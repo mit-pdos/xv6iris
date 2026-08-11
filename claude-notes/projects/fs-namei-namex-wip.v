@@ -1,9 +1,48 @@
 (* ===================================================================== *)
-(*  PARKED WIP -- N4c.  This file is NOT in iris/_CoqProject and is NOT   *)
+(*  PARKED WIP -- N4c2.  This file is NOT in iris/_CoqProject and is NOT  *)
 (*  part of the build.  To resume: copy it to iris/ProofNamex.v and       *)
 (*  compile it standalone against the mirror's .vo tree                   *)
 (*  (bash ~/one.sh ProofNamex.v).  It was LAST GREEN at that command      *)
 (*  (EXIT=0, 0 Error lines) with EXACTLY ONE stub.                        *)
+(*                                                                        *)
+(*  ##  READ THIS FIRST: THE CONTRACT AS FROZEN IS NOT PROVABLE.  ##      *)
+(*                                                                        *)
+(*  Two premises are MISSING from [SpecNamex.wp_namex_sconf_body] (and    *)
+(*  from SpecNamei / SpecNameiparent, which copy them).  Neither is a     *)
+(*  proof difficulty; each is a one-line change, and until they are made  *)
+(*  the walk's two [memmove] call sites cannot be discharged AT ALL.      *)
+(*                                                                        *)
+(*  (A) THE PATH MUST BE OWNED OUTRIGHT.  The contract lends the path at  *)
+(*      a parametric [dqp : dfrac]:                                       *)
+(*        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ{dqp} pfun i)       *)
+(*      but [SpecMemmove.wp_memmove_sconf_body] demands the SOURCE bytes  *)
+(*      at FULL ownership:                                                *)
+(*        ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ src_bytes j)       *)
+(*      and namex's two memmoves (+0x9e and +0x122) pass [a1 = s1], a     *)
+(*      pointer INTO the path.  So [dqp] cannot be instantiated by the    *)
+(*      proof.  FIX, either:                                              *)
+(*        * drop [dqp] from SpecNamex/SpecNamei/SpecNameiparent (write    *)
+(*          [↦ₘ] instead of [↦ₘ{dqp}]) -- sound for every real caller,    *)
+(*          whose path is a MAXPATH kernel array it owns outright; or     *)
+(*        * generalise SpecMemmove's SOURCE to a [{dqm : dfrac}] (the     *)
+(*          DESTINATION must stay full: ProofMemmove refutes the          *)
+(*          descending loop by [mem_bytes_notin] on the two buffers, and  *)
+(*          one full side is enough).  That touches ProofMemmove and the  *)
+(*          nine existing MEMMOVE consumers.                              *)
+(*                                                                        *)
+(*  (B) THE PATH LENGTH MUST FIT IN A C [int].  +0x90 is                  *)
+(*      [addiw s10,a2,0] -- a [sext.w] of [len = s2 - s1] -- and +0x94    *)
+(*      is the SIGNED [bge s8,s10] against 13.  With [plen] unbounded the *)
+(*      truncation is not the identity and the branch does not decide     *)
+(*      [len <= 13]; the short branch then also fails memmove's own       *)
+(*      [Z.of_nat len < 2^32] premise.  ADD                               *)
+(*        (Z.of_nat plen < 2 ^ 31)%Z                                      *)
+(*      to all three contracts.  [SpecFetchstr.v]'s header records the    *)
+(*      identical premise for the identical reason (strlen's [subw]), so  *)
+(*      the precedent and its justification already exist in this tree.   *)
+(*                                                                        *)
+(*  Nothing else was found unprovable: every callee premise, resource and *)
+(*  register fact that the walk has been driven through fitted exactly.   *)
 (*                                                                        *)
 (*  WHAT IS PROVEN (everything except the walk's body):                   *)
 (*    * the twelve-slot prologue +0x00..+0x1a and the frame carve;        *)
@@ -20,15 +59,71 @@
 (*    * the constants block +0x3c..+0x46 in BOTH arms, ending with        *)
 (*      [nx_regs m sp0 pv ipv nb (m !!! a1) _] established;               *)
 (*    * the STATEMENT of [Hloop] (see below), and BOTH arms discharging   *)
-(*      its eight pure obligations and handing over every resource.       *)
+(*      its eight pure obligations and handing over every resource;       *)
+(*                                                                        *)
+(*    * N4c2's ADDITION -- ALL SIX BYTE-SCANNING BLOCKS, as []-persistent *)
+(*      assertions with ABSTRACT CONTINUATIONS, stated and proved BEFORE  *)
+(*      [Hloop] and therefore usable from inside its induction.  Between  *)
+(*      them they cover +0xe4..+0x114 and +0xa4..+0xb2 -- every           *)
+(*      instruction of the inlined [skipelem] except the two memmoves and *)
+(*      the length arithmetic.  In dependency order:                      *)
+(*                                                                        *)
+(*        [Hsk1]   +0xec..+0xf2, fuel-indexed: the LEADING '/' skip.      *)
+(*                 In: [pfun off = SLASH], s1 = pv+off, s3 = 47.          *)
+(*                 Out at +0xf6: [off'], every byte in [off,off') is '/', *)
+(*                 [pfun off' <> SLASH], s1 = pv+off', a5 = the byte.     *)
+(*        [Hsk2]   +0xac..+0xb2, the same loop at the same shape, exiting *)
+(*                 at +0xb6 -- skipelem's TRAILING skip.                  *)
+(*        [Hscn]   +0x106..+0x114, fuel-indexed: the ELEMENT scan.        *)
+(*                 In: s2 = pv+ii, [ii < plen].  Out at +0x8c: [e > ii],  *)
+(*                 no '/' strictly between, [pfun e = SLASH \/ e = plen], *)
+(*                 s2 = pv+e.  BOTH exits (+0x110 taken, +0x114's [c.j])  *)
+(*                 are proved.                                            *)
+(*        [Hmid]   +0xf6..+0x104 with TWO continuations -- INCLUDING THE  *)
+(*                 DEAD BLOCK +0xf8..+0x102, whose two [c.beqz]es are     *)
+(*                 refuted from the byte facts +0xe8/+0xf2 and +0xf6 just *)
+(*                 decided.  Exit A at +0x130 ([a = plen]); exit B at     *)
+(*                 +0x106 (s1 = s2 = pv+a, [pfun a] neither '/' nor NUL). *)
+(*        [Hhead]  +0xe4..+0x104, the WHOLE loop head: the [lbu]/[bne]    *)
+(*                 pair, then [Hsk1] or straight to [Hmid].  Same two     *)
+(*                 exits as [Hmid], with the [off]-relative facts         *)
+(*                 ("every byte in [off,a) is '/'") added.                *)
+(*        [Htrail] +0xa4..+0xb2, the trailing skip's head + [Hsk2], one   *)
+(*                 exit at +0xb6.                                         *)
+(*                                                                        *)
+(*      The four exit facts of [Hhead]/[Hscn] are EXACTLY                 *)
+(*      [ProofNamexParts.nx_skipelem_at]'s four hypotheses, at [a] the    *)
+(*      element start and [e] the scan end.  The remaining bridge to the  *)
+(*      loop invariant, which is stated over [drop off pl], is            *)
+(*        skipelem (drop off pl) = skipelem (drop a pl)                   *)
+(*      i.e. [pe_skip (drop off pl) = drop a pl] from "every byte in      *)
+(*      [off,a) is '/' and [pfun a] is not"; that lemma is NOT yet        *)
+(*      written (induction on [a - off] with [nx_drop_cons],              *)
+(*      [pe_skip_slash], [pe_skip_ne]; then [skipelem]'s definition and   *)
+(*      [pe_skip_idem] give the [skipelem] form).                         *)
+(*                                                                        *)
+(*    * the pure byte-test layer these need, all new in N4c2:             *)
+(*      [nx_nslash_eq/ne], [nx_nnul_eq/ne] ([bne]/[bnez] polarity), and   *)
+(*      N4b trap 8's OWED lemma: [nx_m47_val], [nx_a4_unsigned],          *)
+(*      [nx_m47_arith], [nx_a4_eq], [nx_a4_ne] -- the [addi a4,a5,-47]    *)
+(*      test at +0xfc and +0x10c.                                         *)
 (*                                                                        *)
 (*  WHAT IS OWED: the single [exact (cheat_ _)] that stands for the       *)
-(*  proof of [Hloop] -- the walk at +0xe4 and everything it reaches       *)
-(*  (+0xe4..+0x102, +0x104..+0x114, +0x8c..+0x94, +0x98..+0xa2,           *)
-(*  +0x11c..+0x12e, +0xa4..+0xb2, +0xb6..+0xda, +0xdc..+0xe2, +0x54,      *)
-(*  +0x7a, +0x82, +0x130).  Delete [Axiom cheat_] when it lands.          *)
+(*  proof of [Hloop].  With the six assertions above in hand what is left *)
+(*  inside it is:                                                         *)
+(*    1. drive [Hhead] at [off]; exit A is the +0x130 tail (the [beq      *)
+(*       s6,zero] and, when nameiparent, [iput] then s4 := 0), exit B     *)
+(*       hands the element start [a];                                     *)
+(*    2. drive [Hscn] at [a]; then +0x8c [sub a2,s2,s1] / +0x90 [sext.w]  *)
+(*       / +0x94 [bge s8,s10] -- BLOCKED ON PREMISE (B) ABOVE;            *)
+(*    3. the two memmove branches -- BLOCKED ON PREMISE (A) ABOVE;        *)
+(*    4. drive [Htrail]; then +0xb6..+0xda: ilock, the [lh a5,68(s4)]     *)
+(*       type test, the nameiparent early stop, dirlookup, and the four   *)
+(*       exits (+0x54, +0x7a, +0x82, +0xdc's fall into +0xe4).            *)
+(*  Steps 1 and 4's callee choreography is design layer 6, unchanged.     *)
+(*  Delete [Axiom cheat_] when it lands.                                  *)
 (*                                                                        *)
-(*  The park is recorded in claude-notes/projects/fs-namei.md, N4c.       *)
+(*  The park is recorded in claude-notes/projects/fs-namei.md, N4c2.      *)
 (* ===================================================================== *)
 
 (* ProofNamex.v -- the whole-function proof of namex, fs.c's path walker.
@@ -274,6 +369,95 @@ Proof.
     by (apply bv_eq; vm_compute; reflexivity).
   rewrite H1. apply pa_add_S.
 Qed.
+
+(* ---- the same two tests in [bne]/[bnez] polarity.  [neq_vec] is
+   [negb (eq_vec ...)], so each is one [unfold] away from its sibling. *)
+Lemma nx_nslash_ne (v : mword 8) : v <> SLASH ->
+  neq_vec (zero_extend' 64 v : mword 64) (mword_of_int 47 : mword 64) = true.
+Proof. intro H. unfold neq_vec. rewrite (nx_slash_ne v H). reflexivity. Qed.
+
+Lemma nx_nslash_eq (v : mword 8) : v = SLASH ->
+  neq_vec (zero_extend' 64 v : mword 64) (mword_of_int 47 : mword 64) = false.
+Proof. intro H. unfold neq_vec. rewrite (nx_slash_eq v H). reflexivity. Qed.
+
+Lemma nx_nnul_ne (v : mword 8) : v <> NUL ->
+  neq_vec (zero_extend' 64 v : mword 64) (zero_reg : mword 64) = true.
+Proof. intro H. unfold neq_vec. rewrite (nx_nul_ne v H). reflexivity. Qed.
+
+Lemma nx_nnul_eq (v : mword 8) : v = NUL ->
+  neq_vec (zero_extend' 64 v : mword 64) (zero_reg : mword 64) = false.
+Proof. intro H. unfold neq_vec. rewrite (nx_nul_eq v H). reflexivity. Qed.
+
+(* ---- THE [addi a4,a5,-47] SLASH TEST at +0xfc and +0x10c (N4b trap 8).
+   The immediate decodes as [4049 : mword 12] = -47, and [a4] is zero exactly
+   when the loaded byte is the separator.  The route is [bv_unsigned]
+   arithmetic, like the [nx_slash_*] family, with the wrap done by hand. *)
+Lemma nx_m47_val :
+  (sign_extend' 64 (mword_of_int 4049 : mword 12) : mword 64)
+  = (mword_of_int 18446744073709551569 : mword 64).
+Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+
+Lemma nx_a4_unsigned (v : mword 8) :
+  bv_unsigned (add_vec (zero_extend' 64 v : mword 64)
+                 (sign_extend' 64 (mword_of_int 4049 : mword 12)) : mword 64)
+  = ((bv_unsigned v + 18446744073709551569) mod 18446744073709551616)%Z.
+Proof.
+  rewrite nx_m47_val add_vec64_unsigned nx_zext8_unsigned.
+  assert (Hc : bv_unsigned (mword_of_int 18446744073709551569 : mword 64)
+               = 18446744073709551569%Z) by (vm_compute; reflexivity).
+  rewrite Hc. unfold bv_wrap.
+  assert (Hm : bv_modulus 64 = 18446744073709551616%Z)
+    by (vm_compute; reflexivity).
+  rewrite Hm. reflexivity.
+Qed.
+
+(* the wrap, over PLAIN [Z].  It has to be a separate lemma: with
+   bitvector.tactics' zify hook in scope a goal mentioning [bv_unsigned]
+   makes [lia] give up with "Cannot find witness" (ProofMemmove's
+   [mm_overlap_arith] is the same split for the same reason). *)
+Lemma nx_m47_arith (uv : Z) :
+  (0 <= uv)%Z -> (uv < 256)%Z ->
+  ((uv + 18446744073709551569) mod 18446744073709551616)%Z = 0%Z ->
+  uv = 47%Z.
+Proof.
+  intros H0 H1 Hc.
+  destruct (Z_lt_ge_dec uv 47) as [Hlt | Hge].
+  - rewrite Z.mod_small in Hc; lia.
+  - replace (uv + 18446744073709551569)%Z
+      with ((uv - 47) + 1 * 18446744073709551616)%Z in Hc by lia.
+    rewrite Z_mod_plus_full in Hc. rewrite Z.mod_small in Hc; lia.
+Qed.
+
+Lemma nx_a4_eq (v : mword 8) : v = SLASH ->
+  eq_vec (add_vec (zero_extend' 64 v : mword 64)
+            (sign_extend' 64 (mword_of_int 4049 : mword 12)) : mword 64)
+         (zero_reg : mword 64) = true.
+Proof.
+  intros ->. apply (proj2 (eq_vec_true_iff _ _)).
+  apply bv_eq; vm_compute; reflexivity.
+Qed.
+
+Lemma nx_a4_ne (v : mword 8) : v <> SLASH ->
+  eq_vec (add_vec (zero_extend' 64 v : mword 64)
+            (sign_extend' 64 (mword_of_int 4049 : mword 12)) : mword 64)
+         (zero_reg : mword 64) = false.
+Proof.
+  intro Hne. apply (proj2 (eq_vec_false_iff _ _)). intro Hc.
+  apply (f_equal bv_unsigned) in Hc. rewrite nx_a4_unsigned in Hc.
+  assert (Hz : bv_unsigned (zero_reg : mword 64) = 0%Z)
+    by (vm_compute; reflexivity).
+  rewrite Hz in Hc.
+  pose proof (bv_unsigned_in_range 8 v) as Hr.
+  assert (Hm8 : bv_modulus 8 = 256%Z) by (vm_compute; reflexivity).
+  rewrite Hm8 in Hr. destruct Hr as [Hlo Hhi].
+  apply Hne. apply bv_eq. unfold SLASH.
+  assert (H47 : bv_unsigned (mword_of_int 47 : mword 8) = 47%Z)
+    by (vm_compute; reflexivity).
+  rewrite H47. exact (nx_m47_arith (bv_unsigned v) Hlo Hhi Hc).
+Qed.
+
+(* [a4] in the [c.beqz] polarity is the same fact; both DEAD re-tests at
+   +0x100 / +0x102 and the live +0x110 read it. *)
 
 (* THE STUB AT THE FRONTIER -- removed before the file lands. *)
 Axiom cheat_ : forall (A : Type), A.
@@ -955,6 +1139,942 @@ Section ProofNamexMain.
                 | apply CPo; first [ vm_compute; reflexivity
                                    | vm_compute; discriminate ] ].
       - exact CPa0. }
+    (* ================================================================= *)
+    (*  THE THREE SCANS.  Each is a []-PERSISTENT, fuel-indexed assertion   *)
+    (*  with an ABSTRACT CONTINUATION.  They touch only the path buffer,    *)
+    (*  s1 (or s2), a5 -- and a4 in the element scan -- so stating them     *)
+    (*  here keeps the walk's thirty-slot invariant out of all three loops  *)
+    (*  (the single largest avoidable cost in this file).                   *)
+    (* ================================================================= *)
+    assert (Hnn : forall i : nat, (i < plen)%nat -> pfun i <> NUL)
+      by (intros i Hi; exact (proj1 Hcstr i Hi)).
+    assert (Hterm : pfun plen = NUL) by exact (proj2 Hcstr).
+    assert (HSN : SLASH <> NUL).
+    { intro Hq. apply (f_equal bv_unsigned) in Hq. vm_compute in Hq.
+      discriminate. }
+    (* a separator is never the terminator, so a byte that IS one sits
+       strictly inside the string *)
+    assert (Hslt : forall i : nat, (i <= plen)%nat -> pfun i = SLASH ->
+                     (i < plen)%nat).
+    { intros i Hi Hs. destruct (Nat.eq_dec i plen) as [He | Hne].
+      - exfalso. apply HSN. rewrite -Hs He. exact Hterm.
+      - lia. }
+    assert (Hnult : forall i : nat, (i <= plen)%nat -> pfun i <> NUL ->
+                      (i < plen)%nat).
+    { intros i Hi Hs. destruct (Nat.eq_dec i plen) as [He | Hne].
+      - exfalso. apply Hs. rewrite He. exact Hterm.
+      - lia. }
+    (* ---- (1) the LEADING separator skip, inner loop at +0xec ---------- *)
+    iAssert (∀ fuel : nat, □ wp_next (CID0 := CID) b (proc_addr j)
+               (fun CIDs : CpuId =>
+                 ∀ (off : nat) (Ms : regfile),
+                   ⌜(plen - off <= fuel)%nat⌝ -∗
+                   ⌜(off < plen)%nat⌝ -∗
+                   ⌜pfun off = SLASH⌝ -∗
+                   ⌜Ms !!! Regidx Rs1 = pa_add pv off⌝ -∗
+                   ⌜Ms !!! Regidx Rs3 = (mword_of_int 47 : mword 64)⌝ -∗
+                   sie_cap_gpr Ms (K - 12)%nat b (proc_addr j) -∗
+                   pc_is (mword_of_int (NX + 0xec)) -∗
+                   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ{dqp} pfun i) -∗
+                   wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDe : CpuId =>
+                     ∀ (off' : nat) (Ms' : regfile),
+                       ⌜(off < off')%nat⌝ -∗ ⌜(off' <= plen)%nat⌝ -∗
+                       ⌜forall i : nat, (off <= i)%nat -> (i < off')%nat ->
+                          pfun i = SLASH⌝ -∗
+                       ⌜pfun off' <> SLASH⌝ -∗
+                       ⌜Ms' !!! Regidx Rs1 = pa_add pv off'⌝ -∗
+                       ⌜Ms' !!! Regidx Ra5
+                          = (zero_extend' 64 (pfun off' : mword 8) : mword 64)⌝ -∗
+                       ⌜forall c : mword 5, c <> Rs1 -> c <> Ra5 ->
+                          Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
+                       sie_cap_gpr Ms' (K - 12)%nat b (proc_addr j) -∗
+                       pc_is (mword_of_int (NX + 0xf6)) -∗
+                       ([∗ list] i ∈ seq 0 (S plen),
+                          pa_add pv i ↦ₘ{dqp} pfun i) -∗
+                       WP (Loop : expr riscv_lang)) -∗
+                   WP (Loop : expr riscv_lang)))%I with "[]" as "#Hsk1".
+    { iIntros (fuel). iInduction fuel as [|fuel] "IHs".
+      - iModIntro.
+        iIntros (CIDs Hss off Ms) "%Hf %Holt %Hsl %Hs1 %Hs3 Hcg Hpc Hpath Hqc".
+        assert (Hbad : False) by lia. destruct Hbad.
+      - iModIntro.
+        iIntros (CIDs Hss off Ms) "%Hf %Holt %Hsl %Hs1 %Hs3 Hcg Hpc Hpath Hqc".
+        iPoseProof (nxi_0ec with "Htext") as "Hjec".
+        iPoseProof (nxi_0ee with "Htext") as "Hjee".
+        iPoseProof (nxi_0f2 with "Htext") as "Hjf2".
+        (* +0xec c.addi s1,s1,1 *)
+        iApply (wp_caddi_s_sconf (mword_of_int (NX + 0xec)) Rs1
+                  (mword_of_int 1 : mword 6) Ms (K - 12)%nat b
+                  ltac:(nz) ltac:(rdok) with "Hcg Hpc Hjec").
+        iIntros (CIDk1 Hqk1) "Hcg Hpc".
+        iEval (rgne; rewrite Hs1 (nx_addi1 pv off)) in "Hcg".
+        set (Q1 := <[Regidx Rs1 := regval_into_reg (pa_add pv (S off))]> Ms).
+        assert (HQ1s1 : Q1 !!! Regidx Rs1 = pa_add pv (S off))
+          by (rewrite /Q1; apply upd_eq).
+        assert (HQ1s3 : Q1 !!! Regidx Rs3 = (mword_of_int 47 : mword 64))
+          by (rewrite /Q1 upd_ne; [exact Hs3 | nz]).
+        assert (Hqee : add_vec_int (mword_of_int (NX + 0xec) : mword 64) 2
+                       = mword_of_int (NX + 0xee)) by pcw.
+        iEval (rewrite Hqee) in "Hpc".
+        (* +0xee lbu a5,0(s1) *)
+        iDestruct (nx_buf_acc pv dqp pfun (S plen) (S off) ltac:(lia)
+                     with "Hpath") as "[Hpb Hpback]".
+        iApply (wp_lbu_s_sconf (mword_of_int (NX + 0xee)) Ra5 Rs1
+                  (mword_of_int 0 : mword 12) Q1 (K - 12)%nat
+                  (pfun (S off) : mword 8) b (dqm := dqp)
+                  ltac:(nz) ltac:(rdok) with "Hcg Hpc Hjee [Hpb] [-]").
+        { iEval (rgne; rewrite HQ1s1 addv_sext0). iExact "Hpb". }
+        iIntros (CIDk2 Hqk2) "Hcg Hpc Hpb".
+        iEval (rgne; rewrite HQ1s1 addv_sext0) in "Hpb".
+        iDestruct ("Hpback" with "Hpb") as "Hpath".
+        set (Q2 := <[Regidx Ra5 := regval_into_reg
+                      (zero_extend' 64 (pfun (S off) : mword 8))]> Q1).
+        assert (HQ2a5 : Q2 !!! Regidx Ra5
+                        = (zero_extend' 64 (pfun (S off) : mword 8) : mword 64))
+          by (rewrite /Q2; apply upd_eq).
+        assert (HQ2s1 : Q2 !!! Regidx Rs1 = pa_add pv (S off))
+          by (rewrite /Q2 upd_ne; [exact HQ1s1 | nz]).
+        assert (HQ2s3 : Q2 !!! Regidx Rs3 = (mword_of_int 47 : mword 64))
+          by (rewrite /Q2 upd_ne; [exact HQ1s3 | nz]).
+        assert (HQ2o : forall c : mword 5, c <> Rs1 -> c <> Ra5 ->
+                  Q2 !!! Regidx c = (Ms !!! Regidx c : mword 64)).
+        { intros c N9 N15. rewrite /Q2 upd_ne; [| dlk_xne N15].
+          rewrite /Q1 upd_ne; [reflexivity | dlk_xne N9]. }
+        assert (Hqf2 : add_vec_int (mword_of_int (NX + 0xee) : mword 64) 4
+                       = mword_of_int (NX + 0xf2)) by pcw.
+        iEval (rewrite Hqf2) in "Hpc".
+        assert (Htec : add_vec (mword_of_int (NX + 0xf2) : mword 64)
+                  (sign_extend' 64 (mword_of_int 8186 : mword 13))
+                = mword_of_int (NX + 0xec)) by pcw.
+        destruct (decide (pfun (S off) = SLASH)) as [Hsl2 | Hsl2].
+        + (* another separator: [beq s3,a5] back to +0xec *)
+          iApply (wp_beq_taken_s_sconf (mword_of_int (NX + 0xf2))
+                    (mword_of_int 8186 : mword 13) Rs3 Ra5 Q2 (K - 12)%nat b
+                    ltac:(nz) ltac:(nz)
+                    ltac:(rgne; rgne; rewrite HQ2a5 HQ2s3;
+                          exact (nx_slash_eq _ Hsl2))
+                    ltac:(rewrite Htec; vm_compute; reflexivity)
+                    with "Hcg Hpc Hjf2").
+          iIntros (CIDk3 Hqk3). iNext. iIntros "Hcg Hpc".
+          iEval (rewrite Htec) in "Hpc".
+          iSpecialize ("IHs" $! CIDk3 with "[%]"); [wp_next_chain |].
+          iApply ("IHs" $! (S off) Q2
+                    with "[%] [%] [%] [%] [%] Hcg Hpc Hpath [Hqc]").
+          * lia.
+          * exact (Hslt (S off) ltac:(lia) Hsl2).
+          * exact Hsl2.
+          * exact HQ2s1.
+          * exact HQ2s3.
+          * iIntros (CIDe Hqe off' Ms')
+              "%A1 %A2 %A3 %A4 %A5 %A6 %A7 Hcg Hpc Hpath".
+            iSpecialize ("Hqc" $! CIDe with "[%]"); [wp_next_chain |].
+            iApply ("Hqc" $! off' Ms'
+                      with "[%] [%] [%] [%] [%] [%] [%] Hcg Hpc Hpath").
+            -- lia.
+            -- lia.
+            -- intros i Hi1 Hi2. destruct (Nat.eq_dec i off) as [He | Hne].
+               ++ rewrite He. exact Hsl.
+               ++ apply A3; lia.
+            -- exact A4.
+            -- exact A5.
+            -- exact A6.
+            -- intros c N9 N15. rewrite (A7 c N9 N15). exact (HQ2o c N9 N15).
+        + (* the first non-separator: [beq] falls through to +0xf6 *)
+          iApply (wp_beq_fall_s_sconf (mword_of_int (NX + 0xf2))
+                    (mword_of_int 8186 : mword 13) Rs3 Ra5 Q2 (K - 12)%nat b
+                    ltac:(nz) ltac:(nz)
+                    ltac:(rgne; rgne; rewrite HQ2a5 HQ2s3;
+                          exact (nx_slash_ne _ Hsl2))
+                    with "Hcg Hpc Hjf2").
+          iIntros (CIDk3 Hqk3) "Hcg Hpc".
+          assert (Hqf6 : add_vec_int (mword_of_int (NX + 0xf2) : mword 64) 4
+                         = mword_of_int (NX + 0xf6)) by pcw.
+          iEval (rewrite Hqf6) in "Hpc".
+          iSpecialize ("Hqc" $! CIDk3 with "[%]"); [wp_next_chain |].
+          iApply ("Hqc" $! (S off) Q2
+                    with "[%] [%] [%] [%] [%] [%] [%] Hcg Hpc Hpath").
+          * lia.
+          * lia.
+          * intros i Hi1 Hi2. assert (He : i = off) by lia.
+            rewrite He. exact Hsl.
+          * exact Hsl2.
+          * exact HQ2s1.
+          * exact HQ2a5.
+          * exact HQ2o. }
+    (* ---- (2) the TRAILING separator skip, inner loop at +0xac ---------
+       byte-identical to (1) at three different addresses; the exit is at
+       +0xb6, where [ilock]'s argument setup begins. *)
+    iAssert (∀ fuel : nat, □ wp_next (CID0 := CID) b (proc_addr j)
+               (fun CIDs : CpuId =>
+                 ∀ (off : nat) (Ms : regfile),
+                   ⌜(plen - off <= fuel)%nat⌝ -∗
+                   ⌜(off < plen)%nat⌝ -∗
+                   ⌜pfun off = SLASH⌝ -∗
+                   ⌜Ms !!! Regidx Rs1 = pa_add pv off⌝ -∗
+                   ⌜Ms !!! Regidx Rs3 = (mword_of_int 47 : mword 64)⌝ -∗
+                   sie_cap_gpr Ms (K - 12)%nat b (proc_addr j) -∗
+                   pc_is (mword_of_int (NX + 0xac)) -∗
+                   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ{dqp} pfun i) -∗
+                   wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDe : CpuId =>
+                     ∀ (off' : nat) (Ms' : regfile),
+                       ⌜(off < off')%nat⌝ -∗ ⌜(off' <= plen)%nat⌝ -∗
+                       ⌜forall i : nat, (off <= i)%nat -> (i < off')%nat ->
+                          pfun i = SLASH⌝ -∗
+                       ⌜pfun off' <> SLASH⌝ -∗
+                       ⌜Ms' !!! Regidx Rs1 = pa_add pv off'⌝ -∗
+                       ⌜Ms' !!! Regidx Ra5
+                          = (zero_extend' 64 (pfun off' : mword 8) : mword 64)⌝ -∗
+                       ⌜forall c : mword 5, c <> Rs1 -> c <> Ra5 ->
+                          Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
+                       sie_cap_gpr Ms' (K - 12)%nat b (proc_addr j) -∗
+                       pc_is (mword_of_int (NX + 0xb6)) -∗
+                       ([∗ list] i ∈ seq 0 (S plen),
+                          pa_add pv i ↦ₘ{dqp} pfun i) -∗
+                       WP (Loop : expr riscv_lang)) -∗
+                   WP (Loop : expr riscv_lang)))%I with "[]" as "#Hsk2".
+    { iIntros (fuel). iInduction fuel as [|fuel] "IHt".
+      - iModIntro.
+        iIntros (CIDs Hss off Ms) "%Hf %Holt %Hsl %Hs1 %Hs3 Hcg Hpc Hpath Hqc".
+        assert (Hbad : False) by lia. destruct Hbad.
+      - iModIntro.
+        iIntros (CIDs Hss off Ms) "%Hf %Holt %Hsl %Hs1 %Hs3 Hcg Hpc Hpath Hqc".
+        iPoseProof (nxi_0ac with "Htext") as "Hjac".
+        iPoseProof (nxi_0ae with "Htext") as "Hjae".
+        iPoseProof (nxi_0b2 with "Htext") as "Hjb2".
+        (* +0xac c.addi s1,s1,1 *)
+        iApply (wp_caddi_s_sconf (mword_of_int (NX + 0xac)) Rs1
+                  (mword_of_int 1 : mword 6) Ms (K - 12)%nat b
+                  ltac:(nz) ltac:(rdok) with "Hcg Hpc Hjac").
+        iIntros (CIDt1 Hqt1) "Hcg Hpc".
+        iEval (rgne; rewrite Hs1 (nx_addi1 pv off)) in "Hcg".
+        set (T1 := <[Regidx Rs1 := regval_into_reg (pa_add pv (S off))]> Ms).
+        assert (HT1s1 : T1 !!! Regidx Rs1 = pa_add pv (S off))
+          by (rewrite /T1; apply upd_eq).
+        assert (HT1s3 : T1 !!! Regidx Rs3 = (mword_of_int 47 : mword 64))
+          by (rewrite /T1 upd_ne; [exact Hs3 | nz]).
+        assert (Hqae : add_vec_int (mword_of_int (NX + 0xac) : mword 64) 2
+                       = mword_of_int (NX + 0xae)) by pcw.
+        iEval (rewrite Hqae) in "Hpc".
+        (* +0xae lbu a5,0(s1) *)
+        iDestruct (nx_buf_acc pv dqp pfun (S plen) (S off) ltac:(lia)
+                     with "Hpath") as "[Hpb Hpback]".
+        iApply (wp_lbu_s_sconf (mword_of_int (NX + 0xae)) Ra5 Rs1
+                  (mword_of_int 0 : mword 12) T1 (K - 12)%nat
+                  (pfun (S off) : mword 8) b (dqm := dqp)
+                  ltac:(nz) ltac:(rdok) with "Hcg Hpc Hjae [Hpb] [-]").
+        { iEval (rgne; rewrite HT1s1 addv_sext0). iExact "Hpb". }
+        iIntros (CIDt2 Hqt2) "Hcg Hpc Hpb".
+        iEval (rgne; rewrite HT1s1 addv_sext0) in "Hpb".
+        iDestruct ("Hpback" with "Hpb") as "Hpath".
+        set (T2 := <[Regidx Ra5 := regval_into_reg
+                      (zero_extend' 64 (pfun (S off) : mword 8))]> T1).
+        assert (HT2a5 : T2 !!! Regidx Ra5
+                        = (zero_extend' 64 (pfun (S off) : mword 8) : mword 64))
+          by (rewrite /T2; apply upd_eq).
+        assert (HT2s1 : T2 !!! Regidx Rs1 = pa_add pv (S off))
+          by (rewrite /T2 upd_ne; [exact HT1s1 | nz]).
+        assert (HT2s3 : T2 !!! Regidx Rs3 = (mword_of_int 47 : mword 64))
+          by (rewrite /T2 upd_ne; [exact HT1s3 | nz]).
+        assert (HT2o : forall c : mword 5, c <> Rs1 -> c <> Ra5 ->
+                  T2 !!! Regidx c = (Ms !!! Regidx c : mword 64)).
+        { intros c N9 N15. rewrite /T2 upd_ne; [| dlk_xne N15].
+          rewrite /T1 upd_ne; [reflexivity | dlk_xne N9]. }
+        assert (Hqb2 : add_vec_int (mword_of_int (NX + 0xae) : mword 64) 4
+                       = mword_of_int (NX + 0xb2)) by pcw.
+        iEval (rewrite Hqb2) in "Hpc".
+        assert (Htac : add_vec (mword_of_int (NX + 0xb2) : mword 64)
+                  (sign_extend' 64 (mword_of_int 8186 : mword 13))
+                = mword_of_int (NX + 0xac)) by pcw.
+        destruct (decide (pfun (S off) = SLASH)) as [Hsl2 | Hsl2].
+        + iApply (wp_beq_taken_s_sconf (mword_of_int (NX + 0xb2))
+                    (mword_of_int 8186 : mword 13) Rs3 Ra5 T2 (K - 12)%nat b
+                    ltac:(nz) ltac:(nz)
+                    ltac:(rgne; rgne; rewrite HT2a5 HT2s3;
+                          exact (nx_slash_eq _ Hsl2))
+                    ltac:(rewrite Htac; vm_compute; reflexivity)
+                    with "Hcg Hpc Hjb2").
+          iIntros (CIDt3 Hqt3). iNext. iIntros "Hcg Hpc".
+          iEval (rewrite Htac) in "Hpc".
+          iSpecialize ("IHt" $! CIDt3 with "[%]"); [wp_next_chain |].
+          iApply ("IHt" $! (S off) T2
+                    with "[%] [%] [%] [%] [%] Hcg Hpc Hpath [Hqc]").
+          * lia.
+          * exact (Hslt (S off) ltac:(lia) Hsl2).
+          * exact Hsl2.
+          * exact HT2s1.
+          * exact HT2s3.
+          * iIntros (CIDe Hqe off' Ms')
+              "%A1 %A2 %A3 %A4 %A5 %A6 %A7 Hcg Hpc Hpath".
+            iSpecialize ("Hqc" $! CIDe with "[%]"); [wp_next_chain |].
+            iApply ("Hqc" $! off' Ms'
+                      with "[%] [%] [%] [%] [%] [%] [%] Hcg Hpc Hpath").
+            -- lia.
+            -- lia.
+            -- intros i Hi1 Hi2. destruct (Nat.eq_dec i off) as [He | Hne].
+               ++ rewrite He. exact Hsl.
+               ++ apply A3; lia.
+            -- exact A4.
+            -- exact A5.
+            -- exact A6.
+            -- intros c N9 N15. rewrite (A7 c N9 N15). exact (HT2o c N9 N15).
+        + iApply (wp_beq_fall_s_sconf (mword_of_int (NX + 0xb2))
+                    (mword_of_int 8186 : mword 13) Rs3 Ra5 T2 (K - 12)%nat b
+                    ltac:(nz) ltac:(nz)
+                    ltac:(rgne; rgne; rewrite HT2a5 HT2s3;
+                          exact (nx_slash_ne _ Hsl2))
+                    with "Hcg Hpc Hjb2").
+          iIntros (CIDt3 Hqt3) "Hcg Hpc".
+          assert (Hqb6 : add_vec_int (mword_of_int (NX + 0xb2) : mword 64) 4
+                         = mword_of_int (NX + 0xb6)) by pcw.
+          iEval (rewrite Hqb6) in "Hpc".
+          iSpecialize ("Hqc" $! CIDt3 with "[%]"); [wp_next_chain |].
+          iApply ("Hqc" $! (S off) T2
+                    with "[%] [%] [%] [%] [%] [%] [%] Hcg Hpc Hpath").
+          * lia.
+          * lia.
+          * intros i Hi1 Hi2. assert (He : i = off) by lia.
+            rewrite He. exact Hsl.
+          * exact Hsl2.
+          * exact HT2s1.
+          * exact HT2a5.
+          * exact HT2o. }
+    (* ---- (3) the ELEMENT scan, inner loop at +0x106 -------------------
+       [s2] runs forward until the byte it points at is a separator or the
+       terminator; the [addi a4,a5,-47] at +0x10c is the separator test and
+       the [c.bnez a5] at +0x112 the terminator test.  BOTH exits leave at
+       +0x8c, where the length is computed. *)
+    iAssert (∀ fuel : nat, □ wp_next (CID0 := CID) b (proc_addr j)
+               (fun CIDs : CpuId =>
+                 ∀ (ii : nat) (Ms : regfile),
+                   ⌜(plen - ii <= fuel)%nat⌝ -∗
+                   ⌜(ii < plen)%nat⌝ -∗
+                   ⌜Ms !!! Regidx Rs2 = pa_add pv ii⌝ -∗
+                   sie_cap_gpr Ms (K - 12)%nat b (proc_addr j) -∗
+                   pc_is (mword_of_int (NX + 0x106)) -∗
+                   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ{dqp} pfun i) -∗
+                   wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDe : CpuId =>
+                     ∀ (e : nat) (Ms' : regfile),
+                       ⌜(ii < e)%nat⌝ -∗ ⌜(e <= plen)%nat⌝ -∗
+                       ⌜forall jj : nat, (ii < jj)%nat -> (jj < e)%nat ->
+                          pfun jj <> SLASH⌝ -∗
+                       ⌜pfun e = SLASH \/ e = plen⌝ -∗
+                       ⌜Ms' !!! Regidx Rs2 = pa_add pv e⌝ -∗
+                       ⌜forall c : mword 5, c <> Rs2 -> c <> Ra5 -> c <> Ra4 ->
+                          Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
+                       sie_cap_gpr Ms' (K - 12)%nat b (proc_addr j) -∗
+                       pc_is (mword_of_int (NX + 0x8c)) -∗
+                       ([∗ list] i ∈ seq 0 (S plen),
+                          pa_add pv i ↦ₘ{dqp} pfun i) -∗
+                       WP (Loop : expr riscv_lang)) -∗
+                   WP (Loop : expr riscv_lang)))%I with "[]" as "#Hscn".
+    { iIntros (fuel). iInduction fuel as [|fuel] "IHe".
+      - iModIntro.
+        iIntros (CIDs Hss ii Ms) "%Hf %Hilt %Hs2 Hcg Hpc Hpath Hqc".
+        assert (Hbad : False) by lia. destruct Hbad.
+      - iModIntro.
+        iIntros (CIDs Hss ii Ms) "%Hf %Hilt %Hs2 Hcg Hpc Hpath Hqc".
+        iPoseProof (nxi_106 with "Htext") as "Hj106".
+        iPoseProof (nxi_108 with "Htext") as "Hj108".
+        iPoseProof (nxi_10c with "Htext") as "Hj10c".
+        iPoseProof (nxi_110 with "Htext") as "Hj110".
+        iPoseProof (nxi_112 with "Htext") as "Hj112".
+        iPoseProof (nxi_114 with "Htext") as "Hj114".
+        (* +0x106 c.addi s2,s2,1 *)
+        iApply (wp_caddi_s_sconf (mword_of_int (NX + 0x106)) Rs2
+                  (mword_of_int 1 : mword 6) Ms (K - 12)%nat b
+                  ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj106").
+        iIntros (CIDe1 Hqe1) "Hcg Hpc".
+        iEval (rgne; rewrite Hs2 (nx_addi1 pv ii)) in "Hcg".
+        set (E1 := <[Regidx Rs2 := regval_into_reg (pa_add pv (S ii))]> Ms).
+        assert (HE1s2 : E1 !!! Regidx Rs2 = pa_add pv (S ii))
+          by (rewrite /E1; apply upd_eq).
+        assert (Hq108 : add_vec_int (mword_of_int (NX + 0x106) : mword 64) 2
+                        = mword_of_int (NX + 0x108)) by pcw.
+        iEval (rewrite Hq108) in "Hpc".
+        (* +0x108 lbu a5,0(s2) *)
+        iDestruct (nx_buf_acc pv dqp pfun (S plen) (S ii) ltac:(lia)
+                     with "Hpath") as "[Hpb Hpback]".
+        iApply (wp_lbu_s_sconf (mword_of_int (NX + 0x108)) Ra5 Rs2
+                  (mword_of_int 0 : mword 12) E1 (K - 12)%nat
+                  (pfun (S ii) : mword 8) b (dqm := dqp)
+                  ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj108 [Hpb] [-]").
+        { iEval (rgne; rewrite HE1s2 addv_sext0). iExact "Hpb". }
+        iIntros (CIDe2 Hqe2) "Hcg Hpc Hpb".
+        iEval (rgne; rewrite HE1s2 addv_sext0) in "Hpb".
+        iDestruct ("Hpback" with "Hpb") as "Hpath".
+        set (E2 := <[Regidx Ra5 := regval_into_reg
+                      (zero_extend' 64 (pfun (S ii) : mword 8))]> E1).
+        assert (HE2a5 : E2 !!! Regidx Ra5
+                        = (zero_extend' 64 (pfun (S ii) : mword 8) : mword 64))
+          by (rewrite /E2; apply upd_eq).
+        assert (HE2s2 : E2 !!! Regidx Rs2 = pa_add pv (S ii))
+          by (rewrite /E2 upd_ne; [exact HE1s2 | nz]).
+        assert (Hq10c : add_vec_int (mword_of_int (NX + 0x108) : mword 64) 4
+                        = mword_of_int (NX + 0x10c)) by pcw.
+        iEval (rewrite Hq10c) in "Hpc".
+        (* +0x10c addi a4,a5,-47 *)
+        iApply (wp_addi4_s_sconf (mword_of_int (NX + 0x10c)) Ra4 Ra5
+                  (mword_of_int 4049 : mword 12) E2 (K - 12)%nat b
+                  ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj10c").
+        iIntros (CIDe3 Hqe3) "Hcg Hpc".
+        iEval (rgne; rewrite HE2a5) in "Hcg".
+        set (E3 := <[Regidx Ra4 := regval_into_reg
+                      (add_vec (zero_extend' 64 (pfun (S ii) : mword 8) : mword 64)
+                         (sign_extend' 64 (mword_of_int 4049 : mword 12)))]> E2).
+        assert (HE3a4 : E3 !!! Regidx Ra4
+                        = add_vec (zero_extend' 64 (pfun (S ii) : mword 8)
+                                     : mword 64)
+                            (sign_extend' 64 (mword_of_int 4049 : mword 12)))
+          by (rewrite /E3; apply upd_eq).
+        assert (HE3a5 : E3 !!! Regidx Ra5
+                        = (zero_extend' 64 (pfun (S ii) : mword 8) : mword 64))
+          by (rewrite /E3 upd_ne; [exact HE2a5 | nz]).
+        assert (HE3s2 : E3 !!! Regidx Rs2 = pa_add pv (S ii))
+          by (rewrite /E3 upd_ne; [exact HE2s2 | nz]).
+        assert (HE3o : forall c : mword 5, c <> Rs2 -> c <> Ra5 -> c <> Ra4 ->
+                  E3 !!! Regidx c = (Ms !!! Regidx c : mword 64)).
+        { intros c N18 N15 N14. rewrite /E3 upd_ne; [| dlk_xne N14].
+          rewrite /E2 upd_ne; [| dlk_xne N15].
+          rewrite /E1 upd_ne; [reflexivity | dlk_xne N18]. }
+        assert (Hq110 : add_vec_int (mword_of_int (NX + 0x10c) : mword 64) 4
+                        = mword_of_int (NX + 0x110)) by pcw.
+        iEval (rewrite Hq110) in "Hpc".
+        assert (Ht8c : add_vec (mword_of_int (NX + 0x110) : mword 64)
+                  (sign_extend' 64 (sign_extend' 13
+                     (concat_vec (mword_of_int 190 : mword 8) ('b"0"))))
+                = mword_of_int (NX + 0x8c)) by pcw.
+        destruct (decide (pfun (S ii) = SLASH)) as [Hsl2 | Hsl2].
+        + (* a separator: [c.beqz a4] leaves for +0x8c *)
+          iApply (wp_cbeqz_taken_s_sconf (mword_of_int (NX + 0x110))
+                    (mword_of_int 190 : mword 8) (Cregidx (mword_of_int 6)) Ra4
+                    E3 (K - 12)%nat b ltac:(vm_compute; reflexivity) ltac:(nz)
+                    ltac:(rgne; rewrite HE3a4; exact (nx_a4_eq _ Hsl2))
+                    ltac:(rewrite Ht8c; vm_compute; reflexivity)
+                    with "Hcg Hpc Hj110").
+          iIntros (CIDe4 Hqe4). iNext. iIntros "Hcg Hpc".
+          iEval (rewrite Ht8c) in "Hpc".
+          iSpecialize ("Hqc" $! CIDe4 with "[%]"); [wp_next_chain |].
+          iApply ("Hqc" $! (S ii) E3
+                    with "[%] [%] [%] [%] [%] [%] Hcg Hpc Hpath").
+          * lia.
+          * lia.
+          * intros jj Hj1 Hj2. exfalso. lia.
+          * left. exact Hsl2.
+          * exact HE3s2.
+          * exact HE3o.
+        + (* not a separator: [c.beqz a4] falls through to +0x112 *)
+          iApply (wp_cbeqz_fall_s_sconf (mword_of_int (NX + 0x110))
+                    (mword_of_int 190 : mword 8) (Cregidx (mword_of_int 6)) Ra4
+                    E3 (K - 12)%nat b ltac:(vm_compute; reflexivity) ltac:(nz)
+                    ltac:(rgne; rewrite HE3a4; exact (nx_a4_ne _ Hsl2))
+                    with "Hcg Hpc Hj110").
+          iIntros (CIDe4 Hqe4) "Hcg Hpc".
+          assert (Hq112 : add_vec_int (mword_of_int (NX + 0x110) : mword 64) 2
+                          = mword_of_int (NX + 0x112)) by pcw.
+          iEval (rewrite Hq112) in "Hpc".
+          assert (Ht106 : add_vec (mword_of_int (NX + 0x112) : mword 64)
+                    (sign_extend' 64 (sign_extend' 13
+                       (concat_vec (mword_of_int 250 : mword 8) ('b"0"))))
+                  = mword_of_int (NX + 0x106)) by pcw.
+          destruct (decide (pfun (S ii) = NUL)) as [Hnl2 | Hnl2].
+          * (* the terminator: [c.bnez a5] falls through, +0x114 jumps *)
+            iApply (wp_cbnez_fall_s_sconf (mword_of_int (NX + 0x112))
+                      (mword_of_int 250 : mword 8) (Cregidx (mword_of_int 7)) Ra5
+                      E3 (K - 12)%nat b ltac:(vm_compute; reflexivity) ltac:(nz)
+                      ltac:(rgne; rewrite HE3a5; exact (nx_nnul_eq _ Hnl2))
+                      with "Hcg Hpc Hj112").
+            iIntros (CIDe5 Hqe5) "Hcg Hpc".
+            assert (Hq114 : add_vec_int (mword_of_int (NX + 0x112) : mword 64) 2
+                            = mword_of_int (NX + 0x114)) by pcw.
+            iEval (rewrite Hq114) in "Hpc".
+            assert (Ht8c2 : add_vec (mword_of_int (NX + 0x114) : mword 64)
+                      (sign_extend' 64 (sign_extend' 21
+                         (concat_vec (mword_of_int 1980 : mword 11) ('b"0"))))
+                    = mword_of_int (NX + 0x8c)) by pcw.
+            iApply (wp_cj_s_sconf (mword_of_int (NX + 0x114))
+                      (sign_extend' 21
+                         (concat_vec (mword_of_int 1980 : mword 11) ('b"0")))
+                      E3 (K - 12)%nat b
+                      ltac:(rewrite Ht8c2; vm_compute; reflexivity)
+                      with "Hcg Hpc Hj114").
+            iIntros (CIDe6 Hqe6). iNext. iIntros "Hcg Hpc".
+            iEval (rewrite Ht8c2) in "Hpc".
+            (* the terminator pins the index: [bb_cstr] has no earlier NUL *)
+            assert (Hep : (S ii = plen)%nat).
+            { destruct (Nat.eq_dec (S ii) plen) as [He | Hne]; [exact He |].
+              exfalso. exact (Hnn (S ii) ltac:(lia) Hnl2). }
+            iSpecialize ("Hqc" $! CIDe6 with "[%]"); [wp_next_chain |].
+            iApply ("Hqc" $! (S ii) E3
+                      with "[%] [%] [%] [%] [%] [%] Hcg Hpc Hpath").
+            -- lia.
+            -- lia.
+            -- intros jj Hj1 Hj2. exfalso. lia.
+            -- right. exact Hep.
+            -- exact HE3s2.
+            -- exact HE3o.
+          * (* an ordinary byte: [c.bnez a5] loops back to +0x106 *)
+            iApply (wp_cbnez_taken_s_sconf (mword_of_int (NX + 0x112))
+                      (mword_of_int 250 : mword 8) (Cregidx (mword_of_int 7)) Ra5
+                      E3 (K - 12)%nat b ltac:(vm_compute; reflexivity) ltac:(nz)
+                      ltac:(rgne; rewrite HE3a5; exact (nx_nnul_ne _ Hnl2))
+                      ltac:(rewrite Ht106; vm_compute; reflexivity)
+                      with "Hcg Hpc Hj112").
+            iIntros (CIDe5 Hqe5). iNext. iIntros "Hcg Hpc".
+            iEval (rewrite Ht106) in "Hpc".
+            iSpecialize ("IHe" $! CIDe5 with "[%]"); [wp_next_chain |].
+            iApply ("IHe" $! (S ii) E3 with "[%] [%] [%] Hcg Hpc Hpath [Hqc]").
+            -- lia.
+            -- exact (Hnult (S ii) ltac:(lia) Hnl2).
+            -- exact HE3s2.
+            -- iIntros (CIDe7 Hqe7 e Ms')
+                 "%B1 %B2 %B3 %B4 %B5 %B6 Hcg Hpc Hpath".
+               iSpecialize ("Hqc" $! CIDe7 with "[%]"); [wp_next_chain |].
+               iApply ("Hqc" $! e Ms'
+                         with "[%] [%] [%] [%] [%] [%] Hcg Hpc Hpath").
+               ++ lia.
+               ++ lia.
+               ++ intros jj Hj1 Hj2.
+                  destruct (Nat.eq_dec jj (S ii)) as [He | Hne].
+                  ** rewrite He. exact Hsl2.
+                  ** apply B3; lia.
+               ++ exact B4.
+               ++ exact B5.
+               ++ intros c N18 N15 N14. rewrite (B6 c N18 N15 N14).
+                  exact (HE3o c N18 N15 N14). }
+    (* ---- (4) +0xf6 .. +0x104: the terminator test AND THE DEAD BLOCK ---
+       Two exits, so TWO abstract continuations.  +0xf8..+0x102 re-loads the
+       byte and re-tests it against '/' and 0 -- both were just decided, so
+       both [c.beqz]es fall through and +0x116 is unreachable. *)
+    iAssert (□ wp_next (CID0 := CID) b (proc_addr j) (fun CIDs : CpuId =>
+               ∀ (a : nat) (Ms : regfile),
+                 ⌜(a <= plen)%nat⌝ -∗
+                 ⌜pfun a <> SLASH⌝ -∗
+                 ⌜Ms !!! Regidx Rs1 = pa_add pv a⌝ -∗
+                 ⌜Ms !!! Regidx Ra5
+                    = (zero_extend' 64 (pfun a : mword 8) : mword 64)⌝ -∗
+                 sie_cap_gpr Ms (K - 12)%nat b (proc_addr j) -∗
+                 pc_is (mword_of_int (NX + 0xf6)) -∗
+                 ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ{dqp} pfun i) -∗
+                 (* EXIT A -- the string is exhausted, at +0x130 *)
+                 wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDa : CpuId =>
+                   ⌜(a = plen)%nat⌝ -∗
+                   sie_cap_gpr Ms (K - 12)%nat b (proc_addr j) -∗
+                   pc_is (mword_of_int (NX + 0x130)) -∗
+                   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ{dqp} pfun i) -∗
+                   WP (Loop : expr riscv_lang)) -∗
+                 (* EXIT B -- an element starts at [a], at +0x106 *)
+                 wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDb : CpuId =>
+                   ∀ Ms' : regfile,
+                     ⌜(a < plen)%nat⌝ -∗
+                     ⌜pfun a <> NUL⌝ -∗
+                     ⌜Ms' !!! Regidx Rs1 = pa_add pv a⌝ -∗
+                     ⌜Ms' !!! Regidx Rs2 = pa_add pv a⌝ -∗
+                     ⌜forall c : mword 5, c <> Ra5 -> c <> Ra4 -> c <> Rs2 ->
+                        Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
+                     sie_cap_gpr Ms' (K - 12)%nat b (proc_addr j) -∗
+                     pc_is (mword_of_int (NX + 0x106)) -∗
+                     ([∗ list] i ∈ seq 0 (S plen),
+                        pa_add pv i ↦ₘ{dqp} pfun i) -∗
+                     WP (Loop : expr riscv_lang)) -∗
+                 WP (Loop : expr riscv_lang)))%I with "[]" as "#Hmid".
+    { iModIntro.
+      iIntros (CIDs Hss a Ms) "%Halt %Hns %Hs1 %Ha5 Hcg Hpc Hpath HqA HqB".
+      iPoseProof (nxi_0f6 with "Htext") as "Hjf6".
+      iPoseProof (nxi_0f8 with "Htext") as "Hjf8".
+      iPoseProof (nxi_0fc with "Htext") as "Hjfc".
+      iPoseProof (nxi_100 with "Htext") as "Hj100".
+      iPoseProof (nxi_102 with "Htext") as "Hj102".
+      iPoseProof (nxi_104 with "Htext") as "Hj104".
+      assert (Ht130 : add_vec (mword_of_int (NX + 0xf6) : mword 64)
+                (sign_extend' 64 (sign_extend' 13
+                   (concat_vec (mword_of_int 29 : mword 8) ('b"0"))))
+              = mword_of_int (NX + 0x130)) by pcw.
+      destruct (decide (pfun a = NUL)) as [Hnl | Hnl].
+      - (* the terminator: [c.beqz a5] leaves the walk for +0x130 *)
+        iClear "HqB".
+        iApply (wp_cbeqz_taken_s_sconf (mword_of_int (NX + 0xf6))
+                  (mword_of_int 29 : mword 8) (Cregidx (mword_of_int 7)) Ra5
+                  Ms (K - 12)%nat b ltac:(vm_compute; reflexivity) ltac:(nz)
+                  ltac:(rgne; rewrite Ha5; exact (nx_nul_eq _ Hnl))
+                  ltac:(rewrite Ht130; vm_compute; reflexivity)
+                  with "Hcg Hpc Hjf6").
+        iIntros (CIDm1 Hqm1). iNext. iIntros "Hcg Hpc".
+        iEval (rewrite Ht130) in "Hpc".
+        assert (Hap : (a = plen)%nat).
+        { destruct (Nat.eq_dec a plen) as [He | Hne]; [exact He |].
+          exfalso. exact (Hnn a ltac:(lia) Hnl). }
+        iSpecialize ("HqA" $! CIDm1 with "[%]"); [wp_next_chain |].
+        iApply ("HqA" with "[%] Hcg Hpc Hpath"). exact Hap.
+      - (* an element begins here: fall into the DEAD block *)
+        iClear "HqA".
+        iApply (wp_cbeqz_fall_s_sconf (mword_of_int (NX + 0xf6))
+                  (mword_of_int 29 : mword 8) (Cregidx (mword_of_int 7)) Ra5
+                  Ms (K - 12)%nat b ltac:(vm_compute; reflexivity) ltac:(nz)
+                  ltac:(rgne; rewrite Ha5; exact (nx_nul_ne _ Hnl))
+                  with "Hcg Hpc Hjf6").
+        iIntros (CIDm1 Hqm1) "Hcg Hpc".
+        assert (Hqf8 : add_vec_int (mword_of_int (NX + 0xf6) : mword 64) 2
+                       = mword_of_int (NX + 0xf8)) by pcw.
+        iEval (rewrite Hqf8) in "Hpc".
+        (* +0xf8 lbu a5,0(s1) -- the SAME byte, read again *)
+        iDestruct (nx_buf_acc pv dqp pfun (S plen) a ltac:(lia)
+                     with "Hpath") as "[Hpb Hpback]".
+        iApply (wp_lbu_s_sconf (mword_of_int (NX + 0xf8)) Ra5 Rs1
+                  (mword_of_int 0 : mword 12) Ms (K - 12)%nat
+                  (pfun a : mword 8) b (dqm := dqp)
+                  ltac:(nz) ltac:(rdok) with "Hcg Hpc Hjf8 [Hpb] [-]").
+        { iEval (rgne; rewrite Hs1 addv_sext0). iExact "Hpb". }
+        iIntros (CIDm2 Hqm2) "Hcg Hpc Hpb".
+        iEval (rgne; rewrite Hs1 addv_sext0) in "Hpb".
+        iDestruct ("Hpback" with "Hpb") as "Hpath".
+        set (D1 := <[Regidx Ra5 := regval_into_reg
+                      (zero_extend' 64 (pfun a : mword 8))]> Ms).
+        assert (HD1a5 : D1 !!! Regidx Ra5
+                        = (zero_extend' 64 (pfun a : mword 8) : mword 64))
+          by (rewrite /D1; apply upd_eq).
+        assert (HD1s1 : D1 !!! Regidx Rs1 = pa_add pv a)
+          by (rewrite /D1 upd_ne; [exact Hs1 | nz]).
+        assert (Hqfc : add_vec_int (mword_of_int (NX + 0xf8) : mword 64) 4
+                       = mword_of_int (NX + 0xfc)) by pcw.
+        iEval (rewrite Hqfc) in "Hpc".
+        (* +0xfc addi a4,a5,-47 *)
+        iApply (wp_addi4_s_sconf (mword_of_int (NX + 0xfc)) Ra4 Ra5
+                  (mword_of_int 4049 : mword 12) D1 (K - 12)%nat b
+                  ltac:(nz) ltac:(rdok) with "Hcg Hpc Hjfc").
+        iIntros (CIDm3 Hqm3) "Hcg Hpc".
+        iEval (rgne; rewrite HD1a5) in "Hcg".
+        set (D2 := <[Regidx Ra4 := regval_into_reg
+                      (add_vec (zero_extend' 64 (pfun a : mword 8) : mword 64)
+                         (sign_extend' 64 (mword_of_int 4049 : mword 12)))]> D1).
+        assert (HD2a4 : D2 !!! Regidx Ra4
+                        = add_vec (zero_extend' 64 (pfun a : mword 8) : mword 64)
+                            (sign_extend' 64 (mword_of_int 4049 : mword 12)))
+          by (rewrite /D2; apply upd_eq).
+        assert (HD2a5 : D2 !!! Regidx Ra5
+                        = (zero_extend' 64 (pfun a : mword 8) : mword 64))
+          by (rewrite /D2 upd_ne; [exact HD1a5 | nz]).
+        assert (HD2s1 : D2 !!! Regidx Rs1 = pa_add pv a)
+          by (rewrite /D2 upd_ne; [exact HD1s1 | nz]).
+        assert (Hq100 : add_vec_int (mword_of_int (NX + 0xfc) : mword 64) 4
+                        = mword_of_int (NX + 0x100)) by pcw.
+        iEval (rewrite Hq100) in "Hpc".
+        (* +0x100 c.beqz a4 -- DEAD: the byte is not '/' *)
+        iApply (wp_cbeqz_fall_s_sconf (mword_of_int (NX + 0x100))
+                  (mword_of_int 11 : mword 8) (Cregidx (mword_of_int 6)) Ra4
+                  D2 (K - 12)%nat b ltac:(vm_compute; reflexivity) ltac:(nz)
+                  ltac:(rgne; rewrite HD2a4; exact (nx_a4_ne _ Hns))
+                  with "Hcg Hpc Hj100").
+        iIntros (CIDm4 Hqm4) "Hcg Hpc".
+        assert (Hq102 : add_vec_int (mword_of_int (NX + 0x100) : mword 64) 2
+                        = mword_of_int (NX + 0x102)) by pcw.
+        iEval (rewrite Hq102) in "Hpc".
+        (* +0x102 c.beqz a5 -- DEAD: the byte is not the terminator *)
+        iApply (wp_cbeqz_fall_s_sconf (mword_of_int (NX + 0x102))
+                  (mword_of_int 10 : mword 8) (Cregidx (mword_of_int 7)) Ra5
+                  D2 (K - 12)%nat b ltac:(vm_compute; reflexivity) ltac:(nz)
+                  ltac:(rgne; rewrite HD2a5; exact (nx_nul_ne _ Hnl))
+                  with "Hcg Hpc Hj102").
+        iIntros (CIDm5 Hqm5) "Hcg Hpc".
+        assert (Hq104 : add_vec_int (mword_of_int (NX + 0x102) : mword 64) 2
+                        = mword_of_int (NX + 0x104)) by pcw.
+        iEval (rewrite Hq104) in "Hpc".
+        (* +0x104 c.mv s2,s1 *)
+        iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x104)) Rs2 Rs1
+                  D2 (K - 12)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj104").
+        iIntros (CIDm6 Hqm6) "Hcg Hpc". iEval (rgne) in "Hcg".
+        iEval (rewrite HD2s1) in "Hcg".
+        set (D3 := <[Regidx Rs2 := regval_into_reg
+                      (add_vec (zero_reg : mword 64) (pa_add pv a))]> D2).
+        assert (HD3s2 : D3 !!! Regidx Rs2 = pa_add pv a).
+        { rewrite /D3 upd_eq. apply add_vec_zero_l. }
+        assert (HD3s1 : D3 !!! Regidx Rs1 = pa_add pv a)
+          by (rewrite /D3 upd_ne; [exact HD2s1 | nz]).
+        assert (HD3o : forall c : mword 5, c <> Ra5 -> c <> Ra4 -> c <> Rs2 ->
+                  D3 !!! Regidx c = (Ms !!! Regidx c : mword 64)).
+        { intros c N15 N14 N18. rewrite /D3 upd_ne; [| dlk_xne N18].
+          rewrite /D2 upd_ne; [| dlk_xne N14].
+          rewrite /D1 upd_ne; [reflexivity | dlk_xne N15]. }
+        assert (Hq106 : add_vec_int (mword_of_int (NX + 0x104) : mword 64) 2
+                        = mword_of_int (NX + 0x106)) by pcw.
+        iEval (rewrite Hq106) in "Hpc".
+        iSpecialize ("HqB" $! CIDm6 with "[%]"); [wp_next_chain |].
+        iApply ("HqB" $! D3 with "[%] [%] [%] [%] [%] Hcg Hpc Hpath").
+        + exact (Hnult a Halt Hnl).
+        + exact Hnl.
+        + exact HD3s1.
+        + exact HD3s2.
+        + exact HD3o. }
+    (* ---- (5) +0xe4 .. +0x104: the whole loop head -------------------- *)
+    iAssert (□ wp_next (CID0 := CID) b (proc_addr j) (fun CIDs : CpuId =>
+               ∀ (off : nat) (Ms : regfile),
+                 ⌜(off <= plen)%nat⌝ -∗
+                 ⌜Ms !!! Regidx Rs1 = pa_add pv off⌝ -∗
+                 ⌜Ms !!! Regidx Rs3 = (mword_of_int 47 : mword 64)⌝ -∗
+                 sie_cap_gpr Ms (K - 12)%nat b (proc_addr j) -∗
+                 pc_is (mword_of_int (NX + 0xe4)) -∗
+                 ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ{dqp} pfun i) -∗
+                 (* EXIT A -- nothing but separators left, at +0x130 *)
+                 wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDa : CpuId =>
+                   ∀ Ms' : regfile,
+                     ⌜forall i : nat, (off <= i)%nat -> (i < plen)%nat ->
+                        pfun i = SLASH⌝ -∗
+                     ⌜Ms' !!! Regidx Rs1 = pa_add pv plen⌝ -∗
+                     ⌜forall c : mword 5, c <> Rs1 -> c <> Ra5 ->
+                        Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
+                     sie_cap_gpr Ms' (K - 12)%nat b (proc_addr j) -∗
+                     pc_is (mword_of_int (NX + 0x130)) -∗
+                     ([∗ list] i ∈ seq 0 (S plen),
+                        pa_add pv i ↦ₘ{dqp} pfun i) -∗
+                     WP (Loop : expr riscv_lang)) -∗
+                 (* EXIT B -- an element starts at [a], at +0x106 *)
+                 wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDb : CpuId =>
+                   ∀ (a : nat) (Ms' : regfile),
+                     ⌜(off <= a)%nat⌝ -∗ ⌜(a < plen)%nat⌝ -∗
+                     ⌜forall i : nat, (off <= i)%nat -> (i < a)%nat ->
+                        pfun i = SLASH⌝ -∗
+                     ⌜pfun a <> SLASH⌝ -∗ ⌜pfun a <> NUL⌝ -∗
+                     ⌜Ms' !!! Regidx Rs1 = pa_add pv a⌝ -∗
+                     ⌜Ms' !!! Regidx Rs2 = pa_add pv a⌝ -∗
+                     ⌜forall c : mword 5, c <> Rs1 -> c <> Ra5 -> c <> Ra4 ->
+                        c <> Rs2 ->
+                        Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
+                     sie_cap_gpr Ms' (K - 12)%nat b (proc_addr j) -∗
+                     pc_is (mword_of_int (NX + 0x106)) -∗
+                     ([∗ list] i ∈ seq 0 (S plen),
+                        pa_add pv i ↦ₘ{dqp} pfun i) -∗
+                     WP (Loop : expr riscv_lang)) -∗
+                 WP (Loop : expr riscv_lang)))%I with "[]" as "#Hhead".
+    { iModIntro.
+      iIntros (CIDs Hss off Ms) "%Holt %Hs1 %Hs3 Hcg Hpc Hpath HqA HqB".
+      iPoseProof (nxi_0e4 with "Htext") as "Hje4".
+      iPoseProof (nxi_0e8 with "Htext") as "Hje8".
+      (* +0xe4 lbu a5,0(s1) *)
+      iDestruct (nx_buf_acc pv dqp pfun (S plen) off ltac:(lia)
+                   with "Hpath") as "[Hpb Hpback]".
+      iApply (wp_lbu_s_sconf (mword_of_int (NX + 0xe4)) Ra5 Rs1
+                (mword_of_int 0 : mword 12) Ms (K - 12)%nat
+                (pfun off : mword 8) b (dqm := dqp)
+                ltac:(nz) ltac:(rdok) with "Hcg Hpc Hje4 [Hpb] [-]").
+      { iEval (rgne; rewrite Hs1 addv_sext0). iExact "Hpb". }
+      iIntros (CIDh1 Hqh1) "Hcg Hpc Hpb".
+      iEval (rgne; rewrite Hs1 addv_sext0) in "Hpb".
+      iDestruct ("Hpback" with "Hpb") as "Hpath".
+      set (H1 := <[Regidx Ra5 := regval_into_reg
+                    (zero_extend' 64 (pfun off : mword 8))]> Ms).
+      assert (HH1a5 : H1 !!! Regidx Ra5
+                      = (zero_extend' 64 (pfun off : mword 8) : mword 64))
+        by (rewrite /H1; apply upd_eq).
+      assert (HH1s1 : H1 !!! Regidx Rs1 = pa_add pv off)
+        by (rewrite /H1 upd_ne; [exact Hs1 | nz]).
+      assert (HH1s3 : H1 !!! Regidx Rs3 = (mword_of_int 47 : mword 64))
+        by (rewrite /H1 upd_ne; [exact Hs3 | nz]).
+      assert (HH1o : forall c : mword 5, c <> Ra5 ->
+                H1 !!! Regidx c = (Ms !!! Regidx c : mword 64)).
+      { intros c N15. rewrite /H1 upd_ne; [reflexivity | dlk_xne N15]. }
+      assert (Hqe8 : add_vec_int (mword_of_int (NX + 0xe4) : mword 64) 4
+                     = mword_of_int (NX + 0xe8)) by pcw.
+      iEval (rewrite Hqe8) in "Hpc".
+      assert (Htf6 : add_vec (mword_of_int (NX + 0xe8) : mword 64)
+                (sign_extend' 64 (mword_of_int 14 : mword 13))
+              = mword_of_int (NX + 0xf6)) by pcw.
+      destruct (decide (pfun off = SLASH)) as [Hsl0 | Hsl0].
+      - (* a separator: [bne] falls through into the skip at +0xec *)
+        iApply (wp_bne_fall_s_sconf (mword_of_int (NX + 0xe8))
+                  (mword_of_int 14 : mword 13) Rs3 Ra5 H1 (K - 12)%nat b
+                  ltac:(nz) ltac:(nz)
+                  ltac:(rgne; rgne; rewrite HH1a5 HH1s3;
+                        exact (nx_nslash_eq _ Hsl0))
+                  with "Hcg Hpc Hje8").
+        iIntros (CIDh2 Hqh2) "Hcg Hpc".
+        assert (Hqec : add_vec_int (mword_of_int (NX + 0xe8) : mword 64) 4
+                       = mword_of_int (NX + 0xec)) by pcw.
+        iEval (rewrite Hqec) in "Hpc".
+        iSpecialize ("Hsk1" $! plen CIDh2 with "[%]"); [wp_next_chain |].
+        iApply ("Hsk1" $! off H1
+                  with "[%] [%] [%] [%] [%] Hcg Hpc Hpath [HqA HqB]").
+        + lia.
+        + exact (Hslt off Holt Hsl0).
+        + exact Hsl0.
+        + exact HH1s1.
+        + exact HH1s3.
+        + iIntros (CIDh3 Hqh3 a M2) "%A1 %A2 %A3 %A4 %A5 %A6 %A7 Hcg Hpc Hpath".
+          iSpecialize ("Hmid" $! CIDh3 with "[%]"); [wp_next_chain |].
+          iApply ("Hmid" $! a M2
+                    with "[%] [%] [%] [%] Hcg Hpc Hpath [HqA] [HqB]").
+          * exact A2.
+          * exact A4.
+          * exact A5.
+          * exact A6.
+          * iIntros (CIDh4 Hqh4) "%Hap Hcg Hpc Hpath".
+            iSpecialize ("HqA" $! CIDh4 with "[%]"); [wp_next_chain |].
+            iApply ("HqA" $! M2 with "[%] [%] [%] Hcg Hpc Hpath").
+            -- intros i Hi1 Hi2. destruct (Nat.eq_dec i off) as [He | Hne].
+               ++ rewrite He. exact Hsl0.
+               ++ apply A3; lia.
+            -- rewrite -Hap. exact A5.
+            -- intros c N9 N15. rewrite (A7 c N9 N15). exact (HH1o c N15).
+          * iIntros (CIDh4 Hqh4 M3) "%B1 %B2 %B3 %B4 %B5 Hcg Hpc Hpath".
+            iSpecialize ("HqB" $! CIDh4 with "[%]"); [wp_next_chain |].
+            iApply ("HqB" $! a M3
+                      with "[%] [%] [%] [%] [%] [%] [%] [%] Hcg Hpc Hpath").
+            -- lia.
+            -- exact B1.
+            -- intros i Hi1 Hi2. destruct (Nat.eq_dec i off) as [He | Hne].
+               ++ rewrite He. exact Hsl0.
+               ++ apply A3; lia.
+            -- exact A4.
+            -- exact B2.
+            -- exact B3.
+            -- exact B4.
+            -- intros c N9 N15 N14 N18.
+               rewrite (B5 c N15 N14 N18). rewrite (A7 c N9 N15).
+               exact (HH1o c N15).
+      - (* not a separator: [bne] is taken straight to +0xf6 *)
+        iApply (wp_bne_taken_s_sconf (mword_of_int (NX + 0xe8))
+                  (mword_of_int 14 : mword 13) Rs3 Ra5 H1 (K - 12)%nat b
+                  ltac:(nz) ltac:(nz)
+                  ltac:(rgne; rgne; rewrite HH1a5 HH1s3;
+                        exact (nx_nslash_ne _ Hsl0))
+                  ltac:(rewrite Htf6; vm_compute; reflexivity)
+                  with "Hcg Hpc Hje8").
+        iIntros (CIDh2 Hqh2). iNext. iIntros "Hcg Hpc".
+        iEval (rewrite Htf6) in "Hpc".
+        iSpecialize ("Hmid" $! CIDh2 with "[%]"); [wp_next_chain |].
+        iApply ("Hmid" $! off H1
+                  with "[%] [%] [%] [%] Hcg Hpc Hpath [HqA] [HqB]").
+        + exact Holt.
+        + exact Hsl0.
+        + exact HH1s1.
+        + exact HH1a5.
+        + iIntros (CIDh3 Hqh3) "%Hap Hcg Hpc Hpath".
+          iSpecialize ("HqA" $! CIDh3 with "[%]"); [wp_next_chain |].
+          iApply ("HqA" $! H1 with "[%] [%] [%] Hcg Hpc Hpath").
+          * intros i Hi1 Hi2. exfalso. lia.
+          * rewrite -Hap. exact HH1s1.
+          * intros c N9 N15. exact (HH1o c N15).
+        + iIntros (CIDh3 Hqh3 M3) "%B1 %B2 %B3 %B4 %B5 Hcg Hpc Hpath".
+          iSpecialize ("HqB" $! CIDh3 with "[%]"); [wp_next_chain |].
+          iApply ("HqB" $! off M3
+                    with "[%] [%] [%] [%] [%] [%] [%] [%] Hcg Hpc Hpath").
+          * lia.
+          * exact B1.
+          * intros i Hi1 Hi2. exfalso. lia.
+          * exact Hsl0.
+          * exact B2.
+          * exact B3.
+          * exact B4.
+          * intros c N9 N15 N14 N18. rewrite (B5 c N15 N14 N18).
+            exact (HH1o c N15). }
+    (* ---- (6) +0xa4 .. +0xb2: skipelem's TRAILING separator skip -------
+       reached from BOTH memmove branches, with [s1 = s2] the index just
+       past the element; it ends at +0xb6, where ilock's argument is set up.
+       Same two-instruction head as (5), one exit instead of two. *)
+    iAssert (□ wp_next (CID0 := CID) b (proc_addr j) (fun CIDs : CpuId =>
+               ∀ (off : nat) (Ms : regfile),
+                 ⌜(off <= plen)%nat⌝ -∗
+                 ⌜Ms !!! Regidx Rs1 = pa_add pv off⌝ -∗
+                 ⌜Ms !!! Regidx Rs3 = (mword_of_int 47 : mword 64)⌝ -∗
+                 sie_cap_gpr Ms (K - 12)%nat b (proc_addr j) -∗
+                 pc_is (mword_of_int (NX + 0xa4)) -∗
+                 ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ{dqp} pfun i) -∗
+                 wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDe : CpuId =>
+                   ∀ (off' : nat) (Ms' : regfile),
+                     ⌜(off <= off')%nat⌝ -∗ ⌜(off' <= plen)%nat⌝ -∗
+                     ⌜forall i : nat, (off <= i)%nat -> (i < off')%nat ->
+                        pfun i = SLASH⌝ -∗
+                     ⌜pfun off' <> SLASH⌝ -∗
+                     ⌜Ms' !!! Regidx Rs1 = pa_add pv off'⌝ -∗
+                     ⌜forall c : mword 5, c <> Rs1 -> c <> Ra5 ->
+                        Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
+                     sie_cap_gpr Ms' (K - 12)%nat b (proc_addr j) -∗
+                     pc_is (mword_of_int (NX + 0xb6)) -∗
+                     ([∗ list] i ∈ seq 0 (S plen),
+                        pa_add pv i ↦ₘ{dqp} pfun i) -∗
+                     WP (Loop : expr riscv_lang)) -∗
+                 WP (Loop : expr riscv_lang)))%I with "[]" as "#Htrail".
+    { iModIntro.
+      iIntros (CIDs Hss off Ms) "%Holt %Hs1 %Hs3 Hcg Hpc Hpath Hqc".
+      iPoseProof (nxi_0a4 with "Htext") as "Hja4".
+      iPoseProof (nxi_0a8 with "Htext") as "Hja8".
+      (* +0xa4 lbu a5,0(s1) *)
+      iDestruct (nx_buf_acc pv dqp pfun (S plen) off ltac:(lia)
+                   with "Hpath") as "[Hpb Hpback]".
+      iApply (wp_lbu_s_sconf (mword_of_int (NX + 0xa4)) Ra5 Rs1
+                (mword_of_int 0 : mword 12) Ms (K - 12)%nat
+                (pfun off : mword 8) b (dqm := dqp)
+                ltac:(nz) ltac:(rdok) with "Hcg Hpc Hja4 [Hpb] [-]").
+      { iEval (rgne; rewrite Hs1 addv_sext0). iExact "Hpb". }
+      iIntros (CIDr1 Hqr1) "Hcg Hpc Hpb".
+      iEval (rgne; rewrite Hs1 addv_sext0) in "Hpb".
+      iDestruct ("Hpback" with "Hpb") as "Hpath".
+      set (G1 := <[Regidx Ra5 := regval_into_reg
+                    (zero_extend' 64 (pfun off : mword 8))]> Ms).
+      assert (HG1a5 : G1 !!! Regidx Ra5
+                      = (zero_extend' 64 (pfun off : mword 8) : mword 64))
+        by (rewrite /G1; apply upd_eq).
+      assert (HG1s1 : G1 !!! Regidx Rs1 = pa_add pv off)
+        by (rewrite /G1 upd_ne; [exact Hs1 | nz]).
+      assert (HG1s3 : G1 !!! Regidx Rs3 = (mword_of_int 47 : mword 64))
+        by (rewrite /G1 upd_ne; [exact Hs3 | nz]).
+      assert (HG1o : forall c : mword 5, c <> Ra5 ->
+                G1 !!! Regidx c = (Ms !!! Regidx c : mword 64)).
+      { intros c N15. rewrite /G1 upd_ne; [reflexivity | dlk_xne N15]. }
+      assert (Hqa8 : add_vec_int (mword_of_int (NX + 0xa4) : mword 64) 4
+                     = mword_of_int (NX + 0xa8)) by pcw.
+      iEval (rewrite Hqa8) in "Hpc".
+      assert (Htb6 : add_vec (mword_of_int (NX + 0xa8) : mword 64)
+                (sign_extend' 64 (mword_of_int 14 : mword 13))
+              = mword_of_int (NX + 0xb6)) by pcw.
+      destruct (decide (pfun off = SLASH)) as [Hsl0 | Hsl0].
+      - iApply (wp_bne_fall_s_sconf (mword_of_int (NX + 0xa8))
+                  (mword_of_int 14 : mword 13) Rs3 Ra5 G1 (K - 12)%nat b
+                  ltac:(nz) ltac:(nz)
+                  ltac:(rgne; rgne; rewrite HG1a5 HG1s3;
+                        exact (nx_nslash_eq _ Hsl0))
+                  with "Hcg Hpc Hja8").
+        iIntros (CIDr2 Hqr2) "Hcg Hpc".
+        assert (Hqac : add_vec_int (mword_of_int (NX + 0xa8) : mword 64) 4
+                       = mword_of_int (NX + 0xac)) by pcw.
+        iEval (rewrite Hqac) in "Hpc".
+        iSpecialize ("Hsk2" $! plen CIDr2 with "[%]"); [wp_next_chain |].
+        iApply ("Hsk2" $! off G1
+                  with "[%] [%] [%] [%] [%] Hcg Hpc Hpath [Hqc]").
+        + lia.
+        + exact (Hslt off Holt Hsl0).
+        + exact Hsl0.
+        + exact HG1s1.
+        + exact HG1s3.
+        + iIntros (CIDr3 Hqr3 off' M2)
+            "%A1 %A2 %A3 %A4 %A5 %A6 %A7 Hcg Hpc Hpath".
+          iSpecialize ("Hqc" $! CIDr3 with "[%]"); [wp_next_chain |].
+          iApply ("Hqc" $! off' M2
+                    with "[%] [%] [%] [%] [%] [%] Hcg Hpc Hpath").
+          * lia.
+          * exact A2.
+          * intros i Hi1 Hi2. destruct (Nat.eq_dec i off) as [He | Hne].
+            -- rewrite He. exact Hsl0.
+            -- apply A3; lia.
+          * exact A4.
+          * exact A5.
+          * intros c N9 N15. rewrite (A7 c N9 N15). exact (HG1o c N15).
+      - iApply (wp_bne_taken_s_sconf (mword_of_int (NX + 0xa8))
+                  (mword_of_int 14 : mword 13) Rs3 Ra5 G1 (K - 12)%nat b
+                  ltac:(nz) ltac:(nz)
+                  ltac:(rgne; rgne; rewrite HG1a5 HG1s3;
+                        exact (nx_nslash_ne _ Hsl0))
+                  ltac:(rewrite Htb6; vm_compute; reflexivity)
+                  with "Hcg Hpc Hja8").
+        iIntros (CIDr2 Hqr2). iNext. iIntros "Hcg Hpc".
+        iEval (rewrite Htb6) in "Hpc".
+        iSpecialize ("Hqc" $! CIDr2 with "[%]"); [wp_next_chain |].
+        iApply ("Hqc" $! off G1
+                  with "[%] [%] [%] [%] [%] [%] Hcg Hpc Hpath").
+        + lia.
+        + exact Holt.
+        + intros i Hi1 Hi2. exfalso. lia.
+        + exact Hsl0.
+        + exact HG1s1.
+        + intros c N9 N15. exact (HG1o c N15). }
     (* ================================================================= *)
     (*  THE WALK at +0xe4.  ProofKexit's [forall fuel, wp_next] shape over *)
     (*  the measure [plen - off]; INSIDE it live three more of the same    *)

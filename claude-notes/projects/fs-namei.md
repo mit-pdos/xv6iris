@@ -1483,3 +1483,184 @@ standalone against the full 971-`.vo` tree: `md5 6fc4d509…`, `ERRORS=0`,
 then deleted; the mirror is back at **971 `.vo`** with no namex proof
 artefacts.  `python3 tools/lemma_diff.py --ref HEAD`: one `NEWAXIOM
 Axiom cheat_` in the parked file and nothing else.
+
+### N4c2 — the six scan blocks land; TWO PREMISES ARE MISSING FROM THE CONTRACT
+
+**NOTHING LANDED IN THE BUILD.**  No `iris/_CoqProject` row, no
+`iris/ProofNamex.v`, no `iris/LinkNamex.v`.  The work is parked again as
+**`claude-notes/projects/fs-namei-namex-wip.v`** (2 798 lines, md5
+`05cc5787bcc6416abb80a21446f7aa96`), carrying its own — rewritten —
+resume header.  `SpecNamex.v` was NOT touched.  Still **exactly one**
+`exact (cheat_ _)`, at the same place: `Hloop`'s body.
+
+#### THE HEADLINE: `SpecNamex` (and `SpecNamei` / `SpecNameiparent`) NEED TWO MORE PREMISES
+
+Both were found by driving the walk, not by inspection, and neither is a
+proof difficulty — each is a one-line change.  Until they are made the
+walk's two `memmove` call sites **cannot be discharged at all**, which is
+why the loop body stops where it does.
+
+**(A) THE PATH MUST BE OWNED OUTRIGHT — `dqp` has to go.**
+The contract lends the path at a parametric fraction
+
+```coq
+([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ{dqp} pfun i)
+```
+
+while `SpecMemmove.wp_memmove_sconf_body` demands its SOURCE bytes at FULL
+ownership (`SpecMemmove.v:64`, and `↦ₘ v` is notation for
+`mem_pointsto a (DfracOwn 1) v`):
+
+```coq
+([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ src_bytes j) -∗
+([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ dst_olds j) -∗
+```
+
+namex's two memmoves (+0x9e, +0x122) both pass `a1 = s1`, a pointer INTO
+the path, so `dqp` can never be instantiated by the proof.  There is no
+fractional-source memmove anywhere in the tree (`wp_memmove_sconf` is the
+only spec; its consumers are Memcpy, Iupdate, EitherCopy, Copyout,
+EndOp, InstallTrans, Copyin, Uvmcopy, Ilock).  **Two fixes, pick one:**
+
+- *preferred* — delete the `dqp` parameter from `SpecNamex.v`,
+  `SpecNamei.v` and `SpecNameiparent.v` and write `↦ₘ` in the four places
+  (pre and post, both files).  Sound for every real caller: xv6 paths are
+  `MAXPATH` kernel arrays the caller owns outright, filled by `argstr`;
+- generalise SpecMemmove's SOURCE to a `{dqm : dfrac}`.  The DESTINATION
+  must stay full — ProofMemmove refutes the descending loop with
+  `mem_bytes_notin` on the two buffers and **one** full side is enough, so
+  this IS sound — but it changes the `MEMMOVE` module type and so touches
+  ProofMemmove and all nine consumers.
+
+**(B) THE PATH LENGTH MUST FIT IN A C `int`.**  +0x90 is
+`addiw s10,a2,0`, i.e. `sext.w` of `len = s2 - s1`, and +0x94 is the
+SIGNED `bge s8,s10` against 13.  With `plen` unbounded the truncation is
+not the identity, the branch does not decide `len <= 13`, and the short
+branch then also fails memmove's own `Z.of_nat len < 2^32` premise.  Add
+
+```coq
+(Z.of_nat plen < 2 ^ 31)%Z ->
+```
+
+to all three contracts.  `SpecFetchstr.v`'s header records the identical
+premise for the identical reason (strlen's `subw`, "a caller's buffer is a
+fixed-size kernel array (argstr's is `MAXPATH`), which discharges this
+trivially"), so both the precedent and its justification already exist.
+
+Nothing else was found unprovable: every callee premise, resource and
+register fact the walk has been driven through fitted exactly.
+
+#### WHAT LANDED IN THE PARKED FILE — the whole byte-scanning layer
+
+All of the inlined `skipelem` except the two memmoves and the length
+arithmetic, as **six `□`-persistent assertions with ABSTRACT
+CONTINUATIONS**, stated and proved BEFORE `Hloop` (so they are usable from
+inside its induction, and the thirty-slot invariant is transcribed
+nowhere).  This is the structure the N4c parking agent asked for, and it
+worked: every one of the six compiled first try.
+
+| name | block | shape |
+|---|---|---|
+| `Hsk1` | +0xec..+0xf2 | fuel-indexed; the LEADING `'/'` skip, exit at +0xf6 |
+| `Hsk2` | +0xac..+0xb2 | the same loop, exit at +0xb6 (skipelem's TRAILING skip) |
+| `Hscn` | +0x106..+0x114 | fuel-indexed; the ELEMENT scan, BOTH exits (+0x110 taken and +0x114's `c.j`) to +0x8c |
+| `Hmid` | +0xf6..+0x104 | TWO continuations; **includes the DEAD block** +0xf8..+0x102 |
+| `Hhead` | +0xe4..+0x104 | the whole loop head: `lbu`/`bne`, then `Hsk1` or `Hmid` |
+| `Htrail` | +0xa4..+0xb2 | the trailing skip's head + `Hsk2`, one exit at +0xb6 |
+
+The interfaces, in the form the loop body consumes:
+
+- `Hsk1`/`Hsk2` take `⌜pfun off = SLASH⌝`, `s1 = pa_add pv off`,
+  `s3 = 47`, a fuel bound `plen - off <= fuel` and the path; they return
+  `off'`, `⌜∀ i, off <= i < off' -> pfun i = SLASH⌝`,
+  `⌜pfun off' <> SLASH⌝`, `s1 = pa_add pv off'`,
+  `a5 = zero_extend' 64 (pfun off')`, and a register-thread fact
+  `∀ c, c <> Rs1 -> c <> Ra5 -> Ms' !!! Regidx c = Ms !!! Regidx c`.
+- `Hscn` takes `s2 = pa_add pv ii`, `ii < plen`; returns `e > ii`,
+  `e <= plen`, `⌜∀ jj, ii < jj < e -> pfun jj <> SLASH⌝`,
+  `⌜pfun e = SLASH \/ e = plen⌝`, `s2 = pa_add pv e`, thread fact over
+  `c <> Rs2, Ra5, Ra4`.
+- `Hhead`'s two exits: **A** at +0x130 with
+  `⌜∀ i, off <= i < plen -> pfun i = SLASH⌝` and `s1 = pa_add pv plen`;
+  **B** at +0x106 with the element start `a`, `off <= a < plen`,
+  `⌜∀ i, off <= i < a -> pfun i = SLASH⌝`, `pfun a <> SLASH`,
+  `pfun a <> NUL`, `s1 = s2 = pa_add pv a`.
+
+`Hhead`-B's and `Hscn`'s outputs are EXACTLY
+`ProofNamexParts.nx_skipelem_at`'s four hypotheses at `(a, e)`.
+
+**The one pure bridge still owed** is between `drop off pl` (what the loop
+invariant is stated over) and `drop a pl` (what `nx_skipelem_at` computes
+at):
+
+```coq
+Lemma nx_pe_skip_at (off a plen : nat) (f : nat -> bv 8) :
+  (off <= a)%nat -> (a <= plen)%nat ->
+  (forall i, (off <= i)%nat -> (i < a)%nat -> f i = SLASH) ->
+  f a <> SLASH ->
+  pe_skip (drop off (bview plen f)) = drop a (bview plen f).
+```
+
+induction on `a - off` with `nx_drop_cons`, `pe_skip_slash`, `pe_skip_ne`;
+then `skipelem`'s definition plus `pe_skip_idem` turn it into
+`skipelem (drop off pl) = skipelem (drop a pl)`.  (For exit A the same
+hypotheses give `pe_skip (drop off pl) = []`, hence
+`path_elems (drop off pl) = []` by `path_elems_nil_iff`.)
+
+#### N4b trap 8 IS DISCHARGED — the pure byte-test layer is complete
+
+New top-level lemmas in the parked file, all proved:
+
+- `nx_nslash_eq` / `nx_nslash_ne`, `nx_nnul_eq` / `nx_nnul_ne` — the
+  `bne` / `bnez` polarity of the existing `nx_slash_*` / `nx_nul_*`
+  family.  `neq_vec` is `negb (eq_vec ...)`, so each is one `unfold`.
+- `nx_m47_val`, `nx_a4_unsigned`, `nx_m47_arith`, `nx_a4_eq`, `nx_a4_ne`
+  — **the `addi a4,a5,-47` test at +0xfc and +0x10c**, which N4c recorded
+  as not yet written.  The immediate decodes as `mword_of_int 4049 :
+  mword 12`; `a4` is zero exactly when the byte is `'/'`.
+
+#### THREE surprises
+
+1. **`lia` gives up with *"Cannot find witness"* on any goal that mentions
+   `bv_unsigned`** — bitvector.tactics' zify hook.  `nx_a4_ne`'s wrap
+   argument had to be split into `nx_m47_arith`, a lemma over plain `Z`.
+   ProofMemmove's `mm_overlap_arith` is the same split for the same
+   reason, and its comment says so; N3/N4's trap lists did not.
+2. **A `∀ fuel, □ wp_next …` assertion is the right spelling, not
+   `□ ∀ fuel, …`.**  `iInduction fuel` then leaves the induction
+   hypothesis PERSISTENT (the goal is `□`-headed at induction time), which
+   is what lets the recursive arm use it after the spatial context has
+   filled with `Hcg`/`Hpc`/`Hpath`.  With the `□` outside, the IH lands in
+   the spatial context and the non-recursive arm cannot close.
+   `iSpecialize ("IHs" $! CIDk3 with "[%]"); [wp_next_chain |]` works on
+   the persistent form unchanged.
+3. **Two continuations is the way to encode a block with two exits**
+   (`Hmid`, `Hhead`).  Both are spatial, so the arm that is not taken must
+   be `iClear`ed — iProp is affine, so this is free, but forgetting it
+   leaves an unused spatial hypothesis and `iApply` fails with a leftover.
+
+#### Build evidence (EC2 mirror, git-synced at `ae7914c3`)
+
+Every increment compiled standalone as `iris/ProofNamex.v` against the
+mirror's `.vo` tree with `bash ~/one.sh ProofNamex.v`.  Final:
+`md5 05cc5787bcc6416abb80a21446f7aa96`, `ERRORS=0`,
+`DONE ProofNamex.v = 0`, `EXIT=0`.  The scratch copy and all
+`ProofNamex.*` artefacts were then deleted from the mirror (`ls
+ProofNamex.*` → *No such file or directory*).  NOTE: the mirror's `.vo`
+count read 971 at the start of the run and 972 at the end with no namex
+artefacts present and `git status` clean — the extra object is not this
+stage's (`ls -t` puts `LinkDirlink.vo` newest), so ANOTHER agent is
+probably sharing the mirror; worth a coordinator check.
+
+#### What the resuming agent should do first
+
+1. Make changes (A) and (B) to `SpecNamex.v` / `SpecNamei.v` /
+   `SpecNameiparent.v`.  Nothing else in the campaign consumes them yet.
+2. Copy the WIP to `iris/ProofNamex.v`, compile (green), and thread the
+   new `plen` bound through `wp_namex_sconf`'s `intros`.
+3. Write `nx_pe_skip_at` (above) — locally in `ProofNamex.v` is fine.
+4. Replace the one `exact (cheat_ _)`: `iIntros (fuel); iInduction`, then
+   `Hhead` → (exit A: +0x130's `beq s6,zero` and the nameiparent `iput`;
+   exit B:) `Hscn` → +0x8c..+0x94 → the two memmoves → `Htrail` →
+   +0xb6..+0xda's ilock / type test / early stop / dirlookup and the four
+   exits.  The share choreography is design layer 6, unchanged.
