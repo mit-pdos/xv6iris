@@ -240,6 +240,19 @@ are working on that effort — the relevant `projects/` file.
   later-stripping fence leaf, G5's three sweeps), the callee-by-callee
   resource inventory, the assemblies main performs, and what remains:
   the whole-system adequacy composition.
+- **[`procdump.md`](projects/procdump.md)** — `procdump()`, the `^P` process
+  listing, **PROVEN AND LINKED** — it was the tree's last untouched function,
+  so the coverage report now shows **0 untouched**. Read it for the durable
+  finding rather than the function: procdump reads `state`/`pid`/`name` of all
+  64 slots with **no lock**, so specifying it is where `design/proc-struct.md`'s
+  "racy debug code, out of scope" line comes due. Records the two dead ends
+  (an invariant-based atomic peek cannot serve printk's `%s`, which WALKS the
+  string; a permanent read-share is exactly what allocproc/kfork/kexec forbid)
+  and the design that landed — `procdump_view`, a per-slot read-share at
+  caller-chosen fractions, handed back unchanged, whose being unsatisfiable
+  from anything in the tree IS the statement that procdump is racy. Also: the
+  +344-biased cursor (`pd_cur`, an `ArrCursor.acur` of its own base), the
+  one-join print block, and the `code_manifest.json` regeneration cost.
 - **[`proc-pagetable-ownership.md`](projects/proc-pagetable-ownership.md)** —
   the process page table's OWNERSHIP side (`ProcPtOwn.v`): `proc_pt`, one
   predicate for a valid parked user table — trampoline + trapframe + the pages

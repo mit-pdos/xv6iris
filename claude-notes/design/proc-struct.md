@@ -155,8 +155,12 @@ touch this group:
   proc's lock and can land there.
 - **`freeproc()`** (called from `wait()` by the *parent*) frees a `ZOMBIE`
   child's `trapframe` and `pagetable` under the child's lock.
-- **`procdump()`** reads `p->name` and `p->pid` with no lock, for any p. This
-  is racy debug code by design; it is out of scope, not a counterexample.
+- **`procdump()`** reads `p->state`, `p->pid` and `p->name` with no lock, for
+  any p. This is racy debug code by design; it is not a counterexample to the
+  disciplines below. It is now specified and proved, and what its contract had
+  to do about the race — a per-slot read-share supplied by the caller, and why
+  neither an invariant-based atomic peek nor a permanent read-share can work —
+  is [`projects/procdump.md`](../projects/procdump.md).
 
 So the right statement is: **the group is exclusively owned, and the owner is
 whoever last took the slot out of the lock invariant.** The lock invariant must

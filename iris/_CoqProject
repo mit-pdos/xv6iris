@@ -1030,3 +1030,10 @@ ProofFlags2perm.v
 LinkFlags2perm.v
 SpecFilestat.v
 ProofFilestatParts.v
+ProcdumpAux.v
+SpecProcdump.v
+CodeProcdump.v
+ProofProcdumpParts.v
+ProofProcdumpLoop.v
+ProofProcdump.v
+LinkProcdump.v

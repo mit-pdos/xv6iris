@@ -272,6 +272,11 @@ Lemma kd_01848a33 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (RTYPE (Regidx (mword_of_int 24), Regidx (mword_of_int 9), Regidx (mword_of_int 20), ADD), s).
 Proof. decode_bridge_ms. Qed.
 
+Lemma kd_01d75793 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x01d75793 : mword 32) : M instruction) s
+  = Some (SHIFTIOP (mword_of_int 29 : mword 6, Regidx (mword_of_int 14), Regidx (mword_of_int 15), SRLI), s).
+Proof. decode_bridge_ms. Qed.
+
 Lemma kd_02054463 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x02054463 : mword 32) : M instruction) s
   = Some (BTYPE (mword_of_int 40 : mword 13, zreg, Regidx (mword_of_int 10), BLT), s).
