@@ -150,6 +150,12 @@
   2
  ],
  [
+  "CodeCreate.v",
+  "create",
+  "cri_",
+  3
+ ],
+ [
   "CodeDevintr.v",
   "devintr",
   "dii_",
@@ -238,6 +244,18 @@
   "fileread",
   "fri_",
   2
+ ],
+ [
+  "CodeFilestat.v",
+  "filestat",
+  "fsti_",
+  2
+ ],
+ [
+  "CodeFilewrite.v",
+  "filewrite",
+  "fwri_",
+  3
  ],
  [
   "CodeFreeDesc.v",
@@ -750,6 +768,12 @@
   2
  ],
  [
+  "CodeSysChdir.v",
+  "sys_chdir",
+  "schdi_",
+  2
+ ],
+ [
   "CodeSysClose.v",
   "sys_close",
   "sci_",
@@ -762,6 +786,12 @@
   2
  ],
  [
+  "CodeSysExec.v",
+  "sys_exec",
+  "sxi_",
+  3
+ ],
+ [
   "CodeSysFork.v",
   "sys_fork",
   "sf_",
@@ -771,6 +801,12 @@
   "CodeSysExit.v",
   "sys_exit",
   "se_",
+  2
+ ],
+ [
+  "CodeSysFstat.v",
+  "sys_fstat",
+  "sfsi_",
   2
  ],
  [
@@ -786,6 +822,30 @@
   2
  ],
  [
+  "CodeSysLink.v",
+  "sys_link",
+  "slki_",
+  2
+ ],
+ [
+  "CodeSysMkdir.v",
+  "sys_mkdir",
+  "smdi_",
+  2
+ ],
+ [
+  "CodeSysMknod.v",
+  "sys_mknod",
+  "smni_",
+  2
+ ],
+ [
+  "CodeSysOpen.v",
+  "sys_open",
+  "soi_",
+  3
+ ],
+ [
   "CodeSysPause.v",
   "sys_pause",
   "spi_",
@@ -795,6 +855,12 @@
   "CodeSysPipe.v",
   "sys_pipe",
   "spi_",
+  2
+ ],
+ [
+  "CodeSysRead.v",
+  "sys_read",
+  "sri_",
   2
  ],
  [
@@ -810,6 +876,12 @@
   2
  ],
  [
+  "CodeSysUnlink.v",
+  "sys_unlink",
+  "suli_",
+  3
+ ],
+ [
   "CodeSysUptime.v",
   "sys_uptime",
   "sui_",
@@ -819,6 +891,12 @@
   "CodeSysWait.v",
   "sys_wait",
   "swi_",
+  2
+ ],
+ [
+  "CodeSysWrite.v",
+  "sys_write",
+  "swri_",
   2
  ],
  [

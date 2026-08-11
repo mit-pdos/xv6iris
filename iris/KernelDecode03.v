@@ -147,6 +147,11 @@ Lemma kd_a095 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   = Some (C_J (mword_of_int 50), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
+Lemma kd_a8ad s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xa8ad : mword 16)) s
+  = Some (C_J (mword_of_int 61), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
 Lemma kd_b755 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xb755 : mword 16)) s
   = Some (C_J (mword_of_int 2002), s).
@@ -225,6 +230,11 @@ Proof. intro H. rvc_oneshot s H. Qed.
 Lemma kd_f05a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xf05a : mword 16)) s
   = Some (C_SDSP (mword_of_int 4, Regidx (mword_of_int 22)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma kd_fb52 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xfb52 : mword 16)) s
+  = Some (C_SDSP (mword_of_int 54, Regidx (mword_of_int 20)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
 Lemma kd_0001f997 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -427,9 +437,19 @@ Lemma kd_93dff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (JAL (mword_of_int 2095420 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
+Lemma kd_952fe0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x952fe0ef : mword 32) : M instruction) s
+  = Some (JAL (mword_of_int 2089298 : mword 21, Regidx (mword_of_int 1)), s).
+Proof. decode_bridge_ms. Qed.
+
 Lemma kd_9e9fd0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x9e9fd0ef : mword 32) : M instruction) s
   = Some (JAL (mword_of_int 2087400 : mword 21, Regidx (mword_of_int 1)), s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma kd_a1ffe0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xa1ffe0ef : mword 32) : M instruction) s
+  = Some (JAL (mword_of_int 2091550 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
 Lemma kd_a4f90913 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -467,6 +487,11 @@ Lemma kd_cc4fb0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (JAL (mword_of_int 2077892 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
+Lemma kd_de0fd0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xde0fd0ef : mword 32) : M instruction) s
+  = Some (JAL (mword_of_int 2086368 : mword 21, Regidx (mword_of_int 1)), s).
+Proof. decode_bridge_ms. Qed.
+
 Lemma kd_decfc0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xdecfc0ef : mword 32) : M instruction) s
   = Some (JAL (mword_of_int 2082284 : mword 21, Regidx (mword_of_int 1)), s).
@@ -501,6 +526,16 @@ Lemma kd_f14027f3 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xf14027f3 : mword 32) : M instruction) s
   = Some (CSRReg (mword_of_int 3860 : mword 12, zreg, Regidx (mword_of_int 15), CSRRS), s).
 Proof. decode_bridge_ms_bv. Qed.
+
+Lemma kd_f4f71ce3 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xf4f71ce3 : mword 32) : M instruction) s
+  = Some (BTYPE (mword_of_int 8024 : mword 13, Regidx (mword_of_int 15), Regidx (mword_of_int 14), BNE), s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma kd_f7bfe0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xf7bfe0ef : mword 32) : M instruction) s
+  = Some (JAL (mword_of_int 2092922 : mword 21, Regidx (mword_of_int 1)), s).
+Proof. decode_bridge_ms. Qed.
 
 Lemma kd_fc440613 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xfc440613 : mword 32) : M instruction) s
