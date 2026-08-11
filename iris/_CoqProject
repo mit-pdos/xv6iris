@@ -888,6 +888,7 @@ WeakFunnel.v
 WeakBranch.v
 WeakWord8.v
 WeakRacy.v
+WeakVarCert.v
 WeakEffSkel.v
 WeakPmpEff.v
 WeakTickEff.v

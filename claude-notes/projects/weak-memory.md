@@ -3546,6 +3546,42 @@ difficulties, in the order they will bite:
    shapes, of which two are blocked today) and its write member is unique, so
    a `Q` of the form `wQ_store_w 8 ... la lw'` is stable across it.
 
+### SLICE 2, FIRST HALF: THE POST-RACY PEEL (`iris/WeakVarCert.v`, 2026-08-11)
+
+`wstep_ok_racy_false_of_confined` — `WeakCert.wstep_eff_confined_pin` with
+the `wstep_ok` conclusion replaced by `wstep_ok_racy … false` and the
+AGREEMENT half dropped.  Arm for arm the proof is `WeakCert`'s; the new work
+is `trace_disj` (the `trace_pin` sibling: every read/write entry of the trace
+is `racc_disj` from the window; a `WEbar` touches no address and is exempt by
+construction) and producing the extra disjointness conjunct at the two RAM
+arms.  `Closed under the global context`.
+
+**THE PREMISE THAT IS NOT `WeakCert`'s, AND WHY IT MATTERS.**  The first cut
+of this lemma copied `WeakCert`'s `mm ⊆ wflat (wm_img s) (wm_log s)` and was
+therefore USELESS EXACTLY WHERE IT IS NEEDED: after a racy read the run
+continues on a memory whose window holds the word the read RETURNED, not the
+coherent one, so that inclusion is false.  The comparison has to be against
+the PATCHED flat memory, `write_bytes (wflat …) ra rn wp` — which is
+`WeakRacy.wpatch_st`'s memory — and the two arms that consumed the old
+premise go through `WeakRacy.read_bytes_patch_disj` (off the window the patch
+is invisible, so the confined read IS the flat one) and
+`WeakRacy.write_bytes_patch_comm` (a disjoint write commutes with the patch)
+instead.  Both need only DISJOINTNESS, which `trace_disj` already carries,
+and the patch value `wp` is never inspected — it is a parameter the lemma
+carries and never looks at.  **Lesson for the second half: any lemma in this
+layer that compares against `wflat` rather than the patched flat memory is
+about the PRE-racy phase, and will not compose.**
+
+The `wmem_restrict` instance (`wstep_ok_racy_false_of_window`) additionally
+takes "the window is inside the confined footprint W", which is what makes
+`dom (write_bytes (wmem_restrict s W) ra rn wp) ⊆ W`.
+
+REMAINING for slice 2: the phase-`true` half — from a FAMILY of confined
+runs, one per Φ-admissible window value, produce `wstep_ok_racy … true`.  Its
+racy arm hands each `(ts, w)` to this lemma at `wp := w`; the three
+difficulties above (views depend on `ts`, SC lockstep lost, trace varies with
+the value) are all in that half.
+
 ## THE `weak_view_name` REMOVAL (2026-08-11, DONE)
 
 The last hart-indexed view machinery is out of `weakGS`.  What it was: a
