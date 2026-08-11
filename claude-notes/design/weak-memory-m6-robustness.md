@@ -214,6 +214,93 @@ The tag (mechanism (A)) gets a third constructor for it: `SCexcl`.
 
 ---
 
+## 4b. Soundness end to end: how the premise is stated and discharged
+
+(Recorded 2026-08-11, after W1/W2a landed.  This answers the natural
+objection to the whole plan: the kernel's discipline — owned points-to,
+verified sync sites, walker CAS — lives in the PROOF of the kernel, not in
+its top-level spec, so how can a premise about it ever be extracted from
+the end-to-end WP theorem?)
+
+**The premise is a pure STATE predicate over the promise-free machine, and
+it is exported from the state interpretation — never from any spec.**
+The chain, with what exists and what is owed:
+
+```
+weak_state_interp carries ⌜φ⌝            [W3: wm_ak, w_pub, ownership reflection — owed]
+  → adequacy exports ∀ reachable g2, φ g2  [3-line change at WeakAdequacy.v:225 — owed]
+  → prefix closure: φ along every pf trace [free: rtc is prefix-closed]
+  → projection: WeakLang runs ↔ wp_pf_run / exec_wf   [W4 projections + W5 — owed]
+  → pf_violation_free cls pub …            [exists: WeakRobust.v]
+  → Layer 1 (W2a acyclicity + W2b construction)       [in progress]
+  → every full-machine behavior matched promise-free.
+```
+
+Piece by piece:
+
+- **The formal premise** (landed, `WeakRobust.v`): `pf_violation_free` —
+  no `wp_pf_run`-reachable configuration satisfies `violation` (an
+  owned-UNPUBLISHED message some foreign agent's per-byte `coh` floor has
+  reached), plus reader-discipline and class-soundness.  All state
+  predicates over machine configurations (D-M6-2); no Iris in any of them.
+
+- **The export mechanism.**  `wp_strong_adequacy`'s final continuation
+  hands the state interpretation at the reachable state `g2` (today bound
+  and discarded, `WeakAdequacy.v:225-227`).  A pure conjunct `⌜φ g⌝` in
+  `weak_state_interp` therefore exports as
+  `∀ reachable g2, reducible … ∧ φ g2`.  Prefix closure of `rtc` makes the
+  per-state export a TRACE property — every intermediate state of every
+  execution is itself a reachable endpoint — PROVIDED φ carries no
+  `∃ tagging` (two reachable states' witnesses would come from two
+  unrelated adequacy instantiations and compose into nothing).  Hence
+  D-M6-6: the class is a field of the message (`wm_ak`, written from the
+  access kind the store leaf already has) and publication is an inert
+  `w_pub` watermark in `wstate`; φ is then a plain predicate over
+  (log, wstates) and no existential ever appears.
+
+- **Why "the points-to is just part of the proof" does not matter: the
+  enforcement is by ENUMERATION OF PROOF RULES, not of program sites.**
+  A WP proof, whatever it proves, has exactly one way to take a memory
+  step: a leaf rule.  Every store leaf either consumes the exclusive
+  `↦w{1}` for its bytes, or is an enumerated sync-site leaf, or is the
+  walker-CAS path — there is no fourth way to append a message.  Every
+  load leaf either holds a points-to fragment or is an enumerated racy
+  rule (acquire-shaped, classified bytes only).  The one genuinely owed
+  piece is the OWNERSHIP REFLECTION: holding `↦w{1}` is invisible in the
+  state today (`wlat_interp` is an agreement, no owner), so W3 mints a
+  ghost token at store time recording "these bytes are owned by hart c,
+  unpublished"; with it, φ's preservation is provable rule by rule — a
+  foreign load over owned bytes would need a fragment fractional
+  arithmetic says cannot exist — and the release fence raises `w_pub`
+  exactly where the lock/invariant hands the points-to onward.
+
+- **Reader discipline is the same pattern once more**: "classified read
+  then `fence r,rw` before the next store" spans two instructions, so it
+  becomes one more inert per-agent component (set by a plain classified
+  read, cleared by an acquire fence, violation = fulfil while set),
+  discharged in Iris because the enumerated racy readers ARE verified
+  instruction sequences that go through the fence leaf in order.  SCexcl
+  needs no discharge at all: `wm_ak` is written by the machine at append
+  time, so that arm's class-soundness is definitional.
+
+- **The seam back to the full machine.**  Iris only ever talks about the
+  promise-free machine, and that is enough: the W2b construction builds a
+  promise-free prefix step by step, and at the point where matching the
+  full behavior would need a foreign early read of an owned-unpublished
+  message, the prefix-plus-that-read IS a promise-free run reaching a
+  violating state — contradicting exactly the statement adequacy
+  exported.  The premise is stated, proven and consumed entirely on the
+  promise-free side; the full machine sees only its consequences through
+  the simulation.
+
+In one sentence: the discipline is made an INVARIANT OF THE STATE
+INTERPRETATION — which every memory-touching proof rule must
+re-establish, which the closed set of leaves makes provable, and which
+adequacy exports at every reachable state — so the kernel's top-level
+spec never has to mention it.
+
+---
+
 ## 5. The interference_certify tension — RESOLVED (2026-08-11, from source)
 
 `interference_certify` as paraphrased — certification survives ANY memory

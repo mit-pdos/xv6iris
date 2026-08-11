@@ -383,6 +383,16 @@ file:line map for every item is
       the racy-load rules (`WeakRacy.v`, `WkStartedLoad.v`) are where the
       obligation is DISCHARGED (the started/first setters are `SCfenced`,
       so their racy readers are exempt by class — verify, don't assume).
+- [ ] **The reader-discipline export** (same D-M6-6 pattern, one more
+      inert component; see design §4b): a per-agent flag/watermark set by
+      a PLAIN read of a classified foreign message, cleared by an acquire
+      fence (`pr∧sw`) or an `.aq` read, with the exported φ conjunct
+      "no agent fulfils while its flag is set".  Discharged in Iris
+      because the enumerated racy readers are verified instruction
+      sequences that pass through the fence leaf before any store leaf.
+      This is what feeds W2a's `disciplined` premise
+      (`WeakRobustAcyc.v`); design the exact component shape together
+      with `w_pub` since both ride the same `wstate` sweep.
 - [ ] Move the log-append ghost updates to the funnel chokepoint
       (`WeakInstr.wp_winstr:524` / `WeakFunnel.wwp_instr:615`, which
       already hold the append fact), DELETING the six per-leaf
