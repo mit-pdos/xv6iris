@@ -393,3 +393,83 @@ below has been checked.
 
 The claim is only, but exactly: **for lock-disciplined code, the proof above
 the leaves should be the SC proof.**
+
+---
+
+## 8. The composability problem, and `wobj` (LANDED — `iris/WeakObj.v`)
+
+**Raised by the user, 2026-08-11.** §5.5 landed two conversions at the lock
+boundary, `wpt_own_release` and `wpt_pub_acquire`. Both are stated at a
+single byte. That is fine for a byte and useless for anything real: a
+composite predicate — an fd table, a buffer cache entry, anything built from
+points-to facts nested several definitions deep — is a *different
+proposition* on the two sides of the boundary. So it would have to be
+written twice, or carry a `T` parameter threaded through every definition
+and every intermediate lemma. That is a tax on all client code, levied for a
+boundary the client is not reasoning about.
+
+### The resolution
+
+The parameter you would be threading by hand is **exactly what `vProp` is**,
+and `monPred_at R V` instantiates it *without unfolding `R`*. The freezing a
+lock does was never a rewrite of the payload; it is one application of
+`monPred_at`. So:
+
+```coq
+Definition wobj (R : vProp Σ) : iProp Σ := ∃ V, view_lb V ∗ monPred_at R V.
+```
+
+— "R holds at some view I have already reached". `view_lb V := ∀ a, wflr_lb
+a (flr V a)` is §3's per-byte floor lifted to a whole view, stated pointwise
+through `flr` so its validity *is* `wflr_lb_valid` at every `a`.
+
+What this buys, all for **arbitrary `R`**:
+
+- `wobj R : iProp` ⇒ objective ⇒ invariant-admissible, no `wstate`
+  threading. The §3 property, without §3's construction.
+- Structural laws for `∗ ∃ ⌜⌝ ∨ emp ⎡⎤ ▷ big_sepM big_sepL`. **These are the
+  transport.** No definition below the boundary is restated,
+  reparameterised, or reproved — which is the whole answer to the question.
+- `wobj_release` / `wobj_acquire` / `wobj_handoff`: §5.5's conversions off
+  the single byte. One lemma each. The lock's side conditions are unchanged,
+  but are now paid once for the whole payload rather than once per byte.
+- `wobj_to_hold` / `wobj_of_hold` against `vwp_hold`, so a caller can hold a
+  frame objectively and hand it to an **unmodified** leaf. This is what lets
+  a leaf wrapper carry a real frame instead of discharging it at `⌜True⌝`
+  the way `WeakLeafO.wwp_lui_o` does.
+
+And `wpt_own_wobj : a ↦o{dq} v ⊣⊢ wobj (a ↦w{dq} v)` — **§3 was never a
+separate construct.** It is this modality at a single byte, and everything
+in §5.5 generalises.
+
+### Honest limits
+
+- `wobj` does **not** commute with `∀` in the useful direction: `∀ x, wobj
+  (Φ x) ⊬ wobj (∀ x, Φ x)`, because each `x` may hold at a different view and
+  there is no join over an infinite family. Finite conjunctions and
+  `big_sepM` over a finite map are fine, which is what data-structure
+  predicates actually use.
+- Nor with `-∗` or `→`, in either direction — same reason it does not for
+  `monPred_at`.
+- `▷` passes *out* of the modality freely but back *in* only up to `◇`
+  (`wobj_later_1` / `wobj_later_2`): the floor is timeless, not later-free.
+  Free wherever an invariant is being opened.
+
+### A note on the typeclass alternative
+
+The natural first guess is a "current view" typeclass that a hart and a lock
+invariant both instantiate, so `↦o` refers to whichever is ambient. That does
+give write-once definitions — but it threads the parameter *syntactically*,
+at the Coq level, so the acquire-time conversion `fdtable (LockView T) ⊢
+fdtable (HartView c)` still needs a congruence lemma **per definition**,
+which is the cost we were trying to avoid. `monPred` threads the same
+parameter *semantically*, which is precisely why its conversions are generic
+in `R`. The typeclass idea is right; `vProp` is its principled form, and
+`wobj` is the adapter that makes the result an objective `iProp` at both ends.
+
+### What this changes about the plan
+
+§3's `↦o` stops being the primitive and becomes a derived instance. Client
+data-structure predicates should be written as **`vProp`s over `↦w`**, and
+`wobj` applied at the two places where objectivity is actually needed: the
+lock invariant, and the caller's frame. Nothing in the leaf layer changes.
