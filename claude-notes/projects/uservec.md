@@ -146,8 +146,11 @@ have leaves. Two of them were gaps until 2026-08-11:
   the one CSR whose accessibility is not a constant (`satp_accessible
   Supervisor` READS mstatus for TVM=0), so it could not use the shared
   `exec_check_CSR_result_read_extS` route. Now
-  `WpSconfCsr.wp_csrr_satp_s_sconf`; the TVM premise costs callers nothing
-  because `sconf` already carries `sconf_ms_facts`.
+  `WpSconfCsr.wp_csrr_satp_kpt_s_sconf`; the TVM premise costs callers
+  nothing because `sconf` already carries `sconf_ms_facts`. **It takes the
+  KPT receipt, not a satp points-to** — see design/smode-and-vcgen.md: a
+  leaf that asks for the cell *beside* `sie_cap_gpr` is vacuous, because
+  `strans_inv` owns satp in both arms and is inside the bundle.
 - `csrw stvec,a5` (`prr_2c`) — the trap-destination switch from kerneltrap
   to usertrap. This was **structurally unprovable** while the trap vector
   lived in `intr_inv`: a persistent `inv` whose handler was fixed in its
