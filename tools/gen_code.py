@@ -388,6 +388,31 @@ def main():
     syms = load_syms(os.path.join(args.kernel_rocq, 'KernelSyms.v'))
     by = load_bytes(os.path.join(args.kernel_rocq, 'KernelInstrs.v'))
     man = json.load(open(args.manifest))
+
+    # THE PREFIX COLUMN MUST BE UNIQUE PER FUNCTION, and nothing downstream
+    # notices if it is not: two functions sharing a prefix produce two
+    # `<pre>_00` lemmas that differ only by which Code file a proof imported
+    # last, so the proof silently steps the WRONG function's instruction.
+    # (`printk`/`printkinit` both had `pki_`; `kexit`/`kexec` both had `kxi_`.)
+    #
+    # A WARNING, NOT AN ERROR, and deliberately: the check finds ~20 rows that
+    # predate it, none of them currently reachable -- a collision only bites a
+    # proof that imports BOTH colliding `Code<F>.v` files, and a caller uses
+    # its callees' Specs, not their Code.  Failing here would block every
+    # regeneration on a 20-prefix rename sweep that nothing is asking for.
+    # Read the list when you add a row: yours is the one at the bottom.
+    seen = {}
+    dups = []
+    for row in man:
+        if row[2] in seen and seen[row[2]] != row[1]:
+            dups.append((row[2], seen[row[2]], row[1]))
+        seen.setdefault(row[2], row[1])
+    if dups:
+        print("WARNING: %d duplicate lemma prefixes in %s "
+              "(latent unless one proof imports both):" % (len(dups), args.manifest))
+        for pre, a, b in dups:
+            print("   %-8s shared by %s and %s" % (pre, a, b))
+
     starts = sorted(set(a for a in syms.values() if a in by))
     end = max(by) + 1
 

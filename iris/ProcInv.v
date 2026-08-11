@@ -133,6 +133,30 @@ Definition upd_cwd (V : pprivate) (v : mword 64) : pprivate :=
 Definition upd_pt (V : pprivate) (P : uptd) (ws : list (mword 64)) : pprivate :=
   MkPPriv (pv_sz V) P ws (pv_ofile V) (pv_cwd V) (pv_name V).
 
+(* the 16 debug-name bytes -- kfork's [safestrcpy(np->name, p->name, 16)] and
+   kexec's [safestrcpy(p->name, last, 16)]. *)
+Definition upd_name (V : pprivate) (ns : list (bv 8)) : pprivate :=
+  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_cwd V) ns.
+
+(* EXEC'S MOVE: a process REPLACES its address space.  The size, the
+   descriptor, the trapframe words and the name all change at once; the
+   descriptor array and the working directory survive (xv6's exec closes no
+   file and does not chdir).  This is exactly the composite kexec's two
+   accessors below produce, and [upd_exec_compose] is the equation that says
+   so -- stating the postcondition with this one name is what keeps
+   SpecKexec's success arm readable. *)
+Definition upd_exec (V : pprivate) (szv : mword 64) (P : uptd)
+    (ws : list (mword 64)) (ns : list (bv 8)) : pprivate :=
+  MkPPriv szv P ws (pv_ofile V) (pv_cwd V) ns.
+
+Lemma upd_exec_compose (V : pprivate) (szv : mword 64) (P : uptd)
+    (ws : list (mword 64)) (ns : list (bv 8)) :
+  upd_sz (upd_pt (upd_name V ns) P ws) szv = upd_exec V szv P ws ns.
+Proof. by destruct V. Qed.
+
+Lemma upd_name_id (V : pprivate) : upd_name V (pv_name V) = V.
+Proof. by destruct V. Qed.
+
 (* writing back what was already there is a no-op -- what a caller that only
    READS a descriptor (argfd) needs to close [proc_priv_ofile]'s accessor
    without its [V] drifting. *)
@@ -1167,6 +1191,92 @@ Section ProcInv.
     - exact (proj1 (proj2 (uptd_ext_sz_ext _ _ _ Hext))).
     - exact Hszb.
     - exact (um_below_ext_sz _ _ _ Hbel Hext).
+  Qed.
+
+  (* =================================================================== *)
+  (* THE ADDRESS-SPACE SWAP -- exec, and only exec.                       *)
+  (* =================================================================== *)
+  (* [proc_priv_addrspace] above is the GROW/SHRINK bridge: the table OBJECT
+     stays put and only its map moves, which is why it pins [ud_root] and
+     demands the same [p->pagetable] value back.  kexec REPLACES the object:
+     it builds a second table with proc_pagetable, loads the image into that,
+     and only at the commit block stores its root into [p->pagetable].  So no
+     premise about [ud_root] can be paid, and the cell comes back holding a
+     DIFFERENT page.
+       [ud_tfp] is still pinned, and that is not an artifact of the proof.
+     The trapframe PAGE genuinely does not move across an exec: proc_pagetable
+     maps whatever [p->trapframe] already holds, and [tf_page] -- the page's
+     BYTES -- is outside [proc_pt] entirely, so it survives the old table's
+     proc_freepagetable and is simply re-attached to the new descriptor.  The
+     trapframe WORDS do move (epc / sp / a1), which is what [ws'] is for.
+       Three things this lends that [proc_priv_addrspace] does not, each
+     because kexec needs it while the block is open: the [p->trapframe] CELL
+     (proc_pagetable reads it), [tf_page] (the commit block writes three of
+     its words), and the two pure conjuncts (proc_freepagetable's premises are
+     exactly those, AT THE OLD SIZE AND DESCRIPTOR, and the old size is gone
+     from the cell by the time the free happens -- the C saves it in [oldsz]
+     for the same reason). *)
+  Lemma proc_priv_newspace (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv γf pa pid V -∗
+    ⌜uint (pv_sz V) <= uvm_maxsz⌝ ∗
+    ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
+    p_sz pa ↦₈ pv_sz V ∗
+    p_pagetable pa ↦₈ page_base (ud_root (pv_upt V)) ∗
+    p_trapframe pa ↦₈ page_base (ud_tfp (pv_upt V)) ∗
+    proc_pt (pv_upt V) ∗
+    tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
+    (∀ (P' : uptd) (szv : mword 64) (ws' : list (mword 64)),
+       ⌜ud_tfp P' = ud_tfp (pv_upt V)⌝ -∗
+       ⌜uint szv <= uvm_maxsz⌝ -∗
+       ⌜um_below szv (ud_um P')⌝ -∗
+       p_sz pa ↦₈ szv -∗
+       p_pagetable pa ↦₈ page_base (ud_root P') -∗
+       p_trapframe pa ↦₈ page_base (ud_tfp P') -∗
+       proc_pt P' -∗
+       tf_page (ud_tfp P') ws' -∗
+       proc_priv γf pa pid (upd_sz (upd_pt V P' ws') szv)).
+  Proof.
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
+    rewrite /proc_fields /proc_pt_at.
+    iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
+    iSplitR; [iPureIntro; exact Hszb|].
+    iSplitR; [iPureIntro; exact Hbel|].
+    iFrame "Hsz Hpg Htfc Hptt Htfp".
+    iIntros (P' szv ws') "%Htf %Hszb' %Hbel' Hsz Hpg Htfc Hptt Htfp".
+    rewrite /proc_priv /proc_priv_core /proc_fields /proc_pt_at.
+    cbn [upd_sz upd_pt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    iSplitR "Ho"; [|iFrame "Ho"].
+    iSplitR; [iPureIntro; exact Hszb'|].
+    iSplitR; [iPureIntro; exact Hbel'|].
+    iFrame "Hpid Hpg Htfc Hptt Htfp Hc".
+    iFrame "Hsz Hcwd Hnm". iPureIntro. exact Hnl.
+  Qed.
+
+  (* p->name: the sixteen debug bytes, out and back.  PROMOTED HERE from
+     ProofKforkB4's [kfk_name_open], whose own comment asked for it once there
+     was a second consumer; kexec's [safestrcpy(p->name, last, 16)] is it. *)
+  Lemma proc_priv_name (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv γf pa pid V -∗
+    ⌜length (pv_name V) = PNAMELEN⌝ ∗
+    pname_cells pa (DfracOwn 1) (pv_name V) ∗
+    (∀ ns : list (bv 8), ⌜length ns = PNAMELEN⌝ -∗
+       pname_cells pa (DfracOwn 1) ns -∗
+       proc_priv γf pa pid (upd_name V ns)).
+  Proof.
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
+    rewrite /proc_fields.
+    iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    iSplitR; [iPureIntro; exact Hnl|].
+    iFrame "Hnm".
+    iIntros (ns) "%Hnl' Hnm".
+    rewrite /proc_priv /proc_priv_core /proc_fields.
+    cbn [upd_name pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    iSplitR "Ho"; [|iFrame "Ho"].
+    iSplitR; [iPureIntro; exact Hszb|].
+    iSplitR; [iPureIntro; exact Hbel|].
+    iFrame "Hpid Hpt Htfp Hc Hsz Hcwd Hnm".
+    iPureIntro. exact Hnl'.
   Qed.
 
   (* Borrow one fd slot and hand back a (possibly different) one. *)

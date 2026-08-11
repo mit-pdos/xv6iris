@@ -132,14 +132,10 @@ Definition K_prepare_return : nat := 12%nat.
    site because it is part of THIS contract's statement. *)
 Definition uservec_tvec : mword 64 := mword_of_int TRAMPOLINE.
 
-(* the four KERNEL words prepare_return re-arms, by trapframe word index
+(* the four KERNEL words prepare_return re-arms are, by trapframe word index
    (byte offset / 8): kernel_satp 0, kernel_sp 8, kernel_trap 16,
-   kernel_hartid 32.  [epc] at 24 is READ, not written. *)
-Definition tf_ksatp_idx  : nat := 0%nat.
-Definition tf_ksp_idx    : nat := 1%nat.
-Definition tf_ktrap_idx  : nat := 2%nat.
-Definition tf_epc_idx    : nat := 3%nat.
-Definition tf_khartid_idx : nat := 4%nat.
+   kernel_hartid 32.  [epc] at 24 is READ, not written.  The five names live
+   in [ProcGeom.v] with the rest of the layout -- see the note there. *)
 
 (* the trapframe word list after the four stores, in EXECUTION order *)
 (* [khart] is a parameter rather than [cid_word] directly: this is pure

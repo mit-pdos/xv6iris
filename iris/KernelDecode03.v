@@ -17,6 +17,11 @@ Require Import WpRvcBridge.
 Local Open Scope Z_scope.
 Import Defs.
 
+Lemma kd_06a1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x06a1 : mword 16)) s
+  = Some (C_ADDI (mword_of_int 8, Regidx (mword_of_int 13)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
 Lemma kd_071a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x071a : mword 16)) s
   = Some (C_SLLI (mword_of_int 6, Regidx (mword_of_int 14)), s).
@@ -540,5 +545,10 @@ Proof. decode_bridge_ms. Qed.
 Lemma kd_fc440613 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xfc440613 : mword 32) : M instruction) s
   = Some (ITYPE (mword_of_int 4036 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 12), ADDI), s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma kd_fffc8793 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xfffc8793 : mword 32) : M instruction) s
+  = Some (ITYPE (mword_of_int 4095 : mword 12, Regidx (mword_of_int 25), Regidx (mword_of_int 15), ADDI), s).
 Proof. decode_bridge_ms. Qed.
 

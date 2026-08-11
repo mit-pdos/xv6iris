@@ -144,6 +144,21 @@ Definition TFBYTES : Z := 288.
 Definition tf_word_off (i : nat) : Z := 8 * Z.of_nat i.
 (* the nth syscall argument's field index *)
 Definition tf_arg_idx (n : nat) : nat := (14 + n)%nat.
+(* The named field indices, for the fields some function stores into by name
+   rather than by argument number.  HOISTED HERE from [SpecPrepareReturn.v]
+   (which owned the first five) once there was a second consumer: kexec writes
+   [epc], [sp] and [a1].  Same rule as [InodeInv.ireg_blocks_ok] -- a fact
+   about the LAYOUT belongs in the file that states the layout, not in the
+   Spec of whichever function needed it first, because a Spec file must not
+   have to require another function's Spec to name a struct offset. *)
+Definition tf_ksatp_idx   : nat := 0%nat.
+Definition tf_ksp_idx     : nat := 1%nat.
+Definition tf_ktrap_idx   : nat := 2%nat.
+Definition tf_epc_idx     : nat := 3%nat.
+Definition tf_khartid_idx : nat := 4%nat.
+(* the USER sp -- the one kexec points at the new stack.  Not [tf_arg_idx]'s
+   range: sp is a saved register, not a syscall argument. *)
+Definition tf_sp_idx      : nat := 6%nat.
 (* argraw serves a0..a5 *)
 Definition NARG : nat := 6%nat.
 
