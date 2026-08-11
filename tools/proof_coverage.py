@@ -100,9 +100,13 @@ MANIFEST_PROVEN = {
     "timerinit": ("WpTimerinit.v", "wp_timerinit", "M-mode timer setup, whole function"),
     "spin": ("ProofSpin.v", "wp_spin", "the entry.S park loop (never returns)"),
     "swtch": ("ProofSwtch.v", "wp_swtch_sconf", "context switch, whole function"),
-    "kernelvec": ("ProofKernelvec.v", "wp_kernelvec",
-                  "S-mode trap vector (sealed as SpecKernelvec.KERNELVEC by "
-                  "LinkKernelvec.v); assumes kerneltrap_returns"),
+    "kernelvec": ("ProofKernelvec.v", "kernelvec_handler_spec",
+                  "S-mode trap vector, entry to sret (sealed as "
+                  "SpecKernelvec.KERNELVEC by LinkKernelvec.v).  There is no "
+                  "entry-to-sret lemma below it any more: kerneltrap's post is "
+                  "hart-generic, so the epilogue runs on a different hart than "
+                  "the prologue and the capstone is the only place the whole "
+                  "function exists"),
     "userret": ("ProofUserret.v", "wp_userret_pt",
                 "trampoline return-to-user path, over the user page table"),
     "uservec": ("ProofUservec.v", "wp_uservec_pt",
