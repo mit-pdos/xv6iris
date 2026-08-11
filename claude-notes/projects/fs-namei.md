@@ -1486,7 +1486,8 @@ Axiom cheat_` in the parked file and nothing else.
 
 ### N4c2 — the six scan blocks land; TWO PREMISES ARE MISSING FROM THE CONTRACT
 
-**NOTHING LANDED IN THE BUILD.**  No `iris/_CoqProject` row, no
+**NOTHING LANDED IN THE BUILD** (superseded by N4c3 below, which lands
+it).  No `iris/_CoqProject` row, no
 `iris/ProofNamex.v`, no `iris/LinkNamex.v`.  The work is parked again as
 **`claude-notes/projects/fs-namei-namex-wip.v`** (2 798 lines, md5
 `05cc5787bcc6416abb80a21446f7aa96`), carrying its own — rewritten —
@@ -1664,3 +1665,104 @@ probably sharing the mirror; worth a coordinator check.
    exit B:) `Hscn` → +0x8c..+0x94 → the two memmoves → `Htrail` →
    +0xb6..+0xda's ilock / type test / early stop / dirlookup and the four
    exits.  The share choreography is design layer 6, unchanged.
+
+### N4c3 — **namex is PROVEN and LINKED**
+
+`iris/ProofNamex.v` (5 331 lines) and `iris/LinkNamex.v` LAND IN THE BUILD,
+both rows added to `iris/_CoqProject`, and the parked WIP
+`claude-notes/projects/fs-namei-namex-wip.v` is DELETED (git-moved into
+`iris/ProofNamex.v`).  **No `Admitted`, no `Axiom`, no `cheat_`.**
+
+```
+Print Assumptions Namex.wp_namex_sconf
+  rv64d.valid_reservation      rv64d.plat_term_write
+  rv64d.match_reservation      rv64d.load_reservation
+  rv64d.cancel_reservation     functional_extensionality_dep
+```
+
+i.e. **the five platform axioms plus funext, and nothing else** — balloc's
+Axiom does not reach this cone (dirlookup's readi instance is the
+no-allocation one).  `python3 tools/lemma_diff.py --ref HEAD`: *2 file(s)
+checked — CLEAN*.
+
+`SpecNamex.v` v2 was provable exactly as frozen: the two premises N4c2
+asked for (the path at FULL ownership, `Z.of_nat plen < 2 ^ 31`) were the
+only two, and nothing else in the contract had to move.
+
+#### What the resume had to add on top of N4c2's parked file
+
+- **the mechanical v2 adaptation** — `dqp` gone from the binder and from
+  every `↦ₘ{dqp}`, `Hplen` threaded through `intros` after `Hcstr`;
+- **`nx_pe_skip_at`**, the one owed pure bridge, exactly as N4c2 specified
+  (induction on `a - off`, `nx_drop_cons` / `pe_skip_slash` /
+  `pe_skip_ne`); the `skipelem` form comes from it plus `pe_skip_idem`
+  (`pe_skip (drop a pl) = drop a pl`, so `skipelem (drop off pl) =
+  skipelem (drop a pl)` is one `unfold skipelem` + two rewrites);
+- **`Hloop`'s fuel bound tightened from `plen - off <= fuel` to
+  `plen - off < fuel`.**  With `<=` the `fuel = 0` base case is REACHABLE
+  (at `off = plen`) and the whole +0x130 tail has to be written twice; with
+  `<` it is `lia`-absurd.  Both starting arms discharge it unchanged
+  (their obligations were already `lia`);
+- the whole loop body: `Hhead` → `Hscn` → +0x8c..+0x94 → the two memmoves
+  → `Htrail` → +0xb6..+0xda → the four exits, plus the recursion.
+
+#### SEVEN surprises, none in the N3/N4 trap lists
+
+1. **A block with TWO exits cannot be given two continuations when both
+   need the same resources.**  `Hmid`/`Hhead` take two SPATIAL
+   continuations and iProp cannot split the walk's thirty-slot bundle
+   between them.  The fix is to DECIDE THE ARM ON THE DATA before the
+   call — `nx_first_ns off plen pfun` returns "every byte in `[off,plen)`
+   is `'/'`" or a witness that is not — hand the whole bundle to the arm
+   that runs, and REFUTE the other from its own exit facts (they are
+   exactly strong enough).  Same move at +0xc4/+0xcc.
+2. **...and the converse: one block reached from TWO routes must be a
+   nested `iAssert` that CONSUMES `IHl` and `Hcont`** and takes only the
+   registers, the pc and the path as arguments.  Two of them:
+   `Hrest` (+0xa4 onward, from both memmove branches) and `Hdlblk`
+   (+0xce onward, from the two arms of the `nameiparent` test).  Written
+   naively the tail would be transcribed twice and dirlookup four times.
+3. **`ltac:(...)` side-conditions are elaborated BEFORE unification**, so a
+   lemma applied with an `_` for an argument the `ltac:` proof mentions
+   makes `vm_compute` run on an open evar — **coqc SEGFAULTS** (stack
+   overflow), no error message.  `nx_sextw0`'s offset had to become two
+   evar-free wrappers, `nx_sextw_i12` / `nx_sextw_i6`.
+4. **`lia` answers *"Cannot find witness"* inside the walk's context** even
+   for a ground goal like `-2^63 <= 13 < 2^63` — the same zify poisoning
+   N4c2 recorded for `bv_unsigned`, here with `2 ^ 31` in scope from the
+   contract's premise.  Every arithmetic decision has to be a CLOSED
+   top-level lemma: `nx_bge13_le` / `nx_bge13_gt` / `nx_len32`, and a
+   literal `Hplen' : Z.of_nat plen < 2147483648` asserted once up front.
+5. **`rewrite` with an `⊣⊢` inside an `iAssert { … }` body fails with
+   *"_pattern_value_ is used in conclusion"***.  State the split/join as a
+   WAND PAIR instead (`nx_bs3_split` / `nx_bs3_join`,
+   `nx_name_split_l` / `nx_name_join`); the same lemma rewrites fine at
+   top level and inside `iEval … in "H"`.
+6. **`iEval (rewrite (L … ltac:(lia))) in "H"` does not match** — the
+   inlined `lia` witness term defeats the rewrite's pattern.  Hoist the
+   bound to a named hypothesis, or use the wand form.
+7. **+0xc0's `bne` reads `(Regidx s7, Regidx a5)`, i.e. rs2 = s7 and
+   rs1 = a5** — the opposite of what the mnemonic `bne a5,s7` suggests,
+   so the type test's polarity lemmas are
+   `neq_vec (sign_extend' 64 (di_type dn)) (mword_of_int 1)`, NOT the
+   other way round.  Read the AST, never the mnemonic.
+
+Also worth keeping: **there is no `wp_sb_zero_s_sconf`** — the byte store
+of `x0` at +0x128 goes through the ordinary `wp_sb_s_sconf` with
+`rs2 := x0` plus `IntrDefs.sie_cap_gpr_x0` and
+`WpSconfMem.trunc8_zero`, which is what ProofCopyinstr already does.  No
+new leaf lemma was needed.
+
+#### Build evidence (EC2 mirror, git-synced at `54cf247f`)
+
+`bash ~/one.sh ProofNamex.v LinkNamex.v` →
+`DONE ProofNamex.v = 0`, `DONE LinkNamex.v = 0`, `EXIT=0`, zero `Error`
+lines.  `Print Assumptions` as above.  All `ProofNamex.*` / `LinkNamex.*`
+scratch was then deleted from the mirror.
+
+#### The next frontier
+
+`SpecNamei.v` / `SpecNameiparent.v` are frozen (N4b) and now carry the two
+v2 premises; both wrappers are two-instruction `jal namex` shells, so
+`ProofNamei` / `ProofNameiparent` + their `Link` files are the obvious
+next stage and should be small.
