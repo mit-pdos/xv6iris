@@ -384,7 +384,11 @@ Section WpIntrInv.
       assert (Htm : ms_c = trap_ms elp0 ms) by reflexivity.
       iEval (rewrite Htm) in "Hms".
       (* ---- the handler WP discharges the whole handler.  Its later was
-             stripped by the [iNext] above, so ["Hsp"] is now the bare spec. ---- *)
+             stripped by the [iNext] above, so ["Hsp"] is now the bare spec.
+             THE CONTRACT IS A FIXPOINT NOW, so it is not syntactically a
+             [□ ∀ …] and [iApply] cannot see its premises: unfold one step
+             first ([IntrDefs.intr_handler_spec_unfold]). ---- *)
+      iEval (rewrite intr_handler_spec_unfold) in "Hsp".
       iApply ("Hsp" $! root_ppn elp0 ms pc0 MIE_S mdv0 m
                 with "[%] [%] [%] Hhs Hpriv Hms Hmie Hmdl Hsepc [$Hpcr $Hnpc] Hfile HF").
       { exact Hmsf. }

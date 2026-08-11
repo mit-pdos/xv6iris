@@ -595,13 +595,76 @@ Section IntrDefs.
     iFrame "Hmenv Htlbinv". rewrite Hsp. iExact "Hstk".
   Qed.
 
+  (* ================================================================== *)
+  (* THE CONTRACT IS A BANACH FIXPOINT, AND THE RECURSION IS SPLIT IN TWO. *)
+  (*                                                                      *)
+  (* The cycle is inherent (projects/kerneltrap.md, "THE CYCLE IS REAL"):  *)
+  (* enabled execution HERE means a handler is installed HERE, and the     *)
+  (* handler restores enabled execution ANYWHERE.  So the contract's own   *)
+  (* pre and post mention [intr_res], whose body carries [▷ contract].     *)
+  (* The [▷] is the guard, and it is why [ihs_pre] is contractive at all.  *)
+  (*                                                                      *)
+  (* WHY TWO HALVES AND NOT ONE [Contractive].  [S] occurs in exactly ONE  *)
+  (* place in the whole contract -- under the [▷] in the resource -- so    *)
+  (* the body is abstracted over the RESOURCE FAMILY [R] instead of over   *)
+  (* the spec.  The big half then needs only [NonExpansive] (no            *)
+  (* [dist_later] case-splitting) and the guarded half is six lines.       *)
+  (* MEASURED, because the naive shape is not merely slower:               *)
+  (*   one [solve_contractive] over the whole contract   >16 min (killed)  *)
+  (*   split: [Contractive ires_of] + [NonExpansive ihs_of]     both fast  *)
+  (* [ires_of] therefore stays TRANSPARENT -- [solve_contractive] has to   *)
+  (* SEE the [▷] that [Typeclasses Opaque intr_res] below exists to hide   *)
+  (* from [MaybeIntoLaterN].  The seal goes on the instantiated form only. *)
+  (*                                                                      *)
+  (* HART-INDEXED, because the recursion crosses harts: a trap that parks  *)
+  (* the thread returns it on whatever hart resumes it, so the post is     *)
+  (* [∀ c' : CpuId, …] and every cell in it is that hart's.  Registers are *)
+  (* per-hart ([reg_pointsto] takes a [CpuId]), so the two halves cannot   *)
+  (* share one ambient scope -- hence [ihs_post_of], stated at the         *)
+  (* AMBIENT hart and instantiated at [c'].  That [∀ c'] IS the content of *)
+  (* "the handler may return on a different hart".                        *)
+  (* ================================================================== *)
+
+  (* the installed-handler resource, parameterized by the contract it
+     carries.  [intr_res] below is this at [S := ihs], spelled out again so
+     that its one-step unfolding is the shape consumers already destructure. *)
+  Definition ires_of (S : CPU -d> mword 64 -d> iPropO Σ) : CPU -d> iPropO Σ :=
+    fun c =>
+    (∃ (h : mword 64) (b : mword 1),
+       ⌜ trapVectorMode_forwards (_get_Mtvec_Mode h) = TV_Direct ⌝ ∗
+       ⌜ stvec_base h = h ⌝ ∗
+       ghost_var (sie_name c) (1/4) b ∗
+       reg_pointsto_at c stvec (DfracOwn 1) h ∗
+       ▷ S c h)%I.
+
+  Global Instance ires_of_contractive : Contractive ires_of.
+  Proof. rewrite /ires_of. solve_contractive. Qed.
+
   (* [root_ppn] is UNIVERSAL, per trap: the handler's proof (kernelvec +
      the kerneltrap contract) is uniform in the kernel root, and quantifying
      it here -- rather than parameterizing the spec -- is what lets every
      resource above ([intr_res]/[trap_csrs]/[intr_count]/[sie_arm]) be
      root-free: an interrupted instruction instantiates the spec at whatever
      root its translation slot ([strans_inv]) is currently holding. *)
-  Definition intr_handler_spec (handler : mword 64) : iProp Σ :=
+
+  (* THE POST, AT THE RESUMING HART. *)
+  Definition ihs_post_of (R : CPU -d> iPropO Σ) `{CIDp : CpuId}
+      (root_ppn : mword 44) (elp_v : mword 1) (ms pc0 mie_v mdv0 : mword 64)
+      (m : regfile) : iProp Σ :=
+    ( hart_state ↦ᵣ HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ Supervisor -∗
+      mstatus ↦ᵣ sret_ms5 (trap_ms elp_v ms) -∗
+      mie ↦ᵣ mie_v -∗
+      mideleg ↦ᵣ mdv0 -∗
+      (∃ v : mword 64, sepc ↦ᵣ v) -∗
+      pc_is pc0 -∗
+      gpr_file m -∗
+      intr_frame root_ppn m -∗
+      R cpu_id -∗
+      WP (Loop : expr riscv_lang))%I.
+
+  Definition ihs_body_of (R : CPU -d> iPropO Σ) `{CIDb : CpuId}
+      (handler : mword 64) : iProp Σ :=
     (□ ∀ (root_ppn : mword 44) (elp_v : mword 1) (ms pc0 mie_v mdv0 : mword 64)
          (m : regfile),
         ⌜ intr_ms_facts ms ⌝ -∗
@@ -616,21 +679,53 @@ Section IntrDefs.
         pc_is handler -∗
         gpr_file m -∗
         intr_frame root_ppn m -∗
-        ( hart_state ↦ᵣ HART_ACTIVE tt -∗
-          cur_privilege ↦ᵣ Supervisor -∗
-          mstatus ↦ᵣ sret_ms5 (trap_ms elp_v ms) -∗
-          mie ↦ᵣ mie_v -∗
-          mideleg ↦ᵣ mdv0 -∗
-          (∃ v : mword 64, sepc ↦ᵣ v) -∗
-          pc_is pc0 -∗
-          gpr_file m -∗
-          intr_frame root_ppn m -∗
-          WP (Loop : expr riscv_lang) ) -∗
+        R cpu_id -∗
+        (∀ c' : CpuId, ihs_post_of R (CIDp := c') root_ppn elp_v ms pc0 mie_v mdv0 m) -∗
         WP (Loop : expr riscv_lang))%I.
 
+  Definition ihs_of (R : CPU -d> iPropO Σ) : CPU -d> mword 64 -d> iPropO Σ :=
+    fun (c : CPU) (handler : mword 64) => ihs_body_of R (CIDb := c) handler.
+
+  Global Instance ihs_of_ne : NonExpansive ihs_of.
+  Proof. rewrite /ihs_of /ihs_body_of /ihs_post_of. solve_proper. Qed.
+
+  Definition ihs_pre (S : CPU -d> mword 64 -d> iPropO Σ)
+      : CPU -d> mword 64 -d> iPropO Σ := ihs_of (ires_of S).
+
+  Global Instance ihs_pre_contractive : Contractive ihs_pre.
+  Proof.
+    intros n S1 S2 HS. rewrite /ihs_pre.
+    apply ihs_of_ne. by apply ires_of_contractive.
+  Qed.
+
+  Definition ihs : CPU -d> mword 64 -d> iPropO Σ := fixpoint ihs_pre.
+
+  (* THE PUBLIC NAME AND ARITY ARE UNCHANGED: the contract at the ambient
+     hart.  Every existing spelling [intr_handler_spec h] still means what it
+     meant; what changed is that its body now threads the resource. *)
+  Definition intr_handler_spec (handler : mword 64) : iProp Σ :=
+    ihs cpu_id handler.
+
+  (* PERSISTENCE HAS TO NAME THE INSTANCE.  The body is [□ _], so there is
+     exactly one, but [apply _] after the [fixpoint_unfold] rewrite searches
+     the whole unfolded contract and does not come back (>90s, measured).
+     The pre-fixpoint definition could afford [apply _]; this one cannot. *)
   Global Instance intr_handler_spec_persistent handler :
     Persistent (intr_handler_spec handler).
-  Proof. apply _. Qed.
+  Proof.
+    rewrite /intr_handler_spec /ihs (fixpoint_unfold ihs_pre cpu_id handler)
+            /ihs_pre /ihs_of /ihs_body_of.
+    apply bi.intuitionistically_persistent.
+  Qed.
+
+  (* THE ONE-STEP UNFOLDING, which every consumer of the contract needs: the
+     spec is not syntactically a [□ ∀ …] any more, so [iApply "Hspec"] must
+     be preceded by a rewrite with this. *)
+  Lemma intr_handler_spec_unfold (handler : mword 64) :
+    intr_handler_spec handler ⊣⊢ ihs_body_of (ires_of ihs) handler.
+  Proof.
+    rewrite /intr_handler_spec /ihs. apply (fixpoint_unfold ihs_pre cpu_id handler).
+  Qed.
 
   (* =================================================================== *)
   (* §5 [intr_res] -- THE INSTALLED-HANDLER RESOURCE: a quarter of the SIE *)
