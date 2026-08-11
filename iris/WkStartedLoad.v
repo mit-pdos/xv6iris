@@ -209,14 +209,15 @@ Section wp_started_load.
     ak_coh rak = false →
     (∀ σ σ' : wmstate, Q σ σ' → wm_log σ' = wm_log σ) →
     (∀ (tick : bool) (σ : wmstate), Pp σ → wreads_win a 4 tick σ) →
-    wracy_cert (fin_to_nat cpu_id) pc a 4 rak Pp Q →
+    wracy_cert (fin_to_nat cpu_id) pc a 4 rak wadm_any Pp Q →
     inv wstartedN (wstarted_body a P) -∗
     wstarted_ld_cb a P pc rak Pp Q -∗
     WWP Loop.
   Proof.
     iIntros (Hgid Haccpc Hacca Hakc Hquiet Hreads Hcert) "#Hinv Hk".
     rewrite /wstarted_ld_cb.
-    iApply (wp_wracy_load_gain pc a 4 rak Pp Q Hgid Haccpc Hacca Hakc Hcert).
+    iApply (wp_wracy_load_gain pc a 4 rak wadm_any Pp Q Hgid Haccpc Hacca Hakc
+              Hcert).
     iIntros (σ) "Hσ".
     (* the log lower bound the escrow's snapshot is read against — persistent,
        so taking it costs the caller nothing *)
@@ -232,6 +233,8 @@ Section wp_started_load.
       as "(%Hpc & %Htext & %HP & %Himg & %Hun & Hlat & Ht0 & Hcont)".
     iModIntro. iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
     iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
+    (* the flag's value is unconstrained: the code branches on it itself *)
+    iSplitR; [iPureIntro; apply wadm_filter_any|].
     iSplitR.
     { iPureIntro. exists v.
       exact (read_bytes_of_bytes (wflat (wm_img σ) (wm_log σ)) a 4 v Hflat). }
@@ -367,7 +370,7 @@ Section wp_started_load.
     ak_coh rak = false →
     (∀ σ σ' : wmstate, Ql σ σ' → wm_log σ' = wm_log σ) →
     (∀ (tick : bool) (σ : wmstate), Pl σ → wreads_win a 4 tick σ) →
-    wracy_cert (fin_to_nat cpu_id) pcl a 4 rak Pl Ql →
+    wracy_cert (fin_to_nat cpu_id) pcl a 4 rak wadm_any Pl Ql →
     wstep_cert (fin_to_nat cpu_id) pcf Pf (wQ_fence Barrier_RISCV_r_rw) →
     inv wstartedN (wstarted_body a P) -∗
     (∀ σ : wmstate,

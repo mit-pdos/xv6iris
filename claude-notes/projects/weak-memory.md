@@ -3478,6 +3478,74 @@ descending-copy branch is unreachable. Keep that; it is orthogonal to weak
 memory and re-litigating it would double the work for no weak-memory content.
 
 
+## 6a's REMAINING ITEM, SLICE 1: THE RACY PEEL GETS A VALUE FILTER (2026-08-11)
+
+The audit's "reduced P3" — a variant-tolerant step obligation for the walk's
+PLAIN LEAF read — starts here.  `WeakRacy.wstep_ok_racy` now carries
+`Φ : (nat -> bv 8) -> Prop`, its racy arm demands `Φ (fun j => nth_byte w j)`
+before the continuation, and `wadm_filter s rak ra rn Φ` ("every admissible
+word satisfies Φ") is the side condition that REPLACES pinnedness.  Every
+existing consumer is at `wadm_any` and pays nothing; tree green.
+
+WHY the filter is needed at all: the un-filtered arm asks the caller to prove
+the continuation for EVERY admissible word.  For the `started` flag that is
+right — the hardware's own `bnez` branches on whatever came back.  For a page
+table leaf it is false: an arbitrary 64-bit word need not be a valid PTE and
+the walk would `Err`.  `WeakKpt.wtlb_res_pt_translateAddr_at`'s collapse
+conjunct is already exactly the right Φ (quantified over EVERY access kind
+and every `wadm`-admissible word), and 6b's leaf obligations
+(`wpte_check_ok` / `wpte_valid`) are already stated `∀ a d`, i.e.
+variant-uniform.
+
+TWO THINGS THE IMPLEMENTATION SETTLED, both worth knowing before touching it:
+
+- **Φ is stated PER BYTE, not over `bv (8 * rn)`.**  Inside the fixpoint the
+  racy arm's width `n` is only PROPOSITIONALLY equal to `rn` (`n = rn` is a
+  conjunct), so a word-level predicate would need an `eq_rect` cast at every
+  use and a UIP appeal to discharge it.  `nat -> bv 8` typechecks at any
+  width.  Converting back at the consumer is one `bv_eq_of_bytes`.
+- **The filter's soundness must be TRANSPORTED, and it is ANTI-monotone in
+  views.**  `wadm_down` gives `wadm s2 w -> wadm s w` when `s2` differs from
+  `s` only by raised views, so soundness at `s` yields soundness at `s2`
+  (`wadm_filter_down`, plus the per-step `wadm_filter_set_reg/_set_dev/
+  _set_ws/_read_post` and the `filt_step` tactic).  In the two
+  `wexec`-direction traversals (`wexec_of_exec_racy`, `wrun_wexec_racy`) the
+  premise is CONDITIONAL on the phase flag — `b = true -> wadm_filter ...` —
+  because the post-racy phase permits RAM writes, which break the transport
+  but also make the racy arm unreachable.
+- **Premise ORDER matters for the proof scripts**: the filter premise sits
+  AFTER `wstep_ok_racy`/`wlog_wf` in those two lemmas, so that by the time
+  `ltac:(filt_step)` is elaborated at an `IH` application the state argument
+  is already fixed by unification.  Put it first and the placeholder cannot
+  be inferred.
+
+WHAT SLICE 1 DOES NOT DO, from the WeakCert map (2026-08-11) — the remaining
+difficulties, in the order they will bite:
+
+1. **The successor's views depend on the read TIMESTAMP, not the value.**
+   `wread_post s ak pa ts` computes floors from `ts`, so a Φ-filter on the
+   VALUE does not collapse the successor state; the arm must keep quantifying
+   over `ts` (as it does).  Consequently `wm_ws s' = wm_ws (weffs tid s es)` —
+   the third conclusion of `WeakCert.wstep_eff_confined_pin` — is FALSE for an
+   unpinned read.  Cheapest fix identified: keep `Q` on the pinned reads and
+   prove the walk's contribution by monotonicity, which is what
+   `wcert_ptw_upd_pin`'s pre/post framing already does.
+2. **SC lockstep is lost.**  `wstep_eff_confined_pin`'s read arm relies on the
+   weak read returning the same word the confined `read_bytes` returned; with
+   an unpinned leaf that fails, so the certificate premise must become a
+   FAMILY over Φ-admissible values (the `wpatch_st` shape) rather than one
+   `exec_eff` fact.  The absorption theorem is currently stated at
+   `wflat_st σ`, i.e. on the wrong side of that choice.
+3. **The TRACE ITSELF depends on the value read.**  `update_PTE_Bits` is
+   applied to the STALE word, so whether the run produces `[]`, `[CAS read]`
+   or `[CAS read; CAS write]` depends on the racy value's A/D bits — and
+   `update_PTE_Bits_fires_latest` only gives the downward direction, so a
+   stale read can fire a write-back the latest word would not.  Therefore
+   `wP_eff_*`, which fixes `es` as a PARAMETER, is the wrong home for a
+   walking instruction with an unpinned leaf read.  The family is small (five
+   shapes, of which two are blocked today) and its write member is unique, so
+   a `Q` of the form `wQ_store_w 8 ... la lw'` is stable across it.
+
 ## THE `weak_view_name` REMOVAL (2026-08-11, DONE)
 
 The last hart-indexed view machinery is out of `weakGS`.  What it was: a
