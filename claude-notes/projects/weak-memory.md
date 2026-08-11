@@ -2807,3 +2807,39 @@ answer — it would additionally delete each leaf's `ws`, `∀ ws'` and
 than merely their call sites — but that is now an optional cleanup at ~55
 sites, not the blocking item. The remaining sweep is the other ~19 leaves,
 each `wwp_X_o` + `wwp_X_run`, mechanical.
+
+### Where it belongs in S-mode: `sconf`, not `sie_cap_gpr`
+
+Checked against `IntrDefs.v`. `sconf` is the right home on four counts:
+
+1. **It is the INNER bundle.** `sie_cap_gpr = hart_state ↦ᵣ ∗ sconf ∗ sie_cap
+   m avail b p ∗ gpr_file (tp_pin m)`. Putting the token in `sconf` covers
+   every `sie_cap_gpr` client *and* the `wp_*_s_sconf` leaf family that takes
+   bare `sconf` (e.g. `ProofUvmunmap`'s `wp_cldsp_s_sconf`) — which a
+   `sie_cap_gpr` home would miss.
+2. **It has no parameters at all** (`Definition sconf : iProp Σ`, IntrDefs.v:489),
+   unlike `sie_cap m avail b p`. A value-hidden token changes no signature
+   anywhere.
+3. **It is non-fractional and exclusive** — full `↦ᵣ` on cur_privilege /
+   mstatus / mie / mideleg / menvcfg, plus `ghost_var sie_gname (1/2)`. So an
+   exclusive `hart_view` is compatible with no wrapper, unlike
+   `mmode_config`, whose fractionality forced `WeakLeafO.whart_run`.
+4. **It already uses exactly this pattern** — `∃ ms`, `∃ mie_v mdv0`,
+   `∃ menvcfg0`. IntrDefs.v:511 justifies it in words that describe
+   `hart_view` precisely: *"no leaf and no whole-function spec cares WHICH
+   mstatus it is running at, only that the fact set holds."* Nobody cares
+   which `wstate` either.
+
+Reach: `sconf` 334 mentions / 135 files; `sie_cap_gpr` 1401 / 289 — but the
+latter contains the former, so `sconf` dominates.
+
+**Two work items it implies.** `sconf_at` (the mstatus-exposing flavour) must
+mirror the new conjunct or `sconf_at_open` / `sconf_at_close` break —
+mechanical. And the token has to *enter* somewhere: the M→S transition, which
+is exactly the seam where the M-mode chain's `whart_run` hands off. That is
+the right place for it and the only part needing thought.
+
+**Not actionable yet.** The weak port is M-mode boot code; nothing constructs
+an `sconf` in weak-land. This is a decision to record now and apply when the
+port reaches S-mode. The M-mode side still needs `whart_run` regardless,
+since `mmode_config` is fractional and `sconf` does not help there.
