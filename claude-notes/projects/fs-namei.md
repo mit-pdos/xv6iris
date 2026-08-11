@@ -136,6 +136,73 @@ usual near-full rebuild lands with it.
    dirlookup returns the CHILD's reference via iget. State stage-0:
    which of the 11 take shares, which references.
 
+6. **namex's contract — DESIGNED (coordinator, pre-N4).**
+
+   **The loop currency is `IcacheRef.inode_held ip`** (∃ k q inum,
+   ip = ientry k ∗ inode_ref k q icfg_dev inum) — exactly what
+   `ProcInv.cwd_ref` already is, and the existential fraction is what
+   both starting arms naturally produce. namex's contract should be
+   stated over it, NOT over a caller-named (k, q, inum).
+
+   **The starting arms** (first path byte decides):
+   - `'/'` → iget(ROOTDEV, ROOTINO) (immediates in the decode) —
+     iget's postcondition IS a reference at an existential fraction;
+     package as inode_held. Thread iget's premises verbatim (itable
+     lock, pool shape / live "no inodes" panic arm).
+   - else → read p->cwd out of proc_priv, CARVE a share off cwd_ref's
+     reference, idup over the share (SpecIdup v3: share rides through,
+     new reference minted from the table's retained share at an
+     existential fraction), GATHER the share back — kfork's exact
+     pattern; proc_priv comes back untouched, net one new inode_held.
+
+   **Per-element choreography** (N2's ledger, now made namex's loop
+   invariant): destruct inode_held → carve `inode_ref_shed`'s q/2+q/2
+   → share to ilock(ip), keep `inode_ref_short k (q/2+q/2) (q/2)` —
+   then three exits out of the iteration:
+   - `dn`'s type ≠ T_DIR (ilock's post exposes dn): iunlockput with
+     the deposit descriptor + short parent → net zero inode resources
+     → return 0.
+   - nameiparent ∧ rest = [] (PathElems.path_elems_nil_norm — the rest
+     IS normalised, N1's finding): iunlock alone returns the share →
+     `inode_ref_gather` back to the full reference → return ip with
+     inode_held ip, and the name buffer holds the LAST element
+     (bname-canonical; `nameiparent_of`/`skipelem_is_last`).
+   - dirlookup(ip, name, 0) at the null-poff arm: found → next with
+     ITS inode_held (iget's mint inside dirlookup) → iunlockput(ip) →
+     ip := next, continue. Not found → iunlockput → return 0.
+   After the loop: nameiparent → iput(ip) (destruct inode_held for
+   iput's reference) → return 0; else return ip with inode_held.
+
+   **SCOPE RULING — the postcondition is resource-shaped.** Success =
+   a0 = ip ≠ 0 ∗ inode_held ip (plus, on the nameiparent arm, the name
+   buffer's content = the last element); failure = a0 = 0 with all
+   loaned resources back and NO inode resource retained. There is NO
+   path→inode functional statement: each dirlookup is atomic under its
+   own directory's lock, and no stable global tree exists between
+   iterations under concurrency — a ghost-trace refinement ("there was
+   a sequence of atomic lookups, each finding element i in the
+   then-current contents of directory i−1") is well-defined but earns
+   nothing at this altitude; RECORDED as a future frontier next to the
+   gmap view. The name-buffer clause IS functional because it is
+   locally produced (skipelem_name_view).
+
+   **Budget**: one ilock sleep + one iput interval per element, plus
+   the tail iput on the nameiparent-of-"/" arm — the premise is linear
+   in `length (path_elems path)`, stated with the established interval
+   vocabulary. Partial correctness: the loop needs no measure, only
+   invariant preservation (skipelem_decr exists if a measure is ever
+   wanted).
+
+   **The WP walk owes two oddities** (N1's decode findings): the DEAD
+   re-test block at namex+0xf8–0x102 (both tests already decided;
+   walk and discharge), and the unterminated 14-byte memmove on the
+   long-element branch (skipelem_name_view covers both shapes).
+
+   **The wrappers** (26B each): namei = namex(path, 0, own stack
+   name[14]) — the buffer is namei's frame, so namei's contract does
+   not mention it; nameiparent = namex(path, 1, caller's name buffer)
+   — threads the buffer and its content clause.
+
 ## Stages (per the established loop; each ends merged + gated)
 
 - **N0** (coordinator): land the staged decode; finish this design
