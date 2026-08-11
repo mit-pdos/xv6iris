@@ -1028,3 +1028,5 @@ SpecKexec.v
 SpecFlags2perm.v
 ProofFlags2perm.v
 LinkFlags2perm.v
+SpecFilestat.v
+ProofFilestatParts.v

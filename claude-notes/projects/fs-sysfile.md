@@ -28,7 +28,9 @@ campaign file.c is 7/7 and sysfile.c is 15/16 (sys_exec pending).
    proof adds `bv_unsigned inum < 16*nib` for the linked child.
    **DONE in S2.**
 4. **The stat hole**: SpecStati.stat_at omits bytes 12..15; filestat
-   owns them separately to copyout all 24.
+   owns them separately to copyout all 24. **DISSOLVED in S3** — the
+   buffer is filestat's own frame, so no contract clause is needed at
+   all; see the S3 section.
 5. **The fd-type fact**: FileInv's payload is `inode_ref` only on
    FD_INODE/FD_DEVICE; `f->off` is NOT zero for FD_PIPE/FD_DEVICE
    (sys_open only assigns it on the inode path). filewrite's contract
@@ -139,6 +141,92 @@ proof over a touched Code file dies with *"makes inconsistent
 assumptions over library xv6iris.KernelDecodeNN"*. Run `full.sh` once
 after a git-sync before iterating.
 
+## S3 — filestat's spec + the stat-buffer bridge LANDED; filewrite BLOCKED
+
+### What landed (green on the mirror, lemma_diff clean but the seal)
+
+- **`iris/SpecFilestat.v`** — FROZEN and compiling. Two arms, no device arm,
+  no panic. `filestat_stack = 10 + 50` (copyout dominates ilock's 44).
+- **`iris/ProofFilestatParts.v`** — the stat-buffer bridge, all lemmas PROVEN:
+  the five `st_*` field addresses as `pa_add`; the two-byte alignment pair
+  (`fst_aligned8_aligned2`, `..._hi` — InstrBytes' `z_rem8_*` helpers are
+  `Local`, so the arithmetic is redone); the narrow analogues of
+  `bytes_own_slot` (`fst_bytes_w4`, `fst_bytes_w2`); and the two conversions
+  `fst_bytes_stat` (3 frame slots -> `stat_at` + the hole) and
+  `fst_stat_bytes` (back again).
+- `ProofFilestat.v` / `LinkFilestat.v` NOT written — parked green.
+
+### INHERITANCE ITEM 4 IS DISSOLVED, not solved
+
+The stat hole needs **no contract clause at all**. `struct stat` is filestat's
+OWN 24-byte stack local at `s0-72` = frame slots 9/8/7
+(`StackBytes.slots3_bytes_own` at `k = 9` fits it exactly). So bytes 12..15 are
+frame bytes, existential in `stack_own`, never written by stati, and copyout's
+contract says nothing about what the user pages end up holding. There is no
+resource anywhere in the cone that could record them. SpecFilestat says
+nothing about the buffer at all; a caller owes the SLOTS and nothing else.
+
+### Decode corrections to S1 (read off the tracked `xv6-riscv/kernel/kernel.asm`,
+which matches the Code files byte-for-byte at a base 14 bytes lower)
+
+1. **The `panic("filewrite")` at +0x11e is the ELSE arm** — the type is none of
+   FD_PIPE/FD_DEVICE/FD_INODE — exactly like fileread's. It is **not** a
+   short-write panic. A short write (`r != n1`) `break`s the loop at +0xc0 and
+   the tail `ret = (i == n ? n : -1)` at +0xf4 answers -1. S1's guess was
+   wrong; the `panic_wp_any` threading is unaffected.
+2. **`devsw[major].write` is at offset 8**, not 0 (`.read` is first). So
+   filewrite's cell is `devsw + 16*mj + 8`, NOT fileread's `a_devsw_read`.
+3. **filewrite returns `n`, never a partial count, on the inode arm** —
+   `ret = (i == n ? n : -1)`. Still inside `pipe_rw_ret n r`.
+4. filewrite's `!writable` early return at +0x00/+0x04 is **before the
+   prologue**; its `ret` at +0x124 runs with sp untouched.
+5. filestat's dispatch is a single **unsigned range test** `type - 2 <=u 1`
+   (`bltu a4,a5` — AST order is `(imm, rs2, rs1, op)`, confirmed against the
+   Sail `execute_BTYPE`). Reading it the other way inverts the dispatch.
+6. filestat's `sraiw a0,a0,31` at +0x4a is the `< 0 ? -1 : 0` idiom over
+   copyout's own two-valued result; step it with `ProofBallocParts`'
+   `wp_sraiw_s_sconf`.
+7. `max = ((MAXOPBLOCKS-1-1-2)/2)*BSIZE = 3072`, materialised twice
+   (`lui`/`addi` into s7 and s9) at +0x42..+0x4e.
+
+### THE BLOCKER: filewrite cannot rebuild `ic_loaded` (STOP-AND-REPORT)
+
+`SpecIunlock` takes `IcacheEscrow.ic_loaded`, which carries
+`⌜DirView.dir_ok icfg_nib dn data⌝`. `dir_ok` is conditional on
+`di_type dn = T_DIR`, and it constrains the file's **data bytes**
+(`dir_inums_ok`: every live record's inum is in range). writei cannot change
+`di_type`, so a directory going in is a directory coming out — and an
+**arbitrary user write into a directory's byte range breaks `dir_inums_ok`**.
+Therefore filewrite's FD_INODE arm is **unprovable without a not-a-directory
+premise**, and there is no resource in the file-table or icache layer that
+says so. `dn` is ilock's OUTPUT, so the fact cannot be stated as a premise
+about a caller-held record.
+
+This is the exact shape of inheritance item 2 (dirlink's short-write holes)
+that S2 had to retrofit, and it needs the same kind of ruling. Options:
+
+1. **(RECOMMENDED)** Add `⌜bv_unsigned (di_type dn) <> T_DIR_z⌝` to the
+   FD_INODE arm of `FileInv.file_payload` / `inode_pay`. This IS the real xv6
+   invariant: sys_open refuses `O_RDWR` on a directory, so a writable
+   FD_INODE file is never one. Costs: sys_open (S6) establishes it;
+   fileread/fileclose/filedup carry `inode_pay` inside `file_ref` without
+   inspecting it, so the change is additive to them. Touches `FileInvDefs.v`,
+   which is frozen — hence the coordinator's call, not an agent's.
+2. Pin the loaded type per icache slot in `ic_escrow` so a caller can hold a
+   persistent agreement fact. Bigger change, and the escrow does not do this
+   today.
+3. Weaken `ic_loaded`'s `dir_ok` conjunct — NOT viable, it is load-bearing for
+   dirlookup/namei.
+
+Until this is ruled on, **SpecFilewrite.v is deliberately NOT frozen**:
+encoding the fact provisionally in filewrite's own environment would create
+exactly the retrofit S2 just finished paying for. Everything else about
+filewrite's contract is settled and recorded above.
+
+Mirror evidence: `SpecFilestat.v` and `ProofFilestatParts.v` each `DONE = 0`,
+zero `Error`. `lemma_diff.py --ref HEAD`: 2 files, one NEWAXIOM, the
+`Module Type FILESTAT` seal.
+
 ## The stage ladder
 
 - **S1** (agent): the DECODE stage — 13 Code files (the 12 targets +
@@ -148,9 +236,9 @@ after a git-sync before iterating.
 - **S2** (agent) **— LANDED**: the dist=0 retrofit — SpecWritei kernel
   arm + ProofWritei + SpecDirlink third-arm re-derivation + the
   linked-inum premise (items 2+3) + `DirView.dir_ok_dirlink`.
-- **S3** (agent): filestat (stat_at + the hole + copyout) and
-  filewrite (the loop over writei inside its own transaction;
-  fd-type premise per item 5). file.c 7/7.
+- **S3** (agent) **— PARTIAL**: SpecFilestat + ProofFilestatParts landed;
+  filewrite BLOCKED on the dir_ok ruling (see the S3 section). Its Spec is
+  deliberately unfrozen; ProofFilestat is parked. file.c stays 5/7.
 - **S4** (agent): sys_read/sys_write/sys_fstat — argfd + the file.c
   contracts; thin shells.
 - **S5** (agent): create — the writing half's boss: namei/nameiparent
