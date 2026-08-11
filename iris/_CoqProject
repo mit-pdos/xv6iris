@@ -993,3 +993,4 @@ LinkNameiparent.v
 ProofPrepareReturnParts.v
 ProofPrepareReturn.v
 LinkPrepareReturn.v
+SpecIalloc.v
