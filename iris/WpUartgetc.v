@@ -69,8 +69,31 @@ Section WpUartgetc.
   (* -------------------------------------------------------------------- *)
   (*  uartgetc, inlined.                                                    *)
   (* -------------------------------------------------------------------- *)
+  (* THE SIDE CONDITION ON [rs_lsr] ARRIVES BY INSTANCE RESOLUTION.  This
+     block is a multi-instruction leaf over [WpSconfUartAccess]'s converted
+     UART leaves, and it applies them at two VARIABLE register indices.  For
+     [rs_rhr] the disequality is already an ordinary premise below ([rs_rhr <>
+     Rtp], on the raw [mword 5]) -- and [IntrDefs.srcok_solve]'s injection arm
+     is exactly what turns that spelling into the class, so that premise stays
+     put and nothing about it moves.  [rs_lsr] carried NO such fact: its only
+     premise was the value fact [rget m rs_lsr = uart_pa 5], which says nothing
+     about tp.  Since [wp_uart_read_free_s_sconf] now takes [SrcOk rs1], an
+     application at [rs_lsr] would have had NOTHING to resolve against -- and
+     the resulting failure is the silent one, an instance SHELVED inside
+     [iApply] that only surfaces at [Qed] as "Attempt to save an incomplete
+     proof".  So the class is stated here too, as an implicit argument, which
+     costs no positional slot: the block's two call sites (ProofUartintr.v)
+     pass concrete registers and do not move.
+
+     WHY IT IS TRUE AND NOT MERELY CONVENIENT: [rs_lsr] holds the UART LSR
+     address, so it is a data pointer, not the thread pointer; and the value
+     premise reads it as [rget m rs_lsr] at the ENTRY hart while the poll's
+     load happens after a [wp_next] that may have migrated, so the leaf needs
+     the read to be hart-independent for exactly the same reason [rs_rhr] does.
+     The asymmetry in the ORIGINAL statement (a premise for one base, nothing
+     for the other) was the gap. *)
   Lemma wp_uartgetc_inline (γd : uart_names) (γv : disk_names) (m : regfile) (n : nat)
-      (rs_lsr rs_rhr : mword 5) (imm8 : mword 8)
+      (rs_lsr rs_rhr : mword 5) `{!SrcOk rs_lsr} (imm8 : mword 8)
       (pcL pcA pcB pcR pcK pcNo : mword 64) (b : bool) :
     (* the two bases: the LSR and the RHR, each already in a register --
        [rs_lsr]/[rs_rhr] are register-index VARIABLES, so the read has to go
@@ -118,6 +141,12 @@ Section WpUartgetc.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hlsr Hrhr Hne Hrtp HA HB HR HK HNo Hal) "Hcg Hpc HiL HiA HiB HiR #Hdinv Hk".
+    (* the class, consumed at [rs_lsr]: the LSR address is the same word at
+       every hart, so the premise stated at the entry hart still holds at the
+       hart the poll's [wp_next] lands on.  Also the wiring check -- attach the
+       class to any other parameter and this line stops typechecking. *)
+    assert (Hlsr_all : forall hh : CpuId, rget (CID := hh) m rs_lsr = uart_pa 5)
+      by (intros hh; rewrite (src_ok_rget_indep m rs_lsr hh CID); exact Hlsr).
     (* Ra5 (x15) is never tp (x4): the one register-index fact the a5-side
        reasoning below needs to peel [rget] back to a raw map lookup. *)
     assert (HR5tp : Regidx Ra5 <> Regidx Rtp)
@@ -186,6 +215,18 @@ Section WpUartgetc.
       iDestruct "Hk" as "[_ Hyes]".
       iApply ("Hyes" $! bt c with "[%] Hcg Hpc"). exact Hempty.
   Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* [SrcOk] SMOKE TEST -- see IntrDefs.v's checker block.  The positive   *)
+  (* pair is the two shapes this block actually needs: a CONCRETE register *)
+  (* (arm 1, [vm_compute]) for the a0/a5 it hard-codes, and the RAW-mword  *)
+  (* disequality (arm 4) which is how [rs_rhr <> Rtp] above is spelled --   *)
+  (* that arm was added for exactly this premise, so if it ever regresses  *)
+  (* the failure lands HERE and not as a shelved [Qed] in ProofUartintr.   *)
+  (* ------------------------------------------------------------------- *)
+  Definition ug_srcok_pos_a5 : SrcOk Ra5 := _.
+  Definition ug_srcok_pos_raw (rs : mword 5) (H : rs <> Rtp) : SrcOk rs := _.
+  Fail Definition ug_srcok_neg : SrcOk Rtp := _.
 
 End WpUartgetc.
 End UartgetcProof.

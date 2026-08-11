@@ -2070,8 +2070,57 @@ Class SrcOk (rs : mword 5) : Prop :=
    implicit parameter ... whose type is SrcOk Rtp".)  If a converted leaf ever
    fails this way, look for a call site whose register is a variable before
    looking anywhere else. *)
+(* THE FOUR ARMS, AS A NAMED TACTIC.  They exist because a call site's
+   source-register argument can carry the fact in FOUR DIFFERENT SHAPES, and an
+   arm that is missing does not produce a missing-arm error -- it produces the
+   shelved-obligation / "Attempt to save an incomplete proof" failure described
+   above, hundreds of lines away.  So the arms are enumerated here, each with
+   the site that motivates it, and every one of them has a positive smoke test
+   at the bottom of this file.  ADD ARMS HERE rather than editing call sites:
+   a new arm costs one [first] branch and nothing at the 2173 references. *)
+Ltac srcok_solve :=
+  first
+    [ (* (1) A CONCRETE register -- the overwhelming majority of call sites
+           ([iApply (wp_csdsp_s_sconf pc uimm (mword_of_int 15) ...)]).  Decided
+           by computation, with the SAME script [rd_ok]'s tp conjunct and
+           [src_ok]'s body use, so the class route and the premise route cannot
+           drift apart. *)
+      rdok_tpne
+    | (* (2) THE FACT VERBATIM IN THE CONTEXT: [Regidx rs <> Regidx Rtp].  This
+           is the symbolic-block interpreter [WpSconfVc.v], which applies these
+           leaves at a QUANTIFIED [rs1]/[rs2] and poses exactly this from
+           [VcGenS.is_tp_false] (it needs it anyway, for its own [rget_ne]
+           rewrites); also [ProofMemset.v]'s [Hra1tp]/[Hra5tp] and
+           [ProofVirtioDiskInit.v]'s [Hrs1tp]/[Hrs2tp], which state it as an
+           ordinary premise.  No [vm_compute] can decide a variable, so without
+           this arm those sites shelve. *)
+      assumption
+    | (* (3) THE WRITE-SIDE PREMISE INSTEAD: the context has [rd_ok rs] and the
+           leaf reads the register it also writes (every compressed rd = rs1
+           form).  [rd_ok]'s second conjunct IS this goal, so project it rather
+           than making the site restate it. *)
+      (apply rd_ok_tp; assumption)
+    | (* (4) THE DISEQUALITY ON THE RAW [mword 5], i.e. [rs <> Rtp] rather than
+           [Regidx rs <> Regidx Rtp] -- which is how [WpUartgetc.v] states its
+           [rs_rhr] premise (it wants the plain register-file value, so it never
+           needed the [Regidx] form).  [Regidx] is a constructor, so one
+           [injection] moves the goal onto the raw words and [congruence] closes
+           it against whichever shape the hypothesis has (this arm also covers a
+           hypothesis written the other way round, [Rtp <> rs]).  NOTE this
+           deliberately does NOT [vm_compute] the way [rdok_tpne] does: at a
+           variable register [vm_compute] normalises [Rtp] to a bitvector
+           literal that no longer matches the un-normalised hypothesis, which is
+           exactly why arm (1) does not already cover this case. *)
+      (let H1 := fresh in let H2 := fresh in
+       intro H1; injection H1 as H2; congruence)
+    ].
+(* NO [ops_ok] ARM, and that is not an oversight: [ops_ok b rd rs1 rs2]'s source
+   conjuncts are [src_ok b rs], i.e. [b = true -> ...], and at a VARIABLE [b]
+   the guarded fact does not imply the unguarded one this class asks for.  A
+   leaf whose caller only has [ops_ok] at a variable [b] belongs on the guarded
+   route, not here (see the leaf-family note in the commit that landed this). *)
 Global Hint Extern 0 (SrcOk _) =>
-  (constructor; first [ rdok_tpne | assumption ]) : typeclass_instances.
+  (constructor; srcok_solve) : typeclass_instances.
 
 (* The bridge a converted leaf uses: the class turns the caller's hart-free
    premise about [m] into the [rget] the funnel hands it, at WHATEVER hart the
@@ -2087,3 +2136,62 @@ Proof. intros c. exact (rget_ne (CID := c) m rs src_ok_not_tp). Qed.
 Lemma src_ok_rget_indep (m : regfile) (rs : mword 5) `{!SrcOk rs} :
   forall c1 c2 : CpuId, rget (CID := c1) m rs = rget (CID := c2) m rs.
 Proof. exact (rget_hart_indep m rs src_ok_not_tp). Qed.
+
+(* ==================================================================== *)
+(* THE CHECKER FOR [SrcOk]'S SILENT FAILURE MODE.                        *)
+(* ==================================================================== *)
+
+(* WHY THIS EXISTS AT ALL.  [SrcOk]'s failure inside a tactic-driven [iApply]
+   is a SHELVED goal, not an error: the file compiles for hundreds more lines
+   and dies at [Qed] with "Attempt to save an incomplete proof", naming neither
+   the class, the register, nor the call site.  Per durable-notes' rule for a
+   refactor with a silent failure mode, the checker is written BEFORE the sweep
+   and it checks the two things that can actually go wrong here:
+
+     - the CLASS/HINT ITSELF -- a mis-stated class or a dead [Hint Extern]
+       would make every converted leaf shelve at every call site.  The
+       [srcok_pos_*] / [srcok_neg_*] pairs below pin that down, one per arm of
+       [srcok_solve], plus the negative that says resolution really does FAIL
+       at tp (an accidentally-provable class would make the whole exercise
+       vacuous).  Each converted leaf FILE repeats the concrete pair beside its
+       own leaves, so a file that somehow does not see this hint (import order)
+       fails at itself rather than at a consumer's [Qed].
+     - a leaf's own WIRING, i.e. the class attached to the wrong parameter.
+       That one needs no probe: every converted leaf CONSUMES its class in the
+       proof body, via [src_ok_rget_indep m rs ...] / [src_ok_rget_all m rs ...]
+       naming the same register the statement's premise reads.  Attach the class
+       to the wrong parameter and that line does not typecheck, loudly, in the
+       leaf's own file.  That consumption is not decoration -- it is the wiring
+       check, so DO NOT "simplify" a converted leaf by deleting it. *)
+
+(* arm (1), and the shape 2100-odd of the 2173 references have: a concrete
+   register, decided by [rdok_tpne]'s [vm_compute]. *)
+Definition srcok_pos_concrete : SrcOk (mword_of_int 1 : mword 5) := _.
+Definition srcok_pos_concrete_a5 : SrcOk (mword_of_int 15 : mword 5) := _.
+Definition srcok_pos_sp : SrcOk csp_rs1 := _.
+
+(* THE NEGATIVE, and the reason the class is worth anything: at the thread
+   pointer there is NO instance, so a leaf applied at tp fails AT THE CALL SITE
+   instead of accumulating an obligation nobody can discharge.  If this [Fail]
+   ever stops failing, the class has become provable and every converted leaf's
+   side condition has silently evaporated. *)
+Fail Definition srcok_neg_tp : SrcOk Rtp := _.
+
+(* arms (2)-(4): resolution at a VARIABLE register, from each of the three
+   hypothesis shapes the tree actually carries.  These are the arms whose
+   absence produces the shelved-[Qed] failure, so each gets a positive test. *)
+Definition srcok_pos_assumption (rs : mword 5) (H : Regidx rs <> Regidx Rtp)
+  : SrcOk rs := _.
+Definition srcok_pos_rd_ok (rs : mword 5) (H : rd_ok rs) : SrcOk rs := _.
+Definition srcok_pos_raw_mword (rs : mword 5) (H : rs <> Rtp) : SrcOk rs := _.
+Definition srcok_pos_raw_flipped (rs : mword 5) (H : Rtp <> rs) : SrcOk rs := _.
+
+(* ... and the negative at a variable with NOTHING in the context: resolution
+   must fail, or the arms would be closing goals they have no proof of. *)
+Fail Definition srcok_neg_bare (rs : mword 5) : SrcOk rs := _.
+
+(* the guarded premise does NOT satisfy the unguarded class at a variable [b] --
+   this is the "no [ops_ok] arm" note above, stated as a check so nobody adds
+   such an arm and quietly weakens the class. *)
+Fail Definition srcok_neg_src_ok (b : bool) (rs : mword 5) (H : src_ok b rs)
+  : SrcOk rs := _.

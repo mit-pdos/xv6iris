@@ -430,8 +430,32 @@ Section WpSconfCtl.
   (* c.ret (jalr x0, 0(ra)) -- no register write; the bundle is opened    *)
   (* for the LPE/priv/misa side conditions and reassembled.               *)
   (* ------------------------------------------------------------------- *)
+  (* THE SIDE CONDITION ARRIVES BY INSTANCE RESOLUTION, NOT AS A PREMISE --
+     see [IntrDefs.SrcOk].  c.ret's whole observable effect is the TARGET
+     [ret_pc (rget m ra)], and that is a read of [ra] in [tp_pin m], so as
+     spelled here it depends on the ambient hart at exactly one register,
+     ra = tp.  Once the funnel's σ-callback moves inside [wp_next] the
+     conclusion's [pc_is tgt] is owed at the hart the trap returned TO while
+     [tgt] was elaborated at the hart we came FROM, and the two agree only away
+     from tp.  c.ret writes no register, so there is no [rd_ok]/[ops_ok] slot to
+     widen here, and this leaf has ~150 references -- more than any other in
+     this sweep -- so an ordinary premise would move all of them.  The implicit
+     [`{!SrcOk ra}] occupies no positional slot, so no call site changes.
+
+     NOT REACHABLE AT tp IN PRACTICE, which is why the unguarded class is the
+     right shape: a [c.ret] through the thread pointer is not xv6 code (the
+     return address lives in [ra] by the ABI), and the one register the pin
+     makes hart-dependent is exactly the one a return must not use.  If a call
+     site ever does pass tp here, resolution fails AT THAT SITE naming the
+     lemma and the register -- see the probe in WpSconfBtype.v.
+
+     THE STATEMENT STAYS SPELLED [rget m ra].  Respelling [tgt] hart-free as
+     [ret_pc (m !!! Regidx ra)] was measured on [wp_csdsp_s_sconf] and rejected:
+     callers discharge and normalise this with [rget]-shaped rewrites, which
+     then have nothing to match (99 consumer files).  The class carries the side
+     condition; the spelling does not move. *)
   Lemma wp_cret_s_sconf
-      (pc : mword 64) (ra : mword 5)
+      (pc : mword 64) (ra : mword 5) `{!SrcOk ra}
       (m : regfile) (n : nat) (b : bool) :
     let tgt := ret_pc (rget m ra) in
     uint ra <> 0 ->
@@ -444,6 +468,19 @@ Section WpSconfCtl.
     WP (Loop : expr riscv_lang).
   Proof.
     intros tgt Hra.
+    (* THE CLASS, CONSUMED -- and this line is the leaf's WIRING CHECK, not
+       decoration: it names [ra], the register the statement above reads, so
+       attaching the class to any other parameter fails to typecheck here.
+       [tgt] is the return target as computed at the ENTRY hart; the ALL-HARTS
+       form says the same word is the target at whatever hart the σ-callback is
+       instantiated at.  Today that is still the entry hart, so [Htgt_all
+       cpu_id] is a conversion; the funnel change that moves the callback
+       inside [wp_next] instantiates it at the rebound hart and nothing else in
+       this proof moves.  (At a VARIABLE [ra] this is not a conversion: the
+       pin's [bool_decide] cannot reduce, so without the class there is no
+       proof of it at all.) *)
+    assert (Htgt_all : forall hh : CpuId, ret_pc (rget (CID := hh) m ra) = tgt)
+      by (intros hh; unfold tgt; by rewrite (src_ok_rget_indep m ra hh CID)).
     iIntros "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b pc true (JALR (zeros' 12, Regidx ra, zreg))
               with "Hcg Hpc Hinstr").
@@ -516,8 +553,17 @@ Section WpSconfCtl.
   (* NO alignment side condition -- and the link value is pc+2.           *)
   (* Who needs it: fileread's FD_DEVICE arm calls devsw[major].read.      *)
   (* ------------------------------------------------------------------- *)
+  (* THE READ-SIDE SIDE CONDITION IS ON [rs1] ONLY, and it comes by instance
+     resolution ([IntrDefs.SrcOk]) while the WRITE side keeps its existing
+     [rd_ok rd] premise slot.  The asymmetry is the whole design: [rd_ok] is
+     already a positional premise here, so widening it costs nothing, whereas
+     the read of the target base [rs1] has no slot of its own -- and note this
+     leaf must NOT state [ops_ok b rd rs1 rs1] instead, because [ops_ok]'s
+     source conjunct is guarded on [b] and the target of a jump has to be
+     hart-independent at [b = true] as well.  So: [rd_ok] premise for the write,
+     [SrcOk] class for the read. *)
   Lemma wp_cjalr_s_sconf
-      (pc : mword 64) (rs1 rd : mword 5)
+      (pc : mword 64) (rs1 rd : mword 5) `{!SrcOk rs1}
       (m : regfile) (n : nat) (b : bool) :
     let tgt := ret_pc (rget m rs1) in
     uint rs1 <> 0 ->
@@ -532,6 +578,11 @@ Section WpSconfCtl.
     WP (Loop : expr riscv_lang).
   Proof.
     intros tgt Hrs1 Hrd Hrdok.
+    (* the class, consumed at [rs1] -- the leaf's wiring check, exactly as in
+       [wp_cret_s_sconf] above.  The link write is [rd]'s business and is
+       handled by [rd_ok]/[tp_refold] further down. *)
+    assert (Htgt_all : forall hh : CpuId, ret_pc (rget (CID := hh) m rs1) = tgt)
+      by (intros hh; unfold tgt; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr Hcont".
     pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
     pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
@@ -617,5 +668,18 @@ Section WpSconfCtl.
     iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
     iPureIntro. done.
   Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* [SrcOk] SMOKE TEST -- see IntrDefs.v's checker block for why.        *)
+  (* Resolution must SUCCEED at an ordinary register and FAIL at tp, HERE,*)
+  (* in the file whose leaves depend on it: an unresolved [SrcOk] inside  *)
+  (* an [iApply] is SHELVED, so a broken hint (or one this file does not  *)
+  (* see, through an import change) would not surface until some          *)
+  (* consumer's [Qed] said "Attempt to save an incomplete proof" with no  *)
+  (* mention of the class, the register or the call site.  [ra] = x1 is   *)
+  (* the register [wp_cret_s_sconf] is actually applied at.               *)
+  (* ------------------------------------------------------------------- *)
+  Definition ctl_srcok_pos : SrcOk (mword_of_int 1 : mword 5) := _.
+  Fail Definition ctl_srcok_neg : SrcOk Rtp := _.
 
 End WpSconfCtl.

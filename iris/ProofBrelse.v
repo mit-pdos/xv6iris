@@ -149,7 +149,7 @@ Section ProofBrelse.
   (*  (exactly as [wp_csdsp_s_sconf] spells it).                          *)
   (* ---------------------------------------------------------------- *)
   Local Lemma wp_csdsp_au_s_sconf `{CID0 : CpuId} 
-      (pc : mword 64) (uimm : mword 6) (rs2 : mword 5)
+      (pc : mword 64) (uimm : mword 6) (rs2 : mword 5) `{!SrcOk rs2}
       (m0 : regfile) (av : nat) (Ψ : iProp Σ) (Em : coPset)
       (b : bool) (pme : mword 64) :
     ↑kptN ⊆ Em ->
@@ -168,6 +168,13 @@ Section ProofBrelse.
     WP (Loop : expr riscv_lang).
   Proof.
     intro HkptEm.
+    (* the class, consumed at [rs2] -- see [IntrDefs.SrcOk].  This wrapper
+       applies a converted leaf at a VARIABLE register and carries no tp fact
+       of its own, so the class has to be stated here; it is implicit, so this
+       lemma's own call sites (which pass concrete registers) do not move.  The
+       [assert] is the wiring check: it names the register the premise reads. *)
+    assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m0 rs2 = rget (CID := CID0) m0 rs2)
+      by (intros hh; exact (src_ok_rget_indep m0 rs2 hh CID0)).
     assert (Hsp : rget (CID := CID0) m0 csp_rs1 = m0 !!! Regidx csp_rs1).
     { apply rget_ne. intro He. injection He as He2. vm_compute in He2. congruence. }
     rewrite <- sext9_12_64.

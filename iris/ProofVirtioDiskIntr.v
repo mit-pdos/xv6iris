@@ -108,7 +108,7 @@ Section VtLeaves.
   (* ---- the two dev_inv-borrowing virtio leaves, at a CONCRETE address ---- *)
 
   Lemma wp_vt_lw_dev (γu : uart_names) (γd : disk_names)
-      (pc : mword 64) (rvc : bool) (rd rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rvc : bool) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (a : mword 64) (off : Z) (P : bv 32 -> Prop)
       (p : mword 64) :
     add_vec (rget m rs1) (sign_extend' 64 imm) = a ->
@@ -127,6 +127,15 @@ Section VtLeaves.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hea Hg Hoff Hrd Hrdok Hread. destruct Hg as (Hr & Hal & Hcan & Hdv).
+    (* the class, consumed at [rs1] -- see [IntrDefs.SrcOk].  This wrapper
+       applies a converted leaf at a VARIABLE register and carries no tp fact
+       of its own, so the class has to be stated here; it is implicit, so this
+       lemma's own call sites (which pass concrete registers) do not move.  The
+       [assert] is the wiring check: it names the register the premise reads. *)
+    assert (Hea_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm)
+              = add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm))
+      by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     assert (Ha8 : sign_extend' 64 (subrange_vec_dec
                     (add_vec (rget m rs1) (sign_extend' 64 imm)) (xlen - 0 - 1) 0) = a).
     { rewrite subrange_id. rewrite sign_extend'_id. exact Hea. }
@@ -145,7 +154,7 @@ Section VtLeaves.
   Qed.
 
   Lemma wp_vt_sw_dev (γu : uart_names) (γd : disk_names)
-      (pc : mword 64) (rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
       (m : regfile) (n : nat) (a : mword 64) (off : Z) (sw : mword 32)
       (p : mword 64) :
     add_vec (rget m rs1) (sign_extend' 64 imm) = a ->
@@ -167,6 +176,17 @@ Section VtLeaves.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hea Hg Hoff Hsw Hwr. destruct Hg as (Hr & Hal & Hcan & Hdv).
+    (* the class, consumed at [rs1 / rs2] -- see [IntrDefs.SrcOk].  This wrapper
+       applies a converted leaf at a VARIABLE register and carries no tp fact
+       of its own, so the class has to be stated here; it is implicit, so this
+       lemma's own call sites (which pass concrete registers) do not move.  The
+       [assert] is the wiring check: it names the register the premise reads. *)
+    assert (Hea_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm)
+              = add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm))
+      by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
+      by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     assert (Hsw' : (autocast (T := mword)
                       (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = sw)
       by exact Hsw.
@@ -1064,7 +1084,7 @@ Section VtDevRam.
      [nr <= nc <= np] plus the persistent lower bound at [nc] -- which is
      exactly the evidence the reclaim accessor wants. *)
   Lemma wp_vt_lhu_used_idx (γu : uart_names) (γd : disk_names) (pd pav pu : mword 64)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (np nr : nat) (p : mword 64) :
     add_vec (rget m rs1) (sign_extend' 64 imm) = (pa_add pu 2%nat : mword 64) ->
     uint rd <> 0 -> rd_ok rd ->
@@ -1081,6 +1101,15 @@ Section VtDevRam.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hea Hrd Hrdok.
+    (* the class, consumed at [rs1] -- see [IntrDefs.SrcOk].  This wrapper
+       applies a converted leaf at a VARIABLE register and carries no tp fact
+       of its own, so the class has to be stated here; it is implicit, so this
+       lemma's own call sites (which pass concrete registers) do not move.  The
+       [assert] is the wiring check: it names the register the premise reads. *)
+    assert (Hea_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm)
+              = add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm))
+      by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr #Hdinv #Hgeom Hpub #Hlb0 Hcont".
     iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     iDestruct (disk_geom_static with "Hgeom") as %(_ & _ & Hstu).
@@ -1146,7 +1175,7 @@ Section VtDevRam.
      [used_elem_pa (v_cfg v) p] the very address the code computes off
      [disk.used]. *)
   Lemma wp_vt_lw_used_elem (γu : uart_names) (γd : disk_names) (pd pav pu : mword 64)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (np c p : nat) (sl : vslot) (pin : _)
       (pp : mword 64) :
     (p < c)%nat ->
@@ -1177,6 +1206,15 @@ Section VtDevRam.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hpc0 Hea Hrd Hrdok.
+    (* the class, consumed at [rs1] -- see [IntrDefs.SrcOk].  This wrapper
+       applies a converted leaf at a VARIABLE register and carries no tp fact
+       of its own, so the class has to be stated here; it is implicit, so this
+       lemma's own call sites (which pass concrete registers) do not move.  The
+       [assert] is the wiring check: it names the register the premise reads. *)
+    assert (Hea_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm)
+              = add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm))
+      by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr #Hdinv #Hgeom Hpub Hrcpt #Hlbc Hcont".
     iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     iDestruct (disk_geom_static with "Hgeom") as %(_ & _ & Hstu).

@@ -171,7 +171,56 @@ Section WpSconfMem.
   (* it first ([iIntros (v CID1 Hs1) "..."]) and the engine discharges     *)
   (* both quantifiers in one [iApply ... $! v cpu_id].                     *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_load_s_sconf_au (width : Z) (c uns : bool) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+  (* ==================================================================== *)
+  (* THE READ-SIDE SIDE CONDITION OF EVERY LEAF IN THIS FILE, AND WHY IT   *)
+  (* IS A CLASS AND NOT A PREMISE.  Read this once; the leaves below just  *)
+  (* point back here.                                                     *)
+  (*                                                                      *)
+  (* Every memory leaf computes its effective address from a CALLER-CHOSEN *)
+  (* base register, as [rget m rs1] -- a lookup in [tp_pin m] (HartTp.v),  *)
+  (* so the address as spelled depends on the ambient hart at exactly one  *)
+  (* register, rs1 = tp.  A store additionally reads its DATA register the *)
+  (* same way, [rget m rs2].  Both words are computed from the ENTRY map,  *)
+  (* at the hart we came from, and both appear again INSIDE the [wp_next]  *)
+  (* lambda, where the resource is about the hart we resume on.  Today the *)
+  (* funnel's σ-callback is instantiated at the entry hart so the two      *)
+  (* coincide; once that callback moves inside [WpNext.wp_next] the        *)
+  (* obligation arrives at the hart the trap returned TO and the two agree *)
+  (* only away from tp.  [IntrDefs.SrcOk] is that side condition.          *)
+  (*                                                                      *)
+  (* WHY A CLASS: a store writes no register at all, so it has NO pure     *)
+  (* premises and hence no [rd_ok]/[ops_ok] slot whose MEANING could be    *)
+  (* widened for free; and a load's [rd_ok] slot is about the DESTINATION, *)
+  (* not the base.  An ordinary premise would therefore change ARITY at    *)
+  (* every one of these leaves' references (~640 for [wp_csdsp_s_sconf]    *)
+  (* alone), each needing a positional [ltac:(...)] in the right place.    *)
+  (* An implicit instance argument shifts no positional argument, so the   *)
+  (* whole family converts with ZERO call-site churn.                      *)
+  (*                                                                      *)
+  (* WHY NOT [ops_ok]: [ops_ok]'s source conjuncts are [src_ok b rs], i.e. *)
+  (* guarded on [b = true].  An address must be hart-independent at        *)
+  (* [b = true] too, so the guard buys nothing here, and these leaves have *)
+  (* no slot to put it in anyway.  The two shapes coexist deliberately.    *)
+  (*                                                                      *)
+  (* THE STATEMENTS STAY SPELLED [rget m rs]. Respelling them hart-free as *)
+  (* [m !!! Regidx rs] -- the literal reading of: make the premise         *)
+  (* hart-independent -- was MEASURED and rejected: it breaks 99 consumer  *)
+  (* files, because callers normalise the address/value with [rget]-shaped *)
+  (* rewrites ([rgne], [rewrite Hlk]) that then have nothing to match.  So *)
+  (* the class carries the side condition and the SPELLING does not move;  *)
+  (* the reconciliation happens INSIDE each proof, in one line, via        *)
+  (* [IntrDefs.src_ok_rget_indep].                                         *)
+  (*                                                                      *)
+  (* THAT ONE LINE IS ALSO THE LEAF'S WIRING CHECK, so do not delete it as *)
+  (* an unused hypothesis: it names the register the statement reads, so a *)
+  (* class accidentally attached to the wrong parameter fails to typecheck *)
+  (* HERE instead of shelving silently at some consumer's [Qed].  (The     *)
+  (* [exact]-shaped one-line wrappers below need no such line: a direct    *)
+  (* application reports an unresolvable instance immediately, and it is   *)
+  (* only inside a tactic-driven [iApply] that the failure is shelved.)    *)
+  (* ==================================================================== *)
+  Lemma wp_load_s_sconf_au (width : Z) (c uns : bool) (pc : mword 64) (rd rs1 : mword 5)
+      `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (ext : mword (8*width) -> mword 64)
       (Ψ : mword (8*width) -> iProp Σ) (Em : coPset) (b : bool) {dqm : dfrac} :
     0 < width -> width <= 8 ->
@@ -212,6 +261,15 @@ Section WpSconfMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain Hext pa Hrd Hrdok HkptEm.
+    (* THE CLASS, CONSUMED at [rs1] -- see the family note above.  The
+       effective address this leaf promises is hart-independent, so the address
+       the caller owns the cell at (stated at the entry hart) is still the
+       address the cell comes back at inside the [wp_next] lambda.  Stated and
+       not yet used because today's σ-callback is still instantiated at the
+       entry hart; it is the wiring check regardless. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     rdok_split Hrdok.
     set (wlast := (Z.to_nat width - 1)%nat).
     assert (Hwn : Z.of_nat wlast = width - 1) by (unfold wlast; rewrite Nat2Z.inj_sub; [ rewrite Z2Nat.id; lia | lia ]).
@@ -411,7 +469,9 @@ Section WpSconfMem.
      in the tree (lb/lbu/lh/lhu/lw/lwu/ld and the RVC twins) is one line off
      it.  [wp_load_s_sconf_gen] / [wp_load_s_sconf_ugen] below are its
      [uns = false] / [uns = true] restatements (WRAPPER RECIPE). *)
-  Lemma wp_load_s_sconf_gen_u (width : Z) (c uns : bool) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+  (* [SrcOk rs1]: the base register's read, see the family note above. *)
+  Lemma wp_load_s_sconf_gen_u (width : Z) (c uns : bool) (pc : mword 64) (rd rs1 : mword 5)
+      `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (v : mword (8*width)) (lv : mword 64) (b : bool) {dqm : dfrac} :
     0 < width -> width <= 8 ->
     (* the vmem level splits on a PAGE boundary now, which needs the width to
@@ -442,6 +502,12 @@ Section WpSconfMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain Hlv pa Hrd Hrdok.
+    (* the class, consumed at [rs1]: the wiring check for an [iApply]-shaped
+       wrapper, whose own instance failure would otherwise be SHELVED.  See the
+       family note above [wp_load_s_sconf_au]. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_load_s_sconf_au width c uns pc rd rs1 imm m n
               (fun w => extend_value uns w)
@@ -455,8 +521,13 @@ Section WpSconfMem.
     iPureIntro. exact Hs1.
   Qed.
 
-  (* the SIGNED restatement. *)
-  Lemma wp_load_s_sconf_gen (width : Z) (c : bool) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+  (* the SIGNED restatement.  [SrcOk rs1] rides along; the [exact] below is a
+     DIRECT application, so a class attached to the wrong parameter would be
+     reported here ("Cannot infer the implicit parameter ... SrcOk ...") rather
+     than shelved -- which is why these one-line wrappers need no consuming
+     [assert] of their own. *)
+  Lemma wp_load_s_sconf_gen (width : Z) (c : bool) (pc : mword 64) (rd rs1 : mword 5)
+      `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (v : mword (8*width)) (lv : mword 64) (b : bool) {dqm : dfrac} :
     0 < width -> width <= 8 ->
     (* the vmem level splits on a PAGE boundary now, which needs the width to
@@ -492,7 +563,9 @@ Section WpSconfMem.
      extension ([uns]), so the two differ in exactly that flag -- which is why
      the width-1 [lbu] and the width-4 [lwu] are one-line instances of THIS
      rather than two hand-rolled copies of the same 190-line argument. *)
-  Lemma wp_load_s_sconf_ugen (width : Z) (c : bool) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+  (* [SrcOk rs1] as in the signed twin. *)
+  Lemma wp_load_s_sconf_ugen (width : Z) (c : bool) (pc : mword 64) (rd rs1 : mword 5)
+      `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (v : mword (8*width)) (lv : mword 64) (b : bool) {dqm : dfrac} :
     0 < width -> width <= 8 ->
     (* the vmem level splits on a PAGE boundary now, which needs the width to
@@ -565,8 +638,10 @@ Section WpSconfMem.
      [wp_load_s_sconf_ugen].  [dqm]-parametric: the byte may be owned outright
      (a stack buffer) or held at [DfracDiscarded] (a read-only image byte out
      of [kernel_data], which is how printint reads the [digits] table). *)
+  (* [SrcOk rs1]: the base register's read, see the family note above
+     [wp_load_s_sconf_au]. *)
   Lemma wp_lbu_s_sconf
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (v : mword 8) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
@@ -583,6 +658,10 @@ Section WpSconfMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
+    (* the class, consumed at [rs1] -- the wiring check; see the family note. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbyte Hcont".
     iApply (wp_load_s_sconf_ugen 1 false pc rd rs1 imm m n v (zero_extend' 64 v) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 4096; reflexivity) ltac:(vm_compute; reflexivity)
@@ -619,8 +698,10 @@ Section WpSconfMem.
   (* lwu rd, imm(rs1) -- the width-4 UNSIGNED load (printk's %u and %x read
      their [uint32] argument with it).  One line off [wp_load_s_sconf_ugen],
      exactly as [wp_lw_s_sconf] is off the signed twin. *)
+  (* [SrcOk rs1]: the base register's read, see the family note above
+     [wp_load_s_sconf_au]. *)
   Lemma wp_lwu_s_sconf
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (v : mword 32) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 -> rd_ok rd ->
@@ -633,6 +714,10 @@ Section WpSconfMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
+    (* the class, consumed at [rs1] -- the wiring check; see the family note. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_load_s_sconf_ugen 4 false pc rd rs1 imm m n v (zero_extend' 64 v) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
@@ -640,8 +725,10 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
 
+  (* [SrcOk rs1]: the base register's read, see the family note above
+     [wp_load_s_sconf_au]. *)
   Lemma wp_cld_s_sconf
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (v : mword 64) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 -> rd_ok rd ->
@@ -654,6 +741,10 @@ Section WpSconfMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
+    (* the class, consumed at [rs1] -- the wiring check; see the family note. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_load_s_sconf_gen 8 true pc rd rs1 imm m n v v b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
@@ -661,8 +752,10 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
 
+  (* [SrcOk rs1]: the base register's read, see the family note above
+     [wp_load_s_sconf_au]. *)
   Lemma wp_ld_s_sconf
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (v : mword 64) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 -> rd_ok rd ->
@@ -675,6 +768,10 @@ Section WpSconfMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
+    (* the class, consumed at [rs1] -- the wiring check; see the family note. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_load_s_sconf_gen 8 false pc rd rs1 imm m n v v b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
@@ -682,8 +779,10 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
 
+  (* [SrcOk rs1]: the base register's read, see the family note above
+     [wp_load_s_sconf_au]. *)
   Lemma wp_clw_s_sconf
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (v : mword 32) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 -> rd_ok rd ->
@@ -696,6 +795,10 @@ Section WpSconfMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
+    (* the class, consumed at [rs1] -- the wiring check; see the family note. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_load_s_sconf_gen 4 true pc rd rs1 imm m n v (sign_extend' 64 v) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
@@ -703,8 +806,10 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
 
+  (* [SrcOk rs1]: the base register's read, see the family note above
+     [wp_load_s_sconf_au]. *)
   Lemma wp_lw_s_sconf
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (v : mword 32) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 -> rd_ok rd ->
@@ -717,6 +822,10 @@ Section WpSconfMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
+    (* the class, consumed at [rs1] -- the wiring check; see the family note. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_load_s_sconf_gen 4 false pc rd rs1 imm m n v (sign_extend' 64 v) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
@@ -735,7 +844,11 @@ Section WpSconfMem.
   (* engine callback's mask and takes the WRITTEN cell back there, so a    *)
   (* lock leaf can open [is_lock] around exactly this step.                *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_store_s_sconf_au (width : Z) (c : bool) (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
+  (* [SrcOk rs1] for the ADDRESS base and [SrcOk rs2] for the STORED VALUE:
+     two independent instance arguments, resolved independently (no
+     combinatorics).  See the family note above [wp_load_s_sconf_au]. *)
+  Lemma wp_store_s_sconf_au (width : Z) (c : bool) (pc : mword 64) (rs2 rs1 : mword 5)
+      `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
       (m : regfile) (n : nat) (sv : mword (8*width)) (Ψ : iProp Σ) (Em : coPset) (b : bool) :
     0 < width -> width <= 8 -> vmem_width width ->
     (width | 4096) -> uint (to_bits 64 width) = width ->
@@ -763,6 +876,15 @@ Section WpSconfMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hw0 Hw8 Hvw Hwdvd Huintw Hwrite_plain Hsv HkptEm pa.
+    (* the class, consumed at [rs1] -- the wiring check; see the family note. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    (* ... and at [rs2]: the value this leaf promises to store is the same word
+       at every hart, so the promise made at the entry hart still holds at the
+       hart a trap returned to. *)
+    assert (Hsv_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
+      by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     set (wlast := (Z.to_nat width - 1)%nat).
     assert (Hwn : Z.of_nat wlast = width - 1) by (unfold wlast; rewrite Nat2Z.inj_sub; [ rewrite Z2Nat.id; lia | lia ]).
     assert (Hwlt : (wlast < Z.to_nat width)%nat) by (unfold wlast; lia).
@@ -947,7 +1069,11 @@ Section WpSconfMem.
 
 
   (* the non-atomic instance: the caller owns the cell throughout. *)
-  Lemma wp_store_s_sconf_gen (width : Z) (c : bool) (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
+  (* [SrcOk rs1] for the ADDRESS base and [SrcOk rs2] for the STORED VALUE:
+     two independent instance arguments, resolved independently (no
+     combinatorics).  See the family note above [wp_load_s_sconf_au]. *)
+  Lemma wp_store_s_sconf_gen (width : Z) (c : bool) (pc : mword 64) (rs2 rs1 : mword 5)
+      `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
       (m : regfile) (n : nat) (vold sv : mword (8*width)) (b : bool) :
     0 < width -> width <= 8 -> vmem_width width ->
     (width | 4096) -> uint (to_bits 64 width) = width ->
@@ -971,6 +1097,15 @@ Section WpSconfMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hw0 Hw8 Hvw Hwdvd Huintw Hwrite_plain Hsv pa.
+    (* the class, consumed at [rs1] -- the wiring check; see the family note. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    (* ... and at [rs2]: the value this leaf promises to store is the same word
+       at every hart, so the promise made at the entry hart still holds at the
+       hart a trap returned to. *)
+    assert (Hsv_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
+      by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_store_s_sconf_au width c pc rs2 rs1 imm m n sv
               (wordw_pointsto width pa (DfracOwn 1) sv) (⊤ ∖ ↑minstretN) b
@@ -1003,8 +1138,11 @@ Section WpSconfMem.
     (autocast (T := mword) (subrange_vec_dec r (4*8-1) 0) : mword (8*4)) = trunc32 r.
   Proof. unfold trunc32. reflexivity. Qed.
 
+  (* [SrcOk rs1] for the ADDRESS base and [SrcOk rs2] for the STORED VALUE:
+     two independent instance arguments, resolved independently (no
+     combinatorics).  See the family note above [wp_load_s_sconf_au]. *)
   Lemma wp_csd_s_sconf
-      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
       (m : regfile) (n : nat) (vold : mword 64) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := rget m rs2 in
@@ -1017,6 +1155,15 @@ Section WpSconfMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
+    (* the class, consumed at [rs1] -- the wiring check; see the family note. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    (* ... and at [rs2]: the value this leaf promises to store is the same word
+       at every hart, so the promise made at the entry hart still holds at the
+       hart a trap returned to. *)
+    assert (Hsv_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
+      by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_store_s_sconf_gen 8 true pc rs2 rs1 imm m n vold storeval b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
@@ -1025,8 +1172,11 @@ Section WpSconfMem.
   Qed.
 
 
+  (* [SrcOk rs1] for the ADDRESS base and [SrcOk rs2] for the STORED VALUE:
+     two independent instance arguments, resolved independently (no
+     combinatorics).  See the family note above [wp_load_s_sconf_au]. *)
   Lemma wp_sd_s_sconf
-      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
       (m : regfile) (n : nat) (vold : mword 64) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := rget m rs2 in
@@ -1039,6 +1189,15 @@ Section WpSconfMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
+    (* the class, consumed at [rs1] -- the wiring check; see the family note. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    (* ... and at [rs2]: the value this leaf promises to store is the same word
+       at every hart, so the promise made at the entry hart still holds at the
+       hart a trap returned to. *)
+    assert (Hsv_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
+      by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_store_s_sconf_gen 8 false pc rs2 rs1 imm m n vold storeval b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
@@ -1046,8 +1205,11 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
 
+  (* [SrcOk rs1] for the ADDRESS base and [SrcOk rs2] for the STORED VALUE:
+     two independent instance arguments, resolved independently (no
+     combinatorics).  See the family note above [wp_load_s_sconf_au]. *)
   Lemma wp_csw_s_sconf
-      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
       (m : regfile) (n : nat) (vold : mword 32) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := trunc32 (rget m rs2) in
@@ -1060,6 +1222,15 @@ Section WpSconfMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
+    (* the class, consumed at [rs1] -- the wiring check; see the family note. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    (* ... and at [rs2]: the value this leaf promises to store is the same word
+       at every hart, so the promise made at the entry hart still holds at the
+       hart a trap returned to. *)
+    assert (Hsv_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
+      by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_store_s_sconf_gen 4 true pc rs2 rs1 imm m n vold storeval b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
@@ -1067,8 +1238,11 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
 
+  (* [SrcOk rs1] for the ADDRESS base and [SrcOk rs2] for the STORED VALUE:
+     two independent instance arguments, resolved independently (no
+     combinatorics).  See the family note above [wp_load_s_sconf_au]. *)
   Lemma wp_sw_s_sconf
-      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
       (m : regfile) (n : nat) (vold : mword 32) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := trunc32 (rget m rs2) in
@@ -1081,6 +1255,15 @@ Section WpSconfMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
+    (* the class, consumed at [rs1] -- the wiring check; see the family note. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    (* ... and at [rs2]: the value this leaf promises to store is the same word
+       at every hart, so the promise made at the entry hart still holds at the
+       hart a trap returned to. *)
+    assert (Hsv_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
+      by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_store_s_sconf_gen 4 false pc rs2 rs1 imm m n vold storeval b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
@@ -1150,8 +1333,11 @@ Section WpSconfMem.
   Lemma trunc8_zero : trunc8 (zero_reg : mword 64) = (mword_of_int 0 : mword 8).
   Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
+  (* [SrcOk rs1] for the ADDRESS base and [SrcOk rs2] for the STORED VALUE:
+     two independent instance arguments, resolved independently (no
+     combinatorics).  See the family note above [wp_load_s_sconf_au]. *)
   Lemma wp_sb_s_sconf
-      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
       (m : regfile) (n : nat) (vold : bv 8) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := trunc8 (rget m rs2) in
@@ -1167,6 +1353,15 @@ Section WpSconfMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
+    (* the class, consumed at [rs1] -- the wiring check; see the family note. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    (* ... and at [rs2]: the value this leaf promises to store is the same word
+       at every hart, so the promise made at the entry hart still holds at the
+       hart a trap returned to. *)
+    assert (Hsv_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
+      by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbyte Hcont".
     iApply (wp_instr_s_sconf m n b pc false
               (STORE (imm, Regidx rs2, Regidx rs1, 1))
@@ -1404,8 +1599,8 @@ Section WpSconfMem.
        moves inside [wp_next].  (At a VARIABLE [rs2] this is not a conversion:
        the pin's [bool_decide] cannot reduce, so without the class there is no
        proof of it at all.) *)
-    assert (Hsv_all : forall c : CpuId, rget (CID := c) m rs2 = storeval)
-      by (intros c; exact (src_ok_rget_indep m rs2 c CID)).
+    assert (Hsv_all : forall hh : CpuId, rget (CID := hh) m rs2 = storeval)
+      by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     unfold pa.
     rewrite <- sext9_12_64.
     change sp with (Regidx csp_rs1).
@@ -1416,8 +1611,11 @@ Section WpSconfMem.
   (* ------------------------------------------------------------------- *)
   (* sd zero, imm(rs1) -- release's unconditional zero store.             *)
   (* ------------------------------------------------------------------- *)
+  (* [SrcOk rs1]: the address base's read.  The stored value is x0, a
+     literal, so it needs nothing.  See the family note above
+     [wp_load_s_sconf_au]. *)
   Lemma wp_sd_zero_s_sconf
-      (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (vold : mword 64) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := (zero_reg : mword 64) in
@@ -1433,6 +1631,10 @@ Section WpSconfMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
+    (* the class, consumed at [rs1] -- the wiring check; see the family note. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iDestruct (word_pointsto_aligned_p with "Hbytes") as %Hpalign4.
     assert (Halign4 : is_aligned_vaddr (Virtaddr pa) 8 = true) by exact Hpalign4.
@@ -1603,8 +1805,11 @@ Section WpSconfMem.
 
   (* c.sw x0 store (width-4 sibling of wp_sd_zero_s_sconf); moved here from
      ProofInitlock.v -- a store leaf belongs in the leaf file. *)
+  (* [SrcOk rs1]: the address base's read.  The stored value is x0, a
+     literal, so it needs nothing.  See the family note above
+     [wp_load_s_sconf_au]. *)
   Lemma wp_sw_zero_s_sconf
-      (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (vold : bv 32) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := (mword_of_int 0 : mword 32) in
@@ -1620,6 +1825,10 @@ Section WpSconfMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
+    (* the class, consumed at [rs1] -- the wiring check; see the family note. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iDestruct "Hbytes" as "(%Hpalign4 & Hbytes)".
     assert (Halign4 : is_aligned_vaddr (Virtaddr pa) 4 = true) by exact Hpalign4.
@@ -1787,5 +1996,20 @@ Section WpSconfMem.
     iPureIntro. done.
   Qed.
 
+
+  (* ------------------------------------------------------------------- *)
+  (* [SrcOk] SMOKE TEST -- see IntrDefs.v's checker block for why this is  *)
+  (* here and not only there.  An unresolved [SrcOk] inside an [iApply] is *)
+  (* SHELVED, not reported, so a hint this file cannot see (an import      *)
+  (* change, a reordered [Require]) would surface only as some consumer's  *)
+  (* "Attempt to save an incomplete proof" hundreds of lines away.  These  *)
+  (* two lines make that failure happen HERE.  x9/x15 (s1/a5) are the      *)
+  (* base registers the load/store leaves above are actually applied at;   *)
+  (* [csp_rs1] is the one [wp_c{ld,sd}sp_s_sconf] pass down internally.    *)
+  (* ------------------------------------------------------------------- *)
+  Definition mem_srcok_pos_s1 : SrcOk (mword_of_int 9 : mword 5) := _.
+  Definition mem_srcok_pos_a5 : SrcOk (mword_of_int 15 : mword 5) := _.
+  Definition mem_srcok_pos_sp : SrcOk csp_rs1 := _.
+  Fail Definition mem_srcok_neg : SrcOk Rtp := _.
 
 End WpSconfMem.

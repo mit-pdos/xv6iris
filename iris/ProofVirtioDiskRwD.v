@@ -610,7 +610,7 @@ Section VdrwdLeaves.
      export the window fact [nr <= np], which [disk_res] does not carry and
      the ring-slot freshness argument needs. ---- *)
   Lemma wp_vdrwd_lhu_avail (γu : uart_names) (γd : disk_names) (pme : Arch.pa) (pd pav pu : mword 64)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (np nr : nat) :
     add_vec (rget m rs1) (sign_extend' 64 imm) = (pa_add pav 2%nat : mword 64) ->
     uint rd <> 0 -> rd_ok rd ->
@@ -627,6 +627,15 @@ Section VdrwdLeaves.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hea Hrd Hrdsp.
+    (* the class, consumed at [rs1] -- see [IntrDefs.SrcOk].  This wrapper
+       applies a converted leaf at a VARIABLE register and carries no tp fact
+       of its own, so the class has to be stated here; it is implicit, so this
+       lemma's own call sites (which pass concrete registers) do not move.  The
+       [assert] is the wiring check: it names the register the premise reads. *)
+    assert (Hea_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm)
+              = add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm))
+      by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr #Hdinv #Hgeom Hpub #Hlb0 Hcont".
     iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     iDestruct (disk_geom_static with "Hgeom") as %(_ & Hsta & _).
@@ -686,7 +695,7 @@ Section VdrwdLeaves.
      slot's pending resource, and what comes back is the bumped publisher
      credential plus the RECEIPT. ---- *)
   Lemma wp_vdrwd_sh_publish (γu : uart_names) (γd : disk_names) (pme : Arch.pa) (pd pav pu : mword 64)
-      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
       (m : regfile) (n : nat) (np : nat) (sl : vslot) (pin wrb : _) :
     add_vec (rget m rs1) (sign_extend' 64 imm) = (pa_add pav 2%nat : mword 64) ->
     trunc16 (rget m rs2) = (wrap16 (S np) : SailStdpp.Values.mword 16) ->
@@ -704,6 +713,17 @@ Section VdrwdLeaves.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hea Hsv Hpinok Hwrbdom Hwrpin.
+    (* the class, consumed at [rs1 / rs2] -- see [IntrDefs.SrcOk].  This wrapper
+       applies a converted leaf at a VARIABLE register and carries no tp fact
+       of its own, so the class has to be stated here; it is implicit, so this
+       lemma's own call sites (which pass concrete registers) do not move.  The
+       [assert] is the wiring check: it names the register the premise reads. *)
+    assert (Hea_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm)
+              = add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm))
+      by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
+      by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     iIntros "Hcg Hpc Hinstr #Hdinv #Hgeom Hpub Hpin Hwrb Hpend Hcont".
     iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     iDestruct (disk_geom_static with "Hgeom") as %(_ & Hsta & _).
