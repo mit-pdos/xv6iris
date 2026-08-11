@@ -658,3 +658,99 @@ Proof.
   rewrite Hmb in Hb. change (2 ^ 31) with 2147483648. lia.
 Qed.
 
+
+(* ===================================================================== *)
+(*  6.  THE GRANULARITY-FREE FACTS (fs-icache.md §15(b))                  *)
+(* ===================================================================== *)
+
+(* [16 | size] is NOT a system invariant -- a disk-full dirlink appends a
+   PREFIX of a record and leaves the size permanently non-granular -- so
+   both directory proofs now carry the loop invariant "[16*i < size]"
+   rather than "[i < nrec]", and decide the two apart AFTER readi has
+   returned.  These are the facts that split.  All of them are stated over
+   a plain [Z] size so that [lia] never sees a [bv_unsigned] in the goal
+   (durable-notes' zify-hook gotcha). *)
+
+(* the loop is ENTERED whenever the size is nonzero, whatever [nrec] is --
+   this replaces [dlk_nrec_pos] at the entry *)
+Lemma dlk_off0_lt (sz : Z) : 0 <= sz -> sz <> 0 -> Z.of_nat 0 * 16 < sz.
+Proof. intros Hnn Hne. lia. Qed.
+
+(* the 31-bit bound readi's argument needs, from the LOOP TEST alone *)
+Lemma dlk_off_lt31' (sz : Z) (i : nat) :
+  0 <= sz -> Z.of_nat i * 16 < sz ->
+  sz <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+  Z.of_nat (16 * i) + 16 < 2 ^ 31.
+Proof.
+  intros Hnn Hi Hb.
+  assert (Hmb : Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432) by (vm_compute; reflexivity).
+  rewrite Hmb in Hb. rewrite Nat2Z.inj_mul.
+  change (2 ^ 31) with 2147483648. lia.
+Qed.
+
+(* [rd_clamp]'s two arms, read off its [decide] rather than off granularity *)
+Lemma dlk_rd_clamp_full' (sz : bv 32) (i : nat) :
+  ~ (Z.to_nat (bv_unsigned sz) < 16 * i + 16)%nat ->
+  rd_clamp sz (16 * i) 16 = 16%nat.
+Proof.
+  intros Hc. unfold rd_clamp.
+  destruct (decide (Z.to_nat (bv_unsigned sz) < 16 * i + 16)%nat) as [Hx | Hx];
+    [contradiction | reflexivity].
+Qed.
+
+Lemma dlk_rd_clamp_short (sz : bv 32) (i : nat) :
+  (Z.to_nat (bv_unsigned sz) < 16 * i + 16)%nat ->
+  rd_clamp sz (16 * i) 16 = (Z.to_nat (bv_unsigned sz) - 16 * i)%nat.
+Proof.
+  intros Hc. unfold rd_clamp.
+  destruct (decide (Z.to_nat (bv_unsigned sz) < 16 * i + 16)%nat) as [Hx | Hx];
+    [reflexivity | contradiction].
+Qed.
+
+(* the SHORT arm's returned count is strictly under sixteen -- which is
+   exactly what makes the [bne a0,s3] at the read test TAKEN *)
+Lemma dlk_short_lt16 (sz : Z) (i : nat) :
+  0 <= sz -> Z.of_nat i * 16 < sz ->
+  (Z.to_nat sz < 16 * i + 16)%nat ->
+  ((Z.to_nat sz - 16 * i) < 16)%nat.
+Proof. intros Hnn Hi Hc. lia. Qed.
+
+(* ...and the FULL arm's is the old [i < nrec] *)
+Lemma dlk_full_lt (sz : Z) (i : nat) :
+  0 <= sz -> ~ (Z.to_nat sz < 16 * i + 16)%nat -> (i < dir_nrec sz)%nat.
+Proof.
+  intros Hnn Hc. apply (dir_nrec_le sz i Hnn). lia.
+Qed.
+
+(* the loop test alone bounds [i] by [nrec] -- the fuel bookkeeping's fact *)
+Lemma dlk_le_nrec (sz : Z) (i : nat) :
+  0 <= sz -> Z.of_nat i * 16 < sz -> (i <= dir_nrec sz)%nat.
+Proof. exact (dir_nrec_lt_le sz i). Qed.
+
+(* THE BRANCH ITSELF: a short count is not sixteen.  Sixteen closed
+   [vm_compute]s, the recorded shape for a finite case split (N3d trap 5). *)
+Lemma dlk_neq16 (t : nat) : (t < 16)%nat ->
+  neq_vec (mword_of_int (Z.of_nat t) : mword 64)
+          (mword_of_int 16 : mword 64) = true.
+Proof.
+  intro Ht.
+  do 16 (destruct t as [| t]; [vm_compute; reflexivity |]).
+  exfalso. lia.
+Qed.
+
+(* the latch's exit: [size <= 16*i] refutes [i < nrec] *)
+Lemma dlk_nle_of_ge (sz : Z) (i : nat) :
+  0 <= sz -> sz <= Z.of_nat i * 16 -> (i < dir_nrec sz)%nat -> False.
+Proof.
+  intros Hnn Hle Hi. pose proof (dir_nrec_ge sz i Hnn Hi) as H. lia.
+Qed.
+
+(* [16 * nrec <= sz] without granularity -- dirlink's [dl_slot_off] wants it *)
+Lemma dlk_nrec_mul_le (sz : Z) : 0 <= sz -> Z.of_nat (16 * dir_nrec sz)%nat <= sz.
+Proof.
+  intros Hnn. unfold dir_nrec.
+  pose proof (Z.div_mod sz 16 ltac:(lia)) as Hdm.
+  pose proof (Z.mod_pos_bound sz 16 ltac:(lia)) as Hmb.
+  assert (Hd0 : 0 <= sz / 16) by (apply Z.div_pos; lia).
+  rewrite Nat2Z.inj_mul. lia.
+Qed.

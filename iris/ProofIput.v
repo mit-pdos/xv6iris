@@ -1448,7 +1448,8 @@ Section ProofIput.
     (* the loaded bundle, opened: [i_nlink] is one of its five scalars *)
     iEval (rewrite /ic_payload) in "Hpayl".
     iDestruct "Hpayl" as (dn bm) "Hlk".
-    iDestruct "Hlk" as (data) "(%Hok & Hdat & Hmeta & Haddrs & Hind & Hblks)".
+    iDestruct "Hlk" as (data)
+      "(%Hok & %Hdok & Hdat & Hmeta & Haddrs & Hind & Hblks)".
     pose proof Hok as Hok'.
     destruct Hok' as (Hbmwf & Hcovers & Hdiaddrs & Htyne & Hszcap & Hholes & Hsized).
     iEval (rewrite /inode_meta) in "Hmeta".
@@ -1497,7 +1498,8 @@ Section ProofIput.
       iAssert (ic_payload gfs gi cov logstart k inum true)
         with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks]" as "Hpayl".
       { rewrite /ic_payload. iExists dn, bm, data.
-        iSplitR; [iPureIntro; exact Hok |]. rewrite /inode_meta. iFrame. }
+        iSplitR; [iPureIntro; exact Hok |].
+        iSplitR; [iPureIntro; exact Hdok |]. rewrite /inode_meta. iFrame. }
       iMod (ic_open_held cn gfs gi cov logstart k (⊤ ∖ ↑icEscN)
               Mt q true dev inum ltac:(solve_ndisj) HMk
               with "Hinv Hbody Hhalf Hrtok Hgid Hpayl")
@@ -1677,7 +1679,8 @@ Section ProofIput.
     iAssert (ic_payload gfs gi cov logstart k inum true)
       with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks]" as "Hpayl".
     { rewrite /ic_payload. iExists dn, bm, data.
-      iSplitR; [iPureIntro; exact Hok |]. rewrite /inode_meta. iFrame. }
+      iSplitR; [iPureIntro; exact Hok |].
+      iSplitR; [iPureIntro; exact Hdok |]. rewrite /inode_meta. iFrame. }
     iMod (ic_open_held cn gfs gi cov logstart k (⊤ ∖ ↑icEscN)
             Mt q true dev inum ltac:(solve_ndisj) HMk
             with "Hinv Hbody Hhalf Hrtok Hgid Hpayl")
@@ -1829,7 +1832,8 @@ Section ProofIput.
        one premise SpecItrunc could not otherwise get. *)
     iEval (rewrite /ic_payload) in "Hpayl".
     iDestruct "Hpayl" as (dn2 bm2) "Hlk2".
-    iDestruct "Hlk2" as (data2) "(%Hok2 & Hdat & Hmeta & Haddrs & Hind & Hblks)".
+    iDestruct "Hlk2" as (data2)
+      "(%Hok2 & %Hdok2 & Hdat & Hmeta & Haddrs & Hind & Hblks)".
     pose proof Hok2 as Hok2'.
     destruct Hok2' as (Hbmwf2 & Hcovers2 & Hdiaddrs2 & Htyne2 & Hszcap2 & Hholes2 & Hsized2).
     iDestruct (bslots_op bn 2 1) as "[Hbsp _]".

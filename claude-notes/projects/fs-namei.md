@@ -862,6 +862,10 @@ either file.
 namex drives **dirlookup**, not dirlink; dirlink's consumers are the
 `sysfile.c` create path (`create` / `sys_link`).  Two things carry:
 
+- **SUPERSEDED BY N4a (below): the granularity premise no longer exists.**
+  The observation that follows is still true about xv6 and is exactly WHY
+  it was deleted — the short-readi turn it predicts is now a live panic arm
+  in both directory proofs rather than a premise a caller has to refute.
 - **The GRANULARITY invariant `16 | di_size dn` is still owed by whoever
   calls either function, and dirlink does NOT unconditionally preserve it.**
   On the append arm writei raises the size to `off + tot` with
@@ -879,3 +883,180 @@ namex drives **dirlookup**, not dirlink; dirlink's consumers are the
   no extra work.  The N3 ledger's recommendation to hoist it into the fs
   geometry vocabulary beside `log_geom_ok` / `bitmap_geom_ok` when N5 lands
   ialloc still stands.
+
+### N4a — the directory-wf gate lands: `dir_ok` is an invariant, granularity is a panic arm
+
+**fs-icache.md §15 executed.**  Two changes, both retrofits into PROVEN
+files, no new module and no new `_CoqProject` row.
+
+#### (a) `dir_ok` rides in the escrow payloads
+
+`DirView.v` gains the pure vocabulary — `dir_inums_ok` (MOVED here from
+`SpecDirlookup.v`, which now re-exports it by importing DirView; it had to
+sit below `IcacheEscrow.v` and DirView is the lowest pure file both can
+see), `T_DIR_z = 1`, and
+
+```coq
+Definition dir_ok (nib : nat) (dn : dinode) (data : nat -> list (bv 8)) : Prop :=
+  bv_unsigned (di_type dn) = T_DIR_z ->
+  dir_inums_ok data (dir_nrec (bv_unsigned (di_size dn))) nib.
+```
+
+with four discharge lemmas — `dir_ok_not_dir`, `dir_ok_free` (type 0),
+`dir_ok_size_zero` (a truncated directory: size 0 makes it vacuous),
+`dir_ok_eq` — and one consumer lemma, `dir_ok_dir : di_type dn =
+mword_of_int 1 -> dir_ok nib dn data -> dir_inums_ok data (dir_nrec
+(bv_unsigned (di_size dn))) nib`.  Only `dir_ok_dir` has a caller in this
+tree so far (it is what N4b runs); the other four are the API for the
+writer side, and every re-park that exists today "rides" instead (below).
+
+`IcacheEscrow.v` puts `⌜dir_ok icfg_nib dn data⌝` into **`ic_loaded`** (right
+after its `inode_ok`) and into **`ipool_shape`'s allocated arm** (right after
+its `inode_ok`).  The free arm is untouched: it carries no data.
+
+**`nib` is `icfg_nib`, NOT a new parameter.**  Threading it would have added
+an argument to `ic_loaded`/`ipool_shape` and hence to `SpecIunlock`, which
+has no `nib` anywhere — a signature change reaching every iunlock caller.
+`icfg_nib` is the ambient region size (`IcacheRef.icfg`), already read off
+the class by `inode_held` / `inode_shr_held` for exactly the same bound, and
+every file that mentions `ic_loaded`/`ipool_shape` already has an `icfg`
+instance (`ProofFileread` gets one through `fileG`'s `file_icfg` field).
+Cost: a consumer whose own `nib` is a parameter needs `nib = icfg_nib`, the
+premise `ProofKexit` and `SpecFileclose` already carry.
+
+Re-establishment sites, all of them "rides" as §15 predicted:
+
+| site | file | how |
+|---|---|---|
+| ilock's fill | `ProofIlock.v` (the pool reshuffle at the +0x9c type test, and the `ic_loaded` build at +0xa0) | from the pool's strengthened allocated arm, same `dn`/`data` |
+| iget's eviction re-park | `IcacheEscrow.ic_close_to_empty` | payload → pool, same `dn`/`data`; ProofIget itself needed NO edit |
+| fileread's iunlock re-park (×2 arms) | `ProofFileread.v` | readi changed no byte |
+| iput's window re-open (×2) and its itrunc checkout | `ProofIput.v` | destructure + rebuild, unchanged |
+| iput's post-itrunc park | `ProofIput.v` | **no edit needed** — it parks the FREE arm, which has no conjunct |
+| boot mint | `IcacheBoot.ipool_shape_alloc` / `ipool_alloc` | NEW PREMISE, joining the image-wf family beside `inode_ok`; `ipool_alloc_all_free` unchanged (free arm) |
+
+#### (b) granularity is a live panic arm
+
+`16 | bv_unsigned (di_size dn)` is DELETED from
+`SpecDirlookup.wp_dirlookup_sconf_body` and
+`SpecDirlink.wp_dirlink_sconf_body`.  Both headers rewritten.  No
+postcondition arm was added and no arm changed: panic never returns.
+
+The rework in both proofs is the same, and it is *smaller* than duplicating
+the body walk: **the loop invariant's `⌜(i < nrec)%nat⌝` becomes the loop's
+own test `⌜Z.of_nat i * 16 < bv_unsigned (di_size dn)⌝`**, the fuel measure
+goes from `nrec - i` to `S nrec - i` (one extra turn), and the split happens
+AFTER readi returns, on `rd_clamp`'s own `decide`:
+
+- `~ (Z.to_nat size < 16*i + 16)` — the record is whole, `rd_clamp = 16`,
+  and `i < nrec` is recovered (`dlk_full_lt`); everything downstream is
+  byte-for-byte the old proof;
+- otherwise `tot = Z.to_nat size - 16*i < 16`, the `bne a0,s3` is TAKEN, and
+  the three-instruction panic block runs to `panic_wp_any_at` — ilock's
+  "no type" template verbatim.
+
+DECODE, verified off the Code files (the two are NOT at the same offset):
+
+| | branch | imm (13-bit) | panic block |
+|---|---|---|---|
+| dirlookup | `bne a0,s3` at **+0x6a** | 8156 = −36 | **+0x46** `auipc a0,4` / +0x4a `addi a0,a0,3318` / +0x4e `jal ra,panic` (2084956) |
+| dirlink | `bne a0,s3` at **+0x3e** | 34 | **+0x60** `auipc a0,4` / +0x64 `addi a0,a0,2818` / +0x68 `jal ra,panic` (2084440) |
+
+`ProofDirlookupParts.v` gains the granularity-free arithmetic, all stated
+over a plain `Z` so `lia` never sees a `bv_unsigned` in the goal:
+`dlk_off0_lt`, `dlk_off_lt31'`, `dlk_rd_clamp_full'`, `dlk_rd_clamp_short`,
+`dlk_short_lt16`, `dlk_full_lt`, `dlk_le_nrec`, `dlk_neq16` (sixteen closed
+`vm_compute`s — N3d trap 5's shape), `dlk_nle_of_ge`, `dlk_nrec_mul_le`.
+`DirView.v` gains `dir_nrec_le` / `dir_nrec_ge` / `dir_nrec_lt_le`, the
+three one-directional replacements for the iff `dir_nrec_bound`.
+`ProofDirlink.dl_slot_off` lost its `(16 | sz)` premise (it never needed it:
+`16 * nrec <= sz` holds by floor division).
+
+Nothing else changed: `dlk_rd_clamp_full`, `dlk_off_lt31`, `dlk_nrec_pos`,
+`dl_nrec_pos` and `dir_nrec_bound` all still exist, now unused by these two
+proofs, and are left for anyone who has granularity in hand.
+
+#### What N4b (namex) gets
+
+After ilock returns, namex destructs
+
+```coq
+ic_loaded γfs γi cov logstart k inum dn bm
+  = ∃ data, ⌜inode_ok cov logstart dn bm data⌝
+          ∗ ⌜dir_ok icfg_nib dn data⌝        (* <-- NEW *)
+          ∗ dinode_at γi inum dn ∗ inode_meta (ientry k) dn
+          ∗ inode_addrs (ientry k) (bm_cells bm)
+          ∗ ind_res γfs bm ∗ inode_blocks γfs bm data
+```
+
+and turns the new conjunct into dirlookup's remaining premise in one step:
+
+```coq
+DirView.dir_ok_dir nib dn data Htype Hdok
+  : dir_inums_ok data (dir_nrec (bv_unsigned (di_size dn))) nib
+```
+
+where `Htype : di_type dn = (mword_of_int 1 : mword 16)` is the very test
+namex performs to refute panic("dirlookup not DIR"), and `nib` must be
+`icfg_nib` (add `nib = icfg_nib` to namex's premises, as `ProofKexit` does).
+**namex needs NO granularity fact at all** — that premise is gone.
+
+#### Build evidence (EC2 mirror, git-synced at `ca02aea8`)
+
+`bash ~/full.sh` (`make -f CoqMakefile -j24 -k` over the whole tree):
+**`EXIT=0`, 0 `Error` lines, `967` `.vo`** — the same count as before the
+stage (no file added, none lost; `_CoqProject` untouched).
+
+`Print Assumptions` on the four cones whose contents moved:
+
+| module | assumptions |
+|---|---|
+| `Dirlookup.wp_dirlookup_sconf` | the 5 platform axioms + `functional_extensionality_dep` |
+| `Dirlink.wp_dirlink_sconf` | the same 6 |
+| `Iput.wp_iput_sconf` | the same 6 |
+| `Fileread.wp_fileread_sconf` | the same 6 **+ `LinkConsoleread.Consoleread.wp_consoleread_sconf`**, the one assumed contract that cone has always rested on (`LinkConsoleread.v`'s explicit `Axiom`) — unchanged by N4a |
+
+(the 5 are `cancel_reservation`, `load_reservation`, `match_reservation`,
+`valid_reservation`, `plat_term_write`.)
+
+`tools/lemma_diff.py --ref HEAD`: one line, **`GONE Definition
+dir_inums_ok` in `iris/SpecDirlookup.v`** — the intended §15(a) MOVE to
+`DirView.v`, where the identical definition now lives and from which
+SpecDirlookup re-exports it.  No `ADMITTED`, no `NEWAXIOM`, nothing else
+gone.  The two deleted `(16 | bv_unsigned (di_size dn))` premises are
+statement changes inside `wp_dirlookup_sconf_body` /
+`wp_dirlink_sconf_body`, which the tool does not flag.  No `Admitted`,
+`Axiom` or `cheat_` in any touched file.  `tools/proof_coverage.py`
+unchanged at 156/188 proven.
+
+#### Owed / flagged for N5 and the sysfile campaign
+
+1. **§15(a)'s dirlink analysis does not go through as written, and the
+   mod-256 step is not the reason.**  `SpecDirlink`'s range clause is
+   THREE-way (it is writei's): the record window `[16k0, 16k0+tot)`, then a
+   DISTURBED REGION `[16k0+tot, 16k0+tot+dist)` of *unspecified* bytes with
+   `dist <= BSIZE` (kernel-defect-D1's committed partial chunk,
+   `SpecWritei.v`'s header), then the old bytes.  §15 assumed "new prefix +
+   OLD bytes above tot".  Consequences:
+   - **append arm (`k0 = nrec`)**: preserved, and *more cheaply than §15
+     thought* — the new size is `16*nrec + tot` with `tot < 16`, so
+     `nrec' = nrec` and every record `< nrec` is below `16*k0` and
+     untouched.  The partly-written record is at index `nrec`, out of
+     range.  No mod-256 argument is needed.
+   - **middle-slot arm (`k0 < nrec`, filling a hole)**: the new size is the
+     OLD size, so `nrec' = nrec`, and the disturbed region can cover up to
+     64 following records with arbitrary bytes.  `dir_ok` is NOT derivable
+     from the contract as frozen.  Whoever re-parks after a dirlink (the
+     sysfile `create` path) must either strengthen `SpecDirlink`/
+     `SpecWritei` (on the KERNEL arm `either_copyin` cannot fail, so
+     `dist = 0` there — that is the honest fix) or carry the corruption.
+     N4a is unaffected: dirlink and dirlookup do NOT assemble
+     `ic_loaded`/`ipool_shape` at all, so §15's "ProofDirlookup +
+     ProofDirlink's own parks" have no site in this tree yet.
+2. **§15 says "SpecDirlink already carries `bv_unsigned dinum < 16*nib`".
+   That premise is about the DIRECTORY's own inum** (`i_inum ip ↦₄ dinum`,
+   needed for `IBLOCK dinum inodestart ∈ cov`).  The LINKED inum
+   (`inum : mword 16`) has no range premise in `SpecDirlink` at all.  A
+   writer-side `dir_ok` proof will have to add one.
+3. `IcacheBoot`'s image-wf IOU is now two clauses wide (`inode_ok` and
+   `dir_ok icfg_nib`); the ireclaim/fsinit mint owes both.

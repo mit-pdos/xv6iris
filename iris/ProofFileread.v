@@ -1739,7 +1739,8 @@ Section ProofFileread.
                     cells arrive addressed by SLOT; the file layer speaks the
                     [ip] its own [f->ip] cell holds. ---- *)
              rewrite /ic_loaded.
-             iDestruct "Hlk" as (data) "(%Hiok & Hdnat & Hmeta & Haddrs & Hindres & Hblocks)".
+             iDestruct "Hlk" as (data)
+               "(%Hiok & %Hdok & Hdnat & Hmeta & Haddrs & Hindres & Hblocks)".
              destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes
                                & Hsized).
              iEval (rewrite -Hipk) in "Hmeta".
@@ -2003,6 +2004,9 @@ Section ProofFileread.
                   iSplitR; [iPureIntro; split_and!;
                     [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
                     | exact Hszb | exact Hholes | exact Hsized]|].
+                  (* §15(a): readi changed no byte, so the directory-wf
+                     conjunct goes back exactly as it came out *)
+                  iSplitR; [iPureIntro; exact Hdok |].
                   iDestruct "Hmap" as "[Haddrs Hindres]".
                   iFrame "Hdnat Hmeta Haddrs Hindres Hblocks". }
                 iAssert (i_valid (ientry (frn_ik fn)) ↦₄ valid_word true)%I
@@ -2263,6 +2267,9 @@ Section ProofFileread.
                   iSplitR; [iPureIntro; split_and!;
                     [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
                     | exact Hszb | exact Hholes | exact Hsized]|].
+                  (* §15(a): readi changed no byte, so the directory-wf
+                     conjunct goes back exactly as it came out *)
+                  iSplitR; [iPureIntro; exact Hdok |].
                   iDestruct "Hmap" as "[Haddrs Hindres]".
                   iFrame "Hdnat Hmeta Haddrs Hindres Hblocks". }
                 iAssert (i_valid (ientry (frn_ik fn)) ↦₄ valid_word true)%I

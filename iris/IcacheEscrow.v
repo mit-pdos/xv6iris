@@ -158,6 +158,8 @@ Require Import WpLock.
 Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import DinodeEnc.
+Require Import DirentEnc.
+Require Import DirView.
 Require Import LogInv.
 Require Import FsCrash.
 Require Import InodeInv.
@@ -404,11 +406,20 @@ Section IcacheEscrow.
   (* ONE UNCACHED INUM'S POOL BUNDLE (§13.3).  Two shapes, because free
      inodes exist: [inode_ok] demands a nonzero type, and a type-0 inode
      owns no blocks (itrunc returned them), so it carries only its record.
-     [ialloc] (future) is what flips an entry free -> allocated. *)
+     [ialloc] (future) is what flips an entry free -> allocated.
+
+     THE DIRECTORY-WF CONJUNCT (§15(a)).  The allocated arm also carries
+     [DirView.dir_ok icfg_nib] -- if this inode is a DIRECTORY then every
+     live record in it names an inum the inode region covers.  It rides
+     beside [inode_ok] rather than inside it because [inode_ok]'s signature
+     has no [nib] and its users are legion; [icfg_nib] is the ambient
+     region size, capacity and not resource.  The FREE arm needs no such
+     conjunct: it carries no data at all, and its type is 0. *)
   Definition ipool_shape (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) : iProp Σ :=
     ((∃ (dn0 : dinode) (bm0 : blkmap) (data0 : nat -> list (bv 8)),
         ⌜inode_ok cov logstart dn0 bm0 data0⌝ ∗
+        ⌜dir_ok icfg_nib dn0 data0⌝ ∗
         dinode_at γi inum dn0 ∗
         ind_res γfs bm0 ∗
         inode_blocks γfs bm0 data0)
@@ -434,12 +445,19 @@ Section IcacheEscrow.
      from the loaded arm's (which is about the in-memory one).  The
      stale-record freedom exists only INSIDE a critical section: the
      checked-out bundle's dinode_at may lag until the holder's iupdate
-     retags it.  Design: fs-icache.md §13 (parked-clean). *)
+     retags it.  Design: fs-icache.md §13 (parked-clean).
+
+     THE DIRECTORY-WF CONJUNCT (§15(a)), the twin of [ipool_shape]'s: a
+     parked DIRECTORY's live records all name inums the inode region
+     covers.  This is what namex destructs out of ilock's postcondition,
+     and it is the reason dirlookup's [dir_inums_ok] premise is
+     dischargeable at a directory nobody named in advance. *)
   Definition ic_loaded (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (k : nat) (inum : mword 32)
       (dn : dinode) (bm : blkmap) : iProp Σ :=
     (∃ (data : nat -> list (bv 8)),
        ⌜inode_ok cov logstart dn bm data⌝ ∗
+       ⌜dir_ok icfg_nib dn data⌝ ∗
        dinode_at γi inum dn ∗
        inode_meta (ientry k) dn ∗
        inode_addrs (ientry k) (bm_cells bm) ∗
@@ -1034,7 +1052,8 @@ Section IcacheEscrow.
       with "[Hpay]" as "[Hraw Hpool]".
     { destruct v; [| iExact "Hpay" ].
       iDestruct "Hpay" as (dn bm) "Hlk".
-      iDestruct "Hlk" as (data) "(%Hok & Hdat & Hmeta & Haddrs & Hind & Hblks)".
+      iDestruct "Hlk" as (data)
+        "(%Hok & %Hdok & Hdat & Hmeta & Haddrs & Hind & Hblks)".
       pose proof Hok as Hok'.
       destruct Hok' as (Hwf & _ & Hda & _ & _ & _ & _).
       assert (Hcelllen : length (bm_cells bm) = 13%nat).
@@ -1044,7 +1063,7 @@ Section IcacheEscrow.
         iExists (bm_cells bm). iSplitR; [iPureIntro; exact Hcelllen |].
         iExact "Haddrs". }
       rewrite /ipool_shape. iLeft. iExists dn, bm, data. iFrame.
-      iPureIntro; exact Hok. }
+      iSplitR; iPureIntro; [exact Hok | exact Hdok]. }
     iModIntro. iFrame "Hgf2 Hpool".
     iApply ic_close_empty. rewrite /ic_empty_arm.
     iExists dev, inum, (valid_word v). iFrame.
@@ -1187,16 +1206,19 @@ Section IcacheEscrow.
   Proof.
     iIntros "Hpay". rewrite /ic_payload. destruct v.
     - iDestruct "Hpay" as (dn bm) "Hlk".
-      iDestruct "Hlk" as (data) "(%Hok & Hdat & Hrest)".
+      iDestruct "Hlk" as (data) "(%Hok & %Hdok & Hdat & Hrest)".
       iExists dn. iFrame "Hdat". iIntros "Hdat".
-      iExists dn, bm, data. iFrame "Hrest". iSplitR; [iPureIntro; exact Hok |].
+      iExists dn, bm, data. iFrame "Hrest".
+      iSplitR; [iPureIntro; exact Hok |].
+      iSplitR; [iPureIntro; exact Hdok |].
       iExact "Hdat".
     - rewrite /ic_unloaded. iDestruct "Hpay" as "[Hraw Hpool]".
       rewrite /ipool_shape. iDestruct "Hpool" as "[Hal | Hfr]".
-      + iDestruct "Hal" as (dn0 bm0 data0) "(%Hok & Hdat & Hrest)".
+      + iDestruct "Hal" as (dn0 bm0 data0) "(%Hok & %Hdok & Hdat & Hrest)".
         iExists dn0. iFrame "Hdat". iIntros "Hdat". iFrame "Hraw".
         iLeft. iExists dn0, bm0, data0. iFrame "Hrest".
-        iSplitR; [iPureIntro; exact Hok |]. iExact "Hdat".
+        iSplitR; [iPureIntro; exact Hok |].
+        iSplitR; [iPureIntro; exact Hdok |]. iExact "Hdat".
       + iDestruct "Hfr" as (dn0) "(%Hty & Hdat)".
         iExists dn0. iFrame "Hdat". iIntros "Hdat". iFrame "Hraw".
         iRight. iExists dn0. iSplitR; [iPureIntro; exact Hty |]. iExact "Hdat".

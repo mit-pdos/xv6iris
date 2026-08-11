@@ -44,11 +44,20 @@
    image-well-formedness layer, and it is the bitmap/[ialloc] effort's, not
    the icache's.
 
+   SINCE fs-icache.md §15(a) the allocated arm carries ONE MORE image-wf
+   clause of exactly the same kind, [DirView.dir_ok icfg_nib]: if the inode
+   is a DIRECTORY then every live record in its data names an inum the inode
+   region covers.  It is a claim about the image's directory CONTENTS, not
+   about decoding, so it joins the premise family here rather than being
+   discharged -- mkfs images satisfy it, and the eventual ireclaim/fsinit
+   mint (N5) will owe it alongside [inode_ok].
+
    So [ipool_alloc] takes the allocated inums' bundles as a PREMISE, split
    from the free ones -- the honest [FsBoot.fs_cov_in] shape: a hypothesis
    threaded from the boot client, never an axiom.  [ipool_alloc_all_free]
    discharges it outright for an image whose inodes are all type 0, which is
-   what makes the premise demonstrably satisfiable rather than vacuous.
+   what makes the premise demonstrably satisfiable rather than vacuous (and
+   which needs no [dir_ok] clause at all: the free arm has no data).
 
    ---- THE BOOT STATE IS ALL-EMPTY (§13.7-§13.9) ------------------------
 
@@ -73,6 +82,8 @@ Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import BlockWords.
 Require Import DinodeEnc.
+Require Import DirentEnc.
+Require Import DirView.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
@@ -373,14 +384,19 @@ Section IcacheBootPool.
     iExists dn. iFrame "Hdn". done.
   Qed.
 
+  (* THE SECOND PREMISE IS §15(a)'S DIRECTORY-WF CLAUSE, and it joins the
+     image-wf family for exactly the reason [inode_ok] did: it is a fact
+     about the IMAGE ON DISK, so the boot client owes it and this lemma
+     cannot manufacture it.  mkfs images satisfy it. *)
   Lemma ipool_shape_alloc (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) (dn : dinode) (bm : blkmap)
       (data : nat -> list (bv 8)) :
     inode_ok cov logstart dn bm data ->
+    dir_ok icfg_nib dn data ->
     dinode_at γi inum dn -∗ ind_res γfs bm -∗ inode_blocks γfs bm data -∗
     ipool_shape γfs γi cov logstart inum.
   Proof.
-    iIntros (Hok) "Hdn Hind Hblk". rewrite /ipool_shape. iLeft.
+    iIntros (Hok Hdok) "Hdn Hind Hblk". rewrite /ipool_shape. iLeft.
     iExists dn, bm, data. iFrame "Hdn Hind Hblk". done.
   Qed.
 
@@ -405,6 +421,7 @@ Section IcacheBootPool.
     ([∗ set] z ∈ A,
        ∃ (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)),
          ⌜inode_ok cov logstart dn bm data⌝ ∗
+         ⌜dir_ok icfg_nib dn data⌝ ∗
          dinode_at γi (mword_of_int z : mword 32) dn ∗
          ind_res γfs bm ∗ inode_blocks γfs bm data) -∗
     ([∗ set] z ∈ R ∖ A,
@@ -416,8 +433,9 @@ Section IcacheBootPool.
     iApply (ipool_split γfs γi cov logstart R A Hsub).
     iSplitL "Ha".
     - rewrite /ipool. iApply (big_sepS_mono with "Ha"). intros z _.
-      iIntros "(%dn & %bm & %data & %Hok & Hdn & Hind & Hblk)".
-      iApply (ipool_shape_alloc _ _ _ _ _ dn bm data Hok with "Hdn Hind Hblk").
+      iIntros "(%dn & %bm & %data & %Hok & %Hdok & Hdn & Hind & Hblk)".
+      iApply (ipool_shape_alloc _ _ _ _ _ dn bm data Hok Hdok
+                with "Hdn Hind Hblk").
     - rewrite /ipool. iApply (big_sepS_mono with "Hf"). intros z _.
       iIntros "(%dn & %H0 & Hdn)".
       iApply (ipool_shape_free _ _ _ _ _ dn H0 with "Hdn").

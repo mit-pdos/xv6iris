@@ -747,10 +747,14 @@ Qed.
 (*  7.  THE RECORD COUNT                                                   *)
 (* ====================================================================== *)
 
-(* [nrec], the number of 16-byte records a directory of size [sz] holds.
-   Both loops run [off = 0, 16, 32, ...] while [off < sz], so under the
-   GRANULARITY premise [16 | sz] the loop performs exactly [dir_nrec sz]
-   iterations and every readi is a full-length one. *)
+(* [nrec], the number of WHOLE 16-byte records a directory of size [sz]
+   holds.  Both loops run [off = 0, 16, 32, ...] while [off < sz]; when
+   [16 | sz] that is exactly [dir_nrec sz] iterations and every readi is a
+   full-length one, and when it is NOT the loop takes ONE more turn, whose
+   readi is short and whose next instruction is panic("dirlookup read").
+   See fs-icache.md §15(b): granularity is NOT a system invariant, so the
+   two directory proofs carry that turn as a live panic arm rather than
+   refuting it. *)
 Definition dir_nrec (sz : Z) : nat := Z.to_nat (sz / 16).
 
 Lemma dir_nrec_exact (sz : Z) :
@@ -770,4 +774,122 @@ Lemma dir_nrec_bound (sz : Z) (i : nat) :
 Proof.
   intros Hnn Hd. pose proof (dir_nrec_exact sz Hnn Hd) as He.
   rewrite Nat2Z.inj_mul in He. lia.
+Qed.
+
+(* ---- the GRANULARITY-FREE arithmetic (fs-icache.md §15(b)) -------------
+
+   Without [16 | sz] the loop bound [off < sz] and the record count part
+   ways in exactly one place: at [i = dir_nrec sz] the loop may still run
+   (when [16 * nrec < sz], i.e. a short tail record exists) and its readi is
+   short.  These three replace [dir_nrec_bound]'s two directions, each with
+   the premise that is actually available:
+
+   - [dir_nrec_ge] -- a WHOLE record below [nrec] fits, always;
+   - [dir_nrec_le] -- and conversely, so "readi returned 16" IS [i < nrec];
+   - [dir_nrec_lt_le] -- the loop test alone only bounds [i] by [nrec].     *)
+Lemma dir_nrec_le (sz : Z) (i : nat) :
+  0 <= sz -> ((Z.of_nat i * 16 + 16 <= sz) <-> (i < dir_nrec sz)%nat).
+Proof.
+  intros Hnn. unfold dir_nrec.
+  pose proof (Z.div_mod sz 16 ltac:(lia)) as Hdm.
+  pose proof (Z.mod_pos_bound sz 16 ltac:(lia)) as Hmb.
+  assert (Hd0 : 0 <= sz / 16) by (apply Z.div_pos; lia).
+  lia.
+Qed.
+
+Lemma dir_nrec_ge (sz : Z) (i : nat) :
+  0 <= sz -> (i < dir_nrec sz)%nat -> Z.of_nat i * 16 + 16 <= sz.
+Proof. intros Hnn Hi. exact (proj2 (dir_nrec_le sz i Hnn) Hi). Qed.
+
+Lemma dir_nrec_lt_le (sz : Z) (i : nat) :
+  0 <= sz -> Z.of_nat i * 16 < sz -> (i <= dir_nrec sz)%nat.
+Proof.
+  intros Hnn Hi. unfold dir_nrec.
+  pose proof (Z.div_mod sz 16 ltac:(lia)) as Hdm.
+  pose proof (Z.mod_pos_bound sz 16 ltac:(lia)) as Hmb.
+  assert (Hd0 : 0 <= sz / 16) by (apply Z.div_pos; lia).
+  lia.
+Qed.
+
+(* ====================================================================== *)
+(*  8.  THE DIRECTORY-WF GATE (fs-icache.md §15(a))                        *)
+(* ====================================================================== *)
+
+(* EVERY LIVE RECORD'S INUM IS INSIDE THE INODE REGION.  This is iget's one
+   argument premise ([bv_unsigned inum < 16 * nib]) lifted over the records,
+   because the record a scan stops at is not known until it stops.  It used
+   to live in [SpecDirlookup.v]; §15 makes it a SYSTEM INVARIANT riding in
+   the icache's escrow payloads, which needs it visible from
+   [IcacheEscrow.v] -- far below any spec file -- so it lives here, in the
+   pure record view, and SpecDirlookup re-exports it by importing DirView. *)
+Definition dir_inums_ok (data : nat -> list (bv 8)) (nrec nib : nat) : Prop :=
+  forall k : nat, (k < nrec)%nat -> dir_live data k ->
+    bv_unsigned (dir_inum data k) < 16 * Z.of_nat nib.
+
+(* T_DIR as a NUMBER.  [SpecDirlookup.T_DIR] is the [mword 16] the
+   [lh a4,68(a0)] / [li a5,1] pair compares; the escrow payloads have no
+   register vocabulary and state the same test on [bv_unsigned]. *)
+Definition T_DIR_z : Z := 1.
+
+(* THE CONJUNCT THE TWO ESCROW PAYLOADS GAIN ([IcacheEscrow.ic_loaded] and
+   [ipool_shape]'s allocated arm).  TYPE-CONDITIONAL, because it is only
+   directories whose bytes are records: a file's data is arbitrary and a
+   free inode has no data at all.  [nib] is the ambient [icfg_nib] at both
+   payloads -- capacity, no resource.
+
+   The writers that exist today preserve it, and every re-park in the cache
+   (ilock's fill, iget's eviction, iunlock's park) carries it unchanged
+   because it changed no byte.  itrunc leaves size 0, which makes it
+   vacuous; iupdate touches no data; filewrite cannot reach a T_DIR inode
+   (sys_open refuses writable directories).  dirlink is the one writer that
+   needs an argument rather than a rides: see the N4a ledger in
+   claude-notes/projects/fs-namei.md -- its APPEND arm is fine (a short
+   append leaves [nrec] where it was, so the fragment it wrote is out of
+   range and every record below it is untouched), but its MIDDLE-SLOT arm
+   is NOT derivable from [SpecDirlink] as frozen, because writei's
+   postcondition admits a disturbed region of unspecified bytes after the
+   write.  No site in this tree re-parks after a dirlink yet. *)
+Definition dir_ok (nib : nat) (dn : dinode) (data : nat -> list (bv 8)) : Prop :=
+  bv_unsigned (di_type dn) = T_DIR_z ->
+  dir_inums_ok data (dir_nrec (bv_unsigned (di_size dn))) nib.
+
+(* ---- the four ways a holder discharges it ---------------------------- *)
+
+(* (i) it is not a directory *)
+Lemma dir_ok_not_dir (nib : nat) (dn : dinode) (data : nat -> list (bv 8)) :
+  bv_unsigned (di_type dn) <> T_DIR_z -> dir_ok nib dn data.
+Proof. intros H Hc. exfalso. exact (H Hc). Qed.
+
+(* (ii) it is FREE -- [ipool_shape]'s free arm, and iput's post-itrunc park *)
+Lemma dir_ok_free (nib : nat) (dn : dinode) (data : nat -> list (bv 8)) :
+  bv_unsigned (di_type dn) = 0 -> dir_ok nib dn data.
+Proof.
+  intros H. apply dir_ok_not_dir. rewrite H. unfold T_DIR_z. lia.
+Qed.
+
+(* (iii) it holds no whole record -- itrunc's zeroed directory, whose size
+   is 0, and which is therefore wf whatever its type says *)
+Lemma dir_ok_size_zero (nib : nat) (dn : dinode) (data : nat -> list (bv 8)) :
+  bv_unsigned (di_size dn) = 0 -> dir_ok nib dn data.
+Proof.
+  intros Hsz _ k Hk. exfalso.
+  unfold dir_nrec in Hk. rewrite Hsz in Hk.
+  assert (Hz : Z.to_nat (0 / 16) = 0%nat) by (vm_compute; reflexivity).
+  rewrite Hz in Hk. clear -Hk. lia.
+Qed.
+
+(* (iv) the DATA is unchanged and so is the record -- the "rides" case every
+   re-park in the cache is (ilock's fill, iget's eviction, iunlock's park) *)
+Lemma dir_ok_eq (nib : nat) (dn dn' : dinode) (data data' : nat -> list (bv 8)) :
+  dn = dn' -> data = data' -> dir_ok nib dn data -> dir_ok nib dn' data'.
+Proof. intros -> ->. exact id. Qed.
+
+(* ...and the way a CONSUMER uses it: namex knows the type, off the very
+   [lh]/[li] test that refutes panic("dirlookup not DIR"). *)
+Lemma dir_ok_dir (nib : nat) (dn : dinode) (data : nat -> list (bv 8)) :
+  di_type dn = (mword_of_int 1 : mword 16) ->
+  dir_ok nib dn data ->
+  dir_inums_ok data (dir_nrec (bv_unsigned (di_size dn))) nib.
+Proof.
+  intros Ht H. apply H. rewrite Ht. vm_compute. reflexivity.
 Qed.

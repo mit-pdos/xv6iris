@@ -49,11 +49,25 @@
    TWO PREMISES ARE QUANTIFIED OVER RECORDS RATHER THAN NAMED, because the
    record dirlookup stops at is not known until it stops:
 
-   - [SpecDirlookup.dir_inums_ok] -- iget's argument bound (see that file);
+   - [DirView.dir_inums_ok] -- iget's argument bound (see SpecDirlookup.v).
+     Since fs-icache.md §15(a) a caller gets it out of the icache: it is
+     the conjunct [DirView.dir_ok icfg_nib dn data] riding in
+     [IcacheEscrow.ic_loaded];
    - [ireg_blocks_ok] -- iput's [IBLOCK inum inodestart] membership facts,
      stated for EVERY inum the region covers rather than for the one child.
      That is strictly the better shape: it is a fact about the superblock
      layout, provable once, instead of a fact about a directory's contents.
+
+   ---- THE GRANULARITY PREMISE IS GONE (fs-icache.md §15(b)) -----------
+
+   [16 | di_size dn] used to be a premise here too, refuting
+   panic("dirlink read") at +0x60 (the [bne a0,s3] at +0x3e).  It is not a
+   system invariant -- dirlink's OWN short-write arm is what breaks it (see
+   the APPEND arm below: on [tot < 16] the new size is [16*k0 + tot]) -- so
+   the short-readi turn is now a LIVE panic arm, discharged with
+   [SpecPanic.panic_wp_any], and no caller owes granularity.  A dirlink on a
+   directory a previous short write corrupted therefore PANICS rather than
+   returning; that is what the C does, and it is the honest post-state.
 
    ---- THE ARMS ---------------------------------------------------------
 
@@ -210,9 +224,8 @@ Definition wp_dirlink_sconf_body
   let s := bname 14 fn in
   let k0 := dir_slot data nrec in
   (K_dirlink <= K)%nat ->
-  (* ---- dirlookup's premises ---- *)
+  (* ---- dirlookup's premises (NO granularity -- see the header) ---- *)
   di_type dn = T_DIR ->
-  (16 | bv_unsigned (di_size dn)) ->
   bm_covers bm (bv_unsigned (di_size dn)) ->
   bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
   dir_inums_ok data nrec nib ->

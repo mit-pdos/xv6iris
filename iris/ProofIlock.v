@@ -120,6 +120,8 @@ Require Import FsBlocks LogInv.
 Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import InodeInv.
+Require Import DirentEnc.
+Require Import DirView.
 Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
@@ -671,13 +673,15 @@ Section IlockLoad.
                dinode_at gi inum dn ∗
                ((∃ (bm : blkmap) (data : nat -> list (bv 8)),
                    ⌜inode_ok cov logstart dn bm data⌝ ∗
+                   ⌜dir_ok icfg_nib dn data⌝ ∗
                    ind_res gfs bm ∗ inode_blocks gfs bm data)
                 ∨ ⌜bv_unsigned (di_type dn) = 0⌝))%I
       with "[Hpool]" as (dn) "[Hdn Hrest]".
     { rewrite /ipool_shape. iDestruct "Hpool" as "[Hal | Hfr]".
-      - iDestruct "Hal" as (dn0 bm0 data0) "(%Hok0 & Hdn & Hind & Hblk)".
+      - iDestruct "Hal" as (dn0 bm0 data0) "(%Hok0 & %Hdok0 & Hdn & Hind & Hblk)".
         iExists dn0. iFrame "Hdn". iLeft. iExists bm0, data0.
-        iSplitR; [iPureIntro; exact Hok0 |]. iFrame.
+        iSplitR; [iPureIntro; exact Hok0 |].
+        iSplitR; [iPureIntro; exact Hdok0 |]. iFrame.
       - iDestruct "Hfr" as (dn0) "(%Ht0 & Hdn)".
         iExists dn0. iFrame "Hdn". iRight. iPureIntro. exact Ht0. }
     iDestruct "Hraw" as "[Hmeta0 Haddrs0]".
@@ -1682,7 +1686,7 @@ Section IlockLoad.
       iApply ("Hpan" with "Htext Hpc Hcg"). }
     (* ===== ALLOCATED INODE: the type is nonzero and the branch falls
        through, exactly as v1's dead arm did ===== *)
-    iDestruct "Hal" as (bm data) "(%Hok & Hindres & Hblocks)".
+    iDestruct "Hal" as (bm data) "(%Hok & %Hdok & Hindres & Hblocks)".
     destruct Hok as (Hwf & Hcovers & Hda & Htynz & Hszcap & Hholes & Hsized).
     pose proof (blkmap_wf_dir_len _ _ _ Hwf) as Hdirlen.
     assert (Hcelllen : length (bm_cells bm) = 13%nat)
@@ -1747,6 +1751,9 @@ Section IlockLoad.
     { rewrite /ic_loaded -Hip. iExists data.
       iSplitR.
       { iPureIntro. rewrite /inode_ok. split_and!; assumption. }
+      (* §15(a): the fill RIDES on the pool's strengthened allocated arm --
+         same record, same data, so the conjunct transfers verbatim *)
+      iSplitR; [iPureIntro; exact Hdok |].
       iSplitL "Hdn"; [iExact "Hdn" |].
       iSplitL "Hmty Hmmaj Hmmin Hmnl Hmsz".
       { rewrite /inode_meta.

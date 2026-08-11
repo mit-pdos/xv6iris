@@ -37,36 +37,51 @@
 
    [DirView.v]'s record view over [InodeInv.file_byte data]: [dir_inum],
    [dir_name], [dir_live], [dir_match] and the first-match search
-   [dir_first].  [nrec] is [dir_nrec (di_size dn)] = size/16, which is a
-   record count only because of the GRANULARITY premise below.
+   [dir_first].  [nrec] is [dir_nrec (di_size dn)] = size/16, the number of
+   WHOLE records; when the size is NOT a multiple of 16 the loop takes one
+   turn past [nrec] and dies in panic("dirlookup read") -- see below.
 
-   ---- THE FOUR PREMISES A CALLER MUST BRING ---------------------------
+   ---- THE THREE PREMISES A CALLER MUST BRING ---------------------------
 
    (1) [di_type dn = T_DIR].  Refutes panic("dirlookup not DIR") at +0x1c;
        namex tests exactly this before calling.
 
-   (2) [16 | di_size dn] -- THE GRANULARITY INVARIANT.  Under it every loop
-       readi has [off + 16 <= size], so readi's kernel arm returns EXACTLY
-       16 ([rd_clamp] is 16) and panic("dirlookup read") at +0x6a is dead.
-       mkfs and dirlink are the only two things that ever grow a directory
-       and both do it by whole records, so it is preserved; nothing in the
-       tree has minted it yet, which is why it is a threaded premise.
-       (Recorded as an owed item in claude-notes/projects/fs-namei.md.)
-
-   (3) readi's own threading: [bm_covers], the MAXFILE*BSIZE size bound,
+   (2) readi's own threading: [bm_covers], the MAXFILE*BSIZE size bound,
        [log_geom_ok] / [blkmap_wf].  Note that readi's JOINT NUMERIC
        premise is NOT a caller premise here: [off + 16 <= size <=
        MAXFILE*BSIZE] discharges it at every call.
 
-   (4) [dir_inums_ok] -- EVERY LIVE RECORD'S INUM IS INSIDE THE INODE
-       REGION.  iget's one argument premise is [bv_unsigned inum <
+   (3) [DirView.dir_inums_ok] -- EVERY LIVE RECORD'S INUM IS INSIDE THE
+       INODE REGION.  iget's one argument premise is [bv_unsigned inum <
        16 * nib], and dirlookup's inum comes off the DISK, so nothing in
-       the proof can establish it: it is an image well-formedness fact
-       about the directory's contents and it must be a premise.  This is a
-       genuine addition to the layer-3 design, which had assumed iget's
-       premises could be threaded "verbatim" -- they can, but this one has
-       to be quantified over the records because the matching record is
-       not known until the loop stops.  See the campaign file's N3 ledger.
+       the proof can establish it: it is a well-formedness fact about the
+       directory's contents and it must be a premise.  It is quantified
+       over the records because the matching record is not known until the
+       loop stops.
+
+       WHERE A CALLER GETS IT (fs-icache.md §15(a)): it is now a SYSTEM
+       INVARIANT, the conjunct [DirView.dir_ok icfg_nib dn data] riding in
+       [IcacheEscrow.ic_loaded] and in [ipool_shape]'s allocated arm, so
+       namex destructs it out of ilock's postcondition at a directory it
+       could not have named in advance -- [DirView.dir_ok_dir] is the one
+       step, and it wants [nib = icfg_nib].
+
+   ---- THE GRANULARITY PREMISE IS GONE (fs-icache.md §15(b)) -----------
+
+   [16 | di_size dn] USED to be premise (2), and under it every loop readi
+   had [off + 16 <= size], [rd_clamp] was 16, and panic("dirlookup read")
+   at +0x46 was dead.  It is NOT an invariant: THIS kernel's balloc returns
+   0 when the disk is full (stock xv6 panics -- see SpecBalloc.v's header),
+   so dirlink's third arm really does append a PREFIX of a 16-byte record
+   and leaves [size = 16*nrec + tot] permanently non-granular.  The next
+   scan of such a directory takes ONE extra turn of the loop, at
+   [i = nrec] with [16*nrec < size], whose readi returns [tot < 16] and
+   whose [bne a0,s3] at +0x6a is TAKEN -- into panic("dirlookup read").
+   That arm is now LIVE and discharged by [SpecPanic.panic_wp_any].  No
+   postcondition arm is added: panic never returns, so the found/notfound
+   arms carry an implicit "...and every readi in the scan returned 16",
+   which is what the old premise gave and what the panic arm gives without
+   it.  A caller -- namex included -- needs no granularity fact at all.
 
    ---- THE TWO ARMS ----------------------------------------------------
 
@@ -141,12 +156,11 @@ Definition K_dirlookup : nat := 82%nat.
    against. *)
 Definition T_DIR : mword 16 := mword_of_int 1.
 
-(* THE PREMISE iget's argument bound forces on the CALLER (see the header):
-   every live record in the directory names an inum the inode region
-   covers. *)
-Definition dir_inums_ok (data : nat -> list (bv 8)) (nrec nib : nat) : Prop :=
-  forall k : nat, (k < nrec)%nat -> dir_live data k ->
-    bv_unsigned (dir_inum data k) < 16 * Z.of_nat nib.
+(* [dir_inums_ok] -- the premise iget's argument bound forces on the CALLER
+   (see the header) -- used to be defined here.  fs-icache.md §15(a) made it
+   a conjunct of the icache's escrow payloads, which are defined far below
+   any spec file, so it now lives in [DirView.v] and this file re-exports it
+   by importing DirView.  The premise below is unchanged. *)
 
 Definition wp_dirlookup_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
@@ -178,16 +192,15 @@ Definition wp_dirlookup_sconf_body
   let nrec := dir_nrec (bv_unsigned (di_size dn)) in
   let s := bname 14 fn in
   (K_dirlookup <= K)%nat ->
-  (* (1) the panic at +0x1c is refuted *)
+  (* (1) the panic at +0x1c is refuted.  NOTE that panic("dirlookup read")
+     at +0x46 is NOT refuted -- it is a live arm, see the header. *)
   di_type dn = T_DIR ->
-  (* (2) THE GRANULARITY INVARIANT -- see the header *)
-  (16 | bv_unsigned (di_size dn)) ->
-  (* (3) readi's own threading, verbatim *)
+  (* (2) readi's own threading, verbatim *)
   log_geom_ok cov logstart ->
   blkmap_wf cov logstart bm ->
   bm_covers bm (bv_unsigned (di_size dn)) ->
   bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
-  (* (4) iget's argument bound, over the records -- see the header *)
+  (* (3) iget's argument bound, over the records -- see the header *)
   dir_inums_ok data nrec nib ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
