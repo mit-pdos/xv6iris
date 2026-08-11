@@ -1,37 +1,29 @@
-(** * WeakLeafO.v — PROTOTYPE: leaves with the [wstate] HIDDEN.
+(** * WeakLeafO.v — leaves with the [wstate] HIDDEN.
 
-    Design: [`claude-notes/design/weak-memory-sc-parity.md`] §4 and obligation
-    §5.2, done WITHOUT re-basing [wmstate_interp] — see "the cheap route"
-    below.
+    Design: [`claude-notes/design/weak-memory-sc-parity.md`] §4 / obligation
+    §5.2, done WITHOUT re-basing [wmstate_interp].
 
-    THE RESIDUE THIS REMOVES.  After [WeakLeafM]'s [winstr_m] token and the
-    frame threading, instruction 35 of [WkStartNew] was 11 lines against SC's
-    6, and what was left was exactly three things: the [ws] binder, the
-    [⌜ws_le ws ws'⌝], and the [hart_ws] in and out.  All three exist for one
-    reason — [WeakGhost.hart_ws] is an EXACT-valued [ghost_var], so a leaf
-    can only step it by naming both states.
+    THE RESIDUE THIS REMOVES.  [WeakGhost.hart_ws] is an EXACT-valued
+    [ghost_var], so a leaf can only step it by naming both states — which
+    is why every caller above a leaf carried an [ws] binder, an
+    [⌜ws_le ws ws'⌝] and an [hart_ws] in and out.  [WeakGhost.hart_view]
+    pairs that exact half with the monotone authority under one
+    existential, so the value is hidden outside and still exactly known
+    inside; [hart_view_close] consumes the [ws_le] the leaf hands back, and
+    it never reaches the caller.
 
-    THE CHEAP ROUTE.  [wmstate_interp] holds [wws_auth cpu_id σ.(wm_ws)], the
-    other half of that [ghost_var].  It would be a large change to re-base
-    it.  It is also unnecessary: BOTH halves of what a client needs are
-    already client-side, so the monotone authority can be bundled with the
-    client's [hart_ws] half and the interpretation left alone.
+    NOTHING BELOW THIS FILE CHANGES.  [WeakGhost]'s interpretation, and all
+    twenty existing [WeakLeaf*.v] files, are untouched; so are the ~48
+    [hart_ws_update] call sites.  Every wrapper here is the underlying leaf
+    plus [hart_view_open] / [hart_view_close].
 
-      [hart_view := ∃ ws, hart_ws cpu_id ws ∗ ws_auth γv ws]
-
-    The existential is the whole trick — the value is hidden from the caller
-    but still exactly known INSIDE, which is what lets [hart_view] be passed
-    to an unmodified leaf.  Nothing in [WeakGhost], [WeakInterp] or any of
-    the twenty existing leaf files changes; the ~48 [hart_ws_update] call
-    sites are untouched.
-
-    WHAT THIS BUYS AND WHAT IT DOES NOT.  It buys the SC-shaped leaf
-    interface, and hence SC-shaped call sites, which is the whole point.  It
-    does NOT by itself make [γv] implicit — that needs [weak_view_name] as a
-    [weakGS] field and one new per-hart allocation in [WeakAdequacy], which
-    changes the initial resource the boot composition receives.  Until then
-    [γv] is a section parameter; making it implicit is a rename, not a
-    reproof. *)
+    THE FRAME.  A leaf carries its caller's other resources as
+    [vwp_hold F ws] — indexed by the very [wstate] we are hiding.
+    [WeakObj.wobj_to_hold] / [wobj_of_hold] convert, for ARBITRARY [F] and
+    with no unfolding, so a wrapper takes [wobj F] in and hands [wobj F]
+    back.  (An earlier draft discharged the frame at [⌜True⌝ ]; that made
+    the statement look clean by throwing away the thing callers actually
+    need.) *)
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap.
 From stdpp Require Import bitvector.definitions.
@@ -44,72 +36,63 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RegFile.
 Require Import RiscvFetchExec InstrBytes WpGpr WpMmodeLeafBase.
 Require Import WeakMem WeakInterp WeakLang WeakView WeakVProp WeakGhost.
-Require Import WeakViewMono WeakPtOwn WeakLeafM.
+Require Import WeakViewMono WeakPtOwn WeakPtPub WeakObj WeakLeafM.
 
 Section leafo.
-  Context `{!riscvGS Σ, !weakGS Σ, !weakViewG Σ}.
+  Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (** In the eventual wiring, [weak_view_name cpu_id]. *)
-  Context (γv : wview_names).
-
   (* ------------------------------------------------------------------ *)
-  (** ** 1. The opaque token *)
+  (** ** 1. THE GENERIC CONVERSION.
 
-  Definition hart_view : iProp Σ :=
-    (∃ ws : wstate, hart_ws cpu_id ws ∗ ws_auth γv ws)%I.
+      Every ws-threading leaf in the tree has this shape once its curried
+      resources are bundled into [Pre] / [Post] (check any of the twenty
+      [WeakLeaf*.v] files: none of them mentions a [wstate] in [Pre] or
+      [Post]).  So one lemma is the whole conversion, and the per-leaf
+      sweep is bundling — mechanical, no new proof content.
 
-  (** Snapshotting a floor: the only thing a caller can learn from the
-      token, and being persistent it never has to be given back.  Code that
-      does NOT care about views — every lock-disciplined function — never
-      calls this. *)
-  Lemma hart_view_lb : hart_view -∗ ∃ ws, hart_view ∗ ws_lb γv ws.
-  Proof.
-    iIntros "[%ws [Hws Hauth]]".
-    iDestruct (ws_lb_get with "Hauth") as "#Hlb".
-    iExists ws. iFrame "Hlb". iExists ws. iFrame.
-  Qed.
-
-  (* ------------------------------------------------------------------ *)
-  (** ** 2. THE GENERIC CONVERSION.
-
-      Every ws-threading leaf in the tree has this shape, with [Pre] and
-      [Post] mentioning no [wstate] (check any of the twenty
-      [WeakLeaf*.v] files).  So one lemma converts all of them, and the
-      remaining sweep is bundling each leaf's curried resources into the
-      [Pre]/[Post] slots — mechanical, no new proof content. *)
-  Lemma leaf_hide (Pre Post : iProp Σ) :
+      The frame [F] rides through as [wobj F]; [Pre] / [Post] are the
+      leaf's own resources. *)
+  Lemma leaf_hide (Pre Post : iProp Σ) (F : vProp Σ) :
     (∀ ws : wstate,
-        ⊢ Pre -∗ hart_ws cpu_id ws -∗
+        ⊢ Pre -∗ hart_ws cpu_id ws -∗ vwp_hold F ws -∗
           (∀ ws' : wstate, ⌜ws_le ws ws'⌝ -∗ Post -∗ hart_ws cpu_id ws' -∗
-             WWP Loop) -∗
+             vwp_hold F ws' -∗ WWP Loop) -∗
           WWP Loop) ->
-    Pre -∗ hart_view -∗ (Post -∗ hart_view -∗ WWP Loop) -∗ WWP Loop.
+    Pre -∗ hart_view cpu_id -∗ wobj F -∗
+    (Post -∗ hart_view cpu_id -∗ wobj F -∗ WWP Loop) -∗ WWP Loop.
   Proof.
-    iIntros (Hleaf) "HPre [%ws [Hws Hauth]] Hcont".
-    iApply (Hleaf ws with "HPre Hws").
-    iIntros (ws') "%Hle HPost Hws".
+    iIntros (Hleaf) "HPre [%ws [Hws Hauth]] HF Hcont".
+    iDestruct (wobj_to_hold with "Hauth HF") as "[Hauth HF]".
+    iApply (Hleaf ws with "HPre Hws HF").
+    iIntros (ws') "%Hle HPost Hws HF".
     iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
-    iApply ("Hcont" with "HPost"). iExists ws'. iFrame.
+    iDestruct (wobj_of_hold with "Hauth HF") as "[Hauth HF]".
+    iApply ("Hcont" with "HPost [Hws Hauth] HF").
+    iExists ws'. iFrame.
   Qed.
 
   (* ------------------------------------------------------------------ *)
-  (** ** 3. The worked leaf.
+  (** ** 2. The worked leaf.
 
-      Compare with [WeakLeafM.wwp_lui]: no [ws] parameter, no [F] frame, no
-      [∀ ws'], no [⌜ws_le ws ws'⌝], and [hart_view] in place of [hart_ws
-      cpu_id ws] / [hart_ws cpu_id ws'].  What is left is
-      [WpMmodeUtype.wp_lui_gpr]'s statement plus ONE extra name in the
-      [with "…"] and [iIntros] patterns — a name that rides inside lines the
-      SC proof already has.  That is the 1.0x target from §4 of the design.
+      Compare with [WeakLeafM.wwp_lui]: no [ws] parameter, no [∀ ws'], no
+      [⌜ws_le ws ws'⌝], [hart_view cpu_id] in place of [hart_ws cpu_id ws]
+      / [hart_ws cpu_id ws'], and [wobj F] in place of [vwp_hold F ws] /
+      [vwp_hold F ws'].  What is left is [WpMmodeUtype.wp_lui_gpr]'s
+      statement plus two names, both of which ride inside lines the SC
+      proof already has.
 
-      The [F] frame [WeakLeafM.wwp_lui] carries is discharged here at
-      [⌜True⌝]: with the caller's resources objective ([WeakPtOwn]) there is
-      nothing left for it to carry, which is why it disappears rather than
-      being threaded. *)
+      WHAT THE MEASUREMENT SAYS THIS IS WORTH (WkStartNew vs WpStartNew,
+      34 instructions and 40 leaf applications each, code lines only):
+      1612 vs 1337, i.e. 1.21x — and the [ws] threading accounts for ZERO
+      of that gap.  It is 270 inline mentions spread over lines that exist
+      in the SC proof too, so what this file buys is not lines.  It is
+      that a caller's resources stop being indexed by a [wstate] at all,
+      which is what lets them go in an invariant ([WeakObj]) — and that
+      was never a line-count question. *)
   Lemma wwp_lui_o (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
       (rd : mword 5) (imm : mword 20) (m : regfile)
-      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (F : vProp Σ) :
     gen_id = 0%nat ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
@@ -118,24 +101,27 @@ Section leafo.
     pc_is pc -∗
     gpr_file m -∗
     winstr_m pc is_rvc (UTYPE (imm, Regidx rd, LUI)) -∗
-    hart_view -∗
+    hart_view cpu_id -∗
+    wobj F -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg (luival imm)]> m) -∗
-      hart_view -∗
+      hart_view cpu_id -∗
+      wobj F -∗
       WWP Loop) -∗
     WWP Loop.
   Proof.
     intros Hgid Hpmp Hnz.
-    iIntros "Hmm Hpcf Hpc Hfile #Hi [%ws [Hws Hauth]] Hcont".
-    iAssert (vwp_hold (⌜True⌝ : vProp Σ) ws) as "HF".
-    { rewrite vwp_hold_pure. done. }
-    iApply (wwp_lui pc is_rvc rd imm m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
+    iIntros "Hmm Hpcf Hpc Hfile #Hi [%ws [Hws Hauth]] HF Hcont".
+    iDestruct (wobj_to_hold with "Hauth HF") as "[Hauth HF]".
+    iApply (wwp_lui pc is_rvc rd imm m pmpcfg0 q ws F
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
-    iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws HF".
     iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
-    iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
+    iDestruct (wobj_of_hold with "Hauth HF") as "[Hauth HF]".
+    iApply ("Hcont" with "Hmm Hpcf Hpc Hfile [Hws Hauth] HF").
+    iExists ws'. iFrame.
   Qed.
 
 End leafo.

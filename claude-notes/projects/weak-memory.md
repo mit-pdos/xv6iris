@@ -2653,3 +2653,61 @@ REMAINING, and all of it mechanical or contained:
    builds a `weakGS`, line 157).  This changes the initial resource the boot
    composition receives, which is why it was not done here.  It is a rename,
    not a reproof.
+
+## THE MEASUREMENT (2026-08-11) — taken at last, and it says something unexpected
+
+`WkStartNew.v` vs `WpStartNew.v`. Directly comparable: **34 instruction
+markers and 40 leaf applications each**. Code lines only (comments and
+blanks excluded, since the weak files carry far more prose):
+
+| | code lines |
+|---|---|
+| `WpStartNew` (SC) | 1337 |
+| `WkStartNew` (weak) | 1612 |
+| **ratio** | **1.21×** |
+
+Not 3×. `WkTimerinit` is still ~3× (1652 vs 553) but it has *not* been
+ported onto `WeakLeafM`'s `winstr_m` interface; `WkStartNew` has, and the
+gap already closed most of the way.
+
+### Where the remaining 275 lines are — attributed by grep, not by guess
+
+| cause | extra whole lines |
+|---|---|
+| `winstr_bytes` preamble, inline per instruction | 38 blocks × 7 = **266** |
+| PC/nextPC split (`iDestruct "Hpc" as "[Hpc Hnpc]"` + a second `iEval … in "Hnpc"`) | 38 + 37 = **75** |
+| **`ws` threading** | **0** |
+
+(266 + 75 exceeds 275, so the weak chain is *shorter* than SC somewhere by
+~65 lines — some of SC's per-instruction `assert`s are hoisted differently.
+The point survives: the two engineering gaps dominate and `ws` contributes
+nothing.)
+
+The `ws` threading is **270 inline mentions** (`ws34`, `%Hwsle35`, `Hhws`)
+— and every one of them sits on a line the SC proof has too. `iIntros
+(ws35) "%Hwsle35 Hmm HpcfA Hpc Hfile Hhws Hstk"` replaces SC's `iIntros
+"Hmm HpcfA Hpc Hfile"`. Same line. Wider, not extra.
+
+### What this means for the effort
+
+**The monotone view does not buy line count, because the `ws` threading was
+never costing lines.** What it buys is that a caller's resources stop being
+indexed by a `wstate` — which is what lets them go in an invariant
+(`WeakObj`), and what makes a function's spec statable without a view. That
+is a composability result, not a size result, and the design note should say
+so rather than leading with 3× → 1.0×.
+
+### The two things that WOULD buy line count, neither weak-memory
+
+1. **Hoist the `winstr_bytes` preamble** into per-instruction `wsti_NN`
+   lemmas. `WkStartAux.wsti_35` is the one that exists, and instruction 35
+   is correspondingly the shortest in the file. SC does exactly this
+   (`CodeStartAux.st_instrNN`, applied as a one-line `iPoseProof`). Doing
+   the other 37: −228 lines in the chain, ratio → **~1.04×**. Cost is ~25
+   lines each in `WkStartAux`, so it moves rather than removes work — but
+   SC pays the same and the chain is what we are measuring.
+2. **Stop splitting PC/nextPC** at the leaf boundary: −75 lines.
+
+Neither needs any of `WeakViewMono` / `WeakPtOwn` / `WeakPtPub` / `WeakObj`.
+Both are ordinary proof engineering, and they are now the top of the list if
+the goal is the number.
