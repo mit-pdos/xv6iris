@@ -111,6 +111,14 @@ Definition upd_ofile (V : pprivate) (fd : nat) (v : mword 64) : pprivate :=
 Definition upd_sz (V : pprivate) (v : mword 64) : pprivate :=
   MkPPriv v (pv_upt V) (pv_tf V) (pv_ofile V) (pv_cwd V) (pv_name V).
 
+(* functional update of the trapframe words -- what prepare_return does to
+   the four KERNEL slots (kernel_satp / kernel_sp / kernel_trap /
+   kernel_hartid) it re-arms for the next uservec, and what a syscall's
+   return value write does to the a0 slot.  The page itself is unchanged;
+   only [pv_tf]'s contents move. *)
+Definition upd_tf (V : pprivate) (ws : list (mword 64)) : pprivate :=
+  MkPPriv (pv_sz V) (pv_upt V) ws (pv_ofile V) (pv_cwd V) (pv_name V).
+
 (* the descriptor moves, everything else stays -- what copyin / copyout /
    vmfault do to a process when they fault a page in ([uptd_ext], below). *)
 Definition upd_upt (V : pprivate) (P : uptd) : pprivate :=
@@ -517,6 +525,25 @@ Section ProcInv.
     rewrite /tf_page. iIntros (Hi) "(%Hlen & Hws & Htail)".
     iDestruct (big_sepL_lookup_acc _ _ i w Hi with "Hws") as "[$ Hback]".
     iIntros "Hc". iSplit; [done|]. iSplitL "Hc Hback"; [rewrite /tf_words; iApply ("Hback" with "Hc") | iExact "Htail"].
+  Qed.
+
+  (* THE WRITE TWIN: borrow the cell and put back a DIFFERENT word, the page
+     re-indexed at [<[i := w']> ws].  [tf_page_word] above cannot serve -- its
+     wand demands the old value back -- and every trapframe WRITER needs this
+     one: prepare_return's four kernel slots, syscall's a0, uservec's saves.
+     The length side condition survives by [insert_length], so the page's own
+     [⌜length ws = TFWORDS⌝ ] is re-established with no arithmetic. *)
+  Lemma tf_page_word_upd (tfp : mword 44) (ws : list (mword 64)) (i : nat) (w : mword 64) :
+    ws !! i = Some w ->
+    tf_page tfp ws -∗
+    a_tf_word tfp i ↦₈ w ∗
+    (∀ w' : mword 64, a_tf_word tfp i ↦₈ w' -∗ tf_page tfp (<[i := w']> ws)).
+  Proof.
+    rewrite /tf_page. iIntros (Hi) "(%Hlen & Hws & Htail)".
+    iDestruct (big_sepL_insert_acc _ _ i w Hi with "Hws") as "[$ Hback]".
+    iIntros (w') "Hc". iSplit.
+    { iPureIntro. rewrite length_insert. exact Hlen. }
+    iSplitL "Hc Hback"; [rewrite /tf_words; iApply ("Hback" with "Hc") | iExact "Htail"].
   Qed.
 
   (* STATED AT THE VA TIER.  Every kernel reader of this page -- argraw's

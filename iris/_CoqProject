@@ -346,6 +346,7 @@ ByteBuf.v
 WpHoldingInv.v
 CodePopOff.v
 CodePrepareReturn.v
+SpecPrepareReturn.v
 CodeRelease.v
 CodeKalloc.v
 WpMemsetPage.v
