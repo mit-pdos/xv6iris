@@ -258,6 +258,15 @@ are working on that effort — the relevant `projects/` file.
   whole M-mode boot cone is converted to it, at 1.4× SC.  Read it for the
   argument, not for the names; the worklist's conversion slice has what
   landed.
+- **[`weak-memory-m6-robustness.md`](design/weak-memory-m6-robustness.md)** —
+  M6's tee-up: closing the store-reordering gap.  The promise-free machine is
+  STRONGER than RVWMO (it excludes LB and observable W→W reordering), so
+  adequacy owes a robustness theorem: every full-machine execution of this
+  kernel is matched by a promise-free one.  Two layers — a
+  program-independent delay-simulation over PARM's `pf_exec` skeleton, and a
+  per-store protection premise extracted from the Iris proof — plus the
+  axiomatic characterization lemma, the recorded rejections, and the open
+  questions to settle before any of it is written.
 - **[`weak-memory.md`](projects/weak-memory.md)** — the weak-memory effort's
   staged worklist (M0 model spike → base logic → vProp surface → vertical
   slice → sweep → devices → the LB robustness theorem), with a
