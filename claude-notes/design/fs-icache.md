@@ -2231,3 +2231,37 @@ Execution: N4a = (a)'s retrofit + (b)'s two spec/proof reworks;
 N4b = namex + wrappers on top. Recorded consumers: sysfile's create
 must handle dirlink's short arm (a corrupt directory is a real
 post-state); filewrite's future spec owes the fd-type fact.
+
+### 15.1 Corrections from N4a's execution (the stage that landed §15)
+
+Three of §15's claims were wrong in the details; the conclusions
+survive but the record should not mislead the next reader.
+
+**(i) The short-write analysis ignored writei's disturbed region.**
+SpecWritei's range clause is THREE-way (kernel defect D1): new bytes
+below tot, then up to a BLOCK of UNSPECIFIED bytes above it, then old
+bytes. So §15's "new prefix + old zeros" picture is wrong. The APPEND
+arm is fine — cheaper than §15 argued (the fragment sits at index
+nrec, out of range at the unchanged nrec; no mod-256 argument exists
+in the landed proof at all). But the MIDDLE-SLOT arm (filling an
+interior free record) can clobber up to 64 FOLLOWING records with
+arbitrary bytes — dir_ok is NOT derivable from dirlink's contract as
+frozen. This does not affect N4a (dirlink parks no escrow bundle in
+this tree — the holder does, and today's only holder-after-dirlink is
+future sysfile code); the honest fix, owed to sysfile's create: on
+the KERNEL arm either_copyin cannot fail, so dist = 0 — strengthen
+SpecWritei's kernel arm and the middle-slot analysis becomes the
+append one. Also: the LINKED inum (the mword 16 argument) has no
+range premise in SpecDirlink — the writer-side dir_ok proof adds it.
+
+**(ii) The panic arm is not per-iteration.** For i < nrec, floor
+division alone gives 16*i + 16 <= size — granularity was never needed
+below the boundary. The arm is reachable at exactly ONE index,
+i = nrec with a non-granular tail (including i = 0 for 0 < size < 16).
+The landed proofs restructure the loop invariant around the loop's own
+test (off < size) instead of i < nrec.
+
+**(iii) nib is icfg_nib, forced.** A nib parameter on ic_loaded would
+cascade through SpecIunlock into every caller; the ambient class is
+already how inode_held names the same bound. Consumers with their own
+nib parameter take nib = icfg_nib (ProofKexit's existing premise).
