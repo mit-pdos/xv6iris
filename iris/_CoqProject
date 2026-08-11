@@ -970,3 +970,4 @@ ProofIunlockput.v
 LinkIunlockput.v
 SpecDirlookup.v
 SpecDirlink.v
+ProofDirlookupParts.v
