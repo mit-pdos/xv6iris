@@ -2349,3 +2349,63 @@ the re-park sites in `ProofIget` / `ProofIput` / `ProofIlock`.
 dinodes — its `lh` of type and nlink need no fragment, only
 `InodeRegion.ireg_read_blk` (landed by N5a) — and then composes six
 already-proven contracts.
+
+### 16.4 THE RULING (coordinator, 2026-08-11): §16.3's direction is
+### right, its payout target is wrong; the claim-box completes it
+
+**§16.3's core move stands**: free inums' `dinode_at` fragments live in
+the region invariant (the type-0 conditional conjunct), the claim is
+`ireg_claim_au` guarded by the buffer — the machine's real serialiser —
+and `ireg_write_au` gains `di_type dn' ≠ 0` with `ireg_free_au` as the
+dual. The boot mint gets cheaper exactly as argued.
+
+**But the fragment must NOT pay out to ialloc's caller.** The killing
+interleaving: (1) sys_unlink zeroes a directory record, and a racing
+dirlookup that read the record just before takes its inum; (2) the
+unlinker's iput frees the inode — the fragment returns to the region;
+(3) dirlookup's iget finds the inum uncached and (per the slimmed pool,
+below) parks a MARKER — a stale entry, valid = 0, refs > 0; (4) ialloc
+claims the same inum through its buffer; (5) the stale entry's holder
+calls ilock BEFORE create does. That fill reads type ≠ 0 from the
+buffer, holds a marker, and the fragment is in create's pocket —
+`ic_loaded` cannot be built and the WP wedges. Real xv6 sails through
+(the filler just reads the claimed bytes), so the model must too.
+
+**The claim-box.** A new small invariant (one ghost_map, auth inside):
+per inum, `(∃ dn', inum ↪cb dn' ∗ ⌜fresh_shape dn'⌝) ∨ empty`, where
+`fresh_shape` = zero addrs, zero size, type ≠ 0 (exactly what ialloc's
+memset+stores leave). Lifecycle:
+- `ireg_claim_au` moves the fragment region → box (retagged at dn').
+  A claim against a FULL box slot is refuted by coupling: a full slot
+  means the record's bytes have type ≠ 0, and the claim's premise is a
+  buffer showing type 0.
+- The FIRST fill withdraws box → `ic_loaded`. While boxed, the bytes
+  cannot move: every writer needs the fragment and it is in the box.
+  So the fill's buffer read EQUALS the boxed dn', and `fresh_shape`
+  makes `inode_ok` constructible from nothing (`bm_empty`: ind_res and
+  every blk_res collapse; `inode_sized_zero`; `dir_ok_size_zero`).
+- iput's free path absorbs the holder's fragment box-lessly back into
+  the region conjunct via `ireg_free_au` (type-0 retag).
+
+**The pool stays TOTAL — iget does not reopen.** Keep
+`dom(pool) = in-range ∖ cached` (both sides lock-stable; "allocated" is
+NOT lock-stable once claims bypass the itable, so §16.3's shrunken
+domain is unmaintainable). `ipool_shape` stays two-armed but its free
+arm slims to the marker (no record — the region has it). iget parks
+whichever arm rides in, unchanged. ilock's FILL gains one sub-arm:
+- bundle parked → today's fill, unchanged;
+- marker parked, buffer type = 0 → panic("ilock: no type"), already live;
+- marker parked, buffer type ≠ 0 → box withdrawal (the new arm) — and
+  this case analysis is EXHAUSTIVE: type ≠ 0 means the fragment is out
+  of the region, and out-of-region ∧ not-in-any-ic_loaded (this entry is
+  unloaded; entries are unique per (dev,inum)) forces the box.
+
+**Blast radius (one retrofit cycle, then ialloc, then the boot half):**
+`InodeRegion.v` (conjunct + two AUs + one premise), new `IcacheClaim.v`
+(the box), `IcacheEscrow.v` (the free arm slims), `SpecIlock.v` +
+`ProofIlock.v` (the fill sub-arm), `ProofIput.v` (free path re-parks the
+marker arm + uses the dual), `IcacheBoot.v` (mint simplifies; free mint
+needs no pool contents), `ProofIget.v` (audit — expected to ride).
+ireclaim/fsinit compose only contract SHAPES that survive, but fsinit's
+postcondition is pool-shaped, so the boot half is sequenced AFTER the
+retrofit: N5b (retrofit) → N5c (ialloc) → N5d (ireclaim + fsinit).
