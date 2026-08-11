@@ -20,12 +20,11 @@
         era-initial image — the weak analogue of "one [a ↦ₘ b] per initial
         memory byte", at timestamp 0 (nothing has been written yet);
       - one [hart_view c] per hart — the client half of that hart's
-        weak-state cell, PAIRED with the monotone shadow allocated at the
-        same [ws_init] and with the value hidden.  (It used to be the bare
-        [hart_ws c ws_init]; the pairing is what lets everything above a
-        leaf stop naming [wstate]s.  A client that does want the value back
-        cannot have it — but it can have any floor, persistently, via
-        [WeakGhost.hart_view_lb].)
+        weak-state cell at [ws_init], with the value hidden, which is what
+        lets everything above a leaf stop naming [wstate]s.  (It briefly
+        also carried a monotone shadow, so that a client could snapshot a
+        floor without the value; floors are read at the CONTEXT index now
+        — [WeakCtx.ctx_view_lb_get] — and the shadow is gone.)
       - [uart_frag] / [plic_frag] / [virtio_frag] — VERBATIM;
       - [wlog_lb []] — the (persistent) snapshot of the empty era log.
 
@@ -150,10 +149,6 @@ Proof.
   iMod (ghost_map_alloc (wlat_init (wgimg g))) as (γlat) "[Hlatauth Hlatel]".
   iMod (ghost_var_alloc_halves_cpus ws_init (enum CPU) (NoDup_enum CPU))
     as (γws) "Hwss".
-  (* the MONOTONE SHADOW of the cell just allocated: one [wview_names] per
-     hart, at the SAME [ws_init], which is what makes the [hart_view]
-     pairing below true at boot. *)
-  iMod (ws_alloc_cpus ws_init (enum CPU) (NoDup_enum CPU)) as (γvw) "Hvws".
   (* ---- assemble the two instances ---- *)
   set (E0 := RiscvEraGS f 1%positive 1%positive γu γp γv 1%positive 1%positive
                (fun _ => 1%positive) (fun _ => 1%positive)
@@ -164,12 +159,12 @@ Proof.
                (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ _ 1%positive 1%positive _
                   1%positive _ _ 1%positive (fun _ => True%I) 1%positive)
                E0).
-  set (HW := WeakGS Σ _ γlog γlat γws γvw).
+  set (HW := WeakGS Σ _ γlog γlat γws).
   iDestruct (big_sepL_sep with "Hcpus") as "[Hauths Helems]".
   iDestruct (big_sepL_sep with "Hwss") as "[HwsA HwsF]".
   (* run the caller's proof to obtain the WPs *)
   iPoseProof (Hwp HR HW) as "Hwand".
-  iMod ("Hwand" with "[Helems Hlatel HwsF Hvws HuF HpF HvF]")
+  iMod ("Hwand" with "[Helems Hlatel HwsF HuF HpF HvF]")
     as "[Hwps (Hwpu & Hwpd & Hwpp)]".
   { iSplitL "Helems".
     { iApply (@RiscvAdequacy.big_sepL_enum_to_set (iPropI Σ)). iExact "Helems". }
@@ -177,14 +172,13 @@ Proof.
     { iApply (big_sepM_wlat_init
                 (fun z tv => ghost_map_elem γlat z (DfracOwn 1) tv)).
       iExact "Hlatel". }
-    iSplitL "HwsF Hvws".
+    iSplitL "HwsF".
     { iApply (@RiscvAdequacy.big_sepL_enum_to_set (iPropI Σ)).
-      (* pair each hart's exact half with its monotone shadow, both at
-         [ws_init], and hide the value — that IS [hart_view] *)
-      iDestruct (big_sepL_sep_2 with "HwsF Hvws") as "H".
-      iApply (big_sepL_mono with "H").
-      intros k c Hk. iIntros "[H1 H2]".
-      rewrite /hart_view /hart_ws /=. iExists ws_init. iFrame. }
+      (* each hart's exact half at [ws_init], with the value hidden — that
+         IS [hart_view] *)
+      iApply (big_sepL_mono with "HwsF").
+      intros k c Hk. iIntros "H".
+      rewrite /hart_view /hart_ws /=. by iExists ws_init. }
     iSplitR; [iExact "Hlgf"|].
     iSplitL "HuF"; [iExact "HuF"|].
     iSplitL "HpF"; [iExact "HpF"|iExact "HvF"]. }

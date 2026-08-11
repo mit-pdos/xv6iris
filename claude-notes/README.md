@@ -246,13 +246,18 @@ are working on that effort — the relevant `projects/` file.
   over user VAs), the interrupt-absorbing step engine with hart-switching
   continuations, the Umode leaf WPs, and the sync program's function proofs
   (start/main + the sync/exit ecall stubs).
-- **[`weak-memory-sc-parity.md`](design/weak-memory-sc-parity.md)** — PROPOSAL,
-  nothing built: making a lock-disciplined function's proof under the weak
-  model be LITERALLY its SC proof, via a monotone view ghost state (so the
-  hart's weak state is an opaque threaded token with persistent lower
-  bounds) plus an objective `↦o` for owned memory, leaving the subjective
-  `↦w` only at the racy sites.  Carries the measured breakdown of where the
-  current 3× actually comes from.
+- **[`weak-memory-sc-parity.md`](design/weak-memory-sc-parity.md)** — the
+  design behind making a lock-disciplined function's proof under the weak
+  model be LITERALLY its SC proof: an opaque threaded view token with
+  persistent lower bounds, plus an objective points-to for owned memory,
+  leaving the subjective `↦w` only at the racy sites.  Carries the measured
+  breakdown of where the original 3× came from.  **PARTLY BUILT, and the
+  mechanism changed on the way**: the hart-indexed layer this file describes
+  (`↦o`, a monotone shadow of the hart's own view) was replaced by the
+  CONTEXT-indexed one — `WeakCtx`'s `cobj ξ R` / `ctx_view_lb` — and the
+  whole M-mode boot cone is converted to it, at 1.4× SC.  Read it for the
+  argument, not for the names; the worklist's conversion slice has what
+  landed.
 - **[`weak-memory.md`](projects/weak-memory.md)** — the weak-memory effort's
   staged worklist (M0 model spike → base logic → vProp surface → vertical
   slice → sweep → devices → the LB robustness theorem), with a

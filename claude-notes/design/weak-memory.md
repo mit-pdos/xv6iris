@@ -172,8 +172,11 @@ acquire-AMO, cannot be promised early in the full machine: its fulfilment
 pre-view would exceed the promised timestamp (certification runs the real
 code, so the fence raises `w_vwNew` before the store can fulfil). xv6's
 entire cross-hart discipline — lock CS stores bracketed by aq-AMO and
-fence-release; the `started`/`first`/virtio sites bracketed by `fence
-rw,rw` — is in that class; the gap is real only for racy unfenced stores,
+fence-release; the `started`/`first` sites written with C11
+release/acquire (`fence rw,w ; sw` on the writer, `lw ; fence r,rw` on the
+reader — the image contains no `fence rw,rw` at all); virtio's MMIO seams
+with `io_fence()` = `fence iorw,iorw` — is in that class; the gap is real
+only for racy unfenced stores,
 which the verified kernel should not have. **Until M6 this is a documented
 model assumption** in the same epistemic category as the 5 `rv64d.*`
 platform axioms: stated once, visible in the final theorem's footprint,
@@ -381,7 +384,9 @@ statements tiny. Iris 4.4's monPred + proofmode support is battle-tested
   function proof that owns its memory (directly or through a lock) keeps its
   statement and its proof script shape**. The kmap/translation conjuncts
   inside `mem_pointsto` ride along unchanged.
-- **Fence modalities** for the `fence rw,rw` publication sites. REVISED at
+- **Fence modalities** for the publication sites (`fence rw,w` on the
+  writer, `fence r,rw` on the reader — see the note above; nothing in the
+  image is `rw,rw`). REVISED at
   M2b, and the revision is forced by the index: the frontier a succ-R fence
   delivers is `View (vrNew ⊔ vrOld ⊔ vwOld) coh`, and `vrOld`/`vwOld` are
   not part of the `biIndex` — so `∇ P` cannot be a `vProp → vProp` without
@@ -389,7 +394,14 @@ statements tiny. Iris 4.4's monPred + proofmode support is battle-tested
   `vwp_hold` altitude, where the hart's `wstate` is in hand:
   `vwp_acq P ws := monPred_at P (acq_view ws)`, with
   `vwp_acq P ws ⊢ vwp_hold P (fence_post ws true true true sw)` (an
-  equality of views, so the rule is `reflexivity`). And `Δ` is NOT a
+  equality of views, so the rule is `reflexivity`). REVISED AGAIN at batch
+  5's second half: that identity needs pred-RW, but the kernel's reader-side
+  fence is pred-R only, and the SCALAR bound the delivery actually uses
+  holds at `pw = false` — so the kind-dependence is now abstracted as
+  `WeakFence.acq_pred_r b` ("the read frontier `acq_view_r` is below the
+  hart's index after `b`", instances `rw,rw`/`rw,r`/`r,rw`/`r,r`) with
+  `view_scl_acq_pred_r` the one delivery fact; no lemma is duplicated per
+  fence kind. And `Δ` is NOT a
   modality: promise-free, a predecessor-W fence constrains nothing, and the
   writer side's real content is the timestamp-domination lemma — the
   releaser's whole index is below `S (length log)`, so it may deposit
@@ -422,17 +434,21 @@ statements tiny. Iris 4.4's monPred + proofmode support is battle-tested
 - **MMIO ordering: model the architecture strictly; fix the driver, not the
   model.** RISC-V FENCE has separate device-I/O bits (PI/PO/SI/SO);
   accesses to the virtio-mmio window (PMA IOMemory) are class I (reads) /
-  O (writes), not R/W. So xv6's `fence rw,rw` before the QUEUE_NOTIFY
+  O (writes), not R/W. So a `fence rw,rw` before the QUEUE_NOTIFY
   store does NOT order the RAM ring writes (class W) before the MMIO store
   (class O) — that needs `fence w,o` — and the completion path's MMIO
   status read vs RAM used-ring reads needs `fence i,r` (exactly what
   Linux's riscv `writel`/`readl` emit: `__io_bw() = fence w,o`,
-  `__io_ar() = fence i,r`). xv6 works today only because QEMU and typical
-  interconnects order these edges anyway. DECIDED (2026-08): the model
+  `__io_ar() = fence i,r`). That `rw,rw` was the old `__sync_synchronize`
+  driver, which worked only because QEMU and typical interconnects order
+  these edges anyway. DECIDED (2026-08): the model
   classifies MMIO accesses by the I/O fence bits — no permissive
-  accommodation of the current driver — and **virtio_disk.c gets patched at
-  M5** to emit `fence w,o` / `fence i,r` at the MMIO seams (+ re-dump).
-  The verification catching this is the system working as intended.
+  accommodation of a driver that does not fence I/O. **The driver side of
+  this is already in the tree**: virtio_disk.c's four barrier sites are
+  `io_fence()` = `fence iorw,iorw` (`0ff0000f` in `kernel.asm`), which
+  subsumes both `w,o` and `i,r`, so the M5 patch is spent and only the
+  model half is owed. The verification forcing this is the system working
+  as intended.
   Mechanically: the device-agent view advances only per the hart's
   I/O-ordering state, so a missing `fence w,o` leaves the DMA `mem_view`
   able to read the ring stale — which is what makes the driver proof fail
@@ -513,7 +529,12 @@ this tractable:
   instruction's weak-memory EFFECT (`.aq` raising the scalar floor, the fence
   moving the index, the store's message identity) — `exec` ignores access
   kinds and barriers, so that stays a per-instruction ISA obligation, and only
-  the three sync instructions have one.
+  the three sync instructions have one. CORRECTED at batch 5: a racy READ's
+  view GAIN ("the timestamp behind the byte I read is under my read floor")
+  looked like it belonged in this class and does not — the bridge's own
+  traversal already knows the timestamp list, so it is a theorem
+  (`WeakRacy.wgain`, from `exec_of_wrun_gain`), not a premise. Check the
+  bridge before making a leaf pay for a view fact.
 - Build the new tree in parallel namespaces first (M0–M3 touch no existing
   file), validate the interfaces on a vertical slice (spinlock + one client
   cone + the started handoff), THEN sweep.

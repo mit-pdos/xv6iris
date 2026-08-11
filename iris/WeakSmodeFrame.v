@@ -324,9 +324,15 @@ Section control.
   Context `{!weakGS Σ} `{GEN : GenId} `{CID0 : CpuId}.
   Variables (F : vProp Σ) (b : bool) (p : mword 64) (ξ : CtxId).
   Variables (a : Z) (t : nat).
+  (* A hart-indexed ghost name, as a SECTION VARIABLE.  What §5 is testing
+     is the INDEX, not the resource, and the tree no longer has a
+     hart-indexed view assertion to point at: [weak_view_name] is deleted
+     and floors are read at the context index.  A bare [Variable] is the
+     honest stand-in — it keeps the three checks below letter-identical. *)
+  Variable (γ0 : CPU -> gname).
 
   Definition hart_floor `{CID : CpuId} : iProp Σ :=
-    coh_lb (wvn_coh (weak_view_name cpu_id)) a t.
+    coh_lb (γ0 cpu_id) a t.
 
   (** A. Under the binder, a hart-indexed assertion means the RESUMING
       hart's. *)

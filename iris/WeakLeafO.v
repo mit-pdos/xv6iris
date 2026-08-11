@@ -6,16 +6,22 @@
     THE RESIDUE THIS REMOVES.  [WeakGhost.hart_ws] is an EXACT-valued
     [ghost_var], so a leaf can only step it by naming both states — which
     is why every caller above a leaf carried an [ws] binder, an
-    [⌜ws_le ws ws'⌝] and an [hart_ws] in and out.  [WeakGhost.hart_view]
-    pairs that exact half with the monotone authority under one
-    existential, so the value is hidden outside and still exactly known
-    inside; [hart_view_close] consumes the [ws_le] the leaf hands back, and
-    it never reaches the caller.
+    [⌜ws_le ws ws'⌝] and an [hart_ws] in and out.  Hiding the value under an
+    existential is what removes that residue: it is unknown outside and
+    still exactly known inside, so the [ws_le] the leaf hands back is
+    consumed at the seam and never reaches the caller.
+
+    (HISTORICAL: this file was first written against
+    [WeakGhost.hart_view_open]/[_close], which paired the exact half with a
+    per-hart MONOTONE authority.  The wrappers below go through
+    [WeakCtx.wrunning] instead — the authority is indexed by a CONTEXT, not
+    a hart — and those lemmas, and the [weak_view_name] field behind them,
+    are deleted.)
 
     NOTHING BELOW THIS FILE CHANGES.  [WeakGhost]'s interpretation, and all
     twenty existing [WeakLeaf*.v] files, are untouched; so are the ~48
     [hart_ws_update] call sites.  Every wrapper here is the underlying leaf
-    plus [hart_view_open] / [hart_view_close].
+    plus the context-token open/close pair.
 
     THE FRAME IS GONE, AND THAT IS THE POINT.  [WeakLeafM]'s leaves take
     the caller's other resources as [vwp_hold F ws] and hand back
@@ -220,9 +226,9 @@ Section leafo.
 
       Included to fix the TEMPLATE, since the remaining sweep is this pair
       per instruction and nothing else.  Neither proof does anything
-      instruction-specific: [_o] is [hart_view_open] / [ws_update] /
-      [hart_view_close] around the [winstr_m] leaf, and [_run] is
-      [whart_run_open] / [whart_run_close] around [_o]. *)
+      instruction-specific: [_o] is [WeakCtx]'s context open/update/close
+      around the [winstr_m] leaf, and [_run] is [whart_run_open] /
+      [whart_run_close] around [_o]. *)
   Lemma wwp_addi_o (ξ : CtxId) (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
       (rs1 rd : mword 5) (imm : mword 12) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :

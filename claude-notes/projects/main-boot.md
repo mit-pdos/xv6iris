@@ -1,7 +1,7 @@
 # Project: main() — the boot function and the `started` handover
 
-GOAL: specify and prove `main()` (kernel/main.c, `0x80000e7e .. 0x80000f2f`,
-50 instructions), over the *specs* of its eighteen callees, with an invariant on
+GOAL: specify and prove `main()` (kernel/main.c, `0x80000e7e .. 0x80000f31`,
+51 instructions), over the *specs* of its eighteen callees, with an invariant on
 the `started` flag carrying the boot hart's initialisation to the other harts.
 
 This is the consumer end of the boot wiring parked in
@@ -37,7 +37,7 @@ every callee, but nothing yet DRIVES them.
   is the reusable tool for allocating any FAMILY of locks whose resources
   reference each other's names.
 
-**`ProofMain.v` / `LinkMain.v` — main() is PROVEN** (main.c 178/178 bytes; the
+**`ProofMain.v` / `LinkMain.v` — main() is PROVEN** (main.c 180/180 bytes; the
 axiom footprint is exactly its three assumed callees — printk-general,
 userinit, and kerneltrap via Kernelvec). What the proof taught, worth keeping:
 
@@ -93,10 +93,13 @@ via Kernelvec — no userinit, secondaries never call it). What it settled:
   `⌜v = 0⌝` arm. The load is `wp_load_s_sconf_au` at width 4 with
   `started_inv_load_au` as the AU (they plug together as designed), and the
   loop-back `wp_cbeqz_taken`'s ▷-continuation is what strips the IH's later.
-- **G4 played out exactly as designed**: the payload rides `▷(⌜v=0⌝ ∨ P)`
-  through the fall-through branch, and `wp_fence_gen_later_s_sconf`'s
-  `iNext` at the acquire fence strips it (both IH-style laters and the
-  payload's in one step).
+- **G4 played out as designed, one instruction earlier than it was
+  designed for**: the acquire fence is INSIDE the loop (0x18, between the
+  load and the branch), so `wp_fence_gen_later_s_sconf`'s `iNext` strips
+  `▷(⌜v=0⌝ ∨ P)` on EVERY iteration and the fall-through branch then
+  carries an already-stripped payload. Harmless: the iteration that goes
+  around again simply drops it. (Both IH-style laters and the payload's
+  still come off in one step.)
 - **`Proof using All`** on the top-level lemma: the proof never mentions
   `kallocG`/`fileG`, so without it the section drops them and the sealed
   Definition fails the Module Type check with a baffling component
@@ -118,8 +121,9 @@ Offsets are what the proof's pc chain steps through:
   0x0c..0x10  auipc a4 / addi a4          -> a4 = &started
   0x14        beqz a0, +0x2e              -- cpuid()==0 ? boot arm : secondary
   --- secondary arm -------------------------------------------------------
-  0x16..0x1a  lw a5,0(a4) / sext.w a5 / beqz a5,-4     while (started == 0) ;
-  0x1c        fence rw,rw                 __atomic_thread_fence(SEQ_CST)
+  0x16..0x1e  lw a5,0(a4) / fence r,rw / sext.w a5 / beqz a5,-8
+                              while (__atomic_load_n(&started,__ATOMIC_ACQUIRE) == 0)
+                              -- the ACQUIRE fence is INSIDE the loop
   0x20..0x2e  printk("hart %d starting\n", cpuid())
   0x32..0x3a  kvminithart / trapinithart / plicinithart
   0x3e        jal scheduler               -- THE JOIN, and main's exit
@@ -127,14 +131,20 @@ Offsets are what the proof's pc chain steps through:
   0x42..0x9e  consoleinit printkinit printk×3 kinit kvminit kvminithart
               procinit trapinit trapinithart plicinit plicinithart binit
               iinit fileinit virtio_disk_init userinit
-  0xa2        fence rw,rw
-  0xa6..0xac  li a5,1 / auipc a4 / sw a5,778(a4)       started = 1
-  0xb0        j 0x3e                      -- back to the join
+  0xa2..0xb0  auipc a5 / addi a5 / li a4,1 / fence rw,w / sw a4,0(a5)
+                              __atomic_store_n(&started,1,__ATOMIC_RELEASE)
+  0xb2        j 0x3e                      -- back to the join
 ```
 
-Note `a4` is materialized ONCE at 0x0c/0x10 and reused by the spin loop, and
-RE-materialized at 0xa8 for the store; the boot arm's `beqz` at 0x14 is the
-only place `cpuid()`'s first result is used.
+The barriers are C11's, not `__sync_synchronize`'s two `fence rw,rw`s (which
+is what this block recorded before): gcc lowers the release store to
+`fence rw,w ; sw` and the acquire load to `lw ; fence r,rw`, so the reader's
+fence sits between its load and its branch rather than on the loop-exit path.
+
+Note `a4` is materialized ONCE at 0x0c/0x10 and reused by the spin loop; the
+boot arm materializes its own pointer in `a5` at 0xa2/0xa6 (with the stored 1
+in a4), and its `beqz` at 0x14 is the only place `cpuid()`'s first result is
+used.
 
 Two contracts, not one: `wp_main_boot_sconf` (`fin_to_nat cpu_id = 0`, entered
 with the whole boot supply) and `wp_main_secondary_sconf` (`≠ 0`, entered with
@@ -152,9 +162,10 @@ started_inv  P := inv startedN (started_body P)
 A one-shot escrow keyed on the word: while the word is 0 the invariant promises
 nothing; once nonzero it carries `P`, the boot hart's deposit. Reading a
 nonzero word yields `P`; writing the word costs `P`. That is the C code's
-happens-before spelled in separation logic, and the two `fence rw,rw`s are its
-machine-level counterpart (no-ops in the model —
-`WpSconfCtl.wp_fence_gen_s_sconf` serves both).
+happens-before spelled in separation logic, and the release `fence rw,w` at
+0xac / the acquire `fence r,rw` at 0x18 are its machine-level counterpart
+(no-ops in the model — `WpSconfCtl.wp_fence_gen_s_sconf` is pred/succ-generic
+and serves both).
 
 Four things about this design are load-bearing:
 
@@ -344,16 +355,19 @@ gets `▷ P`. The later must be stripped at a program step, and only
 *control-transfer* leaves expose one: `wp_cbeqz_taken_s_sconf` /
 `wp_cbnez_taken_s_sconf` (WpSconfBtype.v), `wp_cj_s_sconf` (WpSconfCtl.v),
 `wp_wfi_*` (WpSmodeWfi.v). The spin loop EXITS through the FALL-THROUGH of
-`beqz a5` at 0x1a, and every leaf the secondary arm then runs — the fence at
-0x1c, `jal cpuid` at 0x20, `c.mv`, `auipc`, `addi`, `jal printk` — applies its
-continuation without a later. (The loop-BACK edge does expose one, which is why
-the iLöb recursion itself is fine.)
+`beqz a5` at 0x1e, and every leaf the secondary arm then runs — `jal cpuid` at
+0x20, `c.mv`, `auipc`, `addi`, `jal printk` — applies its continuation without
+a later. (The loop-BACK edge does expose one, which is why the iLöb recursion
+itself is fine.) With the C11 lowering the acquire fence is at 0x18, i.e.
+BEFORE the branch and inside the loop, so the strip happens on every iteration
+rather than once on the way out; the fall-through path is unchanged in what it
+receives.
 
 `wp_fence_gen_later_s_sconf` (WpSconfCtl.v) is the fence leaf's statement with
 the continuation under `▷` (WRAPPER RECIPE: new name, the plain leaf untouched,
 zero call-site churn); its proof is the plain one plus one `iNext` inside
 `wp_instr_s_sconf`'s post-step callback. This is
-also the semantically right place — `fence rw,rw` IS the acquire barrier, so
+also the semantically right place — `fence r,rw` IS the acquire barrier, so
 "the fence is where `▷ P` becomes `P`" is the reading the secondary arm's
 proof will use.
 

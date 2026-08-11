@@ -200,6 +200,17 @@ internalising before the sweep:
   state, resolve reads instantly). Its per-instruction shape is short: an
   effect list `[fetch read; the instruction's own access]`, over which every
   `wQ_*` is view arithmetic.
+- **KNOW THE BOUNDARY: a racy read's view GAIN is NOT in this class** (batch
+  5, and it cost a first attempt). "The timestamp behind the byte I read is
+  under my `w_vrOld`" looks per-instruction — `Q` is a relation on STATES and
+  cannot name the read word — but the BRIDGE's own induction has the
+  timestamp list (`wread_ok`'s `ts`) and `WeakMem.load_post_run_vrOld` puts it
+  under the floor on the spot, so it comes out of the same traversal as
+  `wadm`: `WeakRacy.wgain`, proved by `exec_of_wrun_gain`, exposed as
+  `wp_wracy_load_gain`. What is left for the leaf (`WeakRacy.wreads_win`, "the
+  step READS the window") has no weak-memory content at all. **A view
+  obligation that looks per-instruction is usually a bridge obligation plus an
+  SC one; check before making the leaf pay.**
 
 ---
 
@@ -560,11 +571,23 @@ writing:
   RESULTS — one `exec` fact per admissible value (two, for a one-shot flag),
   yielding a disjunction that `wstarted_oneshot` collapses — built over
   `WeakExec.wp_wrun_step`, the primitive rule that has no bridge premise.
-  **Build that rule before porting `ProofMainSecondary`;** the setter
-  (`WeakAcquire.wwp_started_set`) and the reader's FENCE
-  (`wwp_fence_step` + `wwp_started_fence_deliver`) are done;
-- **the virtio ring and the MMIO seams** — M5, and the driver gets patched
-  (`fence w,o` / `fence i,r`) rather than the model accommodated.
+  **THAT RULE IS BUILT AND THE WHOLE HANDOFF COMPOSES** (M4-prep + batch 5):
+  `WeakRacy.wp_wracy_load` and, with the view gain proved from the model,
+  `wp_wracy_load_gain`; the escrow's reader is `WkStartedLoad.wwp_started_load`
+  (premises `ak_coh rak = false` + `WeakRacy.wreads_win`, plus a
+  `WeakRacy.wunwritten` out of the σ-callback — the hart must not have stored
+  to the flag itself, or it reads its own forward bank); the setter is
+  `WeakAcquire.wwp_started_set`; the fence is `wwp_fence_step` +
+  `wwp_started_fence_gen`/`_r`, stated at any pred-R kind
+  (`WeakFence.acq_pred_r`), which is what the kernel's `fence r,rw` needs.
+  `iris/WkStartedMp.v` is the end-to-end MP composition, with
+  `mp_load_alone_does_not_deliver` / `mp_fence_delivers` for why the fence is
+  there. What still blocks `ProofMainSecondary` is the S-mode funnel (batch
+  6c), not the rule;
+- **the virtio ring and the MMIO seams** — M5, and the model is not
+  accommodated to a driver that does not fence I/O.  The driver side is
+  already done: virtio_disk.c's barrier sites are `io_fence()` =
+  `fence iorw,iorw`, which covers the `w,o` and `i,r` edges.
 
 For each racy site the shape is the same and it is worth internalising it as
 a slogan: **the invariant is an `iProp`, the payload is `monPred_at P V`, and
@@ -699,7 +722,9 @@ Every one of these type-checks and is wrong or vacuous.
    of `R`, since the interface is unchanged; the `↦w₈` tower
    (`iris/WeakWord8.v`) now covers the lock's `cpu`/`name` fields.
 4. The straight-line M-mode function proofs, batched by subagent.
-5. `StartedInv` consumers (`ProofMainSecondary`) on the racy-load rule (§3).
+5. `StartedInv` consumers (`ProofMainSecondary`) on the racy-load rule (§3) —
+   **the rule, the escrow, the gain and the fence delivery are all landed**;
+   the file itself is pure-sconf, so it now waits on 6 below, not on §3.
 6. **The sconf tier** — blocked on the page-table-walk design (§2d); do NOT
    schedule an S-mode batch before it.
 7. The virtio cone (M5).

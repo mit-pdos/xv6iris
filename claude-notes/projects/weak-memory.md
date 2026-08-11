@@ -40,6 +40,15 @@ context-indexed (`WeakCtx`, `cobj`); the hart-indexed layer is gone.
 Measured: the weak proof bodies are **1.4× their SC twins**, down from
 2.5–4.4× (see the conversion slice at the end).
 
+**ALSO DONE (2026-08-11): BATCH 5's SECOND HALF.**  `wstarted_gain` is no
+longer a leaf premise — it is `WeakRacy.wgain`, PROVED from the model by
+`exec_of_wrun_gain` — and the delivery lemmas now cover the fence kinds the
+kernel actually executes (`fence r,rw` at `main+0x18`, `fence rw,w` at
+`main+0xac`) via `WeakFence.acq_pred_r`.  `iris/WkStartedMp.v` composes the
+whole boot handoff and proves both directions of "why the fence is there".
+Batch 6 is now the only thing gating everything.  See the "BATCH 5 SECOND
+HALF" slice.
+
 **NEXT, in order.**
 
 0. *(DONE 2026-08-11)* The memmove **loop** prototype landed —
@@ -61,9 +70,8 @@ Measured: the weak proof bodies are **1.4× their SC twins**, down from
    the M-mode bundle; `wwp_start` therefore ends holding a bare
    `wrunning ξ`, which is what `sconf` should pick up).
 
-**KNOWN LOOSE ENDS**, none blocking: `weak_view_name` in `weakGS` is now
-vestigial (removing it is an adequacy-level change); M5 devices; M6
-store-reordering gap.
+**KNOWN LOOSE ENDS**, none blocking: M5 devices; M6 store-reordering gap.
+(`weak_view_name` is **DONE — removed 2026-08-11**; see the slice at the end.)
 
 For the leaf recipe itself read [`weak-memory-porting.md`](weak-memory-porting.md)
 §2g first, then the batch blocks below.
@@ -773,6 +781,9 @@ Validate the operational design before anything depends on it.
     release kind (promise-free, it carries no read-side content — the
     writer's content is `wwp_release_deposit`).  The two kernel kinds
     instantiate directly; full `barrier_kind` genericity was CUT.
+    (SUPERSEDED at batch 5's second half on both counts: the kernel's
+    reader-side kind is `fence r,rw`, not `rw,rw`, and the cut is partly
+    reversed — delivery is now abstracted over `WeakFence.acq_pred_r`.)
 
 - **CUTS**, from the bottom as instructed (the amoswap invariant form was
   never at risk): (i) the `↦w₄` UPDATE across a store — a 4-byte message needs
@@ -2062,7 +2073,7 @@ numbers come from; the prices below replace M4-prep's).
 | 2 | the M-mode leaf libraries through `WeakFunnel.wwp_instr` (`WpMmodeLoad`, `WpMmodeStore`, `WpMmodeLeaf*`) | **COMPLETE — all five leaves**: `ld` 472 (`WeakLeafLd8.v`), `sd` 433 (`WeakLeafSd8.v`), `lw`/`lwu` 439 (`WeakLeafLw4.v`, one parametric leaf), `sw` 406 (`WeakLeafSw4.v`), `amoswap.w.aq` ≈685/leaf + ~400 one-time (`WeakLeafAmo4Leaf.v` — the invariant-form lock leaf, slots under `wwp_acquire_loop_real` DEFINITIONALLY). All five green on the FIRST compile. See the per-leaf blocks + "THE FIFTH LEAF" | consolidation hoists DONE (see the fifth-leaf block); batch 3 opens |
 | 3 | `WpLock` clients | ≈ 0 — **but the payoff is GATED ON 6c** (2026-08 tier audit): the kernel's real acquire/release are SCONF functions (`wp_amoswap_lockopen_s_sconf` & co.); the M3b/M3c lock library validated the SHAPE at M-mode altitude, not the kernel's lock code. The tier-agnostic halves (`wlock_inv`/`wis_lock`/`wlocked`, `wacquire_core`/`wrelease_core`) transfer now | `iris/WeakWord8.v` covers `cpu`/`name` |
 | 4 | the straight-line M-mode function proofs | **THE VERTICAL SLICE IS IN: `wwp_entry`** (`iris/WkEntryNew.v` + `WkEntryEff.v` — the whole 8-instruction `_entry` chain, one Qed, statement = the SC statement under the porting-table swaps, footprint byte-identical to SC `wp_entry`; first consumer of all FOUR fetch-alignment arms). **Price: 2073 lines ≈ 9.8× the SC proof file** — see "THE FIRST FUNCTION PORT" block; the ~150–220-per-register-only-instruction inline cost is the argument for hoisting weak register-leaf lemmas before any bigger sweep. **`start`/`timerinit` ARE NOW IN TOO** — `WkTimerinit.v` (21 instrs, 1652 lines ≈ 3× the SC file) and `WkStartNew.v` + `WkStartAux.v` (39 instrs, 2487 lines together), both one `Qed`, both at SC's axiom footprint; over the hoisted leaves a whole-function chain costs ≈ 3× its SC twin, vs `WkEntryNew`'s 9.8× inline price | the M-mode tier is ONLY the boot path (tier audit); everything else = batch 6c. `sie_cap_gpr`-threading specs do NOT transfer (contain `stack_own` → `↦w₈` respell, `strans_inv` → P4) |
-| 5 | `WeakStarted`'s `wstarted_oneshot` invariant conjunct, then `ProofMainSecondary` | **FIRST HALF DONE (2026-08)** — the escrow conjunct, the reader, the WP rule and the wait smoke test; see the "BATCH 5 FIRST HALF" block below. Remaining: the racy `lw` leaf's `wstarted_gain` discharge from the model, the pred-R fence generalization, then `ProofMainSecondary` — which is a PURE-SCONF file, so the cone itself is gated on 6c | the racy-load rule was landed; the escrow now is too |
+| 5 | `WeakStarted`'s `wstarted_oneshot` invariant conjunct, then `ProofMainSecondary` | **BOTH HALVES DONE (2026-08-11)** — first half: the escrow conjunct, the reader, the WP rule, the wait smoke test ("BATCH 5 FIRST HALF" below). Second half: `wstarted_gain` is now PROVED from the model, not assumed, and the delivery lemmas are stated at the kernel's OWN fence kinds — see "BATCH 5 SECOND HALF" below. Remaining under this row: only `ProofMainSecondary` itself, a PURE-SCONF file, so gated on 6c | the racy-load rule, the escrow, and the gain are all landed |
 | 6 | the sconf tier | **DESIGNED (block below); no decision pending** | see "BATCH 6 — THE sconf/WALK DESIGN" |
 | 7 | the virtio cone | M5 | |
 
@@ -2109,15 +2120,93 @@ carry exactly the 5 platform axioms. Design record:
   5's SECOND half (the racy `lw` leaf). Re-indexing `wracy_cert`'s `Q`
   by the read word was considered and rejected (a real change to landed
   bridge lemmas).
+  **SUPERSEDED by the second half, below: it was never an ISA obligation**
+  — `WkStartedLoad.wstarted_gain` is deleted and `WeakRacy.wgain` is the
+  same statement, proved.
 - **The receipt** `wstarted_rcpt P ws := ∃ T, ⌜T ≤ w_vrOld ws⌝ ∗
   monPred_at P (view_scl T)` — persistent when P is, `ws_le`-monotone,
   delivered by the (pred-RW) fence. **KNOWN GAP, small and concrete:
-  main's spin exit uses `fence r,rw`** (pred R only), and every delivery
+  main's spin uses `fence r,rw`** (pred R only), and every delivery
   lemma is stated at `Barrier_RISCV_rw_rw` because `acq_view`'s identity
   needs pred-RW — but the scalar bound the delivery actually uses already
   holds at `pw = false`, so generalizing scalar delivery to a pred-R
   fence is a short self-contained job. Not done; do it with the racy lw
-  leaf.
+  leaf. **CLOSED in the second half, below** (`WeakFence.acq_pred_r` +
+  the `_gen`/`_r` delivery lemmas), and it was exactly that short.
+### BATCH 5 SECOND HALF — THE GAIN IS A THEOREM, AND THE FENCES ARE THE KERNEL'S (2026-08-11, DONE)
+
+Two gaps the first half recorded are closed, and the closure changed the
+SHAPE of the leaf obligation rather than just discharging it.
+
+- **`wstarted_gain` was never a per-instruction ISA obligation.**  The
+  first-half note ("a per-instruction ISA obligation of exactly §2c's
+  kind ... discharging it from the model is batch 5's SECOND half")
+  assumed the pairing "the timestamp behind the byte I read is under my
+  read floor" had to come from the leaf, because `wracy_cert`'s `Q` is a
+  relation on STATES and cannot name the word.  But the BRIDGE's own
+  induction knows the timestamp list — `wread_ok`'s `ts` — and
+  `WeakMem.load_post_run_vrOld` (new) puts it under `w_vrOld` on the
+  spot; every later step only raises the floor.  So the gain comes out
+  of the same traversal that produces `wadm`:
+  `WeakRacy.exec_of_wrun_gain` / the rule `WeakRacy.wp_wracy_load_gain`.
+  `WkStartedLoad.wstarted_gain` is DELETED; `WeakRacy.wgain` is the same
+  statement, proved.
+- **The two premises that replaced it are about the READER, not the
+  instruction.**  (i) `ak_coh rak = false` — a coherent-tier
+  (fetch/walker) read moves no view, so there is nothing to gain.  (ii)
+  `WeakRacy.wunwritten (wm_ws σ) ra rn` — the window is not in this
+  hart's FORWARD BANK, i.e. the hart has not stored to the flag.  It has
+  to be there: a forwarded load takes the view the store banked, not the
+  timestamp (`WeakMem.fwd_view`), so a hart reading back its OWN write
+  gains nothing.  A secondary hart never writes `started`, so it is
+  immediate; it travels as a pure fact out of the caller's σ-callback,
+  exactly like `wstarted_img_clear`.  NOTE the per-byte form
+  (`w_fwd ws !! a = None`), not the M0 corollary's global `w_fwd ws = ∅`
+  — a hart that has stored elsewhere still reads a foreign flag
+  unforwarded.
+- **WHAT IS LEFT FOR THE LEAF carries no weak-memory content at all.**  A
+  generic traversal cannot know whether the run took the racy read; a run
+  that never touched the window is patch-INDEPENDENT, and that is the
+  second disjunct of the strengthened bridge.  `WeakRacy.wreads_win` is
+  its refutation — "there is no successor that works for EVERY word one
+  writes at the window" — which a load kills because it puts the window's
+  word in its destination register and the register imprint is injective.
+  That is an ordinary SC fact about the instruction.  **This is the
+  design lesson: a view obligation that looks per-instruction is usually
+  a bridge obligation plus an SC one; check before making the leaf pay.**
+- **The delivery lemmas were stated at `Barrier_RISCV_rw_rw` only, and
+  the kernel does not execute that fence.**  `kernel.asm`: the waiter's
+  is `fence r,rw` at `main+0x18` (gcc's `__ATOMIC_ACQUIRE` load fence,
+  INSIDE the loop since 9dd28f5) and the setter's is `fence rw,w` at
+  `main+0xac`.  Fixed by abstracting the property rather than duplicating
+  the lemmas: `WeakFence.acq_pred_r b` ("the read frontier `acq_view_r`
+  is below the hart's index after `b`"), with instances for `rw,rw`,
+  `rw,r`, `r,rw`, `r,r`, and `view_scl_acq_pred_r` as the one delivery
+  fact.  `wwp_fence_scl_gen`, `wstarted_deliver_gen`,
+  `wstarted_rcpt_deliver_gen`, `wwp_started_fence_gen` follow; the old
+  `rw,rw` names survive as instances, and `_r` names are the kernel's.
+  The setter needs nothing: promise-free, a store lands at the log's
+  fresh top and dominates the writer's whole index, so `fence rw,w` is
+  inert (Decision 1) — **all the ordering content of this handoff is on
+  the reader side.**
+- **`iris/WkStartedMp.v` (NEW) is the composition and the demonstration.**
+  `wstarted_mp` threads one `wstarted_body` through hart 0's release and
+  hart k's non-clear racy read + `fence r,rw`; `wstarted_mp_byte` ends it
+  with `WeakVProp.wpt_load_rule`, so the statement is "the byte a
+  secondary loads after its acquire fence is the byte hart 0 wrote".  §3
+  is the necessity, at the machine's own step functions and on the SAME
+  load: `mp_load_alone_does_not_deliver` (a plain load gains the
+  timestamp only at the byte it read — its coherence floor — so the
+  scalar deposit is NOT covered; a concrete post-load index witnesses it)
+  vs `mp_fence_delivers`.  Both `Closed under the global context`.
+- **STILL ABOVE ALL OF THIS: the per-instruction leaves.**  `main` is an
+  S-mode function (`ProofMainSecondary` is pure-sconf) and the weak
+  funnel is M-mode only, so the four waiter instructions cannot be RUN
+  yet.  There is no weak `main` token file and none of the five
+  encodings (`0x431c`, `0xc398`, `0xdfe5`, `0x0230000f`, `0x0310000f`)
+  appears on the weak side; `0x2781` does, as `WkStartAux`'s `sth_61`.
+  That is 6c, unchanged.
+
 - **`ProofMainSecondary` is a pure-sconf file** (every instruction is a
   `*_s_sconf` lemma; the weak funnel is M-mode only). Its weak port needs
   batch 6c's S-funnel + leaves, an sconf-tier racy load (the racy
@@ -2271,10 +2360,34 @@ stages parallelize):
   `wstep_ok_racy` generalization was NOT needed (the reduced design:
   the CAS read is pinned by kind; the plain leaf read collapses via
   `wadm_variant`).
-- **P2** (WeakCert): racy confinement — the symbolic-patch confined run
-  producing `wstep_ok_racy` (the recorded missing piece).
-- **P3** (WeakBridge/WeakRacy): exec-modulo-variants with the confined
-  write; transport across the intervening write-back; multi-window join.
+- **P2 — SUPERSEDED (audited 2026-08-11), not open.**  The artifact it
+  named (a `WeakCert` confinement lemma producing `wstep_ok_racy` from a
+  symbolically patched restricted memory) does not exist and is not on
+  batch 6's path: `WeakCert.v` contains no occurrence of "racy" at all.
+  The only read in the update cone that would have needed a racy window
+  is the CAS read, which is `ak_latest` and therefore `trace_pin`-EXEMPT
+  by kind (`WeakUpdEff.v:47-52`).  **Replaced by** the ordinary confined
+  certificates `WeakUpdEff.wcert_ptw_upd_gen` (`:1078`) /
+  `wcert_ptw_upd_pin` (`:1118`) over `wP_eff`/`wP_eff_pin`, plus
+  `WeakKpt.wtlb_res_pt_translateAddr_at`'s UNPATCHED `exec_eff` fact.
+  (The single-window `wstep_ok_racy` of `WeakRacy.v:327` stays — it is
+  M4-prep's rule for the `started` spin load, a different consumer.)
+- **P3 — SUPERSEDED IN PART; ONE RESIDUAL, and it is 6a's own item.**
+  Superseded: the confined write (the write-back is a plain 8-byte
+  `wQ_store_w 8` certificate), the transport across the intervening
+  write-back (done ghost-side by `WeakKpt` §1's clipped closure —
+  `wlog_variants_from` + `wwin_install` + `wbyte_ok_ge`), and the
+  multi-window join (there is exactly one window).  **Still open, in
+  reduced form:** a VARIANT-TOLERANT `trace_pin` arm for the walk's PLAIN
+  LEAF read.  `WeakFetchEff.wak_plain = AkInfo false false false`, so
+  `ak_pins` is false for it and `WeakCert.wstep_conf_eff_pin` still
+  demands `pinned_read` on all 8 bytes; the absorption theorem
+  deliberately supplies pinnedness only for the two POINTER slots
+  (`WeakKpt.v:1242-1244`).  What is needed is a step obligation that
+  accepts "this read is unpinned but every admissible value is a
+  variant" — single window, no patch.  The collapse facts
+  (`wadm_variant`, `wadm_variant_from`) are minted and waiting.  This IS
+  6a's remaining S-mode fetch/walk-chain item, not a separate one.
 - **P4 — DONE, ALL FOUR OUTCOME ARMS** (`iris/WeakKpt.v`, 1622 lines /
   16.6 s, commit `2def6166`): `wkpt_inv root T_kpt` (namespace inv,
   timeless body; SC's ghost/spec triple verbatim; `ptree_own` replaced
@@ -2569,11 +2682,13 @@ scheduled before its design item is resolved.
 - [ ] Check how the generated Sail model decodes/executes FENCE words with
       I/O bits (barrier_kind is memory-only — see design doc); recover the
       I/O bits at the `run` layer if the model drops them.
-- [ ] **Patch xv6 virtio_disk.c to emit the architecturally correct
-      fences** (`fence w,o` before QUEUE_NOTIFY, `fence i,r` after the
-      MMIO status read) + re-dump; the model classifies MMIO by the I/O
-      fence bits strictly, no accommodation of the old driver (decided
-      2026-08, design doc Decision 6).
+- [x] **Patch xv6 virtio_disk.c to emit the architecturally correct
+      fences** — ALREADY IN THE TREE: the four barrier sites are
+      `io_fence()` = `fence iorw,iorw` (`0ff0000f` in `kernel.asm`), which
+      subsumes the `fence w,o` before QUEUE_NOTIFY and the `fence i,r`
+      after the MMIO status read.  The model still classifies MMIO by the
+      I/O fence bits strictly (decided 2026-08, design doc Decision 6);
+      what is left of this item is the model half, i.e. the box above.
 - [ ] Disk-agent view; notify-carries-view MMIO coupling; `DiskStepDma`
       through the device view; virtio cone re-proof (the fence sites).
 
@@ -3011,8 +3126,8 @@ wrunning ξ` — one bupd at the top of a chain, which is the honest reading (a
 boot context comes into existence when execution starts). It **drops** the
 `ws_auth` half: once ownership is context-indexed nothing consumes the
 hart-indexed authority, and carrying both would mean two updates per leaf.
-`weak_view_name` in `weakGS` is consequently **vestigial** — removing it is an
-adequacy-level change, deliberately not bundled here.
+`weak_view_name` in `weakGS` was consequently **vestigial**, and it is now
+**GONE (2026-08-11)** — see the removal slice at the end of this file.
 
 `WeakSmodeFrame` §5's control now uses `WeakPtOwn.wpt_own` as the stand-in for
 the deleted layer; it has exactly the indexing under test, so the three
@@ -3065,8 +3180,11 @@ protects. Sharpening it would mean indexing `cobj` by a footprint, which buys
 nothing a lock wants.
 
 `WeakSmodeFrame` §5's control no longer has a deleted layer to point at, so it
-defines its own one-line stand-in, `hart_floor := coh_lb (wvn_coh
-(weak_view_name cpu_id)) a t` — literally `wflr_lb`'s first disjunct. What the
+defines its own one-line stand-in, `hart_floor := coh_lb (γ0 cpu_id) a t` over
+a section `Variable (γ0 : CPU -> gname)`.  (It first pointed at `coh_lb (wvn_coh
+(weak_view_name cpu_id))` — literally `wflr_lb`'s first disjunct — but that
+field is gone as of 2026-08-11 and the tree has no hart-indexed view assertion
+left, so a bare `Variable` is the honest stand-in.) What
 control tests is the INDEX, not the points-to, so this is the honest witness
 and the three checks say exactly what they said before. (Note the section
 subtlety: inside the section `Σ` and `weakGS0` are section variables and not
@@ -3358,3 +3476,45 @@ Non-blocking but worth deciding early: memmove's SC spec carries
 non-overlap **by separation** (two separately-owned buffers), so the
 descending-copy branch is unreachable. Keep that; it is orthogonal to weak
 memory and re-litigating it would double the work for no weak-memory content.
+
+
+## THE `weak_view_name` REMOVAL (2026-08-11, DONE)
+
+The last hart-indexed view machinery is out of `weakGS`.  What it was: a
+per-hart `wview_names`, a MONOTONE SHADOW of the exact-valued
+`weak_ws_name` cell, so that a caller could snapshot a FLOOR without
+naming the `wstate` (`hart_view_lb`).  Why it went: `WeakCtx` replaced the
+whole discipline with a CONTEXT-indexed one — floors are
+`ctx_view_lb`/`ctx_view_lb_get` at a `CtxId` — and the one surviving
+consumer, `WeakCtx.hart_view_to_run`, was already discarding the shadow
+half with a `_`.
+
+- **No lemma statement changed shape.**  `weak_system_adequacy` and
+  `hart_view_to_run` are letter-identical; only `hart_view`'s DEFINITION
+  shrank, to `∃ ws, hart_ws c ws`.  That is why keeping the name mattered:
+  handing out a bare `hart_ws c ws_init` instead would have changed the
+  adequacy bundle and the bridge's premise for no gain.
+- **Four lemmas deleted**, all with zero callers:
+  `hart_view_intro`/`_open`/`_close`/`_lb`.  (`_intro` survives in one
+  line, as the trivial introduction.)  `hart_view_lb` needs no successor:
+  `WeakCtx.ctx_view_lb_get` is its context-indexed replacement.
+- **`WeakAdequacy`** loses the `ws_alloc_cpus` mint and the
+  `big_sepL_sep_2` pairing; the `WeakGS` constructor drops its fifth
+  argument.
+- **`WeakSmodeFrame` §5's control** had to grow a section
+  `Variable (γ0 : CPU -> gname)`: after this the tree has NO hart-indexed
+  view assertion to point at, which is the whole point of `WeakCtx`.  The
+  three convertibility checks are unchanged.
+- **`weakΣ` does NOT shrink.**  `weak_pre_viewG :: weakViewG Σ` stays —
+  `WeakCtx`'s entire `ctx_auth`/`ctx_view_lb`/`cobj` layer is
+  `own ξ (● flr_fun V ⋅ ◯ flr_fun V)` over `cohUR` and gets its `inG`
+  through it.  The algebra outlived the field it was introduced for.
+- **WHAT THIS LEAVES FOR A LATER SLICE, deliberately not bundled:**
+  `WeakViewMono`'s SCALAR half is now dead — `weakViewScalarG`,
+  `ws_names`, the `ws_scal_*` family, `ws_auth`/`ws_lb`/`ws_update`/
+  `ws_alloc{,_cpus}`, the `wview_tok` family, and the first FIVE of
+  `weakViewΣ`'s six entries (only `GFunctor (authR cohUR)` is live).  Its
+  one remaining consumer is `iris/WeakViewRacy.v`, which is in
+  `_CoqProject` but has no reverse dependencies at all.  That prune is
+  ~250 lines plus a deletion and it reshapes the `subG_weakViewScalarG` /
+  `subG_weakViewG` instance pair, so it is its own slice.

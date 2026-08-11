@@ -89,7 +89,10 @@ Class weakGpreS (Σ : gFunctors) := WeakGpreS {
   weak_pre_logG :: inG Σ wlogR;
   weak_pre_latG :: ghost_mapG Σ Z (nat * bv 8);
   weak_pre_wsG :: ghost_varG Σ wstate;
-  (* the MONOTONE SHADOW of [weak_pre_wsG] — see [weak_view_name] below *)
+  (* the max-fun authority [WeakCtx]'s objective layer is built on
+     ([ctx_auth] / [ctx_view_lb] / [cobj]).  It used to be here as the
+     MONOTONE SHADOW of [weak_pre_wsG], for the deleted [weak_view_name];
+     the shadow is gone, the algebra stayed and found a better consumer. *)
   weak_pre_viewG :: weakViewG Σ;
 }.
 
@@ -106,14 +109,14 @@ Class weakGS (Σ : gFunctors) := WeakGS {
   weak_lat_name : gname;
   (* PER HART, like [era_reg_name] (see the header's DEVIATION note) *)
   weak_ws_name : CPU -> gname;
-  (* PER HART, and the MONOTONE SHADOW of the one above: [weak_ws_name]'s
-     [ghost_var] is exact-valued, which is why a leaf can only step it by
-     naming both states, and hence why every caller above a leaf had to
-     name them too.  [weak_view_name] carries the same [wstate] in a
-     [mono_nat]/max-fun authority, where "it only grows" is free.  Both are
-     client-side halves of ONE fact, kept in step by [hart_view] below; the
-     state interpretation is untouched by this field. *)
-  weak_view_name : CPU -> wview_names;
+  (* THERE WAS A FIFTH FIELD, [weak_view_name : CPU -> wview_names] — a
+     per-hart monotone shadow of [weak_ws_name], so that a caller could
+     read a FLOOR off the hart's view without naming the exact [wstate].
+     It is deleted (2026-08-11).  The hart-indexed view discipline it
+     served was replaced wholesale by [WeakCtx]'s CONTEXT-indexed one
+     ([ctx_auth] / [ctx_view_lb] / [cobj] / [wrunning]), and the one
+     surviving consumer, [WeakCtx.hart_view_to_run], was already
+     discarding the shadow half with a [_]. *)
 }.
 
 (* ====================================================================== *)
@@ -411,53 +414,24 @@ Section resources.
   (* ---------------------------------------------------------------- *)
   (** *** 3c'. THE CLIENT TOKEN: [hart_ws] with its value hidden.
 
-      This is what everything above a leaf threads, and the reason it can
-      be threaded is the pairing: inside the existential the exact
-      [hart_ws] value and the monotone authority's value are THE SAME
-      [wstate], so a floor read off the authority is a floor on the real
-      hart view.  Outside, neither value is nameable — which is the whole
-      point, since naming them is what forced the [ws]/[ws']/[ws_le]
-      residue on every caller.
+      What boot hands each hart and what [WeakCtx.hart_view_to_run] turns
+      into a [wrunning ξ].  Its value is not nameable from outside, which
+      is the point: naming it is what forced the [ws]/[ws']/[ws_le] residue
+      on every caller.
 
-      Note what is NOT here: [weak_view_name]'s authority never appears in
-      the state interpretation.  It is a purely client-side shadow, kept
-      honest by [hart_view_step] below being the only way to move it. *)
+      IT USED TO CARRY A SECOND CONJUNCT, [ws_auth (weak_view_name c) ws] —
+      a monotone shadow of the exact cell, so that a caller could snapshot
+      a FLOOR ([hart_view_lb]) without naming the [wstate].  That whole
+      discipline is superseded: floors are read at the CONTEXT index now
+      ([WeakCtx.ctx_view_lb_get]), the hart-indexed objective layer is
+      gone, and the bridge lemma was already dropping the shadow half.  So
+      the field, the conjunct, and [hart_view_intro]/[_open]/[_close]/[_lb]
+      (which had no callers left) are all deleted. *)
   Definition hart_view (c : CPU) : iProp Σ :=
-    (∃ ws : wstate, hart_ws c ws ∗ ws_auth (weak_view_name c) ws)%I.
+    (∃ ws : wstate, hart_ws c ws)%I.
 
-  Lemma hart_view_intro c ws :
-    hart_ws c ws -∗ ws_auth (weak_view_name c) ws -∗ hart_view c.
-  Proof. iIntros "H1 H2". iExists ws. iFrame. Qed.
-
-  (** THE CONVERSION EVERY LEAF WRAPPER USES.  Open the token at some
-      unknown [ws], run the underlying leaf (which does name both states),
-      and close it at [ws'] — the [ws_le] the leaf hands back is exactly
-      what [ws_update] needs, so it is consumed here and never reaches the
-      caller. *)
-  Lemma hart_view_open c :
-    hart_view c -∗ ∃ ws, hart_ws c ws ∗ ws_auth (weak_view_name c) ws.
-  Proof. iIntros "H". iExact "H". Qed.
-
-  Lemma hart_view_close c ws ws' :
-    ws_le ws ws' ->
-    ws_auth (weak_view_name c) ws -∗ hart_ws c ws' ==∗ hart_view c.
-  Proof.
-    iIntros (Hle) "Hauth Hws".
-    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
-    iModIntro. iExists ws'. iFrame.
-  Qed.
-
-  (** Snapshotting a floor: the only thing a caller can learn from the
-      token, and being persistent it never has to be given back.  Code that
-      does NOT care about views — every lock-disciplined function — never
-      calls this. *)
-  Lemma hart_view_lb c :
-    hart_view c -∗ ∃ ws, hart_view c ∗ ws_lb (weak_view_name c) ws.
-  Proof.
-    iIntros "[%ws [Hws Hauth]]".
-    iDestruct (ws_lb_get with "Hauth") as "#Hlb".
-    iExists ws. iFrame "Hlb". iExists ws. iFrame.
-  Qed.
+  Lemma hart_view_intro c ws : hart_ws c ws -∗ hart_view c.
+  Proof. iIntros "H". by iExists ws. Qed.
 
   (* ---------------------------------------------------------------- *)
   (** *** 3d. the state interpretations *)

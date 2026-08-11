@@ -1,8 +1,9 @@
 (** * WeakCtx.v — THE EXECUTION CONTEXT, and objective ownership indexed by it.
 
-    WHY THIS FILE EXISTS.  [WeakObj.wobj] is indexed by [CpuId]: its lower
-    bounds live under [weak_view_name cpu_id].  That is fine as long as a
-    proof never changes hart.  It stops being fine the moment an S-mode step
+    WHY THIS FILE EXISTS.  [WeakObj.wobj] was indexed by [CpuId]: its lower
+    bounds lived under a per-hart view authority ([weak_view_name cpu_id],
+    a field of [weakGS] that this file's argument has since deleted).  That
+    is fine as long as a proof never changes hart.  It stops being fine the moment an S-mode step
     can trap, yield, and RESUME ON A DIFFERENT HART -- which is exactly what
     [WpNext.wp_next] models:
 
@@ -24,6 +25,7 @@
                                          Genuinely per-hart.  Stays.
       [ws_auth (weak_view_name c) ws]    the authority behind the view LOWER
                                          BOUNDS that [wobj] is built from.
+                                         GONE (2026-08-11) -- see below.
 
     The second has no business being per-hart.  "This resource was observable
     from view V" is a fact about a THREAD OF CONTROL, not about the silicon it
@@ -398,24 +400,26 @@ End running.
 (* ====================================================================== *)
 (** ** 7. THE M-MODE BRIDGE.
 
-    [WeakAdequacy] hands each hart a [hart_view], which pairs the hart's
-    wstate with [ws_auth (weak_view_name c)] -- the OLD, hart-indexed view
-    authority.  A hart turns that into a context exactly once, at the top of
-    its chain, which is the honest reading anyway: a boot context comes into
-    existence when execution starts.
+    [WeakAdequacy] hands each hart a [hart_view] -- its wstate with the
+    value hidden.  A hart turns that into a context exactly once, at the top
+    of its chain, which is the honest reading anyway: a boot context comes
+    into existence when execution starts.
 
-    The [ws_auth] half is DROPPED.  Once objective ownership is indexed by a
-    context, nothing consumes the hart-indexed authority, and carrying both
-    would mean every leaf performing two updates to keep them in step.  The
-    [weak_view_name] field of [weakGS] is consequently vestigial; removing
-    it is an adequacy-level change and is deliberately not bundled here. *)
+    IT USED TO PAIR THE WSTATE WITH [ws_auth (weak_view_name c)], the old
+    hart-indexed view authority, and this lemma DROPPED that half with a
+    [_]: once objective ownership is indexed by a context, nothing consumes
+    the hart-indexed authority, and carrying both would mean every leaf
+    performing two updates to keep them in step.  That made the field
+    vestigial, and it has since been deleted (2026-08-11) -- [hart_view] is
+    now just [∃ ws, hart_ws c ws], and the statement of this lemma did not
+    change. *)
 Section bridge.
   Context `{!weakGS Σ}.
 
   Lemma hart_view_to_run `{CID : CpuId} :
     hart_view cpu_id ==∗ ∃ ξ : CtxId, wrunning ξ.
   Proof.
-    iIntros "[%ws [Hws _]]".
+    iIntros "(%ws & Hws)".
     iMod (ctx_alloc (ws_view ws)) as (ξ) "Ha".
     iModIntro. iExists ξ. iApply (wrunning_close with "Hws Ha").
   Qed.
