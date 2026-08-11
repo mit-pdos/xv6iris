@@ -344,6 +344,12 @@ and axioms each proven function rests on. `--format text|md|html|json`.
 
 ## Proofmode & bitvector gotchas (recur across files)
 
+- **ssreflect's `last first` REVERSES the remaining goal list, it does not
+  rotate it** — with three or more open goals the middle ones change
+  position too, which silently misroutes bullet-per-goal scripts (found in
+  `WeakRobustAcyc.v`, where a three-way `destruct` under `last first` sent
+  two arms to each other's bullets and the failure surfaced lines later).
+  With >2 goals prefer plain bullets in destruct order.
 - **`stdpp.bitvector.definitions` pulls in `Stdlib.Lists.List`, which SHADOWS
   stdpp's `last` and `NoDup_cons`** (Stdlib's `last : list A → A → A`, and the
   `NoDup` CONSTRUCTOR where stdpp has the lemma). Any file importing that

@@ -876,6 +876,7 @@ WeakRobust.v
 WeakRobustTrace.v
 WeakRobustGraph.v
 WeakRobustAcyc.v
+WeakRobustLin.v
 WeakAxiomatic.v
 WeakAxiomatic2.v
 WeakInterp.v

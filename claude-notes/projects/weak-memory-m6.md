@@ -334,10 +334,20 @@ floor that sees every observation.
       to monotonicity + EXT); the Iris side discharges `covered` for
       owned-published reads from the pub/acquire story (the reader's
       view covers everything below the watermark it acquired).
-      Extension delegated to the measure-theorem agent (its context).
-      Expect the acyclicity proof to be a per-class
-      height/measure argument mixing timestamps (fenced/excl arms) with
-      the violation contradiction (owned arm).  NOTE after W4 slice 2:
+      **STANDALONE ACYCLICITY LANDED, axiom-free**
+      (`WeakRobustAcyc.v`): `fwd_own` (foreign reads never forwarded),
+      S1 with the `edge_ok = disciplined ∨ covered` premise, and
+      `gdep_acyclic_edges_ok` / `wp_behavior_gdep_acyclic` — dependency
+      cycles impossible when every cross rf edge is
+      disciplined-or-covered, by min-timestamp measure induction.  The
+      same-event LRmw entry/exit branch is UNCONDITIONAL (the rmw's own
+      COH conjunct on the post-read state gives the strict
+      inequality).  The premise was sanity-checked against the
+      fence-before-load LB counterexample (discipline genuinely fails
+      there).  What remains of W2a is only what was folded into W2b:
+      SCowned cross edges refuted by φ via the construction.  The Iris
+      side owes `rf_edges_ok`: `disciplined` at the enumerated racy
+      readers, `covered` at CS reads via the pub/acquire story.  NOTE after W4 slice 2:
       D stays EVENT-level (a machine step is atomic in the pf
       interleaving — its bytes cannot split across the topological
       sort); that is fine because D has no co/fr edges, so
