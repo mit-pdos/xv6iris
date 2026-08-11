@@ -92,9 +92,12 @@ Lemma ms_hart_fmt : pk_kinds ms_hart = [PkNum] /\ nonul ms_hart = true /\
 Proof. split_and!; [vm_compute; reflexivity | vm_compute; reflexivity | vm_compute; reflexivity]. Qed.
 
 (* clean-context (mword-free) nat arithmetic, so [lia] never sees a bv *)
+(* the last conjunct is the SCHEDULER's, and it is what [K_main_secondary] is
+   sized by: the loop-head enable funds [kv_frame_slots] out of what the arm
+   hands it. *)
 Lemma ms_bounds (K : nat) : (K_main_secondary <= K)%nat ->
-  (2 <= K)%nat /\ (38 <= K - 2)%nat /\ (20 <= K - 2)%nat.
-Proof. unfold K_main_secondary. lia. Qed.
+  (2 <= K)%nat /\ (38 <= K - 2)%nat /\ (kv_frame_slots + 20 <= K - 2)%nat.
+Proof. unfold K_main_secondary, kv_frame_slots. lia. Qed.
 
 (* ===================================================================== *)
 Module MainSecondaryProof
@@ -557,7 +560,9 @@ Section ProofMainSecondary.
       (γd : uart_names) (γv : disk_names) (γs : list gname)
       (m : regfile) (n : nat) (p0 : mword 64)
       (root : mword 44) (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) :
-    (20 <= n)%nat ->
+    (* the scheduler this block tail-calls enables interrupts at its loop head
+       and must fund [kv_frame_slots] there; see [SpecScheduler]. *)
+    (kv_frame_slots + 20 <= n)%nat ->
     (bv_unsigned cid_word < Z.of_nat dev_ncpu)%Z ->
     p0 = zero_reg ->
     sie_cap_gpr m n false p0 -∗ kernel_text -∗ panic_wp_any -∗

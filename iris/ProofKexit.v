@@ -849,7 +849,7 @@ Section KexitPark.
     (* +0x6c c.mv a0,s3 : a0 := p *)
     iApply (wp_cmv_s_sconf (CID := CIDa) (mword_of_int (KX + 0x6c))
               (mword_of_int 10 : mword 5) (mword_of_int 19 : mword 5)
-              macq av false ltac:(vm_compute; discriminate) ltac:(rdok)
+              macq (trap_res b + av)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi6c [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     assert (Hrga19 : rget (CID := CIDa) macq (mword_of_int 19 : mword 5)
@@ -868,7 +868,7 @@ Section KexitPark.
     iEval (rewrite Hpp6e) in "Hpc".
     (* +0x6e jal ra,reparent *)
     iApply (wp_jal_s_sconf (CID := CIDa) (mword_of_int (KX + 0x6e))
-              (mword_of_int 1 : mword 5) (mword_of_int 2096956 : mword 21) P3 av false
+              (mword_of_int 1 : mword 5) (mword_of_int 2096956 : mword 21) P3 (trap_res b + av)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi6e [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -887,7 +887,7 @@ Section KexitPark.
       by (rewrite /P4 upd_ne; [exact HP3s3 | vm_compute; discriminate]).
     assert (HP4s4 : P4 !!! Regidx (mword_of_int 20 : mword 5) = sv)
       by (rewrite /P4 upd_ne; [exact HP3s4 | vm_compute; discriminate]).
-    iApply (Reparent.wp_reparent_sconf (CID := CIDa)  P4 γs pj ip ps dqi 1%nat av true C false
+    iApply (Reparent.wp_reparent_sconf (CID := CIDa)  P4 γs pj ip ps dqi 1%nat (trap_res b + av)%nat true C false
               ltac:(unfold K_reparent; lia) ltac:(intro r; apply rf_to_gmap_dom) Hlen ltac:(lia)
               with "Hcg Hown Htext Hpc Hpanic Hprocs Hinit Hpar [-]").
     iApply wp_next_off_intro.
@@ -915,7 +915,7 @@ Section KexitPark.
                      = Mrp !!! Regidx (mword_of_int 19 : mword 5)) by (rgne; reflexivity).
     iApply (wp_ld_s_sconf (CID := CIDa) (mword_of_int (KX + 0x72))
               (mword_of_int 10 : mword 5) (mword_of_int 19 : mword 5) (mword_of_int 56 : mword 12)
-              Mrp av w false ltac:(vm_compute; discriminate) ltac:(rdok)
+              Mrp (trap_res b + av)%nat w false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi72 [Hpcell] [-]").
     { iEval (rewrite Hrgr19 Hrp_s3 p_parent_sext). iExact "Hpcell". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hpcell".
@@ -931,7 +931,7 @@ Section KexitPark.
       by (rewrite /P5 upd_ne; [exact Hrp_s4 | vm_compute; discriminate]).
     (* +0x76 jal ra,wakeup(p->parent) : nothing it touches is visible here *)
     iApply (wp_jal_s_sconf (CID := CIDa) (mword_of_int (KX + 0x76))
-              (mword_of_int 1 : mword 5) (mword_of_int 2096842 : mword 21) P5 av false
+              (mword_of_int 1 : mword 5) (mword_of_int 2096842 : mword 21) P5 (trap_res b + av)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi76 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -949,7 +949,7 @@ Section KexitPark.
     assert (HP6s4 : P6 !!! Regidx (mword_of_int 20 : mword 5) = sv)
       by (rewrite /P6 upd_ne; [exact HP5s4 | vm_compute; discriminate]).
     iApply (Wakeup.wp_wakeup_sconf (CID := CIDa)  P6 γs
-              (mycpu_ret (rget (CID := CIDa) P6 Rtp)) pj 1%nat av true C false
+              (mycpu_ret (rget (CID := CIDa) P6 Rtp)) pj 1%nat (trap_res b + av)%nat true C false
               ltac:(lia) ltac:(intro r; apply rf_to_gmap_dom) Hlen ltac:(reflexivity)
               ltac:(rewrite rget_tp; apply mycpu_ret_nonzero; apply tp_ok_cid_of)
               ltac:(lia)
@@ -971,7 +971,7 @@ Section KexitPark.
     (* +0x7a c.mv a0,s3 ; +0x7c jal ra,acquire(&p->lock) *)
     iApply (wp_cmv_s_sconf (CID := CIDa) (mword_of_int (KX + 0x7a))
               (mword_of_int 10 : mword 5) (mword_of_int 19 : mword 5)
-              Mwk av false ltac:(vm_compute; discriminate) ltac:(rdok)
+              Mwk (trap_res b + av)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi7a [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     assert (Hrgw19 : rget (CID := CIDa) Mwk (mword_of_int 19 : mword 5)
@@ -989,7 +989,7 @@ Section KexitPark.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp7c) in "Hpc".
     iApply (wp_jal_s_sconf (CID := CIDa) (mword_of_int (KX + 0x7c))
-              (mword_of_int 1 : mword 5) (mword_of_int 2091888 : mword 21) P7 av false
+              (mword_of_int 1 : mword 5) (mword_of_int 2091888 : mword 21) P7 (trap_res b + av)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi7c [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -1010,7 +1010,7 @@ Section KexitPark.
       by (rewrite /P8 upd_ne; [exact HP7s4 | vm_compute; discriminate]).
     iPoseProof (procs_inv_lookup γs j γl Hgl with "Hprocs") as "#Hislock".
     iApply (Acquire.wp_acquire_sconf (CID := CIDa) γl "proc"%string
-              (proc_lock_res γs γl pj) P8 1%nat true pj C av false
+              (proc_lock_res γs γl pj) P8 1%nat true pj C (trap_res b + av)%nat false
               ltac:(lia) ltac:(lia)
               with "Hcg Hown Htext Hpc [] Hpanic [-]").
     { iEval (rewrite HP8a0). iExact "Hislock". }
@@ -1057,7 +1057,7 @@ Section KexitPark.
       by (rewrite Hrgl19 Hlk_s3; apply p_xstate_sext).
     iApply (wp_sw_s_sconf (CID := CIDa) (mword_of_int (KX + 0x80))
               (mword_of_int 20 : mword 5) (mword_of_int 19 : mword 5) (mword_of_int 44 : mword 12)
-              mlk av xs false with "Hcg Hpc Hi80 [Hxstate] [-]").
+              mlk (trap_res b + av)%nat xs false with "Hcg Hpc Hi80 [Hxstate] [-]").
     { iEval (rewrite Hxaddr). iExact "Hxstate". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hxstate".
     iEval (rewrite Hxaddr) in "Hxstate".
@@ -1068,7 +1068,7 @@ Section KexitPark.
     iApply (wp_cli_s_sconf (CID := CIDa) (mword_of_int (KX + 0x84))
               (mword_of_int 15 : mword 5) (mword_of_int 5 : mword 6)
               (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 5 : mword 6))))
-              mlk av false ltac:(vm_compute; discriminate) ltac:(rdok) eq_refl
+              mlk (trap_res b + av)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) eq_refl
               with "Hcg Hpc Hi84 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (P9 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
@@ -1090,7 +1090,7 @@ Section KexitPark.
       rewrite /P9 upd_eq. unfold ZOMBIE. exact kx_zombie. }
     iApply (wp_sw_s_sconf (CID := CIDa) (mword_of_int (KX + 0x86))
               (mword_of_int 15 : mword 5) (mword_of_int 19 : mword 5) (mword_of_int 24 : mword 12)
-              P9 av RUNNING false with "Hcg Hpc Hi86 [Hstate] [-]").
+              P9 (trap_res b + av)%nat RUNNING false with "Hcg Hpc Hi86 [Hstate] [-]").
     { iEval (rewrite Hsaddr). iExact "Hstate". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hstate".
     iEval (rewrite Hsaddr Hsval) in "Hstate".
@@ -1103,7 +1103,7 @@ Section KexitPark.
     iPoseProof (kxi_92 with "Htext") as "Hi92".
     iApply (wp_auipc_s_sconf (CID := CIDa) (mword_of_int (KX + 0x8a))
               (mword_of_int 10 : mword 5) (mword_of_int 0x10 : mword 20)
-              P9 av false ltac:(vm_compute; discriminate) ltac:(rdok)
+              P9 (trap_res b + av)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi8a [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (PA := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
@@ -1113,7 +1113,7 @@ Section KexitPark.
     iEval (rewrite Hpp8e) in "Hpc".
     iApply (wp_addi4_s_sconf (CID := CIDa) (mword_of_int (KX + 0x8e))
               (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 698 : mword 12)
-              PA av false ltac:(vm_compute; discriminate) ltac:(rdok)
+              PA (trap_res b + av)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi8e [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     assert (HrgA10 : rget (CID := CIDa) PA (mword_of_int 10 : mword 5)
@@ -1130,7 +1130,7 @@ Section KexitPark.
     (* +0x92 jal ra,release(&wait_lock) : back to level 1, still holding
        p->lock -- which is exactly what sched wants. *)
     iApply (wp_jal_s_sconf (CID := CIDa) (mword_of_int (KX + 0x92))
-              (mword_of_int 1 : mword 5) (mword_of_int 2092002 : mword 21) PB av false
+              (mword_of_int 1 : mword 5) (mword_of_int 2092002 : mword 21) PB (trap_res b + av)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi92 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -1146,7 +1146,13 @@ Section KexitPark.
     assert (HPCa0 : PC !!! Regidx (mword_of_int 10 : mword 5) = wait_lock_addr)
       by (rewrite /PC upd_ne; [exact HPBa0 | vm_compute; discriminate]).
     iApply (Release.wp_release_sconf (CID := CIDa) γw wait_lock_addr "wait_lock"%string
-              wait_res PC 1%nat true pj C av
+              (* release's [av] is its EXIT index, i.e. the index of the window
+                 it returns to -- here the LEVEL-1 window (p->lock still held),
+                 which runs at [trap_res b + av], not at the function's own
+                 [av].  Level 2 -> 1 is itself carve-neutral ([trap_res false]
+                 on entry), so both sides of this call sit at
+                 [trap_res b + av]. *)
+              wait_res PC 1%nat true pj C (trap_res b + av)%nat
               ltac:(rewrite HPCa0; apply addv_sext0) ltac:(lia)
               with "Hcg Htext Hpc Hwl Hlkw [Hpar] Hown Hpay2 [-]").
     { iExists _. iExact "Hpar". }
@@ -1159,7 +1165,7 @@ Section KexitPark.
     (* +0x96 jal ra,sched : the ZOMBIE park. *)
     iPoseProof (kxi_96 with "Htext") as "Hi96".
     iApply (wp_jal_s_sconf (CID := CIDa) (mword_of_int (KX + 0x96))
-              (mword_of_int 1 : mword 5) (mword_of_int 2096502 : mword 21) mrel av false
+              (mword_of_int 1 : mword 5) (mword_of_int 2096502 : mword 21) mrel (trap_res b + av)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi96 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -1182,7 +1188,10 @@ Section KexitPark.
        comes back. *)
     iMod (pstate_whole_update (proc_addr j) RUNNING ZOMBIE with "Hpg") as "Hpg".
     iModIntro.
-    iApply (Sched.wp_sched_sconf (CID := CIDa)  γs j γl ZOMBIE ch0 PD av true
+    (* sched() is called with p->lock held, i.e. from inside the level-1
+       window, whose index carries the reserve: [trap_res b + av].  The park is
+       index-generic, so it just rides through at that index. *)
+    iApply (Sched.wp_sched_sconf (CID := CIDa)  γs j γl ZOMBIE ch0 PD (trap_res b + av)%nat true
               Hj Hgl park_ok_ZOMBIE ltac:(lia)
               with "Hcg Htext Hpc Hprocs [Hlkp Hstate Hpg Hchan Hkilled Hxstate Hpidh]
                     [Hpriv Hsp Hir] Hpay Hcpuemp Hoc Htag Hvc [-]").
@@ -1203,7 +1212,7 @@ Section KexitPark.
     (* +0x9a auipc a0,5 ; +0x9e addi a0,a0,314 ; +0xa2 jal panic *)
     iApply (wp_auipc_s_sconf (CID := CIDz) (mword_of_int (KX + 0x9a))
               (mword_of_int 10 : mword 5) (mword_of_int 5 : mword 20)
-              mf av false ltac:(vm_compute; discriminate) ltac:(rdok)
+              mf (trap_res b + av)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi9a [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (PZ := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
@@ -1213,7 +1222,7 @@ Section KexitPark.
     iEval (rewrite Hpp9e) in "Hpc".
     iApply (wp_addi4_s_sconf (CID := CIDz) (mword_of_int (KX + 0x9e))
               (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 314 : mword 12)
-              PZ av false ltac:(vm_compute; discriminate) ltac:(rdok)
+              PZ (trap_res b + av)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi9e [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (PZ2 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
@@ -1222,7 +1231,7 @@ Section KexitPark.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppa2) in "Hpc".
     iApply (wp_jal_s_sconf (CID := CIDz) (mword_of_int (KX + 0xa2))
-              (mword_of_int 1 : mword 5) (mword_of_int 2090856 : mword 21) PZ2 av false
+              (mword_of_int 1 : mword 5) (mword_of_int 2090856 : mword 21) PZ2 (trap_res b + av)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hia2 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".

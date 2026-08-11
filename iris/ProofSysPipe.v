@@ -392,14 +392,24 @@ Section ProofSysPipe.
 
   (* the frame's sp is sound: read the bound out of the ambient capability's
      own stack carve (the conclusion is pure, so the bundle survives). *)
+  (* THE CARVE THIS READS IS ARM-DEPENDENT, hence the [0 < k] premise.
+     [IntrDefs.sie_cap] owns [trap_res bb + k] slots, and [trap_res false] is
+     NOTHING -- so at the interrupts-off arm the ONLY slots underwriting an sp
+     bound are the caller's own [k], and a zero-slot carve says nothing about
+     sp at all.  (Under the old arm-blind reserve the 78 reserved slots
+     covered it at either arm, which is why this used to need no premise.
+     The premise is local to this helper: every call site sits inside the
+     capstone, whose [<fn>_stack <= av] premise is already unfolded, so it is
+     a [lia].) *)
   Lemma sp_sp_bounds `{CID0 : CpuId} (m : regfile) (k : nat)
       (b : bool) (p : mword 64) :
+    (0 < k)%nat ->
     sie_cap_gpr m k b p -∗
     ⌜(8 <= uint (m !!! Regidx csp_rs1) < 274877906944 + 8)%Z⌝.
   Proof.
-    iIntros "(_ & _ & (Hstk & _ & _) & _)".
-    iApply (stack_own_sp_bounds _ (kv_frame_slots + k)%nat with "Hstk").
-    unfold kv_frame_slots. lia.
+    iIntros (Hk) "(_ & _ & (Hstk & _ & _) & _)".
+    iApply (stack_own_sp_bounds _ (trap_res b + k)%nat with "Hstk").
+    destruct b; unfold trap_res, kv_frame_slots; lia.
   Qed.
 
   (* =================================================================== *)

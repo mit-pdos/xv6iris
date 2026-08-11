@@ -153,7 +153,7 @@ Section YieldPostSched.
     msch !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5) ->
     kernel_text -∗
     is_lock γl (proc_addr j) "proc"%string (proc_lock_res γs γl (proc_addr j)) -∗
-    sie_cap_gpr msch (av - 4)%nat false pj -∗
+    sie_cap_gpr msch (trap_res eb + (av - 4))%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.yield + 0x1c)) -∗
     proc_held cpu_id j γl RUNNING ch' -∗
     trap_csrs -∗
@@ -222,7 +222,7 @@ Section YieldPostSched.
        hart is PINNED and [wp_next_off] collapses the binder. *)
     iPoseProof (ydi_1c with "Htext") as "Hi1c".
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.yield + 0x1c)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
-              msch (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              msch (trap_res eb + (av - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
@@ -236,7 +236,7 @@ Section YieldPostSched.
     (* +0x1e: jal release *)
     iPoseProof (ydi_1e with "Htext") as "Hi1e".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.yield + 0x1e)) (mword_of_int 1 : mword 5) (mword_of_int 2092430 : mword 21)
-              D0 (av - 4)%nat false
+              D0 (trap_res eb + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi1e [-]").
     iApply wp_next_off_intro.
@@ -667,7 +667,7 @@ Section ProofYield.
     (* +0x14: c.li a5,3 *)
     iPoseProof (ydi_14 with "Htext") as "Hi14".
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.yield + 0x14)) (mword_of_int 15 : mword 5) (mword_of_int 3 : mword 6)
-              (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 3 : mword 6)))) macq (av - 4)%nat false
+              (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 3 : mword 6)))) macq (trap_res eb + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) eq_refl
               with "Hcg Hpc Hi14 [-]").
     iApply wp_next_off_intro.
@@ -697,7 +697,7 @@ Section ProofYield.
     (* +0x16: c.sw a5,24(s1) : p->state := RUNNABLE *)
     iPoseProof (ydi_16 with "Htext") as "Hi16".
     iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.yield + 0x16)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
-              (mword_of_int 24 : mword 12) C0 (av - 4)%nat RUNNING false
+              (mword_of_int 24 : mword 12) C0 (trap_res eb + (av - 4))%nat RUNNING false
               with "Hcg Hpc Hi16 [Hstate] [-]").
     { iEval (rewrite Hrec_state_g). iExact "Hstate". }
     iApply wp_next_off_intro.
@@ -708,7 +708,7 @@ Section ProofYield.
     (* +0x18: jal sched *)
     iPoseProof (ydi_18 with "Htext") as "Hi18".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.yield + 0x18)) (mword_of_int 1 : mword 5) (mword_of_int 2096940 : mword 21)
-              C0 (av - 4)%nat false
+              C0 (trap_res eb + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi18 [-]").
     iApply wp_next_off_intro.
@@ -743,7 +743,7 @@ Section ProofYield.
        lock owns both halves again. *)
     iMod (pstate_whole_update (proc_addr j) RUNNING RUNNABLE with "Hpg") as "Hpg".
     iModIntro.
-    iApply (Sched.wp_sched_sconf γs j γl RUNNABLE ch0 C1 (av - 4)%nat eb
+    iApply (Sched.wp_sched_sconf γs j γl RUNNABLE ch0 C1 (trap_res eb + (av - 4))%nat eb
               Hj Hgl (park_ok_RUNNABLE) ltac:(lia)
               with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hpg Hchan Hpub] [] Htc Hcpuemp Hown Htag Hvc [-]").
     { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hpub". }

@@ -252,7 +252,11 @@ Section KforkArms.
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs4 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r) ->
     procs_inv γs -∗
-    sie_cap_gpr Mt (K - 8)%nat false pme -∗
+    (* ENTRY is in-lock (allocproc returned holding np->lock: level
+       [S lvl], arm [false]), so the index carries the reserve of the arm
+       this block returns at, namely [b].  See ProofKforkB1/B5 -- the
+       whole post-allocproc stretch of kfork runs at this index. *)
+    sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
     cpu_own (S lvl) eb pme C false -∗
     arm_pay lvl eb pme -∗
     kernel_text -∗
@@ -291,8 +295,8 @@ Section KforkArms.
     iDestruct (ProofKforkParts.kfk_of_priv γf (proc_addr j) pid_c Vc Hofnull Hcwdnull
                  with "HCpriv Hfd Hir Hctx") as "(Hfprest & Hfppt & Hfptf)".
     iApply (B1.kfk_exit_uvmcopy γs γa γl2 j ch Vc pid_c (pv_upt Vc) (pv_tf Vc)
-              m Mt K sp0 ra0 s00 s10 s50 pme eb C lvl
-              HK Hlvl Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMts4 HMtthr
+              m Mt K sp0 ra0 s00 s10 s50 pme eb b C lvl
+              HK Hlvl Hbeq Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMts4 HMtthr
               with "Hcg Hcpu Hpay Htext Hpc Hb1 Hb2 Hb3 Hb4x Hb5x Hb6 Hb7 Hb8
                     Hheld Hhart Hislock Hkalloc Hfprest Hfppt Hfptf [-]").
     iIntros (CID Hcross mf) "%Hpf Hcg Hpc Hcpu2 Hkalloc2".
@@ -442,7 +446,11 @@ Section KforkArms.
     kernel_text -∗
     panic_wp_any -∗
     procs_inv γs -∗
-    sie_cap_gpr Mt (K - 8)%nat false pme -∗
+    (* ENTRY is in-lock (allocproc returned holding np->lock: level
+       [S lvl], arm [false]), so the index carries the reserve of the arm
+       this block returns at, namely [b].  See ProofKforkB1/B5 -- the
+       whole post-allocproc stretch of kfork runs at this index. *)
+    sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
     cpu_own (S lvl) eb pme C false -∗
     pc_is (mword_of_int (KF + 0x4a) : mword 64) -∗
     kfk_frame_at sp0 ra0 s00 s10 s50
@@ -492,7 +500,7 @@ Section KforkArms.
     iDestruct (ProofKforkB7.kfkb7_tf_len with "Htfp_c") as %Hlenc.
     (* ---- ProofKforkB2: the trapframe copy loop ---- *)
     iApply (ProofKforkB2.kfk_tf_copy_loop Mt (ud_tfp (pv_upt Vp)) (ud_tfp (pv_upt Vc'))
-              (pv_tf Vp) (pv_tf Vc') (K - 8)%nat pme
+              (pv_tf Vp) (pv_tf Vc') (trap_res b + (K - 8))%nat pme
               Hpvsrc Hpvdst Hlenp Hlenc HMta5 HMta4 HMta3
               with "Hcg Htext Hpc Htfp_p Htfp_c [-]").
     iApply wp_next_off_intro.
@@ -508,7 +516,7 @@ Section KforkArms.
     assert (Hmfs5 : mf !!! Regidx Rs5 = pme)
       by (rewrite (callee_saved_lookup Hcsmf Rs5 ltac:(vm_compute; reflexivity)); exact HMts5).
     (* ---- ProofKforkB7: MY OWN block ---- *)
-    iApply (ProofKforkB7.kfk_b7 γf npa pme pid_c V1 mf (K - 8)%nat pme Hmfs4 Hmfs5
+    iApply (ProofKforkB7.kfk_b7 γf npa pme pid_c V1 mf (trap_res b + (K - 8))%nat pme Hmfs4 Hmfs5
               with "Hcg Htext Hpc HCpriv [-]").
     iApply wp_next_off_intro.
     iIntros (Mx) "%Hpx Hcg Hpc HCpriv".
@@ -540,7 +548,10 @@ Section KforkArms.
     assert (HofnullV2 : pv_ofile V2 = replicate NOFILE (zero_reg : mword 64)).
     { rewrite /V2 /V1. cbn [pv_ofile upd_pt]. exact Hofnull. }
     (* ---- ProofKforkB3: the fd scan, ALL 16 iterations in one shot ---- *)
-    iPoseProof (B3.kfkb3_fd_loop γl γf pme npa pid_p pid_c Vp V2 m K (S lvl) eb false C
+    (* [trap_res b] is the RESERVE the in-lock window is carrying; B3 is
+       arm-generic and instantiated at [b := false], so it cannot compute the
+       reserve itself -- it takes it as the opaque [rsv] parameter. *)
+    iPoseProof (B3.kfkb3_fd_loop γl γf pme npa pid_p pid_c Vp V2 m (trap_res b) K (S lvl) eb false C
                   (pa_stk sp0 8) (Mt !!! Regidx Rs0) ltac:(lia) ltac:(lia) HofnullV2) as "Hb3app".
     iSpecialize ("Hb3app" with "Htext Hft Hpanic").
     iSpecialize ("Hb3app" $! 0%nat Mx
@@ -562,7 +573,7 @@ Section KforkArms.
       (* ---- ProofKforkB4: idup / safestrcpy / pid read ---- *)
       iApply (B4.kfk_b4 γf γil γic cn γfs cov logstart nib pid_p pid_c Vp
                 (kfk_childV V2 (pv_ofile Vp) NOFILE) pme npa
-                Mx2 K (S lvl) eb C
+                Mx2 (trap_res b) K (S lvl) eb C
                 ltac:(lia) ltac:(lia) Hd4 Hd3
                 with "Hsc Hown Htext Hpcx Hpanic Hitb Hitinv Hirs Hpvx Hpvcx [-]").
       iApply wp_next_off_intro.
@@ -582,9 +593,13 @@ Section KforkArms.
       iEval (rewrite Hnpa) in "Hkctx".
       iEval (rewrite Hnpa) in "Hpvcx4".
       (* ---- ProofKforkB5: the two lock crossings, the RUNNABLE park ---- *)
-      iApply (B5.kfk_b5 γs γf γw γl2 j mf4 K lvl eb (match lvl with O => eb | S _ => false end)
+      (* pass B5's exit arm as THIS proof's [b] (with [eq_sym Hbeq] for B5's
+         own [b = match lvl ...] premise) rather than as the [match] itself:
+         the in-lock index we are handing it is spelled [trap_res b + (K - 8)],
+         and B5's entry index has to be syntactically that. *)
+      iApply (B5.kfk_b5 γs γf γw γl2 j mf4 K lvl eb b
                 pme ks pid_c Vc4 ch rest (sign_extend' 64 pid_c) C
-                ltac:(lia) ltac:(lia) HjN Hgamma Hrestlen eq_refl Hmf4s4 Hmf4s5 Hpid4
+                ltac:(lia) ltac:(lia) HjN Hgamma Hrestlen (eq_sym Hbeq) Hmf4s4 Hmf4s5 Hpid4
                 with "Hsc4 Hown4 Hpay Htext Hpc4 Hpanic Hprocs Hwlock
                       Hheld Hhart Hpvcx4 Hfd Hirsp Hks Hkctx [-]").
       (* [b] is symbolic here (B5's own exit index): an ordinary crossing,
@@ -604,20 +619,22 @@ Section KforkArms.
         rewrite (Hthr4 r Hr Ns1).
         exact (Hd5 r Hr Ncsp Ns0 Ns1 Ns2 Ns3 Ns4 Ns5). }
       (* ---- ProofKfork.kfk_tail_succ: the three lazy reloads ---- *)
+      (* B5 now exits at THIS proof's [b] (see the call above), so the tail and
+         the [cpu_own] transport are instantiated at [b] too -- and none of the
+         [Hbeq] re-spellings that used to bridge [b] and [match lvl ...] here
+         are needed any more. *)
       iApply (ProofKfork.kfk_tail_succ (CID0 := CID5) m mf5 K sp0 ra0 s00 s10 s50
-                (sign_extend' 64 pid_c) w8 pme (match lvl with O => eb | S _ => false end)
+                (sign_extend' 64 pid_c) w8 pme b
                 ltac:(lia) Hmsp Hmra Hms0 Hms1 Hms5 Hmf5sp Hmf5s1 Hmf5thr
                 with "Hsc5 Htext Hpc5 Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 [-]").
       iIntros (CID6 Hcross6 mr) "%Hpost Hsc6 Hpc6".
       destruct Hpost as (Hcsm & Hrv).
-      iDestruct (cpu_own_transport CID5 CID6 lvl eb pme C
-                   (match lvl with O => eb | S _ => false end) Hcross6 with "Hown5") as "Hown5".
+      iDestruct (cpu_own_transport CID5 CID6 lvl eb pme C b Hcross6 with "Hown5") as "Hown5".
       iSpecialize ("Hcont" $! CID6 with "[%]").
-      { rewrite -Hbeq. intros Hdisj. transitivity CID5; [exact (Hcross6 Hdisj) | exact (Hcross5 Hdisj)]. }
+      { intros Hdisj. transitivity CID5; [exact (Hcross6 Hdisj) | exact (Hcross5 Hdisj)]. }
       iApply ("Hcont" $! mr with "[%] Hpc6 [Hsc6 Hown5 Hpvx4 Hkalloc]").
       + exact Hcsm.
       + rewrite /kfork_post.
-        iEval (rewrite Hbeq) in "Hsc6". iEval (rewrite Hbeq) in "Hown5".
         iSplitL "Hsc6"; [iExact "Hsc6" |].
         iSplitL "Hown5"; [iExact "Hown5" |].
         iSplitL "Hpvx4"; [iExact "Hpvx4" |].

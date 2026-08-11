@@ -143,6 +143,38 @@ Proof.
   apply eq_vec_true_iff. exact H.
 Qed.
 
+(* ===================================================================== *)
+(* THE SCHEDULER'S CARVE ARITHMETIC.                                      *)
+(*                                                                        *)
+(* scheduler()'s sp NEVER MOVES after the 10-slot prologue, so the         *)
+(* PHYSICAL carve is the constant [av - 10] at every point of the loop.    *)
+(* [sie_cap]'s index is that constant MINUS the arm's reserve, so it is    *)
+(* arm-dependent -- and it must be, or the loop would have to claim the    *)
+(* same [kv_frame_slots] twice (once as usable stack, once as reserve).    *)
+(* The loop invariants therefore carry the index as a BINDER [n] plus the  *)
+(* side fact [trap_res <arm> + n = av - 10]; writing it as the closed form *)
+(* [av - 10 - trap_res b] would leave a STUCK [av - 10 - 0] at the         *)
+(* disabled arm ([Nat.sub] recurses on its FIRST argument), which is       *)
+(* exactly the trap [IntrDefs]' "left summand" note warns about, one       *)
+(* operator over.  These three facts are all the arithmetic that needs.    *)
+(* ===================================================================== *)
+Lemma sc_res_le (b : bool) : (trap_res b <= kv_frame_slots)%nat.
+Proof. destruct b; cbn; lia. Qed.
+
+(* the ONE real enable: [av - 10] usable at the disabled arm re-reads as
+   "[kv_frame_slots] set aside plus what is left", which is the shape the
+   0 -> 1 flip leaf demands of its pre index. *)
+Lemma sc_carve (av : nat) :
+  (kv_frame_slots + 20 <= av)%nat ->
+  (av - 10)%nat = (trap_res true + (av - 10 - kv_frame_slots))%nat.
+Proof. intros Hav. change (trap_res true) with kv_frame_slots. lia. Qed.
+
+(* the index that goes with an arbitrary arm, and the fact that it does. *)
+Lemma sc_idx_ok (av : nat) (b : bool) :
+  (kv_frame_slots + 20 <= av)%nat ->
+  (trap_res b + (av - 10 - trap_res b))%nat = (av - 10)%nat.
+Proof. intros Hav. pose proof (sc_res_le b). lia. Qed.
+
 Lemma sc_eq_vec_ne (n : Z) (x y : mword n) : x <> y -> eq_vec x y = false.
 Proof. intro H. apply eq_vec_false_iff. exact H. Qed.
 
@@ -762,8 +794,12 @@ Section ProofScheduler.
     (* ================================================================== *)
     (* THE RELEASE TAIL, +0x4a..+0x54, over an arbitrary arrival map.      *)
     (* ================================================================== *)
-    iAssert (□ ( ∀ (jj : nat) (γl : gname) (Mt : regfile) (ebx : bool),
+    iAssert (□ ( ∀ (jj : nat) (γl : gname) (Mt : regfile) (ebx : bool) (n : nat),
         ⌜(jj < NPROC)%nat⌝ -∗ ⌜γs !! jj = Some γl⌝ -∗
+        (* [n] is the index the tail RETURNS at, i.e. the index that goes with
+           the round's base enable [ebx] over the fixed carve [av - 10].  Its
+           own entry is in-lock (arm [false]) and so at the carve itself. *)
+        ⌜ (trap_res ebx + n)%nat = (av - 10)%nat ⌝ -∗
         ⌜ Mt !!! Regidx Rs1 = proc_addr jj
           /\ Mt !!! Regidx Rs2 = proc_addr NPROC
           /\ Mt !!! Regidx Rs3 = sign_extend' 64 RUNNABLE
@@ -791,7 +827,7 @@ Section ProofScheduler.
                 /\ neq_vec (add_vec zero_reg (Mn !!! Regidx Rs7)) zero_reg = true
                 /\ trunc32 (Mn !!! Regidx Rs8) = RUNNING ⌝ -∗
               ⌜ neq_vec (Mn !!! Regidx Rs5) zero_reg = false -> ebx = false ⌝ -∗
-              sie_cap_gpr Mn (av - 10)%nat ebx zero_reg -∗
+              sie_cap_gpr Mn n ebx zero_reg -∗
               pc_is (mword_of_int (KernelSyms.scheduler + 0x58)) -∗
               cpu_own 0 ebx zero_reg emp ebx -∗
               (if ebx then emp else trap_csrs) -∗
@@ -803,7 +839,7 @@ Section ProofScheduler.
                 /\ neq_vec (add_vec zero_reg (Me !!! Regidx Rs7)) zero_reg = true
                 /\ trunc32 (Me !!! Regidx Rs8) = RUNNING ⌝ -∗
               ⌜ neq_vec (Me !!! Regidx Rs5) zero_reg = false -> ebx = false ⌝ -∗
-              sie_cap_gpr Me (av - 10)%nat ebx zero_reg -∗
+              sie_cap_gpr Me n ebx zero_reg -∗
               pc_is (mword_of_int (KernelSyms.scheduler + 0x7e)) -∗
               cpu_own 0 ebx zero_reg emp ebx -∗
               (if ebx then emp else trap_csrs) -∗
@@ -812,7 +848,7 @@ Section ProofScheduler.
         WP (Loop : expr riscv_lang) ))%I
       with "[]" as "#Tail".
     { iModIntro.
-      iIntros (jj γl Mt ebx) "%Hjj %Hgl %Hpins %Htie Hcg Hpc Hlocked HR Hcpu Hcsrs Hown Hcont".
+      iIntros (jj γl Mt ebx n) "%Hjj %Hgl %Hn %Hpins %Htie Hcg Hpc Hlocked HR Hcpu Hcsrs Hown Hcont".
       destruct Hpins as (Hp1 & Hp2 & Hp3 & Hp4 & Hp6 & Hp7 & Hp8).
       iPoseProof (procs_inv_lookup γs jj γl Hgl with "Hprocs") as "#Hislock".
       iPoseProof (schi_4a with "Htext") as "Hi4a".
@@ -856,9 +892,16 @@ Section ProofScheduler.
       { rewrite /arm_pay /trap_csrs_pay /cpu_claim_pay. destruct ebx.
         - iSplitL "Hcsrs"; [ iFrame "Hcsrs"; iApply cpu_claim_idle | done ].
         - iSplitR "Hcsrs"; [ iSplit; done | iExact "Hcsrs" ]. }
+      (* THE RELEASE THAT MAY RE-ENABLE.  It pops to level 0, so its exit arm
+         is the round's base enable [ebx] -- and at [ebx = true] it turns
+         interrupts back on, which means its ENTRY index must show the reserve
+         explicitly ([trap_res ebx + n]).  [Hn] is exactly that re-spelling of
+         the in-lock carve [av - 10]; its exit is [n], the index the tail owes
+         its caller. *)
+      iEval (rewrite -Hn) in "Hcg".
       iApply (Release.wp_release_sconf γl (proc_addr jj) "proc"%string
-                (proc_lock_res γs γl (proc_addr jj)) T1 0 ebx zero_reg emp (av - 10)%nat
-                Hlka ltac:(lia)
+                (proc_lock_res γs γl (proc_addr jj)) T1 0 ebx zero_reg emp n
+                Hlka ltac:(pose proof (sc_res_le ebx); lia)
                 with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay [-]").
       (* release's crossing index is its EXIT index [outb = ebx] -- it re-enables
          at its last instruction -- and the scheduler thread has no proc, so the
@@ -878,7 +921,7 @@ Section ProofScheduler.
         by (rewrite (Hmr Rs1 ltac:(vm_compute; reflexivity)); exact Hp1).
       (* +0x50 addi s1,s1,360 *)
       iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.scheduler + 0x50)) Rs1 Rs1 (mword_of_int 360 : mword 12)
-                mr (av - 10)%nat ebx ltac:(vm_compute; discriminate) ltac:(rdok)
+                mr n ebx ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi50 [-]").
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
       iIntros "Hcg Hpc".
@@ -917,7 +960,7 @@ Section ProofScheduler.
       destruct (decide (S jj = NPROC)) as [Hend | Hne].
       - (* scan finished: branch TAKEN to +0x7e *)
         iApply (wp_beq_taken_s_sconf (mword_of_int (KernelSyms.scheduler + 0x54)) (mword_of_int 42 : mword 13)
-                  Rs2 Rs1 T2 (av - 10)%nat ebx
+                  Rs2 Rs1 T2 n ebx
                   ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                   ltac:(repeat rgne; rewrite HT2s1 HT2s2 Hend; apply eq_vec_true_iff; reflexivity)
                   ltac:(vm_compute; reflexivity)
@@ -934,7 +977,7 @@ Section ProofScheduler.
       - (* keep scanning: branch FALLS to +0x58 *)
         assert (HSjj : (S jj < NPROC)%nat) by lia.
         iApply (wp_beq_fall_s_sconf (mword_of_int (KernelSyms.scheduler + 0x54)) (mword_of_int 42 : mword 13)
-                  Rs2 Rs1 T2 (av - 10)%nat ebx
+                  Rs2 Rs1 T2 n ebx
                   ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                   ltac:(repeat rgne; rewrite HT2s1 HT2s2; apply sc_eq_vec_ne;
                         exact (sc_proc_addr_ne_end (S jj) HSjj))
@@ -952,8 +995,11 @@ Section ProofScheduler.
     (* ================================================================== *)
     (* THE INNER SCAN, entry +0x58, fuel induction on the remaining count. *)
     (* ================================================================== *)
-    iAssert (□ ( ∀ (fuel jj : nat) (M : regfile) (ebc : bool),
+    iAssert (□ ( ∀ (fuel jj : nat) (M : regfile) (ebc : bool) (n : nat),
         ⌜(NPROC - jj <= fuel)%nat⌝ -∗ ⌜(jj < NPROC)%nat⌝ -∗
+        (* the index that goes with this round's base enable over the fixed
+           carve [av - 10] -- see the [sc_res_le]/[sc_idx_ok] header. *)
+        ⌜ (trap_res ebc + n)%nat = (av - 10)%nat ⌝ -∗
         ⌜ M !!! Regidx Rs1 = proc_addr jj
           /\ M !!! Regidx Rs2 = proc_addr NPROC
           /\ M !!! Regidx Rs3 = sign_extend' 64 RUNNABLE
@@ -964,18 +1010,21 @@ Section ProofScheduler.
         ⌜ neq_vec (M !!! Regidx Rs5) zero_reg = false -> ebc = false ⌝ -∗
         (* level 0: the ambient SIE index IS the base enable (cpu_own_eb_agree),
            so [ebc] and NOT a blanket [false]. *)
-        sie_cap_gpr M (av - 10)%nat ebc zero_reg -∗
+        sie_cap_gpr M n ebc zero_reg -∗
         pc_is (mword_of_int (KernelSyms.scheduler + 0x58)) -∗
         cpu_own 0 ebc zero_reg emp ebc -∗
         (if ebc then emp else trap_csrs) -∗
         own_ctx (a_cpu_ctx cid_word) -∗
-        ( ∀ (Me : regfile) (eb2 : bool),
+        ( ∀ (Me : regfile) (eb2 : bool) (n2 : nat),
             ⌜ add_vec (Me !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12)) = a_cpu_proc cid_word
               /\ Me !!! Regidx Rs6 = a_cpu_ctx cid_word
               /\ neq_vec (add_vec zero_reg (Me !!! Regidx Rs7)) zero_reg = true
               /\ trunc32 (Me !!! Regidx Rs8) = RUNNING ⌝ -∗
             ⌜ neq_vec (Me !!! Regidx Rs5) zero_reg = false -> eb2 = false ⌝ -∗
-            sie_cap_gpr Me (av - 10)%nat eb2 zero_reg -∗
+            (* a dispatch may hand the round back at a DIFFERENT base enable,
+               so the exit carries its own arm AND its own index. *)
+            ⌜ (trap_res eb2 + n2)%nat = (av - 10)%nat ⌝ -∗
+            sie_cap_gpr Me n2 eb2 zero_reg -∗
             pc_is (mword_of_int (KernelSyms.scheduler + 0x7e)) -∗
             cpu_own 0 eb2 zero_reg emp eb2 -∗
             (if eb2 then emp else trap_csrs) -∗
@@ -984,7 +1033,7 @@ Section ProofScheduler.
         WP (Loop : expr riscv_lang) ))%I
       with "[]" as "#Scan".
     { iModIntro. iIntros (fuel). iInduction fuel as [|fuel IH] "IH";
-        iIntros (jj M ebc) "%Hfuel %Hjj %Hpins %Htie Hcg Hpc Hcpu Hcsrs Hown Hexit".
+        iIntros (jj M ebc n) "%Hfuel %Hjj %Hn %Hpins %Htie Hcg Hpc Hcpu Hcsrs Hown Hexit".
       { exfalso. unfold NPROC in *. lia. }
       destruct Hpins as (Hp1 & Hp2 & Hp3 & Hp4 & Hp6 & Hp7 & Hp8).
       assert (Hex : is_Some (γs !! jj)) by (apply lookup_lt_is_Some_2; rewrite Hlen; exact Hjj).
@@ -995,7 +1044,7 @@ Section ProofScheduler.
       iPoseProof (schi_5e with "Htext") as "Hi5e".
       iPoseProof (schi_60 with "Htext") as "Hi60".
       (* +0x58 c.mv a0,s1 *)
-      iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.scheduler + 0x58)) Ra0 Rs1 M (av - 10)%nat ebc
+      iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.scheduler + 0x58)) Ra0 Rs1 M n ebc
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi58 [-]").
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
@@ -1008,7 +1057,7 @@ Section ProofScheduler.
       iEval (rewrite Hr5a) in "Hpc".
       (* +0x5a jal acquire *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.scheduler + 0x5a)) Rra (mword_of_int 2092586 : mword 21)
-                M0 (av - 10)%nat ebc ltac:(vm_compute; discriminate) ltac:(rdok)
+                M0 n ebc ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi5a [-]").
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
       iIntros "Hcg Hpc".
@@ -1037,14 +1086,18 @@ Section ProofScheduler.
       (* compiles clean end to end.                                        *)
       (* ================================================================ *)
       iApply (Acquire.wp_acquire_sconf γl "proc"%string
-                (proc_lock_res γs γl (proc_addr jj)) M1 0 ebc zero_reg emp (av - 10)%nat ebc
-                ltac:(lia) ltac:(lia)
+                (proc_lock_res γs γl (proc_addr jj)) M1 0 ebc zero_reg emp n ebc
+                ltac:(lia) ltac:(pose proof (sc_res_le ebc); lia)
                 with "Hcg Hcpu Htext Hpc [Hislock] Hpanic [-]").
       { iEval (rewrite HM1a0). iExact "Hislock". }
       (* acquire's crossing index is its ENTRY [ebc] (a trap can land on its
          first instruction, before push_off disables) -- idle hatch again. *)
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
       iIntros (msq macq) "%Hmsfq Hcg Hpc %Hcsaq Hlocked HR Hcpu Hpay".
+      (* acquire's push_off folded the reserve back into the usable count, so
+         the in-lock index is the full carve [av - 10] -- that is exactly what
+         [Hn] says, and every in-lock site below is written at it. *)
+      iEval (rewrite Hn) in "Hcg".
       assert (Hr5e : ret_pc (M1 !!! Regidx Rra) = mword_of_int (KernelSyms.scheduler + 0x5e))
         by (rewrite HM1ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hr5e) in "Hpc".
@@ -1118,21 +1171,23 @@ Section ProofScheduler.
         (* the slot goes back UNTOUCHED *)
         iAssert (proc_lock_res γs γl (proc_addr jj)) with "[Hstate Hpg Hchan Hpub Hslot]" as "HR".
         { rewrite /proc_lock_res. iExists st, ch. iFrame "Hstate Hpg Hchan Hpub Hslot". }
-        iApply ("Tail" $! jj γl M2 ebc with "[%] [%] [%] [%] Hcg Hpc Hlocked HR Hcpu Hcsrs Hown [-]").
+        iApply ("Tail" $! jj γl M2 ebc n with "[%] [%] [%] [%] [%] Hcg Hpc Hlocked HR Hcpu Hcsrs Hown [-]").
         { exact Hjj. }
         { exact Hgl. }
+        { exact Hn. }
         { split_and!; assumption. }
         { rewrite HM2s5. exact Htie. }
         iSplit.
         + iIntros (HSjj Mn) "%HpinsN %HtieN Hcg Hpc Hcpu Hcsrs Hown".
-          iApply ("IH" $! (S jj) Mn ebc with "[%] [%] [%] [%] Hcg Hpc Hcpu Hcsrs Hown Hexit").
+          iApply ("IH" $! (S jj) Mn ebc n with "[%] [%] [%] [%] [%] Hcg Hpc Hcpu Hcsrs Hown Hexit").
           { unfold NPROC in *. lia. }
           { exact HSjj. }
+          { exact Hn. }
           { exact HpinsN. }
           { exact HtieN. }
         + iIntros (Me) "%HpinsE %HtieE Hcg Hpc Hcpu Hcsrs Hown".
-          iApply ("Hexit" $! Me ebc with "[%] [%] Hcg Hpc Hcpu Hcsrs Hown");
-            [ exact HpinsE | exact HtieE ].
+          iApply ("Hexit" $! Me ebc n with "[%] [%] [%] Hcg Hpc Hcpu Hcsrs Hown");
+            [ exact HpinsE | exact HtieE | exact Hn ].
       - (* RUNNABLE: dispatch it *)
         assert (Hst : st = RUNNABLE)
           by (apply sext64_32_inj; apply (sc_neq_vec_false 64); exact Hcmp).
@@ -1420,30 +1475,123 @@ Section ProofScheduler.
                           (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2023 : mword 11) ('b"0"))))
                         = mword_of_int (KernelSyms.scheduler + 0x4a)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hr4a2) in "Hpc".
-        iApply ("Tail" $! jj γl M5 eb' with "[%] [%] [%] [%] Hcg Hpc Hlocked HR Hcpu Hcsrs Hown [-]").
+        (* THE DISPATCH CHANGED THE ROUND'S BASE ENABLE.  swtch hands the
+           bundle back at the RESUMING thread's [eb'] (its own [sie_cap] index
+           is arm-[false] on both sides, so the carve is untouched), which
+           means the index the tail must return at is the one that goes with
+           [eb'] rather than with [ebc]. *)
+        iApply ("Tail" $! jj γl M5 eb' (av - 10 - trap_res eb')%nat
+                  with "[%] [%] [%] [%] [%] Hcg Hpc Hlocked HR Hcpu Hcsrs Hown [-]").
         { exact Hjj. }
         { exact Hgl. }
+        { exact (sc_idx_ok av eb' Hav). }
         { split_and!; assumption. }
         { exact HM5tie. }
         iSplit.
         + iIntros (HSjj Mn) "%HpinsN %HtieN Hcg Hpc Hcpu Hcsrs Hown".
-          iApply ("IH" $! (S jj) Mn eb' with "[%] [%] [%] [%] Hcg Hpc Hcpu Hcsrs Hown Hexit").
+          iApply ("IH" $! (S jj) Mn eb' (av - 10 - trap_res eb')%nat
+                    with "[%] [%] [%] [%] [%] Hcg Hpc Hcpu Hcsrs Hown Hexit").
           { unfold NPROC in *. lia. }
           { exact HSjj. }
+          { exact (sc_idx_ok av eb' Hav). }
           { exact HpinsN. }
           { exact HtieN. }
         + iIntros (Me) "%HpinsE %HtieE Hcg Hpc Hcpu Hcsrs Hown".
-          iApply ("Hexit" $! Me eb' with "[%] [%] Hcg Hpc Hcpu Hcsrs Hown");
-            [ exact HpinsE | exact HtieE ]. }
+          iApply ("Hexit" $! Me eb' (av - 10 - trap_res eb')%nat
+                    with "[%] [%] [%] Hcg Hpc Hcpu Hcsrs Hown");
+            [ exact HpinsE | exact HtieE | exact (sc_idx_ok av eb' Hav) ]. }
+    (* ================================================================== *)
+    (* THE LOOP HEAD'S intr_on, +0x86 -- THE ONE PLACE THE RESERVE IS PAID. *)
+    (*                                                                     *)
+    (* This is the whole point of the scheduler's carve accounting, so it is *)
+    (* worth being explicit about WHY it is a case split and not one leaf.   *)
+    (*                                                                     *)
+    (* scheduler() is entered from main() with interrupts OFF, and the loop   *)
+    (* head is reached again either from the dispatch tail (whose release at  *)
+    (* level 0 has already re-enabled, so the arm is [true]) or from the wfi  *)
+    (* arm (which proves the arm is [false] and leaves it there).  So BOTH    *)
+    (* arms genuinely occur at +0x86, and they are different events:          *)
+    (*                                                                       *)
+    (*   arm [false] -- a REAL 0 -> 1 flip.  Nobody is holding the trap       *)
+    (*     reserve, so the scheduler funds [kv_frame_slots] out of its own    *)
+    (*     budget: index [av - 10] (the whole carve is usable at a disabled   *)
+    (*     arm) becomes [av - 10 - kv_frame_slots] usable with the reserve    *)
+    (*     set aside.  That is [sc_carve], and it is paid ONCE -- on the      *)
+    (*     first round, and again only after a wfi.                          *)
+    (*                                                                       *)
+    (*   arm [true] -- an IDEMPOTENT SET.  SIE is already '1'; the write      *)
+    (*     changes no ghost state and, decisively, MOVES NO STACK.  The       *)
+    (*     reserve carved on the first round is still set aside, so there is  *)
+    (*     nothing to pay and the index does not move.                        *)
+    (*                                                                       *)
+    (* Using the arm-GENERIC enable leaf for both would demand pre index      *)
+    (* [trap_res true + n] at the enabled arm too -- i.e. room to set aside   *)
+    (* [kv_frame_slots] in a state where they are ALREADY set aside -- which  *)
+    (* forces [av >= 2 * kv_frame_slots + 20].  A factor-of-two reserve is    *)
+    (* exactly the shape the arm-dependent carve exists to remove, so the     *)
+    (* enabled arm goes through the index-generic idempotent leaf instead.    *)
+    (* Both arms converge on ONE state -- arm [true], index                   *)
+    (* [av - 10 - kv_frame_slots] -- which is what lets the rest of the loop  *)
+    (* body be written once; hence this is its own resource rather than a     *)
+    (* [destruct] inside the Löb body.                                        *)
+    (* ================================================================== *)
+    iAssert (□ ( ∀ (M : regfile) (eb : bool) (nx : nat),
+        ⌜ (trap_res eb + nx)%nat = (av - 10)%nat ⌝ -∗
+        sie_cap_gpr M nx eb zero_reg -∗
+        cpu_own 0 eb zero_reg emp eb -∗
+        (if eb then emp else trap_csrs) -∗
+        pc_is (mword_of_int (KernelSyms.scheduler + 0x86)) -∗
+        ( sie_cap_gpr M (av - 10 - kv_frame_slots)%nat true zero_reg -∗
+          pc_is (mword_of_int (KernelSyms.scheduler + 0x8a)) -∗
+          WP (Loop : expr riscv_lang) ) -∗
+        WP (Loop : expr riscv_lang) ))%I
+      with "[]" as "#IntrOn".
+    { iModIntro. iIntros (M eb nx) "%Hnx Hcg Hcpu Hcsrs Hpc Hk".
+      iPoseProof (schi_86 with "Htext") as "Hi86".
+      assert (Ho8a' : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x86) : mword 64) 4
+                      = mword_of_int (KernelSyms.scheduler + 0x8a))
+        by (apply bv_eq; vm_compute; reflexivity).
+      (* The flip leaves take the count eighth and the per-cpu cells SEPARATELY,
+         each behind an [if eb then emp else _]: at the enabled base both live
+         inside [sie_arm]'s arm.  [sc_flip_pre] is exactly [cpu_own 0 eb _ emp eb]
+         re-presented in that shape. *)
+      iDestruct (sc_flip_pre with "Hcpu") as "[Hcnt Hcells]".
+      destruct eb.
+      - (* ---- already enabled: the idempotent set, index untouched ---- *)
+        assert (Hnx' : nx = (av - 10 - kv_frame_slots)%nat)
+          by (change (trap_res true) with kv_frame_slots in Hnx; lia).
+        iEval (rewrite Hnx') in "Hcg".
+        iApply (wp_csrsi_sstatus_x0_idem_s_sconf (mword_of_int (KernelSyms.scheduler + 0x86))
+                  M (av - 10 - kv_frame_slots)%nat with "Hcg Hpc Hi86 [-]").
+        first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
+        iIntros (ms1) "%Hmsf1 Hcg Hpc".
+        iEval (rewrite Ho8a') in "Hpc".
+        iApply ("Hk" with "Hcg Hpc").
+      - (* ---- disabled: the ONE real enable, funded from the entry budget ---- *)
+        assert (Hnx' : nx = (av - 10)%nat) by (cbn in Hnx; lia).
+        iEval (rewrite Hnx') in "Hcg".
+        iEval (rewrite (sc_carve av Hav)) in "Hcg".
+        iApply (wp_csrsi_sstatus_x0_enable_s_sconf (mword_of_int (KernelSyms.scheduler + 0x86))
+                  false M (av - 10 - kv_frame_slots)%nat
+                  with "Hcg Hcnt Hcsrs Hcells [] Havail Hpc Hi86 [-]").
+        (* the scheduler runs with [c->proc == 0], so the claim it owes the arm
+           is the idle one -- [cpu_claim_idle], for free. *)
+        { rewrite /cpu_claim_ext. iApply cpu_claim_idle. }
+        first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
+        iIntros (ms1) "%Hmsf1 Hcg Hpc".
+        iEval (rewrite Ho8a') in "Hpc".
+        iApply ("Hk" with "Hcg Hpc"). }
     (* ================================================================== *)
     (* THE OUTER DISPATCH LOOP, entry +0x86, by iLöb.                     *)
     (* ================================================================== *)
-    iAssert (□ ( ∀ (M : regfile) (eb : bool),
+    iAssert (□ ( ∀ (M : regfile) (eb : bool) (n : nat),
         ⌜ add_vec (M !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12)) = a_cpu_proc cid_word
           /\ M !!! Regidx Rs6 = a_cpu_ctx cid_word
           /\ neq_vec (add_vec zero_reg (M !!! Regidx Rs7)) zero_reg = true
           /\ trunc32 (M !!! Regidx Rs8) = RUNNING ⌝ -∗
-        sie_cap_gpr M (av - 10)%nat eb zero_reg -∗
+        (* the index that goes with the arm over the fixed carve [av - 10] *)
+        ⌜ (trap_res eb + n)%nat = (av - 10)%nat ⌝ -∗
+        sie_cap_gpr M n eb zero_reg -∗
         pc_is (mword_of_int (KernelSyms.scheduler + 0x86)) -∗
         cpu_own 0 eb zero_reg emp eb -∗
         (if eb then emp else trap_csrs) -∗
@@ -1451,7 +1599,7 @@ Section ProofScheduler.
         WP (Loop : expr riscv_lang) ))%I
       with "[]" as "#Outer".
     { iModIntro. iLöb as "IHo".
-      iIntros (M eb) "%Hpo Hcg Hpc Hcpu Hcsrs Hown".
+      iIntros (M eb n) "%Hpo %Hn Hcg Hpc Hcpu Hcsrs Hown".
       destruct Hpo as (Ho4 & Ho6 & Ho7 & Ho8).
       iPoseProof (schi_86 with "Htext") as "Hi86".
       iPoseProof (schi_8a with "Htext") as "Hi8a".
@@ -1464,33 +1612,26 @@ Section ProofScheduler.
       iPoseProof (schi_a2 with "Htext") as "Hia2".
       iPoseProof (schi_7e with "Htext") as "Hi7e".
       iPoseProof (schi_82 with "Htext") as "Hi82".
-      (* The flip leaves take the count eighth and the per-cpu cells SEPARATELY,
-         each behind an [if eb then emp else _]: at the enabled base both live
-         inside [sie_arm]'s arm.  [sc_flip_pre] is exactly [cpu_own 0 eb _ emp eb]
-         re-presented in that shape. *)
-      iDestruct (sc_flip_pre with "Hcpu") as "[Hcnt Hcells]".
-      (* +0x86 csrsi sstatus,2 : intr_on *)
-      iApply (wp_csrsi_sstatus_x0_enable_s_sconf (mword_of_int (KernelSyms.scheduler + 0x86)) eb M (av - 10)%nat
-                with "Hcg Hcnt Hcsrs Hcells [] Havail Hpc Hi86 [-]").
-      (* the scheduler runs with [c->proc == 0], so the claim it owes the arm
-         is the idle one -- [cpu_claim_idle], for free. *)
-      { rewrite /cpu_claim_ext. destruct eb; [done | iApply cpu_claim_idle]. }
-      first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-      (* the enable leaf returns ONLY the bundle: the count eighth it consumed
-         is now inside [sie_arm true], not handed back. *)
-      iIntros (ms1) "%Hmsf1 Hcg Hpc".
-      assert (Ho8a : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x86) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x8a))
-        by (apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Ho8a) in "Hpc".
+      (* +0x86 csrsi sstatus,2 : intr_on.  Both arms converge on arm [true] at
+         index [av - 10 - kv_frame_slots]; see the [IntrOn] header above for
+         why this is a case split and where the one reserve is paid. *)
+      iApply ("IntrOn" $! M eb n with "[%] Hcg Hcpu Hcsrs Hpc [-]").
+      { exact Hn. }
+      iIntros "Hcg Hpc".
       (* +0x8a csrci sstatus,2 : intr_off *)
       (* the disable leaf's premise is [intr_count_pre true 0 true], the PURE
          fact the (now enabled) arm bakes in; it hands the freed cells back as
-         [cpu_cells_pay true zero_reg]. *)
-      iApply (wp_csrci_sstatus_x0_s_sconf (mword_of_int (KernelSyms.scheduler + 0x8a)) M (av - 10)%nat true
+         [cpu_cells_pay true zero_reg].  Its post index [trap_res true + n] is
+         the reserve coming BACK into the usable count -- the scan below runs
+         interrupts-off at the full carve [av - 10], which is what [sc_carve]
+         re-spells. *)
+      iApply (wp_csrci_sstatus_x0_s_sconf (mword_of_int (KernelSyms.scheduler + 0x8a)) M
+                (av - 10 - kv_frame_slots)%nat true
                 with "Hcg [] Hpc Hi8a [-]").
       { iPureIntro. exact (conj eq_refl eq_refl). }
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
       iIntros (ms2) "%Hmsf2 Hcg Hcnt Hcsrs Hcells Hpc".
+      iEval (rewrite -(sc_carve av Hav)) in "Hcg".
       assert (Ho8e : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x8a) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x8e))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Ho8e) in "Hpc".
@@ -1629,19 +1770,23 @@ Section ProofScheduler.
                        (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2011 : mword 11) ('b"0"))))
                      = mword_of_int (KernelSyms.scheduler + 0x58)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Ho58) in "Hpc".
-      iApply ("Scan" $! NPROC 0%nat B5 false with "[%] [%] [%] [%] Hcg Hpc Hcpu Hcsrs Hown [-]").
+      (* the scan runs interrupts-off at the FULL carve: [trap_res false + n]
+         is [n] by conversion, so the index equation is [reflexivity]. *)
+      iApply ("Scan" $! NPROC 0%nat B5 false (av - 10)%nat
+                with "[%] [%] [%] [%] [%] Hcg Hpc Hcpu Hcsrs Hown [-]").
       { lia. }
       { unfold NPROC. lia. }
+      { reflexivity. }
       { split_and!; assumption. }
       { intros _. reflexivity. }
       (* ---- the scan's single exit, at +0x7e ---- *)
-      iIntros (Me eb2) "%Hpe %HtieE Hcg Hpc Hcpu Hcsrs Hown".
+      iIntros (Me eb2 n2) "%Hpe %HtieE %Hn2 Hcg Hpc Hcpu Hcsrs Hown".
       destruct Hpe as (He4 & He6 & He7 & He8).
       assert (HMe5r : rget Me Rs5 = Me !!! Regidx Rs5) by (rgne; reflexivity).
       destruct (neq_vec (Me !!! Regidx Rs5) zero_reg) eqn:Hs5v.
       + (* a proc ran: straight back to the loop head *)
         iApply (wp_bnez_x0_taken_s_sconf (mword_of_int (KernelSyms.scheduler + 0x7e)) (mword_of_int 8 : mword 13)
-                  Rs5 Me (av - 10)%nat eb2 ltac:(vm_compute; discriminate)
+                  Rs5 Me n2 eb2 ltac:(vm_compute; discriminate)
                   ltac:(rewrite HMe5r; exact Hs5v)
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi7e [-]").
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
@@ -1649,13 +1794,14 @@ Section ProofScheduler.
         assert (Hb86 : add_vec (mword_of_int (KernelSyms.scheduler + 0x7e) : mword 64) (sign_extend' 64 (mword_of_int 8 : mword 13))
                        = mword_of_int (KernelSyms.scheduler + 0x86)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hb86) in "Hpc".
-        iApply ("IHo" $! Me eb2 with "[%] Hcg Hpc Hcpu Hcsrs Hown").
+        iApply ("IHo" $! Me eb2 n2 with "[%] [%] Hcg Hpc Hcpu Hcsrs Hown").
         { split_and!; assumption. }
+        { exact Hn2. }
       + (* nothing runnable: SIE is provably off, so wfi is legal *)
         assert (Heb : eb2 = false) by (apply HtieE; first [exact Hs5v | reflexivity]).
         subst eb2.
         iApply (wp_bnez_x0_fall_s_sconf (mword_of_int (KernelSyms.scheduler + 0x7e)) (mword_of_int 8 : mword 13)
-                  Rs5 Me (av - 10)%nat false ltac:(vm_compute; discriminate)
+                  Rs5 Me n2 false ltac:(vm_compute; discriminate)
                   ltac:(rewrite HMe5r; exact Hs5v)
                   with "Hcg Hpc Hi7e [-]").
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
@@ -1666,7 +1812,7 @@ Section ProofScheduler.
         (* +0x82 wfi -- the ONE leaf with no [wp_next] wrapper (it never
            migrates the hart) *)
         iDestruct (sc_cpu_own_open with "Hcpu") as "(Hnoff & Hint & Hcnt & Hproc & _)".
-        iApply (wp_wfi_s_sconf (mword_of_int (KernelSyms.scheduler + 0x82)) Me (av - 10)%nat false
+        iApply (wp_wfi_s_sconf (mword_of_int (KernelSyms.scheduler + 0x82)) Me n2 false
                   with "Hcg Hcnt Hpc Hi82 [-]").
         iNext. iIntros "Hcg Hcnt Hpc".
         assert (Hb86b : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x82) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x86))
@@ -1674,8 +1820,9 @@ Section ProofScheduler.
         iEval (rewrite Hb86b) in "Hpc".
         iAssert (cpu_own 0 false zero_reg emp false) with "[Hnoff Hint Hcnt Hproc]" as "Hcpu".
         { iApply (sc_cpu_own_mk with "Hnoff Hint Hcnt Hproc"). }
-        iApply ("IHo" $! Me false with "[%] Hcg Hpc Hcpu Hcsrs Hown").
-        { split_and!; assumption. } }
+        iApply ("IHo" $! Me false n2 with "[%] [%] Hcg Hpc Hcpu Hcsrs Hown").
+        { split_and!; assumption. }
+        { exact Hn2. } }
     (* ------------------------------------------------------------------ *)
     (* +0x48 c.j +0x3e : into the loop head.                              *)
     (* ------------------------------------------------------------------ *)
@@ -1691,8 +1838,12 @@ Section ProofScheduler.
     iEval (rewrite Hpc86) in "Hpc".
     (* the entry bundle is already tagged at [zero_reg] (the scheduler thread
        has no proc), so no re-tag is owed here. *)
-    iApply ("Outer" $! A16 false with "[%] Hcg Hpc Hcpu Hcsrs Hown").
+    (* scheduler() is entered with interrupts OFF, which is what makes the
+       loop head's first [intr_on] the ONE real enable -- and at the disabled
+       arm the index IS the whole carve, so the equation is [reflexivity]. *)
+    iApply ("Outer" $! A16 false (av - 10)%nat with "[%] [%] Hcg Hpc Hcpu Hcsrs Hown").
     { split_and!; assumption. }
+    { reflexivity. }
   Qed.
 
 End ProofScheduler.

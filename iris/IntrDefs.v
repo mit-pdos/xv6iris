@@ -21,8 +21,10 @@
        [sconf_ms_facts] (the SIE-free common fact set), [sconf]
        (SIE unpinned, [mie] PINNED at [MIE_S], ghost half tied to the
        live bit, menvcfg bundled),
-       the kernel-code capability [sie_cap m avail] -- the
-       [kv_frame_slots + avail] free-stack slots below sp (sp moves trade
+       the kernel-code capability [sie_cap m avail b] -- the
+       [trap_res b + avail] free-stack slots below sp, i.e. [avail] usable
+       plus the ARM-DEPENDENT trap reserve [trap_res b] (78 at b = true,
+       0 at b = false -- see [trap_res]; sp moves trade
        against [avail] via [sie_cap_push]/[sie_cap_pop]), the TRANSLATION
        SLOT [strans_inv] (Bare-with-stvec ∨ ∃root kernel-PT, consumed
        foldedly via the derived regime [strans_regime]), and the SIE arm
@@ -434,6 +436,69 @@ Section IntrDefs.
      proof. *)
   Definition kv_frame_slots : nat := 78.
 
+  (* ------------------------------------------------------------------- *)
+  (* THE TRAP RESERVE IS ARM-DEPENDENT, AND THAT IS NOT AN OPTIMISATION  *)
+  (* -- AN ARM-BLIND RESERVE IS UNSATISFIABLE.                          *)
+  (*                                                                     *)
+  (* [sie_cap] used to own [kv_frame_slots + avail] at BOTH arms: the     *)
+  (* reserve was factored out of the index "harmlessly", since the ABI    *)
+  (* never writes below sp.  With a REAL handler that is not merely       *)
+  (* wasteful, it is UNSATISFIABLE.  The handler runs interrupts-off, so  *)
+  (* under an arm-blind reserve its own bundle [sie_cap m H false] also   *)
+  (* demands [kv_frame_slots] RESERVED slots on top of the H slots its    *)
+  (* cone actually needs -- while the trap can only hand over the         *)
+  (* [kv_frame_slots] it reserved.  Funding the handler therefore costs   *)
+  (* R + H and supplies R: it is [R >= R + H] with [H > 0], FALSE at      *)
+  (* every value of the constant, so enlarging [kv_frame_slots] cannot    *)
+  (* fix it.  (This is why ProofKernelvec.v was only ever able to consume *)
+  (* the legacy 17-cell contract instead of building a [sie_cap] for its  *)
+  (* callee.)  Only code that CAN be trapped may pay the reserve; that is *)
+  (* what breaks the circularity, because the handler -- interrupts off,  *)
+  (* hence reserve-free -- can then be funded OUT of the trap's reserve.  *)
+  (*                                                                     *)
+  (* DO NOT "SIMPLIFY" THE SUMMAND.  It is spelled as a LEFT summand,     *)
+  (* [trap_res b + avail], and each of the three properties that buys is  *)
+  (* load-bearing:                                                        *)
+  (*                                                                     *)
+  (* 1. [trap_res false + avail] is DEFINITIONALLY [avail] -- [Nat.add]   *)
+  (*    recurses on its FIRST argument, so [trap_res false + avail]       *)
+  (*    delta/iota-reduces straight to [avail].  That is the whole reason *)
+  (*    the summand goes on the LEFT: every interrupts-off statement in   *)
+  (*    the tree is unchanged AS WRITTEN and [iExact]/[iFrame] see        *)
+  (*    through the index.  Written [avail + trap_res b] instead, the     *)
+  (*    same reduction leaves [av + 0] STUCK against [av] -- at thousands *)
+  (*    of sites, none of which would be fixable by conversion.           *)
+  (* 2. [sie_cap m av true p] and [sie_cap m (kv_frame_slots + av) false  *)
+  (*    p] have the SYNTACTICALLY IDENTICAL carve, so a trap hands the    *)
+  (*    whole capability to the handler with the stack conjunct NEVER     *)
+  (*    TOUCHED (a pure re-indexing, not a split), and the sret does the  *)
+  (*    same in reverse.                                                  *)
+  (* 3. NO [K <= n] PREMISE MOVES.  The sp movers ([_push]/[_pop]/        *)
+  (*    [_grow]/[_shrink]/[_retarget]) keep their premises VERBATIM:      *)
+  (*    [trap_res b] is an opaque [nat] atom that [lia] carries through   *)
+  (*    [trap_res b + avail = k + (trap_res b + (avail - k))].            *)
+  (*                                                                     *)
+  (* Two alternatives were considered and REJECTED, both isomorphic to    *)
+  (* this one under [avail |-> avail - trap_res b] but worse at the       *)
+  (* seams: (a) carve [= avail] with a pure side fact                     *)
+  (* [b = true -> kv_frame_slots <= avail] -- then a frame push must      *)
+  (* PRESERVE the fact, so [sie_cap_push] needs                            *)
+  (* [k + kv_frame_slots <= avail] and every function's [K] grows by 78;  *)
+  (* (b) keep the arm-blind carve and enlarge [kv_frame_slots] -- the     *)
+  (* [R >= R + H] obstruction above, unsatisfiable at any value.          *)
+  (*                                                                     *)
+  (* NOTE the explicit [0%nat]: this file opens [Z_scope], and a bare [0] *)
+  (* in the [if] branch elaborates as [Z] even under the [: nat] result   *)
+  (* annotation.                                                          *)
+  (* ------------------------------------------------------------------- *)
+  Definition trap_res (b : bool) : nat :=
+    if b then kv_frame_slots else 0%nat.
+
+  (* the conversion of property 1, available by name for the rare site
+     that wants to SAY it rather than rely on it silently. *)
+  Lemma trap_res_off (avail : nat) : (trap_res false + avail)%nat = avail.
+  Proof. reflexivity. Qed.
+
   (* menvcfg is pinned to [MENVCFG_S] here rather than parameterized: the
      handler contract below is only PROVABLE at that value (its own fetches
      need [cfg_ok], the PT walk needs PBMTE=0 / ADUE), and S-mode never runs
@@ -664,11 +729,14 @@ Section IntrDefs.
   (* [sie_cap] -- the kernel-code capability that EXPOSES the SIE mode as
      its index [b], backed by the ghost QUARTER's value (agreement with
      [sconf]'s tied half pins the live bit).  It owns ALL the free stack
-     below the CURRENT sp -- [kv_frame_slots + avail] slots, factored OUT
-     of the arm and held at BOTH indices (harmless: the ABI never writes
-     below sp).  [avail] is the number of slots AVAILABLE to kernel code;
-     the other [kv_frame_slots] are reserved for a potential interrupt
-     frame.  An sp DECREMENT by k slots consumes k from [avail] (k <=
+     below the CURRENT sp -- [trap_res b + avail] slots.  [avail] is the
+     number of slots AVAILABLE to kernel code; the extra [trap_res b] are
+     reserved for a potential interrupt frame, and that reserve is
+     ARM-DEPENDENT ([kv_frame_slots] at b = true, NOTHING at b = false):
+     only code that can be trapped pays it.  See [trap_res] for why an
+     arm-blind reserve is not merely wasteful but UNSATISFIABLE, and why
+     the summand must stay on the LEFT.
+     An sp DECREMENT by k slots consumes k from [avail] (k <=
      avail -- you cannot go below zero) and hands the freed frame region
      [sp', sp) to the client ([sie_cap_push]); an sp INCREMENT feeds the
      frame back and returns k to [avail] ([sie_cap_pop]).  The [b = true]
@@ -1193,7 +1261,7 @@ Section IntrDefs.
 
   Definition sie_cap (m : regfile) (avail : nat) (b : bool)
       (p : mword 64) : iProp Σ :=
-    (stack_own (m !!! Regidx csp_rs1) (kv_frame_slots + avail) ∗
+    (stack_own (m !!! Regidx csp_rs1) (trap_res b + avail) ∗
      strans_inv ∗
      sie_arm b p)%I.
 
@@ -1449,9 +1517,17 @@ Section IntrDefs.
      kernel page table, an interrupt handler, or the trap CSRs: this is
      what makes the whole sconf-tier (memset, the lock/kalloc cone via
      [cpu_own γ 0 false p C], ...) callable during early boot. *)
+  (* THE STACK PREMISE IS PLAIN [avail], NOT [kv_frame_slots + avail]: this
+     produces the capability at [b = false], which by [trap_res_off] owes NO
+     trap reserve.  A boot caller physically holding [kv_frame_slots + K]
+     slots below sp therefore instantiates this at [avail := kv_frame_slots
+     + K] and gets the capability AT THAT INDEX -- which is the honest
+     accounting (BootBridge.v does exactly that).  Instantiating at [K] and
+     dropping the deeper 78 would compile too, and would leave [main] unable
+     to ever fund a trap. *)
   Lemma sie_cap_intro_bare (m : regfile) (avail : nat)
       (v : mword 64) {p : mword 64} :
-    stack_own (m !!! Regidx csp_rs1) (kv_frame_slots + avail) -∗
+    stack_own (m !!! Regidx csp_rs1) avail -∗
     strans_bit ('b"0") -∗
     bare_inv -∗
     stvec ↦ᵣ v -∗
@@ -1596,20 +1672,14 @@ Section IntrDefs.
     iApply (sie_cap_gpr_join with "Hhs Hsc Hcap Hfile").
   Qed.
 
-  (* the funnel's accessor: split off the exact reserved carve (the
-     [intr_frame] stack conjunct); the deep [avail] slots ride outside. *)
-  Lemma sie_cap_acc
-      (m : regfile) (avail : nat) (b : bool) (p : mword 64) :
-    sie_cap m avail b p ⊣⊢
-    stack_own (m !!! Regidx csp_rs1) kv_frame_slots ∗
-    stack_own (pa_stk (m !!! Regidx csp_rs1) kv_frame_slots) avail ∗
-    strans_inv ∗
-    sie_arm b p.
-  Proof.
-    rewrite /sie_cap stack_own_app. iSplit.
-    - iIntros "[[Hkv Hdeep] [Htr Harm]]". iFrame.
-    - iIntros "(Hkv & Hdeep & Htr & Harm)". iFrame.
-  Qed.
+  (* NOTE there is no reserve-PEELING accessor here any more.  The old
+     [sie_cap_acc] split the arm-blind carve into [kv_frame_slots] (to feed
+     [intr_frame]) plus the deep [avail], and with the reserve now
+     arm-dependent that split is exactly what the trap must NOT do: at
+     [b = true] the capability's carve is ALREADY [kv_frame_slots + avail]
+     and the handover is a pure re-indexing to [sie_cap m (kv_frame_slots +
+     avail) false p], leaving the stack conjunct untouched (property 2 at
+     [trap_res]).  It had no users. *)
 
   (* [sie_cap] depends on [m] only through sp (same as [intr_frame]). *)
   Lemma sie_cap_retarget
@@ -1633,8 +1703,10 @@ Section IntrDefs.
     sie_cap m' (avail - k) b p ∗ stack_own (m !!! Regidx csp_rs1) k.
   Proof.
     iIntros (Hk Hsp') "(Hstk & Htr & Harm)". iFrame "Htr Harm".
-    replace (kv_frame_slots + avail)%nat
-      with (k + (kv_frame_slots + (avail - k)))%nat by lia.
+    (* [trap_res b] is an OPAQUE [nat] atom here -- [lia] carries it through
+       untouched, which is why the premise [k <= avail] does not move. *)
+    replace (trap_res b + avail)%nat
+      with (k + (trap_res b + (avail - k)))%nat by lia.
     iDestruct (stack_own_app with "Hstk") as "[Htop Hrest]".
     iFrame "Htop". rewrite Hsp'. iExact "Hrest".
   Qed.
@@ -1650,8 +1722,8 @@ Section IntrDefs.
     sie_cap m' (avail + k) b p.
   Proof.
     iIntros (Hsp) "Hframe (Hstk & Htr & Harm)". iFrame "Htr Harm".
-    replace (kv_frame_slots + (avail + k))%nat
-      with (k + (kv_frame_slots + avail))%nat by lia.
+    replace (trap_res b + (avail + k))%nat
+      with (k + (trap_res b + avail))%nat by lia.
     iApply stack_own_app. iFrame "Hframe". rewrite -Hsp. iExact "Hstk".
   Qed.
 
@@ -1659,7 +1731,7 @@ Section IntrDefs.
      slots below the owned region into [avail]... *)
   Lemma sie_cap_grow
       (m : regfile) (avail k : nat) (b : bool) {p : mword 64} :
-    stack_own (pa_stk (m !!! Regidx csp_rs1) (kv_frame_slots + avail)) k -∗
+    stack_own (pa_stk (m !!! Regidx csp_rs1) (trap_res b + avail)) k -∗
     sie_cap m avail b p -∗
     sie_cap m (avail + k) b p.
   Proof.
@@ -1673,11 +1745,11 @@ Section IntrDefs.
     (k <= avail)%nat ->
     sie_cap m avail b p -∗
     sie_cap m (avail - k) b p ∗
-    stack_own (pa_stk (m !!! Regidx csp_rs1) (kv_frame_slots + (avail - k))) k.
+    stack_own (pa_stk (m !!! Regidx csp_rs1) (trap_res b + (avail - k))) k.
   Proof.
     iIntros (Hk) "(Hstk & Htr & Harm)". iFrame "Htr Harm".
-    replace (kv_frame_slots + avail)%nat
-      with ((kv_frame_slots + (avail - k)) + k)%nat by lia.
+    replace (trap_res b + avail)%nat
+      with ((trap_res b + (avail - k)) + k)%nat by lia.
     iDestruct (stack_own_app with "Hstk") as "[Htop Hdeep]".
     iFrame "Htop Hdeep".
   Qed.

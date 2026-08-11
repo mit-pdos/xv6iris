@@ -80,8 +80,12 @@ Require Import SpecMain.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
 
-(* the secondary arm's stack budget: see the header *)
-Definition K_main_secondary : nat := 40%nat.
+(* the secondary arm's stack budget: see the header.  Like [SpecMain.K_main]
+   this is set by the SCHEDULER's trap reserve rather than by the arm's own
+   cone (38 slots below a 2-slot frame): the secondary hart also ends in
+   [jal scheduler], whose loop-head enable must fund [kv_frame_slots] out of
+   what it is given, i.e. [2 + kv_frame_slots + 20 = 100]. *)
+Definition K_main_secondary : nat := 100%nat.
 
 Section SpecMainSecondary.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.

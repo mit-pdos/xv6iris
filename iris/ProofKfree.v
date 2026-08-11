@@ -529,7 +529,7 @@ Section ProofKfree.
     iPoseProof (kfi_44 with "Htext") as "Hi44".
     (* +0x44 ld a5,24(s2) : a5 := head *)
     iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.kfree + 0x44)) (mword_of_int 15 : mword 5) (mword_of_int 18 : mword 5) (mword_of_int 0x18 : mword 12)
-              macq (K - 4)%nat head false ltac:(vm_compute; discriminate) ltac:(rdok)
+              macq (trap_res b + (K - 4))%nat head false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi44 [Hflw] [-]").
               iClear "Hi44".
     { iEval (rewrite -Hldaddr) in "Hflw". rewrite /word_at. iExact "Hflw". }
@@ -555,7 +555,7 @@ Section ProofKfree.
       rewrite HRlds1. apply kv_addv_zero. }
     iPoseProof (kfi_48 with "Htext") as "Hi48".
     iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.kfree + 0x48)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")))
-              Rld (K - 4)%nat wold false with "Hcg Hpc Hi48 [Hpw] [-]").
+              Rld (trap_res b + (K - 4))%nat wold false with "Hcg Hpc Hi48 [Hpw] [-]").
               iClear "Hi48".
     { iEval (rewrite -Hsdaddr) in "Hpw". rewrite /word_at. iExact "Hpw". }
     iApply wp_next_off_intro.
@@ -572,7 +572,7 @@ Section ProofKfree.
     { rewrite HRlds2 Hfl. apply bv_eq; vm_compute; reflexivity. }
     iPoseProof (kfi_4a with "Htext") as "Hi4a".
     iApply (wp_sd_s_sconf (mword_of_int (KernelSyms.kfree + 0x4a)) (mword_of_int 9 : mword 5) (mword_of_int 18 : mword 5) (mword_of_int 0x18 : mword 12)
-              Rld (K - 4)%nat head false with "Hcg Hpc Hi4a [Hflw] [-]").
+              Rld (trap_res b + (K - 4))%nat head false with "Hcg Hpc Hi4a [Hflw] [-]").
               iClear "Hi4a".
     { iEval (rewrite -Hsdaddr2) in "Hflw". rewrite /word_at. iExact "Hflw". }
     iApply wp_next_off_intro.
@@ -590,7 +590,7 @@ Section ProofKfree.
     (* ===== RELEASE setup + call (intr_count S n -> n, deep-10 lent) ===== *)
     (* +0x4e c.mv a0,s2 : a0 := &kmem *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.kfree + 0x4e)) (mword_of_int 10 : mword 5) (mword_of_int 18 : mword 5)
-              Rld (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              Rld (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi4e [-]").
               iClear "Hi4e".
     iApply wp_next_off_intro.
@@ -602,7 +602,7 @@ Section ProofKfree.
     iPoseProof (kfi_50 with "Htext") as "Hi50".
     (* +0x50 jal ra,release *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.kfree + 0x50)) (mword_of_int 1 : mword 5) (mword_of_int 0x1fa : mword 21)
-              Rae (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
+              Rae (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi50 [-]").
               iClear "Hi50".
     iApply wp_next_off_intro.
@@ -621,6 +621,12 @@ Section ProofKfree.
       rewrite /Rae upd_eq. rewrite HRlds2. apply add_vec_zero_l. }
     assert (HRrelra : Rrel !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.kfree + 0x50) : mword 64) 4)
       by (rewrite /Rrel; apply upd_eq).
+    (* the acquire handed the window index out as [trap_res b + N]; release
+       wants it as [trap_res outb + N] with [outb = match n with O => eb
+       | S _ => false end].  Those are the same bool -- [cpu_own] forces
+       it -- so this is a pure re-spelling, and it is what makes the
+       acquire/release pair compose back to [N]. *)
+    iEval (rewrite Hbmatch) in "Hcg".
     iApply (Release.wp_release_sconf γl lk "kmem"%string (kmem_res γk fl) Rrel
               n eb pcur C (K - 4)%nat
               ltac:(rewrite HRrela0 Hlk; apply bv_eq; vm_compute; reflexivity)

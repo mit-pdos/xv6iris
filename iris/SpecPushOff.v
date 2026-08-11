@@ -36,7 +36,29 @@ Import Defs.
    exactly the [cpu_own (S n) eb p C false] and the [trap_csrs_pay n eb]
    ([= trap_csrs] at the only index reachable from [b = true], n = 0 and
    eb = true) below.  At [b = false] nothing moves and the statement reads
-   exactly as it always did. *)
+   exactly as it always did.
+
+   AND IT IS THE SEAM AT WHICH THE STACK INDEX MOVES.  [IntrDefs.sie_cap m
+   avail b p] owns [trap_res b + avail] free slots below sp -- [avail] usable
+   by kernel code plus an ARM-DEPENDENT trap reserve ([kv_frame_slots] at
+   [b = true], nothing at [b = false]; see [IntrDefs.trap_res] for why an
+   arm-blind reserve is unsatisfiable).  Stack slots are not persistent, so the
+   TOTAL carve is CONSERVED across the flip, and the reserve therefore moves
+   INTO the usable count when interrupts go off:
+
+     ENTRY  [sie_cap_gpr m av b p]                      carve [trap_res b + av]
+     EXIT   [sie_cap_gpr mfin (trap_res b + av) false p]
+                                                        carve [trap_res b + av]
+
+   -- the SAME proposition on both sides, a pure re-indexing and never a split.
+   The [kv_frame_slots] an enabled caller was holding in reserve become
+   ORDINARY USABLE STACK for the interrupts-off window, which is exactly right:
+   nothing can trap in that window, so nothing needs a reserve there.  At
+   [b = false] the exit index is [trap_res false + av], DEFINITIONALLY [av], so
+   every interrupts-off caller reads verbatim as it always did.
+
+   [6 <= av] does NOT move: [av] is still the ENTRY usable count, which is what
+   push_off's own 4-slot frame and the mycpu() call come out of. *)
 Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat)
     (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) :=
   (* push_off's mstatus0-dependent register chain N2..N8 + storeval32 (which
@@ -55,7 +77,9 @@ Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID 
   wp_next b p (fun (CID : CpuId) =>
     ∀ (ms : mword 64) (mfin : regfile),
     ⌜ sconf_ms_facts ms ⌝ -∗
-    sie_cap_gpr mfin av false p -∗
+    (* [trap_res b + av], not [av]: see the header -- the flip conserves the
+       carve, so the reserve the entry arm was holding is usable stack now. *)
+    sie_cap_gpr mfin (trap_res b + av)%nat false p -∗
     cpu_own (S n) eb p C false -∗
     arm_pay n eb p -∗
     pc_is caller_ret -∗
@@ -81,7 +105,28 @@ Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID 
    [sie_arm true p] via [sie_arm_on_in].  That is why the exit [cpu_own] is
    indexed by [bexit] rather than [false]: at [bexit = true] the caller keeps
    only its frame [C] and the pure fact, and reaches the cells through the
-   bundle, at whatever hart it resumes on. *)
+   bundle, at whatever hart it resumes on.
+
+   AND IT IS THE OTHER HALF OF THE INDEX SEAM, so [av] HERE IS THE EXIT USABLE
+   COUNT and the entry index is [trap_res bexit + av].  Re-enabling interrupts
+   must PUT THE TRAP RESERVE BACK, and it comes out of the caller's own usable
+   slots -- the very ones push_off freed for it:
+
+     ENTRY  [sie_cap_gpr m (trap_res bexit + av) false p]
+                                                    carve [trap_res bexit + av]
+     EXIT   [sie_cap_gpr mf av bexit p]             carve [trap_res bexit + av]
+
+   Naming the ENTRY index as the sum (rather than the exit index as a
+   difference) is what makes the pair compose SYNTACTICALLY and makes the
+   [kv_frame_slots <= _] side condition disappear: a caller that reached here
+   through push_off/acquire is holding [trap_res b + N] with [b = bexit] forced
+   by [cpu_own] (see [CpuOwn.cpu_own_eb_agree]), so it hands in an index that is
+   ALREADY of this form, gets [N] back, and the balanced pair is the identity on
+   the index with no arithmetic anywhere.  Spelled the other way round the exit
+   index would read [av - kv_frame_slots] and every caller would owe a bound.
+
+   [4 <= av] does NOT move even though [av] changed meaning: pop_off's own
+   4-slot frame comes out of the ENTRY count [trap_res bexit + av >= av]. *)
 Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat)
     (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pop_off in
@@ -91,7 +136,7 @@ Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
      facts of [cpu_own]: the level is S n > 0, SIE is pinned '0' by the count
      eighth, and the final pop's re-enable branch reads intena = [eb]. *)
   (4 <= av)%nat ->
-  sie_cap_gpr m av false p -∗
+  sie_cap_gpr m (trap_res bexit + av)%nat false p -∗
   cpu_own (S n) eb p C false -∗
   arm_pay n eb p -∗
   kernel_text -∗ pc_is pcE -∗

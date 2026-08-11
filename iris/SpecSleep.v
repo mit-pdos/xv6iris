@@ -76,7 +76,16 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
   γs !! j = Some γl ->
   add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
   eb = true ->
-  (22 <= av)%nat ->
+  (* [kv_frame_slots + 22], NOT [22].  sleep is entered at level 1 with an
+     ENABLED base, so its release(&p->lock) pops to level 0 with [intena] and
+     RE-ENABLES interrupts -- at a point where nobody is holding the trap
+     reserve.  Like the scheduler's inlined intr_on(), it must therefore fund
+     [kv_frame_slots] out of its own budget.  Entry and exit indices do NOT
+     move (they are still [av] at arm [false]); only the stretch between that
+     release and the re-acquire of lk runs at the reduced count, so this is
+     the only premise that changes.  Free at every call site: they all pass
+     [av := trap_res true + (K - k)]. *)
+  (kv_frame_slots + 22 <= av)%nat ->
   (* TWO INDICES, AND THEY ARE OPPOSITE CONSTANTS (porting guide, "A PARKING
      function's [wp_next] index is [true] UNCONDITIONALLY").  sleep runs at
      noff = 1, so [cpu_own 1 eb pj C b] forces the RESOURCE index to [false]:
@@ -238,7 +247,16 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   γs !! j = Some γl ->
   add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
   eb = true ->
-  (22 <= av)%nat ->
+  (* [kv_frame_slots + 22], NOT [22].  sleep is entered at level 1 with an
+     ENABLED base, so its release(&p->lock) pops to level 0 with [intena] and
+     RE-ENABLES interrupts -- at a point where nobody is holding the trap
+     reserve.  Like the scheduler's inlined intr_on(), it must therefore fund
+     [kv_frame_slots] out of its own budget.  Entry and exit indices do NOT
+     move (they are still [av] at arm [false]); only the stretch between that
+     release and the re-acquire of lk runs at the reduced count, so this is
+     the only premise that changes.  Free at every call site: they all pass
+     [av := trap_res true + (K - k)]. *)
+  (kv_frame_slots + 22 <= av)%nat ->
   (* the three refutations of the dead state.  The two token refutations are
      needed at EVERY hart: the interior release runs on the parking hart, the
      re-acquire on the dispatching one. *)

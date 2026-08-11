@@ -319,7 +319,7 @@ Section ProofFiledup.
     { rewrite (rget_ne macq Rs1 ltac:(vm_compute; discriminate)) Hms1. reflexivity. }
     iEval (rewrite -Hpa) in "Hcell".
     iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.filedup + 0x18)) Ra5 Rs1 (mword_of_int 4 : mword 12)
-              macq (K - 4)%nat (mword_of_int (Z.pos cnt) : mword 32) false
+              macq (trap_res b + (K - 4))%nat (mword_of_int (Z.pos cnt) : mword 32) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 Hcell [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell".
@@ -335,7 +335,7 @@ Section ProofFiledup.
     iEval (rewrite Hpp1a) in "Hpc".
     (* +0x1a bge x0,a5 -- the panic arm, NOT taken *)
     iApply (wp_bge_x0_fall_s_sconf (mword_of_int (KernelSyms.filedup + 0x1a)) (mword_of_int 32 : mword 13)
-              Ra5 D1 (K - 4)%nat false ltac:(vm_compute; discriminate)
+              Ra5 D1 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate)
               ltac:(rgne; rewrite HD1a5; apply fref_word_spos; exact Hcnt)
               with "Hcg Hpc Hi1a [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -344,7 +344,7 @@ Section ProofFiledup.
     iEval (rewrite Hpp1e) in "Hpc".
     (* +0x1e c.addiw a5,a5,1 *)
     iApply (wp_caddiw_s_sconf (mword_of_int (KernelSyms.filedup + 0x1e)) Ra5 (mword_of_int 1 : mword 6)
-              D1 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              D1 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
@@ -363,7 +363,7 @@ Section ProofFiledup.
     { rewrite (rget_ne D2 Rs1 ltac:(vm_compute; discriminate)) HD2s1. reflexivity. }
     iEval (rewrite -Hpa2) in "Hcell".
     iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.filedup + 0x20)) Ra5 Rs1 (mword_of_int 4 : mword 12)
-              D2 (K - 4)%nat (mword_of_int (Z.pos cnt) : mword 32) false
+              D2 (trap_res b + (K - 4))%nat (mword_of_int (Z.pos cnt) : mword 32) false
               with "Hcg Hpc Hi20 Hcell [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell".
     iEval (rewrite Hpa2) in "Hcell".
@@ -391,7 +391,7 @@ Section ProofFiledup.
     iEval (rewrite Hpp22) in "Hpc".
     (* +0x22/+0x26 a0 := &ftable ; +0x2a jal release *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.filedup + 0x22)) Ra0 (mword_of_int 0x1e : mword 20)
-              D2 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              D2 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi22 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (D3 := <[Regidx Ra0 := regval_into_reg
@@ -401,7 +401,7 @@ Section ProofFiledup.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp26) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.filedup + 0x26)) Ra0 Ra0 (mword_of_int 0x414 : mword 12)
-              D3 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              D3 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi26 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
@@ -414,7 +414,7 @@ Section ProofFiledup.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp2a) in "Hpc".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.filedup + 0x2a)) Rra (mword_of_int 0x1fcc3c : mword 21)
-              D4 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              D4 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi2a [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (D5 := <[Regidx Rra := regval_into_reg
@@ -444,6 +444,12 @@ Section ProofFiledup.
       by (rewrite /D5; apply upd_eq).
     (* ===== +0x2a lands us in release; let filedup's own derived index
        [Houtb] absorb release's [outb]. ===== *)
+    (* the acquire handed the window index out as [trap_res b + N]; release
+       wants it as [trap_res outb + N] with [outb = match n with O => eb
+       | S _ => false end].  Those are the same bool -- [cpu_own] forces
+       it -- so this is a pure re-spelling, and it is what makes the
+       acquire/release pair compose back to [N]. *)
+    iEval (rewrite Houtb) in "Hcg".
     iApply (Release.wp_release_sconf γl ftable_addr "ftable"%string (ftable_res γf) D5
               n eb p C (K - 4)%nat
               ltac:(rewrite HD5a0; apply bv_eq; vm_compute; reflexivity)

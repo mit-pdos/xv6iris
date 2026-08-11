@@ -445,7 +445,7 @@ Section ProofBunpin.
       rewrite /brefcnt /bpa /pa_add /add_vec_int. reflexivity. }
     iEval (rewrite -Hpa) in "Hcell".
     iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.bunpin + 0x18)) Ra5 Rs1 (mword_of_int 64 : mword 12)
-              macq (K - 4)%nat (cw : mword 32) false
+              macq (trap_res b + (K - 4))%nat (cw : mword 32) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 Hcell [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell".
@@ -460,7 +460,7 @@ Section ProofBunpin.
     iEval (rewrite Hpp1a) in "Hpc".
     (* +0x1a c.addiw a5,a5,-1 *)
     iApply (wp_caddiw_s_sconf (mword_of_int (KernelSyms.bunpin + 0x1a)) Ra5 (mword_of_int 63 : mword 6)
-              D1 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              D1 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1a [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
@@ -480,7 +480,7 @@ Section ProofBunpin.
       rewrite /brefcnt /bpa /pa_add /add_vec_int. reflexivity. }
     iEval (rewrite -Hpa2) in "Hcell".
     iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.bunpin + 0x1c)) Ra5 Rs1 (mword_of_int 64 : mword 12)
-              D2 (K - 4)%nat (cw : mword 32) false
+              D2 (trap_res b + (K - 4))%nat (cw : mword 32) false
               with "Hcg Hpc Hi1c Hcell [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell".
     iEval (rewrite Hpa2) in "Hcell".
@@ -494,7 +494,7 @@ Section ProofBunpin.
     iEval (rewrite Hpp1e) in "Hpc".
     (* +0x1e/+0x22 a0 := &bcache ; +0x26 jal release *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.bunpin + 0x1e)) Ra0 (mword_of_int 0x15 : mword 20)
-              D2 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              D2 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (D3 := <[Regidx Ra0 := regval_into_reg
@@ -504,7 +504,7 @@ Section ProofBunpin.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp22) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.bunpin + 0x22)) Ra0 Ra0 (mword_of_int 0x46e : mword 12)
-              D3 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              D3 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi22 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
@@ -517,7 +517,7 @@ Section ProofBunpin.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp26) in "Hpc".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bunpin + 0x26)) Rra (mword_of_int 0x1fdf66 : mword 21)
-              D4 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              D4 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi26 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (D5 := <[Regidx Rra := regval_into_reg
@@ -543,6 +543,12 @@ Section ProofBunpin.
       by (rewrite /D5; apply upd_eq).
     (* ===== +0x26 lands us in release; bunpin's own derived index [Houtb]
        absorbs release's [outb]. ===== *)
+    (* the acquire handed the window index out as [trap_res b + N]; release
+       wants it as [trap_res outb + N] with [outb = match n with O => eb
+       | S _ => false end].  Those are the same bool -- [cpu_own] forces
+       it -- so this is a pure re-spelling, and it is what makes the
+       acquire/release pair compose back to [N]. *)
+    iEval (rewrite Houtb) in "Hcg".
     iApply (Release.wp_release_sconf (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) D5
               n eb p C (K - 4)%nat
               ltac:(rewrite HD5a0; apply bv_eq; vm_compute; reflexivity)

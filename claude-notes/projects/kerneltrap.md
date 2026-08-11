@@ -418,16 +418,70 @@ alternatives:
   cone — is unchanged as written, and `iExact`/`iFrame` see through the index.
   Writing `avail + trap_res b` instead would leave `av + 0` stuck against `av`
   at thousands of sites.
-- **No `K ≤ n` premise moves and no constant is retuned.**  The sp movers
-  (`_push`/`_pop`/`_grow`/`_shrink`/`_retarget`) keep their premises verbatim;
-  `trap_res b` is an opaque `nat` atom that `lia` carries through
-  `trap_res b + avail = k + (trap_res b + (avail - k))`.  What DOES change is
-  the avail INDEX at the six unbalanced seams — `push_off`/`acquire` exit at
-  `trap_res b + av`, `pop_off`/`release` enter there and exit at `av` — which
-  is exactly what makes a balanced push/pop pair compose back to `av`
-  syntactically, so no balanced caller changes at all.  `sie_cap_acc` (the old
+- **No `K ≤ n` premise moves on the sp movers.**  `_push`/`_pop`/`_grow`/
+  `_shrink`/`_retarget` keep their premises verbatim; `trap_res b` is an opaque
+  `nat` atom that `lia` carries through
+  `trap_res b + avail = k + (trap_res b + (avail - k))`.  `sie_cap_acc` (the old
   reserve-peeling accessor) has no remaining user and goes away with
   `intr_frame`.
+
+**CORRECTION, measured: "no balanced caller changes at all" IS FALSE, and the
+freed reserve must ride `arm_pay`.**  The first draft of this section reasoned
+that since a balanced `push_off`/`pop_off` pair composes back to `av`, only the
+unbalanced seams move.  A balanced pair *does* compose — but **the WINDOW
+BETWEEN them runs at `trap_res b + av`**, and callers at a generic `b` (the
+norm) spell that window's index explicitly.  Cost of routing it through the
+index: **484 in-lock index occurrences across 36 `Proof*.v` files**
+(`ProofPipewrite` 56, `ProofScheduler` 29, `ProofFilealloc` 26, …), each
+needing its arithmetic re-verified.  Two premises also move that the draft said
+would not: the three `sp_bounds` helpers need `(0 < k)` (`stack_own_sp_bounds`
+needs a nonempty carve, and the arm-blind 78 used to cover that at either arm —
+which is precisely why it needed no premise before), and `SpecScheduler`'s
+`20 ≤ av` becomes `kv_frame_slots + 20 ≤ av`, since its inlined `intr_on` is the
+one place that enables interrupts where nobody holds the reserve.
+
+**DECIDED — AND THEN REVERSED, on a design argument that outranks the cost.
+The reserve rides the INDEX: `N -> N+K` on disable, `M -> M-K` on enable with
+`M >= K`.**  The cheaper route below was adopted first and is wrong, for a
+reason worth keeping: **inside the trap handler those `kv_frame_slots` slots ARE
+its ordinary working stack.**  kernelvec pushes its 32-slot frame and kerneltrap
+its 6-slot frame into them with the normal sp movers.  If they arrive as a
+separate `stack_own` conjunct in a handover token, the handler must splice that
+conjunct into its capability by hand before the standard machinery applies — so
+stack use inside the handler looks DIFFERENT from stack use everywhere else.
+That is precisely the bespoke surgery the arm-dependent carve exists to
+eliminate (see the first bullet above: the trap's handover should be a pure
+re-indexing of the same `stack_own`, so the handler gets a standard bundle).
+Paying ~484 mechanical index rewrites to keep ONE uniform notion of usable
+stack is the right trade; the guiding principle is explicit that a clean
+interface beats the effort of reaching it.
+
+The rejected-but-instructive alternative, recorded because it is the obvious
+first idea: **carry the freed reserve in `arm_pay`.**
+`arm_pay n eb p` is already the carrier that crosses exactly this seam — it is
+what `push_off` hands out when it dismantles the arm and what `pop_off` takes
+back, non-`emp` only at level 0 with an enabled base — and it is already
+threaded opaquely as `Hpay` through all 105 acquire/release sites.  So
+`sie_cap`'s definition stays exactly as above, every in-lock index stays at
+`av`, and the flip hands the difference over as a deep-end `stack_own` conjunct
+of `arm_pay` instead of re-indexing.  Verified prerequisite: every call site
+passes `acquire` and `release` the SAME `av` at the same sp (`ProofKfree`
+`(K-4)` both, `ProofSleep` `(av-6)` both), so the conjunct would have ridden
+for free — roughly one rewrite per site against 484.  Cheaper, and rejected
+anyway on the uniformity argument above.
+
+The four arm-FLIP leaves in `WpSconfCsr.v` (`wp_csrci_sstatus_s_sconf`,
+`wp_csrsi_sstatus_x0_s_sconf`, `wp_csrsi_sstatus_x0_enable_s_sconf`,
+`wp_csrci_sstatus_x0_s_sconf`) are **a member of the arm-blind class that the
+enumerated list missed**, and the interesting one: they are the only
+instructions that move the arm, hence the only ones where the reserve appears
+or disappears.  They are proved on branch `trap-res` (`57b6fab7`) at the
+carve-CONSERVING indices under a uniform rule — *a leaf moving the arm
+`b0 → b1` has pre index `trap_res b1 + n` and post index `trap_res b0 + n`*, so
+both sides carve the identical `trap_res b0 + (trap_res b1 + n)` and `iExact` on
+the untouched `Hstk` closes it with no split and no `≤` premise.  Those proofs
+are reusable under the `arm_pay` route (the reserve becomes a raw conjunct
+rather than an index).
 
 Rejected alternatives, both isomorphic to this one under
 `avail ↦ avail - trap_res b` but worse at the seams: (a) carve `= avail` with a

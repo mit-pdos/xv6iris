@@ -149,6 +149,35 @@ Lemma sl_sleeping :
   = (mword_of_int 2 : mword 32).
 Proof. vm_compute. reflexivity. Qed.
 
+(* ===================================================================== *)
+(* THE ONE PLACE sleep's INDEX MOVES: THE LEVEL-0 STRETCH.                *)
+(*                                                                        *)
+(* sleep is entered at noff = 1 with the caller's condition lock held, and *)
+(* is required to be entered with an ENABLED base ([eb = true]).  Its      *)
+(* release(&p->lock) therefore pops to level 0 WITH [intena], i.e. it      *)
+(* RE-ENABLES interrupts -- and it does so at a point where nobody is      *)
+(* holding the trap reserve, so sleep must fund [kv_frame_slots] out of    *)
+(* its own budget, exactly like the scheduler's inlined intr_on().         *)
+(*                                                                        *)
+(* Everything else is balanced and stays at sleep's own indices: entry and *)
+(* exit at [av], the whole body inside the 6-slot frame at [av - 6].  Only *)
+(* the stretch release(&p->lock) .. acquire(lk) -- which runs at level 0   *)
+(* with the arm at [true] -- is at the REDUCED index                       *)
+(* [av - 6 - kv_frame_slots], and the release/acquire pair is what moves   *)
+(* between the two spellings.  The physical carve never changes: at arm    *)
+(* [false] the index [av - 6] IS the carve, and at arm [true] the carve is *)
+(* [trap_res true + (av - 6 - kv_frame_slots)] -- the same number.  This   *)
+(* lemma is that identity, and it is the ONLY arithmetic the reshape needs.*)
+(* It is also why [SpecSleep]'s premise is [kv_frame_slots + 22 <= av] and *)
+(* not [22 <= av]: without the 78 there is nothing to carve out.           *)
+(* ===================================================================== *)
+Lemma sl_carve (av : nat) :
+  (kv_frame_slots + 22 <= av)%nat ->
+  (av - 6)%nat = (trap_res true + (av - 6 - kv_frame_slots))%nat.
+Proof.
+  intros Hav. change (trap_res true) with kv_frame_slots. lia.
+Qed.
+
 (* p->lock is a STATIC kernel lock, so its two call sites take the plain
    [Acquire] / [Release]; only the caller's CONDITION lock lk goes through
    [AcquireGen] / [ReleaseGen].  Both flavours are parameters -- see the
@@ -182,7 +211,8 @@ Section SleepPostSched.
       (m msch : regfile) (av : nat) (C : iProp Σ)
       (sp0 spd vgap : mword 64) :
     let pj := proc_addr j in
-    (22 <= av)%nat ->
+    (* [kv_frame_slots + 22], see [sl_carve]: the release below re-enables. *)
+    (kv_frame_slots + 22 <= av)%nat ->
     (j < NPROC)%nat ->
     add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) = spd ->
     sp0 = m !!! Regidx csp_rs1 ->
@@ -333,8 +363,17 @@ Section SleepPostSched.
     iAssert (proc_lock_res γs γl (proc_addr j)) with "[Hstate Hpg Hchan Hpub Hown' Htaga Hvc']" as "HR2".
     { rewrite /proc_lock_res. iExists RUNNING, (zero_reg : mword 64). iFrame "Hstate Hpg Hchan Hpub".
       iApply (proc_slots_running_intro γs j cpu_id Hjn with "Htaga Hown' Hvc'"). }
+    (* THE RE-ENABLING RELEASE.  Popping to level 0 with [intena] turns
+       interrupts back on, so from here to the re-acquire the arm is [true]
+       and [kv_frame_slots] of the budget is the trap reserve rather than
+       usable stack.  [sl_carve] re-spells [Hcg]'s [av - 6] as
+       [trap_res true + (av - 6 - kv_frame_slots)], which is the shape
+       release's entry index demands at [outb = true]; its exit -- the
+       level-0 usable count -- is that reduced index. *)
+    iEval (rewrite (sl_carve av Hav)) in "Hcg".
     iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) E1 0 true (proc_addr j) C (av - 6)%nat
+              (proc_lock_res γs γl (proc_addr j)) E1 0 true (proc_addr j) C
+              (av - 6 - kv_frame_slots)%nat
               Hlka_r2
               ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu [Htc Hclm Htagb] [-]").
@@ -355,7 +394,7 @@ Section SleepPostSched.
     (* +0x38 c.mv a0,s2 *)
     iPoseProof (sli_38 with "Htext") as "Hi38".
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.sleep + 0x38)) (mword_of_int 10 : mword 5) (mword_of_int 18 : mword 5)
-              mrel2 (av - 6)%nat true ltac:(vm_compute; discriminate) ltac:(rdok)
+              mrel2 (av - 6 - kv_frame_slots)%nat true ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi38 [-]").
     iIntros (CID2 Hs2) "Hcg Hpc".
     iEval (rgne) in "Hcg".
@@ -368,7 +407,7 @@ Section SleepPostSched.
     (* +0x3a jal acquire *)
     iPoseProof (sli_3a with "Htext") as "Hi3a".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sleep + 0x3a)) (mword_of_int 1 : mword 5) (mword_of_int 2092222 : mword 21)
-              F0 (av - 6)%nat true ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
+              F0 (av - 6 - kv_frame_slots)%nat true ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi3a [-]").
     iIntros (CID3 Hs3) "Hcg Hpc".
     set (F1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.sleep + 0x3a) : mword 64) 4)]> F0).
@@ -389,13 +428,19 @@ Section SleepPostSched.
     iDestruct (cpu_own_transport CID1 CID3 0 true pj C true ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     (* the parked credential "HTk" is presented here, and handed back. *)
-    iApply (AcquireGen.wp_acquire_gen_sconf γk Rk Tk Dk F1 0 true (proc_addr j) C (av - 6)%nat true
+    iApply (AcquireGen.wp_acquire_gen_sconf γk Rk Tk Dk F1 0 true (proc_addr j) C
+              (av - 6 - kv_frame_slots)%nat true
               ltac:(lia)
               ltac:(lia)
               HrefT HrefLkp
               with "Hcg Hcpu Htext Hpc [Hkopen] HTk Hpanicany [-]").
     { iEval (rewrite Hislk_f). iExact "Hkopen". }
     iIntros (CID4 Hs4 ms3 macq2) "%Hmsf3 HTk Hcg Hpc %Hcs_acq2 Hklocked HRk Hcpu Hpay0'".
+    (* the re-acquire's push_off disables again and folds the reserve back
+       into the usable count -- [trap_res true + (av - 6 - kv_frame_slots)],
+       which [sl_carve] says IS [av - 6].  The epilogue below is written at
+       that spelling, so undo the re-spelling here. *)
+    iEval (rewrite -(sl_carve av Hav)) in "Hcg".
     assert (Hpc3e : ret_pc (F1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.sleep + 0x3e)) by (rewrite HF1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc3e) in "Hpc".

@@ -117,9 +117,17 @@ Section KforkB1Proof.
       (V : pprivate) (pid : mword 32) (P : uptd) (ws : list (mword 64))
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s50 : mword 64)
-      (pme : mword 64) (eb : bool) (C : iProp Σ) (lvl : nat) :
+      (pme : mword 64) (eb b : bool) (C : iProp Σ) (lvl : nat) :
     (52 <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
+    (* The EXIT arm, named.  This block is entered with np->lock HELD, so its
+       entry index has to carry the trap reserve OF THE ARM IT WILL RETURN AT
+       -- and that arm is the release's [match lvl with O => eb | S _ => false
+       end].  Naming it [b] keeps the ~5 in-lock indices below readable; the
+       one place the spec's own spelling is needed is the [release] call, where
+       [rewrite -Hb] restores it.  ([kfk_b5] carries the same parameter for the
+       same reason.) *)
+    match lvl with O => eb | S _ => false end = b ->
     m !!! Regidx csp_rs1 = sp0 ->
     m !!! Regidx Rra = ra0 ->
     m !!! Regidx Rs0 = s00 ->
@@ -137,7 +145,11 @@ Section KforkB1Proof.
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs4 -> r <> Rs5 ->
         Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (K - 8)%nat false pme -∗
+    (* ENTRY: in-lock (level [S lvl], arm [false]), so the index carries the
+       reserve of the exit arm [b].  EXIT below is at [K] and arm [b]: the
+       physical carve [trap_res b + (K - 8)] -> [trap_res b + K] is exactly the
+       8-slot epilogue pop, i.e. the reserve is CONSERVED across this block. *)
+    sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
     cpu_own (S lvl) eb pme C false -∗
     arm_pay lvl eb pme -∗
     kernel_text -∗
@@ -167,7 +179,7 @@ Section KforkB1Proof.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hlvl Hsp0 Hra0 Hs00 Hs10 Hs50 Hmtsp Hmts4 Hthr.
+    intros HK Hlvl Hb Hsp0 Hra0 Hs00 Hs10 Hs50 Hmtsp Hmts4 Hthr.
     iIntros "Hcg Hcpu Hpay #Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
               Hheld Hhaa #Hislock #Henv Hfprest Hfppt Hfptf Hcont".
     iPoseProof (kfk_07c with "Htext") as "Hi7c".
@@ -178,7 +190,7 @@ Section KforkB1Proof.
     iPoseProof (kfk_08a with "Htext") as "Hi8a".
     iPoseProof (kfk_08c with "Htext") as "Hi8c".
     (* ---- +0x7c: c.mv a0,s4 ---- *)
-    iApply (wp_cmv_s_sconf (mword_of_int (KF + 0x7c)) Ra0 Rs4 Mt (K - 8)%nat false
+    iApply (wp_cmv_s_sconf (mword_of_int (KF + 0x7c)) Ra0 Rs4 Mt (trap_res b + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi7c [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -195,7 +207,7 @@ Section KforkB1Proof.
                      = mword_of_int KernelSyms.freeproc)
       by (apply bv_eq; vm_compute; reflexivity).
     iApply (wp_jal_s_sconf (mword_of_int (KF + 0x7e)) Rra (mword_of_int 2096626 : mword 21)
-              T0 (K - 8)%nat false
+              T0 (trap_res b + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rewrite Htgt7e; vm_compute; reflexivity)
               with "Hcg Hpc Hi7e [-]").
@@ -209,8 +221,8 @@ Section KforkB1Proof.
       by (rewrite /T1 upd_ne; [exact HT0a0 | vm_compute; discriminate]).
     (* ---- freeproc ---- *)
     iApply (FP.wp_freeproc_sconf γa T1 j γl V pid USED ch (Some P) (Some (ud_tfp P, ws))
-              (K - 8)%nat eb pme C (S lvl)
-              (kfkb1_K44 K HK) (kfkb1_lvlS lvl Hlvl) HT1a0
+              (trap_res b + (K - 8))%nat eb pme C (S lvl)
+              ltac:(pose proof (kfkb1_K44 K HK); lia) (kfkb1_lvlS lvl Hlvl) HT1a0
               with "Hcg Hcpu Htext Hpc Hheld Hfprest Hfppt Hfptf Henv [-]").
     iApply wp_next_off_intro.
     iIntros (mfp) "Hcg Hcpu Hpc %Hcsfp Hheld Hdorm".
@@ -233,7 +245,7 @@ Section KforkB1Proof.
       rewrite /T0 upd_ne; [| regne].
       exact (Hthr r Hr Nsp Ns0 Ns1 Ns4 Ns5). }
     (* ---- +0x82: c.mv a0,s4 (prepare release's argument) ---- *)
-    iApply (wp_cmv_s_sconf (mword_of_int (KF + 0x82)) Ra0 Rs4 mfp (K - 8)%nat false
+    iApply (wp_cmv_s_sconf (mword_of_int (KF + 0x82)) Ra0 Rs4 mfp (trap_res b + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi82 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -252,7 +264,7 @@ Section KforkB1Proof.
                      = mword_of_int KernelSyms.release)
       by (apply bv_eq; vm_compute; reflexivity).
     iApply (wp_jal_s_sconf (mword_of_int (KF + 0x84)) Rra (mword_of_int 2092950 : mword 21)
-              T2 (K - 8)%nat false
+              T2 (trap_res b + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rewrite Htgt84; vm_compute; reflexivity)
               with "Hcg Hpc Hi84 [-]").
@@ -279,6 +291,12 @@ Section KforkB1Proof.
                    = proc_addr j).
     { rewrite HT3a0. apply addv_sext0. }
     (* ---- release &np->lock ---- *)
+    (* release wants the reserve spelled AT ITS OWN EXIT ARM, which is the
+       [match lvl ...] that [Hb] names [b]; put [Hcg]'s index back into that
+       form for the call.  Everything after the release is at index [K - 8]
+       with no reserve summand at all (the arm is [b] there), so nothing needs
+       undoing afterwards. *)
+    iEval (rewrite -Hb) in "Hcg".
     iApply (RL.wp_release_sconf γl (proc_addr j) "proc"%string
               (proc_lock_res γs γl (proc_addr j)) T3 lvl eb pme C (K - 8)%nat
               Hlka (kfkb1_K10 K HK)

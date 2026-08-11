@@ -271,7 +271,7 @@ Section ProofSysUptime.
     (* +0x16: auipc a5,0x7 *)
     iPoseProof (sui_16 with "Htext") as "Hi16".
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x16)) (mword_of_int 15 : mword 5) (mword_of_int 0x7 : mword 20)
-              MA (av - 4)%nat false
+              MA (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi16 [-]").
     iApply wp_next_off_intro.
@@ -287,7 +287,7 @@ Section ProofSysUptime.
     { rewrite /B0 upd_eq. rewrite /a_ticks. apply bv_eq; vm_compute; reflexivity. }
     iPoseProof (sui_1a with "Htext") as "Hi1a".
     iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x1a)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5)
-              (mword_of_int 0x7b0 : mword 12) B0 (av - 4)%nat t false (dqm := DfracOwn 1)
+              (mword_of_int 0x7b0 : mword 12) B0 (trap_res b + (av - 4))%nat t false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1a [Hticks] [-]").
     { iEval (rewrite Haddrt). iExact "Hticks". }
@@ -301,7 +301,7 @@ Section ProofSysUptime.
     (* +0x1e: c.mv s1,a5 -- carry the value across release in s1 *)
     iPoseProof (sui_1e with "Htext") as "Hi1e".
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x1e)) (mword_of_int 9 : mword 5) (mword_of_int 15 : mword 5)
-              B1 (av - 4)%nat false
+              B1 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e [-]").
     iApply wp_next_off_intro.
@@ -316,7 +316,7 @@ Section ProofSysUptime.
     (* +0x20: auipc a0,0x15 *)
     iPoseProof (sui_20 with "Htext") as "Hi20".
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x20)) (mword_of_int 10 : mword 5) (mword_of_int 0x15 : mword 20)
-              B2 (av - 4)%nat false
+              B2 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi20 [-]").
     iApply wp_next_off_intro.
@@ -330,7 +330,7 @@ Section ProofSysUptime.
     (* +0x24: addi a0,a0,1764 *)
     iPoseProof (sui_24 with "Htext") as "Hi24".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x24)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x6d6 : mword 12)
-              B3 (av - 4)%nat false
+              B3 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi24 [-]").
     iApply wp_next_off_intro.
@@ -344,7 +344,7 @@ Section ProofSysUptime.
     (* +0x28: jal ra,release *)
     iPoseProof (sui_28 with "Htext") as "Hi28".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x28)) (mword_of_int 1 : mword 5) (mword_of_int 2089446 : mword 21)
-              B4 (av - 4)%nat false
+              B4 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi28 [-]").
     iApply wp_next_off_intro.
@@ -370,6 +370,12 @@ Section ProofSysUptime.
       exact HMAcsp. }
     (* ===================== release(&tickslock) ===================== *)
     iDestruct (ticks_res_intro t with "Hticks") as "HR".
+    (* the acquire handed the window index out as [trap_res b + N]; release
+       wants it as [trap_res outb + N] with [outb = match n with O => eb
+       | S _ => false end].  Those are the same bool -- [cpu_own] forces
+       it -- so this is a pure re-spelling, and it is what makes the
+       acquire/release pair compose back to [N]. *)
+    iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γl a_tickslock "time"%string ticks_res B5
               n eb p C (av - 4)%nat
               ltac:(rewrite HB5a0; apply addv_sext0)

@@ -526,8 +526,16 @@ Section WpSconfCsr.
       strans_inv -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (tp_pin (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m)) -∗
+      (* THE CARVE IS THE CAPABILITY'S, SO IT IS ARM-DEPENDENT.  This leaf
+         takes the bundle at a GENERIC [b] and hands the stack conjunct back
+         raw (the arm-bit fact and the arm travel separately, so the caller
+         can re-fold), which means the size MUST be spelled [trap_res b + n]
+         -- the same thing [IntrDefs.sie_cap] owns.  Spelled
+         [kv_frame_slots + n] (what an arm-blind reserve made it) this
+         statement is FALSE at [b = false]: the [destruct b] in the proof
+         below shows that arm handing back a carve it never received. *)
       ( stack_own (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m
-                     !!! Regidx csp_rs1) (kv_frame_slots + n) ∗
+                     !!! Regidx csp_rs1) (trap_res b + n) ∗
         ⌜ _get_Mstatus_SIE ms = sie_bit b ⌝ ∗
         sie_arm b p ) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -588,7 +596,7 @@ Section WpSconfCsr.
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
     iAssert ( ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms0) ∗
               ( stack_own (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m
-                             !!! Regidx csp_rs1) (kv_frame_slots + n) ∗
+                             !!! Regidx csp_rs1) (trap_res b + n) ∗
                 ⌜ _get_Mstatus_SIE ms0 = sie_bit b ⌝ ∗
                 sie_arm b p ) )%I
       with "[Hstk Harm Hhalf]" as "[Hhalf Hpair]".
@@ -697,6 +705,46 @@ Section WpSconfCsr.
   (* (trap CSRs + stack bound + a persistent intr_inv copy).  The '0'     *)
   (* arm is the idempotent write, ghosts untouched.                       *)
   (* ------------------------------------------------------------------- *)
+(* ===================================================================== *)
+(* THE ARM-FLIP SEAM AND ITS avail INDEX -- READ THIS BEFORE TOUCHING ANY  *)
+(* OF THE FOUR csrci/csrsi LEAVES BELOW.                                   *)
+(*                                                                        *)
+(* [IntrDefs.sie_cap m av b p] owns [trap_res b + av] free stack slots     *)
+(* below sp: [av] usable by kernel code plus an ARM-DEPENDENT trap reserve *)
+(* ([kv_frame_slots] at [b = true], nothing at [b = false] -- see          *)
+(* [IntrDefs.trap_res] for why an arm-blind reserve is unsatisfiable).     *)
+(* These four leaves are the only instructions in the tree that MOVE THE   *)
+(* ARM, so they are the only ones at which that reserve appears or         *)
+(* disappears -- and stack slots are not persistent, so the total carve    *)
+(* must be CONSERVED across each of them.  Hence the uniform rule:         *)
+(*                                                                        *)
+(*   a leaf moving the arm from [b0] to [b1] has                            *)
+(*     PRE  index [trap_res b1 + n]   and   POST index [trap_res b0 + n].   *)
+(*                                                                        *)
+(* Both sides then carve [trap_res b0 + (trap_res b1 + n)] slots, i.e. the *)
+(* stack conjunct is LITERALLY THE SAME PROPOSITION on the way in and on   *)
+(* the way out -- a pure re-indexing, never a split, and never a           *)
+(* [kv_frame_slots <= n] premise (which is what rejected alternative (a)   *)
+(* at [IntrDefs.trap_res] would have cost).  Each direction collapses to   *)
+(* the identity at the arm where nothing moves, because [trap_res false +  *)
+(* n] is DEFINITIONALLY [n]:                                              *)
+(*                                                                        *)
+(*   DISABLING ([b1 = false]): pre [n] (verbatim what it always was),      *)
+(*     post [trap_res b + n] -- the freed reserve becomes usable stack.    *)
+(*     At [b = false] the post is [n] too, so nothing changes.             *)
+(*   ENABLING ([b1 = true]): pre [trap_res true + n], post                 *)
+(*     [trap_res b + n] -- re-enabling interrupts PAYS the reserve out of  *)
+(*     the caller's budget.  At [b = true] (the idempotent write) pre and  *)
+(*     post coincide and the carve rides through untouched.                *)
+(*                                                                        *)
+(* THE CONSEQUENCE FOR CALLERS IS NOT LOCAL, and that is the point: the    *)
+(* window between a push_off/acquire and its matching pop_off/release runs *)
+(* at [trap_res b + av], not [av].  Do not "fix" a caller by dropping the  *)
+(* difference -- the reserve is exactly what funds the trap handler, and a  *)
+(* pop_off that cannot re-establish it is unprovable.                      *)
+(* ===================================================================== *)
+  (* DISABLING: pre index [n], post index [trap_res b + n] -- the reserve the
+     enabled arm was holding becomes usable stack.  See the seam header. *)
   Lemma wp_csrci_sstatus_s_sconf
       (pc : mword 64) (rd : mword 5) (k : nat) (eb : bool)
       (m : regfile) (n : nat) (b : bool) :
@@ -710,7 +758,8 @@ Section WpSconfCsr.
       ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
       ⌜ k = 0%nat -> _get_Mstatus_SIE ms = sie_bit eb ⌝ -∗
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m) n false p -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m)
+                  (trap_res b + n)%nat false p -∗
       intr_count (S k) eb -∗
       trap_csrs_pay k eb -∗
       cpu_claim_pay k eb p -∗
@@ -813,7 +862,8 @@ Section WpSconfCsr.
          re-expressing at the new mstatus -- no ghost movement. *)
       iDestruct (sret_tie_congr ms0 ms1 Hspp' Hspie' with "Hspp") as "Hspp".
       tp_refold Hrdtp "Hfmap".
-      iAssert (sie_cap (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m) n false p)
+      iAssert (sie_cap (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m)
+                       (trap_res true + n)%nat false p)
         with "[Hstk Htr Hq]" as "Hcap".
       { iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
         iFrame "Htr". iExact "Hq". }
@@ -866,7 +916,8 @@ Section WpSconfCsr.
       iEval (rewrite Lnpc) in "Hpc'".
       tp_refold Hrdtp "Hfmap".
       iDestruct (intr_count_push_off k eb with "Hq0 Hcnt") as "(%Heb0 & Hq0 & Hcnt)".
-      iAssert (sie_cap (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m) n false p)
+      iAssert (sie_cap (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m)
+                       (trap_res false + n)%nat false p)
         with "[Hstk Htr Hq0]" as "Hcap".
       { iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
         iFrame "Htr". iExact "Hq0". }
@@ -961,10 +1012,14 @@ Section WpSconfCsr.
      p] would ask it for that eighth at '1' while its own bundle still pins
      it at '0'.)  The already-enabled branch of [sie_cap] is refuted by
      sepc-cell exclusivity (the payload and a '1' arm can't coexist). *)
+  (* ENABLING: pre index [trap_res true + n], post index [trap_res b + n].
+     Re-enabling interrupts must PAY the trap reserve, and the caller pays it
+     out of the very slots its own push_off/csrci freed.  See the seam header
+     above [wp_csrci_sstatus_s_sconf]. *)
   Lemma wp_csrsi_sstatus_x0_s_sconf
       (pc : mword 64)
       (m : regfile) (n : nat) (b : bool) :
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr m (trap_res true + n)%nat b p -∗
     intr_count 1 true -∗
     trap_csrs -∗
     cpu_cells 0 true p -∗
@@ -974,7 +1029,7 @@ Section WpSconfCsr.
     wp_next b p (fun (CID : CpuId) =>
       ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
-      sie_cap_gpr m n true p -∗
+      sie_cap_gpr m (trap_res b + n)%nat true p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -982,7 +1037,7 @@ Section WpSconfCsr.
     iIntros "Hcg Hcnt Hcsrs Hcells Hclm Hpc Hinstr Hcont".
     iDestruct "Hcnt" as "[Htok Hhx]".
     iDestruct "Hcsrs" as "(Hsepcx & Hscausex & Hstvalx & Hsppc)".
-    iApply (wp_instr_s_sconf m n b pc false
+    iApply (wp_instr_s_sconf m (trap_res true + n)%nat b pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc [Hreg Hmem]".
@@ -1048,7 +1103,11 @@ Section WpSconfCsr.
       (* SPP and SPIE are untouched by an SIE flip, so the tie only needs
          re-expressing at the new mstatus -- no ghost movement. *)
       iDestruct (sret_tie_congr ms0 ms1 Hspp' Hspie' with "Hspp") as "Hspp".
-      iAssert (sie_cap m n true p)
+      (* the carve is IDENTICAL on both sides -- [trap_res false + (trap_res
+         true + n)] going in, [trap_res true + (trap_res false + n)] coming
+         out, both [kv_frame_slots + n] by conversion -- so [iExact] on the
+         untouched [Hstk] closes it with no split and no arithmetic. *)
+      iAssert (sie_cap m (trap_res false + n)%nat true p)
         with "[Hqcap Hqcnt Hsepcx Hscausex Hstvalx Hsppc Hclm Hstk Htr Hcells]" as "Hcap".
       { iSplitL "Hstk". { iExact "Hstk". }
         iFrame "Htr".
@@ -1149,17 +1208,43 @@ Section WpSconfCsr.
      through untouched, and every one of the caller's [if eb then emp else _]
      premises is [emp] -- at [eb = true] all of that is ALREADY in the arm,
      which is exactly why the counting token is one of them. *)
-  Lemma wp_csrsi_sstatus_x0_enable_s_sconf
-      (pc : mword 64) (eb : bool) (m : regfile) (n : nat) :
-    sie_cap_gpr m n eb p -∗
-    (if eb then emp else intr_count 0 false) -∗
-    (if eb then emp else trap_csrs) -∗
-    (if eb then emp else cpu_cells 0 true p) -∗
-    cpu_claim_ext eb p -∗
-    intr_handler_avail -∗
+  (* ------------------------------------------------------------------- *)
+  (* THE IDEMPOTENT SET AT AN ALREADY-ENABLED ARM -- AND IT IS            *)
+  (* INDEX-GENERIC, WHICH IS THE WHOLE POINT.                             *)
+  (*                                                                      *)
+  (* [csrsi sstatus,2] with SIE already '1' writes the bit that is already *)
+  (* set: the ghost state does not move (the arm's own eighth and the      *)
+  (* mstatus-tied half already agree at '1'), the '1' arm rides through    *)
+  (* untouched, and -- decisively -- THE STACK CONJUNCT IS NEVER TOUCHED.  *)
+  (* So this leaf holds at an ARBITRARY index [n]: pre and post are the    *)
+  (* SAME [sie_cap_gpr m n true p], with no [trap_res true + _] shape      *)
+  (* demanded of it and no [kv_frame_slots <= n] premise.                  *)
+  (*                                                                      *)
+  (* WHY THAT MATTERS, AND WHY THIS IS A SEPARATE LEMMA.                   *)
+  (* [wp_csrsi_sstatus_x0_enable_s_sconf] below is the arm-GENERIC enable, *)
+  (* and its contract must be stated at pre index [trap_res true + n] --   *)
+  (* at [eb = false] it is a real 0 -> 1 flip and the reserve has to come  *)
+  (* out of the index.  Instantiated at [eb = true] that shape is still    *)
+  (* sound but it is a REQUIREMENT: it forces the caller's index to be at  *)
+  (* least [kv_frame_slots], on top of whatever the enabled arm is already *)
+  (* holding in reserve.  scheduler()'s loop head is exactly that caller   *)
+  (* -- its [intr_on] is reached with interrupts already on from the       *)
+  (* second round onwards -- and paying there would make [SpecScheduler]   *)
+  (* demand [2 * kv_frame_slots + 20], a factor-of-two reserve, which is   *)
+  (* the pathology the arm-dependent carve exists to remove.  Splitting    *)
+  (* the idempotent case out gives that caller a leaf that moves nothing:  *)
+  (* ONE reserve, paid once, at the single real enable.                    *)
+  (*                                                                      *)
+  (* The arm-generic enable's [eb = true] branch IS this lemma at          *)
+  (* [n := trap_res true + n], so nothing is restated: the proof below is  *)
+  (* the one that used to sit inline there.                                *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_csrsi_sstatus_x0_idem_s_sconf
+      (pc : mword 64) (m : regfile) (n : nat) :
+    sie_cap_gpr m n true p -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) -∗
-    wp_next eb p (fun (CID : CpuId) =>
+    wp_next true p (fun (CID : CpuId) =>
       ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
       sie_cap_gpr m n true p -∗
@@ -1167,14 +1252,7 @@ Section WpSconfCsr.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    destruct eb.
-    2:{ (* ---- base state DISABLED: the real flip, via the restore leaf ---- *)
-        iIntros "Hcg Hcnt Hcsrs Hcells Hclm #Havail Hpc Hinstr Hcont".
-        iApply (wp_csrsi_sstatus_x0_s_sconf pc m n false
-                  with "Hcg [Hcnt] Hcsrs Hcells Hclm Hpc Hinstr Hcont").
-        iApply (intr_count_pack_S_on 0 with "Hcnt Havail"). }
-    (* ---- base state ENABLED: idempotent on SIE, ghosts stand still ---- *)
-    iIntros "Hcg _ _ _ _ #Havail Hpc Hinstr Hcont".
+    iIntros "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n true pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS))
               with "Hcg Hpc Hinstr").
@@ -1239,6 +1317,44 @@ Section WpSconfCsr.
     { exact Hmsf. }
   Qed.
 
+  (* ENABLING, so the same index discipline as [wp_csrsi_sstatus_x0_s_sconf]:
+     pre [trap_res true + n], post [trap_res eb + n].  At [eb = true] the two
+     coincide (the write is idempotent and the reserve rides through); at
+     [eb = false] this delegates to that leaf at [b := false], whose pre/post
+     indices are then literally these. *)
+  Lemma wp_csrsi_sstatus_x0_enable_s_sconf
+      (pc : mword 64) (eb : bool) (m : regfile) (n : nat) :
+    sie_cap_gpr m (trap_res true + n)%nat eb p -∗
+    (if eb then emp else intr_count 0 false) -∗
+    (if eb then emp else trap_csrs) -∗
+    (if eb then emp else cpu_cells 0 true p) -∗
+    cpu_claim_ext eb p -∗
+    intr_handler_avail -∗
+    pc_is pc -∗
+    instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) -∗
+    wp_next eb p (fun (CID : CpuId) =>
+      ∀ ms : mword 64,
+      ⌜ sconf_ms_facts ms ⌝ -∗
+      sie_cap_gpr m (trap_res eb + n)%nat true p -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    destruct eb.
+    2:{ (* ---- base state DISABLED: the real flip, via the restore leaf ---- *)
+        iIntros "Hcg Hcnt Hcsrs Hcells Hclm #Havail Hpc Hinstr Hcont".
+        iApply (wp_csrsi_sstatus_x0_s_sconf pc m n false
+                  with "Hcg [Hcnt] Hcsrs Hcells Hclm Hpc Hinstr Hcont").
+        iApply (intr_count_pack_S_on 0 with "Hcnt Havail"). }
+    (* ---- base state ENABLED: idempotent on SIE, ghosts stand still.  This
+           IS [wp_csrsi_sstatus_x0_idem_s_sconf] at index [trap_res true + n];
+           the reserve summand is inert here (nothing reads the index), which
+           is precisely why that lemma can be stated without it. ---- *)
+    iIntros "Hcg _ _ _ _ _ Hpc Hinstr Hcont".
+    iApply (wp_csrsi_sstatus_x0_idem_s_sconf pc m (trap_res true + n)%nat
+              with "Hcg Hpc Hinstr Hcont").
+  Qed.
+
   (* intr_off() at level 0, FROM enabled: the '1'->'0' flip of
      [wp_csrci_sstatus_s_sconf] with rd = x0 and no level push.  Same
      choreography (open intrN, [sie_ghost_flip_off] on all four pieces --
@@ -1263,6 +1379,10 @@ Section WpSconfCsr.
      returns the freed cells as [cpu_cells_pay b p], exactly like its
      sibling [wp_csrci_sstatus_s_sconf]: the flip's second eighth is taken
      out of the arm's own [cpu_hart], not out of the caller. *)
+  (* DISABLING, same index discipline as [wp_csrci_sstatus_s_sconf]: pre [n],
+     post [trap_res b + n].  Reachable only at [b = true] (the [b = false] arm
+     is refuted below), where the post index is [kv_frame_slots + n] -- the
+     scheduler's inlined intr_off() freeing its own reserve. *)
   Lemma wp_csrci_sstatus_x0_s_sconf
       (pc : mword 64) (m : regfile) (n : nat) (b : bool) :
     sie_cap_gpr m n b p -∗
@@ -1272,7 +1392,7 @@ Section WpSconfCsr.
     wp_next b p (fun (CID : CpuId) =>
       ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
-      sie_cap_gpr m n false p -∗
+      sie_cap_gpr m (trap_res b + n)%nat false p -∗
       intr_count 0 false -∗
       trap_csrs -∗
       cpu_cells_pay b p -∗
@@ -1350,7 +1470,7 @@ Section WpSconfCsr.
       (* SPP and SPIE are untouched by an SIE flip, so the tie only needs
          re-expressing at the new mstatus -- no ghost movement. *)
       iDestruct (sret_tie_congr ms0 ms1 Hspp' Hspie' with "Hspp") as "Hspp".
-      iAssert (sie_cap m n false p) with "[Hstk Htr Hq]" as "Hcap".
+      iAssert (sie_cap m (trap_res true + n)%nat false p) with "[Hstk Htr Hq]" as "Hcap".
       { iSplitL "Hstk"; [iExact "Hstk" |].
         iFrame "Htr". iExact "Hq". }
       iAssert (sconf) with "[Hpriv Hms Hhalf Hspp Hmiex Hmenvx]" as "Hsc".

@@ -202,7 +202,7 @@ Section ProofSetkilled.
     iPoseProof (ski_10 with "Htext") as "Hi10".
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.setkilled + 0x10)) sk_a5 (mword_of_int 1 : mword 6)
               (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))
-              macq (av - 4)%nat false
+              macq (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity)
               with "Hcg Hpc Hi10 [-]").
     iApply wp_next_off_intro.
@@ -221,14 +221,14 @@ Section ProofSetkilled.
                      = p_killed (proc_addr j))
       by (rewrite HC1s1; apply sk_killed_off).
     iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.setkilled + 0x12)) sk_a5 sk_s1
-              (mword_of_int 40 : mword 12) C1 (av - 4)%nat kl false
+              (mword_of_int 40 : mword 12) C1 (trap_res b + (av - 4))%nat kl false
               with "Hcg Hpc Hi12 [Hkilled] [-]").
     { iEval (rgne; rewrite Hsaddr). iExact "Hkilled". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hkilled". iEval (rgne; rewrite Hsaddr) in "Hkilled".
     (* +0x14: c.mv a0,s1 *)
     iPoseProof (ski_14 with "Htext") as "Hi14".
-    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.setkilled + 0x14)) sk_a0 sk_s1 C1 (av - 4)%nat false
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.setkilled + 0x14)) sk_a0 sk_s1 C1 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi14 [-]").
     iApply wp_next_off_intro.
@@ -243,7 +243,7 @@ Section ProofSetkilled.
     (* +0x16: jal ra,release *)
     iPoseProof (ski_16 with "Htext") as "Hi16".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.setkilled + 0x16)) sk_ra (mword_of_int 2091858 : mword 21)
-              C2 (av - 4)%nat false
+              C2 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi16 [-]").
     iApply wp_next_off_intro.
@@ -267,6 +267,12 @@ Section ProofSetkilled.
     { iApply (proc_lock_res_intro γs γl (proc_addr j) st ch with "Hstate Hpg Hchan [-Hslot] Hslot").
       iExists _, xs, pid. iFrame "Hkilled Hxstate Hpidhalf". }
     (* ===================== release(&p->lock) ===================== *)
+    (* the acquire handed the window index out as [trap_res b + N]; release
+       wants it as [trap_res outb + N] with [outb = match n with O => eb
+       | S _ => false end].  Those are the same bool -- [cpu_own] forces
+       it -- so this is a pure re-spelling, and it is what makes the
+       acquire/release pair compose back to [N]. *)
+    iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
               (proc_lock_res γs γl (proc_addr j)) C3 n eb p C (av - 4)%nat
               Hlka ltac:(lia)

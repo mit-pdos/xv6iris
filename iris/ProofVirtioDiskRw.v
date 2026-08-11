@@ -133,7 +133,7 @@ Section ProofVirtioDiskRw.
     wp_next (CID0 := CID) true pj (fun (CID : CpuId) =>
       ∀ M : regfile,
         ⌜vdrw_regs M sp0 bp wr (vdrw_sector_raw bno) /\ vdrw_hi M m⌝ -∗
-        sie_cap_gpr M (K - 12)%nat false pj -∗
+        sie_cap_gpr M (trap_res true + (K - 12))%nat false pj -∗
         cpu_own 1 eb pj C false -∗
         arm_pay 0 eb pj -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x036) : mword 64) -∗
@@ -155,7 +155,7 @@ Section ProofVirtioDiskRw.
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iPoseProof (rwi_000 with "Htext") as "Hi000".
     iApply (wp_caddi16sp_push_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x000) : mword 64)
-              (mword_of_int 58 : mword 6) m K 12 true (vdrw_K12 K HK) Hpush
+              (mword_of_int 58 : mword 6) m K 12 true ltac:(pose proof (vdrw_K12 K HK); lia) Hpush
               with "Hcg Hpc Hi000 [-]").
     iIntros (CIDp1 Hsp1) "Hcg Hframe Hpc". rgall.
     iClear "Hi000".
@@ -540,7 +540,7 @@ Section ProofVirtioDiskRw.
                  with "Hown") as "Hown".
     iApply (Acquire.wp_acquire_sconf γk "virtio_disk"%string
               (disk_res γd pd pav pu) R11 0%nat eb pj C (K - 12)%nat true
-              vdrw_noff0 (vdrw_K10 K HK)
+              vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia)
               with "Hcg Hown Htext Hpc [] Hpanic [-]").
     { rgall. iEval (rewrite HR11a0). iExact "Hlk". }
     iIntros (CIDaq Hsaq ms M) "_ Hcg Hpc %HcsM Htok HR Hown Hpay".

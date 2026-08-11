@@ -156,7 +156,12 @@ Section ProofKforkB5.
     Mt !!! Regidx Rs4 = ProcGeom.proc_addr j ->
     Mt !!! Regidx Rs5 = pme ->
     Mt !!! Regidx Rs1 = rv ->
-    sie_cap_gpr Mt (K - 8)%nat false pme -∗
+    (* ENTRY: np->lock is held (level [S lvl], arm [false]), so the index
+       carries the trap reserve of the arm this block will EXIT at, i.e. [b].
+       EXIT below is at [(K - 8)] with arm [b] -- same physical carve
+       [trap_res b + (K - 8)] -- so the reserve is conserved across the block;
+       the three releases and two acquires inside it each conserve it too. *)
+    sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
     cpu_own (S lvl) eb pme C false -∗
     IntrDefs.arm_pay lvl eb pme -∗
     kernel_text -∗
@@ -200,7 +205,7 @@ Section ProofKforkB5.
     (* -------------------------------------------------------------- *)
     (* +0x0c2 c.mv a0,s4  -- regime OFF (np's lock still held)            *)
     (* -------------------------------------------------------------- *)
-    iApply (wp_cmv_s_sconf (mword_of_int (KF + 0xc2)) Ra0 Rs4 Mt (K - 8)%nat false
+    iApply (wp_cmv_s_sconf (mword_of_int (KF + 0xc2)) Ra0 Rs4 Mt (trap_res b + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi_c2 [-]").
               iClear "Hi_c2".
@@ -220,7 +225,7 @@ Section ProofKforkB5.
       by (apply bv_eq; vm_compute; reflexivity).
     iPoseProof (kfk_0c4 with "Htext") as "Hi_c4".
     iApply (wp_jal_s_sconf (mword_of_int (KF + 0xc4)) Rra (mword_of_int 2092886 : mword 21)
-              M1 (K - 8)%nat false
+              M1 (trap_res b + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi_c4 [-]").
               iClear "Hi_c4".
@@ -237,6 +242,11 @@ Section ProofKforkB5.
     assert (Hlka1 : add_vec (M2 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 0 : mword 12)) = (proc_addr j))
       by (rewrite HM2a0; apply addv_sext0).
     (* ---- release(&np->lock) ---- *)
+    (* release wants the reserve at ITS OWN exit arm [match lvl ...]; [Hb]
+       names that [b], so put [Hcg]'s index back into the spec's spelling
+       for the call.  (The [rewrite -Hb] after the call does the reverse
+       for what the release hands back.) *)
+    iEval (rewrite Hb) in "Hcg".
     iApply (RL.wp_release_sconf (CID := CID0) γl (proc_addr j) "proc"%string
               (SchedCtx.proc_lock_res γs γl (proc_addr j)) M2 lvl eb pme C (K - 8)%nat
               Hlka1 (kfkb5_stack_ok K HK)
@@ -329,7 +339,7 @@ Section ProofKforkB5.
       rewrite Hr Hr5s4. apply WaitInv.p_parent_sext. }
     iPoseProof (kfk_0d4 with "Htext") as "Hi_d4".
     iApply (wp_sd_s_sconf (mword_of_int (KF + 0xd4)) Rs5 Rs4 (mword_of_int 56 : mword 12)
-              mr5 (K - 8)%nat vold false with "Hcg Hpc Hi_d4 [Hpcell] [-]").
+              mr5 (trap_res b + (K - 8))%nat vold false with "Hcg Hpc Hi_d4 [Hpcell] [-]").
               iClear "Hi_d4".
     { iEval (rewrite Hea_d4). iExact "Hpcell". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hpcell".
@@ -347,7 +357,7 @@ Section ProofKforkB5.
     (* +0x0d8 / +0x0dc auipc+addi -> wait_lock_addr -- regime OFF          *)
     (* -------------------------------------------------------------- *)
     iApply (wp_auipc_s_sconf (mword_of_int (KF + 0xd8)) Ra0 (mword_of_int 16 : mword 20)
-              mr5 (K - 8)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              mr5 (trap_res b + (K - 8))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi_d8 [-]").
               iClear "Hi_d8".
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -361,7 +371,7 @@ Section ProofKforkB5.
     iEval (rewrite Hpp_dc) in "Hpc".
     iPoseProof (kfk_0dc with "Htext") as "Hi_dc".
     iApply (wp_addi4_s_sconf (mword_of_int (KF + 0xdc)) Ra0 Ra0 (mword_of_int 1554 : mword 12)
-              M6 (K - 8)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              M6 (trap_res b + (K - 8))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi_dc [-]").
               iClear "Hi_dc".
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -381,7 +391,7 @@ Section ProofKforkB5.
       by (apply bv_eq; vm_compute; reflexivity).
     iPoseProof (kfk_0e0 with "Htext") as "Hi_e0".
     iApply (wp_jal_s_sconf (mword_of_int (KF + 0xe0)) Rra (mword_of_int 2092858 : mword 21)
-              M7 (K - 8)%nat false
+              M7 (trap_res b + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi_e0 [-]").
               iClear "Hi_e0".
@@ -396,6 +406,11 @@ Section ProofKforkB5.
                     = SpecProcinit.wait_lock_addr)
       by (rewrite HM8a0; apply addv_sext0).
     (* ---- release(&wait_lock) ---- *)
+    (* release wants the reserve at ITS OWN exit arm [match lvl ...]; [Hb]
+       names that [b], so put [Hcg]'s index back into the spec's spelling
+       for the call.  (The [rewrite -Hb] after the call does the reverse
+       for what the release hands back.) *)
+    iEval (rewrite Hb) in "Hcg".
     iApply (RL.wp_release_sconf (CID := CID5) γw SpecProcinit.wait_lock_addr "wait_lock"%string
               WaitInv.wait_res M8 lvl eb pme C (K - 8)%nat
               Hlka2 (kfkb5_stack_ok K HK)
@@ -478,7 +493,7 @@ Section ProofKforkB5.
       by (apply bv_eq; vm_compute; reflexivity).
     iPoseProof (kfk_0ea with "Htext") as "Hi_ea".
     iApply (wp_cli_s_sconf (mword_of_int (KF + 0xea)) Ra5 (mword_of_int 3 : mword 6)
-              (mword_of_int 3 : mword 64) mr9 (K - 8)%nat false
+              (mword_of_int 3 : mword 64) mr9 (trap_res b + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) Hwval3
               with "Hcg Hpc Hi_ea [-]").
               iClear "Hi_ea".
@@ -499,7 +514,7 @@ Section ProofKforkB5.
       rewrite Hr HM11s4. apply ProcGeom.p_state_sext. }
     iPoseProof (kfk_0ec with "Htext") as "Hi_ec".
     iApply (wp_sw_s_sconf (mword_of_int (KF + 0xec)) Ra5 Rs4 (mword_of_int 24 : mword 12)
-              M11 (K - 8)%nat USED false with "Hcg Hpc Hi_ec [Hpst2] [-]").
+              M11 (trap_res b + (K - 8))%nat USED false with "Hcg Hpc Hi_ec [Hpst2] [-]").
               iClear "Hi_ec".
     { iEval (rewrite Hea_ec). iExact "Hpst2". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hpst2".
@@ -522,7 +537,7 @@ Section ProofKforkB5.
     (* -------------------------------------------------------------- *)
     (* +0x0f0 c.mv a0,s4  -- regime OFF                                  *)
     (* -------------------------------------------------------------- *)
-    iApply (wp_cmv_s_sconf (mword_of_int (KF + 0xf0)) Ra0 Rs4 M11 (K - 8)%nat false
+    iApply (wp_cmv_s_sconf (mword_of_int (KF + 0xf0)) Ra0 Rs4 M11 (trap_res b + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi_f0 [-]").
               iClear "Hi_f0".
@@ -542,7 +557,7 @@ Section ProofKforkB5.
       by (apply bv_eq; vm_compute; reflexivity).
     iPoseProof (kfk_0f2 with "Htext") as "Hi_f2".
     iApply (wp_jal_s_sconf (mword_of_int (KF + 0xf2)) Rra (mword_of_int 2092840 : mword 21)
-              M12 (K - 8)%nat false
+              M12 (trap_res b + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi_f2 [-]").
               iClear "Hi_f2".
@@ -562,6 +577,11 @@ Section ProofKforkB5.
     { rewrite /M13. apply callee_saved_insert_r; [vm_compute; reflexivity | exact Hcs_9_12]. }
     assert (Hcs_0_13 : callee_saved Mt M13) by (eapply callee_saved_trans; [exact Hcs_0_r9 | exact Hcs_9_13]).
     (* ---- release(&np->lock) : THE BLOCK'S OWN EXIT ---- *)
+    (* release wants the reserve at ITS OWN exit arm [match lvl ...]; [Hb]
+       names that [b], so put [Hcg]'s index back into the spec's spelling
+       for the call.  (The [rewrite -Hb] after the call does the reverse
+       for what the release hands back.) *)
+    iEval (rewrite Hb) in "Hcg".
     iApply (RL.wp_release_sconf (CID := CID9) γl (proc_addr j) "proc"%string
               (SchedCtx.proc_lock_res γs γl (proc_addr j)) M13 lvl eb pme C (K - 8)%nat
               Hlka3 (kfkb5_stack_ok K HK)

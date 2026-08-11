@@ -9,8 +9,20 @@
    There is no ghost name, no [sconf], no capability.
 
    [SpecMain.MAIN.wp_main_boot_sconf] wants the sconf-TIER bundle:
-   [sie_cap_gpr m K false p0] + [cpu_own 0 false p0 cpu_ctx_free false] +
+   [sie_cap_gpr m (kv_frame_slots + K) false p0] +
+   [cpu_own 0 false p0 cpu_ctx_free false] +
    the SIE ghost's spare quarter + [main_hart_raw tlbvec0].
+
+   THE CONCLUSION'S avail INDEX NAMES THE RESERVE, and that is the honest
+   number rather than an accident.  [boot_stack_slots K] is
+   [2 + (kv_frame_slots + K)], so the carve the bridge physically takes off
+   [sp0] IS [kv_frame_slots + K] slots -- and since the capability comes out
+   at [b = false], whose reserve is nothing ([IntrDefs.trap_res_off]), all of
+   it is [avail].  Holding the conclusion at [K] instead would be provable
+   ONLY by discarding the deeper 78 slots, after which [main] could never
+   fund a trap (see [IntrDefs.trap_res]: the handler's budget comes out of
+   the interruptible caller's reserve).  Main's own budget premise is
+   [K_main <= avail], which [lia] discharges at this index.
 
    [boot_bridge] below is exactly that conversion, and nothing else: it
    PLACES the three pieces of this hart's SIE ghost (1/2 tied in [sconf],
@@ -208,16 +220,17 @@ Qed.
 (* the stack depth the bridge needs below [sp0]: start()'s still-open
    2-slot frame (dead -- its saved ra/s0 are never read again), then the
    capability's own carve, [kv_frame_slots] reserved interrupt-frame slots
-   plus [K] available to kernel code.  At [K = SpecMain.K_main = 52] that
-   is 2 + 32 + 52 = 86 slots = 688 bytes of the 4096-byte per-hart stack,
+   plus [K] available to kernel code.  At [K = SpecMain.K_main = 100] that
+   is 2 + 78 + 100 = 180 slots = 1440 bytes of the 4096-byte per-hart stack,
    so entry's [stack_own_phys sp0 n] covers it with room to spare. *)
 Definition boot_stack_slots (K : nat) : nat := (2 + (kv_frame_slots + K))%nat.
 
-(* at main's own budget: 132 slots = 1056 bytes, still well inside _entry's
+(* at main's own budget: 180 slots = 1440 bytes, still well inside _entry's
    4096-byte per-hart [stack0] slice.  It grew from 86 when
    [kv_frame_slots] did (32 -> 78, to cover the whole trap path and not just
-   kernelvec's own frame). *)
-Lemma boot_stack_slots_main : boot_stack_slots K_main = 132%nat.
+   kernelvec's own frame), and again from 132 when [K_main] did (52 -> 100, so
+   that the scheduler's loop-head enable can fund its own reserve). *)
+Lemma boot_stack_slots_main : boot_stack_slots K_main = 180%nat.
 Proof. reflexivity. Qed.
 
 (* ------------------------------------------------------------------- *)
@@ -368,7 +381,7 @@ Section BootBridge.
     cpu_ctx_free
     ==∗
     ∃ mf : regfile,
-      sie_cap_gpr mf K false p0 ∗
+      sie_cap_gpr mf (kv_frame_slots + K) false p0 ∗
       cpu_own 0 false p0 cpu_ctx_free false ∗
       ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
       main_hart_raw tlbvec0.
@@ -409,7 +422,10 @@ Section BootBridge.
     iAssert (stack_own (Mf !!! Regidx csp_rs1) (kv_frame_slots + K))
       with "[Hstk]" as "Hstk".
     { rewrite Hsp mb_frame_pa_stk. iExact "Hstk". }
-    iDestruct (sie_cap_intro_bare Mf K stv0 (p := p0)
+    (* [sie_cap_intro_bare]'s stack premise is PLAIN [avail], so it is
+       instantiated at the whole carve in hand -- [kv_frame_slots + K] -- and
+       the capability comes out AT THAT INDEX.  Nothing is dropped. *)
+    iDestruct (sie_cap_intro_bare Mf (kv_frame_slots + K)%nat stv0 (p := p0)
                  with "Hstk Hbit Hbare Hstv He1") as "Hcap".
     (* --- the configuration bundle --- *)
     iEval (rewrite Hmenv) in "Hmenv".

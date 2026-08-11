@@ -392,7 +392,7 @@ Section BoProps.
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
       cpu_own 1 eb (proc_addr j) C false -∗
       arm_pay 0 eb (proc_addr j) -∗
-      sie_cap_gpr M (K - 4)%nat false (proc_addr j) -∗
+      sie_cap_gpr M (trap_res true + (K - 4))%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.begin_op + 0x58)) -∗
       WP (Loop : expr riscv_lang)))%I.
 
@@ -414,7 +414,7 @@ Section BoProps.
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
       cpu_own 1 eb (proc_addr j) C false -∗
       arm_pay 0 eb (proc_addr j) -∗
-      sie_cap_gpr M (K - 4)%nat false (proc_addr j) -∗
+      sie_cap_gpr M (trap_res true + (K - 4))%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.begin_op + 0x2c)) -∗
       bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
       WP (Loop : expr riscv_lang)))%I.
@@ -458,7 +458,7 @@ Section BoBodies.
     p_pid pj ↦₄{dq} pidv -∗
     cpu_own 1 eb pj C false -∗
     arm_pay 0 eb pj -∗
-    sie_cap_gpr M (K - 4)%nat false pj -∗
+    sie_cap_gpr M (trap_res true + (K - 4))%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.begin_op + 0x58)) -∗
     wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ (mf : regfile),
@@ -499,7 +499,7 @@ Section BoBodies.
     iPoseProof (boi_6e with "Htext") as "Hi6e".
     (* +0x58 auipc a0,0x1e *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.begin_op + 0x58)) (mword_of_int 10 : mword 5)
-              (mword_of_int 30 : mword 20) M (K - 4)%nat false
+              (mword_of_int 30 : mword 20) M (trap_res true + (K - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi58 [-]").
     iApply wp_next_off_intro.
@@ -513,7 +513,7 @@ Section BoBodies.
     iEval (rewrite Hp5c) in "Hpc".
     (* +0x5c addi a0,a0,1766 *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.begin_op + 0x5c)) (mword_of_int 10 : mword 5)
-              (mword_of_int 10 : mword 5) (mword_of_int 1746 : mword 12) X1 (K - 4)%nat false
+              (mword_of_int 10 : mword 5) (mword_of_int 1746 : mword 12) X1 (trap_res true + (K - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi5c [-]").
     iApply wp_next_off_intro.
@@ -530,7 +530,7 @@ Section BoBodies.
     { rewrite /X2 upd_eq /X1 upd_eq. exact bo_reloc_a0_58. }
     (* +0x60 jal ra,release *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.begin_op + 0x60)) (mword_of_int 1 : mword 5)
-              (mword_of_int 2084930 : mword 21) X2 (K - 4)%nat false
+              (mword_of_int 2084930 : mword 21) X2 (trap_res true + (K - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi60 [-]").
     iApply wp_next_off_intro.
@@ -723,7 +723,7 @@ Section BoBodies.
     p_pid pj ↦₄{dq} pidv -∗
     cpu_own 1 eb pj C false -∗
     arm_pay 0 eb pj -∗
-    sie_cap_gpr M (K - 4)%nat false pj -∗
+    sie_cap_gpr M (trap_res true + (K - 4))%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.begin_op + 0x24)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -737,7 +737,7 @@ Section BoBodies.
     iPoseProof (boi_28 with "Htext") as "Hi28".
     (* +0x24 c.mv a1,s1 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.begin_op + 0x24)) (mword_of_int 11 : mword 5) (mword_of_int 9 : mword 5)
-              M (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              M (trap_res true + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi24 [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
@@ -749,7 +749,7 @@ Section BoBodies.
     iEval (rewrite Hp26) in "Hpc".
     (* +0x26 c.mv a0,s1 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.begin_op + 0x26)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
-              A0 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              A0 (trap_res true + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi26 [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
@@ -761,7 +761,7 @@ Section BoBodies.
     iEval (rewrite Hp28) in "Hpc".
     (* +0x28 jal ra,sleep *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.begin_op + 0x28)) (mword_of_int 1 : mword 5)
-              (mword_of_int 2089722 : mword 21) A1 (K - 4)%nat false
+              (mword_of_int 2089722 : mword 21) A1 (trap_res true + (K - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi28 [-]").
     iApply wp_next_off_intro.
@@ -787,8 +787,12 @@ Section BoBodies.
     assert (Hsl_lka : add_vec (A2 !!! Regidx (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = log_addr)
       by (rewrite HA2a1; apply addv_sext0).
     iApply (Sleep.wp_sleep_sconf γs j γl (ln_lk γ) log_addr "log"%string
-              (log_res γ bn γfs cov logstart) A2 (K - 4)%nat eb C
-              Hj Hjl Hsl_lka Heb (bo_K22 K HK)
+              (log_res γ bn γfs cov logstart) A2 (trap_res true + (K - 4))%nat eb C
+              Hj Hjl Hsl_lka Heb
+              (* [change]: [lia] cannot relate the atoms [trap_res true] and
+                 [kv_frame_slots] -- see ProofAcquiresleep's sleep call. *)
+              ltac:(pose proof (bo_K22 K HK);
+                    change (trap_res true) with kv_frame_slots; lia)
               with "Hcg Hown Hpay Htext Hpc Hpinv Hislock Htok Hres Hpanic [-]").
     iIntros (CIDs Hss mfs) "%Hs_cs Hcg Hown Hpay Hpc Htok Hres".
     assert (Hpc2c : ret_pc (A2 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x2c))
@@ -833,7 +837,7 @@ Section BoBodies.
     p_pid pj ↦₄{dq} pidv -∗
     cpu_own 1 eb pj C false -∗
     arm_pay 0 eb pj -∗
-    sie_cap_gpr M (K - 4)%nat false pj -∗
+    sie_cap_gpr M (trap_res true + (K - 4))%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.begin_op + 0x46)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -848,7 +852,7 @@ Section BoBodies.
     iPoseProof (boi_4e with "Htext") as "Hi4e".
     (* +0x46 c.mv a1,s1 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.begin_op + 0x46)) (mword_of_int 11 : mword 5) (mword_of_int 9 : mword 5)
-              M (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              M (trap_res true + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi46 [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
@@ -860,7 +864,7 @@ Section BoBodies.
     iEval (rewrite Hp48) in "Hpc".
     (* +0x48 c.mv a0,s1 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.begin_op + 0x48)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
-              B0 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              B0 (trap_res true + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi48 [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
@@ -872,7 +876,7 @@ Section BoBodies.
     iEval (rewrite Hp4a) in "Hpc".
     (* +0x4a jal ra,sleep *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.begin_op + 0x4a)) (mword_of_int 1 : mword 5)
-              (mword_of_int 2089688 : mword 21) B1 (K - 4)%nat false
+              (mword_of_int 2089688 : mword 21) B1 (trap_res true + (K - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi4a [-]").
     iApply wp_next_off_intro.
@@ -898,8 +902,12 @@ Section BoBodies.
     assert (Hsl_lka : add_vec (B2 !!! Regidx (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = log_addr)
       by (rewrite HB2a1; apply addv_sext0).
     iApply (Sleep.wp_sleep_sconf γs j γl (ln_lk γ) log_addr "log"%string
-              (log_res γ bn γfs cov logstart) B2 (K - 4)%nat eb C
-              Hj Hjl Hsl_lka Heb (bo_K22 K HK)
+              (log_res γ bn γfs cov logstart) B2 (trap_res true + (K - 4))%nat eb C
+              Hj Hjl Hsl_lka Heb
+              (* [change]: [lia] cannot relate the atoms [trap_res true] and
+                 [kv_frame_slots] -- see ProofAcquiresleep's sleep call. *)
+              ltac:(pose proof (bo_K22 K HK);
+                    change (trap_res true) with kv_frame_slots; lia)
               with "Hcg Hown Hpay Htext Hpc Hpinv Hislock Htok Hres Hpanic [-]").
     iIntros (CIDs Hss mfs) "%Hs_cs Hcg Hown Hpay Hpc Htok Hres".
     assert (Hpc4e : ret_pc (B2 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x4e))
@@ -909,7 +917,7 @@ Section BoBodies.
     (* +0x4e c.j -> +0x2c : the back edge *)
     iPoseProof (boi_4e with "Htext") as "Hi4e2".
     iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.begin_op + 0x4e))
-              (sign_extend' 21 (concat_vec (mword_of_int 2031 : mword 11) ('b"0"))) mfs (K - 4)%nat false
+              (sign_extend' 21 (concat_vec (mword_of_int 2031 : mword 11) ('b"0"))) mfs (trap_res true + (K - 4))%nat false
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi4e2 [-]").
     iApply wp_next_off_intro.
@@ -958,7 +966,7 @@ Section BoBodies.
     p_pid pj ↦₄{dq} pidv -∗
     cpu_own 1 eb pj C false -∗
     arm_pay 0 eb pj -∗
-    sie_cap_gpr M (K - 4)%nat false pj -∗
+    sie_cap_gpr M (trap_res true + (K - 4))%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.begin_op + 0x2c)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -983,7 +991,7 @@ Section BoBodies.
     { rgne. rewrite Hs1. exact bo_addr_cmt. }
     (* +0x2c c.lw a5,32(s1) : a5 := log.committing *)
     iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.begin_op + 0x2c)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
-              (mword_of_int 32 : mword 12) M (K - 4)%nat
+              (mword_of_int 32 : mword 12) M (trap_res true + (K - 4))%nat
               (mword_of_int (if cmt then 1 else 0) : mword 32) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2c [Hcmt] [-]").
@@ -1038,7 +1046,7 @@ Section BoBodies.
         iSplitR; [iPureIntro; exact Hcmtout|].
         iExact "Hrest". }
       iApply (wp_cbnez_taken_s_sconf (mword_of_int (KernelSyms.begin_op + 0x2e)) (mword_of_int 251 : mword 8)
-                (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) E1 (K - 4)%nat false
+                (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) E1 (trap_res true + (K - 4))%nat false
                 Hc7 ltac:(vm_compute; discriminate)
                 ltac:(rgne; rewrite HE1a5; vm_compute; reflexivity)
                 ltac:(vm_compute; reflexivity)
@@ -1056,7 +1064,7 @@ Section BoBodies.
       iDestruct "Hrest" as (n LB) "(%Hsum & %Hsub & Hbatch)".
       iDestruct (bo_batch_lhn with "Hbatch") as "(%Hn30 & Hlhn & Hbclose)".
       iApply (wp_cbnez_fall_s_sconf (mword_of_int (KernelSyms.begin_op + 0x2e)) (mword_of_int 251 : mword 8)
-                (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) E1 (K - 4)%nat false
+                (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) E1 (trap_res true + (K - 4))%nat false
                 Hc7 ltac:(vm_compute; discriminate)
                 ltac:(rgne; rewrite HE1a5; vm_compute; reflexivity)
                 with "Hcg Hpc Hi2e [-]").
@@ -1068,7 +1076,7 @@ Section BoBodies.
       assert (Haout : add_vec (rget E1 (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 28 : mword 12)) = l_out).
       { rgne. rewrite HE1s1. exact bo_addr_out. }
       iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.begin_op + 0x30)) (mword_of_int 14 : mword 5) (mword_of_int 9 : mword 5)
-                (mword_of_int 28 : mword 12) E1 (K - 4)%nat
+                (mword_of_int 28 : mword 12) E1 (trap_res true + (K - 4))%nat
                 (mword_of_int (Z.of_nat out) : mword 32) false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi30 [Hout] [-]").
@@ -1087,7 +1095,7 @@ Section BoBodies.
       { rewrite /E2 upd_eq. apply bo_sext32. exact (bo_zout_lt out Hout3). }
       (* +0x32 c.addiw a4,a4,1 *)
       iApply (wp_caddiw_s_sconf (mword_of_int (KernelSyms.begin_op + 0x32)) (mword_of_int 14 : mword 5) (mword_of_int 1 : mword 6)
-                E2 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+                E2 (trap_res true + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi32 [-]").
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
@@ -1114,7 +1122,7 @@ Section BoBodies.
       { rgne. rewrite HE3a4. exact (bo_slli2 out Hout3). }
       iApply (wp_slliw_s_sconf (mword_of_int (KernelSyms.begin_op + 0x34)) (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5)
                 (mword_of_int 2 : mword 5) (mword_of_int (4 * (Z.of_nat out + 1)) : mword 64)
-                E3 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) Hsl2
+                E3 (trap_res true + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok) Hsl2
                 with "Hcg Hpc Hi34 [-]").
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
@@ -1132,7 +1140,7 @@ Section BoBodies.
       (* +0x38 c.addw a5,a5,a4 *)
       iEval (rewrite Hc6 Hc7) in "Hi38".
       iApply (wp_addw_s_sconf (mword_of_int (KernelSyms.begin_op + 0x38)) (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5)
-                E4 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+                E4 (trap_res true + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi38 [-]").
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
@@ -1158,7 +1166,7 @@ Section BoBodies.
       { rgne. rewrite HE5a5. exact (bo_slli1 out Hout3). }
       iApply (wp_slliw_s_sconf (mword_of_int (KernelSyms.begin_op + 0x3a)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5)
                 (mword_of_int 1 : mword 5) (mword_of_int (10 * (Z.of_nat out + 1)) : mword 64)
-                E5 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) Hsl1
+                E5 (trap_res true + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok) Hsl1
                 with "Hcg Hpc Hi3a [-]").
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
@@ -1179,7 +1187,7 @@ Section BoBodies.
       assert (Halhn : add_vec (rget E6 (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 44 : mword 12)) = lh_n_pa).
       { rgne. rewrite HE6s1. exact bo_addr_lhn. }
       iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.begin_op + 0x3e)) (mword_of_int 13 : mword 5) (mword_of_int 9 : mword 5)
-                (mword_of_int 44 : mword 12) E6 (K - 4)%nat
+                (mword_of_int 44 : mword 12) E6 (trap_res true + (K - 4))%nat
                 (mword_of_int (Z.of_nat n) : mword 32) false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi3e [Hlhn] [-]").
@@ -1201,7 +1209,7 @@ Section BoBodies.
       (* +0x40 c.addw a5,a5,a3 *)
       iEval (rewrite Hc5 Hc7) in "Hi40".
       iApply (wp_addw_s_sconf (mword_of_int (KernelSyms.begin_op + 0x40)) (mword_of_int 15 : mword 5) (mword_of_int 13 : mword 5)
-                E7 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+                E7 (trap_res true + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi40 [-]").
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
@@ -1248,7 +1256,7 @@ Section BoBodies.
         iPoseProof (boi_50 with "Htext") as "Hi50".
         iPoseProof (boi_54 with "Htext") as "Hi54".
         iApply (wp_bge_taken_s_sconf (mword_of_int (KernelSyms.begin_op + 0x42)) (mword_of_int 14 : mword 13)
-                  (mword_of_int 15 : mword 5) (mword_of_int 18 : mword 5) E8 (K - 4)%nat false
+                  (mword_of_int 15 : mword 5) (mword_of_int 18 : mword 5) E8 (trap_res true + (K - 4))%nat false
                   ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                   Hcmp ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi42 [-]").
@@ -1259,7 +1267,7 @@ Section BoBodies.
         iEval (rewrite Htgt50) in "Hpc".
         (* +0x50 auipc a5,0x1e *)
         iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.begin_op + 0x50)) (mword_of_int 15 : mword 5)
-                  (mword_of_int 30 : mword 20) E8 (K - 4)%nat false
+                  (mword_of_int 30 : mword 20) E8 (trap_res true + (K - 4))%nat false
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi50 [-]").
         iApply wp_next_off_intro.
@@ -1284,7 +1292,7 @@ Section BoBodies.
                          (sign_extend' 64 (mword_of_int 1782 : mword 12)) = l_out).
         { rgne. rewrite HE9a5. exact bo_reloc_out_50. }
         iApply (wp_sw_s_sconf (mword_of_int (KernelSyms.begin_op + 0x54)) (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5)
-                  (mword_of_int 1782 : mword 12) E9 (K - 4)%nat
+                  (mword_of_int 1782 : mword 12) E9 (trap_res true + (K - 4))%nat
                   (mword_of_int (Z.of_nat out) : mword 32) false
                   with "Hcg Hpc Hi54 [Hout] [-]").
         { iEval (rewrite Hsta). iExact "Hout". }
@@ -1346,7 +1354,7 @@ Section BoBodies.
           iSplitR; [iPureIntro; exact Hsub|].
           iApply ("Hbclose" with "Hlhn"). }
         iApply (wp_bge_fall_s_sconf (mword_of_int (KernelSyms.begin_op + 0x42)) (mword_of_int 14 : mword 13)
-                  (mword_of_int 15 : mword 5) (mword_of_int 18 : mword 5) E8 (K - 4)%nat false
+                  (mword_of_int 15 : mword 5) (mword_of_int 18 : mword 5) E8 (trap_res true + (K - 4))%nat false
                   ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Hcmp
                   with "Hcg Hpc Hi42 [-]").
         iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -1407,7 +1415,7 @@ Section ProofBeginOp.
     assert (Hspd : add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) = spd)
       by reflexivity.
     assert (Hsp0 : sp0 = m !!! Regidx csp_rs1) by reflexivity.
-    iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 32 : mword 6) m K 4 true (bo_K4 K HK) Hpush
+    iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 32 : mword 6) m K 4 true ltac:(pose proof (bo_K4 K HK); lia) Hpush
               with "Hcg Hpc Hi00 [-]").
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     iEval (rewrite Hspm) in "Hframe".
@@ -1550,7 +1558,7 @@ Section ProofBeginOp.
                  with "Hown") as "Hown".
     iApply (Acquire.wp_acquire_sconf (ln_lk γ) "log"%string (log_res γ bn γfs cov logstart) Maq
               0%nat eb pj C (K - 4)%nat true
-              bo_noff1 (bo_K10 K HK)
+              bo_noff1 ltac:(pose proof (bo_K10 K HK); lia)
               with "Hcg Hown Htext Hpc [] Hpanic [-]").
     { iEval (rewrite HMaqa0). iExact "Hislock". }
     iIntros (CIDa Hsa ms Macq) "%Hmsf Hcg Hpc %Hcsacq Htok Hres Hown Hpay".
@@ -1584,7 +1592,7 @@ Section ProofBeginOp.
     iPoseProof (boi_20 with "Htext") as "Hi20".
     iPoseProof (boi_22 with "Htext") as "Hi22".
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.begin_op + 0x18)) (mword_of_int 9 : mword 5)
-              (mword_of_int 30 : mword 20) Macq (K - 4)%nat false
+              (mword_of_int 30 : mword 20) Macq (trap_res true + (K - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 [-]").
     iApply wp_next_off_intro.
@@ -1597,7 +1605,7 @@ Section ProofBeginOp.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp1c) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.begin_op + 0x1c)) (mword_of_int 9 : mword 5)
-              (mword_of_int 9 : mword 5) (mword_of_int 1810 : mword 12) T1 (K - 4)%nat false
+              (mword_of_int 9 : mword 5) (mword_of_int 1810 : mword 12) T1 (trap_res true + (K - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c [-]").
     iApply wp_next_off_intro.
@@ -1614,7 +1622,7 @@ Section ProofBeginOp.
     { rewrite /T2 upd_eq /T1 upd_eq. exact bo_reloc_s1_18. }
     (* +0x20 c.li s2,30 *)
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.begin_op + 0x20)) (mword_of_int 18 : mword 5)
-              (mword_of_int 30 : mword 6) (mword_of_int 30 : mword 64) T2 (K - 4)%nat false
+              (mword_of_int 30 : mword 6) (mword_of_int 30 : mword 64) T2 (trap_res true + (K - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi20 [-]").
@@ -1652,7 +1660,7 @@ Section ProofBeginOp.
         rewrite /T1 upd_ne; [| reg_neq]. apply Hacq_rest; [vm_compute; reflexivity|reg_neq..]. }
     (* +0x22 c.j -> +0x2c *)
     iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.begin_op + 0x22))
-              (sign_extend' 21 (concat_vec (mword_of_int 5 : mword 11) ('b"0"))) T3 (K - 4)%nat false
+              (sign_extend' 21 (concat_vec (mword_of_int 5 : mword 11) ('b"0"))) T3 (trap_res true + (K - 4))%nat false
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi22 [-]").
     iApply wp_next_off_intro.

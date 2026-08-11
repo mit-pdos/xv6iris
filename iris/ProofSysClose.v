@@ -122,14 +122,24 @@ Section ProofSysClose.
     lazymatch goal with |- ?a <> ?b =>
       tryif unify a b then fail else (vm_compute; discriminate) end.
 
+  (* THE CARVE THIS READS IS ARM-DEPENDENT, hence the [0 < k] premise.
+     [IntrDefs.sie_cap] owns [trap_res bb + k] slots, and [trap_res false] is
+     NOTHING -- so at the interrupts-off arm the ONLY slots underwriting an sp
+     bound are the caller's own [k], and a zero-slot carve says nothing about
+     sp at all.  (Under the old arm-blind reserve the 78 reserved slots
+     covered it at either arm, which is why this used to need no premise.
+     The premise is local to this helper: every call site sits inside the
+     capstone, whose [<fn>_stack <= av] premise is already unfolded, so it is
+     a [lia].) *)
   Lemma sc_sp_bounds `{CID0 : CpuId} (m : regfile) (k : nat)
       (b : bool) (pp : mword 64) :
+    (0 < k)%nat ->
     sie_cap_gpr m k b pp -∗
     ⌜(8 <= uint (m !!! Regidx csp_rs1) < 274877906944 + 8)%Z⌝.
   Proof.
-    iIntros "(_ & _ & (Hstk & _ & _) & _)".
-    iApply (stack_own_sp_bounds _ (kv_frame_slots + k)%nat with "Hstk").
-    unfold kv_frame_slots. lia.
+    iIntros (Hk) "(_ & _ & (Hstk & _ & _) & _)".
+    iApply (stack_own_sp_bounds _ (trap_res b + k)%nat with "Hstk").
+    destruct b; unfold trap_res, kv_frame_slots; lia.
   Qed.
 
   (* =================================================================== *)
@@ -497,7 +507,11 @@ Section ProofSysClose.
                     = add_vec_int (mword_of_int (KernelSyms.sys_close + 0x12) : mword 64) 4)
       by (rewrite /M6 upd_eq; reflexivity).
     (* the two out-parameters are not null: the frame's own geometry *)
-    iDestruct (sc_sp_bounds with "Hcg") as %Hspb.
+    (* the helper's [0 < k] premise, from the capstone's own stack budget.
+       Named rather than [ltac:(lia)]-inline: at that position [k] is still
+       an unresolved evar, and [lia] answers "Cannot find witness". *)
+    assert (Hkpos : (0 < (av - 4)%nat)%nat) by lia.
+    iDestruct (sc_sp_bounds _ _ _ _ Hkpos with "Hcg") as %Hspb.
     rewrite HM6sp in Hspb.
     assert (Hnzf : M6 !!! Regidx (mword_of_int 12 : mword 5) <> (zero_reg : mword 64)).
     { rewrite HM6a2. by apply sp_bounds_nonzero. }
