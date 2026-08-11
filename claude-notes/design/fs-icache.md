@@ -2679,3 +2679,44 @@ stage of its own; it is a coordinator-level change to §14.6, not a
 retrofit an implementing agent may take.  Until then filewrite's
 FD_INODE arm stays blocked exactly as fs-sysfile S3a left it, and
 `SpecFilewrite.v` stays unwritten.
+
+### 17.2 THE RULING ON §17′ (coordinator, 2026-08-11): adopt §17.1's
+### liveness-generation design, including the ic_loaded slice
+
+§17's persistent witness is DEAD — §17.1's currency argument is
+decisive and joins §16.4's claim-box in the corrected-by-execution
+column. The repair is RATIFIED as proposed, all four pieces:
+
+1. `iliveUR := gmapUR nat (prodR fracR (agreeR (leibnizO gname)))`,
+   `live_frac k s := ∃ g, live_gen k s g` — arity-preserving; no Spec
+   over iref_tok/inode_ref/inode_shr/inode_held changes text.
+2. The generation bump happens where the whole unit exists: the
+   free arm under the itable lock — iget's recycle, the right side
+   condition by construction.
+3. Per-generation ONE-SHOT at the agree-carried gname: minted pending
+   at recycle (parked in ic_unloaded), spent by the fill against
+   `di_type dn`. The type enters at the only instruction that knows
+   it.
+4. `ic_loaded` owns a ½ liveness slice (payload half; holders qt;
+   itable (½−qt) at live slots; free slots keep the whole unit in
+   itable_body). **§14.6's mass-conservation witness is RESTATED, not
+   patched**: the conserved quantity becomes "1 per live slot, split
+   payload-half / holders / itable-rest; 1 per free slot, whole in
+   the table" — write the new ledger as a definition and prove the
+   old lemmas as corollaries where they still hold; where they do
+   not (live_slot's four update lemmas), the new statements replace
+   them with the §17.1 balance sheet as the guide.
+
+Consequences accepted: IcacheBoot's mint distributes the slices;
+ProofIget hands the ½ out at entry mint and reclaims at recycle;
+ProofIput's REF-1 close collects via §13.13's HELD arm; the ~23
+ic_loaded sites across IcacheEscrow/ProofIlock/ProofIunlock/
+ProofFileread/ProofNamex gain the slice mechanically. `inode_pay`
+then carries the generation gname + the one-shot + ⌜fc_wbool C →
+ty ≠ T_DIR⌝ (keyed on the WRITABLE bool — FD_DEVICE selects
+inode_pay too and never reaches writei). sys_open's discharge
+obligations are exactly S3b's report (a)–(c), recorded for S6.
+
+Sequencing: S3c = this retrofit, full-gated. S3d = SpecFilewrite +
+Proof + Link on top. sys_fstat/sys_read are NOT blocked and may be
+folded into S4 whenever the pipeline has room; only sys_write waits.
