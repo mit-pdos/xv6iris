@@ -290,7 +290,17 @@ floor that sees every observation.
       ts_y > ts_x > ts_y); SCexcl — the `excl_ok` window + `ak_latest`
       value pinning.  Expect the acyclicity proof to be a per-class
       height/measure argument mixing timestamps (fenced/excl arms) with
-      the violation contradiction (owned arm).
+      the violation contradiction (owned arm).  NOTE after W4 slice 2:
+      D stays EVENT-level (a machine step is atomic in the pf
+      interleaving — its bytes cannot split across the topological
+      sort); that is fine because D has no co/fr edges, so
+      `ev_rfe_co_fr_cyclic` does not apply to it.  But W2b's
+      read-admissibility argument must handle a multi-byte load reading
+      a MIX of fresh and stale timestamps — test any candidate
+      simulation relation against exactly that witness's shape, and
+      consider reusing `WeakAxiomatic2.evpre`/`opos` (a read's position
+      = its timestamp ⊔ its pre-view) as the W2b view-relation
+      vocabulary.
 - [ ] **W2b — the construction.** Topologically sort D; build the pf run
       by induction over the sort, carrying: a timestamp permutation π
       (the pf log order is FULFILMENT order, which differs from gmo — an
@@ -368,12 +378,35 @@ file:line map for every item is
       (byte-timestamp, position) embedding), atomicity, and the local
       ordering axiom `ax_ord`.  The interim assumption is now a checkable
       axiomatic statement.
-- [ ] Slice 2, ONE unit (the file's §7 has the intended statements):
-      construct the RVWMO global memory order (place every read) → full
-      `ob`-acyclicity (`acyclic(ppo ∪ rfe ∪ co ∪ fr)` — cannot embed into
-      execution order because `fr` points backwards; needs the same
-      construction completeness does) → completeness
-      (axiomatic-consistent ⇒ machine-reachable).
+- [x] **Slice 2 LANDED except the completeness residue**
+      (`WeakAxiomatic2.v`, axiom-free): the global memory order is a
+      total order on OPERATIONS `mop := (byte, event)` — a read placed at
+      its timestamp JOINED with its `load_vpre` (`evpre`; the naive
+      "at-its-timestamp" placement is refuted by `load; fence r,r; load`
+      reading backwards-in-time) — with totality/transitivity/
+      irreflexivity, `ob ⊆ gmo_op`, the co and rf-interval
+      characterizations all in `promise_free_gmo`; and
+      `promise_free_ob_acyclic` with FULL `rf` (stronger than herd's
+      rfe-only form).  **§7's event-level external axiom is FALSE —
+      machine-checked** (`ev_rfe_co_fr_cyclic`): a two-byte load reading
+      byte 0 fresh and byte 1 stale closes an rfe;fr;co cycle with no ppo
+      edge, so per-byte OPERATIONS are forced, matching RVWMO's
+      memory-operation granularity.  `ppo_op` gained a fourth arm (po
+      into a write — free promise-free, subsumes every store-successor
+      ppo rule) and the `ord_pr` arm excludes a fused RMW's written
+      bytes (the fence publishes the read half; the operation sits at
+      the write half).
+- [ ] Completeness residue: the general replay construction and the
+      SC-candidate class LANDED (`cand_reachable`,
+      `sc_cand_reachable` — every SC behavior is promise-free
+      reachable; residue = exactly the stale reads);
+      `promise_free_complete` is stated in checkable form and needs ONE
+      lemma: VIEW DOMINATION (every replayed view value is ≤ `opos` of
+      an `ppo_op`-predecessor).  Key structural finding: this is NOT a
+      corollary of the local `ax_ord` — fence delivery is transitive
+      (a floor value is justified by an `ob`-PATH), so completeness
+      genuinely needs the global axiom.  Estimated 600–900 lines, one
+      conjunct per view component, forward bank fiddliest.
 - [ ] Projection lemmas — the load-bearing missing link for composition:
       `WeakLitmus.lstep → exec_wf` (cheap: the arms match 1:1) and
       `WeakInterp.wrun → exec_wf` (moderate: multi-byte + oracle; note a
@@ -387,7 +420,12 @@ file:line map for every item is
       `store_post_run_vwOld`, `load_post_run_vrOld'`,
       `load_post_run_vrNew_aq`, `store_post_run_fwd_inv`,
       `load_post_run_single`, `msg_byte_range` (from
-      `WeakPromiseBridge.v`).  Into `WeakPromise.v`: `read_ok_single`,
+      `WeakPromiseBridge.v`), `load_post_fold_vrNew_aq_vpre`,
+      `load_post_run_vrNew_aq_vpre`, `rd_ok_ts_bounded` (from
+      `WeakAxiomatic2.v`); also lift `exec_ws_bounded` and `evpre` + its
+      lemmas into `WeakAxiomatic.v`, and `wp_astep_inv` /
+      `astep_of_rtc_frozen` into `WeakPromiseFact.v` (from
+      `WeakRobustTrace.v`).  Into `WeakPromise.v`: `read_ok_single`,
       de-`Local` `read_ok_ts_bounded`, `wpstep_rmw_now` (next to
       `wpstep_store_now`), and consider hoisting `WeakPromiseFact`'s
       `wp_astep`/`astep_ok` as the canonical state-rule presentation +
