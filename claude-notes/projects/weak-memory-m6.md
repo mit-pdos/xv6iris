@@ -320,7 +320,22 @@ floor that sees every observation.
       `class_pins` from the infrastructure slice therefore concretizes
       to: cls-soundness (an SCexcl message's fulfil is an LRmw; an
       SCfenced message's readers are acquire-disciplined), leaving
-      SCowned to φ.  Expect the acyclicity proof to be a per-class
+      SCowned to φ.  **SECOND REFINEMENT (2026-08-11, found integrating
+      the landed measure theorem): `rf_disciplined` is too strong for
+      OWNED-PUBLISHED reads.**  A critical-section read is a plain `ld`
+      and the next store may follow fence-free inside the CS, so
+      `disciplined` fails — yet the edge is harmless because the
+      lock-acquire's `.aq` PRECEDED the read, raising `w_vwNew` above
+      the release timestamp and hence above the message read
+      (publication order): the read is COVERED — `ts ≤ w_vwNew` at the
+      read's pre-state — and EXT alone pins every later fulfil, no
+      fence needed.  The premise becomes `disciplined ∨ covered` per
+      cross edge (covered's S1 case skips the fence machinery, straight
+      to monotonicity + EXT); the Iris side discharges `covered` for
+      owned-published reads from the pub/acquire story (the reader's
+      view covers everything below the watermark it acquired).
+      Extension delegated to the measure-theorem agent (its context).
+      Expect the acyclicity proof to be a per-class
       height/measure argument mixing timestamps (fenced/excl arms) with
       the violation contradiction (owned arm).  NOTE after W4 slice 2:
       D stays EVENT-level (a machine step is atomic in the pf
