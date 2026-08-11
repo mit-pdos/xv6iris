@@ -103,10 +103,12 @@
        against its own [iref_tok] kills OUT ([iref_tok_two_lookup], the line
        [ic_open_auth_ref] already uses) and is what makes the credential
        exclusive -- no second thread holds a reference to this slot at all;
-       the PAYLOAD it is carrying kills PARKED and MID, because both hold a
-       [dinode_at] for the same inum and [InodeRegion.dinode_at_excl] is
-       exactly that (the inum is pinned to the opener's by [ic_id_agree]
-       first); and the table's [ic_id] half at [true] kills EMPTY.  REF-1
+       the PAYLOAD it is carrying kills PARKED and MID, because every payload
+       owns this ENTRY's metadata cells and those are exclusive
+       ([ic_payload_excl]; before §16.4 this went through the payload's
+       [dinode_at], which the slimmed free arm no longer has -- and the cells
+       are slot-keyed, so no [ic_id_agree] is needed to pin the inums first);
+       and the table's [ic_id] half at [true] kills EMPTY.  REF-1
        rather than [ic_tok] is FORCED, not chosen: iput must also be able to
        UNDO the window at +0x44, when [ip->nlink] is nonzero and no
        [acquiresleep] has run.  Putting a
@@ -401,10 +403,20 @@ Section IcacheEscrow.
   (*  2.  THE PAYLOADS                                                   *)
   (* ------------------------------------------------------------------ *)
 
-  (* ONE UNCACHED INUM'S POOL BUNDLE (§13.3).  Two shapes, because free
-     inodes exist: [inode_ok] demands a nonzero type, and a type-0 inode
-     owns no blocks (itrunc returned them), so it carries only its record.
-     [ialloc] (future) is what flips an entry free -> allocated.
+  (* ONE UNCACHED INUM'S POOL BUNDLE (§13.3, slimmed by §16.4).  Two shapes,
+     because free inodes exist: [inode_ok] demands a nonzero type, and a
+     type-0 inode owns no blocks (itrunc returned them).
+
+     THE FREE ARM IS NOW A BARE MARKER (§16.3/§16.4).  It used to carry the
+     inum's [dinode_at]; ialloc cannot reach it there, because the pool is
+     behind the itable spinlock and the claim is serialised by the BUFFER
+     instead (§16.1/§16.2).  So a free inum's record fragment lives in
+     [InodeRegion]'s invariant and what the pool holds is
+     [InodeRegion.imark] -- the per-inum token whose other home is that same
+     invariant's OUT arm.  It is not decoration: it is exactly what makes
+     ilock's fill able to conclude that a nonzero type at a marker-parked
+     entry means the fragment is still in the region
+     ([InodeRegion.ireg_withdraw]).
 
      THE DIRECTORY-WF CONJUNCT (§15(a)).  The allocated arm also carries
      [DirView.dir_ok icfg_nib] -- if this inode is a DIRECTORY then every
@@ -421,9 +433,7 @@ Section IcacheEscrow.
         dinode_at γi inum dn0 ∗
         ind_res γfs bm0 ∗
         inode_blocks γfs bm0 data0)
-     ∨ (∃ dn0 : dinode,
-          ⌜bv_unsigned (di_type dn0) = 0⌝ ∗
-          dinode_at γi inum dn0))%I.
+     ∨ imark γi (bv_unsigned inum))%I.
 
   Global Instance ipool_shape_timeless γfs γi cov logstart inum :
     Timeless (ipool_shape γfs γi cov logstart inum).
@@ -1280,37 +1290,57 @@ Section IcacheEscrow.
     iRight; iLeft. rewrite /ic_out. iExists d, dev, inum. iFrame.
   Qed.
 
-  (* EVERY PAYLOAD NAMES ITS INUM'S REGION RECORD, on both polarities and on
-     both pool shapes.  This is the credential half of the window's re-open:
-     [dinode_at] is an exclusive per-inum fragment
-     ([InodeRegion.dinode_at_excl]), so a holder carrying a payload for inum
-     [inum] refutes any arm that also holds one -- which is PARKED (its
-     [ic_payload]) and MID (its [ic_unloaded]).  Stated as an accessor so the
-     refutation costs the payload nothing. *)
-  Lemma ic_payload_dinode γfs γi cov logstart k inum (v : bool) :
-    ic_payload γfs γi cov logstart k inum v -∗
-    ∃ dn : dinode,
-      dinode_at γi inum dn ∗
-      (dinode_at γi inum dn -∗ ic_payload γfs γi cov logstart k inum v).
+  (* full ownership of a word is EXCLUSIVE -- [FileOff.word4_pointsto_excl]
+     restated, because this file must not depend on the file layer *)
+  Local Lemma iesc_word4_excl (a : Arch.pa) (dq : dfrac) (w1 w2 : bv 32) :
+    a ↦₄ w1 -∗ a ↦₄{dq} w2 -∗ False.
   Proof.
-    iIntros "Hpay". rewrite /ic_payload. destruct v.
-    - iDestruct "Hpay" as (dn bm) "Hlk".
-      iDestruct "Hlk" as (data) "(%Hok & %Hdok & Hdat & Hrest)".
-      iExists dn. iFrame "Hdat". iIntros "Hdat".
-      iExists dn, bm, data. iFrame "Hrest".
-      iSplitR; [iPureIntro; exact Hok |].
-      iSplitR; [iPureIntro; exact Hdok |].
-      iExact "Hdat".
-    - rewrite /ic_unloaded. iDestruct "Hpay" as "[Hraw Hpool]".
-      rewrite /ipool_shape. iDestruct "Hpool" as "[Hal | Hfr]".
-      + iDestruct "Hal" as (dn0 bm0 data0) "(%Hok & %Hdok & Hdat & Hrest)".
-        iExists dn0. iFrame "Hdat". iIntros "Hdat". iFrame "Hraw".
-        iLeft. iExists dn0, bm0, data0. iFrame "Hrest".
-        iSplitR; [iPureIntro; exact Hok |].
-        iSplitR; [iPureIntro; exact Hdok |]. iExact "Hdat".
-      + iDestruct "Hfr" as (dn0) "(%Hty & Hdat)".
-        iExists dn0. iFrame "Hdat". iIntros "Hdat". iFrame "Hraw".
-        iRight. iExists dn0. iSplitR; [iPureIntro; exact Hty |]. iExact "Hdat".
+    iIntros "H1 H2".
+    rewrite !word4_pointsto_unfold.
+    iDestruct "H1" as "[_ H1]". iDestruct "H2" as "[_ H2]".
+    change (seq 0 4) with ([0; 1; 2; 3]%nat).
+    iDestruct "H1" as "[Hb1 _]". iDestruct "H2" as "[Hb2 _]".
+    iDestruct (mem_pointsto_ne with "Hb1 Hb2") as %Hne.
+    iPureIntro. exact (Hne eq_refl).
+  Qed.
+
+  (* EVERY PAYLOAD OWNS THIS ENTRY'S METADATA CELLS, on both polarities and
+     on both pool shapes: the loaded arm holds [inode_meta] outright, the
+     unloaded one holds it inside [InodeLock.inode_raw].  That is the
+     credential half of the window's re-open.
+
+     (§16.4 replaced the old [ic_payload_dinode] here.  That lemma pulled a
+     [dinode_at] out of any payload and refuted a rival arm by
+     [InodeRegion.dinode_at_excl]; since the free arm slimmed to a MARKER,
+     no [dinode_at] is extractable from it.  The metadata CELLS are a
+     strictly better credential anyway -- they are slot-keyed rather than
+     inum-keyed, so the refutation no longer needs [ic_id_agree] to pin the
+     two arms' inums first.) *)
+  Local Lemma ic_payload_size γfs γi cov logstart k inum (v : bool) :
+    ic_payload γfs γi cov logstart k inum v -∗
+    ∃ w : bv 32, i_size (ientry k) ↦₄ w.
+  Proof.
+    rewrite /ic_payload. destruct v.
+    - iIntros "Hpay".
+      iDestruct "Hpay" as (dn bm) "Hlk".
+      iDestruct "Hlk" as (data) "(_ & _ & _ & Hmeta & _)".
+      rewrite /inode_meta. iDestruct "Hmeta" as "(_ & _ & _ & _ & Hsz)".
+      iExists (di_size dn). iExact "Hsz".
+    - rewrite /ic_unloaded /inode_raw.
+      iIntros "[[Hmeta _] _]".
+      iDestruct "Hmeta" as (d) "Hmeta".
+      rewrite /inode_meta. iDestruct "Hmeta" as "(_ & _ & _ & _ & Hsz)".
+      iExists (di_size d). iExact "Hsz".
+  Qed.
+
+  Lemma ic_payload_excl γfs γi cov logstart k inum1 inum2 (v1 v2 : bool) :
+    ic_payload γfs γi cov logstart k inum1 v1 -∗
+    ic_payload γfs γi cov logstart k inum2 v2 -∗ False.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (ic_payload_size with "H1") as (w1) "H1".
+    iDestruct (ic_payload_size with "H2") as (w2) "H2".
+    iApply (iesc_word4_excl with "H1 H2").
   Qed.
 
   (* RE-OPENING THE WINDOW.  iput does this TWICE, on two different paths,
@@ -1365,10 +1395,7 @@ Section IcacheEscrow.
     - (* PARKED: its payload names the same inum (pinned by the ghost first),
          and [dinode_at] is exclusive *)
       iDestruct "Hpk" as (dev' inum' v') "(_ & _ & _ & Hpay' & _ & Hgt)".
-      iDestruct (ic_id_agree with "Hgid Hgt") as %(_ & <- & <-).
-      iDestruct (ic_payload_dinode with "Hpay") as (dn) "[Hd _]".
-      iDestruct (ic_payload_dinode with "Hpay'") as (dn') "[Hd' _]".
-      iExFalso. iApply (dinode_at_excl with "Hd Hd'").
+      iExFalso. iApply (ic_payload_excl with "Hpay Hpay'").
     - (* OUT: REF-1, on both deposit kinds, exactly as in
          [ic_open_auth_ref] -- the count for a reference, the LIVE mass for a
          share (§14.8). *)
@@ -1386,11 +1413,9 @@ Section IcacheEscrow.
                 with "Hinv Hhalf Hlv Hlv'") as "[]".
     - (* MID: its unloaded bundle carries this inum's record too *)
       iDestruct "Hmid" as (dev' inum' w) "(_ & _ & _ & Hpay' & Hgt)".
-      iDestruct (ic_id_agree with "Hgid Hgt") as %(_ & <- & <-).
-      iDestruct (ic_payload_dinode γfs γi cov logstart k inum false
-                   with "Hpay'") as (dn') "[Hd' _]".
-      iDestruct (ic_payload_dinode with "Hpay") as (dn) "[Hd _]".
-      iExFalso. iApply (dinode_at_excl with "Hd Hd'").
+      iExFalso.
+      iApply (ic_payload_excl γfs γi cov logstart k inum inum' v false
+                with "Hpay Hpay'").
     - (* EMPTY: the identification ghost *)
       iDestruct "Hvg" as (dev' inum' w) "(_ & _ & _ & _ & _ & Hgt)".
       iDestruct (ic_id_agree with "Hgid Hgt") as %(Hc & _ & _). discriminate.

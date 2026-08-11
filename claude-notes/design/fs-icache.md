@@ -2409,3 +2409,75 @@ needs no pool contents), `ProofIget.v` (audit — expected to ride).
 ireclaim/fsinit compose only contract SHAPES that survive, but fsinit's
 postcondition is pool-shaped, so the boot half is sequenced AFTER the
 retrofit: N5b (retrofit) → N5c (ialloc) → N5d (ireclaim + fsinit).
+
+### 16.5 §16.4 AS BUILT (N5b, 2026-08-11): the box is NOT a second
+### invariant — it is the region's own arm, and the marker is a real token
+
+§16.4's *content* is landed exactly as ruled: free inums' fragments live in
+the region, the claim is buffer-serialised, `ireg_write_au` gains
+`di_type dn' ≠ 0`, `ireg_free_au` is its dual, the pool stays TOTAL with a
+slimmed free arm, ilock's fill gains one sub-arm, and the boot mint gets
+cheaper.  Its *packaging* changed, for one reason that is a genuine gap in
+the ruling and is worth stating precisely.
+
+**THE GAP: §16.4's exhaustiveness argument is not a proof.** The ruling
+says the fill's third case is forced because "type ≠ 0 means the fragment
+is out of the region, and out-of-region ∧ not-in-any-`ic_loaded` (this
+entry is unloaded; entries are unique per `(dev,inum)`) forces the box."
+That is a **uniqueness claim about the whole itable** — it needs
+`ic_ci_wf`'s injectivity and `dom(pool) = in-range ∖ cached`, both of which
+live under the **itable spinlock**, and ilock's fill holds only its entry's
+sleeplock.  So `icb_withdraw` as ruled has no discharge: with a
+content-free marker, "box full" and "box empty" are indistinguishable from
+inside the fill, and the empty case cannot be refuted.
+
+**THE REPAIR: the marker becomes a per-inum EXCLUSIVE TOKEN**, and then the
+box collapses into the region invariant.  `InodeRegion.imark γi z` is a
+ghost_map element of the region's OWN map at a key no inum can occupy
+(`imark_key z := -(z+1)`; inums are `bv_unsigned`s, hence ≥ 0).  The
+region's per-slot arm is
+
+    ireg_slot γi z d :=
+        (⌜di_type d = 0 ∨ fresh_shape d⌝ ∗ z ↪[γi] d)   (* FREE or CLAIMED *)
+      ∨ (⌜di_type d ≠ 0⌝ ∗ imark γi z)                   (* OUT *)
+
+so **exactly one of {fragment, marker} is inside the invariant and the
+other is outside**, and the claim box is precisely the first arm taken at a
+`type ≠ 0` record.  The fill holds the marker (it is the slimmed free arm),
+which refutes the OUT arm by `imark_excl` in one line — no itable lock, no
+entry-uniqueness argument, no second invariant, and **no two-invariant mask
+discipline to design** (the risk §16.4 flagged evaporates).
+
+Consequences that differ from the ruling's blast-radius list:
+
+- **No `IcacheClaim.v`.** A separate box invariant needs its own gname, and
+  that gname would have to appear in `ireg_inv` *and* in `ipool_shape` —
+  i.e. in `ic_escrow`'s arity, i.e. in every fs contract in the tree.
+  Filing the token in the region's existing map keeps **`ireg_inv`'s and
+  `ic_escrow`'s signatures byte-identical**, which is why SpecIlock did not
+  change at all.
+- **`ireg_claim_au` pays out nothing** (`True`), not a boxed fragment: the
+  retagged fragment simply stays in the region's first arm.  ialloc's whole
+  ghost step is one premise-free AU.  N5c's signatures are in the N5b
+  ledger.
+- **`icb_withdraw` is `InodeRegion.ireg_withdraw`**, a mask-preserving
+  opening in `ireg_read`'s shape: marker + machinery half in, `fresh_shape`
+  + fragment out, map unchanged.
+- **iupdate's contract had to change** — the ruling's "ProofIput's free path
+  switches its region step to `ireg_free_au`" is not reachable from iput,
+  which touches the region only *through* iupdate.  The fix is one
+  conditional payout, `InodeRegion.ireg_out γi inum dn` = `dinode_at` when
+  `di_type dn ≠ 0` and `imark` when it is 0, so iupdate keeps ONE contract
+  and picks the arm move itself.  `SpecWritei` and `SpecItrunc` then need
+  `di_type dn ≠ 0` as a premise (they flush type-preserving records);
+  dirlink has it from `di_type dn = T_DIR` and iput from `inode_ok`.
+- **`ic_payload_dinode` retires.** It pulled a `dinode_at` out of any
+  payload to refute a rival escrow arm; the slimmed free arm has none.  Its
+  replacement `ic_payload_excl` refutes on the entry's `inode_meta` CELLS,
+  which every payload holds on both polarities — strictly better, because
+  the cells are slot-keyed and the refutation no longer needs `ic_id_agree`
+  to pin the two arms' inums first.
+- **The boot mint** allocates the record map and the marker map in one
+  `ghost_map_alloc` and pays out `ireg_out` per inum; `ireg_alloc` needs a
+  flat-inum → (block, slot) re-index (`IcacheBoot.seq16_flatten`) that did
+  not exist before, because the block conjunct now holds ghost elements.
