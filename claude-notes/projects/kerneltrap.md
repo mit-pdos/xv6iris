@@ -1095,6 +1095,105 @@ must flip the SIE ghost, which needs the invariant quarter, which needs
 `intr_inv` in its precondition — and `intr_inv`'s body holds the handler spec.
 Same-hart does not help.
 
+### HANDOVER 2026-08-11: the fixpoint is BUILT and landed; the engines are next
+
+**State.** `main` = `30041d61` (the `intr_inv` deletion), GREEN, 972 files.
+Branch **`kerneltrap-fixpoint` = `3b245758`, deliberately RED on exactly two
+files** — `WpIntrInv.v` (the engine) and `ProofKernelvec.v` (the producer).
+192 files rebuilt after the change and nothing else broke, so the blast radius
+really is the two the list above names.
+
+**What is done.** `intr_handler_spec` is `fixpoint ihs_pre` at the ambient hart,
+threading `intr_res` in and — via `∀ c' : CpuId` — back out at the resuming
+hart.  Public name and arity unchanged, so every existing
+`intr_handler_spec h` still means what it meant, and the ~57 `intr_res` sites
+and 7 `rewrite /intr_res` sites are untouched.
+
+**THE SHAPE IS SPLIT IN TWO AND THAT IS NOT COSMETIC.**  `S` occurs in exactly
+ONE place in the whole contract — under the `▷` inside the resource — so the
+body is abstracted over the RESOURCE FAMILY, not over the spec:
+
+```coq
+Definition ires_of (S : CPU -d> mword 64 -d> iPropO Σ) : CPU -d> iPropO Σ    (* holds the ▷ *)
+Global Instance ires_of_contractive : Contractive ires_of.                   (* solve_contractive *)
+Definition ihs_of  (R : CPU -d> iPropO Σ) : CPU -d> mword 64 -d> iPropO Σ    (* the full contract *)
+Global Instance ihs_of_ne : NonExpansive ihs_of.                             (* solve_proper *)
+Definition ihs_pre S := ihs_of (ires_of S).                                  (* Contractive, 2 lines *)
+Definition ihs := fixpoint ihs_pre.
+Definition intr_handler_spec h := ihs cpu_id h.
+```
+
+MEASURED, all of it, because the naive shape is not merely slower:
+
+| | |
+|---|---|
+| one `solve_contractive` over the whole contract | **>16 min, killed** |
+| split: `Contractive ires_of` + `NonExpansive ihs_of` | both fast |
+| `fixpoint_unfold` at a hart | fast |
+| `Persistent` by `apply _` | **>90 s, killed** |
+| `Persistent` by naming `bi.intuitionistically_persistent` | instant |
+| the whole construction, standalone file | **5.5 s** |
+
+The `Persistent` line is the trap: the PRE-fixpoint definition proves it with
+`apply _.` instantly, and it is the `fixpoint_unfold` rewrite underneath that
+makes the identical tactic pathological — the search then runs over the entire
+unfolded contract for an answer that is one instance, because the body is `□ _`.
+`Opaque`-ing the leaf definitions (`gpr_file`, bitvector arithmetic) was
+measured too and buys NOTHING; do not add it.
+
+`ires_of` STAYS TRANSPARENT while the `Typeclasses Opaque` seal stays on the
+instantiated `intr_res`: `solve_contractive` has to SEE the `▷` that the seal
+exists to hide from `MaybeIntoLaterN`.  Sealing the parameterized form makes the
+fixpoint unprovable; sealing neither re-opens the hazard the `intr_inv` deletion
+just closed.
+
+**Two gotchas a prototype outside the section cannot show you.**
+`(CID := c)` does NOT work on a section-local definition — inside its own open
+section `sie_gname` is not parameterized, it IS `sie_name cpu_id`, so the
+explicit-hart form is the underlying `sie_name c` (else: *"Wrong argument name
+CID"*).  Same rule as slice 3b's `rename`, from a new angle.  And the shadowing
+binders are spelled `CIDp`/`CIDb`, not `CID`: statement-level shadowing is legal
+but unreadable once two of them nest inside a section that already has one.
+
+**WHY THERE IS NO CHEAPER CHECKPOINT — this was my wrong assumption, corrected
+by the build.**  I expected the engine could stay fixed-hart by instantiating
+the contract's `∀ c'` at its own hart.  It cannot, and the reason is POLARITY:
+`(∀ c', post c')` is a **premise** of the contract, i.e. an OBLIGATION on the
+engine to supply its continuation at whatever hart resumes — not a guarantee it
+may specialize.  So the engines must become hart-generic in the same edit.  Do
+not look for an intermediate green state; there isn't one.
+
+**NEXT, in order, with the exact current failures.**
+
+1. `WpIntrInv.v` — the engine.  Its use site already has the needed
+   `iEval (rewrite intr_handler_spec_unfold) in "Hsp"` (the spec is no longer
+   syntactically `□ ∀ …`, so `iApply` cannot see its premises).  It now fails at
+   the continuation with *"iIntro: could not introduce "Hhs", goal is not a wand
+   or implication"* — because the post begins `∀ c'`.  So: `iIntros (c')` there,
+   move the engine's callback inside `wp_next` (the two wraps slice 3b
+   deliberately left out), and RE-FORM `intr_res` to hand to the contract.  The
+   engine OPENED it at `WpIntrInv:310`; the comment already at `:355` explains
+   why re-forming early trips the `iNext`-strips-inside hazard — the re-seal
+   must happen at the point of use, as the Löb re-seal at `:397` already does.
+   The hart-genericity recipe is in `durable-notes.md` under "A HART-INDEXED
+   TERM WRITTEN FRESH IN A PROOF MEANS THE *SECTION* HART"; the engine's `b =
+   true` arm is the hard case because it frames per-hart residue (the
+   travelling `sret_bits` half, the SIE eighth, `cpu_hart`'s cells,
+   `strans_bit`, `intr_res`) across the handler run.
+2. `ProofKernelvec.v:1475` — the producer.  Fails at `iModIntro` with *"the goal
+   is not a modality"*: after `cbv beta delta [kernelvec_handler_spec_body]` the
+   `□` is behind the fixpoint, so `rewrite intr_handler_spec_unfold` first.
+   Then it must CONSUME the new `intr_res` premise and PRODUCE the `∀ c'` post.
+3. Delete `KERNELTRAP_RETURNS` / `KerneltrapRet` / `kv_cell` / `kt_clobbered`
+   and `LinkKerneltrap.v`'s axiom, and rewire `ProofKernelvec` onto the real
+   `KERNELTRAP`.
+
+**Done when** `Print Assumptions Kernelvec.kernelvec_handler_spec` yields
+exactly the 5 rv64d platform axioms + `functional_extensionality_dep` +
+`Consoleintr.wp_consoleintr_sconf`.  Today it additionally shows
+`kerneltrap_returns`; `proof_coverage.py --check` (run it from the REPO ROOT,
+not `iris/`) is at 156 functions proven / 83%.
+
 ### Two rules this decomposition earned
 
 - **A weakening makes a lemma easier to PROVE and harder to USE.**  Wrapping a
