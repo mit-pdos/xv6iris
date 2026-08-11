@@ -1199,6 +1199,88 @@ Proof.
   unfold MachineWord.MachineWord.and. apply bv_and_unsigned.
 Qed.
 
+(* ==================================================================== *)
+(*  FIELDS OF A MASKED WORD.                                             *)
+(*                                                                      *)
+(*  [bvcrush] above extracts a field out of a nest of [update_slice]es,  *)
+(*  which is what the mstatus/sstatus GETTERS need.  This block is its   *)
+(*  counterpart for the other shape a kernel produces: a word built by   *)
+(*  an [andi]/[ori] read-modify-write, whose fields have to be read      *)
+(*  through the mask.  prepare_return's                                  *)
+(*                                                                      *)
+(*      x = r_sstatus(); x &= ~SSTATUS_SPP; x |= SSTATUS_SPIE;           *)
+(*                                                                      *)
+(*  is the case that forced them, and the reason to reason FIELD-WISE    *)
+(*  rather than prove the whole-word identity [sstatus_read ms0 = x] is  *)
+(*  that the field route needs no [update_slice] algebra at all: slicing  *)
+(*  DISTRIBUTES over the bitwise ops, and each mask's own slice is a     *)
+(*  closed computation.                                                  *)
+(* ==================================================================== *)
+
+(* [bv_wrap] is masking with [Z.ones] (stdpp's [bv_wrap_land]), so it
+   commutes with both bitwise ops. *)
+Lemma bv_wrap_land_distr (l : N) (x y : Z) :
+  bv_wrap l (Z.land x y) = Z.land (bv_wrap l x) (bv_wrap l y).
+Proof.
+  rewrite !bv_wrap_land -!Z.land_assoc. f_equal.
+  rewrite (Z.land_comm y) Z.land_assoc Z.land_diag. reflexivity.
+Qed.
+
+Lemma bv_wrap_lor_distr (l : N) (x y : Z) :
+  bv_wrap l (Z.lor x y) = Z.lor (bv_wrap l x) (bv_wrap l y).
+Proof. rewrite !bv_wrap_land. apply Z.land_lor_distr_l. Qed.
+
+(* ...hence a FIELD of a combination is the combination of the fields *)
+Lemma bv_extract_and (n i l : N) (a b : bv n) :
+  bv_extract i l (bv_and a b) = bv_and (bv_extract i l a) (bv_extract i l b).
+Proof.
+  apply bv_eq. rewrite bv_and_unsigned !bv_extract_unsigned bv_and_unsigned.
+  rewrite Z.shiftr_land. apply bv_wrap_land_distr.
+Qed.
+
+Lemma bv_extract_or (n i l : N) (a b : bv n) :
+  bv_extract i l (bv_or a b) = bv_or (bv_extract i l a) (bv_extract i l b).
+Proof.
+  apply bv_eq. rewrite bv_or_unsigned !bv_extract_unsigned bv_or_unsigned.
+  rewrite Z.shiftr_lor. apply bv_wrap_lor_distr.
+Qed.
+
+(* THE THREE ABSORPTIONS, and the reason they are stated on the operand's
+   VALUE rather than as [b2 = zeros] / [b2 = ones]: at every use site the
+   operand is a mask's own slice, so the side condition is a CLOSED
+   computation and discharges by [vm_compute] without the caller having to
+   name the slice's syntactic form.  (stdpp supplies [bv_or_0_r] in this
+   same style; these are the three it lacks.) *)
+Lemma bv_and_0_r (n : N) (b1 b2 : bv n) :
+  bv_unsigned b2 = 0 -> bv_and b1 b2 = b2.
+Proof. intro Hb. apply bv_eq. rewrite bv_and_unsigned Hb. apply Z.land_0_r. Qed.
+
+Lemma bv_and_ones_r (n : N) (b1 b2 : bv n) :
+  bv_unsigned b2 = Z.ones (Z.of_N n) -> bv_and b1 b2 = b1.
+Proof.
+  intro Hb. apply bv_eq. rewrite bv_and_unsigned Hb.
+  rewrite Z.land_ones; [| lia].
+  pose proof (bv_unsigned_in_range _ b1) as [Hlo Hhi].
+  apply Z.mod_small. unfold bv_modulus in Hhi. lia.
+Qed.
+
+Lemma bv_or_ones_r (n : N) (b1 b2 : bv n) :
+  bv_unsigned b2 = Z.ones (Z.of_N n) -> bv_or b1 b2 = b2.
+Proof.
+  intro Hb. apply bv_eq. rewrite bv_or_unsigned Hb.
+  apply Z.bits_inj'. intros j Hj.
+  rewrite Z.lor_spec. rewrite !Z.testbit_ones_nonneg; try lia.
+  destruct (Z.ltb j (Z.of_N n)) eqn:E.
+  - rewrite orb_true_r. reflexivity.
+  - rewrite orb_false_r.
+    pose proof (bv_unsigned_in_range _ b1) as [Hlo Hhi].
+    unfold bv_modulus in Hhi. apply Z.ltb_ge in E.
+    destruct (decide (bv_unsigned b1 = 0)) as [Hz|Hnz].
+    + rewrite Hz. apply Z.bits_0.
+    + apply Z.bits_above_log2; [lia|].
+      apply Z.log2_lt_pow2 in Hhi; lia.
+Qed.
+
 (* SIE lives in bit 1 *)
 Lemma sie_bit (m : mword 64) :
   _get_Mstatus_SIE m = 'b"0" -> Z.testbit (bv_unsigned m) 1 = false.
