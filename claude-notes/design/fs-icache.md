@@ -2534,3 +2534,59 @@ Consequences that differ from the ruling's blast-radius list:
   `ghost_map_alloc` and pays out `ireg_out` per inum; `ireg_alloc` needs a
   flat-inum → (block, slot) re-index (`IcacheBoot.seq16_flatten`) that did
   not exist before, because the block conjunct now holds ghost elements.
+
+## 17. THE FD-TYPE WITNESS (S3's gate, 2026-08-11): how "this open file
+## is not a directory" crosses from sys_open to filewrite's re-park
+
+filewrite's FD_INODE arm must rebuild `ic_loaded` after writei, whose
+`dir_ok` conjunct constrains a DIRECTORY's data bytes. A user write
+into a directory breaks `dir_inums_ok`; writei cannot change
+`di_type`; and `dn` is ilock's OUTPUT, so "not a directory" cannot be
+a premise about a caller-held record. The real xv6 invariant is
+upstream: sys_open refuses writable directory fds. Importing it needs
+a resource, and the analysis of the alternatives is short:
+
+- A pure payload fact `⌜di_type ≠ T_DIR⌝` is unusable — connecting it
+  to ilock's existential dn needs type-stability-under-references as
+  a MECHANISM, not a remark.
+- Fractional type ghosts on references break at the freeing iput
+  (it cannot collect other holders' fractions) or force a SpecIput
+  contract change.
+- What IS true and cheap: **no writer retypes a live inode** (0→ty
+  needs an unallocated slot; ty→0 happens only at the last-reference
+  iput's free path; ty→ty' does not exist in this kernel). So a
+  PERSISTENT witness minted per slot-GENERATION is sound — stale
+  witnesses of dead generations never collide because the key
+  includes the generation.
+
+**The design:**
+- New ghost: `ityp γt (k, g) ty` — a persistent fragment of an auth
+  gmap keyed by (slot, generation), where g is the slot's ic_id
+  descriptor generation (the identity ghost the recycler already
+  bumps; if ic_id's descriptor is not yet generation-shaped, extend
+  it with a monotone counter — capacity, no statement changes).
+- MINT at the fill: ilock's fill knows dn; it mints
+  `ityp (k, g) (di_type dn)` (persistent, duplicable). The escrow's
+  LOADED arm gains the agreement clause: record's type = the current
+  generation's witness (re-established freely by every writer since
+  none retypes; the free path exits the generation before retagging,
+  via the pool arm which carries no record clause).
+- `SpecIlock`'s postcondition EXPOSES the witness (∃ ty, ityp (k,g) ty
+  ∗ ⌜di_type dn = ty⌝) — additive; existing callers ignore it.
+- `FileInv.inode_pay`'s FD_INODE payload gains the witness plus
+  `⌜writable = true -> ty ≠ T_DIR⌝` (NOT unconditional — O_RDONLY
+  directory fds are legal and fileread never needs the fact).
+  sys_open establishes it at file creation: on the T_DIR path it
+  forces O_RDONLY; on the create path the type is T_FILE by
+  construction (ialloc_fresh).
+- filewrite's re-park: ilock's post gives dn and the witness
+  agreement; the payload gives writable → ty ≠ T_DIR; filewrite's
+  contract carries writable = true; dir_ok(new data) is vacuous. ∎
+
+Blast radius: IcacheEscrow (the agreement clause + generation
+plumbing), ProofIlock (the mint — inside the existing fill), possibly
+IcacheRef/ic_id (generation counter), FileInvDefs/FileInv (payload),
+SpecIlock (additive post) + its callers' iDestruct patterns
+(mechanical), sys_open's obligation recorded for S6. fileread/
+fileclose/filedup carry the payload opaquely — audit, expected to
+ride. The boot mint: unloaded slots mint nothing; first fill mints.
