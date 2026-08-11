@@ -214,14 +214,16 @@ usual near-full rebuild lands with it.
   sealed; `Print Assumptions` on each of the three linked modules gives the
   5 platform axioms + funext and nothing else. See "N2's ledger" below for
   the exact names N3/N4 consume.
-- **N3**: PARTIAL — the pure layer (`DirView.v`), BOTH CONTRACTS
+- **N3**: DONE — the pure layer (`DirView.v`), BOTH CONTRACTS
   (`SpecDirlookup.v`, `SpecDirlink.v`), the proofs' shared pure layer
-  (`ProofDirlookupParts.v`, N3b) and **dirlookup's own Proof/Link pair**
-  (N3c) are landed and compiled; `ProofDirlink.v` / `LinkDirlink.v` are NOT
-  (see "N3's ledger" below for exactly what is there, the five spec-fit
-  lemmas that were proved to validate the contracts, the four findings that
-  changed the layer-3 design, and — under "N3c" — the loop/tail shape and
-  the six traps dirlink will meet again).
+  (`ProofDirlookupParts.v`, N3b), **dirlookup's Proof/Link pair** (N3c) and
+  **dirlink's Proof/Link pair** (N3d) are all landed, compiled and sealed;
+  `Print Assumptions` on both linked modules gives the 5 platform axioms +
+  funext and nothing else, and `tools/proof_coverage.py` reads both
+  functions as *proven* (172 B + 170 B).  See "N3's ledger" below for the
+  contracts, the five spec-fit lemmas, the four findings that changed the
+  layer-3 design, and — under "N3c" / "N3d" — the loop/tail shapes and the
+  traps each proof met.
 - **N4**: namex (318B, width 3 — the campaign's boss: the inlined
   skipelem loop over the path grammar, ilock/dirlookup/iunlockput
   per element, the parent-vs-target split) + namei/nameiparent
@@ -720,3 +722,160 @@ mirror's full `.vo` tree, exit 0 each; `Print Assumptions` as above, run from
 a scratch file since deleted from the mirror.  `tools/lemma_diff.py --ref
 HEAD` reports CLEAN — no `GONE`, no `ADMITTED`, no `NEWAXIOM`.  No
 `Admitted`, `Axiom` or `cheat_` anywhere in either file.
+
+### N3d — dirlink is PROVEN and LINKED
+
+**LANDED: `iris/ProofDirlink.v` (≈3030 lines) and `iris/LinkDirlink.v`**, two
+`_CoqProject` rows after `LinkDirlookup.v`.  `SpecDirlink.v` was provable
+exactly as frozen — no premise, no arm and no register fact had to move, and
+the LIVE short-write arm is reached exactly as its header predicted.
+`Print Assumptions Dirlink.wp_dirlink_sconf` gives **the five platform
+axioms (`cancel_reservation`, `load_reservation`, `match_reservation`,
+`valid_reservation`, `plat_term_write`) plus `functional_extensionality_dep`,
+and nothing else**.  Note that writei's bmap CAN allocate here (unlike
+dirlookup's readi, which comes in through `LinkBmapNoalloc`) — balloc is
+itself proven, so the cone stays at the standing six; what it carries
+instead is the THREADED printk obligation, which `SpecDirlink`'s
+`printk_gen_contract` premise passes straight to dirlink's callers.
+`tools/proof_coverage.py` reads dirlink as **proven**, 170 B.
+
+The functor is `DirlinkProof (DL : DIRLOOKUP) (RD : READI) (IP : IPUT)
+(SNC : STRNCPY) (WI : WRITEI)` — note **READI**, which the N3b sketch had:
+dirlink calls readi DIRECTLY in its scan (`jal` at +0x3a), it does not reach
+it only through dirlookup.
+
+**FOUR register bundles, not one.**  dirlink saves s1/s3/s4 LAZILY and its
+two early exits skip the matching restores, so one `callee_saved` transport
+does not fit the function.  Each bundle excludes exactly the registers that
+are live-but-unsaved at that point, and each has `_caller` / `_cs`
+transports:
+
+| bundle | pins | thread fact excludes | live over |
+|---|---|---|---|
+| `dl_eregs` | s0 s2 s5 s6 | sp s0 s2 s5 s6 | +0x0e..+0x1e, and the WHOLE found arm |
+| `dl_pregs` | + s1 (its VALUE is a parameter, not an offset) | + s1 | +0x1e onward, and +0x70..+0x9a |
+| `dl_regs`  | + s3 = 16, s4 = &de | + s3 s4 | the scan |
+| `dl_tregs` | sp only | sp s0 s2 s5 s6 | the epilogue at +0x9c |
+
+Making `dl_pregs` carry the s1 VALUE rather than an `off : nat` is what lets
+the empty-directory arm — where s1 holds `sign_extend' 64 (di_size dn)`, not
+`mword_of_int (16*off)` — share the tail with the two scan exits.  The three
+bridges that matter are `dl_pregs_of_eregs` (the `lw s1,76(s2)` at +0x1e),
+`dl_pregs_of_regs` (the s3/s4 restores at +0x52/+0x54 and +0x6c/+0x6e) and
+`dl_tregs_of_pregs` (the lazy `ld s1` at +0x9a).
+
+**THREE assertions, not two.**  `Htail` is the epilogue from **+0x9c** with
+an ABSTRACT continuation (dirlookup's shape).  The found arm jumps straight
+there; everything else falls through the `ld s1` at +0x9a first — so `Htail`
+takes frame slot 3 as an ∃ and demands only `dl_tregs`, which BOTH arms
+have (on the found arm s1/s3/s4 were never written; on the other they have
+just been restored).  `Hafter` is the shared tail from **+0x70** (strncpy,
+the `sh`, writei, the branchless return), reached by THREE arms, and unlike
+`Htail` it cannot hold an abstract continuation: it takes the contract's own
+continuation spelled out plus every linear resource writei and the
+postcondition need.  `Hloop` is ProofKexit's `∀ fuel, wp_next` shape over
+the measure `nrec - i`, with the contract's continuation threaded as its
+last slot.  So the contract's ~45-line continuation is TRANSCRIBED TWICE (in
+`Hafter` and in `Hloop`); budget for it.  Sharing it would need a
+30-argument top-level `Definition`, which was considered and rejected.
+
+**The two owed spec-fit lemmas landed here**, as the N3 ledger said they
+would: `dl_wi_cost k : wi_cost (16*k) 16 = 7` (sixteen bytes never straddle
+a block at a 16-aligned offset, 1024 = 64*16 — `Nat.Div0.mul_mod_distr_l` at
+`1024 = 16*64`, then `Nat.div_add_l` + `Nat.div_small`; no `Nat.div_unique`
+needed) and `dl_slot_off : Z.of_nat (16 * dir_slot data (dir_nrec sz)) <= sz`,
+which is what kills writei's OWN -1 arm.
+
+Six traps, none of which the N3b/N3c notes predicted:
+
+1. **`pj` vs `proc_addr j` bites on the ARGUMENT side too, and only for
+   `cpu_own`.**  N3c's trap 1 says to fold `proc_addr j` back into the
+   `let`-bound `pj` at each seam.  That is not enough: passing a
+   `cpu_own 0 eb pj C b` INTO a callee whose contract says
+   `cpu_own 0 eb (proc_addr j) C b` fails with *"iSpecialize: cannot
+   instantiate"* — even though `sie_cap_gpr … pj` earlier in the SAME
+   argument list matched fine (that one unfolds; `cpu_own` does not).  The
+   fix that works for a whole function is to go the OTHER way, once:
+   rename the `let`-intro'd variable (`intros … pjv …`), `assert
+   (Hpjd : proc_addr j = pjv) by reflexivity`, `iEval (rewrite -Hpjd)` into
+   `Hcg` / `Hcnt` / `Hppid` / **`Hcont`** immediately after `iIntros`, and
+   then write `proc_addr j` — never `pj` — everywhere in the proof.  After
+   that no seam needs folding and N3c's four
+   `first [ iEval (rewrite Hpjd) … | idtac ]` guards disappear.
+2. **A MISSING `cpu_own_transport` prints as the SAME trap.**  Before the
+   first call the resource is still at the section's ambient `CID` while the
+   ambient instance is whatever the last `iIntros (CIDn …)` introduced, so
+   the two `cpu_own`s print character-identically and the error is
+   indistinguishable from trap 1.  Transport before EVERY call, including
+   the first one after the prologue (`cpu_own_transport CID CID12 …`).
+3. **`↦ₘ` binds tighter than `!!!`.**  `pa_add a jj ↦ₘ dirent_bytes d !!! jj`
+   parses as `(pa_add a jj ↦ₘ dirent_bytes d) !!! jj` and fails with *"has
+   type list (bv 8) while it is expected to have type bv 8"*.  Parenthesise
+   the lookup.
+4. **`rewrite <- lem1 lem2` does not parse under ssreflect** — it is a
+   syntax error reported at the NEXT token (*"[ltac_use_default] expected"*),
+   which reads like a missing period several lines away.  Write
+   `rewrite -lem1 lem2`.
+5. **`do N (destruct t as [| t]; [tac |])` is the safe finite case split.**
+   A hand-written `[| [| … ]]` pattern is one level short more often than
+   not, and the symptom is `lia` failing on the residual branch — which then
+   looks like the zify-hook gotcha and is not.  Used for
+   `dl_snez_lt : t < 16 -> snez (t - 16) = true`, sixteen closed
+   `vm_compute`s.
+6. **`Nat.le_refl` does not close `n - 0 <= n`.**  The loop's initial fuel
+   obligation is exactly that shape and `Nat.sub` recurses on its FIRST
+   argument, so `nrec - 0` and `nrec` are not convertible; it needs its own
+   one-line lemma.
+
+`lia` inside the whole-function context was avoided throughout by the
+recorded route: every numeric side condition is a top-level lemma over plain
+`Z`/`nat` (`dl_le_add`, `dl_lt31`, `dl_nle`, `dl_nnle`, `dl_lt16`,
+`dl_subrng`, `dl_fuel0`, `dl_fuelS`, `dl_fuelinit`, `dl_si`, `dl_offmul`,
+`dl_sioff`, `dl_b64`, `dl_eqn`, `dl_kb`, `dl_3le`, `dl_budget3`), applied as
+a closed fact.  `dl_kb` in particular turns the single premise
+`K_dirlink <= K` into the seven `K - 10` bounds the four callees and the
+`sie_cap_gpr` pop want.
+
+Everything else went as predicted: `dir_free_first_step_live` advances the
+scan invariant, `dir_slot_char` closes BOTH exits at the slot the
+postcondition names (the break arm at `i`, the exhausted arm at `nrec`),
+`dlk_rd_clamp_full` kills the read panic, `dlk_addiw16` carries the
+`c.addiw s1,s1,16`, and `DirView.snc_bview` / `snc_record` turn strncpy's
+image plus the `sh`-stored halfword into `dirent_bytes (de_of_name inum s)`
+— the two one-line bridges `dl_rec_hi` / `dl_rec_nm` are all that sits
+between them and writei's kernel-arm source buffer.  `dl_bytes_half` (ANY
+two bytes are a halfword, witness `Z_to_bv 16 (assemble_bytes [g 0; g 1])`)
+is the one accessor `ProofDirlookupParts` lacked, because dirlookup only
+ever READS the `de` halfword and dirlink WRITES it.
+
+#### Build evidence (EC2 mirror, git-synced at 43df1677)
+
+`ProofDirlink.v` and `LinkDirlink.v` `coqc`-ed standalone against the
+mirror's full `.vo` tree: `DONE ProofDirlink.v = 0`, `DONE LinkDirlink.v = 0`.
+`Print Assumptions` as above, run from a scratch file since deleted from the
+mirror.  `tools/lemma_diff.py --ref HEAD` reports CLEAN — no `GONE`, no
+`ADMITTED`, no `NEWAXIOM`.  No `Admitted`, `Axiom` or `cheat_` anywhere in
+either file.
+
+#### What N4 (namex) should know
+
+namex drives **dirlookup**, not dirlink; dirlink's consumers are the
+`sysfile.c` create path (`create` / `sys_link`).  Two things carry:
+
+- **The GRANULARITY invariant `16 | di_size dn` is still owed by whoever
+  calls either function, and dirlink does NOT unconditionally preserve it.**
+  On the append arm writei raises the size to `off + tot` with
+  `off = 16*k0`, so granularity survives exactly when `tot = 16` — i.e. on
+  the `a0 = 0` arm.  On the LIVE short-write arm (`a0 = -1`, `tot < 16`,
+  balloc out of blocks) the new size is not a multiple of 16 and the
+  directory is no longer scannable under this contract until repaired.
+  That is a real observation about xv6, not a proof artifact; flag it for
+  whoever states `create`'s contract.
+- **`SpecDirlink.ireg_blocks_ok` is the shape to reuse.**  It is a fact
+  about the superblock LAYOUT (every inum the region covers has its
+  `IBLOCK` in `cov` and out of the log region), quantified over inums
+  rather than named at one child, and it discharged BOTH of iput's
+  block-membership premises at whichever record dirlookup stopped on with
+  no extra work.  The N3 ledger's recommendation to hoist it into the fs
+  geometry vocabulary beside `log_geom_ok` / `bitmap_geom_ok` when N5 lands
+  ialloc still stands.

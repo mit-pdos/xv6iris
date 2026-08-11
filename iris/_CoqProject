@@ -973,3 +973,5 @@ SpecDirlink.v
 ProofDirlookupParts.v
 ProofDirlookup.v
 LinkDirlookup.v
+ProofDirlink.v
+LinkDirlink.v
