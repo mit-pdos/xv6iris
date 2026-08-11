@@ -128,6 +128,7 @@ Require Import HartTp.
    the 65 claims are what the deposit wand carries to the secondaries *)
 Require Import KptGhost KptShare KptExecMap KvmMap.
 Require Import KMap.
+Require Import TimerCap.
 Require Import SpecPanic.
 Require Import StartedInv.
 (* the callees, for the vocabulary main's precondition is stated in *)
@@ -401,6 +402,12 @@ Section SpecMain.
        postcondition these are exactly [DiskBoot.disk_res_boot]'s inputs. *)
     ghost_map_auth (dn_claim γv) 1 (∅ : gmap nat dclaim) -∗
     disk_done_lb γv 0%nat -∗
+    (* THE TIMER CAPABILITY, this hart's.  [timer_cap] is the sstc pin plus the
+       stimecmp invariant (TimerCap.v), allocated in the boot chain out of the
+       two cells timerinit wrote and the M->S bridge used to drop.  main needs
+       it because it is a member of [SpecDevintr.devintr_caps], which the
+       handler contract closes over -- clockintr is on kerneltrap's cone. *)
+    timer_cap -∗
     main_hart_raw tlbvec0 -∗
     (* the shared kernel page table's one-shot, minted at adequacy beside the
        per-hart strans halves and spent exactly once -- by MAIN'S OWN BOOT

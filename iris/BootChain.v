@@ -62,6 +62,7 @@ Require Import WpLock KallocInv FdSlots.
 Require Import FileInvDefs.
 Require Import KptGhost VirtioProto VirtioModel SpecFreerange KvmSpec.
 Require Import LinkMain.
+Require Import TimerCap.
 From Kernel Require KernelData.
 From Kernel Require KernelSyms.
 Require Import KernelConsts.
@@ -435,6 +436,12 @@ Section BootRun.
        cpu_own 0 false zero_reg cpu_ctx_free false -∗
        ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
        main_hart_raw (register_lookup tlb rs) -∗
+       (* THE TIMER CAPABILITY, allocated HERE rather than in main: it is
+          PERSISTENT and PER-HART, and this is the one place that holds the
+          two cells it is made of -- [mcounteren] (persisted into
+          [sstc_enabled]) and [stimecmp] (sealed into [stimecmp_inv]).  Both
+          used to be dropped at this seam. *)
+       timer_cap -∗
        pc_is (mword_of_int KernelSyms.main) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -475,7 +482,7 @@ Section BootRun.
        [mstatus_kernel_facts]. *)
     iIntros (Mf msf satpf medelegf midelegf mief menvcfgf stimecmpf mcounterenf
              pmpcfgf pmpaddrf)
-      "(%Hsp & %Htpf & %Hkf & %Hmenvl & %Hmiez & %Hmiev & %Hsatpm & %Hpmpo)
+      "(%Hsp & %Htpf & %Hkf & %Hmenvl & %Hmiez & %Hmiev & %Hsatpm & %Hpmpo & %HmcenTM)
        Hhs Hpriv Hmst Hpmpc Hpmpa Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie
        Hmenv Hmcen Hstc Hgot Hstk".
     (* the two stack-location bounds: [sp0_uint] rewrites only at ITS OWN
@@ -504,7 +511,15 @@ Section BootRun.
                     Hmenv Hstk Hbit Hbit2 Hg2 Hg4a Hg4b Htlb Hsepc Hscause
                     Hstval Hspp1 Hspp2 Hstvec Hnoff Hint Hproc Hctx")
       as (mf) "(Hcap & Hcpu & Hg & Hraw)".
-    iApply ("Hcont" $! mf with "Hcap Hcpu Hg Hraw Hpc").
+    (* the two cells this seam used to drop become the timer capability.  The
+       fupd goes in front of a [WP (Loop)] goal, so peel it with [fupd_wp]
+       first (and put the [iModIntro] back afterwards, or the next [iIntros]
+       fails with a message about the goal not being a wand). *)
+    iApply fupd_wp.
+    iMod (timer_cap_intro ⊤ (DfracOwn 1) mcounterenf stimecmpf HmcenTM
+            with "Hmcen Hstc") as "#Htimc".
+    iModIntro.
+    iApply ("Hcont" $! mf with "Hcap Hcpu Hg Hraw Htimc Hpc").
   Qed.
 
 End BootRun.
@@ -546,13 +561,13 @@ Section BootSecondary.
     pose proof (fin_to_nat_lt cpu_id) as Hn.
     iIntros "#Htext #Hdata Hres #Hpanic #Hstarted".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
-    iIntros (mf) "Hcap Hcpu Hg Hraw Hpc".
+    iIntros (mf) "Hcap Hcpu Hg Hraw #Htimc Hpc".
     iApply (MainSecondary.wp_main_secondary_sconf mf (kv_frame_slots + K_main)%nat zero_reg γd γv
               (register_lookup tlb rs)
               (cid_word_of_nz _ Hn Hnz)
               (cid_word_of_lt_dev _ Hn)
               K_main_secondary_le eq_refl
-              with "Hcap Hcpu Hg Htext Hdata Hpc Hpanic Hstarted Hraw").
+              with "Hcap Hcpu Hg Htext Hdata Hpc Hpanic Hstarted Htimc Hraw").
   Qed.
 
 End BootSecondary.
@@ -620,7 +635,7 @@ Section BootPrimary.
     iIntros "#Htext #Hdata Hres #Hpanic #Hstarted Hlk Hgl Hpark Hpst
              #Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkmap Hpages".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
-    iIntros (mf) "Hcap Hcpu Hg Hraw Hpc".
+    iIntros (mf) "Hcap Hcpu Hg Hraw #Htimc Hpc".
     iApply (Main.wp_main_boot_sconf mf (kv_frame_slots + K_main)%nat zero_reg ps
               (add_vec (and_vec (add_vec (mword_of_int 0x80023558 : mword 64)
                  (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv)
@@ -630,7 +645,7 @@ Section BootPrimary.
               Hlive eq_refl
               with "Hcap Hcpu Hg Htext Hdata Hpc Hpanic Hstarted [] Hlk Hgl
                     Hpark Hpst Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone
-                    Hraw Hkpt Hkmap Hpages").
+                    Htimc Hraw Hkpt Hkmap Hpages").
     (* THE DEPOSIT WAND: main's boot arm hands over exactly [main_deposit]'s
        nine conjuncts at exactly its eight existential witnesses, so the wand
        is intro + exists + frame and nothing else. *)

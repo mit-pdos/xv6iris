@@ -61,7 +61,7 @@ Require Import SpecPanic StartedInv.
 Require Import SpecCpuid SpecPrintk SpecPrintkGen.
 Require Import SpecKvminithart SpecTrapinithart SpecPlicinithart.
 Require Import SpecScheduler SpecKernelvec.
-Require Import SpecBootDevCaps SpecDevintr SpecClockintr DiskInv.
+Require Import SpecDevintr SpecClockintr DiskInv TimerCap.
 Require Import SpecMainSecondary.
 Require Import CodeMain.
 Require Import KernelRvcDecode.
@@ -106,7 +106,6 @@ Module MainSecondaryProof
   (Cpuid : CPUID) (PrintkGen : PRINTK_GEN) (Kvminithart : KVMINITHART)
   (Trapinithart : TRAPINITHART) (Plicinithart : PLICINITHART)
   (Scheduler : SCHEDULER) (Kernelvec : KERNELVEC)
-  (BootDevCaps : BOOT_DEV_CAPS)
   : MAIN_SECONDARY.
 
 Section ProofMainSecondary.
@@ -588,10 +587,12 @@ Section ProofMainSecondary.
        not this hart's to make.  Persistent, so they simply ride in. *)
     is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
     disk_geom γv pd pav pu -∗
+    (* this hart's timer capability, allocated in the boot chain *)
+    timer_cap -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hdc Hcidne Hp0.
-    iIntros "Hcg #Htext #Hpanic Hpc Hcpu Hq Hsbit Htlb Htcsr #Hkinv #Hkptp #Hdev #Hpinv #Hdlock #Hgeom".
+    iIntros "Hcg #Htext #Hpanic Hpc Hcpu Hq Hsbit Htlb Htcsr #Hkinv #Hkptp #Hdev #Hpinv #Hdlock #Hgeom #Htimc".
     iPoseProof (mni_32 with "Htext") as "Hi32".
     iPoseProof (mni_36 with "Htext") as "Hi36".
     iPoseProof (mni_3a with "Htext") as "Hi3a".
@@ -646,11 +647,9 @@ Section ProofMainSecondary.
            the cell to make [intr_res].  Was an [inv_alloc] under an
            [fupd_wp]. ---- *)
     iDestruct (ms_dup_hw with "Hcg") as "(#Hhw & #Hmin & Hcg)".
-    (* the handler contract's credentials: six in hand, one assumed --
-       SpecBootDevCaps.v says which and why. *)
+    (* the handler contract's credentials: all seven in hand, none assumed.
+       [timer_cap] rides in from the boot chain, which mints one per hart. *)
     iDestruct (procs_inv_len with "Hpinv") as %Hnproc.
-    iPoseProof (BootDevCaps.boot_dev_caps γd) as "Hbdc".
-    iDestruct "Hbdc" as "#Htimc".
     (* THE TICK KEEPER IS NOT ASSUMED HERE EITHER, and on a secondary it is
        free: [tick_hart] is [cpuid() == 0] and this arm's premise is
        [cid_word <> zero_reg], so the left disjunct closes it and the ghost
@@ -729,7 +728,7 @@ Section ProofMainSecondary.
     cbv beta delta [wp_main_secondary_sconf_body].
     intros pcE Hcid Hdc HK Hp0.
     pose proof (ms_bounds K HK) as (Hc2 & Hn38 & Hn20).
-    iIntros "Hcg Hcpu Hq #Htext #Hkdata Hpc #Hpany #Hsinv Hhart".
+    iIntros "Hcg Hcpu Hq #Htext #Hkdata Hpc #Hpany #Hsinv #Htimc Hhart".
     (* printk wants the ambient form; the scheduler join wants the generic one
        (its acquire does), so keep both. *)
     iPoseProof (panic_wp_any_at cpu_id with "Hpany") as "#Hpanic".
@@ -748,7 +747,7 @@ Section ProofMainSecondary.
     iApply (ms_inithart_sched γd γv γs γk pd pav pu m3 (K - 2)%nat p0 root tlbvec0
               Hn20 Hdc Hcid Hp0
               with "Hcg Htext Hpany Hpc Hcpu Hq Hsbit Htlb Htcsr Hkinv Hkptp Hdev Hpinv
-                    Hdlock Hgeom").
+                    Hdlock Hgeom Htimc").
   Qed.
 
 End ProofMainSecondary.

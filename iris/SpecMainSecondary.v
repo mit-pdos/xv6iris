@@ -79,6 +79,7 @@ Require Import FileInvDefs.
    □-wand whose arguments [main_deposit] packages) *)
 Require Import SpecMain.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import TimerCap.
 From Kernel Require KernelSyms.
 
 (* the secondary arm's stack budget: see the header.  Like [SpecMain.K_main]
@@ -153,6 +154,12 @@ Section SpecMainSecondary.
     (* the handover channel, at the CONCRETE deposit *)
     started_inv (main_deposit γd γv) -∗
     (* this hart's own translation and trap resources *)
+    (* THE TIMER CAPABILITY, this hart's.  [timer_cap] is the sstc pin plus the
+       stimecmp invariant (TimerCap.v), allocated in the boot chain out of the
+       two cells timerinit wrote and the M->S bridge used to drop.  main needs
+       it because it is a member of [SpecDevintr.devintr_caps], which the
+       handler contract closes over -- clockintr is on kerneltrap's cone. *)
+    timer_cap -∗
     main_hart_raw tlbvec0 -∗
     WP (Loop : expr riscv_lang).
 

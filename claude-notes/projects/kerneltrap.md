@@ -1175,7 +1175,7 @@ deleted; `LinkKernelvec` instantiates `KernelvecProof` over the REAL
   `A; B; [x|y]` parses as `(A; B); [x|y]`: an unbracketed tail after an
   18-way `destruct` asks for 36 tactics.
 
-#### THE TREE IS GREEN, AT THE PRICE OF ONE NAMED BOOT AXIOM
+#### THE TREE IS GREEN AND THE BOOT AXIOM IS GONE TOO
 
 `SpecKernelvec.kernelvec_handler_spec_body` takes `⌜length γs = NPROC⌝` and the
 PERSISTENT `devintr_caps γu γv γtx γdk γtl γs pd pav pu`, and it must: the
@@ -1193,18 +1193,19 @@ raw to the chain's tail, and `intr_res` is folded there — next to the
 arm needed only two more premises on `ms_inithart_sched` (the disk lock and
 `disk_geom`, both out of the `started` deposit, both persistent).
 
-**ASSUMED — three credentials the boot chain does not mint at all.**
-`is_txlock γtx γu`, `timer_cap` and `tick_keeper γtl γs` appear nowhere in
+**IT COST A TEMPORARY AXIOM AND THE AXIOM IS NOW RETIRED.**  Three credentials
+— `is_txlock γtx γu`, `timer_cap` and `tick_keeper γtl γs` — appeared nowhere in
 `SpecMain` / `ProofMain` / `SpecMainSecondary` / `ProofMainSecondary` /
-`BootBridge`.  They are now `SpecBootDevCaps.boot_dev_caps_body`, a functor
-parameter of both main proofs, supplied by an `Axiom` in `LinkBootDevCaps.v`.
-`main`'s ledger is therefore `boot_dev_caps` + the three sanctioned assumed
-contracts (userinit, printk-general, consoleintr) + funext + the platform
-axioms; **`kernelvec_handler_spec`'s own ledger stays clean** (5 platform
+`BootBridge`, and were parked in `SpecBootDevCaps.boot_dev_caps_body`, a functor
+parameter of both main proofs supplied by an `Axiom` in `LinkBootDevCaps.v`.
+**All three are gone, so both files are DELETED** along with the functor
+parameter and the `BOOT_DEV_CAPS` argument at `LinkMain` / `LinkMainSecondary`;
+`main`'s ledger is now the sanctioned assumed contracts + funext + the platform
+axioms, and **`kernelvec_handler_spec`'s own ledger stays clean** (5 platform
 axioms + funext + consoleintr).
 
-**ONE OF THE THREE IS ALREADY DISCHARGED, AND THE OTHER TWO ARE NOW DIAGNOSED
-RATHER THAN GUESSED.**
+**HOW EACH OF THE THREE WENT — and two of them went the same way: find the
+resource the credential is made of, and stop dropping it.**
 
 - **`tick_keeper γtl γs` — DONE, no axiom.**  The boot hart owes the real arm
   and pays it: trapinit initialises tickslock's words, `SpecMain`'s bundle now
@@ -1218,57 +1219,70 @@ RATHER THAN GUESSED.**
   the second makes the NEXT `iIntros` fail with "goal is not a wand"), and the
   ticks cell has to be carved in address order between `initproc` and
   `stack0`.
-- **`is_txlock γtx γu` — NOT unplumbed but UNPROVABLE, and this is the useful
-  finding.**  `is_txlock` is `is_lock … (tx_res γu)`, and `tx_res` holds the
-  EXCLUSIVE transmitter token `uart_tx_own` — which **printkinit has already
-  committed to the printk lock's `pr_res`**, because uartputc_sync needs the
-  token and (in the C) takes no lock at all.  One exclusive token cannot sit
-  in two locks, so no amount of boot plumbing produces this credential: the
-  UART's ownership story has to be settled first (the tension
-  `projects/uart-driver.md` records, now with a concrete consequence).  The
-  boot side is nevertheless finished — the `tx_busy` cell the lock protects is
-  carved and threaded, and dropped in main's chain with a comment saying why —
-  so the day the design lands, nothing at the boot end has to be rediscovered.
-- **`timer_cap` — mechanical, every piece exists, and the ONE missing lemma is
-  identified and measured.**
-  `SpecEntry.wp_entry_boot`'s post already hands back `mcounteren ↦ᵣ` and
-  `stimecmp ↦ᵣ`, and `TimerCap.timer_cap_intro` turns them into the
-  credential.  What is missing is ONE pure conjunct in that post,
-  `_get_Counteren_TM mcounterenf = '1'` — which timerinit provably wrote, so
-  the ENTRY proof already knows it; this is the identical move that put
-  `mief = MIE_S` in the same list.  Then allocate `timer_cap` in the boot
-  chain (not in main: the credential is PERSISTENT and each hart allocates its
-  own from its own two cells) and pass it to both main arms.  Touches a proven
-  M-mode file (`ProofEntry`), `BootChain`, and the two main specs.
+- **`is_txlock γtx γu` — RETIRED BY NOT BEING WANTED, and the diagnosis that
+  said it was unprovable was right, which is why that mattered.**  `is_txlock`
+  is `is_lock … (tx_res γu)` and `tx_res` holds the EXCLUSIVE transmitter token
+  `uart_tx_own`, which **printkinit has already committed to the printk lock's
+  `pr_res`** (uartputc_sync needs the token and, in the C, takes no lock at
+  all).  One exclusive token cannot sit in two locks, so no amount of boot
+  plumbing was ever going to produce it.  What resolved it was the xv6 bump:
+  **at `d80e61c5` uartintr takes no lock**, so `is_txlock` left `devintr_caps`
+  entirely and the `tx_busy` cell it protected is gone from the image.  The
+  UART's ownership question survives, but it is no longer on kerneltrap's cone —
+  it is `LinkTxLockInit.v`'s assumed boot step, on the *printk* effort's ledger
+  (`projects/uart-driver.md`).
+- **`timer_cap` — DISCHARGED.**  Three edits, exactly where the diagnosis said:
+  `SpecEntry.wp_entry_boot`'s post gained the ninth pure conjunct
+  (`_get_Counteren_TM mcounterenf = '1'`), `ProofEntry` closes it with one
+  `exact`, and **`BootChain` allocates the capability out of the `mcounteren`
+  and `stimecmp` cells it was already introducing and then dropping** — per
+  hart, so both main arms get their own, and persistent, so main just holds it.
 
-  **THE LEMMA, AND WHAT IT COSTS.**  The value in flight is concrete all the way
-  from timerinit to `wp_entry_boot`'s post — `legalize_mcounteren mcen0
-  (ti_mcen1 mcen0)` (ProofEntry:113) — so the obligation is one closed bit
-  fact, at an arbitrary entry `mcen0`:
+  **THE BIT LEMMA IS `WpTimerinit.ti_mcen1_TM`, AND IT IS 0.25 s.**  What made
+  it hard is that the goal is a WIDTH-CROSSING tower (64 → 32 → 1) over
+  `bv_extract` / `bv_and` / `bv_or`, not the `update_slice` tower `MstatusBits`'
+  `tb_rw` / `tb1` are tuned for — `mw_prep; tb1` does not come back.  The
+  recipe, worth reusing for any mcounteren/menvcfg-shaped fact:
 
-  ```coq
-  Lemma ti_mcen1_TM (mcen0 : mword 32) :
-    eq_vec (_get_Counteren_TM (legalize_mcounteren mcen0 (ti_mcen1 mcen0)))
-           ('b"1" : mword 1) = true.
-  ```
+    1. `apply eq_vec_true_iff`, then ONE big `unfold` of the model's operations
+       (`and_vec`, `or_vec`, `word_binop`, the extends) plus `mw_prep`, a second
+       `unfold` of the `MachineWord` layer, and `zn_norm`;
+    2. `apply (bv_eq_testbit 1)` and drive the chain LINEARLY — `bv_extract_unsigned`,
+       `bv_and_unsigned`, `bv_extract_unsigned`, `bv_or_unsigned`,
+       `bv_zero_extend_unsigned'`, `bv_sign_extend_unsigned`, then
+       `bv_wrap_spec_low` / `Z.shiftr_spec` / `Z.land_spec` / `Z.lor_spec` in
+       that order.  `tb_rw`'s bulk `rewrite ?…` loop is the wrong tool here;
+    3. at the leaf exactly ONE bit is symbolic, so `destruct` it and both
+       branches are closed: `match goal with |- context [ orb ?t _ ] => destruct t
+       end; vm_compute; reflexivity`.
 
-  It is true for the obvious reason (`i19 = 2` is the TM bit, the `ori` sets
-  it, and `sys_mcounteren_writable_bits` is all ones, so legalization keeps
-  it) but it is NOT one of the shapes the existing toolkit closes:
-  `MstatusBits`' `mw_prep; tb1` is for 1-bit slices of an mword 64 and this
-  one crosses three widths (64 → 32 → 1); tried, and it does not come back in
-  10 minutes.  `bv_simplify`/`bv_solve` need `stdpp.bitvector.tactics`
-  imported, which no file in this tree does yet.  Budget it as a small
-  bitvector exercise, not as a rewrite: either a width-crossing `tb`-style
-  helper beside `mw_prep`, or `TimerCap.counteren_TM_access` (which turns the
-  projection into `access_vec_dec _ 1`) plus an `and_vec x all_ones = x`
-  identity.
+  **Two traps, both of which cost a cycle.**  Take the subterm from what the
+  `context` match RETURNS — rebuilding it from the pattern elaborates
+  `@bv_unsigned` at a different (convertible, not syntactically equal) width
+  index, and then `destruct` abstracts nothing and silently splits into two
+  identical goals.  And in any file that imports `proofmode` you are in
+  ssreflect: `rewrite a, b, c` and `assert (…) as -> by lia` are PARSE errors
+  (space-separated `rewrite a b c`, and `assert (k = 0) as Hk0; [lia | subst k]`).
+  `bv_simplify` / `bv_solve` are reachable (`MstatusBits` imports
+  `stdpp.bitvector.tactics`) but useless here — they normalise to `Z` and end in
+  `lia`, which cannot see through `Z.land` / `Z.lor`.  `bitblast` really is
+  absent: `coq-stdpp-unstable` is not installed in this switch.
 
-So the axiom is now two conjuncts, and they are of two different KINDS: one is
-blocked on a driver design question, the other is three files of threading.
-Do `timer_cap` next; leave `is_txlock` to the UART effort and delete it from
-the axiom's `∗` when that lands (the statement is flat, so each conjunct
-retires independently).
+  Cost of the plumbing beyond the lemma: one `Require Import MstatusBits` and
+  `SailStdpp.Values`/`MachineWord` in `WpTimerinit` (safe — `MstatusBits` has no
+  intra-`iris` requires), one `timer_cap` premise on each main spec, and one
+  `iApply fupd_wp` … `iModIntro` pair around the allocation (the same
+  `WP (Loop)`-goal idiom the tickslock `newlock` needed).
+
+**SO THE BOOT AXIOM IS GONE, AND WITH IT THE WHOLE `BOOT_DEV_CAPS` INTERFACE.**
+The lesson that generalises is the one the two minted credentials share: **a
+"nobody can produce this" boot credential is usually a resource the boot chain
+already holds and DROPS.**  Both `tick_keeper` and `timer_cap` were sitting in
+cells the chain introduced and discarded (tickslock's words; `mcounteren` /
+`stimecmp`), and in both cases the missing piece was one pure conjunct on an
+earlier post, provable only where the written value is still concrete.  Grep the
+boot chain for an `iDestruct` that names a cell and never uses it before
+concluding a credential cannot be minted.
 
 ### Two rules this decomposition earned
 
@@ -1594,17 +1608,31 @@ consumers and its `eb = true` instance made `b` true.
 9. ~~THE OPEN FORK — where preemption's resources live~~ **closed by
    park-to-lock** (section below).
 
-10. **The `intr_handler_spec` upgrade + `ProofKernelvec.v` rewiring**
-   (explicit-cpuid Stage 2) — the one remaining DESIGN, being landed as a
-   series of independently-landable slices rather than one branch.  Six slices
-   are queued ahead of the atomic core, two of them wide sweeps, and the parked
-   reference branch is gone; see the re-scoping note.  What is landed,
-   what is queued and in what order:
-   **[HOW THIS IS BEING LANDED](#how-this-is-being-landed--the-decomposition-and-why-it-exists)**.
-   The design itself is in `STEP 10` and the sections after it: the fixpoint in
+10. ~~**The `intr_handler_spec` upgrade + `ProofKernelvec.v` rewiring**
+   (explicit-cpuid Stage 2)~~ — **DONE**, every slice of it, plus slice `A`
+   (`intr_inv` deleted) and the boot obligation the axiom used to hide.  The
+   decomposition and its reasoning are kept at
+   **[HOW THIS IS BEING LANDED](#how-this-is-being-landed--the-decomposition-and-why-it-exists)**;
+   the design is in `STEP 10` and the sections after it: the fixpoint in
    `THE CYCLE IS REAL`, the carve in `THE STACK ACCOUNTING HAD TO CHANGE`, the
    cause layer in `THE CAUSE LEMMA IS PROVED`, the `stack_own` bug class in
    `THE ARM-BLIND stack_own CLASS`, and the engine in `THE ENGINE, CONCRETELY`.
+
+## WHAT IS ACTUALLY LEFT: three cosmetic cleanups
+
+Nothing structural remains — kerneltrap, the handler contract and the boot
+credentials are all discharged, and the only non-platform assumption in the
+cone is the sanctioned `consoleintr`.  The residue, none of it blocking:
+
+- **`sie_cap_grow` / `sie_cap_shrink`** still sit in `IntrDefs.v` with no user
+  outside that file (worklist 8's open question).  Decide, then delete or
+  document.
+- **`WpSconfVc.v` wants an `ops_ok_of_guards`** beside its `rd_ok_of_guards`:
+  the VC executor already derives the source-side facts, so it is wiring.
+- **`SpecMemsetParts.v:121,131`** still hand-roll standalone
+  `Regidx _ <> Regidx Rtp` premises that `src_ok` could absorb.
+
+When those three are cleared the file moves to `completed/`.
 
 ## THE FORK THAT WAS OPEN HERE IS CLOSED — by park-to-lock
 

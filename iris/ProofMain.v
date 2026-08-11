@@ -83,7 +83,7 @@ Require Import SpecKinit SpecKvminit SpecKvminithart SpecProcinit.
 Require Import SpecTrapinit SpecTrapinithart SpecPlicinit SpecPlicinithart.
 Require Import SpecBinit SpecIinit SpecFileinit SpecVirtioDiskInit.
 Require Import SpecUserinit SpecScheduler SpecKernelvec SpecFreerange.
-Require Import SpecBootDevCaps SpecDevintr SpecClockintr TicksInv.
+Require Import SpecDevintr SpecClockintr TicksInv.
 Require Import KMap.
 Require Import SpecMain.
 Require Import CodeMain.
@@ -148,7 +148,6 @@ Module MainProof
   (Plicinithart : PLICINITHART) (Binit : BINIT) (Iinit : IINIT)
   (Fileinit : FILEINIT) (VirtioDiskInit : VIRTIODISKINIT)
   (Userinit : USERINIT) (Scheduler : SCHEDULER) (Kernelvec : KERNELVEC)
-  (BootDevCaps : BOOT_DEV_CAPS)
   : MAIN.
 
 Section ProofMain.
@@ -1463,7 +1462,7 @@ Section ProofMain.
     pose proof (mn_bounds K HK) as (Hc2 & Hn50 & Hnsched).
     iIntros "Hcg Hcpu Hq #Htext #Hkdata Hpc #Hpany #Hsinv #Hwand Hlocks Hglobals".
     iIntros "Hparks Hpst".
-    iIntros "#Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hhart Hunset Hkauth Hpages".
+    iIntros "#Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone #Htimc Hhart Hunset Hkauth Hpages".
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
                             Hltick & Hlbc & Hlit & Hlft & Hldisk)".
     (* THE [tx_busy] CELL IS GONE from the bundle: ae96fd0 deleted the flag, so
@@ -1473,7 +1472,7 @@ Section ProofMain.
        24 bytes): uartinit's [initlock(&tx_lock,"uart")] consumes it and
        consoleinit returns [lk_fresh].  What the flag was being carried FOR is
        still gone -- uartintr takes no lock, so [is_txlock] left
-       [devintr_caps] entirely (SpecBootDevCaps.v) -- and the [newlock] step
+       [devintr_caps] entirely -- and the [newlock] step
        that would turn that [lk_fresh] into [is_txlock] is not taken here; see
        [mn_grp_printk].
        [Hient] -- the fifty itable entries' cells -- is still carried and
@@ -1522,14 +1521,12 @@ Section ProofMain.
     iIntros (γk pd pav pu m5) "Hcg Hpc Hcpu #Hdlock #Hgeom".
     (* ---- THE INSTALLED-HANDLER RESOURCE, folded HERE and not earlier: the
            handler contract closes over [devintr_caps], and its disk lock and
-           geometry are exactly what the group above just produced.  Six of
-           the seven members are in hand ([dev_inv], [procs_inv],
-           [panic_wp_any], the lock, the geometry, the tick keeper); only
-           [timer_cap] is [LinkBootDevCaps]' assumed boot interface -- see that
-           file for why it is missing and where it belongs. ---- *)
+           geometry are exactly what the group above just produced.  ALL SEVEN
+           members are now in hand and NONE is assumed: [dev_inv], [procs_inv],
+           [panic_wp_any], the disk lock and geometry from the group above,
+           [timer_cap] handed in by the boot chain (which mints it out of the
+           two cells timerinit wrote), and the tick keeper below. ---- *)
     iDestruct (procs_inv_len with "Hpinv") as %Hnproc.
-    iPoseProof (BootDevCaps.boot_dev_caps γd) as "Hbdc".
-    iDestruct "Hbdc" as "#Htimc".
     (* THE TICK KEEPER IS NOT ASSUMED: hart 0 IS the tick hart
        ([tick_hart] is [cpuid() == 0]), so it owes the real arm -- the lock
        trapinit's group brought up, plus [procs_inv] and [panic_wp_any]. *)

@@ -354,9 +354,13 @@ are working on that effort — the relevant `projects/` file.
   `eb` generalization of `SpecYield`/`SpecSched` it forced, and three durable
   lessons (state postconditions absolutely; never leave an `_` for a frame
   word at a block boundary — it cost 141 s per `iExact`; `subst p` picks the
-  wrong equation when two hypotheses define `p`). ONE thing remains: the
-  `intr_handler_spec` upgrade that rewires `ProofKernelvec` off the legacy
-  `KERNELTRAP_RETURNS` axiom (= explicit-cpuid Stage 2).
+  wrong equation when two hypotheses define `p`). **AND SO IS THE HANDLER
+  CONTRACT ABOVE IT**: `intr_handler_spec` is a Banach fixpoint over the folded
+  bundle, `ProofKernelvec` is a functor over the real `KERNELTRAP`, and
+  `KERNELTRAP_RETURNS` is deleted. The BOOT obligation that axiom used to hide
+  is discharged too — all three of `tick_keeper` / `timer_cap` / `is_txlock`
+  are gone, so `SpecBootDevCaps.v` and `LinkBootDevCaps.v` no longer exist.
+  What is left is three cosmetic cleanups, listed at the file's worklist.
 - **[`printk.md`](projects/printk.md)** — the formatted-output cone (printk →
   printint → consputc → uartputc_sync), ALL PROVEN and linked. The
   panic-path specialization is HISTORICAL: `c47a936` deleted the
