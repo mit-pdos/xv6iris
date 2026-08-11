@@ -739,4 +739,162 @@ Section IupdateRes.
     iIntros "H1 H2". rewrite bslots_op. iSplitL "H1"; [iExact "H1" | iExact "H2"].
   Qed.
 
+  (* THE MACHINERY HALF, out of the handle and back.  [InodeInv.ireg_read_blk]
+     needs the block's OTHER [fs_L] half to pin the region's parked bytes to
+     the ones bread returned, and the handle's payload carries exactly that --
+     on BOTH polarities.
+
+     This is [ProofIupdate.iu_held_L] / [ProofIalloc.ia_held_L], hoisted here
+     (N5d) because every whole-block reader of the inode region wants it and a
+     Proof file may not require another Proof file.  The two private copies are
+     left where they are: retiring them would cost a recompile of their cones
+     for nothing. *)
+  Lemma ds_held_L (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+      (dev : mword 32) (cov : gset Z) (k : nat) (pidv dv bno : mword 32)
+      (bs bsl bsd : list (bv 8)) (d : bool) :
+    bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d -∗
+      (uint bno ↪[fs_L γfs]{#(1/2)} bsl) ∗
+      ((uint bno ↪[fs_L γfs]{#(1/2)} bsl) -∗
+       bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d).
+  Proof.
+    rewrite /bio_held /bio_pay /fs_view /=.
+    iIntros "(%A & %B & %C & H1 & H2 & H3 & H4 & H5 & H6 & Hpay)".
+    destruct d.
+    - rewrite /fs_mdirty. iDestruct "Hpay" as "[[HL HD] Hq]".
+      iFrame "HL". iIntros "HL".
+      iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
+      iFrame "H1 H2 H3 H4 H5 H6". iFrame "HL HD Hq".
+    - rewrite /fs_mclean. iDestruct "Hpay" as "[[HL HD] %He]".
+      iFrame "HL". iIntros "HL".
+      iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
+      iFrame "H1 H2 H3 H4 H5 H6". iFrame "HL HD". done.
+  Qed.
+
 End IupdateRes.
+
+(* ===================================================================== *)
+(*  (5) THE WHOLE-REGION SCAN'S ARITHMETIC                                *)
+(*                                                                        *)
+(*  ialloc and ireclaim both walk every inum in the region, and both do    *)
+(*  the slot arithmetic on the SIGN-EXTENDED 64-bit inum rather than on    *)
+(*  the 32-bit one iupdate/ilock start from, so group (1)'s [iu_srliw4]    *)
+(*  and friends do not apply to them.  Hoisted out of ProofIalloc.v (N5d)  *)
+(*  so that ireclaim -- and create, and any later scanner -- does not have *)
+(*  to restate 100 lines of bitvector arithmetic.  ProofIalloc.v keeps its *)
+(*  own [ia_*] copies; they are identical and retiring them would cost a   *)
+(*  recompile for nothing.                                                *)
+(* ===================================================================== *)
+
+(* the sign extension of a value that fits in 31 bits is its own value *)
+Lemma ds_sext_small (w : mword 32) :
+  bv_unsigned w < 2147483648 -> (sign_extend' 64 w : mword 64)
+                                = mword_of_int (bv_unsigned w).
+Proof.
+  intro Hw. pose proof (bv_unsigned_in_range _ w) as [Hw0 _].
+  rewrite -(sext32_64_small (bv_unsigned w)
+              ltac:(change (2^31)%Z with 2147483648%Z; lia)).
+  f_equal. apply bv_eq. rewrite moi32_unsigned. symmetry.
+  apply bvw32_small. change (2^32)%Z with 4294967296%Z. lia.
+Qed.
+
+(* [srli a1,s2,4] -- the 64-bit divide by IPB.  [iu_srliw4] is the [srliw]
+   twin and does NOT apply: it truncates to 32 bits first. *)
+Lemma ds_srli4 (w : mword 32) :
+  bv_unsigned w < 2147483648 ->
+  shift_bits_right (sign_extend' 64 w : mword 64)
+    (subrange_vec_dec (mword_of_int 4 : mword 6) (Z.sub log2_xlen 1) 0)
+  = (mword_of_int (bv_unsigned w / 16) : mword 64).
+Proof.
+  intros Hw.
+  pose proof (bv_unsigned_in_range _ w) as [Hw0 _].
+  rewrite (ds_sext_small w Hw).
+  assert (Hs : shift_bits_right (mword_of_int (bv_unsigned w) : mword 64)
+                 (subrange_vec_dec (mword_of_int 4 : mword 6) (Z.sub log2_xlen 1) 0)
+               = shiftr (mword_of_int (bv_unsigned w) : mword 64) 4).
+  { unfold shift_bits_right. f_equal; vm_compute; reflexivity. }
+  rewrite Hs. apply bv_eq.
+  unfold shiftr, SailStdpp.Values.with_word, get_word,
+    MachineWord.MachineWord.logical_shift_right.
+  rewrite bv_shiftr_unsigned.
+  assert (Hm64 : bv_modulus (MachineWord.MachineWord.Z_idx 64)
+                 = 18446744073709551616) by (vm_compute; reflexivity).
+  assert (H4 : bv_unsigned (MachineWord.MachineWord.N_to_word
+                 (MachineWord.MachineWord.Z_idx 64)
+                 (MachineWord.MachineWord.Z_idx 4)) = 4).
+  { unfold MachineWord.MachineWord.N_to_word, MachineWord.MachineWord.Z_idx.
+    rewrite Z_to_bv_unsigned. apply bv_wrap_small. rewrite Hm64. lia. }
+  rewrite H4 !moi64_unsigned.
+  rewrite (bvw64_small (bv_unsigned w)
+             ltac:(change (2^64)%Z with 18446744073709551616%Z; lia)).
+  rewrite Z.shiftr_div_pow2; [| lia]. change (2 ^ 4)%Z with 16%Z.
+  symmetry. apply bvw64_small.
+  assert (Hd0 : 0 <= bv_unsigned w / 16) by (apply Z.div_pos; lia).
+  assert (Hd1 : bv_unsigned w / 16 <= bv_unsigned w)
+    by (apply Z.div_le_upper_bound; lia).
+  change (2^64)%Z with 18446744073709551616%Z. lia.
+Qed.
+
+(* [c.addw a1,a5] sums (inum/16) + inodestart; [iu_addw_ibl] is stated the
+   other way round *)
+Lemma ds_add_vec32_comm (x y : mword 32) : add_vec x y = add_vec y x.
+Proof. apply bv_eq. rewrite !bv_add_unsigned. f_equal. lia. Qed.
+
+(* [andi a5,s2,15] -- the BASE-encoding twin of [iu_andi15]'s [c.andi] *)
+Lemma ds_andi15 (x : mword 64) :
+  and_vec x (sign_extend' 64 (mword_of_int 15 : mword 12) : mword 64)
+  = (mword_of_int (bv_unsigned x `mod` 16) : mword 64).
+Proof.
+  assert (Hc : (sign_extend' 64 (mword_of_int 15 : mword 12) : mword 64)
+               = sign_extend' 64 (sign_extend' 12 (mword_of_int 15 : mword 6)))
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite Hc. apply iu_andi15.
+Qed.
+
+(* the [lh]'s zero test, both ways -- ProofIlock's [il_type_*] pair *)
+Lemma ds_sext64_16_inj (a c : mword 16) :
+  (sign_extend' 64 a : mword 64) = sign_extend' 64 c -> a = c.
+Proof.
+  intro H. rewrite -(trunc16_sext64 a) -(trunc16_sext64 c) H. reflexivity.
+Qed.
+
+Lemma ds_type_zero (w : mword 16) :
+  bv_unsigned w = 0 ->
+  eq_vec (sign_extend' 64 w : mword 64) (zero_reg : mword 64) = true.
+Proof.
+  intro Hw.
+  assert (Hz : w = (mword_of_int 0 : mword 16))
+    by (apply bv_eq; rewrite Hw; vm_compute; reflexivity).
+  rewrite Hz. vm_compute. reflexivity.
+Qed.
+
+Lemma ds_type_nonzero (w : mword 16) :
+  bv_unsigned w <> 0 ->
+  eq_vec (sign_extend' 64 w : mword 64) (zero_reg : mword 64) = false.
+Proof.
+  intro Hw. apply eq_vec_false_iff. intro Hq. apply Hw.
+  assert (Hz : (zero_reg : mword 64) = sign_extend' 64 (mword_of_int 0 : mword 16))
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite Hz in Hq. apply ds_sext64_16_inj in Hq. rewrite Hq.
+  vm_compute. reflexivity.
+Qed.
+
+(* the loop guards' branch predicates, at the two words the code compares *)
+Lemma ds_uint64_moi (z : Z) : 0 <= z < 18446744073709551616 ->
+  uint (mword_of_int z : mword 64) = z.
+Proof. intro Hz. rewrite uint_unsigned. apply moi64_small. exact Hz. Qed.
+
+Lemma ds_bgeu_moi (x y : Z) :
+  0 <= x < 18446744073709551616 -> 0 <= y < 18446744073709551616 ->
+  zopz0zKzJ_u (mword_of_int x : mword 64) (mword_of_int y : mword 64) = Z.geb x y.
+Proof.
+  intros Hx Hy. unfold zopz0zKzJ_u.
+  rewrite (ds_uint64_moi x Hx) (ds_uint64_moi y Hy). reflexivity.
+Qed.
+
+Lemma ds_bltu_moi (x y : Z) :
+  0 <= x < 18446744073709551616 -> 0 <= y < 18446744073709551616 ->
+  zopz0zI_u (mword_of_int x : mword 64) (mword_of_int y : mword 64) = Z.ltb x y.
+Proof.
+  intros Hx Hy. unfold zopz0zI_u.
+  rewrite (ds_uint64_moi x Hx) (ds_uint64_moi y Hy). reflexivity.
+Qed.

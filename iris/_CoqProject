@@ -1002,3 +1002,5 @@ LinkSyscall.v
 SpecIalloc.v
 ProofIalloc.v
 LinkIalloc.v
+SpecIreclaim.v
+SpecFsinit.v

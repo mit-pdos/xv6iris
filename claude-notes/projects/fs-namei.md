@@ -2944,3 +2944,238 @@ md5s: `iris/ProofIalloc.v f65cd38f6fb8864a1952539c9f39a6bd`,
    into `DinodeSlot.v` first, which is where `iu_srliw4` and friends
    already live and would be the better home for `ia_srli4`,
    `ia_andi15`, `ia_add_vec32_comm` and the `ia_type_*` pair.
+
+### N5d — the two hoists land; **`SpecIreclaim` and `SpecFsinit` are LANDED and FROZEN**; both proofs are PARKED at the contract
+
+**WHAT LANDED IN THE BUILD: two new files, three edited ones, two
+`_CoqProject` rows.**
+
+| file | md5 | what |
+|---|---|---|
+| `iris/SpecIreclaim.v` | `6c8cb25a04f681f42f27cc71a0d34d27` | NEW, 339 lines, axiom-free, green |
+| `iris/SpecFsinit.v` | `01430721d1362b574f3b1b9ebe2e05b2` | NEW, 446 lines, axiom-free, green |
+| `iris/DinodeSlot.v` | `21edfcb61061381468c743227b9c7543` | hoist 1 (additive) |
+| `iris/InodeInv.v` | `802c2714458a9dbff82d7835da2713b9` | hoist 2 (additive) |
+| `iris/SpecNamex.v` | `6a142aec2da87b7f21e91cd35f59c0bb` | hoist 2's alias |
+
+Rows for `SpecIreclaim.v` and `SpecFsinit.v` go after the `LinkIalloc.v`
+row.  **NOT landed: `ProofIreclaim.v` / `ProofFsinit.v` / their `Link`s and
+rows** — see "the park point" below.
+
+`python3 tools/lemma_diff.py --ref HEAD`: **two lines**, the expected
+spec-seal `NEWAXIOM Parameter wp_ireclaim_sconf` and
+`NEWAXIOM Parameter wp_fsinit_sconf`.  **No `GONE`** — in particular the
+`ROOTDEV` hoist produces none, because the alias is a `Notation`.  No
+`Admitted`, no `Axiom`, no `cheat_` anywhere in `iris/`.
+
+#### (a) THE TWO HOISTS, and exactly what shape they took
+
+**Hoist 1 — the scan's arithmetic, into `DinodeSlot.v`.**  Group (5), a new
+section at the end of the file, `ds_`-prefixed: `ds_sext_small`, `ds_srli4`,
+`ds_add_vec32_comm`, `ds_andi15`, `ds_sext64_16_inj`, `ds_type_zero`,
+`ds_type_nonzero`, `ds_uint64_moi`, `ds_bgeu_moi`, `ds_bltu_moi` (pure, at
+file scope), plus **`ds_held_L` inside the existing `IupdateRes` section** —
+whose `Context` is already `!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !fsLogG Σ,
+!bioG Σ`, i.e. character-identical to `ProofIalloc`'s `IallocBytes`, so it
+fitted with no context change.  **`ProofIalloc.v`'s private `ia_*` copies
+were left alone** as the brief directed; the two sets are textually
+identical and retiring the private ones would cost a ProofIalloc recompile
+for nothing.  Everything DinodeSlot needed was already reachable
+(`sext32_64_small`/`bvw32_small`/`moi64_small` from `RiscvExtras`,
+`eq_vec_false_iff` from `PrintintArith`, `zero_reg` from `rv64d`, `fs_L`
+from `FsBlocks`) — **no new `Require` was added to `DinodeSlot.v`.**
+
+**Hoist 2 — `ROOTDEV` and `ROOTINO`, into `InodeInv.v`.**  Both moved (they
+did share the block), beside `NDIRECT`/`MAXFILE` in the fs.h-constants
+group, which is above `sb_ninodes` in the same file — N5a item 4's
+recommended home.  `SpecNamex.v:239` now reads
+
+```coq
+Notation ROOTDEV := InodeInv.ROOTDEV.
+Notation ROOTINO := InodeInv.ROOTINO.
+```
+
+**`Notation`, not `Definition`, and that choice is load-bearing.**  A
+`Definition ROOTDEV := InodeInv.ROOTDEV` would have left
+`ProofNamex.v:4967`'s bare `unfold ROOTDEV` staring at
+`InodeInv.ROOTDEV` rather than at `mword_of_int 1`, and the `pcw` that
+follows it would have died.  An abbreviation resolves to the underlying
+constant, so `unfold ROOTDEV` and `unfold ROOTINO` still reduce all the way.
+**Verified, not assumed**: `ProofNamex.v` was recompiled and is green.
+`SpecNamei.v` / `SpecNameiparent.v` (qualified `SpecNamex.ROOTDEV` uses) are
+green too.
+
+#### (b) `SpecIreclaim.wp_ireclaim_sconf_body` — the shape fsinit drives
+
+`K_ireclaim = 68` (8 frame slots + iput's 60; end_op 58, ilock 44, bread 40,
+iunlock 26, begin_op 26, brelse 26, iget 16).
+
+**IT IS SINGLE-ARMED.**  ireclaim returns `void`, and the second `c.jr ra`
+at +0xc6 — the one that returns with the frame never pushed — is DEAD,
+refuted by `1 < ninodes` exactly as ialloc's +0x12 arm is.  So there is one
+live exit, at +0xc4, and the epilogue is uniform.
+
+Premises, in order: `K_ireclaim <= K`; `log_geom_ok cov logstart`;
+`0 <= inodestart`; `ireg_blocks_ok inodestart nib cov logstart`; itrunc's
+five (`0 < size <= BPB`, `0 <= bmapstart`, `bmapstart ∈ cov`,
+`~ (bmapstart ∈ log_region_set logstart)`, `cov_below cov size`); the three
+geometry premises `1 < ninodes` / `ninodes <= 16 * Z.of_nat nib` /
+`ninodes < 2 ^ 31`; `printk_gen_contract γpr γu γd`; `(j < NPROC)%nat`;
+`γs !! j = Some γl`; `a0 = sign_extend' 64 dev`; `eb = true`.
+
+Resources in: the sconf bundle, `panic_wp_any`, `kernel_data`, `printk_env`,
+`bio_ctx`, `log_ctx`, **`fs_crash_seam` + `gen_cert`** (end_op's), the three
+superblock cells (`sb_ninodes`, `sb_inodestart`, `sb_bmapstart`),
+`ireg_inv`, `is_itable2`, `itable_inv`, `ic_escrows`, **`ic_sleeplocks cn`**,
+`bitmap_res`, `p_pid`, `procs_inv`, `dev_inv`, `disk_geom`, the virtio lock,
+`bslots bn 3`, `iref_slot`.
+
+Post: `∀ mf used'`, everything back — the three cells, `p_pid`,
+`bslots bn 3`, `iref_slot`, `⌜used' ⊆ used⌝` and
+`bitmap_res γfs bmapstart cov logstart size used'`.
+
+**Four things about it that were decided and should not be re-litigated:**
+
+- **NO `log_op` crosses the boundary, in either direction.**  `begin_op` at
+  +0x54 mints `log_op γ MAXOPBLOCKS` and `end_op` at +0x6a retires it, both
+  inside the loop body.  `iput_units = 3 <= MAXOPBLOCKS = 10` is a closed
+  numeric fact, not a premise.  This is the first fs contract in the tree
+  with that shape — ialloc, iupdate and iput all take a reservation.
+- **`ic_sleeplocks cn` is the family, and it is `IcacheBoot`'s copy.**  The
+  scan does not know its slot (iget picks it), so the singleton
+  `is_sleeplock` that ilock/iunlock/iput each take cannot be supplied;
+  `IcacheBoot.ic_sleeplocks_acc` projects the one the run picks.  Naming
+  `IcacheBoot`'s copy rather than `SpecFileclose`'s or `SpecDirlink`'s is
+  what that file's own header asks new contracts to do.
+- **The reference is carved and gathered INSIDE.**  iget pays out
+  `inode_ref k q dev inum`; `IcacheRef.inode_ref_shed` carves the
+  `inode_shr` ilock wants; iunlock returns it; `inode_ref_gather` restores
+  the reference iput spends.  None of it crosses the boundary.
+- **`bslots bn 3`, and three is exactly right.**  bread's reference is held
+  ACROSS iget (+0x8c .. +0x4c) but is returned by the brelse at +0x4c,
+  *before* `begin_op` at +0x54 — so the buffer-across-iget hazard the N5a
+  ledger flags never has to stretch the count to four.  iput's indirect arm
+  is what forces three.
+
+#### (c) `SpecFsinit` — the owed premises finally have somewhere to be
+
+`K_fsinit = 72` (4 frame slots + ireclaim's 68).  `readsb` is INLINED;
+there is no `jal readsb`, only the bread/memmove/brelse triple.
+
+**This file is the only superblock abstraction in the tree, and it exists
+because the `memmove` at +0x26 is where all eight cells are born.**  Before
+it, `&sb` is 32 bytes of raw .bss; after it the eight words are there and
+their values are the image's block 1.  So the contract's IN side takes
+`fsblock γfs 1 bs_sb` plus `[∗ list] i ∈ seq 0 32, pa_add sb_base i ↦ₘ
+sb_old i`, and its OUT side pays the **eight typed cells** — of which four
+are literally the addresses `BitmapInv.sb_size`, `InodeInv.sb_ninodes`,
+`InodeInv.sb_inodestart` and `BitmapInv.sb_bmapstart` that thirteen
+contracts downstream already take as premises (four `Lemma …_addr :
+… = pa_add sb_base n` in the file prove the identifications by
+`reflexivity`).  The other four (`sb_magic`, `sb_nblocks`, `sb_nlog`,
+`sb_logstart`) are named here for the first time.  **Nothing below this
+file changed**: BitmapInv and InodeInv keep their bare fractional cells.
+
+New vocabulary, all in `SpecFsinit.v`: `sb_base`, `sb_magic`, `sb_nblocks`,
+`sb_nlog`, `sb_logstart`, `FSMAGIC = 0x10203040`, `sb_image` (the eight
+fields as bytes, via `BlockWords.word_bytes`) and `sb_image_length`.
+
+**THE IOU FAMILY, AS STATED.**  All of it about `bs_sb`, threaded from the
+boot client, none of it discharged — the same honest shape as
+`IcacheBoot.ipool_alloc`'s allocated-inum bundles:
+
+```coq
+take 32 bs_sb = sb_image v_magic v_size v_nblocks v_ninodes
+                         v_nlog v_logstart v_inodestart v_bmapstart ->
+bv_unsigned v_magic = FSMAGIC ->            (* refutes the LIVE panic arm *)
+v_ninodes = mword_of_int ninodes -> …       (* and the other three fields *)
+1 < ninodes -> ninodes <= 16 * Z.of_nat nib -> ninodes < 2 ^ 31 ->
+dev = icfg_dev -> nib = icfg_nib -> dev = ROOTDEV -> (0 < nib)%nat ->
+```
+
+i.e. **every premise the N4b / N4d / N5a / N5c ledgers parked here, plus the
+magic**, in SpecNamex's exact four-line device shape.  `ROOTDEV` here is
+`InodeInv.ROOTDEV` — which is the whole reason hoist 2 had to happen first.
+
+The `bne a4,a5` at +0x40 is a REAL panic (unlike balloc's and ialloc's
+out-of-space arms, which this kernel turned into `printk`), so a contract
+that promises to return has to refute it; `bv_unsigned v_magic = FSMAGIC` is
+what does.  `panic_wp_any` still rides for the callees' own arms.
+
+#### FINDINGS (numbered)
+
+1. **`SpecFsinit` needs THIRTY-FIVE buffer slots, not thirty-four.**
+   `SpecInitlog` takes `bslots bn ((LOGBLOCKS + 2) + 2)` = 34 and returns
+   only **two** — the other 32 are sealed into `log_batch`'s pool inside the
+   log spinlock, permanently.  But `SpecIreclaim` needs **three** (iput's
+   indirect arm).  So fsinit cannot pass initlog's leftovers straight on: it
+   enters with `((LOGBLOCKS + 2) + 2 + 1)` = 35, holds ONE back across the
+   `jal initlog` at +0x4e, and rejoins it with initlog's two.  **The
+   postcondition therefore hands the caller `bslots bn 3`, not `bslots bn
+   2`** — the boot client (`forkret`/`main`) must be sized for 35, and this
+   is a fact about the composition that neither contract could see alone.
+2. **`InodeInv.ireg_blocks_ok` delivers BOTH of iput's block premises.**  It
+   is stated as `IBLOCK w inodestart ∈ cov /\ ~ (IBLOCK w inodestart ∈
+   log_region_set logstart)` for every covered inum, and iput wants exactly
+   that pair — so ireclaim's scan needs no second quantified premise even
+   though it is the first function to reach `iput` from a scan.
+3. **The `Notation` alias is the only hoist shape that survives a bare
+   `unfold`.**  See (a).  A `Definition` alias typechecks and then breaks a
+   proof 4900 lines away in a file you did not edit.
+4. **fs-icache C7's "ireclaim is the pool's initial-contents authority"
+   flag is RESOLVED, and the answer is "it is not".**  Under §16.5 the
+   pool's free arm is just `imark`; `IcacheBoot.icache_boot` already mints
+   exactly the four persistent things ireclaim takes (`is_itable2`,
+   `itable_inv`, `ic_escrows`, plus the sleeplock family) at the all-empty
+   table, and it does so device-generically.  ireclaim consumes them and
+   mints nothing; the image-wf IOUs stay sealed in the pool by the boot
+   client.  **The mint needed no change and nothing had to move** — the
+   stage's stop-and-report condition on `IcacheBoot` did not fire.
+5. **The decode was re-verified end to end and the N5a ledger is exactly
+   right.**  All ten `jal` targets were resolved numerically against
+   `KernelSyms` off `CodeIreclaim.v` (printk +0x3c, iget +0x44, brelse
+   +0x4c, begin_op +0x54, ilock +0x5a, iunlock +0x60, iput +0x66, end_op
+   +0x6a, bread +0x8c, brelse +0xac), as were fsinit's three `auipc`/`addi`
+   pairs at +0x1e, +0x30 and +0x44 — **all three resolve to `sb =
+   0x80020850`**, confirming that the memmove destination, the magic load
+   and initlog's second argument are the same object.  ireclaim's format
+   string is at **`0x80007468`** and, unlike balloc's and ialloc's, it
+   carries a `%d` (`a1 = s3 = inum` at +0x38), so its `pk_kinds` is not `[]`.
+
+#### THE PARK POINT, precisely
+
+**Both contracts are FROZEN and green; neither proof was started.**  This is
+a deliberate stop, not a failure: `ProofIalloc.v` is 3170 lines for a
+188-byte function and took two full stages (N5c + N5c2), and ireclaim is
+strictly harder — nine callees against five, an orphan block that threads
+the whole bundle through six sequential calls, a loop entered in the middle,
+and a buffer held across `iget`.  Landing a green, frozen, *correct*
+interface for both is the part that unblocks everything else; the proofs are
+obligation against a fixed interface.
+
+What the resuming agent should do first, in order:
+
+1. **`ProofIreclaim.v`, and copy `ProofIalloc.v`'s skeleton.**  The scan
+   (+0x7c..+0xb0) is `ia_scan` with `lh a4,6(a5)` (nlink, offset 6) added:
+   same `ds_srli4` / `ds_andi15` / `iu_slli6` / `iu_slot_addr` arithmetic
+   (now in `DinodeSlot.v`, so no restating), same `ireg_read_blk` +
+   `ireg_blk_slot` decode, same `iInduction`-on-fuel skeleton, and **all
+   five of N5c2's hart/threading surprises apply verbatim** — CIDc
+   anchoring, the IH instantiated at `CIDl`, `cpu_own_transport`'s
+   last-producer rule.  `ia_win_acc` is NOT needed (ireclaim never writes a
+   dinode); `DinodeSlot.diblk_slot_acc` suffices, and `ProofIalloc.v`'s
+   +0x4e block is the borrow/return round trip at an unchanged record
+   (`list_insert_id` closes the give-back).
+2. **Expect the loop invariant to be stated at +0x7c and arrived at twice.**
+   The `c.j +70` at +0x36 enters past the step block, so the first arrival
+   is a special case (`inum = 1`, `s3` not yet meaningful).  This is the one
+   structural thing ialloc's scan does not have.
+3. **Block lemmas, suggested cut** (ialloc's five become these six):
+   `irc_epilogue` (+0xb2..+0xc4), `irc_step` (+0x6e..+0x7a),
+   `irc_orphan` (+0x38..+0x6c — the six-call block, much the largest),
+   `irc_body` (+0x7c..+0xb0), `irc_scan` (the `∀ fuel` wand over
+   +0x6e..+0xb0), `wp_ireclaim_sconf` (+0x00..+0x36).
+4. **`ProofFsinit.v` after it.**  The only genuinely new machinery is the
+   byte→word bridge at the memmove: 32 raw `↦ₘ` cells in, eight `↦₄` cells
+   out, against `sb_image`.  `BlockWords` is where the word/byte lemmas
+   live.  Everything else is three calls in a row.

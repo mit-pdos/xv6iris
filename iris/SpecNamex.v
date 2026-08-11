@@ -235,9 +235,16 @@ Local Open Scope Z_scope.
 Definition K_namex : nat := 94%nat.
 
 (* The two immediates of the absolute arm, read off [li a1,1] at +0x48 and
-   the [mv a0,a1] at +0x4a that makes the device argument the same word. *)
-Definition ROOTDEV : mword 32 := mword_of_int 1.
-Definition ROOTINO : mword 32 := mword_of_int 1.
+   the [mv a0,a1] at +0x4a that makes the device argument the same word.
+
+   HOISTED (N5d): both now live in [InodeInv.v], beside [sb_ninodes], because
+   [SpecFsinit] owes the boot tie [icfg_dev = ROOTDEV] and a Spec file must
+   not require another function's Spec.  These are ABBREVIATIONS, not new
+   definitions: [ROOTDEV] here and [InodeInv.ROOTDEV] are the SAME constant,
+   so the qualified uses in SpecNamei / SpecNameiparent and the bare
+   [unfold ROOTDEV] / [unfold ROOTINO] in ProofNamex still work unchanged. *)
+Notation ROOTDEV := InodeInv.ROOTDEV.
+Notation ROOTINO := InodeInv.ROOTINO.
 
 (* THE CONTRACT'S CONTINUATION, NAMED.  Spelled out it is twenty wands over the
    whole loaned bundle plus the two-armed result; namex's whole-function proof
