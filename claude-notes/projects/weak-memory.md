@@ -2881,3 +2881,75 @@ register-only ALU ones (`or`, `slli`, `add`, `ori`, `addiw`) are the closest
 to `addi` and should go first; the CSR and load/store ones have wider
 signatures and the load/store ones touch memory, so their layer A is not
 purely a rename.
+
+### The sweep, done (2026-08-11)
+
+All seventeen are now packaged. Layer A is `WeakLeafM` §6–§11, layer B is
+`WeakLeafO` §5–§9. Full `make` EXIT=0, `proof_coverage --check` 0,
+`spec_vacuity` CLEAN, `lemma_diff` CLEAN at each of the three batches.
+
+The ~1800-line estimate held. What the estimate did *not* predict is that
+three of the seventeen are not template fills, and each of the three turned
+out to say something:
+
+**1. Five of them are not `is_rvc`-generic.** `wwp_lui` and `wwp_addi`
+quantify over `is_rvc` because batch 2 proved both encodings for them. For
+`c.or` / `c.add` / `c.slli` / `c.addiw` only the compressed leaf exists, and
+for `ori` only the base one, because that is all the two chains reach.
+Stating a wrapper at a `bool` it cannot discharge would owe a leaf that does
+not exist, so each is stated at the encoding its leaf covers — `winstr_m pc
+true` with a 2-bump, `winstr_m pc false` with a 4-bump. Generalising later is
+a leaf-file job, not a wrapper job.
+
+**2. A silent name collision in the CSR numbers.** `csr_menvcfg` and
+`csr_mcounteren` are each defined **twice** — `WpGprCsrrA`/`WpGprCsrrB` as
+`Ox"30A"` / `Ox"306"`, `WpGprCsrwA` as `mword_of_int 0x30a` / `0x306`. Same
+values, different terms. The read wrappers need one and the write wrappers
+the other, so importing both tables hands one section the wrong constant and
+leaves its `winstr_m` token failing to unify with its leaf **for no visible
+reason**. Both files import only the read-side table and spell the write-side
+numbers — and `menvcfg_legalized` / `stimecmp_legalized`, which live in those
+same modules — qualified. Worth remembering: this will bite again the moment
+anything else mentions both families.
+
+**3. Two instructions do not get a `_run`, and the reasons differ.**
+
+- **`mret`** does not take `mmode_config`; it takes the five cells that
+  bundle *constitutes*, because it changes one of them (`cur_privilege`
+  Machine → Supervisor). The bundle is not preserved by this instruction, it
+  is **dissolved** by it, so there is no `whart_run` to hand back. This is
+  the same boundary the `sconf` decision identified: `mret` is the M→S
+  transition, i.e. precisely where `hart_view` should stop travelling inside
+  an M-mode bundle and start travelling inside `sconf`. Until the port
+  reaches S-mode there is nothing to hand it to, so `mret` stops at `_o`.
+- **`c.sd`**, the release store, cannot hide `ws'` at all — its whole payload
+  is a statement *about* `ws'`:
+  `⌜∀ j, (j < 8)%nat -> T ≤ flr (ws_view ws') (acc_addr ea j)⌝`, the released
+  timestamp sitting below the post-state view at the eight stored bytes,
+  which is what lets the acquirer recover the payload. Hiding `ws'` erases
+  it.
+
+**The one open design point this sweep produced.** The objective replacement
+for `c.sd`'s side condition exists in principle — `WeakObj.view_lb`, or eight
+`WeakPtOwn.wflr_lb (acc_addr ea j) T` — and would say the same thing without
+naming `ws'`, since a floor is persistent and only grows. What is missing is
+the **constructor**: no lemma yet takes `ws_auth` plus a bound at a *finite
+set* of addresses and returns the corresponding `view_lb`. Writing one is a
+decision about which shape the future spinlock release consumes, so `c.sd`
+was left at layer A rather than having the question answered by whichever
+shape was easiest to write here. This is the next thing to decide, and it
+should be decided together with the release spec, not before it.
+
+**What `c.ld` shows, for contrast.** It is the first wrapper whose frame is
+not `⌜True⌝`, and it closes cleanly: the caller holds an objective
+`wobj (wpt8 ea dqv v)`, hands it in, gets it back, and no `ws` appears in the
+statement. `wobj_to_hold` / `wobj_of_hold` do the conversion generically, so
+the proof says nothing about `wpt8` in particular — which is the whole claim
+of `WeakObj`, now exercised on a leaf rather than only on a lock payload.
+
+**Still not done:** no *call site* has been converted yet. `WkStartNew` uses
+`wwp_lui` at instruction 35 and raw leaves everywhere else. Converting a site
+also needs its `wsti_NN` token in `WkStartAux` (the `CodeStart.sti_*`
+analogue) — one `iPoseProof` per instruction, assembled from facts that file
+already proves. That is the batch that will actually demonstrate the
+step-site parity these two layers were built for.

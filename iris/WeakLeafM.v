@@ -54,6 +54,7 @@ Require Import WeakView WeakVProp WeakFence.
 Require Import WeakInstr WeakCert WeakEff WeakEffSkel.
 Require Import WeakPmpEff WeakTickEff WeakFetchEff WeakFunnel.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
+Require Import MinstretInv.
 Require Import ExecCommon.
 Require Import InstrBytes.
 Require Import RegFile WpGpr WpMmodeLeafBase.
@@ -69,6 +70,8 @@ Require Import WeakLeafCsrrM WeakLeafCsrrTime.
    pull the write-side one in. *)
 Require Import WpGprCsrrA WpGprCsrrB.
 Require Import WeakLeafCsrw2 WeakLeafStimecmp.
+Require Import WeakLeafJump WeakLeafMret WpGprMretWp.
+Require Import WeakLeafTor WeakWord8.
 Require Import WkEntryEff.
 
 Import SailStdpp.Values.
@@ -900,6 +903,290 @@ Section WeakLeafM.
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hcsr Hhws".
     iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
     iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hrs Hcsr Hhws HF"). exact Hle.
+  Qed.
+
+  (* ==================================================================== *)
+  (** ** 9. Control flow.
+
+      The packaging is the same; what differs is only that the post-state
+      pc is not [add_vec_int pc n].  [jal] lands at [pc + imm] and writes
+      the return address, [c.jr] lands at [ret_pc rav] and writes nothing. *)
+
+  (** [jal rd, imm] *)
+  Lemma wwp_jal (pc : mword 64) (rd : mword 5) (imm : mword 21)
+      (rdv0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate)
+      (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    is_aligned_paddr (Physaddr (add_vec pc (sign_extend' 64 imm))) 4 = true ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rdv0 -∗
+    winstr_m pc false (JAL (imm, Regidx rd)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec pc (sign_extend' 64 imm)) -∗
+      R_bitvector_64 (gpr_of_Z (uint rd))
+        ↦ᵣ (regval_into_reg (add_vec_int pc 4)) -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz Htgt.
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hrd #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_base with "Hi") as
+      (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
+    iApply (wwp_jal_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc w rd imm rdv0 pc pmpcfg0 q D_m dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz Htgt
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec
+              with "Hmm Hpcf Hpc Hnpc Hrd Hb Hhws").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hrd Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hrd Hhws HF"). exact Hle.
+  Qed.
+
+  (** [c.jr ra] *)
+  Lemma wwp_cjr_rvc (pc : mword 64) (ra : mword 5) (rav : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate)
+      (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint ra <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint ra)) ↦ᵣ rav -∗
+    winstr_m pc true (JALR (zeros' 12, Regidx ra, zreg)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (ret_pc rav) -∗
+      R_bitvector_64 (gpr_of_Z (uint ra)) ↦ᵣ rav -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hra #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_rvc with "Hi") as
+      (h i0) "(_ & #Hb & %Hal2 & %Hall & %Hgood & %Hdec & %Hlp0 & %Hg0 & %Hexp)".
+    iApply (wwp_cjr_rvc_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc h ra i0 rav pc pmpcfg0 q D_m D_none dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec Hg0 Hexp
+              with "Hmm Hpcf Hpc Hnpc Hra Hb Hhws").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hra Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hra Hhws HF"). exact Hle.
+  Qed.
+
+  (** ** 10. [mret] -- and why it is the last one this file can package.
+
+      [mret] does not take [mmode_config]; it takes the five cells that
+      bundle CONSTITUTES, because it changes one of them: [cur_privilege]
+      goes from [Machine] to [Supervisor].  So the bundle cannot be
+      reassembled on the way out, and the wrapper below is the [winstr_m]
+      packaging ONLY -- it removes the fetch preamble like every other
+      wrapper here and nothing else.
+
+      This is also exactly the boundary the design notes put the view token
+      at: [mret] is the M->S transition, so it is where [hart_view] should
+      stop travelling inside an M-mode bundle and start travelling inside
+      [sconf].  Until the port reaches S-mode there is nothing to hand it
+      to, so §10 stops at layer A and [WeakLeafO] gives [mret] an [_o] but
+      deliberately no [_run]. *)
+  Lemma wwp_mret (pc : mword 64) (newpriv : Privilege)
+      (ms_cur mepc0 menvcfg1 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (ws : wstate) (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    eq_vec (_get_Mstatus_MIE ms_cur) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV ms_cur) ('b"1") = false ->
+    privLevel_bits_forwards (_get_Mstatus_MPP (cms2 ms_cur), ('b"0"))
+      = returnM newpriv ->
+    newpriv = Supervisor ->
+    _get_MEnvcfg_LPE menvcfg1 = ('b"0") ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ Machine -∗
+    mstatus ↦ᵣ ms_cur -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    pc_is pc -∗
+    menvcfg ↦ᵣ menvcfg1 -∗
+    mepc ↦ᵣ mepc0 -∗
+    winstr_m pc false (MRET tt) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      hart_state ↦ᵣ HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ newpriv -∗
+      mstatus ↦ᵣ cms5 ms_cur -∗
+      pmpcfg_n ↦ᵣ pmpcfg0 -∗
+      menvcfg ↦ᵣ menvcfg1 -∗
+      mepc ↦ᵣ mepc0 -∗
+      pc_is (ret_pc mepc0) -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp HmIE Hmprv Hfwd Hnew Hlpe.
+    iIntros "Hhw Hinv Hhs Hpriv Hms Hpcf [Hpc Hnpc] Hmenv Hmepc
+             #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_base with "Hi") as
+      (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
+    iApply (wwp_mret_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc w newpriv ms_cur mepc0 menvcfg1 pc pmpcfg0 D_m dstateM ws
+              Hgid Hpmp Hal2 eq_refl HmIE Hmprv Hfwd Hnew Hlpe
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec
+              with "Hhw Hinv Hhs Hpriv Hms Hpcf Hpc Hnpc Hmenv Hmepc Hb Hhws").
+    iIntros (ws') "%Hle Hhs Hpriv Hms Hpcf Hmenv Hmepc Hpc Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws'
+              with "[%] Hhs Hpriv Hms Hpcf Hmenv Hmepc Hpc Hhws HF").
+    exact Hle.
+  Qed.
+
+  (* ==================================================================== *)
+  (** ** 11. The two memory instructions.
+
+      These are the ones with real weak-memory content, and the packaging
+      layer does NOT touch it: the fetch preamble comes off exactly as
+      everywhere else, and the memory interface -- the [vwp_hold] in and
+      out for the load, the released [T] and its coherence side condition
+      for the store -- is passed through UNCHANGED.  That is deliberate:
+      §11 is where a silent weakening would do damage, so it does nothing
+      but repackage the fetch. *)
+
+  (** [c.ld rd, imm(rs1)] under a TOR PMP region. *)
+  Lemma wwp_ld8_tor_rvc (pc : mword 64) (rs1 rd : mword 5) (imm : mword 12)
+      (ea : Arch.pa) (v : bv 64) (dqv : dfrac) (q : Qp)
+      (pmpcfg0 : type_of_register pmpcfg_n)
+      (pmpaddrs : type_of_register pmpaddr_n)
+      (rs1v rd0 : mword 64) (ws : wstate) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
+    uint rs1 <> 0 ->
+    uint rd <> 0 ->
+    add_vec rs1v (sign_extend' 64 imm) = ea ->
+    (forall j : nat, (j < 8)%nat -> addr_is_ram (pa_add ea j)) ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
+    winstr_m pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold (wpt8 ea dqv v) ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+      pc_is (add_vec_int pc 2) -∗
+      R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+      R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ (regval_into_reg v) -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold (wpt8 ea dqv v) ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Htor Hnz1 Hnzd Hea Hram.
+    iIntros "Hmm Hpcf Hpad [Hpc Hnpc] Hrs Hrd #Hi Hhws Hpt Hcont".
+    iDestruct (winstr_m_rvc with "Hi") as
+      (h i0) "(_ & #Hb & %Hal2 & %Hall & %Hgood & %Hdec & %Hlp0 & %Hg0 & %Hexp)".
+    iApply (wwp_ld8_tor_rvc_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc h rs1 rd imm i0 ea v dqv q pmpcfg0 pmpaddrs rs1v rd0 pc
+              D_m D_none dstateM ws
+              Hgid Hpmp Htor Hal2 eq_refl Hnz1 Hnzd Hea Hram
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec Hg0 Hexp
+              with "Hmm Hpcf Hpad Hpc Hnpc Hrs Hrd Hb Hhws Hpt").
+    iIntros (ws') "%Hle Hmm Hpcf Hpad Hpc Hrs Hrd Hhws Hpt".
+    iApply ("Hcont" $! ws'
+              with "[%] Hmm Hpcf Hpad Hpc Hrs Hrd Hhws Hpt"). exact Hle.
+  Qed.
+
+  (** [c.sd rs2, imm(rs1)] under a TOR PMP region -- the RELEASE store.
+
+      The continuation keeps the leaf's [T] and its coherence side
+      condition verbatim.  [T] is the whole point of the instruction: it is
+      the timestamp at which the frame [R] becomes publishable, and the
+      bound relates it to the POST-state view, so neither can be dropped
+      without dropping what a lock release is for. *)
+  Lemma wwp_sd8_tor_rvc (pc : mword 64) (rs1 rs2 : mword 5) (imm : mword 12)
+      (ea : Arch.pa) (vold : bv 64) (R : vProp Σ) (q : Qp)
+      (pmpcfg0 : type_of_register pmpcfg_n)
+      (pmpaddrs : type_of_register pmpaddr_n)
+      (rs1v rs2v : mword 64) (ws : wstate) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
+    uint rs1 <> 0 ->
+    uint rs2 <> 0 ->
+    add_vec rs1v (sign_extend' 64 imm) = ea ->
+    (forall j : nat, (j < 8)%nat -> addr_is_ram (pa_add ea j)) ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
+    winstr_m pc true (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold (wpt8 ea (DfracOwn 1) vold) ws -∗
+    vwp_hold R ws -∗
+    ( ∀ (ws' : wstate) (T : nat),
+      ⌜ws_le ws ws'⌝ -∗
+      ⌜forall j : nat, (j < 8)%nat ->
+         (T <= flr (ws_view ws') (acc_addr ea j))%nat⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+      pc_is (add_vec_int pc 2) -∗
+      R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+      R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold (wpt8 ea (DfracOwn 1) rs2v) ws' -∗
+      monPred_at R (view_scl T) -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Htor Hnz1 Hnz2 Hea Hram.
+    iIntros "Hmm Hpcf Hpad [Hpc Hnpc] Hrs1 Hrs2 #Hi Hhws Hpt HR Hcont".
+    iDestruct (winstr_m_rvc with "Hi") as
+      (h i0) "(_ & #Hb & %Hal2 & %Hall & %Hgood & %Hdec & %Hlp0 & %Hg0 & %Hexp)".
+    iApply (wwp_sd8_tor_rvc_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc h rs1 rs2 imm i0 ea vold R q pmpcfg0 pmpaddrs rs1v rs2v pc
+              D_m D_none dstateM ws
+              Hgid Hpmp Htor Hal2 eq_refl Hnz1 Hnz2 Hea Hram
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec Hg0 Hexp
+              with "Hmm Hpcf Hpad Hpc Hnpc Hrs1 Hrs2 Hb Hhws Hpt HR").
+    iIntros (ws' T) "%Hle %HT Hmm Hpcf Hpad Hpc Hrs1 Hrs2 Hhws Hpt HR".
+    iApply ("Hcont" $! ws' T
+              with "[%] [%] Hmm Hpcf Hpad Hpc Hrs1 Hrs2 Hhws Hpt HR");
+      [exact Hle | exact HT].
   Qed.
 
 End WeakLeafM.

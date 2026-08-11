@@ -65,8 +65,9 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ExecCommon WpGprCsrrA WpGprCsrrB.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RegFile.
 Require Import RiscvFetchExec InstrBytes WpGpr WpMmodeLeafBase.
+Require Import RiscvExtras MinstretInv WpGprMretWp.
 Require Import WeakMem WeakInterp WeakLang WeakView WeakVProp WeakGhost.
-Require Import WeakViewMono WeakPtOwn WeakPtPub WeakObj WeakLeafM.
+Require Import WeakViewMono WeakPtOwn WeakPtPub WeakObj WeakWord8 WeakLeafM.
 
 Section leafo.
   Context `{!riscvGS Σ, !weakGS Σ}.
@@ -1089,5 +1090,307 @@ Section leafo.
     iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hrs Hcsr").
     iApply (whart_run_close with "Hmm Hview").
   Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (** ** 8. Control flow. *)
+
+  (** *** 8a. [jal rd, imm] *)
+  Lemma wwp_jal_o (pc : mword 64) (rd : mword 5) (imm : mword 21)
+      (rdv0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    is_aligned_paddr (Physaddr (add_vec pc (sign_extend' 64 imm))) 4 = true ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rdv0 -∗
+    winstr_m pc false (JAL (imm, Regidx rd)) -∗
+    hart_view cpu_id -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec pc (sign_extend' 64 imm)) -∗
+      R_bitvector_64 (gpr_of_Z (uint rd))
+        ↦ᵣ (regval_into_reg (add_vec_int pc 4)) -∗
+      hart_view cpu_id -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz Htgt.
+    iIntros "Hmm Hpcf Hpc Hrd #Hi [%ws [Hws Hauth]] Hcont".
+    iAssert (vwp_hold (⌜True⌝ : vProp Σ) ws) as "HF".
+    { rewrite vwp_hold_pure. done. }
+    iApply (wwp_jal pc rd imm rdv0 pmpcfg0 q ws (⌜True⌝ : vProp Σ)
+              Hgid Hpmp Hnz Htgt with "Hmm Hpcf Hpc Hrd Hi Hws HF").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hrd Hws _".
+    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iApply ("Hcont" with "Hmm Hpcf Hpc Hrd"). iExists ws'. iFrame.
+  Qed.
+
+  Lemma wwp_jal_run (pc : mword 64) (rd : mword 5) (imm : mword 21)
+      (rdv0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    is_aligned_paddr (Physaddr (add_vec pc (sign_extend' 64 imm))) 4 = true ->
+    whart_run q -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rdv0 -∗
+    winstr_m pc false (JAL (imm, Regidx rd)) -∗
+    ( whart_run q -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec pc (sign_extend' 64 imm)) -∗
+      R_bitvector_64 (gpr_of_Z (uint rd))
+        ↦ᵣ (regval_into_reg (add_vec_int pc 4)) -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz Htgt.
+    iIntros "Hrun Hpcf Hpc Hrd #Hi Hcont".
+    iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
+    iApply (wwp_jal_o pc rd imm rdv0 pmpcfg0 q Hgid Hpmp Hnz Htgt
+              with "Hmm Hpcf Hpc Hrd Hi Hview").
+    iIntros "Hmm Hpcf Hpc Hrd Hview".
+    iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hrd").
+    iApply (whart_run_close with "Hmm Hview").
+  Qed.
+
+  (** *** 8b. [c.jr ra] *)
+  Lemma wwp_cjr_rvc_o (pc : mword 64) (ra : mword 5) (rav : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint ra <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint ra)) ↦ᵣ rav -∗
+    winstr_m pc true (JALR (zeros' 12, Regidx ra, zreg)) -∗
+    hart_view cpu_id -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (ret_pc rav) -∗
+      R_bitvector_64 (gpr_of_Z (uint ra)) ↦ᵣ rav -∗
+      hart_view cpu_id -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf Hpc Hra #Hi [%ws [Hws Hauth]] Hcont".
+    iAssert (vwp_hold (⌜True⌝ : vProp Σ) ws) as "HF".
+    { rewrite vwp_hold_pure. done. }
+    iApply (wwp_cjr_rvc pc ra rav pmpcfg0 q ws (⌜True⌝ : vProp Σ)
+              Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hra Hi Hws HF").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hra Hws _".
+    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iApply ("Hcont" with "Hmm Hpcf Hpc Hra"). iExists ws'. iFrame.
+  Qed.
+
+  Lemma wwp_cjr_rvc_run (pc : mword 64) (ra : mword 5) (rav : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint ra <> 0 ->
+    whart_run q -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint ra)) ↦ᵣ rav -∗
+    winstr_m pc true (JALR (zeros' 12, Regidx ra, zreg)) -∗
+    ( whart_run q -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (ret_pc rav) -∗
+      R_bitvector_64 (gpr_of_Z (uint ra)) ↦ᵣ rav -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hrun Hpcf Hpc Hra #Hi Hcont".
+    iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
+    iApply (wwp_cjr_rvc_o pc ra rav pmpcfg0 q Hgid Hpmp Hnz
+              with "Hmm Hpcf Hpc Hra Hi Hview").
+    iIntros "Hmm Hpcf Hpc Hra Hview".
+    iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hra").
+    iApply (whart_run_close with "Hmm Hview").
+  Qed.
+
+  (** *** 8c. [mret] -- [_o] ONLY, and the absence of [_run] is the point.
+
+      [whart_run] bundles [mmode_config], which asserts [cur_privilege ↦ᵣ
+      Machine].  [mret] sets that cell to [Supervisor], so there is no
+      [whart_run] to hand back: the bundle is not preserved by this
+      instruction, it is DISSOLVED by it.  Writing a [_run] here would mean
+      inventing an S-mode bundle to return, which is [sconf]'s job and is
+      where the design notes say [hart_view] should live once the port
+      reaches S-mode.  Until then [mret] stops at [_o], which is honest
+      about what it has: the view token in and the view token out, with the
+      five M-mode cells passing through individually. *)
+  Lemma wwp_mret_o (pc : mword 64) (newpriv : Privilege)
+      (ms_cur mepc0 menvcfg1 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    eq_vec (_get_Mstatus_MIE ms_cur) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV ms_cur) ('b"1") = false ->
+    privLevel_bits_forwards (_get_Mstatus_MPP (cms2 ms_cur), ('b"0"))
+      = returnM newpriv ->
+    newpriv = Supervisor ->
+    _get_MEnvcfg_LPE menvcfg1 = ('b"0") ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ Machine -∗
+    mstatus ↦ᵣ ms_cur -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    pc_is pc -∗
+    menvcfg ↦ᵣ menvcfg1 -∗
+    mepc ↦ᵣ mepc0 -∗
+    winstr_m pc false (MRET tt) -∗
+    hart_view cpu_id -∗
+    ( hart_state ↦ᵣ HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ newpriv -∗
+      mstatus ↦ᵣ cms5 ms_cur -∗
+      pmpcfg_n ↦ᵣ pmpcfg0 -∗
+      menvcfg ↦ᵣ menvcfg1 -∗
+      mepc ↦ᵣ mepc0 -∗
+      pc_is (ret_pc mepc0) -∗
+      hart_view cpu_id -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp HmIE Hmprv Hfwd Hnew Hlpe.
+    iIntros "Hhw Hinv Hhs Hpriv Hms Hpcf Hpc Hmenv Hmepc
+             #Hi [%ws [Hws Hauth]] Hcont".
+    iAssert (vwp_hold (⌜True⌝ : vProp Σ) ws) as "HF".
+    { rewrite vwp_hold_pure. done. }
+    iApply (wwp_mret pc newpriv ms_cur mepc0 menvcfg1 pmpcfg0 ws
+              (⌜True⌝ : vProp Σ) Hgid Hpmp HmIE Hmprv Hfwd Hnew Hlpe
+              with "Hhw Hinv Hhs Hpriv Hms Hpcf Hpc Hmenv Hmepc Hi Hws HF").
+    iIntros (ws') "%Hle Hhs Hpriv Hms Hpcf Hmenv Hmepc Hpc Hws _".
+    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iApply ("Hcont" with "Hhs Hpriv Hms Hpcf Hmenv Hmepc Hpc").
+    iExists ws'. iFrame.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (** ** 9. The load -- and where the sweep stops.
+
+      [c.ld] is the first wrapper here whose frame is not [⌜True⌝, and it
+      is the one that shows what [wobj] bought: the caller holds an
+      OBJECTIVE eight-byte points-to, hands it in, and gets it back, with
+      no [ws] anywhere in the statement.  [wobj_to_hold] / [wobj_of_hold]
+      do the conversion generically, so this proof says nothing about
+      [wpt8] in particular. *)
+  Lemma wwp_ld8_tor_rvc_o (pc : mword 64) (rs1 rd : mword 5) (imm : mword 12)
+      (ea : Arch.pa) (v : bv 64) (dqv : dfrac) (q : Qp)
+      (pmpcfg0 : type_of_register pmpcfg_n)
+      (pmpaddrs : type_of_register pmpaddr_n)
+      (rs1v rd0 : mword 64) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
+    uint rs1 <> 0 ->
+    uint rd <> 0 ->
+    add_vec rs1v (sign_extend' 64 imm) = ea ->
+    (forall j : nat, (j < 8)%nat -> addr_is_ram (pa_add ea j)) ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
+    winstr_m pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
+    hart_view cpu_id -∗
+    wobj (wpt8 ea dqv v) -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+      pc_is (add_vec_int pc 2) -∗
+      R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+      R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ (regval_into_reg v) -∗
+      hart_view cpu_id -∗
+      wobj (wpt8 ea dqv v) -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Htor Hnz1 Hnzd Hea Hram.
+    iIntros "Hmm Hpcf Hpad Hpc Hrs Hrd #Hi [%ws [Hws Hauth]] Hpt Hcont".
+    iDestruct (wobj_to_hold ws with "Hauth Hpt") as "[Hauth Hpt]".
+    iApply (wwp_ld8_tor_rvc pc rs1 rd imm ea v dqv q pmpcfg0 pmpaddrs
+              rs1v rd0 ws Hgid Hpmp Htor Hnz1 Hnzd Hea Hram
+              with "Hmm Hpcf Hpad Hpc Hrs Hrd Hi Hws Hpt").
+    iIntros (ws') "%Hle Hmm Hpcf Hpad Hpc Hrs Hrd Hws Hpt".
+    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iDestruct (wobj_of_hold ws' with "Hauth Hpt") as "[Hauth Hpt]".
+    iApply ("Hcont" with "Hmm Hpcf Hpad Hpc Hrs Hrd [Hws Hauth] Hpt").
+    iExists ws'. iFrame.
+  Qed.
+
+  Lemma wwp_ld8_tor_rvc_run (pc : mword 64) (rs1 rd : mword 5)
+      (imm : mword 12) (ea : Arch.pa) (v : bv 64) (dqv : dfrac) (q : Qp)
+      (pmpcfg0 : type_of_register pmpcfg_n)
+      (pmpaddrs : type_of_register pmpaddr_n)
+      (rs1v rd0 : mword 64) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
+    uint rs1 <> 0 ->
+    uint rd <> 0 ->
+    add_vec rs1v (sign_extend' 64 imm) = ea ->
+    (forall j : nat, (j < 8)%nat -> addr_is_ram (pa_add ea j)) ->
+    whart_run q -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
+    winstr_m pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
+    wobj (wpt8 ea dqv v) -∗
+    ( whart_run q -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+      pc_is (add_vec_int pc 2) -∗
+      R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+      R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ (regval_into_reg v) -∗
+      wobj (wpt8 ea dqv v) -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Htor Hnz1 Hnzd Hea Hram.
+    iIntros "Hrun Hpcf Hpad Hpc Hrs Hrd #Hi Hpt Hcont".
+    iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
+    iApply (wwp_ld8_tor_rvc_o pc rs1 rd imm ea v dqv q pmpcfg0 pmpaddrs
+              rs1v rd0 Hgid Hpmp Htor Hnz1 Hnzd Hea Hram
+              with "Hmm Hpcf Hpad Hpc Hrs Hrd Hi Hview Hpt").
+    iIntros "Hmm Hpcf Hpad Hpc Hrs Hrd Hview Hpt".
+    iApply ("Hcont" with "[Hmm Hview] Hpcf Hpad Hpc Hrs Hrd Hpt").
+    iApply (whart_run_close with "Hmm Hview").
+  Qed.
+
+  (** ** 10. WHY [c.sd] HAS NO [_o] HERE, and what one would need.
+
+      Every other wrapper in this file hides [ws'] behind [hart_view].  The
+      release store cannot be wrapped that way, because its whole payload
+      is a statement ABOUT [ws']:
+
+        ⌜∀ j, (j < 8)%nat -> T ≤ flr (ws_view ws') (acc_addr ea j)⌝
+
+      -- the released timestamp [T] sits below the post-state view at the
+      eight stored bytes, which is exactly what lets the acquirer of the
+      lock recover the payload.  Hiding [ws'] erases it.
+
+      The objective replacement EXISTS in principle -- [WeakObj]'s
+      [view_lb], or eight [WeakPtOwn.wflr_lb (acc_addr ea j) T] -- and
+      would say the same thing without naming [ws'], since a floor is
+      persistent and only grows.  What is missing is the constructor: no
+      lemma yet takes [ws_auth] plus a bound at a FINITE SET of addresses
+      and returns the corresponding [view_lb].  Writing one is a design
+      decision about the release interface (which shape the future spinlock
+      release consumes), not a mechanical wrap, so [c.sd] stops at
+      [WeakLeafM]'s layer-A packaging -- which still removes its fetch
+      preamble -- and the interface question is left open rather than
+      answered by whichever shape happened to be easiest here. *)
 
 End leafo.
