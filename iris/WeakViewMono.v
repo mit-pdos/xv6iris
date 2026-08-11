@@ -354,29 +354,32 @@ Section view.
 End view.
 
 (* ---------------------------------------------------------------------- *)
-(** ** 4. The opaque token, and the leaf-facing step rule.
+(** ** 4. The authority-only token.
 
-    [hart_view] is the thing a client threads: the authority with its value
-    EXISTENTIALLY HIDDEN.  A leaf takes it and hands it back; the step
-    obligation is "there exists a larger [wstate]", and [hart_view_step] is
-    the proof that a leaf can discharge that internally.  Above a leaf there
-    is no [ws] binder, no [ws'], and no [⌜ws_le ws ws'⌝] — which is the
-    entire claim of the design note's §2. *)
+    [wview_tok] is the authority with its value EXISTENTIALLY HIDDEN — the
+    shape that makes a client stop naming [wstate]s.  It is NOT the token
+    the tree threads: the real one ([WeakGhost.hart_view]) additionally
+    bundles the hart's [hart_ws] half, because the monotone authority alone
+    says nothing about the machine.  What is here is the view half of that
+    bundle, proved once so [WeakGhost] can just pair it up.
+
+    NAMING.  This used to be called [hart_view]; the name moved to the real
+    token in [WeakGhost] when [weak_view_name] landed. *)
 
 Section token.
   Context `{!weakViewG Σ}.
 
-  Definition hart_view (γ : wview_names) : iProp Σ := (∃ w, ws_auth γ w)%I.
+  Definition wview_tok (γ : wview_names) : iProp Σ := (∃ w, ws_auth γ w)%I.
 
-  Lemma hart_view_intro γ w : ws_auth γ w -∗ hart_view γ.
+  Lemma wview_tok_intro γ w : ws_auth γ w -∗ wview_tok γ.
   Proof. iIntros "H". by iExists w. Qed.
 
   (** What a leaf does: open the token, learn the current state, step it to
-      any [ws_le]-larger one, close it.  The caller sees [hart_view γ] in and
-      [hart_view γ] out — no values at all. *)
-  Lemma hart_view_step γ (step : wstate -> wstate) :
+      any [ws_le]-larger one, close it.  The caller sees [wview_tok γ] in and
+      [wview_tok γ] out — no values at all. *)
+  Lemma wview_tok_step γ (step : wstate -> wstate) :
     (∀ w, ws_le w (step w)) ->
-    hart_view γ ==∗ hart_view γ.
+    wview_tok γ ==∗ wview_tok γ.
   Proof.
     iIntros (Hstep) "[%w Hauth]".
     iMod (ws_update _ _ (step w) with "Hauth") as "Hauth"; [done|].
@@ -386,18 +389,49 @@ Section token.
   (** Snapshotting through the token: a client that DOES care about views
       (the lock, the escrow) takes a persistent floor and keeps it across
       arbitrarily many later steps. *)
-  Lemma hart_view_snapshot γ : hart_view γ ==∗ ∃ w, hart_view γ ∗ ws_lb γ w.
+  Lemma wview_tok_snapshot γ : wview_tok γ ==∗ ∃ w, wview_tok γ ∗ ws_lb γ w.
   Proof.
     iIntros "[%w Hauth]". iDestruct (ws_lb_get with "Hauth") as "#Hlb".
     iModIntro. iExists w. iFrame "Hlb". by iExists w.
   Qed.
 
-  (** THE PAYOFF LEMMA.  A floor taken before a step is still a floor after
-      arbitrarily many steps — with no [vwp_hold_mono], no rebasing, and
-      without the client ever naming a [wstate].  Contrast [hart_ws], where
-      every intervening instruction forces the fact from [ws] to [ws']. *)
-  Lemma ws_lb_survives γ w0 :
-    ws_lb γ w0 -∗ hart_view γ -∗ ⌜True⌝ ∗ ws_lb γ w0.
-  Proof. iIntros "#Hlb _". by iFrame "Hlb". Qed.
-
 End token.
+
+(* ---------------------------------------------------------------------- *)
+(** ** 5. Allocation for the whole hart enumeration.
+
+    The [ghost_var_alloc_halves_cpus] analogue: one fresh [wview_names] per
+    hart.  Kept generic in the index type so this file still needs nothing
+    but [WeakMem] — [WeakAdequacy] instantiates it at [CPU]. *)
+
+Definition weakViewΣ : gFunctors :=
+  #[ mono_natΣ; mono_natΣ; mono_natΣ; mono_natΣ; mono_natΣ;
+     GFunctor (authR cohUR) ].
+
+(** [solve_inG] ends in a single [split], so it cannot see through the
+    NESTED [wv_scal] field — the scalar bundle has to be discharged first
+    and handed over as a whole. *)
+Global Instance subG_weakViewScalarG Σ : subG weakViewΣ Σ -> weakViewScalarG Σ.
+Proof. solve_inG. Qed.
+
+Global Instance subG_weakViewG Σ : subG weakViewΣ Σ -> weakViewG Σ.
+Proof. intros H. split; [by apply subG_weakViewScalarG|]. revert H. solve_inG. Qed.
+
+Lemma ws_alloc_cpus `{!weakViewG Σ} {A : Type} `{EqDecision A}
+    (w : wstate) (cs : list A) :
+  NoDup cs ->
+  ⊢ |==> ∃ f : A -> wview_names, [∗ list] c ∈ cs, ws_auth (f c) w.
+Proof.
+  induction cs as [|c cs' IH]; intros Hnd.
+  - iModIntro. iExists (fun _ => WvNames (WsNames 1 1 1 1 1) 1)%positive. done.
+  - apply NoDup_cons in Hnd as [Hc Hnd'].
+    iMod (IH Hnd') as (fr) "Hrest".
+    iMod (ws_alloc w) as (γ) "Hg".
+    iModIntro. iExists (fun c' => if decide (c' = c) then γ else fr c').
+    rewrite big_sepL_cons. iSplitL "Hg".
+    { rewrite decide_True //. }
+    iApply (big_sepL_mono with "Hrest").
+    intros k c' Hk. simpl.
+    rewrite decide_False; [done|].
+    intros ->. apply Hc. by eapply elem_of_list_lookup_2.
+Qed.

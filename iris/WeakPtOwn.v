@@ -63,13 +63,19 @@ Require Import WeakMem WeakInterp WeakLang WeakView WeakVProp WeakGhost WeakInst
 Require Import WeakViewMono.
 
 Section ptown.
-  Context `{!riscvGS Σ, !weakGS Σ, !weakViewG Σ}.
+  Context `{!riscvGS Σ, !weakGS Σ}.
 
-  (** The hart whose floors these are.  In the eventual wiring this is
-      [weak_view_name cpu_id], a field of [weakGS] alongside [weak_ws_name];
-      as a prototype parameter it keeps the blast radius at zero while the
-      statements below are already the ones that will be exported. *)
-  Context (γv : wview_names).
+  (** THE HART whose floors these are.  [wflr_lb] is a lower bound on ONE
+      hart's view, so [↦o] is hart-relative: sound to put in an invariant
+      (it is an [iProp]), but useless to a DIFFERENT hart, which could
+      never supply the [ws_auth] that validates the bound.  Crossing harts
+      is what [WeakPtPub]'s [wpt_pub] is for.
+
+      [weak_view_name cpu_id] is now a [weakGS] field, so the hart is
+      implicit exactly as it is for [cpu_id]-indexed registers — no [γ]
+      appears in any client statement. *)
+  Context `{CID : CpuId}.
+  Local Notation γv := (weak_view_name cpu_id).
 
   (* ------------------------------------------------------------------ *)
   (** ** 1. The floor, matched to [flr]
@@ -118,14 +124,15 @@ Section ptown.
 
 End ptown.
 
-Notation "a ↦o[ γv ]{ dq } v" := (wpt_own γv a dq v)
-  (at level 20, format "a  ↦o[ γv ]{ dq }  v") : bi_scope.
-Notation "a ↦o[ γv ] v" := (wpt_own γv a (DfracOwn 1) v)
-  (at level 20, format "a  ↦o[ γv ]  v") : bi_scope.
+Notation "a ↦o{ dq } v" := (wpt_own a dq v)
+  (at level 20, format "a  ↦o{ dq }  v") : bi_scope.
+Notation "a ↦o v" := (wpt_own a (DfracOwn 1) v)
+  (at level 20, format "a  ↦o  v") : bi_scope.
 
 Section ptown_rules.
-  Context `{!riscvGS Σ, !weakGS Σ, !weakViewG Σ}.
-  Context (γv : wview_names).
+  Context `{!riscvGS Σ, !weakGS Σ}.
+  Context `{CID : CpuId}.
+  Local Notation γv := (weak_view_name cpu_id).
 
   (* ------------------------------------------------------------------ *)
   (** ** 3. OBJECTIVITY — the one-line payoff.
@@ -153,35 +160,35 @@ Section ptown_rules.
       this is visible to lock CLIENTS, which are the SC-parity case: within
       one hart the floor never has to move. *)
   Global Instance wpt_own_objective a dq v :
-    Objective (⎡ wpt_own γv a dq v ⎤ : vProp Σ).
+    Objective (⎡ wpt_own a dq v ⎤ : vProp Σ).
   Proof. apply _. Qed.
 
   (* ------------------------------------------------------------------ *)
   (** ** 4. Fractions, agreement, persistence — all in SC's shape *)
 
-  Global Instance wpt_own_timeless a dq v : Timeless (wpt_own γv a dq v).
+  Global Instance wpt_own_timeless a dq v : Timeless (wpt_own a dq v).
   Proof. apply _. Qed.
 
   Global Instance wpt_own_persistent a v :
-    Persistent (wpt_own γv a DfracDiscarded v).
+    Persistent (wpt_own a DfracDiscarded v).
   Proof. apply _. Qed.
 
   Lemma wpt_own_agree a dq1 v1 dq2 v2 :
-    wpt_own γv a dq1 v1 -∗ wpt_own γv a dq2 v2 -∗ ⌜v1 = v2⌝.
+    wpt_own a dq1 v1 -∗ wpt_own a dq2 v2 -∗ ⌜v1 = v2⌝.
   Proof.
     iIntros "[%t1 [H1 _]] [%t2 [H2 _]]".
     by iDestruct (wlat_pointsto_agree with "H1 H2") as %[_ ?].
   Qed.
 
   Lemma wpt_own_valid_2 a dq1 v1 dq2 v2 :
-    wpt_own γv a dq1 v1 -∗ wpt_own γv a dq2 v2 -∗ ⌜✓ (dq1 ⋅ dq2) ∧ v1 = v2⌝.
+    wpt_own a dq1 v1 -∗ wpt_own a dq2 v2 -∗ ⌜✓ (dq1 ⋅ dq2) ∧ v1 = v2⌝.
   Proof.
     iIntros "[%t1 [H1 _]] [%t2 [H2 _]]".
     iDestruct (wlat_pointsto_valid_2 with "H1 H2") as %(? & _ & ?).
     iPureIntro. by split.
   Qed.
 
-  Lemma wpt_own_valid a dq v : wpt_own γv a dq v -∗ ⌜✓ dq⌝.
+  Lemma wpt_own_valid a dq v : wpt_own a dq v -∗ ⌜✓ dq⌝.
   Proof.
     iIntros "[%t [H _]]". rewrite /wlat_pointsto.
     by iDestruct (ghost_map_elem_valid with "H") as %?.
@@ -195,8 +202,8 @@ Section ptown_rules.
       a priori carry different timestamps, and it is element agreement that
       forces them equal before the fractions can be recombined. *)
   Lemma wpt_own_split a q1 q2 v :
-    wpt_own γv a (DfracOwn (q1 + q2)) v ⊣⊢
-    wpt_own γv a (DfracOwn q1) v ∗ wpt_own γv a (DfracOwn q2) v.
+    wpt_own a (DfracOwn (q1 + q2)) v ⊣⊢
+    wpt_own a (DfracOwn q1) v ∗ wpt_own a (DfracOwn q2) v.
   Proof.
     iSplit.
     - iIntros "[%t [He #Hlb]]". rewrite /wlat_pointsto.
@@ -210,16 +217,16 @@ Section ptown_rules.
   Qed.
 
   Global Instance wpt_own_fractional a v :
-    Fractional (fun q => wpt_own γv a (DfracOwn q) v).
+    Fractional (fun q => wpt_own a (DfracOwn q) v).
   Proof. intros q1 q2. apply wpt_own_split. Qed.
 
   Global Instance wpt_own_as_fractional a q v :
-    AsFractional (wpt_own γv a (DfracOwn q) v)
-                 (fun q => wpt_own γv a (DfracOwn q) v) q.
+    AsFractional (wpt_own a (DfracOwn q) v)
+                 (fun q => wpt_own a (DfracOwn q) v) q.
   Proof. split; [done|apply _]. Qed.
 
   Lemma wpt_own_persist a dq v :
-    wpt_own γv a dq v ==∗ wpt_own γv a DfracDiscarded v.
+    wpt_own a dq v ==∗ wpt_own a DfracDiscarded v.
   Proof.
     iIntros "[%t [He #Hlb]]".
     iMod (wlat_pointsto_persist with "He") as "He".
@@ -236,7 +243,7 @@ Section ptown_rules.
       and nothing has to be re-derived.  The two directions are exact
       because [wflr_lb] matches [flr] on the nose. *)
   Lemma wpt_own_to_wpt a dq v w :
-    ws_auth γv w -∗ wpt_own γv a dq v -∗
+    ws_auth γv w -∗ wpt_own a dq v -∗
     ws_auth γv w ∗ vwp_hold (a ↦w{dq} v) w.
   Proof.
     iIntros "Hauth [%t [He #Hlb]]".
@@ -246,10 +253,10 @@ Section ptown_rules.
 
   Lemma wpt_own_of_wpt a dq v w :
     ws_auth γv w -∗ vwp_hold (a ↦w{dq} v) w -∗
-    ws_auth γv w ∗ wpt_own γv a dq v.
+    ws_auth γv w ∗ wpt_own a dq v.
   Proof.
     iIntros "Hauth Hpt". rewrite wpt_at. iDestruct "Hpt" as (t) "[He %Ht]".
-    iDestruct (wflr_lb_get _ w a t Ht with "Hauth") as "#Hlb".
+    iDestruct (wflr_lb_get w a t Ht with "Hauth") as "#Hlb".
     iFrame "Hauth". iExists t. by iFrame "He".
   Qed.
 
@@ -275,7 +282,7 @@ Section ptown_rules.
     wbyte_ok σ ak a t' b ->
     wlat_interp (wm_img σ) (wm_log σ) -∗
     ws_auth γv (wm_ws σ) -∗
-    wpt_own γv a dq v -∗
+    wpt_own a dq v -∗
     ⌜b = v⌝.
   Proof.
     iIntros (Hcoh Hok) "Hi Hauth Hpt".
@@ -290,7 +297,7 @@ Section ptown_rules.
   Lemma wpt_own_flat_lookup (σ : wmstate) (a : Arch.pa) dq v :
     wlog_wf (wm_log σ) ->
     wlat_interp (wm_img σ) (wm_log σ) -∗
-    wpt_own γv (pa_z a) dq v -∗
+    wpt_own (pa_z a) dq v -∗
     ⌜wflat (wm_img σ) (wm_log σ) !! a = Some v⌝.
   Proof.
     iIntros (Hwf) "Hi [%t [He _]]".
@@ -308,8 +315,8 @@ Section ptown_rules.
       all.  The [ws_le] hypothesis is not even used. *)
   Lemma wpt_own_survives_step a dq v w w' :
     ws_le w w' ->
-    ws_auth γv w -∗ wpt_own γv a dq v ==∗
-    ws_auth γv w' ∗ wpt_own γv a dq v.
+    ws_auth γv w -∗ wpt_own a dq v ==∗
+    ws_auth γv w' ∗ wpt_own a dq v.
   Proof.
     iIntros (Hle) "Hauth Hpt".
     iMod (ws_update with "Hauth") as "$"; [exact Hle|].

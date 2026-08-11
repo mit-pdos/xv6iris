@@ -64,7 +64,9 @@ Require Import WeakMem WeakInterp WeakLang WeakView WeakVProp WeakGhost.
 Require Import WeakViewMono WeakPtOwn.
 
 Section pub.
-  Context `{!riscvGS Σ, !weakGS Σ, !weakViewG Σ}.
+  Context `{!riscvGS Σ, !weakGS Σ}.
+  Context `{CID : CpuId}.
+  Local Notation γv := (weak_view_name cpu_id).
 
   (* ------------------------------------------------------------------ *)
   (** ** 1. The points-to at an arbitrary frozen view
@@ -118,14 +120,14 @@ Section pub.
   (** The acquirer's scalar floor, as a resource.  [amo_acq_gain] gives
       [view_scl T ⊑ ws_view ws'], i.e. [T ≤ w_vrNew ws']; this turns that
       into the persistent fact the points-to wants. *)
-  Definition vrNew_lb (γv : wview_names) (T : nat) : iProp Σ :=
+  Definition vrNew_lb (T : nat) : iProp Σ :=
     mono_nat_lb_own (wsn_vrNew (wvn_scal γv)) T.
 
-  Global Instance vrNew_lb_persistent γv T : Persistent (vrNew_lb γv T).
+  Global Instance vrNew_lb_persistent T : Persistent (vrNew_lb T).
   Proof. apply _. Qed.
 
-  Lemma vrNew_lb_get γv ws T :
-    (T ≤ w_vrNew ws)%nat -> ws_auth γv ws -∗ vrNew_lb γv T.
+  Lemma vrNew_lb_get ws T :
+    (T ≤ w_vrNew ws)%nat -> ws_auth γv ws -∗ vrNew_lb T.
   Proof.
     iIntros (Hle) "[Hs _]". iDestruct "Hs" as "(_ & _ & A3 & _ & _)".
     iDestruct (mono_nat_lb_own_get with "A3") as "#L".
@@ -153,8 +155,8 @@ Section pub.
       the acquirer's gain IS the acquirer's objective points-to.  One line,
       and the client never sees a view: this is the whole of "the lock pays
       the weak-memory cost once, on behalf of every client". *)
-  Lemma wpt_pub_acquire_lb γv T a dq v :
-    vrNew_lb γv T -∗ wpt_pub T a dq v -∗ wpt_own γv a dq v.
+  Lemma wpt_pub_acquire_lb T a dq v :
+    vrNew_lb T -∗ wpt_pub T a dq v -∗ wpt_own a dq v.
   Proof.
     iIntros "#Hlb [%t [%Ht He]]". iExists t. iFrame "He".
     iRight. by iApply (mono_nat_lb_own_le with "Hlb").
@@ -164,22 +166,22 @@ Section pub.
       goes through [wflr_lb_get] per byte and so does not care which disjunct
       of [wflr_lb] is used — it works even where only the per-byte coherence
       floor moved. *)
-  Lemma wpt_pub_acquire γv ws T a dq v :
+  Lemma wpt_pub_acquire ws T a dq v :
     view_scl T ⊑ ws_view ws ->
-    ws_auth γv ws -∗ wpt_pub T a dq v -∗ ws_auth γv ws ∗ wpt_own γv a dq v.
+    ws_auth γv ws -∗ wpt_pub T a dq v -∗ ws_auth γv ws ∗ wpt_own a dq v.
   Proof.
     iIntros (Hacq) "Hauth [%t [%Ht He]]".
     specialize (Hacq a). rewrite flr_scl_eq in Hacq.
-    iDestruct (wflr_lb_get _ ws a t with "Hauth") as "#Hlb"; [lia|].
+    iDestruct (wflr_lb_get ws a t with "Hauth") as "#Hlb"; [lia|].
     iFrame "Hauth". iExists t. by iFrame "He".
   Qed.
 
   (** RELEASE.  The releaser's own floor bounds its elements, so publishing
       at any [T] above that floor is sound.  [T] is the releasing store's
       timestamp; [WeakInstr.wwp_release_deposit] is where it comes from. *)
-  Lemma wpt_own_release γv ws T a dq v :
+  Lemma wpt_own_release ws T a dq v :
     (flr (ws_view ws) a ≤ T)%nat ->
-    ws_auth γv ws -∗ wpt_own γv a dq v -∗ ws_auth γv ws ∗ wpt_pub T a dq v.
+    ws_auth γv ws -∗ wpt_own a dq v -∗ ws_auth γv ws ∗ wpt_pub T a dq v.
   Proof.
     iIntros (HT) "Hauth [%t [He #Hlb]]".
     iDestruct (wflr_lb_valid with "Hauth Hlb") as %Hle.
@@ -197,57 +199,30 @@ Section pub.
   Definition wpt_pub_region (T : nat) (dq : dfrac) (m : gmap Z (bv 8))
       : iProp Σ := ([∗ map] a ↦ v ∈ m, wpt_pub T a dq v)%I.
 
-  Definition wpt_own_region (γv : wview_names) (dq : dfrac)
+  Definition wpt_own_region (dq : dfrac)
       (m : gmap Z (bv 8)) : iProp Σ :=
-    ([∗ map] a ↦ v ∈ m, wpt_own γv a dq v)%I.
+    ([∗ map] a ↦ v ∈ m, wpt_own a dq v)%I.
 
-  Lemma wpt_pub_region_acquire γv T dq m :
-    vrNew_lb γv T -∗ wpt_pub_region T dq m -∗ wpt_own_region γv dq m.
+  Lemma wpt_pub_region_acquire T dq m :
+    vrNew_lb T -∗ wpt_pub_region T dq m -∗ wpt_own_region dq m.
   Proof.
     iIntros "#Hlb Hm". rewrite /wpt_pub_region /wpt_own_region.
     iApply (big_sepM_impl with "Hm"). iIntros "!>" (a v _) "Hp".
     by iApply (wpt_pub_acquire_lb with "Hlb Hp").
   Qed.
 
-  Lemma wpt_own_region_release γv ws T dq m :
+  Lemma wpt_own_region_release ws T dq m :
     (∀ a, (flr (ws_view ws) a ≤ T)%nat) ->
-    ws_auth γv ws -∗ wpt_own_region γv dq m -∗
+    ws_auth γv ws -∗ wpt_own_region dq m -∗
     ws_auth γv ws ∗ wpt_pub_region T dq m.
   Proof.
     iIntros (HT) "Hauth Hm". rewrite /wpt_pub_region /wpt_own_region.
     iInduction m as [|a v m Hnew] "IH" using map_ind.
     { rewrite !big_sepM_empty. by iFrame "Hauth". }
     rewrite !big_sepM_insert //. iDestruct "Hm" as "[Hp Hm]".
-    iDestruct (wpt_own_release _ _ T _ _ _ (HT a) with "Hauth Hp")
+    iDestruct (wpt_own_release _ T _ _ _ (HT a) with "Hauth Hp")
       as "[Hauth $]".
     by iApply ("IH" with "Hauth Hm").
-  Qed.
-
-  (* ------------------------------------------------------------------ *)
-  (** ** 5. THE HANDOFF, end to end.
-
-      Hart A holds the region objectively, releases at [T]; the region sits
-      in the invariant as [wpt_pub_region T] with no hart named and no view
-      crossing the boundary; hart B's acquire gains [view_scl T] and takes
-      the region out objectively.  Neither side ever names a [wstate] in its
-      OWN reasoning — the two [ws_auth]s are the leaves' business.
-
-      This is the shape a lock's client-facing spec should have: [↦o] in,
-      [↦o] out, weak memory confined to the two conversions above. *)
-  Lemma wpt_region_handoff (γA γB : wview_names) (wA wB : wstate)
-      (T : nat) dq m :
-    (* the releaser's floor is below the timestamp its store takes *)
-    (∀ a, (flr (ws_view wA) a ≤ T)%nat) ->
-    (* ... which is exactly what the acquirer's [amo_acq_gain] delivers *)
-    (T ≤ w_vrNew wB)%nat ->
-    ws_auth γA wA -∗ ws_auth γB wB -∗ wpt_own_region γA dq m -∗
-    ws_auth γA wA ∗ ws_auth γB wB ∗ wpt_own_region γB dq m.
-  Proof.
-    iIntros (HT Hacq) "HA HB Hm".
-    iDestruct (wpt_own_region_release _ _ T with "HA Hm") as "[HA Hpub]";
-      [exact HT|].
-    iDestruct (vrNew_lb_get _ _ _ Hacq with "HB") as "#Hlb".
-    iFrame "HA HB". by iApply (wpt_pub_region_acquire with "Hlb Hpub").
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -256,7 +231,7 @@ Section pub.
       [wpt_own] and [wpt_pub] look like different constructs.  They are the
       SAME construct with one slot filled differently:
 
-        [wpt_own γv a dq v  =  ∃ t, wlat_pointsto a dq t v ∗ wflr_lb γv a t]
+        [wpt_own a dq v  =  ∃ t, wlat_pointsto a dq t v ∗ wflr_lb a t]
         [wpt_pub T  a dq v  =  ∃ t, wlat_pointsto a dq t v ∗ ⌜t ≤ T⌝]
 
       Same element, same existential; the only difference is WHAT BOUNDS [t]:
@@ -289,8 +264,8 @@ Section pub.
     iIntros "HB [%t [He HB1]]". iExists t. iFrame "He". by iApply "HB".
   Qed.
 
-  Lemma wpt_own_unfold γv a dq v :
-    wpt_own γv a dq v ⊣⊢ ∃ t, wlat_pointsto a dq t v ∗ wflr_lb γv a t.
+  Lemma wpt_own_unfold a dq v :
+    wpt_own a dq v ⊣⊢ ∃ t, wlat_pointsto a dq t v ∗ wflr_lb a t.
   Proof. done. Qed.
 
   Lemma wpt_pub_unfold T a dq v :
@@ -312,11 +287,57 @@ Section pub.
       hart may localise it, with no side condition on its state.  That is
       the degenerate case in which the invariant's resource and the objective
       points-to really are interchangeable. *)
-  Lemma wpt_pub_0_own γv ws a dq v :
-    ws_auth γv ws -∗ wpt_pub 0 a dq v -∗ ws_auth γv ws ∗ wpt_own γv a dq v.
+  Lemma wpt_pub_0_own ws a dq v :
+    ws_auth γv ws -∗ wpt_pub 0 a dq v -∗ ws_auth γv ws ∗ wpt_own a dq v.
   Proof.
     iIntros "Hauth Hp". iApply (wpt_pub_acquire with "Hauth Hp").
     intros a'. rewrite flr_scl_eq. lia.
   Qed.
 
 End pub.
+
+(* ====================================================================== *)
+(** ** 5. THE HANDOFF, end to end — THE ONLY PLACE TWO HARTS ARE NAMED.
+
+    Everywhere else the hart is ambient ([cpu_id], as it is for registers).
+    Here it cannot be, because the whole content of the lemma is that the
+    region CHANGES HANDS — so this lives in its own section, outside the
+    [CpuId] one, and takes both harts explicitly.
+
+    That is also the sharpest statement of why [WeakPtOwn.wpt_own] is
+    hart-relative: the SAME fraction of the SAME bytes is a DIFFERENT
+    proposition on the two sides, and the two hypotheses below are exactly
+    the price of moving between them. *)
+
+Section handoff.
+  Context `{!riscvGS Σ, !weakGS Σ}.
+
+(** Hart A holds the region objectively and releases at [T]; the region
+    sits in the invariant as [wpt_pub_region T], with no hart named and no
+    view crossing the boundary; hart B's acquire gains [view_scl T] and
+    takes the region out objectively.  Neither side ever names a [wstate]
+    in its OWN reasoning — the two [ws_auth]s are the leaves' business.
+
+    This is the shape a lock's client-facing spec should have: [↦o] in,
+    [↦o] out, weak memory confined to the two conversions of §3. *)
+Lemma wpt_region_handoff (CA CB : CpuId) (wA wB : wstate)
+    (T : nat) dq m :
+  (* the releaser's floor is below the timestamp its store takes *)
+  (∀ a, (flr (ws_view wA) a ≤ T)%nat) ->
+  (* ... which is exactly what the acquirer's [amo_acq_gain] delivers *)
+  (T ≤ w_vrNew wB)%nat ->
+  ws_auth (weak_view_name CA) wA -∗
+  ws_auth (weak_view_name CB) wB -∗
+  @wpt_own_region _ _ CA dq m -∗
+  ws_auth (weak_view_name CA) wA ∗ ws_auth (weak_view_name CB) wB ∗
+  @wpt_own_region _ _ CB dq m.
+Proof.
+  iIntros (HT Hacq) "HA HB Hm".
+  iDestruct (@wpt_own_region_release _ _ CA _ T with "HA Hm")
+    as "[HA Hpub]"; [exact HT|].
+  iDestruct (@vrNew_lb_get _ _ CB _ _ Hacq with "HB") as "#Hlb".
+  iFrame "HA HB".
+  by iApply (@wpt_pub_region_acquire _ _ CB with "Hlb Hpub").
+Qed.
+
+End handoff.
