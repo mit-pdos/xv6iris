@@ -1229,7 +1229,8 @@ RATHER THAN GUESSED.**
   boot side is nevertheless finished — the `tx_busy` cell the lock protects is
   carved and threaded, and dropped in main's chain with a comment saying why —
   so the day the design lands, nothing at the boot end has to be rediscovered.
-- **`timer_cap` — mechanical, and every piece exists.**
+- **`timer_cap` — mechanical, every piece exists, and the ONE missing lemma is
+  identified and measured.**
   `SpecEntry.wp_entry_boot`'s post already hands back `mcounteren ↦ᵣ` and
   `stimecmp ↦ᵣ`, and `TimerCap.timer_cap_intro` turns them into the
   credential.  What is missing is ONE pure conjunct in that post,
@@ -1238,7 +1239,30 @@ RATHER THAN GUESSED.**
   `mief = MIE_S` in the same list.  Then allocate `timer_cap` in the boot
   chain (not in main: the credential is PERSISTENT and each hart allocates its
   own from its own two cells) and pass it to both main arms.  Touches a proven
-  M-mode file (`WpEntryNew`), `BootChain`, and the two main specs.
+  M-mode file (`ProofEntry`), `BootChain`, and the two main specs.
+
+  **THE LEMMA, AND WHAT IT COSTS.**  The value in flight is concrete all the way
+  from timerinit to `wp_entry_boot`'s post — `legalize_mcounteren mcen0
+  (ti_mcen1 mcen0)` (ProofEntry:113) — so the obligation is one closed bit
+  fact, at an arbitrary entry `mcen0`:
+
+  ```coq
+  Lemma ti_mcen1_TM (mcen0 : mword 32) :
+    eq_vec (_get_Counteren_TM (legalize_mcounteren mcen0 (ti_mcen1 mcen0)))
+           ('b"1" : mword 1) = true.
+  ```
+
+  It is true for the obvious reason (`i19 = 2` is the TM bit, the `ori` sets
+  it, and `sys_mcounteren_writable_bits` is all ones, so legalization keeps
+  it) but it is NOT one of the shapes the existing toolkit closes:
+  `MstatusBits`' `mw_prep; tb1` is for 1-bit slices of an mword 64 and this
+  one crosses three widths (64 → 32 → 1); tried, and it does not come back in
+  10 minutes.  `bv_simplify`/`bv_solve` need `stdpp.bitvector.tactics`
+  imported, which no file in this tree does yet.  Budget it as a small
+  bitvector exercise, not as a rewrite: either a width-crossing `tb`-style
+  helper beside `mw_prep`, or `TimerCap.counteren_TM_access` (which turns the
+  projection into `access_vec_dec _ 1`) plus an `and_vec x all_ones = x`
+  identity.
 
 So the axiom is now two conjuncts, and they are of two different KINDS: one is
 blocked on a driver design question, the other is three files of threading.
