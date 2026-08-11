@@ -1868,7 +1868,9 @@ Section IreclaimOrphan.
     (* ===== FALL into the step at +0x6e ===== *)
     iApply (irc_step (CID0 := CID26) j bn γfs cov logstart bmapstart inodestart
               ninodes size used usedp dev inum fuel pidv dq dqb dqs dqn
-              m mE K C b HK Hn31 ltac:(set_solver) Hfuel Hinum HmEsp HmEthr
+              m mE K C b HK Hn31
+              ltac:(transitivity usedn; [exact Hsubp | exact Hsub])
+              Hfuel Hinum HmEsp HmEthr
               HmEs1 HmEs4 HmEs5 HmEs6
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref
                     Hbm [Hloop] [Hcont]").
