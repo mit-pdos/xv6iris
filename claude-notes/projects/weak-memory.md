@@ -2711,3 +2711,64 @@ so rather than leading with 3× → 1.0×.
 Neither needs any of `WeakViewMono` / `WeakPtOwn` / `WeakPtPub` / `WeakObj`.
 Both are ordinary proof engineering, and they are now the top of the list if
 the goal is the number.
+
+## "The last name" — deleting `Hhws` from the instruction step site
+
+The goal is not a line count. It is that **an instruction's step site can be
+copied verbatim from the SC proof.** Measured against `WkStartNew`
+instruction 35:
+
+```
+SC     iApply (wp_lui_gpr … with "Hmm HpcfA Hpc Hfile Hi35").
+       iIntros "Hmm HpcfA Hpc Hfile".
+TODAY  iApply (wwp_lui … ws34 _ … with "… Hi35 Hhws Hstk").
+       iIntros (ws35) "%Hwsle35 Hmm HpcfA Hpc Hfile Hhws Hstk".
+NOW    iApply (wwp_lui_o … with "Hmm HpcfA Hpc Hfile Hi35 Hhws").
+       iIntros "Hmm HpcfA Hpc Hfile Hhws".
+```
+
+Three of the four extras are gone, each for a different reason:
+
+- **`ws34` / `%Hwsle35`** — `hart_view` hides the value; `hart_view_close`
+  eats the `ws_le` inside the wrapper (`WeakLeafO`).
+- **`Hstk`** — the frame. It was threaded because a `vProp` frame is indexed
+  by the hart's view and had to be re-indexed at `ws'`. An **objective**
+  frame is not: `wobj F`'s only view-dependence is a persistent floor, and
+  floors only grow, so it stays true across the step untouched — it sits in
+  the Iris context exactly as an SC caller's resources do. The wrappers take
+  `F := ⌜True⌝` and no frame argument. (I briefly "fixed" this by adding
+  `wobj F` in and out, which was backwards: passing it is precisely what is
+  unnecessary.)
+
+**`Hhws` is the last one, and it cannot go at this altitude.** It is the
+client half of an exclusive `ghost_var`, so it must be handed to whoever
+updates it. The only way to delete it is to stop having a client half:
+
+### The change
+
+- `wws_auth c ws := ghost_var (weak_ws_name c) 1 ws` (full, not `1/2`), and
+  `wws_interp` additionally carries `ws_auth (weak_view_name c) (f c)` — so
+  the monotone shadow lives beside the exact cell instead of beside the
+  client's half.
+- **`hart_ws` and `hart_view` are deleted from the client interface.**
+- Every leaf drops its `hart_ws cpu_id ws` argument, its `∀ ws'`, and its
+  `⌜ws_le ws ws'⌝` — so each leaf's statement becomes *literally* its SC
+  twin's. This is a simplification of the leaf layer, not just a rename.
+- `hart_ws_update` becomes a single-owner update inside the leaf proofs; the
+  `ws_le` that used to be exported is consumed on the spot to step
+  `ws_auth`.
+- `wpt_own` / `wobj` validity needs `ws_auth`, which is now in the interp —
+  i.e. available exactly where loads happen, inside the WP. Callers that
+  merely hold objective facts never need it at all.
+
+### Blast radius (grep, `wws_interp` + `hart_ws_update`)
+
+20 `WeakLeaf*.v` files (1–5 sites each), `WeakGhost` (7), `WeakExec` (1),
+`WeakAdequacy` (1), and `WkEntryNew` (8 — the one chain that drives
+`hart_ws_update` directly rather than through leaves, so it needs real
+thought rather than a sweep). ~55 sites total.
+
+This is the "expensive route" that was dodged when `hart_view` was built,
+and the bundling trick was right to defer it — but bundling cannot remove
+the last name, and the last name is the requirement. This is now the top of
+the list.
