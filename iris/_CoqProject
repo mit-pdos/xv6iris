@@ -338,6 +338,7 @@ WpLock.v
 ArrCursor.v
 FdSlots.v
 IcacheRef.v
+FileInvDefs.v
 FileInv.v
 FileOff.v
 KallocInv.v
@@ -486,6 +487,7 @@ SpecFileclose.v
 ProofFilecloseParts.v
 LinkFilealloc.v
 PageFields.v
+PipeInvDefs.v
 PipeInv.v
 CodePipealloc.v
 SpecPipealloc.v

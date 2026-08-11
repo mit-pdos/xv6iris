@@ -49,7 +49,7 @@ Require Import ProcGeom.
 Require Import UserPtTree ProcPtOwn.
 Require Import SwtchCtx.
 Require Import WpLock.
-Require Import FdSlots FileInv.
+Require Import FdSlots FileInvDefs.
 (* [IcacheRef.inode_held]: what [p->cwd] owns, and [IrefSlots.iref_slots]:
    the supply a dormant block parks.  Exported, because a consumer of
    [proc_priv] that has to name the reference should not have to know which
