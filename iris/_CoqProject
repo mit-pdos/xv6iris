@@ -975,3 +975,7 @@ ProofDirlookup.v
 LinkDirlookup.v
 ProofDirlink.v
 LinkDirlink.v
+SpecNamex.v
+ProofNamexParts.v
+SpecNamei.v
+SpecNameiparent.v

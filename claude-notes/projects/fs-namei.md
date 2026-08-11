@@ -227,7 +227,13 @@ usual near-full rebuild lands with it.
 - **N4**: namex (318B, width 3 — the campaign's boss: the inlined
   skipelem loop over the path grammar, ilock/dirlookup/iunlockput
   per element, the parent-vs-target split) + namei/nameiparent
-  (26B wrappers).
+  (26B wrappers).  **N4a DONE** (the directory-wf gate, below).
+  **N4b: the THREE CONTRACTS ARE FROZEN and namex's pure layer is
+  landed** — `SpecNamex.v`, `SpecNamei.v`, `SpecNameiparent.v`,
+  `ProofNamexParts.v`.  **The three Proof/Link halves are OWED**; see
+  "N4b's ledger" below for the decode (verified end to end), the
+  contracts, the loop shape the proof has to walk, and the eight things
+  the proof agent should not have to rediscover.
 - **N5**: ialloc (188B) + ireclaim (200B) + fsinit (112B) — the
   allocation/boot half; ireclaim is fsinit's single-threaded orphan
   sweep (the C7 notes flagged it as the pool's initial-contents
@@ -1060,3 +1066,252 @@ unchanged at 156/188 proven.
    writer-side `dir_ok` proof will have to add one.
 3. `IcacheBoot`'s image-wf IOU is now two clauses wide (`inode_ok` and
    `dir_ok icfg_nib`); the ireclaim/fsinit mint owes both.
+
+### N4b — the three contracts are FROZEN; namex's pure layer is landed
+
+**LANDED: `iris/SpecNamex.v`, `iris/ProofNamexParts.v`, `iris/SpecNamei.v`,
+`iris/SpecNameiparent.v`** — four `_CoqProject` rows, appended after
+`LinkDirlink.v` in that order.  No existing file touched.  Full gate on the
+mirror: `EXIT=0`, 0 `Error` lines, **971 `.vo`** (967 + 4).
+`tools/lemma_diff.py --ref HEAD`: CLEAN apart from **three** `NEWAXIOM`
+lines, one `Module Type` seal `Parameter` per new `Spec` file
+(`wp_namex_sconf`, `wp_namei_sconf`, `wp_nameiparent_sconf`).  No
+`Admitted`, no `Axiom`, no `cheat_`.
+
+**OWED: `ProofNamex.v` / `LinkNamex.v`, and then the two wrappers' pairs.**
+Nothing is parked: there is no WIP walk and no stub anywhere.  Everything
+below is what that stage consumes.
+
+#### THE DECODE, verified end to end (this is the part not to redo)
+
+Every `jal` immediate was resolved numerically against `KernelSyms`
+(`namex = 0x80003828`): myproc `0x80001906` (+0x2e), idup `0x800031a6`
+(+0x36), iget `0x80002f6a` (+0x4c), iunlockput `0x800033e8` (+0x56 AND
++0x84 AND +0xde — three call sites), iunlock `0x8000328a` (+0x7c), memmove
+`0x80000d28` (+0x9e AND +0x122), ilock `0x800031dc` (+0xb8), dirlookup
+`0x8000377c` (+0xd4), iput `0x8000335e` (+0x136).  Every branch target was
+resolved the same way.  **N1's PathElems matches the decode exactly — no
+design bug found.**
+
+Register assignment: `s1`=path (the moving pointer), `s2`=the element
+scanner, `s3`=47, `s4`=ip, `s5`=name, `s6`=nameiparent, `s7`=1 (T_DIR),
+`s8`=13, `s9`=14, `s10`=len; `s0 = sp+96`, a **twelve**-slot frame with
+eleven registers saved (ra + s0..s10), so slot 12 is the odd one out and
+`ProofNamexParts.nx_frm10..12` complete `dlk_frm1..9`.
+
+**gcc reordered the blocks; the CFG is not the address order.**  In
+execution order:
+
+```
+  entry     +0x1c..0x2a   s1=path,s6=npar,s5=name; lbu a4,0(a0); beq a4,'/' -> +0x48
+  relative  +0x2e..0x3a   myproc; ld a0,336(a0); idup; s4=a0
+  absolute  +0x48..0x52   li a1,1; mv a0,a1  (= iget(1,1)); s4=a0; j +0x3c
+  consts    +0x3c..0x46   s3=47,s8=13,s9=14,s7=1; j +0xe4
+L_loop      +0xe4..0xf6   while(*s1=='/') s1++;  if(*s1==0) -> L_done(+0x130)
+  DEAD      +0xf8..0x102  re-load *s1, re-test '/' and 0 -> +0x116 (never taken)
+  scan      +0x104..0x114 s2=s1; do s2++ while(*s2!='/' && *s2!=0) -> L_len
+L_len       +0x8c..0x94   a2=s2-s1; s10=sext.w a2; bge s8,s10 -> L_short(+0x11c)
+  long      +0x98..0xa2   memmove(name,s1,14); NO terminator; s1=s2
+  len0 DEAD +0x116..0x11a s2=s1; s10=0; a2=0   (falls into L_short)
+L_short     +0x11c..0x12e memmove(name,s1,len); name[len]=0; s1=s2; j +0xa4
+L_trail     +0xa4..0xb2   while(*s1=='/') s1++
+            +0xb6..0xc0   ilock(s4); lh a5,68(s4); bne a5,s7 -> L_notdir(+0x54)
+            +0xc4..0xcc   if(s6) { if(*s1==0) -> L_par(+0x7a) }
+            +0xce..0xda   dirlookup(s4,s5,0) -> s2; beqz s2 -> L_miss(+0x82)
+  found     +0xdc..0xe2   iunlockput(s4); s4=s2;  FALLS INTO L_loop
+L_notdir    +0x54..0x5a   iunlockput(s4); s4=0;   (falls into the return)
+L_par       +0x7a..0x80   iunlock(s4); j +0x5c    (returns ip)
+L_miss      +0x82..0x8a   iunlockput(s4); s4=s2(=0); j +0x5c
+L_done      +0x130..0x13c if(!s6) j +0x5c; iput(s4); s4=0; j +0x5c
+  return    +0x5c..0x78   a0=s4; twelve pops; c.addi16sp +96; c.jr ra
+```
+
+**THE DEAD BLOCK IS CONFIRMED DEAD, and it is bigger than N1 predicted.**
+It is not only the two re-tests at +0xf8..+0x102: their target +0x116 is a
+three-instruction `len = 0` PREAMBLE (`s2=s1; s10=0; a2=0`) that falls into
+the SHORT branch at +0x11c, which the `bge` at +0x94 also enters.  So the
+walk must (a) walk +0xf8..+0x102 and discharge both branches from
+`a5 <> '/'` (decided at +0xe8/+0xf2) and `a5 <> 0` (decided at +0xf6), and
+(b) enter +0x11c from +0x94 only.  +0x116..+0x11a is never executed and
+never needs a proof.
+
+**The long branch really writes no terminator** (+0x9e `jal memmove` goes
+straight to +0xa2 `mv s1,s2`), as N1 said; `skipelem_name_view` /
+`bname_of_buf` cover both shapes and `ProofNamexParts.nx_take_long_len` /
+`nx_take_short` are the two `take 14` facts the branches need.
+
+#### `SpecNamex.wp_namex_sconf_body` — the shape
+
+```
+wp_namex_sconf_body
+  gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl ga gf
+  cov logstart bmapstart inodestart nib size dev used
+  cwdv plen pfun nfun npar n pidv dq dqb dqs dqc dqp m K eb C b
+```
+`K_namex = 94` (12-slot frame + dirlookup's 82); `ROOTDEV = ROOTINO =
+mword_of_int 1` are defined here, read off the `li a1,1` / `mv a0,a1` at
++0x48.  `pl := bview plen pfun`, `L := length (path_elems pl)`.
+
+Premises: `dev = icfg_dev`, `nib = icfg_nib` (ProofKexit's pattern, and
+what `DirView.dir_ok_dir` wants), **`dev = ROOTDEV`** and **`0 < nib`**
+(new — see finding 1), iput's/itrunc's geometry verbatim,
+`SpecDirlink.ireg_blocks_ok inodestart nib cov logstart`,
+`ByteBuf.bb_cstr pfun plen`, the budget `((L+1) * iput_units <= n)`, the
+register premise `eq_vec (m !!! a1) zero_reg = negb npar`, and `eb = true`.
+
+Resources beyond the callees' unions: `p_cwd pj ↦₈{dqc} cwdv` and
+`IcacheRef.inode_held cwdv` (**unconditional**, see finding 2), the path
+`[∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ{dqp} pfun i`, the name buffer
+`[∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nfun i` (FULL ownership — memmove
+writes it), `bslots bn 3`, **`iref_slots 2`** (finding 3), `log_op g n`, and
+the icache FAMILIES `ic_escrows` + **`SpecDirlink.ic_sleeplocks cn`** (namex
+cannot name its slots; this is why SpecNamex imports SpecDirlink).
+
+Post (`∀ mf n' used' ok nf ipv`): everything back, the name buffer at an
+UNSPECIFIED `nf`, the spend-at-most interval
+`n - (L+1)*iput_units <= n' <= n`, and
+
+- `ok`: `mf !!! a0 = ipv`, `inode_held ipv`, `iref_slots 1`, and
+  `npar = true -> ∃ es e, nameiparent_of pl es e /\ bname 14 nf = e`;
+- otherwise: `mf !!! a0 = 0` and `iref_slots 2`.
+
+`SpecNamei` is this minus the name buffer (namei's buffer is its OWN frame,
+`sp+0..sp+15` of a four-slot frame — carve it with `StackBytes.slot_bytes_own`
+exactly as dirlookup carves `de`) and minus the nameiparent clause;
+`K_namei = 98`.  `SpecNameiparent` is this with `nb := m !!! a1` and the
+clause unconditional; `K_nameiparent = 96`.  Both wrappers' decodes are in
+their headers and both `jal namex` immediates were checked numerically.
+
+#### FIVE findings the layer-6 design did not anticipate
+
+1. **The absolute arm forces `dev = ROOTDEV` and `0 < nib` as PREMISES.**
+   `li a1,1; mv a0,a1` is literally `iget(1, 1)`, and iget's contract mints
+   an `inode_ref k q dev inum` at the `dev` the ITABLE is stated over.  For
+   that reference to be the one namex hands back as `inode_held` (whose
+   device is `icfg_dev`), the cache's device must BE 1.  `0 < nib` is iget's
+   `bv_unsigned ROOTINO < 16 * nib`.  Both are true of xv6 and neither was
+   in the design.
+2. **The working directory is taken UNCONDITIONALLY, not on the relative
+   arm only.**  A precondition keyed on the first path byte would make the
+   contract two-armed for no gain: every caller holds `p_cwd` and
+   `cwd_ref = inode_held` inside `ProcInv.proc_priv` anyway
+   (`proc_priv_cwd` / `proc_priv_cwd_pid` are the accessors), and the
+   absolute arm simply hands them straight back.
+3. **The ledger is TWO `iref_slot`s in, and the two arms differ.**  The
+   starting arm spends one (iget's mint, or idup's), and each turn peaks at
+   one more (dirlookup's iget, returned by the following iunlockput), so the
+   peak requirement is two.  SUCCESS returns ONE — the walk's own reference
+   is still alive inside `inode_held` — and EVERY failure arm returns BOTH,
+   which is the resource statement of "no inode resource retained".  Check
+   it against the four exits: notdir (iunlockput +1), miss (dirlookup
+   returns its own, iunlockput +1), nameiparent-of-"/" (iput +1), and the
+   nameiparent hit (iunlock returns a SHARE, no slot — hence one, like the
+   namei success).
+4. **The budget is `(L + 1) * iput_units`, not `L`.**  The extra interval is
+   the nameiparent-of-"/" tail iput at +0x136, which happens when `L = 0`;
+   `max 1 L` would be exact and `L + 1` is one line shorter everywhere.
+   ilock and dirlookup take NO log reservation, so nothing else contributes.
+5. **`ic_sleeplocks` had to be pulled from `SpecDirlink`.**  ilock, iunlock,
+   iunlockput and iput each want `is_sleeplock γil γisl (i_lock ip) …` at
+   THEIR slot, and namex's slots are dirlookup's outputs.  `SpecDirlink`'s
+   `ic_sleeplocks cn` is exactly the family (and in exactly the shape
+   `IcacheBoot.icache_alloc` produces), so `SpecNamex.v` imports
+   `SpecDirlink.v` for it and for `ireg_blocks_ok`.  N3's recommendation to
+   hoist `ireg_blocks_ok` into the fs geometry vocabulary now has a second
+   consumer; `ic_sleeplocks` deserves the same move (beside `ic_escrows` in
+   `IcacheEscrow.v`) when N5 touches that file.
+
+#### `ProofNamexParts.v` — what the whole-function proof gets
+
+Six sections, mirroring `ProofDirlookupParts.v`:
+
+1. **Frame geometry**: namex's prologue/epilogue/`s0` arithmetic is
+   BYTE-IDENTICAL to dirlookup's, so `dlk_push` / `dlk_pop` / `dlk_fp` /
+   `dlk_frm1..9` serve unchanged; `nx_frm10` / `nx_frm11` / `nx_frm12` are
+   the three displacements dirlookup never needed.
+2. **The path suffix**: `nx_drop_len`, `nx_bview_drop`, `nx_drop_nil`,
+   `nx_drop_cons`, `nx_drop_app` — the bridges between "the buffer's naming
+   function at offset `off`" and `drop off pl`, which is what every
+   `PathElems` law is stated over.  `nx_drop_app` is the one that feeds
+   `skipelem_split`.
+3. **The two scans, packaged**: `nx_noslash`, `nx_at_sep`, `nx_nonul`,
+   `nx_nonul_drop`, and **`nx_skipelem_at`** — the loop body's ONE law,
+   which computes `skipelem (drop a pl)` from the two scan results alone:
+
+   ```coq
+   nx_skipelem_at (a e plen : nat) (f : nat -> bv 8) :
+     (a < e)%nat -> (e <= plen)%nat ->
+     (forall i, a <= i -> i < e -> f i <> SLASH) ->
+     (e = plen \/ f e = SLASH) ->
+     skipelem (drop a (bview plen f))
+     = Some (take 14 (bview (e - a) (fun i => f (a + i))),
+             pe_skip (drop e (bview plen f)))
+   ```
+4. **The name buffer**: `nx_elem_lookup` (memmove's "`nf jj` is the source
+   byte at `a + jj`" gives `bname_of_buf`'s "`nf jj` is the element's
+   `jj`-th byte"), `nx_take_short`, `nx_take_long_len`.
+5. **The register bundle** `nx_regs m sp0 s1v ipv nbv npv Ml` — sp, s0, s1,
+   s3, s4, s5, s6, s7, s8, s9 and the thread fact.  **s2 (x18) and s10 (x26)
+   are deliberately OUT**: both are written inside every iteration, so they
+   are excluded from the thread fact and travel as ordinary register
+   equations.  Transports `nx_regs_caller` / `nx_regs_cs` (the whole-call
+   one) / `nx_regs_s1` (the three path-pointer writes) / `nx_regs_s4` (the
+   two ip writes), plus the epilogue's `nx_tregs` + `nx_tregs_of_regs` +
+   `nx_tregs_caller`.
+6. **The budget**: `nx_bud_step` (the premise survives one turn),
+   `nx_bud_int` (the intervals compose), `nx_bud_zero`, `nx_bud_tail`.
+
+`Print Assumptions` on any of these is *Closed under the global context*.
+
+#### EIGHT things the proof agent should not have to rediscover
+
+1. **THE LOOP HAS TWO NESTED SCANS AND A THREE-WAY JOIN.**  `Hloop` at
+   +0xe4 is ProofKexit's `∀ fuel, wp_next` shape over the measure
+   `plen - off`; INSIDE it live two more of the same shape (the leading-`/`
+   skip at +0xe4..+0xf2 and the element scan at +0x106..+0x112), and the
+   trailing-`/` skip at +0xa4..+0xb2 is a THIRD, reached from both memmove
+   branches.  Budget for four `∀ fuel` assertions, not one.
+2. **The contract's continuation has to be threaded through `Hloop` as a
+   spatial slot** — N3c's third architectural note, verbatim, and it is
+   ~40 lines of transcription here.  `Htail` (the epilogue from +0x5c) can
+   be `□` with an ABSTRACT continuation because FOUR arms reach it with four
+   different bundles; only `Hloop` needs the real one.
+3. **`ic_loaded` must be re-assembled before iunlock/iunlockput.**  ilock's
+   post gives it; dirlookup consumes only `inode_meta` / `inode_map` /
+   `inode_blocks` / `i_dev` out of it and hands them back untouched, so keep
+   `dinode_at` and the two pure conjuncts (`inode_ok`, **`dir_ok`**) aside
+   and rebuild.  `inode_map γfs ip bm` is `inode_addrs ∗ ind_res` by
+   definition — no lemma needed.
+4. **dirlookup's three readi premises come out of `inode_ok`**
+   (`blkmap_wf`, `bm_covers`, the `MAXFILE*BSIZE` cap are conjuncts 1, 2
+   and 5), and its `dir_inums_ok` premise is `DirView.dir_ok_dir` applied to
+   the `dir_ok` conjunct and the very `lh a5,68(s4)` test namex performs at
+   +0xbc.  Nothing else is owed.
+5. **`hasp = false`** at namex's dirlookup call: the `li a2,0` at +0xce, so
+   the register premise `eq_vec (m !!! a2) zero_reg = negb false` is
+   `reflexivity` and the poff arm is `emp`.
+6. **The `pj` vs `proc_addr j` trap applies** — N3d trap 1's whole-function
+   fix (rename the `let`-intro'd variable, `iEval (rewrite -Hpjd)` into
+   `Hcg`/`Hcnt`/`Hppid`/`Hcont` once, then write `proc_addr j` everywhere).
+   ilock, iunlock, iunlockput, iput and dirlookup ALL have the `let pj`;
+   iget, idup, memmove and myproc take an explicit `p`.
+7. **`cpu_own_transport` before EVERY call** (N3d trap 2), and remember that
+   memmove takes NO `cpu_own`, so the hart the resource sits at does not
+   move across either memmove (N3c trap 2).
+8. **The byte tests are `lbu`-then-compare, and the `-47` one needs its own
+   lemma.**  +0xfc / +0x10c compute `a4 = a5 - 47` and branch on `a4 == 0`;
+   the fact "a 64-bit word holding a BYTE minus 47 is zero iff the byte is
+   `SLASH`" is the family of `ProofNamecmp.nc_byte_of_zero` and is best
+   proved the same way (`bv_unsigned` arithmetic, no 256-way case split).
+   It was deliberately NOT put in `ProofNamexParts.v` because its exact
+   statement depends on the register shape the `lbu` WP lemma leaves.
+
+#### A note for N5 and the sysfile campaign
+
+`SpecNamei` / `SpecNameiparent` are ready to be composed against as
+`Module Type`s today (`NAMEI` / `NAMEIPARENT`), which is what `sys_open`,
+`create`, `sys_link` and `sys_chdir` will want; they cannot be LINKED until
+`ProofNamex` exists, so a `sysfile` functor written now would carry
+`NAMEI` as a parameter and instantiate later.  Both contracts already
+thread `log_op` and `bslots bn 3`, i.e. they are stated INSIDE a
+transaction, which is where all four of those callers stand.
