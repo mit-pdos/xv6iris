@@ -90,7 +90,7 @@ Section ProofKerneltrap.
   Proof.
     cbv beta delta [wp_kerneltrap_sconf_body].
     intros pcE ret_tgt Hlen Hav Hsc Hepal.
-    iIntros "Hcg Hmir Havail Hcpu #Htext Hpc Hsepc Hscause Hstval #Hcaps Hclm Hcont".
+    iIntros "Hcg Hmir Havail Hkptr Hcpu #Htext Hpc Hsepc Hscause Hstval #Hcaps Hclm Hcont".
     (* ---- the head: prologue, the three reads, both panic tests ---- *)
     iApply (kt_pro m av ep sc ltac:(unfold kerneltrap_stack in Hav; lia) Hepal
               with "Hcg Hmir Htext Hpc Hsepc Hscause [-]").
@@ -287,7 +287,7 @@ Section ProofKerneltrap.
            needed at all three of this proof's continuation sites. *)
         iRename "Havail" into "Havz".
         iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro; intros _; reflexivity|].
-        iApply ("Hcont" $! mf ms_f sc tv with "[%] [%] [%] [%] Hcgat Hmir Havz Hcpu
+        iApply ("Hcont" $! mf ms_f sc tv with "[%] [%] [%] [%] Hcgat Hmir Havz Hkptr Hcpu
                               Hsepc Hscause Hstval Hpc Hclm").
         { exact Hcsf. }
         { exact Hsppf. } { exact Hspief. } { exact Hsief. }
@@ -358,7 +358,7 @@ Section ProofKerneltrap.
         iApply (Yield.wp_yield_sconf γs j γl Y0 (av - 6)%nat false C
                   Hj Hgl ltac:(unfold kerneltrap_stack in Hav; lia)
                   with "Hcg Hcpu Htext Hpc Hprocs Hpanic
-                        [Hsepc Hscause Hstval Hmir Havail] [Hclm] [-]").
+                        [Hsepc Hscause Hstval Hmir Havail Hkptr] [Hclm] [-]").
         (* THE HANDLER RESOURCE GOES INTO THE PARK, as the fifth member of
            [trap_csrs] -- and comes back out of yield's post as the RESUMING
            hart's.  It used to be a persistent credential framed around the
@@ -369,7 +369,8 @@ Section ProofKerneltrap.
           iSplitL "Hscause". { iExists sc. iExact "Hscause". }
           iSplitL "Hstval". { iExists tv. iExact "Hstval". }
           iSplitL "Hmir". { iExists ('b"1"), ('b"1"). iExact "Hmir". }
-          iExact "Havail". }
+          iSplitL "Havail". { iExact "Havail". }
+          iExact "Hkptr". }
         (* THE CLAIM THE TRAP HANDED US, spent on yield.  At [eb = false]
            there is no arm to take it from, which is exactly why a preempting
            trap must arrive holding it. *)
@@ -378,7 +379,7 @@ Section ProofKerneltrap.
         iEval (rewrite Hpj) in "Hcg". iEval (rewrite Hpj) in "Hcpu".
         (* back, possibly on ANOTHER hart: the trap CSRs are that hart's *)
         rewrite /trap_csrs_ext /trap_csrs.
-        iDestruct "Hext" as "(Hsepc & Hscause & Hstval & Hmir & Havail_y)".
+        iDestruct "Hext" as "(Hsepc & Hscause & Hstval & Hmir & Havail_y & Hkptr_y)".
         iDestruct "Hsepc" as (ep') "Hsepc".
         iDestruct "Hscause" as (sc') "Hscause".
         iDestruct "Hstval" as (tv') "Hstval".
@@ -425,7 +426,7 @@ Section ProofKerneltrap.
         iRename "Havail_y" into "Havz".
         iSpecialize ("Hcont" $! CIDy with "[%]").
         { intros [Hf | Hz]; [ discriminate | exfalso; exact (Hpne Hz) ]. }
-        iApply ("Hcont" $! mf ms_f sc' tv' with "[%] [%] [%] [%] Hcgat Hmir Havz Hcpu
+        iApply ("Hcont" $! mf ms_f sc' tv' with "[%] [%] [%] [%] Hcgat Hmir Havz Hkptr_y Hcpu
                               Hsepc Hscause Hstval Hpc [Hclm]").
         { exact Hcsf. }
         { exact Hsppf. } { exact Hspief. } { exact Hsief. }
@@ -457,7 +458,7 @@ Section ProofKerneltrap.
       (* NO RE-SEAL NEEDED -- see the twin above. *)
       iRename "Havail" into "Havz".
       iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro; intros _; reflexivity|].
-      iApply ("Hcont" $! mf ms_f sc tv with "[%] [%] [%] [%] Hcgat Hmir Havz Hcpu
+      iApply ("Hcont" $! mf ms_f sc tv with "[%] [%] [%] [%] Hcgat Hmir Havz Hkptr Hcpu
                             Hsepc Hscause Hstval Hpc Hclm").
       { exact Hcsf. }
       { exact Hsppf. } { exact Hspief. } { exact Hsief. }

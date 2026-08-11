@@ -686,11 +686,11 @@ Section WpSconfCsr.
                 sie_arm (CID := CID) b p ) )%I
       with "[Hstk Harm Hhalf]" as "[Hhalf Hpair]".
     { destruct b.
-      - iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx & Hsppc & Hcpu)".
+      - iDestruct "Harm" as "(Hq1 & Hhx & Hkptr & Hsepcx & Hscausex & Hstvalx & Hsppc & Hcpu)".
         iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb.
         iFrame "Hhalf". iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
         iSplitR. { iPureIntro. exact Hb. }
-        iFrame "Hq1 Hhx Hsepcx Hscausex Hstvalx Hsppc Hcpu".
+        iFrame "Hq1 Hhx Hkptr Hsepcx Hscausex Hstvalx Hsppc Hcpu".
       - iDestruct "Harm" as "Hq0".
         iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb.
         iFrame "Hhalf". iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
@@ -900,7 +900,7 @@ Section WpSconfCsr.
            the arm itself is dismantled for the rest. ---- *)
       iDestruct (intr_count_pre_on with "Hcnt") as %Hke.
       destruct Hke as [-> ->].
-      iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx & Hsppc & Hclmx & (Hcells & Hc1))".
+      iDestruct "Harm" as "(Hq1 & Hhx & Hkptr & Hsepcx & Hscausex & Hstvalx & Hsppc & Hclmx & (Hcells & Hc1))".
       iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb1.
       iDestruct (intr_count_get_on 0 true with "Hq1 Hc1") as "(_ & Hq1 & Hc1)".
       destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
@@ -960,14 +960,14 @@ Section WpSconfCsr.
       iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
       iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro; done|].
       iApply ("Hcont" $! ms0 with "[%] [%] Hcg
-                            [Htok] [Hsepcx Hscausex Hstvalx Hsppc Hintr] [Hclmx] [Hcells] [$Hpc' $Hnpc]").
+                            [Htok] [Hsepcx Hscausex Hstvalx Hsppc Hintr Hkptr] [Hclmx] [Hcells] [$Hpc' $Hnpc]").
       { exact Hmsf. }
       { intros _. cbn [sie_bit]. exact Hb1. }
       (* the level-S token is now JUST the eighth: the handler resource it
          used to carry goes out with the trap CSRs below, where the client
          needs it and where its matching pop_off takes it back. *)
       { iApply (intr_count_pack_S_on with "Htok"). }
-      { iFrame "Hsepcx Hscausex Hstvalx Hsppc Hintr". }
+      { iFrame "Hsepcx Hscausex Hstvalx Hsppc Hintr Hkptr". }
       { rewrite /cpu_claim_pay. iExact "Hclmx". }
       { rewrite /cpu_cells_pay. iExact "Hcells". }
     - (* ---- b = false: the idempotent write; ghosts untouched ---- *)
@@ -1137,7 +1137,7 @@ Section WpSconfCsr.
        [intr_count 1 true]'s payload -- which is what lets the flip re-form it
        at the SAME installed vector (the old shape had the spec in a separate
        persistent premise, about an unrelated [h]). *)
-    iDestruct "Hcsrs" as "(Hsepcx & Hscausex & Hstvalx & Hsppc & Hhx)".
+    iDestruct "Hcsrs" as "(Hsepcx & Hscausex & Hstvalx & Hsppc & Hhx & Hkptr)".
     (* REFUTE THE ALREADY-ENABLED CASE ABOVE THE FUNNEL, NOT INSIDE IT.  The
        contradiction is between the payload's sepc cell and the '1' arm's, and
        a register cell is PER HART ([reg_pointsto] takes a [CpuId]): held here,
@@ -1150,7 +1150,7 @@ Section WpSconfCsr.
     destruct b.
     { iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
       iDestruct "Hcap" as "(Hstk & Htr & Harm)".
-      iDestruct "Harm" as "(Hq1 & Hhx' & Hsepcx' & Hscausex' & Hstvalx' & Hsppc' & Hclmx' & Hcells')".
+      iDestruct "Harm" as "(Hq1 & Hhx' & Hkptr' & Hsepcx' & Hscausex' & Hstvalx' & Hsppc' & Hclmx' & Hcells')".
       iDestruct "Hsepcx" as (v1) "Hsepc1".
       iDestruct "Hsepcx'" as (v2) "Hsepc2".
       iDestruct (reg_pointsto_excl sepc v1 v2 with "Hsepc1 Hsepc2") as %[]. }
@@ -1216,10 +1216,10 @@ Section WpSconfCsr.
        out, both [kv_frame_slots + n] by conversion -- so [iExact] on the
        untouched [Hstk] closes it with no split and no arithmetic. *)
     iAssert (sie_cap m (trap_res false + n)%nat true p)
-      with "[Hqcap Hqcnt Hintr Hsepcx Hscausex Hstvalx Hsppc Hclm Hstk Htr Hcells]" as "Hcap".
+      with "[Hqcap Hqcnt Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hclm Hstk Htr Hcells]" as "Hcap".
     { iSplitL "Hstk". { iExact "Hstk". }
       iFrame "Htr".
-      iFrame "Hqcap Hintr Hsepcx Hscausex Hstvalx Hsppc Hclm".
+      iFrame "Hqcap Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hclm".
       (* [cpu_hart 0 true p] -- the cells the caller handed in, plus the
          count eighth the flip just produced at '1'. *)
       iSplitL "Hcells"; [ iExact "Hcells" | iExact "Hqcnt" ]. }
@@ -1561,7 +1561,7 @@ Section WpSconfCsr.
     (* the only reachable arm: interrupts were ON ---- the flip is real, and
        both eighths are in the arm (its own, and the one inside [cpu_hart 0
        true p]), which the callback delivers at the rebound hart. *)
-    iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx & Hsppc & Hclmx & (Hcells & Hc1))".
+    iDestruct "Harm" as "(Hq1 & Hhx & Hkptr & Hsepcx & Hscausex & Hstvalx & Hsppc & Hclmx & (Hcells & Hc1))".
     iClear "Hcnt".
     iDestruct (intr_count_get_on 0 true with "Hq1 Hc1") as "(_ & Hq1 & Hcnt)".
     destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
@@ -1604,10 +1604,10 @@ Section WpSconfCsr.
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
     iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro; done|].
     iApply ("Hcont" $! ms0 with "[%] Hcg [Htok]
-                          [Hsepcx Hscausex Hstvalx Hsppc Hintr] [Hcells] [$Hpc' $Hnpc]").
+                          [Hsepcx Hscausex Hstvalx Hsppc Hintr Hkptr] [Hcells] [$Hpc' $Hnpc]").
     { exact Hmsf. }
     { iExact "Htok". }
-    { iFrame "Hsepcx Hscausex Hstvalx Hsppc Hintr". }
+    { iFrame "Hsepcx Hscausex Hstvalx Hsppc Hintr Hkptr". }
     { rewrite /cpu_cells_pay. iExact "Hcells". }
   Qed.
 

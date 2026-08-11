@@ -278,6 +278,13 @@ Definition wp_kerneltrap_sconf_body
      trap CSRs beside it are threaded piecewise at PINNED values here, which
      is why this is its own conjunct rather than folded into [trap_csrs]. *)
   intr_res -∗
+  (* THE KPT RECEIPT, [trap_csrs]' sixth member (IntrDefs §6b), threaded for
+     EXACTLY [intr_res]'s reasons and by the same route.  kernelvec's sret
+     re-enables interrupts, and the arm it rebuilds carries the receipt, so a
+     returning trap can no more re-enable them without it than without the
+     handler resource.  It crosses the yield park inside [trap_csrs] and comes
+     back as the RESUMING hart's, which is why it is a post as well. *)
+  strans_bit strans_bit_kpt -∗
   cpu_own 0 false p C false -∗
   kernel_text -∗ pc_is pcE -∗
   sepc ↦ᵣ ep -∗ scause ↦ᵣ sc -∗ stval ↦ᵣ tv -∗
@@ -301,6 +308,7 @@ Definition wp_kerneltrap_sconf_body
       sret_bits ('b"1" : mword 1) ('b"1" : mword 1) -∗
       (* at the RESUMING hart -- see the premise *)
       intr_res -∗
+      strans_bit strans_bit_kpt -∗
       cpu_own 0 false p C false -∗
       (* sepc is RESTORED to the trapped pc; scause and stval belong to the
          resuming hart, so their values are existential *)

@@ -277,7 +277,12 @@ Section WpSmodeIntr.
     - (* ---- b = true: the interrupt-absorbing engine.  [sie_arm true]
            needs no unfolding: the [if] reduces by conversion, so
            [iDestruct] / [iFrame] / [iExact] see through it. ---- *)
-      iDestruct "Harm" as "(Hq1 & Hintr & Hsepcx & Hscausex & Hstvalx & Hsppc & Hcpu)".
+      (* [Hkpt] is the enabled arm's KPT receipt (IntrDefs §6b).  The engine
+         neither reads nor moves it -- a trap cannot change which table is
+         installed -- so it is simply framed across the step and rebuilt into
+         the arm below.  Named [Hkptr] (receipt) because [Hkpt] below is the
+         KPT arm's RESIDUE, a different thing. *)
+      iDestruct "Harm" as "(Hq1 & Hintr & Hkptr & Hsepcx & Hscausex & Hstvalx & Hsppc & Hcpu)".
       (* Bare ∧ SIE='1' is impossible: the '1' arm's [intr_res] OWNS stvec and
          the Bare slot owns the same cell.  This used to need an [iInv] under
          an [fupd_wp] to get at the invariant's copy of the cell; owning it
@@ -323,12 +328,12 @@ Section WpSmodeIntr.
       iMod (v2_of_intr_config vta vtb vca vcb with "Hic Hmenv Hsppt Hsppc")
         as "(Hsc & Hsppc & Hsepcx & Hscausex & Hstvalx)".
       iMod ("H" $! σ Hpceq
-              with "Hsc [Hq1 Hintr Hsepcx Hscausex Hstvalx Hsppc Hcpu Hstk Hdeep Htlbinv Hbit1] Hfile Hnpc Hsi")
+              with "Hsc [Hq1 Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hcpu Hstk Hdeep Htlbinv Hbit1] Hfile Hnpc Hsi")
         as (s_exec) "(%Hexec & Hsi' & Hcont)".
       { iSplitL "Hstk Hdeep".
         { iApply stack_own_app. iFrame "Hstk Hdeep". }
         iSplitL "Htlbinv Hbit1". { iRight. iFrame "Hbit1". iExists root_ppn. iExact "Htlbinv". }
-        iFrame "Hq1 Hintr Hsepcx Hscausex Hstvalx Hsppc Hcpu". }
+        iFrame "Hq1 Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hcpu". }
       iModIntro. iExists s_exec.
       iSplitR; [iPureIntro; exact Hexec |].
       iFrame "Hsi'". iExact "Hcont".

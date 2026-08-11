@@ -945,6 +945,29 @@ Section IntrDefs.
      (∃ v : mword 64, stval ↦ᵣ v) ∗
      (∃ a b : mword 1, sret_bits a b))%I.
 
+  (* THE KPT RECEIPT, defined here rather than beside [strans_inv] below,
+     because it is a MEMBER of [trap_csrs] and the bundle comes first.
+
+     WHY IT CANNOT LIVE IN [sie_cap].  The capability is threaded from the
+     very first S-mode instruction, long before kvminithart installs the
+     kernel table -- [sie_cap_intro_bare] builds it over the Bare arm -- so
+     a capability that always carried [strans_bit_kpt] could not be
+     constructed at boot at all.
+
+     WHY IT BELONGS TO THIS BUNDLE.  Once interrupts are ENABLED the
+     translation slot is always at KPT: xv6 enables them only after
+     kvminithart, and a trap taken under Bare is exactly the state
+     [design/interrupts.md] refutes.  So "the kernel table is installed" has
+     the same lifetime as the trap-scratch CSRs -- it holds precisely in the
+     window this bundle is accounted over, arriving with the csrci payout
+     and owed back at the csrsi.  Carrying it here MAKES THAT A STATED
+     INVARIANT instead of a convention, and it is what lets kernel code READ
+     satp ([strans_inv_acc_kpt]) -- which usertrapret's
+     [p->trapframe->kernel_satp = r_satp()] needs and which nothing could do
+     before, the receipt having been dropped by [main]. *)
+  Definition strans_bit (b : mword 1) : iProp Σ :=
+    ghost_var (strans_name cpu_id) (1/2)%Qp b.
+
   (* SPELLED FLAT, not as [trap_csrs_raw ∗ intr_res]: the tier destructures
      this bundle positionally in dozens of places, and a nested pair would
      silently rebind the fourth name to a pair instead of failing loudly. *)
@@ -953,13 +976,16 @@ Section IntrDefs.
      (∃ v : mword 64, scause ↦ᵣ v) ∗
      (∃ v : mword 64, stval ↦ᵣ v) ∗
      (∃ a b : mword 1, sret_bits a b) ∗
-     intr_res)%I.
+     intr_res ∗
+     strans_bit strans_bit_kpt)%I.
 
-  Lemma trap_csrs_of_raw : trap_csrs_raw -∗ intr_res -∗ trap_csrs.
-  Proof. iIntros "(Ha & Hb & Hc & Hd) Hres". iFrame. Qed.
+  Lemma trap_csrs_of_raw :
+    trap_csrs_raw -∗ intr_res -∗ strans_bit strans_bit_kpt -∗ trap_csrs.
+  Proof. iIntros "(Ha & Hb & Hc & Hd) Hres Hkpt". iFrame. Qed.
 
-  Lemma trap_csrs_to_raw : trap_csrs -∗ trap_csrs_raw ∗ intr_res.
-  Proof. iIntros "(Ha & Hb & Hc & Hd & Hres)". iFrame. Qed.
+  Lemma trap_csrs_to_raw :
+    trap_csrs -∗ trap_csrs_raw ∗ intr_res ∗ strans_bit strans_bit_kpt.
+  Proof. iIntros "(Ha & Hb & Hc & Hd & Hres & Hkpt)". iFrame. Qed.
 
   Definition trap_csrs_pay (n : nat) (eb : bool) : iProp Σ :=
     (match n with
@@ -1208,10 +1234,16 @@ Section IntrDefs.
     arm_pay 0 true p ⊣⊢ trap_csrs ∗ cpu_claim p.
   Proof. reflexivity. Qed.
 
+  (* THE KPT RECEIPT IS AN ENABLED-ARM MEMBER, for the reason spelled out at
+     [strans_bit] (§6b): interrupts on implies the kernel table is installed,
+     so the receipt has exactly this arm's lifetime.  The DISABLED arm does
+     not carry it -- which is what keeps boot constructible, since every
+     instruction before kvminithart runs at [b = false] over the Bare slot. *)
   Definition sie_arm (b : bool) (p : mword 64) : iProp Σ :=
     (if b
      then (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
            intr_res ∗
+           strans_bit strans_bit_kpt ∗
            (∃ v : mword 64, sepc ↦ᵣ v) ∗
            (∃ v : mword 64, scause ↦ᵣ v) ∗
            (∃ v : mword 64, stval ↦ᵣ v) ∗
@@ -1231,7 +1263,7 @@ Section IntrDefs.
     ⌜ _get_Mstatus_SIE ms = sie_bit b ⌝.
   Proof.
     iIntros "Hhalf Harm". rewrite /sie_arm. destruct b.
-    - iDestruct "Harm" as "(Hq & _ & _ & _ & _ & _ & _)".
+    - iDestruct "Harm" as "(Hq & _ & _ & _ & _ & _ & _ & _)".
       iDestruct (ghost_var_agree with "Hhalf Hq") as %H. iPureIntro. exact H.
     - iDestruct (ghost_var_agree with "Hhalf Harm") as %H. iPureIntro. exact H.
   Qed.
@@ -1241,6 +1273,7 @@ Section IntrDefs.
     (ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) ∨
      (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
       intr_res ∗
+      strans_bit strans_bit_kpt ∗
       (∃ v : mword 64, sepc ↦ᵣ v) ∗
       (∃ v : mword 64, scause ↦ᵣ v) ∗
       (∃ v : mword 64, stval ↦ᵣ v) ∗
@@ -1266,7 +1299,7 @@ Section IntrDefs.
     trap_csrs ∗
     cpu_claim p ∗
     cpu_hart 0 true p.
-  Proof. iIntros "(Hbit & Hres & Hsep & Hsca & Hstv & Hspp & Hclm & Hcpu)". iFrame. Qed.
+  Proof. iIntros "(Hbit & Hres & Hkpt & Hsep & Hsca & Hstv & Hspp & Hclm & Hcpu)". iFrame. Qed.
 
   Lemma sie_arm_on_in (p : mword 64) :
     ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) -∗
@@ -1274,7 +1307,7 @@ Section IntrDefs.
     cpu_claim p -∗
     cpu_hart 0 true p -∗
     sie_arm true p.
-  Proof. iIntros "Hbit (Hsep & Hsca & Hstv & Hspp & Hres) Hclm Hcpu". iFrame. Qed.
+  Proof. iIntros "Hbit (Hsep & Hsca & Hstv & Hspp & Hres & Hkpt) Hclm Hcpu". iFrame. Qed.
 
   (* [strans_inv] -- THE TRANSLATION SLOT of the capability: the ambient
      S-mode translation invariant, regime and root hidden.  Clients thread
@@ -1304,11 +1337,9 @@ Section IntrDefs.
      flips it with both halves.  In practice the flip is one-way: the boot
      receipt is the only outside half ever minted, so the arm only ever
      moves Bare→KPT. *)
-  (* PER-HART (strans_name is a [CPU -> gname]): this is the AMBIENT hart's
-     translation-slot arm bit, exactly as [reg_pointsto] is the ambient
-     hart's register. *)
-  Definition strans_bit (b : mword 1) : iProp Σ :=
-    ghost_var (strans_name cpu_id) (1/2)%Qp b.
+  (* [strans_bit] itself is DEFINED ABOVE [trap_csrs] (§6b), because the KPT
+     receipt is one of that bundle's members.  Only the slot and its movers
+     live here. *)
 
   Definition strans_inv : iProp Σ :=
     ((strans_bit ('b"0") ∗ bare_inv ∗ (∃ v : mword 64, stvec ↦ᵣ v))
@@ -1339,6 +1370,29 @@ Section IntrDefs.
     - iDestruct (strans_bit_agree with "Hrcpt Hbit") as %Hbad.
       exfalso. apply (f_equal (@bv_unsigned _)) in Hbad.
       vm_compute in Hbad. discriminate.
+  Qed.
+
+  (* THE KPT MIRROR of [strans_inv_acc_bare], and the reason the receipt is
+     worth carrying.  It BORROWS rather than dissolves: the Bare accessor
+     hands both halves out because kvminithart is about to flip the bit,
+     whereas a reader of the kernel table wants the slot back unchanged, so
+     this returns the client's receipt plus a wand that re-seals the arm from
+     the residue.  The root stays EXISTENTIAL -- the sconf tier is
+     deliberately root-free, and a caller that needs to identify the root
+     does so at the boundary where it is named, not here. *)
+  Lemma strans_inv_acc_kpt :
+    strans_bit strans_bit_kpt -∗ strans_inv -∗
+    strans_bit strans_bit_kpt ∗
+    ∃ root_ppn : mword 44,
+      tlb_res_pt root_ppn ∗ (tlb_res_pt root_ppn -∗ strans_inv).
+  Proof.
+    iIntros "Hrcpt [(Hbit & _ & _) | (Hbit & Hres)]".
+    - iDestruct (strans_bit_agree with "Hrcpt Hbit") as %Hbad.
+      exfalso. apply (f_equal (@bv_unsigned _)) in Hbad.
+      vm_compute in Hbad. discriminate.
+    - iFrame "Hrcpt". iDestruct "Hres" as (root_ppn) "Hres".
+      iExists root_ppn. iFrame "Hres".
+      iIntros "Hres". iApply (strans_inv_intro root_ppn with "Hbit Hres").
   Qed.
 
   (* both halves -> flip to '1', split back into two halves. *)

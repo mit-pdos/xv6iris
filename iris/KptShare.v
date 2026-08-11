@@ -158,6 +158,36 @@ Section KptShare.
       pmp_config root_ppn ∗ kpt_inv root_ppn.
   Proof. iIntros "H". iExact "H". Qed.
 
+  (* THE satp CELL, BORROWED.  [tlb_res_pt_open] hands the whole residue out
+     and obliges the caller to rebuild it with [tlb_res_pt_intro]; a reader of
+     satp -- usertrapret's [r_satp()], which stores the kernel table into
+     [p->trapframe->kernel_satp] for the next uservec -- wants the cell and
+     nothing else.  So this is the one-field accessor: the cell, the three
+     facts that make it a Sv39/asid-0 value rooted at [root_ppn] (i.e.
+     [SpecUsertrap.satp_rooted], which is what the trampoline's next entry
+     needs), and a wand that puts it straight back.  READ-ONLY BY
+     CONSTRUCTION: the wand takes the cell at the SAME value, so no caller can
+     use this to switch page tables -- that is [wp_csrw_satp_*]'s business and
+     it goes through the slot's own arms. *)
+  Lemma tlb_res_pt_satp_acc (root_ppn : mword 44) :
+    tlb_res_pt root_ppn -∗
+    ∃ satp0 : mword 64,
+      satp ↦ᵣ satp0 ∗
+      ⌜ _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ⌝ ∗
+      ⌜ zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ⌝ ∗
+      ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ⌝ ∗
+      (satp ↦ᵣ satp0 -∗ tlb_res_pt root_ppn).
+  Proof.
+    iIntros "H".
+    iDestruct "H" as (satp0 tlbvec)
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & Hsnap & Hpmp & Hinv)".
+    iExists satp0. iFrame "Hsatp".
+    iSplitR; [iPureIntro; exact Hmode |].
+    iSplitR; [iPureIntro; exact Hasid |].
+    iSplitR; [iPureIntro; exact Hppn |].
+    iIntros "Hsatp". iExists satp0, tlbvec. iFrame. by iPureIntro.
+  Qed.
+
   (* the PMP grant facts, straight off the residue's own pmp cells *)
   Lemma tlb_res_pt_grant_facts (root_ppn : mword 44) (σ : mstate) :
     reg_interp σ.(sregs) -∗ tlb_res_pt root_ppn -∗

@@ -600,7 +600,8 @@ Section ProofMainSecondary.
     iApply (Kvminithart.wp_kvminithart_sconf Q1 0%nat n root tlbvec0 p0
               eq_refl ltac:(lia)
               with "Hcg Hsbit Htext Hpc Htlb Hkptp Hkinv").
-    iIntros (mkh) "Hcg Hpc %Hcskh _ Hstvec".
+    (* the KPT receipt is kept, not dropped -- see ProofMain.v's twin. *)
+    iIntros (mkh) "Hcg Hpc %Hcskh Hkpt Hstvec".
     assert (Hretkh : ret_pc (Q1 !!! Regidx (mword_of_int 1))
                      = (mword_of_int (KernelSyms.main + 0x36) : mword 64)).
     { rewrite /Q1 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -681,8 +682,8 @@ Section ProofMainSecondary.
     (* fold the boot cells and the handler resource built at +0x36 into the
        [trap_csrs] the scheduler consumes. *)
     iApply (Scheduler.wp_scheduler_sconf γs Q4 n p0 Hp0 ltac:(lia)
-              with "Hcg Hcpu Htext Hpc Hpinv Hpanic [Htcsr Hintr]").
-    iApply (trap_csrs_of_raw with "Htcsr Hintr").
+              with "Hcg Hcpu Htext Hpc Hpinv Hpanic [Htcsr Hintr Hkpt]").
+    iApply (trap_csrs_of_raw with "Htcsr Hintr Hkpt").
   Qed.
 
   (* =================================================================== *)

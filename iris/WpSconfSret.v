@@ -109,6 +109,13 @@ Section WpSconfSret.
     (∃ v : mword 64, scause ↦ᵣ v) -∗
     (∃ v : mword 64, stval ↦ᵣ v) -∗
     intr_res -∗
+    (* THE KPT RECEIPT, [trap_csrs]' sixth member (IntrDefs §6b), piecewise
+       here like the rest.  This leaf RE-ENABLES interrupts, so it is exactly
+       the place that has to show the kernel table is installed -- the arm it
+       builds carries the receipt, and nothing can reach [b = true] without
+       one.  A caller has it from its own [intr_off], which is where the
+       matching csrci put it. *)
+    strans_bit strans_bit_kpt -∗
     cpu_cells 0 true p -∗
     cpu_claim p -∗
     pc_is pc -∗
@@ -118,7 +125,7 @@ Section WpSconfSret.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "Hcg Hmir Htok Hsepc Hscausex Hstvalx Hhx Hcells Hclm Hpc Hinstr Hcont".
+    iIntros "Hcg Hmir Htok Hsepc Hscausex Hstvalx Hhx Hkptr Hcells Hclm Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m (trap_res true + n)%nat false pc false (SRET tt)
               with "Hcg Hpc Hinstr").
     (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic
@@ -254,10 +261,10 @@ Section WpSconfSret.
          [trap_res true + n] coming out, both [kv_frame_slots + n] by
          conversion -- so [iExact] closes the stack with no arithmetic. ---- *)
     iAssert (sie_cap m n true p)
-      with "[Hqcap Hqcnt Hintr Hsepcx Hscausex Hstvalx Hsppc Hclm Hstk Htr Hcells]" as "Hcap".
+      with "[Hqcap Hqcnt Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hclm Hstk Htr Hcells]" as "Hcap".
     { iSplitL "Hstk". { iExact "Hstk". }
       iFrame "Htr".
-      iFrame "Hqcap Hintr Hsepcx Hscausex Hstvalx Hsppc Hclm".
+      iFrame "Hqcap Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hclm".
       (* [cpu_hart 0 true p] -- the cells the caller handed in, plus the count
          eighth the flip just produced at '1'. *)
       iSplitL "Hcells"; [ iExact "Hcells" | iExact "Hqcnt" ]. }

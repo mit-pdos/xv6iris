@@ -705,6 +705,8 @@ Section ProofMain.
         cpu_own 0 false p0 cpu_ctx_free false -∗
         kalloc_env γa (avail_sub (Some (length ps)) K_kvmmake) -∗
         procs_inv γs -∗
+        (* the KPT receipt kvminithart minted, on its way to [trap_csrs] *)
+        strans_bit strans_bit_kpt -∗
         (∃ v : mword 64, stvec ↦ᵣ v) -∗
         (* what kvminithart published about the kernel page table: all four
            PERSISTENT, and exactly what the [started] deposit carries *)
@@ -806,7 +808,12 @@ Section ProofMain.
     iApply (Kvminithart.wp_kvminithart_sconf V3 0%nat n (pt_base t) tlbvec0 p0
               eq_refl ltac:(lia)
               with "Hcg Hsbit Htext Hpc Htlb Hkptp Hkinv").
-    iIntros (mkh) "Hcg Hpc %Hcskh _ Hstvec".
+    (* kvminithart's KPT RECEIPT, kept rather than dropped: it is a member of
+       [trap_csrs] now (IntrDefs §6b -- interrupts enabled implies the kernel
+       table is installed), so the boot chain must carry it to the fold in
+       [wp_main_boot_sconf].  Named [Hkptr] -- [Hkpt] in this lemma is the
+       [kernel_pagetable] CELL, a different thing. *)
+    iIntros (mkh) "Hcg Hpc %Hcskh Hkptr Hstvec".
     assert (Hretkh : ret_pc (V3 !!! Regidx (mword_of_int 1))
                      = (mword_of_int (KernelSyms.main + 0x7a) : mword 64)).
     { rewrite /V3 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -855,7 +862,7 @@ Section ProofMain.
     iMod (procs_inv_alloc ⊤ with "Hin") as (γs) "#Hpinv".
     iModIntro.
     iApply ("Hcont" $! γl γs mpr (pt_base t) pas
-              with "Hcg Hpc Hcpu Hkenv Hpinv Hstvec Hkinv Hkptp Htramp Hkstx").
+              with "Hcg Hpc Hcpu Hkenv Hpinv Hkptr Hstvec Hkinv Hkptp Htramp Hkstx").
   Qed.
 
   (* =================================================================== *)
@@ -1450,7 +1457,7 @@ Section ProofMain.
                     Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hprocs Hppub Hfds Hirs
                     Hparks Hpst").
     iIntros (γa γs m3 root pas)
-      "Hcg Hpc Hcpu Hkenv #Hpinv Hstvec #Hkinv #Hkptp #Htramp #Hkstx".
+      "Hcg Hpc Hcpu Hkenv #Hpinv Hkpt Hstvec #Hkinv #Hkptp #Htramp #Hkstx".
     (* --- 0x7e .. 0x8a : trap / plic, and the interrupt invariant --- *)
     iApply (mn_grp_trap γd γv m3 (K - 2)%nat p0 Hn50 Hcid
               with "Hcg Htext Hkdata Hdev Hpc Hltick Hstvec Hq").
@@ -1466,11 +1473,11 @@ Section ProofMain.
     (* --- 0xa2 .. the join : the deposit and the scheduler --- *)
     iApply (mn_grp_started γpr γk γa γs γd γv m5 (K - 2)%nat p0 pd pav pu
               root pas P ltac:(lia) Hp0
-              with "Hcg Htext Hpany Hpc Hcpu [Htcsr Hintr] Hsinv Hwand Hpenv
+              with "Hcg Htext Hpany Hpc Hcpu [Htcsr Hintr Hkpt] Hsinv Hwand Hpenv
                     Hpinv Hdlock Hgeom Hkinv Hkptp Htramp Hkstx").
     (* fold the boot cells and the freshly built handler resource into the
        [trap_csrs] the scheduler consumes. *)
-    iApply (trap_csrs_of_raw with "Htcsr Hintr").
+    iApply (trap_csrs_of_raw with "Htcsr Hintr Hkpt").
   Qed.
 
 End ProofMain.
