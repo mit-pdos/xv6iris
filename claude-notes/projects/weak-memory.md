@@ -42,6 +42,14 @@ Measured: the weak proof bodies are **1.4× their SC twins**, down from
 
 **NEXT, in order.**
 
+0. *(DONE 2026-08-11)* The memmove **loop** prototype landed —
+   `iris/WkMemmoveLoop.v`, five S-mode leaves as hypotheses, and the headline
+   is that **weak memory costs zero lines**: exact step-site parity with
+   `ProofMemmove.mm_loop` and a shorter proof. See the prototype slice.
+   Three of the four dependencies below are answered by it; only the S-mode
+   funnel (batch 6) is left, and it is now the ONLY thing between here and a
+   real S-mode weak proof.
+
 1. **memmove, weak + interruptible** (user request — see the QUEUED slice at
    the end for the full analysis). Four dependencies: layer C (`wp_next`-shaped
    weak leaves), settling what the weak `wp_next` promises across a
@@ -3204,6 +3212,87 @@ the documented baseline: `functional_extensionality_dep` + `plat_term_write`
    `WkStartNew` calls it at line ~1516. Check callers with a full grep
    BEFORE changing a whole-function statement — the failure surfaces a
    45-minute rebuild later.
+
+### THE memmove LOOP PROTOTYPE (2026-08-11): weak memory costs ZERO lines
+
+`iris/WkMemmoveLoop.v` — memmove's forward byte-copy loop
+(`memmove+0x18..+0x24`: two `c.addi` cursors, `lbu`, `sb`, a backward `bne`)
+under weak memory, INTERRUPTIBLE, i.e. every leaf in `wp_next` form.
+`WeakSmodeFrame`'s discipline scaled up: the five S-mode leaves are section
+HYPOTHESES (`Prop`s, not axioms — batch 6 discharges them without touching a
+line of the proof), so the loop is a real theorem of the form "given leaves
+of this shape, this goes through".
+
+**THE MEASUREMENT, against `ProofMemmove.mm_loop`, its SC twin:**
+
+| | SC `mm_loop` | weak `wmm_loop` |
+|---|---|---|
+| lines / tactics | 190 / 150 | **153 / 119** |
+| `iApply` / `iIntros` / `iEval` / `iDestruct` | 9 / 8 / 12 / 2 | **9 / 8 / 12 / 2** |
+
+Step-site parity is EXACT — the four proofmode counts are identical — and the
+weak proof is *shorter*, by nine `assert`s: SC bridges `rget (CID := CIDn) m r`
+to `m !!! Regidx r` at every step (its own hart-indexing idiom), and the weak
+leaf hypotheses state the lookup directly. **So weak memory costs zero lines
+here**, which is what the effort predicted and had never demonstrated on a
+loop.
+
+**The four questions the prototype was built to answer:**
+
+1. **A loop invariant CAN be objective.** The two buffers are `cobj`s and the
+   induction is SC's own `induction rem`, unchanged. Nothing in the invariant
+   names a hart or a `wstate`, which is what lets it survive migration.
+2. **`cobj_big_sepL` earns its keep, and the per-byte spelling is the one to
+   use.** `wbuf` is `[∗ list] j ∈ seq off rem, cobj ξ (…)`; `wbuf_bundled`
+   (that lemma's first real consumer) says it equals the wrapped-once form.
+   Per-byte is what makes the peel SC's own: a `big_opL` on a cons IS a
+   separating conjunction, so `seq_cons` splits it and nothing is rewritten
+   under a modality.
+3. **A private 1-byte store owes NOTHING.** `wssb1_spec` is objective-in /
+   objective-out with no released timestamp, no floor and no frozen payload —
+   the entire release interface `wwp_sd8_tor_rvc_run` carries is absent,
+   because a store into a cell the context owns exclusively publishes
+   nothing. That is why it fits `wp_next` unchanged and the release store
+   does not.
+4. **NO FENCE.** There is no fence, no view arithmetic, no timestamp and no
+   `wstate` anywhere in the proof. The synchronisation memmove needs was paid
+   at its caller's lock, once.
+
+**AND IT LOCATES THE M-MODE 1.4×.** These five hypotheses are FILE-based —
+each takes the whole register file (inside `wsrun`) and hands it back, as its
+SC twin does. The converted M-mode chains sit at 1.4× because the batch-2
+memory/CSR leaves are CELL-based: every such site pays `gpr_file_acc_2` /
+`gpr_file_lookup_acc` / `gpr_file_insert_acc` plus a `gpr_pt_nz` rewrite in
+and out — measured as +43 `iEval` and +26 `iDestruct` in timerinit, +51/+58
+in start, with `iApply`/`iIntros`/`iPoseProof`/`assert` counts IDENTICAL to
+SC's. **The residual overhead is the cell-vs-file register interface, not
+weak memory**; restating the memory/CSR wrappers in `gpr_file` form (in
+`WeakLeafM`/`WeakLeafO`, where the packaging belongs) would take both chains
+to ~1×. Worth doing when something else touches those wrappers; not worth a
+sweep of its own.
+
+**Two proofmode gotchas, both of which look like something else:**
+
+- **`rewrite !wbuf_cons` on the Coq goal fails with "*`_pattern_value_` is
+  used in conclusion*"** when the resource lives in the Iris CONTEXT — use
+  `iEval (rewrite wbuf_cons) in "Hsrc"`. The same error appears for a
+  higher-order `rewrite cobj_big_sepL` (the `Φ` cannot be inferred): use
+  `symmetry; apply cobj_big_sepL` instead.
+- `zero_extend' 64 v` will not elaborate at `v : bv 8` — annotate
+  `(v : mword 8)`; `mword` is a match on the width literal, so the unifier
+  cannot go backwards.
+
+**Axiom footprint**: the sail model's five platform axioms, inherited
+through `winstr_m`'s statement (it mentions the model's `execute`) — no
+funext, and NONE OF THE FIVE LEAF SPECS, because they are lemma arguments
+rather than axioms. That is exactly the property the hypothesis discipline
+buys, and it is worth checking with `Print Assumptions` on any file written
+this way: a leaf that shows up in the list has been stated as an `Axiom` by
+mistake.
+
+**What is left for the full function** (the other ~21 instructions of
+memmove) is straight-line bookkeeping of exactly the kind the M-mode
+conversion measured; and the leaves become real at batch 6.
 
 ### QUEUED (user request, 2026-08-11): memmove under weak memory, interruptible
 
