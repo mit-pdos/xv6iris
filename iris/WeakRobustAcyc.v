@@ -13,8 +13,8 @@
     segment lemma repeated around the cycle:
 
       S1.  If agent [i] READS timestamp [ts] at trace position [k], and
-           later FULFILS timestamp [ts'] at position [k'], and the read is
-           DISCIPLINED relative to [k'], then [ts < ts'].
+           later FULFILS timestamp [ts'] at position [k'], and the read
+           is OK relative to [k'], then [ts < ts'].
 
     Walking a cycle, each cross rf edge's reader is followed in its own
     trace by the fulfil that sources the NEXT cross edge, so S1 makes the
@@ -32,6 +32,17 @@
     exactly the kernel's discipline ([lw; fence r,rw] racy readers,
     [amoswap.w.aq] locks).
 
+    THE SECOND ARM, [covered] (the owned-published refinement).  Reader
+    discipline is TOO STRONG for a critical-section read: [ld x; sd y]
+    inside a lock has a plain load and no fence before the store, so
+    [disciplined] simply fails — and yet the edge is harmless, because
+    the lock ACQUIRE preceded the read and had already pushed the
+    reader's [w_vwNew] past the release timestamp, hence past the read
+    message's.  [covered T k ts] says exactly that ([ts ≤ w_vwNew] in the
+    read's PRE-state), and in that case EXT alone pins every later
+    fulfil.  The per-edge obligation the theorem takes is therefore
+    [edge_ok = disciplined ∨ covered].
+
     THE AUXILIARY INVARIANT [fwd_own].  The fence arm needs the read to
     raise [w_vrOld] to [ts], and [load_post_at] contributes the FORWARDED
     view [fwd_view], not the raw timestamp.  [fwd_own] — a forward-bank
@@ -47,7 +58,7 @@
     cross edge is refuted by the violation predicate φ, and φ speaks about
     promise-free RUNS — so it folds into W2b's induction, not into a
     standalone theorem.  The theorem below therefore takes "every
-    cross-agent rf edge is disciplined" as its premise.
+    cross-agent rf edge is [edge_ok]" as its premise.
 
     DEPENDENCY-FREE like its parents: stdpp only, no Iris, no Sail.
     [WeakAxiomatic] is imported FIRST (for its parked [WeakMem] fold
@@ -306,6 +317,37 @@ Definition disciplined {P : Type} (T : atrace P) (k k' : nat) : Prop :=
   (∃ k0 ev0, (k < k0)%nat ∧ (k0 < k')%nat ∧
              at_evs T !! k0 = Some ev0 ∧ lb_fence_prsw (ae_lb ev0)).
 
+(** THE SECOND WAY an edge can be harmless — [covered], the
+    owned-published (critical-section) shape.  A CS read is a PLAIN load
+    and the reader's next store may follow with NO fence between
+    ([ld x; sd y] inside a lock's critical section), so [disciplined]
+    fails outright.  The edge is nevertheless harmless because the LOCK
+    ACQUIRE PRECEDED the read: the reader's write floor was already at or
+    above the lock-release timestamp, hence at or above the read
+    message's timestamp, when the read happened — so EXT alone pins every
+    later fulfil and none of the fence/aq machinery is needed.
+
+    NOTE THE STATE: this is the PRE-state of event [k]
+    ([at_ags T !! k] — the record the step at [k] runs FROM), not the
+    post-state.  That is exactly what makes this a statement about what
+    the reader had already acquired, and not a tautology about the read
+    itself. *)
+Definition covered {P : Type} (T : atrace P) (k : nat) (ts : nat) : Prop :=
+  ∃ ag, at_ags T !! k = Some ag ∧ (ts ≤ w_vwNew (pa_ws ag))%nat.
+
+(** THE PER-EDGE OBLIGATION the measure actually consumes: the reader is
+    disciplined, or the message was already covered when it read. *)
+Definition edge_ok {P : Type} (T : atrace P) (k k' : nat) (ts : nat) : Prop :=
+  disciplined T k k' ∨ covered T k ts.
+
+Lemma edge_ok_disciplined {P : Type} (T : atrace P) k k' ts :
+  disciplined T k k' → edge_ok T k k' ts.
+Proof. by left. Qed.
+
+Lemma edge_ok_covered {P : Type} (T : atrace P) k k' ts :
+  covered T k ts → edge_ok T k k' ts.
+Proof. by right. Qed.
+
 (* ------------------------------------------------------------------ *)
 Section trace.
   Context {P : Type}.
@@ -345,8 +387,17 @@ Section trace.
   (* ---------------------------------------------------------------- *)
   (** ** DELIVERABLE 3: THE SEGMENT LEMMA S1
 
-      A DISCIPLINED read of [ts] at position [k], followed at [k' > k] by
-      a fulfil of [ts'], forces [ts < ts'].
+      An OK read of [ts] at position [k] — disciplined, or already
+      covered — followed at [k' > k] by a fulfil of [ts'], forces
+      [ts < ts'].
+
+      THREE ARMS, one shared tail.  All three do the same thing: push
+      [ts] into [w_vwNew] at some position at or before [k'].  The aq arm
+      does it AT the read ([load_post_at]'s [vpost] feeds [w_vwNew]); the
+      fence arm does it at the fence ([w_vrOld] → [w_vwNew]); the covered
+      arm does it BEFORE the read, with no machinery at all — the floor
+      is already there in the read's pre-state.  Then [w_vwNew] is
+      monotone along the trace and EXT closes at [k'].
 
       NOTE ON THE FOREIGNNESS PREMISE.  S1 asks for
       [read_unforwarded] — "the read is [aq], or its source message is
@@ -367,7 +418,7 @@ Section trace.
     at_evs T !! k' = Some ev' →
     ae_ts ev' = Some ts' →
     (k < k')%nat →
-    disciplined T k k' →
+    edge_ok T k k' ts →
     (ts < ts')%nat.
   Proof.
     intros Hwf Hfo Hev Hin Hunf Hev' Hts' Hlt Hdisc.
@@ -392,7 +443,9 @@ Section trace.
       { eapply (asteps_ws_le pstep img log i (at_ags T) (at_evs T) n k');
           [exact Hwf|exact Hn|exact Hagm|exact Hag']. }
       have Hle := ws_le_vwNew _ _ Hmono. lia. }
-    destruct Hdisc as [(ev0 & Hev0 & Haq)|(k0 & ev0 & Hk0 & Hk0' & Hev0 & Hfen)].
+    destruct Hdisc as [[(ev0 & Hev0 & Haq)
+                       |(k0 & ev0 & Hk0 & Hk0' & Hev0 & Hfen)]
+                      |(agc & Hagc & Hcov)].
     - (* THE AQ ARM: the read itself lands in [w_vwNew]. *)
       assert (ev0 = ev) as -> by congruence.
       exists (S k), agn. split_and!; [lia|exact Hagn|].
@@ -420,12 +473,19 @@ Section trace.
       rewrite Hb1e /=. etrans; [exact Hro0|].
       eapply (astep_ok_fence_vwNew img log i ag0 (ae_lb ev0) f0 (ae_ts ev0));
         [exact Hok0|exact Hfen].
+    - (* THE COVERED ARM: the floor is already there, in the read's
+         PRE-state.  Nothing to establish. *)
+      assert (agc = ag) as -> by congruence.
+      exists k, ag. split_and!; [lia|exact Hag|exact Hcov].
   Qed.
 
-  (** S1 with the SAME-STEP case folded in: [k ≤ k'], and the discipline
-      is only demanded when the two positions differ.  This is the form
-      the cycle walk applies, because an [LRmw] can be BOTH the entry
-      read and the exit fulfil of a cycle segment. *)
+  (** S1 with the SAME-STEP case folded in: [k ≤ k'], and [edge_ok] is
+      only demanded when the two positions differ.  This is the form the
+      cycle walk applies, because an [LRmw] can be BOTH the entry read
+      and the exit fulfil of a cycle segment — and in THAT case no
+      premise is needed at all ([astep_ok_read_fulfil_lt] gets the strict
+      inequality out of the rmw's own [fulfil_ok], which is checked on
+      the post-[load_post_run] state). *)
   Corollary atrace_S1_le img log i T k k' ev ev' a ts ts' :
     atrace_wf pstep img log i T →
     (∀ n ag, at_ags T !! n = Some ag → fwd_own log i (pa_ws ag)) →
@@ -435,7 +495,7 @@ Section trace.
     at_evs T !! k' = Some ev' →
     ae_ts ev' = Some ts' →
     (k ≤ k')%nat →
-    ((k < k')%nat → disciplined T k k') →
+    ((k < k')%nat → edge_ok T k k' ts) →
     (ts < ts')%nat.
   Proof.
     intros Hwf Hfo Hev Hin Hunf Hev' Hts' Hle Hdisc.
@@ -462,15 +522,31 @@ Definition ptraces_fwd_own {P : Type} (TS : ptraces P) : Prop :=
   ∀ i T k ag, pt_trs TS !! i = Some T → at_ags T !! k = Some ag →
     fwd_own (pt_log TS) i (pa_ws ag).
 
-(** THE DISCIPLINE PREMISE.  "Every cross-agent rf edge into [(j, k)] is
-    disciplined relative to EVERY later fulfil of agent [j]."  This is
-    strictly stronger than the per-cycle statement the measure needs
-    (which only speaks about the reader's next fulfil ON THE CYCLE), and
-    is chosen because it is a property of the bundle alone — no cycle
-    quantifier — so the Iris side can discharge it at the enumerated
-    racy-read rules.  It is also what the kernel's discipline actually
-    gives: a racy reader's [aq] / [fence r,rw] sits before ANY subsequent
-    store, not merely before a distinguished one. *)
+(** THE PER-EDGE PREMISE.  "Every cross-agent rf edge into [(j, k)] is
+    OK relative to EVERY later fulfil of agent [j]" — where OK is
+    [edge_ok]: the reader is disciplined (aq / [fence r,rw]), or the
+    message was already covered by the reader's write floor when it read
+    (the critical-section shape).
+
+    This is strictly stronger than the per-cycle statement the measure
+    needs (which only speaks about the reader's next fulfil ON THE
+    CYCLE), and is chosen because it is a property of the bundle alone —
+    no cycle quantifier — so the Iris side can discharge it at the
+    enumerated racy-read rules and at the lock rules.  It is also what
+    the kernel actually gives: a racy reader's [aq] / [fence r,rw] sits
+    before ANY subsequent store, and a critical-section reader's acquire
+    floor covers EVERY later store of the section, not merely a
+    distinguished one. *)
+Definition rf_edges_ok {P : Type} (TS : ptraces P) : Prop :=
+  ∀ e1 e2 T ts a k' ev',
+    gev_ts TS e1 = Some ts → gev_reads TS e2 a ts → e1.1 ≠ e2.1 →
+    pt_trs TS !! e2.1 = Some T →
+    (e2.2 < k')%nat →
+    at_evs T !! k' = Some ev' → is_Some (ae_ts ev') →
+    edge_ok T e2.2 k' ts.
+
+(** The ORIGINAL, discipline-only premise, kept because it is the shape
+    the racy-read rules alone deliver — and it is strictly stronger. *)
 Definition rf_disciplined {P : Type} (TS : ptraces P) : Prop :=
   ∀ e1 e2 T k' ev',
     grf TS e1 e2 → e1.1 ≠ e2.1 →
@@ -478,6 +554,14 @@ Definition rf_disciplined {P : Type} (TS : ptraces P) : Prop :=
     (e2.2 < k')%nat →
     at_evs T !! k' = Some ev' → is_Some (ae_ts ev') →
     disciplined T e2.2 k'.
+
+Lemma rf_disciplined_edges_ok {P : Type} (TS : ptraces P) :
+  rf_disciplined TS → rf_edges_ok TS.
+Proof.
+  intros H e1 e2 T ts a k' ev' Hts Hrd Hne HT Hlt Hev' Hsome.
+  left. eapply H; [by exists ts, a|exact Hne|exact HT|exact Hlt|exact Hev'
+                  |exact Hsome].
+Qed.
 
 (** Every agent's wstate is [ws_init] — the promise phase's invariant. *)
 Definition cfg_ws_init {P : Type} (c : wpcfg P) : Prop :=
@@ -595,7 +679,7 @@ Section acyc.
   (** THE ADVANCE STEP: a cross rf edge on a cycle is followed, around
       the cycle, by a cross rf edge with a STRICTLY LARGER timestamp. *)
   Lemma on_cycle_rf_advance TS ts :
-    ptraces_wf pstep TS → ptraces_fwd_own TS → rf_disciplined TS →
+    ptraces_wf pstep TS → ptraces_fwd_own TS → rf_edges_ok TS →
     on_cycle_rf TS ts → ∃ ts', (ts < ts')%nat ∧ on_cycle_rf TS ts'.
   Proof.
     intros Hwf Hfo Hdisc (e1 & e2 & a & Hts1 & Hrd & Hne & Hback).
@@ -627,8 +711,8 @@ Section acyc.
       - exact Hev2.
       - exact Hts2'.
       - exact Hx2.
-      - intros Hklt. eapply (Hdisc e1 e2 T x.2 ev2);
-          [by exists ts, a|exact Hne|exact HT|exact Hklt|exact Hev2|].
+      - intros Hklt. eapply (Hdisc e1 e2 T ts a x.2 ev2);
+          [exact Hts1|exact Hrd|exact Hne|exact HT|exact Hklt|exact Hev2|].
         rewrite Hts2'. by eexists. }
     exists ts2. split; [exact Hlt|].
     exists x, y, a2. split_and!; [exact Hts2|exact Hrd2|exact Hxy|].
@@ -652,7 +736,7 @@ Section acyc.
       bounded set of timestamps.  (The measure is [length log - ts]; no
       cycle-sequence extraction is needed.) *)
   Lemma on_cycle_rf_empty TS :
-    ptraces_wf pstep TS → ptraces_fwd_own TS → rf_disciplined TS →
+    ptraces_wf pstep TS → ptraces_fwd_own TS → rf_edges_ok TS →
     ∀ ts, ¬ on_cycle_rf TS ts.
   Proof.
     intros Hwf Hfo Hdisc.
@@ -672,8 +756,8 @@ Section acyc.
 
   (** ** THE THEOREM *)
 
-  Theorem gdep_acyclic_disciplined TS :
-    ptraces_wf pstep TS → ptraces_fwd_own TS → rf_disciplined TS →
+  Theorem gdep_acyclic_edges_ok TS :
+    ptraces_wf pstep TS → ptraces_fwd_own TS → rf_edges_ok TS →
     gdep_acyclic TS.
   Proof.
     intros Hwf Hfo Hdisc e Hc.
@@ -685,8 +769,18 @@ Section acyc.
     eapply rtc_transitive; [exact Hry|exact Hrx].
   Qed.
 
+  (** The ORIGINAL statement, now a corollary: discipline alone is a
+      special case of [edge_ok]. *)
+  Corollary gdep_acyclic_disciplined TS :
+    ptraces_wf pstep TS → ptraces_fwd_own TS → rf_disciplined TS →
+    gdep_acyclic TS.
+  Proof.
+    intros Hwf Hfo Hdisc. eapply gdep_acyclic_edges_ok;
+      [exact Hwf|exact Hfo|by apply rf_disciplined_edges_ok].
+  Qed.
+
   (** ... at the behavior level, with [fwd_own] DISCHARGED.  Only the
-      reader discipline remains a premise (and the SCowned arm, which
+      per-edge obligation remains a premise (and the SCowned arm, which
       lives in W2b — see the header). *)
   Theorem wp_behavior_gdep_acyclic img ps c :
     lat_free_prog pstep → wp_behavior pstep img ps c →
@@ -696,7 +790,7 @@ Section acyc.
       no_promises c ∧
       ptraces_wf pstep TS ∧
       ptraces_fwd_own TS ∧
-      (rf_disciplined TS → gdep_acyclic TS).
+      (rf_edges_ok TS → gdep_acyclic TS).
   Proof.
     intros Hlfp Hb.
     destruct (wp_behavior_traced pstep img ps c Hlfp Hb)
@@ -706,7 +800,7 @@ Section acyc.
     { eapply cfg_ws_init_promise_run; [apply cfg_ws_init_init|exact Hprom]. }
     have Hfo : ptraces_fwd_own TS by eapply ptraces_of_fwd_own.
     exists mid, TS. split_and!; [done|done|done|done|done|].
-    intros Hdisc. by eapply gdep_acyclic_disciplined.
+    intros Hdisc. by eapply gdep_acyclic_edges_ok.
   Qed.
 
 End acyc.
@@ -718,14 +812,20 @@ End acyc.
       bank never names a foreign write, DERIVED from [wp_init] through
       the promise phase.  Reusable wherever a read's [w_vrOld] gain must
       be the raw timestamp.
-    - [disciplined] / [rf_disciplined]: the exact reader-side obligation
-      the Iris layer must discharge at the racy-read rules.  Note the
-      shape: it is per-(rf edge, later fulfil), with NO cycle quantifier.
+    - [disciplined] / [covered] / [edge_ok] / [rf_edges_ok]: the exact
+      per-edge obligation the Iris layer must discharge — at the
+      racy-read rules ([disciplined]) and at the lock / critical-section
+      rules ([covered], a pure statement about the reader's [w_vwNew] at
+      the read).  Note the shape: it is per-(rf edge, later fulfil), with
+      NO cycle quantifier.  [rf_disciplined] and
+      [rf_disciplined_edges_ok] keep the discipline-only form available.
     - [atrace_S1] / [atrace_S1_le]: the segment lemma, the reusable
       "a disciplined read is ordered before every later fulfil" fact.
-    - [gdep_acyclic_disciplined] / [wp_behavior_gdep_acyclic]: the
+    - [gdep_acyclic_edges_ok] / [wp_behavior_gdep_acyclic]: the
       standalone acyclicity theorem, which is what W2b's topological sort
-      consumes.
+      consumes.  [gdep_acyclic_disciplined] is the discipline-only
+      corollary, kept because it is the shape the racy-read rules alone
+      deliver.
 
     NOT here, deliberately: the SCowned arm (it needs φ, which speaks
     about promise-free runs — the worklist's "acyclicity-under-φ is not
