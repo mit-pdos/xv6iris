@@ -164,12 +164,18 @@ Definition dirlink_units : nat := 7%nat.
 
 (* iput's two block-membership premises, for EVERY inum the inode region
    covers rather than for the one child dirlookup happens to return.  See
-   the header. *)
+   the header.
+
+   HOISTED to [InodeInv.v] (fs-namei N5) once ialloc and ireclaim became
+   its third and fourth consumers -- a Spec file must not require another
+   function's Spec, and InodeInv is the lowest file that sees both
+   [IBLOCK] and [log_region_set].  This transparent alias keeps every
+   existing spelling ([ireg_blocks_ok ...] unqualified, and
+   [SpecDirlink.ireg_blocks_ok ...] qualified) working unchanged; new
+   contracts should name [InodeInv.ireg_blocks_ok] directly. *)
 Definition ireg_blocks_ok (inodestart : Z) (nib : nat)
     (cov : gset Z) (logstart : Z) : Prop :=
-  forall w : mword 32, bv_unsigned w < 16 * Z.of_nat nib ->
-    IBLOCK w inodestart ∈ cov
-    /\ ~ (IBLOCK w inodestart ∈ log_region_set logstart).
+  InodeInv.ireg_blocks_ok inodestart nib cov logstart.
 
 Section DirlinkSpec.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,

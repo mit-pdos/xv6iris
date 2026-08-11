@@ -1009,6 +1009,36 @@ Lemma frame_cancel_192 (X : mword 64) :
           (sign_extend' 64 (caddi16sp_imm (mword_of_int 12 : mword 6))) = X.
 Proof. apply frame_cancel. apply bv_eq. vm_compute. reflexivity. Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* THE DEPTH-GENERIC SLOT DISPLACEMENT -- [c.sdsp] / [c.ldsp].              *)
+(*                                                                          *)
+(* A [c.sdsp rs,off(sp)] / [c.ldsp rd,off(sp)] addresses the frame from the *)
+(* PUSHED sp, i.e. from [pa_stk X d] where [d] is the frame's depth in      *)
+(* slots, with a zero-extended 6-bit uimm scaled by 8.  The slot it lands   *)
+(* on is [pa_stk X k] with [u + k = d].  [stk_push]/[stk_pop] above are     *)
+(* already depth-generic; THIS was the one piece that was not, and every    *)
+(* frame-sized proof re-derived it ([ProofDirlookupParts.dlk_frm] is the    *)
+(* same lemma hard-wired to [pa_stk X 12], with nine sized instances).      *)
+(*                                                                          *)
+(* Instantiate at your own [d] and [k] and discharge the hypothesis with    *)
+(*   [apply stk_frm; apply bv_eq; vm_compute; reflexivity]                  *)
+(* -- both indices are closed at every call site, and [X] stays symbolic    *)
+(* (the [vm_compute] never sees it), which is the property the whole        *)
+(* section is stated for.                                                   *)
+(* ---------------------------------------------------------------------- *)
+Lemma stk_frm (X : mword 64) (d : nat) (u : mword 6) (k : nat) :
+  (mword_of_int (bv_wrap 64 (uint (mword_of_int (- (8 * Z.of_nat d)) : mword 64)
+                             + uint (zero_extend' 64 (concat_vec u ('b"000"))
+                                     : mword 64)))
+   : mword 64)
+  = mword_of_int (- (8 * Z.of_nat k)) ->
+  add_vec (StackOwn.pa_stk X d) (zero_extend' 64 (concat_vec u ('b"000")))
+  = StackOwn.pa_stk X k.
+Proof.
+  intro H. unfold StackOwn.pa_stk, add_vec_int.
+  rewrite StackOwn.pa_stk_off2. apply f_equal. exact H.
+Qed.
+
 (* ===================================================================== *)
 (*  Two [c.lui] immediates and the [x0] spelling, shared by every proof   *)
 (*  that pages an address or branches on zero.                            *)

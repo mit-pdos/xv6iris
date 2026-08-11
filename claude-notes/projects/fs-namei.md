@@ -1893,3 +1893,402 @@ lemma of surprise 2 is worth landing in `KernelRvcDecode.v` before three
 more frames are written; and `IcacheBoot`'s image-wf IOU is still two
 clauses wide (`inode_ok` AND `dir_ok icfg_nib`, N4a finding 3) — the
 ireclaim/fsinit mint owes both, and nothing in N4 discharged either.
+
+### N5a — the shared layer lands; the three decodes are verified; **ialloc is BLOCKED on a design gap**
+
+**LANDED (five files, all additive, no `_CoqProject` row):**
+`KernelRvcDecode.v`, `InodeInv.v`, `InodeRegion.v`, `IcacheBoot.v`,
+`SpecDirlink.v`.  **NOT landed: any `Spec`/`Proof`/`Link` triple** — see
+"THE BLOCKER" below, which is a §-level design question the ground rules
+say to report rather than improvise around.
+
+#### (a) The owed depth-generic frame lemma — `KernelRvcDecode.stk_frm`
+
+N4d surprise 2 executed.  `stk_push`/`stk_pop` were already
+depth-generic; the ONE piece that was not is the `c.sdsp`/`c.ldsp`
+displacement, which every frame-sized proof re-derived
+(`ProofDirlookupParts.dlk_frm` is exactly this lemma hard-wired to
+`pa_stk X 12`, with nine sized instances `dlk_frm1..9`):
+
+```coq
+Lemma stk_frm (X : mword 64) (d : nat) (u : mword 6) (k : nat) :
+  (mword_of_int (bv_wrap 64 (uint (mword_of_int (- (8 * Z.of_nat d)) : mword 64)
+                             + uint (zero_extend' 64 (concat_vec u ('b"000"))
+                                     : mword 64)))
+   : mword 64)
+  = mword_of_int (- (8 * Z.of_nat k)) ->
+  add_vec (StackOwn.pa_stk X d) (zero_extend' 64 (concat_vec u ('b"000")))
+  = StackOwn.pa_stk X k.
+```
+
+Call it as `apply stk_frm; apply bv_eq; vm_compute; reflexivity` — both
+indices are closed at every site and `X` stays symbolic, which is the
+property the whole section is stated for.  Note it is stated with
+`bv_wrap 64` / `StackOwn.pa_stk_off2`, **not** `wrap64` /
+`VcGen.add_vec_off2`: `KernelRvcDecode.v` has no `Section`, no `Context`
+and does NOT import VcGen, and StackOwn keeps an early twin of the
+associativity bridge for exactly this reason.  `dlk_frm`'s existing
+`wrap64` spelling was left alone (retiring it costs a `ProofDirlookup` /
+`ProofDirlink` recompile for no proof-content gain).
+
+#### (b) Two hoists, one done and one deliberately only half done
+
+- **`ireg_blocks_ok` MOVED to `InodeInv.v`** (the lowest file that sees
+  both `DinodeEnc.IBLOCK` and `LogInv.log_region_set`, and it already
+  hosts `sb_inodestart`).  `SpecDirlink.v` keeps a **transparent
+  `Definition` alias**, so both `ireg_blocks_ok …` (unqualified, the
+  spelling in SpecNamex / SpecNamei / SpecNameiparent) and
+  `SpecDirlink.ireg_blocks_ok …` (the SpecNamex header comment) still
+  resolve, and every consumer applies it as a function, which delta-steps
+  through the alias.  Zero risk: it is a `Prop` premise and no proof file
+  `rewrite /`-unfolds it.
+- **`ic_sleeplocks` was NOT moved.**  It is now *also* defined in
+  `IcacheBoot.v` (with `ic_sleeplocks_persistent` and an
+  `ic_sleeplocks_acc`), which is the canonical home — the file that
+  PRODUCES the family, and the lowest one that can state it (it needs
+  `SleepLock` + `IcacheEscrow.ic_tok`; `IcacheEscrow.v` imports neither
+  SleepLock nor anything that re-exports `is_sleeplock`).  New contracts
+  (ireclaim, fsinit) should name `IcacheBoot.ic_sleeplocks`.
+  **Why the two old copies stay:** `SpecDirlink.ic_sleeplocks` and
+  `SpecFileclose.ic_sleeplocks` are consumed through the **qualified**
+  name by `rewrite /SpecDirlink.ic_sleeplocks` in `ProofDirlink.dl_slk_acc`
+  and `ProofNamex.nx_slk_acc`, and by `SpecFileclose.ic_sleeplocks_acc` in
+  `ProofFileclose` + `ProofKexit`.  A `Notation` alias breaks the qualified
+  name outright; a `Definition` alias leaves those four proofs one delta
+  step short of `big_sepL_lookup`.  Retiring the copies is a four-line
+  change **plus a recompile of ProofDirlink / ProofNamex / ProofFileclose /
+  ProofKexit** — four of the most expensive files in the tree — so it is
+  deliberately not bundled here.  It is now a pure cleanup with no new
+  consumer pulling on it.
+
+#### (c) `InodeInv.sb_ninodes` and `InodeRegion.ireg_read_blk`
+
+`sb_ninodes := pa_add sb 12` — the scan bound both ialloc and ireclaim
+read (`lw a4,12(s4)`; ialloc's pre-frame `auipc a4,29 / lw a4,2024(a4)`
+resolves to the SAME address).  Same discipline as `sb_inodestart` /
+`BitmapInv.sb_size`: a plain fractional cell.
+
+`InodeRegion.ireg_read_blk` is the **fragment-free** block read, and it is
+the piece both scanning functions need that did not exist:
+
+```coq
+  Lemma ireg_read_blk (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (bi : nat) (bsl : list (bv 8)) :
+    ↑iregN ⊆ E -> (bi < nib)%nat ->
+    ireg_inv γi γfs inodestart nib -∗
+    ((inodestart + Z.of_nat bi) ↪[fs_L γfs]{#(1/2)} bsl) ={E}=∗
+    ⌜exists ds : list dinode, diblk_wf ds /\ bsl = diblk_bytes ds⌝ ∗
+    ((inodestart + Z.of_nat bi) ↪[fs_L γfs]{#(1/2)} bsl).
+```
+
+`ireg_read` needs a `dinode_at` because it answers "which record is
+MINE"; **a scan does not ask that**.  All ialloc/ireclaim need is that
+the bytes bread returned DECODE, and the caller's machinery half (out of
+`bio_held`, via `ProofIupdate.iu_held_L`'s shape) pins them against the
+region's client half.  No fragment, mask-preserving.  Stated on the block
+INDEX, because a scan names blocks and its sixteen records share one
+opening.  `ireg_blk_slot` (`diblk_wf ds -> i < 16 -> dinode_wf (ds !!! i)`)
+is its per-record companion.
+
+---
+
+#### THE BLOCKER: ialloc's claim has no ghost authority, and the pool cannot supply one
+
+**Report, numbered.  Nothing was improvised; no ialloc contract was written.**
+
+1. **The claim needs `dinode_at γi inum dn0`.**  ialloc's `log_write` at
+   +0x9a must run `InodeRegion.ireg_write_au`, whose FIRST resource
+   premise is `dinode_at γi inum dn` — an *exclusive* ghost_map fragment.
+   There is no other route: retagging the region's map at that key is
+   `ghost_map_update`, which cannot fire without the element, and the
+   region invariant holds only the AUTHORITY plus the block halves.
+
+2. **Every type-0 inum's fragment is behind a lock ialloc does not
+   hold.**  `IcacheEscrow.ipool_shape`'s free arm
+   (`∃ dn0, ⌜di_type dn0 = 0⌝ ∗ dinode_at γi inum dn0`) lives in exactly
+   two places, and both are lock-protected:
+   - the pool, `ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci)`,
+     which is a conjunct of `IcacheEscrow.itable_res2` — i.e. **inside the
+     itable spinlock**;
+   - `ic_unloaded` (= `inode_raw ∗ ipool_shape`) inside `ic_payload`
+     inside `ic_escrow_body` — i.e. **behind that entry's sleeplock**.
+   A LOADED entry cannot hold it: `ic_loaded` carries `inode_ok`, which
+   demands `di_type ≠ 0`.
+
+3. **ialloc holds neither lock, and cannot.**  Read the decode: between
+   `bread` (+0x3c) and `brelse` (+0xa0) ialloc acquires nothing but the
+   buffer.  Its only `iget` (+0xaa) takes the itable lock *internally*,
+   after the claim is already committed.  So the claim step has no lock
+   in hand.
+
+4. **Pushing the obligation to the caller does not help.**  The obvious
+   escape — state the free shape as a caller-supplied `∀ inum, …` loan or
+   as an atomic-update family indexed by the discovered inum — is
+   *expressible*, and ialloc's own proof would go through.  But its only
+   possible discharger is a caller owning the whole pool, and `create`
+   (sysfile, the first caller) holds the itable lock at no point.  It
+   moves the hole one level up and makes it harder to see.
+
+5. **What ACTUALLY serialises the claim in xv6 is the BUFFER, not the
+   itable.**  Two concurrent `ialloc`s cannot both claim one inum because
+   `bread` returns the dinode block under its sleeplock and the loser's
+   `bread` returns the cached buffer with the type already set.  The
+   model's resource layout does not reflect that: it files the free
+   inums' authority under the itable lock, which is the wrong serialiser.
+
+6. **PROPOSED FIX (§16, for the coordinator to rule on): move the free
+   arm's fragment INTO the region invariant.**  `ireg_blk` gains, per
+   block, `[∗ list] i ∈ seq 0 16, if decide (di_type (ds !!! i) = 0)
+   then (16*bi+i) ↪[γi] (ds !!! i) else True` — the region already knows
+   the parked record at every key (`ireg_couple`), so this is
+   re-establishable at every existing site.  Then:
+   - `ipool_shape` loses its free arm and becomes ONE-armed (allocated
+     only); the pool's domain shrinks to the allocated inums.  iget's
+     recycle of a free inum parks nothing, ilock on it still panics
+     ("ilock: no type", already a live arm), iput's close returns nothing.
+   - NEW `ireg_claim_au`: the mirror of `ireg_write_au` with the fragment
+     sourced FROM the invariant instead of supplied to it — given the
+     decoded `ds` and `di_type (ds !!! islot inum) = 0`, it produces
+     exactly `SpecLogWrite.wp_log_write_au_body`'s fupd and pays the
+     retagged `dinode_at γi inum dn'` OUT (legal because `dn'` has type
+     ≠ 0).  This is ialloc's whole ghost step.
+   - DUAL `ireg_free_au`, for iput's `ip->type = 0; iupdate(ip)`: absorb
+     the fragment back INTO the invariant.  Note this makes
+     `ireg_write_au`'s unconditional payout WRONG for a type-0 `dn'`, so
+     it gains a `di_type dn' ≠ 0` premise — free for iupdate's ordinary
+     callers (`inode_ok` gives it) and iput's free path uses the dual.
+   - `IcacheBoot.ipool_shape_free` and `ipool_alloc_all_free` are RETIRED
+     and `ireg_alloc` sorts the image's fragments instead (free stay in,
+     allocated go to the pool).  **This makes the boot mint strictly
+     cheaper**: an all-free mkfs image then needs no pool contents at all.
+   - Blast radius: `InodeRegion.v` (invariant + 2 lemmas + 1 premise),
+     `IcacheEscrow.ipool_shape` (one arm), `IcacheBoot.v` (3 lemmas), and
+     the re-park sites in `ProofIget` / `ProofIput` / `ProofIlock`.
+
+7. **ireclaim and fsinit are NOT blocked by this.**  ireclaim only READS
+   dinodes (its `lh` of type and nlink go through `ireg_read_blk`, no
+   fragment) and then composes iget / begin_op / ilock / iunlock / iput /
+   end_op, every one of which already has a contract.  fsinit is
+   bread/memmove/brelse + a magic test + initlog + ireclaim.  They can be
+   specified and proven independently of the §16 ruling — see the decodes
+   below, which are the part not to redo.
+
+---
+
+#### THE THREE DECODES, verified end to end off the `Code*.v` files
+
+Every `jal` target was resolved NUMERICALLY against `KernelSyms` (the
+21-bit immediate read as signed, added to the site's address); every
+`BTYPE` is `(imm13, rs2, rs1, op)` — **first regidx is rs2** (checked
+against ialloc's `bgeu a5,a4` loop guard, where the other reading gives
+the wrong branch).
+
+**ialloc @ `0x8000306c`, 188 bytes, an EIGHT-slot frame** (`c.addi16sp
+sp,-64`, imm6 60 = −4; `stk_push_64`/`stk_pop_64`/`stk_fp_64` already
+exist).  Registers: `s5 = dev`, `s6 = type`, `s2 = inum`, `s4 = &sb`,
+`s1 = bp`, `s3 = dip`.
+
+    +0x00  c.addi16sp sp,-64
+    +0x02..+0x04  sd ra,56(sp) / sd s0,48(sp)      (uimm 7, 6)
+    +0x06  c.addi4spn s0,sp,64                     (imm8 16)
+    +0x08  auipc a4,29 ; +0x0c lw a4,2024(a4)      -> a4 = sb.ninodes  (= sb+12)
+    +0x10  c.li a5,1
+    +0x12  bgeu a5,a4,+96 -> +0x72                 THE EMPTY-REGION EXIT: it
+                                                   SKIPS the s1..s6 pushes
+    +0x16..+0x20  sd s1,40 / s2,32 / s3,24 / s4,16 / s5,8 / s6,0
+    +0x22  c.mv s5,a0   (dev)   +0x24  c.mv s6,a1   (type)
+    +0x26  c.mv s2,a5   (inum = 1)
+    +0x28  auipc s4,29 ; +0x2c addi s4,s4,1980     -> s4 = &sb
+    ---- LOOP TOP @ +0x30 ----
+    +0x30  srli a1,s2,4                            inum / IPB
+    +0x34  lw a5,24(s4)                            sb.inodestart
+    +0x38  c.addw a1,a5                            a1 = IBLOCK(inum, sb)
+    +0x3a  c.mv a0,s5 ; +0x3c jal bread            (0x80002b44)
+    +0x40  c.mv s1,a0                              bp
+    +0x42  addi s3,a0,88                           bp->data
+    +0x46  andi a5,s2,15 ; +0x4a slli a5,a5,6 ; +0x4c add s3,s3,a5   -> dip
+    +0x4e  lh a5,0(s3)                             dip->type
+    +0x52  c.beqz a5,+54 -> +0x88                  THE CLAIM
+    +0x54  jal brelse    (a0 still = bp)
+    +0x58  addi s2,s2,1
+    +0x5a  lw a4,12(s4)                            sb.ninodes
+    +0x5e  addiw a5,s2,0
+    +0x62  bltu a5,a4,-50 -> +0x30                 loop back
+    +0x66..+0x70  restore s1..s6                   (fallthrough = no inodes)
+    ---- NO-INODES @ +0x72 ----
+    +0x72  auipc a0,4 ; +0x76 addi a0,a0,850
+    +0x7a  jal printk   (0x800004fc)               **NOT panic** -- this kernel's
+                                                   ialloc was modified the same
+                                                   way balloc was
+    +0x7e  c.li a0,0                               return 0
+    +0x80  ld ra,56 ; +0x82 ld s0,48 ; +0x84 c.addi16sp sp,64 ; +0x86 c.jr ra
+    ---- CLAIM @ +0x88 ----
+    +0x88  li a2,64 ; +0x8c c.li a1,0 ; +0x8e c.mv a0,s3
+    +0x90  jal memset   (0x80000cc8)               memset(dip, 0, 64)
+    +0x94  sh s6,0(s3)                             dip->type = type
+    +0x98  c.mv a0,s1 ; +0x9a jal log_write  (0x80003d80)
+    +0x9e  c.mv a0,s1 ; +0xa0 jal brelse
+    +0xa4  addiw a1,s2,0 ; +0xa8 c.mv a0,s5
+    +0xaa  jal iget     (0x80002f6a)
+    +0xae..+0xb8  restore s1..s6
+    +0xba  c.j -58 -> +0x80                        into the shared epilogue
+
+`K_ialloc = 48` (8 frame slots + bread's 40, the deepest callee; iget 16,
+log_write 18, brelse 26, memset 2).  The memset is `MemsetArray`
+(`LinkMemsetArray`), **not** the `MEMSET_PARTS` module `Memset` —
+`LinkBalloc.v` spells that trap out.
+
+**ireclaim @ `0x80003408`, 200 bytes, an EIGHT-slot frame.**  Registers:
+`s5 = dev`, `s1 = inum`, `s4 = &sb`, `s6 = the format string`,
+`s2 = bp`, `s3 = inum(sext32) and then ip`.
+
+    +0x00  auipc a4,29 ; +0x04 lw a4,1108(a4)      -> sb.ninodes
+    +0x08  c.li a5,1
+    +0x0a  bgeu a5,a4,+188 -> +0xc6                A SECOND `c.jr ra` AT +0xc6:
+                                                   the empty-region exit returns
+                                                   with NO FRAME AT ALL
+    +0x0e  c.addi16sp sp,-64
+    +0x10..+0x1e  sd ra,56 / s0,48 / s1,40 / s2,32 / s3,24 / s4,16 / s5,8 / s6,0
+    +0x20  c.addi4spn s0,sp,64
+    +0x22  c.mv s5,a0 (dev)   +0x24  c.mv s1,a5 (inum = 1)
+    +0x26  auipc s4,29 ; +0x2a addi s4,s4,1058     -> &sb
+    +0x2e  auipc s6,4  ; +0x32 addi s6,s6,50       -> "ireclaim: orphaned inode %d\n"
+    +0x36  c.j +70 -> +0x7c                        ENTER THE LOOP IN THE MIDDLE
+    ---- ORPHAN BLOCK @ +0x38 ----
+    +0x38  c.mv a1,s3 ; +0x3a c.mv a0,s6 ; +0x3c jal printk
+    +0x40  c.mv a1,s3 ; +0x42 c.mv a0,s5 ; +0x44 jal iget
+    +0x48  c.mv s3,a0                              s3 := ip  (s3 is REUSED)
+    +0x4a  c.mv a0,s2 ; +0x4c jal brelse           ** brelse AFTER iget **
+    +0x50  beq s3,zero,+30 -> +0x6e                DEAD: iget returns `ientry k`
+    +0x54  jal begin_op   (0x80003bee)
+    +0x58  c.mv a0,s3 ; +0x5a jal ilock   (0x800031dc)
+    +0x5e  c.mv a0,s3 ; +0x60 jal iunlock (0x8000328a)
+    +0x64  c.mv a0,s3 ; +0x66 jal iput    (0x8000335e)
+    +0x6a  jal end_op     (0x80003c5e)
+    ---- STEP @ +0x6e ----
+    +0x6e  addi s1,s1,1 ; +0x70 lw a4,12(s4) ; +0x74 addiw a5,s1,0
+    +0x78  bgeu a5,a4,+58 -> +0xb2                 exit to the epilogue
+    ---- LOOP BODY @ +0x7c ----
+    +0x7c  addiw s3,s1,0                           s3 = inum, sign-extended
+    +0x80  srli a1,s1,4 ; +0x84 lw a5,24(s4) ; +0x88 c.addw a1,a5
+    +0x8a  c.mv a0,s5 ; +0x8c jal bread
+    +0x90  c.mv s2,a0 (bp) ; +0x92 addi a5,a0,88
+    +0x96  andi a4,s3,15 ; +0x9a slli a4,a4,6 ; +0x9c add a5,a5,a4   -> dip
+    +0x9e  lh a4,0(a5)                             dip->type
+    +0xa2  c.beqz a4,+8 -> +0xaa                   type == 0: not an orphan
+    +0xa4  lh a5,6(a5)                             dip->nlink   (offset 6)
+    +0xa8  c.beqz a5,-112 -> +0x38                 nlink == 0: ORPHAN
+    +0xaa  c.mv a0,s2 ; +0xac jal brelse
+    +0xb0  c.j -66 -> +0x6e
+    +0xb2..+0xc0  restore ; +0xc2 c.addi16sp sp,64 ; +0xc4 c.jr ra
+    +0xc6  c.jr ra                                 the no-frame early return
+
+Three things a proof must expect: (i) **TWO return sites**, +0xc4 and
++0xc6, and the second one runs with the frame never pushed; (ii) the loop
+is entered in the MIDDLE (+0x36 jumps past the step block to +0x7c), so
+the invariant has to be stated at +0x7c and the first arrival is a
+special case; (iii) the buffer is held ACROSS iget — the `bslots`
+accounting must cover bread's reference through an iget, and the
+`beq s3,zero` at +0x50 is DEAD, refuted by iget's postcondition
+(`mr !!! a0 = ientry k`), not by a premise.
+`K_ireclaim = 68` (8 + iput's 60, the deepest callee; end_op 58,
+ilock 44, bread 40).
+
+**fsinit @ `0x800034d0`, 112 bytes, a FOUR-slot frame** (`c.addi sp,sp,-32`,
+a plain `c.addi`, so `stk_push_32` / `stk_pop_32` / `stk_fp_32`).
+`readsb` is INLINED.  `s2 = dev`, `s1 = bp`.
+
+    +0x00  c.addi sp,sp,-32
+    +0x02..+0x08  sd ra,24 / s0,16 / s1,8 / s2,0
+    +0x0a  c.addi4spn s0,sp,32
+    +0x0c  c.mv s2,a0 (dev)   +0x0e  c.li a1,1
+    +0x10  jal bread                               bread(dev, 1)  -- the superblock
+    +0x14  c.mv s1,a0 (bp)
+    +0x16  li a2,32                                sizeof(struct superblock)
+    +0x1a  addi a1,a0,88                           bp->data
+    +0x1e  auipc a0,29 ; +0x22 addi a0,a0,866      -> &sb
+    +0x26  jal memmove  (0x80000d28)
+    +0x2a  c.mv a0,s1 ; +0x2c jal brelse
+    +0x30  auipc a4,29 ; +0x34 lw a4,848(a4)       -> sb.magic  (= sb+0)
+    +0x38  lui a5,0x10203 ; +0x3c addi a5,a5,64    -> FSMAGIC = 0x10203040
+    +0x40  bne a4,a5,+36 -> +0x64                  LIVE panic arm
+    +0x44  auipc a1,29 ; +0x48 addi a1,a1,828      -> &sb
+    +0x4c  c.mv a0,s2 ; +0x4e jal initlog (0x80003b6c)
+    +0x52  c.mv a0,s2 ; +0x54 jal ireclaim (0x80003408)
+    +0x58..+0x5e restore ; +0x60 c.addi16sp sp,32 ; +0x62 c.jr ra
+    +0x64  auipc a0,4 ; +0x68 addi a0,a0,3924 ; +0x6c jal panic
+
+`K_fsinit = 72` (4 + ireclaim's 68; initlog 56, bread 40, memmove 2).
+**The `memmove` at +0x26 is where every superblock cell is BORN**: it
+writes all 32 bytes at `&sb`, so fsinit's contract is what turns "32 raw
+bytes at `&sb`" into the typed cells `sb_size` / `sb_ninodes` /
+`sb_inodestart` / `sb_logstart` / `sb_bmapstart` that every other fs
+contract takes as a premise — and their VALUES come from the mkfs image's
+block 1, i.e. from the same image-wf IOU family as
+`IcacheBoot.ipool_shape_alloc`'s.  That is the correct place for the
+boot-side geometry premises the N4b/N4d ledgers flagged (`icfg_dev = 1`,
+`0 < icfg_nib`): they belong in **`SpecFsinit`**, in SpecNamex's exact
+four-line shape (`dev = icfg_dev`, `nib = icfg_nib`, `dev = ROOTDEV`,
+`(0 < nib)%nat`), NOT as `IcacheBoot` premises — `icache_boot` is
+device-generic by construction and takes `dv`/`nib` as parameters, and
+the `dv = icfg_dev` tie is `IcacheRef.icfg_alloc`'s to make.
+
+#### Build evidence (EC2 mirror, git-synced at `c4b08b5f`)
+
+`bash ~/full.sh` (`make -f CoqMakefile -j24 -k` over the whole tree):
+**`EXIT=0`, 0 `Error` lines, `983` `.vo` / `983` `.v`** — the same count as
+before the stage (no file added, none lost; `_CoqProject` untouched).  89
+files recompiled, which is the `InodeRegion`/`InodeInv`/`KernelRvcDecode`
+cone.
+
+Two traps hit, both already in the durable notes and both worth
+re-confirming:
+- editing `InodeInv.v` / `InodeRegion.v` **kills the single-file check
+  loop outright** — `coqc InodeInv.v` alone fails with *"Compiled library
+  xv6iris.ProcGeom … makes inconsistent assumptions over library
+  xv6iris.KernelRvcDecode"*, which names a file you did not touch.  Only
+  `KernelRvcDecode.v` itself is single-file checkable here; everything
+  else needs the full gate.  Budget for two full gates, not one.
+- the first gate failed on ONE line of the new `ireg_blk_slot`
+  (`apply (Forall_lookup_1 _ _ i)` leaves the element implicit
+  unresolved — "Cannot infer this placeholder of type `list dinode`");
+  the fix is to `assert` the `!!` fact first and close with
+  `exact (Forall_lookup_1 _ _ _ _ Hall Hl)`.
+
+`Print Assumptions` on the four linked modules whose cones contain the
+moved code (`Namei.wp_namei_sconf`, `Dirlookup.wp_dirlookup_sconf`,
+`Iput.wp_iput_sconf`, `Iupdate.wp_iupdate_sconf`): **each is EXACTLY the 5
+platform axioms + funext**, four `Axioms:` sections with six entries and
+nothing else — unchanged from N4d's baseline.
+`python3 tools/lemma_diff.py --ref HEAD`: **CLEAN** (nothing dropped,
+nothing admitted, no new assumption — `ireg_blocks_ok` is not reported
+`GONE` because SpecDirlink keeps it as an alias).  No `Admitted`, `Axiom`
+or `cheat_` in any touched file.  Mirror scratch (`N5aCheck.*`) deleted.
+
+md5s of the landed files: `KernelRvcDecode.v 54240c83d61d4e9daf096e278dd5b9d9`,
+`InodeInv.v 3c13f7a054323db9ab7b1329e845c227`,
+`InodeRegion.v a3d3f8fb5fe2fa9d3f11022054e20833`,
+`IcacheBoot.v 062c01c004d61b785664d726615f659c`,
+`SpecDirlink.v 307ab46acd8525ec7ae542c12eb516d6`.
+
+#### What N5b should do
+
+1. Get the §16 ruling (blocker item 6).  ialloc cannot be specified before
+   it.
+2. ireclaim and fsinit are unblocked TODAY and are the cheaper half:
+   `SpecIreclaim` + `SpecFsinit`, then their proofs.  Both need
+   `InodeRegion.ireg_read_blk` (landed) and `IcacheBoot.ic_sleeplocks`
+   (landed).
+3. ireclaim's contract is a boot-context composition of SIX proven
+   contracts inside a loop; state it single-threaded but do NOT try to
+   discharge the image-wf premises — thread them, as `IcacheBoot` does.
+4. **`ROOTDEV` has to be hoisted before `SpecFsinit` can be written.**
+   It is `Definition ROOTDEV : mword 32 := mword_of_int 1.` at
+   `SpecNamex.v:239`, and a Spec file must not require another function's
+   Spec.  `InodeInv.v` (beside `sb_ninodes`) is the home; same transparent
+   alias shape as `ireg_blocks_ok` above — but note `ProofNamex.v:4891`
+   does a bare `unfold ROOTDEV`, so the alias must be checked against a
+   ProofNamex recompile, or `ROOTDEV` moved outright and SpecNamex's
+   `Definition` deleted (`lemma_diff` will then report one intended
+   `GONE`).  This is also where the `icfg_dev = ROOTDEV` premise the
+   N4b/N4d ledgers owe finally gets stated.

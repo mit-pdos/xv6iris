@@ -178,6 +178,41 @@ Qed.
 Definition sb_inodestart : mword 64 :=
   pa_add (mword_of_int KernelSyms.sb : mword 64) 24.
 
+(* ---------------------------------------------------------------------- *)
+(*  sb.ninodes, at [sb + 12] -- the inode region's SIZE, in inodes.        *)
+(*                                                                         *)
+(*  ialloc's and ireclaim's scan bound ([lw a4,12(s4)]; ialloc also reads  *)
+(*  it once through [auipc a4 / lw a4,2024(a4)] before the frame is set    *)
+(*  up, which is the SAME address).  Same discipline as [sb_inodestart]    *)
+(*  and [BitmapInv.sb_size]: a plain fractional cell, read and handed      *)
+(*  straight back, no superblock abstraction.                             *)
+(* ---------------------------------------------------------------------- *)
+Definition sb_ninodes : mword 64 :=
+  pa_add (mword_of_int KernelSyms.sb : mword 64) 12.
+
+(* ---------------------------------------------------------------------- *)
+(*  THE INODE REGION'S BLOCK GEOMETRY.                                     *)
+(*                                                                         *)
+(*  Every inum the region covers lives in a block that is COVERED and is   *)
+(*  not one of the log's own storage blocks -- bread's premise and         *)
+(*  log_write's, for EVERY inum rather than for the one an operation       *)
+(*  happens to touch.  That is strictly the better shape: it is a fact     *)
+(*  about the superblock layout, provable once, instead of a fact about a  *)
+(*  particular directory's contents.                                       *)
+(*                                                                         *)
+(*  HOISTED HERE from [SpecDirlink.v] (which re-exports it by a            *)
+(*  transparent alias) once it had a second consumer: SpecNamex/SpecNamei/ *)
+(*  SpecNameiparent already take it, and the ialloc / ireclaim contracts   *)
+(*  need it too -- and a Spec file must not require another function's     *)
+(*  Spec.  This is the lowest file that can see both [DinodeEnc.IBLOCK]    *)
+(*  and [LogInv.log_region_set].                                          *)
+(* ---------------------------------------------------------------------- *)
+Definition ireg_blocks_ok (inodestart : Z) (nib : nat)
+    (cov : gset Z) (logstart : Z) : Prop :=
+  forall w : mword 32, bv_unsigned w < 16 * Z.of_nat nib ->
+    IBLOCK w inodestart ∈ cov
+    /\ ~ (IBLOCK w inodestart ∈ log_region_set logstart).
+
 (* ===================================================================== *)
 (*  The pure model: a file's block map                                    *)
 (* ===================================================================== *)
