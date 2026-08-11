@@ -97,7 +97,8 @@
    a length [plen] with [ByteBuf.bb_cstr pfun plen]; the MODEL is the byte list
    [pl := DirentEnc.bview plen pfun], and [PathElems.path_elems pl] is the list
    of elements the loop consumes.  namex reads indices 0..plen inclusive and
-   never past the terminator, so [S plen] bytes of (fractional) ownership is
+   never past the terminator, so [S plen] bytes of FULL ownership is (memmove reads the path as its
+   source, and its contract demands DfracOwn 1 there -- N4c2 finding A)
    exactly right.
 
    THE NAME BUFFER is 14 caller-owned bytes at [a2], written by the two
@@ -259,7 +260,7 @@ Definition wp_namex_sconf_body
     (nfun : nat -> bv 8)                               (* the name buffer, in *)
     (npar : bool)                                      (* the a1 flag         *)
     (n : nat)
-    (pidv : mword 32) (dq dqb dqs dqc dqp : dfrac)
+    (pidv : mword 32) (dq dqb dqs dqc : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
     (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.namex in
@@ -289,6 +290,11 @@ Definition wp_namex_sconf_body
   ireg_blocks_ok inodestart nib cov logstart ->
   (* the path really is a NUL-terminated string of length [plen] *)
   bb_cstr pfun plen ->
+  (* the length fits int: the sext.w at +0x90 truncates [len = s2 - s1], and
+     without this bound the [blt]-against-13 stops deciding [len <= 13] (and
+     the short branch fails memmove's own 2^32 bound).  SpecFetchstr's
+     header records the identical premise for strlen's [subw]. *)
+  (Z.of_nat plen < 2 ^ 31)%Z ->
   (* (4) the budget, linear in the element count *)
   ((L + 1) * iput_units <= n)%nat ->
   (j < NPROC)%nat ->
@@ -329,7 +335,7 @@ Definition wp_namex_sconf_body
   p_cwd pj ↦₈{dqc} cwdv -∗
   inode_held cwdv -∗
   (* ---- THE PATH: [plen] content bytes and the terminator ---- *)
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ{dqp} pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
   (* ---- THE NAME BUFFER: fourteen bytes, WRITTEN ---- *)
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nfun i) -∗
   (* ---- three buffer slots (iput's itrunc arm forces three) ---- *)
@@ -353,7 +359,7 @@ Definition wp_namex_sconf_body
       p_pid pj ↦₄{dq} pidv -∗
       p_cwd pj ↦₈{dqc} cwdv -∗
       inode_held cwdv -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ{dqp} pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
       (* the name buffer, at an UNSPECIFIED naming function -- the short
          branch leaves the bytes above [len] alone *)
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nf i) -∗
@@ -394,11 +400,11 @@ Module Type NAMEX.
       (nfun : nat -> bv 8)
       (npar : bool)
       (n : nat)
-      (pidv : mword 32) (dq dqb dqs dqc dqp : dfrac)
+      (pidv : mword 32) (dq dqb dqs dqc : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
       wp_namex_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used cwdv plen pfun nfun npar n
-                          pidv dq dqb dqs dqc dqp m K eb C b.
+                          pidv dq dqb dqs dqc m K eb C b.
 End NAMEX.

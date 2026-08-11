@@ -104,7 +104,7 @@ Definition wp_nameiparent_sconf_body
     (plen : nat) (pfun : nat -> bv 8)                  (* the path buffer     *)
     (nfun : nat -> bv 8)                               (* the name buffer, in *)
     (n : nat)
-    (pidv : mword 32) (dq dqb dqs dqc dqp : dfrac)
+    (pidv : mword 32) (dq dqb dqs dqc : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
     (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.nameiparent in
@@ -128,6 +128,11 @@ Definition wp_nameiparent_sconf_body
   cov_below cov size ->
   ireg_blocks_ok inodestart nib cov logstart ->
   bb_cstr pfun plen ->
+  (* the length fits int: the sext.w at +0x90 truncates [len = s2 - s1], and
+     without this bound the [blt]-against-13 stops deciding [len <= 13] (and
+     the short branch fails memmove's own 2^32 bound).  SpecFetchstr's
+     header records the identical premise for strlen's [subw]. *)
+  (Z.of_nat plen < 2 ^ 31)%Z ->
   ((L + 1) * iput_units <= n)%nat ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
@@ -154,7 +159,7 @@ Definition wp_nameiparent_sconf_body
   p_pid pj ↦₄{dq} pidv -∗
   p_cwd pj ↦₈{dqc} cwdv -∗
   inode_held cwdv -∗
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ{dqp} pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nfun i) -∗
   bslots bn 3 -∗
   iref_slots 2 -∗
@@ -173,7 +178,7 @@ Definition wp_nameiparent_sconf_body
       p_pid pj ↦₄{dq} pidv -∗
       p_cwd pj ↦₈{dqc} cwdv -∗
       inode_held cwdv -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ{dqp} pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nf i) -∗
       bslots bn 3 -∗
       ⌜((n - (L + 1) * iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
@@ -209,11 +214,11 @@ Module Type NAMEIPARENT.
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
       (n : nat)
-      (pidv : mword 32) (dq dqb dqs dqc dqp : dfrac)
+      (pidv : mword 32) (dq dqb dqs dqc : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
       wp_nameiparent_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                 ga gf cov logstart bmapstart inodestart nib
                                 size dev used cwdv plen pfun nfun n
-                                pidv dq dqb dqs dqc dqp m K eb C b.
+                                pidv dq dqb dqs dqc m K eb C b.
 End NAMEIPARENT.
