@@ -1004,3 +1004,5 @@ ProofIalloc.v
 LinkIalloc.v
 SpecIreclaim.v
 SpecFsinit.v
+ProofIreclaim.v
+LinkIreclaim.v

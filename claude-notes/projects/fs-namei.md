@@ -3179,3 +3179,136 @@ What the resuming agent should do first, in order:
    byte→word bridge at the memmove: 32 raw `↦ₘ` cells in, eight `↦₄` cells
    out, against `sb_image`.  `BlockWords` is where the word/byte lemmas
    live.  Everything else is three calls in a row.
+
+### N5d2 — **ireclaim is PROVEN and LINKED**; `SpecIreclaim` did not move
+
+**WHAT LANDED: two files and two `_CoqProject` rows.**  `iris/ProofIreclaim.v`
+(3370 lines, md5 `13b13229e77dccf8604e98e3b14dcdaa`) and
+`iris/LinkIreclaim.v` (46 lines, md5 `4e8f10c6d3c6a88016a478536c2beba6`),
+with their rows **after the `SpecFsinit.v` row**.  `SpecIreclaim.v` is
+untouched: it was FROZEN and every one of the six block lemmas fitted it —
+no premise had to be added, unlike N5c2 surprise 1.
+
+`Print Assumptions Ireclaim.wp_ireclaim_sconf`: **`rv64d.valid_reservation`,
+`rv64d.plat_term_write`, `rv64d.match_reservation`, `rv64d.load_reservation`,
+`rv64d.cancel_reservation`,
+`FunctionalExtensionality.functional_extensionality_dep`** — the five
+platform axioms plus funext, and nothing else.  As with balloc and ialloc
+that is *modulo* the THREADED printk obligation the contract carries as a
+pure hypothesis (`LinkIreclaim.v`'s header says so out loud, and here the
+message carries a `%d`).
+
+`python3 tools/lemma_diff.py --ref HEAD`: **CLEAN** (nothing dropped,
+nothing admitted, no new assumption).  No `Admitted`, no `Axiom`, no
+`cheat_` anywhere in `iris/`.
+
+#### The six blocks, and what each cost
+
+| block | offsets | template | rounds |
+|---|---|---|---|
+| `irc_epilogue` | +0xb2..+0xc4 | `ProofIalloc.ia_epilogue` widened to 8 pops | first try |
+| `irc_step` | +0x6e..+0x7a | `ia_scan`'s tail (+0x58..+0x62), lifted out | 2 (`Z.geb_gt` does not exist) |
+| `irc_orphan` | +0x38..+0x6c | `ProofKexit`'s begin_op/iput/end_op run, plus printk / iget / brelse / ilock / iunlock | 2 (a missing `Require`) |
+| `irc_release` | +0xaa..+0xb0 | `ia_scan`'s brelse arm | (with the scan) |
+| `irc_scan` | +0x7c..+0xb0 | `ia_scan`'s bread + slot arithmetic under an `iInduction` | 2 (surprise 2) |
+| `wp_ireclaim_sconf` | +0x00..+0x36 | `ProofIalloc`'s prologue at an 8-slot frame, push AFTER the test | first try |
+
+#### New vocabulary (all local to the file)
+
+- `irc_msg` / `irc_msg_addr` / `irc_msg_bytes` / `irc_msg_fmt` — the format
+  string at `0x80007468`, **`pk_kinds irc_msg = [PkNum]`**, 28 characters
+  (so `irc_msg_bytes` peels **29**, not ialloc's 19);
+- `irc_frame`, `irc_sp`, `irc_thr8` — ialloc's `ia_*` at ireclaim's slots.
+  There is NO `irc_thr2`: the epilogue restores all eight, so the narrow
+  invariant ialloc needs between its two pops never exists here;
+- `irc_cont` — the contract's post, named;
+- **`irc_loop`** — one turn of the loop AT ITS BODY (+0x7c), the induction's
+  product and the step/orphan blocks' hypothesis (see surprise 1);
+- `irc_esc_acc` — `ProofDirlink.dl_esc_acc` restated (a Proof file may not
+  require another Proof file).  The sleeplock family needed no restatement:
+  `IcacheBoot.ic_sleeplocks_acc` is public and is the copy this contract
+  names.
+
+**Everything else came out of `DinodeSlot.v`'s N5d hoist** — `ds_sext_small`,
+`ds_srli4`, `ds_add_vec32_comm`, `ds_andi15`, `ds_type_zero`,
+`ds_type_nonzero`, `ds_bgeu_moi`, `ds_held_L`, plus the older `iu_*` group.
+`ProofIalloc.v`'s private `ia_*` copies were not touched and not needed.
+`ia_win_acc` was not needed either (ireclaim never writes a dinode):
+`DinodeSlot.diblk_slot_acc` alone carries both `lh`s.
+
+#### SURPRISES (numbered)
+
+1. **THE LOOP WAND IS HART-CLOSED, and that is what makes "entered in the
+   middle" cheap.**  `irc_loop` binds its own `CIDn` *inside* the ∀, so it
+   is a closed `iProp` with no dependence on the ambient hart — which means
+   (a) the induction needs **no `wp_next` wrapper** at all (ProofIalloc's
+   `∀ fuel, wp_next … (fun CIDl => …)` layer, whose `CIDl` its own comment
+   calls unused, is simply dropped), (b) `iInduction fuel as [|fuel] "IH"`
+   works on the bare goal, and (c) the wand can be **passed as a hypothesis
+   to a block lemma**.  (c) is the whole trick: `irc_step` and `irc_orphan`
+   take `irc_loop … fuel` as an argument, so the STEP block does not have to
+   live inside the induction — which is exactly what the middle-entry
+   structure needs, since the prologue jumps past the step to +0x7c while
+   every later turn arrives at +0x7c *from* the step.  N5c2 surprise 5's
+   "instantiate the IH at `CIDl` itself" therefore does not arise.
+2. **The scan's FIRST `cpu_own_transport` starts at the loop wand's own
+   `CIDn`.**  `irc_loop` hands the resources over at `CIDn`, so the transport
+   before `bread` is `cpu_own_transport CIDn CID6` (and the `wp_next_shift`
+   of `irc_cont` likewise `CIDa := CIDn`).  Omitting it gives N5c2 surprise
+   4's error verbatim — *"iSpecialize: cannot instantiate (cpu_own … -∗ …)
+   with (cpu_own …)"*, the two sides printing identically.  This was the
+   ONLY hart error in the whole file.
+3. **`Z.geb_gt` does not exist.**  The `bgeu` at +0x78 is cased on
+   `Z.geb (inum+1) ninodes`; turning the `false` branch into `inum+1 <
+   ninodes` needs `Z.lt_ge_cases` + `Z.geb_le`, not a `geb`-flavoured lemma.
+4. **The `beq s3,zero` at +0x50 needs the x0-flavoured rule.**  Its rs2 IS
+   `zreg`, so `wp_beq_fall_s_sconf` (which demands `uint rs2 <> 0`) does not
+   apply; `WpSconfBtype.wp_beqz_x0_fall_s_sconf` is the one that does.  The
+   refutation itself is `eq_vec_false_iff` + `IcacheRef.ientry_ne_zero`,
+   i.e. **iget's postcondition and nothing else** — the N5a ledger's reading
+   is exactly right.
+5. **The plain arm had to be factored, because the body reaches it TWICE.**
+   `+0xaa..+0xb0` is entered from the zero-type test at +0xa2 and from the
+   nonzero-nlink test at +0xa8; `irc_release` is that tail as a lemma, and
+   it is also where the third `irc_step` call site lives (the other two are
+   the orphan block's fall-through and, transitively, the body).
+6. **Three buffer slots, and the split points are not where ialloc's are.**
+   The body splits `3 = 2 + 1` for bread and rejoins after whichever brelse
+   runs; the orphan block splits `3 = 2 + 1` again for **ilock** (which
+   takes `bslot`, not `bslots 3`) and hands all three to **iput**.  The
+   buffer really is held across `iget` (+0x44 .. +0x4c) and the count never
+   needs a fourth, exactly as the frozen spec says.
+7. **`gen_cert` and `fs_crash_seam` are persistent, and the loop needs them
+   to be.**  Every turn's `end_op` consumes them; a non-persistent pair
+   could not have ridden a scan of unknown length.  Both are `#`-introduced
+   here; `ProofKexit` (a single straight-line use) never had to notice.
+
+#### Build evidence (EC2 mirror, git-synced at `27b971c0`)
+
+Single-file, with the mirror's `~/one.sh` (`coqc -time -R . xv6iris
+-R ../model-xv6iris Riscv -R ../kernel-rocq Kernel -w -notation-overridden`):
+`ProofIreclaim.v` **RC=0**, `LinkIreclaim.v` **RC=0**, and a scratch
+`IrcChk.v` (`Print Assumptions Ireclaim.wp_ireclaim_sconf`) **RC=0** giving
+the six above.  `iris/_CoqProject` was **not** scp'd (N5c surprise 1).
+Mirror scratch (`ProofIreclaim.*`, `LinkIreclaim.*`, `IrcChk.*`,
+`/tmp/one.log`) deleted at the end; the mirror's working tree was left
+clean.  No full gate was run — the campaign's final gate is the
+coordinator's.
+
+md5s: `iris/ProofIreclaim.v 13b13229e77dccf8604e98e3b14dcdaa`,
+`iris/LinkIreclaim.v 4e8f10c6d3c6a88016a478536c2beba6`.
+
+#### What the fsinit stage should know
+
+1. **`Ireclaim.wp_ireclaim_sconf` is the instance to drive**, out of
+   `LinkIreclaim.v`, against the unchanged `SpecIreclaim.v`.  Its premise
+   and resource lists are exactly (b) of the N5d ledger; nothing moved.
+2. **`SpecFsinit`'s 35-slot accounting is unaffected.**  ireclaim takes
+   `bslots bn 3` and hands `bslots bn 3` back, which is what finding 1 of
+   N5d already assumed.
+3. **The printk obligation is now TWO deep.**  `SpecFsinit` threads
+   `printk_gen_contract γpr γu γd` down to `SpecIreclaim`, which threads it
+   to the orphan block; the boot client above fsinit is where it finally has
+   to be discharged (or accepted, as `panic_wp_any` is).
+4. **`ProofFsinit.v`'s only genuinely new machinery is still the memmove's
+   byte→word bridge.**  Nothing in this stage touched `BlockWords`.
