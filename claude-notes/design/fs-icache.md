@@ -1901,3 +1901,25 @@ SIZING (in this project's demonstrated agent-run currency):
 Total ≈ 3–4 agent runs + one design pass: comparable to cycle C3
 alone, and far below §14.4's estimate, which budgeted ledger machinery
 for iput that B turns out not to need.
+
+### 14.7 B1's three corrections to §14.6 (landed, green)
+
+1. **Liveness rides INSIDE `iref_tok`** (`iref_tok k q := iref_frag k q
+   ∗ live_frac k q`; three equal fractions in `inode_ref`), not in a
+   free-standing pool: a support clause counts only what the invariant
+   owns, and the shares are exactly what it does not — the retirement
+   at last close works ONLY by conservation, which needs the closer's
+   tok to carry pool mass proportional to qt. Every consumer statement
+   survives because iref_tok is opaque to all of them.
+2. **Carve/gather are `⊣⊢`, not events.** §14.5's demand for
+   auth-guarded events was aimed at the LEDGER; §14.6's conservation
+   argument deleted the ledger, and with it the need: `inode_ref_carve`
+   is a pure RA split (no fupd, no mask), which B2's fileread/ilock
+   exploit directly. The free slot's whole live unit in the invariant
+   is what makes a share imply `M !! k = Some _` (`iref_live_load_au`).
+3. **No share→reference upgrade exists under positiveR** — the identity
+   budget cannot line up (the share's s is already the hole in its
+   parent's slice). idup-over-shares instead mints from the table's
+   retained share (iget's hit shape, `iref_upgrade_store_au` =
+   incr-with-the-share-carried) and RETURNS the share beside the new
+   reference; kfork's parent gathers it back. B3 adjusts accordingly.
