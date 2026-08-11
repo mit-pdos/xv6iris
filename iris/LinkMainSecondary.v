@@ -3,8 +3,9 @@
    LinkPrintkGen), exactly as for the boot arm. *)
 Require Import LinkCpuid LinkPrintkGen LinkKvminithart LinkTrapinithart.
 Require Import LinkPlicinithart LinkScheduler LinkKernelvec.
+Require Import LinkBootDevCaps.
 Require Import ProofMainSecondary.
 
 Module MainSecondary :=
   MainSecondaryProof Cpuid PrintkGen Kvminithart Trapinithart Plicinithart
-                     Scheduler Kernelvec.
+                     Scheduler Kernelvec BootDevCaps.

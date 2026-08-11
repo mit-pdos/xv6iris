@@ -60,6 +60,7 @@ Require Import SpecPanic StartedInv.
 Require Import SpecCpuid SpecPrintk SpecPrintkGen.
 Require Import SpecKvminithart SpecTrapinithart SpecPlicinithart.
 Require Import SpecScheduler SpecKernelvec.
+Require Import SpecBootDevCaps SpecDevintr DiskInv.
 Require Import SpecMainSecondary.
 Require Import CodeMain.
 Require Import KernelRvcDecode.
@@ -104,6 +105,7 @@ Module MainSecondaryProof
   (Cpuid : CPUID) (PrintkGen : PRINTK_GEN) (Kvminithart : KVMINITHART)
   (Trapinithart : TRAPINITHART) (Plicinithart : PLICINITHART)
   (Scheduler : SCHEDULER) (Kernelvec : KERNELVEC)
+  (BootDevCaps : BOOT_DEV_CAPS)
   : MAIN_SECONDARY.
 
 Section ProofMainSecondary.
@@ -557,7 +559,8 @@ Section ProofMainSecondary.
   (* and [jal scheduler], which never returns.                            *)
   (* =================================================================== *)
   Local Lemma ms_inithart_sched 
-      (γd : uart_names) (γv : disk_names) (γs : list gname)
+      (γd : uart_names) (γv : disk_names) (γs : list gname) (γk : gname)
+      (pd pav pu : mword 64)
       (m : regfile) (n : nat) (p0 : mword 64)
       (root : mword 44) (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) :
     (* the scheduler this block tail-calls enables interrupts at its loop head
@@ -575,10 +578,16 @@ Section ProofMainSecondary.
       (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗
     dev_inv γd γv -∗
     procs_inv γs -∗
+    (* THE LAST TWO [devintr_caps] MEMBERS, out of the [started] deposit: the
+       handler contract this block folds into [intr_res] closes over the whole
+       credential, and the disk lock and geometry are the two pieces that are
+       not this hart's to make.  Persistent, so they simply ride in. *)
+    is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
+    disk_geom γv pd pav pu -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hdc Hp0.
-    iIntros "Hcg #Htext #Hpanic Hpc Hcpu Hq Hsbit Htlb Htcsr #Hkinv #Hkptp #Hdev #Hpinv".
+    iIntros "Hcg #Htext #Hpanic Hpc Hcpu Hq Hsbit Htlb Htcsr #Hkinv #Hkptp #Hdev #Hpinv #Hdlock #Hgeom".
     iPoseProof (mni_32 with "Htext") as "Hi32".
     iPoseProof (mni_36 with "Htext") as "Hi36".
     iPoseProof (mni_3a with "Htext") as "Hi3a".
@@ -633,7 +642,16 @@ Section ProofMainSecondary.
            the cell to make [intr_res].  Was an [inv_alloc] under an
            [fupd_wp]. ---- *)
     iDestruct (ms_dup_hw with "Hcg") as "(#Hhw & #Hmin & Hcg)".
-    iPoseProof (Kernelvec.kernelvec_handler_spec with "Hhw Hmin Htext") as "#Hkvs".
+    (* the handler contract's credentials: five in hand, three assumed --
+       SpecBootDevCaps.v says which and why. *)
+    iDestruct (procs_inv_len with "Hpinv") as %Hnproc.
+    iPoseProof (BootDevCaps.boot_dev_caps γd γs) as "Hbdc".
+    iDestruct "Hbdc" as (γtx γtl) "(#Htxl & #Htimc & #Htick)".
+    iAssert (devintr_caps γd γv γtx γk γtl γs pd pav pu) as "#Hcaps".
+    { rewrite /devintr_caps.
+      iFrame "Hdev Htxl Hgeom Hdlock Htimc Htick Hpinv Hpanic". }
+    iPoseProof (Kernelvec.kernelvec_handler_spec γd γv γtx γk γtl γs pd pav pu
+                  Hnproc with "Hhw Hmin Htext Hcaps") as "#Hkvs".
     iDestruct (intr_res_intro (mword_of_int KernelSyms.kernelvec : mword 64) _
                  kernelvec_tv_direct kernelvec_stvec_base with "Hq Hstvec []")
       as "Hintr".
@@ -716,9 +734,10 @@ Section ProofMainSecondary.
     iApply (ms_printk γpr γd γv m2 (K - 2)%nat p0 Hn38
               with "Hcg Htext Hkdata Hpanic Hpc Hcpu Hpenv").
     iIntros (m3) "Hcg Hpc Hcpu".
-    iApply (ms_inithart_sched γd γv γs m3 (K - 2)%nat p0 root tlbvec0
+    iApply (ms_inithart_sched γd γv γs γk pd pav pu m3 (K - 2)%nat p0 root tlbvec0
               Hn20 Hdc Hp0
-              with "Hcg Htext Hpany Hpc Hcpu Hq Hsbit Htlb Htcsr Hkinv Hkptp Hdev Hpinv").
+              with "Hcg Htext Hpany Hpc Hcpu Hq Hsbit Htlb Htcsr Hkinv Hkptp Hdev Hpinv
+                    Hdlock Hgeom").
   Qed.
 
 End ProofMainSecondary.

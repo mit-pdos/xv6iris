@@ -781,6 +781,8 @@ CodeUartwrite.v
 ProofUartwrite.v
 LinkUartwrite.v
 SpecConsoleintr.v
+SpecBootDevCaps.v
+LinkBootDevCaps.v
 LinkConsoleintr.v
 WpUartgetc.v
 SpecUartintr.v

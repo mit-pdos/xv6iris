@@ -1175,43 +1175,57 @@ deleted; `LinkKernelvec` instantiates `KernelvecProof` over the REAL
   `A; B; [x|y]` parses as `(A; B); [x|y]`: an unbracketed tail after an
   18-way `destruct` asks for 36 tactics.
 
-#### WHAT IS LEFT: THE BOOT CREDENTIALS, AND WHY THEY WERE NEVER PAID
+#### THE TREE IS GREEN, AT THE PRICE OF ONE NAMED BOOT AXIOM
 
-`SpecKernelvec.kernelvec_handler_spec_body` now takes `⌜length γs = NPROC⌝` and
-the PERSISTENT `devintr_caps γu γv γtx γdk γtl γs pd pav pu`, and it must: the
+`SpecKernelvec.kernelvec_handler_spec_body` takes `⌜length γs = NPROC⌝` and the
+PERSISTENT `devintr_caps γu γv γtx γdk γtl γs pd pav pu`, and it must: the
 contract is a `□`, kerneltrap's cone (devintr → uartintr / virtio_disk_intr /
 clockintr) needs those credentials, and everything else it needs per trap rides
 in the bundle.  **While kerneltrap was an axiom nobody ever had to produce
-them**, and that is the whole of what is now red.
+them.**  Two problems came out of that, and only one of them was bookkeeping.
 
-Two separate problems, and only the first is bookkeeping:
+**FIXED — the ordering.**  `main` used to fold `intr_res` the instant
+trapinithart writes stvec, but the disk lock does not exist until
+virtio_disk_init, three groups further on.  `mn_grp_trap` now hands out the
+WRITTEN `stvec ↦ᵣ kernelvec` cell and the SIE ghost quarter instead, both ride
+raw to the chain's tail, and `intr_res` is folded there — next to the
+`trap_csrs_of_raw` that was already waiting to be completed.  The secondary
+arm needed only two more premises on `ms_inithart_sched` (the disk lock and
+`disk_geom`, both out of the `started` deposit, both persistent).
 
-1. **ORDERING (bookkeeping).**  `main` folds `intr_res` the instant
-   trapinithart writes stvec (`ProofMain:946`, `mn_grp_trap`'s continuation),
-   but the disk lock does not exist until virtio_disk_init.  Fix: have
-   `mn_grp_trap` hand out the RAW `stvec ↦ᵣ kernelvec` cell + the SIE quarter
-   instead of `intr_res`, frame both across `mn_grp_fs` (whose continuation
-   delivers `is_lock γk d_lock …` and `disk_geom`), and fold `intr_res` in the
-   top-level chain just before `mn_grp_started`.  `trap_csrs_raw` /
-   `trap_csrs_of_raw` already exist for exactly this.
-2. **THREE CREDENTIALS THE BOOT CHAIN DOES NOT MINT AT ALL.**  Of
-   `devintr_caps`' eight members main has five in hand at that point
-   (`dev_inv`, `procs_inv`, `panic_wp_any`, the disk `is_lock`, `disk_geom`).
-   **`is_txlock γtx γu`, `timer_cap` and `tick_keeper γtl γs` appear NOWHERE in
-   `SpecMain` / `ProofMain` / `SpecMainSecondary` / `ProofMainSecondary` /
-   `BootBridge`** (checked by grep).  `timer_cap` is `sstc_enabled ∗
-   stimecmp_inv` (`TimerCap.timer_cap_intro` needs the mcounteren + stimecmp
-   cells and an allocation); `tick_keeper` is `SpecClockintr`'s hart-indexed
-   disjunction; `is_txlock` is uartinit's.  **The cheap and honest move is to
-   make them PREMISES of `SpecMain` (and of the `started` deposit, for the
-   secondary arm) — which costs nothing today, because nothing consumes
-   `SpecMain` yet** (main-boot.md: "what remains is the whole-system adequacy
-   composition").  Minting them for real belongs to that composition, beside
-   the time-0 device invariants it already has to mint.
+**ASSUMED — three credentials the boot chain does not mint at all.**
+`is_txlock γtx γu`, `timer_cap` and `tick_keeper γtl γs` appear nowhere in
+`SpecMain` / `ProofMain` / `SpecMainSecondary` / `ProofMainSecondary` /
+`BootBridge`.  They are now `SpecBootDevCaps.boot_dev_caps_body`, a functor
+parameter of both main proofs, supplied by an `Axiom` in `LinkBootDevCaps.v`.
+`main`'s ledger is therefore `boot_dev_caps` + the three sanctioned assumed
+contracts (userinit, printk-general, consoleintr) + funext + the platform
+axioms; **`kernelvec_handler_spec`'s own ledger stays clean** (5 platform
+axioms + funext + consoleintr).
 
-**Do NOT paper over this with an axiom.**  The point of the whole slice was to
-retire one; the assumption ledger of `kernelvec_handler_spec` is now clean and
-the two red files are an honest statement of what boot owes.
+**HOW TO DISCHARGE IT** — the next task in this cone, and none of it is
+interrupt work:
+
+- `timer_cap` = `sstc_enabled ∗ stimecmp_inv` (`TimerCap.timer_cap_intro`
+  takes the `mcounteren` and `stimecmp` cells and allocates the invariant).
+  Both cells exist on the M-mode side; the question is whether
+  `BootBridge`/`SpecEntry`'s post hands them to S-mode or drops them.  Start
+  there: if they are dropped, that post gains two conjuncts and the
+  allocation happens in main's kvm group.
+- `tick_keeper γtl γs` is `SpecClockintr`'s hart-indexed disjunction, and its
+  cheap arm is `⌜tick_hart = false⌝` — so a hart that is not the tick hart
+  needs NOTHING.  The tick hart's arm needs `is_tickslock γtl` (main's
+  `mn_grp_trap` already holds `lk_raw tickslock` and could keep the lock it
+  makes) plus the ticks ghost.  This is the one of the three that is likely
+  provable today with no interface change.
+- `is_txlock γtx γu` is uartinit's: `mn_grp_printk`'s console-init group
+  creates the tx lock and does not thread it out.  Widen its continuation.
+
+The right order is `tick_keeper` (probably free) → `is_txlock` (thread one
+lock out of one group) → `timer_cap` (may move a boot-bridge conjunct).  Each
+shrinks the axiom rather than replacing it, so land them one at a time: the
+axiom's statement is a three-way `∗`, and each conjunct can be deleted from it
+independently.
 
 ### Two rules this decomposition earned
 

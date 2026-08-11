@@ -82,6 +82,7 @@ Require Import SpecKinit SpecKvminit SpecKvminithart SpecProcinit.
 Require Import SpecTrapinit SpecTrapinithart SpecPlicinit SpecPlicinithart.
 Require Import SpecBinit SpecIinit SpecFileinit SpecVirtioDiskInit.
 Require Import SpecUserinit SpecScheduler SpecKernelvec SpecFreerange.
+Require Import SpecBootDevCaps SpecDevintr.
 Require Import KMap.
 Require Import SpecMain.
 Require Import CodeMain.
@@ -146,6 +147,7 @@ Module MainProof
   (Plicinithart : PLICINITHART) (Binit : BINIT) (Iinit : IINIT)
   (Fileinit : FILEINIT) (VirtioDiskInit : VIRTIODISKINIT)
   (Userinit : USERINIT) (Scheduler : SCHEDULER) (Kernelvec : KERNELVEC)
+  (BootDevCaps : BOOT_DEV_CAPS)
   : MAIN.
 
 Section ProofMain.
@@ -880,10 +882,18 @@ Section ProofMain.
     lk_raw (mword_of_int KernelSyms.tickslock) -∗
     (∃ v : mword 64, stvec ↦ᵣ v) -∗
     ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
+    (* IT HANDS OUT THE WRITTEN CELL AND THE GHOST QUARTER, NOT [intr_res],
+       and that is an ORDERING fact about main rather than a preference: the
+       handler contract closes over [devintr_caps] (SpecKernelvec.v), whose
+       disk lock does not exist until virtio_disk_init -- three groups further
+       on.  So the two pieces ride raw to the chain's tail, which is where
+       [intr_res] is folded and where [trap_csrs_raw] was already waiting to
+       be completed. *)
     ( ∀ (m' : regfile),
         sie_cap_gpr m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x8e) : mword 64) -∗
-        intr_res -∗
+        stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) -∗
+        ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -942,18 +952,9 @@ Section ProofMain.
                      = (mword_of_int (KernelSyms.main + 0x86) : mword 64)).
     { rewrite /T2 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretth) in "Hpc".
-    (* ---- THE INSTALLED-HANDLER RESOURCE: kernelvec is now in stvec, so the
-           handler contract is available and the SIE ghost's spare quarter
-           joins the cell to make [intr_res] (main is its only producer).
-           This was an [inv_alloc] under an [fupd_wp]; owning the resource
-           makes it a plain [iDestruct], and the contract rides ATTACHED to
-           the cell rather than behind a ghost-guarded implication. ---- *)
-    iDestruct (mn_dup_hw with "Hcg") as "(#Hhw & #Hmin & Hcg)".
-    iPoseProof (Kernelvec.kernelvec_handler_spec with "Hhw Hmin Htext") as "#Hkvs".
-    iDestruct (intr_res_intro (mword_of_int KernelSyms.kernelvec : mword 64) _
-                 kernelvec_tv_direct kernelvec_stvec_base with "Hq Hstvec []")
-      as "Hintr".
-    { iApply bi.later_intro. iExact "Hkvs". }
+    (* trapinithart has written kernelvec into stvec; the cell and the SIE
+       ghost's spare quarter ride on to the chain's tail, where the handler
+       contract's credentials are finally all in hand. *)
     (* ---- +0x86 jal plicinit ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x86)) (mword_of_int 1 : mword 5)
               (mword_of_int 17802 : mword 21) mth n false
@@ -1004,7 +1005,7 @@ Section ProofMain.
                      = (mword_of_int (KernelSyms.main + 0x8e) : mword 64)).
     { rewrite /T4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretph) in "Hpc".
-    iApply ("Hcont" $! mph with "Hcg Hpc Hintr").
+    iApply ("Hcont" $! mph with "Hcg Hpc Hstvec Hq").
   Qed.
 
   (* =================================================================== *)
@@ -1461,7 +1462,7 @@ Section ProofMain.
     (* --- 0x7e .. 0x8a : trap / plic, and the interrupt invariant --- *)
     iApply (mn_grp_trap γd γv m3 (K - 2)%nat p0 Hn50 Hcid
               with "Hcg Htext Hkdata Hdev Hpc Hltick Hstvec Hq").
-    iIntros (m4) "Hcg Hpc Hintr".
+    iIntros (m4) "Hcg Hpc Hstvec Hq".
     (* --- 0x8e .. 0x9e : binit / iinit / fileinit / virtio_disk_init /
            userinit, and the disk lock --- *)
     iApply (mn_grp_fs γa γs γv γd m4 (K - 2)%nat p0 ps c0 free0
@@ -1470,6 +1471,26 @@ Section ProofMain.
                     Hbufn Hbhead Hlit Hinl Hlft Hldisk Hdiskptr Hdiskfree
                     Hdusedidx Hdslots Hclaim Hdone Hcfg Hinitproc").
     iIntros (γk pd pav pu m5) "Hcg Hpc Hcpu #Hdlock #Hgeom".
+    (* ---- THE INSTALLED-HANDLER RESOURCE, folded HERE and not earlier: the
+           handler contract closes over [devintr_caps], and its disk lock and
+           geometry are exactly what the group above just produced.  Five of
+           the eight members are in hand ([dev_inv], [procs_inv],
+           [panic_wp_any], the lock, the geometry); the other three are
+           [LinkBootDevCaps]' one assumed boot interface -- see that file for
+           why they are missing and where they belong. ---- *)
+    iDestruct (procs_inv_len with "Hpinv") as %Hnproc.
+    iPoseProof (BootDevCaps.boot_dev_caps γd γs) as "Hbdc".
+    iDestruct "Hbdc" as (γtx γtl) "(#Htxl & #Htimc & #Htick)".
+    iAssert (devintr_caps γd γv γtx γk γtl γs pd pav pu) as "#Hcaps".
+    { rewrite /devintr_caps.
+      iFrame "Hdev Htxl Hgeom Hdlock Htimc Htick Hpinv Hpany". }
+    iDestruct (mn_dup_hw with "Hcg") as "(#Hhw & #Hmin & Hcg)".
+    iPoseProof (Kernelvec.kernelvec_handler_spec γd γv γtx γk γtl γs pd pav pu
+                  Hnproc with "Hhw Hmin Htext Hcaps") as "#Hkvs".
+    iDestruct (intr_res_intro (mword_of_int KernelSyms.kernelvec : mword 64) _
+                 kernelvec_tv_direct kernelvec_stvec_base with "Hq Hstvec []")
+      as "Hintr".
+    { iApply bi.later_intro. iExact "Hkvs". }
     (* --- 0xa2 .. the join : the deposit and the scheduler --- *)
     iApply (mn_grp_started γpr γk γa γs γd γv m5 (K - 2)%nat p0 pd pav pu
               root pas P ltac:(lia) Hp0
