@@ -59,7 +59,7 @@ From iris.base_logic.lib Require Import iprop own.
 From iris.bi Require Import monpred.
 From iris.proofmode Require Import proofmode monpred.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.Operators_mwords.
-Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RegFile.
 Require Import RiscvFetchExec InstrBytes WpGpr WpMmodeLeafBase.
 Require Import WeakMem WeakInterp WeakLang WeakView WeakVProp WeakGhost.
@@ -274,6 +274,340 @@ Section leafo.
     iIntros "Hrun Hpcf Hpc Hfile #Hi Hcont".
     iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
     iApply (wwp_addi_o pc is_rvc rs1 rd imm m pmpcfg0 q Hgid Hpmp Hnz
+              with "Hmm Hpcf Hpc Hfile Hi Hview").
+    iIntros "Hmm Hpcf Hpc Hfile Hview".
+    iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hfile").
+    iApply (whart_run_close with "Hmm Hview").
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (** ** 5. The rest of the register-only ALU family.
+
+      Five instructions, two wrappers each, and the template above filled in
+      literally: the ONLY per-instruction text is the binder list, the AST,
+      the post-state [gpr_file] expression and the pc bump.  These five are
+      stated at a fixed encoding for the reason [WeakLeafM] §6 records --
+      their leaves cover one encoding each -- so [if is_rvc then 2 else 4]
+      becomes the constant the leaf proves. *)
+
+  (** *** 5a. [c.or] *)
+  Lemma wwp_or_rvc_o (pc : SailStdpp.Values.mword 64)
+      (rs2 rs1 rd : mword 5) (m : regfile)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    winstr_m pc true (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)) -∗
+    hart_view cpu_id -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd :=
+                  regval_into_reg (or_vec (m !!! Regidx rs1)
+                                     (m !!! Regidx rs2))]> m) -∗
+      hart_view cpu_id -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf Hpc Hfile #Hi [%ws [Hws Hauth]] Hcont".
+    iAssert (vwp_hold (⌜True⌝ : vProp Σ) ws) as "HF".
+    { rewrite vwp_hold_pure. done. }
+    iApply (wwp_or_rvc pc rs2 rs1 rd m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
+              Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
+    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
+  Qed.
+
+  Lemma wwp_or_rvc_run (pc : SailStdpp.Values.mword 64)
+      (rs2 rs1 rd : mword 5) (m : regfile)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    whart_run q -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    winstr_m pc true (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)) -∗
+    ( whart_run q -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd :=
+                  regval_into_reg (or_vec (m !!! Regidx rs1)
+                                     (m !!! Regidx rs2))]> m) -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hrun Hpcf Hpc Hfile #Hi Hcont".
+    iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
+    iApply (wwp_or_rvc_o pc rs2 rs1 rd m pmpcfg0 q Hgid Hpmp Hnz
+              with "Hmm Hpcf Hpc Hfile Hi Hview").
+    iIntros "Hmm Hpcf Hpc Hfile Hview".
+    iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hfile").
+    iApply (whart_run_close with "Hmm Hview").
+  Qed.
+
+  (** *** 5b. [c.add] / [c.mv] *)
+  Lemma wwp_add_rvc_o (pc : SailStdpp.Values.mword 64)
+      (rs2 rs1 rd : mword 5) (m : regfile)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    winstr_m pc true (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)) -∗
+    hart_view cpu_id -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd :=
+                  regval_into_reg (add_vec (m !!! Regidx rs1)
+                                     (m !!! Regidx rs2))]> m) -∗
+      hart_view cpu_id -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf Hpc Hfile #Hi [%ws [Hws Hauth]] Hcont".
+    iAssert (vwp_hold (⌜True⌝ : vProp Σ) ws) as "HF".
+    { rewrite vwp_hold_pure. done. }
+    iApply (wwp_add_rvc pc rs2 rs1 rd m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
+              Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
+    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
+  Qed.
+
+  Lemma wwp_add_rvc_run (pc : SailStdpp.Values.mword 64)
+      (rs2 rs1 rd : mword 5) (m : regfile)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    whart_run q -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    winstr_m pc true (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)) -∗
+    ( whart_run q -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd :=
+                  regval_into_reg (add_vec (m !!! Regidx rs1)
+                                     (m !!! Regidx rs2))]> m) -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hrun Hpcf Hpc Hfile #Hi Hcont".
+    iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
+    iApply (wwp_add_rvc_o pc rs2 rs1 rd m pmpcfg0 q Hgid Hpmp Hnz
+              with "Hmm Hpcf Hpc Hfile Hi Hview").
+    iIntros "Hmm Hpcf Hpc Hfile Hview".
+    iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hfile").
+    iApply (whart_run_close with "Hmm Hview").
+  Qed.
+
+  (** *** 5c. [c.slli] *)
+  Lemma wwp_slli_rvc_o (pc : SailStdpp.Values.mword 64)
+      (rs1 rd : mword 5) (shamt : mword 6) (m : regfile)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    winstr_m pc true (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI)) -∗
+    hart_view cpu_id -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd :=
+                  regval_into_reg (shift_bits_left (m !!! Regidx rs1)
+                    (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))]> m) -∗
+      hart_view cpu_id -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf Hpc Hfile #Hi [%ws [Hws Hauth]] Hcont".
+    iAssert (vwp_hold (⌜True⌝ : vProp Σ) ws) as "HF".
+    { rewrite vwp_hold_pure. done. }
+    iApply (wwp_slli_rvc pc rs1 rd shamt m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
+              Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
+    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
+  Qed.
+
+  Lemma wwp_slli_rvc_run (pc : SailStdpp.Values.mword 64)
+      (rs1 rd : mword 5) (shamt : mword 6) (m : regfile)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    whart_run q -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    winstr_m pc true (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI)) -∗
+    ( whart_run q -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd :=
+                  regval_into_reg (shift_bits_left (m !!! Regidx rs1)
+                    (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))]> m) -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hrun Hpcf Hpc Hfile #Hi Hcont".
+    iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
+    iApply (wwp_slli_rvc_o pc rs1 rd shamt m pmpcfg0 q Hgid Hpmp Hnz
+              with "Hmm Hpcf Hpc Hfile Hi Hview").
+    iIntros "Hmm Hpcf Hpc Hfile Hview".
+    iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hfile").
+    iApply (whart_run_close with "Hmm Hview").
+  Qed.
+
+  (** *** 5d. [c.addiw] *)
+  Lemma wwp_addiw_rvc_o (pc : SailStdpp.Values.mword 64)
+      (rs1 rd : mword 5) (immv : mword 12) (m : regfile)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    winstr_m pc true (ADDIW (immv, Regidx rs1, Regidx rd)) -∗
+    hart_view cpu_id -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd :=
+                  regval_into_reg (sign_extend' 64
+                    (subrange_vec_dec
+                       (add_vec (m !!! Regidx rs1)
+                          (sign_extend' 64 immv)) 31 0))]> m) -∗
+      hart_view cpu_id -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf Hpc Hfile #Hi [%ws [Hws Hauth]] Hcont".
+    iAssert (vwp_hold (⌜True⌝ : vProp Σ) ws) as "HF".
+    { rewrite vwp_hold_pure. done. }
+    iApply (wwp_addiw_rvc pc rs1 rd immv m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
+              Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
+    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
+  Qed.
+
+  Lemma wwp_addiw_rvc_run (pc : SailStdpp.Values.mword 64)
+      (rs1 rd : mword 5) (immv : mword 12) (m : regfile)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    whart_run q -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    winstr_m pc true (ADDIW (immv, Regidx rs1, Regidx rd)) -∗
+    ( whart_run q -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd :=
+                  regval_into_reg (sign_extend' 64
+                    (subrange_vec_dec
+                       (add_vec (m !!! Regidx rs1)
+                          (sign_extend' 64 immv)) 31 0))]> m) -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hrun Hpcf Hpc Hfile #Hi Hcont".
+    iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
+    iApply (wwp_addiw_rvc_o pc rs1 rd immv m pmpcfg0 q Hgid Hpmp Hnz
+              with "Hmm Hpcf Hpc Hfile Hi Hview").
+    iIntros "Hmm Hpcf Hpc Hfile Hview".
+    iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hfile").
+    iApply (whart_run_close with "Hmm Hview").
+  Qed.
+
+  (** *** 5e. [ori] -- the uncompressed one, so the bump is 4. *)
+  Lemma wwp_ori_o (pc : SailStdpp.Values.mword 64)
+      (rs1 rd : mword 5) (imm : mword 12) (m : regfile)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    winstr_m pc false (ITYPE (imm, Regidx rs1, Regidx rd, ORI)) -∗
+    hart_view cpu_id -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file (<[Regidx rd :=
+                  regval_into_reg (or_vec (m !!! Regidx rs1)
+                                     (sign_extend' 64 imm))]> m) -∗
+      hart_view cpu_id -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf Hpc Hfile #Hi [%ws [Hws Hauth]] Hcont".
+    iAssert (vwp_hold (⌜True⌝ : vProp Σ) ws) as "HF".
+    { rewrite vwp_hold_pure. done. }
+    iApply (wwp_ori pc rs1 rd imm m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
+              Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
+    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
+  Qed.
+
+  Lemma wwp_ori_run (pc : SailStdpp.Values.mword 64)
+      (rs1 rd : mword 5) (imm : mword 12) (m : regfile)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    whart_run q -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    winstr_m pc false (ITYPE (imm, Regidx rs1, Regidx rd, ORI)) -∗
+    ( whart_run q -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file (<[Regidx rd :=
+                  regval_into_reg (or_vec (m !!! Regidx rs1)
+                                     (sign_extend' 64 imm))]> m) -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hrun Hpcf Hpc Hfile #Hi Hcont".
+    iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
+    iApply (wwp_ori_o pc rs1 rd imm m pmpcfg0 q Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hfile Hi Hview").
     iIntros "Hmm Hpcf Hpc Hfile Hview".
     iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hfile").
