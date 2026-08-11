@@ -1000,3 +1000,5 @@ CodeUsertrap.v
 SpecSyscall.v
 LinkSyscall.v
 SpecIalloc.v
+ProofIalloc.v
+LinkIalloc.v

@@ -2803,3 +2803,144 @@ md5s: `iris/SpecIalloc.v b0651936f9123cc483b294112978a9b0`,
 3. **Do not put `ProofIalloc.v` / `LinkIalloc.v` rows in `_CoqProject`**
    until the five block lemmas are proven — the parked file compiles only
    because of its `cheat_`.
+
+### N5c2 — **ialloc is PROVEN and LINKED**; the frontier is closed
+
+**WHAT LANDED: two files and two `_CoqProject` rows.**  `iris/ProofIalloc.v`
+(3170 lines, md5 `f65cd38f6fb8864a1952539c9f39a6bd`) and
+`iris/LinkIalloc.v` (md5 `f25ffe4009180a57263b0d66bdd717a5`), with their
+rows after the `SpecIalloc.v` row.  The parked WIP
+`claude-notes/projects/fs-namei-ialloc-wip.v` was `git mv`-ed into place and
+is **gone** from `claude-notes/projects/`.  `SpecIalloc.v` did not move: it
+was FROZEN and every one of the five block lemmas fitted it.
+
+`Print Assumptions Ialloc.wp_ialloc_sconf`: **`rv64d.valid_reservation`,
+`rv64d.plat_term_write`, `rv64d.match_reservation`, `rv64d.load_reservation`,
+`rv64d.cancel_reservation`, `FunctionalExtensionality.functional_extensionality_dep`**
+— the five platform axioms plus funext, and nothing else.  As with balloc
+that is *modulo* the THREADED printk obligation the contract carries as a
+pure hypothesis (`LinkIalloc.v`'s header says so out loud).
+
+`python3 tools/lemma_diff.py --ref HEAD`: **CLEAN** (nothing dropped,
+nothing admitted, no new assumption).  No `Admitted`, no `Axiom`, no
+`cheat_` anywhere in `iris/`.
+
+#### The five blocks, and what each cost
+
+| block | offsets | template | rounds |
+|---|---|---|---|
+| `ia_epilogue` | +0x80..+0x86 | `ProofBalloc.ba_epilogue` at 2 pops | first try |
+| `ia_out` | +0x66..+0x7e | `ProofBalloc.ba_out` at 6 pops, then FALL | first try |
+| `ia_claim` | +0x88..+0xba | `ProofIupdate.iu_tail` + `ProofBalloc.ba_bzero` | 4 |
+| `ia_scan` | +0x30..+0x64 | `ProofIupdate`'s bread+slot arithmetic under an `iInduction` | 7 |
+| `wp_ialloc_sconf` | +0x00..+0x2e | `ProofBalloc`'s prologue at an 8-slot frame | 3 |
+
+#### New vocabulary added to the parked file (all proven, all local)
+
+- `ia_cbyte` / `ia_cbyte_zero` — `SpecMemset`'s `cbyte` at `cval = 0`,
+  spelled exactly as the spec body's `let` so the post's big-op **folds**
+  onto it (`ProofBallocParts.ba_cbyte`'s trick, and it really is folding:
+  see surprise 2);
+- `ia_held_L` — `ProofIupdate.iu_held_L` verbatim (a Proof file may not
+  require another Proof file), the machinery half out of the handle;
+- `ia_sext_small`, `ia_srli4` — ialloc divides the **sign-extended 64-bit**
+  inum with `srli`, where iupdate divides the 32-bit one with `srliw`, so
+  `DinodeSlot.iu_srliw4` does not apply;
+- `ia_andi15` — the base-encoding twin of `iu_andi15`'s `c.andi`;
+- `ia_add_vec32_comm` — ialloc's `c.addw a1,a5` sums `(inum/16) +
+  inodestart`, `iu_addw_ibl` is stated the other way round;
+- `ia_sext64_16_inj` / `ia_type_zero` / `ia_type_nonzero` —
+  `ProofIlock.il_type_*` inlined, the `lh`'s zero test both ways;
+- `ia_uint64_moi`, `ia_bgeu_moi`, `ia_bltu_moi` — `ProofBallocParts`'
+  branch predicates, inlined at the two words +0x12 and +0x62 compare.
+
+#### SURPRISES (numbered)
+
+1. **`ia_epilogue` needed a premise the parked statement did not have.**
+   `ia_arms`'s claim arm carries no record, but `ia_cont`'s `alloc` arm
+   wants `fresh_shape dn'`, and `SpecIalloc.ialloc_fresh_shape` is
+   `bv_unsigned ty <> 0 -> ...`.  So **`bv_unsigned ty <> 0` was added to
+   `ia_epilogue` and to `ia_out`** (which reaches the epilogue by falling
+   into it).  Both are `Local Lemma`s and the contract already has the
+   premise, so nothing crossed the frozen interface — but the parked
+   statements were not quite sufficient and a resumer should expect that.
+2. **A `set`-bound abbreviation does NOT fold into proofmode hypotheses.**
+   `set (pdip := pa_add (b_data (bpa kk)) (64 * islot inum))` folded the
+   goal, but every hypothesis produced afterwards by `iDestruct` of a
+   lemma applied at explicit arguments carries the UNFOLDED term, and the
+   next `rewrite -Hx` fails with *"The RHS of Hx `pdip` does not match any
+   subterm of the goal"*.  Inline the term; do not `set` it.
+3. **The memset byte only becomes `bv_0 8` after an explicit FOLD.**
+   `rewrite ia_cbyte_zero` fails on the post's big-op (*"The LHS of
+   ia_cbyte_zero `ia_cbyte` does not match any subterm"*) because the goal
+   carries the spec's `let`-expanded `nth_byte (autocast ...)`.
+   `rewrite -/ia_cbyte ia_cbyte_zero (ia_dzero_bytes i Hlt)` — fold FIRST —
+   is what closes it.  (`ProofBallocParts`' comment "so that the post's
+   big-op folds onto it" is meant literally.)
+4. **`cpu_own_transport`'s source hart is the LAST one that produced the
+   resource, not the block's entry hart.**  After a callee returns,
+   `cpu_own` is re-introduced at the callee's postcondition hart, so the
+   next transport must start there.  Getting it wrong gives
+   *"iSpecialize: cannot instantiate (cpu_own ... -∗ cpu_own ...) with
+   (cpu_own ...)"* — the two sides print IDENTICALLY, because the hart is
+   an implicit argument.
+5. **Inside `ia_scan`'s turn EVERY resource is anchored at `CIDc`, not at
+   the `wp_next`'s `CIDl`.**  The statement binds `CIDc` after `CIDl`, so
+   instance resolution picks `CIDc` for `cpu_own` and for every
+   instruction's own `wp_next` — and there is NO chain from `CIDc` back to
+   `CIDl`.  Two consequences: the block's first transport is
+   `cpu_own_transport CIDc ...` (not `CIDl`), and **the loop re-entry
+   instantiates the induction hypothesis at `CIDl` itself**
+   (`iPoseProof ("IH" $! CIDl with "[%]"); [exact Hql|]`), handing the new
+   turn's anchor over as `CIDc := <the current hart>`.  Instantiating it at
+   the current hart instead fails with *"No applicable tactic"* from
+   `wp_next_chain`, and the reason is not visible in the error.
+6. **`ia_thr8` excludes s1..s6, so it cannot recover them in the
+   prologue.**  `apply HR5thr; iaidx` fails (*"No applicable tactic"*) for
+   `HR5s1 .. HR5s6`; the prologue has to peel the five register updates
+   (`rewrite /R5 upd_ne; ... rewrite /R1 upd_ne; [reflexivity | nz]`)
+   because at that point s1..s6 are still at their entry values by
+   construction, not by the invariant.
+7. **`iInduction fuel as [|fuel] "IH"` works directly on the parked
+   statement** — every hypothesis of `ia_scan` is persistent
+   (`is_itable2`, `itable_inv`, `ic_escrows` included), so the spatial
+   context is empty at `iIntros (fuel)` and the IH is usable at every
+   re-entry.  No auxiliary Coq-level lemma was needed.
+8. **The fuel-0 case is vacuous.**  `Z.to_nat (ninodes - inum) <= 0` with
+   `inum < ninodes` is a contradiction and plain `lia` closes it (Z.to_nat
+   is inside lia's fragment — no zify poisoning here).
+
+#### Build evidence (EC2 mirror, git-synced at `a87fac99`)
+
+Single-file, with the mirror's `~/one.sh` (`coqc -time -R . xv6iris
+-R ../model-xv6iris Riscv -R ../kernel-rocq Kernel -w -notation-overridden`):
+`ProofIalloc.v` **RC=0**, `LinkIalloc.v` **RC=0**.  `iris/_CoqProject` was
+**not** scp'd (N5c surprise 1).  Mirror scratch (`ProofIalloc.*`,
+`LinkIalloc.*`, `IaChk.*`, `/tmp/one.log`) deleted at the end; the mirror's
+working tree was left clean.  No full gate was run — the campaign's final
+gate is the coordinator's.
+
+md5s: `iris/ProofIalloc.v f65cd38f6fb8864a1952539c9f39a6bd`,
+`iris/LinkIalloc.v f25ffe4009180a57263b0d66bdd717a5`.
+
+#### What N5d should know
+
+1. **`SpecIalloc.v` is still FROZEN and now has a real proof behind it.**
+   `SpecFsinit` still owes `1 < ninodes`, `ninodes <= 16 * Z.of_nat nib`,
+   `ninodes < 2 ^ 31`, `icfg_dev = ROOTDEV`, `0 < icfg_nib`, and `ROOTDEV`'s
+   hoist out of `SpecNamex` (N5a item 4).  Nothing about that changed.
+2. **ireclaim can copy `ia_scan` almost line for line.**  Its scan is
+   ialloc's with `lh a4,6(a5)` (nlink) added: same `ia_srli4` /
+   `ia_andi15` / `iu_slli6` / `iu_slot_addr` arithmetic, same
+   `ireg_read_blk` + `ireg_blk_slot` decode, same `sb_ninodes` bound, same
+   `ireg_blocks_ok` premise, same `iInduction`-on-fuel skeleton and the
+   same five surprises above.  `ia_win_acc` is NOT needed (ireclaim never
+   writes a dinode); `DinodeSlot.diblk_slot_acc` is enough, and
+   `ProofIalloc.v`'s +0x4e block shows the borrow/return round trip at an
+   UNCHANGED record (`list_insert_id` closes the give-back).
+3. **The vocabulary listed above is `Local`/section-private to
+   `ProofIalloc.v`.**  A Proof file may not require another Proof file, so
+   ireclaim must re-state the ones it wants — or they should be hoisted
+   into `DinodeSlot.v` first, which is where `iu_srliw4` and friends
+   already live and would be the better home for `ia_srli4`,
+   `ia_andi15`, `ia_add_vec32_comm` and the `ia_type_*` pair.
