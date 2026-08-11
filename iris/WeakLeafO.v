@@ -32,7 +32,25 @@
 
     A caller that wants to USE the frame (do a load out of it) converts at
     that point with [wobj_to_hold], which needs the authority inside
-    [hart_view] — once, where the load is, not once per instruction. *)
+    [hart_view] — once, where the load is, not once per instruction.
+
+    AND THE LAST NAME GOES INTO THE AMBIENT BUNDLE.  [hart_view] itself
+    cannot be hidden by bundling a VALUE — it is exclusive ownership, and
+    somebody has to hand it to whoever updates it.  But it can be hidden by
+    riding in the ambient per-hart bundle a leaf already takes and returns,
+    which is [mmode_config] here and would be [IntrDefs.sie_cap_gpr] for
+    S-mode kernel code.
+
+    ONE OBSTACLE, and it is why [hart_view] is not simply added to
+    [mmode_config]: that bundle is FRACTIONAL ([InstrBytes.mmode_config_split],
+    used at [q/2] by ten files) and [hart_view] is exclusive — a fraction of
+    it could not be updated.  So [whart_run] below wraps rather than
+    extends: it takes the fraction as a parameter and is itself
+    non-fractional.  Leaf proofs that need to split still can; they open the
+    bundle first.
+
+    THE RESULT IS A STEP SITE NAME-FOR-NAME IDENTICAL TO SC's, because the
+    bundle occupies the slot [mmode_config] already occupied. *)
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap.
 From stdpp Require Import bitvector.definitions.
@@ -50,6 +68,23 @@ Require Import WeakViewMono WeakPtOwn WeakPtPub WeakObj WeakLeafM.
 Section leafo.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* ------------------------------------------------------------------ *)
+  (** ** 0. THE AMBIENT BUNDLE.
+
+      [mmode_config] plus this hart's view token.  Non-fractional on
+      purpose (see the header); the [q] is [mmode_config]'s and is threaded
+      exactly as before. *)
+  Definition whart_run (q : Qp) : iProp Σ :=
+    (mmode_config (DfracOwn q) ∗ hart_view cpu_id)%I.
+
+  Lemma whart_run_open q :
+    whart_run q -∗ mmode_config (DfracOwn q) ∗ hart_view cpu_id.
+  Proof. iIntros "$". Qed.
+
+  Lemma whart_run_close q :
+    mmode_config (DfracOwn q) -∗ hart_view cpu_id -∗ whart_run q.
+  Proof. iIntros "H1 H2". iFrame. Qed.
 
   (* ------------------------------------------------------------------ *)
   (** ** 1. THE GENERIC CONVERSION.
@@ -129,6 +164,49 @@ Section leafo.
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
     iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
     iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (** ** 3. The same leaf, against the bundle.
+
+      THIS IS THE ONE TO COMPARE.  Every resource slot is [wp_lui_gpr]'s,
+      and the hart's view rides inside the slot [mmode_config] already
+      occupied — so a caller's step site is SC's, name for name:
+
+        SC     iApply (wp_lui_gpr … with "Hmm HpcfA Hpc Hfile Hi35").
+               iIntros "Hmm HpcfA Hpc Hfile".
+        HERE   iApply (wwp_lui_run … with "Hmm HpcfA Hpc Hfile Hi35").
+               iIntros "Hmm HpcfA Hpc Hfile".
+
+      No [ws], no [ws_le], no frame, no view token.  The only difference
+      left is the lemma's name and that [Hmm] is bound to [whart_run q]
+      rather than [mmode_config (DfracOwn q)]. *)
+  Lemma wwp_lui_run (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
+      (rd : mword 5) (imm : mword 20) (m : regfile)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    whart_run q -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    winstr_m pc is_rvc (UTYPE (imm, Regidx rd, LUI)) -∗
+    ( whart_run q -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+      gpr_file (<[Regidx rd := regval_into_reg (luival imm)]> m) -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hrun Hpcf Hpc Hfile #Hi Hcont".
+    iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
+    iApply (wwp_lui_o pc is_rvc rd imm m pmpcfg0 q Hgid Hpmp Hnz
+              with "Hmm Hpcf Hpc Hfile Hi Hview").
+    iIntros "Hmm Hpcf Hpc Hfile Hview".
+    iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hfile").
+    iApply (whart_run_close with "Hmm Hview").
   Qed.
 
 End leafo.

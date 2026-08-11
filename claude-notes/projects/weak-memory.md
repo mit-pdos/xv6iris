@@ -2768,7 +2768,42 @@ updates it. The only way to delete it is to stop having a client half:
 `hart_ws_update` directly rather than through leaves, so it needs real
 thought rather than a sweep). ~55 sites total.
 
-This is the "expensive route" that was dodged when `hart_view` was built,
-and the bundling trick was right to defer it — but bundling cannot remove
-the last name, and the last name is the requirement. This is now the top of
-the list.
+### SUPERSEDED — the bundle route (user's suggestion, and it is better)
+
+The claim above ("bundling cannot remove the last name") was too narrow. It
+is true that bundling a *value* cannot: `hart_view` is exclusive ownership,
+and somebody must hand it to whoever updates it. But it can ride inside **the
+ambient per-hart bundle a leaf already takes and returns** — occupying a slot
+that already exists — and then the step site is unchanged.
+
+`IntrDefs.sie_cap_gpr` is exactly that bundle for S-mode kernel code
+(`hart_state ↦ᵣ` + `sconf` + `sie_cap` + `gpr_file`), and it is
+non-fractional, so `hart_view cpu_id` can simply be added to it. **Zero
+call-site changes.** No weak file mentions it yet — the port is M-mode so far
+— so this is a design decision to adopt, not a refactor to perform.
+
+**One obstacle, which is why the M-mode bundle could not just be extended.**
+`InstrBytes.mmode_config` *is* fractional (`mmode_config_split`, used at `q/2`
+by ten files) and `hart_view` is exclusive — a fraction of it could not be
+updated. So `WeakLeafO.whart_run` **wraps rather than extends**: it takes the
+fraction as a parameter and is itself non-fractional. Leaf proofs that need to
+split still can; they open the bundle first.
+
+Result — `WeakLeafO.wwp_lui_run`, compiled:
+
+```
+SC     iApply (wp_lui_gpr … with "Hmm HpcfA Hpc Hfile Hi35").
+       iIntros "Hmm HpcfA Hpc Hfile".
+HERE   iApply (wwp_lui_run … with "Hmm HpcfA Hpc Hfile Hi35").
+       iIntros "Hmm HpcfA Hpc Hfile".
+```
+
+Name for name. The only differences left are the lemma's name and that `Hmm`
+is bound to `whart_run q` rather than `mmode_config (DfracOwn q)`.
+
+**So the interp move is no longer required.** It is still the cleaner uniform
+answer — it would additionally delete each leaf's `ws`, `∀ ws'` and
+`⌜ws_le ws ws'⌝`, making leaf *statements* identical to their SC twins rather
+than merely their call sites — but that is now an optional cleanup at ~55
+sites, not the blocking item. The remaining sweep is the other ~19 leaves,
+each `wwp_X_o` + `wwp_X_run`, mechanical.
