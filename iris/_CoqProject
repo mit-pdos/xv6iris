@@ -496,6 +496,8 @@ BioInv.v
 FsBlocks.v
 BlockWords.v
 DinodeEnc.v
+DirentEnc.v
+PathElems.v
 WpSconfSrliw.v
 CodeWriteHead.v
 CodeInstallTrans.v

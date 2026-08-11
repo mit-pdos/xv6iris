@@ -15,20 +15,43 @@ usual near-full rebuild lands with it.
 
 ## The design layers (the §-pass, in progress)
 
-1. **`DirentEnc.v`** — the FOURTH byte vocabulary (after BlockWords'
-   words, DinodeEnc's records, BitmapEnc's bits): `dirent := {de_inum :
-   bv 16; de_name : 14 bytes NUL-padded}`, 16 bytes, 64 per block;
-   `dirent_bytes`/`dirblk_bytes` mirroring diblk's laws (lookup,
-   insert-same/other, length, and the §12.3-style injectivity the
-   region taught us to provide up front). The NAME model: reuse
-   ByteBuf's `bb_cstr`/`bb_nonul` vocabulary (strncmp/safestrcpy's
-   layer) rather than inventing a second string model — namecmp IS
-   strncmp at DIRSIZ and its proven contract should compose directly.
-2. **The path grammar** — namex's loop needs a pure model of
-   skipelem's decomposition (path → element list, the PrintkFmt
-   precedent: a pure model of what the loop consumes is what makes the
-   contract statable). Slashes, empty elements, DIRSIZ truncation,
-   the trailing-name vs parent split (namei vs nameiparent).
+1. **`DirentEnc.v`** — LANDED (N1). The fourth byte vocabulary, mirroring
+   DinodeEnc's law set (lengths, cons, per-record and per-byte lookup,
+   insert-same/other, the `_t` total-lookup twins, zero/replicate, and
+   the §12.3 injectivity family `dirent_bytes_inj`/`dirblk_bytes_inj`).
+   Geometry VERIFIED off the decode, not fs.h: `&de = s0-96`,
+   `&de.name = s0-94` ⇒ inum@0 (2 bytes, read `lhu`), name@2, stride 16
+   (`li s3,16` feeds readi's `n` AND `off += 16`), DIRSIZ 14
+   (`namecmp+0x08 li a2,14`), 64 per block. A FREE slot is
+   `de.inum == 0` (`de_free`).
+   THE NAME MODEL is `cut_nul` (list) / `bname n f` (naming function) —
+   the prefix before the first NUL, capped at n. dirlink calls
+   **strncpy** (`dirlink+0x78`), so a stored name IS NUL-padded
+   (`name_pad`, `de_padded`) and canonical equality determines the bytes
+   (`de_name_faithful`) — that is what makes a `name -> inum` view of a
+   directory well defined. But namex's own buffer is NOT padded, so the
+   bridge is stated without any padding hypothesis: `nc_zero_iff` says
+   "namecmp returned 0" ⟺ `bname 14 f = bname 14 g`, over `nc_stop` /
+   `nc_run` (SpecStrncmp's two `strncmp_res` arms transcribed, minus the
+   returned word — SpecStrncmp is iris-heavy and cannot be imported by a
+   pure leaf). The one step left to the namecmp proof: `mword_of_int
+   (bv_unsigned (f k) - bv_unsigned (g k)) = 0 -> f k = g k`.
+2. **The path grammar** — LANDED (N1) as `PathElems.v`: `skipelem`,
+   `path_elems` (fuel + `path_elems_unfold`, the only law consumers
+   use), `skipelem_decr` (the loop measure), the corner cases, and the
+   `nameiparent_of` (all-but-last + last) split. Read off namex's
+   INLINED loop: the element is `take 14` of the scan but the REST
+   resumes after the FULL element (`skipelem_split` is the master law);
+   the rest also has its leading separators skipped, because skipelem's
+   TRAILING `while (*path=='/')` at namex+0xa4 runs before namex+0xc8's
+   `nameiparent && *path == 0` test — so "no elements left" is literally
+   "the rest is []" for a normalised rest (`path_elems_nil_norm`).
+   Two things the WP proof must expect: namex+0xf8–0x102 re-tests
+   `*path` for `'/'` and NUL and branches to a `len = 0` block that is
+   DEAD (both tests were just decided at +0xe8/+0xf6), and the short
+   branch writes `name[len] = 0` while the `len >= 14` branch writes no
+   terminator at all — `bname_of_buf` / `skipelem_name_view` cover both
+   with one canonical view.
 3. **Directory-inode contracts** — dirlookup/dirlink read and write
    the directory's DATA blocks THROUGH readi/writei's proven contracts
    (xv6's own loops call readi/writei per 16-byte record with kernel
@@ -58,10 +81,9 @@ usual near-full rebuild lands with it.
 
 - **N0** (coordinator): land the staged decode; finish this design
   pass (§-work above); stage-0 scope per function.
-- **N1** (agent): DirentEnc.v + the path grammar (pure layers, no
-  instructions — IcacheBoot's precedent says budget ~100 lines of
-  surprise-free grinding each, but the path grammar's corner cases
-  deserve adversarial review).
+- **N1** (agent): DONE — `DirentEnc.v` + `PathElems.v` (both pure
+  leaves, no `Admitted`, no new assumptions). See layers 1–2 above for
+  what they provide and for the two decode findings that constrain N4.
 - **N2**: stati (46B, trivial — inode_meta → stat struct copy),
   iunlockput (32B, two jals), namecmp (22B, a jal to strncmp).
   Warm-up proofs validating the layers.
