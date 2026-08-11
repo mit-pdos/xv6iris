@@ -46,6 +46,10 @@ Require Import StackOwn.
 Require Import HartTp WpNext.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
+(* [tlb_res_pt_satp_acc]: the satp borrow the csrr-satp leaf takes out of the
+   translation slot's KPT arm.  [IntrDefs] already names [tlb_res_pt], so this
+   adds no edge to the require graph -- only the import. *)
+Require Import KptShare.
 Import Defs.
 
 (* helper copy (Local in WpSmodePtCtl.v) *)
@@ -2294,42 +2298,131 @@ Section WpSconfCsr.
     exact (exec_execute_csrr_sepc_gpr_S rd s Hrd Hpriv HS HC).
   Qed.
 
-  (* ---- csrr rd,satp -- THE FOURTH INSTANCE, and the one that uses the
-     mstatus obligation the other three discard.
+  (* ---- csrr rd,satp -- THE ONE RO READ THAT CANNOT BE AN INSTANCE OF
+     [wp_csrr_ro_s_sconf], and the reason is ownership rather than decode.
 
-     Everything above it is unchanged: same pinned index, same threaded
-     cell, same five lines.  What differs is entirely inside [Hexec] --
-     satp's accessibility is mstatus.TVM = 0 rather than Ext_S, and that
-     bit arrives as the last conjunct of [sconf_ms_facts], which the
-     generic leaf now hands over.  So the premise list here is IDENTICAL
-     to scause's: the caller owes nothing extra, because [sconf] was
-     already carrying the fact.
+     The three instances above thread a cell the ambient bundle does NOT
+     hold: sepc / scause / stval belong to whoever is running with
+     interrupts off.  satp is different -- [IntrDefs.strans_inv] owns it in
+     BOTH arms ([SRegime.bare_inv] at Bare, [KptShare.tlb_res_pt] at KPT),
+     and [strans_inv] is inside [sie_cap], inside [sie_cap_gpr].  So
+     [sie_cap_gpr m n false p ∗ satp ↦ᵣ{dq} v] is not a premise set a caller
+     can be short of; it is one NO caller can hold, and a leaf demanding it
+     is vacuous however carefully it is proved.  (It was: this lemma had
+     that shape until prepare_return tried to call it.)
 
-     THE CELL IS THE SATP POINTS-TO, at an arbitrary fraction -- which is
-     what makes this leaf usable from prepare_return, whose satp share
-     comes out of [KptShare.tlb_res_pt].  Reading pins the value without
-     needing the cell exclusively. ---- *)
-  Lemma wp_csrr_satp_s_sconf
-      (pc : mword 64) (rd : mword 5)
-      (m : regfile) (n : nat) (dq : dfrac) (sp0 : mword 64) :
+     WHAT THE CALLER SUPPLIES INSTEAD IS THE KPT RECEIPT.  [strans_bit
+     strans_bit_kpt] pins the arm at KPT and opens it
+     ([IntrDefs.strans_inv_acc_kpt]); the cell comes out of the
+     [tlb_res_pt] inside ([KptShare.tlb_res_pt_satp_acc]) and goes straight
+     back, so the borrow never escapes this leaf and the bundle handed back
+     is whole.  That also explains why the value is not a parameter: it is
+     whatever the live kernel table's satp says, so it comes back
+     EXISTENTIALLY, carrying the three [satp_rooted] facts the arm knows
+     about it -- which is exactly what a reader of [kernel_satp] wants and
+     strictly more than a bare points-to would give.
+
+     The mstatus obligation the other three discard is used here: satp's
+     accessibility is mstatus.TVM = 0 rather than Ext_S, and that bit is the
+     last conjunct of [sconf_ms_facts], which [sconf] was already
+     carrying. ---- *)
+  Lemma wp_csrr_satp_kpt_s_sconf
+      (pc : mword 64) (rd : mword 5) (m : regfile) (n : nat) :
     uint rd <> 0 ->
     rd_ok rd ->
     sie_cap_gpr m n false p -∗
-    satp ↦ᵣ{dq} sp0 -∗
+    strans_bit strans_bit_kpt -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_satp, zreg, Regidx rd, CSRRS)) -∗
     wp_next false p (fun (CID : CpuId) =>
+      ∀ (sp0 : mword 64) (root : mword 44),
+      ⌜ _get_Satp64_Mode (Mk_Satp64 sp0) = ('b"1000" : mword 4) ⌝ -∗
+      ⌜ zero_extend' 16 (satp_to_asid (autocast (T := mword) sp0 : mword 64))
+          = (mword_of_int 0 : mword 16) ⌝ -∗
+      ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) sp0 : mword 64))
+          = root ⌝ -∗
       sie_cap_gpr (<[Regidx rd := regval_into_reg sp0]> m) n false p -∗
-      satp ↦ᵣ{dq} sp0 -∗
+      strans_bit strans_bit_kpt -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok).
-    iApply (wp_csrr_ro_s_sconf pc csr_satp satp (fun x => x) rd m n dq sp0
-              Hrd Hrdok ltac:(vm_compute; reflexivity)).
-    intros s Hpriv _ _ (_ & _ & _ & _ & _ & _ & _ & _ & _ & HTVM).
-    exact (exec_execute_csrr_satp_gpr_S rd s Hrd Hpriv HTVM).
+    iIntros (Hrd Hrdok) "Hcg Hkptr Hpc Hinstr Hcont".
+    pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
+    pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
+    iApply (wp_instr_s_sconf m n false pc false
+              (CSRReg (csr_satp, zreg, Regidx rd, CSRRS))
+              with "Hcg Hpc Hinstr").
+    iApply wp_next_off_intro.
+    iIntros (sigma Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    (* THE BORROW, taken inside: the receipt pins the arm, the arm's
+       [tlb_res_pt] lends the cell, and both closures are held until the
+       bundle is rebuilt below. *)
+    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct (strans_inv_acc_kpt with "Hkptr Htr") as "(Hkptr & Htrx)".
+    iDestruct "Htrx" as (root) "(Htlb & Htrback)".
+    iDestruct (tlb_res_pt_satp_acc with "Htlb")
+      as (v) "(Hcell & %Hmode & %Hasid & %Hppn & Htlbback)".
+    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
+    iDestruct "Hmsx" as (ms0) "(Hms & Hsie & Hsret & %Hmsf)".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & _ & _ & _ & _ & %HmisaS & %HmisaC & _)".
+    iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
+    iDestruct (reg_valid    with "Hreg Hms")   as %Lms.
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
+    iDestruct (reg_valid    with "Hreg Hcell") as %Lcell.
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg sigma nextPC (add_vec_int pc 4)).
+    assert (Lpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
+      by (unfold s_pc; tmig; exact Lpriv).
+    assert (Lms_spc : register_lookup mstatus s_pc.(sregs) = ms0)
+      by (unfold s_pc; tmig; exact Lms).
+    assert (Lmisa_spc : register_lookup misa s_pc.(sregs) = misa0)
+      by (unfold s_pc; tmig; exact Lmisa).
+    assert (Lcell_spc : register_lookup satp s_pc.(sregs) = v).
+    { unfold s_pc. rewrite irrelevant_register_set;
+        [ exact Lcell | vm_compute; reflexivity ]. }
+    iDestruct (gpr_file_insert_acc (tp_pin m) (Regidx rd) (regval_into_reg v)
+                 with "Hfile") as "[Hrdc Hfins]".
+    rewrite (gpr_pt_nz rd _ Hrd).
+    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg v)
+            with "Hreg Hrdc") as "[Hreg Hrdc]".
+    iDestruct ("Hfins" with "[Hrdc]") as "Hfile".
+    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
+    iModIntro.
+    iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg v)).
+    iSplitR.
+    { iPureIntro. rewrite Hpceq. fold s_pc. rewrite -Lcell_spc.
+      apply (exec_execute_csrr_satp_gpr_S rd s_pc Hrd Lpriv_spc).
+      rewrite Lms_spc.
+      destruct Hmsf as (_ & _ & _ & _ & _ & _ & _ & _ & _ & HTVM). exact HTVM. }
+    iSplitL "Hreg Hmem".
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
+    iIntros "Hhs' Hpc'".
+    assert (Lnpc : register_lookup nextPC
+             (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg v)).(sregs)
+             = add_vec_int pc 4).
+    { unfold s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
+    iEval (rewrite Lnpc) in "Hpc'".
+    (* GIVE THE CELL BACK, innermost closure first, and the bundle is whole
+       again -- the borrow never leaves this proof. *)
+    iDestruct ("Htlbback" with "Hcell") as "Htlb".
+    iDestruct ("Htrback" with "Htlb") as "Htr".
+    assert (Hsp : m !!! Regidx csp_rs1
+                  = <[Regidx rd := regval_into_reg v]> m !!! Regidx csp_rs1)
+      by (symmetry; apply upd_ne; congruence).
+    tp_refold Hrdtp "Hfile".
+    iDestruct (sie_cap_retarget m (<[Regidx rd := regval_into_reg v]> m) n false Hsp
+                 with "[Hstk Htr Harm]") as "Hcap"; [rewrite /sie_cap; iFrame "Hstk Htr Harm"|].
+    iDestruct (sie_cap_gpr_join with
+      "Hhs' [$Hhw $Hminv $Hpriv Hms Hsie Hsret $Hmiex $Hmenvx] Hcap Hfile") as "Hcg".
+    { iExists ms0. iFrame "Hms Hsie Hsret". iPureIntro. exact Hmsf. }
+    iSpecialize ("Hcont" $! cpu_id with "[]"); [iPureIntro; done|].
+    iApply ("Hcont" $! v root with "[%] [%] [%] Hcg Hkptr [$Hpc' $Hnpc]").
+    - exact Hmode.
+    - exact Hasid.
+    - exact Hppn.
   Qed.
 
 End WpSconfCsr.
