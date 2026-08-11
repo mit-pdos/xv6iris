@@ -208,6 +208,25 @@ nothing has to be re-derived.  `wpt_own_load_rule` is `wpt_load_rule` with
 its rebasing side condition and its threaded post-state deleted, which is
 the SC shape verbatim.
 
+**Objective but NOT hart-agnostic.**  `↦o` is tied to a hart — currently an
+explicit `γv : wview_names` parameter, in the real wiring
+`weak_view_name cpu_id`, a `weakGS` field mirroring the existing
+`weak_ws_name : CPU → gname`.  That tie is the mechanism, not an artifact:
+the floor is a fact about one hart's view.
+
+Objectivity makes `⎡↦o⎤` admissible in an invariant, but a whole `↦o` in a
+SHARED invariant is sound and useless — hart B opening it gets
+`coh_lb γ_A a t`, and reading the byte needs `ws_auth γ_A w`, which B does
+not hold.  That is the model being right: B has not synchronised, so B may
+genuinely read stale.  Nothing unsound comes of a mismatched `γv` either;
+`wpt_own_to_wpt` just yields a `vwp_hold` at the wrong hart's state, which no
+leaf can consume.
+
+So: the `wlat_pointsto` element is hart-agnostic and transfers freely; the
+floor is not.  A shared invariant should hold the **element**, with the
+acquire minting the acquiring hart's floor.  Lock CLIENTS — the SC-parity
+case — never see any of this, because within one hart the floor never moves.
+
 **What this costs.**  Soundness now rests on the acquire handing out a
 points-to that already carries the right floor, rather than on a global
 invariant.  That is the same obligation as before, moved: §5.5 and risk §6.3

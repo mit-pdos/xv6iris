@@ -135,8 +135,23 @@ Section ptown_rules.
       fraction and NO timestamp except [t = 0] ([wpt_img]).  This is what
       "everything above the leaves transplants" cashes out to: an objective
       assertion is index-independent, so a function's proof never has to
-      rebase it, never has to name a [wstate], and may put it inside an
-      invariant. *)
+      rebase it and never has to name a [wstate].
+
+      OBJECTIVE BUT NOT HART-AGNOSTIC — the distinction matters and is easy
+      to misread.  Objectivity makes [⎡↦o⎤] admissible in an invariant, but
+      the resource still NAMES A HART, so putting a whole [↦o] in a shared
+      invariant is sound and useless: hart B opening it obtains
+      [coh_lb γ_A a t], and to read the byte B would need [ws_auth γ_A w],
+      which it does not hold — B holds its own.  That is not a defect, it is
+      the model being right: B has not synchronised, so B genuinely may read
+      stale.
+
+      The consequence for protocol design: the [wlat_pointsto] element is
+      hart-agnostic and transfers freely, the floor is not.  A shared
+      invariant should hold the ELEMENT, and the acquire should mint the
+      acquiring hart's floor from its own post-acquire view (§5.5).  None of
+      this is visible to lock CLIENTS, which are the SC-parity case: within
+      one hart the floor never has to move. *)
   Global Instance wpt_own_objective a dq v :
     Objective (⎡ wpt_own γv a dq v ⎤ : vProp Σ).
   Proof. apply _. Qed.
