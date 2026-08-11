@@ -2615,3 +2615,41 @@ the Iris proof already pays for — no separate whole-kernel analysis):
   at all (expected: no — they never read memory).
 - Where the MMIO/ifetch/walker declared assumptions live so
   `proof_coverage.py`/`Print Assumptions` surface them honestly.
+
+### The SC-shaped leaf interface (iris/WeakLeafO.v)
+
+Obligation §5.2, done WITHOUT re-basing `wmstate_interp` — the cheap route,
+and the reason the whole port is not a 28-file rewrite.
+
+`wmstate_interp` holds `wws_auth cpu_id σ.(wm_ws)`, one half of the
+`ghost_var`.  Re-basing it would touch everything.  It is also unnecessary:
+BOTH halves a client needs are already client-side, so the monotone
+authority can be bundled with the client's `hart_ws` half —
+
+    hart_view := ∃ ws, hart_ws cpu_id ws ∗ ws_auth γv ws
+
+The existential is the trick: the value is hidden from the caller but still
+exactly known INSIDE, which is what lets `hart_view` be handed to an
+UNMODIFIED leaf.  Nothing in `WeakGhost`, `WeakInterp`, or any of the twenty
+existing `WeakLeaf*.v` files changes, and the ~48 `hart_ws_update` call
+sites are untouched.
+
+`leaf_hide` is the generic conversion.  Every ws-threading leaf in the tree
+has the shape `Pre -∗ hart_ws cpu_id ws -∗ (∀ ws', ⌜ws_le ws ws'⌝ -∗ Post -∗
+hart_ws cpu_id ws' -∗ WWP Loop) -∗ WWP Loop` with `Pre`/`Post` free of
+`wstate`, so ONE lemma converts all of them; the per-leaf work is bundling
+the curried resources into the `Pre`/`Post` slots.  `wwp_lui_o` is the
+worked instance: no `ws` parameter, no `F` frame, no `∀ ws'`, no `ws_le`,
+`hart_view` in place of `hart_ws` in and out.
+
+REMAINING, and all of it mechanical or contained:
+
+1. The other ~19 leaf wrappers — `leaf_hide` plus bundling, no new content.
+2. Convert the three chains (`WkEntryNew`, `WkTimerinit`, `WkStartNew`) to
+   the `_o` leaves, then MEASURE against the SC twins.  This is the number
+   the whole effort is for and it has NOT been taken yet.
+3. Make `γv` implicit: `weak_view_name : CPU -> wview_names` as a `weakGS`
+   field plus one per-hart allocation in `WeakAdequacy` (the only site that
+   builds a `weakGS`, line 157).  This changes the initial resource the boot
+   composition receives, which is why it was not done here.  It is a rename,
+   not a reproof.
