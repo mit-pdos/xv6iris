@@ -524,9 +524,13 @@ Section KforkB4Proof.
     (* ------------------------------------------------------------- *)
     (* THE safestrcpy CALL.                                           *)
     (* ------------------------------------------------------------- *)
-    iApply (SS.wp_safestrcpy_sconf M6 16%nat (kfk_name_fn (pv_name Vp)) (kfk_name_fn (pv_name Vc2))
+    (* [ns := n = 16]: kfork owns all sixteen bytes of [p->name], so the
+       source-ownership premise is [ssc_src_ok]'s first (budget) disjunct. *)
+    iApply (SS.wp_safestrcpy_sconf M6 16%nat 16%nat
+              (kfk_name_fn (pv_name Vp)) (kfk_name_fn (pv_name Vc2))
               (rsv + (K - 8))%nat (DfracOwn 1) false pme
               ltac:(etransitivity; [exact (kfk_b4_stack_ss K HK) | lia]) HM6a2' Hn31
+              (SpecSafestrcpy.ssc_src_ok_full _ _)
               with "Hcg Htext Hpc HnmPseq HnmCseq [-]").
     iApply wp_next_off_intro.
     iIntros (mr2 h) "Hcg Hpc HnmPseq' HnmCseq' %Hcs_ss %Ha0_ss %Hpostdisj".

@@ -20,12 +20,31 @@
    a generic dfrac.  The only callee is the no-alloc walk, so there is no
    kalloc environment and no [cpu_own].
 
-   THE FAILURE ARM CARRIES NO INFORMATION, deliberately: [va >= MAXVA],
-   "the walk did not reach a slot", "the slot is not a valid user leaf" and
-   "the slot is zero" are four different reasons for the same answer 0, and
-   every caller (copyin / copyout / copyinstr) reacts to 0 the same way --
-   by faulting the page in, or giving up.  Adding the case split would buy
-   nothing and would have to be threaded through both loops.
+   THE FAILURE ARM CARRIES ITS REASON, and it has to.  [va >= MAXVA], "the
+   walk did not reach a slot", "the slot is zero" and "the slot is not a
+   valid USER leaf" collapse to the same answer 0, and for a long time no
+   caller cared: copyin / copyout / copyinstr all react to 0 the same way,
+   by faulting the page in or giving up, so the arm was stated as a bare
+   [a0 = 0] and the header recorded the case split as buying nothing.
+
+   IT BUYS EXACTLY ONE THING, and it turns out to be load-bearing: a caller
+   that KNOWS the leaf is there and is a user leaf can REFUTE the arm.
+   Without the reason it cannot -- a bare [a0 = 0] is permitted
+   unconditionally, so no amount of knowledge about the map rules the
+   branch out, and the fault path stays alive in the proof even where it is
+   dead in the machine.  That is what generalised copyout needs (see
+   [SpecCopyout.co_license]): on a table that is not the running process's
+   there are no [p->sz] / [p->pagetable] cells to give vmfault, so the call
+   must be shown UNREACHABLE, and this disjunction is what shows it.
+
+   The three reasons are exactly the three tests the machine performs, in
+   order, and each is a fact the caller can contradict on its own terms.
+   Note the third is [~ pte_vu w], not [~ pte_valid w]: the compiler merged
+   the V and U tests into one [andi a3,a5,17], so a leaf that is present and
+   valid but has U CLEARED fails here -- which is not a hypothetical, it is
+   precisely a [uvmclear]'d guard page ([ProcPtOwn.proc_pt_wf_clear_u] keeps
+   such an entry in [ud_um]).  A caller whose premise is only "the map has an
+   entry" has not ruled this out.
 
    THE SUCCESS ARM is what makes the answer usable: the returned address is
    the base of the page the map's leaf at this vpn names, that leaf passes
@@ -78,7 +97,10 @@ Definition wp_walkaddr_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID 
     pc_is ret_tgt -∗
     ptree_own 2 dq t -∗
     ⌜callee_saved mm mr⌝ -∗
-    ⌜ mr !!! Regidx (mword_of_int 10) = mword_of_int 0
+    ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0 /\
+       ((2 ^ 38 <= uint va)%Z
+        \/ m !! vpn = None
+        \/ (exists w, m !! vpn = Some w /\ ~ pte_vu w)))
       \/ (exists w, m !! vpn = Some w /\ pte_vu w /\
             (uint va < 2 ^ 38)%Z /\
             mr !!! Regidx (mword_of_int 10) = page_base (pte_ppn w)) ⌝ -∗

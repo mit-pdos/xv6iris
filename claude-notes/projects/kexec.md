@@ -23,6 +23,9 @@ kexec-specific is the *composition*.
 | `ElfEnc.v` — the ELF byte vocabulary | **landed** |
 | `ProcInv.proc_priv_newspace` / `proc_priv_name` / `upd_name` / `upd_exec` | **landed** |
 | `SpecKexec.v` — the contract | **landed** |
+| `SpecCopyout` generalized (`COPYOUT_GEN` + `co_license`) | **landed, proven** |
+| `SpecSafestrcpy` source relaxed (`ssc_src_ok`) | **landed, proven** |
+| `SpecWalkaddr` failure arm made informative | **landed, proven** |
 | `ProofKexec*.v` | NOT STARTED |
 
 `exec.c` is 1/2 functions, 32/892 bytes. `Print Assumptions
@@ -141,49 +144,114 @@ but it buys nothing while the contents are existential anyway.
 `procdump`, which `design/proc-struct.md` already records as unprovable as
 written.
 
-## THE THREE UPSTREAM SPEC CHANGES kexec IS BLOCKED ON
+## THE THREE UPSTREAM SPEC CHANGES — TWO DONE, ONE OPEN
 
 None of these is kexec's own design going wrong; each is a callee contract
-that was stated for the callers it had. All three were found by trying to
-compose them, and each has a recorded fix.
+that was stated for the callers it had, and all three were found by trying to
+compose them. **§1 (copyout) and §2 (safestrcpy) are FIXED and the tree is
+green; §3 (the log budget) is open** and belongs to the fs-namei project.
 
-### 1. `SpecCopyout` assumes the destination table is the RUNNING process's
+### 1. `SpecCopyout` assumed the destination table is the RUNNING process's — **FIXED**
 
-`wp_copyout_sconf_body` demands `p_pagetable p ↦₈{dqp} page_base P.(ud_root)`
-and `p_sz p ↦₈{dqs} szv`. That is not decoration: copyout calls `vmfault`,
+`wp_copyout_sconf_body` demanded `p_pagetable p ↦₈{dqp} page_base P.(ud_root)`
+and `p_sz p ↦₈{dqs} szv`. That was not decoration: copyout calls `vmfault`,
 and `vmfault` reads `p->sz` for its bound check and maps into **`p->pagetable`
 — not the table it was passed** (kernel/vm.c). kexec copies into a table that
-is not installed yet, so the premise is unpayable.
+is not installed yet, so the premise was unpayable.
 
-*The fix*: a second contract for the case the destination range is **already
-mapped**, where the `walkaddr` in copyout's loop always succeeds, the
-`vmfault` call is dead, and the process is not mentioned at all — no `p_sz`,
-no `p_pagetable`, and `P' = P` in the post (copyout maps nothing). kexec is
-exactly that caller: its stack pages were `uvmalloc`'d three instructions
-earlier. This is strictly the cleaner statement of what copyout does, and it
-is what the guiding principle asks for. Cost: re-prove `ProofCopyout`'s loop
-under a "range mapped" invariant; the arms are refuted, not re-derived.
+`SpecCopyout.co_license` is now that dependence as a resource, and
+`COPYOUT_GEN` is the contract over it; `COPYOUT` is `COPYOUT_GEN` at
+`arm := true`, derived, so all five existing callers (either_copyout,
+piperead, kwait, readi, sys_pipe) are untouched.
+
+Three things this cost that were not in the original plan, and all three are
+the reusable part:
+
+- **`co_license` is INDEXED BY A BOOLEAN, not a disjunction, and that is
+  forced.** The license appears in the *postcondition* too. With a bare
+  `A ∨ B`, a caller who hands in `A` gets back `A ∨ B` and cannot recover its
+  own cells — nothing refutes `B`, because `B` is pure. The "general"
+  contract would then be strictly *weaker* than the one it replaced, and
+  `COPYOUT` would not be an instance of it. **When a resource appears on both
+  sides of a contract, a disjunction in it is not a generalization, it is a
+  loss — index the choice instead.**
+- **"the map has an entry here" is the WRONG mapped-arm condition; it needs
+  `pte_vu`.** walkaddr's test is the merged V&U one (`andi a3,a5,17`), so an
+  entry that is present and valid but has U cleared *still* sends copyout to
+  vmfault. Such entries are not hypothetical: `ProcPtOwn.proc_pt_wf_clear_u`
+  keeps a `uvmclear`'d page in `ud_um` with U gone — which is **exec's own
+  stack guard page**, created one instruction before the copies. The first
+  draft of `co_mapped` omitted `pte_vu` and was therefore false of the machine
+  at precisely the page this project creates.
+- **`SpecWalkaddr`'s failure arm had to start carrying its reason.** It was a
+  bare `a0 = 0`, deliberately information-free ("four reasons, one answer, no
+  caller cares"). A bare `a0 = 0` is permitted *unconditionally*, so no amount
+  of knowledge about the map refutes the branch, and the vmfault call stays
+  alive in the proof even where it is dead in the machine. The arm now
+  reports which of the three tests failed (`2^38 <= va`, `m !! vpn = None`,
+  or `∃ w, m !! vpn = Some w ∧ ¬ pte_vu w`). Blast radius was three
+  `destruct` patterns: `ProofCopyin`, `ProofCopyinstr`, `ProofCopyout`.
+  Generalising a caller can require making a *callee's* failure arm
+  informative; budget for it.
 
 Note in passing: the divergence between "the table passed" and
 "`p->pagetable`" inside `vmfault` is a real latent inconsistency in xv6, not
 just a spec artifact. It is unreachable from kexec (the pages are mapped), so
 it is **not** a `kernel-defects.md` entry — but it is why the generalised
-contract must forbid the fault path rather than model it.
+contract forbids the fault path rather than modelling it.
 
-### 2. `SpecSafestrcpy` over-asks its SOURCE
+The derived `COPYOUT` came out at **38 lines, 18 of them proof** — apply the
+general lemma at `arm := true`, pack the license, unpack it in the
+continuation. That number is the check on whether the indexing was right: the
+first (disjunction) draft could not do it at any length.
 
-It demands the full `n = 16` source bytes. Its own header admits the over-ask
-("only `n-2` are read … harmless and simpler, since every caller already owns
-that much"). It is **not** harmless here: kexec's source is `last`, a pointer
-*into* the path string, and 16 bytes past `last` can run off the end of the
-caller's `char path[MAXPATH]`.
+One mechanical trap the indexing introduced, now in `durable-notes.md`: an
+`if`-on-a-ghost-index definition drops the arguments its taken branch does not
+mention, so at a literal arm they are phantom and a crossing that leaves them
+to unification shelves them — surfacing as *"Attempt to save an incomplete
+proof"* ~350 lines later. Apply the license movers with every argument
+explicit.
 
-*The fix*: take an owned source length `ns` with
-`(n - 1 <= ns)%nat \/ (exists k, (k < ns)%nat /\ f k = 0)` — "either you own
-everything the loop's budget can reach, or there is a NUL inside what you
-own, so it stops first". kexec then passes `ns := plen - last` and pays the
-second disjunct from the path's own `bb_cstr`. `safestrcpy` is 52 bytes with
-one loop; this is a small re-proof.
+Two small relocations were deliberately deferred to avoid a mid-tree
+recompile; both are `Local` today with their homes named in comments:
+
+- `wa_pte_vu_bits_inv` (the converse of `PtBuild.pte_vu_bits`, plus the
+  `wa_sub_*` / `wa_z_mod_to_bit` / `wa_bit17` field extractions it restates)
+  → `PtBuild.v`, beside `pte_vu_bits`.
+- `co_pte_vu_set_ad` and `co_pte_set_ad_flag_U` → `PtAdBits.v`, beside its
+  existing V/R/W/X siblings (`flag_U` is the one that file is missing).
+
+### 2. `SpecSafestrcpy` over-asked its SOURCE — **FIXED**
+
+It demanded the full `n = 16` source bytes. Its own header admitted the
+over-ask ("only `n-2` are read … harmless and simpler, since every caller
+already owns that much"). It was **not** harmless here: kexec's source is
+`last`, a pointer *into* the path string, and 16 bytes past `last` can run off
+the end of the caller's `char path[MAXPATH]`.
+
+The contract now takes an owned source length `ns` and the premise
+`ssc_src_ok f n ns := (n - 1 <= ns)%nat \/ (exists k, (k < ns)%nat /\ f k = 0)`
+— "either you own everything the loop's budget can reach, or there is a NUL
+inside what you own, so it stops first". kexec pays the second disjunct from
+the path's own `bb_cstr`; `ssc_src_ok_full` is the first disjunct, so kfork's
+single call site took one extra argument and nothing else moved.
+`Print Assumptions` is unchanged.
+
+**The re-proof needed no new invariant conjunct, which is the lesson.** The
+loop reads the source at exactly one instruction (`+0x20 lbu a4,-1(a1)`),
+reachable only after the `beq` has fallen through — so `d < n - 1` is already
+in hand there, and the invariant already carried `bb_nonul f d` for its exit
+reasoning. Those two are exactly what bounds the cursor under either
+disjunct (`d < n-1 <= ns`, or `d <= k0 < ns` because the loop cannot have
+walked past the NUL at `k0`). One pure `Local Lemma`, `ssc_cursor_lt`, and the
+induction is structurally identical. When relaxing a "how much do I own"
+precondition, look first for a fact the loop already has to carry.
+
+`SpecSafestrcpy.ssc_stop_src` (the final stop index is inside the owned range)
+is proved but currently unused — the proof needs the bound mid-loop, not at
+the exit, and no conjunct of `ssc_post` reaches an unowned byte. Keep it: it
+is the mechanized form of the header's soundness argument, and a caller that
+wants to read `f` up to `k` will want it.
 
 ### 3. The log budget does not close for a two-element path
 
@@ -281,8 +349,9 @@ first one to name it.
 
 ## Worklist
 
-1. **The two callee re-proofs** (§1 and §2 above). Independent of each other
-   and of everything below; do them first, they unblock phases C and D.
+1. ~~The two callee re-proofs (§1 and §2 above).~~ **DONE.** Phases C and D
+   are unblocked. §3 remains, and caps kexec's contract at `L ≤ 1` path
+   elements until namei's success-arm budget is tightened.
 2. **Phase A** — `ProofKexecA.v`, entry through the ELF-header readi and the
    magic test, plus the two short `bad:` tails that are reachable from it.
    This is the phase whose *resources* are hardest and whose *control flow* is

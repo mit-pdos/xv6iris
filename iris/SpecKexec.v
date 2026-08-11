@@ -105,24 +105,30 @@
      a success-arm condition; the C's two [bltu ...,s7] tests against
      [stackbase] take [bad:] otherwise.
 
-   ---- WHAT THIS CONTRACT IS OWED BY ITS CALLEES ------------------------
+   ---- THE TWO CALLEE CONTRACTS THIS FUNCTION FORCED OPEN ----------------
 
-   Two callee contracts are, as stated today, unusable here.  Both are
-   recorded in claude-notes/projects/kexec.md with the fix:
+   Both were stated for the callers they had, and neither was usable here.
+   Both have been generalised; the story is in claude-notes/projects/kexec.md.
 
-   * SpecCopyout demands [p_pagetable p ↦₈ page_base P.(ud_root)] -- i.e.
-     that the table copied into IS the running process's -- because copyout
-     may call vmfault, which reads p->sz and maps into p->pagetable.  kexec
-     copies into a table that is not installed yet.  The fix is a second
-     contract for the case the destination range is ALREADY MAPPED, where the
-     vmfault call is dead and the process is not mentioned at all; kexec's
-     stack pages were just uvmalloc'd, so it is exactly that caller.
+   * SpecCopyout used to demand [p_pagetable p ↦₈ page_base P.(ud_root)] --
+     i.e. that the table copied into IS the running process's -- because
+     copyout may call vmfault, and vmfault reads p->sz and maps into
+     p->pagetable rather than the table it was passed.  kexec copies into a
+     table it has built and not yet installed.  [SpecCopyout.co_license] is
+     now that dependence as a RESOURCE: the process's two cells, or a proof
+     that the destination range is already mapped as valid USER leaves, in
+     which case the vmfault call is dead.  kexec is on the second arm -- its
+     stack pages were uvmalloc'd a few instructions earlier, at [PTE_W|
+     PTE_R|PTE_U].  (The [pte_vu] conjunct is load-bearing and exec is why:
+     a [uvmclear]'d page stays in the map with U cleared, and that page is
+     exec's own stack guard.)
 
-   * SpecSafestrcpy demands ownership of the FULL [n = 16] source bytes,
-     which its own header notes is an over-ask ("only n-2 are read").  kexec's
-     source is [last], a pointer INTO the path string, and 16 bytes past it
-     can run off the end of the caller's buffer.  The fix is to own [ns]
-     bytes with [ns = n \/ the NUL is inside them]. *)
+   * SpecSafestrcpy used to demand the FULL [n = 16] source bytes, an
+     over-ask its own header admitted.  kexec's source is [last], a pointer
+     INTO the path string, and sixteen bytes past it run off the end of the
+     caller's buffer.  It now takes an owned length [ns] with
+     [SpecSafestrcpy.ssc_src_ok], and kexec pays the "there is a NUL inside
+     what you own" disjunct out of the path's own [bb_cstr]. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
