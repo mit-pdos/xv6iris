@@ -3029,3 +3029,102 @@ yet abstracted, so the explicit form is `@hart_floor CID`, not
 sits on `WeakCtx` where it used to sit on `WeakPtOwn`.
 
 **STILL NOT STARTED: the call-site conversion** (unchanged from slice 1).
+
+### The release store is wrapped: `c.sd` gets its `_o`/`_run` (2026-08-11)
+
+`WeakLeafO` §10 recorded `c.sd` as the one open interface question — every
+other wrapper hides `ws'`, but part of a release store's result is a
+statement ABOUT `ws'` (`∀ j<8, T ≤ flr (ws_view ws') (acc_addr ea j)`), so no
+mechanical wrap could work. What was missing was a CONSTRUCTOR taking the
+authority plus a bound at a finite set of addresses and returning an
+objective token.
+
+**`ctx_view_lb` already was that token** — the `WeakCtx` work had solved this
+without my noticing. `ctx_view_lb_get` / `ctx_view_lb_valid` are the build and
+spend laws; all that was needed was to say WHICH view, and that is a fold:
+`view_addrs f n T := ⨆_{j<n} view_byte (f j) T` (`WeakCtx` §8, with
+`ctx_addrs_get` / `ctx_addrs_valid`).
+
+The point worth keeping: the eight byte-bounds collapse into ONE view because
+a join of byte views is a view and `flr` distributes over it. That is the same
+collapse that made `cobj` possible at all — the per-byte family the
+hart-indexed layer needed disappears once the bound is stated about a view —
+applied at the address axis instead of the hart axis. Evidence that indexing
+by context was structurally right and not just lucky for the load case.
+
+Addresses are a function `f : nat -> Z`, not `acc_addr ea`, so `WeakCtx` needs
+no `WeakInterp` import and the same lemmas serve any width and any address
+pattern. `f` need not be injective — the join takes a maximum.
+
+`wwp_sd8_tor_rvc_o` / `_run` have **two** outputs and only one is new: the
+frozen payload `monPred_at R (view_scl T)` was already objective at layer A
+(it is an `iProp`; for a points-to it is literally `WeakPtPub.wpt_pub T`) and
+passes through untouched. They are kept separate deliberately — the payload is
+consumed by whoever opens the invariant, the floor by whoever needs to know
+the store landed.
+
+**Consequence for the call-site conversion:** it was blocked and I had not
+realised. `WkTimerinit` instructions 10/11 are `c.sdsp`, so no amount of work
+on the other 19 sites would have produced a compiling file. It is unblocked
+now.
+
+### QUEUED (user request, 2026-08-11): memmove under weak memory, interruptible
+
+Prove the kernel's `memmove` in the weak setting with **interrupts enabled** —
+every leaf in `wp_next` form — over memory that a spinlock ultimately
+protects, hence over **objective** points-to facts.
+
+Why this is the right next test case, and what it actually exercises:
+
+* **The SC spec is already `wp_next`-shaped.** `SpecMemmove.wp_memmove_sconf_body`
+  takes `sie_cap_gpr m0 n b p`, two `[∗ list] j ∈ seq 0 len, pa_add p j ↦ₘ …`
+  buffers, and returns through `wp_next b p (fun CID => …)`. So the weak twin
+  is a porting-table swap with **`wp_next` unchanged on both sides** — which is
+  the whole claim `WeakCtx` makes. Swaps: `sie_cap_gpr` gains `wrunning ξ`
+  (the design note's "`sconf` is where the view token belongs in S-mode");
+  `↦ₘ` big_sepL becomes `cobj ξ`-wrapped. `cobj_big_sepL` says the two
+  spellings (`cobj` of a big_sepL vs. a big_sepL of `cobj`) agree — it was
+  proved speculatively and this is its first real consumer.
+
+* **First loop invariant in the weak port.** It must be stated in `cobj ξ`
+  terms, because a loop that can be interrupted is a loop whose invariant has
+  to survive migration. Nothing else in the tree has needed this yet.
+
+* **The expected result is that weak memory costs nothing.** memmove is all
+  within one context; the lock pays release/acquire at the boundaries. So no
+  fence should appear and the proof should read like SC's. That is the
+  claim being tested, and a fence turning out to be necessary would be the
+  interesting failure.
+
+**Dependencies, in order:**
+
+1. **Layer C: `wp_next`-shaped weak leaves.** The existing leaves are
+   `∀ ws', ⌜ws_le ws ws'⌝`-shaped, i.e. non-migrating. `WeakSmodeFrame` states
+   three in `wp_next` form as HYPOTHESES; they must become real. Note this is
+   not just repackaging — see (2).
+2. **What the weak `wp_next` promises.** In SC it is pure. In weak, the
+   resuming hart's `hart_ws` is a fresh unrelated `ws`, and `wrunning ξ` has to
+   be reconstituted from the surviving `ctx_auth ξ VA` plus that `ws` plus the
+   fact that the resuming hart's view dominates `VA` — which is NOT free. It
+   is what the reschedule protocol establishes (descheduled holding the
+   runqueue lock, rescheduled after acquiring it). So the obligation cannot be
+   discharged by a leaf; `wrunning ξ` must be the resource threaded INTO the
+   migration and the interrupt/reschedule path must be obliged to return it,
+   with `wrunning_resume` discharging the view side internally. That is
+   already the shape `WeakSmodeFrame`'s `wsrun ξ m` (written inside the
+   binder) encodes, so the design is believed right — memmove is the test
+   that it is.
+3. **A byte-width store leaf in objective form.** memmove's inner loop is
+   `sb`/`lb`, not `sd`. `wwp_sd8_tor_rvc_o` is now the template; the 1-byte
+   twin has to exist. A store into a cell the context owns exclusively
+   publishes nothing, so it should be objective-in/objective-out with **no**
+   `T` at all (`WeakSmodeFrame.wssd8_spec`'s shape), which is strictly simpler
+   than the release store just wrapped.
+4. **The S-mode weak funnel** (privilege, trap delegation, `sstatus`) — memmove
+   runs with interrupts enabled, so this is on the critical path, and it is the
+   largest of the four.
+
+Non-blocking but worth deciding early: memmove's SC spec carries
+non-overlap **by separation** (two separately-owned buffers), so the
+descending-copy branch is unreachable. Keep that; it is orthogonal to weak
+memory and re-litigating it would double the work for no weak-memory content.

@@ -1388,28 +1388,137 @@ Section leafo.
     iApply (whart_run_close with "Hmm Hview").
   Qed.
 
-  (** ** 10. WHY [c.sd] HAS NO [_o] HERE, and what one would need.
+  (** ** 10. [c.sd], THE RELEASE STORE -- the one wrapper with a payload.
 
-      Every other wrapper in this file hides [ws'] behind [hart_view].  The
-      release store cannot be wrapped that way, because its whole payload
-      is a statement ABOUT [ws']:
+      This was the file's open interface question, and it was open for a
+      reason worth keeping on the record.  Every other wrapper here hides
+      [ws'] behind the context; the release store could not be wrapped that
+      way, because part of its result is a statement ABOUT [ws']:
 
         ⌜∀ j, (j < 8)%nat -> T ≤ flr (ws_view ws') (acc_addr ea j)⌝
 
       -- the released timestamp [T] sits below the post-state view at the
-      eight stored bytes, which is exactly what lets the acquirer of the
-      lock recover the payload.  Hiding [ws'] erases it.
+      eight stored bytes, which is what lets the acquirer of the lock
+      recover the payload.  Hiding [ws'] erases it, so no amount of
+      mechanical wrapping would do; what was missing was a CONSTRUCTOR
+      taking the authority plus a bound at a finite set of addresses and
+      returning an objective token.
 
-      The objective replacement EXISTS in principle -- [WeakObj]'s
-      [view_lb], or eight [WeakPtOwn.wflr_lb (acc_addr ea j) T] -- and
-      would say the same thing without naming [ws'], since a floor is
-      persistent and only grows.  What is missing is the constructor: no
-      lemma yet takes [ws_auth] plus a bound at a FINITE SET of addresses
-      and returns the corresponding [view_lb].  Writing one is a design
-      decision about the release interface (which shape the future spinlock
-      release consumes), not a mechanical wrap, so [c.sd] stops at
-      [WeakLeafM]'s layer-A packaging -- which still removes its fetch
-      preamble -- and the interface question is left open rather than
-      answered by whichever shape happened to be easiest here. *)
+      [WeakCtx] §8 is that constructor ([ctx_addrs_get] / [ctx_addrs_valid]),
+      and the token is [ctx_view_lb ξ (view_addrs (acc_addr ea) 8 T)].  Note
+      it is NOT a per-byte family: [ctx_view_lb] bounds one view, and the
+      eight byte-bounds collapse into a single view because a join of byte
+      views is a view.  That collapse is the same one that made [cobj]
+      possible at all, applied at the address axis rather than the hart
+      axis -- which is the evidence that indexing by context was the right
+      move rather than a lucky one for the load case.
+
+      TWO OUTPUTS, AND ONLY ONE OF THEM IS NEW.  [monPred_at R (view_scl T)]
+      -- the frozen lock payload -- was ALREADY objective at layer A (it is
+      an [iProp], and for a points-to it is literally [WeakPtPub.wpt_pub T])
+      so it passes through untouched.  The floor token is the one that had
+      to be built.  Keeping both, rather than folding the floor into the
+      payload, is deliberate: they are consumed by different parties -- the
+      payload by whoever opens the invariant, the floor by whoever needs to
+      know the store landed, and a client wanting the original pure
+      inequality back against its own authority gets it from
+      [ctx_addrs_valid]. *)
+
+  Lemma wwp_sd8_tor_rvc_o (ξ : CtxId) (pc : mword 64) (rs1 rs2 : mword 5)
+      (imm : mword 12) (ea : Arch.pa) (vold : bv 64) (R : vProp Σ) (q : Qp)
+      (pmpcfg0 : type_of_register pmpcfg_n)
+      (pmpaddrs : type_of_register pmpaddr_n)
+      (rs1v rs2v : mword 64) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
+    uint rs1 <> 0 ->
+    uint rs2 <> 0 ->
+    add_vec rs1v (sign_extend' 64 imm) = ea ->
+    (forall j : nat, (j < 8)%nat -> addr_is_ram (pa_add ea j)) ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
+    winstr_m pc true (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
+    wrunning ξ -∗
+    cobj ξ (wpt8 ea (DfracOwn 1) vold) -∗
+    cobj ξ R -∗
+    ( ∀ T : nat,
+      ctx_view_lb ξ (view_addrs (acc_addr ea) 8 T) -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+      pc_is (add_vec_int pc 2) -∗
+      R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+      R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
+      wrunning ξ -∗
+      cobj ξ (wpt8 ea (DfracOwn 1) rs2v) -∗
+      monPred_at R (view_scl T) -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Htor Hnz1 Hnz2 Hea Hram.
+    iIntros "Hmm Hpcf Hpad Hpc Hrs1 Hrs2 #Hi [%ws [Hws Hauth]] Hpt HR Hcont".
+    iDestruct (cobj_to_hold ξ ws with "Hauth Hpt") as "[Hauth Hpt]".
+    iDestruct (cobj_to_hold ξ ws with "Hauth HR") as "[Hauth HR]".
+    iApply (wwp_sd8_tor_rvc pc rs1 rs2 imm ea vold R q pmpcfg0 pmpaddrs
+              rs1v rs2v ws Hgid Hpmp Htor Hnz1 Hnz2 Hea Hram
+              with "Hmm Hpcf Hpad Hpc Hrs1 Hrs2 Hi Hws Hpt HR").
+    iIntros (ws' T) "%Hle %HT Hmm Hpcf Hpad Hpc Hrs1 Hrs2 Hws Hpt HR".
+    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
+      [by apply ws_le_view|].
+    iDestruct (ctx_addrs_get ξ _ (acc_addr ea) 8 T HT with "Hauth") as "#Hlb".
+    iDestruct (cobj_of_hold ξ ws' with "Hauth Hpt") as "[Hauth Hpt]".
+    iApply ("Hcont" $! T with "Hlb Hmm Hpcf Hpad Hpc Hrs1 Hrs2 [Hws Hauth] Hpt HR").
+    iExists ws'. iFrame.
+  Qed.
+
+  Lemma wwp_sd8_tor_rvc_run (ξ : CtxId) (pc : mword 64) (rs1 rs2 : mword 5)
+      (imm : mword 12) (ea : Arch.pa) (vold : bv 64) (R : vProp Σ) (q : Qp)
+      (pmpcfg0 : type_of_register pmpcfg_n)
+      (pmpaddrs : type_of_register pmpaddr_n)
+      (rs1v rs2v : mword 64) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
+    uint rs1 <> 0 ->
+    uint rs2 <> 0 ->
+    add_vec rs1v (sign_extend' 64 imm) = ea ->
+    (forall j : nat, (j < 8)%nat -> addr_is_ram (pa_add ea j)) ->
+    whart_run ξ q -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
+    winstr_m pc true (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
+    cobj ξ (wpt8 ea (DfracOwn 1) vold) -∗
+    cobj ξ R -∗
+    ( ∀ T : nat,
+      ctx_view_lb ξ (view_addrs (acc_addr ea) 8 T) -∗
+      whart_run ξ q -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+      pc_is (add_vec_int pc 2) -∗
+      R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+      R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
+      cobj ξ (wpt8 ea (DfracOwn 1) rs2v) -∗
+      monPred_at R (view_scl T) -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Htor Hnz1 Hnz2 Hea Hram.
+    iIntros "Hrun Hpcf Hpad Hpc Hrs1 Hrs2 #Hi Hpt HR Hcont".
+    iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
+    iApply (wwp_sd8_tor_rvc_o ξ pc rs1 rs2 imm ea vold R q pmpcfg0 pmpaddrs
+              rs1v rs2v Hgid Hpmp Htor Hnz1 Hnz2 Hea Hram
+              with "Hmm Hpcf Hpad Hpc Hrs1 Hrs2 Hi Hview Hpt HR").
+    iIntros (T) "#Hlb Hmm Hpcf Hpad Hpc Hrs1 Hrs2 Hview Hpt HR".
+    iApply ("Hcont" $! T with "Hlb [Hmm Hview] Hpcf Hpad Hpc Hrs1 Hrs2 Hpt HR").
+    iApply (whart_run_close with "Hmm Hview").
+  Qed.
 
 End leafo.

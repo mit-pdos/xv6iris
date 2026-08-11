@@ -421,3 +421,96 @@ Section bridge.
   Qed.
 
 End bridge.
+
+(* ====================================================================== *)
+(** ** 8. THE RELEASE INTERFACE: a floor at a FINITE SET of addresses.
+
+    This is the constructor [WeakLeafO] §10 records as missing, and the
+    reason it was missing is that it had nowhere to live.  A release store
+    hands back
+
+      ⌜∀ j < 8, T ≤ flr (ws_view ws') (acc_addr ea j)⌝
+
+    -- the released timestamp sits below the post-state view at the eight
+    bytes it wrote, which is exactly what lets the acquirer of the lock
+    recover the payload.  That statement NAMES [ws'], so any wrapper that
+    hides the post-state erases it, and every other leaf in [WeakLeafO] is
+    precisely such a wrapper.  Hence [c.sd] stopped at layer A.
+
+    [ctx_view_lb] is the objective form: persistent, monotone, naming
+    neither a hart nor a [wstate], and already equipped with the two laws
+    this needs ([ctx_view_lb_get] to build one from the authority,
+    [ctx_view_lb_valid] to spend it).  What remains is only to say WHICH
+    view -- the join of the [n] single-byte views -- and that is a fold.
+
+    NOTE WHAT MAKES THE FOLD WORK.  [ctx_view_lb] is a lower bound on ONE
+    view, not a family indexed by address, so [n] separate byte-bounds have
+    to become one view before they can be a single resource.  They can,
+    because a join of byte views IS a view and [flr] distributes over it
+    ([flr_join]).  That is the same collapse §2's header describes for
+    [ctx_view_lb] as a whole, applied at the address axis: the per-byte
+    family the hart-indexed layer needed is unnecessary once the bound is
+    stated about a view.
+
+    ADDRESSES ARE A FUNCTION [f : nat -> Z], not [acc_addr ea] -- so this
+    file does not have to import [WeakInterp], and so the same lemmas serve
+    a store of any width and any address pattern.  Nothing here requires
+    [f] to be injective: [view_addrs_ge] holds even if two indices collide,
+    since the join takes a maximum. *)
+
+Fixpoint view_addrs (f : nat -> Z) (n : nat) (T : nat) : view :=
+  match n with
+  | O => view_bot
+  | S k => view_byte (f k) T ⊔ view_addrs f k T
+  end.
+
+(** The bound is BELOW a view exactly when it holds at each address. *)
+Lemma view_addrs_le (f : nat -> Z) (n T : nat) (V : view) :
+  (∀ j : nat, (j < n)%nat -> (T ≤ flr V (f j))%nat) -> view_addrs f n T ⊑ V.
+Proof.
+  induction n as [|k IH]; simpl; intros Hj.
+  - apply view_bot_le.
+  - apply view_join_lub.
+    + apply view_byte_le, Hj. lia.
+    + apply IH. intros j Hlt. apply Hj. lia.
+Qed.
+
+(** ... and it really does bound each address (the converse direction, which
+    is what a consumer spends). *)
+Lemma view_addrs_ge (f : nat -> Z) (n T : nat) (j : nat) :
+  (j < n)%nat -> (T ≤ flr (view_addrs f n T) (f j))%nat.
+Proof.
+  induction n as [|k IH]; simpl; intros Hlt; [lia|].
+  rewrite flr_join. destruct (decide (j = k)) as [->|Hne].
+  - rewrite flr_byte_eq. lia.
+  - specialize (IH ltac:(lia)). lia.
+Qed.
+
+Section release.
+  Context `{!weakViewG Σ}.
+
+  (** BUILD: what a release store's post-state authority yields. *)
+  Lemma ctx_addrs_get (ξ : CtxId) (V : view) (f : nat -> Z) (n T : nat) :
+    (∀ j : nat, (j < n)%nat -> (T ≤ flr V (f j))%nat) ->
+    ctx_auth ξ V -∗ ctx_view_lb ξ (view_addrs f n T).
+  Proof.
+    iIntros (Hj) "Ha".
+    iApply (ctx_view_lb_get with "Ha"). by apply view_addrs_le.
+  Qed.
+
+  (** SPEND: what an acquirer recovers, against ITS OWN authority.  The
+      point of the round trip is that the two authorities may be at
+      different views and even at different harts -- the token is the same
+      proposition on both sides, which [ctx_view_lb_valid] then reads
+      against whichever authority is present. *)
+  Lemma ctx_addrs_valid (ξ : CtxId) (V : view) (f : nat -> Z) (n T : nat) :
+    ctx_auth ξ V -∗ ctx_view_lb ξ (view_addrs f n T) -∗
+    ⌜∀ j : nat, (j < n)%nat -> (T ≤ flr V (f j))%nat⌝.
+  Proof.
+    iIntros "Ha Hlb".
+    iDestruct (ctx_view_lb_valid with "Ha Hlb") as %Hle.
+    iPureIntro. intros j Hj.
+    etrans; [apply (view_addrs_ge f n T j Hj)|apply Hle].
+  Qed.
+
+End release.
