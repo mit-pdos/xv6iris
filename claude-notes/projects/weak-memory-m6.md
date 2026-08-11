@@ -358,15 +358,43 @@ floor that sees every observation.
       consider reusing `WeakAxiomatic2.evpre`/`opos` (a read's position
       = its timestamp ⊔ its pre-view) as the W2b view-relation
       vocabulary.
-- [ ] **W2b — the construction.** Topologically sort D; build the pf run
-      by induction over the sort, carrying: a timestamp permutation π
-      (the pf log order is FULFILMENT order, which differs from gmo — an
-      agent may fulfil out of promise order), value-exact read matching
-      (each read returns the SAME byte values at π-mapped timestamps),
-      and a per-agent view relation (expected shape: pf views bounded by
-      the π-image of full-machine views; the exact direction is the
-      first thing the proof will teach — record it here when it does).
-      The `readable`-transport lemma under π is the crux of the crux.
+- [x] **W2b slice 1 — the linearization backbone, LANDED axiom-free**
+      (`WeakRobustLin.v`): event enumeration, Decision instances for
+      every graph relation (bounded quantifiers — no classical axioms,
+      no reflection substitutes), a REUSABLE generic toposort over any
+      finite decidable acyclic relation, `gdep_toposort`, and
+      `toposort_ind` — the induction interface the simulation consumes
+      (process events in topological order, predecessors always done).
+      Pairwise per-agent monotonicity provided; the filter-subsequence
+      form is a short corollary if needed.
+- [ ] **W2b — the simulation (coordinator; design pinned 2026-08-11).**
+      Invariant carried along `toposort_ind`, after processing `done`:
+      (a) a pf config c' with `rtc wp_pf_run (wp_init img ps) c'`;
+      (b) π: the order-of-processing map from done's fulfilled
+      timestamps to pf log positions (monotone in PROCESSING order, not
+      timestamp order); (c) program states match exactly (same pstep
+      steps in the same per-agent order); (d) the view relation: pf
+      wstate components are the π-transported joins of the same
+      timestamp sets — direction and exact shape to be discovered; the
+      `readable`-transport under π is the crux, and must be tested
+      against the multi-byte mixed fresh/stale witness.
+      **THE WRITE-SERIALIZATION LEMMA — a second pillar found while
+      designing (2026-08-11): D has no co edges, and for UNCLASSIFIED
+      programs that is fatal** — two agents' interleaved same-byte
+      write pairs (x@5,y@2 by A po-ordered; y@3,x@4 by B po-ordered)
+      form a realizable behavior whose co + po constraints are cyclic
+      for ANY pf log, so no pf run reproduces its final memory.  The
+      escape is the classification: for φ-disciplined programs every
+      same-byte write pair is ALREADY tc(D)-connected in timestamp
+      order — owned bytes pass through ownership-transfer chains
+      (release→acquire rf edges), excl/lock words are chained by each
+      AMO reading the previous release, started has a single writer —
+      so π preserves co where it matters and final memory transports.
+      State and prove `co ⊆ tc(D)` (per byte, for classified traces) as
+      W2b's second lemma; its premises will sharpen what W3's
+      class-soundness must export.  Proof route open: via the transfer
+      chains (needs pub machinery) or operationally; record which
+      closes.
 - [ ] **W2c — observables + transport.** From W2b: same final flat
       memory + same program states; the reducibility/safety transport
       corollary in the form W5's composition wants.  Note the full
