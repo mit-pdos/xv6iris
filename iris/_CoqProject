@@ -888,6 +888,17 @@ InodeRegion.v
 IcacheEscrow.v
 IcacheBoot.v
 CodeIget.v
+CodeDirlink.v
+CodeDirlookup.v
+CodeFsinit.v
+CodeIalloc.v
+CodeIreclaim.v
+CodeIunlockput.v
+CodeNamecmp.v
+CodeNamei.v
+CodeNameiparent.v
+CodeNamex.v
+CodeStati.v
 CodeIput.v
 CodeIdup.v
 CodeIlock.v

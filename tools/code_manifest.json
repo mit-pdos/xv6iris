@@ -156,6 +156,18 @@
   2
  ],
  [
+  "CodeDirlink.v",
+  "dirlink",
+  "dki_",
+  2
+ ],
+ [
+  "CodeDirlookup.v",
+  "dirlookup",
+  "dli_",
+  2
+ ],
+ [
   "CodeEitherCopy.v",
   "either_copyin",
   "eci_",
@@ -252,6 +264,12 @@
   2
  ],
  [
+  "CodeFsinit.v",
+  "fsinit",
+  "fsi_",
+  2
+ ],
+ [
   "CodeGrowproc.v",
   "growproc",
   "gpi_",
@@ -267,6 +285,12 @@
   "CodeHolding.v",
   "holding",
   "his_",
+  2
+ ],
+ [
+  "CodeIalloc.v",
+  "ialloc",
+  "iali_",
   2
  ],
  [
@@ -318,6 +342,12 @@
   2
  ],
  [
+  "CodeIreclaim.v",
+  "ireclaim",
+  "irci_",
+  2
+ ],
+ [
   "CodeIsmapped.v",
   "ismapped",
   "imi_",
@@ -333,6 +363,12 @@
   "CodeIunlock.v",
   "iunlock",
   "iui2_",
+  2
+ ],
+ [
+  "CodeIunlockput.v",
+  "iunlockput",
+  "iulpi_",
   2
  ],
  [
@@ -447,6 +483,36 @@
   "CodeMemcpy.v",
   "memcpy",
   "mcpi_",
+  2
+ ],
+ [
+  "CodeNamecmp.v",
+  "namecmp",
+  "nci_",
+  2
+ ],
+ [
+  "CodeNamei.v",
+  "namei",
+  "nmi_",
+  2
+ ],
+ [
+  "CodeNameiparent.v",
+  "nameiparent",
+  "npi_",
+  2
+ ],
+ [
+  "CodeNamex.v",
+  "namex",
+  "nxi_",
+  3
+ ],
+ [
+  "CodeStati.v",
+  "stati",
+  "sti_",
   2
  ],
  [

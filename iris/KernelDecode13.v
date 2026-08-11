@@ -147,6 +147,11 @@ Lemma kd_c385 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   = Some (C_BEQZ (mword_of_int 16, Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
+Lemma kd_c4b9 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xc4b9 : mword 16)) s
+  = Some (C_BEQZ (mword_of_int 39, Cregidx (mword_of_int 1)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
 Lemma kd_c915 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xc915 : mword 16)) s
   = Some (C_BEQZ (mword_of_int 26, Cregidx (mword_of_int 2)), s).
@@ -255,6 +260,11 @@ Proof. decode_bridge_ms. Qed.
 Lemma kd_00043737 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00043737 : mword 32) : M instruction) s
   = Some (UTYPE (mword_of_int 67 : mword 20, Regidx (mword_of_int 14), LUI), s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma kd_00060d1b s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x00060d1b : mword 32) : M instruction) s
+  = Some (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 12), Regidx (mword_of_int 26)), s).
 Proof. decode_bridge_ms. Qed.
 
 Lemma kd_0007861b s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -440,6 +450,11 @@ Proof. decode_bridge_ms. Qed.
 Lemma kd_953fe0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x953fe0ef : mword 32) : M instruction) s
   = Some (JAL (mword_of_int 2091346 : mword 21, Regidx (mword_of_int 1)), s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma kd_aeafd0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xaeafd0ef : mword 32) : M instruction) s
+  = Some (JAL (mword_of_int 2085610 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
 Lemma kd_b0678793 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->

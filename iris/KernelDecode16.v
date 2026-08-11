@@ -207,6 +207,11 @@ Lemma kd_01590633 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (RTYPE (Regidx (mword_of_int 21), Regidx (mword_of_int 18), Regidx (mword_of_int 12), ADD), s).
 Proof. decode_bridge_ms. Qed.
 
+Lemma kd_018a2783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x018a2783 : mword 32) : M instruction) s
+  = Some (LOAD (mword_of_int 24 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 15), false, 4), s).
+Proof. decode_bridge_ms. Qed.
+
 Lemma kd_02068693 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x02068693 : mword 32) : M instruction) s
   = Some (ITYPE (mword_of_int 32 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 13), ADDI), s).
@@ -302,6 +307,11 @@ Lemma kd_7be58593 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (ITYPE (mword_of_int 1982 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI), s).
 Proof. decode_bridge_ms. Qed.
 
+Lemma kd_7ec000ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x7ec000ef : mword 32) : M instruction) s
+  = Some (JAL (mword_of_int 2028 : mword 21, Regidx (mword_of_int 1)), s).
+Proof. decode_bridge_ms. Qed.
+
 Lemma kd_9cffd0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x9cffd0ef : mword 32) : M instruction) s
   = Some (JAL (mword_of_int 2087374 : mword 21, Regidx (mword_of_int 1)), s).
@@ -315,6 +325,11 @@ Proof. decode_bridge_ms. Qed.
 Lemma kd_9fbff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x9fbff0ef : mword 32) : M instruction) s
   = Some (JAL (mword_of_int 2095610 : mword 21, Regidx (mword_of_int 1)), s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma kd_b1fff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xb1fff0ef : mword 32) : M instruction) s
+  = Some (JAL (mword_of_int 2095902 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
 Lemma kd_b92ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -370,6 +385,16 @@ Proof. decode_bridge_ms. Qed.
 Lemma kd_f5050513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xf5050513 : mword 32) : M instruction) s
   = Some (ITYPE (mword_of_int 3920 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma kd_f50ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xf50ff0ef : mword 32) : M instruction) s
+  = Some (JAL (mword_of_int 2094928 : mword 21, Regidx (mword_of_int 1)), s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma kd_f9779ae3 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xf9779ae3 : mword 32) : M instruction) s
+  = Some (BTYPE (mword_of_int 8084 : mword 13, Regidx (mword_of_int 23), Regidx (mword_of_int 15), BNE), s).
 Proof. decode_bridge_ms. Qed.
 
 Lemma kd_f97fe0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->

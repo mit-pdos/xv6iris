@@ -183,6 +183,11 @@ Lemma kd_b775 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   = Some (C_J (mword_of_int 2006), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
+Lemma kd_b7d9 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xb7d9 : mword 16)) s
+  = Some (C_J (mword_of_int 2019), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
 Lemma kd_bfd9 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xbfd9 : mword 16)) s
   = Some (C_J (mword_of_int 2027), s).
@@ -196,6 +201,11 @@ Proof. intro H. rvc_oneshot s H. Qed.
 Lemma kd_cac1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xcac1 : mword 16)) s
   = Some (C_BEQZ (mword_of_int 72, Cregidx (mword_of_int 5)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma kd_d545 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xd545 : mword 16)) s
+  = Some (C_BEQZ (mword_of_int 212, Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
 Lemma kd_f406 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
