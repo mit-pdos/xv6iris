@@ -1208,8 +1208,28 @@ Section WpSconfBtype.
     iPureIntro. done.
   Qed.
 
+  (* THE SIDE CONDITION ARRIVES BY INSTANCE RESOLUTION, NOT AS A PREMISE --
+     see [IntrDefs.SrcOk].  A branch leaf's only caller-varying premise is the
+     COMPARISON below, and that comparison is taken on [rget m rd1], a lookup
+     in [tp_pin m]: its value depends on the ambient hart at exactly one
+     register, rd1 = tp.  When the funnel's σ-callback moves inside [wp_next]
+     the branch's obligation is discharged at the hart the trap returned to
+     while the caller stated its comparison at the entry hart.  A branch writes
+     no register, so there is no [rd_ok]/[ops_ok] slot to widen here and an
+     ordinary premise would shift the three positional arguments below at ~110
+     references.  The implicit [`{!SrcOk rd1}] costs no slot.
+
+     THE PREMISE STAYS SPELLED [rget m rd1], at the entry hart.  Respelling it
+     hart-free as [m !!! Regidx rd1] was MEASURED and rejected: call sites
+     discharge it by rewriting with a [rget]-shaped fact they already hold
+     (WpUartgetc.v's [Hlk] is the pattern), and the same respelling on
+     [WpSconfMem.wp_csdsp_s_sconf] broke 99 consumer files for the same reason.
+     So the class carries the side condition and the spelling does not move;
+     what the class buys is the ALL-HARTS form of the premise, derived once in
+     the proof below. *)
   Lemma wp_cbeqz_fall_s_sconf
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
+      `{!SrcOk rd1}
       (m : regfile) (n : nat) (b : bool) :
     creg2reg_idx rs = Regidx rd1 ->
     uint rd1 <> 0 ->
@@ -1224,6 +1244,20 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs Hrd1 Hcmp) "Hcg Hpc Hinstr Hcont".
+    (* THE CLASS, CONSUMED.  [Hcmp] is the caller's comparison, taken at the
+       ENTRY hart; the σ-obligation below is discharged at whatever hart the
+       callback was instantiated at, and the two agree only away from tp.
+       [src_ok_rget_indep] is [HartTp.rget_hart_indep] under the class, so this
+       one line lifts the premise to the ALL-HARTS form and the endgame never
+       names the hart the comparison was taken at.  Today the callback is still
+       the entry hart, so [Hcmp_all CID] is what gets used; the funnel change
+       that moves the callback inside [wp_next] instantiates it at the rebound
+       hart instead and NOTHING ELSE in this proof moves -- which is the whole
+       point of paying for the class now.
+       (At a VARIABLE [rd1] this is not a conversion: the pin's [bool_decide]
+       cannot reduce, so without the class [Hcmp_all] has no proof.) *)
+    assert (Hcmp_all : forall c : CpuId, eq_vec (rget (CID := c) m rd1) zero_reg = false)
+      by (intros c; rewrite (src_ok_rget_indep m rd1 c CID); exact Hcmp).
     iApply (wp_instr_s_sconf m n b pc true
               (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg, creg2reg_idx rs, BEQ))
               with "Hcg Hpc Hinstr").
@@ -1241,7 +1275,8 @@ Section WpSconfBtype.
       rewrite Lva.
       replace (Z.eqb (uint (zero_extend' 5 ('b"00") : mword 5)) 0) with true
         by (vm_compute; reflexivity).
-      cbn match. exact Hcmp. }
+      (* the ambient hart is the one the callback was instantiated at *)
+      cbn match. exact (Hcmp_all CID). }
     iSplitL "Hreg Hmem". { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2)
@@ -1251,6 +1286,45 @@ Section WpSconfBtype.
     iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
     iPureIntro. done.
   Qed.
+
+  (* WHAT AN [SrcOk] FAILURE LOOKS LIKE, so nobody has to rediscover it.  A
+     converted leaf applied with the thread pointer in the source slot has no
+     instance, and resolution says so AT THE APPLICATION, naming both the
+     lemma and the register.  Uncommenting the probe below gives, verbatim
+     (the line number is wherever the [pose proof] ends up):
+
+       File "./WpSconfBtype.v", line 1293, characters 16-37:
+       Error: Cannot infer the implicit parameter SrcOk0 of
+       wp_cbeqz_fall_s_sconf whose type is "SrcOk Rtp" (no type class
+       instance found) in environment:
+       Σ : gFunctors
+       riscvGS0 : riscvGS Σ
+       sieG0 : sieG Σ
+       GEN : GenId
+       CID : CpuId
+       p, pc : mword 64
+       imm8 : mword 8
+       m : regfile
+       n : nat
+       b : bool
+
+     (An [exact]-shaped application reports the same thing as
+     [Error: Could not find an instance for "SrcOk Rtp"].)  Either way it is a
+     legible resolution failure at the call site -- not a deferred obligation,
+     not a silent success.  That is the intended behaviour: a c.beqz on tp
+     would make the comparison depend on which hart the σ-callback was
+     instantiated at, and there is no proof of it.  Nothing in the tree does
+     this -- [rd1] here comes from a [cregidx], which encodes x8..x15 only --
+     so the register is not even reachable through this leaf; the probe has to
+     forge it.
+
+  Lemma cbeqz_tp_probe (pc : mword 64) (imm8 : mword 8)
+      (m : regfile) (n : nat) (b : bool) : True.
+  Proof.
+    pose proof (wp_cbeqz_fall_s_sconf pc imm8 (Cregidx (mword_of_int 4)) Rtp m n b).
+    exact I.
+  Qed.
+  *)
 
   Lemma wp_cbnez_fall_s_sconf
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)

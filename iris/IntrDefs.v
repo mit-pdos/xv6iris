@@ -2005,3 +2005,85 @@ Ltac ops_ok_split Hops :=
   pose proof (rd_ok_tp _ (ops_ok_rd _ _ _ _ Hops));
   pose proof (ops_ok_s1 _ _ _ _ Hops);
   pose proof (ops_ok_s2 _ _ _ _ Hops).
+
+(* ==================================================================== *)
+(* THE READ-SIDE SIDE CONDITION AS A TYPECLASS -- for the leaves that    *)
+(* HAVE NO PREMISE SLOT TO WIDEN.                                        *)
+(* ==================================================================== *)
+
+(* WHY A CLASS AND NOT A PREMISE.  [src_ok] / [ops_ok] above are free at
+   every call site because they ride in an EXISTING premise slot ([rd_ok]'s),
+   which 1192 sites fill with the positional opaque [ltac:(rdok)]: widening
+   what the slot MEANS costs nothing.  The memory, branch/compare and [c.ret]
+   leaves have no such slot -- their pure premises are exactly the facts about
+   [rget m rs] for a caller-chosen [rs], and nothing else -- so adding an
+   ordinary premise there changes ARITY at ~2173 references, every one of
+   which would have to grow a positional [ltac:(...)] in the right place.
+   Delivering the same side condition by INSTANCE RESOLUTION instead costs no
+   positional slot at all: an implicit [`{!SrcOk rs}] argument is filled in by
+   the [Hint Extern] below, so no call site moves.
+
+   WHAT IT BUYS is what [rget_src_indep] / [rget_next_indep] buy for the
+   widened slot: [sie_cap_gpr] owns [gpr_file (tp_pin m)], so [rget m k] --
+   a lookup in [tp_pin m] -- depends on the ambient hart at exactly one
+   register, [k = tp], and agrees at every other ([HartTp.rget_hart_indep]).
+   Once the funnel's σ-callback moves inside [WpNext.wp_next] a leaf's
+   obligation arrives at the REBOUND hart while its caller's premise was
+   stated at the entry hart, and this class is what reconciles the two.
+   Equivalently, at a non-tp index [HartTp.rget_ne] rewrites the read to the
+   hart-FREE [m !!! Regidx rs], which is the form a converted leaf's
+   statement can then be spelled in.
+
+   UNGUARDED, unlike [src_ok]'s [b = true -> ...], and deliberately.  The
+   guard exists there because three real proofs (mycpu / cpuid / scheduler)
+   read tp at [b = false], and they fill the SAME slot; a leaf that takes
+   this class instead has no [b] to hide behind -- at a variable [b] you
+   would have to prove the unguarded form anyway -- so guarding buys nothing.
+   The corollary is the point: a converted leaf applied at [rs = tp] FAILS,
+   at the call site, with an unsatisfiable-instance error, rather than
+   silently accumulating an obligation nobody can discharge.  That is a
+   feature; it is how we find out that such a call site exists. *)
+Class SrcOk (rs : mword 5) : Prop :=
+  { src_ok_not_tp : Regidx rs <> Regidx Rtp }.
+
+(* THE DECIDING TACTIC IS [rdok_tpne], REUSED VERBATIM: the goal is the same
+   [Regidx rs <> Regidx Rtp] that [rd_ok]'s tp conjunct and [src_ok]'s body
+   are, and it needs the same script ([Regidx]'s injectivity first, then
+   [vm_compute] on the underlying [mword 5]s).  Keeping one script means the
+   class approach and the premise approach cannot drift apart.
+   [constructor] first because [SrcOk] is a record class (one field), so the
+   [Hint Extern] has to build the instance rather than prove the field.
+
+   THE [assumption] ARM IS NOT OPTIONAL, and it is the same arm [rdok_src] has
+   for the same reason: not every call site names a CONCRETE register.  The
+   symbolic-block interpreter [WpSconfVc.v] applies these leaves at a
+   quantified [rs2] and carries the disequality as an ordinary hypothesis
+   ([Hrs2ok : Regidx rs2 <> Regidx Rtp], which it needs anyway to state its
+   own [rget_ne] rewrite), so [rdok_tpne]'s [vm_compute] cannot decide the
+   goal and resolution has to fall back on what the context already proves.
+   WITHOUT THIS ARM THE FAILURE IS THE WORST KIND: an unresolved instance
+   inside a tactic-driven [iApply] is SHELVED rather than reported, so the
+   file compiles for another four hundred lines and then dies at [Qed] with
+   "Attempt to save an incomplete proof", naming neither the class, the
+   register, nor the call site.  (At an [exact]/[pose proof]-shaped
+   application the same failure is immediate and legible -- "Cannot infer the
+   implicit parameter ... whose type is SrcOk Rtp".)  If a converted leaf ever
+   fails this way, look for a call site whose register is a variable before
+   looking anywhere else. *)
+Global Hint Extern 0 (SrcOk _) =>
+  (constructor; first [ rdok_tpne | assumption ]) : typeclass_instances.
+
+(* The bridge a converted leaf uses: the class turns the caller's hart-free
+   premise about [m] into the [rget] the funnel hands it, at WHATEVER hart the
+   σ-callback was instantiated at.  Stated as an [∀ c] so a leaf never has to
+   name the hart it happens to be run at today. *)
+Lemma src_ok_rget_all (m : regfile) (rs : mword 5) `{!SrcOk rs} :
+  forall c : CpuId, rget (CID := c) m rs = m !!! Regidx rs.
+Proof. intros c. exact (rget_ne (CID := c) m rs src_ok_not_tp). Qed.
+
+(* ... and the two-hart form, which is [HartTp.rget_hart_indep] under the
+   class: this is the shape the σ-obligation actually arrives in once the
+   callback is rebound (caller's fact at [c2], obligation at [c1]). *)
+Lemma src_ok_rget_indep (m : regfile) (rs : mword 5) `{!SrcOk rs} :
+  forall c1 c2 : CpuId, rget (CID := c1) m rs = rget (CID := c2) m rs.
+Proof. exact (rget_hart_indep m rs src_ok_not_tp). Qed.

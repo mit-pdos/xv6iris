@@ -1349,8 +1349,35 @@ Section WpSconfMem.
     exact (wp_cld_s_sconf pc rd csp_rs1 imm m n v b (dqm:=dqm) Hrd Hrdok).
   Qed.
 
+  (* THE SIDE CONDITION ARRIVES BY INSTANCE RESOLUTION, NOT AS A PREMISE.
+     [rget m rs2] is a lookup in [tp_pin m], so the stored value as spelled
+     here depends on the ambient hart at exactly one register, rs2 = tp.  Once
+     the funnel's σ-callback moves inside [wp_next] the obligation arrives at
+     the hart the trap returned TO, while this statement was elaborated at the
+     hart we came FROM, and the two agree only away from tp.  This leaf has no
+     [rd_ok]/[ops_ok] slot to widen -- a c.sdsp writes no register, so it has
+     no pure premises at all -- and it is referenced ~640 times, so an ordinary
+     premise would move every one of those call sites.  [IntrDefs.SrcOk] is
+     that same side condition delivered as an IMPLICIT class argument: it
+     occupies no positional slot, so no call site changes.
+
+     THE STORED VALUE STAYS SPELLED [rget m rs2], at the ENTRY hart, and that
+     is deliberate -- see this file's header.  The tempting alternative, making
+     the statement literally hart-free as [m !!! Regidx rs2], was MEASURED and
+     rejected: it breaks 99 consumer files, because a caller normalises the
+     value it gets back with an [iEval (rgne)] / [rewrite H] whose LHS is a
+     [rget], and those have nothing to match once the [rget] is gone.  So the
+     class carries the side condition and the SPELLING does not move.
+
+     LANDED AHEAD OF ITS CONSUMER, exactly as [IntrDefs.src_ok] was, and for
+     the same reason: nothing here needs the reconciliation until the funnel's
+     σ-callback moves inside [wp_next] and the obligation starts arriving at
+     the rebound hart.  What the class buys is proved, not asserted -- see
+     [IntrDefs.src_ok_rget_all] / [src_ok_rget_indep] -- and the point of
+     landing it now is that adding it costs ZERO of this leaf's 672 references,
+     so the funnel change is not entangled with a 672-site sweep. *)
   Lemma wp_csdsp_s_sconf
-      (pc : mword 64) (uimm : mword 6) (rs2 : mword 5)
+      (pc : mword 64) (uimm : mword 6) (rs2 : mword 5) `{!SrcOk rs2}
       (m : regfile) (n : nat) (vold : mword 64) (b : bool) :
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
     let pa := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
@@ -1367,6 +1394,18 @@ Section WpSconfMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros imm pa storeval.
+    (* WHAT THE CLASS WILL DO HERE, recorded as a proved fact rather than a
+       comment: the value this leaf promises is hart-independent, so the
+       promise made at the entry hart is still the promise at the hart a trap
+       returned to.  That is the ONE step the funnel change needs, and
+       [SrcOk rs2] is its whole content.  It is stated and not yet used because
+       today's σ-callback is still instantiated at the entry hart -- the
+       reconciliation has no gap to close until [wp_instr_s_sconf]'s callback
+       moves inside [wp_next].  (At a VARIABLE [rs2] this is not a conversion:
+       the pin's [bool_decide] cannot reduce, so without the class there is no
+       proof of it at all.) *)
+    assert (Hsv_all : forall c : CpuId, rget (CID := c) m rs2 = storeval)
+      by (intros c; exact (src_ok_rget_indep m rs2 c CID)).
     unfold pa.
     rewrite <- sext9_12_64.
     change sp with (Regidx csp_rs1).
