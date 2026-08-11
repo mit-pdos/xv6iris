@@ -991,3 +991,5 @@ LinkNamei.v
 ProofNameiparent.v
 LinkNameiparent.v
 ProofPrepareReturnParts.v
+ProofPrepareReturn.v
+LinkPrepareReturn.v

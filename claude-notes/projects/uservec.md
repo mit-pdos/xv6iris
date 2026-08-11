@@ -188,6 +188,61 @@ set SIE=1 until it is folded back into a real `intr_res`. That is exactly
 interrupts" — and it is why the write is legal only after `intr_off()`,
 which is the order the C code uses.
 
+## prepare_return: PROVEN, 42/42 instructions
+
+`ProofPrepareReturn.v` closes with `Qed` (2026-08-11), sealed as
+`PREPARE_RETURN` and linked by `LinkPrepareReturn.v` against
+`LinkMyproc`. Pure obligations live in `ProofPrepareReturnParts.v`.
+
+**The one structural idea: the function changes index at +0x0c, and
+everything it needs comes out of that flip.** The prologue and the `jal
+myproc` run at `b = true`, so each step rebinds the hart; from the `csrci`
+onward the index is `false` and every step is `wp_next_off_intro`. Three
+consequences that cost real time to find:
+
+- **The binder at the flip itself is still `true`.** The flip leaf's
+  continuation is `wp_next b p` at the leaf's *entry* index, and an
+  interrupt can be taken on that very instruction — so that one step
+  rebinds (`iIntros (CID7 Hk7 ms0)`) and only the ones after it introduce
+  at the ambient hart. Writing `wp_next_off_intro` there fails with an
+  unhelpful unification error.
+- **`c.mv a4,tp` at +0x50 is legal only because the flip already
+  happened.** `src_ok b rs` forbids a tp read at `b = true`, so this
+  instruction could not be proved anywhere before +0x0c. gcc's ordering is
+  the only one that works.
+- **A resource minted before the flip carries the *old* hart in its
+  `rget`s.** "Hbra" (the ra slot, stored at +0x02) holds `rget (CID :=
+  <that step's hart>) M1 ra_idx`, while every fact stated after +0x0c is
+  at the rebound hart; the two do not match syntactically. The fix is to
+  state the restatement ∀-quantified over `CpuId` and let `rget_ne` —
+  which is hart-generic away from tp — rewrite at whichever instance the
+  resource carries. This is the only place in the walk where the hart
+  annotation matters.
+
+**The sstatus RMW was never the hard part it looked like.** The whole-word
+identity `sstatus_read ms0 = (sstatus_read ms &~0x100) | 0x20` is not
+needed and cannot be proved cheaply (it would need `lower_mstatus`'s nest
+of slice updates reasoned about as a word). `flip_core` already takes the
+written word abstractly with five field premises, so generalizing
+`wp_csrw_sstatus_val_s_sconf` to an abstract `wval` reduced the obligation
+to seven three-line field lemmas: slicing distributes over the bitwise ops
+(`bv_extract_and` / `bv_extract_or`, added to `WpGprCsrwC.v`) and each
+mask's own slice is a closed `vm_compute`. `prr_sst_spp` lands at `'b"0"`
+and `prr_sst_spie` at `'b"1"` — exactly the `sret_bits 'b"0" 'b"1"` the
+contract promises.
+
+**Two bugs found by attempting the proof, not by inspection.** The spec's
+post promised the per-cpu bundle twice (`cpu_cells` and `intr_count`
+standalone *and* inside `cpu_own`); and `wp_csrr_satp_s_sconf` as first
+written had a premise set no caller could hold. Both were unprovable-as-
+written rather than hard, and both are fixed.
+
+**`callee_saved m mF` over a 25-deep insert tower** is three lines, not
+13×25 peels: every write above `A` is to a3/a4/a5/ra — all caller-saved —
+so `repeat (apply callee_saved_insert_r; [vm_compute; reflexivity |])`
+collapses the tower to `callee_saved A U17`, and only sp and s0 (saved by
+the prologue, restored by the epilogue) need their own conjuncts.
+
 ## What remains after this project
 
 - Prove usertrap() (huge: syscall/devintr/vmfault/kexit/prepare_return
