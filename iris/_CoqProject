@@ -873,6 +873,7 @@ WeakPromiseLitmus.v
 WeakPromiseFact.v
 WeakPromiseBridge.v
 WeakRobust.v
+WeakRobustTrace.v
 WeakAxiomatic.v
 WeakAxiomatic2.v
 WeakInterp.v

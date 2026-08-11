@@ -256,17 +256,41 @@ floor that sees every observation.
       flat memory a run's log denotes), and `robust` — every lat-free
       `wp_behavior` is matched by a `wp_pf_run` with the same per-agent
       program states and the same flat memory.
-- [ ] **W2a — the dependency graph.** Over a factorized behavior (promise
-      phase + per-agent state runs), define D = per-agent execution order
-      ∪ (fulfil(m) → read-of-m) edges.  Prove: violation-freedom of the
-      program's pf runs + the three classes ⇒ D acyclic.  A D-cycle is
-      the LB shape; the SCowned arm contradicts the pattern (the read
-      would raise a foreign coh floor over an unpublished message —
-      exhibit it IN THE PF PREFIX being built, which is where the premise
-      lives); the SCfenced arm uses §0's pin (a certifiable fenced
-      promise has the whole deposit below it, so its readers sit after
-      its fulfilment in D already); the SCexcl arm uses the `excl_ok`
-      window + value pinning.
+- [x] **W2a step 1 — the traced state phase, LANDED axiom-free**
+      (`WeakRobustTrace.v`): `aev`/`atrace`/`ptraces` with the fulfilled
+      timestamp RECORDED per event (`ae_ts` = `astep_ok`'s `D`
+      verbatim — the packaging was exactly right for traces), extraction
+      AND replay (`astep_of_atrace` / `atrace_replay`),
+      `wp_behavior_traced`, and the full fulfilment accounting
+      (`wp_behavior_fulfil_once`: every authored log position is
+      fulfilled exactly once in its author's trace — existence by
+      constructive induction, uniqueness by strict promise-set
+      decrease).  Hoist candidates for the owed batch: `wp_astep_inv`
+      (the record-building inversion `wp_astep_shape` lacks),
+      `astep_of_rtc_frozen` (rtc-level frame+frozen), `NoDup` folded
+      into `wp_phases`.
+- [ ] **W2a step 2 — the dependency graph (coordinator).** Over a traced
+      behavior: events = (agent, trace index); D = per-agent trace order
+      ∪ {fulfil(p) → read-of-(S p)} edges, with fulfil(p) located by
+      `wp_behavior_fulfil_once`.  Prove: `pf_violation_free` + the three
+      classes ⇒ D acyclic.  **New finding that simplifies the graph
+      (2026-08-11, from the COH fulfil condition): an agent can NEVER
+      read its OWN unfulfilled promise in a completed behavior** — the
+      read raises its `coh` on the byte past the promise's timestamp,
+      and the later fulfil requires `coh < ts`; contradiction.  So own
+      reads of position p always sit trace-AFTER fulfil(p) (a lemma to
+      prove in the graph file), rf edges never conflict with po, and
+      every potential D-cycle is genuinely CROSS-agent — the LB shape.
+      Per-class refutation of cycles: SCowned — a foreign read of an
+      unpublished message exhibits the violation in the pf prefix under
+      construction (where the premise lives); SCfenced — timestamp
+      arithmetic: `fence rw,w` has pr = true, so any read po-before the
+      fenced store has its read timestamp below the store's `EXT`-pinned
+      timestamp (this is why fenced-LB refutes: the two pins give
+      ts_y > ts_x > ts_y); SCexcl — the `excl_ok` window + `ak_latest`
+      value pinning.  Expect the acyclicity proof to be a per-class
+      height/measure argument mixing timestamps (fenced/excl arms) with
+      the violation contradiction (owned arm).
 - [ ] **W2b — the construction.** Topologically sort D; build the pf run
       by induction over the sort, carrying: a timestamp permutation π
       (the pf log order is FULFILMENT order, which differs from gmo — an

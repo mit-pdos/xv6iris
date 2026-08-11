@@ -344,6 +344,14 @@ and axioms each proven function rests on. `--format text|md|html|json`.
 
 ## Proofmode & bitvector gotchas (recur across files)
 
+- **`stdpp.bitvector.definitions` pulls in `Stdlib.Lists.List`, which SHADOWS
+  stdpp's `last` and `NoDup_cons`** (Stdlib's `last : list A → A → A`, and the
+  `NoDup` CONSTRUCTOR where stdpp has the lemma). Any file importing that
+  module must write `list_basics.last` / `list_relations.NoDup_cons`; bare
+  `NoDup` still resolves to stdpp's. Same family: Stdlib's `Forall_forall`
+  (over `In`) shadows stdpp's (over `∈`) — use `Forall_lookup_2`. Found in
+  the M6 dependency-free files (`WeakRobustTrace.v` etc.), which import
+  bitvector.definitions without the iris proofmode.
 - **Some files are deliberately ssreflect-FREE, and that decides where a definition may live.** `Pt4kWalk.v` has 27 vanilla `rewrite … by …` rewrites, so it cannot `Require` anything that pulls in the iris proofmode — which `PageGeom.v` does (it needs ssreflect's `rewrite … in H |- *` for the two `uint`/`bv_unsigned` bridges it inherited from `KallocInv.v`). So a `page_base`-spelled restatement of a `Pt4kWalk` fact has to live in `PtBuild.v`, not in `Pt4kWalk.v`, even though there is no dependency CYCLE. Before planning a relocation into a low file, check whether that file uses `rewrite … by …`; the failure mode is a parse error at the first such rewrite, far from the import you added.
 - In iris proofmode: `rewrite a b c` uses SPACES not commas (`rewrite H1, H2.` fails); `rewrite lem by tac` does NOT parse (ssreflect clash) — use `rewrite lem; [|tac]` / `rewrite (lem args ltac:(tac))` / `assert … by tac`. iris-FREE files can use `rewrite … by`. Rewrite a proofmode HYP with `iEval (rewrite H) in "Hpc"` — bare `rewrite H` rewrites the WHOLE `envs_entails Δ P` (hyps AND goal) and desyncs them.
 - `iDestruct (lem with "…") as %pure` keeps the spatial inputs when the conclusion is pure (relied on by fetch/config lemmas) — a plain `iDestruct` of a pure-conclusion wand CONSUMES its premises. `big_sepM`/`big_sepL` byte extraction needs an EXPLICIT Φ (underscores leave TC evars unresolved).
