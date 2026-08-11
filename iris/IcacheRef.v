@@ -210,6 +210,35 @@ Definition icacheUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
    under §14.6 there is no ledger, and conservation does the counting. *)
 Definition iliveUR : ucmra := gmapUR nat fracR.
 
+(* ---- THE CHECKOUT DEPOSIT'S DESCRIPTOR (design §14.8) ----------------
+
+   WHAT A CHECKED-OUT ENTRY'S ESCROW ARM IS HOLDING FOR THE THREAD INSIDE.
+   The escrow's OUT arm (IcacheEscrow.ic_out) can be reached from two
+   different deposits -- ilock, which enters holding a SHARE, and iput's
+   authority-side window, which enters holding a REFERENCE -- and the two
+   PARKERS are resource-indistinguishable (§14.8's two-parkers problem: both
+   carry ½ of each identity cell, the full valid word, the payload and
+   [SleepLock.sleeplocked], and nothing else).  So neither could refute the
+   other's arm, and [ic_swap_park] could only return the disjunction, which
+   iput cannot absorb.
+
+   The repair is to make the ENTRY SLEEPLOCK's own resource carry the answer.
+   [IcacheEscrow.ic_tok] used to be [WpLock.lock_tok_excl]; it becomes
+   [ghost_var _ 1 DepNone], still exclusive at fraction one (so the sleeplock
+   and its [ic_tok_exclusive] are unchanged), and the checkout UPDATES it to
+   the descriptor of what it is depositing and splits ½ into the arm, keeping
+   ½.  At the park the two halves meet and [ghost_var_agree] pins the KIND,
+   the FRACTION and the IDENTITY at once -- so each parker selects its own
+   arm deterministically, and both [SpecIunlock]'s and [SpecFileread]'s
+   postcondition existentials over the fraction disappear.
+
+   It lives HERE, beside [icacheG], for [icache_idG]'s reason: the class
+   field is what keeps nine spec and proof files from growing a binder. *)
+Inductive ic_dep : Type :=
+  | DepNone
+  | DepRef (q : Qp) (dev inum : mword 32)
+  | DepShr (s : Qp) (dev inum : mword 32).
+
 (* The second field is [IcacheEscrow]'s per-slot IDENTIFICATION ghost
    ([icn_id], design §13.8 as widened by §13.10): an agreement between the
    escrow's arm and the table's [islot2] share carrying (is the entry LIVE,
@@ -221,10 +250,11 @@ Class icacheG (Σ : gFunctors) := IcacheG {
   icache_inG :: inG Σ icacheUR;
   icache_idG :: ghost_varG Σ (bool * mword 32 * mword 32);
   icache_liveG :: inG Σ iliveUR;
+  icache_depG :: ghost_varG Σ ic_dep;
 }.
 Definition icacheΣ : gFunctors :=
   #[GFunctor icacheUR; ghost_varΣ (bool * mword 32 * mword 32);
-    GFunctor iliveUR].
+    GFunctor iliveUR; ghost_varΣ ic_dep].
 Global Instance subG_icacheΣ {Σ} : subG icacheΣ Σ -> icacheG Σ.
 Proof. solve_inG. Qed.
 

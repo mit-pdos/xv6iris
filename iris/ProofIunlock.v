@@ -15,14 +15,16 @@
    with its region fragment at the parked record -- PARKED-MEANS-FLUSHED,
    §13.1d) goes back in, and out come the CHECKOUT TOKEN -- which is now the
    whole of what the sleeplock protects, so it is exactly releasesleep's [R]
-   -- and the caller's REFERENCE, at its own device and inum (§13.1e).
+   -- and the caller's SHARE, at its own fraction, device and inum (v3: the
+   checkout descriptor pins all three, §14.8).
 
    The three panic tests: [ip == 0] because the entry is slot [k]
    ([iul_entry_nonzero], i.e. [IcacheRef.ientry_unsigned]); [ip->ref < 1]
-   from [IcacheInv.iref_load_au] against [itable_inv], over a reference
-   BORROWED out of the escrow's checked-out arm for that one atomic update
-   ([ic_open_out]; the holder's FULL valid cell is what refutes the other two
-   arms) -- after ilock's deposit the holder owns no reference of its own;
+   from [IcacheInv.iref_live_load_au] against [itable_inv], over a LIVENESS
+   SLICE borrowed out of the escrow's checked-out arm for that one atomic
+   update ([ic_open_out]; the holder's FULL valid cell is what refutes the
+   other two arms) -- after ilock's deposit the holder owns nothing of its
+   own, and the arm's deposit is a share, which has no count fragment;
    and [!holdingsleep] from the holder's bundle -- the token, the lock's pid
    field and the caller's own pid cell agreeing -- which is what makes
    SpecHoldingsleep's HOLDER variant answer 1. *)
@@ -124,18 +126,18 @@ Section ProofIunlockMain.
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ (m !!! Regidx Rs2 : mword 64))%I.
 
   Definition iul_cont `{CID0 : CpuId} 
-      (cn : ic_names) (k : nat) (dev inum : mword 32)
+      (cn : ic_names) (k : nat) (s : Qp) (dev inum : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (b : bool) : iProp Σ :=
     wp_next b p (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (q : Qp),
+      ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K b p -∗
         cpu_own 0 eb p C b -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid p ↦₄{dq} pidv -∗
-        inode_ref k q dev inum -∗
+        inode_shr k s dev inum -∗
         WP (Loop : expr riscv_lang))%I.
 
   Lemma wp_iunlock_sconf 
@@ -144,12 +146,12 @@ Section ProofIunlockMain.
       (cn : ic_names)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z)
-      (k : nat) (dev inum : mword 32)
+      (k : nat) (s : Qp) (dev inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (b : bool)
-    : wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k dev inum
+    : wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s dev inum
                             dn' bm' pidv dq m K eb p C b.
   Proof.
     cbv beta delta [wp_iunlock_sconf_body].
@@ -159,11 +161,11 @@ Section ProofIunlockMain.
     assert (Hipnz : uint ip <> 0)
       by (rewrite Hipe; exact (iul_entry_nonzero k Hk)).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hitbl #Hesc #Hslk Hstok Hpid Hppid
-              #Hprocs Hidev Hinumc Hvalid Hlk Hcont".
+              #Hprocs Hdep Hidev Hinumc Hvalid Hlk Hcont".
     iEval (rewrite Hipe) in "Hidev".
     iEval (rewrite Hipe) in "Hinumc".
     iEval (rewrite Hipe) in "Hvalid".
-    iAssert (iul_cont (CID0 := CID)  cn k dev inum pidv dq m K eb p C b)%I
+    iAssert (iul_cont (CID0 := CID)  cn k s dev inum pidv dq m K eb p C b)%I
       with "[Hcont]" as "Hcont"; [rewrite /iul_cont; iExact "Hcont" |].
     iPoseProof (iui2_00 with "Htext") as "Hi00".
     iPoseProof (iui2_02 with "Htext") as "Hi02".
@@ -419,11 +421,13 @@ Section ProofIunlockMain.
                     = mword_of_int (KernelSyms.iunlock + 0x1c)) by pcw.
     iEval (rewrite Hpp1c) in "Hpc".
     (* ===== +0x1c c.lw a5,8(s1) : a5 := ip->ref, HOLDING NOTHING.
-       The holder deposited its whole reference at ilock's checkout, so it
-       BORROWS one out of the escrow's checked-out arm for the duration of
-       this single atomic update -- [ic_open_out], refuting the other two
-       arms with the FULL valid cell it is carrying (§13.1d) -- and reads
-       the word through [iref_load_au] inside that opening. ===== *)
+       The holder deposited its whole credential at ilock's checkout, so it
+       BORROWS from the escrow's checked-out arm for the duration of this
+       single atomic update -- [ic_open_out], refuting the other two arms
+       with the FULL valid cell it is carrying (§13.1d).  What it borrows is
+       the arm's LIVENESS SLICE, which BOTH deposit shapes carry (§14.8): the
+       deposit here is a SHARE and has no count fragment at all, so the read
+       goes through [iref_live_load_au] rather than [iref_load_au]. ===== *)
     assert (Hrefadr : add_vec (rget mH Rs1) (sign_extend' 64 (mword_of_int 8 : mword 12))
                       = i_ref ip).
     { rgne. rewrite HmHs1. reflexivity. }
@@ -438,14 +442,13 @@ Section ProofIunlockMain.
       iInv "Hesc" as ">Hbody" "Hclose".
       iDestruct (ic_open_out cn gfs gi cov logstart k true with "Hbody Hvalid")
         as "[Hvalid Hbor]".
-      iDestruct "Hbor" as (qb devb inumb) "[Hrefb Hbback]".
-      iDestruct "Hrefb" as "[Hrt Hrid]".
-      iMod (iref_load_au (⊤ ∖ ↑minstretN ∖ ↑icEscN) k qb
-              ltac:(solve_ndisj) with "Hitbl Hrt") as (v) "[Hcell Hcl]".
+      iDestruct "Hbor" as (sb) "[Hlv Hbback]".
+      iMod (iref_live_load_au (⊤ ∖ ↑minstretN ∖ ↑icEscN) k sb
+              ltac:(solve_ndisj) Hk with "Hitbl Hlv") as (v) "[Hcell Hcl]".
       iModIntro. iExists v. iFrame "Hcell". iIntros "Hcell".
-      iMod ("Hcl" with "Hcell") as "[%Hb Hrt]".
-      iMod ("Hclose" with "[Hbback Hrt Hrid]") as "_".
-      { iNext. iApply "Hbback". rewrite /inode_ref. iFrame. }
+      iMod ("Hcl" with "Hcell") as "[%Hb Hlv]".
+      iMod ("Hclose" with "[Hbback Hlv]") as "_".
+      { iNext. iApply ("Hbback" with "Hlv"). }
       iModIntro. iFrame "Hvalid". iPureIntro. exact Hb. }
     iIntros (refv CID14 Hq14) "Hcg Hpc [%Href Hvalid]".
     set (R7 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 refv)]> mH).
@@ -520,12 +523,14 @@ Section ProofIunlockMain.
                ic_loaded gfs gi cov logstart k inum dn0 bm0)%I
       with "[Hlk]" as "Hpay"; [iExists dn', bm'; iExact "Hlk" |].
     iInv "Hesc" as ">Hbody" "Hclose".
-    iDestruct (ic_swap_park cn gfs gi cov logstart k true dev inum
-                 with "Hbody Hidev Hinumc Hvalid Hpay")
+    iMod (ic_swap_park cn gfs gi cov logstart k (DepShr s dev inum) true dev inum
+                 with "Hbody Hdep Hidev Hinumc Hvalid Hpay")
       as "(Hbody & Htok & Hrefout)".
     iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
     iModIntro.
-    iDestruct "Hrefout" as (qr) "Href".
+    (* the descriptor pins the fraction and the identity: the share comes back
+       at exactly [s], with no existential (§14.8) *)
+    iDestruct "Hrefout" as "[_ Href]".
     iApply (RS.wp_releasesleep_sconf gs gil gisl "inode"%string
               (ic_tok cn k) R9 pidv p (K - 4)%nat eb C b
               ltac:(lia)
@@ -746,7 +751,7 @@ Section ProofIunlockMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     rewrite /iul_cont.
     iSpecialize ("Hcont" $! CID24 with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! P5 qr with "[%] Hcg Hcnt Hpc Hppid Href").
+    iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hpc Hppid Href").
     { unfold callee_saved. split_and!; assumption. }
   Qed.
 

@@ -854,8 +854,9 @@ Section IputTail.
          authority still showing the slot, and the store deletes it. *)
       iApply fupd_wp.
       iInv "Hesc" as ">Hbody" "Hclose".
-      iDestruct (ic_open_auth_ref cn gfs gi cov logstart k Mt qt qt qt dev inum HMk
-                   with "Hbody Hhalf Hrtok Hrident")
+      iMod (ic_open_auth_ref cn gfs gi cov logstart k (⊤ ∖ ↑icEscN)
+              Mt qt qt dev inum ltac:(solve_ndisj) HMk
+              with "Hinv Hbody Hhalf Hrtok Hrident")
         as "(Hhalf & Hrtok & Hrident & Harm & _)".
       iDestruct "Harm" as (v) "(Hidv & Hinv2 & Hvld & Hpayl & Hmt & Hgida)".
       iDestruct (islot_rest_join k qt dev inum Hqthalf with "Hrident [Hrest]")
@@ -1365,8 +1366,9 @@ Section ProofIput.
               with "Hcg Hpc Hi3c [Hhalf Hrtok Hrident Hrest] [-]").
     { rewrite Hpa3c.
       iInv "Hesc" as ">Hbody" "Hclose".
-      iDestruct (ic_open_auth_ref cn gfs gi cov logstart k Mt q q q dev inum HMk
-                   with "Hbody Hhalf Hrtok Hrident")
+      iMod (ic_open_auth_ref cn gfs gi cov logstart k
+              (⊤ ∖ ↑minstretN ∖ ↑icEscN) Mt q q dev inum
+              ltac:(solve_ndisj) HMk with "Hinv Hbody Hhalf Hrtok Hrident")
         as "(Hhalf & Hrtok & Hrident & Harm & _)".
       iDestruct "Harm" as (v) "(Hidv & Hinh & Hvld & Hpayl & Hmt & Hgida)".
       iModIntro. iExists (valid_word v). iFrame "Hvld". iIntros "Hvld".
@@ -1496,8 +1498,9 @@ Section ProofIput.
         with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks]" as "Hpayl".
       { rewrite /ic_payload. iExists dn, bm, data.
         iSplitR; [iPureIntro; exact Hok |]. rewrite /inode_meta. iFrame. }
-      iDestruct (ic_open_held cn gfs gi cov logstart k Mt q q true dev inum HMk
-                   with "Hbody Hhalf Hrtok Hgid Hpayl")
+      iMod (ic_open_held cn gfs gi cov logstart k (⊤ ∖ ↑icEscN)
+              Mt q true dev inum ltac:(solve_ndisj) HMk
+              with "Hinv Hbody Hhalf Hrtok Hgid Hpayl")
         as "(Hhalf & Hrtok & Hgid & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".
       iDestruct "Hvldx" as (w0) "Hva".
       iDestruct (word4_pointsto_agree with "Hvb Hva") as %<-.
@@ -1675,8 +1678,9 @@ Section ProofIput.
       with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks]" as "Hpayl".
     { rewrite /ic_payload. iExists dn, bm, data.
       iSplitR; [iPureIntro; exact Hok |]. rewrite /inode_meta. iFrame. }
-    iDestruct (ic_open_held cn gfs gi cov logstart k Mt q q true dev inum HMk
-                 with "Hbody Hhalf Hrtok Hgid Hpayl")
+    iMod (ic_open_held cn gfs gi cov logstart k (⊤ ∖ ↑icEscN)
+            Mt q true dev inum ltac:(solve_ndisj) HMk
+            with "Hinv Hbody Hhalf Hrtok Hgid Hpayl")
       as "(Hhalf & Hrtok & Hgid & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".
     iDestruct "Hvldx" as (w0) "Hva".
     iDestruct (word4_pointsto_agree with "Hvb Hva") as %<-.
@@ -1688,9 +1692,16 @@ Section ProofIput.
     iDestruct (word4_pointsto_frac_split (i_inum (ientry k)) q qr inum with "Hn2")
       as "[Hrn Htn]".
     (* ...and so does the dev cell: the arm's half was never ours *)
-    iMod ("Hclose" with "[Hictok Hrtok Hrd Hrn Hmt Hgida]") as "_".
-    { iNext. iApply (ic_close_out cn gfs gi cov logstart k q dev inum
-                       with "Hictok [Hrtok Hrd Hrn] Hmt Hgida").
+    (* THE DEPOSIT'S DESCRIPTOR (§14.8): the sleeplock's variable becomes
+       [DepRef q dev inum], half goes into the arm and half travels with us to
+       the park at +0x70 -- which is what tells iput's arm from iunlock's
+       there. *)
+    iMod (ic_dep_checkout cn k (DepRef q dev inum) with "Hictok")
+      as "[Hdepa Hdepk]".
+    iMod ("Hclose" with "[Hdepa Hrtok Hrd Hrn Hmt Hgida]") as "_".
+    { iNext. iApply (ic_close_out cn gfs gi cov logstart k (DepRef q dev inum)
+                       dev inum with "Hdepa [Hrtok Hrd Hrn] Hmt Hgida").
+      rewrite /ic_dep_res. iSplitR; [iPureIntro; done |].
       rewrite /IcacheRef.inode_ref /IcacheRef.inode_ident. iFrame. }
     iModIntro.
     (* the lock's resource re-forms, unchanged, and is released at +0x5c *)
@@ -1976,11 +1987,14 @@ Section ProofIput.
         iExact "Haddrs".
       - rewrite /ipool_shape. iRight. iExists (di_free dn2).
         iSplitR; [iPureIntro; exact (di_free_type dn2) |]. iExact "Hdat". }
-    iDestruct (ic_swap_park cn gfs gi cov logstart k false dev inum
-                 with "Hbody Hidv Hinh Hvld Hpayf") as "(Hbody & Hictok & Hrefo)".
+    iMod (ic_swap_park cn gfs gi cov logstart k (DepRef q dev inum) false dev inum
+                 with "Hbody Hdepk Hidv Hinh Hvld Hpayf")
+      as "(Hbody & Hictok & Hrefo)".
     iMod ("Hclose" with "[Hbody]") as "_"; [by iNext |].
     iModIntro.
-    iDestruct "Hrefo" as (q2) "Href".
+    (* the descriptor pins the fraction: what comes back is the reference we
+       deposited, at [q], not at some existential [q2] (§14.8) *)
+    iDestruct "Hrefo" as "[_ Href]".
     (* ===== +0x74 c.mv a0,s2 ; +0x76 jal releasesleep ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.iput + 0x74)) Ra0 Rs2
               mfu (K - 4)%nat true ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi74 [-]").
@@ -2139,7 +2153,7 @@ Section ProofIput.
     iEval (rewrite Hpp20d) in "Hpc".
     iDestruct "HRres2" as (Mt2 ci2) "(Hhalf2 & %Hwf2 & %Hciwf2 & Hiauth2 & Hslots2 & Hpool2)".
     iApply (ip_tail (CID := CIDac2) CID j bn g gfs gi cn gtl cov logstart bmapstart
-              inodestart nib size dev used (used ∖ bm_blocks bm2) k q2 inum Mt2 ci2
+              inodestart nib size dev used (used ∖ bm_blocks bm2) k q inum Mt2 ci2
               n (u' - 1)%nat pidv dq dqb dqs m J10 K C sp0 (m !!! Regidx Rs2)
               HK Hk ltac:(wp_next_chain) Hsp0eq HJ10regs Hwf2 Hciwf2
               ltac:(unfold iput_units; lia) ltac:(lia) ltac:(apply ip_diff_sub)

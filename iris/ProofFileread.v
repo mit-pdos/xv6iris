@@ -1695,7 +1695,7 @@ Section ProofFileread.
                        (frn_bio fn) (frn_fs fn) (frn_ireg fn) (frn_ic fn)
                        (frn_ilk fn) (frn_islk fn)
                        (frn_cov fn) (frn_logstart fn) (frn_inodestart fn)
-                       (frn_nib fn) (frn_ik fn) (frn_q fn)
+                       (frn_nib fn) (frn_ik fn) (frn_s fn)
                        (frn_dev fn) (frn_inum fn)
                        pidv (DfracOwn (1/4)) (frn_dqs fn)
                        I2 (K - 6)%nat eb C b
@@ -1704,8 +1704,11 @@ Section ProofFileread.
                        with "Hcg Hcnt Htext Hpc Hpanic Hbio Hitbl Hesc Hireg
                              Hslk Href Hsb Hppid Hprocs
                              Hdevi Hdgeom Hdlock Hbslot [-]").
+             (* v3: ilock also hands back the checkout descriptor's other
+                half, which iunlock consumes to select its own escrow arm
+                (design §14.8) *)
              iIntros (CIDil Hsil mil dnl bml)
-               "%Hcsil Hcg Hcnt Hpc Hppid Hsb Hbslot Hheld Hslpid
+               "%Hcsil Hcg Hcnt Hpc Hppid Hsb Hbslot Hheld Hslpid Hdep
                 Hidev Hinum Hvalid Hlk".
              iDestruct ("Hpivbk" with "Hppid") as "Hpriv".
              assert (Hpc34 : ret_pc (I2 !!! Regidx Rra) = mword_of_int (FR + 0x34)).
@@ -2061,14 +2064,15 @@ Section ProofFileread.
                 iApply (Iunlock.wp_iunlock_sconf γs (frn_fs fn) (frn_ireg fn)
                           (frn_ic fn) (frn_ilk fn) (frn_islk fn)
                           (frn_cov fn) (frn_logstart fn)
-                          (frn_ik fn) (frn_dev fn) (frn_inum fn) dnl bml
+                          (frn_ik fn) (frn_s fn) (frn_dev fn) (frn_inum fn)
+                          dnl bml
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj C b
                           (fr_av_iunlock K HK) Hik
                           ltac:(rewrite HN2a0; exact Hipk)
                           with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk
                                 Hheld Hslpid Hppid Hprocs
-                                Hidev Hinum Hvalid Hlk [-]").
-                iIntros (CIDiu Hsiu miu qout) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout".
+                                Hdep Hidev Hinum Hvalid Hlk [-]").
+                iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout".
                 iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
                 assert (Hpc54 : ret_pc (N2 !!! Regidx Rra) = mword_of_int (FR + 0x54)).
                 { rewrite HN2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -2131,7 +2135,7 @@ Section ProofFileread.
                 { rewrite /file_ref /file_fields.
                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                 { iApply (fr_env_out_fs fn Cf Htyi). rewrite /fileread_fs_out.
-                  iFrame "Hsb Hbslot". iExists qout. iExact "Hrefout". }
+                  iFrame "Hsb Hbslot Hrefout". }
              ++ (* ---- the update RUNS: f->off += r ---- *)
                 iPoseProof (fri_48 with "Htext") as "Hi48".
                 iPoseProof (fri_4a with "Htext") as "Hi4a".
@@ -2320,14 +2324,15 @@ Section ProofFileread.
                 iApply (Iunlock.wp_iunlock_sconf γs (frn_fs fn) (frn_ireg fn)
                           (frn_ic fn) (frn_ilk fn) (frn_islk fn)
                           (frn_cov fn) (frn_logstart fn)
-                          (frn_ik fn) (frn_dev fn) (frn_inum fn) dnl bml
+                          (frn_ik fn) (frn_s fn) (frn_dev fn) (frn_inum fn)
+                          dnl bml
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj C b
                           (fr_av_iunlock K HK) Hik
                           ltac:(rewrite HN2a0; exact Hipk)
                           with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk
                                 Hheld Hslpid Hppid Hprocs
-                                Hidev Hinum Hvalid Hlk [-]").
-                iIntros (CIDiu Hsiu miu qout) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout".
+                                Hdep Hidev Hinum Hvalid Hlk [-]").
+                iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout".
                 iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
                 assert (Hpc54 : ret_pc (N2 !!! Regidx Rra) = mword_of_int (FR + 0x54)).
                 { rewrite HN2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -2390,7 +2395,7 @@ Section ProofFileread.
                 { rewrite /file_ref /file_fields.
                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                 { iApply (fr_env_out_fs fn Cf Htyi). rewrite /fileread_fs_out.
-                  iFrame "Hsb Hbslot". iExists qout. iExact "Hrefout". }
+                  iFrame "Hsb Hbslot Hrefout". }
           -- (* ================ NOT A FILE AT ALL: panic ==========
                 [SpecPanic.panic_wp_any] closes the arm; panic never
                 returns, so there is nothing after the [jal]. *)

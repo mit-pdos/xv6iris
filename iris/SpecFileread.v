@@ -236,7 +236,7 @@ Record fread_names := MkFReadNames {
   frn_inum       : mword 32;
   frn_nib        : nat;           (* the inode region's block count         *)
   frn_ik         : nat;           (* the itable SLOT this inode is           *)
-  frn_q          : Qp;            (* the borrowed reference's fraction       *)
+  frn_s          : Qp;            (* the LENT SHARE's fraction (v3)          *)
   frn_dqs        : dfrac;         (* sb.inodestart                          *)
   frn_rp         : mword 64;      (* devsw[major].read                      *)
   frn_dqv        : dfrac;         (* ...and that cell's fraction            *)
@@ -300,7 +300,8 @@ Section SpecFileread.
      (* THE INODE IS ITABLE SLOT [frn_ik fn].  This replaces v1's
         [uint (fc_ip Cf) <> 0]: [IcacheRef.ientry_unsigned] refutes ilock's
         and iunlock's null test outright.  Their [ref < 1] test is refuted
-        from [itable_inv] by [iref_load_au], so v1's [0 < refv < 2^31]
+        from [itable_inv] by [iref_live_load_au] (v3 -- a share carries no
+        count fragment, §14.6), so v1's [0 < refv < 2^31]
         premise about a caller-owned [i_ref] fraction is gone too.  And
         readi's [size <= MAXFILE*BSIZE] premise is gone because ilock's
         record is now an OUTPUT: the bound travels with it, as the fifth
@@ -323,11 +324,25 @@ Section SpecFileread.
      (* THE ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
      is_sleeplock (frn_ilk fn) (frn_islk fn) (i_lock (fc_ip Cf)) "inode"%string
        (ic_tok (frn_ic fn) (frn_ik fn)) ∗
-     (* THE BORROWED REFERENCE.  ilock deposits it into the escrow and
-        iunlock brings it back, so what fileread hands its own caller is a
-        reference at SOME fraction -- [ic_swap_park] pins the device and the
-        inum but not the share (§13.1e), exactly as brelse does in bio. *)
-     IcacheRef.inode_ref (frn_ik fn) (frn_q fn)
+     (* THE LENT SHARE (v3, design §14.6/§14.8).  SpecIlock v3 takes a
+        SHARE, not a reference: a share is a slice of the two identity cells
+        plus the matching slice of the slot's liveness unit, carved from a
+        reference by [IcacheRef.inode_ref_carve] -- a pure resource split, no
+        fupd and no invariant opening.  ilock deposits it into the escrow and
+        iunlock brings it back AT THE SAME FRACTION (the checkout descriptor
+        pins it, §14.8), so fileread neither loses nor invents mass.
+
+        WHERE IT COMES FROM, in the eventual design: sys_read's cone carves
+        it off the FD_INODE file payload's cinv-parked reference at entry and
+        gathers it back at exit ([inode_ref_gather]) -- the bracket discipline
+        of §14.1, made a resource by the canonical pairing.  The parent
+        reference is [inode_ref_short] while the share is out, so it cannot
+        be spent (iput above all) until the gather, which is exactly what
+        makes shares unable to outlive their parent.  Stating the share HERE
+        rather than a reference is what lets that carve happen at the file
+        table's altitude, where [fp_iq]'s proportional accounting lives; that
+        wiring is B3's, and nothing in this file's cone needs it. *)
+     IcacheRef.inode_shr (frn_ik fn) (frn_s fn)
                (frn_dev fn) (frn_inum fn) ∗
      sb_inodestart ↦₄{frn_dqs fn}
        (mword_of_int (frn_inodestart fn) : mword 32) ∗
@@ -340,16 +355,19 @@ Section SpecFileread.
         readi's does the same, one after the other *)
      bslot (frn_bio fn))%I.
 
-  (* What comes back.  The reference's FRACTION is existential rather than
-     [frn_q fn]: the two early returns (not readable; a type that is not
+  (* What comes back: THE SAME SHARE, at the same fraction.  v2 had to say
+     [∃ q'] here -- the two early returns (not readable; a type that is not
      FD_INODE) never reach ilock and hand the caller's own reference back
-     untouched, while the arm that ran gets one out of [ic_swap_park], which
-     pins the device and the inum but not the share.  A caller re-entering
-     fileread simply passes the [q'] it got.  (v1 had the same shape one
-     field over: its [vv'] was existential for the identical reason.) *)
+     untouched, while the arm that ran got one out of [ic_swap_park], which
+     pinned the device and the inum but not the fraction.  The checkout
+     descriptor (§14.8) pins the fraction too, so both arms now return
+     literally [frn_s fn] and the existential is gone.  That matters beyond
+     tidiness: B3's [fp_iq] accounting has to re-gather this share into the
+     payload's parent reference, and a gather needs the fraction to be the
+     one that was carved. *)
   Definition fileread_fs_out (fn : fread_names) (Cf : fcontent) : iProp Σ :=
-    ((∃ q' : Qp, IcacheRef.inode_ref (frn_ik fn) q'
-                           (frn_dev fn) (frn_inum fn)) ∗
+    (IcacheRef.inode_shr (frn_ik fn) (frn_s fn)
+                           (frn_dev fn) (frn_inum fn) ∗
      sb_inodestart ↦₄{frn_dqs fn}
        (mword_of_int (frn_inodestart fn) : mword 32) ∗
      bslot (frn_bio fn))%I.
@@ -377,9 +395,9 @@ Section SpecFileread.
     fileread_fs_env γf k fn Cf -∗ fileread_fs_out fn Cf.
   Proof.
     rewrite /fileread_fs_env /fileread_fs_out.
-    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Href & Hsb &
+    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hshr & Hsb &
               _ & _ & _ & Hbs)".
-    iFrame "Hsb Hbs". iExists (frn_q fn). iFrame "Href".
+    iFrame "Hsb Hbs Hshr".
   Qed.
 
   Lemma fileread_env_out_of_env γf k fn Cf :

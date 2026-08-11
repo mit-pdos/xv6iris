@@ -35,16 +35,31 @@
 
    ---- WHAT IT CONSUMES, AND WHAT IT PRODUCES --------------------------
 
-   IN: ONE REFERENCE, [IcacheRef.inode_ref γic k q dev inum] -- and it is
-   consumed.  §13.1d: a reference cannot be split without the authority
-   ([iref_tok]'s fraction and its count move together), so the checkout
-   DEPOSITS the winner's whole reference into the escrow's checked-out arm,
-   where it waits for iunlock to bring the content back.  That is why this
-   contract hands nothing reference-shaped to its continuation and why
-   SpecIunlock v2 is the only way to get one back.  Both identity CELLS come
-   out at the escrow's permanent half (§13.1e) -- which is what lets ilock
-   read [ip->dev] for its own bread after the deposit, and what lets iunlock
-   return the reference AT THIS DEVICE.
+   IN: ONE SHARE, [IcacheRef.inode_shr k s dev inum] -- and it is consumed
+   (v3, design §14.6/§14.8).  v2 took a whole REFERENCE; the caller that
+   actually exists is fileread, whose inode reference is parked in the file
+   payload for the duration of the call and can only LEND, so what crosses
+   ilock's boundary is a slice of the identity cells plus the matching slice
+   of the slot's liveness unit ([IcacheRef.inode_ref_carve], a pure resource
+   split -- no fupd, no invariant, §14.7(2)).  A share carries NO count
+   fragment ([positiveR] has no zero, §14.5), which is why the [ref < 1]
+   guard below reads through the liveness pool instead.  ilock has exactly
+   one caller in the tree, so there is no reference-shaped variant of this
+   contract.
+
+   The share is DEPOSITED, exactly as v2's reference was: §13.1d, a checkout
+   hands its credential to the escrow's checked-out arm, where it waits for
+   iunlock.  That is why this contract hands nothing back that could be
+   spent, and why SpecIunlock v3 is the only way to recover the share.  What
+   it DOES hand back is the other half of the entry sleeplock's descriptor
+   variable ([IcacheEscrow.ic_deposit] at [DepShr s dev inum]) -- §14.8's
+   repair: with the OUT arm able to hold either a share or a reference, that
+   half is what lets the parker find its own arm again, and it pins the
+   fraction and the identity so that iunlock's postcondition needs no
+   existential.  Both identity CELLS come out at the escrow's permanent half
+   (§13.1e) -- which is what lets ilock read [ip->dev] for its own bread
+   after the deposit, and what lets iunlock return the share AT THIS
+   DEVICE.
 
    The three persistent invariants replace what v1 asked a caller to own
    outright: [itable_inv] (the [ref] words -- v1's [i_ref ip ↦₄{dqr} refv]
@@ -78,10 +93,16 @@
    ---- ONE PANIC IS DEAD, ONE IS LIVE ----------------------------------
 
    [ip == 0 || ip->ref < 1] is REFUTED: the null half by [ientry_unsigned]
-   as above, the count half by [IcacheInv.iref_load_au] against
+   as above, the count half by [IcacheInv.iref_live_load_au] against
    [itable_inv], whose delivered [0 < v < 2^31] is exactly what
    [InodeLock.inode_ref_spos] turns into "[bge x0,a5] falls through" (v1
-   took those bounds as a premise about a caller-owned cell).
+   took those bounds as a premise about a caller-owned cell).  v2 read
+   through the reference's COUNT fragment ([iref_load_au]); a share has
+   none, and reads through its LIVENESS slice instead -- a free slot's whole
+   unit sits inside [IcacheInv.itable_body], so owning any slice at all
+   proves the slot is live.  That lemma takes [k < NINODE] as a premise
+   where its count-side twin derived it from [icM_wf]; this contract has it
+   already.
 
    [ip->type == 0] IS LIVE -- A FIRST FOR THIS TREE.  §13.1: the shadow that
    used to carry v1's conditional agreement premise is gone, a caller
@@ -156,7 +177,7 @@ Definition wp_ilock_sconf_body
     (cn : ic_names)                                    (* the icache's names  *)
     (gil gisl : gname)                                 (* ip->lock            *)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
-    (k : nat) (q : Qp) (dev inum : mword 32)
+    (k : nat) (s : Qp) (dev inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
     (b : bool) :=
@@ -197,8 +218,8 @@ Definition wp_ilock_sconf_body
   ireg_inv gi gfs inodestart nib -∗
   (* THE ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
   is_sleeplock gil gisl (i_lock ip) "inode"%string (ic_tok cn k) -∗
-  (* THE CALLER'S REFERENCE -- consumed; deposited whole at the checkout *)
-  inode_ref k q dev inum -∗
+  (* THE CALLER'S SHARE (v3) -- consumed; deposited whole at the checkout *)
+  inode_shr k s dev inum -∗
   (* sb.inodestart, read once *)
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   (* the caller's own pid cell (acquiresleep records it in the lock) *)
@@ -223,10 +244,13 @@ Definition wp_ilock_sconf_body
       (* THE LOCK IS HELD ... *)
       sleeplocked gisl -∗
       sl_pid (i_lock ip) ↦₄ pidv -∗
-      (* ... and the entry is CHECKED OUT and LOADED: the escrow's two
+      (* ... and the entry is CHECKED OUT and LOADED: the checkout
+         descriptor's other half (§14.8 -- what the parker selects its arm
+         with, and what pins [s], [dev] and [inum] there), the escrow's two
          identity halves, the valid cell, and the loaded content at a
          record the region agrees with.  Exactly [ic_swap_park]'s input,
-         i.e. exactly SpecIunlock v2's precondition. *)
+         i.e. exactly SpecIunlock v3's precondition. *)
+      ic_deposit cn k (DepShr s dev inum) -∗
       i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
       i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
       i_valid ip ↦₄ valid_word true -∗
@@ -248,11 +272,11 @@ Module Type ILOCK.
       (cn : ic_names)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
-      (k : nat) (q : Qp) (dev inum : mword 32)
+      (k : nat) (s : Qp) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
       wp_ilock_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
-                          cov logstart inodestart nib k q dev inum
+                          cov logstart inodestart nib k s dev inum
                           pidv dq dqs m K eb C b.
 End ILOCK.

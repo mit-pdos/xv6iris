@@ -164,17 +164,22 @@ Design: fs-icache.md §14.5 (A's impossibility) + §14.6 (B's shape and
 sizing). Staging, one branch + gate per stage:
 
 - **B1 — LANDED** (see "What B1 actually landed" below).
-- **B2** — **BLOCKED AS SPECIFIED, no code written (2026-08-11); see
-  fs-icache.md §14.8 and "B2's blocker" below.** Was: C8:
-  SpecIlock/SpecIunlock/SpecFileread over `inode_shr`; the escrow OUT arm
-  gains the share-shaped alternative (refuted at REF-1 by ident-mass
-  overflow, §14.6); ProofIlock re-proof + fileread/iunlock repairs.
-  Re-staged as **B2a** (the escrow's deposit-descriptor rework — the
-  prerequisite §14.6 did not budget) then **B2b** (the three contracts,
-  which are otherwise exactly as scoped).
+- **B2a — LANDED** (2026-08-11): the escrow's deposit-descriptor rework,
+  exactly as fs-icache.md §14.8 specified. `ic_tok` is a `ghost_var` over
+  `IcacheRef.ic_dep`; the OUT arm is descriptor-shaped; `ic_open_auth_ref`
+  and `ic_open_held` are fupds refuting a share deposit by LIVE mass. See
+  "What B2a/B2b actually landed" below.
+- **B2b — LANDED** (2026-08-11): SpecIlock v3 / SpecIunlock v3 /
+  SpecFileread v3 over `inode_shr`, with both postcondition existentials
+  retired by the descriptor.
 - **B3** — origin's share commits ported: SpecIdup's share form
   (carve+upgrade), ProofKforkB4's shorter block, fp_iq's payload arm.
-  Partly deferrable.
+  Partly deferrable. NOTE for B3: `SpecFileread`'s `frn_s` is stated as a
+  premise with no producer yet — sys_read's cone is where the carve from
+  the file payload's cinv-parked reference has to happen
+  (`inode_ref_carve` at entry, `inode_ref_gather` at exit, `fp_iq`'s
+  proportional allotment). Both ends now pin the SAME fraction, which is
+  what a gather needs.
 
 The canonical-pairing convention (tok fraction = ident fraction in
 `inode_ref`) is LOAD-BEARING and must be stated in IcacheRef's header:
@@ -270,50 +275,74 @@ derived it from `icM_wf`), `iref_share_lookup_au`,
 ambient-`icfg`-vs-boot-minted gap recorded under T3 is untouched and now
 covers two gnames instead of one.
 
-## B2's blocker (2026-08-11): the OUT arm's two deposit shapes
+## What B2a/B2b actually landed (2026-08-11)
 
-Full analysis in design/fs-icache.md §14.8. Nothing was written to `iris/`;
-the tree is at B1-state, green. In one paragraph:
+Full remote build green (937 .vo, 0 errors); `lemma_diff --ref f2441b28`
+clean; `proof_coverage` unchanged (151 proven, same seven `!`); iget, idup,
+ilock, iunlock, iput, fileread all still PROVEN. `Print Assumptions` on
+`Ilock.wp_ilock_sconf` / `Fileread.wp_fileread_sconf` / `Iput.wp_iput_sconf`
+is unchanged: the four `rv64d.*` platform axioms + `functional_extensionality`,
+plus fileread's pre-existing `Consoleread` axiom.
 
-The share-shaped OUT alternative is fine to ADD; what does not go through is
-`ic_swap_park`. With two alternatives every parker faces both, and iunlock's
-parker and iput's window-exit parker hold IDENTICAL resources — `½ i_dev`,
-`½ i_inum`, the full `i_valid`, the payload, `sleeplocked` — so neither can
-refute the other's arm. `ic_tok` and `ic_mid` are in both arms and must be
-(they are `ic_swap_checkout`'s and `ic_open_mid`'s refutations); `ic_id`'s
-halves are the arm's and `islot2`'s; the cell fractions never reach 1; iput
-holds no `itable_half` at its park (released at +0x5c). Returning the
-disjunction is dead at iput, whose `ip->ref--` needs a count fragment a
-share does not have; and iput cannot deposit a share instead, because
-re-pairing the returned share with its retained fragment needs `s = q` and
-only `s ≤ q` is derivable.
+**§14.8's design needed no correction.** Every refutation closed as written,
+including the two the analysis was least sure of (the ghost-var fraction
+overflow at the checkout, and the LIVE-mass overflow at REF-1). Neither
+`IcacheBoot`'s allocation nor the sleeplock's `is_sleeplock` instantiation
+moved at all: `ic_tok` is still "the variable, whole", so `ic_tok_exclusive`
+and `sl_fresh_new` are unchanged, and only the esc family's ALLOCATOR
+changed (`ic_dep_fun_alloc`, modelled on `ic_id_fun_alloc`;
+`ic_tok_fun_alloc` survives for the recycle-token family).
 
-Second, smaller finding: §14.6's ident-mass refutation at REF-1 is stated
-over a `½`-resident the arm does not own in the OUT state (SpecIlock hands
-it to the checked-out thread). The task's LIVE-mass replacement is correct,
-but `live_slot` is inside `itable_inv`, so `ic_open_auth_ref` must become a
-fupd taking `itable_inv` + `↑icacheN ⊆ Eo` and forcing `M !! k = Some (q,1)`
-at the tok's own `q`. Verified free at both `ProofIput` call sites (:857
-under `fupd_wp`+`iInv "Hesc"`; :1368 inside the `lw` AU at
-`⊤∖↑minstretN∖↑icEscN`), and both already pass `q = qt = qi`.
+Four things §14.8 did not spell out, all cheap:
 
-**Recommended repair (B2a), one gname's worth:** make `ic_tok` a
-`ghost_var` carrying a deposit descriptor instead of `lock_tok_excl` —
-`ic_tok cn k := ghost_var (icn_esc cn k) 1 DepNone`, with the checkout
-updating it to `DepRef q dev inum` / `DepShr s dev inum`, splitting ½ into
-the arm and keeping ½. Exclusive at 1, so `ic_tok_exclusive` and
-`is_sleeplock ... (ic_tok cn k)` are unchanged; both parkers then pick their
-arm by `ghost_var_agree`, which additionally PINS the fraction and kills the
-`∃ q` in SpecIunlock's postcondition and the `∃ q'` in `fileread_fs_out`
-(B3's `fp_iq` accounting wants exactly that). Touches `ic_tok`,
-`ic_tok_fun_alloc`/`ic_names_alloc` (`ic_id`'s allocator is the template),
-`IcacheBoot`, all five arms, the eleven swap/open lemmas, and
-`ProofIput`/`ProofIlock`/`ProofIunlock`. `ProofIget` rides through (it works
-through `ic_mid`/`ic_id`). Sizing: one C3b-scale run for B2a, then B2b as
-originally scoped.
+1. **The descriptor's other half TRAVELS**, so it is in SpecIlock v3's
+   postcondition and SpecIunlock v3's precondition. In `ProofIlock` that
+   means `il_cont` / `il_epilogue` / `il_load` take two more parameters
+   (`cn`, `s`) and one more premise; in `ProofIput` the half is carried by
+   hand from the window exit at +0x54 to the park at +0x70, with no
+   statement change anywhere (that stretch is one monolithic proof, and the
+   spec applications along it name their arguments, so the resource frames
+   itself).
+2. **`ic_swap_checkout` is GENERIC in the deposit kind** — one lemma, not
+   two. Every checkout-side refutation uses only the identity FRACTION,
+   which a reference and a share both carry; `ic_dep_res_ident` is the
+   accessor that hands it over and takes it back.
+3. **`ic_open_out` returns a LIVENESS accessor** (`ic_dep_res_live`), not a
+   borrowed reference. Both deposit shapes carry a `live_frac`, so the
+   borrow is kind-independent and iunlock's guard read needs no descriptor
+   half of its own — it reads through `iref_live_load_au`.
+4. **`ic_open_held` needed the same fupd treatment as `ic_open_auth_ref`**
+   (§14.8 named only the latter). Both of ITS call sites already pass
+   `q = qt` and sit under `iApply fupd_wp; iInv "Hesc"` at `⊤ ∖ ↑icEscN`,
+   so the cost was the same two edits.
 
-Two facts that make B2b cheap once B2a lands: `ProofFileread` never touches
-`i_dev`/`i_inum` itself (grep: no hits) — it only threads ilock's halves to
-iunlock, so the bundle's shape is free to change; and `ilock` has exactly
-one caller in the tree (`ProofFileread`), so SpecIlock can move WHOLLY to
-shares with no reference-shaped variant, as the task preferred.
+The corrected REF-1 refutation is `IcacheInv.live_whole_share_absurd`, and
+note what does the work: **`q = qt`, not `n = 1`** — the lemma takes the
+count as a parameter and never looks at it. REF-1 is only how the caller
+comes to know its own `q` is the whole outstanding mass.
+
+`IcacheInv.iref_load_au` now has NO consumer (ilock and iunlock both moved
+to `iref_live_load_au`). It is kept as the reference-side twin of the guard
+read; a future reference-holding caller of a lock-free `ip->ref` read is
+exactly what it is for.
+
+## Why the escrow carries a deposit DESCRIPTOR (the durable half of B2a)
+
+Analysis in design/fs-icache.md §14.8; the shape that landed is in
+`IcacheEscrow.v`'s header. In one paragraph, because it is the thing a
+future reader will want to un-invent: the OUT arm holds either a REFERENCE
+(iput's authority-side window exit) or a SHARE (ilock's checkout), and the
+two PARKERS are resource-indistinguishable — both carry `½ i_dev`,
+`½ i_inum`, the full `i_valid`, the payload and `sleeplocked`, and nothing
+else, because iput has released `itable.lock` by then. `ic_tok` and `ic_mid`
+must be in both arms (they are `ic_swap_checkout`'s and `ic_open_mid`'s
+refutations), `ic_id`'s halves belong to the arm and to `islot2`, and no
+cell fraction ever reaches 1. So the arm cannot be selected by ownership,
+and `ic_swap_park` returning the disjunction is dead at iput (a share has no
+count fragment, so `ip->ref--` is unprovable on that branch) — and iput
+cannot deposit a share instead, because re-pairing the returned share with
+its retained fragment needs `s = q` where only `s ≤ q` is derivable. The
+sleeplock's own token is therefore what says which: `ic_tok cn k` is
+`ghost_var (icn_esc cn k) 1 DepNone`, the checkout updates it and splits ½
+into the arm, and one `ghost_var_agree` at the park pins kind, fraction and
+identity together.

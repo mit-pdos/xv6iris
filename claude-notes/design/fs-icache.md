@@ -1924,8 +1924,8 @@ for iput that B turns out not to need.
    incr-with-the-share-carried) and RETURNS the share beside the new
    reference; kfork's parent gathers it back. B3 adjusts accordingly.
 
-### 14.8 B2 IS BLOCKED: the OUT arm cannot carry two deposit shapes,
-### because the two parkers are resource-indistinguishable (2026-08-11)
+### 14.8 B2 WAS BLOCKED (repaired by §14.9): the OUT arm cannot carry two
+### deposit shapes, because the two parkers are resource-indistinguishable
 
 B2's plan is "`ic_out` gains a share-shaped alternative beside the
 reference-shaped one". Worked through against the code, that does not
@@ -2058,3 +2058,54 @@ the callers — dead at iput, as above. (iii) a fourth `ic_names` token
 family — strictly worse than (b)'s repair: it needs a home in EVERY arm at
 boot, whereas the descriptor reuses a gname that already exists and already
 has exactly the right lifetime.
+
+### 14.9 B2a/B2b LANDED (2026-08-11): §14.8's repair as built
+
+§14.8's design went in unchanged — no correction, no alternative — so read
+it as the WHY and this as the WHAT. Tree green (937 .vo); ilock, iunlock,
+fileread, iget, idup, iput all still PROVEN; assumption sets unchanged.
+
+**The descriptor.** `IcacheRef.ic_dep` (`DepNone | DepRef q dev inum |
+DepShr s dev inum`) with `ghost_varG Σ ic_dep` as a fourth `icacheG` field.
+`IcacheEscrow.ic_tok cn k := ghost_var (icn_esc cn k) 1 DepNone` and
+`ic_deposit cn k d := ghost_var (icn_esc cn k) (1/2) d`. The OUT arm is
+`∃ d dev inum, ic_deposit cn k d ∗ ic_dep_res k d dev inum ∗ ic_mid cn k ∗
+ic_id cn k (1/2) true dev inum`, where `ic_dep_res` is `False` at `DepNone`,
+`inode_ref` at `DepRef` and `inode_shr` at `DepShr`, each tying the
+descriptor's own dev/inum to the arm's.
+
+**What the shapes have in common is what every lemma actually uses**, and
+that is the reason the rework stayed small. Two accessors carry the whole
+generic part: `ic_dep_res_ident` (both shapes hold an identity FRACTION —
+which is every checkout-side refutation's ammunition, so `ic_swap_checkout`
+is ONE lemma generic in `d`, not one per kind) and `ic_dep_res_live` (both
+hold a LIVENESS slice — which is all a lock-free `ip->ref` guard needs, so
+`ic_open_out` borrows kind-independently and needs no descriptor half).
+
+**The REF-1 refutation that replaces §14.6's.** `IcacheInv.
+live_whole_share_absurd`: a holder whose `q` IS the map's `qt` carries the
+slot's whole outstanding liveness, the invariant's arm is the exact
+complement, so any further slice is over budget. The COUNT is a parameter
+the lemma never reads — REF-1 is only how the caller comes to know
+`q = qt`. This is what forces `ic_open_auth_ref` AND `ic_open_held` (§14.8
+named only the first) to be fupds over `itable_inv`; all four ProofIput call
+sites sit at masks where `↑icacheN` is free and already pass `q = qt`.
+
+**The contracts.** SpecIlock v3 takes `inode_shr k s dev inum` wholly (its
+one caller is ProofFileread) and its guard read goes through
+`iref_live_load_au`; SpecIunlock v3 takes the bundle plus
+`ic_deposit cn k (DepShr s dev inum)` and returns the share AT `s`.
+SpecFileread v3's `frn_q` becomes `frn_s` and `fileread_fs_out` returns the
+same share. Both postcondition existentials are gone, which is exactly what
+B3's `fp_iq` gather needs: a gather must re-form the fraction that was
+carved.
+
+**The one cost §14.8 did not price:** the descriptor's other half TRAVELS
+with the checked-out thread, so it appears in ilock's postcondition and
+iunlock's precondition, `ProofIlock`'s `il_cont`/`il_epilogue`/`il_load`
+gained `(cn, s)` plus one premise, and `ProofIput` threads it by hand from
++0x54 to +0x70. No statement in `ProofIput` moved; that stretch is one
+proof and the spec applications there name their arguments.
+
+`IcacheInv.iref_load_au` is now consumer-less (both guard reads went to the
+liveness twin). Kept deliberately as the reference-side form.

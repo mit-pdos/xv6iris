@@ -1225,6 +1225,43 @@ Section IcacheRefInv.
     exact (iref_word_live M k qt n Hwf HMk).
   Qed.
 
+  (* NO SHARE CAN COEXIST WITH A HOLDER OF THE SLOT'S WHOLE OUTSTANDING MASS
+     (design §14.8's corrected REF-1 refutation).
+
+     §14.6 stated iput's refutation of a share-shaped escrow arm over IDENTITY
+     mass, and that does not close: in the checked-out state the arm holds only
+     the share's [s] of each identity cell (the parked ½ is in the CHECKED-OUT
+     THREAD's hand -- SpecIlock hands it out), so the sum never passes one.
+     The LIVE mass does close, and this is it: a reference holder whose own
+     [q] IS the map's [qt] (which is what REF-1 gives, [iref_lookup]) carries
+     [live_frac k qt]; the invariant's arm at a live slot is exactly the
+     complement [1 - qt] ([live_slot]); the two are already the WHOLE unit, so
+     any further slice at all is over budget.
+
+     Stated as a fupd because [live_slot] lives inside [itable_inv] and the
+     opener is holding no piece of it -- which is why [IcacheEscrow]'s two
+     authority-side openers had to become fupds too.  The count is irrelevant
+     here: what does the work is [q = qt], not [n = 1]. *)
+  Lemma live_whole_share_absurd (Eo : coPset) (M : gmap nat (Qp * positive))
+      (k : nat) (qt s : Qp) (n : positive) :
+    ↑icacheN ⊆ Eo ->
+    M !! k = Some (qt, n) ->
+    itable_inv -∗ itable_half M -∗ live_frac k qt -∗ live_frac k s ={Eo}=∗ False.
+  Proof.
+    iIntros (HE HMk) "#Hinv Hhalf Hq Hs".
+    iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody _]"; [exact HE|].
+    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >_ & >Hpool)".
+    iDestruct (itable_half_agree with "Ha Hhalf") as %->.
+    assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
+    iDestruct (big_sepL_lookup (fun (_ : nat) (j : nat) => live_slot M j)
+                 (seq 0 NINODE) k k (seq_ninode_lookup k Hk) with "Hpool") as "Hsl".
+    iDestruct (live_slot_some_inv M k qt n HMk with "Hsl") as (c) "[%Ec Hc]".
+    apply Qp.sub_Some in Ec.
+    iDestruct (live_frac_join with "Hq Hc") as "Hone".
+    rewrite -Ec.
+    iDestruct (live_frac_full_excl with "Hone Hs") as "[]".
+  Qed.
+
   (* THE SAME FACT FOR A LOCK HOLDER -- origin's [iref_share_lookup], ported.
      Theirs read a count-0 fragment against [itable_half] and needed no
      invariant; ours is a pool slice, so it opens [itable_inv] (and closes it

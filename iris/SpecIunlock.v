@@ -13,14 +13,22 @@
 
    ---- WHAT IT CONSUMES AND WHAT IT GIVES BACK -------------------------
 
-   It consumes exactly what SpecIlock v2 produced -- the checked-out bundle,
+   It consumes exactly what SpecIlock v3 produced -- the checked-out bundle,
    at whatever [(dn', bm')] the holder ended with (a writei between the two
-   moves them) -- and it PARKS it, handing the checkout token back to the
-   sleeplock inside releasesleep.  What comes out is the caller's REFERENCE,
-   whole: §13.1d's deposit run backwards.  [IcacheEscrow.ic_swap_park] pins
-   the returned reference's [dev] and [inum] to the two identity halves the
-   holder hands back (§13.1e), so a caller can ilock the same inode again;
-   only the FRACTION is existential, exactly as in [BioInv]'s brelse.
+   moves them) -- and it PARKS it, handing the entry sleeplock's variable
+   back whole inside releasesleep.  What comes out is the caller's SHARE,
+   entire: §13.1d's deposit run backwards, over §14.6's share layer.
+
+   NOTHING IS EXISTENTIAL ANY MORE (v3, design §14.8).  v2 returned
+   [∃ q, inode_ref …] -- [ic_swap_park] pinned the arm's [dev] and [inum] off
+   the identity halves the holder handed back (§13.1e) but could say nothing
+   about the fraction, exactly as [BioInv]'s brelse cannot.  Under the
+   checkout DESCRIPTOR the holder carries [IcacheEscrow.ic_deposit cn k
+   (DepShr s dev inum)] across its critical section, and one
+   [ghost_var_agree] at the park pins the kind, the fraction AND the identity
+   at once.  That half is a PREMISE here, and it is not bookkeeping: it is
+   what tells this parker's arm from iput's window-exit parker's, which holds
+   an otherwise identical bundle (§14.8's two-parkers problem).
 
    PARKED-MEANS-FLUSHED is the one obligation this contract adds over v1's:
    [ic_loaded] carries [InodeRegion.dinode_at γi inum dn'] at the SAME [dn']
@@ -34,11 +42,15 @@
 
    THE THREE PANIC TESTS ARE ALL DEAD.  [ip == 0] because the entry is slot
    [k] and [IcacheRef.ientry_unsigned] says its address is
-   [itable + 24 + 136k]; [ip->ref < 1] by [IcacheInv.iref_load_au] against
-   [itable_inv], over a reference BORROWED from the escrow's checked-out arm
-   for the duration of that one atomic update ([ic_open_out] -- the holder's
-   FULL valid cell is what refutes the other two arms, §13.1d), since after
-   ilock's deposit the holder owns no reference of its own;
+   [itable + 24 + 136k]; [ip->ref < 1] by [IcacheInv.iref_live_load_au]
+   against [itable_inv], over a LIVENESS SLICE borrowed from the escrow's
+   checked-out arm for the duration of that one atomic update ([ic_open_out]
+   -- the holder's FULL valid cell is what refutes the other two arms,
+   §13.1d), since after ilock's deposit the holder owns nothing of its own.
+   v2 borrowed the arm's whole reference; under the descriptor the arm may
+   hold only a share, which has no count fragment at all -- but both shapes
+   carry a liveness slice, and a slice is all the guard ever needed
+   (§14.6);
    [!holdingsleep(&ip->lock)] because the holder's bundle -- the token, the
    lock's pid field and the caller's own pid cell agreeing -- is exactly what
    makes holdingsleep return 1 (SpecHoldingsleep.v is stated in that
@@ -99,7 +111,7 @@ Definition wp_iunlock_sconf_body
     (cn : ic_names)
     (gil gisl : gname)
     (cov : gset Z) (logstart : Z)
-    (k : nat) (dev inum : mword 32)
+    (k : nat) (s : Qp) (dev inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
@@ -126,21 +138,23 @@ Definition wp_iunlock_sconf_body
   (* wakeup's resources (releasesleep wakes the lock's sleepers) *)
   procs_inv gs -∗
   (* THE CHECKED-OUT ENTRY, surrendered back into the escrow.  Exactly
-     SpecIlock v2's postcondition, and exactly [ic_swap_park]'s input;
-     [ic_loaded]'s [dinode_at] at [dn'] IS the flushed-record obligation. *)
+     SpecIlock v3's postcondition, and exactly [ic_swap_park]'s input;
+     [ic_loaded]'s [dinode_at] at [dn'] IS the flushed-record obligation, and
+     the descriptor half is what selects this holder's own arm (§14.8). *)
+  ic_deposit cn k (DepShr s dev inum) -∗
   i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
   ic_loaded gfs gi cov logstart k inum dn' bm' -∗
   wp_next b p (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (q : Qp),
+  ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b p -∗
       cpu_own 0 eb p C b -∗
       pc_is ret_tgt -∗
       p_pid p ↦₄{dq} pidv -∗
-      (* the caller's reference, back whole and at ITS OWN device *)
-      inode_ref k q dev inum -∗
+      (* the caller's share, back whole, at ITS OWN fraction and device *)
+      inode_shr k s dev inum -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -155,11 +169,11 @@ Module Type IUNLOCK.
       (cn : ic_names)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z)
-      (k : nat) (dev inum : mword 32)
+      (k : nat) (s : Qp) (dev inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (b : bool),
-      wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k dev inum
+      wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s dev inum
                             dn' bm' pidv dq m K eb p C b.
 End IUNLOCK.
