@@ -208,18 +208,41 @@ End WpNext.
    left one is [true = false], absurd) and re-injects it at whatever index
    the chain fact carries.  At a matching index the first branch fires and
    nothing changes. *)
-Ltac wp_next_chain :=
-  let Hd := fresh "Hd" in
-  intros Hd;
-  repeat match goal with
-         | H : _ = false \/ _ = _ -> _ = _ |- _ =>
-             first
-               [ specialize (H Hd)
-               | specialize (H (or_intror
-                   ltac:(destruct Hd as [Hbad | Hgood];
-                         [ discriminate Hbad | exact Hgood ]))) ]
-         end;
+Ltac wp_next_close :=
   solve [ congruence
         | repeat match goal with
                  | H : ?a = ?b |- ?a = ?c => rewrite H; clear H
                  end; reflexivity ].
+
+(* THE MIXED-INDEX FALLBACK, and why the per-hypothesis one above it is not
+   enough.  When the GOAL's index is the literal [true] (a parking function's
+   own crossing) while the chain facts carry the caller's [eb], the only
+   surviving case is the RIGHT disjunct -- and every chain fact needs it, not
+   just the first.  Destructing [Hd] once, up front, and re-injecting the
+   right disjunct at each fact is what closes the chain; doing it inside the
+   loop leaves the chain half-specialized and [congruence] then fails with no
+   indication of which link is missing.
+     Found by probing ProofIlock's first [wp_next_shift] after ilock's
+   crossing moved to [true]: all eight links were in context and the manual
+   chain closed, while the loop above did not.  Branch one is verbatim the
+   old tactic, so no existing call site can regress. *)
+Ltac wp_next_chain :=
+  let Hd := fresh "Hd" in
+  intros Hd;
+  first
+    [ solve [ repeat match goal with
+                     | H : _ = false \/ _ = _ -> _ = _ |- _ =>
+                         first
+                           [ specialize (H Hd)
+                           | specialize (H (or_intror
+                               ltac:(destruct Hd as [Hbad | Hgood];
+                                     [ discriminate Hbad | exact Hgood ]))) ]
+                     end;
+              wp_next_close ]
+    | let Hg := fresh "Hg" in
+      destruct Hd as [Hd | Hg]; [ discriminate Hd | ];
+      repeat match goal with
+             | H : _ = false \/ _ = _ -> _ = _ |- _ =>
+                 specialize (H (or_intror Hg))
+             end;
+      wp_next_close ].
