@@ -30,17 +30,36 @@
          kernel_trap, kernel_hartid -- which is the state uservec reads on
          its way back in ([SpecUservec.v]).
 
-   THE ENTRY INDEX IS [b = true] AND THE EXIT INDEX IS [false], and that is
-   the load-bearing fact of the whole contract.  prepare_return is entered
-   with interrupts ENABLED at push_off level 0 (usertrapret and forkret both
-   call it that way) and its own [intr_off()] flips them off; every resource
-   it needs beyond the process block comes OUT of that flip:
+   THE EXIT INDEX IS [false] AT EITHER ENTRY INDEX, and that is the
+   load-bearing fact of the whole contract: whatever SIE was, prepare_return
+   leaves with interrupts off, holding the trap CSRs.  The entry index [b] is
+   a PARAMETER because both values are reachable --
 
-     - [wp_csrci_sstatus_x0_s_sconf] at [b = true] pays out [trap_csrs],
-       whose members are the trap-scratch cells, [intr_res] (which OWNS the
-       stvec cell, since 30041d61), and the KPT RECEIPT [strans_bit_kpt]
-       (since IntrDefs §6b).  So the caller supplies neither stvec nor satp
-       access: the function's own [intr_off] hands it both.
+     - [b = true]  forkret, and usertrap's SYSCALL path (which does its own
+                   [csrsi sstatus,2] before the [jal syscall]);
+     - [b = false] usertrap's devintr / vmfault / unexpected-scause paths,
+                   which never re-enable interrupts after the trap cleared
+                   SIE.
+
+   A contract pinned at [b = true] covered only the first, which is what made
+   usertrap unprovable against it.
+
+   WHERE THE FUNCTION'S RESOURCES COME FROM, PER ARM.  Everything it needs
+   beyond the process block is the trap-CSR bundle, and
+   [WpIntrOff.wp_intr_off_lvl0_s_sconf] delivers it at either index:
+
+     - at [b = true] the [csrci] is a REAL flip and pays out [trap_csrs] --
+       the trap-scratch cells, [intr_res] (which OWNS the stvec cell, since
+       30041d61), and the KPT RECEIPT [strans_bit_kpt] (IntrDefs §6b).  So
+       the caller supplies neither stvec nor satp access: the function's own
+       [intr_off] hands it both, and [trap_csrs_ext true = emp];
+     - at [b = false] the [csrci] clears a bit that is already clear, so
+       nothing is paid out and the caller brings the same bundle itself
+       ([trap_csrs_ext false = trap_csrs]) -- which a trap handler always
+       holds, the TRAP having given it to it.
+
+   Either way the code from +0x10 on runs at [false] over one bundle, and is
+   proved once.
 
    ...WHICH IS WHY THE POST HANDS BACK [trap_csrs_raw] AND NOT [trap_csrs].
    After prepare_return this hart has NO KERNEL TRAP HANDLER INSTALLED --
@@ -61,7 +80,10 @@
        intr_off();
 
    The [csrw stvec] is legal only after that [csrci], and the proof cannot
-   be rearranged to do it the other way round.
+   be rearranged to do it the other way round.  Note the argument survives
+   the [b = false] entry unchanged: there the quarter arrives inside the
+   caller's own [intr_res] and leaves dangling all the same, so the invariant
+   "no [intr_res] between here and the sret" is established on both arms.
 
    WHAT THE CALLER STILL OWES: the process block (for the trapframe page and
    [p->kstack]) and the scheduler/cpu context myproc() reads.  Nothing
@@ -135,21 +157,25 @@ Definition wp_prepare_return_sconf_body
     `{GEN : GenId} `{CID : CpuId}
     (γf : gname) (ks : mword 64) (pid : mword 32) (V : pprivate)
     (m : regfile) (av : nat) (C : iProp Σ) (p : mword 64)
-    (epc : mword 64) :=
+    (epc : mword 64) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.prepare_return in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_prepare_return <= av)%nat ->
   (* the user pc the trapframe is holding, which the [csrw sepc] restores *)
   pv_tf V !! tf_epc_idx = Some epc ->
-  (* ENTERED WITH INTERRUPTS ON, at push_off level 0 -- both call sites
-     (usertrapret, forkret) are there, and the [csrci] below needs it. *)
-  sie_cap_gpr m av true p -∗
-  cpu_own 0%nat true p C true -∗
+  (* ENTERED AT PUSH_OFF LEVEL 0, AT EITHER SIE INDEX -- see the header.
+     [cpu_own]'s base-enable is [b] because at level 0 the two agree
+     ([CpuOwn.cpu_own_eb_agree]); writing anything else would be vacuous. *)
+  sie_cap_gpr m av b p -∗
+  cpu_own 0%nat b p C b -∗
+  (* the trap CSRs, from the caller at [b = false] and [emp] at [b = true],
+     where the function's own [intr_off] produces them ([trap_csrs_ext]). *)
+  trap_csrs_ext b -∗
   kernel_text -∗ pc_is pcE -∗
   (* the process: [p] is what myproc() returns, i.e. [cpus[cid].proc] *)
   is_kstack p ks -∗
   proc_priv γf p pid V -∗
-  wp_next true p (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (ksat : mword 64) (root : mword 44) (vb : mword 1),
       ⌜ callee_saved m mf ⌝ -∗
       (* [kernel_satp] is the live kernel table, at an EXISTENTIAL root --
@@ -161,8 +187,9 @@ Definition wp_prepare_return_sconf_body
       ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) ksat : mword 64))
           = root ⌝ -∗
       (* INTERRUPTS ARE OFF, and the reserve the enabled arm was holding is
-         now usable stack -- the standard csrci index move. *)
-      sie_cap_gpr mf (trap_res true + av)%nat false p -∗
+         now usable stack -- the standard csrci index move.  At [b = false]
+         there was no arm and no reserve, and [trap_res false + av = av]. *)
+      sie_cap_gpr mf (trap_res b + av)%nat false p -∗
       (* THE PER-CPU BUNDLE, REASSEMBLED AT THE DISABLED INDEX.  [cpu_own] at
          [b = true] is the pure fact plus the caller's frame [C] -- the cells
          and the counting token live inside [sie_arm true], and the [csrci]
@@ -206,6 +233,6 @@ Module Type PREPARE_RETURN.
       `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (ks : mword 64) (pid : mword 32) (V : pprivate)
       (m : regfile) (av : nat) (C : iProp Σ) (p : mword 64)
-      (epc : mword 64),
-      wp_prepare_return_sconf_body γf ks pid V m av C p epc.
+      (epc : mword 64) (b : bool),
+      wp_prepare_return_sconf_body γf ks pid V m av C p epc b.
 End PREPARE_RETURN.

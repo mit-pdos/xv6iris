@@ -992,6 +992,7 @@ ProofNamei.v
 LinkNamei.v
 ProofNameiparent.v
 LinkNameiparent.v
+WpIntrOff.v
 ProofPrepareReturnParts.v
 ProofPrepareReturn.v
 LinkPrepareReturn.v

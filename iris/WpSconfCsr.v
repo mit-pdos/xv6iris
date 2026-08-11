@@ -1615,6 +1615,102 @@ Section WpSconfCsr.
     { rewrite /cpu_cells_pay. iExact "Hcells". }
   Qed.
 
+  (* ------------------------------------------------------------------- *)
+  (* THE IDEMPOTENT CLEAR AT AN ALREADY-DISABLED ARM -- the exact mirror  *)
+  (* of [wp_csrsi_sstatus_x0_idem_s_sconf] above.                          *)
+  (*                                                                      *)
+  (* [csrci sstatus,2] with SIE already '0' clears the bit that is already *)
+  (* clear: the ghost state does not move (the disabled arm's eighth and   *)
+  (* the mstatus-tied half already agree at '0'), the arm rides through     *)
+  (* untouched, and the stack conjunct is never touched -- so pre and post *)
+  (* are the SAME [sie_cap_gpr m n false p] at an ARBITRARY index [n],     *)
+  (* with no reserve to move and nothing to pay out.                       *)
+  (*                                                                      *)
+  (* WHY IT IS NEEDED.  [wp_csrci_sstatus_x0_s_sconf] REFUTES its          *)
+  (* [b = false] arm (its [intr_count_pre] premise is unsatisfiable there),*)
+  (* so an intr_off() reached with interrupts ALREADY off had no leaf at    *)
+  (* all.  prepare_return is exactly such a caller: usertrap reaches it     *)
+  (* with SIE = 0 on the devintr / vmfault / unexpected-scause paths, and   *)
+  (* only the syscall path (which does its own [csrsi] first) arrives       *)
+  (* enabled.  [WpIntrOff.wp_intr_off_lvl0_s_sconf] is the index-generic    *)
+  (* composite the two arms feed.                                          *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_csrci_sstatus_x0_idem_s_sconf
+      (pc : mword 64) (m : regfile) (n : nat) :
+    sie_cap_gpr m n false p -∗
+    pc_is pc -∗
+    instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRC)) -∗
+    wp_next false p (fun (CID : CpuId) =>
+      ∀ ms : mword 64,
+      ⌜ sconf_ms_facts ms ⌝ -∗
+      sie_cap_gpr m n false p -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros "Hcg Hpc Hinstr Hcont".
+    iApply (wp_instr_s_sconf m n false pc false
+              (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRC))
+              with "Hcg Hpc Hinstr").
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfmap Hnpc [Hreg Hmem]".
+    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
+    iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC & %HmisaU & %HmisaM &
+        %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+    iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
+    iDestruct (reg_valid    with "Hreg Hms") as %Lms.
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
+    assert (Lpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
+      by (unfold s_pc; tmig; exact Lpriv).
+    assert (Lms_spc : register_lookup mstatus s_pc.(sregs) = ms0)
+      by (unfold s_pc; tmig; exact Lms).
+    assert (Lmisa_spc : register_lookup misa s_pc.(sregs) = misa0)
+      by (unfold s_pc; tmig; exact Lmisa).
+    assert (Himm2 : eq_vec (mword_of_int 2 : mword 5) (zeros' 5) = false)
+      by (vm_compute; reflexivity).
+    (* the disabled arm IS its own eighth; the agreement pins the live bit
+       at '0', which is what makes the write idempotent. *)
+    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct (ghost_var_agree with "Hhalf Harm") as %Hb0.
+    iAssert (sie_cap (CID := CID) m n false p) with "[Hstk Htr Harm]" as "Hcap".
+    { iFrame "Hstk Htr Harm". }
+    destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
+    set (ms1 := legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2))).
+    iMod (reg_update _ mstatus _ ms1 with "Hreg Hms") as "[Hreg Hms]".
+    iModIntro.
+    iExists (set_reg s_pc mstatus ms1).
+    iSplitR.
+    { iPureIntro. rewrite Hpceq. fold s_pc.
+      apply (exec_execute_csrrci_sstatus_x0 (mword_of_int 2) ms0 s_pc
+               Lpriv_spc Lms_spc
+               ltac:(rewrite Lmisa_spc; exact HmisaS)
+               ltac:(rewrite Lmisa_spc; exact HmisaU)
+               Himm2). }
+    iSplitL "Hreg Hmem".
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
+    iIntros "Hhs' Hpc'".
+    assert (Lnpc : register_lookup nextPC (set_reg s_pc mstatus ms1).(sregs)
+                   = add_vec_int pc 4).
+    { unfold set_reg at 1; cbn [sregs]. tmig.
+      unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
+    iEval (rewrite Lnpc) in "Hpc'".
+    iEval (rewrite Hb0) in "Hhalf".
+    iEval (rewrite -Hsie') in "Hhalf".
+    iDestruct (sret_tie_congr ms0 ms1 Hspp' Hspie' with "Hspp") as "Hspp".
+    iAssert (sconf (CID := CID)) with "[Hpriv Hms Hhalf Hspp Hmiex Hmenvx]" as "Hsc".
+    { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
+      iExists ms1. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf'. }
+    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
+    iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro; done|].
+    iApply ("Hcont" $! ms0 with "[%] Hcg [$Hpc' $Hnpc]").
+    { exact Hmsf. }
+  Qed.
+
   (* ===================================================================== *)
   (* THE PINNED INDEX: WHY THE SEVEN LEAVES BELOW SAY [false] AND NOT [b].  *)
   (*                                                                        *)
