@@ -1315,3 +1315,171 @@ Six sections, mirroring `ProofDirlookupParts.v`:
 `NAMEI` as a parameter and instantiate later.  Both contracts already
 thread `log_op` and `bslots bn 3`, i.e. they are stated INSIDE a
 transaction, which is where all four of those callers stand.
+
+### N4c — PARKED GREEN: everything but the walk's body
+
+**NOTHING LANDED IN THE BUILD.**  No `iris/_CoqProject` row was added, no
+`iris/ProofNamex.v`, no `iris/LinkNamex.v`.  The work is parked as
+**`claude-notes/projects/fs-namei-namex-wip.v`** (1 678 lines, md5
+`6fc4d509564e664a5ee6b06994723873`), which carries its own resume header.
+`SpecNamex.v` was NOT touched: **the contract is provable as frozen so far
+as the walk has been driven** — every premise, every resource and every
+register fact used below fitted exactly, and no counterexample goal was
+found.  `tools/lemma_diff.py --ref HEAD` reports the file's single
+`NEWAXIOM  Axiom cheat_` and nothing else; there is no `Admitted`.
+
+#### The park point, precisely
+
+**ONE `exact (cheat_ _)`**, and it stands for the proof of `Hloop` — the
+walk at +0xe4 and every block it reaches (+0xe4..+0x102, +0x104..+0x114,
++0x8c..+0x94, +0x98..+0xa2, +0x11c..+0x12e, +0xa4..+0xb2, +0xb6..+0xda,
++0xdc..+0xe2, and the four exits +0x54 / +0x7a / +0x82 / +0x130).
+**`Hloop`'s STATEMENT is landed and typechecks, and BOTH starting arms
+already discharge it** — its eight pure obligations and all thirty-odd
+resource slots are handed over — so the remaining work is a proof
+obligation with a fixed, verified interface, not a design question.
+
+PROVEN and green on the mirror:
+
+- the twelve-slot prologue +0x00..+0x1a (namex fills **all twelve** slots:
+  ra + s0..s10 is twelve registers, not eleven as the N4b ledger said);
+- **`Htail`**, the shared epilogue at +0x5c — `□`-persistent, ABSTRACT
+  continuation, `[c.mv a0,s4]` + twelve pops + `[c.addi16sp +96]` +
+  `[c.jr ra]`, with the whole `callee_saved` record and
+  `mf !!! a0 = Mt !!! s4` discharged.  Four arms can reach it;
+- the entry block +0x1c..+0x2a and the arm split on `pfun 0`;
+- the **ABSOLUTE** arm: `li a1,1; mv a0,a1` = `iget(1,1)`, the call, and
+  `inode_held (ientry kig)` rebuilt from iget's mint;
+- the **RELATIVE** arm: myproc, `ld a0,336(a0)`, the SHED, idup, the
+  GATHER (`p_cwd`'s `inode_held` handed back whole at its own `cq`), and
+  `inode_held (ientry ck)` from idup's new reference;
+- the constants block +0x3c..+0x46 in BOTH arms, ending with
+  `ProofNamexParts.nx_regs m sp0 pv ipv nb (m !!! a1) _` established.
+
+#### `Hloop`'s shape — the part not to redesign
+
+```coq
+∀ fuel, wp_next (CID0 := CID) b (proc_addr j) (fun CIDl =>
+  ∀ (off : nat) (ipv : mword 64) (Ml : regfile) (ncur : nat)
+    (usedc : gset Z) (es0 : list (list (bv 8))) (nf : nat -> bv 8),
+    ⌜plen - off <= fuel⌝ -∗ ⌜off <= plen⌝ -∗
+    ⌜path_elems pl = es0 ++ path_elems (drop off pl)⌝ -∗
+    ⌜(length (path_elems (drop off pl)) + 1) * iput_units <= ncur⌝ -∗
+    ⌜n - (L+1)*iput_units
+       <= ncur - (length (path_elems (drop off pl)) + 1) * iput_units⌝ -∗
+    ⌜ncur <= n⌝ -∗ ⌜usedc ⊆ used⌝ -∗
+    ⌜nx_regs m sp0 (pa_add pv off) ipv nb (m !!! a1) Ml⌝ -∗
+    … twelve frame slots, inode_held ipv, iref_slots 1, the fs bundle,
+      p_cwd + its inode_held, the path, the name buffer at nf,
+      bslots bn 3, log_op g ncur …
+    -∗ wp_next (CID0 := CIDl) … (the CONTRACT's own continuation) -∗ WP)
+```
+
+Five things in that statement were forced and are worth keeping:
+
+1. **`off` is an INDEX, not a pointer.**  `s1 = pa_add pv off` and what is
+   left to walk is `drop off pl`; that is the form every `PathElems` law and
+   every `ProofNamexParts` bridge (`nx_drop_cons`, `nx_drop_app`,
+   `nx_skipelem_at`) is stated over, and the fuel measure is `plen - off`.
+2. **`es0` — the elements already consumed — must be in the invariant.**
+   Without it the nameiparent arm can prove only the LOCAL
+   `path_elems (drop off pl) = [e]` (via `skipelem_is_last`) and cannot
+   reach the contract's `nameiparent_of pl es e`.  The invariant carries
+   `path_elems pl = es0 ++ path_elems (drop off pl)`, and the hit arm then
+   reads `nameiparent_of pl es0 e` straight off it.
+3. **THE BUDGET IS THREE FACTS, not one** — `(Lr+1)*iput_units <= ncur`
+   (what the callee premise wants), the spend-interval
+   `n - (L+1)*iput_units <= ncur - (Lr+1)*iput_units` (what composes to the
+   contract's postcondition), and `ncur <= n`.  The three top-level
+   `nx_bi_step` / `nx_bi_spend` / `nx_bi_free` lemmas in the WIP file move
+   them across one turn, a spending exit and a free exit respectively;
+   `ProofNamexParts`' `nx_bud_*` are the same arithmetic at a different
+   granularity and either set works.
+4. **`usedc` with `usedc ⊆ used` has to be in the invariant** — every
+   iunlockput weakens the bitmap's `used`, and the contract's postcondition
+   quantifies `used'` with `used' ⊆ used`.  The N4b ledger did not call
+   this out.
+5. **The contract's continuation slot is at `CIDl`, the LOOP's hart, not at
+   the section's `CID`.**  ProofDirlookup could state it at `CID` because
+   nothing had been called before its loop; namex has already run
+   iget-or-idup, so `Hcont` has been `wp_next_shift`-ed forward and can
+   never be moved back.  Stating the slot at `CIDl` makes both arms (and
+   the loop's own recursion) shift FORWARD, which is the only direction
+   `wp_next_shift` goes.
+
+#### SEVEN surprises, none of them in the N4b trap list
+
+1. **`callee_saved` has THIRTEEN conjuncts (sp, s0, s1, s2..s11).**
+   dirlookup's `first [ exact CPsp | … | exact CPs7 | apply CPo … ]`
+   closing tactic is one namex cannot copy: it needs `CPs8`, `CPs9`,
+   `CPs10` too, and `s11` alone comes from the thread fact.  The symptom is
+   `Error: No applicable tactic.` pointing at the whole `split_and!`.
+2. **`zero_extend' 64 v` does not elaborate at `v : bv 8`** — the width is
+   an evar, exactly N3c's trap 4 one width down.  Every byte the `lbu` WP
+   lemma leaves must be written `(pfun i : mword 8)`, and the byte-test
+   lemmas must take `(v : mword 8)`, never `(v : bv 8)`.
+3. **`lia` cannot use `HK : K_namex <= K`** even though `K_namex` is a
+   plain `Definition`.  `ltac:(unfold K_iget; lia)` at a call site fails
+   with *"Cannot find witness"*; the fix is N3d's `dl_kb` route —
+   `nx_kb K HK` up front, destructed into named bounds, then `exact Kig`.
+   (The `ltac:(lia)` on `wp_caddi16sp_push_s_sconf`'s own side condition
+   DOES work, which is what makes this look inconsistent.)
+4. **A `(Z.of_nat n + 1 < 2^31)%Z` side condition wants
+   `ltac:(vm_compute; reflexivity)`, not `discriminate`** — `Z.lt` is
+   `(x ?= y) = Lt`, so it reduces to `Lt = Lt`.
+5. **`dev` vs `icfg_dev` is a real seam on the relative arm.**
+   `inode_held` is stated at `icfg_dev`; idup's `is_itable2` is at the
+   caller's `dev`.  They are equal by the contract's premise but not
+   syntactically, and `iSpecialize` fails with *"cannot instantiate with
+   (is_itable2 … dev)"*.  Fix: `iEval (rewrite -Hdev)` into the reference
+   the instant it comes out of `inode_held`, keep the whole shed / idup /
+   gather at `dev`, and `rewrite -Hdev` once more when rebuilding
+   `inode_held`.  The absolute arm is unaffected (iget is called at `dev`).
+6. **A C comment pasted into a Rocq header opens a NESTED comment.**
+   `while(*s1=='/')` contains `(*`; the error is *"Unterminated comment"*
+   reported at the end of the file.  Write `while ( *s1=='/' )`.
+7. **`iIntros (CIDxx …)` names collide across sibling blocks in the same
+   `Proof`.**  A mechanically generated const-block reused `CIDA1`, which
+   the arm's own `c.mv` had already taken; *"CIDA1 is already used."*  Give
+   each straight-line block its own prefix.
+
+#### What the resuming agent should do first
+
+Copy the WIP to `iris/ProofNamex.v`, compile it (green, EXIT=0), then
+replace the one `{ exact (cheat_ _). }` under `as "Hloop"`.  The suggested
+decomposition, in order, all inside `Hloop`'s `iIntros (fuel); iInduction`:
+
+- **the three separator/element scans want `□` assertions with an ABSTRACT
+  continuation, not full-resource `∀ fuel` bodies.**  Each touches only the
+  path buffer plus `s1` (or `s2`) and `a5`, so state the exit as
+  `⌜Ms' !!! Rs1 = pa_add pv off'⌝ ∗ ⌜∀ c, c <> Rs1 -> c <> Ra5 ->
+  Ms' !!! Regidx c = Ms !!! Regidx c⌝` and let the caller rebuild
+  `nx_regs` with `nx_regs_caller` / `nx_regs_s1`.  That avoids
+  transcribing the thirty-slot invariant three more times, which is the
+  single biggest cost in this file if done naively.
+- the DEAD block +0xf8..+0x102: both `beqz`es are refuted from the facts
+  the +0xe8/+0xf2 skip and the +0xf6 test just decided (`f off <> SLASH`
+  and `f off <> NUL`).  The `addi a4,a5,-47` at +0xfc still needs its own
+  arithmetic lemma (N4b trap 8) — it is NOT yet written; the four
+  `nx_slash_*` / `nx_nul_*` lemmas at the top of the WIP file are its
+  siblings and show the `bv_unsigned` route.
+- `nx_skipelem_at` then computes `skipelem (drop off pl)` from the two scan
+  results alone, and `path_elems_unfold` advances `es0`.
+- the per-element share choreography is layer 6's, unchanged: `inode_held`
+  → `inode_ref_shed` → ilock takes the share → `ic_loaded` destructed for
+  the `lh a5,68(s4)` type test and for dirlookup's `dir_inums_ok`
+  (`DirView.dir_ok_dir`) → rebuild `ic_loaded` before iunlock/iunlockput.
+- `iref_slots`: the walk carries **1** through the loop (the WIP already
+  splits `iref_slots 2` into `Hisl1` for iget/idup and `Hisl2` for the
+  walk); dirlookup borrows it on the found arm and the following
+  iunlockput gives one back, so every failure exit ends at 2 and every
+  success exit at 1.
+
+#### Build evidence (EC2 mirror, git-synced at `b2a3184a`)
+
+The parked file, copied to `iris/ProofNamex.v` on the mirror and compiled
+standalone against the full 971-`.vo` tree: `md5 6fc4d509…`, `ERRORS=0`,
+`DONE ProofNamex.v = 0`, `EXIT=0`.  The scratch copy and its `.vo` were
+then deleted; the mirror is back at **971 `.vo`** with no namex proof
+artefacts.  `python3 tools/lemma_diff.py --ref HEAD`: one `NEWAXIOM
+Axiom cheat_` in the parked file and nothing else.
