@@ -473,3 +473,78 @@ in `R`. The typeclass idea is right; `vProp` is its principled form, and
 data-structure predicates should be written as **`vProp`s over `↦w`**, and
 `wobj` applied at the two places where objectivity is actually needed: the
 lock invariant, and the caller's frame. Nothing in the leaf layer changes.
+
+## 9. Hart migration: why the objective layer must be indexed by a CONTEXT
+
+`WpNext.wp_next b p (fun (CID : CpuId) => K CID)` is the SC side's migration
+mechanism — an S-mode step with interrupts enabled may trap, yield, and resume
+on another hart, so the continuation quantifies the resuming hart. Every
+resource written inside `K` elaborates at the *new* hart, which for SC
+resources is free.
+
+For `WeakObj.wobj` it is fatal, and this is now machine-checked
+(`WeakSmodeFrame` §5): `Arguments wobj {Σ weakGS0 CID} R` — the hart is an
+implicit **instance** argument, so under the binder `wobj F` means
+`@wobj _ _ CID F` while the caller holds `@wobj _ _ CID0 F`. Different
+propositions; the Iris frame rule does not apply. The only bridge,
+`wobj_handoff`, needs *both* harts' authorities in one step, which is exactly
+what migrating denies. The consequence is the modularity failure: every
+function on every path that might be preempted would need a `∀ R` frame
+parameter.
+
+**The fix is the index, not a new frame rule.** Two different things are
+indexed by the hart today: `hart_ws c ws` (the hart's wstate — machine state,
+genuinely per-hart, stays) and `ws_auth (weak_view_name c) ws` (the authority
+behind the view lower bounds). The second is a fact about a *thread of
+control*, not about silicon. `WeakCtx` moves it to a `CtxId`, and `cobj ξ R`
+is then hart-free — `Arguments cobj {Σ weakViewG0} ξ R`, explicit, uncapturable.
+
+**The finding that was not anticipated: `ws_auth` is the wrong granularity.**
+It carries five scalars plus a coherence map and is monotone along `ws_le`.
+Neither is available across a migration:
+
+- `ws_le wsA wsB` would need hart B's `w_vrOld` / `w_vwOld` / `w_vwNew` /
+  `w_vRel` to dominate hart A's. Nothing gives that; B may never have issued a
+  load.
+- even *pointwise on the map* fails. If ξ observed a write at byte `a` at
+  timestamp 5, ξ's coherence map says 5 at `a`; B's map may say 0, because B
+  never touched `a`. B still sees the write — its `w_vrNew` is above 5 after
+  the acquire — but that shows up in the **floor**, not in the map.
+
+So the migrating object must be ordered by `⊑` (i.e. by `flr`) and nothing
+finer. `ctx_auth ξ V` is therefore an authority on the single function
+`λ a, MaxNat (flr V a)`, monotone exactly along `⊑`. `wflr_lb`'s three-way
+disjunction (coherence floor / scalar floor / zero) is the shadow of the finer
+structure and is what makes it hart-shaped; `ctx_view_lb` has one disjunct and
+a unit case.
+
+`wrunning_resume` is then the whole migration story: two premises (A released
+past its entire view, B acquired past that timestamp), **neither mentioning a
+resource**, and no relation between the two harts' wstates.
+
+### What goes into a leaf, and what frames
+
+Checked in `WeakSmodeFrame.wwp_bump` — three instructions, three `wp_next`
+crossings at generic `b`, over hypothetical S-mode leaves:
+
+- **In:** `wsrun ξ m` (the ambient bundle: `gpr_file` + `wrunning ξ`). The leaf
+  needs `hart_ws` to step the machine and `ctx_auth ξ` to move the context's
+  floor with it. It is written *inside* the binder, so it returns at the
+  resuming hart.
+- **In:** the `cobj ξ (wpt8 …)` cells the instructions touch. A load's
+  postcondition names what it read; that is not a weak-memory cost, SC is the
+  same.
+- **Framed:** everything else, including an *arbitrary* `vProp F`. In the proof
+  `HF` appears exactly twice — the opening `iIntros` and the closing `iApply`.
+  Nothing decomposes it, so a file table or a `big_sepL` costs what `F` costs,
+  which is nothing.
+
+Two shape changes in the leaf are forced, not cosmetic: `hart_ws cpu_id ws` +
+`∀ ws' ⌜ws_le ws ws'⌝` cannot survive (a migrating leaf cannot state its effect
+as a relation between two harts' wstates at all), and `vwp_hold F ws` cannot
+even be *written* in the continuation (there is no `ws` there).
+
+The SC precedent is already in the tree: `CpuOwn.cpu_own_transport`, applied at
+every migration point, because `cpu_own` genuinely *is* per-hart. That is the
+right treatment for a hart resource. The content of `WeakCtx` is that objective
+memory ownership is not one.

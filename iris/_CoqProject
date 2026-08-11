@@ -935,6 +935,8 @@ WeakViewRacy.v
 WeakPtOwn.v
 WeakPtPub.v
 WeakObj.v
+WeakCtx.v
+WeakSmodeFrame.v
 WeakLockPayload.v
 WeakLeafO.v
 WkTimerinit.v
