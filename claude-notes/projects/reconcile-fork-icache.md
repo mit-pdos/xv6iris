@@ -163,16 +163,7 @@ inside it, so origin's 28-commit kfork line is a real ancestor of main.
 Design: fs-icache.md §14.5 (A's impossibility) + §14.6 (B's shape and
 sizing). Staging, one branch + gate per stage:
 
-- **B1** — the definitional layer: `γlive` (per-slot fractional
-  liveness, auth in `itable_body` beside the ref-word cells, clause
-  tying its support to `dom M`); `inode_shr k s dev inum :=
-  inode_ident k s ∗ live_frac k s`; the carve/gather lemmas (the ONLY
-  minters — auth-guarded events, §14.5's requirement) + upgrade
-  (share→reference under the lock, origin's idup shape); the six
-  store-AU lemmas re-framed over the grown body; iput's last close
-  retires the pool inside its existing invariant opening (ProofIput's
-  REF-1 sites untouched — §14.6's mass argument). ProofIdup and every
-  itable_inv opener ride through with one extra framed conjunct.
+- **B1 — LANDED** (see "What B1 actually landed" below).
 - **B2** — C8: SpecIlock/SpecIunlock/SpecFileread over `inode_shr`;
   the escrow OUT arm gains the share-shaped alternative (refuted at
   REF-1 by ident-mass overflow, §14.6); ProofIlock re-proof +
@@ -185,3 +176,92 @@ The canonical-pairing convention (tok fraction = ident fraction in
 `inode_ref`) is LOAD-BEARING and must be stated in IcacheRef's header:
 it is what makes shares unable to outlive their parent and iput's
 witness a mass corollary.
+
+## What B1 actually landed (2026-08-11), and the three design corrections
+
+Tree green. `IcacheRef.v` + `IcacheInv.v` grew the layer; `ProofIget.v`
+(the recycle's `sw`, one premise at the hit arm), `ProofIput.v` (one
+intro pattern), `IcacheBoot.v` (one premise) and `SystemAdequacy.v`
+(the dummy `icfg`'s fourth field) are the only other files that moved.
+`ProofIdup`/`ProofIlock`/`ProofIunlock`/`ProofFileread` and the whole
+escrow cone rode through untouched — the six store-AU lemmas' statements
+did not change (see correction (3)).
+
+**The shape, in one line.** `γlive` is `gmapUR nat fracR` used WITHOUT an
+auth (`icfg_live`, a fourth `icfg` field). One unit per slot. The
+invariant holds a FREE slot's unit WHOLE and a live slot's arm `1 - qt`;
+the outstanding `qt` rides inside `iref_tok` itself:
+
+    iref_tok k q := iref_frag k q ∗ live_frac k q
+    inode_ref k q dev inum := iref_tok k q ∗ inode_ident k q dev inum
+    inode_shr k s dev inum := inode_ident k s dev inum ∗ live_frac k s
+    inode_ref_short k (q+s) q  -- the parent while a share is out
+
+**(1) THE POOL MUST BE A MIRROR, OR THE RETIREMENT DOES NOT GO THROUGH.**
+§14.6's "make the invariant own [un-fragmentedness] via the support
+clause" does NOT work as stated, and the failure is not fixable by
+choosing a different ghost. Any pool the invariant alone holds leaves
+the last close needing `outstanding-share-mass = 0`, which no support
+clause implies: a clause counts what it owns, and the shares are exactly
+what it does not own. The only accounting available is CONSERVATION, and
+conservation only closes if the closer can present pool mass proportional
+to its own `qt` — i.e. if a reference CARRIES liveness. Folding it into
+`iref_tok` (rather than into `inode_ref`, or into `islot`) is what keeps
+every consumer statement unchanged, because `iref_tok` is opaque to all
+of them. With that, the retirement is five lines
+(`IcacheInv.live_slot_close_last`): closer's `qt` + arm's `1 - qt` = the
+free slot's unit. Nothing is counted and nothing is refuted — a share
+could not have coexisted with the two halves the lemma consumes.
+
+**(2) CARVE/GATHER ARE NOT EVENTS, AND MUST NOT BE.** §14.5 demanded
+auth-guarded carving because a LEDGER cannot count non-events. §14.6
+deleted the ledger, and with it the demand: `IcacheRef.inode_ref_carve`
+is a `⊣⊢` between resource algebra terms (the liveness slice and the
+identity slice split together; the count fragment does not move), with no
+fupd, no mask and no invariant. That is strictly better for B2 —
+fileread/ilock carve without opening anything — and it is sound for the
+same reason (1) is: freeness is refuted by ownership, not by a count.
+Consequently `γlive` needs no authority element at all, and no lemma in
+the layer is an `own_update`.
+
+**(3) THE UPGRADE (share→reference) DOES NOT EXIST, and B3 does not need
+it.** Origin's `iref_upgrade_step` moves a count-0 fragment to count 1 at
+the same fraction; under `natR` that conjures nothing. Under `positiveR`
+the identity budget forbids the analogue: the table's retained share is
+`1/2 - qt` against the authority's `qt` (§13.1b), so a NEW fragment at
+`s` must be matched by `s` of identity coming out of the TABLE — and the
+share's own `s` is already spoken for as the hole in its parent's slice.
+A share therefore cannot become a reference; the fractions do not line
+up. What idup actually needs is weaker and already true: the share is a
+liveness WITNESS (`IcacheInv.iref_share_lookup_au`, origin's
+`iref_share_lookup` ported), and the new reference is minted from the
+table's retained share exactly as iget's cache-hit arm mints one.
+`IcacheInv.iref_upgrade_store_au` is `iref_incr_store_au` with the share
+carried through, provided so B3's call site reads as the upgrade it is.
+**B3's consequence:** SpecIdup returns the share BESIDE the new
+reference, and kfork's parent gathers it back
+(`IcacheRef.inode_ref_gather`) rather than losing it.
+
+**The one statement that changed.** `iref_incr_store_au` (and
+`iref_incr_step`) take `(qt + qn < 1)%Qp` where they took
+`✓ (qt + qn)%Qp`: the pool's arm is an exact complement, so its remainder
+after the mint must be POSITIVE, and `≤ 1` does not give that. Discharged
+at ProofIget's one call site by `ig_frac_lt1` from the same
+`1/2 = qj + qj'` it already had. `iref_close_last_store_au`'s statement
+did NOT change — the closer's `iref_tok` already carries the slice the
+retirement consumes.
+
+**New vocabulary for B2/B3**, all in the two files:
+`live_frac` / `live_slot` / `live_pool` / `live_pool_live`,
+`inode_shr` / `inode_ref_short` / `inode_ref_carve` / `inode_ref_gather` /
+`inode_shr_agree` / `inode_ref_shr_agree`,
+`iref_live_load_au` (B2's lock-free guard read for a share-holder —
+`iref_load_au`'s twin, taking `k < NINODE` as a premise where that one
+derived it from `icM_wf`), `iref_share_lookup_au`,
+`iref_upgrade_store_au`.
+
+**Boot wiring**, unchanged in character: `icache_boot` gained the premise
+`[∗ list] k ∈ seq 0 NINODE, live_frac k 1`, discharged by `icfg_alloc` +
+`live_boot_split` exactly as the count authority's `● ∅` premise is. The
+ambient-`icfg`-vs-boot-minted gap recorded under T3 is untouched and now
+covers two gnames instead of one.

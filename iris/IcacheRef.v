@@ -29,7 +29,50 @@
    threaded, [itable_half] / [iref_tok] / [inode_ref] take no gname argument
    at all: a caller that holds both a reference and the itable lock needs no
    bridging premise to tie them together -- they are stated over the same
-   [icfg_iref] by construction. *)
+   [icfg_iref] by construction.
+
+   ---- THE CANONICAL PAIRING (design/fs-icache.md §14.6, Plan B) --------
+
+   A reference is THREE fractions that are ALWAYS THE SAME NUMBER:
+
+       inode_ref k q dev inum
+         = iref_tok k q                    ∗ inode_ident k (DfracOwn q) …
+         = (iref_frag k q ∗ live_frac k q) ∗ inode_ident k (DfracOwn q) …
+            ^ count authority  ^ liveness pool   ^ the two identity cells
+
+   THIS IS LOAD-BEARING, and it is what §14.6 means by "mass conservation IS
+   the witness".  A SHARE ([inode_shr k s]) is an identity slice plus a
+   liveness slice CARVED OUT OF A PARENT REFERENCE ([inode_ref_carve]): the
+   parent keeps its whole count fragment but drops to
+   [inode_ref_short k (q + s) q] -- ident and liveness at [q], authority
+   still at [q + s].  Two consequences, and they are the entire reason for
+   the convention:
+
+   (1) SHARES CANNOT OUTLIVE THEIR PARENT.  Every contract that SPENDS a
+       reference (iput above all) states [inode_ref k q], i.e. all three
+       fractions equal.  A parent with a share outstanding cannot produce
+       one, so it cannot close; only [inode_ref_gather] puts it back.
+
+   (2) IPUT NEEDS NO WITNESS LEDGER.  At REF-1 (count one) the closer's [q]
+       IS the whole outstanding [qt], so its liveness slice is [qt]; the
+       invariant's own pool arm at a live slot is exactly [1 - qt]
+       ([IcacheInv.live_slot]); the two join to the WHOLE unit, which is
+       precisely the shape a FREE slot's arm has.  The last close therefore
+       RETIRES the slot's pool by arithmetic, inside the invariant opening it
+       already performs -- and had a share been outstanding, its own slice
+       could not have coexisted with that unit.  No count of shares is kept
+       anywhere, because none is needed.  [ProofIput]'s REF-1 derivations do
+       not move.
+
+   The pool exists for the SHARE's sake, not iput's: a share-holder has no
+   count fragment (design §14.5 -- [positiveR] has no zero, so a share is NOT
+   an [icacheUR] fragment), and still has to refute ilock's [ref < 1] panic
+   without the itable lock.  It does that with [live_frac]: a FREE slot's
+   whole unit sits inside [IcacheInv.itable_body], so a lock-free reader that
+   owns any slice at all learns [k ∈ dom M]
+   ([IcacheInv.iref_live_load_au]).  The identity cells cannot do that job --
+   a free slot's identity halves live in the itable LOCK and in the escrow,
+   neither of which a lock-free reader may open. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import auth gmap frac numbers.
@@ -150,6 +193,23 @@ Qed.
    theorem xv6's comment above iput asserts.                             *)
 Definition icacheUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
 
+(* ---- THE LIVENESS POOL (design §14.6) --------------------------------
+
+   ONE fractional unit per itable slot, and NOT an [auth]: the whole point
+   is that the mass is CONSERVED rather than counted, so there is no
+   authority element to be the counter.  [IcacheInv.itable_body] holds the
+   WHOLE unit of every FREE slot and the arm [1 - qt] of every live one;
+   the outstanding [qt] rides with the count fragments ([iref_tok]), which
+   is what makes a reference's three fractions equal (see the header) and
+   what lets the last close reassemble a free slot's unit from the closer's
+   own share plus the invariant's arm.
+
+   Because nothing is an authority, no lemma below is an [own_update]: a
+   carve is a SPLIT and a gather is a JOIN.  §14.5's demand that carving be
+   an auth-guarded EVENT was aimed at a LEDGER that has to count shares;
+   under §14.6 there is no ledger, and conservation does the counting. *)
+Definition iliveUR : ucmra := gmapUR nat fracR.
+
 (* The second field is [IcacheEscrow]'s per-slot IDENTIFICATION ghost
    ([icn_id], design §13.8 as widened by §13.10): an agreement between the
    escrow's arm and the table's [islot2] share carrying (is the entry LIVE,
@@ -160,9 +220,11 @@ Definition icacheUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
 Class icacheG (Σ : gFunctors) := IcacheG {
   icache_inG :: inG Σ icacheUR;
   icache_idG :: ghost_varG Σ (bool * mword 32 * mword 32);
+  icache_liveG :: inG Σ iliveUR;
 }.
 Definition icacheΣ : gFunctors :=
-  #[GFunctor icacheUR; ghost_varΣ (bool * mword 32 * mword 32)].
+  #[GFunctor icacheUR; ghost_varΣ (bool * mword 32 * mword 32);
+    GFunctor iliveUR].
 Global Instance subG_icacheΣ {Σ} : subG icacheΣ Σ -> icacheG Σ.
 Proof. solve_inG. Qed.
 
@@ -188,7 +250,46 @@ Class icfg := MkIcfg {
   icfg_iref : gname;
   icfg_dev  : mword 32;
   icfg_nib  : nat;
+  (* THE LIVENESS POOL's gname, and it is here for exactly the reason
+     [icfg_iref] is: [inode_shr] is stated at the file-table altitude (a
+     parked reference sheds a share to whoever reads through it), so the
+     name must be canonical rather than threaded.  Nothing outside this
+     cache ever mentions it. *)
+  icfg_live : gname;
 }.
+
+(* the pool at BOOT: one whole unit at each of the fifty slots, as ONE map,
+   so a single [own_alloc] mints it and [big_opL_own] fans it out.  Stated
+   outside the section because [icfg_alloc] below is what builds it. *)
+Definition live_boot_map : iliveUR :=
+  ([^op list] k ∈ seq 0 NINODE, ({[ k := 1%Qp ]} : iliveUR)).
+
+Local Lemma live_seq_lookup_lt (n m i : nat) :
+  (i < n)%nat ->
+  ([^op list] k ∈ seq n m, ({[ k := 1%Qp ]} : iliveUR)) !! i = None.
+Proof.
+  revert n. induction m as [|m IH]; intros n Hi.
+  - assert (Hnil : seq n 0 = []) by reflexivity.
+    rewrite Hnil big_opL_nil. done.
+  - assert (Hcons : seq n (S m) = n :: seq (S n) m) by reflexivity.
+    rewrite Hcons big_opL_cons lookup_op (IH (S n) ltac:(lia))
+            lookup_singleton_ne; [done | lia].
+Qed.
+
+Local Lemma live_seq_valid (n m : nat) :
+  ✓ ([^op list] k ∈ seq n m, ({[ k := 1%Qp ]} : iliveUR)).
+Proof.
+  revert n. induction m as [|m IH]; intros n.
+  - assert (Hnil : seq n 0 = []) by reflexivity.
+    rewrite Hnil big_opL_nil. apply ucmra_unit_valid.
+  - assert (Hcons : seq n (S m) = n :: seq (S n) m) by reflexivity.
+    rewrite Hcons big_opL_cons -insert_singleton_op;
+      [| apply live_seq_lookup_lt; lia].
+    apply insert_valid; [by apply frac_valid | apply IH].
+Qed.
+
+Lemma live_boot_map_valid : ✓ live_boot_map.
+Proof. apply live_seq_valid. Qed.
 
 (* ALLOCATING ONE, for a boot that wants to CREATE the authority rather
    than assume it: the class is inhabited at any device and region size,
@@ -201,11 +302,14 @@ Class icfg := MkIcfg {
 Lemma icfg_alloc `{!icacheG Σ} (dv : mword 32) (nib : nat) :
   ⊢ |==> ∃ ICFG : icfg,
       ⌜icfg_dev = dv⌝ ∗ ⌜icfg_nib = nib⌝ ∗
-      own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR).
+      own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
+      own icfg_live live_boot_map.
 Proof.
   iMod (own_alloc (● (∅ : gmap nat (Qp * positive)) : icacheUR)) as (γ) "Ha".
   { by apply auth_auth_valid. }
-  iModIntro. iExists (MkIcfg γ dv nib). by iFrame "Ha".
+  iMod (own_alloc live_boot_map) as (γl) "Hl".
+  { apply live_boot_map_valid. }
+  iModIntro. iExists (MkIcfg γ dv nib γl). by iFrame "Ha Hl".
 Qed.
 
 Section IcacheRefGhost.
@@ -219,11 +323,80 @@ Section IcacheRefGhost.
   Definition itable_half (M : gmap nat (Qp * positive)) : iProp Σ :=
     own icfg_iref (●{#(1/2)} M).
 
-  (* ONE reference to slot [k], holding fraction [q] of its identity. *)
-  Definition iref_tok (k : nat) (q : Qp) : iProp Σ :=
+  (* ---- the liveness pool's fragment ---- *)
+
+  (* [s] of slot [k]'s ONE unit.  A whole unit at [k] is what the invariant
+     holds while the slot is FREE, which is why owning ANY slice of it
+     refutes freeness ([IcacheInv.live_slot_live]).  Nothing here is an
+     authority, so this splits and joins with no fupd at all. *)
+  Definition live_frac (k : nat) (s : Qp) : iProp Σ :=
+    own icfg_live ({[ k := s ]} : gmap nat Qp).
+
+  Lemma live_frac_split k s1 s2 :
+    live_frac k (s1 + s2)%Qp ⊣⊢ live_frac k s1 ∗ live_frac k s2.
+  Proof.
+    rewrite /live_frac -own_op singleton_op.
+    by rewrite (frac_op s1 s2).
+  Qed.
+
+  Lemma live_frac_join k s1 s2 :
+    live_frac k s1 -∗ live_frac k s2 -∗ live_frac k (s1 + s2)%Qp.
+  Proof. iIntros "H1 H2". rewrite live_frac_split. iFrame. Qed.
+
+  (* halving, as its OWN lemma -- durable-notes' [rewrite -(Qp.div_2 q)]
+     trap: written at a call site inside the proofmode the split's evar
+     lands out of [q]'s scope and fails with "cannot instantiate ?b". *)
+  Lemma live_frac_halve k q :
+    live_frac k q -∗ live_frac k (q/2)%Qp ∗ live_frac k (q/2)%Qp.
+  Proof. iIntros "H". rewrite -live_frac_split Qp.div_2. iFrame. Qed.
+
+  Lemma live_frac_bound k s1 s2 :
+    live_frac k s1 -∗ live_frac k s2 -∗ ⌜(s1 + s2 ≤ 1)%Qp⌝.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (live_frac_join with "H1 H2") as "H".
+    rewrite /live_frac. iDestruct (own_valid with "H") as %Hv.
+    iPureIntro. specialize (Hv k). rewrite lookup_singleton in Hv.
+    by apply Some_valid, frac_valid in Hv.
+  Qed.
+
+  (* THE POOL'S WHOLE POINT, in one line: a slot whose unit is entire has no
+     share outstanding, so any slice at all contradicts it. *)
+  Lemma live_frac_full_excl k s : live_frac k 1%Qp -∗ live_frac k s -∗ False.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (live_frac_bound with "H1 H2") as %Hle. iPureIntro.
+    apply (irreflexivity Qp.lt 1%Qp).
+    eapply Qp.lt_le_trans; [| exact Hle].
+    apply Qp.lt_sum. by exists s.
+  Qed.
+
+  (* the boot map fans out into the fifty units the invariant starts with *)
+  Lemma live_boot_split :
+    own icfg_live live_boot_map ⊢ [∗ list] k ∈ seq 0 NINODE, live_frac k 1%Qp.
+  Proof. rewrite /live_boot_map /live_frac. apply big_opL_own_1. Qed.
+
+  (* ---- a reference's count fragment, and the reference token ---- *)
+
+  (* the COUNT half alone.  It is separated out because a share-carving
+     parent keeps its whole count fragment while its liveness and identity
+     slices shrink -- [inode_ref_short], and the reason iput's caller cannot
+     be a parent with a share out. *)
+  Definition iref_frag (k : nat) (q : Qp) : iProp Σ :=
     own icfg_iref (◯ {[ k := (q, 1%positive) ]}).
 
+  (* ONE reference to slot [k], holding fraction [q] of its identity -- the
+     count fragment AND the matching liveness slice, canonically paired (see
+     the header).  Every consumer of [iref_tok] treats it as opaque, which is
+     why the pool could be folded in here without touching a statement. *)
+  Definition iref_tok (k : nat) (q : Qp) : iProp Σ :=
+    (iref_frag k q ∗ live_frac k q)%I.
+
   Global Instance itable_half_timeless M : Timeless (itable_half M).
+  Proof. apply _. Qed.
+  Global Instance live_frac_timeless k s : Timeless (live_frac k s).
+  Proof. apply _. Qed.
+  Global Instance iref_frag_timeless k q : Timeless (iref_frag k q).
   Proof. apply _. Qed.
   Global Instance iref_tok_timeless k q : Timeless (iref_tok k q).
   Proof. apply _. Qed.
@@ -288,11 +461,86 @@ Section IcacheRef.
     iIntros "[_ H1] [_ H2]". iApply (inode_ident_agree with "H1 H2").
   Qed.
 
+  (* ================================================================== *)
+  (*  SHARES: what a reference can lend out, and what it costs it        *)
+  (* ================================================================== *)
+
+  (* A SHARE of slot [k]: [s] of the identity cells, and [s] of the slot's
+     liveness unit.  NO count fragment -- [positiveR] has no zero (design
+     §14.5), which is the whole reason the liveness pool exists: the share
+     still has to prove the slot is live, and [live_frac] is how.
+
+     A share is deliberately NOT self-sufficient: it can be READ through and
+     it refutes ilock's [ref < 1] panic, but it can never be spent as a
+     reference, because no amount of it produces the count fragment. *)
+  Definition inode_shr (k : nat) (s : Qp) (dev inum : mword 32) : iProp Σ :=
+    (inode_ident k (DfracOwn s) dev inum ∗ live_frac k s)%I.
+
+  (* A reference WITH A SHARE OUTSTANDING: the count fragment is still whole
+     at [qtok] -- carving does not move the authority, and MUST not, since
+     the table's retained identity share is stated against it -- while the
+     liveness and identity slices have dropped to [qid].  This is the shape
+     the design calls NON-CANONICAL, and it is the point: no contract in the
+     tree states it, so a parent cannot spend its reference until
+     [inode_ref_gather] restores the pairing. *)
+  Definition inode_ref_short (k : nat) (qtok qid : Qp)
+      (dev inum : mword 32) : iProp Σ :=
+    (iref_frag k qtok ∗ live_frac k qid ∗
+     inode_ident k (DfracOwn qid) dev inum)%I.
+
+  Lemma inode_ref_canon k q dev inum :
+    inode_ref k q dev inum ⊣⊢ inode_ref_short k q q dev inum.
+  Proof.
+    rewrite /inode_ref /inode_ref_short /iref_tok.
+    iSplit; [iIntros "[[$ $] $]" | iIntros "($ & $ & $)"].
+  Qed.
+
+  (* THE CARVE, and its inverse.  Both are pure resource algebra: the
+     liveness slice and the identity slice split together, and the count
+     fragment does not move.  There is no ghost update and no invariant
+     opening, which §14.6 makes sound -- see [iliveUR]'s comment. *)
+  Lemma inode_ref_carve k q s dev inum :
+    inode_ref k (q + s)%Qp dev inum ⊣⊢
+    inode_ref_short k (q + s)%Qp q dev inum ∗ inode_shr k s dev inum.
+  Proof.
+    rewrite /inode_ref /inode_ref_short /inode_shr /iref_tok
+            live_frac_split inode_ident_split.
+    iSplit.
+    - iIntros "[[$ [$ Hl2]] [$ Hi2]]". iFrame.
+    - iIntros "[($ & $ & $) [$ $]]".
+  Qed.
+
+  Lemma inode_ref_gather k q s dev inum :
+    inode_ref_short k (q + s)%Qp q dev inum -∗ inode_shr k s dev inum -∗
+    inode_ref k (q + s)%Qp dev inum.
+  Proof.
+    iIntros "Hp Hs". rewrite inode_ref_carve. iFrame.
+  Qed.
+
+  (* the two identity values a share sees are the entry's, for free *)
+  Lemma inode_shr_agree k s1 d1 n1 s2 d2 n2 :
+    inode_shr k s1 d1 n1 -∗ inode_shr k s2 d2 n2 -∗ ⌜d1 = d2 /\ n1 = n2⌝.
+  Proof.
+    iIntros "[H1 _] [H2 _]". iApply (inode_ident_agree with "H1 H2").
+  Qed.
+
+  Lemma inode_ref_shr_agree k q s d1 n1 d2 n2 :
+    inode_ref k q d1 n1 -∗ inode_shr k s d2 n2 -∗ ⌜d1 = d2 /\ n1 = n2⌝.
+  Proof.
+    iIntros "[_ H1] [H2 _]". iApply (inode_ident_agree with "H1 H2").
+  Qed.
+
   Global Instance inode_ident_timeless k dq dev inum :
     Timeless (inode_ident k dq dev inum).
   Proof. apply _. Qed.
   Global Instance inode_ref_timeless k q dev inum :
     Timeless (inode_ref k q dev inum).
+  Proof. apply _. Qed.
+  Global Instance inode_shr_timeless k s dev inum :
+    Timeless (inode_shr k s dev inum).
+  Proof. apply _. Qed.
+  Global Instance inode_ref_short_timeless k qt qi dev inum :
+    Timeless (inode_ref_short k qt qi dev inum).
   Proof. apply _. Qed.
 
 End IcacheRef.

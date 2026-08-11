@@ -259,6 +259,20 @@ Proof.
   trans (1/2)%Qp; [ rewrite -Hstep; apply Qp.le_add_l | compute_done ].
 Qed.
 
+(* the liveness pool's counterpart of [ig_frac_valid]: the arm [1 - qt] has
+   room for the minted slice, which is what [IcacheInv.iref_incr_store_au]
+   now asks for in place of the bare [valid (qt + qn)] (design 14.6 -- the
+   pool's arm is an exact complement, so its remainder must be POSITIVE). *)
+Lemma ig_frac_lt1 (qt qr : Qp) :
+  (1/2)%Qp = (qt + qr)%Qp -> (qt + qr/2 < 1)%Qp.
+Proof.
+  intro Hs. apply Qp.lt_sum. exists (qr/2 + 1/2)%Qp.
+  rewrite Qp.add_assoc.
+  assert (Hstep : ((qt + qr/2) + qr/2)%Qp = (1/2)%Qp).
+  { rewrite -Qp.add_assoc (Qp.div_2 qr). by rewrite Hs. }
+  rewrite Hstep. by rewrite Qp.half_half.
+Qed.
+
 Lemma ig_frac_rest (qt qr : Qp) :
   (1/2)%Qp = (qt + qr)%Qp -> (1/2 - (qt + qr/2))%Qp = Some (qr/2)%Qp.
 Proof.
@@ -1192,15 +1206,19 @@ Section ProofIget.
                       with "Hcg Hpc Hi78 [Hhalf] [-]").
             { rewrite Hpa78 Hsv78.
               iInv "Hinv" as ">Hbody" "Hclose2".
-              iDestruct "Hbody" as (M') "(Ha & %Hwf' & Hcells)".
+              iDestruct "Hbody" as (M') "(Ha & %Hwf' & Hcells & Hlpool)".
               iDestruct (itable_half_agree with "Ha Hhalf") as %->.
               iDestruct (iref_cells_acc_upd M e He with "Hcells") as "[Hcell Hcback]".
+              (* the recycled slot's liveness unit splits here, exactly as its
+                 identity halves do below: 1/4 to the first reference, the rest
+                 to the invariant's arm (design 14.6). *)
+              iDestruct (live_pool_acc_upd M e He with "Hlpool") as "[Hlslot Hlback]".
               iModIntro. iExists (iref_word M e). iFrame "Hcell". iIntros "Hcell".
               iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
               iMod (iref_alloc_step M e (1/2/2)%Qp HMe ig_quarter_le
-                      with "Hauth") as "[Hauth Htok2]".
+                      with "Hauth Hlslot") as "(Hauth & Hlslot & Htok2)".
               iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
-              iMod ("Hclose2" with "[Ha Hcell Hcback]") as "_".
+              iMod ("Hclose2" with "[Ha Hcell Hcback Hlslot Hlback]") as "_".
               { iNext. iExists (<[e := ((1/2/2)%Qp, 1%positive)]> M). iFrame "Ha".
                 iSplitR.
                 { iPureIntro. destruct Hwf' as [Hdom Hcnt']. split.
@@ -1211,8 +1229,13 @@ Section ProofIget.
                       injection Hi as _ Hn. subst ni. rewrite E31. lia.
                     + rewrite lookup_insert_ne in Hi; [|by apply not_eq_sym].
                       by apply (Hcnt' i qi). }
-                iApply ("Hcback" $! ((1/2/2)%Qp, 1%positive)).
-                rewrite /iref_word lookup_insert. iExact "Hcell". }
+                iSplitL "Hcell Hcback".
+                { iApply ("Hcback" $! ((1/2/2)%Qp, 1%positive)).
+                  rewrite /iref_word lookup_insert. iExact "Hcell". }
+                iApply ("Hlback" $! (<[e := ((1/2/2)%Qp, 1%positive)]> M)
+                          with "[%] Hlslot").
+                intros i Hi. rewrite lookup_insert_ne;
+                  [reflexivity | by apply not_eq_sym]. }
               iModIntro. iFrame. }
             iApply wp_next_off_intro. iIntros "Hcg Hpc [Hhalf Htok2]".
             assert (Hpp7c : add_vec_int (mword_of_int (KernelSyms.iget + 0x78) : mword 64) 4
@@ -1665,7 +1688,7 @@ Section ProofIget.
         assert (Hpa58 : add_vec (rget L4 Rs1) (sign_extend' 64 (mword_of_int 8 : mword 12))
                         = i_ref (ientry j)).
         { rewrite (rget_ne L4 Rs1 ltac:(nz)) HL4s1. reflexivity. }
-        assert (Hqv : ✓ (qj + qj'/2)%Qp) by (apply ig_frac_valid; by apply Qp.sub_Some).
+        assert (Hqv : (qj + qj'/2 < 1)%Qp) by (apply ig_frac_lt1; by apply Qp.sub_Some).
         iApply (wp_sw_au_s_sconf true (mword_of_int (KernelSyms.iget + 0x58)) Ra5 Rs1
                   (mword_of_int 8 : mword 12) L4 (K - 6)%nat
                   (itable_half (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M) ∗

@@ -581,6 +581,12 @@ Section IcacheBootTable.
        it and then claim to have built THE itable.  [IcacheRef.icfg_alloc]
        is what discharges it. *)
     own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) -∗
+    (* THE LIVENESS POOL, at the all-free state: one whole unit per slot
+       (design §14.6).  A PREMISE for [icfg_iref]'s reason -- the gname is
+       [IcacheRef.icfg_live] of the AMBIENT cache, so this lemma may not
+       mint it.  [IcacheRef.icfg_alloc] + [IcacheRef.live_boot_split] is
+       what discharges it. *)
+    ([∗ list] k ∈ seq 0 NINODE, live_frac k 1%Qp) -∗
     itable_lock ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name itable_lock "itable"%string -∗
     lock_cpu itable_lock ↦₈ (zero_reg : mword 64) -∗
@@ -597,7 +603,7 @@ Section IcacheBootTable.
            is_sleeplock γil γisl (i_lock (ientry k)) "inode"%string
                         (ic_tok cn k)).
   Proof.
-    iIntros "Hauth Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hpool".
+    iIntros "Hauth Hlive Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hpool".
     (* ---- take the fifty entries apart, and name the identity values ---- *)
     iDestruct (ientry_raw_split with "Hraw")
       as "(Hdev & Hinum & Href & Hvalid & Hmirror)".
@@ -616,9 +622,10 @@ Section IcacheBootTable.
     iMod (ic_names_alloc dvs) as (cn) "(Htok & Hmid & Hgid)".
     (* ---- the [ref]-word invariant ---- *)
     iMod (inv_alloc icacheN E itable_body
-            with "[HhalfI Href]") as "#Hitinv".
+            with "[HhalfI Href Hlive]") as "#Hitinv".
     { iNext. iExists ∅. iFrame "HhalfI". iSplitR; [iPureIntro; exact icM_wf_empty |].
-      iApply iref_cells_boot. iExact "Href". }
+      iSplitL "Href"; [iApply iref_cells_boot; iExact "Href" |].
+      iApply live_pool_empty. iExact "Hlive". }
     (* ---- the fifty escrows, at the EMPTY arm, and the table's shares ---- *)
     iDestruct (big_sepL_sep_2 with "Hid Hvalid") as "H1".
     iDestruct (big_sepL_sep_2 with "H1 Hmirror") as "H2".

@@ -264,15 +264,17 @@ Qed.
 (* 4. ...and at a CONCRETE functor list, so nothing at all is assumed.     *)
 (* ---------------------------------------------------------------------- *)
 
-(* THE INODE CACHE'S THREE CONSTANTS ARE IRRELEVANT HERE, and this is the
+(* THE INODE CACHE'S FOUR CONSTANTS ARE IRRELEVANT HERE, and this is the
    file that has to say so.  [FileInv.fileG] carries an [IcacheRef.icfg]
    (C6b: an FD_INODE file's payload IS an inode reference, and a reference
    names the one cache), so instantiating the file table at a concrete
    functor list needs one -- but the statements below are about REDUCIBILITY
    and quantify over none of it, so any closed choice does.  Local, so it
-   cannot leak into a proof that ought to be threading a real one. *)
+   cannot leak into a proof that ought to be threading a real one.
+   (The fourth field is the liveness pool's gname, design/fs-icache.md
+   §14.6; this is the ONE place in the tree that names a concrete [icfg].) *)
 Local Instance adequacy_icfg : icfg :=
-  MkIcfg 1%positive (mword_of_int 0 : mword 32) 0%nat.
+  MkIcfg 1%positive (mword_of_int 0 : mword 32) 0%nat 1%positive.
 
 Definition xv6Σ : gFunctors :=
   #[ riscvΣ; sieΣ; lockΣ; kallocΣ; fileΣ; fdslotΣ; irefslotΣ; icacheΣ;
