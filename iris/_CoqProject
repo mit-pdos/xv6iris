@@ -1006,3 +1006,5 @@ SpecIreclaim.v
 SpecFsinit.v
 ProofIreclaim.v
 LinkIreclaim.v
+ProofFsinit.v
+LinkFsinit.v

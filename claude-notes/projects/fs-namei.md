@@ -242,10 +242,22 @@ usual near-full rebuild lands with it.
 - **N5**: ialloc (188B) + ireclaim (200B) + fsinit (112B) — the
   allocation/boot half; ireclaim is fsinit's single-threaded orphan
   sweep (the C7 notes flagged it as the pool's initial-contents
-  authority).
+  authority).  **N5a/N5b DONE** (the shared layer + the §16 retrofit).
+  **N5c/N5c2 DONE** — ialloc PROVEN AND LINKED.  **N5d DONE** — the two
+  hoists, `SpecIreclaim` and `SpecFsinit` FROZEN.  **N5d2 DONE** —
+  ireclaim PROVEN AND LINKED.  **N5d3 DONE — fsinit PROVEN AND LINKED.
+  N5 IS COMPLETE.**
 
-After N5: fs.c is 24/24 and the campaign's exit gate is the shutdown
-(user-standing instruction).
+**THE CAMPAIGN IS CLOSED.**  fs.c is **24/24 PROVEN AND LINKED**.  Every
+one of the eleven functions this campaign opened with — ialloc,
+iunlockput, ireclaim, fsinit, stati, namecmp, dirlookup, dirlink, namex,
+namei, nameiparent — has a frozen contract, a whole-function proof and a
+sealed `Link` module, and `Print Assumptions` on each linked module gives
+the 5 platform axioms + funext and nothing else (modulo the threaded
+`panic_wp_any` / `printk_gen_contract` obligations the tree carries
+throughout).  The campaign's exit gate is the shutdown (user-standing
+instruction).  What fs.c's callers still owe is consolidated under
+"THE SYSFILE INHERITANCE" at the end of the N5d3 ledger.
 
 ## N2's ledger — what N3/N4 consume
 
@@ -3312,3 +3324,251 @@ md5s: `iris/ProofIreclaim.v 13b13229e77dccf8604e98e3b14dcdaa`,
    to be discharged (or accepted, as `panic_wp_any` is).
 4. **`ProofFsinit.v`'s only genuinely new machinery is still the memmove's
    byte→word bridge.**  Nothing in this stage touched `BlockWords`.
+
+### N5d3 — **fsinit is PROVEN and LINKED**; `SpecFsinit` did not move.  **fs.c is 24/24 and THE CAMPAIGN IS CLOSED.**
+
+**WHAT LANDED: two files and two `_CoqProject` rows.**  `iris/ProofFsinit.v`
+(1 488 lines, md5 `24a44277c34df2b6309403f5cc3789ff`) and
+`iris/LinkFsinit.v` (53 lines, md5 `d55d1cb93b6f6af58d7ab7d4a5f4c7b6`), with
+their rows **after the `LinkIreclaim.v` row**.  `SpecFsinit.v` is untouched:
+it was FROZEN at N5d and every premise, every resource and the whole 35-slot
+accounting fitted the proof exactly — no line of the contract had to move,
+and neither did `SpecIreclaim.v`, `SpecInitlog.v`, `SpecBread.v`,
+`SpecBrelse.v` or `SpecMemmove.v`.  **No shared file was touched at all**:
+`BlockWords.v`, `ByteBuf.v`, `DinodeSlot.v`, `BioInv.v` are all unchanged,
+exactly as the N5d2 ledger predicted.
+
+`Print Assumptions Fsinit.wp_fsinit_sconf`: **`rv64d.valid_reservation`,
+`rv64d.plat_term_write`, `rv64d.match_reservation`, `rv64d.load_reservation`,
+`rv64d.cancel_reservation`,
+`FunctionalExtensionality.functional_extensionality_dep`** — the five
+platform axioms plus funext, and **nothing else**.  As throughout this tree
+that is *modulo* two THREADED pure obligations the contract carries as
+hypotheses and never discharges: `SpecPanic.panic_wp_any` (a resource, for
+the callees' own panic arms) and `SpecPrintkGen.printk_gen_contract γpr γu γd`
+(a Prop, now **two deep** — `SpecFsinit` → `SpecIreclaim` → the orphan
+block).  `LinkFsinit.v`'s header says so out loud.
+
+`python3 tools/lemma_diff.py --ref HEAD`: **CLEAN** (nothing dropped, nothing
+admitted, no new assumption).  No `Admitted`, no `Axiom`, no `cheat_` in
+either file.
+
+#### The two blocks, and what each cost
+
+| block | offsets | template | rounds |
+|---|---|---|---|
+| `fsi_epilogue` | +0x58..+0x62 | `ProofIreclaim.irc_epilogue` narrowed to 4 pops, with `ProofSysClose`'s `c.addi16sp` pop | first try |
+| `wp_fsinit_sconf` | +0x00..+0x54 | `ProofIreclaim`'s prologue at a 4-slot frame + `ProofIlock`'s memmove block | 3 (two one-line fixes) |
+
+Only TWO blocks, because fsinit is straight-line: no loop, no join, one live
+exit.  The whole function is 29 instructions and four `jal`s.
+
+#### New vocabulary (all local to the file)
+
+- `fsi_sp`, `fsi_thr4`, `fsi_frame` — `ProofIreclaim`'s `irc_*` at fsinit's
+  four slots (ra@24 s0@16 s1@8 s2@0 off the pushed sp).  `fsi_sp` is stated
+  as `M !!! sp = pa_stk (m !!! sp) 4` (ProofSysClose's spelling) rather than
+  ireclaim's `add_vec` form, because the push is a plain `c.addi` and the pop
+  a `c.addi16sp`, so `KernelRvcDecode.stk_push_32` / `stk_pop_32` /
+  `stk_fp_32` are the exact trio and no new frame arithmetic was needed;
+- `fsi_cont` — the contract's post, named;
+- **`fsi_image_ind` / `fsi_img`** — the byte→word reading.  See surprise 1;
+- `fsi_take_total` — `take n l !!! k = l !!! k` below `n`, the one step that
+  turns the contract's `take 32 bs_sb = sb_image …` into a pointwise fact;
+- `fsi_neq_self` — `neq_vec x x = false`, the +0x40 refutation's last step;
+- **`fsi_data_acc`** — the buffer's 1024 data bytes out of `bio_held` and
+  back, `DinodeSlot.ds_held_L`'s twin for the RAW window.  Nothing in the
+  tree had it: every earlier reader of a buffer went through
+  `DinodeSlot.diblk_slot_acc` (a dinode window) or handled `bb_bytes` inside
+  a proof that already owned `buf_own`;
+- **`fsi_word4`** — four raw bytes folded into a `↦₄` cell.  The inverse of
+  `RiscvPtsto.word4_pointsto_bytes`, with the alignment as a premise.
+
+#### SURPRISES (numbered)
+
+1. **`sb_image` IS `BlockWords.ind_bytes` at an eight-entry list, and that
+   collapses the whole byte→word bridge to one existing lemma.**
+   `sb_image w0 … w7 = ind_bytes [w0;…;w7]` differs only by the Fixpoint's
+   trailing `++ []` (`cbn [ind_bytes]; rewrite app_nil_r; reflexivity`), so
+   `BlockWords.ind_bytes_lookup` — written for INDIRECT blocks — reads the
+   superblock's field `i`, byte `j`, at index `4*i+j` with no new arithmetic
+   at all.  The N5d/N5d2 ledgers called the bridge "the only genuinely new
+   machinery"; it turned out to be **two 5-line lemmas**, because
+   `SpecFsinit` was stated with `word_bytes` rather than an inverse decode.
+   That choice, flagged in the frozen spec's own comment as "an EQUATION ON
+   BYTES the proof can rewrite with", is what paid.
+2. **`ByteBuf.bb_chunk` regroups the 32-byte window in one step, and its
+   `i * n` offsets are BETTER left unnormalised.**  `bb_chunk 4 8 sb_base f`
+   gives eight records at `pa_add sb_base (i*4)` naming `f (i*4+j)`.
+   Instantiating `fsi_word4` at `o := (i*4)%nat` **literally** (not at `4`,
+   `8`, …) means the four addresses the rest of the tree names close by
+   pure conversion: `pa_add sb_base (0*4)%nat` IS `sb_magic` by `change`,
+   and `SpecFsinit.sb_size_addr` / `sb_ninodes_addr` / `sb_inodestart_addr`
+   / `sb_bmapstart_addr` rewrite the other four into `BitmapInv`'s and
+   `InodeInv`'s own constants.  Normalising the offsets first costs eight
+   `change`s and buys nothing.
+3. **`log_ctx` is PERSISTENT, and fsinit is the first function that NEEDS it
+   to be.**  initlog produces `∃ γ, log_ctx γ …`; ireclaim CONSUMES it at
+   +0x54; and the contract hands it to the caller afterwards.  Destructing
+   the existential spatially (`iDestruct "H" as (γ) "H"`) type-checks and
+   then fails at the epilogue with *"iSpecialize: hypotheses ["Hlctx"] not
+   found"* — the `#`-introduction (`as (γlog) "#Hlctx"`) is the whole fix.
+   Every earlier log client either received `log_ctx` as a premise (already
+   persistent in its context) or never returned it.
+4. **`lookup_seq`'s `->` pattern eats the bound byte index.**  Inside
+   `big_sepL_mono`, `apply lookup_seq in Hj as [-> Hlt]` substitutes the
+   ELEMENT away (it becomes `0 + i`), so a later `rewrite (Hf jj …)` dies
+   with *"The variable jj was not found in the current environment"*.  Name
+   the element something you do not intend to use and rewrite at
+   `(0 + i)%nat`.  (This was one of only two errors in the whole file.)
+5. **THE 35-SLOT ACCOUNTING NEEDED NO ARITHMETIC.**  `(LOGBLOCKS + 2) + 2 + 1`
+   already parses as `(((LOGBLOCKS+2)+2)+1)`, so
+   `DinodeSlot.iu_slots_split bn ((LOGBLOCKS+2)+2)%nat 1%nat` applies to the
+   contract's resource *as written* — the 34 go to initlog, the 1 to bread,
+   and `iu_slots_join bn 2 1` + `change (2+1)%nat with 3%nat` makes
+   ireclaim's three.  N5d finding 1's shape is exactly right and the spec's
+   SPELLING of the count is load-bearing.
+6. **The device tie's four premises are UNUSED by the proof, and that is
+   correct.**  `dev = icfg_dev`, `nib = icfg_nib`, `dev = ROOTDEV`,
+   `0 < nib` are threaded by `SpecFsinit` and consumed by nobody inside it:
+   `SpecIreclaim` is device-GENERIC (N5d (b)) and takes only
+   `ireg_blocks_ok` / the three ninodes bounds.  They are in fsinit's
+   contract because fsinit is the only place the boot client can be asked
+   for them — the consumers are `iget` / `namex`, above.  A future reader
+   should not "clean them up".
+7. **The magic test needed no bitvector reasoning.**  `lw a4,848(a4)` leaves
+   `sign_extend' 64 v_magic`, and `DinodeSlot.ds_sext_small` at
+   `bv_unsigned v_magic = FSMAGIC = 0x10203040 < 2^31` turns it into
+   `mword_of_int 0x10203040`; the `lui`/`addi` pair on the other side is a
+   closed term that `apply bv_eq; vm_compute` reduces to the same literal.
+   `neq_vec x x = false` then closes the fall-through.  The panic arm is
+   never entered, so **no `PANIC` functor is instantiated** and
+   `LinkFsinit.v` takes five callee modules and nothing else.
+8. **`bio_locked`'s data bytes had to be carved by hand, and the give-back
+   is what makes brelse's obligation survive.**  memmove does not change the
+   source, so the 32-byte prefix comes back verbatim, rejoins the 992-byte
+   suffix (`ByteBuf.bb_split` in both directions), and `fsi_data_acc`'s wand
+   rebuilds `bio_held` at the SAME `bs` — which is exactly why `bio_locked`
+   (bytes = logical content) still holds at the brelse at +0x2c.  A proof
+   that had rebuilt the window at different bytes could not have called
+   brelse at all.
+
+#### Build evidence (EC2 mirror, git-synced at `8688771c`)
+
+Single-file, with the mirror's `~/one.sh` (`coqc -time -R . xv6iris
+-R ../model-xv6iris Riscv -R ../kernel-rocq Kernel -w -notation-overridden`):
+`ProofFsinit.v` **RC=0**, `LinkFsinit.v` **RC=0**, and a scratch `FsiChk.v`
+(`Print Assumptions Fsinit.wp_fsinit_sconf`) **RC=0** giving the six above.
+`iris/_CoqProject` was **not** scp'd (N5c surprise 1).  `ProofIreclaim.vo` /
+`LinkIreclaim.vo` were confirmed built and the mirror quiet before the first
+compile.  Mirror scratch (`ProofFsinit.*`, `LinkFsinit.*`, `FsiChk.*`,
+`/tmp/one.log`) deleted at the end; the mirror's working tree was left clean
+(`git status --short` empty).  No full gate was run — the campaign's final
+gate is the coordinator's.
+
+md5s: `iris/ProofFsinit.v 24a44277c34df2b6309403f5cc3789ff`,
+`iris/LinkFsinit.v d55d1cb93b6f6af58d7ab7d4a5f4c7b6`.
+
+---
+
+## CAMPAIGN CLOSE-OUT — fs.c 24/24, and THE SYSFILE INHERITANCE
+
+**fs.c is 24/24 PROVEN AND LINKED.**  The eleven this campaign opened with
+(ialloc, iunlockput, ireclaim, fsinit, stati, namecmp, dirlookup, dirlink,
+namex, namei, nameiparent) join the thirteen that preceded it; every one has
+a frozen `Spec*.v`, a whole-function `Proof*.v` and a sealed `Link*.v`, and
+`Print Assumptions` on each linked module gives the 5 platform axioms +
+funext and nothing else.
+
+Nothing below is a defect in what landed.  These are the obligations fs.c's
+contracts THREAD rather than discharge — what `sysfile.c` (`create`,
+`sys_open`, `sys_link`, `sys_unlink`, `sys_chdir`, `filestat`) and the boot
+client (`main` / `forkret`) inherit.  They are gathered here so the next
+campaign does not have to re-derive them from nine ledgers.
+
+1. **`SpecIalloc`'s payout shape (N5c (b)).**  ialloc pays out the RAW
+   `IcacheRef.inode_ref kslot q dev inum` — dirlookup's shape — plus the pure
+   bound `bv_unsigned inum < 16 * nib`, and **not** `inode_held`.  There is
+   deliberately no `dev = icfg_dev` / `nib = icfg_nib` premise: ialloc is
+   device-generic exactly as iget is, and a caller that owns the two ties
+   builds `inode_held` itself.  `create` has both ties.  The `dn'` clause
+   (`dn' = ialloc_fresh ty`, `di_type dn' = ty`, `fresh_shape dn'`) is
+   DOCUMENTATION of what the claim wrote, not a stable fact at return — what
+   actually hands `create` the fresh record is ilock's third fill arm
+   (`InodeRegion.ireg_withdraw`).  `iref_slot` is spent on the claim arm and
+   returned on the dry arm; `log_op γ u` / `log_op γ (S u)` likewise.
+2. **The dirlink SHORT-WRITE obligations (N3d, N4's ledger, "Owed" item 1).**
+   Two, and they are different:
+   - **Granularity is not unconditionally preserved.**  `16 | di_size dn` is
+     what makes every directory scannable under `SpecDirlookup`, and on the
+     LIVE short-write arm (`a0 = -1`, `tot < 16`, balloc out of blocks) the
+     new size is `16*nrec + tot`, not a multiple of 16.  That is a real
+     property of xv6, not a proof artifact.  Whoever states `create`'s
+     contract must either exclude the arm or carry the damage.
+   - **The middle-slot arm's DISTURBED REGION.**  `SpecDirlink`'s range
+     clause is writei's THREE-way one: the record window, then
+     `[16k0+tot, 16k0+tot+dist)` of *unspecified* bytes with `dist <= BSIZE`
+     (kernel-defect-D1's committed partial chunk), then the old bytes.  When
+     dirlink fills a hole (`k0 < nrec`) the size does not change and the
+     disturbed region can cover up to 64 following records, so `dir_ok` is
+     **not** derivable from the contract as frozen.  The honest fix is to
+     strengthen `SpecWritei` / `SpecDirlink` on the KERNEL arm, where
+     `either_copyin` cannot fail and therefore `dist = 0`.
+3. **The LINKED-INUM premise is missing from `SpecDirlink` (N4a "Owed"
+   item 2).**  `SpecDirlink` carries `bv_unsigned dinum < 16 * nib` about the
+   DIRECTORY's own inum (it needs `IBLOCK dinum inodestart ∈ cov`).  The
+   inum being LINKED (`inum : mword 16`) has **no range premise at all**.
+   Any writer-side `dir_ok` proof has to add one.  Relatedly,
+   `IcacheBoot`'s image-wf IOU is two clauses wide (`inode_ok` and
+   `dir_ok icfg_nib`) and the boot mint owes both.
+4. **The stat HOLE (N2's ledger).**  `SpecStati.stat_at` bundles exactly the
+   five cells stati writes — `st_dev`@0, `st_ino`@4, `st_type`@8,
+   `st_nlink`@10, `st_size`@16.  **Bytes 12..15 are deliberately NOT in the
+   bundle**: they are the alignment hole before the 8-byte size and stati
+   never writes them, so `filestat` / `sys_fstat`, which `copyout` the whole
+   24-byte struct, must own them separately.  Note also that only `size`
+   carries an extension (`lwu` into an `sd`); the other four load and store
+   at the same width.
+5. **The fd-type fact (`claude-notes/design/file-table.md`, "struct file").**
+   `f->off` is meaningful only when `type == FD_INODE`; for `FD_PIPE` /
+   `FD_DEVICE` it is dead **and not zero** — `sys_open` assigns `f->off = 0`
+   only on the `FD_INODE` path.  Any `create` / `sys_open` contract that
+   hands out a `file_ref` has to say which arm it is on; the file-table
+   design note already states the discriminated bundle
+   (`fc_type C ∈ {FD_INODE, FD_DEVICE} → inode_ref (fc_ip C) q`) that this
+   must instantiate.
+6. **THE 35-SLOT BOOT ACCOUNTING (N5d finding 1, N5d3 surprise 5).**  The
+   boot client must size for `bslots bn ((LOGBLOCKS + 2) + 2 + 1)` = **35**,
+   not 34: initlog seals 32 into `log_batch`'s pool *permanently* and returns
+   two, ireclaim needs three, and fsinit holds one back across the
+   `jal initlog`.  fsinit returns `bslots bn 3`.  This is a fact about the
+   COMPOSITION that neither contract can see alone.
+7. **`SpecFsinit`'s IMAGE PREMISES (N5d (c)) — the boot client's whole side
+   of the bargain.**  All of them are claims about what mkfs wrote into
+   block 1, threaded and never discharged, in the same family as
+   `IcacheBoot.ipool_alloc`'s allocated-inum bundles, `InodeLock.inode_ok`
+   and `DirView.dir_ok`:
+   - `take 32 bs_sb = sb_image v_magic v_size v_nblocks v_ninodes v_nlog
+     v_logstart v_inodestart v_bmapstart` — the block IS a superblock;
+   - `bv_unsigned v_magic = FSMAGIC` — refutes the LIVE panic at +0x40;
+   - `v_ninodes = mword_of_int ninodes` and the same for `inodestart`,
+     `bmapstart`, `logstart` — the four field values downstream reads;
+   - `1 < ninodes`, `ninodes <= 16 * Z.of_nat nib`, `ninodes < 2^31` — the
+     three geometry ties (the middle one existed nowhere in the tree before
+     N5c);
+   - `dev = icfg_dev`, `nib = icfg_nib`, `dev = ROOTDEV`, `(0 < nib)%nat` —
+     SpecNamex's four-line device tie, threaded for `iget` / `namex` above
+     (see N5d3 surprise 6: fsinit itself does not use them);
+   - `hdr_n bs_hdr = 0` — initlog's stage-2 clean-image precondition.  **Real
+     crash recovery is stage 4** and is the one genuinely unbuilt layer this
+     campaign leaves behind.
+   In exchange the boot client gets the eight typed superblock cells (four of
+   them at the very addresses `BitmapInv.v` and `InodeInv.v` already name),
+   `∃ γ, log_ctx γ …`, `bslots bn 3` and a bitmap whose used set has shrunk
+   by every orphan ireclaim freed.
+8. **The two standing threaded obligations, unchanged.**
+   `SpecPanic.panic_wp_any` (a resource) and
+   `SpecPrintkGen.printk_gen_contract` (a Prop, reaching two deep through
+   `SpecFsinit` → `SpecIreclaim`) ride every fs.c contract and are the boot
+   client's to discharge or to accept.  `Print Assumptions`'s "standing six"
+   is modulo both, throughout this tree.
