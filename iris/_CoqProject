@@ -996,3 +996,6 @@ WpIntrOff.v
 ProofPrepareReturnParts.v
 ProofPrepareReturn.v
 LinkPrepareReturn.v
+CodeUsertrap.v
+SpecSyscall.v
+LinkSyscall.v

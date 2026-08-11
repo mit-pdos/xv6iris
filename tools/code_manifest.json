@@ -864,6 +864,12 @@
   2
  ],
  [
+  "CodeUsertrap.v",
+  "usertrap",
+  "uti_",
+  3
+ ],
+ [
   "CodeUvmalloc.v",
   "uvmalloc",
   "uai_",

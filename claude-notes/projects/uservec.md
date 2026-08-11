@@ -243,10 +243,64 @@ so `repeat (apply callee_saved_insert_r; [vm_compute; reflexivity |])`
 collapses the tower to `callee_saved A U17`, and only sp and s0 (saved by
 the prologue, restored by the epilogue) need their own conjuncts.
 
+## prepare_return: INDEX-GENERIC, at either entry SIE state
+
+`wp_prepare_return_sconf_body` now takes a `b : bool` entry index and a
+`trap_csrs_ext b` premise. Both values are reachable and pinning `true`
+was what made usertrap unprovable against it:
+
+- `b = true` — forkret, and usertrap's SYSCALL path (its own `csrsi
+  sstatus,2` runs just before the `jal syscall`);
+- `b = false` — usertrap's devintr / vmfault / unexpected-scause paths,
+  which never re-enable interrupts after the trap cleared SIE.
+
+**The missing leaf was an `intr_off()` that is a NO-OP.**
+`WpSconfCsr.wp_csrci_sstatus_x0_s_sconf` REFUTES its `b = false` arm (its
+`intr_count_pre b 0 true` premise is unsatisfiable there — the count
+eighth at '1' contradicts the capability's '0' eighth), so a `csrci`
+reached with interrupts already off had no leaf at all. Added:
+
+- `WpSconfCsr.wp_csrci_sstatus_x0_idem_s_sconf` — the exact mirror of the
+  existing `wp_csrsi_sstatus_x0_idem_s_sconf`: pre and post are the same
+  `sie_cap_gpr m n false p` at an ARBITRARY index, nothing moves;
+- `WpIntrOff.v` — `wp_intr_off_lvl0_s_sconf`, the index-generic composite,
+  stated over `CpuOwn.cpu_own` and `IntrDefs.trap_csrs_ext` rather than
+  over the leaf's raw pieces. **That is what makes its postcondition
+  index-free** (`cpu_own 0 false p C false ∗ trap_csrs` on both arms), so
+  everything after the `csrci` is proved once — which is why generalizing
+  a 42-instruction proof cost three lines in its body rather than a
+  second walk. Also `trap_csrs_ext_transport`, the `cpu_own_transport`
+  twin: free on both arms (`emp` at `true`, no hart movement at `false`),
+  and needed because the caller's own trap CSRs must reach the `csrci`
+  across five hart-rebinding steps.
+
+The rule this generalizes: **when a function's contract pins an index
+because one leaf on its path only exists there, check whether the leaf's
+other arm is a NO-OP before assuming the contract is right.** The
+`_idem`/`_disable` pair is the shape; `trap_csrs_ext` is the accounting
+(`SpecYield`/`SpecSched` use the same complement one tier up).
+
 ## What remains after this project
 
 - Prove usertrap() (huge: syscall/devintr/vmfault/kexit/prepare_return
-  cones) and define `usertrap_res` concretely.
+  cones) and define `usertrap_res` concretely. The decode layer is
+  landed (`CodeUsertrap.v`, 90 instructions, `uti_*`) and `SpecSyscall.v`
+  / `LinkSyscall.v` state syscall's contract as ASSUMED (one abstract
+  `syscall_env γf pj` for the union of the twenty-two table entries'
+  footprints, so usertrap threads it opaquely).
+  **ONE BLOCKER LEFT, and it is the same shape as prepare_return's was:**
+  `SpecKexit` has `eb = true ->`, which at level 0 forces `b = true`
+  (`CpuOwn.cpu_own_eb_agree`), but usertrap's first `killed(p) → kexit(-1)`
+  runs BEFORE `intr_on()` and the second is reachable from the devintr and
+  vmfault arms. Unlike prepare_return's, this one is not a missing leaf: it
+  comes from `SpecSleep`'s own `eb = true` ("at level 0 with an enabled base
+  the trap CSRs sit in the SIE arm and the pushing acquire hands them out"),
+  so closing it is the `trap_csrs_ext eb` sweep through sleep →
+  acquiresleep → bread/bwrite/begin_op/end_op/ilock/iput/fileclose → kexit,
+  the same move `completed/sched-hart-generic.md` records for yield/sched.
+  The resources exist at usertrap's call sites — it holds the trap CSRs
+  explicitly, the TRAP having given them to it — so the sweep is mechanical,
+  just wide.
 - The whole-trap-loop theorem: Löb over trap rounds discharging
   `stvec_handler_wp` from USERVEC + USERTRAP + USERRET + USER — the
   resource cycle is already closed by construction (uservec's leftovers =
