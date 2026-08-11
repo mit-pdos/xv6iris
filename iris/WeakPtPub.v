@@ -250,4 +250,73 @@ Section pub.
     iFrame "HA HB". by iApply (wpt_pub_region_acquire with "Hlb Hpub").
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (** ** 6. WHY THE TWO SHAPES DIFFER — and where they coincide.
+
+      [wpt_own] and [wpt_pub] look like different constructs.  They are the
+      SAME construct with one slot filled differently:
+
+        [wpt_own γv a dq v  =  ∃ t, wlat_pointsto a dq t v ∗ wflr_lb γv a t]
+        [wpt_pub T  a dq v  =  ∃ t, wlat_pointsto a dq t v ∗ ⌜t ≤ T⌝]
+
+      Same element, same existential; the only difference is WHAT BOUNDS [t]:
+      a ghost fact naming a hart, or a pure inequality against a published
+      timestamp.  [wpt_bnd_transport] below is the one lemma both conversions
+      of §3 are instances of.
+
+      And the difference is not an artifact — it is forced.  The bound in the
+      invariant must be ABSOLUTE (a timestamp in the global log order),
+      because the invariant is shared and may name no hart.  The bound in the
+      points-to must be RELATIVE to a hart, because that is what licenses a
+      read.  The release–acquire edge is exactly the mechanism that converts
+      absolute into relative.  Put another way, [wpt_pub T] is POTENTIAL and
+      [↦o] is REALISED: [wpt_pub T] on its own says nothing usable until it
+      meets a hart whose floor reaches [T].
+
+      THE FIXED POINT.  The two shapes coincide at [T = 0], where the
+      absolute bound is discharged by every hart at once — and [wpt_pub 0] is
+      literally [WeakVProp.wpt_img], the era-image points-to the tree already
+      has, whose header explains it is objective and "freely shareable across
+      harts" for exactly this reason.  So [wpt_pub] is the generalisation of
+      [wpt_img] from "never written" to "published no later than [T]", and
+      [↦o] is its localisation to a hart. *)
+
+  Lemma wpt_bnd_transport (B1 B2 : nat -> iProp Σ) a dq v :
+    (∀ t, B1 t -∗ B2 t) -∗
+    (∃ t, wlat_pointsto a dq t v ∗ B1 t) -∗
+    (∃ t, wlat_pointsto a dq t v ∗ B2 t).
+  Proof.
+    iIntros "HB [%t [He HB1]]". iExists t. iFrame "He". by iApply "HB".
+  Qed.
+
+  Lemma wpt_own_unfold γv a dq v :
+    wpt_own γv a dq v ⊣⊢ ∃ t, wlat_pointsto a dq t v ∗ wflr_lb γv a t.
+  Proof. done. Qed.
+
+  Lemma wpt_pub_unfold T a dq v :
+    wpt_pub T a dq v ⊣⊢ ∃ t, wlat_pointsto a dq t v ∗ ⌜(t ≤ T)%nat⌝.
+  Proof.
+    rewrite /wpt_pub. apply bi.exist_proper => t. iSplit; iIntros "[$ $]".
+  Qed.
+
+  (** [wpt_pub 0] IS the era-image points-to: the element at timestamp 0,
+      which is [WeakVProp.wpt_img]'s body. *)
+  Lemma wpt_pub_0 a dq v : wpt_pub 0 a dq v ⊣⊢ wlat_pointsto a dq 0%nat v.
+  Proof.
+    rewrite /wpt_pub. iSplit.
+    - iIntros "[%t [%Ht He]]". assert (t = 0%nat) as -> by lia. iFrame "He".
+    - iIntros "He". iExists 0%nat. by iFrame "He".
+  Qed.
+
+  (** ... and at [T = 0] the acquire needs no synchronisation at all: any
+      hart may localise it, with no side condition on its state.  That is
+      the degenerate case in which the invariant's resource and the objective
+      points-to really are interchangeable. *)
+  Lemma wpt_pub_0_own γv ws a dq v :
+    ws_auth γv ws -∗ wpt_pub 0 a dq v -∗ ws_auth γv ws ∗ wpt_own γv a dq v.
+  Proof.
+    iIntros "Hauth Hp". iApply (wpt_pub_acquire with "Hauth Hp").
+    intros a'. rewrite flr_scl_eq. lia.
+  Qed.
+
 End pub.
