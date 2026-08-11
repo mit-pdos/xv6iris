@@ -32,6 +32,13 @@ Require Import MinstretInv.
 Require Import SmodeCore KernelText.
 Require Import WpIntrCore.
 Require Import IntrDefs.
+(* devintr_caps: the PERSISTENT device/proc credential kerneltrap's cone needs.
+   It is closed over here, exactly as [hw_config] / [minstret_inv] /
+   [kernel_text] already are -- the handler contract is a [□], so everything it
+   needs from its caller must be persistent, and everything it needs from the
+   trap rides in the bundle. *)
+Require Import WpLock FdSlots IrefSlots ProcGeom DiskPtsto WpUart.
+Require Import SpecDevintr.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
@@ -49,14 +56,37 @@ Lemma kernelvec_stvec_base :
     = (mword_of_int KernelSyms.kernelvec : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
-Definition kernelvec_handler_spec_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} :=
+(* THE FOUR PERSISTENT PREMISES ARE THE WHOLE CALLER SURFACE, and the reason
+   there are four rather than three is that kernelvec now calls the REAL
+   kerneltrap: its cone (devintr -> uartintr / virtio_disk_intr / clockintr)
+   needs the device invariants, the two locks, the timer capability, the tick
+   keeper, [procs_inv] and [panic_wp_any] -- all of which [devintr_caps]
+   bundles and all of which are persistent, so the [□] handler contract can
+   close over them.  Nothing else is needed: everything the HANDLER gets per
+   trap rides inside [IntrDefs.ihs_entry_of].
+
+   THE BOOT CONSEQUENCE, and it is an ORDERING one: whoever builds [intr_res]
+   must hold these, so [main] can no longer fold the resource the instant
+   trapinithart writes stvec -- the disk lock does not exist until
+   virtio_disk_init.  The stvec cell rides raw (that is what [trap_csrs_raw] is
+   for) until the last credential is in hand. *)
+Definition kernelvec_handler_spec_body
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+    `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+    (γu : uart_names) (γv : disk_names) (γtx γdk γtl : gname)
+    (γs : list gname) (pd pav pu : mword 64) :=
+  length γs = NPROC ->
   hw_config -∗
   minstret_inv -∗
   kernel_text -∗
+  devintr_caps γu γv γtx γdk γtl γs pd pav pu -∗
   intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64).
 
 Module Type KERNELVEC.
   Parameter kernelvec_handler_spec :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId},
-      kernelvec_handler_spec_body.
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+      `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+      (γu : uart_names) (γv : disk_names) (γtx γdk γtl : gname)
+      (γs : list gname) (pd pav pu : mword 64),
+      kernelvec_handler_spec_body γu γv γtx γdk γtl γs pd pav pu.
 End KERNELVEC.

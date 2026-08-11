@@ -433,39 +433,18 @@ Section IntrDefsBase.
   Qed.
 
 
-  (* =================================================================== *)
-  (* §3 [intr_config] -- the interrupts-ENABLED ambient configuration:    *)
-  (* the SIE=1 mirror of [smode_config] (whose SIE=0 fact makes it        *)
-  (* unusable here).  All cells at FULL ownership -- the trap writes      *)
-  (* mstatus / cur_privilege / sepc / scause / stval.  The three trap     *)
-  (* CSRs are value-agnostic (every round trip scribbles them).           *)
-  (* [hart_state] is NOT bundled: the step engine holds it across the     *)
-  (* σ-callback (exactly as in [wp_exec_step_hart_active_inv]), so it     *)
-  (* travels beside the bundle.                                           *)
-  (* =================================================================== *)
-  Definition intr_config : iProp Σ :=
-    (hw_config ∗ minstret_inv ∗
-     cur_privilege ↦ᵣ Supervisor ∗
-     (∃ ms : mword 64,
-        mstatus ↦ᵣ ms ∗
-        ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) ∗
-        ⌜ intr_ms_facts ms ⌝) ∗
-     (* [mie] IS PINNED HERE TOO, and it has to be: this is the SAME machine
-        as [sconf]'s (§6), reached and left by [intr_config_of_v2] /
-        [v2_of_intr_config], and a conversion cannot INVENT the pin.  Were
-        this conjunct left existential, the round trip
-        sconf -> intr_config -> sconf would silently launder [mie = MIE_S]
-        away and the enabled regime -- the only one in which a cause is ever
-        actually DELIVERED -- would be the one place the deliverable-cause
-        argument does not hold.  No instruction between the two conversions
-        writes [mie] (nothing in the kernel ever does), so pinning it costs
-        the engines nothing: they read the value and hand it back. *)
-     (∃ mdv0 : mword 64,
-        mie ↦ᵣ MIE_S ∗ mideleg ↦ᵣ mdv0 ∗
-        ⌜ and_vec MIE_S (not_vec mdv0) = zeros' 64 ⌝) ∗
-     (∃ v : mword 64, sepc ↦ᵣ v) ∗
-     (∃ v : mword 64, scause ↦ᵣ v) ∗
-     (∃ v : mword 64, stval ↦ᵣ v))%I.
+  (* [intr_config] AND [intr_frame] USED TO BE HERE, with the two conversions
+     [intr_config_of_v2] / [v2_of_intr_config] that assembled and dismantled
+     them around the absorbing step engine.  ALL FOUR ARE GONE: the engine
+     ([WpIntrInv.wp_exec_step_intr]) and the funnel
+     ([WpSmodeIntr.wp_instr_s_sconf]) now take the FOLDED BUNDLE, because the
+     handler contract's pre and post are the bundle (§6c) -- and every
+     conjunct of the two deleted resources is already inside it: the trap CSRs
+     and the SIE arm in [sie_arm], menvcfg and the [MIE_S] pin in [sconf], the
+     kernel table in [strans_inv]'s KPT arm, the per-trap stack reserve in
+     [sie_cap]'s arm-dependent carve.  What the pair bought was a place to
+     re-assemble those pieces per trap; the re-indexing does it for free. *)
+
 
   (* =================================================================== *)
   (* §4 [intr_frame] + the handler contract.                               *)
@@ -586,32 +565,6 @@ Section IntrDefsBase.
      need [cfg_ok], the PT walk needs PBMTE=0 / ADUE), and S-mode never runs
      at any other value, so a parameter would only ever be instantiated at
      [MENVCFG_S] anyway. *)
-  (* [intr_frame] carries [tlb_res_pt] -- the KPT arm of the translation
-     slot -- rather than the slot itself, and that is deliberate: xv6
-     enables interrupts only after kvminithart has installed the kernel
-     table, so an interrupt can never be taken under Bare.  (Bare with
-     SIE = '1' is also refuted concretely: [bare_inv]'s stvec cell
-     contradicts [intr_res]'s -- and since the latter is now OWNED rather
-     than behind [inv], that refutation is a direct [reg_pointsto_conflict]
-     with no invariant open.)  So there is nothing to gain from making
-     this slot-generic. *)
-  Definition intr_frame (root_ppn : mword 44)
-      (m : regfile) : iProp Σ :=
-    (menvcfg ↦ᵣ MENVCFG_S ∗
-     tlb_res_pt root_ppn ∗
-     stack_own (m !!! Regidx csp_rs1) kv_frame_slots)%I.
-
-  (* [intr_frame] depends on [m] only through sp: any register write that
-     PRESERVES sp transports the frame to the new map.  (An sp-moving
-     instruction instead re-carves its stack explicitly.) *)
-  Lemma intr_frame_retarget (root_ppn : mword 44)
-      (m m' : regfile) :
-    m !!! Regidx csp_rs1 = m' !!! Regidx csp_rs1 ->
-    intr_frame root_ppn m -∗ intr_frame root_ppn m'.
-  Proof.
-    iIntros (Hsp) "(Hmenv & Htlbinv & Hstk)".
-    iFrame "Hmenv Htlbinv". rewrite Hsp. iExact "Hstk".
-  Qed.
 
 
   (* =================================================================== *)
@@ -2435,74 +2388,6 @@ Section IntrDefs.
     intr_count (S n) false.
   Proof. iIntros "Hc0". iFrame. Qed.
 
-  (* =================================================================== *)
-  (* §7 The v2 <-> interrupts-enabled conversions: the agnostic engines'  *)
-  (* '1' arm assembles [intr_config]/[intr_frame] for the absorbing step  *)
-  (* engine and disassembles them back around its σ-callback.  Ghost      *)
-  (* agreement (tied half vs the quarter-'1' token) pins SIE=1; the       *)
-  (* quarter and the menvcfg cell come back out (the absorbing engine     *)
-  (* threads neither).                                                    *)
-  (* =================================================================== *)
-  Lemma intr_config_of_v2 :
-    sconf -∗
-    ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) -∗
-    (∃ v : mword 64, sepc ↦ᵣ v) -∗
-    (∃ v : mword 64, scause ↦ᵣ v) -∗
-    (∃ v : mword 64, stval ↦ᵣ v) -∗
-    intr_config ∗ ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗ menvcfg ↦ᵣ MENVCFG_S ∗
-    (* THE SPP TIE COMES OUT.  [intr_config] carries no SPP tie, and it must
-       not: a trap sets SPP := 1 and the matching sret sets it back to 0, so
-       across the engine the bit MOVES.  The funnel holds this half and the
-       travelling one (out of [sie_arm true]) and re-ties both to the final
-       mstatus when it converts back -- which is the whole reason the enabled
-       arm holds SPP at an EXISTENTIAL value. *)
-    (∃ a b : mword 1, sret_bits a b).
-  Proof.
-    iIntros "Hsc Hq Hsepc Hscause Hstval".
-    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Hspp & %Hmsf)".
-    iDestruct (ghost_var_agree with "Hhalf Hq") as %Hb1.
-    iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & _ & _ & _ & _ & %Hval)".
-    subst menvcfg0.
-    iFrame "Hq Hmenv Hhw Hminv Hpriv Hmiex Hsepc Hscause Hstval".
-    iSplitR "Hspp"; [| iExists (_get_Mstatus_SPP ms), (_get_Mstatus_SPIE ms); iExact "Hspp" ].
-    iExists ms. iFrame "Hms Hhalf".
-    iPureIntro. apply intr_ms_facts_iff. split; [ | exact Hmsf ].
-    rewrite Hb1. vm_compute. reflexivity.
-  Qed.
-
-  Lemma v2_of_intr_config (vta vtb vca vcb : mword 1) :
-    intr_config -∗
-    menvcfg ↦ᵣ MENVCFG_S -∗
-    (* BOTH SPP halves, at ARBITRARY values -- the tie one this conversion's
-       dual handed out, and the travelling one from [sie_arm true].  A trap
-       and its sret move SPP, so neither is about the mstatus coming back;
-       holding both is what lets this re-tie them to it.  That is also why
-       the enabled arm holds SPP existentially: while interrupts are on, its
-       value is not the client's to know. *)
-    sret_bits vta vtb -∗ sret_bits vca vcb ==∗
-    sconf ∗
-    (∃ a b : mword 1, sret_bits a b) ∗
-    (∃ v : mword 64, sepc ↦ᵣ v) ∗
-    (∃ v : mword 64, scause ↦ᵣ v) ∗
-    (∃ v : mword 64, stval ↦ᵣ v).
-  Proof.
-    iIntros "Hic Hmenv Ht Hc".
-    iDestruct "Hic" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hsepc & Hscause & Hstval)".
-    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & %Hmsf)".
-    pose proof (proj1 (intr_ms_facts_iff ms) Hmsf) as [_ Hcommon].
-    iMod (sret_bits_update vta vtb vca vcb
-            (_get_Mstatus_SPP ms) (_get_Mstatus_SPIE ms) with "Ht Hc") as "[Ht Hc]".
-    iModIntro.
-    iSplitR "Hc Hsepc Hscause Hstval".
-    { iFrame "Hhw Hminv Hpriv Hmiex".
-      iSplitL "Hms Hhalf Ht".
-      { iExists ms. iFrame "Hms Hhalf Ht". iPureIntro. exact Hcommon. }
-      iExists MENVCFG_S. iFrame "Hmenv".
-      iPureIntro. repeat split; vm_compute; reflexivity. }
-    iFrame "Hsepc Hscause Hstval".
-    iExists (_get_Mstatus_SPP ms), (_get_Mstatus_SPIE ms). iExact "Hc".
-  Qed.
 
 End IntrDefs.
 

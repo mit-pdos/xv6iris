@@ -1,7 +1,7 @@
 (* LinkKernelvec.v -- instantiates the kernelvec proof against its only
-   callee's contract ([KERNELTRAP_RETURNS], assumed -- see LinkKerneltrap.v;
-   kerneltrap ITSELF is proven, this is the handler-contract shape).  Sealed,
-   so this is the only place the two ever meet. *)
+   callee's contract: [SpecKerneltrap.KERNELTRAP], the REAL one, which
+   LinkKerneltrap discharges with a theorem.  Sealed, so this is the only
+   place the two ever meet -- and nothing in the cone is assumed any more. *)
 Require Import LinkKerneltrap ProofKernelvec.
 
-Module Kernelvec := KernelvecProof KerneltrapRet.
+Module Kernelvec := KernelvecProof Kerneltrap.
