@@ -30,38 +30,32 @@ sweep's unit price.
 first. The detail behind each line is in the dated slice named after it.
 Everything below the checkpoint is history, in the order it happened.*
 
-**DONE.** The sweep (both layers: `WeakLeafM`'s `winstr_m` packaging and
-`WeakLeafO`'s `_o`/`_run` wrappers, all 17 instructions). The objective layer
-re-indexed by CONTEXT, not hart (`WeakCtx`, `cobj`) and the hart-indexed layer
-deleted (`WeakObj`, `WeakPtOwn` both gone; `WeakPtPub` is now hart-free). The
-release store wrapped — `c.sd` was the last leaf without an `_o`/`_run`, and
-its missing constructor turned out to be `ctx_view_lb` plus a fold
-(`WeakCtx` §8). Tree is green at `ce8b6d9b`.
+**DONE.** Both layers of the leaf sweep (`WeakLeafM`'s `winstr_m` packaging,
+`WeakLeafO`'s `_o`/`_run` wrappers) over **all 31 M-mode instructions the
+boot cone reaches**, and **THE WHOLE M-MODE CONE IS CONVERTED**:
+`WkTimerinit` and `WkStartNew` are stated and proved on the SC-shaped
+interface — `whart_run ξ q` / `cobj ξ R` — with no `wstate`, no `ws_le` and
+no view inequality anywhere in either statement. The objective layer is
+context-indexed (`WeakCtx`, `cobj`); the hart-indexed layer is gone.
+Measured: the weak proof bodies are **1.4× their SC twins**, down from
+2.5–4.4× (see the conversion slice at the end).
 
 **NEXT, in order.**
 
-1. **Convert call sites to the new-style leaves** — `WkTimerinit` first (21
-   instructions, uses seven of the wrapped ones; smaller than `WkStartNew`).
-   *Unblocked as of `ce8b6d9b`* — it was blocked before and I had not noticed:
-   instructions 10/11 are `c.sdsp` and no `c.sd` wrapper existed, so the other
-   19 sites could never have compiled on their own. Recipe: one
-   `hart_view_to_run` at chain entry, `whart_run ξ q` threaded, one `wsti_NN`
-   token per instruction in a `Wk*Aux` file (pattern: `WkStartAux.wsti_35`,
-   built with `WeakLeafM.winstr_m_of_text`). Converting also changes
-   `wwp_timerinit`'s own statement (`hart_ws`/`vwp_hold` → `whart_run`/`cobj`),
-   so check its callers before starting. This is the batch that demonstrates
-   the step-site parity both layers were built for.
-
-2. **memmove, weak + interruptible** (user request — see the QUEUED slice at
-   the end for the full analysis). Not startable yet; it has four
-   dependencies, and (1) is not one of them, so the two can be reordered if
-   memmove is the priority. Its dependencies are: layer C (`wp_next`-shaped
+1. **memmove, weak + interruptible** (user request — see the QUEUED slice at
+   the end for the full analysis). Four dependencies: layer C (`wp_next`-shaped
    weak leaves), settling what the weak `wp_next` promises across a
-   reschedule, a 1-byte objective store leaf, and the S-mode weak funnel.
+   reschedule, a 1-byte objective store leaf, and the S-mode weak funnel —
+   which is now the critical path, and which the M-mode conversion has
+   settled the shape of: `sconf` takes the view token exactly where
+   `mmode_config` took it, and `mret` is the handover point (it is the one
+   instruction with an `_o` and deliberately no `_run`, because it DISSOLVES
+   the M-mode bundle; `wwp_start` therefore ends holding a bare
+   `wrunning ξ`, which is what `sconf` should pick up).
 
 **KNOWN LOOSE ENDS**, none blocking: `weak_view_name` in `weakGS` is now
 vestigial (removing it is an adequacy-level change); M5 devices; M6
-store-reordering gap; `sconf` gaining the view token.
+store-reordering gap.
 
 For the leaf recipe itself read [`weak-memory-porting.md`](weak-memory-porting.md)
 §2g first, then the batch blocks below.
@@ -3114,6 +3108,102 @@ the store landed.
 realised. `WkTimerinit` instructions 10/11 are `c.sdsp`, so no amount of work
 on the other 19 sites would have produced a compiling file. It is unblocked
 now.
+
+### THE CALL SITES ARE CONVERTED (2026-08-11): the whole M-mode cone is SC-shaped
+
+Both whole-function chains now READ like their SC twins. What that took, and
+what it measured:
+
+**The numbers, and they are the point.** Proof bodies (`Proof.`→`Qed.` of the
+whole-function theorem), against the SC file's own body:
+
+| function | SC | weak BEFORE | weak AFTER | ratio |
+|---|---|---|---|---|
+| `timerinit` (21 instrs) | 312 | 1384 | **433** | 4.4× → **1.39×** |
+| `start` (39 instrs) | 614 | 1532 | **842** | 2.5× → **1.37×** |
+
+The ~940 lines that left `WkTimerinit` and ~690 that left `WkStartNew` did
+not move to the Aux files as text: the per-instruction decode preamble
+becomes ONE `wsti_NN` token (~25 lines of assembly in the Aux file, spent
+with one `iPoseProof`), and the `wstate` threading — the `ws` binder, the
+`∀ ws'`, the `⌜ws_le ws ws'⌝`, one `vwp_hold_mono` per carried frame per
+instruction, and the transitivity chains at the joins — is simply GONE, not
+relocated. What is left of the 1.4× is the token line per instruction plus
+the four cell-based sites' open/close pairs.
+
+**The interface, finally stated in one place.** A converted chain takes
+`WeakLeafO.whart_run ξ q` (= `mmode_config (DfracOwn q) ∗ wrunning ξ`) and
+`WeakCtx.cobj ξ R` for every frame, and mentions no `wstate` at all. Its
+frames sit in the Iris context untouched across every step, exactly as an SC
+caller's do — which is the whole claim `cobj` was built to make, now
+exercised on 60 instructions rather than on a lemma.
+
+**FOUR instructions do not ride the bundle, and that is not a defect.**
+`csrr mstatus`, `csrw mstatus`, `csrw pmpcfg0` and `mret` take the CELLS
+`mmode_config` is built from, because each reads or writes one of them.
+They get an `_o` (taking `wrunning ξ`) and NO `_run`, and their call sites
+open/close `whart_run` around the same "combine halves → apply → re-split →
+rebundle" dance the SC chain does at its own config-writing sites. That is
+parity, not a tax: `WpStartNew` opens the bundle at exactly these sites too,
+so a wrapper hiding the dance would be further from step-site parity, not
+closer.
+
+**THE `ws_le`-COMPOSING CHAIN IS DELETED, and here is why it existed.**
+`WkStartNew` used to end with a 38-term `transitivity` tower composing every
+leaf's `⌜ws_le ws ws'⌝` into the one fact its own postcondition stated. That
+tower is an artifact of the hart-indexed interface: each leaf mints a FRESH
+`ws'` and hands back a fact about *named* states, so relating the two ends of
+a function means composing them by hand. The context interface has nothing
+to compose — `ctx_view_lb ξ V` is persistent and monotone, minted once and
+spent once — and a converted chain does not even need that, because its
+frames need no re-indexing. Both statements lost the fact entirely.
+
+**A NOT-YET-CONVERTED CALLER CAN BRIDGE, AND THE BRIDGE WAS DELETED AGAIN.**
+An interim `WeakCtx` §7b adapter (`run_open` / `run_close` /
+`vwp_hold_mono_view`) let the old-style `WkStartNew` call the converted
+`wwp_timerinit`: mint a context at the caller's `ws`, call, take it apart.
+It cost exactly one thing — the caller gets `ws_view ws ⊑ ws_view ws'` back
+rather than `ws_le ws ws'`, because a context's authority is monotone in
+`flr` and in nothing finer (`WeakCtx` §2's finding, in consequence form).
+It was removed once `WkStartNew` was converted and had no consumer. **If a
+future half-converted boundary needs it, rebuild it from those three
+lemmas — but prefer converting the caller: the adapter's whole cost is the
+fact it cannot carry.**
+
+**Landed, per file.** `WeakLeafM` §12: 14 new `winstr_m` wrappers
+(`and_rvc`, `srli_rvc`, `auipc`, `sd8_off_rvc`, `csrr_sie`, `csrw_mepc` /
+`satp` / `medeleg` / `mideleg` / `sie` / `pmpaddr0`, and the three cell-based
+`csrr_mstatus` / `csrw_mstatus` / `csrw_pmpcfg0`). `WeakLeafO` §11: their
+`_o`/`_run` pairs (`_o` only for the three). `WkTimerinitAux.v` NEW (21
+tokens + their decode facts). `WkStartAux` §4b/§5: 18 `stexp_NN` expansion
+facts + 38 new tokens. Axiom footprint of both theorems is unchanged and is
+the documented baseline: `functional_extensionality_dep` + `plat_term_write`
++ the reservation quartet.
+
+**Traps this batch hit, all of which compile or look like something else:**
+
+1. **`csrw mstatus`'s leaf has no `al4` parameter** — it is stated at
+   4-alignment only, so its wrapper takes `is_aligned_vaddr … 4 = true` as a
+   premise instead of instantiating `al4` and passing `eq_refl`. It is the
+   only one in the cone like that.
+2. **The CSR-number collision is WIDER than §7 recorded**: `csr_mstatus` and
+   `csr_sie` are each defined twice (read side `WpGprCsrrA`/`WpGprCsrrB`,
+   write side `WpGprCsrwA`/`WpGprCsrwB`), same value, different terms. So is
+   every value-transformer the write leaves produce (`mepc_val`,
+   `satp_legalized`, `mideleg_legalized`, `sie_new_mie`, `pmp0_newaddr`,
+   `pmpcfg_written`, `mstatus_legalized`). **Write every one of them
+   qualified** in a wrapper statement; an unqualified one resolves by import
+   order and fails to unify with its leaf for no visible reason.
+3. **`(kbs : gmap Arch.pa (bv 8))` does not always elaborate** — the
+   `Countable`-instance trap in the durable notes, hit again in a new file.
+   Write `(kbs : _)` and let `wkb_covers` fix it.
+4. **`iFrame "Hlb HR"` can fail to frame a `cobj`** where an explicit
+   `iSplitL`/`iExact` pair succeeds; do not spend time on it, just split.
+5. **A converted callee's caller must be converted too, or bridged.** The
+   grep that said `wwp_timerinit` had no callers was truncated at `head`;
+   `WkStartNew` calls it at line ~1516. Check callers with a full grep
+   BEFORE changing a whole-function statement — the failure surfaces a
+   45-minute rebuild later.
 
 ### QUEUED (user request, 2026-08-11): memmove under weak memory, interruptible
 

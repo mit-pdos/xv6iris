@@ -423,9 +423,53 @@ the GPR file, the one-turn `untilMT`), live there. A new shape file requires
 it; it does not re-declare them. (Batch 1's four shape files each had their
 own copy — 40 lemmas of duplication, retired.)
 
-## 2h. WHOLE-FUNCTION CHAINS OVER THE HOISTED LEAVES (from wwp_timerinit)
+## 2h′. WRITE A WHOLE-FUNCTION CHAIN ON THE SC-SHAPED INTERFACE (current recipe)
 
-`iris/WkTimerinit.v` is the first whole-function chain built entirely by
+**Read this before §2h, which is the superseded hoisted-leaf recipe kept for
+its trap list.** As of the 2026-08-11 conversion (`weak-memory.md`, "THE CALL
+SITES ARE CONVERTED") a whole-function M-mode chain is written on
+`WeakLeafO`'s `_run` wrappers and comes out at **1.4× its SC twin**, not 3×.
+`iris/WkTimerinit.v` (21 instructions) and `iris/WkStartNew.v` (39) are the
+two worked examples; read the shorter one.
+
+The recipe, in order:
+
+1. **Statement.** `mmode_config (DfracOwn q)` → `WeakLeafO.whart_run ξ q`;
+   every frame → `WeakCtx.cobj ξ R`; add `(ξ : CtxId)` as the first binder.
+   NO `ws` binder, NO `∀ ws'`, NO `⌜ws_le …⌝` in the continuation. If the
+   function's last instruction is `mret`, the postcondition hands back a bare
+   `wrunning ξ` (the bundle is dissolved, not preserved).
+2. **A `Wk<F>Aux.v` file** with one `wsti_NN` token per instruction, built
+   with `WeakLeafM.winstr_m_of_text` — see `WkTimerinitAux.v` (written from
+   scratch) or `WkStartAux` §4b/§5 (which reuses decode facts that were
+   already there). The token is the ONLY place a decode fact is named.
+3. **Per instruction, two lines**: `iPoseProof (wsti_NN kbs Hcov with "Htext")
+   as "#HiNN".` then `iApply (wwp_X_run ξ … with "Hrun Hpcf Hpc Hfile HiNN").`
+   and one `iIntros` naming the resources back. Everything else at the site
+   is the register-map bookkeeping the SC file also does.
+4. **Frames are not threaded.** Split the stack bundle ONCE at the top with
+   `cobj_mono`/`cobj_sep`/`cobj_exist`, leave each piece in the context, and
+   re-bundle at the end. No `vwp_hold_mono`, ever.
+5. **`pc_is` stays bundled** — the `_run` wrappers take and return it whole,
+   so there is no `iDestruct "Hpc" as "[Hpc Hnpc]"` and one
+   `iEval (rewrite P_NN) in "Hpc"` per step.
+6. **A cell-based site** (`csrr`/`csrw mstatus`, `csrw pmpcfg0`, `mret`) is
+   `whart_run_open` → the SC file's own unbundle/join dance → `wwp_X_o` with
+   `Hview` → re-split → `mmode_config_rebuild` → `whart_run_close`.
+
+Its own traps: the four in the conversion slice's list (the missing `al4` on
+`csrw mstatus`, the wider CSR-name collision, `(kbs : _)`, `iFrame` on a
+`cobj`), plus — **check for callers of the function whose statement you are
+changing, with a full grep, before you start**: a converted callee needs a
+converted caller.
+
+## 2h. WHOLE-FUNCTION CHAINS OVER THE HOISTED LEAVES (from wwp_timerinit) — SUPERSEDED BY §2h′
+
+*The chain shape here (leaf per instruction, `ws` threaded, frame bundled and
+bumped) is no longer how a chain is written; the traps below are still real
+for anyone working BELOW the wrapper layer, which is why the section stays.*
+
+`iris/WkTimerinit.v` was the first whole-function chain built entirely by
 applying the hoisted leaves (21 instructions, one leaf application each,
 ~1650 lines ≈ 3× the SC file — vs `WkEntryNew`'s 9.8× inline price).
 Statement = the SC statement under §1's swaps; `ti_*`/`m_*` vocabulary

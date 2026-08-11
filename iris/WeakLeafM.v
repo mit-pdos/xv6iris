@@ -70,6 +70,7 @@ Require Import WeakLeafCsrrM WeakLeafCsrrTime.
    pull the write-side one in. *)
 Require Import WpGprCsrrA WpGprCsrrB.
 Require Import WeakLeafCsrw2 WeakLeafStimecmp.
+Require Import WeakLeafCsrw WeakLeafCsrw3 WeakLeafPmpcfg0 WeakLeafSdspOff.
 Require Import WeakLeafJump WeakLeafMret WpGprMretWp.
 Require Import WeakLeafTor WeakWord8.
 Require Import WkEntryEff.
@@ -1187,6 +1188,686 @@ Section WeakLeafM.
     iApply ("Hcont" $! ws' T
               with "[%] [%] Hmm Hpcf Hpad Hpc Hrs1 Hrs2 Hhws Hpt HR");
       [exact Hle | exact HT].
+  Qed.
+
+  (* ==================================================================== *)
+  (** ** 12. THE [start()] FAMILIES -- everything §5-§11 did not already
+      cover, so that the whole M-mode boot cone can be written on this
+      interface.
+
+      Three kinds appear here, and only the third is not a template fill:
+
+      (a) plain register instructions ([c.and], [c.srli], [auipc]) and the
+          non-TOR 8-byte store ([c.sdsp] under [pmp_all_off]) -- §6/§11
+          verbatim with the leaf name and the post-state changed;
+
+      (b) the CSRs that ride the bundle ([csrr sie], [csrw mepc] / [satp] /
+          [medeleg] / [mideleg] / [sie] / [pmpaddr0]) -- §7/§8 verbatim;
+
+      (c) THE THREE THAT DO NOT TAKE THE BUNDLE ([csrr mstatus],
+          [csrw mstatus], [csrw pmpcfg0]).  Their leaves take the CELLS
+          [mmode_config] is built from, at FULL ownership, because each
+          reads or writes one of them -- so there is no [mmode_config] in
+          the statement and no fraction to thread.  That is not an artifact
+          of this layer: the SC chain ([WpStartNew]) opens the bundle at
+          exactly these three sites too, which is why a wrapper hiding the
+          unbundle/rebuild would be further from step-site parity, not
+          closer.  [WeakLeafO] gives these three an [_o] and no [_run] for
+          the same reason it gives [mret] one -- there is no bundle for the
+          view token to ride in.
+
+      The CSR-number collision §7 records applies again and more widely:
+      [csr_mstatus] and [csr_sie] are each defined twice (read side
+      [WpGprCsrrA]/[WpGprCsrrB], write side [WpGprCsrwA]/[WpGprCsrwB]) with
+      the same value and different terms, so EVERY csr number below is
+      written qualified. *)
+
+  (** *** 12a. [c.and] -- [RTYPE … AND], compressed only. *)
+  Lemma wwp_and_rvc (pc : SailStdpp.Values.mword 64)
+      (rs2 rs1 rd : mword 5) (m : regfile)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate)
+      (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    winstr_m pc true (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd :=
+                  regval_into_reg (and_vec (m !!! Regidx rs1)
+                                     (m !!! Regidx rs2))]> m) -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hfile #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_rvc with "Hi") as
+      (h i0) "(_ & #Hb & %Hal2 & %Hall & %Hgood & %Hdec & %Hlp0 & %Hg0 & %Hexp)".
+    iApply (wwp_and_rvc_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc h rs2 rs1 rd i0 m pc pmpcfg0 q D_m D_none dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec Hg0 Hexp
+              with "Hmm Hpcf Hpc Hnpc Hfile Hb Hhws").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hfile Hhws HF"). exact Hle.
+  Qed.
+
+  (** *** 12b. [c.srli] -- [SHIFTIOP … SRLI], compressed only. *)
+  Lemma wwp_srli_rvc (pc : SailStdpp.Values.mword 64)
+      (rs1 rd : mword 5) (shamt : mword 6) (m : regfile)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate)
+      (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    winstr_m pc true (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd :=
+                  regval_into_reg (shift_bits_right (m !!! Regidx rs1)
+                    (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))]> m) -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hfile #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_rvc with "Hi") as
+      (h i0) "(_ & #Hb & %Hal2 & %Hall & %Hgood & %Hdec & %Hlp0 & %Hg0 & %Hexp)".
+    iApply (wwp_srli_rvc_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc h rs1 rd shamt i0 m pc pmpcfg0 q D_m D_none dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec Hg0 Hexp
+              with "Hmm Hpcf Hpc Hnpc Hfile Hb Hhws").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hfile Hhws HF"). exact Hle.
+  Qed.
+
+  (** *** 12c. [auipc] -- [UTYPE … AUIPC], base only. *)
+  Lemma wwp_auipc (pc : SailStdpp.Values.mword 64)
+      (rd : mword 5) (imm : mword 20) (m : regfile)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate)
+      (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    winstr_m pc false (UTYPE (imm, Regidx rd, AUIPC)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file (<[Regidx rd :=
+                  regval_into_reg (add_vec pc (auipc_off imm))]> m) -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hfile #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_base with "Hi") as
+      (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
+    iApply (wwp_auipc_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc w rd imm m pc pmpcfg0 q D_m dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec
+              with "Hmm Hpcf Hpc Hnpc Hfile Hb Hhws").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hfile Hhws HF"). exact Hle.
+  Qed.
+
+  (** *** 12d. [c.sdsp] with NO PMP region -- the [pmp_all_off] twin of
+      §11's TOR store.  Same release interface, different PMP premise. *)
+  Lemma wwp_sd8_off_rvc (pc : mword 64) (rs1 rs2 : mword 5) (imm : mword 12)
+      (ea : Arch.pa) (vold : bv 64) (R : vProp Σ) (q : Qp)
+      (pmpcfg0 : type_of_register pmpcfg_n)
+      (rs1v rs2v : mword 64) (ws : wstate) :
+    gen_id = 0%nat ->
+    pmp_all_off pmpcfg0 ->
+    uint rs1 <> 0 ->
+    uint rs2 <> 0 ->
+    add_vec rs1v (sign_extend' 64 imm) = ea ->
+    (forall j : nat, (j < 8)%nat -> addr_is_ram (pa_add ea j)) ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
+    winstr_m pc true (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold (wpt8 ea (DfracOwn 1) vold) ws -∗
+    vwp_hold R ws -∗
+    ( ∀ (ws' : wstate) (T : nat),
+      ⌜ws_le ws ws'⌝ -∗
+      ⌜forall j : nat, (j < 8)%nat ->
+         (T <= flr (ws_view ws') (acc_addr ea j))%nat⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 2) -∗
+      R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+      R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold (wpt8 ea (DfracOwn 1) rs2v) ws' -∗
+      monPred_at R (view_scl T) -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz1 Hnz2 Hea Hram.
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hrs1 Hrs2 #Hi Hhws Hpt HR Hcont".
+    iDestruct (winstr_m_rvc with "Hi") as
+      (h i0) "(_ & #Hb & %Hal2 & %Hall & %Hgood & %Hdec & %Hlp0 & %Hg0 & %Hexp)".
+    iApply (wwp_sd8_off_rvc_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc h rs1 rs2 imm i0 ea vold R q pmpcfg0 rs1v rs2v pc
+              D_m D_none dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz1 Hnz2 Hea Hram
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec Hg0 Hexp
+              with "Hmm Hpcf Hpc Hnpc Hrs1 Hrs2 Hb Hhws Hpt HR").
+    iIntros (ws' T) "%Hle %HT Hmm Hpcf Hpc Hrs1 Hrs2 Hhws Hpt HR".
+    iApply ("Hcont" $! ws' T
+              with "[%] [%] Hmm Hpcf Hpc Hrs1 Hrs2 Hhws Hpt HR");
+      [exact Hle | exact HT].
+  Qed.
+
+  (** *** 12e. [csrr rd, sie] -- reads [mie] through [mideleg]. *)
+  Lemma wwp_csrr_sie (pc : mword 64) (rd : mword 5)
+      (mie_in mideleg_in rd0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate)
+      (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    mie ↦ᵣ mie_in -∗
+    mideleg ↦ᵣ mideleg_in -∗
+    R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
+    winstr_m pc false (CSRReg (WpGprCsrrB.csr_sie, zreg, Regidx rd, CSRRS)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ
+        regval_into_reg (lower_mie mie_in mideleg_in) -∗
+      mie ↦ᵣ mie_in -∗
+      mideleg ↦ᵣ mideleg_in -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hmie Hmdl Hrd #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_base with "Hi") as
+      (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
+    iApply (wwp_csrr_sie_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc w rd mie_in mideleg_in rd0 pc pmpcfg0 q D_m dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec
+              with "Hmm Hpcf Hpc Hnpc Hmie Hmdl Hrd Hb Hhws").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hrd Hmie Hmdl Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hrd Hmie Hmdl Hhws HF").
+    exact Hle.
+  Qed.
+
+  (** *** 12f. [csrw mepc, rs1] *)
+  Lemma wwp_csrw_mepc (pc : mword 64) (rs1 : mword 5)
+      (mepc0 : type_of_register mepc) (rs1v : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate)
+      (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rs1 <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    mepc ↦ᵣ mepc0 -∗
+    winstr_m pc false
+      (CSRReg (WpGprCsrwA.csr_mepc, Regidx rs1, zreg, CSRRW)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+      mepc ↦ᵣ WpGprCsrwA.mepc_val rs1v -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hrs Hcsr #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_base with "Hi") as
+      (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
+    iApply (wwp_csrw_mepc_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc w rs1 mepc0 rs1v pc pmpcfg0 q D_m dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec
+              with "Hmm Hpcf Hpc Hnpc Hrs Hcsr Hb Hhws").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hcsr Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hrs Hcsr Hhws HF"). exact Hle.
+  Qed.
+
+  (** *** 12g. [csrw satp, rs1] *)
+  Lemma wwp_csrw_satp (pc : mword 64) (rs1 : mword 5)
+      (satp0 rs1v : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate)
+      (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rs1 <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    satp ↦ᵣ satp0 -∗
+    winstr_m pc false
+      (CSRReg (WpGprCsrwB.csr_satp, Regidx rs1, zreg, CSRRW)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+      satp ↦ᵣ WpGprCsrwB.satp_legalized satp0 rs1v -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hrs Hcsr #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_base with "Hi") as
+      (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
+    iApply (wwp_csrw_satp_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc w rs1 satp0 rs1v pc pmpcfg0 q D_m dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec
+              with "Hmm Hpcf Hpc Hnpc Hrs Hcsr Hb Hhws").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hcsr Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hrs Hcsr Hhws HF"). exact Hle.
+  Qed.
+
+  (** *** 12h. [csrw medeleg, rs1] *)
+  Lemma wwp_csrw_medeleg (pc : mword 64) (rs1 : mword 5)
+      (medeleg0 rs1v : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate)
+      (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rs1 <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    medeleg ↦ᵣ medeleg0 -∗
+    winstr_m pc false
+      (CSRReg (WpGprCsrwA.csr_medeleg, Regidx rs1, zreg, CSRRW)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+      medeleg ↦ᵣ legalize_medeleg medeleg0 rs1v -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hrs Hcsr #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_base with "Hi") as
+      (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
+    iApply (wwp_csrw_medeleg_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc w rs1 medeleg0 rs1v pc pmpcfg0 q D_m dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec
+              with "Hmm Hpcf Hpc Hnpc Hrs Hcsr Hb Hhws").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hcsr Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hrs Hcsr Hhws HF"). exact Hle.
+  Qed.
+
+  (** *** 12i. [csrw mideleg, rs1] *)
+  Lemma wwp_csrw_mideleg (pc : mword 64) (rs1 : mword 5)
+      (mideleg0 : type_of_register mideleg) (rs1v : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate)
+      (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rs1 <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    mideleg ↦ᵣ mideleg0 -∗
+    winstr_m pc false
+      (CSRReg (WpGprCsrwB.csr_mideleg, Regidx rs1, zreg, CSRRW)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+      mideleg ↦ᵣ WpGprCsrwB.mideleg_legalized mideleg0 rs1v -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hrs Hcsr #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_base with "Hi") as
+      (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
+    iApply (wwp_csrw_mideleg_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc w rs1 mideleg0 rs1v pc pmpcfg0 q D_m dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec
+              with "Hmm Hpcf Hpc Hnpc Hrs Hcsr Hb Hhws").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hcsr Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hrs Hcsr Hhws HF"). exact Hle.
+  Qed.
+
+  (** *** 12j. [csrw sie, rs1] -- writes [mie] through [mideleg], which it
+      also reads, so both cells appear. *)
+  Lemma wwp_csrw_sie (pc : mword 64) (rs1 : mword 5)
+      (mie0 mdl0 rs1v : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate)
+      (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rs1 <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    mie ↦ᵣ mie0 -∗
+    mideleg ↦ᵣ mdl0 -∗
+    winstr_m pc false
+      (CSRReg (WpGprCsrwB.csr_sie, Regidx rs1, zreg, CSRRW)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+      mie ↦ᵣ WpGprCsrwB.sie_new_mie mie0 mdl0 rs1v -∗
+      mideleg ↦ᵣ mdl0 -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hrs Hmie Hmdl #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_base with "Hi") as
+      (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
+    iApply (wwp_csrw_sie_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc w rs1 mie0 mdl0 rs1v pc pmpcfg0 q D_m dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec
+              with "Hmm Hpcf Hpc Hnpc Hrs Hmie Hmdl Hb Hhws").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hmie Hmdl Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hrs Hmie Hmdl Hhws HF").
+    exact Hle.
+  Qed.
+
+  (** *** 12k. [csrw pmpaddr0, rs1] *)
+  Lemma wwp_csrw_pmpaddr0 (pc : mword 64) (rs1 : mword 5) (rs1v : mword 64)
+      (pmpaddr00 : type_of_register pmpaddr_n)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate)
+      (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rs1 <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    pmpaddr_n ↦ᵣ pmpaddr00 -∗
+    winstr_m pc false
+      (CSRReg (WpGprCsrwB.csr_pmpaddr0, Regidx rs1, zreg, CSRRW)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+      pmpaddr_n ↦ᵣ WpGprCsrwB.pmp0_newaddr pmpcfg0 pmpaddr00 rs1v -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hrs Hpad #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_base with "Hi") as
+      (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
+    iApply (wwp_csrw_pmpaddr0_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc w rs1 rs1v pc pmpaddr00 pmpcfg0 q D_m dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec
+              with "Hmm Hpcf Hpc Hnpc Hrs Hpad Hb Hhws").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hpad Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hrs Hpad Hhws HF"). exact Hle.
+  Qed.
+
+  (** *** 12l. [csrr rd, mstatus] -- the first of the three CELL-based ones
+      (see the section header). *)
+  Lemma wwp_csrr_mstatus (pc : mword 64) (rd : mword 5) (ms0 rd0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (ws : wstate) (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV ms0) ('b"1") = false ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ Machine -∗
+    mstatus ↦ᵣ ms0 -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
+    winstr_m pc false
+      (CSRReg (WpGprCsrrA.csr_mstatus, zreg, Regidx rd, CSRRS)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      hart_state ↦ᵣ HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ Machine -∗
+      mstatus ↦ᵣ ms0 -∗
+      pmpcfg_n ↦ᵣ pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ regval_into_reg ms0 -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz HmIE Hmprv.
+    iIntros "Hhw Hinv Hhs Hpriv Hms Hpcf [Hpc Hnpc] Hrd #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_base with "Hi") as
+      (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
+    iApply (wwp_csrr_mstatus_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc w rd ms0 rd0 pc pmpcfg0 D_m dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz HmIE Hmprv
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec
+              with "Hhw Hinv Hhs Hpriv Hms Hpcf Hpc Hnpc Hrd Hb Hhws").
+    iIntros (ws') "%Hle Hhs Hpriv Hms Hpcf Hpc Hrd Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws'
+              with "[%] Hhs Hpriv Hms Hpcf Hpc Hrd Hhws HF"). exact Hle.
+  Qed.
+
+  (** *** 12m. [csrw mstatus, rs1].  Its leaf is the one instruction in the
+      cone with NO [al4] parameter -- it is stated at 4-alignment only --
+      so the wrapper takes that as a premise instead of instantiating it. *)
+  Lemma wwp_csrw_mstatus (pc : mword 64) (rs1 : mword 5) (ms0 rs1v : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (ws : wstate) (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+    uint rs1 <> 0 ->
+    eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV ms0) ('b"1") = false ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ Machine -∗
+    mstatus ↦ᵣ ms0 -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    winstr_m pc false
+      (CSRReg (WpGprCsrwA.csr_mstatus, Regidx rs1, zreg, CSRRW)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      hart_state ↦ᵣ HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ Machine -∗
+      mstatus ↦ᵣ WpGprCsrwCommon.mstatus_legalized ms0 rs1v -∗
+      pmpcfg_n ↦ᵣ pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hal4 Hnz HmIE Hmprv.
+    iIntros "Hhw Hinv Hhs Hpriv Hms Hpcf [Hpc Hnpc] Hrs #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_base with "Hi") as
+      (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
+    iApply (wwp_csrw_mstatus_leaf
+              pc w rs1 ms0 rs1v pc pmpcfg0 D_m dstateM ws
+              Hgid Hpmp Hal4 Hnz HmIE Hmprv
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec
+              with "Hhw Hinv Hhs Hpriv Hms Hpcf Hpc Hnpc Hrs Hb Hhws").
+    iIntros (ws') "%Hle Hhs Hpriv Hms Hpcf Hpc Hrs Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws'
+              with "[%] Hhs Hpriv Hms Hpcf Hpc Hrs Hhws HF"). exact Hle.
+  Qed.
+
+  (** *** 12n. [csrw pmpcfg0, rs1] -- the third cell-based one: it writes
+      the very register the PMP premise is about. *)
+  Lemma wwp_csrw_pmpcfg0 (pc : mword 64) (rs1 : mword 5) (ms0 rs1v : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (ws : wstate) (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rs1 <> 0 ->
+    eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV ms0) ('b"1") = false ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ Machine -∗
+    mstatus ↦ᵣ ms0 -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    winstr_m pc false
+      (CSRReg (WpGprCsrwA.csr_pmpcfg0, Regidx rs1, zreg, CSRRW)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      hart_state ↦ᵣ HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ Machine -∗
+      mstatus ↦ᵣ ms0 -∗
+      pmpcfg_n ↦ᵣ WpGprCsrwC.pmpcfg_written rs1v pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz HmIE Hmprv.
+    iIntros "Hhw Hinv Hhs Hpriv Hms Hpcf [Hpc Hnpc] Hrs #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_base with "Hi") as
+      (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
+    iApply (wwp_csrw_pmpcfg0_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc w rs1 ms0 rs1v pc pmpcfg0 D_m dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz HmIE Hmprv
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec
+              with "Hhw Hinv Hhs Hpriv Hms Hpcf Hpc Hnpc Hrs Hb Hhws").
+    iIntros (ws') "%Hle Hhs Hpriv Hms Hpcf Hpc Hrs Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws'
+              with "[%] Hhs Hpriv Hms Hpcf Hpc Hrs Hhws HF"). exact Hle.
   Qed.
 
 End WeakLeafM.

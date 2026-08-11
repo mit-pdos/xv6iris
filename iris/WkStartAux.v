@@ -797,6 +797,135 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
+(** ** 4b. THE RVC EXPANSION FACTS.
+
+    One per compressed instruction: what the intermediate compressed AST
+    expands to.  Half are the model's own [exec_execute_C_*] verbatim; the
+    other half need the bitvector re-normalisation the [f_equal]/[bv_eq]
+    loop does.  §5's tokens are their only consumer. *)
+
+Lemma stexp_30 : forall s : mstate,
+  exec (execute (C_ADDI (i9, Regidx csp_rs1))) s
+  = Some (ExecuteAs (ITYPE (sign_extend' 12 i9, Regidx csp_rs1, Regidx csp_rs1, ADDI)), s).
+Proof. exact (exec_execute_C_ADDI i9 (Regidx csp_rs1)). Qed.
+
+Lemma stexp_31 : forall s : mstate,
+  exec (execute (C_SDSP (u10, Regidx ti_ra))) s
+  = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec u10 ('b"000")), Regidx ti_ra, Regidx csp_rs1, 8)), s).
+Proof. exact (exec_execute_C_SDSP u10 (Regidx ti_ra)). Qed.
+
+Lemma stexp_32 : forall s : mstate,
+  exec (execute (C_SDSP (u11, Regidx ti_s0))) s
+  = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec u11 ('b"000")), Regidx ti_s0, Regidx csp_rs1, 8)), s).
+Proof. exact (exec_execute_C_SDSP u11 (Regidx ti_s0)). Qed.
+
+Lemma stexp_33 : forall s : mstate,
+  exec (execute (C_ADDI4SPN (Cregidx (mword_of_int 0), nz12))) s
+  = Some (ExecuteAs (ITYPE (caddi4spn_imm nz12, Regidx csp_rs1, Regidx ti_s0, ADDI)), s).
+Proof.
+  intro s. rewrite (exec_execute_C_ADDI4SPN (Cregidx (mword_of_int 0)) nz12).
+  repeat first [ reflexivity | (apply bv_eq; vm_compute; reflexivity) | f_equal ].
+Qed.
+
+Lemma stexp_37 : forall s : mstate,
+  exec (execute (C_AND (Cregidx (mword_of_int 7), Cregidx (mword_of_int 6)))) s
+  = Some (ExecuteAs (RTYPE (Regidx ti_a4, Regidx ti_a5, Regidx ti_a5, AND)), s).
+Proof.
+  intro s. rewrite (exec_execute_C_AND (Cregidx (mword_of_int 7)) (Cregidx (mword_of_int 6))).
+  repeat first [ reflexivity | (apply bv_eq; vm_compute; reflexivity) | f_equal ].
+Qed.
+
+Lemma stexp_38 : forall s : mstate,
+  exec (execute (C_LUI (si38, Regidx ti_a4))) s
+  = Some (ExecuteAs (UTYPE (sign_extend' 20 si38, Regidx ti_a4, LUI)), s).
+Proof. exact (exec_execute_C_LUI si38 (Regidx ti_a4)). Qed.
+
+Lemma stexp_40 : forall s : mstate,
+  exec (execute (C_OR (Cregidx (mword_of_int 7), Cregidx (mword_of_int 6)))) s
+  = Some (ExecuteAs (RTYPE (Regidx ti_a4, Regidx ti_a5, Regidx ti_a5, OR)), s).
+Proof.
+  intro s. rewrite (exec_execute_C_OR (Cregidx (mword_of_int 7)) (Cregidx (mword_of_int 6))).
+  repeat first [ reflexivity | (apply bv_eq; vm_compute; reflexivity) | f_equal ].
+Qed.
+
+Lemma stexp_45 : forall s : mstate,
+  exec (execute (C_LI (si45, Regidx ti_a5))) s
+  = Some (ExecuteAs (ITYPE (sign_extend' 12 si45, Regidx cli_rs1, Regidx ti_a5, ADDI)), s).
+Proof.
+  intro s. rewrite (exec_execute_C_LI si45 (Regidx ti_a5)).
+  repeat first [ reflexivity | (apply bv_eq; vm_compute; reflexivity) | f_equal ].
+Qed.
+
+Lemma stexp_47 : forall s : mstate,
+  exec (execute (C_LUI (si47, Regidx ti_a5))) s
+  = Some (ExecuteAs (UTYPE (sign_extend' 20 si47, Regidx ti_a5, LUI)), s).
+Proof. exact (exec_execute_C_LUI si47 (Regidx ti_a5)). Qed.
+
+Lemma stexp_48 : forall s : mstate,
+  exec (execute (C_ADDI (si48, Regidx ti_a5))) s
+  = Some (ExecuteAs (ITYPE (sign_extend' 12 si48, Regidx ti_a5, Regidx ti_a5, ADDI)), s).
+Proof. exact (exec_execute_C_ADDI si48 (Regidx ti_a5)). Qed.
+
+Lemma stexp_54 : forall s : mstate,
+  exec (execute (C_LI (si54, Regidx ti_a5))) s
+  = Some (ExecuteAs (ITYPE (sign_extend' 12 si54, Regidx cli_rs1, Regidx ti_a5, ADDI)), s).
+Proof.
+  intro s. rewrite (exec_execute_C_LI si54 (Regidx ti_a5)).
+  repeat first [ reflexivity | (apply bv_eq; vm_compute; reflexivity) | f_equal ].
+Qed.
+
+Lemma stexp_55 : forall s : mstate,
+  exec (execute (C_SRLI (ssh55, Cregidx (mword_of_int 7)))) s
+  = Some (ExecuteAs (SHIFTIOP (ssh55, Regidx ti_a5, Regidx ti_a5, SRLI)), s).
+Proof.
+  intro s. rewrite (exec_execute_C_SRLI ssh55 (Cregidx (mword_of_int 7))).
+  repeat first [ reflexivity | (apply bv_eq; vm_compute; reflexivity) | f_equal ].
+Qed.
+
+Lemma stexp_57 : forall s : mstate,
+  exec (execute (C_LI (si57, Regidx ti_a5))) s
+  = Some (ExecuteAs (ITYPE (sign_extend' 12 si57, Regidx cli_rs1, Regidx ti_a5, ADDI)), s).
+Proof.
+  intro s. rewrite (exec_execute_C_LI si57 (Regidx ti_a5)).
+  repeat first [ reflexivity | (apply bv_eq; vm_compute; reflexivity) | f_equal ].
+Qed.
+
+Lemma stexp_61 : forall s : mstate,
+  exec (execute (C_ADDIW (si61, Regidx ti_a5))) s
+  = Some (ExecuteAs (ADDIW (sign_extend' 12 si61, Regidx ti_a5, Regidx ti_a5)), s).
+Proof. exact (exec_execute_C_ADDIW si61 (Regidx ti_a5)). Qed.
+
+Lemma stexp_62 : forall s : mstate,
+  exec (execute (C_MV (Regidx st_tp, Regidx ti_a5))) s
+  = Some (ExecuteAs (RTYPE (Regidx ti_a5, Regidx cli_rs1, Regidx st_tp, ADD)), s).
+Proof.
+  intro s. rewrite (exec_execute_C_MV (Regidx st_tp) (Regidx ti_a5)).
+  repeat first [ reflexivity | (apply bv_eq; vm_compute; reflexivity) | f_equal ].
+Qed.
+
+Lemma stexp_ae1 : forall s : mstate,
+  exec (execute (C_LI (sae_li, Regidx ti_a4))) s
+  = Some (ExecuteAs (ITYPE (sign_extend' 12 sae_li, Regidx cli_rs1, Regidx ti_a4, ADDI)), s).
+Proof.
+  intro s. rewrite (exec_execute_C_LI sae_li (Regidx ti_a4)).
+  repeat first [ reflexivity | (apply bv_eq; vm_compute; reflexivity) | f_equal ].
+Qed.
+
+Lemma stexp_ae2 : forall s : mstate,
+  exec (execute (C_SLLI (sae_slli, Regidx ti_a4))) s
+  = Some (ExecuteAs (SHIFTIOP (sae_slli, Regidx ti_a4, Regidx ti_a4, SLLI)), s).
+Proof. exact (exec_execute_C_SLLI sae_slli (Regidx ti_a4)). Qed.
+
+Lemma stexp_ae3 : forall s : mstate,
+  exec (execute (C_OR (Cregidx (mword_of_int 7), Cregidx (mword_of_int 6)))) s
+  = Some (ExecuteAs (RTYPE (Regidx ti_a4, Regidx ti_a5, Regidx ti_a5, OR)), s).
+Proof.
+  intro s. rewrite (exec_execute_C_OR (Cregidx (mword_of_int 7)) (Cregidx (mword_of_int 6))).
+  repeat first [ reflexivity | (apply bv_eq; vm_compute; reflexivity) | f_equal ].
+Qed.
+
+
+(* ====================================================================== *)
 (** ** 5. THE PER-INSTRUCTION TOKENS ([WeakLeafM.winstr_m]) -- this file's
     [CodeStart.sti_*] analogue.  One lemma per instruction, assembled from
     the facts §1-§2 already prove; a caller then spends ONE [iPoseProof] and
@@ -832,5 +961,932 @@ Section WkStartTokens.
               with "Ht").
     iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0xc) stw_35 Hcov stkb_35).
   Qed.
+
+  (* c.addi sp, -16   (start + 0x0) *)
+  Lemma wsti_30 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc30 true
+      (ITYPE (sign_extend' 12 i9, Regidx csp_rs1, Regidx csp_rs1, ADDI)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc30 (F_RVC sth_30) stw_30
+              (ITYPE (sign_extend' 12 i9, Regidx csp_rs1, Regidx csp_rs1, ADDI))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [apply bv_eq; vm_compute; reflexivity
+                           | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ HC _ _ _ => ex_intro _ (C_ADDI (i9, Regidx csp_rs1))
+                 (conj (kd_1141 t HC) (conj stlpad_30 stexp_30)))
+              (conj stgood_30
+                 (ex_intro _ (C_ADDI (i9, Regidx csp_rs1))
+                    (conj stdec_30 (conj stlpad_30
+                       (conj stgoodexp_30 stexp_30)))))
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x0)
+      stw_30 Hcov stkb_30).
+  Qed.
+
+  (* c.sdsp ra, 8(sp)   (start + 0x2) *)
+  Lemma wsti_31 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc31 true
+      (STORE (zero_extend' 12 (concat_vec u10 ('b"000")), Regidx ti_ra, Regidx csp_rs1, 8)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc31 (F_RVC sth_31) stw_31
+              (STORE (zero_extend' 12 (concat_vec u10 ('b"000")), Regidx ti_ra, Regidx csp_rs1, 8))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [apply bv_eq; vm_compute; reflexivity
+                           | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ HC _ _ _ => ex_intro _ (C_SDSP (u10, Regidx ti_ra))
+                 (conj (kd_e406 t HC) (conj stlpad_31 stexp_31)))
+              (conj stgood_31
+                 (ex_intro _ (C_SDSP (u10, Regidx ti_ra))
+                    (conj stdec_31 (conj stlpad_31
+                       (conj stgoodexp_31 stexp_31)))))
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x2)
+      stw_31 Hcov stkb_31).
+  Qed.
+
+  (* c.sdsp s0, 0(sp)   (start + 0x4) *)
+  Lemma wsti_32 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc32 true
+      (STORE (zero_extend' 12 (concat_vec u11 ('b"000")), Regidx ti_s0, Regidx csp_rs1, 8)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc32 (F_RVC sth_32) stw_32
+              (STORE (zero_extend' 12 (concat_vec u11 ('b"000")), Regidx ti_s0, Regidx csp_rs1, 8))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [apply bv_eq; vm_compute; reflexivity
+                           | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ HC _ _ _ => ex_intro _ (C_SDSP (u11, Regidx ti_s0))
+                 (conj (kd_e022 t HC) (conj stlpad_32 stexp_32)))
+              (conj stgood_32
+                 (ex_intro _ (C_SDSP (u11, Regidx ti_s0))
+                    (conj stdec_32 (conj stlpad_32
+                       (conj stgoodexp_32 stexp_32)))))
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x4)
+      stw_32 Hcov stkb_32).
+  Qed.
+
+  (* c.addi4spn s0, sp, 16   (start + 0x6) *)
+  Lemma wsti_33 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc33 true
+      (ITYPE (caddi4spn_imm nz12, Regidx csp_rs1, Regidx ti_s0, ADDI)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc33 (F_RVC sth_33) stw_33
+              (ITYPE (caddi4spn_imm nz12, Regidx csp_rs1, Regidx ti_s0, ADDI))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [apply bv_eq; vm_compute; reflexivity
+                           | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ HC _ _ _ => ex_intro _ (C_ADDI4SPN (Cregidx (mword_of_int 0), nz12))
+                 (conj (kd_0800 t HC) (conj stlpad_33 stexp_33)))
+              (conj stgood_33
+                 (ex_intro _ (C_ADDI4SPN (Cregidx (mword_of_int 0), nz12))
+                    (conj stdec_33 (conj stlpad_33
+                       (conj stgoodexp_33 stexp_33)))))
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x6)
+      stw_33 Hcov stkb_33).
+  Qed.
+
+  (* csrr a5, mstatus   (start + 0x8) *)
+  Lemma wsti_34 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc34 false
+      (CSRReg (WpGprCsrrA.csr_mstatus, zreg, Regidx ti_a5, CSRRS)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc34 (F_Base stw_34) stw_34
+              (CSRReg (WpGprCsrrA.csr_mstatus, zreg, Regidx ti_a5, CSRRS))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [reflexivity | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ _ _ Hmi Hcfg => kd_300027f3 t Hmi Hcfg)
+              (conj stgood_34 stdec_34)
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x8)
+      stw_34 Hcov stkb_34).
+  Qed.
+
+  (* addi a4, a4, 2047   (start + 0xe) *)
+  Lemma wsti_36 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc36 false
+      (ITYPE (si36, Regidx ti_a4, Regidx ti_a4, ADDI)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc36 (F_Base stw_36) stw_36
+              (ITYPE (si36, Regidx ti_a4, Regidx ti_a4, ADDI))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [reflexivity | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ _ _ Hmi Hcfg => kd_7ff70713 t Hmi Hcfg)
+              (conj stgood_36 stdec_36)
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0xe)
+      stw_36 Hcov stkb_36).
+  Qed.
+
+  (* c.and a5, a4   (start + 0x12) *)
+  Lemma wsti_37 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc37 true
+      (RTYPE (Regidx ti_a4, Regidx ti_a5, Regidx ti_a5, AND)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc37 (F_RVC sth_37) stw_37
+              (RTYPE (Regidx ti_a4, Regidx ti_a5, Regidx ti_a5, AND))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [apply bv_eq; vm_compute; reflexivity
+                           | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ HC _ _ _ => ex_intro _ (C_AND (Cregidx (mword_of_int 7), Cregidx (mword_of_int 6)))
+                 (conj (kd_8ff9 t HC) (conj stlpad_37 stexp_37)))
+              (conj stgood_37
+                 (ex_intro _ (C_AND (Cregidx (mword_of_int 7), Cregidx (mword_of_int 6)))
+                    (conj stdec_37 (conj stlpad_37
+                       (conj stgoodexp_37 stexp_37)))))
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x12)
+      stw_37 Hcov stkb_37).
+  Qed.
+
+  (* c.lui a4, 1   (start + 0x14) *)
+  Lemma wsti_38 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc38 true
+      (UTYPE (sign_extend' 20 si38, Regidx ti_a4, LUI)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc38 (F_RVC sth_38) stw_38
+              (UTYPE (sign_extend' 20 si38, Regidx ti_a4, LUI))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [apply bv_eq; vm_compute; reflexivity
+                           | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ HC _ _ _ => ex_intro _ (C_LUI (si38, Regidx ti_a4))
+                 (conj (kd_6705 t HC) (conj stlpad_38 stexp_38)))
+              (conj stgood_38
+                 (ex_intro _ (C_LUI (si38, Regidx ti_a4))
+                    (conj stdec_38 (conj stlpad_38
+                       (conj stgoodexp_38 stexp_38)))))
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x14)
+      stw_38 Hcov stkb_38).
+  Qed.
+
+  (* addi a4, a4, -2048   (start + 0x16) *)
+  Lemma wsti_39 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc39 false
+      (ITYPE (si39, Regidx ti_a4, Regidx ti_a4, ADDI)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc39 (F_Base stw_39) stw_39
+              (ITYPE (si39, Regidx ti_a4, Regidx ti_a4, ADDI))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [reflexivity | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ _ _ Hmi Hcfg => kd_80070713 t Hmi Hcfg)
+              (conj stgood_39 stdec_39)
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x16)
+      stw_39 Hcov stkb_39).
+  Qed.
+
+  (* c.or a5, a4   (start + 0x1a) *)
+  Lemma wsti_40 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc40 true
+      (RTYPE (Regidx ti_a4, Regidx ti_a5, Regidx ti_a5, OR)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc40 (F_RVC sth_40) stw_40
+              (RTYPE (Regidx ti_a4, Regidx ti_a5, Regidx ti_a5, OR))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [apply bv_eq; vm_compute; reflexivity
+                           | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ HC _ _ _ => ex_intro _ (C_OR (Cregidx (mword_of_int 7), Cregidx (mword_of_int 6)))
+                 (conj (kd_8fd9 t HC) (conj stlpad_40 stexp_40)))
+              (conj stgood_40
+                 (ex_intro _ (C_OR (Cregidx (mword_of_int 7), Cregidx (mword_of_int 6)))
+                    (conj stdec_40 (conj stlpad_40
+                       (conj stgoodexp_40 stexp_40)))))
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x1a)
+      stw_40 Hcov stkb_40).
+  Qed.
+
+  (* csrw mstatus, a5   (start + 0x1c) *)
+  Lemma wsti_41 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc41 false
+      (CSRReg (WpGprCsrwA.csr_mstatus, Regidx ti_a5, zreg, CSRRW)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc41 (F_Base stw_41) stw_41
+              (CSRReg (WpGprCsrwA.csr_mstatus, Regidx ti_a5, zreg, CSRRW))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [reflexivity | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ _ _ Hmi Hcfg => kd_30079073 t Hmi Hcfg)
+              (conj stgood_41 stdec_41)
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x1c)
+      stw_41 Hcov stkb_41).
+  Qed.
+
+  (* auipc a5, 1   (start + 0x20) *)
+  Lemma wsti_42 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc42 false
+      (UTYPE (si42, Regidx ti_a5, AUIPC)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc42 (F_Base stw_42) stw_42
+              (UTYPE (si42, Regidx ti_a5, AUIPC))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [reflexivity | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ _ _ Hmi Hcfg => kd_00001797 t Hmi Hcfg)
+              (conj stgood_42 stdec_42)
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x20)
+      stw_42 Hcov stkb_42).
+  Qed.
+
+  (* addi a5, a5, -506   (start + 0x24) *)
+  Lemma wsti_43 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc43 false
+      (ITYPE (si43, Regidx ti_a5, Regidx ti_a5, ADDI)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc43 (F_Base stw_43) stw_43
+              (ITYPE (si43, Regidx ti_a5, Regidx ti_a5, ADDI))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [reflexivity | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ _ _ Hmi Hcfg => kd_e0678793 t Hmi Hcfg)
+              (conj stgood_43 stdec_43)
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x24)
+      stw_43 Hcov stkb_43).
+  Qed.
+
+  (* csrw mepc, a5   (start + 0x28) *)
+  Lemma wsti_44 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc44 false
+      (CSRReg (WpGprCsrwA.csr_mepc, Regidx ti_a5, zreg, CSRRW)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc44 (F_Base stw_44) stw_44
+              (CSRReg (WpGprCsrwA.csr_mepc, Regidx ti_a5, zreg, CSRRW))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [reflexivity | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ _ _ Hmi Hcfg => kd_34179073 t Hmi Hcfg)
+              (conj stgood_44 stdec_44)
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x28)
+      stw_44 Hcov stkb_44).
+  Qed.
+
+  (* c.li a5, 0   (start + 0x2c) *)
+  Lemma wsti_45 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc45 true
+      (ITYPE (sign_extend' 12 si45, Regidx cli_rs1, Regidx ti_a5, ADDI)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc45 (F_RVC sth_45) stw_45
+              (ITYPE (sign_extend' 12 si45, Regidx cli_rs1, Regidx ti_a5, ADDI))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [apply bv_eq; vm_compute; reflexivity
+                           | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ HC _ _ _ => ex_intro _ (C_LI (si45, Regidx ti_a5))
+                 (conj (kd_4781 t HC) (conj stlpad_45 stexp_45)))
+              (conj stgood_45
+                 (ex_intro _ (C_LI (si45, Regidx ti_a5))
+                    (conj stdec_45 (conj stlpad_45
+                       (conj stgoodexp_45 stexp_45)))))
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x2c)
+      stw_45 Hcov stkb_45).
+  Qed.
+
+  (* csrw satp, a5   (start + 0x2e) *)
+  Lemma wsti_46 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc46 false
+      (CSRReg (WpGprCsrwB.csr_satp, Regidx ti_a5, zreg, CSRRW)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc46 (F_Base stw_46) stw_46
+              (CSRReg (WpGprCsrwB.csr_satp, Regidx ti_a5, zreg, CSRRW))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [reflexivity | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ _ _ Hmi Hcfg => kd_18079073 t Hmi Hcfg)
+              (conj stgood_46 stdec_46)
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x2e)
+      stw_46 Hcov stkb_46).
+  Qed.
+
+  (* c.lui a5, 0x10   (start + 0x32) *)
+  Lemma wsti_47 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc47 true
+      (UTYPE (sign_extend' 20 si47, Regidx ti_a5, LUI)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc47 (F_RVC sth_47) stw_47
+              (UTYPE (sign_extend' 20 si47, Regidx ti_a5, LUI))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [apply bv_eq; vm_compute; reflexivity
+                           | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ HC _ _ _ => ex_intro _ (C_LUI (si47, Regidx ti_a5))
+                 (conj (kd_67c1 t HC) (conj stlpad_47 stexp_47)))
+              (conj stgood_47
+                 (ex_intro _ (C_LUI (si47, Regidx ti_a5))
+                    (conj stdec_47 (conj stlpad_47
+                       (conj stgoodexp_47 stexp_47)))))
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x32)
+      stw_47 Hcov stkb_47).
+  Qed.
+
+  (* c.addi a5, -1   (start + 0x34) *)
+  Lemma wsti_48 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc48 true
+      (ITYPE (sign_extend' 12 si48, Regidx ti_a5, Regidx ti_a5, ADDI)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc48 (F_RVC sth_48) stw_48
+              (ITYPE (sign_extend' 12 si48, Regidx ti_a5, Regidx ti_a5, ADDI))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [apply bv_eq; vm_compute; reflexivity
+                           | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ HC _ _ _ => ex_intro _ (C_ADDI (si48, Regidx ti_a5))
+                 (conj (kd_17fd t HC) (conj stlpad_48 stexp_48)))
+              (conj stgood_48
+                 (ex_intro _ (C_ADDI (si48, Regidx ti_a5))
+                    (conj stdec_48 (conj stlpad_48
+                       (conj stgoodexp_48 stexp_48)))))
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x34)
+      stw_48 Hcov stkb_48).
+  Qed.
+
+  (* csrw medeleg, a5   (start + 0x36) *)
+  Lemma wsti_49 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc49 false
+      (CSRReg (WpGprCsrwA.csr_medeleg, Regidx ti_a5, zreg, CSRRW)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc49 (F_Base stw_49) stw_49
+              (CSRReg (WpGprCsrwA.csr_medeleg, Regidx ti_a5, zreg, CSRRW))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [reflexivity | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ _ _ Hmi Hcfg => kd_30279073 t Hmi Hcfg)
+              (conj stgood_49 stdec_49)
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x36)
+      stw_49 Hcov stkb_49).
+  Qed.
+
+  (* csrw mideleg, a5   (start + 0x3a) *)
+  Lemma wsti_50 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc50 false
+      (CSRReg (WpGprCsrwB.csr_mideleg, Regidx ti_a5, zreg, CSRRW)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc50 (F_Base stw_50) stw_50
+              (CSRReg (WpGprCsrwB.csr_mideleg, Regidx ti_a5, zreg, CSRRW))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [reflexivity | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ _ _ Hmi Hcfg => kd_30379073 t Hmi Hcfg)
+              (conj stgood_50 stdec_50)
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x3a)
+      stw_50 Hcov stkb_50).
+  Qed.
+
+  (* csrr a5, sie   (start + 0x3e) *)
+  Lemma wsti_51 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc51 false
+      (CSRReg (WpGprCsrrB.csr_sie, zreg, Regidx ti_a5, CSRRS)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc51 (F_Base stw_51) stw_51
+              (CSRReg (WpGprCsrrB.csr_sie, zreg, Regidx ti_a5, CSRRS))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [reflexivity | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ _ _ Hmi Hcfg => kd_104027f3 t Hmi Hcfg)
+              (conj stgood_51 stdec_51)
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x3e)
+      stw_51 Hcov stkb_51).
+  Qed.
+
+  (* ori a5, a5, 544   (start + 0x42) *)
+  Lemma wsti_52 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc52 false
+      (ITYPE (si52, Regidx ti_a5, Regidx ti_a5, ORI)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc52 (F_Base stw_52) stw_52
+              (ITYPE (si52, Regidx ti_a5, Regidx ti_a5, ORI))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [reflexivity | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ _ _ Hmi Hcfg => kd_2207e793 t Hmi Hcfg)
+              (conj stgood_52 stdec_52)
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x42)
+      stw_52 Hcov stkb_52).
+  Qed.
+
+  (* csrw sie, a5   (start + 0x46) *)
+  Lemma wsti_53 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc53 false
+      (CSRReg (WpGprCsrwB.csr_sie, Regidx ti_a5, zreg, CSRRW)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc53 (F_Base stw_53) stw_53
+              (CSRReg (WpGprCsrwB.csr_sie, Regidx ti_a5, zreg, CSRRW))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [reflexivity | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ _ _ Hmi Hcfg => kd_10479073 t Hmi Hcfg)
+              (conj stgood_53 stdec_53)
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x46)
+      stw_53 Hcov stkb_53).
+  Qed.
+
+  (* c.li a5, -1   (start + 0x4a) *)
+  Lemma wsti_54 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc54 true
+      (ITYPE (sign_extend' 12 si54, Regidx cli_rs1, Regidx ti_a5, ADDI)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc54 (F_RVC sth_54) stw_54
+              (ITYPE (sign_extend' 12 si54, Regidx cli_rs1, Regidx ti_a5, ADDI))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [apply bv_eq; vm_compute; reflexivity
+                           | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ HC _ _ _ => ex_intro _ (C_LI (si54, Regidx ti_a5))
+                 (conj (kd_57fd t HC) (conj stlpad_54 stexp_54)))
+              (conj stgood_54
+                 (ex_intro _ (C_LI (si54, Regidx ti_a5))
+                    (conj stdec_54 (conj stlpad_54
+                       (conj stgoodexp_54 stexp_54)))))
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x4a)
+      stw_54 Hcov stkb_54).
+  Qed.
+
+  (* c.srli a5, 10   (start + 0x4c) *)
+  Lemma wsti_55 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc55 true
+      (SHIFTIOP (ssh55, Regidx ti_a5, Regidx ti_a5, SRLI)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc55 (F_RVC sth_55) stw_55
+              (SHIFTIOP (ssh55, Regidx ti_a5, Regidx ti_a5, SRLI))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [apply bv_eq; vm_compute; reflexivity
+                           | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ HC _ _ _ => ex_intro _ (C_SRLI (ssh55, Cregidx (mword_of_int 7)))
+                 (conj (kd_83a9 t HC) (conj stlpad_55 stexp_55)))
+              (conj stgood_55
+                 (ex_intro _ (C_SRLI (ssh55, Cregidx (mword_of_int 7)))
+                    (conj stdec_55 (conj stlpad_55
+                       (conj stgoodexp_55 stexp_55)))))
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x4c)
+      stw_55 Hcov stkb_55).
+  Qed.
+
+  (* csrw pmpaddr0, a5   (start + 0x4e) *)
+  Lemma wsti_56 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc56 false
+      (CSRReg (WpGprCsrwB.csr_pmpaddr0, Regidx ti_a5, zreg, CSRRW)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc56 (F_Base stw_56) stw_56
+              (CSRReg (WpGprCsrwB.csr_pmpaddr0, Regidx ti_a5, zreg, CSRRW))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [reflexivity | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ _ _ Hmi Hcfg => kd_3b079073 t Hmi Hcfg)
+              (conj stgood_56 stdec_56)
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x4e)
+      stw_56 Hcov stkb_56).
+  Qed.
+
+  (* c.li a5, 15   (start + 0x52) *)
+  Lemma wsti_57 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc57 true
+      (ITYPE (sign_extend' 12 si57, Regidx cli_rs1, Regidx ti_a5, ADDI)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc57 (F_RVC sth_57) stw_57
+              (ITYPE (sign_extend' 12 si57, Regidx cli_rs1, Regidx ti_a5, ADDI))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [apply bv_eq; vm_compute; reflexivity
+                           | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ HC _ _ _ => ex_intro _ (C_LI (si57, Regidx ti_a5))
+                 (conj (kd_47bd t HC) (conj stlpad_57 stexp_57)))
+              (conj stgood_57
+                 (ex_intro _ (C_LI (si57, Regidx ti_a5))
+                    (conj stdec_57 (conj stlpad_57
+                       (conj stgoodexp_57 stexp_57)))))
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x52)
+      stw_57 Hcov stkb_57).
+  Qed.
+
+  (* csrw pmpcfg0, a5   (start + 0x54) *)
+  Lemma wsti_58 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc58 false
+      (CSRReg (WpGprCsrwA.csr_pmpcfg0, Regidx ti_a5, zreg, CSRRW)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc58 (F_Base stw_58) stw_58
+              (CSRReg (WpGprCsrwA.csr_pmpcfg0, Regidx ti_a5, zreg, CSRRW))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [reflexivity | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ _ _ Hmi Hcfg => kd_3a079073 t Hmi Hcfg)
+              (conj stgood_58 stdec_58)
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x54)
+      stw_58 Hcov stkb_58).
+  Qed.
+
+  (* csrr a5, menvcfg   (start + 0x58) *)
+  Lemma wsti_ae0 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc_ae0 false
+      (CSRReg (WpGprCsrrB.csr_menvcfg, zreg, Regidx ti_a5, CSRRS)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc_ae0 (F_Base stw_ae0) stw_ae0
+              (CSRReg (WpGprCsrrB.csr_menvcfg, zreg, Regidx ti_a5, CSRRS))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [reflexivity | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ _ _ Hmi Hcfg => kd_30a027f3 t Hmi Hcfg)
+              (conj stgood_ae0 stdec_ae0)
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x58)
+      stw_ae0 Hcov stkb_ae0).
+  Qed.
+
+  (* c.li a4, 1   (start + 0x5c) *)
+  Lemma wsti_ae1 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc_ae1 true
+      (ITYPE (sign_extend' 12 sae_li, Regidx cli_rs1, Regidx ti_a4, ADDI)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc_ae1 (F_RVC sth_ae1) stw_ae1
+              (ITYPE (sign_extend' 12 sae_li, Regidx cli_rs1, Regidx ti_a4, ADDI))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [apply bv_eq; vm_compute; reflexivity
+                           | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ HC _ _ _ => ex_intro _ (C_LI (sae_li, Regidx ti_a4))
+                 (conj (kd_4705 t HC) (conj stlpad_ae1 stexp_ae1)))
+              (conj stgood_ae1
+                 (ex_intro _ (C_LI (sae_li, Regidx ti_a4))
+                    (conj stdec_ae1 (conj stlpad_ae1
+                       (conj stgoodexp_ae1 stexp_ae1)))))
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x5c)
+      stw_ae1 Hcov stkb_ae1).
+  Qed.
+
+  (* c.slli a4, 0x3d   (start + 0x5e) *)
+  Lemma wsti_ae2 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc_ae2 true
+      (SHIFTIOP (sae_slli, Regidx ti_a4, Regidx ti_a4, SLLI)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc_ae2 (F_RVC sth_ae2) stw_ae2
+              (SHIFTIOP (sae_slli, Regidx ti_a4, Regidx ti_a4, SLLI))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [apply bv_eq; vm_compute; reflexivity
+                           | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ HC _ _ _ => ex_intro _ (C_SLLI (sae_slli, Regidx ti_a4))
+                 (conj (kd_1776 t HC) (conj stlpad_ae2 stexp_ae2)))
+              (conj stgood_ae2
+                 (ex_intro _ (C_SLLI (sae_slli, Regidx ti_a4))
+                    (conj stdec_ae2 (conj stlpad_ae2
+                       (conj stgoodexp_ae2 stexp_ae2)))))
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x5e)
+      stw_ae2 Hcov stkb_ae2).
+  Qed.
+
+  (* c.or a5, a4   (start + 0x60) *)
+  Lemma wsti_ae3 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc_ae3 true
+      (RTYPE (Regidx ti_a4, Regidx ti_a5, Regidx ti_a5, OR)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc_ae3 (F_RVC sth_ae3) stw_ae3
+              (RTYPE (Regidx ti_a4, Regidx ti_a5, Regidx ti_a5, OR))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [apply bv_eq; vm_compute; reflexivity
+                           | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ HC _ _ _ => ex_intro _ (C_OR (Cregidx (mword_of_int 7), Cregidx (mword_of_int 6)))
+                 (conj (kd_8fd9 t HC) (conj stlpad_ae3 stexp_ae3)))
+              (conj stgood_ae3
+                 (ex_intro _ (C_OR (Cregidx (mword_of_int 7), Cregidx (mword_of_int 6)))
+                    (conj stdec_ae3 (conj stlpad_ae3
+                       (conj stgoodexp_ae3 stexp_ae3)))))
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x60)
+      stw_ae3 Hcov stkb_ae3).
+  Qed.
+
+  (* csrw menvcfg, a5   (start + 0x62) *)
+  Lemma wsti_ae4 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc_ae4 false
+      (CSRReg (WpGprCsrwA.csr_menvcfg, Regidx ti_a5, zreg, CSRRW)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc_ae4 (F_Base stw_ae4) stw_ae4
+              (CSRReg (WpGprCsrwA.csr_menvcfg, Regidx ti_a5, zreg, CSRRW))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [reflexivity | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ _ _ Hmi Hcfg => kd_30a79073 t Hmi Hcfg)
+              (conj stgood_ae4 stdec_ae4)
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x62)
+      stw_ae4 Hcov stkb_ae4).
+  Qed.
+
+  (* jal ra, timerinit   (start + 0x66) *)
+  Lemma wsti_59 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc59 false
+      (JAL (sjimm59, Regidx ti_ra)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc59 (F_Base stw_59) stw_59
+              (JAL (sjimm59, Regidx ti_ra))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [reflexivity | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ _ _ Hmi Hcfg => kd_f5fff0ef t Hmi Hcfg)
+              (conj stgood_59 stdec_59)
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x66)
+      stw_59 Hcov stkb_59).
+  Qed.
+
+  (* csrr a5, mhartid   (start + 0x6a) *)
+  Lemma wsti_60 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc60 false
+      (CSRReg (ExecCommon.csr_csrr, zreg, Regidx ti_a5, CSRRS)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc60 (F_Base stw_60) stw_60
+              (CSRReg (ExecCommon.csr_csrr, zreg, Regidx ti_a5, CSRRS))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [reflexivity | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ _ _ Hmi Hcfg => kd_f14027f3 t Hmi Hcfg)
+              (conj stgood_60 stdec_60)
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x6a)
+      stw_60 Hcov stkb_60).
+  Qed.
+
+  (* c.addiw a5, 0   (start + 0x6e) *)
+  Lemma wsti_61 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc61 true
+      (ADDIW (sign_extend' 12 si61, Regidx ti_a5, Regidx ti_a5)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc61 (F_RVC sth_61) stw_61
+              (ADDIW (sign_extend' 12 si61, Regidx ti_a5, Regidx ti_a5))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [apply bv_eq; vm_compute; reflexivity
+                           | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ HC _ _ _ => ex_intro _ (C_ADDIW (si61, Regidx ti_a5))
+                 (conj (kd_2781 t HC) (conj stlpad_61 stexp_61)))
+              (conj stgood_61
+                 (ex_intro _ (C_ADDIW (si61, Regidx ti_a5))
+                    (conj stdec_61 (conj stlpad_61
+                       (conj stgoodexp_61 stexp_61)))))
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x6e)
+      stw_61 Hcov stkb_61).
+  Qed.
+
+  (* c.mv tp, a5   (start + 0x70) *)
+  Lemma wsti_62 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc62 true
+      (RTYPE (Regidx ti_a5, Regidx cli_rs1, Regidx st_tp, ADD)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc62 (F_RVC sth_62) stw_62
+              (RTYPE (Regidx ti_a5, Regidx cli_rs1, Regidx st_tp, ADD))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [apply bv_eq; vm_compute; reflexivity
+                           | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ HC _ _ _ => ex_intro _ (C_MV (Regidx st_tp, Regidx ti_a5))
+                 (conj (kd_823e t HC) (conj stlpad_62 stexp_62)))
+              (conj stgood_62
+                 (ex_intro _ (C_MV (Regidx st_tp, Regidx ti_a5))
+                    (conj stdec_62 (conj stlpad_62
+                       (conj stgoodexp_62 stexp_62)))))
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x70)
+      stw_62 Hcov stkb_62).
+  Qed.
+
+  (* mret   (start + 0x72) *)
+  Lemma wsti_63 (kbs : _) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc63 false
+      (MRET tt).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc63 (F_Base stw_63) stw_63
+              (MRET tt)
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [reflexivity | vm_compute; reflexivity])
+              ltac:(reflexivity)
+              (fun t _ _ _ Hmi Hcfg => kd_30200073 t Hmi Hcfg)
+              (conj stgood_63 stdec_63)
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0x72)
+      stw_63 Hcov stkb_63).
+  Qed.
+
 
 End WkStartTokens.
