@@ -3608,11 +3608,85 @@ The `wmem_restrict` instance (`wstep_ok_racy_false_of_window`) additionally
 takes "the window is inside the confined footprint W", which is what makes
 `dom (write_bytes (wmem_restrict s W) ra rn wp) ⊆ W`.
 
-REMAINING for slice 2: the phase-`true` half — from a FAMILY of confined
-runs, one per Φ-admissible window value, produce `wstep_ok_racy … true`.  Its
-racy arm hands each `(ts, w)` to this lemma at `wp := w`; the three
-difficulties above (views depend on `ts`, SC lockstep lost, trace varies with
-the value) are all in that half.
+### SLICE 2, SECOND HALF: THE PHASE-`true` PRODUCER (2026-08-11, DONE)
+
+`wstep_ok_racy_true_of_confined` + the `wmem_restrict` instance
+`wstep_ok_racy_true_of_window`, both `Closed under the global context`.
+From a FAMILY of confined runs — one per Φ-admissible window value, at the
+memory patched with that value — it produces `wstep_ok_racy … true`.  The
+racy arm hands each `(ts, w)` to the phase-`false` lemma at `wp := w`, which
+is the interface the first half was built for, and the application needs no
+reconciliation step: the family member at `w` RETURNS `w`
+(`write_bytes_lookup_at` + `read_bytes_of_bytes`).
+
+**THREE PREMISES OF THE ORIGINALLY-PLANNED SHAPE WERE UNSATISFIABLE.  Both
+of the first two are instructive.**
+
+- **`trace_disj ra rn es` cannot be the phase-`true` premise: the racy read
+  is IN `es`, and `racc_disj ra rn ra rn` is false.**  Replaced by an
+  ORDERED fixpoint `trace_racy rak ra rn es`: before the window read every
+  read is disjoint and there is NO RAM WRITE AT ALL — not "no overlapping
+  write", because `wstep_ok_racy`'s write arm demands `b = false`, so a
+  pre-racy RAM write makes the goal FALSE rather than merely unprovable — and
+  at the window read the phase flips and the tail is §1's `trace_disj`
+  verbatim.  A trace with no window read is admitted.
+- **`trace_pin s es` is unsatisfiable too, and this is the sharper point.**
+  `classify` gives the walk's leaf read `AkInfo false false false` (the model
+  emits `Read_plain`), so `ak_pins = false` and `trace_pin` would demand
+  exactly the pinnedness that makes the read NON-RACY.  Replaced by
+  `trace_pin_off s ra rn es`, which demands pinnedness only of reads DISJOINT
+  from the window.  `trace_pin_off_of_pin` (a caller with whole-window
+  pinnedness loses nothing) and `trace_pin_of_off`
+  (`trace_disj + trace_pin_off ⇒ trace_pin`, which is how the tail is handed
+  to §2) are the two bridges.
+- Two new side conditions: `(0 < rn)%N` (the empty window is disjoint from
+  itself, so a read arm could not be classified by its footprint — and the
+  classification MUST be by footprint, since it has to be the same for every
+  family member: the address and width come from the monad, the patch value
+  does not), and `∃ w0, Φ w0` (every pre-racy obligation is read off a run,
+  and an empty Φ yields no run).  `wadm_filter_inhabited` makes the second
+  free at the call site, from `wadm_filter` plus window readability — exactly
+  `wp_wracy_load`'s own premises.
+
+Note the `ts` never enters the family: `wread_post` moves only `wm_ws`, which
+no `exec_eff` fact mentions, and both trace premises transport UP the view
+order, so one member serves the whole `ts`-fibre.  That is the answer to
+difficulty (1) above — the successor's views do depend on `ts`, but nothing
+the family says does.
+
+### THE TWO BLOCKERS FOR SLICE 3 (2026-08-11)
+
+**(A) The real walk trace RE-TOUCHES the window after the racy read, and
+`wstep_ok_racy` forbids that.**  `wtlb_res_pt_translateAddr_at` enumerates
+five trace shapes; slice 2 covers two — `[]` (TLB hit) and the plain walk
+`[read a2; read a1; read la]` (racy leaf last, tail empty).  The other three
+carry the A/D writeback CAS AT THE SAME LEAF ADDRESS.  In phase `false` the
+read arm can only take the disjoint disjunct and the write arm demands
+`racc_disj`, so any post-racy access to the window is inexpressible BY
+CONSTRUCTION ("after it, the window may not be touched again" — `WeakRacy`'s
+header).  This is inherited from the definition, not a limitation of the new
+lemma.  **The fix looks tractable and is scoped:** the CAS read half is
+`ak_latest`, hence `ak_pins = true`, hence self-pinning — it needs no
+pinnedness, and only the DISJOINTNESS demand blocks it.  So permit, in phase
+`false`, a self-pinning read at the window and one write at the window, and
+thread the PATCH VALUE through the bridge: `exec_of_wrun_win` currently
+concludes at a fixed `w`, and a window writeback has to move the successor's
+patch from `w` to `lw'`.  That changes `wstep_ok_racy` and three proved
+lemmas in `WeakRacy.v`.  **Do this before (B): it blocks even the
+SINGLE-window walk with a writeback, i.e. the common case.**
+
+**(B) Multi-window is real, and there may be a cheap way out.**  An S-mode
+load with paging on has TWO translations in one step — fetch and data — at
+two DIFFERENT leaf slots; after the first racy read the phase is `false` and
+every later read must be disjoint from the first window, so the second leaf
+read has no arm.  Escapes, in order of appeal: **(i) the TLB** — the hit
+shape is `es = []`, costing no memory read and no window at all, so if the
+kernel's FETCH translation can be held as a TLB hit by the resource, only the
+data walk is racy and the single-window peel suffices; `wtlb_res_pt_translateAddr_at`
+already hands the caller that shape, so this is where to look first.
+**(ii)** otherwise generalise the peel to a LIST of windows with a per-window
+phase — mechanical but wide (`wpatch_st` becomes a fold of patches, and
+`read_bytes_patch_disj`/`write_bytes_patch_comm` need list versions).
 
 ## THE `weak_view_name` REMOVAL (2026-08-11, DONE)
 
