@@ -27,6 +27,15 @@
 
    ---- THE PIECES -------------------------------------------------------
 
+   Each block below hands control on through an [iAssert]ed continuation, and
+   the BODY of every one of them is a named [nx_*_body] Definition above the
+   capstone rather than spelled out at the [iAssert].  That is a performance
+   requirement, not a style choice: nine of these statements are live at the
+   deepest point, the proof term is the Iris context times the number of steps
+   it survives, and naming them was 5:36 -> 3:48 and 118M -> 69M tree nodes.
+   They must stay TRANSPARENT (never [Typeclasses Opaque]) or the [iApply]s
+   below stop unifying -- see claude-notes/optimization.md, "RULE ONE".
+
    [Htail] -- the shared epilogue at +0x5c, a []-PERSISTENT [wp_next]-wrapped
    assertion with an ABSTRACT CONTINUATION (ProofDirlookup's shape).  FOUR
    arms reach it holding four different bundles, so it must speak only about
@@ -806,6 +815,342 @@ Section ProofNamexMain.
     iIntros "Hmid". iEval (rewrite (nx_win_iff q g a l N H)). iFrame.
   Qed.
 
+  (* ---- THE BLOCK STATEMENTS, NAMED ------------------------------------
+
+     Every one of these is a continuation the walk hands around, and
+     spelled out at the [iAssert] they were ~200 lines of statement that
+     EVERY proofmode step of the body re-embeds in the proof term twice
+     (claude-notes/optimization.md, "WHY Qed IS EXPENSIVE": the term is
+     the Iris context times the number of steps it survives).  Naming them
+     makes each one constant applied to its arguments in the context.
+
+     They are TRANSPARENT on purpose, and only the INNER function body is
+     named: [iSpecialize ("Hsk1" $! plen CIDh2 ...)] still sees the [wp_next]
+     and the [□] syntactically, and the following [iApply ("Hsk1" $! off M)]
+     unifies through a transparent constant.  It does NOT unify through a
+     [Typeclasses Opaque] one -- sealing them that way forces an
+     [iEval (rewrite /...)] per use site, which is itself
+     context-proportional and measured at +48% on this file. *)
+
+  Definition nx_tail_body
+      (j : nat) (b : bool) (K : nat) (m : regfile)
+      (sp0 ret_tgt : mword 64) (CIDt : CpuId) : iProp Σ :=
+    (∀ (Mt : regfile) (rv : mword 64),
+     ⌜nx_tregs m sp0 Mt⌝ -∗
+     ⌜Mt !!! Regidx Rs4 = rv⌝ -∗
+     sie_cap_gpr Mt (K - 12)%nat b (proc_addr j) -∗
+     pc_is (mword_of_int (NX + 0x5c)) -∗
+     (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
+     (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
+     (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
+     (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
+     (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
+     (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
+     (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
+     (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
+     (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
+     (pa_stk sp0 10) ↦₈ (m !!! Regidx Rs8 : mword 64) -∗
+     (pa_stk sp0 11) ↦₈ (m !!! Regidx Rs9 : mword 64) -∗
+     (pa_stk sp0 12) ↦₈ (m !!! Regidx Rs10 : mword 64) -∗
+     wp_next (CID0 := CIDt) b (proc_addr j) (fun CIDf : CpuId =>
+       ∀ mf : regfile,
+         ⌜callee_saved m mf⌝ -∗
+         ⌜mf !!! Regidx Ra0 = rv⌝ -∗
+         sie_cap_gpr mf K b (proc_addr j) -∗
+         pc_is ret_tgt -∗
+         WP (Loop : expr riscv_lang)) -∗
+     WP (Loop : expr riscv_lang))%I.
+
+  Definition nx_skip_body
+      (j : nat) (b : bool) (K plen : nat) (pfun : nat -> bv 8)
+      (pv : mword 64) (fuel : nat) (CIDs : CpuId) : iProp Σ :=
+    (∀ (off : nat) (Ms : regfile),
+     ⌜(plen - off <= fuel)%nat⌝ -∗
+     ⌜(off < plen)%nat⌝ -∗
+     ⌜pfun off = SLASH⌝ -∗
+     ⌜Ms !!! Regidx Rs1 = pa_add pv off⌝ -∗
+     ⌜Ms !!! Regidx Rs3 = (mword_of_int 47 : mword 64)⌝ -∗
+     sie_cap_gpr Ms (K - 12)%nat b (proc_addr j) -∗
+     pc_is (mword_of_int (NX + 0xec)) -∗
+     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+     wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDe : CpuId =>
+       ∀ (off' : nat) (Ms' : regfile),
+         ⌜(off < off')%nat⌝ -∗ ⌜(off' <= plen)%nat⌝ -∗
+         ⌜forall i : nat, (off <= i)%nat -> (i < off')%nat ->
+            pfun i = SLASH⌝ -∗
+         ⌜pfun off' <> SLASH⌝ -∗
+         ⌜Ms' !!! Regidx Rs1 = pa_add pv off'⌝ -∗
+         ⌜Ms' !!! Regidx Ra5
+            = (zero_extend' 64 (pfun off' : mword 8) : mword 64)⌝ -∗
+         ⌜forall c : mword 5, c <> Rs1 -> c <> Ra5 ->
+            Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
+         sie_cap_gpr Ms' (K - 12)%nat b (proc_addr j) -∗
+         pc_is (mword_of_int (NX + 0xf6)) -∗
+         ([∗ list] i ∈ seq 0 (S plen),
+            pa_add pv i ↦ₘ pfun i) -∗
+         WP (Loop : expr riscv_lang)) -∗
+     WP (Loop : expr riscv_lang))%I.
+
+  Definition nx_skip2_body
+      (j : nat) (b : bool) (K plen : nat) (pfun : nat -> bv 8)
+      (pv : mword 64) (fuel : nat) (CIDs : CpuId) : iProp Σ :=
+    (∀ (off : nat) (Ms : regfile),
+     ⌜(plen - off <= fuel)%nat⌝ -∗
+     ⌜(off < plen)%nat⌝ -∗
+     ⌜pfun off = SLASH⌝ -∗
+     ⌜Ms !!! Regidx Rs1 = pa_add pv off⌝ -∗
+     ⌜Ms !!! Regidx Rs3 = (mword_of_int 47 : mword 64)⌝ -∗
+     sie_cap_gpr Ms (K - 12)%nat b (proc_addr j) -∗
+     pc_is (mword_of_int (NX + 0xac)) -∗
+     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+     wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDe : CpuId =>
+       ∀ (off' : nat) (Ms' : regfile),
+         ⌜(off < off')%nat⌝ -∗ ⌜(off' <= plen)%nat⌝ -∗
+         ⌜forall i : nat, (off <= i)%nat -> (i < off')%nat ->
+            pfun i = SLASH⌝ -∗
+         ⌜pfun off' <> SLASH⌝ -∗
+         ⌜Ms' !!! Regidx Rs1 = pa_add pv off'⌝ -∗
+         ⌜Ms' !!! Regidx Ra5
+            = (zero_extend' 64 (pfun off' : mword 8) : mword 64)⌝ -∗
+         ⌜forall c : mword 5, c <> Rs1 -> c <> Ra5 ->
+            Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
+         sie_cap_gpr Ms' (K - 12)%nat b (proc_addr j) -∗
+         pc_is (mword_of_int (NX + 0xb6)) -∗
+         ([∗ list] i ∈ seq 0 (S plen),
+            pa_add pv i ↦ₘ pfun i) -∗
+         WP (Loop : expr riscv_lang)) -∗
+     WP (Loop : expr riscv_lang))%I.
+
+  Definition nx_scan_body
+      (j : nat) (b : bool) (K plen : nat) (pfun : nat -> bv 8)
+      (pv : mword 64) (fuel : nat) (CIDs : CpuId) : iProp Σ :=
+    (∀ (ii : nat) (Ms : regfile),
+     ⌜(plen - ii <= fuel)%nat⌝ -∗
+     ⌜(ii < plen)%nat⌝ -∗
+     ⌜Ms !!! Regidx Rs2 = pa_add pv ii⌝ -∗
+     sie_cap_gpr Ms (K - 12)%nat b (proc_addr j) -∗
+     pc_is (mword_of_int (NX + 0x106)) -∗
+     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+     wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDe : CpuId =>
+       ∀ (e : nat) (Ms' : regfile),
+         ⌜(ii < e)%nat⌝ -∗ ⌜(e <= plen)%nat⌝ -∗
+         ⌜forall jj : nat, (ii < jj)%nat -> (jj < e)%nat ->
+            pfun jj <> SLASH⌝ -∗
+         ⌜pfun e = SLASH \/ e = plen⌝ -∗
+         ⌜Ms' !!! Regidx Rs2 = pa_add pv e⌝ -∗
+         ⌜forall c : mword 5, c <> Rs2 -> c <> Ra5 -> c <> Ra4 ->
+            Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
+         sie_cap_gpr Ms' (K - 12)%nat b (proc_addr j) -∗
+         pc_is (mword_of_int (NX + 0x8c)) -∗
+         ([∗ list] i ∈ seq 0 (S plen),
+            pa_add pv i ↦ₘ pfun i) -∗
+         WP (Loop : expr riscv_lang)) -∗
+     WP (Loop : expr riscv_lang))%I.
+
+  Definition nx_mid_body
+      (j : nat) (b : bool) (K plen : nat) (pfun : nat -> bv 8)
+      (pv : mword 64) (CIDs : CpuId) : iProp Σ :=
+    (∀ (a : nat) (Ms : regfile),
+     ⌜(a <= plen)%nat⌝ -∗
+     ⌜pfun a <> SLASH⌝ -∗
+     ⌜Ms !!! Regidx Rs1 = pa_add pv a⌝ -∗
+     ⌜Ms !!! Regidx Ra5
+        = (zero_extend' 64 (pfun a : mword 8) : mword 64)⌝ -∗
+     sie_cap_gpr Ms (K - 12)%nat b (proc_addr j) -∗
+     pc_is (mword_of_int (NX + 0xf6)) -∗
+     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+     (* EXIT A -- the string is exhausted, at +0x130 *)
+     wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDa : CpuId =>
+       ⌜(a = plen)%nat⌝ -∗
+       sie_cap_gpr Ms (K - 12)%nat b (proc_addr j) -∗
+       pc_is (mword_of_int (NX + 0x130)) -∗
+       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+       WP (Loop : expr riscv_lang)) -∗
+     (* EXIT B -- an element starts at [a], at +0x106 *)
+     wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDb : CpuId =>
+       ∀ Ms' : regfile,
+         ⌜(a < plen)%nat⌝ -∗
+         ⌜pfun a <> NUL⌝ -∗
+         ⌜Ms' !!! Regidx Rs1 = pa_add pv a⌝ -∗
+         ⌜Ms' !!! Regidx Rs2 = pa_add pv a⌝ -∗
+         ⌜forall c : mword 5, c <> Ra5 -> c <> Ra4 -> c <> Rs2 ->
+            Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
+         sie_cap_gpr Ms' (K - 12)%nat b (proc_addr j) -∗
+         pc_is (mword_of_int (NX + 0x106)) -∗
+         ([∗ list] i ∈ seq 0 (S plen),
+            pa_add pv i ↦ₘ pfun i) -∗
+         WP (Loop : expr riscv_lang)) -∗
+     WP (Loop : expr riscv_lang))%I.
+
+  Definition nx_head_body
+      (j : nat) (b : bool) (K plen : nat) (pfun : nat -> bv 8)
+      (pv : mword 64) (CIDs : CpuId) : iProp Σ :=
+    (∀ (off : nat) (Ms : regfile),
+     ⌜(off <= plen)%nat⌝ -∗
+     ⌜Ms !!! Regidx Rs1 = pa_add pv off⌝ -∗
+     ⌜Ms !!! Regidx Rs3 = (mword_of_int 47 : mword 64)⌝ -∗
+     sie_cap_gpr Ms (K - 12)%nat b (proc_addr j) -∗
+     pc_is (mword_of_int (NX + 0xe4)) -∗
+     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+     (* EXIT A -- nothing but separators left, at +0x130 *)
+     wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDa : CpuId =>
+       ∀ Ms' : regfile,
+         ⌜forall i : nat, (off <= i)%nat -> (i < plen)%nat ->
+            pfun i = SLASH⌝ -∗
+         ⌜Ms' !!! Regidx Rs1 = pa_add pv plen⌝ -∗
+         ⌜forall c : mword 5, c <> Rs1 -> c <> Ra5 ->
+            Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
+         sie_cap_gpr Ms' (K - 12)%nat b (proc_addr j) -∗
+         pc_is (mword_of_int (NX + 0x130)) -∗
+         ([∗ list] i ∈ seq 0 (S plen),
+            pa_add pv i ↦ₘ pfun i) -∗
+         WP (Loop : expr riscv_lang)) -∗
+     (* EXIT B -- an element starts at [a], at +0x106 *)
+     wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDb : CpuId =>
+       ∀ (a : nat) (Ms' : regfile),
+         ⌜(off <= a)%nat⌝ -∗ ⌜(a < plen)%nat⌝ -∗
+         ⌜forall i : nat, (off <= i)%nat -> (i < a)%nat ->
+            pfun i = SLASH⌝ -∗
+         ⌜pfun a <> SLASH⌝ -∗ ⌜pfun a <> NUL⌝ -∗
+         ⌜Ms' !!! Regidx Rs1 = pa_add pv a⌝ -∗
+         ⌜Ms' !!! Regidx Rs2 = pa_add pv a⌝ -∗
+         ⌜forall c : mword 5, c <> Rs1 -> c <> Ra5 -> c <> Ra4 ->
+            c <> Rs2 ->
+            Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
+         sie_cap_gpr Ms' (K - 12)%nat b (proc_addr j) -∗
+         pc_is (mword_of_int (NX + 0x106)) -∗
+         ([∗ list] i ∈ seq 0 (S plen),
+            pa_add pv i ↦ₘ pfun i) -∗
+         WP (Loop : expr riscv_lang)) -∗
+     WP (Loop : expr riscv_lang))%I.
+
+  Definition nx_trail_body
+      (j : nat) (b : bool) (K plen : nat) (pfun : nat -> bv 8)
+      (pv : mword 64) (CIDs : CpuId) : iProp Σ :=
+    (∀ (off : nat) (Ms : regfile),
+     ⌜(off <= plen)%nat⌝ -∗
+     ⌜Ms !!! Regidx Rs1 = pa_add pv off⌝ -∗
+     ⌜Ms !!! Regidx Rs3 = (mword_of_int 47 : mword 64)⌝ -∗
+     sie_cap_gpr Ms (K - 12)%nat b (proc_addr j) -∗
+     pc_is (mword_of_int (NX + 0xa4)) -∗
+     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+     wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDe : CpuId =>
+       ∀ (off' : nat) (Ms' : regfile),
+         ⌜(off <= off')%nat⌝ -∗ ⌜(off' <= plen)%nat⌝ -∗
+         ⌜forall i : nat, (off <= i)%nat -> (i < off')%nat ->
+            pfun i = SLASH⌝ -∗
+         ⌜pfun off' <> SLASH⌝ -∗
+         ⌜Ms' !!! Regidx Rs1 = pa_add pv off'⌝ -∗
+         ⌜forall c : mword 5, c <> Rs1 -> c <> Ra5 ->
+            Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
+         sie_cap_gpr Ms' (K - 12)%nat b (proc_addr j) -∗
+         pc_is (mword_of_int (NX + 0xb6)) -∗
+         ([∗ list] i ∈ seq 0 (S plen),
+            pa_add pv i ↦ₘ pfun i) -∗
+         WP (Loop : expr riscv_lang)) -∗
+     WP (Loop : expr riscv_lang))%I.
+
+  Definition nx_loop_body
+      (j : nat) (b : bool) (K : nat) (m : regfile)
+      (sp0 pv nb ret_tgt : mword 64) (plen L : nat) (pfun : nat -> bv 8)
+      (pl : list (bv 8)) (eb : bool) (C : iProp Σ)
+      (g : log_names) (gfs : fs_names) (bn : bio_names)
+      (cov : gset Z) (logstart bmapstart inodestart size : Z)
+      (used : gset Z) (cwdv : mword 64) (npar : bool) (n : nat)
+      (pidv : mword 32) (dq dqb dqs dqc : dfrac) (fuel : nat) (CIDl : CpuId) : iProp Σ :=
+    (∀ (off : nat) (ipv : mword 64) (Ml : regfile) (ncur : nat)
+     (usedc : gset Z) (es0 : list (list (bv 8))) (nf : nat -> bv 8),
+     ⌜(plen - off < fuel)%nat⌝ -∗
+     ⌜(off <= plen)%nat⌝ -∗
+     ⌜path_elems pl = es0 ++ path_elems (drop off pl)⌝ -∗
+     ⌜((length (path_elems (drop off pl)) + 1) * iput_units <= ncur)%nat⌝ -∗
+     ⌜((n - (L + 1) * iput_units)%nat
+         <= (ncur - (length (path_elems (drop off pl)) + 1)
+                    * iput_units)%nat)%nat⌝ -∗
+     ⌜(ncur <= n)%nat⌝ -∗
+     ⌜usedc ⊆ used⌝ -∗
+     ⌜nx_regs m sp0 (pa_add pv off) ipv nb
+              (m !!! Regidx Ra1 : mword 64) Ml⌝ -∗
+     sie_cap_gpr Ml (K - 12)%nat b (proc_addr j) -∗
+     cpu_own 0 eb (proc_addr j) C b -∗
+     pc_is (mword_of_int (NX + 0xe4)) -∗
+     (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
+     (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
+     (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
+     (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
+     (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
+     (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
+     (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
+     (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
+     (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
+     (pa_stk sp0 10) ↦₈ (m !!! Regidx Rs8 : mword 64) -∗
+     (pa_stk sp0 11) ↦₈ (m !!! Regidx Rs9 : mword 64) -∗
+     (pa_stk sp0 12) ↦₈ (m !!! Regidx Rs10 : mword 64) -∗
+     inode_held ipv -∗
+     iref_slots 1 -∗
+     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+     bitmap_res gfs bmapstart cov logstart size usedc -∗
+     p_pid (proc_addr j) ↦₄{dq} pidv -∗
+     p_cwd (proc_addr j) ↦₈{dqc} cwdv -∗
+     inode_held cwdv -∗
+     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+     ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nf i) -∗
+     bslots bn 3 -∗
+     log_op g ncur -∗
+     (* ---- THE CONTRACT'S OWN CONTINUATION, at the loop's hart.  Kept
+        SEALED as [SpecNamex.namex_post]: spelled out here it would be
+        twenty more wands inside the loop invariant, i.e. carried by
+        every proofmode step of the body. ---- *)
+     wp_next (CID0 := CIDl) b (proc_addr j) (fun CIDc : CpuId =>
+       namex_post (CID := CIDc) (proc_addr j) pv nb ret_tgt pl m K b eb C
+                  g gfs bn cov logstart bmapstart inodestart size used
+                  cwdv plen pfun npar n pidv dq dqb dqs dqc) -∗
+     WP (Loop : expr riscv_lang))%I.
+
+  Definition nx_rest_body
+      (j : nat) (b : bool) (K : nat) (m : regfile) (sp0 pv nb : mword 64)
+      (plen a e : nat) (pfun : nat -> bv 8) (ipv : mword 64) (ncur : nat)
+      (usedc : gset Z) (eb : bool) (C : iProp Σ)
+      (g : log_names) (gfs : fs_names) (bn : bio_names)
+      (cov : gset Z) (logstart bmapstart inodestart size : Z)
+      (cwdv : mword 64) (pidv : mword 32) (dq dqb dqs dqc : dfrac)
+      (CIDt : CpuId) : iProp Σ :=
+    (∀ (Mt : regfile) (nf' : nat -> bv 8),
+     ⌜nx_regs m sp0 (pa_add pv e) ipv nb
+        (m !!! Regidx Ra1 : mword 64) Mt⌝ -∗
+     ⌜bname 14 nf'
+      = take 14 (bview (e - a)%nat
+                   (fun i => pfun (a + i)%nat))⌝ -∗
+     sie_cap_gpr Mt (K - 12)%nat b (proc_addr j) -∗
+     cpu_own 0 eb (proc_addr j) C b -∗
+     pc_is (mword_of_int (NX + 0xa4)) -∗
+     (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
+     (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
+     (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
+     (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
+     (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
+     (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
+     (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
+     (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
+     (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
+     (pa_stk sp0 10) ↦₈ (m !!! Regidx Rs8 : mword 64) -∗
+     (pa_stk sp0 11) ↦₈ (m !!! Regidx Rs9 : mword 64) -∗
+     (pa_stk sp0 12) ↦₈ (m !!! Regidx Rs10 : mword 64) -∗
+     inode_held ipv -∗
+     iref_slots 1 -∗
+     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+     bitmap_res gfs bmapstart cov logstart size usedc -∗
+     p_pid (proc_addr j) ↦₄{dq} pidv -∗
+     p_cwd (proc_addr j) ↦₈{dqc} cwdv -∗
+     inode_held cwdv -∗
+     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+     ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nf' i) -∗
+     bslots bn 3 -∗
+     log_op g ncur -∗
+     WP (Loop : expr riscv_lang))%I.
+
   Lemma wp_namex_sconf
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -870,7 +1215,7 @@ Section ProofNamexMain.
     iApply (wp_caddi16sp_push_s_sconf pcE (mword_of_int 58 : mword 6) m K 12 b
               ltac:(lia) Hpush with "Hcg Hpc Hi000").
     iIntros (CID1 Hq1) "Hcg Hframe Hpc".
-    set (R1 := <[Regidx csp_rs1 := regval_into_reg
+    pose (R1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (m !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 58 : mword 6))))]> m).
     assert (HR1sp : R1 !!! Regidx csp_rs1 = pa_stk sp0 12)
@@ -1026,7 +1371,7 @@ Section ProofNamexMain.
               ltac:(vm_compute; reflexivity) ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi01a").
     iIntros (CID14 Hq14) "Hcg Hpc".
-    set (R2 := <[Regidx Rs0 := regval_into_reg
+    pose (R2 := <[Regidx Rs0 := regval_into_reg
                   (add_vec (R1 !!! Regidx csp_rs1)
                      (sign_extend' 64 (caddi4spn_imm (mword_of_int 24 : mword 8))))]> R1).
     assert (HR2s0 : R2 !!! Regidx Rs0 = sp0).
@@ -1057,32 +1402,10 @@ Section ProofNamexMain.
     (* ================================================================= *)
     assert (Hcsra : is_cs_idx Rra = false) by (vm_compute; reflexivity).
     assert (Hcsa0 : is_cs_idx Ra0 = false) by (vm_compute; reflexivity).
-    iAssert (□ wp_next (CID0 := CID) b (proc_addr j) (fun CIDt : CpuId =>
-               ∀ (Mt : regfile) (rv : mword 64),
-                 ⌜nx_tregs m sp0 Mt⌝ -∗
-                 ⌜Mt !!! Regidx Rs4 = rv⌝ -∗
-                 sie_cap_gpr Mt (K - 12)%nat b (proc_addr j) -∗
-                 pc_is (mword_of_int (NX + 0x5c)) -∗
-                 (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-                 (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-                 (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-                 (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-                 (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-                 (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
-                 (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-                 (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-                 (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
-                 (pa_stk sp0 10) ↦₈ (m !!! Regidx Rs8 : mword 64) -∗
-                 (pa_stk sp0 11) ↦₈ (m !!! Regidx Rs9 : mword 64) -∗
-                 (pa_stk sp0 12) ↦₈ (m !!! Regidx Rs10 : mword 64) -∗
-                 wp_next (CID0 := CIDt) b (proc_addr j) (fun CIDf : CpuId =>
-                   ∀ mf : regfile,
-                     ⌜callee_saved m mf⌝ -∗
-                     ⌜mf !!! Regidx Ra0 = rv⌝ -∗
-                     sie_cap_gpr mf K b (proc_addr j) -∗
-                     pc_is ret_tgt -∗
-                     WP (Loop : expr riscv_lang)) -∗
-                 WP (Loop : expr riscv_lang)))%I with "[]" as "#Htail".
+    iAssert (□ wp_next (CID0 := CID) b (proc_addr j)
+               (fun CIDt : CpuId =>
+                  nx_tail_body j b K m sp0 ret_tgt CIDt))%I
+      with "[]" as "#Htail".
     { iModIntro.
       iIntros (CIDt Hst Mt rv) "%HTr %HTs4 Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7
                                 Hb8 Hb9 Hb10 Hb11 Hb12 Hqc".
@@ -1106,7 +1429,7 @@ Section ProofNamexMain.
       iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x5c)) Ra0 Rs4 Mt (K - 12)%nat b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj5c").
       iIntros (CIDT0 HqT0) "Hcg Hpc". iEval (rgne) in "Hcg".
-      set (P0 := <[Regidx Ra0 := regval_into_reg
+      pose (P0 := <[Regidx Ra0 := regval_into_reg
                     (add_vec (zero_reg : mword 64) (Mt !!! Regidx Rs4))]> Mt).
       assert (HP0a0 : P0 !!! Regidx Ra0 = rv).
       { rewrite /P0 upd_eq. rewrite HTs4. apply add_vec_zero_l. }
@@ -1124,7 +1447,7 @@ Section ProofNamexMain.
                 Rra P0 (K - 12)%nat (m !!! Regidx Rra : mword 64) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj5e Hb1").
       iIntros (CIDT1 HqT1) "Hcg Hpc Hb1".
-      set (P1 := <[Regidx Rra := regval_into_reg (m !!! Regidx Rra : mword 64)]> P0).
+      pose (P1 := <[Regidx Rra := regval_into_reg (m !!! Regidx Rra : mword 64)]> P0).
       assert (HP1sp : P1 !!! Regidx csp_rs1 = pa_stk sp0 12)
         by (rewrite /P1 upd_ne; [exact HP0sp | nz]).
       assert (Hqq60 : add_vec_int (mword_of_int (NX + 0x5e) : mword 64) 2
@@ -1138,7 +1461,7 @@ Section ProofNamexMain.
                 Rs0 P1 (K - 12)%nat (m !!! Regidx Rs0 : mword 64) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj60 Hb2").
       iIntros (CIDT2 HqT2) "Hcg Hpc Hb2".
-      set (P2 := <[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0 : mword 64)]> P1).
+      pose (P2 := <[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0 : mword 64)]> P1).
       assert (HP2sp : P2 !!! Regidx csp_rs1 = pa_stk sp0 12)
         by (rewrite /P2 upd_ne; [exact HP1sp | nz]).
       assert (Hqq62 : add_vec_int (mword_of_int (NX + 0x60) : mword 64) 2
@@ -1152,7 +1475,7 @@ Section ProofNamexMain.
                 Rs1 P2 (K - 12)%nat (m !!! Regidx Rs1 : mword 64) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj62 Hb3").
       iIntros (CIDT3 HqT3) "Hcg Hpc Hb3".
-      set (P3 := <[Regidx Rs1 := regval_into_reg (m !!! Regidx Rs1 : mword 64)]> P2).
+      pose (P3 := <[Regidx Rs1 := regval_into_reg (m !!! Regidx Rs1 : mword 64)]> P2).
       assert (HP3sp : P3 !!! Regidx csp_rs1 = pa_stk sp0 12)
         by (rewrite /P3 upd_ne; [exact HP2sp | nz]).
       assert (Hqq64 : add_vec_int (mword_of_int (NX + 0x62) : mword 64) 2
@@ -1166,7 +1489,7 @@ Section ProofNamexMain.
                 Rs2 P3 (K - 12)%nat (m !!! Regidx Rs2 : mword 64) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj64 Hb4").
       iIntros (CIDT4 HqT4) "Hcg Hpc Hb4".
-      set (P4 := <[Regidx Rs2 := regval_into_reg (m !!! Regidx Rs2 : mword 64)]> P3).
+      pose (P4 := <[Regidx Rs2 := regval_into_reg (m !!! Regidx Rs2 : mword 64)]> P3).
       assert (HP4sp : P4 !!! Regidx csp_rs1 = pa_stk sp0 12)
         by (rewrite /P4 upd_ne; [exact HP3sp | nz]).
       assert (Hqq66 : add_vec_int (mword_of_int (NX + 0x64) : mword 64) 2
@@ -1180,7 +1503,7 @@ Section ProofNamexMain.
                 Rs3 P4 (K - 12)%nat (m !!! Regidx Rs3 : mword 64) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj66 Hb5").
       iIntros (CIDT5 HqT5) "Hcg Hpc Hb5".
-      set (P5 := <[Regidx Rs3 := regval_into_reg (m !!! Regidx Rs3 : mword 64)]> P4).
+      pose (P5 := <[Regidx Rs3 := regval_into_reg (m !!! Regidx Rs3 : mword 64)]> P4).
       assert (HP5sp : P5 !!! Regidx csp_rs1 = pa_stk sp0 12)
         by (rewrite /P5 upd_ne; [exact HP4sp | nz]).
       assert (Hqq68 : add_vec_int (mword_of_int (NX + 0x66) : mword 64) 2
@@ -1194,7 +1517,7 @@ Section ProofNamexMain.
                 Rs4 P5 (K - 12)%nat (m !!! Regidx Rs4 : mword 64) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj68 Hb6").
       iIntros (CIDT6 HqT6) "Hcg Hpc Hb6".
-      set (P6 := <[Regidx Rs4 := regval_into_reg (m !!! Regidx Rs4 : mword 64)]> P5).
+      pose (P6 := <[Regidx Rs4 := regval_into_reg (m !!! Regidx Rs4 : mword 64)]> P5).
       assert (HP6sp : P6 !!! Regidx csp_rs1 = pa_stk sp0 12)
         by (rewrite /P6 upd_ne; [exact HP5sp | nz]).
       assert (Hqq6a : add_vec_int (mword_of_int (NX + 0x68) : mword 64) 2
@@ -1208,7 +1531,7 @@ Section ProofNamexMain.
                 Rs5 P6 (K - 12)%nat (m !!! Regidx Rs5 : mword 64) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj6a Hb7").
       iIntros (CIDT7 HqT7) "Hcg Hpc Hb7".
-      set (P7 := <[Regidx Rs5 := regval_into_reg (m !!! Regidx Rs5 : mword 64)]> P6).
+      pose (P7 := <[Regidx Rs5 := regval_into_reg (m !!! Regidx Rs5 : mword 64)]> P6).
       assert (HP7sp : P7 !!! Regidx csp_rs1 = pa_stk sp0 12)
         by (rewrite /P7 upd_ne; [exact HP6sp | nz]).
       assert (Hqq6c : add_vec_int (mword_of_int (NX + 0x6a) : mword 64) 2
@@ -1222,7 +1545,7 @@ Section ProofNamexMain.
                 Rs6 P7 (K - 12)%nat (m !!! Regidx Rs6 : mword 64) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj6c Hb8").
       iIntros (CIDT8 HqT8) "Hcg Hpc Hb8".
-      set (P8 := <[Regidx Rs6 := regval_into_reg (m !!! Regidx Rs6 : mword 64)]> P7).
+      pose (P8 := <[Regidx Rs6 := regval_into_reg (m !!! Regidx Rs6 : mword 64)]> P7).
       assert (HP8sp : P8 !!! Regidx csp_rs1 = pa_stk sp0 12)
         by (rewrite /P8 upd_ne; [exact HP7sp | nz]).
       assert (Hqq6e : add_vec_int (mword_of_int (NX + 0x6c) : mword 64) 2
@@ -1236,7 +1559,7 @@ Section ProofNamexMain.
                 Rs7 P8 (K - 12)%nat (m !!! Regidx Rs7 : mword 64) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj6e Hb9").
       iIntros (CIDT9 HqT9) "Hcg Hpc Hb9".
-      set (P9 := <[Regidx Rs7 := regval_into_reg (m !!! Regidx Rs7 : mword 64)]> P8).
+      pose (P9 := <[Regidx Rs7 := regval_into_reg (m !!! Regidx Rs7 : mword 64)]> P8).
       assert (HP9sp : P9 !!! Regidx csp_rs1 = pa_stk sp0 12)
         by (rewrite /P9 upd_ne; [exact HP8sp | nz]).
       assert (Hqq70 : add_vec_int (mword_of_int (NX + 0x6e) : mword 64) 2
@@ -1250,7 +1573,7 @@ Section ProofNamexMain.
                 Rs8 P9 (K - 12)%nat (m !!! Regidx Rs8 : mword 64) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj70 Hb10").
       iIntros (CIDT10 HqT10) "Hcg Hpc Hb10".
-      set (P10 := <[Regidx Rs8 := regval_into_reg (m !!! Regidx Rs8 : mword 64)]> P9).
+      pose (P10 := <[Regidx Rs8 := regval_into_reg (m !!! Regidx Rs8 : mword 64)]> P9).
       assert (HP10sp : P10 !!! Regidx csp_rs1 = pa_stk sp0 12)
         by (rewrite /P10 upd_ne; [exact HP9sp | nz]).
       assert (Hqq72 : add_vec_int (mword_of_int (NX + 0x70) : mword 64) 2
@@ -1264,7 +1587,7 @@ Section ProofNamexMain.
                 Rs9 P10 (K - 12)%nat (m !!! Regidx Rs9 : mword 64) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj72 Hb11").
       iIntros (CIDT11 HqT11) "Hcg Hpc Hb11".
-      set (P11 := <[Regidx Rs9 := regval_into_reg (m !!! Regidx Rs9 : mword 64)]> P10).
+      pose (P11 := <[Regidx Rs9 := regval_into_reg (m !!! Regidx Rs9 : mword 64)]> P10).
       assert (HP11sp : P11 !!! Regidx csp_rs1 = pa_stk sp0 12)
         by (rewrite /P11 upd_ne; [exact HP10sp | nz]).
       assert (Hqq74 : add_vec_int (mword_of_int (NX + 0x72) : mword 64) 2
@@ -1278,7 +1601,7 @@ Section ProofNamexMain.
                 Rs10 P11 (K - 12)%nat (m !!! Regidx Rs10 : mword 64) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj74 Hb12").
       iIntros (CIDT12 HqT12) "Hcg Hpc Hb12".
-      set (P12 := <[Regidx Rs10 := regval_into_reg (m !!! Regidx Rs10 : mword 64)]> P11).
+      pose (P12 := <[Regidx Rs10 := regval_into_reg (m !!! Regidx Rs10 : mword 64)]> P11).
       assert (HP12sp : P12 !!! Regidx csp_rs1 = pa_stk sp0 12)
         by (rewrite /P12 upd_ne; [exact HP11sp | nz]).
       assert (Hqq76 : add_vec_int (mword_of_int (NX + 0x74) : mword 64) 2
@@ -1319,7 +1642,7 @@ Section ProofNamexMain.
                 (mword_of_int 6 : mword 6) P12 (K - 12)%nat 12 b Hpop
                 with "Hcg Hpc Hj76 Hstk").
       iIntros (CIDT13 HqT13) "Hcg Hpc".
-      set (P13 := <[Regidx csp_rs1 := regval_into_reg
+      pose (P13 := <[Regidx csp_rs1 := regval_into_reg
                      (add_vec (P12 !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (caddi16sp_imm (mword_of_int 6 : mword 6))))]> P12).
       iEval (rewrite Kpop) in "Hcg".
@@ -1464,32 +1787,8 @@ Section ProofNamexMain.
     (* ---- (1) the LEADING separator skip, inner loop at +0xec ---------- *)
     iAssert (∀ fuel : nat, □ wp_next (CID0 := CID) b (proc_addr j)
                (fun CIDs : CpuId =>
-                 ∀ (off : nat) (Ms : regfile),
-                   ⌜(plen - off <= fuel)%nat⌝ -∗
-                   ⌜(off < plen)%nat⌝ -∗
-                   ⌜pfun off = SLASH⌝ -∗
-                   ⌜Ms !!! Regidx Rs1 = pa_add pv off⌝ -∗
-                   ⌜Ms !!! Regidx Rs3 = (mword_of_int 47 : mword 64)⌝ -∗
-                   sie_cap_gpr Ms (K - 12)%nat b (proc_addr j) -∗
-                   pc_is (mword_of_int (NX + 0xec)) -∗
-                   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-                   wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDe : CpuId =>
-                     ∀ (off' : nat) (Ms' : regfile),
-                       ⌜(off < off')%nat⌝ -∗ ⌜(off' <= plen)%nat⌝ -∗
-                       ⌜forall i : nat, (off <= i)%nat -> (i < off')%nat ->
-                          pfun i = SLASH⌝ -∗
-                       ⌜pfun off' <> SLASH⌝ -∗
-                       ⌜Ms' !!! Regidx Rs1 = pa_add pv off'⌝ -∗
-                       ⌜Ms' !!! Regidx Ra5
-                          = (zero_extend' 64 (pfun off' : mword 8) : mword 64)⌝ -∗
-                       ⌜forall c : mword 5, c <> Rs1 -> c <> Ra5 ->
-                          Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
-                       sie_cap_gpr Ms' (K - 12)%nat b (proc_addr j) -∗
-                       pc_is (mword_of_int (NX + 0xf6)) -∗
-                       ([∗ list] i ∈ seq 0 (S plen),
-                          pa_add pv i ↦ₘ pfun i) -∗
-                       WP (Loop : expr riscv_lang)) -∗
-                   WP (Loop : expr riscv_lang)))%I with "[]" as "#Hsk1".
+                  nx_skip_body j b K plen pfun pv fuel CIDs))%I
+      with "[]" as "#Hsk1".
     { iIntros (fuel). iInduction fuel as [|fuel] "IHs".
       - iModIntro.
         iIntros (CIDs Hss off Ms) "%Hf %Holt %Hsl %Hs1 %Hs3 Hcg Hpc Hpath Hqc".
@@ -1505,7 +1804,7 @@ Section ProofNamexMain.
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hjec").
         iIntros (CIDk1 Hqk1) "Hcg Hpc".
         iEval (rgne; rewrite Hs1 (nx_addi1 pv off)) in "Hcg".
-        set (Q1 := <[Regidx Rs1 := regval_into_reg (pa_add pv (S off))]> Ms).
+        pose (Q1 := <[Regidx Rs1 := regval_into_reg (pa_add pv (S off))]> Ms).
         assert (HQ1s1 : Q1 !!! Regidx Rs1 = pa_add pv (S off))
           by (rewrite /Q1; apply upd_eq).
         assert (HQ1s3 : Q1 !!! Regidx Rs3 = (mword_of_int 47 : mword 64))
@@ -1524,7 +1823,7 @@ Section ProofNamexMain.
         iIntros (CIDk2 Hqk2) "Hcg Hpc Hpb".
         iEval (rgne; rewrite HQ1s1 addv_sext0) in "Hpb".
         iDestruct ("Hpback" with "Hpb") as "Hpath".
-        set (Q2 := <[Regidx Ra5 := regval_into_reg
+        pose (Q2 := <[Regidx Ra5 := regval_into_reg
                       (zero_extend' 64 (pfun (S off) : mword 8))]> Q1).
         assert (HQ2a5 : Q2 !!! Regidx Ra5
                         = (zero_extend' 64 (pfun (S off) : mword 8) : mword 64))
@@ -1603,32 +1902,8 @@ Section ProofNamexMain.
        +0xb6, where [ilock]'s argument setup begins. *)
     iAssert (∀ fuel : nat, □ wp_next (CID0 := CID) b (proc_addr j)
                (fun CIDs : CpuId =>
-                 ∀ (off : nat) (Ms : regfile),
-                   ⌜(plen - off <= fuel)%nat⌝ -∗
-                   ⌜(off < plen)%nat⌝ -∗
-                   ⌜pfun off = SLASH⌝ -∗
-                   ⌜Ms !!! Regidx Rs1 = pa_add pv off⌝ -∗
-                   ⌜Ms !!! Regidx Rs3 = (mword_of_int 47 : mword 64)⌝ -∗
-                   sie_cap_gpr Ms (K - 12)%nat b (proc_addr j) -∗
-                   pc_is (mword_of_int (NX + 0xac)) -∗
-                   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-                   wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDe : CpuId =>
-                     ∀ (off' : nat) (Ms' : regfile),
-                       ⌜(off < off')%nat⌝ -∗ ⌜(off' <= plen)%nat⌝ -∗
-                       ⌜forall i : nat, (off <= i)%nat -> (i < off')%nat ->
-                          pfun i = SLASH⌝ -∗
-                       ⌜pfun off' <> SLASH⌝ -∗
-                       ⌜Ms' !!! Regidx Rs1 = pa_add pv off'⌝ -∗
-                       ⌜Ms' !!! Regidx Ra5
-                          = (zero_extend' 64 (pfun off' : mword 8) : mword 64)⌝ -∗
-                       ⌜forall c : mword 5, c <> Rs1 -> c <> Ra5 ->
-                          Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
-                       sie_cap_gpr Ms' (K - 12)%nat b (proc_addr j) -∗
-                       pc_is (mword_of_int (NX + 0xb6)) -∗
-                       ([∗ list] i ∈ seq 0 (S plen),
-                          pa_add pv i ↦ₘ pfun i) -∗
-                       WP (Loop : expr riscv_lang)) -∗
-                   WP (Loop : expr riscv_lang)))%I with "[]" as "#Hsk2".
+                  nx_skip2_body j b K plen pfun pv fuel CIDs))%I
+      with "[]" as "#Hsk2".
     { iIntros (fuel). iInduction fuel as [|fuel] "IHt".
       - iModIntro.
         iIntros (CIDs Hss off Ms) "%Hf %Holt %Hsl %Hs1 %Hs3 Hcg Hpc Hpath Hqc".
@@ -1644,7 +1919,7 @@ Section ProofNamexMain.
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hjac").
         iIntros (CIDt1 Hqt1) "Hcg Hpc".
         iEval (rgne; rewrite Hs1 (nx_addi1 pv off)) in "Hcg".
-        set (T1 := <[Regidx Rs1 := regval_into_reg (pa_add pv (S off))]> Ms).
+        pose (T1 := <[Regidx Rs1 := regval_into_reg (pa_add pv (S off))]> Ms).
         assert (HT1s1 : T1 !!! Regidx Rs1 = pa_add pv (S off))
           by (rewrite /T1; apply upd_eq).
         assert (HT1s3 : T1 !!! Regidx Rs3 = (mword_of_int 47 : mword 64))
@@ -1663,7 +1938,7 @@ Section ProofNamexMain.
         iIntros (CIDt2 Hqt2) "Hcg Hpc Hpb".
         iEval (rgne; rewrite HT1s1 addv_sext0) in "Hpb".
         iDestruct ("Hpback" with "Hpb") as "Hpath".
-        set (T2 := <[Regidx Ra5 := regval_into_reg
+        pose (T2 := <[Regidx Ra5 := regval_into_reg
                       (zero_extend' 64 (pfun (S off) : mword 8))]> T1).
         assert (HT2a5 : T2 !!! Regidx Ra5
                         = (zero_extend' 64 (pfun (S off) : mword 8) : mword 64))
@@ -1742,28 +2017,8 @@ Section ProofNamexMain.
        +0x8c, where the length is computed. *)
     iAssert (∀ fuel : nat, □ wp_next (CID0 := CID) b (proc_addr j)
                (fun CIDs : CpuId =>
-                 ∀ (ii : nat) (Ms : regfile),
-                   ⌜(plen - ii <= fuel)%nat⌝ -∗
-                   ⌜(ii < plen)%nat⌝ -∗
-                   ⌜Ms !!! Regidx Rs2 = pa_add pv ii⌝ -∗
-                   sie_cap_gpr Ms (K - 12)%nat b (proc_addr j) -∗
-                   pc_is (mword_of_int (NX + 0x106)) -∗
-                   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-                   wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDe : CpuId =>
-                     ∀ (e : nat) (Ms' : regfile),
-                       ⌜(ii < e)%nat⌝ -∗ ⌜(e <= plen)%nat⌝ -∗
-                       ⌜forall jj : nat, (ii < jj)%nat -> (jj < e)%nat ->
-                          pfun jj <> SLASH⌝ -∗
-                       ⌜pfun e = SLASH \/ e = plen⌝ -∗
-                       ⌜Ms' !!! Regidx Rs2 = pa_add pv e⌝ -∗
-                       ⌜forall c : mword 5, c <> Rs2 -> c <> Ra5 -> c <> Ra4 ->
-                          Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
-                       sie_cap_gpr Ms' (K - 12)%nat b (proc_addr j) -∗
-                       pc_is (mword_of_int (NX + 0x8c)) -∗
-                       ([∗ list] i ∈ seq 0 (S plen),
-                          pa_add pv i ↦ₘ pfun i) -∗
-                       WP (Loop : expr riscv_lang)) -∗
-                   WP (Loop : expr riscv_lang)))%I with "[]" as "#Hscn".
+                  nx_scan_body j b K plen pfun pv fuel CIDs))%I
+      with "[]" as "#Hscn".
     { iIntros (fuel). iInduction fuel as [|fuel] "IHe".
       - iModIntro.
         iIntros (CIDs Hss ii Ms) "%Hf %Hilt %Hs2 Hcg Hpc Hpath Hqc".
@@ -1782,7 +2037,7 @@ Section ProofNamexMain.
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj106").
         iIntros (CIDe1 Hqe1) "Hcg Hpc".
         iEval (rgne; rewrite Hs2 (nx_addi1 pv ii)) in "Hcg".
-        set (E1 := <[Regidx Rs2 := regval_into_reg (pa_add pv (S ii))]> Ms).
+        pose (E1 := <[Regidx Rs2 := regval_into_reg (pa_add pv (S ii))]> Ms).
         assert (HE1s2 : E1 !!! Regidx Rs2 = pa_add pv (S ii))
           by (rewrite /E1; apply upd_eq).
         assert (Hq108 : add_vec_int (mword_of_int (NX + 0x106) : mword 64) 2
@@ -1799,7 +2054,7 @@ Section ProofNamexMain.
         iIntros (CIDe2 Hqe2) "Hcg Hpc Hpb".
         iEval (rgne; rewrite HE1s2 addv_sext0) in "Hpb".
         iDestruct ("Hpback" with "Hpb") as "Hpath".
-        set (E2 := <[Regidx Ra5 := regval_into_reg
+        pose (E2 := <[Regidx Ra5 := regval_into_reg
                       (zero_extend' 64 (pfun (S ii) : mword 8))]> E1).
         assert (HE2a5 : E2 !!! Regidx Ra5
                         = (zero_extend' 64 (pfun (S ii) : mword 8) : mword 64))
@@ -1815,7 +2070,7 @@ Section ProofNamexMain.
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj10c").
         iIntros (CIDe3 Hqe3) "Hcg Hpc".
         iEval (rgne; rewrite HE2a5) in "Hcg".
-        set (E3 := <[Regidx Ra4 := regval_into_reg
+        pose (E3 := <[Regidx Ra4 := regval_into_reg
                       (add_vec (zero_extend' 64 (pfun (S ii) : mword 8) : mword 64)
                          (sign_extend' 64 (mword_of_int 4049 : mword 12)))]> E2).
         assert (HE3a4 : E3 !!! Regidx Ra4
@@ -1942,38 +2197,10 @@ Section ProofNamexMain.
        Two exits, so TWO abstract continuations.  +0xf8..+0x102 re-loads the
        byte and re-tests it against '/' and 0 -- both were just decided, so
        both [c.beqz]es fall through and +0x116 is unreachable. *)
-    iAssert (□ wp_next (CID0 := CID) b (proc_addr j) (fun CIDs : CpuId =>
-               ∀ (a : nat) (Ms : regfile),
-                 ⌜(a <= plen)%nat⌝ -∗
-                 ⌜pfun a <> SLASH⌝ -∗
-                 ⌜Ms !!! Regidx Rs1 = pa_add pv a⌝ -∗
-                 ⌜Ms !!! Regidx Ra5
-                    = (zero_extend' 64 (pfun a : mword 8) : mword 64)⌝ -∗
-                 sie_cap_gpr Ms (K - 12)%nat b (proc_addr j) -∗
-                 pc_is (mword_of_int (NX + 0xf6)) -∗
-                 ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-                 (* EXIT A -- the string is exhausted, at +0x130 *)
-                 wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDa : CpuId =>
-                   ⌜(a = plen)%nat⌝ -∗
-                   sie_cap_gpr Ms (K - 12)%nat b (proc_addr j) -∗
-                   pc_is (mword_of_int (NX + 0x130)) -∗
-                   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-                   WP (Loop : expr riscv_lang)) -∗
-                 (* EXIT B -- an element starts at [a], at +0x106 *)
-                 wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDb : CpuId =>
-                   ∀ Ms' : regfile,
-                     ⌜(a < plen)%nat⌝ -∗
-                     ⌜pfun a <> NUL⌝ -∗
-                     ⌜Ms' !!! Regidx Rs1 = pa_add pv a⌝ -∗
-                     ⌜Ms' !!! Regidx Rs2 = pa_add pv a⌝ -∗
-                     ⌜forall c : mword 5, c <> Ra5 -> c <> Ra4 -> c <> Rs2 ->
-                        Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
-                     sie_cap_gpr Ms' (K - 12)%nat b (proc_addr j) -∗
-                     pc_is (mword_of_int (NX + 0x106)) -∗
-                     ([∗ list] i ∈ seq 0 (S plen),
-                        pa_add pv i ↦ₘ pfun i) -∗
-                     WP (Loop : expr riscv_lang)) -∗
-                 WP (Loop : expr riscv_lang)))%I with "[]" as "#Hmid".
+    iAssert (□ wp_next (CID0 := CID) b (proc_addr j)
+               (fun CIDs : CpuId =>
+                  nx_mid_body j b K plen pfun pv CIDs))%I
+      with "[]" as "#Hmid".
     { iModIntro.
       iIntros (CIDs Hss a Ms) "%Halt %Hns %Hs1 %Ha5 Hcg Hpc Hpath HqA HqB".
       iPoseProof (nxi_0f6 with "Htext") as "Hjf6".
@@ -2024,7 +2251,7 @@ Section ProofNamexMain.
         iIntros (CIDm2 Hqm2) "Hcg Hpc Hpb".
         iEval (rgne; rewrite Hs1 addv_sext0) in "Hpb".
         iDestruct ("Hpback" with "Hpb") as "Hpath".
-        set (D1 := <[Regidx Ra5 := regval_into_reg
+        pose (D1 := <[Regidx Ra5 := regval_into_reg
                       (zero_extend' 64 (pfun a : mword 8))]> Ms).
         assert (HD1a5 : D1 !!! Regidx Ra5
                         = (zero_extend' 64 (pfun a : mword 8) : mword 64))
@@ -2040,7 +2267,7 @@ Section ProofNamexMain.
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hjfc").
         iIntros (CIDm3 Hqm3) "Hcg Hpc".
         iEval (rgne; rewrite HD1a5) in "Hcg".
-        set (D2 := <[Regidx Ra4 := regval_into_reg
+        pose (D2 := <[Regidx Ra4 := regval_into_reg
                       (add_vec (zero_extend' 64 (pfun a : mword 8) : mword 64)
                          (sign_extend' 64 (mword_of_int 4049 : mword 12)))]> D1).
         assert (HD2a4 : D2 !!! Regidx Ra4
@@ -2080,7 +2307,7 @@ Section ProofNamexMain.
                   D2 (K - 12)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj104").
         iIntros (CIDm6 Hqm6) "Hcg Hpc". iEval (rgne) in "Hcg".
         iEval (rewrite HD2s1) in "Hcg".
-        set (D3 := <[Regidx Rs2 := regval_into_reg
+        pose (D3 := <[Regidx Rs2 := regval_into_reg
                       (add_vec (zero_reg : mword 64) (pa_add pv a))]> D2).
         assert (HD3s2 : D3 !!! Regidx Rs2 = pa_add pv a).
         { rewrite /D3 upd_eq. apply add_vec_zero_l. }
@@ -2102,45 +2329,10 @@ Section ProofNamexMain.
         + exact HD3s2.
         + exact HD3o. }
     (* ---- (5) +0xe4 .. +0x104: the whole loop head -------------------- *)
-    iAssert (□ wp_next (CID0 := CID) b (proc_addr j) (fun CIDs : CpuId =>
-               ∀ (off : nat) (Ms : regfile),
-                 ⌜(off <= plen)%nat⌝ -∗
-                 ⌜Ms !!! Regidx Rs1 = pa_add pv off⌝ -∗
-                 ⌜Ms !!! Regidx Rs3 = (mword_of_int 47 : mword 64)⌝ -∗
-                 sie_cap_gpr Ms (K - 12)%nat b (proc_addr j) -∗
-                 pc_is (mword_of_int (NX + 0xe4)) -∗
-                 ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-                 (* EXIT A -- nothing but separators left, at +0x130 *)
-                 wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDa : CpuId =>
-                   ∀ Ms' : regfile,
-                     ⌜forall i : nat, (off <= i)%nat -> (i < plen)%nat ->
-                        pfun i = SLASH⌝ -∗
-                     ⌜Ms' !!! Regidx Rs1 = pa_add pv plen⌝ -∗
-                     ⌜forall c : mword 5, c <> Rs1 -> c <> Ra5 ->
-                        Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
-                     sie_cap_gpr Ms' (K - 12)%nat b (proc_addr j) -∗
-                     pc_is (mword_of_int (NX + 0x130)) -∗
-                     ([∗ list] i ∈ seq 0 (S plen),
-                        pa_add pv i ↦ₘ pfun i) -∗
-                     WP (Loop : expr riscv_lang)) -∗
-                 (* EXIT B -- an element starts at [a], at +0x106 *)
-                 wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDb : CpuId =>
-                   ∀ (a : nat) (Ms' : regfile),
-                     ⌜(off <= a)%nat⌝ -∗ ⌜(a < plen)%nat⌝ -∗
-                     ⌜forall i : nat, (off <= i)%nat -> (i < a)%nat ->
-                        pfun i = SLASH⌝ -∗
-                     ⌜pfun a <> SLASH⌝ -∗ ⌜pfun a <> NUL⌝ -∗
-                     ⌜Ms' !!! Regidx Rs1 = pa_add pv a⌝ -∗
-                     ⌜Ms' !!! Regidx Rs2 = pa_add pv a⌝ -∗
-                     ⌜forall c : mword 5, c <> Rs1 -> c <> Ra5 -> c <> Ra4 ->
-                        c <> Rs2 ->
-                        Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
-                     sie_cap_gpr Ms' (K - 12)%nat b (proc_addr j) -∗
-                     pc_is (mword_of_int (NX + 0x106)) -∗
-                     ([∗ list] i ∈ seq 0 (S plen),
-                        pa_add pv i ↦ₘ pfun i) -∗
-                     WP (Loop : expr riscv_lang)) -∗
-                 WP (Loop : expr riscv_lang)))%I with "[]" as "#Hhead".
+    iAssert (□ wp_next (CID0 := CID) b (proc_addr j)
+               (fun CIDs : CpuId =>
+                  nx_head_body j b K plen pfun pv CIDs))%I
+      with "[]" as "#Hhead".
     { iModIntro.
       iIntros (CIDs Hss off Ms) "%Holt %Hs1 %Hs3 Hcg Hpc Hpath HqA HqB".
       iPoseProof (nxi_0e4 with "Htext") as "Hje4".
@@ -2156,7 +2348,7 @@ Section ProofNamexMain.
       iIntros (CIDh1 Hqh1) "Hcg Hpc Hpb".
       iEval (rgne; rewrite Hs1 addv_sext0) in "Hpb".
       iDestruct ("Hpback" with "Hpb") as "Hpath".
-      set (H1 := <[Regidx Ra5 := regval_into_reg
+      pose (H1 := <[Regidx Ra5 := regval_into_reg
                     (zero_extend' 64 (pfun off : mword 8))]> Ms).
       assert (HH1a5 : H1 !!! Regidx Ra5
                       = (zero_extend' 64 (pfun off : mword 8) : mword 64))
@@ -2266,29 +2458,10 @@ Section ProofNamexMain.
        reached from BOTH memmove branches, with [s1 = s2] the index just
        past the element; it ends at +0xb6, where ilock's argument is set up.
        Same two-instruction head as (5), one exit instead of two. *)
-    iAssert (□ wp_next (CID0 := CID) b (proc_addr j) (fun CIDs : CpuId =>
-               ∀ (off : nat) (Ms : regfile),
-                 ⌜(off <= plen)%nat⌝ -∗
-                 ⌜Ms !!! Regidx Rs1 = pa_add pv off⌝ -∗
-                 ⌜Ms !!! Regidx Rs3 = (mword_of_int 47 : mword 64)⌝ -∗
-                 sie_cap_gpr Ms (K - 12)%nat b (proc_addr j) -∗
-                 pc_is (mword_of_int (NX + 0xa4)) -∗
-                 ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-                 wp_next (CID0 := CIDs) b (proc_addr j) (fun CIDe : CpuId =>
-                   ∀ (off' : nat) (Ms' : regfile),
-                     ⌜(off <= off')%nat⌝ -∗ ⌜(off' <= plen)%nat⌝ -∗
-                     ⌜forall i : nat, (off <= i)%nat -> (i < off')%nat ->
-                        pfun i = SLASH⌝ -∗
-                     ⌜pfun off' <> SLASH⌝ -∗
-                     ⌜Ms' !!! Regidx Rs1 = pa_add pv off'⌝ -∗
-                     ⌜forall c : mword 5, c <> Rs1 -> c <> Ra5 ->
-                        Ms' !!! Regidx c = (Ms !!! Regidx c : mword 64)⌝ -∗
-                     sie_cap_gpr Ms' (K - 12)%nat b (proc_addr j) -∗
-                     pc_is (mword_of_int (NX + 0xb6)) -∗
-                     ([∗ list] i ∈ seq 0 (S plen),
-                        pa_add pv i ↦ₘ pfun i) -∗
-                     WP (Loop : expr riscv_lang)) -∗
-                 WP (Loop : expr riscv_lang)))%I with "[]" as "#Htrail".
+    iAssert (□ wp_next (CID0 := CID) b (proc_addr j)
+               (fun CIDs : CpuId =>
+                  nx_trail_body j b K plen pfun pv CIDs))%I
+      with "[]" as "#Htrail".
     { iModIntro.
       iIntros (CIDs Hss off Ms) "%Holt %Hs1 %Hs3 Hcg Hpc Hpath Hqc".
       iPoseProof (nxi_0a4 with "Htext") as "Hja4".
@@ -2304,7 +2477,7 @@ Section ProofNamexMain.
       iIntros (CIDr1 Hqr1) "Hcg Hpc Hpb".
       iEval (rgne; rewrite Hs1 addv_sext0) in "Hpb".
       iDestruct ("Hpback" with "Hpb") as "Hpath".
-      set (G1 := <[Regidx Ra5 := regval_into_reg
+      pose (G1 := <[Regidx Ra5 := regval_into_reg
                     (zero_extend' 64 (pfun off : mword 8))]> Ms).
       assert (HG1a5 : G1 !!! Regidx Ra5
                       = (zero_extend' 64 (pfun off : mword 8) : mword 64))
@@ -2390,79 +2563,12 @@ Section ProofNamexMain.
     (*  a caller that has already made a call shifts it forward with       *)
     (*  [wp_next_shift] rather than needing it at the entry hart.          *)
     (* ================================================================= *)
-    iAssert (∀ fuel : nat,
-      wp_next (CID0 := CID) b (proc_addr j) (fun CIDl : CpuId =>
-        ∀ (off : nat) (ipv : mword 64) (Ml : regfile) (ncur : nat)
-          (usedc : gset Z) (es0 : list (list (bv 8))) (nf : nat -> bv 8),
-          ⌜(plen - off < fuel)%nat⌝ -∗
-          ⌜(off <= plen)%nat⌝ -∗
-          ⌜path_elems pl = es0 ++ path_elems (drop off pl)⌝ -∗
-          ⌜((length (path_elems (drop off pl)) + 1) * iput_units <= ncur)%nat⌝ -∗
-          ⌜((n - (L + 1) * iput_units)%nat
-              <= (ncur - (length (path_elems (drop off pl)) + 1)
-                         * iput_units)%nat)%nat⌝ -∗
-          ⌜(ncur <= n)%nat⌝ -∗
-          ⌜usedc ⊆ used⌝ -∗
-          ⌜nx_regs m sp0 (pa_add pv off) ipv nb
-                   (m !!! Regidx Ra1 : mword 64) Ml⌝ -∗
-          sie_cap_gpr Ml (K - 12)%nat b (proc_addr j) -∗
-          cpu_own 0 eb (proc_addr j) C b -∗
-          pc_is (mword_of_int (NX + 0xe4)) -∗
-          (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-          (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-          (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-          (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-          (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-          (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
-          (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-          (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-          (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
-          (pa_stk sp0 10) ↦₈ (m !!! Regidx Rs8 : mword 64) -∗
-          (pa_stk sp0 11) ↦₈ (m !!! Regidx Rs9 : mword 64) -∗
-          (pa_stk sp0 12) ↦₈ (m !!! Regidx Rs10 : mword 64) -∗
-          inode_held ipv -∗
-          iref_slots 1 -∗
-          sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-          sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          bitmap_res gfs bmapstart cov logstart size usedc -∗
-          p_pid (proc_addr j) ↦₄{dq} pidv -∗
-          p_cwd (proc_addr j) ↦₈{dqc} cwdv -∗
-          inode_held cwdv -∗
-          ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-          ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nf i) -∗
-          bslots bn 3 -∗
-          log_op g ncur -∗
-          (* ---- THE CONTRACT'S OWN CONTINUATION, at the loop's hart ---- *)
-          wp_next (CID0 := CIDl) b (proc_addr j) (fun CIDc : CpuId =>
-            ∀ (mf : regfile) (n' : nat) (used' : gset Z)
-              (ok : bool) (nf' : nat -> bv 8) (ipr : mword 64),
-                ⌜callee_saved m mf⌝ -∗
-                sie_cap_gpr mf K b (proc_addr j) -∗
-                cpu_own 0 eb (proc_addr j) C b -∗
-                pc_is ret_tgt -∗
-                sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-                sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-                ⌜used' ⊆ used⌝ -∗
-                bitmap_res gfs bmapstart cov logstart size used' -∗
-                p_pid (proc_addr j) ↦₄{dq} pidv -∗
-                p_cwd (proc_addr j) ↦₈{dqc} cwdv -∗
-                inode_held cwdv -∗
-                ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-                ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nf' i) -∗
-                bslots bn 3 -∗
-                ⌜((n - (L + 1) * iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
-                log_op g n' -∗
-                (if ok
-                 then ⌜mf !!! Regidx Ra0 = ipr
-                       /\ (npar = true ->
-                           exists es e, nameiparent_of pl es e
-                                        /\ bname 14 nf' = e)⌝ ∗
-                      inode_held ipr ∗
-                      iref_slots 1
-                 else ⌜mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)⌝ ∗
-                      iref_slots 2) -∗
-                WP (Loop : expr riscv_lang)) -∗
-          WP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
+    iAssert (∀ fuel : nat, wp_next (CID0 := CID) b (proc_addr j)
+               (fun CIDl : CpuId =>
+                  nx_loop_body j b K m sp0 pv nb ret_tgt plen L pfun pl eb C
+                               g gfs bn cov logstart bmapstart inodestart size
+                               used cwdv npar n pidv dq dqb dqs dqc fuel CIDl))%I
+      with "[]" as "Hloop".
     { (* ---- local disequality helpers, used all through the body ---- *)
       assert (Hcsne : forall c r : mword 5,
                 is_cs_idx c = true -> is_cs_idx r = false -> c <> r).
@@ -2547,7 +2653,7 @@ Section ProofNamexMain.
                          Ma (K - 12)%nat b ltac:(nz) ltac:(rdok)
                          with "Hcg Hpc Hj134").
                iIntros (CIDA2 HqA2) "Hcg Hpc". iEval (rgne) in "Hcg".
-               set (T1 := <[Regidx Ra0 := regval_into_reg
+               pose (T1 := <[Regidx Ra0 := regval_into_reg
                              (add_vec (zero_reg : mword 64)
                                 (Ma !!! Regidx Rs4))]> Ma).
                assert (HT1a0 : T1 !!! Regidx Ra0 = ipv).
@@ -2566,7 +2672,7 @@ Section ProofNamexMain.
                          with "Hcg Hpc Hj136").
                iIntros (CIDA3 HqA3) "Hcg Hpc".
                iEval (rewrite Htgip) in "Hpc".
-               set (T2 := <[Regidx Rra := regval_into_reg
+               pose (T2 := <[Regidx Rra := regval_into_reg
                              (add_vec_int
                                 (mword_of_int (NX + 0x136) : mword 64) 4)]> T1).
                assert (HT2ra : T2 !!! Regidx Rra
@@ -2611,7 +2717,7 @@ Section ProofNamexMain.
                          ltac:(nz) ltac:(rdok) ltac:(pcw)
                          with "Hcg Hpc Hj13a").
                iIntros (CIDA4 HqA4) "Hcg Hpc".
-               set (T3 := <[Regidx Rs4 := regval_into_reg
+               pose (T3 := <[Regidx Rs4 := regval_into_reg
                              (mword_of_int 0 : mword 64)]> mip).
                assert (HT3s4 : T3 !!! Regidx Rs4 = (mword_of_int 0 : mword 64))
                  by (rewrite /T3; apply upd_eq).
@@ -2816,7 +2922,7 @@ Section ProofNamexMain.
                          ltac:(rgne; rgne; rewrite E5 F9; exact Hsub)
                          with "Hcg Hpc Hj8c").
                iIntros (CIDE1 HqE1) "Hcg Hpc".
-               set (M1 := <[Regidx Ra2 := regval_into_reg
+               pose (M1 := <[Regidx Ra2 := regval_into_reg
                              (mword_of_int (Z.of_nat (e - a)) : mword 64)]> Me).
                assert (HM1a2 : M1 !!! Regidx Ra2
                         = (mword_of_int (Z.of_nat (e - a)) : mword 64))
@@ -2835,7 +2941,7 @@ Section ProofNamexMain.
                          ltac:(vm_compute; discriminate) ltac:(rdok)
                          with "Hcg Hpc Hj90").
                iIntros (CIDE2 HqE2) "Hcg Hpc".
-               set (M2 := <[Regidx Rs10 := regval_into_reg
+               pose (M2 := <[Regidx Rs10 := regval_into_reg
                      (sign_extend' 64 (subrange_vec_dec
                         (add_vec (rget M1 Ra2)
                            (sign_extend' 64 (mword_of_int 0 : mword 12)))
@@ -2866,40 +2972,10 @@ Section ProofNamexMain.
                   ================================================================ *)
                iAssert (wp_next (CID0 := CIDl) b (proc_addr j)
                           (fun CIDt : CpuId =>
-                 ∀ (Mt : regfile) (nf' : nat -> bv 8),
-                   ⌜nx_regs m sp0 (pa_add pv e) ipv nb
-                      (m !!! Regidx Ra1 : mword 64) Mt⌝ -∗
-                   ⌜bname 14 nf'
-                    = take 14 (bview (e - a)%nat
-                                 (fun i => pfun (a + i)%nat))⌝ -∗
-                   sie_cap_gpr Mt (K - 12)%nat b (proc_addr j) -∗
-                   cpu_own 0 eb (proc_addr j) C b -∗
-                   pc_is (mword_of_int (NX + 0xa4)) -∗
-                   (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-                   (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-                   (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-                   (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-                   (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-                   (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
-                   (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-                   (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-                   (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
-                   (pa_stk sp0 10) ↦₈ (m !!! Regidx Rs8 : mword 64) -∗
-                   (pa_stk sp0 11) ↦₈ (m !!! Regidx Rs9 : mword 64) -∗
-                   (pa_stk sp0 12) ↦₈ (m !!! Regidx Rs10 : mword 64) -∗
-                   inode_held ipv -∗
-                   iref_slots 1 -∗
-                   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-                   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-                   bitmap_res gfs bmapstart cov logstart size usedc -∗
-                   p_pid (proc_addr j) ↦₄{dq} pidv -∗
-                   p_cwd (proc_addr j) ↦₈{dqc} cwdv -∗
-                   inode_held cwdv -∗
-                   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-                   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nf' i) -∗
-                   bslots bn 3 -∗
-                   log_op g ncur -∗
-                   WP (Loop : expr riscv_lang)))%I
+                             nx_rest_body j b K m sp0 pv nb plen a e pfun ipv ncur
+                                          usedc eb C g gfs bn cov logstart bmapstart
+                                          inodestart size cwdv pidv dq dqb dqs dqc
+                                          CIDt))%I
                  with "[IHl Hcont]" as "Hrest".
                { iIntros (CIDt Hst Mt nf') "%Hregt %Hviewt Hcg Hcnt Hpc
                           Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
@@ -2979,7 +3055,7 @@ Section ProofNamexMain.
                              Mr (K - 12)%nat b ltac:(nz) ltac:(rdok)
                              with "Hcg Hpc Hjb6").
                    iIntros (CIDV1 HqV1) "Hcg Hpc". iEval (rgne) in "Hcg".
-                   set (V1 := <[Regidx Ra0 := regval_into_reg
+                   pose (V1 := <[Regidx Ra0 := regval_into_reg
                          (add_vec (zero_reg : mword 64)
                             (Mr !!! Regidx Rs4))]> Mr).
                    assert (HV1a0 : V1 !!! Regidx Ra0 = ientry ik).
@@ -3006,7 +3082,7 @@ Section ProofNamexMain.
                              with "Hcg Hpc Hjb8").
                    iIntros (CIDV2 HqV2) "Hcg Hpc".
                    iEval (rewrite Htgil) in "Hpc".
-                   set (V2 := <[Regidx Rra := regval_into_reg
+                   pose (V2 := <[Regidx Rra := regval_into_reg
                          (add_vec_int
                             (mword_of_int (NX + 0xb8) : mword 64) 4)]> V1).
                    assert (HV2ra : V2 !!! Regidx Rra
@@ -3057,7 +3133,7 @@ Section ProofNamexMain.
                    { iEval (rgne; rewrite Y20 Hie). iExact "Hity". }
                    iIntros (CIDV3 HqV3) "Hcg Hpc Hity".
                    iEval (rgne; rewrite Y20 Hie) in "Hity".
-                   set (V3 := <[Regidx Ra5 := regval_into_reg
+                   pose (V3 := <[Regidx Ra5 := regval_into_reg
                          (sign_extend' 64 (di_type dnl : mword 16)
                           : mword 64)]> mil).
                    assert (HV3a5 : V3 !!! Regidx Ra5
@@ -3148,7 +3224,7 @@ Section ProofNamexMain.
                        iIntros (CIDP2 HqP2) "Hcg Hpc Hpb".
                        iEval (rgne; rewrite HV3s1 addv_sext0) in "Hpb".
                        iDestruct ("Hpback" with "Hpb") as "Hpath".
-                       set (NP1 := <[Regidx Ra5 := regval_into_reg
+                       pose (NP1 := <[Regidx Ra5 := regval_into_reg
                              (zero_extend' 64 (pfun o2 : mword 8))]> V3).
                        assert (HP1a5 : NP1 !!! Regidx Ra5
                                 = (zero_extend' 64 (pfun o2 : mword 8)
@@ -3182,7 +3258,7 @@ Section ProofNamexMain.
                                  Rs4 NP1 (K - 12)%nat b ltac:(nz) ltac:(rdok)
                                  with "Hcg Hpc Hj7a").
                        iIntros (CIDP4 HqP4) "Hcg Hpc". iEval (rgne) in "Hcg".
-                       set (NP2 := <[Regidx Ra0 := regval_into_reg
+                       pose (NP2 := <[Regidx Ra0 := regval_into_reg
                              (add_vec (zero_reg : mword 64)
                                 (NP1 !!! Regidx Rs4))]> NP1).
                        assert (HP2a0 : NP2 !!! Regidx Ra0 = ientry ik).
@@ -3209,7 +3285,7 @@ Section ProofNamexMain.
                                  with "Hcg Hpc Hj7c").
                        iIntros (CIDP5 HqP5) "Hcg Hpc".
                        iEval (rewrite Htgiu) in "Hpc".
-                       set (NP3 := <[Regidx Rra := regval_into_reg
+                       pose (NP3 := <[Regidx Rra := regval_into_reg
                              (add_vec_int
                                 (mword_of_int (NX + 0x7c) : mword 64) 4)]> NP2).
                        assert (HP3ra : NP3 !!! Regidx Rra
@@ -3388,7 +3464,7 @@ Section ProofNamexMain.
                                    (K - 12)%nat b ltac:(nz) ltac:(rdok)
                                    ltac:(pcw) with "Hcg Hpc Hjce").
                          iIntros (CIDG1 HqG1) "Hcg Hpc".
-                         set (GA1 := <[Regidx Ra2 := regval_into_reg
+                         pose (GA1 := <[Regidx Ra2 := regval_into_reg
                                (mword_of_int 0 : mword 64)]> Mz).
                          assert (HGA1a2 : GA1 !!! Regidx Ra2
                                   = (mword_of_int 0 : mword 64))
@@ -3410,7 +3486,7 @@ Section ProofNamexMain.
                                    Rs5 GA1 (K - 12)%nat b ltac:(nz)
                                    ltac:(rdok) with "Hcg Hpc Hjd0").
                          iIntros (CIDG2 HqG2) "Hcg Hpc". iEval (rgne) in "Hcg".
-                         set (GA2 := <[Regidx Ra1 := regval_into_reg
+                         pose (GA2 := <[Regidx Ra1 := regval_into_reg
                                (add_vec (zero_reg : mword 64)
                                   (GA1 !!! Regidx Rs5))]> GA1).
                          assert (HGA2a1 : GA2 !!! Regidx Ra1 = nb).
@@ -3435,7 +3511,7 @@ Section ProofNamexMain.
                                    Rs4 GA2 (K - 12)%nat b ltac:(nz)
                                    ltac:(rdok) with "Hcg Hpc Hjd2").
                          iIntros (CIDG3 HqG3) "Hcg Hpc". iEval (rgne) in "Hcg".
-                         set (GA3 := <[Regidx Ra0 := regval_into_reg
+                         pose (GA3 := <[Regidx Ra0 := regval_into_reg
                                (add_vec (zero_reg : mword 64)
                                   (GA2 !!! Regidx Rs4))]> GA2).
                          assert (HGA3a0 : GA3 !!! Regidx Ra0 = ientry ik).
@@ -3468,7 +3544,7 @@ Section ProofNamexMain.
                                    with "Hcg Hpc Hjd4").
                          iIntros (CIDG4 HqG4) "Hcg Hpc".
                          iEval (rewrite Htgdl) in "Hpc".
-                         set (GA4 := <[Regidx Rra := regval_into_reg
+                         pose (GA4 := <[Regidx Rra := regval_into_reg
                                (add_vec_int
                                   (mword_of_int (NX + 0xd4) : mword 64) 4)]>
                                GA3).
@@ -3573,7 +3649,7 @@ Section ProofNamexMain.
                                      ltac:(rdok) with "Hcg Hpc Hjd8").
                            iIntros (CIDG5 HqG5) "Hcg Hpc".
                            iEval (rgne) in "Hcg".
-                           set (GB1 := <[Regidx Rs2 := regval_into_reg
+                           pose (GB1 := <[Regidx Rs2 := regval_into_reg
                                  (add_vec (zero_reg : mword 64)
                                     (mdl !!! Regidx Ra0))]> mdl).
                            assert (HGB1s2 : GB1 !!! Regidx Rs2
@@ -3616,7 +3692,7 @@ Section ProofNamexMain.
                                      ltac:(rdok) with "Hcg Hpc Hjdc").
                            iIntros (CIDG7 HqG7) "Hcg Hpc".
                            iEval (rgne) in "Hcg".
-                           set (GB2 := <[Regidx Ra0 := regval_into_reg
+                           pose (GB2 := <[Regidx Ra0 := regval_into_reg
                                  (add_vec (zero_reg : mword 64)
                                     (GB1 !!! Regidx Rs4))]> GB1).
                            assert (HGB2a0 : GB2 !!! Regidx Ra0 = ientry ik).
@@ -3648,7 +3724,7 @@ Section ProofNamexMain.
                                      with "Hcg Hpc Hjde").
                            iIntros (CIDG8 HqG8) "Hcg Hpc".
                            iEval (rewrite Htgup2) in "Hpc".
-                           set (GB3 := <[Regidx Rra := regval_into_reg
+                           pose (GB3 := <[Regidx Rra := regval_into_reg
                                  (add_vec_int
                                     (mword_of_int (NX + 0xde) : mword 64) 4)]>
                                  GB2).
@@ -3708,7 +3784,7 @@ Section ProofNamexMain.
                                      ltac:(rdok) with "Hcg Hpc Hje2").
                            iIntros (CIDG9 HqG9) "Hcg Hpc".
                            iEval (rgne; rewrite Hmups2) in "Hcg".
-                           set (GB4 := <[Regidx Rs4 := regval_into_reg
+                           pose (GB4 := <[Regidx Rs4 := regval_into_reg
                                  (add_vec (zero_reg : mword 64)
                                     (ientry kslot))]> mup).
                            assert (HGB4regs : nx_regs m sp0 (pa_add pv o2)
@@ -3763,7 +3839,7 @@ Section ProofNamexMain.
                                      ltac:(rdok) with "Hcg Hpc Hjd8").
                            iIntros (CIDG5 HqG5) "Hcg Hpc".
                            iEval (rgne) in "Hcg".
-                           set (GC1 := <[Regidx Rs2 := regval_into_reg
+                           pose (GC1 := <[Regidx Rs2 := regval_into_reg
                                  (add_vec (zero_reg : mword 64)
                                     (mdl !!! Regidx Ra0))]> mdl).
                            assert (HGC1s2 : GC1 !!! Regidx Rs2
@@ -3810,7 +3886,7 @@ Section ProofNamexMain.
                                      ltac:(rdok) with "Hcg Hpc Hj82").
                            iIntros (CIDG7 HqG7) "Hcg Hpc".
                            iEval (rgne) in "Hcg".
-                           set (GC2 := <[Regidx Ra0 := regval_into_reg
+                           pose (GC2 := <[Regidx Ra0 := regval_into_reg
                                  (add_vec (zero_reg : mword 64)
                                     (GC1 !!! Regidx Rs4))]> GC1).
                            assert (HGC2a0 : GC2 !!! Regidx Ra0 = ientry ik).
@@ -3842,7 +3918,7 @@ Section ProofNamexMain.
                                      with "Hcg Hpc Hj84").
                            iIntros (CIDG8 HqG8) "Hcg Hpc".
                            iEval (rewrite Htgup3) in "Hpc".
-                           set (GC3 := <[Regidx Rra := regval_into_reg
+                           pose (GC3 := <[Regidx Rra := regval_into_reg
                                  (add_vec_int
                                     (mword_of_int (NX + 0x84) : mword 64) 4)]>
                                  GC2).
@@ -3902,7 +3978,7 @@ Section ProofNamexMain.
                                      ltac:(rdok) with "Hcg Hpc Hj88").
                            iIntros (CIDG9 HqG9) "Hcg Hpc".
                            iEval (rgne; rewrite Hmups2) in "Hcg".
-                           set (GC4 := <[Regidx Rs4 := regval_into_reg
+                           pose (GC4 := <[Regidx Rs4 := regval_into_reg
                                  (add_vec (zero_reg : mword 64)
                                     (mword_of_int 0 : mword 64))]> mup).
                            assert (HGC4s4 : GC4 !!! Regidx Rs4
@@ -4005,7 +4081,7 @@ Section ProofNamexMain.
                           iIntros (CIDQ2 HqQ2) "Hcg Hpc Hpb".
                           iEval (rgne; rewrite HV3s1 addv_sext0) in "Hpb".
                           iDestruct ("Hpback" with "Hpb") as "Hpath".
-                          set (QA1 := <[Regidx Ra5 := regval_into_reg
+                          pose (QA1 := <[Regidx Ra5 := regval_into_reg
                                 (zero_extend' 64 (pfun o2 : mword 8))]> V3).
                           assert (HQA1a5 : QA1 !!! Regidx Ra5
                                    = (zero_extend' 64 (pfun o2 : mword 8)
@@ -4095,7 +4171,7 @@ Section ProofNamexMain.
                                V3 (K - 12)%nat b ltac:(nz) ltac:(rdok)
                                with "Hcg Hpc Hj54").
                      iIntros (CIDN1 HqN1) "Hcg Hpc". iEval (rgne) in "Hcg".
-                     set (ND1 := <[Regidx Ra0 := regval_into_reg
+                     pose (ND1 := <[Regidx Ra0 := regval_into_reg
                            (add_vec (zero_reg : mword 64)
                               (V3 !!! Regidx Rs4))]> V3).
                      assert (HND1a0 : ND1 !!! Regidx Ra0 = ientry ik).
@@ -4122,7 +4198,7 @@ Section ProofNamexMain.
                                with "Hcg Hpc Hj56").
                      iIntros (CIDN2 HqN2) "Hcg Hpc".
                      iEval (rewrite Htgup) in "Hpc".
-                     set (ND2 := <[Regidx Rra := regval_into_reg
+                     pose (ND2 := <[Regidx Rra := regval_into_reg
                            (add_vec_int
                               (mword_of_int (NX + 0x56) : mword 64) 4)]> ND1).
                      assert (HND2ra : ND2 !!! Regidx Rra
@@ -4169,7 +4245,7 @@ Section ProofNamexMain.
                                ltac:(nz) ltac:(rdok) ltac:(pcw)
                                with "Hcg Hpc Hj5a").
                      iIntros (CIDN3 HqN3) "Hcg Hpc".
-                     set (ND3 := <[Regidx Rs4 := regval_into_reg
+                     pose (ND3 := <[Regidx Rs4 := regval_into_reg
                            (mword_of_int 0 : mword 64)]> mup).
                      assert (HND3s4 : ND3 !!! Regidx Rs4
                               = (mword_of_int 0 : mword 64))
@@ -4243,7 +4319,7 @@ Section ProofNamexMain.
                             (mword_of_int 0 : mword 6) M2 (K - 12)%nat b
                             ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj11c").
                   iIntros (CIDS1 HqS1) "Hcg Hpc".
-                  set (S1 := <[Regidx Ra2 := regval_into_reg
+                  pose (S1 := <[Regidx Ra2 := regval_into_reg
                         (sign_extend' 64 (subrange_vec_dec
                            (add_vec (rget M2 Ra2)
                               (sign_extend' 64
@@ -4276,7 +4352,7 @@ Section ProofNamexMain.
                             S1 (K - 12)%nat b ltac:(nz) ltac:(rdok)
                             with "Hcg Hpc Hj11e").
                   iIntros (CIDS2 HqS2) "Hcg Hpc". iEval (rgne) in "Hcg".
-                  set (S2 := <[Regidx Ra1 := regval_into_reg
+                  pose (S2 := <[Regidx Ra1 := regval_into_reg
                         (add_vec (zero_reg : mword 64)
                            (S1 !!! Regidx Rs1))]> S1).
                   assert (HS2a1 : S2 !!! Regidx Ra1 = pa_add pv a).
@@ -4295,7 +4371,7 @@ Section ProofNamexMain.
                             S2 (K - 12)%nat b ltac:(nz) ltac:(rdok)
                             with "Hcg Hpc Hj120").
                   iIntros (CIDS3 HqS3) "Hcg Hpc". iEval (rgne) in "Hcg".
-                  set (S3 := <[Regidx Ra0 := regval_into_reg
+                  pose (S3 := <[Regidx Ra0 := regval_into_reg
                         (add_vec (zero_reg : mword 64)
                            (S2 !!! Regidx Rs5))]> S2).
                   assert (HS3a0 : S3 !!! Regidx Ra0 = nb).
@@ -4322,7 +4398,7 @@ Section ProofNamexMain.
                             with "Hcg Hpc Hj122").
                   iIntros (CIDS4 HqS4) "Hcg Hpc".
                   iEval (rewrite Htgmm) in "Hpc".
-                  set (S4 := <[Regidx Rra := regval_into_reg
+                  pose (S4 := <[Regidx Rra := regval_into_reg
                         (add_vec_int
                            (mword_of_int (NX + 0x122) : mword 64) 4)]> S3).
                   assert (HS4ra : S4 !!! Regidx Rra
@@ -4391,7 +4467,7 @@ Section ProofNamexMain.
                   iIntros (CIDS5 HqS5) "Hcg Hpc".
                   iEval (rgne; rgne; rewrite Hmms10 Hmms5
                            (pa_add_comm nb (e - a)%nat)) in "Hcg".
-                  set (S5 := <[Regidx Rs10 := regval_into_reg
+                  pose (S5 := <[Regidx Rs10 := regval_into_reg
                                 (pa_add nb (e - a)%nat)]> mmf).
                   assert (HS5s10 : S5 !!! Regidx Rs10 = pa_add nb (e - a)%nat)
                     by (rewrite /S5; apply upd_eq).
@@ -4476,7 +4552,7 @@ Section ProofNamexMain.
                             with "Hcg Hpc Hj12c").
                   iIntros (CIDS7 HqS7) "Hcg Hpc". iEval (rgne) in "Hcg".
                   iEval (rewrite HS5s2) in "Hcg".
-                  set (S6 := <[Regidx Rs1 := regval_into_reg
+                  pose (S6 := <[Regidx Rs1 := regval_into_reg
                         (add_vec (zero_reg : mword 64) (pa_add pv e))]> S5).
                   assert (HS6regs : nx_regs m sp0 (pa_add pv e) ipv nb
                              (m !!! Regidx Ra1 : mword 64) S6).
@@ -4535,7 +4611,7 @@ Section ProofNamexMain.
                             M2 (K - 12)%nat b ltac:(nz) ltac:(rdok)
                             with "Hcg Hpc Hj98").
                   iIntros (CIDL1 HqL1) "Hcg Hpc". iEval (rgne) in "Hcg".
-                  set (T1 := <[Regidx Ra2 := regval_into_reg
+                  pose (T1 := <[Regidx Ra2 := regval_into_reg
                         (add_vec (zero_reg : mword 64)
                            (M2 !!! Regidx Rs9))]> M2).
                   assert (HT1a2 : T1 !!! Regidx Ra2
@@ -4562,7 +4638,7 @@ Section ProofNamexMain.
                             T1 (K - 12)%nat b ltac:(nz) ltac:(rdok)
                             with "Hcg Hpc Hj9a").
                   iIntros (CIDL2 HqL2) "Hcg Hpc". iEval (rgne) in "Hcg".
-                  set (T2 := <[Regidx Ra1 := regval_into_reg
+                  pose (T2 := <[Regidx Ra1 := regval_into_reg
                         (add_vec (zero_reg : mword 64)
                            (T1 !!! Regidx Rs1))]> T1).
                   assert (HT2a1 : T2 !!! Regidx Ra1 = pa_add pv a).
@@ -4581,7 +4657,7 @@ Section ProofNamexMain.
                             T2 (K - 12)%nat b ltac:(nz) ltac:(rdok)
                             with "Hcg Hpc Hj9c").
                   iIntros (CIDL3 HqL3) "Hcg Hpc". iEval (rgne) in "Hcg".
-                  set (T3 := <[Regidx Ra0 := regval_into_reg
+                  pose (T3 := <[Regidx Ra0 := regval_into_reg
                         (add_vec (zero_reg : mword 64)
                            (T2 !!! Regidx Rs5))]> T2).
                   assert (HT3a0 : T3 !!! Regidx Ra0 = nb).
@@ -4608,7 +4684,7 @@ Section ProofNamexMain.
                             with "Hcg Hpc Hj9e").
                   iIntros (CIDL4 HqL4) "Hcg Hpc".
                   iEval (rewrite Htgmm) in "Hpc".
-                  set (T4 := <[Regidx Rra := regval_into_reg
+                  pose (T4 := <[Regidx Rra := regval_into_reg
                         (add_vec_int
                            (mword_of_int (NX + 0x9e) : mword 64) 4)]> T3).
                   assert (HT4ra : T4 !!! Regidx Rra
@@ -4678,7 +4754,7 @@ Section ProofNamexMain.
                             with "Hcg Hpc Hja2").
                   iIntros (CIDL5 HqL5) "Hcg Hpc". iEval (rgne) in "Hcg".
                   iEval (rewrite Hmms2) in "Hcg".
-                  set (T5 := <[Regidx Rs1 := regval_into_reg
+                  pose (T5 := <[Regidx Rs1 := regval_into_reg
                         (add_vec (zero_reg : mword 64) (pa_add pv e))]> mmf).
                   assert (HT5regs : nx_regs m sp0 (pa_add pv e) ipv nb
                              (m !!! Regidx Ra1 : mword 64) T5).
@@ -4721,7 +4797,7 @@ Section ProofNamexMain.
     iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x1c)) Rs1 Ra0 R2 (K - 12)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi01c").
     iIntros (CID15 Hq15) "Hcg Hpc". iEval (rgne) in "Hcg".
-    set (R3 := <[Regidx Rs1 := regval_into_reg
+    pose (R3 := <[Regidx Rs1 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (R2 !!! Regidx Ra0))]> R2).
     assert (HR3s1 : R3 !!! Regidx Rs1 = pv).
     { rewrite /R3 upd_eq. rewrite HR2a0. apply add_vec_zero_l. }
@@ -4732,7 +4808,7 @@ Section ProofNamexMain.
     iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x1e)) Rs6 Ra1 R3 (K - 12)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi01e").
     iIntros (CID16 Hq16) "Hcg Hpc". iEval (rgne) in "Hcg".
-    set (R4 := <[Regidx Rs6 := regval_into_reg
+    pose (R4 := <[Regidx Rs6 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (R3 !!! Regidx Ra1))]> R3).
     assert (HR3a1 : R3 !!! Regidx Ra1 = (m !!! Regidx Ra1 : mword 64))
       by (rewrite /R3 upd_ne; [exact HR2a1 | nz]).
@@ -4745,7 +4821,7 @@ Section ProofNamexMain.
     iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x20)) Rs5 Ra2 R4 (K - 12)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi020").
     iIntros (CID17 Hq17) "Hcg Hpc". iEval (rgne) in "Hcg".
-    set (R5 := <[Regidx Rs5 := regval_into_reg
+    pose (R5 := <[Regidx Rs5 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (R4 !!! Regidx Ra2))]> R4).
     assert (HR4a2 : R4 !!! Regidx Ra2 = nb).
     { rewrite /R4 upd_ne; [| nz]. rewrite /R3 upd_ne; [exact HR2a2 | nz]. }
@@ -4769,7 +4845,7 @@ Section ProofNamexMain.
     iEval (rgne; rewrite HR5a0 addv_sext0) in "Hp0".
     iEval (rewrite -(pa_add_0 pv)) in "Hp0".
     iDestruct ("Hpback" with "Hp0") as "Hpath".
-    set (R6 := <[Regidx Ra4 := regval_into_reg
+    pose (R6 := <[Regidx Ra4 := regval_into_reg
                   (zero_extend' 64 (pfun 0%nat : mword 8))]> R5).
     assert (HR6a4 : R6 !!! Regidx Ra4
                     = (zero_extend' 64 (pfun 0%nat : mword 8) : mword 64))
@@ -4783,7 +4859,7 @@ Section ProofNamexMain.
               R6 (K - 12)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
               with "Hcg Hpc Hi026").
     iIntros (CID19 Hq19) "Hcg Hpc".
-    set (R7 := <[Regidx Ra5 := regval_into_reg (mword_of_int 47 : mword 64)]> R6).
+    pose (R7 := <[Regidx Ra5 := regval_into_reg (mword_of_int 47 : mword 64)]> R6).
     assert (HR7a5 : R7 !!! Regidx Ra5 = (mword_of_int 47 : mword 64))
       by (rewrite /R7; apply upd_eq).
     assert (HR7a4 : R7 !!! Regidx Ra4
@@ -4852,7 +4928,7 @@ Section ProofNamexMain.
                 (mword_of_int 1 : mword 64) R7 (K - 12)%nat b
                 ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc Hi048").
       iIntros (CID21 Hq21) "Hcg Hpc".
-      set (A1 := <[Regidx Ra1 := regval_into_reg (mword_of_int 1 : mword 64)]> R7).
+      pose (A1 := <[Regidx Ra1 := regval_into_reg (mword_of_int 1 : mword 64)]> R7).
       assert (HA1a1 : A1 !!! Regidx Ra1 = (mword_of_int 1 : mword 64))
         by (rewrite /A1; apply upd_eq).
       assert (Hpp04a : add_vec_int (mword_of_int (NX + 0x48) : mword 64) 2
@@ -4862,7 +4938,7 @@ Section ProofNamexMain.
       iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x4a)) Ra0 Ra1 A1 (K - 12)%nat b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi04a").
       iIntros (CID22 Hq22) "Hcg Hpc". iEval (rgne) in "Hcg".
-      set (A2 := <[Regidx Ra0 := regval_into_reg
+      pose (A2 := <[Regidx Ra0 := regval_into_reg
                     (add_vec (zero_reg : mword 64) (A1 !!! Regidx Ra1))]> A1).
       assert (HA2a0 : A2 !!! Regidx Ra0 = (mword_of_int 1 : mword 64)).
       { rewrite /A2 upd_eq. rewrite HA1a1. apply add_vec_zero_l. }
@@ -4881,7 +4957,7 @@ Section ProofNamexMain.
                 with "Hcg Hpc Hi04c").
       iIntros (CID23 Hq23) "Hcg Hpc".
       iEval (rewrite Htgtig) in "Hpc".
-      set (A3 := <[Regidx Rra := regval_into_reg
+      pose (A3 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (NX + 0x4c) : mword 64) 4)]> A2).
       assert (HA3ra : A3 !!! Regidx Rra
                       = add_vec_int (mword_of_int (NX + 0x4c) : mword 64) 4)
@@ -4914,7 +4990,7 @@ Section ProofNamexMain.
       iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x50)) Rs4 Ra0 mig (K - 12)%nat b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi050").
       iIntros (CIDA1 HqA1) "Hcg Hpc". iEval (rgne) in "Hcg".
-      set (A4 := <[Regidx Rs4 := regval_into_reg
+      pose (A4 := <[Regidx Rs4 := regval_into_reg
                     (add_vec (zero_reg : mword 64) (mig !!! Regidx Ra0))]> mig).
       assert (HA4s4 : A4 !!! Regidx Rs4 = ientry kig).
       { rewrite /A4 upd_eq. rewrite Higa0. apply add_vec_zero_l. }
@@ -4985,7 +5061,7 @@ Section ProofNamexMain.
                 A4 (K - 12)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
                 with "Hcg Hpc Hi03c").
       iIntros (CIDK1 HqK1) "Hcg Hpc".
-      set (A5 := <[Regidx Rs3 := regval_into_reg (mword_of_int 47 : mword 64)]> A4).
+      pose (A5 := <[Regidx Rs3 := regval_into_reg (mword_of_int 47 : mword 64)]> A4).
       assert (HpA040 : add_vec_int (mword_of_int (NX + 0x3c) : mword 64) 4
                        = mword_of_int (NX + 0x40)) by pcw.
       iEval (rewrite HpA040) in "Hpc".
@@ -4993,7 +5069,7 @@ Section ProofNamexMain.
                 (mword_of_int 13 : mword 64) A5 (K - 12)%nat b
                 ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc Hi040").
       iIntros (CIDK2 HqK2) "Hcg Hpc".
-      set (A6 := <[Regidx Rs8 := regval_into_reg (mword_of_int 13 : mword 64)]> A5).
+      pose (A6 := <[Regidx Rs8 := regval_into_reg (mword_of_int 13 : mword 64)]> A5).
       assert (HpA042 : add_vec_int (mword_of_int (NX + 0x40) : mword 64) 2
                        = mword_of_int (NX + 0x42)) by pcw.
       iEval (rewrite HpA042) in "Hpc".
@@ -5001,7 +5077,7 @@ Section ProofNamexMain.
                 (mword_of_int 14 : mword 64) A6 (K - 12)%nat b
                 ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc Hi042").
       iIntros (CIDK3 HqK3) "Hcg Hpc".
-      set (A7 := <[Regidx Rs9 := regval_into_reg (mword_of_int 14 : mword 64)]> A6).
+      pose (A7 := <[Regidx Rs9 := regval_into_reg (mword_of_int 14 : mword 64)]> A6).
       assert (HpA044 : add_vec_int (mword_of_int (NX + 0x42) : mword 64) 2
                        = mword_of_int (NX + 0x44)) by pcw.
       iEval (rewrite HpA044) in "Hpc".
@@ -5009,7 +5085,7 @@ Section ProofNamexMain.
                 (mword_of_int 1 : mword 64) A7 (K - 12)%nat b
                 ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc Hi044").
       iIntros (CIDK4 HqK4) "Hcg Hpc".
-      set (A8 := <[Regidx Rs7 := regval_into_reg (mword_of_int 1 : mword 64)]> A7).
+      pose (A8 := <[Regidx Rs7 := regval_into_reg (mword_of_int 1 : mword 64)]> A7).
       assert (HpA046 : add_vec_int (mword_of_int (NX + 0x44) : mword 64) 2
                        = mword_of_int (NX + 0x46)) by pcw.
       iEval (rewrite HpA046) in "Hpc".
@@ -5095,7 +5171,7 @@ Section ProofNamexMain.
                 with "Hcg Hpc Hi02e").
       iIntros (CID21 Hq21) "Hcg Hpc".
       iEval (rewrite Htgtmp) in "Hpc".
-      set (B1 := <[Regidx Rra := regval_into_reg
+      pose (B1 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (NX + 0x2e) : mword 64) 4)]> R7).
       assert (HB1ra : B1 !!! Regidx Rra
                       = add_vec_int (mword_of_int (NX + 0x2e) : mword 64) 4)
@@ -5119,7 +5195,7 @@ Section ProofNamexMain.
       { iEval (rgne; rewrite Hmpa0 p_cwd_sext). iExact "Hcwdc". }
       iIntros (CID22 Hq22) "Hcg Hpc Hcwdc".
       iEval (rgne; rewrite Hmpa0 p_cwd_sext) in "Hcwdc".
-      set (B2 := <[Regidx Ra0 := regval_into_reg cwdv]> mf1).
+      pose (B2 := <[Regidx Ra0 := regval_into_reg cwdv]> mf1).
       assert (HB2a0 : B2 !!! Regidx Ra0 = cwdv)
         by (rewrite /B2; apply upd_eq).
       assert (Hpp036 : add_vec_int (mword_of_int (NX + 0x32) : mword 64) 4
@@ -5140,7 +5216,7 @@ Section ProofNamexMain.
                 with "Hcg Hpc Hi036").
       iIntros (CID23 Hq23) "Hcg Hpc".
       iEval (rewrite Htgtid) in "Hpc".
-      set (B3 := <[Regidx Rra := regval_into_reg
+      pose (B3 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (NX + 0x36) : mword 64) 4)]> B2).
       assert (HB3ra : B3 !!! Regidx Rra
                       = add_vec_int (mword_of_int (NX + 0x36) : mword 64) 4)
@@ -5174,7 +5250,7 @@ Section ProofNamexMain.
       iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x3a)) Rs4 Ra0 mid (K - 12)%nat b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi03a").
       iIntros (CIDBm1 HqBm1) "Hcg Hpc". iEval (rgne) in "Hcg".
-      set (B4 := <[Regidx Rs4 := regval_into_reg
+      pose (B4 := <[Regidx Rs4 := regval_into_reg
                     (add_vec (zero_reg : mword 64) (mid !!! Regidx Ra0))]> mid).
       assert (HB4s4 : B4 !!! Regidx Rs4 = ientry ck).
       { rewrite /B4 upd_eq. rewrite Hida0. apply add_vec_zero_l. }
@@ -5238,7 +5314,7 @@ Section ProofNamexMain.
                 B4 (K - 12)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
                 with "Hcg Hpc Hi03c").
       iIntros (CIDB1 HqB1) "Hcg Hpc".
-      set (B5 := <[Regidx Rs3 := regval_into_reg (mword_of_int 47 : mword 64)]> B4).
+      pose (B5 := <[Regidx Rs3 := regval_into_reg (mword_of_int 47 : mword 64)]> B4).
       assert (HpB040 : add_vec_int (mword_of_int (NX + 0x3c) : mword 64) 4
                        = mword_of_int (NX + 0x40)) by pcw.
       iEval (rewrite HpB040) in "Hpc".
@@ -5246,7 +5322,7 @@ Section ProofNamexMain.
                 (mword_of_int 13 : mword 64) B5 (K - 12)%nat b
                 ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc Hi040").
       iIntros (CIDB2 HqB2) "Hcg Hpc".
-      set (B6 := <[Regidx Rs8 := regval_into_reg (mword_of_int 13 : mword 64)]> B5).
+      pose (B6 := <[Regidx Rs8 := regval_into_reg (mword_of_int 13 : mword 64)]> B5).
       assert (HpB042 : add_vec_int (mword_of_int (NX + 0x40) : mword 64) 2
                        = mword_of_int (NX + 0x42)) by pcw.
       iEval (rewrite HpB042) in "Hpc".
@@ -5254,7 +5330,7 @@ Section ProofNamexMain.
                 (mword_of_int 14 : mword 64) B6 (K - 12)%nat b
                 ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc Hi042").
       iIntros (CIDB3 HqB3) "Hcg Hpc".
-      set (B7 := <[Regidx Rs9 := regval_into_reg (mword_of_int 14 : mword 64)]> B6).
+      pose (B7 := <[Regidx Rs9 := regval_into_reg (mword_of_int 14 : mword 64)]> B6).
       assert (HpB044 : add_vec_int (mword_of_int (NX + 0x42) : mword 64) 2
                        = mword_of_int (NX + 0x44)) by pcw.
       iEval (rewrite HpB044) in "Hpc".
@@ -5262,7 +5338,7 @@ Section ProofNamexMain.
                 (mword_of_int 1 : mword 64) B7 (K - 12)%nat b
                 ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc Hi044").
       iIntros (CIDB4 HqB4) "Hcg Hpc".
-      set (B8 := <[Regidx Rs7 := regval_into_reg (mword_of_int 1 : mword 64)]> B7).
+      pose (B8 := <[Regidx Rs7 := regval_into_reg (mword_of_int 1 : mword 64)]> B7).
       assert (HpB046 : add_vec_int (mword_of_int (NX + 0x44) : mword 64) 2
                        = mword_of_int (NX + 0x46)) by pcw.
       iEval (rewrite HpB046) in "Hpc".

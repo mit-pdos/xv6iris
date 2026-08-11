@@ -239,6 +239,67 @@ Definition K_namex : nat := 94%nat.
 Definition ROOTDEV : mword 32 := mword_of_int 1.
 Definition ROOTINO : mword 32 := mword_of_int 1.
 
+(* THE CONTRACT'S CONTINUATION, NAMED.  Spelled out it is twenty wands over the
+   whole loaned bundle plus the two-armed result; namex's whole-function proof
+   carries it as a spatial hypothesis for ~4000 proofmode steps and restates it
+   inside its loop invariant, and every step re-embeds it in the proof term
+   twice (claude-notes/optimization.md, "RULE ONE" and "WHY Qed IS EXPENSIVE").
+   Named, it is one constant applied to its arguments.
+
+   TRANSPARENT ON PURPOSE -- do NOT add [Typeclasses Opaque].  The proofmode
+   unifies [iApply ("Hcont" $! mf ...)] through a transparent constant but NOT
+   through an opaque one, so sealing it forces an
+   [iEval (rewrite /namex_post) in "Hcont"] at every use site, and that rewrite
+   is itself context-proportional: measured +48% on the whole file (5:36 ->
+   8:38).  Contrast [SpecUservec.uservec_post], which IS sealed -- that one is
+   unfolded once, at the return, and never applied under a wand. *)
+Definition namex_post
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
+      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    (pj pv nb ret_tgt : mword 64) (pl : list (bv 8))
+    (m : regfile) (K : nat) (b eb : bool) (C : iProp Σ)
+    (g : log_names) (gfs : fs_names) (bn : bio_names)
+    (cov : gset Z) (logstart bmapstart inodestart size : Z)
+    (used : gset Z) (cwdv : mword 64)
+    (plen : nat) (pfun : nat -> bv 8)
+    (npar : bool) (n : nat) (pidv : mword 32)
+    (dq dqb dqs dqc : dfrac) : iProp Σ :=
+  (∀ (mf : regfile) (n' : nat) (used' : gset Z)
+     (ok : bool) (nf : nat -> bv 8) (ipv : mword 64),
+      ⌜callee_saved m mf⌝ -∗
+      sie_cap_gpr mf K b pj -∗
+      cpu_own 0 eb pj C b -∗
+      pc_is ret_tgt -∗
+      (* EVERYTHING LOANED COMES BACK *)
+      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      ⌜used' ⊆ used⌝ -∗
+      bitmap_res gfs bmapstart cov logstart size used' -∗
+      p_pid pj ↦₄{dq} pidv -∗
+      p_cwd pj ↦₈{dqc} cwdv -∗
+      inode_held cwdv -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+      (* the name buffer, at an UNSPECIFIED naming function -- the short
+         branch leaves the bytes above [len] alone *)
+      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nf i) -∗
+      bslots bn 3 -∗
+      ⌜((n - (length (path_elems pl) + 1) * iput_units)%nat <= n')%nat
+       /\ (n' <= n)%nat⌝ -∗
+      log_op g n' -∗
+      (* THE TWO ARMS *)
+      (if ok
+       then ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = ipv
+             /\ (npar = true ->
+                 exists es e, nameiparent_of pl es e /\ bname 14 nf = e)⌝ ∗
+            inode_held ipv ∗
+            iref_slots 1
+       else ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
+             = (mword_of_int 0 : mword 64)⌝ ∗
+            iref_slots 2) -∗
+      WP (Loop : expr riscv_lang))%I.
+
 Definition wp_namex_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
@@ -344,39 +405,11 @@ Definition wp_namex_sconf_body
   iref_slots 2 -∗
   (* ---- this operation's reservation ---- *)
   log_op g n -∗
-  wp_next b pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (n' : nat) (used' : gset Z)
-    (ok : bool) (nf : nat -> bv 8) (ipv : mword 64),
-      ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
-      pc_is ret_tgt -∗
-      (* EVERYTHING LOANED COMES BACK *)
-      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      ⌜used' ⊆ used⌝ -∗
-      bitmap_res gfs bmapstart cov logstart size used' -∗
-      p_pid pj ↦₄{dq} pidv -∗
-      p_cwd pj ↦₈{dqc} cwdv -∗
-      inode_held cwdv -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-      (* the name buffer, at an UNSPECIFIED naming function -- the short
-         branch leaves the bytes above [len] alone *)
-      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nf i) -∗
-      bslots bn 3 -∗
-      ⌜((n - (L + 1) * iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
-      log_op g n' -∗
-      (* THE TWO ARMS *)
-      (if ok
-       then ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = ipv
-             /\ (npar = true ->
-                 exists es e, nameiparent_of pl es e /\ bname 14 nf = e)⌝ ∗
-            inode_held ipv ∗
-            iref_slots 1
-       else ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
-             = (mword_of_int 0 : mword 64)⌝ ∗
-            iref_slots 2) -∗
-      WP (Loop : expr riscv_lang)) -∗
+  (* the continuation is SEALED as [namex_post]; see its header *)
+  wp_next b pj (fun (CIDc : CpuId) =>
+    namex_post (CID := CIDc) pj pv nb ret_tgt pl m K b eb C
+               g gfs bn cov logstart bmapstart inodestart size used cwdv
+               plen pfun npar n pidv dq dqb dqs dqc) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type NAMEX.

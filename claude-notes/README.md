@@ -19,7 +19,9 @@ are working on that effort — the relevant `projects/` file.
   proofmode & bitvector gotchas, and durable spec-design preferences.
 - **[`optimization.md`](optimization.md)** — proof performance rules: the
   performance pitfalls and the tactics/patterns that fix them (apply proactively
-  when writing new proofs).
+  when writing new proofs). Starts with the two diagnosis rules — run `-time`
+  first, and when it finds no hot sentence, name the block continuations that
+  are the Iris context.
 - **[`kernel-defects.md`](kernel-defects.md)** — bugs found in the xv6 SOURCE
   by the verification, as opposed to gaps in the proofs. An entry there means
   the C code is wrong and the stuck proof is the symptom. Currently one open

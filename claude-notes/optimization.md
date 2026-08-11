@@ -1,5 +1,94 @@
 # Proof performance & build optimization
 
+## RULE ONE: when `-time` finds NOTHING, count the `iAssert` STATEMENTS
+
+Rule Zero below is still the first move, but a whole-function proof can be the
+slowest file in the tree with **no hot sentence at all**.  `ProofNamex` was
+exactly that (2026-08-11): the slowest file in the build **and on the critical
+path** (CI 566 s of a 998 s path; isolated `coqc -async-proofs off` **5:35.68
+wall, 6.15 GB RSS**, a 2x memory outlier over the next file), and its most
+expensive non-`Qed` statement was **2.7 s**.  `Qed` was 65 s of 336 s and the
+rest a flat tail — `iApply` 85.6 s over 197 calls, `iIntros` 47.9 s over 225,
+`iNext` 35.6 s over 22, `iEval` 17.5 s over 290, i.e. 3-6x per sentence what
+`ProofPiperead` pays for the same shape.  That ratio *is* the diagnosis: the cost
+is `|Δ|`.  `-d hconstr` confirmed it — **tree 118,092,555 nodes over 519,910
+bindings**, the biggest proof term in the tree (ProofUservec 39 M, Piperead 35 M).
+
+**Where `Δ` had gone was the proof's own block continuations.**  namex hands
+control between basic blocks with nested
+`iAssert (□ wp_next … (fun CIDs => <40-80 lines of ∀/wands>))` assertions — this
+tree's shape for a block reached from two routes, an abstract epilogue, or a
+fuel-indexed scan.  **Ten were live at the deepest point** — `Htail`, `Hsk1`,
+`Hsk2`, `Hscn`, `Hmid`, `Hhead`, `Htrail`, `Hloop`, `Hrest`, and `IHl`, the loop
+invariant's second copy: **~390 lines
+of statement against ~40 lines of actual resources**, and `tree ≈ 2 × steps ×
+|Δ|` charges every one of them to each of the ~4000 steps.
+
+**The fix: NAME the inner function body of each block continuation.**
+
+```coq
+  Definition nx_head_body (j : nat) (b : bool) (K plen : nat)
+      (pfun : nat -> bv 8) (pv : mword 64) (CIDs : CpuId) : iProp Σ := (…)%I.
+  …
+  iAssert (□ wp_next (CID0 := CID) b (proc_addr j)
+             (fun CIDs : CpuId => nx_head_body j b K plen pfun pv CIDs))%I
+    with "[]" as "#Hhead".
+```
+
+Three rules make it a drop-in — the proof script itself does not change:
+
+1. **Keep the definition TRANSPARENT.  Do NOT `Typeclasses Opaque` it.**
+   `iApply ("Hhead" $! off Ms with "…")` unifies through a transparent constant;
+   through an opaque one it fails (*"iSpecialize: cannot instantiate (X …) with
+   off"*), which forces an `iEval (rewrite /X) in "H"` per use site — and that
+   rewrite is itself context-proportional.  Measured on this file with the
+   contract's continuation sealed that way (five unfolds): **5:35.68 → 8:37.64,
+   +48 %**, for a term only 5 % smaller.  `Typeclasses Opaque` is right for a
+   post nobody applies inside the proof (`SpecUservec.uservec_post`, unfolded
+   once at the return); it is wrong for a continuation applied everywhere.
+2. **Fold only the INNER body.**  The call sites do `iSpecialize ("Hsk1" $! plen
+   CIDh2 with "[%]"); [wp_next_chain |]`, which needs the `∀ fuel` and the
+   `wp_next`/`□` to stay syntactically visible; only what follows
+   `fun CIDs : CpuId =>` gets a name.
+3. **For a `∀ fuel, …` block, parameterize the definition by `fuel` and keep the
+   `∀ fuel` outside it.**  Then `iIntros (fuel); iInduction fuel as [|fuel] "IH"`
+   leaves the induction hypothesis **folded** — which is half the win, because
+   `IHl` is a second copy of the loop invariant living in `Δ` for the whole body.
+
+Result on `ProofNamex` (ten blocks folded; isolated, `-async-proofs off`, one
+sibling job in each run, `SpecNamex.namex_post` + `ProofNamex`'s
+`nx_{tail,skip,skip2,scan,mid,head,trail,loop,rest}_body`):
+
+| | before | after |
+|---|---|---|
+| wall | 5:35.68 | **3:48.37 (−32 %)** |
+| RSS | 6.15 GB | **4.35 GB (−29 %)** |
+| `Qed` | 65.6 s | **40.0 s (−39 %)** |
+| proof term (tree) | 118,092,555 | **69,078,943 (−42 %)** |
+| bindings (DAG) | 519,910 | 298,989 |
+
+In-build (`make TIMED=1`, async `Qed` on, which is what CI measures) the same file
+went **355.6 s / 6.32 GB → 204.8 s / 4.32 GB**; it was the critical path's one
+big proof, so that is wall time off the build, not just CPU.
+
+Per-tactic: `iApply` 85.6 → 56.0, `iIntros` 47.9 → 24.9, `iEval` 17.5 → 12.9,
+`iDestruct` 15.5 → 10.8, `iPoseProof` 14.1 → 8.2.  Everything moved together,
+which is what a `|Δ|` fix looks like.  (`iNext` 35.6 → 33.0 is the one that did
+not: 22 calls at 1.5 s, now 15 % of the file and the next thing to look at.)
+
+**What did NOT pay here** (4-way interleaved against a 349 s baseline in that
+batch), so nobody re-runs them: `set (Mk := <[…]> …)` → `pose` over 87 sites,
+**349 → 332 s (~5 %) and the tree −0.03 %** — a tenth of what the same swap was
+worth in `ProofVirtioDiskInit`, because namex's chain links are shallow (landed
+anyway); and dropping the redundant `[-]` from 18 leaf spec patterns, 349 → 339 s,
+inside the batch's noise (not landed).
+
+The shape recurs: `ProofPiperead`, `ProofPipewrite`, `ProofWritei`, `ProofReadi`
+and `ProofPrintk` all carry block continuations.  **Before hunting a hot
+statement in one of them, count the lines of `iAssert` statement live at the
+deepest point; if they outweigh the resources, the file's cost is its own
+continuations.**
+
 ## RULE ZERO: run `-time` FIRST, before believing any theory
 
 The section below ("`Qed` time is term size") is true and was the answer for a
