@@ -66,7 +66,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpGpr RegFile.
+Require Import WpGpr RegFile HartTp.
 Require Import SmodeCore.
 Require Import MstatusBits WpIntrCore.
 Require Export IntrDefs.
@@ -220,220 +220,272 @@ Section WpIntrInv.
       iApply ("Hcont" with "Hhs Hpc").
   Qed.
 
-  (* =================================================================== *)
-  (* §8 THE ENGINE: run the point just before an instruction at [pc0]     *)
-  (* with interrupts ENABLED, under the interrupt invariant.  Takes an    *)
-  (* arbitrary number of pending interrupts (Löb induction over the       *)
-  (* trap + handler round trip), then hands the caller's σ-callback the   *)
-  (* pure no-pending fact and lets the instruction execute.  Every        *)
-  (* threaded resource comes back to the callback UNCHANGED; the          *)
-  (* callback's obligation is [wp_exec_step_hart_active_inv]'s.           *)
-  (* =================================================================== *)
-  (* NO [handler] PARAMETER.  The installed vector is existential inside
-     [intr_res], and the engine reads it out per trap, so nothing above has to
-     name it -- which is what lets the funnel hand this engine an arm conjunct
-     verbatim instead of skolemising a handler out of it first.
+End WpIntrInv.
 
-     [intr_res] IS THREADED, NOT FRAMED BY THE CALLER: it used to be the
-     persistent [intr_inv handler], which a caller kept its own copy of, and
-     it is now owned, so it goes in here and comes back out to the σ-callback
-     with everything else. *)
-  Lemma wp_exec_step_intr (pc0 : mword 64)
-      (root_ppn : mword 44)
-      (m : regfile) :
-    ret_pc pc0 = pc0 ->
-    intr_res -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    intr_config -∗
-    pc_is pc0 -∗
-    gpr_file m -∗
-    intr_frame root_ppn m -∗
-    (∀ σ,
-       ⌜ exec (dispatchInterrupt Supervisor) σ = Some (None, σ) ⌝ -∗
-       intr_res -∗
-       intr_config -∗
-       pc_is pc0 -∗
-       gpr_file m -∗
-       intr_frame root_ppn m -∗
-       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
-       ∃ (retval : mword 32) (s_exec : mstate),
-         ⌜ exec (run_hart_active 0) σ
-             = Some (Step_Execute (RETIRE_SUCCESS, retval), s_exec) ⌝ ∗
-         PC ↦ᵣ (register_lookup PC s_exec.(sregs)) ∗
-         mstate_interp s_exec ∗
-         (hart_state ↦ᵣ HART_ACTIVE tt -∗
-          PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang))) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intros Hpc0.
-    iIntros "Hintr Hhs Hcfg Hpc Hfile HF Hbody".
-    (* [intr_res] joins the Löb-generalised resources: a trap hands it back,
-       possibly at a different installed vector, so it cannot be fixed outside
-       the loop the way the persistent [intr_inv handler] was. *)
-    iRevert "Hintr Hhs Hcfg Hpc Hfile HF Hbody".
-    iLöb as "IH".
-    iIntros "Hintr Hhs Hcfg Hpc Hfile HF Hbody".
-    iDestruct "Hcfg" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hsepcx & Hscausex & Hstvalx)".
-    iDestruct "Hmsx" as (ms) "(Hms & Hsie & %Hmsf)".
-    (* [mie] is PINNED at [MIE_S] by [intr_config] (only [mideleg] is
-       existential), which is what makes the DELIVERABLE CAUSE SET below
-       computable: [Hmm] already speaks about the literal, and the handler
-       contract is instantiated at it. *)
-    iDestruct "Hmiex" as (mdv0) "(Hmie & Hmdl & %Hmm)".
-    pose proof Hmsf as Hmsf'.
-    destruct Hmsf' as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
-    iPoseProof "Hhw" as "#Hhwc".
-    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    pose proof (elp_no_lp elp0 Help_np) as Help0.
-    iApply (wp_exec_step_retire_or_intr with "Hminv Hhs").
-    iIntros (σ) "Hsi".
-    iDestruct (dispatch_S_transient σ misa0 MIE_S mdv0 ms HmisaS Hmm
-                 with "Hsi Hmisa Hmie Hmdl Hms") as %Hdisp0.
-    match type of Hdisp0 with _ = Some (?D, _) =>
-      destruct D as [[i p] |] eqn:Hdres end.
-    - (* ---- an interrupt is pending: take it, run the handler, Löb ---- *)
-      pose proof (s_dispatch_Some_S _ _ _ _ _ _ _ _ Hdres); subst p.
-      (* the destruct folded [Hdres] into [Hdisp0]:
-         Hdisp0 : exec (dispatchInterrupt Supervisor) σ = Some (Some (i, Supervisor), σ) *)
-      (* OPEN [intr_res] for this step: stvec (read by the trap), the vector's
-         two pure facts, and the handler WP.  This is where an [iInv] on
-         [intrN] used to be, together with a [ghost_var_agree] to discharge
-         the invariant body's [b = '1'] guard; the resource carries its
-         contract unconditionally, so both are gone.  The WP arrives UNDER ITS
-         LATER -- the [▷] that replaced [inv]'s guard -- and the trap step's
-         own [iNext] below strips it, so the guard is paid for by a step that
-         exists anyway. *)
-      iEval (rewrite /intr_res) in "Hintr".
-      iDestruct "Hintr" as (handler vb) "(%Htvd & %Hsb & Hq & Hstv & #Hsp)".
-      iDestruct "Hsepcx" as (sepc_old) "Hsepc".
-      iDestruct "Hscausex" as (scause_old) "Hscause".
-      iDestruct "Hstvalx" as (stval_old) "Hstval".
-      iDestruct "Hpc" as "[Hpcr Hnpc]".
-      iDestruct "Hsi" as "[Hreg Hmem]".
-      iDestruct (reg_valid with "Hreg Hpcr") as %Lpc.
-      iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
-      iDestruct (reg_valid with "Hreg Hms") as %Lms.
-      iDestruct (reg_valid with "Hreg Hscause") as %Lsc.
-      iDestruct (reg_valid with "Hreg Hstv") as %Lstvec.
-      iDestruct (reg_valid_dq with "Hreg Help") as %Lelp.
-      iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-      assert (HmisaS' : eq_vec (_get_Misa_S (register_lookup misa σ.(sregs))) ('b"1") = true)
-        by (rewrite Lmisa; exact HmisaS).
-      pose proof (exec_run_hart_active_pending σ i Supervisor Lpriv Hdisp0) as Hha.
-      pose proof (exec_handle_interrupt_S σ i pc0 ms scause_old handler elp0
-                    Lpriv Lms Lsc Lstvec Lelp HmisaS' Htvd Lpc) as Hhi.
-      match type of Hhi with _ = Some (_, ?T) => set (s_trap := T) in Hhi end.
-      (* thread the trap's writes through the ghost cells, in tower order *)
-      pose (ms_e := update_subrange_vec_dec ms 23 23 elp0).
-      pose (c1v := update_subrange_vec_dec scause_old (64 - 1) (64 - 1)
-                     (bool_to_bit (trapCause_is_interrupt (Interrupt i)))).
-      pose (c2v := update_subrange_vec_dec c1v (64 - 2) 0
-                     (zero_extend' (64 - 1) (trapCause_bits_forwards (Interrupt i)))).
-      pose (ms_a := update_subrange_vec_dec ms_e 5 5 (_get_Mstatus_SIE ms_e)).
-      pose (ms_b := update_subrange_vec_dec ms_a 1 1 ('b"0")).
-      pose (ms_c := update_subrange_vec_dec ms_b 8 8 ('b"1")).
-      iMod (reg_update _ mstatus _ ms_e with "Hreg Hms") as "[Hreg Hms]".
-      assert (Hlkelp : register_lookup elp (register_set mstatus ms_e σ.(sregs))
-                       = landing_pad_bits_backwards NO_LP_EXPECTED).
-      { rewrite irrelevant_register_set; [ rewrite Lelp; exact Help0 | vm_compute; reflexivity ]. }
-      iDestruct (reg_interp_set_same _ elp _ Hlkelp with "Hreg") as "Hreg".
-      iMod (reg_update _ scause _ c1v with "Hreg Hscause") as "[Hreg Hscause]".
-      iMod (reg_update _ scause _ c2v with "Hreg Hscause") as "[Hreg Hscause]".
-      iMod (reg_update _ mstatus _ ms_a with "Hreg Hms") as "[Hreg Hms]".
-      iMod (reg_update _ mstatus _ ms_b with "Hreg Hms") as "[Hreg Hms]".
-      iMod (reg_update _ mstatus _ ms_c with "Hreg Hms") as "[Hreg Hms]".
-      iMod (reg_update _ stval _ (zeros' 64) with "Hreg Hstval") as "[Hreg Hstval]".
-      iMod (reg_update _ sepc _ pc0 with "Hreg Hsepc") as "[Hreg Hsepc]".
-      iMod (reg_update _ cur_privilege _ Supervisor with "Hreg Hpriv") as "[Hreg Hpriv]".
-      iMod (reg_update _ nextPC _ (stvec_base handler) with "Hreg Hnpc") as "[Hreg Hnpc]".
-      (* [intr_res]'s PIECES ride across the handler run separately, and are
-         re-formed in the return continuation below -- where the old proof
-         re-sealed the invariant here and let the handler run outside it.
-         Same effect, and sound for the same reason: the trap does not write
-         stvec, and the ghost quarter stays at '1' while the live bit is 0,
-         which is exactly the stale-but-restored state the sret repairs (the
-         handler ties its own per-trap ghost, ProofKernelvec).  Framing a
-         PER-HART resource here is Stage-1 only: the absorbing Löb re-enters
-         at the hart the trap returned to, which is this one.
-
-         RE-FORMING IT HERE DOES NOT WORK, and the failure is the one
-         durable-notes describes: the [iNext] below descends into the
-         [▷ intr_handler_spec] buried inside [intr_res] and strips it, so the
-         hypothesis becomes STRONGER than [intr_res] and stops matching it --
-         [iSpecialize] on the Löb hypothesis then fails as if the resource
-         were missing.  Re-seal at the point of use instead. *)
-      iModIntro. iRight.
-      iExists i, Supervisor, s_trap.
-      iSplitR; [iPureIntro; exact Hha |].
-      iSplitR; [iPureIntro; exact Hhi |].
-      assert (LpcT : register_lookup PC s_trap.(sregs) = pc0).
-      { unfold s_trap. lk. exact Lpc. }
-      rewrite LpcT.
-      iSplitL "Hpcr"; [iExact "Hpcr" |].
-      iSplitL "Hreg Hmem".
-      { unfold s_trap; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-      iNext.
-      iIntros "Hhs Hpcr".
-      assert (LnT : register_lookup nextPC s_trap.(sregs) = stvec_base handler).
-      { unfold s_trap. lk. reflexivity. }
-      iEval (rewrite LnT Hsb) in "Hpcr".
-      iEval (rewrite Hsb) in "Hnpc".
-      assert (Htm : ms_c = trap_ms elp0 ms) by reflexivity.
-      iEval (rewrite Htm) in "Hms".
-      (* ---- the handler WP discharges the whole handler.  Its later was
-             stripped by the [iNext] above, so ["Hsp"] is now the bare spec.
-             THE CONTRACT IS A FIXPOINT NOW, so it is not syntactically a
-             [□ ∀ …] and [iApply] cannot see its premises: unfold one step
-             first ([IntrDefs.intr_handler_spec_unfold]). ---- *)
-      iEval (rewrite intr_handler_spec_unfold) in "Hsp".
-      iApply ("Hsp" $! root_ppn elp0 ms pc0 MIE_S mdv0 m
-                with "[%] [%] [%] Hhs Hpriv Hms Hmie Hmdl Hsepc [$Hpcr $Hnpc] Hfile HF").
-      { exact Hmsf. }
-      { exact Hpc0. }
-      { exact Hmm. }
-      (* the handler's return continuation: re-establish the frame + Löb *)
-      iIntros "Hhs Hpriv Hms Hmie Hmdl Hsepcx Hpc Hfile HF".
-      (* RE-SEAL [intr_res] AT THE POINT OF USE.  The inner [iNext] is what
-         makes one tactic cover both forms -- it strips the GOAL's later and
-         leaves an already-stripped ["Hsp"] untouched -- so this does not have
-         to know whether the trap step's [iNext] got there first. *)
-      iAssert (intr_res) with "[Hq Hstv]" as "Hintr".
-      { iApply (intr_res_intro handler vb Htvd Hsb with "Hq Hstv").
-        iNext. iExact "Hsp". }
-      assert (Hs1 : _get_Mstatus_SIE (sret_ms5 (trap_ms elp0 ms)) = ('b"1" : mword 1))
-        by (apply eq_vec_true_iff; exact (roundtrip_SIE_true elp0 ms HSIE1)).
-      assert (Hs2 : _get_Mstatus_SIE ms = ('b"1" : mword 1))
-        by (apply eq_vec_true_iff; exact HSIE1).
-      iEval (rewrite Hs2 -Hs1) in "Hsie".
-      iApply ("IH" with "Hintr Hhs [Hpriv Hms Hsie Hmie Hmdl Hsepcx Hscause Hstval] Hpc Hfile HF Hbody").
-      iFrame "Hhw Hminv Hpriv".
-      iSplitL "Hms Hsie".
-      { iExists (sret_ms5 (trap_ms elp0 ms)). iFrame "Hms Hsie".
-        iPureIntro. exact (intr_ms_facts_roundtrip elp0 ms Hmsf). }
+(* ===================================================================== *)
+(* §8 THE ENGINE: run the point just before an instruction at [pc0] with   *)
+(* interrupts ENABLED.  Takes an arbitrary number of pending interrupts    *)
+(* (Löb induction over the trap + handler round trip), then hands the      *)
+(* caller's σ-callback the pure no-pending fact and lets the instruction   *)
+(* execute.                                                               *)
+(*                                                                        *)
+(* IT TAKES THE FOLDED BUNDLE AND ITS CALLBACK IS HART-GENERIC, and those  *)
+(* two facts are the same fact.  A trap can park the interrupted thread    *)
+(* (kerneltrap yields on a timer tick when this cpu has a current proc),   *)
+(* so the instruction after the absorbing loop executes on the hart the    *)
+(* LAST trap returned to -- hence the callback sits inside                 *)
+(* [WpNext.wp_next true p].  Everything the loop threads is therefore      *)
+(* per-hart and has to CROSS rather than be framed: the mstatus cell and   *)
+(* its tied SIE half, the trap CSRs, the [sret_bits] travelling half, the  *)
+(* per-cpu bookkeeping, the translation slot, the register file.  The one  *)
+(* vehicle that crosses is [sie_cap_gpr], which is exactly why the handler *)
+(* contract's pre and post are the bundle: THE CONTRACT'S POSTCONDITION IS *)
+(* THIS LEMMA'S OWN PRECONDITION, at whatever hart resumed.                *)
+(*                                                                        *)
+(* OUTSIDE THE SECTION, and it has to be: the Löb is taken over a          *)
+(* statement that QUANTIFIES the hart ([iLöb as "IH" forall (CID0)]), so   *)
+(* the binder must be dischargeable -- a section variable is not.  That    *)
+(* also means every hart-indexed term written fresh in the proof below     *)
+(* means [CID0], the hart the loop is currently on, which is what the      *)
+(* re-entry at [c'] has to be careful about.                              *)
+(*                                                                        *)
+(* NO [handler], NO [root_ppn], NO [intr_config]/[intr_frame] PARAMETERS.  *)
+(* The installed vector is existential inside [intr_res], the kernel root  *)
+(* inside [strans_inv]'s KPT arm, menvcfg and mie inside [sconf]; the      *)
+(* engine reads each out per trap.  [intr_config] / [intr_frame] and the   *)
+(* funnel's assemble/disassemble dance around them are gone with it.       *)
+(* ===================================================================== *)
+Lemma wp_exec_step_intr `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID0 : CpuId}
+    (pc0 : mword 64) (m : regfile) (av : nat) (p : mword 64) :
+  ret_pc pc0 = pc0 ->
+  sie_cap_gpr m av true p -∗
+  pc_is pc0 -∗
+  wp_next true p (fun CID =>
+    ∀ σ,
+      ⌜ exec (dispatchInterrupt Supervisor) σ = Some (None, σ) ⌝ -∗
+      sconf -∗
+      sie_cap m av true p -∗
+      gpr_file (tp_pin m) -∗
+      pc_is pc0 -∗
+      mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
+      ∃ (retval : mword 32) (s_exec : mstate),
+        ⌜ exec (run_hart_active 0) σ
+            = Some (Step_Execute (RETIRE_SUCCESS, retval), s_exec) ⌝ ∗
+        PC ↦ᵣ (register_lookup PC s_exec.(sregs)) ∗
+        mstate_interp s_exec ∗
+        (hart_state ↦ᵣ HART_ACTIVE tt -∗
+         PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
+         ▷ WP (Loop : expr riscv_lang))) -∗
+  WP (Loop : expr riscv_lang).
+Proof.
+  intros Hpc0.
+  iIntros "Hcg Hpc Hbody".
+  (* the whole state crosses, so the Löb generalises the HART as well as the
+     resources: after a trap that parked the thread, the loop re-enters on
+     the hart the handler came back on. *)
+  iRevert "Hcg Hpc Hbody".
+  iLöb as "IH" forall (CID0).
+  iIntros "Hcg Hpc Hbody".
+  (* ---- open the bundle: this is where [intr_config_of_v2] used to be, and
+         the funnel's copy of it is gone with the two [intr_config] lemmas. ---- *)
+  iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
+  iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+  (* [Hrcpt] is the enabled arm's KPT RECEIPT (IntrDefs §6b).  The engine
+     neither reads nor moves it -- a trap cannot change which table is
+     installed -- it just hands it to the handler, which owes the arm back. *)
+  iDestruct "Harm" as "(Hq1 & Hires & Hrcpt & Hsepcx & Hscausex & Hstvalx & Hsppc & Hclm & Hcpu)".
+  (* Bare ∧ SIE = '1' is impossible: the arm's [intr_res] OWNS stvec and the
+     Bare slot owns the same cell.  Two owned cells conflict directly -- this
+     used to need an [iInv] under an [fupd_wp] to reach the invariant's copy. *)
+  iDestruct "Htr" as "[(Hbit0 & Hbare & Hbstv) | (Hbit1 & Hkpt)]".
+  { iEval (rewrite /intr_res) in "Hires".
+    iDestruct "Hires" as (h0 vb0) "(_ & _ & _ & Hstv & _)".
+    iDestruct "Hbstv" as (v0) "Hbstv".
+    iDestruct (reg_pointsto_conflict stvec (DfracOwn 1) with "Hstv Hbstv") as %[]. }
+  iDestruct "Hkpt" as (root_ppn) "Htlb".
+  iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
+  iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Htie & %Hmsf)".
+  (* THE LIVE SIE BIT IS THE ARM INDEX: the tied half and the arm's eighth
+     are fragments of one ghost, so agreement reads it off with no case
+     split.  This is the fact [intr_ms_facts] used to carry as a premise. *)
+  iDestruct (ghost_var_agree with "Hhalf Hq1") as %HSIE1.
+  iDestruct "Hmiex" as (mdv0) "(Hmie & Hmdl & %Hmm)".
+  iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval)".
+  subst menvcfg0.
+  iPoseProof "Hhw" as "#Hhwc".
+  iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+    "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+      %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+  pose proof (elp_no_lp elp0 Help_np) as Help0.
+  iApply (wp_exec_step_retire_or_intr with "Hminv Hhs").
+  iIntros (σ) "Hsi".
+  iDestruct (dispatch_S_transient σ misa0 MIE_S mdv0 ms HmisaS Hmm
+               with "Hsi Hmisa Hmie Hmdl Hms") as %Hdisp0.
+  match type of Hdisp0 with _ = Some (?D, _) =>
+    destruct D as [[i pr] |] eqn:Hdres end.
+  - (* ---- an interrupt is pending: take it, run the handler, Löb ---- *)
+    pose proof (s_dispatch_Some_S _ _ _ _ _ _ _ _ Hdres); subst pr.
+    (* open [intr_res] for this step: stvec (read by the trap), the vector's
+       two pure facts, the ghost quarter (spent by the flip below), and the
+       handler contract.  The contract arrives UNDER ITS LATER -- the [▷] that
+       replaced [inv]'s guard, and the fixpoint's -- and the trap step's own
+       [iNext] strips it, so the guard is paid for by a step that exists
+       anyway. *)
+    iEval (rewrite /intr_res) in "Hires".
+    iDestruct "Hires" as (handler vb) "(%Htvd & %Hsb & Hq4 & Hstv & #Hsp)".
+    iDestruct "Hsepcx" as (sepc_old) "Hsepc".
+    iDestruct "Hscausex" as (scause_old) "Hscause".
+    iDestruct "Hstvalx" as (stval_old) "Hstval".
+    iDestruct "Hsppc" as (vca vcb) "Hsppc".
+    iDestruct "Hcpu" as "(Hcells & Hcnt)".
+    iDestruct "Hpc" as "[Hpcr Hnpc]".
+    iDestruct "Hsi" as "[Hreg Hmem]".
+    iDestruct (reg_valid with "Hreg Hpcr") as %Lpc.
+    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
+    iDestruct (reg_valid with "Hreg Hms") as %Lms.
+    iDestruct (reg_valid with "Hreg Hscause") as %Lsc.
+    iDestruct (reg_valid with "Hreg Hstv") as %Lstvec.
+    iDestruct (reg_valid_dq with "Hreg Help") as %Lelp.
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
+    assert (HmisaS' : eq_vec (_get_Misa_S (register_lookup misa σ.(sregs))) ('b"1") = true)
+      by (rewrite Lmisa; exact HmisaS).
+    pose proof (exec_run_hart_active_pending σ i Supervisor Lpriv Hdisp0) as Hha.
+    pose proof (exec_handle_interrupt_S σ i pc0 ms scause_old handler elp0
+                  Lpriv Lms Lsc Lstvec Lelp HmisaS' Htvd Lpc) as Hhi.
+    match type of Hhi with _ = Some (_, ?T) => set (s_trap := T) in Hhi end.
+    (* thread the trap's writes through the ghost cells, in tower order *)
+    pose (ms_e := update_subrange_vec_dec ms 23 23 elp0).
+    pose (c1v := update_subrange_vec_dec scause_old (64 - 1) (64 - 1)
+                   (bool_to_bit (trapCause_is_interrupt (Interrupt i)))).
+    pose (c2v := update_subrange_vec_dec c1v (64 - 2) 0
+                   (zero_extend' (64 - 1) (trapCause_bits_forwards (Interrupt i)))).
+    (* the scause word IS [IntrDefs.trap_scause], which is what lets the
+       cause layer ([s_cause_ok_of_dispatch]) speak about it -- one spelling
+       of the tower, not two kept in step by hand. *)
+    assert (Hc2 : c2v = trap_scause scause_old i) by reflexivity.
+    pose proof (s_cause_ok_of_dispatch (register_lookup mip σ.(sregs)) mdv0 ms
+                  scause_old (register_lookup sig_meip σ.(sregs))
+                  (register_lookup sig_seip σ.(sregs)) i Supervisor Hdres) as Hcause.
+    pose (ms_a := update_subrange_vec_dec ms_e 5 5 (_get_Mstatus_SIE ms_e)).
+    pose (ms_b := update_subrange_vec_dec ms_a 1 1 ('b"0")).
+    pose (ms_c := update_subrange_vec_dec ms_b 8 8 ('b"1")).
+    iMod (reg_update _ mstatus _ ms_e with "Hreg Hms") as "[Hreg Hms]".
+    assert (Hlkelp : register_lookup elp (register_set mstatus ms_e σ.(sregs))
+                     = landing_pad_bits_backwards NO_LP_EXPECTED).
+    { rewrite irrelevant_register_set; [ rewrite Lelp; exact Help0 | vm_compute; reflexivity ]. }
+    iDestruct (reg_interp_set_same _ elp _ Hlkelp with "Hreg") as "Hreg".
+    iMod (reg_update _ scause _ c1v with "Hreg Hscause") as "[Hreg Hscause]".
+    iMod (reg_update _ scause _ c2v with "Hreg Hscause") as "[Hreg Hscause]".
+    iMod (reg_update _ mstatus _ ms_a with "Hreg Hms") as "[Hreg Hms]".
+    iMod (reg_update _ mstatus _ ms_b with "Hreg Hms") as "[Hreg Hms]".
+    iMod (reg_update _ mstatus _ ms_c with "Hreg Hms") as "[Hreg Hms]".
+    iMod (reg_update _ stval _ (zeros' 64) with "Hreg Hstval") as "[Hreg Hstval]".
+    iMod (reg_update _ sepc _ pc0 with "Hreg Hsepc") as "[Hreg Hsepc]".
+    iMod (reg_update _ cur_privilege _ Supervisor with "Hreg Hpriv") as "[Hreg Hpriv]".
+    iMod (reg_update _ nextPC _ (stvec_base handler) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    (* ---- THE GHOST FLIP '1' -> '0', with all four fractions in hand.  This
+           is the move the trap makes and the [sret] undoes, and it is why the
+           arm has to be OPEN here: the tied half (1/2), the arm's eighth, the
+           count's eighth and [intr_res]'s quarter are exactly the four, and
+           each of the four goes to a DIFFERENT conjunct of what the handler
+           is handed ([sconf], [sie_arm_of _ false], [cpu_hart 0 false],
+           [intr_res]). ---- *)
+    iEval (rewrite /intr_count) in "Hcnt".
+    iMod (sie_ghost_flip_off sie_gname (_get_Mstatus_SIE ms) ('b"1") ('b"1") vb
+            with "Hhalf Hq1 Hcnt Hq4") as "(Hhalf & Hq1 & Hcnt & Hq4)".
+    (* ---- and the SPP/SPIE mirror MOVES with it, which no SIE flip does:
+           the trap writes SPP := 1 and SPIE := old SIE = 1, so BOTH halves
+           are updated together -- possible only because the enabled arm was
+           holding the travelling one. ---- *)
+    iEval (rewrite /sret_tie) in "Htie".
+    iMod (sret_bits_update _ _ vca vcb ('b"1" : mword 1) ('b"1" : mword 1)
+            with "Htie Hsppc") as "[Htie Hsppc]".
+    iModIntro. iRight.
+    iExists i, Supervisor, s_trap.
+    iSplitR; [iPureIntro; exact Hha |].
+    iSplitR; [iPureIntro; exact Hhi |].
+    assert (LpcT : register_lookup PC s_trap.(sregs) = pc0).
+    { unfold s_trap. lk. exact Lpc. }
+    rewrite LpcT.
+    iSplitL "Hpcr"; [iExact "Hpcr" |].
+    iSplitL "Hreg Hmem".
+    { unfold s_trap; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
+    iNext.
+    iIntros "Hhs Hpcr".
+    assert (LnT : register_lookup nextPC s_trap.(sregs) = stvec_base handler).
+    { unfold s_trap. lk. reflexivity. }
+    iEval (rewrite LnT Hsb) in "Hpcr".
+    iEval (rewrite Hsb) in "Hnpc".
+    assert (Htm : ms_c = trap_ms elp0 ms) by reflexivity.
+    iEval (rewrite Htm) in "Hms".
+    (* ---- ASSEMBLE THE HANDLER'S ENTRY PACKAGE.  Nothing here is invented:
+           every conjunct is a piece the enabled arm was carrying, at the
+           value the trap just wrote.  The stack carve is not even touched --
+           [trap_res true + av] is the index at both arms. ---- *)
+    assert (Htie_eq : sret_tie (trap_ms elp0 ms)
+                      = sret_bits ('b"1" : mword 1) ('b"1" : mword 1)).
+    { rewrite /sret_tie trap_ms_SPP trap_ms_SPIE HSIE1. reflexivity. }
+    iAssert (sconf) with "[Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv]" as "Hsc".
+    { rewrite /sconf. iFrame "Hhw Hminv Hpriv".
+      iSplitL "Hms Hhalf Htie".
+      { iExists (trap_ms elp0 ms). iFrame "Hms".
+        rewrite Htie_eq. iFrame "Htie".
+        rewrite trap_ms_SIE. iFrame "Hhalf".
+        iPureIntro. exact (sconf_ms_facts_trap elp0 ms Hmsf). }
       iSplitL "Hmie Hmdl".
       { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
-      iFrame "Hsepcx".
-      iSplitL "Hscause". { iExists c2v. iFrame "Hscause". }
-      iExists (zeros' 64). iFrame "Hstval".
-    - (* ---- nothing pending: the caller's instruction executes ----
-         (the destruct folded [Hdres] into [Hdisp0]:
-          Hdisp0 : exec (dispatchInterrupt Supervisor) σ = Some (None, σ)) *)
-      iSpecialize ("Hbody" $! σ with "[%]"); [exact Hdisp0 |].
-      iMod ("Hbody" with "Hintr [Hpriv Hms Hsie Hmie Hmdl Hsepcx Hscausex Hstvalx] Hpc Hfile HF Hsi")
-        as (retval s_exec) "(%Hha & Hpc' & Hsi' & Hcont)".
-      { iFrame "Hhw Hminv Hpriv".
-        iSplitL "Hms Hsie".
-        { iExists ms. iFrame "Hms Hsie". iPureIntro. exact Hmsf. }
-        iSplitL "Hmie Hmdl".
-        { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
-        iFrame "Hsepcx Hscausex Hstvalx". }
-      iModIntro. iLeft.
-      iExists retval, s_exec.
-      iSplitR; [iPureIntro; exact Hha |].
-      iFrame "Hpc' Hsi'". iExact "Hcont".
-  Qed.
-
-End WpIntrInv.
+      iExists MENVCFG_S. iFrame "Hmenv". iPureIntro.
+      repeat split; try assumption; reflexivity. }
+    iAssert (intr_res) with "[Hq4 Hstv]" as "Hires".
+    { iApply (intr_res_intro handler ('b"0" : mword 1) Htvd Hsb with "Hq4 Hstv").
+      iNext. iExact "Hsp". }
+    iAssert (ihs_entry_of (ires_of ihs) m av p pc0 (trap_scause scause_old i)
+               (zeros' 64) handler)
+      with "[Hhs Hsc Hstk Hbit1 Htlb Hq1 Hfile Hsppc Hsepc Hscause Hstval
+             Hcells Hcnt Hclm Hires Hrcpt Hpcr Hnpc]" as "Hentry".
+    { rewrite /ihs_entry_of /sie_cap_gpr_of /sie_cap_of /sie_arm_of.
+      rewrite Hc2.
+      iFrame "Hhs Hsc Hstk Hfile Hsppc Hsepc Hscause Hstval Hclm Hrcpt".
+      iSplitL "Hbit1 Htlb Hq1".
+      { iSplitL "Hbit1 Htlb".
+        - iApply (strans_inv_intro root_ppn with "Hbit1 Htlb").
+        - iExact "Hq1". }
+      iSplitL "Hcells Hcnt".
+      { rewrite /cpu_hart /intr_count. iFrame "Hcells Hcnt". }
+      iSplitL "Hires".
+      { iEval (rewrite intr_res_of_eq) in "Hires". iExact "Hires". }
+      iFrame "Hpcr Hnpc". }
+    (* ---- run the handler, and re-enter the Löb ON THE HART IT RETURNED TO ---- *)
+    iApply (intr_handler_spec_apply handler m av p pc0 (trap_scause scause_old i)
+              (zeros' 64) Hpc0 Hcause with "Hsp Hentry").
+    iIntros (c' Hs').
+    rewrite /ihs_post_of. iIntros "Hcg Hpc".
+    (* the caller's own obligation is anchored at the hart we STARTED on;
+       [wp_next_retarget] moves it, and [Hs'] -- the guard the contract's
+       [wp_next] carries -- is exactly its premise.  This is where [wp_next]'s
+       second escape hatch pays for itself: at [p = zero_reg] the handler
+       promises it came back here. *)
+    iDestruct (wp_next_retarget CID0 c' true p _ Hs' with "Hbody") as "Hbody".
+    iApply ("IH" $! c' with "Hcg Hpc Hbody").
+  - (* ---- nothing pending: the caller's instruction executes ---- *)
+    iDestruct (wp_next_at true p _ CID0 (fun _ => eq_refl) with "Hbody") as "Hbody".
+    iSpecialize ("Hbody" $! σ with "[%]"); [exact Hdisp0 |].
+    iAssert (sconf) with "[Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv]" as "Hsc".
+    { rewrite /sconf. iFrame "Hhw Hminv Hpriv".
+      iSplitL "Hms Hhalf Htie".
+      { iExists ms. iFrame "Hms Hhalf Htie". iPureIntro. exact Hmsf. }
+      iSplitL "Hmie Hmdl".
+      { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
+      iExists MENVCFG_S. iFrame "Hmenv". iPureIntro.
+      repeat split; try assumption; reflexivity. }
+    iMod ("Hbody" with "Hsc [Hstk Hbit1 Htlb Hq1 Hires Hrcpt Hsepcx Hscausex Hstvalx Hsppc Hclm Hcpu] Hfile Hpc Hsi")
+      as (retval s_exec) "(%Hha & Hpc' & Hsi' & Hcont)".
+    { rewrite /sie_cap /sie_arm. iFrame "Hstk".
+      iSplitL "Hbit1 Htlb".
+      { iApply (strans_inv_intro root_ppn with "Hbit1 Htlb"). }
+      iFrame "Hq1 Hires Hrcpt Hsepcx Hscausex Hstvalx Hsppc Hclm Hcpu". }
+    iModIntro. iLeft.
+    iExists retval, s_exec.
+    iSplitR; [iPureIntro; exact Hha |].
+    iFrame "Hpc' Hsi'". iExact "Hcont".
+Qed.

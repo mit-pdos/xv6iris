@@ -83,32 +83,29 @@ Section WpSmodeIntr.
   Context {p : mword 64}.
 
   (* =================================================================== *)
-  (* §1 THE STEP ENGINE at SIE=1: the [wp_instr_s_tlbinv_pt] callback     *)
-  (* shape over [wp_exec_step_intr].                                      *)
+  (* §1 THE STEP ENGINE at SIE=1, over the FOLDED BUNDLE.  Everything it   *)
+  (* used to take piecewise ([intr_res], [intr_config], [gpr_file],        *)
+  (* [intr_frame]) is inside [sie_cap_gpr] now, and the σ-callback it hands *)
+  (* on is the funnel's own -- which is why §2's '1' arm is three lines.    *)
+  (*                                                                      *)
+  (* THE CALLBACK IS HART-GENERIC, inherited from                          *)
+  (* [WpIntrInv.wp_exec_step_intr]: the absorbing loop can park the thread, *)
+  (* so the instruction executes on the hart the last trap returned to.    *)
+  (* The proof therefore does the standard rename -- the STATEMENT never    *)
+  (* sees it, so callers that name this lemma's hart keep working -- and    *)
+  (* everything after it means the REBOUND hart by instance resolution.     *)
   (* =================================================================== *)
-  (* [m] is the map the register file is held at -- the CALLER passes
-     [tp_pin m] (HartTp.v); nothing here needs to know that. *)
-  (* NO [handler] PARAMETER, and [intr_res] is THREADED rather than framed --
-     both inherited from [wp_exec_step_intr] below.  The funnel therefore
-     hands this engine an arm conjunct verbatim and takes it back from the
-     callback, instead of skolemising a handler out of the arm and keeping a
-     persistent copy across the engine. *)
-  Lemma wp_instr_s_intr (root_ppn : mword 44)
-      (m : regfile)
+  Lemma wp_instr_s_intr (m : regfile) (n : nat)
       (pc : mword 64) (is_rvc : bool) (i : instruction) :
     ret_pc pc = pc ->
-    intr_res -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    intr_config -∗
+    sie_cap_gpr m n true p -∗
     pc_is pc -∗
-    gpr_file m -∗
-    intr_frame root_ppn m -∗
     instr pc is_rvc i -∗
-    (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
-       intr_res -∗
-       intr_config -∗
-       gpr_file m -∗
-       intr_frame root_ppn m -∗
+    wp_next true p (fun (CID : CpuId) =>
+      ∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
+       sconf -∗
+       sie_cap m n true p -∗
+       gpr_file (tp_pin m) -∗
        nextPC ↦ᵣ pc -∗
        mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
@@ -122,26 +119,38 @@ Section WpSmodeIntr.
           ▷ WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hpc0) "Hintr Hhs Hcfg Hpc Hfile HF Hinstr H".
+    iIntros (Hpc0) "Hcg Hpc Hinstr H".
+    iApply (wp_exec_step_intr pc m n p Hpc0 with "Hcg Hpc").
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       which the STATEMENT never sees.  It has to come AFTER any same-section
+       application (there is none here) and before the [iIntros] that binds
+       the engine's hart. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ) "%Hdisp Hsc Hcap Hfile Hpc Hsi".
+    (* the caller's obligation is anchored at the entry hart; [Hs] is the
+       guard that moves it to the one we are on. *)
+    iDestruct (wp_next_at true p _ CID Hs with "H") as "H".
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
     iAssert (⌜ match r with F_Base _ => True | F_RVC _ => True | _ => False end ⌝)%I as %Hrok.
     { iEval (rewrite /instr_bytes) in "Hbytes".
       iDestruct "Hbytes" as "[_ Hb]".
       destruct r; [iDestruct "Hb" as %[] | done | done | iDestruct "Hb" as %[] ]. }
-    iApply (wp_exec_step_intr pc root_ppn m Hpc0
-              with "Hintr Hhs Hcfg Hpc Hfile HF").
-    iIntros (σ) "%Hdisp Hintr Hcfg Hpc Hfile HF Hsi".
-    (* unbundle the config for the σ-level fetch lookups *)
-    iDestruct "Hcfg" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hsepcx & Hscausex & Hstvalx)".
-    iDestruct "Hmsx" as (ms) "(Hms & Hsie & %Hmsf)".
+    (* unbundle for the σ-level fetch lookups *)
+    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
+    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Htie & %Hmsf)".
     pose proof Hmsf as Hmsf'.
-    destruct Hmsf' as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
+    destruct Hmsf' as (HMPRV0 & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
+    iDestruct "Hmiex" as (mdv0) "(Hmie & Hmdl & %Hmm)".
+    iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval)".
+    subst menvcfg0.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iDestruct "HF" as "(Hmenv & Htlbinv & Hstk)".
+    (* the translation slot: SIE = '1' forces the KPT arm *)
+    iDestruct (sie_cap_on_kpt with "Hcap") as (root_ppn) "(Hstk & Hbit1 & Htlbinv & Harm)".
     iDestruct "Hpc" as "[Hpcr Hnpc]".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid    with "Hreg Hpcr")   as %Lpc.
@@ -160,7 +169,7 @@ Section WpSmodeIntr.
     assert (Lpma : pma_allows_all (register_lookup pma_regions σ.(sregs)))
       by (rewrite Lpma0; exact Hpma_all).
     (* the unified fetch through the tree invariant (may write A/D back) *)
-    unshelve iMod (tlb_inv_pt_fetch root_ppn σ pc r _ _
+    unshelve iMod (tlb_inv_pt_fetch (CID := CID) root_ppn σ pc r _ _
             Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma
             with "[$Hreg $Hmem] Htlbinv Hbytes")
       as (σf) "(%Hfetcheq & %Hmdevf & %Hpresf & Hsi & Htlbinv)"; [solve_ndisj |].
@@ -182,14 +191,20 @@ Section WpSmodeIntr.
     assert (Hlpad : eq_vec (register_lookup elp σf.(sregs))
                            (landing_pad_bits_backwards LP_EXPECTED) = false)
       by (rewrite Help_σf; exact Help_np).
-    (* rebundle config + frame; run the caller's execute at σf *)
+    (* rebundle config + capability; run the caller's execute at σf *)
     iMod ("H" $! σf Lpc_σf
-            with "Hintr [Hpriv Hms Hsie Hmiex Hsepcx Hscausex Hstvalx]
-                  Hfile [Hmenv Htlbinv Hstk] Hnpc [$Hreg $Hmem]")
+            with "[Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv]
+                  [Hstk Hbit1 Htlbinv Harm] Hfile Hnpc [$Hreg $Hmem]")
       as (s_exec) "(%Hexec & [Hreg' Hmem'] & Hcont)".
-    { iFrame "Hhw Hminv Hpriv Hmiex Hsepcx Hscausex Hstvalx".
-      iExists ms. iFrame "Hms Hsie". iPureIntro. exact Hmsf. }
-    { iFrame "Hmenv Htlbinv Hstk". }
+    { rewrite /sconf. iFrame "Hhw Hminv Hpriv".
+      iSplitL "Hms Hhalf Htie".
+      { iExists ms. iFrame "Hms Hhalf Htie". iPureIntro. exact Hmsf. }
+      iSplitL "Hmie Hmdl".
+      { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
+      iExists MENVCFG_S. iFrame "Hmenv". iPureIntro.
+      repeat split; try assumption; reflexivity. }
+    { rewrite /sie_cap. iFrame "Hstk Harm".
+      iApply (strans_inv_intro (CID := CID) root_ppn with "Hbit1 Htlbinv"). }
     iDestruct (reg_valid with "Hreg' Hpcr") as %Lpc_exec.
     rewrite Lpc_σf in Hexec.
     (* assemble the run_hart_active retire witness *)
@@ -222,7 +237,7 @@ Section WpSmodeIntr.
   (* §2 THE SIE-AGNOSTIC FUNNEL over [sconf] + [sie_cap]: the capability's *)
   (* SIE INDEX [b] picks the arm (ghost agreement with the bundle's tied   *)
   (* half then pins the live bit at the '0' arm); both arms present the    *)
-  (* same σf-callback.                                                     *)
+  (* same σf-callback.                                                    *)
   (* =================================================================== *)
   Lemma wp_instr_s_sconf
       (m : regfile) (n : nat) (b : bool)
@@ -237,11 +252,10 @@ Section WpSmodeIntr.
        section's, so every resource in the body picks the rebound hart by
        instance resolution and the body is textually unchanged.
 
-       WHY IT STOPS HERE.  The funnel's own proof converts for free
-       ([WpNext.wp_next_here]).  The two engines UNDER it cannot: their '1' arm
-       frames per-hart residue across the engine (the travelling [sret_bits]
-       half, the SIE eighth, [cpu_hart]'s cells, [strans_bit], [intr_inv]), and
-       only the trap handler can hand those back at the resuming hart. *)
+       BOTH ARMS PASS IT ON UNCHANGED NOW.  The '1' arm hands it straight to
+       [wp_instr_s_intr] (the shapes coincide -- that is what the bundle
+       bought); the '0' arm collapses it with [wp_next_off], where no trap can
+       be taken and the hart provably does not move. *)
     wp_next b p (fun (CID : CpuId) =>
       ∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
        sconf -∗
@@ -261,42 +275,9 @@ Section WpSmodeIntr.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hcg Hpc Hinstr H".
-    (* consume the caller's hart-generic obligation at THIS hart -- the whole
-       of the funnel's side of the move, and free because Stage 1's absorbing
-       engine still returns where it came from. *)
-    iDestruct (wp_next_here with "H") as "H".
-    (* sp is not tp, so the PINNED register file's sp slot IS the map's --
-       the bridge between [sie_cap]/[intr_frame] (stated at [m]) and the
-       file the bundle actually owns, [gpr_file (tp_pin m)]. *)
-    assert (Hsppin : tp_pin m !!! Regidx csp_rs1 = m !!! Regidx csp_rs1).
-    { exact (rget_ne m csp_rs1
-               ltac:(intro He; injection He as He2; vm_compute in He2; congruence)). }
-    iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
     destruct b.
-    - (* ---- b = true: the interrupt-absorbing engine.  [sie_arm true]
-           needs no unfolding: the [if] reduces by conversion, so
-           [iDestruct] / [iFrame] / [iExact] see through it. ---- *)
-      (* [Hkpt] is the enabled arm's KPT receipt (IntrDefs §6b).  The engine
-         neither reads nor moves it -- a trap cannot change which table is
-         installed -- so it is simply framed across the step and rebuilt into
-         the arm below.  Named [Hkptr] (receipt) because [Hkpt] below is the
-         KPT arm's RESIDUE, a different thing. *)
-      iDestruct "Harm" as "(Hq1 & Hintr & Hkptr & Hsepcx & Hscausex & Hstvalx & Hsppc & Hcpu)".
-      (* Bare ∧ SIE='1' is impossible: the '1' arm's [intr_res] OWNS stvec and
-         the Bare slot owns the same cell.  This used to need an [iInv] under
-         an [fupd_wp] to get at the invariant's copy of the cell; owning it
-         makes the refutation two [iDestruct]s and a conflict. *)
-      iDestruct "Htr" as "[(Hbit0 & Hbare & Hbstv) | (Hbit1 & Hkpt)]".
-      { iEval (rewrite /intr_res) in "Hintr".
-        iDestruct "Hintr" as (h0 b0) "(_ & _ & _ & Hstv & _)".
-        iDestruct "Hbstv" as (v0) "Hbstv".
-        iDestruct (reg_pointsto_conflict stvec (DfracOwn 1) with "Hstv Hbstv") as %[]. }
-      iDestruct "Hkpt" as (root_ppn) "Htlbinv".
-      (* split the exact reserved carve off for [intr_frame]; the deep
-         [n] available slots ride framed through the absorbing engine *)
-      iEval (rewrite stack_own_app) in "Hstk".
-      iDestruct "Hstk" as "[Hstk Hdeep]".
+    - (* ---- b = true: the interrupt-absorbing engine.  The whole bundle goes
+           in and the callback goes on unchanged. ---- *)
       iAssert (⌜ is_aligned_vaddr (Virtaddr pc) 2 = true ⌝)%I as %Hal2.
       { iDestruct "Hinstr" as "[%Hnlpad Hr]".
         iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
@@ -304,40 +285,12 @@ Section WpSmodeIntr.
         iDestruct "Hbytes" as "[%H2al _]". iPureIntro. exact H2al. }
       assert (Hpc0 : ret_pc pc = pc)
         by (unfold ret_pc; exact (update_bit0_zero_of_aligned2 pc Hal2)).
-      (* THE SPP TIE COMES OUT WITH THE CONFIG.  [intr_config] carries none:
-         the trap sets SPP := 1 and its sret clears it, so across the engine
-         the bit MOVES and a tie framed around the call would be stale.  We
-         hold the tie half here and the TRAVELLING half [Hsppc] out of the
-         enabled arm, which is exactly what lets the conversion back re-tie
-         both to the mstatus the engine returns. *)
-      iDestruct (intr_config_of_v2 with "Hsc Hq1 Hsepcx Hscausex Hstvalx")
-        as "(Hic & Hq1 & Hmenv & Hsppt)".
-      iDestruct "Hsppt" as (vta vtb) "Hsppt".
-      iDestruct "Hsppc" as (vca vcb) "Hsppc".
-      (* the engine runs at the PINNED map: its [gpr_file] / [intr_frame]
-         are the bundle's, retargeted along [Hsppin]. *)
-      iAssert (intr_frame root_ppn (tp_pin m)) with "[Hmenv Htlbinv Hstk]" as "HF".
-      { iApply (intr_frame_retarget root_ppn m (tp_pin m) (eq_sym Hsppin)).
-        iFrame "Hmenv Htlbinv Hstk". }
-      iApply (wp_instr_s_intr root_ppn (tp_pin m) pc is_rvc i
-                Hpc0
-                with "Hintr Hhs Hic Hpc Hfile HF Hinstr").
-      iIntros (σ Hpceq) "Hintr Hic Hfile HF Hnpc Hsi".
-      iDestruct (intr_frame_retarget root_ppn (tp_pin m) m Hsppin with "HF") as "HF".
-      iDestruct "HF" as "(Hmenv & Htlbinv & Hstk)".
-      iMod (v2_of_intr_config vta vtb vca vcb with "Hic Hmenv Hsppt Hsppc")
-        as "(Hsc & Hsppc & Hsepcx & Hscausex & Hstvalx)".
-      iMod ("H" $! σ Hpceq
-              with "Hsc [Hq1 Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hcpu Hstk Hdeep Htlbinv Hbit1] Hfile Hnpc Hsi")
-        as (s_exec) "(%Hexec & Hsi' & Hcont)".
-      { iSplitL "Hstk Hdeep".
-        { iApply stack_own_app. iFrame "Hstk Hdeep". }
-        iSplitL "Htlbinv Hbit1". { iRight. iFrame "Hbit1". iExists root_ppn. iExact "Htlbinv". }
-        iFrame "Hq1 Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hcpu". }
-      iModIntro. iExists s_exec.
-      iSplitR; [iPureIntro; exact Hexec |].
-      iFrame "Hsi'". iExact "Hcont".
+      iApply (wp_instr_s_intr m n pc is_rvc i Hpc0 with "Hcg Hpc Hinstr").
+      iExact "H".
     - (* ---- b = false: the dispatch-None engine, SIE=0 from ghost ---- *)
+      iDestruct (wp_next_here with "H") as "H".
+      iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm)".
       iRename "Harm" into "Hq0".
       iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
       iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Hspp & %Hmsf)".

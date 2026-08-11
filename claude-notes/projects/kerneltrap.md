@@ -1095,104 +1095,154 @@ must flip the SIE ghost, which needs the invariant quarter, which needs
 `intr_inv` in its precondition — and `intr_inv`'s body holds the handler spec.
 Same-hart does not help.
 
-### HANDOVER 2026-08-11: the fixpoint is BUILT and landed; the engines are next
+### HANDOVER 2026-08-11 (second): the CONTRACT, the ENGINE and the FUNNEL are
+### done; ONE file is left
 
-**State.** `main` = `30041d61` (the `intr_inv` deletion), GREEN, 972 files.
-Branch **`kerneltrap-fixpoint` = `3b245758`, deliberately RED on exactly two
-files** — `WpIntrInv.v` (the engine) and `ProofKernelvec.v` (the producer).
-192 files rebuilt after the change and nothing else broke, so the blast radius
-really is the two the list above names.
+**State.** Branch `kerneltrap-fixpoint`, **RED on exactly one file:
+`ProofKernelvec.v`** — the producer.  A full `-k` build (972 files) reports that
+one failure and nothing else, which is the whole measurement worth having: the
+contract's restatement, the two-section split of `IntrDefs.v`, the hart-generic
+engine and the funnel move together cost **zero** changes anywhere else in the
+tree.
 
-**What is done.** `intr_handler_spec` is `fixpoint ihs_pre` at the ambient hart,
-threading `intr_res` in and — via `∀ c' : CpuId` — back out at the resuming
-hart.  Public name and arity unchanged, so every existing
-`intr_handler_spec h` still means what it meant, and the ~57 `intr_res` sites
-and 7 `rewrite /intr_res` sites are untouched.
+**What is done.**
 
-**THE SHAPE IS SPLIT IN TWO AND THAT IS NOT COSMETIC.**  `S` occurs in exactly
-ONE place in the whole contract — under the `▷` inside the resource — so the
-body is abstracted over the RESOURCE FAMILY, not over the spec:
+- `intr_handler_spec` is `fixpoint ihs_pre` and its pre/post are **THE FOLDED
+  BUNDLE**: `ihs_entry_of` (the trap's handover package) and `ihs_post_of` (the
+  engine's own precondition, at the resuming hart), joined by `ihs_trap_of`
+  under `wp_next true p`.  `intr_handler_spec_apply` / `_intro` are the curried
+  faces every consumer/producer should use — nothing else should ever unfold
+  `ihs_trap_of`.
+- `WpIntrInv.wp_exec_step_intr` takes `sie_cap_gpr m av true p` and its
+  σ-callback sits inside `wp_next true p`; it flips the SIE ghost with all four
+  fractions, re-pins the SPP/SPIE mirror, assembles the handler's package, and
+  **re-enters its Löb at the hart the handler returned to** (`iLöb as "IH"
+  forall (CID0)` + `wp_next_retarget`).
+- `WpSmodeIntr.wp_instr_s_intr` is over the bundle too, and
+  `wp_instr_s_sconf`'s `b = true` arm is now **three lines** (`iApply
+  wp_instr_s_intr; iExact "H"`) because the two callbacks coincide.
 
-```coq
-Definition ires_of (S : CPU -d> mword 64 -d> iPropO Σ) : CPU -d> iPropO Σ    (* holds the ▷ *)
-Global Instance ires_of_contractive : Contractive ires_of.                   (* solve_contractive *)
-Definition ihs_of  (R : CPU -d> iPropO Σ) : CPU -d> mword 64 -d> iPropO Σ    (* the full contract *)
-Global Instance ihs_of_ne : NonExpansive ihs_of.                             (* solve_proper *)
-Definition ihs_pre S := ihs_of (ires_of S).                                  (* Contractive, 2 lines *)
-Definition ihs := fixpoint ihs_pre.
-Definition intr_handler_spec h := ihs cpu_id h.
-```
+#### THE CONTRACT COULD NOT STAY IN RAW CELLS, AND THAT FORCED THE FILE SPLIT
 
-MEASURED, all of it, because the naive shape is not merely slower:
+The plan said "state the handler contract in the folded bundle"; what it did not
+say is that this is not a preference.  The engine's Löb must re-enter at the
+resuming hart, so **every per-hart resource it holds has to CROSS the handler**
+— the mstatus cell AND its tied SIE half, the trap CSRs, the travelling
+`sret_bits` half, `cpu_hart`'s cells, `strans_bit`, the register file, the
+stack.  Enumerate them and you have written `sie_cap_gpr` out by hand.  The same
+argument kills the intermediate green state the previous handover was still
+hoping for: the funnel's `b = true` arm frames exactly that residue, so it
+cannot pass a hart-generic callback down while holding it.
 
-| | |
-|---|---|
-| one `solve_contractive` over the whole contract | **>16 min, killed** |
-| split: `Contractive ires_of` + `NonExpansive ihs_of` | both fast |
-| `fixpoint_unfold` at a hart | fast |
-| `Persistent` by `apply _` | **>90 s, killed** |
-| `Persistent` by naming `bi.intuitionistically_persistent` | instant |
-| the whole construction, standalone file | **5.5 s** |
+And a bundle in the contract cannot be written inside the section that defines
+the bundle: **`(CID := c)` does not work on a section-local definition** (the
+rule `ires_of`'s `sie_name c` spelling already came from), so `IntrDefs.v` is
+now `Section IntrDefsBase` (everything the contract NAMES) + `Section IntrDefs`
+(the fixpoint and the four resources that mention it).  What made this cheap:
 
-The `Persistent` line is the trap: the PRE-fixpoint definition proves it with
-`apply _.` instantly, and it is the `fixpoint_unfold` rewrite underneath that
-makes the identical tactic pathological — the search then runs over the entire
-unfolded contract for an answer that is one instance, because the body is `□ _`.
-`Opaque`-ing the leaf definitions (`gpr_file`, bitvector arithmetic) was
-measured too and buys NOTHING; do not add it.
+- **Section 1 gets `_of` copies, Section 2 keeps the public spellings
+  VERBATIM.**  `sie_arm_of` / `sie_cap_of` / `sie_cap_gpr_of` take the
+  installed-handler conjunct as a parameter `R`; `sie_arm` / `sie_cap` /
+  `sie_cap_gpr` / `intr_res` are re-spelled unchanged below the fixpoint, so
+  `rewrite /sie_arm` opens the same shape it always did and the ~30
+  `rewrite /sie_cap*` sites in the tree are untouched.  The four `_of_eq`
+  bridges (`reflexivity`) are for the places that need the two forms to meet
+  syntactically.
+- **The hart-parametric pieces are defined in Section 1 at the AMBIENT hart and
+  annotated ONCE at the use site.**  `ihs_entry_of` / `ihs_post_of` /
+  `ihs_trap_of` are written in the ordinary spelling — every `r ↦ᵣ v`,
+  `pc_is`, `WP Loop` inside them means "this hart" — and the fixpoint says
+  `(CID := CIDb)` / `(CID := c')` exactly three times.  Writing the package out
+  at an explicit hart instead would have meant `reg_pointsto_at`/`_at` twins of
+  the whole vocabulary, which is the mistake that compiles.
+- Only 5 blocks had to move below the split (the fixpoint, `intr_res`, the
+  `trap_csrs` family, `arm_pay`, `sie_arm` + its lemmas).  Everything from
+  `sie_cap` onward was already below it.
 
-`ires_of` STAYS TRANSPARENT while the `Typeclasses Opaque` seal stays on the
-instantiated `intr_res`: `solve_contractive` has to SEE the `▷` that the seal
-exists to hide from `MaybeIntoLaterN`.  Sealing the parameterized form makes the
-fixpoint unprovable; sealing neither re-opens the hazard the `intr_inv` deletion
-just closed.
+#### FOUR THINGS THE BUILD TAUGHT, ALL WORTH KEEPING
 
-**Two gotchas a prototype outside the section cannot show you.**
-`(CID := c)` does NOT work on a section-local definition — inside its own open
-section `sie_gname` is not parameterized, it IS `sie_name cpu_id`, so the
-explicit-hart form is the underlying `sie_name c` (else: *"Wrong argument name
-CID"*).  Same rule as slice 3b's `rename`, from a new angle.  And the shadowing
-binders are spelled `CIDp`/`CIDb`, not `CID`: statement-level shadowing is legal
-but unreadable once two of them nest inside a section that already has one.
+- **A RESOURCE PASSED THROUGH AN `iFrame` PATTERN CANNOT FIX A LEMMA'S HART.**
+  Inside the engine's callback (a second hart in scope) `iDestruct (sie_cap_on_kpt
+  with "Hcap")` is fine — unification with the named hypothesis picks the hart —
+  but `iMod (tlb_inv_pt_fetch … with "[$Hreg $Hmem] …")` is NOT: the `[$…]`
+  pattern builds a GOAL, so instance resolution has already chosen the section
+  hart and the frame then fails with **`iFrame: cannot frame (reg_interp (sregs
+  σ))`**, a message that names no hart at all.  Annotate those:
+  `tlb_inv_pt_fetch (CID := CID)`, `strans_inv_intro (CID := CID)`.  This is the
+  sharp form of durable-notes' "a hart-indexed term written fresh means the
+  SECTION hart" — the tell is which *tactic* consumes the resource.
+- **`wp_next_off` is an `⊣⊢`, so `iDestruct (wp_next_off with "H") as "H"`
+  fails** — and its error is `iRename: (IAnon 1) not found`, which reads like a
+  name bookkeeping bug.  Use `wp_next_here` (or `wp_next_at`), the wand forms.
+- **The stack carve really is untouched.**  `trap_res true + av` is the index on
+  both sides of the handover, so the engine never splits, re-carves or even
+  mentions `stack_own` — it frames one hypothesis.  The arm-dependent carve was
+  designed for this and it paid.
+- **`sconf_ms_facts` is the right fact set to hand across a trap**, and the
+  bundle version needed one new lemma: `sconf_ms_facts_trap` (every conjunct is
+  a field `trap_ms` does not touch; SIE, the one it does, is not in the set).
 
-**WHY THERE IS NO CHEAPER CHECKPOINT — this was my wrong assumption, corrected
-by the build.**  I expected the engine could stay fixed-hart by instantiating
-the contract's `∀ c'` at its own hart.  It cannot, and the reason is POLARITY:
-`(∀ c', post c')` is a **premise** of the contract, i.e. an OBLIGATION on the
-engine to supply its continuation at whatever hart resumes — not a guarantee it
-may specialize.  So the engines must become hart-generic in the same edit.  Do
-not look for an intermediate green state; there isn't one.
+#### WHAT IS LEFT: `ProofKernelvec.v`, AND THE PLAN IS WORKED OUT
 
-**NEXT, in order, with the exact current failures.**
+kernelvec must now consume the REAL `KERNELTRAP` (which is already proven and
+already stated over the bundle — `sie_cap_gpr m av false p`, `sret_bits`,
+`intr_res`, `cpu_own`, the pinned trap CSRs, `wp_next true p` out).  The legacy
+`wp_kernelvec` monolith cannot survive, because **the epilogue runs on a
+DIFFERENT HART than the prologue**: kerneltrap's post is hart-generic, so the
+capstone has to be prologue → kerneltrap → `iIntros (CIDn Hs)` → restore block
+at `(CID := CIDn)` → sret.  The `KernelvecCore` section closes before the
+capstone, so those lemmas are generalized and annotatable — that is what makes
+this possible at all.
 
-1. `WpIntrInv.v` — the engine.  Its use site already has the needed
-   `iEval (rewrite intr_handler_spec_unfold) in "Hsp"` (the spec is no longer
-   syntactically `□ ∀ …`, so `iApply` cannot see its premises).  It now fails at
-   the continuation with *"iIntro: could not introduce "Hhs", goal is not a wand
-   or implication"* — because the post begins `∀ c'`.  So: `iIntros (c')` there,
-   move the engine's callback inside `wp_next` (the two wraps slice 3b
-   deliberately left out), and RE-FORM `intr_res` to hand to the contract.  The
-   engine OPENED it at `WpIntrInv:310`; the comment already at `:355` explains
-   why re-forming early trips the `iNext`-strips-inside hazard — the re-seal
-   must happen at the point of use, as the Löb re-seal at `:397` already does.
-   The hart-genericity recipe is in `durable-notes.md` under "A HART-INDEXED
-   TERM WRITTEN FRESH IN A PROOF MEANS THE *SECTION* HART"; the engine's `b =
-   true` arm is the hard case because it frames per-hart residue (the
-   travelling `sret_bits` half, the SIE eighth, `cpu_hart`'s cells,
-   `strans_bit`, `intr_res`) across the handler run.
-2. `ProofKernelvec.v:1475` — the producer.  Fails at `iModIntro` with *"the goal
-   is not a modality"*: after `cbv beta delta [kernelvec_handler_spec_body]` the
-   `□` is behind the fixpoint, so `rewrite intr_handler_spec_unfold` first.
-   Then it must CONSUME the new `intr_res` premise and PRODUCE the `∀ c'` post.
-3. Delete `KERNELTRAP_RETURNS` / `KerneltrapRet` / `kv_cell` / `kt_clobbered`
-   and `LinkKerneltrap.v`'s axiom, and rewire `ProofKernelvec` onto the real
-   `KERNELTRAP`.
+The heavy VC machinery is REUSED, not re-proved.  Recipe:
+
+1. `iApply intr_handler_spec_intro`, `iModIntro`, intro
+   `(m av p pc0 sc tv)` + the two pure premises + `ihs_entry_of` + the
+   `wp_next` post.
+2. Bundle → raw cells: `sie_cap_gpr_split`, then `sconf`'s six conjuncts.
+   `ghost_var_agree` on the arm's eighth gives `SIE ms = '0'`; the Bare arm of
+   `strans_inv` is refuted by the `intr_res` premise's `stvec` cell (the
+   `sie_cap_on_kpt` argument, at index `false` this time);
+   `WpGprCsrwC.legalize_sie_clear_idem` gives `kv_cfg_split`'s legalize
+   premise from SIE=0 + the XS/FS/VS/SD/MPP conjuncts.
+3. Carve: `trap_res true + av = 32 + (46 + av)` (`lia`, not `reflexivity`) +
+   `stack_own_app` → kernelvec's 32-slot frame on top, `46 + av` below it =
+   **kerneltrap's budget**, so `kerneltrap_stack <= 46 + av` is `lia` with no
+   premise.  The 17 sparse save windows come out of the top 32 exactly as the
+   current proof does it (`kv_slot_addr` + `stack_own_slots`).
+4. `kv_cfg_split` at **the real `sie_gname`** (no fresh per-trap `γk` any more:
+   the bundle's tied half IS the one to hand kernelvec, and it comes back out
+   of `kv_cfg_recombine` for the sret) → `wp_kv_prologue` at the map
+   `tp_pin m`.
+5. `kv_cfg_recombine`, rebuild `sconf` + `sie_cap (kv_m2 (tp_pin m)) (46+av)
+   false p` + `gpr_file`; `tp_pin_upd`/`tp_pin_id` refold the file's map.
+   `devintr_ret sc <> 0` is `s_cause_ok sc` + a `vm_compute` per arm.  Apply
+   `Kerneltrap.wp_kerneltrap_sconf` with `C := emp`.
+6. In its `wp_next`: `iIntros (CIDn Hsn) (mf ms_f sc' tv') "…"`;
+   `sie_cap_gpr_at_close` (ms_f's identity is NOT needed — the sret derives
+   SPP/SPIE from the travelling `sret_bits` half and the tie inside `sconf`);
+   `kv_cfg_split` again; the restore block at `(CID := CIDn)`.
+7. **`wp_kv_epilogue` has to lose its `sret`** (it is the last of its 19
+   instructions): split it into the 17 loads + `c.addi16sp` and let the
+   capstone finish with `WpSconfSret.wp_sret_s_sconf`, whose premise set is
+   exactly what step 6 leaves (`intr_count 1 true` and `cpu_cells 0 true p`
+   are the returned `cpu_hart 0 false p` up to iota).  Its post is
+   `sie_cap_gpr m av true p ∗ pc_is (ret_pc pc0)` = `ihs_post_of`, discharged
+   through `wp_next_at … CIDn Hsn`.
+8. The file-preservation argument (`Hbig` + `gpr_file_ext`) is the existing one
+   with `m := tp_pin m` and `callee_saved` in place of `kt_clobbered`.
+
+Then: `SpecKernelvec.kernelvec_handler_spec_body` gains what kerneltrap's
+contract needs and the □ can hold — `⌜length γs = NPROC⌝` and the PERSISTENT
+`devintr_caps γu γv γtx γdk γtl γs pd pav pu` — the boot chain supplies them at
+the `intr_res_intro` site; `KERNELTRAP_RETURNS` / `KerneltrapRet` / `kv_cell` /
+`kt_clobbered` / `LinkKerneltrap.v`'s axiom go; and `intr_config` /
+`intr_frame` / `intr_frame_retarget` / `intr_config_of_v2` / `v2_of_intr_config`
+are **already dead** (grep: only comments mention them) and should go with it.
 
 **Done when** `Print Assumptions Kernelvec.kernelvec_handler_spec` yields
 exactly the 5 rv64d platform axioms + `functional_extensionality_dep` +
-`Consoleintr.wp_consoleintr_sconf`.  Today it additionally shows
-`kerneltrap_returns`; `proof_coverage.py --check` (run it from the REPO ROOT,
-not `iris/`) is at 156 functions proven / 83%.
+`Consoleintr.wp_consoleintr_sconf`.
 
 ### Two rules this decomposition earned
 

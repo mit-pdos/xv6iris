@@ -50,6 +50,9 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvFetchExec.
 Require Import KptPt.
 Require Import MinstretInv InstrBytes.
 Require Import RegFile HartTp.
+(* EXPORTED, not merely imported: [wp_next] is in the handler contract's own
+   statement, so every consumer of [intr_handler_spec] needs it in scope. *)
+Require Export WpNext.
 Require Import WpGpr WpMmodeLeafBase StackOwn.
 Require Import SmodeCore.
 Require Import KMap.   (* kmap_static_claims, extracted from the config bundle *)
@@ -210,6 +213,21 @@ Lemma intr_ms_facts_iff (ms : mword 64) :
   <-> (eq_vec (_get_Mstatus_SIE ms) ('b"1") = true /\ sconf_ms_facts ms).
 Proof. unfold intr_ms_facts, sconf_ms_facts. tauto. Qed.
 
+(* WHAT THE TRAP LEAVES, as the fact set the interrupts-OFF tier wants.  The
+   engine hands the handler a [sconf] at [trap_ms elp_v ms], so it owes this;
+   every conjunct is a field the trap does not touch except SIE, which
+   [sconf_ms_facts] does not mention -- that is exactly what makes the
+   SIE-agnostic fact set the right one to hand across a trap. *)
+Lemma sconf_ms_facts_trap (elp_v : mword 1) (ms : mword 64) :
+  sconf_ms_facts ms -> sconf_ms_facts (trap_ms elp_v ms).
+Proof.
+  intros (H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11).
+  unfold sconf_ms_facts.
+  rewrite trap_ms_MPRV trap_ms_SXL trap_ms_MXR trap_ms_TSR
+          trap_ms_XS trap_ms_FS trap_ms_VS trap_ms_SD trap_ms_MPP trap_ms_TVM.
+  split_and!; assumption.
+Qed.
+
 (* WHAT AN [sret] DOES TO THE THREE BITS THE sconf TIER TRACKS, over a
    SYMBOLIC entry mstatus -- the sret twin of [WpSieFlipBits.csrsi_sie_flip],
    and stated in exactly the shape its leaf consumes.
@@ -247,7 +265,7 @@ Proof.
   vm_compute. reflexivity.
 Qed.
 
-Section IntrDefs.
+Section IntrDefsBase.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -595,266 +613,6 @@ Section IntrDefs.
     iFrame "Hmenv Htlbinv". rewrite Hsp. iExact "Hstk".
   Qed.
 
-  (* ================================================================== *)
-  (* THE CONTRACT IS A BANACH FIXPOINT, AND THE RECURSION IS SPLIT IN TWO. *)
-  (*                                                                      *)
-  (* The cycle is inherent (projects/kerneltrap.md, "THE CYCLE IS REAL"):  *)
-  (* enabled execution HERE means a handler is installed HERE, and the     *)
-  (* handler restores enabled execution ANYWHERE.  So the contract's own   *)
-  (* pre and post mention [intr_res], whose body carries [▷ contract].     *)
-  (* The [▷] is the guard, and it is why [ihs_pre] is contractive at all.  *)
-  (*                                                                      *)
-  (* WHY TWO HALVES AND NOT ONE [Contractive].  [S] occurs in exactly ONE  *)
-  (* place in the whole contract -- under the [▷] in the resource -- so    *)
-  (* the body is abstracted over the RESOURCE FAMILY [R] instead of over   *)
-  (* the spec.  The big half then needs only [NonExpansive] (no            *)
-  (* [dist_later] case-splitting) and the guarded half is six lines.       *)
-  (* MEASURED, because the naive shape is not merely slower:               *)
-  (*   one [solve_contractive] over the whole contract   >16 min (killed)  *)
-  (*   split: [Contractive ires_of] + [NonExpansive ihs_of]     both fast  *)
-  (* [ires_of] therefore stays TRANSPARENT -- [solve_contractive] has to   *)
-  (* SEE the [▷] that [Typeclasses Opaque intr_res] below exists to hide   *)
-  (* from [MaybeIntoLaterN].  The seal goes on the instantiated form only. *)
-  (*                                                                      *)
-  (* HART-INDEXED, because the recursion crosses harts: a trap that parks  *)
-  (* the thread returns it on whatever hart resumes it, so the post is     *)
-  (* [∀ c' : CpuId, …] and every cell in it is that hart's.  Registers are *)
-  (* per-hart ([reg_pointsto] takes a [CpuId]), so the two halves cannot   *)
-  (* share one ambient scope -- hence [ihs_post_of], stated at the         *)
-  (* AMBIENT hart and instantiated at [c'].  That [∀ c'] IS the content of *)
-  (* "the handler may return on a different hart".                        *)
-  (* ================================================================== *)
-
-  (* the installed-handler resource, parameterized by the contract it
-     carries.  [intr_res] below is this at [S := ihs], spelled out again so
-     that its one-step unfolding is the shape consumers already destructure. *)
-  Definition ires_of (S : CPU -d> mword 64 -d> iPropO Σ) : CPU -d> iPropO Σ :=
-    fun c =>
-    (∃ (h : mword 64) (b : mword 1),
-       ⌜ trapVectorMode_forwards (_get_Mtvec_Mode h) = TV_Direct ⌝ ∗
-       ⌜ stvec_base h = h ⌝ ∗
-       ghost_var (sie_name c) (1/4) b ∗
-       reg_pointsto_at c stvec (DfracOwn 1) h ∗
-       ▷ S c h)%I.
-
-  Global Instance ires_of_contractive : Contractive ires_of.
-  Proof. rewrite /ires_of. solve_contractive. Qed.
-
-  (* [root_ppn] is UNIVERSAL, per trap: the handler's proof (kernelvec +
-     the kerneltrap contract) is uniform in the kernel root, and quantifying
-     it here -- rather than parameterizing the spec -- is what lets every
-     resource above ([intr_res]/[trap_csrs]/[intr_count]/[sie_arm]) be
-     root-free: an interrupted instruction instantiates the spec at whatever
-     root its translation slot ([strans_inv]) is currently holding. *)
-
-  (* THE POST, AT THE RESUMING HART. *)
-  Definition ihs_post_of (R : CPU -d> iPropO Σ) `{CIDp : CpuId}
-      (root_ppn : mword 44) (elp_v : mword 1) (ms pc0 mie_v mdv0 : mword 64)
-      (m : regfile) : iProp Σ :=
-    ( hart_state ↦ᵣ HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ Supervisor -∗
-      mstatus ↦ᵣ sret_ms5 (trap_ms elp_v ms) -∗
-      mie ↦ᵣ mie_v -∗
-      mideleg ↦ᵣ mdv0 -∗
-      (∃ v : mword 64, sepc ↦ᵣ v) -∗
-      pc_is pc0 -∗
-      gpr_file m -∗
-      intr_frame root_ppn m -∗
-      R cpu_id -∗
-      WP (Loop : expr riscv_lang))%I.
-
-  Definition ihs_body_of (R : CPU -d> iPropO Σ) `{CIDb : CpuId}
-      (handler : mword 64) : iProp Σ :=
-    (□ ∀ (root_ppn : mword 44) (elp_v : mword 1) (ms pc0 mie_v mdv0 : mword 64)
-         (m : regfile),
-        ⌜ intr_ms_facts ms ⌝ -∗
-        ⌜ ret_pc pc0 = pc0 ⌝ -∗
-        ⌜ and_vec mie_v (not_vec mdv0) = zeros' 64 ⌝ -∗
-        hart_state ↦ᵣ HART_ACTIVE tt -∗
-        cur_privilege ↦ᵣ Supervisor -∗
-        mstatus ↦ᵣ trap_ms elp_v ms -∗
-        mie ↦ᵣ mie_v -∗
-        mideleg ↦ᵣ mdv0 -∗
-        sepc ↦ᵣ pc0 -∗
-        pc_is handler -∗
-        gpr_file m -∗
-        intr_frame root_ppn m -∗
-        R cpu_id -∗
-        (∀ c' : CpuId, ihs_post_of R (CIDp := c') root_ppn elp_v ms pc0 mie_v mdv0 m) -∗
-        WP (Loop : expr riscv_lang))%I.
-
-  Definition ihs_of (R : CPU -d> iPropO Σ) : CPU -d> mword 64 -d> iPropO Σ :=
-    fun (c : CPU) (handler : mword 64) => ihs_body_of R (CIDb := c) handler.
-
-  Global Instance ihs_of_ne : NonExpansive ihs_of.
-  Proof. rewrite /ihs_of /ihs_body_of /ihs_post_of. solve_proper. Qed.
-
-  Definition ihs_pre (S : CPU -d> mword 64 -d> iPropO Σ)
-      : CPU -d> mword 64 -d> iPropO Σ := ihs_of (ires_of S).
-
-  Global Instance ihs_pre_contractive : Contractive ihs_pre.
-  Proof.
-    intros n S1 S2 HS. rewrite /ihs_pre.
-    apply ihs_of_ne. by apply ires_of_contractive.
-  Qed.
-
-  Definition ihs : CPU -d> mword 64 -d> iPropO Σ := fixpoint ihs_pre.
-
-  (* THE PUBLIC NAME AND ARITY ARE UNCHANGED: the contract at the ambient
-     hart.  Every existing spelling [intr_handler_spec h] still means what it
-     meant; what changed is that its body now threads the resource. *)
-  Definition intr_handler_spec (handler : mword 64) : iProp Σ :=
-    ihs cpu_id handler.
-
-  (* PERSISTENCE HAS TO NAME THE INSTANCE.  The body is [□ _], so there is
-     exactly one, but [apply _] after the [fixpoint_unfold] rewrite searches
-     the whole unfolded contract and does not come back (>90s, measured).
-     The pre-fixpoint definition could afford [apply _]; this one cannot. *)
-  Global Instance intr_handler_spec_persistent handler :
-    Persistent (intr_handler_spec handler).
-  Proof.
-    rewrite /intr_handler_spec /ihs (fixpoint_unfold ihs_pre cpu_id handler)
-            /ihs_pre /ihs_of /ihs_body_of.
-    apply bi.intuitionistically_persistent.
-  Qed.
-
-  (* THE ONE-STEP UNFOLDING, which every consumer of the contract needs: the
-     spec is not syntactically a [□ ∀ …] any more, so [iApply "Hspec"] must
-     be preceded by a rewrite with this. *)
-  Lemma intr_handler_spec_unfold (handler : mword 64) :
-    intr_handler_spec handler ⊣⊢ ihs_body_of (ires_of ihs) handler.
-  Proof.
-    rewrite /intr_handler_spec /ihs. apply (fixpoint_unfold ihs_pre cpu_id handler).
-  Qed.
-
-  (* =================================================================== *)
-  (* §5 [intr_res] -- THE INSTALLED-HANDLER RESOURCE: a quarter of the SIE *)
-  (* ghost (its value [b] mirrors the live mstatus.SIE bit, via agreement  *)
-  (* with the mstatus-tied half), the stvec register, the two pure facts   *)
-  (* about the installed vector, and -- when interrupts are enabled -- the *)
-  (* persistent handler WP.                                                *)
-  (*                                                                      *)
-  (* THIS USED TO BE AN IRIS INVARIANT ([intr_inv handler] =              *)
-  (* [inv intrN (∃ b, quarter ∗ stvec ↦ᵣ handler ∗ □(b='1' -∗ spec))],     *)
-  (* persistent, with the two facts riding outside it).  IT IS NOW PLAIN   *)
-  (* OWNERSHIP, folded into [trap_csrs] (§6a).  Three reasons, in the      *)
-  (* order they matter:                                                    *)
-  (*                                                                      *)
-  (* 1. THE INVARIANT MADE THE TRAP VECTOR PERMANENTLY IMMUTABLE.          *)
-  (*    [handler] was a parameter of a PERSISTENT proposition fixed at     *)
-  (*    allocation, so the cell could be borrowed but only ever returned   *)
-  (*    at the SAME value -- and allocating a second [intr_inv] at a new   *)
-  (*    handler does not help, since two live invariants would each claim  *)
-  (*    a full [stvec] cell, making the first unusable forever.  User mode *)
-  (*    needs [usertrapret]'s [w_stvec(uservec)], and under [inv] that     *)
-  (*    write is not awkward, it is IMPOSSIBLE BY CONSTRUCTION.            *)
-  (*    ([WpSconfCsr.wp_csrw_stvec_s_sconf] is already the right shape:    *)
-  (*    cell in, cell out.  The invariant is the only thing that kept it   *)
-  (*    inapplicable outside the boot window.)                             *)
-  (*                                                                      *)
-  (* 2. THE SAFETY PROPERTY DID NOT LIVE IN THE [inv].  "You cannot set    *)
-  (*    SIE = 1 without an installed handler" is enforced by the GHOST     *)
-  (*    QUARTER -- [sie_ghost_flip] needs all three fractions and the      *)
-  (*    quarter only ever travels with the cell -- and that argument is    *)
-  (*    unchanged here.  Compare [satp], which was always carried this     *)
-  (*    way: explicitly owned inside [strans_inv]'s two arms.              *)
-  (*                                                                      *)
-  (* 3. THE PERSISTENCE WAS UNUSABLE WHERE IT WOULD HAVE MATTERED.  The    *)
-  (*    only thing [inv] bought was a duplicable credential, and the       *)
-  (*    credential is PER-HART (this hart's stvec, this hart's ghost), so  *)
-  (*    a copy is a copy at ONE hart and is useless after a park --        *)
-  (*    persistence is not hart-independence.  The whole                   *)
-  (*    [intr_handler_avail_ext] family existed to work around exactly     *)
-  (*    that, and is deleted with the invariant.                           *)
-  (*                                                                      *)
-  (* THE [▷] IS LOAD-BEARING AND IS NOT CONSERVATISM.  Once                *)
-  (* [intr_handler_spec] becomes the Banach fixpoint the handler contract  *)
-  (* needs (projects/kerneltrap.md, "THE CYCLE IS REAL"), the recursive    *)
-  (* occurrence reached through this resource has to sit under a guard.    *)
-  (* It used to sit under [inv] ([inv_contractive]); with the invariant    *)
-  (* gone, this [▷] IS the guard, and without it [ihs_pre] is not          *)
-  (* contractive and the fixpoint does not exist.  Consumers pay nothing:  *)
-  (* a trap is a program step, so the engine strips it exactly where it    *)
-  (* strips [inv]'s today.                                                 *)
-  (* =================================================================== *)
-
-  (* THE HANDLER SPEC IS UNCONDITIONAL, NOT GUARDED ON THE GHOST VALUE, and
-     that is a REAL difference from the invariant this replaces -- worth
-     understanding before "restoring" the guard.
-
-     The invariant's body read [□ (b = '1' -∗ spec)], so at SIE = 0 it held a
-     cell and no contract.  That was affordable because [inv] is persistent:
-     the guard only had to be DISCHARGED at the moment of enabling, and the
-     [csrsi] leaf got the spec from a separate persistent premise
-     ([intr_handler_avail]) whose handler it could then unify with the
-     invariant's.
-
-     With ownership that route is closed: a separate spec premise is about
-     some [h'], the cell in hand is at [h], and nothing ties them -- so the
-     enabling flip could not re-form the resource.  Carrying the contract
-     unconditionally is what keeps the cell and its contract INSEPARABLE,
-     which is the property the whole change exists for (installing a new
-     vector = swapping both together, atomically, which is exactly
-     usertrapret).
-
-     WHAT IT COSTS: whoever BUILDS this must have the contract, so BOOT
-     CANNOT HOLD ONE -- before trapinithart there is no installed handler at
-     all.  That is why [trap_csrs_raw] below exists and why [main_hart_raw]
-     is stated over it: boot carries the four trap CELLS, and [main] folds
-     the full [trap_csrs] once trapinithart has written stvec and
-     [kernelvec_handler_spec] is in hand.  The resource says "a trap vector
-     is installed and here is its contract", and at boot that is simply
-     false. *)
-  Definition intr_res : iProp Σ :=
-    (∃ (h : mword 64) (b : mword 1),
-       ⌜ trapVectorMode_forwards (_get_Mtvec_Mode h) = TV_Direct ⌝ ∗
-       ⌜ stvec_base h = h ⌝ ∗
-       ghost_var sie_gname (1/4) b ∗
-       stvec ↦ᵣ h ∗
-       ▷ intr_handler_spec h)%I.
-
-  (* THE constructor.  No fupd -- there is no invariant to allocate, which is
-     why the boot chain's [intr_inv_alloc_off] site loses its [iMod].  There
-     is no eliminator: the resource is a plain [∃] of owned conjuncts, so
-     consumers destructure it directly
-     ([iDestruct "H" as (h vb) "(%Htvd & %Hsb & Hq & Hstv & #Hspec)"]) and
-     rebuild with this.  The five old [iInv]/[inv_acc] sites are all that
-     shape now. *)
-  Lemma intr_res_intro (h : mword 64) (b : mword 1) :
-    trapVectorMode_forwards (_get_Mtvec_Mode h) = TV_Direct ->
-    stvec_base h = h ->
-    ghost_var sie_gname (1/4) b -∗
-    stvec ↦ᵣ h -∗
-    ▷ intr_handler_spec h -∗
-    intr_res.
-  Proof.
-    iIntros (Htvd Hsb) "Hq Hstv #Hspec".
-    iExists h, b. iFrame "Hq Hstv Hspec". by iSplit.
-  Qed.
-
-  (* ------------------------------------------------------------------- *)
-  (* SEALED AGAINST TYPECLASS SEARCH, AND THIS IS LOAD-BEARING.           *)
-  (*                                                                      *)
-  (* The [▷] above sits INSIDE the definition, not at its head, so        *)
-  (* [MaybeIntoLaterN]'s structural instances happily descend through     *)
-  (* [trap_csrs]' separating conjunctions and strip it: after ANY branch's *)
-  (* [iNext], a hypothesis that was [trap_csrs] becomes something         *)
-  (* STRICTLY STRONGER that no longer matches [trap_csrs], and            *)
-  (* [iSpecialize] then fails as if the resource were missing.  That is   *)
-  (* the hazard durable-notes records for [cpu_own] and                   *)
-  (* [intr_handler_avail]; the difference here is that [trap_csrs] is     *)
-  (* threaded through the whole park/lock cone, so the repair would have  *)
-  (* to be applied at dozens of unrelated sites.                          *)
-  (*                                                                      *)
-  (* [Typeclasses Opaque] stops the descent at this constant: [iNext]     *)
-  (* cannot see the [▷], so no caller ever holds the stronger form and no *)
-  (* re-seal is needed anywhere.  THE COST is that [iDestruct] can no     *)
-  (* longer take it apart by [IntoExist] either -- the ~6 sites that DO   *)
-  (* open it (the engine, the three SIE-flip leaves, the sret leaf,       *)
-  (* kerneltrap's re-seals) say [rewrite /intr_res] first, which is       *)
-  (* exactly the set of places that should be looking inside.             *)
-  (* ------------------------------------------------------------------- *)
-  Global Typeclasses Opaque intr_res.
 
   (* =================================================================== *)
   (* §6 THE V2 BUNDLE [sconf]: the SIE-AGNOSTIC smode_config successor.   *)
@@ -1063,77 +821,6 @@ Section IntrDefs.
   Definition strans_bit (b : mword 1) : iProp Σ :=
     ghost_var (strans_name cpu_id) (1/2)%Qp b.
 
-  (* SPELLED FLAT, not as [trap_csrs_raw ∗ intr_res]: the tier destructures
-     this bundle positionally in dozens of places, and a nested pair would
-     silently rebind the fourth name to a pair instead of failing loudly. *)
-  Definition trap_csrs : iProp Σ :=
-    ((∃ v : mword 64, sepc ↦ᵣ v) ∗
-     (∃ v : mword 64, scause ↦ᵣ v) ∗
-     (∃ v : mword 64, stval ↦ᵣ v) ∗
-     (∃ a b : mword 1, sret_bits a b) ∗
-     intr_res ∗
-     strans_bit strans_bit_kpt)%I.
-
-  Lemma trap_csrs_of_raw :
-    trap_csrs_raw -∗ intr_res -∗ strans_bit strans_bit_kpt -∗ trap_csrs.
-  Proof. iIntros "(Ha & Hb & Hc & Hd) Hres Hkpt". iFrame. Qed.
-
-  Lemma trap_csrs_to_raw :
-    trap_csrs -∗ trap_csrs_raw ∗ intr_res ∗ strans_bit strans_bit_kpt.
-  Proof. iIntros "(Ha & Hb & Hc & Hd & Hres & Hkpt)". iFrame. Qed.
-
-  Definition trap_csrs_pay (n : nat) (eb : bool) : iProp Σ :=
-    (match n with
-     | O => if eb then trap_csrs else emp
-     | S _ => emp
-     end)%I.
-
-  (* THE COMPLEMENT OF [trap_csrs_pay] AT LEVEL 0: what a caller has to
-     BRING because the bundle does not already own it.  At level 0 the arm
-     index and the saved base coincide, so at [eb = true] the enabled arm
-     owns the trap CSRs and the caller brings nothing, while at
-     [eb = false] nothing in the bundle owns them and the caller brings the
-     whole set.
-
-     A function that PARKS needs the set unconditionally -- sched's crossing
-     takes it and re-delivers the RESUMING hart's, because sepc/scause/stval
-     are PER-HART registers and framing them around a migration would be
-     unsound.  So yield takes [trap_csrs_pay 0 eb] out of its own push_off
-     and [trap_csrs_ext eb] from its caller, and exactly one of the two is
-     [emp].  The [eb = false] case is kerneltrap's: the trap cleared SIE, so
-     the pushing acquire records intena = 0 and hands out nothing, and the
-     handler is holding the trap CSRs itself because the TRAP gave them to
-     it. *)
-  Definition trap_csrs_ext (eb : bool) : iProp Σ :=
-    (if eb then emp else trap_csrs)%I.
-
-  Lemma trap_csrs_ext_split (eb : bool) :
-    trap_csrs_pay 0 eb ∗ trap_csrs_ext eb ⊣⊢ trap_csrs.
-  Proof.
-    destruct eb; rewrite /trap_csrs_pay /trap_csrs_ext.
-    - by rewrite bi.sep_emp.
-    - by rewrite bi.emp_sep.
-  Qed.
-
-  (* [intr_handler_avail_ext] USED TO BE HERE, as the third member of the
-     [trap_csrs_ext] / [cpu_claim_ext] family, together with its [_intro] and
-     its transport, and [intr_restore] = [intr_handler_avail ∗ trap_csrs] with
-     it.  ALL FOUR ARE GONE, and the [eb]-guard they were built around is the
-     thing worth understanding, because it does not survive the change:
-
-     the guard was FORCED, not chosen.  At [eb = true] the returned bundle's
-     [sie_arm true p] held only [∃ h, intr_inv h], NOT the handler WP -- that
-     sat behind the invariant's [□ (b = '1' -∗ spec)], and extracting it needed
-     a LATER stripped, i.e. a program step, which a postcondition does not
-     have.  So the payload had to be [emp] at exactly the index where the arm
-     existed, and the family existed to say so.
-
-     With the resource OWNED, [sie_arm true] carries [intr_res] itself and the
-     arm's own eighth pins the guard's [b = '1'], so [intr_res_acc_on] reads
-     the spec out with no fupd and no step.  There is nothing left to guard:
-     the payload is [trap_csrs], the complement is [trap_csrs_ext], and the
-     handler resource rides inside both. *)
-
   (* [intr_count] IS NOW LEVEL + EIGHTH, WITH NO PAYLOAD.  It used to carry
      [intr_handler_avail] at [n ≥ 1 ∧ eb = true] -- the "the pop will re-enable,
      so a handler had better be installed" obligation.  That obligation is now
@@ -1304,105 +991,6 @@ Section IntrDefs.
     - by rewrite bi.emp_sep.
   Qed.
 
-  (* ==================================================================== *)
-  (* WHAT THE ARM HANDS OUT AT THIS INDEX.  The trap CSRs and the running   *)
-  (* claim are DIFFERENT resources -- yield spends the claim (surrendering  *)
-  (* both state halves to [pstate_lock]) while keeping the trap CSRs, and   *)
-  (* it is the SCHEDULER that later rebuilds the arm, at [zero_reg] -- but  *)
-  (* they enter and leave the arm at the same index, so they travel as one  *)
-  (* carrier.  Bundling is transport only: [arm_pay_parts] takes them apart *)
-  (* again by definition, and anyone who needs just one half says so.       *)
-  (*                                                                        *)
-  (* The SIE-flip leaves below deal in the components (they build and tear  *)
-  (* down the arm piecewise); the function-level specs deal in the bundle,  *)
-  (* which is what keeps a single hypothesis threading through the whole    *)
-  (* push_off / acquire / release / pop_off cone.                           *)
-  (* ==================================================================== *)
-  Definition arm_pay (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
-    (trap_csrs_pay n eb ∗ cpu_claim_pay n eb p)%I.
-
-  Lemma arm_pay_parts (n : nat) (eb : bool) (p : mword 64) :
-    arm_pay n eb p ⊣⊢ trap_csrs_pay n eb ∗ cpu_claim_pay n eb p.
-  Proof. reflexivity. Qed.
-
-  Lemma arm_pay_on (p : mword 64) :
-    arm_pay 0 true p ⊣⊢ trap_csrs ∗ cpu_claim p.
-  Proof. reflexivity. Qed.
-
-  (* THE KPT RECEIPT IS AN ENABLED-ARM MEMBER, for the reason spelled out at
-     [strans_bit] (§6b): interrupts on implies the kernel table is installed,
-     so the receipt has exactly this arm's lifetime.  The DISABLED arm does
-     not carry it -- which is what keeps boot constructible, since every
-     instruction before kvminithart runs at [b = false] over the Bare slot. *)
-  Definition sie_arm (b : bool) (p : mword 64) : iProp Σ :=
-    (if b
-     then (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
-           intr_res ∗
-           strans_bit strans_bit_kpt ∗
-           (∃ v : mword 64, sepc ↦ᵣ v) ∗
-           (∃ v : mword 64, scause ↦ᵣ v) ∗
-           (∃ v : mword 64, stval ↦ᵣ v) ∗
-           (∃ a b : mword 1, sret_bits a b) ∗
-           cpu_claim p ∗
-           cpu_hart 0 true p)
-     else ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1))%I.
-
-  (* THE ARM INDEX IS THE LIVE BIT, at either index and without a case split
-     at the call site.  [sconf]'s tied half and the arm's eighth are
-     fragments of the same ghost, so agreement reads the live SIE off the
-     index -- which is what every leaf that has to know whether interrupts
-     are on (the sstatus reads, the sstatus RESTORE) actually needs. *)
-  Lemma sie_arm_half_agree (b : bool) (px : mword 64) (ms : mword 64) :
-    ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) -∗
-    sie_arm b px -∗
-    ⌜ _get_Mstatus_SIE ms = sie_bit b ⌝.
-  Proof.
-    iIntros "Hhalf Harm". rewrite /sie_arm. destruct b.
-    - iDestruct "Harm" as "(Hq & _ & _ & _ & _ & _ & _ & _)".
-      iDestruct (ghost_var_agree with "Hhalf Hq") as %H. iPureIntro. exact H.
-    - iDestruct (ghost_var_agree with "Hhalf Harm") as %H. iPureIntro. exact H.
-  Qed.
-
-  Lemma sie_arm_of_ex (p : mword 64) :
-    (∃ b : bool, sie_arm b p) ⊣⊢
-    (ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) ∨
-     (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
-      intr_res ∗
-      strans_bit strans_bit_kpt ∗
-      (∃ v : mword 64, sepc ↦ᵣ v) ∗
-      (∃ v : mword 64, scause ↦ᵣ v) ∗
-      (∃ v : mword 64, stval ↦ᵣ v) ∗
-      (∃ a b : mword 1, sret_bits a b) ∗
-      cpu_claim p ∗
-      cpu_hart 0 true p)).
-  Proof.
-    iSplit.
-    - iIntros "H". iDestruct "H" as ([]) "H"; [ iRight | iLeft ]; iExact "H".
-    - iIntros "[H|H]"; [ iExists false | iExists true ]; iExact "H".
-  Qed.
-
-  (* THE TWO MOVES push_off / pop_off make.  The enabled arm's per-cpu
-     bookkeeping comes OUT (push_off, right after its [csrci] has already
-     flipped the live bit -- the eighth it hands back is the one the flip
-     produced) and goes back IN (pop_off's final [csrsi]).  Everything
-     else in the arm is untouched, so these are pure re-associations. *)
-  (* [intr_res] is no longer handed out BESIDE [trap_csrs]: it is a conjunct
-     OF it, so these two are pure re-associations of the same five cells. *)
-  Lemma sie_arm_on_out (p : mword 64) :
-    sie_arm true p -∗
-    ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
-    trap_csrs ∗
-    cpu_claim p ∗
-    cpu_hart 0 true p.
-  Proof. iIntros "(Hbit & Hres & Hkpt & Hsep & Hsca & Hstv & Hspp & Hclm & Hcpu)". iFrame. Qed.
-
-  Lemma sie_arm_on_in (p : mword 64) :
-    ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) -∗
-    trap_csrs -∗
-    cpu_claim p -∗
-    cpu_hart 0 true p -∗
-    sie_arm true p.
-  Proof. iIntros "Hbit (Hsep & Hsca & Hstv & Hspp & Hres & Hkpt) Hclm Hcpu". iFrame. Qed.
 
   (* [strans_inv] -- THE TRANSLATION SLOT of the capability: the ambient
      S-mode translation invariant, regime and root hidden.  Clients thread
@@ -1602,6 +1190,591 @@ Section IntrDefs.
   Lemma strans_regime_inv : sr_inv strans_regime ⊣⊢ strans_inv.
   Proof. reflexivity. Qed.
 
+  (* =================================================================== *)
+  (* §6c THE BUNDLE WITH THE INSTALLED-HANDLER CONJUNCT LEFT OPEN --      *)
+  (* AND WHY THIS FILE IS TWO SECTIONS.                                   *)
+  (*                                                                      *)
+  (* The handler contract (section [IntrDefs] below) is a Banach fixpoint  *)
+  (* whose pre and post are THE FOLDED BUNDLE -- the post at the RESUMING  *)
+  (* hart, because a trap that parks the thread returns it wherever it is  *)
+  (* resumed.  So the recursion has to name [sie_cap_gpr] at an EXPLICIT   *)
+  (* hart, while [sie_cap_gpr] has to name the fixpoint (the enabled arm   *)
+  (* owns [intr_res], which carries the contract).  Two moves untie that   *)
+  (* knot, and both are structural rather than bookkeeping:                *)
+  (*                                                                      *)
+  (* 1. THE RESOURCE IS A PARAMETER HERE.  [sie_arm_of R] / [sie_cap_of R] *)
+  (*    / [sie_cap_gpr_of R] are the bundle with that one conjunct open,   *)
+  (*    so the contract can be stated before the resource exists.  Section *)
+  (*    [IntrDefs] instantiates them at [R := ires_of ihs] and re-spells   *)
+  (*    the public names VERBATIM, so every file that mentions             *)
+  (*    [sie_cap_gpr] is unaffected and [rewrite /sie_arm] still opens the *)
+  (*    same shape.  The [_of_eq] bridges below relate the two by          *)
+  (*    conversion for the few places that need it syntactically.          *)
+  (* 2. THE SECTION CLOSES HERE.  A section-local definition is NOT        *)
+  (*    parameterized inside its own section: [sie_cap_gpr] there IS "the  *)
+  (*    bundle at [cpu_id]", and [(CID := c)] fails outright ("Wrong       *)
+  (*    argument name CID") -- the same rule slice 3b's [rename] and       *)
+  (*    [ires_of]'s [sie_name c] spelling come from.  Closing the section  *)
+  (*    is what makes an explicit hart expressible at all, so EVERYTHING   *)
+  (*    THE CONTRACT NAMES IS DEFINED ABOVE THIS LINE and the contract     *)
+  (*    itself below it.                                                   *)
+  (*                                                                      *)
+  (* THE THREE HART-PARAMETRIC PIECES ARE DEFINED IN THIS SECTION AND      *)
+  (* ANNOTATED AT THE USE SITE, NOT WRITTEN OUT AT AN EXPLICIT HART.       *)
+  (* [ihs_entry_of] / [ihs_post_of] / [ihs_trap_of] are stated here in the *)
+  (* ORDINARY ambient-hart spelling -- every [r ↦ᵣ v], [pc_is], [WP Loop]  *)
+  (* and bundle inside them means "this hart" with no annotation -- and    *)
+  (* the fixpoint below says [(CID := CIDb)] / [(CID := c')] ONCE per      *)
+  (* occurrence.  That is deliberate: a per-hart term written out at an    *)
+  (* explicit hart is the one mistake in this tier that COMPILES (see      *)
+  (* durable-notes, "A HART-INDEXED TERM WRITTEN FRESH IN A PROOF MEANS    *)
+  (* THE *SECTION* HART"), and pushing the parameterization to the         *)
+  (* definition boundary means there is nothing to get wrong inside.       *)
+  (* =================================================================== *)
+  Definition sie_arm_of (R : CPU -d> iPropO Σ) (b : bool) (p : mword 64)
+      : iProp Σ :=
+    (if b
+     then (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
+           R cpu_id ∗
+           (* the KPT receipt: interrupts on implies the kernel table is
+              installed, so it has exactly this arm's lifetime (§6b). *)
+           strans_bit strans_bit_kpt ∗
+           (∃ v : mword 64, sepc ↦ᵣ v) ∗
+           (∃ v : mword 64, scause ↦ᵣ v) ∗
+           (∃ v : mword 64, stval ↦ᵣ v) ∗
+           (∃ a b : mword 1, sret_bits a b) ∗
+           cpu_claim p ∗
+           cpu_hart 0 true p)
+     else ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1))%I.
+
+  Definition sie_cap_of (R : CPU -d> iPropO Σ) (m : regfile) (avail : nat)
+      (b : bool) (p : mword 64) : iProp Σ :=
+    (stack_own (m !!! Regidx csp_rs1) (trap_res b + avail) ∗
+     strans_inv ∗
+     sie_arm_of R b p)%I.
+
+  Definition sie_cap_gpr_of (R : CPU -d> iPropO Σ)
+      (m : regfile) (avail : nat) (b : bool) (p : mword 64) : iProp Σ :=
+    (hart_state ↦ᵣ HART_ACTIVE tt ∗
+     sconf ∗
+     sie_cap_of R m avail b p ∗
+     gpr_file (tp_pin m))%I.
+
+  (* ------------------------------------------------------------------- *)
+  (* THE HANDLER'S ENTRY PACKAGE.  Everything the trap MOVES rather than  *)
+  (* invents: the bundle at the interrupts-OFF index (the trap cleared    *)
+  (* SIE) whose stack carve is the reserve the enabled index was already  *)
+  (* holding -- [trap_res true + av] on both sides, so the handover is a  *)
+  (* pure RE-INDEXING and the [stack_own] conjunct is never touched --    *)
+  (* plus the four things the enabled arm was carrying and the trap       *)
+  (* re-pinned: the trap CSRs at their written values, the [sret_bits]    *)
+  (* travelling half at ('1','1') (the trap came from S-mode with         *)
+  (* interrupts enabled), the per-cpu bookkeeping retuned to '0', and the *)
+  (* running claim verbatim.  [R cpu_id] is the installed-handler         *)
+  (* resource: at [b = false] the arm does not carry it, so it rides as   *)
+  (* its own conjunct -- and it is the recursive occurrence, which is why *)
+  (* [ires_of]'s [▷] is the fixpoint's guard.                            *)
+  (* ------------------------------------------------------------------- *)
+  Definition ihs_entry_of (R : CPU -d> iPropO Σ) (m : regfile) (av : nat)
+      (p pc0 sc tv handler : mword 64) : iProp Σ :=
+    (sie_cap_gpr_of R m (trap_res true + av) false p ∗
+     sret_bits ('b"1" : mword 1) ('b"1" : mword 1) ∗
+     sepc ↦ᵣ pc0 ∗
+     scause ↦ᵣ sc ∗
+     stval ↦ᵣ tv ∗
+     (* THE KPT RECEIPT crosses too, for the same reason the trap CSRs do: the
+        handler owes the ENABLED arm back and the receipt is one of its
+        members.  A trap cannot change which table is installed, so this is a
+        pure hand-over -- and it is what [WpSconfSret.wp_sret_s_sconf] asks of
+        whoever re-enables interrupts. *)
+     strans_bit strans_bit_kpt ∗
+     cpu_hart 0 false p ∗
+     cpu_claim p ∗
+     R cpu_id ∗
+     pc_is handler)%I.
+
+  (* THE POSTCONDITION IS THE ENGINE'S OWN PRECONDITION.  That is the whole
+     point of the shape: [WpIntrInv.wp_exec_step_intr]'s Löb hypothesis is
+     "the enabled bundle at [pc0]", and the handler's continuation hands back
+     precisely that -- no re-assembly, no [intr_config], no [intr_frame].  The
+     avail is [av], the reserve having been spent as the handler's budget. *)
+  Definition ihs_post_of (R : CPU -d> iPropO Σ) (m : regfile) (av : nat)
+      (p pc0 : mword 64) : iProp Σ :=
+    (sie_cap_gpr_of R m av true p -∗
+     pc_is pc0 -∗
+     WP (Loop : expr riscv_lang))%I.
+
+  (* ONE TRAP'S OBLIGATION, at the ambient hart, with the continuation left
+     as a parameter -- because the continuation is the one thing that is NOT
+     at this hart.  [K] is what [wp_next] quantifies. *)
+  Definition ihs_trap_of (R : CPU -d> iPropO Σ) (m : regfile) (av : nat)
+      (p pc0 sc tv handler : mword 64)
+      (K : forall CID : CpuId, iProp Σ) : iProp Σ :=
+    (⌜ ret_pc pc0 = pc0 ⌝ -∗
+     ⌜ s_cause_ok sc ⌝ -∗
+     ihs_entry_of R m av p pc0 sc tv handler -∗
+     wp_next true p K -∗
+     WP (Loop : expr riscv_lang))%I.
+
+End IntrDefsBase.
+
+(* ===================================================================== *)
+(* THE HANDLER CONTRACT AND THE RESOURCES THAT CARRY IT.  Everything in   *)
+(* this section either IS the Banach fixpoint or mentions it; everything  *)
+(* above it is what the fixpoint's body is allowed to name.               *)
+(* ===================================================================== *)
+Section IntrDefs.
+  Context `{!riscvGS Σ}.
+  Context `{!sieG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+
+  (* ================================================================== *)
+  (* THE CONTRACT IS A BANACH FIXPOINT, AND THE RECURSION IS SPLIT IN TWO. *)
+  (*                                                                      *)
+  (* The cycle is inherent (projects/kerneltrap.md, "THE CYCLE IS REAL"):  *)
+  (* enabled execution HERE means a handler is installed HERE, and the     *)
+  (* handler restores enabled execution ANYWHERE.  So the contract's own   *)
+  (* pre and post mention [intr_res], whose body carries [▷ contract].     *)
+  (* The [▷] is the guard, and it is why [ihs_pre] is contractive at all.  *)
+  (*                                                                      *)
+  (* WHY TWO HALVES AND NOT ONE [Contractive].  [S] occurs in exactly ONE  *)
+  (* place in the whole contract -- under the [▷] in the resource -- so    *)
+  (* the body is abstracted over the RESOURCE FAMILY [R] instead of over   *)
+  (* the spec.  The big half then needs only [NonExpansive] (no            *)
+  (* [dist_later] case-splitting) and the guarded half is six lines.       *)
+  (* MEASURED, because the naive shape is not merely slower:               *)
+  (*   one [solve_contractive] over the whole contract   >16 min (killed)  *)
+  (*   split: [Contractive ires_of] + [NonExpansive ihs_of]     both fast  *)
+  (* [ires_of] therefore stays TRANSPARENT -- [solve_contractive] has to   *)
+  (* SEE the [▷] that [Typeclasses Opaque intr_res] below exists to hide   *)
+  (* from [MaybeIntoLaterN].  The seal goes on the instantiated form only. *)
+  (*                                                                      *)
+  (* HART-INDEXED, because the recursion crosses harts: a trap that parks  *)
+  (* the thread returns it on whatever hart resumes it, so the post sits   *)
+  (* under [wp_next true p] -- hart-generic, with the guard that collapses *)
+  (* it at [p = zero_reg].  THAT GUARD IS THE DEBT [WpNext.v] RECORDS      *)
+  (* against this contract ("no current proc implies the trap returns on   *)
+  (* the same hart"), and it is what lets the engine discharge its         *)
+  (* caller's own obligation for the scheduler thread.                    *)
+  (* ================================================================== *)
+
+  (* the installed-handler resource, parameterized by the contract it
+     carries.  [intr_res] below is this at [S := ihs], spelled out again so
+     that its one-step unfolding is the shape consumers already destructure. *)
+  Definition ires_of (S : CPU -d> mword 64 -d> iPropO Σ) : CPU -d> iPropO Σ :=
+    fun c =>
+    (∃ (h : mword 64) (b : mword 1),
+       ⌜ trapVectorMode_forwards (_get_Mtvec_Mode h) = TV_Direct ⌝ ∗
+       ⌜ stvec_base h = h ⌝ ∗
+       ghost_var (sie_name c) (1/4) b ∗
+       reg_pointsto_at c stvec (DfracOwn 1) h ∗
+       ▷ S c h)%I.
+
+  Global Instance ires_of_contractive : Contractive ires_of.
+  Proof. rewrite /ires_of. solve_contractive. Qed.
+
+  (* THE CONTRACT.  [root_ppn] / [elp_v] / the entry mstatus / mie / mideleg
+     USED TO BE PARAMETERS here, and are not any more: every one of them is
+     inside the bundle ([strans_inv]'s KPT arm, [sconf]'s existential mstatus
+     and its [MIE_S] pin, the menvcfg pin), which is what makes the statement
+     this short.  [av] is the handler's usable stack budget; the reserve it
+     runs in is the enabled index's, re-indexed. *)
+  Definition ihs_body_of (R : CPU -d> iPropO Σ) `{CIDb : CpuId}
+      (handler : mword 64) : iProp Σ :=
+    (□ ∀ (m : regfile) (av : nat) (p pc0 sc tv : mword 64),
+        ihs_trap_of (CID := CIDb) R m av p pc0 sc tv handler
+          (fun c' => ihs_post_of (CID := c') R m av p pc0))%I.
+
+  Definition ihs_of (R : CPU -d> iPropO Σ) : CPU -d> mword 64 -d> iPropO Σ :=
+    fun (c : CPU) (handler : mword 64) => ihs_body_of R (CIDb := c) handler.
+
+  Global Instance ihs_of_ne : NonExpansive ihs_of.
+  Proof.
+    rewrite /ihs_of /ihs_body_of /ihs_trap_of /ihs_entry_of /ihs_post_of
+            /sie_cap_gpr_of /sie_cap_of /sie_arm_of /wp_next.
+    solve_proper.
+  Qed.
+
+  Definition ihs_pre (S : CPU -d> mword 64 -d> iPropO Σ)
+      : CPU -d> mword 64 -d> iPropO Σ := ihs_of (ires_of S).
+
+  Global Instance ihs_pre_contractive : Contractive ihs_pre.
+  Proof.
+    intros n S1 S2 HS. rewrite /ihs_pre.
+    apply ihs_of_ne. by apply ires_of_contractive.
+  Qed.
+
+  Definition ihs : CPU -d> mword 64 -d> iPropO Σ := fixpoint ihs_pre.
+
+  (* THE PUBLIC NAME AND ARITY ARE UNCHANGED: the contract at the ambient
+     hart.  Every existing spelling [intr_handler_spec h] still means what it
+     meant; what changed is that its body now threads the bundle. *)
+  Definition intr_handler_spec (handler : mword 64) : iProp Σ :=
+    ihs cpu_id handler.
+
+  (* PERSISTENCE HAS TO NAME THE INSTANCE.  The body is [□ _], so there is
+     exactly one, but [apply _] after the [fixpoint_unfold] rewrite searches
+     the whole unfolded contract and does not come back (>90s, measured).
+     The pre-fixpoint definition could afford [apply _]; this one cannot. *)
+  Global Instance intr_handler_spec_persistent handler :
+    Persistent (intr_handler_spec handler).
+  Proof.
+    rewrite /intr_handler_spec /ihs (fixpoint_unfold ihs_pre cpu_id handler)
+            /ihs_pre /ihs_of /ihs_body_of.
+    apply bi.intuitionistically_persistent.
+  Qed.
+
+  (* THE ONE-STEP UNFOLDING, which every consumer of the contract needs: the
+     spec is not syntactically a [□ ∀ …] any more, so [iApply "Hspec"] must
+     be preceded by a rewrite with this. *)
+  Lemma intr_handler_spec_unfold (handler : mword 64) :
+    intr_handler_spec handler ⊣⊢ ihs_body_of (ires_of ihs) handler.
+  Proof.
+    rewrite /intr_handler_spec /ihs. apply (fixpoint_unfold ihs_pre cpu_id handler).
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* THE CONTRACT'S TWO FACES, CURRIED.  [ihs_trap_of] packages one trap's *)
+  (* obligation as a single definition (it has to: the hart-parametric      *)
+  (* pieces live in the base section), so neither [iApply "Hsp"] on the     *)
+  (* consumer side nor [iModIntro; iIntros] on the producer side can see    *)
+  (* through it.  These two do the unfolding once, and they are the ONLY    *)
+  (* interface either side should use:                                      *)
+  (*   - the ENGINE ([WpIntrInv.wp_exec_step_intr]) applies the spec;        *)
+  (*   - the PRODUCER ([ProofKernelvec.kernelvec_handler_spec]) builds it.   *)
+  (* ------------------------------------------------------------------- *)
+  Lemma intr_handler_spec_apply (handler : mword 64)
+      (m : regfile) (av : nat) (p pc0 sc tv : mword 64) :
+    ret_pc pc0 = pc0 ->
+    s_cause_ok sc ->
+    intr_handler_spec handler -∗
+    ihs_entry_of (ires_of ihs) m av p pc0 sc tv handler -∗
+    wp_next true p (fun c' => ihs_post_of (CID := c') (ires_of ihs) m av p pc0) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros (Hpc0 Hsc) "Hsp Hentry Hnext".
+    iEval (rewrite intr_handler_spec_unfold /ihs_body_of) in "Hsp".
+    iSpecialize ("Hsp" $! m av p pc0 sc tv).
+    iEval (rewrite /ihs_trap_of) in "Hsp".
+    iApply ("Hsp" with "[%] [%] Hentry Hnext"); done.
+  Qed.
+
+  Lemma intr_handler_spec_intro (handler : mword 64) :
+    □ (∀ (m : regfile) (av : nat) (p pc0 sc tv : mword 64),
+         ⌜ ret_pc pc0 = pc0 ⌝ -∗
+         ⌜ s_cause_ok sc ⌝ -∗
+         ihs_entry_of (ires_of ihs) m av p pc0 sc tv handler -∗
+         wp_next true p
+           (fun c' => ihs_post_of (CID := c') (ires_of ihs) m av p pc0) -∗
+         WP (Loop : expr riscv_lang)) -∗
+    intr_handler_spec handler.
+  Proof.
+    iIntros "#H".
+    iEval (rewrite intr_handler_spec_unfold /ihs_body_of).
+    iModIntro. iIntros (m av p pc0 sc tv).
+    rewrite /ihs_trap_of. iApply "H".
+  Qed.
+
+  (* =================================================================== *)
+  (* §5 [intr_res] -- THE INSTALLED-HANDLER RESOURCE: a quarter of the SIE *)
+  (* ghost (its value [b] mirrors the live mstatus.SIE bit, via agreement  *)
+  (* with the mstatus-tied half), the stvec register, the two pure facts   *)
+  (* about the installed vector, and -- when interrupts are enabled -- the *)
+  (* persistent handler WP.                                                *)
+  (*                                                                      *)
+  (* THIS USED TO BE AN IRIS INVARIANT ([intr_inv handler] =              *)
+  (* [inv intrN (∃ b, quarter ∗ stvec ↦ᵣ handler ∗ □(b='1' -∗ spec))],     *)
+  (* persistent, with the two facts riding outside it).  IT IS NOW PLAIN   *)
+  (* OWNERSHIP, folded into [trap_csrs] (§6a).  Three reasons, in the      *)
+  (* order they matter:                                                    *)
+  (*                                                                      *)
+  (* 1. THE INVARIANT MADE THE TRAP VECTOR PERMANENTLY IMMUTABLE.          *)
+  (*    [handler] was a parameter of a PERSISTENT proposition fixed at     *)
+  (*    allocation, so the cell could be borrowed but only ever returned   *)
+  (*    at the SAME value -- and allocating a second [intr_inv] at a new   *)
+  (*    handler does not help, since two live invariants would each claim  *)
+  (*    a full [stvec] cell, making the first unusable forever.  User mode *)
+  (*    needs [usertrapret]'s [w_stvec(uservec)], and under [inv] that     *)
+  (*    write is not awkward, it is IMPOSSIBLE BY CONSTRUCTION.            *)
+  (*    ([WpSconfCsr.wp_csrw_stvec_s_sconf] is already the right shape:    *)
+  (*    cell in, cell out.  The invariant is the only thing that kept it   *)
+  (*    inapplicable outside the boot window.)                             *)
+  (*                                                                      *)
+  (* 2. THE SAFETY PROPERTY DID NOT LIVE IN THE [inv].  "You cannot set    *)
+  (*    SIE = 1 without an installed handler" is enforced by the GHOST     *)
+  (*    QUARTER -- [sie_ghost_flip] needs all three fractions and the      *)
+  (*    quarter only ever travels with the cell -- and that argument is    *)
+  (*    unchanged here.  Compare [satp], which was always carried this     *)
+  (*    way: explicitly owned inside [strans_inv]'s two arms.              *)
+  (*                                                                      *)
+  (* 3. THE PERSISTENCE WAS UNUSABLE WHERE IT WOULD HAVE MATTERED.  The    *)
+  (*    only thing [inv] bought was a duplicable credential, and the       *)
+  (*    credential is PER-HART (this hart's stvec, this hart's ghost), so  *)
+  (*    a copy is a copy at ONE hart and is useless after a park --        *)
+  (*    persistence is not hart-independence.  The whole                   *)
+  (*    [intr_handler_avail_ext] family existed to work around exactly     *)
+  (*    that, and is deleted with the invariant.                           *)
+  (*                                                                      *)
+  (* THE [▷] IS LOAD-BEARING AND IS NOT CONSERVATISM.  Once                *)
+  (* [intr_handler_spec] becomes the Banach fixpoint the handler contract  *)
+  (* needs (projects/kerneltrap.md, "THE CYCLE IS REAL"), the recursive    *)
+  (* occurrence reached through this resource has to sit under a guard.    *)
+  (* It used to sit under [inv] ([inv_contractive]); with the invariant    *)
+  (* gone, this [▷] IS the guard, and without it [ihs_pre] is not          *)
+  (* contractive and the fixpoint does not exist.  Consumers pay nothing:  *)
+  (* a trap is a program step, so the engine strips it exactly where it    *)
+  (* strips [inv]'s today.                                                 *)
+  (* =================================================================== *)
+
+  (* THE HANDLER SPEC IS UNCONDITIONAL, NOT GUARDED ON THE GHOST VALUE, and
+     that is a REAL difference from the invariant this replaces -- worth
+     understanding before "restoring" the guard.
+
+     The invariant's body read [□ (b = '1' -∗ spec)], so at SIE = 0 it held a
+     cell and no contract.  That was affordable because [inv] is persistent:
+     the guard only had to be DISCHARGED at the moment of enabling, and the
+     [csrsi] leaf got the spec from a separate persistent premise
+     ([intr_handler_avail]) whose handler it could then unify with the
+     invariant's.
+
+     With ownership that route is closed: a separate spec premise is about
+     some [h'], the cell in hand is at [h], and nothing ties them -- so the
+     enabling flip could not re-form the resource.  Carrying the contract
+     unconditionally is what keeps the cell and its contract INSEPARABLE,
+     which is the property the whole change exists for (installing a new
+     vector = swapping both together, atomically, which is exactly
+     usertrapret).
+
+     WHAT IT COSTS: whoever BUILDS this must have the contract, so BOOT
+     CANNOT HOLD ONE -- before trapinithart there is no installed handler at
+     all.  That is why [trap_csrs_raw] below exists and why [main_hart_raw]
+     is stated over it: boot carries the four trap CELLS, and [main] folds
+     the full [trap_csrs] once trapinithart has written stvec and
+     [kernelvec_handler_spec] is in hand.  The resource says "a trap vector
+     is installed and here is its contract", and at boot that is simply
+     false. *)
+  Definition intr_res : iProp Σ :=
+    (∃ (h : mword 64) (b : mword 1),
+       ⌜ trapVectorMode_forwards (_get_Mtvec_Mode h) = TV_Direct ⌝ ∗
+       ⌜ stvec_base h = h ⌝ ∗
+       ghost_var sie_gname (1/4) b ∗
+       stvec ↦ᵣ h ∗
+       ▷ intr_handler_spec h)%I.
+
+  (* THE constructor.  No fupd -- there is no invariant to allocate, which is
+     why the boot chain's [intr_inv_alloc_off] site loses its [iMod].  There
+     is no eliminator: the resource is a plain [∃] of owned conjuncts, so
+     consumers destructure it directly
+     ([iDestruct "H" as (h vb) "(%Htvd & %Hsb & Hq & Hstv & #Hspec)"]) and
+     rebuild with this.  The five old [iInv]/[inv_acc] sites are all that
+     shape now. *)
+  Lemma intr_res_intro (h : mword 64) (b : mword 1) :
+    trapVectorMode_forwards (_get_Mtvec_Mode h) = TV_Direct ->
+    stvec_base h = h ->
+    ghost_var sie_gname (1/4) b -∗
+    stvec ↦ᵣ h -∗
+    ▷ intr_handler_spec h -∗
+    intr_res.
+  Proof.
+    iIntros (Htvd Hsb) "Hq Hstv #Hspec".
+    iExists h, b. iFrame "Hq Hstv Hspec". by iSplit.
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* SEALED AGAINST TYPECLASS SEARCH, AND THIS IS LOAD-BEARING.           *)
+  (*                                                                      *)
+  (* The [▷] above sits INSIDE the definition, not at its head, so        *)
+  (* [MaybeIntoLaterN]'s structural instances happily descend through     *)
+  (* [trap_csrs]' separating conjunctions and strip it: after ANY branch's *)
+  (* [iNext], a hypothesis that was [trap_csrs] becomes something         *)
+  (* STRICTLY STRONGER that no longer matches [trap_csrs], and            *)
+  (* [iSpecialize] then fails as if the resource were missing.  That is   *)
+  (* the hazard durable-notes records for [cpu_own] and                   *)
+  (* [intr_handler_avail]; the difference here is that [trap_csrs] is     *)
+  (* threaded through the whole park/lock cone, so the repair would have  *)
+  (* to be applied at dozens of unrelated sites.                          *)
+  (*                                                                      *)
+  (* [Typeclasses Opaque] stops the descent at this constant: [iNext]     *)
+  (* cannot see the [▷], so no caller ever holds the stronger form and no *)
+  (* re-seal is needed anywhere.  THE COST is that [iDestruct] can no     *)
+  (* longer take it apart by [IntoExist] either -- the ~6 sites that DO   *)
+  (* open it (the engine, the three SIE-flip leaves, the sret leaf,       *)
+  (* kerneltrap's re-seals) say [rewrite /intr_res] first, which is       *)
+  (* exactly the set of places that should be looking inside.             *)
+  (* ------------------------------------------------------------------- *)
+  Global Typeclasses Opaque intr_res.
+  (* SPELLED FLAT, not as [trap_csrs_raw ∗ intr_res]: the tier destructures
+     this bundle positionally in dozens of places, and a nested pair would
+     silently rebind the fourth name to a pair instead of failing loudly. *)
+  Definition trap_csrs : iProp Σ :=
+    ((∃ v : mword 64, sepc ↦ᵣ v) ∗
+     (∃ v : mword 64, scause ↦ᵣ v) ∗
+     (∃ v : mword 64, stval ↦ᵣ v) ∗
+     (∃ a b : mword 1, sret_bits a b) ∗
+     intr_res ∗
+     strans_bit strans_bit_kpt)%I.
+
+  Lemma trap_csrs_of_raw :
+    trap_csrs_raw -∗ intr_res -∗ strans_bit strans_bit_kpt -∗ trap_csrs.
+  Proof. iIntros "(Ha & Hb & Hc & Hd) Hres Hkpt". iFrame. Qed.
+
+  Lemma trap_csrs_to_raw :
+    trap_csrs -∗ trap_csrs_raw ∗ intr_res ∗ strans_bit strans_bit_kpt.
+  Proof. iIntros "(Ha & Hb & Hc & Hd & Hres & Hkpt)". iFrame. Qed.
+
+  Definition trap_csrs_pay (n : nat) (eb : bool) : iProp Σ :=
+    (match n with
+     | O => if eb then trap_csrs else emp
+     | S _ => emp
+     end)%I.
+
+  (* THE COMPLEMENT OF [trap_csrs_pay] AT LEVEL 0: what a caller has to
+     BRING because the bundle does not already own it.  At level 0 the arm
+     index and the saved base coincide, so at [eb = true] the enabled arm
+     owns the trap CSRs and the caller brings nothing, while at
+     [eb = false] nothing in the bundle owns them and the caller brings the
+     whole set.
+
+     A function that PARKS needs the set unconditionally -- sched's crossing
+     takes it and re-delivers the RESUMING hart's, because sepc/scause/stval
+     are PER-HART registers and framing them around a migration would be
+     unsound.  So yield takes [trap_csrs_pay 0 eb] out of its own push_off
+     and [trap_csrs_ext eb] from its caller, and exactly one of the two is
+     [emp].  The [eb = false] case is kerneltrap's: the trap cleared SIE, so
+     the pushing acquire records intena = 0 and hands out nothing, and the
+     handler is holding the trap CSRs itself because the TRAP gave them to
+     it. *)
+  Definition trap_csrs_ext (eb : bool) : iProp Σ :=
+    (if eb then emp else trap_csrs)%I.
+
+  Lemma trap_csrs_ext_split (eb : bool) :
+    trap_csrs_pay 0 eb ∗ trap_csrs_ext eb ⊣⊢ trap_csrs.
+  Proof.
+    destruct eb; rewrite /trap_csrs_pay /trap_csrs_ext.
+    - by rewrite bi.sep_emp.
+    - by rewrite bi.emp_sep.
+  Qed.
+
+  (* [intr_handler_avail_ext] USED TO BE HERE, as the third member of the
+     [trap_csrs_ext] / [cpu_claim_ext] family, together with its [_intro] and
+     its transport, and [intr_restore] = [intr_handler_avail ∗ trap_csrs] with
+     it.  ALL FOUR ARE GONE, and the [eb]-guard they were built around is the
+     thing worth understanding, because it does not survive the change:
+
+     the guard was FORCED, not chosen.  At [eb = true] the returned bundle's
+     [sie_arm true p] held only [∃ h, intr_inv h], NOT the handler WP -- that
+     sat behind the invariant's [□ (b = '1' -∗ spec)], and extracting it needed
+     a LATER stripped, i.e. a program step, which a postcondition does not
+     have.  So the payload had to be [emp] at exactly the index where the arm
+     existed, and the family existed to say so.
+
+     With the resource OWNED, [sie_arm true] carries [intr_res] itself and the
+     arm's own eighth pins the guard's [b = '1'], so [intr_res_acc_on] reads
+     the spec out with no fupd and no step.  There is nothing left to guard:
+     the payload is [trap_csrs], the complement is [trap_csrs_ext], and the
+     handler resource rides inside both. *)
+
+  (* ==================================================================== *)
+  (* WHAT THE ARM HANDS OUT AT THIS INDEX.  The trap CSRs and the running   *)
+  (* claim are DIFFERENT resources -- yield spends the claim (surrendering  *)
+  (* both state halves to [pstate_lock]) while keeping the trap CSRs, and   *)
+  (* it is the SCHEDULER that later rebuilds the arm, at [zero_reg] -- but  *)
+  (* they enter and leave the arm at the same index, so they travel as one  *)
+  (* carrier.  Bundling is transport only: [arm_pay_parts] takes them apart *)
+  (* again by definition, and anyone who needs just one half says so.       *)
+  (*                                                                        *)
+  (* The SIE-flip leaves below deal in the components (they build and tear  *)
+  (* down the arm piecewise); the function-level specs deal in the bundle,  *)
+  (* which is what keeps a single hypothesis threading through the whole    *)
+  (* push_off / acquire / release / pop_off cone.                           *)
+  (* ==================================================================== *)
+  Definition arm_pay (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
+    (trap_csrs_pay n eb ∗ cpu_claim_pay n eb p)%I.
+
+  Lemma arm_pay_parts (n : nat) (eb : bool) (p : mword 64) :
+    arm_pay n eb p ⊣⊢ trap_csrs_pay n eb ∗ cpu_claim_pay n eb p.
+  Proof. reflexivity. Qed.
+
+  Lemma arm_pay_on (p : mword 64) :
+    arm_pay 0 true p ⊣⊢ trap_csrs ∗ cpu_claim p.
+  Proof. reflexivity. Qed.
+
+  (* THE KPT RECEIPT IS AN ENABLED-ARM MEMBER, for the reason spelled out at
+     [strans_bit] (§6b): interrupts on implies the kernel table is installed,
+     so the receipt has exactly this arm's lifetime.  The DISABLED arm does
+     not carry it -- which is what keeps boot constructible, since every
+     instruction before kvminithart runs at [b = false] over the Bare slot. *)
+  Definition sie_arm (b : bool) (p : mword 64) : iProp Σ :=
+    (if b
+     then (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
+           intr_res ∗
+           strans_bit strans_bit_kpt ∗
+           (∃ v : mword 64, sepc ↦ᵣ v) ∗
+           (∃ v : mword 64, scause ↦ᵣ v) ∗
+           (∃ v : mword 64, stval ↦ᵣ v) ∗
+           (∃ a b : mword 1, sret_bits a b) ∗
+           cpu_claim p ∗
+           cpu_hart 0 true p)
+     else ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1))%I.
+
+  (* THE ARM INDEX IS THE LIVE BIT, at either index and without a case split
+     at the call site.  [sconf]'s tied half and the arm's eighth are
+     fragments of the same ghost, so agreement reads the live SIE off the
+     index -- which is what every leaf that has to know whether interrupts
+     are on (the sstatus reads, the sstatus RESTORE) actually needs. *)
+  Lemma sie_arm_half_agree (b : bool) (px : mword 64) (ms : mword 64) :
+    ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) -∗
+    sie_arm b px -∗
+    ⌜ _get_Mstatus_SIE ms = sie_bit b ⌝.
+  Proof.
+    iIntros "Hhalf Harm". rewrite /sie_arm. destruct b.
+    - iDestruct "Harm" as "(Hq & _ & _ & _ & _ & _ & _ & _)".
+      iDestruct (ghost_var_agree with "Hhalf Hq") as %H. iPureIntro. exact H.
+    - iDestruct (ghost_var_agree with "Hhalf Harm") as %H. iPureIntro. exact H.
+  Qed.
+
+  Lemma sie_arm_of_ex (p : mword 64) :
+    (∃ b : bool, sie_arm b p) ⊣⊢
+    (ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) ∨
+     (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
+      intr_res ∗
+      strans_bit strans_bit_kpt ∗
+      (∃ v : mword 64, sepc ↦ᵣ v) ∗
+      (∃ v : mword 64, scause ↦ᵣ v) ∗
+      (∃ v : mword 64, stval ↦ᵣ v) ∗
+      (∃ a b : mword 1, sret_bits a b) ∗
+      cpu_claim p ∗
+      cpu_hart 0 true p)).
+  Proof.
+    iSplit.
+    - iIntros "H". iDestruct "H" as ([]) "H"; [ iRight | iLeft ]; iExact "H".
+    - iIntros "[H|H]"; [ iExists false | iExists true ]; iExact "H".
+  Qed.
+
+  (* THE TWO MOVES push_off / pop_off make.  The enabled arm's per-cpu
+     bookkeeping comes OUT (push_off, right after its [csrci] has already
+     flipped the live bit -- the eighth it hands back is the one the flip
+     produced) and goes back IN (pop_off's final [csrsi]).  Everything
+     else in the arm is untouched, so these are pure re-associations. *)
+  (* [intr_res] is no longer handed out BESIDE [trap_csrs]: it is a conjunct
+     OF it, so these two are pure re-associations of the same five cells. *)
+  Lemma sie_arm_on_out (p : mword 64) :
+    sie_arm true p -∗
+    ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
+    trap_csrs ∗
+    cpu_claim p ∗
+    cpu_hart 0 true p.
+  Proof. iIntros "(Hbit & Hres & Hkpt & Hsep & Hsca & Hstv & Hspp & Hclm & Hcpu)". iFrame. Qed.
+
+  Lemma sie_arm_on_in (p : mword 64) :
+    ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) -∗
+    trap_csrs -∗
+    cpu_claim p -∗
+    cpu_hart 0 true p -∗
+    sie_arm true p.
+  Proof. iIntros "Hbit (Hsep & Hsca & Hstv & Hspp & Hres & Hkpt) Hclm Hcpu". iFrame. Qed.
+
   Definition sie_cap (m : regfile) (avail : nat) (b : bool)
       (p : mword 64) : iProp Σ :=
     (stack_own (m !!! Regidx csp_rs1) (trap_res b + avail) ∗
@@ -1617,6 +1790,34 @@ Section IntrDefs.
      a premise on a public spec surface (SpecUart.v), and it stays the premise
      of every write-only leaf.  A leaf that ALSO reads a caller-varying
      register states [ops_ok] instead, whose first conjunct is this. *)
+  (* INTERRUPTS ENABLED IMPLIES THE KERNEL TABLE IS INSTALLED, and the
+     refutation of the Bare arm is a two-cell conflict rather than an
+     invariant open: the enabled arm carries [intr_res], which OWNS
+     [stvec ↦ᵣ h], and the Bare slot owns the same cell.  (xv6 enables
+     interrupts only after kvminithart, so this is the truth about the code;
+     what makes it PROVABLE here is that a trap vector cannot be installed
+     while translation is Bare.)  Both the absorbing engine and the SIE=1
+     instruction engine need exactly this shape -- the reserved carve, the
+     arm bit, the table, and the arm -- so it is stated once. *)
+  Lemma sie_cap_on_kpt (m : regfile) (avail : nat) (p : mword 64) :
+    sie_cap m avail true p -∗
+    ∃ root_ppn : mword 44,
+      stack_own (m !!! Regidx csp_rs1) (trap_res true + avail) ∗
+      strans_bit ('b"1") ∗ tlb_res_pt root_ppn ∗ sie_arm true p.
+  Proof.
+    iIntros "(Hstk & Htr & Harm)".
+    iDestruct "Htr" as "[(Hbit0 & Hbare & Hbstv) | (Hbit1 & Hkpt)]".
+    { (* the arm's own KPT RECEIPT against the Bare arm's bit: agreement, no
+         cell conflict needed (the receipt landed in the arm upstream). *)
+      iEval (rewrite /sie_arm) in "Harm".
+      iDestruct "Harm" as "(_ & _ & Hrcpt & _)".
+      iDestruct (strans_bit_agree with "Hrcpt Hbit0") as %Hbad.
+      exfalso. apply (f_equal (@bv_unsigned _)) in Hbad.
+      vm_compute in Hbad. discriminate. }
+    iDestruct "Hkpt" as (root_ppn) "Htlb".
+    iExists root_ppn. iFrame "Hstk Hbit1 Htlb Harm".
+  Qed.
+
   Definition rd_ok (rd : mword 5) : Prop :=
     rd <> csp_rs1 /\ Regidx rd <> Regidx Rtp.
 
@@ -1920,6 +2121,31 @@ Section IntrDefs.
     iDestruct (sconf_at_open with "Hsc") as (ms) "Hsc".
     iExists ms. iFrame "Hhs Hsc Hcap Hfile".
   Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* THE PUBLIC SPELLINGS ARE THE PARAMETERIZED ONES AT [R := ires_of ihs],  *)
+  (* BY CONVERSION.  Each of the four is written out verbatim rather than as  *)
+  (* [foo_of (ires_of ihs)], so that every [rewrite /sie_arm] /               *)
+  (* [rewrite /sie_cap_gpr] site in the tree keeps opening the shape it       *)
+  (* opens today.  These bridges are for the places that need the two forms   *)
+  (* to meet SYNTACTICALLY -- the contract's consumers, which see the [_of]   *)
+  (* form after [intr_handler_spec_unfold] -- and each is a conversion, not   *)
+  (* a proof.                                                                *)
+  (* ------------------------------------------------------------------- *)
+  Lemma intr_res_of_eq : intr_res ⊣⊢ ires_of ihs cpu_id.
+  Proof. reflexivity. Qed.
+
+  Lemma sie_arm_of_eq (b : bool) (p : mword 64) :
+    sie_arm b p ⊣⊢ sie_arm_of (ires_of ihs) b p.
+  Proof. reflexivity. Qed.
+
+  Lemma sie_cap_of_eq (m : regfile) (avail : nat) (b : bool) (p : mword 64) :
+    sie_cap m avail b p ⊣⊢ sie_cap_of (ires_of ihs) m avail b p.
+  Proof. reflexivity. Qed.
+
+  Lemma sie_cap_gpr_of_eq (m : regfile) (avail : nat) (b : bool) (p : mword 64) :
+    sie_cap_gpr m avail b p ⊣⊢ sie_cap_gpr_of (ires_of ihs) m avail b p.
+  Proof. reflexivity. Qed.
 
   Global Instance sie_cap_gpr_into_sep m avail b p :
     IntoSep (sie_cap_gpr m avail b p)
