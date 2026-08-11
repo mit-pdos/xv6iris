@@ -1270,15 +1270,24 @@ Section SpBodies.
       assert (Hlka : add_vec (L4 !!! Regidx (mword_of_int 11 : mword 5))
                        (sign_extend' 64 (mword_of_int 0 : mword 12)) = a_tickslock)
         by (rewrite HL4a1; apply sp_add_vec_0).
+      (* sleep takes the trap CSRs and the running claim SEPARATELY now, and
+         index-free.  Here [eb = true], so the complement is [emp] and
+         [IntrDefs.arm_pay_ext_join] turns the pay into the pair. *)
+      iDestruct (arm_pay_ext_join eb _ with "Hpay []") as "[Htcx Hclmx]".
+      { rewrite Heb /trap_csrs_ext /cpu_claim_ext. iSplitR; done. }
       iApply (Sleep.wp_sleep_sconf γs j γl γt a_tickslock "time"%string ticks_res L4
-                (trap_res true + (av - 8))%nat eb C Hj Hjl Hlka Heb
+                (trap_res true + (av - 8))%nat eb C Hj Hjl Hlka
                 (* [change]: [trap_res true] vs [kv_frame_slots], see
                    ProofAcquiresleep's sleep call. *)
-                ltac:(change (trap_res true) with kv_frame_slots; lia)
-                with "Hcg Hown Hpay Htext Hpc Hpinv Hlk2 Htok HR Hpanic [-]").
+                ltac:(rewrite Heb; change (trap_res true) with kv_frame_slots; lia)
+                with "Hcg Hown Htcx Hclmx Htext Hpc Hpinv Hlk2 Htok HR Hpanic [-]").
       (* SLEEP RETURNS ON HART [CIDs].  Everything after the park runs there,
          inside [sp_post_sleep_body] at [(CID := CIDs)]. *)
-      iIntros (CIDs Hss mfs) "%Hscs Hcg Hown Hpay Hpc Htok HR".
+      iIntros (CIDs Hss mfs) "%Hscs Hcg Hown Htcx Hclmx Hpc Htok HR".
+      (* ... and back into the pay at the RESUMING hart.  A lemma application,
+         not an [iAssert]: a hart-indexed term written fresh would mean the
+         SECTION hart (durable-notes.md). *)
+      iDestruct (arm_pay_ext_split eb _ with "Htcx Hclmx") as "[Hpay _]".
       assert (Hl5c : ret_pc (L4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0x5c))
         by (rewrite HL4ra; pcstep).
       iEval (rewrite Hl5c) in "Hpc".

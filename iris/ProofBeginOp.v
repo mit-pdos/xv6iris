@@ -786,15 +786,25 @@ Section BoBodies.
     assert (HboA2 : bo_regs m A2 spd) by (apply (bo_regs_cs m M A2 spd HcsMA2 HboM)).
     assert (Hsl_lka : add_vec (A2 !!! Regidx (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = log_addr)
       by (rewrite HA2a1; apply addv_sext0).
+    (* sleep takes the trap CSRs and the running claim SEPARATELY now, and
+       index-free.  At this call site [eb = true], so the complement is
+       [emp] and [IntrDefs.arm_pay_ext_join] turns the pay into the pair. *)
+    iDestruct (arm_pay_ext_join eb _ with "Hpay []") as "[Htcx Hclmx]".
+    { rewrite Heb /trap_csrs_ext /cpu_claim_ext. iSplitR; done. }
     iApply (Sleep.wp_sleep_sconf γs j γl (ln_lk γ) log_addr "log"%string
               (log_res γ bn γfs cov logstart) A2 (trap_res true + (K - 4))%nat eb C
-              Hj Hjl Hsl_lka Heb
+              Hj Hjl Hsl_lka
               (* [change]: [lia] cannot relate the atoms [trap_res true] and
                  [kv_frame_slots] -- see ProofAcquiresleep's sleep call. *)
-              ltac:(pose proof (bo_K22 K HK);
+              ltac:(pose proof (bo_K22 K HK); rewrite Heb;
                     change (trap_res true) with kv_frame_slots; lia)
-              with "Hcg Hown Hpay Htext Hpc Hpinv Hislock Htok Hres Hpanic [-]").
-    iIntros (CIDs Hss mfs) "%Hs_cs Hcg Hown Hpay Hpc Htok Hres".
+              with "Hcg Hown Htcx Hclmx Htext Hpc Hpinv Hislock Htok Hres Hpanic [-]").
+    iIntros (CIDs Hss mfs) "%Hs_cs Hcg Hown Htcx Hclmx Hpc Htok Hres".
+    (* ... and back into the pay at the RESUMING hart.  A lemma application,
+       not an [iAssert]: a hart-indexed term written fresh would mean the
+       SECTION hart, while unification against "Htcx" picks the right one
+       (durable-notes.md). *)
+    iDestruct (arm_pay_ext_split eb _ with "Htcx Hclmx") as "[Hpay _]".
     assert (Hpc2c : ret_pc (A2 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x2c))
       by (rewrite HA2ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2c) in "Hpc".
@@ -901,15 +911,25 @@ Section BoBodies.
     assert (HboB2 : bo_regs m B2 spd) by (apply (bo_regs_cs m M B2 spd HcsMB2 HboM)).
     assert (Hsl_lka : add_vec (B2 !!! Regidx (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = log_addr)
       by (rewrite HB2a1; apply addv_sext0).
+    (* sleep takes the trap CSRs and the running claim SEPARATELY now, and
+       index-free.  At this call site [eb = true], so the complement is
+       [emp] and [IntrDefs.arm_pay_ext_join] turns the pay into the pair. *)
+    iDestruct (arm_pay_ext_join eb _ with "Hpay []") as "[Htcx Hclmx]".
+    { rewrite Heb /trap_csrs_ext /cpu_claim_ext. iSplitR; done. }
     iApply (Sleep.wp_sleep_sconf γs j γl (ln_lk γ) log_addr "log"%string
               (log_res γ bn γfs cov logstart) B2 (trap_res true + (K - 4))%nat eb C
-              Hj Hjl Hsl_lka Heb
+              Hj Hjl Hsl_lka
               (* [change]: [lia] cannot relate the atoms [trap_res true] and
                  [kv_frame_slots] -- see ProofAcquiresleep's sleep call. *)
-              ltac:(pose proof (bo_K22 K HK);
+              ltac:(pose proof (bo_K22 K HK); rewrite Heb;
                     change (trap_res true) with kv_frame_slots; lia)
-              with "Hcg Hown Hpay Htext Hpc Hpinv Hislock Htok Hres Hpanic [-]").
-    iIntros (CIDs Hss mfs) "%Hs_cs Hcg Hown Hpay Hpc Htok Hres".
+              with "Hcg Hown Htcx Hclmx Htext Hpc Hpinv Hislock Htok Hres Hpanic [-]").
+    iIntros (CIDs Hss mfs) "%Hs_cs Hcg Hown Htcx Hclmx Hpc Htok Hres".
+    (* ... and back into the pay at the RESUMING hart.  A lemma application,
+       not an [iAssert]: a hart-indexed term written fresh would mean the
+       SECTION hart, while unification against "Htcx" picks the right one
+       (durable-notes.md). *)
+    iDestruct (arm_pay_ext_split eb _ with "Htcx Hclmx") as "[Hpay _]".
     assert (Hpc4e : ret_pc (B2 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x4e))
       by (rewrite HB2ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc4e) in "Hpc".

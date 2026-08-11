@@ -914,16 +914,25 @@ Section UwBodies.
         rewrite /S1 upd_eq. rewrite uw_zero_reg_add. exact Hs3. }
       assert (HS3ra : S3 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.uartwrite + 0x52) : mword 64) 4)
         by (rewrite /S3 upd_eq; reflexivity).
+      (* sleep takes the trap CSRs and the running claim SEPARATELY now, and
+         index-free.  Here [eb = true], so the complement is [emp] and
+         [IntrDefs.arm_pay_ext_join] turns the pay into the pair. *)
+      iDestruct (arm_pay_ext_join eb _ with "Hpay []") as "[Htcx Hclmx]".
+      { rewrite Heb /trap_csrs_ext /cpu_claim_ext. iSplitR; done. }
       iApply (Sleep.wp_sleep_sconf γs j γlp γl a_tx_lock "uart"%string (tx_res γu)
                 S3 (trap_res true + (av - 10))%nat eb C Hj Hjlp
-                ltac:(rewrite HS3a1; apply uw_addv_0) Heb
+                ltac:(rewrite HS3a1; apply uw_addv_0)
                 (* [change]: [trap_res true] vs [kv_frame_slots], see
                    ProofAcquiresleep's sleep call. *)
-                ltac:(unfold uartwrite_stack in Hav;
+                ltac:(unfold uartwrite_stack in Hav; rewrite Heb;
                       change (trap_res true) with kv_frame_slots; lia)
-                with "Hcg Hcnt Hpay Ht Hpc Hpinv [Hlk] Htok Hres Hpanic [-]").
+                with "Hcg Hcnt Htcx Hclmx Ht Hpc Hpinv [Hlk] Htok Hres Hpanic [-]").
       { iExact "Hlk". }
-      iIntros (CIDs Hss Ms) "%Hscs Hcg Hcnt Hpay Hpc Htok Hres".
+      iIntros (CIDs Hss Ms) "%Hscs Hcg Hcnt Htcx Hclmx Hpc Htok Hres".
+      (* ... and back into the pay at the RESUMING hart.  A lemma application,
+         not an [iAssert]: a hart-indexed term written fresh would mean the
+         SECTION hart (durable-notes.md). *)
+      iDestruct (arm_pay_ext_split eb _ with "Htcx Hclmx") as "[Hpay _]".
       iEval (rewrite HS3ra P56) in "Hpc".
       assert (HcsS3 : callee_saved M1 S3).
       { rewrite /S3 /S2 /S1.

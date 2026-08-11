@@ -2221,13 +2221,17 @@ Section ProofPipewrite.
                  ProofAcquiresleep's sleep call. *)
               assert (Hav22 : (kv_frame_slots + 22 <= trap_res true + (av - 14))%nat)
                 by (change (trap_res true) with kv_frame_slots; lia).
+              (* sleep takes the pair separately and index-free now; at the
+                 literal [true] the split is definitional. *)
+              iDestruct "Hpay" as "[Htcx Hclmx]".
               iApply (SleepGen.wp_sleep_gen_sconf γs j γlp γl pi (pipe_res γp pi)
                         (pipe_ref γp w q) (pipe_dead γl γp) G3 (trap_res true + (av - 14))%nat true C
-                        Hj Hjlp HlkaG3 eq_refl Hav22
+                        Hj Hjlp HlkaG3 Hav22
                         ltac:(iApply pipe_ref_dead) ltac:(intros ?i; iApply locked_dead)
                         ltac:(intros ?i; iApply locked_pre_dead)
-                        with "Hcg Hown Hpay Htext Hpc Hpinv Hopen Href Hlocked Hres Hpanic [-]").
-              iIntros (CIDsl Hssl Ms) "%Hscs Hcg Hown Hpay Hpc Href Hlocked Hres". rgall.
+                        with "Hcg Hown Htcx Hclmx Htext Hpc Hpinv Hopen Href Hlocked Hres Hpanic [-]").
+              iIntros (CIDsl Hssl Ms) "%Hscs Hcg Hown Htcx Hclmx Hpc Href Hlocked Hres". rgall.
+              iDestruct (arm_pay_ext_split true _ with "Htcx Hclmx") as "[Hpay _]".
               assert (HraG3 : G3 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.pipewrite + 0x76) : mword 64) 4)
                 by (rewrite /G3; apply upd_eq).
               iEval (rewrite HraG3) in "Hpc".

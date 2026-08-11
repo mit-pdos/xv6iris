@@ -2498,16 +2498,20 @@ Section ProofPiperead.
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_refl. }
+      (* sleep takes the pair separately and index-free now; at the literal
+         [true] the split is definitional. *)
+      iDestruct "Hpay" as "[Htcx Hclmx]".
       iApply (SleepGen.wp_sleep_gen_sconf γs j γlp γl pi (pipe_res γp pi)
                 (pipe_ref γp w q) (pipe_dead γl γp) L6 (trap_res true + (av - 12))%nat true C
                 (* [change]: [trap_res true] vs [kv_frame_slots], see
                    ProofAcquiresleep's sleep call. *)
-                Hj Hjl HL6lka eq_refl
+                Hj Hjl HL6lka
                 ltac:(change (trap_res true) with kv_frame_slots; lia)
                 ltac:(iApply pipe_ref_dead) ltac:(intros ?i; iApply locked_dead)
                 ltac:(intros ?i; iApply locked_pre_dead)
-                with "Hcg Hown Hpay Htext Hpc Hpinv Hopen Href Hlocked Hres Hpanic").
-      iIntros (CIDsl Hssl mfs) "%Hscs Hcg Hown Hpay Hpc Href Hlocked Hres". rgall.
+                with "Hcg Hown Htcx Hclmx Htext Hpc Hpinv Hopen Href Hlocked Hres Hpanic").
+      iIntros (CIDsl Hssl mfs) "%Hscs Hcg Hown Htcx Hclmx Hpc Href Hlocked Hres". rgall.
+      iDestruct (arm_pay_ext_split true _ with "Htcx Hclmx") as "[Hpay _]".
       iEval (rewrite HL6ra) in "Hpc".
       clear HL6ra.
       assert (Hw4a : ret_pc (add_vec_int (mword_of_int (KernelSyms.piperead + 0x46) : mword 64) 4)

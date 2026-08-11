@@ -267,7 +267,7 @@ Section ProofPrepareReturn.
        [b = false] a write of a bit that is already clear, with the caller's
        own [trap_csrs_ext false] standing in for the payout.  Its post is
        index-free, so everything below this line is proved ONCE. *)
-    iDestruct (trap_csrs_ext_transport CID CID6 p b
+    iDestruct (trap_csrs_ext_transport CID CID6 b p
                  ltac:(wp_next_chain) with "Hext") as "Hext".
     iApply (wp_intr_off_lvl0_s_sconf (mword_of_int (PRR + 0x0c)) b p A
               (av - 2)%nat C with "Hcg Hcpu Hext Hpc Hi0c [-]").

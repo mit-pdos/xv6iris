@@ -1653,6 +1653,39 @@ Section IntrDefs.
     arm_pay 0 true p ⊣⊢ trap_csrs ∗ cpu_claim p.
   Proof. reflexivity. Qed.
 
+  (* ------------------------------------------------------------------- *)
+  (* THE INDEX SPLIT AT LEVEL 0, IN BOTH DIRECTIONS.                      *)
+  (*                                                                      *)
+  (* A parking function needs [trap_csrs] and [cpu_claim] UNCONDITIONALLY *)
+  (* -- sched's crossing takes both, because sepc/scause/stval and the     *)
+  (* hart tag are per-hart and cannot be framed around a migration -- but  *)
+  (* the acquire/release pair it is sandwiched between speaks [arm_pay],   *)
+  (* which is that pair at [eb = true] and [emp] at [eb = false].  These   *)
+  (* two move between the spellings, and they are what let such a function *)
+  (* be stated index-free and proved ONCE: split before the interior       *)
+  (* release, rejoin after the re-acquire, and the whole stretch between   *)
+  (* is written without a case analysis.                                   *)
+  (*                                                                      *)
+  (* [arm_pay_on] above is the [eb = true] instance of both, by            *)
+  (* [reflexivity]; that is why an existing enabled-index caller sees no   *)
+  (* change beyond passing two hypotheses where it passed one.             *)
+  (* ------------------------------------------------------------------- *)
+  Lemma arm_pay_ext_split (eb : bool) (p : mword 64) :
+    trap_csrs -∗ cpu_claim p -∗
+    arm_pay 0 eb p ∗ (trap_csrs_ext eb ∗ cpu_claim_ext eb p).
+  Proof.
+    rewrite /arm_pay /trap_csrs_pay /cpu_claim_pay /trap_csrs_ext /cpu_claim_ext.
+    destruct eb; iIntros "Htc Hclm"; iFrame; try done.
+  Qed.
+
+  Lemma arm_pay_ext_join (eb : bool) (p : mword 64) :
+    arm_pay 0 eb p -∗ (trap_csrs_ext eb ∗ cpu_claim_ext eb p) -∗
+    trap_csrs ∗ cpu_claim p.
+  Proof.
+    rewrite /arm_pay /trap_csrs_pay /cpu_claim_pay /trap_csrs_ext /cpu_claim_ext.
+    destruct eb; iIntros "Hpay Hext"; iFrame; try done.
+  Qed.
+
   (* THE KPT RECEIPT IS AN ENABLED-ARM MEMBER, for the reason spelled out at
      [strans_bit] (§6b): interrupts on implies the kernel table is installed,
      so the receipt has exactly this arm's lifetime.  The DISABLED arm does
