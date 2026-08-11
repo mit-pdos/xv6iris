@@ -1923,3 +1923,138 @@ for iput that B turns out not to need.
    retained share (iget's hit shape, `iref_upgrade_store_au` =
    incr-with-the-share-carried) and RETURNS the share beside the new
    reference; kfork's parent gathers it back. B3 adjusts accordingly.
+
+### 14.8 B2 IS BLOCKED: the OUT arm cannot carry two deposit shapes,
+### because the two parkers are resource-indistinguishable (2026-08-11)
+
+B2's plan is "`ic_out` gains a share-shaped alternative beside the
+reference-shaped one". Worked through against the code, that does not
+close, and the obstruction is not local to any one lemma. Two findings,
+the first repairable, the second not without new ghost state.
+
+**(a) §14.6's REF-1 refutation is stated over resources iput does not
+hold — but the task's LIVE-mass replacement works, at the cost of making
+`ic_open_auth_ref` a fupd.** §14.6 says the share arm is refuted at REF-1
+by "caller q + table (½−q) + arm's ½-resident + the share's s exceeds 1".
+The `½-resident` is wrong: in the OUT state the parked arm's ½ of `i_dev`
+/ `i_inum` is in the CHECKED-OUT THREAD's hand (SpecIlock's postcondition
+hands it out; SpecIunlock consumes it), not in the arm. So the arm holds
+only the share's `s` of each cell, iput holds `q + (½−q) = ½`, and
+`½ + s ≤ 1`: no overflow, no refutation.
+
+The LIVE-mass form does work: at REF-1 the caller's `iref_tok k q` carries
+`live_frac k q` with `q = qt` (both `ProofIput` call sites already
+instantiate the lemma that way), the arm's share carries `live_frac k s`,
+and `live_slot M k` carries `1 − qt`; the three sum past one. But
+`live_slot` lives inside `itable_inv`, and `ic_open_auth_ref` is a pure
+wand. It has to become
+
+    Lemma ic_open_auth_ref ... (Eo : coPset) (M) (q qi) (dev inum) :
+      ↑icacheN ⊆ Eo -> M !! k = Some (q, 1%positive) ->
+      itable_inv -∗ ic_escrow_body ... -∗ itable_half M -∗
+      iref_tok k q -∗ inode_ident k (DfracOwn qi) dev inum -∗
+      |={Eo}=> (... as today ...)
+
+i.e. fupd + `itable_inv` + the tok's fraction FORCED to be the map's `qt`.
+Checked at both call sites: `ProofIput:857` is inside `fupd_wp`/`iInv
+"Hesc"` at mask `⊤ ∖ ↑icEscN`, `ProofIput:1368` inside the `lw` AU at
+`⊤ ∖ ↑minstretN ∖ ↑icEscN`; `↑icacheN` is free in both, and both already
+pass `q = qt = qi`. So (a) costs two `iDestruct`→`iMod` edits and a
+`solve_ndisj`. Repairable.
+
+**(b) THE BLOCKER: `ic_swap_park` cannot be made deterministic.** With two
+OUT alternatives, every parker faces both, and the two parkers hold
+IDENTICAL resources:
+
+- iunlock parks with `½ i_dev`, `½ i_inum`, the FULL `i_valid`, the
+  payload, `sleeplocked gisl`, and no reference (§13.1d's deposit);
+- iput's window exit parks with exactly the same four (ProofIput:1979:
+  `Hidv`, `Hinh`, `Hvld`, `Hpayf`), having released `itable.lock` at
+  +0x5c — so it holds NO `itable_half`, NO `islot_rest`, NO
+  `iref_tok`, NO `live_frac`, and no `ic_tok`/`ic_mid` (both deposited).
+
+Inventory of every candidate discriminator, all dead:
+- `ic_tok` must be in BOTH OUT arms (it is the sleeplock's sealed resource
+  and the arm is what records "somebody is inside"; drop it from either arm
+  and `ic_swap_checkout` loses its refutation of that arm);
+- `ic_mid` must be in both (drop it from either and `ic_open_mid`, iget's
+  re-open at +0x7c, loses its refutation);
+- `ic_id`'s two halves are the arm's and `islot2`'s — a parker holds
+  neither;
+- cell fractions: the arm holds `q` (reference) or `s` (share) of each
+  identity cell, both `≤ ½`, against the parker's `½`; never past 1;
+- `dinode_at` is in the parker's payload and in NEITHER arm;
+- `itable_inv` is persistent and available, but the pool gives only
+  `s ≤ qt`, and the parker knows no `qt`.
+
+So a share-parker cannot refute the reference arm, and a reference-parker
+cannot refute the share arm. `ic_swap_park` can only return the
+DISJUNCTION — and iput cannot absorb it: a share has no count fragment, so
+its `ip->ref--` (`iref_close_store_au`, needing `iref_tok k q'` with the
+liveness and the count fragment at the SAME fraction) is unprovable on the
+share branch.
+
+**And iput cannot switch to depositing a share either**, which is what
+would make OUT uniform and delete the problem. Keeping `iref_frag k q` and
+depositing `inode_shr k q` fails at the gather: `ic_swap_park` returns the
+arm's share at an EXISTENTIAL fraction `s`, and re-pairing it with the
+retained fragment needs `s = q`. Only `s ≤ q` is derivable (identity: arm
+½ + table (½−q) + iput s ≤ 1; liveness: pool (1−q) + s ≤ 1). Equality is
+exactly the un-ownable conservation fact §14.6 was built to avoid needing.
+Note the fraction being existential is otherwise harmless — `ic_swap_park`
+is existential in it TODAY and `fileread_fs_out` already returns
+`∃ q'` — the problem is the KIND, not the fraction.
+
+Three requirements, pairwise fine and jointly impossible with the present
+ghost state:
+  (R1) the share must sit IN the arm, or iput's REF-1 opener cannot see
+       its mass (this is what forces (a)'s shape too);
+  (R2) each parker must recover its own deposit;
+  (R3) the two deposits differ in kind, because §14.7(3) says a share
+       cannot become a reference and the gather above cannot re-form one.
+
+**THE MINIMAL REPAIR (recommended): turn `ic_tok` into a deposit
+descriptor.** `ic_tok cn k` is today `lock_tok_excl (icn_esc cn k)`, i.e.
+`lock_frag (icn_esc cn k) None`. Make it a `ghost_var` instead:
+
+    Inductive ic_dep := DepNone | DepRef (q : Qp) (dev inum : mword 32)
+                                 | DepShr (s : Qp) (dev inum : mword 32).
+    ic_tok cn k     := ghost_var (icn_esc cn k) 1 DepNone.
+    ic_deposit cn k d := ghost_var (icn_esc cn k) (1/2) d.
+
+`ic_tok` keeps its role verbatim — it is exclusive at fraction 1, so
+`ic_tok_exclusive` survives, and `is_sleeplock ... (ic_tok cn k)` needs no
+change. At checkout the winner updates the whole var to its deposit and
+splits: ½ into the arm, ½ kept. At the park the two halves meet,
+`ghost_var_agree` PINS the shape, the fraction and the identity, they
+rejoin, and the var goes back to `DepNone` for releasesleep. Consequences:
+- `ic_swap_checkout`'s refutation of both OUT arms becomes ghost_var
+  1-vs-½ invalidity (same one line);
+- both parkers select their arm by agreement, deterministically;
+- BOTH postcondition existentials disappear — `ic_swap_park` returns the
+  deposit at its EXACT fraction, so SpecIunlock's `∃ q` and
+  `fileread_fs_out`'s `∃ q'` can be tightened (B3's `fp_iq` accounting
+  wants exactly this);
+- `ic_open_out` can select its arm the same way, or simply return the
+  common `live_frac k _` both arms carry, which is all
+  `iref_live_load_au` needs.
+- (a)'s fupd is STILL required: at REF-1 iput holds no descriptor half.
+
+COST, honestly: `ic_tok`'s definition, `ic_tok_fun_alloc` /
+`ic_names_alloc` (the esc family becomes a `ghost_var` family, `ic_id`'s
+allocator is the template), `IcacheBoot`, all five arms, all eleven escrow
+swap/open lemmas, `ProofIput` (three sites), `ProofIlock`, `ProofIunlock`.
+That is a token-layer rework of the escrow, not "one line per arm" — call
+it its own stage (B2a) ahead of the contract work (B2b).
+
+Rejected alternatives, for the record: (i) asymmetric cell budgets, so that
+each arm holds a `½`-resident the OTHER parker's `½` overflows — it does
+close the two refutations, but it then denies each parker a fraction of the
+cell it must PIN (`ic_parked` ties the ½ `i_inum` to the payload's inum),
+and patching that back needs an epsilon-sliver whose side condition
+(`½ < r + q`) has to be written into the arm; a house of cards.
+(ii) `ic_swap_park` returning the disjunction and pushing the case split to
+the callers — dead at iput, as above. (iii) a fourth `ic_names` token
+family — strictly worse than (b)'s repair: it needs a home in EVERY arm at
+boot, whereas the descriptor reuses a gname that already exists and already
+has exactly the right lifetime.
