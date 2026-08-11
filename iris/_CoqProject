@@ -1030,3 +1030,5 @@ ProofFlags2perm.v
 LinkFlags2perm.v
 SpecFilestat.v
 ProofFilestatParts.v
+ProofFilestat.v
+LinkFilestat.v

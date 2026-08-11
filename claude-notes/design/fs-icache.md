@@ -2590,3 +2590,92 @@ SpecIlock (additive post) + its callers' iDestruct patterns
 (mechanical), sys_open's obligation recorded for S6. fileread/
 fileclose/filedup carry the payload opaquely — audit, expected to
 ride. The boot mint: unloaded slots mint nothing; first fill mints.
+
+### 17.1 §17 DOES NOT CLOSE AS RULED (fs-sysfile S3b, 2026-08-11) —
+### STOP-AND-REPORT, with the repair worked out
+
+Four findings, in the order they bite.  Nothing below was built; S3b
+stopped here and spent its budget on filestat instead.
+
+**(i) `ic_id` IS NOT THE RIGHT HOME, AND MAKING IT GENERATION-SHAPED
+DOES NOT HELP.** `ic_id cn k q (v, dev, inum)` is a `ghost_var` whose
+two halves live in the escrow's arm and in `IcacheInv.islot2`.  Both
+homes sit behind the itable lock or inside the escrow, and **the
+consumer §17 was written for holds neither**: filewrite reaches the
+fact through `FileInv.inode_pay`, whose only icache-side resource is
+`IcacheRef.inode_shr_held` — the two identity CELLS at a fraction plus
+a `live_frac` slice.  A counter bolted onto `ic_id` is unreadable from
+there, so the generation cannot be plumbed that way at any price.
+
+**(ii) A PERSISTENT WITNESS CANNOT SAY "THIS GENERATION IS THE CURRENT
+ONE", AND THAT IS THE WHOLE OBLIGATION.**  The re-park needs
+`di_type dn = ty` for the payload's recorded `ty`.  With a persistent
+`ityp (k,g) ty`, the payload's `g` and ilock's `g` must be shown
+EQUAL, i.e. somebody must assert that `g` is slot `k`'s live
+generation — and a persistent fragment is by construction not
+revocable, so it would survive the recycler's bump and keep asserting
+a dead generation.  Currency is therefore a REVOCABLE, reference-tied
+fact; persistence is exactly the property that forbids it.
+
+**(iii) SO THE GENERATION MUST RIDE THE LIVENESS POOL, AND THAT MUCH
+IS CAPACITY.**  The only reference-tied fractional resources in the
+tree are `inode_ident` (the dev/inum cells) and `live_frac` (§14.6's
+pool).  The cells pin IDENTITY, which is reused across a free +
+realloc, so they cannot key a type.  The pool can:
+
+    iliveUR := gmapUR nat (prodR fracR (agreeR (leibnizO gname)))
+    live_gen k s g := own icfg_live {[ k := (s, to_agree g) ]}
+    live_frac k s  := ∃ g, live_gen k s g          (* ARITY UNCHANGED *)
+
+The existential keeps `live_frac`'s arity, so `iref_tok`, `inode_ref`,
+`inode_shr`, `inode_ref_short`, `inode_held*` and every Spec over them
+are textually unchanged.  A bump needs the WHOLE unit at the slot,
+which exists in exactly one place — `IcacheInv.live_slot`'s `None`
+(free) arm, under the itable lock, which is precisely iget's recycle.
+That is the right side condition: a bump is impossible while any
+reference exists.
+
+The agree must carry a per-generation **gname**, not the type: at
+recycle the type is UNKNOWN (iget writes `valid = 0`; the type is not
+read until ilock's `bread`), and after the recycle nobody holds the
+whole unit again until the last iput — so a "set the type at recycle"
+scheme is unsatisfiable.  The type attaches later through a ONE-SHOT
+at that gname: iget allocates it and parks the pending token in
+`ic_unloaded`; ilock's fill spends it and mints the persistent
+`own g (Cinr (to_agree (di_type dn)))`.  §17 left this two-level
+structure implicit and it is forced.
+
+**(iv) THE REMAINING GAP IS THE ARM SIDE: `ic_loaded` TRAVELS.**
+ilock hands `ic_loaded` to its caller, so the agreement clause has to
+be self-contained — "di_type dn is the CURRENT generation's type" —
+with no access to the arm it came from.  Two shapes, and both cost
+more than §17 budgets:
+
+- a persistent WAND
+  `□ (∀ s g, live_gen k s g -∗ live_gen k s g ∗ ityp_wit g (di_type dn))`
+  is provable (the fill borrows the OUT arm's slice through
+  `ic_dep_res_live`, mints at the borrowed generation, and closes by
+  pool agreement) — but **it is not TIMELESS**, and
+  `ic_loaded_timeless` / `ic_payload_timeless` are load-bearing:
+  IcacheEscrow's own header records that every opener is inside a
+  store's or a load's atomic update with no step left to absorb a ▷.
+  So this shape breaks the escrow outright.
+- `ic_loaded` carrying a POOL SLICE OF ITS OWN is timeless and
+  self-contained (the slice names `g`; the one-shot witness rides
+  beside it), and every transition still balances — split the unit at
+  a LIVE slot as ½ (payload) + qt (holders) + (½ − qt) (itable), leave
+  a FREE slot's whole unit in `itable_body` so `iref_live_load_au` and
+  `live_slot_live` are untouched, hand the ½ out with the new payload
+  at iget's recycle, and take it back at iput's REF-1 close, which
+  holds the payload already (§13.13's HELD arm).  But it MOVES §14.6's
+  mass conservation, which these notes call load-bearing, and it
+  touches `IcacheInv.live_slot`'s four update lemmas, IcacheBoot,
+  ProofIget, ProofIput, and every construct/destruct of `ic_loaded`
+  (IcacheEscrow ×5, ProofIlock ×5, ProofIunlock ×1, ProofFileread ×6,
+  ProofNamex ×6).
+
+**RECOMMENDATION.** Rule on (iv)'s second shape as §17′ and give it a
+stage of its own; it is a coordinator-level change to §14.6, not a
+retrofit an implementing agent may take.  Until then filewrite's
+FD_INODE arm stays blocked exactly as fs-sysfile S3a left it, and
+`SpecFilewrite.v` stays unwritten.

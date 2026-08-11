@@ -155,6 +155,7 @@ after a git-sync before iterating.
   `fst_bytes_stat` (3 frame slots -> `stat_at` + the hole) and
   `fst_stat_bytes` (back again).
 - `ProofFilestat.v` / `LinkFilestat.v` NOT written — parked green.
+  **(Both landed in S3b; see that section.)**
 
 ### INHERITANCE ITEM 4 IS DISSOLVED, not solved
 
@@ -227,6 +228,78 @@ Mirror evidence: `SpecFilestat.v` and `ProofFilestatParts.v` each `DONE = 0`,
 zero `Error`. `lemma_diff.py --ref HEAD`: 2 files, one NEWAXIOM, the
 `Module Type FILESTAT` seal.
 
+## S3b — filestat PROVEN AND LINKED; §17 STOPPED-AND-REPORTED
+
+### What landed
+
+- **`iris/ProofFilestat.v` + `iris/LinkFilestat.v`** — filestat is proven and
+  linked, `Print Assumptions Filestat.wp_filestat_sconf` = **5 platform axioms
+  + funext**, nothing else.  All five callees are real proofs (myproc, ilock,
+  stati, iunlock, copyout), so unlike LinkFileread this cone assumes nothing:
+  filestat has no device arm and reaches no allocator.  **file.c is 6/7**
+  (filewrite is the last).
+- **`iris/ProofFilestatParts.v` grew an S3b half**: the ten-slot frame
+  (`fst_push_80`/`fst_pop_80`/`fst_fp_80`, `fst_frm1..6`, `fst_stbuf` for
+  `&st = s0-72 = pa_stk sp0 9`), the dispatch arithmetic, the two `sraiw`
+  values, `fst_bytes_name24`, and the shared epilogue `fst_epi` at +0x52.
+- Decode corrections 1–7 in the S3a section all held up under the proof; none
+  needed revision.
+
+### Three things worth keeping from the proof
+
+1. **The dispatch is `1 <u (int)(type - 2)`, and the honest way to prove the
+   "neither" arm is to decompose it.**  `fst_bltu_in` is two `vm_compute`s
+   (types 2 and 3 are literals); `fst_bltu_out` goes
+   `fst_addiw_m2` (the `c.addiw` leaves `t + (2^32 - 2)` at width 32, via
+   `trunc32_add`/`trunc32_sext`) → `fst_sub2_eq` (a difference of 0 or 1 pins
+   the type at 2 or 3) → `fst_gt1_of_ne` (`1 <u X` for any 64-bit `X ∉ {0,1}`,
+   which needs no signedness reasoning at all).  Do NOT try to characterise
+   `uint (sign_extend' 64 w)` by cases on the sign bit; the ∉{0,1} route is
+   three lines and needs no `bv_swrap`.
+2. **`Z.mod_small` TAKES BOTH `a` AND `b` EXPLICITLY.**  `Z.mod_small (u + c)
+   ltac:(lia)` passes the tactic as the MODULUS, and the failure surfaces as
+   `Tactic failure: Cannot find witness` from a `lia` running on an open goal —
+   i.e. it reads exactly like the `bitvector.tactics` zify-hook trap and is
+   not one.  Spell `Z.mod_small a b ltac:(lia)`.  (The real hook trap is also
+   here: the modular reasoning is factored into `fst_mod32_sub2` over plain
+   `Z` variables, because `lia` does answer "Cannot find witness" on a goal
+   mentioning `bv_unsigned`.)
+3. **`n%: tac` GOAL SELECTORS RENUMBER.**  `split_and!` on `callee_saved`'s
+   thirteen conjuncts followed by `4-5: …` then `7-13: …` fails with
+   *"No such goal"*: the first selector SOLVES its goals and the rest shift
+   down.  Run the selectors HIGHEST-FIRST (`7-13:` then `4-5:`), which is what
+   `fr_epi` does and why it reads oddly.
+4. **An explicit `rget_ne X R ltac:(…)` does not survive a callee's
+   `wp_next` boundary** (durable-notes) — every such site after ilock /
+   stati / iunlock / copyout had to become the ambient `rgne`, and the error
+   is a *"does not match any subterm"* on a term you can see in the goal.
+
+### THE §17 RULING DOES NOT CLOSE — see design/fs-icache.md §17.1
+
+Summarised there in full.  The three-line version: `ic_id` is unreadable from
+a file payload (which holds only `inode_shr_held`), so no generation counter
+on it can reach filewrite; a PERSISTENT witness cannot assert that its
+generation is the current one, because persistence is exactly
+non-revocability; and the generation therefore has to ride §14.6's liveness
+pool — which is capacity for `live_frac` (an existential keeps its arity and
+every statement over it) but NOT for `ic_loaded`, which travels out of the
+escrow and so must carry a self-contained, TIMELESS "this is the current
+generation's type".  The only timeless shape that works gives `ic_loaded` a
+pool slice of its own and re-scales §14.6's mass conservation.  That is a
+coordinator ruling (§17′) and a stage of its own; `SpecFilewrite.v` stays
+unwritten, exactly as S3a left it.
+
+### Mirror evidence
+
+`ProofFilestatParts.v`, `ProofFilestat.v`, `LinkFilestat.v` each `DONE = 0`,
+zero `Error`.  **TRAP OBSERVED: the mirror was `git pull`ed mid-stage** (it
+moved a73e9e5a → 95956162, two unrelated commits on `WpNext.v` and
+`ProofIreclaim.v`), which silently REVERTED the tracked `ProofFilestatParts.v`
+under a `.vo` built from the agent's version — the exact stale-`.vo` false
+green the notes warn about, arriving from a direction nobody was watching.
+Re-check the md5 of every tracked file you have scp'd before believing a gate,
+not just after the scp.
+
 ## The stage ladder
 
 - **S1** (agent): the DECODE stage — 13 Code files (the 12 targets +
@@ -239,6 +312,10 @@ zero `Error`. `lemma_diff.py --ref HEAD`: 2 files, one NEWAXIOM, the
 - **S3** (agent) **— PARTIAL**: SpecFilestat + ProofFilestatParts landed;
   filewrite BLOCKED on the dir_ok ruling (see the S3 section). Its Spec is
   deliberately unfrozen; ProofFilestat is parked. file.c stays 5/7.
+- **S3b** (agent) **— PARTIAL**: filestat PROVEN AND LINKED (file.c 6/7);
+  §17's fd-type witness STOPPED-AND-REPORTED as unimplementable in the ruled
+  shape — design/fs-icache.md §17.1 has the finding and the repair (§17′) to
+  rule on. filewrite is still blocked and still unspecified.
 - **S4** (agent): sys_read/sys_write/sys_fstat — argfd + the file.c
   contracts; thin shells.
 - **S5** (agent): create — the writing half's boss: namei/nameiparent
