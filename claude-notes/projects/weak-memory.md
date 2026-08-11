@@ -2985,3 +2985,47 @@ the sweep — no site in `WkTimerinit` / `WkStartNew` uses a `_run` wrapper yet.
 Note the ordering is now settled by this slice: a converted site needs
 `hart_view_to_run` once at chain entry, then `whart_run ξ q` threaded, then a
 `wsti_NN` token per instruction in the `Wk*Aux` file.
+
+### Cleanup slice 2 (2026-08-11): the prune — `WeakPtPub` is now hart-free
+
+`WeakPtOwn.v` **deleted**. Its whole content was the hart-indexed floor
+(`wflr_lb`) and the points-to built on it (`wpt_own`, `↦o`). `cobj ξ (a ↦w{dq}
+v)` is the same construct at the right index, and the byte-level laws come for
+free rather than being re-proved: `wpt_agree` / `wpt_valid_2` / `wpt_split` /
+`wpt_persist` already exist at **vProp** level in `WeakVProp`, and
+`cobj_sep` / `cobj_exist` / `cobj_pure` lift each of them. That is the check
+that the deletion is a replacement and not a loss — the old file re-proved
+five fraction/agreement lemmas that the generic layer does not need.
+
+`WeakPtPub` lost its `Context {CID : CpuId}` **entirely**, which is the
+substantive outcome: the file that exists to say what may go in a shared
+invariant now names no hart anywhere. What went with it: `vrNew_lb`,
+`wpt_pub_acquire_lb`, `wpt_pub_acquire`, `wpt_own_release`,
+`wpt_own_region`, `wpt_pub_region_acquire`, `wpt_own_region_release`,
+`wpt_own_unfold`, `wpt_pub_0_own`, `wpt_bnd_transport`, `wpt_region_handoff`.
+The successors are `cobj_pt_acquire` / `cobj_pt_release` (one line each on
+`cobj_acquire` / `cobj_release` plus `wpt_pub_frozen`), their region twins,
+and `cobj_pt_region_handoff`.
+
+**One real weakening, recorded in the file header.** The old `wpt_own_release`
+bounded the floor AT THE ONE ADDRESS; `cobj_pt_release` needs `∀ a, flr V a ≤
+T`. This is forced, not incidental: `cobj ξ R` existentially quantifies the
+view `R` is held at, so a release has no footprint to bound against — it
+cannot know `R` speaks only of `a`. For a REGION the two coincide (the region
+release quantified over all addresses anyway), and a region is what a lock
+protects. Sharpening it would mean indexing `cobj` by a footprint, which buys
+nothing a lock wants.
+
+`WeakSmodeFrame` §5's control no longer has a deleted layer to point at, so it
+defines its own one-line stand-in, `hart_floor := coh_lb (wvn_coh
+(weak_view_name cpu_id)) a t` — literally `wflr_lb`'s first disjunct. What the
+control tests is the INDEX, not the points-to, so this is the honest witness
+and the three checks say exactly what they said before. (Note the section
+subtlety: inside the section `Σ` and `weakGS0` are section variables and not
+yet abstracted, so the explicit form is `@hart_floor CID`, not
+`@hart_floor _ _ CID`.)
+
+`_CoqProject` order is now `WeakViewMono, WeakCtx, WeakPtPub` — `WeakPtPub`
+sits on `WeakCtx` where it used to sit on `WeakPtOwn`.
+
+**STILL NOT STARTED: the call-site conversion** (unchanged from slice 1).

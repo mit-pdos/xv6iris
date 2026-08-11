@@ -67,7 +67,7 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RegFile.
 Require Import RiscvFetchExec InstrBytes WpGpr WpMmodeLeafBase.
 Require Import RiscvExtras MinstretInv WpGprMretWp.
 Require Import WeakMem WeakInterp WeakLang WeakView WeakVProp WeakGhost.
-Require Import WeakViewMono WeakPtOwn WeakPtPub WeakWord8 WeakCtx WeakLeafM.
+Require Import WeakViewMono WeakCtx WeakPtPub WeakWord8 WeakLeafM.
 
 Section leafo.
   Context `{!riscvGS Σ, !weakGS Σ}.

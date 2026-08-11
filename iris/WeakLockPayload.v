@@ -44,7 +44,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import WeakMem WeakInterp WeakLang WeakView WeakVProp WeakGhost.
-Require Import WeakViewMono WeakPtOwn WeakPtPub WeakCtx.
+Require Import WeakViewMono WeakCtx WeakPtPub.
 
 (** One entry of the protected structure: an address and the byte it holds.
     Deliberately plain — the point is the SHAPE of the predicate over a

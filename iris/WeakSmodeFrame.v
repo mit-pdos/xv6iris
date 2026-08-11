@@ -28,9 +28,10 @@
     passed to the continuation at the end, having crossed three [wp_next]
     binders untouched.
 
-    THE CONTROL.  §5 states the same frame indexed by [CpuId] -- the current
-    [WeakObj.wobj] -- and shows it does NOT typecheck in the continuation,
-    which is the whole reason this file exists. *)
+    THE CONTROL.  §5 states the same frame indexed by [CpuId] -- the shape
+    the deleted [WeakObj.wobj] and [WeakPtOwn.wpt_own] had -- and shows it
+    does NOT typecheck in the continuation, which is the whole reason this
+    file exists. *)
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap.
 From stdpp Require Import bitvector.definitions.
@@ -43,7 +44,7 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RegFile WpGpr InstrBytes.
 Require Import WpNext.
 Require Import WeakMem WeakInterp WeakLang WeakView WeakVProp WeakGhost.
-Require Import WeakViewMono WeakWord8 WeakCtx WeakPtOwn.
+Require Import WeakViewMono WeakWord8 WeakCtx.
 Require Import WeakFunnel WeakLeafM.
 
 Import SailStdpp.Values.
@@ -306,34 +307,43 @@ End framing.
 (** ** 5. THE CONTROL, MACHINE-CHECKED.
 
     The argument above turns entirely on one claim about ELABORATION, so it
-    is checked here rather than asserted.  The stand-in for the deleted
-    hart-indexed layer is [WeakPtOwn.wpt_own], which has exactly the
-    indexing under test: its hart is an implicit INSTANCE argument, so it is
-    resolved from whatever [CpuId] is innermost -- and inside [wp_next]'s
-    binder that is the RESUMING hart.  [cobj]'s context is an explicit
-    argument ([Arguments cobj {Σ weakViewG0} ξ R]) and cannot be captured. *)
+    is checked here rather than asserted.
+
+    THE STAND-IN.  The hart-indexed layer this replaced ([WeakPtOwn], now
+    deleted) is gone, so the control names the smallest thing with the same
+    indexing: [hart_floor] below is literally the first disjunct of the
+    deleted [WeakPtOwn.wflr_lb], and [WeakPtOwn.wpt_own] was that disjunction
+    paired with a hart-free element.  What is under test is not the
+    points-to, it is the INDEX -- an [iProp] whose definition mentions
+    [cpu_id], resolved from whatever [CpuId] instance is innermost, and
+    inside [wp_next]'s binder that is the RESUMING hart.  [cobj]'s context is
+    an explicit argument ([Arguments cobj {Σ weakViewG0} ξ R]) and cannot be
+    captured this way. *)
 
 Section control.
   Context `{!weakGS Σ} `{GEN : GenId} `{CID0 : CpuId}.
   Variables (F : vProp Σ) (b : bool) (p : mword 64) (ξ : CtxId).
-  Variables (a : Z) (dq : dfrac) (v : bv 8).
+  Variables (a : Z) (t : nat).
+
+  Definition hart_floor `{CID : CpuId} : iProp Σ :=
+    coh_lb (wvn_coh (weak_view_name cpu_id)) a t.
 
   (** A. Under the binder, a hart-indexed assertion means the RESUMING
       hart's. *)
   Lemma hart_indexed_rebinds :
-    wp_next b p (fun CID : CpuId => wpt_own a dq v)
-  = wp_next b p (fun CID : CpuId => @wpt_own _ _ CID a dq v).
+    wp_next b p (fun CID : CpuId => hart_floor)
+  = wp_next b p (fun CID : CpuId => @hart_floor CID).
   Proof. reflexivity. Qed.
 
   (** B. So it is NOT the frame the caller is holding, which is at [CID0].
-      This is the failure: the caller's [wobj F] and the one the
+      This is the failure: the caller's assertion and the one the
       continuation demands are different propositions, and the only bridge
-      between them -- the deleted [wobj_handoff], or [WeakPtPub]'s
-      [wpt_region_handoff] -- needs BOTH harts' authorities in one step,
-      which is precisely what migrating denies. *)
+      between them -- the deleted [WeakObj.wobj_handoff], or the deleted
+      [WeakPtPub.wpt_region_handoff] -- needs BOTH harts' authorities in one
+      step, which is precisely what migrating denies. *)
   Lemma hart_indexed_not_the_callers_frame :
-    wp_next b p (fun CID : CpuId => wpt_own a dq v)
-  <> wp_next b p (fun _ : CpuId => @wpt_own _ _ CID0 a dq v).
+    wp_next b p (fun CID : CpuId => hart_floor)
+  <> wp_next b p (fun _ : CpuId => @hart_floor CID0).
   Proof. Fail reflexivity. Abort.
 
   (** C. [cobj ξ F] is literally the same term on both sides of the binder,

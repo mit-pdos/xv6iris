@@ -932,9 +932,8 @@ WkGprAcc.v
 WeakLeafM.v
 WeakViewMono.v
 WeakViewRacy.v
-WeakPtOwn.v
-WeakPtPub.v
 WeakCtx.v
+WeakPtPub.v
 WeakSmodeFrame.v
 WeakLockPayload.v
 WeakLeafO.v
