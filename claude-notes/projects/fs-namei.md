@@ -230,10 +230,15 @@ usual near-full rebuild lands with it.
   (26B wrappers).  **N4a DONE** (the directory-wf gate, below).
   **N4b: the THREE CONTRACTS ARE FROZEN and namex's pure layer is
   landed** — `SpecNamex.v`, `SpecNamei.v`, `SpecNameiparent.v`,
-  `ProofNamexParts.v`.  **The three Proof/Link halves are OWED**; see
-  "N4b's ledger" below for the decode (verified end to end), the
-  contracts, the loop shape the proof has to walk, and the eight things
-  the proof agent should not have to rediscover.
+  `ProofNamexParts.v`; see "N4b's ledger" below for the decode (verified
+  end to end), the contracts, the loop shape the proof has to walk, and
+  the eight things the proof agent should not have to rediscover.
+  **N4c3 DONE** — namex PROVEN AND LINKED.  **N4d DONE** — namei and
+  nameiparent PROVEN AND LINKED.  **N4 IS COMPLETE**: all three
+  Proof/Link pairs are landed and sealed, and `Print Assumptions` on
+  `Namex.wp_namex_sconf`, `Namei.wp_namei_sconf` and
+  `Nameiparent.wp_nameiparent_sconf` gives the 5 platform axioms + funext
+  and nothing else.
 - **N5**: ialloc (188B) + ireclaim (200B) + fsinit (112B) — the
   allocation/boot half; ireclaim is fsinit's single-threaded orphan
   sweep (the C7 notes flagged it as the pool's initial-contents
@@ -1760,9 +1765,131 @@ new leaf lemma was needed.
 lines.  `Print Assumptions` as above.  All `ProofNamex.*` / `LinkNamex.*`
 scratch was then deleted from the mirror.
 
+### N4d — the two wrappers, PROVEN AND LINKED.  N4 is complete.
+
+**LANDED: `iris/ProofNamei.v` + `iris/LinkNamei.v`,
+`iris/ProofNameiparent.v` + `iris/LinkNameiparent.v`** — four
+`_CoqProject` rows appended after `LinkNamex.v` in that order.  No
+existing file touched apart from `_CoqProject` and these notes.  Functors
+`NameiProof (NX : NAMEX) : NAMEI` and
+`NameiparentProof (NX : NAMEX) : NAMEIPARENT`; linked modules `Namei` and
+`Nameiparent` (bare names, for the coverage tool).  Both compiled on the
+mirror on the FIRST attempt, no red iteration at all.
+
+`Print Assumptions Namei.wp_namei_sconf` and
+`Print Assumptions Nameiparent.wp_nameiparent_sconf` are each EXACTLY
+`rv64d.valid_reservation`, `rv64d.plat_term_write`,
+`rv64d.match_reservation`, `rv64d.load_reservation`,
+`rv64d.cancel_reservation` and
+`FunctionalExtensionality.functional_extensionality_dep` — the 5 platform
+axioms + funext.  `tools/lemma_diff.py --ref HEAD`: **CLEAN** (nothing
+dropped, nothing admitted, **no new assumption** — unlike N4b these are
+`Proof`/`Link` files, so there is no `Module Type` seal `Parameter`).  No
+`Admitted`, no `Axiom`, no `cheat_`.
+
+#### The decodes, as PROVEN (the N4b headers had two small errors)
+
+**namei @ `0x80003a10`, 26 bytes, ELEVEN instructions, a FOUR-slot frame:**
+
+    +0x00  c.addi sp,sp,-32       (sign_extend' 12 (mword_of_int 32 : mword 6))
+    +0x02  c.sdsp ra,24(sp)       uimm 3 -> pa_stk sp0 1
+    +0x04  c.sdsp s0,16(sp)       uimm 2 -> pa_stk sp0 2
+    +0x06  c.addi4spn s0,sp,32    imm8 8   -> s0 = the ENTRY sp
+    +0x08  addi a2,s0,-32         imm12 4064 (BASE encoding, pc += 4)
+                                  -> a2 = pa_stk sp0 4 = &name[0]
+    +0x0c  c.li a1,0
+    +0x0e  jal ra,namex           imm21 2096650 (= -502)
+    +0x12  c.ldsp ra,24(sp) ; +0x14 c.ldsp s0,16(sp)
+    +0x16  c.addi16sp sp,32       (imm6 2)
+    +0x18  c.jr ra
+
+**nameiparent @ `0x80003a2a`, 24 bytes (NOT 26 — SpecNameiparent's header
+says 26; the header is frozen and only the comment is wrong), ELEVEN
+instructions, a TWO-slot frame:**
+
+    +0x00  c.addi sp,sp,-16       (sign_extend' 12 (mword_of_int 48 : mword 6))
+    +0x02  c.sdsp ra,8(sp)        uimm 1 -> pa_stk sp0 1
+    +0x04  c.sdsp s0,0(sp)        uimm 0 -> pa_stk sp0 2
+    +0x06  c.addi4spn s0,sp,16    imm8 4
+    +0x08  c.mv a2,a1  ; +0x0a  c.li a1,1
+    +0x0c  jal ra,namex           imm21 2096626 (= -526)
+    +0x10  c.ldsp ra,8(sp) ; +0x12 c.ldsp s0,0(sp)
+    +0x14  c.addi sp,sp,16        -- a PLAIN c.addi, NOT a c.addi16sp
+    +0x16  c.jr ra
+
+It is NOT a tail call: nameiparent builds a real frame and returns
+normally.  `K_namei = 98 = K_namex + 4` and
+`K_nameiparent = 96 = K_namex + 2` are both exactly right.
+
+#### FIVE surprises (four of them cheap, one worth remembering)
+
+1. **nameiparent's pop is `wp_caddi_sp_pop_s_sconf`, not
+   `wp_caddi16sp_pop_s_sconf`** — +16 fits the 6-bit signed field, so gcc
+   emits the cheaper `c.addi`.  Reading "16-byte frame ⇒ addi16sp" off the
+   32/48/64/96-byte frames every other proof in the tree has is wrong.
+   `KernelRvcDecode.stk_pop_16` / `frame_cancel_16` already existed for it.
+2. **`KernelRvcDecode.v` already has the whole frame algebra** —
+   `stk_push`/`stk_pop` and the sized `stk_push_32` / `stk_pop_32` /
+   `stk_fp_32` / `stk_pop_16` instances.  Only the two `c.sdsp`
+   displacement families had to be re-derived (they are stated at a fixed
+   frame depth: `ProofDirlookupParts.dlk_frm` is hard-wired to
+   `pa_stk X 12`), which is a two-line `add_vec_off2` lemma per depth.
+   **A depth-generic `frm` lemma in `KernelRvcDecode.v` is the obvious
+   cleanup** — every wrapper-sized proof re-derives it.
+3. **The whole name-buffer carve is already in the tree.**  namei's
+   `char name[14]` is slots 4 and 3 of its own frame; the four moves are
+   `StackBytes.slot_bytes_own` / `bytes_own_slot` (word ↔ 8 bytes),
+   `StackBytes.bytes_own_app` (16 = 8 + 8), `ByteBuf.bb_any_named` /
+   `bb_named_any` (unnamed bytes ↔ a naming function — this is what turns
+   an uninitialised C array into namex's `nfun` and back), and
+   `ByteBuf.bb_split` (16 = 14 + 2, the two spare bytes namex never
+   touches riding through at the ORIGINAL `nfun`).  `ProofDirlookupParts`'
+   `dlk_slots_bytes` / `dlk_bytes_slots` / `dlk_bytes_name` /
+   `dlk_name_bytes` are the same five lemmas at depth 12; copying them to
+   depth 4 is four three-line proofs.  **No new pure lemma was needed for
+   this stage at all.**
+4. **namei's `addi a2,s0,-32` is the BASE encoding** (`instr … false`,
+   pc += 4, `ITYPE (mword_of_int 4064 : mword 12, …)`), so it is
+   `WpSconfAlu.wp_addi4_s_sconf`, not one of the compressed `caddi`
+   leaves.  The arithmetic is `s0 = sp0` and `s0 - 32 = pa_stk sp0 4`,
+   i.e. `stk_push` at k = 4 with a 12-bit immediate.
+5. **namex's `npar` premise is instantiated by the `c.li`'s value, not by
+   its immediate.**  `eq_vec (m !!! a1) zero_reg = negb npar` is
+   discharged with `npar := false` / `true` from a CLOSED top-level lemma
+   (`nam_a1_false` / `npi_a1_true`) so that no `vm_compute` ever runs
+   inside the function's context (N4c3's traps 3 and 4).  Every K bound
+   likewise comes from a closed `nam_kb` / `npi_kb` rather than an inline
+   `ltac:(lia)`.
+
+The postcondition mapping is exactly what the specs advertise: namei
+takes namex's ok arm, **drops** the `npar = true -> ∃ es e, …` conjunct
+(vacuous at `npar = false`) and drops the `nf` binder entirely; nameiparent
+keeps the binder and applies the implication to `eq_refl`, which makes the
+clause unconditional.  Both re-state the arm at the FINAL register file —
+`a0` is not callee-saved but the epilogue does not touch it, so three
+`upd_ne`s carry `mf !!! a0` to `P3 !!! a0`.
+
+#### Build evidence (EC2 mirror, git-synced at `33272854`)
+
+`bash ~/one.sh ProofNameiparent.v` → `DONE ProofNameiparent.v = 0`,
+`EXIT=0`, zero `Error` lines.  `bash ~/one.sh ProofNamei.v LinkNamei.v
+LinkNameiparent.v` → `DONE ProofNamei.v = 0`, `DONE LinkNamei.v = 0`,
+`DONE LinkNameiparent.v = 0`, `EXIT=0`, zero `Error` lines.
+`Print Assumptions` on both linked modules as above (≈115 s each).  All
+`ProofNamei.*` / `LinkNamei.*` / `ProofNameiparent.*` /
+`LinkNameiparent.*` scratch and the check file were then deleted from the
+mirror and its `_CoqProject` restored.
+
+md5s of the landed files: `ProofNamei.v e5f3f39b028548ae0c568bd068cffc69`,
+`LinkNamei.v 64e7bc6bf50eb36f55e697af08f660ac`,
+`ProofNameiparent.v ddcdb4afa5b9b91f884f332bf838270e`,
+`LinkNameiparent.v 986cfc424767256af47a59c1d9edc81f`.
+
 #### The next frontier
 
-`SpecNamei.v` / `SpecNameiparent.v` are frozen (N4b) and now carry the two
-v2 premises; both wrappers are two-instruction `jal namex` shells, so
-`ProofNamei` / `ProofNameiparent` + their `Link` files are the obvious
-next stage and should be small.
+**N5 — ialloc (188B) + ireclaim (200B) + fsinit (112B)**, the campaign's
+last stage.  Two things from here that bear on it: the depth-generic frame
+lemma of surprise 2 is worth landing in `KernelRvcDecode.v` before three
+more frames are written; and `IcacheBoot`'s image-wf IOU is still two
+clauses wide (`inode_ok` AND `dir_ok icfg_nib`, N4a finding 3) — the
+ireclaim/fsinit mint owes both, and nothing in N4 discharged either.
