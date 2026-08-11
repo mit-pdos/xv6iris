@@ -14,7 +14,6 @@ Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import KernelText.
 Require Import WpMmodeLeafBase.
-Require Import UserExecFacts.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode00.
@@ -33,6 +32,7 @@ Require Import KernelDecode24.
 Require Import KernelDecode27.
 Require Import KernelDecode30.
 Require Import KernelDecode31.
+Require Import UserExecFacts.
 Local Open Scope Z_scope.
 Import Defs.
 

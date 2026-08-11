@@ -72,6 +72,16 @@ Lemma ke_431c s :
   = Some (ExecuteAs (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), false, 4)), s).
 Proof. apply exec_execute_C_LW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
 
+Lemma kd_6d38 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x6d38 : mword 16)) s
+  = Some (C_LD (mword_of_int 11, Cregidx (mword_of_int 2), Cregidx (mword_of_int 6)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma ke_6d38 s :
+  exec (execute (C_LD (mword_of_int 11, Cregidx (mword_of_int 2), Cregidx (mword_of_int 6)))) s
+  = Some (ExecuteAs (LOAD (mword_of_int 88 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 14), false, 8)), s).
+Proof. apply exec_execute_C_LD_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+
 Lemma kd_7442 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x7442 : mword 16)) s
   = Some (C_LDSP (mword_of_int 6, Regidx (mword_of_int 8)), s).
@@ -126,6 +136,16 @@ Lemma kd_e0ca s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   exec (ext_decode_compressed (mword_of_int 0xe0ca : mword 16)) s
   = Some (C_SDSP (mword_of_int 8, Regidx (mword_of_int 18)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma kd_e71c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xe71c : mword 16)) s
+  = Some (C_SD (mword_of_int 1, Cregidx (mword_of_int 6), Cregidx (mword_of_int 7)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma ke_e71c s :
+  exec (execute (C_SD (mword_of_int 1, Cregidx (mword_of_int 6), Cregidx (mword_of_int 7)))) s
+  = Some (ExecuteAs (STORE (mword_of_int 8 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), 8)), s).
+Proof. apply exec_execute_C_SD_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
 
 Lemma kd_ec4e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xec4e : mword 16)) s

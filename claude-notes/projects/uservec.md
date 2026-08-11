@@ -137,6 +137,54 @@ Worth keeping (proof-technique notes from the build):
   wf premise is extracted (`iDestruct … as %`, keeping the spatial input)
   rather than spec-threaded.
 
+## prepare_return: the resource shape, after `intr_inv` was deleted
+
+`prepare_return`'s 42 instructions (`CodePrepareReturn.v`, `prr_*`) all
+have leaves. Two of them were gaps until 2026-08-11:
+
+- `csrr a4,satp` (`prr_32`, `CSRReg (0x180, zreg, a4, CSRRS)`) — satp is
+  the one CSR whose accessibility is not a constant (`satp_accessible
+  Supervisor` READS mstatus for TVM=0), so it could not use the shared
+  `exec_check_CSR_result_read_extS` route. Now
+  `WpSconfCsr.wp_csrr_satp_s_sconf`; the TVM premise costs callers nothing
+  because `sconf` already carries `sconf_ms_facts`.
+- `csrw stvec,a5` (`prr_2c`) — the trap-destination switch from kerneltrap
+  to usertrap. This was **structurally unprovable** while the trap vector
+  lived in `intr_inv`: a persistent `inv` whose handler was fixed in its
+  type, so the cell could be borrowed but only ever returned at the SAME
+  value. `30041d61` deleted it.
+
+**The post-`intr_res` shape, which is what a proof should be written
+against.** The vector is now OWNED:
+
+```coq
+Definition intr_res : iProp Σ :=
+  (∃ h b, ⌜TV_Direct h⌝ ∗ ⌜stvec_base h = h⌝ ∗
+          ghost_var sie_gname (1/4) b ∗ stvec ↦ᵣ h ∗ ▷ intr_handler_spec h)%I.
+```
+
+and rides as the fifth member of `trap_csrs`, with `trap_csrs_to_raw :
+trap_csrs -∗ trap_csrs_raw ∗ intr_res`. So prepare_return gets the cell
+from **its own `intr_off()`**: `wp_csrci_sstatus_x0_s_sconf` at `b = true`
+hands back `trap_csrs` (plus `intr_count 0 false`, `cpu_cells_pay`, and
+the bundle at the disabled index), and `rewrite /intr_res` opens it —
+`Typeclasses Opaque` means `iDestruct` cannot, by design.
+
+**The postcondition hands back `trap_csrs_raw`, NOT `trap_csrs`.** After
+prepare_return this hart has no *kernel* trap handler installed: traps go
+to uservec, whose contract is not `intr_handler_spec` (it never returns to
+the interrupted pc — it runs usertrap and sret's to user), so claiming
+`intr_res` at TRAMPOLINE would be false. What comes out is
+`trap_csrs_raw` + `stvec ↦ᵣ TRAMPOLINE` + the dangling SIE quarter.
+
+**That dangling quarter is the safety argument, and it makes the C comment
+a theorem.** `sie_ghost_flip` needs all three fractions; the 1/4 that
+lived in `intr_res` is now loose in prepare_return's post, so nothing can
+set SIE=1 until it is folded back into a real `intr_res`. That is exactly
+"a trap from kernel code to usertrap would be a disaster, turn off
+interrupts" — and it is why the write is legal only after `intr_off()`,
+which is the order the C code uses.
+
 ## What remains after this project
 
 - Prove usertrap() (huge: syscall/devintr/vmfault/kexit/prepare_return

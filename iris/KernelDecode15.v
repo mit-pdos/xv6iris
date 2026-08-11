@@ -82,6 +82,16 @@ Lemma ke_611c s :
   = Some (ExecuteAs (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), false, 8)), s).
 Proof. apply exec_execute_C_LD_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
 
+Lemma kd_613c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x613c : mword 16)) s
+  = Some (C_LD (mword_of_int 8, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma ke_613c s :
+  exec (execute (C_LD (mword_of_int 8, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)))) s
+  = Some (ExecuteAs (LOAD (mword_of_int 64 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), false, 8)), s).
+Proof. apply exec_execute_C_LD_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+
 Lemma kd_639c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x639c : mword 16)) s
   = Some (C_LD (mword_of_int 0, Cregidx (mword_of_int 7), Cregidx (mword_of_int 7)), s).

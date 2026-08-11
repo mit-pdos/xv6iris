@@ -22,6 +22,11 @@ Lemma kd_05b1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   = Some (C_ADDI (mword_of_int 12, Regidx (mword_of_int 11)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
+Lemma kd_0732 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x0732 : mword 16)) s
+  = Some (C_SLLI (mword_of_int 12, Regidx (mword_of_int 14)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
 Lemma kd_408c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x408c : mword 16)) s
   = Some (C_LW (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 3)), s).
@@ -101,6 +106,16 @@ Lemma kd_6de2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   exec (ext_decode_compressed (mword_of_int 0x6de2 : mword 16)) s
   = Some (C_LDSP (mword_of_int 3, Regidx (mword_of_int 27)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma kd_6f9c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x6f9c : mword 16)) s
+  = Some (C_LD (mword_of_int 3, Cregidx (mword_of_int 7), Cregidx (mword_of_int 7)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma ke_6f9c s :
+  exec (execute (C_LD (mword_of_int 3, Cregidx (mword_of_int 7), Cregidx (mword_of_int 7)))) s
+  = Some (ExecuteAs (LOAD (mword_of_int 24 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 8)), s).
+Proof. apply exec_execute_C_LD_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
 
 Lemma kd_852e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x852e : mword 16)) s
