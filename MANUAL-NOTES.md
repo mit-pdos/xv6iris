@@ -64,6 +64,8 @@ Some high-level ideas that might be interesting for some eventual paper:
 - unsynchronized access to ip->ref in ilock, could be tricky to prove under weak memory
 - proved intr_handler_spec is contractive to enable recursive defn (inside sie_cap_gpr)
 - interesting sharing pattern: multiple struct file holders need to share access to single inode ref
+- weak memory: monotone view resource to hide view-advance at each instruction, with duplicable lb facts at fences etc
+- weak memory: objective points-to for SC-like memory, fractional for SC-like read-only sharing
 
 Big things that still need to be done/explored:
 
