@@ -482,4 +482,242 @@ Section LogAmort.
     wi_amort γ bmapstart ind u -∗ ∃ v : nat, ⌜(u <= v)%nat⌝ ∗ log_op γ v.
   Proof. rewrite /wi_amort. iApply log_amort_elim. Qed.
 
+  (* RESERVING A BLOCK WHOSE IDENTITY IS NOT YET KNOWN.  [log_amort_adopt]
+     is free but needs the block to be logged ALREADY; this is its dual --
+     one GENUINE unit buys capacity for an ARBITRARY block, logged or not.
+     It is what lets a loop reserve for the data block bmap is about to
+     return before bmap has returned it.  (Note there is no [∀ x] form: the
+     ledger element is not duplicable, so the block must be picked at the
+     moment the wand is applied, not afterwards.) *)
+  Lemma log_amort_reserve γ F u (x : Z) :
+    log_amort γ F (S u) -∗ log_amort γ ({[x]} ∪ F) u.
+  Proof.
+    iIntros "H". rewrite /log_amort. iDestruct "H" as (Sb v) "(%Hv & H)".
+    iExists Sb, v. iFrame. iPureIntro.
+    assert (Heq : ({[x]} ∪ F) ∖ Sb = ({[x]} ∖ Sb) ∪ (F ∖ Sb)) by set_solver.
+    rewrite Heq.
+    pose proof (gset_size_union_le ({[x]} ∖ Sb) (F ∖ Sb)) as H1.
+    assert (Hs : ({[x]} ∖ Sb) ⊆ ({[x]} : gset Z)) by set_solver.
+    pose proof (subseteq_size _ _ Hs) as H2. rewrite size_singleton in H2.
+    lia.
+  Qed.
+
+  (* THE CREDITED balloc's SHAPE, EXACTLY.  [SpecBalloc.wp_balloc_gen] takes
+     [log_opS γ (2 + u) Sb] with [cr = true -> bmapstart ∈ Sb] and returns
+     [log_opS γ (if cr then S u else u) Sb'] at a set that contains
+     [Sb ∪ {[bmapstart]}] -- it presents ONE block of F (the bitmap block,
+     absorbing when credited) and spends ONE genuine unit (bzero of the
+     freshly allocated block).  So the free units drop by EXACTLY ONE across
+     a balloc, whichever arm of the bitmap's log_write ran.
+
+     TWO units must be free going in: the credited arm needs two in hand
+     even though it hands one back, because log_write's own "a unit must be
+     in hand either way" premise applies on the absorbing arm too. *)
+  Lemma log_amort_present_spend γ F u (b : Z) :
+    b ∈ F ->
+    log_amort γ F (S (S u)) -∗
+    ∃ (Sb : gset Z) (v : nat) (cr : bool),
+      ⌜cr = true -> b ∈ Sb⌝ ∗
+      log_opS γ (S (S v)) Sb ∗
+      (∀ Sb' : gset Z,
+         ⌜Sb ∪ {[b]} ⊆ Sb'⌝ -∗
+         log_opS γ (if cr then S v else v) Sb' -∗ log_amort γ F (S u)).
+  Proof.
+    iIntros (HbF) "H". rewrite /log_amort.
+    iDestruct "H" as (Sb v) "(%Hv & H)".
+    destruct (decide (b ∈ Sb)) as [Hin|Hout].
+    - (* PAID: the bitmap write absorbs; only the bzero's unit is gone. *)
+      destruct v as [|v0]; [lia|]. destruct v0 as [|v1]; [lia|].
+      iExists Sb, v1, true. iSplitR; [iPureIntro; done|]. iFrame "H".
+      iIntros (Sb') "%Hsub H". iExists Sb', (S v1). iFrame. iPureIntro.
+      assert (Hs : F ∖ Sb' ⊆ F ∖ Sb) by set_solver.
+      pose proof (subseteq_size _ _ Hs). lia.
+    - (* UNPAID: the bitmap write spends too, but [b] joins the set and the
+         held-back term drops by exactly one, so [u] moves by one all the
+         same. *)
+      assert (Hb : b ∈ F ∖ Sb) by set_solver.
+      assert (Hne : (1 <= size (F ∖ Sb))%nat).
+      { assert (Hs : {[b]} ⊆ F ∖ Sb) by set_solver.
+        pose proof (subseteq_size _ _ Hs). rewrite size_singleton in H. lia. }
+      destruct v as [|v0]; [lia|]. destruct v0 as [|v1]; [lia|].
+      iExists Sb, v1, false. iSplitR; [iPureIntro; discriminate|]. iFrame "H".
+      iIntros (Sb') "%Hsub H". iExists Sb', v1. iFrame. iPureIntro.
+      assert (Hsub2 : F ∖ Sb' ⊂ F ∖ Sb).
+      { split; [set_solver|]. intros Hcontra.
+        assert (b ∈ F ∖ Sb') by (apply Hcontra; exact Hb). set_solver. }
+      pose proof (subset_size _ _ Hsub2). lia.
+  Qed.
+
 End LogAmort.
+
+(* ===================================================================== *)
+(*  7. THE SET writei's LOOP RESERVES, AS A FUNCTION OF THE BLOCK MAP     *)
+(* ===================================================================== *)
+
+(* [F] is "the bitmap block, and the indirect block ONCE IT EXISTS".  It is
+   not an existential in the loop invariant: [bm] is already a loop-carried
+   parameter, so the reserved set is a FUNCTION of it, and the only moment
+   it moves is the single iteration in which bmap allocates the indirect
+   block.  [wi_fset_grow] is that moment, and [wi_fset_same] is every other
+   iteration -- which is what keeps the invariant free of a case split on
+   whether the indirect block has appeared yet. *)
+Definition wi_indset (bm : blkmap) : gset Z :=
+  if decide (bv_unsigned (bm_ind bm) = 0) then ∅
+  else {[bv_unsigned (bm_ind bm)]}.
+
+Definition wi_fset (bmapstart : Z) (bm : blkmap) : gset Z :=
+  {[bmapstart]} ∪ wi_indset bm.
+
+Lemma wi_fset_size (bmapstart : Z) (bm : blkmap) :
+  (size (wi_fset bmapstart bm) <= 2)%nat.
+Proof.
+  unfold wi_fset, wi_indset. destruct (decide (bv_unsigned (bm_ind bm) = 0)).
+  - rewrite right_id_L size_singleton. lia.
+  - etrans; [apply gset_size_union_le|]. rewrite !size_singleton. lia.
+Qed.
+
+(* the indirect block was already there: the reserved set does not move *)
+Lemma wi_fset_same (bmapstart : Z) (bm bm' : blkmap) :
+  bm_ind bm' = bm_ind bm -> wi_fset bmapstart bm' = wi_fset bmapstart bm.
+Proof. intros H. unfold wi_fset, wi_indset. by rewrite H. Qed.
+
+(* ...and the one iteration in which it does: the new set is the old one
+   with the freshly allocated indirect block adjoined, which is exactly the
+   shape [log_amort_adopt] consumes. *)
+Lemma wi_fset_grow (bmapstart : Z) (bm bm' : blkmap) :
+  bv_unsigned (bm_ind bm) = 0 ->
+  wi_fset bmapstart bm' = {[bv_unsigned (bm_ind bm')]} ∪ wi_fset bmapstart bm
+  \/ wi_fset bmapstart bm' = wi_fset bmapstart bm.
+Proof.
+  intros H0. unfold wi_fset, wi_indset.
+  destruct (decide (bv_unsigned (bm_ind bm) = 0)) as [_|Hc]; [|contradiction].
+  destruct (decide (bv_unsigned (bm_ind bm') = 0)) as [He|He].
+  - right. reflexivity.
+  - left. set_solver.
+Qed.
+
+(* ===================================================================== *)
+(*  8. THE PER-ITERATION COST, AS A FUNCTION OF THE ARMS bmap CAN TAKE    *)
+(* ===================================================================== *)
+
+(* What ONE iteration of writei's loop costs the ledger, split by the four
+   facts a caller can observe at the call site.  Read [ai] as "bmap
+   allocated the indirect block", [ad] as "bmap allocated the data block",
+   [ind] as "this file index goes through the indirect block", and the two
+   credit bits as "the bitmap / the indirect block is already in this op's
+   logged set".
+
+     - the FIRST balloc of the call pays for the bitmap block unless it is
+       credited; every later one absorbs, because there is exactly one
+       bitmap block ([one_bitmap_block]);
+     - each allocation pays ONE for its own bzero;
+     - bmap's own [log_write(bp)] of the indirect block runs only when it
+       installed a data block on the indirect path, and absorbs when the
+       indirect block is credited -- which it always is when bmap itself
+       just bzero'd it;
+     - the caller's OWN log_write of the data block absorbs exactly when
+       bmap allocated it (balloc's bzero put it in the set), and otherwise
+       costs one.
+
+   [bm_iter_cost_one] is the theorem: NET OF THE TWO CREDITS, every arm
+   costs exactly ONE.  That one unit is the [B] of [wi_cost_tight]; the two
+   credited bits are the [+2] writei's [log_amort] holds back, and the
+   [ai] unit is paid out of the same reservation the first time. *)
+Definition bm_iter_cost (crb cri ai ad ind : bool) : nat :=
+  ((if (ai || ad)%bool then (if crb then 0 else 1) else 0)
+   + (if ai then 1 else 0)
+   + (if ad then 1 else 0)
+   + (if (ad && ind && negb ai)%bool then (if cri then 0 else 1) else 0)
+   + (* the caller's own log_write of the data block *)
+     (if ad then 0 else 1))%nat.
+
+(* THE WORST ARM: both credits missing and the indirect block allocated too.
+   That is the entry iteration of a file whose indirect block does not yet
+   exist, and it is the only arm that costs more than three. *)
+Lemma bm_iter_cost_max (crb cri ai ad ind : bool) :
+  (bm_iter_cost crb cri ai ad ind <= 4)%nat.
+Proof. destruct crb, cri, ai, ad, ind; vm_compute; lia. Qed.
+
+(* NET OF THE TWO CREDITS AND THE ONE-TIME INDIRECT ALLOCATION, EVERY ARM
+   COSTS EXACTLY ONE.  This is the invariant that makes the loop provable
+   without a case split: the two credit misses are paid by the potential
+   [size (F ∖ Sb)] dropping (the blocks join the set), and the [ai] unit is
+   the [+1] writei reserves for the indirect block once and for all. *)
+Lemma bm_iter_cost_one (crb cri ai ad ind : bool) :
+  (bm_iter_cost crb cri ai ad ind
+   = 1 + (if crb then 0 else 1) * (if (ai || ad)%bool then 1 else 0)
+       + (if (ad && ind && negb ai)%bool then (if cri then 0 else 1) else 0)
+       + (if ai then 1 else 0))%nat.
+Proof. destruct crb, cri, ai, ad, ind; vm_compute; reflexivity. Qed.
+
+(* ...and with both credits in hand and the indirect block already there,
+   the arm-aware cost collapses to the one unit [wi_cost_tight] charges per
+   straddled block. *)
+Lemma bm_iter_cost_credited (ad ind : bool) :
+  bm_iter_cost true true false ad ind = 1%nat.
+Proof. destruct ad, ind; vm_compute; reflexivity. Qed.
+
+(* ===================================================================== *)
+(*  9. WHICH CREDITS ARE ACTUALLY LOAD-BEARING                            *)
+(* ===================================================================== *)
+
+(* Section 5 showed both of S3i's weaker accountings bust.  This is the
+   other end of the question: [wi_cost_tight]'s 7 buys three slots of
+   slack, but the retrofit does NOT have to buy all of it.  The absorptions
+   split into three, and only TWO of them are load-bearing:
+
+   (a) THE BITMAP CREDIT, across the whole call.  Every balloc of the
+       transaction log_writes the same block ([one_bitmap_block]), so the
+       first pays and the rest absorb.  REQUIRED: without it a four-block
+       chunk pays five bitmap writes instead of one and lands at 14.
+
+   (b) THE DATA-BLOCK ABSORPTION.  balloc's bzero of a fresh block and
+       writei's own log_write of it are the same block, so exactly ONE of
+       the two is ever paid -- and a block that is NOT fresh skips the bzero
+       and pays the log_write instead, which is why the charge is one per
+       straddled block either way.  REQUIRED: without it, 14 again.
+
+   (c) THE CROSS-ITERATION INDIRECT CREDIT.  bmap's own [log_write(bp)] of
+       the indirect block runs on EVERY iteration that installs a data block
+       on the indirect path.  When bmap allocated the indirect block in the
+       same call it absorbs against balloc's bzero of it -- that is the case
+       [WriteiBudget]'s header calls absorption (2) -- but when the indirect
+       block was allocated by an EARLIER ITERATION of the same writei call,
+       the absorption is against that earlier iteration's write and needs a
+       credit that survives across iterations.
+
+   (c) IS NOT REQUIRED.  With (a) and (b) alone the honest cost is
+   [2 * B + 2]: one for the bitmap, one for iupdate, and TWO per straddled
+   block (its own write, plus one indirect write that did not absorb).  At
+   B = 4 that is EXACTLY MAXOPBLOCKS -- it fits, with ZERO slack.  So a
+   cheaper bmap contract carrying ONE credit instead of two is sound, and
+   the second credit's whole value is the three slots of headroom between
+   [wi_cost_bmonly = 10] and [wi_cost_tight = 7].
+
+   Recording this because "which absorptions must I model?" is exactly the
+   question the S3i sizing got wrong in the other direction, and the answer
+   is not "all of them". *)
+Definition wi_cost_bmonly (off n : nat) : nat := (2 * wi_blocks off n + 2)%nat.
+
+Lemma wi_cost_bmonly_value : wi_cost_bmonly 1023 FW_MAX = 10%nat.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma wi_cost_bmonly_fits (off n : nat) :
+  (n <= FW_MAX)%nat -> (wi_cost_bmonly off n <= MAXOPBLOCKS)%nat.
+Proof.
+  intros Hn. unfold wi_cost_bmonly.
+  pose proof (wi_blocks_le4 off n Hn). unfold MAXOPBLOCKS. lia.
+Qed.
+
+(* ...and it fits with NOTHING to spare, which is the whole argument for
+   paying for (c) anyway: one more log_write anywhere on the path -- a
+   future kernel change, or a call site this proof has not met -- and the
+   one-credit accounting stops fitting, while the two-credit one still has
+   three slots. *)
+Lemma wi_cost_bmonly_no_slack :
+  wi_cost_bmonly 1023 FW_MAX = MAXOPBLOCKS.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma wi_cost_tight_slack :
+  (wi_cost_tight 1023 FW_MAX + 3 = MAXOPBLOCKS)%nat.
+Proof. vm_compute. reflexivity. Qed.

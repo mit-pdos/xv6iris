@@ -1,10 +1,11 @@
 (* SpecBalloc.v -- the public interface of balloc, stated independently of
-   any proof.  balloc is ASSUMED for now: this file is a [Module Type] with
-   no [Proof<F>.v] behind it, the sanctioned pattern already used for
-   myproc / panic / kerneltrap (claude-notes/design/spec-modules.md, "An
-   ASSUMED callee").  A [Link] file supplies the single instance with an
-   [Axiom], so bmap's own proof stays axiom-free and proving balloc later
-   replaces exactly one file.
+   any proof.  balloc IS PROVEN: [ProofBalloc.v]'s [BallocProof] functor is
+   the single instance of the [Module Type] below, and [LinkBalloc.v]
+   carries no [Axiom].  A NEW [Parameter] HERE IS THEREFORE A PROOF
+   OBLIGATION ON THAT FUNCTOR, not a free contract widening -- widening this
+   interface costs work in a 4100-line proof file.  (It is still not an
+   assumption in anyone's [Print Assumptions] cone: a [Module Type]
+   parameter discharged by a real proof adds nothing.)
 
      static uint balloc(uint dev) {
        int b, bi, m;
@@ -251,7 +252,145 @@ Definition wp_balloc_sconf_body
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(*  THE CREDITED FORM -- balloc's contract with the LOG'S ALREADY-LOGGED  *)
+(*  SET carried through it, [SpecBfree.wp_bfree_gen]'s shape verbatim.    *)
+(* ===================================================================== *)
+
+(* WHY.  balloc log_writes exactly TWO blocks, and a caller that is
+   allocating several blocks in one transaction pays far less than
+   [2 * blocks] for them:
+
+   - THE BITMAP BLOCK.  [BBLOCK] collapses to [bmapstart] for every
+     allocatable block ([WriteiBudget.one_bitmap_block], from this
+     contract's own [0 < size <= BPB] premise), so EVERY balloc of the
+     transaction log_writes THE SAME block.  Only the first pays; the rest
+     absorb.  That is what [cr] claims, exactly as in bfree.
+
+   - THE FRESH BLOCK, log_written by the inlined bzero at +0x4c.  It is
+     never credited (a freshly allocated block cannot already be in this
+     op's set in any way the caller can know), so it always costs one --
+     but the caller LEARNS the block is now in the set, and can therefore
+     absorb its OWN later log_write of the very same block.  That is the
+     data-block absorption without which a four-block chunk of writei does
+     not fit MAXOPBLOCKS ([WriteiBudget.wi_cost_noabs_busts]).
+
+   The FAILURE arm log_writes nothing, so both the budget and the set come
+   back untouched.  [wp_balloc_sconf] is this at [cr = false] with the set
+   forgotten, and is unchanged: every existing caller keeps threading
+   [log_op]. *)
+Definition wp_balloc_gen_body
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+
+    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+    (pd pav pu : mword 64)
+    (bn : bio_names)
+    (γ : log_names) (γfs : fs_names)
+    (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
+    (used : gset Z)
+    (γpr : gname)
+    (u : nat) (cr : bool) (Sb : gset Z)
+    (pidv : mword 32) (dq dqb dqs : dfrac)
+    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (b : bool) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.balloc in
+  let pj := proc_addr j in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (K_balloc <= K)%nat ->
+  log_geom_ok cov logstart ->
+  printk_gen_contract γpr γu γd ->
+  0 < size <= BPB ->
+  0 <= bmapstart ->
+  bmapstart ∈ cov ->
+  ~ (bmapstart ∈ log_region_set logstart) ->
+  (* THE CREDIT'S PREMISE: claiming the free arm means claiming this op has
+     already logged THE BITMAP BLOCK in this batch.  There is only one. *)
+  (cr = true -> bmapstart ∈ Sb) ->
+  (j < NPROC)%nat ->
+  γs !! j = Some γl ->
+  m !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 dev ->
+  eb = true ->
+  sie_cap_gpr m K b pj -∗
+  cpu_own 0 eb pj C b -∗
+  kernel_text -∗ pc_is pcE -∗
+  panic_wp_any -∗
+  kernel_data -∗
+  printk_env γpr γu γd -∗
+  bio_ctx bn (fs_view γfs γd dev cov) -∗
+  log_ctx γ bn γfs cov logstart dev -∗
+  p_pid pj ↦₄{dq} pidv -∗
+  sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  bitmap_res γfs bmapstart cov logstart size used -∗
+  procs_inv γs -∗
+  dev_inv γu γd -∗
+  disk_geom γd pd pav pu -∗
+  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  bslots bn 2 -∗
+  (* THE RESERVATION.  Two units must be in hand either way -- log_write's
+     own "a unit in hand" requirement holds on the absorbing arm too. *)
+  log_opS γ (2 + u) Sb -∗
+  wp_next b pj (fun (CID : CpuId) =>
+  ∀ (mf : regfile),
+      ⌜callee_saved m mf⌝ -∗
+      sie_cap_gpr mf K b pj -∗
+      cpu_own 0 eb pj C b -∗
+      pc_is ret_tgt -∗
+      p_pid pj ↦₄{dq} pidv -∗
+      sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      bslots bn 2 -∗
+      ((* FAILURE: nothing allocated, NOTHING LOGGED -- budget and set both
+          come back exactly as they went in *)
+       (⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64)⌝ ∗
+        bitmap_res γfs bmapstart cov logstart size used ∗
+        log_opS γ (2 + u) Sb)
+       ∨
+       (* SUCCESS: the bitmap block was logged (absorbing if credited) and
+          so was the fresh block -- which is what lets the caller absorb its
+          own log_write of it later *)
+       (∃ blk : mword 32,
+          ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 blk⌝ ∗
+          ⌜bv_unsigned blk <> 0⌝ ∗
+          ⌜bv_unsigned blk ∈ cov⌝ ∗
+          ⌜~ (bv_unsigned blk ∈ log_region_set logstart)⌝ ∗
+          fsblock γfs (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
+          blk_own γfs (bv_unsigned blk) ∗
+          bitmap_res γfs bmapstart cov logstart size
+                     (used ∪ {[ bv_unsigned blk ]}) ∗
+          log_opS γ (if cr then S u else u)
+                    (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned blk]}))) -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type BALLOC.
+  (* THE CREDITED / GENERAL FORM; [wp_balloc_sconf] below is its
+     set-forgetting instance at [cr = false], kept as its own parameter so
+     that every existing caller is unchanged. *)
+  Parameter wp_balloc_gen :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ}
+      `{GEN : GenId} `{CID : CpuId}
+
+      (γs : list gname) (j : nat) (γl : gname)
+      (γu : uart_names) (γd : disk_names) (γk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (γ : log_names) (γfs : fs_names)
+      (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
+      (used : gset Z)
+      (γpr : gname)
+      (u : nat) (cr : bool) (Sb : gset Z)
+      (pidv : mword 32) (dq dqb dqs : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool),
+      wp_balloc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
+                         cov logstart bmapstart size dev used γpr u cr Sb
+                         pidv dq dqb dqs m K eb C b.
+
   Parameter wp_balloc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ}
