@@ -53,6 +53,12 @@ Two things worth having in mind before writing any of it:
   kerneltrap's three are: the trap came from user mode, so
   `trap_mstatus_ok`'s `SPP = User` makes the `andi/bnez` fall through. That is
   what keeps `panic` (and with it printk-on-the-panic-path) out of the cone.
+  **DONE** — `ProofUsertrapParts.ut_spp_bit` / `ut_spp_clear_eq`, the
+  opposite-polarity mirror of `ProofKerneltrapParts`' `kt_spp_bit` /
+  `kt_spp_set_neq` (kerneltrap's `== 0` test needs the mask NONZERO from
+  SPP = 1; usertrap's `!= 0` needs it ZERO from SPP = 0). All four belong
+  beside `sstatus_read` in `WpGprCsrwC.v` and are split only because neither
+  parts file may import the other's — hoist them together.
 - **the function changes SIE index twice**: it is entered at `false` (the trap
   cleared SIE), the `csrsi sstatus,2` at +0xa2 flips it to `true` for the
   syscall arm only, and prepare_return is reached at `true` from that arm and
