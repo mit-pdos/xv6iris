@@ -213,6 +213,26 @@ fence/acquire on the new CPU before returning.  How it lands on C/D/S:
   that ONE persistent floor token.  Publication-at-migration + lazy
   retarget ≡ context indexing, with no `wcds` redesign and no leaf
   statement changes beyond the acceptance arm.
+- SPEC REFINEMENT (2026-08-12, from design review): in the PORTED
+  whole-function `yield()` spec, the resume-side facts travel as ONE
+  persistent bundle `yield_lb ξ V := ctx_view_lb ξ V ∗
+  ⌜pub_covers_view c_old V⌝` — the sc-parity `ctx_view_lb` (which is
+  what crosses `wp_next`; the example's raw `⊒V` is its
+  altitude-lowered stand-in, used only because the example's thread is
+  not a registered WeakCtx context) plus the publication half stated
+  OVER THE VIEW, not over a position: the framed dirty fact's
+  `⊒view_byte a t` gives `t ≤ V(a)` by construction, so the `t ≤ n`
+  side condition disappears, and the release store can mint coverage
+  of V without naming any position (its watermark is the fresh top).
+  The two halves are independent and both needed: `ctx_view_lb` is
+  about what the context OBSERVED (frames clean facts; implies nothing
+  about `w_pub`, which is deliberately inert and not a view
+  component); the pub half is about what the world may READ of the old
+  hart's writes (the lazy-upgrade evidence + the φ payment).
+  Certificates (`wstep_cert`/`wQ_fr`) appear only in the
+  example-altitude lemmas because the example has no Code file; in the
+  ported spec they are proof-internal (CodeYield facts), exactly as in
+  the SC tree.
 - THE EXAMPLE `WkYieldFrame.v`: thread T on hart A: `x := 1`
   (dirty-A), holds a clean fact `z`; yield (fence rw,w; handoff-flag
   release; [migration]; new-CPU acquire/fence; return); resumed on B:
