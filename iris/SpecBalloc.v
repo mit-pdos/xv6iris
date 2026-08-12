@@ -334,9 +334,18 @@ Definition wp_balloc_gen_body
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   m !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 dev ->
-  eb = true ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b -∗
+  (* THE TRAP-CSR COMPLEMENT.  Same pure-pass-through shape as
+     [wp_balloc_sconf_body] above.  balloc holds no lock of its own, so it
+     never inspects these: it carries them from entry to exit and hands
+     them back re-indexed.  Generalizing the CREDITED form (not just the
+     counted one) is what lets bmap keep a SINGLE core -- bmap's credited
+     path routes here, and a core pinned at [eb = true] would have forced
+     a second, independent proof of the same 70 instructions.  See
+     claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   kernel_data -∗
@@ -356,14 +365,14 @@ Definition wp_balloc_gen_body
      own "a unit in hand" requirement holds on the absorbing arm too. *)
   log_opS γ (2 + u) Sb -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b] -- balloc's bread/bwrite
-     park, and the counted form above already says [true].  (Round 12: this
-     set-form body landed on our side of the fork, so [5ca52338]'s sweep
-     could not see it.) *)
+     park, and the counted form above already says [true]. *)
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗

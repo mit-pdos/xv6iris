@@ -1331,12 +1331,14 @@ Section KexecABad.
               used2 k qi sq gy inum dn bm n2 pidv (DfracOwn (1/4)) dqb dqs
               B2 (K - 68)%nat true C true
               ltac:(unfold K_iunlockput, K_iput in *; lia) Hk Hlg Hsz Hbm0 Hbmc
-              Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hitab Hitinv Hesck
+              Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0
+              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hitab Hitinv Hesck
                     Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
                     Hity Hkeep Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock Hbs
                     Hlog [-]").
-    iIntros (CIDu Hsu M1 n3 used3) "%Hcsu Hcg Hcnt Hpc Hppid Hbm Hins %Hu3
+    { rewrite /trap_csrs_ext. done. }
+    { rewrite /cpu_claim_ext. done. }
+    iIntros (CIDu Hsu M1 n3 used3) "%Hcsu Hcg Hcnt _ _ Hpc Hppid Hbm Hins %Hu3
              Hbits Hbs %Hn3 Hlog Hirs1".
     assert (Hpc6a : ret_pc (B2 !!! Regidx Rra) = mword_of_int (KXA + 0x6a))
       by (rewrite HB2ra; pcw).
@@ -1367,10 +1369,12 @@ Section KexecABad.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn g gfs
               cov logstart dev n3 pidv (DfracOwn (1/4)) B3 (K - 68)%nat
-              true C true ltac:(unfold K_end_op; lia) Hlg Hjp Hgs eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hcrash Hcert Hppid
+              true C true ltac:(unfold K_end_op; lia) Hlg Hjp Hgs
+              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hcrash Hcert Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hlog [-]").
-    iIntros (CIDe Hse M2) "%Hcse Hcg Hcnt Hpc Hppid".
+    { rewrite /trap_csrs_ext. done. }
+    { rewrite /cpu_claim_ext. done. }
+    iIntros (CIDe Hse M2) "%Hcse Hcg Hcnt _ _ Hpc Hppid".
     assert (Hpc6e : ret_pc (B3 !!! Regidx Rra) = mword_of_int (KXA + 0x6e))
       by (rewrite HB3ra; pcw).
     iEval (rewrite Hpc6e) in "Hpc".
@@ -2255,10 +2259,11 @@ Section KexecABody.
               gilk gislk cov logstart inodestart nib k (q/2)%Qp gy dev inum
               pidv (DfracOwn (1/4)) dqs Q2 (K - 68)%nat true C true
               ltac:(unfold K_ilock; lia) Hk Hlg Hins0 Hibc Hib' Hjp Hgs HQ2a0
-              eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hitinv Hesck Hireg Hslkk
+              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hitinv Hesck Hireg Hslkk
                     Hshr Hins Hppid Hprocs Hdevi Hdgeom Hdlock Hbs1 [-]").
-    iIntros (CIDil Hsil M1 dnl bml) "%Hcsil Hcg Hcnt Hpc Hppid Hins Hbs1
+    { rewrite /trap_csrs_ext. done. }
+    { rewrite /cpu_claim_ext. done. }
+    iIntros (CIDil Hsil M1 dnl bml) "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hins Hbs1
              Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload Hity".
     assert (Hpc3a : ret_pc (Q2 !!! Regidx Rra) = mword_of_int (KXA + 0x3a))
       by (rewrite HQ2ra; pcw).
@@ -2429,11 +2434,13 @@ Section KexecABody.
               pidv (DfracOwn (1/4)) (DfracOwn (1/2)) Q8 (K - 68)%nat true C true
               ltac:(unfold K_readi; lia) Hlg Hbmwf Hbmcov Hszb
               ltac:(vm_compute; reflexivity) Hjp Hgs HQ8a0
-              ltac:(rewrite HQ8a1; vm_compute; reflexivity) HQ8a3 HQ8a4 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hka Hidev Hmeta Hmap Hblocks
+              ltac:(rewrite HQ8a1; vm_compute; reflexivity) HQ8a3 HQ8a4
+              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hka Hidev Hmeta Hmap Hblocks
                     [Helfb Hppid] Hprocs Hdevi Hdgeom Hdlock Hbs1 [-]").
+    { rewrite /trap_csrs_ext. done. }
+    { rewrite /cpu_claim_ext. done. }
     { iSplitL "Helfb"; [iExact "Helfb" | iExact "Hppid"]. }
-    iIntros (CIDrd Hsrd M2 tot P') "%Hcsrd %Hupt %Htotb %Hret Hcg Hcnt Hpc
+    iIntros (CIDrd Hsrd M2 tot P') "%Hcsrd %Hupt %Htotb %Hret Hcg Hcnt _ _ Hpc
              Hidev Hmeta Hmap Hblocks [Helfb Hppid] Hbs1".
     assert (Hpc4c : ret_pc (Q8 !!! Regidx Rra) = mword_of_int (KXA + 0x4c))
       by (rewrite HQ8ra; pcw).

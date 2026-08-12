@@ -459,6 +459,14 @@ Definition wp_writei_sconf_body
      these ranges are the literals *)
   m !!! Regidx (mword_of_int 13 : mword 5) = (mword_of_int (Z.of_nat off) : mword 64) ->
   m !!! Regidx (mword_of_int 14 : mword 5) = (mword_of_int (Z.of_nat n) : mword 64) ->
+  (* NO eb-GATED RESTRICTION HERE.  An earlier round of the sweep had to
+     add [eb = false -> bm_covers bm (off + n)] -- "an interrupts-off
+     caller must already own the whole range" -- because writei's loop
+     allocates through [SpecBmap.wp_bmap_gen_body], which in turn needed
+     balloc's CREDITED contract, and that one was still pinned at
+     [eb = true].  Both have since been generalized, so the allocating
+     path is reachable at either index and the restriction is gone.  See
+     claude-notes/projects/eb-generic-sweep.md ("Round 13"). *)
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  writei holds no lock of
@@ -719,11 +727,19 @@ Definition wp_writei_gen_body
      these ranges are the literals *)
   m !!! Regidx (mword_of_int 13 : mword 5) = (mword_of_int (Z.of_nat off) : mword 64) ->
   m !!! Regidx (mword_of_int 14 : mword 5) = (mword_of_int (Z.of_nat n) : mword 64) ->
-  (* PARKING PREMISE (hart-generic scheduler protocol) -- everything below
-     sleeps.  See SpecSched.v / SpecSleep.v. *)
-  eb = true ->
+  (* NO eb-GATED RESTRICTION HERE -- see [wp_writei_sconf_body] above. *)
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b -∗
+  (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  Same pure-pass-through
+     shape as [wp_writei_sconf_body] above -- required so that
+     [wp_writei_sconf] (which must reach [eb = false]) can continue to be
+     DERIVED from this SET-FORM core: writei's own loop must present the
+     bitmap-block credit to bmap across several iterations, which only the
+     SET form ([bmap]'s [cr]/[Sb]) can express, so the derivation has to
+     reach through here at whatever [eb] the counted caller was given.  See
+     claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   (* the two PERSISTENT printk credentials, forwarded through bmap to balloc *)
@@ -791,9 +807,7 @@ Definition wp_writei_gen_body
      counter.  No credit parameter -- see the header. *)
   log_opS γ ncount Sb -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b] -- writei's bread/bmap/
-     iupdate park, and the counted form above already says [true].  (Round
-     12: this set-form body landed on our side of the fork, so [5ca52338]'s
-     sweep could not see it.) *)
+     iupdate park, and the counted form above already says [true]. *)
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (tot : nat) (bm' : blkmap) (data' : nat -> list (bv 8))
     (dn' dn0' : dinode) (n' : nat)
@@ -852,6 +866,8 @@ Definition wp_writei_gen_body
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗

@@ -1463,9 +1463,11 @@ Section IreclaimOrphan.
                  with "Hcont") as "Hcont".
     iApply (BO.wp_begin_op_sconf γs j γl bn γ γfs cov logstart dev pidv dq
               OA (K - 8)%nat true C b
-              ltac:(unfold K_begin_op; lia) Hj Hgl eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hlctx Hppid Hprocs").
-    iIntros (CID15 Hq15 mB) "%Hcsbo Hcg Hcnt Hpc Hppid Hop".
+              ltac:(unfold K_begin_op; lia) Hj Hgl
+              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hlctx Hppid Hprocs").
+    { rewrite /trap_csrs_ext. done. }
+    { rewrite /cpu_claim_ext. done. }
+    iIntros (CID15 Hq15 mB) "%Hcsbo Hcg Hcnt _ _ Hpc Hppid Hop".
     assert (Hpc58 : ret_pc (OA !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x58))
       by (rewrite HOAra; pcw).
@@ -1569,11 +1571,13 @@ Section IreclaimOrphan.
               cov logstart inodestart nib kslot (q/2)%Qp gsh dev inum
               pidv dq dqs OC (K - 8)%nat true C b
               ltac:(unfold K_ilock; lia) Hkslot Hgeom Hst Hibcov Hnibin Hj Hgl
-              HOCa0 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hitbl Hescrow Hireg Hslk
+              HOCa0
+              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hitbl Hescrow Hireg Hslk
                     Hshr Hsbi Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
+    { rewrite /trap_csrs_ext. done. }
+    { rewrite /cpu_claim_ext. done. }
     iIntros (CID18 Hq18 mL dnl bml)
-      "%Hcsil Hcg Hcnt Hpc Hppid Hsbi Hsl1 Hslkd Hslpid Hdep Hidev Hiinum
+      "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsbi Hsl1 Hslkd Hslpid Hdep Hidev Hiinum
        Hvalid Hloaded #Hshot".
     assert (Hpc5e : ret_pc (OC !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x5e))
@@ -1772,11 +1776,13 @@ Section IreclaimOrphan.
               kslot q inum MAXOPBLOCKS pidv dq dqb dqs OG (K - 8)%nat true C b
               ltac:(unfold K_iput; lia) Hkslot Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hst Hibcov Hiblog Hnibin Hcovb
-              ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl HOGa0 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hitb2 Hitbl Hescrow
+              ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl HOGa0
+              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlctx Hitb2 Hitbl Hescrow
                     Hireg Hslk Href Hsbb Hsbi Hbm Hppid Hprocs Hdevi Hdgeom
                     Hdlock Hsl Hop").
-    iIntros (CID24 Hq24 mQ n' usedp) "%Hcsip Hcg Hcnt Hpc Hppid Hsbb Hsbi
+    { rewrite /trap_csrs_ext. done. }
+    { rewrite /cpu_claim_ext. done. }
+    iIntros (CID24 Hq24 mQ n' usedp) "%Hcsip Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi
                                       %Hsubp Hbm Hsl %Hn' Hop Hiref".
     assert (Hpc6a : ret_pc (OG !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x6a))
@@ -1838,10 +1844,12 @@ Section IreclaimOrphan.
                  with "Hcont") as "Hcont".
     iApply (EO.wp_end_op_sconf γs j γl γu γd γk pd pav pu bn γ γfs cov logstart
               dev n' pidv dq OH (K - 8)%nat true C b
-              ltac:(unfold K_end_op; lia) Hgeom Hj Hgl eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hseam Hgen Hppid
+              ltac:(unfold K_end_op; lia) Hgeom Hj Hgl
+              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlctx Hseam Hgen Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hop").
-    iIntros (CID26 Hq26 mE) "%Hcseo Hcg Hcnt Hpc Hppid".
+    { rewrite /trap_csrs_ext. done. }
+    { rewrite /cpu_claim_ext. done. }
+    iIntros (CID26 Hq26 mE) "%Hcseo Hcg Hcnt _ _ Hpc Hppid".
     assert (Hpc6e : ret_pc (OH !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x6e))
       by (rewrite HOHra; pcw).
@@ -2381,10 +2389,12 @@ Section IreclaimScan.
                 (fs_view γfs γd dev cov) pidv dev bno dq
                 W6 (K - 8)%nat true C b
                 ltac:(unfold K_bread; lia) Hbnolt eq_refl Hbnocov eq_refl Hj Hgl
-                HW6a0 HW6a1 eq_refl
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs
+                HW6a0 HW6a1
+                with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hsl1").
-      iIntros (CID7 Hq7 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hpc Hppid Hheld".
+      { rewrite /trap_csrs_ext. done. }
+      { rewrite /cpu_claim_ext. done. }
+      iIntros (CID7 Hq7 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt _ _ Hpc Hppid Hheld".
       destruct Hfacts as [Hcsb HmBa0].
       assert (Hpc90 : ret_pc (W6 !!! Regidx Rra : mword 64)
                       = mword_of_int (KernelSyms.ireclaim + 0x90))

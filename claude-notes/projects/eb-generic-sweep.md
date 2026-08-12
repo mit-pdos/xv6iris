@@ -218,3 +218,56 @@ contract as ASSUMED with one abstract `syscall_env γf pj`. See
 
 `prepare_return` is already index-generic (`WpIntrOff.v`), so usertrap's
 other blocker is gone.
+
+## Round 13: the credited (`cr`/`Sb`) forms, and why they had to generalize too
+
+Upstream's round 12 added a SECOND public contract to `balloc`, `bmap`,
+`iupdate` and `writei`: a **credited / set form** (`wp_..._gen_body`, carrying
+`cr` and `Sb`) alongside the counted `wp_..._sconf_body` the sweep had already
+generalized. These landed after the sweep branched, so the rebase brought them
+in still carrying `eb = true ->`.
+
+The counted form is *derived from* the set form in each of these files. So the
+moment `wp_..._sconf_body` is eb-generic and `wp_..._gen_body` is not, the
+derivation stops typechecking — you cannot get a general `eb` out of a core
+that demands `eb = true`.
+
+There are only two ways out, and **one of them is a trap**:
+
+- **Generalize the set form too.** One core, both contracts as thin wrappers.
+  This is what `ProofIupdate` (`iu_main_gen`), `ProofBalloc` (`ba_main`) and
+  `ProofBmap` now do.
+- **Keep the set form pinned and prove a second, eb-generic core beside it.**
+  This is what a first attempt at `ProofBmap` did, and it cost **~3000 lines
+  of duplicated proof** — a verbatim second pass over the same 70
+  instructions, in a file whose own seal comment says "no step of the code is
+  proved twice". Reject this on sight.
+
+The duplication is contagious through the call graph, which is the real reason
+to refuse it: bmap's credited path routes to **balloc's** credited contract, so
+a `wp_balloc_gen_body` pinned at `eb = true` forces bmap to duplicate; a
+duplicated bmap would in turn have forced writei to duplicate. Generalizing
+`wp_balloc_gen_body` — free, since `ba_main` already *was* that statement,
+merely re-pinned at `true` on the way out — collapsed the whole chain.
+
+**Rule: when a function has both a counted and a credited form, generalize
+BOTH in the same step, bottom-up.** Never generalize one and pin the other.
+
+### The rebase recovers more than it looks like it does
+
+When upstream rewrites a file the sweep had already converted, `--ours`/
+`--theirs` both throw away real work. The two edits are almost always
+orthogonal — upstream's are about `cr`/`Sb`/binders, the sweep's are about
+`eb`/`trap_csrs_ext`/`Hextc` — and they merely land on adjacent lines. So do a
+literal three-way merge instead of re-deriving:
+
+    git merge-base <sweep-tip> <upstream-tip>
+    git show $MB:iris/ProofX.v      > base.v
+    git show <sweep-tip>:iris/ProofX.v   > ours.v      # sweep applied, was green
+    git show <upstream-tip>:iris/ProofX.v > theirs.v
+    cp ours.v merged.v && git merge-file -L sweep -L base -L upstream merged.v base.v theirs.v
+
+For `ProofBmap.v` this reduced a 3900-line re-derivation to 28 small conflict
+regions (~400 lines), and in essentially every one the resolution is *both
+sides*, not a choice between them. The pre-rebase sweep tip is worth keeping
+on a branch (`wip/eb-sweep-N`) precisely so this is available.
