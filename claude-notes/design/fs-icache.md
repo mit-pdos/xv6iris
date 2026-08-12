@@ -2883,3 +2883,142 @@ recorded in §17.3.
 Execution: S3d = pieces 2–4 per §17.3 (the arm slices, the one-shot
 parking, SpecIlock's additive post, inode_pay's witness), full-gated;
 then SpecFilewrite/Proof/Link in the same stage if budget allows.
+
+### 17.5 §17.3(A) LANDED; §17.3(B) DOES NOT CLOSE EITHER — §16.4's
+### CLAIM BOX puts a second fill inside one generation (fs-sysfile S3d,
+### 2026-08-12)
+
+Piece (A) went in exactly as ratified and the tree is green.  Piece (B)
+— the one-shot's parking — was worked forward against `ProofIlock` and
+died on a branch §17.3 did not know about.  The finding is sharp, the
+counterexample is in the code, and the repair needs a coordinator
+ruling, so `ic_payload`'s witness conjunct is NOT in and `SpecIlock`'s
+additive post is NOT in.  Everything they will need IS.
+
+**WHAT (A) LANDED, and the one place it is smaller than the ruling.**
+`live_slot`'s live case is `1/2 − qt`, which is `islot_rest_at`'s shape
+character for character — the liveness ledger and the identity ledger
+are now the SAME ledger, which is the endorsement §17.3 predicted.
+`ic_parked` gains `∃ g, live_gen k (1/2) g` bound with its payload;
+`ic_dep_res` splits into `ic_dep_own` (the depositor's reference or
+share, generation-NAMED so `live_gen_agree` can pin the arm's half to
+it) and `ic_dep_half` (the arm's ½ at the descriptor's generation), so
+`ic_out`'s text does not move; `ic_dep` gains the gname field and
+`ic_dep_gname` is the pure side condition the two swap lemmas carry.
+`live_slot_alloc` is a fupd at `q < 1/2` that mints the fresh
+generation AND its pending token; `live_slot_close_last`,
+`iref_close_last_step`, `iref_close_last_store_au` and
+`live_whole_share_absurd` each gain a `live_frac k (1/2)` premise;
+`live_slot_incr` (hence `iref_incr_store_au` and
+`iref_upgrade_store_au`) tightens to `qt + qn < 1/2`.
+`ic_open_auth_ref`'s REF-1 refutation of OUT/`DepShr` is back to
+`qt + (1/2 − qt) + 1/2 + s > 1`, and `ic_open_held`'s with it.
+
+**THE ONE DEVIATION, and it is forced by the instruction stream.**
+§17.3 says parked/mid/held all gain the ½.  MID and HELD do NOT, and
+cannot:
+
+  * MID is built at iget's `sw inum` (+0x72) and sealed into the escrow
+    there, but the slot does not enter `M` until the `sw 1` to
+    `ip->ref` at +0x78 — so at +0x72 no unit has been split and there
+    is no ½ in existence to put in the arm.  The recycler carries the
+    ½ (and the pending token) by hand from +0x78 to the reclose at
+    +0x7c, where `ic_close_mid_to_parked` deposits both.
+  * HELD is entered at iput's +0x3c off `ic_open_auth_ref`, which hands
+    the parked arm's ½ out with the payload; iput carries it across
+    `acquiresleep` exactly as it carries the payload, and puts it into
+    `ic_dep_half` at the +0x54 checkout or back into PARKED at the
+    +0x44 nlink undo.
+
+  Neither costs anything: both arms are windows ONE thread holds
+  exclusively between two stores, the mass ledger balances at every
+  instant (the ½ is in that thread's hand), and no opener's refutation
+  of either arm uses liveness — both are refuted by their FULL `i_inum`
+  cell.  The operative claim of §17.3 (A) — "every live arm an opener
+  can MEET holds the exact complement" — is true of PARKED and OUT,
+  which are the only two an opener ever meets.
+
+**(B) IS REFUTED BY §16.4.**  §17.3 (B) parks the pending one-shot with
+`ipool_shape`'s ALLOCATED disjunct, on the argument that *"ilock's fill
+MUST take the allocated branch (it is where `dinode_at` lives), so it
+always finds a pending to spend"*.  That is false in this tree.
+`ProofIlock`'s `il_load` splits the pool shape THREE ways (§16.4's own
+sentence): the allocated bundle; a MARKER over a type-0 record, which
+is the free inode ilock panics on; and **a MARKER over a NONZERO type,
+which is ialloc's claim box** — `InodeRegion.ireg_withdraw` takes the
+fragment out of the region, delivers `fresh_shape`, and the fill
+COMPLETES on that branch.  So the fill reaches its mint holding only a
+marker, and there is no pending token there.
+
+Parking the pending on BOTH pool disjuncts is the obvious fix and is
+exactly what §17.3 (B) refuted from the other side: `ProofIput.v:1981`
+re-parks UNLOADED at the MARKER **inside the same generation**, after
+the fill has already SHOT it.  So:
+
+    fill needs   a pending on the marker disjunct
+    iput needs   NO obligation on the marker disjunct
+
+and for a per-generation one-shot these are jointly unsatisfiable.
+Nothing weaker works either, and the reason is structural: the witness
+must be IMMUTABLE per generation (that is what makes it agree with the
+file payload's copy), so a generation that is filled TWICE is
+unprovable — and iget's recycle plus iput's free path give a generation
+exactly two fills.
+
+**WHY THE OBVIOUS ESCAPES ARE DEAD** (so nobody re-derives them):
+
+  * *Let the marker disjunct carry `ity_pending g ∨ ∃ ty, ity_shot g ty`
+    and make the fill discharge the second case.*  On that branch the
+    fill must prove `di_type dn = ty` for the record it just withdrew.
+    That is TRUE — iput's free path leaves the region record at type 0,
+    so the second fill would take ilock's `ip->type == 0` panic — but it
+    is not DERIVABLE: `imark γi z` is `∃ d, imark_key z ↪[γi] d`, an
+    exclusive token carrying no type at all (§16.4 slimmed the free arm
+    to exactly this), and ialloc's claim can retag the inum between the
+    two.  Making it derivable is an `InodeRegion` change: the marker
+    would have to name its record's type, or a new region-side fact
+    ("this inum's parked record is type 0") would have to travel with
+    iput's re-park.
+  * *Bump the generation at iput's re-park.*  §17.3 already killed this:
+    the bump needs the slot's whole unit and iput released the itable
+    lock at +0x5c, so it holds no `itable_half` and cannot know the
+    map's `qt` is still its own `q`.  Note the ½ is no obstacle under
+    (A) — `ic_swap_park` could hand it back — but the table's `1/2 − qt`
+    still is.
+  * *Let the payload's generation differ from the arm's slice
+    generation.*  Impossible by construction: `iliveUR`'s `agree` is
+    per-KEY, so ALL slices of slot `k` name one generation at every
+    instant.  That is what makes `live_gen_agree` unconditional, and it
+    is what makes the descriptor's gname field cost nothing — but it
+    also means "re-park at a fresh generation" is not a local move.
+  * *A fractional/authoritative type ghost instead of a one-shot.*
+    §17.1 (ii) already ruled: currency is revocable, and a second
+    setter must collect every outstanding fragment — which the file
+    payload's persistent copy forbids.
+
+**WHAT A FIFTH RULING HAS TO CHOOSE BETWEEN.**  Three candidates, each
+priced against the code:
+
+  (a) **Type the marker.**  `InodeRegion.imark` becomes
+      `imark_at γi z ty` (or gains a duplicable "the parked record's
+      type is `ty`" companion), `ireg_free_au` delivers it at 0,
+      `ireg_claim_au` retags it, and `ic_pool_gen`'s marker disjunct
+      becomes `imark_at … ty ∗ (ity_pending g ∨ ∃ ty', ity_shot g ty' ∗
+      ⌜ty = 0⌝)`.  The fill then discharges the shot case by taking the
+      panic branch.  Blast radius: `InodeRegion` (the marker, three
+      lemmas, the invariant's per-slot arm), `ProofIlock`'s fill,
+      `ProofIput`'s free path, `ProofIalloc`'s claim, `IcacheBoot`.
+      This is the only candidate that is faithful to what is TRUE.
+  (b) **Give iput's free path a fresh generation by re-checking REF-1
+      at +0x70.**  xv6 does not perform that read, so this is a
+      no-go without changing the kernel — recorded only to close it.
+  (c) **Move the witness off the generation entirely** and key it on
+      (slot, inum, type) with the file payload holding a persistent
+      fragment plus a REVOCATION guarded by the pool — i.e. redo §17.1
+      (ii) with the generation as the revocation key rather than the
+      witness key.  Unexplored; probably (a) in different clothes.
+
+Until one of those is ruled, `ic_payload`'s `g` is a live but
+unconstrained parameter and the witness is a ONE-LINE addition to that
+definition plus one line in `SpecIlock`'s postcondition.  filewrite
+stays blocked exactly where S3a left it.

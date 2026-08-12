@@ -111,7 +111,7 @@ Definition wp_iunlock_sconf_body
     (cn : ic_names)
     (gil gisl : gname)
     (cov : gset Z) (logstart : Z)
-    (k : nat) (s : Qp) (dev inum : mword 32)
+    (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
@@ -141,7 +141,7 @@ Definition wp_iunlock_sconf_body
      SpecIlock v3's postcondition, and exactly [ic_swap_park]'s input;
      [ic_loaded]'s [dinode_at] at [dn'] IS the flushed-record obligation, and
      the descriptor half is what selects this holder's own arm (§14.8). *)
-  ic_deposit cn k (DepShr s dev inum) -∗
+  ic_deposit cn k (DepShr s dev inum g) -∗
   i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
@@ -169,11 +169,11 @@ Module Type IUNLOCK.
       (cn : ic_names)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z)
-      (k : nat) (s : Qp) (dev inum : mword 32)
+      (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (b : bool),
-      wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s dev inum
+      wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev inum
                             dn' bm' pidv dq m K eb p C b.
 End IUNLOCK.

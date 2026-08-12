@@ -633,12 +633,15 @@ Section ProofFilestat.
       iDestruct (proc_priv_pid γf pj pidv V with "Hpriv") as "[Hppid Hpivbk]".
       iDestruct (cpu_own_transport CID10 CID19 0%nat eb pj C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
+      (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)) *)
+      iEval (rewrite inode_shr_gen_intro) in "Hshr".
+      iDestruct "Hshr" as (gsh) "Hshr".
       iApply (Ilock.wp_ilock_sconf γs j γlp (fsn_uart fn) (fsn_disk fn)
                 (fsn_dlock fn) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn)
                 (fsn_bio fn) (fsn_fs fn) (fsn_ireg fn) (fsn_ic fn)
                 (fsn_ilk fn) (fsn_islk fn)
                 (fsn_cov fn) (fsn_logstart fn) (fsn_inodestart fn)
-                (fsn_nib fn) (fsn_ik fn) (fsn_s fn)
+                (fsn_nib fn) (fsn_ik fn) (fsn_s fn) gsh
                 (fsn_dev fn) (fsn_inum fn)
                 pidv (DfracOwn (1/4)) (fsn_dqs fn)
                 Q3 (K - 10)%nat eb C b
@@ -911,7 +914,7 @@ Section ProofFilestat.
       iApply (Iunlock.wp_iunlock_sconf γs (fsn_fs fn) (fsn_ireg fn)
                 (fsn_ic fn) (fsn_ilk fn) (fsn_islk fn)
                 (fsn_cov fn) (fsn_logstart fn)
-                (fsn_ik fn) (fsn_s fn) (fsn_dev fn) (fsn_inum fn)
+                (fsn_ik fn) (fsn_s fn) gsh (fsn_dev fn) (fsn_inum fn)
                 dnl bml
                 pidv (DfracOwn (1/4)) J2 (K - 10)%nat eb pj C b
                 (fst_av_iunlock K HK) Hik

@@ -3098,9 +3098,11 @@ Section ProofNamexMain.
                    iDestruct (cpu_own_transport CIDt CIDV2 0%nat eb
                                 (proc_addr j) C b ltac:(wp_next_chain)
                                 with "Hcnt") as "Hcnt".
+                   iEval (rewrite inode_shr_gen_intro) in "Hshr".
+                   iDestruct "Hshr" as (gsh) "Hshr".
                    iApply (IL.wp_ilock_sconf gs j gl gu gd gk pd pav pu bn
                              gfs gi cn gilk gislk cov logstart inodestart nib
-                             ik (iq/2)%Qp dev iinum pidv dq dqs
+                             ik (iq/2)%Qp gsh dev iinum pidv dq dqs
                              V2 (K - 12)%nat eb C b
                              Kil Hik Hlg Hinos0 Hibc Hib' Hj Hgs HV2a0 Heb
                              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hitbl Hesck
@@ -3312,7 +3314,7 @@ Section ProofNamexMain.
                                     (proc_addr j) C b ltac:(wp_next_chain)
                                     with "Hcnt") as "Hcnt".
                        iApply (IU.wp_iunlock_sconf gs gfs gi cn gilk gislk
-                                 cov logstart ik (iq/2)%Qp dev iinum dnl bml
+                                 cov logstart ik (iq/2)%Qp gsh dev iinum dnl bml
                                  pidv dq NP3 (K - 12)%nat eb (proc_addr j) C b
                                  Kiu Hik HP3a0
                                  with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesck
@@ -3750,7 +3752,7 @@ Section ProofNamexMain.
                            iApply (IUP.wp_iunlockput_sconf gs j gl gu gd gk
                                      pd pav pu bn g gfs gi cn gtl gilk gislk
                                      cov logstart bmapstart inodestart nib
-                                     size dev usedc ik (iq/2)%Qp (iq/2)%Qp
+                                     size dev usedc ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur pidv dq dqb dqs
                                      GB3 (K - 12)%nat eb C b
                                      Kiup Hik Hlg Hsize Hbmap0 Hbmapcov
@@ -3944,7 +3946,7 @@ Section ProofNamexMain.
                            iApply (IUP.wp_iunlockput_sconf gs j gl gu gd gk
                                      pd pav pu bn g gfs gi cn gtl gilk gislk
                                      cov logstart bmapstart inodestart nib
-                                     size dev usedc ik (iq/2)%Qp (iq/2)%Qp
+                                     size dev usedc ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur pidv dq dqb dqs
                                      GC3 (K - 12)%nat eb C b
                                      Kiup Hik Hlg Hsize Hbmap0 Hbmapcov
@@ -4217,7 +4219,7 @@ Section ProofNamexMain.
                      iApply (IUP.wp_iunlockput_sconf gs j gl gu gd gk pd pav pu
                                bn g gfs gi cn gtl gilk gislk cov logstart
                                bmapstart inodestart nib size dev usedc
-                               ik (iq/2)%Qp (iq/2)%Qp iinum dnl bml ncur
+                               ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                pidv dq dqb dqs ND2 (K - 12)%nat eb C b
                                Kiup Hik Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
                                Hinos0 Hibc Hibl Hib' Hcovb Hiu Hj Hgs

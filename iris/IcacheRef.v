@@ -278,11 +278,31 @@ Definition ityR : cmra := csumR (exclR unitO) (agreeR (leibnizO (bv 16))).
    postcondition existentials over the fraction disappear.
 
    It lives HERE, beside [icacheG], for [icache_idG]'s reason: the class
-   field is what keeps nine spec and proof files from growing a binder. *)
+   field is what keeps nine spec and proof files from growing a binder.
+
+   THE FOURTH FIELD IS THE GENERATION (design §17.3 (A1), ratified §17.4).
+   Under §17' the escrow's live arms hold a ½ slice of the slot's liveness
+   unit AT A NAMED GENERATION, and a PARKER holds no [live_frac] at all
+   (§14.8's two-parkers inventory is explicit about that).  So the
+   descriptor's [ghost_var_agree] is the only handle by which
+   [IcacheEscrow.ic_swap_park] can pin the returning payload's generation to
+   the arm's -- the descriptor already pins kind, fraction and identity, and
+   generation is the fourth at no new cost. *)
 Inductive ic_dep : Type :=
   | DepNone
-  | DepRef (q : Qp) (dev inum : mword 32)
-  | DepShr (s : Qp) (dev inum : mword 32).
+  | DepRef (q : Qp) (dev inum : mword 32) (g : gname)
+  | DepShr (s : Qp) (dev inum : mword 32) (g : gname).
+
+(* the descriptor's generation, where it has one.  [DepNone] is the
+   sleeplock's neutral value and names no slot state at all, which is why
+   [IcacheEscrow.ic_dep_res] is [False] there; the [option] keeps this
+   total without inventing a gname. *)
+Definition ic_dep_gname (d : ic_dep) : option gname :=
+  match d with
+  | DepNone => None
+  | DepRef _ _ _ g => Some g
+  | DepShr _ _ _ g => Some g
+  end.
 
 (* The second field is [IcacheEscrow]'s per-slot IDENTIFICATION ghost
    ([icn_id], design §13.8 as widened by §13.10): an agreement between the
@@ -565,6 +585,33 @@ Section IcacheRefGhost.
     apply Qp.lt_sum. by exists s.
   Qed.
 
+  (* THE GENERATION BUMP (design §17.2 piece 2 / §17.3 (A)).  It needs the
+     slot's WHOLE unit, which exists in exactly one place -- the invariant's
+     arm at a FREE slot ([IcacheInv.live_slot]'s [None] case), i.e. iget's
+     recycle, under the itable lock.  That is the right side condition BY
+     CONSTRUCTION: a bump is impossible while any reference or share exists.
+
+     The fresh generation is minted here together with its PENDING one-shot,
+     because the two are born at the same instant and a generation with no
+     pending token could never be filled. *)
+  Lemma live_gen_bump k (g : gname) :
+    live_gen k 1%Qp g ==∗ ∃ g' : gname, live_gen k 1%Qp g' ∗ ity_pending g'.
+  Proof.
+    iIntros "H".
+    iMod (own_alloc (Cinl (Excl ()) : ityR)) as (g') "Hp"; [done|].
+    rewrite /live_gen.
+    iMod (own_update _ _
+            ({[ k := (1%Qp, to_agree (g' : leibnizO gname)) ]} : iliveUR)
+           with "H") as "H".
+    { apply singleton_update, cmra_update_exclusive.
+      split; [by apply frac_valid | done]. }
+    iModIntro. iExists g'. iFrame.
+  Qed.
+
+  Lemma live_frac_bump k :
+    live_frac k 1%Qp ==∗ ∃ g' : gname, live_gen k 1%Qp g' ∗ ity_pending g'.
+  Proof. iIntros "[%g H]". iApply (live_gen_bump with "H"). Qed.
+
   (* the boot map fans out into the fifty units the invariant starts with *)
   Lemma live_boot_split (g : gname) :
     own icfg_live (live_boot_map g)
@@ -676,6 +723,56 @@ Section IcacheRef.
      reference, because no amount of it produces the count fragment. *)
   Definition inode_shr (k : nat) (s : Qp) (dev inum : mword 32) : iProp Σ :=
     (inode_ident k (DfracOwn s) dev inum ∗ live_frac k s)%I.
+
+  (* ---- THE GENERATION-NAMED FORMS (design §17.3, ratified §17.4) ------
+
+     A share and a reference each carry a liveness slice, and under §17' that
+     slice names a GENERATION.  [inode_shr] / [inode_ref] leave it ∃-bound,
+     which is what kept every Spec's arity when §17' piece 1 landed -- but
+     two consumers must NAME it:
+
+       [SpecIlock], whose postcondition exposes the fill's type witness at
+       the generation the CALLER's share belongs to, and
+
+       [IcacheEscrow.ic_dep_res], whose checkout must pin the arm's ½ to the
+       depositor's own generation ([live_gen_agree] is the only mechanism,
+       and it needs both sides named).
+
+     They are the ∃-forms with the binder pulled out, so a caller moves
+     between them by [iExists] / [iDestruct "H" as (g) "H"] and nothing
+     else. *)
+  Definition inode_shr_gen (k : nat) (s : Qp) (dev inum : mword 32)
+      (g : gname) : iProp Σ :=
+    (inode_ident k (DfracOwn s) dev inum ∗ live_gen k s g)%I.
+
+  Definition inode_ref_gen (k : nat) (q : Qp) (dev inum : mword 32)
+      (g : gname) : iProp Σ :=
+    (iref_frag k q ∗ live_gen k q g ∗ inode_ident k (DfracOwn q) dev inum)%I.
+
+  Lemma inode_shr_gen_intro k s dev inum :
+    inode_shr k s dev inum ⊣⊢ ∃ g : gname, inode_shr_gen k s dev inum g.
+  Proof.
+    rewrite /inode_shr /inode_shr_gen /live_frac.
+    iSplit.
+    - iIntros "[Hid [%g Hg]]". iExists g. iFrame.
+    - iIntros "[%g [Hid Hg]]". iFrame "Hid". iExists g. iFrame.
+  Qed.
+
+  Lemma inode_ref_gen_intro k q dev inum :
+    inode_ref k q dev inum ⊣⊢ ∃ g : gname, inode_ref_gen k q dev inum g.
+  Proof.
+    rewrite /inode_ref /inode_ref_gen /iref_tok /live_frac.
+    iSplit.
+    - iIntros "[[Hf [%g Hg]] Hid]". iExists g. iFrame.
+    - iIntros "[%g (Hf & Hg & Hid)]". iFrame "Hf Hid". iExists g. iFrame.
+  Qed.
+
+  Global Instance inode_shr_gen_timeless k s dev inum g :
+    Timeless (inode_shr_gen k s dev inum g).
+  Proof. apply _. Qed.
+  Global Instance inode_ref_gen_timeless k q dev inum g :
+    Timeless (inode_ref_gen k q dev inum g).
+  Proof. apply _. Qed.
 
   (* A reference WITH A SHARE OUTSTANDING: the count fragment is still whole
      at [qtok] -- carving does not move the authority, and MUST not, since
@@ -848,6 +945,49 @@ Section IcacheHeld.
        ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
        ⌜qt = (qi + s)%Qp⌝ ∗
        inode_ref_short k qt qi icfg_dev inum)%I.
+
+  (* ...and the GENERATION-NAMED form of the travelling share (design §17.3
+     piece 4).  [FileInv.inode_pay] records the generation its slice belongs
+     to, because that is what carries sys_open's "this fd is not a writable
+     directory" to filewrite: the payload's [ity_shot] and ilock's are the
+     same one-shot exactly when the two slices name the same generation. *)
+  Definition inode_shr_held_gen (v : mword 64) (s : Qp) (g : gname) : iProp Σ :=
+    (∃ (k : nat) (inum : mword 32),
+       ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
+       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
+       inode_shr_gen k s icfg_dev inum g)%I.
+
+  Lemma inode_shr_held_gen_forget v s g :
+    inode_shr_held_gen v s g -∗ inode_shr_held v s.
+  Proof.
+    rewrite /inode_shr_held_gen /inode_shr_held.
+    iIntros "(%k & %inum & %Hv & %Hk & %Hb & Hs)".
+    iExists k, inum. iFrame "%".
+    rewrite inode_shr_gen_intro. iExists g. iExact "Hs".
+  Qed.
+
+  Lemma inode_shr_held_gen_split v s1 s2 g :
+    inode_shr_held_gen v (s1 + s2)%Qp g ⊣⊢
+    inode_shr_held_gen v s1 g ∗ inode_shr_held_gen v s2 g.
+  Proof.
+    rewrite /inode_shr_held_gen /inode_shr_gen. iSplit.
+    - iIntros "(%k & %inum & %Hv & %Hk & %Hb & [Hid Hlv])".
+      rewrite inode_ident_split live_gen_split.
+      iDestruct "Hid" as "[Hid1 Hid2]". iDestruct "Hlv" as "[Hl1 Hl2]".
+      iSplitL "Hid1 Hl1"; iExists k, inum; by iFrame.
+    - iIntros "[(%k1 & %n1 & %Hv1 & %Hk1 & %Hb1 & [Hid1 Hl1])
+                (%k2 & %n2 & %Hv2 & %Hk2 & %Hb2 & [Hid2 Hl2])]".
+      assert (Hkk : k1 = k2).
+      { apply ientry_inj; [lia | lia |]. rewrite -Hv1 -Hv2. reflexivity. }
+      subst k2.
+      iDestruct (inode_ident_agree with "Hid1 Hid2") as %[_ ->].
+      iExists k1, n2. iFrame "%".
+      rewrite inode_ident_split live_gen_split. iFrame.
+  Qed.
+
+  Global Instance inode_shr_held_gen_timeless v s g :
+    Timeless (inode_shr_held_gen v s g).
+  Proof. apply _. Qed.
 
   Global Instance inode_shr_held_timeless v s : Timeless (inode_shr_held v s).
   Proof. apply _. Qed.

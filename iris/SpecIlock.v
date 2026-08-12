@@ -177,7 +177,7 @@ Definition wp_ilock_sconf_body
     (cn : ic_names)                                    (* the icache's names  *)
     (gil gisl : gname)                                 (* ip->lock            *)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
-    (k : nat) (s : Qp) (dev inum : mword 32)
+    (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
     (b : bool) :=
@@ -218,8 +218,13 @@ Definition wp_ilock_sconf_body
   ireg_inv gi gfs inodestart nib -∗
   (* THE ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
   is_sleeplock gil gisl (i_lock ip) "inode"%string (ic_tok cn k) -∗
-  (* THE CALLER'S SHARE (v3) -- consumed; deposited whole at the checkout *)
-  inode_shr k s dev inum -∗
+  (* THE CALLER'S SHARE (v3) -- consumed; deposited whole at the checkout.
+     GENERATION-NAMED (design 17.3, ratified 17.4): the share's liveness
+     slice belongs to slot [k]'s current generation [g], and naming it is
+     what lets this contract EXPOSE that generation's type witness below.
+     Mechanical for every existing caller: [IcacheRef.inode_shr_gen_intro]
+     is the existential its [inode_shr] already carries. *)
+  inode_shr_gen k s dev inum g -∗
   (* sb.inodestart, read once *)
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   (* the caller's own pid cell (acquiresleep records it in the lock) *)
@@ -250,11 +255,16 @@ Definition wp_ilock_sconf_body
          identity halves, the valid cell, and the loaded content at a
          record the region agrees with.  Exactly [ic_swap_park]'s input,
          i.e. exactly SpecIunlock v3's precondition. *)
-      ic_deposit cn k (DepShr s dev inum) -∗
+      ic_deposit cn k (DepShr s dev inum g) -∗
       i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
       i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
       i_valid ip ↦₄ valid_word true -∗
       ic_loaded gfs gi cov logstart k inum dn bm -∗
+      (* THE FD-TYPE WITNESS IS NOT HERE YET.  It belongs exactly at this
+         line, as [IcacheRef.ity_shot g (di_type dn)] -- persistent, additive,
+         ignored by every existing caller.  What blocks it is the PLACEMENT
+         of the pending one-shot, not this contract: see [IcacheEscrow.
+         ic_payload]'s header and design fs-icache.md 17.5. *)
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -272,11 +282,11 @@ Module Type ILOCK.
       (cn : ic_names)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
-      (k : nat) (s : Qp) (dev inum : mword 32)
+      (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
       wp_ilock_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
-                          cov logstart inodestart nib k s dev inum
+                          cov logstart inodestart nib k s g dev inum
                           pidv dq dqs m K eb C b.
 End ILOCK.

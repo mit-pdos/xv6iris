@@ -357,6 +357,93 @@ platform axioms + `functional_extensionality_dep`, with Fileread's known
 `iris/IcacheRef.v` md5 `d62349202b867501f9b3ae709c5b192f`, verified equal on
 both sides after the scp and re-verified after the gate.
 
+## S3d — §17' PIECE (A) LANDED AND FULL-GATED; PIECE (B)
+## STOPPED-AND-REPORTED (design/fs-icache.md §17.5)
+
+**Landed (§17.3 (A), whole).**  The restated mass ledger and the
+arm-resident liveness slice, across ten files:
+
+- `IcacheInv.live_slot`'s live case is `1/2 - qt` — literally
+  `islot_rest_at`'s shape, so the liveness ledger and the identity
+  ledger are now ONE shape.  `live_slot_alloc` is a fupd at `q < 1/2`
+  that mints the slot's fresh generation and its pending one-shot;
+  `live_slot_incr` (hence `iref_incr_store_au`, `iref_upgrade_store_au`)
+  tightens to `qt + qn < 1/2`; `live_slot_close_last`,
+  `iref_close_last_step`, `iref_close_last_store_au` and
+  `live_whole_share_absurd` each gain a `live_frac k (1/2)` premise.
+  New: `live_gen_bump` / `live_frac_bump` (IcacheRef),
+  `live_slot_live_gen` / `live_pool_live_gen` / `iref_live_gen_load_au`
+  (the generation-named guard read SpecIlock v4 needs).
+- `IcacheRef.ic_dep` gains a `gname` field and `ic_dep_gname` is the pure
+  side condition the two swap lemmas carry;
+  `inode_shr_gen` / `inode_ref_gen` / `inode_shr_held_gen` are the
+  generation-named forms, each an `⊣⊢` with the ∃-form so a caller moves
+  between them with one `iExists`.
+- `IcacheEscrow`: `ic_parked` binds `∃ g` over its payload AND a
+  `live_gen k (1/2) g`; `ic_dep_res` splits into `ic_dep_own` (the
+  depositor's part, generation-NAMED so `live_gen_agree` can pin the
+  arm's half to it) and `ic_dep_half`, so **`ic_out`'s text does not
+  move**; `ic_payload` gains the generation parameter and `ic_loaded`
+  does not move at all — the "~23 `ic_loaded` sites" line stayed retired.
+  `ic_swap_checkout` / `ic_swap_park` take `ic_dep_gname d = Some g` and
+  trade in `ic_dep_own`.  `ic_open_auth_ref`'s REF-1 refutation of
+  OUT/`DepShr` is back to `qt + (1/2 - qt) + 1/2 + s > 1`.
+- `SpecIlock` v4 takes the share generation-named
+  (`inode_shr_gen k s dev inum g`) and returns
+  `ic_deposit cn k (DepShr s dev inum g)`; `SpecIunlock` /
+  `SpecIunlockput` thread the same `g`.  Five consumers (fileread,
+  filestat, namex, ireclaim, iunlockput) needed ONE line each —
+  `iEval (rewrite inode_shr_gen_intro) in "Hshr"; iDestruct … as (gsh)` —
+  plus the argument.
+
+**The one place the build is smaller than the ruling, and it is forced
+by the instruction stream.**  §17.3 says parked/mid/held all gain the
+½.  MID and HELD do NOT: MID is sealed at iget's +0x72, four
+instructions BEFORE the slot enters `M` at +0x78, so no unit has been
+split yet and there is no ½ to put in it; HELD is iput's own window and
+`ic_open_auth_ref` hands the parked ½ out with the payload.  Both
+threads carry the ½ in hand across their window; the ledger balances at
+every instant, and no opener's refutation of either arm uses liveness
+(both die to a FULL `i_inum` cell).  Full analysis in §17.5.
+
+**Not landed, and why: §17.3 (B) is refuted by §16.4's CLAIM BOX.**
+(B) parks the pending one-shot with `ipool_shape`'s ALLOCATED disjunct
+because "ilock's fill MUST take the allocated branch".  `ProofIlock`'s
+`il_load` splits the pool shape THREE ways, and the third — a MARKER
+over a NONZERO type, ialloc's claim, withdrawn through
+`InodeRegion.ireg_withdraw` — COMPLETES the fill with no pending token
+in sight.  Parking the pending on both disjuncts is what (B) refuted
+from the other side (`ProofIput.v:1981` re-parks the marker inside a
+generation whose shot is already out).  The two constraints are jointly
+unsatisfiable for a per-generation one-shot, and the dead escapes are
+enumerated in §17.5 along with three candidate repairs — (a) TYPE THE
+MARKER in `InodeRegion` is the only one faithful to what is true.
+
+So `ic_payload`'s witness conjunct, `SpecIlock`'s additive post,
+`FileInv.inode_pay`'s witness and `SpecFilewrite` are all NOT in.  The
+generation parameter on `ic_payload` is their landing site: the witness
+is a one-line addition there plus one line in `SpecIlock`'s post.
+
+**Gate.**  Mirror `full.sh` `EXIT=0`, **1032 `.vo`** (unchanged), zero
+`Error`.  `Print Assumptions` on all eight cones (Ilock, Iget, Iput,
+Iunlock, Fileread, Namex, Fileclose, Kexit): each exactly the 5 platform
+axioms + `functional_extensionality_dep`, with Fileread's known
+`Consoleread.wp_consoleread_sconf` — every set unchanged.
+`tools/lemma_diff.py --ref HEAD`: one GONE, `ProofIget.ig_quarter_le`,
+replaced by `ig_quarter_lt` because §17.3 (A2) tightens the first
+reference's budget from `≤ 1/2` to `< 1/2`.  Nothing admitted, no new
+assumption.
+
+**sys_open's obligations for S6, as they stand.**  Unchanged from
+§17.2's list (S3b (a)–(c)) and still owed, but they cannot be FROZEN
+until (B) is re-ruled, because their resource form is exactly the
+witness's: on the `O_CREATE` path the type is `T_FILE` by construction
+(`ialloc_fresh`); on the open-existing path a `T_DIR` inode forces
+`O_RDONLY`, i.e. `fc_wbool C = false`; and the fd's payload must record
+the generation its share belongs to so filewrite's `ity_shot_agree`
+fires.  Under repair (a) the first two are unchanged and the third
+becomes "record the marker's type alongside".
+
 ## The stage ladder
 
 - **S1** (agent): the DECODE stage — 13 Code files (the 12 targets +
@@ -374,6 +461,16 @@ both sides after the scp and re-verified after the gate.
   pieces 2+3 STOPPED-AND-REPORTED (design/fs-icache.md §17.3 has both
   findings and both repairs, each checked against the code).  filewrite
   is still blocked and still unspecified.
+- **S3d** (agent) **— PARTIAL**: §17' piece (A) — the restated ledger and
+  the arm-resident ½, plus `ic_dep`'s generation field, `ic_payload`'s
+  generation parameter and SpecIlock/SpecIunlock v4 — LANDED and
+  full-gated (1032 `.vo`, eight cones unchanged).  Piece (B), the
+  one-shot's parking, STOPPED-AND-REPORTED: §16.4's claim box makes
+  ilock's fill complete on the MARKER branch, so the pending cannot live
+  on the allocated disjunct alone, and iput's in-generation re-park
+  forbids it on the marker disjunct — design/fs-icache.md §17.5 has the
+  counterexample, the dead escapes and three candidate repairs.
+  filewrite is still blocked and still unspecified.
 - **S3b** (agent) **— PARTIAL**: filestat PROVEN AND LINKED (file.c 6/7);
   §17's fd-type witness STOPPED-AND-REPORTED as unimplementable in the ruled
   shape — design/fs-icache.md §17.1 has the finding and the repair (§17′) to

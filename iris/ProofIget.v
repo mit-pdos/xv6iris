@@ -259,13 +259,10 @@ Qed.
    now asks for in place of the bare [valid (qt + qn)] (design 14.6 -- the
    pool's arm is an exact complement, so its remainder must be POSITIVE). *)
 Lemma ig_frac_lt1 (qt qr : Qp) :
-  (1/2)%Qp = (qt + qr)%Qp -> (qt + qr/2 < 1)%Qp.
+  (1/2)%Qp = (qt + qr)%Qp -> (qt + qr/2 < 1/2)%Qp.
 Proof.
-  intro Hs. apply Qp.lt_sum. exists (qr/2 + 1/2)%Qp.
-  rewrite Qp.add_assoc.
-  assert (Hstep : ((qt + qr/2) + qr/2)%Qp = (1/2)%Qp).
-  { rewrite -Qp.add_assoc (Qp.div_2 qr). by rewrite Hs. }
-  rewrite Hstep. by rewrite Qp.half_half.
+  intro Hs. apply Qp.lt_sum. exists (qr/2)%Qp.
+  rewrite -Qp.add_assoc (Qp.div_2 qr). exact Hs.
 Qed.
 
 Lemma ig_frac_rest (qt qr : Qp) :
@@ -275,8 +272,11 @@ Proof.
   rewrite -Qp.add_assoc (Qp.div_2 qr). exact Hs.
 Qed.
 
-Lemma ig_quarter_le : ((1/2/2)%Qp ≤ 1/2)%Qp.
-Proof. compute_done. Qed.
+(* the restated ledger's budget (design 17.3 (A2)): a first reference's
+   fraction is STRICTLY below 1/2, which is [islot_rest_at]'s identity
+   budget verbatim -- the two ledgers are the same shape now. *)
+Lemma ig_quarter_lt : ((1/2/2)%Qp < 1/2)%Qp.
+Proof. apply Qp.lt_sum. exists (1/2/2)%Qp. compute_done. Qed.
 
 Lemma ig_quarter_rest : (1/2 - 1/2/2)%Qp = Some (1/2/2)%Qp.
 Proof. apply Qp.sub_Some. compute_done. Qed.
@@ -1201,7 +1201,8 @@ Section ProofIget.
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x78)) Ra5 Rs3
                       (mword_of_int 8 : mword 12) V1 (trap_res b + (K - 6))%nat
                       (itable_half (<[e := ((1/2/2)%Qp, 1%positive)]> M) ∗
-                       iref_tok e (1/2/2)%Qp)%I
+                       iref_tok e (1/2/2)%Qp ∗
+                       ∃ g : gname, live_gen e (1/2) g ∗ ity_pending g)%I
                       (⊤ ∖ ↑minstretN ∖ ↑icacheN) false ltac:(solve_ndisj)
                       with "Hcg Hpc Hi78 [Hhalf] [-]").
             { rewrite Hpa78 Hsv78.
@@ -1215,8 +1216,16 @@ Section ProofIget.
               iDestruct (live_pool_acc_upd M e He with "Hlpool") as "[Hlslot Hlback]".
               iModIntro. iExists (iref_word M e). iFrame "Hcell". iIntros "Hcell".
               iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
-              iMod (iref_alloc_step M e (1/2/2)%Qp HMe ig_quarter_le
-                      with "Hauth Hlslot") as "(Hauth & Hlslot & Htok2)".
+              (* THE GENERATION IS BORN HERE (design 17.2 piece 2 / 17.3 (B)):
+                 the recycle is the only moment the slot's whole unit is in
+                 one place, so the bump and the pending one-shot happen with
+                 the [ref] store.  The 1/2 and the token then travel by hand
+                 to the reclose at +0x7c -- the MID arm cannot hold them,
+                 because at +0x72 the slot was not yet in [M] and no unit had
+                 been split. *)
+              iMod (iref_alloc_step M e (1/2/2)%Qp HMe ig_quarter_lt
+                      with "Hauth Hlslot")
+                as (gnew) "(Hauth & Hlslot & Htok2 & Hlvh & Hpend)".
               iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
               iMod ("Hclose2" with "[Ha Hcell Hcback Hlslot Hlback]") as "_".
               { iNext. iExists (<[e := ((1/2/2)%Qp, 1%positive)]> M). iFrame "Ha".
@@ -1236,8 +1245,9 @@ Section ProofIget.
                           with "[%] Hlslot").
                 intros i Hi. rewrite lookup_insert_ne;
                   [reflexivity | by apply not_eq_sym]. }
-              iModIntro. iFrame. }
-            iApply wp_next_off_intro. iIntros "Hcg Hpc [Hhalf Htok2]".
+              iModIntro. iFrame "Hhalf Htok2". iExists gnew. iFrame. }
+            iApply wp_next_off_intro.
+            iIntros "Hcg Hpc (Hhalf & Htok2 & (%gnew & Hlvh & Hpend))".
             assert (Hpp7c : add_vec_int (mword_of_int (KernelSyms.iget + 0x78) : mword 64) 4
                             = mword_of_int (KernelSyms.iget + 0x7c)) by pcw.
             iEval (rewrite Hpp7c) in "Hpc".
@@ -1257,7 +1267,7 @@ Section ProofIget.
                        i_inum (ientry e) ↦₄{DfracOwn (1/2)} inum ∗
                        ic_id cn e (1/2) true dev inum)%I
                       (⊤ ∖ ↑minstretN ∖ ↑icEscN) false ltac:(solve_ndisj)
-                      with "Hcg Hpc Hi7c [Hmt Hgid2 Hd2] [-]").
+                      with "Hcg Hpc Hi7c [Hmt Hgid2 Hd2 Hlvh Hpend] [-]").
             { rewrite Hpa7c Hsv7c.
               iInv "Hesc" as ">Hbody" "Hclose2".
               iDestruct (ic_open_mid cn γfs γi cov logstart e with "Hmt Hbody")
@@ -1265,8 +1275,9 @@ Section ProofIget.
               iDestruct "Harm" as (dev' inum' wv) "(Hd1 & Hincell & Hvld & Hpay & Hgid1)".
               iDestruct (ic_id_agree with "Hgid2 Hgid1") as %(_ & <- & <-).
               iModIntro. iExists wv. iFrame "Hvld". iIntros "Hvld".
-              iDestruct (ic_close_mid_to_parked cn γfs γi cov logstart e dev inum
-                           with "Hmt Hgid1 Hd1 Hincell Hvld Hpay") as "[Hbody Hinhalf]".
+              iDestruct (ic_close_mid_to_parked cn γfs γi cov logstart e dev inum gnew
+                           with "Hmt Hgid1 Hd1 Hincell Hvld Hpay Hlvh")
+                as "[Hbody Hinhalf]".
               iMod ("Hclose2" with "[Hbody]") as "_"; [by iNext |].
               iModIntro. iFrame "Hd2 Hinhalf Hgid2". }
             iApply wp_next_off_intro. iIntros "Hcg Hpc (Hd2 & Hinhalf & Hgid2)".
@@ -1693,7 +1704,7 @@ Section ProofIget.
         assert (Hpa58 : add_vec (rget L4 Rs1) (sign_extend' 64 (mword_of_int 8 : mword 12))
                         = i_ref (ientry j)).
         { rewrite (rget_ne L4 Rs1 ltac:(nz)) HL4s1. reflexivity. }
-        assert (Hqv : (qj + qj'/2 < 1)%Qp) by (apply ig_frac_lt1; by apply Qp.sub_Some).
+        assert (Hqv : (qj + qj'/2 < 1/2)%Qp) by (apply ig_frac_lt1; by apply Qp.sub_Some).
         iApply (wp_sw_au_s_sconf true (mword_of_int (KernelSyms.iget + 0x58)) Ra5 Rs1
                   (mword_of_int 8 : mword 12) L4 (trap_res b + (K - 6))%nat
                   (itable_half (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M) ∗

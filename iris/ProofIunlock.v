@@ -119,7 +119,7 @@ Section ProofIunlockMain.
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ (m !!! Regidx Rs2 : mword 64))%I.
 
   Definition iul_cont `{CID0 : CpuId} 
-      (cn : ic_names) (k : nat) (s : Qp) (dev inum : mword 32)
+      (cn : ic_names) (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (b : bool) : iProp Σ :=
@@ -139,12 +139,12 @@ Section ProofIunlockMain.
       (cn : ic_names)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z)
-      (k : nat) (s : Qp) (dev inum : mword 32)
+      (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (b : bool)
-    : wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s dev inum
+    : wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev inum
                             dn' bm' pidv dq m K eb p C b.
   Proof.
     cbv beta delta [wp_iunlock_sconf_body].
@@ -158,7 +158,7 @@ Section ProofIunlockMain.
     iEval (rewrite Hipe) in "Hidev".
     iEval (rewrite Hipe) in "Hinumc".
     iEval (rewrite Hipe) in "Hvalid".
-    iAssert (iul_cont (CID0 := CID)  cn k s dev inum pidv dq m K eb p C b)%I
+    iAssert (iul_cont (CID0 := CID)  cn k s g dev inum pidv dq m K eb p C b)%I
       with "[Hcont]" as "Hcont"; [rewrite /iul_cont; iExact "Hcont" |].
     iPoseProof (iui2_00 with "Htext") as "Hi00".
     iPoseProof (iui2_02 with "Htext") as "Hi02".
@@ -512,18 +512,21 @@ Section ProofIunlockMain.
        checked-out bundle back and takes the CHECKOUT TOKEN -- which is all
        the sleeplock protects now -- and the caller's reference out. *)
     iApply fupd_wp.
-    iAssert (∃ (dn0 : dinode) (bm0 : blkmap),
-               ic_loaded gfs gi cov logstart k inum dn0 bm0)%I
+    iAssert (ic_payload gfs gi cov logstart k inum g true)%I
       with "[Hlk]" as "Hpay"; [iExists dn', bm'; iExact "Hlk" |].
     iInv "Hesc" as ">Hbody" "Hclose".
-    iMod (ic_swap_park cn gfs gi cov logstart k (DepShr s dev inum) true dev inum
-                 with "Hbody Hdep Hidev Hinumc Hvalid Hpay")
+    iMod (ic_swap_park cn gfs gi cov logstart k (DepShr s dev inum g) g
+                 true dev inum eq_refl with "Hbody Hdep Hidev Hinumc Hvalid Hpay")
       as "(Hbody & Htok & Hrefout)".
     iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
     iModIntro.
     (* the descriptor pins the fraction and the identity: the share comes back
        at exactly [s], with no existential (§14.8) *)
     iDestruct "Hrefout" as "[_ Href]".
+    (* the descriptor's share comes back generation-named; the contract
+       returns it in the arity-preserving form (design §17.3 (A)) *)
+    iAssert (inode_shr k s dev inum) with "[Href]" as "Href".
+    { rewrite inode_shr_gen_intro. iExists g. iExact "Href". }
     iApply (RS.wp_releasesleep_sconf gs gil gisl "inode"%string
               (ic_tok cn k) R9 pidv p (K - 4)%nat eb C b
               ltac:(lia)

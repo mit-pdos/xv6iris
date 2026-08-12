@@ -108,7 +108,7 @@ Section ProofIunlockputMain.
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (used : gset Z)
-      (k : nat) (qi s : Qp) (inum : mword 32)
+      (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -116,7 +116,7 @@ Section ProofIunlockputMain.
       (b : bool)
     : wp_iunlockput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                gil gisl cov logstart bmapstart inodestart nib
-                               size dev used k qi s inum dn' bm' n
+                               size dev used k qi s gy inum dn' bm' n
                                pidv dq dqb dqs m K eb C b.
   Proof.
     cbv beta delta [wp_iunlockput_sconf_body].
@@ -275,7 +275,7 @@ Section ProofIunlockputMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (IU.wp_iunlock_sconf gs gfs gi cn gil gisl cov logstart k s dev inum
+    iApply (IU.wp_iunlock_sconf gs gfs gi cn gil gisl cov logstart k s gy dev inum
               dn' bm' pidv dq R4 (K - 4)%nat eb pj C b
               ltac:(unfold K_iunlock; lia) Hk ltac:(rewrite HR4a0; exact Hipe)
               with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk Hstok Hpid Hppid

@@ -1685,12 +1685,16 @@ Section ProofFileread.
              iDestruct (proc_priv_pid γf pj pidv V with "Hpriv") as "[Hppid Hpivbk]".
              iDestruct (cpu_own_transport CID CID72 0%nat eb pj C b ltac:(wp_next_chain)
                           with "Hcnt") as "Hcnt".
+             (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)):
+                the binder is the one [inode_shr] already carried. *)
+             iEval (rewrite inode_shr_gen_intro) in "Href".
+             iDestruct "Href" as (gsh) "Href".
              iApply (Ilock.wp_ilock_sconf γs j γlp (frn_uart fn) (frn_disk fn)
                        (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
                        (frn_bio fn) (frn_fs fn) (frn_ireg fn) (frn_ic fn)
                        (frn_ilk fn) (frn_islk fn)
                        (frn_cov fn) (frn_logstart fn) (frn_inodestart fn)
-                       (frn_nib fn) (frn_ik fn) (frn_s fn)
+                       (frn_nib fn) (frn_ik fn) (frn_s fn) gsh
                        (frn_dev fn) (frn_inum fn)
                        pidv (DfracOwn (1/4)) (frn_dqs fn)
                        I2 (K - 6)%nat eb C b
@@ -2063,7 +2067,7 @@ Section ProofFileread.
                 iApply (Iunlock.wp_iunlock_sconf γs (frn_fs fn) (frn_ireg fn)
                           (frn_ic fn) (frn_ilk fn) (frn_islk fn)
                           (frn_cov fn) (frn_logstart fn)
-                          (frn_ik fn) (frn_s fn) (frn_dev fn) (frn_inum fn)
+                          (frn_ik fn) (frn_s fn) gsh (frn_dev fn) (frn_inum fn)
                           dnl bml
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj C b
                           (fr_av_iunlock K HK) Hik
@@ -2326,7 +2330,7 @@ Section ProofFileread.
                 iApply (Iunlock.wp_iunlock_sconf γs (frn_fs fn) (frn_ireg fn)
                           (frn_ic fn) (frn_ilk fn) (frn_islk fn)
                           (frn_cov fn) (frn_logstart fn)
-                          (frn_ik fn) (frn_s fn) (frn_dev fn) (frn_inum fn)
+                          (frn_ik fn) (frn_s fn) gsh (frn_dev fn) (frn_inum fn)
                           dnl bml
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj C b
                           (fr_av_iunlock K HK) Hik

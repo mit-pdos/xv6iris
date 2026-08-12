@@ -120,7 +120,7 @@ Definition wp_iunlockput_sconf_body
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (used : gset Z)
-    (k : nat) (qi s : Qp) (inum : mword 32)
+    (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (n : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -166,7 +166,7 @@ Definition wp_iunlockput_sconf_body
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked gisl -∗
   sl_pid (i_lock ip) ↦₄ pidv -∗
-  ic_deposit cn k (DepShr s dev inum) -∗
+  ic_deposit cn k (DepShr s dev inum gy) -∗
   i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
@@ -219,7 +219,7 @@ Module Type IUNLOCKPUT.
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (used : gset Z)
-      (k : nat) (qi s : Qp) (inum : mword 32)
+      (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -227,6 +227,6 @@ Module Type IUNLOCKPUT.
       (b : bool),
       wp_iunlockput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                gil gisl cov logstart bmapstart inodestart nib
-                               size dev used k qi s inum dn' bm' n
+                               size dev used k qi s gy inum dn' bm' n
                                pidv dq dqb dqs m K eb C b.
 End IUNLOCKPUT.

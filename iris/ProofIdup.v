@@ -74,13 +74,10 @@ Local Open Scope Z_scope.
    If a third caller appears they belong in [IcacheInv] beside
    [iref_upgrade_store_au]. *)
 Lemma id_frac_lt1 (qt qr : Qp) :
-  (1/2)%Qp = (qt + qr)%Qp -> (qt + qr/2 < 1)%Qp.
+  (1/2)%Qp = (qt + qr)%Qp -> (qt + qr/2 < 1/2)%Qp.
 Proof.
-  intro Hs. apply Qp.lt_sum. exists (qr/2 + 1/2)%Qp.
-  rewrite Qp.add_assoc.
-  assert (Hstep : ((qt + qr/2) + qr/2)%Qp = (1/2)%Qp).
-  { rewrite -Qp.add_assoc (Qp.div_2 qr). by rewrite Hs. }
-  rewrite Hstep. by rewrite Qp.half_half.
+  intro Hs. apply Qp.lt_sum. exists (qr/2)%Qp.
+  rewrite -Qp.add_assoc (Qp.div_2 qr). exact Hs.
 Qed.
 
 Lemma id_frac_rest (qt qr : Qp) :
@@ -345,7 +342,7 @@ Section ProofIdup.
     iDestruct (inode_ident_agree with "Hrest Hrident") as %[Hcd Hcn].
     subst cdev cinum.
     assert (Hhalfsum : (1/2)%Qp = (qt + qr)%Qp) by (by apply Qp.sub_Some).
-    assert (Hqv : (qt + qr/2 < 1)%Qp) by (by apply id_frac_lt1).
+    assert (Hqv : (qt + qr/2 < 1/2)%Qp) by (by apply id_frac_lt1).
     (* the iref-slot conservation law: the caller's unit plus the ones the
        table already holds for this entry are within the fixed supply, so the
        count is safely below what an int holds -- before AND after. *)

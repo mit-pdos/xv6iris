@@ -1563,8 +1563,11 @@ Section IreclaimOrphan.
     iDestruct (wp_next_shift (CIDa := CID14) (CIDb := CID17) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iDestruct (iu_slots_split bn 2 1 with "Hsl") as "[Hsl Hsl1]".
+    (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)) *)
+    iEval (rewrite inode_shr_gen_intro) in "Hshr".
+    iDestruct "Hshr" as (gsh) "Hshr".
     iApply (IL.wp_ilock_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn gil gisl
-              cov logstart inodestart nib kslot (q/2)%Qp dev inum
+              cov logstart inodestart nib kslot (q/2)%Qp gsh dev inum
               pidv dq dqs OC (K - 8)%nat true C b
               ltac:(unfold K_ilock; lia) Hkslot Hgeom Hst Hibcov Hnibin Hj Hgl
               HOCa0 eq_refl
@@ -1667,7 +1670,7 @@ Section IreclaimOrphan.
     iDestruct (wp_next_shift (CIDa := CID17) (CIDb := CID20) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IU.wp_iunlock_sconf γs γfs γi cn gil gisl cov logstart kslot
-              (q/2)%Qp dev inum dnl bml pidv dq OE (K - 8)%nat true
+              (q/2)%Qp gsh dev inum dnl bml pidv dq OE (K - 8)%nat true
               (proc_addr j) C b
               ltac:(unfold K_iunlock; lia) Hkslot HOEa0
               with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hescrow Hslk Hslkd Hslpid
