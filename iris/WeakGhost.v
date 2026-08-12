@@ -203,6 +203,23 @@ Proof.
   - apply Hnew. exists t'. split_and!; [lia|done|exact Hw].
 Qed.
 
+(** THE BACKWARD READING of [latest_val]'s second conjunct: EVERY message
+    that writes byte [a] sits at or below the byte's latest-write timestamp.
+    This is what turns a bound on the ELEMENT's timestamp into a bound on the
+    whole write history of the byte, and it is the pure heart of the
+    lazy-upgrade arm (§3b'' below): a floor that covers [t] covers every
+    message that ever wrote [a]. *)
+Lemma latest_val_plain_le img log a t v p m :
+  latest_val img log a t v -> log !! p = Some m -> is_Some (msg_byte m a) ->
+  (S p <= t)%nat.
+Proof.
+  intros [_ Hn] Hp [b Hb].
+  destruct (decide (S p <= t)%nat) as [?|Hgt]; [done|exfalso].
+  apply Hn. exists (S p). apply lookup_lt_Some in Hp as Hlen.
+  split_and!; [lia|lia|]. exists m. rewrite Nat.sub_succ Nat.sub_0_r.
+  split; [exact Hp|by exists b].
+Qed.
+
 (** ... and the converse reading of that premise, for the arm that must
     IDENTIFY the offending message: a write in the new window comes from one
     of the appended messages. *)
@@ -378,6 +395,59 @@ Proof.
   rewrite lookup_app_l //. by eapply lookup_lt_Some.
 Qed.
 
+(** *** THE PUBLICATION FLOOR, PURELY (φ-upgrade §1.5, the framing pattern)
+
+    [wpub_upto log tid n] — "agent [tid] has published EVERY position below
+    [n]".  ONE release message of [tid] at index [q] with [n ≤ S q] does it,
+    because [wpublished log tid p] only asks for a later release of the same
+    agent; so this is [wpublished] uniformly over a whole prefix.
+
+    It is exactly what a RELEASE STORE establishes about its own backlog at
+    the moment it appends: the message's position IS the log's fresh top, so
+    it covers every earlier position without naming any of them.  That is why
+    a migration handoff can mint publication coverage of the parking hart's
+    WHOLE view in one step ([WeakVProp.pub_covers_view]) — the ghost token a
+    yield returns. *)
+Definition wpub_upto (log : list wmsg) (tid : option agent) (n : nat) : Prop :=
+  exists (q : nat) (mq : wmsg),
+    (n <= S q)%nat /\ log !! q = Some mq /\ wm_tid mq = tid /\ wm_ak mq = WCrel.
+
+Lemma wpub_upto_published log tid n p :
+  wpub_upto log tid n -> (p < n)%nat -> wpublished log tid p.
+Proof.
+  intros (q & mq & Hn & Hq & Ht & Hk) Hp. exists q, mq. split_and!; try done. lia.
+Qed.
+
+Lemma wpub_upto_mono log tid n n' :
+  (n' <= n)%nat -> wpub_upto log tid n -> wpub_upto log tid n'.
+Proof.
+  intros Hle (q & mq & Hn & Hq & Ht & Hk). exists q, mq. split_and!; try done. lia.
+Qed.
+
+(** The token is a fact about a PREFIX, and it survives to the whole log —
+    which is what makes the [wlog_lb]-carried spelling of the token sound
+    across arbitrarily many later steps of any hart. *)
+Lemma wpub_upto_prefix l log tid n :
+  l `prefix_of` log -> wpub_upto l tid n -> wpub_upto log tid n.
+Proof.
+  intros [ms ->] (q & mq & Hn & Hq & Ht & Hk). exists q, mq. split_and!; try done.
+  rewrite lookup_app_l //. by eapply lookup_lt_Some.
+Qed.
+
+Lemma wpub_upto_app log ms tid n :
+  wpub_upto log tid n -> wpub_upto (log ++ ms) tid n.
+Proof. apply wpub_upto_prefix. by apply prefix_app_r. Qed.
+
+(** THE MINT, purely: a release-class message appended at the top publishes
+    every position of the log it was appended to. *)
+Lemma wpub_upto_rel log (mrel : wmsg) tid :
+  wm_tid mrel = tid -> wm_ak mrel = WCrel ->
+  wpub_upto (log ++ [mrel]) tid (S (length log)).
+Proof.
+  intros Ht Hk. exists (length log), mrel. split_and!; try done.
+  rewrite lookup_app_r; [|lia]. by rewrite Nat.sub_diag.
+Qed.
+
 Definition wcds_clean (log : list wmsg) (a : Z) : Prop :=
   forall p m, wplain_at log a p m ->
     wm_tid m = None \/ wpublished log (wm_tid m) p.
@@ -522,6 +592,29 @@ Proof.
   destruct (Hdi p m Hp) as [?|[?|Hc]]; [by left|by right|].
   right. rewrite Hc. exists q, mq. split_and!; try done.
   destruct Hp as (Hlk & _). apply lookup_lt_Some in Hlk. lia.
+Qed.
+
+(** THE LAZY UPGRADE, purely (φ-upgrade §1.5).  The flip above needs the
+    releasing hart's message to be the log's LAST, which is what a release
+    SITE has; a hart that PARKED and resumed elsewhere has no such thing —
+    arbitrarily many messages of arbitrarily many harts sit between its
+    migration handoff and the byte's first use on the new CPU.
+
+    What survives that gap is a FLOOR: hart [c] published every position
+    below [n], and the byte's whole write history is at or below its own
+    latest-write timestamp [t] ([latest_val_plain_le]).  So [t ≤ n] flips it,
+    no matter how long ago and no matter what has happened since.  This is
+    the pure content of the acceptance arm. *)
+Lemma wcds_dirty_flip_pub img log a (c : CPU) (t n : nat) (v : bv 8) :
+  latest_val img log a t v -> (t <= n)%nat ->
+  wpub_upto log (Some (fin_to_nat c)) n ->
+  wcds_dirty log a c -> wcds_clean log a.
+Proof.
+  intros Hlat Htn Hpub Hdi p m Hp.
+  destruct (Hdi p m Hp) as [Hnone|[Hp'|Hc]]; [by left|by right|].
+  right. rewrite Hc. apply (wpub_upto_published log _ n p Hpub).
+  destruct Hp as (Hlk & Hs & _).
+  pose proof (latest_val_plain_le img log a t v p m Hlat Hlk Hs). lia.
 Qed.
 
 (** The map-level tie, the twin of [wlat_agree]. *)
@@ -847,6 +940,43 @@ Proof. intros H c n. by apply nv_byte_unwritten. Qed.
 Lemma nv_byte_of_free log c a n : nv_free log a -> nv_byte log c a n.
 Proof. intros H. apply H. Qed.
 
+(** THE φ PAYMENT OF THE LAZY-UPGRADE ARM (φ-upgrade §1.5).  A byte that is
+    still [WDirty c] in the ghost map but whose whole write history [c] has
+    PUBLISHED carries no obligation to ANY hart at ANY floor — [no_violation]
+    only ever constrains UNPUBLISHED owned stores, and there are none here.
+
+    So the arm does not have to flip the state element first in order to pay:
+    the publication evidence pays directly, which is what lets a leaf state
+    its [nv_ok] obligation before its ghost section runs.  (After the flip it
+    is the ordinary [nv_free_clean], of course — the two agree.) *)
+Lemma nv_free_published img log a (c : CPU) (t n : nat) (v : bv 8) :
+  latest_val img log a t v -> (t <= n)%nat ->
+  wpub_upto log (Some (fin_to_nat c)) n ->
+  wcds_dirty log a c -> nv_free log a.
+Proof.
+  intros Hlat Htn Hpub Hdi. apply nv_free_clean.
+  exact (wcds_dirty_flip_pub img log a c t n v Hlat Htn Hpub Hdi).
+Qed.
+
+Lemma nv_byte_published img log (c' : CPU) a (m : nat) (c : CPU) (t n : nat)
+    (v : bv 8) :
+  latest_val img log a t v -> (t <= n)%nat ->
+  wpub_upto log (Some (fin_to_nat c)) n ->
+  wcds_dirty log a c -> nv_byte log c' a m.
+Proof.
+  intros Hlat Htn Hpub Hdi.
+  exact (nv_free_published img log a c t n v Hlat Htn Hpub Hdi c' m).
+Qed.
+
+Lemma nv_ok_published img log (c' : CPU) a (c : CPU) (t n : nat) (v : bv 8) :
+  latest_val img log a t v -> (t <= n)%nat ->
+  wpub_upto log (Some (fin_to_nat c)) n ->
+  wcds_dirty log a c -> nv_ok log c' a.
+Proof.
+  intros Hlat Htn Hpub Hdi. apply nv_ok_of_free.
+  exact (nv_free_published img log a c t n v Hlat Htn Hpub Hdi).
+Qed.
+
 (* ====================================================================== *)
 (** ** 3. The resources *)
 
@@ -880,6 +1010,68 @@ Section resources.
   Proof.
     rewrite /wlog_auth. iIntros "Ha". iApply (own_update with "Ha").
     apply mono_list_update. by apply prefix_app_r.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (** *** 3a'. THE PUBLICATION-FLOOR TOKEN (φ-upgrade §1.5)
+
+      [pub_floor c n] — "hart [c] has published everything at or below [n]",
+      as a PERSISTENT resource.
+
+      SPELLING, and why it is not the [WeakViewMono] [w_pub] mono_nat.  The
+      semantics wanted is a lower bound on the publication watermark, and
+      [WeakViewMono.ws_scal_lb]'s sixth component is exactly that shape — but
+      (a) its AUTHORITY is not threaded anywhere (the [weak_view_name] field
+      was deleted when [WeakCtx]'s context-indexed discipline landed, see §1's
+      class comment), and (b) even with the authority back, the arm needs the
+      CONVERSE of [WeakViolation.wpublished_w_pub] — "[w_pub ≥ S p] implies
+      [p] is published" — which is not an available machine invariant and
+      would have to be added to the state interpretation.  The LOG is already
+      a mono-list with a persistent lower bound, and publication is a LOG
+      predicate ([wpublished]), so the token is spelled there: a snapshot of a
+      prefix in which [c] has already released.  Nothing new is wired, and the
+      arm reads the fact it actually needs off it directly.  The [w_pub]
+      reading is still recoverable — [WeakViolation.wpub_upto_w_pub] is the
+      one-line bridge — it is simply not the load-bearing spelling. *)
+  Definition pub_floor (c : CPU) (n : nat) : iProp Σ :=
+    (∃ l : list wmsg, wlog_lb l ∗ ⌜wpub_upto l (Some (fin_to_nat c)) n⌝)%I.
+
+  Global Instance pub_floor_persistent c n : Persistent (pub_floor c n).
+  Proof. rewrite /pub_floor. apply _. Qed.
+  Global Instance pub_floor_timeless c n : Timeless (pub_floor c n).
+  Proof. rewrite /pub_floor /wlog_lb. apply _. Qed.
+
+  (** AGREEMENT: what the token says about the CURRENT log.  One
+      [wlog_valid] plus the prefix-monotonicity of [wpub_upto]. *)
+  Lemma pub_floor_agree log c n :
+    wlog_auth log -∗ pub_floor c n -∗ ⌜wpub_upto log (Some (fin_to_nat c)) n⌝.
+  Proof.
+    iIntros "Ha [%l [Hlb %Hp]]".
+    iDestruct (wlog_valid with "Ha Hlb") as %Hpre.
+    iPureIntro. exact (wpub_upto_prefix l log _ n Hpre Hp).
+  Qed.
+
+  (** MINTING, at the RELEASE/HANDOFF STORE's own ghost section: the message
+      the step appended is [c]'s and release-class, and it sits at the log's
+      fresh top — so it covers EVERY prior position at once.  This is the only
+      site that mints, and it needs nothing but the log authority the store
+      leaf already updates. *)
+  Lemma pub_floor_mint (log : list wmsg) (mrel : wmsg) (c : CPU) :
+    wm_tid mrel = Some (fin_to_nat c) -> wm_ak mrel = WCrel ->
+    wlog_auth (log ++ [mrel]) -∗
+    wlog_auth (log ++ [mrel]) ∗ pub_floor c (S (length log)).
+  Proof.
+    intros Ht Hk. iIntros "Ha".
+    iDestruct (wlog_snapshot with "Ha") as "[$ #Hlb]".
+    iExists (log ++ [mrel])%list. iFrame "Hlb". iPureIntro.
+    by apply wpub_upto_rel.
+  Qed.
+
+  (** A floor may always be LOWERED. *)
+  Lemma pub_floor_le c n n' : (n' <= n)%nat -> pub_floor c n -∗ pub_floor c n'.
+  Proof.
+    iIntros (Hle) "[%l [Hlb %Hp]]". iExists l. iFrame "Hlb". iPureIntro.
+    by eapply wpub_upto_mono.
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -1136,6 +1328,61 @@ Section resources.
     - exact Hk.
     - rewrite length_app /=. lia.
     - exact (Hagc a (WDirty c) Hlk).
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (** *** 3b''. THE LAZY UPGRADE — the D→C flip a MIGRATED thread does
+
+      [wlat_flip] is the flip at a release SITE: it needs the releasing hart's
+      [WCrel] message to be the log's last, which only that one step has.  A
+      thread that parked on hart [c] and resumed on another CPU is arbitrarily
+      many messages downstream of its own handoff, so it cannot use it.
+
+      What it uses instead is the FLOOR: [pub_floor c n] says [c] published
+      everything below [n], and the element's timestamp [t ≤ n] says the
+      byte's whole write history is inside that.  The state element is
+      retargeted [WDirty c → WClean] with no premise about the current top at
+      all — which is precisely what makes the ownership fact FRAME around the
+      yield instead of appearing in its specification.
+
+      Note what it does NOT need: the flipping hart's identity.  The evidence
+      is about [c], the author; whoever holds the element may spend it. *)
+  Lemma nv_free_of_own_pub img log (c : CPU) (a : Z) (t n : nat) (v : bv 8) :
+    (t <= n)%nat ->
+    wlog_auth log -∗ pub_floor c n -∗ wlat_interp img log -∗
+    wlat_elem a (DfracOwn 1) t v -∗ wown_st c a -∗ ⌜nv_free log a⌝.
+  Proof.
+    intros Htn. iIntros "Hlog #Hpf Hi Hel Hs".
+    iDestruct (pub_floor_agree with "Hlog Hpf") as %Hpub.
+    iDestruct (wlat_lookup_elem with "Hi Hel") as %Hlat.
+    iDestruct "Hs" as (s) "[Hsel %Hs]".
+    iDestruct (wcds_lookup with "Hi Hsel") as %Hok.
+    iPureIntro. destruct Hs as [-> | ->]; simpl in Hok.
+    - by apply nv_free_clean.
+    - exact (nv_free_published (img_z img) log a c t n v Hlat Htn Hpub Hok).
+  Qed.
+
+  Lemma wlat_flip_pub img log (c : CPU) (a : Z) (t n : nat) (v : bv 8) :
+    (t <= n)%nat ->
+    wlog_auth log -∗ pub_floor c n -∗
+    wlat_interp img log -∗ wlat_elem a (DfracOwn 1) t v -∗ wown_st c a ==∗
+    wlog_auth log ∗ wlat_interp img log ∗
+    wlat_elem a (DfracOwn 1) t v ∗ wclean a (DfracOwn 1).
+  Proof.
+    intros Htn. iIntros "Hlog #Hpf Hi Hel Hs".
+    iDestruct (pub_floor_agree with "Hlog Hpf") as %Hpub.
+    iDestruct (wlat_lookup_elem with "Hi Hel") as %Hlat.
+    iDestruct "Hs" as (s) "[Hsel %Hs]".
+    iDestruct (wcds_lookup with "Hi Hsel") as %Hok.
+    iDestruct "Hi" as (mm mc) "(Hauth & %Hag & Hc & %Hagc)".
+    rewrite /wcds_el.
+    iMod (ghost_map_update WClean with "Hc Hsel") as "[Hc Hsel]".
+    iModIntro. iFrame "Hlog Hel Hsel".
+    iExists mm, (<[a := WClean]> mc). iFrame "Hauth Hc".
+    iSplitR; [iPureIntro; exact Hag|].
+    iPureIntro. apply wcds_agree_insert; [exact Hagc|]. simpl.
+    destruct Hs as [-> | ->]; simpl in Hok; [exact Hok|].
+    exact (wcds_dirty_flip_pub (img_z img) log a c t n v Hlat Htn Hpub Hok).
   Qed.
 
   (** THE S MINT.  A byte with no owned store in the log — at boot, every

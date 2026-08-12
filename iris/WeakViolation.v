@@ -99,6 +99,21 @@ Proof.
   intros Hcov (q & mq & Hle & Hq & Ht & Hk). pose proof (Hcov q mq Hq Ht Hk). lia.
 Qed.
 
+(** THE SAME BRIDGE FOR THE PUBLICATION-FLOOR TOKEN (φ-upgrade §1.5).
+    [WeakGhost.pub_floor c n] is spelled over the LOG (a [wlog_lb] snapshot in
+    which [c] has already released) rather than as a [WeakViewMono] [w_pub]
+    lower bound — see [WeakGhost]'s §3a' for why (the [w_pub] authority is not
+    threaded, and the arm would need the CONVERSE of [wpublished_w_pub], which
+    is not a machine invariant).  This records that nothing is LOST by that
+    choice: under the same honest premise the two readings coincide, so a
+    ported spec may state the token either way. *)
+Lemma wpub_upto_w_pub (log : list wmsg) (i : agent) (ws : wstate) (n : nat) :
+  wpub_covers log i ws -> wpub_upto log (Some i) n -> (n <= w_pub ws)%nat.
+Proof.
+  intros Hcov (q & mq & Hle & Hq & Ht & Hk).
+  pose proof (Hcov q mq Hq Ht Hk). lia.
+Qed.
+
 (** The φ-export shape, at the hart index the state interpretation uses. *)
 Lemma wpublished_w_pub_cpu (log : list wmsg) (c : CPU) (ws : wstate) (p : nat) :
   wpub_covers log (fin_to_nat c) ws ->
