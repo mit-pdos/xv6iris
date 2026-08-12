@@ -108,6 +108,15 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import FdSlots.
 Require Import FileInvDefs.
+(* the classes the module type's [usertrap_res] parameter needs -- see the
+   note above [Module Type USERTRAP] at the foot of this file *)
+Require Import BioInv.
+Require Import DiskPtsto DiskInv.
+Require Import WpUart.
+Require Import FsBlocks LogInv.
+Require Import FsCrash.
+Require Import KallocInv.
+Require Import IrefSlots InodeRegion.
 Require Import ProcGeom.
 Require Import PtTree.
 Require Import TrampPt KptTree UptTree.
@@ -244,15 +253,43 @@ Definition wp_usertrap_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fi
   wp_next true pj (fun (CID' : CpuId) => usertrap_post (CID := CID') R pt ksp m) -∗
   WP (Loop : expr riscv_lang).
 
-Module Type USERTRAP.
+(* THE MODULE TYPE'S INSTANCE LIST IS THE UNION OF THE FIVE CONES', NOT THE
+   BOUNDARY'S.  [wp_usertrap_body] above needs almost none of these -- its
+   own statement is register cells, [wp_next] and the abstract [R] -- but
+   [usertrap_res] is a PARAMETER, so its type has to be the one its
+   instantiation has, and [UsertrapRes.ut_res] is the union of syscall's /
+   devintr's / vmfault's / printk-general's / kexit's environments.  It is
+   SpecKexit.v's list verbatim (kexit is the deepest of the five, and the
+   other four add no class of their own).  A consumer that only wants the
+   boundary pays nothing for them: they are Sigma constraints, discharged by
+   whatever Sigma the whole-system composition is built over. *)
+(* SPLIT OUT so the definition can be checked against it WHERE IT IS WRITTEN.
+   [UsertrapRes.v] defines the bundle long before ProofUsertrap can seal
+   USERTRAP (its [wp_usertrap] is the whole proof), and a parameter's instance
+   list that does not admit its instantiation is a thing to discover there
+   rather than at the seal.  [UsertrapRes.UtResFits] is a
+   [<: USERTRAP_RES], which makes that mechanical. *)
+Module Type USERTRAP_RES.
   (* the kernel-internal resources usertrap consumes, for the process whose
      user page table is [pt] and whose kernel stack top is [ksp]: defined
-     concretely by the (future) proof; threaded opaquely by consumers. *)
+     concretely by the proof (as [UsertrapRes.ut_res SY.syscall_env], the
+     functor's syscall environment being the one piece that is itself still
+     abstract); threaded opaquely by consumers. *)
   Parameter usertrap_res :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId},
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId},
       uptd -> mword 64 -> iProp Σ.
+End USERTRAP_RES.
+
+Module Type USERTRAP.
+  Include USERTRAP_RES.
   Parameter wp_usertrap :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId}
       (pt : uptd) (j : nat)
       (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64),
       wp_usertrap_body usertrap_res pt j m ms_v sc_v stval_v sepc_v ksp.
