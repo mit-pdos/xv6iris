@@ -208,9 +208,20 @@ End coh_alg.
     [mono_nat_auth] does, so that [ws_lb_get] is [cmra_included_r] rather
     than a frame-preserving update. *)
 
+(** THE PER-HART WRITE WATERMARK of a CONTEXT (φ-upgrade §1.6).  A map from
+    a hart's index to the highest log position that context wrote through it,
+    as a [max_nat] auth: the AUTHORITY rides in the context's running bundle
+    ([WeakCtx.ctx_migr]) and the FRAGMENT is the persistent breadcrumb
+    ([WeakGhost.ctx_wrote]) an owned points-to carries.  [max_nat] because the
+    breadcrumb must be a LOWER bound that stays true as the context keeps
+    writing, and [gmap nat] rather than a [discrete_fun] over [CPU] because
+    only the harts a context has actually run on ever appear. *)
+Notation ctxwrUR := (gmapUR nat max_natUR).
+
 Class weakViewG (Σ : gFunctors) := {
   wv_scal :: weakViewScalarG Σ;
   wv_coh  :: inG Σ (authR cohUR);
+  wv_wr   :: inG Σ (authR ctxwrUR);
 }.
 
 Record wview_names := WvNames {
@@ -437,7 +448,7 @@ End token.
 
 Definition weakViewΣ : gFunctors :=
   #[ mono_natΣ; mono_natΣ; mono_natΣ; mono_natΣ; mono_natΣ;
-     GFunctor (authR cohUR) ].
+     GFunctor (authR cohUR); GFunctor (authR ctxwrUR) ].
 
 (** [solve_inG] ends in a single [split], so it cannot see through the
     NESTED [wv_scal] field — the scalar bundle has to be discharged first
@@ -446,7 +457,9 @@ Global Instance subG_weakViewScalarG Σ : subG weakViewΣ Σ -> weakViewScalarG 
 Proof. solve_inG. Qed.
 
 Global Instance subG_weakViewG Σ : subG weakViewΣ Σ -> weakViewG Σ.
-Proof. intros H. split; [by apply subG_weakViewScalarG|]. revert H. solve_inG. Qed.
+Proof.
+  intros H. split; [by apply subG_weakViewScalarG| |]; revert H; solve_inG.
+Qed.
 
 Lemma ws_alloc_cpus `{!weakViewG Σ} {A : Type} `{EqDecision A}
     (w : wstate) (cs : list A) :

@@ -119,8 +119,7 @@ Section leafo.
     iIntros (Hleaf) "HPre [%ws [Hws Hauth]] Hcont".
     iApply (Hleaf ws with "HPre Hws").
     iIntros (ws') "%Hle HPost Hws".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "HPost"). iExists ws'. iFrame.
   Qed.
 
@@ -173,8 +172,7 @@ Section leafo.
     iApply (wwp_lui pc is_rvc rd imm m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
   Qed.
 
@@ -258,8 +256,7 @@ Section leafo.
     iApply (wwp_addi pc is_rvc rs1 rd imm m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
   Qed.
 
@@ -333,8 +330,7 @@ Section leafo.
     iApply (wwp_or_rvc pc rs2 rs1 rd m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
   Qed.
 
@@ -398,8 +394,7 @@ Section leafo.
     iApply (wwp_add_rvc pc rs2 rs1 rd m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
   Qed.
 
@@ -463,8 +458,7 @@ Section leafo.
     iApply (wwp_slli_rvc pc rs1 rd shamt m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
   Qed.
 
@@ -530,8 +524,7 @@ Section leafo.
     iApply (wwp_addiw_rvc pc rs1 rd immv m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
   Qed.
 
@@ -597,8 +590,7 @@ Section leafo.
     iApply (wwp_ori pc rs1 rd imm m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
   Qed.
 
@@ -670,8 +662,7 @@ Section leafo.
               (⌜True⌝ : vProp Σ) Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hcsr Hrd Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrd Hcsr Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hrd Hcsr"). iExists ws'. iFrame.
   Qed.
 
@@ -737,8 +728,7 @@ Section leafo.
               (⌜True⌝ : vProp Σ) Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hcsr Hrd Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrd Hcsr Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hrd Hcsr"). iExists ws'. iFrame.
   Qed.
 
@@ -804,8 +794,7 @@ Section leafo.
               (⌜True⌝ : vProp Σ) Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hcsr Hrd Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrd Hcsr Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hrd Hcsr"). iExists ws'. iFrame.
   Qed.
 
@@ -868,8 +857,7 @@ Section leafo.
               (⌜True⌝ : vProp Σ) Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hrd Hi Hws HF").
     iIntros (tv ws') "%Hle Hmm Hpcf Hpc Hrd Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" $! tv with "Hmm Hpcf Hpc Hrd"). iExists ws'. iFrame.
   Qed.
 
@@ -940,8 +928,7 @@ Section leafo.
               (⌜True⌝ : vProp Σ) Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hrs Hcsr Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hcsr Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hrs Hcsr"). iExists ws'. iFrame.
   Qed.
 
@@ -1008,8 +995,7 @@ Section leafo.
               (⌜True⌝ : vProp Σ) Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hrs Hcsr Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hcsr Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hrs Hcsr"). iExists ws'. iFrame.
   Qed.
 
@@ -1076,8 +1062,7 @@ Section leafo.
               (⌜True⌝ : vProp Σ) Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hrs Hcsr Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hcsr Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hrs Hcsr"). iExists ws'. iFrame.
   Qed.
 
@@ -1145,8 +1130,7 @@ Section leafo.
     iApply (wwp_jal pc rd imm rdv0 pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz Htgt with "Hmm Hpcf Hpc Hrd Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrd Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hrd"). iExists ws'. iFrame.
   Qed.
 
@@ -1207,8 +1191,7 @@ Section leafo.
     iApply (wwp_cjr_rvc pc ra rav pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hra Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hra Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hra"). iExists ws'. iFrame.
   Qed.
 
@@ -1292,8 +1275,7 @@ Section leafo.
               (⌜True⌝ : vProp Σ) Hgid Hpmp HmIE Hmprv Hfwd Hnew Hlpe
               with "Hhw Hinv Hhs Hpriv Hms Hpcf Hpc Hmenv Hmepc Hi Hws HF").
     iIntros (ws') "%Hle Hhs Hpriv Hms Hpcf Hmenv Hmepc Hpc Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hhs Hpriv Hms Hpcf Hmenv Hmepc Hpc").
     iExists ws'. iFrame.
   Qed.
@@ -1341,14 +1323,13 @@ Section leafo.
   Proof.
     intros Hgid Hpmp Htor Hnz1 Hnzd Hea Hram.
     iIntros "Hmm Hpcf Hpad Hpc Hrs Hrd #Hi [%ws [Hws Hauth]] Hpt Hcont".
-    iDestruct (cobj_to_hold ξ ws with "Hauth Hpt") as "[Hauth Hpt]".
+    iDestruct (ctx_run_to_hold ξ ws with "Hauth Hpt") as "[Hauth Hpt]".
     iApply (wwp_ld8_tor_rvc pc rs1 rd imm ea v dqv q pmpcfg0 pmpaddrs
               rs1v rd0 ws Hgid Hpmp Htor Hnz1 Hnzd Hea Hram
               with "Hmm Hpcf Hpad Hpc Hrs Hrd Hi Hws Hpt").
     iIntros (ws') "%Hle Hmm Hpcf Hpad Hpc Hrs Hrd Hws Hpt".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
-    iDestruct (cobj_of_hold ξ ws' with "Hauth Hpt") as "[Hauth Hpt]".
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
+    iDestruct (ctx_run_of_hold ξ ws' with "Hauth Hpt") as "[Hauth Hpt]".
     iApply ("Hcont" with "Hmm Hpcf Hpad Hpc Hrs Hrd [Hws Hauth] Hpt").
     iExists ws'. iFrame.
   Qed.
@@ -1387,14 +1368,13 @@ Section leafo.
   Proof.
     intros Hgid Hpmp Htor Hnz1 Hnzd Hea Hram.
     iIntros "Hmm Hpcf Hpad Hpc Hrs Hrd #Hi [%ws [Hws Hauth]] Hpt Hcont".
-    iDestruct (cobj_to_hold ξ ws with "Hauth Hpt") as "[Hauth Hpt]".
+    iDestruct (ctx_run_to_hold ξ ws with "Hauth Hpt") as "[Hauth Hpt]".
     iApply (wwp_ld8_tor_rvc_own pc rs1 rd imm ea v q pmpcfg0 pmpaddrs
               rs1v rd0 ws Hgid Hpmp Htor Hnz1 Hnzd Hea Hram
               with "Hmm Hpcf Hpad Hpc Hrs Hrd Hi Hws Hpt").
     iIntros (ws') "%Hle Hmm Hpcf Hpad Hpc Hrs Hrd Hws Hpt".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
-    iDestruct (cobj_of_hold ξ ws' with "Hauth Hpt") as "[Hauth Hpt]".
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
+    iDestruct (ctx_run_of_hold ξ ws' with "Hauth Hpt") as "[Hauth Hpt]".
     iApply ("Hcont" with "Hmm Hpcf Hpad Hpc Hrs Hrd [Hws Hauth] Hpt").
     iExists ws'. iFrame.
   Qed.
@@ -1555,16 +1535,15 @@ Section leafo.
   Proof.
     intros Hgid Hpmp Htor Hnz1 Hnz2 Hea Hram.
     iIntros "Hmm Hpcf Hpad Hpc Hrs1 Hrs2 #Hi [%ws [Hws Hauth]] Hpt HR Hcont".
-    iDestruct (cobj_to_hold ξ ws with "Hauth Hpt") as "[Hauth Hpt]".
-    iDestruct (cobj_to_hold ξ ws with "Hauth HR") as "[Hauth HR]".
+    iDestruct (ctx_run_to_hold ξ ws with "Hauth Hpt") as "[Hauth Hpt]".
+    iDestruct (ctx_run_to_hold ξ ws with "Hauth HR") as "[Hauth HR]".
     iApply (wwp_sd8_tor_rvc pc rs1 rs2 imm ea vold R q pmpcfg0 pmpaddrs
               rs1v rs2v ws Hgid Hpmp Htor Hnz1 Hnz2 Hea Hram
               with "Hmm Hpcf Hpad Hpc Hrs1 Hrs2 Hi Hws Hpt HR").
     iIntros (ws' T) "%Hle %HT Hmm Hpcf Hpad Hpc Hrs1 Hrs2 Hws Hpt HR".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
-    iDestruct (ctx_addrs_get ξ _ (acc_addr ea) 8 T HT with "Hauth") as "#Hlb".
-    iDestruct (cobj_of_hold ξ ws' with "Hauth Hpt") as "[Hauth Hpt]".
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
+    iDestruct (ctx_run_addrs_get ξ _ (acc_addr ea) 8 T HT with "Hauth") as "#Hlb".
+    iDestruct (ctx_run_of_hold ξ ws' with "Hauth Hpt") as "[Hauth Hpt]".
     iApply ("Hcont" $! T with "Hlb Hmm Hpcf Hpad Hpc Hrs1 Hrs2 [Hws Hauth] Hpt HR").
     iExists ws'. iFrame.
   Qed.
@@ -1657,8 +1636,7 @@ Section leafo.
     iApply (wwp_and_rvc pc rs2 rs1 rd m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
   Qed.
 
@@ -1722,8 +1700,7 @@ Section leafo.
     iApply (wwp_srli_rvc pc rs1 rd shamt m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
   Qed.
 
@@ -1786,8 +1763,7 @@ Section leafo.
     iApply (wwp_auipc pc rd imm m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
   Qed.
 
@@ -1855,16 +1831,15 @@ Section leafo.
   Proof.
     intros Hgid Hpmp Hnz1 Hnz2 Hea Hram.
     iIntros "Hmm Hpcf Hpc Hrs1 Hrs2 #Hi [%ws [Hws Hauth]] Hpt HR Hcont".
-    iDestruct (cobj_to_hold ξ ws with "Hauth Hpt") as "[Hauth Hpt]".
-    iDestruct (cobj_to_hold ξ ws with "Hauth HR") as "[Hauth HR]".
+    iDestruct (ctx_run_to_hold ξ ws with "Hauth Hpt") as "[Hauth Hpt]".
+    iDestruct (ctx_run_to_hold ξ ws with "Hauth HR") as "[Hauth HR]".
     iApply (wwp_sd8_off_rvc pc rs1 rs2 imm ea vold R q pmpcfg0
               rs1v rs2v ws Hgid Hpmp Hnz1 Hnz2 Hea Hram
               with "Hmm Hpcf Hpc Hrs1 Hrs2 Hi Hws Hpt HR").
     iIntros (ws' T) "%Hle %HT Hmm Hpcf Hpc Hrs1 Hrs2 Hws Hpt HR".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
-    iDestruct (ctx_addrs_get ξ _ (acc_addr ea) 8 T HT with "Hauth") as "#Hlb".
-    iDestruct (cobj_of_hold ξ ws' with "Hauth Hpt") as "[Hauth Hpt]".
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
+    iDestruct (ctx_run_addrs_get ξ _ (acc_addr ea) 8 T HT with "Hauth") as "#Hlb".
+    iDestruct (ctx_run_of_hold ξ ws' with "Hauth Hpt") as "[Hauth Hpt]".
     iApply ("Hcont" $! T with "Hlb Hmm Hpcf Hpc Hrs1 Hrs2 [Hws Hauth] Hpt HR").
     iExists ws'. iFrame.
   Qed.
@@ -1943,8 +1918,7 @@ Section leafo.
               (⌜True⌝ : vProp Σ) Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hmie Hmdl Hrd Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrd Hmie Hmdl Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hrd Hmie Hmdl"). iExists ws'. iFrame.
   Qed.
 
@@ -2012,8 +1986,7 @@ Section leafo.
     iApply (wwp_csrw_mepc pc rs1 mepc0 rs1v pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hrs Hcsr Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hcsr Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hrs Hcsr"). iExists ws'. iFrame.
   Qed.
 
@@ -2079,8 +2052,7 @@ Section leafo.
     iApply (wwp_csrw_satp pc rs1 satp0 rs1v pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hrs Hcsr Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hcsr Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hrs Hcsr"). iExists ws'. iFrame.
   Qed.
 
@@ -2147,8 +2119,7 @@ Section leafo.
               (⌜True⌝ : vProp Σ) Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hrs Hcsr Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hcsr Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hrs Hcsr"). iExists ws'. iFrame.
   Qed.
 
@@ -2215,8 +2186,7 @@ Section leafo.
               (⌜True⌝ : vProp Σ) Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hrs Hcsr Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hcsr Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hrs Hcsr"). iExists ws'. iFrame.
   Qed.
 
@@ -2285,8 +2255,7 @@ Section leafo.
               (⌜True⌝ : vProp Σ) Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hrs Hmie Hmdl Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hmie Hmdl Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hrs Hmie Hmdl"). iExists ws'. iFrame.
   Qed.
 
@@ -2355,8 +2324,7 @@ Section leafo.
               (⌜True⌝ : vProp Σ) Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hrs Hpad Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hpad Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hmm Hpcf Hpc Hrs Hpad"). iExists ws'. iFrame.
   Qed.
 
@@ -2430,8 +2398,7 @@ Section leafo.
               Hgid Hpmp Hnz HmIE Hmprv
               with "Hhw Hinv Hhs Hpriv Hms Hpcf Hpc Hrd Hi Hws HF").
     iIntros (ws') "%Hle Hhs Hpriv Hms Hpcf Hpc Hrd Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hhs Hpriv Hms Hpcf Hpc Hrd"). iExists ws'. iFrame.
   Qed.
 
@@ -2473,8 +2440,7 @@ Section leafo.
               Hgid Hpmp Hal4 Hnz HmIE Hmprv
               with "Hhw Hinv Hhs Hpriv Hms Hpcf Hpc Hrs Hi Hws HF").
     iIntros (ws') "%Hle Hhs Hpriv Hms Hpcf Hpc Hrs Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hhs Hpriv Hms Hpcf Hpc Hrs"). iExists ws'. iFrame.
   Qed.
 
@@ -2515,8 +2481,7 @@ Section leafo.
               Hgid Hpmp Hnz HmIE Hmprv
               with "Hhw Hinv Hhs Hpriv Hms Hpcf Hpc Hrs Hi Hws HF").
     iIntros (ws') "%Hle Hhs Hpriv Hms Hpcf Hpc Hrs Hws _".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
-      [by apply ws_le_view|].
+    iMod (ctx_run_update _ _ ws' Hle with "Hauth") as "Hauth".
     iApply ("Hcont" with "Hhs Hpriv Hms Hpcf Hpc Hrs"). iExists ws'. iFrame.
   Qed.
 

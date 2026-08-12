@@ -126,13 +126,13 @@ Section flat_bridge.
     exact (proj1 Hlat).
   Qed.
 
-  Lemma wpt_own_flat_lookup (c : CPU) (σ : wmstate) (a : Arch.pa) (v : bv 8) :
+  Lemma wpt_own_h_flat_lookup (c : CPU) (σ : wmstate) (a : Arch.pa) (v : bv 8) :
     wlog_wf (wm_log σ) →
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
-    vwp_hold (wpt_own c (pa_z a) v) (wm_ws σ) -∗
+    vwp_hold (wpt_own_h c (pa_z a) v) (wm_ws σ) -∗
     ⌜wflat (wm_img σ) (wm_log σ) !! a = Some v⌝.
   Proof.
-    intros Hwf. iIntros "Hi Hpt". rewrite wpt_own_at.
+    intros Hwf. iIntros "Hi Hpt". rewrite wpt_own_h_at.
     iDestruct "Hpt" as (t) "(He & _ & _)".
     by iApply (wlat_flat_lookup_e σ a (DfracOwn 1) t v Hwf with "Hi He").
   Qed.
@@ -213,19 +213,19 @@ Section byte_bridges.
   Qed.
 
   (** The OWNED (C-or-D) twin of [wpt_byte_flat_pin]. *)
-  Lemma wpt_own_byte_flat_pin (c : CPU) (σ : wmstate) (a : Arch.pa) (n : N)
+  Lemma wpt_own_h_byte_flat_pin (c : CPU) (σ : wmstate) (a : Arch.pa) (n : N)
       (b : bv 8) (j : nat) :
     wlog_wf (wm_log σ) → acc_wf a n → (j < N.to_nat n)%nat →
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
-    vwp_hold (wpt_own c (acc_addr a j) b) (wm_ws σ) -∗
+    vwp_hold (wpt_own_h c (acc_addr a j) b) (wm_ws σ) -∗
     ⌜wflat (wm_img σ) (wm_log σ) !! pa_add a j = Some b ∧
      pinned_read σ (acc_addr a j)⌝.
   Proof.
     intros Hwf Hacc Hj. iIntros "Hi Hpt".
-    iDestruct (wpt_own_pinned_read c σ (acc_addr a j) b with "Hi Hpt")
+    iDestruct (wpt_own_h_pinned_read c σ (acc_addr a j) b with "Hi Hpt")
       as %Hpin.
     iAssert (⌜wflat (wm_img σ) (wm_log σ) !! pa_add a j = Some b⌝)%I as %Hfl.
-    { iApply (wpt_own_flat_lookup c σ (pa_add a j) b Hwf with "Hi [Hpt]").
+    { iApply (wpt_own_h_flat_lookup c σ (pa_add a j) b Hwf with "Hi [Hpt]").
       rewrite (acc_wf_byte a n j Hacc Hj). iExact "Hpt". }
     iPureIntro. by split.
   Qed.

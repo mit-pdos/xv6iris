@@ -31,7 +31,11 @@
     THE CONTROL.  §5 states the same frame indexed by [CpuId] -- the shape
     the deleted [WeakObj.wobj] and [WeakPtOwn.wpt_own] had -- and shows it
     does NOT typecheck in the continuation, which is the whole reason this
-    file exists. *)
+    file exists.  (φ-upgrade §1.6 acted on exactly this: the OWNED points-to
+    [WeakVProp.wpt_own] is now indexed by [CtxId] too, so an owned dirty byte
+    frames across a migration like everything else.  The hart-indexed byte
+    form survives only as [WeakVProp.wpt_own_h], carrying the M-mode towers,
+    which never cross a [wp_next].) *)
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap.
 From stdpp Require Import bitvector.definitions.
@@ -72,11 +76,11 @@ Section bundle.
     (gpr_file m ∗ wrunning ξ)%I.
 
   Lemma wsrun_open `{CID : CpuId} ξ m :
-    wsrun ξ m -∗ gpr_file m ∗ ∃ ws, hart_ws cpu_id ws ∗ ctx_auth ξ (ws_view ws).
+    wsrun ξ m -∗ gpr_file m ∗ ∃ ws, hart_ws cpu_id ws ∗ ctx_run ξ ws.
   Proof. iIntros "[$ H]". iApply (wrunning_open with "H"). Qed.
 
   Lemma wsrun_close `{CID : CpuId} ξ m ws :
-    gpr_file m -∗ hart_ws cpu_id ws -∗ ctx_auth ξ (ws_view ws) -∗ wsrun ξ m.
+    gpr_file m -∗ hart_ws cpu_id ws -∗ ctx_run ξ ws -∗ wsrun ξ m.
   Proof. iIntros "H1 H2 H3". iFrame "H1". iApply (wrunning_close with "H2 H3"). Qed.
 
 End bundle.

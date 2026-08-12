@@ -73,6 +73,7 @@ Require Import WeakMem.
 Require Import WeakInterp.
 Require Import WeakLang.
 Require Import WeakViewMono.
+Require Import WeakView.
 Require Import RiscvLang RiscvPtsto.
 
 Local Open Scope Z_scope.
@@ -418,6 +419,13 @@ Proof.
   intros (q & mq & Hn & Hq & Ht & Hk) Hp. exists q, mq. split_and!; try done. lia.
 Qed.
 
+(** Coverage cannot outrun the log: the release that establishes it is IN the
+    log.  This is what bounds the migration invariant's map entries. *)
+Lemma wpub_upto_len log tid n : wpub_upto log tid n -> (n <= length log)%nat.
+Proof.
+  intros (q & mq & Hn & Hq & _). apply lookup_lt_Some in Hq. lia.
+Qed.
+
 Lemma wpub_upto_mono log tid n n' :
   (n' <= n)%nat -> wpub_upto log tid n -> wpub_upto log tid n'.
 Proof.
@@ -437,6 +445,43 @@ Qed.
 Lemma wpub_upto_app log ms tid n :
   wpub_upto log tid n -> wpub_upto (log ++ ms) tid n.
 Proof. apply wpub_upto_prefix. by apply prefix_app_r. Qed.
+
+(** ... AND THE CONVERSE ACROSS ONE MESSAGE THAT CANNOT BE THE PUBLISHER
+    (φ-upgrade §1.6).  A leaf reads the publication floor of a FOREIGN hart
+    off the log authority it holds, and the authority it holds at a STORE
+    site is the one at the POST-log — one message ahead of the [wlat_interp]
+    the retarget must re-establish.  The gap closes for free: the appended
+    message is the storing hart's own, so it is not the foreign hart's
+    release, and coverage in the longer log was already coverage in the
+    shorter one. *)
+Lemma wpub_upto_unsnoc log mnew tid n :
+  ¬ (wm_tid mnew = tid /\ wm_ak mnew = WCrel) ->
+  wpub_upto (log ++ [mnew]) tid n -> wpub_upto log tid n.
+Proof.
+  intros Hne (q & mq & Hn & Hq & Ht & Hk).
+  apply lookup_app_Some in Hq as [Hq|[Hge Hq]]; [by exists q, mq|].
+  exfalso. destruct (q - length log)%nat as [|j] eqn:Hj; simpl in Hq;
+    [|by rewrite lookup_nil in Hq]. simplify_eq. by apply Hne.
+Qed.
+
+(** THE TRANSFER CONDITION the owned leaves quantify over: "the messages the
+    log authority is ahead of the interpretation by publish nothing on behalf
+    of any hart other than [c]".  Two constructors cover every site — a load
+    (the logs coincide) and a store (the extra message is [c]'s own). *)
+Definition pub_transfer (logA log : list wmsg) (c : CPU) : Prop :=
+  forall (c' : CPU) (n : nat), c' <> c ->
+    wpub_upto logA (Some (fin_to_nat c')) n ->
+    wpub_upto log (Some (fin_to_nat c')) n.
+
+Lemma pub_transfer_refl log c : pub_transfer log log c.
+Proof. by intros c' n _. Qed.
+
+Lemma pub_transfer_snoc log mnew (c : CPU) :
+  wm_tid mnew = Some (fin_to_nat c) -> pub_transfer (log ++ [mnew]) log c.
+Proof.
+  intros Htid c' n Hne. apply wpub_upto_unsnoc. intros [Ht _].
+  apply Hne, (inj fin_to_nat). rewrite Htid in Ht. by injection Ht.
+Qed.
 
 (** THE MINT, purely: a release-class message appended at the top publishes
     every position of the log it was appended to. *)
@@ -980,6 +1025,25 @@ Qed.
 (* ====================================================================== *)
 (** ** 3. The resources *)
 
+(* ====================================================================== *)
+(** ** 0'. THE EXECUTION CONTEXT'S NAME (φ-upgrade §1.6)
+
+    [WeakCtx]'s [CtxId] lives HERE, not there, because the OWNED POINTS-TO is
+    indexed by it ([WeakVProp.wpt_own]) and [WeakVProp] sits below [WeakCtx].
+    That is the whole reason for the move: Stage 1.6 makes the migration
+    upgrade invisible by putting the context's write breadcrumb INSIDE the
+    points-to, so the type of contexts has to be visible at the points-to's
+    altitude.
+
+    TWO ghost names rather than one.  [ctx_vn] is [WeakCtx]'s view authority
+    (an [authR cohUR], the context's [flr] summary); [ctx_wn] is the per-hart
+    write watermark this file's §3a'' builds ([authR ctxwrUR]).  They are
+    separate [own]s under separate names because Iris allocates a name per
+    algebra; pairing them in a record keeps a context ONE value, so nothing
+    downstream of [WeakCtx] can tell the difference — [CtxId] stays an opaque
+    parameter exactly as its header demands. *)
+Record CtxId := CtxNames { ctx_vn : gname; ctx_wn : gname }.
+
 Section resources.
   Context `{!riscvGS Σ, !weakGS Σ}.
 
@@ -1033,13 +1097,23 @@ Section resources.
       arm reads the fact it actually needs off it directly.  The [w_pub]
       reading is still recoverable — [WeakViolation.wpub_upto_w_pub] is the
       one-line bridge — it is simply not the load-bearing spelling. *)
-  Definition pub_floor (c : CPU) (n : nat) : iProp Σ :=
-    (∃ l : list wmsg, wlog_lb l ∗ ⌜wpub_upto l (Some (fin_to_nat c)) n⌝)%I.
+  (** The HART-INDEX-KEYED spelling is the primitive one: [WeakCtx]'s
+      migration invariant is a map over hart indices, so the entry it stores
+      has to be statable at a bare [nat]. *)
+  Definition pub_floorn (k n : nat) : iProp Σ :=
+    (∃ l : list wmsg, wlog_lb l ∗ ⌜wpub_upto l (Some k) n⌝)%I.
 
+  Definition pub_floor (c : CPU) (n : nat) : iProp Σ :=
+    pub_floorn (fin_to_nat c) n.
+
+  Global Instance pub_floorn_persistent k n : Persistent (pub_floorn k n).
+  Proof. rewrite /pub_floorn. apply _. Qed.
+  Global Instance pub_floorn_timeless k n : Timeless (pub_floorn k n).
+  Proof. rewrite /pub_floorn /wlog_lb. apply _. Qed.
   Global Instance pub_floor_persistent c n : Persistent (pub_floor c n).
   Proof. rewrite /pub_floor. apply _. Qed.
   Global Instance pub_floor_timeless c n : Timeless (pub_floor c n).
-  Proof. rewrite /pub_floor /wlog_lb. apply _. Qed.
+  Proof. rewrite /pub_floor. apply _. Qed.
 
   (** AGREEMENT: what the token says about the CURRENT log.  One
       [wlog_valid] plus the prefix-monotonicity of [wpub_upto]. *)
@@ -1072,6 +1146,294 @@ Section resources.
   Proof.
     iIntros (Hle) "[%l [Hlb %Hp]]". iExists l. iFrame "Hlb". iPureIntro.
     by eapply wpub_upto_mono.
+  Qed.
+
+  (** THE VIEW-INDEXED FLOOR (φ-upgrade §1.5).  "Hart [c] has published
+      everything the view [V] can see."  Stated over a VIEW rather than a
+      position because that is the shape an owned points-to already carries:
+      its receipt [⊒(view_byte a t)] read at any index [V] IS [t ≤ flr V a],
+      so a token about [V] discharges the timestamp side condition by
+      construction and no leaf ever has to name a timestamp. *)
+  Definition pub_covers_view (c : CPU) (V : view) : iProp Σ :=
+    (∃ n : nat, pub_floor c n ∗ ⌜V ⊑ view_scl n⌝)%I.
+
+  Global Instance pub_covers_view_persistent c V :
+    Persistent (pub_covers_view c V).
+  Proof. rewrite /pub_covers_view. apply _. Qed.
+  Global Instance pub_covers_view_timeless c V :
+    Timeless (pub_covers_view c V).
+  Proof. rewrite /pub_covers_view. apply _. Qed.
+
+  Lemma pub_covers_view_intro c V n :
+    V ⊑ view_scl n -> pub_floor c n -∗ pub_covers_view c V.
+  Proof. iIntros (Hle) "H". iExists n. by iFrame "H". Qed.
+
+  Lemma pub_covers_view_mono c V V' :
+    V' ⊑ V -> pub_covers_view c V -∗ pub_covers_view c V'.
+  Proof.
+    iIntros (Hle) "[%n [H %Hn]]". iExists n. iFrame "H". iPureIntro.
+    by etrans.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (** *** 3a''. THE CONTEXT'S WRITE BREADCRUMB, AND THE MIGRATION INVARIANT
+      (φ-upgrade §1.6 — what makes the lazy upgrade INVISIBLE)
+
+      Stage 1.5 left the upgrade as a lemma the CALLER applied at the first
+      touch of a dirty byte after a migration.  That is unacceptable
+      ergonomics: an access site's script must not depend on whether the
+      thread has been rescheduled since it last wrote the byte.  The fix is to
+      move the evidence INTO the resource and the case split INTO the leaf,
+      and the evidence is this pair:
+
+        [ctx_wrote ξ c V]  — PERSISTENT.  "context [ξ] wrote, through hart
+                             [c], at or below [V]."  Minted by the owned store
+                             leaf, carried by [WeakVProp.wpt_own]'s dirty
+                             disjunct, and never mentioned by a caller.
+        [ctx_migr ξ c]     — the SCHEDULER-SIDE authority, riding in
+                             [WeakCtx.wrunning]: "[ξ] is running on hart [c],
+                             and every OTHER hart it has ever written through
+                             has published what it wrote."
+
+      Their product is the whole of Stage 1.6: given a breadcrumb for a hart
+      that is not the current one, the invariant hands back
+      [pub_covers_view], which is exactly Stage 1.5's evidence — now produced
+      inside the leaf rather than by the caller.
+
+      THE ALGEBRA IS A MAX PER HART.  The breadcrumb has to be persistent
+      (points-to facts are duplicated, framed and re-proved freely) and has to
+      survive the context writing more, so it is a LOWER bound on a monotone
+      quantity: the highest position [ξ] has written through [c].  A
+      [gmap nat max_nat] auth gives that in one [own], with the fragment
+      core-id hence persistent for free.
+
+      WHY THE LIVE HART IS AN EXCEPTION AND NOT A HOLE.  The entry for the
+      hart [ξ] is running on is deliberately NOT covered — those writes are
+      the thread's own outstanding dirty bytes, and the leaf never needs
+      coverage for them (it takes the ordinary own-dirty path instead).  What
+      every entry carries instead is the POSITION BOUND [wlog_ts_ok], which is
+      what lets the PARK discharge the exception: a release at the log's fresh
+      top publishes every position at or below the log's length, so it covers
+      the live entry without knowing which bytes, or how many, the thread
+      dirtied. *)
+
+  (** "position [n] is IN the log" — the bound a store's own fresh top
+      satisfies (its message is the log's last, so [n] is the post-log's
+      length), and the one the park spends against the floor its release
+      mints (which is that same number). *)
+  Definition wlog_ts_ok (n : nat) : iProp Σ :=
+    (∃ l : list wmsg, wlog_lb l ∗ ⌜(n <= length l)%nat⌝)%I.
+
+  Global Instance wlog_ts_ok_persistent n : Persistent (wlog_ts_ok n).
+  Proof. rewrite /wlog_ts_ok. apply _. Qed.
+  Global Instance wlog_ts_ok_timeless n : Timeless (wlog_ts_ok n).
+  Proof. rewrite /wlog_ts_ok /wlog_lb. apply _. Qed.
+
+  Lemma wlog_ts_ok_get (log : list wmsg) (n : nat) :
+    (n <= length log)%nat -> wlog_auth log -∗ wlog_auth log ∗ wlog_ts_ok n.
+  Proof.
+    iIntros (Hn) "Ha". iDestruct (wlog_snapshot with "Ha") as "[$ #Hlb]".
+    iExists log. by iFrame "Hlb".
+  Qed.
+
+  Lemma wlog_ts_ok_bound (log : list wmsg) (n : nat) :
+    wlog_auth log -∗ wlog_ts_ok n -∗ ⌜(n <= length log)%nat⌝.
+  Proof.
+    iIntros "Ha [%l [Hlb %Hn]]".
+    iDestruct (wlog_valid with "Ha Hlb") as %Hpre.
+    iPureIntro. apply prefix_length in Hpre. lia.
+  Qed.
+
+  (** ... and a published floor is bounded too, so EVERY entry of the map is
+      (this is what makes the park's discharge uniform). *)
+  Lemma pub_floorn_bound (log : list wmsg) (k n : nat) :
+    wlog_auth log -∗ pub_floorn k n -∗ ⌜(n <= length log)%nat⌝.
+  Proof.
+    iIntros "Ha [%l [Hlb %Hp]]".
+    iDestruct (wlog_valid with "Ha Hlb") as %Hpre.
+    iPureIntro. apply prefix_length in Hpre.
+    pose proof (wpub_upto_len l _ n Hp). lia.
+  Qed.
+
+  (** The map, as an element of the algebra.  Spelled through a named
+      coercion rather than an inline [fmap] so that the [gmap] functor is
+      pinned by the result type. *)
+  Definition ctxwr_of (m : gmap nat nat) : gmap nat max_nat :=
+    (fun n : nat => MaxNat n) <$> m.
+
+  Definition ctx_wr_auth (ξ : CtxId) (m : gmap nat nat) : iProp Σ :=
+    own (ctx_wn ξ) (● (ctxwr_of m)).
+
+  Definition ctx_wrote_pos (ξ : CtxId) (c : CPU) (t : nat) : iProp Σ :=
+    own (ctx_wn ξ) (◯ {[ fin_to_nat c := MaxNat t ]}).
+
+  Global Instance ctx_wrote_pos_persistent ξ c t :
+    Persistent (ctx_wrote_pos ξ c t).
+  Proof. rewrite /ctx_wrote_pos. apply _. Qed.
+  Global Instance ctx_wrote_pos_timeless ξ c t :
+    Timeless (ctx_wrote_pos ξ c t).
+  Proof. rewrite /ctx_wrote_pos. apply _. Qed.
+
+  (** The VIEW-indexed breadcrumb, for the same reason [pub_covers_view] is
+      view-indexed: the points-to's own receipt is a view, so nothing has to
+      name a timestamp. *)
+  Definition ctx_wrote (ξ : CtxId) (c : CPU) (V : view) : iProp Σ :=
+    (∃ t : nat, ctx_wrote_pos ξ c t ∗ ⌜V ⊑ view_scl t⌝)%I.
+
+  Global Instance ctx_wrote_persistent ξ c V : Persistent (ctx_wrote ξ c V).
+  Proof. rewrite /ctx_wrote. apply _. Qed.
+  Global Instance ctx_wrote_timeless ξ c V : Timeless (ctx_wrote ξ c V).
+  Proof. rewrite /ctx_wrote. apply _. Qed.
+
+  Lemma ctx_wrote_intro ξ c t :
+    ctx_wrote_pos ξ c t -∗ ctx_wrote ξ c (view_scl t).
+  Proof. iIntros "H". iExists t. by iFrame "H". Qed.
+
+  Lemma ctx_wrote_byte ξ c a t :
+    ctx_wrote_pos ξ c t -∗ ctx_wrote ξ c (view_byte a t).
+  Proof.
+    iIntros "H". iExists t. iFrame "H". iPureIntro. intros a'.
+    rewrite flr_scl_eq. destruct (decide (a' = a)) as [->|Hne].
+    - rewrite flr_byte_eq. lia.
+    - rewrite flr_byte_ne //. lia.
+  Qed.
+
+  Lemma ctx_wrote_mono ξ c V V' :
+    V' ⊑ V -> ctx_wrote ξ c V -∗ ctx_wrote ξ c V'.
+  Proof.
+    iIntros (Hle) "[%t [H %Ht]]". iExists t. iFrame "H". iPureIntro.
+    by etrans.
+  Qed.
+
+  (** THE INVARIANT, as a resource: the authority plus, per hart, either "this
+      is the hart I am running on" or full publication coverage — and, either
+      way, the position bound. *)
+  Definition ctx_migr (ξ : CtxId) (c : CPU) : iProp Σ :=
+    (∃ m : gmap nat nat, ctx_wr_auth ξ m ∗
+       [∗ map] k ↦ n ∈ m,
+         wlog_ts_ok n ∗ (⌜k = fin_to_nat c⌝ ∨ pub_floorn k n))%I.
+
+  (** THE PARKED FORM: EVERY entry covered, no live hart named.  This is what
+      the migration handoff produces and what the resume consumes — and the
+      reason the resume needs no memory evidence: an all-covered map satisfies
+      the invariant at WHATEVER hart the scheduler picks. *)
+  Definition ctx_migr_all (ξ : CtxId) : iProp Σ :=
+    (∃ m : gmap nat nat, ctx_wr_auth ξ m ∗
+       [∗ map] k ↦ n ∈ m, wlog_ts_ok n ∗ pub_floorn k n)%I.
+
+  Lemma ctx_migr_all_run ξ (c : CPU) : ctx_migr_all ξ -∗ ctx_migr ξ c.
+  Proof.
+    iIntros "[%m [Ha #Hall]]". iExists m. iFrame "Ha".
+    iApply (big_sepM_impl with "Hall"). iIntros "!>" (k n _) "[$ #Hp]".
+    by iRight.
+  Qed.
+
+  Lemma ctx_wr_alloc : ⊢ |==> ∃ γ : gname, own γ (● (∅ : ctxwrUR)).
+  Proof.
+    iMod (own_alloc (● (∅ : ctxwrUR))) as (γ) "H".
+    { by apply auth_auth_valid. }
+    by iExists γ.
+  Qed.
+
+  Lemma ctx_migr_empty ξ c : own (ctx_wn ξ) (● (∅ : ctxwrUR)) -∗ ctx_migr ξ c.
+  Proof.
+    iIntros "H". iExists ∅. rewrite /ctx_wr_auth /ctxwr_of fmap_empty. iFrame "H".
+    by rewrite big_sepM_empty.
+  Qed.
+
+  (** SPENDING A BREADCRUMB — the whole point of the stage.  A points-to whose
+      dirty author is a hart the context is NOT running on yields Stage 1.5's
+      publication evidence, with no caller involvement whatsoever. *)
+  Lemma ctx_migr_pub ξ (c c' : CPU) (V : view) :
+    c' <> c ->
+    ctx_migr ξ c -∗ ctx_wrote ξ c' V -∗ pub_covers_view c' V.
+  Proof.
+    iIntros (Hne) "[%m [Ha #Hall]] [%t [Hf %Ht]]".
+    iDestruct (own_valid_2 with "Ha Hf") as %Hv.
+    assert (Hm : exists n, m !! fin_to_nat c' = Some n /\ (t <= n)%nat).
+    { apply auth_both_valid_discrete in Hv as [Hincl _].
+      apply singleton_included_l in Hincl as (y & Hy & Hle).
+      rewrite /ctxwr_of lookup_fmap in Hy.
+      destruct (m !! fin_to_nat c') as [n|] eqn:Hn; [|by inversion Hy].
+      exists n. split; [done|]. simpl in Hy.
+      apply (inj Some) in Hy. rewrite -Hy in Hle.
+      apply Some_included_total, max_nat_included in Hle. exact Hle. }
+    destruct Hm as (n & Hn & Htn).
+    iDestruct (big_sepM_lookup _ _ _ _ Hn with "Hall") as "[_ [%Hk|Hpf]]".
+    { exfalso. apply Hne. by apply (inj fin_to_nat). }
+    iApply (pub_covers_view_intro c' V n); [|iExact "Hpf"].
+    etrans; [exact Ht|]. intros a. rewrite !flr_scl_eq. exact Htn.
+  Qed.
+
+  (** The algebraic step behind the mint: raising one key of the map IS
+      op-ing the singleton in. *)
+  Lemma ctxwr_fmap_op (m : gmap nat nat) (k t : nat) :
+    ctxwr_of (<[k := Nat.max t (default 0%nat (m !! k))]> m)
+    ≡ ({[k := MaxNat t]} : ctxwrUR) ⋅ ctxwr_of m.
+  Proof.
+    intros i. rewrite /ctxwr_of lookup_op !lookup_fmap.
+    destruct (decide (i = k)) as [->|Hne].
+    - rewrite lookup_insert lookup_singleton /=.
+      destruct (m !! k) as [n|]; simpl.
+      + rewrite -Some_op max_nat_op //.
+      + rewrite Nat.max_0_r. by rewrite right_id.
+    - rewrite lookup_insert_ne // lookup_singleton_ne //.
+      by destruct (m !! i).
+  Qed.
+
+  (** MINTING, at the owned store leaf: the store's own message sits at the
+      log's fresh top, so the position bound is the log's length and nothing
+      else — no view arithmetic, no knowledge of any other byte. *)
+  Lemma ctx_migr_mint ξ (c : CPU) (log : list wmsg) (t : nat) :
+    (t <= length log)%nat ->
+    wlog_auth log -∗ ctx_migr ξ c ==∗
+    wlog_auth log ∗ ctx_migr ξ c ∗ ctx_wrote_pos ξ c t.
+  Proof.
+    iIntros (Ht) "Hlog [%m [Ha #Hall]]".
+    set (k := fin_to_nat c).
+    set (n' := Nat.max t (default 0%nat (m !! k))).
+    (* the old entry is bounded too, so the raised one still is *)
+    iAssert (⌜(n' <= length log)%nat⌝)%I as %Hn'.
+    { rewrite /n'. destruct (m !! k) as [n|] eqn:Hn; simpl; [|by iPureIntro; lia].
+      iDestruct (big_sepM_lookup _ _ _ _ Hn with "Hall") as "[Hts _]".
+      iDestruct (wlog_ts_ok_bound with "Hlog Hts") as %Hb.
+      iPureIntro. lia. }
+    iDestruct (wlog_ts_ok_get log n' Hn' with "Hlog") as "[Hlog #Hts']".
+    iMod (own_update _ _ (● (ctxwr_of (<[k := n']> m))
+                          ⋅ ◯ ({[k := MaxNat t]} : ctxwrUR)) with "Ha")
+      as "[Ha #Hf]".
+    { apply auth_update_alloc.
+      rewrite local_update_unital_discrete => z _ Heq. split.
+      - intros i. rewrite /ctxwr_of lookup_fmap. by destruct (_ !! i).
+      - rewrite left_id in Heq. rewrite /n' ctxwr_fmap_op -Heq //. }
+    iModIntro. iFrame "Hlog Hf". iExists (<[k := n']> m). iFrame "Ha".
+    iApply big_sepM_insert_2; [|iExact "Hall"]. iFrame "Hts'". by iLeft.
+  Qed.
+
+  (** THE PARK.  The migration handoff's release publishes every position at
+      or below the log's length, and every entry of the map is at or below
+      that — so the live-hart exception disappears, every entry becomes
+      covered, and the invariant re-forms at WHATEVER hart the context is
+      about to resume on.  That last quantifier is why the resume side needs
+      no memory evidence at all. *)
+  Lemma ctx_migr_park ξ (c : CPU) (log : list wmsg) (N : nat) :
+    (length log <= N)%nat ->
+    wlog_auth log -∗ pub_floor c N -∗ ctx_migr ξ c -∗
+    wlog_auth log ∗ ctx_migr_all ξ.
+  Proof.
+    iIntros (HN) "Hlog #Hpf [%m [Ha #Hall]]".
+    iAssert (⌜forall k n, m !! k = Some n -> (n <= length log)%nat⌝)%I
+      as %Hbnd.
+    { rewrite bi.pure_forall. iIntros (k). rewrite bi.pure_forall. iIntros (n).
+      rewrite bi.pure_impl. iIntros (Hkn).
+      iDestruct (big_sepM_lookup _ _ _ _ Hkn with "Hall") as "[Hts _]".
+      by iApply (wlog_ts_ok_bound with "Hlog Hts"). }
+    iFrame "Hlog". iExists m. iFrame "Ha".
+    iApply (big_sepM_impl with "Hall"). iIntros "!>" (k n Hkn) "[$ [%Hk|#Hp]]".
+    - subst k. rewrite /pub_floor.
+      iApply (pub_floor_le c N n); [apply Hbnd in Hkn; lia|].
+      iExact "Hpf".
+    - iExact "Hp".
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -1347,6 +1709,20 @@ Section resources.
 
       Note what it does NOT need: the flipping hart's identity.  The evidence
       is about [c], the author; whoever holds the element may spend it. *)
+  Lemma nv_free_of_own_pure img log (c : CPU) (a : Z) (t n : nat) (v : bv 8) :
+    (t <= n)%nat -> wpub_upto log (Some (fin_to_nat c)) n ->
+    wlat_interp img log -∗
+    wlat_elem a (DfracOwn 1) t v -∗ wown_st c a -∗ ⌜nv_free log a⌝.
+  Proof.
+    intros Htn Hpub. iIntros "Hi Hel Hs".
+    iDestruct (wlat_lookup_elem with "Hi Hel") as %Hlat.
+    iDestruct "Hs" as (s) "[Hsel %Hs]".
+    iDestruct (wcds_lookup with "Hi Hsel") as %Hok.
+    iPureIntro. destruct Hs as [-> | ->]; simpl in Hok.
+    - by apply nv_free_clean.
+    - exact (nv_free_published (img_z img) log a c t n v Hlat Htn Hpub Hok).
+  Qed.
+
   Lemma nv_free_of_own_pub img log (c : CPU) (a : Z) (t n : nat) (v : bv 8) :
     (t <= n)%nat ->
     wlog_auth log -∗ pub_floor c n -∗ wlat_interp img log -∗
@@ -1360,6 +1736,27 @@ Section resources.
     iPureIntro. destruct Hs as [-> | ->]; simpl in Hok.
     - by apply nv_free_clean.
     - exact (nv_free_published (img_z img) log a c t n v Hlat Htn Hpub Hok).
+  Qed.
+
+  Lemma wlat_flip_pure img log (c : CPU) (a : Z) (t n : nat) (v : bv 8) :
+    (t <= n)%nat -> wpub_upto log (Some (fin_to_nat c)) n ->
+    wlat_interp img log -∗ wlat_elem a (DfracOwn 1) t v -∗ wown_st c a ==∗
+    wlat_interp img log ∗
+    wlat_elem a (DfracOwn 1) t v ∗ wclean a (DfracOwn 1).
+  Proof.
+    intros Htn Hpub. iIntros "Hi Hel Hs".
+    iDestruct (wlat_lookup_elem with "Hi Hel") as %Hlat.
+    iDestruct "Hs" as (s) "[Hsel %Hs]".
+    iDestruct (wcds_lookup with "Hi Hsel") as %Hok.
+    iDestruct "Hi" as (mm mc) "(Hauth & %Hag & Hc & %Hagc)".
+    rewrite /wcds_el.
+    iMod (ghost_map_update WClean with "Hc Hsel") as "[Hc Hsel]".
+    iModIntro. iFrame "Hel Hsel".
+    iExists mm, (<[a := WClean]> mc). iFrame "Hauth Hc".
+    iSplitR; [iPureIntro; exact Hag|].
+    iPureIntro. apply wcds_agree_insert; [exact Hagc|]. simpl.
+    destruct Hs as [-> | ->]; simpl in Hok; [exact Hok|].
+    exact (wcds_dirty_flip_pub (img_z img) log a c t n v Hlat Htn Hpub Hok).
   Qed.
 
   Lemma wlat_flip_pub img log (c : CPU) (a : Z) (t n : nat) (v : bv 8) :
@@ -1383,6 +1780,133 @@ Section resources.
     iPureIntro. apply wcds_agree_insert; [exact Hagc|]. simpl.
     destruct Hs as [-> | ->]; simpl in Hok; [exact Hok|].
     exact (wcds_dirty_flip_pub (img_z img) log a c t n v Hlat Htn Hpub Hok).
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (** *** 3b'''. THE CONTEXT-INDEXED OWNED STATE (φ-upgrade §1.6)
+
+      [wown_st c a] says "clean, or dirty by hart [c]", and that is a fact
+      about SILICON: it stops being true of the same byte the moment the
+      thread is rescheduled.  [wown_ctx ξ a t] is its context-indexed
+      successor and the payload of [WeakVProp.wpt_own]:
+
+        clean            — no breadcrumb needed, and no hart is named;
+        dirty by [c]     — plus [ctx_wrote ξ c (view_byte a t)], the
+                           persistent receipt the store leaf minted.
+
+      NOTHING HERE NAMES THE RUNNING HART.  That is the entire point: the
+      assertion is invariant under migration, so it frames across a yield with
+      nothing to prove, and the case analysis "is the author the hart I am on
+      now?" happens INSIDE the leaf, below the caller's script.
+
+      [wown_ctx_retarget] IS that case analysis.  Given the scheduler's
+      migration invariant it hands back an ordinary [wown_st c a] at the
+      CURRENT hart — flipping a foreign author's dirty byte clean out of the
+      publication coverage the invariant supplies, exactly as Stage 1.5's
+      caller-applied [wpt_own_upgrade] did, and otherwise doing nothing at
+      all.  Every owned rule is stated over [wown_ctx] and opens with this. *)
+
+  Definition wcds_ob (b : option CPU) : wcds :=
+    match b with None => WClean | Some c => WDirty c end.
+
+  Definition ctx_bc (ξ : CtxId) (b : option CPU) (a : Z) (t : nat) : iProp Σ :=
+    match b with
+    | None => emp
+    | Some c => ctx_wrote ξ c (view_byte a t)
+    end%I.
+
+  Global Instance ctx_bc_persistent ξ b a t : Persistent (ctx_bc ξ b a t).
+  Proof. destruct b; apply _. Qed.
+
+  Definition wown_ctx (ξ : CtxId) (a : Z) (t : nat) : iProp Σ :=
+    (∃ b : option CPU, wcds_el a (DfracOwn 1) (wcds_ob b) ∗ ctx_bc ξ b a t)%I.
+
+  Global Instance wown_ctx_timeless ξ a t : Timeless (wown_ctx ξ a t).
+  Proof. rewrite /wown_ctx /ctx_bc. apply _. Qed.
+
+  Lemma wown_ctx_of_clean ξ a t :
+    wclean a (DfracOwn 1) -∗ wown_ctx ξ a t.
+  Proof. iIntros "H". iExists None. by iFrame "H". Qed.
+
+  Lemma wown_ctx_of_dirty ξ (c : CPU) a t :
+    wdirty c a -∗ ctx_wrote ξ c (view_byte a t) -∗ wown_ctx ξ a t.
+  Proof. iIntros "H #Hw". iExists (Some c). by iFrame "H Hw". Qed.
+
+  (** ... and the form the store rule rebuilds through: an [wown_st] at the
+      CURRENT hart plus that hart's fresh breadcrumb is a [wown_ctx].  (The
+      breadcrumb is minted unconditionally at a store, because the resulting
+      state is [WDirty c] for a plain message and the caller must not have to
+      know the message's class.) *)
+  Lemma wown_ctx_of_own_st ξ (c : CPU) a t :
+    wown_st c a -∗ ctx_wrote ξ c (view_byte a t) -∗ wown_ctx ξ a t.
+  Proof.
+    iIntros "[%s [Hel %Hs]] #Hw".
+    destruct Hs as [-> | ->].
+    - iExists None. by iFrame "Hel".
+    - iExists (Some c). by iFrame "Hel Hw".
+  Qed.
+
+  (** THE RETARGET — the leaf-internal upgrade.  [logA] is the log the CALLER
+      holds the authority at, which at a store site is ONE MESSAGE AHEAD of
+      the interpretation's; [pub_transfer] is the (trivially discharged)
+      statement that the extra message publishes nothing on a foreign hart's
+      behalf. *)
+  Lemma wown_ctx_retarget ξ (c : CPU) (a : Z) (t : nat) (v : bv 8)
+      img (log logA : list wmsg) :
+    pub_transfer logA log c ->
+    wlog_auth logA -∗ ctx_migr ξ c -∗ wlat_interp img log -∗
+    wlat_elem a (DfracOwn 1) t v -∗ wown_ctx ξ a t ==∗
+    wlog_auth logA ∗ ctx_migr ξ c ∗ wlat_interp img log ∗
+    wlat_elem a (DfracOwn 1) t v ∗ wown_st c a.
+  Proof.
+    intros Htr. iIntros "Hlog Hmg Hi Hel [%b [Hst #Hbc]]".
+    destruct b as [c'|]; simpl.
+    - destruct (decide (c' = c)) as [->|Hne].
+      { iModIntro. iFrame "Hlog Hmg Hi Hel".
+        by iApply (wdirty_own_st with "Hst"). }
+      (* THE FOREIGN-AUTHOR ARM: the invariant supplies the coverage *)
+      iDestruct (ctx_migr_pub ξ c c' (view_byte a t) Hne with "Hmg Hbc")
+        as "#[%n [Hpf %Hn]]".
+      iDestruct (pub_floor_agree with "Hlog Hpf") as %HpubA.
+      assert (Htn : (t <= n)%nat).
+      { specialize (Hn a). by rewrite flr_byte_eq flr_scl_eq in Hn. }
+      iMod (wlat_flip_pure img log c' a t n v Htn (Htr c' n Hne HpubA)
+              with "Hi Hel [Hst]") as "(Hi & Hel & Hcl)".
+      { by iApply (wdirty_own_st with "Hst"). }
+      iModIntro. iFrame "Hlog Hmg Hi Hel".
+      by iApply (wclean_own_st with "Hcl").
+    - iModIntro. iFrame "Hlog Hmg Hi Hel".
+      by iApply (wclean_own_st with "Hst").
+  Qed.
+
+  (** THE φ PAYMENT OF THE SAME CASE SPLIT, with no ghost step: an owned byte
+      pays [nv_ok] at the running hart whichever arm it is in — clean and
+      own-dirty through [nv_ok_of_own_st]'s reasoning, foreign-dirty because a
+      PUBLISHED owned store is not a violation to anybody
+      ([nv_free_published]).  A leaf states this where it holds its
+      resources, and it is the SAME lemma before and after a migration. *)
+  Lemma nv_ok_of_wown_ctx ξ (c : CPU) (a : Z) (t : nat) (v : bv 8)
+      img (log logA : list wmsg) :
+    pub_transfer logA log c ->
+    wlog_auth logA -∗ ctx_migr ξ c -∗ wlat_interp img log -∗
+    wlat_elem a (DfracOwn 1) t v -∗ wown_ctx ξ a t -∗ ⌜nv_ok log c a⌝.
+  Proof.
+    intros Htr. iIntros "Hlog Hmg Hi Hel [%b [Hst #Hbc]]".
+    destruct b as [c'|]; simpl.
+    - destruct (decide (c' = c)) as [->|Hne].
+      { iApply (nv_ok_of_own_st with "Hi [Hst]").
+        by iApply (wdirty_own_st with "Hst"). }
+      iDestruct (ctx_migr_pub ξ c c' (view_byte a t) Hne with "Hmg Hbc")
+        as "#[%n [Hpf %Hn]]".
+      iDestruct (pub_floor_agree with "Hlog Hpf") as %HpubA.
+      assert (Htn : (t <= n)%nat).
+      { specialize (Hn a). by rewrite flr_byte_eq flr_scl_eq in Hn. }
+      iDestruct (nv_free_of_own_pure img log c' a t n v Htn
+                   (Htr c' n Hne HpubA) with "Hi Hel [Hst]") as %Hfree.
+      { by iApply (wdirty_own_st with "Hst"). }
+      iPureIntro. by apply nv_ok_of_free.
+    - iApply (nv_ok_of_own_st with "Hi [Hst]").
+      by iApply (wclean_own_st with "Hst").
   Qed.
 
   (** THE S MINT.  A byte with no owned store in the log — at boot, every

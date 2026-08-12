@@ -181,27 +181,29 @@ Section pingpong.
     flipped.  [wpt_dirty] is [wpt_own] with the disjunction resolved; it is
     used only in the statements, never in a proof obligation. *)
 
-  Definition wpt_dirty (c : CPU) (a : Z) (v : bv 8) : vProp Σ :=
-    (∃ t : nat, ⎡ wlat_elem a (DfracOwn 1) t v ∗ wdirty c a ⎤ ∗
-                ⊒(view_byte a t))%I.
+  Definition wpt_dirty (ξ : CtxId) (c : CPU) (a : Z) (v : bv 8) : vProp Σ :=
+    (∃ t : nat, ⎡ wlat_elem a (DfracOwn 1) t v ∗ wdirty c a ∗
+                  ctx_wrote ξ c (view_byte a t) ⎤ ∗ ⊒(view_byte a t))%I.
 
-  Lemma wpt_dirty_own c a v : wpt_dirty c a v ⊢ wpt_own c a v.
+  Lemma wpt_dirty_own ξ c a v : wpt_dirty ξ c a v ⊢ wpt_own ξ a v.
   Proof.
     rewrite /wpt_dirty /wpt_own. constructor => V.
     rewrite !monPred_at_exist. apply bi.exist_mono => t.
     rewrite !monPred_at_sep !monPred_at_embed.
-    iIntros "[[He Hd] $]". iFrame "He". by iApply wdirty_own_st.
+    iIntros "[(He & Hd & #Hw) $]". iFrame "He".
+    by iApply (wown_ctx_of_dirty with "Hd Hw").
   Qed.
 
-  Lemma wpt_dirty_mono c a v ws ws' :
+  Lemma wpt_dirty_mono ξ c a v ws ws' :
     ws_le ws ws' ->
-    vwp_hold (wpt_dirty c a v) ws ⊢ vwp_hold (wpt_dirty c a v) ws'.
+    vwp_hold (wpt_dirty ξ c a v) ws ⊢ vwp_hold (wpt_dirty ξ c a v) ws'.
   Proof. apply vwp_hold_mono. Qed.
 
   (** Its decode, the twin of [WeakVProp.wpt_own_at]. *)
-  Lemma wpt_dirty_at c a v ws :
-    vwp_hold (wpt_dirty c a v) ws ⊣⊢
+  Lemma wpt_dirty_at ξ c a v ws :
+    vwp_hold (wpt_dirty ξ c a v) ws ⊣⊢
       ∃ t : nat, wlat_elem a (DfracOwn 1) t v ∗ wdirty c a ∗
+                 ctx_wrote ξ c (view_byte a t) ∗
                  ⌜(t ≤ flr (ws_view ws) a)%nat⌝.
   Proof.
     rewrite /vwp_hold /wpt_dirty monPred_at_exist.
@@ -209,19 +211,21 @@ Section pingpong.
     setoid_rewrite monPred_at_in.
     apply bi.exist_proper => t.
     iSplit.
-    - iIntros "[[He Hd] %H]". iFrame "He Hd". iPureIntro. by apply view_byte_le.
-    - iIntros "(He & Hd & %H)". iFrame "He Hd". iPureIntro.
+    - iIntros "[(He & Hd & Hw) %H]". iFrame "He Hd Hw". iPureIntro.
+      by apply view_byte_le.
+    - iIntros "(He & Hd & Hw & %H)". iFrame "He Hd Hw". iPureIntro.
       by apply view_byte_le.
   Qed.
 
   (** ... and its introduction form, which is what an own STORE's
       postcondition gives when the message it appended was [WCplain]. *)
-  Lemma wpt_dirty_at_intro c a v t ws :
+  Lemma wpt_dirty_at_intro ξ c a v t ws :
     (t ≤ flr (ws_view ws) a)%nat ->
     wlat_elem a (DfracOwn 1) t v -∗ wdirty c a -∗
-    vwp_hold (wpt_dirty c a v) ws.
+    ctx_wrote ξ c (view_byte a t) -∗
+    vwp_hold (wpt_dirty ξ c a v) ws.
   Proof.
-    intros Ht. rewrite wpt_dirty_at. iIntros "He Hd". iExists t. by iFrame.
+    intros Ht. rewrite wpt_dirty_at. iIntros "He Hd Hw". iExists t. by iFrame.
   Qed.
 
 (* ====================================================================== *)
@@ -243,26 +247,38 @@ Section pingpong.
     that IS the per-byte selectivity, and the reason to state it here rather
     than assert it. *)
 
-  Lemma wrelease_flip_core (γ : gname) (lk : Arch.pa) (x : Z) (v : bv 8)
-      (i : CPU) (σ σ' : wmstate) :
+  Lemma wrelease_flip_core (ξ : CtxId) (γ : gname) (lk : Arch.pa) (x : Z)
+      (v : bv 8) (i : CPU) (σ σ' : wmstate) :
     wQ_store (Some (fin_to_nat i)) lk lock_zero σ σ' ->
     (* §1: the release store's own message, class and all *)
     wm_log σ' =
       (wm_log σ ++ [wwrite_msg (Some (fin_to_nat i)) WCrel lk 4 lock_zero])%list ->
     ws_bounded (wm_ws σ) (length (wm_log σ)) ->
+    (* the log authority at the POST-log and the scheduler's migration
+       invariant — what every owned rule takes since φ-upgrade §1.6, and
+       neither of them a fact about [x] *)
+    wlog_auth (wm_log σ') -∗ ctx_migr ξ i -∗
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
     wlock_inv γ lk (x ↦w v) -∗
     locked γ i -∗
-    vwp_hold (wpt_own i x v) (wm_ws σ) ==∗
+    vwp_hold (wpt_own ξ x v) (wm_ws σ) ==∗
+    wlog_auth (wm_log σ') ∗ ctx_migr ξ i ∗
     wlat_interp (wm_img σ') (wm_log σ') ∗ wlock_inv γ lk (x ↦w v).
   Proof.
     intros (Himg & _ & Hle & Hflr) Hlog Hbnd.
-    iIntros "Hi Hinv Htok Hpt".
+    iIntros "Hlg Hmg Hi Hinv Htok Hpt".
     iDestruct "Hinv" as (st t w) "(Hw & Ha & _)".
     iDestruct (locked_state with "Ha Htok") as %->.
     (* the payload's element and its DIRTY-or-clean state, at the timestamp
        the byte's latest write took *)
     rewrite wpt_own_at. iDestruct "Hpt" as (t0) "(Hel & Hs & %Ht0)".
+    (* THE RETARGET, leaf-internally: if this context dirtied [x] on a hart it
+       has since left, the migration invariant flips it clean here — the
+       release site's script does not know and does not care *)
+    iMod (wown_ctx_retarget ξ i x t0 v (wm_img σ) (wm_log σ) (wm_log σ')
+            ltac:(rewrite Hlog; by apply pub_transfer_snoc)
+            with "Hlg Hmg Hi Hel Hs") as "(Hlg & Hmg & Hi & Hel & Hs)".
+    iFrame "Hlg Hmg".
     (* the lock word's own bundle moves to the fresh top — it stays CLEAN,
        because a [WCrel] message is not an owned store *)
     iMod (wlat4_store_gen (Some (fin_to_nat i)) WCrel σ σ' lk t w lock_zero
@@ -292,24 +308,26 @@ Section pingpong.
       DIRTY-[i], at the releaser's post-state index, having crossed a release
       that flipped [x].  Its proof is [iFrame] plus one monotonicity step —
       which is the point. *)
-  Lemma wrelease_flip_frame (γ : gname) (lk : Arch.pa) (x y : Z)
+  Lemma wrelease_flip_frame (ξ : CtxId) (γ : gname) (lk : Arch.pa) (x y : Z)
       (v w : bv 8) (i : CPU) (σ σ' : wmstate) :
     wQ_store (Some (fin_to_nat i)) lk lock_zero σ σ' ->
     wm_log σ' =
       (wm_log σ ++ [wwrite_msg (Some (fin_to_nat i)) WCrel lk 4 lock_zero])%list ->
     ws_bounded (wm_ws σ) (length (wm_log σ)) ->
+    wlog_auth (wm_log σ') -∗ ctx_migr ξ i -∗
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
     wlock_inv γ lk (x ↦w v) -∗
     locked γ i -∗
-    vwp_hold (wpt_own i x v) (wm_ws σ) -∗
-    vwp_hold (wpt_dirty i y w) (wm_ws σ) ==∗
+    vwp_hold (wpt_own ξ x v) (wm_ws σ) -∗
+    vwp_hold (wpt_dirty ξ i y w) (wm_ws σ) ==∗
+    wlog_auth (wm_log σ') ∗ ctx_migr ξ i ∗
     wlat_interp (wm_img σ') (wm_log σ') ∗ wlock_inv γ lk (x ↦w v) ∗
-    vwp_hold (wpt_dirty i y w) (wm_ws σ').
+    vwp_hold (wpt_dirty ξ i y w) (wm_ws σ').
   Proof.
-    intros HQ Hlog Hbnd. iIntros "Hi Hinv Htok Hpt Hy".
-    iMod (wrelease_flip_core γ lk x v i σ σ' HQ Hlog Hbnd
-            with "Hi Hinv Htok Hpt") as "[$ $]".
-    iModIntro. iApply (wpt_dirty_mono i y w (wm_ws σ) (wm_ws σ')); [|iFrame].
+    intros HQ Hlog Hbnd. iIntros "Hlg Hmg Hi Hinv Htok Hpt Hy".
+    iMod (wrelease_flip_core ξ γ lk x v i σ σ' HQ Hlog Hbnd
+            with "Hlg Hmg Hi Hinv Htok Hpt") as "($ & $ & $ & $)".
+    iModIntro. iApply (wpt_dirty_mono ξ i y w (wm_ws σ) (wm_ws σ')); [|iFrame].
     exact (proj1 (proj2 (proj2 HQ))).
   Qed.
 
@@ -334,8 +352,8 @@ Section receive.
   Proof. intros HPQ. rewrite /vwp_hold HPQ. done. Qed.
 
   (** RE-OWNING.  One line, and it is the whole "receive". *)
-  Lemma pp_receive (c : CPU) (x : Z) (v : bv 8) (ws : wstate) :
-    vwp_hold (x ↦w v) ws ⊢ vwp_hold (wpt_own c x v) ws.
+  Lemma pp_receive (ξ : CtxId) (x : Z) (v : bv 8) (ws : wstate) :
+    vwp_hold (x ↦w v) ws ⊢ vwp_hold (wpt_own ξ x v) ws.
   Proof. apply vwp_hold_ent, wpt_own_of_wpt. Qed.
 
   (** DIRTYING IT AGAIN, under the new author.  [WeakVProp.wpt_store_rule_own]
@@ -343,7 +361,7 @@ Section receive.
       is the SHARP [wpt_dirty] rather than the absorbing [↦wo] — which is what
       makes "the author alternated" a statement and not a hope.  (A ported
       store site wants the absorbing form; this one exists for the exhibit.) *)
-  Lemma wpt_store_rule_dirty (c : CPU) σ σ' m a v v' :
+  Lemma wpt_store_rule_dirty (ξ : CtxId) (c : CPU) σ σ' m a v v' :
     msg_byte m a = Some v' ->
     (∀ a', a' ≠ a -> msg_byte m a' = None) ->
     wm_tid m = Some (fin_to_nat c) ->
@@ -351,14 +369,25 @@ Section receive.
     wm_img σ' = wm_img σ ->
     wm_log σ' = (wm_log σ ++ [m])%list ->
     (S (length (wm_log σ)) ≤ flr (ws_view (wm_ws σ')) a)%nat ->
+    wlog_auth (wm_log σ') -∗ ctx_migr ξ c -∗
     wlat_interp (wm_img σ) (wm_log σ) -∗
-    vwp_hold (wpt_own c a v) (wm_ws σ) ==∗
+    vwp_hold (wpt_own ξ a v) (wm_ws σ) ==∗
+    wlog_auth (wm_log σ') ∗ ctx_migr ξ c ∗
     wlat_interp (wm_img σ') (wm_log σ') ∗
-    vwp_hold (wpt_dirty c a v') (wm_ws σ').
+    vwp_hold (wpt_dirty ξ c a v') (wm_ws σ').
   Proof.
     intros Hma Hother Htid Hk Himg Hlog Hfl.
-    iIntros "Hi Hpt". rewrite wpt_own_at.
+    iIntros "Hlg Hmg Hi Hpt". rewrite wpt_own_at.
     iDestruct "Hpt" as (t) "(He & Hs & _)".
+    iMod (wown_ctx_retarget ξ c a t v (wm_img σ) (wm_log σ) (wm_log σ')
+            ltac:(rewrite Hlog; by apply pub_transfer_snoc)
+            with "Hlg Hmg Hi He Hs") as "(Hlg & Hmg & Hi & He & Hs)".
+    iMod (ctx_migr_mint ξ c (wm_log σ') (S (length (wm_log σ)))
+            ltac:(rewrite Hlog length_app /=; lia) with "Hlg Hmg")
+      as "(Hlg & Hmg & #Hbc)".
+    iDestruct (ctx_wrote_byte ξ c a (S (length (wm_log σ))) with "Hbc")
+      as "#Hbca".
+    iFrame "Hlg Hmg".
     iDestruct "Hs" as (s) "[Hsel %Hs]".
     iDestruct "Hi" as (mm mc) "(Hauth & %Hag & Hcauth & %Hagc)".
     rewrite /wlat_elem /wcds_el.
@@ -380,24 +409,26 @@ Section receive.
         intros m0 Hm0. apply elem_of_list_singleton in Hm0 as ->.
         by apply Hother.
     - rewrite wpt_dirty_at. iExists (S (length (wm_log σ))).
-      rewrite /wdirty /wcds_el. iFrame "He Hsel". by iPureIntro.
+      rewrite /wdirty /wcds_el. iFrame "He Hsel Hbca". by iPureIntro.
   Qed.
 
   (** ... at the machine's own store post-state, where the view premise is
       automatic — the [WeakVProp.wpt_store_post_own] twin. *)
-  Lemma wpt_store_post_dirty (c : CPU) σ m a v v' rl :
+  Lemma wpt_store_post_dirty (ξ : CtxId) (c : CPU) σ m a v v' rl :
     msg_byte m a = Some v' ->
     (∀ a', a' ≠ a -> msg_byte m a' = None) ->
     wm_tid m = Some (fin_to_nat c) ->
     wm_ak m = WCplain ->
+    wlog_auth ((wm_log σ ++ [m])%list) -∗ ctx_migr ξ c -∗
     wlat_interp (wm_img σ) (wm_log σ) -∗
-    vwp_hold (wpt_own c a v) (wm_ws σ) ==∗
+    vwp_hold (wpt_own ξ a v) (wm_ws σ) ==∗
+    wlog_auth ((wm_log σ ++ [m])%list) ∗ ctx_migr ξ c ∗
     wlat_interp (wm_img σ) ((wm_log σ ++ [m])%list) ∗
-    vwp_hold (wpt_dirty c a v')
+    vwp_hold (wpt_dirty ξ c a v')
       (store_post (wm_ws σ) rl a (S (length (wm_log σ)))).
   Proof.
     intros Hma Hother Htid Hk.
-    iApply (wpt_store_rule_dirty c
+    iApply (wpt_store_rule_dirty ξ c
               (WMState (wm_regs σ) (wm_img σ) (wm_log σ) (wm_ws σ) (wm_dev σ))
               (WMState (wm_regs σ) (wm_img σ) ((wm_log σ ++ [m])%list)
                        (store_post (wm_ws σ) rl a (S (length (wm_log σ))))
@@ -436,8 +467,8 @@ Section receive.
     iModIntro. by iFrame "Hi Hbody Htok HR".
   Qed.
 
-  Corollary pp_acquire_own (γ : gname) (lk : Arch.pa) (x : Z) (v : bv 8)
-      (c : CPU) (tid : option nat) (σ σ' : wmstate) :
+  Corollary pp_acquire_own (ξ : CtxId) (γ : gname) (lk : Arch.pa) (x : Z)
+      (v : bv 8) (c : CPU) (tid : option nat) (σ σ' : wmstate) :
     wlog_wf (wm_log σ) -> acc_wf lk 4 ->
     wQ_amo_aq tid lk lock_one σ σ' ->
     (∀ j : nat, (j < 4)%nat ->
@@ -445,33 +476,36 @@ Section receive.
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
     wlock_inv γ lk (x ↦w v) ==∗
     wlat_interp (wm_img σ') (wm_log σ') ∗ wlock_inv γ lk (x ↦w v) ∗
-    locked γ c ∗ vwp_hold (wpt_own c x v) (wm_ws σ').
+    locked γ c ∗ vwp_hold (wpt_own ξ x v) (wm_ws σ').
   Proof.
     intros Hwf Hacc HQ Hzero. iIntros "Hi Hinv".
     iMod (pp_acquire_payload γ lk x v c tid σ σ' Hwf Hacc HQ Hzero
             with "Hi Hinv") as "($ & $ & $ & HR)".
-    iModIntro. by iApply (pp_receive c x v (wm_ws σ')).
+    iModIntro. by iApply (pp_receive ξ x v (wm_ws σ')).
   Qed.
 
   (** THE RECEIVER'S OWN STORE, in one step from the payload: take the clean
       byte the handoff delivered and plain-store to it.  The postcondition is
       [wpt_dirty c] at the RECEIVING hart — the author has alternated, and the
       byte is now unpublishable by anyone else until [c] releases it. *)
-  Corollary pp_receive_and_dirty (c : CPU) (σ : wmstate) (m : wmsg)
+  Corollary pp_receive_and_dirty (ξ : CtxId) (c : CPU) (σ : wmstate) (m : wmsg)
       (x : Z) (v v' : bv 8) (rl : bool) :
     msg_byte m x = Some v' ->
     (∀ a', a' ≠ x -> msg_byte m a' = None) ->
     wm_tid m = Some (fin_to_nat c) ->
     wm_ak m = WCplain ->
+    wlog_auth ((wm_log σ ++ [m])%list) -∗ ctx_migr ξ c -∗
     wlat_interp (wm_img σ) (wm_log σ) -∗
     vwp_hold (x ↦w v) (wm_ws σ) ==∗
+    wlog_auth ((wm_log σ ++ [m])%list) ∗ ctx_migr ξ c ∗
     wlat_interp (wm_img σ) ((wm_log σ ++ [m])%list) ∗
-    vwp_hold (wpt_dirty c x v')
+    vwp_hold (wpt_dirty ξ c x v')
       (store_post (wm_ws σ) rl x (S (length (wm_log σ)))).
   Proof.
-    intros Hma Hother Htid Hk. iIntros "Hi HR".
-    iApply (wpt_store_post_dirty c σ m x v v' rl Hma Hother Htid Hk with "Hi").
-    by iApply (pp_receive c x v (wm_ws σ)).
+    intros Hma Hother Htid Hk. iIntros "Hlg Hmg Hi HR".
+    iApply (wpt_store_post_dirty ξ c σ m x v v' rl Hma Hother Htid Hk
+              with "Hlg Hmg Hi").
+    by iApply (pp_receive ξ x v (wm_ws σ)).
   Qed.
 
 End receive.
@@ -502,7 +536,7 @@ Section wp_pingpong.
   Context `{!riscvGS Σ, !weakGS Σ, !lockG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Definition wrel_own_cb (x y : Z) (v w : bv 8)
+  Definition wrel_own_cb (ξ : CtxId) (x y : Z) (v w : bv 8)
       (pc : SailStdpp.Values.mword 64) (P : wmstate → Prop) : iProp Σ :=
     (∀ σ : wmstate,
        wlat_interp (wm_img σ) (wm_log σ) -∗
@@ -516,19 +550,21 @@ Section wp_pingpong.
             is both what keeps the lock word clean and what licenses the flip *)
          ⌜w_relp (wm_ws σ) = true⌝ ∗
          wlat_interp (wm_img σ) (wm_log σ) ∗
-         vwp_hold (wpt_own cpu_id x v) (wm_ws σ) ∗
-         vwp_hold (wpt_dirty cpu_id y w) (wm_ws σ) ∗
+         vwp_hold (wpt_own ξ x v) (wm_ws σ) ∗
+         vwp_hold (wpt_dirty ξ cpu_id y w) (wm_ws σ) ∗
          ∃ t0 t1 : mstate,
            ⌜exec (riscv_step false) (wflat_st σ) = Some (tt, t0)⌝ ∗
            ⌜exec (riscv_step true) (wflat_st σ) = Some (tt, t1)⌝ ∗
            ▷ (∀ (tick : bool) (σ' : wmstate),
                 ⌜wstep_post σ σ' (if tick then t1 else t0)⌝ -∗
-                vwp_hold (wpt_dirty cpu_id y w) (wm_ws σ') -∗
+                vwp_hold (wpt_dirty ξ cpu_id y w) (wm_ws σ') -∗
                 |={∅, ⊤ ∖ ↑wlockN}=> wmstate_rest_nonv σ' ∗
-                  WWP Loop))%I.
+                  (* the migration invariant comes back to the thread: it is
+                     scheduler state, not part of the memory frame *)
+                  (ctx_migr ξ cpu_id -∗ WWP Loop)))%I.
 
-  Lemma wwp_release_flip (γ : gname) (lk : Arch.pa) (x y : Z) (v w : bv 8)
-      (pc : SailStdpp.Values.mword 64)
+  Lemma wwp_release_flip (ξ : CtxId) (γ : gname) (lk : Arch.pa) (x y : Z)
+      (v w : bv 8) (pc : SailStdpp.Values.mword 64)
       (akf : akinfo) (pf : Arch.pa) (nf : N) (akw : akinfo) :
     gen_id = 0%nat →
     acc_wf pc 4 →
@@ -539,12 +575,15 @@ Section wp_pingpong.
        ∃ j : nat, (j < 4)%nat ∧ a = acc_addr pc j) →
     inv wlockN (wlock_inv γ lk (x ↦w v)) -∗
     locked γ cpu_id -∗
-    wrel_own_cb x y v w pc
+    (* the scheduler resource the ctx conversion threads anyway; NOT a memory
+       fact, and it comes straight back out *)
+    ctx_migr ξ cpu_id -∗
+    wrel_own_cb ξ x y v w pc
       (wP_eff (Some (fin_to_nat cpu_id))
          [WEread akf pf nf; WEwrite akw lk 4 lock_zero]) -∗
     WWP Loop.
   Proof.
-    intros Hgid Haccpc Hacclk Hlatw Hfetch. iIntros "#Hinv Htok Hk".
+    intros Hgid Haccpc Hacclk Hlatw Hfetch. iIntros "#Hinv Htok Hmg Hk".
     rewrite /wrel_own_cb.
     assert (Hfoot : ∀ a : Z,
               weffs_touch [WEread akf pf nf; WEwrite akw lk 4 lock_zero] a →
@@ -582,8 +621,15 @@ Section wp_pingpong.
                               WCrel lk 4 lock_zero])%list)
       by exact (wQ_eff_store_rel _ akf pf nf akw lk lock_zero σ σ'
                   Hlatw Hrelp HQeff).
-    iMod (wrelease_flip_core γ lk x v cpu_id σ σ' HQ Hlog Hbnd
-            with "Hlat Hbody Htok Hx") as "[Hlat Hbody]".
+    (* the continuation FIRST: the log authority the retarget and the mint
+       ride lives in the POST-state remainder it returns *)
+    iMod ("Hcont" $! tick σ' with "[%] [Hy]") as "[Hrest Hk2]"; [exact Hpost| |].
+    { iApply (wpt_dirty_mono ξ cpu_id y w (wm_ws σ) (wm_ws σ')); [|iFrame].
+      exact (wstep_post_ws_le σ σ' _ Hpost). }
+    iDestruct "Hrest" as "(%Hb' & %Hw' & Hr & Hd & Hlogauth & Hws)".
+    iMod (wrelease_flip_core ξ γ lk x v cpu_id σ σ' HQ Hlog Hbnd
+            with "Hlogauth Hmg Hlat Hbody Htok Hx")
+      as "(Hlogauth & Hmg & Hlat & Hbody)".
     (* the φ payment, verbatim [WeakAcquire.wwp_release_store]'s: the fetch
        window transports across an own append, and the lock word's bundle
        comes back CLEAN out of the invariant *)
@@ -598,12 +644,13 @@ Section wp_pingpong.
       - rewrite Hlog. intros n. apply nv_byte_app_own; [by apply Hnvpc|].
         intros m Hm. apply elem_of_list_singleton in Hm as ->. reflexivity.
       - by apply Hnvlk. }
-    iMod ("Hcont" $! tick σ' with "[%] [Hy]") as "[Hrest $]"; [exact Hpost| |].
-    { iApply (wpt_dirty_mono cpu_id y w (wm_ws σ) (wm_ws σ')); [|iFrame].
-      exact (wstep_post_ws_le σ σ' _ Hpost). }
+    iSpecialize ("Hk2" with "Hmg").
     iMod ("Hclose" with "[Hbody]") as "_"; [by iNext|].
-    iModIntro. iApply (wmstate_interp_split σ'). iFrame "Hlat".
-    iApply (wmstate_rest_of_nonv σ' with "[%] Hrest"). exact Hnv'.
+    iModIntro. iFrame "Hk2".
+    iApply (wmstate_interp_split σ'). iFrame "Hlat".
+    iApply (wmstate_rest_of_nonv σ' with "[%]"); [exact Hnv'|].
+    rewrite /wmstate_rest_nonv. iSplitR; [by iPureIntro|].
+    iSplitR; [by iPureIntro|]. iFrame "Hr Hd Hws Hlogauth".
   Qed.
 
   (** ... AND THE OTHER SIDE OF THE HANDOFF NEEDS NO NEW RULE AT ALL.  The
@@ -656,8 +703,8 @@ End wp_pingpong.
 Section payoff.
   Context `{!riscvGS Σ, !weakGS Σ, !lockG Σ}.
 
-  Corollary pp_handoff_load (γ : gname) (lk : Arch.pa) (x : Z) (v : bv 8)
-      (c : CPU) (tid : option nat) (σ σ' σn : wmstate)
+  Corollary pp_handoff_load (ξ : CtxId) (γ : gname) (lk : Arch.pa) (x : Z)
+      (v : bv 8) (c : CPU) (tid : option nat) (σ σ' σn : wmstate)
       (ak : akinfo) (t' : nat) (b : bv 8) :
     (* --- the acquire: the swap read 0, so the payload is thawed here --- *)
     wlog_wf (wm_log σ) -> acc_wf lk 4 ->
@@ -672,7 +719,7 @@ Section payoff.
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
     wlock_inv γ lk (x ↦w v) ==∗
     wlat_interp (wm_img σn) (wm_log σn) ∗ wlock_inv γ lk (x ↦w v) ∗
-    locked γ c ∗ ⌜b = v⌝ ∗ vwp_hold (wpt_own c x v) (wm_ws σn).
+    locked γ c ∗ ⌜b = v⌝ ∗ vwp_hold (wpt_own ξ x v) (wm_ws σn).
   Proof.
     intros Hwf Hacc HQ Hzero Hcoh Himg Hlog Hle Hok. iIntros "Hi Hinv".
     iMod (pp_acquire_payload γ lk x v c tid σ σ' Hwf Hacc HQ Hzero
@@ -685,7 +732,7 @@ Section payoff.
                  Hcoh Hok eq_refl eq_refl ltac:(lia) with "Hi HR")
       as "(%Hv & Hi & HR)".
     iModIntro. iFrame "Hi Hbody Htok". iSplitR; [by iPureIntro|].
-    by iApply (pp_receive c x v (wm_ws σn)).
+    by iApply (pp_receive ξ x v (wm_ws σn)).
   Qed.
 
   (** THE RETURN LEG, and the whole point of calling it a PING-PONG: the same
@@ -696,8 +743,8 @@ Section payoff.
 
       Two bytes, one release, one flip: the protocol is per-byte, and this
       statement is where that stops being a claim. *)
-  Corollary pp_return_leg (γ : gname) (lk : Arch.pa) (x y : Z) (v w : bv 8)
-      (cA : CPU) (tid : option nat) (σ σ' σn : wmstate)
+  Corollary pp_return_leg (ξ : CtxId) (γ : gname) (lk : Arch.pa) (x y : Z)
+      (v w : bv 8) (cA : CPU) (tid : option nat) (σ σ' σn : wmstate)
       (ak : akinfo) (t' : nat) (b : bv 8) :
     wlog_wf (wm_log σ) -> acc_wf lk 4 ->
     wQ_amo_aq tid lk lock_one σ σ' ->
@@ -709,18 +756,18 @@ Section payoff.
     wbyte_ok σn ak x t' b ->
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
     wlock_inv γ lk (x ↦w v) -∗
-    vwp_hold (wpt_dirty cA y w) (wm_ws σ) ==∗
+    vwp_hold (wpt_dirty ξ cA y w) (wm_ws σ) ==∗
     wlat_interp (wm_img σn) (wm_log σn) ∗ wlock_inv γ lk (x ↦w v) ∗
     locked γ cA ∗ ⌜b = v⌝ ∗
-    vwp_hold (wpt_own cA x v) (wm_ws σn) ∗
-    vwp_hold (wpt_dirty cA y w) (wm_ws σn).
+    vwp_hold (wpt_own ξ x v) (wm_ws σn) ∗
+    vwp_hold (wpt_dirty ξ cA y w) (wm_ws σn).
   Proof.
     intros Hwf Hacc HQ Hzero Hcoh Himg Hlog Hle Hok.
     iIntros "Hi Hinv Hy".
-    iMod (pp_handoff_load γ lk x v cA tid σ σ' σn ak t' b
+    iMod (pp_handoff_load ξ γ lk x v cA tid σ σ' σn ak t' b
             Hwf Hacc HQ Hzero Hcoh Himg Hlog Hle Hok with "Hi Hinv")
       as "($ & $ & $ & $ & $)".
-    iModIntro. iApply (wpt_dirty_mono cA y w (wm_ws σ) (wm_ws σn)); [|iFrame].
+    iModIntro. iApply (wpt_dirty_mono ξ cA y w (wm_ws σ) (wm_ws σn)); [|iFrame].
     etrans; [exact (proj1 (proj2 (proj2 (proj1 HQ)))) | exact Hle].
   Qed.
 
@@ -737,7 +784,8 @@ Section payoff.
       - the FETCH WINDOW: text, never written, [nv_ok_unwritten] (the
         vacuous arm every leaf uses);
       - the TRANSFERRED / PRIVATE byte: owned, possibly DIRTY, paid by the
-        state element itself ([nv_ok_of_own_st]) — this is the arm no clean
+        owned points-to itself ([WeakVProp.nv_ok_of_wpt_own_at], which case-
+        splits on the dirty author internally) — this is the arm no clean
         fragment and no view bound can substitute for, and the reason the
         C/D/S protocol exists;
       - the LOCK WORD: clean inside the invariant, paid by the ordinary
@@ -745,16 +793,19 @@ Section payoff.
         write half is [WCexcl] and the release's is [WCrel] — neither is an
         owned store — so no [WSync] mint is needed. *)
 
-  Lemma pp_phi_three_arms (c : CPU) (img : _) (log : list wmsg)
-      (pcb x lkb : Z) (dq : dfrac) (t : nat) (vl : bv 8) :
+  Lemma pp_phi_three_arms (ξ : CtxId) (c : CPU) (img : _) (log : list wmsg)
+      (ws : wstate) (pcb x lkb : Z) (vx : bv 8) (dq : dfrac) (t : nat)
+      (vl : bv 8) :
     latest_ts log pcb = 0%nat ->
+    wlog_auth log -∗ ctx_migr ξ c -∗
     wlat_interp img log -∗
-    wown_st c x -∗
+    vwp_hold (wpt_own ξ x vx) ws -∗
     wlat_pointsto lkb dq t vl -∗
     ⌜nv_ok log c pcb ∧ nv_ok log c x ∧ nv_ok log c lkb⌝.
   Proof.
-    intros Htext. iIntros "Hi Hx Hlk".
-    iDestruct (nv_ok_of_own_st img log c x with "Hi Hx") as %Hnx.
+    intros Htext. iIntros "Hlg Hmg Hi Hx Hlk".
+    iDestruct (nv_ok_of_wpt_own_at ξ c x vx img log ws with "Hlg Hmg Hi Hx")
+      as %Hnx.
     iDestruct (nv_ok_of_pointsto img log c lkb dq t vl with "Hi Hlk") as %Hnl.
     iPureIntro. split_and!; [by apply nv_ok_unwritten|exact Hnx|exact Hnl].
   Qed.
@@ -764,10 +815,16 @@ End payoff.
 (* ======================================================================
    WHAT A PORTED PROOF TAKES FROM THIS FILE, in the order it needs it.
 
-   1. Own-store sites are unchanged: [WeakVProp.wpt_store_rule_own] in,
-      [↦wo] out.  Do NOT case-split on the class; the absorbing form is
+   1. Own-store sites are uniform: [WeakVProp.wpt_store_rule_own] in,
+      [wpt_own ξ] out.  Do NOT case-split on the class; the absorbing form is
       there so you never have to.  ([wpt_store_rule_dirty] above exists only
-      because this file has to SAY "dirty" in a statement.)
+      because this file has to SAY "dirty" in a statement.)  Since φ-upgrade
+      §1.6 the rule also takes the POST-log authority and the context's
+      migration invariant [WeakGhost.ctx_migr ξ c] — both threaded at every
+      store site whether or not the thread has ever been rescheduled, and
+      both returned unchanged; they are what let the rule retarget a byte
+      this context dirtied on a hart it has since left, WITHOUT the caller
+      knowing that is what happened.
 
    2. At a release that egresses owned memory, three things change and no
       more:
@@ -782,17 +839,16 @@ End payoff.
       [WeakAcquire.wwp_release_store]'s in two lines.
 
    3. On the receiving side there is nothing to do but [wpt_own_of_wpt].
-      Load first if you want the load's collapse ([WeakVProp.wpt_load_rule]
-      wants the clean form); re-own at the store.
+      A thread that wants to re-read what it just wrote uses
+      [WeakVProp.wpt_load_rule_own], which is stated over the owned form and
+      needs no migration machinery at all — a load moves no [wcds] state, so
+      it reads a foreign-author dirty byte verbatim.  (This closes the gap
+      this file recorded at Stage 1: the loads below sit before the receiving
+      store only because that is the program's order.)
 
-   THE ONE GAP WORTH RECORDING.  There is no byte-level OWNED load rule —
-   [wpt_load_rule] is stated at [↦w{dq}], and its proof goes through
-   [WeakGhost.wlat_lookup], which wants the clean half.  Its ingredients are
-   all owned-form-ready ([wlat_lookup_elem] is stated over the bare element,
-   and the word-level [WeakStore.wpt4_own_flat_pin] /
-   [WeakWord8.wpt8_own_flat_pin] exist), so a [wpt_load_rule_own] is a
-   ten-line copy — but until it lands, a hart that wants to READ its own
-   DIRTY byte through the collapse rule cannot, and every load in this file
-   is therefore placed before the receiving store rather than after it.  For
-   the ping-pong that is the program's real order anyway; for a ported proof
-   that re-reads what it just wrote, it is a blocker. *)
+   4. THE INDEX IS A CONTEXT, NOT A HART.  [wpt_own ξ] and [wpt_dirty ξ c]
+      are propositions about the thread, so they frame across a yield
+      unchanged; [WkYieldFrame] is where that is exercised, and §4a of that
+      file applies one access block on both sides of a migration.  The
+      hart-indexed byte form [WeakVProp.wpt_own_h] survives only as the
+      carrier of the M-mode 4/8-byte towers, which never migrate. *)

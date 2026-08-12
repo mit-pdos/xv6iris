@@ -500,14 +500,14 @@ Section store.
 
   Definition wpt4_own (c : CPU) (a : Arch.pa) (w : bv 32) : vProp Σ :=
     (⌜is_aligned_paddr (Physaddr a) 4 = true⌝ ∗ ⌜acc_wf a 4⌝ ∗
-     wpt_own c (acc_addr a 0) (nth_byte w 0) ∗
-     wpt_own c (acc_addr a 1) (nth_byte w 1) ∗
-     wpt_own c (acc_addr a 2) (nth_byte w 2) ∗
-     wpt_own c (acc_addr a 3) (nth_byte w 3))%I.
+     wpt_own_h c (acc_addr a 0) (nth_byte w 0) ∗
+     wpt_own_h c (acc_addr a 1) (nth_byte w 1) ∗
+     wpt_own_h c (acc_addr a 2) (nth_byte w 2) ∗
+     wpt_own_h c (acc_addr a 3) (nth_byte w 3))%I.
 
   Lemma wpt4_own_of_wpt4 c a w : wpt4 a (DfracOwn 1) w ⊢ wpt4_own c a w.
   Proof.
-    rewrite /wpt4 /wpt4_own !wpt_own_of_wpt. iIntros "$".
+    rewrite /wpt4 /wpt4_own !wpt_own_h_of_wpt. iIntros "$".
   Qed.
 
   Lemma wpt4_own_facts c a w :
@@ -725,7 +725,7 @@ Section store.
         wlat_elem (acc_addr a 3) (DfracOwn 1) t3 (nth_byte w 3) ∗
           wown_st c (acc_addr a 3).
   Proof.
-    rewrite /wpt4_own !vwp_hold_sep !vwp_hold_pure !wpt_own_at.
+    rewrite /wpt4_own !vwp_hold_sep !vwp_hold_pure !wpt_own_h_at.
     iIntros "(%Hal & %Hacc & H0 & H1 & H2 & H3)".
     iDestruct "H0" as (t0) "(H0 & S0 & _)".
     iDestruct "H1" as (t1) "(H1 & S1 & _)".
@@ -747,15 +747,15 @@ Section store.
     iIntros "(H0 & S0 & H1 & S1 & H2 & S2 & H3 & S3)".
     iSplitR; [iPureIntro; exact Hal|]. iSplitR; [iPureIntro; exact Hacc|].
     iSplitL "H0 S0";
-      [by iApply (wpt_own_at_intro c _ _ t ws (Hfl 0%nat ltac:(lia))
+      [by iApply (wpt_own_h_at_intro c _ _ t ws (Hfl 0%nat ltac:(lia))
                     with "H0 S0")|].
     iSplitL "H1 S1";
-      [by iApply (wpt_own_at_intro c _ _ t ws (Hfl 1%nat ltac:(lia))
+      [by iApply (wpt_own_h_at_intro c _ _ t ws (Hfl 1%nat ltac:(lia))
                     with "H1 S1")|].
     iSplitL "H2 S2";
-      [by iApply (wpt_own_at_intro c _ _ t ws (Hfl 2%nat ltac:(lia))
+      [by iApply (wpt_own_h_at_intro c _ _ t ws (Hfl 2%nat ltac:(lia))
                     with "H2 S2")|].
-    by iApply (wpt_own_at_intro c _ _ t ws (Hfl 3%nat ltac:(lia))
+    by iApply (wpt_own_h_at_intro c _ _ t ws (Hfl 3%nat ltac:(lia))
                  with "H3 S3").
   Qed.
 
@@ -785,7 +785,7 @@ Section store.
   Qed.
 
   (** THE OWNED LOAD FACTS: the flat window and its pinnedness, four
-      applications of [WeakInstr.wpt_own_byte_flat_pin]. *)
+      applications of [WeakInstr.wpt_own_h_byte_flat_pin]. *)
   Lemma wpt4_own_flat_pin (c : CPU) (σ : wmstate) (a : Arch.pa) (w : bv 32) :
     wlog_wf (wm_log σ) ->
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
@@ -796,13 +796,13 @@ Section store.
   Proof.
     intros Hwf. rewrite /wpt4_own !vwp_hold_sep !vwp_hold_pure.
     iIntros "Hi (%Hal & %Hacc & H0 & H1 & H2 & H3)".
-    iDestruct (wpt_own_byte_flat_pin c σ a 4 (nth_byte w 0) 0 Hwf Hacc
+    iDestruct (wpt_own_h_byte_flat_pin c σ a 4 (nth_byte w 0) 0 Hwf Hacc
                  ltac:(lia) with "Hi H0") as %E0.
-    iDestruct (wpt_own_byte_flat_pin c σ a 4 (nth_byte w 1) 1 Hwf Hacc
+    iDestruct (wpt_own_h_byte_flat_pin c σ a 4 (nth_byte w 1) 1 Hwf Hacc
                  ltac:(lia) with "Hi H1") as %E1.
-    iDestruct (wpt_own_byte_flat_pin c σ a 4 (nth_byte w 2) 2 Hwf Hacc
+    iDestruct (wpt_own_h_byte_flat_pin c σ a 4 (nth_byte w 2) 2 Hwf Hacc
                  ltac:(lia) with "Hi H2") as %E2.
-    iDestruct (wpt_own_byte_flat_pin c σ a 4 (nth_byte w 3) 3 Hwf Hacc
+    iDestruct (wpt_own_h_byte_flat_pin c σ a 4 (nth_byte w 3) 3 Hwf Hacc
                  ltac:(lia) with "Hi H3") as %E3.
     iPureIntro. split; [exact Hacc|]. intros j Hj.
     destruct j as [|[|[|[|j]]]]; [exact E0|exact E1|exact E2|exact E3|lia].

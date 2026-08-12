@@ -132,17 +132,17 @@ Section word8.
 
   Definition wpt8_own (c : CPU) (a : Arch.pa) (w : bv 64) : vProp Σ :=
     (⌜is_aligned_paddr (Physaddr a) 8 = true⌝ ∗ ⌜acc_wf a 8⌝ ∗
-     wpt_own c (acc_addr a 0) (nth_byte w 0) ∗
-     wpt_own c (acc_addr a 1) (nth_byte w 1) ∗
-     wpt_own c (acc_addr a 2) (nth_byte w 2) ∗
-     wpt_own c (acc_addr a 3) (nth_byte w 3) ∗
-     wpt_own c (acc_addr a 4) (nth_byte w 4) ∗
-     wpt_own c (acc_addr a 5) (nth_byte w 5) ∗
-     wpt_own c (acc_addr a 6) (nth_byte w 6) ∗
-     wpt_own c (acc_addr a 7) (nth_byte w 7))%I.
+     wpt_own_h c (acc_addr a 0) (nth_byte w 0) ∗
+     wpt_own_h c (acc_addr a 1) (nth_byte w 1) ∗
+     wpt_own_h c (acc_addr a 2) (nth_byte w 2) ∗
+     wpt_own_h c (acc_addr a 3) (nth_byte w 3) ∗
+     wpt_own_h c (acc_addr a 4) (nth_byte w 4) ∗
+     wpt_own_h c (acc_addr a 5) (nth_byte w 5) ∗
+     wpt_own_h c (acc_addr a 6) (nth_byte w 6) ∗
+     wpt_own_h c (acc_addr a 7) (nth_byte w 7))%I.
 
   Lemma wpt8_own_of_wpt8 c a w : wpt8 a (DfracOwn 1) w ⊢ wpt8_own c a w.
-  Proof. rewrite /wpt8 /wpt8_own !wpt_own_of_wpt. iIntros "$". Qed.
+  Proof. rewrite /wpt8 /wpt8_own !wpt_own_h_of_wpt. iIntros "$". Qed.
 
   Lemma wpt8_own_facts c a w :
     wpt8_own c a w ⊢ ⌜is_aligned_paddr (Physaddr a) 8 = true /\ acc_wf a 8⌝.
@@ -592,7 +592,7 @@ Section store8.
         wlat_elem (acc_addr a 7) (DfracOwn 1) t7 (nth_byte w 7) ∗
           wown_st c (acc_addr a 7).
   Proof.
-    rewrite /wpt8_own !vwp_hold_sep !vwp_hold_pure !wpt_own_at.
+    rewrite /wpt8_own !vwp_hold_sep !vwp_hold_pure !wpt_own_h_at.
     iIntros "(%Hal & %Hacc & H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7)".
     iDestruct "H0" as (t0) "(H0 & S0 & _)".
     iDestruct "H1" as (t1) "(H1 & S1 & _)".
@@ -619,27 +619,27 @@ Section store8.
               & H6 & S6 & H7 & S7)".
     iSplitR; [iPureIntro; exact Hal|]. iSplitR; [iPureIntro; exact Hacc|].
     iSplitL "H0 S0";
-      [by iApply (wpt_own_at_intro c _ _ t ws (Hfl 0%nat ltac:(lia))
+      [by iApply (wpt_own_h_at_intro c _ _ t ws (Hfl 0%nat ltac:(lia))
                     with "H0 S0")|].
     iSplitL "H1 S1";
-      [by iApply (wpt_own_at_intro c _ _ t ws (Hfl 1%nat ltac:(lia))
+      [by iApply (wpt_own_h_at_intro c _ _ t ws (Hfl 1%nat ltac:(lia))
                     with "H1 S1")|].
     iSplitL "H2 S2";
-      [by iApply (wpt_own_at_intro c _ _ t ws (Hfl 2%nat ltac:(lia))
+      [by iApply (wpt_own_h_at_intro c _ _ t ws (Hfl 2%nat ltac:(lia))
                     with "H2 S2")|].
     iSplitL "H3 S3";
-      [by iApply (wpt_own_at_intro c _ _ t ws (Hfl 3%nat ltac:(lia))
+      [by iApply (wpt_own_h_at_intro c _ _ t ws (Hfl 3%nat ltac:(lia))
                     with "H3 S3")|].
     iSplitL "H4 S4";
-      [by iApply (wpt_own_at_intro c _ _ t ws (Hfl 4%nat ltac:(lia))
+      [by iApply (wpt_own_h_at_intro c _ _ t ws (Hfl 4%nat ltac:(lia))
                     with "H4 S4")|].
     iSplitL "H5 S5";
-      [by iApply (wpt_own_at_intro c _ _ t ws (Hfl 5%nat ltac:(lia))
+      [by iApply (wpt_own_h_at_intro c _ _ t ws (Hfl 5%nat ltac:(lia))
                     with "H5 S5")|].
     iSplitL "H6 S6";
-      [by iApply (wpt_own_at_intro c _ _ t ws (Hfl 6%nat ltac:(lia))
+      [by iApply (wpt_own_h_at_intro c _ _ t ws (Hfl 6%nat ltac:(lia))
                     with "H6 S6")|].
-    by iApply (wpt_own_at_intro c _ _ t ws (Hfl 7%nat ltac:(lia))
+    by iApply (wpt_own_h_at_intro c _ _ t ws (Hfl 7%nat ltac:(lia))
                  with "H7 S7").
   Qed.
 
@@ -681,21 +681,21 @@ Section store8.
   Proof.
     intros Hwf. rewrite /wpt8_own !vwp_hold_sep !vwp_hold_pure.
     iIntros "Hi (%Hal & %Hacc & H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7)".
-    iDestruct (wpt_own_byte_flat_pin c σ a 8 (nth_byte w 0) 0 Hwf Hacc
+    iDestruct (wpt_own_h_byte_flat_pin c σ a 8 (nth_byte w 0) 0 Hwf Hacc
                  ltac:(lia) with "Hi H0") as %E0.
-    iDestruct (wpt_own_byte_flat_pin c σ a 8 (nth_byte w 1) 1 Hwf Hacc
+    iDestruct (wpt_own_h_byte_flat_pin c σ a 8 (nth_byte w 1) 1 Hwf Hacc
                  ltac:(lia) with "Hi H1") as %E1.
-    iDestruct (wpt_own_byte_flat_pin c σ a 8 (nth_byte w 2) 2 Hwf Hacc
+    iDestruct (wpt_own_h_byte_flat_pin c σ a 8 (nth_byte w 2) 2 Hwf Hacc
                  ltac:(lia) with "Hi H2") as %E2.
-    iDestruct (wpt_own_byte_flat_pin c σ a 8 (nth_byte w 3) 3 Hwf Hacc
+    iDestruct (wpt_own_h_byte_flat_pin c σ a 8 (nth_byte w 3) 3 Hwf Hacc
                  ltac:(lia) with "Hi H3") as %E3.
-    iDestruct (wpt_own_byte_flat_pin c σ a 8 (nth_byte w 4) 4 Hwf Hacc
+    iDestruct (wpt_own_h_byte_flat_pin c σ a 8 (nth_byte w 4) 4 Hwf Hacc
                  ltac:(lia) with "Hi H4") as %E4.
-    iDestruct (wpt_own_byte_flat_pin c σ a 8 (nth_byte w 5) 5 Hwf Hacc
+    iDestruct (wpt_own_h_byte_flat_pin c σ a 8 (nth_byte w 5) 5 Hwf Hacc
                  ltac:(lia) with "Hi H5") as %E5.
-    iDestruct (wpt_own_byte_flat_pin c σ a 8 (nth_byte w 6) 6 Hwf Hacc
+    iDestruct (wpt_own_h_byte_flat_pin c σ a 8 (nth_byte w 6) 6 Hwf Hacc
                  ltac:(lia) with "Hi H6") as %E6.
-    iDestruct (wpt_own_byte_flat_pin c σ a 8 (nth_byte w 7) 7 Hwf Hacc
+    iDestruct (wpt_own_h_byte_flat_pin c σ a 8 (nth_byte w 7) 7 Hwf Hacc
                  ltac:(lia) with "Hi H7") as %E7.
     iPureIntro. split; [exact Hacc|]. intros j Hj.
     destruct j as [|[|[|[|[|[|[|[|j]]]]]]]];

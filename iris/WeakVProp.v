@@ -183,29 +183,36 @@ Section rules.
   Definition wpt (a : Z) (dq : dfrac) (v : bv 8) : vProp Σ :=
     (∃ t : nat, ⎡ wlat_pointsto a dq t v ⎤ ∗ ⊒(view_byte a t))%I.
 
-  (** *** 3'. THE OWNED FORM — [↦wo] (the φ-upgrade's C-or-D points-to)
+  (** *** 3'. THE OWNED FORM (the φ-upgrade's C-or-D points-to)
 
-      A byte a hart owns EXCLUSIVELY and may have plain-stored to: the value
-      element at full fraction, plus a state element that is CLEAN or DIRTY
-      BY THIS HART.  This is the postcondition shape of every owned store —
-      it absorbs both outcomes, so no call site case-splits on the access
-      class — and the only shape a plain store accepts on the way in.
+      A byte a thread owns EXCLUSIVELY and may have plain-stored to: the value
+      element at full fraction, plus a state element that is CLEAN or DIRTY —
+      and, if dirty, the persistent breadcrumb naming the hart that dirtied it
+      ([WeakGhost.wown_ctx]).  This is the postcondition shape of every owned
+      store — it absorbs both outcomes, so no call site case-splits on the
+      access class — and the only shape a plain store accepts on the way in.
 
-      IT IS HART-INDEXED, DELIBERATELY, and therefore does NOT survive
-      [WpNext.wp_next] (see [WeakSmodeFrame]'s §5 control).  That is sound:
-      an unpublished own store IS a fact about the storing hart, and a
-      migrating context must publish (flip to C, §5b) before it moves.  The
-      M-mode weak port never crosses a [wp_next] binder with one. *)
-  Definition wpt_own (c : CPU) (a : Z) (v : bv 8) : vProp Σ :=
-    (∃ t : nat, ⎡ wlat_elem a (DfracOwn 1) t v ∗ wown_st c a ⎤ ∗
+      IT IS INDEXED BY THE EXECUTION CONTEXT [ξ], NOT BY A HART (φ-upgrade
+      §1.6), and that is what makes it FRAME across a migration: nothing in
+      the assertion changes when the thread is rescheduled, so the caller's
+      resource is literally the same proposition on both sides of a yield and
+      Iris's frame rule applies.  The hart that dirtied the byte is recorded
+      inside, in the breadcrumb, where only the LEAF ever looks at it —
+      [WeakGhost.wown_ctx_retarget] turns it back into an ordinary
+      [wown_st cpu_id] out of the scheduler's migration invariant, so an
+      access site's script is identical before and after the migration.
+
+      (Stage 1.5 had this hart-indexed, with the retarget as a lemma the
+      CALLER applied at the first touch after a migration.  That is the
+      ergonomics this stage exists to delete.) *)
+  Definition wpt_own (ξ : CtxId) (a : Z) (v : bv 8) : vProp Σ :=
+    (∃ t : nat, ⎡ wlat_elem a (DfracOwn 1) t v ∗ wown_ctx ξ a t ⎤ ∗
                 ⊒(view_byte a t))%I.
 
 End rules.
 
 Notation "a ↦w dq v" := (wpt a dq v)
   (at level 20, dq custom dfrac at level 1, format "a  ↦w dq  v") : bi_scope.
-Notation "a ↦wo v" := (wpt_own cpu_id a v)
-  (at level 20, format "a  ↦wo  v") : bi_scope.
 
 Section pointsto.
   Context `{!riscvGS Σ, !weakGS Σ}.
@@ -418,9 +425,9 @@ Section pointsto.
       [wpt_own]'s decode is [wpt_at]'s with the state element carried
       alongside; it is the shape both memory rules of §4/§5 destruct to. *)
 
-  Lemma wpt_own_at_view c a v (V : view) :
-    monPred_at (wpt_own c a v) V ⊣⊢
-      ∃ t : nat, wlat_elem a (DfracOwn 1) t v ∗ wown_st c a ∗
+  Lemma wpt_own_at_view ξ a v (V : view) :
+    monPred_at (wpt_own ξ a v) V ⊣⊢
+      ∃ t : nat, wlat_elem a (DfracOwn 1) t v ∗ wown_ctx ξ a t ∗
                  ⌜(t ≤ flr V a)%nat⌝.
   Proof.
     rewrite /wpt_own monPred_at_exist.
@@ -433,152 +440,130 @@ Section pointsto.
       by apply view_byte_le.
   Qed.
 
-  Lemma wpt_own_at c a v ws :
-    vwp_hold (wpt_own c a v) ws ⊣⊢
-      ∃ t : nat, wlat_elem a (DfracOwn 1) t v ∗ wown_st c a ∗
+  Lemma wpt_own_at ξ a v ws :
+    vwp_hold (wpt_own ξ a v) ws ⊣⊢
+      ∃ t : nat, wlat_elem a (DfracOwn 1) t v ∗ wown_ctx ξ a t ∗
                  ⌜(t ≤ flr (ws_view ws) a)%nat⌝.
   Proof. apply wpt_own_at_view. Qed.
 
-  Lemma wpt_own_at_intro c a v t ws :
+  Lemma wpt_own_at_intro ξ a v t ws :
     (t ≤ flr (ws_view ws) a)%nat →
-    wlat_elem a (DfracOwn 1) t v -∗ wown_st c a -∗
-    vwp_hold (wpt_own c a v) ws.
+    wlat_elem a (DfracOwn 1) t v -∗ wown_ctx ξ a t -∗
+    vwp_hold (wpt_own ξ a v) ws.
   Proof.
     intros Ht. rewrite wpt_own_at. iIntros "He Hs". iExists t. by iFrame.
   Qed.
 
-  (** A CLEAN full-fraction byte IS an owned byte.  The converse is NOT
-      available in general — that is the whole point of the D state, and
-      recovering it is what a release's flip ([WeakStore.wpt_own_flip]) does. *)
-  Lemma wpt_own_of_wpt c a v : (a ↦w v : vProp Σ) ⊢ wpt_own c a v.
+  (* ---------------------------------------------------------------- *)
+  (** *** 3c''. THE HART-INDEXED BYTE FORM — [wpt_own_h], M-MODE ONLY
+
+      Stage 1.5's owned points-to, kept under a distinguishing name for ONE
+      purpose: it is what the four- and eight-byte OWNED TOWERS
+      ([WeakStore.wpt4_own], [WeakWord8.wpt8_own]) and the M-mode store leaves
+      built on them are stated over, and those never cross a migration — the
+      M-mode boot chain runs one context per hart from reset to [wp_next], so
+      indexing them by a context would buy nothing and cost a rewrite of every
+      leaf in the batch-2 family.
+
+      IT IS NOT THE API.  A resource that names a hart does not frame across a
+      yield, which is the whole content of §1.6; anything that can be
+      rescheduled must use [wpt_own].  The two forms do not interconvert
+      except through the clean form [a ↦w{1} v], which both accept — and that
+      is the honest statement of the difference. *)
+  Definition wpt_own_h (c : CPU) (a : Z) (v : bv 8) : vProp Σ :=
+    (∃ t : nat, ⎡ wlat_elem a (DfracOwn 1) t v ∗ wown_st c a ⎤ ∗
+                ⊒(view_byte a t))%I.
+
+  Lemma wpt_own_h_at_view c a v (V : view) :
+    monPred_at (wpt_own_h c a v) V ⊣⊢
+      ∃ t : nat, wlat_elem a (DfracOwn 1) t v ∗ wown_st c a ∗
+                 ⌜(t ≤ flr V a)%nat⌝.
   Proof.
-    rewrite /wpt /wpt_own. constructor => V.
+    rewrite /wpt_own_h monPred_at_exist.
+    setoid_rewrite monPred_at_sep. setoid_rewrite monPred_at_embed.
+    setoid_rewrite monPred_at_in.
+    apply bi.exist_proper => t.
+    iSplit.
+    - iIntros "[[He Hs] %H]". iFrame "He Hs". iPureIntro. by apply view_byte_le.
+    - iIntros "(He & Hs & %H)". iFrame "He Hs". iPureIntro.
+      by apply view_byte_le.
+  Qed.
+
+  Lemma wpt_own_h_at c a v ws :
+    vwp_hold (wpt_own_h c a v) ws ⊣⊢
+      ∃ t : nat, wlat_elem a (DfracOwn 1) t v ∗ wown_st c a ∗
+                 ⌜(t ≤ flr (ws_view ws) a)%nat⌝.
+  Proof. apply wpt_own_h_at_view. Qed.
+
+  Lemma wpt_own_h_at_intro c a v t ws :
+    (t ≤ flr (ws_view ws) a)%nat →
+    wlat_elem a (DfracOwn 1) t v -∗ wown_st c a -∗
+    vwp_hold (wpt_own_h c a v) ws.
+  Proof.
+    intros Ht. rewrite wpt_own_h_at. iIntros "He Hs". iExists t. by iFrame.
+  Qed.
+
+  Lemma wpt_own_h_of_wpt c a v : (a ↦w v : vProp Σ) ⊢ wpt_own_h c a v.
+  Proof.
+    rewrite /wpt /wpt_own_h. constructor => V.
     rewrite !monPred_at_exist. apply bi.exist_mono => t.
     rewrite !monPred_at_sep !monPred_at_embed.
     iIntros "[[He Hc] $]". iFrame "He". by iApply wclean_own_st.
   Qed.
 
-  Lemma wpt_own_mono c a v ws ws' :
-    ws_le ws ws' → vwp_hold (wpt_own c a v) ws ⊢ vwp_hold (wpt_own c a v) ws'.
+  (** A CLEAN full-fraction byte IS an owned byte, at EVERY context — a clean
+      byte names no author, so there is nothing to be indexed by.  The
+      converse is NOT available in general: that is the whole point of the D
+      state, and recovering it is what a release's flip does. *)
+  Lemma wpt_own_of_wpt ξ a v : (a ↦w v : vProp Σ) ⊢ wpt_own ξ a v.
+  Proof.
+    rewrite /wpt /wpt_own. constructor => V.
+    rewrite !monPred_at_exist. apply bi.exist_mono => t.
+    rewrite !monPred_at_sep !monPred_at_embed.
+    iIntros "[[He Hc] $]". iFrame "He". by iApply wown_ctx_of_clean.
+  Qed.
+
+  Lemma wpt_own_mono ξ a v ws ws' :
+    ws_le ws ws' → vwp_hold (wpt_own ξ a v) ws ⊢ vwp_hold (wpt_own ξ a v) ws'.
   Proof. apply vwp_hold_mono. Qed.
 
   (* ---------------------------------------------------------------- *)
-  (** *** 3c'. THE PUBLICATION FLOOR OVER A VIEW, AND THE LAZY UPGRADE
-      (φ-upgrade §1.5 — the framing pattern's ACCEPTANCE ARM)
+  (** *** 3c'. THE φ PAYMENT OF AN OWNED BYTE (φ-upgrade §1.6)
 
-      A thread that dirtied bytes on hart [c], parked, and resumed elsewhere
-      holds its ownership facts FROZEN at the index [V] it had when it parked
-      ([monPred_at P V] — objective, so it frames around the yield with
-      nothing to prove).  What it gets back from the yield is ONE persistent
-      token:
+      Every leaf owes [nv_hart] at its post-log, one [WeakGhost.nv_byte] per
+      byte of its own effect trace.  For an owned byte the obligation is paid
+      HERE, and — this is the stage's whole content — by the SAME lemma
+      whether or not the thread has migrated since it last wrote the byte.
+      [WeakGhost.nv_ok_of_wown_ctx] does the case analysis internally: clean
+      and own-dirty bytes pay directly, a byte dirtied on a hart the context
+      has since left pays out of the publication coverage the migration
+      invariant supplies.
 
-        [pub_covers_view c V] — "hart [c] has published everything [V] can
-        see".
-
-      STATED OVER THE VIEW, not over a position, and that is the whole trick:
-      a framed [↦wo] carries [⊒(view_byte a t)], which AT THE FROZEN INDEX is
-      [t ≤ flr V a] — so the timestamp side condition the position-indexed
-      form would need is already in the resource, by construction.  Nothing
-      at the leaf has to name a timestamp.
-
-      The token is minted by the migration handoff's RELEASE STORE, which
-      needs no view arithmetic either: its message sits at the log's fresh
-      top, which dominates the parking hart's whole index by
-      [WeakMem.ws_bounded]. *)
-
-  Definition pub_covers_view (c : CPU) (V : view) : iProp Σ :=
-    (∃ n : nat, pub_floor c n ∗ ⌜V ⊑ view_scl n⌝)%I.
-
-  Global Instance pub_covers_view_persistent c V :
-    Persistent (pub_covers_view c V).
-  Proof. rewrite /pub_covers_view. apply _. Qed.
-  Global Instance pub_covers_view_timeless c V :
-    Timeless (pub_covers_view c V).
-  Proof. rewrite /pub_covers_view. apply _. Qed.
-
-  (** THE MINT, at the view altitude: a floor at [n] covers every view whose
-      floors are below [n] — which, at a release store, is the parking hart's
-      whole index. *)
-  Lemma pub_covers_view_intro c V n :
-    V ⊑ view_scl n → pub_floor c n -∗ pub_covers_view c V.
-  Proof. iIntros (Hle) "H". iExists n. by iFrame "H". Qed.
-
-  (** ... and it covers every SMALLER view for free. *)
-  Lemma pub_covers_view_mono c V V' :
-    V' ⊑ V → pub_covers_view c V -∗ pub_covers_view c V'.
+      (Stage 1.5 had TWO lemmas here, [nv_ok_of_own_st] and
+      [nv_free_of_own_upgrade], and the caller had to know which situation it
+      was in.  That is exactly what the user's directive rules out.) *)
+  Lemma nv_ok_of_wpt_own (ξ : CtxId) (c : CPU) (a : Z) (v : bv 8) (V : view)
+      img (log logA : list wmsg) :
+    pub_transfer logA log c →
+    wlog_auth logA -∗ ctx_migr ξ c -∗ wlat_interp img log -∗
+    monPred_at (wpt_own ξ a v) V -∗ ⌜nv_ok log c a⌝.
   Proof.
-    iIntros (Hle) "[%n [H %Hn]]". iExists n. iFrame "H". iPureIntro.
-    by etrans.
+    intros Htr. iIntros "Hlog Hmg Hi Hpt".
+    rewrite wpt_own_at_view. iDestruct "Hpt" as (t) "(Hel & Hs & _)".
+    by iApply (nv_ok_of_wown_ctx ξ c a t v img log logA Htr
+                 with "Hlog Hmg Hi Hel Hs").
   Qed.
 
-  (** THE ACCEPTANCE ARM.  A byte that hart [c] left DIRTY, presented at the
-      index [c] parked with, together with [c]'s publication coverage of that
-      index, IS a clean full-fraction byte at ANY hart whose index dominates
-      [V].  The [wcds] state element is retargeted [WDirty c → WClean] in the
-      interp-open ghost section; nothing else moves.
-
-      AFTER THIS THE ORDINARY RULES APPLY VERBATIM — that is the point, and
-      the reason there is no "own load with optional evidence" and no "own
-      store with optional evidence": [wpt_load_rule] collapses the load,
-      [wpt_own_of_wpt] re-owns at the NEW hart, and [wpt_store_rule_own]
-      re-dirties it there.  No leaf statement changes. *)
-  Lemma wpt_own_upgrade (c : CPU) (a : Z) (v : bv 8) (V : view)
+  Lemma nv_ok_of_wpt_own_at (ξ : CtxId) (c : CPU) (a : Z) (v : bv 8)
       img (log : list wmsg) (ws : wstate) :
-    V ⊑ ws_view ws →
-    wlog_auth log -∗ pub_covers_view c V -∗ wlat_interp img log -∗
-    monPred_at (wpt_own c a v) V ==∗
-    wlog_auth log ∗ wlat_interp img log ∗ vwp_hold (a ↦w v) ws.
+    wlog_auth log -∗ ctx_migr ξ c -∗ wlat_interp img log -∗
+    vwp_hold (wpt_own ξ a v) ws -∗ ⌜nv_ok log c a⌝.
   Proof.
-    iIntros (HV) "Hlog [%n [#Hpf %Hn]] Hi Hpt".
-    rewrite wpt_own_at_view. iDestruct "Hpt" as (t) "(Hel & Hs & %Ht)".
-    assert (Htn : (t ≤ n)%nat).
-    { etrans; [exact Ht|]. rewrite -(flr_scl_eq n a). apply Hn. }
-    iMod (wlat_flip_pub img log c a t n v Htn with "Hlog Hpf Hi Hel Hs")
-      as "(Hlog & Hi & Hel & Hcl)".
-    iModIntro. iFrame "Hlog Hi".
-    iApply (vwp_hold_intro V _ ws HV). rewrite wpt_at_view.
-    iExists t. rewrite /wlat_pointsto. iFrame "Hel Hcl". by iPureIntro.
+    iIntros "Hlog Hmg Hi Hpt".
+    iApply (nv_ok_of_wpt_own ξ c a v (ws_view ws) img log log
+              (pub_transfer_refl log c) with "Hlog Hmg Hi Hpt").
   Qed.
 
-  (** THE STORE ARM, in one step: the same upgrade followed by re-owning at
-      the CURRENT hart, so the byte comes out [WDirty]-able by [c'].  After
-      this the ordinary [wpt_store_rule_own] / [wpt_store_post_own] apply
-      verbatim — a migrated thread's first STORE to a byte it dirtied on the
-      old CPU costs exactly this one lemma and no leaf change.
-
-      (The two arms are one lemma because the [wcds] retarget is the same in
-      both: [WDirty c → WClean]; whether the byte then becomes [WDirty c'] is
-      decided by the store's own message class, exactly as it always was.) *)
-  Lemma wpt_own_upgrade_own (c c' : CPU) (a : Z) (v : bv 8) (V : view)
-      img (log : list wmsg) (ws : wstate) :
-    V ⊑ ws_view ws →
-    wlog_auth log -∗ pub_covers_view c V -∗ wlat_interp img log -∗
-    monPred_at (wpt_own c a v) V ==∗
-    wlog_auth log ∗ wlat_interp img log ∗ vwp_hold (wpt_own c' a v) ws.
-  Proof.
-    iIntros (HV) "Hlog #Hpf Hi Hpt".
-    iMod (wpt_own_upgrade c a v V img log ws HV with "Hlog Hpf Hi Hpt")
-      as "($ & $ & Hpt)".
-    iModIntro. iApply (vwp_hold_ent _ _ _ (wpt_own_of_wpt c' a v)).
-    iExact "Hpt".
-  Qed.
-
-  (** ... and the φ payment of the SAME arm, before any ghost step: the byte
-      is foreign-dirty but PUBLISHED, so it carries no violation obligation to
-      any hart at any floor.  A leaf states this where it holds the framed
-      fact, exactly as [WeakGhost.nv_ok_of_own_st] is used for a byte the
-      CURRENT hart dirtied. *)
-  Lemma nv_free_of_own_upgrade (c : CPU) (a : Z) (v : bv 8) (V : view)
-      img (log : list wmsg) :
-    wlog_auth log -∗ pub_covers_view c V -∗ wlat_interp img log -∗
-    monPred_at (wpt_own c a v) V -∗ ⌜nv_free log a⌝.
-  Proof.
-    iIntros "Hlog [%n [#Hpf %Hn]] Hi Hpt".
-    rewrite wpt_own_at_view. iDestruct "Hpt" as (t) "(Hel & Hs & %Ht)".
-    assert (Htn : (t ≤ n)%nat).
-    { etrans; [exact Ht|]. rewrite -(flr_scl_eq n a). apply Hn. }
-    by iApply (nv_free_of_own_pub img log c a t n v Htn with "Hlog Hpf Hi Hel Hs").
-  Qed.
 
   (* ==================================================================== *)
   (** ** 4. THE LOAD RULE
@@ -650,18 +635,21 @@ Section pointsto.
       with one lemma name changed, and it is the rule every ported proof that
       re-reads what it just wrote will use.
 
-      IT IS ALSO THE GENERAL SHAPE OF §3c''s ACCEPTANCE ARM: reading a
-      FOREIGN-dirty published byte is this rule after [wpt_own_upgrade] +
-      [wpt_own_of_wpt] ([wpt_load_rule_pub] below composes them). *)
-  Lemma wpt_load_rule_own (c : CPU) σ σ' ak a v t' b :
+      IT NEEDS NO MIGRATION MACHINERY AT ALL, and that is worth stating: a
+      load moves no [wcds] state, so a byte dirtied on a hart the context has
+      since left reads through this rule VERBATIM.  What the migration costs
+      is the φ payment, and that is [nv_ok_of_wpt_own]'s internal case split
+      (§3c'), not a caller obligation.  So the load site's script is literally
+      unchanged across a yield — which is Stage 1.6's acid test. *)
+  Lemma wpt_load_rule_own (ξ : CtxId) σ σ' ak a v t' b :
     ak_coh ak = false →
     wbyte_ok σ ak a t' b →
     wm_img σ' = wm_img σ →
     wm_log σ' = wm_log σ →
     (flr (ws_view (wm_ws σ)) a ≤ flr (ws_view (wm_ws σ')) a)%nat →
-    wlat_interp (wm_img σ) (wm_log σ) -∗ vwp_hold (wpt_own c a v) (wm_ws σ) -∗
+    wlat_interp (wm_img σ) (wm_log σ) -∗ vwp_hold (wpt_own ξ a v) (wm_ws σ) -∗
     ⌜b = v⌝ ∗ wlat_interp (wm_img σ') (wm_log σ') ∗
-    vwp_hold (wpt_own c a v) (wm_ws σ').
+    vwp_hold (wpt_own ξ a v) (wm_ws σ').
   Proof.
     intros Hcoh Hok Himg Hlog Hfl.
     iIntros "Hi Hpt". rewrite wpt_own_at.
@@ -684,44 +672,18 @@ Section pointsto.
 
   (** The framing side conditions at the interpreter's own read post-state,
       exactly as [wpt_load_wread] discharges them for the clean form. *)
-  Lemma wpt_load_wread_own (c : CPU) σ ak a v pa ts t' b :
+  Lemma wpt_load_wread_own (ξ : CtxId) σ ak a v pa ts t' b :
     ak_coh ak = false →
     wbyte_ok σ ak a t' b →
-    wlat_interp (wm_img σ) (wm_log σ) -∗ vwp_hold (wpt_own c a v) (wm_ws σ) -∗
+    wlat_interp (wm_img σ) (wm_log σ) -∗ vwp_hold (wpt_own ξ a v) (wm_ws σ) -∗
     ⌜b = v⌝ ∗
     wlat_interp (wm_img (wread_post σ ak pa ts)) (wm_log (wread_post σ ak pa ts)) ∗
-    vwp_hold (wpt_own c a v) (wm_ws (wread_post σ ak pa ts)).
+    vwp_hold (wpt_own ξ a v) (wm_ws (wread_post σ ak pa ts)).
   Proof.
     intros Hcoh Hok. iApply wpt_load_rule_own; [exact Hcoh|exact Hok| | |].
     - apply wread_post_img.
     - apply wread_post_log.
     - apply (ws_view_mono _ _ (wread_post_ws_le σ ak pa ts) a).
-  Qed.
-
-  (** THE FOREIGN-PUBLISHED LOAD, in one step: the migrated thread's first
-      read of a byte it dirtied on the OLD hart.  Everything in the conclusion
-      is at the NEW hart's index, and the byte comes back OWNED there — so the
-      next store is an ordinary [wpt_store_rule_own]. *)
-  Lemma wpt_load_rule_pub (c c' : CPU) (V : view) σ σ' ak a v t' b :
-    ak_coh ak = false →
-    wbyte_ok σ ak a t' b →
-    wm_img σ' = wm_img σ →
-    wm_log σ' = wm_log σ →
-    V ⊑ ws_view (wm_ws σ) →
-    (flr (ws_view (wm_ws σ)) a ≤ flr (ws_view (wm_ws σ')) a)%nat →
-    wlog_auth (wm_log σ) -∗ pub_covers_view c V -∗
-    wlat_interp (wm_img σ) (wm_log σ) -∗ monPred_at (wpt_own c a v) V ==∗
-    ⌜b = v⌝ ∗ wlog_auth (wm_log σ) ∗
-    wlat_interp (wm_img σ') (wm_log σ') ∗
-    vwp_hold (wpt_own c' a v) (wm_ws σ').
-  Proof.
-    intros Hcoh Hok Himg Hlog HV Hfl. iIntros "Hlog #Hpf Hi Hpt".
-    iMod (wpt_own_upgrade c a v V (wm_img σ) (wm_log σ) (wm_ws σ) HV
-            with "Hlog Hpf Hi Hpt") as "(Hlog & Hi & Hpt)".
-    iDestruct (wpt_load_rule σ σ' ak a (DfracOwn 1) v t' b
-                 Hcoh Hok Himg Hlog Hfl with "Hi Hpt") as "(%Hb & Hi & Hpt)".
-    iModIntro. iFrame "Hlog Hi". iSplitR; [by iPureIntro|].
-    iApply (vwp_hold_ent _ _ _ (wpt_own_of_wpt c' a v)). iExact "Hpt".
   Qed.
 
   (* ==================================================================== *)
@@ -754,21 +716,51 @@ Section pointsto.
           which is what keeps a lock word — held clean inside an invariant —
           clean across an acquire and a release. *)
 
-  Lemma wpt_store_rule_own (c : CPU) σ σ' m a v v' :
+  (** THE OWNED STORE, Stage 1.6 shape.  Three things enter beyond the
+      Stage-1.5 statement, and NONE of them is an evidence parameter a caller
+      supplies per site:
+
+        - the LOG AUTHORITY at the POST-log, which every store leaf already
+          holds (it comes back inside [wmstate_rest σ']).  The retarget reads
+          the foreign author's publication floor off it, and the mint reads
+          the position bound;
+        - [ctx_migr ξ c], the scheduler's migration invariant, which rides in
+          [WeakCtx.wrunning] and is therefore threaded by the ctx conversion
+          anyway;
+        - nothing else.
+
+      The case split "did this context dirty [a] on a hart it has since
+      left?" happens INSIDE, in [WeakGhost.wown_ctx_retarget].  So the store
+      site's script is the same before and after a yield. *)
+  Lemma wpt_store_rule_own (ξ : CtxId) (c : CPU) σ σ' m a v v' :
     msg_byte m a = Some v' →
     (∀ a', a' ≠ a → msg_byte m a' = None) →
     wm_tid m = Some (fin_to_nat c) →
     wm_img σ' = wm_img σ →
     wm_log σ' = (wm_log σ ++ [m])%list →
     (S (length (wm_log σ)) ≤ flr (ws_view (wm_ws σ')) a)%nat →
+    wlog_auth (wm_log σ') -∗ ctx_migr ξ c -∗
     wlat_interp (wm_img σ) (wm_log σ) -∗
-    vwp_hold (wpt_own c a v) (wm_ws σ) ==∗
+    vwp_hold (wpt_own ξ a v) (wm_ws σ) ==∗
+    wlog_auth (wm_log σ') ∗ ctx_migr ξ c ∗
     wlat_interp (wm_img σ') (wm_log σ') ∗
-    vwp_hold (wpt_own c a v') (wm_ws σ').
+    vwp_hold (wpt_own ξ a v') (wm_ws σ').
   Proof.
     intros Hma Hother Htid Himg Hlog Hfl.
-    iIntros "Hi Hpt". rewrite wpt_own_at.
+    iIntros "Hlg Hmg Hi Hpt". rewrite wpt_own_at.
     iDestruct "Hpt" as (t) "(He & Hs & _)".
+    (* THE RETARGET, and the log-authority offset it tolerates: the store's
+       own message is [c]'s, so it publishes nothing for any other hart *)
+    iMod (wown_ctx_retarget ξ c a t v (wm_img σ) (wm_log σ) (wm_log σ')
+            ltac:(rewrite Hlog; by apply pub_transfer_snoc)
+            with "Hlg Hmg Hi He Hs") as "(Hlg & Hmg & Hi & He & Hs)".
+    (* THE MINT, at the store's own fresh top *)
+    iMod (ctx_migr_mint ξ c (wm_log σ') (S (length (wm_log σ)))
+            ltac:(rewrite Hlog length_app /=; lia) with "Hlg Hmg")
+      as "(Hlg & Hmg & #Hbc)".
+    iDestruct (ctx_wrote_byte ξ c a (S (length (wm_log σ))) with "Hbc")
+      as "#Hbca".
+    iFrame "Hlg Hmg".
     iDestruct "Hs" as (s) "[Hsel %Hs]".
     iDestruct "Hi" as (mm mc) "(Hauth & %Hag & Hcauth & %Hagc)".
     rewrite /wlat_elem /wcds_el.
@@ -790,6 +782,8 @@ Section pointsto.
         by apply Hother.
     - rewrite wpt_own_at. iExists (S (length (wm_log σ))). iFrame "He".
       iSplitL "Hsel"; [|by iPureIntro].
+      iApply (wown_ctx_of_own_st ξ c a (S (length (wm_log σ)))
+                with "[Hsel] Hbca").
       iExists (wcds_own_step c (wm_ak m) s). iFrame "Hsel". iPureIntro.
       destruct (wm_ak m); simpl; [by right|by left|exact Hs].
   Qed.
@@ -840,18 +834,20 @@ Section pointsto.
   Qed.
 
   (** The owned twin. *)
-  Lemma wpt_store_post_own (c : CPU) σ m a v v' rl :
+  Lemma wpt_store_post_own (ξ : CtxId) (c : CPU) σ m a v v' rl :
     msg_byte m a = Some v' →
     (∀ a', a' ≠ a → msg_byte m a' = None) →
     wm_tid m = Some (fin_to_nat c) →
+    wlog_auth ((wm_log σ ++ [m])%list) -∗ ctx_migr ξ c -∗
     wlat_interp (wm_img σ) (wm_log σ) -∗
-    vwp_hold (wpt_own c a v) (wm_ws σ) ==∗
+    vwp_hold (wpt_own ξ a v) (wm_ws σ) ==∗
+    wlog_auth ((wm_log σ ++ [m])%list) ∗ ctx_migr ξ c ∗
     wlat_interp (wm_img σ) ((wm_log σ ++ [m])%list) ∗
-    vwp_hold (wpt_own c a v')
+    vwp_hold (wpt_own ξ a v')
       (store_post (wm_ws σ) rl a (S (length (wm_log σ)))).
   Proof.
     intros Hma Hother Htid.
-    iApply (wpt_store_rule_own c
+    iApply (wpt_store_rule_own ξ c
               (WMState (wm_regs σ) (wm_img σ) (wm_log σ) (wm_ws σ) (wm_dev σ))
               (WMState (wm_regs σ) (wm_img σ) ((wm_log σ ++ [m])%list)
                        (store_post (wm_ws σ) rl a (S (length (wm_log σ))))
@@ -1015,16 +1011,20 @@ Section demo.
 
   (** ... so the store rule fires at the interpreter's own write post-state,
       with no side condition left for the caller beyond the value. *)
-  Lemma wpt_wwrite_byte (c : CPU) σ ak (pa : Arch.pa) (v : bv (8 * 1))
-      (v0 : bv 8) :
+  Lemma wpt_wwrite_byte (ξ : CtxId) (c : CPU) σ ak (pa : Arch.pa)
+      (v : bv (8 * 1)) (v0 : bv 8) :
+    wlog_auth (wm_log (wwrite_post (Some (fin_to_nat c)) σ ak pa 1 v)) -∗
+    ctx_migr ξ c -∗
     wlat_interp (wm_img σ) (wm_log σ) -∗
-    vwp_hold (wpt_own c (pa_z pa) v0) (wm_ws σ) ==∗
+    vwp_hold (wpt_own ξ (pa_z pa) v0) (wm_ws σ) ==∗
+    wlog_auth (wm_log (wwrite_post (Some (fin_to_nat c)) σ ak pa 1 v)) ∗
+    ctx_migr ξ c ∗
     wlat_interp (wm_img (wwrite_post (Some (fin_to_nat c)) σ ak pa 1 v))
                 (wm_log (wwrite_post (Some (fin_to_nat c)) σ ak pa 1 v)) ∗
-    vwp_hold (wpt_own c (pa_z pa) (nth_byte v 0))
+    vwp_hold (wpt_own ξ (pa_z pa) (nth_byte v 0))
              (wm_ws (wwrite_post (Some (fin_to_nat c)) σ ak pa 1 v)).
   Proof.
-    iApply (wpt_store_rule_own c σ
+    iApply (wpt_store_rule_own ξ c σ
               (wwrite_post (Some (fin_to_nat c)) σ ak pa 1 v)
               (wwrite_msg (Some (fin_to_nat c)) (wm_class_of ak (wm_ws σ))
                           pa 1 v)).

@@ -101,8 +101,12 @@ Qed.
 Global Instance flr_fun_core_id V : CoreId (flr_fun V).
 Proof. constructor=> a. reflexivity. Qed.
 
-(** A context is named by ONE ghost name.  Not a class -- see the header. *)
-Definition CtxId : Type := gname.
+(** [CtxId] itself now lives in [WeakGhost] (φ-upgrade §1.6): the OWNED
+    POINTS-TO is indexed by a context, and [WeakVProp] sits below this file,
+    so the type has to be visible there.  It is a record of TWO ghost names --
+    this section's view authority ([ctx_vn]) and the per-hart write watermark
+    the migration invariant is built on ([ctx_wn]) -- and it is still not a
+    class, for exactly the reason the header gives. *)
 
 (* ====================================================================== *)
 (** ** 2. The context's view: authority and floors. *)
@@ -113,7 +117,7 @@ Section ctx.
   (** The context's current view, exactly.  Carries the fragment at the same
       value, so handing out a floor is inclusion rather than an update. *)
   Definition ctx_auth (ξ : CtxId) (V : view) : iProp Σ :=
-    own ξ (● flr_fun V ⋅ ◯ flr_fun V).
+    own (ctx_vn ξ) (● flr_fun V ⋅ ◯ flr_fun V).
 
   (** THE PERSISTENT FLOOR, whole-view.  A single fragment rather than a
       family of per-byte ones: the object we need to be monotone in is
@@ -126,7 +130,7 @@ Section ctx.
       [own ξ ε] is not derivable without a [bupd], so an all-zero floor is
       carried as a pure fact instead. *)
   Definition ctx_view_lb (ξ : CtxId) (V : view) : iProp Σ :=
-    (own ξ (◯ flr_fun V) ∨ ⌜∀ a, flr V a = 0%nat⌝)%I.
+    (own (ctx_vn ξ) (◯ flr_fun V) ∨ ⌜∀ a, flr V a = 0%nat⌝)%I.
 
   Global Instance ctx_view_lb_persistent ξ V : Persistent (ctx_view_lb ξ V).
   Proof. apply _. Qed.
@@ -189,11 +193,11 @@ Section ctx.
     by apply auth_update, flr_fun_local_update.
   Qed.
 
-  Lemma ctx_alloc V : ⊢ |==> ∃ ξ : CtxId, ctx_auth ξ V.
+  Lemma ctx_valloc V : ⊢ |==> ∃ γ : gname, own γ (● flr_fun V ⋅ ◯ flr_fun V).
   Proof.
-    iMod (own_alloc (● flr_fun V ⋅ ◯ flr_fun V)) as (ξ) "H".
+    iMod (own_alloc (● flr_fun V ⋅ ◯ flr_fun V)) as (γ) "H".
     { apply auth_both_valid_discrete. split; [done|by intros a]. }
-    by iExists ξ.
+    by iExists γ.
   Qed.
 
 End ctx.
@@ -338,10 +342,23 @@ End cobj.
     the CONTEXT, so the pairing is what migrates. *)
 
 Section running.
-  Context `{!weakGS Σ}.
+  Context `{!riscvGS Σ, !weakGS Σ}.
+
+  (** THE CONTEXT'S HALF OF THE BUNDLE (φ-upgrade §1.6).  Two authorities, one
+      resource: the VIEW authority §2 is about, and the MIGRATION INVARIANT
+      [WeakGhost.ctx_migr] -- "every hart this context has written through,
+      other than the one it is running on, has published what it wrote".
+
+      The second is what makes the Stage-1.6 upgrade invisible.  It is
+      scheduler state, exactly like the view authority: a caller threads it
+      because it threads [wrunning], never because a byte it owns is dirty.
+      The own leaves consume it (through [wrunning_acc]) to decide, INTERNALLY,
+      whether an owned byte's dirty author is the hart they are on. *)
+  Definition ctx_run `{CID : CpuId} (ξ : CtxId) (ws : wstate) : iProp Σ :=
+    (ctx_auth ξ (ws_view ws) ∗ ctx_migr ξ cpu_id)%I.
 
   Definition wrunning `{CID : CpuId} (ξ : CtxId) : iProp Σ :=
-    (∃ ws : wstate, hart_ws cpu_id ws ∗ ctx_auth ξ (ws_view ws))%I.
+    (∃ ws : wstate, hart_ws cpu_id ws ∗ ctx_run ξ ws)%I.
 
   Lemma ws_le_view ws ws' : ws_le ws ws' -> ws_view ws ⊑ ws_view ws'.
   Proof.
@@ -349,23 +366,58 @@ Section running.
     specialize (Hc a). lia.
   Qed.
 
+  (** THE ONLY UPDATE A LEAF PERFORMS, and the reason [ctx_run] is a named
+      definition: every ws-threading leaf calls exactly this, and the
+      migration half rides through untouched. *)
+  Lemma ctx_run_update `{CID : CpuId} ξ ws ws' :
+    ws_le ws ws' -> ctx_run ξ ws ==∗ ctx_run ξ ws'.
+  Proof.
+    iIntros (Hle) "[Ha $]".
+    iApply (ctx_auth_update _ _ (ws_view ws') with "Ha"). by apply ws_le_view.
+  Qed.
+
+  (** §4's leaf bridge, against the bundle rather than the bare view
+      authority: the migration half rides through untouched, which is why
+      every existing leaf's script is unchanged. *)
+  Lemma ctx_run_to_hold `{CID : CpuId} ξ ws R :
+    ctx_run ξ ws -∗ cobj ξ R -∗ ctx_run ξ ws ∗ vwp_hold R ws.
+  Proof.
+    iIntros "[Ha $] HR".
+    by iDestruct (cobj_to_hold ξ ws R with "Ha HR") as "[$ $]".
+  Qed.
+
+  Lemma ctx_run_of_hold `{CID : CpuId} ξ ws R :
+    ctx_run ξ ws -∗ vwp_hold R ws -∗ ctx_run ξ ws ∗ cobj ξ R.
+  Proof.
+    iIntros "[Ha $] HR".
+    by iDestruct (cobj_of_hold ξ ws R with "Ha HR") as "[$ $]".
+  Qed.
+
   Lemma wrunning_open `{CID : CpuId} ξ :
-    wrunning ξ -∗ ∃ ws, hart_ws cpu_id ws ∗ ctx_auth ξ (ws_view ws).
+    wrunning ξ -∗ ∃ ws, hart_ws cpu_id ws ∗ ctx_run ξ ws.
   Proof. iIntros "H". iExact "H". Qed.
 
   Lemma wrunning_close `{CID : CpuId} ξ ws :
-    hart_ws cpu_id ws -∗ ctx_auth ξ (ws_view ws) -∗ wrunning ξ.
+    hart_ws cpu_id ws -∗ ctx_run ξ ws -∗ wrunning ξ.
   Proof. iIntros "H1 H2". iExists ws. iFrame. Qed.
 
+  (** THE OWN LEAVES' ACCESSOR.  A memory leaf takes [wrunning ξ] and needs
+      the migration invariant out of it for the duration of its ghost section;
+      nothing else in the bundle is touched. *)
+  Lemma wrunning_acc `{CID : CpuId} ξ :
+    wrunning ξ -∗ ctx_migr ξ cpu_id ∗ (ctx_migr ξ cpu_id -∗ wrunning ξ).
+  Proof.
+    iIntros "[%ws [Hws [Ha $]]]". iIntros "Hm". iExists ws. iFrame.
+  Qed.
+
   (** The ordinary step: the hart's wstate grew, so the context's view grows
-      with it.  This is the only update a leaf performs. *)
+      with it. *)
   Lemma wrunning_step `{CID : CpuId} ξ ws ws' :
     ws_le ws ws' ->
-    ctx_auth ξ (ws_view ws) -∗ hart_ws cpu_id ws' ==∗ wrunning ξ.
+    ctx_run ξ ws -∗ hart_ws cpu_id ws' ==∗ wrunning ξ.
   Proof.
     iIntros (Hle) "Ha Hws".
-    iMod (ctx_auth_update _ _ (ws_view ws') with "Ha") as "Ha".
-    { by apply ws_le_view. }
+    iMod (ctx_run_update _ _ ws' Hle with "Ha") as "Ha".
     iModIntro. iApply (wrunning_close with "Hws Ha").
   Qed.
 
@@ -387,12 +439,39 @@ Section running.
       (T : nat) :
     (∀ a, (flr VA a ≤ T)%nat) ->      (* A released past its whole view *)
     (T ≤ w_vrNew ws)%nat ->            (* B acquired past T *)
-    ctx_auth ξ VA -∗ hart_ws cpu_id ws ==∗ wrunning ξ.
+    ctx_auth ξ VA -∗ ctx_migr_all ξ -∗ hart_ws cpu_id ws ==∗ wrunning ξ.
   Proof.
-    iIntros (HT Hacq) "Ha Hws".
+    iIntros (HT Hacq) "Ha Hall Hws".
     iMod (ctx_auth_update _ _ (ws_view ws) with "Ha") as "Ha".
     { intros a. rewrite flr_ws_view. etrans; [apply HT|lia]. }
-    iModIntro. iApply (wrunning_close with "Hws Ha").
+    iModIntro. iApply (wrunning_close with "Hws"). iFrame "Ha".
+    by iApply (ctx_migr_all_run with "Hall").
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (** ** 6'. THE PARK, ON THE MIGRATION INVARIANT (φ-upgrade §1.6)
+
+      The other half of §6, and the one Stage 1.6 adds.  The scheduler's
+      handoff store is a RELEASE at the log's fresh top, so it publishes every
+      position at or below the log's length -- which, by the invariant's own
+      position bound, is every position this context has written through the
+      parking hart.  So the live-hart exception discharges, and what comes out
+      is the PARKED form [ctx_migr_all], which satisfies the invariant at
+      whatever hart the context is about to resume on.
+
+      NOTE WHAT IS NOT IN THE STATEMENT: no byte, no points-to, no view, and
+      no [pub_covers_view] handed to a caller.  Stage 1.5 returned that token;
+      here it stays inside the invariant, which is the difference between "the
+      caller applies an upgrade lemma" and "the caller's script is
+      unchanged". *)
+  Lemma wrunning_park `{CID : CpuId} (ξ : CtxId) (log : list wmsg) (N : nat)
+      (ws : wstate) :
+    (length log <= N)%nat ->
+    wlog_auth log -∗ pub_floor cpu_id N -∗ ctx_run ξ ws -∗
+    wlog_auth log ∗ ctx_auth ξ (ws_view ws) ∗ ctx_migr_all ξ.
+  Proof.
+    iIntros (HN) "Hlog #Hpf [$ Hm]".
+    iDestruct (ctx_migr_park ξ cpu_id log N HN with "Hlog Hpf Hm") as "[$ $]".
   Qed.
 
 End running.
@@ -414,14 +493,25 @@ End running.
     now just [∃ ws, hart_ws c ws], and the statement of this lemma did not
     change. *)
 Section bridge.
-  Context `{!weakGS Σ}.
+  Context `{!riscvGS Σ, !weakGS Σ}.
+
+  (** Allocation: BOTH ghost names, and the migration invariant at its empty
+      map (a context that has not run has written through no hart). *)
+  Lemma ctx_alloc `{CID : CpuId} (V : view) :
+    ⊢ |==> ∃ ξ : CtxId, ctx_auth ξ V ∗ ctx_migr ξ cpu_id.
+  Proof.
+    iMod (ctx_valloc V) as (γv) "Hv".
+    iMod ctx_wr_alloc as (γw) "Hw".
+    iModIntro. iExists (CtxNames γv γw). iFrame "Hv".
+    by iApply (ctx_migr_empty (CtxNames γv γw) cpu_id with "Hw").
+  Qed.
 
   Lemma hart_view_to_run `{CID : CpuId} :
     hart_view cpu_id ==∗ ∃ ξ : CtxId, wrunning ξ.
   Proof.
     iIntros "(%ws & Hws)".
-    iMod (ctx_alloc (ws_view ws)) as (ξ) "Ha".
-    iModIntro. iExists ξ. iApply (wrunning_close with "Hws Ha").
+    iMod (ctx_alloc (ws_view ws)) as (ξ) "[Ha Hm]".
+    iModIntro. iExists ξ. iApply (wrunning_close with "Hws"). iFrame.
   Qed.
 
 End bridge.
@@ -518,3 +608,20 @@ Section release.
   Qed.
 
 End release.
+
+(** ... and the same BUILD against the RUNNING BUNDLE, which is what a leaf
+    actually holds since φ-upgrade §1.6: the migration half rides along
+    untouched, so a release site's script does not change. *)
+Section release_run.
+  Context `{!riscvGS Σ, !weakGS Σ}.
+
+  Lemma ctx_run_addrs_get `{CID : CpuId} (ξ : CtxId) (ws : wstate)
+      (f : nat -> Z) (n T : nat) :
+    (∀ j : nat, (j < n)%nat -> (T ≤ flr (ws_view ws) (f j))%nat) ->
+    ctx_run ξ ws -∗ ctx_view_lb ξ (view_addrs f n T).
+  Proof.
+    iIntros (Hj) "[Ha _]".
+    by iApply (ctx_addrs_get ξ (ws_view ws) f n T Hj with "Ha").
+  Qed.
+
+End release_run.

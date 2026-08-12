@@ -620,13 +620,13 @@ Section connector.
     by rewrite flr_ws_view in Ht.
   Qed.
 
-  (** The OWNED (C-or-D) form: same proof through [wpt_own_at], since
+  (** The OWNED (C-or-D) form: same proof through [wpt_own_h_at], since
       pinnedness reads only the value element and the floor. *)
-  Lemma wpt_own_pinned_read (c : CPU) σ (a : Z) (v : bv 8) :
+  Lemma wpt_own_h_pinned_read (c : CPU) σ (a : Z) (v : bv 8) :
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
-    vwp_hold (wpt_own c a v) (wm_ws σ) -∗ ⌜pinned_read σ a⌝.
+    vwp_hold (wpt_own_h c a v) (wm_ws σ) -∗ ⌜pinned_read σ a⌝.
   Proof.
-    iIntros "Hi Hpt". rewrite wpt_own_at.
+    iIntros "Hi Hpt". rewrite wpt_own_h_at.
     iDestruct "Hpt" as (t) "(He & _ & %Ht)".
     iDestruct (wlat_lookup_elem with "Hi He") as %Hlat.
     iPureIntro. rewrite /pinned_read (latest_val_ts _ _ _ _ _ Hlat).
