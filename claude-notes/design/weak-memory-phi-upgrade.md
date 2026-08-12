@@ -411,6 +411,30 @@ convert them to vProp.  The abstraction:
   published-clean via the flip, so ctx_dom moves floors only, never
   dirty states; ctx_morph is a ==∗ (real ghost re-registration).
 
+
+- **STAGE 1.8 LANDED (2026-08-12; WeakCtxPt/WeakCtxLock/WkCtxSurface,
+  1821 lines, additions-only, green, adequacy unchanged).**  As-built:
+  TWO ptsto forms mirroring ↦w/↦wo (`wptsto_cl` fractional-clean —
+  the only CtxMorph atom — and `wptsto` owned-exclusive, characterised
+  as `cobj ξ (wpt_own ξ a v)`); `ctx_own ξ c` with the ledger tie
+  RELAXED to ⊑ (re-sync at stores via `ctx_lb_sync`); ξ_L internal to
+  `wctx_is_lock`'s ∃; yield = the payload construction at emp (the
+  baton IS the ledger).  The ledger needed NOTHING new (ctx_view_lb at
+  view_byte gives per-byte precision).  FRICTIONS (all recorded
+  in-file): `ctx_dom` CANNOT be persistent (a persistent domination
+  would forge floors for later-created facts) — it carries ξ's
+  authority, is view-indexed, and the class THREADS it; only the clean
+  ptsto morphs (dirty breadcrumbs have no image; a general owned
+  payload needs a future `CtxFlip` companion — `wctx_release_byte`
+  does the one-byte case concretely); `Typeclasses Opaque cur_ctx`
+  forces a duplicate leaf instance at the `<{ }>` projection spelling;
+  `<[ ]>` collides with stdpp insert — the wrapper is `<{ P }>`;
+  the WP park takes ledger+migr (not ctx_own whole — hart_ws belongs
+  to the callback); `wctx_held` names both contexts (per convention).
+  Acceptance: WkCtxSurface's statements are MACHINE-CHECKED free of
+  monPred/vwp_hold/⊒/view_*/ws_view/⊑; zero re-index or upgrade
+  applications at access sites.
+
 **Stage 2 — the REAL migration test (a PORT TARGET, gated on the S-mode
 scheduler cone): the same program with the handoff replaced by
 `wp_next`/`p_sched`** — the parked-continuation crossing where the
