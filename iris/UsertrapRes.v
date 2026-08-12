@@ -706,6 +706,32 @@ Section UsertrapRes.
     unfold K_usertrap, trap_res, kv_frame_slots. destruct b; lia.
   Qed.
 
+  (* ...and the STRONGER bound the [csrsi] at +0x9e needs, which is available
+     only on the arm that reaches it.  There the block's index is still the
+     disabled one, so nothing has been spent on a reserve yet and the whole
+     [kv_frame_slots + K_syscall] is in hand -- which is exactly what
+     [wp_csrsi_sstatus_x0_enable_s_sconf]'s pre index [trap_res true + n]
+     demands, and why [K_usertrap] carries the summand at all. *)
+  Lemma ut_nx_bound_off (av nx : nat) :
+    (K_usertrap <= av)%nat -> (trap_res false + nx)%nat = (av - 4)%nat ->
+    (kv_frame_slots + K_syscall <= nx)%nat.
+  Proof. unfold K_usertrap, trap_res, kv_frame_slots. lia. Qed.
+
+  (* WHAT THE FLIP AT +0x9e TAKES OUT OF THE PER-CPU BUNDLE.  The enabling
+     leaf wants the counting token and the cells SEPARATELY (at the enabled
+     base both live inside [sie_arm]), and at the disabled index
+     [cpu_own 0 false pj C false] IS the two of them beside the caller's own
+     frame.  ProofScheduler's [sc_flip_pre] is the same lemma at [C = emp];
+     this one is [C]-generic because usertrap's frame is a parameter. *)
+  Lemma ut_flip_pre (pj : mword 64) (C : iProp Σ) :
+    cpu_own 0%nat false pj C false -∗
+    intr_count 0 false ∗ cpu_cells 0 true pj ∗ C.
+  Proof.
+    rewrite cpu_own_off /cpu_hart /cpu_cells.
+    iIntros "(((_ & Hn & Hi & Hp) & Hc) & HC)".
+    iFrame "Hc HC Hn Hi Hp". iPureIntro. vm_compute. reflexivity.
+  Qed.
+
 End UsertrapRes.
 
 (* ---------------------------------------------------------------------- *)
