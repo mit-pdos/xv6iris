@@ -45,6 +45,16 @@
    exactly one per iteration (strlen's [sl_loop] shape, not fuel bounded from
    above -- the loop's OWN end-pointer arithmetic already bounds it).
 
+   THE SOURCE IS OWNED ONLY OVER [seq 0 ns] ([SpecSafestrcpy.ssc_src_ok]), so
+   the loop must also justify that the byte it is about to LOAD is inside that
+   prefix.  That obligation is discharged once, at the [lbu], by
+   [ssc_cursor_lt]: [bb_nonul f d] -- already in the invariant, for the exit
+   reasoning -- says the cursor has passed no NUL, and [d < n - 1] is what the
+   [beq] falling through just established, which together put [d < ns] under
+   either disjunct.  Nothing else in the induction changes: the loop's own
+   bound is still the end pointer, and the destination big-op is still over
+   [seq 0 n].
+
    THE TWO EXITS out of [ssc_loop] match [ssc_stop]'s two disjuncts exactly:
 
    - [rem = 0], i.e. [d = n - 1]: the +0x18 [beq] is TAKEN (no [bnez] ever
@@ -351,6 +361,28 @@ Qed.
 
 (* the loop is entered with nothing copied: the "copied prefix" clause is
    vacuous and the "untouched tail" clause is the whole buffer. *)
+(* HOW FAR THE CURSOR CAN GO INTO THE SOURCE.  The loop only ever LOADS at an
+   index [d] it has already shown is strictly below the budget ([d < n - 1],
+   the [beq] having fallen through), and the invariant carries [bb_nonul f d]
+   -- no NUL strictly below the cursor.  That is exactly enough to place [d]
+   inside the OWNED prefix under either disjunct of [ssc_src_ok]:
+
+   - [n - 1 <= ns]: immediate, [d < n - 1 <= ns].
+   - a NUL at [k0 < ns]: the cursor cannot have passed it, since every byte
+     below [d] is nonzero -- so [d <= k0 < ns].
+
+   This is the only new fact the relaxed contract needs; nothing else in the
+   induction changes. *)
+Local Lemma ssc_cursor_lt (f : nat -> bv 8) (n ns d : nat) :
+  ssc_src_ok f n ns -> bb_nonul f d -> (d < n - 1)%nat -> (d < ns)%nat.
+Proof.
+  intros [Hbud | (k0 & Hk0 & Hf0)] Hnn Hd.
+  - lia.
+  - destruct (Nat.lt_ge_cases k0 d) as [Hlt | Hge].
+    + exfalso. exact (Hnn k0 Hlt Hf0).
+    + lia.
+Qed.
+
 Local Lemma ssc_cp_init (f h : nat -> bv 8) :
   forall j, (j < 0)%nat -> h j = f j.
 Proof. intros j Hj. exfalso. lia. Qed.
@@ -561,12 +593,15 @@ Section ProofSafestrcpy.
   (*  THE COPY LOOP (+0x18 head), by induction on the remaining fuel.     *)
   (* ================================================================== *)
   Local Lemma ssc_loop
-      (mm : regfile) (n : nat) (f g : nat -> bv 8) (K : nat) (dq : dfrac)
+      (mm : regfile) (n ns : nat) (f g : nat -> bv 8) (K : nat) (dq : dfrac)
       (t s sp0 : mword 64) (b : bool) (p : mword 64) (CIDh : CpuId) :
     (0 < n)%nat ->
     (* the count's [int] bound, needed to read the end-pointer compare back
        as an INDEX compare ([pa_add_eqb] wants both indices below 2^64) *)
     (Z.of_nat n < 2 ^ 31)%Z ->
+    (* how much of [t] is owned -- consumed ONLY at the [lbu], via
+       [ssc_cursor_lt] against the invariant's [bb_nonul f d]. *)
+    ssc_src_ok f n ns ->
     forall (rem d : nat) (h : nat -> bv 8) (M : regfile) (CID0 : CpuId),
     (b = false \/ p = zero_reg -> (CID0 : CPU) = (CIDh : CPU)) ->
     (d + rem = n - 1)%nat ->
@@ -583,7 +618,7 @@ Section ProofSafestrcpy.
     sie_cap_gpr (CID := CID0) M (K - 2)%nat b p -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.safestrcpy + 0x18) : mword 64) -∗
-    ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ{dq} f j) -∗
+    ([∗ list] j ∈ seq 0 ns, (pa_add t j) ↦ₘ{dq} f j) -∗
     ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ h j) -∗
     wp_next (CID0 := CIDh) b p (fun (CID : CpuId) =>
       ∀ (Mt : regfile) (hf : nat -> bv 8),
@@ -594,12 +629,12 @@ Section ProofSafestrcpy.
             Mt !!! Regidx r = mm !!! Regidx r⌝ -∗
         sie_cap_gpr Mt (K - 2)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.safestrcpy + 0x2e) : mword 64) -∗
-        ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ{dq} f j) -∗
+        ([∗ list] j ∈ seq 0 ns, (pa_add t j) ↦ₘ{dq} f j) -∗
         ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ hf j) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hn0 Hn31 rem.
+    intros Hn0 Hn31 Hsok rem.
     induction rem as [| rem IH]; intros d h M CID0 Hchain Hsum Hcp Hun Hnn Hsp Ha0 Ha1 Ha3 Ha5 Hthr;
       pose proof (ssc_d_lt64 n d _ Hsum Hn31) as Hd64;
       pose proof (ssc_nm1_lt64 n Hn31) as Hnm164;
@@ -726,7 +761,10 @@ Section ProofSafestrcpy.
       iPoseProof (sscp_20 with "Htext") as "Hi20".
       (* ---- +0x20: lbu a4,-1(a1) ---- *)
       pose proof (ssc_d_lt_n n d (S rem) Hn0 Hsum) as Hdn.
-      iDestruct (bb_byte_acc t n d f dq Hdn with "Hsrc") as "[Hsb Hsback]".
+      (* the ONE place the source is read: [d < ns] comes from [ssc_src_ok]
+         plus the invariant's [bb_nonul f d], not from [d < n]. *)
+      pose proof (ssc_cursor_lt f n ns d Hsok Hnn Hdlt1) as Hdns.
+      iDestruct (bb_byte_acc t ns d f dq Hdns with "Hsrc") as "[Hsb Hsback]".
       iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x20)) Ra4 Ra1
                 (mword_of_int 4095 : mword 12) Q2 (K - 2)%nat (f d : mword 8) b (dqm := dq)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -846,11 +884,11 @@ Section ProofSafestrcpy.
   (*  THE WHOLE FUNCTION.                                                *)
   (* ================================================================== *)
   Lemma wp_safestrcpy_sconf (mm : regfile)
-      (n : nat) (f g : nat -> bv 8) (K : nat) (dq : dfrac) (b : bool) (p : mword 64)
-    : wp_safestrcpy_sconf_body mm n f g K dq b p.
+      (n ns : nat) (f g : nat -> bv 8) (K : nat) (dq : dfrac) (b : bool) (p : mword 64)
+    : wp_safestrcpy_sconf_body mm n ns f g K dq b p.
   Proof.
     cbv beta delta [wp_safestrcpy_sconf_body].
-    intros pcE s t ret_tgt HK Hn2 Hn31.
+    intros pcE s t ret_tgt HK Hn2 Hn31 Hsok.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg #Htext Hpc Hsrc Hdst Hcont".
     iPoseProof (sscp_00 with "Htext") as "Hi00".
@@ -1108,8 +1146,8 @@ Section ProofSafestrcpy.
         rewrite /R3 upd_ne; [| apply cs_ne; [vm_compute; reflexivity | exact Hr]].
         apply HR2thr; assumption. }
       (* ---- the loop, entered with d = 0 ---- *)
-      iApply (ssc_loop mm n f g K dq t s sp0 b p CID10
-                (ssc_pos_of_ne n Hnz) Hn31 (n - 1)%nat 0%nat g R7 CID10
+      iApply (ssc_loop mm n ns f g K dq t s sp0 b p CID10
+                (ssc_pos_of_ne n Hnz) Hn31 Hsok (n - 1)%nat 0%nat g R7 CID10
                 ltac:(intros _; reflexivity)
                 (ssc_sum_init n)
                 (ssc_cp_init f g)

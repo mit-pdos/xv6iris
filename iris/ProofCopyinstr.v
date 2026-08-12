@@ -990,7 +990,7 @@ Section ProofCopyinstr.
     assert (Hmws11 : mw !!! Regidx Rs11 = v11).
     { rewrite (callee_saved_lookup Hwcs Rs11 ltac:(vm_compute; reflexivity)). lkp. }
     (* ---- +0x6a: c.beqz a0 -- the walkaddr verdict ---- *)
-    destruct Hwv as [Ha0z | (w & Hsome & Hvu & Hvab & Ha0v)].
+    destruct Hwv as [(Ha0z & _) | (w & Hsome & Hvu & Hvab & Ha0v)].
     - (* =============== UNMAPPED: return -1 =============== *)
       iPoseProof (csi_a4 with "Htext") as "Hia4".
       iPoseProof (csi_a6 with "Htext") as "Hia6".

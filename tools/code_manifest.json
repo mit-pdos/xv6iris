@@ -1060,5 +1060,11 @@
   "kexec",
   "kxc_",
   3
+ ],
+ [
+  "CodeProcdump.v",
+  "procdump",
+  "pdi_",
+  2
  ]
 ]

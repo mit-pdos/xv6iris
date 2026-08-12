@@ -1032,3 +1032,10 @@ SpecFilestat.v
 ProofFilestatParts.v
 ProofFilestat.v
 LinkFilestat.v
+ProcdumpAux.v
+SpecProcdump.v
+CodeProcdump.v
+ProofProcdumpParts.v
+ProofProcdumpLoop.v
+ProofProcdump.v
+LinkProcdump.v

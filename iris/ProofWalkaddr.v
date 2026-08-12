@@ -72,6 +72,87 @@ Proof.
   rewrite P. lia.
 Qed.
 
+(* ...and the same test's OTHER verdict, which the informative failure arm
+   now has to report. *)
+Lemma wa_z_maxva_ge (x : Z) : Z.geb 274877906943 x = false -> 2 ^ 38 <= x.
+Proof.
+  intros H. rewrite Z.geb_leb in H. apply Z.leb_gt in H.
+  assert (P : 2 ^ 38 = 274877906944) by (vm_compute; reflexivity).
+  rewrite P. lia.
+Qed.
+
+
+(* ===================================================================== *)
+(* THE V&U BIT TEST, THE DIRECTION [PtBuild.pte_vu_bits] DOES NOT PROVE.   *)
+(*                                                                        *)
+(*   [pte_vu_bits] reads the TAKEN [beq]: the mask came out 17, so V and  *)
+(*   U are both set.  The failure arm reports [~ pte_vu w], so it needs    *)
+(*   the converse -- if V and U are both set the mask MUST come out 17.    *)
+(*   The proper home is beside [pte_vu_bits] in PtBuild.v (with the three  *)
+(*   field extractions, which are [Local] there and so are restated here); *)
+(*   kept local only to avoid a mid-tree recompile.                        *)
+(* ===================================================================== *)
+Local Lemma wa_sub_7_0 (v : mword 64) :
+  bv_unsigned (subrange_vec_dec v 7 0 : mword 8) = bv_unsigned v mod 256.
+Proof. apply (subrange_dec_unsigned_lo0 v 7 256); [lia | reflexivity]. Qed.
+
+Local Lemma wa_sub_0_0 (v : mword 8) :
+  bv_unsigned (subrange_vec_dec v 0 0 : mword 1) = bv_unsigned v mod 2.
+Proof. apply (subrange_dec_unsigned_lo0 v 0 2); [lia | reflexivity]. Qed.
+
+Local Lemma wa_sub_4_4 (v : mword 8) :
+  bv_unsigned (subrange_vec_dec v 4 4 : mword 1) = bv_unsigned v / 16 mod 2.
+Proof. apply (subrange_dec_unsigned v 4 4 16 2); [lia | lia | reflexivity | reflexivity]. Qed.
+
+Local Lemma wa_z_mod_to_bit (y : Z) : y mod 2 = 1 -> Z.testbit y 0 = true.
+Proof.
+  intros H. rewrite Z.bit0_odd. rewrite Zmod_odd in H.
+  destruct (Z.odd y); [reflexivity | discriminate].
+Qed.
+
+(* 17 is exactly bits 0 and 4 *)
+Local Lemma wa_bit17 (n : Z) : 0 <= n -> n <> 0 -> n <> 4 -> Z.testbit 17 n = false.
+Proof.
+  intros Hn H0 H4.
+  destruct (Z_lt_le_dec n 5) as [Hlt | Hge].
+  - assert (Hc : n = 1 \/ n = 2 \/ n = 3) by lia.
+    destruct Hc as [-> | [-> | ->]]; vm_compute; reflexivity.
+  - apply Z.bits_above_log2; [lia |].
+    assert (Hl : Z.log2 17 = 4) by (vm_compute; reflexivity). lia.
+Qed.
+
+Lemma wa_pte_vu_bits_inv (w : mword 64) :
+  pte_vu w ->
+  and_vec w (sign_extend' 64 (mword_of_int 17 : mword 12)) = (mword_of_int 17 : mword 64).
+Proof.
+  intros (HV & HU).
+  unfold _get_PTE_Flags_V, _get_PTE_Flags_U, Mk_PTE_Flags in HV, HU.
+  apply (f_equal bv_unsigned) in HV. apply (f_equal bv_unsigned) in HU.
+  assert (H1 : bv_unsigned ('b"1" : mword 1) = 1) by (vm_compute; reflexivity).
+  rewrite H1 in HV. rewrite H1 in HU.
+  rewrite wa_sub_0_0 wa_sub_7_0 in HV.
+  rewrite wa_sub_4_4 wa_sub_7_0 in HU.
+  assert (Hb0 : Z.testbit (bv_unsigned w) 0 = true).
+  { apply wa_z_mod_to_bit in HV.
+    change 256 with (2 ^ 8) in HV.
+    rewrite Z.mod_pow2_bits_low in HV; [exact HV | lia]. }
+  assert (Hb4 : Z.testbit (bv_unsigned w) 4 = true).
+  { apply wa_z_mod_to_bit in HU.
+    change 16 with (2 ^ 4) in HU.
+    rewrite Z.div_pow2_bits in HU; [| lia | lia].
+    change 256 with (2 ^ 8) in HU.
+    rewrite Z.mod_pow2_bits_low in HU; [| lia].
+    replace (0 + 4) with 4 in HU by lia. exact HU. }
+  apply bv_eq. rewrite andi17_unsigned.
+  assert (H17 : bv_unsigned (mword_of_int 17 : mword 64) = 17)
+    by (vm_compute; reflexivity).
+  rewrite H17.
+  apply Z.bits_inj'. intros n Hn. rewrite Z.land_spec.
+  destruct (Z.eq_dec n 0) as [-> | Hn0]; [rewrite Hb0; reflexivity |].
+  destruct (Z.eq_dec n 4) as [-> | Hn4]; [rewrite Hb4; reflexivity |].
+  rewrite (wa_bit17 n Hn Hn0 Hn4). apply andb_false_r.
+Qed.
+
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
    one-line bridge from a leaf's [rget] to the register-map facts a
    whole-function proof already has.  Written name-free (durable-notes: an
@@ -197,7 +278,8 @@ Section ProofWalkaddr.
         { rewrite /V3. apply callee_saved_insert_r; [vm_compute; reflexivity |].
           rewrite /V2. apply callee_saved_insert_r; [vm_compute; reflexivity |].
           apply callee_saved_refl. }
-        { left. rewrite /V3 upd_eq. reflexivity. } }
+        { left. split; [rewrite /V3 upd_eq; reflexivity |].
+          left. exact (wa_z_maxva_ge (uint va) Hge). } }
     (* ---- va < MAXVA: the branch is TAKEN, into the framed body ------- *)
     assert (Hvalt : (uint va < 2 ^ 38)%Z) by (apply wa_z_maxva; exact Hge).
     iApply (wp_bgeu_taken_s_sconf (mword_of_int (KernelSyms.walkaddr + 0x04)) (mword_of_int 8 : mword 13)
@@ -389,7 +471,10 @@ Section ProofWalkaddr.
                sie_cap_gpr (CID := CIDe) M (K - 2)%nat b p -∗
                pc_is (CID := CIDe) (mword_of_int (KernelSyms.walkaddr + 0x2a) : mword 64) -∗
                ptree_own 2 dq t -∗
-               ⌜ M !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0
+               ⌜ (M !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0 /\
+                    ((2 ^ 38 <= uint va)%Z
+                     \/ m !! vpn = None
+                     \/ (exists w, m !! vpn = Some w /\ ~ pte_vu w)))
                  \/ (exists w, m !! vpn = Some w /\ pte_vu w /\
                        M !!! Regidx (mword_of_int 10 : mword 5) = page_base (pte_ppn w)) ⌝ -∗
                WP (Loop : expr riscv_lang))%I
@@ -516,8 +601,8 @@ Section ProofWalkaddr.
         - apply HE3peel; [vm_compute; reflexivity | vm_compute; discriminate | vm_compute; discriminate].
         - apply HE3peel; [vm_compute; reflexivity | vm_compute; discriminate | vm_compute; discriminate].
         - apply HE3peel; [vm_compute; reflexivity | vm_compute; discriminate | vm_compute; discriminate]. }
-      { rewrite HE3a0. destruct Hpay' as [Hz | (w & Hsome & Hvu & Ha0)].
-        - left. exact Hz.
+      { rewrite HE3a0. destruct Hpay' as [(Hz & Hwhy) | (w & Hsome & Hvu & Ha0)].
+        - left. split; [exact Hz | exact Hwhy].
         - right. exists w. split; [exact Hsome |]. split; [exact Hvu |].
           split; [exact Hvalt | exact Ha0]. } }
     (* ================================================================= *)
@@ -542,7 +627,7 @@ Section ProofWalkaddr.
       iApply ("EPI" $! CID18 mw with "[%] [%] Hcg Hpc Hptree [%]").
       { wp_next_chain. }
       { apply callee_saved_refl. }
-      { left. exact Ha0z. } }
+      { left. split; [exact Ha0z |]. right. left. exact Hnone. } }
     (* ---- walk returned the L0 slot address: read it ---- *)
     iDestruct (ptree_own_level0_ro dq t vpn p2 p1 w0 Hl0 with "Hptree") as "(#Hcl0 & Hcell & Hclose)".
     iDestruct (phys_word_pointsto_ram with "Hcell") as %Hslotram.
@@ -677,7 +762,14 @@ Section ProofWalkaddr.
         iApply ("EPI" $! CID24 B4 with "[%] [%] Hcg Hpc Hptree [%]").
         { wp_next_chain. }
         { exact HcsB4. }
-        { left. exact HB4a0. } }
+        (* the reason: either the slot was the zero word (so this vpn is not
+           in the map at all) or it is in the map and its V&U test failed *)
+        { left. split; [exact HB4a0 |]. right.
+          apply eq_vec_false_iff in Hbeq. rewrite HB4a3 HB4a4 in Hbeq.
+          destruct Hverd as [Hs | (_ & Hn)].
+          - right. exists w0. split; [exact Hs |].
+            intro Hvu. exact (Hbeq (wa_pte_vu_bits_inv w0 Hvu)).
+          - left. exact Hn. } }
     (* ---- V and U are both set: this vpn IS mapped, and PTE2PA is the answer ---- *)
     assert (Hand : and_vec w0 (sign_extend' 64 (mword_of_int 17 : mword 12))
                    = (mword_of_int 17 : mword 64)).

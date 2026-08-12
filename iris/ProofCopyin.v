@@ -1085,7 +1085,7 @@ Section ProofCopyin.
     assert (Hmws11 : mw !!! Regidx Rs11 = v11).
     { rewrite (callee_saved_lookup Hwcs Rs11 ltac:(vm_compute; reflexivity)). lkp. }
     (* ---- +0x62 c.bnez a0 : the walkaddr verdict ---- *)
-    destruct Hwv as [Ha0z | (w & Hsome & Hvu & Hvab & Ha0v)].
+    destruct Hwv as [(Ha0z & _) | (w & Hsome & Hvu & Hvab & Ha0v)].
     2:{ (* ================= MAPPED: borrow the page ==================== *)
       destruct (upt_ad_view_vu Pc.(ud_tfp) Pc.(ud_um) m_ad (svpn_of va0) w Hview Hsome Hvu)
         as (w0 & Hl0 & Hppn).
