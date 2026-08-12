@@ -1683,7 +1683,7 @@ Section ProofFileread.
                exact (HB7thr c Hcs N2 N8 N9 N18 N19). }
              (* THE PID QUARTER, lent out of the block for the length of the
                 ilock call and closed again the instant it returns. *)
-             iDestruct (proc_priv_pid γf pj pidv V with "Hpriv") as "[Hppid Hpivbk]".
+             iDestruct (proc_priv_core_pid pj pidv V with "Hpriv") as "[Hppid Hpivbk]".
              iDestruct (cpu_own_transport CID CID72 0%nat eb pj C b ltac:(wp_next_chain)
                           with "Hcnt") as "Hcnt".
              (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)):
@@ -2061,7 +2061,7 @@ Section ProofFileread.
                   rewrite /N2 upd_ne; [| regne].
                   rewrite /N1 upd_ne; [| regne].
                   exact (HM1thr c Hcs N2n N8 N9 N18 N19). }
-                iDestruct (proc_priv_pid γf pj pidv (upd_upt V P') with "Hpriv")
+                iDestruct (proc_priv_core_pid pj pidv (upd_upt V P') with "Hpriv")
                   as "[Hppid Hpivbk2]".
                 iDestruct (cpu_own_transport CIDrd CID82 0%nat eb pj C b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2324,7 +2324,7 @@ Section ProofFileread.
                   rewrite /N2 upd_ne; [| regne].
                   rewrite /N1 upd_ne; [| regne].
                   exact (HM4thr c Hcs N2n N8 N9 N18 N19). }
-                iDestruct (proc_priv_pid γf pj pidv (upd_upt V P') with "Hpriv")
+                iDestruct (proc_priv_core_pid pj pidv (upd_upt V P') with "Hpriv")
                   as "[Hppid Hpivbk2]".
                 iDestruct (cpu_own_transport CIDrd CID92 0%nat eb pj C b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".

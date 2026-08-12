@@ -71,6 +71,8 @@ Require Import DinodeEnc.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheEscrow.
+Require Import IcacheBoot.   (* [ic_sleeplocks_acc]: the entry sleeplock the
+                                payload's slot names, out of the family *)
 (* RE-IMPORT: [IcacheInv.islot] shadows [DinodeEnc.islot] and
    [IcacheRef.inode_ref] shadows [FileInv]'s placeholder; neither icache name
    is meant here except through the two contracts. *)
@@ -121,7 +123,7 @@ Module FilestatProof (Myproc : MYPROC) (Ilock : ILOCK) (Stati : STATI)
 Section ProofFilestat.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -142,13 +144,13 @@ Section ProofFilestat.
   (* ---- the type-indexed environment, opened at the decision the code
          performed ---- *)
   Local Lemma fst_env_in (fn : fstat_names) (Cf : fcontent) :
-    fstat_has_inode Cf -> filestat_env fn Cf -∗ filestat_fs_env fn Cf.
+    fstat_has_inode Cf -> filestat_env fn Cf -∗ filestat_fs_env fn.
   Proof.
     intro H. rewrite /filestat_env. case_decide; [by iIntros "$" | contradiction].
   Qed.
 
   Local Lemma fst_env_out_in (fn : fstat_names) (Cf : fcontent) :
-    fstat_has_inode Cf -> filestat_fs_out fn Cf -∗ filestat_env_out fn Cf.
+    fstat_has_inode Cf -> filestat_fs_out fn -∗ filestat_env_out fn Cf.
   Proof.
     intro H. rewrite /filestat_env_out.
     case_decide; [by iIntros "$" | contradiction].
@@ -505,15 +507,30 @@ Section ProofFilestat.
       (* the environment, opened at the decision the code took *)
       iDestruct (fst_env_in fn Cf Hin with "Henv") as "Henv".
       iEval (rewrite /filestat_fs_env) in "Henv".
-      iDestruct "Henv" as "(%Hlg & %Hist & %Hibcov & %Hinlt & %Hipk & %Hik &
-                            #Hbio & #Hitbl & #Hesc & #Hireg & #Hslk0 & Hshr &
+      iDestruct "Henv" as "(%Hlg & %Hist & %Hgeo &
+                            #Hbio & #Hitbl & #Hescs & #Hireg & #Hslks &
                             Hsb & #Hdevi & #Hdgeom & #Hdlock & Hbslot)".
-      (* the sleeplock is stated at the pointer [f->ip] holds; ilock and
-         iunlock name the entry by its SLOT.  [Hipk] is the bridge. *)
-      iAssert (is_sleeplock (fsn_ilk fn) (fsn_islk fn)
-                 (i_lock (ientry (fsn_ik fn))) "inode"%string
-                 (ic_tok (fsn_ic fn) (fsn_ik fn))) as "#Hslk";
-        [ rewrite -Hipk; iExact "Hslk0" |].
+      (* ---- THE CARVE (fs-sysfile S4', blocker 2's ratified alternative).
+         The slot, the inum, the device, the region bound and the SHARE are
+         not the caller's to supply -- they come out of the reference's own
+         FD_INODE payload, which is a generation-named slice of exactly this
+         inode.  The per-slot escrow and sleeplock then come out of the two
+         families by the slot the payload named. ---- *)
+      iDestruct (filestat_pay_carve γf k q Cf Hin with "Hrpay")
+        as (ikk inm ssh gsh) "(%Hipk & %Hik & %Hinlt & Hshr0 & Hpayback)".
+      assert (Hibcov : IBLOCK inm (fsn_inodestart fn) ∈ fsn_cov fn)
+        by (apply Hgeo; exact Hinlt).
+      iDestruct (ic_escrows_acc2 (fsn_ic fn) (fsn_fs fn) (fsn_ireg fn)
+                   (fsn_cov fn) (fsn_logstart fn) ikk Hik with "Hescs")
+        as "#Hesc".
+      iDestruct (ic_sleeplocks_acc (fsn_ic fn) ikk Hik with "Hslks")
+        as (gil gisl) "#Hslk".
+      (* LEND HALF, KEEP HALF.  iunlock returns the arity-preserving
+         [inode_shr], so the generation the payload names has to be pinned on
+         the way back, and the kept half is what pins it
+         ([inode_shr_regen2]).  filewrite already does exactly this. *)
+      iEval (rewrite inode_shr_gen_halve2) in "Hshr0".
+      iDestruct "Hshr0" as "[Hshr Hkeep]".
       (* +0x1e c.sdsp s2,48(sp) *)
       assert (Hf4 : add_vec (P3 !!! Regidx csp_rs1)
                       (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))
@@ -631,19 +648,18 @@ Section ProofFilestat.
         rewrite /Q2 upd_ne; [| regne].
         exact (HQ1thr c Hcs N2 N8 N9 N19 N20). }
       (* THE PID QUARTER, lent for the length of the ilock call *)
-      iDestruct (proc_priv_pid γf pj pidv V with "Hpriv") as "[Hppid Hpivbk]".
+      iDestruct (proc_priv_core_pid pj pidv V with "Hpriv") as "[Hppid Hpivbk]".
       iDestruct (cpu_own_transport CID10 CID19 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)) *)
-      iEval (rewrite inode_shr_gen_intro) in "Hshr".
-      iDestruct "Hshr" as (gsh) "Hshr".
+      (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)); the
+         payload's slice already does, so nothing has to be introduced here. *)
       iApply (Ilock.wp_ilock_sconf γs j γlp (fsn_uart fn) (fsn_disk fn)
                 (fsn_dlock fn) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn)
                 (fsn_bio fn) (fsn_fs fn) (fsn_ireg fn) (fsn_ic fn)
-                (fsn_ilk fn) (fsn_islk fn)
+                gil gisl
                 (fsn_cov fn) (fsn_logstart fn) (fsn_inodestart fn)
-                (fsn_nib fn) (fsn_ik fn) (fsn_s fn) gsh
-                (fsn_dev fn) (fsn_inum fn)
+                icfg_nib ikk (ssh/2)%Qp gsh
+                icfg_dev inm
                 pidv (DfracOwn (1/4)) (fsn_dqs fn)
                 Q3 (K - 10)%nat eb C b
                 (fst_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
@@ -811,7 +827,7 @@ Section ProofFilestat.
         rewrite /I2 upd_ne; [| regne].
         exact (HI1thr c Hcs N2 N8 N9 N18 N19 N20). }
       iApply (Stati.wp_stati_sconf I4 (fc_ip Cf) (pa_stk sp0 9)
-                (fsn_dev fn) (fsn_inum fn) dnl dev0 ino0 ty0 nl0 sz0
+                icfg_dev inm dnl dev0 ino0 ty0 nl0 sz0
                 (K - 10)%nat (DfracOwn (1/2)) (DfracOwn (1/2)) b pj
                 (fst_av_stati K HK) HI4a0 HI4a1
                 with "Hcg Htext Hpc Hidev Hinum Hmeta Hstat [-]").
@@ -848,7 +864,7 @@ Section ProofFilestat.
       iEval (rewrite Hipk) in "Hidev".
       iEval (rewrite Hipk) in "Hinum".
       iAssert (ic_loaded (fsn_fs fn) (fsn_ireg fn) (fsn_cov fn) (fsn_logstart fn)
-                 (fsn_ik fn) (fsn_inum fn) dnl bml)
+                 ikk inm dnl bml)
         with "[Hdnat Hmeta Haddrs Hindres Hblocks]" as "Hlk".
       { rewrite /ic_loaded. iExists data.
         iSplitR; [iPureIntro; exact Hiok |].
@@ -909,13 +925,13 @@ Section ProofFilestat.
         rewrite /J2 upd_ne; [| regne].
         rewrite /J1 upd_ne; [| regne].
         exact (Hmstthr c Hcs N2 N8 N9 N18 N19 N20). }
-      iDestruct (proc_priv_pid γf pj pidv V with "Hpriv") as "[Hppid Hpivbk2]".
+      iDestruct (proc_priv_core_pid pj pidv V with "Hpriv") as "[Hppid Hpivbk2]".
       iDestruct (cpu_own_transport CIDil CID26 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply (Iunlock.wp_iunlock_sconf γs (fsn_fs fn) (fsn_ireg fn)
-                (fsn_ic fn) (fsn_ilk fn) (fsn_islk fn)
+                (fsn_ic fn) gil gisl
                 (fsn_cov fn) (fsn_logstart fn)
-                (fsn_ik fn) (fsn_s fn) gsh (fsn_dev fn) (fsn_inum fn)
+                ikk (ssh/2)%Qp gsh icfg_dev inm
                 dnl bml
                 pidv (DfracOwn (1/4)) J2 (K - 10)%nat eb pj C b
                 (fst_av_iunlock K HK) Hik
@@ -925,6 +941,13 @@ Section ProofFilestat.
                       Hdep Hidev Hinum Hvalid Hlk Hshot [-]").
       iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr".
       iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
+      (* THE GATHER: iunlock gives the half back WITHOUT its generation; the
+         half that never left pins it, and the payload takes the whole slice
+         back.  From here the reference is intact again. *)
+      iDestruct (inode_shr_regen2 ikk (ssh/2)%Qp (ssh/2)%Qp icfg_dev inm gsh
+                   with "Hkeep Hshr") as "Hshr".
+      iEval (rewrite Qp.div_2) in "Hshr".
+      iDestruct ("Hpayback" with "Hshr") as "Hrpay".
       assert (Hpc3c : ret_pc (J2 !!! Regidx Rra) = mword_of_int (FST + 0x3c)).
       { rewrite HJ2ra. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hpc3c) in "Hpc".
@@ -992,8 +1015,8 @@ Section ProofFilestat.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp42) in "Hpc".
       (* the copy accessor, taken once and closed once *)
-      iDestruct (proc_priv_sz_bound with "Hpriv") as %Hszb.
-      iDestruct (proc_priv_copy with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
+      iDestruct (proc_priv_core_sz_bound with "Hpriv") as %Hszb.
+      iDestruct (proc_priv_core_copy with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
       (* +0x42 ld a0,80(s3) -- a0 := p->pagetable *)
       assert (Hpta : add_vec (rget U3 Rs3) (sign_extend' 64 (mword_of_int 80 : mword 12))
                      = p_pagetable pj)
@@ -1057,7 +1080,7 @@ Section ProofFilestat.
         rewrite /U1 upd_ne; [| regne].
         exact (Hmiuthr c Hcs N2 N8 N9 N18 N19 N20). }
       (* ---- the stat buffer as copyout's NAMED source run ---- *)
-      iDestruct (fst_stat_bytes (pa_stk sp0 9) (fsn_dev fn) (fsn_inum fn)
+      iDestruct (fst_stat_bytes (pa_stk sp0 9) icfg_dev inm
                    (di_type dnl) (di_nlink dnl)
                    (zero_extend' 64 (di_size dnl : mword 32))
                    with "Hstat Hhole") as "Hbuf".
@@ -1189,7 +1212,7 @@ Section ProofFilestat.
       iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! mfin RV P' with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv] Hpriv
-                [Hshr Hsb Hbslot]").
+                [Hsb Hbslot]").
       { exact Hcsf. }
       { exact (uptd_ext_sz_ext _ _ _ Hext). }
       { exact Hrvok. }
@@ -1198,7 +1221,7 @@ Section ProofFilestat.
       { rewrite /file_ref /file_fields.
         iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
       { iApply (fst_env_out_in fn Cf Hin). rewrite /filestat_fs_out.
-        iFrame "Hshr Hsb Hbslot". }
+        iFrame "Hsb Hbslot". }
     - (* =============== NEITHER: the c.li a0,-1 arm ==================== *)
       assert (Hne2 : fc_type Cf <> (mword_of_int 2 : mword 32)).
       { intro Hc. apply Hout. left. exact Hc. }

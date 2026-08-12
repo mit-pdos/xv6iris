@@ -79,7 +79,7 @@
    verbatim: the pid fraction is the KERNEL arm's and rides INSIDE the
    [if user] bracket, in the precondition and the postcondition of both
    [wp_writei_sconf_body] and [wp_writei_gen_body].  So the walk, standing
-   at +0xa0 holding [proc_priv γf pj pidv V] and nothing else, satisfies the
+   at +0xa0 holding [proc_priv_core pj pidv V] and nothing else, satisfies the
    source premise EXACTLY -- see [fw_writei_src] below, which is that
    discharge, machine-checked, at the [user = true] the decode forces.
    Inside writei the quarter is borrowed out of [proc_priv] by
@@ -767,10 +767,10 @@ Section FwWriteiSrc.
   Lemma fw_writei_src (γf : gname) (j : nat) (pidv : mword 32) (V : pprivate)
       (dq : dfrac) (src : mword 64) (n : nat) (src_bytes : nat -> bv 8) :
     (if true
-     then proc_priv γf (proc_addr j) pidv V
+     then proc_priv_core (proc_addr j) pidv V
      else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) ∗
           p_pid (proc_addr j) ↦₄{dq} pidv)
-    ⊣⊢ proc_priv γf (proc_addr j) pidv V.
+    ⊣⊢ proc_priv_core (proc_addr j) pidv V.
   Proof. reflexivity. Qed.
 End FwWriteiSrc.
 
@@ -1489,7 +1489,7 @@ Section ProofFilewrite.
     word_pointsto (pa_stk sp0 11) (DfracOwn 1) (m !!! Regidx Rs9) -∗
     word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 -∗
     file_ref gf kx qx Cf -∗
-    proc_priv gf pj pidv (upd_upt V PI) -∗
+    proc_priv_core pj pidv (upd_upt V PI) -∗
     KvmSpec.kalloc_env ga None -∗
     (* ---- the PERSISTENT half of [filewrite_fs_env] ---- *)
     off_inv gf kx -∗
@@ -1527,7 +1527,7 @@ Section ProofFilewrite.
         cpu_own 0%nat eb pj C b -∗
         InstrBytes.pc_is (ret_pc (m !!! Regidx Rra)) -∗
         file_ref gf kx qx Cf -∗
-        proc_priv gf pj pidv (upd_upt V P') -∗
+        proc_priv_core pj pidv (upd_upt V P') -∗
         filewrite_env_out fn Cf used' -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1734,7 +1734,7 @@ Section ProofFilewrite.
     assert (HD1cs : forall r : mword 5, is_cs_idx r = true ->
               D1 !!! Regidx r = B0 !!! Regidx r).
     { intros r Hr. rewrite /D1 upd_ne; [reflexivity | regne]. }
-    iDestruct (proc_priv_pid gf (proc_addr jx) pidv (upd_upt V PI) with "Hpriv")
+    iDestruct (proc_priv_core_pid (proc_addr jx) pidv (upd_upt V PI) with "Hpriv")
       as "[Hppid Hpbk1]".
     iDestruct (cpu_own_transport CID0 CIDa1 0%nat eb (proc_addr jx) C b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
@@ -1801,7 +1801,7 @@ Section ProofFilewrite.
     iDestruct "Hshr" as "[Hshrk Hshrl]".
     iEval (rewrite fw_bslots3) in "Hbsl".
     iDestruct "Hbsl" as "[Hbsl1 Hbsl2]".
-    iDestruct (proc_priv_pid gf (proc_addr jx) pidv (upd_upt V PI) with "Hpriv")
+    iDestruct (proc_priv_core_pid (proc_addr jx) pidv (upd_upt V PI) with "Hpriv")
       as "[Hppid Hpbk2]".
     iDestruct (cpu_own_transport CIDbo CIDa3 0%nat eb (proc_addr jx) C b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2205,7 +2205,7 @@ Section ProofFilewrite.
     assert (HX2s1 : X2 !!! Regidx Rs1 = (mword_of_int rz : mword 64)).
     { rewrite /X2 upd_ne; [| vm_compute; discriminate].
       rewrite /X1 upd_ne; [exact HX0s1 | vm_compute; discriminate]. }
-    iDestruct (proc_priv_pid gf (proc_addr jx) pidv
+    iDestruct (proc_priv_core_pid (proc_addr jx) pidv
                  (upd_upt (upd_upt V PI) P') with "Hpriv") as "[Hppid Hpbk3]".
     iDestruct (cpu_own_transport CIDwi CIDb4 0%nat eb (proc_addr jx) C b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2260,7 +2260,7 @@ Section ProofFilewrite.
     { intros r Hr N1. rewrite /X3 upd_ne; [| regne]. exact (Hiucs r Hr N1). }
     assert (HX3s1 : X3 !!! Regidx Rs1 = (mword_of_int rz : mword 64))
       by (rewrite /X3 upd_ne; [exact Hius1 | vm_compute; discriminate]).
-    iDestruct (proc_priv_pid gf (proc_addr jx) pidv
+    iDestruct (proc_priv_core_pid (proc_addr jx) pidv
                  (upd_upt (upd_upt V PI) P') with "Hpriv") as "[Hppid Hpbk4]".
     iDestruct (cpu_own_transport CIDiu CIDb5 0%nat eb (proc_addr jx) C b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".

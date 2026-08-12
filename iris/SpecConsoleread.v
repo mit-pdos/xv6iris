@@ -108,7 +108,7 @@ Definition wp_consoleread_sconf_body
   (* noff = 0: sleep demands cons.lock be the ONLY lock held *)
   cpu_own 0%nat eb pj C b -∗
   kernel_text -∗ pc_is pcE -∗
-  proc_priv γf pj pid V -∗
+  proc_priv_core pj pid V -∗
   kalloc_env γa None -∗
   procs_inv γs -∗
   panic_wp_any -∗
@@ -123,7 +123,7 @@ Definition wp_consoleread_sconf_body
       sie_cap_gpr mf av b pj -∗
       cpu_own 0%nat eb pj C b -∗
       pc_is ret_tgt -∗
-      proc_priv γf pj pid (upd_upt V P') -∗
+      proc_priv_core pj pid (upd_upt V P') -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

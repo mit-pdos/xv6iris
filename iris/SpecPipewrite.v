@@ -110,7 +110,7 @@ Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   is_pipe γl γp pi -∗
   pipe_ref γp w q -∗
   (* the process block (copyin's tier is reached via proc_priv_copy) *)
-  proc_priv γf pj pid V -∗
+  proc_priv_core pj pid V -∗
   kalloc_env γa None -∗
   (* the running-thread bundle (SpecSleep.v) *)
   procs_inv γs -∗
@@ -124,7 +124,7 @@ Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
       cpu_own 0%nat eb pj C b -∗
       pc_is ret_tgt -∗
       pipe_ref γp w q -∗
-      proc_priv γf pj pid (upd_upt V P') -∗
+      proc_priv_core pj pid (upd_upt V P') -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

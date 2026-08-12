@@ -463,7 +463,7 @@ Definition wp_fileread_sconf_body
   (* the borrowed reference -- at an ARBITRARY fraction, and given back *)
   file_ref γf k q Cf -∗
   (* ambient, because three of the four arms copy into user memory *)
-  proc_priv γf pj pidv V -∗
+  proc_priv_core pj pidv V -∗
   kalloc_env γa None -∗
   procs_inv γs -∗
   (* ...and what the file's TYPE selects *)
@@ -486,7 +486,7 @@ Definition wp_fileread_sconf_body
       cpu_own 0%nat eb pj C b -∗
       pc_is ret_tgt -∗
       file_ref γf k q Cf -∗
-      proc_priv γf pj pidv (upd_upt V P') -∗
+      proc_priv_core pj pidv (upd_upt V P') -∗
       fileread_env_out fn Cf -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

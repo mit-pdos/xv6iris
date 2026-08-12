@@ -53,46 +53,38 @@
      user address is filestat's (i.e. copyout's) problem, not this
      function's -- copyout's contract is total in the destination.
 
-   ==== THE DESCRIPTOR ENVIRONMENT, AND WHY IT IS A WAND ==================
+   ==== THE DESCRIPTOR ENVIRONMENT, AND WHY IT IS NOT A WAND ==============
 
-   THE ONE REAL DESIGN QUESTION IN THIS FILE.  [SpecFilestat.filestat_env fn
-   Cf] is INDEXED BY THE FILE'S CONTENT: on the inode arm it names the itable
-   slot ([fc_ip Cf = ientry (fsn_ik fn)]), that slot's escrow and sleeplock,
-   and a SHARE of that inode's reference.  A syscall cannot own it up front,
-   because it does not know -- and cannot know -- which file the descriptor
-   names: [ProcInv.ofile_slot] quantifies the slot [k], the fraction [q] AND
-   the content [Cf] existentially, and nothing the caller holds pins them.
-   Taking [Cf] as a contract parameter does not help: after the borrow the
-   proof learns some [Cf'] and has no way to identify it with the parameter
-   ([FileInv.file_ref_agree] would do it, but only for a caller that already
-   holds a second fraction of the SAME slot's reference, which no caller
-   does).
+   S4 froze this contract with an OPENER -- a wand turning the reference the
+   descriptor turned out to hold into filestat's environment for THAT file --
+   because [SpecFilestat.filestat_env] was indexed by the file's CONTENT and
+   a syscall cannot know which file its descriptor names
+   ([ProcInv.ofile_slot] quantifies the slot, the fraction and the content
+   existentially).  S4' overturned it, and the reason is stronger than
+   taste: the opener promised back a [file_ref gf k q' Cf] at a SMALLER
+   fraction, and NO SUCH THING EXISTS.  [FileInvDefs.fref_tok] is
+   [fref_own g (fragment {[k := (q, 1%positive)]})] -- the reference COUNT
+   rides with the fraction -- so two fragments at [q/2] compose to [(q, 2)]
+   and not to [(q, 1)].  Splitting a [file_ref] at all needs the ftable
+   AUTHORITY, i.e. [FileInv.file_dup_step], which is filedup's ghost step and
+   is unsound without the physical [f->ref++].  The opener was therefore
+   satisfiable only at [q' = q], with the whole environment already in the
+   caller's hands: it deferred the problem rather than solving it.
 
-   So what the contract takes is an OPENER: a wand that turns the reference
-   the descriptor actually held into the environment for THAT file, and takes
-   the environment back afterwards.  Three things recommend this shape:
+   What this contract takes instead is [SpecFilestat.filestat_fs_env fn],
+   which is content-INDEPENDENT -- [SpecFileclose.fileclose_fs_env]'s form:
+   the escrow FAMILY, the sleeplock FAMILY, the inode region, the block cache,
+   the disk fabric and the region-wide inum geometry.  The per-inode pieces
+   the old environment asked its caller for (the itable slot, the inum, the
+   device, the region bound and the SHARE) were inside the reference all
+   along: [FileInvDefs.inode_pay] carries
+   [IcacheRef.inode_shr_held_gen (fc_ip Cf) (q * Q) g], which names all four
+   and IS the share ilock wants.  filestat carves it out itself
+   ([SpecFilestat.filestat_pay_carve]) and gathers it back, so the syscall
+   owes nothing per-file at all.  The type test stays filestat's business,
+   exactly as sys_close hands fileclose both of ITS arms and lets
+   [fileclose_env_split] pick.
 
-   * it is honest -- it is a real [iProp], not a pure premise nobody can
-     discharge, and it says precisely what is owed;
-   * it is the shape the file-table design already predicts.  The per-slot
-     pieces are inside the reference: [FileInvDefs.inode_pay] carries
-     [inode_shr_held_gen (fc_ip Cf) (q * Q) g], which IS the share ilock
-     wants, and it names [k], [dev] and [inum].  The rest of the environment
-     (the escrow family, the sleeplock family, the inode region, the block
-     cache and the disk fabric) is content-INDEPENDENT, exactly as
-     [SpecFileclose.fileclose_fs_env] is.  Building this wand is therefore
-     the "carve at entry, gather at exit" bracket SpecFileread.v's header
-     defers to B3, packaged so that it is written ONCE rather than in each
-     of the three syscalls;
-   * it is the precedent this tree already set one level up:
-     [SpecSyscall.v]'s [syscall_env] is one abstract parameter for the same
-     reason -- spelling the union out at the wrong altitude buys nothing.
-
-   THE FRACTION MAY MOVE ([q'] is existential): a carve leaves the parent
-   reference smaller, and filestat takes its reference at an ARBITRARY
-   fraction, so nothing downstream cares.  The close puts the original [q]
-   back.  The opener is a [==∗] because a carve out of a cinv-parked
-   reference is a ghost step.
 
    ==== WHAT THE POSTCONDITION SAYS ======================================
 
@@ -172,51 +164,46 @@ Definition sys_fstat_ret (V : pprivate) (v : mword 64) (r : mword 64) : Prop :=
 Section SpecSysFstat.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* THE DESCRIPTOR ENVIRONMENT (see the header).  Given the reference the
-     descriptor turned out to hold, produce filestat's environment for THAT
-     file; take it back at the end and restore the reference at its original
-     fraction.
+  (* THE DESCRIPTOR ENVIRONMENT -- AND IT IS NO LONGER A WAND.
 
-     A caller that knows the descriptor names a pipe (or anything else
-     without an inode) can build this for free -- [filestat_env] is [emp]
-     there -- which is what [fstat_fdenv_nofs] below says. *)
-  Definition fstat_fdenv (γf : gname) : iProp Σ :=
-    (∀ (k : nat) (q : Qp) (Cf : fcontent),
-       ⌜(k < NFILE)%nat⌝ -∗
-       file_ref γf k q Cf ==∗
-       ∃ (fn : fstat_names) (q' : Qp),
-         filestat_env fn Cf ∗ file_ref γf k q' Cf ∗
-         (file_ref γf k q' Cf -∗ filestat_env_out fn Cf ==∗
-            file_ref γf k q Cf))%I.
+     The header above records the shape S4 froze: an OPENER, a wand turning
+     the reference the descriptor turned out to hold into filestat's
+     environment for THAT file.  S4' overturned it, and for a reason stronger
+     than taste: the opener promised back a [file_ref γf k q' Cf] at a
+     SMALLER fraction, and there is no such thing.  [FileInvDefs.fref_tok] is
+     [fref_own γ (◯ {[k := (q, 1%positive)]})] -- the count component rides
+     WITH the fraction, so two fragments at [q/2] compose to [(q, 2)], not to
+     [(q, 1)].  A [file_ref] therefore cannot be split at all without the
+     ftable AUTHORITY (that split is [FileInv.file_dup_step], i.e. filedup's
+     ghost step, and it is unsound without the physical [f->ref++]).  So the
+     opener could only ever be satisfied at [q' = q], with the whole
+     environment already in the caller's hands -- it deferred the problem
+     rather than solving it.
 
-  (* The trivial instance, and the check that the definition is not
-     accidentally unsatisfiable: for a descriptor whose file carries no
-     inode the environment is [emp] on both sides, so the opener is the
-     identity.  (It is stated over ALL contents under the hypothesis, so a
-     caller that has ruled the inode arm out -- pipealloc's files, a pipe
-     descriptor -- owes nothing at all.) *)
-  Lemma fstat_fdenv_nofs (γf : gname) (fn0 : fstat_names) :
-    (forall Cf : fcontent, ~ fstat_has_inode Cf) -> ⊢ fstat_fdenv γf.
-  Proof.
-    intro Hno. rewrite /fstat_fdenv.
-    iIntros (k q Cf) "_ Href". iModIntro. iExists fn0, q.
-    iSplitR; [by iApply filestat_env_none|].
-    iFrame "Href". iIntros "Href Hout". by iFrame "Href".
-  Qed.
+     What replaced it is [SpecFilestat.filestat_fs_env], which is
+     content-INDEPENDENT ([SpecFileclose.fileclose_fs_env]'s form) and which
+     a syscall simply OWNS: the per-inode pieces the old environment asked
+     for -- the itable slot, the inum, the device, the region bound and the
+     share -- are inside the reference all along
+     ([FileInvDefs.inode_pay]), and filestat now carves them out itself.
+     This contract hands the bundle down and gets it back; the type test is
+     filestat's business, exactly as sys_close hands fileclose both of ITS
+     arms and lets [fileclose_env_split] pick. *)
 
 End SpecSysFstat.
 
 Definition wp_sys_fstat_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
+    (fn : fstat_names)                           (* the file system's ghosts *)
     (pidv : mword 32) (V : pprivate)
     (v : mword 64)                               (* syscall argument 0      *)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
@@ -245,8 +232,8 @@ Definition wp_sys_fstat_sconf_body
   proc_priv γf pj pidv V -∗
   kalloc_env γa None -∗
   procs_inv γs -∗
-  (* ...and the environment for whatever file the descriptor names *)
-  fstat_fdenv γf -∗
+  (* ...and the file system, in the form that does NOT name a file *)
+  filestat_fs_env fn -∗
   (* THE CROSSING IS THE LITERAL [true]: filestat parks, and a park moves the
      hart with interrupts off, so the crossing has nothing to do with SIE
      (SpecFilestat.v's note, and SpecSyscall.v's pinned index above). *)
@@ -261,6 +248,12 @@ Definition wp_sys_fstat_sconf_body
       pc_is ret_tgt -∗
       proc_priv γf pj pidv (upd_upt V P') -∗
       kalloc_env γa None -∗
+      (* the file system, back.  filestat's own postcondition returns the
+         superblock fraction and the slot unit; everything else in the bundle
+         is persistent, so the syscall re-presents the WHOLE bundle to its
+         caller only by keeping the persistent half in hand -- which is why
+         what comes back here is [filestat_fs_out], not [filestat_fs_env]. *)
+      filestat_fs_out fn -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -268,13 +261,14 @@ Module Type SYSFSTAT.
   Parameter wp_sys_fstat_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
 
       (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
+      (fn : fstat_names)
       (pidv : mword 32) (V : pprivate)
       (v : mword 64)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool),
-      wp_sys_fstat_sconf_body γa γf γs j γlp pidv V v m av eb C b.
+      wp_sys_fstat_sconf_body γa γf γs j γlp fn pidv V v m av eb C b.
 End SYSFSTAT.

@@ -698,6 +698,32 @@ owed for three stages because no caller existed to force it.**
   ([`../completed/fileclose.md`](../completed/fileclose.md) §3b), so one piece
   of ghost state settles both.
 
+  **fs-sysfile S4' RULED AND BUILT IT (option (ii)), and found the opener was
+  never an option at all.**  `file_ref` DOES NOT SPLIT BY FRACTION:
+  `fref_tok γ k q = fref_own γ (◯ {[k := (q, 1%positive)]})` carries the
+  reference COUNT in the same map entry, so two halves compose to `(q, 2)`.
+  The only splitter is the ftable authority, i.e. `FileInv.file_dup_step` —
+  filedup's ghost step, unsound without the physical `f->ref++`.  An opener
+  promising `file_ref γ k q' C` at `q' < q` is therefore UNSATISFIABLE, and
+  option (i) collapses into "the caller already holds the whole environment".
+
+  What option (ii) looks like, built for filestat and identical for the other
+  two: the contract's environment is `SpecFileclose.fileclose_fs_env`'s form
+  (escrow family, sleeplock family, region, cache, fabric, and the
+  region-WIDE inum geometry), the record loses every per-inode field, and the
+  function carves its share out of `FileInvDefs.inode_pay` itself
+  (`SpecFilestat.filestat_pay_carve`).  Two things the sizing missed:
+  * the generation is lost at **iunlock** (`SpecIunlock` returns the
+    arity-preserving `inode_shr`), not at the file.c boundary, so the fix is
+    not a stronger postcondition but `ProofFilewriteParts.fw_shr_regen`'s
+    trick — lend `s/2`, keep `s/2` generation-named, pin the returned half
+    with `live_gen_agree`.  With the share never leaving the reference, the
+    postcondition carries no share at all;
+  * `SpecFilestat`/`SpecFileread`/`SpecFilewrite` all bind BOTH `!fileG Σ`
+    and `!icacheG Σ`, which are two `icfg` instances (durable-notes' bundling
+    trap).  Harmless until something in the file mixes a payload's share with
+    a written `icfg_dev` — the carve does.  Drop the standalone binder.
+
   **fs-sysfile S4 sharpened this and found it is not only the pipe arm.**
   Every arm's environment is content-indexed: `filestat_env fn Cf` and its
   two siblings name the itable SLOT (`fc_ip Cf = ientry (fsn_ik fn)`), that
