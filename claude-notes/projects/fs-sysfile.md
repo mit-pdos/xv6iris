@@ -830,6 +830,137 @@ plus the three untracked new files, nothing else; no scratch left.
    compressed while +0x48 (`lui a5,0x1`) is not.  Same trap for
    `c.addw`/`addw` (`wp_addw_s_sconf` vs `wp_addw4_s_sconf`) at +0xae/+0xc4.
 
+## S3h — STOPPED AND REPORTED: `SpecWritei`'s postcondition cannot rebuild
+## `ic_loaded`.  `fw_tail` landed and full-gated; `ProofFilewrite` still unwritten
+
+**The frozen `SpecFilewrite` is not provable against the frozen
+`SpecWritei`.**  The FD_INODE arm's re-park needs
+`IcacheEscrow.ic_loaded`, whose `⌜InodeLock.inode_ok cov logstart dn' bm'
+data'⌝` conjunct has SEVEN components, and writei's postcondition
+re-establishes only FIVE:
+
+| # | `inode_ok` conjunct | after writei |
+|---|---|---|
+| 1 | `blkmap_wf cov logstart bm'` | post ✓ |
+| 2 | `bm_covers bm' (di_size dn')` | post ✓ |
+| 3 | `di_addrs dn' = bm_cells bm'` | post ✓ |
+| 4 | `bv_unsigned (di_type dn') <> 0` | ✓ — `wi_dinode` keeps `di_type` DEFINITIONALLY |
+| 5 | `bv_unsigned (di_size dn') <= MAXFILE*BSIZE` | **MISSING** — post gives only `< 2^31` |
+| 6 | `blk_holes_zero bm' data'` | post ✓ |
+| 7 | `inode_sized data'` | **MISSING OUTRIGHT** |
+
+§17.6/§17.7's type witness is NOT the problem: conjunct 4 and `dir_ok` both
+close exactly as `SpecFilewrite`'s header says (`ity_shot_agree` pins
+`di_type dn = fwn_ty fn`, `fc_wbool` is true past +0x04, `dir_ok_not_dir`
+finishes).  The blocker is the two *arithmetic/shape* conjuncts.
+
+**Why no earlier caller hit it.**  fileread re-parks with the IDENTICAL
+`data` and `dn` — readi changes no byte — so all seven conjuncts go back
+verbatim (`ProofFileread.v` 1999–2010 and 2262–2273: `exact Hdok`,
+`exact Hsized`, …).  dirlink, the only other writei caller, does not re-park
+at all: it FORWARDS writei's postcondition into its own contract
+(`SpecDirlink.v:395`).  **filewrite is the first re-parker of a CHANGED
+payload**, which is why the gap is only visible now.
+
+**Why (5) cannot be recovered at the call site.**  On the success arm
+`dn' = wi_dinode dn bm' off tot`, whose size field is
+`max (di_size dn) (off+tot)`.  `off <= MAXFILE*BSIZE` (`off_wf`) and
+`n1 <= 3072`, so `off+n1` reaches 277504 > 274432 — reachable, and exactly
+the case a file at maximum size produces.  `SpecFilewrite.fw_off_advance` is
+stated to CONSUME `¬(MAXFILE*BSIZE < off+n1)`, and nothing supplies it:
+writei's two-arm disjunction exposes the guard only as a CONSEQUENCE of
+returning -1, never as an exclusion on the counting arm.  A case split on
+`decide (MAXFILE*BSIZE < off+n1)` does not rescue it — in the "yes" branch
+the contract still permits arm 2.
+
+**Why (7) cannot be recovered at all.**  `inode_sized data'` is
+`forall i < MAXFILE, length (data' i) = BSIZE`.  The range clause is about
+`file_byte data' k = data' (k `div` BSIZE) !!! (k `mod` BSIZE)`, and
+`list_lookup_total` returns the INHABITANT out of range, so a `data'` with
+short lists satisfies it.  The resource cannot supply it either:
+`inode_blocks` is a big-op of `blk_res`, `blk_res` is `True` at holes and
+`fsblock ∗ blk_own` at allocated indices, and `FsBlocks.fsblock γ bno bs`
+is `bno ↪[fs_L γ]{#(1/2)} bs` — a bare ghost_map half.  `InodeInv.v` 503–506
+says this in prose already ("`FsBlocks.fsblock` is a bare ghost_map half
+with no length side condition"), which is *why* conjunct 7 exists.  Holes
+are fine (`blk_holes_zero` gives `replicate BSIZE`); allocated blocks are not.
+
+### THE REPAIR (out of S3h's scope; ruling needed)
+
+Two clauses on `SpecWritei`'s postcondition:
+
+```coq
+⌜bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE⌝ -∗
+⌜inode_sized data'⌝ -∗
+```
+
+- **(5) is nearly free.**  `wi_loop` ALREADY takes
+  `(off + n <= MAXFILE * BSIZE)%nat` as a premise (`ProofWritei.v:1598`) and
+  the top-level proof already derives `Hrng : (off + n <= MAXFILE*BSIZE)%nat`
+  the moment the guard at +0x2a falls (`ProofWritei.v:3736`).  It is a
+  threading job, not a proof.
+- **(7) is the real work.**  `inode_sized` appears NOWHERE in
+  `ProofWritei.v`, so `wi_loop`'s invariant has to carry it and re-establish
+  it at every block update.  `InodeInv.inode_sized_insert`
+  (`inode_sized data -> length bs = BSIZE -> inode_sized (<[i := bs]> data)`)
+  is exactly the tool, and the buffer writei installs is a bread'd BSIZE
+  block, so the length is on hand.
+
+**Ripple.**  `SpecWritei` (2 postcondition clauses), `ProofWritei`
+(`wi_loop`'s invariant + the two return sites), and the three `ProofDirlink`
+destructuring sites (1692 / 2060 / 2436) plus `SpecDirlink` if it forwards
+them.  **Premise count is UNCHANGED** at every call site — both additions
+are postcondition clauses, so only consumers' `iIntros` patterns widen by
+two.  Nothing in the icache, the escrow or `SpecFilewrite` moves;
+`SpecFilewrite` stays FROZEN exactly as it is, and `fw_off_advance` becomes
+dischargeable because (5) makes the "yes" branch of the case split
+irrelevant (the size cap comes from writei rather than from the guard).
+
+### What DID land, green
+
+**`ProofFilewriteParts.fw_tail`** — +0xf4 through the epilogue, i.e. the
+FD_INODE arm's WHOLE tail, and the eighth block in the file.  All THREE
+paths that reach +0xf4 (the zero-trip jump at +0xe8, the normal loop exit
+through the five `c.ldsp`s at +0xda, the short-write break through the same
+five at +0xea) arrive in ONE shape — s4 = i, s5 = n, s1/s3/s7/s8/s9 already
+back at the caller's values — so the join is one lemma with `i` a parameter.
+`bne s5,s4` then picks between `c.mv a0,s5 ; c.ldsp s4,48(sp)` into `fw_epi`
+and +0x12e, which is `fw_m1j4`.  The postcondition is the disjunction
+`rv = -1 ∨ (i = n ∧ rv = n)`, which a caller turns into `filewrite_ret` with
+`filewrite_ret_m1` / `filewrite_ret_all`.  `Print Assumptions fw_tail`:
+5 platform axioms + funext.  It needs NO ghost state and survives the repair
+untouched.
+
+### Traps recorded
+
+1. **`ProofFilewriteParts.v` was missing `WpSconfBtype` from its imports** —
+   it had `WpSconfAlu WpSconfMem WpSconfCtl` only, because S3g's seven blocks
+   contain no full-width conditional branch (the panic arm and the epilogue
+   are straight-line, and `fw_m1j`/`fw_m1j4` end in `c.j`).  Any block with a
+   `beq`/`bne`/`bge`/`bltu` needs it; the failure is *"The variable
+   wp_bne_fall_s_sconf was not found in the current environment"*.
+2. **`fw_li0`'s comment mislabels it.**  The header says "[c.li s8,1] at
+   +0x50", but the lemma is stated at the ZERO immediate — it is +0x40's
+   `c.li s4,0`.  +0x50's `c.li s8,1` is `ProofFilereadParts.fr_li1`.
+3. **`RTYPE`/`RTYPEW` argument order is `(rs2, rs1, rd, op)`**, not
+   `(rs1, rs2, rd, op)`: `fwri_0cc = RTYPEW (Regidx 20, Regidx 21, Regidx 15,
+   SUBW)` is `subw a5,s5,s4`, i.e. rs2 = s4 and rs1 = s5.  Reading it the
+   other way inverts the loop's `n - i` into `i - n`.
+4. **`fw_epi`'s `Hthr` does NOT exclude s4**, so anything that reaches +0xfc
+   must already have restored it; `fw_tail` is where that happens (+0xfa on
+   the full-write path, inside `fw_m1j4` on the short-write path).
+
+### Mirror evidence
+
+`full.sh` `EXIT=0`, **1036 `.vo`** (unchanged — one file edited, none added),
+zero `Error`.  `tools/lemma_diff.py --ref HEAD`: *"1 file(s) checked --
+CLEAN (nothing dropped, nothing admitted, no new assumption)"*.
+`Print Assumptions fw_tail` = the 5 platform axioms + funext, checked in a
+scratch file that was deleted afterwards.  md5 verified equal on both sides
+after the scp: `ProofFilewriteParts.v` `3499da0354bcdf79e3fceef8ac8928d2`.
+`_CoqProject` NOT touched (no new file).  Mirror `git status`:
+`iris/ProofFilewriteParts.v` modified, nothing else; no scratch left.
+
 ## The stage ladder
 
 - **S1** (agent): the DECODE stage — 13 Code files (the 12 targets +
@@ -870,9 +1001,21 @@ plus the three untracked new files, nothing else; no scratch left.
   +0x32) and the `SpecIunlock`-loses-the-generation finding with its
   in-Parts repair are recorded in the S3g section.
   `ProofFilewrite` / `LinkFilewrite` parked green.  file.c stays 6/7.
-- **S3h** (agent): `ProofFilewrite` + `LinkFilewrite` — the control flow
-  between S3g's blocks plus the FD_INODE arm's ghost work.  Then file.c
-  is 7/7.
+- **S3h** (agent) **— STOPPED AND REPORTED**: the FD_INODE arm cannot
+  rebuild `IcacheEscrow.ic_loaded`, because `InodeLock.inode_ok` has seven
+  conjuncts and `SpecWritei`'s postcondition re-establishes five — the size
+  cap (`di_size dn' <= MAXFILE*BSIZE`, weakened to `< 2^31`) and
+  `inode_sized data'` are both missing, and neither is recoverable at the
+  call site.  filewrite is the first re-parker of a CHANGED payload; the
+  S3h section has the table, the two impossibility arguments and the
+  two-clause repair to `SpecWritei` (ripple: ProofWritei's `wi_loop` plus
+  three ProofDirlink sites; premise counts unchanged).  `SpecFilewrite`
+  stays FROZEN and correct.  `ProofFilewriteParts.fw_tail` (the whole
+  +0xf4-to-epilogue join, all three arriving paths) LANDED and full-gated.
+  `ProofFilewrite` / `LinkFilewrite` still unwritten; file.c stays 6/7.
+- **S3i** (agent, AFTER the S3h ruling): the `SpecWritei` repair, then
+  `ProofFilewrite` + `LinkFilewrite` on S3g's seven blocks + `fw_tail`.
+  Then file.c is 7/7.
 - **S3b** (agent) **— PARTIAL**: filestat PROVEN AND LINKED (file.c 6/7);
   §17's fd-type witness STOPPED-AND-REPORTED as unimplementable in the ruled
   shape — design/fs-icache.md §17.1 has the finding and the repair (§17′) to
