@@ -619,6 +619,20 @@ Both cost real time in one session; check for them before believing a
   command's status, not make's.  Capture make's own exit status
   (`make proofs > log 2>&1; echo $?`) and grep the file afterwards.
 
+- **A green build BEFORE a rebase says nothing about the tree AFTER it, and
+  the commit most likely to break you cannot conflict textually.** The
+  nightly dead-import sweep (`.github/workflows/dead-imports.yml`) removes and
+  RE-POINTS imports across ~100 files at a time. It changes no statement and
+  no proof, so a rebase onto it is always clean — but what it changes is which
+  names arrive TRANSITIVELY, and its most likely victim is a brand-new file,
+  whose own import list nobody has ever pruned and which therefore names half
+  its vocabulary through chains that happen to carry it. Landing
+  `ProofKexecA.v` this way put main red at `The reference is_sleeplock was not
+  found` for a few minutes. **Rebase, THEN build, THEN push — never push while
+  the verification build is still running, however small the incoming delta
+  looks.** The fix is always the same: add the requires explicitly; the next
+  sweep will prune whatever is genuinely unused.
+
 ## Proof coverage report
 
 `tools/proof_coverage.py` answers "what of the kernel is proved?" — a hierarchy
