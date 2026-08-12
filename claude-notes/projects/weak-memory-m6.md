@@ -464,6 +464,40 @@ floor that sees every observation.
       (gpo forces it); (c) pf program states are the prefix endpoints';
       (d) pf wstates are definitionally the π-transported folds, with
       components = max π(leaves) by (i).
+
+      **TWO MORE FINDINGS (2026-08-12, sharpening the file plan):**
+
+      (v) **`robust` as stated is unprovable without a
+      TIMESTAMP-OBLIVIOUSNESS premise on `pstep`.**  The pf witness
+      steps the program with π-retimed labels (`LLoad`'s `tvs` carry
+      timestamps), so a program that branches on a timestamp would
+      diverge from the behavior's program states.  Add the premise
+      "`pstep` is invariant under retiming a label's timestamps with
+      values fixed" to `robust`; the Sail instantiation satisfies it
+      trivially (programs see values only).
+
+      (vi) **The simulation needs NO discipline premises — clean
+      decoupling.**  The readable-transport closes from: the toposort
+      order (E-edges order every floor-leaf's fulfil below every
+      stale-passed write, processed or not), co-serialization
+      (per-byte π-monotonicity, and "cross-author writes above an rmw
+      are sorted after it" for excl_ok), leaf-fulfils ∈ done (rf/po
+      downward closure), and the Prov correspondence.  Discipline
+      (S1/S2/edge_ok/φ) is consumed ONLY by the acyclicity theorem.
+      Moreover the sim should be stated over an arbitrary
+      DOWNWARD-CLOSED (under gdep) toposortable event subset S — full
+      S gives `robust`'s witness; the ancestor closure of a minimal
+      bad (owned-unpublished) edge gives the φ-contradiction exhibit,
+      with no separate mini-sim.
+
+      **File plan:** `WeakRobustProv.v` (provenance) →
+      `WeakRobustSer.v` (byte premises + co ⊆ tc(gdep)) →
+      `WeakRobustOrd.v` (floor-leaf sets over trace prefixes, the E
+      edges, D⁺ = gdep ∪ E, decidability, subset toposort) →
+      `WeakRobustSim.v` (the subset sim; acyclicity of D⁺ taken as a
+      hypothesis) ∥ `WeakRobustAcyc2.v` (acyclicity of D⁺ from the
+      discipline premises — the remaining research risk) →
+      `WeakRobustMain.v` (robust + bad-edge composition + W2c).
       **THE WRITE-SERIALIZATION LEMMA — a second pillar found while
       designing (2026-08-11): D has no co edges, and for UNCLASSIFIED
       programs that is fatal** — two agents' interleaved same-byte
@@ -505,11 +539,31 @@ file:line map for every item is
       `WeakWord8.v:493-520`) and the six store leaves — the value at each
       leaf is a constant already written in its effect trace.  The walker
       CAS classifies `SCexcl` automatically (`ak_latest` on both halves).
-- [ ] `w_pub` watermark field: add to `wstate` (inert — read by NO rule),
-      raised by release fences and `rl` stores.  Touch list:
-      `WeakMem.v` record literals + `ws_le` + `ws_bounded`,
-      `WeakInterp.barrier_post`, `WeakViewMono.v`'s five `mono_nat`s.
-      Semantics provably unchanged (nothing inspects it).
+- [ ] `w_pub` watermark field — **SEMANTICS REVISED (2026-08-12, from
+      the W2b design work; supersedes "raised by release fences")**.
+      Two inert `wstate` fields: `w_relp : bool` (pending release — SET
+      by a pw∧sw fence, CLEARED by the agent's next store) and
+      `w_pub : nat` (raised to the store's own timestamp at a store
+      taken with `w_relp` set, and at an `rl` store).  The point: the
+      RISC-V release idiom is `fence rw,w; sd flag`, and the FLAG store
+      is the publication — EXT at that store forces every po-earlier
+      store's timestamp below it (the fence shipped `w_vwOld` into
+      `w_vwNew`), so `published p := S p ≤ w_pub(author)` covers
+      exactly the deposit AND the flag store itself.  Raising `w_pub`
+      at the fence (the old plan) covers only the deposit and leaves
+      the flag store — the very message racy readers read — forever
+      unpublished, making φ false at every racy read.  Consequence for
+      the class: `wm_ak` is COMPUTED at append as
+      WCexcl (ak_latest) / WCrel (`w_relp` set, or `rl`) / WCplain —
+      fully machine-syntactic, resolving the recon's "plain store ≠
+      owned store" caveat: SCfenced ≐ WCrel, SCowned ≐ WCplain, and the
+      Iris side's job reduces to φ (no foreign floor reaches a
+      WCplain-unpublished message), discharged because in the verified
+      kernel every racy-publish site fences immediately before its
+      store (making it WCrel) while WCplain stores are exactly the
+      `↦w{1}`-owned ones.  Touch list unchanged plus the `w_relp`
+      clear-on-store in `store_post`.  Semantics provably unchanged
+      (nothing reads either field).
 - [ ] The φ conjunct in `weak_state_interp` (`WeakGhost.v:458`) and the
       export: `weak_state_interp_export : weak_state_interp g -∗ ⌜φ g⌝`,
       consumed by a three-line change in `WeakAdequacy.v:225-227`.  φ =
