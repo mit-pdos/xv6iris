@@ -367,17 +367,103 @@ floor that sees every observation.
       (process events in topological order, predecessors always done).
       Pairwise per-agent monotonicity provided; the filter-subsequence
       form is a short corollary if needed.
-- [ ] **W2b — the simulation (coordinator; design pinned 2026-08-11).**
-      Invariant carried along `toposort_ind`, after processing `done`:
-      (a) a pf config c' with `rtc wp_pf_run (wp_init img ps) c'`;
-      (b) π: the order-of-processing map from done's fulfilled
-      timestamps to pf log positions (monotone in PROCESSING order, not
-      timestamp order); (c) program states match exactly (same pstep
-      steps in the same per-agent order); (d) the view relation: pf
-      wstate components are the π-transported joins of the same
-      timestamp sets — direction and exact shape to be discovered; the
-      `readable`-transport under π is the crux, and must be tested
-      against the multi-byte mixed fresh/stale witness.
+- [ ] **W2b — the simulation (coordinator; design REVISED 2026-08-12 —
+      the 08-11 pinned design was tested against the mixed fresh/stale
+      witness as instructed and FAILED; two machine-level
+      counterexamples found, both recorded here before building).**
+
+      **COUNTEREXAMPLE 1 — floor inversion (kills "any toposort of
+      gdep").**  x@ts by j; x@t'' by m; y@t by k, with ts < t < t''.
+      Reader i acquire-reads y@t, then plain-reads x@ts — behavior-legal
+      (window (ts, t] is clean; t'' sits above the floor).  A toposort
+      of gdep may process f(ts), f(t''), f(t), then i's reads (no gdep
+      edges force otherwise): pf log [x@1, x@2, y@3], the acquire sets
+      i's floor to 3, and the plain read of x@1 is BLOCKED by x@2 in
+      (1, 3].  The π-inversion between an acquired message and a
+      higher-timestamp stale write is fatal, so the graph handed to the
+      sort must be EXTENDED (the E-edges below).
+
+      **COUNTEREXAMPLE 2 — the post-fence store (kills "reader-side
+      discipline suffices"; forces a NEW writer-side premise).**
+      Writer: `fence rw,w; sd A; sd B` with promises giving
+      ts(B) < ts(A).  EXT only checks `w_vwNew < ts`, and a fulfil
+      raises `w_vwOld`, not `w_vwNew`, so both fulfils pass — the
+      behavior is full-machine-real, and RVWMO allows it (A→B is bare
+      po∩W×W, not ppo).  Reader acquire-reads B, then reads A's byte
+      STALE (below ts(A)) — behavior-legal since ts(A) > ts(B) ≥ floor.
+      Promise-free it is IMPOSSIBLE: the writer appends A before B, so
+      acquiring B's position pulls A under the reader's floor.  Every
+      cross read here is acquire-disciplined, so `rf_edges_ok` +
+      reader-side class-soundness do NOT imply `robust`.  The missing
+      premise is the DEPOSIT DISCIPLINE (S2 below) — exactly the
+      kernel's actual shape (a publish/release store's fence covers ALL
+      po-earlier stores; nothing is stored between the fence and the
+      published store).
+
+      **THE REVISED DESIGN**, in four pieces:
+
+      (i) **View provenance (`WeakRobustProv.v`).**  Every wstate
+      component of a trace prefix is `max` over a computable LEAF SET of
+      message timestamps, and the pf run computes the SAME fold with
+      leaves transported by π — stated once as: for σ with σ 0 = 0 and
+      σ injective, each component of the σ-transported fold = max σ(the
+      leaf set).  Mirrors the fwd bank (hit/miss transports because σ
+      is injective; aq bypasses).  NOTE `load_post_at` raises `coh a`
+      to max(vpost, t) — the coherence floor ABSORBS the read's whole
+      pre-view, so coh's leaf set includes prior floor leaves, not just
+      byte-a timestamps; the readable-transport below relies on leaves,
+      never on "coh a only holds byte-a history".
+
+      (ii) **The extended graph D⁺ = gdep ∪ E.**  For each read r
+      (agent j, byte a, timestamp ts, behavior floor F = the leaf-max of
+      max(load_vpre, coh a) at r): an edge f(t*) → f(t̂) for every leaf
+      t* of r's floor and every byte-a write t̂ > F ("r stale-passes
+      t̂"; such t̂ is automatically FOREIGN to j, since an own byte-a
+      write above the own floor contradicts coh ⊆ floor).  Every E edge
+      is timestamp-increasing (t* ≤ F < t̂).  OV := the set of E-targets
+      (stale-passed writes).  With E in the sort, `readable` transports:
+      window (π(ts), pf-floor]: byte-a writes ≤ ts sit ≤ π(ts) by
+      per-byte co-monotonicity; (ts, F] is empty by the behavior's own
+      readability; > F writes have π above every floor leaf by E —
+      whether processed before or after r.  The rmw's excl_ok and the
+      final mem_of equality transport from per-byte co-monotonicity
+      alone.
+
+      (iii) **Acyclicity of D⁺ (the W2a extension).**  Same
+      min-timestamp measure walk, now with E-milestones (each E edge
+      strictly increases the measure).  NEW PREMISE **S2 (the deposit
+      discipline)**: an OV-fulfil po-before a floor-relevant fulfil of
+      the same author has the SMALLER timestamp — discharged in Iris by
+      the release-fence shape (a pw∧sw fence between them ships the OV
+      timestamp from w_vwOld into w_vwNew, and EXT at the later fulfil
+      forces it below).  Counterexample 2 is exactly an S2 violation.
+      OPEN POINT for the proof: the walk's po-hops from an E-target to
+      the next E-source have unknown sign in general; candidate
+      resolutions are (a) S2 stated over FR := rf-sources ∪
+      E-left-endpoints, or (b) a floor-based measure (the E-hop jumps
+      from floor(r), which absorbs a po-earlier OV leaf whenever a
+      pw-fence intervenes).  Sharpen in the file; the Layer-1 premise
+      list may grow — record what closes.
+
+      (iv) **SCowned/φ via minimal bad edge.**  Per cross edge prove
+      `edge_ok ∨ bad` (bad = owned-unpublished read).  If a bad edge
+      exists, take a gdep-MINIMAL one: its ancestor closure is all-ok,
+      hence sortable; sim that prefix; append the bad read — a pf run
+      reaching a violating state, contradicting `pf_violation_free`.
+      Consequences: the toposort/induction must run on a DOWNWARD-CLOSED
+      all-ok subset (subset variant of `toposort_ind`), and the abstract
+      `pub` parameter needs the property "pub only via processed
+      release-events of the author" so ¬pub holds in the minimal prefix
+      (the publishing fence is po-after f(ts) and outside the closure).
+
+      Invariant carried along the (subset) `toposort_ind`, after
+      processing `done`: (a) a pf config c' with
+      `rtc wp_pf_run (wp_init img ps) c'`; (b) π: injective
+      processing-order map from done's fulfilled timestamps to pf log
+      positions, π(0) = 0; per-agent, done's events are a TRACE PREFIX
+      (gpo forces it); (c) pf program states are the prefix endpoints';
+      (d) pf wstates are definitionally the π-transported folds, with
+      components = max π(leaves) by (i).
       **THE WRITE-SERIALIZATION LEMMA — a second pillar found while
       designing (2026-08-11): D has no co edges, and for UNCLASSIFIED
       programs that is fatal** — two agents' interleaved same-byte
@@ -390,11 +476,12 @@ floor that sees every observation.
       (release→acquire rf edges), excl/lock words are chained by each
       AMO reading the previous release, started has a single writer —
       so π preserves co where it matters and final memory transports.
-      State and prove `co ⊆ tc(D)` (per byte, for classified traces) as
-      W2b's second lemma; its premises will sharpen what W3's
-      class-soundness must export.  Proof route open: via the transfer
-      chains (needs pub machinery) or operationally; record which
-      closes.
+      State and prove `co ⊆ tc(D⁺)` (per byte, for classified traces;
+      D⁺ = gdep ∪ E per the revised design above — the E edges only
+      make this EASIER) as W2b's second lemma; its premises will
+      sharpen what W3's class-soundness must export.  Proof route open:
+      via the transfer chains (needs pub machinery) or operationally;
+      record which closes.
 - [ ] **W2c — observables + transport.** From W2b: same final flat
       memory + same program states; the reducibility/safety transport
       corollary in the form W5's composition wants.  Note the full
@@ -436,6 +523,15 @@ file:line map for every item is
       the racy-load rules (`WeakRacy.v`, `WkStartedLoad.v`) are where the
       obligation is DISCHARGED (the started/first setters are `SCfenced`,
       so their racy readers are exempt by class — verify, don't assume).
+- [ ] **The WRITER-discipline (S2/deposit) export — NEW, forced by
+      W2b counterexample 2.**  The per-agent inert component records
+      "an OV-class store since the last pw∧sw fence"; the exported φ
+      conjunct is S2's premise (every publish/release-class store is
+      fence-separated from ALL po-earlier stores).  Kernel-true at
+      every enumerated release/publish site (`fence rw,w` immediately
+      before the flag store; nothing stored between).  Design the
+      component together with `w_pub` and the reader flag — all three
+      ride the same `wstate` sweep.
 - [ ] **The reader-discipline export** (same D-M6-6 pattern, one more
       inert component; see design §4b): a per-agent flag/watermark set by
       a PLAIN read of a classified foreign message, cleared by an acquire
