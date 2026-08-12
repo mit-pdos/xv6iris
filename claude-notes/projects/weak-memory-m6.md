@@ -709,11 +709,34 @@ file:line map for every item is
       `↦w{1}`-owned ones.  Touch list unchanged plus the `w_relp`
       clear-on-store in `store_post`.  Semantics provably unchanged
       (nothing reads either field).
-- [ ] The φ conjunct in `weak_state_interp` (`WeakGhost.v:458`) and the
-      export: `weak_state_interp_export : weak_state_interp g -∗ ⌜φ g⌝`,
-      consumed by a three-line change in `WeakAdequacy.v:225-227`.  φ =
-      violation-freedom over (log, `wm_ak`, `published` via `w_pub`) — NOT
-      a bare "everything is tagged", which rules out nothing.
+- [ ] **The φ conjunct — RE-SCOPED TO DEFERRED (2026-08-12), with the
+      blocking analysis recorded.**  Working the preservation proof
+      per rule class found: stores/appends preserve violation-freedom
+      FREE (ws_bounded puts every floor below the fresh top); fences/
+      registers free; `readable`'s window makes coh-flooding
+      impossible without genuinely reading at/above the hazarded
+      position (a stale read under a high floor is inadmissible), so
+      the whole obligation concentrates in ONE arm: a FRAGMENT-BACKED
+      load of a byte carrying a foreign unpublished-WCplain message.
+      There the interp would need to refute a foreign `↦w` fragment
+      whose existence fractional arithmetic excludes in reality — but
+      an auth cannot observe outstanding-fraction distribution, and
+      every escrow variant examined either (a) deposits a co-fraction
+      of the element into the interp, which breaks the leaves'
+      `↦w{1}`-in/`↦w{1}`-out contract on re-stores within a CS, or
+      (b) tags `↦w` itself / the transfer payloads, sweeping leaf or
+      lock-payload statements tree-wide.  The clean fix is a REWORK of
+      the `↦w` transfer discipline (retention tokens travelling
+      through the ~4 enumerated egress lemmas
+      `wwp_release_deposit`/`release_fence_transfer`/…): a real
+      project, recorded here as the upgrade path.  DECISION: the
+      final theorem carries `pf_violation_free cls_of pub_of` as a
+      precisely-stated DECLARED premise (same epistemic category as
+      D-M6-8's static residue and `bad_wf`), instantiated at the
+      machine-syntactic `cls_of`/`pub_of`, so it is sharply checkable
+      and Iris-refinable later.  The original wiring plan (conjunct at
+      `WeakGhost.v:458`, three-line export at `WeakAdequacy.v:225-227`)
+      remains valid for the upgrade.
 - [ ] **The ownership reflection — the real cost, budgeted as its own
       item.  DESIGN SKETCH (2026-08-12):** φ's induction needs the
       interp conjunct "every unpublished WCplain message's bytes are
