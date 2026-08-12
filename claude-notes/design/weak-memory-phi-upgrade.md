@@ -393,6 +393,24 @@ convert them to vProp.  The abstraction:
   current form modulo the ptsto spelling); vProp forms remain as
   internal glue (monPred_at is how the leaves consume the WP layer).
 
+
+- **STAGE 1.8 REFINEMENT (user directive): ξ_L is INTERNAL.**
+  `is_lock γ lk R := ∃ ξ_L, …` over `R : CtxId → iProp`; client specs
+  apply R at `cur_ctx` only, and the notation
+  `<[ P ]> := λ ξ, let _ : CurCtx := ξ in P` lets clients write plain
+  iProp payloads with bare `ptsto` (the λ over the ambient instance IS
+  the "un-application").  Re-application = the structural class
+  `CtxMorph R := ∀ ξ ξ', ctx_dom ξ ξ' -∗ R ξ ==∗ R ξ'` with
+  `ctx_dom` (ledger domination) minted only at the lock's two seams
+  (release: from ctx_own ξ_p's authority + raising ξ_L's ledger to the
+  release view; acquire: from the aq view transfer + bumping ξ_q's
+  ledger to the hart view).  Instances: ptsto (the one real
+  re-registration), structural for ∗/∃/∨/pure/persistent, constant for
+  context-free facts; sealed abstractions export theirs once (the
+  Objective/Timeless pattern for context-dependence).  Deposits are
+  published-clean via the flip, so ctx_dom moves floors only, never
+  dirty states; ctx_morph is a ==∗ (real ghost re-registration).
+
 **Stage 2 — the REAL migration test (a PORT TARGET, gated on the S-mode
 scheduler cone): the same program with the handoff replaced by
 `wp_next`/`p_sched`** — the parked-continuation crossing where the
