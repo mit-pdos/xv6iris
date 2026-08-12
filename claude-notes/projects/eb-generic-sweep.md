@@ -147,6 +147,49 @@ It printed all eight of ilock's links present and derivable (⇒ tactic bug),
 and for dirlookup it showed the failing site was the `cpu_own_transport` on
 the line ABOVE the one the error pointed at (⇒ a real gap, fixed by `Hb`).
 
+## What the per-function ports turned up (beyond the recipe)
+
+Learned porting `virtio_disk_rw` and `ilock`; expect all four on any of the
+remaining functions.
+
+- **A SEALED MULTI-FILE PROOF NEEDS THE COMPLEMENT AS A PASSTHROUGH ON EVERY
+  PHASE.** `virtio_disk_rw`'s proof is six files whose phase boundaries are
+  opaquely-`Qed`'d `wp_next true` crossings, and `wp_next_chain` cannot see
+  guards through a prior phase's `Qed`. So the join/split dance — which works
+  inside one self-contained proof — cannot transport across a seam. The fix
+  is to give the NON-sleeping phases (there, the acquire prologue) the
+  complement in their own pre and post purely as a passthrough, so they
+  relocate it internally alongside `cpu_own` and the join happens at a hart
+  the earlier phase has already delivered it to. Budget for this in any
+  function whose proof is split.
+- **THE `trap_res true` -> `trap_res eb` SWEEP IS LARGE**, ~76 sites in
+  virtio_disk_rw: the reserve budget is threaded through nearly every leaf
+  call on a path where a sleep is reachable.
+- **LEVEL-0 STRETCHES CARRY HARDCODED `true` SIE INDICES** — the prologue
+  before the acquire and the epilogue after the release, ~40 sites there.
+  Those literals were only correct because `eb = true` was forced; they all
+  become `eb`.
+- **A CALLEE THAT DOES NOT THREAD THE COMPLEMENT STRANDS IT.** `brelse`'s
+  contract does not mention `trap_csrs_ext`/`cpu_claim_ext`, so across its
+  internal crossing those two stay at the pre-call hart while `cpu_own` (which
+  brelse does return) comes back correctly re-indexed. Transport them across
+  the WIDER span, not the callee's own.
+
+## Two process rules for running this as a sweep
+
+- **`virtio_disk_rw` was a 24th crossing the earlier pass missed**, because it
+  was not in the failing set at the time. When generalizing a function, CHECK
+  ITS OWN CROSSING FIRST: with `eb = true ->` gone, a stale `wp_next b` stops
+  being vacuous and starts being false.
+- **NEVER LEAVE A `.vo` BUILT FROM TEXT YOU THEN REVERTED.** Sketching a Spec
+  change, compiling it, and `git checkout`ing the source leaves a `.vo` whose
+  contract exists nowhere in the tree — and a dependent proof will compile
+  against it and look finished. That happened here with `SpecBread.vo`, and
+  `ProofIlock` "passed" against a contract no one had committed; rebuilding
+  the spec from its committed source put the real error back at the bread call
+  site. If a proof succeeds against a dependency you did not build yourself,
+  suspect the `.vo` before believing the result.
+
 ## Where it stands
 
 LANDED ON MAIN: `sleep` index-free and re-proved; `acquiresleep`
@@ -157,10 +200,14 @@ REMAINING, in dependency order — for each: drop `eb = true ->`, add
 `trap_csrs_ext eb` / `cpu_claim_ext eb pj` to pre and post, thread them to
 the sleeping callee and back:
 
-    bread, bwrite, virtio_disk_rw
-      -> begin_op, end_op, install_trans, write_head
-      -> ilock, iupdate, itrunc, bmap, balloc, bfree, readi, writei
-      -> iput, iunlockput, fileclose
+    virtio_disk_rw                       [DONE]
+      -> bread, bwrite
+      -> ilock (its UNCACHED arm calls bread -- it is NOT a tier-1 function,
+                which a first pass got wrong), begin_op, install_trans,
+                write_head
+      -> end_op
+      -> iupdate, balloc, bfree -> bmap, itrunc, readi, writei
+      -> iput -> iunlockput, fileclose
       -> kexit
 
 Then `usertrap` itself: its contract is the assumed-but-stated
