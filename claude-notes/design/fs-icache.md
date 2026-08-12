@@ -3022,3 +3022,391 @@ Until one of those is ruled, `ic_payload`'s `g` is a live but
 unconstrained parameter and the witness is a ONE-LINE addition to that
 definition plus one line in `SpecIlock`'s postcondition.  filewrite
 stays blocked exactly where S3a left it.
+
+### 17.6 THE RULING ON §17.5 (fs-sysfile S3e, 2026-08-12): BOTH CANDIDATES
+### DIE; the mechanism is a SECOND GENERATION BUMP, taken by iput's free
+### path at +0x54 where it still holds the itable lock and REF-1
+
+§17.5's two live candidates were worked to a mechanism against the code.
+(a) is dead twice over and (c) is dead once; both certificates are in
+§17.6.5.  The design that closes is neither: it keeps §17's ORIGINAL
+per-generation witness — which §17.5 refuted only because *"a generation
+admits exactly two fills"* — and removes the refutation at its root by
+giving the second fill its own generation.  The bump has a home the four
+previous iterations never looked at, and the reason it was never looked at
+is that §17.3 and §17.5 both killed the bump AT THE RE-PARK (+0x70, no
+`itable_half`) and neither went back twenty-six bytes to +0x54, where iput
+has not yet let go of the lock.
+
+**THE CENTRAL LEMMA IS PROVED.**  `live_slot_regen` (statement in
+§17.6.3 (2)) compiled clean against the tree at `b538f806` as a scratch
+probe on the mirror, first try, `DONE = 0` — the arithmetic, the invariant
+round trip and the re-split are not conjecture.  Scratch deleted; mirror
+`git status` clean at 1032 `.vo`.
+
+#### 17.6.1 THE KILLER SEQUENCE IS REACHABLE, AND EVERY STEP IS PROVEN CODE
+
+Worked against the instruction streams rather than argued:
+
+1. `ProofIget.v:1226` recycles slot `k` at generation `g`
+   (`iref_alloc_step` → `live_slot_alloc`, `IcacheInv.v:493`), which mints
+   `g` AND `ity_pending g`; the re-close at `ProofIget.v:1278`
+   (`ic_close_mid_to_parked`) parks the entry UNLOADED.
+2. `ProofIlock.v:974` fills from the pool bundle's `dinode_at`, at type
+   `ty₁`.
+3. sys_open publishes an fd; the payload's share is
+   `IcacheRef.inode_shr_held_gen … g` (`IcacheRef.v:954`).  The fd is
+   closed later; a persistent `ity_shot g ty₁` survives in whatever
+   context copied it.
+4. iput's last close takes the free path: `ProofIput.v:1366`
+   (`ic_open_auth_ref`, +0x3c) at REF-1, +0x44 falls through
+   (`ProofIput.v:1538`), the truncate / `ip->type = 0` / iupdate stretch
+   returns the region fragment and pays out the MARKER
+   (`ireg_out_free_inv`, `ProofIput.v:1960`), +0x70 clears valid and
+   `ProofIput.v:2013` re-parks UNLOADED at the marker — **still generation
+   `g`**.
+5. **The window is real and xv6 walks into it deliberately.**  Between
+   iput's `release(&itable.lock)` at +0x5c and its `ip->ref--`, the entry
+   is still CACHED with `ref = 1`, so `iget`'s hit test
+   (`ip->ref > 0 && dev && inum`) matches.  `ProofIalloc.v:1454` claims the
+   very same inum through `ireg_claim_au` — buffer-serialised, no cache
+   lock (§16.1) — retagging the region record to `fresh_shape ty₂`, and
+   `ProofIalloc.v:1625` then calls `iget`, which takes the CACHED entry and
+   bumps `ref` to 2.  iput's decrement leaves 1.  The slot never goes free,
+   so no recycle intervenes.
+6. `create`'s `ilock` finds `valid = 0` and fills a SECOND time, on the
+   third branch of `ProofIlock.v:974`'s split — marker parked, nonzero
+   type, `InodeRegion.ireg_withdraw` — producing `ty₂` at generation `g`.
+
+So a generation genuinely sees two fills at two types, and §17.5's
+structural sentence is confirmed: any fact keyed on `g` ALONE is dead.
+
+#### 17.6.2 THE FD-LIVENESS OBSERVATION, WORKED HONESTLY: it excludes the
+#### second fill, it IS a resource, and it is the ENABLING condition — not
+#### a proof that stale witnesses are unusable
+
+The task's hypothesis is **confirmed, and then some**, but its intended use
+does not work and the reason is worth recording.
+
+*What is true.*  Step 4 needs `M !! k = Some (q, 1%positive)` — that is
+literally `ic_open_auth_ref`'s second premise (`IcacheEscrow.v:1096`), and
+`positiveR` has no zero (§14.5), so a count of 1 forces the caller's `q` to
+BE the map's `qt`.  Then `IcacheInv.live_whole_share_absurd`
+(`IcacheInv.v:1345`) says any further `live_frac k s` is over budget:
+`qt + (1/2 − qt) + 1/2 + s > 1`.  A live fd's payload holds
+`inode_shr_held (q·Q)`, which carries exactly such a slice.  **So no fd of
+slot `k` is alive when the free path is taken**, and the resource that
+carries the exclusion is the liveness pool's mass ledger — the lemma is
+`live_whole_share_absurd`, and it is already landed.
+
+*Why that alone does NOT rescue a per-generation one-shot.*  The
+obstruction was never soundness — nobody could ever USE a stale
+`ity_shot g ty₁` to conclude a falsehood, because using it needs agreement
+with the payload's copy and the payload has only one.  The obstruction is
+PROVABILITY at the second fill: `ity_shot` is PERSISTENT
+(`IcacheRef.v:439`), so a stale copy survives the death of every share, and
+`own g (Cinr _) ~~> own g (Cinl (Excl ()))` is not an update at any mask.
+Fill₂ is stuck, and a stuck WP is as fatal as an unsound one.  "All
+ty₁-holders are dead" is therefore not a fact the model needs; it is a fact
+the model cannot even use.
+
+*What the exclusion is actually good for, and this is the whole ruling.*
+Read `live_whole_share_absurd` in the positive direction.  The three
+summands it adds to a contradiction are, at that same instant, an
+ASSEMBLY: the closer's `qt`, the escrow arm's `1/2` (handed to it with the
+payload at `ProofIput.v:1376–1388`, since `ic_held` holds no slice —
+§17.5's forced deviation), and the table's `1/2 − qt` inside `itable_inv`.
+They sum to `1`.  **Holding the whole unit is precisely what licenses
+`live_gen_bump` (`IcacheRef.v:597`), and `live_gen_bump` mints both a fresh
+generation and a fresh `ity_pending`.**  The exclusion is not evidence
+about stale witnesses; it is the PERMISSION SLIP for revocation, and it is
+expressible as a resource because it already is one.
+
+*The serialisation that makes it airtight.*  A concurrent `iget` cannot
+slip a reference in before the bump: `iget`'s hit path takes the ITABLE
+LOCK, which iput holds continuously from its `acquire` through +0x5c, and
+the bump sits inside that window.  So every reference minted after the free
+path commits — including step 5's, the one that keeps the slot alive — is
+minted at the NEW generation.  Every reference that existed before it is
+refuted by REF-1.  There is no interleaving in between; the lock is the
+whole argument, and it is the same lock §16.2 calls the wrong serialiser
+for ialloc and the right one for the cache.
+
+**VERDICT: the killer sequence is REACHABLE, but never with a ty₁-witness
+holder LIVE, and that exclusion — as an assembly, not as an absence — is
+exactly the resource that retires generation `g` before fill₂ runs.**  So
+agreement never crosses a re-type, for the reason the task guessed, by a
+mechanism it did not.
+
+#### 17.6.3 THE MECHANISM
+
+**RA: NOTHING NEW.**  `ityR` (`IcacheRef.v:256`), `ity_pending` /
+`ity_shot` / `ity_shoot` / `ity_shot_agree` (`IcacheRef.v:434–457`) and
+`iliveUR`'s agreed gname are S3c's, unchanged; `live_gen_bump` is S3d's,
+unchanged.  §17.6 adds no algebra at all.  What moves is WHERE the pending
+lives and WHO bumps.
+
+**(1) The pending rides `ic_payload`'s FALSE polarity — not `ic_unloaded`,
+and not a pool disjunct.**
+
+    ic_payload γfs γi cov logstart k inum g v :=
+      if v then ∃ dn bm, ic_loaded γfs γi cov logstart k inum dn bm ∗
+                         ity_shot g (di_type dn)
+           else ic_unloaded γfs γi cov logstart k inum ∗ ity_pending g
+
+`ic_loaded` does not move (still nineteen files, still untouched) and
+**`ic_unloaded` does not move either** — which matters, because
+`ic_mid_arm` (`IcacheEscrow.v:724`) holds `ic_unloaded` DIRECTLY, not
+`ic_payload`, and it is sealed at iget's +0x72 (`ic_mk_unloaded`,
+`ProofIget.v:1167`) six instructions before the unit is split at +0x78.
+Putting the pending inside `ic_unloaded` would demand a token that does not
+exist yet — §17.5's MID deviation, one level down.  On the FALSE polarity
+of `ic_payload` the obligation lands exactly at +0x7c
+(`ic_close_mid_to_parked`, `ProofIget.v:1278`), where `Hpend` is ALREADY in
+the recycler's hand and is today simply dropped (`ProofIget.v:1205` carries
+`∃ g, live_gen e (1/2) g ∗ ity_pending g` by hand from +0x78 to +0x7c).
+Both conjuncts are TIMELESS (S3c made them so), so `ic_payload_timeless`
+survives verbatim — §17.1 (iv) respected.  §17.3 (B)'s pool-disjunct
+placement is RETIRED: the fill's three branches all get their pending from
+the same place, and `ipool_shape` / `ipool_alloc` / `imark` are NOT
+TOUCHED — which is what keeps `InodeRegion` and ialloc out of this
+entirely (§16's constraint, respected by construction rather than by
+argument).
+
+**(2) `live_slot_regen` — the second bump.  PROVED (probe).**
+
+    Lemma live_slot_regen (Eo : coPset) (M : gmap nat (Qp * positive))
+        (k : nat) (qt : Qp) (n : positive) :
+      ↑icacheN ⊆ Eo -> M !! k = Some (qt, n) ->
+      itable_inv -∗ itable_half M -∗ live_frac k qt -∗ live_frac k (1/2)%Qp
+      ={Eo}=∗ ∃ g' : gname,
+         itable_half M ∗ live_gen k qt g' ∗ live_gen k (1/2)%Qp g' ∗
+         ity_pending g'.
+
+It is `live_whole_share_absurd` with the contradiction replaced by
+`live_frac_bump` and a close: open `itable_inv`, `itable_half_agree`,
+`live_pool_acc_upd`, `live_slot_some_inv` for `c` with `1/2 = qt + c`, join
+`qt + c + 1/2 = 1`, bump, re-split, put `c` back through the accessor —
+`live_slot`'s text does not change, because it is stated over `live_frac`
+whose generation is existential.  **The COUNT `n` is a parameter the lemma
+never reads**, exactly as in `live_whole_share_absurd`: REF-1 is only how
+the caller comes to know `q = qt`.  Home: `IcacheInv.v`, beside
+`live_whole_share_absurd`.
+
+**(3) Who does what, at which instruction.**
+
+| where | file:line | move |
+|---|---|---|
+| recycle, +0x78 | `ProofIget.v:1226` | `live_slot_alloc` mints `g` + `ity_pending g` (LANDED, unchanged) |
+| recycle, +0x7c | `ProofIget.v:1278` | `ic_close_mid_to_parked` now CONSUMES `Hpend` instead of dropping it |
+| the fill | `ProofIlock.v:940–1012` | inside the existing `fupd_wp`, `ity_shoot g (di_type dn)` — one `iMod`, on both payload-building branches of the three-way split; the panic branch builds none |
+| iput +0x3c | `ProofIput.v:1366` | unchanged; the LOADED branch already hands out the arm's `1/2` and the payload |
+| iput +0x44 taken (nlink ≠ 0) | `ProofIput.v:1506` | unchanged — no bump; the loaded payload and its shot go straight back |
+| **iput +0x54, before `ic_open_held`** | **`ProofIput.v:1688`** | **`iMod (live_slot_regen …) as (ga') "…"`.**  Every premise is in hand at that line: `Hhalf : itable_half Mt` with `HMk : Mt !! k = Some (q, 1)`, `Hrtok : iref_tok k q`, `Hlvh : live_gen k (1/2) ga`, `#Hinv : itable_inv`; the mask is `⊤ ∖ ↑icEscN` and `↑icacheN` is free there |
+| iput +0x54, checkout | `ProofIput.v:1714–1722` | the descriptor becomes `DepRef q dev inum ga'`; `ic_dep_own` / `ic_dep_half` at `ga'` |
+| iput +0x74 | `ProofIput.v:2004–2013` | `ic_swap_park` at `ga'`; the FALSE payload is raw cells + marker + the fresh `ity_pending ga'` |
+| ialloc | `ProofIalloc.v:1454, 1625` | **nothing.**  No token, no witness, no region change |
+
+Note the shape of the last row against §16: the claim and its `iget` are
+the two instructions that MAKE the killer sequence, and they acquire no
+obligation whatsoever — the cache retires the generation on its own side,
+under its own lock, before either of them can run.
+
+**(4) The ONE generalisation the placement forces, and it is free.**
+`ic_open_held` (`IcacheEscrow.v:1552`) today takes `live_gen k (1/2) g` and
+`ic_payload … g v` at ONE `g`.  After the bump iput's arm-half is at `ga'`
+while the payload in its hand is still the LOADED one at `ga` (with
+`ity_shot ga ty₁`) — and it must stay there, because restating it at `ga'`
+would mean shooting the fresh pending, which the +0x74 park needs.  So the
+lemma takes two gnames.  This costs nothing: the payload is threaded
+through untouched, its only use is refuting PARKED via `ic_payload_excl`,
+and `ic_payload_excl` (`IcacheEscrow.v:1514`) is ALREADY generic in `g1`,
+`g2`; the OUT and MID refutations use REF-1, the live mass and the cells,
+never the payload's generation.  The stale loaded payload is destroyed on
+iput's own path (itrunc + `ip->type = 0` turn `ic_loaded` into raw cells
+and a marker), so `ity_shot ga ty₁` dies with the generation that named it.
+
+**(5) The consumer end.**  `SpecIlock`'s postcondition gains one line, at
+the site its own comment already reserves (`SpecIlock.v:262–268`):
+`ity_shot g (di_type dn)`, at the CALLER'S `g` — SpecIlock v4 already takes
+the share generation-named, and `live_gen_agree` inside ilock pins the
+arm's generation to the caller's **with no itable fact anywhere**, which is
+§17.1's currency requirement discharged.  `SpecIunlock`
+(`SpecIunlock.v:148`) and `SpecIunlockput` gain the same conjunct as a
+PREcondition, since `ic_payload`'s TRUE polarity is what they rebuild; the
+five existing consumers (fileread, filestat, namex, ireclaim, iunlockput)
+thread one resource each and none of them changes `di_type`.
+`FileInvDefs.inode_pay` (`FileInvDefs.v:592`) becomes
+
+    inode_pay γx Q v q := cinv fileipN γx (inode_held_short v Q) ∗
+                          cinv_own γx q ∗ inode_shr_held_gen v (q*Q) g ∗
+                          (∃ ty, ity_shot g ty ∗
+                                 ⌜fc_wbool C = true -> ty ≠ T_DIR⌝)
+
+with `g` a field of `fpnames` beside `fp_iq` — a per-slot CONSTANT, exactly
+`fp_iq`'s status.  `ity_shot` is persistent, so `inode_pay_split`'s
+distributivity is untouched.  filewrite then closes: ilock's post gives
+`ity_shot g (di_type dn)`, the payload gives `ity_shot g ty` with
+`ty ≠ T_DIR`, `ity_shot_agree` (`IcacheRef.v:457`) joins them, and `dir_ok`
+is vacuous.  **Constraint 8 (filewrite's re-park) closes for free:**
+`SpecWritei.v:263` defines `wi_dinode dn bm' off tot :=
+MkDinode (di_type dn) …`, so the flushed record's type is DEFINITIONALLY
+the fill's and filewrite re-parks with the same shot it was handed.
+
+**(6) The boot story: ZERO.**  `IcacheBoot.v:855` starts all fifty slots at
+`ic_empty_arm`, and an empty arm holds no payload — so no slot carries a
+pending at boot, and `live_boot_map`'s single gname for all fifty (S3c) is
+still right.  The first `live_slot_alloc` per slot mints that slot's first
+real generation and its first pending.  `IcacheBoot.v` does not change.
+
+**(7) Where a generation ends.**  At the last close the slot leaves `M`,
+`live_slot_close_last` (`IcacheInv.v:562`) reassembles the whole unit into
+the free arm, and the eviction turns `ic_payload` into `ipool_shape`,
+DROPPING an unspent pending (or a spent shot).  Both are harmless: a free
+slot carries no obligation, and the next recycle bumps again.  Every
+generation therefore sees AT MOST ONE FILL — the invariant §17.5 proved was
+necessary and could not get.
+
+#### 17.6.4 BLAST RADIUS, priced per file
+
+- **`IcacheInv.v`** — ONE new lemma, `live_slot_regen`, PROVED (22 lines).
+  Nothing else moves: `live_slot`, `live_pool`, `live_slot_alloc`,
+  `live_slot_close_last`, `live_whole_share_absurd` and all four update
+  lemmas are text-identical.
+- **`IcacheEscrow.v`** — `ic_payload`'s two arms gain one conjunct each (a
+  three-line edit at `:520`); `ic_open_held` (`:1552`) takes a second
+  gname; `ic_close_mid_to_parked` (`:1381`) gains an `ity_pending g`
+  premise.  `ic_unloaded`, `ic_loaded`, `ic_mid_arm`, `ic_parked`,
+  `ic_out`, `ic_held`, `ipool_shape`, `ic_swap_checkout`, `ic_swap_park`,
+  `ic_open_auth_ref`, `ic_payload_excl`, `ic_payload_timeless` — **all
+  unchanged**.  Of the 28 `ic_payload` mentions most thread it opaquely;
+  expect ≈6 construct/destruct sites to need one `iFrame` each.
+- **`ProofIget.v`** — ONE LINE: `Hpend` moves from the drop list into
+  `ic_close_mid_to_parked`'s arguments at `:1278`.
+- **`ProofIlock.v`** — one `iMod (ity_shoot …)` inside the existing
+  `fupd_wp` at `:940`, discharged on both payload-building branches of the
+  `:974` split; `il_load` (`:617`) gains one premise (`ity_pending g`, and
+  `g` is ALREADY one of its parameters) and the caller at `:2220` splits it
+  out of the payload alongside the `inode_raw`/`ipool_shape` pair it
+  already splits.
+- **`ProofIput.v`** — one `iMod (live_slot_regen …)` at `:1688` plus a
+  `ga → ga'` rename over the free-path stretch `:1688–2013` (§14.9 records
+  that this stretch is one proof whose spec applications name their
+  arguments, so the rename is mechanical); `:2013` supplies the fresh
+  pending; `:1684`'s payload rebuild and `:1506`'s undo carry the shot they
+  already hold.
+- **`SpecIlock.v`** (+1 line, additive), **`SpecIunlock.v`** /
+  **`SpecIunlockput.v`** (+1 premise each), and their five consumers
+  (**ProofFileread, ProofFilestat, ProofNamex, ProofIreclaim,
+  ProofIunlockput**) one line each — the same shape S3d's
+  `inode_shr_gen_intro` retrofit had.
+- **`FileInvDefs.v` / `FileInv.v`** — `fpnames` gains a gname field,
+  `inode_pay` gains the witness conjunct, `inode_pay_split` /
+  `inode_pay_alloc` / `inode_pay_cancel` re-prove with `ity_shot`
+  persistent (distributivity unaffected).
+- **`IcacheBoot.v`, `InodeRegion.v`, `ProofIalloc.v`, `IcacheRef.v`,
+  `ProofIunlock.v`, `SpecIget` / `SpecIput`, and every `ic_loaded`
+  consumer** — **UNTOUCHED.**
+
+Sequencing: **S3f** = (1)+(2)+(3)+(4), full-gated — escrow, iget, ilock,
+iput, i.e. the icache half, with no contract flip beyond SpecIlock's
+additive line.  **S3g** = (5) + `SpecFilewrite` + Proof + Link.  Splitting
+there keeps the tree green at a point where nothing above the icache has
+moved.
+
+#### 17.6.5 DEATH CERTIFICATES
+
+**(a) TYPE THE MARKER — DEAD TWICE, and §17.5's own parenthetical holds the
+first counterexample.**  §17.5 proposed `imark_at γi z ty` with
+*"`ireg_free_au` delivers it at 0, `ireg_claim_au` retags it"*.
+  * *Not maintainable.*  `imark γi z` is `∃ d, imark_key z ↪[γi] d`
+    (`InodeRegion.v:355`) — a ghost_map ELEMENT — and `ireg_slot`
+    (`InodeRegion.v:416`) puts exactly one of {fragment, marker} inside the
+    invariant.  At a type-0 or `fresh_shape` record the FRAGMENT is in and
+    **the MARKER IS OUT**, in the pool or in a checked-out entry's
+    `ic_unloaded`.  `ireg_claim_au` (`InodeRegion.v:751`) is the arm that
+    retypes 0 → `ty₂`, and it runs with no cache lock and no marker in hand
+    (§16.1 — the whole reason §16.3/§16.4 exist).  A ghost_map element is
+    updatable only by its holder.  **So the claim cannot retag the marker**,
+    and a marker naming its record's type is false the instant ialloc runs.
+  * *Not true either.*  §17.5 justified the shot-case discharge with *"iput's
+    free path leaves the region record at type 0, so the second fill would
+    take ilock's `ip->type == 0` panic"* — and wrote, four lines earlier,
+    *"ialloc's claim can retag the inum between the two"*.  §17.6.1 IS that
+    retag, in proven code (`ProofIalloc.v:1454` then `:1625`).  On the
+    killer sequence the second fill reads `ty₂ ≠ 0` and COMPLETES; the panic
+    never happens.  Either the invariant is unmaintainable or the fill
+    derives `False`.
+  * And it breaks §16's standing constraint head-on: the type-knowledge
+    ialloc must update would have to live in something ialloc holds, and
+    ialloc holds only the buffer.
+
+**(c) THE WITNESS KEYED ON (slot, inum, type) WITH A POOL-GUARDED
+REVOCATION — DEAD AS STATED, and its live half is what §17.6 builds.**  The
+revocation INSTRUMENT is right; the KEY is wrong, and the arithmetic says so
+in one line.  A revocable per-slot fact is a fractional-agree over the slot,
+and re-setting one needs the whole unit.  The whole unit exists in exactly
+three assemblies:
+  * at a FREE slot, in `itable_body` — that is the recycle, i.e. §17's
+    generation, i.e. exactly what (c) proposed to abandon;
+  * at iput's `[+0x3c, +0x54)` window — §17.6's bump;
+  * nowhere else.  At the FILL the filler holds the payload, the sleeplock
+    deposit and its own share — the arm's `1/2` is in `ic_dep_half` and the
+    table's `1/2 − qt` is behind the itable lock, so **a filler can never
+    re-set a slot-keyed agreed value**.  At iput's +0x70 the table's
+    `1/2 − qt` is gone (§17.3's dead escape 2, still dead).
+So (c)'s "persistent fragment + revocation guarded by the pool" has no
+instant at which the revocation can fire other than the two the generation
+already marks — which makes (c) exactly §17's generation witness, and the
+only question left is whether the SECOND of those instants is used.  §17.5
+did not ask it.  §17.6 uses it.
+
+**(b) RE-CHECK REF-1 AT +0x70** — unchanged, dead: xv6 performs no such
+read.  Recorded in §17.5, not revisited.
+
+**Also dead, enumerated so a seventh iteration does not re-derive them:**
+  * *Put the pending in `ic_unloaded` rather than on `ic_payload`'s FALSE
+    polarity.*  `ic_mid_arm` (`IcacheEscrow.v:724`) holds `ic_unloaded`
+    directly and is sealed at `ProofIget.v:1167` (+0x72), six instructions
+    before `live_slot_alloc` mints anything.  There is no pending in
+    existence to put there — §17.5's MID deviation, replayed one level down.
+  * *Bump at +0x3c instead of +0x54.*  It works on the nlink-undo path and
+    destroys the free path: restating the LOADED payload at the new
+    generation spends the fresh pending, and the +0x74 UNLOADED park then
+    has none.  Bumping twice does not help — the second bump separates the
+    arm's half from the payload again.  The bump must sit AFTER the free
+    path commits (`ProofIput.v:1538`, +0x44 fall-through) and BEFORE the
+    arm's half leaves iput's hand (`ProofIput.v:1714`'s `ic_close_out`
+    deposit); `:1688` is the natural line and every premise is already
+    named there.
+  * *Bump at iput's `ip->ref--` (+0x7c), where the itable lock is back.*  By
+    then the killer sequence's `iget` has run: `qt' = q + qn > q`, the
+    assembly is `q + 1/2 + (1/2 − qt') = 1 − qn < 1`, and `live_gen_bump`'s
+    premise fails.  **The +0x54 window is the last instant at which REF-1 is
+    still knowledge.**
+  * *Carry the type witness at the holders' own fractions, so the fd's copy
+    dies with its share.*  Two ledgers then have to agree, and the pool
+    cannot supply a fragment to `iget`'s cache-hit — the hit mints its
+    reference out of the table's `1/2 − qt` while the payload (the only
+    place a type could live) is in another thread's hand.  A leaked fragment
+    wedges the next free path, and a `dfrac` discard makes the authority
+    unreassemblable forever.
+  * *A `□`-wand from liveness to the type.*  Still not timeless; still
+    breaks the escrow outright (§17.1 (iv), unchanged).
+
+#### 17.6.6 WHAT THIS RULING ASSERTS, AND THE ONE THING IT DOES NOT
+
+Asserted and code-checked: the reachability of §17.6.1 (every step a proven
+proof at a cited line); the resources in hand at `ProofIput.v:1688`; the
+arm's half being in iput's hand and not in `ic_held`; `ic_mid_arm` holding
+`ic_unloaded` directly; `ic_payload_excl`'s genericity in both gnames;
+`wi_dinode`'s type preservation; `ic_empty_arm` at boot — and
+`live_slot_regen` itself, COMPILED.
+
+NOT checked by compilation, and the only step an implementing stage should
+be ready to find different: `ic_open_held`'s two-gname generalisation
+(argued from its proof text at `IcacheEscrow.v:1552`, which threads the
+payload and refutes on cells, REF-1 and live mass).  If it turns out to
+need the two equal, the fallback is to split it — an `ic_open_held_out`
+used only at +0x54, with the +0x44 undo caller keeping today's single-gname
+form — at the cost of one duplicated lemma and no design change.

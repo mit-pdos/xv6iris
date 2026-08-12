@@ -444,6 +444,72 @@ the generation its share belongs to so filewrite's `ity_shot_agree`
 fires.  Under repair (a) the first two are unchanged and the third
 becomes "record the marker's type alongside".
 
+## S3e — §17.5 RULED (DESIGN-ONLY): candidates (a) and (c) BOTH DIE; the
+## mechanism is a SECOND GENERATION BUMP at iput's +0x54
+## (design/fs-icache.md §17.6)
+
+No `iris/` change; the deliverable is §17.6, worked to a mechanism against
+the instruction streams rather than argued.
+
+**The killer sequence is REACHABLE, in proven code.**  `ProofIget.v:1226`
+(recycle at `g`) → `ProofIlock.v:974` (fill₁, `ty₁`) → fd published at `g`
+→ `ProofIput.v:1366/1538/2013` (free path, re-park UNLOADED, **still `g`**)
+→ `ProofIalloc.v:1454` (claim, buffer-serialised) + `:1625` (`iget` HITS
+the still-cached entry, `ref` 1→2, so the slot never goes free) →
+`ProofIlock.v:974`'s THIRD branch (`ireg_withdraw`) fills a second time at
+`ty₂`, inside generation `g`.
+
+**The fd-liveness verdict, honestly.**  A live fd's share IS refuted at the
+free path — `IcacheInv.live_whole_share_absurd` (`:1345`), off
+`ic_open_auth_ref`'s `M !! k = Some (q,1)` premise and `positiveR`'s
+no-zero.  But that does NOT rescue a per-generation one-shot: `ity_shot` is
+PERSISTENT, so a stale copy outlives every share and the second fill is
+STUCK at the mint (not unsound — unprovable).  **The exclusion's real value
+is the other direction**: the three summands `live_whole_share_absurd` adds
+to a contradiction are, at the same instant, an ASSEMBLY of the slot's
+whole liveness unit (closer's `qt` + arm's `1/2`, in iput's hand since
+`ProofIput.v:1376` + table's `1/2 − qt`), and the whole unit is exactly
+`live_gen_bump`'s premise.  So the exclusion is the PERMISSION SLIP for
+revocation, and the itable lock (held from iput's `acquire` through +0x5c)
+serialises it perfectly: every reference minted after the free path commits
+— including ialloc's — is minted at the NEW generation.
+
+**The mechanism (no new algebra).**  (i) the pending rides `ic_payload`'s
+FALSE polarity and the shot its TRUE polarity — NOT `ic_unloaded` (which
+`ic_mid_arm` holds directly, sealed at `ProofIget.v:1167` before any unit
+is split) and NOT a pool disjunct (which is what §17.5 refuted); (ii) a new
+`IcacheInv.live_slot_regen`, **PROVED on the mirror as a scratch probe,
+first try, `DONE = 0`**; (iii) iput calls it at `ProofIput.v:1688`, where
+`itable_half`, REF-1, `iref_tok` and the arm's `1/2` are all named already;
+(iv) `ic_open_held` takes two gnames (free — `ic_payload_excl` is already
+generic in both).  `ipool_shape`, `imark`, `InodeRegion` and `ProofIalloc`
+are **untouched**, so §16's "ialloc reaches no cache resource" holds by
+construction.  Boot: ZERO change (`ic_empty_arm` carries no payload).
+
+**Blast radius:** IcacheInv +1 lemma; IcacheEscrow 3 small edits;
+ProofIget ONE LINE; ProofIlock one `iMod` + one premise; ProofIput one
+`iMod` + a `ga → ga'` rename over `:1688–2013`; SpecIlock +1 line additive,
+SpecIunlock/SpecIunlockput +1 premise and five consumers one line each;
+FileInvDefs/FileInv for `inode_pay`.  Untouched: IcacheBoot, InodeRegion,
+ProofIalloc, IcacheRef, ProofIunlock, every `ic_loaded` consumer.
+Constraint 8 closes for free — `SpecWritei.v:263`'s `wi_dinode` preserves
+`di_type` definitionally.
+
+**Recommended split:** S3f = the icache half (escrow/iget/ilock/iput +
+SpecIlock's additive line), full-gated; S3g = `inode_pay` + SpecFilewrite +
+Proof + Link.
+
+**Mirror hygiene.**  Probe `S3eProbe.v` compiled at `b538f806`, then
+deleted; mirror `git status` clean, 1032 `.vo` unchanged.  No tracked file
+was touched on either side.
+
+**sys_open's S6 obligations, restated under this ruling** (superseding the
+"under repair (a)" line above): on `O_CREATE` the type is `T_FILE` by
+construction (`ialloc_fresh`); on the open-existing path a `T_DIR` inode
+forces `O_RDONLY`, i.e. `fc_wbool C = false`; and the fd's payload records
+the SHARE'S GENERATION `g` plus `ity_shot g ty` — the marker's type never
+enters, because the marker is never typed.
+
 ## The stage ladder
 
 - **S1** (agent): the DECODE stage — 13 Code files (the 12 targets +
