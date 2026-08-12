@@ -230,6 +230,10 @@ Section IupdateTail.
     bv_unsigned inum < 16 * Z.of_nat nib ->
     diblk_wf ds ->
     dinode_wf dn ->
+    (* TYPE STABILITY (fs-icache.md §19.6 Part 1): [ireg_write_au]'s new
+       premise, travelling verbatim.  The type-0 arm below leaves through
+       [ireg_free_au], which does not want it; the ordinary arm hands it on. *)
+    di_type_stable dn dn0 ->
     (* THE ABSORPTION CREDIT (S5a finding 3): passed straight through to
        log_write's own [cr], where it is honest for exactly this reason. *)
     (cru = true -> IBLOCK inum inodestart ∈ Sb) ->
@@ -266,7 +270,7 @@ Section IupdateTail.
             dev pidv dq dqd dqn dqs j m K eb C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hsp Hthr Hs2 Hkk Hbno Hcov Hlog Hnib Hdswf Hdnwf Hcru.
+    intros HK Hsp Hthr Hs2 Hkk Hbno Hcov Hlog Hnib Hdswf Hdnwf Hstab Hcru.
     pose proof HK as HK'. unfold K_iupdate in HK'.
     iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hmeta Hmap Hsb Hsl Hop #Hireg Hdn Hheld Hcont".
     (* THE eb/b BRIDGE, once per top-level lemma (eb-generic-sweep.md). *)
@@ -355,7 +359,8 @@ Section IupdateTail.
       - iApply (ireg_free_au ⊤ γi γfs inodestart nib inum dn0 dn ds
                   ltac:(solve_ndisj) Hnib Hdswf Hdnwf Hty with "Hireg Hdn").
       - iApply (ireg_write_au ⊤ γi γfs inodestart nib inum dn0 dn ds
-                  ltac:(solve_ndisj) Hnib Hdswf Hdnwf Hty with "Hireg Hdn"). }
+                  ltac:(solve_ndisj) Hnib Hdswf Hdnwf Hty Hstab
+                  with "Hireg Hdn"). }
     iIntros (CID3 Hq3 mL) "Hcg Hcnt Hpc %Hcs1 HopS Hdn Hlk Hsl".
     (* log_write returned the set grown by the block it logged, and [Hbno]
        names that block: it is THIS inum's inode block, so the growth the
@@ -692,6 +697,7 @@ Section ProofIupdateMain.
       IBLOCK inum inodestart ∈ cov ->
       ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
       bv_unsigned inum < 16 * Z.of_nat nib ->
+      di_type_stable dn dn0 ->
       di_addrs dn = bm_cells bm ->
       length (bm_dir bm) = NDIRECT ->
       (j < NPROC)%nat ->
@@ -740,7 +746,7 @@ Section ProofIupdateMain.
           WP (Loop : expr riscv_lang)) -∗
       WP (Loop : expr riscv_lang).
   Proof.
-    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hcru.
+    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hda Hdirlen Hj Hgl Ha0 Hcru.
     pose proof HK as HK'. unfold K_iupdate in HK'.
     destruct Hgeom as [Hcovok Hlogsub].
     destruct (Hcovok _ Hcov) as [Hibpos Hiblt].
@@ -1703,7 +1709,7 @@ Section ProofIupdateMain.
     iApply (iu_tail (CID0 := CID36) γs j γfs γi γd bn γ cov logstart inodestart
               nib dev
               ip inum dn dn0 bm ds u Sb cru kk bno bsd0 d0 pidv dq dqd dqn dqs m mM K eb C b
-              HK HmMsp HmMthr HmMs2 Hkk Hbno Hcov Hlog Hnib Hdswf Hdnwf Hcru
+              HK HmMsp HmMthr HmMs2 Hkk Hbno Hcov Hlog Hnib Hdswf Hdnwf Hstab Hcru
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe
                     Hppid Hidev Hinumc [Hmty Hmmaj Hmmin Hmnl Hmsz] Hmap Hsb
                     Hsl Hop Hireg Hdn Hheld [Hcont]").
@@ -1734,14 +1740,14 @@ Qed.
                           pidv dq dqd dqn dqs m K eb C b.
   Proof.
     cbv beta delta [wp_iupdate_gen_body].
-    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0.
+    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hda Hdirlen Hj Hgl Ha0.
     iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb false
               pidv dq dqd dqn dqs m K eb C b
-              HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 ltac:(discriminate)
+              HK Hgeom Hst Hcov Hlog Hnib Hstab Hda Hdirlen Hj Hgl Ha0 ltac:(discriminate)
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hop
                     [Hcont]").
@@ -1778,7 +1784,7 @@ Qed.
                            pidv dq dqd dqn dqs m K eb C b.
   Proof.
     cbv beta delta [wp_iupdate_cred_body].
-    intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Heb.
+    intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hda Hdirlen Hj Hgl Ha0 Heb.
     subst eb.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
@@ -1786,7 +1792,7 @@ Qed.
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
               pidv dq dqd dqn dqs m K true C b
-              HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hcru
+              HK Hgeom Hst Hcov Hlog Hnib Hstab Hda Hdirlen Hj Hgl Ha0 Hcru
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont]").
     { rewrite /trap_csrs_ext. done. }
@@ -1828,7 +1834,7 @@ Qed.
                             pidv dq dqd dqn dqs m K eb C b.
   Proof.
     cbv beta delta [wp_iupdate_sconf_body].
-    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0.
+    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hda Hdirlen Hj Hgl Ha0.
     iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
@@ -1836,7 +1842,7 @@ Qed.
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb0 false
               pidv dq dqd dqn dqs m K eb C b
-              HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 ltac:(discriminate)
+              HK Hgeom Hst Hcov Hlog Hnib Hstab Hda Hdirlen Hj Hgl Ha0 ltac:(discriminate)
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hop
                     [Hcont]").

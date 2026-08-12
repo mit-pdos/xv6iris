@@ -2047,7 +2047,12 @@ Section ProofFilewrite.
               Q6 (K - 12)%nat eb C b
               (fw_av_writei K HK)
               (fw_budget_ok (Z.to_nat (bv_unsigned v)) (Z.to_nat c) Hcb)
-              P1 P2 P3 P4 P5 Hdaddr Hdty Hbmwf Hholes Hbmcov
+              P1 P2 P3 P4 P5 Hdaddr Hdty
+              (* §19.6 Part 1: filewrite hands writei ONE record for both
+                 the in-memory and the region slot ([dnl dnl]), so writei's
+                 type-stability premise is reflexivity. *)
+              (InodeRegion.di_type_stable_refl dnl)
+              Hbmwf Hholes Hbmcov
               (SpecFilewrite.fw_chunk_joint (Z.to_nat (bv_unsigned v))
                  (Z.to_nat c) Hoffb Hcb)
               (fw_size_lt31 (bv_unsigned (di_size dnl)) (proj1 (bv_unsigned_in_range _ _)) Hszb)

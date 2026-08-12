@@ -3870,3 +3870,115 @@ Part 2. Part 2 (the allocatedness invariant) is a recorded frontier
 project beside crash recovery and the image-wf discharge. SpecCreate
 gains exactly the one additive premise; its freeze note is amended
 accordingly.
+
+
+### 19.9 PART 1 AS BUILT, AND **PART 3 IS DEAD: THE ASSUMED Prop IS FALSE
+### ON A REACHABLE TRACE** (fs-sysfile S5d, 2026-08-12)
+
+**PART 1 LANDED AND FULLY GATED.**  `ireg_write_au` now takes
+`InodeRegion.di_type_stable dn' dn`
+(`bv_unsigned (di_type dn') = 0 \/ di_type dn' = di_type dn`), so
+§19.1(i)'s retype is refuted by the REGION and not by a survey of
+callers.  Three helper lemmas ship with it — `di_type_stable_eq`,
+`_zero`, `_refl` — which is all any caller needs.
+
+**§19.7 UNDER-PRICED THE BLAST RADIUS BY TWO CONTRACTS, and the reason
+is worth recording because it recurs.**  The premise is stated against
+the record the REGION currently holds, and at `iupdate`'s seam that is
+the STALE `dn0`, not the in-memory `dn`.  `SpecWritei` and `SpecItrunc`
+deliberately keep `dn0` distinct from `dn` ("the region's record is not
+`dn`", SpecWritei.v:185), so neither can derive `di_type dn = di_type
+dn0` from anything it owns: both gain the premise, and so does
+`SpecDirlink` above writei.  It costs nothing further, because every
+CALLER instantiates the two at ONE record out of `ic_loaded`'s single
+`dinode_at` — filewrite passes `dnl dnl`, iput passes `dn2 dn2`, and
+`di_type_stable_refl` closes it.  **The general rule: a premise about a
+resource's CURRENT value travels to every contract that holds that
+resource at a stale index, not just to the one that consumes it.**
+
+Files: `InodeRegion.v`, `SpecIupdate.v` (all THREE bodies — sconf, gen
+and cred — since ProofIput and ProofItrunc consume the sconf form),
+`ProofIupdate.v`, `SpecWritei.v`, `ProofWritei.v`, `SpecItrunc.v`,
+`ProofItrunc.v`, `SpecDirlink.v`, `ProofDirlink.v`, `ProofIput.v`,
+`ProofFilewrite.v`.  41 files rebuilt, zero `Error`, nothing left stale.
+
+**A PARSING TRAP THAT COSTS AN HOUR IF IT IS NOT NAMED.**  A raw `\/`
+cannot be written in a `wp_*_body`'s premise list: a `_body` definition
+elaborates in `bi_scope` (that is what makes its trailing bare `WP e`
+legal — `RiscvPtsto.v:1470`), and `bi_scope` has `∨` for `bi_or` and no
+`\/` at all.  The failure is a **syntax error at the body's final `WP`,
+a hundred lines below the disjunction**, reading
+`Syntax error: '[{' or '?' or '{{' or '@' expected` — which looks like
+a broken WP notation, not like a scope problem.  Name the disjunction
+(`di_type_stable`) and the problem disappears; that is the second
+reason to prefer a named predicate over an inline conjunct.
+
+#### 19.9.1 PART 3 DOES NOT CLOSE EITHER — the fact is not merely
+#### unprovable, it is FALSE, and every step of the refuting trace is a
+#### LANDED contract
+
+The coordinator's S5d redirect (user-prompted) asked whether §17.6.1's
+window trace can be extended from "a foreign referrer exists" to "a
+foreign referrer FREES the claim".  It can, and this stage checked each
+step against what the tree's contracts actually admit:
+
+| step | the machine | the contract that admits it |
+|---|---|---|
+| 1. claim | `ireg_claim_au` at ialloc +0x9a writes `ialloc_fresh ty₁`, **nlink 0** | `InodeRegion.v:751`; `SpecIalloc.v:159`, header line 78 |
+| 2. a foreign referrer at REF-1 on that entry | §17.6.1's certified trace: iput past its regen at +0x54, lock released at +0x5c, `ip->ref--` not yet run | §17.6.1, already ratified |
+| 3. window-FILL | the referrer carves a share and `ilock`s; the fill withdraws the CLAIM BOX, sees `fresh_shape` (type ≠ 0), does not panic | `ProofIlock.v:1000` — the ordinary `wp_ilock_sconf`'s fill of a marker-parked entry **is** §16.4's claim box.  S5b's constraint (3) is the statement that this arm cannot be excluded |
+| 4. window-FREE | `ref == 1 && valid && nlink == 0` all hold — valid from step 3's own fill, nlink 0 from step 1 — so `itrunc; ip->type = 0; iupdate; valid = 0` runs | `IcacheEscrow.ic_open_auth_ref` (:1108) at REF-1, satisfiable **precisely because the claimant holds no reference in the window**; the flush is `ireg_free_au`, `ProofIput.v:2052`'s landed instance |
+| 5. re-claim at ty₂ | a third `ialloc` scans, finds type 0, claims | `ireg_claim_au`'s ONLY premise is `di_type (ds !!! islot inum) = 0` |
+| 6. create's `ilock` | withdraws the NEW claim box | `ireg_withdraw`, `ProofIlock.v:1000` again |
+
+So `⌜dn = ialloc_fresh ty⌝` at create's fresh ilock is **false in this
+model**, and threading it as an assumed `Prop` would have made create's
+contract vacuous-by-a-false-premise rather than merely relative to an
+open obligation.  §19.6 Part 3 is WITHDRAWN and SpecCreate stays frozen
+exactly as S5a wrote it.
+
+**PART 1 DOES NOT CLOSE IT, AND WAS NEVER GOING TO.**  §19.6 said Part 1
+"reduces the residual hazard from {retype, free-and-reclaim} to
+{free-and-reclaim} alone"; step 4 IS free-and-reclaim, and it takes the
+LEFT disjunct of the new premise — the one deliberately left open for
+iput.  Part 1 is still worth having (it is what makes §17's type story a
+theorem), it is simply orthogonal to §19.
+
+**NO `kernel-defects.md` ENTRY: THIS IS A MODEL GAP, NOT AN OBJECT-CODE
+DEFECT.**  Step 2 needs a thread that NAMES a just-claimed inum.  In
+xv6 the only two sources of an inum for `iget` are `dirlookup` and
+`ialloc` itself; a free inum appears in no directory (unlink removed the
+entry before the free), and the outgoing `iput` of step 2 will run
+`ref--` and never `ilock` again.  In THIS development the namer exists
+because `SpecIget` is stated for an arbitrary `inum` (deliberately —
+see its header) and `DirView.dir_ok` says only that a directory's live
+records name inums the region COVERS (`dir_inums_ok`, :824), never that
+they name ALLOCATED ones.  **That is §19.6 Part 2's bill, restated as a
+soundness obligation rather than a convenience**, and it is now the only
+route to an unblocked create.
+
+#### 19.9.2 WHAT THE `∃ty'` WEAKENING BUYS, AND WHAT IT DOES NOT
+
+The expected S5e move — weaken create's `made` arm and let sys_open read
+the type from its own `ilock` witness — must be sized against the same
+trace, and it is smaller than it looks:
+
+* **The three FIELD claims survive.**  `di_major dn = major`,
+  `di_minor dn = minor` and `di_nlink dn = 1` are create's OWN stores at
+  +0x90/+0x94/+0x9a, applied by `ProofCreateParts.cr_setf` to whatever
+  record the fill returned.  They do not depend on the fill's contents.
+* **`di_type dn = ty` and `dn = create_made ty major minor` do not.**
+  Under the trace the fill may return the re-claimed `ialloc_fresh ty₂`
+  — or, one more interleaving on, an arbitrary record — so the full
+  record identity must go too, not just the type.  The strongest
+  surviving type fact is the region's own arm invariant,
+  `bv_unsigned (di_type dn) ≠ 0`.
+* **THE MKDIR ARM IS NOT UNBLOCKED BY THIS.**  `dirlink(ip, ".")`'s
+  FIRST premise is `di_type dn = T_DIR` and create calls no panic, so an
+  `∃ty'` post cannot reach it; and S5a finding 1's "the other three
+  dirlink premises follow from `di_size dn = 0`" is equally lost, since
+  §19.4's `fresh_shape` payout is the CLAIM-BOX arm's and the trace can
+  put create's fill on the ordinary one.  **So the `∃ty'` weakening
+  unblocks the T_FILE/T_DEVICE arm only; ARM C-OK-DIR stays gated on
+  Part 2.**  Plan S5e's walk accordingly: seven of create's eight arms,
+  with the mkdir arm parked.

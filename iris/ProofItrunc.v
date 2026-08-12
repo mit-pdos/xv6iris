@@ -189,6 +189,8 @@ Section ItruncTail.
     ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     bv_unsigned (di_type dn) <> 0 ->
+    (* §19.6 Part 1: iupdate's type-stability premise, travelling. *)
+    di_type_stable dn dn0 ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
     it_sp m M ->
@@ -225,7 +227,7 @@ Section ItruncTail.
             used dev ip inum dn bm u pidv dq dqd dqn dqb dqs j m K C b eb -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hj Hgl Hsp Hthr Hs3.
+    intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hj Hgl Hsp Hthr Hs3.
     pose proof HK as HK'. unfold K_itrunc in HK'.
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hsbb Hsbi Hmeta Hmap Hblks Hbmr
               #Hireg Hdn #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
@@ -325,7 +327,11 @@ Section ItruncTail.
               cov logstart inodestart nib dev ip inum (di_trunc dn) dn0
               bm_empty u
               pidv dq dqd dqn dqs T1 (K - 6)%nat eb C b
-              HKiu Hgeom Hist Hicov Hilog Hnib (di_trunc_addrs dn) Hdirlen
+              HKiu Hgeom Hist Hicov Hilog Hnib
+              (* §19.6 Part 1: [di_trunc] keeps the type, so itrunc's own
+                 [Hstab] about [dn] vs [dn0] is exactly what iupdate wants. *)
+              Hstab
+              (di_trunc_addrs dn) Hdirlen
               Hj Hgl HT1a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hidev Hinum Hmeta Hmap
                     Hsbi Hireg Hdn Hppid Hprocs Hdevi Hdgeom
@@ -2454,7 +2460,7 @@ Section ItruncMain.
   Proof.
     cbv beta delta [wp_itrunc_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
-           Hnib Hdtnz Hwf Hbelow Hblen Hadr Hj Hgl Ha0.
+           Hnib Hdtnz Hstab Hwf Hbelow Hblen Hadr Hj Hgl Ha0.
     pose proof HK as HK'. unfold K_itrunc in HK'.
     (* THE PER-SLOT RANGE FACT, no longer a premise: [blkmap_wf] already
        says every block the map names is covered, and [cov_below] bounds a
@@ -2828,7 +2834,7 @@ Section ItruncMain.
                 cov logstart bmapstart inodestart size nib dev used ip inum
                 dn dn0 bm
                 n1 pidv dq dqd dqn dqb dqs m R0 K C b eb
-                HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hj Hgl HR0sp HR0thr HR0s3
+                HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hj Hgl HR0sp HR0thr HR0s3
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs
                       Hframe Hppid Hidev Hinum Hsbb Hsbi
                       Hmeta Hmap Hblks Hbmr Hireg Hdn Hdevi Hdgeom Hdlock
@@ -2893,7 +2899,7 @@ Section ItruncMain.
                 cov logstart bmapstart inodestart size nib dev used ip inum
                 dn dn0 bm
                 n3 pidv dq dqd dqn dqb dqs m Mz K C b eb
-                HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hj Hgl HMzsp HMzthr HMzs3
+                HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hj Hgl HMzsp HMzthr HMzs3
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs
                       [Hf1 Hf2 Hf3 Hf4 Hf5 Hslot6] Hppid Hidev Hinum Hsbb
                       Hsbi Hmeta Hmap Hblks Hbmr Hireg Hdn Hdevi Hdgeom Hdlock

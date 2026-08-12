@@ -3275,6 +3275,142 @@ two `made` arms need the fact.
 probe compiled.  Working tree carries exactly two edited notes files.
 
 
+## S5d — **§19 PART 1 LANDED AND FULLY GATED (11 files, 41 rebuilt, zero
+## Error).  PART 3 IS WITHDRAWN: the assumed Prop is FALSE on a reachable
+## trace, and every step of the refutation is a LANDED contract.**
+## SpecCreate stays frozen; the budget retrofits and the walk are NOT started
+
+The stage's product is the Part 1 retrofit plus the reachability read that
+killed Part 3 (coordinator redirect, mid-stage).  Design write-up:
+`design/fs-icache.md` §19.9 / §19.9.1 / §19.9.2 — read those before S5e.
+
+### PART 1 — LANDED, and §19.7 under-priced it by TWO CONTRACTS
+
+`InodeRegion.ireg_write_au` gains `di_type_stable dn' dn`, a NAMED
+predicate (`bv_unsigned (di_type dn') = 0 \/ di_type dn' = di_type dn`)
+with three one-line helpers (`_eq` / `_zero` / `_refl`).  The proof body
+of `ireg_write_au` does not move: the premise only travels.
+
+**The mis-sizing, and it is the reusable lesson.**  §19.7 priced six
+files on the reading that `ProofWritei` / `ProofItrunc` / `ProofIput`
+would *discharge* the premise.  Two of them cannot: the premise is about
+the record the REGION holds, which at iupdate's seam is the STALE `dn0`,
+and `SpecWritei` (:185) and `SpecItrunc` deliberately keep `dn0` apart
+from the in-memory `dn`.  Both gain the premise, and `SpecDirlink` above
+writei gains it too.  **It still costs nothing downstream**, because
+every CALLER instantiates the pair at ONE record out of `ic_loaded`'s
+single `dinode_at` — `ProofFilewrite` passes `dnl dnl`, `ProofIput`
+passes `dn2 dn2`, and `di_type_stable_refl` closes both.  `SpecDirlink`
+has no caller yet, so that one is free as well.
+
+Landed, in dependency order: `InodeRegion.v`, `SpecIupdate.v` (ALL THREE
+bodies — sconf/gen/cred; ProofIput and ProofItrunc consume the sconf
+form, so the §19.7 table's "gen/cred, both" was one short),
+`ProofIupdate.v`, `SpecWritei.v`, `ProofWritei.v`, `SpecItrunc.v`,
+`ProofItrunc.v`, `SpecDirlink.v`, `ProofDirlink.v`, `ProofIput.v`,
+`ProofFilewrite.v`.  Every discharge is one token:
+
+| site | discharge |
+|---|---|
+| `ProofWritei` at its iupdate | `ltac:(rewrite Hdneq; exact Hstab)` — `wi_dinode` keeps the type, by conversion |
+| `ProofItrunc` at its iupdate | `Hstab` verbatim — `di_trunc` keeps the type, by conversion |
+| `ProofIput` at its iupdate | `di_type_stable_zero (di_free dn2) (di_trunc dn2) (di_free_type dn2)` — **the LEFT disjunct, the one place in the kernel where a type legitimately moves** |
+| `ProofIput` at its itrunc, `ProofFilewrite` at its writei | `di_type_stable_refl` |
+| `ProofDirlink` at its writei | `Hstab` verbatim |
+
+### PART 3 — WITHDRAWN.  The Prop is FALSE, not merely unprovable
+
+Mid-stage the coordinator asked whether §17.6.1's window trace extends
+from "a foreign referrer exists" to "a foreign referrer FREES the
+claim".  It does; §19.9.1 has the six-step table with the landed
+contract that admits each step.  The two that decide it:
+
+* **the window-FILL is `ProofIlock.v:1000` itself** — the ordinary
+  `wp_ilock_sconf`'s fill of a marker-parked entry IS §16.4's claim box,
+  and S5b's constraint (3) is precisely the statement that this arm
+  cannot be excluded from ilock's precondition;
+* **the window-FREE's REF-1 premise (`ic_open_auth_ref`, :1108) is
+  satisfiable exactly because the claimant holds no reference in the
+  window**, and `ialloc_fresh`'s `nlink = 0` plus the fill's own
+  `valid = 1` make the C-level test `ref==1 && valid && nlink==0` true.
+
+So an `ialloc_fresh_fill` premise would have made create's contract
+vacuous-by-a-false-premise.  `SpecCreate.v` is **byte-identical to
+HEAD** (md5 `e9f1916110fde9edbf5913427f3bd842`); S5a's freeze note is
+NOT amended, and §19.6's "SpecCreate gains exactly the one additive
+premise" is superseded.
+
+**Not a kernel defect.**  Step 2 needs a thread that NAMES a
+just-claimed inum; in xv6 `iget`'s only inum sources are `dirlookup`
+(and a free inum is in no directory) and `ialloc` itself.  The namer
+exists only in the MODEL, because `SpecIget` takes an arbitrary inum and
+`DirView.dir_ok` says "covers" and not "allocated".  §19.6 Part 2 is
+therefore no longer a convenience — it is the soundness obligation, and
+the only route to an unblocked create.
+
+**Size the S5e weakening against §19.9.2:** the `∃ty'` post unblocks the
+T_FILE/T_DEVICE arm only.  create's three FIELD claims survive (they are
+its own stores, applied by `cr_setf`), but `dn = create_made ty mj mn`
+goes with the type, and the mkdir arm still cannot call
+`dirlink(ip, ".")` (first premise `di_type dn = T_DIR`, no panic to
+refute it) nor recover the other three dirlink premises from
+`di_size dn = 0`.  **Plan seven arms, park the mkdir arm.**
+
+### NOT STARTED, and honestly so
+
+* **Retrofits 1, 3, 4, 5** (writei's credited spend, `DIRLINK_GEN`,
+  iput/iunlockput's `ip_spend`, `wp_ialloc_gen`).  `CreateBudget.v`'s
+  arm theorems name all four and consume all four: `ia_spend` needs
+  retrofit 5, `dl_spend`/`dl_need` need 3 (which needs 1 underneath),
+  `ip_spend` needs 4.  Only retrofit 2 (`wp_iupdate_cred`) is landed
+  (S5b).  Each is stage-sized — S5b landed exactly one in a whole stage
+  — and 3 is a second walk of a 3150-line proof.
+* **`ProofCreate.v` / `LinkCreate.v`** — not started.  With Part 3
+  withdrawn the walk is gated differently than §19.8 assumed: the six
+  ruling-free arms are still buildable, but every one of them past
+  +0x80 threads the op-wide set through `ialloc` and `iunlockput`, so
+  the walk cannot begin before retrofits 4 and 5 at least.
+
+### Gate
+
+`~/one5.sh` and one detached `~/mk5.sh go` (`/tmp/mk5.log`) against the
+EC2 mirror; no `full.sh`, `_CoqProject` never edited and never scp'd, no
+git on EC2.  Part 1's cone: **41 files rebuilt, zero `Error`, and a
+follow-up `make -n` lists ZERO remaining targets** (the only honest
+"tree is green" check — see durable-notes' mtime-sweep warning).
+`tools/lemma_diff.py --ref HEAD`: CLEAN — nothing GONE, nothing
+ADMITTED, no new `Axiom`/`Parameter`/`Hypothesis`, no `cheat_`.
+`Print Assumptions` over `Iupdate` / `Writei` / `Dirlink` / `Iput` /
+`Iunlockput` / `Ialloc` / `Ilock` / `Itrunc` / `Filewrite`'s linked
+`wp_*_sconf`: **the standing six for eight of the nine** (the five
+`rv64d` platform axioms plus `functional_extensionality_dep`).
+`Filewrite` carries those six plus its ONE pre-existing caveat,
+`LinkConsolewrite.Consolewrite.wp_consolewrite_sconf` (the assumed
+console contract its `devsw` arm reaches) — unchanged by this stage.
+
+### Traps recorded
+
+1. **The mirror is where the tree is green; the local checkout is NOT.**
+   `/shared/xv6iris/iris` locally holds 850 `.vo` against 1049 `.v`
+   rows in `_CoqProject`, so a local single-file `coqc` of an fs file
+   dies on `Cannot find a physical path bound to logical path BitmapInv`
+   — or, worse, on a **syntax error at a `_body`'s final `WP`**, because
+   the `WP e` notation (`RiscvPtsto.v:1470`) arrives through a `.vo`
+   that is not there.  That second symptom is indistinguishable from a
+   real parse bug in the premise you just added, and it cost a full
+   bisect.  Copying the main checkout's `.vo` tree into a worktree does
+   not fix it; the missing files are missing on both sides.
+2. **A raw `\/` does not parse in a `wp_*_body` premise list** —
+   `bi_scope`, not `type_scope`.  Same syntax error at the final `WP`,
+   ~100 lines below the real line.  Name the disjunction.
+3. **A double-quoted phrase in a header comment must not span lines**
+   (durable-notes already has this; hit again while writing the §19.6
+   banner, and the error again surfaced far away).
+4. `make -f CoqMakefile -n | grep '^COQC'` finds nothing in this tree:
+   the recipe echoes `ROCQ compile <f>.v`.  A "0 targets pending" read
+   off the wrong pattern is a false green.
+
+
 ## UNSATISFIABLE, and that is the finding that matters
 
 ### B1 (proc_priv -> proc_priv_core) — DONE, and the composition probe passed first try

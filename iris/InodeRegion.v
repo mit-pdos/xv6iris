@@ -277,6 +277,36 @@ Proof.
   intros (_ & _ & Ha). rewrite /dinode_wf Ha length_replicate. reflexivity.
 Qed.
 
+(* TYPE STABILITY (fs-icache.md §19.6 Part 1, fs-sysfile S5d).  "A flush
+   either CLEARS an inode's type or leaves it exactly where it was" -- the
+   premise [ireg_write_au] gained so that §19.1(i)'s retype is refuted by
+   the REGION rather than by a survey of this tree's callers.
+
+   NAMED, not written inline, for two reasons.  (i) Every consumer spells
+   it in a premise list that also has to travel through [SpecIupdate]'s
+   three bodies and every proof that threads them, and a named predicate
+   is what keeps that a one-token edit (durable-notes: keep a side
+   condition in one named, Ltac-dischargeable predicate).  (ii) A raw
+   [\/] does not even PARSE in those premise lists: a [_body] definition
+   is elaborated in [bi_scope] (that is what makes the trailing bare [WP e]
+   legal, RiscvPtsto.v:1470), and [bi_scope] has [∨] for [bi_or] and no
+   [\/] at all -- the failure surfaces as a syntax error at the body's
+   final [WP], a hundred lines below the disjunction. *)
+Definition di_type_stable (dn' dn : dinode) : Prop :=
+  bv_unsigned (di_type dn') = 0 \/ di_type dn' = di_type dn.
+
+(* The two ways every caller in the tree discharges it. *)
+Lemma di_type_stable_eq (dn' dn : dinode) :
+  di_type dn' = di_type dn -> di_type_stable dn' dn.
+Proof. intros H. right. exact H. Qed.
+
+Lemma di_type_stable_zero (dn' dn : dinode) :
+  bv_unsigned (di_type dn') = 0 -> di_type_stable dn' dn.
+Proof. intros H. left. exact H. Qed.
+
+Lemma di_type_stable_refl (dn : dinode) : di_type_stable dn dn.
+Proof. right. reflexivity. Qed.
+
 (* THE MARKER'S KEY.  The claim box needs a per-inum EXCLUSIVE token whose
    two homes are the region invariant and a pool/entry marker; a second
    ghost name for it would have to appear in [ireg_inv] AND in
@@ -648,7 +678,23 @@ Section InodeRegion.
      type-0 [dn']: the slot's arm has to flip and the marker has to come
      out.  That is [ireg_free_au] below; this lemma keeps the arm where it
      is and therefore demands an allocated [dn'].  Every ordinary caller
-     has it from [InodeLock.inode_ok]. *)
+     has it from [InodeLock.inode_ok].
+
+     THE TYPE-STABILITY PREMISE (fs-icache.md §19.6 Part 1, fs-sysfile S5d).
+     Before it, the only constraint on the flushed record's type was the
+     nonzero-ness above, so ANY holder of [dinode_at γi inum dn] could
+     RETYPE the inode and re-establish the invariant -- i.e. no-writer-
+     retypes-an-allocated-inode was a fact about this tree's callers and
+     not a theorem of the model, which is what §19.1(i) refuted.  With the
+     disjunction below it IS a theorem of the region: a flush either clears
+     the type (iput's [ip->type = 0], the LEFT disjunct -- and that route
+     actually leaves through [ireg_free_au], so here the left disjunct is
+     dead against [Hnz] and only records the shape) or leaves it exactly
+     where it was.  The premise only TRAVELS: the proof body does not move,
+     and every caller in the tree discharges it today ([ProofWritei] and
+     [ProofItrunc] from their own [wi_dinode]/size-only updates,
+     [ProofCreate] from [ProofCreateParts.cr_setf], [ProofIput]'s free path
+     at the left disjunct). *)
   Lemma ireg_write_au (E : coPset) (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) (inum : bv 32) (dn dn' : dinode)
       (ds : list dinode) :
@@ -657,6 +703,7 @@ Section InodeRegion.
     diblk_wf ds ->
     dinode_wf dn' ->
     bv_unsigned (di_type dn') <> 0 ->
+    di_type_stable dn' dn ->
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
     |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
@@ -666,7 +713,7 @@ Section InodeRegion.
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗ dinode_at γi inum dn').
   Proof.
-    iIntros (HE Hin Hwf Hdn' Hnz) "#Hinv Hdn".
+    iIntros (HE Hin Hwf Hdn' Hnz Hstab) "#Hinv Hdn".
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).

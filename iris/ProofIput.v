@@ -1960,7 +1960,10 @@ Section ProofIput.
               pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqb dqs J2 (K - 4)%nat
               eb C eb
               ltac:(unfold K_itrunc; lia) Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
-              Hnib Htyne2 Hbmwf2 Hcovb Hsized2 Hdiaddrs2 Hj Hgsj HJ2a0
+              Hnib Htyne2
+              (* §19.6 Part 1: iput hands itrunc ONE record for both slots. *)
+              (InodeRegion.di_type_stable_refl dn2)
+              Hbmwf2 Hcovb Hsized2 Hdiaddrs2 Hj Hgsj HJ2a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlogc Hidv Hinh Hmeta
                     [Haddrs Hind] Hblks Hbms Hins Hbm Hireg Hdat Hppid Hprocs
                     Hdevi Hdgeom Hdlock [Hbs2 Hbs1] [Hop] [-]").
@@ -2055,6 +2058,11 @@ Section ProofIput.
               pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqs J4 (K - 4)%nat
               eb C eb
               ltac:(unfold K_iupdate; lia) Hgeom Hist Hicov Hilog Hnib
+              (* §19.6 Part 1, THE LEFT DISJUNCT: this is the free path's
+                 [ip->type = 0] flush, the one place in the kernel where a
+                 record's type legitimately moves, and it moves to ZERO. *)
+              (InodeRegion.di_type_stable_zero (di_free dn2) (di_trunc dn2)
+                 (di_free_type dn2))
               (di_free_addrs dn2) ltac:(reflexivity) Hj Hgsj HJ4a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlogc Hidv Hinh Hmeta Hmap
                     Hins Hireg Hdat Hppid Hprocs Hdevi Hdgeom Hdlock Hbs2 [Hop] [-]").
