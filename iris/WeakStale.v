@@ -853,3 +853,134 @@ Proof.
            (wmem_restrict s W) W Hwf HW0 Hwin (wmem_restrict_dom s W)
            (wmem_restrict_sub s W) Hfam).
 Qed.
+
+(* ====================================================================== *)
+(** ** 6. THE SECOND TRANSFER: the mirror against the PATCHED memory
+
+    §3 carries a sub-run whose UNPINNED reads miss the window; this carries
+    one whose PINNED reads miss it — and those are the two halves the walk
+    decomposes into:
+
+      - the PT WALK (three plain reads, one of them the racy leaf slot): no
+        pinned read at all, so it is [exec_eff] at the PATCHED memory, i.e.
+        the existing walk library applies verbatim with the leaf slot holding
+        the racy word;
+      - the CAS ([read_pte_exclusive] + [write_pte_conditional]) and the TLB
+        fill: no UNPINNED read at all, so §3 applies and the existing library
+        applies at the REAL memory, which is where the fresh word lives.
+
+    So neither half needs a mirrored proof — which is the point of keying the
+    mirror on [ak_pins] rather than on the address.
+
+    The write-free restriction is what keeps the state relation an equality
+    rather than a patch-commutation: a RAM write inside such a sub-run would
+    land on the patched memory in one run and the real one in the other, and
+    the walk has none (its one write is in the CAS half, which goes through
+    §3 instead). *)
+
+Definition mpatch (ra : Arch.pa) (rn : N) (w : bv (8 * rn)) (s : mstate)
+    : mstate :=
+  MState s.(sregs) (write_bytes s.(mem) ra rn w) s.(mdev).
+
+Lemma mpatch_set_reg ra rn w s r v :
+  mpatch ra rn w (set_reg s r v) = set_reg (mpatch ra rn w s) r v.
+Proof. reflexivity. Qed.
+
+(** [trace_off_win]'s mirror image: the PINNED reads are the ones that must
+    miss the window here, because they are the ones the mirror answers from
+    the real memory. *)
+Definition trace_pin_win (ra : Arch.pa) (rn : N) (es : list weff) : Prop :=
+  forall (ak : akinfo) (pa : Arch.pa) (n : N),
+    WEread ak pa n ∈ es -> ak_pins ak = true ->
+    acc_wf pa n /\ racc_disj ra rn pa n.
+
+Lemma trace_pin_win_tail ra rn e es :
+  trace_pin_win ra rn (e :: es) -> trace_pin_win ra rn es.
+Proof.
+  intros H ak pa n Hin. apply (H ak pa n), elem_of_cons. by right.
+Qed.
+
+Lemma trace_pin_win_head ra rn ak pa n es :
+  trace_pin_win ra rn (WEread ak pa n :: es) -> ak_pins ak = true ->
+  acc_wf pa n /\ racc_disj ra rn pa n.
+Proof. intros H. apply (H ak pa n), elem_of_cons. by left. Qed.
+
+Lemma exec_stale_of_patch_nowrite (ra : Arch.pa) (rn : N) (w : bv (8 * rn))
+    {X} (m : M X) :
+  acc_wf ra rn ->
+  forall s x T es,
+    exec_eff m (mpatch ra rn w s) = Some (x, T, es) ->
+    nowrite_trace es ->
+    trace_pin_win ra rn es ->
+    exec_stale ra rn w m s
+    = Some (x, MState T.(sregs) s.(mem) T.(mdev), es) /\
+    T = mpatch ra rn w (MState T.(sregs) s.(mem) T.(mdev)).
+Proof.
+  intros Hracc.
+  induction m as [y0 | Ty oc k IH]; intros s x T es Hex Hnw Hpw.
+  - simpl in Hex |- *. injection Hex as <- <- <-.
+    destruct s as [rs ms ds]. by split.
+  - destruct oc; simpl in Hex |- *; try discriminate;
+      try (exact (IH _ _ _ _ _ Hex Hnw Hpw)).
+    + (* RegWrite: [mpatch] commutes with it, definitionally *)
+      exact (IH _ (set_reg s reg regval) _ _ _ Hex Hnw Hpw).
+    + (* MemRead *)
+      destruct (dev_addr _) eqn:Hd.
+      * destruct (dev_read _ _ _) as [[v0 d']|] eqn:Hdr; [|discriminate].
+        destruct (IH _ (MState s.(sregs) s.(mem) d') _ _ _ Hex Hnw Hpw)
+          as [Hst Hpt].
+        simpl in Hst, Hpt. by split.
+      * destruct (read_bytes (write_bytes s.(mem) ra rn w) _ _) as [v0|] eqn:Hrb;
+          [|discriminate].
+        destruct (exec_eff (k _) _) as [[[x0 t0] es0]|] eqn:Hee; [|discriminate].
+        injection Hex as <- <- <-.
+        assert (Hmem : read_bytes
+                  (stale_mem ra rn w
+                     (classify (Interface.ReadReq.access_kind t)) s)
+                  (Interface.ReadReq.pa t) n = Some v0).
+        { destruct (ak_pins (classify (Interface.ReadReq.access_kind t)))
+            eqn:Hpin.
+          - rewrite (stale_mem_pins _ _ _ _ _ Hpin).
+            destruct (trace_pin_win_head ra rn _ _ _ _ Hpw Hpin) as [Hacc Hdisj].
+            by rewrite -(read_bytes_patch_disj s.(mem) ra rn w _ n
+                           Hracc Hacc Hdisj).
+          - by rewrite (stale_mem_unpinned _ _ _ _ _ Hpin). }
+        rewrite Hmem.
+        destruct (IH _ s _ _ _ Hee
+                    (proj2 (Forall_cons_1 _ _ _ Hnw))
+                    (trace_pin_win_tail _ _ _ _ Hpw)) as [Hst Hpt].
+        rewrite Hst. by split.
+    + (* MemWrite: the RAM arm is excluded by [nowrite_trace] *)
+      destruct (dev_addr _) eqn:Hd.
+      * destruct (dev_write _ _ _ _) as [d'|] eqn:Hdw; [|discriminate].
+        destruct (IH _ (MState s.(sregs) s.(mem) d') _ _ _ Hex Hnw Hpw)
+          as [Hst Hpt].
+        simpl in Hst, Hpt. by split.
+      * exfalso.
+        destruct (exec_eff (k _) _) as [[[x0 t0] es0]|] eqn:Hee; [|discriminate].
+        injection Hex as <- <- <-.
+        exact (proj1 (Forall_cons_1 _ _ _ Hnw)).
+    + (* Barrier *)
+      destruct (exec_eff (k tt) _) as [[[x0 t0] es0]|] eqn:Hee; [|discriminate].
+      injection Hex as <- <- <-.
+      destruct (IH tt s _ _ _ Hee
+                  (proj2 (Forall_cons_1 _ _ _ Hnw))
+                  (trace_pin_win_tail _ _ _ _ Hpw)) as [Hst Hpt].
+      rewrite Hst. by split.
+Qed.
+
+(** The shape the walk uses: a sub-run that leaves the patched state alone
+    leaves the real one alone too. *)
+Lemma exec_stale_of_patch_id (ra : Arch.pa) (rn : N) (w : bv (8 * rn))
+    {X} (m : M X) (s : mstate) (x : X) (es : list weff) :
+  acc_wf ra rn ->
+  exec_eff m (mpatch ra rn w s) = Some (x, mpatch ra rn w s, es) ->
+  nowrite_trace es ->
+  trace_pin_win ra rn es ->
+  exec_stale ra rn w m s = Some (x, s, es).
+Proof.
+  intros Hracc Hex Hnw Hpw.
+  destruct (exec_stale_of_patch_nowrite ra rn w m Hracc s x _ es Hex Hnw Hpw)
+    as [Hst _].
+  rewrite Hst. by destruct s.
+Qed.

@@ -94,14 +94,36 @@ below were untouched by either.
   backward transfer and the phase-`false` embedding
   (`wstep_ok_racy_false_of_wstep_ok`).  This is option (c) done right — the
   patch sequence belongs in the READ ARM, not in the state.
-- *OWED, and it is the rest of slice 3* (§8.3 items 4–5): the walk's dispatch
-  at `exec_stale` — only `WeakKpt.wptree_translate_miss_eff_core` and the
-  `translate`/`translateAddr` heads that FEED the leaf read, since
-  `WeakUpdEff`'s arms already take the stale word as a parameter separate
-  from the freshly-read one — and then the racy absorption theorem, which
-  gains a SIXTH outcome: under a racy plain read the miss-path O-FRESH arm
-  becomes reachable and is read-only (`[read a2; read a1; read la;
-  read(excl) la]`, no write).
+- *LANDED, the walk itself (`iris/WeakWalkStale.v`, §8.3 item 4).*  Headline
+  **`exec_stale_translateAddr_pt_miss_cases`** — ONE `translateAddr` fact at
+  the stale mirror covering every outcome a TLB-miss walk can take when its
+  plain leaf read returns a variant `pv` of the memory's word `p0`, with
+  `Print Assumptions` giving `rv64d.plat_term_write` and nothing else (the
+  single platform axiom every walk head in the tree already carries).  The
+  file is short because of the transfers: the WALK is
+  `WeakWalkEff.exec_eff_pt_walk_user` at the PATCHED state plus
+  `exec_stale_of_patch_id`, and the CAS is `WeakUpdEff`'s
+  `update_and_write_pte` arms at the REAL state plus
+  `exec_stale_of_exec_eff` — neither chain re-proved, and no new model
+  reasoning anywhere, because those arms already separate the stale word
+  from the freshly-read one.  What IS re-derived is the glue: the three
+  `translate_TLB_miss` composites, the `translate` head, the `translateAddr`
+  front, and — the one piece of generic infrastructure the front forced —
+  **`execR_stale`**, the early-return interpreter's mirror.
+  **THE SIXTH OUTCOME IS PROVED** (`..._miss_fresh`): gate fires on the racy
+  word, the fresh one needs nothing, so the step reads the leaf slot TWICE
+  and writes nothing.  Unreachable at `exec_eff`; reachable here.
+- *OWED* (§8.3 items 5–6): the Iris-level racy absorption theorem (the pure
+  side is done; §8.6's `pt_slot_mem` transports are in), and — a discovery
+  of the item-4 work, not part of the original plan — **the peel's CPS BIND
+  composition**, without which the producer's family would be over the WHOLE
+  step monad and would demand an `exec_stale` fact for `riscv_step`, i.e.
+  the entire fetch/decode/execute skeleton mirrored.  With it, only
+  `translateAddr` rides `exec_stale` and everything around it rides the
+  ordinary `WeakCert` machinery through the phase-`false` embedding.  The
+  phase has to be an argument of the continuation `K`: at the prefix's `Ret`
+  leaf it is whatever the racy read left, and the tail's obligations differ
+  between the two.
 
 **SLICES 1–2 ARE IN** (`iris/WeakVarCert.v`, `iris/WeakRacy.v`), green and
 axiom-free: the racy peel carries a value filter `Φ` with `wadm_filter`

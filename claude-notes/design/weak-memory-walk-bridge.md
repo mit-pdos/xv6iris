@@ -336,7 +336,7 @@ bookkeeping, no phase, and no second window.
   exec_eff m (wpatch_st …)`-shaped, so the existing patched-`exec` bridge
   stays available to whoever wants it.
 
-### 8.3 The build order — items 1–3 LANDED (2026-08-12), 4–5 owed
+### 8.3 The build order — items 1–4 LANDED (2026-08-12), 5 reshaped
 
 **`iris/WeakStale.v` is in and axiom-free** (`Closed under the global
 context` on every export; tree green). It carries items 1–3 below:
@@ -349,6 +349,38 @@ and **the producer `wstep_ok_racy_true_of_stale` (+ its `wmem_restrict`
 instance) (§5)**. With it, shape 4 is producible: a family of `exec_stale`
 runs, one per Φ-admissible window value, yields
 `wstep_ok_racy … wD_any true`.
+
+**`iris/WeakWalkStale.v` is in too, and it is item 4 — the walk itself.**
+Headline: **`exec_stale_translateAddr_pt_miss_cases`**, one `translateAddr`
+fact at the stale mirror covering every outcome a TLB-miss walk can take
+when its plain leaf read returns a variant `pv` of the memory's word `p0`.
+`Print Assumptions` gives `rv64d.plat_term_write` and nothing else — the
+same single platform axiom every walk head in the tree carries.
+
+The file is short because of the transfers, and that is the whole design
+claim made good:
+
+- `exec_stale_pt_walk_user` is `WeakWalkEff.exec_eff_pt_walk_user` AT THE
+  PATCHED STATE plus `exec_stale_of_patch_id` — no walk chain re-proved;
+- the CAS arms are `WeakUpdEff.exec_eff_update_and_write_pte_{none,fresh,
+  written}` AT THE REAL STATE plus `exec_stale_of_exec_eff` — no update
+  chain re-proved.  Those arms already separate the stale word from the
+  freshly-read one, so no new model reasoning was needed anywhere;
+- what IS re-proved is exactly the glue that crosses the two halves: the
+  three `exec_stale_translate_TLB_miss_{none,fresh,written}` composites
+  (~35 lines each, the `exec_eff` scripts with the bind kit renamed), the
+  `translate` head, and the `translateAddr` front.
+- The front forced ONE piece of generic infrastructure: **`execR_stale`**,
+  the early-return interpreter's mirror (`WeakEffSkel` §§1–3 replayed, with
+  `_bind_eq`'s `None` case a direct induction because the mirror has no
+  bridge to `RiscvTryStep.execR`).  It is generic, not walk-specific, and
+  anything else stated over `catch_early_return` can use it.
+
+**THE SIXTH OUTCOME IS REAL AND IS NOW PROVED**: `..._miss_fresh` is the
+arm where the gate fires on the racy word and the freshly-read one needs
+nothing — four reads, NO write.  Unreachable at `exec_eff` on the miss path;
+reachable here.  Its outcome disjunct is the one an absorption theorem must
+grow.
 
 1. **`iris/WeakStale.v`** (new, additive): `exec_stale` + the bind kit
    mirroring `WeakEff` §2 + the TRANSFER lemma — a run whose non-pinning
@@ -378,12 +410,28 @@ runs, one per Φ-admissible window value, yields
    the leaf read: `WeakKpt.wptree_translate_miss_eff_core` and the
    `translate` / `translateAddr` heads it calls. Everything else in
    `WeakWalkEff` is window-free and rides (1).
-5. **The racy absorption theorem**: `wtlb_res_pt_translateAddr_at` gains a
-   sixth outcome. At the flat memory the miss-path O-FRESH arm is
-   unreachable ("in a single `exec_eff` run the fresh word IS the walked
-   word" — `WeakUpdEff`'s header); under a racy plain read it is REACHABLE,
-   and it is read-only: `[read a2; read a1; read la; read(excl) la]` with no
-   write. Anyone enumerating the walk's traces must add it.
+5. **The racy absorption theorem** (OWED): `wtlb_res_pt_translateAddr_at`'s
+   twin over `WeakWalkStale.exec_stale_translateAddr_pt_miss_cases`. The
+   pure side is done; what is left is the Iris side — open `wkptN`, read the
+   slot facts off `wleaf_res`/`wptr8`, supply the three read facts (the
+   walk's AT THE PATCHED STATE, which needs the `pt_slot_mem` transports of
+   §8.6, and the CAS's at the real one), and hand out the same collapse
+   conjuncts plus the SIXTH outcome disjunct. Note what does NOT move: `pa`
+   is variant-independent, and the theorem already declines to pin the `tlb`
+   register, so the interface grows by one disjunct and nothing else.
+6. **The peel's BIND composition** (OWED, and it is what makes item 5
+   usable — a discovery of the item-4 work, not part of the original plan).
+   `wstep_ok_racy_true_of_stale`'s family is over the WHOLE step monad, so
+   taken literally it would demand an `exec_stale` fact for `riscv_step` —
+   i.e. the entire fetch/decode/execute skeleton mirrored, which is far more
+   than the walk. It is not needed: give the peel a CPS form
+   (`wstep_ok_racy_k`, the fixpoint with `K : X -> wmstate -> bool -> Prop`
+   in the `Ret` arm) and one `bind` lemma, and then only `translateAddr`
+   rides `exec_stale` while everything around it rides the ORDINARY
+   `WeakCert` machinery through §4's embedding. The phase must be an
+   argument of `K` — that is why a plain (non-CPS) bind lemma does not work:
+   at `m`'s `Ret` leaf the phase is whatever `m`'s racy read left, and the
+   tail's obligations differ between the two.
 
 ### 8.4 The variant arithmetic, worked out (why the outcome is still absorbed)
 
