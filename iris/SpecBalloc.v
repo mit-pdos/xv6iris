@@ -341,7 +341,11 @@ Definition wp_balloc_gen_body
   (* THE RESERVATION.  Two units must be in hand either way -- log_write's
      own "a unit in hand" requirement holds on the absorbing arm too. *)
   log_opS γ (2 + u) Sb -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b] -- balloc's bread/bwrite
+     park, and the counted form above already says [true].  (Round 12: this
+     set-form body landed on our side of the fork, so [5ca52338]'s sweep
+     could not see it.) *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗

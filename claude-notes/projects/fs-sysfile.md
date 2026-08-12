@@ -2563,3 +2563,87 @@ bucket as SpecReadi's stale comment (S3p).
 Mirror sync + the union full gate DEFERRED until S3r lands (live on
 the mirror at d6db9a27); S3r's walk proves SpecFilewrite as frozen,
 unaffected by the coincidence.
+
+## S3s — the union gate is GREEN: five cross-line seams, five minimal fixes
+
+The red union gate's five errors were TWO families, not five problems.
+
+**Family A (4 sites) — the crossing convention, one line each.** Round 12's
+owed list was INCOMPLETE: `SpecIupdate:337` (gen) also spelled `wp_next b`
+and is not in it. All four broke the same way and were fixed the same way,
+by the ruling's repair direction (align OUR side to `wp_next true`):
+
+| body | fix |
+|---|---|
+| `SpecIupdate.v` gen (was :337) | `wp_next b` -> `wp_next true` |
+| `SpecBalloc.v` gen (was :344) | `wp_next b` -> `wp_next true` |
+| `SpecBmap.v` gen (was :492) | `wp_next b` -> `wp_next true` |
+| `SpecWritei.v` gen (was :781) | `wp_next b` -> `wp_next true` |
+
+Nothing else moved: every internal `*_cont` bundle in the four proof files
+ALREADY said `true` (origin's `5ca52338` swept them), which is exactly why
+the four seams broke — the sweep moved the bundles and the sconf siblings
+but could not see the set-form bodies, which landed on our side of the fork.
+The two spellings meet syntactically at only these four places:
+
+- `ProofIupdate:699` / `ProofBalloc:3285` — `iAssert (iu_cont ...) ... iExact
+  "Hcont"`, i.e. a `b`-spelled contract crossing handed to a `true`-spelled
+  bundle;
+- `ProofBmap:3528` / `ProofWritei:3581` — the other polarity, `iEval (rewrite
+  /wp_next); iIntros (CIDf) "%Hchain"` off a `true` bundle, then `exact
+  Hchain` into the `b`-spelled contract's chain premise.
+
+Both directions vanish once the contract says `true`. **No proof tactic in
+any of the four files changed** — the fix is four lines of Spec.
+
+**STILL OWED (unchanged, and deliberately):** `SpecFilewrite:531` and
+`SpecConsolewrite:143`. Neither seam demanded it — the union gate is green
+with them as they are — and the ruling allows leaving them. SpecFilewrite in
+particular should move in ONE pass with the walk that finishes it:
+`ProofFilewrite`'s two internal bundles (`:974`, `:1252`) are `b`-spelled to
+match it, and ~15 `iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro;
+wp_next_chain|]` sites plus the `cpu_own_transport` guards would have to move
+with them (origin's own note on dirlookup/dirlink/namex/filestat: from a
+`true`-indexed guard the `b`-indexed transport is underivable, so each such
+function derives `b = true` once as `Hb` and rewrites it into the
+TRANSPORTS only). Doing that under a live `cheat_` buys nothing and risks
+the parked frontier.
+
+**Family B (1 site) — `ProofKexecA:1225`, THEIR proof against OUR reshaped
+contract.** Not a crossing problem at all: `DepShr` gained a fourth field
+(the generation `gname`) with SpecIlock v5, and `SpecIunlockput` gained the
+`ity_shot gy (di_type dn')` premise that rides with it. The repair is the
+mechanical one SpecIlock's own porting note prescribes and that
+`ProofIreclaim:1566` / `ProofFileread:1691` already do:
+
+- `kxc_a2`: after `inode_ref_shed`, `iEval (rewrite inode_shr_gen_intro) in
+  "Hshr"; iDestruct "Hshr" as (gy) "Hshr"` — SpecIlock v5 takes the share at
+  a NAMED generation — then `gy` into the `wp_ilock_sconf` argument list and
+  `Hity` onto its `iIntros`;
+- `kxc_bad64`: one new binder `(gy : gname)`, `DepShr sq dev inum gy`, one new
+  premise `ity_shot gy (di_type dn)` threaded straight into
+  `wp_iunlockput_sconf`;
+- the two `+0x90` fall-through crossings (`kxc_a2`'s and `kxc_phaseA`'s): one
+  new `∀`-binder `gyf` and the matching `ity_shot gyf (di_type dnf)`.
+
+The witness is never invented — it is produced by ilock and consumed by
+iunlockput inside the same lemma chain, so `kxc_a2` does strictly MORE work
+than before and `kxc_bad64` strictly less-general work. `kxc_phaseA` needed
+no edit: it only forwards `Hcont90`.
+
+**Gate.** Union full gate EXIT=0, **1040 vo**, zero `Error`.
+`lemma_diff.py --ref HEAD`: 5 files, CLEAN. `Print Assumptions` on
+`Writei` (sconf+gen), `Iupdate` (sconf+gen), `Balloc` (sconf+gen), `Bmap`
+(sconf+gen), `Dirlink`, `Ilock`, `Iput`, `Namex`, `Namei`: the 5 platform
+axioms + funext, each; `Fileread`: those plus its known
+`LinkConsoleread.Consoleread.wp_consoleread_sconf`.
+
+**KEXEC PHASE A'S ASSUMPTION INVENTORY.** There is no `LinkKexecA.v` —
+phase A is FUNCTOR-ONLY (`KexecAProof (Myproc) (BeginOp) (Namei) (Ilock)
+(Readi) (Iunlockput) (EndOp)`), so `_CoqProject` carries `CodeKexec`,
+`SpecKexec`, `ProofKexecParts`, `ProofKexecA` and no link. Instantiated in
+scratch against the seven real Link modules (all seven exist), **`Print
+Assumptions KexecA.kxc_phaseA` = the 5 platform axioms + funext AND NOTHING
+ELSE** — no consoleread, no named kexec axiom, no module-parameter residue.
+Phase A is genuinely assumption-clean; writing `LinkKexecA.v` when phase B
+lands will not add one.

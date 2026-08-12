@@ -1178,7 +1178,11 @@ Section KexecABad.
       (cn : ic_names) (gtl : gname) (gil gisl : gname) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32) (used used2 : gset Z)
-      (k : nat) (qi sq : Qp) (inum : mword 32) (dn : dinode) (bm : blkmap)
+      (* [gy]: the GENERATION the caller's share names (SpecIlock v5 /
+         fs-icache 17.6 (5)).  It rides through the deposit and pins the
+         [ity_shot] SpecIunlockput now demands. *)
+      (k : nat) (qi sq : Qp) (gy : gname) (inum : mword 32)
+      (dn : dinode) (bm : blkmap)
       (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -1222,11 +1226,14 @@ Section KexecABad.
     (* ---- the open inode: exactly SpecIunlockput's input ---- *)
     sleeplocked gisl -∗
     sl_pid (i_lock (ientry k)) ↦₄ pidv -∗
-    ic_deposit cn k (DepShr sq dev inum) -∗
+    ic_deposit cn k (DepShr sq dev inum gy) -∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry k) ↦₄ valid_word true -∗
     ic_loaded gfs gi cov logstart k inum dn bm -∗
+    (* the parked record's type witness -- SpecIunlockput's new premise
+       (SpecIlock v5's postcondition supplies it at the same [gy]) *)
+    ity_shot gy (di_type dn) -∗
     inode_ref_short k (qi + sq)%Qp qi dev inum -∗
     (* ---- and the rest of kexec's state ---- *)
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1269,7 +1276,7 @@ Section KexecABad.
            Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hmts4 Hthr.
     unfold K_kexec in HK.
     iIntros "Hcg Hcnt #Htext #Hpanic Hpc #Hfab #Hslkk Hslkd Hslpid Hdep Hidev
-             Hiinum Hivalid Hload Hkeep Hbm Hins Hbits #Hka Hpriv Hpath Hargv
+             Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits #Hka Hpriv Hpath Hargv
              Hargs Hbs Hirs Hlog Hframe Hcont".
     iDestruct "Hfab" as "(#Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
@@ -1321,13 +1328,13 @@ Section KexecABad.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Iunlockput.wp_iunlockput_sconf gs jp gl gu gd gk pd pav pu bn g gfs
               gi cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
-              used2 k qi sq inum dn bm n2 pidv (DfracOwn (1/4)) dqb dqs
+              used2 k qi sq gy inum dn bm n2 pidv (DfracOwn (1/4)) dqb dqs
               B2 (K - 68)%nat true C true
               ltac:(unfold K_iunlockput, K_iput in *; lia) Hk Hlg Hsz Hbm0 Hbmc
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0 eq_refl
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hitab Hitinv Hesck
                     Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
-                    Hkeep Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock Hbs
+                    Hity Hkeep Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock Hbs
                     Hlog [-]").
     iIntros (CIDu Hsu M1 n3 used3) "%Hcsu Hcg Hcnt Hpc Hppid Hbm Hins %Hu3
              Hbits Hbs %Hn3 Hlog Hirs1".
@@ -2074,7 +2081,7 @@ Section KexecABody.
     (* ---- and the FALL-THROUGH: the state at +0x090, phase B's entry ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M90 : regfile) (kf : nat) (qf sf : Qp) (inumf : mword 32)
-        (dnf : dinode) (bmf : blkmap) (gilf gislf : gname)
+        (dnf : dinode) (bmf : blkmap) (gilf gislf gyf : gname)
         (n2 : nat) (used2 : gset Z),
         ⌜ M90 !!! Regidx csp_rs1 = pa_stk sp0 68 /\
           M90 !!! Regidx Rs0 = sp0 /\
@@ -2094,11 +2101,14 @@ Section KexecABody.
                      (ic_tok cn kf) -∗
         sleeplocked gislf -∗
         sl_pid (i_lock (ientry kf)) ↦₄ pidv -∗
-        ic_deposit cn kf (DepShr sf dev inumf) -∗
+        ic_deposit cn kf (DepShr sf dev inumf gyf) -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
         i_valid (ientry kf) ↦₄ valid_word true -∗
         ic_loaded gfs gi cov logstart kf inumf dnf bmf -∗
+        (* SpecIlock v5's additive type witness, at the generation the
+           share names -- what SpecIunlockput now needs at +0x064. *)
+        ity_shot gyf (di_type dnf) -∗
         inode_ref_short kf (qf + sf)%Qp qf dev inumf -∗
         log_op g n2 -∗
         iref_slots 1 -∗
@@ -2136,6 +2146,11 @@ Section KexecABody.
     iDestruct "Hheld" as (k q inum) "(%Hie & %Hk & %Hib & Href)".
     iEval (rewrite -Hdev) in "Href".
     rewrite inode_ref_shed. iDestruct "Href" as "[Hkeep Hshr]".
+    (* SpecIlock v5 takes the share at a NAMED generation
+       ([IcacheRef.inode_shr_gen]); the conversion is the one every existing
+       caller does ([inode_shr_gen_intro] -- SpecIlock's own porting note). *)
+    iEval (rewrite inode_shr_gen_intro) in "Hshr".
+    iDestruct "Hshr" as (gy) "Hshr".
     assert (Hib' : bv_unsigned inum < 16 * Z.of_nat nib)
       by (rewrite Hnib; exact Hib).
     destruct (Hiregb inum Hib') as [Hibc Hibl].
@@ -2233,14 +2248,14 @@ Section KexecABody.
     iDestruct (cpu_own_transport CID0 CID3 0%nat true (proc_addr jp) C true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Ilock.wp_ilock_sconf gs jp gl gu gd gk pd pav pu bn gfs gi cn
-              gilk gislk cov logstart inodestart nib k (q/2)%Qp dev inum
+              gilk gislk cov logstart inodestart nib k (q/2)%Qp gy dev inum
               pidv (DfracOwn (1/4)) dqs Q2 (K - 68)%nat true C true
               ltac:(unfold K_ilock; lia) Hk Hlg Hins0 Hibc Hib' Hjp Hgs HQ2a0
               eq_refl
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hitinv Hesck Hireg Hslkk
                     Hshr Hins Hppid Hprocs Hdevi Hdgeom Hdlock Hbs1 [-]").
     iIntros (CIDil Hsil M1 dnl bml) "%Hcsil Hcg Hcnt Hpc Hppid Hins Hbs1
-             Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload".
+             Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload Hity".
     assert (Hpc3a : ret_pc (Q2 !!! Regidx Rra) = mword_of_int (KXA + 0x3a))
       by (rewrite HQ2ra; pcw).
     iEval (rewrite Hpc3a) in "Hpc".
@@ -2591,9 +2606,9 @@ Section KexecABody.
           iSplitL "Hindres"; [iExact "Hindres" | iExact "Hblocks"]. }
         iDestruct (kxa_bs3_join bn with "Hbs1 Hbs2") as "Hbs".
         iSpecialize ("Hcont90" $! CID15 with "[%]"); [wp_next_chain |].
-        iApply ("Hcont90" $! Q12 k (q/2)%Qp (q/2)%Qp inum dnl bml gilk gislk
+        iApply ("Hcont90" $! Q12 k (q/2)%Qp (q/2)%Qp inum dnl bml gilk gislk gy
                   n1 used1 with "[%] [%] Hpc Hcg Hcnt Hslkk Hslkd Hslpid Hdep
-                  Hidev Hiinum Hivalid Hload Hkeep Hlog Hirs Hbm Hins Hbits
+                  Hidev Hiinum Hivalid Hload Hity Hkeep Hlog Hirs Hbm Hins Hbits
                   Hbs Hka Hpriv Hpath Hargv Hargs [-]").
         * split_and!; [exact HQ12sp | exact HQ12s0 | exact HQ12s1 | exact HQ12s2
                       | exact HQ12s4 | exact Hk | exact Hib' | exact HQ12thr].
@@ -2654,13 +2669,13 @@ Section KexecABody.
                      with "Hcont") as "Hcont".
         iApply (kxc_bad64 gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                   gilk gislk ga gf cov logstart bmapstart inodestart nib size
-                  dev used used1 k (q/2)%Qp (q/2)%Qp inum dnl bml n1
+                  dev used used1 k (q/2)%Qp (q/2)%Qp gy inum dnl bml n1
                   plen pfun na avf alen aslen afun pidv V dqb dqs dqa
                   m Q12 K C sp0 ra0 s00 s10 s20 pv av
                   HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
                   Hjp Hgs Hused1 Hsp Hra Hs0 Hs1 Hs2 HQ12sp HQ12s4 HQ12thr
                   with "Hcg Hcnt Htext Hpanic Hpc [] Hslkk Hslkd Hslpid Hdep
-                        Hidev Hiinum Hivalid Hload Hkeep Hbm Hins Hbits Hka
+                        Hidev Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits Hka
                         Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
         { rewrite /fs_fabric. iFrame "Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
                                       Hslks Hireg Hprocs Hdevi Hdgeom Hdlock". }
@@ -2723,13 +2738,13 @@ Section KexecABody.
                    with "Hcont") as "Hcont".
       iApply (kxc_bad64 gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                 gilk gislk ga gf cov logstart bmapstart inodestart nib size
-                dev used used1 k (q/2)%Qp (q/2)%Qp inum dnl bml n1
+                dev used used1 k (q/2)%Qp (q/2)%Qp gy inum dnl bml n1
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa
                 m Q9 K C sp0 ra0 s00 s10 s20 pv av
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
                 Hjp Hgs Hused1 Hsp Hra Hs0 Hs1 Hs2 HQ9sp HQ9s4 HQ9thr
                 with "Hcg Hcnt Htext Hpanic Hpc [] Hslkk Hslkd Hslpid Hdep
-                      Hidev Hiinum Hivalid Hload Hkeep Hbm Hins Hbits Hka
+                      Hidev Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits Hka
                       Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
       { rewrite /fs_fabric. iFrame "Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
                                     Hslks Hireg Hprocs Hdevi Hdgeom Hdlock". }
@@ -2883,7 +2898,7 @@ Section KexecAMain.
     (* ---- and the FALL-THROUGH: phase B's entry at +0x090 ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M90 : regfile) (kf : nat) (qf sf : Qp) (inumf : mword 32)
-        (dnf : dinode) (bmf : blkmap) (gilf gislf : gname)
+        (dnf : dinode) (bmf : blkmap) (gilf gislf gyf : gname)
         (n2 : nat) (used2 : gset Z),
         ⌜ M90 !!! Regidx csp_rs1 = pa_stk sp0 68 /\
           M90 !!! Regidx Rs0 = sp0 /\
@@ -2903,11 +2918,14 @@ Section KexecAMain.
                      (ic_tok cn kf) -∗
         sleeplocked gislf -∗
         sl_pid (i_lock (ientry kf)) ↦₄ pidv -∗
-        ic_deposit cn kf (DepShr sf dev inumf) -∗
+        ic_deposit cn kf (DepShr sf dev inumf gyf) -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
         i_valid (ientry kf) ↦₄ valid_word true -∗
         ic_loaded gfs gi cov logstart kf inumf dnf bmf -∗
+        (* SpecIlock v5's additive type witness, at the generation the
+           share names -- what SpecIunlockput now needs at +0x064. *)
+        ity_shot gyf (di_type dnf) -∗
         inode_ref_short kf (qf + sf)%Qp qf dev inumf -∗
         log_op g n2 -∗
         iref_slots 1 -∗

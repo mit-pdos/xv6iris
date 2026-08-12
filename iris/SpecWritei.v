@@ -778,7 +778,11 @@ Definition wp_writei_gen_body
   (* THE RESERVATION, SET FORM: the op's logged set rides beside the
      counter.  No credit parameter -- see the header. *)
   log_opS γ ncount Sb -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b] -- writei's bread/bmap/
+     iupdate park, and the counted form above already says [true].  (Round
+     12: this set-form body landed on our side of the fork, so [5ca52338]'s
+     sweep could not see it.) *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (tot : nat) (bm' : blkmap) (data' : nat -> list (bv 8))
     (dn' dn0' : dinode) (n' : nat)
     (wrote : nat -> bv 8) (dist : nat) (dstb : nat -> bv 8) (P' : uptd)

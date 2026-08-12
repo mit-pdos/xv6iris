@@ -334,7 +334,11 @@ Definition wp_iupdate_gen_body
      [IBLOCK inum inodestart] is the whole of [Sb' ∖ Sb] and a caller
      needs no ceiling to know it. *)
   log_opS γ (S u) Sb -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b] -- the set form says exactly
+     what the counted form above says; see that banner.  (Round 12: this body
+     was the one [5ca52338]'s sweep could not see, because it landed on our
+     side of the fork.) *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗

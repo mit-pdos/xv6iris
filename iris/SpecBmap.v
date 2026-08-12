@@ -489,7 +489,11 @@ Definition wp_bmap_gen_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslots bn 3 -∗
   log_opS γ n Sb -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b] -- bmap's bread/balloc
+     park, and the counted form above already says [true].  (Round 12: this
+     set-form body landed on our side of the fork, so [5ca52338]'s sweep
+     could not see it.) *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (bm' : blkmap) (n' : nat) (data' : nat -> list (bv 8))
     (used' : gset Z) (Sb' : gset Z),
       ⌜callee_saved m mf⌝ -∗
