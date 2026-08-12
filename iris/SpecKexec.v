@@ -310,6 +310,63 @@ Definition kexec_ok (V V' : pprivate) (r : mword 64)
    (uint spv <= uint szv')%Z).
 
 (* ===================================================================== *)
+(*  THE FILE SYSTEM FABRIC, as one bundle.                                *)
+(* ===================================================================== *)
+(* Thirteen resources that every FS client's contract lists one by one --
+   SpecNamei, SpecIlock, SpecReadi and SpecIunlockput each spell out their
+   own subset, and kexec needs the union of all four.  EVERY ONE OF THEM IS
+   PERSISTENT (machine-checked: the two invariants, the two ctx's, the four
+   icache pieces, the crash seam, the era certificate, the disk lock and its
+   geometry, and procs_inv, which is a big-op of [is_lock]).  So the bundle
+   costs nothing to carry, nothing to split, and nothing to give back --
+   which is what makes it worth having: kexec's four phases would otherwise
+   each restate the thirteen, and a block statement that is thirteen lines of
+   fabric before its first real resource is unreadable.
+
+   A caller unbundles with one [iDestruct] at each callee call site.
+
+   ITS HOME IS HERE ONLY UNTIL A SECOND CONTRACT WANTS IT.  Nothing about
+   this is kexec-specific, and the right home is a shared [FsFabric.v] that
+   SpecNamei / SpecIlock / SpecReadi / SpecIunlockput are all restated over.
+   That is a sweep across eight Spec files and their proofs, it is not needed
+   to prove kexec, and the tree's rule is to promote on the second consumer
+   (as [ProcInv.proc_priv_name] and [InodeInv.ireg_blocks_ok] both were).
+   Promote it then. *)
+Definition fs_fabric
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    (gs : list gname) (gu : uart_names) (gd : disk_names) (gk : gname)
+    (pd pav pu : mword 64) (bn : bio_names)
+    (g : log_names) (gfs : fs_names) (gi : gname) (cn : ic_names) (gtl : gname)
+    (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
+    : iProp Σ :=
+  (bio_ctx bn (fs_view gfs gd dev cov) ∗
+   log_ctx g bn gfs cov logstart dev ∗
+   fs_crash_seam cov logstart ∗
+   gen_cert ∗
+   is_itable2 gtl cn gfs gi cov logstart nib dev ∗
+   itable_inv ∗
+   ic_escrows cn gfs gi cov logstart ∗
+   ic_sleeplocks cn ∗
+   ireg_inv gi gfs inodestart nib ∗
+   procs_inv gs ∗
+   dev_inv gu gd ∗
+   disk_geom gd pd pav pu ∗
+   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu))%I.
+
+Global Instance fs_fabric_persistent
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    gs gu gd gk pd pav pu bn g gfs gi cn gtl cov logstart inodestart nib dev :
+  Persistent (fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
+                        cov logstart inodestart nib dev).
+Proof. apply _. Qed.
+
+(* ===================================================================== *)
 (*  The contract.                                                         *)
 (* ===================================================================== *)
 Definition wp_kexec_sconf_body
@@ -379,20 +436,9 @@ Definition wp_kexec_sconf_body
   cpu_own 0 eb pj C b -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
-  bio_ctx bn (fs_view gfs gd dev cov) -∗
-  log_ctx g bn gfs cov logstart dev -∗
-  fs_crash_seam cov logstart -∗
-  gen_cert -∗
+  fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
+            cov logstart inodestart nib dev -∗
   kalloc_env ga None -∗
-  is_itable2 gtl cn gfs gi cov logstart nib dev -∗
-  itable_inv -∗
-  ic_escrows cn gfs gi cov logstart -∗
-  ic_sleeplocks cn -∗
-  ireg_inv gi gfs inodestart nib -∗
-  procs_inv gs -∗
-  dev_inv gu gd -∗
-  disk_geom gd pd pav pu -∗
-  is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   bitmap_res gfs bmapstart cov logstart size used -∗

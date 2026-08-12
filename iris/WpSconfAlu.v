@@ -965,13 +965,21 @@ Section WpSconfAlu.
   (* as a write under the pin.  (Both call sites below are at rd = sp and *)
   (* read sp, so [ltac:(rdok)] closes the whole thing.)                   *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_gpr_write_s_sconf_cap
-      (pc : mword 64) (rd rsa rsb : mword 5) (base : instruction) (wval : mword 64)
+  (* THE ENCODING WIDTH IS A PARAMETER, because kexec's frame does not fit a
+     compressed sp-move.  [c.addi sp]/[c.addi16sp] reach -512..+496, and kexec
+     pushes 544 bytes, so gcc emits a BASE-encoded [addi sp,sp,-544] /
+     [addi sp,sp,544] -- the only function in the tree that does.  The funnel
+     underneath ([wp_instr_s_sconf]) is already width-generic, so this is the
+     one engine at both widths and [wp_gpr_write_s_sconf_cap] below is its
+     instance at [c := true]; the base-width sp movers are at the end of the
+     push/pop group. *)
+  Lemma wp_gpr_write_s_sconf_cap_w
+      (pc : mword 64) (c : bool) (rd rsa rsb : mword 5) (base : instruction) (wval : mword 64)
       (m : regfile) (n n' : nat) (P : iProp Σ) (b : bool) :
     uint rd <> 0 ->
     ops_ok_sp b rd rsa rsb ->
     (forall s_pc : mstate,
-       register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2 ->
+       register_lookup nextPC s_pc.(sregs) = add_vec_int pc (if c then 2 else 4) ->
        (if Z.eqb (uint rsa) 0 then zero_reg
         else register_lookup (R_bitvector_64 (gpr_of_Z (uint rsa))) s_pc.(sregs)) = rget m rsa ->
        (if Z.eqb (uint rsb) 0 then zero_reg
@@ -981,7 +989,7 @@ Section WpSconfAlu.
                set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval))) ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗
-    instr pc true base -∗
+    instr pc c base -∗
     (* THE TRANSFORMER IS HART-GENERIC, and it has to be: the capability it
        rewrites is the one the σ-callback delivers, i.e. the REBOUND hart's,
        while the caller writes this wand down at its own.  [sie_cap] is
@@ -994,13 +1002,13 @@ Section WpSconfAlu.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n' b p -∗
       P -∗
-      pc_is (add_vec_int pc 2) -∗
+      pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hops Hbexec) "Hcg Hpc Hinstr Hrecap Hcont".
     pose proof (ops_ok_sp_rd _ _ _ _ Hops) as Hrdtp.
-    iApply (wp_instr_s_sconf m n b pc true base with "Hcg Hpc Hinstr").
+    iApply (wp_instr_s_sconf m n b pc c base with "Hcg Hpc Hinstr").
     (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
        ordinary context entry inside a proof, so [rename] moves it aside --
        and the STATEMENT never sees that, so the 184 call sites that name this
@@ -1019,9 +1027,9 @@ Section WpSconfAlu.
                   (ops_ok_sp_s1 _ _ _ _ Hops)) as Hra.
     pose proof (rget_next_indep (CID := CID0) b p CID m rsb Hs
                   (ops_ok_sp_s2 _ _ _ _ Hops)) as Hrb.
-    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
-    assert (Lnpc0 : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2)
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc (if c then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int pc (if c then 2 else 4))).
+    assert (Lnpc0 : register_lookup nextPC s_pc.(sregs) = add_vec_int pc (if c then 2 else 4))
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rsa) with "Hfile") as "[Hrac Hfba]".
     iDestruct (gpr_pt_value (CID := CID) rsa (tp_pin (CID := CID) m (Regidx rsa)) s_pc with "Hreg Hrac") as %Lva0.
@@ -1044,7 +1052,7 @@ Section WpSconfAlu.
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval)).(sregs)
-             = add_vec_int pc 2)
+             = add_vec_int pc (if c then 2 else 4))
       by (tmig; exact Lnpc0).
     iEval (rewrite Lnpc) in "Hpc'".
     (* the leaf's own write commutes with the tp pin *)
@@ -1056,6 +1064,36 @@ Section WpSconfAlu.
     iApply ("Hcont" $! CID with "[] Hcg HP [$Hpc' $Hnpc]").
     iPureIntro. exact Hs.
   Qed.
+
+  (* the COMPRESSED cap engine, the shape every existing sp-mover is built
+     over: the general one at [c := true]. *)
+  Lemma wp_gpr_write_s_sconf_cap
+      (pc : mword 64) (rd rsa rsb : mword 5) (base : instruction) (wval : mword 64)
+      (m : regfile) (n n' : nat) (P : iProp Σ) (b : bool) :
+    uint rd <> 0 ->
+    ops_ok_sp b rd rsa rsb ->
+    (forall s_pc : mstate,
+       register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2 ->
+       (if Z.eqb (uint rsa) 0 then zero_reg
+        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rsa))) s_pc.(sregs)) = rget m rsa ->
+       (if Z.eqb (uint rsb) 0 then zero_reg
+        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rsb))) s_pc.(sregs)) = rget m rsb ->
+       exec (execute base) s_pc
+       = Some (RETIRE_SUCCESS,
+               set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval))) ->
+    sie_cap_gpr m n b p -∗
+    pc_is pc -∗
+    instr pc true base -∗
+    ( ∀ CIDx : CpuId,
+      sie_cap (CID := CIDx) m n b p -∗
+      sie_cap (CID := CIDx) (<[Regidx rd := regval_into_reg wval]> m) n' b p ∗ P ) -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n' b p -∗
+      P -∗
+      pc_is (add_vec_int pc 2) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof. exact (wp_gpr_write_s_sconf_cap_w pc true rd rsa rsb base wval m n n' P b). Qed.
 
   (* the two real sp-movers over the cap engine: c.addi sp, imm and
      c.addi16sp.  The caller supplies the capability transformer -- at
@@ -1257,6 +1295,109 @@ Section WpSconfAlu.
                             !!! Regidx csp_rs1) k).
     { rewrite upd_eq. exact Hw. }
     iApply (wp_caddi16sp_s_sconf pc imm6 m n (n + k) emp%I b
+              with "Hcg Hpc Hinstr [Hframe] [Hcont]").
+    { iIntros (CIDx) "Hcap".
+      iSplitL; [| done].
+      iApply (sie_cap_pop (CID := CIDx) m _ n k b Hsp with "[Hframe] Hcap").
+      rewrite upd_eq. iExact "Hframe". }
+    iIntros (CID1 Hs1) "Hcg _ Hpc".
+    iApply ("Hcont" $! CID1 with "[] Hcg Hpc").
+    iPureIntro. exact Hs1.
+  Qed.
+
+
+  (* ------------------------------------------------------------------- *)
+  (* THE BASE-ENCODED sp MOVER: [addi sp,sp,imm12], the 4-byte form the     *)
+  (* assembler falls back to when the frame is too large for c.addi16sp     *)
+  (* (kexec's 544 bytes -- the tree's one such frame).  Same three lemmas   *)
+  (* as the compressed family, over the width-generic cap engine.          *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_addi_sp4_s_sconf
+      (pc : mword 64) (imm : mword 12)
+      (m : regfile) (n n' : nat) (P : iProp Σ) (b : bool) :
+    let wval := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 imm) in
+    sie_cap_gpr m n b p -∗
+    pc_is pc -∗
+    instr pc false (ITYPE (imm, Regidx csp_rs1, Regidx csp_rs1, ADDI)) -∗
+    ( ∀ CIDx : CpuId,
+      sie_cap (CID := CIDx) m n b p -∗
+      sie_cap (CID := CIDx) (<[Regidx csp_rs1 := regval_into_reg wval]> m) n' b p ∗ P ) -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr (<[Regidx csp_rs1 := regval_into_reg wval]> m) n' b p -∗
+      P -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros wval.
+    iIntros "Hcg Hpc Hinstr Hrecap Hcont".
+    unshelve iApply (wp_gpr_write_s_sconf_cap_w pc false csp_rs1 csp_rs1 csp_rs1
+              (ITYPE (imm, Regidx csp_rs1, Regidx csp_rs1, ADDI)) wval m n n' P b
+              ltac:(vm_compute; discriminate)
+              ltac:(rdok) _
+              with "Hcg Hpc Hinstr Hrecap Hcont").
+    intros s_pc Hnpc Hva _.
+    rewrite (exec_execute_ITYPE_ADDI_gpr csp_rs1 csp_rs1 imm s_pc).
+    replace (Z.eqb (uint (csp_rs1 : mword 5)) 0) with false by (vm_compute; reflexivity).
+    unfold gpr_addi_val. rewrite Hva. reflexivity.
+  Qed.
+
+  Lemma wp_addi_sp_push4_s_sconf
+      (pc : mword 64) (imm : mword 12)
+      (m : regfile) (n k : nat) (b : bool) :
+    let sp0 := m !!! Regidx csp_rs1 in
+    let wval := add_vec sp0 (sign_extend' 64 imm) in
+    (k <= n)%nat ->
+    wval = pa_stk sp0 k ->
+    sie_cap_gpr m n b p -∗
+    pc_is pc -∗
+    instr pc false (ITYPE (imm, Regidx csp_rs1, Regidx csp_rs1, ADDI)) -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr (<[Regidx csp_rs1 := regval_into_reg wval]> m) (n - k) b p -∗
+      stack_own sp0 k -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros sp0 wval.
+    iIntros (Hk Hw) "Hcg Hpc Hinstr Hcont".
+    assert (Hsp' : <[Regidx csp_rs1 := regval_into_reg wval]> m !!! Regidx csp_rs1
+                   = pa_stk (m !!! Regidx csp_rs1) k).
+    { rewrite upd_eq. exact Hw. }
+    iApply (wp_addi_sp4_s_sconf pc imm m n (n - k) (stack_own sp0 k) b
+              with "Hcg Hpc Hinstr [] [Hcont]").
+    { iIntros (CIDx) "Hcap".
+      iDestruct (sie_cap_push (CID := CIDx) m _ n k b Hk Hsp' with "Hcap")
+        as "[Hcap Hframe]".
+      iFrame "Hcap Hframe". }
+    iIntros (CID1 Hs1) "Hcg Hframe Hpc".
+    iApply ("Hcont" $! CID1 with "[] Hcg Hframe Hpc").
+    iPureIntro. exact Hs1.
+  Qed.
+
+  Lemma wp_addi_sp_pop4_s_sconf
+      (pc : mword 64) (imm : mword 12)
+      (m : regfile) (n k : nat) (b : bool) :
+    let sp0 := m !!! Regidx csp_rs1 in
+    let wval := add_vec sp0 (sign_extend' 64 imm) in
+    sp0 = pa_stk wval k ->
+    sie_cap_gpr m n b p -∗
+    pc_is pc -∗
+    instr pc false (ITYPE (imm, Regidx csp_rs1, Regidx csp_rs1, ADDI)) -∗
+    stack_own wval k -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr (<[Regidx csp_rs1 := regval_into_reg wval]> m) (n + k) b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros sp0 wval.
+    iIntros (Hw) "Hcg Hpc Hinstr Hframe Hcont".
+    assert (Hsp : m !!! Regidx csp_rs1
+                  = pa_stk (<[Regidx csp_rs1 := regval_into_reg wval]> m
+                            !!! Regidx csp_rs1) k).
+    { rewrite upd_eq. exact Hw. }
+    iApply (wp_addi_sp4_s_sconf pc imm m n (n + k) emp%I b
               with "Hcg Hpc Hinstr [Hframe] [Hcont]").
     { iIntros (CIDx) "Hcap".
       iSplitL; [| done].
