@@ -1033,6 +1033,9 @@ ProofFilestatParts.v
 ProofFilestat.v
 LinkFilestat.v
 SpecFilewrite.v
+SpecConsolewrite.v
+LinkConsolewrite.v
+ProofFilewriteParts.v
 ProcdumpAux.v
 SpecProcdump.v
 CodeProcdump.v

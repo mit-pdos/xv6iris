@@ -608,6 +608,228 @@ shapes are frozen.**  A publisher of an FD_INODE fd must, in this order:
   These SUPERSEDE the S3b (a)–(c) list and the "under repair (a)" and §17.6
   restatements above; they are now stated over resources that exist.
 
+## S3g — the device contract + filewrite's whole SCAFFOLD landed and
+## full-gated; `ProofFilewrite` PARKED GREEN with the decode settled
+
+**Landed, all three green on the mirror.**
+
+- **`iris/SpecConsolewrite.v` + `iris/LinkConsolewrite.v`** — the assumed
+  device contract, `SpecConsoleread`'s shape conjunct for conjunct with the
+  copy direction reversed.  The shape is FORCED, not chosen:
+  `SpecFilewrite.filewrite_dev_env` is ONE devsw cell, so the only resources
+  the `c.jalr a5` at +0x7e can hand the callee are filewrite's own
+  (`sie_cap_gpr`, `cpu_own`, text, `proc_priv`, `kalloc_env`, `procs_inv`,
+  `panic_wp_any`).  Return bound `-1 <= r <= n`, deliberately WEAKER than
+  the C's `0 <= i <= n`: under-promising costs filewrite nothing
+  (`pipe_rw_ret` admits -1 anyway) and keeps the eventual discharge small.
+- **`iris/ProofFilewriteParts.v`** — 1329 lines, the whole non-ghost half of
+  filewrite: the 96-byte frame, all the arithmetic, SEVEN block lemmas, and
+  the share-generation algebra.  `Print Assumptions` on `fw_epi` / `fw_pro` /
+  `fw_panic`: 5 platform axioms + funext; on `fw_shr_regen`: **Closed under
+  the global context**.
+
+**NOT WRITTEN, parked green: `ProofFilewrite.v`, `LinkFilewrite.v`.**  What
+is left is the control flow between the blocks plus the FD_INODE arm's ghost
+work (peel/rebuild `ic_loaded`, `off_checkout`/`off_checkin`, writei's
+fifteen post clauses, the log reservation per chunk, the type-witness join).
+file.c stays 6/7.  The three landed files carry their own `_CoqProject` rows;
+`ProofFilewrite.v` / `LinkFilewrite.v` do NOT (they do not exist yet).
+
+### THE DECODE, READ OFF `CodeFilewrite.v` IN FULL — and one fact S3a missed
+
+The tracked `xv6-riscv/kernel/kernel.asm` is not in this checkout, so the
+control-flow graph below was reconstructed from `CodeFilewrite.v`'s 118 AST
+lemmas.  S3a/S3f's four corrections all hold.  A FIFTH one does not appear in
+any earlier list:
+
+**5. THE FD_INODE ARM HAS A HOISTED ZERO-TRIP TEST.**  `bge x0,a2` at +0x32
+   (`BTYPE (180, a2, zreg, BGE)`, i.e. branch when `0 >= n`) jumps to +0xe6,
+   which sets `i = 0` and joins the tail at +0xf4 — so the `while (i < n)`
+   loop body is entered only for `n >= 1`, and on the `n <= 0` path
+   s1/s3/s7/s8/s9 are NEVER SPILLED (their `c.sdsp`s are at +0x36..+0x3e,
+   AFTER the branch) and never restored.  gcc's loop rotation; it is a fifth
+   arm-internal path, and it is why `fw_epi` takes seven frame slots as
+   arbitrary words.
+
+The full graph (offsets from `KernelSyms.filewrite`):
+
+```
++0x00 lbu a5,9(a0)          f->writable
++0x04 beq a5,x0 -> +0x122   NOT writable: c.li a0,-1 ; c.jr ra at +0x124
+                            (BEFORE the prologue -- sp untouched: note 1)
++0x08..+0x14  PROLOGUE      push 12; sdsp ra/s0/s2/s5/s6; addi4spn s0,sp,96
++0x16 c.mv s2,a0   s2 = f
++0x18 c.mv s6,a1   s6 = addr
++0x1a c.mv s5,a2   s5 = n
++0x1c c.lw a5,0(a0)         f->type
++0x1e/+0x20  li a4,1 ; beq -> +0x54   FD_PIPE
++0x24/+0x26  li a4,3 ; beq -> +0x5c   FD_DEVICE
++0x2a/+0x2c  li a4,2 ; bne -> +0x10a  ELSE: panic (note 3)
+--- FD_PIPE ---
++0x54 c.ld a0,16(a0) ; +0x56 jal pipewrite ; +0x5a c.j -> +0xfc
+--- FD_DEVICE ---
++0x5c lh a5,36(a0) ; +0x60 slli a3,a5,48 ; +0x64 c.srli a3,a3,48
++0x66 li a4,9 ; +0x68 bltu a4,a3 -> +0x126   (out of range: -1)
++0x6c..+0x78  &devsw[mj].write at OFFSET 8, and the slot   (note 2)
++0x7a c.beqz a5 -> +0x12a   (null slot: -1)
++0x7c c.li a0,1 ; +0x7e c.jalr a5 ; +0x80 c.j -> +0xfc
+--- FD_INODE ---
++0x30 c.sdsp s4,48(sp)
++0x32 bge x0,a2 -> +0xe6    ZERO-TRIP (note 5)
++0x36..+0x3e  sdsp s1,s3,s7,s8,s9
++0x40 c.li s4,0             i = 0
++0x42/+0x44 lui/addi s7,3072    max          (note 4)
++0x48/+0x4a lui/addiw a5,3072 ; +0x4e c.mv s9,a5   max, twice
++0x50 c.li s8,1             writei's user_src, hoisted
++0x52 c.j -> +0xcc          the loop is BOTTOM-TESTED
+  LOOP BODY @ +0x82
+  +0x82 addiw s3,s3,0       sext.w n1
+  +0x84 jal begin_op
+  +0x88 c.ld a0,24(s2) ; +0x8c jal ilock
+  +0x90 c.mv a4,s3   (n1) ; +0x92 c.lw a3,32(s2)  (f->off)
+  +0x96 add a2,s4,s6 (addr+i) ; +0x9a c.mv a1,s8 (1) ; +0x9c c.ld a0,24(s2)
+  +0xa0 jal writei
+  +0xa4 c.mv s1,a0   r = writei(...)
+  +0xa6 bge x0,a0 -> +0xb4     skip the offset update when r <= 0
+  +0xaa c.lw a5,32(s2) ; +0xae c.addw a5,a0 ; +0xb0 c.sw a5,32(s2)
+  +0xb4 c.ld a0,24(s2) ; +0xb8 jal iunlock ; +0xbc jal end_op
+  +0xc0 bne s3,s1 -> +0xea     SHORT WRITE: break
+  +0xc4 addw s4,s4,s1          i += r
+  +0xc8 bge s4,s5 -> +0xda     i >= n: normal exit
+  LOOP TEST @ +0xcc
+  +0xcc subw a5,s5,s4 ; +0xd0 c.mv s3,a5     n1 = n - i
+  +0xd2 bge s7,a5 -> +0x82                   n1 <= max
+  +0xd6 c.mv s3,s9 ; +0xd8 c.j -> +0x82      n1 = max
+--- the joins ---
++0xda..+0xe2 restore s1,s3,s7,s8,s9 ; +0xe4 c.j -> +0xf4
++0xe6 c.li s4,0 ; +0xe8 c.j -> +0xf4         the zero-trip path
++0xea..+0xf2 restore s1,s3,s7,s8,s9 ; fall to +0xf4
++0xf4 bne s5,s4 -> +0x12e    i != n: -1 (li a0,-1; ldsp s4; c.j +0xfc)
++0xf8 c.mv a0,s5 ; +0xfa c.ldsp s4,48(sp)
++0xfc..+0x108 EPILOGUE  restore ra/s0/s2/s5/s6 ; addi16sp 96 ; c.jr ra
++0x10a..+0x11e  the ELSE arm: six spills, then panic("filewrite")
+```
+
+The frame, in SLOTS off the entry sp (`pa_stk sp0 k = sp0 - 8k`):
+
+| slot | disp | reg | spilled at | restored at |
+|---|---|---|---|---|
+| 1 | 88 | ra | +0x0a | +0xfc |
+| 2 | 80 | s0 | +0x0c | +0xfe |
+| 3 | 72 | s1 | +0x36 / +0x10a | +0xda / +0xea |
+| 4 | 64 | s2 | +0x0e | +0x100 |
+| 5 | 56 | s3 | +0x38 / +0x10c | +0xdc / +0xec |
+| 6 | 48 | s4 | +0x30 / +0x10e | +0xfa / +0x130 |
+| 7 | 40 | s5 | +0x10 | +0x102 |
+| 8 | 32 | s6 | +0x12 | +0x104 |
+| 9 | 24 | s7 | +0x3a / +0x110 | +0xde / +0xee |
+| 10 | 16 | s8 | +0x3c / +0x112 | +0xe0 / +0xf0 |
+| 11 | 8 | s9 | +0x3e / +0x114 | +0xe2 / +0xf2 |
+| 12 | 0 | — | never | never |
+
+### THE ONE DESIGN FINDING: `SpecIunlock`'s postcondition LOSES the generation
+
+`SpecIlock` v5 takes `inode_shr_gen k s dev inum g` and returns
+`ity_shot g (di_type dn)` at THAT `g`; `SpecIunlock` gives the share back as
+the arity-preserving `inode_shr k s dev inum`, i.e. `∃ g'`.  filewrite is the
+first caller that has to survive that: iteration 2 must feed ilock a
+generation-named share and then join ilock's shot with the fd's own
+`ity_shot fwn_g fwn_ty` through `ity_shot_agree`, which needs ONE gname.  The
+same gap bites the CONTRACT: `filewrite_fs_out` demands
+`inode_shr_gen … (fwn_g fn)`, which a single chunk could not produce either.
+
+**It is provable without touching any frozen file, and the mechanism is in
+`ProofFilewriteParts.v`.**  §17.6's argument — a generation bump needs the
+slot's WHOLE liveness unit, which this caller's share denies — is true but
+is not exposed by the contract, so filewrite proves it instead: it HALVES its
+share (`fw_shr_gen_halve`), lends ilock `s/2`, keeps `s/2`, and when iunlock
+returns `inode_shr k (s/2) …` the retained half's `live_gen` pins the
+returned half's generation by `IcacheRef.live_gen_agree`
+(`fw_shr_regen : inode_shr_gen k s1 … g -∗ inode_shr k s2 … -∗
+inode_shr_gen k (s1+s2) … g`).  Rejoin, and the loop invariant carries the
+share at `fwn_s` and `fwn_g` unchanged.  **`SpecIlock`'s `s` argument at the
+call site is therefore `(fwn_s fn / 2)%Qp`, not `fwn_s fn`** — the checkout
+descriptor pins whatever fraction it is handed (§14.8), so nothing else moves.
+(A cleaner long-term fix is to add `g` to SpecIunlock's postcondition; that
+touches five consumers and was out of S3g's scope.)
+
+### WHAT `ProofFilewriteParts.v` GIVES THE CONTINUATION
+
+Frame: `fw_push_96` / `fw_pop_96` / `fw_fp_96`, `fw_frm1..fw_frm11`
+(displacement -> slot), `fw_frame_back`.
+Values: `fw_lui1`, `fw_addi_m1024`, `fw_addiw_m1024` (the two 3072s),
+`fw_li0`, `fw_addv32_moi2`, `fw_subv32_moi`, `fw_sextw_moi` (the +0x82
+`sext.w` — NOT `RiscvExtras.sextw_moi`, which is stated at the other
+spelling of a zero immediate), `fw_subw_moi`, `fw_addw_moi`, `fw_bge_moi`,
+`fw_bge0_moi`, `fw_neq_moi`.
+Blocks (all hart-generic):
+
+- `fw_pro`   +0x08..+0x14, the prologue -> the twelve slots + the register map;
+- `fw_epi`   +0xfc..+0x108, the epilogue, all six returning exits;
+- `fw_rest5` the five `c.ldsp`s, over six literal pcs (+0xda and +0xea);
+- `fw_m1j`   `c.li a0,-1; c.j +0xfc` (+0x126 and +0x12a);
+- `fw_m1j4`  the same with s4's restore wedged in (+0x12e);
+- `fw_devidx` +0x6c..+0x78, `&devsw[mj].write` at offset 8 and its value;
+- `fw_panic` +0x10a..+0x11e, THE WHOLE ELSE ARM, closed by `panic_wp_any`.
+
+`ProofFilereadParts.v` is IMPORTED rather than copied: the dispatch's `c.li`
+immediates, the `short` zero-extension, the `devsw` index shift and the
+`c.addw` store value are character-for-character fileread's.
+
+### The loop, as designed but not yet built
+
+Fuel = `n - i` (or the chunk count `⌈(n-i)/3072⌉`); the decrease is
+`i += r` with `r = n1 >= 1` on every non-exiting iteration.  Invariant:
+`0 <= i <= n`, `i` in s4, `n` in s5, 3072 in s7 and s9, 1 in s8, the share at
+`fwn_s`/`fwn_g` (see above), `off_inv`, `bitmap_res` at a `used_i` with
+`fwn_used ⊆ used_i`, and the twelve frame slots.  Per iteration:
+`begin_op` mints `log_op γ MAXOPBLOCKS`; writei's `wi_cost off n1 <= MAXOPBLOCKS`
+is the budget premise to discharge; `end_op` spends whatever is left.
+`fw_chunk_joint` (SpecFilewrite) discharges writei's joint bound from
+`n1 <= 3072` and `off_wf`; `fw_off_advance` keeps `off_wf` after the
+`c.addw`/`c.sw` pair.  The re-park closes as §17.6 says: `wi_dinode`
+preserves `di_type` definitionally, `ity_shot_agree` pins it to `fwn_ty`,
+`fwn_ty <> T_DIR` makes `DirView.dir_ok` vacuous on the new data.
+
+### Mirror evidence
+
+`full.sh` `EXIT=0`, **1036 `.vo`** (1033 + the three new), zero `Error`.
+`tools/lemma_diff.py --ref HEAD`: 3 files, TWO NEWAXIOMs and nothing else —
+`SpecConsolewrite`'s `Module Type CONSOLEWRITE` seal (one seal per new Spec)
+and `LinkConsolewrite`'s named `Axiom` (LinkConsoleread-precedented).  Nothing
+GONE, nothing ADMITTED.  `Print Assumptions`: `Fileread.wp_fileread_sconf` =
+5 platform axioms + funext + its known `Consoleread.wp_consoleread_sconf`
+(unchanged); `Filestat.wp_filestat_sconf` = 5 + funext (unchanged);
+`fw_epi` / `fw_pro` / `fw_panic` = 5 + funext; `fw_shr_regen` = Closed under
+the global context.  md5s verified equal on both sides after every scp:
+`SpecConsolewrite.v` `34877a4175cc4fcc0902ed48fbd971f1`,
+`LinkConsolewrite.v` `5efab2a781630775cba1670b39ce6b83`,
+`ProofFilewriteParts.v` `6064f0366771052eedbdec4e323aa0ae`,
+`_CoqProject` `c831e4adb5f567c9765b87de4d8b958f` (patched IN PLACE on the
+mirror with `sed`, never scp'd).  Mirror `git status`: `_CoqProject` modified
+plus the three untracked new files, nothing else; no scratch left.
+
+### Traps recorded
+
+1. **`rget` lives in `HartTp.v`, not `RegFile.v`.**  A Parts file that spells
+   a `c.slli`/`c.add` result symbolically needs `Require Import HartTp`; the
+   failure is *"The variable rget was not found in the current environment"*,
+   which reads like a section-variable problem and is an import problem.
+2. **A `Context` for the icache's pure ghost lemmas still needs `riscvGS`.**
+   `IcacheRef.inode_shr_gen` is `inode_ident` (a `↦₄`) beside `live_gen`, so
+   `` `{ICFG : icfg, !icacheG Σ} `` alone leaves seven existential instances
+   unresolved.  The error names `?Equiv : Equiv (iPropI ?Σ)` first, which
+   points nowhere useful.
+3. **`coq_makefile` does NOT need re-running after a `_CoqProject` edit on
+   this tree.**  The generated `CoqMakefile.conf` computes its file list at
+   make time (`$(COQMKFILE) -sources-of -f _CoqProject`), so the `sed` patch
+   is the whole job; regenerating is harmless but S3f's extra step is not
+   load-bearing.
+4. **`c.lui` is `wp_clui_s_sconf`, not `wp_lui_s_sconf`** — the two differ
+   only in the `instr`'s compressed flag, and +0x42 (`c.lui s7,0x1`) is
+   compressed while +0x48 (`lui a5,0x1`) is not.  Same trap for
+   `c.addw`/`addw` (`wp_addw_s_sconf` vs `wp_addw4_s_sconf`) at +0xae/+0xc4.
+
 ## The stage ladder
 
 - **S1** (agent): the DECODE stage — 13 Code files (the 12 targets +
@@ -639,9 +861,18 @@ shapes are frozen.**  A publisher of an FD_INODE fd must, in this order:
   icache half + `inode_pay`); `SpecFilewrite.v` FROZEN and compiling;
   `ProofFilewrite` / `LinkFilewrite` / `SpecConsolewrite` /
   `LinkConsolewrite` parked green for S3g.  file.c stays 6/7.
-- **S3g** (agent): `ProofFilewrite` + `LinkFilewrite` against the frozen
-  contract, plus the ASSUMED `consolewrite` (LinkConsoleread-style named
-  Axiom).  Then file.c is 7/7.
+- **S3g** (agent) **— PARTIAL**: `SpecConsolewrite` + `LinkConsolewrite`
+  (the assumed device contract, one named Axiom) and
+  `ProofFilewriteParts.v` (the 96-byte frame, the arithmetic, SEVEN block
+  lemmas incl. the WHOLE panic arm, and the share-generation algebra)
+  LANDED and full-gated (1036 `.vo`).  The complete decode graph, the
+  frame map, a FIFTH decode correction (the hoisted `n <= 0` test at
+  +0x32) and the `SpecIunlock`-loses-the-generation finding with its
+  in-Parts repair are recorded in the S3g section.
+  `ProofFilewrite` / `LinkFilewrite` parked green.  file.c stays 6/7.
+- **S3h** (agent): `ProofFilewrite` + `LinkFilewrite` — the control flow
+  between S3g's blocks plus the FD_INODE arm's ghost work.  Then file.c
+  is 7/7.
 - **S3b** (agent) **— PARTIAL**: filestat PROVEN AND LINKED (file.c 6/7);
   §17's fd-type witness STOPPED-AND-REPORTED as unimplementable in the ruled
   shape — design/fs-icache.md §17.1 has the finding and the repair (§17′) to
