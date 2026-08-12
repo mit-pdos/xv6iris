@@ -339,7 +339,23 @@ Section ProofSysClose.
     set (M1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (m !!! Regidx csp_rs1)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hftab #Hpanic Hpriv Hpenv Hfenv Hcont".
+    iIntros "Hcg Hcpu Hextc Hextm #Htext #Hdata Hpc #Hftab #Hpanic Hpriv Hpenv
+              Hfenv Hcont".
+    (* [b] AND [eb] ARE DERIVABLY EQUAL HERE, and the derivation is available
+       because fileclose's FS bundle carries [⌜n = 0⌝]: sys_close has no
+       acquire of its own, so it runs at push_off level 0 throughout, and at
+       level 0 [CpuOwn.cpu_own_eb_agree] reads [eb = b] straight off
+       [cpu_own].  Do NOT [subst] either name -- [b] is spelled by name in a
+       hundred leaf-instruction arguments below, and the failure surfaces far
+       away ("The variable b was not found").  [Hb] is used ONLY at the
+       [trap_csrs_ext]/[cpu_claim_ext] transports, to turn their [eb]-guard
+       into the [b]-guard the per-instruction chain facts are stated over. *)
+    iAssert (⌜(n = 0)%nat⌝)%I as %Hn0.
+    { iEval (rewrite /fileclose_fs_env /fileclose_fs_env_nopid) in "Hfenv".
+      iDestruct "Hfenv" as "[(%Hz & _) _]". iPureIntro. exact Hz. }
+    iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbm.
+    assert (Hb : eb = b) by (rewrite -Hbm Hn0; reflexivity).
+    clear Hbm.
     iPoseProof (sci_00 with "Htext") as "Hi00".
     iPoseProof (sci_02 with "Htext") as "Hi02".
     iPoseProof (sci_04 with "Htext") as "Hi04".
@@ -612,8 +628,15 @@ Section ProofSysClose.
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hfcell [-]").
       iIntros (CID12 Hs12 mf) "[%Hcsf %Hmfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CID9 CID12 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+      (* [Hextc]/[Hextm] never moved: argfd does not mention them, so they
+         rode along in the frame at the ENTRY hart.  ONE WIDE HOP from there,
+         spanning argfd's own guard fact and every leaf step since. *)
+      iDestruct (trap_csrs_ext_transport CID CID12 eb p
+                   ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CID CID12 eb p
+                   ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc [Hpriv] [Hpenv] [Hfenv]");
+      iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hextc Hextm Hpc [Hpriv] [Hpenv] [Hfenv]");
         [exact Hcsf| | |].
       { rewrite /sys_close_post. iLeft. iFrame "Hpriv". iPureIntro.
         split; [exact Hmfa0 | exact Hnone]. }
@@ -813,6 +836,14 @@ Section ProofSysClose.
       { rewrite /D upd_ne; [| reg_neq].
         rewrite /C5 upd_eq. exact Hfv. }
       iDestruct (cpu_own_transport CID13 CID20 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+      (* the complement is fileclose's, and it has not moved since entry --
+         neither argfd nor myproc mentions it, so it rode along in the frame
+         at the ENTRY hart.  ONE WIDE HOP from there, spanning both calls'
+         guard facts and every leaf step. *)
+      iDestruct (trap_csrs_ext_transport CID CID20 eb p
+                   ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CID CID20 eb p
+                   ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       (* the descriptor's type is not visible here -- [ofile_slot] quantifies
          the content -- so hand fileclose whichever bundle it asks for and
          keep the other ([fileclose_env_split]). *)
@@ -820,8 +851,8 @@ Section ProofSysClose.
         as "[Hfcenv Hfcback]".
       iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf fn on us D n eb p C (av - 4)%nat b
                 ltac:(unfold fileclose_stack, K_iput; lia) Hn HDa0
-                with "Hcg Hcpu Htext Hpc Hftab Hpanic Href Hfcenv [-]").
-      iIntros (CID21 Hs21 R) "Hcg Hcpu Hpc %HcsR Hfdslot Hout".
+                with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Href Hfcenv [-]").
+      iIntros (CID21 Hs21 R) "Hcg Hcpu Hextc Hextm Hpc %HcsR Hfdslot Hout".
       iDestruct ("Hfcback" with "Hout") as "[Hpenv Hfenv]".
       assert (Hpc38 : ret_pc (D !!! Regidx (mword_of_int 1 : mword 5))
                       = mword_of_int (KernelSyms.sys_close + 0x38))
@@ -882,8 +913,16 @@ Section ProofSysClose.
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hfcell [-]").
       iIntros (CID23 Hs23 mf) "[%Hcsf %Hmfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CID21 CID23 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+      (* fileclose gave the complement back re-indexed at its own return hart
+         [CID21], so this hop starts THERE -- it does not have to span
+         fileclose's crossing, which is the literal [true] and would carry no
+         chain fact at [b = false]. *)
+      iDestruct (trap_csrs_ext_transport CID21 CID23 eb p
+                   ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CID21 CID23 eb p
+                   ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc [Hpriv] Hpenv Hfenv");
+      iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hextc Hextm Hpc [Hpriv] Hpenv Hfenv");
         [exact Hcsf|].
       rewrite /sys_close_post. iRight. iExists fd, fv. iFrame "Hpriv". iPureIntro.
       split; [exact Hmfa0 | exact Hsome].

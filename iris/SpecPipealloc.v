@@ -159,6 +159,17 @@ Definition wp_pipealloc_sconf_body
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b -∗
+  (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true], so no existing
+     call site changes; at [eb = false] the real pair, which can only have
+     come from the TRAP.  pipealloc acquires no lock of its own, so it mints
+     nothing and is a pure PASS-THROUGH: the two files it closes on its error
+     paths are untyped ([SpecFileclose.fileclose_env_none], so neither arm can
+     park), but fileclose's crossing is the literal [true] on EVERY arm, and a
+     hart-indexed resource cannot be framed across such a call -- it has to be
+     handed over and given back.  See
+     claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the two object pools pipealloc draws on *)
   is_ftable γfl γf -∗
@@ -175,10 +186,16 @@ Definition wp_pipealloc_sconf_body
      their incoming contents are arbitrary *)
   pf0 ↦₈ v0 -∗
   pf1 ↦₈ v1 -∗
-  wp_next b p (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  pipealloc's error paths
+     call fileclose, whose crossing is [true] on every arm, so pipealloc can
+     return on another hart; the cost is the CALLER's, which must supply its
+     continuation hart-generically. *)
+  wp_next true p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b p -∗
     cpu_own n eb p C b -∗
+    trap_csrs_ext eb -∗
+    cpu_claim_ext eb p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     pipealloc_post γf γk on pf0 pf1 (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗

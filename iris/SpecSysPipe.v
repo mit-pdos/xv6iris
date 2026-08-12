@@ -183,6 +183,16 @@ Definition wp_sys_pipe_sconf_body
      interrupts un-pushed (SpecCopyout.v) -- and sys_pipe holds no lock
      across any of its calls anyway. *)
   cpu_own 0%nat eb p C b -∗
+  (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true], so no existing
+     call site changes; at [eb = false] the real pair, which can only have
+     come from the TRAP.  sys_pipe acquires no lock of its own, so it mints
+     nothing: it is a pure PASS-THROUGH to pipealloc and to its own three
+     fileclose calls, both of whose crossings are the literal [true].  It has
+     to be threaded rather than framed -- a hart-indexed resource held across
+     a [true] crossing could not be transported back.  See
+     claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   is_ftable γfl γf -∗
   (* the kmem lock, the sealed page count and panic's contract: pipealloc
@@ -202,12 +212,18 @@ Definition wp_sys_pipe_sconf_body
      recoverable from the file table. *)
   fileclose_pipe_env fn on 0%nat -∗
   fileclose_fs_env fn us 0%nat eb p -∗
-  wp_next b p (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  sys_pipe calls pipealloc
+     and fileclose, and both cross at [true] -- fileclose's FS arm parks -- so
+     sys_pipe can return on another hart.  The cost is the CALLER's: it must
+     supply its continuation hart-generically. *)
+  wp_next true p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       sie_cap_gpr mf av b p -∗
       cpu_own 0%nat eb p C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb p -∗
       pc_is ret_tgt -∗
       sys_pipe_post γf p pid (upd_upt V P')
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗

@@ -97,6 +97,31 @@ Section ProofPipealloc.
 
   Local Ltac regne := reg_ne_side.
 
+  (* THE [eb]-GUARD FROM THE [b]-GUARD.  The [trap_csrs_ext] / [cpu_claim_ext]
+     transports ask for [eb = false \/ p = zero_reg -> ...] while every
+     per-instruction chain fact is stated over [b], and pipealloc's contract
+     does not pin [n = 0], so the usual [eb = b] is not available here.  It is
+     not needed: [CpuOwn.cpu_own_eb_agree] gives
+     [match n with O => eb | S _ => false end = b] at ANY level, and that
+     already yields [eb = false -> b = false] -- at level 0 because the two
+     indices agree, above it because [b] is [false] outright.  Weaken the
+     guard with that and hand the [b]-spelled goal to [wp_next_chain].
+     [Hbf] is the hypothesis of that type. *)
+  Local Ltac ext_chain Hbf :=
+    let Hd := fresh "Hd" in
+    let Hdb := fresh "Hdb" in
+    intros Hd;
+    lazymatch type of Hbf with
+    | _ = false -> ?bb = false =>
+        lazymatch type of Hd with
+        | _ \/ ?pp = ?zz =>
+            assert (Hdb : bb = false \/ pp = zz)
+              by (destruct Hd as [Hf | Hz];
+                  [ left; exact (Hbf Hf) | right; exact Hz ]);
+            clear Hd; revert Hdb; wp_next_chain
+        end
+    end.
+
   Lemma wp_pipealloc_sconf
       (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile) (v0 v1 : mword 64) (on : option nat)
@@ -106,7 +131,13 @@ Section ProofPipealloc.
     cbv beta delta [wp_pipealloc_sconf_body].
     intros pcE pf0 pf1 ret_tgt HK Hfl Hnoffpos.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hftab #Hkmem Hav #Hpanic Hslota Hslotb Hc0 Hc1 Hcont".
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkdata Hpc #Hftab #Hkmem Hav #Hpanic
+              Hslota Hslotb Hc0 Hc1 Hcont".
+    (* the one fact [ext_chain] runs on.  Do NOT [subst] [b] or [eb] -- both
+       are spelled by name in every leaf-instruction argument below. *)
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
+    assert (Hbf : eb = false -> b = false)
+      by (intros He; rewrite -Hbm; destruct n; [exact He | reflexivity]).
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
     (* the "pipe" string literal (4 chars + NUL), read out of the data image *)
@@ -296,7 +327,14 @@ Section ProofPipealloc.
     iPoseProof (pai_be with "Htext") as "Hibe".
     iPoseProof (pai_c0 with "Htext") as "Hic0".
     iPoseProof (pai_c2 with "Htext") as "Hic2".
-    set (EPI := (wp_next (CID0 := CID) b p (fun (CIDe : CpuId) =>
+    (* THE THREE BLOCK CONTINUATIONS MOVE WITH pipealloc's OWN CROSSING, to
+       the literal [true]: each of them is reached from a path that has
+       crossed a fileclose, whose crossing is [true] and therefore carries no
+       chain fact at [b = false].  Each also THREADS the complement -- takes
+       it as an argument and hands it on -- rather than capturing it in the
+       closure: a bundle built at the entry hart cannot transport a
+       hart-indexed resource to the arbitrary hart it is later consumed at. *)
+    set (EPI := (wp_next (CID0 := CID) true p (fun (CIDe : CpuId) =>
         ∀ (mj : regfile) (res : mword 64),
         ⌜ mj !!! Regidx csp_rs1 = spr
           /\ mj !!! Regidx Ra0 = res
@@ -306,12 +344,14 @@ Section ProofPipealloc.
         sie_cap_gpr mj (K - 6)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.pipealloc + 0xb8)) -∗
         cpu_own n eb p C b -∗
+        trap_csrs_ext eb -∗
+        cpu_claim_ext eb p -∗
         (∃ w4 w5 : mword 64, pa_stk sp0 4 ↦₈ w4 ∗ pa_stk sp0 5 ↦₈ w5) -∗
         pipealloc_post γf γk on pf0 pf1 res -∗
         WP (Loop : expr riscv_lang)))%I).
     iAssert EPI with "[Hcont Hr40 Hr32 Hr24 Hr0]" as "Hepi".
     { rewrite /EPI.
-      iIntros (CIDe Hbe mj res) "(%Hjsp & %Hja0 & %Hjthr) Hcg Hpc Hcnt Hslots Hpost".
+      iIntros (CIDe Hbe mj res) "(%Hjsp & %Hja0 & %Hjthr) Hcg Hpc Hcnt Hextc Hextm Hslots Hpost".
       iDestruct "Hslots" as (w4 w5) "[Hs4c Hs5c]".
       iEval (rewrite HspR1) in "Hr40". iEval (rewrite HspR1) in "Hr32".
       iEval (rewrite HspR1) in "Hr24". iEval (rewrite HspR1) in "Hr0".
@@ -422,8 +462,14 @@ Section ProofPipealloc.
       iEval (rewrite Hretf) in "Hpc".
       iDestruct (cpu_own_transport CIDe CIDf6 n eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
+      (* the complement arrived at [CIDe] with [cpu_own], so it moves with it:
+         the hop spans only the epilogue's own six leaf steps. *)
+      iDestruct (trap_csrs_ext_transport CIDe CIDf6 eb p ltac:(ext_chain Hbf)
+                   with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CIDe CIDf6 eb p ltac:(ext_chain Hbf)
+                   with "Hextm") as "Hextm".
       iSpecialize ("Hcont" $! CIDf6 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! P5 with "Hcg Hcnt Hpc [%] [Hpost]").
+      iApply ("Hcont" $! P5 with "Hcg Hcnt Hextc Hextm Hpc [%] [Hpost]").
       2:{ rewrite HP5a0. iExact "Hpost". }
       { assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
                   c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 -> c <> Rs4 -> c <> Rra ->
@@ -479,7 +525,7 @@ Section ProofPipealloc.
                  ∨ (∃ (k1 : nat) (Cf1 : fcontent),
                       ⌜(k1 < NFILE)%nat /\ fc_type Cf1 = FD_NONE⌝ ∗
                       pf1 ↦₈ fnode k1 ∗ file_ref γf k1 1 Cf1))%I).
-    set (T8 := (wp_next (CID0 := CID) b p (fun (CIDt : CpuId) =>
+    set (T8 := (wp_next (CID0 := CID) true p (fun (CIDt : CpuId) =>
         ∀ (Mt : regfile),
         ⌜ Mt !!! Regidx csp_rs1 = spr
           /\ Mt !!! Regidx Rs4 = pf1
@@ -489,6 +535,8 @@ Section ProofPipealloc.
         sie_cap_gpr Mt (K - 6)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.pipealloc + 0xa8)) -∗
         cpu_own n eb p C b -∗
+        trap_csrs_ext eb -∗
+        cpu_claim_ext eb p -∗
         (∃ w4 w5 : mword 64, pa_stk sp0 4 ↦₈ w4 ∗ pa_stk sp0 5 ↦₈ w5) -∗
         (∃ w : mword 64, pf0 ↦₈ w) -∗
         (* the READ end's unit: banked by the time control reaches +0xa8,
@@ -498,7 +546,7 @@ Section ProofPipealloc.
         PF1 -∗
         kalloc_avail γk on -∗
         WP (Loop : expr riscv_lang)))%I).
-    set (T4C := (wp_next (CID0 := CID) b p (fun (CIDu : CpuId) =>
+    set (T4C := (wp_next (CID0 := CID) true p (fun (CIDu : CpuId) =>
         ∀ (Mt : regfile) (k0 : nat) (Cf0 : fcontent),
         (* the TYPE conjunct is the fileclose at +0xa4's: an untyped file
            costs its closer nothing (SpecFileclose.fileclose_env_none) *)
@@ -512,6 +560,8 @@ Section ProofPipealloc.
         sie_cap_gpr Mt (K - 6)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.pipealloc + 0xa4)) -∗
         cpu_own n eb p C b -∗
+        trap_csrs_ext eb -∗
+        cpu_claim_ext eb p -∗
         file_ref γf k0 1 Cf0 -∗
         (∃ w4 w5 : mword 64, pa_stk sp0 4 ↦₈ w4 ∗ pa_stk sp0 5 ↦₈ w5) -∗
         (∃ w : mword 64, pf0 ↦₈ w) -∗
@@ -527,7 +577,7 @@ Section ProofPipealloc.
     iPoseProof (pai_b6 with "Htext") as "Hib6".
     iAssert (EPI ∧ T8)%I with "[Hepi]" as "HK1".
     { iSplit; [iExact "Hepi"|]. rewrite /T8.
-      iIntros (CIDt Hbt Mt) "(%Htsp & %Hts4 & %Htthr) Hcg Hpc Hcnt Hslots Hcell0 Hunit0 Hcell1 Hav".
+      iIntros (CIDt Hbt Mt) "(%Htsp & %Hts4 & %Htthr) Hcg Hpc Hcnt Hextc Hextm Hslots Hcell0 Hunit0 Hcell1 Hav".
       (* the value sitting in *f1 is what the last branch tests *)
       iAssert (∃ x : mword 64, pf1 ↦₈ x ∗
                  (⌜x = (zero_reg : mword 64)⌝ ∗ fd_slot
@@ -599,8 +649,12 @@ Section ProofPipealloc.
         iEval (rewrite Htgt8) in "Hpc".
         iDestruct (cpu_own_transport CIDt CIDt3 n eb p C b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
+        iDestruct (trap_csrs_ext_transport CIDt CIDt3 eb p ltac:(ext_chain Hbf)
+                     with "Hextc") as "Hextc".
+        iDestruct (cpu_claim_ext_transport CIDt CIDt3 eb p ltac:(ext_chain Hbf)
+                     with "Hextm") as "Hextm".
         iSpecialize ("Hepi" $! CIDt3 with "[%]"); [wp_next_chain|].
-        iApply ("Hepi" $! U2 (mword_of_int (-1) : mword 64) with "[%] Hcg Hpc Hcnt Hslots [Hav Hunit0 Hunit1 Hcell0 Hcell1]").
+        iApply ("Hepi" $! U2 (mword_of_int (-1) : mword 64) with "[%] Hcg Hpc Hcnt Hextc Hextm Hslots [Hav Hunit0 Hunit1 Hcell0 Hcell1]").
         { split; [exact HU2sp|]. split; [exact HU2a0 | exact HU2thr]. }
         rewrite /pipealloc_post. iLeft. iSplitR; [done|].
         iFrame "Hav Hunit0 Hunit1".
@@ -656,14 +710,21 @@ Section ProofPipealloc.
           by (rewrite /U4; apply upd_eq).
         iDestruct (cpu_own_transport CIDt CIDt5 n eb p C b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
+        (* fileclose THREADS the complement -- it is at the top level of its
+           contract, never inside the framed environment bundle -- so it goes
+           in beside [cpu_own] and comes back re-indexed. *)
+        iDestruct (trap_csrs_ext_transport CIDt CIDt5 eb p ltac:(ext_chain Hbf)
+                     with "Hextc") as "Hextc".
+        iDestruct (cpu_claim_ext_transport CIDt CIDt5 eb p ltac:(ext_chain Hbf)
+                     with "Hextm") as "Hextm".
         iApply (Fileclose.wp_fileclose_sconf γfl γf k1 1%Qp Cf1 inhabitant on (∅ : gset Z) U4 n eb p C (K - 6)%nat b
                   ltac:(unfold fileclose_stack, K_iput; lia) Hnoffpos HU4a0
-                  with "Hcg Hcnt Htext Hpc Hftab Hpanic Href1 [] [-]").
+                  with "Hcg Hcnt Hextc Hextm Htext Hpc Hftab Hpanic Href1 [] [-]").
         { iApply (fileclose_env_none _ _ _ _ _ _ _ Hk1ty). }
         (* fileclose hands back the unit the reference was holding: it is
            the WRITE end's, and together with [Hunit0] it pays the two
            [pipealloc_post]'s failure arm promises. *)
-        iIntros (CIDt6 Hst6 mr) "Hcg Hcnt Hpc %Hfcpins Hunit1 _".
+        iIntros (CIDt6 Hst6 mr) "Hcg Hcnt Hextc Hextm Hpc %Hfcpins Hunit1 _".
         assert (Hpcb6 : ret_pc (U4 !!! Regidx Rra) = mword_of_int (KernelSyms.pipealloc + 0xb6))
           by (rewrite HU4ra; apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpcb6) in "Hpc".
@@ -681,8 +742,14 @@ Section ProofPipealloc.
         iEval (rewrite Hpab8) in "Hpc".
         iDestruct (cpu_own_transport CIDt6 CIDt7 n eb p C b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
+        (* from the hart fileclose CAME BACK on, not from [CIDt]: its own
+           crossing is the literal [true] and carries no chain fact. *)
+        iDestruct (trap_csrs_ext_transport CIDt6 CIDt7 eb p ltac:(ext_chain Hbf)
+                     with "Hextc") as "Hextc".
+        iDestruct (cpu_claim_ext_transport CIDt6 CIDt7 eb p ltac:(ext_chain Hbf)
+                     with "Hextm") as "Hextm".
         iSpecialize ("Hepi" $! CIDt7 with "[%]"); [wp_next_chain|].
-        iApply ("Hepi" $! U5 (mword_of_int (-1) : mword 64) with "[%] Hcg Hpc Hcnt Hslots [Hav Hunit0 Hunit1 Hcell0 Hcell1]").
+        iApply ("Hepi" $! U5 (mword_of_int (-1) : mword 64) with "[%] Hcg Hpc Hcnt Hextc Hextm Hslots [Hav Hunit0 Hunit1 Hcell0 Hcell1]").
         { split.
           { rewrite /U5 upd_ne; [| vm_compute; discriminate].
             rewrite (callee_saved_lookup Hfcpins_cs csp_rs1 ltac:(vm_compute; reflexivity)).
@@ -700,7 +767,7 @@ Section ProofPipealloc.
     { iSplit; [iDestruct "HK1" as "[$ _]"|].
       iSplit; [iDestruct "HK1" as "[_ $]"|].
       iDestruct "HK1" as "[_ Ht8]". rewrite /T4C.
-      iIntros (CIDu Hbu Mt k0 Cf0) "(%Hk0ty & %Htsp & %Hts4 & %Hta0 & %Htthr) Hcg Hpc Hcnt Href0 Hslots Hcell0 Hcell1 Hav".
+      iIntros (CIDu Hbu Mt k0 Cf0) "(%Hk0ty & %Htsp & %Hts4 & %Hta0 & %Htthr) Hcg Hpc Hcnt Hextc Hextm Href0 Hslots Hcell0 Hcell1 Hav".
       (* +0xa4 jal ra,fileclose *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.pipealloc + 0xa4)) Rra (mword_of_int 0x1ffc40 : mword 21)
                 Mt (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -723,21 +790,25 @@ Section ProofPipealloc.
         by (rewrite /V1; apply upd_eq).
       iDestruct (cpu_own_transport CIDu CIDu1 n eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
+      iDestruct (trap_csrs_ext_transport CIDu CIDu1 eb p ltac:(ext_chain Hbf)
+                   with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CIDu CIDu1 eb p ltac:(ext_chain Hbf)
+                   with "Hextm") as "Hextm".
       iApply (Fileclose.wp_fileclose_sconf γfl γf k0 1%Qp Cf0 inhabitant on (∅ : gset Z) V1 n eb p C (K - 6)%nat b
                 ltac:(unfold fileclose_stack, K_iput; lia) Hnoffpos HV1a0
-                with "Hcg Hcnt Htext Hpc Hftab Hpanic Href0 [] [-]").
+                with "Hcg Hcnt Hextc Hextm Htext Hpc Hftab Hpanic Href0 [] [-]").
       (* an untyped file costs its closer nothing -- no pipe, no inode, so no
          file system.  [inhabitant] above is the ghost bundle the arms this
          file cannot take would have been indexed by. *)
       { iApply (fileclose_env_none _ _ _ _ _ _ _ Hk0ty). }
       (* the READ end's unit, banked for T8 *)
-      iIntros (CIDu2 Hsu2 mr) "Hcg Hcnt Hpc %Hfcpins Hunit0 _".
+      iIntros (CIDu2 Hsu2 mr) "Hcg Hcnt Hextc Hextm Hpc %Hfcpins Hunit0 _".
       assert (Hpca8 : ret_pc (V1 !!! Regidx Rra) = mword_of_int (KernelSyms.pipealloc + 0xa8))
         by (rewrite HV1ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpca8) in "Hpc".
       pose proof Hfcpins as Hfcpins_cs.
       iSpecialize ("Ht8" $! CIDu2 with "[%]"); [wp_next_chain|].
-      iApply ("Ht8" $! mr with "[%] Hcg Hpc Hcnt Hslots Hcell0 Hunit0 Hcell1 Hav").
+      iApply ("Ht8" $! mr with "[%] Hcg Hpc Hcnt Hextc Hextm Hslots Hcell0 Hunit0 Hcell1 Hav").
       split.
       { rewrite (callee_saved_lookup Hfcpins_cs csp_rs1 ltac:(vm_compute; reflexivity)).
         rewrite /V1 upd_ne; [exact Htsp | vm_compute; discriminate]. }
@@ -843,8 +914,15 @@ Section ProofPipealloc.
       iDestruct "HK" as "[_ [Ht8 _]]".
       iDestruct (cpu_own_transport CID12 CID14 n eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
+      (* filealloc does not mention the complement, so it rode along in the
+         frame at the ENTRY hart: ONE WIDE HOP from there, spanning
+         filealloc's own guard fact and every leaf step. *)
+      iDestruct (trap_csrs_ext_transport CID CID14 eb p ltac:(ext_chain Hbf)
+                   with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CID CID14 eb p ltac:(ext_chain Hbf)
+                   with "Hextm") as "Hextm".
       iSpecialize ("Ht8" $! CID14 with "[%]"); [wp_next_chain|].
-      iApply ("Ht8" $! mB with "[%] Hcg Hpc Hcnt [Hr16 Hr8] [Hc0] Hslota' [Hc1 Hslotb] Hav").
+      iApply ("Ht8" $! mB with "[%] Hcg Hpc Hcnt Hextc Hextm [Hr16 Hr8] [Hc0] Hslota' [Hc1 Hslotb] Hav").
       { split; [exact HmBsp|]. split; [exact HmBs4 | exact HmBthr]. }
       { iExists u16, u8. iFrame "Hr16 Hr8". }
       { iExists (mB !!! Regidx Ra0). iExact "Hc0". }
@@ -977,8 +1055,12 @@ Section ProofPipealloc.
       iDestruct "HK" as "[_ [_ Ht4]]".
       iDestruct (cpu_own_transport CID16 CID20 n eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
+      iDestruct (trap_csrs_ext_transport CID CID20 eb p ltac:(ext_chain Hbf)
+                   with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CID CID20 eb p ltac:(ext_chain Hbf)
+                   with "Hextm") as "Hextm".
       iSpecialize ("Ht4" $! CID20 with "[%]"); [wp_next_chain|].
-      iApply ("Ht4" $! B1 k0 Cf0 with "[%] Hcg Hpc Hcnt Href0 [Hr16 Hr8] [Hc0] [Hc1 Hslotb'] Hav").
+      iApply ("Ht4" $! B1 k0 Cf0 with "[%] Hcg Hpc Hcnt Hextc Hextm Href0 [Hr16 Hr8] [Hc0] [Hc1 Hslotb'] Hav").
       { split; [exact Hk0ty|]. split; [exact HB1sp|]. split; [exact HB1s4|].
         split; [exact HB1a0 | exact HB1thr]. }
       { iExists u16, u8. iFrame "Hr16 Hr8". }
@@ -1184,8 +1266,14 @@ Section ProofPipealloc.
       iDestruct "HK" as "[_ [_ Ht4]]".
       iDestruct (cpu_own_transport CID21 CID27 n eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
+      (* neither filealloc nor kalloc mentions the complement: still the wide
+         hop from the entry hart. *)
+      iDestruct (trap_csrs_ext_transport CID CID27 eb p ltac:(ext_chain Hbf)
+                   with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CID CID27 eb p ltac:(ext_chain Hbf)
+                   with "Hextm") as "Hextm".
       iSpecialize ("Ht4" $! CID27 with "[%]"); [wp_next_chain|].
-      iApply ("Ht4" $! C2 k0 Cf0 with "[%] Hcg Hpc Hcnt Href0 [Hr16 Hr8] [Hc0] [Hc1 Href1] Hav").
+      iApply ("Ht4" $! C2 k0 Cf0 with "[%] Hcg Hpc Hcnt Hextc Hextm Href0 [Hr16 Hr8] [Hc0] [Hc1 Href1] Hav").
       { split; [exact Hk0ty|]. split; [exact HC2sp|]. split; [exact HC2s4|].
         split; [exact HC2a0 | exact HC2thr]. }
       { iExists (mD !!! Regidx Rs2), u8. iFrame "Hr16 Hr8". }
@@ -1939,8 +2027,14 @@ Section ProofPipealloc.
     iEval (rewrite HtgtD) in "Hpc".
     iDestruct (cpu_own_transport CID21 CID53 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
+    (* the success path calls filealloc, kalloc and initlock, none of which
+       mentions the complement: the wide hop is still from the entry hart. *)
+    iDestruct (trap_csrs_ext_transport CID CID53 eb p ltac:(ext_chain Hbf)
+                 with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID CID53 eb p ltac:(ext_chain Hbf)
+                 with "Hextm") as "Hextm".
     iSpecialize ("Hepi" $! CID53 with "[%]"); [wp_next_chain|].
-    iApply ("Hepi" $! O3 (zero_reg : mword 64) with "[%] Hcg Hpc Hcnt [Hr16 Hr8] [-]").
+    iApply ("Hepi" $! O3 (zero_reg : mword 64) with "[%] Hcg Hpc Hcnt Hextc Hextm [Hr16 Hr8] [-]").
     { split; [exact HO3sp|]. split; [exact HO3a0 | exact HO3thr]. }
     { iExists (mD !!! Regidx Rs2), (m !!! Regidx Rs3). iFrame "Hr16 Hr8". }
     rewrite /pipealloc_post. iRight.

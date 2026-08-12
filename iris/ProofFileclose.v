@@ -100,6 +100,27 @@ Section ProofFileclose.
 
   Local Ltac regne := reg_ne_side.
 
+  (* MOVING THE TRAP-CSR COMPLEMENT ACROSS A STRETCH.  [trap_csrs_ext] /
+     [cpu_claim_ext] transport under an [eb]-indexed guard, while a
+     straight-line stretch's chain facts are [b]-indexed -- so [wp_next_chain]
+     cannot close such a goal directly.  It does not have to: [eb = false]
+     forces [b = false] at EVERY nesting depth ([Hebf], read off
+     [sie_b_agree]), so the [eb] guard reduces to the [b] one and the ordinary
+     chain closes that.  [Hf] is [Hebf] and [Bv] is the proof's [b]; both are
+     passed rather than named here so the tactic is usable inside the arms
+     that have substituted their other indices. *)
+  Local Ltac ext_chain Hf Bv :=
+    let Hd := fresh "Hdx" in
+    let Hd2 := fresh "Hdx2" in
+    lazymatch goal with
+    | |- (_ = false \/ ?P = zero_reg -> _) =>
+        intros Hd;
+        assert (Hd2 : Bv = false \/ P = zero_reg)
+          by (destruct Hd as [Hee | Hpp];
+              [ left; exact (Hf Hee) | right; exact Hpp ]);
+        clear Hd; revert Hd2; wp_next_chain
+    end.
+
   (* [b] and [n],[eb] are two presentations of the same SIE state; read once
      at entry, this is what makes release's derived exit index fileclose's
      own.  (Copied from ProofFiledup; a shared home for it would drag the
@@ -130,8 +151,12 @@ Section ProofFileclose.
     intros pcE ret_tgt HK HnZ Ha0.
     unfold fileclose_stack, K_iput in HK.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hpanic Href Henv Hcont".
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hlock #Hpanic Href Henv Hcont".
     iDestruct (sie_b_agree m n K eb b p C with "Hcg Hcnt") as %Houtb.
+    (* THE ONE FACT THE COMPLEMENT'S TRANSPORTS NEED (see [ext_chain]): the
+       disabled base forces the disabled arm, at any nesting depth. *)
+    assert (Hebf : eb = false -> b = false)
+      by (intro Hx; rewrite Houtb Hx; by destruct n).
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6)))).
     iPoseProof (fci_00 with "Htext") as "Hi00".
@@ -558,8 +583,15 @@ Section ProofFileclose.
       iIntros (CIDe Hse mf) "%Hcsf Hcg Hpc".
       iDestruct (cpu_own_transport CIDr CIDe n eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
+      (* ONE WIDE HOP for the complement: nothing on this path threads it
+         (acquire and release do not mention it), so it is still at the entry
+         hart and moves straight to the exit's. *)
+      iDestruct (trap_csrs_ext_transport CID CIDe eb p ltac:(ext_chain Hebf b)
+                   with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CID CIDe eb p ltac:(ext_chain Hebf b)
+                   with "Hextm") as "Hextm".
       iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-      iApply ("Hcont" $! mf with "Hcg Hcnt [Hpc] [%] Hunit [Henv]").
+      iApply ("Hcont" $! mf with "Hcg Hcnt Hextc Hextm [Hpc] [%] Hunit [Henv]").
       { iEval (rewrite /ret_tgt). iExact "Hpc". }
       { exact Hcsf. }
       { by iApply fileclose_env_out_of_env. }
@@ -1144,8 +1176,14 @@ Section ProofFileclose.
         iIntros (CIDp7 Hsp7 mf) "%Hcsf Hcg Hpc".
         iDestruct (cpu_own_transport CIDp5 CIDp7 n eb p C b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
+        (* ONE WIDE HOP again: pipeclose does not thread the complement
+           either, so it never left the entry hart. *)
+        iDestruct (trap_csrs_ext_transport CID CIDp7 eb p ltac:(ext_chain Hebf b)
+                     with "Hextc") as "Hextc".
+        iDestruct (cpu_claim_ext_transport CID CIDp7 eb p ltac:(ext_chain Hebf b)
+                     with "Hextm") as "Hextm".
         iSpecialize ("Hcont" $! CIDp7 with "[]"); [iPureIntro; wp_next_chain|].
-        iApply ("Hcont" $! mf with "Hcg Hcnt [Hpc] [%] Hfd [Hav]").
+        iApply ("Hcont" $! mf with "Hcg Hcnt Hextc Hextm [Hpc] [%] Hfd [Hav]").
         { iEval (rewrite /ret_tgt). iExact "Hpc". }
         { exact Hcsf. }
         { rewrite /fileclose_env_out Hpipe bool_decide_eq_true_2; [|reflexivity].
@@ -1253,11 +1291,14 @@ Section ProofFileclose.
           iDestruct "Hheld" as (kk qq inum) "(%Hipe & %Hkk & %Hinumb & Href)".
           iModIntro.
           rewrite /fileclose_fs_env /fileclose_fs_env_nopid.
-          iDestruct "Henv" as "[(%Hn0 & %Heb & %Hpj & %Hjlt & %Hgl & %Hgeom &
+          (* FIVE pure conjuncts, not six: the bundle no longer pins
+             [eb = true], and this arm runs at a generic index.  [n] and [p]
+             still are pinned, and both substitutions stay. *)
+          iDestruct "Henv" as "[(%Hn0 & %Hpj & %Hjlt & %Hgl & %Hgeom &
                                  #Hprocs & #Hbio & #Hlog & #Hseam &
                                  #Hgen & #Hdev & #Hgeo & #Hdlk & Hbsl &
                                  #Hicenv & Hbm) Hpid]".
-          subst n. subst eb. subst p.
+          subst n. subst p.
           rewrite /fileclose_ic_env.
           iDestruct "Hicenv" as "(%Hcdev & %Hcnib & %Hsz & %Hbm0 &
                                   %Hbmcov & %Hbmlog & %Hist0 & %Hinumgeo &
@@ -1277,11 +1318,12 @@ Section ProofFileclose.
           assert (Hinb : bv_unsigned inum < 16 * Z.of_nat (fcn_nib fn))
             by (rewrite Hcnib; exact Hinumb).
           destruct (Hinumgeo inum Hinb) as [Hiblk Hiblog].
-          (* with no lock held and the parking premise, the SIE arm is fixed:
-             [Houtb] reads [b = eb] at [noff = 0]. *)
-          subst b.
+          (* NO [subst b] HERE.  [Houtb] does read [b = eb] at [noff = 0], but
+             the arm is proved at the generic index: [cpu_own]'s slot stays
+             [eb], a leaf instruction's index stays [b], and the three
+             sleeping callees take the complement rather than an [eb] pin. *)
           iApply (wp_bgeu_taken_s_sconf (mword_of_int (FC + 0x60))
-                    (mword_of_int 74 : mword 13) Ra5 Ra4 Q2 (K - 8)%nat true
+                    (mword_of_int 74 : mword 13) Ra5 Ra4 Q2 (K - 8)%nat b
                     ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     ltac:(rewrite Hcmp60; by apply fc_ty_inode_iff)
                     ltac:(rewrite Htgtaa; vm_compute; reflexivity)
@@ -1299,7 +1341,7 @@ Section ProofFileclose.
           iPoseProof (fci_c0 with "Htext") as "Hic0".
           (* ---- +0xaa jal begin_op ---- *)
           iApply (wp_jal_s_sconf (mword_of_int (FC + 0xaa)) Rra
-                    (mword_of_int 2095828 : mword 21) Q2 (K - 8)%nat true
+                    (mword_of_int 2095828 : mword 21) Q2 (K - 8)%nat b
                     ltac:(vm_compute; discriminate) ltac:(rdok)
                     ltac:(vm_compute; reflexivity) with "Hcg Hpc Hiaa [-]").
           iIntros (CIDf2 Hsf2) "Hcg Hpc".
@@ -1316,20 +1358,22 @@ Section ProofFileclose.
           assert (HB1cs : forall c : mword 5, is_cs_idx c = true ->
                     B1 !!! Regidx c = Q2 !!! Regidx c)
             by (intros c Hcs; rewrite /B1 upd_ne; [reflexivity | regne]).
-          iDestruct (cpu_own_transport CIDr2 CIDf2 0 true (proc_addr (fcn_j fn)) C true
+          iDestruct (cpu_own_transport CIDr2 CIDf2 0 eb (proc_addr (fcn_j fn)) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+          (* the complement is still at the ENTRY hart -- neither acquire nor
+             release nor the leaves between them thread it -- so it makes one
+             wide hop to the hart begin_op is called on. *)
+          iDestruct (trap_csrs_ext_transport CID CIDf2 eb (proc_addr (fcn_j fn))
+                       ltac:(ext_chain Hebf b) with "Hextc") as "Hextc".
+          iDestruct (cpu_claim_ext_transport CID CIDf2 eb (proc_addr (fcn_j fn))
+                       ltac:(ext_chain Hebf b) with "Hextm") as "Hextm".
           iApply (BeginOp.wp_begin_op_sconf (CID := CIDf2)  (fcn_procs fn)
                     (fcn_j fn) (fcn_plock fn) (fcn_bio fn) (fcn_log fn) (fcn_fs fn)
                     (fcn_cov fn) (fcn_logstart fn) (fcn_dev fn)
-                    (fcn_pid fn) (fcn_dq fn) B1 (K - 8)%nat true C true
+                    (fcn_pid fn) (fcn_dq fn) B1 (K - 8)%nat eb C b
                     ltac:(unfold K_begin_op; lia) Hjlt Hgl
-                    with "Hcg Hcnt [] [] Htext Hpc Hpanic Hlog Hpid Hprocs [-]").
-          (* the complement is [emp]: fileclose keeps its own [eb = true] pin,
-             which the bundle's [⌜eb = true⌝] conjunct supplies and which
-             [subst eb] above has already turned into the literal. *)
-          { rewrite /trap_csrs_ext. done. }
-          { rewrite /cpu_claim_ext. done. }
-          iIntros (CIDf3 Hsf3 mb) "%Hbcs Hcg Hcnt _ _ Hpc Hpid Hop".
+                    with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hlog Hpid Hprocs [-]").
+          iIntros (CIDf3 Hsf3 mb) "%Hbcs Hcg Hcnt Hextc Hextm Hpc Hpid Hop".
           pose proof Hbcs as Hbcs_cs.
           assert (Hpcae : ret_pc (B1 !!! Regidx Rra) = mword_of_int (FC + 0xae)).
           { rewrite HB1ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1340,7 +1384,7 @@ Section ProofFileclose.
             rewrite (HQ2cs Rs5 ltac:(vm_compute; reflexivity)).
             rewrite /H1 upd_ne; [exact Hmr2s5 | vm_compute; discriminate]. }
           (* ---- +0xae c.mv a0,s5 ---- *)
-          iApply (wp_cmv_s_sconf (mword_of_int (FC + 0xae)) Ra0 Rs5 mb (K - 8)%nat true
+          iApply (wp_cmv_s_sconf (mword_of_int (FC + 0xae)) Ra0 Rs5 mb (K - 8)%nat b
                     ltac:(vm_compute; discriminate) ltac:(rdok)
                     with "Hcg Hpc Hiae [-]").
           iIntros (CIDf4 Hsf4) "Hcg Hpc". iEval (rgne) in "Hcg".
@@ -1354,7 +1398,7 @@ Section ProofFileclose.
           iEval (rewrite Hppb0) in "Hpc".
           (* ---- +0xb0 jal iput ---- *)
           iApply (wp_jal_s_sconf (mword_of_int (FC + 0xb0)) Rra
-                    (mword_of_int 2093630 : mword 21) B2 (K - 8)%nat true
+                    (mword_of_int 2093630 : mword 21) B2 (K - 8)%nat b
                     ltac:(vm_compute; discriminate) ltac:(rdok)
                     ltac:(vm_compute; reflexivity) with "Hcg Hpc Hib0 [-]").
           iIntros (CIDf5 Hsf5) "Hcg Hpc".
@@ -1375,8 +1419,14 @@ Section ProofFileclose.
           { intros c Hcs.
             rewrite /B3 upd_ne; [| regne].
             rewrite /B2 upd_ne; [reflexivity | regne]. }
-          iDestruct (cpu_own_transport CIDf3 CIDf5 0 true (proc_addr (fcn_j fn)) C true
+          iDestruct (cpu_own_transport CIDf3 CIDf5 0 eb (proc_addr (fcn_j fn)) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+          (* begin_op HANDED the complement back, so this hop matches
+             [cpu_own]'s own span: two plain instructions. *)
+          iDestruct (trap_csrs_ext_transport CIDf3 CIDf5 eb (proc_addr (fcn_j fn))
+                       ltac:(ext_chain Hebf b) with "Hextc") as "Hextc".
+          iDestruct (cpu_claim_ext_transport CIDf3 CIDf5 eb (proc_addr (fcn_j fn))
+                       ltac:(ext_chain Hebf b) with "Hextm") as "Hextm".
           iApply (Iput.wp_iput_sconf (CID := CIDf5) (fcn_procs fn) (fcn_j fn)
                     (fcn_plock fn) (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
                     (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) (fcn_bio fn)
@@ -1386,17 +1436,15 @@ Section ProofFileclose.
                     (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn)
                     (fcn_dev fn) us kk qq inum MAXOPBLOCKS
                     (fcn_pid fn) (fcn_dq fn) (fcn_dqb fn) (fcn_dqs fn)
-                    B3 (K - 8)%nat true C true
+                    B3 (K - 8)%nat eb C b
                     ltac:(unfold K_iput; lia) Hkk Hgeom Hsz Hbm0 Hbmcov Hbmlog
                     Hist0 Hiblk Hiblog Hinb Hcovb
                     ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hjlt Hgl
                     ltac:(rewrite HB3a0; exact Hipe)
-                    with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlog Hitab Hitinv
+                    with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlog Hitab Hitinv
                           Hescrow Hireg Hslk Href Hsbb Hsbi Hbmres Hpid Hprocs
                           Hdev Hgeo Hdlk Hbsl Hop [-]").
-          { rewrite /trap_csrs_ext. done. }
-          { rewrite /cpu_claim_ext. done. }
-          iIntros (CIDf6 Hsf6 mi ni us') "%Hics Hcg Hcnt _ _ Hpc Hpid Hsbb Hsbi
+          iIntros (CIDf6 Hsf6 mi ni us') "%Hics Hcg Hcnt Hextc Hextm Hpc Hpid Hsbb Hsbi
                                           %Hussub Hbmres Hbsl %Hni Hop Hislot".
           pose proof Hics as Hics_cs.
           assert (Hpcb4 : ret_pc (B3 !!! Regidx Rra) = mword_of_int (FC + 0xb4)).
@@ -1404,7 +1452,7 @@ Section ProofFileclose.
           iEval (rewrite Hpcb4) in "Hpc".
           (* ---- +0xb4 jal end_op ---- *)
           iApply (wp_jal_s_sconf (mword_of_int (FC + 0xb4)) Rra
-                    (mword_of_int 2095930 : mword 21) mi (K - 8)%nat true
+                    (mword_of_int 2095930 : mword 21) mi (K - 8)%nat b
                     ltac:(vm_compute; discriminate) ltac:(rdok)
                     ltac:(vm_compute; reflexivity) with "Hcg Hpc Hib4 [-]").
           iIntros (CIDf7 Hsf7) "Hcg Hpc".
@@ -1421,20 +1469,22 @@ Section ProofFileclose.
           assert (HB4cs : forall c : mword 5, is_cs_idx c = true ->
                     B4 !!! Regidx c = mi !!! Regidx c)
             by (intros c Hcs; rewrite /B4 upd_ne; [reflexivity | regne]).
-          iDestruct (cpu_own_transport CIDf6 CIDf7 0 true (proc_addr (fcn_j fn)) C true
+          iDestruct (cpu_own_transport CIDf6 CIDf7 0 eb (proc_addr (fcn_j fn)) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+          iDestruct (trap_csrs_ext_transport CIDf6 CIDf7 eb (proc_addr (fcn_j fn))
+                       ltac:(ext_chain Hebf b) with "Hextc") as "Hextc".
+          iDestruct (cpu_claim_ext_transport CIDf6 CIDf7 eb (proc_addr (fcn_j fn))
+                       ltac:(ext_chain Hebf b) with "Hextm") as "Hextm".
           iApply (EndOp.wp_end_op_sconf (CID := CIDf7)  (fcn_procs fn) (fcn_j fn)
                     (fcn_plock fn) (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
                     (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) (fcn_bio fn)
                     (fcn_log fn) (fcn_fs fn) (fcn_cov fn) (fcn_logstart fn)
                     (fcn_dev fn) ni (fcn_pid fn) (fcn_dq fn)
-                    B4 (K - 8)%nat true C true
+                    B4 (K - 8)%nat eb C b
                     ltac:(unfold K_end_op; lia) Hgeom Hjlt Hgl
-                    with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hpid
+                    with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hpid
                           Hprocs Hdev Hgeo Hdlk Hop [-]").
-          { rewrite /trap_csrs_ext. done. }
-          { rewrite /cpu_claim_ext. done. }
-          iIntros (CIDf8 Hsf8 me) "%Hecs Hcg Hcnt _ _ Hpc Hpid".
+          iIntros (CIDf8 Hsf8 me) "%Hecs Hcg Hcnt Hextc Hextm Hpc Hpid".
           pose proof Hecs as Hecs_cs.
           assert (Hpcb8 : ret_pc (B4 !!! Regidx Rra) = mword_of_int (FC + 0xb8)).
           { rewrite HB4ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1457,7 +1507,7 @@ Section ProofFileclose.
                     (m !!! Regidx Rs5)
                     (FC + 0xb8) (FC + 0xba) (FC + 0xbc) (FC + 0xbe) (FC + 0xc0)
                     (sign_extend' 21 (concat_vec (mword_of_int 2023 : mword 11) ('b"0")))
-                    (proc_addr (fcn_j fn)) true Hmesp
+                    (proc_addr (fcn_j fn)) b Hmesp
                     ltac:(apply bv_eq; vm_compute; reflexivity)
                     ltac:(apply bv_eq; vm_compute; reflexivity)
                     ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -1497,15 +1547,19 @@ Section ProofFileclose.
           iApply (fc_epi (CID0 := CIDf9) m Mr K sp0 (m !!! Regidx Rra)
                     (m !!! Regidx Rs0) (m !!! Regidx Rs1)
                     (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4)
-                    (m !!! Regidx Rs5) u8 (proc_addr (fcn_j fn)) true
+                    (m !!! Regidx Rs5) u8 (proc_addr (fcn_j fn)) b
                     ltac:(lia) eq_refl eq_refl eq_refl eq_refl HMrsp HMrall
                     with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 [-]").
           iIntros (CIDf10 Hsf10 mf) "%Hcsf Hcg Hpc".
-          iDestruct (cpu_own_transport CIDf8 CIDf10 0 true (proc_addr (fcn_j fn)) C true
+          iDestruct (cpu_own_transport CIDf8 CIDf10 0 eb (proc_addr (fcn_j fn)) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+          iDestruct (trap_csrs_ext_transport CIDf8 CIDf10 eb (proc_addr (fcn_j fn))
+                       ltac:(ext_chain Hebf b) with "Hextc") as "Hextc".
+          iDestruct (cpu_claim_ext_transport CIDf8 CIDf10 eb (proc_addr (fcn_j fn))
+                       ltac:(ext_chain Hebf b) with "Hextm") as "Hextm".
           iSpecialize ("Hcont" $! CIDf10 with "[]"); [iPureIntro; wp_next_chain|].
           iApply ("Hcont" $! mf with
-                    "Hcg Hcnt [Hpc] [%] Hfd [Hpid Hbsl Hsbb Hsbi Hbmres]").
+                    "Hcg Hcnt Hextc Hextm [Hpc] [%] Hfd [Hpid Hbsl Hsbb Hsbi Hbmres]").
           { iEval (rewrite /ret_tgt). iExact "Hpc". }
           { exact Hcsf. }
           { rewrite /fileclose_env_out bool_decide_eq_false_2; [|exact Hnpipe].
@@ -1579,8 +1633,12 @@ Section ProofFileclose.
           iIntros (CIDz3 Hsz3 mf) "%Hcsf Hcg Hpc".
           iDestruct (cpu_own_transport CIDr2 CIDz3 n eb p C b ltac:(wp_next_chain)
                        with "Hcnt") as "Hcnt".
+          iDestruct (trap_csrs_ext_transport CID CIDz3 eb p ltac:(ext_chain Hebf b)
+                       with "Hextc") as "Hextc".
+          iDestruct (cpu_claim_ext_transport CID CIDz3 eb p ltac:(ext_chain Hebf b)
+                       with "Hextm") as "Hextm".
           iSpecialize ("Hcont" $! CIDz3 with "[]"); [iPureIntro; wp_next_chain|].
-          iApply ("Hcont" $! mf with "Hcg Hcnt [Hpc] [%] Hfd [Henv]").
+          iApply ("Hcont" $! mf with "Hcg Hcnt Hextc Hextm [Hpc] [%] Hfd [Henv]").
           { iEval (rewrite /ret_tgt). iExact "Hpc". }
           { exact Hcsf. }
           { by iApply fileclose_env_out_of_env. }
