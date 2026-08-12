@@ -2344,11 +2344,63 @@ red.  Everything S3o staged for it is intact and now unobstructed.
   machine-checked at the `user = true` the decode forces and stated with the
   `if` UNREDUCED so the bracket cannot drift again unnoticed.
   **THE WALK ITSELF WAS NOT STARTED** — see S3q.  file.c stays 6/7.
-- **S3q** (agent): the walk itself — `wp_filewrite_sconf` +
-  `FilewriteProof` + `LinkFilewrite`, on S3g's seven blocks, `fw_tail`, and
-  S3n+S3o's preamble/leaf table.  **Nothing is owed in front of it**: S3o
-  cleared every premise of every call by hand and S3p repaired the one that
-  failed.  Then file.c is 7/7 and S4's three shells unblock.
+- **S3q** (agent) **— PARTIAL, PARKED GREEN AT THE LOOP TEST**: the walk is
+  written.  `iris/ProofFilewrite.v` now carries `FilewriteProof
+  (Pipewrite)(Ilock)(Writei)(Iunlock)(BeginOp)(EndOp)(Consolewrite) :
+  FILEWRITE` and `wp_filewrite_sconf` is proved instruction by instruction
+  for **every path except the FD_INODE loop BODY**, under exactly ONE
+  banered `Axiom cheat_` whose single `exact (cheat_ _)` sits at **+0xcc,
+  the bottom loop test**.  Proved outright: the pre-prologue `f->writable`
+  test and its frame-free -1 return at +0x122; `fw_pro`; the three-way type
+  dispatch; **FD_PIPE in full**; **FD_DEVICE in full, all four paths**
+  (out-of-range major, null slot, the `c.jalr` into consolewrite, the join);
+  the ELSE arm (`fw_panic`); and FD_INODE's entry — the s4 spill at +0x30,
+  the hoisted `n<=0` test, the **whole zero-trip path** through `fw_tail`
+  and `fw_epi`, plus the five late spills, both `lui`/`addi` 3072 pairs,
+  `i:=0`, `user:=1` and the `c.j` to the test.  `lemma_diff --ref HEAD`
+  reports exactly `NEWAXIOM Axiom cheat_` and nothing else.
+  **`LinkFilewrite.v` is DELIBERATELY ABSENT** (park-green protocol: no
+  parked walk may be consumed outside its own file), so **file.c stays 6/7
+  and S4 stays blocked.**  `_CoqProject` untouched — it already carried
+  `ProofFilewrite.v`.
+  FIVE MECHANICAL TRAPS, all recorded for the resumer:
+  1. **Four typeclasses are not where the preamble puts them.**  The
+     functor's `Context` needs `diskGhostG` / `uartGhostG` / `fsLogG` /
+     `iregG`, which live in `DiskPtsto` / `WpUart` / `FsBlocks` /
+     `InodeRegion` and are re-exported by NONE of `ProofFilewrite.v`'s
+     original imports.  Without them Rocq invents four fresh section
+     variables and the body fails with *"Could not find an instance for
+     ?diskGhostG0"* and three more — an error that names no file.  Same
+     shape as the `lockG`/`lockG0` tell, one tier up.
+  2. `dev_major` / `NDEV_max` are **`SpecFileread`'s**; `SpecFilewrite`
+     states `filewrite_dev_env`'s guard with them but does not re-export
+     them, so the device arm's four `Local Lemma`s cannot even be typed
+     without `Require Import SpecFileread`.
+  3. **`neq_vec`'s arguments are the two mwords, not an `eq_vec`.**  A BNE
+     leaf's premise is `neq_vec _ _ = _`, and `rewrite Hcmp` with an
+     `eq_vec` equation has nothing to match: it fails *"does not match any
+     subterm"*.  `unfold neq_vec` first works for the rewrite but then the
+     follow-up `rewrite Hp` fails.  The fix is fileread's, and the reason
+     `ProofFilereadParts.fr_ty_neqz` exists: carry BOTH an `eq_vec` and a
+     `neq_vec` comparison hypothesis, and use `rewrite Hncmp; unfold
+     neq_vec; first [rewrite Hp | idtac]; reflexivity`.
+  4. `destruct (Z.geb 0 n) eqn:Hz0` **rewrites the already-asserted
+     `zopz0zKzJ_s`-vs-`Z.geb` bridge hypothesis too**, so that hypothesis
+     IS the branch leaf's premise; a `rewrite Hbge0; exact Hz0` leaves
+     `true = true` and fails on the type.  `exact Hbge0`.
+  5. `Z.geb_gt` does not exist.
+  The walk's own imports are placed **after** the seventeen preamble lemmas
+  on purpose (a `Require Import` re-resolves every unqualified name below
+  it — the file's own `FW_MAX` warning generalised), which is why
+  `fw_writei_src`'s context says `WpLock.lockG` and the functor's says
+  `lockG`.
+- **S3r** (agent): close the frontier — the `∀`-fuel loop lemma at `n - i`
+  (`ProofWritei.wi_loop`'s shape one level up) whose body is
+  begin_op → ilock at `s/2` → the re-park → writei → the `f->off` update →
+  iunlock → end_op → break/continue, joining through `fw_rest5` into
+  `fw_tail`; then delete `cheat_` and write `LinkFilewrite.v`.  The state
+  the loop is handed is spelled out in the FRONTIER banner in
+  `ProofFilewrite.v`.  Then file.c is 7/7 and S4's three shells unblock.
 - **S4** (agent): sys_read/sys_write/sys_fstat — argfd + the file.c
   contracts; thin shells.
 - **S5** (agent): create — the writing half's boss: namei/nameiparent
