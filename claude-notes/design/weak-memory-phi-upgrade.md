@@ -185,6 +185,42 @@ they just wrote; land it with the site-predicate pre-port batch.
 (2) `wpt_store_rule_dirty`/`_post_dirty` exist only in the example for
 the exhibit — ported store sites keep the absorbing `↦wo` form.
 
+**STAGE 1.5 — THE FRAMING PATTERN (the user's intended shape,
+2026-08-12; supersedes the interim publish-before-park rule and
+DISSOLVES the context-indexed-WDirty redesign).**  The required
+pattern: ONE thread owns several locations, accesses them, calls
+`yield`, resumes on another CPU — and the ownership facts FRAME AROUND
+the yield call (they appear in neither its pre- nor postcondition).
+Yield internally: `fence rw,w` on the old CPU before migrating, a
+fence/acquire on the new CPU before returning.  How it lands on C/D/S:
+
+- MACHINE SIDE, inside yield, zero ghost ops: the old-CPU fence arms
+  `w_relp`, so the migration handoff store (the scheduler-flag
+  release) is WCrel — BORN-PUBLISHED, covering every pre-yield store
+  of the old hart including all the thread's dirty bytes.  The
+  new-CPU fence installs the floor.  φ/`no_violation` needs no change:
+  the new hart touches only published messages.
+- GHOST SIDE: clean `↦w` facts frame FREE (vProp view-monotonicity;
+  yield only raises the thread's view).  DIRTY facts frame AS-IS
+  (`WDirty A` survives the crossing) and are LAZILY UPGRADED at first
+  use on the new CPU: extend the own-load/own-store leaves to accept a
+  foreign-dirty element WHEN PUBLISHED — evidence = a persistent
+  `w_pub` lower bound (the WeakViewMono sixth mono_nat, now
+  load-bearing) linking the element's timestamp under the floor; the
+  leaf's interp-open section retargets the `wcds` state (flip to
+  WClean on load; to `WDirty cpu_id` on store) via `wlat_flip`'s
+  published premise.  Yield's whole memory-visible postcondition is
+  that ONE persistent floor token.  Publication-at-migration + lazy
+  retarget ≡ context indexing, with no `wcds` redesign and no leaf
+  statement changes beyond the acceptance arm.
+- THE EXAMPLE `WkYieldFrame.v`: thread T on hart A: `x := 1`
+  (dirty-A), holds a clean fact `z`; yield (fence rw,w; handoff-flag
+  release; [migration]; new-CPU acquire/fence; return); resumed on B:
+  `load x = 1` (the lazy upgrade), `x := 2` (re-dirty at B), use `z`
+  (framed clean) — with x and z appearing ONLY in T's own pre/post
+  and in NO yield spec component.  Stage 1's transfer example remains
+  valid as the lock-payload test; this is the FRAMING test.
+
 **Stage 2 — the REAL migration test (a PORT TARGET, gated on the S-mode
 scheduler cone): the same program with the handoff replaced by
 `wp_next`/`p_sched`** — the parked-continuation crossing where the
