@@ -113,17 +113,28 @@ below were untouched by either.
   **THE SIXTH OUTCOME IS PROVED** (`..._miss_fresh`): gate fires on the racy
   word, the fresh one needs nothing, so the step reads the leaf slot TWICE
   and writes nothing.  Unreachable at `exec_eff`; reachable here.
-- *OWED* (§8.3 items 5–6): the Iris-level racy absorption theorem (the pure
-  side is done; §8.6's `pt_slot_mem` transports are in), and — a discovery
-  of the item-4 work, not part of the original plan — **the peel's CPS BIND
-  composition**, without which the producer's family would be over the WHOLE
-  step monad and would demand an `exec_stale` fact for `riscv_step`, i.e.
-  the entire fetch/decode/execute skeleton mirrored.  With it, only
-  `translateAddr` rides `exec_stale` and everything around it rides the
-  ordinary `WeakCert` machinery through the phase-`false` embedding.  The
-  phase has to be an argument of the continuation `K`: at the prefix's `Ret`
-  leaf it is whatever the racy read left, and the tail's obligations differ
-  between the two.
+- *ALSO LANDED (§8.3 item 6): the peel's CPS BIND composition*
+  (`WeakStale` §7) — a discovery of the item-4 work, not part of the
+  original plan, and what makes item 5 usable.  Without it the producer's
+  family is over the WHOLE step monad and a walking instruction would owe an
+  `exec_stale` fact for `riscv_step`, i.e. the entire fetch/decode/execute
+  skeleton mirrored.  With it only `translateAddr` rides `exec_stale`;
+  everything around it rides the ordinary `WeakCert` machinery through the
+  phase-`false` embedding.  `wstep_ok_racy_k` + `_triv` + `_of_run` +
+  `_bind`, and the user-facing `wstep_ok_racy_bind`, all axiom-free.  The
+  phase is an argument of the continuation `K` because at the prefix's `Ret`
+  leaf it is whatever the racy read left.
+- *OWED*: (i) the Iris-level racy absorption theorem — the pure side is
+  done and §8.6's `pt_slot_mem` transports are in, so what is left is
+  opening `wkptN`, supplying the walk's read facts AT THE PATCHED state and
+  the CAS's at the real one, and handing out the same collapse conjuncts
+  plus the sixth outcome disjunct; (ii) the STORE case of the bind rule —
+  `wstep_ok_racy_k_of_run` demands the tail at BOTH phases (which is what
+  keeps it free of a phase-tracking run relation), and a walking store's
+  tail has the phase-`false` obligation only.  A TLB-miss walk always reads
+  its leaf, so the phase IS `false` there; saying so needs either a "did
+  this run read the window" companion to `wrun` or §8.5's pre-racy-write
+  widening.  A walking LOAD needs neither.
 
 **SLICES 1–2 ARE IN** (`iris/WeakVarCert.v`, `iris/WeakRacy.v`), green and
 axiom-free: the racy peel carries a value filter `Φ` with `wadm_filter`

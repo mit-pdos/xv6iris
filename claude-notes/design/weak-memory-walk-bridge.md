@@ -419,8 +419,9 @@ grow.
    conjuncts plus the SIXTH outcome disjunct. Note what does NOT move: `pa`
    is variant-independent, and the theorem already declines to pin the `tlb`
    register, so the interface grows by one disjunct and nothing else.
-6. **The peel's BIND composition** (OWED, and it is what makes item 5
-   usable — a discovery of the item-4 work, not part of the original plan).
+6. **The peel's BIND composition** — **LANDED** (`WeakStale` §7), and it is
+   what makes item 5 usable; a discovery of the item-4 work, not part of the
+   original plan.
    `wstep_ok_racy_true_of_stale`'s family is over the WHOLE step monad, so
    taken literally it would demand an `exec_stale` fact for `riscv_step` —
    i.e. the entire fetch/decode/execute skeleton mirrored, which is far more
@@ -432,6 +433,21 @@ grow.
    argument of `K` — that is why a plain (non-CPS) bind lemma does not work:
    at `m`'s `Ret` leaf the phase is whatever `m`'s racy read left, and the
    tail's obligations differ between the two.
+   What landed: `wstep_ok_racy_k` (the fixpoint with `K : X -> wmstate ->
+   bool -> Prop` in the `Ret` arm), `wstep_ok_racy_k_triv` (the trivial
+   continuation IS the peel, both directions), `wstep_ok_racy_k_of_run` (a
+   peel plus a fact about every state the run can reach is a CPS peel),
+   `wstep_ok_racy_k_bind`, and the user-facing `wstep_ok_racy_bind`.
+   **THE ONE RESTRICTION LEFT, and it is the store case.**
+   `wstep_ok_racy_k_of_run` demands `K` at BOTH phases, which is what keeps
+   it free of a phase-tracking run relation. A tail with no RAM write of its
+   own — a walking LOAD — has that for nothing through §4's embedding. A
+   walking STORE's tail needs the phase-`false` arm only, and to know the
+   phase IS `false` there one must know the prefix TOOK its racy read (a
+   TLB-miss walk always reads its leaf, so it is true — it is just not
+   expressible without a "did this run read the window" companion to `wrun`).
+   Either build that companion, or take the pre-racy-write widening of §8.5,
+   which dissolves the phase question for `D = wD_any` altogether.
 
 ### 8.4 The variant arithmetic, worked out (why the outcome is still absorbed)
 
