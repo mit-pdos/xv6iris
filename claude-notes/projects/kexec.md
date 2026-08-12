@@ -214,6 +214,85 @@ but it buys nothing while the contents are existential anyway.
 `procdump`, which `design/proc-struct.md` already records as unprovable as
 written.
 
+## Phase B: the design, and the ONE upstream gap it predicts for phase C
+
+Phase B is `+0x090 .. +0x1ac`: `proc_pagetable`, the seven lazy spills, the
+phdr loop with the INLINED `loadseg` inside it, and the closing
+`iunlockput`/`end_op`. ~100 instructions, two nested loops, and **seven** of
+kexec's eight `bad:` entries (`+0x318 +0x31c +0x320 +0x33c +0x342 +0x348
++0x34e`) — phase A owns the other one plus the shared epilogue.
+
+Read the control flow off the instructions, not the C: **the phdr loop's head
+is its BODY at `+0x12c`**, entered by a `j` from the setup at `+0x0cc`, with
+the increment-and-test at `+0x11a..+0x128` as the back edge. The loadseg loop
+is entered at `+0xf6` from two places (`+0x19a` on a fresh segment, and its
+own back edge at `+0xf2`).
+
+### The phdr loop invariant
+
+Carried across iterations, in the machine's own variables (`s10 = i`,
+`s2 = sz`, `a3`/slot 63 `= off`):
+
+- `i <= phnum` and `off = ElfEnc.ph_at ef i` (the C's `off += sizeof(ph)`);
+- `proc_pt P_i` for the descriptor built so far, plus `uint sz <= uvm_maxsz`;
+- **`um_below sz P_i.(ud_um)`** — everything mapped is below `sz`;
+- **its dual, everything below `sz` IS mapped, as a valid USER leaf.**
+
+That dual is the one to think about. It is true — `uvmalloc` maps
+`[PGROUNDUP(oldsz), newsz)` and the previous iteration left `[0, oldsz)`
+covered, and `PGROUNDUP(oldsz) >= oldsz` means the two runs abut with no hole
+— and it is what phase C will need. State it page-granularly:
+
+```coq
+kxc_covered sz um := forall vpn, (bv_unsigned vpn * 4096 < uint sz)%Z ->
+                       exists w, um !! vpn = Some w /\ pte_vu w
+```
+
+### THE GAP: `SpecUvmalloc` does not say what its new leaves ARE
+
+Its success arm pins `uptd_ext P P'` and `dom P'.(ud_um) = dom P.(ud_um) ∪
+vpn_run vpn0 n` — **the DOMAIN and nothing else.** The old leaves survive by
+`uptd_ext`; the new ones have no stated value, so `pte_vu` is not derivable,
+and neither is anything about their permission. `proc_pt_wf` does not help:
+its `upt_acc_wf` conjunct explicitly permits `uleaf_denied`.
+
+This is the *same shape* as the `co_mapped` mistake — "the map has an entry
+here" is not "walkaddr will find it" — and it is the second time on this
+project that a domain-only statement turned out to be too weak.
+
+**Phase B does not need it**; the one place it would (refuting
+`panic("loadseg: address should exist")` when `walkaddr` returns 0) is covered
+for free by the `panic_wp_any` kexec's contract already carries for ilock's
+live panic. **Phase C does**: `copyout`'s mapped arm needs `co_mapped` — with
+`pte_vu` — over the stack pages that phase C's own `uvmalloc` has just
+created, and there is no other way to get it.
+
+*The fix*, when phase C reaches it: publish the new leaves' PERMISSION, i.e.
+
+```coq
+⌜forall i, (i < n)%nat -> exists ppn,
+   P'.(ud_um) !! vpn_at vpn0 i = uvm_pte (Z.lor xperm 18) ppn⌝
+```
+
+**Do not narrow this to `pte_vu`, tempting though it is.** `copyout`'s
+`co_mapped` wants only `pte_vu`, so on that evidence alone the weaker conjunct
+looks like the right minimal ask — but the call three instructions earlier
+settles it. `SpecUvmclear` takes
+
+```coq
+P.(ud_um) !! vpn = Some w -> uvm_perm_ok (Z.land (pte_flags10 w) 1007) -> …
+```
+
+so phase C has to exhibit the guard page's leaf and prove a predicate about
+its FLAG BITS, which `pte_vu` cannot give. Two consumers, and the second wants
+strictly more than the first — check both before choosing the shape. (This was
+narrowed to `pte_vu` and then reverted, on exactly that oversight.)
+
+The proof is immediate: mappages builds that leaf, and the
+`uvm_perm_ok (Z.lor xperm 18)` premise is already in uvmalloc's statement for
+it. Do it as part of phase C, not before: it is one file plus `ProofUvmalloc`,
+and phase C is the caller that pins the shape.
+
 ## Block-interface conventions (decided before the first block was written)
 
 Four rules, so that A/B/C/D compose without renegotiating their seams. The
@@ -266,11 +345,25 @@ first two are kexec-specific; the last two are the tree's existing shape
 
 6. **The open inode travels as one bundle.** What `ilock` produces and
    `iunlockput` consumes — `sleeplocked`, `sl_pid`, `ic_deposit`, the two ½
-   identity cells, `i_valid`, `ic_loaded`, and the retained
-   `inode_ref_short` — is eight resources that phases A and B both carry and
-   neither looks inside. Bundle it (`kxc_open`) for the same reason
-   `fs_fabric` is bundled. Unlike `fs_fabric` it is NOT persistent, so it is
-   threaded linearly.
+   identity cells, `i_valid`, `ic_loaded`, the generation's type witness
+   `ity_shot`, and the retained `inode_ref_short` — is nine resources that
+   phases A and B both carry and neither looks inside. Bundle it
+   (`kxc_open`) for the same reason `fs_fabric` is bundled. Unlike
+   `fs_fabric` it is NOT persistent, so it is threaded linearly.
+
+   **The bundle is GENERATION-NAMED (`gyf : gname`), and the name is minted
+   at the namei→ilock seam.** Under the §17.3/§17.4 icache interface,
+   `IcacheEscrow.DepShr` takes the generation as a fourth argument, `ilock`
+   consumes `inode_shr_gen k s dev inum g` rather than `inode_shr`, and
+   `iunlockput` consumes the deposit plus the `ity_shot g (di_type dn)` that
+   ilock published. So the seam is `inode_held` → destruct →
+   `inode_ref_shed` → `IcacheRef.inode_shr_gen_intro` (destruct the `∃ g`
+   right there) → ilock. **Use ONE `g` for ilock's parameter and
+   iunlockput's `gy`** — iunlockput's is exactly what ilock deposited.
+   `ity_shot` is persistent and kexec never writes the inode, so it is
+   carried, never spent; it must still cross the A→B seam or phase B cannot
+   call iunlockput. `kxc_at_a2` (the +0x032 seam) is BEFORE ilock and stays
+   generation-free.
 
 ### The duplicate `icacheG`, and why the fix is ONE file and not seventeen
 
