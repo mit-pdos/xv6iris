@@ -260,6 +260,44 @@ fence/acquire on the new CPU before returning.  How it lands on C/D/S:
   and in NO yield spec component.  Stage 1's transfer example remains
   valid as the lock-payload test; this is the FRAMING test.
 
+**STAGE 1.6 — THE UPGRADE MUST BE INVISIBLE (user directive,
+2026-08-12; CORRECTS Stage 1.5's ergonomics — `wpt_own_upgrade` as a
+caller-applied lemma is NOT acceptable; the first touch after
+migration must cost zero script lines).**  The fix: CONTEXT-index the
+owned points-to and move the upgrade INSIDE the leaf rules:
+
+- `wpt_own ξ a v := ∃ t b, elem (t,v,b) ∗ ⊒view_byte a t ∗
+  (⌜b = None⌝ ∨ ∃ c, ⌜b = Some c⌝ ∗ ctx_wrote ξ c (view_byte a t))`
+  — indexed by the WeakCtx context ξ, NOT CpuId, so it frames across
+  yield/`wp_next` unchanged.  `ctx_wrote ξ c V` is a persistent "ξ
+  wrote via hart c at-or-below V" breadcrumb minted by the own-store
+  leaf.
+- THE CTX MIGRATION INVARIANT (scheduler-protocol-internal, invisible
+  to callers): for every hart c that ξ is NOT currently running on,
+  `ctx_wrote ξ c V ⊢ pub_covers_view c V` — maintained by yield
+  (park publishes, so the old hart's breadcrumbs gain coverage; the
+  invariant rides the `wrunning ξ` bundle / WeakCtx machinery, where
+  ctx_view_lb already lives).
+- THE OWN LEAVES take `wrunning ξ ∗ wpt_own ξ …` (the sc-parity
+  conversion threads the ctx token through every function ANYWAY, so
+  this is not new per-caller plumbing) and case-split INTERNALLY:
+  b = Some (current hart) → the own-dirty path; b = Some (other hart)
+  → the migration invariant supplies the pub evidence and the leaf's
+  ghost section retargets (the Stage-1.5 `wpt_own_upgrade` BECOMES
+  leaf-internal machinery, not caller API).  Caller scripts are
+  IDENTICAL before and after yield — true SC parity.
+- The wcds ghost stays HART-indexed (machine truth); only the logical
+  layer is context-indexed.  Yield's spec: pre/post carry `wrunning ξ`
+  (a scheduler resource like cur_proc, NOT part of the memory frame)
+  and no memory facts; park's mint feeds the invariant instead of
+  returning a caller-visible token (pub_covers_view remains as
+  internal machinery).
+- Rework: re-index `wpt_own` (and the wpt4/8_own towers' own forms) by
+  ξ; add ctx_wrote + the invariant to WeakCtx; restate the own leaves;
+  update WkOwnPingPong/WkYieldFrame so their post-migration scripts
+  apply NO upgrade lemma (the acid test of this stage); keep
+  `wpt_own_upgrade` as the internal lemma the leaves use.
+
 **Stage 2 — the REAL migration test (a PORT TARGET, gated on the S-mode
 scheduler cone): the same program with the handoff replaced by
 `wp_next`/`p_sched`** — the parked-continuation crossing where the
