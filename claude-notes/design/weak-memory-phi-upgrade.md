@@ -507,6 +507,28 @@ lemma remains load-bearing for the one thing interp exports cannot
 cover: it is SUPPORT-INDEPENDENT (value-blind), closing the
 pc-in-text half of D-M6-8's residue.
 
+
+### 2b'. REFINED (user design review): checker-reflection, no scan artifact
+
+The load-bearing object is ONE vm_compute fact about the pinned image
+constant — `image_disciplineb = true` for a hand-written decidable
+`site_okb` over (pc−4, pc, pc+4) decoded words — the SAME trust shape
+as the Code decode facts (all vm_compute facts about the same
+constant).  Plus ONE hand-proven transfer theorem:
+`image_disciplineb = true → in-text behavior events satisfy the
+edges_split/ee_ok site components` (ingredients: text-fetch
+determinism via single-message text; the armed⟹SIE-off adjacency
+conjunct; label-from-word decode).  WHY the interp cannot replace it:
+the acyclicity walk inspects CYCLE events, which are not pf-reachable
+by construction — only a reachability-BLIND fact about the image
+constant constrains labels there.  AND pc∈text is MACHINE-ENFORCED
+(fetch translation + kpt_inv X-permissions, rwx-kmap) — not an
+assumption; a corrupted jalr lands in text (covered) or faults
+(trap machinery).  D-M6-8's static residue therefore reduces to: one
+vm_compute fact + one transfer theorem + zero assumptions.
+gen_sites.py demotes to audit tooling (site report; interrupts-off
+source check).
+
 ## 3. Sequencing (why this precedes the port)
 
 Land BEFORE the mass port, in order: (1) the C/D/S points-to surgery +
