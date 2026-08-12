@@ -3410,3 +3410,13 @@ payload and refutes on cells, REF-1 and live mass).  If it turns out to
 need the two equal, the fallback is to split it — an `ic_open_held_out`
 used only at +0x54, with the +0x44 undo caller keeping today's single-gname
 form — at the cost of one duplicated lemma and no design change.
+
+### 17.7 RATIFIED (coordinator, 2026-08-12): §17.6 is the design
+
+The second bump at iput's free window is adopted verbatim — the
+pending/shot on ic_payload's polarities, live_slot_regen at
+ProofIput's +0x54 checkout, the two-gname ic_open_held (fallback: one
+duplicated lemma, pre-approved), SpecIlock's additive post and the
+generation-premised iunlock family. The §17.6.6 unprobed step is
+authorized to resolve either way. Execution: one stage, icache half
+full-gated before inode_pay + SpecFilewrite/Proof/Link proceed.
