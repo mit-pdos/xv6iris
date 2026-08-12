@@ -224,6 +224,134 @@ Definition wp_iupdate_sconf_body
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(*  THE SET-FORM CONTRACT (fs-icache.md section 18 clause 1)              *)
+(*  Everything except the ledger is VERBATIM [wp_iupdate_sconf_body].     *)
+(*  [wp_iupdate_sconf] is this with the set forgotten, derived at the     *)
+(*  [log_op] existential's own witness -- so no existing caller moves.    *)
+(*                                                                        *)
+(*  WHY writei NEEDS THIS.  writei's own set-form contract promises its    *)
+(*  caller [Sb ⊆ Sb'], and iupdate runs on EVERY returning path of        *)
+(*  writei -- including the [n = 0] one.  Against the counted contract    *)
+(*  the set coming out of iupdate is an unrelated existential, so the      *)
+(*  monotonicity claim is simply unprovable past the flush.  This is the   *)
+(*  one clause of section 18's ruling that could not be met by touching    *)
+(*  the four files S3j sized.                                             *)
+(* ===================================================================== *)
+Definition wp_iupdate_gen_body
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+
+    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+    (pd pav pu : mword 64)
+    (bn : bio_names)
+    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+    (ip : mword 64) (inum : mword 32)
+    (dn dn0 : dinode) (bm : blkmap)
+    (u : nat) (Sb : gset Z)
+    (pidv : mword 32) (dq dqd dqn dqs : dfrac)
+    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (b : bool) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
+  let pj := proc_addr j in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (K_iupdate <= K)%nat ->
+  (* the covered range's block-number bounds (bread's 2^31 arithmetic
+     premise, and 0 is never a client block) and the fact that the log's own
+     storage is covered *)
+  log_geom_ok cov logstart ->
+  (* the superblock field is a real block number, so the [addw] that forms
+     IBLOCK cannot wrap: with [IBLOCK ... ∈ cov] this bounds the sum by
+     2^31 (log_geom_ok's [cov_ok]) *)
+  0 <= inodestart ->
+  (* the inode's own block is a covered HOME block: bread's premise, and
+     log_write's *)
+  IBLOCK inum inodestart ∈ cov ->
+  ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
+  (* the inum is one the region covers: [nib] inode blocks, sixteen inums
+     each.  This replaces the old [diblk_wf ds] premise -- the region owns
+     the well-formedness of every block it holds. *)
+  bv_unsigned inum < 16 * Z.of_nat nib ->
+  (* ...and the record whose scalars [inode_meta] owns names exactly the
+     thirteen addrs cells [inode_map] owns.  THE tie between the two
+     resources; see the header. *)
+  di_addrs dn = bm_cells bm ->
+  length (bm_dir bm) = NDIRECT ->
+  (j < NPROC)%nat ->
+  γs !! j = Some γl ->
+  (* a0 = ip *)
+  m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  (* PARKING PREMISE (hart-generic scheduler protocol) -- bread sleeps, and a
+     parking thread hands the trap CSRs across the crossing only with an
+     enabled base.  See SpecSched.v / SpecSleep.v. *)
+  eb = true ->
+  sie_cap_gpr m K b pj -∗
+  cpu_own 0 eb pj C b -∗
+  kernel_text -∗ pc_is pcE -∗
+  panic_wp_any -∗
+  bio_ctx bn (fs_view γfs γd dev cov) -∗
+  log_ctx γ bn γfs cov logstart dev -∗
+  (* ip->dev and ip->inum: read, never written -- FRACTIONS, so the caller
+     keeps its own copies *)
+  i_dev ip ↦₄{dqd} dev -∗
+  i_inum ip ↦₄{dqn} inum -∗
+  (* the five metadata cells, and the thirteen addrs cells *)
+  inode_meta ip dn -∗
+  inode_map γfs ip bm -∗
+  (* sb.inodestart, read once *)
+  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  (* THE INODE REGION, and THIS INUM'S on-disk record: the exclusive
+     per-inum fragment that replaced the block half (design §11.3/§12).
+     [dn0] is the STALE record -- it need not equal [dn]. *)
+  ireg_inv γi γfs inodestart nib -∗
+  dinode_at γi inum dn0 -∗
+  (* the caller's own pid cell (bread's acquiresleep records it) *)
+  p_pid pj ↦₄{dq} pidv -∗
+  (* the running-thread bundle *)
+  procs_inv γs -∗
+  (* the disk fabric *)
+  dev_inv γu γd -∗
+  disk_geom γd pd pav pu -∗
+  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  (* TWO slot units: bread's reference is held across log_write, which wants
+     one of its own; brelse gives it back *)
+  bslots bn 2 -∗
+  (* THE RESERVATION, SPEND-EXACTLY: the one log_write always runs *)
+  (* THE RESERVATION, SET FORM: spend-exactly on the counter, and the set
+     grows by exactly the one block iupdate logs -- this inum's inode
+     block.  DETERMINATE, not an existential: iupdate is straight-line, so
+     [IBLOCK inum inodestart] is the whole of [Sb' ∖ Sb] and a caller
+     needs no ceiling to know it. *)
+  log_opS γ (S u) Sb -∗
+  wp_next b pj (fun (CID : CpuId) =>
+  ∀ mf : regfile,
+      ⌜callee_saved m mf⌝ -∗
+      sie_cap_gpr mf K b pj -∗
+      cpu_own 0 eb pj C b -∗
+      pc_is ret_tgt -∗
+      p_pid pj ↦₄{dq} pidv -∗
+      i_dev ip ↦₄{dqd} dev -∗
+      i_inum ip ↦₄{dqn} inum -∗
+      inode_meta ip dn -∗
+      inode_map γfs ip bm -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      (* THE FLUSH: this inum's on-disk record is now the in-memory one.
+         CONDITIONAL since fs-icache §16.4: for an allocated [dn] this is
+         the retagged [InodeRegion.dinode_at] as before, and for a type-0
+         [dn] -- iput's [ip->type = 0; iupdate(ip)], the one place an inode
+         goes back to the free pool -- the fragment is ABSORBED into the
+         region invariant and what comes back is [InodeRegion.imark], the
+         marker the free pool arm now carries.  One contract, because the
+         two cases differ only in the payout. *)
+      ireg_out γi inum dn -∗
+      bslots bn 2 -∗
+      log_opS γ u (Sb ∪ {[IBLOCK inum inodestart]}) -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type IUPDATE.
   Parameter wp_iupdate_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
@@ -245,4 +373,28 @@ Module Type IUPDATE.
       wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                             cov logstart inodestart nib dev ip inum dn dn0 bm u
                             pidv dq dqd dqn dqs m K eb C b.
+
+  (* the SET-FORM contract; [wp_iupdate_sconf] above is its instance with the
+     set forgotten, kept as its own parameter so that every existing caller
+     is unchanged (wp_bmap_gen / wp_balloc_gen's pattern) *)
+  Parameter wp_iupdate_gen :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId}
+
+      (γs : list gname) (j : nat) (γl : gname)
+      (γu : uart_names) (γd : disk_names) (γk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+      (ip : mword 64) (inum : mword 32)
+      (dn dn0 : dinode) (bm : blkmap)
+      (u : nat) (Sb : gset Z)
+      (pidv : mword 32) (dq dqd dqn dqs : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool),
+      wp_iupdate_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+                          cov logstart inodestart nib dev ip inum dn dn0 bm u Sb
+                          pidv dq dqd dqn dqs m K eb C b.
 End IUPDATE.

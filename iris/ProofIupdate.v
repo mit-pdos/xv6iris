@@ -132,7 +132,7 @@ Section IupdateDefs.
   Definition iu_cont `{GEN : GenId} `{CID0 : CpuId}
       (γfs : fs_names) (γi : gname) (bn : bio_names) (γ : log_names)
       (inodestart : Z) (ip : mword 64) (inum : mword 32)
-      (dn : dinode) (bm : blkmap) (u : nat)
+      (dn : dinode) (bm : blkmap) (u : nat) (Sbo : gset Z)
       (dev : mword 32) (pidv : mword 32) (dq dqd dqn dqs : dfrac) (j : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
     wp_next b (proc_addr j) (fun (CID : CpuId) =>
@@ -149,7 +149,11 @@ Section IupdateDefs.
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
         ireg_out γi inum dn -∗
         bslots bn 2 -∗
-        log_op γ u -∗
+        (* SET FORM throughout the interior: the OUT set is a parameter, so
+           the counted seal instantiates it at the caller's own witness
+           unioned with the inode block, and forgets it again on the way
+           out.  See SpecIupdate's set-form banner. *)
+        log_opS γ u Sbo -∗
         WP (Loop : expr riscv_lang))%I.
 
   (* THE MACHINERY HALF, out of the handle and back.  [ireg_read] needs the
@@ -206,7 +210,7 @@ Section IupdateTail.
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32) (dn dn0 : dinode) (bm : blkmap)
-      (ds : list dinode) (u : nat)
+      (ds : list dinode) (u : nat) (Sb : gset Z)
       (kk : nat) (bno : mword 32) (bsd : list (bv 8)) (d0 : bool)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) :
@@ -240,12 +244,13 @@ Section IupdateTail.
     inode_map γfs ip bm -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bslots bn 1 -∗
-    log_op γ (S u) -∗
+    log_opS γ (S u) Sb -∗
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn0 -∗
     bio_held bn (fs_view γfs γd dev cov) kk pidv dev bno
        (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 -∗
     iu_cont (CID0 := CID0) γfs γi bn γ inodestart ip inum dn bm u
+            (Sb ∪ {[IBLOCK inum inodestart]})
             dev pidv dq dqd dqn dqs j m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -313,10 +318,11 @@ Section IupdateTail.
        our hands and never was: [ireg_write_au] IS the premise, opening the
        region at log_write's own ghost step and paying out the retagged
        fragment.  [cr := false] (this is an ordinary uncredited spend, the
-       unit is gone) and [Sb] is whatever set the caller's [log_op]
-       existential names -- iupdate does not care which blocks this op has
-       already logged, so it forgets the set again on the way out. *)
-    rewrite /log_op. iDestruct "Hop" as (Sb) "HopS".
+       unit is gone) and [Sb] is the caller's own set, now an explicit
+       parameter: iupdate does not care which blocks this op has already
+       logged, but its CALLER does, so the set is threaded rather than
+       forgotten.  The counted seal below is what forgets it. *)
+    iRename "Hop" into "HopS".
     iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bno
               (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 u
               false Sb (⊤ ∖ ↑iregN) (ireg_out γi inum dn)
@@ -336,7 +342,11 @@ Section IupdateTail.
       - iApply (ireg_write_au ⊤ γi γfs inodestart nib inum dn0 dn ds
                   ltac:(solve_ndisj) Hnib Hdswf Hdnwf Hty with "Hireg Hdn"). }
     iIntros (CID3 Hq3 mL) "Hcg Hcnt Hpc %Hcs1 HopS Hdn Hlk Hsl".
-    iDestruct (log_opS_op with "HopS") as "Hop".
+    (* log_write returned the set grown by the block it logged, and [Hbno]
+       names that block: it is THIS inum's inode block, so the growth the
+       public contract promises is exact rather than existential. *)
+    iEval (rewrite Hbno) in "HopS".
+    iRename "HopS" into "Hop".
     assert (Hpc6c : ret_pc (T1 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iupdate + 0x6c)) by (rewrite HT1ra; pcw).
     iEval (rewrite Hpc6c) in "Hpc".
@@ -629,7 +639,10 @@ Section ProofIupdateMain.
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_iupdate_sconf 
+  (* THE CORE, in SET FORM.  [wp_iupdate_sconf] below is this with the set
+     forgotten -- SpecBmap / SpecBalloc's pattern, and the reason no
+     existing caller of iupdate moves. *)
+  Lemma wp_iupdate_gen
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -639,15 +652,15 @@ Section ProofIupdateMain.
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
-      (u : nat)
+      (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
-    : wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi
-                            cov logstart inodestart nib dev ip inum dn dn0 bm u
-                            pidv dq dqd dqn dqs m K eb C b.
+    : wp_iupdate_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+                          cov logstart inodestart nib dev ip inum dn dn0 bm u Sb
+                          pidv dq dqd dqn dqs m K eb C b.
   Proof.
-    cbv beta delta [wp_iupdate_sconf_body].
+    cbv beta delta [wp_iupdate_gen_body].
     intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Heb.
     subst eb.
     pose proof HK as HK'. unfold K_iupdate in HK'.
@@ -681,6 +694,7 @@ Section ProofIupdateMain.
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
     iAssert (iu_cont (CID0 := CID) γfs γi bn γ inodestart ip inum dn bm u
+               (Sb ∪ {[IBLOCK inum inodestart]})
                dev pidv dq dqd dqn dqs j m K C b)%I with "[Hcont]" as "Hcont";
       [rewrite /iu_cont; iExact "Hcont" |].
     iDestruct "Hmeta" as "(Hmty & Hmmaj & Hmmin & Hmnl & Hmsz)".
@@ -1597,7 +1611,7 @@ Section ProofIupdateMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (iu_tail (CID0 := CID36) γs j γfs γi γd bn γ cov logstart inodestart
               nib dev
-              ip inum dn dn0 bm ds u kk bno bsd0 d0 pidv dq dqd dqn dqs m mM K C b
+              ip inum dn dn0 bm ds u Sb kk bno bsd0 d0 pidv dq dqd dqn dqs m mM K C b
               HK HmMsp HmMthr HmMs2 Hkk Hbno Hcov Hlog Hnib Hdswf Hdnwf
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe
                     Hppid Hidev Hinumc [Hmty Hmmaj Hmmin Hmnl Hmsz] Hmap Hsb
@@ -1608,6 +1622,55 @@ Section ProofIupdateMain.
       iExact "Hmsz". }
     { iApply (wp_next_shift (CIDa := CID14) (CIDb := CID36) ltac:(wp_next_chain)
                 with "Hcont"). }
+  Qed.
+
+  (* THE COUNTED SEAL, derived at the [log_op] existential's OWN WITNESS
+     (fs-icache.md section 18; ProofBmap's wp_bmap_sconf, same shape).
+     [log_op γ u] IS [∃ Sb, log_opS γ u Sb], so the counted form destructs
+     it, runs the core at whatever set was hiding there, and forgets the
+     grown set again on the way out via [log_opS_op].  Deriving at [Sb := ∅]
+     instead would force every counted caller to prove its set empty, which
+     is both false and unnecessary. *)
+  Lemma wp_iupdate_sconf
+      (γs : list gname) (j : nat) (γl : gname)
+      (γu : uart_names) (γd : disk_names) (γk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (dev : mword 32)
+      (ip : mword 64) (inum : mword 32)
+      (dn dn0 : dinode) (bm : blkmap)
+      (u : nat)
+      (pidv : mword 32) (dq dqd dqn dqs : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool)
+    : wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+                            cov logstart inodestart nib dev ip inum dn dn0 bm u
+                            pidv dq dqd dqn dqs m K eb C b.
+  Proof.
+    cbv beta delta [wp_iupdate_sconf_body].
+    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Heb.
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
+              Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
+              #Hdlock Hsl Hop Hcont".
+    iDestruct "Hop" as (Sb0) "Hop".
+    iApply (wp_iupdate_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
+              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb0
+              pidv dq dqd dqn dqs m K eb C b
+              HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Heb
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
+                    Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hop
+                    [Hcont]").
+    iEval (rewrite /wp_next).
+    iIntros (CIDf) "%Hchain".
+    iIntros (mf) "%Hcs Hcg Hcnt Hpc Hppid Hidev Hinumc Hmeta Hmap Hsb
+                  Hiout Hsl Hop".
+    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hpc Hppid Hidev Hinumc Hmeta Hmap
+                     Hsb Hiout Hsl [Hop]").
+    { exact Hcs. }
+    { iApply (log_opS_op with "Hop"). }
   Qed.
 
 End ProofIupdateMain.

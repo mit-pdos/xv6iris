@@ -205,18 +205,64 @@
 
    ==== THE BUDGET IS SPEND-AT-MOST, WITH AN ITERATION BOUND =============
 
-   Per iteration: bmap at most 5, plus writei's own log_write 1 = 6; plus
-   iupdate's 1 at the end.  The iteration count is bounded by the number of
-   blocks the range straddles ([wi_blocks]), because every iteration but the
-   last fills its block to the boundary.  So the premise is the lower bound
-   [wi_cost off n <= ncount] and the postcondition is spend-at-most -- writei
-   BRANCHES, and [log_op] has no mover outside the log spinlock, so a path
-   that skips a spend cannot burn the surplus (SpecBmap.v's header).
+   The iteration count is bounded by the number of blocks the range
+   straddles ([wi_blocks]), because every iteration but the last fills its
+   block to the boundary.  So the premise is the lower bound
+   [wi_cost_bmonly off n <= ncount] and the postcondition is spend-at-most
+   -- writei BRANCHES, and [log_op] has no mover outside the log spinlock,
+   so a path that skips a spend cannot burn the surplus (SpecBmap.v's
+   header).
 
-   NOTE ON TIGHTNESS: 6 per block is bmap's worst case (two ballocs plus its
-   own log_write), not the amortised cost -- the indirect block is allocated
-   at most once in a file's life.  Tightening it needs an arm-aware bmap
-   budget, not a change here.
+   THE COST IS TWO PER BLOCK, NOT SIX, AND THAT IS WHAT MAKES filewrite
+   PROVABLE.  The naive per-iteration sum -- bmap's worst case 5 plus
+   writei's own log_write -- gives [wi_cost], and [wi_cost 1023 FW_MAX = 25]
+   against a MAXOPBLOCKS of 10: filewrite's own four-block chunk would be
+   unpayable and the KERNEL would be at fault rather than the proof.  It is
+   not: the 6 double-counts, because within ONE transaction the same block
+   is logged once however many times it is written.  Under link 2's
+   set-form bmap contract the honest figure is [wi_cost_bmonly = 2B + 2],
+   which at B = 4 is EXACTLY 10.  See [WriteiBudget] sections 9-10 and
+   fs-icache.md section 18.
+
+   WHICH ABSORPTIONS ARE MODELLED, and which are merely true.  Two: the
+   bitmap block (there is exactly one per file system, so every balloc of a
+   transaction logs the SAME block and only the first pays --
+   [WriteiBudget.one_bitmap_block]), and a freshly allocated data block
+   (balloc's [bzero] already logged it, so writei's own [log_write] of it is
+   free).  A third -- the indirect block, across ITERATIONS -- is true and
+   deliberately NOT modelled: it would buy the three slots between 10 and
+   [WriteiBudget.wi_cost_tight = 7], and the machinery is proven and parked
+   in [WriteiBudget]'s [LogAmort] section for the day a kernel change needs
+   them.  Today's accounting fits with ZERO slack
+   ([WriteiBudget.wi_cost_bmonly_no_slack]).
+
+   ==== ...AND THE CONTRACT COMES IN TWO FORMS ==========================
+
+   [wp_writei_sconf] is the COUNTED form above.  [wp_writei_gen] below is
+   the SET form of fs-icache.md section 18 clause 1: it takes
+   [LogInv.log_opS γ ncount Sb] and returns [log_opS γ n' Sb'] with
+   [Sb ⊆ Sb'], so a caller running writei inside a transaction it also uses
+   for other calls can thread ONE set.  The counted form is DERIVED from it
+   -- [log_op] IS [∃ Sb, log_opS] -- at whatever set the existential was
+   hiding, exactly wp_bmap_sconf's pattern, so no existing caller moves.
+
+   writei TAKES NO CREDIT PARAMETER, unlike bmap and log_write.  It does not
+   need one: its loop invariant carries the unpaid bitmap block as one unit
+   of held-back POTENTIAL ([WriteiBudget.bm_pot]) rather than as a case
+   split, and [WriteiBudget.wi_inv_enter] establishes the invariant at ANY
+   entry set.  A caller that has already logged the bitmap simply gets a
+   call that spends one less than its budget allowed.
+
+   NO CEILING ON [Sb' ∖ Sb] IS OFFERED.  Section 18 clause 1 asks for one
+   and bmap supplies it, but S3l's finding is that no obligation anywhere
+   consumes a ceiling -- callers only ever claim MEMBERSHIPS -- and here it
+   would have to name every data block the loop touched, i.e. a set-valued
+   function of the loop-carried [blkmap].  That is exactly the shape S3l
+   recommended against letting the decorative clause force.  Budget
+   soundness is carried by the counter alone: [log_spend_step] already
+   refuses to grow [Sb] without spending a unit.
+
+   ==== ====================================================================
 
    writei SLEEPS (bmap, bread, brelse, iupdate), so it threads the full
    running-process bundle.  It enters and returns at noff 0. *)
@@ -284,8 +330,35 @@ Definition K_writei : nat := 70%nat.
 Definition wi_blocks (off n : nat) : nat :=
   ((off `mod` BSIZE + n + BSIZE - 1) `div` BSIZE)%nat.
 
-(* six units per iteration (bmap 5 + log_write 1), plus iupdate's one *)
+(* six units per iteration (bmap 5 + log_write 1), plus iupdate's one.
+   THE LOOSE BOUND, kept because [WriteiBudget]'s sections 1-9 are stated
+   against it: it is what the budget ruling had to REPLACE, since
+   [wi_cost 1023 FW_MAX = 25] busts MAXOPBLOCKS. *)
 Definition wi_cost (off n : nat) : nat := (6 * wi_blocks off n + 1)%nat.
+
+(* THE REAL COST, under the one-credit set-form bmap contract of
+   fs-icache.md section 18 (link 2).  TWO units per straddled block -- the
+   block's own [log_write], plus the one indirect write that did not absorb
+   -- plus one for the bitmap block (paid at most once in the whole call,
+   whichever iteration first allocates) and one for the trailing iupdate.
+
+     wi_cost_bmonly 1023 FW_MAX = 10 = MAXOPBLOCKS, EXACTLY.
+
+   [WriteiBudget] section 9 is the derivation, section 10 is this number as
+   a loop invariant, and [WriteiBudget.wi_cost_bmonly_fits] /
+   [wi_cost_bmonly_value] / [wi_cost_bmonly_no_slack] are the arithmetic.
+   It lives HERE rather than in [WriteiBudget] only because of the import
+   direction: [WriteiBudget] requires this file.
+
+   NON-MONOTONICITY, AND WHY EVERY CONSUMER IS RE-CHECKED.  This is NOT
+   uniformly below [wi_cost] -- [wi_cost_bmonly 0 0 = 2] against
+   [wi_cost 0 0 = 1], because the bitmap unit is held back even on the
+   empty range, while the loose bound charged only iupdate's.  So swapping
+   it in can make a caller's premise HARDER, and the empty-range arm of
+   every call site is audited explicitly rather than assumed to follow.
+   ([WriteiBudget.wi_cost_tight_incomparable] records the same trap for the
+   two-credit cost.) *)
+Definition wi_cost_bmonly (off n : nat) : nat := (2 * wi_blocks off n + 2)%nat.
 
 (* the on-disk inode writei flushes: the caller's metadata with the size
    raised to the advanced offset when the write went past the old end, and
@@ -325,9 +398,9 @@ Definition wp_writei_sconf_body
   let src := m !!! Regidx (mword_of_int 12 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_writei <= K)%nat ->
-  (* ENOUGH BUDGET for the worst case: six units per straddled block, plus
-     iupdate's one.  See the header. *)
-  (wi_cost off n <= ncount)%nat ->
+  (* ENOUGH BUDGET for the worst case: TWO units per straddled block, plus
+     one for the bitmap block and one for iupdate.  See the header. *)
+  (wi_cost_bmonly off n <= ncount)%nat ->
   (* the covered range's block-number bounds, and the log's own storage *)
   log_geom_ok cov logstart ->
   (* the inode's own block, exactly as iupdate takes it *)
@@ -489,8 +562,8 @@ Definition wp_writei_sconf_body
            /\ (tot <= n)%nat
            /\ dn' = wi_dinode dn bm' off tot
            /\ dn0' = dn')⌝ -∗
-      (* at most [wi_cost off n] units gone, and none gained *)
-      ⌜((ncount - wi_cost off n)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
+      (* at most [wi_cost_bmonly off n] units gone, and none gained *)
+      ⌜((ncount - wi_cost_bmonly off n)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
@@ -511,6 +584,234 @@ Definition wp_writei_sconf_body
        else [∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) -∗
       bslots bn 3 -∗
       log_op γ n' -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
+(* ===================================================================== *)
+(*  THE SET-FORM CONTRACT (fs-icache.md section 18 clause 1)              *)
+(*  Everything except the ledger is VERBATIM [wp_writei_sconf_body]:      *)
+(*  same premises, same resources, same twelve postcondition clauses.     *)
+(*  Only [log_op] becomes [log_opS], and [Sb ⊆ Sb'] is added.             *)
+(*  [wp_writei_sconf] is this contract with the set forgotten, derived    *)
+(*  at the [log_op] existential's own witness -- so no caller moves.      *)
+(* ===================================================================== *)
+Definition wp_writei_gen_body
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
+      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    
+    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+    (pd pav pu : mword 64)
+    (bn : bio_names)
+    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (γa : gname) (γf : gname)                         (* kalloc, file table  *)
+    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+    (bmapstart : Z) (size : Z) (dev : mword 32)
+    (used : gset Z) (γpr : gname)
+    (ip : mword 64) (inum : mword 32)
+    (bm : blkmap) (data : nat -> list (bv 8))
+    (dn dn0 : dinode)
+    (user : bool) (off n : nat) (src_bytes : nat -> bv 8)
+    (V : pprivate) (ncount : nat) (Sb : gset Z)
+    (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
+    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (b : bool) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.writei in
+  let pj := proc_addr j in
+  let src := m !!! Regidx (mword_of_int 12 : mword 5) in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (K_writei <= K)%nat ->
+  (* ENOUGH BUDGET for the worst case: TWO units per straddled block, plus
+     one for the bitmap block and one for iupdate.  See the header. *)
+  (wi_cost_bmonly off n <= ncount)%nat ->
+  (* the covered range's block-number bounds, and the log's own storage *)
+  log_geom_ok cov logstart ->
+  (* the inode's own block, exactly as iupdate takes it *)
+  0 <= inodestart ->
+  IBLOCK inum inodestart ∈ cov ->
+  ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
+  (* the inum is one the inode REGION covers -- iupdate's premise, which
+     replaced the block-half premise and its [diblk_wf ds] (design §11.3) *)
+  bv_unsigned inum < 16 * Z.of_nat nib ->
+  di_addrs dn = bm_cells bm ->
+  (* THE INODE IS ALLOCATED (fs-icache §16.4).  iupdate's flush keeps this
+     inum's fragment OUT of the region invariant, which the region's arm
+     only permits for a nonzero type -- a type-0 flush is iput's free path
+     and absorbs the fragment instead.  Every caller has it: a locked
+     inode's [InodeLock.inode_ok] carries it, and dirlink's own
+     [di_type dn = T_DIR] is stronger. *)
+  bv_unsigned (di_type dn) <> 0 ->
+  (* the file's block map, and the normalisation of its holes *)
+  blkmap_wf cov logstart bm ->
+  blk_holes_zero bm data ->
+  (* EVERY BLOCK BELOW THE FILE'S SIZE IS ALLOCATED.  Threaded in and back
+     out at the NEW size -- see the header. *)
+  bm_covers bm (bv_unsigned (di_size dn)) ->
+  (* THE JOINT NUMERIC PREMISE.  [off] and [n] are uints whose SUM stays in
+     int range -- not two separate bounds.  It is what makes the
+     [addw a5,a3,a4] at +0x022 non-wrapping, and hence what makes the
+     [bltu a5,a3] overflow test at +0x02e DEAD.  Two separate 2^31 bounds
+     do NOT suffice: their sum can reach 2^32, the 32-bit add wraps, the
+     sign-extended result is huge, and the MAXFILE*BSIZE compare at +0x02a
+     is then taken -- a live arm whose proof would need a wrapping-[addw]
+     reading that this tree does not have.
+
+     Every caller can discharge it: filewrite's [off] is bounded by the
+     file size (<= MAXFILE*BSIZE = 274432) and its [n] is chunked, and the
+     in-kernel callers (dirlink, the create path) pass small constants.
+
+     COVERAGE NOTE: this means xv6's own [off + n < off] overflow check is
+     not exercised by the proof -- the premise makes that arm dead rather
+     than proving what the code does when it fires. *)
+  (Z.of_nat off + Z.of_nat n < 2 ^ 31) ->
+  bv_unsigned (di_size dn) < 2 ^ 31 ->
+  (* the bitmap's geometry, forwarded through bmap to balloc *)
+  bitmap_geom_ok cov logstart bmapstart size ->
+  (* balloc's out-of-blocks arm calls the GENERAL printk path; carried as a
+     hypothesis, never a functor.  See SpecBalloc.v's header. *)
+  printk_gen_contract γpr γu γd ->
+  (j < NPROC)%nat ->
+  γs !! j = Some γl ->
+  (* a0 = ip *)
+  m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  (* a1 = user_src, reflected into the ghost boolean the way
+     either_copyin's own contract spells it *)
+  eq_vec (m !!! Regidx (mword_of_int 11 : mword 5)) zero_reg = negb user ->
+  (* a3 = off, a4 = n -- the RV64 ABI's sign-extended uints, which for
+     these ranges are the literals *)
+  m !!! Regidx (mword_of_int 13 : mword 5) = (mword_of_int (Z.of_nat off) : mword 64) ->
+  m !!! Regidx (mword_of_int 14 : mword 5) = (mword_of_int (Z.of_nat n) : mword 64) ->
+  (* PARKING PREMISE (hart-generic scheduler protocol) -- everything below
+     sleeps.  See SpecSched.v / SpecSleep.v. *)
+  eb = true ->
+  sie_cap_gpr m K b pj -∗
+  cpu_own 0 eb pj C b -∗
+  kernel_text -∗ pc_is pcE -∗
+  panic_wp_any -∗
+  (* the two PERSISTENT printk credentials, forwarded through bmap to balloc *)
+  kernel_data -∗
+  printk_env γpr γu γd -∗
+  bio_ctx bn (fs_view γfs γd dev cov) -∗
+  log_ctx γ bn γfs cov logstart dev -∗
+  (* either_copyin's user arm reaches copyin, which reaches vmfault/kalloc *)
+  kalloc_env γa None -∗
+  (* ip->dev and ip->inum: read, never written -- FRACTIONS *)
+  i_dev ip ↦₄{dqd} dev -∗
+  i_inum ip ↦₄{dqn} inum -∗
+  (* the five metadata cells (ip->size is read AND written), the thirteen
+     addrs cells and the indirect block, and the file's data blocks *)
+  inode_meta ip dn -∗
+  inode_map γfs ip bm -∗
+  inode_blocks γfs bm data -∗
+  (* sb.inodestart, read once inside iupdate *)
+  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  (* sb.size and sb.bmapstart, and THE BITMAP: bmap's interior balloc needs
+     all three, and writei calls bmap once per straddled block *)
+  sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  bitmap_res γfs bmapstart cov logstart size used -∗
+  (* THE INODE REGION, and this inum's (stale) on-disk record: iupdate's
+     resources, threaded through (design §11.3/§12) *)
+  ireg_inv γi γfs inodestart nib -∗
+  dinode_at γi inum dn0 -∗
+  (* THE SOURCE.  On the user arm a virtual address into the running
+     process's own space; on the kernel arm the caller's own byte buffer,
+     returned unchanged. *)
+  (if user
+   then proc_priv γf pj pidv V
+   else [∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) -∗
+  (* the caller's own pid cell (acquiresleep records it).  On the user arm
+     this is [proc_priv]'s own quarter (ProcInv.proc_priv_pid). *)
+  p_pid pj ↦₄{dq} pidv -∗
+  (* the running-thread bundle *)
+  procs_inv γs -∗
+  (* the disk fabric *)
+  dev_inv γu γd -∗
+  disk_geom γd pd pav pu -∗
+  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  (* THREE slot units -- bmap's peak; writei's own bread holds one across
+     either_copyin and log_write, and log_write wants one of its own *)
+  bslots bn 3 -∗
+  (* THE RESERVATION, spend-at-most *)
+  (* THE RESERVATION, SET FORM: the op's logged set rides beside the
+     counter.  No credit parameter -- see the header. *)
+  log_opS γ ncount Sb -∗
+  wp_next b pj (fun (CID : CpuId) =>
+  ∀ (mf : regfile) (tot : nat) (bm' : blkmap) (data' : nat -> list (bv 8))
+    (dn' dn0' : dinode) (n' : nat)
+    (wrote : nat -> bv 8) (dist : nat) (dstb : nat -> bv 8) (P' : uptd)
+    (used' : gset Z) (Sb' : gset Z),
+      ⌜callee_saved m mf⌝ -∗
+      (* THE ALLOCATOR NEVER UN-MARKS: [used] only grows, across every bmap
+         the loop performs. *)
+      ⌜used ⊆ used'⌝ -∗
+      ⌜blkmap_wf cov logstart bm'⌝ -∗
+      ⌜blk_holes_zero bm' data'⌝ -∗
+      ⌜di_addrs dn' = bm_cells bm'⌝ -∗
+      ⌜bv_unsigned (di_size dn') < 2 ^ 31⌝ -∗
+      (* COVERAGE IS PRESERVED, AT THE NEW SIZE.  See the header. *)
+      ⌜bm_covers bm' (bv_unsigned (di_size dn'))⌝ -∗
+      (* THE LAST TWO [InodeLock.inode_ok] CONJUNCTS, AS PRESERVATIONS.
+         See the header's "...AND THE TWO CONJUNCTS A RE-PARKER NEEDS". *)
+      ⌜bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+       bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE⌝ -∗
+      ⌜inode_sized data -> inode_sized data'⌝ -∗
+      (* THE DISTURBED REGION: at most one block, immediately after the
+         written range, and EMPTY unless a copy failed part-way.  See the
+         header. *)
+      ⌜(dist <= BSIZE)%nat⌝ -∗
+      ⌜(tot = n)%nat -> dist = 0%nat⌝ -∗
+      (* ...and EMPTY OUTRIGHT on the KERNEL arm: either_copyin cannot fail
+         there, so the committed partial chunk never exists.  §15.1(i). *)
+      ⌜user = false -> dist = 0%nat⌝ -∗
+      (* THE RANGE CLAUSE -- the whole effect of the write, in one line *)
+      ⌜forall k : nat,
+         file_byte data' k
+         = if decide ((off <= k)%nat /\ (k < off + tot)%nat)
+           then wrote (k - off)%nat
+           else if decide ((off + tot <= k)%nat /\ (k < off + tot + dist)%nat)
+                then dstb (k - (off + tot))%nat
+                else file_byte data k⌝ -∗
+      (* ...and, on the KERNEL arm only, what those bytes were *)
+      ⌜user = false -> forall i : nat, (i < tot)%nat -> wrote i = src_bytes i⌝ -∗
+      (* THE TWO ARMS, on the returned a0.  A SHORT WRITE IS THE SECOND
+         ARM, not the first: only the up-front checks answer -1. *)
+      ⌜(mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int (-1) : mword 64)
+        /\ (bv_unsigned (di_size dn) < Z.of_nat off
+            \/ (MAXFILE * BSIZE < off + n)%nat)
+        /\ tot = 0%nat /\ dist = 0%nat
+        /\ bm' = bm /\ data' = data /\ dn' = dn /\ dn0' = dn0
+        /\ n' = ncount)
+       \/ (mf !!! Regidx (mword_of_int 10 : mword 5)
+             = (mword_of_int (Z.of_nat tot) : mword 64)
+           /\ (tot <= n)%nat
+           /\ dn' = wi_dinode dn bm' off tot
+           /\ dn0' = dn')⌝ -∗
+      (* at most [wi_cost_bmonly off n] units gone, and none gained *)
+      ⌜((ncount - wi_cost_bmonly off n)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
+      (* THE SET ONLY GROWS.  No ceiling -- see the header. *)
+      ⌜Sb ⊆ Sb'⌝ -∗
+      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      sie_cap_gpr mf K b pj -∗
+      cpu_own 0 eb pj C b -∗
+      pc_is ret_tgt -∗
+      p_pid pj ↦₄{dq} pidv -∗
+      i_dev ip ↦₄{dqd} dev -∗
+      i_inum ip ↦₄{dqn} inum -∗
+      inode_meta ip dn' -∗
+      inode_map γfs ip bm' -∗
+      inode_blocks γfs bm' data' -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      bitmap_res γfs bmapstart cov logstart size used' -∗
+      dinode_at γi inum dn0' -∗
+      (if user
+       then proc_priv γf pj pidv (upd_upt V P')
+       else [∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) -∗
+      bslots bn 3 -∗
+      log_opS γ n' Sb' -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -542,4 +843,35 @@ Module Type WRITEI.
                            ip inum bm data dn dn0
                            user off n src_bytes V ncount
                            pidv dq dqd dqn dqs dqb dqbs m K eb C b.
+
+  (* the SET-FORM contract; [wp_writei_sconf] above is its instance with the
+     set forgotten, kept as its own parameter so that every existing caller
+     is unchanged (wp_bmap_gen / wp_balloc_gen's pattern) *)
+  Parameter wp_writei_gen :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
+             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId}
+
+      (γs : list gname) (j : nat) (γl : gname)
+      (γu : uart_names) (γd : disk_names) (γk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (γa : gname) (γf : gname)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (bmapstart : Z) (size : Z) (dev : mword 32)
+      (used : gset Z) (γpr : gname)
+      (ip : mword 64) (inum : mword 32)
+      (bm : blkmap) (data : nat -> list (bv 8))
+      (dn dn0 : dinode)
+      (user : bool) (off n : nat) (src_bytes : nat -> bv 8)
+      (V : pprivate) (ncount : nat) (Sb : gset Z)
+      (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool),
+      wp_writei_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
+                         cov logstart inodestart nib bmapstart size dev used γpr
+                         ip inum bm data dn dn0
+                         user off n src_bytes V ncount Sb
+                         pidv dq dqd dqn dqs dqb dqbs m K eb C b.
 End WRITEI.

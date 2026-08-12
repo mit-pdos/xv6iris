@@ -75,6 +75,10 @@ Require Import BitmapInv.
 Require Import KernelDataInv.
 Require Import SpecPrintkGen.
 Require Import SpecWritei.
+(* the loop's ledger algebra: bm_pot, wi_inv_bud/wi_inv_spent, the two step
+   lemmas, wi_inv_enter/wi_inv_exit and the two iteration bounds.  Section 10
+   of WriteiBudget.v is written to BE this file's budget reasoning. *)
+Require Import WriteiBudget.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
@@ -171,6 +175,35 @@ Local Ltac nz := vm_compute; discriminate.
 Local Ltac widx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 
 (* ===================================================================== *)
+(*  THE SET SHAPES, PROVED ONCE, WHERE THE CONTEXT IS THREE VARIABLES     *)
+(*                                                                        *)
+(*  [set_solver] runs [set_unfold] over the WHOLE hypothesis context, and *)
+(*  inside this file's proofs that context is several hundred hypotheses  *)
+(*  of Iris proofmode state, register-threading facts and mword           *)
+(*  equalities: a single call did not terminate in fifteen minutes in     *)
+(*  ProofBmap's interior, and the failure reads exactly like a hang.      *)
+(*  (S3l's trap; ProofBmap.v carries the same block for the same reason.) *)
+(*  Every set obligation the budget retrofit discharges is one of these   *)
+(*  four shapes, so each is proved once here and applied BY NAME.         *)
+(*  NEVER write [set_solver] inside a function-proof lemma in this file.  *)
+(* ===================================================================== *)
+Lemma wiset_add_r (A D : gset Z) : A ⊆ A ∪ D.
+Proof. set_solver. Qed.
+
+(* monotonicity through one more union: what every call that grows the op's
+   set needs in order to keep the public [Sb ⊆ Sb'] promise *)
+Lemma wiset_sub_add_r (A B D : gset Z) : A ⊆ B -> A ⊆ B ∪ D.
+Proof. set_solver. Qed.
+
+(* the bitmap block is in the set once anything has allocated -- carried
+   forward across the rest of the loop, which only ever grows the set *)
+Lemma wiset_in_add_r (x : Z) (B D : gset Z) : x ∈ B -> x ∈ B ∪ D.
+Proof. set_solver. Qed.
+
+Lemma wiset_in_sing_r (x : Z) (B : gset Z) : x ∈ B ∪ {[x]}.
+Proof. set_solver. Qed.
+
+(* ===================================================================== *)
 (*  Vocabulary: the frame in three strengths, and the continuation.       *)
 (* ===================================================================== *)
 Section WriteiDefs.
@@ -259,13 +292,14 @@ Section WriteiDefs.
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn dn0 : dinode)
       (user : bool) (off n : nat) (src_bytes : nat -> bv 8)
-      (V : pprivate) (ncount : nat)
+      (V : pprivate) (ncount : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac) (A : bm_alloc) (j : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
     wp_next b (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (tot : nat) (bm' : blkmap) (data' : nat -> list (bv 8))
         (dn' dn0' : dinode) (n' : nat)
-        (wrote : nat -> bv 8) (dist : nat) (dstb : nat -> bv 8) (P' : uptd),
+        (wrote : nat -> bv 8) (dist : nat) (dstb : nat -> bv 8) (P' : uptd)
+        (Sb' : gset Z),
         ⌜callee_saved m mf⌝ -∗
         ⌜blkmap_wf cov logstart bm'⌝ -∗
         ⌜blk_holes_zero bm' data'⌝ -∗
@@ -296,7 +330,8 @@ Section WriteiDefs.
              /\ (tot <= n)%nat
              /\ dn' = wi_dinode dn bm' off tot
              /\ dn0' = dn')⌝ -∗
-        ⌜((ncount - wi_cost off n)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
+        ⌜((ncount - wi_cost_bmonly off n)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
+        ⌜Sb ⊆ Sb'⌝ -∗
         ⌜uptd_ext (pv_upt V) P'⌝ -∗
         sie_cap_gpr mf K b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) C b -∗
@@ -315,7 +350,7 @@ Section WriteiDefs.
          else [∗ list] i ∈ seq 0 n,
                 pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i)) -∗
         bslots bn 3 -∗
-        log_op γ n' -∗
+        log_opS γ n' Sb' -∗
         WP (Loop : expr riscv_lang))%I.
 
 End WriteiDefs.
@@ -342,7 +377,7 @@ Section WriteiRet.
       (dn dn' dn0 dn0' : dinode)
       (user : bool) (off n tot : nat) (src_bytes wrote : nat -> bv 8)
       (dist : nat) (dstb : nat -> bv 8)
-      (V : pprivate) (P' : uptd) (ncount n' : nat)
+      (V : pprivate) (P' : uptd) (ncount n' : nat) (Sb Sb' : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac) (A : bm_alloc) (j : nat)
       (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) :
     (K_writei <= K)%nat ->
@@ -384,7 +419,8 @@ Section WriteiRet.
          /\ (tot <= n)%nat
          /\ dn' = wi_dinode dn bm' off tot
          /\ dn0' = dn')) ->
-    ((ncount - wi_cost off n)%nat <= n')%nat -> (n' <= ncount)%nat ->
+    ((ncount - wi_cost_bmonly off n)%nat <= n')%nat -> (n' <= ncount)%nat ->
+    Sb ⊆ Sb' ->
     uptd_ext (pv_upt V) P' ->
     sie_cap_gpr M (K - 14)%nat b (proc_addr j) -∗
     cpu_own 0 true (proc_addr j) C b -∗
@@ -405,15 +441,16 @@ Section WriteiRet.
      else [∗ list] i ∈ seq 0 n,
             pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i)) -∗
     bslots bn 3 -∗
-    log_op γ n' -∗
+    log_opS γ n' Sb' -∗
     wi_cont (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
-            bm data dn dn0 user off n src_bytes V ncount pidv dq dqd dqn dqs A j
+            bm data dn dn0 user off n src_bytes V ncount Sb
+            pidv dq dqd dqn dqs A j
             m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hs1 Hs3 Hs8 Hs9 Hs10 Hs11
            Hwf' Hhz' Hadr' Hsz' Hcov' Hcap' Hsized' Hdb Hd0 Hdk Hrange Hker Harm
-           Hlo Hhi Hext.
+           Hlo Hhi Hsbsub Hext.
     pose proof HK as HK'. unfold K_writei in HK'.
     iIntros "Hcg Hcnt #Htext Hpc Hframe Hppid Hidev Hinum
               Hmeta Hmap Hblocks Hsb Hba Hdn Hsrc Hsl Hop Hcont".
@@ -667,8 +704,8 @@ Section WriteiRet.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     rewrite /wi_cont.
     iSpecialize ("Hcont" $! CID9 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! P8 tot bm' data' dn' dn0' n' wrote dist dstb P'
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hdn
+    iApply ("Hcont" $! P8 tot bm' data' dn' dn0' n' wrote dist dstb P' Sb'
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hdn
                     Hsrc Hsl Hop").
     { unfold callee_saved. split_and!; assumption. }
     { exact Hwf'. }
@@ -685,6 +722,7 @@ Section WriteiRet.
     { exact Hker. }
     { rewrite Ca0. exact Harm. }
     { split; assumption. }
+    { exact Hsbsub. }
     { exact Hext. }
   Qed.
 
@@ -709,7 +747,7 @@ Section WriteiJoin.
       (dn dn' dn0 : dinode)
       (user : bool) (off n tot : nat) (src_bytes wrote : nat -> bv 8)
       (dist : nat) (dstb : nat -> bv 8)
-      (V : pprivate) (P' : uptd) (ncount u : nat)
+      (V : pprivate) (P' : uptd) (ncount u : nat) (Sb SbC : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac) (A : bm_alloc)
       (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) :
     (K_writei <= K)%nat ->
@@ -752,7 +790,10 @@ Section WriteiJoin.
     (user = false -> forall i : nat, (i < tot)%nat -> wrote i = src_bytes i) ->
     (tot <= n)%nat ->
     dn' = wi_dinode dn bm' off tot ->
-    ((ncount - wi_cost off n)%nat <= u)%nat -> (u <= ncount)%nat ->
+    ((ncount - wi_cost_bmonly off n)%nat <= u)%nat -> (u <= ncount)%nat ->
+    (* the op's logged set has only grown since entry; iupdate grows it once
+       more, by this inum's inode block *)
+    Sb ⊆ SbC ->
     uptd_ext (pv_upt V) P' ->
     sie_cap_gpr M (K - 14)%nat b (proc_addr j) -∗
     cpu_own 0 true (proc_addr j) C b -∗
@@ -781,16 +822,17 @@ Section WriteiJoin.
      else [∗ list] i ∈ seq 0 n,
             pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i)) -∗
     bslots bn 3 -∗
-    log_op γ (S u) -∗
+    log_opS γ (S u) SbC -∗
     wi_cont (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
-            bm data dn dn0 user off n src_bytes V ncount pidv dq dqd dqn dqs A j
+            bm data dn dn0 user off n src_bytes V ncount Sb
+            pidv dq dqd dqn dqs A j
             m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hadr Hwf' Hhz' Hsz' Hcov'
            Hrngt Hsized'
            Hj Hgl Hsp Hs5 Hs3 Hs1 Hs8 Hs9 Hs10 Hs11 Hdb Hd0 Hdk Hrange Hker Htotn Hdneq
-           Hlo Hhi Hext.
+           Hlo Hhi Hsbsub Hext.
     pose proof HK as HK'. unfold K_writei in HK'.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hppid Hidev Hinum
@@ -861,8 +903,13 @@ Section WriteiJoin.
     assert (Hdirlen : length (bm_dir bm') = NDIRECT)
       by exact (blkmap_wf_dir_len cov logstart bm' Hwf').
     iDestruct (wi_slots_split bn 2 1 with "Hsl") as "[Hsl2 Hsl1]".
-    iApply (IU.wp_iupdate_sconf γs j γl γu γd γk pd pav pu bn γ γfs γi
-              cov logstart inodestart nib dev ip inum dn' dn0 bm' u
+    (* THE SET-FORM iupdate: the flush is the last thing writei logs, and
+       the set it grows by is exactly this inum's inode block.  Threading it
+       (rather than taking the counted form, which re-hides the set behind
+       an existential) is what lets the public contract promise its caller
+       [Sb ⊆ Sb'] past the flush. *)
+    iApply (IU.wp_iupdate_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
+              cov logstart inodestart nib dev ip inum dn' dn0 bm' u SbC
               pidv dq dqd dqn dqs T1 (K - 14)%nat true C b
               HKiu Hgeom Hist Hicov Hilog Hnib Hadr Hdirlen Hj Hgl HT1a0 eq_refl
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hidev Hinum Hmeta Hmap
@@ -979,6 +1026,7 @@ Section WriteiJoin.
               dev ip inum
               bm bm' data data' dn dn' dn0 dn'
               user off n tot src_bytes wrote dist dstb V P' ncount u
+              Sb (SbC ∪ {[IBLOCK inum inodestart]})
               pidv dq dqd dqn dqs A j m T3 K C b
               HK HT3sp HT3s1 HT3s3 HT3s8 HT3s9 HT3s10 HT3s11
               Hwf' Hhz'
@@ -989,7 +1037,9 @@ Section WriteiJoin.
               Hdb Hd0 Hdk Hrange Hker
               ltac:(right; split_and!;
                     [exact HT3a0 | exact Htotn | exact Hdneq | reflexivity])
-              Hlo Hhi Hext
+              Hlo Hhi
+              (wiset_sub_add_r Sb SbC {[IBLOCK inum inodestart]} Hsbsub)
+              Hext
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hidev Hinum
                     Hmeta Hmap Hblocks Hsb Hba Hdn Hsrc Hsl Hop [Hcont]").
     iApply (wp_next_shift (CIDa := CID2) (CIDb := CID5) ltac:(wp_next_chain)
@@ -1019,7 +1069,7 @@ Section WriteiSize.
       (dn dn0 : dinode)
       (user : bool) (off n tot : nat) (src_bytes wrote : nat -> bv 8)
       (dist : nat) (dstb : nat -> bv 8)
-      (V : pprivate) (P' : uptd) (ncount u : nat)
+      (V : pprivate) (P' : uptd) (ncount u : nat) (Sb SbC : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac) (A : bm_alloc)
       (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) :
     (K_writei <= K)%nat ->
@@ -1061,7 +1111,8 @@ Section WriteiSize.
               else file_byte data k) ->
     (user = false -> forall i : nat, (i < tot)%nat -> wrote i = src_bytes i) ->
     (tot <= n)%nat ->
-    ((ncount - wi_cost off n)%nat <= u)%nat -> (u <= ncount)%nat ->
+    ((ncount - wi_cost_bmonly off n)%nat <= u)%nat -> (u <= ncount)%nat ->
+    Sb ⊆ SbC ->
     uptd_ext (pv_upt V) P' ->
     sie_cap_gpr M (K - 14)%nat b (proc_addr j) -∗
     cpu_own 0 true (proc_addr j) C b -∗
@@ -1090,15 +1141,16 @@ Section WriteiSize.
      else [∗ list] i ∈ seq 0 n,
             pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i)) -∗
     bslots bn 3 -∗
-    log_op γ (S u) -∗
+    log_opS γ (S u) SbC -∗
     wi_cont (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
-            bm data dn dn0 user off n src_bytes V ncount pidv dq dqd dqn dqs A j
+            bm data dn dn0 user off n src_bytes V ncount Sb
+            pidv dq dqd dqn dqs A j
             m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hwf' Hhz' HcovS HcovT Hszlt Hofflt
            Hrngt Hsized'
-           Hj Hgl Hsp Hs5 Hs2 Hs3 Hdb Hd0 Hdk Hrange Hker Htotn Hlo Hhi Hext.
+           Hj Hgl Hsp Hs5 Hs2 Hs3 Hdb Hd0 Hdk Hrange Hker Htotn Hlo Hhi Hsbsub Hext.
     pose proof HK as HK'. unfold K_writei in HK'.
     change (2 ^ 31)%Z with 2147483648%Z in Hszlt, Hofflt.
     (* the coverage the join needs: whichever size [wi_dinode] installs is
@@ -1345,13 +1397,13 @@ Section WriteiSize.
       iApply (wi_join (CID0 := CIDz3) γs j γl γu γd γk pd pav pu γfs γi bn γ γf
                 cov logstart inodestart nib dev ip inum bm bm' data data' dn
                 (wi_dinode dn bm' off tot) dn0 user off n tot src_bytes wrote
-                dist dstb V P' ncount u pidv dq dqd dqn dqs A m QB5 K C b
+                dist dstb V P' ncount u Sb SbC pidv dq dqd dqn dqs A m QB5 K C b
                 HK Hgeom Hist Hicov Hilog Hnib Hdtnz eq_refl Hwf' Hhz'
                 ltac:(rewrite Hdsz; change (2 ^ 31)%Z with 2147483648%Z; exact Hszlt)
                 Hcovf Hrngt Hsized'
                 Hj Hgl HQB5sp HQB5s5 HQB5s3
                 HQB5Rs1 HQB5Rs8 HQB5Rs9 HQB5Rs10 HQB5Rs11
-                Hdb Hd0 Hdk Hrange Hker Htotn eq_refl Hlo Hhi Hext
+                Hdb Hd0 Hdk Hrange Hker Htotn eq_refl Hlo Hhi Hsbsub Hext
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hppid Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
@@ -1547,13 +1599,13 @@ Section WriteiSize.
       iApply (wi_join (CID0 := CIDQA5) γs j γl γu γd γk pd pav pu γfs γi bn γ γf
                 cov logstart inodestart nib dev ip inum bm bm' data data' dn
                 (wi_dinode dn bm' off tot) dn0 user off n tot src_bytes wrote
-                dist dstb V P' ncount u pidv dq dqd dqn dqs A m QA5 K C b
+                dist dstb V P' ncount u Sb SbC pidv dq dqd dqn dqs A m QA5 K C b
                 HK Hgeom Hist Hicov Hilog Hnib Hdtnz eq_refl Hwf' Hhz'
                 ltac:(change (2 ^ 31)%Z with 2147483648%Z; exact Hszn)
                 Hcovf Hrngt Hsized'
                 Hj Hgl HQA5sp HQA5s5 HQA5s3
                 HQA5Rs1 HQA5Rs8 HQA5Rs9 HQA5Rs10 HQA5Rs11
-                Hdb Hd0 Hdk Hrange Hker Htotn eq_refl Hlo Hhi Hext
+                Hdb Hd0 Hdk Hrange Hker Htotn eq_refl Hlo Hhi Hsbsub Hext
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hppid Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
@@ -1606,7 +1658,7 @@ Section WriteiLoop.
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn dn0 : dinode)
       (user : bool) (off n : nat) (src_bytes : nat -> bv 8)
-      (V : pprivate) (ncount : nat) (usv : mword 64)
+      (V : pprivate) (ncount : nat) (Sb : gset Z) (usv : mword 64)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac) (A : bm_alloc)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) :
     (K_writei <= K)%nat ->
@@ -1624,7 +1676,8 @@ Section WriteiLoop.
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
     forall (W tot : nat) (bmI : blkmap) (dataI : nat -> list (bv 8))
-           (wroteI : nat -> bv 8) (PI : uptd) (nI : nat) (M : regfile),
+           (wroteI : nat -> bv 8) (PI : uptd) (nI : nat) (SI : gset Z)
+           (M : regfile),
     (tot < n)%nat ->
     blkmap_wf cov logstart bmI ->
     blk_holes_zero bmI dataI ->
@@ -1648,10 +1701,20 @@ Section WriteiLoop.
     (user = false -> forall i : nat, (i < tot)%nat -> wroteI i = src_bytes i) ->
     uptd_ext (pv_upt V) PI ->
     (wi_blocks (off + tot) (n - tot) <= W)%nat ->
-    (6 * W + 1 <= nI)%nat ->
+    (* THE LEDGER INVARIANT (WriteiBudget section 10).  What used to be two
+       raw inequalities in 6-per-block arithmetic is now the two clauses of
+       the [bm_pot] accounting: [wi_inv_bud] is what the REST of the loop
+       can still afford, [wi_inv_spent] is what has been spent so far and is
+       what the public spend-at-most postcondition is read off at exit.  The
+       unpaid bitmap block rides inside both as one unit of potential, which
+       is why neither clause needs a "has the bitmap been paid yet" case
+       split -- see WriteiBudget's section-10 header. *)
+    wi_inv_bud (ba_bms A) W nI SI ->
     (nI <= ncount)%nat ->
-    (ncount <= nI + 6 * (wi_blocks off n - W))%nat ->
+    wi_inv_spent (ba_bms A) ncount nI (wi_blocks off n) W SI ->
     (W <= wi_blocks off n)%nat ->
+    (* the op's logged set only grows: the caller's entry set is still in it *)
+    Sb ⊆ SI ->
     wi_sp m M ->
     M !!! Regidx Rs5 = ip ->
     M !!! Regidx Rs7 = usv ->
@@ -1694,9 +1757,10 @@ Section WriteiLoop.
      else [∗ list] i ∈ seq 0 n,
             pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i)) -∗
     bslots bn 3 -∗
-    log_op γ nI -∗
+    log_opS γ nI SI -∗
     wi_cont (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
-            bm data dn dn0 user off n src_bytes V ncount pidv dq dqd dqn dqs A j
+            bm data dn dn0 user off n src_bytes V ncount Sb
+            pidv dq dqd dqn dqs A j
             m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1708,9 +1772,9 @@ Section WriteiLoop.
     pose proof Hrng as Hrng2. rewrite wi_maxfile_bsize_nat in Hrng2.
     intro W. revert CID0.
     induction W as [| W IH];
-      intros CID0 tot bmI dataI wroteI PI nI M
+      intros CID0 tot bmI dataI wroteI PI nI SI M
              Htotlt HwfI HhzI HsizedI HcovSI HcovTI HrangeI HkerI HextI
-             HW1 HW2 HW3 HW4 HW5
+             HW1 HW2 HW3 HW4 HW5 HWsb
              Hsp Hs5 Hs7 Hs4 Hs2 Hs6 Hs3 Hs9 Hs8 Hprkc;
       [ exfalso; pose proof (wi_blocks_pos (off + tot) (n - tot) ltac:(lia)); lia |].
     remember ((off + tot) `div` BSIZE)%nat as fbn eqn:Hfbne.
@@ -1800,16 +1864,26 @@ Section WriteiLoop.
        loop invariant never mentions the bitmap's current set. *)
     iDestruct "Hba" as "(%Hgok & Hszc & Hbmsc & Hbmg)".
     iDestruct "Hbmg" as (uIn) "[%HuIn Hbmres]".
-    iApply (BM.wp_bmap_sconf γs j γl γu γd γk pd pav pu bn γ γfs
+    (* THE CREDIT writei PRESENTS: "this op has already logged the bitmap
+       block".  It is a DECIDABLE READ of the loop's own set, not a case
+       split -- [wi_bmap_need_ok] discharges bmap's reservation at either
+       value of it, out of the one invariant clause. *)
+    iApply (BM.wp_bmap_gen γs j γl γu γd γk pd pav pu bn γ γfs
               cov logstart (ba_bms A) (ba_size A) dev uIn (ba_pr A)
-              ip bmI dataI fbn nI pidv dq dqd (ba_dqb A) (ba_dqs A)
+              ip bmI dataI fbn nI (bool_decide (ba_bms A ∈ SI)) SI
+              pidv dq dqd (ba_dqb A) (ba_dqs A)
               A3 (K - 14)%nat true C b
-              HKbm ltac:(lia) Hgeom0 Hgok Hprkc Hfbnlt HwfI Hj Hgl HA3a0 HA3a1 eq_refl
+              HKbm
+              (wi_bmap_need_ok (ba_bms A) (S W) nI SI (bmap_ind fbn)
+                 ltac:(lia) HW2)
+              Hgeom0 Hgok Hprkc
+              ltac:(intros Hc; exact (proj1 (bool_decide_eq_true _) Hc))
+              Hfbnlt HwfI Hj Hgl HA3a0 HA3a1 eq_refl
               with "Hcg Hcnt Htext Hpc Hpanic Hkdata Hprkenv Hbio Hlctx Hidev Hmap
                     Hblocks Hppid
                     Hszc Hbmsc Hbmres
                     Hprocs Hdevi Hdgeom Hdlock Hsl Hop").
-    iIntros (CIDa4 Hqa4 mB bm2 nB data2 uMid)
+    iIntros (CIDa4 Hqa4 mB bm2 nB data2 uMid Sb2)
       "%Hcs1 %HuMid %Hwf2 %Hagr2 %Hnoun2 %Harm2 Hcg Hcnt Hpc Hppid
        Hszc Hbmsc Hbmres Hidev Hmap %Hdep2 Hblocks Hsl %Hbud2 Hop".
     (* re-close the bundle at the SAME index -- [ba_used A ⊆ uIn ⊆ uMid] *)
@@ -1818,7 +1892,49 @@ Section WriteiLoop.
       iFrame "Hszc Hbmsc".
       iApply (bm_bitmap_intro γfs cov logstart (ba_bms A) (ba_size A)
                 (ba_used A) uMid (bm_used_trans _ _ _ HuIn HuMid) with "Hbmres"). }
-    destruct nB as [| uX]; [exfalso; lia|].
+    (* the loop still has a unit for its own [log_write]: the invariant
+       reserved two per remaining block plus the bitmap's potential, and no
+       arm of bmap costs more than two plus that potential
+       ([wi_bmap_cost_le]) *)
+    destruct nB as [| uX];
+      [ exfalso;
+        pose proof (wi_bmap_cost_le (ba_bms A) SI
+                      (bmap_alloced bmI bm2 fbn) (bmap_ind fbn));
+        unfold wi_inv_bud in HW2;
+        destruct Hbud2 as (Hbd1 & Hbd2 & _); lia
+      |].
+    (* THE LEDGER, unpacked once: the spend, the two set bounds, and the two
+       memberships that ARE the absorption (SpecBmap's clauses (a)-(d)). *)
+    destruct Hbud2 as (Hbc1 & Hbc2 & Hbc3 & Hbc4 & Hbc5 & Hbc6).
+    assert (HSuXnc : (S uX <= ncount)%nat) by lia.
+    assert (HsbSb2 : Sb ⊆ Sb2) by (etransitivity; [exact HWsb | exact Hbc3]).
+    (* THE ITERATION'S FIRST HALF against the accounting.  Either bmap
+       allocated -- and then it logged the bitmap block, so the potential is
+       discharged in the same breath that spends it ([wi_step_alloc]) -- or it
+       did not, and spent nothing at all ([wi_step_noalloc]).  Stated at the
+       count bmap left behind, which is what the two loop EXITS below hand on;
+       an iteration that CONTINUES re-derives it past its own log_write. *)
+    assert (Hinv2 : wi_inv_bud (ba_bms A) W (S uX) Sb2
+                    /\ wi_inv_spent (ba_bms A) ncount (S uX)
+                         (wi_blocks off n) W Sb2).
+    (* NOTE: [destruct ... eqn:] SUBSTITUTES the scrutinee, so [Hbc1]/[Hbc5]
+       carry the literal [true]/[false] from here on -- the arm facts must be
+       named at the literal, not at [bmap_alloced bmI bm2 fbn]. *)
+    (* the step lemmas conclude at [S W - 1], which unification does NOT
+       reduce to [W] on its own *)
+    { destruct (bmap_alloced bmI bm2 fbn) eqn:Hal2.
+      - assert (Hlo2 : (nI <= S uX + 2 + bm_pot (ba_bms A) SI)%nat).
+        { pose proof (wi_bmap_cost_le (ba_bms A) SI true (bmap_ind fbn)). lia. }
+        pose proof (wi_step_alloc (ba_bms A) ncount nI (S uX) (wi_blocks off n)
+                      (S W) SI Sb2 ltac:(lia) HW5 HW2 HW4 Hbc3 (Hbc5 eq_refl)
+                      Hlo2 Hbc2) as Hst2.
+        replace (S W - 1)%nat with W in Hst2 by lia. exact Hst2.
+      - assert (Hlo2 : (nI <= S uX + 1)%nat).
+        { assert (Hz2 : bmap_cost (bool_decide (ba_bms A ∈ SI)) false
+                          (bmap_ind fbn) = 0%nat) by reflexivity. lia. }
+        pose proof (wi_step_noalloc (ba_bms A) ncount nI (S uX) (wi_blocks off n)
+                      (S W) SI Sb2 ltac:(lia) HW5 HW2 HW4 Hbc3 Hlo2 Hbc2) as Hst2.
+        replace (S W - 1)%nat with W in Hst2 by lia. exact Hst2. }
     assert (Hpc8c : ret_pc (A3 !!! Regidx Rra : mword 64)
                     = mword_of_int (WI + 0x8c)) by (rewrite HA3ra; pcw).
     iEval (rewrite Hpc8c) in "Hpc".
@@ -1910,6 +2026,7 @@ Section WriteiLoop.
       iApply (wi_size (CID0 := CIDa6) γs j γl γu γd γk pd pav pu γfs γi bn γ γf
                 cov logstart inodestart nib dev ip inum bm bm2 data data2 dn dn0
                 user off n tot src_bytes wroteI 0%nat wroteI V PI ncount uX
+                Sb Sb2
                 pidv dq dqd dqn dqs A m B1 K C b
                 HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hwf2 Hhz2 HcovS2 HcovT2
                 Hszdn ltac:(lia)
@@ -1919,7 +2036,16 @@ Section WriteiLoop.
                 Hj Hgl HB1sp HB1s5 HB1s2 HB1s3 ltac:(lia) ltac:(intros; reflexivity)
                 ltac:(intros; reflexivity)
                 (wi_range_dist0 data data2 off tot wroteI wroteI Hrange2)
-                HkerI ltac:(lia) ltac:(unfold wi_cost; lia) ltac:(lia) HextI
+                HkerI ltac:(lia)
+                ltac:(exact (proj1 (wi_inv_exit (ba_bms A) ncount (S uX) uX
+                              (wi_blocks off n) W off n Sb2
+                              ltac:(lia) eq_refl (proj2 Hinv2) HSuXnc
+                              ltac:(lia) ltac:(lia))))
+                ltac:(exact (proj2 (wi_inv_exit (ba_bms A) ncount (S uX) uX
+                              (wi_blocks off n) W off n Sb2
+                              ltac:(lia) eq_refl (proj2 Hinv2) HSuXnc
+                              ltac:(lia) ltac:(lia))))
+                HsbSb2 HextI
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hppid Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
@@ -2540,14 +2666,68 @@ Section WriteiLoop.
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           assert (HKlw : (K_log_write <= K - 14)%nat) by (unfold K_log_write; lia).
           iDestruct (wi_slots_split bn 1 1 with "Hsl2") as "[Hsla Hslb]".
-          iApply (LW.wp_log_write_sconf bn γ γfs γd cov logstart dev kkb pidv
+          (* THE ABSORPTION, claimed as a decidable read of the op's set: if
+             bmap just allocated this data block then balloc's [bzero]
+             already logged it and this write is FREE.  The premise is
+             discharged by the very bool_decide that names the credit. *)
+          iApply (LW.wp_log_write_gen bn γ γfs γd cov logstart dev kkb pidv
                     (blkmap_get bm2 fbn) (wi_splice (data2 fbn) o mm g)
                     (data2 fbn) bsdB dB uX
+                    (bool_decide (uint (blkmap_get bm2 fbn : mword 32) ∈ Sb2)) Sb2
                     F2 0%nat true (proc_addr j) C (K - 14)%nat b
                     HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia)
                     Hkklt HF2a0 Hbcovlw Hbloglw
+                    ltac:(intros Hc; exact (proj1 (bool_decide_eq_true _) Hc))
                     with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsla Hop Hfsb1 Hheld").
           iIntros (CIDc4 Hqc4 mL) "Hcg Hcnt Hpc %HcsL Hop Hfsb1 Hheld Hsla".
+          (* the count log_write left, as a variable: [S uX] when it absorbed,
+             [uX] when it spent.  Naming it keeps the rest of this iteration
+             free of the case split. *)
+          remember (if bool_decide (uint (blkmap_get bm2 fbn : mword 32) ∈ Sb2)
+                    then S uX else uX) as nL eqn:HnLdef.
+          assert (HnLhi : (nL <= S uX)%nat)
+            by (rewrite HnLdef; case_bool_decide; lia).
+          assert (HnLlo : (S uX <= nL + (if bool_decide (uint (blkmap_get bm2 fbn : mword 32) ∈ Sb2)
+                                         then 0 else 1))%nat)
+            by (rewrite HnLdef; case_bool_decide; lia).
+          (* THE WHOLE ITERATION against the accounting, bmap and this
+             log_write together.  The allocating arm needs the absorption to
+             have fired, and [wi_ad_of_alloced] is why it did: on the
+             indirect path an allocating bmap allocated the DATA block too. *)
+          assert (Hinv3 : wi_inv_bud (ba_bms A) W nL (Sb2 ∪ {[uint (blkmap_get bm2 fbn : mword 32)]})
+                          /\ wi_inv_spent (ba_bms A) ncount nL
+                               (wi_blocks off n) W (Sb2 ∪ {[uint (blkmap_get bm2 fbn : mword 32)]})).
+          { destruct (bmap_alloced bmI bm2 fbn) eqn:Hal3.
+            - (* THE ABSORPTION FIRED, and [wi_ad_of_alloced] is why *)
+              assert (Hcrlw : true = true -> bmap_ind fbn = true ->
+                              bool_decide (uint (blkmap_get bm2 fbn : mword 32) ∈ Sb2) = true).
+              { intros _ Hind3. apply bool_decide_eq_true.
+                (* bmap states clause (d) on [bv_unsigned], log_write's set on
+                   [uint]; [Hubno] is the bridge, already in scope *)
+                rewrite Hubno. apply Hbc6.
+                exact (wi_ad_of_alloced cov logstart bmI bm2 fbn HwfI Hfbnlt
+                         Hbnzz Hind3 Hal3). }
+              assert (Hlo3 : (nI <= nL + 2 + bm_pot (ba_bms A) SI)%nat)
+                by exact (wi_iter_alloc_bound (ba_bms A) nI (S uX) nL SI _
+                            true (bmap_ind fbn) Hbc1 HnLlo Hcrlw).
+              pose proof (wi_step_alloc (ba_bms A) ncount nI nL (wi_blocks off n)
+                            (S W) SI (Sb2 ∪ {[uint (blkmap_get bm2 fbn : mword 32)]})
+                            ltac:(lia) HW5 HW2 HW4
+                            (wiset_sub_add_r SI Sb2 _ Hbc3)
+                            (wiset_in_add_r _ Sb2 _ (Hbc5 eq_refl))
+                            Hlo3 ltac:(lia)) as Hst3.
+              replace (S W - 1)%nat with W in Hst3 by lia. exact Hst3.
+            - assert (Hlo3 : (nI <= nL + 1)%nat)
+                by exact (wi_iter_noalloc_bound (ba_bms A) nI (S uX) nL SI _
+                            (bmap_ind fbn) Hbc1 HnLlo).
+              pose proof (wi_step_noalloc (ba_bms A) ncount nI nL
+                            (wi_blocks off n) (S W) SI (Sb2 ∪ {[uint (blkmap_get bm2 fbn : mword 32)]})
+                            ltac:(lia) HW5 HW2 HW4
+                            (wiset_sub_add_r SI Sb2 _ Hbc3)
+                            Hlo3 ltac:(lia)) as Hst3.
+              replace (S W - 1)%nat with W in Hst3 by lia. exact Hst3. }
+          assert (HsbSb3 : Sb ⊆ Sb2 ∪ {[uint (blkmap_get bm2 fbn : mword 32)]})
+            by (apply wiset_sub_add_r; exact HsbSb2).
           assert (Hpc6e : ret_pc (F2 !!! Regidx Rra : mword 64)
                           = mword_of_int (WI + 0x6e)) by (rewrite HF2ra; pcw).
           iEval (rewrite Hpc6e) in "Hpc".
@@ -2795,7 +2975,11 @@ Section WriteiLoop.
                       (sign_extend' 64 (mword_of_int 62 : mword 13))
                     = mword_of_int (WI + 0xbc)) by pcw.
             iEval (rewrite Htgtbc) in "Hpc".
-            destruct uX as [| uY]; [exfalso; lia|].
+            (* the trailing iupdate always has its unit: the invariant reserves
+               one past the straddled blocks, on EVERY exit *)
+            destruct nL as [| uY];
+              [exfalso; pose proof (wi_inv_bud_pos (ba_bms A) W 0%nat _ (proj1 Hinv3));
+               lia|].
             iDestruct (cpu_own_transport CIDc7 CIDc11 0 true (proc_addr j) C b
                          ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
             iApply (wi_size (CID0 := CIDc11) γs j γl γu γd γk pd pav pu γfs γi bn γ γf
@@ -2803,6 +2987,7 @@ Section WriteiLoop.
                       (<[fbn := wi_splice (data2 fbn) o mm g]> data2) dn dn0
                       user off n (tot + mm)%nat src_bytes wrote2 0%nat wrote2
                       V P2 ncount uY
+                      Sb (Sb2 ∪ {[uint (blkmap_get bm2 fbn : mword 32)]})
                       pidv dq dqd dqn dqs A m G3 K C b
                       HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hwf2 Hhz3 HcovS2 Hcov3
                       Hszdn ltac:(lia)
@@ -2814,7 +2999,16 @@ Section WriteiLoop.
                       ltac:(lia) ltac:(intros; reflexivity)
                       ltac:(intros; reflexivity)
                       (wi_range_dist0 data _ off (tot + mm)%nat wrote2 wrote2 Hrange3)
-                      Hker3 ltac:(lia) ltac:(unfold wi_cost; lia) ltac:(lia) Hext2
+                      Hker3 ltac:(lia)
+                      ltac:(exact (proj1 (wi_inv_exit (ba_bms A) ncount (S uY) uY
+                                    (wi_blocks off n) W off n _
+                                    ltac:(lia) eq_refl (proj2 Hinv3) ltac:(lia)
+                                    ltac:(lia) ltac:(lia))))
+                      ltac:(exact (proj2 (wi_inv_exit (ba_bms A) ncount (S uY) uY
+                                    (wi_blocks off n) W off n _
+                                    ltac:(lia) eq_refl (proj2 Hinv3) ltac:(lia)
+                                    ltac:(lia) ltac:(lia))))
+                      HsbSb3 Hext2
                       with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                             Hdgeom Hdlock Hframe Hppid Hidev Hinum Hmeta
                             Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
@@ -2851,13 +3045,15 @@ Section WriteiLoop.
             iDestruct (wp_next_shift (CIDa := CIDa14) (CIDb := CIDc11)
                          ltac:(wp_next_chain) with "Hcont") as "Hcont".
             iApply (IH CIDc11 (tot + mm)%nat bm2
-                      (<[fbn := wi_splice (data2 fbn) o mm g]> data2) wrote2 P2 uX G3
+                      (<[fbn := wi_splice (data2 fbn) o mm g]> data2) wrote2 P2 nL
+                      (Sb2 ∪ {[uint (blkmap_get bm2 fbn : mword 32)]}) G3
                       ltac:(lia) Hwf2 Hhz3
                       ltac:(intros Hs;
                             exact (wi_sized_step bmI data dataI data2 fbn o mm g
                                      Hdep2 HsizedI Hs))
                       HcovS2 Hcov3 Hrange3 Hker3 Hext2
-                      ltac:(lia) ltac:(lia) ltac:(lia) ltac:(lia) ltac:(lia)
+                      ltac:(lia) (proj1 Hinv3) ltac:(lia) (proj2 Hinv3)
+                      ltac:(lia) HsbSb3
                       HG3sp HG3s5 HG3s7 HG3s4 HG3s2 HG3s6 HG3s3 HG3s9 HG3s8 Hprkc
                       with "Hcg Hcnt Htext Hpc Hpanic Hkdata Hprkenv Hbio Hlctx
                             Hkenv Hprocs
@@ -2919,14 +3115,68 @@ Section WriteiLoop.
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           assert (HKlw : (K_log_write <= K - 14)%nat) by (unfold K_log_write; lia).
           iDestruct (wi_slots_split bn 1 1 with "Hsl2") as "[Hsla Hslb]".
-          iApply (LW.wp_log_write_sconf bn γ γfs γd cov logstart dev kkb pidv
+          (* THE ABSORPTION, claimed as a decidable read of the op's set: if
+             bmap just allocated this data block then balloc's [bzero]
+             already logged it and this write is FREE.  The premise is
+             discharged by the very bool_decide that names the credit. *)
+          iApply (LW.wp_log_write_gen bn γ γfs γd cov logstart dev kkb pidv
                     (blkmap_get bm2 fbn) (wi_splice (data2 fbn) o mm g)
                     (data2 fbn) bsdB dB uX
+                    (bool_decide (uint (blkmap_get bm2 fbn : mword 32) ∈ Sb2)) Sb2
                     J2 0%nat true (proc_addr j) C (K - 14)%nat b
                     HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia)
                     Hkklt HJ2a0 Hbcovlw Hbloglw
+                    ltac:(intros Hc; exact (proj1 (bool_decide_eq_true _) Hc))
                     with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsla Hop Hfsb1 Hheld").
           iIntros (CIDd4 Hqd4 mL) "Hcg Hcnt Hpc %HcsL Hop Hfsb1 Hheld Hsla".
+          (* the count log_write left, as a variable: [S uX] when it absorbed,
+             [uX] when it spent.  Naming it keeps the rest of this iteration
+             free of the case split. *)
+          remember (if bool_decide (uint (blkmap_get bm2 fbn : mword 32) ∈ Sb2)
+                    then S uX else uX) as nL eqn:HnLdef.
+          assert (HnLhi : (nL <= S uX)%nat)
+            by (rewrite HnLdef; case_bool_decide; lia).
+          assert (HnLlo : (S uX <= nL + (if bool_decide (uint (blkmap_get bm2 fbn : mword 32) ∈ Sb2)
+                                         then 0 else 1))%nat)
+            by (rewrite HnLdef; case_bool_decide; lia).
+          (* THE WHOLE ITERATION against the accounting, bmap and this
+             log_write together.  The allocating arm needs the absorption to
+             have fired, and [wi_ad_of_alloced] is why it did: on the
+             indirect path an allocating bmap allocated the DATA block too. *)
+          assert (Hinv3 : wi_inv_bud (ba_bms A) W nL (Sb2 ∪ {[uint (blkmap_get bm2 fbn : mword 32)]})
+                          /\ wi_inv_spent (ba_bms A) ncount nL
+                               (wi_blocks off n) W (Sb2 ∪ {[uint (blkmap_get bm2 fbn : mword 32)]})).
+          { destruct (bmap_alloced bmI bm2 fbn) eqn:Hal3.
+            - (* THE ABSORPTION FIRED, and [wi_ad_of_alloced] is why *)
+              assert (Hcrlw : true = true -> bmap_ind fbn = true ->
+                              bool_decide (uint (blkmap_get bm2 fbn : mword 32) ∈ Sb2) = true).
+              { intros _ Hind3. apply bool_decide_eq_true.
+                (* bmap states clause (d) on [bv_unsigned], log_write's set on
+                   [uint]; [Hubno] is the bridge, already in scope *)
+                rewrite Hubno. apply Hbc6.
+                exact (wi_ad_of_alloced cov logstart bmI bm2 fbn HwfI Hfbnlt
+                         Hbnzz Hind3 Hal3). }
+              assert (Hlo3 : (nI <= nL + 2 + bm_pot (ba_bms A) SI)%nat)
+                by exact (wi_iter_alloc_bound (ba_bms A) nI (S uX) nL SI _
+                            true (bmap_ind fbn) Hbc1 HnLlo Hcrlw).
+              pose proof (wi_step_alloc (ba_bms A) ncount nI nL (wi_blocks off n)
+                            (S W) SI (Sb2 ∪ {[uint (blkmap_get bm2 fbn : mword 32)]})
+                            ltac:(lia) HW5 HW2 HW4
+                            (wiset_sub_add_r SI Sb2 _ Hbc3)
+                            (wiset_in_add_r _ Sb2 _ (Hbc5 eq_refl))
+                            Hlo3 ltac:(lia)) as Hst3.
+              replace (S W - 1)%nat with W in Hst3 by lia. exact Hst3.
+            - assert (Hlo3 : (nI <= nL + 1)%nat)
+                by exact (wi_iter_noalloc_bound (ba_bms A) nI (S uX) nL SI _
+                            (bmap_ind fbn) Hbc1 HnLlo).
+              pose proof (wi_step_noalloc (ba_bms A) ncount nI nL
+                            (wi_blocks off n) (S W) SI (Sb2 ∪ {[uint (blkmap_get bm2 fbn : mword 32)]})
+                            ltac:(lia) HW5 HW2 HW4
+                            (wiset_sub_add_r SI Sb2 _ Hbc3)
+                            Hlo3 ltac:(lia)) as Hst3.
+              replace (S W - 1)%nat with W in Hst3 by lia. exact Hst3. }
+          assert (HsbSb3 : Sb ⊆ Sb2 ∪ {[uint (blkmap_get bm2 fbn : mword 32)]})
+            by (apply wiset_sub_add_r; exact HsbSb2).
           assert (Hpcb6 : ret_pc (J2 !!! Regidx Rra : mword 64)
                           = mword_of_int (WI + 0xb6)) by (rewrite HJ2ra; pcw).
           iEval (rewrite Hpcb6) in "Hpc".
@@ -3015,13 +3265,16 @@ Section WriteiLoop.
           assert (HRs5 : mR !!! Regidx Rs5 = ip).
           { rewrite (callee_saved_lookup HcsRc Rs5 ltac:(vm_compute; reflexivity)).
             assert (HH : J4 !!! Regidx Rs5 = ip) by lkp. exact HH. }
-          destruct uX as [| uY]; [exfalso; lia|].
+          destruct nL as [| uY];
+            [exfalso; pose proof (wi_inv_bud_pos (ba_bms A) W 0%nat _ (proj1 Hinv3));
+             lia|].
           iDestruct (cpu_own_transport CIDd7 CIDd7 0 true (proc_addr j) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           iApply (wi_size (CID0 := CIDd7) γs j γl γu γd γk pd pav pu γfs γi bn γ γf
                     cov logstart inodestart nib dev ip inum bm bm2 data
                     (<[fbn := wi_splice (data2 fbn) o mm g]> data2) dn dn0
                     user off n tot src_bytes wroteI mm g V P2 ncount uY
+                    Sb (Sb2 ∪ {[uint (blkmap_get bm2 fbn : mword 32)]})
                     pidv dq dqd dqn dqs A m mR K C b
                     HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hwf2 Hhz3 HcovS2 HcovT2
                     Hszdn ltac:(lia)
@@ -3037,7 +3290,16 @@ Section WriteiLoop.
                     ltac:(intros Heq; exfalso; rewrite Heq in Huser; discriminate)
                     (wi_range_fail data data2 off tot mm fbn o wroteI g
                        Hmmo Hdm Hrange2)
-                    HkerI ltac:(lia) ltac:(unfold wi_cost; lia) ltac:(lia) Hext2
+                    HkerI ltac:(lia)
+                    ltac:(exact (proj1 (wi_inv_exit (ba_bms A) ncount (S uY) uY
+                                  (wi_blocks off n) W off n _
+                                  ltac:(lia) eq_refl (proj2 Hinv3) ltac:(lia)
+                                  ltac:(lia) ltac:(lia))))
+                    ltac:(exact (proj2 (wi_inv_exit (ba_bms A) ncount (S uY) uY
+                                  (wi_blocks off n) W off n _
+                                  ltac:(lia) eq_refl (proj2 Hinv3) ltac:(lia)
+                                  ltac:(lia) ltac:(lia))))
+                    HsbSb3 Hext2
                     with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                           Hdgeom Hdlock Hframe Hppid Hidev Hinum Hmeta
                           Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
@@ -3162,7 +3424,9 @@ Section WriteiMain.
     repeat rewrite add_vec_zero_l;
     first [ reflexivity | assumption ].
 
-  Lemma wp_writei_sconf 
+  (* THE CORE, in SET FORM (fs-icache.md section 18 clause 1).
+     [wp_writei_sconf] below is this with the set forgotten. *)
+  Lemma wp_writei_gen
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -3176,17 +3440,17 @@ Section WriteiMain.
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn dn0 : dinode)
       (user : bool) (off n : nat) (src_bytes : nat -> bv 8)
-      (V : pprivate) (ncount : nat)
+      (V : pprivate) (ncount : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
-    : wp_writei_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
-                           cov logstart inodestart nib bmapstart size dev used γpr
-                           ip inum bm data dn dn0
-                           user off n src_bytes V ncount
-                           pidv dq dqd dqn dqs dqb dqbs m K eb C b.
+    : wp_writei_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
+                         cov logstart inodestart nib bmapstart size dev used γpr
+                         ip inum bm data dn dn0
+                         user off n src_bytes V ncount Sb
+                         pidv dq dqd dqn dqs dqb dqbs m K eb C b.
   Proof.
-    cbv beta delta [wp_writei_sconf_body].
+    cbv beta delta [wp_writei_gen_body].
     intros pcE pj src ret_tgt HK Hcost Hgeom Hist Hicov Hilog Hnib Hadr Hdtnz
            Hwf Hhz Hcovin Hsum Hszdn Hgok Hprkc Hj Hgl Ha0 Ha1 Ha3 Ha4 Heb.
     (* the whole allocation side travels as ONE record from here down *)
@@ -3211,20 +3475,21 @@ Section WriteiMain.
        everything below carries the bundle at the fixed entry index.  Written
        once here rather than at every interior continuation. *)
     iAssert (wi_cont (CID0 := CID) γfs γi bn γ γf cov logstart inodestart nib dev
-               ip inum bm data dn dn0 user off n src_bytes V ncount pidv dq dqd
-               dqn dqs A j m K C b)%I with "[Hcont]" as "Hcont".
+               ip inum bm data dn dn0 user off n src_bytes V ncount Sb
+               pidv dq dqd dqn dqs A j m K C b)%I with "[Hcont]" as "Hcont".
     { rewrite /wi_cont. iEval (rewrite /wp_next).
       iIntros (CIDf) "%Hchain".
-      iIntros (mf tot bm2 data2 dn2 dn02 n2 wrote dist dstb P2)
-        "%C1 %C2 %C3 %C4 %C5 %C6 %Ccap %Csz %C7 %C8 %C8k %C9 %C10 %C11 %C12 %C13
+      iIntros (mf tot bm2 data2 dn2 dn02 n2 wrote dist dstb P2 SbF)
+        "%C1 %C2 %C3 %C4 %C5 %C6 %Ccap %Csz %C7 %C8 %C8k %C9 %C10 %C11 %C12 %Csb
+         %C13
          Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb
          Hba Hdn Hsrc Hsl Hop".
       iDestruct "Hba" as "(%Hgok2 & Hszc & Hbmsc & Hbmg)".
       iDestruct "Hbmg" as (uOut) "[%HuOut Hbmres]".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
-      iApply ("Hcont" $! mf tot bm2 data2 dn2 dn02 n2 wrote dist dstb P2 uOut
+      iApply ("Hcont" $! mf tot bm2 data2 dn2 dn02 n2 wrote dist dstb P2 uOut SbF
                 with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
-                      [%] [%]
+                      [%] [%] [%]
                       Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap
                       Hblocks Hsb Hszc Hbmsc Hbmres Hdn Hsrc Hsl Hop").
       { exact C1. } { exact HuOut. } { exact C2. } { exact C3. }
@@ -3232,6 +3497,7 @@ Section WriteiMain.
       { exact Ccap. } { exact Csz. } { exact C7. } { exact C8. }
       { exact C8k. }
       { exact C9. } { exact C10. } { exact C11. } { exact C12. }
+      { exact Csb. }
       { exact C13. } }
     iPoseProof (wri_00 with "Htext") as "Hi00".
     iPoseProof (wri_02 with "Htext") as "Hi02".
@@ -3339,9 +3605,11 @@ Section WriteiMain.
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       rewrite /wi_cont.
       iSpecialize ("Hcont" $! CIDx3 with "[%]"); [wp_next_chain|].
+      (* the -1 arm returns before anything is logged, so the op's set is
+         the one it came in with *)
       iApply ("Hcont" $! X1 0%nat bm data dn dn0 ncount
-                (fun _ => bv_0 8) 0%nat (fun _ => bv_0 8) (pv_upt V)
-                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hdn
+                (fun _ => bv_0 8) 0%nat (fun _ => bv_0 8) (pv_upt V) Sb
+                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hdn
                       [Hsrc] Hsl Hop").
       { unfold callee_saved. split_and!; lkp. }
       { exact Hwf. }
@@ -3361,6 +3629,8 @@ Section WriteiMain.
           [ lkp | left; exact Hsml | reflexivity | reflexivity | reflexivity
           | reflexivity | reflexivity | reflexivity | reflexivity ]. }
       { split; lia. }
+      { (* nothing was logged on the -1 arm: the set is the entry set *)
+        reflexivity. }
       { apply uptd_ext_refl. }
       { rewrite HVid. iExact "Hsrc". }
     }
@@ -3736,6 +4006,7 @@ Section WriteiMain.
                 dev
                 ip inum bm bm data data dn dn dn0 dn0 user off n 0%nat src_bytes
                 (fun _ => bv_0 8) 0%nat (fun _ => bv_0 8) V (pv_upt V) ncount ncount
+                Sb Sb
                 pidv dq dqd dqn dqs A j m Y1 K C b
                 HK HY1sp ltac:(lkp) ltac:(lkp) ltac:(lkp) ltac:(lkp) ltac:(lkp)
                 ltac:(lkp) Hwf Hhz Hadr Hszdn Hcovin
@@ -3750,7 +4021,7 @@ Section WriteiMain.
                       | right; rewrite wi_maxfile_val wi_bsize_val; lia
                       | reflexivity | reflexivity | reflexivity | reflexivity
                       | reflexivity | reflexivity | reflexivity ])
-                ltac:(lia) ltac:(lia) ltac:(apply uptd_ext_refl)
+                ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(apply uptd_ext_refl)
                 with "Hcg Hcnt Htext Hpc Hframe Hppid Hidev Hinum
                       Hmeta Hmap Hblocks Hsb Hba Hdn Hsrc Hsl Hop [Hcont]").
       iApply (wp_next_shift (CIDa := CID) (CIDb := CIDy3) ltac:(wp_next_chain)
@@ -3871,14 +4142,18 @@ Section WriteiMain.
       assert (Hdn0 : wi_dinode dn bm off 0%nat = dn).
       { rewrite /wi_dinode. case_decide as Hd; [exfalso; lia|].
         rewrite -Hadr. destruct dn; reflexivity. }
+      (* NOTE the non-monotonicity trap: [wi_cost_bmonly 0 0 = 2], where the
+         old [wi_cost 0 0] was 1.  The empty range still has a positive
+         budget premise, and it is the bitmap unit that the accounting holds
+         back on every path.  This arm needs only that [ncount <> 0]. *)
       destruct ncount as [| unc];
-        [exfalso; unfold wi_cost in Hcost; lia|].
+        [exfalso; unfold wi_cost_bmonly in Hcost; lia|].
       iDestruct (cpu_own_transport CID CIDz3 0 true (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply (wi_join (CID0 := CIDz3) γs j γl γu γd γk pd pav pu γfs γi bn γ γf
                 cov logstart inodestart nib dev ip inum bm bm data data dn dn dn0
                 user off 0%nat 0%nat src_bytes (fun _ => bv_0 8)
-                0%nat (fun _ => bv_0 8) V (pv_upt V) (S unc) unc
+                0%nat (fun _ => bv_0 8) V (pv_upt V) (S unc) unc Sb Sb
                 pidv dq dqd dqn dqs A m Z1 K C b
                 HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hadr Hwf Hhz Hszdn Hcovin
                 ltac:(lia) ltac:(intros Hc; exact Hc) Hj Hgl
@@ -3889,7 +4164,8 @@ Section WriteiMain.
                       rewrite decide_False; [reflexivity | lia])
                 ltac:(intros _ i Hi; exfalso; lia) ltac:(lia)
                 ltac:(symmetry; exact Hdn0)
-                ltac:(unfold wi_cost; lia) ltac:(lia) ltac:(apply uptd_ext_refl)
+                ltac:(unfold wi_cost_bmonly; lia) ltac:(lia) ltac:(reflexivity)
+                ltac:(apply uptd_ext_refl)
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hppid Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
@@ -4078,10 +4354,10 @@ Section WriteiMain.
                  with "Hcont") as "Hcont".
     iApply (wi_loop (CID0 := CIDp17) γs j γl γu γd γk pd pav pu γfs γi bn γ γf γa
               cov logstart inodestart nib dev ip inum bm data dn dn0 user off n
-              src_bytes V ncount (m !!! Regidx Ra1 : mword 64)
+              src_bytes V ncount Sb (m !!! Regidx Ra1 : mword 64)
               pidv dq dqd dqn dqs A m K C b
               HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hszdn Hofflt Hnlt Hrng Ha1 Hj Hgl
-              (wi_blocks off n) 0%nat bm data (fun _ => bv_0 8) (pv_upt V) ncount U3
+              (wi_blocks off n) 0%nat bm data (fun _ => bv_0 8) (pv_upt V) ncount Sb U3
               ltac:(lia) Hwf Hhz ltac:(intros Hc; exact Hc) Hcovin
               ltac:(apply (bm_covers_mono bm (bv_unsigned (di_size dn)) _ Hcovin);
                     rewrite Nat.add_0_r; exact Hbig)
@@ -4089,12 +4365,88 @@ Section WriteiMain.
               ltac:(intros _ i Hi; exfalso; lia) ltac:(apply uptd_ext_refl)
               ltac:(replace (off + 0)%nat with off by lia;
                     replace (n - 0)%nat with n by lia; lia)
-              ltac:(unfold wi_cost in Hcost; lia) ltac:(lia) ltac:(lia) ltac:(lia)
+              (* THE INVARIANT AT ENTRY, at the caller's OWN set: [wi_inv_enter]
+                 holds at ANY entry set, which is exactly why writei needs no
+                 credit parameter of its own. *)
+              (proj1 (wi_inv_enter (ba_bms A) ncount off n Sb Hcost))
+              ltac:(lia)
+              (proj2 (wi_inv_enter (ba_bms A) ncount off n Sb Hcost))
+              ltac:(lia) ltac:(reflexivity)
               HU3sp HU3s5 HU3s7 HU3s4 HU3s2 HU3s6 HU3s3 HU3s9 HU3s8 Hprkc
               with "Hcg Hcnt Htext Hpc Hpanic Hkdata Hprkenv Hbio Hlctx Hkenv
                     Hprocs
                     Hdevi Hdgeom Hdlock Hframe Hppid Hidev Hinum
                     Hmeta Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop Hcont").
+  Qed.
+
+  (* THE COUNTED SEAL, derived at the [log_op] existential's OWN WITNESS
+     (fs-icache.md section 18; ProofBmap's wp_bmap_sconf, same shape).
+     [log_op γ ncount] IS [∃ Sb, log_opS γ ncount Sb], so the counted form
+     destructs it, runs the core at whatever set was hiding there, and
+     forgets the grown set again via [log_opS_op].  Deriving at [Sb := ∅]
+     instead would force every counted caller to prove its set empty, which
+     is both false and unnecessary -- and here it would be pointless as well,
+     since [wi_inv_enter] holds at ANY entry set. *)
+  Lemma wp_writei_sconf
+      (γs : list gname) (j : nat) (γl : gname)
+      (γu : uart_names) (γd : disk_names) (γk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (γa : gname) (γf : gname)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (bmapstart : Z) (size : Z) (dev : mword 32)
+      (used : gset Z) (γpr : gname)
+      (ip : mword 64) (inum : mword 32)
+      (bm : blkmap) (data : nat -> list (bv 8))
+      (dn dn0 : dinode)
+      (user : bool) (off n : nat) (src_bytes : nat -> bv 8)
+      (V : pprivate) (ncount : nat)
+      (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool)
+    : wp_writei_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
+                           cov logstart inodestart nib bmapstart size dev used γpr
+                           ip inum bm data dn dn0
+                           user off n src_bytes V ncount
+                           pidv dq dqd dqn dqs dqb dqbs m K eb C b.
+  Proof.
+    cbv beta delta [wp_writei_sconf_body].
+    intros pcE pj src ret_tgt HK Hcost Hgeom Hist Hicov Hilog Hnib Hadr Hdtnz
+           Hwf Hhz Hcovin Hsum Hszdn Hgok Hprkc Hj Hgl Ha0 Ha1 Ha3 Ha4 Heb.
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hkdata #Hprkenv #Hbio #Hlctx #Hkenv
+              Hidev Hinum
+              Hmeta Hmap Hblocks Hsb Hszc Hbmsc Hbmres #Hireg Hdn Hsrc Hppid
+              #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
+    iDestruct "Hop" as (Sb0) "Hop".
+    iApply (wp_writei_gen γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
+              cov logstart inodestart nib bmapstart size dev used γpr
+              ip inum bm data dn dn0 user off n src_bytes V ncount Sb0
+              pidv dq dqd dqn dqs dqb dqbs m K eb C b
+              HK Hcost Hgeom Hist Hicov Hilog Hnib Hadr Hdtnz
+              Hwf Hhz Hcovin Hsum Hszdn Hgok Hprkc Hj Hgl Ha0 Ha1 Ha3 Ha4 Heb
+              with "Hcg Hcnt Htext Hpc Hpanic Hkdata Hprkenv Hbio Hlctx Hkenv
+                    Hidev Hinum
+                    Hmeta Hmap Hblocks Hsb Hszc Hbmsc Hbmres Hireg Hdn Hsrc Hppid
+                    Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont]").
+    iEval (rewrite /wp_next).
+    iIntros (CIDf) "%Hchain".
+    iIntros (mf tot bm' data' dn' dn0' n' wrote dist dstb P' used' Sb')
+      "%D1 %D2 %D3 %D4 %D5 %D6 %D7 %Dcap %Dsz %D8 %D9 %D9k %D10 %D11 %D12 %D13
+       %Dsb %D14
+       Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb
+       Hszc Hbmsc Hbmres Hdn Hsrc Hsl Hop".
+    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iApply ("Hcont" $! mf tot bm' data' dn' dn0' n' wrote dist dstb P' used'
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
+                    [%] [%]
+                    Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb
+                    Hszc Hbmsc Hbmres Hdn Hsrc Hsl [Hop]").
+    { exact D1. } { exact D2. } { exact D3. } { exact D4. } { exact D5. }
+    { exact D6. } { exact D7. } { exact Dcap. } { exact Dsz. } { exact D8. }
+    { exact D9. } { exact D9k. } { exact D10. } { exact D11. } { exact D12. }
+    { exact D13. } { exact D14. }
+    { iApply (log_opS_op with "Hop"). }
   Qed.
 
 End WriteiMain.

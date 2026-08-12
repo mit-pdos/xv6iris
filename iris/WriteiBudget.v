@@ -93,7 +93,7 @@ Require Import FsCrash.       (* BSIZE *)
 Require Import InodeInv.      (* NDIRECT, NINDIRECT, MAXFILE *)
 Require Import LogInv.        (* MAXOPBLOCKS, log_op, log_opS *)
 Require Import BitmapInv.     (* BPB, bitmap_geom_ok, BBLOCK *)
-Require Import SpecWritei.    (* wi_blocks, wi_cost *)
+Require Import SpecWritei.    (* wi_blocks, wi_cost, wi_cost_bmonly *)
 Require Import SpecBmap.      (* bmap_cost, bmap_need -- the link-2 contract *)
 
 Local Open Scope Z_scope.
@@ -698,7 +698,11 @@ Proof. destruct ad, ind; vm_compute; reflexivity. Qed.
    Recording this because "which absorptions must I model?" is exactly the
    question the S3i sizing got wrong in the other direction, and the answer
    is not "all of them". *)
-Definition wi_cost_bmonly (off n : nat) : nat := (2 * wi_blocks off n + 2)%nat.
+
+(* [wi_cost_bmonly] itself now lives in [SpecWritei], beside [wi_cost] whose
+   replacement it is: writei's PUBLIC contract is stated on it, and this
+   file REQUIRES SpecWritei, so the definition cannot sit here.  Everything
+   below is its arithmetic. *)
 
 Lemma wi_cost_bmonly_value : wi_cost_bmonly 1023 FW_MAX = 10%nat.
 Proof. vm_compute. reflexivity. Qed.
@@ -869,6 +873,85 @@ Proof.
   unfold wi_inv_spent, wi_cost_bmonly in *.
   pose proof (bm_pot_le1 bms SI). split; lia.
 Qed.
+
+(* ===================================================================== *)
+(*  THE ITERATION, AS THE LOOP ACTUALLY TAKES IT: bmap THEN log_write      *)
+(* ===================================================================== *)
+
+(* The two step lemmas above bound the WHOLE iteration -- bmap's arm-wise
+   spend plus writei's own [log_write] of the chunk.  Getting from one to
+   the other needs the fact that the log_write ABSORBS on exactly the arm
+   where it must, and that fact is not arithmetic: it is a property of the
+   block map.
+
+   THE PROBLEM ARM is [al = true, ind = true, crlw = false] -- bmap paid
+   for the bitmap AND an indirect write, and then writei paid again for its
+   own chunk: three units plus one, against the [2 + bm_pot] the accounting
+   allows.  It cannot arise.  On the indirect path, an allocating call
+   allocated the DATA block, so balloc's [bzero] already logged it and
+   writei's [log_write] is free.
+
+   WHY: [bmap_alloced] is [ai || ad].  If [ad] we are done.  If [ai] then
+   the indirect BLOCK was 0 on the way in, and [blkmap_wf]'s "no indirect
+   block => no entries" conjunct ([InodeInv.blkmap_wf_ind_nz], read
+   backwards) makes every indirect ENTRY 0 too -- so the data block was 0
+   on the way in, is nonzero on the way out (the success arm), and [ad]
+   holds after all. *)
+Lemma wi_ad_of_alloced (cov : gset Z) (logstart : Z) (bm bm' : blkmap)
+    (fbn : nat) :
+  blkmap_wf cov logstart bm ->
+  (fbn < MAXFILE)%nat ->
+  bv_unsigned (blkmap_get bm' fbn) <> 0 ->
+  bmap_ind fbn = true ->
+  bmap_alloced bm bm' fbn = true ->
+  bmap_ad bm bm' fbn = true.
+Proof.
+  intros Hwf Hlt Hnz Hind Hal.
+  unfold bmap_ad. apply bool_decide_eq_true. split; [| exact Hnz].
+  (* the entry was zero going in, because the indirect block was *)
+  destruct (decide (bv_unsigned (blkmap_get bm fbn) = 0)) as [Hz | Hnz0];
+    [exact Hz | exfalso].
+  (* ...otherwise [ad] is false, so [ai] must hold *)
+  assert (Had : bmap_ad bm bm' fbn = false).
+  { unfold bmap_ad. apply bool_decide_eq_false.
+    intros [Hc _]. exact (Hnz0 Hc). }
+  assert (Hai : bmap_ai bm bm' = true).
+  { unfold bmap_alloced in Hal. rewrite Had orb_false_r in Hal. exact Hal. }
+  (* and [ai] says the indirect block was absent, which forces the entry *)
+  apply bool_decide_eq_true in Hai. destruct Hai as [Hindz _].
+  unfold bmap_ind in Hind. apply bool_decide_eq_true in Hind.
+  exact (blkmap_wf_ind_nz cov logstart bm fbn Hwf Hind Hlt Hnz0 Hindz).
+Qed.
+
+(* THE ALLOCATING ITERATION's spend, bmap and log_write together.  [nB] is
+   the count between them and [nL] the count after; the [if crlw] is
+   log_write's own absorption ([SpecLogWrite]'s post returns [S u] on the
+   credited arm and [u] otherwise). *)
+Lemma wi_iter_alloc_bound (bms : Z) (nI nB nL : nat) (SI : gset Z)
+    (crlw al ind : bool) :
+  (nI <= nB + bmap_cost (bool_decide (bms ∈ SI)) al ind)%nat ->
+  (nB <= nL + (if crlw then 0 else 1))%nat ->
+  (al = true -> ind = true -> crlw = true) ->
+  (nI <= nL + 2 + bm_pot bms SI)%nat.
+Proof.
+  unfold bmap_cost, bm_pot.
+  destruct (decide (bms ∈ SI)) as [Hi | Hn].
+  - rewrite (bool_decide_eq_true_2 _ Hi).
+    destruct al, ind, crlw; cbn; intros H1 H2 H3; try lia;
+      specialize (H3 eq_refl eq_refl); discriminate.
+  - rewrite (bool_decide_eq_false_2 _ Hn).
+    destruct al, ind, crlw; cbn; intros H1 H2 H3; try lia;
+      specialize (H3 eq_refl eq_refl); discriminate.
+Qed.
+
+(* ...and the NON-allocating one, where bmap spent nothing at all and only
+   writei's own log_write can have cost a unit *)
+Lemma wi_iter_noalloc_bound (bms : Z) (nI nB nL : nat) (SI : gset Z)
+    (crlw ind : bool) :
+  (nI <= nB + bmap_cost (bool_decide (bms ∈ SI)) false ind)%nat ->
+  (nB <= nL + (if crlw then 0 else 1))%nat ->
+  (nI <= nL + 1)%nat.
+Proof. unfold bmap_cost. destruct crlw; cbn; lia. Qed.
 
 (* and the whole point, restated at the numbers: entering at MAXOPBLOCKS --
    what [begin_op] hands filewrite -- covers every chunk filewrite can ask

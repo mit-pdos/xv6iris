@@ -1512,6 +1512,174 @@ arithmetic is machine-checked; what remains is mechanical:
    EMPTY-RANGE ARM** — `wi_cost_bmonly 0 0 = 2` against `wi_cost 0 0 = 1`,
    so the non-monotonicity trap is live here exactly as recorded above.
 
+## S3m — LINKS 3+4 LANDED: writei's contract is `wi_cost_bmonly`, the whole
+## budget retrofit is CLOSED.  `ProofFilewrite` NOT STARTED
+
+### What landed
+
+**`SpecWritei.v` (+~250): `wi_cost_bmonly` moved up, and the SET form.**
+`wi_cost_bmonly off n = 2 * wi_blocks off n + 2` now lives beside `wi_cost`
+(the loose 6-per-block bound it replaces), because `WriteiBudget` *requires*
+`SpecWritei` and the public contract is stated on it.  The sconf body's two
+`wi_cost` occurrences — the premise and the spend-at-most postcondition —
+are swapped for it.  `wp_writei_gen_body` is the set form: `log_opS γ ncount
+Sb` in, `log_opS γ n' Sb'` out, plus `Sb ⊆ Sb'`.  The numbers that matter:
+
+```
+wi_cost        1023 FW_MAX = 25   (busts MAXOPBLOCKS = 10)
+wi_cost_bmonly 1023 FW_MAX = 10   (EXACTLY MAXOPBLOCKS, zero slack)
+wi_cost_bmonly (16*k) 16    =  4   (dirlink's call site; was 7)
+```
+
+**`ProofWritei.v` (+~490/-100): the loop carries the ledger invariant.**
+`wi_cont`, `wi_ret`, `wi_join`, `wi_size` and `wi_loop` all take the op's set
+as a parameter; `wi_loop`'s loop-carried state gains `SI` beside `nI`.  The
+five numeric premises became `wi_inv_bud` + `nI <= ncount` + `wi_inv_spent` +
+`W <= B` + `Sb ⊆ SI`.  The bmap call is `BM.wp_bmap_gen` at
+`cr := bool_decide (ba_bms A ∈ SI)`; both `log_write`s are
+`LW.wp_log_write_gen` at `cr := bool_decide (uint (blkmap_get bm2 fbn) ∈ Sb2)`.
+`wp_writei_gen` is the core and `wp_writei_sconf` is derived from it at the
+`log_op` existential's own witness — **its STATEMENT IS UNCHANGED** apart from
+the cost function, so no caller but dirlink moved.
+
+**`ProofDirlink.v` (+~36): one call site, and the empty-range audit.**
+`dl_wi_blocks k : wi_blocks (16*k) 16 = 1` is factored out of the old
+`dl_wi_cost`, and `dl_wi_cost_bmonly k = 4` is read off it.  `dirlink_units`
+**STAYS AT 7**: it is a constant that must dominate both writei's cost and
+iput's 3, nothing forwards writei's cost through dirlink's contract, and
+lowering it would ripple into every caller for no gain.  The spend
+postcondition now holds *a fortiori* (4 <= 7).
+
+**`WriteiBudget.v` (+~87): the two iteration bounds and the arm lemma.**
+`wi_iter_alloc_bound` / `wi_iter_noalloc_bound` compose bmap's arm-wise cost
+with log_write's absorption into exactly the hypotheses `wi_step_alloc` /
+`wi_step_noalloc` want; `wi_ad_of_alloced` is the block-map fact that makes
+the allocating arm affordable (see surprise 2).
+
+### SURPRISE 1 (and the one real shape change): iupdate had to go SET FORM
+
+`wp_writei_gen` promises `Sb ⊆ Sb'`, and **iupdate runs on every returning
+path of writei, including the `n = 0` one.**  Against iupdate's counted
+contract (`log_op γ (S u)` in, `log_op γ u` out) the set coming out is an
+unrelated existential, so monotonicity past the flush is simply unprovable.
+This is the one clause of §18's ruling that could not be met inside the four
+files S3j sized.
+
+The fix is small and strictly stronger than a bare existential: iupdate is
+straight-line and logs exactly one block, so its set growth is
+**DETERMINATE** —
+
+```coq
+log_opS γ (S u) Sb  -∗ … -∗  log_opS γ u (Sb ∪ {[IBLOCK inum inodestart]})
+```
+
+`SpecIupdate.v` gains `wp_iupdate_gen_body` + the `IUPDATE` parameter (+152,
+pure insertion — the sconf body is untouched); `ProofIupdate.v` threads the
+set through `iu_cont`/`iu_tail` and derives the counted seal (+95).  It
+compiled clean first try, because `ProofIupdate` was *already* destructing
+`log_op` to `log_opS` internally to reach `wp_log_write_au` — the retrofit
+only stopped it from throwing the set away again.  **The three consumers
+(Itrunc, Iput, Writei) take `IUPDATE` and did not move.**
+
+### SURPRISE 2: the allocating arm needs a BLOCK-MAP fact, not arithmetic
+
+`wi_step_alloc` allows `2 + bm_pot` for the whole iteration.  The arm
+`al = true, ind = true` costs bmap 3 (bitmap 2 uncredited + one indirect
+write), leaving **nothing** for writei's own `log_write` — so that arm only
+closes if the log_write ABSORBS, i.e. if bmap allocated the DATA block too.
+It always did, and the reason is `InodeInv.blkmap_wf_ind_nz` read backwards:
+`bmap_ai` says the indirect BLOCK was 0 on the way in, and `blkmap_wf`'s "no
+indirect block ⇒ no entries" conjunct then makes the indirect ENTRY 0 as
+well, so on the success arm `bmap_ad` holds.  That is `wi_ad_of_alloced`.
+
+The `ind = false` arm needs no absorption at all — bmap costs at most
+`1 + bm_pot` there, leaving exactly one unit for the log_write.  Both facts
+are packed into `wi_iter_alloc_bound`, whose one non-arithmetic hypothesis is
+`al = true -> ind = true -> crlw = true`.
+
+### SURPRISE 3: `destruct … eqn:` SUBSTITUTES, so the arm facts change shape
+
+`destruct (bmap_alloced bmI bm2 fbn) eqn:Hal` rewrites the scrutinee to the
+literal `true`/`false` **in every hypothesis**, so bmap's `Hbc5 : bmap_alloced
+… = true -> bmapstart ∈ Sb'` becomes `true = true -> …` and must be applied to
+`eq_refl`, NOT to `Hal` (whose statement keeps the original left-hand side).
+Likewise `wi_bmap_cost_le` must be named at the literal `true`, and the
+`rewrite Hal in Hbc1` that would have normalised the no-alloc arm is a no-op —
+use `assert (bmap_cost cr false ind = 0) by reflexivity` instead.
+
+### SURPRISE 4: `S W - 1` is NOT unified with `W`
+
+The two step lemmas conclude at `W - 1`; applied at `S W` that is `S W - 1`,
+which is *convertible* to `W` but which `refine`'s unifier does not reduce.
+Every use needs `pose proof … as H; replace (S W - 1)%nat with W in H by lia`
+rather than a direct `refine` against a goal stated at `W`.
+
+### SURPRISE 5: `destruct (bool_decide _)` silently does not fire
+
+`by (rewrite HnLdef; destruct (bool_decide _); lia)` fails with `lia`'s
+"Cannot find witness", because the wildcard leaves the `Decision` instance
+unresolved and nothing is destructed — `lia` then sees an opaque
+`if b then S uX else uX`.  **Use stdpp's `case_bool_decide`.**  The failure
+names `lia` and hides the real cause, which cost this stage a cycle.
+
+### TRAP CHECK: the empty-range arm, audited
+
+`wi_cost_bmonly 0 0 = 2` against `wi_cost 0 0 = 1`, so the new premise is
+STRICTLY HARDER on an empty range and no consumer may be waved through.
+
+- **writei's own `n = 0` path**: reached with the premise in hand; the arm
+  needs only `ncount <> 0`, and `unfold wi_cost_bmonly in Hcost; lia` gives it.
+- **dirlink**: has NO empty-range arm.  Its single writei call is at the
+  literal `n = 16` — one directory entry — on both the middle-slot and the
+  append arm, so `wi_blocks` is 1 and never 0.  The trap does not fire.
+
+### The set CEILING is still decorative, and writei does not offer one
+
+S3l's finding held: §18 clause 1's bound on `Sb' ∖ Sb` would have to name
+every data block the loop touched — a set-valued function of the loop-carried
+`blkmap`, exactly the shape S3l recommended against.  writei promises
+`Sb ⊆ Sb'` and nothing more.  Budget soundness is carried by the counter
+alone (`log_spend_step` already refuses to grow `Sb` without spending).
+iupdate, by contrast, gives its growth EXACTLY, because it is one block.
+
+### Gate (links 3+4)
+
+Mirror `full.sh` **`EXIT=0`, 1037 `.vo`, zero `Error`**, on top of `ff3c9d9f`
+(the same 1037 as link 2 — this stage adds no files).  `lemma_diff --ref HEAD`
+reports exactly three things, all justified: the two new `Parameter`s
+(`wp_writei_gen`, `wp_iupdate_gen`) are MODULE-TYPE OBLIGATIONS, supplied by
+`ProofWritei.wp_writei_gen` / `ProofIupdate.wp_iupdate_gen` under the
+`: WRITEI` / `: IUPDATE` ascriptions — not axioms; and the one `GONE`
+(`WriteiBudget.wi_cost_bmonly`) is the MOVE up into `SpecWritei` that S3l
+itself prescribed.  No `Admitted`, no new `Axiom`.
+
+**`Print Assumptions` NOT CAPTURED — the one gate item this stage owes.**
+The audit file (`Writei.wp_writei_sconf` / `wp_writei_gen`,
+`Dirlink.wp_dirlink_sconf`, `Iupdate.wp_iupdate_sconf` / `wp_iupdate_gen`,
+`Bmap.*`, `Balloc.wp_balloc_sconf`, `Readi.wp_readi_sconf`) was written and
+launched twice and did not finish inside the stage's window — the cost is
+loading the Link cone, not the printing.  It is a CONFIRMATORY check here
+rather than a load-bearing one: `full.sh` is green at `EXIT=0` / 1037 `.vo`
+/ zero `Error`, `lemma_diff` is clean, and the two new module parameters are
+discharged by the `: WRITEI` / `: IUPDATE` ascriptions, which is exactly what
+would make a new axiom impossible.  **Whoever picks up S3n should run it
+first** — the expectation is UNCHANGED from S3l for every listed name, since
+no proof in this stage introduces a hypothesis that is not discharged from an
+existing lemma.
+
+### NOT STARTED: `ProofFilewrite` + `LinkFilewrite`
+
+Untouched.  Everything S3g–S3l staged for it is intact, and link 3 has now
+removed the blocker: a four-block chunk costs `wi_cost_bmonly = 10 =
+MAXOPBLOCKS`, which is exactly what `begin_op` hands each iteration, so
+**every chunk filewrite can ask for is payable**.  Note for whoever picks it
+up: filewrite does NOT need `wp_writei_gen` — each iteration is its own
+begin_op/end_op, so the set resets per chunk and the COUNTED
+`wp_writei_sconf` at `ncount := MAXOPBLOCKS` suffices, with the premise
+discharged by `WriteiBudget.wi_cost_bmonly_fits`.  The gen form is for
+create's S5 op-wide set (§18 clause 1), and it is now real rather than
+aspirational.
+
 ## The stage ladder
 
 - **S1** (agent): the DECODE stage — 13 Code files (the 12 targets +

@@ -153,9 +153,11 @@ Notation Rs6 := (mword_of_int 22 : mword 5).
 (* FIT 2 -- sixteen bytes never straddle a block at a 16-aligned offset
    (1024 = 64*16), which is why [dirlink_units] is a CONSTANT rather than a
    function of the slot. *)
-Lemma dl_wi_cost (k : nat) : wi_cost (16 * k) 16 = 7%nat.
+(* the one fact both cost functions are read off: sixteen bytes at a
+   16-aligned offset straddle exactly ONE block *)
+Lemma dl_wi_blocks (k : nat) : wi_blocks (16 * k) 16 = 1%nat.
 Proof.
-  unfold wi_cost, wi_blocks.
+  unfold wi_blocks.
   assert (HB : BSIZE = 1024%nat) by reflexivity.
   rewrite HB.
   assert (Hm : ((16 * k) mod 1024)%nat = (16 * (k mod 64))%nat).
@@ -169,6 +171,29 @@ Proof.
   rewrite (Nat.div_small (16 * (k mod 64) + 15)%nat 1024 ltac:(lia)).
   reflexivity.
 Qed.
+
+Lemma dl_wi_cost (k : nat) : wi_cost (16 * k) 16 = 7%nat.
+Proof. unfold wi_cost. rewrite (dl_wi_blocks k). reflexivity. Qed.
+
+(* ...and the same fact against the cost writei's contract ACTUALLY charges
+   since the budget ruling (fs-icache.md section 18): 2 per straddled block,
+   plus one for the bitmap and one for iupdate.  FOUR, not seven.
+
+   [dirlink_units] STAYS AT SEVEN.  It is a constant that has to dominate
+   BOTH arms -- writei's and iput's three -- and nothing forwards writei's
+   cost through dirlink's contract, so lowering it would ripple into every
+   caller of dirlink for no gain.  The slack is real and unclaimed; S5's
+   create is the stage that will want it.
+
+   THE EMPTY-RANGE ARM, AUDITED (the non-monotonicity trap:
+   [wi_cost_bmonly 0 0 = 2] against [wi_cost 0 0 = 1], so the new premise is
+   STRICTLY HARDER there and a consumer cannot be waved through).  dirlink
+   HAS no empty-range arm: its single writei call is at the literal [n = 16]
+   -- the width of one directory entry -- on both the middle-slot and the
+   append arm, so [wi_blocks] is 1 and never 0.  The trap does not fire
+   here, and this comment is the check rather than an assumption. *)
+Lemma dl_wi_cost_bmonly (k : nat) : wi_cost_bmonly (16 * k) 16 = 4%nat.
+Proof. unfold wi_cost_bmonly. rewrite (dl_wi_blocks k). reflexivity. Qed.
 
 (* FIT 3 -- the free slot is at most [nrec], so the write is at
    [off <= size]: writei's OWN -1 arm is DEAD and the only failure dirlink
@@ -2022,8 +2047,8 @@ Section ProofDirlinkMain.
                   dl_dummyV ncount
                   pidv dq dqd dqf dqs dqb dqbs V6 (K - 10)%nat eb C b
                   ltac:(exact HKwi)
-                  ltac:(rewrite (dl_wi_cost k0); unfold dirlink_units in Hnc;
-                        exact Hnc)
+                  ltac:(rewrite (dl_wi_cost_bmonly k0);
+                        unfold dirlink_units in Hnc; lia)
                   Hlg Hist0 Hiblk Hiblog Hdinb Haddrs
                   ltac:(rewrite Htype; vm_compute; discriminate)
                   Hbmwf Hholes Hbmcov
@@ -2188,7 +2213,8 @@ Section ProofDirlinkMain.
                   "[%] Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi
                    Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] Hop [%]").
         { exact Hcsf. }
-        { rewrite (dl_wi_cost k0) in Hbud. unfold dirlink_units. exact Hbud. }
+        { rewrite (dl_wi_cost_bmonly k0) in Hbud. unfold dirlink_units.
+          destruct Hbud as [Hbud1 Hbud2]. split; lia. }
         { split; [exact Hnone |].
           split; [exact Hused |].
           split; [exact Hwf' |].
