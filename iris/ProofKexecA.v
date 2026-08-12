@@ -168,6 +168,7 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
+Require Import SleepLock.   (* [is_sleeplock]: the nightly dead-import sweep re-pointed the chain that used to carry it *)
 Require Import WpLock.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -194,6 +195,15 @@ Require Import KallocInv.
 Require Import KvmSpec.
 Require Import ProcInv.
 Require Import FileInvDefs.
+(* Names the nightly dead-import sweep stopped delivering transitively. *)
+Require Import DinodeEnc.
+Require Import DirView.
+Require Import InodeLock.
+Require Import SchedCtx.
+Require Import DiskInv.
+Require Import UserPtTree.
+Require Import ProcPtOwn.
+Require Import FileInv.
 Require Import SpecIput.
 Require Import SpecKexec.
 Require Import SpecMyproc.
