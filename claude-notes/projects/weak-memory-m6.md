@@ -664,13 +664,27 @@ the two field sweeps are mechanical M4-batch work.  The evidence and
 file:line map for every item is
 [`weak-memory-m6-w3-recon.md`](weak-memory-m6-w3-recon.md).
 
-- [ ] `wm_ak` message-class field: add to `wmsg` (`WeakMem.v:48`), thread
-      through `wwrite_msg`/`wwrite_post` (`WeakInterp.v:451,473`), the `Q`s
-      naming `wwrite_msg` (`WeakInstr.v:648/659/674/677`,
-      `WeakWord8.v:493-520`) and the six store leaves — the value at each
-      leaf is a constant already written in its effect trace.  The walker
-      CAS classifies `SCexcl` automatically (`ak_latest` on both halves).
-- [ ] `w_pub` watermark field — **SEMANTICS REVISED (2026-08-12, from
+- [x] **`wm_ak` LANDED (2026-08-12, the quiet-point batch, 39 files,
+      tree green, adequacy still on the 5 baseline axioms).**
+      `wm_class := WCplain | WCrel | WCexcl` on `wmsg`;
+      `wm_class_of ak ws` computes it at `wwrite_post`.  THREE landing
+      deltas to know: (1) `WeakAxiomatic.lbl` carries the class too —
+      its replay (`mnext`/`mstep_det`) makes the message a function of
+      the LABEL, so a state-computed class is inexpressible there; the
+      three projections supply the class their machine computed, which
+      keeps projected logs literally equal.  (2) `WeakLitmus` stamps
+      constant classes (state-sensitive classes would force an
+      existential through ~1500 lines of litmus invariants; comment at
+      `lstep` records it).  (3) `WeakInstr.wQ_store_w`'s log conjunct
+      is CLASS-EXISTENTIAL (`wQ_amo_aq_w` is defined through it and
+      the two classes differ); the class is still operationally fixed
+      by `wwrite_post`, which is where φ reads it.
+- [x] **`w_pub`/`w_relp` LANDED in the same batch** (store_post raises
+      w_pub at flag/rl stores and clears w_relp; fence pw∧sw sets it;
+      ws_le gained the w_pub conjunct, w_relp deliberately unordered;
+      WeakViewMono gained a sixth mono_nat for w_pub, w_relp none).
+      The original design record:
+      **SEMANTICS REVISED (2026-08-12, from
       the W2b design work; supersedes "raised by release fences")**.
       Two inert `wstate` fields: `w_relp : bool` (pending release — SET
       by a pw∧sw fence, CLEARED by the agent's next store) and
@@ -832,8 +846,11 @@ file:line map for every item is
       (ak_coh) reads are silent (dead for rv64d anyway).  Env note:
       `by etrans` fails under this stdpp/ssreflect combo — use
       `etrans; [exact H1|exact H2]`.
-- [ ] WeakMem/WeakPromise lemma lifts owed (ONE batch, when those files
-      are next touched — not while sibling `.vo`s are in flight).  Into
+- [x] **Lemma lifts DONE in the quiet-point batch (59 moves, all
+      justified by lemma_diff; `wp_astep`/`astep_ok` hoisting and
+      Primitive Projections deliberately skipped to bound risk).**
+      Original list (for the record): ONE batch, when those files
+      are next touched — not while sibling `.vo`s are in flight.  Into
       `WeakMem.v`: `load_post_run_coh`, `store_post_run_coh` (now used by
       TWO files — WeakAxiomatic and WeakPromiseBridge's `own_coh`),
       `store_post_run_vwOld`, `load_post_run_vrOld'`,
