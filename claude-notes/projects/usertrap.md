@@ -74,10 +74,35 @@ prologue (its first four steps are usertrap's +0x00..+0x06 with a frame two
 slots smaller); `stk_push_32` / `stk_frm` / `stk_fp_32` are already in
 `KernelRvcDecode.v` for exactly a 32-byte frame.
 
-Then `Module UsertrapProof … : USERTRAP` (a functor over SYSCALL, PRINTK_GEN,
+**SPLIT IT IN TWO AND THE FIRST HALF COMPILES BEFORE THE ARMS EXIST.**
++0x00..+0x2e depends on nothing but the boundary, so state it as `ut_entry`
+over the ALREADY-DESTRUCTED pieces — `N V av C` as parameters, `ut_trap` and
+`ut_env` as separate resources beside the boundary's raw cells, exactly as
+every other block lemma is stated — with ONE exit premise
+
+```coq
+    (∀ (M : regfile) (V' : pprivate),
+       ⌜M !!! Regidx csp_rs1 = pa_stk ksp 4⌝ -∗ ⌜M !!! Regidx Rs1 = un_pj N⌝ -∗
+       ⌜M !!! Regidx Ra0 = un_pj N⌝ -∗ ⌜ut_cs m M⌝ -∗ ⌜pv_upt V' = pv_upt V⌝ -∗
+       pc_is (mword_of_int (UT + 0x30)) -∗
+       sie_cap_gpr M (av - 4)%nat false (un_pj N) -∗
+       cpu_own 0%nat false (un_pj N) C false -∗ cpu_claim (un_pj N) -∗
+       ut_csrs_raw sepc_v sc_v stval_v -∗ ut_env Rsys N V' -∗
+       WP (Loop : expr riscv_lang)) -∗
+```
+
+and leave the dispatch (+0x30..+0x54: the scause read, the `== 8` branch, the
+`jal devintr` and its `c.bnez`, the two further scause reads and their `beq`s)
+as a second lemma that consumes it. The dispatch is the only part that needs
+`ProofUsertrapArms.v`, and it is where `devintr`'s contract goes — note it
+takes the scause CELL at a fraction and hands it back, which is why the raw
+set and not `trap_csrs` is what travels this far.
+
+`ut_res` is destructed exactly once, in the seal:
+`Module UsertrapProof … : USERTRAP` (a functor over SYSCALL, PRINTK_GEN,
 MYPROC, KILLED, SETKILLED, DEVINTR, VMFAULT, YIELD, PREPARE_RETURN, KEXIT and
-KERNELVEC), whose `usertrap_res := ut_res SY.syscall_env`, and
-`LinkUsertrap.v`.
+KERNELVEC), whose `usertrap_res := ut_res SY.syscall_env`. Its one non-obvious
+step is `UsertrapRes.wp_next_true_swap`, finding 4b. Then `LinkUsertrap.v`.
 
 Two process rules from the neighbours apply from the first line: put
 `Set Printing Depth 40.` at the top of every proof file (usertrap proves over
