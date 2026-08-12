@@ -23,16 +23,21 @@
         · [cls m = SCowned]        ↦ [wm_ak m = WCplain]
           (exactly [WeakRobustMain.cls_of]'s first arm),
         · [pub c (S p)]            ↦ [wpublished log (wm_tid m) p]
-          (§4 below bridges the two),
+          — SINCE THE PUBLICATION ALIGNMENT LANDED (L0(c), 2026-08-12)
+          THIS IS NO LONGER A TRANSLATION: [WeakRobustMain.pub_of] IS
+          [WeakMem.wpublished] at the configuration's log, the very
+          predicate [no_violation] is stated with,
         · [obs_flr c j a]          ↦ [coh (wsf c') a]
           ([obs_flr] IS the agent's [coh], [WeakRobust]'s header),
         · the agents [i]/[j]       ↦ [CPU]s.
-    THE DELIBERATE GAP is the agent quantifier: [no_violation] constrains
-    only messages whose [wm_tid] is a HART.  That is the surgery's Delta 2
-    ([wm_tid = None] — the DMA/boot agent — is exempted from the C/D/S
-    invariants and can never be published), and it is why Layer 1's [bad]
-    predicate must carry "the message's tid is a hart"; the design file's
-    DMA-tid unification (seam 1c/d) closes the gap from the other side.
+    THE ONE REMAINING GAP is the agent quantifier: [no_violation]
+    constrains only messages whose [wm_tid] is a HART.  That is the
+    surgery's Delta 2 (a non-hart author — the disk, [wm_tid = Some
+    WeakLang.n_disk] since the DMA-tid unification — is exempted from the
+    C/D/S invariants and can never be published), and it is why Layer 1's
+    [WeakRobustMain.bad] carries the matching [e1.1 < nh] conjunct,
+    instantiated at [WeakLang.n_disk] in [WeakCompose].  Both sides now
+    say "is a hart" ([WeakMem.tid_hart]); nothing is renamed at the seam.
 
     WHERE THE PREDICATE LIVES.  §§1–3 (the predicate, its induction algebra
     and the three C/D/S discharge arms) MOVED INTO [WeakGhost] when the
@@ -60,14 +65,22 @@ Local Open Scope Z_scope.
 (* ====================================================================== *)
 (** ** 4. THE [w_pub] BRIDGE — the machine fact the φ export owes Layer 1
 
-    [WeakGhost.wpublished] is a predicate of the LOG ("some later message of
-    the same agent is [WCrel]"), which is what let the C/D/S invariant keep
-    [wlat_interp]'s arity (φ-upgrade §1b, delta 1).  Layer 1's
-    [WeakRobustMain.pub_of] instead reads the AUTHOR's inert [w_pub]
-    watermark: [pub_of c (S p)] is [∃ …, pc_ags c !! i = Some ag ∧
-    (S p ≤ w_pub (pa_ws ag))%nat].  The two are tied by [wpub_covers]
-    below, which is exactly "the author's watermark has caught up with every
-    [WCrel] message of its own that the log contains".
+    HISTORICAL NOTE (2026-08-12): THIS BRIDGE IS NO LONGER ON THE φ-EXPORT
+    PATH.  [WeakMem.wpublished] is a predicate of the LOG ("some later
+    message of the same agent is [WCrel]"), which is what let the C/D/S
+    invariant keep [wlat_interp]'s arity (φ-upgrade §1b, delta 1); Layer 1's
+    [WeakRobustMain.pub_of] USED TO read the AUTHOR's inert [w_pub]
+    watermark instead ([∃ ag, pc_ags c !! i = Some ag ∧
+    (S p ≤ w_pub (pa_ws ag))%nat]), and the two had to be tied.  L0(c) of
+    the lift plan replaced [pub_of] with [wpublished] itself, so the export
+    no longer owes the tie and [wpub_covers] is no longer a wiring debt.
+
+    WHAT IS KEPT BELOW, and why: the bridge is still the honest statement of
+    the MACHINE fact that the log reading implies the watermark reading —
+    "the author's watermark has caught up with every [WCrel] message of its
+    own that the log contains" — and any future spec that wants to talk
+    about [w_pub] directly (a ported release site, say) needs exactly it.
+    Nothing in the tower consumes it today.
 
     WHY THAT IS THE HONEST PREMISE.  It is NOT a conjunct of any state
     interpretation today, so it cannot be assumed; and it is not derivable

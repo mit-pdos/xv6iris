@@ -62,9 +62,15 @@ Global Instance wm_class_eq_dec : EqDecision wm_class.
 Proof. solve_decision. Defined.
 
 (** One write event.  It covers the byte range [wm_pa, wm_pa + |wm_data|).
-    [wm_tid = None] is reserved for the DMA/boot-era agents.  [wm_ak] is the
-    inert class field above; it is LAST so that positional literals that
-    predate it fail loudly rather than silently permuting. *)
+    [wm_tid] names the AGENT that appended the message; every agent of the
+    composed machine — harts AND the disk — has an index, so [None] is now
+    only the never-used boot-era slot (the DMA-tid unification, seam 1a of
+    [claude-notes/projects/weak-memory-lift.md]: [WeakLang.wmsgs_of_map]
+    stamps [Some WeakLang.n_disk], matching the disk's index in
+    [WeakCompose.xv6_ps]).  Predicates that used to exempt [wm_tid = None]
+    are re-keyed on IS-A-HART ([tid_hart] below).  [wm_ak] is the inert class
+    field above; it is LAST so that positional literals that predate it fail
+    loudly rather than silently permuting. *)
 Record wmsg := WMsg {
   wm_pa   : Z;
   wm_data : list (bv 8);
@@ -82,6 +88,51 @@ Definition msg_byte (m : wmsg) (a : Z) : option (bv 8) :=
   if bool_decide (wm_pa m ≤ a)
   then wm_data m !! Z.to_nat (a - wm_pa m)
   else None.
+
+(* ------------------------------------------------------------------ *)
+(** ** The two tid-space notions both towers share
+
+    [tid_hart nh t] — "[t] is one of the first [nh] agents", i.e. A HART.
+    The DMA-tid unification (seam 1a) gives the disk an ordinary agent index
+    ([nh] itself), so "is a hart" — not "[wm_tid = None]" — is what every
+    ownership/publication invariant is keyed on.  The bound is a PARAMETER
+    here because [WeakMem] is deliberately stdpp-only and knows no [NCPU];
+    [WeakLang.tid_is_hart] and [WeakCompose] fix it at [RiscvLang.NCPU]. *)
+Definition tid_hart (nh : nat) (t : option agent) : Prop :=
+  ∃ i : agent, t = Some i ∧ (i < nh)%nat.
+
+Lemma tid_hart_ne_disk nh t : tid_hart nh t → t ≠ Some nh.
+Proof. intros (i & -> & Hlt) [= ->]. lia. Qed.
+
+Lemma tid_hart_none nh : ¬ tid_hart nh None.
+Proof. by intros (i & ? & _). Qed.
+
+(** *** PUBLICATION, PURELY OVER THE LOG (φ-upgrade §1b, delta 1).
+
+    [wpublished log tid p] — "position [p] has been published by agent
+    [tid]": a LATER message of the SAME agent is release-class.  Since
+    [WeakMem.store_post] raises the storing agent's [w_pub] to the store's
+    own timestamp whenever the store is release-class, and [w_pub] only ever
+    grows, this IMPLIES the watermark reading — and it is a predicate of the
+    LOG ALONE, which is what lets the Iris-side C/D/S invariant keep
+    [wlat_interp]'s arity AND what lets Layer 1 ([WeakRobustMain.pub_of])
+    spell publication without reaching into the agent vector.
+
+    IT LIVES HERE, not in [WeakGhost] or [WeakRobustMain], because BOTH
+    towers must mean the same thing by it: the φ export produces
+    [WeakGhost.no_violation] (stated with this predicate) and Layer 1
+    consumes [WeakRobust.violation cls_of pub_of] (also stated with it), and
+    the lift's whole job is to identify the two. *)
+Definition wpublished (log : list wmsg) (tid : option agent) (p : nat) : Prop :=
+  ∃ (q : nat) (mq : wmsg),
+    (p ≤ q)%nat ∧ log !! q = Some mq ∧ wm_tid mq = tid ∧ wm_ak mq = WCrel.
+
+Lemma wpublished_app log ms tid p :
+  wpublished log tid p → wpublished (log ++ ms) tid p.
+Proof.
+  intros (q & mq & Hle & Hq & Ht & Hk). exists q, mq. split_and!; try done.
+  rewrite lookup_app_l //. by eapply lookup_lt_Some.
+Qed.
 
 (** Memory is an era-initial image plus an append-only log.  Timestamp 0 is the
     image; timestamp [i+1] is log entry [i].  [log_byte img log t a] is the

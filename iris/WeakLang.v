@@ -337,13 +337,72 @@ Proof.
   - exists ∅. split; [apply WDiskStepIdle|by rewrite left_id_L].
 Qed.
 
+(** THE DISK'S AGENT INDEX (the DMA-tid unification, seam 1a of
+    [claude-notes/projects/weak-memory-lift.md]).  The composed wp machine
+    ([WeakCompose.xv6_ps]) lays the agents out as [n] harts at indices
+    [0 .. n-1] and the DISK at index [n]; with [n = NCPU] that index is
+    [NCPU], and [n_disk] is that number.  Making the disk an ORDINARY agent
+    here — rather than the old [wm_tid = None] "agent-less" slot — is what
+    erases the tid RENAMING from the WeakLang ↔ wp-machine correspondence
+    (old seam (1d) of [WeakCompose] §6): the two machines now stamp the same
+    tid on the same message. *)
+Definition n_disk : nat := NCPU.
+
+(** ... and the twin notion every ownership/publication invariant is keyed
+    on since: "the author is a HART".  [WeakMem.tid_hart] with the bound
+    fixed at [NCPU]; the [CPU]-shaped reading is [tid_is_hart_cpu] below,
+    which is the form [WeakGhost]'s C/D/S invariants use. *)
+Definition tid_is_hart (t : option agent) : Prop := tid_hart NCPU t.
+
+Lemma tid_is_hart_cpu (t : option agent) :
+  tid_is_hart t <-> exists c : CPU, t = Some (fin_to_nat c).
+Proof.
+  split.
+  - intros (i & -> & Hlt). exists (nat_to_fin Hlt). by rewrite fin_to_nat_to_fin.
+  - intros (c & ->). exists (fin_to_nat c). split; [reflexivity|apply fin_to_nat_lt].
+Qed.
+
+Lemma tid_is_hart_cpu_intro (c : CPU) : tid_is_hart (Some (fin_to_nat c)).
+Proof. apply tid_is_hart_cpu. by exists c. Qed.
+
+(** THE DISK IS NOT A HART — the one fact the exemptions rest on. *)
+Lemma n_disk_not_hart : ¬ tid_is_hart (Some n_disk).
+Proof.
+  rewrite /tid_is_hart /tid_hart /n_disk.
+  intros (i & Heq & Hlt). simplify_eq. lia.
+Qed.
+
 (** The DMA's write set as log messages: ONE message per byte, in
-    [map_to_list] order, tagged [None] — the disk agent (design doc: the tid
-    space is [option CPU], and [None] is the DMA/boot-era agent).  Per-byte
+    [map_to_list] order, tagged [Some n_disk] — the disk agent.  Per-byte
     rather than per-run because the write set is a map, not a contiguous
     range; the order is irrelevant since the bytes are pairwise distinct. *)
 Definition wmsgs_of_map (w : gmap Arch.pa (bv 8)) : list wmsg :=
-  (fun ab : Arch.pa * bv 8 => WMsg (pa_z ab.1) [ab.2] None WCplain) <$> map_to_list w.
+  (fun ab : Arch.pa * bv 8 => WMsg (pa_z ab.1) [ab.2] (Some n_disk) WCplain)
+    <$> map_to_list w.
+
+(** The two facts every consumer of a DMA append needs: the messages are the
+    DISK's (never a hart's) and they are plain (never a publication). *)
+Lemma wmsgs_of_map_tid w m : m ∈ wmsgs_of_map w -> wm_tid m = Some n_disk.
+Proof.
+  rewrite /wmsgs_of_map elem_of_list_fmap. by intros ([a b] & -> & _).
+Qed.
+
+Lemma wmsgs_of_map_not_hart w m : m ∈ wmsgs_of_map w -> ¬ tid_is_hart (wm_tid m).
+Proof.
+  intros Hm. rewrite (wmsgs_of_map_tid w m Hm). apply n_disk_not_hart.
+Qed.
+
+Lemma wmsgs_of_map_plain w m : m ∈ wmsgs_of_map w -> wm_ak m = WCplain.
+Proof.
+  rewrite /wmsgs_of_map elem_of_list_fmap. by intros ([a b] & -> & _).
+Qed.
+
+(** ... and the [log_ne] shape Layer 1's simulation needs: every DMA message
+    carries exactly one byte, so none is empty. *)
+Lemma wmsgs_of_map_data w m : m ∈ wmsgs_of_map w -> wm_data m ≠ [].
+Proof.
+  rewrite /wmsgs_of_map elem_of_list_fmap. intros ([a b] & -> & _). done.
+Qed.
 
 Lemma wmsgs_of_map_empty : wmsgs_of_map ∅ = [].
 Proof. rewrite /wmsgs_of_map map_to_list_empty //. Qed.

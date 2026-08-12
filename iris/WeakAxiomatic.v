@@ -98,8 +98,12 @@ Inductive lbl :=
     agent are the same kind of thing (decision D-M6-4: "devices = the simple
     disk agent, uniformly", one more agent of the same LTS).  Consequently
     every message this machine appends carries [wm_tid = Some i]; the
-    [wm_tid = None] slot [WeakMem] reserves for boot-era/DMA writes is used by
-    NO step here — such writes belong to the era-initial image instead. *)
+    [wm_tid = None] slot is used by NO step here — such writes belong to the
+    era-initial image instead.  SINCE THE DMA-TID UNIFICATION (seam 1a of
+    [claude-notes/projects/weak-memory-lift.md]) the operational machine
+    agrees: [WeakLang.wmsgs_of_map] stamps [Some WeakLang.n_disk], so
+    [wm_tid = None] is now unreachable on BOTH sides and the modelling
+    choice above costs nothing at the seam. *)
 Record estep := EStep { es_ag : agent; es_lb : lbl }.
 
 Record mstate := MSt {

@@ -373,28 +373,24 @@ Qed.
     [WeakStore]) is a separate, one-line fact that the φ export will use.
 
     SECOND DELTA: the DMA/boot agents.  [WeakLang.wmsgs_of_map] stamps the
-    disk's messages [wm_tid = None] and [wm_ak = WCplain], and no [WCrel]
-    message ever carries [wm_tid = None], so an agent-less [WCplain] message
-    can never be published.  Clean-purity therefore EXEMPTS [wm_tid = None]:
-    it constrains the messages of real agents, which is what φ's bad-edge
-    shape (a cross-hart read of an unpublished owned store) is about. *)
+    disk's messages [wm_tid = Some n_disk] and [wm_ak = WCplain] (the DMA-tid
+    unification, seam 1a — the disk is an ORDINARY agent, one index past the
+    harts), and the disk never issues a [WCrel] message, so a disk [WCplain]
+    message can never be published.  Clean-purity therefore EXEMPTS every
+    NON-HART author ([¬ tid_is_hart]): it constrains the messages of harts,
+    which is what φ's bad-edge shape (a cross-hart read of an unpublished
+    owned store) is about.  Layer 1's [WeakRobustMain.bad] carries the same
+    conjunct from the other side, so the two align syntactically. *)
 
 (** [p] writes byte [a] with an owned-store ([WCplain]) message [m]. *)
 Definition wplain_at (log : list wmsg) (a : Z) (p : nat) (m : wmsg) : Prop :=
   log !! p = Some m /\ is_Some (msg_byte m a) /\ wm_ak m = WCplain.
 
 (** [p] is PUBLISHED by agent [tid]: a later message of the same agent is a
-    release-class store, which raised that agent's [w_pub] past [p]. *)
-Definition wpublished (log : list wmsg) (tid : option agent) (p : nat) : Prop :=
-  exists (q : nat) (mq : wmsg),
-    (p <= q)%nat /\ log !! q = Some mq /\ wm_tid mq = tid /\ wm_ak mq = WCrel.
-
-Lemma wpublished_app log ms tid p :
-  wpublished log tid p -> wpublished (log ++ ms) tid p.
-Proof.
-  intros (q & mq & Hle & Hq & Ht & Hk). exists q, mq. split_and!; try done.
-  rewrite lookup_app_l //. by eapply lookup_lt_Some.
-Qed.
+    release-class store, which raised that agent's [w_pub] past [p].  THE
+    DEFINITION NOW LIVES IN [WeakMem] ([wpublished] / [wpublished_app]) so
+    that Layer 1's [WeakRobustMain.pub_of] is the very same predicate — the
+    publication-alignment item of the lift plan.  Nothing else changed. *)
 
 (** *** THE PUBLICATION FLOOR, PURELY (φ-upgrade §1.5, the framing pattern)
 
@@ -495,11 +491,11 @@ Qed.
 
 Definition wcds_clean (log : list wmsg) (a : Z) : Prop :=
   forall p m, wplain_at log a p m ->
-    wm_tid m = None \/ wpublished log (wm_tid m) p.
+    ¬ tid_is_hart (wm_tid m) \/ wpublished log (wm_tid m) p.
 
 Definition wcds_dirty (log : list wmsg) (a : Z) (c : CPU) : Prop :=
   forall p m, wplain_at log a p m ->
-    wm_tid m = None \/ wpublished log (wm_tid m) p \/
+    ¬ tid_is_hart (wm_tid m) \/ wpublished log (wm_tid m) p \/
     wm_tid m = Some (fin_to_nat c).
 
 Definition wcds_sync (log : list wmsg) (a : Z) : Prop :=
@@ -860,10 +856,13 @@ Proof.
            (Hbnd c0)).
 Qed.
 
-(** The DEVICE/DMA arm.  [WeakLang.wmsgs_of_map] stamps [wm_tid = None],
-    so a disk append adds no obligation at all, and no hart's floor moves:
-    the conjunct survives by [nv_hart_app] alone.  (The DMA messages are
-    [WCplain] but agent-less — the surgery's Delta 2.) *)
+(** The DEVICE/DMA arm.  [WeakLang.wmsgs_of_map] stamps [wm_tid = Some
+    n_disk], which is NOT a hart ([WeakLang.n_disk_not_hart]), so a disk
+    append adds no obligation at all and no hart's floor moves: the conjunct
+    survives by [nv_hart_app] alone.  (The DMA messages are [WCplain] but
+    the disk is not a hart — the surgery's Delta 2, re-keyed by the DMA-tid
+    unification.  The lemma itself never inspects [ms]: [nv_hart]'s message
+    quantifier is already restricted to hart authors.) *)
 Lemma no_violation_dma (log ms : list wmsg) (wsf : CPU -> wstate) :
   no_violation log wsf ->
   (forall c0 : CPU, ws_bounded (wsf c0) (length log)) ->
@@ -893,7 +892,7 @@ Lemma nv_byte_clean log c' a n : wcds_clean log a -> nv_byte log c' a n.
 Proof.
   intros Hcl p m c Hp Ht Hk Hnp Hs _.
   destruct (Hcl p m (conj Hp (conj Hs Hk))) as [Hn|Hpub].
-  - rewrite Ht in Hn. discriminate.
+  - destruct Hn. rewrite Ht. apply tid_is_hart_cpu_intro.
   - by destruct (Hnp Hpub).
 Qed.
 
@@ -901,7 +900,7 @@ Lemma nv_byte_dirty log c a n : wcds_dirty log a c -> nv_byte log c a n.
 Proof.
   intros Hdi p m c0 Hp Ht Hk Hnp Hs Hne.
   destruct (Hdi p m (conj Hp (conj Hs Hk))) as [Hn|[Hpub|Hc]].
-  - rewrite Ht in Hn. discriminate.
+  - destruct Hn. rewrite Ht. apply tid_is_hart_cpu_intro.
   - by destruct (Hnp Hpub).
   - exfalso. apply Hne. rewrite Ht in Hc. by simplify_eq.
 Qed.

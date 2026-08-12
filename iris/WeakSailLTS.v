@@ -9,7 +9,8 @@
 
     Three things are delivered:
 
-    (1) the LTS ([psail], [sail_step]) and its two Layer-1 side conditions —
+    (1) the LTS ([psail], [sail_step] — with the MMIO oracle [sp_dev] and
+        the INTERRUPT oracle [sp_irq]) and its two Layer-1 side conditions —
         LAT-FREEDOM ([sail_lat_free]) and TIMESTAMP-OBLIVIOUSNESS
         ([sail_ts_oblivious], [sail_ts_oblivious_rmw]);
     (2) the FUSED RMW arm, which is the fix point [WeakInterpProj.v]'s header
@@ -50,6 +51,44 @@
         order the run performs them, and CONSUMED EXACTLY (the bracket runs
         from [str ++ tail] to [tail]).
 
+    (b') THE INTERRUPT ORACLE ([sp_irq], [irq_deliver]; L0(b) of
+        [claude-notes/projects/weak-memory-lift.md], landed 2026-08-12).
+        [RiscvLang.plic_step] writes ANOTHER agent's register file
+        ([PlicStepWire] sets hart [c]'s [sig_seip] from [dev_seip]), which a
+        per-agent LTS whose only shared channel is the log cannot express at
+        all — the gap the lift plan names.  The fix is a SECOND per-agent
+        oracle stream, [sp_irq : istream], and one silent arm [irq_deliver]
+        that consumes an entry and installs it in [sig_seip].  So a
+        [plic_step] of the real machine maps to ONE [LSilent] pf step of the
+        hart it targets, and nothing else in this file changes.
+
+        WHY THE ARM WRITES THE REGISTER rather than the alternative shape
+        the plan floated (oracle-FED READS of the interrupt-pending CSRs,
+        with [sp_regs] not consulted there).  Two reasons, and the second is
+        decisive.  (1) The value type of a [RegRead] is [type_of_register r],
+        so an oracle-fed read arm needs a dependent match over the [register]
+        family just to give the stream a type — invasive, and it would have
+        to be mirrored in [silent1] (the fused-RMW window) as well.  (2) An
+        oracle-fed read lets [sp_regs] DRIFT from the interpreter's
+        [wm_regs], and [sail_instr_bracket] pins them equal at every
+        instruction boundary ([PSail None (wm_regs s) …]); the whole lift
+        rests on that equation.  Delivering into the register file keeps it,
+        and it is the more faithful reading anyway — [plic_step] IS a
+        register write.
+
+        SCOPE, honestly: (i) the designated register is [sig_seip], the
+        S-mode external pin [RiscvLang.plic_step] actually drives (the
+        M-mode [sig_meip] would be a second entry of the same shape, and is
+        not wired by [plic_step]); (ii) the arm is GATED by [sp_fence], so
+        no delivery separates the two halves of a [fence.tso] (delta (c));
+        (iii) [silent1] is unchanged, so no delivery happens inside a fused
+        AMO window — that window is register/choice code and an interrupt
+        arriving there is unobservable to the AMO.  A delivery is otherwise
+        admissible at ANY point, which over-approximates the real PLIC (it
+        only ever writes the current pin level); that is the safe direction
+        for the conclusion, and it strengthens the declared premise exactly
+        as the MMIO oracle already does — seam (4).
+
     (c) THE PENDING SECOND FENCE.  [WeakInterp.barrier_post] makes
         [fence.tso] TWO chained [fence_post]s, but a [wlabel] carries one
         fence.  [sail_step] emits the FIRST fence (r,r) AND TAKES THE
@@ -59,6 +98,8 @@
         fire — the outer match on [sp_fence] gates everything — so the two
         fences cannot be separated by another event of this agent.
         [fence.i] is [LSilent] ([barrier_post] is the identity on it).
+        (The interrupt arm of (b') is gated by the same outer match, so it
+        cannot fire between them either.)
 
     (d) COHERENT READS ARE A STUCK ARM, NOT A SILENT ONE.  A read with
         [ak_coh = true] (ifetch / page-table walk) would want [lat = true],
@@ -125,11 +166,18 @@ Local Open Scope Z_scope.
 (** One oracle entry: the little-endian bytes one device read returns. *)
 Definition dstream := list (list (bv 8)).
 
+(** THE INTERRUPT ORACLE (delta (b') below).  One entry is one delivery of an
+    external interrupt pin to this hart — the value [RiscvLang.plic_step]'s
+    [PlicStepWire] writes into the hart's [sig_seip].  Typed by the register
+    itself so that no [mword] spelling is duplicated here. *)
+Definition istream := list (type_of_register sig_seip).
+
 Record psail := PSail {
   sp_m     : option (M unit);
   sp_regs  : regstate;
   sp_dev   : dstream;
   sp_fence : option (bool * bool * bool * bool);
+  sp_irq   : istream;
 }.
 Add Printing Constructor psail.
 
@@ -211,19 +259,19 @@ Definition barrier_lbl (b : barrier_kind)
     opposite the [wrun] arm of the same outcome. *)
 
 Definition sail_mstep (m : M unit) (rs : regstate) (d : dstream)
-    (l : wlabel) (p' : psail) : Prop :=
+    (iq : istream) (l : wlabel) (p' : psail) : Prop :=
   match m with
   | Interface.Ret _ =>
       (* end of the instruction: back to the boundary *)
-      l = WeakPromise.LSilent ∧ p' = PSail None rs d None
+      l = WeakPromise.LSilent ∧ p' = PSail None rs d None iq
   | Interface.Next oc k =>
       (match oc in Interface.outcome _ T return (T → M unit) → Prop with
        | Interface.RegRead r _ => λ k,
            l = WeakPromise.LSilent ∧
-           p' = PSail (Some (k (register_lookup r rs))) rs d None
+           p' = PSail (Some (k (register_lookup r rs))) rs d None iq
        | Interface.RegWrite r _ v => λ k,
            l = WeakPromise.LSilent ∧
-           p' = PSail (Some (k tt)) (register_set r v rs) d None
+           p' = PSail (Some (k tt)) (register_set r v rs) d None iq
        | Interface.MemRead n req => λ k,
            if dev_addr (Interface.ReadReq.pa req)
            then
@@ -232,7 +280,7 @@ Definition sail_mstep (m : M unit) (rs : regstate) (d : dstream)
              ∃ (e : list (bv 8)) (d' : dstream) (w : bv (8 * n)),
                d = e :: d' ∧ length e = N.to_nat n ∧
                (∀ j : nat, (j < N.to_nat n)%nat → e !! j = Some (nth_byte w j)) ∧
-               p' = PSail (Some (k (inl (w, None)))) rs d' None
+               p' = PSail (Some (k (inl (w, None)))) rs d' None iq
            else
              ak_coh (classify (Interface.ReadReq.access_kind req)) = false ∧
              match l with
@@ -246,7 +294,7 @@ Definition sail_mstep (m : M unit) (rs : regstate) (d : dstream)
                  ∃ w : bv (8 * n),
                    (∀ j : nat, (j < N.to_nat n)%nat →
                       tvs.*2 !! j = Some (nth_byte w j)) ∧
-                   p' = PSail (Some (k (inl (w, None)))) rs d None
+                   p' = PSail (Some (k (inl (w, None)))) rs d None iq
              | WeakPromise.LRmw aq rl base tvs data =>
                  (* THE FUSED ARM: exclusive read, silent prefix, conditional
                     write — one label *)
@@ -259,13 +307,13 @@ Definition sail_mstep (m : M unit) (rs : regstate) (d : dstream)
                       tvs.*2 !! j = Some (nth_byte w j)) ∧
                    silent_run (k (inl (w, None)), rs) (m1, rs1) ∧
                    wr_node m1 rl base data m2 ∧
-                   p' = PSail (Some m2) rs1 d None
+                   p' = PSail (Some m2) rs1 d None iq
              | _ => False
              end
        | Interface.MemWrite n req => λ k,
            if dev_addr (Interface.WriteReq.pa req)
            then l = WeakPromise.LSilent ∧
-                p' = PSail (Some (k (inl None))) rs d None
+                p' = PSail (Some (k (inl None))) rs d None iq
            else
              l = WeakPromise.LStore
                    (ak_sync (classify (Interface.WriteReq.access_kind req)))
@@ -273,37 +321,55 @@ Definition sail_mstep (m : M unit) (rs : regstate) (d : dstream)
                    (wbytes n (Interface.WriteReq.value req)) ∧
              n ≠ 0%N ∧
              ak_latest (classify (Interface.WriteReq.access_kind req)) = false ∧
-             p' = PSail (Some (k (inl None))) rs d None
+             p' = PSail (Some (k (inl None))) rs d None iq
        | Interface.Barrier b => λ k,
            l = (barrier_lbl b).1 ∧
-           p' = PSail (Some (k tt)) rs d (barrier_lbl b).2
+           p' = PSail (Some (k tt)) rs d (barrier_lbl b).2 iq
        | Interface.InstrAnnounce _ => λ k,
-           l = WeakPromise.LSilent ∧ p' = PSail (Some (k tt)) rs d None
+           l = WeakPromise.LSilent ∧ p' = PSail (Some (k tt)) rs d None iq
        | Interface.BranchAnnounce _ _ => λ k,
-           l = WeakPromise.LSilent ∧ p' = PSail (Some (k tt)) rs d None
+           l = WeakPromise.LSilent ∧ p' = PSail (Some (k tt)) rs d None iq
        | Interface.CacheOp _ => λ k,
-           l = WeakPromise.LSilent ∧ p' = PSail (Some (k tt)) rs d None
+           l = WeakPromise.LSilent ∧ p' = PSail (Some (k tt)) rs d None iq
        | Interface.TlbOp _ => λ k,
-           l = WeakPromise.LSilent ∧ p' = PSail (Some (k tt)) rs d None
+           l = WeakPromise.LSilent ∧ p' = PSail (Some (k tt)) rs d None iq
        | Interface.TakeException _ => λ k,
-           l = WeakPromise.LSilent ∧ p' = PSail (Some (k tt)) rs d None
+           l = WeakPromise.LSilent ∧ p' = PSail (Some (k tt)) rs d None iq
        | Interface.ReturnException _ => λ k,
-           l = WeakPromise.LSilent ∧ p' = PSail (Some (k tt)) rs d None
+           l = WeakPromise.LSilent ∧ p' = PSail (Some (k tt)) rs d None iq
        | Interface.TranslationStart _ => λ k,
-           l = WeakPromise.LSilent ∧ p' = PSail (Some (k tt)) rs d None
+           l = WeakPromise.LSilent ∧ p' = PSail (Some (k tt)) rs d None iq
        | Interface.TranslationEnd _ => λ k,
-           l = WeakPromise.LSilent ∧ p' = PSail (Some (k tt)) rs d None
+           l = WeakPromise.LSilent ∧ p' = PSail (Some (k tt)) rs d None iq
        | Interface.CycleCount => λ k,
-           l = WeakPromise.LSilent ∧ p' = PSail (Some (k tt)) rs d None
+           l = WeakPromise.LSilent ∧ p' = PSail (Some (k tt)) rs d None iq
        | Interface.Message _ => λ k,
-           l = WeakPromise.LSilent ∧ p' = PSail (Some (k tt)) rs d None
+           l = WeakPromise.LSilent ∧ p' = PSail (Some (k tt)) rs d None iq
        | Interface.GetCycleCount => λ k,
-           l = WeakPromise.LSilent ∧ p' = PSail (Some (k 0%Z)) rs d None
+           l = WeakPromise.LSilent ∧ p' = PSail (Some (k 0%Z)) rs d None iq
        | Interface.Choose _ => λ k,
-           l = WeakPromise.LSilent ∧ ∃ c, p' = PSail (Some (k c)) rs d None
+           l = WeakPromise.LSilent ∧ ∃ c, p' = PSail (Some (k c)) rs d None iq
        | _ => λ _, False
        end) k
   end.
+
+(** THE INTERRUPT-DELIVERY ARM (delta (b')).  The environment — concretely
+    [RiscvLang.plic_step]'s [PlicStepWire], which writes ANOTHER agent's
+    register file — raises or lowers this hart's external-interrupt pin.  It
+    is SILENT (no memory event, no log, no [wstate] move) and consumes one
+    entry of the interrupt oracle [sp_irq].
+
+    Whether this arm has fired is invisible to every other arm: reads of the
+    pin go through the ordinary [RegRead] path, which is what keeps
+    [sp_regs] equal to the interpreter's [wm_regs] at every instruction
+    boundary — see delta (b') for why THAT, and not an oracle-fed CSR read,
+    is the right shape here. *)
+Definition irq_deliver (p : psail) (l : wlabel) (p' : psail) : Prop :=
+  l = WeakPromise.LSilent ∧
+  ∃ (v : type_of_register sig_seip) (iq : istream),
+    sp_irq p = v :: iq ∧
+    p' = PSail (sp_m p) (register_set sig_seip v (sp_regs p)) (sp_dev p)
+               (sp_fence p) iq.
 
 (** The LTS.  [next] is the instruction generator taken at a boundary —
     [RiscvLang.riscv_step] downstream (§6), kept a parameter so that the bulk
@@ -314,15 +380,17 @@ Definition sail_step (next : bool → M unit)
   | Some (pr, pw, sr, sw) =>
       (* the parked second fence of a [fence.tso]; nothing else may fire *)
       l = WeakPromise.LFence pr pw sr sw ∧
-      p' = PSail (sp_m p) (sp_regs p) (sp_dev p) None
+      p' = PSail (sp_m p) (sp_regs p) (sp_dev p) None (sp_irq p)
   | None =>
-      match sp_m p with
-      | None =>
-          l = WeakPromise.LSilent ∧
-          ∃ tick : bool,
-            p' = PSail (Some (next tick)) (sp_regs p) (sp_dev p) None
-      | Some m => sail_mstep m (sp_regs p) (sp_dev p) l p'
-      end
+      irq_deliver p l p'
+      ∨ match sp_m p with
+        | None =>
+            l = WeakPromise.LSilent ∧
+            ∃ tick : bool,
+              p' = PSail (Some (next tick)) (sp_regs p) (sp_dev p) None
+                     (sp_irq p)
+        | Some m => sail_mstep m (sp_regs p) (sp_dev p) (sp_irq p) l p'
+        end
   end.
 
 (* ====================================================================== *)
@@ -340,6 +408,7 @@ Theorem sail_lat_free next : lat_free_prog (sail_step next).
 Proof.
   intros p aq base tvs p' H. rewrite /sail_step in H.
   destruct (sp_fence p) as [[[[pr pw] sr] sw]|]; [by destruct H as [? _]|].
+  destruct H as [Hirq|H]; [by destruct Hirq as [? _]|].
   destruct (sp_m p) as [m|]; [|by destruct H as [? _]].
   destruct m as [y|T oc k]; [by destruct H as [? _]|].
   destruct oc; simpl in H;
@@ -367,6 +436,7 @@ Proof.
   have Hlen : length tvs = length tvs'.
   { by rewrite -(length_fmap snd tvs) -(length_fmap snd tvs') Heq. }
   destruct (sp_fence p) as [[[[pr pw] sr] sw]|]; [by destruct H as [? _]|].
+  destruct H as [Hirq|H]; [by destruct Hirq as [? _]|]. right.
   destruct (sp_m p) as [m|]; [|by destruct H as [? _]].
   destruct m as [y|T oc k]; [by destruct H as [? _]|].
   destruct oc; simpl in H |- *;
@@ -394,6 +464,7 @@ Proof.
   have Hlen : length tvs = length tvs'.
   { by rewrite -(length_fmap snd tvs) -(length_fmap snd tvs') Heq. }
   destruct (sp_fence p) as [[[[pr pw] sr] sw]|]; [by destruct H as [? _]|].
+  destruct H as [Hirq|H]; [by destruct Hirq as [? _]|]. right.
   destruct (sp_m p) as [m|]; [|by destruct H as [? _]].
   destruct m as [y|T oc k]; [by destruct H as [? _]|].
   destruct oc; simpl in H |- *;
@@ -665,13 +736,13 @@ Section bracket.
       sail_shaped m →
       wrun (Some i) m s x s' →
       ∃ str : dstream,
-        ∀ (tail : dstream) (prom : gset nat) ags,
-          ags !! i = Some (WPAgent (PSail (Some m) (wm_regs s) (str ++ tail) None)
+        ∀ (tail : dstream) (iq : istream) (prom : gset nat) ags,
+          ags !! i = Some (WPAgent (PSail (Some m) (wm_regs s) (str ++ tail) None iq)
                              (wm_ws s) prom) →
           rtc (wp_pf_run (sail_step next))
             (WPCfg (wimg s) (wm_log s) ags)
             (WPCfg (wimg s) (wm_log s')
-               (<[i := WPAgent (PSail (Some (Interface.Ret x)) (wm_regs s') tail None)
+               (<[i := WPAgent (PSail (Some (Interface.Ret x)) (wm_regs s') tail None iq)
                          (wm_ws s') prom]> ags)).
 
   Definition amo_bracket (pa : Arch.pa) (n : N) (m : M unit) : Prop :=
@@ -683,14 +754,14 @@ Section bracket.
         silent_run (m, wm_regs s) (m1, rs1) ∧
         wr_node m1 rl (pa_z pa) data m2 ∧
         length data = N.to_nat n ∧ data ≠ [] ∧
-        (∀ (tail : dstream) (prom : gset nat) ags,
-           ags !! i = Some (WPAgent (PSail (Some m2) rs1 (str ++ tail) None)
+        (∀ (tail : dstream) (iq : istream) (prom : gset nat) ags,
+           ags !! i = Some (WPAgent (PSail (Some m2) rs1 (str ++ tail) None iq)
                               (store_post_run (wm_ws s) rl (pa_z pa) (length data)
                                  (S (length (wm_log s)))) prom) →
            rtc (wp_pf_run (sail_step next))
              (WPCfg (wimg s) (wm_log s ++ [WMsg (pa_z pa) data (Some i) k]) ags)
              (WPCfg (wimg s) (wm_log s')
-                (<[i := WPAgent (PSail (Some (Interface.Ret x)) (wm_regs s') tail None)
+                (<[i := WPAgent (PSail (Some (Interface.Ret x)) (wm_regs s') tail None iq)
                           (wm_ws s') prom]> ags))).
 
   Local Ltac sbr_silent :=
@@ -698,9 +769,9 @@ Section bracket.
     | Hsh : ∀ _, sail_shaped _, Hrun : wrun _ _ _ _ _, IH : ∀ _, _ ∧ _ |- _ =>
         let str := fresh "str" in let Hch := fresh "Hch" in
         destruct (proj1 (IH _) _ _ _ (Hsh _) Hrun) as (str & Hch);
-        exists str; intros tail prom ags Hlk;
+        exists str; intros tail iq prom ags Hlk;
         eapply pf_silent;
-          [exact Hlk | by (rewrite /sail_step /=; split; reflexivity) |];
+          [exact Hlk | by (rewrite /sail_step /=; right; split; reflexivity) |];
         apply Hch; by apply (lookup_insert_i _ _ _ Hlk)
     end.
 
@@ -727,7 +798,7 @@ Section bracket.
   Proof.
     induction m as [y|T oc k IH].
     { split.
-      - intros s x s' _ [-> ->]. exists []. intros tail prom ags Hlk.
+      - intros s x s' _ [-> ->]. exists []. intros tail iq prom ags Hlk.
         rewrite (list_insert_id _ _ _ Hlk). apply rtc_refl.
       - intros pa n s x s' Hamo. destruct Hamo. }
     split.
@@ -742,9 +813,9 @@ Section bracket.
           destruct (dev_read (wm_dev s) (Interface.ReadReq.pa req) nn)
             as [[w d']|] eqn:Hdr; [|by exfalso; exact Hrun].
           destruct (proj1 (IH (inl (w, None))) _ _ _ (Hsh _) Hrun) as (str & Hch).
-          exists (wbytes nn w :: str). intros tail prom ags Hlk.
+          exists (wbytes nn w :: str). intros tail iq prom ags Hlk.
           eapply pf_silent; [exact Hlk| |].
-          + rewrite /sail_step /= Hd. split; [reflexivity|].
+          + rewrite /sail_step /= Hd. right. split; [reflexivity|].
             exists (wbytes nn w), (str ++ tail), w. split_and!.
             * reflexivity.
             * apply wbytes_length.
@@ -760,11 +831,11 @@ Section bracket.
             destruct (proj2 (IH (inl (w, None))) (Interface.ReadReq.pa req) nn
                         _ _ _ (Hsh w) Hrun)
               as (m1 & m2 & rs1 & rl & data & kc & str & Hsil & Hwr & Hlend & Hne & Hch).
-            exists str. intros tail prom ags Hlk.
+            exists str. intros tail iq prom ags Hlk.
             pose proof Hok as (Hlents & _).
             eapply pf_rmw.
             * exact Hlk.
-            * rewrite /sail_step /= Hd. split; [exact Hcoh|].
+            * rewrite /sail_step /= Hd. right. split; [exact Hcoh|].
               split_and!;
                 [exact Hlat|reflexivity|reflexivity
                 |exact (mk_tvs_length nn ts w Hlents)|exact Hlend|].
@@ -781,11 +852,11 @@ Section bracket.
           + (* a plain load *)
             destruct (proj1 (IH (inl (w, None))) _ _ _ (Hsh _) Hrun)
               as (str & Hch).
-            exists str. intros tail prom ags Hlk.
+            exists str. intros tail iq prom ags Hlk.
             pose proof Hok as (Hlents & _).
             eapply pf_load with (lat := false).
             * exact Hlk.
-            * rewrite /sail_step /= Hd. split; [exact Hcoh|].
+            * rewrite /sail_step /= Hd. right. split; [exact Hcoh|].
               split_and!;
                 [exact Hlat|reflexivity|reflexivity
                 |exact (mk_tvs_length nn ts w Hlents)|].
@@ -802,43 +873,45 @@ Section bracket.
                       (Interface.WriteReq.value req)) as [d'|] eqn:Hdw;
             [|by exfalso; exact Hrun].
           destruct (proj1 (IH (inl None)) _ _ _ (Hsh _) Hrun) as (str & Hch).
-          exists str. intros tail prom ags Hlk.
+          exists str. intros tail iq prom ags Hlk.
           eapply pf_silent; [exact Hlk| |].
-          + rewrite /sail_step /= Hd. split; reflexivity.
+          + rewrite /sail_step /= Hd. right. split; reflexivity.
           + apply Hch. by apply (lookup_insert_i _ _ _ Hlk).
         - destruct Hn as (Hn0 & Hnlat).
           destruct (proj1 (IH (inl None)) _ _ _ (Hsh _) Hrun) as (str & Hch).
-          exists str. intros tail prom ags Hlk.
+          exists str. intros tail iq prom ags Hlk.
           eapply pf_store.
           + exact Hlk.
-          + rewrite /sail_step /= Hd. split_and!; [reflexivity|exact Hn0|exact Hnlat|reflexivity].
+          + rewrite /sail_step /= Hd. right.
+            split_and!; [reflexivity|exact Hn0|exact Hnlat|reflexivity].
           + by apply wbytes_nonnil.
           + rewrite wbytes_length. apply Hch.
             by apply (lookup_insert_i _ _ _ Hlk). }
       { (* Barrier *)
         destruct (proj1 (IH tt) _ _ _ (Hsh _) Hrun) as (str & Hch).
-        exists str. intros tail prom ags Hlk. destruct bk.
+        exists str. intros tail iq prom ags Hlk. destruct bk.
         1-9: eapply pf_fence;
-               [exact Hlk | by (rewrite /sail_step /=; split; reflexivity) |];
+               [exact Hlk | by (rewrite /sail_step /=; right; split; reflexivity) |];
              apply Hch; by apply (lookup_insert_i _ _ _ Hlk).
         - (* fence.tso: two chained fences, the second parked *)
           eapply pf_fence;
-            [exact Hlk | by (rewrite /sail_step /=; split; reflexivity) |].
+            [exact Hlk | by (rewrite /sail_step /=; right; split; reflexivity) |].
           eapply pf_fence.
           + by apply (lookup_insert_i _ _ _ Hlk).
-          + rewrite /sail_step /=. split; reflexivity.
+          + (* the PARKED fence: [sp_fence] is set, so no irq arm here *)
+            rewrite /sail_step /=. split; reflexivity.
           + rewrite list_insert_insert. apply Hch.
             by apply (lookup_insert_i _ _ _ Hlk).
         - (* fence.i: no event *)
           eapply pf_silent;
-            [exact Hlk | by (rewrite /sail_step /=; split; reflexivity) |].
+            [exact Hlk | by (rewrite /sail_step /=; right; split; reflexivity) |].
           apply Hch. by apply (lookup_insert_i _ _ _ Hlk). }
       { (* Choose *)
         destruct Hrun as (c & Hrun).
         destruct (proj1 (IH c) _ _ _ (Hsh _) Hrun) as (str & Hch).
-        exists str. intros tail prom ags Hlk.
+        exists str. intros tail iq prom ags Hlk.
         eapply pf_silent; [exact Hlk| |].
-        - rewrite /sail_step /=. split; [reflexivity|]. by exists c.
+        - rewrite /sail_step /=. right. split; [reflexivity|]. by exists c.
         - apply Hch. by apply (lookup_insert_i _ _ _ Hlk). }
     - (* ---------------- amo_bracket ---------------- *)
       intros pa n s x s' Hsh Hrun.
@@ -877,13 +950,13 @@ Section bracket.
     sail_shaped m →
     wrun (Some i) m s x s' →
     ∃ str : dstream,
-      ∀ (tail : dstream) (prom : gset nat) ags,
-        ags !! i = Some (WPAgent (PSail (Some m) (wm_regs s) (str ++ tail) None)
+      ∀ (tail : dstream) (iq : istream) (prom : gset nat) ags,
+        ags !! i = Some (WPAgent (PSail (Some m) (wm_regs s) (str ++ tail) None iq)
                            (wm_ws s) prom) →
         rtc (wp_pf_run (sail_step next))
           (WPCfg (wimg s) (wm_log s) ags)
           (WPCfg (wimg s) (wm_log s')
-             (<[i := WPAgent (PSail (Some (Interface.Ret x)) (wm_regs s') tail None)
+             (<[i := WPAgent (PSail (Some (Interface.Ret x)) (wm_regs s') tail None iq)
                        (wm_ws s') prom]> ags)).
   Proof. apply (proj1 (sail_bracket_all m)). Qed.
 
@@ -931,27 +1004,28 @@ Section instr.
     sail_shaped (riscv_step tick) →
     wrun (Some i) (riscv_step tick) s x s' →
     ∃ str : dstream,
-      ∀ (tail : dstream) (prom : gset nat) (ags : list (wpagent psail)),
-        ags !! i = Some (WPAgent (PSail None (wm_regs s) (str ++ tail) None)
+      ∀ (tail : dstream) (iq : istream) (prom : gset nat)
+        (ags : list (wpagent psail)),
+        ags !! i = Some (WPAgent (PSail None (wm_regs s) (str ++ tail) None iq)
                            (wm_ws s) prom) →
         rtc (wp_pf_run (sail_step riscv_step))
           (WPCfg (wimg s) (wm_log s) ags)
           (WPCfg (wimg s) (wm_log s')
-             (<[i := WPAgent (PSail None (wm_regs s') tail None)
+             (<[i := WPAgent (PSail None (wm_regs s') tail None iq)
                        (wm_ws s') prom]> ags)).
   Proof.
     intros Hsh Hrun.
     destruct (wrun_sail_bracket riscv_step i (riscv_step tick) s x s' Hsh Hrun)
       as (str & Hch).
-    exists str. intros tail prom ags Hlk.
+    exists str. intros tail iq prom ags Hlk.
     have Hlt : (i < length ags)%nat by exact (lookup_lt_Some _ _ _ Hlk).
     eapply pf_silent.
     - exact Hlk.
-    - rewrite /sail_step /=. split; [reflexivity|]. by exists tick.
+    - rewrite /sail_step /=. right. split; [reflexivity|]. by exists tick.
     - eapply rtc_transitive.
       + apply Hch. apply list_lookup_insert. exact Hlt.
       + apply pf_silent_last; [by rewrite length_insert|].
-        rewrite /sail_step /=. split; reflexivity.
+        rewrite /sail_step /=. right. split; reflexivity.
   Qed.
 
 End instr.
@@ -964,17 +1038,17 @@ Corollary sail_instr_bracket_single (tick : bool) s x s' :
   sail_shaped (riscv_step tick) →
   wrun (Some 0%nat) (riscv_step tick) s x s' →
   ∃ str : dstream,
-    ∀ (tail : dstream) (prom : gset nat),
+    ∀ (tail : dstream) (iq : istream) (prom : gset nat),
       rtc (wp_pf_run (sail_step riscv_step))
         (WPCfg (wimg s) (wm_log s)
-           [WPAgent (PSail None (wm_regs s) (str ++ tail) None) (wm_ws s) prom])
+           [WPAgent (PSail None (wm_regs s) (str ++ tail) None iq) (wm_ws s) prom])
         (WPCfg (wimg s) (wm_log s')
-           [WPAgent (PSail None (wm_regs s') tail None) (wm_ws s') prom]).
+           [WPAgent (PSail None (wm_regs s') tail None iq) (wm_ws s') prom]).
 Proof.
   intros Hsh Hrun.
   destruct (sail_instr_bracket 0%nat tick s x s' Hsh Hrun) as (str & Hch).
-  exists str. intros tail prom.
-  apply (Hch tail prom
-           [WPAgent (PSail None (wm_regs s) (str ++ tail) None) (wm_ws s) prom]).
+  exists str. intros tail iq prom.
+  apply (Hch tail iq prom
+           [WPAgent (PSail None (wm_regs s) (str ++ tail) None iq) (wm_ws s) prom]).
   reflexivity.
 Qed.

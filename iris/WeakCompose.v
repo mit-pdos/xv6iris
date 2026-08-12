@@ -33,28 +33,38 @@
     ------------------------------------------------------------------------
     DESIGN DELTAS (deliberate; read before extending).
 
-    (i) THE DISK AGENT IS A SUPERSET, NOT A SIMULATION of [WeakLang.wdisk_step].
-        Its program state is [unit] and its LTS admits ANY [LStore false base
-        data] with [data ≠ []], or [LSilent].  The real DMA arm appends
-        [WeakLang.wmsgs_of_map w] — ONE single-byte message [WMsg (pa_z a) [b]
-        None WCplain] per byte of the write set — so every real DMA append is
-        an instance of this arm (at [base := pa_z a], [data := [b]]).  Taking
-        the superset is honest in BOTH directions, but they are not the same
-        direction: the CONCLUSION covers strictly more full-machine behaviors
-        (good), while the DECLARED PREMISE [m6_side_conditions] must hold of
-        those extra behaviors too (a genuine strengthening of the obligation).
-        Threading [DevModel.dev_state] and a [wdisk_step]-shaped constraint
-        would weaken both; it is the recorded upgrade path, and it is cheap —
-        it changes only [pxv6]'s second constructor and the two side-condition
-        proofs, never the theorem.
+    (i) THE DISK AGENT SIMULATES [WeakLang.wdisk_step] (THE SUPERSET IS
+        RETIRED — L0(d) of the lift plan, 2026-08-12).  Its program state is
+        [DevModel.dev_state] together with the RESIDUAL MESSAGE BURST of the
+        DMA step in flight, and its LTS has exactly two moving arms: a silent
+        BURST step, which takes one [WeakLang.wdisk_step] and loads
+        [WeakLang.wmsgs_of_map w] into the burst buffer, and an EMIT step,
+        which turns the head buffered message into its own
+        [LStore false (wm_pa m) (wm_data m)].  So ONE [WeakLang] disk arm is
+        [1 + |w|] steps here — the lift's disk arm maps 1:1 — and no store
+        the real DMA cannot make is admitted any more.  (Previously the arm
+        admitted ANY nonempty non-release store at any time, which was honest
+        but strengthened the declared premise [m6_side_conditions] over
+        behaviors the real disk has not got.)
 
-    (ii) THE TID DELTA.  [WeakLang] tags DMA messages [wm_tid = None] (the
-        boot/DMA agent), while [wp_pf_step]'s store arms tag [Some i] for the
-        stepping agent [i].  Making the disk an ORDINARY agent therefore
-        renames [None ↦ Some n_disk] on the log.  This is inert for everything
-        Layer 1 says (the classification [cls_of] reads [wm_ak], and [mem_of]
-        reads only [wm_base]/[wm_data]) but it is a real part of the WeakLang
-        ↔ wp-machine correspondence residue — seam (1).
+        THE ONE RESIDUE, and it is the M5 device-view seam (4), not a new
+        one: [wdisk_step] reads the FLAT MEMORY, which a [wpcfg] does not
+        carry (its memory is the log).  The burst arm therefore quantifies
+        the memory argument EXISTENTIALLY — "some flat memory would have
+        produced this write set".  Pinning it to [wflat (pc_img c)
+        (pc_log c)] needs the disk's own view, which is exactly what M5
+        adds.
+
+    (ii) THE TID DELTA IS GONE (L0(a) of the lift plan, 2026-08-12).
+        [WeakLang.wmsgs_of_map] now stamps [wm_tid = Some WeakLang.n_disk]
+        with [n_disk = NCPU], which is precisely the disk's index in
+        [xv6_ps] below (harts occupy [0 .. NCPU-1]), so the two machines
+        stamp the SAME tid on the same message and the old [None ↦ Some
+        n_disk] renaming of seam (1d) has no content left.  What the
+        unification buys downstream is that "the author is a hart" is a
+        uniform test on BOTH sides: [WeakGhost]'s C/D/S invariants exempt
+        every non-hart author, and [WeakRobustMain.bad] carries the matching
+        [e1.1 < nh] conjunct, instantiated here at [WeakLang.n_disk].
 
     (iii) THE FRAME IS AT THE PROGRAM-TYPE LEVEL, not at the agent-list level.
         [WeakSailLTS.sail_instr_bracket] is ALREADY stated over an arbitrary
@@ -97,6 +107,11 @@ From xv6iris Require Import WeakMem WeakPromise WeakPromiseFact WeakPromiseBridg
 From xv6iris Require Import WeakRobust WeakRobustTrace WeakRobustSim WeakRobustMain.
 From xv6iris Require Import WeakInterp WeakSailLTS.
 Require Import RiscvLang.
+(* L0(d): the disk arm is now [WeakLang.wdisk_step]-shaped, and L0(a) fixes
+   the DMA tid at [WeakLang.n_disk] — so this file DOES import [WeakLang]
+   for those two definitions.  It still does NOT build the [wprim_step] ⇔
+   [wp_pf_run] correspondence (seam (1)); [WeakAdequacy] stays out. *)
+Require Import WeakLang.
 
 Local Open Scope Z_scope.
 
@@ -111,29 +126,45 @@ Local Open Scope Z_scope.
 
 Inductive pxv6 :=
 | PHart (p : psail)
-| PDisk (d : unit).
+| PDisk (d : dev_state) (pend : list wmsg).
 
 (** The step relation.  The hart arm is [WeakSailLTS.sail_step] verbatim; the
-    disk arm is the SUPERSET of [WeakLang.wdisk_step]'s log effect described
-    in delta (i): any nonempty non-release store, or nothing.  An agent never
-    changes species, so mismatched constructors are stuck. *)
+    disk arm SIMULATES [WeakLang.wdisk_step] per delta (i) — a silent BURST
+    that advances the device fabric and buffers the DMA write set as the very
+    messages [WeakLang.wmsgs_of_map] would append, then one EMIT per buffered
+    message.  A stutter arm keeps the agent reducible with an empty log
+    effect (the [WDiskStepIdle] / not-live cases of [WeakLang]).  An agent
+    never changes species, so mismatched constructors are stuck.
+
+    THE MEMORY ARGUMENT IS EXISTENTIAL — see delta (i): a [wpcfg] has no flat
+    memory to feed [wdisk_step], and pinning it is M5's device-view work. *)
 Definition pstep_xv6 (next : bool → M unit)
     (p : pxv6) (l : wlabel) (p' : pxv6) : Prop :=
   match p, p' with
   | PHart q, PHart q' => sail_step next q l q'
-  | PDisk d, PDisk d' =>
-      d' = d ∧
-      (l = WeakPromise.LSilent ∨
-       ∃ (base : Z) (data : list (bv 8)),
-         l = WeakPromise.LStore false base data ∧ data ≠ [])
+  | PDisk d pend, PDisk d' pend' =>
+      (* silent: stutter, or one [wdisk_step] loading the burst buffer *)
+      (l = WeakPromise.LSilent ∧
+       ((d' = d ∧ pend' = pend) ∨
+        (pend = [] ∧ ∃ mem w, wdisk_step d mem d' w ∧
+                              pend' = wmsgs_of_map w)))
+      ∨
+      (* emit: the head buffered message becomes this agent's own store *)
+      (∃ (m : wmsg) (rest : list wmsg),
+         pend = m :: rest ∧ pend' = rest ∧ d' = d ∧
+         l = WeakPromise.LStore false (wm_pa m) (wm_data m))
   | _, _ => False
   end.
 
 (** The standard xv6 agent vector: [n] harts at indices [0 .. n-1], the disk
-    at index [n].  Keeping the harts at a prefix is what makes the framing of
-    §5 index-stable. *)
-Definition xv6_ps (hs : list psail) : list pxv6 :=
-  (PHart <$> hs) ++ [PDisk tt].
+    at index [n], starting from the device fabric [d0] with an empty burst
+    buffer.  Keeping the harts at a prefix is what makes the framing of §5
+    index-stable — AND, at [n = NCPU], what makes the disk's index equal
+    [WeakLang.n_disk], which is the tid [WeakLang.wmsgs_of_map] stamps
+    (delta (ii)) and the hart bound [m6_side_conditions] passes to
+    [main_premises]. *)
+Definition xv6_ps (d0 : dev_state) (hs : list psail) : list pxv6 :=
+  (PHart <$> hs) ++ [PDisk d0 []].
 
 (* ====================================================================== *)
 (** ** 2. The two Layer-1 side conditions
@@ -146,10 +177,10 @@ Definition xv6_ps (hs : list psail) : list pxv6 :=
 Theorem xv6_lat_free next : lat_free_prog (pstep_xv6 next).
 Proof.
   intros p aq base tvs p' H.
-  destruct p as [q|d], p' as [q'|d']; simpl in H;
+  destruct p as [q|d pend], p' as [q'|d' pend']; simpl in H;
     try (exfalso; exact H).
   - exact (sail_lat_free next _ _ _ _ _ H).
-  - destruct H as (_ & [Hc|(? & ? & Hc & _)]); discriminate.
+  - destruct H as [(Hc & _)|(? & ? & _ & _ & _ & Hc)]; discriminate.
 Qed.
 
 (** TIMESTAMP-OBLIVIOUSNESS — worklist finding (v): the pf witness steps the
@@ -161,15 +192,15 @@ Theorem xv6_ts_oblivious next : ts_oblivious (pstep_xv6 next).
 Proof.
   split.
   - intros p aq lat base tvs tvs' p' Heq H.
-    destruct p as [q|d], p' as [q'|d']; simpl in H |- *;
+    destruct p as [q|d pend], p' as [q'|d' pend']; simpl in H |- *;
       try (exfalso; exact H).
     + exact (sail_ts_oblivious next q aq lat base tvs tvs' q' Heq H).
-    + destruct H as (_ & [Hc|(? & ? & Hc & _)]); discriminate.
+    + destruct H as [(Hc & _)|(? & ? & _ & _ & _ & Hc)]; discriminate.
   - intros p aq rl base tvs tvs' data p' Heq H.
-    destruct p as [q|d], p' as [q'|d']; simpl in H |- *;
+    destruct p as [q|d pend], p' as [q'|d' pend']; simpl in H |- *;
       try (exfalso; exact H).
     + exact (sail_ts_oblivious_rmw next q aq rl base tvs tvs' data q' Heq H).
-    + destruct H as (_ & [Hc|(? & ? & Hc & _)]); discriminate.
+    + destruct H as [(Hc & _)|(? & ? & _ & _ & _ & Hc)]; discriminate.
 Qed.
 
 (* ====================================================================== *)
@@ -208,7 +239,7 @@ Definition m6_side_conditions (next : bool → M unit) (img : image)
      wp_behavior (pstep_xv6 next) img ps c →
      rtc (wp_promise_step (P := pxv6)) (wp_init img ps) mid →
      ptraces_of (pstep_xv6 next) TS mid c →
-     main_premises TS)
+     main_premises n_disk TS)
   ∧ pf_violation_free cls_of pub_of (pstep_xv6 next) img ps.
 
 (* ====================================================================== *)
@@ -232,7 +263,7 @@ Theorem xv6_weak_robust (next : bool → M unit) (img : image) (ps : list pxv6)
         prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
 Proof.
   intros [Hprem Hvf] Hbeh.
-  apply (robust_main (pstep_xv6 next) img ps c
+  apply (robust_main (pstep_xv6 next) n_disk img ps c
            (xv6_lat_free next) (xv6_ts_oblivious next) Hbeh
            (λ mid TS, Hprem c mid TS Hbeh) Hvf).
 Qed.
@@ -251,7 +282,7 @@ Corollary xv6_weak_robust_prefix (next : bool → M unit) (img : image)
     prog_of cf = prog_of cend ∧ (∀ a, mem_of cf a = mem_of cend a).
 Proof.
   intros [Hprem Hvf] Hc.
-  apply (robust_transport (pstep_xv6 next) img ps c
+  apply (robust_transport (pstep_xv6 next) n_disk img ps c
            (xv6_lat_free next) (xv6_ts_oblivious next) Hc Hprem Hvf).
 Qed.
 
@@ -353,10 +384,12 @@ Qed.
 (** The initial configuration of the xv6 agent vector IS the embedding of the
     harts' initial configuration with the disk framed — so the frame lemmas
     apply from [wp_init] onwards. *)
-Definition xv6_disk_agent : wpagent pxv6 := WPAgent (PDisk tt) ws_init ∅.
+Definition xv6_disk_agent (d0 : dev_state) : wpagent pxv6 :=
+  WPAgent (PDisk d0 []) ws_init ∅.
 
-Lemma wp_init_xv6 img hs :
-  wp_init img (xv6_ps hs) = lift_cfg [xv6_disk_agent] (wp_init (P := psail) img hs).
+Lemma wp_init_xv6 img d0 hs :
+  wp_init img (xv6_ps d0 hs)
+  = lift_cfg [xv6_disk_agent d0] (wp_init (P := psail) img hs).
 Proof.
   rewrite /xv6_ps /lift_cfg /wp_init /xv6_disk_agent.
   cbn [pc_img pc_log pc_ags]. f_equal.
@@ -374,26 +407,31 @@ Qed.
 
     [sail_shaped] is the caller's obligation (rv64d facts, seam (6)); [str] is
     the MMIO oracle prefix the instruction consumes, produced existentially by
-    the run and consumed exactly (delta (b) of [WeakSailLTS]). *)
+    the run and consumed exactly (delta (b) of [WeakSailLTS]).  [iq] is the
+    INTERRUPT ORACLE (delta (b') there), framed: one [wrun] instruction never
+    consumes an entry, because delivery is its own silent LTS arm — which is
+    exactly what makes [RiscvLang.plic_step]'s cross-hart register write
+    expressible in the per-agent LTS (L0(b) of the lift plan). *)
 Corollary xv6_pf_instr (i : agent) (tick : bool) (s : wmstate) (x : unit)
     (s' : wmstate) (dks : list (wpagent pxv6)) :
   sail_shaped (riscv_step tick) →
   wrun (Some i) (riscv_step tick) s x s' →
   ∃ str : dstream,
-    ∀ (tail : dstream) (prom : gset nat) (ags : list (wpagent psail)),
-      ags !! i = Some (WPAgent (PSail None (wm_regs s) (str ++ tail) None)
+    ∀ (tail : dstream) (iq : istream) (prom : gset nat)
+      (ags : list (wpagent psail)),
+      ags !! i = Some (WPAgent (PSail None (wm_regs s) (str ++ tail) None iq)
                          (wm_ws s) prom) →
       rtc (wp_pf_run (pstep_xv6 riscv_step))
         (WPCfg (wimg s) (wm_log s) ((lift_ag <$> ags) ++ dks))
         (WPCfg (wimg s) (wm_log s')
-           (<[i := WPAgent (PHart (PSail None (wm_regs s') tail None))
+           (<[i := WPAgent (PHart (PSail None (wm_regs s') tail None iq))
                      (wm_ws s') prom]> ((lift_ag <$> ags) ++ dks))).
 Proof.
   intros Hsh Hrun.
   destruct (sail_instr_bracket i tick s x s' Hsh Hrun) as (str & Hch).
-  exists str. intros tail prom ags Hlk.
+  exists str. intros tail iq prom ags Hlk.
   have Hlt : (i < length ags)%nat by exact (lookup_lt_Some _ _ _ Hlk).
-  have Hr := pf_run_frame riscv_step dks _ _ (Hch tail prom ags Hlk).
+  have Hr := pf_run_frame riscv_step dks _ _ (Hch tail iq prom ags Hlk).
   rewrite /lift_cfg in Hr. cbn [pc_img pc_log pc_ags] in Hr.
   rewrite (lift_ags_insert dks ags i _ Hlt) in Hr.
   exact Hr.
@@ -454,13 +492,21 @@ Qed.
            [wp_init].  M6 is stated per-era, which is the right scope (a
            reboot's fresh era has an empty log), but the per-era decomposition
            of a whole [erased_step] sequence is unstated.
-      (1d) THE TID RENAMING, delta (ii): DMA messages are [wm_tid = None] in
-           [WeakLang] and [Some n_disk] in the wp machine.  [mem_of] and
-           [cls_of] are blind to it; [WeakRobust.violation]'s "foreign agent"
-           test is not, and it is the correspondence's job to fix the disk's
-           index.
-    UPGRADE PATH: a [WeakComposeLang.v] carrying (1a)–(1d) as one induction.
-    Its cost is dominated by (1a); (1b)–(1d) are mechanical.
+      (1d) THE TID RENAMING — RESOLVED (L0(a), 2026-08-12), NOTHING IS
+           DECLARED HERE ANY MORE.  [WeakLang.wmsgs_of_map] stamps
+           [Some WeakLang.n_disk] with [n_disk = NCPU], which IS the disk's
+           index in [xv6_ps], so the two machines agree on every message's
+           [wm_tid] and no renaming happens at the seam.  What the
+           unification replaced it with is a UNIFORM "the author is a hart"
+           test on both sides: [WeakMem.tid_hart] / [WeakLang.tid_is_hart],
+           spent by [WeakGhost.wcds_clean]/[wcds_dirty] (which exempt
+           non-hart authors, because a device never publishes) and by
+           [WeakRobustMain.bad]'s [e1.1 < nh] conjunct (instantiated at
+           [n_disk] in [m6_side_conditions]).  Likewise the DISK ARM itself
+           is now a simulation rather than a superset (delta (i)), so (1b)'s
+           regrouping has a 1:1 disk case to work with.
+    UPGRADE PATH: a [WeakComposeLang.v] carrying (1a)–(1c) as one induction.
+    Its cost is dominated by (1a); (1b)–(1c) are mechanical.
 
     ------------------------------------------------------------------------
     (2) [pf_violation_free cls_of pub_of] — DECLARED (the second conjunct of
@@ -469,8 +515,13 @@ Qed.
     This is the Layer-2 premise: no promise-free run of the program reaches a
     configuration where some foreign agent's per-byte coherence floor has
     reached an owned ([wm_ak = WCplain]) message its author has not yet
-    published ([w_pub] below the message's timestamp).  It is the ONE place
-    φ/Iris remains load-bearing, and its use is sound as designed:
+    published.  PUBLICATION IS NOW THE LOG PREDICATE [WeakMem.wpublished]
+    (L0(c), 2026-08-12): [WeakRobustMain.pub_of] no longer reads the author's
+    [w_pub] watermark out of the agent vector, so this premise and the Iris
+    side's exported [WeakGhost.no_violation] are the SAME statement modulo
+    the hart quantifier — which is what the DMA-tid unification lines up.
+    It is the ONE place φ/Iris remains load-bearing, and its use is sound as
+    designed:
     [WeakRobustMain.bad_edge_violates] builds the violating configuration as a
     REAL [wp_pf_run] (the exhibit prefix is pf-real by construction), so the
     premise is applied only to configurations the Iris side actually covers.
