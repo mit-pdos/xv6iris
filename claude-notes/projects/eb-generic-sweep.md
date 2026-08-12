@@ -1,0 +1,173 @@
+# Project: the eb-generic sweep — making the sleep cone callable with interrupts OFF
+
+**Why.** `usertrap()` calls `kexit(-1)` on paths that have not run `intr_on()`
+— the first `killed(p)` check runs before it, and the second is reachable
+from the devintr and vmfault arms. `SpecKexit` carries `eb = true ->`, which
+at push_off level 0 forces `b = true` (`CpuOwn.cpu_own_eb_agree`), so the
+disabled-index instance of its contract is **vacuous** and usertrap cannot
+call it. The premise is inherited: it comes from `SpecSleep`, through
+`begin_op` / `iput` / `ilock` / `fileclose`, i.e. the whole FS cone.
+
+Closing that is this project. `sleep` is done; the crossing corrections the
+sweep turned up are done; the per-function generalization is not.
+
+## The restatement that makes a sleeper index-generic
+
+`SpecSleep` used to take `arm_pay 0 eb pj` plus `eb = true ->`. It now takes
+**`trap_csrs -∗ cpu_claim pj`**, index-free, in and out. At `eb = true` that
+is the SAME proposition (`IntrDefs.arm_pay_on` is a `reflexivity`), so no
+existing caller gains an obligation; at `eb = false` it is the honest one,
+the caller holding the pair because the TRAP handed it over. No `if` in the
+statement and no `eb` premise left.
+
+For a function that is push/pop-BALANCED (acquires at level 0 and releases
+before returning — bread, acquiresleep, and most of the cone) the right form
+is not the bare pair but the COMPLEMENT:
+
+```coq
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗          (* in, and again in the continuation *)
+```
+
+At `eb = true` both are `emp`, so **no existing call site changes at all**,
+and the function's own `acquire` mints the pay its interior sleep needs. At
+`eb = false` the acquire mints nothing and the pair can only come from the
+caller. `IntrDefs.arm_pay_ext_split` / `_join` move between the two
+spellings; split before the interior release, rejoin after the re-acquire,
+and the stretch between is written ONCE instead of under a `destruct eb`.
+
+Budget premises tighten the same way: `kv_frame_slots + 22 <= av` became
+`trap_res eb + 22 <= av`. The 78-slot trap reserve is owed only on the arm
+where the interior pop actually re-enables interrupts; making the
+disabled-index callers (the trap cone — the whole point) fund a reserve for
+a window that cannot take a trap would be a real cost carried all the way up.
+
+## A PARK'S CROSSING IS THE LITERAL `true`, NOT `b` — 23 contracts said `b`
+
+Landed. Every function in the FS cone that can sleep was spelling its
+crossing `wp_next b`: acquiresleep, ilock, bread, balloc, bfree, bmap,
+end_op, fileread, filestat, fsinit, ialloc, initlog, install_trans,
+ireclaim, itrunc, iupdate, namex, readi, write_head, writei, namei,
+nameiparent, dirlookup, dirlink.
+
+**It was not a soundness bug, and the reason is what hid it.** Each carries
+`eb = true ->`, so `b = true` and the two spellings COINCIDE at the only
+instance anyone can construct; the `b = false` instance has unsatisfiable
+premises, so the weak "you come back on your own hart" promise cannot be
+collected. It stops being vacuous the moment `eb = false` is reachable —
+which is exactly what this sweep does. **So the crossings move FIRST, ahead
+of the `eb` threading and independently of it.**
+
+What moves with a crossing, per proof file:
+
+- the local continuation bundles (`*_cont`, `*_exit`, the named block
+  continuations) — a proof-file `Definition` wrapping `wp_next`;
+- the `_cont_shift` guard that goes with such a bundle (`end_op`,
+  `install_trans` have one; `bread`'s is `bd_cont_shift`) — `wp_next_shift`
+  cannot see through a named `Definition`, which is why those exist;
+- `(b := true)` on every `wp_next_shift` that re-anchors a moved bundle:
+  inference used to read the index off the bundle and cannot once it says
+  `true`.
+
+**The discriminator for what moves is NOT syntactic**, and a blind sed gets
+it wrong in both directions — both mistakes were made and caught here:
+
+- `wp_next b p` inside a LEAF instruction rule (`wp_sllw_s_sconf`, which
+  lives in `ProofBfree.v`) is the caller's index and must stay `b`. A
+  function's continuation moves; an instruction's does not.
+- `(b := true)` pins must go only in files whose OWN continuation moved.
+  Pinning them in `uvmunmap` / `iunlock` / `namecmp` / `iunlockput`, whose
+  continuations are legitimately at `b`, breaks working proofs.
+  (`iunlockput` WILL need to move — it parks through `iput` — but not until
+  `iput` does.)
+
+## `Hb`: the scaffolding at the four `cpu_own_transport` sites
+
+`dirlookup`, `dirlink`, `namex` and `filestat` carry `cpu_own` across
+internal boundaries with `cpu_own_transport`, whose guard is `b`-indexed.
+From a `true`-indexed guard that is **underivable** — `b = false` tells you
+nothing about the hart — so moving their crossings breaks the transports.
+
+Since those four still carry `eb = true ->`, `b = true` is derivable inside
+them. Each derives it once and rewrites it into the transport guards only:
+
+```coq
+  iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
+  assert (Hb : b = true) by (rewrite -Hbm; exact Heb).
+  clear Hbm.
+  … ltac:(rewrite Hb; wp_next_chain) …     (* at the TRANSPORTS only *)
+```
+
+Two things about this:
+
+- **NOT `subst b`.** It erases a name a hundred later tactic arguments still
+  spell, and the failure surfaces far away ("The variable b was not found").
+  `ProofDirlookup` died at line 295 on exactly that.
+- **The rewrite belongs at the transports, not at the function's own
+  `Hcont` guard** — that one has already moved to `true` and has no `b`
+  left, where `rewrite Hb` fails with "does not match any subterm".
+
+When these four are generalized in their own right the derivation is exactly
+what goes, and the transports become honest at both indices. The comment at
+each site says so; do not mistake it for a fix.
+
+## `wp_next_chain` had a hole in the mixed-index case (fixed)
+
+The tactic that assembles a `wp_next_shift` obligation handled the mixed
+case — goal index and chain facts spelled differently — one hypothesis at a
+time, with the destruct INSIDE the loop. That is fine when one link needs
+it and wrong when every link does, which is what a `true` crossing over
+`eb`-indexed leaves produces: the chain comes out half-specialized and
+`congruence` fails with no indication of which link is missing. It reads as
+an unprovable goal rather than a tactic that gave up.
+
+Fixed by hoisting: try the old loop, and if it does not close, discriminate
+the goal's absurd left disjunct ONCE and re-inject the right one at every
+link. Branch one is verbatim the old tactic, so no existing call site can
+take a different path.
+
+**The lesson is the diagnostic, not the fix.** When `wp_next_chain` fails,
+print the guards rather than theorise — the probe that cracked both cases:
+
+```coq
+  assert (HPROBE : (true = false \/ pj = zero_reg -> (CIDn : CPU) = (CID0 : CPU))).
+  { intros Hd. destruct Hd as [Hbad | Hgood]; [discriminate Hbad |].
+    idtac "=== guards ===";
+    repeat match goal with
+           | H : ?T |- _ =>
+               lazymatch T with
+               | (_ = false \/ _ = _ -> _ = _) => idtac H " : " T; clear H
+               | _ => fail
+               end
+           end;
+    idtac "=== goal ==="; match goal with |- ?g => idtac g end; fail. }
+```
+
+It printed all eight of ilock's links present and derivable (⇒ tactic bug),
+and for dirlookup it showed the failing site was the `cpu_own_transport` on
+the line ABOVE the one the error pointed at (⇒ a real gap, fixed by `Hb`).
+
+## Where it stands
+
+LANDED ON MAIN: `sleep` index-free and re-proved; `acquiresleep`
+generalized; the `wp_next_chain` fix; the 23 crossings with all their
+per-file fallout; `IntrDefs.arm_pay_ext_split` / `_join`.
+
+REMAINING, in dependency order — for each: drop `eb = true ->`, add
+`trap_csrs_ext eb` / `cpu_claim_ext eb pj` to pre and post, thread them to
+the sleeping callee and back:
+
+    bread, bwrite, virtio_disk_rw
+      -> begin_op, end_op, install_trans, write_head
+      -> ilock, iupdate, itrunc, bmap, balloc, bfree, readi, writei
+      -> iput, iunlockput, fileclose
+      -> kexit
+
+Then `usertrap` itself: its contract is the assumed-but-stated
+`SpecUsertrap.v` boundary layer, the decode layer is `CodeUsertrap.v` (90
+instructions), and `SpecSyscall.v` / `LinkSyscall.v` state syscall's
+contract as ASSUMED with one abstract `syscall_env γf pj`. See
+[`uservec.md`](uservec.md).
+
+`prepare_return` is already index-generic (`WpIntrOff.v`), so usertrap's
+other blocker is gone.
