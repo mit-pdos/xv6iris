@@ -87,8 +87,20 @@ Import Defs.
    change to kexit's budget must not silently leave this one behind.  The
    others are all smaller and subsumed -- devintr 40, vmfault 38,
    printk-general 38, yield 20, killed/setkilled 14, prepare_return 12,
-   myproc 10, and kexit itself 74 (which syscall's 82 already covers). *)
-Definition K_usertrap : nat := (4 + K_syscall)%nat.
+   myproc 10, and kexit itself 74 (which syscall's 82 already covers).
+
+   AND [kv_frame_slots] ON TOP OF THAT, WHICH IS NOT AN OVERESTIMATE.  The
+   [csrsi sstatus,2] at +0x9e RE-ENABLES INTERRUPTS before the [jal syscall],
+   and an enabled arm's carve is [trap_res true + avail]
+   ([IntrDefs.sie_cap]) -- so the leaf that performs the flip
+   ([WpSconfCsr.wp_csrsi_sstatus_x0_enable_s_sconf]) is stated at pre index
+   [trap_res true + n] and post index [n].  In other words the 78 slots
+   kernelvec would need for a NESTED trap have to come out of usertrap's own
+   budget at that instruction, exactly as scheduler()'s single real
+   [intr_on] pays for them out of its.  Only the syscall arm needs it, but a
+   function has one budget.  The other four arms never re-enable, so they
+   fit in [4 + K_syscall] and nothing there notices. *)
+Definition K_usertrap : nat := (4 + kv_frame_slots + K_syscall)%nat.
 
 Section UsertrapRes.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -313,111 +325,144 @@ Section UsertrapRes.
   (* ------------------------------------------------------------------- *)
   (* THE FIVE CONES' ENVIRONMENTS.  usertrap hands these over and, except  *)
   (* on the kexit paths, takes them back; nothing here is read by usertrap *)
-  (* itself.  The parameter list is long for the reason SpecKexit.v's is,  *)
-  (* and every name is existentially closed one definition down.          *)
+  (* itself.                                                              *)
   (* ------------------------------------------------------------------- *)
   (* WHAT THE NAMES ARE SHARED BY -- this is the content of the union, and
      the reason it is one bundle rather than five:
-       [γu] (uart) is devintr's uartintr, printk-general's console, and
+       [un_u] (uart) is devintr's uartintr, printk-general's console, and
              kexit's [dev_inv];
-       [γv] (disk) and [γk] (the virtio lock) are devintr's disk interrupt
+       [un_v] (disk) and [un_k] (the virtio lock) are devintr's disk interrupt
              and kexit's begin_op/end_op cone;
-       [γs]  is the proc array, shared by killed / setkilled / yield /
+       [un_s]  is the proc array, shared by killed / setkilled / yield /
              devintr's tick_keeper / kexit;
-       [γkl]/[γka] are kexit's kalloc pieces AND vmfault's [kalloc_env];
-       [γf]  is the open-file table, shared by syscall and kexit.
+       [un_kl]/[un_ka] are kexit's kalloc pieces AND vmfault's [kalloc_env];
+       [un_f]  is the open-file table, shared by syscall and kexit.
      Getting those identifications right is what makes the bundle coherent;
-     five independently-named piles would be satisfiable by nobody. *)
-  Definition ut_env
-      (Rsys : gname -> mword 64 -> iProp Σ)
-      (γft γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γv : disk_names) (γk : gname)
-      (pd pav pu : mword 64)
-      (γtx γtk : gname)                                  (* tx lock, ticks *)
-      (γpr : gname)                                      (* the pr lock    *)
-      (bn : bio_names) (γ : log_names) (γfs : fs_names)
-      (cov : gset Z) (logstart : Z) (dev : mword 32)
-      (ip : mword 64) (dqi : dfrac)
-      (γkl : gname) (γka : gname * gname)
-      (γi : gname) (cn : ic_names) (γtl : gname)
-      (bmapstart inodestart : Z) (nib : nat) (size : Z)
-      (dqb dqs : dfrac) (us : gset Z)
-      (fn : fclose_names)
-      (ks : mword 64) (pid : mword 32) (V : pprivate) : iProp Σ :=
-    let pj := proc_addr j in
+     five independently-named piles would be satisfiable by nobody.
+
+     AND THEY ARE A RECORD, not a parameter list.  [SpecKexit.v] spells its
+     thirty-odd names out because it is ONE contract; usertrap's walk is six
+     block lemmas that each hand the whole pile to the next, and a
+     thirty-argument list restated a dozen times is where a wrong
+     identification hides.  [fclose_names] is the precedent -- and the
+     equation SpecKexit takes as a premise ([fn = MkFCloseNames ...]) becomes
+     the DEFINITION [un_fn] below, so the coherence cannot be got wrong
+     rather than merely being checked. *)
+  Record ut_names : Type := MkUtNames {
+    un_ft : gname;                    (* ftable.lock                        *)
+    un_f  : gname;                    (* the open-file table                *)
+    un_w  : gname;                    (* wait_lock                          *)
+    un_s  : list gname;               (* the proc array's per-slot locks     *)
+    un_j  : nat;                      (* the running process's slot          *)
+    un_l  : gname;
+    un_u  : uart_names;
+    un_v  : disk_names;
+    un_k  : gname;                    (* virtio_disk.lock                   *)
+    un_pd : mword 64;
+    un_pav : mword 64;
+    un_pu : mword 64;
+    un_tx : gname;                    (* the uart tx lock                   *)
+    un_tk : gname;                    (* the ticks lock                     *)
+    un_pr : gname;                    (* the pr lock (printk-general)        *)
+    un_bn : bio_names;
+    un_lg : log_names;
+    un_fs : fs_names;
+    un_cov : gset Z;
+    un_logstart : Z;
+    un_dev : mword 32;
+    un_ip  : mword 64;                (* the initproc pointer's value        *)
+    un_dqi : dfrac;
+    un_kl  : gname;                   (* kmem.lock                          *)
+    un_ka  : gname * gname;
+    un_i   : gname;                   (* the inode region's ghost            *)
+    un_cn  : ic_names;
+    un_tl  : gname;                   (* itable.lock                        *)
+    un_bmapstart : Z;
+    un_inodestart : Z;
+    un_nib : nat;
+    un_size : Z;
+    un_dqb : dfrac;
+    un_dqs : dfrac;
+    un_us  : gset Z;
+    un_ks  : mword 64;                (* the kernel stack's BASE             *)
+    un_pid : mword 32;
+  }.
+
+  (* the running process's [struct proc] address, and the fileclose
+     environment index -- DERIVED, see the note above. *)
+  Definition un_pj (N : ut_names) : mword 64 := proc_addr (un_j N).
+
+  Definition un_fn (N : ut_names) : fclose_names :=
+    MkFCloseNames (un_s N) (un_j N) (un_l N) (un_kl N) (un_ka N)
+      (un_u N) (un_v N) (un_k N) (un_pd N) (un_pav N) (un_pu N)
+      (un_bn N) (un_lg N) (un_fs N) (un_cov N) (un_logstart N) (un_dev N)
+      (un_pid N) (DfracOwn (1/4))
+      (un_i N) (un_cn N) (un_tl N) (un_bmapstart N) (un_inodestart N)
+      (un_nib N) (un_size N) (un_dqb N) (un_dqs N).
+
+  (* the pure side conditions every callee below usertrap shares.  Bundled
+     for the same reason the names are: each block lemma needs all four and
+     none of them is about the block. *)
+  Definition ut_wf (N : ut_names) : Prop :=
+    (un_j N < NPROC)%nat /\
+    un_s N !! un_j N = Some (un_l N) /\
+    length (un_s N) = NPROC /\
+    log_geom_ok (un_cov N) (un_logstart N).
+
+  Definition ut_env (Rsys : gname -> mword 64 -> iProp Σ)
+      (N : ut_names) (V : pprivate) : iProp Σ :=
     (* ---- persistent, so free to carry ---- *)
-    (procs_inv γs ∗
+    (procs_inv (un_s N) ∗
      panic_wp_any ∗
      kernel_data ∗
-     is_kstack pj ks ∗
-     devintr_caps γu γv γtx γk γtk γs pd pav pu ∗
-     printk_env γpr γu γv ∗
-     is_lock γw wait_lock_addr "wait_lock"%string wait_res ∗
-     is_ftable γft γf ∗
-     is_lock γkl (mword_of_int KernelSyms.kmem) "kmem"%string
-       (kmem_res γka (mword_of_int (KernelSyms.kmem + 24))) ∗
-     is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) ∗
-     bio_ctx bn (fs_view γfs γv dev cov) ∗
-     log_ctx γ bn γfs cov logstart dev ∗
-     fs_crash_seam cov logstart ∗
+     is_kstack (un_pj N) (un_ks N) ∗
+     devintr_caps (un_u N) (un_v N) (un_tx N) (un_k N) (un_tk N) (un_s N)
+       (un_pd N) (un_pav N) (un_pu N) ∗
+     printk_env (un_pr N) (un_u N) (un_v N) ∗
+     is_lock (un_w N) wait_lock_addr "wait_lock"%string wait_res ∗
+     is_ftable (un_ft N) (un_f N) ∗
+     is_lock (un_kl N) (mword_of_int KernelSyms.kmem) "kmem"%string
+       (kmem_res (un_ka N) (mword_of_int (KernelSyms.kmem + 24))) ∗
+     is_lock (un_k N) d_lock "virtio_disk"%string
+       (disk_res (un_v N) (un_pd N) (un_pav N) (un_pu N)) ∗
+     bio_ctx (un_bn N) (fs_view (un_fs N) (un_v N) (un_dev N) (un_cov N)) ∗
+     log_ctx (un_lg N) (un_bn N) (un_fs N) (un_cov N) (un_logstart N) (un_dev N) ∗
+     fs_crash_seam (un_cov N) (un_logstart N) ∗
      gen_cert ∗
-     dev_inv γu γv ∗
-     disk_geom γv pd pav pu ∗
+     dev_inv (un_u N) (un_v N) ∗
+     disk_geom (un_v N) (un_pd N) (un_pav N) (un_pu N) ∗
      (* ---- exclusive ---- *)
-     kalloc_avail γka None ∗
-     bslots bn 3 ∗
-     fileclose_ic_env fn ∗
-     fileclose_bm fn us ∗
-     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip ∗
+     kalloc_avail (un_ka N) None ∗
+     bslots (un_bn N) 3 ∗
+     fileclose_ic_env (un_fn N) ∗
+     fileclose_bm (un_fn N) (un_us N) ∗
+     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{un_dqi N} (un_ip N) ∗
      fd_slots FDSPARE ∗
      iref_slots IREFSPARE ∗
      (* THE PROCESS BLOCK.  The one owner of the user page table and of the
         trapframe page (at the VA tier) -- which is why SpecUsertrap.v's
         boundary hands over neither. *)
-     proc_priv γf pj pid V ∗
+     proc_priv (un_f N) (un_pj N) (un_pid N) V ∗
      (* everything the twenty-two syscall table entries consume, abstractly *)
-     Rsys γf pj)%I.
+     Rsys (un_f N) (un_pj N))%I.
 
   (* ------------------------------------------------------------------- *)
   (* [usertrap_res] itself.                                              *)
   (* ------------------------------------------------------------------- *)
   Definition ut_res (Rsys : gname -> mword 64 -> iProp Σ)
       (pt : uptd) (ksp : mword 64) : iProp Σ :=
-    (∃ (γft γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
-       (γu : uart_names) (γv : disk_names) (γk : gname)
-       (pd pav pu : mword 64) (γtx γtk γpr : gname)
-       (bn : bio_names) (γ : log_names) (γfs : fs_names)
-       (cov : gset Z) (logstart : Z) (dev : mword 32)
-       (ip : mword 64) (dqi : dfrac)
-       (γkl : gname) (γka : gname * gname)
-       (γi : gname) (cn : ic_names) (γtl : gname)
-       (bmapstart inodestart : Z) (nib : nat) (size : Z)
-       (dqb dqs : dfrac) (us : gset Z) (fn : fclose_names)
-       (ks : mword 64) (pid : mword 32) (V : pprivate) (av : nat) (C : iProp Σ),
+    (∃ (N : ut_names) (V : pprivate) (av : nat) (C : iProp Σ),
        (* THE PROCESS RUNNING IS THE ONE WHOSE TABLE THE TRAMPOLINE PARKED.
           This equation is the whole reason R is keyed on [pt]: it is what
           lets userret install [MAKE_SATP(p->pagetable)] and know it is the
           table uservec came out of. *)
        ⌜ pv_upt V = pt ⌝ ∗
        (* ...and the stack the trapframe's kernel_sp word named *)
-       ⌜ add_vec ks (mword_of_int 4096) = ksp ⌝ ∗
-       ⌜ (j < NPROC)%nat ⌝ ∗
-       ⌜ γs !! j = Some γl ⌝ ∗
-       ⌜ length γs = NPROC ⌝ ∗
+       ⌜ add_vec (un_ks N) (mword_of_int 4096) = ksp ⌝ ∗
+       ⌜ ut_wf N ⌝ ∗
        ⌜ (K_usertrap <= av)%nat ⌝ ∗
-       ⌜ log_geom_ok cov logstart ⌝ ∗
-       (* fileclose's environment index is not a degree of freedom: it is
-          kexit's own ghosts, bundled the way fileclose wants them.  One
-          equation rather than fifteen coherence conjuncts, exactly as
-          SpecKexit.v takes it. *)
-       ⌜ fn = MkFCloseNames γs j γl γkl γka γu γv γk pd pav pu bn γ γfs
-                cov logstart dev pid (DfracOwn (1/4))
-                γi cn γtl bmapstart inodestart nib size dqb dqs ⌝ ∗
-       ut_trap (proc_addr j) ksp av C ∗
-       ut_env Rsys γft γf γw γs j γl γu γv γk pd pav pu γtx γtk γpr
-              bn γ γfs cov logstart dev ip dqi γkl γka
-              γi cn γtl bmapstart inodestart nib size dqb dqs us fn
-              ks pid V)%I.
+       ut_trap (un_pj N) ksp av C ∗
+       ut_env Rsys N V)%I.
 
 End UsertrapRes.
 

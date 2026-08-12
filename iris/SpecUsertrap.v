@@ -186,9 +186,15 @@ Definition usertrap_post `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG
   let ret_tgt : mword 64 := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   ( ∀ (pt' : uptd) (mf : regfile)
       (ms' usatp uepc sc' stval' : mword 64),
-    (* the user table as usertrap leaves it: vmfault may have mapped new
-       pages, the root and the trapframe page never move *)
-    ⌜ud_root pt' = ud_root pt⌝ -∗
+    (* THE TRAPFRAME PAGE IS THE ONE THING THAT CANNOT MOVE, and the ROOT IS
+       NOT.  The first draft promised [ud_root pt' = ud_root pt] as well, on
+       the strength of the vmfault arm (which only inserts leaves).  It is
+       FALSE on the syscall arm: exec() replaces the address space wholesale,
+       so [SpecSyscall]'s post pins [ud_tfp] and nothing else, and no proof of
+       the stronger conjunct exists.  Nothing wanted it either -- what the
+       trampoline needs is that the satp usertrap RETURNS is rooted at the
+       table it hands over, which is [satp_rooted usatp (ud_root pt')]
+       below. *)
     ⌜ud_tfp pt' = ud_tfp pt⌝ -∗
     (* the pure facts the trampoline halves need about it, which the process
        block's [proc_pt_at] carries *)

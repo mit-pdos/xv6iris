@@ -195,6 +195,14 @@ Definition wp_prepare_return_sconf_body
          [intr_count 0 false]) alongside the [C] that came in.  Listing the
          cells or the token again beside it would promise them twice. *)
       cpu_own 0%nat false p C false -∗
+      (* THE RUNNING CLAIM, on the same two-sided split: at [b = true] the
+         [intr_off]'s dismantled arm pays it out, at [b = false] the caller
+         never handed it over and keeps its own, so the conjunct is [emp].
+         usertrap is what made this explicit -- it reaches prepare_return at
+         [b = true] on the syscall arm and its own boundary owes the claim
+         back, so a post that dropped it made the contract lose a resource
+         (see WpSconfCsr's [wp_csrci_sstatus_x0_s_sconf]). *)
+      cpu_claim_pay 0%nat b p -∗
       (* ---- what the flip paid out, MINUS [intr_res] ---- *)
       (* the trap-scratch cells.  sepc is PINNED at the legalized user pc:
          the write goes through [mepc_val] (bit 0 cleared), like every sepc

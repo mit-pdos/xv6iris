@@ -1630,7 +1630,11 @@ Section ProofScheduler.
                 with "Hcg [] Hpc Hi8a [-]").
       { iPureIntro. exact (conj eq_refl eq_refl). }
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-      iIntros (ms2) "%Hmsf2 Hcg Hcnt Hcsrs Hcells Hpc".
+      (* the [cpu_claim] the disable leaf now hands back is [cpu_claim
+         zero_reg] -- the scheduler runs with [c->proc == 0], so it is the
+         idle claim ([IntrDefs.cpu_claim_idle]) and carries nothing.  Dropped
+         here rather than threaded: the next [intr_on] round re-derives it. *)
+      iIntros (ms2) "%Hmsf2 Hcg Hcnt Hcsrs _ Hcells Hpc".
       iEval (rewrite -(sc_carve av Hav)) in "Hcg".
       assert (Ho8e : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x8a) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x8e))
         by (apply bv_eq; vm_compute; reflexivity).
