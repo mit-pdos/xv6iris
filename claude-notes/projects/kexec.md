@@ -345,11 +345,25 @@ first two are kexec-specific; the last two are the tree's existing shape
 
 6. **The open inode travels as one bundle.** What `ilock` produces and
    `iunlockput` consumes — `sleeplocked`, `sl_pid`, `ic_deposit`, the two ½
-   identity cells, `i_valid`, `ic_loaded`, and the retained
-   `inode_ref_short` — is eight resources that phases A and B both carry and
-   neither looks inside. Bundle it (`kxc_open`) for the same reason
-   `fs_fabric` is bundled. Unlike `fs_fabric` it is NOT persistent, so it is
-   threaded linearly.
+   identity cells, `i_valid`, `ic_loaded`, the generation's type witness
+   `ity_shot`, and the retained `inode_ref_short` — is nine resources that
+   phases A and B both carry and neither looks inside. Bundle it
+   (`kxc_open`) for the same reason `fs_fabric` is bundled. Unlike
+   `fs_fabric` it is NOT persistent, so it is threaded linearly.
+
+   **The bundle is GENERATION-NAMED (`gyf : gname`), and the name is minted
+   at the namei→ilock seam.** Under the §17.3/§17.4 icache interface,
+   `IcacheEscrow.DepShr` takes the generation as a fourth argument, `ilock`
+   consumes `inode_shr_gen k s dev inum g` rather than `inode_shr`, and
+   `iunlockput` consumes the deposit plus the `ity_shot g (di_type dn)` that
+   ilock published. So the seam is `inode_held` → destruct →
+   `inode_ref_shed` → `IcacheRef.inode_shr_gen_intro` (destruct the `∃ g`
+   right there) → ilock. **Use ONE `g` for ilock's parameter and
+   iunlockput's `gy`** — iunlockput's is exactly what ilock deposited.
+   `ity_shot` is persistent and kexec never writes the inode, so it is
+   carried, never spent; it must still cross the A→B seam or phase B cannot
+   call iunlockput. `kxc_at_a2` (the +0x032 seam) is BEFORE ilock and stays
+   generation-free.
 
 ### The duplicate `icacheG`, and why the fix is ONE file and not seventeen
 

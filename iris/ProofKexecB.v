@@ -517,21 +517,23 @@ Section KexecBSeam.
   Notation Ra5 := (mword_of_int 15 : mword 5).
 
   (* THE OPEN INODE, as ilock produced it and iunlockput will consume it
-     (convention 6): eight resources phases A and B both carry and neither
+     (convention 6): nine resources phases A and B both carry and neither
      looks inside.  Bundled here so the two output states below do not each
      spell them out. *)
   Definition kxc_open (gfs : fs_names) (gi : gname) (cn : ic_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (pidv : mword 32)
-      (kf : nat) (qf sf : Qp) (inumf : mword 32) (dnf : dinode) (bmf : blkmap)
+      (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+      (dnf : dinode) (bmf : blkmap)
       (gilf gislf : gname) : iProp Σ :=
     (is_sleeplock gilf gislf (i_lock (ientry kf)) "inode"%string (ic_tok cn kf) ∗
      sleeplocked gislf ∗
      sl_pid (i_lock (ientry kf)) ↦₄ pidv ∗
-     ic_deposit cn kf (DepShr sf dev inumf) ∗
+     ic_deposit cn kf (DepShr sf dev inumf gyf) ∗
      i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev ∗
      i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf ∗
      i_valid (ientry kf) ↦₄ valid_word true ∗
      ic_loaded gfs gi cov logstart kf inumf dnf bmf ∗
+     ity_shot gyf (di_type dnf) ∗
      inode_ref_short kf (qf + sf)%Qp qf dev inumf)%I.
 
   (* --------------------------------------------------------------- *)
@@ -552,7 +554,8 @@ Section KexecBSeam.
       (cn : ic_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32) (used used2 : gset Z)
-      (kf : nat) (qf sf : Qp) (inumf : mword 32) (dnf : dinode) (bmf : blkmap)
+      (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+      (dnf : dinode) (bmf : blkmap)
       (gilf gislf : gname) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
@@ -582,7 +585,8 @@ Section KexecBSeam.
      pc_is (mword_of_int (KXB + 0x1a2) : mword 64) ∗
      sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
      cpu_own 0 true (proc_addr jp) C true ∗
-     kxc_open gfs gi cn cov logstart dev pidv kf qf sf inumf dnf bmf gilf gislf ∗
+     kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
+              gilf gislf ∗
      log_op g n2 ∗
      iref_slots 1 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
@@ -614,7 +618,8 @@ Section KexecBSeam.
       (cn : ic_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32) (used used2 : gset Z)
-      (kf : nat) (qf sf : Qp) (inumf : mword 32) (dnf : dinode) (bmf : blkmap)
+      (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+      (dnf : dinode) (bmf : blkmap)
       (gilf gislf : gname) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
@@ -653,7 +658,8 @@ Section KexecBSeam.
      pc_is (mword_of_int (KXB + 0x12c) : mword 64) ∗
      sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
      cpu_own 0 true (proc_addr jp) C true ∗
-     kxc_open gfs gi cn cov logstart dev pidv kf qf sf inumf dnf bmf gilf gislf ∗
+     kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
+              gilf gislf ∗
      log_op g n2 ∗
      iref_slots 1 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
@@ -726,7 +732,8 @@ Section KexecBBody.
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (used used2 : gset Z)
-      (kf : nat) (qf sf : Qp) (inumf : mword 32) (dnf : dinode) (bmf : blkmap)
+      (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+      (dnf : dinode) (bmf : blkmap)
       (gilf gislf : gname) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64)
@@ -773,7 +780,8 @@ Section KexecBBody.
     pc_is (mword_of_int (KXB + 0x90) : mword 64) -∗
     sie_cap_gpr M90 (K - 68)%nat b (proc_addr jp) -∗
     cpu_own 0 eb (proc_addr jp) C b -∗
-    kxc_open gfs gi cn cov logstart dev pidv kf qf sf inumf dnf bmf gilf gislf -∗
+    kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
+              gilf gislf -∗
     log_op g n2 -∗
     iref_slots 1 -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -813,7 +821,8 @@ Section KexecBBody.
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M : regfile) (ef : nat -> bv 8) (P : uptd) (w67 : mword 64),
         kxc_at_1a2 jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart
-                   nib size dev used used2 kf qf sf inumf dnf bmf gilf gislf n2
+                   nib size dev used used2 kf qf sf gyf inumf dnf bmf
+                   gilf gislf n2
                    plen pfun na avf aslen afun pidv V dqb dqs dqa
                    m M K C sp0 ra0 s00 s10 s20 pv av
                    (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
@@ -825,7 +834,8 @@ Section KexecBBody.
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M : regfile) (ef : nat -> bv 8) (P : uptd),
         kxc_at_12c jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart
-                   nib size dev used used2 kf qf sf inumf dnf bmf gilf gislf n2
+                   nib size dev used used2 kf qf sf gyf inumf dnf bmf
+                   gilf gislf n2
                    plen pfun na avf aslen afun pidv V dqb dqs dqa
                    m M K C sp0 ra0 s00 s10 s20 pv av
                    (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
@@ -1674,7 +1684,7 @@ Section KexecBBody.
       iDestruct (cpu_own_transport CID4 CID8 0%nat true (proc_addr jp) C true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct "Hopen" as "(#Hslkk & Hslkd & Hslpid & Hdep & Hidev & Hiinum &
-                             Hivalid & Hload & Hkeep)".
+                             Hivalid & Hload & #Hity & Hkeep)".
       (* [kxc_bad64] is applied AT [CID8] (its [sie_cap_gpr] premise pins its
          own [CID0] from "Hcg"), so kexec's exit -- still anchored at the
          section's [CID0] -- has to be re-anchored there.  The crossing fact
@@ -1685,14 +1695,15 @@ Section KexecBBody.
                    with "Hcont") as "Hcont".
       iApply (A.kxc_bad64 gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                 gilf gislf ga gf cov logstart bmapstart inodestart nib size
-                dev used used2 kf qf sf inumf dnf bmf n2
+                dev used used2 kf qf sf gyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa
                 m B1 K C sp0 ra0 s00 s10 s20 pv av
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
                 Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 HB1sp HB1s4 HB1thr
                 with "Hcg Hcnt Htext Hpanic Hpc Hfab Hslkk Hslkd Hslpid Hdep
-                      Hidev Hiinum Hivalid Hload Hkeep Hbm Hins Hbits Hka
-                      Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
+                      Hidev Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits
+                      Hka Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont]
+                      Hcont").
       rewrite /kxc_frameA6.
       iDestruct (kxc_mid_join sp0 with "Hust Helf Hph") as "Hmid".
       iSplitL "Hf1"; [iExact "Hf1" |].
