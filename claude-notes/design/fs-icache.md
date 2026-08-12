@@ -3540,3 +3540,320 @@ Sequencing: S3l = links 2+3+4 under this ruling (bmap arm-wise
 one-credit set-form; writei's premise = log_opS with the B+3-shaped
 bound; dirlink re-discharged); S3m = ProofFilewrite + LinkFilewrite.
 create's S5 brief inherits clause 1 for its op-wide set.
+
+
+## 19. THE FRESH-TYPE WITNESS (fs-sysfile S5c, 2026-08-12): **STOP-AND-REPORT.**
+## The fact is not obtainable anywhere inside the icache/region layer, and
+## §17.6.1's own reachable trace is the reason — not the receipt algebra
+
+S5b left `create` blocked on `di_type dn = ty` at its `ilock(ip)` and named
+two exits, (A) a REF-1 bridge from the slot index to the inum index and (B)
+a §16 re-opening.  This section works the coordinator's three-stability
+derivation against the code, **refutes one stability outright, localises the
+other two, and then refutes BOTH of S5b's exits with a trace this design
+document already certified as reachable.**  Nothing in `iris/` moved.
+
+The one-sentence finding: *the obstruction is not what the claimant could be
+handed, it is WHEN — there is a sixteen-byte window in `ialloc`, between the
+claim at +0x9a and the `iget` at +0xaa, in which the claimant owns no
+resource naming the inum at all, and §17.6.1 shows the window is inhabited.*
+
+### 19.1 THE THREE STABILITIES, CHECKED AGAINST THE CODE
+
+**(i) TYPE-STABILITY — REFUTED AS A PROPERTY OF THE MODEL.**
+`InodeRegion.ireg_write_au` (`InodeRegion.v:652`) is the ghost step behind
+every `iupdate`, and its only constraint on the new record is
+`bv_unsigned (di_type dn') <> 0` (`InodeRegion.v:659`).  So *any* holder of
+`dinode_at γi inum dn` may retype `ty -> ty'` and the invariant is
+re-established.  "No writer retypes an allocated inode" is true of this
+TREE'S CALLERS — create's five inode stores are `ProofCreateParts.cr_setf`,
+whose whole content is that "type, size and addrs do not move" — but callers
+are not what an interleaving argument may quantify over.  In this
+development the only thing constraining a concurrent hart is the invariants,
+and the invariants permit the retype.  §17's story ("a generation sees at
+most one fill, so agreement never crosses a re-type") is sound because the
+GENERATION is bumped, not because the type is stable; the two must not be
+conflated.  Repairable at one premise — §19.6 Part 1 — and it should be
+repaired whether or not create is ever unblocked.
+
+**(ii) NO-FREE-UNDER-REFERENCE — TRUE AND PROVABLE, BUT ONLY FROM create's
+`iget` ONWARD.**  The free path's opener is
+`IcacheEscrow.ic_open_auth_ref` (`IcacheEscrow.v:1108`), whose second
+premise is `M !! k = Some (q, 1%positive)` (`IcacheEscrow.v:1112`).  A second
+referrer makes the count at least 2 (`positiveR` has no zero, §14.5), so the
+premise is unsatisfiable, and `IcacheInv.live_whole_share_absurd`
+(`IcacheInv.v:1345`) refutes any further liveness slice at REF-1.  create's
+own reference is therefore a complete block on anybody's free of that inum —
+`ProofIput.v:1366` is the site.  Verified, and it is the one piece of the
+coordinator's analysis that survives intact.
+
+**(iii) GENERATION-STABILITY — TRUE, same window, same reason.**  A recycle
+needs the slot free (`M !! k = None`, refuted by
+`IcacheInv.iref_tok_free_absurd`) and the free-path regen
+(`IcacheInv.live_slot_regen`, `IcacheInv.v:1400`) needs the whole liveness
+unit, which (ii) denies.  So the `g` create's reference names is current at
+its `ilock`.
+
+**The trap is in the word "onward".**  (ii) and (iii) both start at create's
+`iget`.  The claim is sixteen bytes earlier.
+
+### 19.2 THE WINDOW, STATED SO IT IS NOT RE-DERIVED
+
+`ProofIalloc.v:1451` runs `ireg_claim_au` at +0x9a; `ProofIalloc.v:1622`
+calls `iget` at +0xaa.  Between them the claimant holds **nothing that names
+the inum** — and that is not an oversight, it is §16's whole design:
+`ireg_claim_au` (`InodeRegion.v:751`) takes no resource premise and pays out
+`True`, because ialloc holds neither the itable spinlock nor any sleeplock
+and the only serialiser it has is the BUFFER (§16.1/§16.2).  `SpecIalloc.v`
+says so in its own header at line 83: the `ialloc_fresh ty` fact "says
+nothing about the region's state at RETURN time — by then another hart may
+already have locked the new inode."  That sentence is the whole of §19.
+
+Every candidate mechanism, including the four new ones priced in §19.5,
+needs one of: exclusive ownership of the region's element (S5b constraint 3),
+a monotone snapshot plus a CURRENCY proof, or an invariant clause tied to
+something exclusive the claimant owns.  All three want a resource at the
+moment of the claim.  There is none, and there cannot be one — see §19.3(a).
+
+### 19.3 §17.6.1 IS THE UNIVERSAL REFUTATION
+
+The claim-and-hit sequence this document certified in §17.6.1 — every step
+a proven instruction stream — puts a **live foreign reference on the claimed
+inum's entry at the instant of the claim**, and then two referrers on one
+entry at one generation:
+
+> iput at +0x54 bumps the slot to `g'` under the itable lock, releases at
+> +0x5c and has not yet run `ip->ref--`; the entry is CACHED at `ref = 1`;
+> `ProofIalloc.v:1451` claims that very inum, buffer-serialised, with no
+> cache lock; `ProofIalloc.v:1622`'s `iget` then takes the **HIT** arm and
+> bumps `ref` to 2.
+
+Four consequences, and together they close every door S5b left open:
+
+**(a) The claim cannot TAKE anything, either.**  The one shape that would
+have closed the window is a per-inum "no referrer exists" licence parked in
+the region's type-0 arm, which `ireg_claim_au` would collect as it retags.
+§17.6.1 has a referrer at that instant, so the licence would be in that
+referrer's hand and `ireg_claim_au` would be **unprovable on a reachable
+trace**.  A licence the claim may find missing is a licence that proves
+nothing.
+
+**(b) S5b's exit (A) is REFUTED.**  There is no "this entry has exactly one
+referrer and it is me" witness to expose at ialloc's `iget`, because ialloc's
+`iget` can take the HIT arm at `ref` 1 -> 2.  `SpecIget.v`'s header states
+the design constraint that forbids even ASKING which arm ran: "Which of the
+two happened is invisible to the caller, and must be: xv6's whole point is
+that a second `iget` of a cached inode is indistinguishable from the first."
+The index bridge S5b sized was the easy half; the uniqueness it was to carry
+does not exist.
+
+**(c) S5b's constraint (3) is FORCED, not a spelling accident.**  No content
+of a claim-box arm can be made refutable at the ORDINARY fill, because the
+ordinary fill's caller may legitimately hold a share of the very slot at the
+very generation the claimant is using.  The assembly argument that would
+have produced the contradiction — `live_whole_share_absurd` read positively,
+§17.6.2's own move — cannot be assembled: create never holds the whole
+holder mass, since its own `iget` may be the HIT.
+
+**(d) The window's hazard is real and it is the FREE.**  As far as every
+invariant knows, the foreign referrer may carve a share, `ilock` (its fill
+reads `ialloc_fresh ty` and does not panic — the type is nonzero), and then
+`iput`: the free test is `ref == 1 && nlink == 0`, and the claim's record has
+`nlink = 0` by construction (`SpecIalloc.v:159`, `ialloc_fresh`; the header
+at line 78 says "NLINK STAYS 0 until the caller's own `iupdate`").  Its REF-1
+premise is satisfiable precisely because the claimant has no reference yet.
+A third `ialloc` then re-claims the inum at `ty'`, and create's `ilock`
+returns `ty'`.  With Part 1 (§19.6) landed, this FREE-AND-RECLAIM is the
+*only* surviving hazard in the window — which is what makes the owed
+obligation in Part 3 minimal and auditable.
+
+### 19.4 WHAT THE FILL ALREADY GIVES, AND HOW BIG THE DEFICIT ACTUALLY IS
+
+Worth recording because it shrinks Part 3's debt to sixteen bits.
+`InodeRegion.ireg_withdraw` (`InodeRegion.v:924`) already pays out
+`⌜fresh_shape (ds !!! islot inum)⌝` beside the fragment, and
+`ProofIlock.v:1000` already destructs it into `Hfty/Hfsz/Hfad`.  So on the
+claim-box arm the fill ALREADY knows size = 0, addrs = all-zero and
+type <> 0 — S5a finding 1's "the other three dirlink premises all follow
+from `di_size dn = 0`" is available with no new machinery the moment the arm
+can be forced.  **The entire missing quantity is the sixteen-bit type
+VALUE**, and the only frame in the system that holds it is ialloc's.
+
+### 19.5 DEATH CERTIFICATES
+
+**(a) "Nothing new — the ity/generation machinery already implies it."**
+DEAD.  The shot's VALUE is decided by the fill, at the region's record and
+nowhere else: `ProofIlock.v:1030` is the single `ity_shoot g (di_type dn)`,
+placed there because it is "the only instruction in this kernel that knows
+`di_type`".  create's only handle on that value is `SpecIlock.v:285`'s
+`ity_shot g (di_type dn)` — the very term it is trying to evaluate.  Closing
+by `IcacheRef.ity_shot_agree` (`IcacheRef.v:457`) needs a SECOND,
+independent `ity_shot g ty`, and `ty` lives in one frame which cannot reach
+the pending: the pending is parked inside `ic_payload`'s UNLOADED polarity
+(`IcacheEscrow.v:538`), behind the entry's sleeplock, and `iget`'s recycle
+parks it at +0x7c (`ic_close_mid_to_parked`) with no payout.  *And the
+suggested repair — "strengthen `SpecIalloc`'s `dn'`-fact from documentation
+to a stable fact" — is not available:* the facts at `SpecIalloc.v:286-288`
+are about the region at CLAIM time, and §19.2/§19.3(d) make each of them
+possibly false at RETURN time.  Strengthening a false statement is not a
+retrofit.
+
+**(b) "A type cell in the LIVENESS agree — `gname` becomes `gname × type`."**
+DEAD, and by a sharper argument than "the type is unknown at the recycle"
+(which is true — `live_slot_alloc`, `IcacheInv.v:493`, mints before any
+bread).  Grant the strong form: let ialloc widen `iget` and supply `ty` at
+the mint, so the recycle parks `ity_shot g ty` instead of `ity_pending g`.
+The LATER fill must still re-establish the LOADED polarity's
+`ity_shot g (di_type d)` at the record it withdrew — with the pending
+already spent it can only AGREE, i.e. it must prove `di_type d = ty` against
+the region, which is the original goal.  **A pre-shot generation makes the
+fill circular; a post-shot one makes it uninformative.**  There is no third
+timing.
+
+**(c) "The escrow learns the inum -> slot key at ialloc's `iget`."**  DEAD on
+§19.3(b).  The KEY is learnable — create does know its `k` — but the key was
+never the missing thing; the UNIQUENESS was, and §17.6.1 exhibits its
+failure.  Every packaging of premises (i)-(iii) into an additive
+`wp_ilock_fresh` bottoms out at "and the arm is refuted because I am the
+only referrer", which is false.
+
+**(e) THE MARKER AS THE CARRIER — the strongest new candidate, and it still
+dies.**  `InodeRegion.imark` (`InodeRegion.v:355`) is already the per-inum
+EXCLUSIVE baton the tree lacks elsewhere, and its ghost value slot is
+*unused* ("no marker entry is ever updated -- only moved",
+`InodeRegion.v:288`).  Holding it proves a great deal: the fragment is in
+the region, and no other cache entry or pool bundle holds this inum's record
+(`imark_excl` :361 against `ipool_alloc`'s `dinode_at`, plus
+`dinode_at_excl` :328).  It is genuinely the right shape.  It is
+nevertheless unusable, for the reason S5b's table gave and this stage can
+now make exact: **the marker's value can be written only by an agent holding
+both the element and the authority — i.e. by `ireg_withdraw` (:924) or
+`ireg_free_au` (:834), the fill and the free.  Never by `ireg_claim_au`,
+which is the only agent that knows `ty`.**  Every mirror clause one might add
+to `ireg_body` (marker value tracks the claim box, or the converse) is
+unmaintainable at exactly the transition that matters.
+
+**(f) A THIRD KEY SPACE INSIDE `γi`** — a claim ticket at a `claim_key z`
+alongside `imark_key z`, which has the real virtue of dodging §16.5's
+packaging argument entirely (no new gname, so `ireg_inv`'s signature — named
+in THIRTY files — does not move).  DEAD on S5b's constraint (4), which this
+stage can sharpen into three exhaustive cases: a ticket that a RE-CLAIM must
+update is blocked by any outstanding copy, so `ireg_claim_au` becomes
+unprovable; a ticket the re-claim ignores is stale-indistinguishable from the
+live one; and a PERSISTENT ticket (`ghost_map`'s `↪□`) can never be
+re-issued at all.
+
+**(g) AN AMBIENT PER-INUM ONE-SHOT** — `icfg` gains a `Z -> gname` array so
+the generation needs no storage, and the authority parks in `ireg_body`
+without touching any signature.  The cleanest algebra of the four.  DEAD on
+CURRENCY: the fill shoots the CURRENT per-inum generation, and create's proof
+that its generation is still current is exactly "no free since MY claim",
+which is §19.3(d)'s hazard.  Generations solve staleness only where a
+CURRENCY resource exists — §17.6's slot generations have `live_gen` and the
+mass ledger; an inum has nothing, because the free that would bump it is
+slot-indexed.
+
+**(h) THE VIRGIN-RECORD DISTINCTION** — block the thief's FREE instead of the
+thief's REFERENCE, by refusing `ireg_free_au` on a never-committed claim box.
+DEAD, and instructively: a legitimately freed inode's record at
+`ireg_free_au` is post-`itrunc` — type <> 0, size 0, addrs zero, nlink 0 —
+which is LITERALLY `fresh_shape` (`InodeRegion.v:270`) and literally
+`ialloc_fresh ty`'s shape.  **The region cannot tell a virgin claim box from
+a truncated corpse.**  A "committed" token minted by an ordinary `iupdate` is
+mintable by the thief too, since it holds the metadata cells and may write
+any nlink it likes.
+
+### 19.6 THE RULING
+
+Every candidate reduces to ONE proposition, and it is not an icache fact:
+
+> **NO THREAD OTHER THAN THE CLAIMANT CAN NAME A JUST-CLAIMED INUM.**
+
+In xv6 that is true because a free inum appears in no directory and `iget`'s
+only two inum sources are `dirlookup` and `ialloc` itself.  In this
+development it is unavailable: `SpecIget` is stated for an arbitrary `inum`
+(deliberately — see its header's premise discussion), and `DirView.dir_ok`
+(`DirView.v:855`) says only that a directory's live records name inums the
+region COVERS (`dir_inums_ok`, :824), never that they name ALLOCATED ones.
+`SpecIlock.v:110` already flagged the gap in the abstract — "a caller premise
+'this inum is allocated' would be undischargeable today (allocatedness is
+directory-structure knowledge — namei/ialloc, future work)".  §19 is the
+bill for that sentence.
+
+**PART 1 — LAND NOW (stage-sized, independently correct, no ruling needed).**
+`ireg_write_au` gains the premise
+`di_type dn' = 0 \/ di_type dn' = di_type dn`, making §19.1(i) a THEOREM of
+the region rather than a claim about callers.  The disjunct is what iput's
+free path takes; everybody else takes the equation.  This is worth doing on
+its own merits: it removes a latent gap in §17's whole type story, and it
+reduces §19.3's residual hazard from {retype, free-and-reclaim} to
+{free-and-reclaim} alone, which is what makes Part 3's debt one line long.
+
+**PART 2 — THE DISCHARGE (project-sized, NOT this campaign's).**  The
+allocatedness invariant: `DirView.dir_ok`'s conjunct strengthened from
+"covers" to "allocated", a matching premise on `SpecIget`, and the
+preservation obligation discharged in every function that writes a directory
+(`dirlink`, `create`, `sys_unlink`) plus the boot layer (`IcacheBoot`).  This
+is `fs-namei`'s and `fs-inode`'s territory, it re-opens §15, and it is the
+only thing that discharges Part 3.
+
+**PART 3 — THE UNBLOCK (what S5d does).**  create takes the fact as a
+THREADED PURE HYPOTHESIS, exactly as `SpecIalloc` takes
+`SpecPrintkGen.printk_gen_contract` and every sleeping contract takes
+`SpecPanic.panic_wp_any`: an `ilock_fresh_contract`-shaped `Prop` premise on
+`wp_create_sconf_body`, so that `Print Assumptions` stays at the standing six
+and **every consumer of create sees the debt in its own statement**.  This is
+the tree's established shape for "true of the kernel, not yet provable from
+the invariants", and `SpecBalloc.v`'s header ("READ THIS BEFORE TRUSTING THE
+STANDING SIX") is the precedent to imitate verbatim.
+
+*The recommended statement of the threaded contract* is an ADDITIVE
+`wp_ilock_fresh` whose post adds `⌜dn = ialloc_fresh ty⌝` — not merely
+`di_type dn = ty`.  Three reasons: it is what the kernel actually
+guarantees (create's `ilock` is the first fill and reads exactly the claim's
+record); it is what the fresh arm already produces internally (§19.4); and
+`ProofCreateParts.cr_made_setf` already proves
+`cr_setf (ialloc_fresh ty) mj mn 1 = create_made ty mj mn`, so the `made`
+arm of the frozen `SpecCreate` falls out with no further work and all four
+`dirlink` premises are discharged at once.
+
+**WHAT THIS COSTS THE FROZEN CONTRACT.**  S5a's "nothing in `SpecCreate.v`
+moves under any of the three rulings" does not survive Part 3: the contract
+gains one `Prop` premise.  That is a one-line, additive, purely-hypothetical
+change and it does not touch the arms, the budget or the return shape — but
+it is a change, and the freeze note should be amended rather than quietly
+broken.
+
+### 19.7 BLAST RADIUS, PRICED PER FILE
+
+*Part 1 (recommended for the next implementation stage):*
+
+| file | change |
+|---|---|
+| `InodeRegion.v` | one premise on `ireg_write_au` (:652); the proof body does not move — the premise only travels |
+| `SpecIupdate.v` | the same premise on `wp_iupdate_gen_body` / `wp_iupdate_cred_body`; both, since S5b split them |
+| `ProofIupdate.v` | pass it at the one `ireg_write_au` call site |
+| `ProofIput.v` | discharge by the `= 0` disjunct (the `ip->type = 0` flush) |
+| `ProofItrunc.v` | discharge by the equation (`ip->size = 0` only) |
+| `ProofWritei.v` | discharge by the equation (`wi_dinode` moves size/addrs) |
+| `LinkIupdate.v` and the two cones | rebuild only |
+
+Nothing else names `ireg_write_au` (`SpecLogWrite.v` mentions it in prose
+only).  No signature that 30 files carry (`ireg_inv`, `ic_escrow`,
+`dinode_at`) is touched, so §16.5's packaging argument is respected.
+
+*Part 3:* `SpecCreate.v` (+1 premise), `ProofCreate.v` (uses it at +0xb4),
+`LinkCreate.v` (threads it).  Zero files outside create's own three.
+
+*Part 2* is not priced here; it is a project brief, not a retrofit.
+
+### 19.8 WHAT S5d MAY BUILD WITHOUT ANY RULING
+
+Six of create's eight arms do not need the fact at all, and the walk order
+S5a prescribed (back to front) reaches them first: the epilogue join at
++0x74, `fail:` (+0x11c..+0x132), the two `iunlockput`-and-return tails
+(+0x76, +0xc6) and the `found` arm.  Only the two `made` arms need it — the
+mkdir arm at its `dirlink(ip, ".")` and the T_FILE arm at sys_open's fd-type
+witness (S5a finding 1's second bullet).  So S5d is a real stage under any
+ruling: build the six, take Part 1, and gate the two `made` arms behind the
+Part 3 hypothesis.

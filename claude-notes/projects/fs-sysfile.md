@@ -3189,6 +3189,92 @@ already carried by `LinkIupdate`), nothing GONE, nothing ADMITTED, no
 `cheat_`.
 
 
+## S5c — DESIGN-ONLY. **RULING 1 IS STOPPED-AND-REPORTED FOR GOOD:** the
+## fresh-type witness cannot be built inside the icache/region layer, and
+## §17.6.1 is the proof.  `design/fs-icache.md` §19 is the ratifiable ruling
+
+No `iris/` file was touched.  The deliverable is `fs-icache.md` §19
+(19.1–19.8); this entry is the ledger.
+
+**THE VERDICT.** The coordinator's derivation was to get `di_type dn = ty`
+from three stabilities already owned.  Checked against the code:
+
+* **(i) type-stability is NOT a theorem of the model.**
+  `InodeRegion.ireg_write_au`'s only constraint on the flushed record is
+  `di_type dn' <> 0` (`InodeRegion.v:659`) — any fragment holder may
+  retype.  It is true of this tree's CALLERS (`cr_setf`), and callers are
+  not what an interleaving argument may quantify over.
+* **(ii) no-free-under-reference is TRUE and provable** —
+  `ic_open_auth_ref`'s REF-1 premise (`IcacheEscrow.v:1112`) +
+  `live_whole_share_absurd` (`IcacheInv.v:1345`) — **but only from
+  create's `iget` onward.**
+* **(iii) generation-stability is TRUE**, same window, same reason.
+
+**AND THE WINDOW IS THE WHOLE PROBLEM.**  `ireg_claim_au` fires at ialloc
++0x9a (`ProofIalloc.v:1451`); `iget` is at +0xaa (`ProofIalloc.v:1622`).
+In those sixteen bytes the claimant owns NOTHING naming the inum — by
+§16's design, the claim takes no resource and pays `True`.  Everything
+(ii)/(iii) protect begins after the window shuts.
+
+**§17.6.1 IS THE UNIVERSAL REFUTATION.**  This document's own certified
+claim-and-hit trace puts a live FOREIGN reference on the claimed inum's
+entry at the instant of the claim (iput at `ref = 1`, between its lock
+release at +0x5c and its `ref--`), and then two referrers on one entry at
+one generation.  Consequences: the claim cannot TAKE a "no referrer
+exists" licence either (it would make `ProofIalloc` unprovable on a
+reachable trace); **S5b's exit (A) is refuted** — ialloc's `iget` may take
+the HIT arm, and `SpecIget`'s header forbids even asking which arm ran;
+S5b's constraint (3) is FORCED, since the ordinary fill's caller may hold
+a share of the very slot at the very generation; and the window's hazard
+is concrete — the foreign referrer may `ilock` (no panic, the type is
+nonzero) and then free, because `ialloc_fresh ty` has `nlink = 0`.
+
+**EIGHT DEATH CERTIFICATES** in §19.5: the coordinator's (a)/(b)/(c) plus
+four new shapes priced this stage — the MARKER as carrier (dies because
+only `ireg_withdraw`/`ireg_free_au` may write its value, never the claim,
+and the claim is the only agent that knows `ty`); a third key space inside
+`γi` (dodges §16.5's packaging, dies on constraint 4 in three exhaustive
+cases); an ambient per-inum one-shot (cleanest algebra, dies on currency);
+and the virgin-record distinction (dies because a truncated corpse IS
+`fresh_shape`).
+
+**ONE USEFUL POSITIVE.**  `ireg_withdraw` already pays `⌜fresh_shape …⌝`
+(`InodeRegion.v:924`, destructed at `ProofIlock.v:1000`), so the fresh
+arm already yields size 0 and zero addrs.  **The entire deficit is the
+sixteen-bit type value.**
+
+**THE RULING, THREE PARTS** (§19.6, with the per-file blast radius in
+§19.7):
+
+1. **PART 1, land now:** `ireg_write_au` gains
+   `di_type dn' = 0 \/ di_type dn' = di_type dn`.  Makes (i) a theorem;
+   six files, no signature moves, every caller discharges it today.
+   Reduces the residual hazard to free-and-reclaim alone.
+2. **PART 2, the discharge (project, not this campaign):** the
+   allocatedness invariant — `DirView.dir_ok` strengthened from "covers"
+   to "allocated", a matching `SpecIget` premise, preservation in every
+   directory writer.  `SpecIlock.v:110` predicted this bill.
+3. **PART 3, the unblock (S5d):** thread the fact as a PURE Prop
+   hypothesis on `wp_create_sconf_body`, the `printk_gen_contract` /
+   `panic_wp_any` precedent, so `Print Assumptions` stays at the standing
+   six and every consumer of create sees the debt in its statement.  The
+   recommended post is `⌜dn = ialloc_fresh ty⌝` (not just the type):
+   `ProofCreateParts.cr_made_setf` then closes the `made` arm and all four
+   `dirlink` premises at once.
+
+**ONE FREEZE NOTE TO AMEND.**  S5a's "nothing in `SpecCreate.v` moves
+under any of the three rulings" does not survive Part 3 — the contract
+gains one additive `Prop` premise.  Say so rather than break it quietly.
+
+**S5d MAY STILL BUILD SIX OF EIGHT ARMS** with no ruling at all: the
+epilogue join (+0x74), `fail:` (+0x11c..+0x132), the two
+iunlockput-and-return tails (+0x76, +0xc6) and the `found` arm.  Only the
+two `made` arms need the fact.
+
+**Gate.** Design-only: no `iris/` change, no build, no mirror traffic, no
+probe compiled.  Working tree carries exactly two edited notes files.
+
+
 ## UNSATISFIABLE, and that is the finding that matters
 
 ### B1 (proc_priv -> proc_priv_core) — DONE, and the composition probe passed first try
