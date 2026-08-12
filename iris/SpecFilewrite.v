@@ -154,6 +154,9 @@ Require Import DirView.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
+Require Import IcacheBoot.   (* [ic_sleeplocks]: the canonical entry-sleeplock
+                                family, taken because this contract cannot know
+                                WHICH entry its descriptor points at. *)
 Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
@@ -231,6 +234,19 @@ Proof. intros Hle Htot. lia. Qed.
 (* ---------------------------------------------------------------------- *)
 (*  The ghost names and geometry the two heavy arms are indexed by          *)
 (* ---------------------------------------------------------------------- *)
+(* NOTHING PER-INODE IS IN HERE (fs-sysfile S4' / blocker 2's ratified
+   alternative; [SpecFilestat.fstat_names] is the landed template and
+   [SpecFileread.fread_names] the sibling).  NINE fields went: the itable
+   slot, the inum, the lent share's fraction, its GENERATION, the recorded
+   inode TYPE, the entry's two sleeplock gnames, the device and the region's
+   block count.  Every one of them is something a CALLER cannot know -- a
+   reference borrowed out of [ProcInv.ofile_slot] comes with its slot,
+   fraction and content existentially quantified -- and every one comes out
+   of the reference itself ([SpecFileread.fileread_pay_carve], which is
+   [SpecFilestat.filestat_pay_carve] GROWN by the [ty] output precisely so
+   that filewrite's [ity_shot] can come from the same place), or is the
+   ambient cache's ([IcacheRef.icfg_dev] / [icfg_nib]), or is existential
+   under the sleeplock FAMILY. *)
 Record fwrite_names := MkFWriteNames {
   fwn_procs      : list gname;    (* the proc table's per-slot lock names   *)
   fwn_j          : nat;           (* the running process's index            *)
@@ -246,27 +262,21 @@ Record fwrite_names := MkFWriteNames {
   fwn_fs         : fs_names;
   fwn_ireg       : gname;         (* the inode region (InodeRegion.v)       *)
   fwn_ic         : ic_names;      (* the icache's names (IcacheEscrow.v)    *)
-  fwn_ilk        : gname;         (* ip->lock's inner spinlock              *)
-  fwn_islk       : gname;         (* ip->lock's holder token                *)
   fwn_pr         : gname;         (* balloc's printk credential             *)
   fwn_cov        : gset Z;
   fwn_logstart   : Z;
   fwn_inodestart : Z;
   fwn_bmapstart  : Z;             (* the bitmap, for bmap -> balloc          *)
   fwn_size       : Z;             (* sb.size                                *)
-  fwn_dev        : mword 32;
-  fwn_inum       : mword 32;
-  fwn_nib        : nat;           (* the inode region's block count         *)
-  fwn_ik         : nat;           (* the itable SLOT this inode is           *)
-  fwn_s          : Qp;            (* the LENT SHARE's fraction (SpecIlock v3)*)
-  fwn_g          : gname;         (* ...and the GENERATION it names (§17.6)  *)
-  fwn_ty         : bv 16;         (* the fd's recorded inode type (§17.6)    *)
   fwn_used       : gset Z;        (* the bitmap's marked set, going IN       *)
   fwn_dqs        : dfrac;         (* sb.inodestart                          *)
   fwn_dqb        : dfrac;         (* sb.bmapstart                           *)
   fwn_dqbs       : dfrac;         (* sb.size                                *)
-  fwn_wp         : mword 64;      (* devsw[major].write                     *)
-  fwn_dqv        : dfrac;         (* ...and that cell's fraction            *)
+  (* THE DEVICE TABLE'S WRITE COLUMN, AS FUNCTIONS OF THE MAJOR -- the read
+     side's story verbatim (SpecFileread.v's note): one cell covers one
+     major, and a syscall cannot know which major its descriptor names. *)
+  fwn_wp         : Z -> mword 64; (* devsw[mj].write                        *)
+  fwn_dqv        : Z -> dfrac;    (* ...and that cell's fraction            *)
 }.
 
 (* Spelled out rather than derived, exactly as [SpecFileread.fread_names] is:
@@ -289,16 +299,20 @@ Global Instance fwrite_names_inhabited : Inhabited fwrite_names :=
     (MkFsNames 1%positive 1%positive 1%positive)
     1%positive (MkIcNames (fun _ => 1%positive) (fun _ => 1%positive)
                           (fun _ => 1%positive))
-    1%positive 1%positive 1%positive
-    ∅ 0 0 0 0 (mword_of_int 0) (mword_of_int 0) 0%nat 0%nat 1%Qp
-    1%positive (bv_0 16) ∅
+    1%positive
+    ∅ 0 0 0 0 ∅
     (DfracOwn 1) (DfracOwn 1) (DfracOwn 1)
-    (mword_of_int 0) (DfracOwn 1)).
+    (fun _ => mword_of_int 0) (fun _ => DfracOwn 1)).
 
+(* THE DUPLICATE [!icacheG Σ] IS GONE.  [fileG] BUNDLES [icacheG] (and the
+   [icfg]), so binding both gives TWO instances and propositions that print
+   identically but do not unify (durable-notes.md).  It was invisible while
+   nothing here mixed the two; the carve does -- the payload's share is at
+   [fileG]'s [icfg_dev].  Same edit as SpecFilestat's and SpecFileread's. *)
 Section SpecFilewrite.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- the FD_DEVICE arm's environment ---- *)
@@ -312,79 +326,133 @@ Section SpecFilewrite.
      [SpecFileread.a_devsw_read]: decode note 2. *)
   Definition filewrite_dev_env (fn : fwrite_names) (Cf : fcontent) : iProp Σ :=
     (if decide (dev_major Cf <= NDEV_max)
-     then ⌜fwn_wp fn = (zero_reg : mword 64)
-           \/ fwn_wp fn = (mword_of_int KernelSyms.consolewrite : mword 64)⌝ ∗
-          a_devsw_write (dev_major Cf) ↦₈{fwn_dqv fn} fwn_wp fn
+     then ⌜fwn_wp fn (dev_major Cf) = (zero_reg : mword 64)
+           \/ fwn_wp fn (dev_major Cf)
+               = (mword_of_int KernelSyms.consolewrite : mword 64)⌝ ∗
+          a_devsw_write (dev_major Cf) ↦₈{fwn_dqv fn (dev_major Cf)}
+            fwn_wp fn (dev_major Cf)
      else emp)%I.
 
   (* it is only READ, so it comes back as it went in *)
   Definition filewrite_dev_out (fn : fwrite_names) (Cf : fcontent) : iProp Σ :=
     filewrite_dev_env fn Cf.
 
+  (* ---- THE WHOLE COLUMN, and how one entry comes out of it ----
+     [SpecFileread.fileread_devsw]'s twin at the write side, and there for the
+     same reason: it is what a caller that cannot name its descriptor's major
+     must own. *)
+  Definition filewrite_devsw (fn : fwrite_names) : iProp Σ :=
+    ([∗ list] i ∈ seq 0 (Z.to_nat NDEV_max + 1),
+       ⌜fwn_wp fn (Z.of_nat i) = (zero_reg : mword 64)
+         \/ fwn_wp fn (Z.of_nat i)
+             = (mword_of_int KernelSyms.consolewrite : mword 64)⌝ ∗
+       a_devsw_write (Z.of_nat i) ↦₈{fwn_dqv fn (Z.of_nat i)}
+         fwn_wp fn (Z.of_nat i))%I.
+
+  Lemma filewrite_devsw_acc (fn : fwrite_names) (Cf : fcontent) :
+    filewrite_devsw fn -∗
+    filewrite_dev_env fn Cf ∗ (filewrite_dev_out fn Cf -∗ filewrite_devsw fn).
+  Proof.
+    (* THE UNFOLD ORDER MATTERS: [/filewrite_dev_out] rewrites to [filewrite_dev_env], so
+       unfolding [filewrite_dev_env] FIRST leaves the out side folded and the
+       closing [iExact] fails on two terms that print differently for that
+       reason alone. *)
+    rewrite /filewrite_dev_out /filewrite_dev_env.
+    iIntros "H". case_decide as Hle; [| iSplitR; [done | by iIntros "_"]].
+    (* the major is a [bv_unsigned], hence non-negative, so it IS the index
+       [Z.to_nat] of it names *)
+    pose proof (proj1 (bv_unsigned_in_range _ (fc_major Cf))) as Hnn.
+    rewrite /dev_major in Hle Hnn |- *.
+    set (i := Z.to_nat (bv_unsigned (fc_major Cf))).
+    assert (Hid : Z.of_nat i = bv_unsigned (fc_major Cf))
+      by (rewrite /i; apply Z2Nat.id; exact Hnn).
+    assert (Hlk : seq 0 (Z.to_nat NDEV_max + 1) !! i = Some i).
+    { rewrite lookup_seq. split; [reflexivity|].
+      rewrite /i. exact (devsw_idx_lt _ Hnn Hle). }
+    (* an EXPLICIT [Phi]: underscores leave the big-op's typeclass evars
+       unresolved and the destructuring pattern then fails (durable-notes.md) *)
+    iDestruct (big_sepL_lookup_acc
+                 (fun (_ : nat) (jj : nat) =>
+                    (⌜fwn_wp fn (Z.of_nat jj) = (zero_reg : mword 64)
+                      \/ fwn_wp fn (Z.of_nat jj)
+                          = (mword_of_int KernelSyms.consolewrite : mword 64)⌝ ∗
+                     a_devsw_write (Z.of_nat jj) ↦₈{fwn_dqv fn (Z.of_nat jj)}
+                       fwn_wp fn (Z.of_nat jj))%I)
+                 _ i i Hlk with "H") as "[Hone Hback]".
+    iEval (rewrite Hid) in "Hone".
+    iSplitL "Hone"; [iExact "Hone"|].
+    iIntros "Hone". iApply "Hback". rewrite Hid. iExact "Hone".
+  Qed.
+
   (* ---- the FD_INODE arm's environment ----------------------------------
-     begin_op's, ilock's, writei's, iunlock's and end_op's, in that order,
-     with §17.6's type witness at the end.  It is bigger than fileread's by
-     exactly the log and the allocator, which is what makes this a WRITE. *)
-  Definition filewrite_fs_env (γa : gname) (γf : gname) (k : nat)
-      (fn : fwrite_names) (Cf : fcontent) : iProp Σ :=
+     begin_op's, ilock's, writei's, iunlock's and end_op's, in that order.
+     It is bigger than fileread's by exactly the log and the allocator, which
+     is what makes this a WRITE.
+
+     CONTENT-INDEPENDENT, in [SpecFilestat.filestat_fs_env]'s form: the
+     escrow FAMILY, the sleeplock FAMILY, the off-borrow FAMILY, and the
+     region-WIDE inum geometry (BOTH geometry facts quantified, since the
+     inum is existential in the reference).  It names neither [Cf], nor an
+     itable slot, nor an fd slot, so a syscall that has not yet borrowed its
+     descriptor can own it.  The per-inode pieces -- including §17.6's type
+     witness, which used to sit at the end of this bundle -- come out of the
+     reference at the call ([SpecFileread.fileread_pay_carve]). *)
+  Definition filewrite_fs_env (γf : gname) (fn : fwrite_names) : iProp Σ :=
     (⌜log_geom_ok (fwn_cov fn) (fwn_logstart fn)⌝ ∗
      ⌜0 <= fwn_inodestart fn⌝ ∗
-     ⌜IBLOCK (fwn_inum fn) (fwn_inodestart fn) ∈ fwn_cov fn⌝ ∗
-     (* writei's iupdate flushes this inode's own block, which must NOT be
-        one of the log's own slots -- iupdate's premise, verbatim *)
-     ⌜~ (IBLOCK (fwn_inum fn) (fwn_inodestart fn)
-           ∈ log_region_set (fwn_logstart fn))⌝ ∗
-     (* the inum is inside the inode region: [ireg_read]'s premise *)
-     ⌜bv_unsigned (fwn_inum fn) < 16 * Z.of_nat (fwn_nib fn)⌝ ∗
+     (* EVERY inum the region covers has its block inside [cov] *)
+     ⌜forall inum : mword 32,
+        bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
+        IBLOCK inum (fwn_inodestart fn) ∈ fwn_cov fn⌝ ∗
+     (* ...and none of those blocks is one of the log's own slots.  writei's
+        iupdate flushes the inode's block, and this is iupdate's premise,
+        quantified for the same reason as the one above. *)
+     ⌜forall inum : mword 32,
+        bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
+        ~ (IBLOCK inum (fwn_inodestart fn)
+             ∈ log_region_set (fwn_logstart fn))⌝ ∗
      (* the bitmap's geometry, forwarded through bmap to balloc *)
      ⌜bitmap_geom_ok (fwn_cov fn) (fwn_logstart fn) (fwn_bmapstart fn)
                      (fwn_size fn)⌝ ∗
      (* balloc's out-of-blocks arm calls the GENERAL printk path; carried as
         a hypothesis, never a functor (SpecBalloc.v's header) *)
      ⌜printk_gen_contract (fwn_pr fn) (fwn_uart fn) (fwn_disk fn)⌝ ∗
-     (* THE INODE IS ITABLE SLOT [fwn_ik fn] -- what refutes ilock's and
-        iunlock's null test outright ([IcacheRef.ientry_unsigned]) *)
-     ⌜fc_ip Cf = ientry (fwn_ik fn)⌝ ∗
-     ⌜(fwn_ik fn < NINODE)%nat⌝ ∗
-     (* THE OFF-BORROW INVARIANT for this slot: [f->off] is not a content
-        field, and its [off_wf] bound is what makes writei's joint premise
-        closed (see the header). *)
-     off_inv γf k ∗
+     (* THE OFF-BORROW INVARIANTS: [f->off] is not a content field, and its
+        [off_wf] bound is what makes writei's joint premise closed (see the
+        header).  The FAMILY, not the slot's -- an environment that may not
+        name the descriptor cannot name [k]; [FileOff.off_invs_lookup]
+        selects the slot at the call. *)
+     off_invs γf ∗
      bio_ctx (fwn_bio fn)
-       (fs_view (fwn_fs fn) (fwn_disk fn) (fwn_dev fn) (fwn_cov fn)) ∗
+       (fs_view (fwn_fs fn) (fwn_disk fn) icfg_dev (fwn_cov fn)) ∗
      (* THE LOG: begin_op mints the reservation, end_op spends it, and the
         loop does one transaction PER CHUNK *)
      log_ctx (fwn_log fn) (fwn_bio fn) (fwn_fs fn) (fwn_cov fn)
-             (fwn_logstart fn) (fwn_dev fn) ∗
+             (fwn_logstart fn) icfg_dev ∗
      (* end_op's crash seam and era certificate *)
      fs_crash_seam (fwn_cov fn) (fwn_logstart fn) ∗
      gen_cert ∗
      (* balloc's two PERSISTENT printk credentials *)
      kernel_data ∗
      printk_env (fwn_pr fn) (fwn_uart fn) (fwn_disk fn) ∗
-     (* THE THREE PERSISTENT ICACHE INVARIANTS SpecIlock / SpecIunlock take *)
+     (* THE THREE PERSISTENT ICACHE INVARIANTS SpecIlock / SpecIunlock take,
+        the escrow at the FAMILY where it was per-slot *)
      itable_inv ∗
-     ic_escrow (fwn_ic fn) (fwn_fs fn) (fwn_ireg fn) (fwn_cov fn)
-               (fwn_logstart fn) (fwn_ik fn) ∗
-     ireg_inv (fwn_ireg fn) (fwn_fs fn) (fwn_inodestart fn) (fwn_nib fn) ∗
-     (* THE ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
-     is_sleeplock (fwn_ilk fn) (fwn_islk fn) (i_lock (fc_ip Cf)) "inode"%string
-       (ic_tok (fwn_ic fn) (fwn_ik fn)) ∗
-     (* THE LENT SHARE, GENERATION-NAMED (design fs-icache.md §17.3, ratified
-        §17.4).  fileread takes the arity-preserving [inode_shr]; filewrite
-        cannot, because SpecIlock's type witness is stated at the CALLER'S
-        generation and a caller that has forgotten which generation its slice
-        names cannot join the two shots.  A holder moves between the two
-        forms with one [IcacheRef.inode_shr_gen_intro]. *)
-     IcacheRef.inode_shr_gen (fwn_ik fn) (fwn_s fn)
-       (fwn_dev fn) (fwn_inum fn) (fwn_g fn) ∗
-     (* ...AND THAT GENERATION'S TYPE WITNESS (design §17.6 (5), ratified
-        §17.7).  This is the resource that carries sys_open's "no writable
-        directory fd" down to the re-park; see the header.  It is exactly
-        what [FileInvDefs.inode_pay] holds, in exactly that conditional form
-        -- so a caller holding the fd's payload owes nothing new. *)
-     IcacheRef.ity_shot (fwn_g fn) (fwn_ty fn) ∗
-     ⌜fc_wbool Cf = true -> bv_unsigned (fwn_ty fn) <> T_DIR_z⌝ ∗
+     ic_escrows (fwn_ic fn) (fwn_fs fn) (fwn_ireg fn) (fwn_cov fn)
+                (fwn_logstart fn) ∗
+     ireg_inv (fwn_ireg fn) (fwn_fs fn) (fwn_inodestart fn) icfg_nib ∗
+     (* EVERY ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
+     ic_sleeplocks (fwn_ic fn) ∗
+     (* THE LENT SHARE AND ITS GENERATION'S TYPE WITNESS ARE NOT HERE.
+        Both used to be: the generation-named share (design fs-icache.md
+        §17.3, ratified §17.4) and [ity_shot] at that generation (§17.6 (5),
+        ratified §17.7), the resource that carries sys_open's "no writable
+        directory fd" down to the re-park.  Both are EXACTLY what
+        [FileInvDefs.inode_pay] holds, in exactly those forms -- which is why
+        asking a caller for them was always redundant and, once the caller is
+        a syscall, unsatisfiable.  [SpecFileread.fileread_pay_carve] hands out
+        the share, the generation, [ity_shot] AND the [fc_wbool] side
+        condition together, and takes the share back. *)
      (* sb.inodestart (iupdate), sb.size and sb.bmapstart (bmap -> balloc) *)
      sb_inodestart ↦₄{fwn_dqs fn}
        (mword_of_int (fwn_inodestart fn) : mword 32) ∗
@@ -403,17 +471,16 @@ Section SpecFilewrite.
         commit borrow from the same three, one transaction at a time. *)
      bslots (fwn_bio fn) 3)%I.
 
-  (* What comes back: THE SAME SHARE at the same fraction and the same
-     generation (the checkout descriptor pins the fraction, §14.8; the
-     generation cannot move while this share exists, §17.6), the three
-     superblock fields, the slot units, and the bitmap AT A SET THAT ONLY
-     GREW.  [used'] is existential because the number of chunks -- hence of
-     ballocs -- is not a function of anything the caller holds. *)
-  Definition filewrite_fs_out (fn : fwrite_names) (Cf : fcontent)
+  (* What comes back: the three superblock fields, the slot units, and the
+     bitmap AT A SET THAT ONLY GREW.  [used'] is existential because the
+     number of chunks -- hence of ballocs -- is not a function of anything
+     the caller holds.  NO SHARE: it never left the reference's payload, so
+     there is nothing here for it to be returned through, and hence no
+     generation to lose (which is what made a returned [inode_shr]
+     ungatherable in the first place). *)
+  Definition filewrite_fs_out (fn : fwrite_names)
       (used' : gset Z) : iProp Σ :=
     (⌜fwn_used fn ⊆ used'⌝ ∗
-     IcacheRef.inode_shr_gen (fwn_ik fn) (fwn_s fn)
-       (fwn_dev fn) (fwn_inum fn) (fwn_g fn) ∗
      sb_inodestart ↦₄{fwn_dqs fn}
        (mword_of_int (fwn_inodestart fn) : mword 32) ∗
      sb_size ↦₄{fwn_dqbs fn} (mword_of_int (fwn_size fn) : mword 32) ∗
@@ -423,12 +490,12 @@ Section SpecFilewrite.
      bslots (fwn_bio fn) 3)%I.
 
   (* ---- and the three, selected by the file's type ---- *)
-  Definition filewrite_env (γa : gname) (γf : gname) (k : nat)
+  Definition filewrite_env (γf : gname)
       (fn : fwrite_names) (Cf : fcontent) : iProp Σ :=
     (if bool_decide (fc_type Cf = FD_PIPE) then emp
      else if bool_decide (fc_type Cf = FD_DEVICE) then filewrite_dev_env fn Cf
      else if bool_decide (fc_type Cf = FD_INODE)
-     then filewrite_fs_env γa γf k fn Cf
+     then filewrite_fs_env γf fn
      else emp)%I.
 
   Definition filewrite_env_out (fn : fwrite_names) (Cf : fcontent)
@@ -436,7 +503,7 @@ Section SpecFilewrite.
     (if bool_decide (fc_type Cf = FD_PIPE) then emp
      else if bool_decide (fc_type Cf = FD_DEVICE) then filewrite_dev_out fn Cf
      else if bool_decide (fc_type Cf = FD_INODE)
-     then filewrite_fs_out fn Cf used'
+     then filewrite_fs_out fn used'
      else emp)%I.
 
   (* THE EARLY RETURN'S OBLIGATION, checked here rather than discovered in
@@ -444,18 +511,17 @@ Section SpecFilewrite.
      1) and before the type is ever tested, so the environment must already
      contain everything the postcondition promises -- at [used' = fwn_used],
      the set nothing has touched. *)
-  Lemma filewrite_fs_env_out γa γf k fn Cf :
-    filewrite_fs_env γa γf k fn Cf -∗ filewrite_fs_out fn Cf (fwn_used fn).
+  Lemma filewrite_fs_env_out γf fn :
+    filewrite_fs_env γf fn -∗ filewrite_fs_out fn (fwn_used fn).
   Proof.
     rewrite /filewrite_fs_env /filewrite_fs_out.
     iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
-              _ & _ & _ & _ & Hshr & _ & _ & Hsbi & Hsbs & Hsbb & Hbits &
-              _ & _ & _ & Hbsl)".
-    iFrame "Hshr Hsbi Hsbs Hsbb Hbits Hbsl". iPureIntro. reflexivity.
+              _ & Hsbi & Hsbs & Hsbb & Hbits & _ & _ & _ & Hbsl)".
+    iFrame "Hsbi Hsbs Hsbb Hbits Hbsl". iPureIntro. reflexivity.
   Qed.
 
-  Lemma filewrite_env_out_of_env γa γf k fn Cf :
-    filewrite_env γa γf k fn Cf -∗ filewrite_env_out fn Cf (fwn_used fn).
+  Lemma filewrite_env_out_of_env γf fn Cf :
+    filewrite_env γf fn Cf -∗ filewrite_env_out fn Cf (fwn_used fn).
   Proof.
     rewrite /filewrite_env /filewrite_env_out.
     case_bool_decide; [by iIntros "$"|].
@@ -467,8 +533,8 @@ Section SpecFilewrite.
   (* A file that is neither a pipe, nor a device, nor an inode costs its
      writer nothing -- the arm is [panic] at +0x11e (decode note 3), and
      [panic_wp_any] closes it. *)
-  Lemma filewrite_env_none γa γf k fn Cf :
-    fc_type Cf = FD_NONE -> ⊢ filewrite_env γa γf k fn Cf.
+  Lemma filewrite_env_none γf fn Cf :
+    fc_type Cf = FD_NONE -> ⊢ filewrite_env γf fn Cf.
   Proof.
     intro Ht. rewrite /filewrite_env Ht.
     rewrite bool_decide_eq_false_2; [|by vm_compute].
@@ -482,7 +548,7 @@ End SpecFilewrite.
 Definition wp_filewrite_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      !fsCrashG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !fsCrashG Σ, !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
@@ -527,7 +593,7 @@ Definition wp_filewrite_sconf_body
   kalloc_env γa None -∗
   procs_inv γs -∗
   (* ...and what the file's TYPE selects *)
-  filewrite_env γa γf k fn Cf -∗
+  filewrite_env γf fn Cf -∗
   (* THE CROSSING IS [true], NOT [b].  Every arm of this function parks, and
      the porting guide's rule is that a PARKING function's [wp_next] index is
      [true] unconditionally -- a swtch moves the hart whatever SIE was doing.
@@ -553,7 +619,7 @@ Module Type FILEWRITE.
   Parameter wp_filewrite_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !fsCrashG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             !fsCrashG Σ, !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
 
       (γa : gname) (γf : gname)

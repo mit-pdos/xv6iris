@@ -86,6 +86,8 @@ Require Import DinodeEnc InodeInv InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheEscrow.
+Require Import IcacheBoot.   (* [ic_sleeplocks_acc]: the entry sleeplock the
+                                carve's slot selects out of the family. *)
 (* RE-IMPORT: [IcacheInv.islot] shadows [DinodeEnc.islot] and
    [IcacheRef.inode_ref] shadows [FileInv]'s placeholder; neither icache
    name is meant here except through the two contracts. *)
@@ -233,9 +235,13 @@ Module FilereadProof (Piperead : PIPEREAD) (Ilock : ILOCK) (Readi : READI)
                      (Iunlock : IUNLOCK) (Consoleread : CONSOLEREAD) : FILEREAD.
 
 Section ProofFileread.
+  (* NO [!icacheG Σ]: [fileG] bundles it, and binding both gives two
+     instances whose propositions print identically and do not unify.  The
+     carve is what makes that visible (durable-notes.md; SpecFileread.v's
+     note). *)
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -253,10 +259,10 @@ Section ProofFileread.
   Local Ltac regne := reg_ne_side.
 
   (* ---- the type-indexed environment, opened at the type the code read ---- *)
-  Local Lemma fr_env_dev (γf' : gname) (k' : nat)
+  Local Lemma fr_env_dev (γf' : gname)
       (fn' : fread_names) (Cf' : fcontent) :
     fc_type Cf' = FD_DEVICE ->
-    fileread_env γf' k' fn' Cf' -∗ fileread_dev_env fn' Cf'.
+    fileread_env γf' fn' Cf' -∗ fileread_dev_env fn' Cf'.
   Proof.
     intro Ht. rewrite /fileread_env Ht.
     rewrite bool_decide_eq_false_2; [| by vm_compute].
@@ -277,28 +283,32 @@ Section ProofFileread.
   Local Lemma fr_dev_in (fn' : fread_names) (Cf' : fcontent) :
     (dev_major Cf' <= NDEV_max)%Z ->
     fileread_dev_env fn' Cf' -∗
-    ⌜frn_rp fn' = (zero_reg : mword 64)
-      \/ frn_rp fn' = (mword_of_int KernelSyms.consoleread : mword 64)⌝ ∗
-    a_devsw_read (dev_major Cf') ↦₈{frn_dqv fn'} frn_rp fn'.
+    ⌜frn_rp fn' (dev_major Cf') = (zero_reg : mword 64)
+      \/ frn_rp fn' (dev_major Cf')
+          = (mword_of_int KernelSyms.consoleread : mword 64)⌝ ∗
+    a_devsw_read (dev_major Cf') ↦₈{frn_dqv fn' (dev_major Cf')}
+      frn_rp fn' (dev_major Cf').
   Proof.
     intro H. rewrite /fileread_dev_env. case_decide as H'; [by iIntros "$" | contradiction].
   Qed.
 
   Local Lemma fr_dev_in_back (fn' : fread_names) (Cf' : fcontent) :
     (dev_major Cf' <= NDEV_max)%Z ->
-    ⌜frn_rp fn' = (zero_reg : mword 64)
-      \/ frn_rp fn' = (mword_of_int KernelSyms.consoleread : mword 64)⌝ -∗
-    a_devsw_read (dev_major Cf') ↦₈{frn_dqv fn'} frn_rp fn' -∗
+    ⌜frn_rp fn' (dev_major Cf') = (zero_reg : mword 64)
+      \/ frn_rp fn' (dev_major Cf')
+          = (mword_of_int KernelSyms.consoleread : mword 64)⌝ -∗
+    a_devsw_read (dev_major Cf') ↦₈{frn_dqv fn' (dev_major Cf')}
+      frn_rp fn' (dev_major Cf') -∗
     fileread_dev_env fn' Cf'.
   Proof.
     intro H. rewrite /fileread_dev_env. case_decide as H'; [| contradiction].
     iIntros "%Hd Hc". iSplitR; [iPureIntro; exact Hd | iExact "Hc"].
   Qed.
 
-  Local Lemma fr_env_fs (γf' : gname) (k' : nat)
+  Local Lemma fr_env_fs (γf' : gname)
       (fn' : fread_names) (Cf' : fcontent) :
     fc_type Cf' = FD_INODE ->
-    fileread_env γf' k' fn' Cf' -∗ fileread_fs_env γf' k' fn' Cf'.
+    fileread_env γf' fn' Cf' -∗ fileread_fs_env γf' fn'.
   Proof.
     intro Ht. rewrite /fileread_env Ht.
     rewrite bool_decide_eq_false_2; [| by vm_compute].
@@ -309,7 +319,7 @@ Section ProofFileread.
 
   Local Lemma fr_env_out_fs (fn' : fread_names) (Cf' : fcontent) :
     fc_type Cf' = FD_INODE ->
-    fileread_fs_out fn' Cf' -∗ fileread_env_out fn' Cf'.
+    fileread_fs_out fn' -∗ fileread_env_out fn' Cf'.
   Proof.
     intro Ht. rewrite /fileread_env_out Ht.
     rewrite bool_decide_eq_false_2; [| by vm_compute].
@@ -945,7 +955,7 @@ Section ProofFileread.
              which is exactly what the environment's guard is about. *)
           assert (Htyd : fc_type Cf = FD_DEVICE)
             by (apply eq_vec_true_iff; exact Hp3).
-          iDestruct (fr_env_dev γf k fn Cf Htyd with "Henv") as "Henv".
+          iDestruct (fr_env_dev γf fn Cf Htyd with "Henv") as "Henv".
           pose proof (fr_major_range (fc_major Cf : mword 16)) as Hmjr.
           iPoseProof (fri_72 with "Htext") as "Hi72".
           iPoseProof (fri_76 with "Htext") as "Hi76".
@@ -1189,12 +1199,12 @@ Section ProofFileread.
                apply addv_sext0. }
              iEval (rewrite -Hpsl) in "Hslot".
              iApply (wp_cld_s_sconf (mword_of_int (FR + 0x8e)) Ra5 Ra5
-                       (mword_of_int 0 : mword 12) D8 (K - 6)%nat (frn_rp fn) b
+                       (mword_of_int 0 : mword 12) D8 (K - 6)%nat (frn_rp fn (dev_major Cf)) b
                        ltac:(vm_compute; discriminate) ltac:(rdok)
                        with "Hcg Hpc Hi8e Hslot [-]").
              iIntros (CID55 Hs55) "Hcg Hpc Hslot". iEval (rewrite Hpsl) in "Hslot".
-             set (D9 := <[Regidx Ra5 := regval_into_reg (frn_rp fn)]> D8).
-             assert (HD9a5 : rget D9 Ra5 = frn_rp fn).
+             set (D9 := <[Regidx Ra5 := regval_into_reg (frn_rp fn (dev_major Cf))]> D8).
+             assert (HD9a5 : rget D9 Ra5 = frn_rp fn (dev_major Cf)).
              { rewrite (rget_ne D9 Ra5 ltac:(vm_compute; discriminate)).
                rewrite /D9; apply upd_eq. }
              assert (HD9a0 : D9 !!! Regidx Ra0 = fnode k).
@@ -1567,15 +1577,41 @@ Section ProofFileread.
                 BORROW protocol; iunlock. *)
              assert (Htyi : fc_type Cf = FD_INODE)
                by (apply eq_vec_true_iff; exact Hp2).
-             iDestruct (fr_env_fs γf k fn Cf Htyi with "Henv") as "Henv".
+             iDestruct (fr_env_fs γf fn Cf Htyi with "Henv") as "Henv".
              rewrite /fileread_fs_env.
-             iDestruct "Henv" as "(%Hlg & %Hist & %Hibcov & %Hinlt & %Hipk &
-                                   %Hik & #Hoffinv & #Hbio & #Hitbl & #Hesc &
-                                   #Hireg & #Hslk & Href & Hsb &
+             iDestruct "Henv" as "(%Hlg & %Hist & %Hgeo &
+                                   #Hoffinvs & #Hbio & #Hitbl & #Hescs &
+                                   #Hireg & #Hslks & Hsb &
                                    #Hdevi & #Hdgeom & #Hdlock & Hbslot)".
-             (* the entry is itable slot [frn_ik fn]: the sleeplock's address
-                is stated over the file's [ip], the icache's over the slot *)
-             iEval (rewrite Hipk) in "Hslk".
+             (* ---- THE CARVE (fs-sysfile S4', blocker 2's ratified
+                alternative; ProofFilestat is the landed instance).  The
+                slot, the inum, the device, the region bound and the SHARE
+                are not the caller's to supply -- they come out of the
+                reference's own FD_INODE payload, which is a
+                generation-named slice of exactly this inode.  The per-slot
+                escrow and sleeplock then come out of the two families by
+                the slot the payload named, and the off-borrow invariant out
+                of the off FAMILY by the slot THIS CONTRACT names. ---- *)
+             iDestruct (fileread_pay_carve γf k q Cf (or_introl Htyi)
+                          with "Hrpay")
+               as (ikk inm ssh gsh ty0)
+                  "(%Hipk & %Hik & %Hinlt & %Hnd0 & #Hshot0 & Hshr0 &
+                    Hpayback)".
+             assert (Hibcov : IBLOCK inm (frn_inodestart fn) ∈ frn_cov fn)
+               by (apply Hgeo; exact Hinlt).
+             iDestruct (off_invs_lookup γf k Hk with "Hoffinvs") as "#Hoffinv".
+             iDestruct (ic_escrows_acc2 (frn_ic fn) (frn_fs fn) (frn_ireg fn)
+                          (frn_cov fn) (frn_logstart fn) ikk Hik with "Hescs")
+               as "#Hesc".
+             iDestruct (ic_sleeplocks_acc (frn_ic fn) ikk Hik with "Hslks")
+               as (gil gisl) "#Hslk".
+             (* LEND HALF, KEEP HALF.  iunlock returns the arity-preserving
+                [inode_shr], so the generation the payload names has to be
+                pinned on the way back, and the kept half is what pins it
+                ([inode_shr_regen2]).  filestat and filewrite both do
+                exactly this. *)
+             iEval (rewrite inode_shr_gen_halve2) in "Hshr0".
+             iDestruct "Hshr0" as "[Href Hkeep]".
              iPoseProof (fri_2e with "Htext") as "Hi2e".
              iPoseProof (fri_30 with "Htext") as "Hi30".
              iPoseProof (fri_34 with "Htext") as "Hi34".
@@ -1686,17 +1722,17 @@ Section ProofFileread.
              iDestruct (proc_priv_core_pid pj pidv V with "Hpriv") as "[Hppid Hpivbk]".
              iDestruct (cpu_own_transport CID CID72 0%nat eb pj C b ltac:(wp_next_chain)
                           with "Hcnt") as "Hcnt".
-             (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)):
-                the binder is the one [inode_shr] already carried. *)
-             iEval (rewrite inode_shr_gen_intro) in "Href".
-             iDestruct "Href" as (gsh) "Href".
+             (* SpecIlock v4 names the share's GENERATION (design 17.3 (A));
+                the payload's slice already does, so nothing has to be
+                introduced here -- the [inode_shr_gen_intro] this call used
+                to open with is gone with the caller-supplied [inode_shr]. *)
              iApply (Ilock.wp_ilock_sconf γs j γlp (frn_uart fn) (frn_disk fn)
                        (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
                        (frn_bio fn) (frn_fs fn) (frn_ireg fn) (frn_ic fn)
-                       (frn_ilk fn) (frn_islk fn)
+                       gil gisl
                        (frn_cov fn) (frn_logstart fn) (frn_inodestart fn)
-                       (frn_nib fn) (frn_ik fn) (frn_s fn) gsh
-                       (frn_dev fn) (frn_inum fn)
+                       icfg_nib ikk (ssh/2)%Qp gsh
+                       icfg_dev inm
                        pidv (DfracOwn (1/4)) (frn_dqs fn)
                        I2 (K - 6)%nat eb C b
                        (fr_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
@@ -1899,7 +1935,7 @@ Section ProofFileread.
              iApply (Readi.wp_readi_sconf γs j γlp (frn_uart fn) (frn_disk fn)
                        (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
                        (frn_bio fn) (frn_fs fn) γa γf
-                       (frn_cov fn) (frn_logstart fn) (frn_dev fn) (fc_ip Cf)
+                       (frn_cov fn) (frn_logstart fn) icfg_dev (fc_ip Cf)
                        bml data dnl
                        true (Z.to_nat (bv_unsigned v)) (Z.to_nat n)
                        (fun _ => (mword_of_int 0 : mword 8)) V
@@ -1998,7 +2034,7 @@ Section ProofFileread.
                 iModIntro.
                 (* re-assemble the checked-out bundle, back at the SLOT *)
                 iAssert (ic_loaded (frn_fs fn) (frn_ireg fn) (frn_cov fn)
-                           (frn_logstart fn) (frn_ik fn) (frn_inum fn) dnl bml)
+                           (frn_logstart fn) ikk inm dnl bml)
                   with "[Hdnat Hmeta Hmap Hblocks]" as "Hlk".
                 { rewrite /ic_loaded /inode_map -Hipk. iExists data.
                   iSplitR; [iPureIntro; split_and!;
@@ -2009,7 +2045,7 @@ Section ProofFileread.
                   iSplitR; [iPureIntro; exact Hdok |].
                   iDestruct "Hmap" as "[Haddrs Hindres]".
                   iFrame "Hdnat Hmeta Haddrs Hindres Hblocks". }
-                iAssert (i_valid (ientry (frn_ik fn)) ↦₄ valid_word true)%I
+                iAssert (i_valid (ientry ikk) ↦₄ valid_word true)%I
                   with "[Hvalid]" as "Hvalid"; [rewrite -Hipk; iExact "Hvalid" |].
                 iEval (rewrite Hipk) in "Hidev".
                 iEval (rewrite Hipk) in "Hslpid".
@@ -2066,9 +2102,9 @@ Section ProofFileread.
                 iDestruct (cpu_own_transport CIDrd CID82 0%nat eb pj C b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
                 iApply (Iunlock.wp_iunlock_sconf γs (frn_fs fn) (frn_ireg fn)
-                          (frn_ic fn) (frn_ilk fn) (frn_islk fn)
+                          (frn_ic fn) gil gisl
                           (frn_cov fn) (frn_logstart fn)
-                          (frn_ik fn) (frn_s fn) gsh (frn_dev fn) (frn_inum fn)
+                          ikk (ssh/2)%Qp gsh icfg_dev inm
                           dnl bml
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj C b
                           (fr_av_iunlock K HK) Hik
@@ -2078,6 +2114,15 @@ Section ProofFileread.
                                 Hdep Hidev Hinum Hvalid Hlk Hshot [-]").
                 iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout".
                 iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
+                (* THE GATHER: iunlock gives the half back WITHOUT its
+                   generation; the half that never left pins it
+                   ([IcacheRef.live_gen_agree], inside [inode_shr_regen2]),
+                   and the payload takes the whole slice back.  From here the
+                   reference is intact again. *)
+                iDestruct (inode_shr_regen2 ikk (ssh/2)%Qp (ssh/2)%Qp
+                             icfg_dev inm gsh with "Hkeep Hrefout") as "Hshr".
+                iEval (rewrite Qp.div_2) in "Hshr".
+                iDestruct ("Hpayback" with "Hshr") as "Hrpay".
                 assert (Hpc54 : ret_pc (N2 !!! Regidx Rra) = mword_of_int (FR + 0x54)).
                 { rewrite HN2ra. apply bv_eq; vm_compute; reflexivity. }
                 iEval (rewrite Hpc54) in "Hpc".
@@ -2130,7 +2175,7 @@ Section ProofFileread.
                           with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                 Hpriv
-                                [Hrefout Hsb Hbslot]").
+                                [Hsb Hbslot]").
                 { exact Hcsf. }
                 { exact Hupt. }
                 { exact Hretok. }
@@ -2139,7 +2184,7 @@ Section ProofFileread.
                 { rewrite /file_ref /file_fields.
                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                 { iApply (fr_env_out_fs fn Cf Htyi). rewrite /fileread_fs_out.
-                  iFrame "Hsb Hbslot Hrefout". }
+                  iFrame "Hsb Hbslot". }
              ++ (* ---- the update RUNS: f->off += r ---- *)
                 iPoseProof (fri_48 with "Htext") as "Hi48".
                 iPoseProof (fri_4a with "Htext") as "Hi4a".
@@ -2261,7 +2306,7 @@ Section ProofFileread.
                 iModIntro.
                 (* re-assemble the checked-out bundle, back at the SLOT *)
                 iAssert (ic_loaded (frn_fs fn) (frn_ireg fn) (frn_cov fn)
-                           (frn_logstart fn) (frn_ik fn) (frn_inum fn) dnl bml)
+                           (frn_logstart fn) ikk inm dnl bml)
                   with "[Hdnat Hmeta Hmap Hblocks]" as "Hlk".
                 { rewrite /ic_loaded /inode_map -Hipk. iExists data.
                   iSplitR; [iPureIntro; split_and!;
@@ -2272,7 +2317,7 @@ Section ProofFileread.
                   iSplitR; [iPureIntro; exact Hdok |].
                   iDestruct "Hmap" as "[Haddrs Hindres]".
                   iFrame "Hdnat Hmeta Haddrs Hindres Hblocks". }
-                iAssert (i_valid (ientry (frn_ik fn)) ↦₄ valid_word true)%I
+                iAssert (i_valid (ientry ikk) ↦₄ valid_word true)%I
                   with "[Hvalid]" as "Hvalid"; [rewrite -Hipk; iExact "Hvalid" |].
                 iEval (rewrite Hipk) in "Hidev".
                 iEval (rewrite Hipk) in "Hslpid".
@@ -2329,9 +2374,9 @@ Section ProofFileread.
                 iDestruct (cpu_own_transport CIDrd CID92 0%nat eb pj C b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
                 iApply (Iunlock.wp_iunlock_sconf γs (frn_fs fn) (frn_ireg fn)
-                          (frn_ic fn) (frn_ilk fn) (frn_islk fn)
+                          (frn_ic fn) gil gisl
                           (frn_cov fn) (frn_logstart fn)
-                          (frn_ik fn) (frn_s fn) gsh (frn_dev fn) (frn_inum fn)
+                          ikk (ssh/2)%Qp gsh icfg_dev inm
                           dnl bml
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj C b
                           (fr_av_iunlock K HK) Hik
@@ -2341,6 +2386,15 @@ Section ProofFileread.
                                 Hdep Hidev Hinum Hvalid Hlk Hshot [-]").
                 iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout".
                 iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
+                (* THE GATHER: iunlock gives the half back WITHOUT its
+                   generation; the half that never left pins it
+                   ([IcacheRef.live_gen_agree], inside [inode_shr_regen2]),
+                   and the payload takes the whole slice back.  From here the
+                   reference is intact again. *)
+                iDestruct (inode_shr_regen2 ikk (ssh/2)%Qp (ssh/2)%Qp
+                             icfg_dev inm gsh with "Hkeep Hrefout") as "Hshr".
+                iEval (rewrite Qp.div_2) in "Hshr".
+                iDestruct ("Hpayback" with "Hshr") as "Hrpay".
                 assert (Hpc54 : ret_pc (N2 !!! Regidx Rra) = mword_of_int (FR + 0x54)).
                 { rewrite HN2ra. apply bv_eq; vm_compute; reflexivity. }
                 iEval (rewrite Hpc54) in "Hpc".
@@ -2393,7 +2447,7 @@ Section ProofFileread.
                           with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                 Hpriv
-                                [Hrefout Hsb Hbslot]").
+                                [Hsb Hbslot]").
                 { exact Hcsf. }
                 { exact Hupt. }
                 { exact Hretok2. }
@@ -2402,7 +2456,7 @@ Section ProofFileread.
                 { rewrite /file_ref /file_fields.
                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                 { iApply (fr_env_out_fs fn Cf Htyi). rewrite /fileread_fs_out.
-                  iFrame "Hsb Hbslot Hrefout". }
+                  iFrame "Hsb Hbslot". }
           -- (* ================ NOT A FILE AT ALL: panic ==========
                 [SpecPanic.panic_wp_any] closes the arm; panic never
                 returns, so there is nothing after the [jal]. *)

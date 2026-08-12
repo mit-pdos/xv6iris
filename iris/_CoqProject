@@ -1046,9 +1046,11 @@ ProofProcdumpParts.v
 ProofProcdumpLoop.v
 ProofProcdump.v
 LinkProcdump.v
+LinkSysFstat.v
 ProofKexecParts.v
 ProofKexecA.v
 ProofKexecB.v
 SpecSysFstat.v
 SpecSysRead.v
 SpecSysWrite.v
+ProofSysFstat.v

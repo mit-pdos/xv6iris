@@ -822,6 +822,8 @@ Require Import DinodeEnc InodeInv InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheEscrow.
+Require Import IcacheBoot.   (* [ic_sleeplocks_acc]: the entry sleeplock the
+                                carve's slot selects out of the family. *)
 (* RE-IMPORT, fileread's line for line: [IcacheInv.islot] shadows
    [DinodeEnc.islot] and [IcacheRef.inode_ref] shadows [FileInv]'s
    placeholder; neither icache name is meant here except through the two
@@ -945,7 +947,7 @@ Module FilewriteProof (Pipewrite : PIPEWRITE) (Ilock : ILOCK) (Writei : WRITEI)
 Section ProofFilewrite.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -972,10 +974,10 @@ Section ProofFilewrite.
      fileread's [fr_env_*] block, one arm at a time; the [used'] parameter is
      the only difference, and on the device arm it is the set nothing
      touched. ---------------------------------------------------------- *)
-  Local Lemma fw_env_dev (γa' γf' : gname) (k' : nat)
+  Local Lemma fw_env_dev (γf' : gname)
       (fn' : fwrite_names) (Cf' : fcontent) :
     fc_type Cf' = FD_DEVICE ->
-    filewrite_env γa' γf' k' fn' Cf' -∗ filewrite_dev_env fn' Cf'.
+    filewrite_env γf' fn' Cf' -∗ filewrite_dev_env fn' Cf'.
   Proof.
     intro Ht. rewrite /filewrite_env Ht.
     rewrite bool_decide_eq_false_2; [| by vm_compute].
@@ -997,9 +999,11 @@ Section ProofFilewrite.
   Local Lemma fw_dev_in (fn' : fwrite_names) (Cf' : fcontent) :
     (dev_major Cf' <= NDEV_max)%Z ->
     filewrite_dev_env fn' Cf' -∗
-    ⌜fwn_wp fn' = (zero_reg : mword 64)
-      \/ fwn_wp fn' = (mword_of_int KernelSyms.consolewrite : mword 64)⌝ ∗
-    a_devsw_write (dev_major Cf') ↦₈{fwn_dqv fn'} fwn_wp fn'.
+    ⌜fwn_wp fn' (dev_major Cf') = (zero_reg : mword 64)
+      \/ fwn_wp fn' (dev_major Cf')
+          = (mword_of_int KernelSyms.consolewrite : mword 64)⌝ ∗
+    a_devsw_write (dev_major Cf') ↦₈{fwn_dqv fn' (dev_major Cf')}
+      fwn_wp fn' (dev_major Cf').
   Proof.
     intro H. rewrite /filewrite_dev_env.
     case_decide as H'; [by iIntros "$" | contradiction].
@@ -1007,9 +1011,11 @@ Section ProofFilewrite.
 
   Local Lemma fw_dev_in_back (fn' : fwrite_names) (Cf' : fcontent) :
     (dev_major Cf' <= NDEV_max)%Z ->
-    ⌜fwn_wp fn' = (zero_reg : mword 64)
-      \/ fwn_wp fn' = (mword_of_int KernelSyms.consolewrite : mword 64)⌝ -∗
-    a_devsw_write (dev_major Cf') ↦₈{fwn_dqv fn'} fwn_wp fn' -∗
+    ⌜fwn_wp fn' (dev_major Cf') = (zero_reg : mword 64)
+      \/ fwn_wp fn' (dev_major Cf')
+          = (mword_of_int KernelSyms.consolewrite : mword 64)⌝ -∗
+    a_devsw_write (dev_major Cf') ↦₈{fwn_dqv fn' (dev_major Cf')}
+      fwn_wp fn' (dev_major Cf') -∗
     filewrite_dev_env fn' Cf'.
   Proof.
     intro H. rewrite /filewrite_dev_env. case_decide as H'; [| contradiction].
@@ -1022,10 +1028,10 @@ Section ProofFilewrite.
      bitmap only grows.  Neither does anything but reduce three
      [bool_decide]s, and they exist so that no [vm_compute] on an
      [fcontent] runs at a call site. ------------------------------------ *)
-  Local Lemma fw_env_fs (ga' gf' : gname) (k' : nat)
+  Local Lemma fw_env_fs (gf' : gname)
       (fn' : fwrite_names) (Cf' : fcontent) :
     fc_type Cf' = FD_INODE ->
-    filewrite_env ga' gf' k' fn' Cf' -∗ filewrite_fs_env ga' gf' k' fn' Cf'.
+    filewrite_env gf' fn' Cf' -∗ filewrite_fs_env gf' fn'.
   Proof.
     intro Ht. rewrite /filewrite_env Ht.
     rewrite bool_decide_eq_false_2; [| by vm_compute].
@@ -1037,7 +1043,7 @@ Section ProofFilewrite.
   Local Lemma fw_env_out_fs (fn' : fwrite_names) (Cf' : fcontent)
       (used' : gset Z) :
     fc_type Cf' = FD_INODE ->
-    filewrite_fs_out fn' Cf' used' -∗ filewrite_env_out fn' Cf' used'.
+    filewrite_fs_out fn' used' -∗ filewrite_env_out fn' Cf' used'.
   Proof.
     intro Ht. rewrite /filewrite_env_out Ht.
     rewrite bool_decide_eq_false_2; [| by vm_compute].
@@ -1439,16 +1445,18 @@ Section ProofFilewrite.
        are Coq hypotheses and cost the induction nothing. ---- *)
     log_geom_ok (fwn_cov fn) (fwn_logstart fn) ->
     (0 <= fwn_inodestart fn)%Z ->
-    IBLOCK (fwn_inum fn) (fwn_inodestart fn) ∈ fwn_cov fn ->
-    IBLOCK (fwn_inum fn) (fwn_inodestart fn)
-      ∉ log_region_set (fwn_logstart fn) ->
-    (bv_unsigned (fwn_inum fn) < 16 * Z.of_nat (fwn_nib fn))%Z ->
+    (* the REGION-WIDE geometry, quantified: the inum is existential in the
+       reference and only the carve names it (fs-sysfile S4c) *)
+    (forall inum : mword 32,
+       (bv_unsigned inum < 16 * Z.of_nat icfg_nib)%Z ->
+       IBLOCK inum (fwn_inodestart fn) ∈ fwn_cov fn) ->
+    (forall inum : mword 32,
+       (bv_unsigned inum < 16 * Z.of_nat icfg_nib)%Z ->
+       IBLOCK inum (fwn_inodestart fn)
+         ∉ log_region_set (fwn_logstart fn)) ->
     BitmapInv.bitmap_geom_ok (fwn_cov fn) (fwn_logstart fn)
       (fwn_bmapstart fn) (fwn_size fn) ->
     SpecPrintkGen.printk_gen_contract (fwn_pr fn) (fwn_uart fn) (fwn_disk fn) ->
-    fc_ip Cf = ientry (fwn_ik fn) ->
-    (fwn_ik fn < NINODE)%nat ->
-    (fc_wbool Cf = true -> bv_unsigned (fwn_ty fn) <> T_DIR_z) ->
     (* ---- THE FUEL, and everything the loop carries under it ---- *)
     forall (W : nat) (iz : Z) (PI : uptd) (SI : gset Z) (M : regfile),
     (n - iz <= Z.of_nat W)%Z ->
@@ -1494,26 +1502,26 @@ Section ProofFilewrite.
     (* ---- the PERSISTENT half of [filewrite_fs_env] ---- *)
     off_inv gf kx -∗
     bio_ctx (fwn_bio fn)
-      (fs_view (fwn_fs fn) (fwn_disk fn) (fwn_dev fn) (fwn_cov fn)) -∗
+      (fs_view (fwn_fs fn) (fwn_disk fn) icfg_dev (fwn_cov fn)) -∗
     log_ctx (fwn_log fn) (fwn_bio fn) (fwn_fs fn) (fwn_cov fn)
-      (fwn_logstart fn) (fwn_dev fn) -∗
+      (fwn_logstart fn) icfg_dev -∗
     fs_crash_seam (fwn_cov fn) (fwn_logstart fn) -∗
     gen_cert -∗
     KernelDataInv.kernel_data -∗
     SpecPrintkGen.printk_env (fwn_pr fn) (fwn_uart fn) (fwn_disk fn) -∗
     IcacheInv.itable_inv -∗
-    ic_escrow (fwn_ic fn) (fwn_fs fn) (fwn_ireg fn) (fwn_cov fn)
-      (fwn_logstart fn) (fwn_ik fn) -∗
-    ireg_inv (fwn_ireg fn) (fwn_fs fn) (fwn_inodestart fn) (fwn_nib fn) -∗
-    SleepLock.is_sleeplock (fwn_ilk fn) (fwn_islk fn) (i_lock (fc_ip Cf))
-      "inode"%string (ic_tok (fwn_ic fn) (fwn_ik fn)) -∗
-    ity_shot (fwn_g fn) (fwn_ty fn) -∗
+    (* the FAMILIES, since the slot is the carve's output and not the
+       caller's to name *)
+    ic_escrows (fwn_ic fn) (fwn_fs fn) (fwn_ireg fn) (fwn_cov fn)
+      (fwn_logstart fn) -∗
+    ireg_inv (fwn_ireg fn) (fwn_fs fn) (fwn_inodestart fn) icfg_nib -∗
+    ic_sleeplocks (fwn_ic fn) -∗
     dev_inv (fwn_uart fn) (fwn_disk fn) -∗
     DiskInv.disk_geom (fwn_disk fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) -∗
     is_lock (fwn_dlock fn) DiskInv.d_lock "virtio_disk"%string
       (DiskInv.disk_res (fwn_disk fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)) -∗
     (* ---- the EXCLUSIVE half, at the set the loop has reached ---- *)
-    filewrite_fs_out fn Cf SI -∗
+    filewrite_fs_out fn SI -∗
     (* ---- and the contract's own continuation ---- *)
     (* [true], verbatim from [SpecFilewrite]: this IS the contract's crossing,
        forwarded, so the two must be spelled the same or [iExact] fails. *)
@@ -1533,7 +1541,7 @@ Section ProofFilewrite.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hkf Hjp Hgsj Hlens Hfnj Hfnps Hn Heb Htyi Hwb Hspm Hpjeq.
-    intros P1 P2 P3 P4 P5 P6 P7 P8 P9 P10.
+    intros P1 P2 P3q P4q P6 P7.
     (* [pj] is the CALLER's let-bound local and every callee contract below
        states its resources at [proc_addr jx]; the two are the same word and
        the equation is eliminated once here rather than rewritten at each of
@@ -1549,8 +1557,8 @@ Section ProofFilewrite.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hprocs
              Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
              Href Hpriv #Hkenv
-             #Hoff #Hbio #Hlog #Hcrash #Hgc #Hkd #Hpk #Hit #Hesc #Hireg
-             #Hslk #Hty #Hdev #Hgeo #Hdlk Hout Hcont".
+             #Hoff #Hbio #Hlog #Hcrash #Hgc #Hkd #Hpk #Hit #Hescs #Hireg
+             #Hslks #Hdev #Hgeo #Hdlk Hout Hcont".
     (* PIN THE INDEX.  Same one-liner as the contract's own proof below, and
        needed for the same reason: the body calls THREE [true]-crossing
        parking contracts (ilock, writei, end_op), whose chain facts are
@@ -1685,16 +1693,30 @@ Section ProofFilewrite.
     assert (Hclt31 : (0 <= c < 2 ^ 31)%Z) by (apply fw_chunk_lt31; lia).
     assert (Hizlt31 : (0 <= iz < 2 ^ 31)%Z) by (apply (fw_i_lt31 n iz); lia).
     (* ---- the iteration's own resources ---- *)
-    iDestruct "Hout" as "(%Hsub & Hshr & Hsbi & Hsbsz & Hsbb & Hbmres & Hbsl)".
+    iDestruct "Hout" as "(%Hsub & Hsbi & Hsbsz & Hsbb & Hbmres & Hbsl)".
     iDestruct "Href" as "(Hrtok & Hrfields & Hrpay & Hrlv)".
     iEval (rewrite /file_fields) in "Hrfields".
     iDestruct "Hrfields" as "(Hcty & Hcrd & Hcwr & Hcpp & Hcip & Hcmaj)".
-    (* the entry IS itable slot [fwn_ik fn]: the sleeplock is stated over the
-       file's own [ip] and the two icache contracts over the slot. *)
-    iAssert (SleepLock.is_sleeplock (fwn_ilk fn) (fwn_islk fn)
-               (i_lock (ientry (fwn_ik fn))) "inode"%string
-               (ic_tok (fwn_ic fn) (fwn_ik fn))) as "#Hslk2".
-    { rewrite -P8. iExact "Hslk". }
+    (* ---- THE CARVE (fs-sysfile S4', blocker 2's ratified alternative;
+       ProofFilestat is the landed instance and ProofFileread the sibling).
+       The slot, the inum, the device, the region bound, the SHARE, the
+       GENERATION and the fd's recorded TYPE are not the caller's to supply
+       -- they come out of the reference's own FD_INODE payload.  It is done
+       once per ITERATION because the loop threads the reference whole; the
+       names below are local to the iteration and everything derived from
+       them is re-derived on the next one. ---- *)
+    iDestruct (fileread_pay_carve gf kx qx Cf (or_introl Htyi) with "Hrpay")
+      as (ik inum sh g ty)
+         "(%P8 & %P9 & %P5 & %P10 & #Hty & Hshr & Hpayback)".
+    assert (P3 : IBLOCK inum (fwn_inodestart fn) ∈ fwn_cov fn)
+      by (apply P3q; exact P5).
+    assert (P4 : IBLOCK inum (fwn_inodestart fn)
+                   ∉ log_region_set (fwn_logstart fn))
+      by (apply P4q; exact P5).
+    iDestruct (ic_escrows_acc2 (fwn_ic fn) (fwn_fs fn) (fwn_ireg fn)
+                 (fwn_cov fn) (fwn_logstart fn) ik P9 with "Hescs") as "#Hesc".
+    iDestruct (ic_sleeplocks_acc (fwn_ic fn) ik P9 with "Hslks")
+      as (gil gisl) "#Hslk2".
     iPoseProof (fwri_084 with "Htext") as "Hi84".
     iPoseProof (fwri_088 with "Htext") as "Hi88".
     iPoseProof (fwri_08c with "Htext") as "Hi8c".
@@ -1739,7 +1761,7 @@ Section ProofFilewrite.
     iDestruct (cpu_own_transport CID0 CIDa1 0%nat eb (proc_addr jx) C b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (BeginOp.wp_begin_op_sconf gs jx glp (fwn_bio fn) (fwn_log fn)
-              (fwn_fs fn) (fwn_cov fn) (fwn_logstart fn) (fwn_dev fn)
+              (fwn_fs fn) (fwn_cov fn) (fwn_logstart fn) icfg_dev
               pidv (DfracOwn (1/4)) D1 (K - 12)%nat eb C b
               (fw_av_begin_op K HK) Hjp Hgsj Heb
               with "Hcg Hcnt Htext Hpc Hpanic Hlog Hppid Hprocs [-]").
@@ -1808,10 +1830,10 @@ Section ProofFilewrite.
     iApply (Ilock.wp_ilock_sconf gs jx glp (fwn_uart fn) (fwn_disk fn)
               (fwn_dlock fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
               (fwn_bio fn) (fwn_fs fn) (fwn_ireg fn) (fwn_ic fn)
-              (fwn_ilk fn) (fwn_islk fn)
+              gil gisl
               (fwn_cov fn) (fwn_logstart fn) (fwn_inodestart fn)
-              (fwn_nib fn) (fwn_ik fn) (fwn_s fn / 2)%Qp (fwn_g fn)
-              (fwn_dev fn) (fwn_inum fn)
+              icfg_nib ik (sh / 2)%Qp g
+              icfg_dev inum
               pidv (DfracOwn (1/4)) (fwn_dqs fn)
               D3 (K - 12)%nat eb C b
               (fw_av_ilock K HK) P9 P1 P2 P3 P5 Hjp Hgsj
@@ -1840,6 +1862,9 @@ Section ProofFilewrite.
     (* THE FD'S TYPE, PINNED.  ilock's witness and the fd's own witness name
        ONE generation, so [ity_shot_agree] joins them and the environment's
        last pure field turns "the fd is writable" into "not a directory". *)
+    (* THE FD'S TYPE, PINNED.  ilock's witness and the fd's own witness (out
+       of the CARVE now, not out of a caller-supplied field) name ONE
+       generation, so [ity_shot_agree] joins them. *)
     iDestruct (ity_shot_agree with "Hshot Hty") as %Htyeq.
     assert (Hnodir : bv_unsigned (di_type dnl) <> T_DIR_z)
       by (rewrite Htyeq; exact (P10 Hwb)).
@@ -1849,7 +1874,7 @@ Section ProofFilewrite.
     iDestruct "Hlk" as (datal)
       "(%Hiok & %Hdok & Hdnat & Hmeta & Haddrs & Hindres & Hblocks)".
     destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
-    iAssert (inode_map (fwn_fs fn) (ientry (fwn_ik fn)) bml)
+    iAssert (inode_map (fwn_fs fn) (ientry ik) bml)
       with "[Haddrs Hindres]" as "Hmap".
     { rewrite /inode_map. iFrame. }
     (* ---- CHECK OUT the offset cell ---- *)
@@ -2005,10 +2030,10 @@ Section ProofFilewrite.
     iApply (Writei.wp_writei_sconf gs jx glp (fwn_uart fn) (fwn_disk fn)
               (fwn_dlock fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
               (fwn_bio fn) (fwn_log fn) (fwn_fs fn) (fwn_ireg fn) ga gf
-              (fwn_cov fn) (fwn_logstart fn) (fwn_inodestart fn) (fwn_nib fn)
-              (fwn_bmapstart fn) (fwn_size fn) (fwn_dev fn)
+              (fwn_cov fn) (fwn_logstart fn) (fwn_inodestart fn) icfg_nib
+              (fwn_bmapstart fn) (fwn_size fn) icfg_dev
               SI (fwn_pr fn)
-              (ientry (fwn_ik fn)) (fwn_inum fn)
+              (ientry ik) inum
               bml datal dnl dnl
               true (Z.to_nat (bv_unsigned v)) (Z.to_nat c)
               (fun _ => (mword_of_int 0 : mword 8))
@@ -2153,11 +2178,11 @@ Section ProofFilewrite.
             ltac:(solve_ndisj) Hwf2 with "Hoff Hcip Hcell")
       as "(Hcip & Hmark & Hrlv)".
     iModIntro.
-    iAssert (i_valid (ientry (fwn_ik fn)) ↦₄ valid_word true)%I
+    iAssert (i_valid (ientry ik) ↦₄ valid_word true)%I
       with "[Hmark]" as "Hvalid".
     { rewrite -P8. iExact "Hmark". }
     iAssert (ic_loaded (fwn_fs fn) (fwn_ireg fn) (fwn_cov fn)
-               (fwn_logstart fn) (fwn_ik fn) (fwn_inum fn) dn' bm')
+               (fwn_logstart fn) ik inum dn' bm')
       with "[Hdnat Hmeta Hmap Hblocks]" as "Hlk".
     { rewrite /ic_loaded /inode_map. iExists data'.
       iSplitR; [iPureIntro; exact Hiok2 |].
@@ -2210,10 +2235,10 @@ Section ProofFilewrite.
     iDestruct (cpu_own_transport CIDwi CIDb4 0%nat eb (proc_addr jx) C b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Iunlock.wp_iunlock_sconf gs (fwn_fs fn) (fwn_ireg fn)
-              (fwn_ic fn) (fwn_ilk fn) (fwn_islk fn)
+              (fwn_ic fn) gil gisl
               (fwn_cov fn) (fwn_logstart fn)
-              (fwn_ik fn) (fwn_s fn / 2)%Qp (fwn_g fn) (fwn_dev fn)
-              (fwn_inum fn) dn' bm'
+              ik (sh / 2)%Qp g icfg_dev
+              inum dn' bm'
               pidv (DfracOwn (1/4)) X2 (K - 12)%nat eb (proc_addr jx) C b
               (fw_av_iunlock K HK) P9 ltac:(rewrite HX2a0; exact P8)
               with "Hcg Hcnt Htext Hpc Hpanic Hit Hesc Hslk2
@@ -2234,10 +2259,12 @@ Section ProofFilewrite.
     { rewrite (callee_saved_lookup Hcsiu_cs Rs1 ltac:(vm_compute; reflexivity)).
       exact HX2s1. }
     (* THE SHARE, WHOLE AGAIN, at the generation the retained half names *)
-    iDestruct (fw_shr_regen (fwn_ik fn) (fwn_s fn / 2)%Qp (fwn_s fn / 2)%Qp
-                 (fwn_dev fn) (fwn_inum fn) (fwn_g fn) with "Hshrk Hshrb")
-      as "Hshr".
+    iDestruct (fw_shr_regen ik (sh / 2)%Qp (sh / 2)%Qp
+                 icfg_dev inum g with "Hshrk Hshrb") as "Hshr".
     iEval (rewrite fw_qp_halves) in "Hshr".
+    (* ...and back into the payload it came from.  From here the reference is
+       intact again and the postcondition carries no share at all. *)
+    iDestruct ("Hpayback" with "Hshr") as "Hrpay".
     (* ---- +0xbc jal ra,end_op : the transaction closes at whatever the
            chunk left of its reservation ([SpecEndOp] takes any [u]) ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (FW + 0xbc)) Rra
@@ -2267,7 +2294,7 @@ Section ProofFilewrite.
     iApply (EndOp.wp_end_op_sconf gs jx glp (fwn_uart fn) (fwn_disk fn)
               (fwn_dlock fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
               (fwn_bio fn) (fwn_log fn) (fwn_fs fn)
-              (fwn_cov fn) (fwn_logstart fn) (fwn_dev fn) n'
+              (fwn_cov fn) (fwn_logstart fn) icfg_dev n'
               pidv (DfracOwn (1/4)) X3 (K - 12)%nat eb C b
               (fw_av_end_op K HK) P1 Hjp Hgsj Heb
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlog Hcrash Hgc
@@ -2303,11 +2330,11 @@ Section ProofFilewrite.
     { rewrite /file_ref /file_fields.
       iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
     (* THE EXCLUSIVE HALF, back at the set the chunk reached *)
-    iAssert (filewrite_fs_out fn Cf used')
-      with "[Hshr Hsbi Hsbsz Hsbb Hbmres Hbsl]" as "Hout".
+    iAssert (filewrite_fs_out fn used')
+      with "[Hsbi Hsbsz Hsbb Hbmres Hbsl]" as "Hout".
     { rewrite /filewrite_fs_out.
       iSplitR; [iPureIntro; exact (transitivity Hsub Hsub2) |].
-      iFrame "Hshr Hsbi Hsbsz Hsbb Hbmres Hbsl". }
+      iFrame "Hsbi Hsbsz Hsbb Hbmres Hbsl". }
     (* the page-table descriptor, re-based on the contract's own [V] *)
     iEval (rewrite (fw_upd_upt_upd V PI P')) in "Hpriv".
     assert (Hupt2 : uptd_ext (pv_upt V) P').
@@ -2516,8 +2543,8 @@ Section ProofFilewrite.
                   with "Hcg Hcnt Htext Hpc Hpanic Hprocs
                         Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
                         Href Hpriv Hkenv
-                        Hoff Hbio Hlog Hcrash Hgc Hkd Hpk Hit Hesc Hireg
-                        Hslk Hty Hdev Hgeo Hdlk Hout Hcont").
+                        Hoff Hbio Hlog Hcrash Hgc Hkd Hpk Hit Hescs Hireg
+                        Hslks Hdev Hgeo Hdlk Hout Hcont").
     - (* ============ THE SHORT WRITE (and writei's -1): +0xea ============ *)
       iPoseProof (fwri_0ea with "Htext") as "Hiea".
       iPoseProof (fwri_0ec with "Htext") as "Hiec".
@@ -3086,7 +3113,7 @@ Section ProofFilewrite.
              consolewrite, whose contract is the functor's parameter. *)
           assert (Htyd : fc_type Cf = FD_DEVICE)
             by (apply eq_vec_true_iff; exact Hp3).
-          iDestruct (fw_env_dev γa γf k fn Cf Htyd with "Henv") as "Henv".
+          iDestruct (fw_env_dev γf fn Cf Htyd with "Henv") as "Henv".
           pose proof (fw_major_range (fc_major Cf : mword 16)) as Hmjr.
           iPoseProof (fwri_05c with "Htext") as "Hi5c".
           iPoseProof (fwri_060 with "Htext") as "Hi60".
@@ -3228,7 +3255,7 @@ Section ProofFilewrite.
              { rewrite HD4a5. apply fr_sext16_small. exact Hmj15. }
              iEval (rewrite /a_devsw_write /dev_major) in "Hslot".
              iApply (fw_devidx (CID0 := CID16) D4 (K - 12)%nat
-                       (bv_unsigned (fc_major Cf)) (fwn_wp fn) (fwn_dqv fn) pj b
+                       (bv_unsigned (fc_major Cf)) (fwn_wp fn (dev_major Cf)) (fwn_dqv fn (dev_major Cf)) pj b
                        (conj Hmj0 Hmj16) HD4a5m
                        with "Hcg Htext Hpc Hslot [-]").
              iIntros (CID17 Hs17 Dr) "%Hdr Hcg Hpc Hslot".
@@ -4042,9 +4069,18 @@ Section ProofFilewrite.
                  assert (Hpos : (0 < n)%Z).
                  { destruct (Z.le_gt_cases n 0) as [Hle | Hgt]; [| exact Hgt].
                    exfalso. rewrite (proj2 (Z.geb_le 0 n) Hle) in Hz0. discriminate. }
-                 iPoseProof (fw_env_fs _ _ _ _ _ Htyi with "Henv") as "Henv".
+                 iPoseProof (fw_env_fs _ _ _ Htyi with "Henv") as "Henv".
                  iEval (rewrite /filewrite_fs_env) in "Henv".
-                 iDestruct "Henv" as "(%E1 & %E2 & %E3 & %E4 & %E5 & %E6 & %E7 & %E8 & %E9 & #E10 & #E11 & #E12 & #E13 & #E14 & #E15 & #E16 & #E17 & #E18 & #E19 & #E20 & E21 & #E22 & %E23 & E24 & E25 & E26 & E27 & #E28 & #E29 & #E30 & E31)".
+                 (* 25 conjuncts, not 31: the six per-inode fields (the two
+                    slot facts, the two point geometry facts, the share and
+                    its [ity_shot] with the [fc_wbool] side condition) are
+                    gone, replaced by the two QUANTIFIED geometry facts and
+                    the two FAMILIES -- fs-sysfile S4c. *)
+                 iDestruct "Henv" as "(%E1 & %E2 & %E3 & %E4 & %E5 & %E6 & #E7 & #E8 & #E9 & #E10 & #E11 & #E12 & #E13 & #E14 & #E15 & #E16 & #E17 & E18 & E19 & E20 & E21 & #E22 & #E23 & #E24 & E25)".
+                 (* the loop still takes the ONE slot's off-borrow invariant;
+                    the environment now carries the family, so it is selected
+                    here rather than by the caller. *)
+                 iDestruct (off_invs_lookup γf k Hk with "E7") as "#Eoff".
                  assert (HVid : upd_upt V (pv_upt V) = V) by apply fw_upd_upt_id.
                  (* [cpu_own] IS HART-INDEXED and the loop lemma states it at
                     ITS OWN [CID0]; the walk still holds the ENTRY hart's copy.
@@ -4055,7 +4091,7 @@ Section ProofFilewrite.
                            m K eb C n b sp0 w12 pj
                            HK Hk Hj Hgs Hlens Hfnj Hfnps Hn Heb Htyi Hwb Hspm
                            ltac:(reflexivity)
-                           E1 E2 E3 E4 E5 E6 E7 E8 E9 E23
+                           E1 E2 E3 E4 E5 E6
                            (Z.to_nat n) 0%Z (pv_upt V) (fwn_used fn) L7
                            ltac:(rewrite (Z2Nat.id n (proj1 Hn)); lia)
                            ltac:(lia)
@@ -4067,14 +4103,14 @@ Section ProofFilewrite.
                                  Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
                                  [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                  [Hpriv] Hkenv
-                                 E10 E11 E12 E13 E14 E15 E16 E17 E18 E19 E20 E22
-                                 E28 E29 E30 [E21 E24 E25 E26 E27 E31] [-]").
+                                 Eoff E8 E9 E10 E11 E12 E13 E14 E15 E16 E17
+                                 E22 E23 E24 [E18 E19 E20 E21 E25] [-]").
                  { rewrite /file_ref /file_fields.
                    iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                  { rewrite HVid. iExact "Hpriv". }
                  { rewrite /filewrite_fs_out.
                    iSplitR; [iPureIntro; reflexivity|].
-                   iFrame "E21 E24 E25 E26 E27 E31". }
+                   iFrame "E18 E19 E20 E21 E25". }
                  iIntros (CIDx Hsx mf rv P' used')
                    "%Hcs %Hup %Hret %Hra Hcg Hcnt Hpc Href Hpriv Henvo".
                  iSpecialize ("Hcont" $! CIDx with "[]"); [iPureIntro; wp_next_chain|].
