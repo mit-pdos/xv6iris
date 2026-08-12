@@ -793,10 +793,12 @@ Section FsinitMain.
               (fs_view γfs γd dev cov) pidv dev bno dq
               M5 (K - 4)%nat true C b
               ltac:(unfold K_bread; lia) Hbnolt eq_refl Hbnocov eq_refl Hj Hgl
-              HM5a0 HM5a1 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs
+              HM5a0 HM5a1
+              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
-    iIntros (CID10 Hq10 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hpc Hppid Hheld".
+    { rewrite /trap_csrs_ext. done. }
+    { rewrite /cpu_claim_ext. done. }
+    iIntros (CID10 Hq10 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt _ _ Hpc Hppid Hheld".
     destruct Hfacts as [Hcsb HmBa0].
     assert (Hpc14 : ret_pc (M5 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.fsinit + 0x14))

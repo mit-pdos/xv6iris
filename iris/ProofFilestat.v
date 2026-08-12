@@ -663,12 +663,14 @@ Section ProofFilestat.
                 pidv (DfracOwn (1/4)) (fsn_dqs fn)
                 Q3 (K - 10)%nat eb C b
                 (fst_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
-                ltac:(rewrite HQ3a0; exact Hipk) Heb
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hitbl Hesc Hireg
+                ltac:(rewrite HQ3a0; exact Hipk)
+                with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hitbl Hesc Hireg
                       Hslk Hshr Hsb Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hbslot [-]").
+      { rewrite Heb /trap_csrs_ext. done. }
+      { rewrite Heb /cpu_claim_ext. done. }
       iIntros (CIDil Hsil mil dnl bml)
-        "%Hcsil Hcg Hcnt Hpc Hppid Hsb Hbslot Hheld Hslpid Hdep
+        "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hslpid Hdep
          Hidev Hinum Hvalid Hlk #Hshot".
       iDestruct ("Hpivbk" with "Hppid") as "Hpriv".
       assert (Hpc2a : ret_pc (Q3 !!! Regidx Rra) = mword_of_int (FST + 0x2a)).

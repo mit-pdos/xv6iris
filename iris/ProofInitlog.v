@@ -809,10 +809,12 @@ Section ProofInitlog.
     iApply (Bread.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (mword_of_int logstart : mword 32) dq
               T3 (K - 6)%nat true C b
-              HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HT3a0 HT3a1 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs
+              HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HT3a0 HT3a1
+              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hs1u [-]").
-    iIntros (CID22 Hs22 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hpc Hppid Hheld".
+    { rewrite /trap_csrs_ext. done. }
+    { rewrite /cpu_claim_ext. done. }
+    iIntros (CID22 Hs22 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt _ _ Hpc Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc3a : ret_pc (T3 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.initlog + 0x3a)).
@@ -1070,10 +1072,12 @@ Section ProofInitlog.
               cov logstart dev true 0%nat ([] : list (mword 32))
               (fun _ : nat => ([] : list (bv 8))) L D pidv dq
               C2 (K - 6)%nat true C b True%I
-              HKit Hgeomok Hj Hgl eq_refl
+              HKit Hgeomok Hj Hgl
               Hrec0 HC2a0 Hshape0 Hnodup0 Hwcov0 Hlw0
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil1 HLauth HDauth
+              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil1 HLauth HDauth
                     Hnil2 Hs2 [] [] [-]").
+    { rewrite /trap_csrs_ext. done. }
+    { rewrite /cpu_claim_ext. done. }
     (* THE EMPTY WRITE SET's per-entry permits: this call installs NOTHING
        (the on-disk header is clean, which is initlog's precondition), so the
        generator is vacuous -- there is no entry to look up -- and the
@@ -1081,7 +1085,7 @@ Section ProofInitlog.
     { iModIntro. iIntros (i w bs') "%Hi _ _". rewrite lookup_nil in Hi.
       discriminate. }
     { done. }
-    iIntros (CID30 Hs30 mI) "%Hcs3 Hcg Hcnt Hpc Hppid
+    iIntros (CID30 Hs30 mI) "%Hcs3 Hcg Hcnt _ _ Hpc Hppid
                              Hncell _ HLauth HDauth _ Hs2 _".
     assert (Hpc68 : ret_pc (C2 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.initlog + 0x68)).
@@ -1180,9 +1184,11 @@ Section ProofInitlog.
               cov logstart dev 0%nat ([] : list (mword 32)) L pidv dq
               D2 (K - 6)%nat true C b
               (log_mirror_at (0%nat, []) ∗ swap_lb (S gen_id))%I
-              HKwh Hgeomok Hj Hgl eq_refl Hshape0
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
+              HKwh Hgeomok Hj Hgl Hshape0
+              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
                     Hs1u [Hmirf] [-]").
+    { rewrite /trap_csrs_ext. done. }
+    { rewrite /cpu_claim_ext. done. }
     { iExists bs_hdr. iExact "Hfsb". }
     (* THE SWAP, riding this write (phase C2b/D1 stage 3): the era takes
        custody of the crash record at the image the write produces.  The
@@ -1195,7 +1201,7 @@ Section ProofInitlog.
       iApply (fs_swap_permit cov logstart bs' ltac:(exact Hlen')
                 ltac:(rewrite Hhn'; reflexivity)
                 with "Hseam Hregc Hstc Hmirf"). }
-    iIntros (CID34 Hs34 mW bs') "%Hcs4 Hcg Hcnt Hpc Hppid
+    iIntros (CID34 Hs34 mW bs') "%Hcs4 Hcg Hcnt _ _ Hpc Hppid
                                  Hncell _ HLauth Hfsb %Hhn %Hhdec Hs1u HQ".
     assert (Hpc74 : ret_pc (D2 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.initlog + 0x74)).

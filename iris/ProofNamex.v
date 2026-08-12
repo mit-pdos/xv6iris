@@ -2704,12 +2704,14 @@ Section ProofNamexMain.
                          T2 (K - 12)%nat eb C b
                          Kip Hpk Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0
                          Hibc Hibl Hpb' Hcovb ltac:(unfold iput_units in *; lia)
-                         Hj Hgs HT2a0 Heb
-                         with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hitb2 Hitbl
+                         Hj Hgs HT2a0
+                         with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hitb2 Hitbl
                                Hescp Hireg Hslkp Href Hbmap Hinos Hbits Hppid
                                Hprocs Hdev Hgeom Hdlk Hbslot Hlog").
+               { rewrite Heb /trap_csrs_ext. done. }
+               { rewrite Heb /cpu_claim_ext. done. }
                iIntros (CIDip Hqip mip nip usedip)
-                 "%Hcsip Hcg Hcnt Hpc Hppid Hbmap Hinos %Husdip Hbits Hbslot
+                 "%Hcsip Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdip Hbits Hbslot
                   %Hbdip Hlog Hisl2".
                assert (Hpc13a : ret_pc (T2 !!! Regidx Rra)
                        = mword_of_int (NX + 0x13a)).
@@ -3109,12 +3111,14 @@ Section ProofNamexMain.
                              gfs gi cn gilk gislk cov logstart inodestart nib
                              ik (iq/2)%Qp gsh dev iinum pidv dq dqs
                              V2 (K - 12)%nat eb C b
-                             Kil Hik Hlg Hinos0 Hibc Hib' Hj Hgs HV2a0 Heb
-                             with "Hcg Hcnt Htext Hpc Hpanic Hbio Hitbl Hesck
+                             Kil Hik Hlg Hinos0 Hibc Hib' Hj Hgs HV2a0
+                             with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hitbl Hesck
                                    Hireg Hslkk Hshr Hinos Hppid Hprocs Hdev
                                    Hgeom Hdlk Hbs1").
+                   { rewrite Heb /trap_csrs_ext. done. }
+                   { rewrite Heb /cpu_claim_ext. done. }
                    iIntros (CIDil Hqil mil dnl bml)
-                     "%Hcsil Hcg Hcnt Hpc Hppid Hinos Hbs1 Hslkd Hslpid Hdep
+                     "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hinos Hbs1 Hslkd Hslpid Hdep
                       Hidev Hiinum Hivalid Hload #Hshot".
                    assert (Hpcbc : ret_pc (V2 !!! Regidx Rra)
                             = mword_of_int (NX + 0xbc)).
@@ -3762,15 +3766,17 @@ Section ProofNamexMain.
                                      GB3 (K - 12)%nat eb C b
                                      Kiup Hik Hlg Hsize Hbmap0 Hbmapcov
                                      Hbmaplog Hinos0 Hibc Hibl Hib' Hcovb
-                                     Hiu Hj Hgs HGB3a0 Heb
-                                     with "Hcg Hcnt Htext Hpc Hpanic Hbio
+                                     Hiu Hj Hgs HGB3a0
+                                     with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg
                                            Hslkk Hslkd Hslpid Hdep Hidev
                                            Hiinum Hivalid Hload Hshot Hkeep Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
                                            Hgeom Hdlk Hbslot Hlog").
+                           { rewrite Heb /trap_csrs_ext. done. }
+                           { rewrite Heb /cpu_claim_ext. done. }
                            iIntros (CIDup Hqup mup nup usedup)
-                             "%Hcsup Hcg Hcnt Hpc Hppid Hbmap Hinos %Husdup
+                             "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup
                               Hbits Hbslot %Hbdup Hlog Hisl".
                            assert (Hpce2 : ret_pc (GB3 !!! Regidx Rra)
                                     = mword_of_int (NX + 0xe2)).
@@ -3956,15 +3962,17 @@ Section ProofNamexMain.
                                      GC3 (K - 12)%nat eb C b
                                      Kiup Hik Hlg Hsize Hbmap0 Hbmapcov
                                      Hbmaplog Hinos0 Hibc Hibl Hib' Hcovb
-                                     Hiu Hj Hgs HGC3a0 Heb
-                                     with "Hcg Hcnt Htext Hpc Hpanic Hbio
+                                     Hiu Hj Hgs HGC3a0
+                                     with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg
                                            Hslkk Hslkd Hslpid Hdep Hidev
                                            Hiinum Hivalid Hload Hshot Hkeep Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
                                            Hgeom Hdlk Hbslot Hlog").
+                           { rewrite Heb /trap_csrs_ext. done. }
+                           { rewrite Heb /cpu_claim_ext. done. }
                            iIntros (CIDup Hqup mup nup usedup)
-                             "%Hcsup Hcg Hcnt Hpc Hppid Hbmap Hinos %Husdup
+                             "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup
                               Hbits Hbslot %Hbdup Hlog Hisl3".
                            assert (Hpc88 : ret_pc (GC3 !!! Regidx Rra)
                                     = mword_of_int (NX + 0x88)).
@@ -4228,14 +4236,16 @@ Section ProofNamexMain.
                                pidv dq dqb dqs ND2 (K - 12)%nat eb C b
                                Kiup Hik Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
                                Hinos0 Hibc Hibl Hib' Hcovb Hiu Hj Hgs
-                               HND2a0 Heb
-                               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc
+                               HND2a0
+                               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg Hslkk Hslkd
                                      Hslpid Hdep Hidev Hiinum Hivalid Hload
                                      Hshot Hkeep Hbmap Hinos Hbits Hppid Hprocs
                                      Hdev Hgeom Hdlk Hbslot Hlog").
+                     { rewrite Heb /trap_csrs_ext. done. }
+                     { rewrite Heb /cpu_claim_ext. done. }
                      iIntros (CIDup Hqup mup nup usedup)
-                       "%Hcsup Hcg Hcnt Hpc Hppid Hbmap Hinos %Husdup Hbits
+                       "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup Hbits
                         Hbslot %Hbdup Hlog Hisl2".
                      assert (Hpc5a : ret_pc (ND2 !!! Regidx Rra)
                               = mword_of_int (NX + 0x5a)).

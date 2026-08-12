@@ -91,23 +91,28 @@ Definition wp_bread_sconf_body
      64-bit compares against the sign-extending [lw]s are then exact *)
   m !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 dev ->
   m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bno ->
-  (* PARKING PREMISE (hart-generic scheduler protocol): the saved base enable
-     is [true].  Everything below sleeps, and a parking thread must hand the
-     trap CSRs across the crossing -- which only the interior acquire can mint,
-     and only with an enabled base.  See SpecSched.v / SpecSleep.v. *)
-  eb = true ->
   sie_cap_gpr m K b pj -∗
   (* enters at noff 0; the acquires raise it to what sleep demands *)
   cpu_own 0 eb pj C b -∗
-  (* TRAP CSRs: NOT threaded.  This function acquires at level 0 and releases
-     before returning, so it is push/pop- AND trap-CSR-BALANCED: its own
-     [acquire] mints the [arm_pay 0 eb _] its interior sleep needs and its
-     [release] spends it.  A CALLER-held level-0 pay would be a second one, and
-     a second one is UNIMPLEMENTABLE above a park -- sleep carries exactly the
-     one the pushing acquire minted, so the extra copy would be [trap_csrs] at
-     the parking hart with the postcondition wanting it at the resuming one
-     (and at [eb = true] two of them at one hart are outright contradictory).
-     See claude-notes/completed/sched-hart-generic.md. *)
+  (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  This function acquires at
+     level 0 and releases before returning, so it is push/pop-BALANCED: its
+     own [acquire] mints [arm_pay 0 eb _], and at [eb = true] that IS the
+     pair ([trap_csrs] ∗ [cpu_claim]) its interior sleepers (acquiresleep;
+     rw's two sleeps) need, spent back by its own [release] before either
+     runs.  A caller-held level-0 pay would be a SECOND one, and a second
+     one is UNIMPLEMENTABLE above a park -- sleep carries exactly the one
+     the pushing acquire minted, so stating the bare pair here would want
+     [trap_csrs] at the parking hart AND at the resuming one (and at
+     [eb = true] two of them at one hart are outright contradictory).  The
+     [_ext] COMPLEMENT is exactly the resource that avoids this: at
+     [eb = true] it is [emp], so nothing changes for any existing caller
+     (the acquire already supplies what the interior sleepers need); at
+     [eb = false] the acquire's push_off mints nothing, so the pair the
+     sleepers need can only come from here, and the caller holds it because
+     the TRAP handed it over.  See claude-notes/completed/sched-hart-generic.md
+     and claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn V -∗
@@ -134,6 +139,8 @@ Definition wp_bread_sconf_body
        /\ mf !!! Regidx (mword_of_int 10 : mword 5) = bnode k⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       (* the locked buffer, keyed to the request: its bytes ARE the

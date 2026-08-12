@@ -110,13 +110,15 @@ Section ProofIunlockputMain.
   Proof.
     cbv beta delta [wp_iunlockput_sconf_body].
     intros pcE ip pj ret_tgt HK Hk Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0
-           Hiblk Hiblklog Hinumb Hcovb Hnu Hj Hgl Ha0 Heb.
+           Hiblk Hiblklog Hinumb Hcovb Hnu Hj Hgl Ha0.
     pose proof HK as HK'. unfold K_iunlockput in HK'.
     assert (Hipe : ip = ientry k) by reflexivity.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
+    iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
               #Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hpar
               Hbms Hins Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hlogop
               Hcont".
+    (* THE eb/b BRIDGE, once per top-level lemma (eb-generic-sweep.md). *)
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     iPoseProof (iulpi_00 with "Htext") as "Hi00".
     iPoseProof (iulpi_02 with "Htext") as "Hi02".
     iPoseProof (iulpi_04 with "Htext") as "Hi04".
@@ -262,7 +264,7 @@ Section ProofIunlockputMain.
       rewrite /R4 upd_ne; [| regne]. exact (HR3thr c Hcs N2 N8 N9). }
     iDestruct (cpu_own_transport CID CID7 0%nat eb pj C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IU.wp_iunlock_sconf gs gfs gi cn gil gisl cov logstart k s gy dev inum
               dn' bm' pidv dq R4 (K - 4)%nat eb pj C b
@@ -329,18 +331,26 @@ Section ProofIunlockputMain.
       rewrite /R6 upd_ne; [| regne]. exact (HR5thr c Hcs N2 N8 N9). }
     iDestruct (cpu_own_transport CID8 CID10 0%nat eb pj C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID7) (CIDb := CID10) ltac:(wp_next_chain)
+    (* THE WIDE HOP: iunlock is not in the ALREADY-GENERALIZED set, so the
+       complement is still at the entry hart CID -- span all the way from
+       there to right before iput's call, skipping iunlock's call in one hop
+       (eb-generic-sweep.md). *)
+    iDestruct (trap_csrs_ext_transport CID CID10 eb pj
+                 ltac:(rewrite Hbm; wp_next_chain) with "Htc") as "Htc".
+    iDestruct (cpu_claim_ext_transport CID CID10 eb pj
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hclm") as "Hclm".
+    iDestruct (wp_next_shift (b := true) (CIDa := CID7) (CIDb := CID10) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IP.wp_iput_sconf gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
               cov logstart bmapstart inodestart nib size dev used
               k (qi + s)%Qp inum n pidv dq dqb dqs R6 (K - 4)%nat eb C b
               ltac:(unfold K_iput; lia) Hk Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
-              Hinumb Hcovb Hnu Hj Hgl ltac:(rewrite HR6a0; exact Hipe) Heb
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hitb2 Hitbl Hesc Hireg
+              Hinumb Hcovb Hnu Hj Hgl ltac:(rewrite HR6a0; exact Hipe)
+              with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlogc Hitb2 Hitbl Hesc Hireg
                     Hslk Href Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk
                     Hbslots Hlogop").
     iIntros (CID11 Hq11 mP n' used')
-            "%HcsP Hcg Hcnt Hpc Hppid Hbms Hins %Hsub Hbitmap Hbslots %Hbud
+            "%HcsP Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins %Hsub Hbitmap Hbslots %Hbud
              Hlogop Hslot".
     assert (Hpc16 : ret_pc (R6 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iunlockput + 0x16))
@@ -527,8 +537,14 @@ Section ProofIunlockputMain.
       by (apply Hfin; iuidx).
     iDestruct (cpu_own_transport CID11 CID16 0%nat eb pj C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    (* iput IS generalized -- thread NORMALLY, matching cpu_own_transport's
+       own span (fresh at iput's own return hart CID11). *)
+    iDestruct (trap_csrs_ext_transport CID11 CID16 eb pj
+                 ltac:(rewrite Hbm; wp_next_chain) with "Htc") as "Htc".
+    iDestruct (cpu_claim_ext_transport CID11 CID16 eb pj
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hclm") as "Hclm".
     iSpecialize ("Hcont" $! CID16 with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! P4 n' used' with "[%] Hcg Hcnt Hpc Hppid Hbms Hins [%]
+    iApply ("Hcont" $! P4 n' used' with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins [%]
                                           Hbitmap Hbslots [%] Hlogop Hslot").
     { unfold callee_saved. split_and!; assumption. }
     { exact Hsub. }

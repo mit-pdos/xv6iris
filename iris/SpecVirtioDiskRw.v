@@ -97,23 +97,18 @@ Definition wp_virtio_disk_rw_sconf_body
   (forall k, (k < 1024)%nat -> addr_is_kdata (pa_add (b_data bp) k)) ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
-  (* PARKING PREMISE (hart-generic scheduler protocol): the saved base enable
-     is [true].  Everything below sleeps, and a parking thread must hand the
-     trap CSRs across the crossing -- which only the interior acquire can mint,
-     and only with an enabled base.  See SpecSched.v / SpecSleep.v. *)
-  eb = true ->
   sie_cap_gpr m K b pj -∗
   (* enters at noff 0; acquire raises to the level sleep requires *)
   cpu_own 0 eb pj C b -∗
-  (* TRAP CSRs: NOT threaded.  This function acquires at level 0 and releases
-     before returning, so it is push/pop- AND trap-CSR-BALANCED: its own
-     [acquire] mints the [arm_pay 0 eb _] its interior sleep needs and its
-     [release] spends it.  A CALLER-held level-0 pay would be a second one, and
-     a second one is UNIMPLEMENTABLE above a park -- sleep carries exactly the
-     one the pushing acquire minted, so the extra copy would be [trap_csrs] at
-     the parking hart with the postcondition wanting it at the resuming one
-     (and at [eb = true] two of them at one hart are outright contradictory).
-     See claude-notes/completed/sched-hart-generic.md. *)
+  (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM.  Everything below sleeps,
+     and a parking thread must hand [trap_csrs] and [cpu_claim] across the
+     crossing (SpecSched.v).  At [eb = true] this function's OWN acquire
+     frees them out of [sie_arm true], so the complement is [emp] and the
+     caller brings nothing -- which is why this used to be an [eb = true]
+     premise instead.  At [eb = false] the push_off frees nothing and the
+     caller brings the pair, holding it because the TRAP handed it over. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   procs_inv γs -∗
@@ -143,11 +138,22 @@ Definition wp_virtio_disk_rw_sconf_body
      unchanged in meaning. *)
   disk_write_permit gen_id
     (if wr then Some (1024 * uint bno, bs_buf)%Z else None) Q -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b] (porting guide: "a PARKING
+     function's [wp_next] index is [true] UNCONDITIONALLY").  virtio_disk_rw
+     sleeps -- twice -- so a [swtch] can move the hart with interrupts OFF,
+     which has nothing to do with SIE.  While this contract carried
+     [eb = true ->], [cpu_own_eb_agree] forced [b = true] too and the two
+     spellings coincided, which is what hid this: the [b = false] instance
+     was vacuous, so the weak "returns on the hart that called it" promise
+     was never actually collected.  It stops being vacuous the moment
+     [eb = false] is reachable, which is exactly this generalization. *)
+  wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       (* the exchange: a read fills the buffer from the block, a write
          moves the buffer's bytes onto the disk; b->disk ends at 0 *)

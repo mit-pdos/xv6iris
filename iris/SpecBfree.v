@@ -147,12 +147,19 @@ Definition wp_bfree_gen_body
   (* the two uint arguments arrive sign-extended (RV64 ABI) *)
   m !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 dev ->
   m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bno ->
-  (* PARKING PREMISE (hart-generic scheduler protocol) -- bread sleeps, and a
-     parking thread hands the trap CSRs across the crossing only with an
-     enabled base.  See SpecSched.v / SpecSleep.v. *)
-  eb = true ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b -∗
+  (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  bfree does no acquire/
+     release of its own -- it is a pure PASS-THROUGH to bread, which is
+     push/pop-BALANCED and mints/spends the pair its own interior sleepers
+     need.  At [eb = true] the complement is [emp], so no existing caller
+     gains an obligation; at [eb = false] it is the honest pair, held by the
+     caller because the TRAP handed it over, and bfree just threads it
+     unchanged to bread and back.  See
+     claude-notes/completed/sched-hart-generic.md and
+     claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -195,6 +202,8 @@ Definition wp_bfree_gen_body
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -251,12 +260,19 @@ Definition wp_bfree_sconf_body
   (* the two uint arguments arrive sign-extended (RV64 ABI) *)
   m !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 dev ->
   m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bno ->
-  (* PARKING PREMISE (hart-generic scheduler protocol) -- bread sleeps, and a
-     parking thread hands the trap CSRs across the crossing only with an
-     enabled base.  See SpecSched.v / SpecSleep.v. *)
-  eb = true ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b -∗
+  (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  bfree does no acquire/
+     release of its own -- it is a pure PASS-THROUGH to bread, which is
+     push/pop-BALANCED and mints/spends the pair its own interior sleepers
+     need.  At [eb = true] the complement is [emp], so no existing caller
+     gains an obligation; at [eb = false] it is the honest pair, held by the
+     caller because the TRAP handed it over, and bfree just threads it
+     unchanged to bread and back.  See
+     claude-notes/completed/sched-hart-generic.md and
+     claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -296,6 +312,8 @@ Definition wp_bfree_sconf_body
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗

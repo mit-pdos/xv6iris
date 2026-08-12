@@ -223,11 +223,18 @@ Definition wp_readi_sconf_body
      these ranges are the literals *)
   m !!! Regidx (mword_of_int 13 : mword 5) = (mword_of_int (Z.of_nat off) : mword 64) ->
   m !!! Regidx (mword_of_int 14 : mword 5) = (mword_of_int (Z.of_nat n) : mword 64) ->
-  (* PARKING PREMISE (hart-generic scheduler protocol) -- everything below
-     sleeps.  See SpecSched.v / SpecSleep.v. *)
-  eb = true ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b -∗
+  (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  readi never acquires
+     anything itself -- its interior sleepers (bmap's bread, its own
+     bread, brelse, either_copyout's copyout) all supply and consume the
+     pair internally -- so this is a PURE PASS-THROUGH: at [eb = true] it
+     is [emp] and no existing caller gains an obligation; at [eb = false]
+     the caller holds it because the trap handed it over, and readi
+     threads it to bmap and bread unchanged and takes it back from each in
+     turn.  See claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -300,6 +307,8 @@ Definition wp_readi_sconf_body
            /\ tot = rd_clamp (di_size dn) off n)⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       i_dev ip ↦₄{dqd} dev -∗
       inode_meta ip dn -∗

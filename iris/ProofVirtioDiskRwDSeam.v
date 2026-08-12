@@ -113,9 +113,10 @@ Section ProofVirtioDiskRwDSeam.
                     (vdrwd_bufwin b wr bs_buf))⌝ -∗
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
-       sie_cap_gpr M (trap_res true + (K - 12))%nat false (proc_addr j) -∗
+       sie_cap_gpr M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
        cpu_own 1 eb (proc_addr j) C false -∗
-       arm_pay 0 eb (proc_addr j) -∗
+       trap_csrs -∗
+       cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x186) : mword 64) -∗
        locked γk cpu_id -∗
        vdrw_body γd pd pav np nr fl pk tr fr -∗
@@ -144,9 +145,10 @@ Section ProofVirtioDiskRwDSeam.
        ⌜forall p T, tr !! p = Some T -> tri_set T ## tri_set (h, m2, t)⌝ -∗
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
-       sie_cap_gpr M (trap_res true + (K - 12))%nat false (proc_addr j) -∗
+       sie_cap_gpr M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
        cpu_own 1 eb (proc_addr j) C false -∗
-       arm_pay 0 eb (proc_addr j) -∗
+       trap_csrs -∗
+       cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x162) : mword 64) -∗
        locked γk cpu_id -∗
        vdrw_body γd pd pav np nr fl pk tr
@@ -183,7 +185,7 @@ Section ProofVirtioDiskRwDSeam.
     iIntros "#Htext #Hdinv #Hgeom Hbuf Hdisk Hpend Hexit".
     rewrite /vdrw_p3_exit_x.
     iIntros (CIDx Hsx M np nr fl pk tr fr h m2 t) "%Hrh %Hpin %Hfacts %Hdisj0 %Hal
-             Hcg Hown Hpay Hpc Htok Hbody Hchain Hidx".
+             Hcg Hown Htc Hclm Hpc Htok Hbody Hchain Hidx".
     destruct Hrh as (Hregs & Hhi).
     destruct Hpin as (Ha0 & Ha1 & Ha5).
     destruct Hfacts as (Hok & Hfrh & Hfrm & Hfrt).
@@ -200,7 +202,7 @@ Section ProofVirtioDiskRwDSeam.
     (* the sector arithmetic P1 deferred *)
     assert (Hoff : (bv_unsigned (vdrw_sector_raw bno) * 512)%Z = (1024 * uint bno)%Z).
     { rewrite (vdrwd_sector_raw_val bno Hbno). lia. }
-    iApply (wp_vdrw_p4 (CID := CIDx) kq γu γd (proc_addr jp) M (trap_res true + (K - 12))%nat pd pav pu b wr (vdrw_sector_raw bno)
+    iApply (wp_vdrw_p4 (CID := CIDx) kq γu γd (proc_addr jp) M (trap_res eb + (K - 12))%nat pd pav pu b wr (vdrw_sector_raw bno)
               np nr h m2 t fl pk tr
               (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false)
               bs_buf bs_disk (1024 * uint bno)%Z
@@ -215,7 +217,7 @@ Section ProofVirtioDiskRwDSeam.
                                (h, m2, t) pin ]> fl) pk
               (<[ np := (h, m2, t) ]> tr)
               (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false) h m2 t pin
-              with "[%] [%] [%] [%] [%] Hcg Hown Hpay Hpc Htok Hbody
+              with "[%] [%] [%] [%] [%] Hcg Hown Htc Hclm Hpc Htok Hbody
                     Hclaim Hrm Hrt Hidx").
     - split; [| exact (vdrw_hi_frame M M1 m0 Hcs Hhi)].
       destruct Hregs as (Hsp & Hs0 & Hs3 & Hs6 & Hs7).

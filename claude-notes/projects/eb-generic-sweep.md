@@ -147,6 +147,49 @@ It printed all eight of ilock's links present and derivable (⇒ tactic bug),
 and for dirlookup it showed the failing site was the `cpu_own_transport` on
 the line ABOVE the one the error pointed at (⇒ a real gap, fixed by `Hb`).
 
+## What the per-function ports turned up (beyond the recipe)
+
+Learned porting `virtio_disk_rw` and `ilock`; expect all four on any of the
+remaining functions.
+
+- **A SEALED MULTI-FILE PROOF NEEDS THE COMPLEMENT AS A PASSTHROUGH ON EVERY
+  PHASE.** `virtio_disk_rw`'s proof is six files whose phase boundaries are
+  opaquely-`Qed`'d `wp_next true` crossings, and `wp_next_chain` cannot see
+  guards through a prior phase's `Qed`. So the join/split dance — which works
+  inside one self-contained proof — cannot transport across a seam. The fix
+  is to give the NON-sleeping phases (there, the acquire prologue) the
+  complement in their own pre and post purely as a passthrough, so they
+  relocate it internally alongside `cpu_own` and the join happens at a hart
+  the earlier phase has already delivered it to. Budget for this in any
+  function whose proof is split.
+- **THE `trap_res true` -> `trap_res eb` SWEEP IS LARGE**, ~76 sites in
+  virtio_disk_rw: the reserve budget is threaded through nearly every leaf
+  call on a path where a sleep is reachable.
+- **LEVEL-0 STRETCHES CARRY HARDCODED `true` SIE INDICES** — the prologue
+  before the acquire and the epilogue after the release, ~40 sites there.
+  Those literals were only correct because `eb = true` was forced; they all
+  become `eb`.
+- **A CALLEE THAT DOES NOT THREAD THE COMPLEMENT STRANDS IT.** `brelse`'s
+  contract does not mention `trap_csrs_ext`/`cpu_claim_ext`, so across its
+  internal crossing those two stay at the pre-call hart while `cpu_own` (which
+  brelse does return) comes back correctly re-indexed. Transport them across
+  the WIDER span, not the callee's own.
+
+## Two process rules for running this as a sweep
+
+- **`virtio_disk_rw` was a 24th crossing the earlier pass missed**, because it
+  was not in the failing set at the time. When generalizing a function, CHECK
+  ITS OWN CROSSING FIRST: with `eb = true ->` gone, a stale `wp_next b` stops
+  being vacuous and starts being false.
+- **NEVER LEAVE A `.vo` BUILT FROM TEXT YOU THEN REVERTED.** Sketching a Spec
+  change, compiling it, and `git checkout`ing the source leaves a `.vo` whose
+  contract exists nowhere in the tree — and a dependent proof will compile
+  against it and look finished. That happened here with `SpecBread.vo`, and
+  `ProofIlock` "passed" against a contract no one had committed; rebuilding
+  the spec from its committed source put the real error back at the bread call
+  site. If a proof succeeds against a dependency you did not build yourself,
+  suspect the `.vo` before believing the result.
+
 ## Where it stands
 
 LANDED ON MAIN: `sleep` index-free and re-proved; `acquiresleep`
@@ -157,10 +200,14 @@ REMAINING, in dependency order — for each: drop `eb = true ->`, add
 `trap_csrs_ext eb` / `cpu_claim_ext eb pj` to pre and post, thread them to
 the sleeping callee and back:
 
-    bread, bwrite, virtio_disk_rw
-      -> begin_op, end_op, install_trans, write_head
-      -> ilock, iupdate, itrunc, bmap, balloc, bfree, readi, writei
-      -> iput, iunlockput, fileclose
+    virtio_disk_rw                       [DONE]
+      -> bread, bwrite
+      -> ilock (its UNCACHED arm calls bread -- it is NOT a tier-1 function,
+                which a first pass got wrong), begin_op, install_trans,
+                write_head
+      -> end_op
+      -> iupdate, balloc, bfree -> bmap, itrunc, readi, writei
+      -> iput -> iunlockput, fileclose
       -> kexit
 
 Then `usertrap` itself: its contract is the assumed-but-stated
@@ -171,3 +218,56 @@ contract as ASSUMED with one abstract `syscall_env γf pj`. See
 
 `prepare_return` is already index-generic (`WpIntrOff.v`), so usertrap's
 other blocker is gone.
+
+## Round 13: the credited (`cr`/`Sb`) forms, and why they had to generalize too
+
+Upstream's round 12 added a SECOND public contract to `balloc`, `bmap`,
+`iupdate` and `writei`: a **credited / set form** (`wp_..._gen_body`, carrying
+`cr` and `Sb`) alongside the counted `wp_..._sconf_body` the sweep had already
+generalized. These landed after the sweep branched, so the rebase brought them
+in still carrying `eb = true ->`.
+
+The counted form is *derived from* the set form in each of these files. So the
+moment `wp_..._sconf_body` is eb-generic and `wp_..._gen_body` is not, the
+derivation stops typechecking — you cannot get a general `eb` out of a core
+that demands `eb = true`.
+
+There are only two ways out, and **one of them is a trap**:
+
+- **Generalize the set form too.** One core, both contracts as thin wrappers.
+  This is what `ProofIupdate` (`iu_main_gen`), `ProofBalloc` (`ba_main`) and
+  `ProofBmap` now do.
+- **Keep the set form pinned and prove a second, eb-generic core beside it.**
+  This is what a first attempt at `ProofBmap` did, and it cost **~3000 lines
+  of duplicated proof** — a verbatim second pass over the same 70
+  instructions, in a file whose own seal comment says "no step of the code is
+  proved twice". Reject this on sight.
+
+The duplication is contagious through the call graph, which is the real reason
+to refuse it: bmap's credited path routes to **balloc's** credited contract, so
+a `wp_balloc_gen_body` pinned at `eb = true` forces bmap to duplicate; a
+duplicated bmap would in turn have forced writei to duplicate. Generalizing
+`wp_balloc_gen_body` — free, since `ba_main` already *was* that statement,
+merely re-pinned at `true` on the way out — collapsed the whole chain.
+
+**Rule: when a function has both a counted and a credited form, generalize
+BOTH in the same step, bottom-up.** Never generalize one and pin the other.
+
+### The rebase recovers more than it looks like it does
+
+When upstream rewrites a file the sweep had already converted, `--ours`/
+`--theirs` both throw away real work. The two edits are almost always
+orthogonal — upstream's are about `cr`/`Sb`/binders, the sweep's are about
+`eb`/`trap_csrs_ext`/`Hextc` — and they merely land on adjacent lines. So do a
+literal three-way merge instead of re-deriving:
+
+    git merge-base <sweep-tip> <upstream-tip>
+    git show $MB:iris/ProofX.v      > base.v
+    git show <sweep-tip>:iris/ProofX.v   > ours.v      # sweep applied, was green
+    git show <upstream-tip>:iris/ProofX.v > theirs.v
+    cp ours.v merged.v && git merge-file -L sweep -L base -L upstream merged.v base.v theirs.v
+
+For `ProofBmap.v` this reduced a 3900-line re-derivation to 28 small conflict
+regions (~400 lines), and in essentially every one the resolution is *both
+sides*, not a choice between them. The pre-rebase sweep tip is worth keeping
+on a branch (`wip/eb-sweep-N`) precisely so this is available.

@@ -2120,10 +2120,12 @@ Section IallocScan.
       iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
                 (fs_view γfs γd dev cov) pidv dev bno dq
                 G4 (K - 8)%nat true C b
-                HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HG4a0 HG4a1 eq_refl
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs
+                HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HG4a0 HG4a1
+                with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hsl1").
-      iIntros (CID6 Hq6 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hpc Hppid Hheld".
+      { rewrite /trap_csrs_ext. done. }
+      { rewrite /cpu_claim_ext. done. }
+      iIntros (CID6 Hq6 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt _ _ Hpc Hppid Hheld".
       destruct Hfacts as [Hcsb HmBa0].
       assert (Hpc40 : ret_pc (G4 !!! Regidx Rra : mword 64)
                       = mword_of_int (KernelSyms.ialloc + 0x40)) by (rewrite HG4ra; pcw).

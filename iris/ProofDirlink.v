@@ -1525,12 +1525,14 @@ Section ProofDirlinkMain.
                 ncount pidv dq dqb dqs E1 (K - 10)%nat eb C b
                 ltac:(exact HKip) Hkslot Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0
                 Hcblk Hcblog Hinb Hcovb ltac:(exact (dl_3le ncount Hnc)) Hj Hgs
-                HE1a0 Heb
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlog Hitb2 Hitbl Hesck
+                HE1a0
+                with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlog Hitb2 Hitbl Hesck
                       Hiregi Hslk Href Hsbb Hsbi Hbmr Hppid Hprocs Hdev Hgeom
                       Hdlk Hbsl Hop [-]").
+      { rewrite Heb /trap_csrs_ext. done. }
+      { rewrite Heb /cpu_claim_ext. done. }
       iIntros (CIDip Hsip mip nn uu)
-        "%Hcsip Hcg Hcnt Hpc Hppid Hsbb Hsbi %Huu Hbmr Hbsl %Hnn Hop Hislot".
+        "%Hcsip Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Huu Hbmr Hbsl %Hnn Hop Hislot".
       assert (Hpcip : ret_pc (E1 !!! Regidx Rra : mword 64)
                       = mword_of_int (DK + 0x5c)) by (rewrite HE1ra; pcw).
       iEval (rewrite Hpcip) in "Hpc".
@@ -2067,15 +2069,17 @@ Section ProofDirlinkMain.
                   Hsz31 Hbmgeo Hpkc Hj Hgs HV6a0
                   ltac:(cbn [negb]; rewrite HV6a1 dlk_zero_moi;
                         exact (eq_vec_refl _))
-                  HV6a3 HV6a4 Heb
-                  with "Hcg Hcnt Htext Hpc Hpanic Hkd Hpk Hbio Hlog Hkenv
+                  HV6a3 HV6a4
+                  with "Hcg Hcnt [] [] Htext Hpc Hpanic Hkd Hpk Hbio Hlog Hkenv
                         Hidev Hiinum Hmeta Hmap Hblocks Hsbi Hsbs Hsbb Hbmr
                         Hiregi Hdat Hsrc Hprocs Hdev Hgeom Hdlk Hbsl
                         Hop [-]").
+        { rewrite Heb /trap_csrs_ext. done. }
+        { rewrite Heb /cpu_claim_ext. done. }
         iIntros (CIDwi Hswi mwi tot bm' data' dn' dn0' nn wrote dist dstb P' used')
           "%Hcswi %Hused %Hwf' %Hholes' %Haddrs' %Hsz' %Hcov' %Hcap' %Hsized'
            %Hdistb %Hdist0
-           %Hdistk %Hrange %Htie %Harm %Hbud %Hupt Hcg Hcnt Hpc Hidev Hiinum
+           %Hdistk %Hrange %Htie %Harm %Hbud %Hupt Hcg Hcnt _ _ Hpc Hidev Hiinum
            Hmeta Hmap Hblocks Hsbi Hsbs Hsbb Hbmr Hdat Hsrc Hbsl Hop".
         (* and they come back together: re-bracket into the two names the
            rest of dirlink threads *)
@@ -2688,11 +2692,13 @@ Section ProofDirlinkMain.
                     Hj Hgs HL6a0
                     ltac:(cbn [negb]; rewrite HL6a1 dlk_zero_moi;
                           exact (eq_vec_refl _))
-                    HL6a3 HL6a4 Heb
-                    with "Hcg Hcnt Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
+                    HL6a3 HL6a4
+                    with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
                           Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbs1 [-]").
+          { rewrite Heb /trap_csrs_ext. done. }
+          { rewrite Heb /cpu_claim_ext. done. }
           iIntros (CIDrd Hsrd mrd tot P')
-            "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks
+            "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks
              Hdst2 Hbs1".
           iAssert (([∗ list] ii ∈ seq 0 16,
                       pa_add (L6 !!! Regidx Ra2 : mword 64) ii

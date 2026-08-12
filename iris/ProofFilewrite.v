@@ -1741,9 +1741,11 @@ Section ProofFilewrite.
     iApply (BeginOp.wp_begin_op_sconf gs jx glp (fwn_bio fn) (fwn_log fn)
               (fwn_fs fn) (fwn_cov fn) (fwn_logstart fn) (fwn_dev fn)
               pidv (DfracOwn (1/4)) D1 (K - 12)%nat eb C b
-              (fw_av_begin_op K HK) Hjp Hgsj Heb
-              with "Hcg Hcnt Htext Hpc Hpanic Hlog Hppid Hprocs [-]").
-    iIntros (CIDbo Hsbo mbo) "%Hcsbo Hcg Hcnt Hpc Hppid Hlogop".
+              (fw_av_begin_op K HK) Hjp Hgsj
+              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hlog Hppid Hprocs [-]").
+    { rewrite Heb /trap_csrs_ext. done. }
+    { rewrite Heb /cpu_claim_ext. done. }
+    iIntros (CIDbo Hsbo mbo) "%Hcsbo Hcg Hcnt _ _ Hpc Hppid Hlogop".
     iDestruct ("Hpbk1" with "Hppid") as "Hpriv".
     assert (Hpc88 : ret_pc (D1 !!! Regidx Rra) = mword_of_int (FW + 0x88)).
     { rewrite HD1ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1815,12 +1817,14 @@ Section ProofFilewrite.
               pidv (DfracOwn (1/4)) (fwn_dqs fn)
               D3 (K - 12)%nat eb C b
               (fw_av_ilock K HK) P9 P1 P2 P3 P5 Hjp Hgsj
-              ltac:(rewrite HD3a0; exact P8) Heb
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hit Hesc Hireg
+              ltac:(rewrite HD3a0; exact P8)
+              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hit Hesc Hireg
                     Hslk2 Hshrl Hsbi Hppid Hprocs
                     Hdev Hgeo Hdlk Hbsl1 [-]").
+    { rewrite Heb /trap_csrs_ext. done. }
+    { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CIDil Hsil mil dnl bml)
-      "%Hcsil Hcg Hcnt Hpc Hppid Hsbi Hbsl1 Hheld Hslpid Hdep
+      "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsbi Hbsl1 Hheld Hslpid Hdep
        Hidev Hinum Hvalid Hlk #Hshot".
     iDestruct ("Hpbk2" with "Hppid") as "Hpriv".
     assert (Hpc90 : ret_pc (D3 !!! Regidx Rra) = mword_of_int (FW + 0x90)).
@@ -2025,10 +2029,12 @@ Section ProofFilewrite.
               P6 P7 Hjp Hgsj
               ltac:(rewrite HQ6a0; exact P8)
               ltac:(rewrite HQ6a1; vm_compute; reflexivity)
-              HQ6a3 HQ6a4 Heb
-              with "Hcg Hcnt Htext Hpc Hpanic Hkd Hpk Hbio Hlog Hkenv
+              HQ6a3 HQ6a4
+              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hkd Hpk Hbio Hlog Hkenv
                     Hidev Hinum Hmeta Hmap Hblocks Hsbi Hsbsz Hsbb Hbmres
                     Hireg Hdnat [Hpriv] Hprocs Hdev Hgeo Hdlk Hbsl Hlogop [-]").
+    { rewrite Heb /trap_csrs_ext. done. }
+    { rewrite Heb /cpu_claim_ext. done. }
     (* [fw_writei_src] is NOT applied here and does not need to be: the
        [if user] bracket is at the literal [true] the decode forces, and the
        proofmode iota-reduces it before the goal is ever shown.  Rewriting
@@ -2041,7 +2047,7 @@ Section ProofFilewrite.
     iIntros (CIDwi Hswi mwi tot bm' data' dn' dn0' n' wrote dist dstb P' used')
       "%Hcswi %Hsub2 %Hbmwf2 %Hholes2 %Hdaddr2 %Hsz2 %Hbmcov2 %Hcap2 %Hsized2
        %Hdist %Hdistn %Hdistk %Hrange %Hkbytes %Harms %Hbud %Hupt
-       Hcg Hcnt Hpc Hidev Hinum Hmeta Hmap Hblocks Hsbi Hsbsz Hsbb Hbmres
+       Hcg Hcnt _ _ Hpc Hidev Hinum Hmeta Hmap Hblocks Hsbi Hsbsz Hsbb Hbmres
        Hdnat Hpriv Hbsl Hlogop".
     assert (Hpca4 : ret_pc (Q6 !!! Regidx Rra) = mword_of_int (FW + 0xa4)).
     { rewrite HQ6ra. apply bv_eq; vm_compute; reflexivity. }
@@ -2269,10 +2275,12 @@ Section ProofFilewrite.
               (fwn_bio fn) (fwn_log fn) (fwn_fs fn)
               (fwn_cov fn) (fwn_logstart fn) (fwn_dev fn) n'
               pidv (DfracOwn (1/4)) X3 (K - 12)%nat eb C b
-              (fw_av_end_op K HK) P1 Hjp Hgsj Heb
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlog Hcrash Hgc
+              (fw_av_end_op K HK) P1 Hjp Hgsj
+              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlog Hcrash Hgc
                     Hppid Hprocs Hdev Hgeo Hdlk Hlogop [-]").
-    iIntros (CIDeo Hseo meo) "%Hcseo Hcg Hcnt Hpc Hppid".
+    { rewrite Heb /trap_csrs_ext. done. }
+    { rewrite Heb /cpu_claim_ext. done. }
+    iIntros (CIDeo Hseo meo) "%Hcseo Hcg Hcnt _ _ Hpc Hppid".
     iDestruct ("Hpbk4" with "Hppid") as "Hpriv".
     assert (Hpcc0 : ret_pc (X3 !!! Regidx Rra) = mword_of_int (FW + 0xc0)).
     { rewrite HX3ra. apply bv_eq; vm_compute; reflexivity. }

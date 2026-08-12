@@ -1494,11 +1494,13 @@ Section ProofDirlookupMain.
                   ltac:(unfold K_readi; lia) Hlg Hbmwf Hbmcov Hszb
                   ltac:(change (Z.of_nat 16) with 16; lia) Hj Hgs HL6a0
                   ltac:(rewrite HL6a1 dlk_zero_moi; exact (eq_vec_refl _))
-                  HL6a3 HL6a4 Heb
-                  with "Hcg Hcnt Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
+                  HL6a3 HL6a4
+                  with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
                         Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbslot [-]").
+        { rewrite Heb /trap_csrs_ext. done. }
+        { rewrite Heb /cpu_claim_ext. done. }
         iIntros (CIDrd Hsrd mrd tot P')
-          "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks
+          "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks
            Hdst2 Hbslot".
         first [ iEval (rewrite Hpjd) in "Hcg" | idtac ].
         first [ iEval (rewrite Hpjd) in "Hcnt" | idtac ].

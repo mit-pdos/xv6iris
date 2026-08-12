@@ -134,12 +134,18 @@ Section ProofBwrite.
                            pidv dev bno dq m K eb C bs bsd b Q.
   Proof.
     cbv beta delta [wp_bwrite_sconf_body].
-    intros pcE pj ret_tgt HK Hbno HgdV Hj Hgl Hk Ha0 Heb.
+    intros pcE pj ret_tgt HK Hbno HgdV Hj Hgl Hk Ha0.
     unfold K_bwrite in HK.
-    subst eb.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanicany #Hbio Hppid Hprocs
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanicany #Hbio Hppid Hprocs
               Hdev Hgeom Hdlock Hlocked Hperm Hcont".
+    (* [b] and [eb] are DERIVABLY EQUAL: bwrite enters and stays at noff 0
+       (it has no acquire of its own), so [CpuOwn.cpu_own_eb_agree] gives
+       [eb = b] right here.  Do NOT [subst] either -- keep both names, and
+       use [Hbm] to align the [trap_csrs_ext]/[cpu_claim_ext] transports'
+       [eb]-guard with the per-instruction chain facts, which are all
+       stated over [b]. *)
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     iEval (rewrite /bio_hold0) in "Hlocked".
     iDestruct "Hlocked" as
       "(%Hk2 & %Hcov & %Hdv & Hstok & Hpid & Hvalid & Hbdev & Hbuf & Hdisk)".
@@ -312,10 +318,18 @@ Section ProofBwrite.
     assert (HmAra : mA !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.bwrite + 0x0e) : mword 64) 4)
       by (rewrite /mA; apply upd_eq).
     assert (HKhsl : (16 <= K - 4)%nat) by lia.
-    iDestruct (cpu_own_transport CID CID8 0 true pj C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID8 0 eb pj C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
+    (* [trap_csrs_ext]/[cpu_claim_ext] are NOT part of holdingsleep's own
+       signature, so they simply RIDE ALONG in its frame; re-anchor them here
+       exactly like [Hcnt], via [Hbm] ([eb = b]) turning the [eb]-guard into
+       the [b]-guard [wp_next_chain] already knows how to chain. *)
+    iDestruct (trap_csrs_ext_transport CID CID8 eb pj ltac:(rewrite Hbm; wp_next_chain)
+                 with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID CID8 eb pj ltac:(rewrite Hbm; wp_next_chain)
+                 with "Hextm") as "Hextm".
     iApply (HSL.wp_holdingsleep_sconf (fst (bn_slk bn k)) (snd (bn_slk bn k))
-              "buffer"%string (bown bn k) mA pj pidv (K - 4)%nat true C b HKhsl
+              "buffer"%string (bown bn k) mA pj pidv (K - 4)%nat eb C b HKhsl
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hpanicany Hppid [-]").
     { iEval (rewrite HmAa0). iExact "Hslk". }
     { iEval (rewrite HmAa0). iExact "Hpid". }
@@ -405,8 +419,17 @@ Section ProofBwrite.
     { intros kk Hkk. rewrite HD3a0. exact (bnode_data_kdata k kk Hk Hkk). }
     assert (HKrw : (K_virtio_disk_rw <= K - 4)%nat)
       by (unfold K_virtio_disk_rw; lia).
-    iDestruct (cpu_own_transport CID9 CID13 0 true pj C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID9 CID13 0 eb pj C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
+    (* [Hextc]/[Hextm] were never handed to holdingsleep (not in its
+       signature), so they are still stranded at [CID8] -- its own crossing
+       hart, NOT the [CID9] its call happened to return -- and this transport
+       must start there, spanning holdingsleep's own guard fact ([Hs9]) plus
+       every leaf step since. *)
+    iDestruct (trap_csrs_ext_transport CID8 CID13 eb pj ltac:(rewrite Hbm; wp_next_chain)
+                 with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID8 CID13 eb pj ltac:(rewrite Hbm; wp_next_chain)
+                 with "Hextm") as "Hextm".
     (* ================================================================== *)
     (* The one-time blocker here is GONE: bwrite no longer carries          *)
     (* [▷ sched_vc] -- hart h's parked scheduler record, fourteen exclusive *)
@@ -415,14 +438,19 @@ Section ProofBwrite.
     (* [p->lock] ([SchedCtx.run_slot]), which the parking function reaches  *)
     (* by holding that lock -- so nothing about it is threaded here at all, *)
     (* and bwrite passes on only the HART-FREE [procs_inv] / [p_pid].       *)
+    (*                                                                      *)
+    (* [Hextc]/[Hextm] ARE explicitly threaded through THIS call -- rw's    *)
+    (* own crossing is the unconditional [true] (it parks), so no          *)
+    (* [_transport] lemma could carry them across it; rw's contract hands   *)
+    (* the pair back itself, exactly like [Hcnt]/[Hcg] above it never is.  *)
     (* ================================================================== *)
     iApply (RW.wp_virtio_disk_rw_sconf γs j γl γu γd γk pd pav pu D3
-              (K - 4)%nat true C bno (mword_of_int 0 : mword 32) bs bsd b
+              (K - 4)%nat eb C bno (mword_of_int 0 : mword 32) bs bsd b
               Q
-              HKrw Hbno Hkdata Hj Hgl eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanicany Hprocs Hdev Hgeom Hdlock [Hbuf] Hdisk Hperm [-]").
+              HKrw Hbno Hkdata Hj Hgl
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanicany Hprocs Hdev Hgeom Hdlock [Hbuf] Hdisk Hperm [-]").
     { iEval (rewrite HD3a0). iExact "Hbuf". }
-    iIntros (CID14 Hs14 mR) "%Hcs2 Hcg Hcnt Hpc Hbuf Hdisk HQ".
+    iIntros (CID14 Hs14 mR) "%Hcs2 Hcg Hcnt Hextc Hextm Hpc Hbuf Hdisk HQ".
     iEval (rewrite (bw_wr_true _ bs bsd HD3a1)) in "Hbuf".
     iEval (rewrite (bw_wr_true _ bs bsd HD3a1)) in "Hdisk".
     iEval (rewrite HD3a0) in "Hbuf".
@@ -600,10 +628,17 @@ Section ProofBwrite.
       by (apply Hfin; bwidx).
     assert (Cs11 : P4 !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5))
       by (apply Hfin; bwidx).
-    iDestruct (cpu_own_transport CID14 CID19 0 true pj C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID14 CID19 0 eb pj C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID14 CID19 eb pj ltac:(rewrite Hbm; wp_next_chain)
+                 with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID14 CID19 eb pj ltac:(rewrite Hbm; wp_next_chain)
+                 with "Hextm") as "Hextm".
+    (* the crossing bwrite hands its OWN caller is the literal [true] (it
+       tail-calls a parker), so this guard is vacuous, unlike the [eb]-guards
+       above. *)
     iSpecialize ("Hcont" $! CID19 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! P4 with "[%] Hcg Hcnt Hpc Hppid Hlocked HQ").
+    iApply ("Hcont" $! P4 with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hlocked HQ").
     unfold callee_saved. repeat split; assumption.
   Qed.
 

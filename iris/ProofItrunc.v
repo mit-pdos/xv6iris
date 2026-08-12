@@ -90,12 +90,14 @@ Section ItruncCont.
       (ip : mword 64) (inum : mword 32) (dn : dinode) (bm : blkmap)
       (u : nat)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac) (j : nat)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K b (proc_addr j) -∗
-        cpu_own 0 true (proc_addr j) C b -∗
+        cpu_own 0 eb (proc_addr j) C b -∗
+        trap_csrs_ext eb -∗
+        cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         i_dev ip ↦₄{dqd} dev -∗
@@ -179,7 +181,7 @@ Section ItruncTail.
       (used : gset Z) (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) :
+      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) :
     (K_itrunc <= K)%nat ->
     log_geom_ok cov logstart ->
     0 <= inodestart ->
@@ -193,7 +195,9 @@ Section ItruncTail.
     it_thr m M ->
     M !!! Regidx Rs3 = ip ->
     sie_cap_gpr M (K - 6)%nat b (proc_addr j) -∗
-    cpu_own 0 true (proc_addr j) C b -∗
+    cpu_own 0 eb (proc_addr j) C b -∗
+    trap_csrs_ext eb -∗
+    cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (IT + 0x38) : mword 64) -∗
     panic_wp_any -∗
@@ -218,13 +222,14 @@ Section ItruncTail.
     bslots bn 3 -∗
     log_op γ (S u) -∗
     it_cont (CID0 := CID0) γ γfs γi bn cov logstart bmapstart inodestart size
-            used dev ip inum dn bm u pidv dq dqd dqn dqb dqs j m K C b -∗
+            used dev ip inum dn bm u pidv dq dqd dqn dqb dqs j m K C b eb -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hj Hgl Hsp Hthr Hs3.
     pose proof HK as HK'. unfold K_itrunc in HK'.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hsbb Hsbi Hmeta Hmap Hblks Hbmr
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hsbb Hsbi Hmeta Hmap Hblks Hbmr
               #Hireg Hdn #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     iPoseProof (iti_38 with "Htext") as "Hi38".
     iPoseProof (iti_3c with "Htext") as "Hi3c".
     iPoseProof (iti_3e with "Htext") as "Hi3e".
@@ -301,8 +306,12 @@ Section ItruncTail.
     { intros c Hcs N2 N8 N9 N18 N19.
       rewrite /T1 upd_ne; [| regne]. rewrite /T0 upd_ne; [| regne].
       exact (Hthr c Hcs N2 N8 N9 N18 N19). }
-    iDestruct (cpu_own_transport CID0 CID3 0 true (proc_addr j) C b
+    iDestruct (cpu_own_transport CID0 CID3 0 eb (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID0 CID3 eb (proc_addr j)
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID0 CID3 eb (proc_addr j)
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKiu : (K_iupdate <= K - 6)%nat) by (unfold K_iupdate; lia).
@@ -315,13 +324,13 @@ Section ItruncTail.
     iApply (IU.wp_iupdate_sconf γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum (di_trunc dn) dn0
               bm_empty u
-              pidv dq dqd dqn dqs T1 (K - 6)%nat true C b
+              pidv dq dqd dqn dqs T1 (K - 6)%nat eb C b
               HKiu Hgeom Hist Hicov Hilog Hnib (di_trunc_addrs dn) Hdirlen
-              Hj Hgl HT1a0 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hidev Hinum Hmeta Hmap
+              Hj Hgl HT1a0
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hidev Hinum Hmeta Hmap
                     Hsbi Hireg Hdn Hppid Hprocs Hdevi Hdgeom
                     Hdlock Hsl Hop").
-    iIntros (CID4 Hq4 mI) "%Hcs1 Hcg Hcnt Hpc Hppid Hidev Hinum
+    iIntros (CID4 Hq4 mI) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hinum
                            Hmeta Hmap Hsbi Hdn Hsl Hop".
     (* §16.4: iupdate's payout is conditional on the flushed record's type,
        and [di_trunc] keeps the type -- so this is the allocated branch *)
@@ -536,8 +545,12 @@ Section ItruncTail.
       by (rewrite HP6ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
     (* ===== hand everything to the caller ===== *)
-    iDestruct (cpu_own_transport CID4 CID11 0 true (proc_addr j) C b
+    iDestruct (cpu_own_transport CID4 CID11 0 eb (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID4 CID11 eb (proc_addr j)
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID4 CID11 eb (proc_addr j)
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     rewrite /it_cont.
     iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain|].
     (* the five saved registers are back at the caller's values, sp is
@@ -584,7 +597,7 @@ Section ItruncTail.
     assert (Cs11 : P6 !!! Regidx (mword_of_int 27 : mword 5)
                    = (m !!! Regidx (mword_of_int 27 : mword 5) : mword 64))
       by (apply Hfin; itidx).
-    iApply ("Hcont" $! P6 with "[%] Hcg Hcnt Hpc Hppid Hidev Hinum
+    iApply ("Hcont" $! P6 with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hinum
                                  Hsbb Hsbi Hmeta Hmap Hblks Hbmr Hdn [Hsl Hslp]
                                  [Hop]").
     { unfold callee_saved. split_and!; assumption. }
@@ -616,12 +629,14 @@ Section ItruncDLoop.
       (dev : mword 32) (ip : mword 64) (bm : blkmap)
       (data : nat -> list (bv 8))
       (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat) (w : nat)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ Mx : regfile,
         ⌜it_sp m Mx⌝ -∗ ⌜it_thr m Mx⌝ -∗ ⌜Mx !!! Regidx Rs3 = ip⌝ -∗
         sie_cap_gpr Mx (K - 6)%nat b (proc_addr j) -∗
-        cpu_own 0 true (proc_addr j) C b -∗
+        cpu_own 0 eb (proc_addr j) C b -∗
+        trap_csrs_ext eb -∗
+        cpu_claim_ext eb (proc_addr j) -∗
         pc_is (mword_of_int (IT + 0x32) : mword 64) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         i_dev ip ↦₄{dqd} dev -∗
@@ -640,7 +655,7 @@ Section ItruncDLoop.
       (used : gset Z) (ip : mword 64) (bm : blkmap)
       (data : nat -> list (bv 8))
       (pidv : mword 32) (dq dqd dqb : dfrac) (w : nat)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (fuel : nat) :
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) (fuel : nat) :
     (K_itrunc <= K)%nat ->
     log_geom_ok cov logstart ->
     0 < size <= BPB ->
@@ -662,7 +677,9 @@ Section ItruncDLoop.
     M !!! Regidx Rs2 = i_addr ip NDIRECT ->
     M !!! Regidx Rs3 = ip ->
     sie_cap_gpr M (K - 6)%nat b (proc_addr jx) -∗
-    cpu_own 0 true (proc_addr jx) C b -∗
+    cpu_own 0 eb (proc_addr jx) C b -∗
+    trap_csrs_ext eb -∗
+    cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗
     pc_is (mword_of_int (IT + 0x20) : mword 64) -∗
     panic_wp_any -∗
@@ -678,7 +695,7 @@ Section ItruncDLoop.
     bslots bn 2 -∗
     it_dir_state γ γfs ip bm data cov logstart bmapstart size used bn w k -∗
     it_dexit (CID0 := CID0) γ γfs bn cov logstart bmapstart size used dev
-             ip bm data pidv dq dqd dqb jx w m K C b -∗
+             ip bm data pidv dq dqd dqb jx w m K C b eb -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hj Hgl.
@@ -692,7 +709,8 @@ Section ItruncDLoop.
     induction fuel as [|fuel IH];
       intros CID0 k M Hk Hfuel Hsp Hthr Hs1 Hs2 Hs3;
       [ exfalso; unfold NDIRECT in Hk, Hfuel; lia |].
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hppid Hidev Hsbb #Hdevi #Hdgeom #Hdlock Hsl Hst Hexit".
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hppid Hidev Hsbb #Hdevi #Hdgeom #Hdlock Hsl Hst Hexit".
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     pose proof HK as HK'. unfold K_itrunc in HK'.
     pose proof (blkmap_wf_dir_len _ _ _ Hwf) as Hdirlen.
     assert (Hzlen : length (bm_dir (bm_dir_zeroed bm k)) = NDIRECT)
@@ -820,11 +838,15 @@ Section ItruncDLoop.
                          = mword_of_int (IT + 0x32)) by pcw.
         iEval (rewrite Htgt32) in "Hpc".
         rewrite /it_dexit.
-        iDestruct (cpu_own_transport CID0 CID4 0 true (proc_addr jx) C b
+        iDestruct (cpu_own_transport CID0 CID4 0 eb (proc_addr jx) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+        iDestruct (trap_csrs_ext_transport CID0 CID4 eb (proc_addr jx)
+                     ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+        iDestruct (cpu_claim_ext_transport CID0 CID4 eb (proc_addr jx)
+                     ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
         iSpecialize ("Hexit" $! CID4 with "[%]"); [wp_next_chain|].
         rewrite Hlast.
-        iApply ("Hexit" $! L1 with "[%] [%] [%] Hcg Hcnt Hpc Hppid
+        iApply ("Hexit" $! L1 with "[%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hppid
                                     Hidev Hsbb Hsl Hst");
           [exact HL1sp | exact HL1thr | exact HL1s3].
       + (* more entries to go: round again *)
@@ -849,10 +871,14 @@ Section ItruncDLoop.
            chain has reached; the IH, being CID-generic, is applied there *)
         iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID4)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
-        iDestruct (cpu_own_transport CID0 CID4 0 true (proc_addr jx) C b
+        iDestruct (cpu_own_transport CID0 CID4 0 eb (proc_addr jx) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+        iDestruct (trap_csrs_ext_transport CID0 CID4 eb (proc_addr jx)
+                     ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+        iDestruct (cpu_claim_ext_transport CID0 CID4 eb (proc_addr jx)
+                     ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
         iApply (IH CID4 (S k) L1 Hk' Hf' HL1sp HL1thr HL1s1 HL1s2 HL1s3
-                  with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
+                  with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
                         Hst Hexit").
     - (* ---------- FREE: the slot names a block ---------- *)
       iPoseProof (iti_24 with "Htext") as "Hi24".
@@ -968,25 +994,29 @@ Section ItruncDLoop.
       (* THE BUDGET: bm_paid hands bfree a token with cr and the spare unit
          chosen to match, and takes back the same resource either way *)
       iDestruct (bm_paid_use with "Hpaid") as (cr u' Sb) "(%Hcrin & %Hbud & Hop & Hback)".
-      iDestruct (cpu_own_transport CID0 CID3 0 true (proc_addr jx) C b
+      iDestruct (cpu_own_transport CID0 CID3 0 eb (proc_addr jx) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+      iDestruct (trap_csrs_ext_transport CID0 CID3 eb (proc_addr jx)
+                   ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CID0 CID3 eb (proc_addr jx)
+                   ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
       iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3)
                    ltac:(wp_next_chain) with "Hexit") as "Hexit".
       assert (HKbf : (K_bfree <= K - 6)%nat) by (unfold K_bfree; lia).
       iApply (BF.wp_bfree_gen γs jx γl γu γd γk pd pav pu bn γ γfs
                 cov logstart bmapstart size dev (used ∖ bm_dir_freed bm k)
                 (bm_dir bm !!! k : mword 32) (data k) u' cr Sb
-                pidv dq dqb L3 (K - 6)%nat true C b
+                pidv dq dqb L3 (K - 6)%nat eb C b
                 HKbf Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 ltac:(destruct (bv_unsigned_in_range 32 (bm_dir bm !!! k))
                         as [Hlo _]; split; [exact Hlo | exact Hklt])
                 Hkcov Hklog
                 (Hblen k ltac:(unfold MAXFILE, NDIRECT in *; lia))
-                Hcrin Hj Hgl HL3a0 HL3a1 eq_refl
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsbb [Hbmr] Hfsb Htok
+                Hcrin Hj Hgl HL3a0 HL3a1
+                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hsbb [Hbmr] Hfsb Htok
                       Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hop").
       { iExact "Hbmr". }
-      iIntros (CID4 Hq4 mf) "%Hcs Hcg Hcnt Hpc Hppid Hsbb Hbmr
+      iIntros (CID4 Hq4 mf) "%Hcs Hcg Hcnt Hextc Hextm Hpc Hppid Hsbb Hbmr
                              Hsl Hop".
       assert (Hpc2c : ret_pc (L3 !!! Regidx Rra : mword 64)
                       = mword_of_int (IT + 0x2c)) by (rewrite HL3ra; pcw).
@@ -1103,13 +1133,17 @@ Section ItruncDLoop.
                           = mword_of_int (IT + 0x32)) by pcw.
         iEval (rewrite Htgt32') in "Hpc".
         rewrite /it_dexit.
-        iDestruct (cpu_own_transport CID4 CID8 0 true (proc_addr jx) C b
+        iDestruct (cpu_own_transport CID4 CID8 0 eb (proc_addr jx) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+        iDestruct (trap_csrs_ext_transport CID4 CID8 eb (proc_addr jx)
+                     ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+        iDestruct (cpu_claim_ext_transport CID4 CID8 eb (proc_addr jx)
+                     ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
         iDestruct (wp_next_shift (b := true) (CIDa := CID3) (CIDb := CID8)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iSpecialize ("Hexit" $! CID8 with "[%]"); [wp_next_chain|].
         rewrite Hlast.
-        iApply ("Hexit" $! N1 with "[%] [%] [%] Hcg Hcnt Hpc Hppid
+        iApply ("Hexit" $! N1 with "[%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hppid
                                     Hidev Hsbb Hsl Hst");
           [exact HN1sp | exact HN1thr | exact HN1s3].
       + assert (Hne' : i_addr ip (S k) <> i_addr ip NDIRECT).
@@ -1128,12 +1162,16 @@ Section ItruncDLoop.
           by (clear - Hk Hmore; unfold NDIRECT in *; lia).
         assert (Hf'' : (NDIRECT - S k <= fuel)%nat)
           by (clear - Hk Hfuel Hmore; unfold NDIRECT in *; lia).
-        iDestruct (cpu_own_transport CID4 CID8 0 true (proc_addr jx) C b
+        iDestruct (cpu_own_transport CID4 CID8 0 eb (proc_addr jx) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+        iDestruct (trap_csrs_ext_transport CID4 CID8 eb (proc_addr jx)
+                     ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+        iDestruct (cpu_claim_ext_transport CID4 CID8 eb (proc_addr jx)
+                     ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
         iDestruct (wp_next_shift (b := true) (CIDa := CID3) (CIDb := CID8)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iApply (IH CID8 (S k) N1 Hk'' Hf'' HN1sp HN1thr HN1s1 HN1s2 HN1s3
-                  with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
+                  with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
                         Hst Hexit").
   Qed.
 
@@ -1159,13 +1197,15 @@ Section ItruncELoop.
       (dev : mword 32) (ip : mword 64) (bm : blkmap)
       (data : nat -> list (bv 8)) (kk : nat) (dsk : mword 32)
       (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat) (w : nat)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ Mx : regfile,
         ⌜it_sp m Mx⌝ -∗ ⌜it_thr4 m Mx⌝ -∗ ⌜Mx !!! Regidx Rs3 = ip⌝ -∗
         ⌜Mx !!! Regidx Rs4 = bnode kk⌝ -∗
         sie_cap_gpr Mx (K - 6)%nat b (proc_addr j) -∗
-        cpu_own 0 true (proc_addr j) C b -∗
+        cpu_own 0 eb (proc_addr j) C b -∗
+        trap_csrs_ext eb -∗
+        cpu_claim_ext eb (proc_addr j) -∗
         pc_is (mword_of_int (IT + 0x7a) : mword 64) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         i_dev ip ↦₄{dqd} dev -∗
@@ -1185,7 +1225,7 @@ Section ItruncELoop.
       (used : gset Z) (ip : mword 64) (bm : blkmap)
       (data : nat -> list (bv 8)) (kk : nat) (dsk : mword 32)
       (pidv : mword 32) (dq dqd dqb : dfrac) (w : nat)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (fuel : nat) :
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) (fuel : nat) :
     (K_itrunc <= K)%nat ->
     log_geom_ok cov logstart ->
     0 < size <= BPB ->
@@ -1209,7 +1249,9 @@ Section ItruncELoop.
     M !!! Regidx Rs3 = ip ->
     M !!! Regidx Rs4 = bnode kk ->
     sie_cap_gpr M (K - 6)%nat b (proc_addr jx) -∗
-    cpu_own 0 true (proc_addr jx) C b -∗
+    cpu_own 0 eb (proc_addr jx) C b -∗
+    trap_csrs_ext eb -∗
+    cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗
     pc_is (mword_of_int (IT + 0x6c) : mword 64) -∗
     panic_wp_any -∗
@@ -1226,7 +1268,7 @@ Section ItruncELoop.
     buf_own (bpa kk) (bm_ind bm) dsk (ind_bytes (bm_ent bm)) -∗
     it_ent_state γ γfs bm data cov logstart bmapstart size used w q -∗
     it_eexit (CID0 := CID0) γ γfs bn γd cov logstart bmapstart size used dev
-             ip bm data kk dsk pidv dq dqd dqb jx w m K C b -∗
+             ip bm data kk dsk pidv dq dqd dqb jx w m K C b eb -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hkk Hj Hgl.
@@ -1234,7 +1276,8 @@ Section ItruncELoop.
     induction fuel as [|fuel IH];
       intros CID0 q M Hq Hfuel Hsp Hthr Hs1 Hs2 Hs3 Hs4;
       [ exfalso; unfold NINDIRECT in Hq, Hfuel; lia |].
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hppid Hidev Hsbb #Hdevi #Hdgeom #Hdlock Hsl Hbuf Hst Hexit".
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hppid Hidev Hsbb #Hdevi #Hdgeom #Hdlock Hsl Hbuf Hst Hexit".
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     pose proof HK as HK'. unfold K_itrunc in HK'.
     pose proof (blkmap_wf_ent_len _ _ _ Hwf) as Hentlen.
     iDestruct (it_ent_state_open with "Hst") as "(Hres & Hbmr & Hpaid)".
@@ -1364,13 +1407,17 @@ Section ItruncELoop.
                          = mword_of_int (IT + 0x7a)) by pcw.
         iEval (rewrite Htgt7a) in "Hpc".
         rewrite /it_eexit.
-        iDestruct (cpu_own_transport CID0 CIDb 0 true (proc_addr jx) C b
+        iDestruct (cpu_own_transport CID0 CIDb 0 eb (proc_addr jx) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+        iDestruct (trap_csrs_ext_transport CID0 CIDb eb (proc_addr jx)
+                     ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+        iDestruct (cpu_claim_ext_transport CID0 CIDb eb (proc_addr jx)
+                     ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
         iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDb)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iSpecialize ("Hexit" $! CIDb with "[%]"); [wp_next_chain|].
         rewrite Hlast.
-        iApply ("Hexit" $! E1 with "[%] [%] [%] [%] Hcg Hcnt Hpc
+        iApply ("Hexit" $! E1 with "[%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc
                                     Hppid Hidev Hsbb Hsl Hbuf Hst");
           [exact HE1sp | exact HE1thr | exact HE1s3 | exact HE1s4].
       + assert (Hne : pa_add (b_data (bpa kk)) (4 * S q)%nat
@@ -1391,12 +1438,16 @@ Section ItruncELoop.
           by (clear - Hq Hmore; unfold NINDIRECT in *; lia).
         assert (Hf'' : (NINDIRECT - S q <= fuel)%nat)
           by (clear - Hq Hfuel Hmore; unfold NINDIRECT in *; lia).
-        iDestruct (cpu_own_transport CID0 CIDb 0 true (proc_addr jx) C b
+        iDestruct (cpu_own_transport CID0 CIDb 0 eb (proc_addr jx) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+        iDestruct (trap_csrs_ext_transport CID0 CIDb eb (proc_addr jx)
+                     ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+        iDestruct (cpu_claim_ext_transport CID0 CIDb eb (proc_addr jx)
+                     ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
         iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDb)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iApply (IH CIDb (S q) E1 Hq'' Hf'' HE1sp HE1thr HE1s1 HE1s2 HE1s3 HE1s4
-                  with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
+                  with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
                         Hbuf Hst Hexit").
 
     - (* ---------- FREE ---------- *)
@@ -1492,8 +1543,12 @@ Section ItruncELoop.
       { intros c Hcs2 N2 N8 N9 N18 N19 N20.
         rewrite /E3 upd_ne; [| regne]. exact (HE2thr c Hcs2 N2 N8 N9 N18 N19 N20). }
       iDestruct (bm_paid_use with "Hpaid") as (cr u' Sb) "(%Hcrin & %Hbud & Hop & Hback)".
-      iDestruct (cpu_own_transport CID0 CIDz 0 true (proc_addr jx) C b
+      iDestruct (cpu_own_transport CID0 CIDz 0 eb (proc_addr jx) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+      iDestruct (trap_csrs_ext_transport CID0 CIDz eb (proc_addr jx)
+                   ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CID0 CIDz eb (proc_addr jx)
+                   ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
       iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDz)
                    ltac:(wp_next_chain) with "Hexit") as "Hexit".
       assert (HKbf : (K_bfree <= K - 6)%nat) by (unfold K_bfree; lia).
@@ -1501,17 +1556,17 @@ Section ItruncELoop.
                 cov logstart bmapstart size dev
                 (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm q))
                 (bm_ent bm !!! q : mword 32) (data (NDIRECT + q)%nat) u' cr Sb
-                pidv dq dqb E3 (K - 6)%nat true C b
+                pidv dq dqb E3 (K - 6)%nat eb C b
                 HKbf Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 ltac:(destruct (bv_unsigned_in_range 32 (bm_ent bm !!! q))
                         as [Hlo _]; split; [exact Hlo | exact Hqlt])
                 Hqcov Hqlog (Hblen (NDIRECT + q)%nat
                                     ltac:(unfold MAXFILE, NDIRECT, NINDIRECT in *;
                                           lia))
-                Hcrin Hj Hgl HE3a0 HE3a1 eq_refl
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsbb Hbmr Hfsb Htok
+                Hcrin Hj Hgl HE3a0 HE3a1
+                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hsbb Hbmr Hfsb Htok
                       Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hop").
-      iIntros (CIDf Hqf mfE) "%Hcs Hcg Hcnt Hpc Hppid Hsbb Hbmr
+      iIntros (CIDf Hqf mfE) "%Hcs Hcg Hcnt Hextc Hextm Hpc Hppid Hsbb Hbmr
                               Hsl Hop".
       assert (Hpc78 : ret_pc (E3 !!! Regidx Rra : mword 64)
                       = mword_of_int (IT + 0x78)) by (rewrite HE3ra; pcw).
@@ -1604,13 +1659,17 @@ Section ItruncELoop.
                          = mword_of_int (IT + 0x7a)) by pcw.
         iEval (rewrite Htgt7af) in "Hpc".
         rewrite /it_eexit.
-        iDestruct (cpu_own_transport CIDf CIDr 0 true (proc_addr jx) C b
+        iDestruct (cpu_own_transport CIDf CIDr 0 eb (proc_addr jx) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+        iDestruct (trap_csrs_ext_transport CIDf CIDr eb (proc_addr jx)
+                     ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+        iDestruct (cpu_claim_ext_transport CIDf CIDr eb (proc_addr jx)
+                     ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
         iDestruct (wp_next_shift (b := true) (CIDa := CIDz) (CIDb := CIDr)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iSpecialize ("Hexit" $! CIDr with "[%]"); [wp_next_chain|].
         rewrite Hlastf.
-        iApply ("Hexit" $! F1 with "[%] [%] [%] [%] Hcg Hcnt Hpc
+        iApply ("Hexit" $! F1 with "[%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc
                                     Hppid Hidev Hsbb Hsl Hbuf Hst");
           [exact HF1sp | exact HF1thr | exact HF1s3 | exact HF1s4].
       + assert (Hnef : pa_add (b_data (bpa kk)) (4 * S q)%nat
@@ -1631,12 +1690,16 @@ Section ItruncELoop.
           by (clear - Hq Hmoref; unfold NINDIRECT in *; lia).
         assert (Hff'' : (NINDIRECT - S q <= fuel)%nat)
           by (clear - Hq Hfuel Hmoref; unfold NINDIRECT in *; lia).
-        iDestruct (cpu_own_transport CIDf CIDr 0 true (proc_addr jx) C b
+        iDestruct (cpu_own_transport CIDf CIDr 0 eb (proc_addr jx) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+        iDestruct (trap_csrs_ext_transport CIDf CIDr eb (proc_addr jx)
+                     ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+        iDestruct (cpu_claim_ext_transport CIDf CIDr eb (proc_addr jx)
+                     ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
         iDestruct (wp_next_shift (b := true) (CIDa := CIDz) (CIDb := CIDr)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iApply (IH CIDr (S q) F1 Hqf'' Hff'' HF1sp HF1thr HF1s1 HF1s2 HF1s3 HF1s4
-                  with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
+                  with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
                         Hbuf Hst Hexit").
 
   Qed.
@@ -1661,12 +1724,14 @@ Section ItruncIArm.
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
       (dev : mword 32) (ip : mword 64) (bm : blkmap)
       (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat) (w : nat)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ Mx : regfile,
         ⌜it_sp m Mx⌝ -∗ ⌜it_thr m Mx⌝ -∗ ⌜Mx !!! Regidx Rs3 = ip⌝ -∗
         sie_cap_gpr Mx (K - 6)%nat b (proc_addr j) -∗
-        cpu_own 0 true (proc_addr j) C b -∗
+        cpu_own 0 eb (proc_addr j) C b -∗
+        trap_csrs_ext eb -∗
+        cpu_claim_ext eb (proc_addr j) -∗
         pc_is (mword_of_int (IT + 0x38) : mword 64) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         i_dev ip ↦₄{dqd} dev -∗
@@ -1687,7 +1752,7 @@ Section ItruncIArm.
       (used : gset Z) (ip : mword 64) (bm : blkmap)
       (data : nat -> list (bv 8))
       (pidv : mword 32) (dq dqd dqb : dfrac) (w : nat)
-      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) :
+      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) :
     (K_itrunc <= K)%nat ->
     log_geom_ok cov logstart ->
     0 < size <= BPB ->
@@ -1709,7 +1774,9 @@ Section ItruncIArm.
        re-reads the cell much later, at +0x80, for the block's own free. *)
     M !!! Regidx Ra1 = sign_extend' 64 (bm_ind bm : mword 32) ->
     sie_cap_gpr M (K - 6)%nat b (proc_addr jx) -∗
-    cpu_own 0 true (proc_addr jx) C b -∗
+    cpu_own 0 eb (proc_addr jx) C b -∗
+    trap_csrs_ext eb -∗
+    cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗
     pc_is (mword_of_int (IT + 0x50) : mword 64) -∗
     panic_wp_any -∗
@@ -1730,14 +1797,15 @@ Section ItruncIArm.
     bitmap_res γfs bmapstart cov logstart size (used ∖ bm_dir_freed bm NDIRECT) -∗
     bm_paid γ bmapstart w -∗
     it_armexit (CID0 := CID0) γ γfs bn cov logstart bmapstart size used dev
-               ip bm pidv dq dqd dqb jx w m K C b -∗
+               ip bm pidv dq dqd dqb jx w m K C b eb -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hindnz Hj Hgl
            Hsp Hthr Hs3 Ha1.
     pose proof HK as HK'. unfold K_itrunc in HK'.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hppid Hidev Hsbb #Hdevi #Hdgeom #Hdlock Hslot6 Hsl Hmap
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hppid Hidev Hsbb #Hdevi #Hdgeom #Hdlock Hslot6 Hsl Hmap
               Hres Hbmr Hpaid Hexit".
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     iPoseProof (iti_50 with "Htext") as "Hi50".
     iPoseProof (iti_52 with "Htext") as "Hi52".
     iPoseProof (iti_56 with "Htext") as "Hi56".
@@ -1859,20 +1927,24 @@ Section ItruncIArm.
     assert (Hicov32 : uint (bm_ind bm : mword 32)
                       ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite Huc; exact Hicov).
-    iDestruct (cpu_own_transport CID0 CID3 0 true (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID0 CID3 0 eb (proc_addr jx) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID0 CID3 eb (proc_addr jx)
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID0 CID3 eb (proc_addr jx)
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3)
                  ltac:(wp_next_chain) with "Hexit") as "Hexit".
     iApply (BR.wp_bread_sconf γs jx γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (bm_ind bm : mword 32) dq
-              A1 (K - 6)%nat true C b
+              A1 (K - 6)%nat eb C b
               HKbr
               ltac:(rewrite Huc;
                     change (2 ^ 31)%Z with 2147483648%Z in Hilt; exact Hilt)
               eq_refl Hicov32 eq_refl Hj Hgl
-              HA1a0 HA1a1 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
-    iIntros (CID4 Hq4 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hpc
+              HA1a0 HA1a1
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
+    iIntros (CID4 Hq4 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc
                                           Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc5a : ret_pc (A1 !!! Regidx Rra : mword 64)
@@ -2000,19 +2072,23 @@ Section ItruncIArm.
       with "[Hres Hbmr Hpaid]" as "Hst".
     { iApply (it_ent_state_close with "Hres Hbmr Hpaid"). }
     (* Hcnt came back from bread at CID4, not from the pre-call transport *)
-    iDestruct (cpu_own_transport CID4 CID8 0 true (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID4 CID8 0 eb (proc_addr jx) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID4 CID8 eb (proc_addr jx)
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID4 CID8 eb (proc_addr jx)
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iApply (it_eloop (CID0 := CID8) γs jx γl γu γd γk pd pav pu bn γ γfs
               cov logstart bmapstart size dev used ip bm data kk
-              (mword_of_int 0 : mword 32) pidv dq dqd dqb w m K C b NINDIRECT
+              (mword_of_int 0 : mword 32) pidv dq dqd dqb w m K C b eb NINDIRECT
               HK ltac:(split; [exact Hcovok | exact Hlogsub]) Hsize Hbm0
               Hbmcov Hbmlog Hwf Hrange Hblen
               Hkk Hj Hgl
               0%nat A4 ltac:(unfold NINDIRECT; lia) ltac:(lia)
               HA4sp HA4thr HA4s1 HA4s2 HA4s3 HA4s4
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl Hbuf Hst [-]").
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl Hbuf Hst [-]").
     (* ===== the loop is done: +0x7a onwards ===== *)
-    iIntros (CID9 Hq9 Mx) "%HMxsp %HMxthr %HMxs3 %HMxs4 Hcg Hcnt Hpc
+    iIntros (CID9 Hq9 Mx) "%HMxsp %HMxthr %HMxs3 %HMxs4 Hcg Hcnt Hextc Hextm Hpc
                            Hppid Hidev Hsbb Hsl Hbuf Hst".
     iPoseProof (iti_7a with "Htext") as "Hi7a".
     iPoseProof (iti_7c with "Htext") as "Hi7c".
@@ -2084,10 +2160,10 @@ Section ItruncIArm.
       rewrite /B1 upd_ne; [| regne]. exact (HB0thr c Hcs2 N2 N8 N9 N18 N19 N20). }
     assert (HKbl : (K_brelse <= K - 6)%nat) by (unfold K_brelse; lia).
     (* Hcnt arrived with the loop's exit at CID9 *)
-    iDestruct (cpu_own_transport CID9 CID11 0 true (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID9 CID11 0 eb (proc_addr jx) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
-              pidv dev (bm_ind bm : mword 32) dq B1 (K - 6)%nat true
+              pidv dev (bm_ind bm : mword 32) dq B1 (K - 6)%nat eb
               (proc_addr jx) C (ind_bytes (bm_ent bm)) bsd0 d0 b
               HKbl Hkk HB1a0
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hheld").
@@ -2197,8 +2273,16 @@ Section ItruncIArm.
       by (rewrite -Hstop; exact (Hrange MAXFILE ltac:(lia)
             ltac:(rewrite Hstop; exact Hindnz))).
     iDestruct (bm_paid_use with "Hpaid") as (cr u' Sb) "(%Hcrin & %Hbud & Hop & Hback)".
-    iDestruct (cpu_own_transport CID12 CID15 0 true (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID12 CID15 0 eb (proc_addr jx) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    (* Hextc/Hextm were last transported at CID9, the it_eloop exit --
+       brelse's contract does not mention them, so they are STRANDED there
+       and must cross the WIDER span (CID9 -> CID15), skipping over brelse's
+       own (narrower) cpu_own-only hop. *)
+    iDestruct (trap_csrs_ext_transport CID9 CID15 eb (proc_addr jx)
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID9 CID15 eb (proc_addr jx)
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     (* Hexit was already moved to CID3 before the bread *)
     iDestruct (wp_next_shift (b := true) (CIDa := CID3) (CIDb := CID15)
                  ltac:(wp_next_chain) with "Hexit") as "Hexit".
@@ -2207,17 +2291,17 @@ Section ItruncIArm.
               cov logstart bmapstart size dev
               (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm NINDIRECT))
               (bm_ind bm : mword 32) (ind_bytes (bm_ent bm)) u' cr Sb
-              pidv dq dqb C2 (K - 6)%nat true C b
+              pidv dq dqb C2 (K - 6)%nat eb C b
               HKbf2 ltac:(split; [exact Hcovok | exact Hlogsub]) Hsize Hbm0
               Hbmcov Hbmlog
               ltac:(destruct (bv_unsigned_in_range 32 (bm_ind bm))
                       as [Hlo _]; split; [exact Hlo | exact Hilt2])
               Hicov Hilog
               ltac:(rewrite ind_bytes_length Hentlen; reflexivity)
-              Hcrin Hj Hgl HC2a0 HC2a1 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsbb Hbmr Hindblk
+              Hcrin Hj Hgl HC2a0 HC2a1
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hsbb Hbmr Hindblk
                     Hindtok Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hop").
-    iIntros (CID16 Hq16 mZ) "%Hcs3 Hcg Hcnt Hpc Hppid Hsbb Hbmr Hsl Hop".
+    iIntros (CID16 Hq16 mZ) "%Hcs3 Hcg Hcnt Hextc Hextm Hpc Hppid Hsbb Hbmr Hsl Hop".
     assert (Hpc8c : ret_pc (C2 !!! Regidx Rra : mword 64)
                     = mword_of_int (IT + 0x8c)) by (rewrite HC2ra; pcw).
     iEval (rewrite Hpc8c) in "Hpc".
@@ -2322,15 +2406,19 @@ Section ItruncIArm.
     iEval (rewrite Htgt38) in "Hpc".
     (* ===== hand the emptied inode to the tail ===== *)
     rewrite /it_armexit.
-    iDestruct (cpu_own_transport CID16 CID19 0 true (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID16 CID19 0 eb (proc_addr jx) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID16 CID19 eb (proc_addr jx)
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID16 CID19 eb (proc_addr jx)
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID15) (CIDb := CID19)
                  ltac:(wp_next_chain) with "Hexit") as "Hexit".
     iSpecialize ("Hexit" $! CID19 with "[%]"); [wp_next_chain|].
     iAssert (bslots bn 3) with "[Hsl Hsl1]" as "Hsl3".
     { assert (H3 : (3 = 2 + 1)%nat) by lia.
       rewrite H3 bslots_op. iSplitL "Hsl"; [iExact "Hsl" | iExact "Hsl1"]. }
-    iApply ("Hexit" $! D0 with "[%] [%] [%] Hcg Hcnt Hpc Hppid Hidev Hsbb
+    iApply ("Hexit" $! D0 with "[%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hsbb
                                 [Hslot6] Hmap [] Hbmr Hsl3 Hpaid");
       [exact HD0sp | exact HD0thr | exact HD0s3
       | iExists _; iExact "Hslot6"
@@ -2366,8 +2454,7 @@ Section ItruncMain.
   Proof.
     cbv beta delta [wp_itrunc_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
-           Hnib Hdtnz Hwf Hbelow Hblen Hadr Hj Hgl Ha0 Heb.
-    subst eb.
+           Hnib Hdtnz Hwf Hbelow Hblen Hadr Hj Hgl Ha0.
     pose proof HK as HK'. unfold K_itrunc in HK'.
     (* THE PER-SLOT RANGE FACT, no longer a premise: [blkmap_wf] already
        says every block the map names is covered, and [cov_below] bounds a
@@ -2379,9 +2466,10 @@ Section ItruncMain.
     { intros i Hi Hnz.
       exact (proj2 (blkmap_slot_inrange cov logstart size bm
                       (proj1 Hgeom) Hbelow Hwf i Hi Hnz)). }
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinum Hmeta Hmap
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinum Hmeta Hmap
               Hblks Hsbb Hsbi Hbmr #Hireg Hdn Hppid #Hprocs #Hdevi
               #Hdgeom #Hdlock Hsl Hop Hcont".
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     iPoseProof (iti_00 with "Htext") as "Hi00".
     iPoseProof (iti_02 with "Htext") as "Hi02".
     iPoseProof (iti_04 with "Htext") as "Hi04".
@@ -2625,18 +2713,22 @@ Section ItruncMain.
     assert (H3 : (3 = 2 + 1)%nat) by lia.
     iEval (rewrite H3 bslots_op) in "Hsl".
     iDestruct "Hsl" as "[Hsl Hslp]".
-    iDestruct (cpu_own_transport CID CID11x 0 true (proc_addr j) C b
+    iDestruct (cpu_own_transport CID CID11x 0 eb (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID CID11x eb (proc_addr j)
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID CID11x eb (proc_addr j)
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iApply (it_dloop (CID0 := CID11x) γs j γl γu γd γk pd pav pu bn γ γfs
               cov logstart bmapstart size dev used ip bm data
-              pidv dq dqd dqb u m K C b NDIRECT
+              pidv dq dqd dqb u m K C b eb NDIRECT
               HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hj Hgl
               0%nat Q3 ltac:(unfold NDIRECT; lia) ltac:(lia)
               HQ3sp HQ3thr HQ3s1 HQ3s2 HQ3s3
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs
                     Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl Hst [-]").
     (* ===== the direct loop is done: +0x32 onwards ===== *)
-    iIntros (CID12x Hq12x Mx) "%HMsp %HMthr %HMs3 Hcg Hcnt Hpc Hppid
+    iIntros (CID12x Hq12x Mx) "%HMsp %HMthr %HMs3 Hcg Hcnt Hextc Hextm Hpc Hppid
                                Hidev Hsbb Hsl Hst".
     iPoseProof (iti_32 with "Htext") as "Hi32".
     iPoseProof (iti_36 with "Htext") as "Hi36".
@@ -2724,16 +2816,20 @@ Section ItruncMain.
       iDestruct (bm_paid_elim with "Hpaid") as (n0) "(%Hn0 & Hop)".
       (* iupdate wants a successor; bm_paid guarantees at least S u *)
       destruct n0 as [|n1]; [exfalso; lia|].
-      iDestruct (cpu_own_transport CID12x CID14x 0 true (proc_addr j) C b
+      iDestruct (cpu_own_transport CID12x CID14x 0 eb (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+      iDestruct (trap_csrs_ext_transport CID12x CID14x eb (proc_addr j)
+                   ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CID12x CID14x eb (proc_addr j)
+                   ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
       iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID14x)
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (it_tail (CID0 := CID14x) γs j γl γu γd γk pd pav pu bn γ γfs γi
                 cov logstart bmapstart inodestart size nib dev used ip inum
                 dn dn0 bm
-                n1 pidv dq dqd dqn dqb dqs m R0 K C b
+                n1 pidv dq dqd dqn dqb dqs m R0 K C b eb
                 HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hj Hgl HR0sp HR0thr HR0s3
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs
+                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs
                       Hframe Hppid Hidev Hinum Hsbb Hsbi
                       Hmeta Hmap Hblks Hbmr Hireg Hdn Hdevi Hdgeom Hdlock
                       [Hsl Hslp] Hop [Hcont]").
@@ -2744,9 +2840,9 @@ Section ItruncMain.
       rewrite /it_cont.
       iIntros (CIDz) "%Hch". iSpecialize ("Hcont" $! CIDz with "[%]");
         [exact Hch|].
-      iIntros (mf) "%Hcs Hsie Hcnt Hpc Hppid Hidev Hinum Hsbb Hsbi
+      iIntros (mf) "%Hcs Hsie Hcnt Hextc Hextm Hpc Hppid Hidev Hinum Hsbb Hsbi
                     Hmeta Hmap Hblks Hbmr Hdn Hsl Hop".
-      iApply ("Hcont" $! mf with "[%] Hsie Hcnt Hpc Hppid Hidev Hinum
+      iApply ("Hcont" $! mf with "[%] Hsie Hcnt Hextc Hextm Hpc Hppid Hidev Hinum
                                   Hsbb Hsbi Hmeta Hmap Hblks Hbmr Hdn Hsl
                                   [Hop]");
         [exact Hcs | iExists n1; iSplitR; [iPureIntro; lia|]; iExact "Hop"].
@@ -2768,14 +2864,18 @@ Section ItruncMain.
                    with "Hblks") as "Hres0".
       rewrite /it_frame.
       iDestruct "Hframe" as "(Hf1 & Hf2 & Hf3 & Hf4 & Hf5 & Hf6)".
-      iDestruct (cpu_own_transport CID12x CID14y 0 true (proc_addr j) C b
+      iDestruct (cpu_own_transport CID12x CID14y 0 eb (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+      iDestruct (trap_csrs_ext_transport CID12x CID14y eb (proc_addr j)
+                   ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CID12x CID14y eb (proc_addr j)
+                   ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
       iApply (it_iarm (CID0 := CID14y) γs j γl γu γd γk pd pav pu bn γ γfs
                 cov logstart bmapstart size dev used ip bm data
-                pidv dq dqd dqb u m R0 K C b
+                pidv dq dqd dqb u m R0 K C b eb
                 HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hyesind
                 Hj Hgl HR0sp HR0thr HR0s3 HR0a1
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs
+                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs
                       Hppid Hidev Hsbb Hdevi Hdgeom Hdlock [Hf6]
                       [Hsl Hslp] Hmap Hres0 Hbmr Hpaid [-]").
       { iExact "Hf6". }
@@ -2783,7 +2883,7 @@ Section ItruncMain.
         rewrite H3c bslots_op. iSplitL "Hsl"; [iExact "Hsl" | iExact "Hslp"]. }
       (* ===== the arm rejoins at +0x38: hand on to the tail ===== *)
       rewrite /it_armexit.
-      iIntros (CID15y Hq15y Mz) "%HMzsp %HMzthr %HMzs3 Hcg Hcnt Hpc Hppid
+      iIntros (CID15y Hq15y Mz) "%HMzsp %HMzthr %HMzs3 Hcg Hcnt Hextc Hextm Hpc Hppid
                                  Hidev Hsbb Hslot6 Hmap Hblks Hbmr Hsl Hpaid".
       iDestruct (bm_paid_elim with "Hpaid") as (n2) "(%Hn2 & Hop)".
       destruct n2 as [|n3]; [exfalso; lia|].
@@ -2792,9 +2892,9 @@ Section ItruncMain.
       iApply (it_tail (CID0 := CID15y) γs j γl γu γd γk pd pav pu bn γ γfs γi
                 cov logstart bmapstart inodestart size nib dev used ip inum
                 dn dn0 bm
-                n3 pidv dq dqd dqn dqb dqs m Mz K C b
+                n3 pidv dq dqd dqn dqb dqs m Mz K C b eb
                 HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hj Hgl HMzsp HMzthr HMzs3
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs
+                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs
                       [Hf1 Hf2 Hf3 Hf4 Hf5 Hslot6] Hppid Hidev Hinum Hsbb
                       Hsbi Hmeta Hmap Hblks Hbmr Hireg Hdn Hdevi Hdgeom Hdlock
                       Hsl Hop [Hcont]").
@@ -2802,9 +2902,9 @@ Section ItruncMain.
       rewrite /it_cont.
       iIntros (CIDw) "%Hchw". iSpecialize ("Hcont" $! CIDw with "[%]");
         [exact Hchw|].
-      iIntros (mf) "%Hcsw Hsie Hcnt Hpc Hppid Hidev Hinum Hsbb Hsbi
+      iIntros (mf) "%Hcsw Hsie Hcnt Hextc Hextm Hpc Hppid Hidev Hinum Hsbb Hsbi
                     Hmeta Hmap Hblks Hbmr Hdn Hsl Hop".
-      iApply ("Hcont" $! mf with "[%] Hsie Hcnt Hpc Hppid Hidev Hinum
+      iApply ("Hcont" $! mf with "[%] Hsie Hcnt Hextc Hextm Hpc Hppid Hidev Hinum
                                   Hsbb Hsbi Hmeta Hmap Hblks Hbmr Hdn Hsl
                                   [Hop]");
         [exact Hcsw | iExists n3; iSplitR; [iPureIntro; lia|]; iExact "Hop"].

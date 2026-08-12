@@ -95,8 +95,11 @@
 
    balloc SLEEPS (it breads), so it threads the running-process bundle
    exactly as SpecBread.v does: procs_inv / p_pid, the disk fabric
-   (dev_inv / disk_geom / the virtio_disk lock), and the parking premise
-   eb = true.  It enters and returns at noff 0.  The parked scheduler record
+   (dev_inv / disk_geom / the virtio_disk lock), and the trap-CSR complement
+   ([trap_csrs_ext eb] / [cpu_claim_ext eb pj], index-free -- see
+   claude-notes/projects/eb-generic-sweep.md) that bread's own contract now
+   demands.  It enters and returns at noff 0 but PARKS internally, so its
+   own crossing is the literal [true], not [b].  The parked scheduler record
    is not threaded -- it lives in the running proc's own [p->lock]. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -179,12 +182,21 @@ Definition wp_balloc_sconf_body
   γs !! j = Some γl ->
   (* the uint argument arrives sign-extended (RV64 ABI) *)
   m !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 dev ->
-  (* PARKING PREMISE (hart-generic scheduler protocol) -- everything below
-     sleeps, and a parking thread hands the trap CSRs across the crossing
-     only with an enabled base.  See SpecSched.v / SpecSleep.v. *)
-  eb = true ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b -∗
+  (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  balloc holds no lock of its
+     own -- every push_off/pop_off pair that can mint or spend an
+     [arm_pay 0 eb _] lives inside bread (and, through it, acquiresleep /
+     virtio_disk_rw), so balloc is a PURE PASS-THROUGH: it neither mints nor
+     spends this complement itself, only threads it down to each bread call
+     and takes it back from bread's continuation.  At [eb = true] the
+     complement is [emp], so no existing caller gains an obligation; at
+     [eb = false] it is the honest pair, held by the caller because the TRAP
+     handed it over, and passed to bread exactly as bread's own contract
+     wants it.  See claude-notes/completed/sched-hart-generic.md and
+     claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   (* the general printk path's two PERSISTENT credentials, for the
@@ -225,6 +237,8 @@ Definition wp_balloc_sconf_body
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
@@ -320,9 +334,18 @@ Definition wp_balloc_gen_body
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   m !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 dev ->
-  eb = true ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b -∗
+  (* THE TRAP-CSR COMPLEMENT.  Same pure-pass-through shape as
+     [wp_balloc_sconf_body] above.  balloc holds no lock of its own, so it
+     never inspects these: it carries them from entry to exit and hands
+     them back re-indexed.  Generalizing the CREDITED form (not just the
+     counted one) is what lets bmap keep a SINGLE core -- bmap's credited
+     path routes here, and a core pinned at [eb = true] would have forced
+     a second, independent proof of the same 70 instructions.  See
+     claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   kernel_data -∗
@@ -342,14 +365,14 @@ Definition wp_balloc_gen_body
      own "a unit in hand" requirement holds on the absorbing arm too. *)
   log_opS γ (2 + u) Sb -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b] -- balloc's bread/bwrite
-     park, and the counted form above already says [true].  (Round 12: this
-     set-form body landed on our side of the fork, so [5ca52338]'s sweep
-     could not see it.) *)
+     park, and the counted form above already says [true]. *)
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗

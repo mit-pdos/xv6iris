@@ -475,6 +475,8 @@ Section WriteHeadDefs.
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) C b -∗
+        trap_csrs_ext eb -∗
+        cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
@@ -528,7 +530,7 @@ Section WriteHeadBlocks.
       (pidv : mword 32) (dq : dfrac)
       (k : nat) (bno : mword 32) (bsh bs0 bsd0 : list (bv 8)) (d0 : bool)
       (f : nat -> bv 8)
-      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (Q : iProp Σ) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (Q : iProp Σ) :
     (K_write_head <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     uint bno = logstart ->
@@ -547,7 +549,9 @@ Section WriteHeadBlocks.
     wh_regs m M ->
     M !!! Regidx Rs1 = bnode k ->
     sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
-    cpu_own 0 true (proc_addr j) C b -∗
+    cpu_own 0 eb (proc_addr j) C b -∗
+    trap_csrs_ext eb -∗
+    cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.write_head + 0x46) : mword 64) -∗
     panic_wp_any -∗
@@ -569,14 +573,23 @@ Section WriteHeadBlocks.
     (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
        ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
        disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
-    wh_cont (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K true C b Q -∗
+    wh_cont (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K eb C b Q -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hf4 Henc Hregs HMs1.
     pose proof Hregs as (Hsp & Hthr).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio Hppid #Hprocs
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio Hppid #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
               Hncell HW Hperm Hcont".
+    (* LEVEL 0 TIES THE TWO INDICES: write_head never push_off's, so its
+       [cpu_own]'s [n] is [0] throughout and [cpu_own_eb_agree] gives
+       [eb = b] outright (kept as a hypothesis, not [subst] -- [b] is still
+       the index every leaf instruction rule below is stated at); the
+       [_ext_transport] guards are spelled at [eb], so this is what lets
+       [wp_next_chain] close them off the SAME per-step facts [b]'s
+       transports use. *)
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
+    cbn in Hbm.
     iPoseProof (whi_46 with "Htext") as "Hi46".
     iPoseProof (whi_48 with "Htext") as "Hi48".
     iPoseProof (whi_4c with "Htext") as "Hi4c".
@@ -635,8 +648,12 @@ Section WriteHeadBlocks.
     { intros c Hcs N2 N8 N9 N18.
       rewrite /T2 upd_ne; [| regne]. exact (HT1thr c Hcs N2 N8 N9 N18). }
     iDestruct (wh_hold_to with "Hhold") as "Hhold".
-    iDestruct (cpu_own_transport CID0 CID2 0 true (proc_addr j) C b
+    iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID0 CID2 eb (proc_addr j)
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID0 CID2 eb (proc_addr j)
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbw : (K_bwrite <= K - 4)%nat)
@@ -651,10 +668,10 @@ Section WriteHeadBlocks.
     assert (Hdec_early : hdr_dec (f <$> seq 0 1024) = (n, map uint W))
       by exact (wh_hdr_dec f n W HnW HnB Hf4 Henc).
     iApply (BW.wp_bwrite_sconf γs j γl γu γd γk pd pav pu bn
-              (fs_view γfs γd dev cov) k pidv dev bno dq T2 (K - 4)%nat true C
+              (fs_view γfs γd dev cov) k pidv dev bno dq T2 (K - 4)%nat eb C
               (f <$> seq 0 1024) bsd0 b Q
-              HKbw Hbnolt eq_refl Hj Hgl Hk HT2a0 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs
+              HKbw Hbnolt eq_refl Hj Hgl Hk HT2a0
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hhold [Hperm] [-]").
     (* THE CALLER'S OWN PERMIT, at the header image this function assembled
        (phase C2b/D1 stage 3).  [Hbnou] is what makes the two spellings of
@@ -664,7 +681,7 @@ Section WriteHeadBlocks.
       { iPureIntro. rewrite length_fmap length_seq. reflexivity. }
       { iPureIntro. exact Hhn_early. }
       iPureIntro. exact Hdec_early. }
-    iIntros (CID3 Hs3 mB) "%Hcs1 Hcg Hcnt Hpc Hppid Hhold HQ".
+    iIntros (CID3 Hs3 mB) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid Hhold HQ".
     assert (Hpc4c : ret_pc (T2 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.write_head + 0x4c)).
     { rewrite HT2ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc4c) in "Hpc".
@@ -743,14 +760,23 @@ Section WriteHeadBlocks.
               T4 !!! Regidx c = (m !!! Regidx c : mword 64)).
     { intros c Hcs N2 N8 N9 N18.
       rewrite /T4 upd_ne; [| regne]. exact (HT3thr c Hcs N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID3 CID5 0 true (proc_addr j) C b
+    iDestruct (cpu_own_transport CID3 CID5 0 eb (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    (* [Hextc]/[Hextm] are not part of brelse's own contract, so brelse's
+       internal crossing (CID5 -> CID6) leaves them STRANDED at CID5 here --
+       carried this far (CID3 -> CID5) and no further; the transport past
+       brelse has to span the WIDER range CID5 -> (the next hart they are
+       needed at), not brelse's own CID5 -> CID6. *)
+    iDestruct (trap_csrs_ext_transport CID3 CID5 eb (proc_addr j)
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID3 CID5 eb (proc_addr j)
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID2) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 4)%nat)
       by (unfold K_brelse, K_write_head in *; lia).
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) k pidv dev bno dq
-              T4 (K - 4)%nat true (proc_addr j) C
+              T4 (K - 4)%nat eb (proc_addr j) C
               (f <$> seq 0 1024) (f <$> seq 0 1024) d0 b
               HKbl Hk HT4a0
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk [-]").
@@ -968,11 +994,18 @@ Section WriteHeadBlocks.
       apply moi32_small.
       unfold LOGBLOCKS in HnB.
       change (2 ^ 32)%Z with 4294967296%Z. lia. }
-    iDestruct (cpu_own_transport CID6 CID12 0 true (proc_addr j) C b
+    iDestruct (cpu_own_transport CID6 CID12 0 eb (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    (* [Hextc]/[Hextm] were stranded at CID5 by brelse's own crossing
+       (CID5 -> CID6): span the whole CID5 -> CID12 range here, not just
+       CID6 -> CID12. *)
+    iDestruct (trap_csrs_ext_transport CID5 CID12 eb (proc_addr j)
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID5 CID12 eb (proc_addr j)
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     rewrite /wh_cont.
     iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! P5 (f <$> seq 0 1024) with "[%] Hcg Hcnt Hpc Hppid
+    iApply ("Hcont" $! P5 (f <$> seq 0 1024) with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid
                      Hncell HW HLauth Hfsb [%] [%] Hslot HQ").
     { unfold callee_saved. repeat split; assumption. }
     { exact Hhn. }
@@ -998,7 +1031,7 @@ Section WriteHeadBlocks.
       (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac)
       (kk : nat) (bno : mword 32) (bsh bs0 bsd0 : list (bv 8)) (d0 : bool)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (fuel : nat)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (fuel : nat)
       (Q : iProp Σ) :
     (K_write_head <= K)%nat ->
     (uint bno < 2147483648)%Z ->
@@ -1022,7 +1055,9 @@ Section WriteHeadBlocks.
     M !!! Regidx Ra5 = pa_add (bnode kk) (4 * i)%nat ->
     M !!! Regidx Ra2 = pa_add (bnode kk) (4 * n)%nat ->
     sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
-    cpu_own 0 true (proc_addr j) C b -∗
+    cpu_own 0 eb (proc_addr j) C b -∗
+    trap_csrs_ext eb -∗
+    cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.write_head + 0x3a) : mword 64) -∗
     panic_wp_any -∗
@@ -1044,7 +1079,7 @@ Section WriteHeadBlocks.
     (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
        ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
        disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
-    wh_cont (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K true C b Q -∗
+    wh_cont (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K eb C b Q -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbnolt Hbnou Hj Hgl HnW HnB Hk.
@@ -1054,9 +1089,12 @@ Section WriteHeadBlocks.
       iIntros (i M f Hi Hfuel Hf4 Henc Hregs HMs1 HMa4 HMa5 HMa2);
       [ exfalso; lia |].
     pose proof Hregs as (Hsp & Hthr).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio Hppid #Hprocs
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio Hppid #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
               Hncell HW Hperm Hcont".
+    (* LEVEL 0 TIES THE TWO INDICES, as in [wh_tail]. *)
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
+    cbn in Hbm.
     iPoseProof (whi_3a with "Htext") as "Hi3a".
     iPoseProof (whi_3c with "Htext") as "Hi3c".
     iPoseProof (whi_3e with "Htext") as "Hi3e".
@@ -1221,16 +1259,20 @@ Section WriteHeadBlocks.
                       = mword_of_int (KernelSyms.write_head + 0x46))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp46) in "Hpc".
-      iDestruct (cpu_own_transport CID0 CID5 0 true (proc_addr j) C b
+      iDestruct (cpu_own_transport CID0 CID5 0 eb (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+      iDestruct (trap_csrs_ext_transport CID0 CID5 eb (proc_addr j)
+                   ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CID0 CID5 eb (proc_addr j)
+                   ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
       iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
       iApply (wh_tail (CID0 := CID5)  γs j γl γu γd γk pd pav pu bn γfs cov logstart
-                dev n W L pidv dq kk bno bsh bs0 bsd0 d0 f' m S3 K C b Q
+                dev n W L pidv dq kk bno bsh bs0 bsd0 d0 f' m S3 K eb C b Q
                 HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hf4'
                 ltac:(intros i' jj Hi' Hjj; exact (Henc' i' jj ltac:(lia) Hjj))
                 HS3regs HS3s1
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs
+                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
                       Hncell HW Hperm Hcont").
     - (* more entries: branch back to +0x3a *)
@@ -1253,13 +1295,17 @@ Section WriteHeadBlocks.
       iEval (rewrite Htgt3a) in "Hpc".
       assert (Hi' : (S i < n)%nat) by (clear -Hi Hmore; lia).
       assert (Hf' : (n - S i <= fuel)%nat) by (clear -Hi Hfuel Hmore; lia).
-      iDestruct (cpu_own_transport CID0 CID5 0 true (proc_addr j) C b
+      iDestruct (cpu_own_transport CID0 CID5 0 eb (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+      iDestruct (trap_csrs_ext_transport CID0 CID5 eb (proc_addr j)
+                   ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CID0 CID5 eb (proc_addr j)
+                   ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
       iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
       iSpecialize ("IH" $! CID5 (S i) S3 f' Hi' Hf' Hf4' Henc' HS3regs HS3s1
                      HS3a4 HS3a5 HS3a2).
-      iApply ("IH" with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD
+      iApply ("IH" with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD
                          Hextra HLauth Hfsb Hncell HW Hperm Hcont").
   Qed.
 
@@ -1287,13 +1333,15 @@ Section ProofWriteHead.
                                cov logstart dev n W L pidv dq m K eb C b Q.
   Proof.
     cbv beta delta [wp_write_head_sconf_body].
-    intros pcE pj ret_tgt HK Hgeom Hj Hgl Heb Hbatch.
+    intros pcE pj ret_tgt HK Hgeom Hj Hgl Hbatch.
     destruct Hgeom as [Hcovok Hlogsub].
     destruct Hbatch as [HnW HnB].
-    subst eb.
     unfold K_write_head in HK.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hfroz Hppid #Hprocs
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hfroz Hppid #Hprocs
               #Hdevi #Hdgeom #Hdlock Hncell HW HLauth Hhdr Hslot Hperm Hcont".
+    (* LEVEL 0 TIES THE TWO INDICES, as in [wh_tail]. *)
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
+    cbn in Hbm.
     iDestruct "Hhdr" as (bsh) "Hfsb".
     iDestruct "Hfroz" as "(#Hdevc & #Hstc)".
     (* the header block is covered, and its number is a small positive int *)
@@ -1310,7 +1358,7 @@ Section ProofWriteHead.
     assert (Hcovin : uint (mword_of_int logstart : mword 32)
                      ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite Huint; exact Hhdrcov).
-    iAssert (wh_cont (CID0 := CID)  γfs bn logstart n W L pidv dq j m K true C b Q)%I
+    iAssert (wh_cont (CID0 := CID)  γfs bn logstart n W L pidv dq j m K eb C b Q)%I
       with "[Hcont]" as "Hcont"; [rewrite /wh_cont; iExact "Hcont"|].
     iPoseProof (whi_00 with "Htext") as "Hi00".
     iPoseProof (whi_02 with "Htext") as "Hi02".
@@ -1543,18 +1591,22 @@ Section ProofWriteHead.
       rewrite /R3 upd_ne; [| regne].
       rewrite /R2 upd_ne; [| regne].
       rewrite /R1 upd_ne; [reflexivity | regne]. }
-    iDestruct (cpu_own_transport CID CID11 0 true pj C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID11 0 eb pj C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID CID11 eb pj
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID CID11 eb pj
+                 ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 4)%nat) by (unfold K_bread; lia).
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (mword_of_int logstart : mword 32) dq
-              mA (K - 4)%nat true C b
-              HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HmAa0 HmAa1 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs
+              mA (K - 4)%nat eb C b
+              HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HmAa0 HmAa1
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hslot [-]").
-    iIntros (CID12 Hs12 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hpc Hppid Hheld".
+    iIntros (CID12 Hs12 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc20 : ret_pc (mA !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.write_head + 0x20)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }
@@ -1701,17 +1753,21 @@ Section ProofWriteHead.
                        = mword_of_int (KernelSyms.write_head + 0x46))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt46) in "Hpc".
-      iDestruct (cpu_own_transport CID12 CID16 0 true pj C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID12 CID16 0 eb pj C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
+      iDestruct (trap_csrs_ext_transport CID12 CID16 eb pj
+                   ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CID12 CID16 eb pj
+                   ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
       iDestruct (wp_next_shift (b := true) (CIDa := CID11) (CIDb := CID16) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
       iApply (wh_tail (CID0 := CID16)  γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev 0%nat W L pidv dq kk (mword_of_int logstart : mword 32)
-                bsh bs0 bsd0 d0 f1 m B2 K C b Q
+                bsh bs0 bsd0 d0 f1 m B2 K eb C b Q
                 HK Hbnolt Huint Hj Hgl HnW HnB HA Hf14
                 ltac:(intros i' jj Hi' Hjj; exfalso; lia)
                 HB2regs HB2s1
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs
+                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
                       Hncell HW Hperm Hcont").
     - (* ---- n > 0: set the cursors up and enter the loop ---- *)
@@ -1862,18 +1918,22 @@ Section ProofWriteHead.
                       = mword_of_int (KernelSyms.write_head + 0x3a))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3a) in "Hpc".
-      iDestruct (cpu_own_transport CID12 CID21 0 true pj C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID12 CID21 0 eb pj C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
+      iDestruct (trap_csrs_ext_transport CID12 CID21 eb pj
+                   ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CID12 CID21 eb pj
+                   ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
       iDestruct (wp_next_shift (b := true) (CIDa := CID11) (CIDb := CID21) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
       iApply (wh_loop (CID0 := CID21)  γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev (S n') W L pidv dq kk (mword_of_int logstart : mword 32)
-                bsh bs0 bsd0 d0 m K C b (S n') Q
+                bsh bs0 bsd0 d0 m K eb C b (S n') Q
                 HK Hbnolt Huint Hj Hgl HnW HnB HA 0%nat B7 f1
                 ltac:(lia) ltac:(lia) Hf14
                 ltac:(intros i' jj Hi' Hjj; exfalso; lia)
                 HB7regs HB7s1 HB7a4 HB7a5 HB7a2
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs
+                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
                       Hncell HW Hperm Hcont").
   Qed.

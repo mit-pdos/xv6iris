@@ -565,7 +565,13 @@ Section BfreeDefs.
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K b (proc_addr j) -∗
-        cpu_own 0 true (proc_addr j) C b -∗
+        cpu_own 0 b (proc_addr j) C b -∗
+        (* bfree's own crossing established [eb = b] once at entry
+           (cpu_own_eb_agree, n = 0); the whole function is a PURE
+           PASS-THROUGH of the trap-CSR complement (it does no acquire of
+           its own), so it stays [b] rather than a fresh [eb]. *)
+        trap_csrs_ext b -∗
+        cpu_claim_ext b (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -614,7 +620,9 @@ Section BfreeTail.
     bitmap_ok cov logstart size (used ∖ {[ bi ]}) ->
     (cr = true -> bmapstart ∈ Sb) ->
     sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
-    cpu_own 0 true (proc_addr j) C b -∗
+    cpu_own 0 b (proc_addr j) C b -∗
+    trap_csrs_ext b -∗
+    cpu_claim_ext b (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.bfree + 0x4a) : mword 64) -∗
     panic_wp_any -∗
@@ -637,7 +645,7 @@ Section BfreeTail.
   Proof.
     intros HK Hsp Hthr Ha0 Hs2 Hkk Hbno Hcov Hlog Hokdel Hcredit.
     pose proof HK as HK'. unfold K_bfree in HK'.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hsb Hsl Hop Hfsb Hpool Hheld Hcont".
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hsb Hsl Hop Hfsb Hpool Hheld Hcont".
     iPoseProof (bfi_4a with "Htext") as "Hi4a".
     iPoseProof (bfi_4e with "Htext") as "Hi4e".
     iPoseProof (bfi_50 with "Htext") as "Hi50".
@@ -671,15 +679,18 @@ Section BfreeTail.
     assert (HT0thr : bf_thr m T0).
     { intros c Hcs N2 N8 N9 N18.
       rewrite /T0 upd_ne; [| regne]. exact (Hthr c Hcs N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID0 CID1 0 true (proc_addr j) C b
+    iDestruct (cpu_own_transport CID0 CID1 0 b (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID1) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKlw : (K_log_write <= K - 4)%nat) by (unfold K_log_write; lia).
     iEval (rewrite -Hbno) in "Hfsb".
+    (* log_write does not thread the trap-CSR complement at all: [Hextc]/
+       [Hextm] are stranded at bf_tail's entry hart and are not touched
+       here -- transported across the whole span, right before [bf_cont]. *)
     iApply (LW.wp_log_write_gen bn γ γfs γd cov logstart dev kk pidv bnoB
               (bitmap_bytes (used ∖ {[ bi ]})) (bitmap_bytes used) bsd d0 u cr Sb
-              T0 0%nat true (proc_addr j) C (K - 4)%nat b
+              T0 0%nat b (proc_addr j) C (K - 4)%nat b
               HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HT0a0
               ltac:(rewrite Hbno; exact Hcov)
               ltac:(rewrite Hbno; exact Hlog)
@@ -744,13 +755,15 @@ Section BfreeTail.
     assert (HT2thr : bf_thr m T2).
     { intros c Hcs N2 N8 N9 N18.
       rewrite /T2 upd_ne; [| regne]. exact (HT1thr c Hcs N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID2 CID4 0 true (proc_addr j) C b
+    iDestruct (cpu_own_transport CID2 CID4 0 b (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID1) (CIDb := CID4) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 4)%nat) by (unfold K_brelse; lia).
+    (* brelse does not thread the trap-CSR complement either: same
+       stranding as log_write above. *)
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
-              pidv dev bnoB dq T2 (K - 4)%nat true (proc_addr j) C
+              pidv dev bnoB dq T2 (K - 4)%nat b (proc_addr j) C
               (bitmap_bytes (used ∖ {[ bi ]})) bsd true b
               HKbl Hkk HT2a0
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
@@ -970,11 +983,19 @@ Section BfreeTail.
     (* the bitmap resource, at the CLEARED bit *)
     iDestruct (bitmap_res_close γfs bmapstart cov logstart size
                  (used ∖ {[ bi ]}) Hokdel with "Hfsb Hpool") as "Hbmr".
-    iDestruct (cpu_own_transport CID5 CID11 0 true (proc_addr j) C b
+    iDestruct (cpu_own_transport CID5 CID11 0 b (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    (* THE STRANDING PATTERN: neither log_write nor brelse threads the
+       trap-CSR complement, so [Hextc]/[Hextm] have sat untouched since
+       bf_tail's OWN entry hart [CID0] -- transport across that WIDER span
+       in one shot, not through either callee's own crossing. *)
+    iDestruct (trap_csrs_ext_transport CID0 CID11 b (proc_addr j)
+                 ltac:(wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID0 CID11 b (proc_addr j)
+                 ltac:(wp_next_chain) with "Hextm") as "Hextm".
     rewrite /bf_cont.
     iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hpc Hppid Hsb Hbmr
+    iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hsb Hbmr
                      Hsl Hop").
     { unfold callee_saved. split_and!; assumption. }
   Qed.
@@ -1007,8 +1028,7 @@ Section ProofBfreeMain.
   Proof.
     cbv beta delta [wp_bfree_gen_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
-           Hbirange Hbicov Hbilog Hbslen Hcredit Hj Hgl Ha0 Ha1 Heb.
-    subst eb.
+           Hbirange Hbicov Hbilog Hbslen Hcredit Hj Hgl Ha0 Ha1.
     pose proof HK as HK'. unfold K_bfree in HK'.
     destruct Hgeom as [Hcovok Hlogsub].
     destruct (Hcovok _ Hbmcov) as [Hbmpos Hbmlt].
@@ -1035,8 +1055,14 @@ Section ProofBfreeMain.
     { rewrite HbnoB. exact (proj2 Hbm31). }
     assert (HbnoBcov : uint bnoB ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite HbnoB; exact Hbmcov).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hsb Hbmr Hfsb Hown Hppid
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx Hsb Hbmr Hfsb Hown Hppid
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
+    (* bfree enters at level 0, so the live index IS the saved base -- one
+       variable [b] carries both from here on (the porting guide's "derive
+       the SIE index rather than stating it"); bfree does no acquire of its
+       own, so this holds at EVERY hart the function touches, not just at
+       entry. *)
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbe. cbn in Hbe. subst eb.
     iAssert (bf_cont (CID0 := CID) γfs bn γ cov logstart bmapstart size used bi
                (log_opS γ (if cr then S u else u) (Sb ∪ {[bmapstart]}))
                pidv dq dqb j m K C b)%I with "[Hcont]" as "Hcont";
@@ -1326,19 +1352,27 @@ Section ProofBfreeMain.
     assert (HRAthr : bf_thr m RA).
     { intros c Hcs N2 N8 N9 N18.
       rewrite /RA upd_ne; [| regne]. exact (HR7thr c Hcs N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID CID12 0 true (proc_addr j) C b
+    iDestruct (cpu_own_transport CID CID12 0 b (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    (* bread SLEEPS, but bfree's own [b]/[eb] agreement (derived once, at
+       entry) makes it a PURE PASS-THROUGH: transport the complement across
+       the same span as [cpu_own] and hand it straight to bread's own
+       precondition. *)
+    iDestruct (trap_csrs_ext_transport CID CID12 b (proc_addr j)
+                 ltac:(wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID CID12 b (proc_addr j)
+                 ltac:(wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID12) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 4)%nat) by (unfold K_bread; lia).
     iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bnoB dq
-              RA (K - 4)%nat true C b
-              HKbr HbnoBlt eq_refl HbnoBcov eq_refl Hj Hgl HRAa0 HRAa1 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs
+              RA (K - 4)%nat b C b
+              HKbr HbnoBlt eq_refl HbnoBcov eq_refl Hj Hgl HRAa0 HRAa1
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
-    iIntros (CID13 Hq13 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hpc Hppid Hheld".
+    iIntros (CID13 Hq13 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc20 : ret_pc (RA !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.bfree + 0x20)) by (rewrite HRAra; pcw).
@@ -1770,14 +1804,21 @@ Section ProofBfreeMain.
     iDestruct ("Hheldback" with "Hbuf") as "Hheld".
     iEval (rewrite HbnoB) in "Hfsbm".
     (* ---- into the tail ---- *)
-    iDestruct (cpu_own_transport CID13 CID27 0 true (proc_addr j) C b
+    iDestruct (cpu_own_transport CID13 CID27 0 b (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    (* bread's own continuation already handed [Hextc]/[Hextm] back at
+       [CID13]; the bit-test/clear stretch since then touches neither, so
+       transport them the same span as [cpu_own]. *)
+    iDestruct (trap_csrs_ext_transport CID13 CID27 b (proc_addr j)
+                 ltac:(wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID13 CID27 b (proc_addr j)
+                 ltac:(wp_next_chain) with "Hextm") as "Hextm".
     assert (HB11a0' : B11 !!! Regidx Ra0 = bnode kk) by exact HB11a0.
     iApply (bf_tail (CID0 := CID27)  γs j γfs γd bn γ cov logstart bmapstart size
               dev used bi u cr Sb kk bnoB bsd0 d0 pidv dq dqb m B11 K C b
               HK HB11sp HB11thr HB11a0' HB11s2 Hkk HbnoB Hbmcov Hbmlog Hokdel
               Hcredit
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe
                     Hppid Hsb Hsl Hop Hfsbm Hpool Hheld [Hcont]").
     { iApply (wp_next_shift (b := true) (CIDa := CID12) (CIDb := CID27) ltac:(wp_next_chain)
                 with "Hcont"). }
@@ -1804,21 +1845,21 @@ Section ProofBfreeMain.
   Proof.
     cbv beta delta [wp_bfree_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
-           Hbirange Hbicov Hbilog Hbslen Hj Hgl Ha0 Ha1 Heb.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hsb Hbmr Hfsb Hown Hppid
+           Hbirange Hbicov Hbilog Hbslen Hj Hgl Ha0 Ha1.
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx Hsb Hbmr Hfsb Hown Hppid
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
     rewrite /log_op. iDestruct "Hop" as (Sb) "Hop".
     iApply (wp_bfree_gen γs j γl γu γd γk pd pav pu bn γ γfs
               cov logstart bmapstart size dev used bno bs u false Sb
               pidv dq dqb m K eb C b
               HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
-              Hbirange Hbicov Hbilog Hbslen ltac:(discriminate) Hj Hgl Ha0 Ha1 Heb
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsb Hbmr Hfsb Hown Hppid
+              Hbirange Hbicov Hbilog Hbslen ltac:(discriminate) Hj Hgl Ha0 Ha1
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hsb Hbmr Hfsb Hown Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont]").
     iIntros (CIDx) "%Hchain". iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
-    iIntros (mf) "%Hcs Hsie Hcnt Hpc Hppid Hsb Hbmr Hsl HopS".
+    iIntros (mf) "%Hcs Hsie Hcnt Hextc Hextm Hpc Hppid Hsb Hbmr Hsl HopS".
     iDestruct (log_opS_op with "HopS") as "Hop".
-    iApply ("Hcont" $! mf with "[%] Hsie Hcnt Hpc Hppid Hsb Hbmr Hsl Hop").
+    iApply ("Hcont" $! mf with "[%] Hsie Hcnt Hextc Hextm Hpc Hppid Hsb Hbmr Hsl Hop").
     exact Hcs.
   Qed.
 

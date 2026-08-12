@@ -1322,9 +1322,14 @@ Section ProofFileclose.
                     (fcn_j fn) (fcn_plock fn) (fcn_bio fn) (fcn_log fn) (fcn_fs fn)
                     (fcn_cov fn) (fcn_logstart fn) (fcn_dev fn)
                     (fcn_pid fn) (fcn_dq fn) B1 (K - 8)%nat true C true
-                    ltac:(unfold K_begin_op; lia) Hjlt Hgl eq_refl
-                    with "Hcg Hcnt Htext Hpc Hpanic Hlog Hpid Hprocs [-]").
-          iIntros (CIDf3 Hsf3 mb) "%Hbcs Hcg Hcnt Hpc Hpid Hop".
+                    ltac:(unfold K_begin_op; lia) Hjlt Hgl
+                    with "Hcg Hcnt [] [] Htext Hpc Hpanic Hlog Hpid Hprocs [-]").
+          (* the complement is [emp]: fileclose keeps its own [eb = true] pin,
+             which the bundle's [⌜eb = true⌝] conjunct supplies and which
+             [subst eb] above has already turned into the literal. *)
+          { rewrite /trap_csrs_ext. done. }
+          { rewrite /cpu_claim_ext. done. }
+          iIntros (CIDf3 Hsf3 mb) "%Hbcs Hcg Hcnt _ _ Hpc Hpid Hop".
           pose proof Hbcs as Hbcs_cs.
           assert (Hpcae : ret_pc (B1 !!! Regidx Rra) = mword_of_int (FC + 0xae)).
           { rewrite HB1ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1385,11 +1390,13 @@ Section ProofFileclose.
                     ltac:(unfold K_iput; lia) Hkk Hgeom Hsz Hbm0 Hbmcov Hbmlog
                     Hist0 Hiblk Hiblog Hinb Hcovb
                     ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hjlt Hgl
-                    ltac:(rewrite HB3a0; exact Hipe) eq_refl
-                    with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlog Hitab Hitinv
+                    ltac:(rewrite HB3a0; exact Hipe)
+                    with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlog Hitab Hitinv
                           Hescrow Hireg Hslk Href Hsbb Hsbi Hbmres Hpid Hprocs
                           Hdev Hgeo Hdlk Hbsl Hop [-]").
-          iIntros (CIDf6 Hsf6 mi ni us') "%Hics Hcg Hcnt Hpc Hpid Hsbb Hsbi
+          { rewrite /trap_csrs_ext. done. }
+          { rewrite /cpu_claim_ext. done. }
+          iIntros (CIDf6 Hsf6 mi ni us') "%Hics Hcg Hcnt _ _ Hpc Hpid Hsbb Hsbi
                                           %Hussub Hbmres Hbsl %Hni Hop Hislot".
           pose proof Hics as Hics_cs.
           assert (Hpcb4 : ret_pc (B3 !!! Regidx Rra) = mword_of_int (FC + 0xb4)).
@@ -1422,10 +1429,12 @@ Section ProofFileclose.
                     (fcn_log fn) (fcn_fs fn) (fcn_cov fn) (fcn_logstart fn)
                     (fcn_dev fn) ni (fcn_pid fn) (fcn_dq fn)
                     B4 (K - 8)%nat true C true
-                    ltac:(unfold K_end_op; lia) Hgeom Hjlt Hgl eq_refl
-                    with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hpid
+                    ltac:(unfold K_end_op; lia) Hgeom Hjlt Hgl
+                    with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hpid
                           Hprocs Hdev Hgeo Hdlk Hop [-]").
-          iIntros (CIDf8 Hsf8 me) "%Hecs Hcg Hcnt Hpc Hpid".
+          { rewrite /trap_csrs_ext. done. }
+          { rewrite /cpu_claim_ext. done. }
+          iIntros (CIDf8 Hsf8 me) "%Hecs Hcg Hcnt _ _ Hpc Hpid".
           pose proof Hecs as Hecs_cs.
           assert (Hpcb8 : ret_pc (B4 !!! Regidx Rra) = mword_of_int (FC + 0xb8)).
           { rewrite HB4ra. apply bv_eq; vm_compute; reflexivity. }

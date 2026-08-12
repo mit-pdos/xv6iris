@@ -1700,15 +1700,17 @@ Section ProofFileread.
                        pidv (DfracOwn (1/4)) (frn_dqs fn)
                        I2 (K - 6)%nat eb C b
                        (fr_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
-                       ltac:(rewrite HI2a0; exact Hipk) Heb
-                       with "Hcg Hcnt Htext Hpc Hpanic Hbio Hitbl Hesc Hireg
+                       ltac:(rewrite HI2a0; exact Hipk)
+                       with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hitbl Hesc Hireg
                              Hslk Href Hsb Hppid Hprocs
                              Hdevi Hdgeom Hdlock Hbslot [-]").
+             { rewrite Heb /trap_csrs_ext. done. }
+             { rewrite Heb /cpu_claim_ext. done. }
              (* v3: ilock also hands back the checkout descriptor's other
                 half, which iunlock consumes to select its own escrow arm
                 (design §14.8) *)
              iIntros (CIDil Hsil mil dnl bml)
-               "%Hcsil Hcg Hcnt Hpc Hppid Hsb Hbslot Hheld Hslpid Hdep
+               "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hslpid Hdep
                 Hidev Hinum Hvalid Hlk #Hshot".
              iDestruct ("Hpivbk" with "Hppid") as "Hpriv".
              assert (Hpc34 : ret_pc (I2 !!! Regidx Rra) = mword_of_int (FR + 0x34)).
@@ -1906,11 +1908,13 @@ Section ProofFileread.
                        pidv (DfracOwn 1) (DfracOwn (1/2))
                        J6 (K - 6)%nat eb C b
                        (fr_av_readi K HK) Hlg Hbmwf Hbmcov Hszb Hjoint Hj Hgs
-                       HJ6a0 ltac:(rewrite HJ6a1; by vm_compute) HJ6a3 HJ6a4 Heb
-                       with "Hcg Hcnt Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
+                       HJ6a0 ltac:(rewrite HJ6a1; by vm_compute) HJ6a3 HJ6a4
+                       with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
                              Hblocks Hpriv Hprocs Hdevi Hdgeom
                              Hdlock Hbslot [-]").
-             iIntros (CIDrd Hsrd mrd tot P') "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks
+             { rewrite Heb /trap_csrs_ext. done. }
+             { rewrite Heb /cpu_claim_ext. done. }
+             iIntros (CIDrd Hsrd mrd tot P') "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks
                                               Hpriv Hbslot".
              iPoseProof (fri_42 with "Htext") as "Hi42".
              iPoseProof (fri_44 with "Htext") as "Hi44".
