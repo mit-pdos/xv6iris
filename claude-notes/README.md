@@ -258,6 +258,18 @@ are working on that effort — the relevant `projects/` file.
   whole M-mode boot cone is converted to it, at 1.4× SC.  Read it for the
   argument, not for the names; the worklist's conversion slice has what
   landed.
+- **[`weak-memory-phi-upgrade.md`](design/weak-memory-phi-upgrade.md)** —
+  the PRE-PORT framework surgery that discharges M6's declared residue:
+  the three-state (Clean/Dirty/Sync) per-byte points-to protocol that
+  makes `pf_violation_free` provable (hazard state lives in the element
+  fragments agree on; exclusive D so CS re-stores are free; absorbing S
+  with a persistent witness for racy bytes; D→C flips at the release
+  leaf), why SC-parity survives (the state hides behind `∃s` at q=1),
+  the site-predicate leaves + whole-image sweep that mechanize the
+  static side conditions and `sail_shaped`, the mip-oracle/DMA-tid
+  unifications for the WeakLang lift, why `bad_wf` stays declared even
+  then, and the ordering: this lands BEFORE the mass SC→weak port
+  because it rewrites the leaf interfaces the port replicates.
 - **[`weak-memory-m6-robustness.md`](design/weak-memory-m6-robustness.md)** —
   M6's tee-up: closing the store-reordering gap.  The promise-free machine is
   STRONGER than RVWMO (it excludes LB and observable W→W reordering), so
