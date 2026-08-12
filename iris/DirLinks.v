@@ -184,4 +184,182 @@ Section DirLinks.
     iIntros "H". iExact "H".
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (*  (v) THE WRITER'S CASE -- [DirView.dir_ok_dirlink]'s twin           *)
+  (*      design: fs-icache.md §20.3 / §20.6's dirlink row               *)
+  (* ------------------------------------------------------------------ *)
+
+  (* THE SHAPE DEVIATES FROM §20.3, AND THE REASON IS A REAL GAP (fs-sysfile
+     S5i).  §20.3 charters this lemma as "the same hypothesis list, one
+     [ilink inum] in, the new big-op out ... the resource moves only in the
+     third case ([tot >= 2])".  That is wrong at [tot = 1], and the pure
+     sibling is what shows it: [DirView.dir_ok_dirlink]'s middle case proves
+     the stored halfword is [inum mod 256] (only the LOW byte is new, and the
+     slot's old high byte is zero because the slot was free).  The PURE
+     clause survives that -- [inum mod 256 <= inum] is still in range -- but
+     the RESOURCE clause does not: the record at [k0] becomes LIVE at the
+     inum [inum mod 256], and no [ilink] for that key exists anywhere.  An
+     [ilink inum] is a fragment for a DIFFERENT key and cannot be bent.
+
+     [tot = 1] is UNREACHABLE in the kernel -- dirlink's window is sixteen
+     bytes at a 16-aligned offset and 1024 = 64*16, so writei's loop takes
+     exactly one chunk of sixteen and either bmap fails before it (leaving
+     [tot = 0]) or the whole record goes in ([either_copyin] cannot fail on
+     the kernel arm) -- but [SpecWritei]'s postcondition offers only
+     [tot <= n], so [SpecDirlink]'s offers only [tot < 16], and the fact is
+     not available to a caller.  See the S5i ledger.
+
+     So the twin is stated in the form that is TRUE WITHOUT A SIDE
+     CONDITION: the caller hands in the ticket for the slot that was
+     written, whatever landed in it.  [dir_link_at_dirlink] below is the
+     constructor for the case create actually takes on its success arms
+     ([tot >= 2], hence [tot = 16]), and [dir_links_dirlink_nop] is the
+     no-write arm, which needs no ticket at all. *)
+  Lemma dir_links_dirlink (self : Z) (dn dn' : dinode)
+      (data data' : nat -> list (bv 8))
+      (inum : bv 16) (s : list (bv 8)) (nrec k0 tot : nat) :
+    nrec = dir_nrec (bv_unsigned (di_size dn)) ->
+    k0 = dir_slot data nrec ->
+    (tot <= 16)%nat ->
+    (* writei preserves the type and installs [max(size, off+tot)] *)
+    di_type dn' = di_type dn ->
+    bv_unsigned (di_size dn')
+      = Z.max (bv_unsigned (di_size dn)) (Z.of_nat (16 * k0 + tot)) ->
+    (* dirlink's TIGHTENED range clause: no disturbed region *)
+    (forall x : nat,
+       file_byte data' x
+       = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + tot)%nat)
+         then dirent_bytes (de_of_name inum s) !!! (x - 16 * k0)%nat
+         else file_byte data x) ->
+    dir_link_at self data' k0 -∗
+    dir_links self dn data -∗ dir_links self dn' data'.
+  Proof.
+    intros Hnrec Hk0 Htot Hty Hsz Hrng.
+    (* the type is unmoved, so the two big-ops are both live or both [emp] *)
+    rewrite /dir_links Hty.
+    destruct (decide (bv_unsigned (di_type dn) = T_DIR_z)) as [_ | _];
+      [| iIntros "_ _"; done].
+    (* ---- the count arithmetic, verbatim from [dir_ok_dirlink] ---- *)
+    assert (Hsznn : 0 <= bv_unsigned (di_size dn))
+      by exact (proj1 (bv_unsigned_in_range _ (di_size dn))).
+    assert (Hsznn' : 0 <= bv_unsigned (di_size dn'))
+      by exact (proj1 (bv_unsigned_in_range _ (di_size dn'))).
+    destruct (dir_nrec_range (bv_unsigned (di_size dn)) Hsznn) as [Hnr1 Hnr2].
+    destruct (dir_nrec_range (bv_unsigned (di_size dn')) Hsznn')
+      as [Hnr1' Hnr2'].
+    rewrite <- Hnrec in Hnr1, Hnr2.
+    assert (Hk0le : (k0 <= nrec)%nat) by (rewrite Hk0; apply dir_slot_le).
+    assert (Hcalt : dir_nrec (bv_unsigned (di_size dn')) = nrec
+                    \/ (dir_nrec (bv_unsigned (di_size dn')) = S nrec
+                        /\ k0 = nrec /\ tot = 16%nat)) by lia.
+    (* every record BUT [k0] keeps its two inum bytes *)
+    assert (Hagree : forall q : nat, q <> k0 ->
+                       dir_inum data' q = dir_inum data q).
+    { intros q Hq. unfold dir_inum.
+      rewrite (Hrng (16 * q)%nat). rewrite (Hrng (16 * q + 1)%nat).
+      rewrite decide_False; [| lia]. rewrite decide_False; [| lia].
+      reflexivity. }
+    rewrite <- Hnrec.
+    iIntros "Hk0 H".
+    destruct Hcalt as [Hn' | (Hn' & Hkn & Ht16)]; rewrite Hn'.
+    - (* ======== the record COUNT did not move ======== *)
+      destruct (Nat.lt_ge_cases k0 nrec) as [Hlt | Hge].
+      + (* the written slot is one of the goal's indices: swap it *)
+        rewrite (big_sepL_delete
+                   (fun _ k => dir_link_at self data' k) (seq 0 nrec) k0 k0).
+        2:{ apply lookup_seq; lia. }
+        iSplitL "Hk0"; [iExact "Hk0" |].
+        iApply (big_sepL_mono with "H"). intros i k Hik.
+        apply lookup_seq in Hik. destruct Hik as [Hk Hi].
+        destruct (decide (i = k0)) as [_ | Hne]; [by iIntros "_" |].
+        assert (Heq : dir_inum data' k = dir_inum data k)
+          by (apply Hagree; lia).
+        iIntros "Hx". iApply (dir_link_at_agree with "Hx"). exact Heq.
+      + (* the written slot is at or past the end: nothing in range moved *)
+        iApply (big_sepL_mono with "H"). intros i k Hik.
+        apply lookup_seq in Hik. destruct Hik as [Hk Hi].
+        assert (Heq : dir_inum data' k = dir_inum data k)
+          by (apply Hagree; lia).
+        iIntros "Hx". iApply (dir_link_at_agree with "Hx"). exact Heq.
+    - (* ======== ONE record was appended, at [k0 = nrec] ======== *)
+      rewrite seq_S big_sepL_app. iSplitL "H".
+      + iApply (big_sepL_mono with "H"). intros i k Hik.
+        apply lookup_seq in Hik. destruct Hik as [Hk Hi].
+        assert (Heq : dir_inum data' k = dir_inum data k)
+          by (apply Hagree; lia).
+        iIntros "Hx". iApply (dir_link_at_agree with "Hx"). exact Heq.
+      + simpl. iSplitL "Hk0"; [| done].
+        rewrite <- Hkn. iExact "Hk0".
+  Qed.
+
+  (* THE CONSTRUCTOR create USES ON ITS SUCCESS ARMS.  Two bytes are enough:
+     [dir_inum] reads exactly the record's first two, and [de_of_name inum s]
+     puts [inum] there.  If the linked inum is the directory's OWN (mkdir's
+     ["."]) or is zero, the ticket is [emp] and the fragment is simply
+     dropped -- affine, and the self-record exemption is the whole point. *)
+  Lemma dir_link_at_dirlink (self : Z) (data data' : nat -> list (bv 8))
+      (inum : bv 16) (s : list (bv 8)) (k0 tot : nat) :
+    (2 <= tot)%nat ->
+    (forall x : nat,
+       file_byte data' x
+       = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + tot)%nat)
+         then dirent_bytes (de_of_name inum s) !!! (x - 16 * k0)%nat
+         else file_byte data x) ->
+    ilink (bv_unsigned inum) -∗ dir_link_at self data' k0.
+  Proof.
+    intros Htot Hrng.
+    assert (Hrec : dir_inum data' k0 = inum).
+    { rewrite (dir_inum_of_two data' k0 (de_of_name inum s)); [reflexivity |].
+      intros jj Hjj. rewrite (Hrng (16 * k0 + jj)%nat).
+      rewrite decide_True; [| lia].
+      replace (16 * k0 + jj - 16 * k0)%nat with jj by lia. reflexivity. }
+    (* S5h trap 3: [dir_liveb] is [negb (dir_freeb ..)] -- unfold BOTH, or
+       the rewrite under [Hrec] does not fire. *)
+    rewrite /dir_link_at /dir_liveb /dir_freeb Hrec.
+    destruct (negb (bool_decide (inum = bv_0 16))
+              && negb (bool_decide (bv_unsigned inum = self)));
+      [| by iIntros "_"].
+    iIntros "H". iLeft. iExact "H".
+  Qed.
+
+  (* ...AND THE NO-WRITE ARM.  writei's short-write break at [tot = 0] moves
+     no byte and no size, so the whole big-op rides -- and this is the arm
+     create's [fail:] takes when a dirlink could not allocate. *)
+  Lemma dir_links_dirlink_nop (self : Z) (dn dn' : dinode)
+      (data data' : nat -> list (bv 8))
+      (inum : bv 16) (s : list (bv 8)) (nrec k0 : nat) :
+    nrec = dir_nrec (bv_unsigned (di_size dn)) ->
+    k0 = dir_slot data nrec ->
+    di_type dn' = di_type dn ->
+    bv_unsigned (di_size dn')
+      = Z.max (bv_unsigned (di_size dn)) (Z.of_nat (16 * k0 + 0)) ->
+    (forall x : nat,
+       file_byte data' x
+       = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + 0)%nat)
+         then dirent_bytes (de_of_name inum s) !!! (x - 16 * k0)%nat
+         else file_byte data x) ->
+    dir_links self dn data -∗ dir_links self dn' data'.
+  Proof.
+    intros Hnrec Hk0 Hty Hsz Hrng.
+    (* the range clause degenerates: EVERY byte agrees *)
+    assert (Hall : forall x : nat, file_byte data' x = file_byte data x).
+    { intros x. rewrite (Hrng x). rewrite decide_False; [reflexivity | lia]. }
+    assert (Hagree : forall q : nat, dir_inum data' q = dir_inum data q).
+    { intros q. unfold dir_inum. rewrite (Hall (16 * q)%nat).
+      rewrite (Hall (16 * q + 1)%nat). reflexivity. }
+    (* ...and so does the size: the slot is at or below the record count *)
+    assert (Hsznn : 0 <= bv_unsigned (di_size dn))
+      by exact (proj1 (bv_unsigned_in_range _ (di_size dn))).
+    destruct (dir_nrec_range (bv_unsigned (di_size dn)) Hsznn) as [Hnr1 _].
+    rewrite <- Hnrec in Hnr1.
+    assert (Hk0le : (k0 <= nrec)%nat) by (rewrite Hk0; apply dir_slot_le).
+    assert (Hszeq : bv_unsigned (di_size dn') = bv_unsigned (di_size dn))
+      by lia.
+    rewrite /dir_links Hty Hszeq.
+    destruct (decide (bv_unsigned (di_type dn) = T_DIR_z)) as [_ | _];
+      [| by iIntros "_"].
+    iIntros "H". iApply (big_sepL_mono with "H"). intros i k Hik.
+    iIntros "Hx". iApply (dir_link_at_agree with "Hx"). apply Hagree.
+  Qed.
+
 End DirLinks.

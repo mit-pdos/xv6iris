@@ -4209,6 +4209,23 @@ inum` in, the new big-op out.  Its three cases are the ones the pure
 proof already splits on (`tot = 0` / `tot = 1` / `tot ≥ 2`,
 `DirView.v:1036-1066`) and the resource moves only in the third.
 
+> **AMENDED (fs-sysfile S5i, 2026-08-12): the last sentence is WRONG, and
+> the twin as landed has a different shape.**  The resource moves in the
+> `tot = 1` case too, and there is nothing to move it with: only the
+> record's LOW inum byte is new, so the slot goes LIVE at `inum mod 256`
+> and `dir_link_at` wants an `ilink` at *that* key.  The pure sibling
+> survives by the mod-256 bound; a ghost fragment cannot be re-keyed.
+> `tot = 1` is unreachable in the kernel (writei's loop takes one
+> sixteen-byte chunk and the window never straddles a block, so `tot ∈
+> {0,16}`) but NO LANDED CONTRACT SAYS SO — `SpecWritei` offers `tot ≤ n`,
+> `SpecDirlink` offers `tot < 16`.  So `DirLinks.v` ships
+> `dir_links_dirlink` with the caller supplying `dir_link_at self data' k0`
+> (true with no side condition), plus `dir_link_at_dirlink` (the `2 ≤ tot`
+> constructor from `ilink`) and `dir_links_dirlink_nop` (the `tot = 0`
+> ride).  `1 ≤ tot ≤ 15` has no route; the repair is a `tot = 0 ∨ tot = 16`
+> strengthening of `SpecDirlink` resting on writei CHUNK ATOMICITY.  See
+> projects/fs-sysfile.md's S5i entry.
+
 ### 20.4 `SpecIget`'s PREMISE: the licence, and the six sources
 
 `SpecIget.v:34` — "iget is the function that MINTS references, so unlike
