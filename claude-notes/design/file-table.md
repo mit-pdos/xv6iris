@@ -519,6 +519,19 @@ Two consequences for `fileread`'s contract, both accepted:
   not inside fileread.** The two options there: (a) prove readi's overflow arm
   properly, which needs a wrapping-`addw` reading the tree does not have, or
   (b) bound `n` at the syscall boundary.
+
+  **fs-sysfile S4 settled the reading of this, against the object code.**
+  Option (b) is not open: sys_read's only branch is argfd's, so the kernel
+  genuinely does not bound `n`, and option (a) is the only faithful repair.
+  S4 also found the debt is TWO premises, not one. `SpecSysRead.v` states
+  both about the trapframe word, via
+  `sys_rw_count v := bv_signed (trunc32 v)`: the upper half of the range is
+  free (`sys_rw_count_lt`, a 32-bit signed value), `MAXFILE*BSIZE + n < 2^31`
+  is owed by sys_read alone (filewrite's chunking closes writei's joint
+  bound), and **`0 <= n` is owed by sys_read AND sys_write**, because
+  `SpecReadi`/`SpecWritei` type `n` as a `nat` and so cannot express the
+  negative case the C handles perfectly well. That last one is a modelling
+  premise rather than a kernel fact and is the cheaper of the two to retire.
 * **the delivered bytes are not describable, and this too is inherited.**
   `readi`'s postcondition describes the destination bytes only on its KERNEL
   arm; on the user arm — the one fileread takes, `a1 = 1` at `+0x3a` — it says
@@ -684,6 +697,70 @@ owed for three stages because no caller existed to force it.**
   want the identical fact for the identical reason
   ([`../completed/fileclose.md`](../completed/fileclose.md) §3b), so one piece
   of ghost state settles both.
+
+  **fs-sysfile S4 sharpened this and found it is not only the pipe arm.**
+  Every arm's environment is content-indexed: `filestat_env fn Cf` and its
+  two siblings name the itable SLOT (`fc_ip Cf = ientry (fsn_ik fn)`), that
+  slot's escrow and sleeplock, and a share of that inode's reference — so an
+  inode fd is in exactly the same position as a pipe fd, and taking `Cf` as
+  a contract parameter does not help (`file_ref_agree` identifies two
+  contents only for a holder of a second fraction of the SAME slot, which no
+  syscall has). The two answers on the table are (i) an OPENER wand, a
+  premise of the syscall contract that turns the reference actually found
+  into the environment for that file and back — what S4's three Specs do —
+  or (ii) restating the three environments in `fileclose_fs_env`'s
+  content-INDEPENDENT form and letting each `file.c` function take its
+  per-slot share out of the `inode_pay` already inside the `file_ref` it
+  holds, which would delete the opener. Under (ii), note that
+  `filestat_fs_out` and `fileread_fs_out` return a NON-generation-named
+  `inode_shr`, which cannot be gathered back into `inode_pay`'s
+  `inode_shr_held_gen … g`; `filewrite_fs_out` is already gen-named, so that
+  is a one-line fix in each of the other two postconditions.
+
+## A FUNCTION THAT TAKES A DESCRIPTOR'S REFERENCE MUST NOT TAKE `proc_priv`
+
+The rule, and it is a hard constraint rather than a style preference:
+
+> A `file.c` contract may take `file_ref γf k q C`, or it may take
+> `ProcInv.proc_priv γf pa pid V`. **It may not take both.**
+
+`proc_priv` contains `proc_ofiles`, hence every descriptor's `ofile_slot`,
+hence the reference itself; `ProcInv.proc_priv_ofile` is an ACCESSOR, so
+while the reference is borrowed out the block is gone. And the reference
+cannot be split to leave a copy in the slot: `file_ref` is
+`fref_tok ∗ file_fields ∗ file_pay ∗ flive_tok`, and while the first three
+split by fraction, `flive_tok γ k = flive_own γ (◯ {[k := 1%positive]})` sits
+in `authUR (gmapUR nat positiveR)` — `Pos.add` is not idempotent, so the
+fragment is indivisible, and the only way to get a second one is
+`FileInv.flive_dup`, which needs the authority and BUMPS the count. That is
+filedup's ghost step and is unsound without the physical `f->ref++`.
+
+This is why `fileclose` takes no `proc_priv` and reaches for the pid QUARTER
+instead (`ProcInv.proc_priv_pid_ofile`), and why `filedup` takes none either.
+Both were written that way deliberately; what was missing was the statement
+of the general rule, so `fileread` / `filestat` / `filewrite` were all frozen
+taking both — and, being the first three functions in the file that copy
+to/from user memory, all three need the process block. fs-sysfile S4 is where
+that collided: the three contracts have no possible caller as frozen.
+
+**What a user-memory-touching `file.c` function should take instead is
+`ProcInv.proc_priv_core pa pid V`** — the block MINUS the fd table, which
+already exists, and for which `proc_priv γf pa pid V ⊣⊢ proc_priv_core pa pid
+V ∗ proc_ofiles γf pa (pv_ofile V)` is already proved. Nothing in the cone
+loses anything: measured over ProofFileread/-Parts, ProofFilewrite/-Parts,
+ProofFilestat/-Parts, ProofReadi, ProofWritei, ProofCopyout, ProofCopyin,
+ProofPiperead, ProofPipewrite, ProofIlock, ProofIunlock, ProofStati and
+ProofMyproc, the number of occurrences of `proc_ofiles` / `ofile_slot` /
+`proc_priv_ofile` / `p_ofile` is **zero in every one** — the whole cone uses
+`proc_priv` only through `proc_priv_pid`, `proc_priv_sz_bound`,
+`proc_priv_copy`, `proc_priv_tf` and `proc_priv_um_below`, each of which
+destructs the core and ignores the array. `SpecCopyout` is already stated at
+`proc_pt` altitude and is the model to copy.
+
+The syscall shell then does the split once: `proc_priv` → core + ofiles,
+borrow the descriptor out of the ofiles, hand the core down, put the
+reference back and rejoin. Its own contract still presents `proc_priv` to
+*its* caller, so nothing above the syscall layer moves.
 
 ## Why `f->ref++` cannot overflow: the fd-slot resource
 

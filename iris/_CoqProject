@@ -1049,3 +1049,6 @@ LinkProcdump.v
 ProofKexecParts.v
 ProofKexecA.v
 ProofKexecB.v
+SpecSysFstat.v
+SpecSysRead.v
+SpecSysWrite.v

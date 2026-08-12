@@ -2477,6 +2477,218 @@ only assumption anywhere under it is the named consolewrite Axiom that
 `LinkConsoleread`'s twin already puts under `Fileread`.
 
 
+## S4 — the three shells' contracts LANDED; the file.c call seam is BLOCKED TWICE
+
+### What landed (green on the mirror)
+
+- **`iris/SpecSysFstat.v`, `iris/SpecSysRead.v`, `iris/SpecSysWrite.v`** —
+  the three contracts, compiling, with the full decode written into each
+  header.  `_CoqProject` gains three rows (after `ProofKexecB.v`).
+- **No proofs and no Links.**  They are not parked for a budget reason: the
+  two blockers below make the capstones UNPROVABLE as the file.c contracts
+  now stand, and forcing them would mean either a vacuous premise or a
+  retrofit of a frozen contract from inside a caller.
+
+### The decode, confirmed against the tracked dump
+
+sys_read and sys_write are the SAME 25 instructions — same 48-byte frame,
+same slot map, same registers, same offsets — differing only in their three
+`jal` targets; sys_fstat is the same shape with a 32-byte frame and no
+argint.  Slot maps (`pa_stk` from the ENTRY sp):
+
+| | frame | ra | s0 | `f` | `n` | `p` / `st` |
+|---|---|---|---|---|---|---|
+| sys_fstat | 4 slots | 1 | 2 | 3 (`s0-24`) | — | 4 (`s0-32`) |
+| sys_read / sys_write | 6 slots | 1 | 2 | 3 (`s0-24`) | slot 4's UPPER word (`s0-28`) | 5 (`s0-40`); slot 6 unused |
+
+Three shape facts worth keeping:
+
+1. **The error return is HOISTED above the branch** (`c.mv a5,a0` then
+   `c.li a0,-1` then `blt a5,x0`), so both arms reach ONE epilogue with the
+   answer already in a0 — no `c.mv` on the join, unlike ProofSysClose's
+   `sc_tail`.  The epilogue is one lemma over the a0 value.
+2. **All three pass `pfd = 0` to argfd**, which is exactly the case
+   `SpecArgfd.ofd_out` was generalised for (`ofd_out_null`); only `pf` needs
+   the frame's non-nullity.  sys_read/sys_write therefore never split slot 4
+   for argfd — only for argint's `int` cell.
+3. Every frame constant already exists generically: `KernelRvcDecode`'s
+   `stk_push_32/48`, `stk_pop_32/48`, `stk_fp_32/48` and the depth-generic
+   `stk_frm`.  The only new arithmetic a capstone needs is four `addi
+   rd,s0,-imm` instances, each one line via `stk_push` (`0xfe0`→slot 4,
+   `0xfe8`→slot 3, `0xfd8`→slot 5, `0xfe4`→slot 4's upper word), plus a
+   six-slot `stack_own` bundle.  **Do not re-derive; instantiate.**
+
+### THE SYS_READ NUMERIC PREMISE — RESOLVED, AND IT IS TWO PREMISES NOT ONE
+
+`sys_rw_count v := bv_signed (trunc32 v)` is what reaches file.c: argint's
+`c.sw` narrows argraw's `uint64` to the `int` cell and the `lw` at +0x30
+reads it back SIGNED, and `RiscvExtras.sext32_64_moi` says the register then
+holds `mword_of_int (bv_signed (trunc32 v))` exactly.  Reading the decode
+confirms the brief's premise: **xv6 checks nothing between argint and the
+call — the only branch in either function is argfd's** — so no premise about
+`n` is dischargeable here, and there is no live arm to take instead.  What
+the two contracts owe is therefore:
+
+| premise | sys_read | sys_write | why |
+|---|---|---|---|
+| `sys_rw_count v2 < 2^31` | FREE | FREE | `bv_signed` of a 32-bit word (`sys_rw_count_lt`, proved in `SpecSysRead.v`) |
+| `0 <= sys_rw_count v2` | **owed** | **owed** | both `SpecFileread` and `SpecFilewrite` take it |
+| `MAXFILE*BSIZE + n < 2^31` | **owed** | not taken | readi's joint bound, inherited through fileread; filewrite's chunking closes writei's (S3f, `fw_chunk_joint`) |
+
+So the S3f bank is confirmed and SHARPENED: the asymmetry is real but it is
+only the second row.  `0 <= n` is carried by BOTH, and it is a MODELLING
+premise rather than a kernel fact — a negative `n` is handled fine by the C
+(filewrite's loop body never runs and its tail answers -1; fileread's readi
+returns 0), it is only `SpecReadi`/`SpecWritei`'s `nat`-typed `n` that
+cannot express it.  Retiring `0 <= n` is much cheaper than retiring the
+MAXFILE bound and should be done first.  The MAXFILE bound is
+design/file-table.md's already-recorded debt ("to be settled at sys_read"),
+whose two options are unchanged: prove readi's overflow arm (needs a
+wrapping-`addw` reading the tree does not have), or bound `n` at the syscall
+boundary — which the object code says the kernel does NOT do, so option (a)
+is the only faithful one.
+
+Both premises are stated in the contracts, about the trapframe word, so
+nothing is hidden: a caller sees exactly what is owed.
+
+### BLOCKER 1 — the file.c environments are indexed by the file's CONTENT
+
+`filestat_env fn Cf` / `fileread_env γf k fn Cf` / `filewrite_env γa γf k fn
+Cf` name, on the inode arm, the itable SLOT the file points at
+(`⌜fc_ip Cf = ientry (fsn_ik fn)⌝`), that slot's escrow and sleeplock, and a
+SHARE of that inode's reference.  **A syscall cannot own any of it up
+front**: `ProcInv.ofile_slot` quantifies `k`, `q` AND `Cf` existentially and
+nothing the caller holds pins them.  Taking `Cf` as a contract parameter does
+not help either — after the borrow the proof learns some `Cf'` and has no way
+to identify it with the parameter (`FileInv.file_ref_agree` would, but only
+for a caller already holding a SECOND fraction of the same slot's reference,
+which no caller does).
+
+This is exactly the wiring `SpecFileread.v`'s header defers to B3 ("sys_read's
+cone carves it off the FD_INODE file payload's cinv-parked reference at entry
+and gathers it back at exit ... nothing in this file's cone needs it").  S4 is
+the first stage where something does.
+
+**What S4 did about it, and it is a spec-shape decision to ratify or
+overturn:** each contract takes an OPENER — `fstat_fdenv γf`,
+`read_fdenv γf`, `write_fdenv γa γf γs j` — a wand that turns the reference
+the descriptor turned out to hold into the environment for THAT file and
+takes it back:
+
+```coq
+Definition fstat_fdenv (γf : gname) : iProp Σ :=
+  (∀ (k : nat) (q : Qp) (Cf : fcontent),
+     ⌜(k < NFILE)%nat⌝ -∗ file_ref γf k q Cf ==∗
+     ∃ (fn : fstat_names) (q' : Qp),
+       filestat_env fn Cf ∗ file_ref γf k q' Cf ∗
+       (file_ref γf k q' Cf -∗ filestat_env_out fn Cf ==∗ file_ref γf k q Cf))%I.
+```
+
+It is honest (a real `iProp`, not an undischargeable pure premise), it is the
+precedent `SpecSyscall.v` already set one level up (`syscall_env` is ONE
+abstract parameter for the same reason), the fraction is allowed to move
+because a carve shrinks the parent and all three callees take `q`
+arbitrary, and each Spec carries a `_fdenv_none` lemma proving the definition
+is not accidentally unsatisfiable.  The ALTERNATIVE, and probably the better
+long-run shape, is to restate the three environments in
+`SpecFileclose.fileclose_fs_env`'s CONTENT-INDEPENDENT form (the escrow
+family + `ic_sleeplocks` + the fabric) and let each file.c function take its
+per-slot share out of the `inode_pay` it already holds inside `file_ref` —
+which would make the opener unnecessary and cost the syscalls nothing.  Three
+sub-gaps to price before choosing that:
+
+* the inum GEOMETRY facts (`IBLOCK inum inodestart ∈ cov`,
+  `bv_unsigned inum < 16 * nib`) are not obviously derivable from the payload
+  and may have to stay in the Cf-independent bundle keyed on the escrow;
+* `filestat_fs_out` / `fileread_fs_out` return `IcacheRef.inode_shr`, which
+  is NOT generation-named, so a gather back into `inode_pay`'s
+  `inode_shr_held_gen … g` cannot pin `g`.  **filewrite's out IS gen-named**
+  (`inode_shr_gen … (fwn_g fn)`), so this is a two-of-three gap, and it is
+  one line in each of the two postconditions;
+* the fraction: `inode_pay` carries the share at `q * Q`, so a function that
+  wants it at `fsn_s fn` needs the record's `s` to be that product.
+
+### BLOCKER 2 — `file_ref` and `proc_priv` CANNOT BE HELD AT ONCE (the fatal one)
+
+`SpecFileread` / `SpecFilestat` / `SpecFilewrite` each take BOTH
+`file_ref γf k q Cf` and `proc_priv γf pj pidv V`.  A syscall's only source
+for the reference is the descriptor, i.e. `ProcInv.proc_priv_ofile`, which is
+an ACCESSOR: while the slot is out, `proc_priv` is out.  And the reference
+cannot be split to leave a copy behind —
+
+```coq
+file_ref γ k q C := fref_tok γ k q ∗ file_fields k q C ∗ file_pay γ k q C ∗ flive_tok γ k
+flive_tok γ k    := flive_own γ (◯ {[ k := 1%positive ]})     (* fliveUR = authUR (gmapUR nat positiveR) *)
+```
+
+`fref_tok`, `file_fields` and `file_pay` all split by fraction; `flive_tok`
+does NOT (`positiveR`'s op is `Pos.add`, not idempotent), and duplicating it
+is `FileInv.flive_dup`, which needs the AUTHORITY and BUMPS the count — i.e.
+it is filedup's ghost step and is unsound without the physical `f->ref++`.
+There is no lemma anywhere in the tree producing two `file_ref`s from one; I
+looked.
+
+This is why fileclose and filedup — the two landed functions that DO take a
+descriptor's reference — take no `proc_priv` at all (`SpecFileclose` takes the
+pid QUARTER instead, lent by `proc_priv_pid_ofile`, and its header says
+exactly why).  fileread/filestat/filewrite need the process block because
+they copy to/from user memory, and that is where the two requirements
+collide.  **The consequence is blunt: as frozen, the three contracts have no
+possible caller.**  Nothing detected it earlier because S4 is their first.
+
+**THE REPAIR, AND IT IS MACHINE-SIZED.**  The whole cone uses `proc_priv`
+only through its CORE accessors — `proc_priv_pid`, `proc_priv_sz_bound`,
+`proc_priv_copy`, `proc_priv_tf`, `proc_priv_um_below` — and never touches
+the fd table.  Measured: `grep -c 'proc_ofiles\|ofile_slot\|proc_priv_ofile\|p_ofile'`
+over ProofFileread, ProofFilereadParts, ProofFilewrite, ProofFilewriteParts,
+ProofFilestat, ProofFilestatParts, ProofReadi, ProofWritei, ProofCopyout,
+ProofCopyin, ProofPiperead, ProofPipewrite, ProofIlock, ProofIunlock,
+ProofStati, ProofMyproc = **0 in every one**.  So the repair is to move the
+cone from `proc_priv γf pa pid V` to `ProcInv.proc_priv_core pa pid V` (the
+predicate already exists, and `proc_priv γf pa pid V ⊣⊢ proc_priv_core pa pid
+V ∗ proc_ofiles γf pa (pv_ofile V)` is already proved in `ProcInv.v`), after
+which a syscall splits `proc_priv` once, borrows the reference out of
+`proc_ofiles`, and hands the core down.
+
+Ripple: the twelve contracts in the cone that mention `proc_priv` —
+`SpecFileread`, `SpecFilewrite`, `SpecFilestat`, `SpecReadi`, `SpecWritei`,
+`SpecCopyin`, `SpecEitherCopyin`, `SpecEitherCopyout`, `SpecPiperead`,
+`SpecPipewrite`, `SpecConsoleread`, `SpecConsolewrite` — plus a `_core` twin
+of each accessor used (each a one-line restatement, since every existing one
+destructs the core and ignores the ofiles).  `SpecCopyout` needs nothing: it
+is already stated at `proc_pt` altitude.  ZERO logical difficulty is expected
+and the measurement above is the evidence.
+
+Cheaper-looking alternatives, all rejected with reasons: a third "loaned"
+disjunct in `ofile_slot` (that is the per-`ofile` ghost state
+`SpecFileclose.v`'s header defers, and every `proc_priv` consumer — kexit's
+close loop, kfork's dup loop, fdalloc, argfd — would have to refute it);
+handing the callee a `proc_priv` at `upd_ofile V fd 0` (the predicate asserts
+the CELL's value and the code never stores 0); getting a second reference
+from the ftable (`file_rest` holds fields+pay and NO `flive_tok`); folding
+the problem into the opener (it would have to conjure a second reference —
+unsatisfiable, i.e. it would make the whole contract vacuous).
+
+### Gate
+
+Mirror `full.sh` `EXIT=0`, **1045 `.vo`**, zero `Error`.  (1041 at the
+git-sync, plus `ProofKexecB.vo` — which the merge brought in and no gate had
+built yet — plus the three new Specs.)  `tools/lemma_diff.py --ref HEAD`: three files, three NEWAXIOMs —
+the `SYSFSTAT` / `SYSREAD` / `SYSWRITE` module-type seals, one per new Spec.
+Nothing GONE, nothing ADMITTED, no `Print Assumptions` to report (no linked
+module was produced).  `_CoqProject` carries the three Spec rows only; the
+mirror's copy was patched IN PLACE with `sed`, per the standing rule.
+
+### What S4' picks up
+
+In order: (1) the coordinator rules on B2 (the `proc_priv_core` sweep is the
+recommendation, and it is a stage of its own — twelve contracts); (2) the
+coordinator rules on B1 (keep the opener, or restate the three environments
+content-independently and delete it); (3) the three capstones are then
+genuinely thin — the contracts in this stage do not change under either
+ruling, because a syscall that splits `proc_priv` still PRESENTS `proc_priv`
+to its own caller, and the opener is a premise either way.
+
 ## The stage ladder
 
 - **S1** (agent): the DECODE stage — 13 Code files (the 12 targets +
@@ -2690,8 +2902,16 @@ only assumption anywhere under it is the named consolewrite Axiom that
   same pass.  `Print Assumptions Filewrite.wp_filewrite_sconf` = the 5
   platform axioms + funext + the named consolewrite Axiom.  See the S3t
   section for the three arm-join devices and the nine traps.
-- **S4** (agent): sys_read/sys_write/sys_fstat — argfd + the file.c
-  contracts; thin shells.
+- **S4** (agent) **— PARTIAL / STOPPED AND REPORTED**: the three shells'
+  contracts LANDED and compiling (`SpecSysFstat.v`, `SpecSysRead.v`,
+  `SpecSysWrite.v`), the sys_read numeric premise resolved and stated, and
+  **TWO composition blockers found and sized** — the file.c read/write/stat
+  contracts have NO POSSIBLE CALLER as frozen. See the S4 section: (B1) the
+  three environments are indexed by the file's CONTENT, which a syscall
+  cannot name; (B2) `file_ref` and `proc_priv` cannot be held at once,
+  because the descriptor's reference lives inside `proc_priv` and
+  `flive_tok` (a `positiveR` fragment) makes `file_ref` unsplittable.  No
+  proofs written; both repairs are the coordinator's ruling.
 - **S5** (agent): create — the writing half's boss: namei/nameiparent
   + ialloc + ilock's third arm + dirlink (+ the "." and ".." links on
   the mkdir path) + the found-arm early exit. Its contract's
