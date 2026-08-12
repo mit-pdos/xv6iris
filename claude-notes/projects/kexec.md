@@ -214,6 +214,66 @@ but it buys nothing while the contents are existential anyway.
 `procdump`, which `design/proc-struct.md` already records as unprovable as
 written.
 
+## Phase B: the design, and the ONE upstream gap it predicts for phase C
+
+Phase B is `+0x090 .. +0x1ac`: `proc_pagetable`, the seven lazy spills, the
+phdr loop with the INLINED `loadseg` inside it, and the closing
+`iunlockput`/`end_op`. ~100 instructions, two nested loops, and **seven** of
+kexec's eight `bad:` entries (`+0x318 +0x31c +0x320 +0x33c +0x342 +0x348
++0x34e`) — phase A owns the other one plus the shared epilogue.
+
+Read the control flow off the instructions, not the C: **the phdr loop's head
+is its BODY at `+0x12c`**, entered by a `j` from the setup at `+0x0cc`, with
+the increment-and-test at `+0x11a..+0x128` as the back edge. The loadseg loop
+is entered at `+0xf6` from two places (`+0x19a` on a fresh segment, and its
+own back edge at `+0xf2`).
+
+### The phdr loop invariant
+
+Carried across iterations, in the machine's own variables (`s10 = i`,
+`s2 = sz`, `a3`/slot 63 `= off`):
+
+- `i <= phnum` and `off = ElfEnc.ph_at ef i` (the C's `off += sizeof(ph)`);
+- `proc_pt P_i` for the descriptor built so far, plus `uint sz <= uvm_maxsz`;
+- **`um_below sz P_i.(ud_um)`** — everything mapped is below `sz`;
+- **its dual, everything below `sz` IS mapped, as a valid USER leaf.**
+
+That dual is the one to think about. It is true — `uvmalloc` maps
+`[PGROUNDUP(oldsz), newsz)` and the previous iteration left `[0, oldsz)`
+covered, and `PGROUNDUP(oldsz) >= oldsz` means the two runs abut with no hole
+— and it is what phase C will need. State it page-granularly:
+
+```coq
+kxc_covered sz um := forall vpn, (bv_unsigned vpn * 4096 < uint sz)%Z ->
+                       exists w, um !! vpn = Some w /\ pte_vu w
+```
+
+### THE GAP: `SpecUvmalloc` does not say what its new leaves ARE
+
+Its success arm pins `uptd_ext P P'` and `dom P'.(ud_um) = dom P.(ud_um) ∪
+vpn_run vpn0 n` — **the DOMAIN and nothing else.** The old leaves survive by
+`uptd_ext`; the new ones have no stated value, so `pte_vu` is not derivable,
+and neither is anything about their permission. `proc_pt_wf` does not help:
+its `upt_acc_wf` conjunct explicitly permits `uleaf_denied`.
+
+This is the *same shape* as the `co_mapped` mistake — "the map has an entry
+here" is not "walkaddr will find it" — and it is the second time on this
+project that a domain-only statement turned out to be too weak.
+
+**Phase B does not need it**; the one place it would (refuting
+`panic("loadseg: address should exist")` when `walkaddr` returns 0) is covered
+for free by the `panic_wp_any` kexec's contract already carries for ilock's
+live panic. **Phase C does**: `copyout`'s mapped arm needs `co_mapped` — with
+`pte_vu` — over the stack pages that phase C's own `uvmalloc` has just
+created, and there is no other way to get it.
+
+*The fix*, when phase C reaches it: strengthen uvmalloc's success arm to say
+the new leaves are `uvm_pte (Z.lor xperm 18) ppn` for some ppn (or at least
+`pte_vu`). The proof has it — `mappages` builds exactly that leaf, and the
+`uvm_perm_ok (Z.lor xperm 18)` premise is already there for it. Do it as part
+of phase C, not before: it is one file plus `ProofUvmalloc`, and phase C is
+the caller that tells you which form is actually wanted.
+
 ## Block-interface conventions (decided before the first block was written)
 
 Four rules, so that A/B/C/D compose without renegotiating their seams. The
