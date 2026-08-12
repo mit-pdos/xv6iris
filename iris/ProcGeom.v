@@ -648,7 +648,7 @@ Qed.
 
 (* [mycpu_ret tp0] is &cpus[tp0], in the EXACT closed form mycpu()'s five
    instructions leave in a0 -- [c.mv a5,tp] / [sext.w] / [c.slli a5,7] build
-   [mycpu_a5], and the [auipc a0,0x11] / [addi a0,a0,-1404] pair materializes
+   [mycpu_a5], and the [auipc a0,0x11] / [addi a0,a0,-1264] pair materializes
    &cpus.  Every per-CPU cell address below, and every acquire / release /
    push_off / pop_off / myproc contract, is stated in this form, so cells unify
    by name across call boundaries with no arithmetic at the seam.
@@ -665,7 +665,7 @@ Definition mycpu_ret (tp0 : mword 64) : mword 64 :=
     (add_vec
        (add_vec (add_vec_int (mword_of_int KernelSyms.mycpu : mword 64) 14)
                 (auipc_off (mword_of_int 0x11 : mword 20)))
-       (sign_extend' 64 (mword_of_int 0xa84 : mword 12)))
+       (sign_extend' 64 (mword_of_int 0xb10 : mword 12)))
     (mycpu_a5 tp0).
 
 (* c->proc (offset 0): the cell the current-process resource owns. *)

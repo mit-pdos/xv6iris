@@ -388,6 +388,10 @@ SpecSleep.v
 CodeSleep.v
 ProofSleep.v
 LinkSleep.v
+SpecSleepPrepare.v
+CodeSleepPrepare.v
+ProofSleepPrepare.v
+LinkSleepPrepare.v
 CodeWakeup.v
 SpecWakeup.v
 ProofWakeup.v
@@ -782,8 +786,8 @@ LinkEitherCopyin.v
 UartTxInv.v
 SpecUartwrite.v
 CodeUartwrite.v
-ProofUartwrite.v
 LinkUartwrite.v
+LinkTxLockInit.v
 SpecConsoleintr.v
 SpecBootDevCaps.v
 LinkBootDevCaps.v

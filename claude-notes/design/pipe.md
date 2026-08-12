@@ -306,11 +306,18 @@ record, proof structure, and the gotchas they turned up are in
   and the crossing bytes are unobservable at this altitude by design.
 - **Sleeping inside a reclaimable object is sound** because the sleeper's own
   `pipe_ref` rides its frame through sched(): the pipe cannot die while any
-  process sleeps in it.  That is `SLEEP_GEN` (SpecSleep.v) — sleep over
-  `lock_openable + Tk/Dk`, the same generalization acquire/release already
-  had; the pipe instantiates Tk := `pipe_ref`, Dk := `pipe_dead`,
-  Rk := `pipe_res`.
-- **Interrupt level is pinned 0 at entry**: sleep's sched() demands noff = 1
-  — the pipe lock alone — so the copies run at lvl = 1, which is what forced
-  the level-generalization of the whole vmfault/copyin/copyout (and
-  walk/mappages) chain off its `lvl = 0` artifacts.
+  process sleeps in it.  Since xv6 split the sleep protocol
+  (`sleep_prepare(chan)`; `release(lk)`; `sleep()`; `acquire(lk)` —
+  SpecSleep.v), that argument is spelled in the CALLER's frame: `sleep()`
+  names no condition lock at all, so the cancellable-lock genericity is just
+  piperead/pipewrite's own `RELEASE_GEN` / `ACQUIRE_GEN` calls, presenting
+  `pipe_ref` as the credential exactly as the entry acquire does.  There is
+  no lock-generic sleep interface (`SLEEP_GEN` was deleted with the merged
+  protocol, not ported).
+- **Interrupt level is pinned 0 at entry**: the wait loop has to reach
+  `sleep()` at noff 0 with interrupts back on, which it can only do if the
+  pipe lock is the ONLY lock held — so the copies run at lvl = 1, which is
+  what forced the level-generalization of the whole vmfault/copyin/copyout
+  (and walk/mappages) chain off its `lvl = 0` artifacts.  At that call site
+  `eb = true`, so sleep's two extra premises are `emp`
+  (`trap_csrs_ext true` / `cpu_claim_ext true pj`).

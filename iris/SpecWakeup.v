@@ -25,17 +25,29 @@ Require Import ProcGeom.
 Require Import SchedCtx.
 From Kernel Require KernelSyms.
 
+(* THE SCAN NO LONGER SKIPS THE RUNNING PROCESS.  xv6's wakeup used to guard
+   the whole body with [if (p != myproc())]; it now acquires every slot's
+   lock, including its own, and clears [p->chan] wherever it matches --
+   because the field is the wakeup FLAG the split sleep protocol
+   (SpecSleep.v) reads, so a registered-but-not-yet-parked waiter has to be
+   signalled too, and the caller may BE that waiter.
+
+   Two premises went with the guard: the [myproc()] call is gone from the
+   code, so [a0f] (&cpus[tp], the value it returned) and the [a0f <> 0]
+   refutation have nothing left to name.  Reaching one's own slot needs no
+   new resource -- p->lock hands out only the invariant's HALF of the state
+   mirror, and the running thread's own half stays where it is; the write
+   arm is licensed by the state READ being SLEEPING, which is unclaimed, so
+   the proof never has to know which slot is the caller's. *)
 Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-     (m : regfile) (γs : list gname) (a0f pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
+     (m : regfile) (γs : list gname) (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
   let sp0 : mword 64 := m !!! Regidx csp_rs1 in
   let spF := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
   let rettgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (18 <= K)%nat ->
   (forall r : regidx, r ∈ dom (rf_to_gmap m)) ->
   length γs = NPROC ->
-  mycpu_ret (rget m Rtp) = a0f ->
-  eq_vec (zero_reg : mword 64) (mycpu_ret (rget m Rtp)) = false ->
-  (* myproc/acquire's push_off keeps the transient noff increment in range *)
+  (* acquire's push_off keeps the transient noff increment in range *)
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b -∗
@@ -53,6 +65,6 @@ Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslot
 Module Type WAKEUP.
   Parameter wp_wakeup_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-       (m : regfile) (γs : list gname) (a0f pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool),
-      wp_wakeup_sconf_body m γs a0f pme lvl K eb C b.
+       (m : regfile) (γs : list gname) (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool),
+      wp_wakeup_sconf_body m γs pme lvl K eb C b.
 End WAKEUP.

@@ -51,9 +51,9 @@ Section CodeSysGetpid.
   Proof. mk_rvc (KernelSyms.sys_getpid + 0x6) (mword_of_int 0x0800 : mword 16)
     (mword_of_int (KernelSyms.sys_getpid + 0x6) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) kd_0800 exec_execute_C_ADDI4SPN. Qed.
 
-  Lemma sg_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_getpid + 0x8) : mword 64) false (JAL (mword_of_int 2093060 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_getpid + 0x8) (mword_of_int 0x804ff0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_getpid + 0x8) : mword 64) (JAL (mword_of_int 2093060 : mword 21, Regidx (mword_of_int 1))) kd_804ff0ef. Qed.
+  Lemma sg_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_getpid + 0x8) : mword 64) false (JAL (mword_of_int 2093018 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_getpid + 0x8) (mword_of_int 0xfdbfe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_getpid + 0x8) : mword 64) (JAL (mword_of_int 2093018 : mword 21, Regidx (mword_of_int 1))) kd_fdbfe0ef. Qed.
 
   Lemma sg_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_getpid + 0xc) : mword 64) true (LOAD (mword_of_int 48 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), false, 4)).
   Proof. mk_rvc (KernelSyms.sys_getpid + 0xc) (mword_of_int 0x5908 : mword 16)

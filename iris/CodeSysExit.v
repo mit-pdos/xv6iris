@@ -19,6 +19,7 @@ From Kernel Require KernelSyms.
 Require Import KernelDecode00.
 Require Import KernelDecode04.
 Require Import KernelDecode06.
+Require Import KernelDecode09.
 Require Import KernelDecode10.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
@@ -26,7 +27,6 @@ Require Import KernelDecode15.
 Require Import KernelDecode17.
 Require Import KernelDecode19.
 Require Import KernelDecode21.
-Require Import KernelDecode23.
 Require Import KernelDecode27.
 Local Open Scope Z_scope.
 Import Defs.
@@ -70,9 +70,9 @@ Section CodeSysExit.
   Proof. mk_base (KernelSyms.sys_exit + 0x12) (mword_of_int 0xfec42503 : mword 32)
     (mword_of_int (KernelSyms.sys_exit + 0x12) : mword 64) (LOAD (mword_of_int 4076 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 10), false, 4)) kd_fec42503. Qed.
 
-  Lemma se_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_exit + 0x16) : mword 64) false (JAL (mword_of_int 2094896 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_exit + 0x16) (mword_of_int 0xf30ff0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_exit + 0x16) : mword 64) (JAL (mword_of_int 2094896 : mword 21, Regidx (mword_of_int 1))) kd_f30ff0ef. Qed.
+  Lemma se_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_exit + 0x16) : mword 64) false (JAL (mword_of_int 2094882 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_exit + 0x16) (mword_of_int 0xf22ff0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_exit + 0x16) : mword 64) (JAL (mword_of_int 2094882 : mword 21, Regidx (mword_of_int 1))) kd_f22ff0ef. Qed.
 
   Lemma se_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_exit + 0x1a) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
   Proof. mk_rvc (KernelSyms.sys_exit + 0x1a) (mword_of_int 0x4501 : mword 16)

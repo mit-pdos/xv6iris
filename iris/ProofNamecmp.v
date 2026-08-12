@@ -270,14 +270,14 @@ Section ProofNamecmpMain.
     iEval (rewrite Hpp0a) in "Hpc".
     (* ===== +0x0a jal ra,strncmp ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.namecmp + 0x0a)) Rra
-              (mword_of_int 2086444 : mword 21) R3 (K - 2)%nat b
+              (mword_of_int 2086386 : mword 21) R3 (K - 2)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi0a").
     iIntros (CID6 Hq6) "Hcg Hpc".
     set (R4 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.namecmp + 0x0a) : mword 64) 4)]> R3).
     assert (Htgt : add_vec (mword_of_int (KernelSyms.namecmp + 0x0a) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2086444 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2086386 : mword 21))
                    = mword_of_int KernelSyms.strncmp) by pcw.
     iEval (rewrite Htgt) in "Hpc".
     assert (HR4a2 : R4 !!! Regidx Ra2 = (mword_of_int (Z.of_nat 14) : mword 64))

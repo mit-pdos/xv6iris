@@ -333,7 +333,7 @@ Section UsertrapRes.
       (γft γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γv : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (γtx γtk : gname)                                  (* tx lock, ticks *)
+      (γtk : gname)                                      (* ticks *)
       (γpr : gname)                                      (* the pr lock    *)
       (bn : bio_names) (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -350,7 +350,7 @@ Section UsertrapRes.
      panic_wp_any ∗
      kernel_data ∗
      is_kstack pj ks ∗
-     devintr_caps γu γv γtx γk γtk γs pd pav pu ∗
+     devintr_caps γu γv γk γtk γs pd pav pu ∗
      printk_env γpr γu γv ∗
      is_lock γw wait_lock_addr "wait_lock"%string wait_res ∗
      is_ftable γft γf ∗
@@ -385,7 +385,7 @@ Section UsertrapRes.
       (pt : uptd) (ksp : mword 64) : iProp Σ :=
     (∃ (γft γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
        (γu : uart_names) (γv : disk_names) (γk : gname)
-       (pd pav pu : mword 64) (γtx γtk γpr : gname)
+       (pd pav pu : mword 64) (γtk γpr : gname)
        (bn : bio_names) (γ : log_names) (γfs : fs_names)
        (cov : gset Z) (logstart : Z) (dev : mword 32)
        (ip : mword 64) (dqi : dfrac)
@@ -414,7 +414,7 @@ Section UsertrapRes.
                 cov logstart dev pid (DfracOwn (1/4))
                 γi cn γtl bmapstart inodestart nib size dqb dqs ⌝ ∗
        ut_trap (proc_addr j) ksp av C ∗
-       ut_env Rsys γft γf γw γs j γl γu γv γk pd pav pu γtx γtk γpr
+       ut_env Rsys γft γf γw γs j γl γu γv γk pd pav pu γtk γpr
               bn γ γfs cov logstart dev ip dqi γkl γka
               γi cn γtl bmapstart inodestart nib size dqb dqs us fn
               ks pid V)%I.

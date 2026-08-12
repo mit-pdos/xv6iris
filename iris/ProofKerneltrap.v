@@ -82,11 +82,11 @@ Section ProofKerneltrap.
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 
   Lemma wp_kerneltrap_sconf
-      (γu : uart_names) (γv : disk_names) (γtx γdk γtl : gname)
+      (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av : nat) (p : mword 64) (C : iProp Σ)
       (ep sc tv : mword 64)
-    : wp_kerneltrap_sconf_body γu γv γtx γdk γtl γs pd pav pu m av p C ep sc tv.
+    : wp_kerneltrap_sconf_body γu γv γdk γtl γs pd pav pu m av p C ep sc tv.
   Proof.
     cbv beta delta [wp_kerneltrap_sconf_body].
     intros pcE ret_tgt Hlen Hav Hsc Hepal.
@@ -125,7 +125,7 @@ Section ProofKerneltrap.
     assert (HD0s2 : D0 !!! Regidx s2_idx = ep)
       by (rewrite /D0 upd_ne; [exact HMs2 | vm_compute; discriminate]).
     (* devintr's caps are the whole device complement, threaded persistently *)
-    iApply (Devintr.wp_devintr_sconf γu γv γtx γdk γtl γs pd pav pu
+    iApply (Devintr.wp_devintr_sconf γu γv γdk γtl γs pd pav pu
               D0 (av - 6)%nat 0 false p C (DfracOwn 1) sc
               Hlen ltac:(change (2^31)%Z with 2147483648%Z; lia)
               ltac:(unfold kerneltrap_stack in Hav; unfold devintr_stack; lia)
@@ -212,7 +212,7 @@ Section ProofKerneltrap.
       (* ---- +0x86: jal myproc ---- *)
       iPoseProof (kti_86 with "Htext") as "Hi86".
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x86)) ra_idx
-                (mword_of_int 2093546 : mword 21) D1 (av - 6)%nat false
+                (mword_of_int 2093504 : mword 21) D1 (av - 6)%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi86 [-]").
       iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -221,7 +221,7 @@ Section ProofKerneltrap.
       change (<[Regidx ra_idx := regval_into_reg
           (add_vec_int (mword_of_int (KernelSyms.kerneltrap + 0x86) : mword 64) 4)]> D1) with D2.
       assert (Hpcmp : add_vec (mword_of_int (KernelSyms.kerneltrap + 0x86) : mword 64)
-                        (sign_extend' 64 (mword_of_int 2093546 : mword 21))
+                        (sign_extend' 64 (mword_of_int 2093504 : mword 21))
                       = mword_of_int KernelSyms.myproc) by pcw.
       iEval (rewrite Hpcmp) in "Hpc".
       assert (HD2ra : D2 !!! Regidx ra_idx
@@ -324,7 +324,7 @@ Section ProofKerneltrap.
         (* ---- +0x8c: jal yield ---- *)
         iPoseProof (kti_8c with "Htext") as "Hi8c".
         iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x8c)) ra_idx
-                  (mword_of_int 2095042 : mword 21) mmp (av - 6)%nat false
+                  (mword_of_int 2095000 : mword 21) mmp (av - 6)%nat false
                   ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi8c [-]").
         iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -333,7 +333,7 @@ Section ProofKerneltrap.
         change (<[Regidx ra_idx := regval_into_reg
             (add_vec_int (mword_of_int (KernelSyms.kerneltrap + 0x8c) : mword 64) 4)]> mmp) with Y0.
         assert (Hpcyd : add_vec (mword_of_int (KernelSyms.kerneltrap + 0x8c) : mword 64)
-                          (sign_extend' 64 (mword_of_int 2095042 : mword 21))
+                          (sign_extend' 64 (mword_of_int 2095000 : mword 21))
                         = mword_of_int KernelSyms.yield) by pcw.
         iEval (rewrite Hpcyd) in "Hpc".
         assert (HY0ra : Y0 !!! Regidx ra_idx
@@ -351,7 +351,7 @@ Section ProofKerneltrap.
         (* the proc's lock ghost, and the trap CSRs the crossing carries:
            at [eb = false] yield takes them from US, because there is no
            enabled arm to dismantle. *)
-        iDestruct "Hcaps" as "(#Hdev & #Htx & #Hgeom & #Hdisk & #Htimer & #Htick & #Hprocs & #Hpanic)".
+        iDestruct "Hcaps" as "(#Hdev & #Hgeom & #Hdisk & #Htimer & #Htick & #Hprocs & #Hpanic)".
         (* [j < NPROC] and [length γs = NPROC] give a slot ghost for proc j *)
         assert (Hjl : (j < length γs)%nat) by (rewrite Hlen; exact Hj).
         destruct (lookup_lt_is_Some_2 γs j Hjl) as [γl Hgl].

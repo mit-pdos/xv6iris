@@ -38,9 +38,9 @@ Definition nullp : mword 64 := mword_of_int 0.
    4096-byte-aligned physical address within [end, PHYSTOP).  kfree PANICS
    otherwise (bounds + [pa % PGSIZE] checks), and kalloc only ever hands out
    pages it earlier took in, so the invariant must CARRY this validity to make
-   kalloc's result re-freeable.  [end = 0x80023558], [PHYSTOP = 17 << 27]. *)
+   kalloc's result re-freeable.  [end = 0x800235b0], [PHYSTOP = 17 << 27]. *)
 Definition PGSIZE  : Z := 4096.
-Definition kmem_lo : Z := 0x80023558.   (* <end> *)
+Definition kmem_lo : Z := 0x800235b0.   (* <end> *)
 Definition kmem_hi : Z := 0x88000000.   (* PHYSTOP = 17 << 27 *)
 Definition page_aligned (p : mword 64) : Prop := (uint p) mod PGSIZE = 0.
 Definition page_in_range (p : mword 64) : Prop := kmem_lo <= uint p < kmem_hi.
@@ -125,7 +125,7 @@ Qed.
 
 (* THE BRIDGE LEMMA: every byte of a kalloc page lies in the kernel data
    region [RiscvPtsto.addr_is_kdata] = [etext, PHYSTOP).  Pure arithmetic on
-   the concrete literals: [kmem_lo] (0x80023558) > [text_end]
+   the concrete literals: [kmem_lo] (0x800235b0) > [text_end]
    (0x80007000), and [kmem_hi] (0x88000000) = [ram_base]+[ram_size] =
    PHYSTOP.  Page-alignment of both [p] and [kmem_hi] is what keeps
    [uint p + j] strictly below [kmem_hi] for every in-page offset [j] --

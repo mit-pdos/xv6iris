@@ -489,7 +489,12 @@ what makes this tractable at all); then fix what it does NOT cover.
   `main`, `bmap`, `iupdate`) still break — they call into code that did.
 
 - **NEVER compute the fix set by value arithmetic.** Three separate ways it
-  is wrong, each hit for real: (a) `removed − added` set-difference silently
+  is wrong, each hit for real — **and `tools/relayout_map.py` is the
+  mechanized form of the rule that follows** (`map` prints a Code file's
+  per-offset immediate changes; `apply` rewrites a proof with them, anchored
+  on the last `KernelSyms.<sym> + 0x<off>` it saw, so both occurrences per
+  call site move and nothing outside the region does). Three ways value
+  arithmetic is wrong: (a) `removed − added` set-difference silently
   drops any value that reappears as a NEW immediate elsewhere — that hid
   `ProofFilealloc` entirely; (b) immediates are written in HEX in some
   proofs and DECIMAL in others (`0x6a2` vs `1698`), so a decimal grep misses

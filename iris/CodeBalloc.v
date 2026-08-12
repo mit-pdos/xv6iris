@@ -80,9 +80,9 @@ Section CodeBalloc.
   Proof. mk_base (KernelSyms.balloc + 0xa) (mword_of_int 0x0001e797 : mword 32)
     (mword_of_int (KernelSyms.balloc + 0xa) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_0001e797. Qed.
 
-  Lemma bai_00e : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0xe) : mword 64) false (LOAD (mword_of_int 2726 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
-  Proof. mk_base (KernelSyms.balloc + 0xe) (mword_of_int 0xaa67a783 : mword 32)
-    (mword_of_int (KernelSyms.balloc + 0xe) : mword 64) (LOAD (mword_of_int 2726 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) kd_aa67a783. Qed.
+  Lemma bai_00e : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0xe) : mword 64) false (LOAD (mword_of_int 2808 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
+  Proof. mk_base (KernelSyms.balloc + 0xe) (mword_of_int 0xaf87a783 : mword 32)
+    (mword_of_int (KernelSyms.balloc + 0xe) : mword 64) (LOAD (mword_of_int 2808 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) kd_af87a783. Qed.
 
   Lemma bai_012 : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0x12) : mword 64) false (BTYPE (mword_of_int 228 : mword 13, zreg, Regidx (mword_of_int 15), BEQ)).
   Proof. mk_base (KernelSyms.balloc + 0x12) (mword_of_int 0x0e078263 : mword 32)
@@ -128,9 +128,9 @@ Section CodeBalloc.
   Proof. mk_base (KernelSyms.balloc + 0x28) (mword_of_int 0x0001eb17 : mword 32)
     (mword_of_int (KernelSyms.balloc + 0x28) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 22), AUIPC)) kd_0001eb17. Qed.
 
-  Lemma bai_02c : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0x2c) : mword 64) false (ITYPE (mword_of_int 2692 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)).
-  Proof. mk_base (KernelSyms.balloc + 0x2c) (mword_of_int 0xa84b0b13 : mword 32)
-    (mword_of_int (KernelSyms.balloc + 0x2c) : mword 64) (ITYPE (mword_of_int 2692 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)) kd_a84b0b13. Qed.
+  Lemma bai_02c : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0x2c) : mword 64) false (ITYPE (mword_of_int 2774 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)).
+  Proof. mk_base (KernelSyms.balloc + 0x2c) (mword_of_int 0xad6b0b13 : mword 32)
+    (mword_of_int (KernelSyms.balloc + 0x2c) : mword 64) (ITYPE (mword_of_int 2774 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)) kd_ad6b0b13. Qed.
 
   Lemma bai_030 : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0x30) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 19), ADDI)).
   Proof. mk_rvc (KernelSyms.balloc + 0x30) (mword_of_int 0x4985 : mword 16)
@@ -164,9 +164,9 @@ Section CodeBalloc.
   Proof. mk_rvc (KernelSyms.balloc + 0x40) (mword_of_int 0x854a : mword 16)
     (mword_of_int (KernelSyms.balloc + 0x40) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)) kd_854a exec_execute_C_MV. Qed.
 
-  Lemma bai_042 : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0x42) : mword 64) false (JAL (mword_of_int 3994 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.balloc + 0x42) (mword_of_int 0x79b000ef : mword 32)
-    (mword_of_int (KernelSyms.balloc + 0x42) : mword 64) (JAL (mword_of_int 3994 : mword 21, Regidx (mword_of_int 1))) kd_79b000ef. Qed.
+  Lemma bai_042 : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0x42) : mword 64) false (JAL (mword_of_int 4022 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.balloc + 0x42) (mword_of_int 0x7b7000ef : mword 32)
+    (mword_of_int (KernelSyms.balloc + 0x42) : mword 64) (JAL (mword_of_int 4022 : mword 21, Regidx (mword_of_int 1))) kd_7b7000ef. Qed.
 
   Lemma bai_046 : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0x46) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.balloc + 0x46) (mword_of_int 0x854a : mword 16)
@@ -204,17 +204,17 @@ Section CodeBalloc.
   Proof. mk_base (KernelSyms.balloc + 0x5c) (mword_of_int 0x05850513 : mword 32)
     (mword_of_int (KernelSyms.balloc + 0x5c) : mword 64) (ITYPE (mword_of_int 88 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_05850513. Qed.
 
-  Lemma bai_060 : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0x60) : mword 64) false (JAL (mword_of_int 2088644 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.balloc + 0x60) (mword_of_int 0xec5fd0ef : mword 32)
-    (mword_of_int (KernelSyms.balloc + 0x60) : mword 64) (JAL (mword_of_int 2088644 : mword 21, Regidx (mword_of_int 1))) kd_ec5fd0ef. Qed.
+  Lemma bai_060 : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0x60) : mword 64) false (JAL (mword_of_int 2088586 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.balloc + 0x60) (mword_of_int 0xe8bfd0ef : mword 32)
+    (mword_of_int (KernelSyms.balloc + 0x60) : mword 64) (JAL (mword_of_int 2088586 : mword 21, Regidx (mword_of_int 1))) kd_e8bfd0ef. Qed.
 
   Lemma bai_064 : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0x64) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.balloc + 0x64) (mword_of_int 0x854a : mword 16)
     (mword_of_int (KernelSyms.balloc + 0x64) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)) kd_854a exec_execute_C_MV. Qed.
 
-  Lemma bai_066 : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0x66) : mword 64) false (JAL (mword_of_int 3958 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.balloc + 0x66) (mword_of_int 0x777000ef : mword 32)
-    (mword_of_int (KernelSyms.balloc + 0x66) : mword 64) (JAL (mword_of_int 3958 : mword 21, Regidx (mword_of_int 1))) kd_777000ef. Qed.
+  Lemma bai_066 : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0x66) : mword 64) false (JAL (mword_of_int 3986 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.balloc + 0x66) (mword_of_int 0x793000ef : mword 32)
+    (mword_of_int (KernelSyms.balloc + 0x66) : mword 64) (JAL (mword_of_int 3986 : mword 21, Regidx (mword_of_int 1))) kd_793000ef. Qed.
 
   Lemma bai_06a : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0x6a) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.balloc + 0x6a) (mword_of_int 0x854a : mword 16)
@@ -424,13 +424,13 @@ Section CodeBalloc.
   Proof. mk_base (KernelSyms.balloc + 0xf6) (mword_of_int 0x00004517 : mword 32)
     (mword_of_int (KernelSyms.balloc + 0xf6) : mword 64) (UTYPE (mword_of_int 4 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00004517. Qed.
 
-  Lemma bai_0fa : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0xfa) : mword 64) false (ITYPE (mword_of_int 1350 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.balloc + 0xfa) (mword_of_int 0x54650513 : mword 32)
-    (mword_of_int (KernelSyms.balloc + 0xfa) : mword 64) (ITYPE (mword_of_int 1350 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_54650513. Qed.
+  Lemma bai_0fa : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0xfa) : mword 64) false (ITYPE (mword_of_int 1368 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.balloc + 0xfa) (mword_of_int 0x55850513 : mword 32)
+    (mword_of_int (KernelSyms.balloc + 0xfa) : mword 64) (ITYPE (mword_of_int 1368 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_55850513. Qed.
 
-  Lemma bai_0fe : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0xfe) : mword 64) false (JAL (mword_of_int 2086490 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.balloc + 0xfe) (mword_of_int 0xe5afd0ef : mword 32)
-    (mword_of_int (KernelSyms.balloc + 0xfe) : mword 64) (JAL (mword_of_int 2086490 : mword 21, Regidx (mword_of_int 1))) kd_e5afd0ef. Qed.
+  Lemma bai_0fe : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0xfe) : mword 64) false (JAL (mword_of_int 2086498 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.balloc + 0xfe) (mword_of_int 0xe62fd0ef : mword 32)
+    (mword_of_int (KernelSyms.balloc + 0xfe) : mword 64) (JAL (mword_of_int 2086498 : mword 21, Regidx (mword_of_int 1))) kd_e62fd0ef. Qed.
 
   Lemma bai_102 : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0x102) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 9), ADDI)).
   Proof. mk_rvc (KernelSyms.balloc + 0x102) (mword_of_int 0x4481 : mword 16)

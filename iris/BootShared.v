@@ -94,7 +94,7 @@ Qed.
 (* THE CUT CURSOR, and it is the whole shape of the .bss chain: the client owns
    ONE range and walks it in ADDRESS order, taking each bundle's window and
    keeping the tail.  The skipped prefix is DROPPED -- every gap in the layout
-   table (tx_chan/tx_busy, ticks, sb, log, a record's padding) is claimed by
+   table (tx_chan, ticks, sb, log, a record's padding) is claimed by
    nobody, and [boot_raw_ran] is affine.  With this, one bundle is one line. *)
 Lemma bss_cut `{!riscvGS Σ} (g : gstate) (lo a b hi : Z) :
   lo <= a -> a <= b -> b <= hi ->
@@ -428,15 +428,12 @@ Section BootBssChain.
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hpki H]".
     iDestruct (boot_ran_cell4 g KernelSyms.panicking Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Hpki") as (vpki) "Hpki".
-    (* ---- 0x8000a22c tx_busy: the flag tx_lock protects.  It used to be one
-           of the gaps this chain skips; main needs it to bring the lock up. ---- *)
-    iDestruct (bss_cut g (KernelSyms.panicking + 4) KernelSyms.tx_busy
-                 (KernelSyms.tx_busy + 4) ram_hi
-                 ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Htb H]".
-    iDestruct (boot_ran_cell4 g KernelSyms.tx_busy Hmem ltac:(zlit)
-                 ltac:(zlit) ltac:(zeq) with "Hcl Htb") as (vtb) "Htb".
-    (* ---- 0x8000a230 started: PINNED zero, the escrow's left disjunct ---- *)
-    iDestruct (bss_cut g (KernelSyms.tx_busy + 4) KernelSyms.started
+    (* [tx_chan] (panicking + 4) is NOT carved: ae96fd0 deleted [tx_busy], so
+       the word after [panicking] is the sleep channel, whose ADDRESS is all
+       anyone uses -- the cell itself is never read or written and belongs to
+       nobody (UartTxInv.v).  It is one of the gaps this chain skips. *)
+    (* ---- 0x8000a26c started: PINNED zero, the escrow's left disjunct ---- *)
+    iDestruct (bss_cut g (KernelSyms.panicking + 4) KernelSyms.started
                  (KernelSyms.started + 4) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hst H]".
     iDestruct (boot_ran_cell4_bss g KernelSyms.started started_clear Hmem
@@ -632,7 +629,7 @@ Section BootBssChain.
     iSplitL "Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11".
     { iApply (boot_main_locks_raw g Hmem with
                 "Hcl Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11"). }
-    iSplitL "Hdr Hdw Hpkd Hpki Hkm Hkpt Hpr1 Hpr2 Hfd Hir Hip Htk Htb Hbsl Hbln Hhd Hino
+    iSplitL "Hdr Hdw Hpkd Hpki Hkm Hkpt Hpr1 Hpr2 Hfd Hir Hip Htk Hbsl Hbln Hhd Hino
              Hient Hdd Hda Hdu Hdf Hdi Hslots".
     { rewrite /main_globals_raw.
       iSplitL "Hdr Hdw".
@@ -647,7 +644,6 @@ Section BootBssChain.
       iSplitL "Hir"; [iExact "Hir" |].
       iSplitL "Hip"; [iExists vip; iExact "Hip" |].
       iSplitL "Htk"; [iExists vtk; rewrite /a_ticks; iExact "Htk" |].
-      iSplitL "Htb"; [iExists vtb; rewrite /a_tx_busy; iExact "Htb" |].
       iSplitL "Hbsl"; [iExact "Hbsl" |].
       iSplitL "Hbln"; [iExact "Hbln" |].
       iSplitL "Hhd"; [rewrite bhead_of_z; iExact "Hhd" |].

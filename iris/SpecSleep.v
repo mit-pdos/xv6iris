@@ -1,47 +1,69 @@
-(* SpecSleep.v -- the public interface of Sleep, stated independently of its
-   proof.  Requires only the definitional layer -- never a whole-function
+(* SpecSleep.v -- the public interface of sleep(), stated independently of
+   its proof.  Requires only the definitional layer -- never a whole-function
    proof file -- so every function proof can be checked in parallel.
 
-   sleep(chan, lk) parks the current process on [chan]: entered holding the
-   caller's CONDITION LOCK lk (an arbitrary spinlock γk/Rk, so noff = 1 and
-   intr_count 1), it takes p->lock, releases lk (noff 1→2→1 -- p->lock is
-   the interlock that closes the missed-wakeup race), records chan, moves
-   the state to SLEEPING, and parks through sched().  When some scheduler
-   dispatches the process again (after a wakeup made it RUNNABLE), sleep
-   clears chan, releases p->lock, REACQUIRES lk, and returns.
+     void sleep(void) {
+       struct proc *p = myproc();
+       acquire(&p->lock);
+       if (p->chan != 0) { p->state = SLEEPING; sched(); }
+       release(&p->lock);
+     }
 
-   The postcondition is the precondition shape back -- lk held again with
-   its resource Rk, the running-thread bundle (▷ sched_vc, own context
-   cells) refreshed, noff back at 1.  Nothing in the spec promises the
-   wakeup HAPPENS (liveness); it promises what holds when sleep returns.
+   THE CONDITION LOCK IS GONE FROM THIS CONTRACT, and that is the whole
+   change.  xv6 used to spell the sleep protocol as one function
 
-   IT DOES NOT RETURN ON THE HART IT PARKED FROM (SpecSched.v): proc
-   contexts are migratable, so the continuation is quantified over the
-   DISPATCHING hart [h] and its per-hart SIE ghost [g], every resource comes
-   back at [(h, g)], the register fact weakens to [callee_saved m mf] (tp-free)
-   plus <the tp conjunct, now deleted: tp_pin makes it true by construction> (CalleeSaved.v), and the conclusion is
-   hart [h]'s own [WP (LoopE h)].  Consequences for the interface:
-     - the cpu context slot [C] stays ONE hart-independent proposition: it is
-       carried out of the entry bundle and back into the exit bundle
-       unchanged.  A hart-INDEXED slot could not work -- nothing in the
-       crossing turns [C cpu_id] into [C h], and a [C] admitting such a
-       bridge is exactly a hart-independent one;
-     - the lock tokens come back as [locked γk h] -- the re-acquire runs on
-       hart [h];
-     - [panic_wp_any] replaces [panic_wp]: the re-acquire's holding-panic arm
-       has to be discharged at the RESUMING hart;
-     - the trap CSRs and the running claim ride BOTH SIDES, index-free.
-       sched's crossing demands them (sepc/scause/stval are per-hart, so a
-       park cannot frame them), and sleep's interior pop reaches level 0, so
-       it must hold them across that stretch too.  This used to be
-       [arm_pay 0 eb pj] plus an [eb = true] premise -- true at the enabled
-       index, where the caller's push_off frees the pair out of
-       [sie_arm true], and VACUOUS at the disabled one, which is what made
-       every sleeper (hence kexit, hence usertrap) unprovable with
-       interrupts off.  Naming the pair directly says the same thing at
-       [eb = true] ([arm_pay_on] is a [reflexivity]) and the honest thing at
-       [eb = false], where the caller holds them because the TRAP handed
-       them over -- with no [if] anywhere in the statement. *)
+       sleep(chan, lk)   /* takes p->lock, releases lk, parks, re-acquires lk */
+
+   whose contract therefore had to name the caller's lock (γk / lka / Rk),
+   its resource, and -- once a pipe's cancellable lock wanted the same
+   treatment -- a credential [Tk], a dead state [Dk] and three refutations,
+   in a whole second [SLEEP_GEN] interface.  The protocol is now split in
+   two, and the caller does the lock work itself:
+
+       sleep_prepare(chan);   /* SpecSleepPrepare.v: record the channel   */
+       release(lk);           /* the caller's own release                 */
+       sleep();               /* park, if no wakeup arrived meanwhile     */
+       acquire(lk);           /* the caller's own re-acquire              */
+
+   so everything lock-shaped moved to where it belongs -- the ordinary
+   acquire/release contracts, which are already [lock_openable]-generic
+   (ACQUIRE_GEN / RELEASE_GEN).  [SLEEP_GEN] is deleted, not ported.
+
+   WHAT IS LEFT IS YIELD'S CONTRACT (SpecYield.v), verbatim but for the
+   entry pc: a thread at noff = 0 acquires its own p->lock, parks through
+   sched(), and -- once some scheduler dispatches it again -- releases and
+   returns.  Read SpecYield.v's header for the reasoning behind each line;
+   the two differ only in
+
+     - the state stored before the park (SLEEPING here, RUNNABLE there),
+       which no caller can observe, both being [park_ok]; and
+     - THE PARK IS CONDITIONAL.  sleep() reads [p->chan] under p->lock and
+       parks only if it is non-zero -- wakeup() clears the field, so a
+       wakeup that landed between the caller's sleep_prepare and here makes
+       sleep a no-op instead of a lost wakeup.  The contract does not case
+       on this: [wp_next true pj] already quantifies the continuation over
+       the resuming hart, and the no-park arm simply instantiates it at the
+       hart it is already on.  (Nothing here promises the wakeup HAPPENS --
+       that is liveness; this promises what holds when sleep returns.)
+
+   [eb] IS NOT PINNED, for yield's reason: the trap cone reaches sleep with
+   interrupts off, so the acquire inside records intena = 0 and the whole
+   call runs at [eb = false].  Hence the trap CSRs and the running claim are
+   premises, in their [_ext] form: at [eb = true] sleep's own acquire
+   produces them out of the enabled SIE arm and [trap_csrs_ext true = emp];
+   at [eb = false] there is no arm to dismantle and the caller brings them.
+   sched's crossing demands the set unconditionally, and sepc/scause/stval
+   are PER-HART, so a parking function cannot frame them.
+
+   THE CROSSING INDEX IS THE LITERAL [true]: a swtch moves the hart with
+   interrupts off, so a park is a hart change that has nothing to do with
+   SIE.  Threading [eb] there would claim, at [eb = false], that sleep
+   returns on the hart that called it.
+
+   The second interface below, [wp_sleep_nested_body], is what a caller that
+   is ALREADY holding a spinlock gets.  It used to be a pure divergence
+   claim; the conditional park makes that false, and its header explains
+   why. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -68,274 +90,112 @@ Import Defs.
 
 
 Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    
     (γs : list gname) (j : nat) (γl : gname)
-    (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sleep in
   let pj := proc_addr j in
-  (* a0 = the channel, a1 = the caller's condition lock *)
-  let chan : mword 64 := m !!! Regidx (mword_of_int 10 : mword 5) in
-  let lk0 : mword 64 := m !!! Regidx (mword_of_int 11 : mword 5) in
-  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
-                   in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
-  add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
-  (* THE RESERVE IS OWED ONLY WHERE THE POP RE-ENABLES, which is why the
-     bound is [trap_res eb + 22] and not a constant.  At [eb = true] sleep's
-     release(&p->lock) pops to level 0 WITH [intena], i.e. it turns
-     interrupts back on at a point where nobody is holding the trap reserve,
-     so -- like the scheduler's inlined intr_on() -- sleep must fund
-     [kv_frame_slots] out of its own budget; that is the old
-     [kv_frame_slots + 22 <= av], unchanged, and free at every existing call
-     site (they all pass [av := trap_res true + (K - k)]).  At [eb = false]
-     the pop re-enables nothing, there is no reserve to fund, and the bound
-     is just sleep's own [22] -- which matters, because the disabled-index
-     callers are the trap cone, where inflating every budget by 78 slots
-     would be a real cost for a window that cannot take a trap.
-     Entry and exit indices do NOT move either way (still [av] at arm
-     [false]); only the stretch between that release and the re-acquire of
-     lk runs at the reduced count. *)
-  (trap_res eb + 22 <= av)%nat ->
-  (* TWO INDICES, AND THEY ARE OPPOSITE CONSTANTS (porting guide, "A PARKING
-     function's [wp_next] index is [true] UNCONDITIONALLY").  sleep runs at
-     noff = 1, so [cpu_own 1 eb pj C b] forces the RESOURCE index to [false]:
-     at [b = true] the enabled arm carries [⌜n = 0⌝], making the premise
-     [False] and that instance of the contract VACUOUS.  Its CROSSING index
-     is the literal [true] -- a [swtch] moves the hart with interrupts OFF,
-     so the park is a hart change that has nothing to do with SIE.  Stated
-     with one [b], the only live instance claimed "sleep returns on the hart
-     that called it", which is false twice over.  Hence no [b] binder. *)
-  sie_cap_gpr m av false pj -∗
-  cpu_own 1 eb pj C false -∗
-  (* THE TRAP CSRS AND THE RUNNING CLAIM, INDEX-FREE.  sleep is not
-     push/pop-order-balanced: it pops p->lock to level 0 BEFORE
-     re-acquiring the condition lock, so it must hold both across that
-     stretch and hand both to sched's crossing.  Where they COME FROM is
-     what depends on [eb], and that is the caller's business, not this
-     contract's: at [eb = true] the caller's own push_off freed them out of
-     [sie_arm true] ([arm_pay 0 true pj] IS this pair, by [arm_pay_on]), and
-     at [eb = false] the caller holds them because the TRAP handed them
-     over.  Stating the pair rather than [arm_pay 0 eb pj] is what drops the
-     [eb = true] premise without adding an [if]: it is the same proposition
-     at the enabled index and the honest one at the disabled index. *)
-  trap_csrs -∗
-  cpu_claim pj -∗
+  (20 <= av)%nat ->
+  sie_cap_gpr m av eb pj -∗
+  cpu_own 0 eb pj C eb -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
-  (* the caller's condition lock, HELD (acquired on this cpu) *)
-  is_lock γk lka sk Rk -∗
-  locked γk cpu_id -∗
-  Rk -∗
-  (* the running-thread bundle *)
   panic_wp_any -∗
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf av false pj -∗
-      cpu_own 1 eb pj C false -∗
-      trap_csrs -∗
-      cpu_claim pj -∗
+      sie_cap_gpr mf av eb pj -∗
+      cpu_own 0 eb pj C eb -∗
       pc_is ret_tgt -∗
-      (* lk reacquired on the resuming hart, with its resource *)
-      locked γk cpu_id -∗
-      Rk -∗
-      (* the running-thread bundle, refreshed *)
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 (* ===================================================================== *)
-(*  ROUTE B, LEMMA (2): sleep ENTERED AT noff >= 2 DIVERGES.              *)
+(*  ROUTE B, LEMMA (2): sleep ENTERED WITH A SPINLOCK HELD.               *)
 (* ===================================================================== *)
-(* sleep(chan, lk) takes p->lock and releases lk, so a thread that enters
-   it holding TWO levels (its condition lock plus something else) reaches
-   sched() still at noff >= 2 -- and sched panics ("sched locks",
+(* sleep() takes p->lock, so a thread that enters it already holding a
+   spinlock reaches sched() at noff >= 2 -- and sched panics ("sched locks",
    [SpecSched.wp_sched_locks_body]).  This is design fs-icache.md 13.12's
    middle lemma: it is what makes the LOCKED branch of a nested
    [acquiresleep] safe.
 
-   Relative to [wp_sleep_sconf_body] the postcondition and the [wp_next]
-   crossing are gone (there is no return), and with them:
-     - [arm_pay 0 eb pj] and the [eb = true] premise.  They exist to hand
-       the trap CSRs and the cpu claim across the swtch; the swtch is
-       never reached, and at noff >= 2 the enabled arm is unreachable
-       anyway, so [eb] is unconstrained;
-     - the credential [Tk].  It exists to be presented again at the
-       re-acquire of lk, and there is no re-acquire.
-   [Rk] and [locked γk cpu_id] are still CONSUMED: the interior
-   release(lk) at +0x1e really runs.                                     *)
-Definition wp_sleep_gen_locks_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γs : list gname) (j : nat) (γl : gname)
-    (γk : gname) (lka : mword 64) (Rk Dk : iProp Σ)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat) :=
-  let pcE : mword 64 := mword_of_int KernelSyms.sleep in
-  let pj := proc_addr j in
-  let chan : mword 64 := m !!! Regidx (mword_of_int 10 : mword 5) in
-  let lk0 : mword 64 := m !!! Regidx (mword_of_int 11 : mword 5) in
-  (j < NPROC)%nat ->
-  γs !! j = Some γl ->
-  add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
-  (22 <= av)%nat ->
-  (* the interior acquire transiently reaches [S (S (S n))] + 1 *)
-  (Z.of_nat n + 4 < 2 ^ 31)%Z ->
-  (* the two dead-state refutations the interior release needs; the third
-     ([Tk] vs [Dk]) is not owed, [Tk] having dropped *)
-  (forall i : CPU, ⊢ locked γk i -∗ Dk -∗ False) ->
-  (forall i : CPU, ⊢ locked_pre γk i -∗ Dk -∗ False) ->
-  sie_cap_gpr m av false pj -∗
-  cpu_own (S (S n)) eb pj C false -∗
-  kernel_text -∗ pc_is pcE -∗
-  procs_inv γs -∗
-  lock_openable γk lka Rk Dk -∗
-  locked γk cpu_id -∗
-  Rk -∗
-  panic_wp_any -∗
-  WP (Loop : expr riscv_lang).
+   IT IS NO LONGER A DIVERGENCE LEMMA, and that is the split protocol's one
+   real cost.  The old sleep(chan, lk) parked UNCONDITIONALLY, so entering it
+   with a lock held reached the panic and nothing came back; the new sleep
+   parks only if [p->chan] is still non-zero, and the [beqz] at +0x16 takes
+   the thread straight to the release and the [c.ret].  So there are two
+   arms, and only one of them panics:
 
-(* the static-kernel-lock instance, which is what acquiresleep takes *)
-Definition wp_sleep_locks_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+     - chan <> 0 (nobody woke us between the caller's sleep_prepare and
+       here): SLEEPING, sched(), panic.  Diverges, as before.
+     - chan = 0 (a wakeup landed in the window): no park, release p->lock,
+       RETURN -- noff-balanced, back at [S n].
+
+   AND NOTHING CAN RULE THE SECOND ARM OUT.  [p_chan] sits under an
+   EXISTENTIAL in [SchedCtx.proc_lock_res] and [SpecSleepPrepare]'s
+   postcondition is deliberately empty, so a caller holds no receipt saying
+   the channel is still armed -- nor could one exist, because wakeup()
+   clears the field holding only p->lock, so no fraction of "chan <> 0"
+   survives the window.  Claiming divergence here would be claiming
+   something false about a real trace.
+
+   Hence the continuation.  Note what it does NOT need: no [wp_next], and no
+   trap CSRs.  At [n >= 1] the interior release pops to [S n] rather than 0,
+   so it re-enables nothing and the hart cannot move; and the swtch that
+   would have demanded the CSRs is on the arm that never returns.
+
+   The old spelling of this lemma also took the caller's condition lock,
+   because sleep(chan, lk) released it on the way to sched().  The split
+   protocol releases nothing, so this lemma consumes NOTHING -- which is why
+   the [lock_openable]-generic twin it used to need ([wp_sleep_gen_locks])
+   has no reason to exist any more.
+
+   For the nested [acquiresleep] this is still enough, and the shape of the
+   argument is the only thing that changes: its LOCKED branch used to end in
+   a divergence and now ends in a Löb loop (sleep_prepare / release / sleep /
+   acquire, forever), which is the honest reading of a thread that keeps
+   being woken and keeps finding the sleeplock taken.  REF-1
+   (design/fs-icache.md 5(b)) makes both unreachable at iput's call site; we
+   do not prove that, we permit it. *)
+Definition wp_sleep_nested_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)
-    (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sleep in
   let pj := proc_addr j in
-  let chan : mword 64 := m !!! Regidx (mword_of_int 10 : mword 5) in
-  let lk0 : mword 64 := m !!! Regidx (mword_of_int 11 : mword 5) in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
-  add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
-  (22 <= av)%nat ->
-  (Z.of_nat n + 4 < 2 ^ 31)%Z ->
+  (20 <= av)%nat ->
+  (* the interior acquire reaches [S (S n)], transiently +1 *)
+  (Z.of_nat n + 3 < 2 ^ 31)%Z ->
   sie_cap_gpr m av false pj -∗
-  cpu_own (S (S n)) eb pj C false -∗
+  cpu_own (S n) eb pj C false -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
-  is_lock γk lka sk Rk -∗
-  locked γk cpu_id -∗
-  Rk -∗
   panic_wp_any -∗
+  (∀ (mf : regfile),
+     ⌜callee_saved m mf⌝ -∗
+     sie_cap_gpr mf av false pj -∗
+     cpu_own (S n) eb pj C false -∗
+     pc_is ret_tgt -∗
+     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type SLEEP.
   Parameter wp_sleep_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-
       (γs : list gname) (j : nat) (γl : gname)
-      (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ),
-      wp_sleep_sconf_body γs j γl γk lka sk Rk m av eb C.
-  Parameter wp_sleep_locks :
+      wp_sleep_sconf_body γs j γl m av eb C.
+  Parameter wp_sleep_nested :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat),
-      wp_sleep_locks_body γs j γl γk lka sk Rk m av eb C n.
+      wp_sleep_nested_body γs j γl m av eb C n.
 End SLEEP.
-
-(* ===================================================================== *)
-(*  The [lock_openable]-generic form.                                     *)
-(* ===================================================================== *)
-(* The body above takes the condition lock as a STATIC [is_lock]; but a
-   kalloc'd object's lock (a pipe's) is cancellable, and the licence to
-   touch it is a credential [Tk] -- exactly the generalization acquire and
-   release already have (ACQUIRE_GEN / RELEASE_GEN).  sleep touches lk
-   three ways, so the caller owes three refutations of the dead state
-   [Dk]: the interior release presents the [locked]/[locked_pre] tokens it
-   is already holding, and the re-acquire presents [Tk], which sleep then
-   hands back.
-
-   The sleeper's own [Tk] rides its frame through sched(), which is what
-   makes sleeping on a reclaimable object sound: as long as any process
-   sleeps inside pipewrite/piperead it still holds its end reference, so
-   the object cannot die under it.
-
-   [wp_sleep_sconf_body] is the [Tk := emp], [Dk := False] instance
-   (via WpLock.is_lock_openable); ProofSleep.SleepOfGen restates it. *)
-Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    
-    (γs : list gname) (j : nat) (γl : gname)
-    (γk : gname) (lka : mword 64) (Rk Tk Dk : iProp Σ)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) :=
-  let pcE : mword 64 := mword_of_int KernelSyms.sleep in
-  let pj := proc_addr j in
-  (* a0 = the channel, a1 = the caller's condition lock *)
-  let chan : mword 64 := m !!! Regidx (mword_of_int 10 : mword 5) in
-  let lk0 : mword 64 := m !!! Regidx (mword_of_int 11 : mword 5) in
-  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
-                   in
-  (j < NPROC)%nat ->
-  γs !! j = Some γl ->
-  add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
-  (* THE RESERVE IS OWED ONLY WHERE THE POP RE-ENABLES, which is why the
-     bound is [trap_res eb + 22] and not a constant.  At [eb = true] sleep's
-     release(&p->lock) pops to level 0 WITH [intena], i.e. it turns
-     interrupts back on at a point where nobody is holding the trap reserve,
-     so -- like the scheduler's inlined intr_on() -- sleep must fund
-     [kv_frame_slots] out of its own budget; that is the old
-     [kv_frame_slots + 22 <= av], unchanged, and free at every existing call
-     site (they all pass [av := trap_res true + (K - k)]).  At [eb = false]
-     the pop re-enables nothing, there is no reserve to fund, and the bound
-     is just sleep's own [22] -- which matters, because the disabled-index
-     callers are the trap cone, where inflating every budget by 78 slots
-     would be a real cost for a window that cannot take a trap.
-     Entry and exit indices do NOT move either way (still [av] at arm
-     [false]); only the stretch between that release and the re-acquire of
-     lk runs at the reduced count. *)
-  (trap_res eb + 22 <= av)%nat ->
-  (* the three refutations of the dead state.  The two token refutations are
-     needed at EVERY hart: the interior release runs on the parking hart, the
-     re-acquire on the dispatching one. *)
-  (⊢ Tk -∗ Dk -∗ False) ->
-  (forall i : CPU, ⊢ locked γk i -∗ Dk -∗ False) ->
-  (forall i : CPU, ⊢ locked_pre γk i -∗ Dk -∗ False) ->
-  (* same two-index note as [wp_sleep_sconf_body] above *)
-  sie_cap_gpr m av false pj -∗
-  cpu_own 1 eb pj C false -∗
-  (* same note as [wp_sleep_sconf_body]: the interior pop reaches 0, and the
-     pair is stated index-free rather than as [arm_pay 0 eb pj] *)
-  trap_csrs -∗
-  cpu_claim pj -∗
-  kernel_text -∗ pc_is pcE -∗
-  procs_inv γs -∗
-  (* the caller's condition lock, HELD, with the credential *)
-  lock_openable γk lka Rk Dk -∗
-  Tk -∗
-  locked γk cpu_id -∗
-  Rk -∗
-  (* the running-thread bundle *)
-  panic_wp_any -∗
-  wp_next true pj (fun (CID : CpuId) =>
-    ∀ (mf : regfile),
-      ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf av false pj -∗
-      cpu_own 1 eb pj C false -∗
-      trap_csrs -∗
-      cpu_claim pj -∗
-      pc_is ret_tgt -∗
-      (* lk reacquired on the resuming hart, with its resource and the
-         credential *)
-      Tk -∗
-      locked γk cpu_id -∗
-      Rk -∗
-      (* the running-thread bundle, refreshed *)
-      WP (Loop : expr riscv_lang)) -∗
-  WP (Loop : expr riscv_lang).
-
-Module Type SLEEP_GEN.
-  Parameter wp_sleep_gen_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      
-      (γs : list gname) (j : nat) (γl : gname)
-      (γk : gname) (lka : mword 64) (Rk Tk Dk : iProp Σ)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ),
-      wp_sleep_gen_sconf_body γs j γl γk lka Rk Tk Dk m av eb C.
-  (* Route B (2), in the [lock_openable]-generic form the proof lives in;
-     [SLEEP.wp_sleep_locks] is its static instance. *)
-  Parameter wp_sleep_gen_locks :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γs : list gname) (j : nat) (γl : gname)
-      (γk : gname) (lka : mword 64) (Rk Dk : iProp Σ)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat),
-      wp_sleep_gen_locks_body γs j γl γk lka Rk Dk m av eb C n.
-End SLEEP_GEN.

@@ -17,18 +17,17 @@ Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode01.
-Require Import KernelDecode04.
-Require Import KernelDecode05.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
 Require Import KernelDecode11.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
+Require Import KernelDecode17.
 Require Import KernelDecode18.
-Require Import KernelDecode20.
-Require Import KernelDecode22.
+Require Import KernelDecode23.
 Require Import KernelDecode24.
 Require Import KernelDecode26.
+Require Import KernelDecode29.
 Require Import KernelDecode31.
 Local Open Scope Z_scope.
 Import Defs.
@@ -64,9 +63,9 @@ Section CodeConsputc.
   Proof. mk_base (KernelSyms.consputc + 0xc) (mword_of_int 0x00f50863 : mword 32)
     (mword_of_int (KernelSyms.consputc + 0xc) : mword 64) (BTYPE (mword_of_int 16 : mword 13, Regidx (mword_of_int 15), Regidx (mword_of_int 10), BEQ)) kd_00f50863. Qed.
 
-  Lemma cpi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.consputc + 0x10) : mword 64) false (JAL (mword_of_int 1764 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.consputc + 0x10) (mword_of_int 0x6e4000ef : mword 32)
-    (mword_of_int (KernelSyms.consputc + 0x10) : mword 64) (JAL (mword_of_int 1764 : mword 21, Regidx (mword_of_int 1))) kd_6e4000ef. Qed.
+  Lemma cpi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.consputc + 0x10) : mword 64) false (JAL (mword_of_int 1730 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.consputc + 0x10) (mword_of_int 0x6c2000ef : mword 32)
+    (mword_of_int (KernelSyms.consputc + 0x10) : mword 64) (JAL (mword_of_int 1730 : mword 21, Regidx (mword_of_int 1))) kd_6c2000ef. Qed.
 
   Lemma cpi_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.consputc + 0x14) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.consputc + 0x14) (mword_of_int 0x60a2 : mword 16)
@@ -88,25 +87,25 @@ Section CodeConsputc.
   Proof. mk_rvc (KernelSyms.consputc + 0x1c) (mword_of_int 0x4521 : mword 16)
     (mword_of_int (KernelSyms.consputc + 0x1c) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 8 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) kd_4521 exec_execute_C_LI. Qed.
 
-  Lemma cpi_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.consputc + 0x1e) : mword 64) false (JAL (mword_of_int 1750 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.consputc + 0x1e) (mword_of_int 0x6d6000ef : mword 32)
-    (mword_of_int (KernelSyms.consputc + 0x1e) : mword 64) (JAL (mword_of_int 1750 : mword 21, Regidx (mword_of_int 1))) kd_6d6000ef. Qed.
+  Lemma cpi_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.consputc + 0x1e) : mword 64) false (JAL (mword_of_int 1716 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.consputc + 0x1e) (mword_of_int 0x6b4000ef : mword 32)
+    (mword_of_int (KernelSyms.consputc + 0x1e) : mword 64) (JAL (mword_of_int 1716 : mword 21, Regidx (mword_of_int 1))) kd_6b4000ef. Qed.
 
   Lemma cpi_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.consputc + 0x22) : mword 64) false (ITYPE (mword_of_int 32 : mword 12, zreg, Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (KernelSyms.consputc + 0x22) (mword_of_int 0x02000513 : mword 32)
     (mword_of_int (KernelSyms.consputc + 0x22) : mword 64) (ITYPE (mword_of_int 32 : mword 12, zreg, Regidx (mword_of_int 10), ADDI)) kd_02000513. Qed.
 
-  Lemma cpi_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.consputc + 0x26) : mword 64) false (JAL (mword_of_int 1742 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.consputc + 0x26) (mword_of_int 0x6ce000ef : mword 32)
-    (mword_of_int (KernelSyms.consputc + 0x26) : mword 64) (JAL (mword_of_int 1742 : mword 21, Regidx (mword_of_int 1))) kd_6ce000ef. Qed.
+  Lemma cpi_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.consputc + 0x26) : mword 64) false (JAL (mword_of_int 1708 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.consputc + 0x26) (mword_of_int 0x6ac000ef : mword 32)
+    (mword_of_int (KernelSyms.consputc + 0x26) : mword 64) (JAL (mword_of_int 1708 : mword 21, Regidx (mword_of_int 1))) kd_6ac000ef. Qed.
 
   Lemma cpi_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.consputc + 0x2a) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 8 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
   Proof. mk_rvc (KernelSyms.consputc + 0x2a) (mword_of_int 0x4521 : mword 16)
     (mword_of_int (KernelSyms.consputc + 0x2a) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 8 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) kd_4521 exec_execute_C_LI. Qed.
 
-  Lemma cpi_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.consputc + 0x2c) : mword 64) false (JAL (mword_of_int 1736 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.consputc + 0x2c) (mword_of_int 0x6c8000ef : mword 32)
-    (mword_of_int (KernelSyms.consputc + 0x2c) : mword 64) (JAL (mword_of_int 1736 : mword 21, Regidx (mword_of_int 1))) kd_6c8000ef. Qed.
+  Lemma cpi_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.consputc + 0x2c) : mword 64) false (JAL (mword_of_int 1702 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.consputc + 0x2c) (mword_of_int 0x6a6000ef : mword 32)
+    (mword_of_int (KernelSyms.consputc + 0x2c) : mword 64) (JAL (mword_of_int 1702 : mword 21, Regidx (mword_of_int 1))) kd_6a6000ef. Qed.
 
   Lemma cpi_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.consputc + 0x30) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2034 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (KernelSyms.consputc + 0x30) (mword_of_int 0xb7d5 : mword 16)

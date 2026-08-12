@@ -1,10 +1,12 @@
 (* ProofUartinit.v -- the whole-function WP for xv6's uartinit() over the
-   SIE-agnostic sconf world.  uartinit() programs the 16550 (7 MMIO byte
-   writes to UART0) then initlock(&tx_lock,"uart").
+   SIE-agnostic sconf world.  uartinit() programs the 16550: 7 MMIO byte
+   writes to UART0, and NOTHING ELSE.
 
-   Straight-line, 16-byte frame, one jal sub-call (initlock).  Structurally a
-   clone of ProofKinit with the freerange/lock-invariant tail replaced by
-   returning initlock's raw outputs, and the seven device stores inserted.
+   Straight-line, 16-byte frame, NO sub-calls at all.  Upstream ae96fd0 turned
+   tx_lock into a sleeplock and deleted the trailing [initlock(&tx_lock,"uart")]
+   without replacing it (kernel-defects.md D2), so the argument setup, the jal
+   and the string literal are all gone: the body is prologue, seven stores,
+   epilogue.
 
    THE SEVEN STORES RUN UNDER THE TIME-0 UART INVARIANT.  The UART thread is a
    top-level thread from step 0, so [uart_frag] can never sit raw in a CPU's
@@ -53,7 +55,6 @@ Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs HartTp WpNext.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock.
-Require Import SpecInitlock.
 Require Import SpecUart.
 Require Import CodeUartinit.
 From Kernel Require KernelSyms.
@@ -63,7 +64,7 @@ Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
-Module UartinitProof (Uart : UART) (Initlock : INITLOCK) : UARTINIT.
+Module UartinitProof (Uart : UART) : UARTINIT.
 
 Section ProofUartinit.
   Context `{!riscvGS Σ, !sieG Σ}.
@@ -116,26 +117,16 @@ Section ProofUartinit.
   Qed.
 
   Lemma wp_uartinit_sconf (γd : uart_names)
-      (m : regfile) (K : nat) (l : list (bv 8)) (b0 : bool)
-      (vlock : bv 32) (vname vcpu : bv 64) (p : mword 64)
-    : wp_uartinit_sconf_body γd m K l b0 vlock vname vcpu p.
+      (m : regfile) (K : nat) (l : list (bv 8)) (b0 : bool) (p : mword 64)
+    : wp_uartinit_sconf_body γd m K l b0 p.
   Proof.
     cbv beta delta [wp_uartinit_sconf_body].
-    intros pcE ret_tgt lk c_name c_cpu HK.
+    intros pcE ret_tgt HK.
     set (sp0 := m !!! Regidx csp_rs1).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
-    iIntros "Hcg #Htext #Hkdata Hpc #Huinv Htx #Hlb #Hsent Hdlab Hlock Hname Hcpu Hcont".
+    iIntros "Hcg #Htext #Hkdata Hpc #Huinv Htx #Hlb #Hsent Hdlab Hcont".
     iDestruct (sie_cap_gpr_x0 m K false p (mword_of_int 0 : mword 5) ltac:(vm_compute; reflexivity)
                  with "Hcg") as "[%Hx0 Hcg]".
-    (* the "uart" string literal, read out of the kernel's data image *)
-    assert (Huart : forall j bt, cstring_bytes "uart"%string !! j = Some bt ->
-                      KernelData.kernel_data !! (0x80007030 + Z.of_nat j)%Z = Some bt).
-    { intros j bt Hj.
-      do 5 (destruct j as [|j];
-            [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
-      vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string 0x80007030 "uart"%string _ eq_refl ltac:(unfold text_end; lia) Huart
-                  with "Hkdata") as "#Hstr".
     (* pc-advance helper facts *)
     assert (Hspr2 : spr = pa_stk sp0 2).
     { unfold spr, pa_stk, add_vec_int. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
@@ -162,14 +153,9 @@ Section ProofUartinit.
     iPoseProof (uii_32 with "Htext") as "Hi32".
     iPoseProof (uii_36 with "Htext") as "Hi36".
     iPoseProof (uii_3a with "Htext") as "Hi3a".
+    iPoseProof (uii_3c with "Htext") as "Hi3c".
     iPoseProof (uii_3e with "Htext") as "Hi3e".
-    iPoseProof (uii_42 with "Htext") as "Hi42".
-    iPoseProof (uii_46 with "Htext") as "Hi46".
-    iPoseProof (uii_4a with "Htext") as "Hi4a".
-    iPoseProof (uii_4e with "Htext") as "Hi4e".
-    iPoseProof (uii_50 with "Htext") as "Hi50".
-    iPoseProof (uii_52 with "Htext") as "Hi52".
-    iPoseProof (uii_54 with "Htext") as "Hi54".
+    iPoseProof (uii_40 with "Htext") as "Hi40".
     (* ===== PROLOGUE 0x00..0x06: 2-slot frame + save ra/s0 ===== *)
     set (R1 := <[Regidx csp_rs1 := regval_into_reg (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> m).
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.
@@ -495,118 +481,34 @@ Section ProofUartinit.
       rewrite /R2 upd_ne; [exact HspR1 | vm_compute; discriminate]. }
     assert (Hpp3a : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x36) : mword 64) 4 = mword_of_int (KernelSyms.uartinit + 0x3a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp3a) in "Hpc".
-    (* ===== args: a1 = "uart", a0 = &tx_lock (0x3a..0x46) ===== *)
-    (* +0x3a auipc a1,0x6 *)
-    iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.uartinit + 0x3a)) (mword_of_int 11 : mword 5) (mword_of_int 6 : mword 20)
-              R9 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi3a [-]").
-    iApply wp_next_off_intro.
-    iIntros "Hcg Hpc".
-    set (R10 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.uartinit + 0x3a) : mword 64) (auipc_off (mword_of_int 6 : mword 20)))]> R9).
-    assert (Hpp3e : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x3a) : mword 64) 4 = mword_of_int (KernelSyms.uartinit + 0x3e)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp3e) in "Hpc".
-    (* +0x3e addi a1,a1,1904 *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartinit + 0x3e)) (mword_of_int 11 : mword 5) (mword_of_int 11 : mword 5) (mword_of_int 1904 : mword 12)
-              R10 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi3e [-]").
-    iApply wp_next_off_intro.
-    iIntros "Hcg Hpc".
-    set (R11 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (rget R10 (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 1904 : mword 12)))]> R10).
-    (* a1 now holds &"uart" -- the string initlock is about to store *)
-    assert (HR11a1 : R11 !!! Regidx (mword_of_int 11 : mword 5) = (mword_of_int 0x80007030 : mword 64)).
-    { rewrite /R11 upd_eq. rgne. rewrite /R10 upd_eq. apply bv_eq; vm_compute; reflexivity. }
-    assert (Hpp42 : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x3e) : mword 64) 4 = mword_of_int (KernelSyms.uartinit + 0x42)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp42) in "Hpc".
-    (* +0x42 auipc a0,0x12 *)
-    iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.uartinit + 0x42)) (mword_of_int 10 : mword 5) (mword_of_int 18 : mword 20)
-              R11 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi42 [-]").
-    iApply wp_next_off_intro.
-    iIntros "Hcg Hpc".
-    set (R12 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.uartinit + 0x42) : mword 64) (auipc_off (mword_of_int 18 : mword 20)))]> R11).
-    assert (Hpp46 : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x42) : mword 64) 4 = mword_of_int (KernelSyms.uartinit + 0x46)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp46) in "Hpc".
-    (* +0x46 addi a0,a0,2632  (a0 := &tx_lock = lk) *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartinit + 0x46)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 2632 : mword 12)
-              R12 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi46 [-]").
-    iApply wp_next_off_intro.
-    iIntros "Hcg Hpc".
-    set (R13 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (rget R12 (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2632 : mword 12)))]> R12).
-    assert (HR13a0 : R13 !!! Regidx (mword_of_int 10 : mword 5) = lk).
-    { rewrite /R13 upd_eq. rgne. rewrite /R12 upd_eq. unfold lk. apply bv_eq; vm_compute; reflexivity. }
-    assert (HR13sp : R13 !!! Regidx csp_rs1 = spr).
-    { rewrite /R13 upd_ne; [| vm_compute; discriminate].
-      rewrite /R12 upd_ne; [| vm_compute; discriminate].
-      rewrite /R11 upd_ne; [| vm_compute; discriminate].
-      rewrite /R10 upd_ne; [exact HR9sp | vm_compute; discriminate]. }
-    assert (Hpp4a : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x46) : mword 64) 4 = mword_of_int (KernelSyms.uartinit + 0x4a)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp4a) in "Hpc".
-    (* ===== jal initlock (0x4a) ===== *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uartinit + 0x4a)) (mword_of_int 1 : mword 5) (mword_of_int 696 : mword 21)
-              R13 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi4a [-]").
-    iApply wp_next_off_intro.
-    iIntros "Hcg Hpc".
-    set (R14 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.uartinit + 0x4a) : mword 64) 4)]> R13).
-    assert (Htgtil : add_vec (mword_of_int (KernelSyms.uartinit + 0x4a) : mword 64) (sign_extend' 64 (mword_of_int 696 : mword 21)) = mword_of_int KernelSyms.initlock) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Htgtil) in "Hpc".
-    assert (HR14a0 : R14 !!! Regidx (mword_of_int 10 : mword 5) = lk)
-      by (rewrite /R14 upd_ne; [exact HR13a0 | vm_compute; discriminate]).
-    assert (HR14a1 : R14 !!! Regidx (mword_of_int 11 : mword 5) = (mword_of_int 0x80007030 : mword 64)).
-    { rewrite /R14 upd_ne; [| vm_compute; discriminate].
-      rewrite /R13 upd_ne; [| vm_compute; discriminate].
-      rewrite /R12 upd_ne; [exact HR11a1 | vm_compute; discriminate]. }
-    assert (HR14sp : R14 !!! Regidx csp_rs1 = spr)
-      by (rewrite /R14 upd_ne; [exact HR13sp | vm_compute; discriminate]).
-    assert (HR14ra : R14 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.uartinit + 0x4a) : mword 64) 4)
-      by (rewrite /R14; apply upd_eq).
-    (* initlock(&tx_lock,"uart"): owns lk's 3 fields, returns them init'd *)
-    iApply (Initlock.wp_initlock_sconf R14 vlock vname vcpu "uart"%string (K - 2) false p
-              ltac:(lia)
-              with "Hcg Htext Hpc [] [Hlock] [Hname] [Hcpu]").
-    { iEval (rewrite HR14a1). iExact "Hstr". }
-    { iEval (rewrite HR14a0). iExact "Hlock". }
-    { iEval (rewrite HR14a0). iExact "Hname". }
-    { iEval (rewrite HR14a0). iExact "Hcpu". }
-    iApply wp_next_off_intro.
-    iIntros (mil) "Hcg Hpc %Hilcs Hlock Hlname Hcpu".
-    iEval (rewrite HR14a0) in "Hlock". iEval (rewrite HR14a0 HR14a1) in "Hlname". iEval (rewrite HR14a0) in "Hcpu".
-    iMod (lock_name_intro with "Hstr Hlname") as "#Hlnm".
-    assert (Hpcil : ret_pc (R14 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.uartinit + 0x4e)).
-    { rewrite HR14ra. apply bv_eq; vm_compute; reflexivity. }
-    iEval (rewrite Hpcil) in "Hpc".
-    pose proof Hilcs as Hilcs_full. unfold callee_saved in Hilcs.
-    destruct Hilcs as (Hilsp & Hils0 & Hils1 & Hils2 & Hils3 & Hils4 & Hils5 & Hils6 & Hils7 & Hils8 & Hils9 & Hils10 & Hils11).
-    assert (Hmilsp : mil !!! Regidx csp_rs1 = spr) by (rewrite Hilsp; exact HR14sp).
-    (* ===== EPILOGUE 0x4e..0x54: restore ra/s0, pop frame, ret ===== *)
-    (* +0x4e c.ldsp ra,8(sp) *)
-    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uartinit + 0x4e)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
-              mil (K - 2)%nat (m !!! Regidx (mword_of_int 1 : mword 5)) false (dqm:=DfracOwn 1)
+    (* ===== EPILOGUE 0x3a..0x40: restore ra/s0, pop frame, ret ===== *)
+    (* +0x3a c.ldsp ra,8(sp) *)
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uartinit + 0x3a)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
+              R9 (K - 2)%nat (m !!! Regidx (mword_of_int 1 : mword 5)) false (dqm:=DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi4e [Hras] [-]").
-    { iEval (rewrite -Hb1 -Hmilsp) in "Hras". iExact "Hras". }
+              with "Hcg Hpc Hi3a [Hras] [-]").
+    { iEval (rewrite -Hb1 -HR9sp) in "Hras". iExact "Hras". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hras".
-    iEval (rewrite Hmilsp Hb1) in "Hras".
-    set (E1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 1 : mword 5))]> mil).
-    assert (HE1sp : E1 !!! Regidx csp_rs1 = spr) by (rewrite /E1 upd_ne; [exact Hmilsp | vm_compute; discriminate]).
-    assert (Hpp50 : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x4e) : mword 64) 2 = mword_of_int (KernelSyms.uartinit + 0x50)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp50) in "Hpc".
-    (* +0x50 c.ldsp s0,0(sp) *)
-    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uartinit + 0x50)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
+    iEval (rewrite HR9sp Hb1) in "Hras".
+    set (E1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 1 : mword 5))]> R9).
+    assert (HE1sp : E1 !!! Regidx csp_rs1 = spr) by (rewrite /E1 upd_ne; [exact HR9sp | vm_compute; discriminate]).
+    assert (Hpp3c : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x3a) : mword 64) 2 = mword_of_int (KernelSyms.uartinit + 0x3c)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp3c) in "Hpc".
+    (* +0x3c c.ldsp s0,0(sp) *)
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uartinit + 0x3c)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
               E1 (K - 2)%nat (m !!! Regidx (mword_of_int 8 : mword 5)) false (dqm:=DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi50 [Hs0s] [-]").
+              with "Hcg Hpc Hi3c [Hs0s] [-]").
     { iEval (rewrite -Hb2 -HE1sp) in "Hs0s". iExact "Hs0s". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hs0s".
     iEval (rewrite HE1sp Hb2) in "Hs0s".
     set (E2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 8 : mword 5))]> E1).
     assert (HE2sp : E2 !!! Regidx csp_rs1 = spr) by (rewrite /E2 upd_ne; [exact HE1sp | vm_compute; discriminate]).
-    assert (Hpp52 : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x50) : mword 64) 2 = mword_of_int (KernelSyms.uartinit + 0x52)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp52) in "Hpc".
-    (* +0x52 c.addi sp,16 : pop frame *)
+    assert (Hpp3e : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x3c) : mword 64) 2 = mword_of_int (KernelSyms.uartinit + 0x3e)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp3e) in "Hpc".
+    (* +0x3e c.addi sp,16 : pop frame *)
     set (E3 := <[Regidx csp_rs1 := regval_into_reg (add_vec (E2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))))]> E2).
     assert (HE3csp : E3 !!! Regidx csp_rs1 = sp0).
     { rewrite /E3 upd_eq. rewrite HE2sp. unfold regval_into_reg, spr, sp0.
@@ -621,23 +523,23 @@ Section ProofUartinit.
       iSplitL "Hras"; [iExists _; iExact "Hras"|].
       iSplitL "Hs0s"; [iExists _; iExact "Hs0s"|]. done. }
     iEval (rewrite -Hwv) in "Hframe".
-    iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.uartinit + 0x52)) (mword_of_int 16 : mword 6) E2 (K - 2)%nat 2 false Hpop
-              with "Hcg Hpc Hi52 Hframe [-]").
+    iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.uartinit + 0x3e)) (mword_of_int 16 : mword 6) E2 (K - 2)%nat 2 false Hpop
+              with "Hcg Hpc Hi3e Hframe [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     assert (Hnk : ((K - 2) + 2)%nat = K) by lia.
     iEval (rewrite Hnk) in "Hcg".
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec (E2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))))]> E2) with E3.
-    assert (Hpp54 : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x52) : mword 64) 2 = mword_of_int (KernelSyms.uartinit + 0x54)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp54) in "Hpc".
-    (* +0x54 c.ret *)
+    assert (Hpp40 : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x3e) : mword 64) 2 = mword_of_int (KernelSyms.uartinit + 0x40)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp40) in "Hpc".
+    (* +0x40 c.ret *)
     assert (HE3ra : E3 !!! Regidx (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1 : mword 5)).
     { rewrite /E3 upd_ne; [| vm_compute; discriminate].
       rewrite /E2 upd_ne; [| vm_compute; discriminate].
       rewrite /E1 upd_eq; reflexivity. }
-    iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.uartinit + 0x54)) (mword_of_int 1 : mword 5) E3 K false
+    iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.uartinit + 0x40)) (mword_of_int 1 : mword 5) E3 K false
               ltac:(vm_compute; discriminate)
-              with "Hcg Hpc Hi54 [-]").
+              with "Hcg Hpc Hi40 [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     assert (Hretf : forall (CID' : CpuId), ret_pc (rget (CID := CID') E3 (mword_of_int 1 : mword 5)) = ret_tgt)
@@ -648,8 +550,6 @@ Section ProofUartinit.
               c <> mword_of_int 1 -> c <> csp_rs1 -> c <> mword_of_int 8 ->
               E3 !!! Regidx c = m !!! Regidx c).
     { intros c Hc N1 Nsp N8.
-      pose proof (is_cs_idx_true_neq (mword_of_int 10 : mword 5) c ltac:(vm_compute; reflexivity) Hc) as Na0.
-      pose proof (is_cs_idx_true_neq (mword_of_int 11 : mword 5) c ltac:(vm_compute; reflexivity) Hc) as Na1.
       pose proof (is_cs_idx_true_neq (mword_of_int 12 : mword 5) c ltac:(vm_compute; reflexivity) Hc) as Na2.
       pose proof (is_cs_idx_true_neq (mword_of_int 13 : mword 5) c ltac:(vm_compute; reflexivity) Hc) as Na3.
       pose proof (is_cs_idx_true_neq (mword_of_int 14 : mword 5) c ltac:(vm_compute; reflexivity) Hc) as Na4.
@@ -657,12 +557,6 @@ Section ProofUartinit.
       rewrite /E3 upd_ne; [| congruence].
       rewrite /E2 upd_ne; [| congruence].
       rewrite /E1 upd_ne; [| congruence].
-      rewrite (callee_saved_lookup Hilcs_full c Hc).
-      rewrite /R14 upd_ne; [| congruence].
-      rewrite /R13 upd_ne; [| congruence].
-      rewrite /R12 upd_ne; [| congruence].
-      rewrite /R11 upd_ne; [| congruence].
-      rewrite /R10 upd_ne; [| congruence].
       rewrite /R9 upd_ne; [| congruence].
       rewrite /R8 upd_ne; [| congruence].
       rewrite /R7 upd_ne; [| congruence].
@@ -672,7 +566,7 @@ Section ProofUartinit.
       rewrite /R3 upd_ne; [| congruence].
       rewrite /R2 upd_ne; [| congruence].
       rewrite /R1 upd_ne; [reflexivity | congruence]. }
-    iApply ("Hcont" $! E3 with "Hcg Hpc [%] Htx Hsent Hdoff Hlock Hlnm Hcpu").
+    iApply ("Hcont" $! E3 with "Hcg Hpc [%] Htx Hsent Hdoff").
     unfold callee_saved.
     split. { rewrite HE3csp. reflexivity. }
     split. { rewrite /E3 upd_ne; [| vm_compute; discriminate].

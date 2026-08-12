@@ -339,8 +339,8 @@ Definition i_auipc : mword 5 :=
 (* [ld sp, N(sp)] loading the boot stack pointer via a GOT-relative offset
    from _entry's auipc; N tracks wherever the linker places the GOT/stack0
    data, so this literal must be re-synced whenever the kernel image's data
-   segment shifts (last synced: N = 0x208, i.e. stack0's current GOT slot). *)
-Definition w_ld : mword 32 := mword_of_int 0x20813103.
+   segment shifts (last synced: N = 0x248, i.e. stack0's current GOT slot). *)
+Definition w_ld : mword 32 := mword_of_int 0x24813103.
 
 Definition imm_ld : mword 12 := subrange_vec_dec w_ld 31 20.
 Definition i_ld : mword 5 :=

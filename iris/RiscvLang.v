@@ -443,7 +443,7 @@ Definition ram_hi : Z := 0x88000000.
    with no lookup into either 20k-entry literal.  [img_end] is the single
    PT_LOAD's vaddr + filesz, and [.bss] runs from there up to
    [KernelData.kernelMemEnd]. *)
-Definition img_end : Z := 0x8000a220.
+Definition img_end : Z := 0x8000a260.
 
 Definition boot_image : gmap Z (bv 8) :=
   base.filter (fun ab : Z * bv 8 => (ab.1 < img_end)%Z)

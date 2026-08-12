@@ -74,7 +74,7 @@ Local Open Scope Z_scope.
    WORD OF THE IMAGE, at the pc-relative slot [entry_got]; and the word there
    is &stack0.  [MbootVocab.mb_ld_ea] is the address the WP computes; these
    two lemmas are the only place the tree says what it IS. *)
-Definition entry_got : Z := 0x8000a208.
+Definition entry_got : Z := 0x8000a248.
 
 Definition v_stack0 : mword 64 := mword_of_int KernelSyms.stack0.
 

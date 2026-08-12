@@ -382,13 +382,13 @@ Section ProofUartPutc.
     iIntros (CID1 Hs1) "Hcg Hpc".
     iEval (rewrite P10) in "Hpc".
     set (g0c := <[Regidx (mword_of_int 15) := regval_into_reg (add_vec (mword_of_int (KernelSyms.uartputc_sync + 0x0c)) (auipc_off (mword_of_int 0xa : mword 20)))]> m).
-    assert (Hea0 : add_vec (rget g0c (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 0x8a8 : mword 12))
+    assert (Hea0 : add_vec (rget g0c (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 0x8fc : mword 12))
                    = (mword_of_int KernelSyms.panicking : mword 64)).
     { rewrite (rget_ne g0c (mword_of_int 15 : mword 5) ltac:(vm_compute; discriminate)).
       unfold g0c. rewrite upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite <- Hea0) in "Hpk".
     (* ---- 0x10 lw a5,-1880(a5) : panicking ---- *)
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.uartputc_sync + 0x10)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 0x8a8 : mword 12)
+    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.uartputc_sync + 0x10)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 0x8fc : mword 12)
               g0c n pv b (dqm:=dqm) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10 Hpk").
     iIntros (CID2 Hs2) "Hcg Hpc Hpk".
@@ -411,13 +411,13 @@ Section ProofUartPutc.
     iIntros (CID4 Hs4) "Hcg Hpc".
     iEval (rewrite P1a) in "Hpc".
     set (g16 := <[Regidx (mword_of_int 15) := regval_into_reg (add_vec (mword_of_int (KernelSyms.uartputc_sync + 0x16)) (auipc_off (mword_of_int 0xa : mword 20)))]> f1).
-    assert (Hea1 : add_vec (rget g16 (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 0x89a : mword 12))
+    assert (Hea1 : add_vec (rget g16 (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 0x8ee : mword 12))
                    = (mword_of_int KernelSyms.panicked : mword 64)).
     { rewrite (rget_ne g16 (mword_of_int 15 : mword 5) ltac:(vm_compute; discriminate)).
       unfold g16. rewrite upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite <- Hea1) in "Hpkd".
     (* ---- 0x1a lw a5,-1894(a5) : panicked ---- *)
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.uartputc_sync + 0x1a)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 0x89a : mword 12)
+    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.uartputc_sync + 0x1a)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 0x8ee : mword 12)
               g16 n pkv b (dqm:=dqm2) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1a Hpkd").
     iIntros (CID5 Hs5) "Hcg Hpc Hpkd".
@@ -451,13 +451,13 @@ Section ProofUartPutc.
     iIntros (CID8 Hs8) "Hcg Hpc".
     iEval (rewrite P40) in "Hpc".
     set (h3c := <[Regidx (mword_of_int 15) := regval_into_reg (add_vec (mword_of_int (KernelSyms.uartputc_sync + 0x3c)) (auipc_off (mword_of_int 0xa : mword 20)))]> (ppc_f6' f2 bt)).
-    assert (Hea2 : add_vec (rget h3c (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 0x878 : mword 12))
+    assert (Hea2 : add_vec (rget h3c (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 0x8cc : mword 12))
                    = (mword_of_int KernelSyms.panicking : mword 64)).
     { rewrite (rget_ne h3c (mword_of_int 15 : mword 5) ltac:(vm_compute; discriminate)).
       unfold h3c. rewrite upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite <- Hea2) in "Hpk".
     (* ---- 0x40 lw a5,-1928(a5) : panicking (2nd read) ---- *)
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.uartputc_sync + 0x40)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 0x878 : mword 12)
+    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.uartputc_sync + 0x40)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 0x8cc : mword 12)
               h3c n pv b (dqm:=dqm) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi40 Hpk").
     iIntros (CID9 Hs9) "Hcg Hpc Hpk".

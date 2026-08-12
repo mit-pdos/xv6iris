@@ -20,9 +20,8 @@ Require Import IntrDefs.
 From Kernel Require KernelSyms.
 Require Import ProcGeom.
 
-(* myproc is PROVEN (SpecMyproc.v / ProofMyproc.v / LinkMyproc.v), and wakeup
-   threads the [cur_proc] resource so it can use [wp_myproc_sconf] directly
-   (SpecWakeup.v).  There is no myproc axiom. *)
+(* wakeup no longer calls myproc at all -- the scan visits every slot,
+   including the caller's own (SpecWakeup.v).  Nothing here mentions it. *)
 
 (* wakeup's own 7-entry register-save frame, at spF+8..spF+56 (written by the
    [c.sdsp] prologue, read back by the epilogue).  Cell addresses are given in
@@ -41,10 +40,10 @@ Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{G
   wp_next b p (fun (CID : CpuId) =>
       ∀ (M : regfile) (vpad : mword 64),
       ⌜ M !!! Regidx (mword_of_int 9)  = proc_addr 0
-      /\ M !!! Regidx (mword_of_int 18) = proc_addr NPROC
-      /\ M !!! Regidx (mword_of_int 19) = (mword_of_int 2 : mword 64)
+      /\ M !!! Regidx (mword_of_int 19) = proc_addr NPROC
+      /\ M !!! Regidx (mword_of_int 20) = (mword_of_int 2 : mword 64)
       /\ M !!! Regidx (mword_of_int 21) = (mword_of_int 3 : mword 64)
-      /\ M !!! Regidx (mword_of_int 20) = m !!! Regidx (mword_of_int 10)
+      /\ M !!! Regidx (mword_of_int 18) = m !!! Regidx (mword_of_int 10)
       /\ M !!! Regidx csp_rs1 = spF
       /\ M !!! Regidx (mword_of_int 1)  = m !!! Regidx (mword_of_int 1)
       /\ M !!! Regidx (mword_of_int 22) = m !!! Regidx (mword_of_int 22)
@@ -74,7 +73,7 @@ Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{G
   (8 <= K)%nat ->
   (forall r : regidx, r ∈ dom (rf_to_gmap M)) ->
   sie_cap_gpr M (K - 8) b p -∗
-  kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x58)) -∗
+  kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x54)) -∗
   wk_fcell spF 7 ↦₈ vra -∗ wk_fcell spF 6 ↦₈ vs0 -∗ wk_fcell spF 5 ↦₈ vs1 -∗
   wk_fcell spF 4 ↦₈ vs2 -∗ wk_fcell spF 3 ↦₈ vs3 -∗ wk_fcell spF 2 ↦₈ vs4 -∗
   wk_fcell spF 1 ↦₈ vs5 -∗ wk_fcell spF 0 ↦₈ vpad -∗

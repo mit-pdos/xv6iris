@@ -397,17 +397,17 @@ Qed.
 Local Lemma iu_align_arith (kk qq off dv : Z) :
   0 <= kk -> kk < 30 -> 0 <= qq -> qq < 16 -> 0 <= off -> off < 64 ->
   (dv = 2 \/ dv = 4) -> off `mod` dv = 0 ->
-  (2147582376 + 1112 * kk + (88 + (64 * qq + off))) `mod` dv = 0
-  /\ 0 <= 2147582376 + 1112 * kk + (88 + (64 * qq + off))
-  /\ 2147582376 + 1112 * kk + (88 + (64 * qq + off)) < 18446744073709551616.
+  (2147582464 + 1112 * kk + (88 + (64 * qq + off))) `mod` dv = 0
+  /\ 0 <= 2147582464 + 1112 * kk + (88 + (64 * qq + off))
+  /\ 2147582464 + 1112 * kk + (88 + (64 * qq + off)) < 18446744073709551616.
 Proof.
   intros H1 H2 H3 H4 H5 H6 Hd Hoff. split_and!; [| lia | lia].
-  assert (Hz : 2147582376 + 1112 * kk + (88 + (64 * qq + off))
-               = (536895616 + 278 * kk + 16 * qq) * 4 + off) by lia.
+  assert (Hz : 2147582464 + 1112 * kk + (88 + (64 * qq + off))
+               = (536895638 + 278 * kk + 16 * qq) * 4 + off) by lia.
   rewrite Hz. destruct Hd as [-> | ->].
   - rewrite Z.add_mod; [| lia]. rewrite Hoff.
-    replace ((536895616 + 278 * kk + 16 * qq) * 4) with
-      ((536895616 + 278 * kk + 16 * qq) * 2 * 2) by lia.
+    replace ((536895638 + 278 * kk + 16 * qq) * 4) with
+      ((536895638 + 278 * kk + 16 * qq) * 2 * 2) by lia.
     rewrite Z_mod_mult. reflexivity.
   - rewrite Z.add_mod; [| lia]. rewrite Hoff Z_mod_mult. reflexivity.
 Qed.
@@ -428,8 +428,8 @@ Proof.
               ltac:(lia) ltac:(unfold NBUF in Hk; lia) ltac:(lia) ltac:(lia)
               ltac:(lia) ltac:(lia) Hdv Hm)
     as (Hmod & Hlo & Hhi).
-  replace (0x80018190 + 24 + 1112 * Z.of_nat k + Z.of_nat (88 + (64 * q + off)))
-    with (2147582376 + 1112 * Z.of_nat k
+  replace (0x800181e8 + 24 + 1112 * Z.of_nat k + Z.of_nat (88 + (64 * q + off)))
+    with (2147582464 + 1112 * Z.of_nat k
           + (88 + (64 * Z.of_nat q + Z.of_nat off))) by lia.
   apply iu_align_z; [exact Hlo | exact Hhi | destruct Hdv as [-> | ->]; lia
                     | exact Hmod].
