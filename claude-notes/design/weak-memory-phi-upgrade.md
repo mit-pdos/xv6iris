@@ -158,6 +158,33 @@ log's last" premise holds because the flip is atomic with the append),
 the payload, and — with φ landed — all three arms of the
 `no_violation` preservation trichotomy exercised in one run.
 
+**STAGE 1 LANDED (`WkOwnPingPong.v`, 798 lines, 2026-08-12; σ-altitude
+theorems closed, WP-altitude ones on the 5 baseline axioms).  THE FLIP
+RECIPE THAT PROVED OUT — the port-recipe answer:** a release that
+EGRESSES owned memory is a DIFFERENT CORE from `wrelease_core` (which
+consumes the payload at the PRE-state, while `wlat_flip` needs the
+post-state authority where the WCrel message is the log's last).
+`wrelease_flip_core`: lock element update → flip → reassemble `↦w{1}`
+at the element's own timestamp → `wwp_release_deposit`.  The missing
+class fact (`wm_ak = WCrel` on the nose, which `wQ_store_w`'s
+existential deliberately withholds) is read off the φ-upgrade's OWN
+trace fact with no new certificate: `wQ_eff_store_rel`
+(`ak_latest = false` + `w_relp = true` pin the appended message's
+class).  A ported release keeps its leaf interface + one pure lemma
+application; the RECEIVING side needs NO new rule
+(`wwp_acquire_loop_cert` verbatim).  `pp_return_leg` exhibits the
+private byte surviving BOTH handoffs dirty; `pp_receive_and_dirty`
+closes the `WDirty A → WClean → WDirty B` cycle; `pp_phi_three_arms`
+pays the trichotomy at one state.  TWO PRE-PORT GAPS RECORDED:
+(1) **`wpt_load_rule_own` is missing** — a hart cannot yet read its own
+DIRTY byte through the collapse rule (`wpt_load_rule` goes through
+`wlat_lookup`, which wants the clean half; the ingredients
+(`wlat_lookup_elem`, `readable_latest_pin`) are owned-ready — a
+~10-line copy).  A real blocker for ported proofs that re-read what
+they just wrote; land it with the site-predicate pre-port batch.
+(2) `wpt_store_rule_dirty`/`_post_dirty` exist only in the example for
+the exhibit — ported store sites keep the absorbing `↦wo` form.
+
 **Stage 2 — the REAL migration test (a PORT TARGET, gated on the S-mode
 scheduler cone): the same program with the handoff replaced by
 `wp_next`/`p_sched`** — the parked-continuation crossing where the
