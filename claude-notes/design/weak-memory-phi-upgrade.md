@@ -233,7 +233,26 @@ fence/acquire on the new CPU before returning.  How it lands on C/D/S:
   example-altitude lemmas because the example has no Code file; in the
   ported spec they are proof-internal (CodeYield facts), exactly as in
   the SC tree.
-- THE EXAMPLE `WkYieldFrame.v`: thread T on hart A: `x := 1`
+- **STAGE 1.5 LANDED (2026-08-12; `WkYieldFrame.v` 652 lines +
+  WeakGhost/WeakVProp additions; all green, adequacy unchanged).**
+  TWO FINDINGS: (1) the `w_pub` mono_nat is a DEAD GHOST (its authority
+  field was deleted with WeakCtx) — and re-threading it would have been
+  wrong anyway (the arm needs the converse of `wpublished_w_pub`, not a
+  machine invariant); the token rides the LOG's mono-list instead:
+  `pub_floor c n := ∃ l, wlog_lb l ∗ ⌜wpub_upto l (Some c) n⌝` and the
+  view-indexed `pub_covers_view c V` — ZERO new ghost state, minted at
+  the release append.  (2) THE ACCEPTANCE ARM COLLAPSED TO ONE LEMMA:
+  `wpt_own_upgrade` retargets WDirty c → WClean and returns an ORDINARY
+  clean `↦w{1}` — no "load/store with evidence" variants, no leaf
+  statement changes; `wpt_load_rule`/`wpt_own_of_wpt`/
+  `wpt_store_rule_own` then apply verbatim.  The view-indexed token
+  killed the timestamp side condition as predicted.  Yield spec shape
+  as designed: `wyield_park_core` consumes/returns only the handoff
+  lock + `pub_covers_view i V`; `wyield_resume_core` returns the holder
+  token + `⌜V ⊑ ws_view⌝`; no points-to anywhere.  `wpt_load_rule_own`
+  (ping-pong gap 1) landed.  Word-level `↦wo` wrappers unneeded (byte
+  altitude covers via wpt4/8_own decompositions).
+- THE EXAMPLE `WkYieldFrame.v` (as specced): thread T on hart A: `x := 1`
   (dirty-A), holds a clean fact `z`; yield (fence rw,w; handoff-flag
   release; [migration]; new-CPU acquire/fence; return); resumed on B:
   `load x = 1` (the lazy upgrade), `x := 2` (re-dirty at B), use `z`
