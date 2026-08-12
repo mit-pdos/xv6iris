@@ -589,12 +589,39 @@ floor that sees every observation.
       sharpen what W3's class-soundness must export.  Proof route open:
       via the transfer chains (needs pub machinery) or operationally;
       record which closes.
-- [ ] **W2c — observables + transport.** From W2b: same final flat
-      memory + same program states; the reducibility/safety transport
-      corollary in the form W5's composition wants.  Note the full
-      machine is never `wpstep`-stuck (promising is always enabled), so
-      the transported content is about observable states of completable
-      behaviors, not raw stuckness — state it that way.
+- [ ] **W2c + the assembled Layer-1 theorem (`WeakRobustMain.v`) —
+      DESIGN (2026-08-12, coordinator).**  Contents: (1) the per-edge
+      premise weakened to `edge_ok ∨ bad` (bad = an owned-unpublished
+      cross read, the shape φ refutes); (2) the case split: no bad
+      edge → rf_edges_ok total → Acyc2 → full sim → `robust`'s
+      conclusion; some bad edge → THE EXHIBIT: take U := the bad-free
+      cone (events with no bad-edge target in their inclusive
+      ancestry — downward-closed; all U-internal edges are edge_ok, so
+      the restricted walk gives U-restricted acyclicity — instantiate
+      WeakRobustLin's generic sort at R∩U² rather than editing
+      anything), sim U via the subset sim, then append the minimal bad
+      read (its po-prefix ⊆ U when its target is chosen with
+      bad-target-free strict ancestry) — its pf step reaches a
+      violating state, contradicting `pf_violation_free`.
+      (3) THE HONEST RESIDUE: a "bad SCC" — bad edges lying on a
+      mutual-reachability cycle, i.e. spontaneously mutually-justified
+      owned-read LB — admits no minimal bad target and no exhibit
+      (its events' pf-realization is circular and its message never
+      enters the pf log).  The theorem therefore carries the premise
+      **`bad_wf`: bad-edge targets are gdep2-well-founded (no bad
+      SCC)** — same epistemic category as D-M6-8's static residue,
+      and the same justification: a bad SCC is exactly the
+      thin-air-owned shape the kernel's discipline excludes.
+      (4) W2c proper: the transport corollary is `sim_full`'s
+      conclusion (same prog states + same flat memory) restated over
+      completable prefixes for W5; the full machine is never
+      wpstep-stuck, so state it about observables of completable
+      behaviors, not stuckness.
+      NOTE for the sim's premise plumbing when building Main: the
+      subset sim's `writes_fulfilled` use must be checked — for a
+      cone U it holds in the needed form (read sources of U-events lie
+      in U); if the landed sim consumed the global form, weaken its
+      hypothesis to the read-sources form.
 - [ ] Byte-granularity audit of the whole simulation: every case per
       byte; W1's exact-match fulfil rule is what keeps a promise/fulfil
       width mismatch out.
