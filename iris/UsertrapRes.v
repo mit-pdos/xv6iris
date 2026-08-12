@@ -47,12 +47,13 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
-Require Import RegFile HartTp.
+Require Import RegFile HartTp WpGpr.
 Require Import SmodeCore.
-Require Import KernelText KernelDataInv.
+Require Import KernelText KernelDataInv MstatusBits.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import StackOwn.
+Require Import WpMmodeLeafBase.   (* csp_rs1 -- sie_cap's stack key *)
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
@@ -106,14 +107,37 @@ Section UsertrapRes.
   Definition ut_stack (ksp : mword 64) (av : nat) : iProp Σ :=
     stack_own ksp (trap_res false + av)%nat.
 
-  (* [sconf] MINUS the mstatus cell, as its own CLOSER rather than as a
-     restatement of the bundle's internals: [sconf_at]'s second conjunct is
-     precisely "the rest of sconf", and re-spelling hw_config / minstret /
-     the mie / menvcfg pins here would be a second place for them to drift.
-     Phase A builds [sconf_msown ms_v] out of the boundary's mstatus cell and
-     the two loose halves below, then applies this. *)
+  (* [sconf] MINUS the mstatus cell AND the privilege cell, as a CLOSER
+     rather than as a restatement of the bundle's internals: re-spelling
+     hw_config / minstret / the mie and menvcfg pin blocks here would be a
+     second place for five pure side conditions to drift.  This is
+     [IntrDefs.sconf_at]'s idiom with one more cell handed out --
+     [sconf_at] exposes only mstatus, and the trampoline needs
+     [cur_privilege] too (userret's [sret] writes it).
+
+     BELONGS BESIDE [sconf_at] IN IntrDefs.v and is here only because
+     IntrDefs is at the bottom of the tree and editing it costs a near-total
+     rebuild; hoist it the next time something else has to touch that file. *)
   Definition ut_sconf_closer : iProp Σ :=
-    (∀ ms' : mword 64, sconf_msown ms' -∗ sconf)%I.
+    (∀ ms' : mword 64,
+       cur_privilege ↦ᵣ Supervisor -∗ sconf_msown ms' -∗ sconf)%I.
+
+  (* the opener that makes it faithful: if this proof breaks, the closer above
+     is no longer "the rest of sconf". *)
+  Lemma ut_sconf_open :
+    sconf -∗ ∃ ms : mword 64,
+      ut_sconf_closer ∗ cur_privilege ↦ᵣ Supervisor ∗ sconf_msown ms.
+  Proof.
+    iIntros "(#Hhw & #Hminv & Hpriv & Hmsx & Hmie & Hmenv)".
+    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Htie & %Hmsf)".
+    iExists ms. iSplitR "Hpriv Hms Hhalf Htie".
+    { rewrite /ut_sconf_closer. iIntros (ms') "Hpriv' Hown'".
+      iDestruct "Hown'" as "(Hms' & Hhalf' & Htie' & %Hmsf')".
+      iFrame "Hhw Hminv Hpriv' Hmie Hmenv".
+      iExists ms'. iFrame "Hms' Hhalf' Htie'". iPureIntro. exact Hmsf'. }
+    iFrame "Hpriv". rewrite /sconf_msown. iFrame "Hms Hhalf Htie".
+    iPureIntro. exact Hmsf.
+  Qed.
 
   (* THE FOUR LOOSE GHOSTS -- see the header.  Values are PINNED, not
      existential: [usertrap_entry_ms] pins SPP = 0 / SPIE = 1 / SIE = 0, and
@@ -143,6 +167,98 @@ Section UsertrapRes.
      (* the handler the [csrw stvec] at +0x1e installs -- persistent, and the
         one thing in this bundle that is about code rather than state *)
      intr_handler_spec (mword_of_int KernelSyms.kernelvec))%I.
+
+  (* ---- THE ENTRY ASSEMBLY (Phase A) --------------------------------- *)
+  (* The boundary's raw machine state plus [ut_trap] IS the kernel cone's
+     entry state.  No instruction is involved, which is the point: if this
+     lemma holds then SpecUsertrap's restated boundary is the right one, and
+     everything after +0x1e is ordinary kernel-cone work.
+
+     WHAT COMES OUT LOOSE is exactly what usertrap still has to fold.  The
+     dangling SIE quarter, the KPT receipt and the sret mirror are three of
+     [trap_csrs]'s six members; the [csrw stvec, kernelvec] at +0x1e turns
+     them -- plus the boundary's stvec cell and the handler contract -- into
+     the bundle.  The three trap CSR CELLS stay on the boundary rather than
+     coming out here because usertrap READS them (scause three times, sepc
+     once, stval twice) before ever folding them away. *)
+  Lemma ut_trap_open (pj ksp : mword 64) (av : nat) (C : iProp Σ)
+      (m : regfile) (ms : mword 64) :
+    sconf_ms_facts ms ->
+    eq_vec (_get_Mstatus_SIE ms) ('b"1") = false ->
+    eq_vec (_get_Mstatus_SPP ms) ('b"1") = false ->
+    _get_Mstatus_SPIE ms = ('b"1" : mword 1) ->
+    m !!! Regidx csp_rs1 = ksp ->
+    m !!! Regidx Rtp = cid_word ->
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ Supervisor -∗
+    mstatus ↦ᵣ ms -∗
+    gpr_file m -∗
+    ut_trap pj ksp av C -∗
+      sie_cap_gpr m av false pj ∗
+      cpu_own 0%nat false pj C false ∗
+      cpu_claim pj ∗
+      ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
+      strans_bit strans_bit_kpt ∗
+      sret_bits ('b"0" : mword 1) ('b"1" : mword 1) ∗
+      intr_handler_spec (mword_of_int KernelSyms.kernelvec).
+  Proof.
+    intros Hmsf Hsie Hspp Hspie Hsp Htp.
+    apply mword1_zero_of_ne_one in Hsie.
+    apply mword1_zero_of_ne_one in Hspp.
+    iIntros "Hhs Hpriv Hms Hgpr Ht".
+    iDestruct "Ht" as "(Hstk & Hstr & Harm & Hkpt & Hcl & Hgh & Hcpu & Hclm & #Hih)".
+    iDestruct "Hgh" as "(Hhalf & Hq & Htie & Htrav)".
+    iFrame "Hcpu Hclm Hq Hkpt Htrav Hih".
+    rewrite /sie_cap_gpr. iFrame "Hhs".
+    iSplitL "Hpriv Hms Hhalf Htie Hcl".
+    { iApply ("Hcl" $! ms with "Hpriv [Hms Hhalf Htie]").
+      rewrite /sconf_msown /sret_tie Hsie Hspp Hspie.
+      iFrame "Hms Hhalf Htie". iPureIntro. exact Hmsf. }
+    rewrite /sie_cap /ut_stack Hsp.
+    iFrame "Hstk Hstr Harm".
+    rewrite (tp_pin_id m Htp). iExact "Hgpr".
+  Qed.
+
+  (* ---- THE EXIT FACTS ARE DERIVABLE, NOT ARRANGED (Phase D) ---------- *)
+  (* [SpecUsertrap.usertrap_ret_ms] is the boundary's promise that the mstatus
+     usertrap returns is sret-ready.  usertrap does not have to ESTABLISH it:
+     every conjunct is already a consequence of the bundle prepare_return
+     hands back, read off two ghost agreements and [sconf_ms_facts] --
+
+       SIE = 0     : the loose quarter (prepare_return's DANGLING one, the
+                     fraction that forbids re-enabling interrupts before the
+                     sret) agrees with [sconf]'s half, which is tied to the
+                     LIVE mstatus;
+       SPP, SPIE   : the travelling sret mirror agrees with [sconf]'s tie, so
+                     SPP = User and SPIE = 1, and [sret_ms2_SPP] turns the
+                     first into [sret_newpriv ms = User];
+       the rest    : MPRV / SXL / MXR / TSR / TVM verbatim from
+                     [sconf_ms_facts], and FS / VS from its Off pins.
+
+     So the two ghost fractions the excursion parks are not bookkeeping -- they
+     are what MAKES the return legal, and this lemma is where that is cashed. *)
+  Lemma ut_exit_ms_ok (ms : mword 64) :
+    sconf_msown ms -∗
+    sret_bits ('b"0" : mword 1) ('b"1" : mword 1) -∗
+    ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
+    ⌜ usertrap_ret_ms ms ⌝.
+  Proof.
+    iIntros "(Hms & Hhalf & Htie & %Hmsf) Htrav Hq".
+    rewrite /sret_tie.
+    iDestruct (sret_bits_agree _ _ _ _ with "Htie Htrav") as %[Hspp Hspie].
+    iDestruct (ghost_var_agree with "Hhalf Hq") as %Hsie.
+    destruct Hmsf as (Hmprv & Hsxl & Hmxr & Htsr & _ & Hfs & Hvs & _ & _ & Htvm).
+    iPureIntro. rewrite /usertrap_ret_ms. split_and!.
+    - rewrite Hsie. vm_compute. reflexivity.
+    - exact Hmprv.
+    - exact Hsxl.
+    - exact Htvm.
+    - exact Hmxr.
+    - exact Htsr.
+    - rewrite Hfs. vm_compute. reflexivity.
+    - rewrite Hvs. vm_compute. reflexivity.
+    - unfold sret_newpriv. rewrite sret_ms2_SPP Hspp. vm_compute. reflexivity.
+  Qed.
 
   (* ------------------------------------------------------------------- *)
   (* THE FIVE CONES' ENVIRONMENTS.  usertrap hands these over and, except  *)

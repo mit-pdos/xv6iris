@@ -193,6 +193,29 @@ union already — kexit's list IS `sys_exit`'s — so the real content is the
 handful of things syscall does not need: devintr's device bundle, vmfault's,
 printk-general's `pr` lock, and the trap-side pieces above.
 
+**LANDED as `UsertrapRes.v`**, split three ways (`ut_trap` / `ut_env` /
+`ut_res`) so the phases can open them separately, with `K_usertrap =
+4 + K_syscall`. Two things worth knowing about it:
+
+- **The instance list is kexit's, not the boundary's**, because a module
+  PARAMETER's type has to be its instantiation's. Nothing would have caught a
+  mismatch until `ProofUsertrap` seals `USERTRAP` — the whole proof away — so
+  `USERTRAP` now `Include`s a split-out `USERTRAP_RES` and the file ends with
+  `Module UtResFits (SY : SYSCALL) <: USERTRAP_RES`, checked against the
+  declaration rather than a hand-copied mirror of it (verified to bite:
+  dropping one class gives *"Signature components for field usertrap_res do
+  not match"*). It has to be a functor because `syscall_env` is the one member
+  of the union that is itself still an assumed contract.
+- **`ut_sconf_closer` is `IntrDefs.sconf_at`'s idiom with one more cell.**
+  `sconf_at` exposes only the mstatus cell; the trampoline needs
+  `cur_privilege` too (userret's `sret` writes it). Keeping it as a CLOSER
+  rather than re-spelling `sconf`'s internals avoids a second copy of five
+  pure side conditions, and `ut_sconf_open` is the proof that the closer
+  really is "the rest of `sconf`". It BELONGS beside `sconf_at` in
+  `IntrDefs.v` and is in `UsertrapRes.v` only because editing the bottom of
+  the tree costs a near-total rebuild — hoist it whenever something else has
+  to touch that file.
+
 ## What is OWED to the trampoline halves (the dovetail, now explicit)
 
 The restatement moves the seam rather than closing it. `SpecUservec`'s post
@@ -238,6 +261,14 @@ so the instruction count is not the driver — the resource assembly is.
   `cpu_own` + `trap_csrs` + `proc_priv` at index `false` — after which every
   later phase is ordinary kernel-cone work. **This is the phase that proves
   the design; do it before anything else.**
+  **The resource half of it is DONE** — `UsertrapRes.ut_trap_open`, and it
+  went through on the first attempt: the boundary's raw machine state plus
+  `ut_trap` *is* `sie_cap_gpr m av false pj ∗ cpu_own 0 false pj C false`,
+  with the dangling SIE quarter, the KPT receipt and the sret mirror falling
+  out loose (three of `trap_csrs`' six members — the `csrw stvec` folds them,
+  together with the boundary's stvec cell and the handler contract, into the
+  bundle). No instruction is involved, which is exactly why it is the design
+  check. The remaining Phase A work is the nine instructions themselves.
 - **Phase B — the scause dispatch and the three cheap arms.** devintr,
   vmfault, and the unexpected-scause arm (printk-general ×2 + setkilled).
   Each is a call and a branch; the interesting part is that the arms rejoin at
@@ -249,7 +280,14 @@ so the instruction count is not the driver — the resource assembly is.
 - **Phase D — the tail.** The second `killed`/`kexit`, the `which_dev == 2`
   yield, `jal prepare_return`, `MAKE_SATP`, the epilogue, and the exit
   DISASSEMBLY (prepare_return's post back into the boundary's raw pieces plus
-  `R pt' ksp`).
+  `R pt' ksp`). **Its load-bearing fact is already proven**:
+  `UsertrapRes.ut_exit_ms_ok` shows `usertrap_ret_ms` is DERIVABLE from the
+  bundle prepare_return hands back, not something usertrap has to arrange —
+  SIE = 0 off the dangling quarter's agreement with `sconf`'s half, SPP/SPIE
+  off the travelling mirror's agreement with `sconf`'s tie (then
+  `sret_ms2_SPP` for `sret_newpriv ms = User`), and the rest verbatim from
+  `sconf_ms_facts`. So the two ghost fractions the user-mode excursion parks
+  are not bookkeeping: they are what makes the return legal.
 - **Phase E — `usertrap_res` defined concretely, `ProofUsertrap` sealed as
   `Module UsertrapProof : USERTRAP`, `LinkUsertrap.v`.**
 
