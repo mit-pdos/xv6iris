@@ -4701,3 +4701,68 @@ ic_id, so it can carry "outstanding iref_lic fragments for this inum
 stage, stop-and-report if the arm's timelessness or the §17.5 mass
 ledger objects. Stage order: R1 → L1/L3 → B → C (with (L4)'s root
 clause and the ireg_read_blk-shaped accessor S5f described) → D.
+
+### 20.15 (R1) AND THE CLAUSES ARE LANDED (fs-sysfile S5g); **(R2) IS
+### REFUTED AS PRICED — M1's obstruction is the DIRECTION of the count, not
+### the home, and it is §17.5's mass ledger after all**
+
+The knot is untied and it cost what §20.14 said, less: `ic_payload_at` (the
+loaded polarity at a named record) plus a `v`-free `ic_open_held`, and the
+opener's proof did not move — its only use of the bundle is the SIZE cell
+in two refutations.  `ireg_link_ok` is now (L1) `w ≤ di_nlink d` and (L3)
+`di_type d = 0 → di_nlink d = 0`, re-established at all six arm moves, so
+
+* **"a free inode is named by no live directory record" is a THEOREM of
+  the region** — `ireg_free_au` derives `w = 0` from the record it writes,
+  with no caller obligation.  The user's premise (3), proved.
+* **`ireg_claim_au`'s (L1) closes on the OLD record's (L3)**, which was
+  §20.13's step 1.
+* `ireg_link_ok_alloc` is §20.2's payoff line, and `ireg_link_alloc` is the
+  `ireg_read_blk`-shaped accessor that cashes it.
+
+**§20.6's iput row is now HALF discharged, and the half that remains is the
+one §20.7 always owned.**  (L3)'s travelling half went into
+`di_nlink_stable`'s second conjunct — the one this design always described
+and S5f could not state — which cost ZERO contract edits (the premise slot
+already rode through `SpecIupdate`×3, `SpecWritei`, `SpecItrunc`,
+`SpecDirlink`) and three discharge sites.  **A travelling predicate that
+already exists is always cheaper to strengthen than a premise slot is to
+add; check for the carrier before pricing a §19.9-style tour.**
+
+**WHAT §20.14 GOT WRONG ABOUT (M1).**  Homing the clause in the escrow arm
+does not work, and the reason generalises past the address:
+
+(i) *the arm does not know the slot's count.*  It knows its inum (`ic_id`)
+and a liveness slice; the count is `M !! k` under `icfg_iref` in
+`itable_inv`, and no arm holds a count fragment.  Giving one to the arm
+re-opens §13/§14's share arithmetic that §17.3 (A) settled.
+
+(ii) *the direction iput needs is the WHOLE-SHARE one.*  `iref_lic z`
+against `● (…, r)` gives `1 ≤ r`; the discharge needs `r ≤ 1`, i.e. the
+ABSENCE of other fragments, which no `nat`-counter authority delivers from
+the presence of one.  §20.2's "the whole §14 machine is unnecessary here"
+is TRUE of the `w` half — the free reads `w = 0` off the authority — and
+FALSE of the `r` half, which is a claim about everyone else.  This holds at
+every home; it is not a placement question.
+
+(iii) *and iput's free runs OUTSIDE the itable lock* — `release` at +0x5c,
+the free at +0x70, the reference already deposited at +0x54.  So a count
+fact would have to cross the release, which is a TEMPORAL carrier, i.e.
+**(M2)'s** shape and not (M1)'s.
+
+**The recommendation therefore flips, or M1 grows a price.**  (M2) — a
+generation bump at the free, or the colour flip moved into `ireg_free_au` —
+carries REF-1 past the release by construction, at the cost §20.7 named
+(re-opening §17.6.3's placement argument).  (M1) can still work, but only
+as a whole-share witness: the OUT arm persists across the release and holds
+iput's `DepRef q dev inum g` with `q` the map's whole share (REF-1), so the
+arm can carry the *residual* `iref_lic` for its inum — and the missing half
+is `itable_half`'s "q is the whole share", i.e. §14's machine.  **Neither
+is one clause.  §20.11's stage E must be re-priced before D's landing can
+be made unconditional.**
+
+Everything else in §20 stands: the RA (unchanged — `r` and `iref_lic` were
+landed in S5f and neither move), the parking, the grey colour, the ten
+death certificates, D2, and stages B/C/D as scoped.  (L2), (L4) and the
+`c = None` half of (L3) remain unstated, all three for reasons already in
+the text: nothing mints an `iclaim` yet, and the root clause is stage C's.

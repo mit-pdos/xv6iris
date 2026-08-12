@@ -457,11 +457,30 @@ Section IcacheBootRegion.
      THEY ARE STATED AT [w = 0] because stage A mints no fragment: with the
      directory payloads' [dir_links] (stage B) the same premise grows to
      [w_z] per inum plus the fragments that stock each directory.  The
-     authority's shape does not change when it does. *)
+     authority's shape does not change when it does.
+
+     AND (L3) IS AN IMAGE OBLIGATION (fs-sysfile S5g).  With the ledger's
+     clauses landed, [ireg_slot] now says of every record that a ZERO TYPE
+     forces a zero [nlink] -- true of every mkfs image, false of nothing
+     this kernel can produce (the only writer that clears a type is iput's
+     free, which runs behind [ip->nlink == 0]), and unprovable here: the
+     bytes are the boot client's.  So it rides as a premise, in the same
+     ∀-over-decodings form the payout's own image premises take, because
+     [dss] is produced by [image_decode] inside the proof.  (L1) at [w = 0]
+     needs nothing. *)
+  Definition image_free_nlink (dss : list (list dinode)) (nib : nat) : Prop :=
+    forall z : Z, z ∈ region_inums nib ->
+      bv_unsigned (di_type (image_dinode dss z)) = 0 ->
+      bv_unsigned (di_nlink (image_dinode dss z)) = 0.
+
   Lemma ireg_alloc (E : coPset) (γfs : fs_names) (inodestart : Z) (nib : nat)
       (bss : nat -> list (bv 8)) :
     16 * Z.of_nat nib <= 2 ^ 32 ->
     (forall bi : nat, (bi < nib)%nat -> length (bss bi) = 1024%nat) ->
+    (forall dss : list (list dinode),
+       length dss = nib -> Forall diblk_wf dss ->
+       (forall bi : nat, (bi < nib)%nat -> bss bi = diblk_bytes (dss !!! bi)) ->
+       image_free_nlink dss nib) ->
     ([∗ set] z ∈ region_inums nib, link_auth z 0 0 None 0) -∗
     ([∗ list] bi ∈ seq 0 nib,
        fsblock γfs (inodestart + Z.of_nat bi) (bss bi))
@@ -472,8 +491,9 @@ Section IcacheBootRegion.
       ([∗ set] z ∈ region_inums nib,
          ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)).
   Proof.
-    intros Hnib Hlen.
+    intros Hnib Hlen Himg.
     destruct (image_decode nib bss Hlen) as (dss & Hl & Hwf & He).
+    pose proof (Himg dss Hl Hwf He) as Hl3.
     iIntros "Hlk Hblks".
     iMod (ghost_map_alloc (ireg_M0 dss nib ∪ ireg_MK nib)) as (γi) "[Ha Hels]".
     iDestruct (big_sepM_union with "Hels") as "[Hels Hmks]";
@@ -492,7 +512,8 @@ Section IcacheBootRegion.
       with "[Hall]" as "Hall".
     { iApply (big_sepS_mono with "Hall"). intros z Hz.
       iIntros "[[Hfrag Hmk] Hla]".
-      assert (Hok : ireg_link_ok (image_dinode dss z) 0) by exact I.
+      assert (Hok : ireg_link_ok (image_dinode dss z) 0).
+      { split; [lia | exact (Hl3 z Hz)]. }
       rewrite /ireg_out /dinode_at (region_inum_faithful nib z Hnib Hz).
       case_decide as Hty.
       - iSplitR "Hmk"; [| iExact "Hmk"].

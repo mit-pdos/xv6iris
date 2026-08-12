@@ -115,6 +115,7 @@ Require Import FsBlocks LogInv.
 Require Import BitmapInv.
 Require Import InodeInv.
 Require Import DinodeEnc.
+Require Import DinodeSlot.
 Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
@@ -144,6 +145,31 @@ Proof.
   - apply eq_vec_true_iff in Hab. subst b. apply eq_vec_true_iff. reflexivity.
   - apply eq_vec_false_iff in Hab. apply eq_vec_false_iff.
     intro Hc. apply Hab. exact (sext64_32_inj a b Hc).
+Qed.
+
+(* [ProofIlock.il_sext64_16_inj], restated for the same reason, and the
+   halfword ZERO test it gives.  The [c.bnez] at +0x44 falls through
+   exactly when [ip->nlink] is zero, and §20's (L3) needs that as a VALUE
+   fact about the record iput is holding -- which, since [ic_open_held]
+   went record-parametric (§20.14's (R1)), is the same record the free
+   flushes.  Without it the free cannot certify "nothing names this
+   inum". *)
+Lemma ip_sext64_16_inj (a c : mword 16) :
+  (sign_extend' 64 a : mword 64) = sign_extend' 64 c -> a = c.
+Proof.
+  intro H. rewrite -(trunc16_sext64 a) -(trunc16_sext64 c) H. reflexivity.
+Qed.
+
+Lemma ip_nlink_zero (w : mword 16) :
+  neq_vec (sign_extend' 64 w : mword 64) (zero_reg : mword 64) = false ->
+  bv_unsigned w = 0.
+Proof.
+  intro H. unfold neq_vec in H. apply negb_false_iff in H.
+  apply eq_vec_true_iff in H.
+  assert (Hz : (zero_reg : mword 64) = sign_extend' 64 (mword_of_int 0 : mword 16))
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite Hz in H. apply ip_sext64_16_inj in H.
+  rewrite H. vm_compute. reflexivity.
 Qed.
 
 (* THE TEST AT +0x1c, decided by the COUNT.  [c.li a5,1] leaves the literal
@@ -1547,16 +1573,17 @@ Section ProofIput.
       (* THE nlink UNDO TAKES NO BUMP (design §17.6 (3)): nothing is retyped
          on this path, the loaded payload and its shot go straight back into
          PARKED, and the two gnames [ic_open_held] now takes are equal. *)
-      iAssert (ic_payload gfs gi cov logstart k inum ga true)
+      iAssert (ic_payload_at gfs gi cov logstart k inum ga dn bm)
         with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks]" as "Hpayl".
-      { rewrite /ic_payload. iExists dn, bm.
+      { rewrite /ic_payload_at.
         iSplitR "Hshot"; [| iExact "Hshot"]. iExists data.
         iSplitR; [iPureIntro; exact Hok |].
         iSplitR; [iPureIntro; exact Hdok |]. rewrite /inode_meta. iFrame. }
       iMod (ic_open_held cn gfs gi cov logstart k (⊤ ∖ ↑icEscN)
-              Mt q true ga ga dev inum ltac:(solve_ndisj) HMk
+              Mt q ga ga dev inum dn bm ltac:(solve_ndisj) HMk
               with "Hinv Hbody Hhalf Hrtok Hlvh Hgid Hpayl")
         as "(Hhalf & Hrtok & Hlvh & Hgid & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".
+      iDestruct (ic_payload_at_pack with "Hpayl") as "Hpayl".
       iDestruct "Hvldx" as (w0) "Hva".
       iDestruct (word4_pointsto_agree with "Hvb Hva") as %<-.
       iDestruct (word4_pointsto_half_join with "Hvb Hva") as "Hvld".
@@ -1766,14 +1793,14 @@ Section ProofIput.
     (* the payload in hand is still the LOADED one at the OLD generation, and
        it must stay there: restating it at [ga'] would spend the fresh
        pending the +0x74 park needs.  Hence [ic_open_held]'s two gnames. *)
-    iAssert (ic_payload gfs gi cov logstart k inum ga true)
+    iAssert (ic_payload_at gfs gi cov logstart k inum ga dn bm)
       with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks]" as "Hpayl".
-    { rewrite /ic_payload. iExists dn, bm.
+    { rewrite /ic_payload_at.
       iSplitR "Hshot"; [| iExact "Hshot"]. iExists data.
       iSplitR; [iPureIntro; exact Hok |].
       iSplitR; [iPureIntro; exact Hdok |]. rewrite /inode_meta. iFrame. }
     iMod (ic_open_held cn gfs gi cov logstart k (⊤ ∖ ↑icEscN)
-            Mt q true ga' ga dev inum ltac:(solve_ndisj) HMk
+            Mt q ga' ga dev inum dn bm ltac:(solve_ndisj) HMk
             with "Hinv Hbody Hhalf Hrtok Hlvh Hgid Hpayl")
       as "(Hhalf & Hrtok & Hlvh & Hgid & Hpayl & Hidv & Hnfull & Hvldx & Hmt
            & Hgida)".
@@ -1931,11 +1958,17 @@ Section ProofIput.
     (* the checked-out bundle, opened for itrunc.  [inode_sized] is
        [inode_ok]'s seventh conjunct (§13.12(b)) -- iput's discharge of the
        one premise SpecItrunc could not otherwise get. *)
-    iEval (rewrite /ic_payload) in "Hpayl".
+    iEval (rewrite /ic_payload_at) in "Hpayl".
     (* the OLD generation's shot is dropped here -- [live_slot_regen] already
        retired [ga], and itrunc + [ip->type = 0] are about to turn this
-       [ic_loaded] into raw cells and a marker (design §17.6 (4)). *)
-    iDestruct "Hpayl" as (dn2 bm2) "[Hlk2 _]".
+       [ic_loaded] into raw cells and a marker (design §17.6 (4)).
+
+       THE RECORD IS THE SAME ONE (design §20.14's (R1)).  [ic_open_held] is
+       record-parametric, so what comes back out of the window is [dn], not
+       a fresh existential -- which is what carries the [ip->nlink == 0] the
+       +0x44 branch test established ([Hnl0] below) all the way down to the
+       region free at +0x74, where (L3) needs it. *)
+    iDestruct "Hpayl" as "[Hlk2 _]".
     iDestruct "Hlk2" as (data2)
       "(%Hok2 & %Hdok2 & Hdat & Hmeta & Haddrs & Hind & Hblks)".
     pose proof Hok2 as Hok2'.
@@ -1956,14 +1989,14 @@ Section ProofIput.
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     iApply (IT.wp_itrunc_sconf gs j gl gu gd gk pd pav pu bn g gfs gi
               cov logstart bmapstart inodestart nib size dev used
-              (ientry k) inum dn2 dn2 bm2 data2 (n - 2)%nat
+              (ientry k) inum dn dn bm data2 (n - 2)%nat
               pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqb dqs J2 (K - 4)%nat
               eb C eb
               ltac:(unfold K_itrunc; lia) Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
               Hnib Htyne2
               (* §19.6 Part 1: iput hands itrunc ONE record for both slots. *)
-              (InodeRegion.di_type_stable_refl dn2)
-              (InodeRegion.di_nlink_stable_refl dn2)
+              (InodeRegion.di_type_stable_refl dn)
+              (InodeRegion.di_nlink_stable_refl dn Htyne2)
               Hbmwf2 Hcovb Hsized2 Hdiaddrs2 Hj Hgsj HJ2a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlogc Hidv Hinh Hmeta
                     [Haddrs Hind] Hblks Hbms Hins Hbm Hireg Hdat Hppid Hprocs
@@ -1994,14 +2027,14 @@ Section ProofIput.
     iEval (rewrite -Hpa66) in "Hmty".
     iApply (wp_sh_s_sconf (mword_of_int (KernelSyms.iput + 0x66)) Rz Rs1
               (mword_of_int 68 : mword 12) mfi (K - 4)%nat
-              (di_type (di_trunc dn2)) eb with "Hcg Hpc Hi66 Hmty [-]").
+              (di_type (di_trunc dn)) eb with "Hcg Hpc Hi66 Hmty [-]").
     iIntros (CIDsh Hssh) "Hcg Hpc Hmty".
     iEval (rewrite Hpa66) in "Hmty".
     assert (Hsv66 : trunc16 (rget mfi Rz) = (mword_of_int 0 : mword 16)).
     { rewrite (rget_ne mfi Rz ltac:(nz)) Hx0. exact ip_trunc16_zero. }
     iEval (rewrite Hsv66) in "Hmty".
     (* the record iupdate will flush: the truncated one, with type zeroed *)
-    iAssert (inode_meta (ientry k) (di_free dn2))
+    iAssert (inode_meta (ientry k) (di_free dn))
       with "[Hmty Hmmaj Hmmin Hmnl Hmsz]" as "Hmeta".
     { rewrite /inode_meta /di_free /di_trunc.
       cbn [di_type di_major di_minor di_nlink di_size]. iFrame. }
@@ -2055,21 +2088,26 @@ Section ProofIput.
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     iApply (IU.wp_iupdate_sconf gs j gl gu gd gk pd pav pu bn g gfs gi
               cov logstart inodestart nib dev (ientry k) inum
-              (di_free dn2) (di_trunc dn2) bm_empty (u' - 1)%nat
+              (di_free dn) (di_trunc dn) bm_empty (u' - 1)%nat
               pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqs J4 (K - 4)%nat
               eb C eb
               ltac:(unfold K_iupdate; lia) Hgeom Hist Hicov Hilog Hnib
               (* §19.6 Part 1, THE LEFT DISJUNCT: this is the free path's
                  [ip->type = 0] flush, the one place in the kernel where a
                  record's type legitimately moves, and it moves to ZERO. *)
-              (InodeRegion.di_type_stable_zero (di_free dn2) (di_trunc dn2)
-                 (di_free_type dn2))
-              (* §20.6: [di_free] and [di_trunc] both rebuild the record
-                 with [di_nlink dn2] verbatim, so the ledger's monotone
-                 premise is a conversion. *)
-              (InodeRegion.di_nlink_stable_eq (di_free dn2) (di_trunc dn2)
-                 eq_refl)
-              (di_free_addrs dn2) ltac:(reflexivity) Hj Hgsj HJ4a0
+              (InodeRegion.di_type_stable_zero (di_free dn) (di_trunc dn)
+                 (di_free_type dn))
+              (* §20.6's iput row, and §20.14's (R1) cashed.  [di_free] and
+                 [di_trunc] both rebuild the record with [di_nlink dn]
+                 verbatim, and [dn] IS the record whose [nlink] halfword
+                 the [c.bnez] at +0x44 found zero -- it survives the
+                 sleeplock window because [ic_open_held] is
+                 record-parametric.  So the region learns [di_nlink = 0] of
+                 the record it is about to type-zero, which is (L3), and
+                 (L1) then collapses to [w = 0]: nothing names this inum. *)
+              (InodeRegion.di_nlink_stable_free (di_free dn) (di_trunc dn)
+                 eq_refl (ip_nlink_zero (di_nlink dn) Hnl0))
+              (di_free_addrs dn) ltac:(reflexivity) Hj Hgsj HJ4a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlogc Hidv Hinh Hmeta Hmap
                     Hins Hireg Hdat Hppid Hprocs Hdevi Hdgeom Hdlock Hbs2 [Hop] [-]").
     { rewrite Hu'1. iExact "Hop". }
@@ -2079,7 +2117,7 @@ Section ProofIput.
        iupdate ran [InodeRegion.ireg_free_au] -- the fragment went back INTO
        the region invariant and what comes out is the MARKER, which is
        exactly what the park below deposits. *)
-    iDestruct (ireg_out_free_inv gi inum (di_free dn2) (di_free_type dn2)
+    iDestruct (ireg_out_free_inv gi inum (di_free dn) (di_free_type dn)
                  with "Hdat") as "Hdat".
     assert (Hpc70 : ret_pc (J4 !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x70))
       by (rewrite HJ4ra; pcw).
@@ -2131,7 +2169,7 @@ Section ProofIput.
       iDestruct "Hmap" as "[Haddrs Hind]".
       iSplitR "Hpend"; [| iExact "Hpend"].
       iSplitR "Hdat".
-      - rewrite /inode_raw. iSplitL "Hmeta"; [by iExists (di_free dn2) |].
+      - rewrite /inode_raw. iSplitL "Hmeta"; [by iExists (di_free dn) |].
         iExists (bm_cells bm_empty). iSplitR; [iPureIntro; reflexivity |].
         iExact "Haddrs".
       - rewrite /ipool_shape. iRight. iExact "Hdat". }
@@ -2315,7 +2353,7 @@ Section ProofIput.
     iEval (rewrite Hpp20d) in "Hpc".
     iDestruct "HRres2" as (Mt2 ci2) "(Hhalf2 & %Hwf2 & %Hciwf2 & Hiauth2 & Hslots2 & Hpool2)".
     iApply (ip_tail (CID := CIDac2) CID j bn g gfs gi cn gtl cov logstart bmapstart
-              inodestart nib size dev used (used ∖ bm_blocks bm2) k q inum Mt2 ci2
+              inodestart nib size dev used (used ∖ bm_blocks bm) k q inum Mt2 ci2
               n (u' - 1)%nat pidv dq dqb dqs m J10 K eb C sp0 (m !!! Regidx Rs2)
               HK Hk ltac:(wp_next_chain) Hsp0eq HJ10regs Hwf2 Hciwf2
               ltac:(unfold iput_units; lia) ltac:(lia) ltac:(apply ip_diff_sub)

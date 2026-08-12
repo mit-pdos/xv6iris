@@ -3705,6 +3705,184 @@ is unaffected.
 
 
 
+## S5g — §20's (R1) AND THE LEDGER'S CLAUSES ARE LANDED AND FULLY GATED.
+## `ireg_link_ok` is (L1)+(L3), "a free inode is named by no live directory
+## record" is a THEOREM of the region, and the accessor that cashes it
+## exists.  **Stage B NOT started; (R2) is STOPPED-AND-REPORTED — the
+## escrow arm is not M1's home either, and the reason is not the home**
+
+### What landed, green (5 files, full tree green first try after one fix)
+
+* **(R1) `IcacheEscrow.ic_open_held` IS RECORD-PARAMETRIC.**  New
+  `ic_payload_at γfs γi cov logstart k inum g dn bm` — the LOADED polarity
+  at a named record — with `ic_payload_at_pack` back to `ic_payload … true`
+  and its own `Timeless`.  `ic_open_held` takes and returns
+  `ic_payload_at … dn bm` (the `v` parameter is GONE; both call sites pass
+  `true`), so `ProofIput`'s post-`acquiresleep` re-open at +0x54 yields the
+  SAME `dn`, not a fresh `dn2`.  `ic_payload` itself is untouched — the
+  nineteen files that name it, and every arm that binds the record
+  existentially, did not move.
+* **`InodeRegion.ireg_link_ok d w` IS §20.2's (L1)+(L3)**:
+  `w ≤ Z.to_nat (di_nlink d)` and `di_type d = 0 → di_nlink d = 0`.  All
+  six arm moves re-establish it — `ireg_write_au` (L1 rides on
+  `di_nlink_stable`, L3 vacuous), `ireg_claim_au` (the OLD record's L3
+  collapses L1 to `w = 0`, which is the step S5f called the knot),
+  `ireg_free_au` (**`w = 0` derived inside the region**), `ireg_withdraw`
+  (record unchanged, clause verbatim), `ireg_write_link` /
+  `ireg_write_unlink` (L1 grows / falls on both sides at once).  Two pure
+  readers land with it: `ireg_link_ok_alloc` (the `ilink ⟹ w≥1 ⟹ nlink≥1
+  ⟹ type≠0` chain) and `ireg_link_ok_free`.
+* **`di_nlink_stable` GAINS ITS DOCUMENTED SECOND CONJUNCT** —
+  `di_type dn' = 0 → di_nlink dn' = 0`.  This is where (L3)'s travelling
+  half belongs and it is why the tour cost NOTHING: the premise slot
+  already exists in `SpecIupdate`×3, `SpecWritei`, `SpecItrunc`,
+  `SpecDirlink` and every proof that merely passes it through, so **zero
+  contract edits** and exactly **three discharge sites** in the whole tree
+  (`ProofFilewrite:2055`, `ProofIput`'s itrunc call, `ProofIput`'s free).
+  `_refl` / `_eq` now take the record's nonzero type (every ordinary writer
+  has it from `inode_ok`); new `di_nlink_stable_free` is iput's, and both
+  of its conjuncts come out of the one zero.
+* **`ProofIput` carries `ip->nlink == 0` to the free.**  `ip_sext64_16_inj`
+  + `ip_nlink_zero` turn the +0x44 `c.bnez` fall-through into
+  `bv_unsigned (di_nlink dn) = 0`; (R1) carries `dn` across the window;
+  `di_nlink_stable_free (di_free dn) (di_trunc dn) eq_refl …` hands it to
+  the region.  `dn2`/`bm2` are gone — the free path names one record.
+* **`InodeRegion.ireg_link_alloc`, the accessor S5f described.**
+  `ireg_read_blk`'s credential (the dinode block's machinery half, between
+  a `bread` and a `brelse`) plus `ilink z` ⟹ the decoded list and
+  `di_type (ds !!! islot z) ≠ 0`, fragment borrowed and returned,
+  mask-preserving.  This is §20.4's licence (a) cashed, and it is what
+  stage C's `SpecIget` premise will consume.
+* **`IcacheBoot.ireg_alloc` gains (L3) as an image IOU** —
+  `image_free_nlink`, in ∀-over-decodings form because `dss` is produced by
+  `image_decode` inside the proof.  Free: `ireg_alloc` still has no callers.
+
+### Gate
+
+`~/mk7.sh` (detached, `/tmp/mk7.log`, `make -f CoqMakefile -j24 -k`) on the
+EC2 mirror synced at `986e2e59` + the five files: **`EXIT=0`, zero `Error`,
+1054 `.vo` (unchanged)**.  `~/audit7.sh` → `Print Assumptions` on all
+fourteen linked fs theorems (Dirlink, Iupdate ×3, Itrunc, Iput,
+Iunlockput, Ilock, Ialloc, Writei ×2, Namex, Namei, Filewrite):
+**every one is `functional_extensionality_dep` + the five `rv64d.*`
+platform axioms**, plus filewrite's pre-existing declared
+`LinkConsolewrite.Consolewrite.wp_consolewrite_sconf`.  Cones unchanged.
+No `_CoqProject` edit, no git write on EC2, mirror quiet throughout.
+
+`lemma_diff`: +`ic_payload_at`, +`ic_payload_at_timeless`,
++`ic_payload_at_pack`, +`ic_payload_at_size` (Local) in `IcacheEscrow`;
++`di_nlink_nonneg`, +`di_nlink_stable_free`, +`ireg_link_ok_alloc`,
++`ireg_link_ok_free`, +`ireg_link_alloc` in `InodeRegion`;
++`image_free_nlink`, +`ip_sext64_16_inj`, +`ip_nlink_zero`.  Nothing
+retired: `ic_payload_excl` / `ic_payload_unloaded_excl` stay (they are the
+`ic_payload`-shaped refutations other openers use).  Every addition is
+named by §20.13/§20.14 or is the arithmetic side condition four of them
+share.
+
+### (R2) STOP-AND-REPORT: the ESCROW ARM is not M1's home either, and the
+### obstruction is the DIRECTION of the count, not the address
+
+§20.14 homes M1's clause in the escrow arm — "the arm is per-slot and knows
+its inum via `ic_id`, so it can carry *outstanding `iref_lic` fragments for
+this inum ≤ the slot's count*".  Worked against the arms' actual shapes
+(`IcacheEscrow.v:774-853`), three things object, and only the first is
+about the address:
+
+1. **The arm does not know the slot's COUNT.**  It knows its inum
+   (`ic_id cn k (1/2) true dev inum`) and it knows a LIVENESS slice
+   (`live_gen k (1/2) g`, and `ic_dep_res`'s `Qp` on the OUT arm).  The
+   count is `M !! k = Some (q, n)` under `own icfg_iref (● M)` in
+   `itable_inv` (`IcacheInv.v:592`), and no arm holds a count fragment at
+   all.  So `≤ the slot's count` has no denotation in the arm as it
+   stands; giving the arm one re-opens §13/§14's share arithmetic (the arm
+   already carries the liveness ½ as an exact complement, and a
+   differently-keyed second slice is what §17.2 got wrong).
+2. **THE DIRECTION IPUT NEEDS IS THE WHOLE-SHARE ONE, i.e. §17.5's mass
+   ledger.**  This is the real objection and it holds at EVERY home.  From
+   `iref_lic z` against `● (…, r)` an auth gives `1 ≤ r`.  iput's discharge
+   of `ireg_free_au`'s `c = None` needs `r ≤ 1` — *no OTHER reference to
+   `z` exists* — and a `nat` counter authority cannot deliver the ABSENCE
+   of fragments from the presence of one.  It needs an exact-sum clause
+   tied to something a holder owns WHOLLY, which is precisely the §14
+   machine §20.2 declared unnecessary for the `w` half (rightly — the
+   free's obligation there is read off the AUTHORITY).  **M1 is not one
+   clause in any home; it is a whole-share witness.**
+3. **AND IPUT'S FREE RUNS OUTSIDE THE ITABLE LOCK.**  `release` is at
+   iput+0x5c (`ProofIput.v`'s `wp_release_sconf`), the region free at
+   +0x70's `iupdate`; the reference was deposited into the OUT arm at +0x54
+   and `itable_half` went back with the lock.  So at the free iput holds
+   neither the count share nor the lock — only the sleeplock token and the
+   checked-out cells.  Any count fact must therefore be carried ACROSS the
+   release, which is a TEMPORAL carrier, i.e. §20.7's **(M2)** shape (a
+   generation bump at the free), not (M1)'s.
+
+**Constructive residue, for whoever prices M1 next.**  The OUT arm DOES
+persist across the release and it holds iput's whole deposited reference
+(`DepRef q dev inum g`, and REF-1 says that `q` IS the map's share).  So
+the arm is the right place for a *residual* — "the fragments for this inum
+that are not in any client's hand" — and the missing half is exactly
+"`q` is the whole share", which lives in `itable_half`.  Either M1 buys the
+whole-share witness (§14's machine, which §20.2 avoided) or (M2)'s bump
+carries REF-1 past the release; §20.14 chose neither.  **No code was
+written for (R2).**
+
+### NOT STARTED
+
+**Stage B in full** — `dir_links`, the five DirView twins, the boot IOU's
+fragments, the five re-park sites.  It was not begun.  One sizing note it
+is worth having: `dir_links` is an **iProp** over `icfg_link`, and
+`DirView.v` is a PURE file that requires neither `IcacheRef` nor the
+proofmode.  Nothing forbids it importing `IcacheRef` (no cycle:
+`IcacheRef` requires no fs file), but §20.3's "five short lemmas mirroring
+the pure ones" understates the move — DirView stops being a pure record
+view.  The alternative home is `IcacheEscrow.v`, which already imports
+both, at the cost of splitting the twins from the pure lemmas they mirror.
+**Decide that before starting B.**
+
+### Traps recorded
+
+1. **`ireg_read`'s opening leaves the SLOT big-op under a `▷`; every arm
+   move strips it with `>Hsls`.**  `ireg_read` does not (it never touches
+   the slots), so copying ITS opening into a lemma that DOES read a slot
+   fails at the clause with **`Tactic failure: iPure: (▷ ⌜ireg_link_ok …⌝)
+   not pure`** — which reads as a purity defect in the freshly-landed
+   clause and is a missing `>` three lines up.
+2. **`set (dn2 := dn)` is the wrong tool for keeping a downstream name
+   after (R1) pins the record.**  `set` abstracts occurrences of `dn` INTO
+   `dn2` — the opposite direction — and silently rewrites the context.
+   Rename the downstream occurrences instead (13 of them in `ProofIput`).
+3. **A record-parametric opener needs no new proof.**  `ic_open_held`'s
+   only use of the bundle is its SIZE cell, in the PARKED and MID
+   refutations; replacing the two `ic_payload_excl` calls with the
+   `ic_payload_at_size` / `ic_payload_size` pair fed to `iesc_word4_excl`
+   is the entire edit.  Worth knowing before re-proving a 40-line opener.
+4. **Strengthening a TRAVELLING predicate is far cheaper than adding a
+   premise.**  (L3)'s travelling half cost zero contract edits because
+   `di_nlink_stable` already rode through all five; a new premise slot
+   would have been §19.9's tour again.  Check for an existing carrier
+   before pricing a tour.
+
+### What stage C inherits (essentials)
+
+* `InodeRegion.ireg_link_alloc` — the licence-(a) accessor, ready.  Its
+  credential is the dinode block's machinery half, so the `SpecIget`
+  premise it discharges must be consumed at a caller that is between
+  `bread` and `brelse` of the target's block, or the fact must be taken at
+  the region and carried.  **That shapes §20.4's six-licence `iname`: (a)
+  is not free-standing, it is block-scoped.**
+* (L4), the ROOT clause, is NOT landed (`ireg_body` is untouched); licence
+  (f) has nothing behind it yet.  It is one conjunct in `ireg_body` plus
+  its preservation obligation on S7's unlink.
+* `ireg_claim_au` still pays out `True`, not `iclaim`: (L2) and (L3)'s
+  `c = None` half are still absent, for the reason `InodeRegion.v`'s own
+  note now records — the free cannot re-establish `c = None` without
+  CONSUMING an `iclaim` it does not hold.  Licence (d) and §20.5 wait on
+  (R2)'s repair, not on stage B or C.
+* Stage D's derivation is therefore still relative to `ireg_free_au`'s
+  unproven `c = None`, exactly as §20.11's stage-E note says — but the
+  `di_nlink dn' = 0` half of §20.6's iput row is now DISCHARGED, so what
+  D owes is one premise, not two.
+
 ## UNSATISFIABLE, and that is the finding that matters
 
 ### B1 (proc_priv -> proc_priv_core) — DONE, and the composition probe passed first try
