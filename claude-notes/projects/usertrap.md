@@ -280,12 +280,41 @@ so the instruction count is not the driver — the resource assembly is.
   kernel") is a fold, and its ORDER is a theorem: nothing before +0x1e can
   set SIE = 1, because `sie_ghost_flip` needs all three fractions and the
   quarter is not inside an `intr_res` to be found in.
-  The remaining Phase A work is the nine instructions themselves, and the
-  leaves all exist — `ProofPrepareReturn` uses every one of them verbatim
-  (`wp_caddi_sp_push_s_sconf`, `wp_csdsp_s_sconf`, `wp_caddi4spn_s_sconf`,
-  `wp_jal_s_sconf`, `wp_auipc_s_sconf`, `wp_addi4_s_sconf`, `wp_cld_s_sconf`,
-  `wp_csd_s_sconf`, and **`wp_csrw_stvec_s_sconf`, which takes the RAW stvec
-  cell** — exactly what the boundary hands over).
+  The remaining Phase A work is the walk itself, and **every ingredient it
+  needs already exists** — checked one by one, so it is a mechanical chain
+  rather than an exploration. Per instruction:
+
+  | off | insn | leaf | pure fact |
+  |---|---|---|---|
+  | +0x00 | `c.addi sp,sp,-32` | `wp_caddi_sp_push_s_sconf` | `KernelRvcDecode.stk_push_32` |
+  | +0x02 | `c.sdsp ra,24(sp)` | `wp_csdsp_s_sconf` | `stk_frm` at `d=4,u=3,k=1` |
+  | +0x04 | `c.sdsp s0,16(sp)` | `wp_csdsp_s_sconf` | `stk_frm` at `4,2,2` |
+  | +0x06 | `c.sdsp s1,8(sp)` | `wp_csdsp_s_sconf` | `stk_frm` at `4,1,3` |
+  | +0x08 | `c.sdsp s2,0(sp)` | `wp_csdsp_s_sconf` | `stk_frm` at `4,0,4` |
+  | +0x0a | `c.addi4spn s0,sp,32` | `wp_caddi4spn_s_sconf` | `stk_fp_32` |
+  | +0x0c | `csrr a5,sstatus` | `WpSconfCsr.wp_csrr_sstatus_s_sconf` | — |
+  | +0x10 | `andi a5,a5,256` | `WpSconfAlu.wp_andi_s_sconf` | — |
+  | +0x14 | `c.bnez a5` (NOT taken) | `WpSconfBtype.wp_cbnez_fall_s_sconf` | `ut_spp_clear_neq` |
+  | +0x16 | `auipc a5,0x3` | `wp_auipc_s_sconf` | — |
+  | +0x1a | `addi a5,a5,-374` | `wp_addi4_s_sconf` | — |
+  | +0x1e | `csrw stvec,a5` | `wp_csrw_stvec_s_sconf` (takes the **RAW** cell) | then `ut_trap_csrs_fold` |
+  | +0x22 | `jal myproc` | `wp_jal_s_sconf` + `MYPROC.wp_myproc_sconf` | — |
+  | +0x26 | `c.mv s1,a0` | `WpSconfAlu.wp_cmv_s_sconf` | — |
+  | +0x28 | `c.ld a5,88(a0)` | `wp_cld_s_sconf` | — (opens `proc_priv`) |
+
+  The frame words come out of `StackOwn.stack_own_4_elim`, and the epilogue's
+  `c.addi16sp sp,32` at +0xfc is `stk_pop_32`. **The prologue needs no new
+  pure lemma at all** — `stk_push_32` / `stk_fp_32` / `stk_pop_32` are already
+  in `KernelRvcDecode.v` for exactly a 32-byte frame, and `stk_frm` is the
+  generic slot-address lemma (its own header gives the call form:
+  `apply stk_frm; apply bv_eq; vm_compute; reflexivity`, both indices closed,
+  `X` symbolic). `ProofPrepareReturn` is the walk template for all of it —
+  its first four steps are +0x00..+0x06 with the frame two slots smaller.
+
+  The one step that is not prologue bookkeeping is **+0x28**, the first read
+  of `p->trapframe`: it needs `proc_priv` opened for the `p_trapframe` cell,
+  which is where Phase A stops being mechanical and Phase B's resource work
+  begins.
 
   One thing the bundle deliberately does NOT carry:
   `intr_handler_spec kernelvec`. `SpecKernelvec.kernelvec_handler_spec` builds

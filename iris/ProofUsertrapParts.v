@@ -93,4 +93,15 @@ Section UsertrapParts.
       apply Z.eqb_neq. lia.
   Qed.
 
+  (* the same fact in the form the BRANCH LEAF consumes.
+     [WpSconfBtype.wp_cbnez_fall_s_sconf] wants [neq_vec _ zero_reg = false],
+     so stating it here saves the walk a polarity step at the one site that
+     needs it -- and keeps [ut_spp_clear_eq] itself in [kt_spp_set_neq]'s
+     [eq_vec] spelling, which is the twin's. *)
+  Lemma ut_spp_clear_neq (ms : mword 64) :
+    _get_Mstatus_SPP ms = ('b"0" : mword 1) ->
+    neq_vec (and_vec (sstatus_read ms)
+              (sign_extend' 64 (mword_of_int 256 : mword 12))) zero_reg = false.
+  Proof. intro H. unfold neq_vec. rewrite (ut_spp_clear_eq ms H). reflexivity. Qed.
+
 End UsertrapParts.
