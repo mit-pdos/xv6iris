@@ -338,6 +338,28 @@ bookkeeping, no phase, and no second window.
   and data translations walk two DIFFERENT leaf slots patches both. (The
   peel is still single-window, so this is the direction a later widening
   takes, not something available today.)
+
+  **AND THE WIDENING IS LOAD-BEARING FOR 6c, NOT A CORNER (2026-08-12).**
+  Do not assume the two-translation case away: kernel PTEs are INSTALLED
+  WITHOUT A/D (`kvmmap`/`mappages` write `PTE_R|PTE_X` / `PTE_R|PTE_W` and
+  nothing else — `kperm_flags`'s `(true, true)` is only the A/D-CANONICAL
+  ghost representative, not what the code writes), so fetch walks DO miss
+  and DO write back on first touch.  And first touch is the COMMON case:
+  every `sfence.vma`/satp switch empties the TLB, and xv6 crosses one on
+  every user/kernel transition — so the first memory-touching instruction
+  after any crossing can pay a fetch miss AND a data miss in one step: two
+  racy windows, with the fetch's CAS write PRECEDING the data walk's racy
+  read (which the phase-flip design's renunciation forbids at one window).
+  Consequences: (i) per-vpn "A already set" tracking in the invariant
+  makes steady-state fetch walks read-only but does not remove the second
+  window and does nothing for first touch — insufficient alone; (ii) the
+  cheapest widening shape is SEQUENTIAL windows via the CPS kit
+  (translations never interleave: a peel at window₁ whose post-racy
+  continuation is a fresh peel at window₂), with a new certifier rule for
+  nested peels and the `wadm` transport across the other window's write as
+  the price; (iii) the WP rule for a post-crossing instruction cannot be
+  stated without it — settle this widening's shape BEFORE the 6c leaf
+  rule.
 - **`acc_wf` gymnastics at the window disappear** for the mirror: the patch
   is byte-addressed, so a partially-overlapping access needs no case split.
 - **It subsumes the `started` cone.** For a trace that reads the window once
