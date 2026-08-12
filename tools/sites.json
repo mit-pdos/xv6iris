@@ -1,0 +1,447 @@
+{
+ "intr_off_audit": [
+  {
+   "class": "racy_load",
+   "off": 22,
+   "ok": true,
+   "pc": 2147487380,
+   "sym": "main",
+   "why": "pre-scheduler boot path.  start() enables sie.SEIE/STIE but never sets sstatus.SIE; the first intr_on() in the whole kernel is inside scheduler(), which main() only reaches after the started publication (start.c, main.c, proc.c)."
+  },
+  {
+   "class": "racy_load",
+   "off": 28,
+   "ok": true,
+   "pc": 2147490132,
+   "sym": "forkret",
+   "why": "reached only by swtch() from scheduler(), whose loop does intr_on(); intr_off(); BEFORE acquire(&p->lock) -- so the push_off recorded intena = 0 and forkret's release(&p->lock) pop_off() does NOT re-enable interrupts.  The `first` acquire-load and release-store therefore run with SIE clear. NOTE: this depends on scheduler()'s intr_on();intr_off() pair; an xv6 revision without it would leave these two sites interruptible (proc.c)."
+  },
+  {
+   "class": "release_store",
+   "off": 26,
+   "ok": true,
+   "pc": 2147486890,
+   "sym": "release",
+   "why": "release() runs inside the critical section it is ending: pop_off() comes AFTER the flag store, so the fence+store pair is still under push_off (spinlock.c)."
+  },
+  {
+   "class": "release_store",
+   "off": 176,
+   "ok": true,
+   "pc": 2147487534,
+   "sym": "main",
+   "why": "pre-scheduler boot path.  start() enables sie.SEIE/STIE but never sets sstatus.SIE; the first intr_on() in the whole kernel is inside scheduler(), which main() only reaches after the started publication (start.c, main.c, proc.c)."
+  },
+  {
+   "class": "release_store",
+   "off": 56,
+   "ok": true,
+   "pc": 2147490160,
+   "sym": "forkret",
+   "why": "reached only by swtch() from scheduler(), whose loop does intr_on(); intr_off(); BEFORE acquire(&p->lock) -- so the push_off recorded intena = 0 and forkret's release(&p->lock) pop_off() does NOT re-enable interrupts.  The `first` acquire-load and release-store therefore run with SIE clear. NOTE: this depends on scheduler()'s intr_on();intr_off() pair; an xv6 revision without it would leave these two sites interruptible (proc.c)."
+  },
+  {
+   "class": "amo",
+   "off": 28,
+   "ok": true,
+   "pc": 2147486756,
+   "sym": "acquire",
+   "why": "push_off() is the first thing acquire() does, so the amoswap runs with sstatus.SIE clear (spinlock.c)."
+  },
+  {
+   "class": "fence",
+   "off": 22,
+   "ok": true,
+   "pc": 2147486886,
+   "sym": "release",
+   "why": "release() runs inside the critical section it is ending: pop_off() comes AFTER the flag store, so the fence+store pair is still under push_off (spinlock.c)."
+  },
+  {
+   "class": "fence",
+   "off": 24,
+   "ok": true,
+   "pc": 2147487382,
+   "sym": "main",
+   "why": "pre-scheduler boot path.  start() enables sie.SEIE/STIE but never sets sstatus.SIE; the first intr_on() in the whole kernel is inside scheduler(), which main() only reaches after the started publication (start.c, main.c, proc.c)."
+  },
+  {
+   "class": "fence",
+   "off": 172,
+   "ok": true,
+   "pc": 2147487530,
+   "sym": "main",
+   "why": "pre-scheduler boot path.  start() enables sie.SEIE/STIE but never sets sstatus.SIE; the first intr_on() in the whole kernel is inside scheduler(), which main() only reaches after the started publication (start.c, main.c, proc.c)."
+  },
+  {
+   "class": "fence",
+   "off": 30,
+   "ok": true,
+   "pc": 2147490134,
+   "sym": "forkret",
+   "why": "reached only by swtch() from scheduler(), whose loop does intr_on(); intr_off(); BEFORE acquire(&p->lock) -- so the push_off recorded intena = 0 and forkret's release(&p->lock) pop_off() does NOT re-enable interrupts.  The `first` acquire-load and release-store therefore run with SIE clear. NOTE: this depends on scheduler()'s intr_on();intr_off() pair; an xv6 revision without it would leave these two sites interruptible (proc.c)."
+  },
+  {
+   "class": "fence",
+   "off": 52,
+   "ok": true,
+   "pc": 2147490156,
+   "sym": "forkret",
+   "why": "reached only by swtch() from scheduler(), whose loop does intr_on(); intr_off(); BEFORE acquire(&p->lock) -- so the push_off recorded intena = 0 and forkret's release(&p->lock) pop_off() does NOT re-enable interrupts.  The `first` acquire-load and release-store therefore run with SIE clear. NOTE: this depends on scheduler()'s intr_on();intr_off() pair; an xv6 revision without it would leave these two sites interruptible (proc.c)."
+  },
+  {
+   "class": "fence",
+   "off": 370,
+   "ok": true,
+   "pc": 2147506386,
+   "sym": "virtio_disk_rw",
+   "why": "holds disk.vdisk_lock (acquire -> push_off) across the whole body (virtio_disk.c)."
+  },
+  {
+   "class": "fence",
+   "off": 386,
+   "ok": true,
+   "pc": 2147506402,
+   "sym": "virtio_disk_rw",
+   "why": "holds disk.vdisk_lock (acquire -> push_off) across the whole body (virtio_disk.c)."
+  },
+  {
+   "class": "fence",
+   "off": 44,
+   "ok": true,
+   "pc": 2147506590,
+   "sym": "virtio_disk_intr",
+   "why": "holds disk.vdisk_lock (acquire -> push_off) across the whole body (virtio_disk.c)."
+  },
+  {
+   "class": "fence",
+   "off": 62,
+   "ok": true,
+   "pc": 2147506608,
+   "sym": "virtio_disk_intr",
+   "why": "holds disk.vdisk_lock (acquire -> push_off) across the whole body (virtio_disk.c)."
+  },
+  {
+   "class": "fencei",
+   "off": 0,
+   "ok": true,
+   "pc": 2147508380,
+   "sym": "userret",
+   "why": "trampoline; usertrapret() does intr_off() before jumping here (trap.c, trampoline.S)."
+  }
+ ],
+ "racy_byte_audit": [
+  {
+   "flag": "first.1",
+   "refs": [
+    {
+     "feeds_site": 2147490132,
+     "off": 24,
+     "pc": 2147490128,
+     "sym": "forkret",
+     "text": "addi a5,a5,-1884 # 8000a1f0 <first.1>"
+    },
+    {
+     "feeds_site": 2147490160,
+     "off": 48,
+     "pc": 2147490152,
+     "sym": "forkret",
+     "text": "addi a5,a5,-1908 # 8000a1f0 <first.1>"
+    }
+   ],
+   "unaccounted": []
+  },
+  {
+   "flag": "started",
+   "refs": [
+    {
+     "feeds_site": 2147487380,
+     "off": 16,
+     "pc": 2147487374,
+     "sym": "main",
+     "text": "addi a4,a4,934 # 8000a230 <started>"
+    },
+    {
+     "feeds_site": 2147487534,
+     "off": 166,
+     "pc": 2147487524,
+     "sym": "main",
+     "text": "addi a5,a5,784 # 8000a230 <started>"
+    }
+   ],
+   "unaccounted": []
+  }
+ ],
+ "sites": {
+  "amo": [
+   {
+    "amoop": "amoswap",
+    "aq": true,
+    "lr": false,
+    "next": "sext.w a5,a5",
+    "next_pc": 2147486760,
+    "off": 28,
+    "pc": 2147486756,
+    "prev": "mv a5,a4",
+    "prev_pc": 2147486754,
+    "real": true,
+    "rl": false,
+    "sc": false,
+    "sym": "acquire",
+    "text": "amoswap.w.aq a5,a5,(s1)",
+    "width": 32,
+    "word": 217360303
+   }
+  ],
+  "fence": [
+   {
+    "class": "rel",
+    "next": "sw zero,0(s1)",
+    "next_pc": 2147486890,
+    "off": 22,
+    "pc": 2147486886,
+    "pred": 3,
+    "pred_bits": "rw",
+    "prev": "sd zero,16(s1)",
+    "prev_pc": 2147486882,
+    "real": true,
+    "succ": 1,
+    "succ_bits": "w",
+    "sym": "release",
+    "text": "fence rw,w",
+    "width": 32,
+    "word": 51380239
+   },
+   {
+    "class": "acq",
+    "next": "sext.w a5,a5",
+    "next_pc": 2147487386,
+    "off": 24,
+    "pc": 2147487382,
+    "pred": 2,
+    "pred_bits": "r",
+    "prev": "lw a5,0(a4)",
+    "prev_pc": 2147487380,
+    "real": true,
+    "succ": 3,
+    "succ_bits": "rw",
+    "sym": "main",
+    "text": "fence r,rw",
+    "width": 32,
+    "word": 36700175
+   },
+   {
+    "class": "rel",
+    "next": "sw a4,0(a5)",
+    "next_pc": 2147487534,
+    "off": 172,
+    "pc": 2147487530,
+    "pred": 3,
+    "pred_bits": "rw",
+    "prev": "li a4,1",
+    "prev_pc": 2147487528,
+    "real": true,
+    "succ": 1,
+    "succ_bits": "w",
+    "sym": "main",
+    "text": "fence rw,w",
+    "width": 32,
+    "word": 51380239
+   },
+   {
+    "class": "acq",
+    "next": "sext.w a5,a5",
+    "next_pc": 2147490138,
+    "off": 30,
+    "pc": 2147490134,
+    "pred": 2,
+    "pred_bits": "r",
+    "prev": "lw a5,0(a5)",
+    "prev_pc": 2147490132,
+    "real": true,
+    "succ": 3,
+    "succ_bits": "rw",
+    "sym": "forkret",
+    "text": "fence r,rw",
+    "width": 32,
+    "word": 36700175
+   },
+   {
+    "class": "rel",
+    "next": "sw zero,0(a5)",
+    "next_pc": 2147490160,
+    "off": 52,
+    "pc": 2147490156,
+    "pred": 3,
+    "pred_bits": "rw",
+    "prev": "addi a5,a5,-1908 # 8000a1f0 <first.1>",
+    "prev_pc": 2147490152,
+    "real": true,
+    "succ": 1,
+    "succ_bits": "w",
+    "sym": "forkret",
+    "text": "fence rw,w",
+    "width": 32,
+    "word": 51380239
+   },
+   {
+    "class": "full",
+    "next": "ld a4,8(a5)",
+    "next_pc": 2147506390,
+    "off": 370,
+    "pc": 2147506386,
+    "pred": 15,
+    "pred_bits": "iorw",
+    "prev": "sh a0,4(a3)",
+    "prev_pc": 2147506382,
+    "real": true,
+    "succ": 15,
+    "succ_bits": "iorw",
+    "sym": "virtio_disk_rw",
+    "text": "fence",
+    "width": 32,
+    "word": 267386895
+   },
+   {
+    "class": "full",
+    "next": "lui a5,0x10001",
+    "next_pc": 2147506406,
+    "off": 386,
+    "pc": 2147506402,
+    "pred": 15,
+    "pred_bits": "iorw",
+    "prev": "sh a5,2(a4)",
+    "prev_pc": 2147506398,
+    "real": true,
+    "succ": 15,
+    "succ_bits": "iorw",
+    "sym": "virtio_disk_rw",
+    "text": "fence",
+    "width": 32,
+    "word": 267386895
+   },
+   {
+    "class": "full",
+    "next": "ld a5,16(s1)",
+    "next_pc": 2147506594,
+    "off": 44,
+    "pc": 2147506590,
+    "pred": 15,
+    "pred_bits": "iorw",
+    "prev": "sw a5,100(a4)",
+    "prev_pc": 2147506588,
+    "real": true,
+    "succ": 15,
+    "succ_bits": "iorw",
+    "sym": "virtio_disk_intr",
+    "text": "fence",
+    "width": 32,
+    "word": 267386895
+   },
+   {
+    "class": "full",
+    "next": "ld a4,16(s1)",
+    "next_pc": 2147506612,
+    "off": 62,
+    "pc": 2147506608,
+    "pred": 15,
+    "pred_bits": "iorw",
+    "prev": "beq a4,a5,800059fc <virtio_disk_intr+0x8a>",
+    "prev_pc": 2147506604,
+    "real": true,
+    "succ": 15,
+    "succ_bits": "iorw",
+    "sym": "virtio_disk_intr",
+    "text": "fence",
+    "width": 32,
+    "word": 267386895
+   }
+  ],
+  "fencei": [
+   {
+    "next": "sfence.vma",
+    "next_pc": 2147508384,
+    "off": 0,
+    "pc": 2147508380,
+    "prev": "jalr t0",
+    "prev_pc": 2147508378,
+    "real": true,
+    "sym": "userret",
+    "text": "",
+    "width": 32,
+    "word": 4111
+   }
+  ],
+  "racy_load": [
+   {
+    "delta": 2,
+    "fence": "fence r,rw",
+    "fence_pc": 2147487382,
+    "off": 22,
+    "pc": 2147487380,
+    "real": true,
+    "sym": "main",
+    "text": "lw a5,0(a4)",
+    "width": 16,
+    "word": 1000220
+   },
+   {
+    "delta": 2,
+    "fence": "fence r,rw",
+    "fence_pc": 2147490134,
+    "off": 28,
+    "pc": 2147490132,
+    "real": true,
+    "sym": "forkret",
+    "text": "lw a5,0(a5)",
+    "width": 16,
+    "word": 1000348
+   }
+  ],
+  "real_instructions": 8457,
+  "release_store": [
+   {
+    "delta": 4,
+    "fence": "fence rw,w",
+    "fence_pc": 2147486886,
+    "off": 26,
+    "pc": 2147486890,
+    "real": true,
+    "sym": "release",
+    "text": "sw zero,0(s1)",
+    "width": 32,
+    "word": 303139
+   },
+   {
+    "delta": 4,
+    "fence": "fence rw,w",
+    "fence_pc": 2147487530,
+    "off": 176,
+    "pc": 2147487534,
+    "real": true,
+    "sym": "main",
+    "text": "sw a4,0(a5)",
+    "width": 16,
+    "word": 3077686168
+   },
+   {
+    "delta": 4,
+    "fence": "fence rw,w",
+    "fence_pc": 2147490156,
+    "off": 56,
+    "pc": 2147490160,
+    "real": true,
+    "sym": "forkret",
+    "text": "sw zero,0(a5)",
+    "width": 32,
+    "word": 499747
+   }
+  ],
+  "text_hi": 2147508516,
+  "text_lo": 2147483648,
+  "violations": [],
+  "walk_covers_real": true,
+  "walk_end": 2147508516,
+  "walk_positions": 9215
+ },
+ "xv6_rev": "9dd28f5e3526197b65a58306ce90248647c77777"
+}

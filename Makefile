@@ -43,6 +43,7 @@ IRIS  := iris
 
 DUMPER     := tools/dump_elf.py
 GENCODE    := tools/gen_code.py
+GENSITES   := tools/gen_sites.py
 XV6_DIR    := xv6-riscv
 XV6_URL    ?= https://github.com/mit-pdos/xv6-riscv
 KERNEL_ELF := $(XV6_DIR)/kernel/kernel
@@ -75,6 +76,7 @@ USER_DUMPS ?= sync:Sync
 
 .PHONY: all proofs model kernel user dump dump-force kernel-rocq user-rocq \
         xv6-rev-check sail-rev-check gen-code check-decode update-decode \
+        gen-sites check-sites \
         clean clean-proofs distclean model-gen
 
 all: proofs
@@ -186,6 +188,25 @@ GENFILES := $(addprefix $(IRIS)/,$(shell $(PYTHON) -c "import json;print(' '.joi
 check-decode: gen-code
 	git diff --exit-code -- $(IRIS)/KernelDecode*.v $(GENFILES)
 update-decode: gen-code
+
+# The memory-ordering SITE enumeration, a sibling of the decode layer: same
+# inputs (the tracked kernel-rocq/ dump), same rule that its outputs are
+# generated and never patched.
+#
+#   make gen-sites     regenerate tools/sites.{json,md} + iris/KernelSites.v
+#   make check-sites   regenerate, then fail if anything moved -- AND fail if
+#                      the tool found a discipline violation or a site with no
+#                      recorded interrupts-off argument
+#
+# iris/KernelSitesDef.v is HAND-WRITTEN and is not touched by either target;
+# its site lists must match the Coq snippet at the end of tools/sites.md,
+# which is what a check-sites diff will point at after an image bump.
+gen-sites:
+	$(PYTHON) $(GENSITES) --iris $(IRIS) --kernel-rocq $(KDUMP) --emit-coq
+
+check-sites:
+	$(PYTHON) $(GENSITES) --iris $(IRIS) --kernel-rocq $(KDUMP) --emit-coq --check
+	git diff --exit-code -- tools/sites.json tools/sites.md $(IRIS)/KernelSites.v
 
 # Re-dump every image from the ELFs currently in xv6-riscv/, even if make
 # thinks the .v are up to date.  Check `git diff kernel-rocq/` afterwards: a

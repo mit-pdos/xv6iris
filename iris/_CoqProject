@@ -890,6 +890,7 @@ WeakAxiomatic3.v
 WeakInterp.v
 WeakInterpProj.v
 WeakSailLTS.v
+WeakSailLTS2.v
 WeakCompose.v
 WeakLang.v
 WeakGhost.v
@@ -1018,3 +1019,5 @@ SpecSafestrcpy.v
 SpecStrncpy.v
 WkYieldFrame.v
 WkCtxSurface.v
+KernelSitesDef.v
+KernelSites.v
