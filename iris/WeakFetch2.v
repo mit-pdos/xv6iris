@@ -938,15 +938,15 @@ Qed.
 
 Lemma wcert_amo_aq_base2 (cid : nat) (pc : SailStdpp.Values.mword 64)
     (aka akw : akinfo) (ea : Arch.pa) (v : bv 32) :
-  ak_coh aka = false -> ak_sync aka = true ->
+  ak_coh aka = false -> ak_sync aka = true -> ak_latest akw = true ->
   wstep_cert cid pc
     (wP_eff (Some cid)
        ([WEread wak_plain pc 2; WEread wak_plain (add_vec_int pc 2) 2]
           ++ [WEread aka ea 4; WEwrite akw ea 4 v]))
     (wQ_amo_aq (Some cid) ea v).
 Proof.
-  intros Hcoh Hsync.
-  exact (wcert_amo_aq_gen cid pc _ [] aka akw ea v Hcoh Hsync
+  intros Hcoh Hsync Hlat.
+  exact (wcert_amo_aq_gen cid pc _ [] aka akw ea v Hcoh Hsync Hlat
            (nowrite_fetch2 pc) nowrite_nil).
 Qed.
 
@@ -982,14 +982,14 @@ Proof. exact (wcert_store cid pc wak_plain pc 2 akw ea v). Qed.
 
 Lemma wcert_amo_aq_rvc2 (cid : nat) (pc : SailStdpp.Values.mword 64)
     (aka akw : akinfo) (ea : Arch.pa) (v : bv 32) :
-  ak_coh aka = false -> ak_sync aka = true ->
+  ak_coh aka = false -> ak_sync aka = true -> ak_latest akw = true ->
   wstep_cert cid pc
     (wP_eff (Some cid)
        ([WEread wak_plain pc 2] ++ [WEread aka ea 4; WEwrite akw ea 4 v]))
     (wQ_amo_aq (Some cid) ea v).
 Proof.
-  intros Hcoh Hsync.
-  exact (wcert_amo_aq cid pc wak_plain pc 2 aka akw ea v Hcoh Hsync).
+  intros Hcoh Hsync Hlat.
+  exact (wcert_amo_aq cid pc wak_plain pc 2 aka akw ea v Hcoh Hsync Hlat).
 Qed.
 
 (** *** 5c. The end-to-end join check, for the genuinely NEW shape — the

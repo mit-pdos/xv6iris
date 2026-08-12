@@ -425,10 +425,12 @@ Section quiet_interp.
     qmsgs l ->
     (wlat_interp img log : iProp Σ) -∗ wlat_interp img ((log ++ l)%list).
   Proof.
-    iIntros (Hq) "Hi". iDestruct "Hi" as (m) "[Hauth %Hag]".
-    iExists m. iFrame "Hauth". iPureIntro.
-    apply (wlat_agree_app _ _ _ _ Hag).
-    intros a _. exact (qmsgs_not_writes_in log l a Hq).
+    iIntros (Hq) "Hi". iDestruct "Hi" as (m mc) "(Hauth & %Hag & Hc & %Hagc)".
+    iExists m, mc. iFrame "Hauth Hc". iSplitR.
+    - iPureIntro. apply (wlat_agree_app _ _ _ _ Hag).
+      intros a _. exact (qmsgs_not_writes_in log l a Hq).
+    - iPureIntro. apply wcds_agree_app; [|exact Hagc].
+      intros a _ mg Hmg. by apply (proj1 (Forall_forall _ _) Hq mg Hmg).
   Qed.
 
   (** …and at the shape a leaf meets it: [wQ_quiet] says the successor's log
@@ -480,6 +482,31 @@ Proof.
   revert s. induction es as [|e es IH]; intros s He; [reflexivity|].
   destruct (nowrite_trace_cons_inv _ _ He) as [He1 He2].
   rewrite weffs_cons (IH _ He2). exact (weff_apply_nowrite_log tid s e He1).
+Qed.
+
+(** [w_relp] is MONOTONE along a write-free suffix: only a store clears the
+    release-pending flag, and a read leaves it alone while a [pw ∧ sw] fence
+    can only set it.  This is what lets [wcert_fence_gen] certify the release
+    fence's arming through a write-free tail (φ-upgrade §1). *)
+Lemma weff_apply_nowrite_relp tid s e :
+  weff_nowrite e -> w_relp (wm_ws s) = true ->
+  w_relp (wm_ws (weff_apply tid s e)) = true.
+Proof.
+  destruct e as [ak pa n|ak pa n v|b]; intros He Hr.
+  - rewrite weff_apply_read. by rewrite wread_post_relp.
+  - destruct He.
+  - rewrite weff_apply_bar wm_ws_wset_ws /barrier_post.
+    destruct b; simpl; rewrite ?Hr; reflexivity.
+Qed.
+
+Lemma weffs_nowrite_relp tid s es :
+  nowrite_trace es -> w_relp (wm_ws s) = true ->
+  w_relp (wm_ws (weffs tid s es)) = true.
+Proof.
+  revert s. induction es as [|e es IH]; intros s He Hr; [exact Hr|].
+  destruct (nowrite_trace_cons_inv _ _ He) as [He1 He2].
+  rewrite weffs_cons. apply IH; [exact He2|].
+  by apply weff_apply_nowrite_relp.
 Qed.
 
 (** The view side: a write-free suffix cannot lose a floor already reached. *)
@@ -535,9 +562,12 @@ Lemma wcert_fence_gen (cid : nat) (pc : SailStdpp.Values.mword 64)
 Proof.
   intros Hpre Hpost. apply wstep_cert_eff. intros s s' Hi Hl Hws.
   rewrite /wQ_fence /wV_fence Hws weffs_app weffs_cons weff_apply_bar.
-  etrans; [apply barrier_post_mono, weffs_ws_le|].
-  etrans; [|apply (weffs_ws_le (Some cid) _ post)].
-  rewrite wm_ws_wset_ws. reflexivity.
+  split.
+  - etrans; [apply barrier_post_mono, weffs_ws_le|].
+    etrans; [|apply (weffs_ws_le (Some cid) _ post)].
+    rewrite wm_ws_wset_ws. reflexivity.
+  - intros Ha. apply weffs_nowrite_relp; [exact Hpost|].
+    rewrite wm_ws_wset_ws. by apply barrier_post_relp.
 Qed.
 
 (** *** 6c. The 4-byte STORE with write-free surroundings *)
@@ -566,7 +596,9 @@ Proof.
                       (wm_class_of akw (wm_ws s1)) ea 4 v])%list).
   { rewrite Hl weffs_app weffs_cons -/s1 -/s2 Hlpost Hl2. reflexivity. }
   rewrite /wQ_store /wV_store.
-  split_and!; [exact Hi|by eexists; exact Hls'|exact Hle|].
+  split_and!; [exact Hi| |exact Hle|].
+  { eexists. split; [exact Hls'|]. intros Hr. apply wm_class_of_relp.
+    subst s1. by apply weffs_nowrite_relp. }
   intros j Hj.
   (* the floor reached at the store's own step survives the write-free tail *)
   assert (Hstep : (S (length (wm_log s))
@@ -626,13 +658,13 @@ Qed.
 
 Lemma wcert_amo_aq_gen (cid : nat) (pc : SailStdpp.Values.mword 64)
     (pre post : list weff) (aka akw : akinfo) (ea : Arch.pa) (v : bv 32) :
-  ak_coh aka = false -> ak_sync aka = true ->
+  ak_coh aka = false -> ak_sync aka = true -> ak_latest akw = true ->
   nowrite_trace pre -> nowrite_trace post ->
   wstep_cert cid pc
     (wP_eff (Some cid) (pre ++ WEread aka ea 4 :: WEwrite akw ea 4 v :: post))
     (wQ_amo_aq (Some cid) ea v).
 Proof.
-  intros Hcoh Hsync Hpre Hpost. apply wstep_cert_eff.
+  intros Hcoh Hsync Hlat Hpre Hpost. apply wstep_cert_eff.
   intros s s' Hi Hl Hws.
   assert (Hle : ws_le (wm_ws s) (wm_ws s')) by (rewrite Hws; apply weffs_ws_le).
   set (s1 := weffs (Some cid) s pre).
@@ -658,10 +690,14 @@ Proof.
                    wm_ws s' = wm_ws (weffs (Some cid) s3 post)).
   { rewrite Hl Hws !weffs_app !weffs_cons -/s1 -/s2 -/s3. by split. }
   destruct Hsplit as [Hls' Hwss'].
-  rewrite /wQ_amo_aq. split.
+  assert (Hexcl : wm_class_of akw (wm_ws s2) = WCexcl)
+    by (unfold wm_class_of; by rewrite Hlat).
+  rewrite /wQ_amo_aq. split_and!;
+    [| |by rewrite Hls' Hlpost Hl3 Hexcl].
   - rewrite /wQ_store /wV_store. split_and!.
     + exact Hi.
-    + eexists. rewrite Hls' Hlpost Hl3. reflexivity.
+    + eexists. split; [rewrite Hls' Hlpost Hl3; reflexivity|].
+      intros Hr. rewrite Hexcl. discriminate.
     + exact Hle.
     + intros j Hj.
       assert (Hstep : (S (length (wm_log s))

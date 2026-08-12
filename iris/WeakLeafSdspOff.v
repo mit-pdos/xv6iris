@@ -155,7 +155,7 @@ Section wP_eff_half.
       (pc : SailStdpp.Values.mword 64) (h : SailStdpp.Values.mword 16)
       (rs1 rs2 : mword 5) (imm : mword 12) (i0 : instruction)
       (ea : Arch.pa) (vold : bv 64) (vs : SailStdpp.Values.mword 64)
-      (dq : dfrac) (D D0 : register -> bool) (dst : mstate) :
+      (cid8 : CPU) (D D0 : register -> bool) (dst : mstate) :
     wlog_wf (wm_log σ) ->
     (* --- the M-mode config tower, at σ's own registers --- *)
     register_lookup PC (wm_regs σ) = pc ->
@@ -197,7 +197,7 @@ Section wP_eff_half.
     (* --- the resources --- *)
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
     winstr_bytes pc (F_RVC h) -∗
-    vwp_hold (wpt8 ea dq vold) (wm_ws σ) -∗
+    vwp_hold (wpt8_own cid8 ea vold) (wm_ws σ) -∗
     ⌜wP_eff (Some cid)
        ([WEread wak_plain pc (if al4 then 4%N else 2%N)]
           ++ [WEwrite wak_plain ea 8 vs]) σ⌝.
@@ -209,9 +209,9 @@ Section wP_eff_half.
     iDestruct (winstr_bytes_lookup σ pc (F_RVC h) Hwf with "Hlat Hbs")
       as %[_ Hfok].
     iDestruct (winstr_pinned σ pc (F_RVC h) Hwf with "Hlat Hbs") as %Hpinpc.
-    iDestruct (wpt8_flat_pin σ ea dq vold Hwf with "Hlat Hpt")
+    iDestruct (wpt8_own_flat_pin cid8 σ ea vold Hwf with "Hlat Hpt")
       as %[Haccea Hflatpin].
-    iDestruct (wpt8_align with "Hpt") as %Halea.
+    iDestruct (wpt8_own_align with "Hpt") as %Halea.
     iPureIntro.
     assert (Hpinea : forall j : nat, (j < 8)%nat ->
               pinned_read σ (acc_addr ea j))
@@ -329,7 +329,7 @@ Section leaf.
     R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
     winstr_bytes pc (F_RVC h) -∗
     hart_ws cpu_id ws -∗
-    vwp_hold (wpt8 ea (DfracOwn 1) vold) ws -∗
+    vwp_hold (wpt8_own cpu_id ea vold) ws -∗
     vwp_hold R ws -∗
     (∀ (ws' : wstate) (T : nat),
        ⌜ws_le ws ws'⌝ -∗
@@ -341,7 +341,7 @@ Section leaf.
        R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
        R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
        hart_ws cpu_id ws' -∗
-       vwp_hold (wpt8 ea (DfracOwn 1) rs2v) ws' -∗
+       vwp_hold (wpt8_own cpu_id ea rs2v) ws' -∗
        monPred_at R (view_scl T) -∗
        WWP Loop) -∗
     WWP Loop.
@@ -392,12 +392,12 @@ Section leaf.
     { apply Hagree; [exact Lpriv | exact Lmisa | exact Lsec]. }
     (* ---- the certificate's precondition (§2) ---- *)
     iDestruct (wP_eff_sd8_rvc al4 (fin_to_nat cpu_id) σ pc h rs1 rs2 imm i0
-                 ea vold rs2v (DfracOwn 1) D D0 dst
+                 ea vold rs2v cpu_id D D0 dst
                  Hwf Lpc0 Lpriv ltac:(rewrite Lpmpc; exact Hpmp) Lpma
                  Lhtif Lhart LmisaS LmisaC LmIE Lmprv Lpmm Lelp Hal2 Hal4
                  Hea_σ Hvs_σ Hram8 Hag_σ HDmi Hgood Hdec Hgood0 Hexp
                  with "Hlat Hbs Hpt") as %HP.
-    iDestruct (wpt8_align with "Hpt") as %Halea.
+    iDestruct (wpt8_own_align with "Hpt") as %Halea.
     (* ---- the run, at the FLAT state ---- *)
     pose proof (exec_eff_sd8_off_at (wflat_st σ) b (add_vec_int pc 2) rs1 rs2
                   imm ea rs2v Lpriv Lmprv Lpmm
@@ -419,15 +419,17 @@ Section leaf.
     assert (Hdevt : mdev t = wm_dev σ) by (rewrite Hdevt0; reflexivity).
     destruct Hpost as (Hregs & Hdevs & Hmems & Himgs & Hlogs & Hwsle & Hwf'
                        & Hbnd').
-    destruct HQ as (HQi & [kc HQl] & HQle & HQv).
+    destruct HQ as (HQi & (kc & HQl & _) & HQle & HQv).
     (* the release deposit: freeze R at the store's own timestamp *)
     iDestruct (wwp_release_deposit R σ Hbnd with "HR") as "HRdep".
     (* THE WINDOW UPDATE: retarget the eight elements at the message *)
-    iDestruct (wpt8_at_elems with "Hpt") as "(%Halea2 & %Haccea & Hels)".
+    iDestruct (wpt8_own_at_elems with "Hpt") as "(%Halea2 & %Haccea & Hels)".
     iDestruct "Hels" as (t0 t1 t2 t3 t4 t5 t6 t7)
-      "(H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7)".
-    iMod (wlat8_store_prim (Some (fin_to_nat cpu_id)) kc σ ea rs2v
-            with "Hlat H0 H1 H2 H3 H4 H5 H6 H7") as "[Hlat Hl8]".
+      "(H0 & S0 & H1 & S1 & H2 & S2 & H3 & S3 & H4 & S4 & H5 & S5
+        & H6 & S6 & H7 & S7)".
+    iMod (wlat8_store_prim_own cpu_id kc σ ea rs2v
+            with "Hlat H0 S0 H1 S1 H2 S2 H3 S3 H4 S4 H5 S5 H6 S6 H7 S7")
+      as "[Hlat Hl8]".
     iMod (wlog_update (wm_log σ)
             [wwrite_msg (Some (fin_to_nat cpu_id)) kc ea 8 rs2v]
             with "Hlogauth") as "Hlogauth".
@@ -448,7 +450,7 @@ Section leaf.
                HRdep").
     - exact Hwsle.
     - intros j Hj. apply HQv. exact Hj.
-    - iApply (wlat8_wpt8 ea (DfracOwn 1) (S (length (wm_log σ))) rs2v
+    - iApply (wlat8_own_wpt8_own cpu_id ea (S (length (wm_log σ))) rs2v
                 (wm_ws σ') Halea2 Haccea
                 ltac:(intros j Hj; apply HQv; exact Hj) with "Hl8").
   Qed.

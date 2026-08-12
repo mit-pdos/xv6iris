@@ -232,15 +232,15 @@ Section weak_lock.
              ∨ ⌜v ≠ lock_zero⌝)).
   Proof.
     intros Hwf Hacc Heff.
-    destruct Heff as [(Himg & [kc Hlog] & Hle & Hflr) Hgain].
+    destruct Heff as ((Himg & (kc & Hlog & _) & Hle & Hflr) & Hgain & Hexcl).
     iIntros "Hi Hinv".
     iDestruct "Hinv" as (st t v) "(Hw & Ha & Harm)".
     iDestruct (wlat4_flat_gen σ lk (DfracOwn 1) t v Hwf Hacc with "Hi Hw")
       as %[Hflat Hts].
     iExists v. iSplitR; [by iPureIntro|].
     (* the machine's own write: the elements move to the fresh top, value 1 *)
-    iMod (wlat4_store_gen tid kc σ σ' lk t v lock_one Himg Hlog with "Hi Hw")
-      as "[Hi Hw]".
+    iMod (wlat4_store_gen tid WCexcl σ σ' lk t v lock_one
+            ltac:(discriminate) Himg Hexcl with "Hi Hw") as "[Hi Hw]".
     iDestruct "Harm" as "[(-> & -> & Hfrag & HR)|(%Hst & %Hv)]".
     - (* the lock was FREE: take it, and thaw the payload *)
       iMod (lock_take γ i with "Ha Hfrag") as "[Ha Hpre]".
@@ -279,6 +279,12 @@ Section weak_lock.
   Lemma wrelease_core (γ : gname) (lk : Arch.pa) R (i : CPU) (tid : option nat)
       (σ σ' : wmstate) :
     wQ_store tid lk lock_zero σ σ' →
+    (* φ-upgrade §1: the RELEASE-PENDING flag is what makes this store's
+       message release-class ([WeakInstr.wm_class_of_relp]), hence what lets
+       the lock word's invariant-held bundle be retargeted CLEAN.  It is set
+       by the [fence rw,w] that precedes every xv6 release, and it is the one
+       fact the fence contributes to this machine. *)
+    w_relp (wm_ws σ) = true →
     ws_bounded (wm_ws σ) (length (wm_log σ)) →
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
     wlock_inv γ lk R -∗
@@ -286,7 +292,8 @@ Section weak_lock.
     vwp_hold R (wm_ws σ) ==∗
     wlat_interp (wm_img σ') (wm_log σ') ∗ wlock_inv γ lk R.
   Proof.
-    intros (Himg & [kc Hlog] & Hle & Hflr) Hbnd.
+    intros (Himg & (kc & Hlog & Hnp) & Hle & Hflr) Hrelp Hbnd.
+    specialize (Hnp Hrelp).
     iIntros "Hi Hinv Htok HR".
     iDestruct "Hinv" as (st t v) "(Hw & Ha & _)".
     (* the holder's token says the lock is held by [i] *)
@@ -295,8 +302,8 @@ Section weak_lock.
        timestamp, so it may be frozen there and handed to the invariant *)
     iAssert (monPred_at R (view_scl (S (length (wm_log σ)))))%I with "[HR]" as "HR".
     { by iApply (wwp_release_deposit R σ Hbnd with "HR"). }
-    iMod (wlat4_store_gen tid kc σ σ' lk t v lock_zero Himg Hlog with "Hi Hw")
-      as "[Hi Hw]".
+    iMod (wlat4_store_gen tid kc σ σ' lk t v lock_zero Hnp Himg Hlog
+            with "Hi Hw") as "[Hi Hw]".
     iMod (lock_clrcpu γ (Some (i, true)) i with "Ha Htok") as "(_ & Ha & Hpre)".
     iMod (lock_give γ (Some (i, false)) i with "Ha Hpre") as "(_ & Ha & Hfrag)".
     iModIntro. iFrame "Hi".

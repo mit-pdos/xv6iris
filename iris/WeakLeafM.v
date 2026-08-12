@@ -1126,6 +1126,58 @@ Section WeakLeafM.
     iIntros (ws') "%Hle Hmm Hpcf Hpad Hpc Hrs Hrd Hhws Hpt".
     iApply ("Hcont" $! ws'
               with "[%] Hmm Hpcf Hpad Hpc Hrs Hrd Hhws Hpt"). exact Hle.
+  Unshelve. all: try exact (DfracOwn 1).
+  Qed.
+
+  Lemma wwp_ld8_tor_rvc_own (pc : mword 64) (rs1 rd : mword 5) (imm : mword 12)
+      (ea : Arch.pa) (v : bv 64) (q : Qp)
+      (pmpcfg0 : type_of_register pmpcfg_n)
+      (pmpaddrs : type_of_register pmpaddr_n)
+      (rs1v rd0 : mword 64) (ws : wstate) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
+    uint rs1 <> 0 ->
+    uint rd <> 0 ->
+    add_vec rs1v (sign_extend' 64 imm) = ea ->
+    (forall j : nat, (j < 8)%nat -> addr_is_ram (pa_add ea j)) ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
+    winstr_m pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold (wpt8_own cpu_id ea v) ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+      pc_is (add_vec_int pc 2) -∗
+      R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+      R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ (regval_into_reg v) -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold (wpt8_own cpu_id ea v) ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Htor Hnz1 Hnzd Hea Hram.
+    iIntros "Hmm Hpcf Hpad [Hpc Hnpc] Hrs Hrd #Hi Hhws Hpt Hcont".
+    iDestruct (winstr_m_rvc with "Hi") as
+      (h i0) "(_ & #Hb & %Hal2 & %Hall & %Hgood & %Hdec & %Hlp0 & %Hg0 & %Hexp)".
+    iApply (wwp_ld8_tor_rvc_leaf_own (is_aligned_vaddr (Virtaddr pc) 4)
+              pc h rs1 rd imm i0 ea v _ q pmpcfg0 pmpaddrs rs1v rd0 pc
+              D_m D_none dstateM ws
+              Hgid Hpmp Htor Hal2 eq_refl Hnz1 Hnzd Hea Hram
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec Hg0 Hexp
+              with "Hmm Hpcf Hpad Hpc Hnpc Hrs Hrd Hb Hhws Hpt").
+    iIntros (ws') "%Hle Hmm Hpcf Hpad Hpc Hrs Hrd Hhws Hpt".
+    iApply ("Hcont" $! ws'
+              with "[%] Hmm Hpcf Hpad Hpc Hrs Hrd Hhws Hpt"). exact Hle.
+  Unshelve. all: try exact (DfracOwn 1).
   Qed.
 
   (** [c.sd rs2, imm(rs1)] under a TOR PMP region -- the RELEASE store.
@@ -1155,7 +1207,7 @@ Section WeakLeafM.
     R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
     winstr_m pc true (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
     hart_ws cpu_id ws -∗
-    vwp_hold (wpt8 ea (DfracOwn 1) vold) ws -∗
+    vwp_hold (wpt8_own cpu_id ea vold) ws -∗
     vwp_hold R ws -∗
     ( ∀ (ws' : wstate) (T : nat),
       ⌜ws_le ws ws'⌝ -∗
@@ -1168,7 +1220,7 @@ Section WeakLeafM.
       R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
       R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
       hart_ws cpu_id ws' -∗
-      vwp_hold (wpt8 ea (DfracOwn 1) rs2v) ws' -∗
+      vwp_hold (wpt8_own cpu_id ea rs2v) ws' -∗
       monPred_at R (view_scl T) -∗
       WWP Loop) -∗
     WWP Loop.
@@ -1369,7 +1421,7 @@ Section WeakLeafM.
     R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
     winstr_m pc true (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
     hart_ws cpu_id ws -∗
-    vwp_hold (wpt8 ea (DfracOwn 1) vold) ws -∗
+    vwp_hold (wpt8_own cpu_id ea vold) ws -∗
     vwp_hold R ws -∗
     ( ∀ (ws' : wstate) (T : nat),
       ⌜ws_le ws ws'⌝ -∗
@@ -1381,7 +1433,7 @@ Section WeakLeafM.
       R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
       R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
       hart_ws cpu_id ws' -∗
-      vwp_hold (wpt8 ea (DfracOwn 1) rs2v) ws' -∗
+      vwp_hold (wpt8_own cpu_id ea rs2v) ws' -∗
       monPred_at R (view_scl T) -∗
       WWP Loop) -∗
     WWP Loop.

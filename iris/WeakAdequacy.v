@@ -147,6 +147,8 @@ Proof.
                    ⋅ ◯ML ([] : list (leibnizO wmsg)))) as (γlog) "[Hlga #Hlgf]".
   { apply mono_list_both_valid_L. reflexivity. }
   iMod (ghost_map_alloc (wlat_init (wgimg g))) as (γlat) "[Hlatauth Hlatel]".
+  (* the C/D/S state map (φ-upgrade §1): every image byte starts CLEAN *)
+  iMod (ghost_map_alloc (wcds_init (wgimg g))) as (γcds) "[Hcdsauth Hcdsel]".
   iMod (ghost_var_alloc_halves_cpus ws_init (enum CPU) (NoDup_enum CPU))
     as (γws) "Hwss".
   (* ---- assemble the two instances ---- *)
@@ -159,19 +161,24 @@ Proof.
                (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ _ 1%positive 1%positive _
                   1%positive _ _ 1%positive (fun _ => True%I) 1%positive)
                E0).
-  set (HW := WeakGS Σ _ γlog γlat γws).
+  set (HW := WeakGS Σ _ γlog γlat γcds γws).
   iDestruct (big_sepL_sep with "Hcpus") as "[Hauths Helems]".
   iDestruct (big_sepL_sep with "Hwss") as "[HwsA HwsF]".
   (* run the caller's proof to obtain the WPs *)
   iPoseProof (Hwp HR HW) as "Hwand".
-  iMod ("Hwand" with "[Helems Hlatel HwsF HuF HpF HvF]")
+  iMod ("Hwand" with "[Helems Hlatel Hcdsel HwsF HuF HpF HvF]")
     as "[Hwps (Hwpu & Hwpd & Hwpp)]".
   { iSplitL "Helems".
     { iApply (@RiscvAdequacy.big_sepL_enum_to_set (iPropI Σ)). iExact "Helems". }
-    iSplitL "Hlatel".
-    { iApply (big_sepM_wlat_init
-                (fun z tv => ghost_map_elem γlat z (DfracOwn 1) tv)).
-      iExact "Hlatel". }
+    iSplitL "Hlatel Hcdsel".
+    { rewrite /wlat_pointsto /wlat_elem /wclean /wcds_el big_sepM_sep.
+      iSplitL "Hlatel".
+      - iApply (big_sepM_wlat_init
+                  (fun z tv => ghost_map_elem γlat z (DfracOwn 1) tv)).
+        iExact "Hlatel".
+      - iApply (big_sepM_wcds_init
+                  (fun z s => ghost_map_elem γcds z (DfracOwn 1) s)).
+        iExact "Hcdsel". }
     iSplitL "HwsF".
     { iApply (@RiscvAdequacy.big_sepL_enum_to_set (iPropI Σ)).
       (* each hart's exact half at [ws_init], with the value hidden — that
@@ -190,7 +197,7 @@ Proof.
     (fun _ : mval => True%I),
     (@state_interp_mono HasLc weak_riscv_lang Σ (@weak_irisGS Σ HR HW)).
   cbv zeta beta.
-  iSplitL "Hauths Hlga Hlatauth HwsA HuA HpA HvA".
+  iSplitL "Hauths Hlga Hlatauth Hcdsauth HwsA HuA HpA HvA".
   { (* the initial state interpretation *)
     rewrite /weak_state_interp.
     iSplitR; [iPureIntro; by split|].
@@ -207,10 +214,12 @@ Proof.
       iSplitL "HpA"; [iExact "HpA"|iExact "HvA"]. }
     iSplitL "Hlga".
     { rewrite /wlog_auth Hlog. iExact "Hlga". }
-    iSplitL "Hlatauth".
-    { rewrite /wlat_interp. iExists (wlat_init (wgimg g)).
-      iSplitL "Hlatauth"; [iExact "Hlatauth"|].
-      iPureIntro. rewrite Hlog. apply wlat_init_agree. }
+    iSplitL "Hlatauth Hcdsauth".
+    { rewrite /wlat_interp.
+      iExists (wlat_init (wgimg g)), (wcds_init (wgimg g)).
+      iFrame "Hlatauth Hcdsauth".
+      iSplitR; [iPureIntro; rewrite Hlog; apply wlat_init_agree|].
+      iPureIntro. rewrite Hlog. apply wcds_init_agree. }
     rewrite /wws_interp.
     iApply (big_sepS_mono (fun c => wws_auth c ws_init)).
     { intros c _. rewrite /wws_auth (Hws c). done. }

@@ -445,6 +445,10 @@ Section weak_started.
       the conjunct is a lower bound and not an exact timestamp. *)
   Lemma wstarted_set (a : Arch.pa) P (tid : option nat) (σ σ' : wmstate) :
     wQ_store tid a lock_one σ σ' ->
+    (* φ-upgrade §1, as in [WeakLock.wrelease_core]: the [fence rw,w] before
+       the [started] store is what makes its message release-class, hence what
+       keeps the escrow's element bundle CLEAN. *)
+    w_relp (wm_ws σ) = true ->
     ws_bounded (wm_ws σ) (length (wm_log σ)) ->
     wlog_lb (wm_log σ) -∗
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
@@ -453,7 +457,8 @@ Section weak_started.
     wlat_interp (wm_img σ') (wm_log σ') ∗
     wstarted_at a P (S (length (wm_log σ))) lock_one.
   Proof.
-    intros (Himg & [kc Hlog] & Hle & Hflr) Hbnd.
+    intros (Himg & (kc & Hlog & Hnp) & Hle & Hflr) Hrelp Hbnd.
+    specialize (Hnp Hrelp).
     iIntros "#Hlbσ Hi Hbody HP".
     iDestruct "Hbody" as (t v) "[Hw Hhist]".
     iDestruct "Hhist" as (T log0) "(#Hlb0 & %Hcov & %Hlbf & Hdisj)".
@@ -472,7 +477,7 @@ Section weak_started.
     - (* CLEAR: nothing non-clear was ever written, so the deposit is ours *)
       pose proof (wstarted_lb_now (wimg σ) (wm_log σ) log0 a T t lock_zero
                     Hcov Hlbf Hcmp Hlv (or_introl (conj eq_refl HT))) as Hnow.
-      iMod (wlat4_store_gen tid kc σ σ' a t lock_zero lock_one Himg Hlog
+      iMod (wlat4_store_gen tid kc σ σ' a t lock_zero lock_one Hnp Himg Hlog
               with "Hi Hw") as "[Hi Hw]".
       iModIntro. iFrame "Hi". rewrite /wstarted_at. iFrame "Hw".
       iExists (S (length (wm_log σ))), (wm_log σ). iFrame "Hlbσ".
@@ -497,7 +502,7 @@ Section weak_started.
     - (* ALREADY SET: keep the earlier deposit, and with it the earlier [T] *)
       pose proof (wstarted_lb_now (wimg σ) (wm_log σ) log0 a T t lock_one
                     Hcov Hlbf Hcmp Hlv (or_intror (conj eq_refl HT))) as Hnow.
-      iMod (wlat4_store_gen tid kc σ σ' a t lock_one lock_one Himg Hlog
+      iMod (wlat4_store_gen tid kc σ σ' a t lock_one lock_one Hnp Himg Hlog
               with "Hi Hw") as "[Hi Hw]".
       iModIntro. iFrame "Hi". rewrite /wstarted_at. iFrame "Hw".
       iExists T, (wm_log σ). iFrame "Hlbσ".

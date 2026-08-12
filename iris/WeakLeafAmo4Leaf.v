@@ -856,7 +856,7 @@ Section leaf.
               Hgid Hacca Haccb Hacclk
               (wcert_amo_aq_pin_base4 (fin_to_nat cpu_id) pca
                  (AkInfo false true true) (AkInfo false true false) lk lock_one
-                 eq_refl eq_refl)
+                 eq_refl eq_refl eq_refl)
               (wcert_nowrite (fin_to_nat cpu_id) pcb [WEread akf2 pf2 nf2]
                  (nowrite_trace_read akf2 pf2 nf2))
               with "Hinv Hatt Hbr HK").

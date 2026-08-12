@@ -62,6 +62,7 @@ Require Import RiscvModelBytes.
 Require Import DevModel.
 Require Import WeakMem.
 Require Import WeakInterp.
+Require Import WeakLang.
 Require Import WeakGhost.
 Require Import WeakView.
 Require Import WeakVProp.
@@ -161,6 +162,45 @@ Lemma wwrite_msg_win_none1 tid k (pa : Arch.pa) (v : bv (8 * 1)) (a : Z) :
 Proof.
   intros Hne. apply (wwrite_msg_win_none tid k pa 1 v a).
   change (Z.of_N 1) with 1. lia.
+Qed.
+
+(** WHICH ADDRESSES A WIDTH-[n] STORE CAN WRITE — the contrapositive of
+    [wwrite_msg_win_none], packaged as "the message's footprint is inside the
+    caller's list".  This is the frame premise the C/D/S window update of §3c
+    takes, and it is discharged once per width. *)
+Lemma wwrite_msg_zs tid k (a : Arch.pa) (n : N) {w : N} (v : bv w)
+    (zs : list Z) :
+  (forall j : nat, (j < N.to_nat n)%nat -> acc_addr a j ∈ zs) ->
+  forall z, msg_byte (wwrite_msg tid k a n v) z <> None -> z ∈ zs.
+Proof.
+  intros Hzs z Hz.
+  destruct (decide (pa_z a <= z < pa_z a + Z.of_N n)) as [Hr|Hr];
+    [|by destruct Hz; apply (wwrite_msg_win_none tid k a n v z Hr)].
+  assert (Heq : z = acc_addr a (Z.to_nat (z - pa_z a)))
+    by (rewrite /acc_addr; lia).
+  rewrite Heq. apply Hzs. rewrite /acc_addr in Heq. lia.
+Qed.
+
+Lemma wwrite_msg_zs4 tid k (a : Arch.pa) {w : N} (v : bv w) :
+  forall z, msg_byte (wwrite_msg tid k a 4 v) z <> None ->
+    z ∈ [acc_addr a 0; acc_addr a 1; acc_addr a 2; acc_addr a 3].
+Proof.
+  apply (wwrite_msg_zs tid k a 4 v).
+  intros j Hj. change (N.to_nat 4) with 4%nat in Hj.
+  destruct j as [|[|[|[|j]]]];
+    [set_solver|set_solver|set_solver|set_solver|lia].
+Qed.
+
+Lemma wwrite_msg_zs8 tid k (a : Arch.pa) {w : N} (v : bv w) :
+  forall z, msg_byte (wwrite_msg tid k a 8 v) z <> None ->
+    z ∈ [acc_addr a 0; acc_addr a 1; acc_addr a 2; acc_addr a 3;
+         acc_addr a 4; acc_addr a 5; acc_addr a 6; acc_addr a 7].
+Proof.
+  apply (wwrite_msg_zs tid k a 8 v).
+  intros j Hj. change (N.to_nat 8) with 8%nat in Hj.
+  destruct j as [|[|[|[|[|[|[|[|j]]]]]]]];
+    [set_solver|set_solver|set_solver|set_solver
+    |set_solver|set_solver|set_solver|set_solver|lia].
 Qed.
 
 (** THE WINDOW FLOOR.  [WeakVProp.flr_store_post] covers the ONE byte a
@@ -320,10 +360,164 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
+(** ** 3c. THE C/D/S WINDOW, AT EVERY WIDTH AT ONCE (φ-upgrade §1)
+
+    The state map is keyed by the same addresses as the latest-write map but
+    carries no value, so its window update is simply "set these addresses to
+    one common state".  [winsl] is that; the store's own window is the list
+    of its byte addresses, and BOTH widths (and the one-byte rule of
+    [WeakVProp]) are instances. *)
+
+Fixpoint winsl (zs : list Z) (s : wcds) (mc : gmap Z wcds) : gmap Z wcds :=
+  match zs with
+  | [] => mc
+  | z :: zs' => <[z := s]> (winsl zs' s mc)
+  end.
+
+Lemma winsl_lookup_in zs s mc z : z ∈ zs -> winsl zs s mc !! z = Some s.
+Proof.
+  induction zs as [|z0 zs IH]; intros Hz; [by apply elem_of_nil in Hz|].
+  simpl. apply elem_of_cons in Hz as [->|Hz]; [by rewrite lookup_insert|].
+  destruct (decide (z = z0)) as [->|Hne]; [by rewrite lookup_insert|].
+  rewrite lookup_insert_ne //. by apply IH.
+Qed.
+
+Lemma winsl_lookup_out zs s mc z : z ∉ zs -> winsl zs s mc !! z = mc !! z.
+Proof.
+  induction zs as [|z0 zs IH]; intros Hz; [reflexivity|]. simpl.
+  rewrite lookup_insert_ne; [apply IH|]; set_solver.
+Qed.
+
+(** THE OWNED WINDOW UPDATE, pure.  Inside the window the state becomes the
+    class's own step ([WDirty c] for a plain store, [WClean] for a release —
+    the D→C flip); outside, nothing moved and the message wrote nothing. *)
+(** [WCexcl] maps to [WDirty c] rather than [WClean]: an exclusive store
+    neither dirties nor publishes, so the honest step is "keep the state" —
+    and [WDirty c] is the WEAKENING of both possible incoming states
+    ([wcds_clean_dirty]), which keeps the target uniform across the window
+    and so keeps the primitive premise-free. *)
+Definition wcds_plain_step (c : CPU) (k : wm_class) : wcds :=
+  match k with WCrel => WClean | _ => WDirty c end.
+
+Lemma wcds_agree_winsl log mnew (zs : list Z) (c : CPU) mc :
+  wm_tid mnew = Some (fin_to_nat c) ->
+  (forall z, msg_byte mnew z <> None -> z ∈ zs) ->
+  (forall z, z ∈ zs -> exists s, mc !! z = Some s /\ (s = WClean \/ s = WDirty c)) ->
+  wcds_agree log mc ->
+  wcds_agree (log ++ [mnew]) (winsl zs (wcds_plain_step c (wm_ak mnew)) mc).
+Proof.
+  intros Htid Hcov Hold Hag z s Hz.
+  destruct (decide (z ∈ zs)) as [Hin|Hout].
+  - rewrite (winsl_lookup_in zs _ mc z Hin) in Hz. simplify_eq.
+    destruct (Hold z Hin) as (s0 & Hs0 & Hs0ok).
+    pose proof (wcds_ok_store_own log mnew z c s0 Htid Hs0ok (Hag z s0 Hs0))
+      as Hstep.
+    destruct (wm_ak mnew) eqn:Hk; simpl in Hstep |- *; [exact Hstep|exact Hstep|].
+    destruct Hs0ok as [-> | ->]; simpl in Hstep;
+      [by apply wcds_clean_dirty|exact Hstep].
+  - rewrite (winsl_lookup_out zs _ mc z Hout) in Hz.
+    apply wcds_ok_app; [|by apply Hag].
+    intros m0 Hm0. apply elem_of_list_singleton in Hm0 as ->.
+    destruct (msg_byte mnew z) as [b|] eqn:Hb; [|reflexivity].
+    exfalso. apply Hout, Hcov. by rewrite Hb.
+Qed.
+
+Section cdswin.
+  Context `{!riscvGS Σ, !weakGS Σ}.
+
+  Lemma wcds_lookup_list (c : CPU) (zs : list Z) mc :
+    ghost_map_auth weak_cds_name 1 mc -∗ ([∗ list] z ∈ zs, wown_st c z) -∗
+    ⌜forall z, z ∈ zs ->
+       exists s, mc !! z = Some s /\ (s = WClean \/ s = WDirty c)⌝.
+  Proof.
+    iIntros "Ha Hl". iInduction zs as [|z zs] "IH"; simpl.
+    - iPureIntro. intros z Hz. by apply elem_of_nil in Hz.
+    - iDestruct "Hl" as "[Hz Hl]".
+      iDestruct (wown_st_lookup with "Ha Hz") as %Hz0.
+      iDestruct ("IH" with "Ha Hl") as %Hrest.
+      iPureIntro. intros z' Hz'. apply elem_of_cons in Hz' as [->|Hz'];
+        [exact Hz0|by apply Hrest].
+  Qed.
+
+  Lemma wcds_update_list (c : CPU) (zs : list Z) (snew : wcds) mc :
+    (snew = WClean \/ snew = WDirty c) ->
+    ghost_map_auth weak_cds_name 1 mc -∗ ([∗ list] z ∈ zs, wown_st c z) ==∗
+    ghost_map_auth weak_cds_name 1 (winsl zs snew mc) ∗
+    ([∗ list] z ∈ zs, wown_st c z).
+  Proof.
+    intros Hnew. iIntros "Ha Hl".
+    iInduction zs as [|z zs] "IH" forall (mc); simpl; [by iFrame|].
+    iDestruct "Hl" as "[Hz Hl]".
+    iMod ("IH" with "Ha Hl") as "[Ha Hl]".
+    iDestruct "Hz" as (s) "[Hz _]". rewrite /wcds_el.
+    iMod (ghost_map_update snew with "Ha Hz") as "[Ha Hz]".
+    iModIntro. iFrame "Ha Hl". iExists snew. by iFrame "Hz".
+  Qed.
+
+  (** THE C/D/S HALF OF AN OWNED STORE, width-generic: hand it the state
+      authority and the window's owned states, get back the authority at the
+      new log and the window's owned states.  Both bundle prims below are one
+      application of it. *)
+  Lemma wcds_store_list (c : CPU) (mnew : wmsg) (log : list wmsg)
+      (zs : list Z) mc :
+    wm_tid mnew = Some (fin_to_nat c) ->
+    (forall z, msg_byte mnew z <> None -> z ∈ zs) ->
+    wcds_agree log mc ->
+    ghost_map_auth weak_cds_name 1 mc -∗ ([∗ list] z ∈ zs, wown_st c z) ==∗
+    ∃ mc', ghost_map_auth weak_cds_name 1 mc' ∗
+           ⌜wcds_agree (log ++ [mnew]) mc'⌝ ∗
+           ([∗ list] z ∈ zs, wown_st c z).
+  Proof.
+    intros Htid Hcov Hag. iIntros "Ha Hl".
+    iDestruct (wcds_lookup_list with "Ha Hl") as %Hold.
+    iMod (wcds_update_list c zs (wcds_plain_step c (wm_ak mnew))
+            with "Ha Hl") as "[Ha Hl]".
+    { destruct (wm_ak mnew); simpl; [by right|by left|by right]. }
+    iModIntro. iExists _. iFrame "Ha Hl". iPureIntro.
+    by apply wcds_agree_winsl.
+  Qed.
+
+End cdswin.
+
+(* ====================================================================== *)
 (** ** 4. The bundle updates *)
 
 Section store.
   Context `{!riscvGS Σ, !weakGS Σ}.
+
+  (** THE OWNED FOUR-BYTE BUNDLES (φ-upgrade §1).  [wlat4]'s and [wpt4]'s
+      twins with the byte states OWNED (clean-or-dirty-by-[c]) rather than
+      pinned clean: the shape a plain store consumes and produces. *)
+  Definition wlat4_own (c : CPU) (a : Arch.pa) (t : nat) (w : bv 32) : iProp Σ :=
+    (wlat_elem (acc_addr a 0) (DfracOwn 1) t (nth_byte w 0) ∗
+       wown_st c (acc_addr a 0) ∗
+     wlat_elem (acc_addr a 1) (DfracOwn 1) t (nth_byte w 1) ∗
+       wown_st c (acc_addr a 1) ∗
+     wlat_elem (acc_addr a 2) (DfracOwn 1) t (nth_byte w 2) ∗
+       wown_st c (acc_addr a 2) ∗
+     wlat_elem (acc_addr a 3) (DfracOwn 1) t (nth_byte w 3) ∗
+       wown_st c (acc_addr a 3))%I.
+
+  Definition wpt4_own (c : CPU) (a : Arch.pa) (w : bv 32) : vProp Σ :=
+    (⌜is_aligned_paddr (Physaddr a) 4 = true⌝ ∗ ⌜acc_wf a 4⌝ ∗
+     wpt_own c (acc_addr a 0) (nth_byte w 0) ∗
+     wpt_own c (acc_addr a 1) (nth_byte w 1) ∗
+     wpt_own c (acc_addr a 2) (nth_byte w 2) ∗
+     wpt_own c (acc_addr a 3) (nth_byte w 3))%I.
+
+  Lemma wpt4_own_of_wpt4 c a w : wpt4 a (DfracOwn 1) w ⊢ wpt4_own c a w.
+  Proof.
+    rewrite /wpt4 /wpt4_own !wpt_own_of_wpt. iIntros "$".
+  Qed.
+
+  Lemma wpt4_own_facts c a w :
+    wpt4_own c a w ⊢ ⌜is_aligned_paddr (Physaddr a) 4 = true /\ acc_wf a 4⌝.
+  Proof. iIntros "(% & % & _)". by iPureIntro. Qed.
+
+  Lemma wpt4_own_mono c a w ws ws' :
+    ws_le ws ws' ->
+    vwp_hold (wpt4_own c a w) ws ⊢ vwp_hold (wpt4_own c a w) ws'.
+  Proof. apply vwp_hold_mono. Qed.
 
   (** THE PRIMITIVE.  Four full-fraction elements over the window, at
       arbitrary pre-timestamps and pre-values (see the header's note), one
@@ -332,6 +526,7 @@ Section store.
       timestamp. *)
   Lemma wlat4_store_prim (tid : option nat) k (σ : wmstate) (a : Arch.pa)
       (v : bv 32) (t0 t1 t2 t3 : nat) (b0 b1 b2 b3 : bv 8) :
+    k <> WCplain ->
     wlat_interp (wm_img σ) (wm_log σ) -∗
     wlat_pointsto (acc_addr a 0) (DfracOwn 1) t0 b0 -∗
     wlat_pointsto (acc_addr a 1) (DfracOwn 1) t1 b1 -∗
@@ -340,8 +535,11 @@ Section store.
     wlat_interp (wm_img σ) (wm_log σ ++ [wwrite_msg tid k a 4 v]) ∗
     wlat4 a (DfracOwn 1) (S (length (wm_log σ))) v.
   Proof.
-    iIntros "Hi H0 H1 H2 H3".
-    iDestruct "Hi" as (mm) "[Hauth %Hag]". rewrite /wlat_pointsto.
+    intros Hk. iIntros "Hi H0 H1 H2 H3".
+    iDestruct "Hi" as (mm mc) "(Hauth & %Hag & Hc & %Hagc)".
+    rewrite /wlat_pointsto /wlat_elem.
+    iDestruct "H0" as "[H0 C0]". iDestruct "H1" as "[H1 C1]".
+    iDestruct "H2" as "[H2 C2]". iDestruct "H3" as "[H3 C3]".
     iMod (ghost_map_update (S (length (wm_log σ)), nth_byte v 0)
             with "Hauth H0") as "[Hauth H0]".
     iMod (ghost_map_update (S (length (wm_log σ)), nth_byte v 1)
@@ -350,10 +548,51 @@ Section store.
             with "Hauth H2") as "[Hauth H2]".
     iMod (ghost_map_update (S (length (wm_log σ)), nth_byte v 3)
             with "Hauth H3") as "[Hauth H3]".
-    iModIntro. iSplitL "Hauth".
-    - iExists (wins4 a (S (length (wm_log σ))) v mm). iFrame "Hauth".
-      iPureIntro. by apply wlat_agree_store4.
-    - rewrite /wlat4. iFrame.
+    iModIntro. iSplitL "Hauth Hc".
+    - iExists (wins4 a (S (length (wm_log σ))) v mm), mc. iFrame "Hauth Hc".
+      iSplitR; [iPureIntro; by apply wlat_agree_store4|].
+      iPureIntro. by apply wcds_agree_nonplain.
+    - rewrite /wlat4 /wlat_pointsto /wlat_elem. iFrame.
+  Qed.
+
+  (** THE OWNED PRIMITIVE — the entry form of every PLAIN store.  It takes
+      the window's value elements at full fraction PLUS its owned C/D states,
+      and gives them back with the states stepped: dirty after a [WCplain]
+      store, clean after a [WCrel] one (the D->C flip).  Its side condition is
+      the mirror of the clean form's: an exclusive store may not run through
+      it, because it neither dirties nor publishes. *)
+  Lemma wlat4_store_prim_own (c : CPU) k (σ : wmstate) (a : Arch.pa)
+      (v : bv 32) (t0 t1 t2 t3 : nat) (b0 b1 b2 b3 : bv 8) :
+    wlat_interp (wm_img σ) (wm_log σ) -∗
+    wlat_elem (acc_addr a 0) (DfracOwn 1) t0 b0 -∗ wown_st c (acc_addr a 0) -∗
+    wlat_elem (acc_addr a 1) (DfracOwn 1) t1 b1 -∗ wown_st c (acc_addr a 1) -∗
+    wlat_elem (acc_addr a 2) (DfracOwn 1) t2 b2 -∗ wown_st c (acc_addr a 2) -∗
+    wlat_elem (acc_addr a 3) (DfracOwn 1) t3 b3 -∗ wown_st c (acc_addr a 3) ==∗
+    wlat_interp (wm_img σ)
+      (wm_log σ ++ [wwrite_msg (Some (fin_to_nat c)) k a 4 v]) ∗
+    wlat4_own c a (S (length (wm_log σ))) v.
+  Proof.
+    iIntros "Hi H0 C0 H1 C1 H2 C2 H3 C3".
+    iDestruct "Hi" as (mm mc) "(Hauth & %Hag & Hc & %Hagc)".
+    rewrite /wlat_elem.
+    iMod (ghost_map_update (S (length (wm_log σ)), nth_byte v 0)
+            with "Hauth H0") as "[Hauth H0]".
+    iMod (ghost_map_update (S (length (wm_log σ)), nth_byte v 1)
+            with "Hauth H1") as "[Hauth H1]".
+    iMod (ghost_map_update (S (length (wm_log σ)), nth_byte v 2)
+            with "Hauth H2") as "[Hauth H2]".
+    iMod (ghost_map_update (S (length (wm_log σ)), nth_byte v 3)
+            with "Hauth H3") as "[Hauth H3]".
+    iMod (wcds_store_list c (wwrite_msg (Some (fin_to_nat c)) k a 4 v)
+            (wm_log σ) [acc_addr a 0; acc_addr a 1; acc_addr a 2; acc_addr a 3]
+            mc eq_refl (wwrite_msg_zs4 _ _ a v) Hagc
+            with "Hc [C0 C1 C2 C3]") as (mc') "(Hc & %Hagc' & Hl)".
+    { simpl. iFrame. }
+    iModIntro. iSplitL "Hauth Hc".
+    - iExists (wins4 a (S (length (wm_log σ))) v mm), mc'. iFrame "Hauth Hc".
+      iSplitR; [iPureIntro; by apply wlat_agree_store4|by iPureIntro].
+    - simpl. iDestruct "Hl" as "(C0 & C1 & C2 & C3 & _)".
+      rewrite /wlat4_own /wlat_elem. iFrame.
   Qed.
 
   (** THE BUNDLE UPDATE at an explicitly described post-state — the shape
@@ -361,6 +600,7 @@ Section store.
       did not move and the log grew by this message" can fire it. *)
   Lemma wlat4_store_gen (tid : option nat) k (σ σ' : wmstate) (a : Arch.pa)
       (t : nat) (w v : bv 32) :
+    k <> WCplain ->
     wm_img σ' = wm_img σ ->
     wm_log σ' = (wm_log σ ++ [wwrite_msg tid k a 4 v])%list ->
     wlat_interp (wm_img σ) (wm_log σ) -∗
@@ -368,9 +608,10 @@ Section store.
     wlat_interp (wm_img σ') (wm_log σ') ∗
     wlat4 a (DfracOwn 1) (S (length (wm_log σ))) v.
   Proof.
-    intros Himg Hlog. rewrite /wlat4. iIntros "Hi (H0 & H1 & H2 & H3)".
+    intros Hk Himg Hlog. rewrite /wlat4. iIntros "Hi (H0 & H1 & H2 & H3)".
     rewrite Himg Hlog.
-    by iMod (wlat4_store_prim tid k σ a v with "Hi H0 H1 H2 H3") as "[$ $]".
+    by iMod (wlat4_store_prim tid k σ a v _ _ _ _ _ _ _ _ Hk
+               with "Hi H0 H1 H2 H3") as "[$ $]".
   Qed.
 
   (** ... and at the interpreter's OWN write post-state, which is what a leaf
@@ -380,6 +621,7 @@ Section store.
       the four bytes of [a] rather than a wrapped range. *)
   Lemma wlat4_store (tid : option nat) (σ : wmstate) (ak : akinfo) (a : Arch.pa)
       (t : nat) (w : bv 32) (v : bv (8 * 4)) :
+    ak_latest ak = true ->
     acc_wf a 4 ->
     wlat_interp (wm_img σ) (wm_log σ) -∗
     wlat4 a (DfracOwn 1) t w ==∗
@@ -387,8 +629,10 @@ Section store.
                 (wm_log (wwrite_post tid σ ak a 4 v)) ∗
     wlat4 a (DfracOwn 1) (S (length (wm_log σ))) v.
   Proof.
-    intros _. iIntros "Hi Hl".
-    iApply (wlat4_store_gen tid _ σ (wwrite_post tid σ ak a 4 v) a t w v
+    intros Hlt _. iIntros "Hi Hl".
+    iApply (wlat4_store_gen tid (wm_class_of ak (wm_ws σ)) σ
+              (wwrite_post tid σ ak a 4 v) a t w v
+              ltac:(unfold wm_class_of; rewrite Hlt; discriminate)
               (wwrite_post_img tid σ ak a 4 v) (wwrite_post_log tid σ ak a 4 v)
               with "Hi Hl").
   Qed.
@@ -440,16 +684,18 @@ Section store.
       window. *)
   Lemma wpt4_store (tid : option nat) (σ : wmstate) (ak : akinfo) (a : Arch.pa)
       (w : bv 32) (v : bv (8 * 4)) :
+    ak_latest ak = true ->
     wlat_interp (wm_img σ) (wm_log σ) -∗
     vwp_hold (wpt4 a (DfracOwn 1) w) (wm_ws σ) ==∗
     wlat_interp (wm_img (wwrite_post tid σ ak a 4 v))
                 (wm_log (wwrite_post tid σ ak a 4 v)) ∗
     vwp_hold (wpt4 a (DfracOwn 1) v) (wm_ws (wwrite_post tid σ ak a 4 v)).
   Proof.
-    iIntros "Hi Hpt".
+    intros Hlt. iIntros "Hi Hpt".
     iDestruct (wpt4_at_elems with "Hpt") as "(%Hal & %Hacc & Hpt)".
     iDestruct "Hpt" as (t0 t1 t2 t3) "(H0 & H1 & H2 & H3)".
     iMod (wlat4_store_prim tid (wm_class_of ak (wm_ws σ)) σ a v
+            _ _ _ _ _ _ _ _ ltac:(unfold wm_class_of; rewrite Hlt; discriminate)
             with "Hi H0 H1 H2 H3") as "[Hi Hl]".
     iModIntro.
     rewrite (wwrite_post_img tid σ ak a 4 v) (wwrite_post_log tid σ ak a 4 v).
@@ -459,7 +705,136 @@ Section store.
     intros j Hj. apply (flr_wwrite_post tid σ ak a 4 v j). lia.
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (** *** 4c. THE OWNED ALTITUDE — [wpt4_own] (φ-upgrade §1)
+
+      The decode / re-assembly pair and the store rule, exactly mirroring
+      §4b's clean ones but carrying the byte states instead of pinning them
+      clean.  This is what an [sw] leaf consumes and produces. *)
+
+  Lemma wpt4_own_at_elems (c : CPU) (a : Arch.pa) (w : bv 32) (ws : wstate) :
+    vwp_hold (wpt4_own c a w) ws ⊢
+      ⌜is_aligned_paddr (Physaddr a) 4 = true⌝ ∗ ⌜acc_wf a 4⌝ ∗
+      ∃ t0 t1 t2 t3 : nat,
+        wlat_elem (acc_addr a 0) (DfracOwn 1) t0 (nth_byte w 0) ∗
+          wown_st c (acc_addr a 0) ∗
+        wlat_elem (acc_addr a 1) (DfracOwn 1) t1 (nth_byte w 1) ∗
+          wown_st c (acc_addr a 1) ∗
+        wlat_elem (acc_addr a 2) (DfracOwn 1) t2 (nth_byte w 2) ∗
+          wown_st c (acc_addr a 2) ∗
+        wlat_elem (acc_addr a 3) (DfracOwn 1) t3 (nth_byte w 3) ∗
+          wown_st c (acc_addr a 3).
+  Proof.
+    rewrite /wpt4_own !vwp_hold_sep !vwp_hold_pure !wpt_own_at.
+    iIntros "(%Hal & %Hacc & H0 & H1 & H2 & H3)".
+    iDestruct "H0" as (t0) "(H0 & S0 & _)".
+    iDestruct "H1" as (t1) "(H1 & S1 & _)".
+    iDestruct "H2" as (t2) "(H2 & S2 & _)".
+    iDestruct "H3" as (t3) "(H3 & S3 & _)".
+    iSplitR; [iPureIntro; exact Hal|]. iSplitR; [iPureIntro; exact Hacc|].
+    iExists t0, t1, t2, t3. iFrame.
+  Qed.
+
+  Lemma wlat4_own_wpt4_own (c : CPU) (a : Arch.pa) (t : nat) (w : bv 32)
+      (ws : wstate) :
+    is_aligned_paddr (Physaddr a) 4 = true ->
+    acc_wf a 4 ->
+    (forall j : nat, (j < 4)%nat -> (t <= flr (ws_view ws) (acc_addr a j))%nat) ->
+    wlat4_own c a t w -∗ vwp_hold (wpt4_own c a w) ws.
+  Proof.
+    intros Hal Hacc Hfl.
+    rewrite /wlat4_own /wpt4_own !vwp_hold_sep !vwp_hold_pure.
+    iIntros "(H0 & S0 & H1 & S1 & H2 & S2 & H3 & S3)".
+    iSplitR; [iPureIntro; exact Hal|]. iSplitR; [iPureIntro; exact Hacc|].
+    iSplitL "H0 S0";
+      [by iApply (wpt_own_at_intro c _ _ t ws (Hfl 0%nat ltac:(lia))
+                    with "H0 S0")|].
+    iSplitL "H1 S1";
+      [by iApply (wpt_own_at_intro c _ _ t ws (Hfl 1%nat ltac:(lia))
+                    with "H1 S1")|].
+    iSplitL "H2 S2";
+      [by iApply (wpt_own_at_intro c _ _ t ws (Hfl 2%nat ltac:(lia))
+                    with "H2 S2")|].
+    by iApply (wpt_own_at_intro c _ _ t ws (Hfl 3%nat ltac:(lia))
+                 with "H3 S3").
+  Qed.
+
+  (** THE OWNED STORE RULE at the interpreter's own write post-state. *)
+  Lemma wpt4_store_own (c : CPU) (σ : wmstate) (ak : akinfo) (a : Arch.pa)
+      (w : bv 32) (v : bv (8 * 4)) :
+    wlat_interp (wm_img σ) (wm_log σ) -∗
+    vwp_hold (wpt4_own c a w) (wm_ws σ) ==∗
+    wlat_interp (wm_img (wwrite_post (Some (fin_to_nat c)) σ ak a 4 v))
+                (wm_log (wwrite_post (Some (fin_to_nat c)) σ ak a 4 v)) ∗
+    vwp_hold (wpt4_own c a v)
+             (wm_ws (wwrite_post (Some (fin_to_nat c)) σ ak a 4 v)).
+  Proof.
+    iIntros "Hi Hpt".
+    iDestruct (wpt4_own_at_elems with "Hpt") as "(%Hal & %Hacc & Hpt)".
+    iDestruct "Hpt" as (t0 t1 t2 t3) "(H0 & S0 & H1 & S1 & H2 & S2 & H3 & S3)".
+    iMod (wlat4_store_prim_own c (wm_class_of ak (wm_ws σ)) σ a v
+            with "Hi H0 S0 H1 S1 H2 S2 H3 S3") as "[Hi Hl]".
+    iModIntro.
+    rewrite (wwrite_post_img (Some (fin_to_nat c)) σ ak a 4 v)
+            (wwrite_post_log (Some (fin_to_nat c)) σ ak a 4 v).
+    iFrame "Hi".
+    iApply (wlat4_own_wpt4_own c a (S (length (wm_log σ))) v _ Hal Hacc
+              with "Hl").
+    intros j Hj. apply (flr_wwrite_post (Some (fin_to_nat c)) σ ak a 4 v j).
+    lia.
+  Qed.
+
+  (** THE OWNED LOAD FACTS: the flat window and its pinnedness, four
+      applications of [WeakInstr.wpt_own_byte_flat_pin]. *)
+  Lemma wpt4_own_flat_pin (c : CPU) (σ : wmstate) (a : Arch.pa) (w : bv 32) :
+    wlog_wf (wm_log σ) ->
+    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
+    vwp_hold (wpt4_own c a w) (wm_ws σ) -∗
+    ⌜acc_wf a 4 /\ forall j : nat, (j < 4)%nat ->
+       wflat (wm_img σ) (wm_log σ) !! pa_add a j = Some (nth_byte w j) /\
+       pinned_read σ (acc_addr a j)⌝.
+  Proof.
+    intros Hwf. rewrite /wpt4_own !vwp_hold_sep !vwp_hold_pure.
+    iIntros "Hi (%Hal & %Hacc & H0 & H1 & H2 & H3)".
+    iDestruct (wpt_own_byte_flat_pin c σ a 4 (nth_byte w 0) 0 Hwf Hacc
+                 ltac:(lia) with "Hi H0") as %E0.
+    iDestruct (wpt_own_byte_flat_pin c σ a 4 (nth_byte w 1) 1 Hwf Hacc
+                 ltac:(lia) with "Hi H1") as %E1.
+    iDestruct (wpt_own_byte_flat_pin c σ a 4 (nth_byte w 2) 2 Hwf Hacc
+                 ltac:(lia) with "Hi H2") as %E2.
+    iDestruct (wpt_own_byte_flat_pin c σ a 4 (nth_byte w 3) 3 Hwf Hacc
+                 ltac:(lia) with "Hi H3") as %E3.
+    iPureIntro. split; [exact Hacc|]. intros j Hj.
+    destruct j as [|[|[|[|j]]]]; [exact E0|exact E1|exact E2|exact E3|lia].
+  Qed.
+
+  Lemma wpt4_own_flat (c : CPU) (σ : wmstate) (a : Arch.pa) (w : bv 32) :
+    wlog_wf (wm_log σ) ->
+    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
+    vwp_hold (wpt4_own c a w) (wm_ws σ) -∗
+    ⌜forall j : nat, (j < 4)%nat ->
+       wflat (wm_img σ) (wm_log σ) !! pa_add a j = Some (nth_byte w j)⌝.
+  Proof.
+    intros Hwf. iIntros "Hi Hpt".
+    iDestruct (wpt4_own_flat_pin c σ a w Hwf with "Hi Hpt") as %[_ Hall].
+    iPureIntro. intros j Hj. exact (proj1 (Hall j Hj)).
+  Qed.
+
+  Lemma wpt4_own_pinned (c : CPU) (σ : wmstate) (a : Arch.pa) (w : bv 32) :
+    wlog_wf (wm_log σ) ->
+    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
+    vwp_hold (wpt4_own c a w) (wm_ws σ) -∗
+    ⌜forall j : nat, (j < 4)%nat -> pinned_read σ (acc_addr a j)⌝.
+  Proof.
+    intros Hwf. iIntros "Hi Hpt".
+    iDestruct (wpt4_own_flat_pin c σ a w Hwf with "Hi Hpt") as %[_ Hall].
+    iPureIntro. intros j Hj. exact (proj2 (Hall j Hj)).
+  Qed.
+
 End store.
+
+Notation "a ↦w₄ₒ w" := (wpt4_own cpu_id a w)
+  (at level 20, format "a  ↦w₄ₒ  w") : bi_scope.
 
 (* ====================================================================== *)
 (** ** 5. Soundness check *)

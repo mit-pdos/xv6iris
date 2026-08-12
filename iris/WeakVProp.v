@@ -176,10 +176,29 @@ Section rules.
   Definition wpt (a : Z) (dq : dfrac) (v : bv 8) : vProp Σ :=
     (∃ t : nat, ⎡ wlat_pointsto a dq t v ⎤ ∗ ⊒(view_byte a t))%I.
 
+  (** *** 3'. THE OWNED FORM — [↦wo] (the φ-upgrade's C-or-D points-to)
+
+      A byte a hart owns EXCLUSIVELY and may have plain-stored to: the value
+      element at full fraction, plus a state element that is CLEAN or DIRTY
+      BY THIS HART.  This is the postcondition shape of every owned store —
+      it absorbs both outcomes, so no call site case-splits on the access
+      class — and the only shape a plain store accepts on the way in.
+
+      IT IS HART-INDEXED, DELIBERATELY, and therefore does NOT survive
+      [WpNext.wp_next] (see [WeakSmodeFrame]'s §5 control).  That is sound:
+      an unpublished own store IS a fact about the storing hart, and a
+      migrating context must publish (flip to C, §5b) before it moves.  The
+      M-mode weak port never crosses a [wp_next] binder with one. *)
+  Definition wpt_own (c : CPU) (a : Z) (v : bv 8) : vProp Σ :=
+    (∃ t : nat, ⎡ wlat_elem a (DfracOwn 1) t v ∗ wown_st c a ⎤ ∗
+                ⊒(view_byte a t))%I.
+
 End rules.
 
 Notation "a ↦w dq v" := (wpt a dq v)
   (at level 20, dq custom dfrac at level 1, format "a  ↦w dq  v") : bi_scope.
+Notation "a ↦wo v" := (wpt_own cpu_id a v)
+  (at level 20, format "a  ↦wo  v") : bi_scope.
 
 Section pointsto.
   Context `{!riscvGS Σ, !weakGS Σ}.
@@ -215,27 +234,49 @@ Section pointsto.
       elements for the same byte agree on BOTH components.  (The timestamp
       cannot be stated at the [vProp] altitude — it is existentially bound
       there — which is precisely why this one is a base-logic lemma.) *)
+  Lemma wlat_elem_agree a dq1 t1 v1 dq2 t2 v2 :
+    wlat_elem a dq1 t1 v1 -∗ wlat_elem a dq2 t2 v2 -∗ ⌜t1 = t2 ∧ v1 = v2⌝.
+  Proof.
+    rewrite /wlat_elem. iIntros "H1 H2".
+    iDestruct (ghost_map_elem_agree with "H1 H2") as %Heq.
+    iPureIntro. by simplify_eq.
+  Qed.
+
   Lemma wlat_pointsto_agree a dq1 t1 v1 dq2 t2 v2 :
     wlat_pointsto a dq1 t1 v1 -∗ wlat_pointsto a dq2 t2 v2 -∗
     ⌜t1 = t2 ∧ v1 = v2⌝.
   Proof.
-    rewrite /wlat_pointsto. iIntros "H1 H2".
-    iDestruct (ghost_map_elem_agree with "H1 H2") as %Heq.
-    iPureIntro. by simplify_eq.
+    iIntros "[H1 _] [H2 _]". by iApply (wlat_elem_agree with "H1 H2").
   Qed.
 
   Lemma wlat_pointsto_valid_2 a dq1 t1 v1 dq2 t2 v2 :
     wlat_pointsto a dq1 t1 v1 -∗ wlat_pointsto a dq2 t2 v2 -∗
     ⌜✓ (dq1 ⋅ dq2) ∧ t1 = t2 ∧ v1 = v2⌝.
   Proof.
-    rewrite /wlat_pointsto. iIntros "H1 H2".
+    rewrite /wlat_pointsto /wlat_elem. iIntros "[H1 _] [H2 _]".
     iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hv Heq].
     iPureIntro. split; [exact Hv|by simplify_eq].
   Qed.
 
   Lemma wlat_pointsto_persist a dq t v :
     wlat_pointsto a dq t v ==∗ wlat_pointsto a DfracDiscarded t v.
-  Proof. apply ghost_map_elem_persist. Qed.
+  Proof.
+    rewrite /wlat_pointsto /wlat_elem /wclean /wcds_el. iIntros "[H1 H2]".
+    iMod (ghost_map_elem_persist with "H1") as "$".
+    by iMod (ghost_map_elem_persist with "H2") as "$".
+  Qed.
+
+  (** FRACTION SPLIT at the base altitude: both halves of the points-to are
+      [ghost_map_elem]s, so the split is the algebra's, twice. *)
+  Lemma wlat_pointsto_split a q1 q2 t v :
+    wlat_pointsto a (DfracOwn (q1 + q2)) t v ⊣⊢
+    wlat_pointsto a (DfracOwn q1) t v ∗ wlat_pointsto a (DfracOwn q2) t v.
+  Proof.
+    rewrite /wlat_pointsto /wlat_elem /wclean /wcds_el. iSplit.
+    - iIntros "[[E1 E2] [C1 C2]]". iFrame.
+    - iIntros "[[E1 C1] [E2 C2]]".
+      iCombine "E1 E2" as "E". iCombine "C1 C2" as "C". iFrame.
+  Qed.
 
   Global Instance wlat_pointsto_persistent a t v :
     Persistent (wlat_pointsto a DfracDiscarded t v).
@@ -291,7 +332,7 @@ Section pointsto.
     iSplit.
     - iIntros "H". iDestruct "H" as (t) "H".
       rewrite !monPred_at_sep !monPred_at_embed.
-      iDestruct "H" as "[He #Hv]". rewrite /wlat_pointsto.
+      iDestruct "H" as "[He #Hv]". rewrite wlat_pointsto_split.
       iDestruct "He" as "[He1 He2]".
       iSplitL "He1"; iExists t; rewrite monPred_at_sep monPred_at_embed;
         by iFrame.
@@ -301,7 +342,7 @@ Section pointsto.
       iDestruct "H1" as "[He1 #Hv1]". iDestruct "H2" as "[He2 _]".
       iDestruct (wlat_pointsto_agree with "He1 He2") as %[<- _].
       iExists t1. rewrite monPred_at_sep monPred_at_embed.
-      rewrite /wlat_pointsto. iCombine "He1 He2" as "He". by iFrame.
+      rewrite wlat_pointsto_split. by iFrame.
   Qed.
 
   Lemma wpt_persist a dq v : (a ↦w{dq} v : vProp Σ) ⊢ |==> a ↦w□ v.
@@ -353,6 +394,50 @@ Section pointsto.
       visible.  [wpt_at] is what connects the two. *)
   Lemma wpt_img_at a dq v ws : vwp_hold (wpt_img a dq v) ws ⊣⊢ wlat_pointsto a dq 0%nat v.
   Proof. apply monPred_at_embed. Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (** *** 3c. the algebra of the OWNED form
+
+      [wpt_own]'s decode is [wpt_at]'s with the state element carried
+      alongside; it is the shape both memory rules of §4/§5 destruct to. *)
+
+  Lemma wpt_own_at c a v ws :
+    vwp_hold (wpt_own c a v) ws ⊣⊢
+      ∃ t : nat, wlat_elem a (DfracOwn 1) t v ∗ wown_st c a ∗
+                 ⌜(t ≤ flr (ws_view ws) a)%nat⌝.
+  Proof.
+    rewrite /vwp_hold /wpt_own monPred_at_exist.
+    setoid_rewrite monPred_at_sep. setoid_rewrite monPred_at_embed.
+    setoid_rewrite monPred_at_in.
+    apply bi.exist_proper => t.
+    iSplit.
+    - iIntros "[[He Hs] %H]". iFrame "He Hs". iPureIntro. by apply view_byte_le.
+    - iIntros "(He & Hs & %H)". iFrame "He Hs". iPureIntro.
+      by apply view_byte_le.
+  Qed.
+
+  Lemma wpt_own_at_intro c a v t ws :
+    (t ≤ flr (ws_view ws) a)%nat →
+    wlat_elem a (DfracOwn 1) t v -∗ wown_st c a -∗
+    vwp_hold (wpt_own c a v) ws.
+  Proof.
+    intros Ht. rewrite wpt_own_at. iIntros "He Hs". iExists t. by iFrame.
+  Qed.
+
+  (** A CLEAN full-fraction byte IS an owned byte.  The converse is NOT
+      available in general — that is the whole point of the D state, and
+      recovering it is what a release's flip ([WeakStore.wpt_own_flip]) does. *)
+  Lemma wpt_own_of_wpt c a v : (a ↦w v : vProp Σ) ⊢ wpt_own c a v.
+  Proof.
+    rewrite /wpt /wpt_own. constructor => V.
+    rewrite !monPred_at_exist. apply bi.exist_mono => t.
+    rewrite !monPred_at_sep !monPred_at_embed.
+    iIntros "[[He Hc] $]". iFrame "He". by iApply wclean_own_st.
+  Qed.
+
+  Lemma wpt_own_mono c a v ws ws' :
+    ws_le ws ws' → vwp_hold (wpt_own c a v) ws ⊢ vwp_hold (wpt_own c a v) ws'.
+  Proof. apply vwp_hold_mono. Qed.
 
   (* ==================================================================== *)
   (** ** 4. THE LOAD RULE
@@ -429,25 +514,82 @@ Section pointsto.
       machine's own [store_post], and [ws_view_mono] carries it through any
       later view growth. *)
 
+  (** THE C/D/S SPLIT (φ-upgrade §1) gives the rule TWO ENTRY FORMS, and the
+      class of the message decides which applies:
+
+        - the OWNED form, for a store that may be [WCplain] (every plain [sb]
+          / [sw] / [sd]): it consumes and produces [↦wo], because a plain
+          store DIRTIES its byte and only the owning hart may hold a dirty
+          one.  Its side condition is [wm_ak m ≠ WCexcl] — an exclusive store
+          neither dirties nor publishes, so it must not be allowed to declare
+          a byte clean.
+        - the CLEAN form, for a store that is not an owned store at all (an
+          AMO's write half, a release): it consumes and produces [↦w{1}],
+          which is what keeps a lock word — held clean inside an invariant —
+          clean across an acquire and a release. *)
+
+  Lemma wpt_store_rule_own (c : CPU) σ σ' m a v v' :
+    msg_byte m a = Some v' →
+    (∀ a', a' ≠ a → msg_byte m a' = None) →
+    wm_tid m = Some (fin_to_nat c) →
+    wm_img σ' = wm_img σ →
+    wm_log σ' = (wm_log σ ++ [m])%list →
+    (S (length (wm_log σ)) ≤ flr (ws_view (wm_ws σ')) a)%nat →
+    wlat_interp (wm_img σ) (wm_log σ) -∗
+    vwp_hold (wpt_own c a v) (wm_ws σ) ==∗
+    wlat_interp (wm_img σ') (wm_log σ') ∗
+    vwp_hold (wpt_own c a v') (wm_ws σ').
+  Proof.
+    intros Hma Hother Htid Himg Hlog Hfl.
+    iIntros "Hi Hpt". rewrite wpt_own_at.
+    iDestruct "Hpt" as (t) "(He & Hs & _)".
+    iDestruct "Hs" as (s) "[Hsel %Hs]".
+    iDestruct "Hi" as (mm mc) "(Hauth & %Hag & Hcauth & %Hagc)".
+    rewrite /wlat_elem /wcds_el.
+    iDestruct (ghost_map_lookup with "Hcauth Hsel") as %Hlk.
+    iMod (ghost_map_update (S (length (wm_log σ)), v') with "Hauth He")
+      as "[Hauth He]".
+    iMod (ghost_map_update (wcds_own_step c (wm_ak m) s) with "Hcauth Hsel")
+      as "[Hcauth Hsel]".
+    iModIntro. rewrite Himg Hlog. iSplitL "Hauth Hcauth".
+    - iExists _, _. iFrame "Hauth Hcauth". iSplitR.
+      { iPureIntro. by apply wlat_agree_store. }
+      iPureIntro. intros a' s' Ha'.
+      destruct (decide (a' = a)) as [->|Hne].
+      + rewrite lookup_insert in Ha'. simplify_eq.
+        by apply wcds_ok_store_own; [| |apply (Hagc a s Hlk)].
+      + rewrite lookup_insert_ne // in Ha'.
+        apply wcds_ok_app; [|by apply Hagc].
+        intros m0 Hm0. apply elem_of_list_singleton in Hm0 as ->.
+        by apply Hother.
+    - rewrite wpt_own_at. iExists (S (length (wm_log σ))). iFrame "He".
+      iSplitL "Hsel"; [|by iPureIntro].
+      iExists (wcds_own_step c (wm_ak m) s). iFrame "Hsel". iPureIntro.
+      destruct (wm_ak m); simpl; [by right|by left|exact Hs].
+  Qed.
+
   Lemma wpt_store_rule σ σ' m a v v' :
     msg_byte m a = Some v' →
     (∀ a', a' ≠ a → msg_byte m a' = None) →
+    wm_ak m ≠ WCplain →
     wm_img σ' = wm_img σ →
     wm_log σ' = (wm_log σ ++ [m])%list →
     (S (length (wm_log σ)) ≤ flr (ws_view (wm_ws σ')) a)%nat →
     wlat_interp (wm_img σ) (wm_log σ) -∗ vwp_hold (a ↦w v) (wm_ws σ) ==∗
     wlat_interp (wm_img σ') (wm_log σ') ∗ vwp_hold (a ↦w v') (wm_ws σ').
   Proof.
-    intros Hma Hother Himg Hlog Hfl.
-    iIntros "Hi Hpt". rewrite wpt_at. iDestruct "Hpt" as (t) "[He _]".
-    iDestruct "Hi" as (mm) "[Hauth %Hag]".
-    rewrite /wlat_pointsto.
+    intros Hma Hother Hk Himg Hlog Hfl.
+    iIntros "Hi Hpt". rewrite wpt_at. iDestruct "Hpt" as (t) "[[He Hc] _]".
+    iDestruct "Hi" as (mm mc) "(Hauth & %Hag & Hcauth & %Hagc)".
+    rewrite /wlat_elem.
     iMod (ghost_map_update (S (length (wm_log σ)), v') with "Hauth He")
       as "[Hauth He]".
-    iModIntro. rewrite Himg Hlog. iSplitL "Hauth".
-    - iExists _. iFrame "Hauth". iPureIntro.
-      by apply wlat_agree_store.
-    - rewrite wpt_at. iExists (S (length (wm_log σ))). by iFrame "He".
+    iModIntro. rewrite Himg Hlog. iSplitL "Hauth Hcauth".
+    - iExists _, _. iFrame "Hauth Hcauth". iSplitR.
+      { iPureIntro. by apply wlat_agree_store. }
+      iPureIntro. intros a' s' Ha'.
+      by apply wcds_ok_store_nonplain; [|apply Hagc].
+    - rewrite wpt_at. iExists (S (length (wm_log σ))). by iFrame "He Hc".
   Qed.
 
   (** At the machine's own store post-state, the post-view premise is
@@ -455,18 +597,40 @@ Section pointsto.
   Lemma wpt_store_post σ m a v v' rl :
     msg_byte m a = Some v' →
     (∀ a', a' ≠ a → msg_byte m a' = None) →
+    wm_ak m ≠ WCplain →
     wlat_interp (wm_img σ) (wm_log σ) -∗ vwp_hold (a ↦w v) (wm_ws σ) ==∗
     wlat_interp (wm_img σ) ((wm_log σ ++ [m])%list) ∗
     vwp_hold (a ↦w v')
       (store_post (wm_ws σ) rl a (S (length (wm_log σ)))).
   Proof.
-    intros Hma Hother.
+    intros Hma Hother Hk.
     iApply (wpt_store_rule
               (WMState (wm_regs σ) (wm_img σ) (wm_log σ) (wm_ws σ) (wm_dev σ))
               (WMState (wm_regs σ) (wm_img σ) ((wm_log σ ++ [m])%list)
                        (store_post (wm_ws σ) rl a (S (length (wm_log σ))))
                        (wm_dev σ)));
-      [exact Hma|exact Hother|reflexivity|reflexivity|].
+      [exact Hma|exact Hother|exact Hk|reflexivity|reflexivity|].
+    apply flr_store_post.
+  Qed.
+
+  (** The owned twin. *)
+  Lemma wpt_store_post_own (c : CPU) σ m a v v' rl :
+    msg_byte m a = Some v' →
+    (∀ a', a' ≠ a → msg_byte m a' = None) →
+    wm_tid m = Some (fin_to_nat c) →
+    wlat_interp (wm_img σ) (wm_log σ) -∗
+    vwp_hold (wpt_own c a v) (wm_ws σ) ==∗
+    wlat_interp (wm_img σ) ((wm_log σ ++ [m])%list) ∗
+    vwp_hold (wpt_own c a v')
+      (store_post (wm_ws σ) rl a (S (length (wm_log σ)))).
+  Proof.
+    intros Hma Hother Htid.
+    iApply (wpt_store_rule_own c
+              (WMState (wm_regs σ) (wm_img σ) (wm_log σ) (wm_ws σ) (wm_dev σ))
+              (WMState (wm_regs σ) (wm_img σ) ((wm_log σ ++ [m])%list)
+                       (store_post (wm_ws σ) rl a (S (length (wm_log σ))))
+                       (wm_dev σ)));
+      [exact Hma|exact Hother|exact Htid|reflexivity|reflexivity|].
     apply flr_store_post.
   Qed.
 
@@ -506,13 +670,14 @@ Section vprop_altitude.
   Lemma wpt_store_vprop σ m a v v' rl :
     msg_byte m a = Some v' →
     (∀ a', a' ≠ a → msg_byte m a' = None) →
+    wm_ak m ≠ WCplain →
     (⎡wlat_interp (wm_img σ) (wm_log σ)⎤ ∗ (a ↦w v) @@ ws_view (wm_ws σ)
        : vProp Σ)
     ⊢ |==> ⎡wlat_interp (wm_img σ) ((wm_log σ ++ [m])%list)⎤ ∗
            (a ↦w v') @@ ws_view (store_post (wm_ws σ) rl a
                                     (S (length (wm_log σ)))).
   Proof.
-    intros Hma Hother. constructor => V.
+    intros Hma Hother Hk. constructor => V.
     rewrite monPred_at_sep monPred_at_embed view_at_at monPred_at_bupd
             monPred_at_sep monPred_at_embed view_at_at.
     iIntros "[Hi Hpt]".
@@ -624,16 +789,22 @@ Section demo.
 
   (** ... so the store rule fires at the interpreter's own write post-state,
       with no side condition left for the caller beyond the value. *)
-  Lemma wpt_wwrite_byte tid σ ak (pa : Arch.pa) (v : bv (8 * 1)) (v0 : bv 8) :
+  Lemma wpt_wwrite_byte (c : CPU) σ ak (pa : Arch.pa) (v : bv (8 * 1))
+      (v0 : bv 8) :
     wlat_interp (wm_img σ) (wm_log σ) -∗
-    vwp_hold (pa_z pa ↦w v0) (wm_ws σ) ==∗
-    wlat_interp (wm_img (wwrite_post tid σ ak pa 1 v))
-                (wm_log (wwrite_post tid σ ak pa 1 v)) ∗
-    vwp_hold (pa_z pa ↦w nth_byte v 0) (wm_ws (wwrite_post tid σ ak pa 1 v)).
+    vwp_hold (wpt_own c (pa_z pa) v0) (wm_ws σ) ==∗
+    wlat_interp (wm_img (wwrite_post (Some (fin_to_nat c)) σ ak pa 1 v))
+                (wm_log (wwrite_post (Some (fin_to_nat c)) σ ak pa 1 v)) ∗
+    vwp_hold (wpt_own c (pa_z pa) (nth_byte v 0))
+             (wm_ws (wwrite_post (Some (fin_to_nat c)) σ ak pa 1 v)).
   Proof.
-    iApply (wpt_store_rule σ (wwrite_post tid σ ak pa 1 v)).
+    iApply (wpt_store_rule_own c σ
+              (wwrite_post (Some (fin_to_nat c)) σ ak pa 1 v)
+              (wwrite_msg (Some (fin_to_nat c)) (wm_class_of ak (wm_ws σ))
+                          pa 1 v)).
     - apply wwrite_msg_byte1.
     - intros a' Hne. by apply wwrite_msg_byte1_none.
+    - reflexivity.
     - reflexivity.
     - reflexivity.
     - rewrite /wwrite_post /store_post_run /store_post_bytes /=.

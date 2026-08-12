@@ -1102,7 +1102,10 @@ Proof.
                       (wm_class_of akw (wm_ws s2)) ea 8 v])%list).
   { rewrite Hl !weffs_app !weffs_cons -/s1 -/s2 -/s3 Hlpost Hl3. reflexivity. }
   rewrite /wQ_store_w /wV_store_w.
-  split_and!; [exact Hi|by eexists; exact Hls'|exact Hle|].
+  split_and!; [exact Hi| |exact Hle|].
+  { eexists. split; [exact Hls'|]. intros Hr. apply wm_class_of_relp.
+    subst s2. rewrite weff_apply_read wread_post_relp. subst s1.
+    by apply weffs_nowrite_relp. }
   intros j Hj.
   (* the floor reached at the write's own step survives the write-free tail *)
   assert (Hstep : (S (length (wm_log s))
@@ -1147,7 +1150,10 @@ Proof.
                       (wm_class_of akw (wm_ws s2)) ea 8 v])%list).
   { rewrite Hl !weffs_app !weffs_cons -/s1 -/s2 -/s3 Hlpost Hl3. reflexivity. }
   rewrite /wQ_store_w /wV_store_w.
-  split_and!; [exact Hi|by eexists; exact Hls'|exact Hle|].
+  split_and!; [exact Hi| |exact Hle|].
+  { eexists. split; [exact Hls'|]. intros Hr. apply wm_class_of_relp.
+    subst s2. rewrite weff_apply_read wread_post_relp. subst s1.
+    by apply weffs_nowrite_relp. }
   intros j Hj.
   assert (Hstep : (S (length (wm_log s))
                    ≤ flr (ws_view (wm_ws s3)) (acc_addr ea j))%nat).

@@ -226,7 +226,7 @@ Section WkTimerinitThm.
   (* [WkStackOwn.wstack_own_phys_2_intro] as a single [∗]-shaped entailment,
      so it composes with [WeakCtx.cobj_mono] at the final re-bundling. *)
   Local Lemma stack_2_intro_ent (sp : Arch.pa) (w1 w2 : bv 64) :
-    (wpt8 (pa_stk sp 1) (DfracOwn 1) w1 ∗ wpt8 (pa_stk sp 2) (DfracOwn 1) w2)
+    (wpt8_own cpu_id (pa_stk sp 1) w1 ∗ wpt8_own cpu_id (pa_stk sp 2) w2)
     ⊢ wstack_own_phys sp 2.
   Proof. iIntros "[H1 H2]". iApply (wstack_own_phys_2_intro with "H1 H2"). Qed.
 
@@ -607,9 +607,9 @@ Section WkTimerinitThm.
     iEval (rewrite (gpr_pt_nz csp_rs1 _ Hnz_sp) -(rf_lookup (ti_m24 m sp0 menv0 mcen0 tv)
              (Regidx csp_rs1)) L26sp) in "Hspc".
     iEval (rewrite (gpr_pt_nz ti_ra _ Hnz_ra)) in "Hrac".
-    iApply (wwp_ld8_tor_rvc_run ξ ti_pc26 csp_rs1 ti_ra
+    iApply (wwp_ld8_tor_rvc_run_own ξ ti_pc26 csp_rs1 ti_ra
               (zero_extend' 12 (concat_vec u10 ('b"000")))
-              (ti_ea_ra sp0) ra0 (DfracOwn 1) q pmpcfg1 pmpaddrs
+              (ti_ea_ra sp0) ra0 q pmpcfg1 pmpaddrs
               (ti_sp1 sp0) (ti_m24 m sp0 menv0 mcen0 tv (Regidx ti_ra))
               Hgid Hpmp Htor_ra Hnz_sp Hnz_ra eq_refl Hram_ra
               with "Hrun Hpmpc Hpaddr Hpc Hspc Hrac Hi26 Hstkra").
@@ -634,9 +634,9 @@ Section WkTimerinitThm.
     iEval (rewrite (gpr_pt_nz csp_rs1 _ Hnz_sp) -(rf_lookup (ti_m26 m sp0 menv0 mcen0 tv ra0)
              (Regidx csp_rs1)) L27sp) in "Hspc".
     iEval (rewrite (gpr_pt_nz ti_s0 _ Hnz_s0)) in "Hs0c".
-    iApply (wwp_ld8_tor_rvc_run ξ ti_pc27 csp_rs1 ti_s0
+    iApply (wwp_ld8_tor_rvc_run_own ξ ti_pc27 csp_rs1 ti_s0
               (zero_extend' 12 (concat_vec u11 ('b"000")))
-              (ti_ea_s0 sp0) s00 (DfracOwn 1) q pmpcfg1 pmpaddrs
+              (ti_ea_s0 sp0) s00 q pmpcfg1 pmpaddrs
               (ti_sp1 sp0) (ti_m26 m sp0 menv0 mcen0 tv ra0 (Regidx ti_s0))
               Hgid Hpmp Htor_s0 Hnz_sp Hnz_s0 eq_refl Hram_s0
               with "Hrun Hpmpc Hpaddr Hpc Hspc Hs0c Hi27 Hstks0").
@@ -691,8 +691,8 @@ Section WkTimerinitThm.
        everything to the caller.  No view arithmetic: each [cobj] has sat in
        the context, untouched, since the step that produced it. *)
     iEval (rewrite Hpra) in "Hstkra". iEval (rewrite Hps0) in "Hstks0".
-    iAssert (cobj ξ (wpt8 (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
-                     wpt8 (pa_stk sp0 2) (DfracOwn 1) s00))
+    iAssert (cobj ξ (wpt8_own cpu_id (pa_stk sp0 1) ra0 ∗
+                     wpt8_own cpu_id (pa_stk sp0 2) s00))
       with "[Hstkra Hstks0]" as "Htop".
     { iEval (rewrite cobj_sep). iFrame. }
     iDestruct (cobj_mono _ _ _ (stack_2_intro_ent sp0 ra0 s00) with "Htop") as "Htop".

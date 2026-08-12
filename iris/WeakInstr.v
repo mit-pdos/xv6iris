@@ -109,6 +109,34 @@ Section flat_bridge.
     exact (proj1 Hlat).
   Qed.
 
+  (** The same over the BARE value element — the form the C/D/S owned
+      points-to decodes to, and the one both surface forms go through. *)
+  Lemma wlat_flat_lookup_e (σ : wmstate) (a : Arch.pa) (dq : dfrac) (t : nat)
+      (v : bv 8) :
+    wlog_wf (wm_log σ) →
+    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
+    wlat_elem (pa_z a) dq t v -∗
+    ⌜wflat (wm_img σ) (wm_log σ) !! a = Some v⌝.
+  Proof.
+    intros Hwf. iIntros "Hi He".
+    iDestruct (wlat_lookup_elem with "Hi He") as %Hlat.
+    iPureIntro.
+    rewrite (wflat_latest (wm_img σ) (wm_log σ) a t Hwf
+               (latest_val_latest _ _ _ _ _ Hlat)).
+    exact (proj1 Hlat).
+  Qed.
+
+  Lemma wpt_own_flat_lookup (c : CPU) (σ : wmstate) (a : Arch.pa) (v : bv 8) :
+    wlog_wf (wm_log σ) →
+    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
+    vwp_hold (wpt_own c (pa_z a) v) (wm_ws σ) -∗
+    ⌜wflat (wm_img σ) (wm_log σ) !! a = Some v⌝.
+  Proof.
+    intros Hwf. iIntros "Hi Hpt". rewrite wpt_own_at.
+    iDestruct "Hpt" as (t) "(He & _ & _)".
+    by iApply (wlat_flat_lookup_e σ a (DfracOwn 1) t v Hwf with "Hi He").
+  Qed.
+
   (** The owned form.  ([wpt_at] hands out the element; the receipt is not
       needed — which is the whole point.) *)
   Lemma wpt_flat_lookup (σ : wmstate) (a : Arch.pa) (dq : dfrac) (v : bv 8) :
@@ -180,6 +208,24 @@ Section byte_bridges.
     iDestruct (wpt_pinned_read σ (acc_addr a j) dq b with "Hi Hpt") as %Hpin.
     iAssert (⌜wflat (wm_img σ) (wm_log σ) !! pa_add a j = Some b⌝)%I as %Hfl.
     { iApply (wpt_flat_lookup σ (pa_add a j) dq b Hwf with "Hi [Hpt]").
+      rewrite (acc_wf_byte a n j Hacc Hj). iExact "Hpt". }
+    iPureIntro. by split.
+  Qed.
+
+  (** The OWNED (C-or-D) twin of [wpt_byte_flat_pin]. *)
+  Lemma wpt_own_byte_flat_pin (c : CPU) (σ : wmstate) (a : Arch.pa) (n : N)
+      (b : bv 8) (j : nat) :
+    wlog_wf (wm_log σ) → acc_wf a n → (j < N.to_nat n)%nat →
+    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
+    vwp_hold (wpt_own c (acc_addr a j) b) (wm_ws σ) -∗
+    ⌜wflat (wm_img σ) (wm_log σ) !! pa_add a j = Some b ∧
+     pinned_read σ (acc_addr a j)⌝.
+  Proof.
+    intros Hwf Hacc Hj. iIntros "Hi Hpt".
+    iDestruct (wpt_own_pinned_read c σ (acc_addr a j) b with "Hi Hpt")
+      as %Hpin.
+    iAssert (⌜wflat (wm_img σ) (wm_log σ) !! pa_add a j = Some b⌝)%I as %Hfl.
+    { iApply (wpt_own_flat_lookup c σ (pa_add a j) b Hwf with "Hi [Hpt]").
       rewrite (acc_wf_byte a n j Hacc Hj). iExact "Hpt". }
     iPureIntro. by split.
   Qed.
@@ -635,8 +681,24 @@ Definition wV_load_w (n : N) (ea : Arch.pa) : wmstate → wstate → Prop :=
 
 Definition wQ_none : wmstate → wmstate → Prop := λ _ _, True.
 
+(** [w_relp] after a barrier: a [pw ∧ sw] fence ARMS the next store.  It is
+    absent from [ws_le] (it toggles), so [wV_fence] cannot carry it and
+    [wQ_fence] states it separately — this is the one fact the release
+    discipline of the φ-upgrade (§1) needs from a fence. *)
+Definition barrier_arms (b : barrier_kind) : bool :=
+  match b with
+  | Barrier_RISCV_rw_w | Barrier_RISCV_w_w | Barrier_RISCV_rw_rw
+  | Barrier_RISCV_w_rw | Barrier_RISCV_tso => true
+  | _ => false
+  end.
+
+Lemma barrier_post_relp ws b :
+  barrier_arms b = true -> w_relp (barrier_post ws b) = true.
+Proof. destruct b; try discriminate; reflexivity. Qed.
+
 Definition wQ_fence (b : barrier_kind) : wmstate → wmstate → Prop :=
-  λ σ σ', wV_fence b σ (wm_ws σ').
+  λ σ σ', wV_fence b σ (wm_ws σ') ∧
+          (barrier_arms b = true → w_relp (wm_ws σ') = true).
 
 Definition wQ_load_w (n : N) (ea : Arch.pa) : wmstate → wmstate → Prop :=
   λ σ σ', wm_img σ' = wm_img σ ∧ wm_log σ' = wm_log σ ∧
@@ -645,6 +707,41 @@ Definition wQ_load_w (n : N) (ea : Arch.pa) : wmstate → wmstate → Prop :=
 (** A width-[n] STORE of [v] to [ea]: ONE message at the log's fresh top, and
     the hart's own floor covers it afterwards.  The stored value's width [m]
     is left free — the message carries whatever the interpreter was handed. *)
+(** [w_relp] IS INERT UNDER READS (φ-upgrade §1).  A load never touches the
+    release-pending flag, so a store's class as computed by
+    [WeakInterp.wm_class_of] at the post-fetch state is the class computed at
+    the instruction's own entry state — which is what lets [wQ_store_w] below
+    record "if the hart was release-pending, this message is not an owned
+    store". *)
+Lemma load_post_fold_relp aq vpre ats ws :
+  w_relp (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats)
+  = w_relp ws.
+Proof.
+  revert ws. induction ats as [|a l IH]; [done|]. intros ws. simpl. by rewrite IH.
+Qed.
+
+Lemma load_post_bytes_relp ws aq ats :
+  w_relp (load_post_bytes ws aq ats) = w_relp ws.
+Proof. apply load_post_fold_relp. Qed.
+
+Lemma load_post_run_relp ws aq base ts :
+  w_relp (load_post_run ws aq base ts) = w_relp ws.
+Proof. apply load_post_bytes_relp. Qed.
+
+Lemma wread_post_relp s ak pa ts :
+  w_relp (wm_ws (wread_post s ak pa ts)) = w_relp (wm_ws s).
+Proof.
+  rewrite /wread_post. destruct (ak_coh ak); [reflexivity|].
+  apply load_post_run_relp.
+Qed.
+
+(** ... hence a class computed at a state whose [w_relp] is set is never
+    [WCplain]. *)
+Lemma wm_class_of_relp ak ws : w_relp ws = true -> wm_class_of ak ws <> WCplain.
+Proof.
+  intros Hr. rewrite /wm_class_of Hr. by destruct (ak_latest ak).
+Qed.
+
 Definition wQ_store_w (n : N) (tid : option nat) (ea : Arch.pa) {m : N}
     (v : bv m) : wmstate → wmstate → Prop :=
   λ σ σ',
@@ -656,7 +753,8 @@ Definition wQ_store_w (n : N) (tid : option nat) (ea : Arch.pa) {m : N}
        write half ([WCexcl]) — so pinning it at this altitude would make
        [wQ_amo_aq_w] unprovable, since it is defined THROUGH this predicate.
        Nothing above the leaves reads the class; φ reads it off the log. *)
-    (∃ k, wm_log σ' = (wm_log σ ++ [wwrite_msg tid k ea n v])%list) ∧
+    (∃ k, wm_log σ' = (wm_log σ ++ [wwrite_msg tid k ea n v])%list ∧
+          (w_relp (wm_ws σ) = true → k ≠ WCplain)) ∧
     ws_le (wm_ws σ) (wm_ws σ') ∧
     wV_store_w n ea σ (wm_ws σ').
 
@@ -665,7 +763,11 @@ Definition wQ_store_w (n : N) (tid : option nat) (ea : Arch.pa) {m : N}
     took, which is the latest write to the word ([ak_latest]). *)
 Definition wQ_amo_aq_w (n : N) (tid : option nat) (ea : Arch.pa) {m : N}
     (v : bv m) : wmstate → wmstate → Prop :=
-  λ σ σ', wQ_store_w n tid ea v σ σ' ∧ wV_amo_aq_w n ea σ (wm_ws σ').
+  λ σ σ', wQ_store_w n tid ea v σ σ' ∧ wV_amo_aq_w n ea σ (wm_ws σ') ∧
+          (* M6/φ: an exclusive write half is [WCexcl] — pinned here (not in
+             [wQ_store_w], where the class must stay existential) so that the
+             lock word's invariant-held bundle can be retargeted CLEAN. *)
+          wm_log σ' = (wm_log σ ++ [wwrite_msg tid WCexcl ea n v])%list.
 
 (** *** The WIDTH-4 NAMES, as instances.  Every existing call site is
     unchanged; the only churn is that a proof which unfolded the body with
@@ -685,7 +787,12 @@ Definition wQ_amo_aq (tid : option nat) (ea : Arch.pa) (v : bv 32)
 
 Lemma wQ_amo_aq_store tid ea v σ σ' :
   wQ_amo_aq tid ea v σ σ' → wQ_store tid ea v σ σ'.
-Proof. by intros [? _]. Qed.
+Proof. by intros (? & _ & _). Qed.
+
+Lemma wQ_amo_aq_excl tid ea v σ σ' :
+  wQ_amo_aq tid ea v σ σ' →
+  wm_log σ' = (wm_log σ ++ [wwrite_msg tid WCexcl ea 4 v])%list.
+Proof. by intros (_ & _ & ?). Qed.
 
 Lemma wQ_store_wV tid ea v σ σ' :
   wQ_store tid ea v σ σ' → wV_store ea σ (wm_ws σ').
@@ -693,7 +800,7 @@ Proof. by intros (_ & _ & _ & ?). Qed.
 
 Lemma wQ_amo_aq_gain tid ea v σ σ' :
   wQ_amo_aq tid ea v σ σ' → wV_amo_aq ea σ (wm_ws σ').
-Proof. by intros [_ ?]. Qed.
+Proof. by intros (_ & ? & _). Qed.
 
 Section leaves.
   Context `{!riscvGS Σ, !weakGS Σ}.

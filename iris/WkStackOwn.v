@@ -36,13 +36,13 @@ Require Import StackOwn.
 Local Open Scope Z_scope.
 
 Section wstack_own_phys.
-  Context `{!riscvGS Σ, !weakGS Σ}.
+  Context `{!riscvGS Σ, !weakGS Σ} `{CID : CpuId}.
 
   (** The weak stack bundle: [StackOwn.stack_own_phys] with [↦ₚ₈] swapped
       for [wpt8], at the vProp altitude. *)
   Definition wstack_own_phys (sp : Arch.pa) (n : nat) : vProp Σ :=
     (∃ ws : list (bv 64), ⌜length ws = n⌝ ∗
-       [∗ list] i ↦ w ∈ ws, wpt8 (pa_stk sp (S i)) (DfracOwn 1) w)%I.
+       [∗ list] i ↦ w ∈ ws, wpt8_own cpu_id (pa_stk sp (S i)) w)%I.
 
   Lemma wstack_own_phys_0 (sp : Arch.pa) : wstack_own_phys sp 0 ⊣⊢ emp.
   Proof.
@@ -90,7 +90,7 @@ Section wstack_own_phys.
 
   Lemma wstack_own_phys_1 (sp : Arch.pa) :
     wstack_own_phys sp 1
-    ⊣⊢ ∃ w : bv 64, wpt8 (pa_stk sp 1) (DfracOwn 1) w.
+    ⊣⊢ ∃ w : bv 64, wpt8_own cpu_id (pa_stk sp 1) w.
   Proof.
     rewrite /wstack_own_phys. iSplit.
     - iIntros "H". iDestruct "H" as (ws) "[%Hlen H]".
@@ -101,7 +101,7 @@ Section wstack_own_phys.
   Qed.
 
   Lemma wstack_own_phys_1_intro (sp : Arch.pa) (w : bv 64) :
-    wpt8 (pa_stk sp 1) (DfracOwn 1) w ⊢ wstack_own_phys sp 1.
+    wpt8_own cpu_id (pa_stk sp 1) w ⊢ wstack_own_phys sp 1.
   Proof. rewrite wstack_own_phys_1. iIntros "H". by iExists w. Qed.
 
   Lemma wstack_own_phys_split_1 (sp : Arch.pa) (a n : nat) :
@@ -118,8 +118,8 @@ Section wstack_own_phys.
 
   Lemma wstack_own_phys_2_elim (sp : Arch.pa) :
     wstack_own_phys sp 2 ⊢ ∃ w1 w2 : bv 64,
-      wpt8 (pa_stk sp 1) (DfracOwn 1) w1 ∗
-      wpt8 (pa_stk sp 2) (DfracOwn 1) w2.
+      wpt8_own cpu_id (pa_stk sp 1) w1 ∗
+      wpt8_own cpu_id (pa_stk sp 2) w2.
   Proof.
     rewrite (wstack_own_phys_app sp 1 1) wstack_own_phys_1.
     iIntros "[H1 H2]". iDestruct "H1" as (w1) "H1".
@@ -128,8 +128,8 @@ Section wstack_own_phys.
   Qed.
 
   Lemma wstack_own_phys_2_intro (sp : Arch.pa) (w1 w2 : bv 64) :
-    wpt8 (pa_stk sp 1) (DfracOwn 1) w1 -∗
-    wpt8 (pa_stk sp 2) (DfracOwn 1) w2 -∗
+    wpt8_own cpu_id (pa_stk sp 1) w1 -∗
+    wpt8_own cpu_id (pa_stk sp 2) w2 -∗
     wstack_own_phys sp 2.
   Proof.
     iIntros "H1 H2". rewrite (wstack_own_phys_app sp 1 1). iSplitL "H1".

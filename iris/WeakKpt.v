@@ -1500,7 +1500,8 @@ Section WeakKptAbsorb.
       iEval (rewrite /wlat8) in "Hel0".
       iDestruct "Hel0" as "(E0 & E1 & E2 & E3 & E4 & E5 & E6 & E7)".
       iMod (wlat8_store_prim tid WCexcl σ (la : Arch.pa) (lw' : mword 64)
-              ts ts ts ts ts ts ts ts
+              ts ts ts ts ts ts ts ts _ _ _ _ _ _ _ _
+              ltac:(discriminate)
               with "Hi E0 E1 E2 E3 E4 E5 E6 E7") as "[Hi Hel0']".
       (* the new leaf bundle's clipped facts *)
       assert (Hlatbyte : forall img : image,

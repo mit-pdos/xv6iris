@@ -272,4 +272,16 @@ Section align.
     rewrite /wpt4 !vwp_hold_sep !vwp_hold_pure. by iIntros "(%H & _)".
   Qed.
 
+  Lemma wpt8_own_align (c : CPU) (ea : Arch.pa) (v : bv 64) (ws : wstate) :
+    vwp_hold (wpt8_own c ea v) ws ⊢ ⌜is_aligned_paddr (Physaddr ea) 8 = true⌝.
+  Proof.
+    rewrite /wpt8_own !vwp_hold_sep !vwp_hold_pure. by iIntros "(%H & _)".
+  Qed.
+
+  Lemma wpt4_own_align (c : CPU) (ea : Arch.pa) (v : bv 32) (ws : wstate) :
+    vwp_hold (wpt4_own c ea v) ws ⊢ ⌜is_aligned_paddr (Physaddr ea) 4 = true⌝.
+  Proof.
+    rewrite /wpt4_own !vwp_hold_sep !vwp_hold_pure. by iIntros "(%H & _)".
+  Qed.
+
 End align.

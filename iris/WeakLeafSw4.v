@@ -209,11 +209,11 @@ Qed.
 Section wP_eff_half.
   Context `{!riscvGS Σ, !weakGS Σ}.
 
-  Lemma wP_eff_sw4 (cid : nat) (σ : wmstate)
+  Lemma wP_eff_sw4 (cid : nat) (cid4 : CPU) (σ : wmstate)
       (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
       (rs1 rs2 : mword 5) (imm : mword 12)
       (ea : Arch.pa) (vold : bv 32) (vs : SailStdpp.Values.mword 64)
-      (vw : bv 32) (dq : dfrac) (D : register -> bool) (dst : mstate) :
+      (vw : bv 32) (D : register -> bool) (dst : mstate) :
     wlog_wf (wm_log σ) ->
     (* --- the M-mode config tower, at σ's own registers --- *)
     register_lookup PC (wm_regs σ) = pc ->
@@ -253,7 +253,7 @@ Section wP_eff_half.
     (* --- the resources --- *)
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
     winstr_bytes pc (F_Base w) -∗
-    vwp_hold (wpt4 ea dq vold) (wm_ws σ) -∗
+    vwp_hold (wpt4_own cid4 ea vold) (wm_ws σ) -∗
     ⌜wP_eff (Some cid)
        ([WEread wak_plain pc 4] ++ [WEwrite wak_plain ea 4 vw]) σ⌝.
   Proof.
@@ -264,9 +264,9 @@ Section wP_eff_half.
     iDestruct (winstr_bytes_lookup σ pc (F_Base w) Hwf with "Hlat Hbs")
       as %[_ Hfok].
     iDestruct (winstr_pinned σ pc (F_Base w) Hwf with "Hlat Hbs") as %Hpinpc.
-    iDestruct (wpt4_flat_pin σ ea dq vold Hwf with "Hlat Hpt")
+    iDestruct (wpt4_own_flat_pin cid4 σ ea vold Hwf with "Hlat Hpt")
       as %[Haccea Hflatpin].
-    iDestruct (wpt4_align with "Hpt") as %Halea.
+    iDestruct (wpt4_own_align with "Hpt") as %Halea.
     iPureIntro.
     assert (Hpinea : forall j : nat, (j < 4)%nat ->
               pinned_read σ (acc_addr ea j))
@@ -367,7 +367,7 @@ Section leaf.
     R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
     winstr_bytes pc (F_Base w) -∗
     hart_ws cpu_id ws -∗
-    vwp_hold (wpt4 ea (DfracOwn 1) vold) ws -∗
+    vwp_hold (wpt4_own cpu_id ea vold) ws -∗
     vwp_hold R ws -∗
     (∀ (ws' : wstate) (T : nat),
        ⌜ws_le ws ws'⌝ -∗
@@ -379,7 +379,7 @@ Section leaf.
        R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
        R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
        hart_ws cpu_id ws' -∗
-       vwp_hold (wpt4 ea (DfracOwn 1) vw) ws' -∗
+       vwp_hold (wpt4_own cpu_id ea vw) ws' -∗
        monPred_at R (view_scl T) -∗
        WWP Loop) -∗
     WWP Loop.
@@ -432,13 +432,13 @@ Section leaf.
               register_lookup r (wm_regs σ) = register_lookup r dst.(sregs)).
     { apply Hagree; [exact Lpriv | exact Lmisa | exact Lsec]. }
     (* ---- the certificate's precondition (§2d) ---- *)
-    iDestruct (wP_eff_sw4 (fin_to_nat cpu_id) σ pc w rs1 rs2 imm ea vold rs2v
-                 vw (DfracOwn 1) D dst
+    iDestruct (wP_eff_sw4 (fin_to_nat cpu_id) cpu_id σ pc w rs1 rs2 imm ea vold
+                 rs2v vw D dst
                  Hwf Lpc0 Lpriv ltac:(rewrite Lpmpc; exact Hpmp) Lpma
                  Lhtif Lhart LmisaS LmIE Lmprv Lpmm Lelp Hal4 HnotRVC Hea_σ
                  Hvs_σ Hvw Hram4 Hag_σ HDmi Hgood Hdec with "Hlat Hbs Hpt")
       as %HP.
-    iDestruct (wpt4_align with "Hpt") as %Halea.
+    iDestruct (wpt4_own_align with "Hpt") as %Halea.
     (* ---- the run, at the FLAT state: the SC [execute] fact ---- *)
     pose proof (exec_eff_sw4_at (wflat_st σ) b pc rs1 rs2 imm ea rs2v vw Lpriv
                   Lmprv Lpmm ltac:(rewrite Lpmpc; exact Hpmp) Lpma Lhtif Hea_σ
@@ -460,15 +460,15 @@ Section leaf.
     assert (Hdevt : mdev t = wm_dev σ) by (rewrite Hdevt0; reflexivity).
     destruct Hpost as (Hregs & Hdevs & Hmems & Himgs & Hlogs & Hwsle & Hwf'
                        & Hbnd').
-    destruct HQ as (HQi & [kc HQl] & HQle & HQv).
+    destruct HQ as (HQi & (kc & HQl & _) & HQle & HQv).
     (* the release deposit: freeze R at the store's own timestamp *)
     iDestruct (wwp_release_deposit R σ Hbnd with "HR") as "HRdep".
     (* THE WINDOW UPDATE: retarget the four elements at the message [wQ_store]
        names (failure mode 3 of the porting guide, discharged) *)
-    iDestruct (wpt4_at_elems with "Hpt") as "(%Halea2 & %Haccea & Hels)".
-    iDestruct "Hels" as (t0 t1 t2 t3) "(H0 & H1 & H2 & H3)".
-    iMod (wlat4_store_prim (Some (fin_to_nat cpu_id)) kc σ ea vw
-            with "Hlat H0 H1 H2 H3") as "[Hlat Hl4]".
+    iDestruct (wpt4_own_at_elems with "Hpt") as "(%Halea2 & %Haccea & Hels)".
+    iDestruct "Hels" as (t0 t1 t2 t3) "(H0 & S0 & H1 & S1 & H2 & S2 & H3 & S3)".
+    iMod (wlat4_store_prim_own cpu_id kc σ ea vw
+            with "Hlat H0 S0 H1 S1 H2 S2 H3 S3") as "[Hlat Hl4]".
     (* the log authority grows by the SAME message *)
     iMod (wlog_update (wm_log σ)
             [wwrite_msg (Some (fin_to_nat cpu_id)) kc ea 4 vw]
@@ -493,7 +493,7 @@ Section leaf.
     - intros j Hj. apply HQv. exact Hj.
     - (* the window, rebuilt at the successor's view AT THE STORED VALUE:
          [wQ_store]'s view conjunct is exactly [wlat4_wpt4]'s floor premise *)
-      iApply (wlat4_wpt4 ea (DfracOwn 1) (S (length (wm_log σ))) vw
+      iApply (wlat4_own_wpt4_own cpu_id ea (S (length (wm_log σ))) vw
                 (wm_ws σ') Halea2 Haccea
                 ltac:(intros j Hj; apply HQv; exact Hj) with "Hl4").
   Qed.

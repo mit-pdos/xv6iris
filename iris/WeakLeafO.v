@@ -1353,6 +1353,52 @@ Section leafo.
     iExists ws'. iFrame.
   Qed.
 
+  Lemma wwp_ld8_tor_rvc_o_own (ξ : CtxId) (pc : mword 64) (rs1 rd : mword 5) (imm : mword 12)
+      (ea : Arch.pa) (v : bv 64) (q : Qp)
+      (pmpcfg0 : type_of_register pmpcfg_n)
+      (pmpaddrs : type_of_register pmpaddr_n)
+      (rs1v rd0 : mword 64) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
+    uint rs1 <> 0 ->
+    uint rd <> 0 ->
+    add_vec rs1v (sign_extend' 64 imm) = ea ->
+    (forall j : nat, (j < 8)%nat -> addr_is_ram (pa_add ea j)) ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
+    winstr_m pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
+    wrunning ξ -∗
+    cobj ξ (wpt8_own cpu_id ea v) -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+      pc_is (add_vec_int pc 2) -∗
+      R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+      R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ (regval_into_reg v) -∗
+      wrunning ξ -∗
+      cobj ξ (wpt8_own cpu_id ea v) -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Htor Hnz1 Hnzd Hea Hram.
+    iIntros "Hmm Hpcf Hpad Hpc Hrs Hrd #Hi [%ws [Hws Hauth]] Hpt Hcont".
+    iDestruct (cobj_to_hold ξ ws with "Hauth Hpt") as "[Hauth Hpt]".
+    iApply (wwp_ld8_tor_rvc_own pc rs1 rd imm ea v q pmpcfg0 pmpaddrs
+              rs1v rd0 ws Hgid Hpmp Htor Hnz1 Hnzd Hea Hram
+              with "Hmm Hpcf Hpad Hpc Hrs Hrd Hi Hws Hpt").
+    iIntros (ws') "%Hle Hmm Hpcf Hpad Hpc Hrs Hrd Hws Hpt".
+    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
+      [by apply ws_le_view|].
+    iDestruct (cobj_of_hold ξ ws' with "Hauth Hpt") as "[Hauth Hpt]".
+    iApply ("Hcont" with "Hmm Hpcf Hpad Hpc Hrs Hrd [Hws Hauth] Hpt").
+    iExists ws'. iFrame.
+  Qed.
+
   Lemma wwp_ld8_tor_rvc_run (ξ : CtxId) (pc : mword 64) (rs1 rd : mword 5)
       (imm : mword 12) (ea : Arch.pa) (v : bv 64) (dqv : dfrac) (q : Qp)
       (pmpcfg0 : type_of_register pmpcfg_n)
@@ -1387,6 +1433,47 @@ Section leafo.
     iIntros "Hrun Hpcf Hpad Hpc Hrs Hrd #Hi Hpt Hcont".
     iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
     iApply (wwp_ld8_tor_rvc_o ξ pc rs1 rd imm ea v dqv q pmpcfg0 pmpaddrs
+              rs1v rd0 Hgid Hpmp Htor Hnz1 Hnzd Hea Hram
+              with "Hmm Hpcf Hpad Hpc Hrs Hrd Hi Hview Hpt").
+    iIntros "Hmm Hpcf Hpad Hpc Hrs Hrd Hview Hpt".
+    iApply ("Hcont" with "[Hmm Hview] Hpcf Hpad Hpc Hrs Hrd Hpt").
+    iApply (whart_run_close with "Hmm Hview").
+  Qed.
+
+  Lemma wwp_ld8_tor_rvc_run_own (ξ : CtxId) (pc : mword 64) (rs1 rd : mword 5)
+      (imm : mword 12) (ea : Arch.pa) (v : bv 64) (q : Qp)
+      (pmpcfg0 : type_of_register pmpcfg_n)
+      (pmpaddrs : type_of_register pmpaddr_n)
+      (rs1v rd0 : mword 64) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
+    uint rs1 <> 0 ->
+    uint rd <> 0 ->
+    add_vec rs1v (sign_extend' 64 imm) = ea ->
+    (forall j : nat, (j < 8)%nat -> addr_is_ram (pa_add ea j)) ->
+    whart_run ξ q -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
+    winstr_m pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
+    cobj ξ (wpt8_own cpu_id ea v) -∗
+    ( whart_run ξ q -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+      pc_is (add_vec_int pc 2) -∗
+      R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+      R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ (regval_into_reg v) -∗
+      cobj ξ (wpt8_own cpu_id ea v) -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Htor Hnz1 Hnzd Hea Hram.
+    iIntros "Hrun Hpcf Hpad Hpc Hrs Hrd #Hi Hpt Hcont".
+    iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
+    iApply (wwp_ld8_tor_rvc_o_own ξ pc rs1 rd imm ea v q pmpcfg0 pmpaddrs
               rs1v rd0 Hgid Hpmp Htor Hnz1 Hnzd Hea Hram
               with "Hmm Hpcf Hpad Hpc Hrs Hrd Hi Hview Hpt").
     iIntros "Hmm Hpcf Hpad Hpc Hrs Hrd Hview Hpt".
@@ -1450,7 +1537,7 @@ Section leafo.
     R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
     winstr_m pc true (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
     wrunning ξ -∗
-    cobj ξ (wpt8 ea (DfracOwn 1) vold) -∗
+    cobj ξ (wpt8_own cpu_id ea vold) -∗
     cobj ξ R -∗
     ( ∀ T : nat,
       ctx_view_lb ξ (view_addrs (acc_addr ea) 8 T) -∗
@@ -1461,7 +1548,7 @@ Section leafo.
       R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
       R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
       wrunning ξ -∗
-      cobj ξ (wpt8 ea (DfracOwn 1) rs2v) -∗
+      cobj ξ (wpt8_own cpu_id ea rs2v) -∗
       monPred_at R (view_scl T) -∗
       WWP Loop) -∗
     WWP Loop.
@@ -1501,7 +1588,7 @@ Section leafo.
     R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
     R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
     winstr_m pc true (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
-    cobj ξ (wpt8 ea (DfracOwn 1) vold) -∗
+    cobj ξ (wpt8_own cpu_id ea vold) -∗
     cobj ξ R -∗
     ( ∀ T : nat,
       ctx_view_lb ξ (view_addrs (acc_addr ea) 8 T) -∗
@@ -1511,7 +1598,7 @@ Section leafo.
       pc_is (add_vec_int pc 2) -∗
       R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
       R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
-      cobj ξ (wpt8 ea (DfracOwn 1) rs2v) -∗
+      cobj ξ (wpt8_own cpu_id ea rs2v) -∗
       monPred_at R (view_scl T) -∗
       WWP Loop) -∗
     WWP Loop.
@@ -1751,7 +1838,7 @@ Section leafo.
     R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
     winstr_m pc true (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
     wrunning ξ -∗
-    cobj ξ (wpt8 ea (DfracOwn 1) vold) -∗
+    cobj ξ (wpt8_own cpu_id ea vold) -∗
     cobj ξ R -∗
     ( ∀ T : nat,
       ctx_view_lb ξ (view_addrs (acc_addr ea) 8 T) -∗
@@ -1761,7 +1848,7 @@ Section leafo.
       R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
       R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
       wrunning ξ -∗
-      cobj ξ (wpt8 ea (DfracOwn 1) rs2v) -∗
+      cobj ξ (wpt8_own cpu_id ea rs2v) -∗
       monPred_at R (view_scl T) -∗
       WWP Loop) -∗
     WWP Loop.
@@ -1797,7 +1884,7 @@ Section leafo.
     R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
     R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
     winstr_m pc true (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
-    cobj ξ (wpt8 ea (DfracOwn 1) vold) -∗
+    cobj ξ (wpt8_own cpu_id ea vold) -∗
     cobj ξ R -∗
     ( ∀ T : nat,
       ctx_view_lb ξ (view_addrs (acc_addr ea) 8 T) -∗
@@ -1806,7 +1893,7 @@ Section leafo.
       pc_is (add_vec_int pc 2) -∗
       R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
       R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
-      cobj ξ (wpt8 ea (DfracOwn 1) rs2v) -∗
+      cobj ξ (wpt8_own cpu_id ea rs2v) -∗
       monPred_at R (view_scl T) -∗
       WWP Loop) -∗
     WWP Loop.

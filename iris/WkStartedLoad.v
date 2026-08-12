@@ -310,7 +310,7 @@ Section wp_started_load.
     iModIntro. iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
     iSplitR; [by iPureIntro|]. iExists t0, t1.
     iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
-    iNext. iIntros (tick σ') "%Hpost %HQ".
+    iNext. iIntros (tick σ') "%Hpost %HQ %HQrelp".
     iApply ("Hcont" $! tick σ' with "[%]"); [exact Hpost|].
     by iApply (wstarted_rcpt_deliver_gen P σ (wm_ws σ') b Hb HQ with "Hrcpt").
   Qed.

@@ -1158,14 +1158,14 @@ Proof. exact (wcert_store cid pc wak_plain pc 4 akw ea v). Qed.
 
 Lemma wcert_amo_aq_base4 (cid : nat) (pc : SailStdpp.Values.mword 64)
     (aka akw : akinfo) (ea : Arch.pa) (v : bv 32) :
-  ak_coh aka = false -> ak_sync aka = true ->
+  ak_coh aka = false -> ak_sync aka = true -> ak_latest akw = true ->
   wstep_cert cid pc
     (wP_eff (Some cid)
        ([WEread wak_plain pc 4] ++ [WEread aka ea 4; WEwrite akw ea 4 v]))
     (wQ_amo_aq (Some cid) ea v).
 Proof.
-  intros Hcoh Hsync.
-  exact (wcert_amo_aq cid pc wak_plain pc 4 aka akw ea v Hcoh Hsync).
+  intros Hcoh Hsync Hlat.
+  exact (wcert_amo_aq cid pc wak_plain pc 4 aka akw ea v Hcoh Hsync Hlat).
 Qed.
 
 (** ... and the PIN form at the same fetch element — what the invariant-form
@@ -1173,14 +1173,14 @@ Qed.
     [exact]). *)
 Lemma wcert_amo_aq_pin_base4 (cid : nat) (pc : SailStdpp.Values.mword 64)
     (aka akw : akinfo) (ea : Arch.pa) (v : bv 32) :
-  ak_coh aka = false -> ak_sync aka = true ->
+  ak_coh aka = false -> ak_sync aka = true -> ak_latest akw = true ->
   wstep_cert cid pc
     (wP_eff_pin (Some cid)
        ([WEread wak_plain pc 4] ++ [WEread aka ea 4; WEwrite akw ea 4 v]))
     (wQ_amo_aq (Some cid) ea v).
 Proof.
-  intros Hcoh Hsync.
-  exact (wcert_amo_aq_pin cid pc wak_plain pc 4 aka akw ea v Hcoh Hsync).
+  intros Hcoh Hsync Hlat.
+  exact (wcert_amo_aq_pin cid pc wak_plain pc 4 aka akw ea v Hcoh Hsync Hlat).
 Qed.
 
 (** *** 9b. …and the recipe at the same [es], for the LOAD shape.

@@ -1280,7 +1280,8 @@ Proof.
   apply wstep_cert_eff. intros s s' Hi Hl Hws.
   rewrite /wQ_fence /wV_fence Hws weffs_cons2 weff_apply_read weff_apply_bar
           wm_ws_wset_ws.
-  apply barrier_post_mono, wread_post_ws_le.
+  split; [apply barrier_post_mono, wread_post_ws_le|].
+  intros Ha. by apply barrier_post_relp.
 Qed.
 
 (** *** 8c. The 4-byte STORE *)
@@ -1298,7 +1299,9 @@ Proof.
   rewrite wwrite_post_log wread_post_log in Hl.
   rewrite wwrite_post_ws wread_post_log in Hws.
   rewrite /wQ_store /wV_store.
-  split_and!; [exact Hi|by eexists; exact Hl|exact Hle|].
+  split_and!; [exact Hi| |exact Hle|].
+  { eexists. split; [exact Hl|]. intros Hr. apply wm_class_of_relp.
+    by rewrite wread_post_relp. }
   intros j Hj. rewrite Hws flr_ws_view /acc_addr.
   etrans; [|apply Nat.le_max_r].
   apply (store_post_run_coh (wm_ws (wread_post s akf pf (coh_ts s pf nf)))
@@ -1311,12 +1314,12 @@ Qed.
 Lemma wcert_amo_aq (cid : nat) (pc : SailStdpp.Values.mword 64)
     (akf : akinfo) (pf : Arch.pa) (nf : N)
     (aka akw : akinfo) (ea : Arch.pa) (v : bv 32) :
-  ak_coh aka = false -> ak_sync aka = true ->
+  ak_coh aka = false -> ak_sync aka = true -> ak_latest akw = true ->
   wstep_cert cid pc
     (wP_eff (Some cid) [WEread akf pf nf; WEread aka ea 4; WEwrite akw ea 4 v])
     (wQ_amo_aq (Some cid) ea v).
 Proof.
-  intros Hcoh Hsync. apply wstep_cert_eff. intros s s' Hi Hl Hws.
+  intros Hcoh Hsync Hlat. apply wstep_cert_eff. intros s s' Hi Hl Hws.
   assert (Hle : ws_le (wm_ws s) (wm_ws s')) by (rewrite Hws; apply weffs_ws_le).
   rewrite weffs_cons3 !weff_apply_read weff_apply_write in Hl Hws.
   (* the fetch left the log alone, so the AMO's read is at [coh_ts s] *)
@@ -1326,9 +1329,15 @@ Proof.
   rewrite wwrite_post_ws !wread_post_log in Hws.
   rewrite (wread_post_ws_weak (wread_post s akf pf (coh_ts s pf nf)) aka ea
              (coh_ts s ea 4) Hcoh) Hsync in Hws.
-  rewrite /wQ_amo_aq. split.
+  assert (Hexcl : wm_class_of akw
+            (wm_ws (wread_post (wread_post s akf pf (coh_ts s pf nf)) aka ea
+                      (coh_ts s ea 4))) = WCexcl)
+    by (unfold wm_class_of; by rewrite Hlat).
+  rewrite /wQ_amo_aq. split_and!; [| |by rewrite Hl Hexcl].
   - rewrite /wQ_store /wV_store.
-    split_and!; [exact Hi|by eexists; exact Hl|exact Hle|].
+    split_and!; [exact Hi| |exact Hle|].
+    { eexists. split; [exact Hl|]. intros Hr. apply wm_class_of_relp.
+      by rewrite !wread_post_relp. }
     intros j Hj. rewrite Hws flr_ws_view /acc_addr.
     etrans; [|apply Nat.le_max_r].
     apply (store_post_run_coh
@@ -1382,12 +1391,12 @@ Qed.
 Lemma wcert_amo_aq_pin (cid : nat) (pc : SailStdpp.Values.mword 64)
     (akf : akinfo) (pf : Arch.pa) (nf : N)
     (aka akw : akinfo) (ea : Arch.pa) (v : bv 32) :
-  ak_coh aka = false -> ak_sync aka = true ->
+  ak_coh aka = false -> ak_sync aka = true -> ak_latest akw = true ->
   wstep_cert cid pc
     (wP_eff_pin (Some cid) [WEread akf pf nf; WEread aka ea 4; WEwrite akw ea 4 v])
     (wQ_amo_aq (Some cid) ea v).
 Proof.
-  intros Hcoh Hsync. apply wstep_cert_eff_pin. intros s s' Hi Hl Hws.
+  intros Hcoh Hsync Hlat. apply wstep_cert_eff_pin. intros s s' Hi Hl Hws.
   assert (Hle : ws_le (wm_ws s) (wm_ws s')) by (rewrite Hws; apply weffs_ws_le).
   rewrite weffs_cons3 !weff_apply_read weff_apply_write in Hl Hws.
   (* the fetch left the log alone, so the AMO's read is at [coh_ts s] *)
@@ -1397,9 +1406,15 @@ Proof.
   rewrite wwrite_post_ws !wread_post_log in Hws.
   rewrite (wread_post_ws_weak (wread_post s akf pf (coh_ts s pf nf)) aka ea
              (coh_ts s ea 4) Hcoh) Hsync in Hws.
-  rewrite /wQ_amo_aq /wQ_amo_aq_w. split.
+  assert (Hexcl : wm_class_of akw
+            (wm_ws (wread_post (wread_post s akf pf (coh_ts s pf nf)) aka ea
+                      (coh_ts s ea 4))) = WCexcl)
+    by (unfold wm_class_of; by rewrite Hlat).
+  rewrite /wQ_amo_aq /wQ_amo_aq_w. split_and!; [| |by rewrite Hl Hexcl].
   - rewrite /wQ_store_w /wV_store_w.
-    split_and!; [exact Hi|by eexists; exact Hl|exact Hle|].
+    split_and!; [exact Hi| |exact Hle|].
+    { eexists. split; [exact Hl|]. intros Hr. apply wm_class_of_relp.
+      by rewrite !wread_post_relp. }
     intros j Hj. rewrite Hws flr_ws_view /acc_addr.
     etrans; [|apply Nat.le_max_r].
     apply (store_post_run_coh

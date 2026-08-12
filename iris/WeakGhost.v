@@ -85,9 +85,38 @@ Local Open Scope Z_scope.
     spelled out — the same shape [FsCrash.fs_hist_auth] uses. *)
 Notation wlogR := (mono_listR (leibnizO wmsg)).
 
+(** THE C/D/S STATE of a byte (the φ-upgrade's three-state protocol; see
+    [claude-notes/design/weak-memory-phi-upgrade.md] §1).  It rides in a
+    SECOND ghost map, keyed by the same [Z] addresses as the latest-write map
+    and carrying NO value — which is exactly what lets the S state be entered
+    by DISCARDING (a persistent witness that pins no value, so a sync byte
+    stays writable) while the C and D states keep a full-fraction element that
+    a store must consume.
+
+      - [WClean]   — every [WCplain] message on the byte is PUBLISHED (some
+                     later message of the same agent is [WCrel]).  This is the
+                     state [wlat_pointsto] — hence [↦w] at every fraction —
+                     carries, so nothing about the existing surface changes.
+      - [WDirty c] — the byte's UNPUBLISHED [WCplain] messages are all hart
+                     [c]'s.  Exclusive (full fraction only): a fraction split
+                     would let two harts each believe they are the only dirty
+                     author.
+      - [WSync]    — the byte is permanently racy-readable and NO [WCplain]
+                     message ever writes it.  Absorbing, entered once at boot
+                     by [sync_mint], and PERSISTENT — which is what makes it
+                     incompatible with the full-fraction element a [WCplain]
+                     store needs, so "a sync byte is never plain-written" is
+                     enforced by the dfrac algebra rather than by a side
+                     condition every store site would have to thread. *)
+Inductive wcds := WClean | WDirty (c : CPU) | WSync.
+
+Global Instance wcds_eq_dec : EqDecision wcds.
+Proof. solve_decision. Defined.
+
 Class weakGpreS (Σ : gFunctors) := WeakGpreS {
   weak_pre_logG :: inG Σ wlogR;
   weak_pre_latG :: ghost_mapG Σ Z (nat * bv 8);
+  weak_pre_cdsG :: ghost_mapG Σ Z wcds;
   weak_pre_wsG :: ghost_varG Σ wstate;
   (* the max-fun authority [WeakCtx]'s objective layer is built on
      ([ctx_auth] / [ctx_view_lb] / [cobj]).  It used to be here as the
@@ -97,8 +126,8 @@ Class weakGpreS (Σ : gFunctors) := WeakGpreS {
 }.
 
 Definition weakΣ : gFunctors :=
-  #[ GFunctor wlogR; ghost_mapΣ Z (nat * bv 8); ghost_varΣ wstate;
-     weakViewΣ ].
+  #[ GFunctor wlogR; ghost_mapΣ Z (nat * bv 8); ghost_mapΣ Z wcds;
+     ghost_varΣ wstate; weakViewΣ ].
 
 Global Instance subG_weakGpreS Σ : subG weakΣ Σ -> weakGpreS Σ.
 Proof. intros H. split; try (revert H; solve_inG). Qed.
@@ -107,6 +136,8 @@ Class weakGS (Σ : gFunctors) := WeakGS {
   weak_preGS :: weakGpreS Σ;
   weak_log_name : gname;
   weak_lat_name : gname;
+  (* the C/D/S state map (φ-upgrade §1); same keys as [weak_lat_name] *)
+  weak_cds_name : gname;
   (* PER HART, like [era_reg_name] (see the header's DEVIATION note) *)
   weak_ws_name : CPU -> gname;
   (* THERE WAS A FIFTH FIELD, [weak_view_name : CPU -> wview_names] — a
@@ -305,6 +336,243 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
+(** ** 2b. The C/D/S invariant, PURELY over the log
+
+    THE ONE DESIGN DELTA that matters (design file §1 asked for the
+    publication test to read the AUTHOR's [w_pub], which would have forced
+    the whole [wstate] family into [wlat_interp] and hence into every one of
+    the 140-odd leaf statements that mention it).  It is not needed:
+    [WeakMem.store_post] raises the storing agent's [w_pub] to the store's
+    OWN timestamp whenever the store is release-class, and [w_pub] only ever
+    grows ([ws_le]).  So
+
+        "some message of agent [tid] at a log position [≥ p] is [WCrel]"
+
+    IMPLIES "position [p] is published by [tid]", and it is a predicate of the
+    LOG ALONE.  Everything below is stated with it, so [wlat_interp] keeps its
+    arity, the invariant is preserved by purely local reasoning at each store,
+    and the machine-level bridge to [w_pub] ([wpub_of_rel_store] in
+    [WeakStore]) is a separate, one-line fact that the φ export will use.
+
+    SECOND DELTA: the DMA/boot agents.  [WeakLang.wmsgs_of_map] stamps the
+    disk's messages [wm_tid = None] and [wm_ak = WCplain], and no [WCrel]
+    message ever carries [wm_tid = None], so an agent-less [WCplain] message
+    can never be published.  Clean-purity therefore EXEMPTS [wm_tid = None]:
+    it constrains the messages of real agents, which is what φ's bad-edge
+    shape (a cross-hart read of an unpublished owned store) is about. *)
+
+(** [p] writes byte [a] with an owned-store ([WCplain]) message [m]. *)
+Definition wplain_at (log : list wmsg) (a : Z) (p : nat) (m : wmsg) : Prop :=
+  log !! p = Some m /\ is_Some (msg_byte m a) /\ wm_ak m = WCplain.
+
+(** [p] is PUBLISHED by agent [tid]: a later message of the same agent is a
+    release-class store, which raised that agent's [w_pub] past [p]. *)
+Definition wpublished (log : list wmsg) (tid : option agent) (p : nat) : Prop :=
+  exists (q : nat) (mq : wmsg),
+    (p <= q)%nat /\ log !! q = Some mq /\ wm_tid mq = tid /\ wm_ak mq = WCrel.
+
+Lemma wpublished_app log ms tid p :
+  wpublished log tid p -> wpublished (log ++ ms) tid p.
+Proof.
+  intros (q & mq & Hle & Hq & Ht & Hk). exists q, mq. split_and!; try done.
+  rewrite lookup_app_l //. by eapply lookup_lt_Some.
+Qed.
+
+Definition wcds_clean (log : list wmsg) (a : Z) : Prop :=
+  forall p m, wplain_at log a p m ->
+    wm_tid m = None \/ wpublished log (wm_tid m) p.
+
+Definition wcds_dirty (log : list wmsg) (a : Z) (c : CPU) : Prop :=
+  forall p m, wplain_at log a p m ->
+    wm_tid m = None \/ wpublished log (wm_tid m) p \/
+    wm_tid m = Some (fin_to_nat c).
+
+Definition wcds_sync (log : list wmsg) (a : Z) : Prop :=
+  forall p m, ¬ wplain_at log a p m.
+
+Definition wcds_ok (log : list wmsg) (a : Z) (s : wcds) : Prop :=
+  match s with
+  | WClean => wcds_clean log a
+  | WDirty c => wcds_dirty log a c
+  | WSync => wcds_sync log a
+  end.
+
+Lemma wcds_clean_dirty log a c : wcds_clean log a -> wcds_dirty log a c.
+Proof. intros H p m Hp. destruct (H p m Hp); auto. Qed.
+
+(** THE FRAMING FACT: a byte the appended messages do not write keeps its
+    state, whatever it is.  ([wpublished] only gets easier as the log grows,
+    and no new [wplain_at] obligation appears.) *)
+Lemma wcds_ok_app log ms a s :
+  (forall m, m ∈ ms -> msg_byte m a = None) ->
+  wcds_ok log a s -> wcds_ok (log ++ ms) a s.
+Proof.
+  intros Hno.
+  assert (Hback : forall p m, wplain_at (log ++ ms) a p m -> wplain_at log a p m).
+  { intros p m (Hp & Hs & Hk).
+    apply lookup_app_Some in Hp as [Hp|[_ Hp]]; [by split_and!|].
+    exfalso. apply elem_of_list_lookup_2, Hno in Hp. rewrite Hp in Hs.
+    by destruct Hs. }
+  destruct s as [|c|]; simpl.
+  - intros Hcl p m Hp. destruct (Hcl p m (Hback p m Hp)) as [?|?];
+      [by left|right; by apply wpublished_app].
+  - intros Hdi p m Hp. destruct (Hdi p m (Hback p m Hp)) as [?|[?|?]];
+      [by left|right; left; by apply wpublished_app|by right; right].
+  - intros Hsy p m Hp. exact (Hsy p m (Hback p m Hp)).
+Qed.
+
+(** ... and the STORE step at the byte the message writes.  The state moves
+    by [wcds_own_step]: an owned ([WCplain]) store dirties, a release
+    ([WCrel]) store CLEANS — it publishes every earlier own message of the
+    same hart, which is exactly the D→C flip — and an exclusive ([WCexcl])
+    store leaves the state alone. *)
+Definition wcds_own_step (c : CPU) (k : wm_class) (s : wcds) : wcds :=
+  match k with
+  | WCplain => WDirty c
+  | WCrel => WClean
+  | WCexcl => s
+  end.
+
+Lemma wcds_ok_store_own log mnew a c s :
+  wm_tid mnew = Some (fin_to_nat c) ->
+  (s = WClean \/ s = WDirty c) ->
+  wcds_ok log a s ->
+  wcds_ok (log ++ [mnew]) a (wcds_own_step c (wm_ak mnew) s).
+Proof.
+  intros Htid Hs Hok.
+  (* the old obligations, transported *)
+  assert (Hdi : wcds_dirty log a c).
+  { destruct Hs as [->| ->]; [by apply wcds_clean_dirty|exact Hok]. }
+  assert (Hback : forall p m, wplain_at (log ++ [mnew]) a p m ->
+                    wplain_at log a p m \/ (p = length log /\ m = mnew)).
+  { intros p m (Hp & Hsm & Hk).
+    apply lookup_app_Some in Hp as [Hp|[Hge Hp]]; [left; by split_and!|].
+    right. destruct (p - length log)%nat as [|n] eqn:Hn; simpl in Hp;
+      [|by rewrite lookup_nil in Hp]. simplify_eq. split; [lia|done]. }
+  (* the release message publishes every earlier own message of [c] *)
+  assert (Hpub : wm_ak mnew = WCrel ->
+            forall p, (p < length log)%nat ->
+              wpublished (log ++ [mnew]) (Some (fin_to_nat c)) p).
+  { intros Hk p Hp. exists (length log), mnew. split_and!; try done; [lia|].
+    rewrite lookup_app_r; [|lia]. by rewrite Nat.sub_diag. }
+  destruct (wm_ak mnew) as [| |] eqn:Hk; simpl.
+  - (* WCplain: dirty by [c] *)
+    intros p m Hp. destruct (Hback p m Hp) as [Hold|[-> ->]].
+    + destruct (Hdi p m Hold) as [?|[?|?]];
+        [by left|right; left; by apply wpublished_app|by right; right].
+    + right; right. exact Htid.
+  - (* WCrel: clean — the new message publishes [c]'s whole backlog *)
+    intros p m Hp. destruct (Hback p m Hp) as [Hold|[-> ->]];
+      [|by destruct Hp as (_ & _ & Hc); rewrite Hk in Hc].
+    destruct (Hdi p m Hold) as [Hn|[Hp'|Hc]];
+      [by left|right; by apply wpublished_app|].
+    right. rewrite Hc. apply Hpub; [done|].
+    destruct Hold as (Hlk & _). by eapply lookup_lt_Some.
+  - (* WCexcl: the state is unchanged, and the new message is not plain *)
+    destruct Hs as [-> | ->]; simpl in Hok |- *.
+    + intros p m Hp. destruct (Hback p m Hp) as [Hold|[-> ->]];
+        [|by destruct Hp as (_ & _ & Hc); rewrite Hk in Hc].
+      destruct (Hok p m Hold) as [?|?];
+        [by left|right; by apply wpublished_app].
+    + intros p m Hp. destruct (Hback p m Hp) as [Hold|[-> ->]];
+        [|by destruct Hp as (_ & _ & Hc); rewrite Hk in Hc].
+      destruct (Hok p m Hold) as [?|[?|?]];
+        [by left|right; left; by apply wpublished_app|by right; right].
+Qed.
+
+(** THE NON-PLAIN STORE: a message that is not an owned store adds no
+    obligation to ANY state, so every state survives it — including [WSync]
+    (the "a sync byte is never plain-written" clause) and [WClean] (which is
+    why an AMO or a release keeps a shared/invariant-held bundle clean). *)
+Lemma wcds_ok_store_nonplain log mnew a s :
+  wm_ak mnew ≠ WCplain -> wcds_ok log a s -> wcds_ok (log ++ [mnew]) a s.
+Proof.
+  intros Hk Hok.
+  assert (Hback : forall p m, wplain_at (log ++ [mnew]) a p m ->
+                    wplain_at log a p m).
+  { intros p m (Hp & Hs & Hkm).
+    apply lookup_app_Some in Hp as [Hp|[_ Hp]]; [by split_and!|].
+    exfalso. destruct (p - length log)%nat as [|n]; simpl in Hp;
+      [|by rewrite lookup_nil in Hp]. simplify_eq; by apply Hk. }
+  destruct s as [|c|]; simpl in Hok |- *.
+  - intros p m Hp. destruct (Hok p m (Hback p m Hp)) as [?|?];
+      [by left|right; by apply wpublished_app].
+  - intros p m Hp. destruct (Hok p m (Hback p m Hp)) as [?|[?|?]];
+      [by left|right; left; by apply wpublished_app|by right; right].
+  - intros p m Hp. exact (Hok p m (Hback p m Hp)).
+Qed.
+
+Lemma wcds_ok_store_sync log mnew a :
+  wm_ak mnew ≠ WCplain ->
+  wcds_sync log a -> wcds_sync (log ++ [mnew]) a.
+Proof. apply (wcds_ok_store_nonplain log mnew a WSync). Qed.
+
+(** THE FLIP, purely.  A byte that is dirty by [c] is CLEAN as soon as [c]'s
+    release store is the log's LAST message: that message publishes every
+    earlier position, hence every one of [c]'s outstanding own stores.  This
+    is what a release site applies to the bytes of its deposit, and it is
+    stated at the POST-state so that the store's own window and the deposit's
+    other bytes are flipped by one and the same lemma. *)
+Lemma wcds_dirty_flip log a c q mq :
+  log !! q = Some mq -> wm_tid mq = Some (fin_to_nat c) -> wm_ak mq = WCrel ->
+  (length log <= S q)%nat ->
+  wcds_dirty log a c -> wcds_clean log a.
+Proof.
+  intros Hq Htid Hk Hlen Hdi p m Hp.
+  destruct (Hdi p m Hp) as [?|[?|Hc]]; [by left|by right|].
+  right. rewrite Hc. exists q, mq. split_and!; try done.
+  destruct Hp as (Hlk & _). apply lookup_lt_Some in Hlk. lia.
+Qed.
+
+(** The map-level tie, the twin of [wlat_agree]. *)
+Definition wcds_agree (log : list wmsg) (m : gmap Z wcds) : Prop :=
+  forall a s, m !! a = Some s -> wcds_ok log a s.
+
+Lemma wcds_agree_app log ms m :
+  (forall a, is_Some (m !! a) -> forall mg, mg ∈ ms -> msg_byte mg a = None) ->
+  wcds_agree log m -> wcds_agree (log ++ ms) m.
+Proof.
+  intros Hno Hag a s Ha. apply wcds_ok_app; [|by apply Hag].
+  intros mg Hmg. apply (Hno a (mk_is_Some _ _ Ha) mg Hmg).
+Qed.
+
+Lemma wcds_agree_insert log m a s :
+  wcds_agree log m -> wcds_ok log a s -> wcds_agree log (<[a := s]> m).
+Proof.
+  intros Hag Hok a' s' Ha'.
+  destruct (decide (a' = a)) as [->|Hne].
+  - rewrite lookup_insert in Ha'. by simplify_eq.
+  - rewrite lookup_insert_ne // in Ha'. by apply Hag.
+Qed.
+
+(** The whole map survives a non-plain store: no state gains an obligation. *)
+Lemma wcds_agree_nonplain log mnew mc :
+  wm_ak mnew ≠ WCplain -> wcds_agree log mc -> wcds_agree (log ++ [mnew]) mc.
+Proof. intros Hk Hag a s Ha. by apply wcds_ok_store_nonplain; [|apply Hag]. Qed.
+
+(** The initial state map: every byte of the era-initial image is CLEAN (the
+    log is empty, so there is nothing to publish). *)
+Definition wcds_init (img : gmap Arch.pa (bv 8)) : gmap Z wcds :=
+  (fun _ : nat * bv 8 => WClean) <$> wlat_init img.
+
+Lemma wcds_init_agree (img : gmap Arch.pa (bv 8)) :
+  wcds_agree [] (wcds_init img).
+Proof.
+  intros a s Ha. rewrite /wcds_init lookup_fmap in Ha.
+  destruct (wlat_init img !! a) as [tv|]; simplify_eq/=.
+  intros p m (Hp & _). by rewrite lookup_nil in Hp.
+Qed.
+
+Lemma big_sepM_wcds_init {PROP : bi} (Φ : Z -> wcds -> PROP)
+    (img : gmap Arch.pa (bv 8)) :
+  ([∗ map] z ↦ s ∈ wcds_init img, Φ z s)
+  ⊣⊢ ([∗ map] a ↦ b ∈ img, Φ (pa_z a) WClean).
+Proof.
+  rewrite /wcds_init big_sepM_fmap.
+  apply (big_sepM_wlat_init (fun z _ => Φ z WClean)).
+Qed.
+
+(* ====================================================================== *)
 (** ** 3. The resources *)
 
 Section resources.
@@ -342,34 +610,181 @@ Section resources.
   (* ---------------------------------------------------------------- *)
   (** *** 3b. the per-byte latest-write map (the BASE points-to) *)
 
-  Definition wlat_pointsto (a : Z) (dq : dfrac) (t : nat) (v : bv 8) : iProp Σ :=
+  (** THE VALUE ELEMENT — what [wlat_pointsto] used to BE, verbatim.  It is
+      now one half of the points-to; the other half is the C/D/S state. *)
+  Definition wlat_elem (a : Z) (dq : dfrac) (t : nat) (v : bv 8) : iProp Σ :=
     ghost_map_elem weak_lat_name a dq (t, v).
 
+  (** THE STATE ELEMENTS. *)
+  Definition wcds_el (a : Z) (dq : dfrac) (s : wcds) : iProp Σ :=
+    ghost_map_elem weak_cds_name a dq s.
+
+  Definition wclean (a : Z) (dq : dfrac) : iProp Σ := wcds_el a dq WClean.
+  Definition wdirty (c : CPU) (a : Z) : iProp Σ :=
+    wcds_el a (DfracOwn 1) (WDirty c).
+
+  (** The PERSISTENT sync witness.  It pins no value, so a sync byte stays
+      writable; and it is [DfracDiscarded], so it is INCOMPATIBLE with the
+      full-fraction state element every owned store consumes — which is
+      exactly the "a sync byte is never plain-written" side condition, paid
+      for by the algebra rather than by a premise on every store. *)
+  Definition sync_byte (a : Z) : iProp Σ := wcds_el a DfracDiscarded WSync.
+
+  Global Instance sync_byte_persistent a : Persistent (sync_byte a).
+  Proof. rewrite /sync_byte /wcds_el. apply _. Qed.
+  Global Instance wcds_el_timeless a dq s : Timeless (wcds_el a dq s).
+  Proof. rewrite /wcds_el. apply _. Qed.
+
+  (** THE OWNED STATE: clean, or dirty by THIS hart.  The [∃] is what makes
+      the surface absorb both, so that a store's postcondition needs no case
+      split at any call site. *)
+  Definition wown_st (c : CPU) (a : Z) : iProp Σ :=
+    (∃ s : wcds, wcds_el a (DfracOwn 1) s ∗ ⌜s = WClean \/ s = WDirty c⌝)%I.
+
+  Global Instance wown_st_timeless c a : Timeless (wown_st c a).
+  Proof. rewrite /wown_st. apply _. Qed.
+
+  Lemma wclean_own_st c a : wclean a (DfracOwn 1) -∗ wown_st c a.
+  Proof. iIntros "H". iExists WClean. iFrame "H". by iLeft. Qed.
+
+  Lemma wdirty_own_st c a : wdirty c a -∗ wown_st c a.
+  Proof. iIntros "H". iExists (WDirty c). iFrame "H". by iRight. Qed.
+
+  (** A full-fraction state element and a sync witness cannot coexist. *)
+  Lemma wcds_el_sync_excl a s : wcds_el a (DfracOwn 1) s -∗ sync_byte a -∗ False.
+  Proof.
+    rewrite /wcds_el /sync_byte. iIntros "H1 H2".
+    by iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[? _].
+  Qed.
+
+  (** THE BASE POINTS-TO: the value element PLUS the clean state, at the same
+      fraction.  Every existing statement that mentions [wlat_pointsto] keeps
+      its exact meaning — including the [DfracDiscarded] read-only form, which
+      is clean forever and blocks stores. *)
+  Definition wlat_pointsto (a : Z) (dq : dfrac) (t : nat) (v : bv 8) : iProp Σ :=
+    (wlat_elem a dq t v ∗ wclean a dq)%I.
+
+  Lemma wlat_pointsto_elem a dq t v : wlat_pointsto a dq t v -∗ wlat_elem a dq t v.
+  Proof. by iIntros "[$ _]". Qed.
+
   Definition wlat_interp (img : _) (log : list wmsg) : iProp Σ :=
-    (∃ m, ghost_map_auth weak_lat_name 1 m ∗ ⌜wlat_agree (img_z img) log m⌝)%I.
+    (∃ m mc, ghost_map_auth weak_lat_name 1 m ∗ ⌜wlat_agree (img_z img) log m⌝ ∗
+             ghost_map_auth weak_cds_name 1 mc ∗ ⌜wcds_agree log mc⌝)%I.
 
   (** THE READ BRIDGE: my element IS the latest write.  This is what an M2
-      load leaf turns into "every admissible timestamp returns [v]". *)
+      load leaf turns into "every admissible timestamp returns [v]".  Stated
+      over the bare value element, so that the OWNED (possibly dirty) form
+      reads through it too. *)
+  Lemma wlat_lookup_elem img log a dq t v :
+    wlat_interp img log -∗ wlat_elem a dq t v -∗
+    ⌜latest_val (img_z img) log a t v⌝.
+  Proof.
+    iIntros "Hi He". iDestruct "Hi" as (m mc) "(Hauth & %Hag & _ & _)".
+    iDestruct (ghost_map_lookup with "Hauth He") as %Hlk.
+    iPureIntro. exact (Hag a (t, v) Hlk).
+  Qed.
+
   Lemma wlat_lookup img log a dq t v :
     wlat_interp img log -∗ wlat_pointsto a dq t v -∗
     ⌜latest_val (img_z img) log a t v⌝.
   Proof.
-    iIntros "Hi He". iDestruct "Hi" as (m) "[Hauth %Hag]".
-    iDestruct (ghost_map_lookup with "Hauth He") as %Hlk.
-    iPureIntro. exact (Hag a (t, v) Hlk).
+    iIntros "Hi [He _]". by iApply (wlat_lookup_elem with "Hi He").
   Qed.
+
+  (** The C/D/S lookup: an owned state element is accurate at the log. *)
+  Lemma wcds_lookup img log a dq s :
+    wlat_interp img log -∗ wcds_el a dq s -∗ ⌜wcds_ok log a s⌝.
+  Proof.
+    iIntros "Hi He". iDestruct "Hi" as (m mc) "(_ & _ & Hauth & %Hag)".
+    iDestruct (ghost_map_lookup with "Hauth He") as %Hlk.
+    iPureIntro. exact (Hag a s Hlk).
+  Qed.
+
+  Lemma wown_st_lookup (c : CPU) a mc :
+    ghost_map_auth weak_cds_name 1 mc -∗ wown_st c a -∗
+    ⌜exists s, mc !! a = Some s /\ (s = WClean \/ s = WDirty c)⌝.
+  Proof.
+    iIntros "Ha Hs". iDestruct "Hs" as (s) "[Hel %Hs]".
+    iDestruct (ghost_map_lookup with "Ha Hel") as %Hlk.
+    iPureIntro. by exists s.
+  Qed.
+
+  (** SYNC-PURITY, at the surface: a sync byte carries no owned store. *)
+  Lemma sync_byte_no_plain img log a :
+    wlat_interp img log -∗ sync_byte a -∗ ⌜wcds_sync log a⌝.
+  Proof. iIntros "Hi #Hs". by iApply (wcds_lookup with "Hi Hs"). Qed.
 
   (** The accessor M2's store leaf uses: take the authority out, update the
       elements of the bytes the store wrote, put it back at the new log. *)
   Lemma wlat_interp_acc img log :
     wlat_interp img log -∗
-    ∃ m, ghost_map_auth weak_lat_name 1 m ∗ ⌜wlat_agree (img_z img) log m⌝ ∗
-      (∀ m' log', ghost_map_auth weak_lat_name 1 m' -∗
-         ⌜wlat_agree (img_z img) log' m'⌝ -∗ wlat_interp img log').
+    ∃ m mc, ghost_map_auth weak_lat_name 1 m ∗ ⌜wlat_agree (img_z img) log m⌝ ∗
+            ghost_map_auth weak_cds_name 1 mc ∗ ⌜wcds_agree log mc⌝ ∗
+      (∀ m' mc' log', ghost_map_auth weak_lat_name 1 m' -∗
+         ⌜wlat_agree (img_z img) log' m'⌝ -∗
+         ghost_map_auth weak_cds_name 1 mc' -∗
+         ⌜wcds_agree log' mc'⌝ -∗ wlat_interp img log').
   Proof.
-    iIntros "Hi". iDestruct "Hi" as (m) "[Hauth %Hag]".
-    iExists m. iFrame "Hauth". iSplitR; [iPureIntro; exact Hag|].
-    iIntros (m' log') "Hauth' %Hag'". iExists m'. by iFrame "Hauth'".
+    iIntros "Hi". iDestruct "Hi" as (m mc) "(Hauth & %Hag & Hc & %Hagc)".
+    iExists m, mc. iFrame "Hauth Hc". iSplitR; [iPureIntro; exact Hag|].
+    iSplitR; [iPureIntro; exact Hagc|].
+    iIntros (m' mc' log') "Hauth' %Hag' Hc' %Hagc'".
+    iExists m', mc'. by iFrame.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (** *** 3b'. THE D→C FLIP and the S mint
+
+      [wlat_flip] is the ghost half of a RELEASE: once the releasing hart's
+      [WCrel] message is the log's last, every byte that hart had dirtied is
+      clean — its whole own-store backlog is published.  Note the byte need
+      NOT be the one the release wrote: this is what lets a release site flip
+      a whole DEPOSIT clean before it egresses. *)
+  Lemma wlat_flip img log (mrel : wmsg) (c : CPU) (a : Z) :
+    wm_tid mrel = Some (fin_to_nat c) -> wm_ak mrel = WCrel ->
+    wlat_interp img (log ++ [mrel]) -∗ wown_st c a ==∗
+    wlat_interp img (log ++ [mrel]) ∗ wclean a (DfracOwn 1).
+  Proof.
+    intros Htid Hk. iIntros "Hi Hs".
+    iDestruct "Hs" as (s) "[Hel %Hs]".
+    iDestruct "Hi" as (m mc) "(Hauth & %Hag & Hc & %Hagc)".
+    iDestruct (ghost_map_lookup with "Hc Hel") as %Hlk.
+    iMod (ghost_map_update WClean with "Hc Hel") as "[Hc Hel]".
+    iModIntro. iFrame "Hel". iExists m, (<[a := WClean]> mc).
+    iFrame "Hauth Hc". iSplitR; [iPureIntro; exact Hag|].
+    iPureIntro. apply wcds_agree_insert; [exact Hagc|]. simpl.
+    destruct Hs as [-> | ->]; [exact (Hagc a WClean Hlk)|].
+    apply (wcds_dirty_flip _ _ c (length log) mrel).
+    - rewrite lookup_app_r; [|lia]. by rewrite Nat.sub_diag.
+    - exact Htid.
+    - exact Hk.
+    - rewrite length_app /=. lia.
+    - exact (Hagc a (WDirty c) Hlk).
+  Qed.
+
+  (** THE S MINT.  A byte with no owned store in the log — at boot, every
+      byte — may be turned sync once and for all, consuming its state element
+      and yielding the persistent witness. *)
+  Lemma sync_mint img log a s :
+    wcds_sync log a ->
+    wlat_interp img log -∗ wcds_el a (DfracOwn 1) s ==∗
+    wlat_interp img log ∗ sync_byte a.
+  Proof.
+    intros Hsy. iIntros "Hi Hel".
+    iDestruct "Hi" as (m mc) "(Hauth & %Hag & Hc & %Hagc)".
+    iMod (ghost_map_update WSync with "Hc Hel") as "[Hc Hel]".
+    iMod (ghost_map_elem_persist with "Hel") as "#Hel".
+    iModIntro. iFrame "Hel". iExists m, (<[a := WSync]> mc).
+    iFrame "Hauth Hc". iSplitR; [iPureIntro; exact Hag|].
+    iPureIntro. by apply wcds_agree_insert.
+  Qed.
+
+  (** At boot the log is empty, so the premise is free. *)
+  Lemma sync_mint_nil img a s :
+    wlat_interp img [] -∗ wcds_el a (DfracOwn 1) s ==∗
+    wlat_interp img [] ∗ sync_byte a.
+  Proof.
+    apply sync_mint. intros p m (Hp & _). by rewrite lookup_nil in Hp.
   Qed.
 
   (* ---------------------------------------------------------------- *)

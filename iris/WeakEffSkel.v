@@ -819,13 +819,14 @@ Proof. exact (wcert_store cid pc akf pf nf akw ea v). Qed.
 Lemma wcert_amo_aq_via_skeleton (cid : nat) (pc : SailStdpp.Values.mword 64)
     (akf : akinfo) (pf : Arch.pa) (nf : N) (aka akw : akinfo) (ea : Arch.pa)
     (v : bv 32) :
-  ak_coh aka = false -> ak_sync aka = true ->
+  ak_coh aka = false -> ak_sync aka = true -> ak_latest akw = true ->
   wstep_cert cid pc
     (wP_eff (Some cid)
        ([WEread akf pf nf] ++ [WEread aka ea 4; WEwrite akw ea 4 v])%list)
     (wQ_amo_aq (Some cid) ea v).
 Proof.
-  intros Hcoh Hsync. exact (wcert_amo_aq cid pc akf pf nf aka akw ea v Hcoh Hsync).
+  intros Hcoh Hsync Hlat.
+  exact (wcert_amo_aq cid pc akf pf nf aka akw ea v Hcoh Hsync Hlat).
 Qed.
 
 (* ====================================================================== *)

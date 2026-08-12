@@ -533,11 +533,121 @@ Section wP_eff_halves.
         apply wmem_restrict_dom.
   Qed.
 
+  Lemma wP_eff_ld8_tor_own (al4 : bool) (cid : nat) (σ : wmstate)
+      (pc : SailStdpp.Values.mword 64) (h : SailStdpp.Values.mword 16)
+      (rs1 rd : mword 5) (imm : mword 12) (i0 : instruction)
+      (ea : Arch.pa) (v : bv 64) (cid8 : CPU)
+      (D D0 : register -> bool) (dst : mstate) :
+    wlog_wf (wm_log σ) ->
+    (* --- the M-mode config tower, at σ's own registers --- *)
+    register_lookup PC (wm_regs σ) = pc ->
+    register_lookup cur_privilege (wm_regs σ) = Machine ->
+    pmp_allows_all (register_lookup pmpcfg_n (wm_regs σ)) ->
+    pmp_tor0_grants (register_lookup pmpcfg_n (wm_regs σ))
+                    (register_lookup pmpaddr_n (wm_regs σ)) ea 8 ->
+    pma_allows_all (register_lookup pma_regions (wm_regs σ)) ->
+    register_lookup htif_tohost_base (wm_regs σ) = None ->
+    register_lookup hart_state (wm_regs σ) = HART_ACTIVE tt ->
+    eq_vec (_get_Misa_S (register_lookup misa (wm_regs σ))) ('b"1") = true ->
+    eq_vec (_get_Misa_C (register_lookup misa (wm_regs σ))) ('b"1") = true ->
+    eq_vec (_get_Mstatus_MIE (register_lookup mstatus (wm_regs σ))) ('b"1")
+      = false ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus (wm_regs σ))) ('b"1")
+      = false ->
+    pmm_mode_backwards (_get_Seccfg_PMM (register_lookup mseccfg (wm_regs σ)))
+      = PMM_Disabled ->
+    eq_vec (register_lookup elp (wm_regs σ))
+           (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    (* --- the instruction's pure geometry --- *)
+    is_aligned_vaddr (Virtaddr pc) 2 = true ->
+    is_aligned_vaddr (Virtaddr pc) 4 = al4 ->
+    uint rd <> 0 ->
+    add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+             else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1)))
+                    (wm_regs σ))
+            (sign_extend' 64 imm) = ea ->
+    (forall j : nat, (j < 8)%nat -> addr_is_ram (pa_add ea j)) ->
+    (* --- the COMPRESSED decode and its expansion --- *)
+    (forall r, D r = true ->
+       register_lookup r (wm_regs σ) = register_lookup r dst.(sregs)) ->
+    D (R_bool minstret_increment) = false ->
+    goodb0 D (ext_decode_compressed h) dst = true ->
+    exec (ext_decode_compressed h) dst = Some (i0, dst) ->
+    (forall s : mstate, goodb0 D0 (execute i0) s = true) ->
+    (forall s : mstate, exec (execute i0) s
+       = Some (ExecuteAs (LOAD (imm, Regidx rs1, Regidx rd, false, 8)), s)) ->
+    (* --- the resources --- *)
+    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
+    winstr_bytes pc (F_RVC h) -∗
+    vwp_hold (wpt8_own cid8 ea v) (wm_ws σ) -∗
+    ⌜wP_eff (Some cid)
+       ([WEread wak_plain pc (if al4 then 4%N else 2%N)]
+          ++ [WEread wak_plain ea 8]) σ⌝.
+  Proof.
+    intros Hwf Lpc Lpriv Lpmp Htor Lpma Lhtif Lhart LmisaS LmisaC LmIE Lmprv
+           Lpmm Lelp Hal2 Hal4 Hrd Hea Hram8 Hagree HDmi Hgood Hdec Hgood0 Hexp.
+    iIntros "Hlat #Hbs Hpt".
+    iDestruct (winstr_bytes_acc_wf with "Hbs") as %Haccpc.
+    iDestruct (winstr_bytes_lookup σ pc (F_RVC h) Hwf with "Hlat Hbs")
+      as %[_ Hfok].
+    iDestruct (winstr_pinned σ pc (F_RVC h) Hwf with "Hlat Hbs") as %Hpinpc.
+    iDestruct (wwp_ld8_own cid8 σ ea v Hwf with "Hlat Hpt")
+      as %[[Haccea Hpinea] Hflat8].
+    iDestruct (wpt8_own_align with "Hpt") as %Halea.
+    iPureIntro.
+    destruct Hfok as (Hal2' & Hrampc & w & [Hsub HisRVC] & Htext).
+    apply (wP_eff_of_leaf_rvc al4 cid σ (wwin pc ea 8) pc h w i0
+             (LOAD (imm, Regidx rs1, Regidx rd, false, 8))
+             [WEread wak_plain ea 8] D D0 dst).
+    - exact Hwf.
+    - exact (wwin_nonzero pc ea 8 Hrampc Hram8).
+    - exact (wwin_pinned σ pc ea 8 Haccpc Haccea Hpinpc Hpinea).
+    - exact Lpc.
+    - exact Lpriv.
+    - exact Lpmp.
+    - exact Lpma.
+    - exact Lhtif.
+    - exact Lhart.
+    - exact LmisaS.
+    - exact LmisaC.
+    - exact LmIE.
+    - exact Lelp.
+    - exact Hal2.
+    - exact Hal4.
+    - exact Hrampc.
+    - exact (wwin_conf_text σ pc ea 8 w Htext).
+    - exact Hsub.
+    - exact HisRVC.
+    - exact Hagree.
+    - exact HDmi.
+    - exact Hgood.
+    - exact Hdec.
+    - exact Hgood0.
+    - exact Hexp.
+    - intro b. eexists. split_and!.
+      + exact (exec_eff_ld8_tor_at
+                 (MState (wm_regs σ) (wmem_restrict σ (wwin pc ea 8))
+                    (wm_dev σ)) b (add_vec_int pc 2) rs1 rd imm ea v
+                 Hrd Lpriv Lmprv Lpmm Htor Lpma Lhtif Hea Halea Hram8
+                 (wwin_conf_data σ pc ea 8 v Hflat8)).
+      + rewrite (proj1 (load_sexec_facts
+                   (MState (wm_regs σ) (wmem_restrict σ (wwin pc ea 8))
+                      (wm_dev σ)) b (add_vec_int pc 2) rd (regval_into_reg v))).
+        exact Lhart.
+      + exact (proj1 (proj2 (load_sexec_facts
+                   (MState (wm_regs σ) (wmem_restrict σ (wwin pc ea 8))
+                      (wm_dev σ)) b (add_vec_int pc 2) rd (regval_into_reg v)))).
+      + rewrite (proj1 (proj2 (proj2 (load_sexec_facts
+                   (MState (wm_regs σ) (wmem_restrict σ (wwin pc ea 8))
+                      (wm_dev σ)) b (add_vec_int pc 2) rd (regval_into_reg v))))).
+        apply wmem_restrict_dom.
+  Qed.
+
   Lemma wP_eff_sd8_tor (al4 : bool) (cid : nat) (σ : wmstate)
       (pc : SailStdpp.Values.mword 64) (h : SailStdpp.Values.mword 16)
       (rs1 rs2 : mword 5) (imm : mword 12) (i0 : instruction)
       (ea : Arch.pa) (vold : bv 64) (vs : SailStdpp.Values.mword 64)
-      (dq : dfrac) (D D0 : register -> bool) (dst : mstate) :
+      (cid8 : CPU) (D D0 : register -> bool) (dst : mstate) :
     wlog_wf (wm_log σ) ->
     register_lookup PC (wm_regs σ) = pc ->
     register_lookup cur_privilege (wm_regs σ) = Machine ->
@@ -577,7 +687,7 @@ Section wP_eff_halves.
        = Some (ExecuteAs (STORE (imm, Regidx rs2, Regidx rs1, 8)), s)) ->
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
     winstr_bytes pc (F_RVC h) -∗
-    vwp_hold (wpt8 ea dq vold) (wm_ws σ) -∗
+    vwp_hold (wpt8_own cid8 ea vold) (wm_ws σ) -∗
     ⌜wP_eff (Some cid)
        ([WEread wak_plain pc (if al4 then 4%N else 2%N)]
           ++ [WEwrite wak_plain ea 8 vs]) σ⌝.
@@ -589,9 +699,9 @@ Section wP_eff_halves.
     iDestruct (winstr_bytes_lookup σ pc (F_RVC h) Hwf with "Hlat Hbs")
       as %[_ Hfok].
     iDestruct (winstr_pinned σ pc (F_RVC h) Hwf with "Hlat Hbs") as %Hpinpc.
-    iDestruct (wpt8_flat_pin σ ea dq vold Hwf with "Hlat Hpt")
+    iDestruct (wpt8_own_flat_pin cid8 σ ea vold Hwf with "Hlat Hpt")
       as %[Haccea Hflatpin].
-    iDestruct (wpt8_align with "Hpt") as %Halea.
+    iDestruct (wpt8_own_align with "Hpt") as %Halea.
     iPureIntro.
     assert (Hpinea : forall j : nat, (j < 8)%nat ->
               pinned_read σ (acc_addr ea j))
@@ -826,6 +936,170 @@ Section leaves.
                   |exact Hlogs|exact Hwsle|exact Hwf'|exact Hbnd'].
   Qed.
 
+  Lemma wwp_ld8_tor_rvc_leaf_own (al4 : bool)
+      (pc : SailStdpp.Values.mword 64) (h : SailStdpp.Values.mword 16)
+      (rs1 rd : mword 5) (imm : mword 12) (i0 : instruction)
+      (ea : Arch.pa) (v : bv 64) (dqv : dfrac) (q : Qp)
+      (pmpcfg0 : type_of_register pmpcfg_n)
+      (pmpaddrs : type_of_register pmpaddr_n)
+      (rs1v rd0 npc0 : SailStdpp.Values.mword 64)
+      (D D0 : register -> bool) (dst : mstate) (ws : wstate) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
+    is_aligned_vaddr (Virtaddr pc) 2 = true ->
+    is_aligned_vaddr (Virtaddr pc) 4 = al4 ->
+    uint rs1 <> 0 ->
+    uint rd <> 0 ->
+    add_vec rs1v (sign_extend' 64 imm) = ea ->
+    (forall j : nat, (j < 8)%nat -> addr_is_ram (pa_add ea j)) ->
+    (* the decode, in the two shapes its two consumers ask for *)
+    (forall t : mstate,
+       priv_mSU (register_lookup cur_privilege t.(sregs)) = true ->
+       eq_vec (_get_Misa_C (register_lookup misa t.(sregs))) ('b"1") = true ->
+       eq_vec (_get_Misa_A (register_lookup misa t.(sregs))) ('b"1") = true ->
+       register_lookup misa t.(sregs) = MISA_C ->
+       cfg_ok t ->
+       exists i0' : instruction,
+         exec (decode_fetch (F_RVC h)) t = Some (i0', t) /\
+         is_lpad_instruction i0' = false /\
+         (forall s : mstate, exec (execute i0') s
+            = Some (ExecuteAs (LOAD (imm, Regidx rs1, Regidx rd, false, 8)),
+                    s))) ->
+    (forall rs : regstate,
+       register_lookup cur_privilege rs = Machine ->
+       register_lookup misa rs = MISA_C ->
+       register_lookup mseccfg rs = mword_of_int 0 ->
+       forall r, D r = true ->
+         register_lookup r rs = register_lookup r dst.(sregs)) ->
+    D (R_bool minstret_increment) = false ->
+    goodb0 D (ext_decode_compressed h) dst = true ->
+    exec (ext_decode_compressed h) dst = Some (i0, dst) ->
+    (forall s : mstate, goodb0 D0 (execute i0) s = true) ->
+    (forall s : mstate, exec (execute i0) s
+       = Some (ExecuteAs (LOAD (imm, Regidx rs1, Regidx rd, false, 8)), s)) ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+    PC ↦ᵣ pc -∗
+    nextPC ↦ᵣ npc0 -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
+    winstr_bytes pc (F_RVC h) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold (wpt8_own cpu_id ea v) ws -∗
+    (∀ ws' : wstate,
+       ⌜ws_le ws ws'⌝ -∗
+       mmode_config (DfracOwn q) -∗
+       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+       pc_is (add_vec_int pc 2) -∗
+       R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+       R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ (regval_into_reg v) -∗
+       hart_ws cpu_id ws' -∗
+       vwp_hold (wpt8_own cpu_id ea v) ws' -∗
+       WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Htor Hal2 Hal4 Hrs1nz Hrd Hea Hram8 Hdecf Hagree HDmi
+           Hgood Hdec Hgood0 Hexp.
+    iIntros "Hmm Hpmpc Hpaddr Hpc Hnpc Hrs1c Hrdc #Hbs Hhws Hpt Hcont".
+    iDestruct (winstr_bytes_acc_wf with "Hbs") as %Haccpc.
+    (* THE WHOLE config goes to the funnel: it hands the reads back. *)
+    iApply (wwp_instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8))
+              pmpcfg0 (dq := DfracOwn q)
+              (wP_eff (Some (fin_to_nat cpu_id))
+                 [WEread wak_plain pc (if al4 then 4%N else 2%N);
+                  WEread wak_plain ea 8])
+              (wQ_load_w 8 ea) Hgid Haccpc Hpmp
+              (wcert_load_w 8 (fin_to_nat cpu_id) pc wak_plain pc
+                 (if al4 then 4%N else 2%N) wak_plain ea eq_refl)
+              with "Hmm Hpmpc Hpc [] ").
+    { iApply (winstr_intro pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8))
+                (F_RVC h) eq_refl eq_refl Hdecf with "Hbs"). }
+    rewrite /wwp_cb. iIntros (σ b) "%Lpc0 %Hcfg Hlat Hreg Hnorg".
+    iDestruct "Hnorg" as "(%Hbnd & %Hwf & Hdev & Hlogauth & Hwsauth)".
+    iDestruct (hart_ws_agree cpu_id (wm_ws σ) ws with "Hwsauth Hhws") as %->.
+    destruct Hcfg as (Lpriv & Lhart & Lmisa & Lsec & Lpmpc & Lpma & Lhtif &
+                      LmisaS & LmIE & Lmprv & Lpmm & Lelp).
+    assert (LmisaC : eq_vec (_get_Misa_C (register_lookup misa (wm_regs σ)))
+                       ('b"1") = true)
+      by (rewrite Lmisa; vm_compute; reflexivity).
+    (* the TWO registers the funnel does not read: the pmp ADDRESS register
+       (which the TOR grant is about) and this instruction's base *)
+    iDestruct (reg_valid_dq with "Hreg Hpaddr") as %Lpaddr_a.
+    pose proof (eq_trans (eq_sym (reg_at_flat pmpaddr_n σ b eq_refl))
+                  Lpaddr_a) as Lpaddr.
+    iDestruct (reg_valid with "Hreg Hrs1c") as %Lrs1_a.
+    pose proof (eq_trans (eq_sym (reg_at_flat
+                  (R_bitvector_64 (gpr_of_Z (uint rs1))) σ b eq_refl))
+                  Lrs1_a)   as Lrs1.
+    (* the effective address, at [σ]'s own register file *)
+    assert (Hea_σ : add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1)))
+                            (wm_regs σ)) (sign_extend' 64 imm) = ea).
+    { rewrite (proj2 (Z.eqb_neq (uint rs1) 0) Hrs1nz) Lrs1. exact Hea. }
+    (* the agreement, at [σ]'s registers *)
+    assert (Hag_σ : forall r, D r = true ->
+              register_lookup r (wm_regs σ) = register_lookup r dst.(sregs)).
+    { apply Hagree; [exact Lpriv | exact Lmisa | exact Lsec]. }
+    (* ---- the certificate's precondition (§2) ---- *)
+    iDestruct (wP_eff_ld8_tor_own al4 (fin_to_nat cpu_id) σ pc h rs1 rd imm i0
+                 ea v cpu_id D D0 dst
+                 Hwf Lpc0 Lpriv ltac:(rewrite Lpmpc; exact Hpmp)
+                 ltac:(rewrite Lpmpc Lpaddr; exact Htor) Lpma
+                 Lhtif Lhart LmisaS LmisaC LmIE Lmprv Lpmm Lelp Hal2 Hal4
+                 Hrd Hea_σ Hram8 Hag_σ HDmi Hgood Hdec Hgood0 Hexp
+                 with "Hlat Hbs Hpt") as %HP.
+    (* ---- the flat facts: the data doubleword ---- *)
+    iDestruct (wwp_ld8_own cpu_id σ ea v Hwf with "Hlat Hpt") as %[_ Hflat8].
+    iDestruct (wpt8_own_align with "Hpt") as %Halea.
+    (* ---- the run, at the FLAT state ---- *)
+    pose proof (exec_eff_ld8_tor_at (wflat_st σ) b (add_vec_int pc 2) rs1 rd
+                  imm ea v Hrd Lpriv Lmprv Lpmm
+                  ltac:(rewrite Lpmpc Lpaddr; exact Htor) Lpma Lhtif Hea_σ
+                  Halea Hram8 Hflat8) as Hexf.
+    (* ---- the two register writes the [execute] performs ---- *)
+    iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc")
+      as "[Hreg Hnpc]".
+    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
+            (regval_into_reg v) with "Hreg Hrdc") as "[Hreg Hrdc]".
+    iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hclose".
+    iSplitR; [iPureIntro; exact HP|].
+    iExists (set_reg (set_reg (set_reg (wflat_st σ)
+                        (R_bool minstret_increment) b)
+                      nextPC (add_vec_int pc 2))
+                     (R_bitvector_64 (gpr_of_Z (uint rd)))
+                     (regval_into_reg v)).
+    iSplitR; [iPureIntro; exact (exec_eff_exec _ _ _ _ _ Hexf)|].
+    iFrame "Hreg".
+    iNext. iIntros (tick σ' t) "%Hstep %Hdevt0 %Hpost %HQ Hmm' Hpmpc' Hpc'".
+    (* the device frame: the [execute] moved no device *)
+    assert (Hdevt : mdev t = wm_dev σ).
+    { rewrite Hdevt0 -(wflat_st_dev σ).
+      exact (proj1 (proj2 (proj2 (proj2 (load_sexec_facts (wflat_st σ) b
+                (add_vec_int pc 2) rd (regval_into_reg v)))))). }
+    destruct Hpost as (Hregs & Hdevs & Hmems & Himgs & Hlogs & Hwsle & Hwf' & Hbnd').
+    destruct HQ as (HQi & HQl & HQv).
+    iMod (hart_ws_update cpu_id (wm_ws σ) (wm_ws σ) (wm_ws σ')
+            with "Hwsauth Hhws") as "[Hwsauth Hhws]".
+    iMod "Hclose" as "_". iModIntro.
+    (* the PC the funnel hands back IS [pc+2] *)
+    iEval (rewrite (proj2 (proj2 (proj2 (proj2 (load_sexec_facts (wflat_st σ) b
+             (add_vec_int pc 2) rd (regval_into_reg v))))))) in "Hpc'".
+    iSplitL "Hlat"; [by rewrite HQi HQl|].
+    iSplitL "Hdev Hlogauth Hwsauth".
+    { rewrite /wmstate_norg. iSplitR; [by iPureIntro|].
+      iSplitR; [by iPureIntro|].
+      rewrite Hdevs Hdevt HQl. iFrame. }
+    iApply ("Hcont" $! (wm_ws σ') with
+              "[%] Hmm' Hpmpc' Hpaddr [$Hpc' $Hnpc] Hrs1c Hrdc Hhws [Hpt]").
+    - exact Hwsle.
+    - iApply (wwp_ld8_own_carry cpu_id σ σ' t ea v with "Hpt").
+      split_and!; [exact Hregs|exact Hdevs|exact Hmems|exact Himgs
+                  |exact Hlogs|exact Hwsle|exact Hwf'|exact Hbnd'].
+  Qed.
+
   (** *** 3b. [c.sdsp]-class: the compressed width-8 STORE. *)
 
   Lemma wwp_sd8_tor_rvc_leaf (al4 : bool)
@@ -877,7 +1151,7 @@ Section leaves.
     R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
     winstr_bytes pc (F_RVC h) -∗
     hart_ws cpu_id ws -∗
-    vwp_hold (wpt8 ea (DfracOwn 1) vold) ws -∗
+    vwp_hold (wpt8_own cpu_id ea vold) ws -∗
     vwp_hold R ws -∗
     (∀ (ws' : wstate) (T : nat),
        ⌜ws_le ws ws'⌝ -∗
@@ -890,7 +1164,7 @@ Section leaves.
        R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
        R_bitvector_64 (gpr_of_Z (uint rs2)) ↦ᵣ rs2v -∗
        hart_ws cpu_id ws' -∗
-       vwp_hold (wpt8 ea (DfracOwn 1) rs2v) ws' -∗
+       vwp_hold (wpt8_own cpu_id ea rs2v) ws' -∗
        monPred_at R (view_scl T) -∗
        WWP Loop) -∗
     WWP Loop.
@@ -944,13 +1218,13 @@ Section leaves.
     { apply Hagree; [exact Lpriv | exact Lmisa | exact Lsec]. }
     (* ---- the certificate's precondition (§2) ---- *)
     iDestruct (wP_eff_sd8_tor al4 (fin_to_nat cpu_id) σ pc h rs1 rs2 imm i0
-                 ea vold rs2v (DfracOwn 1) D D0 dst
+                 ea vold rs2v cpu_id D D0 dst
                  Hwf Lpc0 Lpriv ltac:(rewrite Lpmpc; exact Hpmp)
                  ltac:(rewrite Lpmpc Lpaddr; exact Htor) Lpma
                  Lhtif Lhart LmisaS LmisaC LmIE Lmprv Lpmm Lelp Hal2 Hal4
                  Hea_σ Hvs_σ Hram8 Hag_σ HDmi Hgood Hdec Hgood0 Hexp
                  with "Hlat Hbs Hpt") as %HP.
-    iDestruct (wpt8_align with "Hpt") as %Halea.
+    iDestruct (wpt8_own_align with "Hpt") as %Halea.
     (* ---- the run, at the FLAT state ---- *)
     pose proof (exec_eff_sd8_tor_at (wflat_st σ) b (add_vec_int pc 2) rs1 rs2
                   imm ea rs2v Lpriv Lmprv Lpmm
@@ -972,15 +1246,17 @@ Section leaves.
     assert (Hdevt : mdev t = wm_dev σ) by (rewrite Hdevt0; reflexivity).
     destruct Hpost as (Hregs & Hdevs & Hmems & Himgs & Hlogs & Hwsle & Hwf'
                        & Hbnd').
-    destruct HQ as (HQi & [kc HQl] & HQle & HQv).
+    destruct HQ as (HQi & (kc & HQl & _) & HQle & HQv).
     (* the release deposit: freeze R at the store's own timestamp *)
     iDestruct (wwp_release_deposit R σ Hbnd with "HR") as "HRdep".
     (* THE WINDOW UPDATE: retarget the eight elements at the message *)
-    iDestruct (wpt8_at_elems with "Hpt") as "(%Halea2 & %Haccea & Hels)".
+    iDestruct (wpt8_own_at_elems with "Hpt") as "(%Halea2 & %Haccea & Hels)".
     iDestruct "Hels" as (t0 t1 t2 t3 t4 t5 t6 t7)
-      "(H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7)".
-    iMod (wlat8_store_prim (Some (fin_to_nat cpu_id)) kc σ ea rs2v
-            with "Hlat H0 H1 H2 H3 H4 H5 H6 H7") as "[Hlat Hl8]".
+      "(H0 & S0 & H1 & S1 & H2 & S2 & H3 & S3 & H4 & S4 & H5 & S5
+        & H6 & S6 & H7 & S7)".
+    iMod (wlat8_store_prim_own cpu_id kc σ ea rs2v
+            with "Hlat H0 S0 H1 S1 H2 S2 H3 S3 H4 S4 H5 S5 H6 S6 H7 S7")
+      as "[Hlat Hl8]".
     iMod (wlog_update (wm_log σ)
             [wwrite_msg (Some (fin_to_nat cpu_id)) kc ea 8 rs2v]
             with "Hlogauth") as "Hlogauth".
@@ -1001,7 +1277,7 @@ Section leaves.
                HRdep").
     - exact Hwsle.
     - intros j Hj. apply HQv. exact Hj.
-    - iApply (wlat8_wpt8 ea (DfracOwn 1) (S (length (wm_log σ))) rs2v
+    - iApply (wlat8_own_wpt8_own cpu_id ea (S (length (wm_log σ))) rs2v
                 (wm_ws σ') Halea2 Haccea
                 ltac:(intros j Hj; apply HQv; exact Hj) with "Hl8").
   Qed.

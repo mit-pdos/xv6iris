@@ -228,6 +228,7 @@ Section branch.
     acc_wf lk 4 →
     ak_coh aka = false →
     ak_sync aka = true →
+    ak_latest akw = true →
     inv wlockN (wlock_inv γ lk R) -∗
     □ (K -∗ ▷ (Kb -∗ WWP Loop) -∗
          wacq_cb γ lk R pca
@@ -238,11 +239,11 @@ Section branch.
            (wP_eff (Some (fin_to_nat cpu_id)) [WEread akf2 pf2 nf2]) wQ_pure) -∗
     K -∗ WWP Loop.
   Proof.
-    intros Hgid Hacca Haccb Hacclk Hcoh Hsync. iIntros "#Hinv #Hatt #Hbr HK".
+    intros Hgid Hacca Haccb Hacclk Hcoh Hsync Hlat. iIntros "#Hinv #Hatt #Hbr HK".
     iApply (wwp_acquire_loop_real γ lk R pca pcb _ _ _ K Kb
               Hgid Hacca Haccb Hacclk
               (wcert_amo_aq (fin_to_nat cpu_id) pca akf pf nf aka akw lk lock_one
-                 Hcoh Hsync)
+                 Hcoh Hsync Hlat)
               (wcert_nowrite (fin_to_nat cpu_id) pcb [WEread akf2 pf2 nf2]
                  (nowrite_trace_read akf2 pf2 nf2))
               with "Hinv Hatt Hbr HK").

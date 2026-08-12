@@ -129,7 +129,7 @@ Section WkStartThm.
      composes with [WeakCtx.cobj_mono] at the frame re-bundling step (the
      [WkTimerinit.stack_2_intro_ent] twin -- Local there). *)
   Local Lemma wstack2_intro_ent (sp : Arch.pa) (w1 w2 : bv 64) :
-    (wpt8 (pa_stk sp 1) (DfracOwn 1) w1 ∗ wpt8 (pa_stk sp 2) (DfracOwn 1) w2)
+    (wpt8_own cpu_id (pa_stk sp 1) w1 ∗ wpt8_own cpu_id (pa_stk sp 2) w2)
     ⊢ wstack_own_phys sp 2.
   Proof. iIntros "[H1 H2]". iApply (wstack_own_phys_2_intro with "H1 H2"). Qed.
 
@@ -242,8 +242,8 @@ Section WkStartThm.
     (* timerinit's two slots, bundled ONCE here (they are not touched by
        start's own instructions at all). *)
     iEval (rewrite Htb1) in "Htra". iEval (rewrite Htb2) in "Hts0".
-    iAssert (cobj ξ (wpt8 (pa_stk (ti_sp1 sp0) 1) (DfracOwn 1) vtra ∗
-                     wpt8 (pa_stk (ti_sp1 sp0) 2) (DfracOwn 1) vts0))
+    iAssert (cobj ξ (wpt8_own cpu_id (pa_stk (ti_sp1 sp0) 1) vtra ∗
+                     wpt8_own cpu_id (pa_stk (ti_sp1 sp0) 2) vts0))
       with "[Htra Hts0]" as "Hti2".
     { iEval (rewrite cobj_sep). iFrame. }
     iDestruct (cobj_mono _ _ _ (wstack2_intro_ent (ti_sp1 sp0) vtra vts0) with "Hti2")
@@ -1021,8 +1021,8 @@ Section WkStartThm.
        No view arithmetic anywhere: each [cobj] has sat untouched in the
        context since the step that produced it. ---- *)
     iEval (rewrite Hb1) in "Hsra". iEval (rewrite Hb2) in "Hss0".
-    iAssert (cobj ξ (wpt8 (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
-                     wpt8 (pa_stk sp0 2) (DfracOwn 1) s00))
+    iAssert (cobj ξ (wpt8_own cpu_id (pa_stk sp0 1) ra0 ∗
+                     wpt8_own cpu_id (pa_stk sp0 2) s00))
       with "[Hsra Hss0]" as "Ht12".
     { iEval (rewrite cobj_sep). iFrame. }
     iDestruct (cobj_mono _ _ _ (wstack2_intro_ent sp0 ra0 s00) with "Ht12") as "Ht12".

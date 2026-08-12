@@ -299,6 +299,11 @@ Section wp_lock.
          ⌜register_lookup PC (wm_regs σ) = pc⌝ ∗
          ⌜∀ j : nat, (j < 4)%nat → pinned_read σ (acc_addr pc j)⌝ ∗
          ⌜P σ⌝ ∗
+         (* φ-upgrade §1: the release site witnesses its own [fence rw,w]
+            here.  It is delivered at the store's PRE-state, which is the
+            fence's post-state, so [wwp_release_fence_store] passes it
+            straight through from [wQ_fence]. *)
+         ⌜w_relp (wm_ws σ) = true⌝ ∗
          wlat_interp (wm_img σ) (wm_log σ) ∗
          vwp_hold R (wm_ws σ) ∗
          ∃ t0 t1 : mstate,
@@ -328,14 +333,14 @@ Section wp_lock.
     iDestruct (wmstate_rest_facts with "Hrest") as %[Hbnd Hwf].
     iInv wlockN as "Hbody" "Hclose".
     iMod ("Hk" $! σ with "Hlat Hrest")
-      as "(%Hpc & %Htext & %HP & Hlat & HR & Hcont)".
+      as "(%Hpc & %Htext & %HP & %Hrelp & Hlat & HR & Hcont)".
     iModIntro. iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
     iSplitR; [by iPureIntro|].
     iDestruct "Hcont" as (t0 t1) "(%Hex0 & %Hex1 & Hcont)".
     iExists t0, t1. iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
     iNext. iIntros (tick σ') "%Hpost %HQ".
-    iMod (wrelease_core γ lk R cpu_id (Some (fin_to_nat cpu_id)) σ σ' HQ Hbnd
-            with "Hlat Hbody Htok HR") as "[Hlat Hbody]".
+    iMod (wrelease_core γ lk R cpu_id (Some (fin_to_nat cpu_id)) σ σ' HQ
+            Hrelp Hbnd with "Hlat Hbody Htok HR") as "[Hlat Hbody]".
     iMod ("Hcont" $! tick σ' with "[%]") as "[Hrest $]"; [exact Hpost|].
     iMod ("Hclose" with "[Hbody]") as "_"; [by iNext|].
     iModIntro. iApply (wmstate_interp_split σ'). iFrame.
@@ -376,13 +381,13 @@ Section wp_lock.
     iDestruct (wmstate_rest_facts with "Hrest") as %[Hbnd Hwf].
     iInv wstartedN as "Hbody" "Hclose".
     iMod ("Hk" $! σ with "Hlat Hrest")
-      as "(%Hpc & %Htext & %HP & Hlat & HP0 & Hcont)".
+      as "(%Hpc & %Htext & %HP & %Hrelp & Hlat & HP0 & Hcont)".
     iModIntro. iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
     iSplitR; [by iPureIntro|].
     iDestruct "Hcont" as (t0 t1) "(%Hex0 & %Hex1 & Hcont)".
     iExists t0, t1. iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
     iNext. iIntros (tick σ') "%Hpost %HQ".
-    iMod (wstarted_set a Pl (Some (fin_to_nat cpu_id)) σ σ' HQ Hbnd
+    iMod (wstarted_set a Pl (Some (fin_to_nat cpu_id)) σ σ' HQ Hrelp Hbnd
             with "Hlbσ Hlat Hbody HP0") as "[Hlat Hat]".
     iMod ("Hcont" $! tick σ' with "[%]") as "[Hrest $]"; [exact Hpost|].
     iMod ("Hclose" with "[Hat]") as "_".
@@ -415,7 +420,8 @@ Section wp_lock.
          ⌜exec (riscv_step true) (wflat_st σ) = Some (tt, t1)⌝ ∗
          ▷ (∀ (tick : bool) (σ' : wmstate),
               ⌜wstep_post σ σ' (if tick then t1 else t0)⌝ -∗
-              ⌜wV_fence b σ (wm_ws σ')⌝
+              ⌜wV_fence b σ (wm_ws σ')⌝ -∗
+              ⌜barrier_arms b = true → w_relp (wm_ws σ') = true⌝
               ={∅,⊤}=∗ wmstate_interp σ' ∗
                        WWP Loop)) -∗
     WWP Loop.
@@ -428,7 +434,8 @@ Section wp_lock.
     iSplitR; [by iPureIntro|]. iExists t0, t1.
     iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
     iNext. iIntros (tick σ') "%Hpost %HQ".
-    iApply ("Hcont" $! tick σ' with "[%] [%]"); [exact Hpost|exact HQ].
+    iApply ("Hcont" $! tick σ' with "[%] [%] [%]");
+      [exact Hpost|exact (proj1 HQ)|exact (proj2 HQ)].
   Qed.
 
   (** ... and the escrow's READER-SIDE payoff at that step: whatever the
@@ -443,7 +450,8 @@ Section wp_lock.
     wQ_fence b σ σ' →
     monPred_at Pl (view_scl t) ⊢ vwp_hold Pl (wm_ws σ').
   Proof.
-    intros Hb Ht HQ. exact (wstarted_deliver_gen Pl σ (wm_ws σ') t b Hb Ht HQ).
+    intros Hb Ht HQ. exact (wstarted_deliver_gen Pl σ (wm_ws σ') t b Hb Ht
+                              (proj1 HQ)).
   Qed.
 
   Lemma wwp_started_fence_deliver (Pl : vProp Σ) (σ σ' : wmstate) (t : nat) :
@@ -484,7 +492,8 @@ Section wp_lock.
          ⌜exec (riscv_step true) (wflat_st σ) = Some (tt, t1)⌝ ∗
          ▷ (∀ (tick : bool) (σ' : wmstate),
               ⌜wstep_post σ σ' (if tick then t1 else t0)⌝ -∗
-              ⌜wV_fence Barrier_RISCV_rw_w σ (wm_ws σ')⌝
+              ⌜wV_fence Barrier_RISCV_rw_w σ (wm_ws σ')⌝ -∗
+              ⌜w_relp (wm_ws σ') = true⌝
               ={∅,⊤}=∗ wmstate_interp σ' ∗ wrel_cb R pcs Ps wlockN)) -∗
     WWP Loop.
   Proof.
@@ -496,9 +505,9 @@ Section wp_lock.
     iModIntro. iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
     iSplitR; [by iPureIntro|]. iExists t0, t1.
     iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
-    iNext. iIntros (tick σ') "%Hpost %HQ".
-    iMod ("Hcont" $! tick σ' with "[%] [%]") as "[$ Hrel]";
-      [exact Hpost|exact HQ|].
+    iNext. iIntros (tick σ') "%Hpost %HQ %HQrelp".
+    iMod ("Hcont" $! tick σ' with "[%] [%] [%]") as "[$ Hrel]";
+      [exact Hpost|exact HQ|by apply HQrelp|].
     iModIntro.
     iApply (wwp_release_store γ lk R pcs Ps Hgid Haccs Hcerts
               with "Hinv Htok Hrel").
@@ -529,16 +538,17 @@ Section wp_lock.
     acc_wf lk 4 →
     ak_coh aka = false →
     ak_sync aka = true →
+    ak_latest akw = true →
     inv wlockN (wlock_inv γ lk R) -∗
     wacq_cb γ lk R pc
       (wP_eff (Some (fin_to_nat cpu_id))
          [WEread akf pf nf; WEread aka lk 4; WEwrite akw lk 4 lock_one]) -∗
     WWP Loop.
   Proof.
-    intros Hgid Haccpc Hacclk Hcoh Hsync. iIntros "#Hinv Hk".
+    intros Hgid Haccpc Hacclk Hcoh Hsync Hlat. iIntros "#Hinv Hk".
     iApply (wwp_acquire_swap γ lk R pc _ Hgid Haccpc Hacclk
               (wcert_amo_aq (fin_to_nat cpu_id) pc akf pf nf aka akw lk lock_one
-                 Hcoh Hsync) with "Hinv Hk").
+                 Hcoh Hsync Hlat) with "Hinv Hk").
   Qed.
 
   Corollary wwp_release_store_cert (γ : gname) (lk : Arch.pa) R
@@ -585,6 +595,7 @@ Section wp_lock.
     acc_wf lk 4 →
     ak_coh aka = false →
     ak_sync aka = true →
+    ak_latest akw = true →
     inv wlockN (wlock_inv γ lk R) -∗
     □ (K -∗ ▷ (K -∗ WWP Loop) -∗
          wacq_cb γ lk R pc
@@ -592,10 +603,10 @@ Section wp_lock.
               [WEread akf pf nf; WEread aka lk 4; WEwrite akw lk 4 lock_one])) -∗
     K -∗ WWP Loop.
   Proof.
-    intros Hgid Haccpc Hacclk Hcoh Hsync. iIntros "#Hinv #Hatt HK".
+    intros Hgid Haccpc Hacclk Hcoh Hsync Hlat. iIntros "#Hinv #Hatt HK".
     iApply (wwp_acquire_loop γ lk R pc _ K Hgid Haccpc Hacclk
               (wcert_amo_aq (fin_to_nat cpu_id) pc akf pf nf aka akw lk lock_one
-                 Hcoh Hsync) with "Hinv Hatt HK").
+                 Hcoh Hsync Hlat) with "Hinv Hatt HK").
   Qed.
 
 End wp_lock.

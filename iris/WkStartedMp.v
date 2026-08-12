@@ -95,6 +95,9 @@ Section mp.
   Lemma wstarted_mp_release (a : Arch.pa) P (tid : option nat)
       (σ σ' : wmstate) :
     wQ_store tid a lock_one σ σ' ->
+    (* φ-upgrade §1: the [fence rw,w] that precedes the [started] store is
+       what keeps the escrow's bundle CLEAN across it. *)
+    w_relp (wm_ws σ) = true ->
     ws_bounded (wm_ws σ) (length (wm_log σ)) ->
     wlog_lb (wm_log σ) -∗
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
@@ -102,8 +105,8 @@ Section mp.
     vwp_hold P (wm_ws σ) ==∗
     wlat_interp (wm_img σ') (wm_log σ') ∗ wstarted_body a P.
   Proof.
-    intros HQ Hbnd. iIntros "#Hlb Hi Hbody HP".
-    iMod (wstarted_set a P tid σ σ' HQ Hbnd with "Hlb Hi Hbody HP")
+    intros HQ Hrelp Hbnd. iIntros "#Hlb Hi Hbody HP".
+    iMod (wstarted_set a P tid σ σ' HQ Hrelp Hbnd with "Hlb Hi Hbody HP")
       as "[Hi Hat]".
     iModIntro. iFrame "Hi". iExists (S (length (wm_log σ))), lock_one.
     iExact "Hat".
