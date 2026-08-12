@@ -22,9 +22,10 @@ Prerequisites are all in place:
 
 ## CHECKPOINT — where this stands, and how to pick it up
 
-**The design is done and machine-checked, the BOUNDARY is settled, and the
-walk is written for the TAIL.** Everything below the horizontal rule in the
-"What is on disk" table compiles with no `Admitted` and no new `Axiom`.
+**FOUR OF THE FIVE BLOCKS ARE PROVEN.** The boundary is settled, and the
+tail, the syscall arm and the three cheap arms all compile with no `Admitted`
+and no new `Axiom`; the full `iris/` build is green. What is left is the entry
++ dispatch block and the seal.
 
 Writing the walk is what turned the remaining design questions up, and they
 were not in the instruction stepping — they were in places the
@@ -41,7 +42,7 @@ line of the walk; two of them change files you would otherwise not touch.
 | `iris/UsertrapAux.v` | the two printk format strings of the unexpected-scause arm. |
 | `iris/ProofUsertrapTail.v` | **the tail, PROVEN**: `ut_kexit` (the kexit(-1) dead end), `ut_ret2` (+0xb2..+0xc6 and the exit), `ut_ret` (+0xae), `ut_a6`, `ut_fa`. All index-generic in `b`. |
 | `iris/ProofUsertrapSys.v` | **the syscall arm, PROVEN**: +0x90..+0xa2, i.e. the killed pre-check, the epc bump, the `csrsi` that pays finding 3's reserve, and `jal syscall`. |
-| `iris/ProofUsertrapArms.v` | the devintr / vmfault / unexpected-scause arms. |
+| `iris/ProofUsertrapArms.v` | **the three cheap arms, PROVEN**: `ut_56` (printk ×2 + setkilled), `ut_d0` (vmfault), `ut_e8` (the devintr arm's killed). All at the literal `false`. |
 
 ### Resume here
 
@@ -73,6 +74,19 @@ CSR cells. `ProofPrepareReturn.v:105-235` is the tactic template for the
 prologue (its first four steps are usertrap's +0x00..+0x06 with a frame two
 slots smaller); `stk_push_32` / `stk_frm` / `stk_fp_32` are already in
 `KernelRvcDecode.v` for exactly a 32-byte frame.
+
+**AND IT NEEDS NO KERNELVEC ARGUMENT AFTER ALL — but the DISPATCH does.**
+The arms turned up a simplification the phase plan did not predict: at
+`b = false`, `trap_csrs_ext false` IS `trap_csrs`, which already holds
+sepc / scause / stval under existentials, so a block that only PASSES those
+values on (to printk, to vmfault) can open the folded bundle, name them, read
+them and close it again — no `ut_csrs_raw`, hence no
+`intr_handler_spec kernelvec` and no KERNELVEC functor argument.
+`ProofUsertrapArms` does exactly that. The raw form is still what the walk has
+to carry from +0x1e to the dispatch, because there the three values must be
+PINNED: the branches read them. So `ut_csrs_raw` and the KERNELVEC argument
+belong to `ProofUsertrap.v` alone, and the fold happens once per outgoing
+route rather than "at the head of +0xa6".
 
 **SPLIT IT IN TWO AND THE FIRST HALF COMPILES BEFORE THE ARMS EXIST.**
 +0x00..+0x2e depends on nothing but the boundary, so state it as `ut_entry`
@@ -532,6 +546,19 @@ Four smaller things that cost a compile each to find:
   `with "[%] [%] …"`. One too few and the error blames the first RESOURCE
   instead ("cannot instantiate … with `hart_state ↦ᵣ …`"), which reads exactly
   like the hart trap and is not it.
+
+### One contract that does NOT fit, and it is not usertrap's
+
+`SpecVmfault` still carries an un-shed raw-map premise
+`mm !!! Regidx Rtp = cid_word`, exactly as `ProofCopyout.v`'s own note
+records. Nothing in usertrap's boundary hands a BLOCK that fact about its own
+map — the bundle it holds is `gpr_file (tp_pin m)`, from which the fact is
+derivable but not free — so `ProofUsertrapArms` pays the same three-lemma price
+ProofCopyout does (`ua_pin_sie_cap_gpr` / `ua_pin_lookup` / `ua_pin_cs`, i.e.
+push the whole call through `tp_pin M` and put the map back afterwards). It is
+a vmfault-side cleanup — drop the premise and derive it from
+`gpr_file (tp_pin m)` inside vmfault's own proof — and it will bite every
+future caller the same way until it is done.
 
 ### Two hoists owed (both deliberate, neither blocking)
 
