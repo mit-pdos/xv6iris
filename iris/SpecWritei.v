@@ -514,7 +514,7 @@ Definition wp_writei_sconf_body
      user-arm caller, is what forced the repair.  [SpecReadi.v]:244-267 is
      the same fix, made one stage earlier by fileread.) *)
   (if user
-   then proc_priv γf pj pidv V
+   then proc_priv_core pj pidv V
    else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) ∗
         p_pid pj ↦₄{dq} pidv) -∗
   (* the running-thread bundle *)
@@ -604,7 +604,7 @@ Definition wp_writei_sconf_body
       (* the source goes back the way it came -- with the kernel arm's
          buffer, or inside the user arm's block *)
       (if user
-       then proc_priv γf pj pidv (upd_upt V P')
+       then proc_priv_core pj pidv (upd_upt V P')
        else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) ∗
             p_pid pj ↦₄{dq} pidv) -∗
       bslots bn 3 -∗
@@ -762,7 +762,7 @@ Definition wp_writei_gen_body
      user-arm caller, is what forced the repair.  [SpecReadi.v]:244-267 is
      the same fix, made one stage earlier by fileread.) *)
   (if user
-   then proc_priv γf pj pidv V
+   then proc_priv_core pj pidv V
    else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) ∗
         p_pid pj ↦₄{dq} pidv) -∗
   (* the running-thread bundle *)
@@ -854,7 +854,7 @@ Definition wp_writei_gen_body
       (* the source goes back the way it came -- with the kernel arm's
          buffer, or inside the user arm's block *)
       (if user
-       then proc_priv γf pj pidv (upd_upt V P')
+       then proc_priv_core pj pidv (upd_upt V P')
        else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) ∗
             p_pid pj ↦₄{dq} pidv) -∗
       bslots bn 3 -∗

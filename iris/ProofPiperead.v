@@ -591,7 +591,7 @@ Section ProofPiperead.
                pc_is (mword_of_int (KernelSyms.piperead + 0xd6) : mword 64) -∗
                cpu_own 0%nat true pj C true -∗
                pipe_ref γp w q -∗
-               proc_priv γf pj pid (upd_upt V P') -∗
+               proc_priv_core pj pid (upd_upt V P') -∗
                pa_stk sp0 1 ↦₈ vra -∗ pa_stk sp0 2 ↦₈ vs0 -∗ pa_stk sp0 3 ↦₈ vs1 -∗
                pa_stk sp0 4 ↦₈ vs2 -∗ pa_stk sp0 5 ↦₈ vs3 -∗ pa_stk sp0 6 ↦₈ vs4 -∗
                pa_stk sp0 7 ↦₈ vs5 -∗
@@ -1131,7 +1131,7 @@ Section ProofPiperead.
         locked γl cpu_id -∗
         pipe_res γp pi -∗
         pipe_ref γp w q -∗
-        proc_priv γf pj pid V -∗
+        proc_priv_core pj pid V -∗
         pa_stk sp0 8 ↦₈ vs6 -∗
         pa_stk sp0 9 ↦₈ vs7 -∗
         pa_stk sp0 10 ↦₈ vs8 -∗
@@ -1154,7 +1154,7 @@ Section ProofPiperead.
                pc_is (mword_of_int (KernelSyms.piperead + 0xd6) : mword 64) -∗
                cpu_own 0%nat true pj C true -∗
                pipe_ref γp w q -∗
-               proc_priv γf pj pid (upd_upt V P') -∗
+               proc_priv_core pj pid (upd_upt V P') -∗
                (∃ z : mword 64, pa_stk sp0 8 ↦₈ z) -∗
                (∃ z : mword 64, pa_stk sp0 9 ↦₈ z) -∗
                (∃ z : mword 64, pa_stk sp0 10 ↦₈ z) -∗
@@ -1266,8 +1266,8 @@ Section ProofPiperead.
       iDestruct "Hchb" as (chb0) "Hch".
       iEval (rewrite -Hchaddr) in "Hch".
       (* ---- the process block, borrowed once for the whole copy phase ---- *)
-      iDestruct (proc_priv_sz_bound with "Hpriv") as %Hszb.
-      iDestruct (proc_priv_copy with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
+      iDestruct (proc_priv_core_sz_bound with "Hpriv") as %Hszb.
+      iDestruct (proc_priv_core_copy with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
       (* ================= WEXIT: the five-entry join at +0xc2 ============= *)
       pose (WXP := ((∀ (M2 : regfile) (P' : uptd) (rv : mword 64),
           ⌜ M2 !!! Regidx csp_rs1 = spr
@@ -1285,7 +1285,7 @@ Section ProofPiperead.
           locked γl cpu_id -∗
           pipe_res γp pi -∗
           pipe_ref γp w q -∗
-          proc_priv γf pj pid (upd_upt V P') -∗
+          proc_priv_core pj pid (upd_upt V P') -∗
           (∃ b : bv 8, chaddr ↦ₘ b) -∗
           WP (Loop : expr riscv_lang))%I : iProp Σ)).
       iAssert WXP with "[EPI Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hc8 Hc9 Hc10 Hq12 Hchback]" as "HWX".
@@ -1543,7 +1543,7 @@ Section ProofPiperead.
           proc_pt P' -∗
           (∀ P'' : uptd, ⌜uptd_ext_sz (pv_sz V) (pv_upt V) P''⌝ -∗ p_sz pj ↦₈ pv_sz V -∗
              p_pagetable pj ↦₈ page_base (ud_root (pv_upt V)) -∗ proc_pt P'' -∗
-             proc_priv γf pj pid (upd_upt V P'')) -∗
+             proc_priv_core pj pid (upd_upt V P'')) -∗
           chaddr ↦ₘ chb -∗
           WP (Loop : expr riscv_lang))%I with "[]" as "CLOOP".
       { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
@@ -2133,7 +2133,7 @@ Section ProofPiperead.
         locked γl cpu_id -∗
         pipe_res γp pi -∗
         pipe_ref γp w q -∗
-        proc_priv γf pj pid V -∗
+        proc_priv_core pj pid V -∗
         (∃ z : mword 64, pa_stk sp0 8 ↦₈ z) -∗
         (∃ z : mword 64, pa_stk sp0 9 ↦₈ z) -∗
         (∃ z : mword 64, pa_stk sp0 10 ↦₈ z) -∗
@@ -2410,7 +2410,7 @@ Section ProofPiperead.
                        = mword_of_int (KernelSyms.piperead + 0xd6)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjd6) in "Hpc".
         clear Hjd6.
-        iDestruct (proc_priv_copy with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
+        iDestruct (proc_priv_core_copy with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
         iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) (pv_upt V)⌝)%I as "#Hxr"; [iPureIntro; apply uptd_ext_sz_refl|].
         iDestruct ("Hpback" $! (pv_upt V) with "Hxr Hszc Hptc Hpt") as "Hpriv".
         iDestruct "HEX" as "[HEPI _]". iEval (rewrite /EPIC) in "HEPI".

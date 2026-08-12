@@ -723,8 +723,8 @@ Section ProofEitherCopyout.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp1e) in "Hpc".
       (* the ONE borrow out of [proc_priv] *)
-      iDestruct (proc_priv_sz_bound with "Hres") as %Hszb.
-      iDestruct (proc_priv_copy with "Hres") as "(Hszc & Hptc & Hpt & Hpback)".
+      iDestruct (proc_priv_core_sz_bound with "Hres") as %Hszb.
+      iDestruct (proc_priv_core_copy with "Hres") as "(Hszc & Hptc & Hpt & Hpback)".
       (* ---- +0x1e: c.mv a3,s2 -- len ---- *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.either_copyout + 0x1e)) Ra3 Rs2 Am (av - 6)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1402,8 +1402,8 @@ Section ProofEitherCopyin.
       assert (Hpp1e : add_vec_int (mword_of_int (KernelSyms.either_copyin + 0x1c) : mword 64) 2 = mword_of_int (KernelSyms.either_copyin + 0x1e))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp1e) in "Hpc".
-      iDestruct (proc_priv_sz_bound with "Hres") as %Hszb.
-      iDestruct (proc_priv_copy with "Hres") as "(Hszc & Hptc & Hpt & Hpback)".
+      iDestruct (proc_priv_core_sz_bound with "Hres") as %Hszb.
+      iDestruct (proc_priv_core_copy with "Hres") as "(Hszc & Hptc & Hpt & Hpback)".
       (* ---- +0x1e: c.mv a3,s2 -- len ---- *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.either_copyin + 0x1e)) Ra3 Rs2 Am (av - 6)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)

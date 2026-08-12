@@ -263,7 +263,7 @@ Definition wp_readi_sconf_body
      first caller, is what found it.  [SpecWritei.v] still has the same
      shape -- see claude-notes/design/file-table.md.) *)
   (if user
-   then proc_priv γf pj pidv V
+   then proc_priv_core pj pidv V
    else ([∗ list] i ∈ seq 0 n, pa_add dst i ↦ₘ dst_olds i) ∗
         p_pid pj ↦₄{dq} pidv) -∗
   (* the running-thread bundle *)
@@ -310,7 +310,7 @@ Definition wp_readi_sconf_body
          fraction goes back the way it came -- with the kernel arm's buffer,
          or inside the user arm's block. *)
       (if user
-       then proc_priv γf pj pidv (upd_upt V P')
+       then proc_priv_core pj pidv (upd_upt V P')
        else ([∗ list] i ∈ seq 0 n,
               pa_add dst i ↦ₘ rd_delivered data dst_olds off tot i) ∗
             p_pid pj ↦₄{dq} pidv) -∗

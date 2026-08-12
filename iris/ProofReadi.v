@@ -227,7 +227,7 @@ Section ReadiDefs.
       (user : bool) (Vc : pprivate) (dstb : mword 64) (n : nat)
       (bytes : nat -> bv 8) : iProp Σ :=
     (if user
-     then proc_priv γf (proc_addr j) pidv Vc
+     then proc_priv_core (proc_addr j) pidv Vc
      else ([∗ list] i ∈ seq 0 n, pa_add dstb i ↦ₘ bytes i) ∗
           p_pid (proc_addr j) ↦₄{dq} pidv)%I.
 
@@ -245,7 +245,7 @@ Section ReadiDefs.
          rd_dst γf j pidv dq user Vc dstb n bytes).
   Proof.
     rewrite /rd_dst /rd_q. destruct user.
-    - iIntros "Hp". iDestruct (proc_priv_pid with "Hp") as "[Hq Hback]".
+    - iIntros "Hp". iDestruct (proc_priv_core_pid with "Hp") as "[Hq Hback]".
       iSplitL "Hq"; [iExact "Hq"|]. iIntros "Hq". iApply ("Hback" with "Hq").
     - iIntros "Hd". iDestruct "Hd" as "[Hb Hq]". iSplitL "Hq"; [iExact "Hq"|].
       iIntros "Hq". iSplitL "Hb"; [iExact "Hb"|]. iExact "Hq".
@@ -1619,7 +1619,7 @@ Section ReadiLoop.
                    with "Hbuf") as "(%Hlenb & Hwin & Hwinback)".
       (* ---- and the destination window, on the kernel arm ---- *)
       iAssert ((if user
-                then proc_priv γf (proc_addr j) pidv (upd_upt V PI)
+                then proc_priv_core (proc_addr j) pidv (upd_upt V PI)
                 else [∗ list] jj ∈ seq 0 mm,
                        pa_add (pa_add (m !!! Regidx Ra2 : mword 64) tot) jj
                          ↦ₘ rd_delivered data dst_olds off tot (tot + jj)%nat)

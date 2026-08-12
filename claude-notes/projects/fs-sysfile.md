@@ -3037,6 +3037,131 @@ no `Print Assumptions` to report (no linked module was produced).
 4. Nothing in `SpecCreate.v` moves under any of the three rulings — the
    contract is about create's behaviour, and the three findings are about
    what its callees are willing to say.
+## S4' — B1 SWEPT AND GATED; B2 LANDED FOR FILESTAT.  The ratified OPENER is
+## UNSATISFIABLE, and that is the finding that matters
+
+### B1 (proc_priv -> proc_priv_core) — DONE, and the composition probe passed first try
+
+`ProcInv.v` gains six `_core` twins (`proc_priv_core_pid`, `_sz_maxsz`,
+`_sz_bound`, `_um_below`, `_tf`, `_addrspace`, `_copy`) and eleven contracts
+move to them: `SpecFileread`, `SpecFilewrite`, `SpecFilestat`, `SpecReadi`,
+`SpecWritei`, `SpecEitherCopyin`, `SpecEitherCopyout`, `SpecPiperead`,
+`SpecPipewrite`, `SpecConsoleread`, `SpecConsolewrite` — **22 statement
+changes, every one a literal `proc_priv γf X pid V` -> `proc_priv_core X pid
+V`**, no arity change anywhere.  `SpecCopyin` was on S4's list of twelve by
+mistake: its only `proc_priv` is in a COMMENT.  `SpecCopyout` needed nothing,
+as predicted.  Nine proofs followed mechanically (ProofEitherCopy,
+ProofFileread, ProofFilestat, ProofFilewrite, ProofPiperead, ProofPipewrite,
+ProofReadi, ProofWritei).  Zero logical difficulty, exactly as S4 measured.
+
+**`γf` IS NOW UNUSED IN SIX OF THOSE CONTRACTS** (readi, writei, the two
+either_copy*, the two console*) and was deliberately KEPT: removing it changes
+the module-type arity and ripples into ProofDirlookup / ProofDirlink /
+ProofKexecA / every Link.  Retiring it is a clean-up of its own.
+
+**The seam needs NO new lemma.**  `ProcInv.proc_priv_lend` +
+`proc_ofiles_repay` + `proc_priv_join` already are the bracket (sys_dup's),
+and the `upd_upt` crossing is free — `pv_ofile (upd_upt V P') = pv_ofile V`
+by `cbn`.  A 15-line probe of exactly the sys_fstat seam compiled on the
+first attempt.
+
+### B2 — THE OPENER S4 RATIFIED CANNOT BE SATISFIED.  Read this before S5
+
+S4's opener promised back `file_ref γf k q' Cf` at a SMALLER `q'`, on the
+reasoning that "a carve shrinks the parent and all three callees take `q`
+arbitrary".  **A `file_ref` does not shrink.**
+
+```coq
+fref_tok γ k q := fref_own γ (◯ {[ k := (q, 1%positive) ]})   (* frefUR = authUR (gmapUR nat (prodR fracR positiveR)) *)
+```
+
+the reference COUNT rides in the same map entry as the fraction, so
+`◯{[k:=(q/2,1)]} ⋅ ◯{[k:=(q/2,1)]} = ◯{[k:=(q,2)]}`, not `◯{[k:=(q,1)]}`.
+Splitting a `file_ref` at all needs the ftable AUTHORITY — that split IS
+`FileInv.file_dup_step`, i.e. filedup's ghost step, unsound without the
+physical `f->ref++`.  (S4's blocker-2 text says "`fref_tok`, `file_fields`
+and `file_pay` all split by fraction"; the first conjunct is wrong.)  So the
+opener was satisfiable only at `q' = q`, with the caller already holding the
+whole environment — it deferred the problem instead of solving it, and every
+"bridge lemma" variant that keeps the three contracts frozen dies the same
+way.  **B2's alternative was not merely the better shape; it was the only
+one.**
+
+### B2 for filestat — LANDED AND COMPILING
+
+* `fstat_names` loses SEVEN fields — `fsn_ik`, `fsn_inum`, `fsn_s`,
+  `fsn_ilk`, `fsn_islk`, `fsn_dev`, `fsn_nib`.  Every one of them is
+  something a caller cannot know, and every one comes out of the reference or
+  is the ambient cache's (`IcacheRef.icfg_dev` / `icfg_nib`).
+* `filestat_fs_env fn` is content-independent and no longer takes `Cf`:
+  `fileclose_fs_env`'s form — `ic_escrows`, `IcacheBoot.ic_sleeplocks`,
+  `ireg_inv`, `itable_inv`, `bio_ctx`, the disk fabric, the sb cell, one
+  `bslot`, plus the region-WIDE inum geometry (`∀ inum, bv_unsigned inum <
+  16*icfg_nib -> IBLOCK inum inodestart ∈ cov`).  `filestat_fs_out fn` is the
+  sb cell and the slot unit — **no share at all**.  `filestat_env fn Cf`
+  keeps its type-selecting `if`, exactly as `fileclose_env` does.
+* `SpecFilestat.filestat_pay_carve` is the new load-bearing lemma: from
+  `file_pay γf k q Cf` at an FD_INODE/FD_DEVICE content it hands out
+  `ik`, `inum`, `s`, `g`, `⌜fc_ip Cf = ientry ik⌝`, `⌜ik < NINODE⌝`,
+  `⌜bv_unsigned inum < 16*icfg_nib⌝` and `inode_shr_gen ik s icfg_dev inum g`,
+  with a wand back.  The per-slot escrow and sleeplock then come out of the
+  two families at that `ik`.
+* **THE GENERATION IS RECOVERED, NOT STRENGTHENED.**  S4 sized this as "one
+  line in `filestat_fs_out`/`fileread_fs_out` — return `inode_shr_gen`".  It
+  is not: `SpecIunlock`'s postcondition returns the arity-preserving
+  `inode_shr`, so the `g` is lost at IUNLOCK, not at filestat's boundary.
+  The mechanism already in the tree is `ProofFilewriteParts.fw_shr_regen`:
+  **lend `s/2`, keep `s/2` generation-named, and let `live_gen_agree` pin the
+  returned half.**  filestat now does the same (`inode_shr_gen_halve2` /
+  `inode_shr_regen2` in SpecFilestat.v), and since the share never leaves the
+  reference there is nothing left for the postcondition to carry.
+* `SpecSysFstat` drops `fstat_fdenv` and `fstat_fdenv_nofs` (the two GONEs in
+  `lemma_diff`, justified by this ruling), gains an `fn : fstat_names`
+  parameter, takes `filestat_fs_env fn` and returns `filestat_fs_out fn`.
+
+### THE TRAP THAT COST THE MOST, AND IT IS AN OLD ONE
+
+`SpecFilestat`'s Context bound BOTH `` `{!fileG Σ} `` and `` `{!icacheG Σ} ``.
+`fileG` BUNDLES `icacheG` (and the `icfg`), so those are **two different
+instances** — durable-notes' "a class that carries another class as a FIELD
+instance must not be bound alongside it", and ProofKexecA's header warns about
+this exact pair.  It was invisible for three stages because nothing in the
+file mixed the two; the carve does (the payload's share is at `fileG`'s
+`icfg_dev`, and a freshly written `icfg_dev` in the same file is the
+standalone instance's).  The symptom is
+**`iExact: (inode_shr_gen ik (q * fp_iq pn) icfg_dev inum (fp_ig pn)) does not
+match goal`, where the goal prints IDENTICALLY.**  The fix is one `sed`:
+drop `!icacheG Σ, ` from the Context of `SpecFilestat` / `ProofFilestat` /
+`SpecSysFstat`.  **fileread and filewrite have the same duplicated binder and
+will hit this the moment they carve.**
+
+Second, smaller: `iFrame` cannot frame a folded `IcacheRef.inode_shr_gen`
+(no `Frame` instance sees through the definition) — `iSplitL "H"; [iExact
+"H"|]` is what closes it, the `ProcInv.proc_priv_cwd` lesson again.
+
+### What S5 inherits
+
+1. **fileread and filewrite, same recipe** — and it is now a recipe, not a
+   design question.  Per function: drop the seven per-inode record fields,
+   restate `*_fs_env` content-independently, delete the share from `*_fs_out`,
+   drop the duplicate `!icacheG Σ`, carve at the env-open site, lend half /
+   keep half, regen after iunlock, gather at the exits.  In ProofFilestat
+   that was ~5 edit sites and 11 field references; ProofFileread has 12 and
+   ProofFilewrite 25, and NEITHER Parts file has any.  filewrite additionally
+   needs the payload's `ity_shot` (it is already in `inode_pay`, and
+   `filestat_pay_carve` should grow a `ty` output when hoisted).
+2. **HOIST THE ALGEBRA.**  `inode_shr_gen_split2` / `_halve2` /
+   `inode_shr_regen2` / `ic_escrows_acc2` and `filestat_pay_carve` sit in
+   `SpecFilestat.v` only because a bottom-of-tree edit costs a full rebuild.
+   Their homes are `IcacheRef.v` (the three share laws — with
+   `ProofFilewriteParts.fw_shr_*`, which are the same lemmas), `IcacheEscrow.v`
+   (`ic_escrows_acc`, and `ic_sleeplocks` too: it exists FOUR times now —
+   IcacheBoot, SpecFileclose, SpecDirlink, and IcacheBoot's own header asks
+   for the retirement) and `FileInvDefs.v` (the carve).
+3. **The three shell proofs** (sys_fstat, sys_read, sys_write) — untouched
+   this stage.  sys_fstat's contract is now genuinely callable, and its seam
+   is the probe in §B1 above.
+4. `γf`'s retirement from the six contracts that no longer use it.
 
 ## The stage ladder
 

@@ -141,6 +141,11 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
+Require Import IcacheBoot.   (* [ic_sleeplocks]: the canonical entry-sleeplock
+                                family -- IcacheBoot.v's header names itself the
+                                home for it, and a contract that cannot know
+                                WHICH entry its descriptor points at takes the
+                                family. *)
 Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
@@ -183,6 +188,18 @@ Proof. rewrite /fstat_has_inode. apply _. Defined.
    same seam here as they do there.  Spelled out rather than imported, for the
    reason SpecFileclose.fclose_names is: a contract file should not depend on
    a sibling contract's record layout. *)
+(* NOTHING PER-INODE IS IN HERE, and that is the point (fs-sysfile S4' /
+   blocker 2's ratified alternative).  The itable SLOT, the inum, the lent
+   share's fraction, the entry's two sleeplock gnames, the device and the
+   region's block count are all things a CALLER cannot know: a reference
+   borrowed out of [ProcInv.ofile_slot] comes with its slot, fraction and
+   content existentially quantified.  Every one of them comes out of the
+   reference itself instead ([FileInvDefs.inode_pay] carries
+   [IcacheRef.inode_shr_held_gen (fc_ip Cf) (q * Q) g], which names the slot,
+   the device and the inum and IS the share ilock wants), or is the ambient
+   cache's ([IcacheRef.icfg_dev] / [icfg_nib]), or is existential under the
+   sleeplock FAMILY.  What is left is exactly the content-independent bundle
+   [SpecFileclose.fileclose_fs_env] already had. *)
 Record fstat_names := MkFStatNames {
   fsn_uart       : uart_names;
   fsn_disk       : disk_names;
@@ -194,16 +211,9 @@ Record fstat_names := MkFStatNames {
   fsn_fs         : fs_names;
   fsn_ireg       : gname;         (* the inode region (InodeRegion.v)       *)
   fsn_ic         : ic_names;      (* the icache's names (IcacheEscrow.v)    *)
-  fsn_ilk        : gname;         (* ip->lock's inner spinlock              *)
-  fsn_islk       : gname;         (* ip->lock's holder token                *)
   fsn_cov        : gset Z;
   fsn_logstart   : Z;
   fsn_inodestart : Z;
-  fsn_dev        : mword 32;
-  fsn_inum       : mword 32;
-  fsn_nib        : nat;           (* the inode region's block count         *)
-  fsn_ik         : nat;           (* the itable SLOT this inode is          *)
-  fsn_s          : Qp;            (* the LENT SHARE's fraction (v3)         *)
   fsn_dqs        : dfrac;         (* sb.inodestart                          *)
 }.
 
@@ -220,45 +230,42 @@ Global Instance fstat_names_inhabited : Inhabited fstat_names :=
     (MkFsNames 1%positive 1%positive 1%positive)
     1%positive (MkIcNames (fun _ => 1%positive) (fun _ => 1%positive)
                           (fun _ => 1%positive))
-    1%positive 1%positive
-    ∅ 0 0 (mword_of_int 0) (mword_of_int 0) 0%nat 0%nat 1%Qp (DfracOwn 1)).
+    ∅ 0 0 (DfracOwn 1)).
 
 Section SpecFilestat.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* ---- the inode arm's environment: ilock's and iunlock's ---- *)
-  (* [SpecFileread.fileread_fs_env] with the two READI-ONLY conjuncts dropped
-     ([off_inv] and nothing else -- readi's other needs already lived inside
-     [ic_loaded]).  Everything here is either persistent or handed straight
-     back. *)
-  Definition filestat_fs_env (fn : fstat_names) (Cf : fcontent) : iProp Σ :=
+  (* ---- the inode arm's environment: ilock's and iunlock's ----
+
+     CONTENT-INDEPENDENT, in [SpecFileclose.fileclose_fs_env]'s form: the
+     escrow FAMILY, the sleeplock FAMILY, the inode region, the block cache,
+     the disk fabric, and the region-WIDE inum geometry (quantified, exactly
+     as [fileclose_ic_env]'s is, because the inum is existential in the
+     reference).  It mentions neither [Cf] nor any slot, so a syscall that has
+     not yet borrowed its descriptor can own it -- which is the whole point.
+     The per-inode pieces come out of the reference at the call
+     ([filestat_pay_carve] below). *)
+  Definition filestat_fs_env (fn : fstat_names) : iProp Σ :=
     (⌜log_geom_ok (fsn_cov fn) (fsn_logstart fn)⌝ ∗
      ⌜0 <= fsn_inodestart fn⌝ ∗
-     ⌜IBLOCK (fsn_inum fn) (fsn_inodestart fn) ∈ fsn_cov fn⌝ ∗
-     (* the inum is inside the inode region: [ireg_read]'s premise *)
-     ⌜bv_unsigned (fsn_inum fn) < 16 * Z.of_nat (fsn_nib fn)⌝ ∗
-     (* THE INODE IS ITABLE SLOT [fsn_ik fn] -- what refutes ilock's and
-        iunlock's null test, via [IcacheRef.ientry_unsigned] *)
-     ⌜fc_ip Cf = ientry (fsn_ik fn)⌝ ∗
-     ⌜(fsn_ik fn < NINODE)%nat⌝ ∗
+     (* EVERY inum the region covers has its block inside [cov] -- the
+        quantified form, since the reference names the inum existentially *)
+     ⌜forall inum : mword 32,
+        bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
+        IBLOCK inum (fsn_inodestart fn) ∈ fsn_cov fn⌝ ∗
      bio_ctx (fsn_bio fn)
-       (fs_view (fsn_fs fn) (fsn_disk fn) (fsn_dev fn) (fsn_cov fn)) ∗
-     (* the three persistent invariants SpecIlock v3 / SpecIunlock v3 take *)
+       (fs_view (fsn_fs fn) (fsn_disk fn) icfg_dev (fsn_cov fn)) ∗
+     (* the three persistent invariants SpecIlock v3 / SpecIunlock v3 take,
+        at the FAMILY where they were per-slot *)
      itable_inv ∗
-     ic_escrow (fsn_ic fn) (fsn_fs fn) (fsn_ireg fn) (fsn_cov fn)
-               (fsn_logstart fn) (fsn_ik fn) ∗
-     ireg_inv (fsn_ireg fn) (fsn_fs fn) (fsn_inodestart fn) (fsn_nib fn) ∗
-     (* THE ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
-     is_sleeplock (fsn_ilk fn) (fsn_islk fn) (i_lock (fc_ip Cf)) "inode"%string
-       (ic_tok (fsn_ic fn) (fsn_ik fn)) ∗
-     (* THE LENT SHARE (v3, design §14.6/§14.8): deposited by ilock, brought
-        back by iunlock AT THE SAME FRACTION, so filestat neither loses nor
-        invents mass. *)
-     IcacheRef.inode_shr (fsn_ik fn) (fsn_s fn)
-               (fsn_dev fn) (fsn_inum fn) ∗
+     ic_escrows (fsn_ic fn) (fsn_fs fn) (fsn_ireg fn) (fsn_cov fn)
+                (fsn_logstart fn) ∗
+     ireg_inv (fsn_ireg fn) (fsn_fs fn) (fsn_inodestart fn) icfg_nib ∗
+     (* EVERY ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
+     ic_sleeplocks (fsn_ic fn) ∗
      sb_inodestart ↦₄{fsn_dqs fn}
        (mword_of_int (fsn_inodestart fn) : mword 32) ∗
      (* the disk fabric *)
@@ -269,34 +276,33 @@ Section SpecFilestat.
      (* ONE slot unit: ilock's bread takes it and brelse gives it back *)
      bslot (fsn_bio fn))%I.
 
-  (* What comes back: THE SAME SHARE, at the same fraction (the checkout
-     descriptor pins it, §14.8), the superblock fraction and the slot unit. *)
-  Definition filestat_fs_out (fn : fstat_names) (Cf : fcontent) : iProp Σ :=
-    (IcacheRef.inode_shr (fsn_ik fn) (fsn_s fn)
-                           (fsn_dev fn) (fsn_inum fn) ∗
-     sb_inodestart ↦₄{fsn_dqs fn}
+  (* What comes back: the superblock fraction and the slot unit.  NO SHARE --
+     the share never left the reference's payload, so there is nothing here
+     for it to be returned through, and hence no generation to lose (which is
+     what made the old [inode_shr] return ungatherable). *)
+  Definition filestat_fs_out (fn : fstat_names) : iProp Σ :=
+    (sb_inodestart ↦₄{fsn_dqs fn}
        (mword_of_int (fsn_inodestart fn) : mword 32) ∗
      bslot (fsn_bio fn))%I.
 
   (* ---- and the two, selected by the file's type ---- *)
   Definition filestat_env (fn : fstat_names) (Cf : fcontent) : iProp Σ :=
-    (if decide (fstat_has_inode Cf) then filestat_fs_env fn Cf else emp)%I.
+    (if decide (fstat_has_inode Cf) then filestat_fs_env fn else emp)%I.
 
   Definition filestat_env_out (fn : fstat_names) (Cf : fcontent) : iProp Σ :=
-    (if decide (fstat_has_inode Cf) then filestat_fs_out fn Cf else emp)%I.
+    (if decide (fstat_has_inode Cf) then filestat_fs_out fn else emp)%I.
 
   (* The type-error arm returns before ilock, so the environment must already
      contain everything the postcondition promises.  Checked here rather than
      discovered in the proof -- although in filestat, unlike fileread, the arm
      that skips the work is also the arm whose environment is [emp], so this
      only has to hold on the [decide] branch that is taken. *)
-  Lemma filestat_fs_env_out fn Cf :
-    filestat_fs_env fn Cf -∗ filestat_fs_out fn Cf.
+  Lemma filestat_fs_env_out fn :
+    filestat_fs_env fn -∗ filestat_fs_out fn.
   Proof.
     rewrite /filestat_fs_env /filestat_fs_out.
-    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hshr & Hsb &
-              _ & _ & _ & Hbs)".
-    iFrame "Hsb Hbs Hshr".
+    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & Hsb & _ & _ & _ & Hbs)".
+    iFrame "Hsb Hbs".
   Qed.
 
   Lemma filestat_env_out_of_env fn Cf :
@@ -305,6 +311,116 @@ Section SpecFilestat.
     rewrite /filestat_env /filestat_env_out.
     case_decide; [| by iIntros "$"].
     iApply filestat_fs_env_out.
+  Qed.
+
+  (* ==================================================================== *)
+  (*  THE CARVE: the per-inode pieces, out of the reference's own payload  *)
+  (* ==================================================================== *)
+  (* OWED CLEANUP: these three are not about filestat at all -- they are the
+     file-table / icache algebra every [file.c] function that locks its fd's
+     inode needs, and they belong in [FileInvDefs.v] (the carve) and
+     [IcacheRef.v] (the two share laws) respectively.  They are stated here
+     because fs-sysfile S4' landed filestat first and a bottom-of-tree edit
+     costs a full rebuild; fileread and filewrite hoist them when they
+     follow.  [ProofFilewriteParts]'s [fw_shr_*] are the slot-level twins of
+     the two share laws and go with them. *)
+
+  (* the generation-named share splits, exactly as its ∃-form does *)
+  Lemma inode_shr_gen_split2 (ik : nat) (s1 s2 : Qp) (dev inum : mword 32)
+      (g : gname) :
+    IcacheRef.inode_shr_gen ik (s1 + s2)%Qp dev inum g ⊣⊢
+    IcacheRef.inode_shr_gen ik s1 dev inum g ∗
+    IcacheRef.inode_shr_gen ik s2 dev inum g.
+  Proof.
+    rewrite /IcacheRef.inode_shr_gen IcacheRef.inode_ident_split
+            IcacheRef.live_gen_split.
+    iSplit; [iIntros "[[$ $] [$ $]]" | iIntros "[[$ $] [$ $]]"].
+  Qed.
+
+  (* halving, as its OWN lemma -- durable-notes' [rewrite -(Qp.div_2 q)]
+     trap: written at a call site inside the proofmode the split's evar lands
+     out of [s]'s scope. *)
+  Lemma inode_shr_gen_halve2 (ik : nat) (s : Qp) (dev inum : mword 32)
+      (g : gname) :
+    IcacheRef.inode_shr_gen ik s dev inum g ⊣⊢
+    IcacheRef.inode_shr_gen ik (s/2)%Qp dev inum g ∗
+    IcacheRef.inode_shr_gen ik (s/2)%Qp dev inum g.
+  Proof. rewrite -inode_shr_gen_split2 Qp.div_2. reflexivity. Qed.
+
+  (* THE REGEN.  iunlock returns the arity-preserving [IcacheRef.inode_shr]
+     (its [∃ g] form), and a payload's slice is generation-NAMED, so the two
+     cannot be rejoined blind.  Any other slice of the same entry pins it
+     ([IcacheRef.live_gen_agree]), and the half that was NOT lent is exactly
+     such a slice -- which is why the carve lends [s/2] and keeps [s/2].
+     Verbatim [ProofFilewriteParts.fw_shr_regen], which is where filewrite
+     already does this. *)
+  Lemma inode_shr_regen2 (ik : nat) (s1 s2 : Qp) (dev inum : mword 32)
+      (g : gname) :
+    IcacheRef.inode_shr_gen ik s1 dev inum g -∗
+    IcacheRef.inode_shr ik s2 dev inum -∗
+    IcacheRef.inode_shr_gen ik (s1 + s2)%Qp dev inum g.
+  Proof.
+    iIntros "H1 H2".
+    iEval (rewrite IcacheRef.inode_shr_gen_intro) in "H2".
+    iDestruct "H2" as (g2) "H2".
+    iDestruct "H1" as "[Hid1 Hlv1]". iDestruct "H2" as "[Hid2 Hlv2]".
+    iDestruct (IcacheRef.live_gen_agree with "Hlv1 Hlv2") as %<-.
+    rewrite inode_shr_gen_split2. iFrame.
+  Qed.
+
+  (* the per-entry escrow, out of the family -- [SpecFileclose]'s
+     [ic_escrows_acc], restated here so this contract does not depend on a
+     sibling contract (same OWED note as above: the home is IcacheEscrow). *)
+  Lemma ic_escrows_acc2 (cn : ic_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (ik : nat) :
+    (ik < NINODE)%nat ->
+    (ic_escrows cn γfs γi cov logstart -∗ ic_escrow cn γfs γi cov logstart ik
+     : iProp Σ).
+  Proof.
+    iIntros (Hk) "H". rewrite /ic_escrows.
+    assert (Hl : seq 0 NINODE !! ik = Some ik) by (rewrite lookup_seq; lia).
+    iDestruct (big_sepL_lookup _ _ ik ik Hl with "H") as "$".
+  Qed.
+
+  (* THE CARVE ITSELF.  An FD_INODE / FD_DEVICE file's payload IS a share of
+     its inode's reference, generation-named, parked beside the cancel token
+     ([FileInvDefs.inode_pay]).  So a function that holds the descriptor's
+     reference already holds everything the old, content-indexed environment
+     asked its caller for: the slot, the device, the inum, the region bound
+     and the share.  This hands them out and takes the share back. *)
+  Lemma filestat_pay_carve (γf : gname) (k : nat) (q : Qp) (Cf : fcontent) :
+    fstat_has_inode Cf ->
+    file_pay γf k q Cf -∗
+    ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname),
+      ⌜fc_ip Cf = ientry ik⌝ ∗ ⌜(ik < NINODE)%nat⌝ ∗
+      ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
+      IcacheRef.inode_shr_gen ik s icfg_dev inum g ∗
+      (IcacheRef.inode_shr_gen ik s icfg_dev inum g -∗ file_pay γf k q Cf).
+  Proof.
+    intros Hty. iIntros "(%pn & Hpn & Hpl)".
+    assert (Hnp : bool_decide (fc_type Cf = FD_PIPE) = false).
+    { apply bool_decide_eq_false_2.
+      destruct Hty as [Hc | Hc]; rewrite Hc; by vm_compute. }
+    assert (Hyes : (bool_decide (fc_type Cf = FD_INODE)
+                    || bool_decide (fc_type Cf = FD_DEVICE))%bool = true).
+    { destruct Hty as [Hc | Hc]; rewrite Hc.
+      - by rewrite (bool_decide_eq_true_2 (FD_INODE = FD_INODE) eq_refl).
+      - by rewrite (bool_decide_eq_true_2 (FD_DEVICE = FD_DEVICE) eq_refl)
+                   orb_true_r. }
+    rewrite /file_payload Hnp Hyes /inode_pay.
+    iDestruct "Hpl" as "(#Hci & Hown & Hs & Hwt)".
+    iDestruct "Hs" as (ik inum) "(%Hipk & %Hik & %Hinb & Hshr)".
+    iExists ik, inum, (q * fp_iq pn)%Qp, (fp_ig pn).
+    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+    (* [iExact], not [iFrame]: both sides are the same FOLDED
+       [IcacheRef.inode_shr_gen] and conversion closes it, while the [Frame]
+       instance search does not see through the definition. *)
+    iSplitL "Hshr"; [iExact "Hshr"|].
+    iIntros "Hshr". iExists pn. iFrame "Hpn".
+    rewrite /file_payload Hnp Hyes /inode_pay.
+    iSplitR; [iExact "Hci"|]. iSplitL "Hown"; [iExact "Hown"|].
+    iSplitL "Hshr"; [iExists ik, inum; iFrame "%"; iExact "Hshr"|].
+    iExact "Hwt".
   Qed.
 
   (* A file that carries no inode costs its stat-er nothing. *)
@@ -317,7 +433,7 @@ End SpecFilestat.
 Definition wp_filestat_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
@@ -350,7 +466,7 @@ Definition wp_filestat_sconf_body
   (* the borrowed reference -- at an ARBITRARY fraction, and given back *)
   file_ref γf k q Cf -∗
   (* ambient: myproc runs first, and the surviving arm copies out *)
-  proc_priv γf pj pidv V -∗
+  proc_priv_core pj pidv V -∗
   kalloc_env γa None -∗
   procs_inv γs -∗
   (* ...and what the file's TYPE selects *)
@@ -369,7 +485,7 @@ Definition wp_filestat_sconf_body
       cpu_own 0%nat eb pj C b -∗
       pc_is ret_tgt -∗
       file_ref γf k q Cf -∗
-      proc_priv γf pj pidv (upd_upt V P') -∗
+      proc_priv_core pj pidv (upd_upt V P') -∗
       filestat_env_out fn Cf -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -378,7 +494,7 @@ Module Type FILESTAT.
   Parameter wp_filestat_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
 
       (γa : gname) (γf : gname)

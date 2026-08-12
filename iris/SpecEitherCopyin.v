@@ -75,7 +75,7 @@ Section SpecEitherCopyin.
       (src_bytes : nat -> bv 8) (r : mword 64) : iProp Σ :=
     (if user
      then ⌜r = (mword_of_int 0 : mword 64) \/ r = (mword_of_int (-1) : mword 64)⌝ ∗
-          (∃ P' : uptd, ⌜uptd_ext (pv_upt V) P'⌝ ∗ proc_priv γf p pid (upd_upt V P')) ∗
+          (∃ P' : uptd, ⌜uptd_ext (pv_upt V) P'⌝ ∗ proc_priv_core p pid (upd_upt V P')) ∗
           (∃ dst_new : nat -> bv 8,
              [∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ dst_new j)
      else ⌜r = (mword_of_int 0 : mword 64)⌝ ∗
@@ -108,7 +108,7 @@ Definition wp_either_copyin_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kall
   kalloc_env γa None -∗
   ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ dst_olds j) -∗
   (if user
-   then proc_priv γf p pid V
+   then proc_priv_core p pid V
    else [∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,

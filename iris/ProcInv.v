@@ -1194,6 +1194,129 @@ Section ProcInv.
   Qed.
 
   (* =================================================================== *)
+  (* THE SAME PROJECTIONS AT THE CORE'S ALTITUDE                          *)
+  (* =================================================================== *)
+  (* WHY THERE ARE TWO FAMILIES, AND WHY IT IS NOT A CROSS-PRODUCT.  A
+     [file.c] function that copies to or from user memory needs the process
+     block AND a descriptor's [file_ref] -- and those cannot be held at once,
+     because the only source for the reference is [proc_ofiles], which
+     [proc_priv_ofile] / [proc_priv_lend] BORROW out of the block
+     (design/file-table.md, "A FUNCTION THAT TAKES A DESCRIPTOR'S REFERENCE
+     MUST NOT TAKE [proc_priv]").  So fileread / filewrite / filestat and
+     their whole cone are stated over [proc_priv_core], and the syscall above
+     them splits once ([proc_priv_lend]), keeps the fd table, and hands the
+     core down.
+
+     None of those callees ever touches the descriptor array -- measured, and
+     that is what makes the move free -- so each of these is exactly its
+     [proc_priv] twin with the [proc_ofiles] conjunct absent.  The twin at the
+     block's altitude stays: every consumer that does NOT hold a reference
+     (growproc, kexit, kfork, the trapframe writers) is stated there and
+     should not be made to split.
+
+     They are stated rather than derived from the block versions for the
+     obvious reason: [proc_priv_core] cannot conjure a [proc_ofiles]. *)
+
+  Lemma proc_priv_core_pid (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv_core pa pid V -∗
+    p_pid pa ↦₄{DfracOwn (1/4)} pid ∗
+    (p_pid pa ↦₄{DfracOwn (1/4)} pid -∗ proc_priv_core pa pid V).
+  Proof.
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc)".
+    assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
+    rewrite Hq word4_pointsto_frac_split.
+    iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
+    iIntros "Hq1". rewrite /proc_priv_core Hq word4_pointsto_frac_split.
+    iSplitR; [done|]. iSplitR; [done|]. iFrame.
+  Qed.
+
+  Lemma proc_priv_core_sz_maxsz (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv_core pa pid V -∗ ⌜uint (pv_sz V) <= uvm_maxsz⌝.
+  Proof. iIntros "(%Hszb & _)". done. Qed.
+
+  Lemma proc_priv_core_sz_bound (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv_core pa pid V -∗ ⌜uint (pv_sz V) <= 2 ^ 38⌝.
+  Proof.
+    iIntros "(%Hszb & _)". iPureIntro.
+    rewrite uvm_maxsz_val in Hszb. change (2 ^ 38)%Z with 274877906944%Z. lia.
+  Qed.
+
+  Lemma proc_priv_core_um_below (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv_core pa pid V -∗ ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝.
+  Proof. iIntros "(_ & %Hbel & _)". done. Qed.
+
+  Lemma proc_priv_core_tf (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv_core pa pid V -∗
+    p_trapframe pa ↦₈{DfracOwn (1/4)} page_base (ud_tfp (pv_upt V)) ∗
+    tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
+    (p_trapframe pa ↦₈{DfracOwn (1/4)} page_base (ud_tfp (pv_upt V)) -∗
+     tf_page (ud_tfp (pv_upt V)) (pv_tf V) -∗ proc_priv_core pa pid V).
+  Proof.
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc)".
+    rewrite /proc_pt_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
+    iDestruct (word_split14 with "Htfc") as "[Hq1 Hq2]".
+    iFrame "Hq1 Htfp".
+    iIntros "Hq1 Htfp". rewrite /proc_priv_core /proc_pt_at.
+    iDestruct (word_join14 with "Hq1 Hq2") as "Htfc".
+    iSplitR; [done|]. iSplitR; [done|]. iFrame.
+  Qed.
+
+  Lemma proc_priv_core_addrspace (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv_core pa pid V -∗
+    p_sz pa ↦₈ pv_sz V ∗
+    p_pagetable pa ↦₈ page_base (ud_root (pv_upt V)) ∗
+    proc_pt (pv_upt V) ∗
+    (∀ (P' : uptd) (szv : mword 64),
+       ⌜ud_root P' = ud_root (pv_upt V)⌝ -∗
+       ⌜ud_tfp P' = ud_tfp (pv_upt V)⌝ -∗
+       ⌜uint szv <= uvm_maxsz⌝ -∗
+       ⌜um_below szv (ud_um P')⌝ -∗
+       p_sz pa ↦₈ szv -∗
+       p_pagetable pa ↦₈ page_base (ud_root (pv_upt V)) -∗
+       proc_pt P' -∗
+       proc_priv_core pa pid (upd_sz (upd_upt V P') szv)).
+  Proof.
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc)".
+    rewrite /proc_fields /proc_pt_at.
+    iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
+    iFrame "Hsz Hpg Hptt".
+    iIntros (P' szv) "%Hroot %Htf %Hszb' %Hbel' Hsz Hpg Hptt".
+    rewrite /proc_priv_core /proc_fields /proc_pt_at.
+    cbn [upd_sz upd_upt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    rewrite Hroot Htf.
+    iSplitR; [iPureIntro; exact Hszb'|].
+    iSplitR; [iPureIntro; exact Hbel'|].
+    iFrame "Hpid".
+    iSplitL "Hsz Hcwd Hnm".
+    { iFrame "Hsz Hcwd Hnm". iPureIntro. exact Hnl. }
+    iFrame "Hpg Htfc Hptt Htfp Hc".
+  Qed.
+
+  Lemma proc_priv_core_copy (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv_core pa pid V -∗
+    p_sz pa ↦₈ pv_sz V ∗
+    p_pagetable pa ↦₈ page_base (ud_root (pv_upt V)) ∗
+    proc_pt (pv_upt V) ∗
+    (∀ P' : uptd, ⌜uptd_ext_sz (pv_sz V) (pv_upt V) P'⌝ -∗
+       p_sz pa ↦₈ pv_sz V -∗
+       p_pagetable pa ↦₈ page_base (ud_root (pv_upt V)) -∗
+       proc_pt P' -∗
+       proc_priv_core pa pid (upd_upt V P')).
+  Proof.
+    iIntros "Hpv".
+    iDestruct (proc_priv_core_sz_maxsz with "Hpv") as "%Hszb".
+    iDestruct (proc_priv_core_um_below with "Hpv") as "%Hbel".
+    iDestruct (proc_priv_core_addrspace with "Hpv") as "($ & $ & $ & Hback)".
+    iIntros (P') "%Hext Hsz Hpg Hptt".
+    iApply ("Hback" $! P' (pv_sz V) with "[%] [%] [%] [%] Hsz Hpg Hptt").
+    - exact (proj1 (uptd_ext_sz_ext _ _ _ Hext)).
+    - exact (proj1 (proj2 (uptd_ext_sz_ext _ _ _ Hext))).
+    - exact Hszb.
+    - exact (um_below_ext_sz _ _ _ Hbel Hext).
+  Qed.
+
+  (* =================================================================== *)
   (* THE ADDRESS-SPACE SWAP -- exec, and only exec.                       *)
   (* =================================================================== *)
   (* [proc_priv_addrspace] above is the GROW/SHRINK bridge: the table OBJECT

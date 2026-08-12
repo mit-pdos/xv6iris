@@ -309,18 +309,18 @@ Section WriteiDefs.
       (user : bool) (Vc : pprivate) (srcb : mword 64) (n : nat)
       (bytes : nat -> bv 8) :
     (if user
-     then proc_priv γf (proc_addr j) pidv Vc
+     then proc_priv_core (proc_addr j) pidv Vc
      else ([∗ list] i ∈ seq 0 n, pa_add srcb i ↦ₘ bytes i) ∗
           p_pid (proc_addr j) ↦₄{dq} pidv) -∗
       p_pid (proc_addr j) ↦₄{wi_q user dq} pidv ∗
       (p_pid (proc_addr j) ↦₄{wi_q user dq} pidv -∗
        (if user
-        then proc_priv γf (proc_addr j) pidv Vc
+        then proc_priv_core (proc_addr j) pidv Vc
         else ([∗ list] i ∈ seq 0 n, pa_add srcb i ↦ₘ bytes i) ∗
              p_pid (proc_addr j) ↦₄{dq} pidv)).
   Proof.
     rewrite /wi_q. destruct user.
-    - iIntros "Hp". iDestruct (proc_priv_pid with "Hp") as "[Hq Hback]".
+    - iIntros "Hp". iDestruct (proc_priv_core_pid with "Hp") as "[Hq Hback]".
       iSplitL "Hq"; [iExact "Hq"|]. iIntros "Hq". iApply ("Hback" with "Hq").
     - iIntros "Hd". iDestruct "Hd" as "[Hb Hq]". iSplitL "Hq"; [iExact "Hq"|].
       iIntros "Hq". iSplitL "Hb"; [iExact "Hb"|]. iExact "Hq".
@@ -390,7 +390,7 @@ Section WriteiDefs.
         dinode_at γi inum dn0' -∗
         (* the source goes back the way it came, and the pid share with it *)
         (if user
-         then proc_priv γf (proc_addr j) pidv (upd_upt V P')
+         then proc_priv_core (proc_addr j) pidv (upd_upt V P')
          else ([∗ list] i ∈ seq 0 n,
                  pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i)) ∗
               p_pid (proc_addr j) ↦₄{dq} pidv) -∗
@@ -481,7 +481,7 @@ Section WriteiRet.
     bm_alloc_res γfs cov logstart A -∗
     dinode_at γi inum dn0' -∗
     (if user
-     then proc_priv γf (proc_addr j) pidv (upd_upt V P')
+     then proc_priv_core (proc_addr j) pidv (upd_upt V P')
      else ([∗ list] i ∈ seq 0 n,
              pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i)) ∗
           p_pid (proc_addr j) ↦₄{dq} pidv) -∗
@@ -862,7 +862,7 @@ Section WriteiJoin.
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn0 -∗
     (if user
-     then proc_priv γf (proc_addr j) pidv (upd_upt V P')
+     then proc_priv_core (proc_addr j) pidv (upd_upt V P')
      else ([∗ list] i ∈ seq 0 n,
              pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i)) ∗
           p_pid (proc_addr j) ↦₄{dq} pidv) -∗
@@ -1190,7 +1190,7 @@ Section WriteiSize.
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn0 -∗
     (if user
-     then proc_priv γf (proc_addr j) pidv (upd_upt V P')
+     then proc_priv_core (proc_addr j) pidv (upd_upt V P')
      else ([∗ list] i ∈ seq 0 n,
              pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i)) ∗
           p_pid (proc_addr j) ↦₄{dq} pidv) -∗
@@ -1806,7 +1806,7 @@ Section WriteiLoop.
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn0 -∗
     (if user
-     then proc_priv γf (proc_addr j) pidv (upd_upt V PI)
+     then proc_priv_core (proc_addr j) pidv (upd_upt V PI)
      else ([∗ list] i ∈ seq 0 n,
              pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i)) ∗
           p_pid (proc_addr j) ↦₄{dq} pidv) -∗
@@ -2530,7 +2530,7 @@ Section WriteiLoop.
                      with "Hbuf") as "(%Hlenb & Hwin & Hwinback)".
         (* ---- and the source window, on the kernel arm ---- *)
         iAssert ((if user
-                  then proc_priv γf (proc_addr j) pidv (upd_upt V PI)
+                  then proc_priv_core (proc_addr j) pidv (upd_upt V PI)
                   else [∗ list] jj ∈ seq 0 mm,
                          pa_add (pa_add (m !!! Regidx Ra2 : mword 64) tot) jj
                            ↦ₘ (src_bytes (tot + jj)%nat))
@@ -2612,7 +2612,7 @@ Section WriteiLoop.
                            = (mword_of_int (-1) : mword 64))⌝ ∗
                    ([∗ list] i ∈ seq 0 mm,
                       pa_add (pa_add (b_data (bnode kkb)) o) i ↦ₘ (g i)) ∗
-                   (if user then proc_priv γf (proc_addr j) pidv (upd_upt V P2)
+                   (if user then proc_priv_core (proc_addr j) pidv (upd_upt V P2)
                     else ([∗ list] i ∈ seq 0 n,
                             pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i))
                          ∗ p_pid (proc_addr j) ↦₄{dq} pidv))%I
@@ -3732,7 +3732,7 @@ Section WriteiMain.
        framed exits take ---- *)
     assert (HVid : upd_upt V (pv_upt V) = V) by apply wi_upd_upt_id.
     iAssert (if user
-             then proc_priv γf (proc_addr j) pidv (upd_upt V (pv_upt V))
+             then proc_priv_core (proc_addr j) pidv (upd_upt V (pv_upt V))
              else ([∗ list] i ∈ seq 0 n,
                      pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i))
                   ∗ p_pid (proc_addr j) ↦₄{dq} pidv)%I

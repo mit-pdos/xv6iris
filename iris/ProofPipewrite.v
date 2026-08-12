@@ -531,7 +531,7 @@ Section PwConts.
        cpu_own 0%nat eb (proc_addr j) C true -∗
        pc_is (mword_of_int (KernelSyms.pipewrite + 0x58) : mword 64) -∗
        pipe_ref γp w q -∗
-       proc_priv γf (proc_addr j) pid (upd_upt V P') -∗
+       proc_priv_core (proc_addr j) pid (upd_upt V P') -∗
        WP (Loop : expr riscv_lang)))%I.
 
   (* +0xd8: wakeup(&pi->nread); release(&pi->lock); jump to the epilogue.  Three
@@ -555,7 +555,7 @@ Section PwConts.
        pipe_res γp pi -∗
        pc_is (mword_of_int (KernelSyms.pipewrite + 0xd8) : mword 64) -∗
        pipe_ref γp w q -∗
-       proc_priv γf (proc_addr j) pid (upd_upt V P') -∗
+       proc_priv_core (proc_addr j) pid (upd_upt V P') -∗
        WP (Loop : expr riscv_lang)))%I.
 
   (* +0x46: release(&pi->lock); i := -1; reload s6..s10; fall into the
@@ -578,7 +578,7 @@ Section PwConts.
        pipe_res γp pi -∗
        pc_is (mword_of_int (KernelSyms.pipewrite + 0x46) : mword 64) -∗
        pipe_ref γp w q -∗
-       proc_priv γf (proc_addr j) pid (upd_upt V P') -∗
+       proc_priv_core (proc_addr j) pid (upd_upt V P') -∗
        WP (Loop : expr riscv_lang)))%I.
 
   (* exactly ONE of the two is taken, so they are offered as a conjunction and
@@ -610,7 +610,7 @@ Section PwConts.
        pipe_res γp pi -∗
        pc_is (mword_of_int (KernelSyms.pipewrite + 0x7e) : mword 64) -∗
        pipe_ref γp w q -∗
-       proc_priv γf (proc_addr j) pid (upd_upt V Pc) -∗
+       proc_priv_core (proc_addr j) pid (upd_upt V Pc) -∗
        kalloc_env γa None -∗
        pw_exits CID0 γf γs j γl γp w q m av eb C pid V n sp0 pi -∗
        WP (Loop : expr riscv_lang)))%I.
@@ -783,7 +783,7 @@ Section PwGuard.
     pipe_res γp pi -∗
     pc_is (mword_of_int (KernelSyms.pipewrite + 0x7a) : mword 64) -∗
     pipe_ref γp w q -∗
-    proc_priv γf (proc_addr j) pid (upd_upt V Pc) -∗
+    proc_priv_core (proc_addr j) pid (upd_upt V Pc) -∗
     kalloc_env γa None -∗
     pw_exits CID0 γf γs j γl γp w q m av eb C pid V n sp0 pi -∗
     pw_loop CID0 γa γf γs j γl γp w q m av eb C pid V n sp0 pi addr -∗
@@ -927,7 +927,7 @@ Section ProofPipewrite.
     clear Hbm. subst b.
     iDestruct (is_pipe_valid with "Hpipe") as %Hpv.
     iPoseProof (is_pipe_openable with "Hpipe") as "#Hopen".
-    iDestruct (proc_priv_sz_bound with "Hpriv") as %Hszb.
+    iDestruct (proc_priv_core_sz_bound with "Hpriv") as %Hszb.
     (* ================================================================= *)
     (* EPI -- the common epilogue at +0x58.                              *)
     (* ================================================================= *)
@@ -2297,7 +2297,7 @@ Section ProofPipewrite.
               assert (Hppa4 : add_vec_int (mword_of_int (KernelSyms.pipewrite + 0xa2) : mword 64) 2 = mword_of_int (KernelSyms.pipewrite + 0xa4)) by (apply bv_eq; vm_compute; reflexivity).
               iEval (rewrite Hppa4) in "Hpc".
               (* the ONE borrow out of [proc_priv] for this iteration *)
-              iDestruct (proc_priv_copy with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
+              iDestruct (proc_priv_core_copy with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
               iEval (rewrite (pw_pv_sz_upd V Pc)) in "Hszc".
               iEval (rewrite (pw_pv_upt_upd V Pc)) in "Hptc".
               iEval (rewrite (pw_pv_upt_upd V Pc)) in "Hpt".
