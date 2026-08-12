@@ -1680,6 +1680,130 @@ discharged by `WriteiBudget.wi_cost_bmonly_fits`.  The gen form is for
 create's S5 op-wide set (§18 clause 1), and it is now real rather than
 aspirational.
 
+## S3n — S3m's OWED AUDIT IS IN AND CLEAN; the five things that could have
+## blocked filewrite are all REFUTED; `ProofFilewrite`'s preamble lands, the
+## walk does NOT
+
+### Step 0 — the `Print Assumptions` audit S3m owed: **NOTHING MOVED**
+
+Run detached on the mirror (`nohup` — an ssh-tethered `coqc` dies with the
+connection and reads like a crash), one scratch file over the eleven names,
+`coqc` exit 0, scratch deleted.  **All eleven cones are exactly the five
+`rv64d` platform axioms + `functional_extensionality_dep`**:
+`Writei.wp_writei_sconf`, `Writei.wp_writei_gen`, `Iupdate.wp_iupdate_sconf`,
+`Dirlink.wp_dirlink_sconf`, `Bmap.wp_bmap_sconf`, `Balloc.wp_balloc_sconf`,
+`Readi.wp_readi_sconf`, `Ilock.wp_ilock_sconf`, `Iput.wp_iput_sconf`,
+`Namex.wp_namex_sconf`; `Fileread.wp_fileread_sconf` is the same set plus its
+known named `LinkConsoleread.Consoleread.wp_consoleread_sconf` and nothing
+else.  S3m's expectation is confirmed: the set-form retrofit introduced no
+assumption, exactly as the `: WRITEI` / `: IUPDATE` ascriptions predicted.
+
+**Cost note for whoever runs it again:** ~1.3 min per name, ~15 min total,
+and it is the CONE LOAD that costs, not the printing — S3m's two failures
+were window-length, not a tooling problem.  `pgrep coqc` finds nothing while
+it runs: the process is **`rocqworker`**, which is why S3m's progress checks
+looked like crashes.
+
+### The five pre-walk checks — the sixth blocker that ISN'T
+
+Done BEFORE any of the walk, on S3i's trap-2 principle (a numeric obligation
+wants arithmetic, not reading).  All five hold; each is now machine-checked
+in `ProofFilewrite.v` rather than asserted:
+
+1. **The stack constants close, and `filewrite_stack` is EXACTLY TIGHT on
+   writei.**  `filewrite_stack = 12 + K_writei = 82`; every call is made
+   inside the frame, so each callee needs `<= K - 12 = 70`: writei 70
+   (EQUALITY, no slack), pipewrite 64, consolewrite 62, end_op 58, ilock 44,
+   begin_op 26, iunlock 26.  `SpecFilewrite`'s header claim holds.
+   (`fw_av_*`.)
+2. **The budget premise is UNIFORM IN `off`.**  S3m's headline is
+   `wi_cost_bmonly 1023 FW_MAX = 10`; what the loop needs is that bound at
+   EVERY offset, since `f->off` is not block-aligned.
+   `WriteiBudget.wi_cost_bmonly_fits` is already stated that way — its only
+   hypothesis is `n <= FW_MAX`, `off` universally quantified, because
+   `wi_blocks_le4` bounds `off mod BSIZE` rather than `off`.  Every chunk
+   filewrite can ask for is payable.  (`fw_budget_ok`.)
+3. **The share algebra composes.**  SpecIlock v5 consumes
+   `inode_shr_gen k s dev inum g` and returns `ic_deposit cn k
+   (DepShr s dev inum g)` + `ity_shot g (di_type dn)`; SpecIunlock takes the
+   deposit and returns the arity-preserving `inode_shr k s dev inum`.
+   Lending `s/2` leaves `inode_shr_gen k (s/2) .. g` in hand and gets
+   `inode_shr k (s/2) ..` back — exactly `fw_shr_regen`'s two arguments —
+   and `Qp.div_2` rejoins at `s`.  (`fw_qp_halves`.)
+4. **writei's two unobvious resource premises are both available.**
+   `p_pid pj` is NOT in `filewrite_fs_env` and need not be: filewrite writes
+   from USER memory (`c.li s8,1` at +0x50), so it holds `proc_priv` and
+   `ProcInv.proc_priv_pid` splits the quarter out, as SpecWritei's own
+   comment at that premise says.  `dinode_at gi inum dn0` is not in the
+   environment either — it arrives inside ilock's `ic_loaded` payload
+   (fileread destructs it as `Hdnat`, ProofFileread.v:1741).
+5. **end_op accepts a PARTIALLY SPENT reservation.**  `SpecEndOp` takes
+   `log_op g u` for ANY `u` (:30, :142), so no iteration has to prove it
+   spent its whole `begin_op` grant; writei promises spend-at-most and the
+   remainder is carried straight into end_op.
+
+### THE SURPRISE: there are TWO constants named `FW_MAX`, at two TYPES
+
+`SpecFilewrite.FW_MAX : Z` (the chunk size as the `lui`/`addi` pairs at
++0x42..+0x4e materialise it) and `WriteiBudget.FW_MAX : nat` (the same 3072
+as every budget lemma's hypothesis) are DIFFERENT CONSTANTS, and
+`ProofFilewrite` must `Require Import` BOTH — so whichever comes second
+shadows the other.  Every occurrence in `ProofFilewrite.v` is written
+QUALIFIED, and `fw_max_bridge : Z.of_nat WriteiBudget.FW_MAX =
+SpecFilewrite.FW_MAX` is the one place they meet.  An unqualified `FW_MAX`
+in the walk typechecks in some goals and fails in others with a `nat`-vs-`Z`
+mismatch that reads like a coercion problem.
+
+### What landed: `ProofFilewrite.v`, THE ARITHMETIC PREAMBLE ONLY
+
+~240 lines, compiles clean, `_CoqProject` row added (1038 `.vo`).  It carries
+the WIP/resume header, the five findings above, and the pure `nat`/`Z`/`Qp`
+obligations the walk consumes at its call sites — hoisted above the module
+for the same reason `ProofFileread.v` hoists `fr_av_*`: a `lia` cannot run at
+a call site, where the context holds a register file.  Contents: `fw_K12`,
+`fw_av_writei/pipe/cons/ilock/iunlock/begin_op/end_op`, `fw_K_back`,
+`fw_max_bridge`, `fw_budget_ok`, `fw_budget_ok_empty` (S3m's empty-range trap
+check, re-audited at the call site: it fits with eight to spare),
+`fw_chunk_rem`/`fw_chunk_cap`/`fw_chunk_lt31` (the two arms of the
+`bge s7,a5` chunk test at +0xd2), `fw_i_advance` (the fuel step),
+`fw_i_lt31`, `fw_off_lt31`, `fw_qp_halves`, `fw_ret_of_tail` (fw_tail's
+disjunction into `filewrite_ret`), `fw_ret_of_dev`, `fw_zero_trip`.
+
+**`wp_filewrite_sconf` and the `FilewriteProof` functor are NOT WRITTEN, so
+`LinkFilewrite.v` does not exist and file.c STAYS 6/7.  S4 is NOT
+unblocked.**  The walk is ~2500 lines of instruction-wise Iris —
+`ProofFileread.v`'s single lemma is 2139 lines for FOUR arms and NO loop, and
+filewrite adds a bottom-tested loop with a nine-component invariant — which
+did not fit this stage's window alongside the audit.  The resume point is
+spelled out in the file's header.
+
+### Gate
+
+Mirror `full.sh` **`EXIT=0`, 1038 `.vo`, zero `Error`** on top of `441c398e`.
+`tools/lemma_diff.py --ref HEAD`: *"1 file(s) checked -- CLEAN (nothing
+dropped, nothing admitted, no new assumption)"* — no new seal, since
+`SpecFilewrite` already exists and the file adds only lemmas.  No `Admitted`,
+no `Axiom`, no `cheat_`.  md5s equal on both sides: `ProofFilewrite.v`
+`b38a6d7d0cc8eb28cb9a7ade8fc0bfd4`, `_CoqProject`
+`f3e7affd32d753625e10b1ee1e219a8f` (patched IN PLACE on the mirror with
+`sed`, never scp'd).  Audit scratch deleted; no scratch left on the mirror.
+
+### Traps recorded
+
+1. **`one.sh`'s trailing `EXIT=0` IS A FALSE GREEN.**  The script echoes it
+   unconditionally after the loop; the real status is the
+   `DONE <file> = <rc>` line.  A first attempt here printed
+   `DONE ProofFilewrite.v = 1` and `EXIT=0` together, and a `grep EXIT`
+   check would have landed a file that does not compile.
+2. **`Require Import A` does NOT re-export A's own imports.**
+   `ProofFilewrite` imports `SpecFilewrite`, which imports `InodeInv`, and
+   `MAXFILE` was still *"not found in the current environment"* — the
+   dependency is LOADED but not IN SCOPE.  Import the defining file
+   (`InodeInv`, `FsCrash`) directly.
+3. **The mirror's Rocq worker is `rocqworker`, not `coqc`.**  Every
+   `pgrep -af coqc` progress check reports nothing while a compile is
+   running, which reads as a dead job.
+
 ## The stage ladder
 
 - **S1** (agent): the DECODE stage — 13 Code files (the 12 targets +
@@ -1785,6 +1909,22 @@ aspirational.
   §17's fd-type witness STOPPED-AND-REPORTED as unimplementable in the ruled
   shape — design/fs-icache.md §17.1 has the finding and the repair (§17′) to
   rule on. filewrite is still blocked and still unspecified.
+- **S3n** (agent) **— PARTIAL**: S3m's owed `Print Assumptions` audit is IN
+  and **CLEAN — all eleven cones unmoved** (five platform axioms + funext;
+  Fileread + its known named `Consoleread` Axiom).  The five things that
+  could have made filewrite a SIXTH blocker are all refuted and now
+  machine-checked (stack constants close with writei EXACTLY tight; the
+  budget premise is uniform in `off`; the s/2 share algebra composes;
+  writei's `p_pid`/`dinode_at` both reachable; end_op takes a partly spent
+  reservation).  `ProofFilewrite.v` lands as the ARITHMETIC PREAMBLE ONLY
+  (1038 `.vo`, lemma_diff clean) with a WIP/resume header; the ~2500-line
+  walk and `LinkFilewrite` are NOT written, so **file.c stays 6/7 and S4
+  stays blocked**.  New surprise: two constants named `FW_MAX` at two types
+  (`SpecFilewrite`'s `Z`, `WriteiBudget`'s `nat`) which this file must import
+  together — qualify every occurrence.
+- **S3o** (agent): the walk itself — `wp_filewrite_sconf` +
+  `FilewriteProof` + `LinkFilewrite`, on S3g's seven blocks, `fw_tail` and
+  S3n's preamble.  Then file.c is 7/7 and S4's three shells unblock.
 - **S4** (agent): sys_read/sys_write/sys_fstat — argfd + the file.c
   contracts; thin shells.
 - **S5** (agent): create — the writing half's boss: namei/nameiparent
