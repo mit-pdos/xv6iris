@@ -944,10 +944,23 @@ Section StaleCases.
       exec_stale la 8 pv (translateAddr (Virtaddr va) acc) s
         = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sg', es) /\
       mdev sg' = s.(mdev) /\
-      (exists tv, sregs sg' = register_set tlb tv s.(sregs)) /\
-      ( (* the two READ-ONLY outcomes *)
-        (mem sg' = s.(mem) /\ (es = [e2; e1; e0] \/
-                               es = [e2; e1; e0] ++ [WEread wak_excl la 8]))
+      (* the entry filled is always an A/D variant of the racy word — the
+         CONCRETE form an Iris caller needs to re-establish [tlb_ok_pt] *)
+      (exists ae de : mword 1,
+         sregs sg' = register_set tlb
+           (vec_update_dec (register_lookup tlb s.(sregs))
+              (tlb_hash (__id 39) vpn)
+              (Some (u_walk_entry vpn p2 p1 (pte_set_ad pv ae de)
+                       (mword_of_int 0))))
+           s.(sregs)) /\
+      ( (* the two READ-ONLY outcomes, each carrying the equation that
+           DECIDED it — a downstream dispatch keyed on the fresh word's
+           [update_PTE_Bits] needs to refute the arms it excludes *)
+        (mem sg' = s.(mem) /\
+         ((update_PTE_Bits (pv : mword 64) acc = None /\
+           es = [e2; e1; e0]) \/
+          (update_PTE_Bits (p0 : mword 64) acc = None /\
+           es = [e2; e1; e0] ++ [WEread wak_excl la 8])))
         \/
         (* the write-back *)
         (exists p0' : mword 64,
@@ -980,7 +993,10 @@ Section StaleCases.
                    Hrdx (Hwrite p0' eq_refl) eq_refl Hmisa Hrd2 Hrd1 Hrd0
                    Hmenv HPBMTE).
         * by rewrite mdev_set_reg.
-        * eexists. by rewrite sregs_set_reg.
+        * destruct (update_PTE_Bits_set_ad _ _ _ Hupdf) as (a2 & d2 & Hq).
+          assert (Hvar' : p0' = pte_set_ad pv a2 d2)
+            by (rewrite Hq Hvar; exact (pte_set_ad_absorb pv a1 d1 a2 d2)).
+          exists a2, d2. rewrite sregs_set_reg -Hvar'. reflexivity.
         * right. exists p0'. split_and!; [reflexivity| |reflexivity].
           by rewrite mem_set_reg.
       + (* O-FRESH — the sixth outcome *)
@@ -998,8 +1014,9 @@ Section StaleCases.
                    Hvar Hfv Hfl (Hfchkall mxr do_sum) HfN Hgate Hupdf HADUE
                    Hrdx Hmisa Hrd2 Hrd1 Hrd0 Hmenv HPBMTE).
         * by rewrite mdev_set_reg.
-        * eexists. by rewrite sregs_set_reg.
-        * left. split; [by rewrite mem_set_reg|]. by right.
+        * exists a1, d1. rewrite sregs_set_reg -Hvar. reflexivity.
+        * left. split; [by rewrite mem_set_reg|].
+          right. split; reflexivity.
     - (* O-UNCHANGED: the gate does not fire on the racy word *)
       eexists _, _. split_and!.
       + apply (exec_stale_translateAddr_pt_front acc p la pv vpn root
@@ -1014,8 +1031,41 @@ Section StaleCases.
                  Hracc Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 (Hchkall mxr do_sum) H0N
                  Hgate Hmisa Hrd2 Hrd1 Hrd0 Hmenv HPBMTE).
       + by rewrite mdev_set_reg.
-      + eexists. by rewrite sregs_set_reg.
-      + left. split; [by rewrite mem_set_reg|]. by left.
+      + destruct (pte_set_ad_refl pv) as (ar & dr & Hself).
+        exists ar, dr. rewrite sregs_set_reg -Hself. reflexivity.
+      + left. split; [by rewrite mem_set_reg|].
+        left. split; reflexivity.
   Qed.
 
 End StaleCases.
+
+(* ====================================================================== *)
+(** ** 7. The slot facts at the patched state
+
+    What an Iris-level caller needs in order to supply §6's read premises:
+    the walk's two POINTER slots are disjoint from the window, so their
+    [pt_slot_mem] survives the patch untouched; the LEAF slot's holds the
+    RACY word, which is exactly how the family member indexed by [pv] comes
+    to return [pv]. *)
+
+Lemma pt_slot_mem_mpatch_disj (ra : Arch.pa) (rn : N) (w : bv (8 * rn))
+    (s : mstate) (a : Arch.pa) (v : mword 64) :
+  acc_wf ra rn -> acc_wf a 8 -> racc_disj ra rn a 8 ->
+  pt_slot_mem s a v -> pt_slot_mem (mpatch ra rn w s) a v.
+Proof.
+  intros Hracc Hacc Hdisj (Hbytes & Hram & Hram7 & Halign).
+  split_and!; [|exact Hram|exact Hram7|exact Halign].
+  intros j Hj. rewrite /mpatch /=.
+  rewrite (write_bytes_lookup_ne s.(mem) ra rn w (pa_add a j)); [by apply Hbytes|].
+  intros i Hi. apply (pa_add_neq a ra 8 rn j i Hacc Hracc Hdisj); lia.
+Qed.
+
+Lemma pt_slot_mem_mpatch_win (la : Arch.pa) (pv : mword 64) (s : mstate)
+    (v : mword 64) :
+  acc_wf la 8 -> pt_slot_mem s la v -> pt_slot_mem (mpatch la 8 pv s) la pv.
+Proof.
+  intros Hracc (_ & Hram & Hram7 & Halign).
+  split_and!; [|exact Hram|exact Hram7|exact Halign].
+  intros j Hj. rewrite /mpatch /=.
+  exact (write_bytes_lookup_at s.(mem) la 8 pv j Hracc ltac:(lia)).
+Qed.

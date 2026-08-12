@@ -124,11 +124,22 @@ below were untouched by either.
   `_bind`, and the user-facing `wstep_ok_racy_bind`, all axiom-free.  The
   phase is an argument of the continuation `K` because at the prefix's `Ret`
   leaf it is whatever the racy read left.
-- *OWED*: (i) the Iris-level racy absorption theorem — the pure side is
-  done and §8.6's `pt_slot_mem` transports are in, so what is left is
-  opening `wkptN`, supplying the walk's read facts AT THE PATCHED state and
-  the CAS's at the real one, and handing out the same collapse conjuncts
-  plus the sixth outcome disjunct; (ii) the STORE case of the bind rule —
+- *LANDED (2026-08-12): the Iris-level racy absorption theorem*
+  (`iris/WeakKptStale.v`, axioms = `plat_term_write` + funext, same as the
+  SC twin).  `wtlb_res_pt_translateAddr_stale_at` — same premises and the
+  same five pure exports as `wtlb_res_pt_translateAddr_at`, with the
+  headline a per-variant FAMILY (`∀ av dv` bounded by `pte_ad_le … lw`,
+  which is what keeps the read-only/write-back ghost split
+  family-uniform via `update_PTE_Bits_fires_mono`), the sixth outcome as
+  the read-only arm's fourth trace disjunct, and the registers returned as
+  a WAND keyed on the actual family member (`exec_stale` is a function,
+  so the member's equation pins `sg'`; `tlb_ok_pt_fill` absorbs any
+  variant entry).  Slot disjointness for the §7 transports is DERIVED
+  (`pt_slot_racc_disj`: pointer word vs leaf word at 8-aligned slots), not
+  a new invariant conjunct.  Details + the two `WeakWalkStale` interface
+  strengthenings it forced: walk-bridge §8.3 item 5.  **This closes 6a's
+  last item for the walking-LOAD shape.**
+- *OWED*: (ii) the STORE case of the bind rule —
   `wstep_ok_racy_k_of_run` demands the tail at BOTH phases (which is what
   keeps it free of a phase-tracking run relation), and a walking store's
   tail has the phase-`false` obligation only.  A TLB-miss walk always reads

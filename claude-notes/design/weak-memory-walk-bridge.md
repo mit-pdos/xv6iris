@@ -1,5 +1,13 @@
 # The walk's racy leaf: the peel/bridge split (DECIDED: option (a))
 
+**STATUS (2026-08-12): §8.3's six items are ALL LANDED** — the stale mirror
+(`iris/WeakStale.v`), the walk at it (`iris/WeakWalkStale.v`), and the racy
+absorption theorem (`iris/WeakKptStale.v`,
+`wtlb_res_pt_translateAddr_stale_at`).  What remains of this front is item
+6's store-case restriction (a walking STORE's tail phase — see §8.3 item 6)
+and the eventual 6b/6c consumer that wires the peel + absorption into a WP
+rule.
+
 **DECISION (2026-08-12, the φ-upgrade author, as §5 requested): take
 option (a), and do NOT start until the in-flight C/D/S points-to surgery
 lands.**  Rationale beyond §4's (which stands):
@@ -336,7 +344,7 @@ bookkeeping, no phase, and no second window.
   exec_eff m (wpatch_st …)`-shaped, so the existing patched-`exec` bridge
   stays available to whoever wants it.
 
-### 8.3 The build order — items 1–4 LANDED (2026-08-12), 5 reshaped
+### 8.3 The build order — ALL SIX ITEMS LANDED (2026-08-12)
 
 **`iris/WeakStale.v` is in and axiom-free** (`Closed under the global
 context` on every export; tree green). It carries items 1–3 below:
@@ -410,15 +418,45 @@ grow.
    the leaf read: `WeakKpt.wptree_translate_miss_eff_core` and the
    `translate` / `translateAddr` heads it calls. Everything else in
    `WeakWalkEff` is window-free and rides (1).
-5. **The racy absorption theorem** (OWED): `wtlb_res_pt_translateAddr_at`'s
-   twin over `WeakWalkStale.exec_stale_translateAddr_pt_miss_cases`. The
-   pure side is done; what is left is the Iris side — open `wkptN`, read the
-   slot facts off `wleaf_res`/`wptr8`, supply the three read facts (the
-   walk's AT THE PATCHED STATE, which needs the `pt_slot_mem` transports of
-   §8.6, and the CAS's at the real one), and hand out the same collapse
-   conjuncts plus the SIXTH outcome disjunct. Note what does NOT move: `pa`
-   is variant-independent, and the theorem already declines to pin the `tlb`
-   register, so the interface grows by one disjunct and nothing else.
+5. **The racy absorption theorem — LANDED (2026-08-12, `iris/WeakKptStale.v`,
+   `Print Assumptions` = `plat_term_write` + funext, same as the SC twin).**
+   `wtlb_res_pt_translateAddr_stale_at`: identical premise list to
+   `wtlb_res_pt_translateAddr_at`, the five pure exports unchanged (lw
+   variant-ness, the three `pt_slot_mem` facts, pointer pins, the collapse
+   fact, `nv_free`), and THREE interface deltas where the SC theorem's
+   single-run headline cannot survive:
+   - **the headline is a per-variant FAMILY**, `∀ av dv` with
+     `pte_ad_le (pte_set_ad w0 av dv) lw`, of `exec_stale la 8 pv` runs of
+     `translateAddr` — one fupd cannot commit per-variant ghost outcomes,
+     and it does not have to: the read-only/write-back split is
+     family-UNIFORM because the write-back event is decided by the LATEST
+     word (`update_PTE_Bits_fires_mono`).  **The `pte_ad_le` index bound is
+     load-bearing, not cosmetic**: a variant NOT below the latest could
+     carry bits the latest lacks and refuse the gate while the latest
+     fires, splitting the family across the two ghost arms.  `ad_le` is
+     exactly the second collapse conjunct, so consumers lose nothing.
+   - **the read-only arm's trace set grows by the sixth outcome**
+     (walk ++ CAS-read), the one interface growth §5 predicted.
+   - **registers come back as a WAND**, not updated in the main line:
+     `∀ av dv sg' es, ⌜ad_le⌝ -∗ ⌜the member's exec_stale equation⌝ -∗
+     reg_interp (wm_regs σ) ==∗ reg_interp (sregs sg') ∗ wtlb_res_pt …`.
+     `exec_stale` is a function, so the caller's equation pins `sg'`
+     against the proof's stored family analysis, and `tlb_ok_pt_fill`
+     absorbs whichever A/D-variant walk entry the run installed (any
+     variant of the mapped leaf is a legal cache entry).  The theorem
+     "declines to pin the tlb register" became this wand.
+   Supporting pieces, same file: `wptree_translateAddr_stale_cases` (the
+   pure dispatch twin, covering HIT and MISS — hit arms are the `exec_eff`
+   runs transferred, since their traces have no unpinned read), and the §1
+   derivation that slot disjointness is FREE (`pt_slot_racc_disj`: 8-aligned
+   slots either coincide — forcing the words equal, refuted by
+   `pte_ptr` vs `pte_leaf` — or are `racc_disj`), so the transports need no
+   new invariant conjunct.  Two consumer-driven strengthenings landed in
+   `WeakWalkStale.v` on the way: the miss lemma's read-only arms now carry
+   the gate equations that DECIDED them (an arm you cannot refute from its
+   content is an arm a keyed dispatch cannot exclude), and its sregs
+   conjunct pins the installed entry concretely (`∃ tv` is not consumable
+   by a caller that must re-establish `tlb_ok_pt`).
 6. **The peel's BIND composition** — **LANDED** (`WeakStale` §7), and it is
    what makes item 5 usable; a discovery of the item-4 work, not part of the
    original plan.
