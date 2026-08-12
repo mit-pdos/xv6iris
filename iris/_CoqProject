@@ -959,6 +959,8 @@ WeakLeafM.v
 WeakViewMono.v
 WeakViewRacy.v
 WeakCtx.v
+WeakCtxPt.v
+WeakCtxLock.v
 WeakPtPub.v
 WeakSmodeFrame.v
 WkMemmoveLoop.v
@@ -1014,3 +1016,4 @@ SpecKfork.v
 SpecSafestrcpy.v
 SpecStrncpy.v
 WkYieldFrame.v
+WkCtxSurface.v
