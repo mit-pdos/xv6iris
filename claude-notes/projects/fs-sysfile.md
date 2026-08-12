@@ -1137,6 +1137,232 @@ else; no scratch left.
    is correct and also means it is no evidence at all here — the gate that
    sees this change is `Print Assumptions` plus the full build.
 
+## S3j — THE BUDGET RULING: **xv6 IS LOG-SOUND AT MAXOPBLOCKS = 10.**
+## The absorption seam LANDED (`WriteiBudget.v`); the four-file retrofit is
+## sized and NOT started
+
+### The verdict (step 0) — NO KERNEL DEFECT
+
+**S3i's item (3) — "either the honest bound is `2B+3 <= 11 > MAXOPBLOCKS`, a
+genuine `kernel-defects.md` candidate" — is REFUTED.**  The honest bound is
+`B + 3 <= 7`, and the fact that closes the gap was already a premise of
+every fs.c contract in the tree:
+
+> **`BitmapInv.bitmap_geom_ok` contains `0 < size <= BPB`, with
+> `BPB = 8 * BSIZE = 8192`.  There is EXACTLY ONE BITMAP BLOCK.**
+
+So `BitmapInv.BBLOCK` collapses to `bmapstart` for every allocatable block
+(`WriteiBudget.one_bitmap_block`), and all FIVE ballocs of a four-block
+chunk — the indirect one and the four data ones — log_write **the same
+block**.  S3i's sizing charged one bitmap block *per data block*; that is
+where the phantom 11 came from.  It is the same fact `LogInv`'s own header
+already invokes for itrunc (*"every one of them a bit in THE SAME bitmap
+block (FSSIZE = 2000 < BPB = 8192)"*) and that `SpecItrunc` is built on —
+the vocabulary was in the tree, one level away, and the S3i sizing did the
+arithmetic without it.
+
+**The per-DISTINCT-block multiset for a B-block chunk**, machine-checked as
+`WriteiBudget.wi_logset_size` / `wi_logset_fits`:
+
+| group | count | why |
+|---|---|---|
+| the data blocks the range straddles | `B` | distinct by `blkmap_wf`'s injectivity |
+| `bmapstart` | ≤ 1 | one bitmap block (above); every balloc absorbs after the first |
+| the indirect block | ≤ 1 | at most one per file; bmap's own `log_write(bp)` absorbs against balloc's `bzero` of it |
+| `IBLOCK inum inodestart` | 1 | the trailing `iupdate` — it runs on **every** returning path, `n = 0` included |
+| | **`B + 3`** | |
+
+with `B <= 4` (`wi_blocks_le4`) and **4 genuinely reached**
+(`wi_blocks_four_reached`: `wi_blocks 1023 3072 = 4`, because `f->off` need
+not be block-aligned).  Worst case **7 against MAXOPBLOCKS = 10, three
+slots to spare.**  The bound needs no disjointness between the four groups
+— coincidences only shrink the set.
+
+So **the C code is right and the accounting was wrong**, exactly as it was
+for itrunc.  Nothing was added to `kernel-defects.md`.
+
+### All three absorptions are load-bearing — machine-checked
+
+Both intermediate repairs S3i sized still bust, and the file records them
+so neither is dropped as "probably enough":
+
+| accounting | at `off=1023, n=3072` | vs 10 |
+|---|---|---|
+| `wi_cost` (today) = `6B+1` | **25** | busts |
+| `wi_cost_armaware` = `4B+3` (S3i piece 1 alone) | **19** | busts |
+| `wi_cost_noabs` = `2B+3` (pieces 1+2, no data-block absorption) | **11** | busts |
+| `wi_cost_tight` = `B+3` | **7** | **fits** |
+
+`wi_cost_noabs` fits at `B = 3` (`= 9`) and busts only at `B = 4`
+(`wi_cost_noabs_three_fits` / `_busts`).  **The fourth block is the whole
+problem**, and it is reachable only because `f->off` is unaligned — which
+is also why xv6's own `max = ((MAXOPBLOCKS-1-1-2)/2)*BSIZE` reads as
+budgeting for three data blocks plus "two spare": the two spare slots are
+what the fourth straddled block eats.  So the data-block absorption
+(balloc's `bzero` of a fresh block vs writei's own `log_write` of the same
+block) cannot be left out.
+
+### What LANDED: `WriteiBudget.v`, the absorption seam
+
+One new file, **additive — no existing statement moved**, so the whole
+retrofit's ripple is still ahead.  `_CoqProject` gains one line after
+`SpecWritei.v`.
+
+**The chosen seam is `LogInv.log_opS`, not a new absorption lemma on the
+counted form.**  The task's two options were "move writei's loop onto
+`log_opS`'s set-based accounting" or "add `log_op_absorb` to the counted
+form"; the second is **impossible** and it is worth recording why:
+`log_op γ u = ∃ Sb, log_opS γ u Sb` *forgets the set*, so the counted ghost
+cannot express "this op has already logged this block" at all — there is
+nothing for an absorb lemma to be stated about.  The set-based form needs
+**zero new ghost state and zero new invariant work**: `log_opS`,
+`log_spend_step`, `log_absorb_step`, `op_sum_absorb` and the credit's
+soundness clause `e.2 ⊆ LB` in `log_res` all already exist and already
+carry the "the set dies with the entry at end_op" argument.
+
+`log_amort γ F u` — *"u units are genuinely free, and one unit is still
+held back for each block of `F` this op has not yet logged"*:
+
+```coq
+Definition log_amort (γ : log_names) (F : gset Z) (u : nat) : iProp Σ :=
+  (∃ (Sb : gset Z) (v : nat),
+     ⌜(u + size (F ∖ Sb) <= v)%nat⌝ ∗ log_opS γ v Sb)%I.
+```
+
+It is `SpecItrunc.bm_paid` generalised from ONE amortised block to a SET,
+which is what writei needs (the bitmap block **and** the indirect block).
+The potential `u + size (F ∖ Sb)` is what makes it work; `v` and `Sb` are
+both existential because no caller can know either, and the `<=` (rather
+than `=`) is forced because `log_opS` is an exact ghost_map element and its
+budget cannot be weakened without the ledger authority.
+
+Nine lemmas, all proven:
+
+- `log_amort_intro` / `log_amort_elim` — in at `u + size F` units, out at
+  `≥ u`; `elim` produces the counted `log_op` that iupdate and end_op take.
+- `log_amort_weaken` / `log_amort_shrink` — monotone in `u`, **anti**-monotone
+  in `F` (reserving fewer blocks is the weaker claim: `F` is capacity held
+  back, not a claim of ownership).
+- **`log_amort_present`** — the workhorse, and **IDEMPOTENT**: `u` is
+  identical going in and coming out, on both arms.  Paid (`b ∈ Sb`):
+  log_write's credited arm absorbs and the unit returns. Unpaid: the unit is
+  spent, `b` joins `Sb`, and the held-back term drops by *exactly* one
+  (`subset_size` on `F ∖ (Sb ∪ {[b]}) ⊂ F ∖ Sb`). So writei's loop
+  invariant mentions `log_amort γ F u` and **never case-splits on which
+  iteration was the first to touch the bitmap** — the same property that
+  makes itrunc's 269 frees provable.
+- `log_amort_spend` — one genuine unit for a block outside `F` (the
+  per-data-block charge), stated over an arbitrary *larger* result set so a
+  callee that logged more than it was asked about still re-establishes it.
+- **`log_amort_adopt`** — enlarging `F` by a block the op has ALREADY
+  logged is free. This is what lets writei enter its loop at
+  `F = {[bmapstart]}` and **adopt the indirect block whose identity it does
+  not learn until balloc returns it**, out of balloc's own credited
+  postcondition. Without it the loop invariant would have to name a block
+  that does not exist yet.
+- `log_amort_reframe`, and `wi_amort` / `wi_amort_intro` / `wi_amort_elim` —
+  the two-block instance writei's loop actually carries, entering at
+  `u + 2`.
+
+Plus the arithmetic: `FW_MAX` (spelled from `MAXOPBLOCKS`/`BSIZE`, not as
+3072), `wi_blocks_le4`, `wi_blocks_four_reached`, `wi_blocks_dirlink`,
+`wi_cost_tight`, **`wi_cost_tight_fits`** (the theorem that unblocks
+filewrite), `wi_cost_tight_worst = 7`, `wi_cost_tight_dirlink = 4`.
+
+### FINDING: the reshaped premise is NOT a pointwise weakening
+
+`wi_cost` and `wi_cost_tight` are **incomparable**
+(`wi_cost_tight_incomparable`): at `wi_blocks = 0` the loose form charges
+**1** (a zero-block call runs no iteration, so only iupdate) and the tight
+form charges **3**, because the bitmap and indirect capacities are reserved
+unconditionally — which is precisely what keeps the loop invariant free of a
+"did we straddle any block at all" case split.  `wi_cost_tight_le_loose`
+therefore needs `1 <= wi_blocks off n` as a hypothesis.
+
+**So the `SpecWritei` statement change may NOT be waved through as "the
+premise got cheaper".**  Every consumer must be re-checked on the empty-range
+arm.  In practice nothing is hurt — dirlink sits at `wi_blocks = 1` (4 vs
+7) and any begin_op caller holds 10 — but a reviewer who assumes
+monotonicity will mis-size the ripple, which is exactly the mistake that
+produced S3i's 11.
+
+### NOT STARTED: the four-file retrofit, sized bottom-up
+
+The dependency chain is forced **bottom-up**, and each link is a stage-sized
+job on a proof file of 3000–4100 lines. This is why S3j stopped here rather
+than starting a retrofit it could not finish and leave green:
+
+1. **`SpecBalloc` credited form** — cheapest, and FIRST. balloc is ASSUMED
+   (`Module Type` + one `LinkBalloc` `Axiom`), so this is a contract
+   widening with **no proof**. It must hand back a credit for `bmapstart`
+   *and* for the block it allocated (its `bzero` logged it) — the shape is
+   `SpecBfree.wp_bfree_gen`'s `(cr, Sb)` pair, already in the tree, verbatim.
+   ⚠ **Check first** whether a new `Parameter` in `Module Type BALLOC` puts a
+   new entry in the downstream `Print Assumptions` cones; the standing gate
+   is 5 platform axioms + funext for `Writei`/`Dirlink`, and balloc's Axiom
+   is *not* in them today.
+2. **`SpecBmap` credited form + `ProofBmap`** (3270 lines) — the piece with
+   the real uncertainty. **The architecture is already right for it:**
+   `ProofBmap.bm_kit` is the single point where `log_op (ba_log a) n` is
+   threaded, and every interior lemma already quantifies over the `ak :
+   option bm_alloc` record. Put the credit set in the kit as an
+   **existential with a fixed lower bound** — `∃ Sb, ⌜ba_cred a ⊆ Sb⌝ ∗
+   log_opS (ba_log a) n Sb`, with `ba_cred` a new record FIELD — and the
+   index is invariant (credits only grow), so **no interior lemma gains a
+   binder**. This is verbatim the trick the file's own header already
+   documents for `ba_used`: *"indexing by the set on ENTRY and existentially
+   quantifying the CURRENT one instead makes the index INVARIANT."* Derive
+   the existing counted `BMAP` by forgetting, so `BMAP_NOALLOC` and readi
+   do not move.
+3. **`SpecWritei` tight premise + `ProofWritei`** (4103 lines) — the loop
+   invariant becomes `wi_amort γ bmapstart ind u`, `wi_cost` becomes
+   `wi_cost_tight` at the premise, and the five budget `lia`s
+   (`ProofWritei` :1922, :2817, :3040, :3875, :3892, :4092) re-derive. Note
+   S3i's trap 3: the `off > ip->size` arm inlines `iApply ("Hcont" $! …)` at
+   :3342 and a `wi_ret` grep misses it.
+4. **`ProofDirlink`** (3111 lines) — ONE consumer site
+   (`grep -rl wp_writei_sconf` gives exactly this file); discharge with
+   `wi_cost_tight_dirlink` (= 4).
+
+Then `ProofFilewrite` + `LinkFilewrite` on S3g's seven blocks + `fw_tail`,
+which S3h/S3i left otherwise ready.
+
+### Gate
+
+Mirror `full.sh` `EXIT=0`, **1037 `.vo`** (1036 + `WriteiBudget.v`), zero
+`Error`. `tools/lemma_diff.py --ref HEAD`: no existing statement touched, no
+`GONE`, no `ADMITTED`. `Print Assumptions` on the
+`Writei`/`Dirlink`/`EndOp`/`BeginOp`/`LogWrite` cones UNCHANGED — trivially,
+since the change is one new leaf file and no existing file was edited; the
+new file's own lemmas are axiom-free. `_CoqProject` `sed`-ed in place on the
+mirror, never scp'd. Step-0 probe deleted from the mirror.
+
+### Traps recorded
+
+1. **A BUDGET-SOUNDNESS ARGUMENT IS ONLY AS GOOD AS THE GEOMETRY PREMISES
+   YOU REMEMBERED TO LOOK UP.** S3i's "possible kernel defect" was a
+   one-premise miss: `bitmap_geom_ok`'s `size <= BPB` was already in
+   writei's own premise list, and reading it turns 11 into 7. Before
+   escalating a cost overrun to `kernel-defects.md`, enumerate the callee's
+   geometry premises and ask of each whether it *collapses* the multiset —
+   `BBLOCK`-style collapses are invisible in a per-call cost table.
+2. **THE COUNTED LEDGER CANNOT EXPRESS ABSORPTION, SO "ADD AN ABSORB LEMMA
+   TO THE COUNTED FORM" IS NOT A DESIGN OPTION.** `log_op` is
+   `∃ Sb, log_opS _ _ Sb`; the set is *forgotten*, so there is no
+   already-logged-this-op predicate to state a credit against. When a choice
+   is offered between "move to the richer form" and "add a lemma to the poor
+   one", check that the poor one can even *mention* the fact.
+3. **AN AMORTISED BUDGET WANTS A POTENTIAL FUNCTION, NOT A DISJUNCTION, ONCE
+   MORE THAN ONE BLOCK IS AMORTISED.** `bm_paid`'s explicit paid/unpaid
+   disjunction works for one block; for two it would be four arms.
+   `u + size (F ∖ Sb) <= v` is one clause, scales to any `F`, and gives
+   idempotence from `subset_size` instead of from case analysis.
+4. **A "TIGHTER" COST FUNCTION IS NOT AUTOMATICALLY POINTWISE SMALLER.**
+   `wi_cost_tight` beats `wi_cost` by 18 at four blocks and LOSES to it by 2
+   at zero, because hoisting a per-block charge into a per-call reservation
+   moves cost onto the empty arm. `vm_compute` both at the degenerate input
+   before sizing the consumer ripple.
+
 ## The stage ladder
 
 - **S1** (agent): the DECODE stage — 13 Code files (the 12 targets +
@@ -1202,9 +1428,29 @@ else; no scratch left.
   repair (arm-aware bmap budget; log_write absorption via `LogInv.log_opS`;
   and a kernel question — a four-block chunk may exceed MAXOPBLOCKS
   outright).  file.c stays 6/7.
-- **S3j** (agent, AFTER the budget ruling): `ProofFilewrite` +
-  `LinkFilewrite` on S3g's seven blocks + `fw_tail`.  Then file.c is 7/7 and
-  S4's three shells unblock.
+- **S3j** (agent) **— PARTIAL**: **the budget ruling is IN, and it is
+  "xv6 is sound".**  S3i's possible-kernel-defect arm is REFUTED: every
+  fs.c contract already carries `bitmap_geom_ok`'s `0 < size <= BPB`, so
+  there is exactly ONE bitmap block and the honest per-distinct-block cost
+  of a B-block chunk is `B + 3 <= 7`, not `2B + 3 = 11`, against
+  MAXOPBLOCKS = 10.  Nothing was added to `kernel-defects.md`.  The
+  ABSORPTION SEAM landed as `WriteiBudget.v` (additive, zero ripple,
+  1037 `.vo`): the tight cost `wi_cost_tight = wi_blocks + 3` with
+  `wi_cost_tight_fits`, the machine-checked multiset bound, machine-checked
+  refutations of both weaker accountings S3i sized (19 and 11, both bust),
+  and `log_amort` — `SpecItrunc.bm_paid` generalised from one amortised
+  block to a SET, with the idempotent `log_amort_present` and the
+  `log_amort_adopt` that lets writei's loop reserve an indirect block whose
+  identity balloc has not yet returned.  Chosen on `LogInv.log_opS`; the
+  counted-form alternative is IMPOSSIBLE (`log_op` forgets the set, so
+  there is nothing for an absorb lemma to be about).  The four-file
+  retrofit (`SpecBalloc` → `SpecBmap`/`ProofBmap` → `SpecWritei`/
+  `ProofWritei` → `ProofDirlink`) is sized bottom-up in the S3j section and
+  NOT STARTED — each link is a stage-sized job on a 3000–4100-line proof.
+  `ProofFilewrite` / `LinkFilewrite` still unwritten; file.c stays 6/7.
+- **S3k** (agent): the retrofit, bottom-up per the S3j sizing, then
+  `ProofFilewrite` + `LinkFilewrite` on S3g's seven blocks + `fw_tail`.
+  Then file.c is 7/7 and S4's three shells unblock.
 - **S3b** (agent) **— PARTIAL**: filestat PROVEN AND LINKED (file.c 6/7);
   §17's fd-type witness STOPPED-AND-REPORTED as unimplementable in the ruled
   shape — design/fs-icache.md §17.1 has the finding and the repair (§17′) to
