@@ -35,10 +35,12 @@
 
    It DOES sleep (both arms of the retry loop), so it threads the full
    running-process bundle exactly as SpecBread.v does and enters/returns at
-   noff 0: its own acquire mints the [arm_pay 0 eb _] the interior sleep
-   needs and its release spends it, so no caller-held pay crosses the
-   interface (see SpecBread.v's note on why a second one is
-   unimplementable).
+   noff 0, taking the [trap_csrs_ext eb]/[cpu_claim_ext eb pj] COMPLEMENT in
+   and out: at [eb = true] its own acquire mints the pair the interior sleep
+   needs (the complement is [emp] and no caller gains an obligation); at
+   [eb = false] the acquire mints nothing and the pair can only come from the
+   caller, who holds it because the TRAP handed it over.  Since it PARKS, its
+   crossing is the literal [true], not [b] (SpecAcquiresleep.v's note).
 
    The [p_pid] cell is threaded for UNIFORMITY with the rest of the log
    layer (write_head / install_trans / initlog / end_op all need it, for
@@ -95,11 +97,16 @@ Definition wp_begin_op_sconf_body
   (K_begin_op <= K)%nat ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
-  (* PARKING PREMISE (hart-generic scheduler protocol), as SpecBread.v *)
-  eb = true ->
   sie_cap_gpr m K b pj -∗
   (* enters at noff 0; the acquire raises it to what sleep demands *)
   cpu_own 0 eb pj C b -∗
+  (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM.  begin_op's own acquire
+     mints the pay its interior sleeps need at [eb = true] (the complement is
+     [emp] and the caller brings nothing); at [eb = false] the push_off frees
+     nothing and the caller brings the pair, holding it because the TRAP
+     handed it over -- see SpecSleep.v / SpecAcquiresleep.v. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   log_ctx γ bn γfs cov logstart dev -∗
@@ -107,11 +114,17 @@ Definition wp_begin_op_sconf_body
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle threaded through the two sleeps *)
   procs_inv γs -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b]: begin_op PARKS (its retry
+     loop sleeps), and a park moves the hart with interrupts off, which has
+     nothing to do with SIE (the porting guide's "a PARKING function's
+     [wp_next] index is [true] UNCONDITIONALLY"). *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       (* THE reservation: a full-budget operation *)

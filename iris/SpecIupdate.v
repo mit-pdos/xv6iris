@@ -161,12 +161,20 @@ Definition wp_iupdate_sconf_body
   γs !! j = Some γl ->
   (* a0 = ip *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
-  (* PARKING PREMISE (hart-generic scheduler protocol) -- bread sleeps, and a
-     parking thread hands the trap CSRs across the crossing only with an
-     enabled base.  See SpecSched.v / SpecSleep.v. *)
-  eb = true ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b -∗
+  (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  iupdate itself never
+     acquires or releases anything -- it just calls bread, whose OWN acquire
+     mints [arm_pay 0 eb _] and whose OWN release spends it again before
+     bread returns to iupdate.  So the complement iupdate receives at entry
+     is a PURE PASS-THROUGH: at [eb = true] it is [emp], so no existing
+     caller gains an obligation; at [eb = false] it is the honest pair, held
+     by the caller because the TRAP handed it over, and iupdate threads it
+     straight through to bread and back, unused, all the way to its own
+     exit.  See claude-notes/completed/sched-hart-generic.md and
+     claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -211,6 +219,8 @@ Definition wp_iupdate_sconf_body
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       i_dev ip ↦₄{dqd} dev -∗

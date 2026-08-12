@@ -152,7 +152,6 @@ Definition wp_install_trans_sconf_body
   log_geom_ok cov logstart ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
-  eb = true ->
   (* THE STAGE-2 RESTRICTION.  end_op installs at recovering = false;
      initlog calls at recovering = true but with an EMPTY log, where the
      function returns from its pre-frame test having done nothing.  Real
@@ -172,6 +171,15 @@ Definition wp_install_trans_sconf_body
      W !! i = Some w -> L !! uint w = Some (Lw i)) ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b -∗
+  (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  install_trans has NO
+     acquire/release of its own -- it delegates entirely to bread/bwrite, so
+     a parking thread must hand [trap_csrs]/[cpu_claim] across the crossing
+     exactly as [SpecBwrite.v] does: at [eb = true] this is [emp] (the
+     callee's own acquire mints what it needs) and at [eb = false] it is the
+     honest pair, held because the TRAP handed it over.  See
+     claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -225,15 +233,17 @@ Definition wp_install_trans_sconf_body
      (its bread / ilock / bwrite does), and a park moves the hart with
      interrupts off, so the crossing has nothing to do with SIE -- the
      porting guide's "a PARKING function's [wp_next] index is [true]
-     UNCONDITIONALLY".  Spelled [b] the two coincide at the only instance
-     the [eb = true] premise admits, which is why this went unnoticed; once
-     [eb = false] is reachable the [b] form would promise the caller it
-     comes back on the hart it called from, which a park makes false. *)
+     UNCONDITIONALLY".  Spelled [b] the two would coincide at [eb = true] --
+     which is why this went unnoticed while [eb = true] was forced -- but at
+     [eb = false] the [b] form would promise the caller it comes back on the
+     hart it called from, which a park makes false. *)
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       (* the in-memory header, unchanged (lh.n := 0 is the CALLER's store) *)

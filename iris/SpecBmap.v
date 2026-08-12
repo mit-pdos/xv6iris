@@ -301,12 +301,21 @@ Definition wp_bmap_sconf_body
   (* a0 = ip; a1 = bn, sign-extended as the RV64 ABI passes a uint *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bnw ->
-  (* PARKING PREMISE (hart-generic scheduler protocol) -- everything below
-     sleeps, and a parking thread hands the trap CSRs across the crossing
-     only with an enabled base.  See SpecSched.v / SpecSleep.v. *)
-  eb = true ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b -∗
+  (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  bmap holds no lock of its
+     own -- every push_off/pop_off pair that can mint or spend an
+     [arm_pay 0 eb _] lives inside bread/balloc (and, through them,
+     acquiresleep / virtio_disk_rw), so bmap is a PURE PASS-THROUGH: it
+     neither mints nor spends this complement itself, only threads it down
+     to each bread/balloc call and takes it back from their continuations.
+     At [eb = true] the complement is [emp], so no existing caller gains an
+     obligation; at [eb = false] it is the honest pair, held by the caller
+     because the TRAP handed it over.  See
+     claude-notes/completed/sched-hart-generic.md and
+     claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   (* the two PERSISTENT printk credentials, forwarded to balloc *)
@@ -390,6 +399,8 @@ Definition wp_bmap_sconf_body
            /\ bv_unsigned (blkmap_get bm' fbn) <> 0)⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
@@ -665,9 +676,13 @@ Definition wp_bmap_noalloc_sconf_body
   γs !! j = Some γl ->
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bnw ->
-  eb = true ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b -∗
+  (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR -- see the allocating
+     contract above; the no-alloc arm still sleeps (bread), so it is a
+     pure pass-through here too. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -699,6 +714,8 @@ Definition wp_bmap_noalloc_sconf_body
          = sign_extend' 64 (blkmap_get bm fbn : mword 32)⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       i_dev ip ↦₄{dqd} dev -∗

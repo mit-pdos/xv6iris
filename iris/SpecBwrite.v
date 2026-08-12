@@ -83,23 +83,19 @@ Definition wp_bwrite_sconf_body
   (* a0 is the buffer *)
   (k < NBUF)%nat ->
   m !!! Regidx (mword_of_int 10 : mword 5) = bnode k ->
-  (* PARKING PREMISE (hart-generic scheduler protocol): the saved base enable
-     is [true].  Everything below sleeps, and a parking thread must hand the
-     trap CSRs across the crossing -- which only the interior acquire can mint,
-     and only with an enabled base.  See SpecSched.v / SpecSleep.v. *)
-  eb = true ->
   sie_cap_gpr m K b pj -∗
   (* enters at noff 0 (rw's acquire raises it to what sleep demands) *)
   cpu_own 0 eb pj C b -∗
-  (* TRAP CSRs: NOT threaded.  This function acquires at level 0 and releases
-     before returning, so it is push/pop- AND trap-CSR-BALANCED: its own
-     [acquire] mints the [arm_pay 0 eb _] its interior sleep needs and its
-     [release] spends it.  A CALLER-held level-0 pay would be a second one, and
-     a second one is UNIMPLEMENTABLE above a park -- sleep carries exactly the
-     one the pushing acquire minted, so the extra copy would be [trap_csrs] at
-     the parking hart with the postcondition wanting it at the resuming one
-     (and at [eb = true] two of them at one hart are outright contradictory).
-     See claude-notes/completed/sched-hart-generic.md. *)
+  (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM.  bwrite has NO acquire of
+     its own -- it delegates entirely to virtio_disk_rw, and everything past
+     that call sleeps, so a parking thread must hand [trap_csrs] and
+     [cpu_claim] across the crossing (SpecSched.v).  Threaded through
+     UNCHANGED, verbatim virtio_disk_rw's own premise (SpecVirtioDiskRw.v):
+     at [eb = true] this is [emp] (virtio_disk_rw's own acquire mints what it
+     needs) and at [eb = false] it is the honest pair, held because the TRAP
+     handed it over. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn V -∗
@@ -130,11 +126,17 @@ Definition wp_bwrite_sconf_body
      ([FsCrash.fs_logfill_permit] and its siblings), and there is no
      [Pc]-generic way to write a disk block. *)
   disk_write_permit gen_id (Some (1024 * uint bno, bs)%Z) Q -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  bwrite's whole body is a
+     tail call into virtio_disk_rw, which PARKS -- so a [swtch] can move the
+     hart with interrupts off, which has nothing to do with the entry SIE
+     state [b]. *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       (* the write-through: the handle's disk value is now its bytes *)

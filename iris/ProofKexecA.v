@@ -1723,9 +1723,11 @@ Section KexecABody.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (BeginOp.wp_begin_op_sconf gs jp gl bn g gfs cov logstart dev
               pidv (DfracOwn (1/4)) N3 (K - 68)%nat true C true
-              ltac:(unfold K_begin_op; lia) Hjp Hgs eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hlogc Hppid Hprocs [-]").
-    iIntros (CIDb Hsb M3) "%Hcsb Hcg Hcnt Hpc Hppid Hlog".
+              ltac:(unfold K_begin_op; lia) Hjp Hgs
+              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hlogc Hppid Hprocs [-]").
+    { rewrite /trap_csrs_ext. done. }
+    { rewrite /cpu_claim_ext. done. }
+    iIntros (CIDb Hsb M3) "%Hcsb Hcg Hcnt _ _ Hpc Hppid Hlog".
     assert (Hpc2a : ret_pc (N3 !!! Regidx Rra) = mword_of_int (KXA + 0x2a))
       by (rewrite HN3ra; pcw).
     iEval (rewrite Hpc2a) in "Hpc".
@@ -1921,10 +1923,12 @@ Section KexecABody.
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn g gfs
                 cov logstart dev n1 pidv (DfracOwn (1/4)) P1 (K - 68)%nat
-                true C true ltac:(unfold K_end_op; lia) Hlg Hjp Hgs eq_refl
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hcrash Hcert Hppid
-                      Hprocs Hdevi Hdgeom Hdlock Hlog [-]").
-      iIntros (CIDe1 Hse1 M5) "%Hcse Hcg Hcnt Hpc Hppid".
+                true C true ltac:(unfold K_end_op; lia) Hlg Hjp Hgs
+                with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hcrash Hcert
+                      Hppid Hprocs Hdevi Hdgeom Hdlock Hlog [-]").
+      { rewrite /trap_csrs_ext. done. }
+      { rewrite /cpu_claim_ext. done. }
+      iIntros (CIDe1 Hse1 M5) "%Hcse Hcg Hcnt _ _ Hpc Hppid".
       assert (Hpc8c : ret_pc (P1 !!! Regidx Rra) = mword_of_int (KXA + 0x8c))
         by (rewrite HP1ra; pcw).
       iEval (rewrite Hpc8c) in "Hpc".

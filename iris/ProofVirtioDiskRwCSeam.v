@@ -112,9 +112,10 @@ Section ProofVirtioDiskRwCSeam.
        ⌜forall p T, tr !! p = Some T -> tri_set T ## tri_set (h, m2, t)⌝ -∗
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
-       sie_cap_gpr M (trap_res true + (K - 12))%nat false (proc_addr j) -∗
+       sie_cap_gpr M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
        cpu_own 1 eb (proc_addr j) C false -∗
-       arm_pay 0 eb (proc_addr j) -∗
+       trap_csrs -∗
+       cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x162) : mword 64) -∗
        locked γk cpu_id -∗
        vdrw_body γd pd pav np nr fl pk tr
@@ -139,20 +140,20 @@ Section ProofVirtioDiskRwCSeam.
     iIntros "#Htext #Hgeom Hbd Hexit".
     rewrite /P2.vdrw_p2_exit.
     iIntros (CIDx Hsx M np nr fl pk tr fr h m2 t) "%Hrh %Hfacts %Hdisj0 %Hal
-             Hcg Hown Hpay Hpc Htok Hbody Hbh Hbm Hbt Hidx".
+             Hcg Hown Htc Hclm Hpc Htok Hbody Hbh Hbm Hbt Hidx".
     destruct Hrh as (Hregs & Hhi).
     destruct Hfacts as (Hok & Hfrh & Hfrm & Hfrt).
     destruct Hok as (Hhm & Hht & Hmt & Hh8 & Hm8 & Ht8).
     cbn in Hh8, Hm8, Ht8.
     iDestruct "Hgeom" as "(Hdp & _)".
-    iApply (wp_vdrw_p3 (CID := CIDx) (proc_addr j) M (trap_res true + (K - 12))%nat pd sp0 b wr sector h m2 t dsk0
+    iApply (wp_vdrw_p3 (CID := CIDx) (proc_addr j) M (trap_res eb + (K - 12))%nat pd sp0 b wr sector h m2 t dsk0
               Hh8 Hm8 Ht8 Hregs
               with "Hcg Htext Hpc Hdp Hidx Hbh Hbm Hbt Hbd [-]").
     iIntros (M1) "%F Hcg Hpc Hidx Hchain".
     destruct F as (Hcs & H1a0 & H1a1 & H1a5).
     iSpecialize ("Hexit" $! CIDx with "[%]"); [wp_next_chain|].
     iApply ("Hexit" $! M1 np nr fl pk tr fr h m2 t
-              with "[%] [%] [%] [%] [%] Hcg Hown Hpay Hpc Htok Hbody
+              with "[%] [%] [%] [%] [%] Hcg Hown Htc Hclm Hpc Htok Hbody
                     Hchain Hidx").
     - split; [| exact (vdrw_hi_frame M M1 m0 Hcs Hhi)].
       destruct Hregs as (Hsp & Hs0 & Hs3 & Hs6 & Hs7).

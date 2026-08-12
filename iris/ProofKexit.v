@@ -1371,9 +1371,11 @@ Section KexitRest.
                  with "Hown") as "Hown".
     iApply (BeginOp.wp_begin_op_sconf (CID := CID1)  γs j γl bn γ γfs cov logstart dev
               pid (DfracOwn (1/4)) Q0 av true C b
-              ltac:(unfold K_begin_op; lia) Hj Hgl eq_refl
-              with "Hcg Hown Htext Hpc Hpanic Hlog Hpidq Hprocs [-]").
-    iIntros (CID2 Hs2 mbo) "%Hcsbo Hcg Hown Hpc Hpidq Hop".
+              ltac:(unfold K_begin_op; lia) Hj Hgl
+              with "Hcg Hown [] [] Htext Hpc Hpanic Hlog Hpidq Hprocs [-]").
+    { rewrite /trap_csrs_ext. done. }
+    { rewrite /cpu_claim_ext. done. }
+    iIntros (CID2 Hs2 mbo) "%Hcsbo Hcg Hown _ _ Hpc Hpidq Hop".
     assert (Hpc50 : ret_pc (Q0 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x50))
       by (rewrite HQ0ra; apply bv_eq; vm_compute; reflexivity).
@@ -1434,11 +1436,13 @@ Section KexitRest.
               ltac:(unfold K_iput; lia) Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hist0 Hiblk Hiblog Hinb Hcovb
               ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl
-              ltac:(rewrite HQ2a0; exact Hipe) eq_refl
-              with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hitab Hitinv Hescrow
+              ltac:(rewrite HQ2a0; exact Hipe)
+              with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hitab Hitinv Hescrow
                     Hireg Hslk Href Hsbb Hsbi Hbmres Hpidq Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop [-]").
-    iIntros (CID5 Hs5 mip n' us') "%Hcsip Hcg Hown Hpc Hpidq Hsbb Hsbi
+    { rewrite /trap_csrs_ext. done. }
+    { rewrite /cpu_claim_ext. done. }
+    iIntros (CID5 Hs5 mip n' us') "%Hcsip Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi
                                    %Hussub Hbmres Hbsl %Hn' Hop Hislot".
     assert (Hpc58 : ret_pc (Q2 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x58))
@@ -1473,9 +1477,11 @@ Section KexitRest.
                  with "Hown") as "Hown".
     iApply (EndOp.wp_end_op_sconf (CID := CID6)  γs j γl γu γd γk pd pav pu bn γ γfs
               cov logstart dev n' pid (DfracOwn (1/4)) Q3 av true C b
-              ltac:(unfold K_end_op; lia) Hgeom Hj Hgl eq_refl
-              with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hpidq Hprocs Hdev Hgeo Hdlk Hop [-]").
-    iIntros (CID7 Hs7 meo) "%Hcseo Hcg Hown Hpc Hpidq".
+              ltac:(unfold K_end_op; lia) Hgeom Hj Hgl
+              with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hpidq Hprocs Hdev Hgeo Hdlk Hop [-]").
+    { rewrite /trap_csrs_ext. done. }
+    { rewrite /cpu_claim_ext. done. }
+    iIntros (CID7 Hs7 meo) "%Hcseo Hcg Hown _ _ Hpc Hpidq".
     assert (Hpc5c : ret_pc (Q3 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x5c))
       by (rewrite HQ3ra; apply bv_eq; vm_compute; reflexivity).

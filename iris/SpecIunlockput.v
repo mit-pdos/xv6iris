@@ -42,8 +42,9 @@
 
    Every premise below is one of the two callees'.  In particular:
 
-   - [eb = true] (iput's parking premise, UNCONDITIONAL: iput may truncate
-     and no caller can know in advance which arm runs);
+   - [trap_csrs_ext eb] / [cpu_claim_ext eb pj] (iput's complement,
+     UNCONDITIONAL: iput may truncate and no caller can know in advance
+     which arm runs -- see claude-notes/projects/eb-generic-sweep.md);
    - the whole disk/log/bitmap environment, because iput's last-close arm
      truncates;
    - the budget interval [(n - iput_units) <= n' <= n], spend-at-most,
@@ -149,10 +150,15 @@ Definition wp_iunlockput_sconf_body
   gs !! j = Some gl ->
   (* a0 = ip *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
-  (* PARKING PREMISE -- iput's, unconditional *)
-  eb = true ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b -∗
+  (* the trap-CSR complement, threaded straight from iput's own precondition
+     (SpecIput.v): [emp] at [eb = true], where iput's own acquire mints what
+     its interior sleeps need; the real pair at [eb = false], where the
+     caller holds it because the TRAP gave it to it.  See
+     claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
@@ -190,11 +196,16 @@ Definition wp_iunlockput_sconf_body
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   bslots bn 3 -∗
   log_op g n -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true]: iunlockput parks (through iput,
+     down to sleep), so it can return on another hart whatever SIE was
+     doing. *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (n' : nat) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗

@@ -106,11 +106,12 @@ Definition wp_write_head_sconf_body
   log_geom_ok cov logstart ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
-  eb = true ->
   (* the batch's shape: the cells below read the write set W *)
   (n = length W /\ (n <= LOGBLOCKS)%nat) ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b -∗
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -158,6 +159,8 @@ Definition wp_write_head_sconf_body
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       (* the in-memory header, unchanged *)

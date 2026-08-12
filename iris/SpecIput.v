@@ -168,9 +168,14 @@ Definition wp_iput_sconf_body
      (Note (B1): under Route B the truncate arm's acquiresleep is the
      NESTED one, which does not park; bread under itrunc/iupdate still
      does, so this premise stays.) *)
-  eb = true ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b -∗
+  (* the trap-CSR complement: [emp] at [eb = true], where iput's own
+     acquire mints what the interior sleeps need; the real pair at
+     [eb = false], where the caller holds it because the TRAP gave it
+     to it.  See claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
@@ -205,11 +210,19 @@ Definition wp_iput_sconf_body
   bslots bn 3 -∗
   (* this operation's reservation *)
   log_op g n -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true]: iput sleeps (ilock/itrunc/begin_op),
+     so it can return on another hart whatever SIE was doing. *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (n' : nat) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
+  (* the trap-CSR complement: [emp] at [eb = true], where iput's own
+     acquire mints what the interior sleeps need; the real pair at
+     [eb = false], where the caller holds it because the TRAP gave it
+     to it.  See claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗

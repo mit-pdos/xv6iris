@@ -459,11 +459,21 @@ Definition wp_writei_sconf_body
      these ranges are the literals *)
   m !!! Regidx (mword_of_int 13 : mword 5) = (mword_of_int (Z.of_nat off) : mword 64) ->
   m !!! Regidx (mword_of_int 14 : mword 5) = (mword_of_int (Z.of_nat n) : mword 64) ->
-  (* PARKING PREMISE (hart-generic scheduler protocol) -- everything below
-     sleeps.  See SpecSched.v / SpecSleep.v. *)
-  eb = true ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b -∗
+  (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  writei holds no lock of
+     its own -- every push_off/pop_off pair that can mint or spend an
+     [arm_pay 0 eb _] lives inside bmap/bread/iupdate (and, through them,
+     acquiresleep / virtio_disk_rw), so writei is a PURE PASS-THROUGH: it
+     neither mints nor spends this complement itself, only threads it down
+     to each bmap/bread/iupdate call and takes it back from their
+     continuations.  At [eb = true] the complement is [emp], so no existing
+     caller gains an obligation; at [eb = false] it is the honest pair, held
+     by the caller because the TRAP handed it over.  See
+     claude-notes/completed/sched-hart-generic.md and
+     claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   (* the two PERSISTENT printk credentials, forwarded through bmap to balloc *)
@@ -590,6 +600,8 @@ Definition wp_writei_sconf_body
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗

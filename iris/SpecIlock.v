@@ -202,12 +202,17 @@ Definition wp_ilock_sconf_body
   gs !! j = Some gl ->
   (* a0 = ip *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
-  (* PARKING PREMISE (hart-generic scheduler protocol) -- acquiresleep and
-     bread both sleep, and a parking thread hands the trap CSRs across the
-     crossing only with an enabled base.  See SpecSched.v / SpecSleep.v. *)
-  eb = true ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b -∗
+  (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM -- acquiresleep and bread
+     both sleep, and a parking thread hands [trap_csrs] / [cpu_claim] across
+     the crossing (SpecSched.v).  At [eb = true] ilock's own [acquiresleep]
+     acquire frees them out of [sie_arm true], so the complement is [emp]
+     and the caller brings nothing -- which is why this used to be an
+     [eb = true] premise instead.  At [eb = false] the caller brings the
+     pair, holding it because the TRAP handed it over. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
@@ -249,6 +254,8 @@ Definition wp_ilock_sconf_body
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗

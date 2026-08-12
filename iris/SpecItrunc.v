@@ -259,9 +259,21 @@ Definition wp_itrunc_sconf_body
   γs !! j = Some γl ->
   (* a0 = ip *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
-  eb = true ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b -∗
+  (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  itrunc itself never
+     acquires or releases anything -- it is a pure PASS-THROUGH to its
+     sleeping callees (bfree, bread, iupdate), each of whose OWN acquire
+     mints [arm_pay 0 eb _] and whose OWN release spends it again before
+     returning.  So the complement itrunc receives at entry is a PURE
+     PASS-THROUGH: at [eb = true] it is [emp], so no existing caller gains
+     an obligation; at [eb = false] it is the honest pair, held by the
+     caller because the TRAP handed it over, and itrunc threads it straight
+     through to each callee and back, unused, all the way to its own exit.
+     See claude-notes/completed/sched-hart-generic.md and
+     claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -315,6 +327,8 @@ Definition wp_itrunc_sconf_body
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       i_dev ip ↦₄{dqd} dev -∗
