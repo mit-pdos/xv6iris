@@ -482,16 +482,19 @@ Qed.
     With the disjointness parameter at [True], the phase-[false] peel IS
     [WeakBridge.wstep_ok]: the off-window disjunct's first conjunct is
     vacuous, the racy disjunct is refuted by the phase, and the write arm
-    differs only by the phase bit it already has.  So the walk's POST-RACY
-    tail needs no producer of its own — [WeakCert.wstep_eff_confined_pin]
+    differs only by the phase bit it already has (its [b = false \/ W]
+    obligation is the LEFT disjunct, whatever the write parameter — so this
+    embedding is [W]-GENERIC, and it is what §8's store-shaped bind feeds its
+    tail).  So the walk's POST-RACY tail needs no producer of its own — [WeakCert.wstep_eff_confined_pin]
     (through §3's backward transfer) discharges it. *)
 
 Definition wD_any : Arch.pa -> N -> Prop := fun _ _ => True.
 
 Lemma wstep_ok_racy_false_of_wstep_ok (tid : option nat) (ra : Arch.pa)
-    (rn : N) (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) {X} (m : M X) :
+    (rn : N) (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) (Wp : Prop)
+    {X} (m : M X) :
   forall s, wstep_ok tid m s ->
-    wstep_ok_racy tid ra rn rak Φ wD_any false m s.
+    wstep_ok_racy tid ra rn rak Φ wD_any Wp false m s.
 Proof.
   induction m as [y0 | T oc k IH]; intros s Hok.
   - exact I.
@@ -511,7 +514,7 @@ Proof.
       destruct (dev_addr _).
       * intros d' Hdw. exact (IH _ _ (Hok d' Hdw)).
       * destruct Hok as (Hacc & Hk).
-        split_and!; [reflexivity|exact Hacc|exact I|exact (IH _ _ Hk)].
+        split_and!; [by left|exact Hacc|exact I|exact (IH _ _ Hk)].
 Qed.
 
 (** WHAT THE CAS RE-READ COSTS IN THE PEEL, in one sentence: nothing new.
@@ -542,8 +545,9 @@ Qed.
 
     The trace premise is [trace_stale], the [WeakVarCert.trace_racy] analogue:
     before the racy read every read is either PINNED (any address) or
-    disjoint; a RAM write is still refuted rather than unprovable (the peel's
-    write arm demands [b = false]); and AFTER it, only the unpinned reads have
+    disjoint; a RAM write is excluded by the trace itself (which is why the
+    producer is [W]-generic: it never produces the write arm at all); and
+    AFTER it, only the unpinned reads have
     to stay off the window — which is what admits the CAS pair. *)
 
 Fixpoint trace_stale (rak : akinfo) (ra : Arch.pa) (rn : N) (es : list weff)
@@ -597,7 +601,8 @@ Proof.
 Qed.
 
 Lemma wstep_ok_racy_true_of_stale (tid : option nat) (ra : Arch.pa)
-    (rn : N) (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) {X} (m : M X) :
+    (rn : N) (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) (Wp : Prop)
+    {X} (m : M X) :
   acc_wf ra rn ->
   (0 < rn)%N ->
   ak_pins rak = false ->
@@ -615,7 +620,7 @@ Lemma wstep_ok_racy_true_of_stale (tid : option nat) (ra : Arch.pa)
          dom (mem t') ⊆ W /\
          trace_pin_off s ra rn es /\
          trace_stale rak ra rn es) ->
-    wstep_ok_racy tid ra rn rak Φ wD_any true m s.
+    wstep_ok_racy tid ra rn rak Φ wD_any Wp true m s.
 Proof.
   intros Hracc Hrn Hrk [w0 HΦ0].
   assert (Hrdw : forall (u : bv (8 * rn)) (mp : gmap Arch.pa (bv 8)),
@@ -777,7 +782,7 @@ Proof.
                           ltac:(rewrite Hak in Hpin;
                                 exact (racc_disj_irrefl ra rn Hrn)) Hr2)
                 as (_ & _ & _ & Hoff3).
-              apply (wstep_ok_racy_false_of_wstep_ok tid ra rn rak Φ).
+              apply (wstep_ok_racy_false_of_wstep_ok tid ra rn rak Φ Wp).
               apply (wstep_eff_confined_pin tid (k (inl (w, None)))
                        (wread_post s rak ra ts) mm W x3 t3 es3
                        (wlog_wf_read_post _ _ _ _ Hwf) HW0).
@@ -830,8 +835,8 @@ Qed.
 
 (** The [wmem_restrict] instance — the shape a certificate carries. *)
 Lemma wstep_ok_racy_true_of_stale_window (tid : option nat) (ra : Arch.pa)
-    (rn : N) (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) {X} (m : M X)
-    (s : wmstate) (W : gset Arch.pa) :
+    (rn : N) (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) (Wp : Prop)
+    {X} (m : M X) (s : wmstate) (W : gset Arch.pa) :
   acc_wf ra rn ->
   (0 < rn)%N ->
   ak_pins rak = false ->
@@ -846,10 +851,10 @@ Lemma wstep_ok_racy_true_of_stale_window (tid : option nat) (ra : Arch.pa)
        dom (mem t') ⊆ W /\
        trace_pin_off s ra rn es /\
        trace_stale rak ra rn es) ->
-  wstep_ok_racy tid ra rn rak Φ wD_any true m s.
+  wstep_ok_racy tid ra rn rak Φ wD_any Wp true m s.
 Proof.
   intros Hracc Hrn Hrk HΦ Hwf HW0 Hwin Hfam.
-  exact (wstep_ok_racy_true_of_stale tid ra rn rak Φ m Hracc Hrn Hrk HΦ s
+  exact (wstep_ok_racy_true_of_stale tid ra rn rak Φ Wp m Hracc Hrn Hrk HΦ s
            (wmem_restrict s W) W Hwf HW0 Hwin (wmem_restrict_dom s W)
            (wmem_restrict_sub s W) Hfam).
 Qed.
@@ -1000,27 +1005,28 @@ Qed.
     design point.  At the prefix's [Ret] leaf the phase is whatever its racy
     read left — [false] if it took one, [true] if it did not — and the tail's
     obligations differ between the two ([wstep_ok_racy]'s write arm demands
-    [b = false]).  A plain, non-CPS bind lemma cannot state that. *)
+    [b = false \/ W]).  A plain, non-CPS bind lemma cannot state that.  §8
+    then removes the phase-[true] demand for a WRITING tail, at [W]. *)
 
 Fixpoint wstep_ok_racy_k (tid : option nat) (ra : Arch.pa) (rn : N)
     (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) (D : Arch.pa -> N -> Prop)
-    (b : bool) {X} (m : M X) (s : wmstate)
+    (W : Prop) (b : bool) {X} (m : M X) (s : wmstate)
     (K : X -> wmstate -> bool -> Prop) {struct m} : Prop :=
   match m with
   | Interface.Ret y => K y s b
   | Interface.Next oc k =>
       (match oc in Interface.outcome _ T return (T -> M X) -> Prop with
        | Interface.RegRead r _ =>
-           fun k => wstep_ok_racy_k tid ra rn rak Φ D b
+           fun k => wstep_ok_racy_k tid ra rn rak Φ D W b
                       (k (register_lookup r s.(wm_regs))) s K
        | Interface.RegWrite r _ v =>
-           fun k => wstep_ok_racy_k tid ra rn rak Φ D b (k tt) (wset_reg s r v) K
+           fun k => wstep_ok_racy_k tid ra rn rak Φ D W b (k tt) (wset_reg s r v) K
        | Interface.MemRead n req =>
            fun k =>
              if dev_addr (Interface.ReadReq.pa req) then
                forall w d',
                  dev_read s.(wm_dev) (Interface.ReadReq.pa req) n = Some (w, d') ->
-                 wstep_ok_racy_k tid ra rn rak Φ D b (k (inl (w, None)))
+                 wstep_ok_racy_k tid ra rn rak Φ D W b (k (inl (w, None)))
                    (wset_dev s d') K
              else
                acc_wf (Interface.ReadReq.pa req) n /\
@@ -1032,7 +1038,7 @@ Fixpoint wstep_ok_racy_k (tid : option nat) (ra : Arch.pa) (rn : N)
                      wread_bytes s (classify (Interface.ReadReq.access_kind req))
                        (Interface.ReadReq.pa req) n
                        (coh_ts s (Interface.ReadReq.pa req) n) = Some w ->
-                     wstep_ok_racy_k tid ra rn rak Φ D b (k (inl (w, None)))
+                     wstep_ok_racy_k tid ra rn rak Φ D W b (k (inl (w, None)))
                        (wread_post s (classify (Interface.ReadReq.access_kind req))
                           (Interface.ReadReq.pa req)
                           (coh_ts s (Interface.ReadReq.pa req) n)) K))
@@ -1043,7 +1049,7 @@ Fixpoint wstep_ok_racy_k (tid : option nat) (ra : Arch.pa) (rn : N)
                      wread_bytes s (classify (Interface.ReadReq.access_kind req))
                        (Interface.ReadReq.pa req) n ts = Some w ->
                      Φ (fun j : nat => nth_byte w j) ->
-                     wstep_ok_racy_k tid ra rn rak Φ D false (k (inl (w, None)))
+                     wstep_ok_racy_k tid ra rn rak Φ D W false (k (inl (w, None)))
                        (wread_post s (classify (Interface.ReadReq.access_kind req))
                           (Interface.ReadReq.pa req) ts) K)) )
        | Interface.MemWrite n req =>
@@ -1052,38 +1058,38 @@ Fixpoint wstep_ok_racy_k (tid : option nat) (ra : Arch.pa) (rn : N)
                forall d',
                  dev_write s.(wm_dev) (Interface.WriteReq.pa req) n
                            (Interface.WriteReq.value req) = Some d' ->
-                 wstep_ok_racy_k tid ra rn rak Φ D b (k (inl None)) (wset_dev s d') K
+                 wstep_ok_racy_k tid ra rn rak Φ D W b (k (inl None)) (wset_dev s d') K
              else
-               b = false /\
+               (b = false \/ W) /\
                acc_wf (Interface.WriteReq.pa req) n /\
                D (Interface.WriteReq.pa req) n /\
-               wstep_ok_racy_k tid ra rn rak Φ D b (k (inl None))
+               wstep_ok_racy_k tid ra rn rak Φ D W false (k (inl None))
                  (wwrite_post tid s
                     (classify (Interface.WriteReq.access_kind req))
                     (Interface.WriteReq.pa req) n (Interface.WriteReq.value req)) K
        | Interface.Barrier bk =>
-           fun k => wstep_ok_racy_k tid ra rn rak Φ D b (k tt)
+           fun k => wstep_ok_racy_k tid ra rn rak Φ D W b (k tt)
                       (wset_ws s (barrier_post s.(wm_ws) bk)) K
-       | Interface.InstrAnnounce _   => fun k => wstep_ok_racy_k tid ra rn rak Φ D b (k tt) s K
-       | Interface.BranchAnnounce _ _=> fun k => wstep_ok_racy_k tid ra rn rak Φ D b (k tt) s K
-       | Interface.CacheOp _         => fun k => wstep_ok_racy_k tid ra rn rak Φ D b (k tt) s K
-       | Interface.TlbOp _           => fun k => wstep_ok_racy_k tid ra rn rak Φ D b (k tt) s K
-       | Interface.TakeException _   => fun k => wstep_ok_racy_k tid ra rn rak Φ D b (k tt) s K
-       | Interface.ReturnException _ => fun k => wstep_ok_racy_k tid ra rn rak Φ D b (k tt) s K
-       | Interface.TranslationStart _=> fun k => wstep_ok_racy_k tid ra rn rak Φ D b (k tt) s K
-       | Interface.TranslationEnd _  => fun k => wstep_ok_racy_k tid ra rn rak Φ D b (k tt) s K
-       | Interface.CycleCount        => fun k => wstep_ok_racy_k tid ra rn rak Φ D b (k tt) s K
-       | Interface.Message _         => fun k => wstep_ok_racy_k tid ra rn rak Φ D b (k tt) s K
-       | Interface.GetCycleCount     => fun k => wstep_ok_racy_k tid ra rn rak Φ D b (k 0%Z) s K
+       | Interface.InstrAnnounce _   => fun k => wstep_ok_racy_k tid ra rn rak Φ D W b (k tt) s K
+       | Interface.BranchAnnounce _ _=> fun k => wstep_ok_racy_k tid ra rn rak Φ D W b (k tt) s K
+       | Interface.CacheOp _         => fun k => wstep_ok_racy_k tid ra rn rak Φ D W b (k tt) s K
+       | Interface.TlbOp _           => fun k => wstep_ok_racy_k tid ra rn rak Φ D W b (k tt) s K
+       | Interface.TakeException _   => fun k => wstep_ok_racy_k tid ra rn rak Φ D W b (k tt) s K
+       | Interface.ReturnException _ => fun k => wstep_ok_racy_k tid ra rn rak Φ D W b (k tt) s K
+       | Interface.TranslationStart _=> fun k => wstep_ok_racy_k tid ra rn rak Φ D W b (k tt) s K
+       | Interface.TranslationEnd _  => fun k => wstep_ok_racy_k tid ra rn rak Φ D W b (k tt) s K
+       | Interface.CycleCount        => fun k => wstep_ok_racy_k tid ra rn rak Φ D W b (k tt) s K
+       | Interface.Message _         => fun k => wstep_ok_racy_k tid ra rn rak Φ D W b (k tt) s K
+       | Interface.GetCycleCount     => fun k => wstep_ok_racy_k tid ra rn rak Φ D W b (k 0%Z) s K
        | Interface.Choose _          => fun _ => False
        | _ => fun _ => True
        end) k
   end.
 
 (** The trivial continuation IS the peel. *)
-Lemma wstep_ok_racy_k_triv tid ra rn rak Φ D b {X} (m : M X) s :
-  wstep_ok_racy_k tid ra rn rak Φ D b m s (fun _ _ _ => True) <->
-  wstep_ok_racy tid ra rn rak Φ D b m s.
+Lemma wstep_ok_racy_k_triv tid ra rn rak Φ D W b {X} (m : M X) s :
+  wstep_ok_racy_k tid ra rn rak Φ D W b m s (fun _ _ _ => True) <->
+  wstep_ok_racy tid ra rn rak Φ D W b m s.
 Proof.
   revert b s. induction m as [y|T oc k IH]; intros b s; [done|].
   destruct oc; simpl; try done; try (apply IH).
@@ -1112,11 +1118,11 @@ Qed.
     keeps this free of a phase-tracking run relation; a caller whose tail is
     an ordinary [wstep_ok] (no RAM write of its own) has that for nothing
     through §4's embedding. *)
-Lemma wstep_ok_racy_k_of_run tid ra rn rak Φ D b {X} (m : M X) s
+Lemma wstep_ok_racy_k_of_run tid ra rn rak Φ D W b {X} (m : M X) s
     (K : X -> wmstate -> bool -> Prop) :
-  wstep_ok_racy tid ra rn rak Φ D b m s ->
+  wstep_ok_racy tid ra rn rak Φ D W b m s ->
   (forall x s', wrun tid m s x s' -> forall b', K x s' b') ->
-  wstep_ok_racy_k tid ra rn rak Φ D b m s K.
+  wstep_ok_racy_k tid ra rn rak Φ D W b m s K.
 Proof.
   revert b s. induction m as [y|T oc k IH]; intros b s Hok HK.
   - exact (HK y s (conj eq_refl eq_refl) b).
@@ -1148,11 +1154,11 @@ Proof.
 Qed.
 
 (** THE BIND RULE. *)
-Lemma wstep_ok_racy_k_bind tid ra rn rak Φ D b {X Y} (m : M X) (f : X -> M Y)
+Lemma wstep_ok_racy_k_bind tid ra rn rak Φ D W b {X Y} (m : M X) (f : X -> M Y)
     s (K : Y -> wmstate -> bool -> Prop) :
-  wstep_ok_racy_k tid ra rn rak Φ D b m s
-    (fun x s' b' => wstep_ok_racy_k tid ra rn rak Φ D b' (f x) s' K) ->
-  wstep_ok_racy_k tid ra rn rak Φ D b (Defs.bind m f) s K.
+  wstep_ok_racy_k tid ra rn rak Φ D W b m s
+    (fun x s' b' => wstep_ok_racy_k tid ra rn rak Φ D W b' (f x) s' K) ->
+  wstep_ok_racy_k tid ra rn rak Φ D W b (Defs.bind m f) s K.
 Proof.
   revert b s. induction m as [y|T oc k IH]; intros b s Hok.
   - by rewrite bind_Ret.
@@ -1179,13 +1185,100 @@ Qed.
     can reach.  For the walk the prefix is [translateAddr] — the only
     sub-run that needs [exec_stale] — and the tail is discharged by
     [WeakCert.wstep_eff_confined_pin] through §4. *)
-Lemma wstep_ok_racy_bind tid ra rn rak Φ D b {X Y} (m : M X) (f : X -> M Y) s :
-  wstep_ok_racy tid ra rn rak Φ D b m s ->
+Lemma wstep_ok_racy_bind tid ra rn rak Φ D W b {X Y} (m : M X) (f : X -> M Y) s :
+  wstep_ok_racy tid ra rn rak Φ D W b m s ->
   (forall x s', wrun tid m s x s' ->
-     forall b', wstep_ok_racy tid ra rn rak Φ D b' (f x) s') ->
-  wstep_ok_racy tid ra rn rak Φ D b (Defs.bind m f) s.
+     forall b', wstep_ok_racy tid ra rn rak Φ D W b' (f x) s') ->
+  wstep_ok_racy tid ra rn rak Φ D W b (Defs.bind m f) s.
 Proof.
   intros Hm Hf. apply wstep_ok_racy_k_triv, wstep_ok_racy_k_bind.
-  apply (wstep_ok_racy_k_of_run _ _ _ _ _ _ _ m s _ Hm).
+  apply (wstep_ok_racy_k_of_run _ _ _ _ _ _ _ _ m s _ Hm).
   intros x s' Hrun b'. by apply wstep_ok_racy_k_triv, Hf.
+Qed.
+
+(* ====================================================================== *)
+(** ** 8. THE PHASE, RENOUNCED: what the write parameter [W] buys
+
+    [WeakRacy.wstep_ok_racy]'s write arm demands [b = false \/ W], and the
+    bridge cone fixes [W := False] because its replay argument needs the
+    pre-racy segment to be write-free.  A REDUCIBILITY-only consumer does not,
+    and at [W := True] the phase bit becomes MONOTONE: a phase-[false] peel is
+    a phase-[true] peel, because the only arm the phase gates is the racy read
+    — which a [true] peel may simply RENOUNCE, taking the off-window disjunct
+    at every read exactly as the [false] peel did — and the write arm, whose
+    obligation [W] now discharges.
+
+    THE POINT OF THE EXERCISE is the store-shaped composition below.  A
+    walking STORE decomposes as [bind translateAddr execute]: the racy read
+    lives in the prefix, and the tail WRITES.  [wstep_ok_racy_k_of_run]'s [K]
+    is demanded at BOTH phases (the prefix's run need not have taken the racy
+    read), so with the plain bind rule the tail would owe a phase-[true] fact
+    about a writing monad — refuted at [W := False], and awkward at any [W].
+    [wstep_ok_racy_bind_false] asks for the tail at phase [false] only, which
+    is exactly what §4's embedding of an ordinary [WeakBridge.wstep_ok]
+    delivers, and lifts it with the monotonicity below. *)
+
+Lemma wstep_ok_racy_phase_mono_gen tid ra rn rak Φ D (W : Prop) {X} (m : M X) :
+  W ->
+  forall s, wstep_ok_racy tid ra rn rak Φ D W false m s ->
+            wstep_ok_racy tid ra rn rak Φ D W true m s.
+Proof.
+  intros HW.
+  induction m as [y|T oc k IH]; intros s Hok.
+  - exact I.
+  - destruct oc; simpl in Hok |- *;
+      try (exact (IH _ _ Hok));
+      try (exact Hok);
+      try (exact I).
+    + (* MemRead: the racy disjunct is refuted at the SOURCE phase, so the
+         off-window arm is the one that maps over *)
+      destruct (dev_addr _).
+      * intros w d' Hdr. exact (IH _ _ (Hok w d' Hdr)).
+      * destruct Hok as (Hacc & [(Hd & Hpin & Hk)|(Hb & _)]); [|discriminate].
+        split; [exact Hacc|]. left. split_and!; [exact Hd|exact Hpin|].
+        intros w Hw. exact (IH _ _ (Hk w Hw)).
+    + (* MemWrite: [W] discharges the phase obligation, and the arm's own
+         continuation is already at phase [false] on both sides *)
+      destruct (dev_addr _).
+      * intros d' Hdw. exact (IH _ _ (Hok d' Hdw)).
+      * destruct Hok as (_ & Hacc & Hd & Hk).
+        split_and!; [by right|exact Hacc|exact Hd|exact Hk].
+Qed.
+
+(** The instance the reducibility-only consumers use. *)
+Lemma wstep_ok_racy_phase_mono tid ra rn rak Φ D {X} (m : M X) s :
+  wstep_ok_racy tid ra rn rak Φ D True false m s ->
+  wstep_ok_racy tid ra rn rak Φ D True true m s.
+Proof. exact (wstep_ok_racy_phase_mono_gen tid ra rn rak Φ D True m I s). Qed.
+
+(** [wstep_ok_racy_k_of_run] with [K] demanded at phase [false] ALONE, given
+    that [K] is itself phase-monotone — which is what the previous lemma
+    supplies for the [K] the bind rule builds. *)
+Lemma wstep_ok_racy_k_of_run_false tid ra rn rak Φ D W b {X} (m : M X) s
+    (K : X -> wmstate -> bool -> Prop) :
+  (forall x s', K x s' false -> K x s' true) ->
+  wstep_ok_racy tid ra rn rak Φ D W b m s ->
+  (forall x s', wrun tid m s x s' -> K x s' false) ->
+  wstep_ok_racy_k tid ra rn rak Φ D W b m s K.
+Proof.
+  intros Hmono Hok HK.
+  apply (wstep_ok_racy_k_of_run _ _ _ _ _ _ _ _ m s _ Hok).
+  intros x s' Hrun b'. destruct b'; [apply Hmono|]; exact (HK x s' Hrun).
+Qed.
+
+(** THE STORE-SHAPED BIND: the tail is certified at phase [false] only. *)
+Lemma wstep_ok_racy_bind_false tid ra rn rak Φ D (W : Prop) b {X Y} (m : M X)
+    (f : X -> M Y) s :
+  W ->
+  wstep_ok_racy tid ra rn rak Φ D W b m s ->
+  (forall x s', wrun tid m s x s' ->
+     wstep_ok_racy tid ra rn rak Φ D W false (f x) s') ->
+  wstep_ok_racy tid ra rn rak Φ D W b (Defs.bind m f) s.
+Proof.
+  intros HW Hm Hf. apply wstep_ok_racy_k_triv, wstep_ok_racy_k_bind.
+  eapply wstep_ok_racy_k_of_run_false; [|exact Hm|].
+  - intros x s' HK.
+    apply wstep_ok_racy_k_triv, (wstep_ok_racy_phase_mono_gen _ _ _ _ _ _ _ _ HW),
+      wstep_ok_racy_k_triv. exact HK.
+  - intros x s' Hrun. by apply wstep_ok_racy_k_triv, Hf.
 Qed.

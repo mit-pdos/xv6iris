@@ -112,7 +112,7 @@ Proof. intros [_ Hw]. apply (Hw ak pa n v), elem_of_cons. by left. Qed.
     the extra conjunct at the two RAM arms. *)
 
 Lemma wstep_ok_racy_false_of_confined (tid : option nat) (ra : Arch.pa)
-    (rn : N) (rak : akinfo) (Φ : (nat -> bv 8) -> Prop)
+    (rn : N) (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) (Wp : Prop)
     (wp : bv (8 * rn)) {X} (m : M X) :
   acc_wf ra rn ->
   forall (s : wmstate) (mm : gmap Arch.pa (bv 8)) (W : gset Arch.pa)
@@ -125,7 +125,7 @@ Lemma wstep_ok_racy_false_of_confined (tid : option nat) (ra : Arch.pa)
     mm ⊆ write_bytes (wflat (wm_img s) (wm_log s)) ra rn wp ->
     dom (mem t') ⊆ W ->
     exec_eff m (MState (wm_regs s) mm (wm_dev s)) = Some (x, t', es) ->
-    wstep_ok_racy tid ra rn rak Φ (racc_disj ra rn) false m s.
+    wstep_ok_racy tid ra rn rak Φ (racc_disj ra rn) Wp false m s.
 Proof.
   intros Hracc.
   induction m as [y|T oc k IH];
@@ -263,7 +263,7 @@ Proof.
                       Hracc Hacc Hdisjw).
           by apply write_bytes_mono. }
         split_and!.
-        -- reflexivity.
+        -- by left.
         -- exact Hacc.
         -- exact Hdisjw.
         -- exact (IH _ _ _ W x0 t0 es0
@@ -288,7 +288,8 @@ Qed.
     the restriction PATCHED at the window with the word the racy read
     returned — [WeakRacy.wpatch_st]'s memory, restricted. *)
 Lemma wstep_ok_racy_false_of_window (tid : option nat) (ra : Arch.pa) (rn : N)
-    (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) (wp : bv (8 * rn)) {X} (m : M X)
+    (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) (Wp : Prop)
+    (wp : bv (8 * rn)) {X} (m : M X)
     (s : wmstate) (W : gset Arch.pa) (x : X) (t' : mstate) (es : list weff) :
   acc_wf ra rn ->
   wlog_wf (wm_log s) ->
@@ -301,10 +302,10 @@ Lemma wstep_ok_racy_false_of_window (tid : option nat) (ra : Arch.pa) (rn : N)
   exec_eff m (MState (wm_regs s)
                 (write_bytes (wmem_restrict s W) ra rn wp) (wm_dev s))
     = Some (x, t', es) ->
-  wstep_ok_racy tid ra rn rak Φ (racc_disj ra rn) false m s.
+  wstep_ok_racy tid ra rn rak Φ (racc_disj ra rn) Wp false m s.
 Proof.
   intros Hracc Hwf HW0 Hwin Hpes Hdes Hdom' Hex.
-  apply (wstep_ok_racy_false_of_confined tid ra rn rak Φ wp m Hracc s
+  apply (wstep_ok_racy_false_of_confined tid ra rn rak Φ Wp wp m Hracc s
            (write_bytes (wmem_restrict s W) ra rn wp) W x t' es Hwf HW0 Hpes
            Hdes); [| |exact Hdom'|exact Hex].
   - apply write_bytes_dom_sub; [apply wmem_restrict_dom|exact Hwin].
@@ -377,8 +378,11 @@ Proof. intros Hp. apply (Hp ak pa n), elem_of_cons. by left. Qed.
 
 (** THE ORDERED HALF.  Before the racy read every read is disjoint from the
     window and there is no RAM WRITE AT ALL — not "no overlapping write":
-    [wstep_ok_racy]'s write arm demands [b = false], so a RAM write before the
-    racy read makes the conclusion FALSE, not merely unprovable.  At the racy
+    at the bridge's [W := False] instantiation [wstep_ok_racy]'s write arm
+    demands [b = false], so a RAM write before the racy read makes the
+    conclusion FALSE, not merely unprovable.  (The producers below are proved
+    [W]-GENERIC, so they are stronger than that instantiation; it is this
+    trace premise, not the peel, that excludes the write.)  At the racy
     read the phase flips and the rest is §1's [trace_disj] verbatim, which is
     what §2 consumes.  A trace with no window read at all is admitted: the run
     simply never took the racy read, and then the whole family is one run.
@@ -449,7 +453,8 @@ Proof. intros Hrn Hnd [[Hd _]|H]; [by destruct (Hnd Hd)|exact H]. Qed.
     member would narrow nothing a caller can use. *)
 
 Lemma wstep_ok_racy_true_of_confined (tid : option nat) (ra : Arch.pa)
-    (rn : N) (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) {X} (m : M X) :
+    (rn : N) (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) (Wp : Prop)
+    {X} (m : M X) :
   acc_wf ra rn ->
   (0 < rn)%N ->
   (exists w0 : bv (8 * rn), Φ (fun j : nat => nth_byte w0 j)) ->
@@ -468,7 +473,7 @@ Lemma wstep_ok_racy_true_of_confined (tid : option nat) (ra : Arch.pa)
          dom (mem t') ⊆ W /\
          trace_pin_off s ra rn es /\
          trace_racy rak ra rn es) ->
-    wstep_ok_racy tid ra rn rak Φ (racc_disj ra rn) true m s.
+    wstep_ok_racy tid ra rn rak Φ (racc_disj ra rn) Wp true m s.
 Proof.
   intros Hracc Hrn [w0 HΦ0].
   (* the patched memory holds the patch word AT the window — this is what
@@ -585,7 +590,7 @@ Proof.
            injection Hex2 as <- <- <-.
            destruct (trace_racy_win_tail rak ra rn _ ra rn es3 Hrn
                        (racc_disj_irrefl ra rn Hrn) Hr2) as (_ & _ & _ & Hdes3).
-           apply (wstep_ok_racy_false_of_confined tid ra rn rak Φ w _ Hracc
+           apply (wstep_ok_racy_false_of_confined tid ra rn rak Φ Wp w _ Hracc
                     (wread_post s rak ra ts) (write_bytes mm ra rn w) W
                     x3 t3 es3 (wlog_wf_read_post _ _ _ _ Hwf) HW0).
            ++ (* the tail is disjoint, so off-window pinnedness IS pinnedness *)
@@ -610,9 +615,10 @@ Proof.
         rewrite ?Hd ?Hdw /= in Hex1.
         exists x1, t1, es1. split_and!; [exact Hex1|exact Hd1| |exact Hr1].
         apply (trace_pin_off_mono s); [reflexivity|reflexivity|exact Hp1].
-      * (* A RAM WRITE BEFORE THE RACY READ IS NOT MERELY UNPROVABLE, IT IS
-           REFUTED: [wstep_ok_racy]'s write arm demands [b = false].  So the
-           premise has to exclude it, and [trace_racy] is where it does. *)
+      * (* A RAM WRITE BEFORE THE RACY READ IS EXCLUDED BY THE PREMISE, and
+           [trace_racy] is where it is excluded — which is why this producer
+           is [W]-generic: it never has to produce the write arm's
+           [b = false \/ W] at all. *)
         exfalso.
         destruct (exec_eff (k (inl None))
                     (MState (wm_regs s)
@@ -646,7 +652,7 @@ Qed.
 (** The [wmem_restrict] instance, the shape a certificate carries — §2's
     [wstep_ok_racy_false_of_window] on this side of the racy read. *)
 Lemma wstep_ok_racy_true_of_window (tid : option nat) (ra : Arch.pa) (rn : N)
-    (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) {X} (m : M X)
+    (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) (Wp : Prop) {X} (m : M X)
     (s : wmstate) (W : gset Arch.pa) :
   acc_wf ra rn ->
   (0 < rn)%N ->
@@ -662,10 +668,10 @@ Lemma wstep_ok_racy_true_of_window (tid : option nat) (ra : Arch.pa) (rn : N)
        dom (mem t') ⊆ W /\
        trace_pin_off s ra rn es /\
        trace_racy rak ra rn es) ->
-  wstep_ok_racy tid ra rn rak Φ (racc_disj ra rn) true m s.
+  wstep_ok_racy tid ra rn rak Φ (racc_disj ra rn) Wp true m s.
 Proof.
   intros Hracc Hrn HΦ Hwf HW0 Hwin Hfam.
-  exact (wstep_ok_racy_true_of_confined tid ra rn rak Φ m Hracc Hrn HΦ s
+  exact (wstep_ok_racy_true_of_confined tid ra rn rak Φ Wp m Hracc Hrn HΦ s
            (wmem_restrict s W) W Hwf HW0 Hwin (wmem_restrict_dom s W)
            (wmem_restrict_sub s W) Hfam).
 Qed.

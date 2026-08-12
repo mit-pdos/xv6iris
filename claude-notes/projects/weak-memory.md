@@ -139,13 +139,27 @@ below were untouched by either.
   a new invariant conjunct.  Details + the two `WeakWalkStale` interface
   strengthenings it forced: walk-bridge §8.3 item 5.  **This closes 6a's
   last item for the walking-LOAD shape.**
-- *OWED*: (ii) the STORE case of the bind rule —
-  `wstep_ok_racy_k_of_run` demands the tail at BOTH phases (which is what
-  keeps it free of a phase-tracking run relation), and a walking store's
-  tail has the phase-`false` obligation only.  A TLB-miss walk always reads
-  its leaf, so the phase IS `false` there; saying so needs either a "did
-  this run read the window" companion to `wrun` or §8.5's pre-racy-write
-  widening.  A walking LOAD needs neither.
+- *LANDED (2026-08-12): the STORE case, by the PHASE-FLIP design* (neither
+  of the two routes the previous note listed — no "did this run read the
+  window" companion, no §8.5 `wadm` transport).  The peel gained a
+  parameter `W : Prop` ("pre-racy writes permitted") in the §7-liberation
+  mold: the write arm's `b = false` became `(b = false ∨ W)`, the bridge
+  cone is pinned at `W := False` (byte-identical strength — the patched
+  replay still gets its write-free pre-racy segment), everything else is
+  W-generic.  Renouncing the racy read is always sound, so at `W := True`
+  phase-monotonicity holds (`wstep_ok_racy_phase_mono`: a phase-`false`
+  peel IS a phase-`true` peel) and `wstep_ok_racy_bind_false` composes a
+  racy translation prefix with a WRITING tail certified at phase `false`
+  only — which the W-generic §4 embedding hands over from ordinary
+  `wstep_ok`.  ONE semantic delta forced by measurement (the wexec
+  traversals consume the write-arm phase for the `wadm_filter` transport,
+  which genuinely fails across a window write): a permitted pre-racy
+  write's continuation is at phase `false` unconditionally — writing
+  RENOUNCES the racy read.  No-op for every existing consumer and for the
+  walk shapes (racy read THEN write); what stays out of reach is a
+  write-THEN-racy-read peel at one window, which is the same
+  two-translation shape the single-window peel already could not express
+  (§8.2's later widening, unchanged).  Details: walk-bridge §8.3 item 6.
 
 **SLICES 1–2 ARE IN** (`iris/WeakVarCert.v`, `iris/WeakRacy.v`), green and
 axiom-free: the racy peel carries a value filter `Φ` with `wadm_filter`
@@ -220,6 +234,34 @@ HALF" slice.
    of the CURRENT installation" rather than of a fixed one.  That is the
    first thing to try, and it is why the clipped form should not be
    collapsed back into the unclipped one.
+
+   **VALIDATED (2026-08-12, `iris/WkClipAdvance.v` — the step-0 prototype,
+   closed under the global context, existing vocabulary UNCHANGED).**
+   `wclip_reinstall`: appending an ARBITRARY (non-variant) window store
+   re-establishes all three clipped conjuncts at the new cut
+   `S (length log)` — and consumes NO fact about the pre-existing log
+   (`intros _ _`), which was exactly the flagged risk.  Mind the
+   convention the prototype pinned down: the cut is a TIMESTAMP and index
+   `i`'s timestamp is `S i`, so the advancing cut is `S (length log)`, not
+   `length log` (at `length log` the closure would still reach the last
+   pre-existing message).  `wfresh_from` bakes in no boot-cut assumption
+   (vacuous at a fresh cut, uniformly in the image); `wwin_install` is
+   minted by `wwrite_msg_byte` alone and carried forward by
+   `wwin_install_prefix`.  End to end: `wclip_unmap_faults` — after the
+   zero store, EVERY `wadm`-admissible read of the slot is
+   `wpte_invalid` (A/D bits never touch V:
+   `pte_set_ad_zero_invalid`), which is what forces the walker's
+   `PTW_Invalid_PTE` arm via
+   `WeakWalkEff.exec_eff_check_leaf_pte_invalid`.  What step 0 does NOT
+   cover (the remaining design work, in order): re-minting the Iris half
+   at the advancing cut — the `wlog_lb` baton and the floor receipt
+   `T0 ≤ w_vrNew` become DYNAMIC (the cut travels as data in the parked
+   -table/handoff payload; the resuming hart's floor coverage comes from
+   the view transfer at the release/acquire, not from a boot horizon) —
+   and the TLB-maintenance obligation below.  Both are what the
+   two-hart MP toy (`WkUnmapMp`, WkStartedMp-shaped: zero store; fence;
+   flag store ∥ flag spin; sfence.vma; satp write; translation must
+   fault) is for.
 
    **WHERE THE TLB MAINTENANCE ACTUALLY IS — check this before designing
    the invariant.**  Six `sfence.vma` sites in the image, and NONE of them

@@ -938,6 +938,7 @@ WkEntryNew.v
 WeakUpdEff.v
 WeakWalkStale.v
 WeakKptStale.v
+WkClipAdvance.v
 WeakFunnelCfg.v
 WeakLeafCsrw.v
 WeakVariant.v

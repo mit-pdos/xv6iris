@@ -1,12 +1,13 @@
 # The walk's racy leaf: the peel/bridge split (DECIDED: option (a))
 
-**STATUS (2026-08-12): §8.3's six items are ALL LANDED** — the stale mirror
-(`iris/WeakStale.v`), the walk at it (`iris/WeakWalkStale.v`), and the racy
-absorption theorem (`iris/WeakKptStale.v`,
-`wtlb_res_pt_translateAddr_stale_at`).  What remains of this front is item
-6's store-case restriction (a walking STORE's tail phase — see §8.3 item 6)
-and the eventual 6b/6c consumer that wires the peel + absorption into a WP
-rule.
+**STATUS (2026-08-12): §8.3's six items are ALL LANDED, and the store-case
+restriction is CLOSED** — the stale mirror (`iris/WeakStale.v`), the walk
+at it (`iris/WeakWalkStale.v`), the racy absorption theorem
+(`iris/WeakKptStale.v`, `wtlb_res_pt_translateAddr_stale_at`), and the
+phase-flip design (`W` parameter + `wstep_ok_racy_phase_mono` +
+`wstep_ok_racy_bind_false`, §8.3 item 6) that lets a walking STORE
+compose.  What remains of this front is only the eventual 6b/6c consumer
+that wires the peel + absorption into a WP rule.
 
 **DECISION (2026-08-12, the φ-upgrade author, as §5 requested): take
 option (a), and do NOT start until the in-flight C/D/S points-to surgery
@@ -476,16 +477,40 @@ grow.
    continuation IS the peel, both directions), `wstep_ok_racy_k_of_run` (a
    peel plus a fact about every state the run can reach is a CPS peel),
    `wstep_ok_racy_k_bind`, and the user-facing `wstep_ok_racy_bind`.
-   **THE ONE RESTRICTION LEFT, and it is the store case.**
-   `wstep_ok_racy_k_of_run` demands `K` at BOTH phases, which is what keeps
-   it free of a phase-tracking run relation. A tail with no RAM write of its
-   own — a walking LOAD — has that for nothing through §4's embedding. A
-   walking STORE's tail needs the phase-`false` arm only, and to know the
-   phase IS `false` there one must know the prefix TOOK its racy read (a
-   TLB-miss walk always reads its leaf, so it is true — it is just not
-   expressible without a "did this run read the window" companion to `wrun`).
-   Either build that companion, or take the pre-racy-write widening of §8.5,
-   which dissolves the phase question for `D = wD_any` altogether.
+   **THE STORE CASE IS CLOSED (2026-08-12), by the PHASE-FLIP design** —
+   a third route, cheaper than both this note used to list (no run
+   companion, no §8.5 `wadm` transport).  The observation (user's): the
+   phase bit's only power is gating the racy-read disjunct, so FLIPPING to
+   phase-`false` early merely RENOUNCES the racy read — always sound.  The
+   only obstruction was the write arm's `b = false` conjunct, and
+   measurement showed it served the peel's consumers unevenly: the two
+   wexec-direction traversals never use it for the exec construction (only
+   for a `wadm_filter`-transport premise, see the delta below), and the one
+   real consumer is `exec_of_wrun_racy_gen`'s write-refutation — a BRIDGE
+   concern, the same situation §7 found for `racc_disj`.  Same cure: the
+   peel gained `W : Prop` ("pre-racy writes permitted") — the write arm's
+   conjunct is `(b = false ∨ W)` — with the bridge cone at `W := False`
+   (byte-identical strength) and traversals/producers/CPS kit W-generic.
+   New exports (`WeakStale` §8, all closed under the global context):
+   `wstep_ok_racy_phase_mono{,_gen}` (at `W := True`, a phase-`false` peel
+   IS a phase-`true` peel), `wstep_ok_racy_k_of_run_false` (K-monotone
+   variant demanding the tail at phase `false` only), and the
+   consumer-facing `wstep_ok_racy_bind_false` — racy prefix at `W`, WRITING
+   tail certified at phase `false` only, which the W-generic §4 embedding
+   supplies from an ordinary `wstep_ok`.  A walking STORE now composes.
+   **The one semantic delta, forced by measurement:** the write arm's
+   continuation runs at phase `false` UNCONDITIONALLY (was: at the current
+   phase) — i.e. a permitted pre-racy write itself renounces the racy read.
+   This is what keeps the traversals' `wadm_filter`-transport discharge
+   (`b = true → wadm_filter …` becomes vacuous post-write; with `D`
+   generic the permitted write may hit the window, where the filter
+   genuinely does not transport).  It is a no-op for every existing
+   instantiation and for the walk shapes (racy read THEN write).  What it
+   deliberately gives up: a write-then-racy-read peel at one window — the
+   same two-translation shape the single-window peel could not express
+   anyway; if that widening is ever built (§8.2's window-set direction),
+   the `wadm` transport across off-window writes returns as ITS price,
+   not this design's.
 
 ### 8.4 The variant arithmetic, worked out (why the outcome is still absorbed)
 
