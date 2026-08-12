@@ -146,6 +146,45 @@ PARM sources: `snu-sf/promising-arm` @ `10291375` (2022-09-01), read
   must additionally REFLECT per-byte ownership to prove φ inductively —
   see the rewritten W3, which budgets that as its own item.
 
+- **D-M6-8 (2026-08-12, coordinator — THE PREMISE-DISCHARGE SPLIT;
+  found while designing W3's exports, supersedes the reader/writer
+  "inert flag + φ conjunct" export items as the discharge mechanism
+  for the trace-global premises).**  Layer 1's premises (rf_edges_ok,
+  ee_ok, byte_ok) quantify over FULL-machine traces, but adequacy's φ
+  covers only pf-reachable states — and a full-machine trace position
+  po-after an early (pf-unsupported) read has a program state Iris
+  never visits, so a φ-derived flag conjunct ("no agent fulfils while
+  its discipline flag is set") CANNOT discharge them.  The way out is
+  a three-way split of each premise's content:
+  (a) MACHINE-side facts (EXT/COH/view arithmetic, `covered`,
+  waw-cover's vwNew inequality) — pure statements about the traced
+  wstates, premise-free or provable per-trace;
+  (b) VALUE-INDEPENDENT SITE facts — the aq bit of the reading
+  instruction, "the fence is the instruction immediately after the
+  racy load / immediately before the release store", which depend
+  only on the PC at the event, where minimal-cycle structure makes
+  the pc supported: a minimal cycle visits each agent in one po
+  segment (gpo shortcuts kill revisits), the segment head's po
+  predecessors all lie in the acyclic ancestry U (pf-real by the
+  subset sim), so the head's pc is Iris-covered, and the site's
+  discipline instructions execute unconditionally before any
+  value-dependent branch;
+  (c) the residue — discipline of positions po-after an unsupported
+  read, where only a static, value-independent code property can
+  help.  DECISION: the final theorem carries (c) as an EXPLICIT,
+  sharply-scoped static side condition on the kernel image (a
+  per-site-checkable predicate over the enumerated racy/release
+  sites; a checker tool is the recorded upgrade path), alongside the
+  D-M6-3 correspondence note.  φ/Iris remains load-bearing ONLY for
+  `pf_violation_free` (the SCowned arm), whose minimal-bad-edge use
+  is sound as designed (the exhibit prefix is pf-real by
+  construction).  This retires the store-reordering axiom into a
+  machine-checked theorem plus auditable static side conditions —
+  the honest form of the original goal.  W3's reader/writer
+  discipline export items are re-scoped accordingly: the inert
+  components stay (they make the site predicates statable) but the
+  premise discharge is per-site/static, not a φ conjunct.
+
 - **D-M6-7 (2026-08-11, after W1 slice 1 and W4 slice 1 landed with
   DIFFERENT LTSs): `WeakAxiomatic.exec` is the canonical promise-free
   execution object, and everything meets there by PROJECTION.**
