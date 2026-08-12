@@ -2421,3 +2421,25 @@ mirror, specs frozen before proofs, park-green protocol, stop-and-
 report on design surprises, lemma_diff + Print Assumptions gates,
 NEVER scp _CoqProject, no coordinator gates while an agent is live.
 The ~50 recorded traps live in projects/fs-namei.md's stage ledgers.
+
+## Reconcile round 12 (coordinator, 2026-08-12)
+
+Origin's 9: kexec phase A PROVEN (through the ELF header + both -1
+tails), the second nightly dead-import sweep (338/58 + 122/100), and
+5ca52338: 23 parking contracts' crossings moved from [wp_next b] to
+[wp_next true] (a park moves the hart with interrupts OFF; not a
+soundness bug today — eb = true forces b = true at the only
+constructible instance — but the crossings must move ahead of the
+eb-generic sweep). One textual conflict (ProofBmap's two gen-form
+hunks: our Sb binders + their true — both taken).
+
+**OWED (convention alignment, apply when each file's cone next
+rebuilds):** our five post-fork bodies still spell [wp_next b] —
+SpecBmap:492 (gen), SpecWritei:781 (gen), SpecBalloc:344 (gen),
+SpecFilewrite:531, SpecConsolewrite:143. The coincidence keeps them
+compiling; the eb sweep will not reach them until aligned. Same
+bucket as SpecReadi's stale comment (S3p).
+
+Mirror sync + the union full gate DEFERRED until S3r lands (live on
+the mirror at d6db9a27); S3r's walk proves SpecFilewrite as frozen,
+unaffected by the coincidence.
