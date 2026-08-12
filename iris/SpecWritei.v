@@ -126,6 +126,38 @@
    REGION below lies at or above [off + tot], hence at or above the new size,
    where coverage claims nothing.
 
+   ==== ...AND THE TWO CONJUNCTS A RE-PARKER NEEDS ======================
+
+   [IcacheEscrow.ic_loaded] carries [InodeLock.inode_ok cov logstart dn' bm'
+   data'], whose SEVEN conjuncts a caller that re-parks the inode after the
+   write has to rebuild.  Five of them are the clauses above (blkmap_wf,
+   bm_covers, di_addrs, [di_type] -- which [wi_dinode] keeps definitionally
+   -- and blk_holes_zero).  The remaining two are the SIZE CAP
+   [di_size dn' <= MAXFILE*BSIZE] (the [< 2^31] clause above is weaker) and
+   [InodeInv.inode_sized data'].  fileread re-parks the IDENTICAL record and
+   so never needed them; dirlink forwards rather than re-parks; filewrite is
+   the first caller to re-park a CHANGED payload, which is why they appear
+   only now.
+
+   BOTH ARE STATED AS PRESERVATIONS, not as facts, and they have to be.
+   Neither is provable outright:
+
+   - the size cap, because [wi_dinode] installs [max(di_size dn, off+tot)]
+     and the guard at +0x2a bounds only [off+n]; nothing in writei's
+     premises bounds the caller's OWN [di_size dn] below MAXFILE*BSIZE (the
+     premise is [< 2^31]), and on the -1 arm [dn' = dn] outright;
+   - [inode_sized], because writei touches only the blocks its range
+     straddles.  Every other index keeps [data i], whose length no resource
+     in the cone constrains ([FsBlocks.fsblock] is a bare ghost_map half --
+     InodeInv.v 503-506), and again on the -1 arm [data' = data].
+
+   So both would have to be PREMISES, at which point they would ripple into
+   SpecDirlink and every caller below it.  Stating the implication instead
+   costs a re-parking caller nothing -- it holds both antecedents already,
+   out of the very [inode_ok] it is going to rebuild -- and costs a caller
+   that does not re-park (dirlink) exactly nothing at all: no premise moves,
+   and the two clauses are dropped at its boundary.
+
    ==== A SHORT WRITE IS A NORMAL RETURN ================================
 
    The two breaks -- bmap returning 0 (out of blocks) and either_copyin
@@ -421,6 +453,11 @@ Definition wp_writei_sconf_body
       ⌜bv_unsigned (di_size dn') < 2 ^ 31⌝ -∗
       (* COVERAGE IS PRESERVED, AT THE NEW SIZE.  See the header. *)
       ⌜bm_covers bm' (bv_unsigned (di_size dn'))⌝ -∗
+      (* THE LAST TWO [InodeLock.inode_ok] CONJUNCTS, AS PRESERVATIONS.
+         See the header's "...AND THE TWO CONJUNCTS A RE-PARKER NEEDS". *)
+      ⌜bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+       bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE⌝ -∗
+      ⌜inode_sized data -> inode_sized data'⌝ -∗
       (* THE DISTURBED REGION: at most one block, immediately after the
          written range, and EMPTY unless a copy failed part-way.  See the
          header. *)

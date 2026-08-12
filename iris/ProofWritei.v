@@ -272,6 +272,9 @@ Section WriteiDefs.
         ⌜di_addrs dn' = bm_cells bm'⌝ -∗
         ⌜bv_unsigned (di_size dn') < 2 ^ 31⌝ -∗
         ⌜bm_covers bm' (bv_unsigned (di_size dn'))⌝ -∗
+        ⌜bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+         bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE⌝ -∗
+        ⌜inode_sized data -> inode_sized data'⌝ -∗
         ⌜(dist <= BSIZE)%nat⌝ -∗
         ⌜(tot = n)%nat -> dist = 0%nat⌝ -∗
         ⌜user = false -> dist = 0%nat⌝ -∗
@@ -357,6 +360,9 @@ Section WriteiRet.
     di_addrs dn' = bm_cells bm' ->
     bv_unsigned (di_size dn') < 2 ^ 31 ->
     bm_covers bm' (bv_unsigned (di_size dn')) ->
+    (bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+     bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE) ->
+    (inode_sized data -> inode_sized data') ->
     (dist <= BSIZE)%nat ->
     ((tot = n)%nat -> dist = 0%nat) ->
     (user = false -> dist = 0%nat) ->
@@ -406,7 +412,8 @@ Section WriteiRet.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hs1 Hs3 Hs8 Hs9 Hs10 Hs11
-           Hwf' Hhz' Hadr' Hsz' Hcov' Hdb Hd0 Hdk Hrange Hker Harm Hlo Hhi Hext.
+           Hwf' Hhz' Hadr' Hsz' Hcov' Hcap' Hsized' Hdb Hd0 Hdk Hrange Hker Harm
+           Hlo Hhi Hext.
     pose proof HK as HK'. unfold K_writei in HK'.
     iIntros "Hcg Hcnt #Htext Hpc Hframe Hppid Hidev Hinum
               Hmeta Hmap Hblocks Hsb Hba Hdn Hsrc Hsl Hop Hcont".
@@ -661,7 +668,7 @@ Section WriteiRet.
     rewrite /wi_cont.
     iSpecialize ("Hcont" $! CID9 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! P8 tot bm' data' dn' dn0' n' wrote dist dstb P'
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hdn
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hdn
                     Hsrc Hsl Hop").
     { unfold callee_saved. split_and!; assumption. }
     { exact Hwf'. }
@@ -669,6 +676,8 @@ Section WriteiRet.
     { exact Hadr'. }
     { exact Hsz'. }
     { exact Hcov'. }
+    { exact Hcap'. }
+    { exact Hsized'. }
     { exact Hdb. }
     { exact Hd0. }
     { exact Hdk. }
@@ -715,6 +724,11 @@ Section WriteiJoin.
     blk_holes_zero bm' data' ->
     bv_unsigned (di_size dn') < 2 ^ 31 ->
     bm_covers bm' (bv_unsigned (di_size dn')) ->
+    (* the +0x2a guard's cap, and [inode_sized] carried across the loop --
+       the two [inode_ok] conjuncts a re-parking caller needs.  See
+       SpecWritei.v's header. *)
+    (off + tot <= MAXFILE * BSIZE)%nat ->
+    (inode_sized data -> inode_sized data') ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
     wi_sp m M ->
@@ -774,6 +788,7 @@ Section WriteiJoin.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hadr Hwf' Hhz' Hsz' Hcov'
+           Hrngt Hsized'
            Hj Hgl Hsp Hs5 Hs3 Hs1 Hs8 Hs9 Hs10 Hs11 Hdb Hd0 Hdk Hrange Hker Htotn Hdneq
            Hlo Hhi Hext.
     pose proof HK as HK'. unfold K_writei in HK'.
@@ -967,7 +982,11 @@ Section WriteiJoin.
               pidv dq dqd dqn dqs A j m T3 K C b
               HK HT3sp HT3s1 HT3s3 HT3s8 HT3s9 HT3s10 HT3s11
               Hwf' Hhz'
-              Hadr Hsz' Hcov' Hdb Hd0 Hdk Hrange Hker
+              Hadr Hsz' Hcov'
+              ltac:(intros Hc; rewrite Hdneq;
+                    exact (wi_size_cap bm' dn off tot Hrngt Hc))
+              Hsized'
+              Hdb Hd0 Hdk Hrange Hker
               ltac:(right; split_and!;
                     [exact HT3a0 | exact Htotn | exact Hdneq | reflexivity])
               Hlo Hhi Hext
@@ -1020,6 +1039,10 @@ Section WriteiSize.
     bm_covers bm' (Z.of_nat (off + tot)) ->
     bv_unsigned (di_size dn) < 2 ^ 31 ->
     Z.of_nat (off + tot) < 2 ^ 31 ->
+    (* the +0x2a guard's cap, and [inode_sized] carried across the loop --
+       forwarded to [wi_join].  See SpecWritei.v's header. *)
+    (off + tot <= MAXFILE * BSIZE)%nat ->
+    (inode_sized data -> inode_sized data') ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
     wi_sp m M ->
@@ -1074,6 +1097,7 @@ Section WriteiSize.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hwf' Hhz' HcovS HcovT Hszlt Hofflt
+           Hrngt Hsized'
            Hj Hgl Hsp Hs5 Hs2 Hs3 Hdb Hd0 Hdk Hrange Hker Htotn Hlo Hhi Hext.
     pose proof HK as HK'. unfold K_writei in HK'.
     change (2 ^ 31)%Z with 2147483648%Z in Hszlt, Hofflt.
@@ -1324,7 +1348,7 @@ Section WriteiSize.
                 dist dstb V P' ncount u pidv dq dqd dqn dqs A m QB5 K C b
                 HK Hgeom Hist Hicov Hilog Hnib Hdtnz eq_refl Hwf' Hhz'
                 ltac:(rewrite Hdsz; change (2 ^ 31)%Z with 2147483648%Z; exact Hszlt)
-                Hcovf
+                Hcovf Hrngt Hsized'
                 Hj Hgl HQB5sp HQB5s5 HQB5s3
                 HQB5Rs1 HQB5Rs8 HQB5Rs9 HQB5Rs10 HQB5Rs11
                 Hdb Hd0 Hdk Hrange Hker Htotn eq_refl Hlo Hhi Hext
@@ -1526,7 +1550,7 @@ Section WriteiSize.
                 dist dstb V P' ncount u pidv dq dqd dqn dqs A m QA5 K C b
                 HK Hgeom Hist Hicov Hilog Hnib Hdtnz eq_refl Hwf' Hhz'
                 ltac:(change (2 ^ 31)%Z with 2147483648%Z; exact Hszn)
-                Hcovf
+                Hcovf Hrngt Hsized'
                 Hj Hgl HQA5sp HQA5s5 HQA5s3
                 HQA5Rs1 HQA5Rs8 HQA5Rs9 HQA5Rs10 HQA5Rs11
                 Hdb Hd0 Hdk Hrange Hker Htotn eq_refl Hlo Hhi Hext
@@ -1604,6 +1628,11 @@ Section WriteiLoop.
     (tot < n)%nat ->
     blkmap_wf cov logstart bmI ->
     blk_holes_zero bmI dataI ->
+    (* [InodeInv.inode_sized], carried as a PRESERVATION: writei touches only
+       the blocks its range straddles, so the fact about the untouched ones
+       is the caller's and travels through unchanged.  Re-established at each
+       deposit ([wi_sized_bmap]) and each block update ([wi_splice_len]). *)
+    (inode_sized data -> inode_sized dataI) ->
     (* COVERAGE, in two halves.  The first is the caller's premise carried
        across every bmap call by [bm_covers_keep]; the SECOND is the loop's
        own invariant -- every block below the byte offset reached so far has
@@ -1680,7 +1709,8 @@ Section WriteiLoop.
     intro W. revert CID0.
     induction W as [| W IH];
       intros CID0 tot bmI dataI wroteI PI nI M
-             Htotlt HwfI HhzI HcovSI HcovTI HrangeI HkerI HextI HW1 HW2 HW3 HW4 HW5
+             Htotlt HwfI HhzI HsizedI HcovSI HcovTI HrangeI HkerI HextI
+             HW1 HW2 HW3 HW4 HW5
              Hsp Hs5 Hs7 Hs4 Hs2 Hs6 Hs3 Hs9 Hs8 Hprkc;
       [ exfalso; pose proof (wi_blocks_pos (off + tot) (n - tot) ltac:(lia)); lia |].
     remember ((off + tot) `div` BSIZE)%nat as fbn eqn:Hfbne.
@@ -1883,6 +1913,9 @@ Section WriteiLoop.
                 pidv dq dqd dqn dqs A m B1 K C b
                 HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hwf2 Hhz2 HcovS2 HcovT2
                 Hszdn ltac:(lia)
+                ltac:(lia)
+                ltac:(intros Hs; exact (wi_sized_bmap bmI dataI data2 fbn Hdep2
+                                          (HsizedI Hs)))
                 Hj Hgl HB1sp HB1s5 HB1s2 HB1s3 ltac:(lia) ltac:(intros; reflexivity)
                 ltac:(intros; reflexivity)
                 (wi_range_dist0 data data2 off tot wroteI wroteI Hrange2)
@@ -2773,6 +2806,10 @@ Section WriteiLoop.
                       pidv dq dqd dqn dqs A m G3 K C b
                       HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hwf2 Hhz3 HcovS2 Hcov3
                       Hszdn ltac:(lia)
+                      ltac:(lia)
+                      ltac:(intros Hs;
+                            exact (wi_sized_step bmI data dataI data2 fbn o mm g
+                                     Hdep2 HsizedI Hs))
                       Hj Hgl HG3sp HG3s5 HG3s2 HG3s3
                       ltac:(lia) ltac:(intros; reflexivity)
                       ltac:(intros; reflexivity)
@@ -2815,7 +2852,11 @@ Section WriteiLoop.
                          ltac:(wp_next_chain) with "Hcont") as "Hcont".
             iApply (IH CIDc11 (tot + mm)%nat bm2
                       (<[fbn := wi_splice (data2 fbn) o mm g]> data2) wrote2 P2 uX G3
-                      ltac:(lia) Hwf2 Hhz3 HcovS2 Hcov3 Hrange3 Hker3 Hext2
+                      ltac:(lia) Hwf2 Hhz3
+                      ltac:(intros Hs;
+                            exact (wi_sized_step bmI data dataI data2 fbn o mm g
+                                     Hdep2 HsizedI Hs))
+                      HcovS2 Hcov3 Hrange3 Hker3 Hext2
                       ltac:(lia) ltac:(lia) ltac:(lia) ltac:(lia) ltac:(lia)
                       HG3sp HG3s5 HG3s7 HG3s4 HG3s2 HG3s6 HG3s3 HG3s9 HG3s8 Hprkc
                       with "Hcg Hcnt Htext Hpc Hpanic Hkdata Hprkenv Hbio Hlctx
@@ -2984,6 +3025,10 @@ Section WriteiLoop.
                     pidv dq dqd dqn dqs A m mR K C b
                     HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hwf2 Hhz3 HcovS2 HcovT2
                     Hszdn ltac:(lia)
+                    ltac:(lia)
+                    ltac:(intros Hs;
+                          exact (wi_sized_step bmI data dataI data2 fbn o mm g
+                                   Hdep2 HsizedI Hs))
                     Hj Hgl HRsp HRs5 HRs2 HRs3
                     ltac:(rewrite Hbsz in Hmmo |- *; lia)
                     ltac:(intros Heq; exfalso; lia)
@@ -3171,7 +3216,7 @@ Section WriteiMain.
     { rewrite /wi_cont. iEval (rewrite /wp_next).
       iIntros (CIDf) "%Hchain".
       iIntros (mf tot bm2 data2 dn2 dn02 n2 wrote dist dstb P2)
-        "%C1 %C2 %C3 %C4 %C5 %C6 %C7 %C8 %C8k %C9 %C10 %C11 %C12 %C13
+        "%C1 %C2 %C3 %C4 %C5 %C6 %Ccap %Csz %C7 %C8 %C8k %C9 %C10 %C11 %C12 %C13
          Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb
          Hba Hdn Hsrc Hsl Hop".
       iDestruct "Hba" as "(%Hgok2 & Hszc & Hbmsc & Hbmg)".
@@ -3179,10 +3224,12 @@ Section WriteiMain.
       iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
       iApply ("Hcont" $! mf tot bm2 data2 dn2 dn02 n2 wrote dist dstb P2 uOut
                 with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
+                      [%] [%]
                       Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap
                       Hblocks Hsb Hszc Hbmsc Hbmres Hdn Hsrc Hsl Hop").
       { exact C1. } { exact HuOut. } { exact C2. } { exact C3. }
-      { exact C4. } { exact C5. } { exact C6. } { exact C7. } { exact C8. }
+      { exact C4. } { exact C5. } { exact C6. }
+      { exact Ccap. } { exact Csz. } { exact C7. } { exact C8. }
       { exact C8k. }
       { exact C9. } { exact C10. } { exact C11. } { exact C12. }
       { exact C13. } }
@@ -3294,7 +3341,7 @@ Section WriteiMain.
       iSpecialize ("Hcont" $! CIDx3 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! X1 0%nat bm data dn dn0 ncount
                 (fun _ => bv_0 8) 0%nat (fun _ => bv_0 8) (pv_upt V)
-                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hdn
+                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hdn
                       [Hsrc] Hsl Hop").
       { unfold callee_saved. split_and!; lkp. }
       { exact Hwf. }
@@ -3302,6 +3349,8 @@ Section WriteiMain.
       { exact Hadr. }
       { exact Hszdn. }
       { exact Hcovin. }
+      { intros Hc. exact Hc. }
+      { intros Hc. exact Hc. }
       { unfold BSIZE. lia. }
       { reflexivity. }
       { reflexivity. }
@@ -3690,6 +3739,7 @@ Section WriteiMain.
                 pidv dq dqd dqn dqs A j m Y1 K C b
                 HK HY1sp ltac:(lkp) ltac:(lkp) ltac:(lkp) ltac:(lkp) ltac:(lkp)
                 ltac:(lkp) Hwf Hhz Hadr Hszdn Hcovin
+                ltac:(intros Hc; exact Hc) ltac:(intros Hc; exact Hc)
                 ltac:(unfold BSIZE; lia) ltac:(intros; reflexivity)
                 ltac:(intros; reflexivity)
                 ltac:(intro k; rewrite decide_False; [| lia];
@@ -3830,7 +3880,8 @@ Section WriteiMain.
                 user off 0%nat 0%nat src_bytes (fun _ => bv_0 8)
                 0%nat (fun _ => bv_0 8) V (pv_upt V) (S unc) unc
                 pidv dq dqd dqn dqs A m Z1 K C b
-                HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hadr Hwf Hhz Hszdn Hcovin Hj Hgl
+                HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hadr Hwf Hhz Hszdn Hcovin
+                ltac:(lia) ltac:(intros Hc; exact Hc) Hj Hgl
                 HZ1sp HZ1s5 HZ1s3 ltac:(lkp) ltac:(lkp) ltac:(lkp) ltac:(lkp)
                 ltac:(lkp) ltac:(unfold BSIZE; lia) ltac:(intros; reflexivity)
                 ltac:(intros; reflexivity)
@@ -4031,7 +4082,7 @@ Section WriteiMain.
               pidv dq dqd dqn dqs A m K C b
               HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hszdn Hofflt Hnlt Hrng Ha1 Hj Hgl
               (wi_blocks off n) 0%nat bm data (fun _ => bv_0 8) (pv_upt V) ncount U3
-              ltac:(lia) Hwf Hhz Hcovin
+              ltac:(lia) Hwf Hhz ltac:(intros Hc; exact Hc) Hcovin
               ltac:(apply (bm_covers_mono bm (bv_unsigned (di_size dn)) _ Hcovin);
                     rewrite Nat.add_0_r; exact Hbig)
               ltac:(intro k; rewrite decide_False; [reflexivity | lia])

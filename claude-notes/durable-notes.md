@@ -479,6 +479,24 @@ Two mitigations worth reaching for before budgeting the full sweep:
   designing FOR: keep such side conditions in one named, Ltac-discharged
   predicate rather than as loose conjuncts.
 
+**The mirror-image plan — "the POSTCONDITION gains a conjunct, so no premise
+moves and no call site changes" — is only free if the callee's own premises
+already imply the conjunct, AND THE ARM TO CHECK IS THE ONE THAT RETURNS ITS
+INPUTS UNTOUCHED.**  An early-return arm typically answers with the caller's
+own record (`dn' = dn`, `data' = data`), so a new postcondition conjunct about
+the OUTPUT is, on that arm, a claim about the INPUT — which the callee was
+never given.  Both of `SpecWritei`'s two added `inode_ok` conjuncts failed
+exactly there (and the size cap failed on the writing arm too, because
+`max(old, new)` is unbounded when the old one is), and stating them
+unconditionally would have forced them to become premises and rippled into
+`SpecDirlink` and every caller below.  **When the consumer that wants the fact
+already holds it going in — which it does whenever the fact is a conjunct of
+an invariant it is about to REBUILD — state the PRESERVATION,
+`⌜P input -> P output⌝`, not the fact.**  It is provable, it is genuinely
+additive, and the consumer discharges the antecedent from the bundle it
+already opened.  Budget a postcondition strengthening only after checking it
+against every arm that returns an input verbatim.
+
 Corollary on picking the premise: **guard a side condition on the index that makes
 it necessary.**  `src_ok b rs := b = true -> Regidx rs <> Regidx Rtp` is provable
 at every site, whereas the unguarded `rs <> Rtp` is UNPROVABLE at the three places

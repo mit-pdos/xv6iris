@@ -2038,9 +2038,17 @@ Section ProofDirlinkMain.
                         Hiregi Hdat Hsrc Hppid Hprocs Hdev Hgeom Hdlk Hbsl
                         Hop [-]").
         iIntros (CIDwi Hswi mwi tot bm' data' dn' dn0' nn wrote dist dstb P' used')
-          "%Hcswi %Hused %Hwf' %Hholes' %Haddrs' %Hsz' %Hcov' %Hdistb %Hdist0
+          "%Hcswi %Hused %Hwf' %Hholes' %Haddrs' %Hsz' %Hcov' %Hcap' %Hsized'
+           %Hdistb %Hdist0
            %Hdistk %Hrange %Htie %Harm %Hbud %Hupt Hcg Hcnt Hpc Hppid Hidev Hiinum
            Hmeta Hmap Hblocks Hsbi Hsbs Hsbb Hbmr Hdat Hsrc Hbsl Hop".
+        (* writei's two PRESERVATION clauses (SpecWritei.v's header) are for a
+           caller that RE-PARKS the inode; dirlink forwards its record to its
+           own caller instead, so they are dropped at this boundary.  When
+           create needs them they are here, and both antecedents are already
+           dirlink's premises (the size cap literally, [inode_sized] once it
+           is added). *)
+        clear Hcap' Hsized'.
         (* THE DISTURBED REGION IS EMPTY (fs-icache.md §15.1(i)): dirlink's
            source is its own stack record, so writei ran on the KERNEL arm
            and [dist = 0].  Substituting it here is what turns the range

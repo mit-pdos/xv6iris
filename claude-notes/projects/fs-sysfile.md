@@ -961,6 +961,182 @@ after the scp: `ProofFilewriteParts.v` `3499da0354bcdf79e3fceef8ac8928d2`.
 `_CoqProject` NOT touched (no new file).  Mirror `git status`:
 `iris/ProofFilewriteParts.v` modified, nothing else; no scratch left.
 
+## S3i — the `SpecWritei` repair LANDED AND FULL-GATED (as PRESERVATIONS, not
+## facts); `ProofFilewrite` STOPPED AND REPORTED on the LOG BUDGET
+
+### Part 1 — landed, full-gated
+
+`SpecWritei`'s postcondition gains S3h's two clauses, placed right after
+`bm_covers`, but **as PRESERVATIONS**:
+
+```coq
+⌜bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+ bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE⌝ -∗
+⌜inode_sized data -> inode_sized data'⌝ -∗
+```
+
+**S3h's "both are provable outright" is WRONG, and the implication form is
+what makes the ruling's "premise counts unchanged everywhere" achievable.**
+Neither clause holds unconditionally:
+
+- **the size cap.**  `wi_dinode` installs `max(di_size dn, off+tot)`.  The
+  +0x2a guard bounds `off+n`, and nothing in writei's premises bounds the
+  CALLER's `di_size dn` below `MAXFILE*BSIZE` — the premise is `< 2^31`,
+  which is 7800× weaker.  So the max can exceed the cap on the WRITING arm,
+  and on the -1 arm `dn' = dn` outright.  S3h's "(5) is nearly free /
+  a threading job" is true only of the `off+tot` half of the max.
+- **`inode_sized`.**  writei touches only the blocks its range straddles;
+  every other index keeps `data i`, whose length no resource in the cone
+  constrains (`FsBlocks.fsblock` is a bare ghost_map half — InodeInv.v
+  503-506, which is the very reason conjunct 7 exists).  And again
+  `data' = data` on the -1 arm.
+
+Stated unconditionally they would both have to become PREMISES, i.e. exactly
+the ripple the ruling forbade: `SpecDirlink` would gain `inode_sized data`
+(it already has the size cap at :265) and create/S5 would owe both.  The
+implication form costs a re-parking caller nothing — filewrite holds both
+antecedents already, out of the very `inode_ok` it is about to rebuild — and
+costs dirlink nothing at all (`clear`ed at its boundary with a comment).
+
+Threading, as built:
+
+- `ProofWriteiParts`: `wi_size_cap` (the max, over `Z` throughout so the
+  274432 literal is never unary), `wi_sized_bmap` (across bmap's deposit —
+  the deposited block is a `replicate BSIZE`), `wi_sized_step` (deposit then
+  block update; `wi_splice` is built from `seq 0 BSIZE`, so `wi_splice_len`
+  is the length).
+- `ProofWritei`: `wi_cont` +2 clauses; `wi_ret` +2 (the implications);
+  `wi_join` / `wi_size` +2 each (`(off+tot <= MAXFILE*BSIZE)%nat` plus the
+  `inode_sized` implication — wi_join DERIVES the size-cap implication from
+  the former with `wi_size_cap`); `wi_loop`'s invariant carries
+  `inode_sized data -> inode_sized dataI`.
+- **FOUR top-level sites, not three.**  Besides `wi_ret`@3731 (the
+  `off+n > MAXFILE*BSIZE` -1 exit), `wi_join`@3873 (the n=0 path) and
+  `wi_loop`@4073, the `off > ip->size` -1 exit feeds `wi_cont` DIRECTLY with
+  an inline `iApply ("Hcont" $! …)` at :3342 — no `wi_ret` — so a
+  `grep "iApply (wi_ret"` sweep misses it.  It surfaces as
+  *"iSpecialize: cannot instantiate"* with the residual wand printed, ~450
+  lines below the sites you did edit.
+- `ProofDirlink`: **ONE** consumer site, not three (the S3h ripple estimate
+  of ":1692/:2060/:2436" is stale — `grep -rl wp_writei_sconf` gives exactly
+  `ProofDirlink.v`).  Its `iIntros` widens by two and the pair is `clear`ed.
+
+### Part 2 — STOPPED AND REPORTED: the FD_INODE loop cannot pay for a chunk
+
+**`begin_op` pays `log_op γ MAXOPBLOCKS` = 10 units.  writei's budget premise
+for the chunk the code hands it is up to 25.**  All figures machine-checked
+in a scratch probe (compiled `DONE = 0`, then deleted):
+
+| chunk | `wi_blocks` | `wi_cost` | vs MAXOPBLOCKS = 10 |
+|---|---|---|---|
+| `off = 0`, `n1 = 1024` | 1 | **7** | fits |
+| `off = 16*63`, `n1 = 16` (dirlink) | 1 | **7** | fits |
+| `off = 1023`, `n1 = 2` | 2 | **13** | BUSTS |
+| `off = 1023`, `n1 = 1024` | 2 | **13** | BUSTS |
+| `off = 0`, `n1 = 3072` | 3 | **19** | BUSTS |
+| `off = 1023`, `n1 = 3072` | 4 | **25** | BUSTS |
+
+`wi_cost off n = 6 * wi_blocks off n + 1`, and only `wi_blocks = 1` fits.  So
+the arm is provable ONLY for a chunk that stays inside one block — while the
+code's chunk is `n1 = min(n - i, 3072)` (s7/s9 at +0x42..+0x4e).  **The very
+first iteration of any write of more than one block busts it**, and a 2-byte
+write straddling a block boundary busts it too.  This is why no earlier
+caller hit it: dirlink's only write is 16 bytes at a 16-aligned offset
+(`ProofDirlink.dl_wi_cost : wi_cost (16*k) 16 = 7`), and readi has no budget
+at all.
+
+**It is the recorded looseness, coming due.**  `SpecWritei.v`'s own header
+says so: *"6 per block is bmap's worst case (two ballocs plus its own
+log_write), not the amortised cost -- the indirect block is allocated at most
+once in a file's life.  Tightening it needs an arm-aware bmap budget, not a
+change here."*  filewrite is the first caller for which the amortisation
+matters, and the gap between the model and the machine is 6/block vs. the
+2/block + fixed overhead that xv6's own `max` formula is derived from:
+`((MAXOPBLOCKS-1-1-2)/2)*BSIZE` reads "one slot for the inode, one for the
+indirect, two spare, and the rest two-per-data-block".
+
+**What a repair has to do (sized, not chosen — this is a coordinator ruling).**
+Three things stack, and the first two are proof engineering while the third
+may be a kernel finding:
+
+1. **Hoist the indirect block out of the per-block charge.**  bmap's 5 is
+   `2 ballocs x 2 + its own log_write`, but the INDIRECT balloc happens at
+   most once per file, not once per block.  An arm-aware `SpecBmap` budget —
+   the direct-hit arm at 0, the data-alloc arm at 2, the
+   indirect-alloc-too arm at 5 — turns writei's per-block 6 into a per-block
+   3 plus a per-CALL 3.  Touches `SpecBmap`, `ProofBmap`, `SpecWritei`'s
+   `wi_cost`, `ProofWritei`'s five budget `lia`s, and re-derives
+   `dl_wi_cost`.  Gets a 4-block chunk to `4*3 + 3 + 1 = 16`.  **Still > 10.**
+2. **Model log_write's ABSORPTION.**  balloc's `bzero` log_writes the very
+   block writei then log_writes again; xv6 charges that once.  `LogInv`
+   already has the set-indexed `log_opS γ u Sb` (:278) — the vocabulary
+   exists — but every fs.c spec above it is stated on the counted
+   `log_op γ u` (:288).  Absorption takes the per-block 3 to 2, i.e.
+   `2B + 3`.  For B = 3 that is 9; **for B = 4 it is 11, still > 10.**
+3. **B = 4 IS REACHABLE, and that is the part to rule on before building
+   anything.**  `f->off` need not be block-aligned (it advances by whatever
+   the last short write returned), so a 3072-byte chunk can straddle four
+   blocks, and xv6's own `max` formula budgets for three.  Either the honest
+   bound is `2B+3 <= 11 > MAXOPBLOCKS` — a genuine `kernel-defects.md`
+   candidate, the same shape as D1 — or there is an absorption argument that
+   makes the fourth block free (the two extreme blocks are partial, so at
+   most one of them can be a fresh allocation... which is FALSE for a write
+   past the end of the file).  **Check this against the machine before
+   choosing between (1)+(2) and a defect report.**
+
+Nothing else about the arm is in doubt: the re-park now closes (Part 1's two
+clauses are conjuncts 5 and 7, `wi_dinode` keeps `di_type` definitionally,
+`ity_shot_agree` pins the type and `dir_ok_not_dir` finishes), the share
+algebra is `fw_shr_gen_halve`/`fw_shr_regen`, and the whole tail is
+`fw_tail`.  The budget is the ONE thing between S3g's blocks and a complete
+`ProofFilewrite`.
+
+**`ProofFilewrite.v` / `LinkFilewrite.v` remain unwritten; file.c stays 6/7,
+and S4's three shells stay blocked.**
+
+### Gate (Part 1)
+
+Mirror `full.sh` `EXIT=0`, **1036 `.vo`** (unchanged — four files edited,
+none added), zero `Error`.  `tools/lemma_diff.py --ref HEAD`: *"4 file(s)
+checked -- CLEAN (nothing dropped, nothing admitted, no new assumption)"*.
+`Print Assumptions` in a scratch file (deleted afterwards):
+`Writei.wp_writei_sconf` and `Dirlink.wp_dirlink_sconf` = 5 platform axioms +
+`functional_extensionality_dep`; `Fileread.wp_fileread_sconf` = the same plus
+its known `Consoleread.wp_consoleread_sconf`; `Filestat.wp_filestat_sconf` =
+5 + funext.  Every set UNCHANGED.  md5s verified equal on both sides after
+every scp: `SpecWritei.v` `b20d163777ed09b8d112c8fad23b8b6b`,
+`ProofWriteiParts.v` `0d1d1e21ad0b0b7bf1485f9e410f7c7c`,
+`ProofWritei.v` `53d06fcccc3ddcbd856995012ee11d46`,
+`ProofDirlink.v` `8c096c231fe20f4c38ba7150ca9ea990`.  `_CoqProject` NOT
+touched (no new file).  Mirror `git status`: those four modified, nothing
+else; no scratch left.
+
+### Traps recorded
+
+1. **A POSTCONDITION-ONLY STRENGTHENING IS ONLY FREE IF THE CALLEE'S OWN
+   PREMISES ALREADY IMPLY IT — AND THE -1 ARM IS WHERE TO CHECK.**  Both of
+   S3h's clauses look like they follow from the loop, and both fail on the
+   early-return arm where the callee returns the caller's OWN record
+   untouched.  A "the post gains a conjunct, no premise moves" ruling should
+   be checked against every arm that returns its inputs verbatim before it is
+   budgeted; the escape, when the caller has the fact anyway, is to state the
+   PRESERVATION rather than the fact.
+2. **A LOG-BUDGET PREMISE IS A NUMERIC OBLIGATION AND WANTS ARITHMETIC, NOT
+   READING.**  writei's `wi_cost` and `MAXOPBLOCKS` are three lines apart in
+   two files and both look fine; the mismatch is only visible once you
+   evaluate `wi_cost` at the chunk the CODE passes.  Do that with a
+   `vm_compute` probe at the top of a stage that threads a reservation
+   through a loop, not after the ghost work is written.
+3. **`grep "iApply (<block lemma>"` DOES NOT FIND EVERY CONSUMER OF A
+   CONTINUATION.**  ProofWritei's `off > ip->size` arm inlines
+   `iApply ("Hcont" $! …)` instead of going through `wi_ret`, so a sweep that
+   widens the block lemmas' argument lists compiles for 20 minutes and then
+   fails at an untouched site.  Grep the CONTINUATION's name (`Hcont`) as
+   well as the lemmas'.
+4. **`lemma_diff` stays CLEAN across a pure statement-strengthening**, which
+   is correct and also means it is no evidence at all here — the gate that
+   sees this change is `Print Assumptions` plus the full build.
+
 ## The stage ladder
 
 - **S1** (agent): the DECODE stage — 13 Code files (the 12 targets +
@@ -1013,9 +1189,22 @@ after the scp: `ProofFilewriteParts.v` `3499da0354bcdf79e3fceef8ac8928d2`.
   stays FROZEN and correct.  `ProofFilewriteParts.fw_tail` (the whole
   +0xf4-to-epilogue join, all three arriving paths) LANDED and full-gated.
   `ProofFilewrite` / `LinkFilewrite` still unwritten; file.c stays 6/7.
-- **S3i** (agent, AFTER the S3h ruling): the `SpecWritei` repair, then
-  `ProofFilewrite` + `LinkFilewrite` on S3g's seven blocks + `fw_tail`.
-  Then file.c is 7/7.
+- **S3i** (agent) **— PARTIAL**: the `SpecWritei` repair LANDED and
+  full-gated, but as PRESERVATIONS (`di_size dn <= cap -> di_size dn' <= cap`
+  and `inode_sized data -> inode_sized data'`) — S3h's unconditional form is
+  UNPROVABLE on the -1 arm and on the writing arm alike, and the implication
+  is what keeps the ruling's zero premise ripple.  `ProofFilewrite` STOPPED
+  AND REPORTED on a SECOND blocker, the LOG BUDGET: `begin_op` pays
+  MAXOPBLOCKS = 10 and writei's `wi_cost` for the code's chunk is 13..25, so
+  the FD_INODE loop cannot discharge writei's budget premise for any chunk
+  that spans more than one block.  The S3i section has the machine-checked
+  table, why dirlink and readi never saw it, and the three-part sizing of a
+  repair (arm-aware bmap budget; log_write absorption via `LogInv.log_opS`;
+  and a kernel question — a four-block chunk may exceed MAXOPBLOCKS
+  outright).  file.c stays 6/7.
+- **S3j** (agent, AFTER the budget ruling): `ProofFilewrite` +
+  `LinkFilewrite` on S3g's seven blocks + `fw_tail`.  Then file.c is 7/7 and
+  S4's three shells unblock.
 - **S3b** (agent) **— PARTIAL**: filestat PROVEN AND LINKED (file.c 6/7);
   §17's fd-type witness STOPPED-AND-REPORTED as unimplementable in the ruled
   shape — design/fs-icache.md §17.1 has the finding and the repair (§17′) to

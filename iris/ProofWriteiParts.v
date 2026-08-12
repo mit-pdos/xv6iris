@@ -841,6 +841,61 @@ Proof.
   rewrite (moi32_small (Z.of_nat (off + tot)) Hlt32). exact Hct.
 Qed.
 
+(* THE SIZE CAP, [InodeLock.inode_ok]'s fifth conjunct.  [wi_dinode] installs
+   [max(old size, off + tot)], so the cap is PRESERVED rather than
+   established: the old size's cap is the caller's (it comes out of
+   [inode_ok] going in) and the new candidate is capped by the +0x2a guard.
+   Stated over [Z] throughout -- the [MAXFILE * BSIZE] product is never
+   forced into a unary [nat] literal (see [wi_maxfile_bsize]'s comment). *)
+Lemma wi_size_cap (bm' : blkmap) (dn : dinode) (off tot : nat) :
+  (off + tot <= MAXFILE * BSIZE)%nat ->
+  bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+  bv_unsigned (di_size (wi_dinode dn bm' off tot))
+    <= Z.of_nat MAXFILE * Z.of_nat BSIZE.
+Proof.
+  intros Hle Hcap.
+  assert (Hmb : Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432).
+  { rewrite <- Nat2Z.inj_mul. exact wi_maxfile_bsize. }
+  assert (Hz : Z.of_nat (off + tot) <= 274432).
+  { rewrite <- wi_maxfile_bsize. apply Nat2Z.inj_le. exact Hle. }
+  rewrite /wi_dinode. cbn [di_size].
+  case_decide as Hd; [| exact Hcap].
+  assert (Hlt32 : (0 <= Z.of_nat (off + tot) < 2 ^ 32)%Z).
+  { split; [apply Nat2Z.is_nonneg |].
+    change (2 ^ 32)%Z with 4294967296%Z. clear - Hz. lia. }
+  rewrite (moi32_small (Z.of_nat (off + tot)) Hlt32). rewrite Hmb. exact Hz.
+Qed.
+
+(* [InodeInv.inode_sized] across bmap's DEPOSIT: the deposited block is a
+   [replicate BSIZE], so the length is on hand and the fact is preserved by
+   [inode_sized_insert].  (The same lemma, at [wi_splice], covers writei's
+   own block update -- see [wi_splice_len].) *)
+Lemma wi_sized_bmap (bm : blkmap) (data data' : nat -> list (bv 8)) (fbn : nat) :
+  (data' = data \/ (bv_unsigned (blkmap_get bm fbn) = 0
+                    /\ data' = <[fbn := replicate BSIZE (bv_0 8)]> data)) ->
+  inode_sized data -> inode_sized data'.
+Proof.
+  intros [-> | [_ ->]] Hs; [exact Hs|].
+  apply (inode_sized_insert data fbn _ Hs). apply length_replicate.
+Qed.
+
+(* ...and across ONE WHOLE ITERATION: bmap's deposit, then the block update.
+   [wi_splice] rebuilds the block out of [seq 0 BSIZE], so its length is
+   BSIZE by construction ([wi_splice_len]). *)
+Lemma wi_sized_step (bm : blkmap) (data dataI data2 : nat -> list (bv 8))
+    (fbn o mm : nat) (g : nat -> bv 8) :
+  (data2 = dataI \/ (bv_unsigned (blkmap_get bm fbn) = 0
+                     /\ data2 = <[fbn := replicate BSIZE (bv_0 8)]> dataI)) ->
+  (inode_sized data -> inode_sized dataI) ->
+  inode_sized data ->
+  inode_sized (<[fbn := wi_splice (data2 fbn) o mm g]> data2).
+Proof.
+  intros Hdep HI Hs.
+  apply (inode_sized_insert data2 fbn _
+           (wi_sized_bmap bm dataI data2 fbn Hdep (HI Hs))).
+  apply wi_splice_len.
+Qed.
+
 (* ===================================================================== *)
 (*  (5) MISCELLANY                                                        *)
 (* ===================================================================== *)
