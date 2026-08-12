@@ -85,6 +85,39 @@ mint S for them only if a racy lock read ever appears.
   therefore carry "the message's tid is a hart" — closed by the
   DMA-tid unification item below (seam 1c/d).
 
+## 1c. The migration test: the ownership ping-pong (Stage 1 now, Stage 2 at the port)
+
+**Stage 1 — `WkOwnPingPong.v` (buildable on the C/D/S + φ base; the
+protocol's acid test).**  Two harts, one flag word (lock, stays CLEAN —
+`ak_latest` AMO acquires, WCrel releases), one TRANSFERRED byte x, one
+deliberately PRIVATE byte y:
+A: `x := 1` (dirty-A), `y := 1` (dirty-A, never transferred);
+`fence rw,w`; flag store (WCrel — the flip bundle carries x, NOT y);
+deposit `↦w{1} x`.  B: spin-acquire; `load x = 1` (clean arm);
+`x := 2` (dirty-B — author alternation); fence; release back.
+A: re-acquire; `load x = 2`; still uses its dirty y freely (the flip is
+per-byte selective; the frame is real).  Tests in one proof: the
+release-site `wlat_flip` at a REAL site (its "my WCrel message is the
+log's last" premise holds because the flip is atomic with the append),
+`wpt_own_of_wpt` on the receiving side, the
+`WDirty A → WClean → WDirty B` cycle, the `⊒view_byte` transfer through
+the payload, and — with φ landed — all three arms of the
+`no_violation` preservation trichotomy exercised in one run.
+
+**Stage 2 — the REAL migration test (a PORT TARGET, gated on the S-mode
+scheduler cone): the same program with the handoff replaced by
+`wp_next`/`p_sched`** — the parked-continuation crossing where the
+proof context teleports instead of passing through an explicit payload.
+The parked closure may contain only migration-stable resources
+(`cobj ξ`, clean `↦w`, `ctx_view_lb`); the park site inherits "flip
+everything dirty in the closure at the parking release".  Stage 2
+decides empirically between the INTERIM RULE (publish-before-park —
+matches what xv6's scheduler crossing physically does: the `p->lock`
+release is fence-then-store; prior: this survives, and the
+context-indexed dirty author is never needed) and the heavier
+`WDirty ξ` redesign.  Keep Stage 1's program shape so Stage 2 is a
+drop-in replacement of the handoff.
+
 ## 2. Per-residue framework changes
 
 - **WeakLang ⇐ lift (seam 1)**: (a) fold INTERRUPT DELIVERY into the
