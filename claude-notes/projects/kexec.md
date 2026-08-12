@@ -29,7 +29,8 @@ kexec-specific is the *composition*.
 | `StackBytes.slotsn_bytes_own` (general n-slot carve) | **landed, proven** |
 | `WpSconfAlu` base-encoded sp movers (width-generic) | **landed, proven** |
 | `ProofKexecParts.v` — frame carve, `kxc_epi`, `kxc_frame` | **landed, proven** |
-| `ProofKexecA.v` … `D` — the whole-function proof | NOT STARTED |
+| `ProofKexecA.v` — **PHASE A PROVEN** (`kxc_a1`/`kxc_a2`/`kxc_phaseA`) | **landed, proven** |
+| `ProofKexecB/C/D.v` — phases B, C, D | NOT STARTED |
 
 `exec.c` is 1/2 functions, 32/892 bytes. `Print Assumptions
 Flags2perm.wp_flags2perm_sconf` is byte-identical to what every leaf carries
