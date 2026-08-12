@@ -270,6 +270,14 @@ are working on that effort — the relevant `projects/` file.
   unifications for the WeakLang lift, why `bad_wf` stays declared even
   then, and the ordering: this lands BEFORE the mass SC→weak port
   because it rewrites the leaf interfaces the port replicates.
+- **[`weak-memory-walk-bridge.md`](design/weak-memory-walk-bridge.md)** —
+  OPEN ISSUE, 6a's last item and the gate on 6b/6c: the page-table walk reads
+  its leaf slot twice in one step (plain, racy; then exclusive, latest) with
+  no write between, and the racy bridge describes a weak run as an SC run at
+  ONE patched memory — which a kind-blind `exec` cannot make return two
+  different values.  Which trace shapes are affected (one of five), the three
+  ways out with a recommendation, why the recommended one also dissolves the
+  multi-window question, and how it sequences against the φ-upgrade surgery.
 - **[`weak-memory-m6-robustness.md`](design/weak-memory-m6-robustness.md)** —
   M6's tee-up: closing the store-reordering gap.  The promise-free machine is
   STRONGER than RVWMO (it excludes LB and observable W→W reordering), so

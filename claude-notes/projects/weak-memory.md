@@ -40,6 +40,19 @@ context-indexed (`WeakCtx`, `cobj`); the hart-indexed layer is gone.
 Measured: the weak proof bodies are **1.4× their SC twins**, down from
 2.5–4.4× (see the conversion slice at the end).
 
+**⇒ OPEN ISSUE, AND IT IS 6a's LAST ITEM:**
+[`design/weak-memory-walk-bridge.md`](../design/weak-memory-walk-bridge.md).
+The walk reads the leaf slot TWICE in one step — plain (racy) then exclusive
+(`ak_latest`) with no intervening write — and the racy bridge's
+single-patched-`exec` conclusion cannot express that, since
+`RiscvExec.exec` is kind-blind and `wpatch_st` fixes ONE window value.  Not
+a strengthenable premise; a shape problem.  Exactly one of the absorption
+theorem's five trace shapes is blocked (the TLB-miss walk WITH the A/D
+writeback); the other four are covered or need no racy window.  Three
+options, a recommendation, and a sequencing interaction with the φ-upgrade's
+site-predicate surgery are in that file.  **A decision is owed before any
+more code.**
+
 **ALSO DONE (2026-08-11): BATCH 5's SECOND HALF.**  `wstarted_gain` is no
 longer a leaf premise — it is `WeakRacy.wgain`, PROVED from the model by
 `exec_of_wrun_gain` — and the delivery lemmas now cover the fence kinds the
