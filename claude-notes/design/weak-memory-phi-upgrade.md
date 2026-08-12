@@ -332,6 +332,26 @@ hygiene so two `CurCtx` instances never silently coexist; two-context
 lemmas use the explicit spelling only.  Acceptance: the examples'
 access scripts written with bare `↦wo`, zero explicit ξ outside the
 yield/scheduler lemmas.
+**LANDED (2026-08-12, 3 files, green, adequacy unchanged).**  As-built:
+class + notation + convention block in WeakVProp §3''; CpuId's
+conventions mirrored exactly (bare singleton class, ZERO instances —
+every supplier a local binder; notation over the primitive), PLUS
+`Typeclasses Opaque cur_ctx` and the load-bearing NAMED-binder rule:
+`` `{XI : CurCtx} `` not anonymous — Coq auto-names an anonymous
+instance `H`, colliding with `iIntros "%H"` ("H is already used").
+Acceptance passed: `wyf_touch` takes NO context argument and its two
+instantiations (hart A pre-yield, hart B post-migration) differ only
+in the hart; `cur_ctx` resolves to the one section instance on both
+sides — the same ξ, the property CpuId lacks.  MEASURED HAZARD
+(documented next to the class, not papered over): with two `CurCtx`
+hypotheses in scope, `cur_ctx` silently resolves to the LAST-declared
+one (no warning) — so transfer-joining lemmas (both sides' contexts in
+scope) MUST spell ξ explicitly; explicit terms print unsugared, so the
+spellings stay visually distinct.  `_cur` one-line corollaries wrap
+the own rules; ξ-explicit originals remain the primitives;
+`wpt_dirty` deliberately stays explicit (the sharp exhibit form).
+Process note: use DISTINCT build-log sentinel names per run (a dead
+build's `echo EXIT` can append into a same-named live log).
 
 **Stage 2 — the REAL migration test (a PORT TARGET, gated on the S-mode
 scheduler cone): the same program with the handoff replaced by
