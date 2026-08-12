@@ -1804,6 +1804,196 @@ no `Axiom`, no `cheat_`.  md5s equal on both sides: `ProofFilewrite.v`
    `pgrep -af coqc` progress check reports nothing while a compile is
    running, which reads as a dead job.
 
+## S3o -- STOPPED AND REPORTED: the SIXTH blocker is real, and `SpecReadi.v`
+## already named it.  `SpecWritei`'s USER ARM IS UNCALLABLE
+
+**`ProofFilewrite.v`'s walk was not started.**  The stop is at ONE premise of
+ONE call -- writei's, at `+0xa0` -- and it is not a discovery: it is the item
+`claude-notes/design/file-table.md` files under **"OWED: `SpecWritei.v`
+cannot be called on its user arm"**, whose last line reads *"`filewrite` is
+the function that will hit this, and it should be done BEFORE that proof is
+started rather than during it."*  S3o is that hit.
+
+### What S3n's clearance (4) got wrong
+
+S3n cleared the writei call by reading **SpecWritei's own comment at the
+premise** -- *"On the user arm this is `proc_priv`'s own quarter
+(`ProcInv.proc_priv_pid`)"* (SpecWritei.v:501).  That comment is the stale
+one.  `SpecReadi.v`:255-263 is the correction, written when fileread became
+readi's first caller, and it says so in terms:
+
+> An earlier version of this contract asked for both at once, with a comment
+> claiming `proc_priv_pid` supplied the quarter alongside the block.  It does
+> not, and the user arm was uncallable; fileread, its first caller, is what
+> found it.  **`SpecWritei.v` still has the same shape.**
+
+**The rule this stage adds to the trap list: when a spec's premise is
+justified by a COMMENT rather than by a lemma, the comment is evidence about
+the author's belief, not about the resource algebra.  Clear it against the
+accessor's STATEMENT.**  `ProcInv.proc_priv_pid` (:892) is
+`proc_priv -* p_pid |->4{1/4} * (p_pid |->4{1/4} -* proc_priv)` -- a borrow,
+in the type.  Two seconds of reading the signature refutes the comment; S3n
+read the comment.
+
+### The precise goal
+
+filewrite's writei call passes `a1 = 1` (`c.li s8,1` at `+0x50`,
+`c.mv a1,s8` at `+0x9a`), so writei's `eq_vec (m !!! Ra1) zero_reg = negb
+user` forces **`user = true`**.  On that arm `wp_writei_sconf_body`
+(SpecWritei.v:497-502) demands, as two separate premises of the same call,
+
+```coq
+  (if user then proc_priv gf pj pidv V else <the caller's byte buffer>) -*
+  p_pid pj |->4{dq} pidv -*
+```
+
+and the walk holds exactly one of the two: `wp_filewrite_sconf_body` hands it
+`proc_priv gf pj pidv V`, and `filewrite_fs_env` contains no `p_pid` cell at
+any fraction.  The residual obligation is
+
+```coq
+  proc_priv gf (proc_addr j) pidv V
+    |- proc_priv gf (proc_addr j) pidv V * exists dq, p_pid (proc_addr j) |->4{dq} pidv
+```
+
+which is **false, not merely unproven**.  The cell totals one:
+`ProcInv.proc_priv_core` holds a half (:665) and `SchedCtx.proc_pub` the
+other behind `p->lock`.  There is no third fragment, so a `proc_priv` holder
+produces the fraction only by giving `proc_priv` up.  Widening
+`SpecFilewrite` instead is not an escape -- sys_write is in the same position
+one frame up, and `SpecFilewrite` is frozen.
+
+### What is NOT blocked -- the rest of the walk was cleared BY HAND
+
+S3o re-checked every other premise of every other call against what the walk
+holds at that instruction.  **This is the only unsatisfiable one.**
+
+- **The other four loop callees are clear, and clear for a REASON**:
+  `SpecBeginOp`, `SpecIlock`, `SpecIunlock` and `SpecEndOp` each take the
+  bare `p_pid pj |->4{dq} pidv` at a universally quantified `dq` and want no
+  `proc_priv` at all, so the accessor serves them exactly as it serves
+  fileread's ilock/iunlock (lend before the `jal`, close the wand the
+  instant it returns -- ProofFileread.v:1685 / :1712).  **The defect is
+  precisely "wants both at once", and writei is the only callee that does.**
+- **writei's eighteen numeric/pure premises all close.**  (2) is
+  `fw_budget_ok`; (13) is `SpecFilewrite.fw_chunk_joint`; (14) is
+  `fw_size_lt31`; (8)(9)(10)(11)(12) are conjuncts 3, 4, 1, 6, 2 of the
+  `InodeLock.inode_ok` ilock hands out inside `ic_loaded`; (3)-(7), (15),
+  (16) are `filewrite_fs_env`'s own pure fields; the register premises are
+  the decode.
+- **Every writei RESOURCE except the pid pair is in hand**: `i_dev`/`i_inum`
+  at 1/2 and `inode_meta`/`inode_map`/`inode_blocks`/`dinode_at` out of
+  ilock's `ic_loaded` (at `dn0 := dn`), the three superblock cells +
+  `bitmap_res` + `ireg_inv` + `bslots _ 3` out of the environment,
+  `log_op g MAXOPBLOCKS` out of begin_op, `kalloc_env`/`proc_priv` out of the
+  contract.
+- **The re-park closes**, and its two assemblies are now machine-checked and
+  landed: `fw_inode_ok_rebuild` builds `InodeLock.inode_ok` from writei's
+  post verbatim (conjuncts 5 and 7 are S3i's two preservations, whose
+  antecedents are the SAME conjuncts of the `inode_ok` that came in), and
+  `fw_dir_ok_wi` makes `DirView.dir_ok` vacuous.
+- **iunlock's `ity_shot g (di_type dn')` is ilock's own witness unchanged**,
+  because `fw_wi_type` says writei never moves `di_type` (definitional in
+  `wi_dinode`).
+- **`bslots` composes**: the environment's three split for ilock's one by
+  `fw_bslots3` and rejoin.
+- S3n's five clearances (stack constants, budget-uniform-in-`off`, the `s/2`
+  share algebra, `dinode_at` inside `ic_loaded`, end_op's partial spend) all
+  stand; only the `p_pid` half of clearance 4 falls.
+
+### The repair (S3p) -- sized, not done
+
+`SpecReadi.v`:264-267 is the landed template: put the pid fraction in the
+KERNEL arm only, precondition AND postcondition, in **both**
+`wp_writei_sconf_body` and `wp_writei_gen_body`; then inside `ProofWritei.v`
+carry `p_pid |->4{1/4} * (p_pid |->4{1/4} -* proc_priv ...)` in place of
+`proc_priv * p_pid`, applying the wand before each `either_copyin` and
+re-splitting after.  Blast radius, counted on the file:
+
+| site | what moves |
+|---|---|
+| `SpecWritei.v` `wp_writei_sconf_body` / `wp_writei_gen_body` | the pair, pre and post -- 4 places |
+| `ProofWritei.wi_cont` :339/:348, `wi_ret` :430/:439, `wi_join` :810/:820, `wi_size` :1129/:1139, `wi_loop` :1745/:1755 | 5 in-file premise pairs |
+| `ProofWritei.wp_writei_gen` :3429, `wp_writei_sconf` :4390 | the two public lemmas |
+| `ProofWritei` :2463, :2539, :3642 | the three `either_copyin` bundling sites -- where the wand-apply / re-split goes |
+| `ProofWritei` -- 34 `Hppid` occurrences | threading |
+| `ProofDirlink.v` :2042 | the ONE downstream consumer; `user = false`, so it only re-brackets its two arguments into the arm's pair |
+
+Nothing above writei changes, because the new premise is strictly WEAKER.
+`file-table.md`'s OWED note becomes DONE.  The reason it was deferred there --
+*"`SpecWritei.v` and `ProofWritei.v` are mid-flight for the `balloc` contract
+ripple"* -- **expired at S3m**, which landed that ripple.
+
+### What LANDED (green, gated)
+
+`iris/ProofFilewrite.v` only, still the preamble, now carrying:
+
+- the S3o banner: the blocker, the precise goal, why it is false rather than
+  open, the repair with its blast radius, and the resume point retargeted to
+  **S3q**;
+- **S3o's LEAF TABLE** -- the whole walk, instruction by instruction, with the
+  `wp_*_s_sconf` leaf named for each of the ~60 instructions and **every
+  branch displacement evaluated rather than copied** from S3g's graph.  Three
+  are compressed-vs-full traps (`c.addw` at `+0xae` vs `addw` at `+0xc4`;
+  `c.lui`/`lui`; the COMPRESSED `ADDIW` at `+0x82` -> `wp_caddiw_s_sconf`) and
+  one, `+0xd8`, is a 21-bit field that is NEGATIVE (`2*2005 = 4010`, bit 11
+  set -> `-86`) and reads as a forward jump if the sign extension is skipped;
+- **the loop shape, settled**: `ProofWritei.wi_loop`'s -- a `Local Lemma` with
+  a `wi_cont`-style packaged continuation and `revert CID0; induction W`, at
+  fuel `n - i`.  NOT ireclaim's hart-closed wand: the back edge at `+0xc8`
+  re-enters at `+0xcc` with a different `i`, so the invariant must be
+  universally quantified over the loop-carried values, which is what the
+  forall-fuel shape gives and a persistent-tail does not.  `fw_tail` IS that
+  persistent tail and is already proved;
+- seventeen new machine-checked lemmas the walk consumes: `fw_maxfile_bsize`,
+  `fw_n_range`, `fw_size_lt31`, `fw_uint_moi`, `fw_major_range`,
+  `fw_bltu9_false`, `fw_bltu9_true`, `fw_ret_pc_cons`, `fw_upd_upt_id`,
+  `fw_ret_of_pipe`, `fw_zext8_zero`, `fw_wbool_of_fall`,
+  `fw_inode_ok_rebuild`, `fw_wi_type`, `fw_dir_ok_wi`, `fw_dir_ok_same`,
+  `fw_bslots3`.
+
+`LinkFilewrite.v` is NOT written.  **file.c stays 6/7 and S4 stays blocked.**
+
+### Gate
+
+Mirror `one.sh ProofFilewrite.v`: **`DONE ProofFilewrite.v = 0`** (the
+`DONE` line, not the trailing `EXIT=0` -- S3n's trap 1).  `full.sh` `EXIT=0`,
+**1038 `.vo`** (no file added or removed).  `tools/lemma_diff.py --ref HEAD`:
+*"1 file(s) checked -- CLEAN (nothing dropped, nothing admitted, no new
+assumption)"*.  No `Admitted` / `Axiom` / `cheat_` / `admit` in the file.
+`Print Assumptions` NOT run: `wp_filewrite_sconf` does not exist, and every
+other cone is untouched (one leaf file changed, nothing depends on it).
+md5 verified equal on both sides after every scp; `_CoqProject` NOT touched
+(`ProofFilewrite.v`'s row landed at S3n).  Mirror `git status`: that one file
+modified, nothing else; no scratch left.
+
+### Traps recorded
+
+1. **A PREMISE JUSTIFIED BY A COMMENT IS NOT CLEARED.**  S3n's pre-walk
+   clearance read SpecWritei's prose and passed it; the accessor's TYPE
+   refutes it in one line.  When a stage's job is "prove the blockers are
+   gone", the evidence has to be a signature, a lemma or a `vm_compute` --
+   never the callee author's sentence about what the caller can do.  The
+   corollary S3o adds to file-table.md's own lesson (*"a spec's premise set
+   is only validated by its first caller"*): **and a comment about the
+   premise set is validated by nothing at all.**
+2. **`uint` is not where three plausible imports put it.**  The Sail `uint`
+   the `bltu` range facts are stated over lives in
+   `SailStdpp.Operators_mwords`.  `Require Import SailStdpp.Values` does not
+   reach it, `Require Import Riscv.riscv_extras` does not reach it, and
+   `Import Defs` -- which `SpecFilewrite.v`:170 does -- does not reach it
+   either; all three were tried, in that order, at one mirror round-trip
+   each.  Copy `ProofFileread.v`'s whole four-line SailStdpp block.
+3. **`wp_lh_s_sconf` is not in the `WpSconf*` four.**  It is in
+   `WpSmodeHalf.v`, which `ProofFilewriteParts.v` does not import; the
+   FD_DEVICE arm's `lh a5,36(a0)` at `+0x5c` needs the walk to require it
+   directly, as `ProofFileread.v` does.
+4. **`until grep -q "^EXIT=" /tmp/one.log` races the script's own `rm -f`.**
+   Launching `one.sh` with `nohup ... &` and immediately polling reads the
+   PREVIOUS run's log -- complete with its `EXIT=` -- and reports the previous
+   run's result as this one's.  `rm -f /tmp/one.log` from the LAUNCHING shell
+   before the `nohup`, not only inside the script.
+
 ## The stage ladder
 
 - **S1** (agent): the DECODE stage — 13 Code files (the 12 targets +
@@ -1922,9 +2112,30 @@ no `Axiom`, no `cheat_`.  md5s equal on both sides: `ProofFilewrite.v`
   stays blocked**.  New surprise: two constants named `FW_MAX` at two types
   (`SpecFilewrite`'s `Z`, `WriteiBudget`'s `nat`) which this file must import
   together — qualify every occurrence.
-- **S3o** (agent): the walk itself — `wp_filewrite_sconf` +
-  `FilewriteProof` + `LinkFilewrite`, on S3g's seven blocks, `fw_tail` and
-  S3n's preamble.  Then file.c is 7/7 and S4's three shells unblock.
+- **S3o** (agent) **— STOPPED AND REPORTED**: the SIXTH blocker is real and
+  was already on file.  **`SpecWritei`'s user arm is uncallable** — it wants
+  `proc_priv` AND a `p_pid` fraction on the same call, `ProcInv.proc_priv_pid`
+  is a borrow, and the cell has no third fragment; filewrite's writei call is
+  `user = true` (`c.li s8,1` at `+0x50`).  `SpecReadi.v`:255-263 and
+  design/file-table.md's "OWED" section had both named it and named filewrite
+  as the function that would hit it.  S3n's clearance (4) was read off
+  SpecWritei's stale COMMENT rather than off the accessor's type.  Everything
+  else in the walk was cleared by hand and is clear.  `ProofFilewrite.v` lands
+  green with the S3o banner, the instruction-by-instruction LEAF TABLE (every
+  displacement re-evaluated; four decode traps), the settled forall-fuel loop
+  shape, and seventeen new lemmas including the re-park's two assemblies
+  (`fw_inode_ok_rebuild`, `fw_dir_ok_wi`).  1038 `.vo`, lemma_diff clean.
+  **file.c stays 6/7 and S4 stays blocked.**
+- **S3p** (agent): THE REPAIR, on `SpecReadi.v`:264-267's landed template —
+  move writei's pid fraction into the KERNEL arm of the `if user`, pre and
+  post, in both bodies; carry the borrow-wand inside `ProofWritei.v`.  Sized
+  in the S3o section (4 spec places, 5 in-file premise pairs, 2 public
+  lemmas, 3 `either_copyin` sites, 34 `Hppid` threads, ONE downstream
+  consumer).  Strictly weaker premise, so nothing above writei moves.
+- **S3q** (agent): the walk itself — `wp_filewrite_sconf` +
+  `FilewriteProof` + `LinkFilewrite`, on S3g's seven blocks, `fw_tail`, and
+  S3n+S3o's preamble/leaf table.  Then file.c is 7/7 and S4's three shells
+  unblock.
 - **S4** (agent): sys_read/sys_write/sys_fstat — argfd + the file.c
   contracts; thin shells.
 - **S5** (agent): create — the writing half's boss: namei/nameiparent

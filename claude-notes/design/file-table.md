@@ -543,6 +543,22 @@ Two consequences for `fileread`'s contract, both accepted:
 
 ## OWED: `SpecWritei.v` cannot be called on its user arm
 
+> **STATUS (fs-sysfile S3o): CONFIRMED BY THE PREDICTED CALLER, AND NOW DUE.**
+> The last line of this section said filewrite would hit this and that it
+> should be repaired before that proof was started. Filewrite hit it, at
+> `+0xa0`, with the walk otherwise fully cleared: fs-sysfile S3o stopped there
+> and `iris/ProofFilewrite.v`'s header carries the precise residual goal and a
+> counted blast radius for the repair. The deferral reason below —
+> "`SpecWritei.v` and `ProofWritei.v` are mid-flight for the `balloc` contract
+> ripple" — **expired at S3m**, which landed that ripple. Fs-sysfile stage
+> **S3p** is the repair; **S3q** is the walk.
+>
+> S3o's addendum to this section's own lesson: an *unused* callee contract is
+> unverified, and a *comment* on one of its premises is verified by nothing at
+> all. fs-sysfile S3n cleared this very call by reading SpecWritei's premise
+> comment (which is the stale sentence this section refutes) instead of
+> `ProcInv.proc_priv_pid`'s type. Clear premises against signatures.
+
 **`writei`'s user arm is uncallable, for exactly the reason `readi`'s was, and
 the fix is known.** Recorded here rather than applied because `SpecWritei.v` and
 `ProofWritei.v` are mid-flight for the `balloc` contract ripple; do not fix them
