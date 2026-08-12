@@ -446,6 +446,25 @@ Section winstr.
     rewrite -(acc_wf_byte pc 4 j Hacc ltac:(lia)). exact (Hts j Hj).
   Qed.
 
+  (** THE UNWRITTEN HALF (φ-upgrade, deliverable C).  [winstr_pinned] proves
+      this on the way and throws it away; the violation-freedom conjunct
+      needs it directly, because a byte no message writes carries no
+      obligation ([WeakViolation.nv_byte_unwritten]).  Text is [.text]: it
+      is in the era image and nothing ever stores to it, so the whole fetch
+      footprint of every leaf is free. *)
+  Lemma winstr_unwritten (σ : wmstate) pc r :
+    wlog_wf (wm_log σ) ->
+    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
+    winstr_bytes pc r -∗
+    ⌜forall j : nat, (j < 4)%nat -> latest_ts (wm_log σ) (acc_addr pc j) = 0%nat⌝.
+  Proof.
+    intros Hwf. iIntros "Hi #Hb".
+    iDestruct (winstr_bytes_acc_wf with "Hb") as %Hacc.
+    iDestruct (winstr_bytes_lookup σ pc r Hwf with "Hi Hb") as %[Hts _].
+    iPureIntro. intros j Hj.
+    rewrite -(acc_wf_byte pc 4 j Hacc ltac:(lia)). exact (Hts j Hj).
+  Qed.
+
 End winstr.
 
 (* ====================================================================== *)

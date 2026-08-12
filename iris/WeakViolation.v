@@ -265,6 +265,43 @@ Proof.
   - by apply nv_byte_sync.
 Qed.
 
+(** THE FETCH ARM, and the reason the ~50 register-only leaves pay nothing:
+    a byte NO message of the log ever writes carries no obligation at all,
+    whatever the floor.  Kernel text is exactly that ([WeakFunnel]'s
+    [winstr_unwritten]: [latest_ts = 0] this era), and the fetch is the only
+    memory access a register-only instruction makes. *)
+Lemma nv_byte_unwritten (log : list wmsg) (c : CPU) (a : Z) (n : nat) :
+  latest_ts log a = 0%nat -> nv_byte log c a n.
+Proof.
+  intros Hlt p m c0 Hp _ _ _ [b Hb] _. exfalso.
+  apply (latest_ts_top log a). rewrite Hlt.
+  apply (writes_in_log_byte (fun _ => None)). exists (S p).
+  apply lookup_lt_Some in Hp as Hlen. split_and!; [lia|lia|].
+  exists b. rewrite log_byte_S Hp /=. exact Hb.
+Qed.
+
+(** THE BYTE-LEVEL SUMMARY a resource-holder exports.  "Byte [a] carries no
+    foreign unpublished [WCplain] message, for ANY hart at ANY floor" — which
+    is exactly what a clean fragment, a sync witness, or an unwritten byte
+    gives, and exactly what a reassembly site needs per touched byte.  It is
+    PURE, so it survives the closing of the invariant the fragment came from
+    (the walk's leaf slot is minted this way: the element goes back into
+    [WeakKpt]'s invariant, the fact stays). *)
+Definition nv_free (log : list wmsg) (a : Z) : Prop :=
+  forall (c : CPU) (n : nat), nv_byte log c a n.
+
+Lemma nv_free_clean log a : wcds_clean log a -> nv_free log a.
+Proof. intros H c n. by apply nv_byte_clean. Qed.
+
+Lemma nv_free_sync log a : wcds_sync log a -> nv_free log a.
+Proof. intros H c n. by apply nv_byte_sync. Qed.
+
+Lemma nv_free_unwritten log a : latest_ts log a = 0%nat -> nv_free log a.
+Proof. intros H c n. by apply nv_byte_unwritten. Qed.
+
+Lemma nv_byte_of_free log c a n : nv_free log a -> nv_byte log c a n.
+Proof. intros H. apply H. Qed.
+
 Section resources.
   Context `{!riscvGS Σ, !weakGS Σ}.
 
@@ -295,6 +332,26 @@ Section resources.
   Proof.
     iIntros "Hi #He". iDestruct (sync_byte_no_plain with "Hi He") as %Hsy.
     iPureIntro. by apply nv_byte_sync.
+  Qed.
+
+  (** The [nv_free] forms — what a site EXPORTS when it is about to give the
+      fragment back (the pure fact outlives the element). *)
+  Lemma nv_free_of_clean img log a dq :
+    wlat_interp img log -∗ wclean a dq -∗ ⌜nv_free log a⌝.
+  Proof.
+    iIntros "Hi He". iDestruct (wcds_lookup with "Hi He") as %Hok.
+    iPureIntro. by apply nv_free_clean.
+  Qed.
+
+  Lemma nv_free_of_pointsto img log a dq t v :
+    wlat_interp img log -∗ wlat_pointsto a dq t v -∗ ⌜nv_free log a⌝.
+  Proof. iIntros "Hi [_ He]". by iApply (nv_free_of_clean with "Hi He"). Qed.
+
+  Lemma nv_free_of_sync img log a :
+    wlat_interp img log -∗ sync_byte a -∗ ⌜nv_free log a⌝.
+  Proof.
+    iIntros "Hi #He". iDestruct (sync_byte_no_plain with "Hi He") as %Hsy.
+    iPureIntro. by apply nv_free_sync.
   Qed.
 
 End resources.

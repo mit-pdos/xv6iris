@@ -817,6 +817,45 @@ Proof.
         rewrite Hl wwrite_post_log -app_assoc //.
 Qed.
 
+(** ... and WHOSE messages they are (φ-upgrade, deliverable C).  Every message
+    a run appends carries the interpreter's own [tid] parameter — [wwrite_msg]
+    stamps it and nothing else creates a message — which is what makes a
+    hart's own stores FREE for its own violation-freedom obligation
+    ([WeakViolation.nv_hart_app_own]: the obligation quantifies over authors
+    OTHER than the floor's owner).  Same induction as [wrun_log_app], with the
+    appended tail identified rather than just existentially quantified. *)
+Lemma wrun_log_tid tid {X} (m : M X) :
+  forall s x s', wrun tid m s x s' ->
+    exists l, wm_log s' = wm_log s ++ l /\ forall mg, mg ∈ l -> wm_tid mg = tid.
+Proof.
+  induction m as [y|T oc k IH]; intros s x s' Hrun.
+  - destruct Hrun as [_ ->]. exists []. rewrite app_nil_r.
+    split; [reflexivity|]. intros mg Hmg. by apply elem_of_nil in Hmg.
+  - destruct oc; simpl in Hrun;
+      try (exact (IH _ _ _ _ Hrun));
+      try (exfalso; exact Hrun);
+      try (destruct Hrun as (c & Hrun); exact (IH _ _ _ _ Hrun)).
+    + (* MemRead *)
+      destruct (dev_addr _) eqn:Hd.
+      * destruct (dev_read _ _ _) as [[w0 d']|] eqn:Hdr; [|exfalso; exact Hrun].
+        exact (IH _ _ _ _ Hrun).
+      * destruct Hrun as (w & ts & _ & Hrun).
+        destruct (IH _ _ _ _ Hrun) as (l & Hl & Hown). exists l.
+        rewrite Hl wread_post_log. split; [reflexivity|exact Hown].
+    + (* MemWrite *)
+      destruct (dev_addr _) eqn:Hd.
+      * destruct (dev_write _ _ _ _) as [d'|] eqn:Hdw; [|exfalso; exact Hrun].
+        exact (IH _ _ _ _ Hrun).
+      * destruct (IH _ _ _ _ Hrun) as (l & Hl & Hown).
+        lazymatch goal with
+        | Hr0 : wrun _ _ (wwrite_post ?tt0 ?ss ?akk ?pa ?nn ?vv) _ _ |- _ =>
+            exists (wwrite_msg tt0 (wm_class_of akk (wm_ws ss)) pa nn vv :: l)
+        end.
+        rewrite Hl wwrite_post_log -app_assoc. split; [reflexivity|].
+        intros mg Hmg. apply elem_of_cons in Hmg as [->|Hmg];
+          [reflexivity|by apply Hown].
+Qed.
+
 (** THE AGENT'S VIEWS ONLY EVER RISE.  Every arm that touches [wm_ws] does so
     through [load_post_run] / [store_post_run] / [barrier_post], each of which
     is [ws_le]-increasing, and the [Barrier] arm is the only one that can raise

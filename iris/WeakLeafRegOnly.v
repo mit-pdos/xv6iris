@@ -38,7 +38,7 @@ Require Import RiscvModelBytes.
 Require Import DevModel.
 Require Import WeakMem WeakInterp WeakLang WeakBridge.
 Require Import WeakView WeakVProp WeakFence.
-Require Import WeakInstr WeakStore WeakCert WeakEff.
+Require Import WeakInstr WeakStore WeakCert WeakEff WeakViolation.
 Require Import WeakEffSkel WeakPmpEff WeakTickEff WeakLeafEffCommon.
 Require Import WeakFetchEff WeakFetch2.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
@@ -66,6 +66,32 @@ Lemma nowrite_regonly (al4 : bool) (pc : SailStdpp.Values.mword 64) :
   nowrite_trace (regonly_es al4 pc).
 Proof.
   destruct al4; [exact (nowrite_read1 wak_plain pc 4) | exact (nowrite_fetch2 pc)].
+Qed.
+
+(** THE FETCH FOOTPRINT (φ-upgrade, deliverable C).  Whatever the alignment,
+    the trace touches exactly the four text bytes of [pc] — which is what
+    makes the violation-freedom obligation of every register-only leaf
+    vacuous ([WeakFunnel.winstr_unwritten] + [WeakViolation.nv_byte_unwritten]:
+    text is unwritten this era). *)
+Lemma weffs_touch_regonly (al4 : bool) (pc : SailStdpp.Values.mword 64) (a : Z) :
+  acc_wf pc 4 ->
+  weffs_touch (regonly_es al4 pc) a ->
+  exists j : nat, (j < 4)%nat /\ a = acc_addr pc j.
+Proof.
+  intros Hacc (e & He & Ht). rewrite /regonly_es in He.
+  assert (Hhi : pa_z (add_vec_int pc 2) = pa_z pc + 2).
+  { replace (add_vec_int pc 2) with (pa_add pc 2)
+      by (rewrite /pa_add; f_equal).
+    rewrite (acc_wf_byte pc 4 2 Hacc ltac:(lia)) /acc_addr. lia. }
+  destruct al4.
+  - apply elem_of_list_singleton in He as ->. simpl in Ht.
+    destruct Ht as (j & Hj & ->). exists j. split; [lia|reflexivity].
+  - apply elem_of_cons in He as [->|He].
+    + simpl in Ht. destruct Ht as (j & Hj & ->).
+      exists j. split; [lia|reflexivity].
+    + apply elem_of_list_singleton in He as ->. simpl in Ht.
+      destruct Ht as (j & Hj & ->). exists (2 + j)%nat. split; [lia|].
+      rewrite /acc_addr Hhi. lia.
 Qed.
 
 (** The certificate every register-only leaf hands to the funnel. *)

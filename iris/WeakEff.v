@@ -720,6 +720,73 @@ Proof.
     rewrite (weffs_coh_frame (Some (fin_to_nat c)) s es a Ht) in Hlt. lia.
 Qed.
 
+(* ====================================================================== *)
+(** ** 5c. CARRYING THE TRACE THROUGH THE CERTIFICATE (φ-upgrade, (i))
+
+    [WeakCert.wstep_cert_eff] already PROVES that the successor's log and
+    weak state are the fold of the effect trace; every [wcert_*] below then
+    throws that away and keeps only the view arithmetic its leaf wants.  The
+    violation-freedom conjunct needs it back — [nv_hart_weffs] is stated
+    exactly at it — so [wQ_eff] names it and [wstep_cert_fr] pairs it with
+    ANY certificate the leaf already has, generically, so that no [wcert_*]
+    has to be restated. *)
+
+Definition wQ_eff (tid : option nat) (es : list weff) : wmstate -> wmstate -> Prop :=
+  fun s s' => wm_img s' = wm_img s /\
+              wm_log s' = wm_log (weffs tid s es) /\
+              wm_ws s' = wm_ws (weffs tid s es).
+
+Definition wQ_fr (Q : wmstate -> wmstate -> Prop) (tid : option nat)
+    (es : list weff) : wmstate -> wmstate -> Prop :=
+  fun s s' => Q s s' /\ wQ_eff tid es s s'.
+
+Lemma wcert_eff (cid : nat) (pc : SailStdpp.Values.mword 64) (es : list weff) :
+  wstep_cert cid pc (wP_eff (Some cid) es) (wQ_eff (Some cid) es).
+Proof.
+  apply wstep_cert_eff. intros s s' Hi Hl Hws. by split_and!.
+Qed.
+
+Lemma wstep_cert_fr (cid : nat) (pc : SailStdpp.Values.mword 64)
+    (es : list weff) (Q : wmstate -> wmstate -> Prop) :
+  wstep_cert cid pc (wP_eff (Some cid) es) Q ->
+  wstep_cert cid pc (wP_eff (Some cid) es) (wQ_fr Q (Some cid) es).
+Proof.
+  intros HQ s tick Hpc Hacc Htext HP.
+  destruct (HQ s tick Hpc Hacc Htext HP) as [Hok Hq].
+  destruct (wcert_eff cid pc es s tick Hpc Hacc Htext HP) as [_ He].
+  split; [exact Hok|]. intros χ s' χ' Hex.
+  split; [exact (Hq χ s' χ' Hex)|exact (He χ s' χ' Hex)].
+Qed.
+
+(** THE LEAF-FACING ONE-LINER.  With [wQ_eff] in hand, a leaf's whole
+    violation-freedom obligation is: for each byte its OWN effect trace
+    touches, one [WeakViolation.nv_byte] — paid by the fragment it already
+    holds for that byte ([nv_byte_of_pointsto] / [_of_own_st] / [_of_sync]),
+    or, for the FETCH window, for free ([nv_byte_unwritten]). *)
+Lemma nv_hart_of_wQ_eff (c : CPU) (σ σ' : wmstate) (es : list weff) :
+  wQ_eff (Some (fin_to_nat c)) es σ σ' ->
+  nv_hart (wm_log σ) c (wm_ws σ) ->
+  (forall a : Z, weffs_touch es a ->
+     nv_byte (wm_log σ') c a (coh (wm_ws σ') a)) ->
+  nv_hart (wm_log σ') c (wm_ws σ').
+Proof.
+  intros (_ & Hl & Hws) Hnv Ht. rewrite Hl Hws. rewrite Hl Hws in Ht.
+  by apply nv_hart_weffs.
+Qed.
+
+(** ... and its FETCH-ONLY instance, which is what every register-only leaf
+    (the bulk of the sweep) applies: the trace touches only the text window,
+    and text is unwritten. *)
+Lemma nv_hart_of_wQ_eff_unwritten (c : CPU) (σ σ' : wmstate) (es : list weff) :
+  wQ_eff (Some (fin_to_nat c)) es σ σ' ->
+  nv_hart (wm_log σ) c (wm_ws σ) ->
+  (forall a : Z, weffs_touch es a -> latest_ts (wm_log σ') a = 0%nat) ->
+  nv_hart (wm_log σ') c (wm_ws σ').
+Proof.
+  intros HQ Hnv Ht. apply (nv_hart_of_wQ_eff c σ σ' es HQ Hnv).
+  intros a Ha. by apply nv_byte_unwritten, Ht.
+Qed.
+
 (** *** 6a. A memory-effect-free instruction (branch / jump / ALU)
 
     The strict form: no write of ANY width, so the log is unchanged on the
