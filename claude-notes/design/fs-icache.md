@@ -4010,3 +4010,605 @@ trace, and it is smaller than it looks:
   unblocks the T_FILE/T_DEVICE arm only; ARM C-OK-DIR stays gated on
   Part 2.**  Plan S5e's walk accordingly: seven of create's eight arms,
   with the mkdir arm parked.
+
+## 20. THE ALLOCATEDNESS INVARIANT (§19.6 PART 2), DESIGNED (fs-sysfile
+## S5e, 2026-08-12): a per-inum LINK LEDGER filed in the region, six
+## licences on `SpecIget`, and the claim token that spans ialloc's window
+
+§19 ended by naming Part 2 "the soundness obligation, and the only route
+to an unblocked create" and leaving it unpriced.  This section prices it,
+designs it against the code, and reports three things §19 did not know:
+
+1. **The window CAN be spanned by a resource after all.**  `ireg_claim_au`
+   (`InodeRegion.v:798`) can pay out an exclusive per-inum CLAIM TOKEN,
+   and §19.5(f)'s constraint-4 refutation of that idea misses one thing:
+   a token whose *absence at a type-0 record* is an invariant clause is
+   re-mintable, because the FREE re-establishes the clause.  §19.5(f)
+   priced a ticket without a free-side obligation.
+2. **With the ledger, §19.9.1's six-step table dies at ROW 2** — every
+   licence that could produce "a foreign referrer at REF-1" on a
+   just-claimed inum is refuted, and `⌜dn = ialloc_fresh ty⌝` at create's
+   fresh ilock becomes a THEOREM, mkdir arm included.  §19.9.2's "ARM
+   C-OK-DIR stays gated" is lifted.
+3. **The invariant as chartered is FALSE of xv6, at exactly one record.**
+   The `..` of an unlinked-but-still-referenced directory is a live
+   record whose target's `nlink` no longer accounts for it, and that
+   target may be freed and re-claimed underneath it.  This is a genuine
+   kernel defect (§20.8), it forces a second colour in the ledger, and it
+   leaves create's derivation with ONE case gated on a named assumption —
+   one that, unlike §19.6 Part 3's, is TRUE on every trace that does not
+   fire the defect.
+
+And one thing it does NOT close, stated up front so no reader is misled:
+§20 discharges the *directory* half of the user's argument (names are
+minted only under a licence, and no licence for a just-claimed inum
+exists).  It does not by itself discharge the *cache* half — a REFERENCE
+outlives the licence that minted it, and "no free has happened since my
+licence" needs a temporal carrier keyed to the slot generation.  That is
+ONE obligation, it is §17-family and not directory-family, and §20.7
+prices its two candidates.  **create is unblocked by §20 plus that one
+carrier, and by nothing less.**
+
+### 20.1 WHY THE CONJUNCT CANNOT STAY PURE (the coupling, priced first)
+
+`DirView.dir_ok` (`DirView.v:855-857`) is
+
+    dir_ok nib dn data :=
+      bv_unsigned (di_type dn) = T_DIR_z ->
+      dir_inums_ok data (dir_nrec (bv_unsigned (di_size dn))) nib
+
+and `dir_inums_ok` (`:824-826`) says only `bv_unsigned (dir_inum data k)
+< 16 * nib` — *covers*, i.e. exactly `SpecIget`'s one premise
+(`SpecIget.v:176`) lifted over the records.  It is a `Prop` over the
+directory's OWN bytes, and it rides as `⌜…⌝` in two escrow payloads:
+`ipool_alloc` (`IcacheEscrow.v:431`) and `ic_loaded` (`:474`).
+
+"Allocated" is a fact about **another inum's region record** — the
+region's per-slot arm (`InodeRegion.v:446`, `ireg_slot`) is what decides
+it.  Three consequences, and together they force the shape:
+
+* a `Prop` over `data` cannot mention the region's map at all;
+* a `Prop` that DID mention the map (`m !!! z` has nonzero type) would not
+  be preservable by the payload's holder at its re-park: the map moves
+  under other threads while the holder sleeps, so the conjunct would be
+  false by the time it had to be re-established.  This is §17.5's
+  objection to per-generation facts, one level down;
+* the fact must therefore be carried by a RESOURCE whose validity is
+  maintained by whoever changes the region — i.e. by a ghost whose
+  authority the region invariant holds.
+
+So: **`dir_ok` keeps its pure text unchanged and gains a RESOURCE TWIN
+beside it in the same two payloads.**  Nothing about `dir_inums_ok`,
+`dir_ok_dirlink` (`DirView.v:977`) or `dir_ok_dir` (`:1075`) moves; they
+stay exactly what dirlookup's `iget` bound needs.
+
+### 20.2 THE GHOST: a per-inum LINK LEDGER, filed in `ireg_slot`
+
+**The gname is AMBIENT.**  `icfg` (`IcacheRef.v:345`) already carries two
+canonical ghost names for exactly this reason — `icfg_iref` (`:346`, the
+itable authority) and `icfg_live` (`:354`, the liveness pool) — with the
+argument spelled out at `IcacheRef.v:335-343`: threading them would put a
+filesystem ghost name on thirty-odd spec files.  The ledger takes the same
+door:
+
+    Class icfg := MkIcfg { icfg_iref; icfg_dev; icfg_nib; icfg_live;
+                           icfg_link : gname }.
+
+**Zero signature moves anywhere.**  This is the packaging §19.5(g)
+reached for and could not use; unlike (g)'s ambient one-shot it needs no
+currency proof, because a COUNT is evidence in the present, not a claim
+about the past.  It also respects §16.5's argument verbatim
+(`InodeRegion.v:310-318`): no new gname enters `ireg_inv`, `ipool_shape`
+or `ic_escrow`'s arity.
+
+**The RA.**  One `own icfg_link` of
+
+    linkR := gmapUR Z (authR (prodUR (prodUR natUR natUR)
+                                     (optionUR (exclR unitO))))
+
+i.e. per inum `z` an authority `● (w, g, c)` and three fragment shapes:
+
+| fragment | notation | meaning |
+|---|---|---|
+| `◯ ((1,0), None)` | `ilink z` | one live directory record names `z`, and `z`'s `nlink` pays for it |
+| `◯ ((0,1), None)` | `igrey z` | one live directory record names `z` and NOTHING pays for it (§20.8's orphaned `..`) |
+| `◯ ((0,0), Excl ())` | `iclaim z` | `z` has been claimed by an `ialloc` that has not committed |
+
+Fragments compose by `nat_local_update` in the two counters and are
+exclusive in the third; `● ⋅ ◯` validity gives `w' ≤ w`, `g' ≤ g` and,
+for the claim, outright agreement.  No `frac_auth`, no mass ledger, no
+positivity tricks — the whole §14 machine is unnecessary here, because
+the free's obligation is `w = 0` and that is read off the AUTHORITY, not
+assembled from shares.
+
+**The authority is parked in the REGION, on BOTH arms of `ireg_slot`.**
+`ireg_slot γi z d` (`InodeRegion.v:446-448`) becomes
+
+    ireg_slot γi z d :=
+      (∃ w g c, link_auth z w g c ∗
+         ⌜w <= Z.to_nat (bv_unsigned (di_nlink d))⌝              (* L1 *)
+       ∗ ⌜c <> None -> fresh_shape d⌝                            (* L2 *)
+       ∗ ⌜bv_unsigned (di_type d) = 0 ->
+            bv_unsigned (di_nlink d) = 0 /\ c = None⌝)           (* L3 *)
+      ∗ ((⌜ireg_in d⌝ ∗ z ↪[γi] d) ∨ (⌜di_type d <> 0⌝ ∗ imark γi z))
+
+**Why the region and not the payload.**  `d` here is the ON-DISK record —
+`ireg_couple` (`:429-432`) pins it to the parked block's bytes on both
+arms — so (L1) can be stated against `di_nlink` *whether or not the
+fragment is checked out*.  Park the authority with the record instead
+(in `ic_loaded` / `ipool_alloc`) and the cap is stranded at every
+checkout: the ordinary fill would have to re-establish `w ≤ nlink` for a
+claim box (`nlink = 0`, `w = 1`) and could not — S5b's constraint (3) in
+a new costume.  In the region it costs nothing: `ireg_slot` is internal
+to `InodeRegion.v`, its arity does not change, and `ireg_free_au` derives
+`w = 0` from `di_nlink = 0` **inside the region, with no caller
+obligation at all**.
+
+**The payoff, one line each.**
+
+* `ilink z` ⟹ `w ≥ 1` ⟹ (L1) `di_nlink d ≥ 1` ⟹ (L3, contrapositive)
+  `di_type d ≠ 0`.  **ALLOCATED.**
+* `iclaim z` ⟹ `c = Excl ()` ⟹ (L2) the record is a claim box, and (L3)
+  says no `ireg_claim_au` may fire at `z` while it is outstanding.
+* `igrey z` ⟹ nothing.  That is the point; see §20.8.
+
+**Mint / spend / convert are mask-preserving fupds, not AUs.**  The
+region already exposes openings in `ireg_read`'s shape
+(`InodeRegion.v:573`, `ireg_withdraw` `:971`), usable at ANY point in a
+caller's proof because the update is purely ghost — no program step in
+between.  So the new lemmas thread through no contract:
+
+    ireg_link_mint  : ↑iregN ⊆ E -> ireg_inv -∗ dinode_at γi z d -∗
+                      ⌜w+1 <= nlink d⌝ ={E}=∗ dinode_at γi z d ∗ ilink z
+    ireg_link_grey  : ↑iregN ⊆ E -> ireg_inv -∗ ilink z ={E}=∗ igrey z
+    ireg_link_read  : ↑iregN ⊆ E -> ireg_inv -∗ ilink z ={E}=∗
+                      ilink z ∗ ⌜di_type (m !!! z) <> 0⌝
+
+with the SPEND riding the nlink write that pays for it (§20.6), which is
+what keeps (L1) an inequality nobody has to re-argue.
+
+### 20.3 `dir_links` — the resource twin, and its ONE exemption
+
+    dir_link_at γ self data k :=
+      if dir_liveb data k && negb (bool_decide (dir_inum data k = self))
+      then (ilink (bv_unsigned (dir_inum data k))
+            ∨ igrey (bv_unsigned (dir_inum data k)))
+      else emp
+
+    dir_links self dn data :=
+      if decide (bv_unsigned (di_type dn) = T_DIR_z)
+      then [∗ list] k ∈ seq 0 (dir_nrec (bv_unsigned (di_size dn))),
+             dir_link_at icfg_link self data k
+      else emp
+
+It rides beside `⌜dir_ok icfg_nib dn data⌝` in `ipool_alloc`
+(`IcacheEscrow.v:431`) and `ic_loaded` (`:474`) — the same two homes, for
+the same reason — and `self` is the inum both definitions already carry
+as a parameter.  **No arity changes**: the colour disjunction lives
+inside the definition, exactly as §17.6.3 put `ity_shot`/`ity_pending`
+inside `ic_payload` without moving `ic_loaded`.  Both fragments are
+timeless, so `ic_loaded_timeless` / `ipool_alloc_timeless` survive
+verbatim.
+
+**THE SELF-RECORD EXEMPTION IS FORCED, NOT CHOSEN.**  mkdir writes
+`dirlink(ip, ".", ip->inum)` and xv6 deliberately does not bump
+`ip->nlink` for it — the source comment is "No ip->nlink++ for '.':
+avoid cyclic ref count".  So a self-record has no `nlink` to pay for it
+and (L1) would be violated the instant the dot went in.  Excluding it
+costs the consumer NOTHING: a lookup of `"."` returns the inum of the
+directory the caller is holding, and `ic_loaded`'s own `dinode_at γi inum
+dn` with `inode_ok`'s `di_type dn ≠ 0` is a strictly better allocatedness
+witness than any fragment — it is licence (c) below.
+
+The DirView twins are five short lemmas mirroring the pure ones:
+`dir_links_not_dir` (`dir_ok_not_dir`, `DirView.v:862`), `_free`
+(`:867`), `_size_zero` (`:875` — itrunc's zeroed directory drops to
+`emp`), `_eq` (`:886`), and the writer lemma `dir_links_dirlink`, the
+twin of `dir_ok_dirlink` (`:977`): the same hypothesis list, one `ilink
+inum` in, the new big-op out.  Its three cases are the ones the pure
+proof already splits on (`tot = 0` / `tot = 1` / `tot ≥ 2`,
+`DirView.v:1036-1066`) and the resource moves only in the third.
+
+### 20.4 `SpecIget`'s PREMISE: the licence, and the six sources
+
+`SpecIget.v:34` — "iget is the function that MINTS references, so unlike
+idup / ilock / iput it takes none" — is precisely why the premise belongs
+there and nowhere else.  `wp_iget_sconf_body` (`SpecIget.v:161-204`)
+gains ONE resource premise beside `iref_slot` (`:193`) and gives it back
+unchanged in the post beside `inode_ref` (`:202`):
+
+    iname γi inum -∗ …  ∀ …, inode_ref k q dev inum -∗ iname γi inum -∗ …
+
+**Borrowed, not consumed.**  A consumed licence is unsound as a design:
+dirlookup's fragment belongs to the DIRECTORY's payload and has to go
+back at the holder's `iunlock`, so a second lookup of the same name would
+become unprovable.  iget's own proof spends the premise on nothing — one
+`iFrame` on each of the two arms — which is also what keeps
+`SpecIget.v:62-86`'s "which arm ran is invisible to the caller" intact.
+
+    iname γi z := ilink z                                        (* a LINKED  *)
+                ∨ igrey z                                        (* b ORPHAN  *)
+                ∨ (∃ d, dinode_at γi z d ∗ ⌜di_type d <> 0⌝)     (* c HELD    *)
+                ∨ iclaim z                                       (* d CLAIMED *)
+                ∨ (∃ ds, bio_locked-on-IBLOCK ds ∗
+                         ⌜di_type (ds !!! islot z) <> 0⌝)        (* e BUFFERED*)
+                ∨ ⌜bv_unsigned z = ROOTINO⌝                      (* f ROOT    *)
+
+Six, and each is forced by an existing call site — this enumeration IS
+the formal content of the user's premise (1):
+
+| call site | file:line | licence | why |
+|---|---|---|---|
+| dirlookup `+0x8e` | `ProofDirlookup.v:1895` | (a)/(b) for an ordinary record, (c) for `"."` | the fragment is pulled out of the caller's `dir_links` by `big_sepL_lookup_acc` at the matched index `i` — the SAME index `Hinums` is applied at (`:1892`) — and put back before the return |
+| ialloc `+0xaa` | `ProofIalloc.v:1622` | (d) | §20.5 — the buffer is already gone (`brelse` at `:1528`, two instructions earlier) |
+| ireclaim `+0x44` | `ProofIreclaim.v:1252` | (e) | it **still holds the dinode buffer** at its iget (the comment at `ProofIreclaim.v:1213` says so), which is §16.2's serialiser: while that buffer is locked, no free of any inum in the block can commit |
+| namex `+0x4c` | `ProofNamex.v:4996` | (f) | `ROOTINO` is a literal; the root's liveness is a region clause (L4), established by the image-wf IOU and never lowered |
+
+**(L4), the root clause.**  `ireg_body` (`:461`) gains
+`⌜bv_unsigned (di_nlink (m !!! ROOTINO)) >= 1⌝`.  True of every mkfs
+image; the only writer that lowers an `nlink` is sys_unlink, whose
+`dp->nlink--` runs at a directory with at least two links (its own
+parent's entry plus the child being removed) and whose `ip->nlink--`
+never names the root — `sys_unlink` refuses the names `"."` and `".."`
+outright.  Preservation is owed to S7 and is one premise on the unlink
+write.
+
+**`SpecDirlookup` gains `dinode_at γi dinum dn`, in and out.**  It takes
+the locked-inode payload today (`SpecDirlookup.v:216-222`) but not the
+region element, so licence (c) is out of its reach; `SpecDirlink` already
+takes exactly this resource (`SpecDirlink.v:337`), so the precedent and
+the caller-side supply (namex destructs it out of `ic_loaded`) both
+exist.  It also gains `dir_links` over its own `data`, borrowed and
+returned — the resource twin of the `dir_inums_ok` premise at `:203`.
+
+### 20.5 THE IALLOC WINDOW, RECONCILED: the claim token
+
+The window is `ProofIalloc.v:1451` (`ireg_claim_au`, +0x9a) to `:1622`
+(`iget`, +0xaa), and §19.2 established that the claimant holds **nothing**
+across it.  It is worse than §19.2 said, and the check is recorded here:
+`brelse` is at `ProofIalloc.v:1528`, i.e. *before* the iget, so not even
+the buffer survives — the mandate's "did it brelse before iget?" is
+answered YES.  §19.5's eight death certificates all killed receipts that
+identify the RECORD.  The licence iget needs identifies nothing, and that
+is the whole difference.
+
+**`ireg_claim_au` (`InodeRegion.v:798-812`) pays out `iclaim inum`
+instead of `True`.**  Every premise it needs is already there:
+
+* its own premise `bv_unsigned (di_type (ds !!! islot inum)) = 0`
+  (`:804`) plus (L3) gives `c = None` at that instant — so the token is
+  MINTABLE, and no outstanding copy can block it;
+* its own premise `fresh_shape dn'` (`:805`) is literally (L2)'s
+  conclusion, so the clause is re-established by the same hypothesis;
+* (L1) rides: `w = 0` before (from `di_nlink = 0`, by (L3)) and the claim
+  mints no `ilink`.
+
+**This is where §19.5(f) went wrong, and it is worth stating exactly.**
+(f) rejected "a third key space inside γi" on S5b's constraint (4) in
+three exhaustive cases, the first being "a ticket that a RE-CLAIM must
+update is blocked by any outstanding copy, so `ireg_claim_au` becomes
+unprovable".  That case is real only if nothing re-establishes the
+ticket's absence.  (L3) does, and the agent that re-establishes it is
+`ireg_free_au` — which §19.5(f) never considered, because it was pricing
+a receipt for the *type value* and not a licence.  (f)'s other two cases
+(a ticket the re-claim ignores; a persistent ticket) do not apply to an
+exclusive token the free must clear.
+
+**`SpecIalloc`'s postcondition gains `iclaim inum`.**  This is the
+strengthening §19.5(a) declared unavailable — "the facts at
+`SpecIalloc.v:286-288` are about the region at CLAIM time and each of
+them is possibly false at RETURN time" — and it is available now for the
+one reason (a) could not see: `iclaim` asserts nothing about the record's
+value, only that the region's claim slot is still the holder's, and THAT
+is stable by (L3) plus the free's new obligation.
+
+### 20.6 PRESERVATION, PER WRITER
+
+| writer | site | the move | the clause it re-establishes |
+|---|---|---|---|
+| ialloc's claim | `InodeRegion.v:798` at `ProofIalloc.v:1451` | mint `iclaim`; `(w,g,c) : (0,0,None) -> (0,0,Excl)` | (L2) from `fresh_shape dn'` (`:805`); (L1) vacuous |
+| create's COMMIT | `ireg_write_au` (`:698`) at create's `iupdate` of `cr_setf dn mj mn 1` | spend `iclaim`, mint one `ilink`: `(0,0,Excl) -> (1,0,None)` | (L1) `1 <= di_nlink (cr_setf … 1) = 1`; (L3) vacuous (type ≠ 0) |
+| `dirlink`'s deposit | `SpecDirlink.v:290`'s child-range premise gains a resource sibling `ilink inum`, landing in the post's `dir_links` | `dir_links_dirlink` | (L1) untouched — the fragment was paid for by the caller's `nlink++` |
+| mkdir's `"."` | `dirlink(ip, ".", ip->inum)` | **no fragment**: the self-record exemption | forced by xv6's own "No ip->nlink++ for '.'" |
+| mkdir's `".."` | `dp->nlink++; iupdate(dp)`, then `dirlink(ip, "..", dp->inum)` | mint `ilink dp` AT the nlink write, deposit at the dirlink | (L1) grows on both sides at once |
+| sys_link | `ip->nlink++; iupdate(ip)`, then (after `iunlock`) `dirlink(dp, name, ip->inum)` | mint at the write, carry the fragment past the `iunlock` | (L1) grows on both sides at once |
+| sys_unlink's zeroing | S7, the `writei` of the zero record on `dp` | the k-th `dir_link_at` collapses to `emp`, releasing one fragment | the released fragment is SPENT at the next step, never dropped |
+| sys_unlink's `ip->nlink--` | S7, `iupdate(ip)` | **a new `ireg_write_unlink`**: the ONLY nlink-lowering region write, and it CONSUMES one `ilink ip` as it lowers | (L1) falls on both sides at once |
+| sys_unlink's `dp->nlink--` (dir arm) | S7 | converts `ip`'s `".."` fragment, `ilink dp -> igrey dp`, and lowers `dp`'s `w` | §20.8 — the defect's home |
+| `itrunc` | `ProofItrunc` | `dir_links_size_zero`: the big-op collapses to `emp` | the released set is EMPTY on every reachable trace (below) |
+| iput's free | `ireg_free_au` (`:881`) at `ProofIput.v:2076` | gains TWO premises: `di_nlink dn' = 0` and `c = None` | (L3) both halves; (L1) `w <= 0`, hence `w = 0`, hence **no `ilink` for `z` exists anywhere** — the user's premise (3), proved |
+| ordinary iupdate | `ireg_write_au` at `ProofIupdate` | gains the pure premise `di_nlink dn <= di_nlink dn'` | (L1) rides; every landed caller preserves `nlink` by conversion, exactly as §19.9's `di_type_stable` table did |
+| boot | `IcacheBoot.v:543` / `:572` | the image-wf IOU gains `● (w_z, 0, None)` per inum with `w_z` = the count of non-self live records naming `z` across the image, plus (L1)/(L3)/(L4); the fragments stock each directory's `dir_links` | mkfs images satisfy it; same shape as §15(a)'s existing `dir_ok` IOU |
+| ireclaim / fsinit | `ProofIreclaim.v:1252` | licence (e) | it never writes a record |
+
+**The itrunc row deserves its sentence.**  iput's free path truncates
+before it clears the type, so `dir_links` must shed whatever the
+directory's own records held.  It sheds NOTHING on any reachable trace: a
+file has no records, and a directory reaches `nlink = 0` only through
+`sys_unlink`, which refuses a non-empty directory (`isdirempty`) and
+refuses the names `"."` and `".."` — so the only survivors are the
+self-record (exempt) and the `".."` (already grey, §20.8).  **That is a
+real obligation on S7 and it should be named there**: *at the record
+zeroing, the target directory has no live record but `.` and `..`*.
+Without it, freeing a directory would strand fragments for OTHER inums
+and make those unfreeable — a blocker on a reachable step, i.e. dead.
+
+### 20.7 WHAT create DERIVES — and the ONE step that does not close
+
+**The derivation, spelled.**  create holds `iclaim inum` from
+`SpecIalloc`'s new post; it carries it to `ilock(ip)` at +0xb4 and hands
+it to the fill.  At `ProofIlock.v:1027`'s `ireg_withdraw` — the claim-box
+sub-arm §16.4 introduced, `ProofIlock.v:999-1007`:
+
+1. `iclaim inum` agrees with the region's `c` ⟹ `c = Excl ()`;
+2. (L3) ⟹ no `ireg_claim_au` has fired at `inum` since: a claim needs
+   `di_type = 0`, and `di_type = 0` forces `c = None`;
+3. `ireg_free_au`'s new `c = None` premise ⟹ no free has fired either;
+4. no free ⟹ no re-claim (a re-claim needs a type-0 record, which only
+   the free produces);
+5. Part 1's `di_type_stable` (`InodeRegion.v:706`, landed S5d) ⟹ no
+   ordinary write retyped it, and the only write that could rewrite the
+   record wholesale is the claimant's own commit, which create has not
+   run;
+6. therefore the record `ireg_withdraw` returns is **byte-identical to the
+   one `ireg_claim_au` wrote**, i.e. `dn = ialloc_fresh ty`.
+
+`ProofCreateParts.cr_made_setf` then closes the `made` arm and all four
+`dirlink` premises at once, exactly as §19.6 predicted — **including
+`di_type dn = T_DIR` for `dirlink(ip, ".")`.  §19.9.2's "ARM C-OK-DIR
+stays gated on Part 2" is lifted; all eight arms come into scope.**  And
+§19.4's positive stands unchanged: `ireg_withdraw` already pays
+`⌜fresh_shape …⌝` (`InodeRegion.v:983`), so size 0 and zero addrs need no
+new machinery — §20 supplies only the sixteen-bit type value §19.4 said
+was the entire deficit.
+
+**§19.9.1's table, row by row, under §20.**
+
+| row | fate |
+|---|---|
+| 1. the claim writes `ialloc_fresh ty₁`, nlink 0 | unchanged, and it now also mints `iclaim` |
+| **2. a foreign referrer at REF-1 on that entry** | **needs an `iget`, hence a licence.  (a) LINKED: refuted by (L1)+(L3), `w <= nlink = 0`.  (c) HELD: refuted because a claimed record's fragment is INSIDE the region (`ireg_in`, `InodeRegion.v:443`, left arm), so no client holds `dinode_at inum d`.  (d) CLAIMED: refuted by the token's exclusivity — create holds it.  (e) BUFFERED: refuted because it demands a type-nonzero read through the very block whose buffer ialloc's `log_write` has just committed, at a record whose type the claim set from 0.  (f) ROOT: refuted by (L4) — `ireg_claim_au` needs `di_type = 0`, and (L3) then forces `di_nlink = 0`, contradicting the root clause.** |
+| 3. the window-FILL | needs row 2 |
+| 4. the window-FREE | needs row 2, and now also `c = None`, which create's token denies |
+| 5. re-claim at ty₂ | needs row 4 |
+| 6. create's ilock reads ty₂ | dead with row 5 |
+
+**THE ONE STEP THAT DOES NOT CLOSE.**  Row 2 has a sixth case §20 cannot
+refute, and one it cannot yet even state:
+
+* **(b) ORPHAN.**  An `igrey inum` licence carries no allocatedness by
+  construction.  It exists only if some unlinked directory's `".."` names
+  `inum` — §20.8.  `ireg_claim_au` can PAY OUT the pure disjunction
+  `⌜g inum = 0⌝ ∨ ⌜g inum > 0⌝` (it has the region open and `g` is right
+  there), so create's proof splits and the `> 0` arm is gated on a NAMED
+  assumption: *no orphaned directory names the claimed inum*.  Unlike
+  §19.6 Part 3's assumption, this one is **true on every trace that does
+  not fire the defect** — it is unproven, not false — and it is retired by
+  fixing the kernel or by strengthening `sys_unlink`'s dir arm.
+* **THE REFERENCE THAT OUTLIVES ITS LICENCE.**  A licence is checked at
+  the `iget` and returned; the REFERENCE persists.  So "no client can
+  obtain a licence for `z` right now" does not give "no client holds a
+  reference to `z` right now" — that needs *"and every reference minted
+  earlier has since been dropped"*, a statement about the past.
+  Concretely: `ireg_free_au`'s new `c = None` premise has **no discharge
+  in `ProofIput` today**.  iput holds `ic_loaded` and REF-1, and (L2)
+  cannot help, because §19.5(h)'s observation still stands — **a
+  truncated corpse IS `fresh_shape`** — so the region cannot tell a claim
+  box from the record iput is about to free.
+
+  Two carriers, both §17-family, both stage-sized:
+
+  **(M1) THE REFERENCE COUNTER.**  Add a fourth component `r` to the
+  ledger: `iget` mints `iref_lic z` from the caller's licence and the
+  reference carries it; `iput`'s `ip->ref--` returns it; one clause in
+  `itable_inv` — which already holds `own icfg_iref (● M)`
+  (`IcacheInv.v:592`) — ties `r z` to the count of the entry holding `z`.
+  iput's REF-1 then gives `r = 1`; a live claimant that has run its own
+  `iget` gives `r >= 2`; `c = None` follows.  Cost: `SpecIget` gains
+  `ireg_inv` as a premise (persistent, four call sites, free), and the
+  region/itable coupling §16.5 spent a subsection avoiding comes back as
+  ONE clause maintained under the itable lock, where both halves are in
+  hand.  The claimant's own window (`iclaim` held, `iget` not yet run,
+  `r = 0`) is the residue, and row 2's enumeration is what closes it.
+
+  **(M2) A THIRD GENERATION BUMP.**  §17.6 bumps at `ProofIput.v:1759`
+  (+0x54), *before* the region free at `:2076`, so one generation spans
+  the free and `live_gen k q g` does NOT certify "no free since".  Bumping
+  again at the free — or moving the colour flip into `ireg_free_au` —
+  would make the caller's own share the temporal carrier, at the cost of
+  re-opening §17.6.3's placement argument.
+
+  **RECOMMENDATION: (M1).**  It is additive, needs no §17 re-opening, and
+  the coupling it introduces is exactly the one xv6 itself relies on — "a
+  free inum is in no directory, so no `iget` can race iput's free window"
+  — which is the sentence §19.9.1 wrote and could not formalise.  It is
+  also worth an audit note: the liveness mass ledger ALREADY blocks a
+  concurrent hit during iput's free stretch (§17.6.2's assembly), and
+  allocatedness is the only thing that makes that block sound rather than
+  lucky.
+
+### 20.8 THE ORPHANED `".."`: the invariant is FALSE as chartered, and
+### this is a genuine kernel defect
+
+§19.6 chartered Part 2 as "`dir_ok` strengthened from covers to
+allocated".  **That statement is false of xv6.**  The counterexample is
+four system calls long and every step is stock code:
+
+1. `mkdir /a`, `mkdir /a/b` — `b`'s data holds `"."` → b and `".."` → a;
+2. a process `chdir /a/b`, so `b` has a live icache reference;
+3. `rmdir /a/b` — `isdirempty(b)` passes, the record in `a` is zeroed,
+   `a->nlink--`, `b->nlink--` → 0.  **`b`'s `".."` record still names
+   `a`, and nothing accounts for it any more**; `b` is not freed, because
+   the cwd holds a reference;
+4. `rmdir /a` — `a` is empty now, `a->nlink--` → 0, no references, so
+   `iput` frees it: `itrunc`, `type = 0`.  `a`'s inum is free;
+5. from the deleted cwd, `namei("..")` → `dirlookup(b, "..")` returns
+   `a`'s inum → `iget` → `ilock`, which finds `type == 0` and takes
+   `panic("ilock: no type")` — or, if an `ialloc` re-claimed the inum in
+   between, returns **the wrong inode, silently**.
+
+So exactly one live record in xv6 has a target whose `nlink` does not pay
+for it, and it is reachable.  Consequences for the design:
+
+* the fragment for `".."` must be CONVERTED, not kept: at `dp->nlink--`
+  sys_unlink holds both `dp` (the authority) and `ip` (the payload
+  carrying the `".."` fragment), so `ireg_link_grey` fires there and (L1)
+  falls on both sides.  **Keeping `dir_links` total instead is dead**: it
+  would leave `w(dp) >= 1` at `dp`'s later free, blocking `ireg_free_au`
+  on a machine-reachable step;
+* `dir_links` must accept the grey colour (§20.3's disjunction), which
+  keeps `dirlookup` provable on an orphaned directory — a lookup in a
+  deleted cwd is a reachable step and may not be blocked;
+* a grey licence carries no allocatedness, which is honest: in the trace
+  above, the target genuinely is not allocated;
+* create's derivation inherits the one gated case, §20.7's (b).
+
+**`kernel-defects.md` gains an entry.**  Suggested text: *"`namei("..")`
+from a deleted directory.  `sys_unlink`'s directory arm decrements the
+parent's `nlink` while the child's `".."` record still names it, and the
+child is not truncated until its last reference goes.  If the parent is
+then removed and freed, the child's `".."` names a free inum: `ilock`
+panics, or — after a racing `ialloc` — resolves to an unrelated inode.
+The model records this as the `igrey` colour of the link ledger (design
+§20.8); every `igrey` fragment is a witness to a reachable instance."*
+
+### 20.9 DEATH CERTIFICATES (the §17.6 standard)
+
+**(a) A PURELY PURE STRENGTHENING of `dir_ok`.**  DEAD twice.  `dir_ok`
+is a `Prop` over `data` (`DirView.v:855`) with no access to the region;
+and a variant taking the region's map as an argument would not be
+re-establishable by the payload's holder at its re-park, because the map
+moves while it sleeps.  The invariant must be carried by a resource whose
+authority the region holds.
+
+**(b) A PERSISTENT PER-INUM "ALLOCATED" WITNESS**, in any packaging
+(one-shot, `to_agree`, ambient array).  DEAD on free-and-reclaim — S5a's
+refutation (c) — and the epoch repair is §19.5(g) verbatim: the holder's
+proof that its epoch is current is exactly "no free since", which is the
+goal.  §20's fragments dodge this because a COUNT is evidence in the
+present: `w >= 1` is checked against the authority at the instant it is
+used, never remembered from an earlier one.
+
+**(c) ONE GLOBAL `auth (gmap Z nat)` INSIDE `ireg_body`.**  DEAD on the
+free's obligation: with a single global authority `ireg_free_au` can read
+`dl !!! z` only by opening, and nothing lets the CALLER supply
+`dl z = 0`.  The per-inum authority parked in `ireg_slot` makes (L1)
+local, so `w = 0` follows from `di_nlink = 0` inside the region with no
+caller obligation at all.
+
+**(d) PARKING THE AUTHORITY WITH THE RECORD** (`ic_loaded` /
+`ipool_alloc`).  DEAD on S5b's constraint (3) in a new costume: the
+ordinary fill of a claim box would have to re-establish `w <= nlink` at
+`nlink = 0` with the claimant's fragment outstanding, and it cannot.  It
+would also put a new conjunct into the two payloads nineteen files name.
+
+**(e) A NEW GNAME for the ledger.**  DEAD on §16.5's packaging argument
+(`InodeRegion.v:310-318`): it would enter `ireg_inv` AND `ipool_shape`,
+i.e. `ic_escrow`'s arity, i.e. every fs contract in the tree.
+`icfg_link` beside `icfg_iref` / `icfg_live` (`IcacheRef.v:346` / `:354`)
+is the established dodge and costs nothing.
+
+**(f) MAKING `SpecIget` CONSUME the licence.**  DEAD: dirlookup's
+fragment belongs to the directory's payload and must return at the
+holder's `iunlock`; a consumed licence makes a second lookup of the same
+name unprovable, and `SpecIget.v:34`'s "iget takes no reference" becomes
+"iget takes a reference-shaped thing", which is worse.
+
+**(g) COUNTING SELF-RECORDS.**  DEAD by xv6's own design decision: mkdir
+does not bump `ip->nlink` for `"."`, so (L1) would be violated at the
+instant the dot is written.  The exemption is forced, and it costs the
+consumer nothing — licence (c) is strictly stronger than a fragment.
+
+**(h) KEEPING `dir_links` TOTAL over all directories** (no grey).  DEAD
+on a machine-reachable step: `iput`'s free of an orphan's parent would be
+blocked by an outstanding fragment.  §19.7's rule — a resource cannot
+forbid a machine-reachable step, it only wedges the proof — applies
+verbatim, and this time the reachable step is the defect itself.
+
+**(i) SCOPING `dir_links` BY THE DIRECTORY'S OWN LIVENESS**
+(`di_nlink dn <> 0`), the obvious way to dodge (h).  DEAD at the
+CONSUMER: `dirlookup` in a directory whose `nlink` has reached zero is
+reachable (namei from a deleted cwd), such a directory's payload would
+carry no fragments at all, and dirlookup would be stuck.  The grey colour
+is the same scoping done at the RECORD instead of at the DIRECTORY, and
+it is the only placement that leaves every reachable step provable.
+
+**(j) TYING THE LEDGER TO `nlink` ONLY, WITHOUT A CLAIM COMPONENT.**  DEAD
+at ialloc: the claim's record has `nlink = 0` by construction
+(`SpecIalloc.v:159`), so an `ilink` minted at the claim violates (L1)
+immediately, and without one the window has no licence at all.  The claim
+needs its own component, and it must be EXCLUSIVE (a counter would let a
+second claim of the same inum through).
+
+### 20.10 BLAST RADIUS, PRICED PER FILE
+
+*Stage A — the ledger (region-side):*
+
+| file | change |
+|---|---|
+| `IcacheRef.v` | one field, `icfg_link : gname` (`:345`), and the `icfg_alloc` boot builder |
+| `InodeRegion.v` | the `linkR` algebra; `ireg_slot` (`:446`) gains the authority and (L1)/(L2)/(L3); `ireg_body` (`:461`) gains (L4); `ireg_claim_au` (`:798`) pays out `iclaim`; `ireg_free_au` (`:881`) gains `di_nlink dn' = 0` and `c = None`; `ireg_write_au` (`:698`) gains the nlink-monotone premise; three new fupd lemmas plus `ireg_write_unlink` |
+| `SpecIupdate.v` (all THREE bodies), `SpecWritei.v`, `SpecItrunc.v`, `SpecDirlink.v` | the nlink-monotone premise travels exactly as `di_type_stable` did — **§19.9's lesson applies verbatim**: a premise about the record the REGION holds reaches every contract that holds it at a stale index, not only the one that consumes it |
+| `ProofIupdate.v`, `ProofWritei.v`, `ProofItrunc.v`, `ProofDirlink.v`, `ProofFilewrite.v`, `ProofIput.v` | one token each on `di_nlink`, the S5d table's shape |
+
+*Stage B — the payload twin and the boot mint:* `DirView.v` (five twin
+lemmas), `IcacheEscrow.v` (`ipool_alloc` `:431`, `ic_loaded` `:474` — one
+conjunct each, no arity change, timelessness survives), `IcacheBoot.v`
+(`:543`, `:572` — the IOU grows), and the re-park sites: `ProofIlock.v`
+(`:1007` / `:1048`), `ProofIget.v` (the eviction), `ProofFileread.v`,
+`ProofFilewrite.v` (`:2104`), `ProofIput.v`.
+
+*Stage C — the consumers:* `SpecIget.v` (+1 premise, +1 payout) and
+`ProofIget.v` (two `iFrame`s); the four iget call sites;
+`SpecDirlookup.v` (+`dinode_at`, +`dir_links`) and `ProofDirlookup.v`
+(the `lookup_acc` at the matched index, beside `:1892`); `SpecDirlink.v`
+(+`ilink inum`, the resource sibling of the unused range premise at
+`:290`) and `ProofDirlink.v`; `SpecNamex` / `SpecNamei` /
+`SpecNameiparent` thread; `ProofIreclaim.v` (licence (e));
+`ProofNamex.v` (licence (f)).
+
+*Stage D — create:* `SpecIalloc.v` (+`iclaim` in the post),
+`ProofIalloc.v` (`:1451` takes the payout, `:1622` spends it as licence
+(d)), `SpecCreate.v` **unchanged in shape** — the fact is DERIVED, not
+assumed, so S5a's freeze note survives and §19.6's "SpecCreate gains
+exactly the one additive premise" stays superseded — `ProofCreate.v` /
+`LinkCreate.v`.
+
+*Stage E — the carrier (§20.7):* `IcacheInv.v` (one clause in
+`itable_inv`), `SpecIget.v` (+`ireg_inv`, persistent), `ProofIput.v` (the
+`c = None` discharge at `:2076`).
+
+*S7 inherits:* the record-zeroing withdrawal, `ireg_write_unlink`, the
+grey conversion at `dp->nlink--`, the `isdirempty` obligation named in
+§20.6, and (L4)'s preservation.
+
+### 20.11 STAGE PLAN
+
+**A — THE LEDGER.**  `icfg_link`, the algebra, `ireg_slot`'s three
+clauses, the region lemmas, and the nlink-monotone premise's tour of the
+five contracts.  Self-contained, gated on its own cone, and it lands
+`ireg_claim_au`'s payout with no consumer yet.  *Independently correct
+whatever happens later:* (L1)+(L3) make "a free inode is unnamed" a
+theorem of the region.
+
+**B — THE PAYLOAD TWIN.**  `dir_links` in the two payloads, the five
+DirView twins, the boot IOU, the five re-park sites.  Ends with the tree
+green and every directory carrying its fragments; still no consumer.
+
+**C — THE CONSUMERS.**  `SpecIget`'s licence and the six sources, the
+four call sites, dirlookup / dirlink / namex threading.  This is the
+stage that makes "a reference implies a name" true, and the one with real
+proof work (dirlookup's `lookup_acc` at an index the scan discovers).
+
+**D — CREATE.**  `SpecIalloc`'s payout, create's commit exchange, §20.7's
+fresh-ilock derivation, and the walk — all eight arms.
+
+**E — THE CARRIER.**  §20.7's (M1): the reference counter and the
+itable-side clause, ending with `ProofIput`'s `c = None` discharge.  Until
+E lands, D's derivation is relative to `ireg_free_au`'s unproven premise,
+and that should be visible in D's own ledger entry rather than hidden.
+
+Expect A and B to be threading-shaped (S5d's rhythm), C and E to be the
+two that can surprise, and D to be the walk S5a scoped.  E may be
+sequenced BEFORE D if the coordinator prefers create's first landing to
+be unconditional; nothing in D depends on E's text, only on its truth.
