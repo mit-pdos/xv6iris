@@ -280,6 +280,19 @@ are working on that effort — the relevant `projects/` file.
   split (catalog / store+CSR leaves / reverse pt2 switch / chain) with its
   reusable lessons, and the remaining work: prove usertrap(), then the
   whole-trap-loop Löb theorem that discharges `stvec_handler_wp`.
+- **[`usertrap.md`](projects/usertrap.md)** — `usertrap()`, the C half of the
+  user trap (90 instructions, 5 cones). Every callee is now available (kexit
+  went index-generic in `74f28a7e`; syscall and printk-general are stated
+  ASSUMED contracts), so what was left to find was in the BOUNDARY: the
+  contract stated ahead of the proof took the trampoline tier's
+  `tlb_inv_pt`/physical trapframe/`user_cfg`, which together with the kernel
+  cone's `sie_cap` are **unsatisfiable** (two exclusive owners of the kernel
+  `ptree`), so proving it would have been vacuous. Records the restatement in
+  kernel vocabulary — whose entry payload turns out to be prepare_return's
+  exit payload with the trap's writes applied, ghost fractions and all — the
+  `usertrap_res` composition, the three conversions now explicitly OWED to the
+  trampoline dovetail (chief among them kpt-share's named
+  user-mode-under-shared-table follow-up), and the A–E phase plan.
 - **[`kerneltrap.md`](projects/kerneltrap.md)** — **`kerneltrap()` IS
   PROVEN.** `Print Assumptions` gives the 5 platform axioms + funext +
   consoleintr (inherited through devintr/uartintr) and nothing else: no

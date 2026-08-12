@@ -1,46 +1,94 @@
 (* SpecUsertrap.v -- the public interface of usertrap() (trap.c), stated
-   ahead of its proof (which does not exist yet: syscall / devintr /
-   vmfault / kexit / prepare_return are all still unproven).  What is
-   load-bearing NOW is the BOUNDARY: usertrap is the C function between
-   the two trampoline halves, and its entry/return machine states are
-   fixed by uservec's postcondition (SpecUservec.v) and userret's
-   precondition (SpecUserret.v).  This file pins that boundary; the
-   kernel-internal resources usertrap consumes (process bundle, kernel
-   stack, scheduler context, file table, ticks lock, PLIC, ...) are the
-   abstract per-process predicate [usertrap_res] of the module type,
-   which the eventual proof will define concretely -- consumers thread it
-   opaquely, so refining it does not churn the boundary.
+   ahead of its proof.  Everything the five cones below it consume is the
+   ABSTRACT per-process predicate [usertrap_res] of the module type, which
+   the proof will define concretely -- consumers thread it opaquely, so
+   refining it does not churn the boundary.
 
-   THE BOUNDARY.
+     uint64 usertrap(void)   @ KernelSyms.usertrap, 262 bytes / 90 instrs
 
-   Entry (= uservec's continuation, SpecUservec.v): called by [jalr] from
-   the trampoline with ra = uva 0x9c (userret -- usertrap RETURNS INTO
-   userret), sp = the process's kernel stack top, tp = this hart's id;
-   Supervisor, mstatus with the [trap_mstatus_ok] pins (SIE=0, SPP=User,
-   MPRV=0, MXR=0, SXL=64, TVM=0, TSR=0); scause/stval/sepc holding
-   whatever the trap wrote (usertrap must handle EVERY cause -- the trap
-   frame's values are existential); the KERNEL page table live
-   ([tlb_inv_pt kroot]), the user table parked ([pt_frame]), the user
-   data pages owned, and the whole trapframe page's words owned by the
-   kernel (the 31 save slots hold the interrupted user registers, the
-   4+1 kernel words -- kernel_satp/kernel_sp/kernel_trap/kernel_hartid
-   and epc -- are usertrap's to rewrite).
+   ==== THIS CONTRACT IS IN THE KERNEL TIER, NOT THE TRAMPOLINE'S ========
 
-   Return (= userret's precondition, SpecUserret.v): back at ra (= uva
-   0x9c) with callee-saved registers restored and a0 = the USER satp
-   value (Sv39, asid 0, rooted at the process's table -- possibly with
-   NEW mappings, [pt'], from vmfault; the root and the trapframe page
-   never change); mstatus ready for sret to User ([usertrap_ret_ms]:
-   SIE=0 again via prepare_return's intr_off, SPP=User, SPIE set, the
-   M-mode pins intact); sepc = the user pc to resume; stvec back at
-   TRAMPOLINE (uservec); the trapframe's kernel words re-armed for the
-   NEXT trap (kernel_trap := usertrap, kernel_hartid := this hart,
-   kernel_satp := a kroot-rooted satp value); the 31 save slots holding
-   the user registers to restore (existential: syscalls overwrite the
-   a0 slot, kexit'd processes never return at all).  usertrap does not
-   return on every path (kexit) and may return only after scheduling
-   away and back (yield) -- the continuation is simply not invoked on
-   non-returning paths. *)
+   The first statement of this file (10892e92) read the boundary off the two
+   trampoline halves: it took [tlb_inv_pt kroot], the parked user table, the
+   36 trapframe words at the PHYSICAL tier, and [user_cfg].  That is uservec's
+   postcondition verbatim, and it cannot be usertrap's precondition, because
+   every function usertrap CALLS describes the same objects one tier up and
+   the two descriptions are not merely different -- together they are
+   UNSATISFIABLE.  Three collisions, one shape (see
+   claude-notes/projects/usertrap.md for the long form):
+
+   * THE KERNEL PAGE TABLE.  [tlb_inv_pt kroot] owns [ptree_own 2 1] of the
+     kernel tree; the kernel cone reaches the same tree through
+     [IntrDefs.sie_cap]'s [strans_inv], whose KPT arm is
+     [KptShare.tlb_res_pt], which carries the INVARIANT [kpt_inv root] that
+     holds it.  Hold both and one [iInv kptN] gives two exclusive owners of
+     one tree, i.e. [False] -- and every leaf's [sr_absorb] opens [kptN], so
+     the interior would go through BY ABSURDITY.  usertrap never writes satp
+     (only the trampoline halves do), so it has no business owning a tree:
+     the kernel table reaches it the way it reaches every other kernel
+     function, inside [usertrap_res].  The exclusive/shared seam belongs to
+     uservec/userret, which is the only code that needs exclusivity, and
+     closing it is completed/kpt-share.md's named follow-up.
+   * THE TRAPFRAME PAGE.  [ProcInv.proc_priv] -- which every callee below
+     takes, and which usertrap itself needs for [p->trapframe->epc] -- owns
+     that page as [tf_page] at the VA tier.  So the words are NOT in this
+     contract; the physical<->VA crossing belongs on the trampoline side,
+     where the mapping is in scope.
+   * [user_cfg]'s mie/mideleg/menvcfg cells ARE [sconf]'s cells, so they ride
+     inside [usertrap_res] too.  The one config cell that stays here is the
+     one usertrap WRITES: [stvec].
+
+   ==== THE ENTRY PAYLOAD IS prepare_return'S EXIT PAYLOAD ===============
+
+   What is left once those three are out is exactly the state
+   [SpecPrepareReturn.v]'s postcondition hands over, with the trap's own
+   writes applied -- which is the check that this boundary is the right one:
+
+     stvec at TRAMPOLINE with NO [intr_res] (no kernel handler installed);
+     the [sie_gname] 1/4 that lived in [intr_res] still DANGLING; the KPT
+     receipt loose; the sret mirror at (SPP = User, SPIE = 1) -- prepare_return
+     wrote that pair, the [sret] set SIE := SPIE = 1, and the trap set
+     SPP := User, SPIE := SIE = 1, so it comes back UNCHANGED; mstatus with
+     SIE = 0 again (prepare_return's [intr_off] cleared it, the sret set it,
+     the trap cleared it); scause/stval/sepc at whatever the trap wrote.
+
+   EVERY GHOST FRACTION IS WHERE prepare_return LEFT IT, and the two mstatus
+   bits the mirror tracks return to the same values -- so the excursion
+   through userret / user mode / uservec moves no ghost at all and
+   [usertrap_res] simply carries the mirror halves across it.  That is why
+   this contract mentions no ghost variable of its own.
+
+   AND usertrap'S FIRST ACT CLOSES THE LOOP: the [csrw stvec, kernelvec] at
+   +0x1e folds the dangling quarter + the stvec cell + [intr_handler_spec
+   kernelvec] into a real [IntrDefs.intr_res], hence [trap_csrs] -- precisely
+   the [intr_res] prepare_return's [csrci] will unfold again on the way out.
+   The C comment ("send interrupts and exceptions to kerneltrap(), since
+   we're now in the kernel") IS that fold, and the order is forced: before
+   +0x1e this hart has no kernel handler, so nothing there may enable
+   interrupts.
+
+   ==== THE POST CROSSES ================================================
+
+   usertrap PARKS -- yield on the timer arm, and every sleeping syscall
+   through [SpecSyscall]'s own [wp_next true pj] -- so it may return on a
+   different hart and the post has to be a crossing.  The consequence is on
+   the CALLER (see eb-generic-sweep.md on [wp_next]'s polarity): the trap-loop
+   composition must build its continuation hart-generically.
+
+   ==== WHAT IS STILL OWED (the trampoline dovetail) =====================
+
+   This statement moves the trampoline seam rather than closing it: composing
+   uservec -> usertrap -> userret (the Loeb theorem that discharges
+   [UserExec.stvec_handler_wp]) owes three conversions -- the kernel table
+   exclusive<->shared, the trapframe page physical<->VA, and
+   [user_cfg] <-> [sconf]'s cells (which needs [uc_mie C = MIE_S]; sconf pins
+   mie and [ucfg] only constrains [mie & ~mideleg = 0]).  All three are
+   trampoline-side work and all three are tracked in
+   claude-notes/projects/usertrap.md.  [usertrap_ret_ms] and [satp_rooted]
+   stay here: they are the shared vocabulary that seam will be stated in, and
+   SpecPrepareReturn's post already spells [satp_rooted]'s three conjuncts out
+   longhand rather than importing it (this file has no [Require]ing consumer
+   yet -- the two Specs that name it, name it in prose). *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
@@ -50,12 +98,13 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvExtras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import MinstretInv InstrBytes WireInv.
 Require Import WpGpr.
 Require Import KernelText MstatusBits.
 Require Import SmodeCore.
 Require Import CalleeSaved.
+Require Import IntrDefs.
 Require Import WpLock.
 Require Import FdSlots.
 Require Import FileInvDefs.
@@ -91,194 +140,120 @@ Definition satp_rooted (v : mword 64) (root : mword 44) : Prop :=
   zero_extend' 16 (satp_to_asid (autocast (T := mword) v : mword 64)) = (mword_of_int 0 : mword 16) /\
   autocast (T := mword) (satp_to_ppn (autocast (T := mword) v : mword 64)) = root.
 
+(* WHAT THE TRAP DELIVERED, in the vocabulary the two tiers meet in.
+
+   [trap_mstatus_ok] is the trampoline's pin set (UserExec.v: SIE = 0,
+   SPP = User, MPRV = MXR = 0, SXL = 64, TVM = TSR = 0) -- what uservec's
+   own [csrw satp] / [sfence] gates need.  [sconf_ms_facts] is the kernel
+   tier's (IntrDefs.v), which additionally pins the FS/VS/XS extension
+   states, SD and a nominal MPP: it is what [IntrDefs.sconf] carries, so
+   usertrap cannot assemble the bundle its callees take without it.  The two
+   overlap and neither implies the other.
+
+   [SPIE = 1] is the third: it is what the mirror half inside
+   [usertrap_res] agrees with ([IntrDefs.sret_tie]), and it is a fact about
+   the code rather than an assumption about the user -- userret's [sret] set
+   SPIE := 1, so user mode ran with SIE = 1, so the trap copied SIE into
+   SPIE.  Nothing user mode can execute changes it. *)
+Definition usertrap_entry_ms (ms : mword 64) : Prop :=
+  trap_mstatus_ok ms /\
+  sconf_ms_facts ms /\
+  _get_Mstatus_SPIE ms = ('b"1" : mword 1).
+
 (* The statement, parameterized over the abstract kernel-internal resource
-   [R : uptd -> mword 64 -> iProp Σ] (the process bundle: R pt ksp is
-   everything usertrap needs beyond the boundary, for the process whose
-   user table is [pt] and whose kernel stack top is [ksp]).  The module
-   type instantiates it with its own [usertrap_res]. *)
+   [R : uptd -> mword 64 -> iProp Σ]: [R pt ksp] is everything usertrap needs
+   beyond the machine state above, for the process whose user page table is
+   [pt] and whose kernel stack top is [ksp].  The module type instantiates it
+   with its own [usertrap_res].
+
+   The key is (pt, ksp) and not the process's ghost names because those are
+   the only two the TRAMPOLINE knows: the proof's definition existentially
+   packages the rest (the fd-table name, the slot index, the pid, the private
+   record [V] with [pv_upt V = pt], the stack budget, the per-cpu frame) --
+   see claude-notes/projects/usertrap.md.  [ksp] appears because [sie_cap] is
+   keyed on sp, which is what the [m !!! sp = ksp] premise below licenses. *)
 Definition usertrap_post `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (R : uptd -> mword 64 -> iProp Σ) (C : ucfg) (pt : uptd) (kroot : mword 44) (m : regfile) : iProp Σ :=
-  let tfp := ud_tfp pt in
+    (R : uptd -> mword 64 -> iProp Σ) (pt : uptd) (ksp : mword 64) (m : regfile) : iProp Σ :=
   let ret_tgt : mword 64 := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   ( ∀ (pt' : uptd) (mf : regfile)
-      (ms' usatp uepc sc' stval' vksat' : mword 64)
-      (ksp' vkhart' : bv 64)
-      (v40 v48 v56 v64 v72 v80 v88 v96 v104 v120 v128 v136 v144 v152 v160
-       v168 v176 v184 v192 v200 v208 v216 v224 v232 v240 v248 v256 v264
-       v272 v280 v112 : bv 64),
+      (ms' usatp uepc sc' stval' : mword 64),
+    (* the user table as usertrap leaves it: vmfault may have mapped new
+       pages, the root and the trapframe page never move *)
     ⌜ud_root pt' = ud_root pt⌝ -∗
     ⌜ud_tfp pt' = ud_tfp pt⌝ -∗
+    (* the pure facts the trampoline halves need about it, which the process
+       block's [proc_pt_at] carries *)
     ⌜udata_cov (ud_um pt') (ud_data pt')⌝ -∗
     ⌜upt_acc_wf (ud_um pt')⌝ -∗
     ⌜upt_map_wf (ud_um pt')⌝ -∗
+    (* sret-ready, and still a legal S-mode configuration *)
     ⌜usertrap_ret_ms ms'⌝ -∗
+    ⌜sconf_ms_facts ms'⌝ -∗
     ⌜callee_saved m mf⌝ -∗
+    ⌜mf !!! Regidx (mword_of_int 4 : mword 5) = cid_word⌝ -∗
+    (* the return value: MAKE_SATP(p->pagetable) *)
     ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = usatp⌝ -∗
     ⌜satp_rooted usatp (ud_root pt')⌝ -∗
-    ⌜satp_rooted vksat' kroot⌝ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
     mstatus ↦ᵣ ms' -∗
     scause ↦ᵣ sc' -∗
     stval ↦ᵣ stval' -∗
+    (* the user pc to resume, which prepare_return's [csrw sepc] wrote *)
     sepc ↦ᵣ uepc -∗
+    (* THE VECTOR IS BACK AT uservec, and still owned outright: after
+       prepare_return this hart has no kernel handler installed, which is
+       what forbids re-enabling interrupts before the sret. *)
+    stvec ↦ᵣ (mword_of_int TRAMPOLINE : mword 64) -∗
     pc_is ret_tgt -∗
     gpr_file mf -∗
-    tlb_inv_pt kroot -∗
-    pt_frame (upt_tree_spec (ud_root pt') (ud_tfp pt') (ud_um pt')) -∗
-    udata_own (ud_data pt') -∗
-    user_cfg C -∗
-    (* the trapframe's kernel words, re-armed for the NEXT trap *)
-    tf_pa tfp 0 ↦ₚ₈ vksat' -∗
-    tf_pa tfp 8 ↦ₚ₈ ksp' -∗
-    tf_pa tfp 16 ↦ₚ₈ (mword_of_int KernelSyms.usertrap : mword 64) -∗
-    tf_pa tfp 24 ↦ₚ₈ uepc -∗
-    tf_pa tfp 32 ↦ₚ₈ vkhart' -∗
-    (* the 31 save slots, holding the registers userret restores *)
-    tf_pa tfp 40 ↦ₚ₈ v40 -∗
-    tf_pa tfp 48 ↦ₚ₈ v48 -∗
-    tf_pa tfp 56 ↦ₚ₈ v56 -∗
-    tf_pa tfp 64 ↦ₚ₈ v64 -∗
-    tf_pa tfp 72 ↦ₚ₈ v72 -∗
-    tf_pa tfp 80 ↦ₚ₈ v80 -∗
-    tf_pa tfp 88 ↦ₚ₈ v88 -∗
-    tf_pa tfp 96 ↦ₚ₈ v96 -∗
-    tf_pa tfp 104 ↦ₚ₈ v104 -∗
-    tf_pa tfp 120 ↦ₚ₈ v120 -∗
-    tf_pa tfp 128 ↦ₚ₈ v128 -∗
-    tf_pa tfp 136 ↦ₚ₈ v136 -∗
-    tf_pa tfp 144 ↦ₚ₈ v144 -∗
-    tf_pa tfp 152 ↦ₚ₈ v152 -∗
-    tf_pa tfp 160 ↦ₚ₈ v160 -∗
-    tf_pa tfp 168 ↦ₚ₈ v168 -∗
-    tf_pa tfp 176 ↦ₚ₈ v176 -∗
-    tf_pa tfp 184 ↦ₚ₈ v184 -∗
-    tf_pa tfp 192 ↦ₚ₈ v192 -∗
-    tf_pa tfp 200 ↦ₚ₈ v200 -∗
-    tf_pa tfp 208 ↦ₚ₈ v208 -∗
-    tf_pa tfp 216 ↦ₚ₈ v216 -∗
-    tf_pa tfp 224 ↦ₚ₈ v224 -∗
-    tf_pa tfp 232 ↦ₚ₈ v232 -∗
-    tf_pa tfp 240 ↦ₚ₈ v240 -∗
-    tf_pa tfp 248 ↦ₚ₈ v248 -∗
-    tf_pa tfp 256 ↦ₚ₈ v256 -∗
-    tf_pa tfp 264 ↦ₚ₈ v264 -∗
-    tf_pa tfp 272 ↦ₚ₈ v272 -∗
-    tf_pa tfp 280 ↦ₚ₈ v280 -∗
-    tf_pa tfp 112 ↦ₚ₈ v112 -∗
-    R pt' (autocast (T := mword) (ksp' : mword 64)) -∗
+    R pt' ksp -∗
     WP (Loop : expr riscv_lang)).
 
 Definition wp_usertrap_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (R : uptd -> mword 64 -> iProp Σ)
-    (C : ucfg) (pt : uptd) (kroot : mword 44)
-    (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64)
-    (w0 w8 w16 w24 w32 : bv 64)
-    (u40 u48 u56 u64 u72 u80 u88 u96 u104 u120 u128 u136 u144 u152 u160
-     u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264
-     u272 u280 u112 : bv 64) :=
+    (pt : uptd) (j : nat)
+    (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.usertrap in
-  let tfp := ud_tfp pt in
-  let ret_tgt : mword 64 := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (* the trap delivered the [trap_mstatus_ok] pins *)
-  trap_mstatus_ok ms_v ->
-  (* stvec still points at the trampoline (uservec set nothing; the trap
-     entered through it), and the config cells are kernel-owned outright *)
-  uc_stvec C = mword_of_int TRAMPOLINE ->
-  uc_dqc C = DfracOwn 1 ->
-  (* calling convention: sp = the process's kernel stack top, tp = this
-     hart's id (myproc), ra = userret *)
+  let pj := proc_addr j in
+  (* the trap delivered a legal S-mode configuration -- see above *)
+  usertrap_entry_ms ms_v ->
+  (j < NPROC)%nat ->
+  (* calling convention: sp = the process's kernel stack top (uservec loaded
+     it out of the trapframe's kernel_sp), tp = this hart's id (myproc),
+     ra = uva 0x9c, i.e. userret -- usertrap RETURNS INTO userret. *)
   m !!! Regidx (mword_of_int 2 : mword 5) = ksp ->
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
-  (* the user data pages' pure facts, as the trap frame carried them *)
-  udata_cov (ud_um pt) (ud_data pt) ->
-  upt_acc_wf (ud_um pt) ->
-  upt_map_wf (ud_um pt) ->
-  kernel_text -∗
-  hw_config -∗
-  minstret_inv -∗
-  wire_inv -∗
+  kernel_text -∗ pc_is pcE -∗
   hart_state ↦ᵣ HART_ACTIVE tt -∗
   cur_privilege ↦ᵣ Supervisor -∗
   mstatus ↦ᵣ ms_v -∗
   scause ↦ᵣ sc_v -∗
   stval ↦ᵣ stval_v -∗
   sepc ↦ᵣ sepc_v -∗
-  pc_is pcE -∗
+  (* NO KERNEL HANDLER IS INSTALLED: the cell is owned raw, at the
+     trampoline, and the [csrw stvec] at +0x1e is what turns it into an
+     [intr_res].  The dangling SIE quarter that pairs with it rides inside
+     [R] -- see the header. *)
+  stvec ↦ᵣ (mword_of_int TRAMPOLINE : mword 64) -∗
   gpr_file m -∗
-  (* the kernel table live, the user table parked, the user pages owned *)
-  tlb_inv_pt kroot -∗
-  pt_frame (upt_tree_spec (ud_root pt) (ud_tfp pt) (ud_um pt)) -∗
-  udata_own (ud_data pt) -∗
-  (* the boot config cells (stvec is rewritten twice inside; it comes
-     back at TRAMPOLINE, i.e. user_cfg is returned intact) *)
-  user_cfg C -∗
-  (* the whole trapframe page's words: the 4+1 kernel words ... *)
-  tf_pa tfp 0 ↦ₚ₈ w0 -∗
-  tf_pa tfp 8 ↦ₚ₈ w8 -∗
-  tf_pa tfp 16 ↦ₚ₈ w16 -∗
-  tf_pa tfp 24 ↦ₚ₈ w24 -∗
-  tf_pa tfp 32 ↦ₚ₈ w32 -∗
-  (* ... and the 31 save slots, holding the interrupted user registers *)
-  tf_pa tfp 40 ↦ₚ₈ u40 -∗
-  tf_pa tfp 48 ↦ₚ₈ u48 -∗
-  tf_pa tfp 56 ↦ₚ₈ u56 -∗
-  tf_pa tfp 64 ↦ₚ₈ u64 -∗
-  tf_pa tfp 72 ↦ₚ₈ u72 -∗
-  tf_pa tfp 80 ↦ₚ₈ u80 -∗
-  tf_pa tfp 88 ↦ₚ₈ u88 -∗
-  tf_pa tfp 96 ↦ₚ₈ u96 -∗
-  tf_pa tfp 104 ↦ₚ₈ u104 -∗
-  tf_pa tfp 120 ↦ₚ₈ u120 -∗
-  tf_pa tfp 128 ↦ₚ₈ u128 -∗
-  tf_pa tfp 136 ↦ₚ₈ u136 -∗
-  tf_pa tfp 144 ↦ₚ₈ u144 -∗
-  tf_pa tfp 152 ↦ₚ₈ u152 -∗
-  tf_pa tfp 160 ↦ₚ₈ u160 -∗
-  tf_pa tfp 168 ↦ₚ₈ u168 -∗
-  tf_pa tfp 176 ↦ₚ₈ u176 -∗
-  tf_pa tfp 184 ↦ₚ₈ u184 -∗
-  tf_pa tfp 192 ↦ₚ₈ u192 -∗
-  tf_pa tfp 200 ↦ₚ₈ u200 -∗
-  tf_pa tfp 208 ↦ₚ₈ u208 -∗
-  tf_pa tfp 216 ↦ₚ₈ u216 -∗
-  tf_pa tfp 224 ↦ₚ₈ u224 -∗
-  tf_pa tfp 232 ↦ₚ₈ u232 -∗
-  tf_pa tfp 240 ↦ₚ₈ u240 -∗
-  tf_pa tfp 248 ↦ₚ₈ u248 -∗
-  tf_pa tfp 256 ↦ₚ₈ u256 -∗
-  tf_pa tfp 264 ↦ₚ₈ u264 -∗
-  tf_pa tfp 272 ↦ₚ₈ u272 -∗
-  tf_pa tfp 280 ↦ₚ₈ u280 -∗
-  tf_pa tfp 112 ↦ₚ₈ u112 -∗
-  (* the kernel-internal process bundle *)
+  (* everything kernel-side, abstractly *)
   R pt ksp -∗
-  (* the continuation: back at userret, sret-ready.  [pt'] is the user
-     table as usertrap leaves it (vmfault may have mapped new pages; the
-     root and the trapframe page are stable), [mf] the returned register
-     file (callee-saved restored, a0 = the user satp), the [v*] the user
-     register values userret will restore. *)
-  usertrap_post R C pt kroot m -∗
+  (* THE CROSSING: usertrap parks (yield, and every sleeping syscall), so it
+     may return on a different hart. *)
+  wp_next true pj (fun (CID' : CpuId) => usertrap_post (CID := CID') R pt ksp m) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type USERTRAP.
-  (* the kernel-internal resources usertrap consumes, for the process
-     whose user table is [pt] and whose kernel stack top is [ksp]:
-     defined concretely by the (future) proof; threaded opaquely by
-     consumers. *)
+  (* the kernel-internal resources usertrap consumes, for the process whose
+     user page table is [pt] and whose kernel stack top is [ksp]: defined
+     concretely by the (future) proof; threaded opaquely by consumers. *)
   Parameter usertrap_res :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId},
       uptd -> mword 64 -> iProp Σ.
   Parameter wp_usertrap :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (C : ucfg) (pt : uptd) (kroot : mword 44) (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64)
-      (w0 w8 w16 w24 w32 : bv 64)
-      (u40 u48 u56 u64 u72 u80 u88 u96 u104 u120 u128 u136 u144 u152 u160
-       u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264
-       u272 u280 u112 : bv 64),
-      wp_usertrap_body usertrap_res C pt kroot m ms_v sc_v stval_v sepc_v ksp
-        w0 w8 w16 w24 w32
-        u40 u48 u56 u64 u72 u80 u88 u96 u104 u120 u128 u136 u144 u152 u160
-        u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264
-        u272 u280 u112.
+      (pt : uptd) (j : nat)
+      (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64),
+      wp_usertrap_body usertrap_res pt j m ms_v sc_v stval_v sepc_v ksp.
 End USERTRAP.
