@@ -758,18 +758,24 @@ Sail machine instantiates (exactly D-M6-5's rationale (2)):
   thread-local), floors only grow, and other authors' `w_pub` cannot
   move — so `pf_violation_free` at event granularity follows from the
   boundary export.
-- **THE DEVICE SEAM (open, decision needed):** `wpcfg` has no device
-  component — agents interact only through the log — while the real
-  machine has shared MMIO device state as a second channel, and the
-  sim's changed interleaving does not literally preserve cross-hart
-  device-access order.  (Informally it does: device accesses sit in
-  lock CSs whose handoffs are rf-chained, so the toposort preserves
-  their order.)  RECOMMENDED: state W5 over the RAM/log projection and
-  DECLARE the MMIO seam (device accesses are synchronous/SC in both
-  machines) as a correspondence note in the same epistemic category as
-  the D-M6-3 PARM seam and the M5 deferral — do not build a
-  device-aware full machine.  Revisit only if the declared note proves
-  embarrassing to state.
+- **THE DEVICE SEAM — RESOLVED (2026-08-12): it is the EXISTING
+  MMIO-ordering assumption, not new machinery.**  `wpcfg` has no device
+  component while the real machine has shared MMIO state as a second
+  channel, and the sim's changed interleaving does not literally
+  preserve cross-hart device-access order (informally it does — device
+  accesses sit in lock CSs whose handoffs are rf-chained).  But the
+  final-footprint plan (the W5 Print Assumptions item below) ALWAYS
+  kept "MMIO-ordering" as a retained axiom — so scope the composition
+  to harts + the disk agent over the log, with each hart's MMIO-read
+  responses absorbed as a per-behavior ORACLE STREAM inside the
+  abstract program state (P_sail carries the stream; device reads
+  consume it silently, device writes are silent), and let the retained
+  MMIO-ordering assumption cover the stream-run ↔ real-device-run
+  correspondence in BOTH uses (the behavior factoring and the
+  φ/`pf_violation_free` transport for exhibit prefixes).  φ itself is
+  device-oblivious (device arms touch neither log nor ws), which is
+  what makes the transport well-posed.  Do not build a device-aware
+  full machine.
 
 - [ ] The final theorem: full-machine behaviors (completable prefixes, per
       the tee-up §2(a)) transported through Layer 1 (premise from Layer 2)
