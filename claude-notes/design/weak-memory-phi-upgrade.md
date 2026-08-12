@@ -529,6 +529,19 @@ vm_compute fact + one transfer theorem + zero assumptions.
 gen_sites.py demotes to audit tooling (site report; interrupts-off
 source check).
 
+
+### 2b''. Performance (user review): the checker is BITMASK-level
+
+`site_okb`/`image_disciplineb` never invoke the Sail decoder — raw
+fixed-field tests on the words (fence = w&0x707f=0x0f, pred/succ at
+27:20; opcodes/funct for load/store/AMO; aq/rl at 26:25; RVC needs
+2-byte-granular walking or a checked all-32-bit-sites claim).
+Reflection = milliseconds; Qed via the ColdBoot vm_cast_no_check
+pattern.  The Sail linkage rides the EXISTING KernelDecode catalogue
+(kd_<word> lemmas, already generated+compiled): a generated companion
+derives per-pc site facts by lookup; generic mask→decode lemmas are
+the fallback (decode_bridge_ms_bv traps noted).
+
 ## 3. Sequencing (why this precedes the port)
 
 Land BEFORE the mass port, in order: (1) the C/D/S points-to surgery +
