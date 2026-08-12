@@ -292,11 +292,27 @@ owned points-to and move the upgrade INSIDE the leaf rules:
   and no memory facts; park's mint feeds the invariant instead of
   returning a caller-visible token (pub_covers_view remains as
   internal machinery).
-- Rework: re-index `wpt_own` (and the wpt4/8_own towers' own forms) by
-  ξ; add ctx_wrote + the invariant to WeakCtx; restate the own leaves;
-  update WkOwnPingPong/WkYieldFrame so their post-migration scripts
-  apply NO upgrade lemma (the acid test of this stage); keep
-  `wpt_own_upgrade` as the internal lemma the leaves use.
+- **STAGE 1.6 LANDED (2026-08-12, 12 files, green; adequacy unchanged;
+  the upgrade lemmas are DELETED from the API).**  Acid test passed
+  verbatim: `WkYieldFrame.wyf_touch` (load x; x := 2; load z) is ONE
+  lemma instantiated argument-for-argument on hart A before the yield
+  and on hart B after migration, at a byte still `WDirty A` in the
+  ghost map — zero upgrade applications.  As-landed shapes:
+  `CtxId := CtxNames {ctx_vn; ctx_wn}` (moved to WeakGhost; opaque);
+  breadcrumbs = auth (gmap nat max_nat) per context (`ctx_wrote_pos`
+  core-persistent for free); `ctx_migr ξ c` rides `ctx_run`/`wrunning`
+  with the live hart's entry carrying a position BOUND instead of
+  coverage; park converts to `ctx_migr_all` (all-covered, hart-free) —
+  which is why resume needs no memory evidence and yield's park
+  returns a scheduler resource naming no byte/view/hart-publication.
+  FINDING: own LOADS need no migration machinery at all (a load moves
+  no wcds state — foreign-dirty reads through `wpt_load_rule_own`
+  verbatim); only the STORE retargets, and the post-log offset is
+  absorbed by `pub_transfer_snoc` (own append can't be a foreign
+  release).  Sanctioned alias: `wpt_own_h` (hart-indexed) survives as
+  the carrier of the wpt4/8 towers and M-mode batch-2 leaves that
+  never cross wp_next — documented as not-the-API, converts only
+  through clean `↦w{1}`.
 
 **Stage 2 — the REAL migration test (a PORT TARGET, gated on the S-mode
 scheduler cone): the same program with the handoff replaced by
