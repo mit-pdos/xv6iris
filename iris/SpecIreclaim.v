@@ -288,7 +288,15 @@ Definition wp_ireclaim_sconf_body
   (* ONE ledger unit: iget spends it at +0x44 and iput returns it at +0x66,
      every iteration.  It comes back. *)
   iref_slot -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
+     (its bread / ilock / bwrite does), and a park moves the hart with
+     interrupts off, so the crossing has nothing to do with SIE -- the
+     porting guide's "a PARKING function's [wp_next] index is [true]
+     UNCONDITIONALLY".  Spelled [b] the two coincide at the only instance
+     the [eb = true] premise admits, which is why this went unnoticed; once
+     [eb = false] is reachable the [b] form would promise the caller it
+     comes back on the hart it called from, which a park makes false. *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗

@@ -360,7 +360,11 @@ Definition wp_filestat_sconf_body
   procs_inv γs -∗
   (* ...and what the file's TYPE selects *)
   filestat_env fn Cf -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  filestat can SLEEP (its
+     ilock does), and a park moves the hart with interrupts off, so the
+     crossing has nothing to do with SIE.  Spelled [b] the two coincide at
+     the only instance the [eb = true] premise admits. *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (r : mword 64) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗

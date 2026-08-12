@@ -48,7 +48,7 @@
      back: 34 out, split 32 (the batch's pool at n = 0) + 2 (the caller's
      working pair).
 
-   HART-GENERIC PROTOCOL.  Every callee returns through [wp_next b pj (fun
+   HART-GENERIC PROTOCOL.  Every callee returns through [wp_next true pj (fun
    CID => ...)], so the caller's own continuation is re-anchored at each
    crossing with [WpSconfVc.wp_next_shift] and the [cpu_own] with
    [CpuOwn.cpu_own_transport]. *)
@@ -803,7 +803,7 @@ Section ProofInitlog.
     iDestruct "Hslots" as "[Hs1u Hslots]".
     iDestruct (cpu_own_transport CID CID21 0 true pj C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID21) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID21) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 6)%nat) by (unfold K_bread; lia).
     iApply (Bread.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
@@ -957,7 +957,7 @@ Section ProofInitlog.
       rewrite /B2 upd_ne; [| regne]. exact (HB1cs c Hcs N2 N8 N9 N18 N19). }
     iDestruct (cpu_own_transport CID22 CID26 0 true pj C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID21) (CIDb := CID26) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID21) (CIDb := CID26) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 6)%nat) by (unfold K_brelse; lia).
     iApply (Brelse.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk pidv dev
@@ -1039,7 +1039,7 @@ Section ProofInitlog.
       with "[Hncell]" as "Hncell"; [iExact "Hncell"|].
     iDestruct (cpu_own_transport CID27 CID29 0 true pj C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID26) (CIDb := CID29) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID26) (CIDb := CID29) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKit : (K_install_trans <= K - 6)%nat)
       by (unfold K_install_trans; lia).
@@ -1171,7 +1171,7 @@ Section ProofInitlog.
       with "[Hncell]" as "Hncell"; [iExact "Hncell"|].
     iDestruct (cpu_own_transport CID30 CID33 0 true pj C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID29) (CIDb := CID33) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID29) (CIDb := CID33) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKwh : (K_write_head <= K - 6)%nat) by (unfold K_write_head; lia).
     iAssert ([∗ list] i ↦ w ∈ ([] : list (mword 32)), lh_block i ↦₄ w)%I

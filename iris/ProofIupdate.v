@@ -135,7 +135,7 @@ Section IupdateDefs.
       (dn : dinode) (bm : blkmap) (u : nat)
       (dev : mword 32) (pidv : mword 32) (dq dqd dqn dqs : dfrac) (j : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
-    wp_next b (proc_addr j) (fun (CID : CpuId) =>
+    wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K b (proc_addr j) -∗
@@ -306,7 +306,7 @@ Section IupdateTail.
       rewrite /T1 upd_ne; [| regne]. exact (HT0thr c Hcs N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID0 CID2 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKlw : (K_log_write <= K - 4)%nat) by (unfold K_log_write; lia).
     (* THE ATOMIC-UPDATE FORM (design §12.2).  The block's half is not in
@@ -392,7 +392,7 @@ Section IupdateTail.
       rewrite /T3 upd_ne; [| regne]. exact (HT2thr c Hcs N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID3 CID5 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID2) (CIDb := CID5) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID2) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 4)%nat) by (unfold K_brelse; lia).
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
@@ -1002,7 +1002,7 @@ Section ProofIupdateMain.
       rewrite /RA upd_ne; [| regne]. exact (HR9thr c Hcs N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID CID14 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID14) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID14) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 4)%nat) by (unfold K_bread; lia).
     iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
@@ -1606,7 +1606,7 @@ Section ProofIupdateMain.
       iSplitL "Hmty"; [iExact "Hmty" |]. iSplitL "Hmmaj"; [iExact "Hmmaj" |].
       iSplitL "Hmmin"; [iExact "Hmmin" |]. iSplitL "Hmnl"; [iExact "Hmnl" |].
       iExact "Hmsz". }
-    { iApply (wp_next_shift (CIDa := CID14) (CIDb := CID36) ltac:(wp_next_chain)
+    { iApply (wp_next_shift (b := true) (CIDa := CID14) (CIDb := CID36) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
 

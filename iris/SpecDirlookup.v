@@ -239,7 +239,12 @@ Definition wp_dirlookup_sconf_body
   ic_escrows cn γfs γi cov logstart -∗
   (* ONE ledger unit for the iget on the found arm; RETURNED on the other *)
   iref_slot -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
+     (through namex / dirlookup, down to ilock and sleep), so a park moves
+     the hart with interrupts off and the crossing has nothing to do with
+     SIE.  Spelled [b] the two coincide at the only instance the [eb = true]
+     premise admits, which is why this went unnoticed. *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (found : bool) (k : nat) (kslot : nat) (q : Qp),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗

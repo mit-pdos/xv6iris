@@ -573,7 +573,7 @@ Section InstallTransDefs.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool)
       (R : iProp Σ) : iProp Σ :=
-    wp_next b (proc_addr j) (fun (CID : CpuId) =>
+    wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K b (proc_addr j) -∗
@@ -599,7 +599,8 @@ Section InstallTransDefs.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool)
       (R : iProp Σ) :
-    (b = false \/ proc_addr j = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
+    (* the guard is at the LITERAL [true] now, matching it_cont's own index *)
+    (true = false \/ proc_addr j = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
     it_cont (CID0 := CIDa)  j bn γfs logstart n W Lw L D pidv dq m K eb C b R -∗
     it_cont (CID0 := CIDb)  j bn γfs logstart n W Lw L D pidv dq m K eb C b R.
   Proof.

@@ -258,7 +258,15 @@ Definition wp_ialloc_sconf_body
   iref_slot -∗
   (* THIS OPERATION'S RESERVATION: the one log_write the claim runs *)
   log_op γ (S u) -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
+     (its bread / ilock / bwrite does), and a park moves the hart with
+     interrupts off, so the crossing has nothing to do with SIE -- the
+     porting guide's "a PARKING function's [wp_next] index is [true]
+     UNCONDITIONALLY".  Spelled [b] the two coincide at the only instance
+     the [eb = true] premise admits, which is why this went unnoticed; once
+     [eb = false] is reachable the [b] form would promise the caller it
+     comes back on the hart it called from, which a park makes false. *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (alloc : bool) (kslot : nat) (q : Qp) (inum : mword 32)
     (dn' : dinode),
       ⌜callee_saved m mf⌝ -∗

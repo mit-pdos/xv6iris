@@ -55,13 +55,18 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
                    in
   (j < NPROC)%nat ->
   (26 <= av)%nat ->
-  (* PARKING PREMISE (hart-generic scheduler protocol): the saved base enable
-     is [true].  Everything below sleeps, and a parking thread must hand the
-     trap CSRs across the crossing -- at level 0 with an enabled base the
-     pushing acquire produces exactly that set.  See SpecSched.v. *)
-  eb = true ->
   sie_cap_gpr m av b pj -∗
   cpu_own 0 eb pj C b -∗
+  (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM.  Everything below sleeps,
+     and a parking thread must hand [trap_csrs] and [cpu_claim] across the
+     crossing (SpecSched.v).  At [eb = true] acquiresleep's OWN acquire frees
+     them out of [sie_arm true], so the complement is [emp] and the caller
+     brings nothing -- which is why this used to be an [eb = true] premise
+     instead.  At [eb = false] the push_off frees nothing and the caller
+     brings the pair, holding it because the TRAP handed it over; that is the
+     case iput/ilock need, and through them kexit and usertrap. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
   panic_wp_any -∗
@@ -69,11 +74,20 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle threaded through to sleep() *)
   procs_inv γs -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  acquiresleep PARKS (its
+     wait loop sleeps), and a park moves the hart with interrupts off, so it
+     has nothing to do with SIE -- the porting guide's "a PARKING function's
+     [wp_next] index is [true] UNCONDITIONALLY".  While the contract was
+     pinned at [b = true] the two spellings coincided and [b] was harmless;
+     at [b = false] it would claim acquiresleep returns on the hart that
+     called it, which is false. *)
+  wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
       sie_cap_gpr mf av b pj -∗
       cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       (* the lock is now HELD: token + pid field + protected resource *)
       sleeplocked γsl -∗

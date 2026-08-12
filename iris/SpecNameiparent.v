@@ -164,7 +164,12 @@ Definition wp_nameiparent_sconf_body
   bslots bn 3 -∗
   iref_slots 2 -∗
   log_op g n -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
+     (through namex / dirlookup, down to ilock and sleep), so a park moves
+     the hart with interrupts off and the crossing has nothing to do with
+     SIE.  Spelled [b] the two coincide at the only instance the [eb = true]
+     premise admits, which is why this went unnoticed. *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (n' : nat) (used' : gset Z)
     (ok : bool) (nf : nat -> bv 8) (ipv : mword 64),
       ⌜callee_saved m mf⌝ -∗

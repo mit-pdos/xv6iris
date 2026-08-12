@@ -413,7 +413,15 @@ Definition wp_namex_sconf_body
   (* ---- this operation's reservation ---- *)
   log_op g n -∗
   (* the continuation is SEALED as [namex_post]; see its header *)
-  wp_next b pj (fun (CIDc : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
+     (its bread / ilock / bwrite does), and a park moves the hart with
+     interrupts off, so the crossing has nothing to do with SIE -- the
+     porting guide's "a PARKING function's [wp_next] index is [true]
+     UNCONDITIONALLY".  Spelled [b] the two coincide at the only instance
+     the [eb = true] premise admits, which is why this went unnoticed; once
+     [eb = false] is reachable the [b] form would promise the caller it
+     comes back on the hart it called from, which a park makes false. *)
+  wp_next true pj (fun (CIDc : CpuId) =>
     namex_post (CID := CIDc) pj pv nb ret_tgt pl m K b eb C
                g gfs bn cov logstart bmapstart inodestart size used cwdv
                plen pfun npar n pidv dq dqb dqs dqc) -∗

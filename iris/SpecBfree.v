@@ -182,7 +182,15 @@ Definition wp_bfree_gen_body
      bitmap block's first log_write of this batch; credited, that block is
      already in the header, log_write ABSORBS, and the unit comes back. *)
   log_opS γ (S u) Sb -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
+     (its bread / ilock / bwrite does), and a park moves the hart with
+     interrupts off, so the crossing has nothing to do with SIE -- the
+     porting guide's "a PARKING function's [wp_next] index is [true]
+     UNCONDITIONALLY".  Spelled [b] the two coincide at the only instance
+     the [eb = true] premise admits, which is why this went unnoticed; once
+     [eb = false] is reachable the [b] form would promise the caller it
+     comes back on the hart it called from, which a park makes false. *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
@@ -275,7 +283,15 @@ Definition wp_bfree_sconf_body
   bslots bn 2 -∗
   (* THE RESERVATION, SPEND-EXACTLY: the one log_write always runs *)
   log_op γ (S u) -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
+     (its bread / ilock / bwrite does), and a park moves the hart with
+     interrupts off, so the crossing has nothing to do with SIE -- the
+     porting guide's "a PARKING function's [wp_next] index is [true]
+     UNCONDITIONALLY".  Spelled [b] the two coincide at the only instance
+     the [eb = true] premise admits, which is why this went unnoticed; once
+     [eb = false] is reachable the [b] form would promise the caller it
+     comes back on the hart it called from, which a park makes false. *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗

@@ -230,7 +230,15 @@ Definition wp_bmap_sconf_body
      on the caller's own counter rather than a [5 + u] shape, so a writei
      loop can present its counter directly and re-present what comes back. *)
   log_op γ n -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
+     (its bread / ilock / bwrite does), and a park moves the hart with
+     interrupts off, so the crossing has nothing to do with SIE -- the
+     porting guide's "a PARKING function's [wp_next] index is [true]
+     UNCONDITIONALLY".  Spelled [b] the two coincide at the only instance
+     the [eb = true] premise admits, which is why this went unnoticed; once
+     [eb = false] is reachable the [b] form would promise the caller it
+     comes back on the hart it called from, which a park makes false. *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (bm' : blkmap) (n' : nat) (data' : nat -> list (bv 8))
     (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
@@ -401,7 +409,15 @@ Definition wp_bmap_noalloc_sconf_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   (* ONE slot unit: the interior bread's, handed back by brelse *)
   bslot bn -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
+     (its bread / ilock / bwrite does), and a park moves the hart with
+     interrupts off, so the crossing has nothing to do with SIE -- the
+     porting guide's "a PARKING function's [wp_next] index is [true]
+     UNCONDITIONALLY".  Spelled [b] the two coincide at the only instance
+     the [eb = true] premise admits, which is why this went unnoticed; once
+     [eb = false] is reachable the [b] form would promise the caller it
+     comes back on the hart it called from, which a park makes false. *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       (* the block the map already named, and nothing else happened *)

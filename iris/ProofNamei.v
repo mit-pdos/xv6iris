@@ -438,7 +438,7 @@ Section ProofNameiMain.
     iEval (rewrite -HR5a2) in "Hname".
     iDestruct (cpu_own_transport CID CID7 0%nat eb (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (NX.wp_namex_sconf gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib size dev used cwdv

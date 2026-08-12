@@ -471,7 +471,7 @@ Section IallocDefs.
       (inodestart ninodes : Z) (nib : nat) (dev : mword 32) (ty : mword 16)
       (u : nat) (pidv : mword 32) (dq dqs dqn : dfrac) (j : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
-    wp_next b (proc_addr j) (fun (CID : CpuId) =>
+    wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (alloc : bool) (kslot : nat) (q : Qp) (inum : mword 32)
         (dn' : dinode),
         ⌜callee_saved m mf⌝ -∗
@@ -1010,7 +1010,7 @@ Section IallocOut.
       rewrite /Q9 upd_ne; [| regne]. exact (HQ8thr c Hcs N2 N8). }
     iDestruct (cpu_own_transport CID0 CID9 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID9) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID9) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iPoseProof (panic_wp_any_at CID9 with "Hpanic") as "Hpanic9".
     iApply (Hpk CID9 Q9 (K - 8)%nat true (proc_addr j) C
@@ -1059,7 +1059,7 @@ Section IallocOut.
     { rewrite /ia_arms. iLeft.
       iSplitR; [iPureIntro; exact HQBa0 |].
       iSplitL "Hiref"; [iExact "Hiref" | iExact "Hop"]. }
-    { iApply (wp_next_shift (CIDa := CID9) (CIDb := CID11) ltac:(wp_next_chain)
+    { iApply (wp_next_shift (b := true) (CIDa := CID9) (CIDb := CID11) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
 
@@ -1434,7 +1434,7 @@ Section IallocClaim.
       rewrite /W5 upd_ne; [| regne]. exact (HW4thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
     iDestruct (cpu_own_transport CID0 CID8 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID8) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID8) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKlw : (K_log_write <= K - 8)%nat) by (unfold K_log_write; lia).
     (* THE ONE GHOST STEP (fs-icache.md §16.5): no resource in, [True] out.
@@ -1525,7 +1525,7 @@ Section IallocClaim.
       rewrite /W7 upd_ne; [| regne]. exact (HW6thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
     iDestruct (cpu_own_transport CID9 CID11 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID8) (CIDb := CID11) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID8) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 8)%nat) by (unfold K_brelse; lia).
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
@@ -1620,7 +1620,7 @@ Section IallocClaim.
       rewrite /WA upd_ne; [| regne]. exact (HW9thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
     iDestruct (cpu_own_transport CID12 CID15 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID11) (CIDb := CID15) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID11) (CIDb := CID15) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IG.wp_iget_sconf gtl cn γfs γi cov logstart nib dev inum
               WA 0%nat true (proc_addr j) C (K - 8)%nat b
@@ -1825,7 +1825,7 @@ Section IallocClaim.
       { iPureIntro. split; [exact HV6a0 |]. split; [exact Hkslot |].
         split; [exact Hinum | exact Hnib]. }
       iSplitL "Href"; [iExact "Href" | iExact "Hop"]. }
-    { iApply (wp_next_shift (CIDa := CID15) (CIDb := CID23) ltac:(wp_next_chain)
+    { iApply (wp_next_shift (b := true) (CIDa := CID15) (CIDb := CID23) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
 
@@ -2116,7 +2116,7 @@ Section IallocScan.
         rewrite /G4 upd_ne; [| regne]. exact (HG3thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
       iDestruct (cpu_own_transport CIDc CID5 0 true (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iDestruct (wp_next_shift (CIDa := CIDc) (CIDb := CID5) ltac:(wp_next_chain)
+      iDestruct (wp_next_shift (b := true) (CIDa := CIDc) (CIDb := CID5) ltac:(wp_next_chain)
                    with "Hcont") as "Hcont".
       assert (HKbr : (K_bread <= K - 8)%nat) by (unfold K_bread; lia).
       iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
@@ -2427,7 +2427,7 @@ Section IallocScan.
                   with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hireg Hprocs
                         Hdevi Hdgeom Hdlock Hitb2 Hitbl Hesc Hiref Hframe
                         Hppid Hsbn Hsbi Hsl Hop Hheld [Hcont]").
-        { iApply (wp_next_shift (CIDa := CID5) (CIDb := CID13)
+        { iApply (wp_next_shift (b := true) (CIDa := CID5) (CIDb := CID13)
                     ltac:(wp_next_chain) with "Hcont"). }
       + (* ---- FALL: brelse, inum++, and the loop test ---- *)
         assert (Hcmp : eq_vec (rget GA Ra5) (zero_reg : mword 64) = false).
@@ -2472,7 +2472,7 @@ Section IallocScan.
           rewrite /GB upd_ne; [| regne]. exact (HGAthr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
         iDestruct (cpu_own_transport CID6 CID14 0 true (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iDestruct (wp_next_shift (CIDa := CID5) (CIDb := CID14) ltac:(wp_next_chain)
+        iDestruct (wp_next_shift (b := true) (CIDa := CID5) (CIDb := CID14) ltac:(wp_next_chain)
                      with "Hcont") as "Hcont".
         assert (HKbl : (K_brelse <= K - 8)%nat) by (unfold K_brelse; lia).
         iAssert (bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bno
@@ -2633,7 +2633,7 @@ Section IallocScan.
           iEval (rewrite Hjt) in "Hpc".
           iDestruct (cpu_own_transport CID15 CID19 0 true (proc_addr j) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-          iDestruct (wp_next_shift (CIDa := CID14) (CIDb := CID19)
+          iDestruct (wp_next_shift (b := true) (CIDa := CID14) (CIDb := CID19)
                        ltac:(wp_next_chain) with "Hcont") as "Hcont".
           (* THE RE-ENTRY.  The loop wand's own [CIDl] binder is unused by its
              body -- every resource inside is anchored at the [CIDc] the
@@ -2672,7 +2672,7 @@ Section IallocScan.
                     dev ty u pidv dq dqs dqn m GE K C b HK Hty Hpk HGEsp HGEthr
                     with "Hcg Hcnt Htext Hkdata Hpc Hpanic Hpenv Hframe Hppid
                           Hsbn Hsbi Hsl Hiref Hop [Hcont]").
-          { iApply (wp_next_shift (CIDa := CID14) (CIDb := CID19)
+          { iApply (wp_next_shift (b := true) (CIDa := CID14) (CIDb := CID19)
                       ltac:(wp_next_chain) with "Hcont"). }
   Qed.
 
@@ -3138,7 +3138,7 @@ Section IallocMain.
     (* ===== +0x30 : THE SCAN, entered at inum = 1 ===== *)
     iDestruct (cpu_own_transport CID CID19 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID19) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID19) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (Hunit1 : bv_unsigned (mword_of_int 1 : mword 32) = 1).
     { rewrite moi32_unsigned. apply bvw32_small.

@@ -246,7 +246,11 @@ Section BreadDefs.
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
       : iProp Σ :=
-    wp_next eb pj (fun (CID : CpuId) =>
+    (* THE LITERAL [true], matching SpecBread's crossing: bread PARKS (its
+       acquiresleep sleeps), so its continuation is about an arbitrary hart
+       whatever SIE was doing.  Spelled [eb] this was sound only because the
+       contract had no [eb = false] instance. *)
+    wp_next true pj (fun (CID : CpuId) =>
       ∀ (mf : regfile) (k : nat) (bs bsd : list (bv 8)) (d : bool),
         ⌜callee_saved m mf
          /\ mf !!! Regidx Ra0 = bnode k⌝ -∗
@@ -265,7 +269,8 @@ Section BreadDefs.
       (j : nat) (bn : bio_names) (V : bio_view Σ)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ) :
-    (eb = false \/ pj = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
+    (* the guard is at the LITERAL [true] now, [bd_cont]'s own index *)
+    (true = false \/ pj = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
     bd_cont (CID0 := CIDa)  j bn V pidv dev bno dq m K eb pj C -∗
     bd_cont (CID0 := CIDb)  j bn V pidv dev bno dq m K eb pj C.
   Proof.
@@ -1106,11 +1111,15 @@ Section BreadBlocks.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (ASL.wp_acquiresleep_sconf (dq := dq)  γs j (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bown bn k) H7 pidv (K - 6)%nat eb C eb
-              Hj ltac:(unfold K_bread in HK; lia) Heb
-              with "Hcg Hcnt Htext Hpc [] Hpanic Hppid Hprocs [-]").
+              Hj ltac:(unfold K_bread in HK; lia)
+              with "Hcg Hcnt [] [] Htext Hpc [] Hpanic Hppid Hprocs [-]").
+    (* acquiresleep is index-generic now and takes the trap-CSR
+       complement; here [eb = true], where it is [emp]. *)
+    { rewrite Heb /trap_csrs_ext. done. }
+    { rewrite Heb /cpu_claim_ext. done. }
     { iEval (rewrite HH7a0). iExact "Hslk". }
     (* acquiresleep PARKS: it returns on hart [CIDs]. *)
-    iIntros (CIDs Hss mf) "%Hcsasl Hcg Hcnt Hpc Hstok Hpid Hbown Hppid".
+    iIntros (CIDs Hss mf) "%Hcsasl Hcg Hcnt _ _ Hpc Hstok Hpid Hbown Hppid".
     iEval (rewrite HH7a0) in "Hpid".
     iPoseProof (bdi_62 with "Htext") as "Hi62".
     assert (Hpc62 : ret_pc (H7 !!! Regidx Rra) = mword_of_int (KernelSyms.bread + 0x62)).
@@ -1457,11 +1466,15 @@ Section BreadBlocks.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (ASL.wp_acquiresleep_sconf (dq := dq)  γs j (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bown bn k) C6 pidv (K - 6)%nat eb C eb
-              Hj ltac:(unfold K_bread in HK; lia) Heb
-              with "Hcg Hcnt Htext Hpc [] Hpanic Hppid Hprocs [-]").
+              Hj ltac:(unfold K_bread in HK; lia)
+              with "Hcg Hcnt [] [] Htext Hpc [] Hpanic Hppid Hprocs [-]").
+    (* acquiresleep is index-generic now and takes the trap-CSR
+       complement; here [eb = true], where it is [emp]. *)
+    { rewrite Heb /trap_csrs_ext. done. }
+    { rewrite Heb /cpu_claim_ext. done. }
     { iEval (rewrite HC6a0). iExact "Hslk". }
     (* acquiresleep PARKS: it returns on hart [CIDs]. *)
-    iIntros (CIDs Hss mf) "%Hcsasl Hcg Hcnt Hpc Hstok Hpid Hbown Hppid".
+    iIntros (CIDs Hss mf) "%Hcsasl Hcg Hcnt _ _ Hpc Hstok Hpid Hbown Hppid".
     iEval (rewrite HC6a0) in "Hpid".
     assert (Hpcb4 : ret_pc (C6 !!! Regidx Rra) = mword_of_int (KernelSyms.bread + 0xb4)).
     { rewrite HC6ra. apply bv_eq; vm_compute; reflexivity. }
