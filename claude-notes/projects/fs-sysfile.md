@@ -2199,6 +2199,126 @@ red.  Everything S3o staged for it is intact and now unobstructed.
    `SailStdpp.Operators_mwords`): **in this tree, having the operation does
    not mean having its argument type.**
 
+## S3r — THE LOOP LEMMA LANDS AND IS MACHINE-CHECKED AGAINST THE REAL
+## STATE; the frontier moves from the loop TEST into the loop BODY (+0x84).
+## `LinkFilewrite.v` still ABSENT, file.c stays 6/7
+
+**Parked green.**  `iris/ProofFilewrite.v` compiles under the one banered
+`Axiom cheat_`, whose single occurrence moved from +0xcc (the loop test) to
++0x84 (the `jal begin_op`).  `lemma_diff --ref HEAD` is CLEAN.
+
+### What landed
+
+Three new `Local Lemma`s inside `FilewriteProof`, plus the call site:
+
+- **`fw_env_fs` / `fw_env_out_fs`** — `fw_env_dev`'s twins at the third arm.
+  `fw_env_out_fs` is stated at an ARBITRARY `used'` because the bitmap only
+  grows; that is what lets the loop exit without re-assembling anything.
+- **`fw_test`** — +0xcc..+0xd8, the chunk computation, in BOTH arms.
+- **`fw_loop`** — the `∀`-fuel induction at `n - i`, entered at +0xcc,
+  applied at the walk's park point against the state it actually holds.
+  Inside it: `fw_test`, then the `sext.w s3,s3` at +0x82, then the park.
+
+### The design finding, and it is the stage's real product
+
+The loop lemma's STATEMENT is now a typechecked signature rather than a
+note, and what it says is that the invariant is much SMALLER than S3g's
+sketch assumed.
+
+1. **Three things are loop-carried**: the counter `iz`, the page-table
+   descriptor `PI` (writei's user arm advances it), and the bitmap's marked
+   set `SI` (balloc grows it).  Nothing else.
+2. **The inode is NOT carried.**  At the head of every iteration it is
+   PARKED in the escrow, so no `dinode`, no `blkmap` and no `data` appears
+   anywhere in the invariant — ilock mints them inside the iteration and
+   iunlock parks them again.  This is why the re-park obligations
+   (`fw_inode_ok_rebuild`, `fw_dir_ok_wi`) are *iteration-local* and never
+   became induction hypotheses.
+3. **`f->off` is NOT carried either.**  It is RESIDENT in `off_inv` at the
+   head and is borrowed and returned inside one iteration, so the borrow
+   never crosses the back edge.
+4. **The environment splits exactly along the contract's own seam.**
+   Fourteen components of `filewrite_fs_env` are PERSISTENT (all fourteen
+   verified so — they are introduced with `#` and the file compiles), the
+   ten pure fields are Coq hypotheses and cost the induction nothing, and
+   the EXCLUSIVE remainder is *literally* `filewrite_fs_out fn Cf SI` — the
+   same six resources the contract returns.  So the loop's resource
+   argument and the contract's postcondition are the same object at
+   different sets.
+
+### Why `fw_test` is a separate lemma (the load-bearing structural point)
+
+`bge s7,a5` at +0xd2 is taken to +0x82 and its fall reaches +0x82 too, via
+`c.mv s3,s9 ; c.j`.  **A Rocq proof cannot JOIN two arms.**  Written
+inline, the entire loop body — begin_op through the back edge — would have
+had to be written TWICE, once per arm.  Lifting the test into a lemma whose
+continuation is quantified over the chunk `c` and the register map `P`
+(the only things the two arms disagree about) collapses that to one copy.
+The same device will be needed at +0xa6 (the `r <= 0` skip of the `f->off`
+update), which also rejoins.
+
+### Surprises, numbered, for the trap ledger
+
+1. **`pc_is` is `InstrBytes.pc_is` in this file.**  `kernel_text`,
+   `sie_cap_gpr`, `cpu_own`, `file_ref`, `proc_priv`, `procs_inv`,
+   `word_pointsto` and `panic_wp_any` are all bare; `pc_is` is not.  The
+   error is a bare "The reference pc_is was not found", nowhere near the
+   line that matters.  **The cheap way to learn every spelling at once**:
+   destructure the environment at the park point and `Show.` — the printed
+   context prints each name exactly as the file's scope resolves it.  That
+   one probe supplied `KernelDataInv.kernel_data`,
+   `SpecPrintkGen.printk_env` / `.printk_gen_contract`,
+   `IcacheInv.itable_inv`, `SleepLock.is_sleeplock`, `BitmapInv.sb_size` /
+   `.sb_bmapstart` / `.bitmap_res` / `.bitmap_geom_ok`,
+   `DiskInv.disk_geom` / `.d_lock` / `.disk_res` and `KvmSpec.kalloc_env`,
+   all of which the loop lemma's statement needs and none of which is bare.
+2. **`destruct … eqn:H` rewrites the bridge hypothesis** — the recorded
+   trap, hit exactly as recorded.  After `destruct (Z.geb …) eqn:Hge`, the
+   compare bridge `Hcmp` is ALREADY at `= true` / `= false`, so the leaf's
+   premise is `ltac:(exact Hcmp)` and **not** `ltac:(rewrite Hcmp; exact
+   Hge)`.  The latter fails with "`Hge` has type `(FW_MAX >=? …) = true`
+   while it is expected to have type `true = true`", which reads like a
+   universe problem and is not one.
+3. **`split_and!` splits `0 < c <= FW_MAX` into TWO goals.**  A
+   four-conjunct postcondition whose first conjunct is a double inequality
+   needs FIVE branches.  The error names the wrong hypothesis.
+4. **`cpu_own` is hart-indexed and the loop lemma states it at its own
+   `CID0`.**  One `cpu_own_transport CID CID28 … ltac:(wp_next_chain)`
+   before the `iApply`, exactly as the -1 exit does before `Hcont`.
+   `sie_cap_gpr` needs no such thing — the leaves already hand it back at
+   the current hart.  The failure is `iSpecialize: cannot instantiate
+   (cpu_own 0 eb pj C b -∗ …) with (cpu_own 0 eb pj C b)`, i.e. the two
+   printed types are IDENTICAL and it still fails; that is the tell.
+5. **Do NOT re-declare `` `{GEN : GenId} `` on a `Local Lemma` inside this
+   section.**  `ProofFilewriteParts`' lemmas carry it because their section
+   has none; `Section ProofFilewrite` already has `Context `{GEN} `{CID}`,
+   so re-declaring shadows it with a `GEN0` that nothing can match.  Only
+   `` `{CID0 : CpuId} `` is re-declared, and that one is deliberate.
+6. **Pass the caller's `pj`, not `proc_addr jx`.**  `pj` is a let-bound
+   local at the call site and `iApply` will not unify the two through the
+   let.  The loop lemma therefore takes `pj` plus `pj = proc_addr jx` and
+   does NOT `subst` it — the callee contracts that need `proc_addr j` will
+   rewrite with the equation where they need it.
+7. **The park point's `0 < n` was left to be derived here** (S3q said so).
+   `Hz0 : (0 >=? n) = false`; there is no `Z.geb_gt`, so it goes by cases
+   through `proj2 (Z.geb_le 0 n)`.
+
+### What is left, in order
+
+The straight line +0x84 .. +0xc8 and its three joins, unchanged from S3q's
+plan and with every premise already cleared by hand in S3o/S3p:
+begin_op → `ld a0,24(s2)` → ilock at `s/2` (`fw_shr_gen_halve`) → the four
+argument moves and `off_checkout` → writei (`fw_writei_src`,
+`fw_budget_ok` + `fw_max_bridge`) → the `r <= 0` skip and the `f->off`
+advance + `off_checkin` → iunlock (`fw_shr_regen`) → end_op → the short-
+write break at +0xc0 → `i += r` and the exit test at +0xc8, whose FALL is
+the back edge and where `IH` is instantiated at `fw_i_advance`'s decrease.
+`IH` is in context and unused today for exactly that reason.  Then delete
+`cheat_` and write `LinkFilewrite.v`
+(`Module Filewrite := FilewriteProof Pipewrite Ilock Writei Iunlock BeginOp
+EndOp Consolewrite.` — that IS the functor's parameter order) and file.c is
+7/7.
+
 ## The stage ladder
 
 - **S1** (agent): the DECODE stage — 13 Code files (the 12 targets +
