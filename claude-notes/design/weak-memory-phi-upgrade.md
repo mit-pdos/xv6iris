@@ -353,6 +353,46 @@ the own rules; ξ-explicit originals remain the primitives;
 Process note: use DISTINCT build-log sentinel names per run (a dead
 build's `echo EXIT` can append into a same-named live log).
 
+**STAGE 1.8 — THE iPROP RESURFACING (user directive, 2026-08-12; the
+target API for the mass port, superseding Stage 1.6/1.7's vProp
+surface — those stay as internal machinery).**  Motivation: the 500K
+lines of existing SC proofs are iProp-shaped; the port must not
+convert them to vProp.  The abstraction:
+
+- `ptsto a v` — an IPROP, implicitly ξ-indexed (ambient `CurCtx`):
+  the element + wcds state + the byte's floor REGISTERED IN ξ's
+  LEDGER (`ctx_view_lb ξ (view_byte a t)`-style, persistent), instead
+  of an in-fact `⊒`.  No view in the fact ⇒ framing across yield is
+  trivial (iProps don't mention views).
+- `ctx_own ξ` — the running bundle (explicit CPU index, ∃/`wp_next`-
+  re-bound across yield exactly like `cur_proc`): (i) "ξ's ledger ≤
+  this hart's view" — the ONE invariant making every ptsto's floor
+  usable at every leaf; (ii) the Stage-1.6 migration invariant
+  (`ctx_migr` breadcrumbs — publication is NOT view-implied, the
+  w_pub-not-a-view-component finding stands); yield consumes/returns
+  it with the CPU re-bound.
+- **ξ_lock — every lock owns a CONTEXT, like every process does.**
+  The lock invariant holds `ptsto[ξ_L]` facts (explicit index, per the
+  Stage-1.7 convention).  RELEASE = re-index `ptsto[ξ_p] → ptsto[ξ_L]`
+  (a ghost op in the lock library: each deposited floor ≤ depositor's
+  hart view ≤ the release view, which becomes ξ_L's ledger bound — the
+  Cosmo lock-protects-a-view story with the view ledger as the lock's
+  context; the release flip publishes as now, so deposited facts are
+  clean).  ACQUIRE = re-index `ptsto[ξ_L] → ptsto[ξ_q]` (acquirer's
+  hart view ⊒ release view by the aq transfer, so registration into
+  ξ_q's ledger is sound).  Function proofs never see the re-indexing —
+  it lives in the lock library's release/acquire lemmas, once.
+- Stores register their new floor in ξ's ledger inside the store leaf
+  (one ghost op, leaf-internal); plain reads need no ledger op
+  (ctx_own supplies the floor).
+- Build plan: `ptsto`/`ctx_own`/ξ_lock as the new surface over the
+  landed Stage 1.6/1.7 machinery (WeakCtx ledgers = ctx_vn ghosts;
+  wcds unchanged; leaves gain iProp-surface rules); re-derive the
+  yield and lock lemmas in the new surface; the examples restated
+  iProp-shaped as the acceptance test (scripts unchanged from their
+  current form modulo the ptsto spelling); vProp forms remain as
+  internal glue (monPred_at is how the leaves consume the WP layer).
+
 **Stage 2 — the REAL migration test (a PORT TARGET, gated on the S-mode
 scheduler cone): the same program with the handoff replaced by
 `wp_next`/`p_sched`** — the parked-continuation crossing where the
