@@ -199,3 +199,47 @@ which the surgery's leaf rules sit on.
 - The landed atomic-recheck walker: `model-xv6iris/rv64d.v:24781`
   (`write_pte_conditional`), `:24795` (`read_pte_exclusive`), `:24965`
   (`update_and_write_pte`); classifications in `iris/WeakUpdEff.v`'s header.
+
+---
+
+## 7. MEASURED: the phase-`false` disjointness serves ONLY the bridge (2026-08-12)
+
+The datum that decides option (a)'s cost, and it is machine-checked rather
+than argued.
+
+Shape 4 is blocked by `wstep_ok_racy`'s PHASE-`false` demand that every
+later access be `racc_disj` from the window — a property of the PEEL, not of
+the bridge's conclusion.  So the question is whether that demand earns its
+keep anywhere except the bridge.  It does not:
+
+> Replacing the disjointness binder with `_` at BOTH of its phase-`false`
+> destruct sites — in `WeakRacy.wexec_of_exec_racy` and
+> `wrun_wexec_racy` — leaves `WeakRacy.v` compiling with zero errors.
+> `exec_of_wrun_win`, the patched-memory bridge, uses it four times.
+
+(Experiment run 2026-08-12 against the post-C/D/S tree and REVERTED; the
+file is unchanged.  Re-run it in one line if you doubt the claim.)
+
+**Consequence.** An "unbridged" peel — one that permits the window to be
+re-touched after the racy read — supports the two `wexec`-direction
+traversals VERBATIM, hence supports REDUCIBILITY, which is what
+`WeakAdequacy` actually needs.  All it gives up is the patched `exec` fact,
+which option (a) does not want.  So (a) is not merely the smallest option:
+the peel already does not depend on the restriction that blocks shape 4.
+
+**Concrete shape for the implementation.**  Do NOT add a second fixpoint.
+Remove the `racc_disj` conjunct from `wstep_ok_racy`'s phase-`false` read and
+write arms, and give it back to `exec_of_wrun_win` / `exec_of_wrun_racy_gen`
+as an EXPLICIT premise — `WeakVarCert.trace_disj` is already exactly that
+predicate, with its transports proved.  Then:
+
+- the `started` cone keeps the bridge by supplying `trace_disj` (it has it:
+  its trace touches the flag window once);
+- the walk supplies no `trace_disj`, gets no patched `exec`, and takes its
+  outcome facts from `WeakKpt.wtlb_res_pt_translateAddr_at` instead;
+- `WeakVarCert`'s producers need only drop the now-unnecessary conjunct from
+  what they prove.
+
+The one thing to check while doing it: `wp_wracy_load`/`wracy_cert` deliver
+peel and bridge together, so the split has to reach them — that is §4(b)'s
+churn, but confined to the one consumer rather than to the peel's definition.
