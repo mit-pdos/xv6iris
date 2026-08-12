@@ -74,6 +74,7 @@ Require Import SpecDevintr.
 Require Import SpecPrintkGen.
 Require Import SpecSyscall.
 Require Import SpecKexit.
+Require Import SpecKernelvec.   (* the two kernelvec trap-vector facts *)
 Require Import SpecUsertrap.   (* USERTRAP_RES -- the fit is checked at the foot *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -163,10 +164,17 @@ Section UsertrapRes.
      cpu_own 0%nat false pj C false ∗
      (* the running claim.  It is what [SpecYield] / [SpecKexit] want as
         [cpu_claim_ext false pj], and the trap is where it comes from. *)
-     cpu_claim pj ∗
-     (* the handler the [csrw stvec] at +0x1e installs -- persistent, and the
-        one thing in this bundle that is about code rather than state *)
-     intr_handler_spec (mword_of_int KernelSyms.kernelvec))%I.
+     cpu_claim pj)%I.
+
+  (* NOT IN THE BUNDLE: [intr_handler_spec kernelvec], the contract the
+     [csrw stvec] at +0x1e installs.  It is DERIVABLE from what [ut_env]
+     already carries -- [SpecKernelvec]'s [kernelvec_handler_spec] takes
+     hw_config, minstret_inv, kernel_text and [devintr_caps], and the first two
+     are persistent conjuncts of the [sconf] this bundle assembles.  So asking
+     for it here would be asking R's builder for something it can compute, and
+     the cost of not asking is one more functor argument on ProofUsertrap
+     (KERNELVEC, a PROVEN module).  Named here because the derivation lives one
+     layer up: this file may not mention a module parameter. *)
 
   (* ---- THE ENTRY ASSEMBLY (Phase A) --------------------------------- *)
   (* The boundary's raw machine state plus [ut_trap] IS the kernel cone's
@@ -199,16 +207,15 @@ Section UsertrapRes.
       cpu_claim pj ∗
       ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
       strans_bit strans_bit_kpt ∗
-      sret_bits ('b"0" : mword 1) ('b"1" : mword 1) ∗
-      intr_handler_spec (mword_of_int KernelSyms.kernelvec).
+      sret_bits ('b"0" : mword 1) ('b"1" : mword 1).
   Proof.
     intros Hmsf Hsie Hspp Hspie Hsp Htp.
     apply mword1_zero_of_ne_one in Hsie.
     apply mword1_zero_of_ne_one in Hspp.
     iIntros "Hhs Hpriv Hms Hgpr Ht".
-    iDestruct "Ht" as "(Hstk & Hstr & Harm & Hkpt & Hcl & Hgh & Hcpu & Hclm & #Hih)".
+    iDestruct "Ht" as "(Hstk & Hstr & Harm & Hkpt & Hcl & Hgh & Hcpu & Hclm)".
     iDestruct "Hgh" as "(Hhalf & Hq & Htie & Htrav)".
-    iFrame "Hcpu Hclm Hq Hkpt Htrav Hih".
+    iFrame "Hcpu Hclm Hq Hkpt Htrav".
     rewrite /sie_cap_gpr. iFrame "Hhs".
     iSplitL "Hpriv Hms Hhalf Htie Hcl".
     { iApply ("Hcl" $! ms with "Hpriv [Hms Hhalf Htie]").
@@ -258,6 +265,49 @@ Section UsertrapRes.
     - rewrite Hfs. vm_compute. reflexivity.
     - rewrite Hvs. vm_compute. reflexivity.
     - unfold sret_newpriv. rewrite sret_ms2_SPP Hspp. vm_compute. reflexivity.
+  Qed.
+
+  (* ---- THE FOLD AT +0x1e, WHICH IS WHAT THE C COMMENT SAYS -----------
+
+         // send interrupts and exceptions to kerneltrap(),
+         // since we're now in the kernel.
+         w_stvec((uint64)kernelvec);
+
+     [ut_trap_open] hands out three of [trap_csrs]' six members loose -- the
+     DANGLING SIE quarter, the KPT receipt and the sret mirror -- because at
+     entry no kernel handler is installed, and an [intr_res] at TRAMPOLINE
+     would be FALSE: uservec's contract is not [intr_handler_spec], since it
+     never returns to the interrupted pc.  This is the step that makes it true
+     again, and it is the exact inverse of what prepare_return's [csrci] does
+     on the way out.
+
+     THE ORDER IS FORCED, which is the theorem hiding in the C comment:
+     nothing before this instruction may set SIE = 1, because
+     [sie_ghost_flip] needs all three fractions and the quarter is not inside
+     an [intr_res] to be found in.  xv6 writes stvec first and enables
+     interrupts (the [csrsi] at +0xa2) only on the syscall arm, long after. *)
+  Lemma ut_trap_csrs_fold (ep sc st : mword 64) :
+    sepc ↦ᵣ ep -∗
+    scause ↦ᵣ sc -∗
+    stval ↦ᵣ st -∗
+    sret_bits ('b"0" : mword 1) ('b"1" : mword 1) -∗
+    stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) -∗
+    ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
+    strans_bit strans_bit_kpt -∗
+    intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64) -∗
+    trap_csrs.
+  Proof.
+    iIntros "Hep Hsc Hst Hsret Hstv Hq Hkpt #Hih".
+    iApply (trap_csrs_of_raw with "[Hep Hsc Hst Hsret] [Hq Hstv] Hkpt").
+    - rewrite /trap_csrs_raw.
+      iSplitL "Hep"; [iExists ep; iExact "Hep" |].
+      iSplitL "Hsc"; [iExists sc; iExact "Hsc" |].
+      iSplitL "Hst"; [iExists st; iExact "Hst" |].
+      iExists ('b"0" : mword 1), ('b"1" : mword 1). iExact "Hsret".
+    - iApply (intr_res_intro (mword_of_int KernelSyms.kernelvec : mword 64)
+                ('b"0" : mword 1) kernelvec_tv_direct kernelvec_stvec_base
+                with "Hq Hstv [Hih]").
+      iApply bi.later_intro. iExact "Hih".
   Qed.
 
   (* ------------------------------------------------------------------- *)

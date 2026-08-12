@@ -265,10 +265,31 @@ so the instruction count is not the driver — the resource assembly is.
   went through on the first attempt: the boundary's raw machine state plus
   `ut_trap` *is* `sie_cap_gpr m av false pj ∗ cpu_own 0 false pj C false`,
   with the dangling SIE quarter, the KPT receipt and the sret mirror falling
-  out loose (three of `trap_csrs`' six members — the `csrw stvec` folds them,
-  together with the boundary's stvec cell and the handler contract, into the
-  bundle). No instruction is involved, which is exactly why it is the design
-  check. The remaining Phase A work is the nine instructions themselves.
+  out loose (three of `trap_csrs`' six members). No instruction is involved,
+  which is exactly why it is the design check. `ut_trap_csrs_fold` is the
+  other half: those three plus the WRITTEN stvec cell and the handler
+  contract *are* `trap_csrs`, via `intr_res_intro` at
+  `SpecKernelvec.kernelvec_tv_direct` / `_stvec_base`. So the C comment
+  ("send interrupts and exceptions to kerneltrap(), since we're now in the
+  kernel") is a fold, and its ORDER is a theorem: nothing before +0x1e can
+  set SIE = 1, because `sie_ghost_flip` needs all three fractions and the
+  quarter is not inside an `intr_res` to be found in.
+  The remaining Phase A work is the nine instructions themselves, and the
+  leaves all exist — `ProofPrepareReturn` uses every one of them verbatim
+  (`wp_caddi_sp_push_s_sconf`, `wp_csdsp_s_sconf`, `wp_caddi4spn_s_sconf`,
+  `wp_jal_s_sconf`, `wp_auipc_s_sconf`, `wp_addi4_s_sconf`, `wp_cld_s_sconf`,
+  `wp_csd_s_sconf`, and **`wp_csrw_stvec_s_sconf`, which takes the RAW stvec
+  cell** — exactly what the boundary hands over).
+
+  One thing the bundle deliberately does NOT carry:
+  `intr_handler_spec kernelvec`. `SpecKernelvec.kernelvec_handler_spec` builds
+  it from hw_config + minstret_inv + kernel_text + `devintr_caps`, and
+  `ut_env` holds the last while the first two are persistent conjuncts of the
+  `sconf` `ut_trap_open` assembles — so asking R's builder for it would be
+  asking for something it can compute. The cost is one more functor argument
+  on ProofUsertrap (KERNELVEC, a proven module), and the reason the derivation
+  is not in `UsertrapRes.v` is that a definitional file may not name a module
+  parameter.
 - **Phase B — the scause dispatch and the three cheap arms.** devintr,
   vmfault, and the unexpected-scause arm (printk-general ×2 + setkilled).
   Each is a call and a branch; the interesting part is that the arms rejoin at
