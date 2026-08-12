@@ -85,6 +85,40 @@ mint S for them only if a racy lock read ever appears.
   therefore carry "the message's tid is a hart" — closed by the
   DMA-tid unification item below (seam 1c/d).
 
+## 1b'. φ STAGE 1 LANDED (2026-08-12): WeakViolation.v + sync threading + the sweep map
+
+Landed green: `WeakViolation.v` (`no_violation` aligned term-for-term
+with `WeakRobust.violation`; the `nv_byte`/`nv_hart` induction algebra;
+the three discharge arms `nv_byte_of_{pointsto,own_st,sync}`; the
+`w_pub` bridge `wpublished_w_pub` under the honest `wpub_covers`
+machine-invariant premise), the `sync_win` premise threaded into the
+racy/started rules, the started escrow made SYNC (minted inside
+`wstarted_alloc`, which already proves the empty-history fact — so
+adequacy's statement is untouched), and the machine-level reduction
+`nv_hart_weffs` (`WeakEff` §5b): a leaf's φ obligation = one `nv_byte`
+per byte of its own effect trace, framed elsewhere by
+`weffs_coh_frame`.
+
+THREE DURABLE FINDINGS: (1) **every leaf raises `coh`, because every
+instruction FETCHES** (rv64d fetch = Read_plain), so the interp
+conjunct cannot ride only the memory leaves — all ~50
+`wmstate_norg`-reassembly sites pay, with the fetch arm vacuous via
+`winstr_flat`'s `latest_ts = 0`; (2) the two shortcut candidates are
+REFUTED — a pinned read of a hazarded byte ALWAYS violates (pinned
+reads are exactly the dangerous ones), and no view-bound invariant can
+substitute for ownership (own-store + `fence rw,rw` floods `vrNew`
+above a foreign hazard); (3) a **zero-width release-class write breaks
+the `w_pub` bridge** (`store_post_run` folds per byte, so a width-0
+WCrel message raises nothing) — `wpub_covers_write` carries the
+nz-width premise explicitly, dovetailing with `WeakInterpProj`'s
+`nz_writes` and `sail_shaped`.
+
+The remaining C/D sweep (in flight): carry the effect trace through the
+certificate Q's (`wQ_pure` → `wQ_pure_fr es` family, ~30+30 sites), the
+`nv_hart` conjunct into the interp defs paid at ~50 sites, the
+non-funnel paths (racy/started/acquire/walk/Tor/Amo4) with their
+per-path evidence, then `weak_system_adequacy_phi`.
+
 ## 1c. The migration test: the ownership ping-pong (Stage 1 now, Stage 2 at the port)
 
 **Stage 1 — `WkOwnPingPong.v` (buildable on the C/D/S + φ base; the
