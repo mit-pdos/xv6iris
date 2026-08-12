@@ -50,6 +50,41 @@ rules (use S).  The φ conjunct + the three-line adequacy export then
 land per the D-M6-6 wiring plan unchanged (`WeakGhost.v` interp,
 `WeakAdequacy.v` continuation).
 
+## 1b. THE SURGERY LANDED (2026-08-12) — deltas and flags
+
+Landed green (31 files, lemma_diff clean, all Print Assumptions
+preserved).  Deltas from §1's sketch, all improvements: TWO ghost maps
+(`weak_lat_name` untouched + `weak_cds_name : gmap Z wcds`,
+`wcds := WClean | WDirty CPU | WSync`) so `wlat_pointsto` keeps its
+meaning verbatim and the window machinery is untouched; PUBLICATION IS A
+LOG PREDICATE (`wpublished log tid p` — a later WCrel message by the
+same tid — implying real `w_pub` coverage, so `wlat_interp` keeps its
+arity; the `w_pub` bridge is a one-line machine fact owed to the φ
+export); the S state is entered by DISCARDING THE STATE ELEMENT
+(persistent `sync_byte`, byte stays writable, plain stores excluded by
+dfrac algebra, no premise threading); owned store prims need NO side
+condition (`WCexcl ↦ WDirty` is a sound weakening); and the RELEASE
+CLASS IS NOW LOAD-BEARING (`wQ_store_w` gains
+`w_relp → k ≠ WCplain`, `wQ_fence` gains the `pw∧sw → w_relp` arm,
+`wrelease_core`/`wstarted_set` take `w_relp = true` — the D→C flip at a
+release IS the release store's own class transition).  Lock words left
+CLEAN, not SYNC (nothing racy-reads them — the spin is `ak_latest`);
+mint S for them only if a racy lock read ever appears.
+
+**TWO OPEN FLAGS from the landing:**
+- **`↦wo` is CpuId-indexed and does NOT cross `wp_next`** (exactly
+  `WeakSmodeFrame` §5's control).  The migrating/`cobj` (S-mode
+  context) world needs a CONTEXT-indexed dirty author — a real design
+  item for the port; the interim rule (stated in `wpt_own`'s header):
+  a migrating context PUBLISHES before it moves.  `WkMemmoveLoop`'s
+  `wssb1_spec` hypothesis is now unrealisable as stated (it compiles —
+  the leaves there are Prop hypotheses) — fix when that file is next
+  touched.
+- **DMA messages (tid None) are exempted** from the clean/dirty
+  invariants and can never be published; Layer 1's `bad` predicate must
+  therefore carry "the message's tid is a hart" — closed by the
+  DMA-tid unification item below (seam 1c/d).
+
 ## 2. Per-residue framework changes
 
 - **WeakLang ⇐ lift (seam 1)**: (a) fold INTERRUPT DELIVERY into the
