@@ -83,6 +83,7 @@ Require Import FsBlocks.
 Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import DirView.
+Require Import DirLinks.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
@@ -579,11 +580,16 @@ Section IcacheBootPool.
       (data : nat -> list (bv 8)) :
     inode_ok cov logstart dn bm data ->
     dir_ok icfg_nib dn data ->
+    dir_links (bv_unsigned inum) dn data -∗
     dinode_at γi inum dn -∗ ind_res γfs bm -∗ inode_blocks γfs bm data -∗
     ipool_shape γfs γi cov logstart inum.
   Proof.
-    iIntros (Hok Hdok) "Hdn Hind Hblk". rewrite /ipool_shape. iLeft.
-    iExists dn, bm, data. iFrame "Hdn Hind Hblk". done.
+    iIntros (Hok Hdok) "Hdlk Hdn Hind Hblk". rewrite /ipool_shape. iLeft.
+    iExists dn, bm, data.
+    iSplitR; [iPureIntro; exact Hok |].
+    iSplitR; [iPureIntro; exact Hdok |].
+    iSplitL "Hdlk"; [iExact "Hdlk" |].
+    iFrame "Hdn Hind Hblk".
   Qed.
 
   (* the pool is a [∗ set], so it splits and rejoins along any subset *)
@@ -608,6 +614,7 @@ Section IcacheBootPool.
        ∃ (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)),
          ⌜inode_ok cov logstart dn bm data⌝ ∗
          ⌜dir_ok icfg_nib dn data⌝ ∗
+         dir_links (bv_unsigned (mword_of_int z : mword 32)) dn data ∗
          dinode_at γi (mword_of_int z : mword 32) dn ∗
          ind_res γfs bm ∗ inode_blocks γfs bm data) -∗
     ([∗ set] z ∈ R ∖ A,
@@ -618,9 +625,9 @@ Section IcacheBootPool.
     iApply (ipool_split γfs γi cov logstart R A Hsub).
     iSplitL "Ha".
     - rewrite /ipool. iApply (big_sepS_mono with "Ha"). intros z _.
-      iIntros "(%dn & %bm & %data & %Hok & %Hdok & Hdn & Hind & Hblk)".
+      iIntros "(%dn & %bm & %data & %Hok & %Hdok & Hdlk & Hdn & Hind & Hblk)".
       iApply (ipool_shape_alloc _ _ _ _ _ dn bm data Hok Hdok
-                with "Hdn Hind Hblk").
+                with "Hdlk Hdn Hind Hblk").
     - rewrite /ipool. iApply (big_sepS_mono with "Hf"). intros z _.
       iIntros "Hmk". iApply (ipool_shape_free with "Hmk").
   Qed.

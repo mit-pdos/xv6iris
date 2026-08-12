@@ -120,6 +120,7 @@ Require Import DinodeEnc.
 Require Import FsCrash.
 Require Import InodeInv.
 Require Import DirView.
+Require Import DirLinks.
 Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
@@ -1005,11 +1006,13 @@ Section IlockLoad.
                  (∃ (bm : blkmap) (data : nat -> list (bv 8)),
                     ⌜inode_ok cov logstart dn bm data⌝ ∗
                     ⌜dir_ok icfg_nib dn data⌝ ∗
+                    dir_links (bv_unsigned inum) dn data ∗
                     ind_res gfs bm ∗ inode_blocks gfs bm data))
                 ∨ ⌜bv_unsigned (di_type dn) = 0⌝))%I
       with "[Hpool HL]" as ">[HL Hrest]".
     { rewrite /ipool_shape. iDestruct "Hpool" as "[Hal | Hmk]".
-      - iDestruct "Hal" as (dn0 bm0 data0) "(%Hok0 & %Hdok0 & Hdn & Hind & Hblk)".
+      - iDestruct "Hal" as (dn0 bm0 data0)
+          "(%Hok0 & %Hdok0 & Hdlk0 & Hdn & Hind & Hblk)".
         iMod (ireg_read ⊤ gi gfs inodestart nib inum dn0
                 (IBLOCK inum inodestart) (diblk_bytes ds)
                 ltac:(solve_ndisj) Hinlt eq_refl with "Hireg Hdn HL")
@@ -1021,7 +1024,8 @@ Section IlockLoad.
         iModIntro. iFrame "HL". iLeft. iFrame "Hdn".
         iExists bm0, data0.
         iSplitR; [iPureIntro; exact Hok0 |].
-        iSplitR; [iPureIntro; exact Hdok0 |]. iFrame.
+        iSplitR; [iPureIntro; exact Hdok0 |].
+        iSplitL "Hdlk0"; [iExact "Hdlk0" |]. iFrame.
       - destruct (decide (bv_unsigned (di_type dn) = 0)) as [Ht0 | Htnz].
         + iModIntro. iFrame "HL". iRight. iPureIntro. exact Ht0.
         + iMod (ireg_withdraw ⊤ gi gfs inodestart nib inum ds
@@ -1046,6 +1050,11 @@ Section IlockLoad.
             - apply bm_empty_holes. intros i. reflexivity.
             - exact inode_sized_zero. }
           iSplitR; [iPureIntro; exact (dir_ok_size_zero icfg_nib dn _ Hfsz) |].
+          (* §16.4's CLAIM BOX has [fresh_shape], i.e. size 0, so the twin
+             collapses to [emp] exactly where [dir_ok_size_zero] makes the
+             pure conjunct vacuous -- the resource half of §19.4's
+             "[ireg_withdraw] already pays [fresh_shape]". *)
+          iSplitR; [iApply (dir_links_size_zero (bv_unsigned inum) dn _ Hfsz) |].
           iSplitL; [iApply il_ind_res_empty | iApply il_blocks_empty]. }
     (* THE FILL SPENDS THE GENERATION'S ONE-SHOT (design §17.6 (3)), at the
        only instruction in this kernel that knows [di_type]: the record has
@@ -1815,7 +1824,7 @@ Section IlockLoad.
       iApply ("Hpan" with "Htext Hpc Hcg"). }
     (* ===== ALLOCATED INODE: the type is nonzero and the branch falls
        through, exactly as v1's dead arm did ===== *)
-    iDestruct "Hal" as (bm data) "(%Hok & %Hdok & Hindres & Hblocks)".
+    iDestruct "Hal" as (bm data) "(%Hok & %Hdok & Hdlk & Hindres & Hblocks)".
     destruct Hok as (Hwf & Hcovers & Hda & Htynz & Hszcap & Hholes & Hsized).
     pose proof (blkmap_wf_dir_len _ _ _ Hwf) as Hdirlen.
     assert (Hcelllen : length (bm_cells bm) = 13%nat)
@@ -1883,7 +1892,7 @@ Section IlockLoad.
               HK HZ0sp HZ0thr
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsb Hsl Hstok Hpid
                     Hdep Hidev Hinumc Hvalid
-                    [Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hindres Hblocks Hdn]
+                    [Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hindres Hblocks Hdn Hdlk]
                     Hshot [Hcont]").
     { rewrite /ic_loaded -Hip. iExists data.
       iSplitR.
@@ -1891,6 +1900,7 @@ Section IlockLoad.
       (* §15(a): the fill RIDES on the pool's strengthened allocated arm --
          same record, same data, so the conjunct transfers verbatim *)
       iSplitR; [iPureIntro; exact Hdok |].
+      iSplitL "Hdlk"; [iExact "Hdlk" |].
       iSplitL "Hdn"; [iExact "Hdn" |].
       iSplitL "Hmty Hmmaj Hmmin Hmnl Hmsz".
       { rewrite /inode_meta.

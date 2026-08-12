@@ -4766,3 +4766,255 @@ landed in S5f and neither move), the parking, the grey colour, the ten
 death certificates, D2, and stages B/C/D as scoped.  (L2), (L4) and the
 `c = None` half of (L3) remain unstated, all three for reasons already in
 the text: nothing mints an `iclaim` yet, and the root clause is stage C's.
+
+### 20.16 THE M2 DERIVATION (fs-sysfile S5h, 2026-08-12): **STOP-AND-REPORT.
+### (M2) IS REFUTED, AND SO IS EVERY OTHER CARRIER, BECAUSE THE OBLIGATION IS
+### FALSE ON A REACHABLE TRACE** — `ireg_free_au`'s `c = None` fails on
+### §20.8's own defect, and §20.5's `iclaim` payout is FORMALLY INCOMPATIBLE
+### with §20.8's grey colour
+
+*(numbered §20.16 because §20.15 is S5g's report; the mandate said "§20.15".)*
+
+S5g left a residue and this section works it.  The residue does not close,
+and the reason is not a missing carrier: **the thing every carrier was being
+built to prove is false of xv6.**  §19.9.1's shape, one subsystem over.
+
+#### 20.16.1 THE RESIDUE, WORKED — and where it dies
+
+§20.15's constructive residue was: *the OUT arm persists across iput's
+release and holds iput's whole reference as `DepRef q`, so the arm can carry
+the residual `iref_lic` for its inum, and the missing half is "q is the whole
+share".*  Worked against the code it dies twice before that half is reached.
+
+1. **`auth nat` cannot express absence, and no home changes that** — S5g's
+   own point (ii), which is why the residue reached for a *share*.
+2. **The share it would reach for is not the ledger's.**  `IcacheInv`'s mass
+   is `M !! k = Some (q, n)` with `q` the exact sum of holders' `iref_tok`s
+   (`iref_tok_two_lookup`, `IcacheInv.v:669`), so "no other reference to slot
+   `k`" is ALREADY a theorem there — under the lock.  A ledger-side
+   `r`-fraction would have to be minted and split in lockstep with `q` at
+   every `iget`/`iput`, i.e. M1's coupling clause in a new costume with §14's
+   arithmetic on top.  The OUT arm's `DepRef q` (`IcacheEscrow.v:637`) IS the
+   itable's `q`, not a ledger fraction, and the arm cannot convert one into
+   the other because it does not hold `itable_half`.
+3. **And it would not matter if it did.**  What iput's free needs is not
+   `r ≤ 1`; it is `c = None`.  `r ≤ 1` refutes only the case where the
+   claimant has already run its `iget`, and that case is refuted WITHOUT the
+   ledger, by REF-1 in `itable_half` at +0x50.  The case that survives is the
+   claimant's own `(claim, iget)` window — `ProofIalloc.v:1451` to `:1622`,
+   with the `brelse` at `:1528` in between — where the claimant holds
+   `iclaim` and NO reference at all.  A reference count is silent about that
+   window by construction.
+
+#### 20.16.2 THE FACT THAT KILLS THE WHOLE FAMILY: `c = None` AT THE FREE IS
+#### FALSE, AND THE TRACE IS §20.8's WITH ONE MORE STEP
+
+Every step is stock xv6 and each is a landed contract or a proven function.
+
+1. `mkdir /a`, `mkdir /a/b`; a process P does `chdir /a/b`.  `b`'s data holds
+   `"."` → b and `".."` → a; P holds a live icache reference to `b`.
+2. `rmdir /a/b`.  `isdirempty(b)` passes, the record in `a` is zeroed,
+   `a->nlink--`, `b->nlink--` → 0.  `b` is NOT freed (P's reference), and
+   **`b`'s `".."` still names `a` with nothing accounting for it** — §20.8's
+   orphan, i.e. `igrey a`, `g a = 1`.
+3. `rmdir /a`.  `a` is empty, `a->nlink--` → 0, no references, `iput` frees
+   it: `itrunc`, `type = 0`, `ireg_free_au` fires.  `c a = None` here, fine.
+   `a`'s inum is now free.
+4. A process Q runs `create("/f")`.  `ialloc` scans, finds `a`'s inum free,
+   `memset`, `dip->type = T_FILE`, `log_write`, `brelse`
+   (`ProofIalloc.v:1528`).  **`ireg_claim_au` has fired: `c a = Excl`.**  Q is
+   preempted before its `iget` at `+0xaa`.
+5. P runs `namei("..")` from its deleted cwd.  `dirlookup(b, "..")` returns
+   `a`'s inum — licence **(b) ORPHAN**, the one §20.7 already gates.  `iget`
+   mints a fresh entry (`a` is in no slot: step 3 emptied it), so P holds
+   REF-1.  `ilock` finds `valid == 0`, `bread`s the block, reads
+   `type = T_FILE ≠ 0`, does not panic, and **`ireg_withdraw` takes the CLAIM
+   BOX out of the region** — `ireg_in d` at a nonzero type IS `fresh_shape d`
+   (`InodeRegion.v:573`, used at `:1332`), i.e. the box, which is exactly the
+   arm §16.4 built the withdraw for.
+6. P's `namex` rejects the non-directory / the path ends, and P `iput`s.
+   `ip->ref--` → 0; `valid` is 1; **`ip->nlink == 0`** — a claim box has
+   `nlink = 0`, `ialloc_fresh` models `memset(dip,0,64)` — so iput takes
+   **the free path**: `itrunc`, `ip->type = 0`, `iupdate`.
+   **`ireg_free_au` fires with `c a = Excl`.**
+7. Q resumes, `iget`s, `ilock`s, and reads `type == 0`:
+   `panic("ilock: no type")` — or, after a second racing `ialloc`, silently
+   returns an unrelated inode while believing it owns a fresh one.
+
+Step 6 is the refutation.  `ireg_free_au`'s `c = None` premise — §20.6's iput
+row, §20.7's carrier obligation, (M1)'s and (M2)'s whole purpose — is **not
+merely undischargeable in `ProofIput`; it is false.**  No carrier can prove
+it: a generation bump, a reference count, a whole-share witness and a
+temporal colour flip would each be a proof of a false proposition.
+
+**This also shows D2 is worse than `kernel-defects.md` records.**  The
+recorded harm is a panic (or a wrong inode) in the READER.  Step 6 is a
+different and strictly worse harm: **a stranger's `iput`, walking a dangling
+`".."`, FREES an inode that a live `create` has already allocated and is
+about to fill** — the same inum is then handed to two callers, with no panic
+anywhere.  The window is bounded below by `ialloc`'s `brelse`-to-`iget` gap,
+but P's whole `namei`/`ilock`/`iput` sequence only has to *finish* inside it;
+P can have started long before.
+
+#### 20.16.3 THE SECOND MOVER, AND WHY A GUARD DOES NOT SAVE IT
+
+The obvious repair is to guard the claim discipline by the orphan colour,
+which is what §20.7's arm (b) already does for create.  Written out, the
+`ireg_slot` clauses would become
+
+    ireg_link_ok d w  ∧  (g = 0 -> claim_ok d c inreg)
+    claim_ok d c inreg := (di_type d = 0 -> c = None)
+                        ∧ (c <> None -> fresh_shape d ∧ di_nlink d = 0
+                                        ∧ inreg = true)
+
+with `inreg` the arm bit (`InodeRegion.v:661-662`: `⌜ireg_in d⌝ ∗ z ↪[γi] d`
+versus `⌜di_type d ≠ 0⌝ ∗ imark γi z`).  The clause `c ≠ None → inreg` is the
+one that does the work, and **it needs no carrier at all**: `ireg_free_au`
+ALREADY refutes the in-region arm at `InodeRegion.v:1215-1217`, with
+`dinode_at_excl` against the caller's own checked-out record.  Two lines.
+Under the guard the free is then
+
+* `g = 0`: `inreg = false` (the caller holds `dinode_at`) ⟹ `c = None` ⟹
+  every conjunct re-established at the type-0 record it writes;
+* `g ≥ 1`: the guard is off, before and after — the free changes no `g` — so
+  there is nothing to prove.
+
+`ireg_claim_au` mints only in the `g = 0` arm and pays out
+`iclaim inum ∨ ⌜1 ≤ g inum⌝`, which is §20.7's (b) verbatim, stated ONCE at
+its natural home instead of twice.  **That half closes.**
+
+**`ireg_withdraw` is the half that does not, and it cannot be repaired.**  The
+withdraw flips `inreg` from true to false, so under the guard it owes
+`c = None` afterwards, i.e. it must consume an `iclaim` or refute one.  And
+`ireg_withdraw`'s ONLY reachable firing is at a claim box: it requires the
+in-region arm and `di_type ≠ 0`, and `ireg_in` at a nonzero type IS
+`fresh_shape`.  So:
+
+* create's own ilock hands in `iclaim` and the clause is re-established —
+  the good case, and also where §20.7's steps 1–5 already wanted the token
+  checked;
+* **P's ilock in step 5 above hands in nothing**, and the guard does not help
+  it, because a guard is a licence to skip an obligation, not a source of a
+  resource: P's proof still has to produce the region's closing `ireg_slot`
+  and it has no `iclaim` to put in it.  Stating the clause makes P's ilock —
+  a LANDED, GREEN proof in `ProofIlock`/`ProofNamex` — unprovable.
+
+That is §19.7's rule (*a resource may not forbid a machine-reachable step; it
+only wedges the proof*) landing on the withdraw, and step 5 is machine
+reachable.  **So the claim discipline is broken at TWO movers, and the second
+has no guard, no premise and no carrier a stranger's `ilock` can supply.**
+
+Nor can the licence rescue it.  Giving `ireg_withdraw` stage C's
+`iname γi z` premise refutes (a) LINKED (`w ≥ 1` ⟹ `nlink ≥ 1`, against the
+box's `nlink = 0`), (c) HELD (the box is in-region, so no client holds
+`dinode_at`) and (f) ROOT (by (L4)), and (b) ORPHAN turns the guard off — the
+two halves fit exactly — but **the premise is not supplyable at the call
+site.**  `namex` ilocks the CHILD after `iunlockput(parent)`, so the
+`dir_links` fragment the lookup borrowed is already back in the parent's
+parked payload and out of reach; `SpecIlock` would need a licence its callers
+do not hold.  This is "THE REFERENCE THAT OUTLIVES ITS LICENCE" (§20.7)
+appearing at `ilock` instead of at `iget`, and it is the same wall.
+
+#### 20.16.4 THE RULING
+
+**§20.5's `iclaim` payout and §20.8's grey colour are formally
+incompatible.**  The grey colour exists so that the defect trace stays
+provable (§20.9(h)/(i): a resource may not block `dirlookup` in a deleted
+cwd, nor `iput`'s free of an orphan's parent).  The claim token exists only
+if the defect trace is EXCLUDED, because on that trace a stranger both
+withdraws and frees a live claim box.  You may have either, not both.
+
+Consequences, stated so nothing downstream is built on sand:
+
+* **§20.11's stage E is DEAD as chartered**, not unpriced.  (M1), (M2), the
+  whole-share witness and the generation bump are all proofs of a false
+  proposition; do not re-price them.
+* **Licence (d) has no source**, so §20.4's six-licence `iname` is a
+  FIVE-licence `iname` until something replaces it, and `ProofIalloc.v:1622`
+  is the one call site of the four with nothing behind it.
+* **§20.7's create derivation loses its instrument.**  Steps 1–4 are all
+  `iclaim`-driven; step 5 (`di_type_stable`) and §19.4's `fresh_shape` payout
+  survive, so what create can still prove at its fresh ilock is
+  `fresh_shape dn` — size 0, zero addrs — and NOT the sixteen-bit type value,
+  which §19.4 named as the entire deficit.  **Stage D lands with arm
+  C-OK-DIR gated exactly as §19.9.2 left it.**
+* **Stages B and C are untouched.**  Neither needs `c`; both were scoped on
+  `ilink`/`igrey`, which are sound and landed.  §20.10's A/B/C sizing stands.
+
+**THE RECOMMENDATION IS TO FIX THE KERNEL, and this is the first time the
+model's own progress — not just its honesty — depends on it.**  Two
+independent one-line fixes each kill the trace:
+
+* **(F1) D2's fix.**  Do not leave a dangling `".."`: either `sys_unlink`'s
+  directory arm rewrites the child's `".."`, or `iput`'s free path re-checks.
+  Retires the grey colour, after which `c ≠ None → inreg` closes with **no
+  carrier at all** — the two lines of §20.16.3 — and stage E disappears.
+* **(F2) MOVE `ialloc`'s `brelse` AFTER its `iget`.**  The claim and the free
+  are both serialised by the dinode block's buffer (§16.2); holding it across
+  the `iget` closes the `(claim, iget)` window outright, and makes licence
+  (d) unnecessary because licence (e) BUFFERED then covers
+  `ProofIalloc.v:1622`.  Strictly smaller than (F1), and it fixes the
+  allocate-twice harm without touching the reader's panic.
+  **`kernel-defects.md` should gain it as D3.**
+
+Absent a kernel change, the sound design is: **carry the claim component in
+the algebra, constrain it with NOTHING, and let stage D land gated** —
+exactly the state S5g left, now with a reason instead of an open obligation.
+
+#### 20.16.5 DEATH CERTIFICATES (the §17.6 standard)
+
+**(a) (M2) AS §20.15 PRICED IT — the OUT arm carries the `iref_lic`
+complement.**  DEAD three times: `auth nat` yields no absence at any home;
+the arm's `DepRef q` is the ITABLE's share and cannot be converted to a
+ledger fraction without `itable_half`, which the arm does not hold; and the
+target proposition is false (§20.16.2).
+
+**(b) (M2) AS §20.7 PRICED IT — a third generation bump at the free.**  DEAD
+on §20.16.2: a temporal carrier certifying "no free since" would be
+certifying a proposition the free itself falsifies on a reachable trace.
+
+**(c) (M1) IN ANY HOME.**  DEAD, and S5g's three objections are now known to
+be symptoms: the direction, the address and the lock are all downstream of
+the proposition being false.
+
+**(d) GUARDING THE CLAIM CLAUSES BY `g = 0`.**  HALF DEAD: it saves
+`ireg_free_au` (which needs no carrier once the arm clause is stated) and
+does NOT save `ireg_withdraw`, because a guard removes an obligation and
+cannot supply the `iclaim` the closing `ireg_slot` demands.  §19.7, at the
+withdraw.
+
+**(e) A LICENCE PREMISE ON `ireg_withdraw`.**  DEAD at the CALL SITE, not in
+the lemma: the case analysis closes (a)/(b)/(c)/(f), but `namex` ilocks the
+child after `iunlockput(parent)` and holds no fragment then.  The reference
+outlives the licence, one function further on than §20.7 found it.
+
+**(f) `ireg_claim_au` PAYING OUT `dinode_at γi z (ialloc_fresh ty)` instead
+of a token** (licence (c) for ialloc's iget, deposited back afterwards).
+DEAD on the marker's uniqueness: moving the slot to the marker arm needs the
+region to park an `imark γi z`, and for an uncached inum that token is in the
+POOL (`ipool_shape`'s free arm, `IcacheEscrow.v:437`), behind the itable
+spinlock ialloc does not hold.  §16.1/§16.2's serialisation is exactly what
+forbids it.
+
+**(g) DROPPING THE GREY COLOUR BY EXEMPTING `".."` FROM `dir_links`**, as
+`"."` is exempted.  DEAD at every trace, not just the defect: a `..` record
+with no fragment leaves `dirlookup(dp, "..")` with nothing to hand `iget`, so
+`namex`'s parent step — the commonest walk in the kernel — has no licence at
+all.  The `"."` exemption is free only because licence (c) is strictly
+stronger there (§20.3); there is no such substitute for `".."`.
+
+**(h) A REGION-LEVEL ASSUMPTION `∀ z, g z = 0`** (assume the defect never
+fires).  DEAD on §20.8: it makes the grey conversion at `dp->nlink--`
+illegal, so `sys_unlink`'s directory arm cannot re-establish (L1) — a
+machine-reachable step, blocked, §19.7 again.  It is §20.9(h) arriving from
+the other side.
+
+#### 20.16.6 BLAST RADIUS OF THE RULING
+
+Zero files.  Nothing is built, nothing is retired, and the algebra does not
+move — `c`, `iclaim` and `iref_lic` stay in `IcacheRef.v` exactly as S5f
+landed them, unconstrained, because the cost of keeping them is one
+existential in `ireg_slot` and the cost of removing them is a sweep.  What
+changes is the STAGE PLAN: §20.11's E is struck, D's gate is §19.9.2's, and
+`ProofIalloc.v:1622` is carried as a known-open call site in stage C rather
+than as work.

@@ -1524,7 +1524,7 @@ Section ProofIput.
        free path it dies with the generation [live_slot_regen] retires. *)
     iDestruct "Hpayl" as (dn bm) "[Hlk #Hshot]".
     iDestruct "Hlk" as (data)
-      "(%Hok & %Hdok & Hdat & Hmeta & Haddrs & Hind & Hblks)".
+      "(%Hok & %Hdok & Hdlk & Hdat & Hmeta & Haddrs & Hind & Hblks)".
     pose proof Hok as Hok'.
     destruct Hok' as (Hbmwf & Hcovers & Hdiaddrs & Htyne & Hszcap & Hholes & Hsized).
     iEval (rewrite /inode_meta) in "Hmeta".
@@ -1574,11 +1574,12 @@ Section ProofIput.
          on this path, the loaded payload and its shot go straight back into
          PARKED, and the two gnames [ic_open_held] now takes are equal. *)
       iAssert (ic_payload_at gfs gi cov logstart k inum ga dn bm)
-        with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks]" as "Hpayl".
+        with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks Hdlk]" as "Hpayl".
       { rewrite /ic_payload_at.
         iSplitR "Hshot"; [| iExact "Hshot"]. iExists data.
         iSplitR; [iPureIntro; exact Hok |].
-        iSplitR; [iPureIntro; exact Hdok |]. rewrite /inode_meta. iFrame. }
+        iSplitR; [iPureIntro; exact Hdok |].
+        iSplitL "Hdlk"; [iExact "Hdlk" |]. rewrite /inode_meta. iFrame. }
       iMod (ic_open_held cn gfs gi cov logstart k (⊤ ∖ ↑icEscN)
               Mt q ga ga dev inum dn bm ltac:(solve_ndisj) HMk
               with "Hinv Hbody Hhalf Hrtok Hlvh Hgid Hpayl")
@@ -1794,11 +1795,12 @@ Section ProofIput.
        it must stay there: restating it at [ga'] would spend the fresh
        pending the +0x74 park needs.  Hence [ic_open_held]'s two gnames. *)
     iAssert (ic_payload_at gfs gi cov logstart k inum ga dn bm)
-      with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks]" as "Hpayl".
+      with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks Hdlk]" as "Hpayl".
     { rewrite /ic_payload_at.
       iSplitR "Hshot"; [| iExact "Hshot"]. iExists data.
       iSplitR; [iPureIntro; exact Hok |].
-      iSplitR; [iPureIntro; exact Hdok |]. rewrite /inode_meta. iFrame. }
+      iSplitR; [iPureIntro; exact Hdok |].
+      iSplitL "Hdlk"; [iExact "Hdlk" |]. rewrite /inode_meta. iFrame. }
     iMod (ic_open_held cn gfs gi cov logstart k (⊤ ∖ ↑icEscN)
             Mt q ga' ga dev inum dn bm ltac:(solve_ndisj) HMk
             with "Hinv Hbody Hhalf Hrtok Hlvh Hgid Hpayl")
@@ -1970,7 +1972,17 @@ Section ProofIput.
        region free at +0x74, where (L3) needs it. *)
     iDestruct "Hpayl" as "[Hlk2 _]".
     iDestruct "Hlk2" as (data2)
-      "(%Hok2 & %Hdok2 & Hdat & Hmeta & Haddrs & Hind & Hblks)".
+      "(%Hok2 & %Hdok2 & Hdlk2 & Hdat & Hmeta & Haddrs & Hind & Hblks)".
+    (* [Hdlk2] -- the link-ledger fragments this directory's own records held
+       (design §20.3/§20.6's itrunc row) -- is SHED here and never re-parked:
+       the free path's exit is [ipool_shape]'s marker arm, which carries no
+       data and therefore no twin.  Dropping is sound (the logic is affine)
+       and it is what itrunc's [dir_links_size_zero] says at the pure level.
+       What it COSTS is liveness, not soundness, and the reachable-trace
+       argument is §20.6's: a file has no records, and a directory reaches
+       [nlink = 0] only through sys_unlink, which refuses a non-empty one --
+       so the only survivors are ["."] (exempt) and [".."] (already grey).
+       S7 owes that as a named obligation at the record zeroing. *)
     pose proof Hok2 as Hok2'.
     destruct Hok2' as (Hbmwf2 & Hcovers2 & Hdiaddrs2 & Htyne2 & Hszcap2 & Hholes2 & Hsized2).
     iDestruct (bslots_op bn 2 1) as "[Hbsp _]".

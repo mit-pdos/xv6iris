@@ -343,6 +343,7 @@ Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import DirView.
+Require Import DirLinks.
 Require Import LogInv.
 Require Import BioInv.
 Require Import FdSlots FileInvDefs.
@@ -1876,7 +1877,7 @@ Section ProofFilewrite.
            content (SpecIlock v2) and it IS [FileOff.off_mark]. ---- *)
     rewrite /ic_loaded.
     iDestruct "Hlk" as (datal)
-      "(%Hiok & %Hdok & Hdnat & Hmeta & Haddrs & Hindres & Hblocks)".
+      "(%Hiok & %Hdok & Hdlnk & Hdnat & Hmeta & Haddrs & Hindres & Hblocks)".
     destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
     iAssert (inode_map (fwn_fs fn) (ientry ik) bml)
       with "[Haddrs Hindres]" as "Hmap".
@@ -2150,6 +2151,13 @@ Section ProofFilewrite.
         + apply fw_wi_type.
         + reflexivity. }
     destruct Hjoin as (rz & Hrza0 & Hrzr & Hrzadv & Hiok2 & Hdok2 & Htyq & Hdn0q).
+    (* the RESOURCE twin of [Hdok2] (design §20.3).  filewrite cannot reach a
+       T_DIR inode -- sys_open refuses writable directories, which is what
+       [Hnodir] records -- so the twin is [emp] at the record writei
+       returned, exactly as [fw_dir_ok_wi] makes [dir_ok] vacuous there.  The
+       incoming [Hdlnk] was [emp] for the same reason and is dropped. *)
+    assert (Hnodir' : bv_unsigned (di_type dn') <> T_DIR_z)
+      by (rewrite Htyq; exact Hnodir).
     (* ---- +0xa4 c.mv s1,a0 : park the count ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (FW + 0xa4)) Rs1 Ra0 mwi (K - 12)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2200,6 +2208,7 @@ Section ProofFilewrite.
     { rewrite /ic_loaded /inode_map. iExists data'.
       iSplitR; [iPureIntro; exact Hiok2 |].
       iSplitR; [iPureIntro; exact Hdok2 |].
+      iSplitR; [iApply (dir_links_not_dir (bv_unsigned inum) dn' data' Hnodir') |].
       iDestruct "Hmap" as "[Haddrs Hindres]".
       rewrite Hdn0q. iFrame "Hdnat Hmeta Haddrs Hindres Hblocks". }
     (* ---- +0xb4 ld a0,24(s2) ; +0xb8 jal ra,iunlock ---- *)

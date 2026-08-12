@@ -253,6 +253,45 @@ Any C change here is subject to `durable-notes.md` §"Changing the kernel
 SOURCE" — the pinned image, the reproducibility gate and the address
 sweep — so it is not cheap even at 16 bytes.
 
+### D2's THIRD outcome, found later and strictly worse than the other two (fs-sysfile S5h)
+
+The two harms above are both suffered by the WALKER. There is a third, and
+it is suffered by an innocent third party: **a stranger walking the dangling
+`".."` can FREE an inode that a live `create` has already allocated.**
+
+Take the trace above to step 5 and put a concurrent `create` in it. After
+`rmdir /a` frees `a`'s inum, process Q runs `create("/f")`; `ialloc` finds
+`a`'s inum free, `memset`s it, sets `dip->type = T_FILE`, `log_write`s,
+`brelse`s — and is preempted **before its `iget`**. Now P walks `".."` from
+its deleted cwd: `iget` mints a fresh entry (nothing references that inum:
+`ialloc` has not `iget`ed yet), `ilock` breads a record whose `type` is
+nonzero — no panic this time — and P's own `iput` then finds
+`ref == 0 && valid && nlink == 0`, because `memset(dip,0,64)` left `nlink`
+at zero. So iput takes the **free path**: `itrunc`, `ip->type = 0`,
+`iupdate`. Q's inode is deallocated under it. Q resumes, `iget`s, `ilock`s,
+and either panics on the type-0 record or — after a second racing `ialloc` —
+proceeds to fill an inode a third process now owns. **The same inum is
+handed to two callers, with no error anywhere.**
+
+The window is `ialloc`'s `brelse`→`iget` gap, but P only has to FINISH
+inside it; P can have started long before, so it is not a two-instruction
+race in practice.
+
+**A SECOND, SMALLER FIX KILLS THIS OUTCOME ON ITS OWN: hold the dinode
+buffer across `ialloc`'s `iget`** — i.e. move the `brelse` after the
+`return iget(dev, inum)`, or take the reference before releasing. Every
+claim and every free is serialised by that block's buffer, so holding it
+closes the window outright. It does not fix the walker's panic (that needs
+D2's own fix) and it is even smaller than 16 bytes of `writei`.
+
+**In the PROOF this is not a side note.** `design/fs-icache.md` §20.16
+shows it is exactly why the model's claim token cannot be built: the
+obligation `ireg_free_au` would have to discharge — *no claim is
+outstanding at the inum I am freeing* — is FALSE on this trace, so no ghost
+carrier of any shape can prove it, and §20's stage E is dead as chartered
+until the kernel changes. This is the first defect in this file whose fix
+the verification's own progress depends on.
+
 ---
 
 ## Near-misses and non-defects

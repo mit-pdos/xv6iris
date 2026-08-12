@@ -161,6 +161,7 @@ Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import DinodeEnc.
 Require Import DirView.
+Require Import DirLinks.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
@@ -423,12 +424,22 @@ Section IcacheEscrow.
      beside [inode_ok] rather than inside it because [inode_ok]'s signature
      has no [nib] and its users are legion; [icfg_nib] is the ambient
      region size, capacity and not resource.  The FREE arm needs no such
-     conjunct: it carries no data at all, and its type is 0. *)
+     conjunct: it carries no data at all, and its type is 0.
+
+     ...AND ITS RESOURCE TWIN (§20.3, stage B).  [DirLinks.dir_links] rides
+     BESIDE [dir_ok], not inside it: one ledger fragment per live non-self
+     record, in one of the two colours [ilink]/[igrey].  [dir_ok] says the
+     named inum is IN RANGE; the twin says it is ALLOCATED, which is a fact
+     about another inum's REGION record and therefore cannot be a [Prop]
+     over [data] (§20.1, §20.9(a)).  No arity moves -- the colour
+     disjunction is inside [dir_link_at] -- and both fragments are timeless,
+     so the [Timeless] instance below survives verbatim. *)
   Definition ipool_alloc (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) : iProp Σ :=
     (∃ (dn0 : dinode) (bm0 : blkmap) (data0 : nat -> list (bv 8)),
        ⌜inode_ok cov logstart dn0 bm0 data0⌝ ∗
        ⌜dir_ok icfg_nib dn0 data0⌝ ∗
+       dir_links (bv_unsigned inum) dn0 data0 ∗
        dinode_at γi inum dn0 ∗
        ind_res γfs bm0 ∗
        inode_blocks γfs bm0 data0)%I.
@@ -465,13 +476,21 @@ Section IcacheEscrow.
      parked DIRECTORY's live records all name inums the inode region
      covers.  This is what namex destructs out of ilock's postcondition,
      and it is the reason dirlookup's [dir_inums_ok] premise is
-     dischargeable at a directory nobody named in advance. *)
+     dischargeable at a directory nobody named in advance.
+
+     ...AND ITS RESOURCE TWIN (§20.3, stage B), the twin of [ipool_alloc]'s:
+     [DirLinks.dir_links] over this record's own [data].  It is what
+     dirlookup will hand [iget] as licence (a)/(b) in stage C, borrowed out
+     of this payload at the matched index and returned before the holder's
+     iunlock.  Every re-park in the landed tree carries it unchanged
+     ([dir_links_eq]) because none of them changes a DIRECTORY's bytes. *)
   Definition ic_loaded (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (k : nat) (inum : mword 32)
       (dn : dinode) (bm : blkmap) : iProp Σ :=
     (∃ (data : nat -> list (bv 8)),
        ⌜inode_ok cov logstart dn bm data⌝ ∗
        ⌜dir_ok icfg_nib dn data⌝ ∗
+       dir_links (bv_unsigned inum) dn data ∗
        dinode_at γi inum dn ∗
        inode_meta (ientry k) dn ∗
        inode_addrs (ientry k) (bm_cells bm) ∗
@@ -1377,7 +1396,7 @@ Section IcacheEscrow.
     { destruct v; [| iDestruct "Hpay" as "[Hpu _]"; iExact "Hpu" ].
       iDestruct "Hpay" as (dn bm) "[Hlk _]".
       iDestruct "Hlk" as (data)
-        "(%Hok & %Hdok & Hdat & Hmeta & Haddrs & Hind & Hblks)".
+        "(%Hok & %Hdok & Hdlk & Hdat & Hmeta & Haddrs & Hind & Hblks)".
       pose proof Hok as Hok'.
       destruct Hok' as (Hwf & _ & Hda & _ & _ & _ & _).
       assert (Hcelllen : length (bm_cells bm) = 13%nat).
@@ -1386,8 +1405,10 @@ Section IcacheEscrow.
       { rewrite /inode_raw. iSplitL "Hmeta"; [by iExists dn |].
         iExists (bm_cells bm). iSplitR; [iPureIntro; exact Hcelllen |].
         iExact "Haddrs". }
-      rewrite /ipool_shape /ipool_alloc. iLeft. iExists dn, bm, data. iFrame.
-      iSplitR; iPureIntro; [exact Hok | exact Hdok]. }
+      rewrite /ipool_shape /ipool_alloc. iLeft. iExists dn, bm, data.
+      iSplitR; [iPureIntro; exact Hok |].
+      iSplitR; [iPureIntro; exact Hdok |].
+      iSplitL "Hdlk"; [iExact "Hdlk" |]. iFrame. }
     (* the two right-hand conjuncts go out structurally: [iFrame "Hgf2
        Hpool"] would search the [ic_escrow_body] conjunct -- five arms, each
        an existential over [ic_payload]/[inode_raw] -- for each of the two
@@ -1583,7 +1604,7 @@ Section IcacheEscrow.
     rewrite /ic_payload. destruct v.
     - iIntros "Hpay".
       iDestruct "Hpay" as (dn bm) "[Hlk _]".
-      iDestruct "Hlk" as (data) "(_ & _ & _ & Hmeta & _)".
+      iDestruct "Hlk" as (data) "(_ & _ & _ & _ & Hmeta & _)".
       rewrite /inode_meta. iDestruct "Hmeta" as "(_ & _ & _ & _ & Hsz)".
       iExists (di_size dn). iExact "Hsz".
     - iIntros "[Hu _]". iApply (ic_unloaded_size with "Hu").

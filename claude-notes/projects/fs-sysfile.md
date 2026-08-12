@@ -3883,6 +3883,238 @@ both, at the cost of splitting the twins from the pure lemmas they mirror.
   `di_nlink dn' = 0` half of §20.6's iput row is now DISCHARGED, so what
   D owes is one premise, not two.
 
+
+## S5h — **THE VERDICT: `ireg_free_au`'s `c = None` IS FALSE ON A REACHABLE
+## TRACE**, so (M2), (M1) and every other carrier are proofs of a false
+## proposition; §20.5's `iclaim` and §20.8's grey colour are formally
+## incompatible and stage E is DEAD as chartered.  Stage B (`dir_links`) is
+## BUILT and gated; the home question is settled
+
+### Part 1 — the M2 derivation (design §20.16, written for ratification)
+
+**Numbered §20.16, not §20.15**: §20.15 is S5g's own report.  The mandate
+said "§20.15"; the section is the one it describes.
+
+The residue S5g left — *the OUT arm crosses iput's release holding
+`DepRef q`, so let it carry the inum's `iref_lic` complement* — dies three
+times, and only the first two are about the mechanism:
+
+1. `auth nat` yields no absence at any home (S5g's point (ii));
+2. the arm's `q` is the ITABLE's share, and converting it into a ledger
+   fraction needs `itable_half`, which the arm does not hold.  `IcacheInv`
+   already proves "no other reference to slot `k`" from `iref_tok k q` at
+   REF-1 — under the lock, which is where iput is at +0x50 and is not at
+   +0x70;
+3. **and `r ≤ 1` would not have been enough anyway.**  It refutes only the
+   case where the claimant has already `iget`ed, and REF-1 refutes THAT
+   without any ledger.  The surviving case is the claimant's own
+   `(claim, iget)` window, where it holds `iclaim` and no reference at all.
+
+**THE FINDING.  The proposition every carrier was being built to prove is
+FALSE.**  §20.16.2 gives the trace, seven steps, all stock xv6: §20.8's own
+orphaned-`".."` setup, plus one preempted `create`.  A stranger walking the
+dangling `".."` `iget`s the freshly-claimed inum (licence (b) ORPHAN),
+`ilock`s the CLAIM BOX (`ireg_in` at a nonzero type IS `fresh_shape`, so the
+withdraw fires), and then **`iput`s it — `ref == 0`, `valid`, and
+`nlink == 0` because `memset(dip,0,64)` left it there — taking the FREE
+path.**  `ireg_free_au` fires with `c = Excl`.
+
+So: no generation bump, no reference count, no whole-share witness and no
+temporal colour flip can discharge it.  **§20.11's stage E is dead as
+chartered, not unpriced.  Do not re-price (M1) or (M2).**
+
+**The repair that ALMOST works, and where it stops.**  `c ≠ None → inreg`
+(the arm bit) needs no carrier at all — `ireg_free_au` already refutes the
+in-region arm at `InodeRegion.v:1215-1217` with `dinode_at_excl`, so the
+free's half is two lines — and guarding the whole claim discipline by
+`g = 0` makes the free vacuous on the defect trace.  It stops at
+**`ireg_withdraw`**, which flips `inreg` and therefore owes `c = None`
+after, and whose only reachable firing is at a claim box.  create's ilock
+can hand in the token; the stranger's cannot, and a GUARD removes an
+obligation without supplying a resource — so stating the clause makes a
+LANDED green proof (`ProofIlock`/`ProofNamex`) unprovable.  §19.7 at the
+withdraw.  Giving the withdraw stage C's `iname` premise closes the case
+analysis ((a) by `nlink = 0`, (c) by in-region, (f) by (L4), (b) turns the
+guard off — the halves fit exactly) and is **not supplyable at the call
+site**: `namex` ilocks the child after `iunlockput(parent)`, so the
+`dir_links` fragment is already back in the parent's parked payload.  The
+reference outliving its licence, one function further on than §20.7 found
+it.
+
+**Consequences to carry forward.**  Licence (d) has no source, so §20.4's
+six-licence `iname` is a FIVE-licence one and `ProofIalloc.v:1622` is a
+known-open call site rather than stage-C work.  create's fresh-ilock
+derivation keeps `fresh_shape` (from `ireg_withdraw`, §19.4) and loses the
+sixteen-bit TYPE value, so **stage D lands with arm C-OK-DIR gated exactly
+as §19.9.2 left it.**  Stages B and C are untouched — neither needs `c`.
+
+**Eight death certificates** in §20.16.5, including two new shapes worth
+having: `ireg_claim_au` paying out `dinode_at` instead of a token is dead on
+the MARKER's uniqueness (an uncached inum's `imark` is in the POOL, behind
+the itable spinlock ialloc does not hold — §16.1/§16.2's serialisation
+forbidding it); and exempting `".."` from `dir_links` the way `"."` is
+exempted is dead on EVERY trace, because `namex`'s parent step would then
+have no licence at all.
+
+**RECOMMENDATION: fix the kernel**, and this is the first time the
+verification's own progress depends on it.  Either D2's fix (retires grey,
+after which the two-line clause closes and stage E disappears) or a NEW and
+strictly smaller one: **hold `ialloc`'s dinode buffer across its `iget`**
+(move the `brelse` after `return iget(dev, inum)`).  The claim and the free
+are both serialised by that buffer, so it closes the window outright and
+makes licence (e) BUFFERED cover ialloc's call site.  `kernel-defects.md`
+gains it as D2's third outcome, with the allocate-twice harm spelled out.
+
+### Part 2 — stage B: `dir_links` IS BUILT, and the home question is settled
+
+**THE HOME: a new thin file `DirLinks.v`, above `DirView` and `IcacheRef`,
+below `IcacheEscrow`.**  Not DirView (it would stop being a pure record view
+and drag the icache algebra into every pure consumer), not `IcacheEscrow`
+(it would split the twins from the pure lemmas they mirror by 400 lines of
+arm machinery).  **The rule this instantiates: the pure vocabulary stays
+where the pure consumers are; the RESOURCE twin quantifies over it from one
+level up.**  `DirView.v` did not move a character.
+
+* `dir_link_at self data k` — the per-record ticket, the two-colour
+  disjunction inside the definition (so no arity moves anywhere), with the
+  self-record exemption `negb (bool_decide (dir_inum data k = self))`.
+* `dir_links self dn data` — type-conditional exactly as `dir_ok` is, a
+  `[∗ list]` over `seq 0 (dir_nrec (di_size dn))`.  **Timeless**, so
+  `ic_loaded_timeless` / `ipool_alloc_timeless` survive by `apply _` with no
+  edit at all.
+* four twins — `dir_links_not_dir`, `_free`, `_size_zero`, `_eq` — plus
+  `dir_link_at_agree`, the pointwise congruence the writer twin will
+  iterate over.
+* **`dir_links_dirlink` is DEFERRED, deliberately.**  Its only consumer is
+  `SpecDirlink`, whose only caller is `create` — not landed, and §20.16 has
+  just re-gated stage D anyway.  `dir_link_at_agree` is the half that does
+  not depend on how D lands.
+
+**The twin rides in both payloads with arity unchanged**:
+`IcacheEscrow.ipool_alloc` and `ic_loaded` each gain one conjunct beside
+`⌜dir_ok icfg_nib …⌝`, at `self := bv_unsigned inum` (the parameter both
+already carry).
+
+**The re-park rows, repaired** — and every one of them is the "rides
+unchanged" case, because no writer in the landed tree changes a DIRECTORY's
+bytes:
+
+| site | what it does |
+|---|---|
+| `IcacheEscrow` eviction (`:1389`) | loaded → pool, same data: the fragment goes straight back |
+| `ProofIlock`'s fill | pool's allocated arm → `ic_loaded`, same record; **and §16.4's CLAIM-BOX sub-arm gets `dir_links_size_zero`**, the resource half of "`ireg_withdraw` already pays `fresh_shape`" |
+| `ProofIput` ×2 (the nlink-undo and the +0x54 window) | `ic_payload_at` in and out, verbatim |
+| `ProofIput`'s FREE path | the fragments are SHED — the exit is `ipool_shape`'s marker arm, which carries no data.  Sound (affine), and §20.6's reachable-trace argument is why it costs no liveness; **S7 owes the `isdirempty` obligation** |
+| `ProofFilewrite` | `dir_links_not_dir` at the record writei returned: sys_open refuses writable directories, which is what `Hnodir` already records |
+| `ProofFileread` ×2, `ProofNamex` ×3, `ProofKexecA` ×3, `ProofFilestat` | readers; the fragment goes back exactly as it came out |
+| `IcacheBoot.ipool_shape_alloc` / `ipool_alloc` | the IOU grows by one resource conjunct per allocated inum — and `ipool_alloc_all_free`, which is the case the actual boot takes, needs **nothing**: a free inum hands over the MARKER and its record never leaves the region |
+
+**The boot mint is therefore free**, which §20.6's boot row did not foresee:
+the fragments only have to be produced for an image with allocated inodes,
+and that is already a premise the boot client supplies.
+
+### Gate
+
+`~/mk8.sh` (detached, `/tmp/mk8.log`, `make -f CoqMakefile -j24 -k`) on the
+EC2 mirror synced at `10bacacf` + the ten files and the new one:
+**`EXIT=0`, zero `Error`, 1055 `.vo`** (1054 + `DirLinks.vo`).  `~/audit8.sh`
+→ `Print Assumptions` on all fourteen linked fs theorems (Dirlink,
+Iupdate ×3, Itrunc, Iput, Iunlockput, Ilock, Ialloc, Writei ×2, Namex,
+Namei, Filewrite): **every one is `functional_extensionality_dep` + the five
+`rv64d.*` platform axioms**, plus filewrite's pre-existing declared
+`LinkConsolewrite.Consolewrite.wp_consolewrite_sconf`.  Cones UNCHANGED from
+S5g.  `_CoqProject` was edited IN PLACE on the mirror (one line,
+`DirLinks.v` after `DirView.v`) and never copied; no git write on EC2;
+scratch deleted; mirror quiet at the end.
+
+`lemma_diff` (`--ref 10bacacf`): **CLEAN** — nothing dropped, nothing
+admitted, no new `Axiom`/`Parameter`/`Hypothesis`.  Additions are the whole
+of `DirLinks.v` (`dir_link_at`, `dir_links`, their two `Timeless` instances,
+`dir_links_not_dir`, `_free`, `_size_zero`, `_eq`, `dir_link_at_agree`) and
+nothing else; no existing declaration changed its statement except
+`IcacheBoot.ipool_shape_alloc`, which gains the one resource premise the
+payload gained.
+
+### NOT STARTED
+
+**Stage C in full** — `SpecIget`'s licence and the six (now five) sources,
+`SpecDirlookup`'s `lookup_acc` at the matched index, `SpecDirlink`'s
+resource sibling, (L4)'s root clause in `ireg_body`.  Not begun; §20.16
+changes one thing about it (licence (d) is sourceless, so
+`ProofIalloc.v:1622` is carried as open rather than proved) and nothing
+else.  `InodeRegion.ireg_link_alloc` is still ready and still block-scoped.
+
+**`dir_links_dirlink`** — the fifth twin, §20.3's writer.  Deferred with a
+reason, not forgotten: `dir_link_at_agree` is landed and is the half the
+three-case proof iterates over.
+
+### WHAT STAGE D OWES, ARM BY ARM (the essentials, re-priced by §20.16)
+
+Against the eight-arm graph above.  §20.16 changed exactly one column:
+create's fresh ilock now yields `fresh_shape dn` and NOT
+`dn = ialloc_fresh ty`, because `iclaim` has no source.
+
+| arm | what it still owes |
+|---|---|
+| **N** (+0x26 `beqz`) | nothing new — no inode is touched |
+| **F-OK** | `dir_links` on `dp` is BORROWED by the lookup and returned at the `iunlockput(dp)`; the `ilock(ip)` of the FOUND child is a stage-C licence question, not a stage-D one |
+| **F-BAD**, **A-FAIL**, **FAIL** | nothing new: they write `nlink := 0` and release; the ledger's (L1) falls with the count via `ireg_write_unlink`, which is landed |
+| **C-OK-FILE** | the three stores + `iupdate` are `ireg_write_au` with `di_nlink_stable`, landed.  `dirlink(dp, name, inum)` needs the **resource sibling `ilink inum`**, minted at the same `iupdate` by `ireg_write_link` (landed) and deposited by `dir_links_dirlink` (**owed, stage B's deferred twin**).  The fresh ilock gives `fresh_shape dn` — enough for `inode_ok`, §19.4 — so this arm closes **without** the type value |
+| **C-OK-DIR** | everything C-OK-FILE owes, PLUS the two extra `dirlink`s.  `dirlink(ip, ".")` needs `di_type dn = T_DIR` at the fresh record — the sixteen-bit type value §19.4 named as the entire deficit and §20.16 has just confirmed is unobtainable.  **This arm stays GATED, exactly as §19.9.2 left it**; `dirlink(ip, "..")` additionally needs `ilink dp`, minted at `dp->nlink++` by `ireg_write_link`, and the self-record `"."` needs NO fragment (the exemption, landed in `dir_link_at`) |
+
+So stage D's real order is: land `dir_links_dirlink`, then seven arms
+unconditionally, then C-OK-DIR behind one named assumption whose retirement
+is a KERNEL change (§20.16.4's (F1)/(F2)) and not a proof.
+
+### Traps recorded
+
+1. **A NEW FILE IN THE Iris LAYER NEEDS THE `iris.base_logic.lib` REQUIRES
+   OF ITS OWN, and the error names `iProp`.**  `Require Import IcacheRef`
+   LOADS iris's libraries but does not IMPORT their names, so a file that
+   only requires the fs vocabulary fails with **`The reference iProp was not
+   found in the current environment`** at the first `: iProp Σ` — which
+   reads like a missing typeclass or a broken `Σ`.  Copy the requiring
+   file's own `From iris.… Require Import` block; `gen_heap invariants own
+   ghost_var` is what this tier uses.
+2. **...AND `Local Open Scope Z_scope`, or a bare `0` fails with `No
+   interpretation for number "0"`.**  Both `DirView.v` and `IcacheRef.v`
+   open it locally; a new file between them does not inherit it, and the
+   error appears at the FIRST lemma statement rather than at the
+   definitions, so it looks like the lemma is malformed.
+3. **`dir_liveb` UNFOLDS TO `negb (dir_freeb …)`, so rewriting the inum
+   equality under `/dir_liveb` alone does not fire.**  The failure is
+   `iExact: "H" : (if negb (dir_freeb data k) && … then … else …) does not
+   match goal` with two sides that look identical except for `data`/`data'`
+   — the tell is that `dir_freeb` is still there.  Unfold BOTH.
+4. **PICK A FRESH PROOFMODE NAME BY GREPPING THE FILE, NOT BY GUESSING.**
+   `Hdlk` was already taken in `ProofFilewrite` and `ProofNamex` (it is the
+   persistent DISK-LAYOUT hypothesis, `#Hdlk`), and the error —
+   **`iAndDestruct: "Hdlk" or (IAnon 48) not fresh`** — names the new
+   binding and not the old one.  Cost one whole build round.  Renamed to
+   `Hdlnk`.
+5. **A CONJUNCT ADDED TO A PAYLOAD MUST BE ADDED TO EVERY *CONTEXT-GATHERING*
+   `iAssert` BETWEEN THE PEEL AND THE RE-PARK, AND GREPPING FOR THE PEEL'S
+   OTHER NAMES IS HOW YOU FIND THEM.**  `ProofNamex` states the `+0xce`
+   block once for its two routes (`ProofNamex.v:3451`, `"Hdlblk"`) with an
+   explicit 30-name selection list; a new hypothesis not in that list is
+   simply absent inside the block, and the error —
+   **`iSpecialize: hypotheses ["Hdlnk"] not found`** — appears **300 lines
+   later**, at the re-park, in a branch that looks like it should have it.
+   The diagnosis is one grep: `grep -n Hdiat <file>` (any OTHER name from
+   the same peel) enumerates every list the conjunct also belongs in.
+   Two of `ProofNamex`'s three re-park sites were inside such a block; the
+   third was not, which is exactly why the failure looked branch-specific.
+6. **TWO CONCURRENT `make`s ON THE MIRROR IS A SELF-INFLICTED WOUND, and
+   the first symptom is a truncated log.**  `grep -n "EXIT="` printing
+   nothing means the build is STILL RUNNING; reading the error list at that
+   moment and relaunching gives two makes on one tree, the second of which
+   `rm`s the first's log.  Recovery: `ps -eo pid,args | grep CoqMakefile`,
+   `kill -9` the sub-make PIDs (a bare `pkill -f "CoqMakefile -j24"`
+   self-matches through ssh and returns 255 — the recorded trap, in its ssh
+   costume), then `pkill -x rocqworker`, then confirm quiet before
+   relaunching.  **Wait on the sentinel, never on a poll that reads the log
+   for errors.**
+
 ## UNSATISFIABLE, and that is the finding that matters
 
 ### B1 (proc_priv -> proc_priv_core) — DONE, and the composition probe passed first try
