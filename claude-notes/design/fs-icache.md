@@ -2861,3 +2861,25 @@ s g` preserved every arity as promised (the ripple was ZERO files —
 `IcacheRef.v` alone), and the one-shot's vocabulary (`ityR`,
 `ity_pending`, `ity_shot`, `ity_shoot`, `ity_shot_agree`) is in beside
 it, modelled on `KptGhost.v`'s.  Pieces 2-4 wait on the ruling above.
+
+### 17.4 RATIFIED (coordinator, 2026-08-12): §17.3's two repairs are
+### the design; §17.2's piece-3 slice-in-ic_loaded is dead
+
+Both S3c findings were verified against code and their repairs are
+adopted verbatim: (A) the ½ liveness slice lives in the ESCROW ARMS
+(parked/mid/held gain live_gen k (1/2) g; ic_dep gains the gname
+field; live_slot's live case is 1/2−qt exactly as the restated
+ledger says; live_slot_alloc becomes a fupd at q<1/2, unifying the
+live and identity ledgers' shapes) and the generation + type witness
+ride ic_payload — ic_loaded does not move, and ic_open_auth_ref's
+REF-1 refutation keeps its full unit. (B) the per-generation
+one-shot parks with ipool_shape's ALLOCATED disjunct inside
+ic_unloaded — minted at iget's recycle on that branch, spent by the
+fill where dinode_at lives; iput's in-generation free re-park owes
+nothing. The discarded routes (§17.2's travelling slice; bumping at
+the retype, dead because iput holds no itable_half at +0x5c) stay
+recorded in §17.3.
+
+Execution: S3d = pieces 2–4 per §17.3 (the arm slices, the one-shot
+parking, SpecIlock's additive post, inode_pay's witness), full-gated;
+then SpecFilewrite/Proof/Link in the same stage if budget allows.
