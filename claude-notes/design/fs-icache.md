@@ -3500,3 +3500,43 @@ payload and better than it predicted for the consumers: `ProofFileclose`
 (two argument lists) and `ProofPipealloc` (four `MkFPNames`, for the new
 field).  fileread, filestat, filedup and kexit carry the payload opaquely
 and did not move a character — the audit §17 asked for, done by the build.
+
+## 18. THE OP-WIDE SET LEDGER (the budget ruling, 2026-08-12): contracts
+## go SET-FORM, because create is the same wall one level up
+
+S3k's link-2 question ("cost function vs arm disjunction; one credit
+vs two") is answered by looking one campaign stage ahead. create's
+single transaction runs ialloc + iupdate×3 + dirlink×4; the sum of
+their COUNTED budgets is far past MAXOPBLOCKS, but the op's distinct-
+block set is ~5 (parent data, parent inode, child inode, bitmap,
+maybe indirect). Absorption must therefore work ACROSS CALLS within
+one op — a per-call counted premise can never express that, and any
+per-call slack ruling would be answering the wrong question.
+
+**RULING:**
+1. **Budget-bearing fs contracts move to SET FORM at the seam**:
+   writei (and, when S5 reopens them, dirlink/ialloc/iupdate's
+   budget clauses) take `log_opS γ u Sb` in and return
+   `log_opS γ u' Sb'` with an EXPLICIT bound on `Sb' ∖ Sb` (the
+   blocks this call may have logged: its data-block window, the
+   bitmap block, the file's indirect block, the inode block) and
+   `u' ≥ u − (genuine allocations)`. The counted sconf form is
+   DERIVED at Sb := ∅ for compatibility, exactly wp_balloc_gen's
+   pattern. A caller (filewrite's loop; create's body) threads ONE
+   set across all its calls and pays each distinct block once.
+2. **bmap: ONE credit (the bitmap), arm-wise exact** — S3k proved the
+   cross-iteration indirect credit buys only slack (10 → 7) at real
+   contract complexity; under set-form the op-wide set bound is what
+   callers consume, and 2B+2 ≤ 10 closes writei. Take (B)'s arm-wise
+   exact set-growth per disjunct — the caller must COMPUTE its set,
+   so exact growth per arm is the usable form; S3k's measured sizing
+   says the arms discharge at one built-once epilogue.
+   The two-credit machinery (log_amort_adopt/reserve, wi_fset) stays
+   in WriteiBudget.v, proven, for the day slack is needed.
+3. wi_cost_tight's non-monotonicity trap applies to every consumer
+   re-check; the empty-range arm is audited explicitly.
+
+Sequencing: S3l = links 2+3+4 under this ruling (bmap arm-wise
+one-credit set-form; writei's premise = log_opS with the B+3-shaped
+bound; dirlink re-discharged); S3m = ProofFilewrite + LinkFilewrite.
+create's S5 brief inherits clause 1 for its op-wide set.
