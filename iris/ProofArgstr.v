@@ -41,7 +41,8 @@ Require Import VcGen.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock.
 Require Import UserPtTree.
-Require Import FdSlots FileInv ProcInv.
+Require Import FdSlots ProcInv.
+Require Import FileInvDefs.
 Require Import CodeArgstr.
 Require Import SpecArgraw SpecFetchstr.
 Require Import SpecArgstr.

@@ -47,7 +47,6 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import RegFile.
@@ -56,26 +55,21 @@ Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn StackBytes.
 Require Import CalleeSaved.
-Require Import KernelRvcDecode.
-Require Import VcGen.
-Require Import InstrBytes KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
-Require Import WpSmodeIntr WpSmodeHalf.
+Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import ProcGeom.
-Require Import FdSlots FileInv.
+Require Import FdSlots.
+Require Import FileInvDefs.
 Require Import KallocInv.
 Require Import UserPtTree.
-Require Import KvmSpec.
 Require Import ProcPtOwn.
-Require Import SpecPanic.
 Require Import ProcInv.
-Require Import WpUart DiskPtsto BioInv FsBlocks LogInv FsCrash.
-Require Import DinodeEnc InodeInv InodeLock.
+Require Import WpUart DiskPtsto BioInv FsBlocks LogInv.
+Require Import DinodeEnc.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheInv.
 Require Import IcacheEscrow.
 (* RE-IMPORT: [IcacheInv.islot] shadows [DinodeEnc.islot] and
    [IcacheRef.inode_ref] shadows [FileInv]'s placeholder; neither icache name

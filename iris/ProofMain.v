@@ -71,7 +71,8 @@ Require Import KallocInv KvmSpec PageGeom.
 Require Import KptGhost KptShare KptExecMap KvmMap.
 Require Import PtreeType.
 Require Import WpKvminithart.
-Require Import ProcGeom CpuOwn SchedCtx FdSlots FileInv.
+Require Import ProcGeom CpuOwn SchedCtx FdSlots.
+Require Import FileInvDefs.
 Require Import BcacheInv SleepLock.
 Require Import DevModel VirtioModel DiskPtsto WpUart.
 Require Import VirtioQueue VirtioProto DiskInv DiskBoot.

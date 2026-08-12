@@ -68,8 +68,9 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
-Require Import FdSlots FileInv.
-Require Import UserPtTree ProcPtOwn.
+Require Import FdSlots.
+Require Import FileInvDefs.
+Require Import UserPtTree.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import IrefSlots.

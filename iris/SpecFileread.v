@@ -140,8 +140,9 @@ Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
-Require Import PipeInv.
-Require Import FileInv FileOff ProcInv.
+Require Import PipeInvDefs.
+Require Import FileOff ProcInv.
+Require Import FileInvDefs.
 Require Import SpecReadi.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

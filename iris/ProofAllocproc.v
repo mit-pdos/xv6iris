@@ -76,7 +76,8 @@ Require Import PageGeom KallocInv ByteBuf.
 Require Import PtTree PtBuild.
 Require Import UserPtTree ProcPtOwn.
 Require Import ProcGeom CpuOwn.
-Require Import FdSlots FileInv.
+Require Import FdSlots.
+Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KvmSpec.

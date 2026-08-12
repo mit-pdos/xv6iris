@@ -73,7 +73,8 @@ Require Import SpecPanic.
 Require Import DevModel.
 Require Import DiskPtsto WpUart.
 Require Import DiskInv.
-Require Import WpLock FileInv.
+Require Import WpLock.
+Require Import FileInvDefs.
 (* the boot-arm interface, for the per-hart bundle [main_hart_raw] (and the
    □-wand whose arguments [main_deposit] packages) *)
 Require Import SpecMain.

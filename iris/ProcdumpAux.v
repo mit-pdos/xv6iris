@@ -45,7 +45,7 @@ Require Import ArrCursor.
 Require Import StackOwn.
 Require Import WpMmodeLeafBase.
 Require Import KernelRvcDecode.
-Require Import KernelText KernelDataInv.
+Require Import KernelDataInv.
 Require Import ProcGeom.
 Require Import PrintkFmt.
 From Kernel Require KernelSyms.

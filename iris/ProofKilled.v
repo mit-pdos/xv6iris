@@ -31,7 +31,8 @@ Require Import WpNext.
 Require Import CpuOwn.
 Require Import WpLock.
 Require Import ProcGeom.
-Require Import FdSlots FileInv.
+Require Import FdSlots.
+Require Import FileInvDefs.
 Require Import SchedCtx.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecKilled.

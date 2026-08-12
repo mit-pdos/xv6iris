@@ -62,8 +62,9 @@ Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
-Require Import FdSlots FileInv ProcInv.
-Require Import PipeInv.
+Require Import FdSlots ProcInv.
+Require Import FileInvDefs.
+Require Import PipeInvDefs.
 Require Import SpecPanic.
 Require Import SchedCtx.
 Require Export SwtchCtx.

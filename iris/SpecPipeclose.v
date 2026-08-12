@@ -40,7 +40,7 @@ Require Import FdSlots.
 Require Import SchedCtx.
 Require Import WpLock.
 Require Import KallocInv.
-Require Import PipeInv.
+Require Import PipeInvDefs.
 Require Import SpecPanic.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

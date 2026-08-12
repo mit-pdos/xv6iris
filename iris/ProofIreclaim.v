@@ -91,7 +91,6 @@ Require Import DiskPtsto DiskInv.
 Require Import BufOwn.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
-Require Import WpSconfSrliw.
 Require Import ByteBuf.
 Require Import PrintintArith.
 Require Import PrintkFmt.
@@ -102,7 +101,6 @@ Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import BlockWords.
 Require Import BitmapInv.
 Require Import DinodeEnc.
 Require Import DinodeSlot.
@@ -112,7 +110,6 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import SleepLock.
 Require Import IcacheBoot.
 Require Import CodeIreclaim.
 Require Import SpecPanic.

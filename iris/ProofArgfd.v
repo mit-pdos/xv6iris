@@ -51,7 +51,8 @@ Require Import IntrDefs WpLock.
 Require Import HartTp WpNext.
 Require Import ProcGeom CpuOwn.
 Require Import UserPtTree.
-Require Import FdSlots FileInv ProcInv.
+Require Import FdSlots ProcInv.
+Require Import FileInvDefs.
 Require Import SpecMyproc SpecArgint.
 Require Import SpecArgfd.
 Require Import CodeArgfd.

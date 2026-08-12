@@ -26,7 +26,8 @@ Require Import KernelText KernelDataInv.
 Require Import SmodeCore.
 Require Import IntrDefs.
 Require Import ProcGeom SwtchCtx SchedCtx.
-Require Import WpLock KallocInv FileInv FdSlots.
+Require Import WpLock KallocInv FdSlots.
+Require Import FileInvDefs.
 Require Import VirtioProto VirtioModel VirtioQueue DiskPtsto.
 Require Import PlicPlan WpUart WireInv.
 Require Import SpecConsoleinit SpecIinit.

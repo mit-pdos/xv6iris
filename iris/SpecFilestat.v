@@ -135,7 +135,6 @@ Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeRegion.
@@ -146,12 +145,8 @@ Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
-Require Import FileInv ProcInv.
-Require Import SpecIlock.
-Require Import SpecStati.
-Require Import SpecIunlock.
-Require Import SpecCopyout.
-Require Import SpecMyproc.
+Require Import ProcInv.
+Require Import FileInvDefs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

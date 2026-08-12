@@ -66,7 +66,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import RegFile.
-Require Import MinstretInv InstrBytes WpGpr.
+Require Import InstrBytes WpGpr.
 Require Import SmodeCore WpMmodeLeafBase.
 Require Import MstatusBits.
 (* [exec_execute_SRET_menv] -- the SRET reduction with the get_xLPE premise

@@ -104,7 +104,8 @@ Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
-Require Import FileInv ProcInv.
+Require Import ProcInv.
+Require Import FileInvDefs.
 Require Import CodeReadi.
 Require Import SpecPanic.
 Require Import SpecBmap SpecBread SpecBrelse SpecEitherCopyout.

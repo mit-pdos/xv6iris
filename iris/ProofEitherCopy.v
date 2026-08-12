@@ -68,7 +68,8 @@ Require Import ProcGeom CpuOwn.
 Require Import KallocInv.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
-Require Import FdSlots FileInv ProcInv.
+Require Import FdSlots ProcInv.
+Require Import FileInvDefs.
 Require Import CodeEitherCopy.
 Require Import SpecMyproc SpecMemmove SpecCopyin SpecCopyout.
 Require Import SpecEitherCopyout SpecEitherCopyin.

@@ -65,7 +65,8 @@ Require Import WpNext.
 Require Import WpLock.
 Require Import CpuOwn.
 Require Import ByteBuf.
-Require Import FdSlots FileInv ProcInv.
+Require Import FdSlots ProcInv.
+Require Import FileInvDefs.
 From Kernel Require KernelSyms.
 Import Defs.
 Local Open Scope Z_scope.

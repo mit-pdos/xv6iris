@@ -48,7 +48,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile InstrBytes.
 Require Import SmodeCore.
-Require Import HartTp WpNext.
+Require Import WpNext.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import WpPushOffCsr.   (* [csr_sstatus] -- WpSconfCsr's copy is [Local] *)

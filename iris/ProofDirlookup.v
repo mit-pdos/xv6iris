@@ -63,20 +63,15 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
-Require Import RiscvFetchExec.
 Require Import InstrBytes.
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
-Require Import MinstretInv.
-Require Import KptGhost.
 Require Import SmodeCore.
-Require Import KernelText.
-Require Import KernelRvcDecode.
 Require Import VcGen.
-Require Import StackOwn StackBytes.
+Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSconfVc.
+Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSmodeHalf.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
@@ -84,27 +79,23 @@ Require Import CpuOwn.
 Require Import ByteBuf.
 Require Import FdSlots.
 Require Import ProcGeom.
-Require Import SchedCtx.
-Require Import SleepLock.
+Require Import ProcInv.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import DinodeEnc.
-Require Import DirentEnc.
 Require Import InodeInv.
-Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import KallocInv.
 Require Import UserPtTree.
-Require Import KvmSpec.
-Require Import ProcPtOwn.
-Require Import FileInv ProcInv.
+Require Import SpecPanic.
+Require Import ProcInv.
+Require Import FileInvDefs.
 Require Import DirView.
 Require Import SpecPanic.
 Require Import SpecReadi SpecNamecmp SpecIget.

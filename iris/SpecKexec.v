@@ -160,7 +160,6 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import SleepLock.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
@@ -168,13 +167,9 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
 Require Import ByteBuf.
-Require Import ElfEnc.
-Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import PathElems.
-Require Import DirView.
 Require Import InodeInv.
-Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
@@ -183,14 +178,13 @@ Require Import IcacheEscrow.
 Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
-Require Import ProcPtOwn.
-Require Import FileInv ProcInv.
+Require Import ProcInv.
+Require Import FileInvDefs.
 Require Import SpecIput.
 (* [SpecNamex] for [ROOTDEV] -- a param.h constant that happens to live in a
    Spec file.  It should be hoisted the way [tf_epc_idx] was (see ProcGeom.v):
    a Spec should not have to require another function's Spec to name a
    constant.  Recorded in projects/kexec.md's cleanup list. *)
-Require Import SpecNamex.
 (* [SpecDirlink] for [ic_sleeplocks], and it must be THIS one: the definition
    exists three times, identically, in IcacheBoot.v / SpecFileclose.v /
    SpecDirlink.v, and in SpecNamei's import scope the name resolves to
@@ -198,7 +192,6 @@ Require Import SpecNamex.
    precondition must be the SYNTACTICALLY same proposition namei's is.  The
    three copies should be one; also in the cleanup list. *)
 Require Import SpecDirlink.
-Require Import SpecNamei.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

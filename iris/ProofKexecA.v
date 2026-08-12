@@ -172,19 +172,15 @@ Require Import WpLock.
 Require Import SpecPanic.
 Require Import FdSlots.
 Require Export SwtchCtx.
-Require Import SleepLock.
 Require Import WpUart.
 Require Import FsCrash.
-Require Import DinodeEnc.
-Require Import DirView.
-Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IcacheEscrow.
 Require Import ByteBuf.
 Require Import ElfEnc.
 Require Import ProcGeom.
-Require Import SchedCtx.
-Require Import DiskPtsto DiskInv.
+Require Import ProcInv.
+Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
@@ -195,10 +191,9 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import KallocInv.
-Require Import UserPtTree.
 Require Import KvmSpec.
-Require Import ProcPtOwn.
-Require Import FileInv ProcInv.
+Require Import ProcInv.
+Require Import FileInvDefs.
 Require Import SpecIput.
 Require Import SpecKexec.
 Require Import SpecMyproc.
@@ -207,7 +202,6 @@ Require Import SpecEndOp.
 Require Import SpecIlock.
 Require Import SpecReadi.
 Require Import SpecIunlockput.
-Require Import SpecNamex.
 Require Import SpecDirlink.
 Require Import SpecNamei.
 Require Import ProofKexecParts.

@@ -61,7 +61,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RiscvModelBytes.
 Require Import RiscvExtras.
 Require Import InstrBytes.
-Require Import KernelText KernelDataInv.
+Require Import KernelText.
 Require Import KernelRvcDecode.
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
@@ -70,35 +70,30 @@ Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import VcGen.
 Require Import IntrDefs WpSmodeIntr.
-Require Import WpSmodeHalf.
 Require Import CpuOwn.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
+Require Import BufOwn.
 Require Import BufOwn.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
 Require Import ByteBuf.
 Require Import FdSlots.
 Require Import ProcGeom.
-Require Import SchedCtx.
+Require Import IcacheRef.
+Require Import IrefSlots.
 Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BlockWords.
 Require Import BitmapInv.
-Require Import DinodeEnc.
 Require Import DinodeSlot.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import SleepLock.
-Require Import IcacheBoot.
 Require Import CodeFsinit.
-Require Import SpecPanic.
-Require Import SpecPrintkGen.
 Require Import SpecBread SpecBrelse SpecMemmove.
 Require Import SpecInitlog SpecIreclaim.
 Require Import SpecFsinit.

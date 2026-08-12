@@ -119,7 +119,6 @@ Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import FsCrash.
 Require Import InodeInv.
-Require Import DirentEnc.
 Require Import DirView.
 Require Import InodeLock.
 Require Import InodeRegion.

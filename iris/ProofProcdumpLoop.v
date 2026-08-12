@@ -40,10 +40,9 @@ Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText KernelDataInv.
-Require Import StackOwn CalleeSaved.
+Require Import CalleeSaved.
 Require Import WpMmodeLeafBase.
-Require Import KernelRvcDecode.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import IntrDefs WpNext.
 Require Import CpuOwn.
 Require Import WpLock.

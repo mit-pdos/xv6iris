@@ -42,7 +42,6 @@ From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import list bitvector.definitions.
 Require Import SailStdpp.Values.
 Require Import RiscvModelBytes.
-Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import InodeInv.

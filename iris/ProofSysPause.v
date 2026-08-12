@@ -114,7 +114,8 @@ Require Import WpSmodeIntr.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import PageGeom.
-Require Import FdSlots FileInv ProcInv.
+Require Import FdSlots ProcInv.
+Require Import FileInvDefs.
 Require Import SchedCtx.
 Require Import TicksInv.
 Require Import CodeSysPause.

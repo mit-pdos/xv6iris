@@ -30,8 +30,6 @@ Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import StackOwn CalleeSaved.
 Require Import WpMmodeLeafBase.
-Require Import KernelRvcDecode.
-Require Import VcGen.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSmodeIntr.
 Require Import IntrDefs WpNext.
 Require Import ArrCursor.

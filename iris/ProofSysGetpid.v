@@ -30,7 +30,8 @@ Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import IntrDefs HartTp WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
-Require Import FdSlots FileInv ProcInv.
+Require Import FdSlots ProcInv.
+Require Import FileInvDefs.
 Require Import SpecMyproc.
 Require Import SpecSysGetpid.
 From Kernel Require KernelInstrs.

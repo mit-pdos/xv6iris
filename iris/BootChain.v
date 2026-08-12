@@ -58,7 +58,8 @@ Require Import LinkEntry.
 Require Import SpecMainSecondary LinkMainSecondary.
 Require Import StartedInv DevModel.
 Require Import WpUart DiskPtsto SpecPanic.
-Require Import WpLock KallocInv FileInv FdSlots.
+Require Import WpLock KallocInv FdSlots.
+Require Import FileInvDefs.
 Require Import KptGhost VirtioProto VirtioModel SpecFreerange KvmSpec.
 Require Import LinkMain.
 From Kernel Require KernelData.

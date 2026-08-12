@@ -65,7 +65,8 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
-Require Import FdSlots FileInv.
+Require Import FdSlots.
+Require Import FileInvDefs.
 Require Import SchedCtx.
 Require Import SpecPanic.
 From Kernel Require KernelSyms.
