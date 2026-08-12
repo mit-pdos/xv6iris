@@ -27,6 +27,7 @@ computable without parsing.
 """
 
 import argparse
+import gen_consts
 import hashlib
 import json
 import os
@@ -455,6 +456,11 @@ def main():
           % (len(groups), sum(len(v) for v in groups.values()), len(decoded)))
     if args.dry_run:
         return 0
+
+    ncst, wrote = gen_consts.emit(args.iris, syms, by,
+                                  lambda a, n: word_at(by, a, n))
+    print("KernelConsts.v: %d image constants%s"
+          % (ncst, "" if wrote else " (unchanged)"))
 
     nc, nb = emit_decode_file(decoded, args.iris)
     print("KernelDecode.v: %d compressed + %d base decode lemmas%s"

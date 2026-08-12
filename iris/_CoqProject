@@ -331,6 +331,7 @@ KernelDecode28.v
 KernelDecode29.v
 KernelDecode30.v
 KernelDecode31.v
+KernelConsts.v
 KernelDecode.v
 CodePushOff.v
 WpAmo.v

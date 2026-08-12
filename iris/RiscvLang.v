@@ -442,8 +442,22 @@ Definition ram_hi : Z := 0x88000000.
    or above [img_end] the filter yields [None], so [boot_byte] is [byte0]
    with no lookup into either 20k-entry literal.  [img_end] is the single
    PT_LOAD's vaddr + filesz, and [.bss] runs from there up to
-   [KernelData.kernelMemEnd]. *)
-Definition img_end : Z := 0x8000a260.
+   [KernelData.kernelMemEnd].
+
+   IT IS COMPUTED FROM THE DUMP, not transcribed from it: the dumper already
+   emits the program headers as [KernelData.kernel_segments], so a literal
+   here was pure duplication -- and a stale one surfaced as an unhelpful
+   [lia] "Cannot find witness" deep inside BootCarve.v rather than at this
+   line.  The [ltac:(eval vm_compute)] form is durable-notes.md's "compute
+   the result ONCE into its own Definition" idiom: the body is a plain [Z]
+   literal by the time anything downstream sees it, so [unfold img_end; lia]
+   reduces exactly as it did before. *)
+Definition img_end : Z :=
+  ltac:(let x := eval vm_compute in
+          (match KernelData.kernel_segments with
+           | (va, filesz, _, _) :: _ => (va + filesz)%Z
+           | [] => 0%Z
+           end) in exact x).
 
 Definition boot_image : gmap Z (bv 8) :=
   base.filter (fun ab : Z * bv 8 => (ab.1 < img_end)%Z)

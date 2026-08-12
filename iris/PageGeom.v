@@ -29,6 +29,9 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto.
 Require Import RiscvExtras.
+(* [kmem_lo] IS the dumped `end` symbol -- see below.  This is what stops it
+   being a transcription that goes stale on every image bump. *)
+From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -38,9 +41,22 @@ Definition nullp : mword 64 := mword_of_int 0.
    4096-byte-aligned physical address within [end, PHYSTOP).  kfree PANICS
    otherwise (bounds + [pa % PGSIZE] checks), and kalloc only ever hands out
    pages it earlier took in, so the invariant must CARRY this validity to make
-   kalloc's result re-freeable.  [end = 0x800235b0], [PHYSTOP = 17 << 27]. *)
+   kalloc's result re-freeable.  [PHYSTOP = 17 << 27].
+
+   [kmem_lo] IS `end`, so it is DEFINED as the dumped symbol rather than
+   transcribed from it.  As a literal it went stale on every image bump, and
+   it failed NOT here but as a bare [lia] "Cannot find witness" in whichever
+   consumer built first -- which reads as a broken proof and is not one.  The
+   [ltac:(eval vm_compute)] is durable-notes.md's "compute the result ONCE
+   into its own Definition" idiom: the body is a plain [Z] literal by the
+   time anything downstream sees it, so every existing [unfold kmem_lo; lia]
+   works unchanged -- which is the point.  Defining it as [KernelSyms.end_]
+   directly does NOT work: [unfold kmem_lo] then leaves a constant [lia]
+   cannot see through, and every one of the consumers has to learn to unfold
+   a second name. *)
 Definition PGSIZE  : Z := 4096.
-Definition kmem_lo : Z := 0x800235b0.   (* <end> *)
+Definition kmem_lo : Z :=
+  ltac:(let x := eval vm_compute in KernelSyms.end_ in exact x).
 Definition kmem_hi : Z := 0x88000000.   (* PHYSTOP = 17 << 27 *)
 Definition page_aligned (p : mword 64) : Prop := (uint p) mod PGSIZE = 0.
 Definition page_in_range (p : mword 64) : Prop := kmem_lo <= uint p < kmem_hi.
@@ -125,7 +141,7 @@ Qed.
 
 (* THE BRIDGE LEMMA: every byte of a kalloc page lies in the kernel data
    region [RiscvPtsto.addr_is_kdata] = [etext, PHYSTOP).  Pure arithmetic on
-   the concrete literals: [kmem_lo] (0x800235b0) > [text_end]
+   the concrete literals: [kmem_lo] (= `end`) > [text_end]
    (0x80007000), and [kmem_hi] (0x88000000) = [ram_base]+[ram_size] =
    PHYSTOP.  Page-alignment of both [p] and [kmem_hi] is what keeps
    [uint p + j] strictly below [kmem_hi] for every in-page offset [j] --

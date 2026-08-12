@@ -36,6 +36,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecMycpu.
 Require Import KernelRvcDecode.
 Require Import ProcGeom.
+Require Import KernelConsts.
 Import Defs.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
@@ -73,8 +74,8 @@ Section ProofMycpu.
     set (imm_entry := (mword_of_int 48 : mword 6)).
     set (imm_dealloc := (mword_of_int 16 : mword 6)).
     set (nzimm_s0 := (mword_of_int 4 : mword 8)).
-    set (imm_auipc := (mword_of_int 0x11 : mword 20)).
-    set (imm_addi := (mword_of_int 0xb10 : mword 12)).
+    set (imm_auipc := (mword_of_int KernelConsts.mycpu_cpus_auipc : mword 20)).
+    set (imm_addi := (mword_of_int KernelConsts.mycpu_cpus_addi : mword 12)).
     set (shamt_slli := (mword_of_int 7 : mword 6)).
     set (imm_addiw := (mword_of_int 0 : mword 6)).
     set (sp' := add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry))).

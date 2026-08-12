@@ -944,3 +944,40 @@ extra structure.
   request's block content, which is what makes `virtio_disk_rw`'s read
   postcondition provable — claude-notes/completed/virtio-disk-rw.md).
 - Avoid ad-hoc argument couplings in preconditions (e.g. a precondition like `eq_vec (m0!!!a2) zero_reg = Nat.eqb N 0` that ties an argument to a branch condition). Prefer deriving branch conditions internally / a natural contract; if a coupling is genuinely unavoidable, flag it and confirm the form before building it out.
+
+## IMAGE CONSTANTS ARE GENERATED — do not transcribe one by hand
+
+A handful of files need an image constant as a Coq **term** rather than as an
+`instr` fact, because a spec unifies on the term: `ProcGeom.mycpu_ret` (the
+closed form of `&cpus` that every per-CPU cell address and every
+acquire/release/push_off/pop_off/myproc contract is stated in),
+`ProofMyproc.mp_A4C`, `WpDecode.w_ld`, `BootChain.entry_got`, and the
+hand-written `Code*Aux.v` files. Each used to be a transcribed literal, and
+**each went stale on every image bump** — surfacing not at its own definition
+but as an unhelpful failure in whatever consumer compiled first (a bare `lia`
+"Cannot find witness" inside `BootCarve.v`; `Unable to unify "2147558352" with
+"2147558212"` inside `ProcGeom.v`). The diagnosis is nowhere near the defect,
+which is what made them expensive.
+
+They are all generated now. **`iris/KernelConsts.v` is produced by
+`tools/gen_consts.py` (hooked into `make gen-code`)** from the same dump the
+rest of the decode layer comes from; adding one is a row in its `CONSTS`
+table, which names the symbol, the offset and the field kind (`word32` /
+`imm_i` / `imm_u` / `imm_jal` / `pcrel`, the last being the address an
+`auipc`/`addi` pair computes). If you find yourself about to write a hex
+literal that came out of `kernel.asm`, add a row instead.
+
+Two constants are NOT routed through the generator, because the dumper
+already emits exactly them and a generator would be a second copy:
+`RiscvLang.img_end` (the single PT_LOAD's `vaddr + filesz`, from
+`KernelData.kernel_segments`) and `PageGeom.kmem_lo` (the `end` symbol, from
+`KernelSyms.end_`).
+
+**Both use `Definition c : Z := ltac:(let x := eval vm_compute in <e> in exact x).`
+and that form is load-bearing, not stylistic.** Defining `kmem_lo` as
+`KernelSyms.end_` directly compiles, but `unfold kmem_lo` then leaves a
+constant `lia` cannot see through, and all six downstream `unfold kmem_lo;
+lia` sites break — measured, not hypothetical. Computing the value at
+definition time leaves a plain `Z` literal in the body, so every existing
+consumer works unchanged. It is the same "compute the result ONCE into its own
+Definition" idiom as `ColdBoot.v`'s, used for a different reason.

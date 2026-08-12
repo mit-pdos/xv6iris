@@ -5,6 +5,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import KernelConsts.
 
 (* cE Zicsr = hartSupports Zicsr = true, at any Acc level. *)
 Lemma exec_rec_cE_Zicsr_any (k : Z) (acc : Acc (Zwf 0) k) s :
@@ -337,10 +338,12 @@ Definition i_auipc : mword 5 :=
    keep this shared-prefix file cheap. *)
 
 (* [ld sp, N(sp)] loading the boot stack pointer via a GOT-relative offset
-   from _entry's auipc; N tracks wherever the linker places the GOT/stack0
-   data, so this literal must be re-synced whenever the kernel image's data
-   segment shifts (last synced: N = 0x248, i.e. stack0's current GOT slot). *)
-Definition w_ld : mword 32 := mword_of_int 0x24813103.
+   from _entry's auipc.  N tracks wherever the linker places the GOT/stack0
+   data, so it moves on every image bump; the word is therefore READ OUT OF
+   THE IMAGE by tools/gen_consts.py rather than transcribed here.  It used to
+   be a literal, and a stale one surfaced as an impossible-looking arity error
+   in CodeEntryAux.v rather than at this line. *)
+Definition w_ld : mword 32 := mword_of_int KernelConsts.entry_ld_word.
 
 Definition imm_ld : mword 12 := subrange_vec_dec w_ld 31 20.
 Definition i_ld : mword 5 :=
