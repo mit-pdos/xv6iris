@@ -881,6 +881,7 @@ WeakRobustSer.v
 WeakRobustLin.v
 WeakRobustProv.v
 WeakRobustOrd.v
+WeakRobustSim.v
 WeakRobustAcyc2.v
 WeakAxiomatic.v
 WeakAxiomatic2.v
