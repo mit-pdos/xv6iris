@@ -1575,7 +1575,7 @@ Section IreclaimOrphan.
                     Hshr Hsbi Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
     iIntros (CID18 Hq18 mL dnl bml)
       "%Hcsil Hcg Hcnt Hpc Hppid Hsbi Hsl1 Hslkd Hslpid Hdep Hidev Hiinum
-       Hvalid Hloaded".
+       Hvalid Hloaded #Hshot".
     assert (Hpc5e : ret_pc (OC !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x5e))
       by (rewrite HOCra; pcw).
@@ -1674,7 +1674,7 @@ Section IreclaimOrphan.
               (proc_addr j) C b
               ltac:(unfold K_iunlock; lia) Hkslot HOEa0
               with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hescrow Hslk Hslkd Hslpid
-                    Hppid Hprocs Hdep Hidev Hiinum Hvalid Hloaded").
+                    Hppid Hprocs Hdep Hidev Hiinum Hvalid Hloaded Hshot").
     iIntros (CID21 Hq21 mU) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr".
     assert (Hpc64 : ret_pc (OE !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x64))

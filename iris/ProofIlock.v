@@ -338,6 +338,7 @@ Section IlockDefs.
         i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
         i_valid ip ↦₄ valid_word true -∗
         ic_loaded gfs gi cov logstart k inum dn bm -∗
+        ity_shot g (di_type dn) -∗
         WP (Loop : expr riscv_lang))%I.
 
 End IlockDefs.
@@ -375,6 +376,7 @@ Section IlockEpilogue.
     i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
     i_valid ip ↦₄ valid_word true -∗
     ic_loaded gfs gi cov logstart k inum dn bm -∗
+    ity_shot g (di_type dn) -∗
     il_cont (CID0 := CID0)  gfs gi gisl bn cn s g cov logstart inodestart k ip
             dev inum pidv dq dqs j m K C b -∗
     WP (Loop : expr riscv_lang).
@@ -382,7 +384,7 @@ Section IlockEpilogue.
     intros HK Hsp Hthr.
     pose proof HK as HK'. unfold K_ilock in HK'.
     iIntros "Hcg Hcnt #Htext Hpc Hframe Hppid Hsb
-              Hsl Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk Hcont".
+              Hsl Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hcont".
     iPoseProof (ili_1e with "Htext") as "Hi1e".
     iPoseProof (ili_20 with "Htext") as "Hi20".
     iPoseProof (ili_22 with "Htext") as "Hi22".
@@ -569,7 +571,7 @@ Section IlockEpilogue.
     rewrite /il_cont.
     iSpecialize ("Hcont" $! CID5 with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! P4 dn bm with "[%] Hcg Hcnt Hpc Hppid Hsb
-                     Hsl Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk").
+                     Hsl Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk Hshot").
     { unfold callee_saved. split_and!; assumption. }
   Qed.
 
@@ -660,6 +662,11 @@ Section IlockLoad.
     i_valid ip ↦₄ (mword_of_int 0 : mword 32) -∗
     inode_raw ip -∗
     ipool_shape gfs gi cov logstart inum -∗
+    (* THE GENERATION'S PENDING ONE-SHOT (design §17.6): the caller splits it
+       out of the UNLOADED payload alongside the [inode_raw]/[ipool_shape]
+       pair it already splits, and this arm SPENDS it against the record the
+       [bread] returns.  [g] was already one of this lemma's parameters. *)
+    ity_pending g -∗
     il_cont (CID0 := CID0)  gfs gi gisl bn cn s g cov logstart inodestart k ip
             dev inum pidv dq dqs j m K C b -∗
     WP (Loop : expr riscv_lang).
@@ -691,7 +698,7 @@ Section IlockLoad.
     pose proof (il_thr6_of_5 m M Hthr) as Hthr6.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hireg #Hprocs #Hdevi #Hdgeom
               #Hdlock Hframe Hppid Hidev Hinumc Hsb Hsl
-              Hstok Hpid Hdep Hvalid Hraw Hpool Hcont".
+              Hstok Hpid Hdep Hvalid Hraw Hpool Hpend Hcont".
     (* THE POOL ENTRY STAYS OPAQUE UNTIL THE BUFFER HAS BEEN READ (§16.4).
        Before §16.4 both of §13.3's shapes carried the region fragment, so
        the record could be named here; now the FREE shape is a bare marker
@@ -1010,6 +1017,14 @@ Section IlockLoad.
             - exact inode_sized_zero. }
           iSplitR; [iPureIntro; exact (dir_ok_size_zero icfg_nib dn _ Hfsz) |].
           iSplitL; [iApply il_ind_res_empty | iApply il_blocks_empty]. }
+    (* THE FILL SPENDS THE GENERATION'S ONE-SHOT (design §17.6 (3)), at the
+       only instruction in this kernel that knows [di_type]: the record has
+       just been decoded off the buffer, and [dn] is fixed for the rest of
+       this arm.  It is spent HERE rather than on each completing branch
+       because the [ip->type == 0] branch diverges through
+       [SpecPanic.panic_wp_any] and owes nothing either way -- one [iMod]
+       covers both the pool bundle and §16.4's claim box. *)
+    iMod (ity_shoot g (di_type dn) with "Hpend") as "#Hshot".
     iModIntro.
     iEval (rewrite -Hbno) in "HL".
     iDestruct ("Hbackl" with "HL") as "Hheld".
@@ -1826,7 +1841,7 @@ Section IlockLoad.
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hsb Hsl Hstok Hpid
                     Hdep Hidev Hinumc Hvalid
                     [Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hindres Hblocks Hdn]
-                    [Hcont]").
+                    Hshot [Hcont]").
     { rewrite /ic_loaded -Hip. iExists data.
       iSplitR.
       { iPureIntro. rewrite /inode_ok. split_and!; assumption. }
@@ -2188,10 +2203,14 @@ Section ProofIlockMain.
       assert (Hpp1e : add_vec_int (mword_of_int (KernelSyms.ilock + 0x1c) : mword 64) 2
                       = mword_of_int (KernelSyms.ilock + 0x1e)) by pcw.
       iEval (rewrite Hpp1e) in "Hpc".
+      (* the CACHED arm's witness is the one the FILL that loaded this entry
+         minted, riding on the payload's TRUE polarity (design §17.6 (1)) --
+         so this arm proves the post's new conjunct with no work at all. *)
       iAssert (∃ (dn0 : dinode) (bm0 : blkmap),
-                 ic_loaded gfs gi cov logstart k inum dn0 bm0)%I
+                 ic_loaded gfs gi cov logstart k inum dn0 bm0 ∗
+                 ity_shot g (di_type dn0))%I
         with "[Hpay]" as "Hpay2"; [iExact "Hpay" |].
-      iDestruct "Hpay2" as (dnp bmp) "Hlk".
+      iDestruct "Hpay2" as (dnp bmp) "[Hlk #Hshot]".
       iDestruct (cpu_own_transport CIDa CID13 0 true (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift (CIDa := CID11) (CIDb := CID13) ltac:(wp_next_chain)
@@ -2200,7 +2219,7 @@ Section ProofIlockMain.
                 inodestart k ip dev inum dnp bmp pidv dq dqs m Q1 K C b
                 HK HQ1sp HQ1thr
                 with "Hcg Hcnt Htext Hpc Hframe Hppid Hsb Hsl Hstok Hpid
-                      Hdep Hidev Hinumc Hvalid Hlk Hcont").
+                      Hdep Hidev Hinumc Hvalid Hlk Hshot Hcont").
     - (* ---- UNCACHED: valid = 0, branch to +0x36 ---- *)
       assert (Htk : add_vec (mword_of_int (KernelSyms.ilock + 0x1c) : mword 64)
                       (sign_extend' 64 (sign_extend' 13
@@ -2217,8 +2236,10 @@ Section ProofIlockMain.
       iEval (rewrite Htk) in "Hpc".
       iEval (change (valid_word false) with (mword_of_int 0 : mword 32)) in "Hvalid".
       iAssert (inode_raw (ientry k) ∗
-               ipool_shape gfs gi cov logstart inum)%I
-        with "[Hpay]" as "[Hraw Hpool]"; [iExact "Hpay" |].
+               ipool_shape gfs gi cov logstart inum ∗
+               ity_pending g)%I
+        with "[Hpay]" as "(Hraw & Hpool & Hpend)";
+        [rewrite /ic_payload /ic_unloaded; iDestruct "Hpay" as "[[$ $] $]" |].
       iEval (rewrite -Hipe) in "Hraw".
       iDestruct (cpu_own_transport CIDa CID13 0 true (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2230,7 +2251,7 @@ Section ProofIlockMain.
                 HK HQ1sp HQ1thr HQ1s1 Hipe Hk Hgeom Hst Hcov Hinlt Hj Hgl
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hireg Hprocs Hdevi Hdgeom
                       Hdlock Hframe Hppid Hidev Hinumc Hsb
-                      Hsl Hstok Hpid Hdep Hvalid Hraw Hpool Hcont").
+                      Hsl Hstok Hpid Hdep Hvalid Hraw Hpool Hpend Hcont").
   Qed.
 
 End ProofIlockMain.

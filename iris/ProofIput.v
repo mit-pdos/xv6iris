@@ -1450,7 +1450,10 @@ Section ProofIput.
     iEval (rewrite Hpp40) in "Hpc".
     (* the loaded bundle, opened: [i_nlink] is one of its five scalars *)
     iEval (rewrite /ic_payload) in "Hpayl".
-    iDestruct "Hpayl" as (dn bm) "Hlk".
+    (* the LOADED polarity's type witness (design §17.6 (1)) rides out with
+       the bundle; both re-park sites below hand it straight back, and on the
+       free path it dies with the generation [live_slot_regen] retires. *)
+    iDestruct "Hpayl" as (dn bm) "[Hlk #Hshot]".
     iDestruct "Hlk" as (data)
       "(%Hok & %Hdok & Hdat & Hmeta & Haddrs & Hind & Hblks)".
     pose proof Hok as Hok'.
@@ -1498,13 +1501,17 @@ Section ProofIput.
       iEval (rewrite Hpp20c) in "Hpc".
       iApply fupd_wp.
       iInv "Hesc" as ">Hbody" "Hclose".
+      (* THE nlink UNDO TAKES NO BUMP (design §17.6 (3)): nothing is retyped
+         on this path, the loaded payload and its shot go straight back into
+         PARKED, and the two gnames [ic_open_held] now takes are equal. *)
       iAssert (ic_payload gfs gi cov logstart k inum ga true)
         with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks]" as "Hpayl".
-      { rewrite /ic_payload. iExists dn, bm, data.
+      { rewrite /ic_payload. iExists dn, bm.
+        iSplitR "Hshot"; [| iExact "Hshot"]. iExists data.
         iSplitR; [iPureIntro; exact Hok |].
         iSplitR; [iPureIntro; exact Hdok |]. rewrite /inode_meta. iFrame. }
       iMod (ic_open_held cn gfs gi cov logstart k (⊤ ∖ ↑icEscN)
-              Mt q true ga dev inum ltac:(solve_ndisj) HMk
+              Mt q true ga ga dev inum ltac:(solve_ndisj) HMk
               with "Hinv Hbody Hhalf Hrtok Hlvh Hgid Hpayl")
         as "(Hhalf & Hrtok & Hlvh & Hgid & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".
       iDestruct "Hvldx" as (w0) "Hva".
@@ -1679,14 +1686,51 @@ Section ProofIput.
       rewrite (callee_saved_lookup Hcsa_cs c Hcs). exact (HG4thr c Hcs N2 N8 N9 N18). }
     (* ---- THE WINDOW EXITS: HELD -> OUT, the reference deposited ---- *)
     iApply fupd_wp.
+    (* ================================================================
+       THE SECOND GENERATION BUMP (design §17.6, ratified §17.7).
+
+       The free path is committed (+0x44 fell through), and this slot is
+       about to be re-parked UNLOADED with its region record retyped -- the
+       state §17.6.1 shows a SECOND FILL can reach, inside what would
+       otherwise be one generation: ialloc's claim retags the very same inum
+       through the buffer (no cache lock, §16.1) and its [iget] HITS the
+       still-cached entry, so the slot never goes free and no recycle
+       intervenes.  A generation that is filled twice cannot carry a type.
+
+       This is the LAST instant at which the slot's whole liveness unit
+       exists: REF-1 says the closer's [q] IS the map's [qt]
+       ([iref_lookup]), the escrow arm's 1/2 has been in our hand since
+       +0x3c, and the table's [1/2 - qt] is in [live_slot].  Bumping at the
+       re-park (+0x70) is dead -- no [itable_half] there (§17.3) -- and
+       bumping at [ip->ref--] (+0x7c) is dead too: by then the killer
+       sequence's [iget] has moved [qt], and the assembly falls short of one.
+
+       The ITABLE LOCK is the whole serialisation argument: iput holds it
+       from its [acquire] through the [release] at +0x5c, and this call is
+       inside that window, so every reference minted after it -- including
+       ialloc's -- names the NEW generation, and every one that existed
+       before is refuted by REF-1.  The count [1] is a parameter
+       [live_slot_regen] never reads.
+       ================================================================ *)
+    iDestruct "Hrtok" as "[Hfrg Hlvq]".
+    iMod (live_slot_regen ⊤ Mt k q 1%positive ltac:(solve_ndisj) HMk
+            with "Hinv Hhalf Hlvq [Hlvh]") as (ga') "(Hhalf & Hlvq & Hlvh & Hpend)";
+      [iExists ga; iExact "Hlvh" |].
+    iAssert (iref_tok k q) with "[Hfrg Hlvq]" as "Hrtok".
+    { rewrite /iref_tok. iSplitL "Hfrg"; [iExact "Hfrg" |].
+      iExists ga'. iExact "Hlvq". }
     iInv "Hesc" as ">Hbody" "Hclose".
+    (* the payload in hand is still the LOADED one at the OLD generation, and
+       it must stay there: restating it at [ga'] would spend the fresh
+       pending the +0x74 park needs.  Hence [ic_open_held]'s two gnames. *)
     iAssert (ic_payload gfs gi cov logstart k inum ga true)
       with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks]" as "Hpayl".
-    { rewrite /ic_payload. iExists dn, bm, data.
+    { rewrite /ic_payload. iExists dn, bm.
+      iSplitR "Hshot"; [| iExact "Hshot"]. iExists data.
       iSplitR; [iPureIntro; exact Hok |].
       iSplitR; [iPureIntro; exact Hdok |]. rewrite /inode_meta. iFrame. }
     iMod (ic_open_held cn gfs gi cov logstart k (⊤ ∖ ↑icEscN)
-            Mt q true ga dev inum ltac:(solve_ndisj) HMk
+            Mt q true ga' ga dev inum ltac:(solve_ndisj) HMk
             with "Hinv Hbody Hhalf Hrtok Hlvh Hgid Hpayl")
       as "(Hhalf & Hrtok & Hlvh & Hgid & Hpayl & Hidv & Hnfull & Hvldx & Hmt
            & Hgida)".
@@ -1711,10 +1755,10 @@ Section ProofIput.
     iDestruct "Hrtok" as "[Hfrg Hlvr]".
     iDestruct "Hlvr" as (gr) "Hlvr".
     iDestruct (live_gen_agree with "Hlvr Hlvh") as %->.
-    iMod (ic_dep_checkout cn k (DepRef q dev inum ga) with "Hictok")
+    iMod (ic_dep_checkout cn k (DepRef q dev inum ga') with "Hictok")
       as "[Hdepa Hdepk]".
     iMod ("Hclose" with "[Hdepa Hfrg Hlvr Hlvh Hrd Hrn Hmt Hgida]") as "_".
-    { iNext. iApply (ic_close_out cn gfs gi cov logstart k (DepRef q dev inum ga)
+    { iNext. iApply (ic_close_out cn gfs gi cov logstart k (DepRef q dev inum ga')
                        dev inum with "Hdepa [Hfrg Hlvr Hlvh Hrd Hrn] Hmt Hgida").
       rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
       iSplitR "Hlvh"; [| iExact "Hlvh"].
@@ -1845,7 +1889,10 @@ Section ProofIput.
        [inode_ok]'s seventh conjunct (§13.12(b)) -- iput's discharge of the
        one premise SpecItrunc could not otherwise get. *)
     iEval (rewrite /ic_payload) in "Hpayl".
-    iDestruct "Hpayl" as (dn2 bm2) "Hlk2".
+    (* the OLD generation's shot is dropped here -- [live_slot_regen] already
+       retired [ga], and itrunc + [ip->type = 0] are about to turn this
+       [ic_loaded] into raw cells and a marker (design §17.6 (4)). *)
+    iDestruct "Hpayl" as (dn2 bm2) "[Hlk2 _]".
     iDestruct "Hlk2" as (data2)
       "(%Hok2 & %Hdok2 & Hdat & Hmeta & Haddrs & Hind & Hblks)".
     pose proof Hok2 as Hok2'.
@@ -2001,16 +2048,21 @@ Section ProofIput.
        [inode_raw]. ---- *)
     iApply fupd_wp.
     iInv "Hesc" as ">Hbody" "Hclose".
-    iAssert (ic_payload gfs gi cov logstart k inum ga false)
-      with "[Hmeta Hmap Hdat]" as "Hpayf".
+    (* the re-park is at the FRESH generation and carries ITS pending token
+       (design §17.6 (3)): the next fill of this slot -- ialloc's, on §16.4's
+       claim-box branch -- therefore has one to spend, and can never be asked
+       to agree with the dead [ga]'s type. *)
+    iAssert (ic_payload gfs gi cov logstart k inum ga' false)
+      with "[Hmeta Hmap Hdat Hpend]" as "Hpayf".
     { rewrite /ic_payload /ic_unloaded. rewrite /inode_map.
       iDestruct "Hmap" as "[Haddrs Hind]".
+      iSplitR "Hpend"; [| iExact "Hpend"].
       iSplitR "Hdat".
       - rewrite /inode_raw. iSplitL "Hmeta"; [by iExists (di_free dn2) |].
         iExists (bm_cells bm_empty). iSplitR; [iPureIntro; reflexivity |].
         iExact "Haddrs".
       - rewrite /ipool_shape. iRight. iExact "Hdat". }
-    iMod (ic_swap_park cn gfs gi cov logstart k (DepRef q dev inum ga) ga
+    iMod (ic_swap_park cn gfs gi cov logstart k (DepRef q dev inum ga') ga'
                  false dev inum eq_refl with "Hbody Hdepk Hidv Hinh Hvld Hpayf")
       as "(Hbody & Hictok & Hrefo)".
     iMod ("Hclose" with "[Hbody]") as "_"; [by iNext |].
@@ -2021,7 +2073,7 @@ Section ProofIput.
        contract states in the arity-preserving form. *)
     iDestruct "Hrefo" as "[_ Href]".
     iAssert (inode_ref k q dev inum) with "[Href]" as "Href".
-    { rewrite inode_ref_gen_intro. iExists ga. iExact "Href". }
+    { rewrite inode_ref_gen_intro. iExists ga'. iExact "Href". }
     (* ===== +0x74 c.mv a0,s2 ; +0x76 jal releasesleep ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.iput + 0x74)) Ra0 Rs2
               mfu (K - 4)%nat true ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi74 [-]").

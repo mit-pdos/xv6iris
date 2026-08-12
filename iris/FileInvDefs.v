@@ -75,6 +75,10 @@ Require Export FdSlots.
 Require Import WpLock.
 Require Import PipeInvDefs.
 Require Import IcacheRef.
+(* for [T_DIR_z] alone -- [inode_pay]'s witness says "not a directory", and
+   the number is stated once, where [IcacheEscrow.ic_loaded]'s [dir_ok]
+   states it (design fs-icache.md §17.6 (5)). *)
+Require Import DirView.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
@@ -223,14 +227,26 @@ Definition frefUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
    [(q1 + q2) * Q = q1 * Q + q2 * Q].
 
    It lives HERE, in the per-slot names, because that is what this record is
-   for: per-slot constants agreed across every holder by [fpay_tok]. *)
+   for: per-slot constants agreed across every holder by [fpay_tok].
+
+   [fp_ig] IS THE INODE SLOT'S LIVENESS GENERATION (design fs-icache.md
+   §17.6 (5), ratified §17.7), and it is [fp_iq]'s exact status: a per-slot
+   CONSTANT fixed when the file is published.  It is what the fd's type
+   witness is keyed on -- [inode_pay] carries [IcacheRef.ity_shot fp_ig ty]
+   with "[ty] is not a directory if this fd is writable", and filewrite joins
+   it to ilock's copy with [IcacheRef.ity_shot_agree].  It can be a constant
+   because a live reference PINS the generation: a bump needs the slot's
+   whole liveness unit, which does not exist while any share is outstanding
+   ([IcacheInv.live_slot_alloc] at the recycle, [IcacheInv.live_slot_regen]
+   at iput's REF-1 free window -- and this fd's share refutes both). *)
 Record fpnames := MkFPNames
-  { fp_lock : gname; fp_pipe : pipe_names; fp_icv : gname; fp_iq : Qp }.
+  { fp_lock : gname; fp_pipe : pipe_names; fp_icv : gname; fp_iq : Qp;
+    fp_ig : gname }.
 
 Global Instance fpnames_inhabited : Inhabited fpnames :=
   populate (MkFPNames 1%positive
               (MkPipeNames 1%positive 1%positive 1%positive 1%positive)
-              1%positive 1%Qp).
+              1%positive 1%Qp 1%positive).
 
 Definition fpayUR : ucmra :=
   gmapUR nat (prodR fracR (agreeR (leibnizO fpnames))).
@@ -589,47 +605,106 @@ Section FileInv.
      both [inode_held_short] and [inode_shr_held] are stated at the pointer. *)
   Definition fileipN : namespace := nroot .@ "fileip".
 
-  Definition inode_pay (γx : gname) (Q : Qp) (v : mword 64) (q : Qp) : iProp Σ :=
-    (cinv fileipN γx (inode_held_short v Q) ∗ cinv_own γx q ∗
-     inode_shr_held v (q * Q)%Qp)%I.
+  (* THE FOURTH CONJUNCT: THE FD'S TYPE WITNESS (design fs-icache.md §17.6
+     (5), ratified §17.7).  filewrite's FD_INODE arm must rebuild
+     [IcacheEscrow.ic_loaded], whose [DirView.dir_ok] constrains a
+     DIRECTORY's data bytes -- and an arbitrary user write into a directory
+     breaks it.  The real xv6 invariant is five frames up: sys_open refuses
+     writable directory fds.  This is where it crosses.
 
-  Lemma inode_pay_split γx Q v q1 q2 :
-    inode_pay γx Q v (q1 + q2) ⊣⊢ inode_pay γx Q v q1 ∗ inode_pay γx Q v q2.
+     The travelling share is therefore GENERATION-NAMED, and the witness is
+     that generation's one-shot: ilock's postcondition hands filewrite
+     [ity_shot g (di_type dn)] at the caller's [g], this payload holds
+     [ity_shot g ty] with [ty <> T_DIR], [IcacheRef.ity_shot_agree] joins
+     them, and [DirView.dir_ok_not_dir] finishes.  A generation sees at most
+     one fill (§17.6), which is what makes the agreement mean something.
+
+     CONDITIONAL ON [wr], NOT UNCONDITIONAL: an O_RDONLY directory fd is
+     legal and fileread never needs the fact.  [wr] is [fc_wbool C] at the
+     call site in [file_payload], and FD_DEVICE selects this payload too but
+     never reaches writei.
+
+     Everything here is PERSISTENT except the cinv token and the share, so
+     [inode_pay_split]'s distributivity is untouched. *)
+  Definition inode_pay (γx : gname) (Q : Qp) (g : gname) (v : mword 64)
+      (wr : bool) (q : Qp) : iProp Σ :=
+    (cinv fileipN γx (inode_held_short v Q) ∗ cinv_own γx q ∗
+     inode_shr_held_gen v (q * Q)%Qp g ∗
+     ∃ ty : bv 16, ity_shot g ty ∗ ⌜wr = true -> bv_unsigned ty <> T_DIR_z⌝)%I.
+
+  Lemma inode_pay_split γx Q g v wr q1 q2 :
+    inode_pay γx Q g v wr (q1 + q2) ⊣⊢
+    inode_pay γx Q g v wr q1 ∗ inode_pay γx Q g v wr q2.
   Proof.
     rewrite /inode_pay cinv_own_fractional Qp.mul_add_distr_r
-            inode_shr_held_split.
+            inode_shr_held_gen_split.
     iSplit.
-    - iIntros "(#Hi & [H1 H2] & [S1 S2])". iFrame "Hi H1 H2 S1 S2".
-    - iIntros "[(#Hi & H1 & S1) (_ & H2 & S2)]". iFrame "Hi H1 H2 S1 S2".
+    - iIntros "(#Hi & [H1 H2] & [S1 S2] & #Hw)". iFrame "Hi H1 H2 S1 S2 Hw".
+    - iIntros "[(#Hi & H1 & S1 & #Hw) (_ & H2 & S2 & _)]".
+      iFrame "Hi H1 H2 S1 S2 Hw".
   Qed.
 
   (* THE LAST CLOSER'S MOVE, packaged: fraction one is the whole reference.
      A fupd, and the only one the file layer performs.  The gather is what
      makes it a WHOLE one -- the cinv gives back the parent short by [Q] and
      the closer's own arm is [1 * Q], the exact complement. *)
-  Lemma inode_pay_cancel (E : coPset) (γx : gname) (Q : Qp) (v : mword 64) :
-    ↑fileipN ⊆ E -> inode_pay γx Q v 1 ={E}=∗ inode_held v.
+  Lemma inode_pay_cancel (E : coPset) (γx : gname) (Q : Qp) (g : gname)
+      (v : mword 64) (wr : bool) :
+    ↑fileipN ⊆ E -> inode_pay γx Q g v wr 1 ={E}=∗ inode_held v.
   Proof.
-    iIntros (HE) "(#Hi & Hown & Hs)".
+    iIntros (HE) "(#Hi & Hown & Hs & _)".
     iMod (cinv_cancel with "Hi Hown") as "H"; [exact HE|].
     iMod "H". iModIntro. rewrite Qp.mul_1_l.
+    iDestruct (inode_shr_held_gen_forget with "Hs") as "Hs".
     iApply (inode_held_gather with "H Hs").
   Qed.
 
-  (* ...and its inverse, for whoever PUBLISHES an FD_INODE file (sys_open):
-     an inode reference becomes a payload at fraction one.  The constant is
-     the publisher's to choose -- it comes OUT of the carve here, and the
-     [fpnames] it installs in the same breath is where it is recorded. *)
-  Lemma inode_pay_alloc (E : coPset) (v : mword 64) :
-    inode_held v ={E}=∗ ∃ (γx : gname) (Q : Qp), inode_pay γx Q v 1.
+  (* the travelling share names SOME generation -- the one every slice of
+     this slot names, since [iliveUR]'s agree is per-KEY ([IcacheRef.
+     live_gen_agree]).  A publisher learns it by shedding, which is why
+     [inode_pay_alloc] below takes the pieces rather than the whole
+     reference: the type witness sys_open must supply is keyed on a gname it
+     cannot name until the shed has happened. *)
+  Local Lemma inode_shr_held_gen_intro (v : mword 64) (s : Qp) :
+    inode_shr_held v s -∗ ∃ g : gname, inode_shr_held_gen v s g.
+  Proof.
+    rewrite /inode_shr_held /inode_shr_held_gen.
+    iIntros "(%k & %inum & %Hv & %Hk & %Hb & Hs)".
+    rewrite inode_shr_gen_intro. iDestruct "Hs" as (g) "Hs".
+    iExists g, k, inum. by iFrame.
+  Qed.
+
+  Lemma inode_held_shed_gen (v : mword 64) :
+    inode_held v -∗ ∃ (s : Qp) (g : gname),
+      inode_held_short v s ∗ inode_shr_held_gen v s g.
   Proof.
     iIntros "H".
-    iDestruct (inode_held_shed with "H") as (Q) "[Hsh Hs]".
+    iDestruct (inode_held_shed with "H") as (s) "[Hsh Hs]".
+    iDestruct (inode_shr_held_gen_intro with "Hs") as (g) "Hs".
+    iExists s, g. iFrame.
+  Qed.
+
+  (* ...and the inverse of the cancel, for whoever PUBLISHES an FD_INODE file
+     (sys_open): a shed inode reference plus a TYPE WITNESS becomes a payload
+     at fraction one.  The [Q] and the [g] the caller ends up recording in
+     [fpnames] are the shed's outputs, which is why they are parameters here
+     rather than existentials: sys_open runs [inode_held_shed_gen] first,
+     reads [g] off it, discharges the witness against ilock's postcondition
+     (T_FILE by construction on the O_CREATE path; O_RDONLY forced on a
+     T_DIR inode on the open-existing one), and only then installs the
+     names. *)
+  Lemma inode_pay_alloc (E : coPset) (v : mword 64) (Q : Qp) (g : gname)
+      (wr : bool) (ty : bv 16) :
+    (wr = true -> bv_unsigned ty <> T_DIR_z) ->
+    inode_held_short v Q -∗ inode_shr_held_gen v Q g -∗ ity_shot g ty
+    ={E}=∗ ∃ γx : gname, inode_pay γx Q g v wr 1.
+  Proof.
+    iIntros (Hwr) "Hsh Hs #Hty".
     iMod (cinv_alloc E fileipN (inode_held_short v Q) with "[Hsh]")
       as (γx) "[#Hi Hown]".
     { by iNext. }
-    iModIntro. iExists γx, Q. rewrite /inode_pay Qp.mul_1_l.
-    by iFrame "Hi Hown Hs".
+    iModIntro. iExists γx. rewrite /inode_pay Qp.mul_1_l.
+    iFrame "Hi Hown Hs". iExists ty. iFrame "Hty". iPureIntro. exact Hwr.
   Qed.
 
   (* the per-slot payload-names ghost: fractional, agreeing, and updatable
@@ -692,7 +767,7 @@ Section FileInv.
      then is_pipe (fp_lock pn) (fp_pipe pn) (fc_pipe C) ∗
           pipe_ref (fp_pipe pn) (fc_wbool C) q
      else if bool_decide (fc_type C = FD_INODE) || bool_decide (fc_type C = FD_DEVICE)
-     then inode_pay (fp_icv pn) (fp_iq pn) (fc_ip C) q
+     then inode_pay (fp_icv pn) (fp_iq pn) (fp_ig pn) (fc_ip C) (fc_wbool C) q
      else emp)%I.
 
   Lemma file_payload_split q1 q2 pn C :

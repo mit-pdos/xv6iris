@@ -495,35 +495,48 @@ Section IcacheEscrow.
     Timeless (ic_unloaded γfs γi cov logstart k inum).
   Proof. rewrite /ic_unloaded. apply _. Qed.
 
-  (* THE PAYLOAD THE VALID WORD KEYS, AT THE SLOT'S GENERATION (design §17.3
-     (A), ratified §17.4).  [ic_loaded] DOES NOT MOVE -- it is named in
-     nineteen files and this is why none of them changed; the generation
-     rides HERE, where three files name it, and the type witness is meant to
-     ride beside it as [ity_shot g (di_type dn)] on the LOADED case.
+  (* THE PAYLOAD THE VALID WORD KEYS, AT THE SLOT'S GENERATION, AND THE
+     GENERATION'S TYPE ONE-SHOT ON ITS TWO POLARITIES (design §17.3 (A) /
+     §17.6, ratified §17.4 / §17.7).
 
-     THE WITNESS IS NOT IN YET, and the generation parameter is its landing
-     site.  §17.3 (B) put the pending one-shot with [ipool_shape]'s ALLOCATED
-     disjunct on the argument that "ilock's fill MUST take the allocated
-     branch -- it is where [dinode_at] lives".  §16.4's CLAIM BOX refutes
-     that: [ProofIlock]'s fill also completes on the MARKER branch, through
-     [InodeRegion.ireg_withdraw], whenever ialloc has retagged the inum to a
-     [fresh_shape] record -- and on that branch there is no pending token to
-     spend.  Parking the pending on BOTH pool disjuncts is the obvious fix
-     and is exactly what §17.3 (B) refuted from the other side: iput's free
-     path re-parks UNLOADED inside the SAME generation with that generation's
-     one-shot already SHOT.  The two constraints are jointly unsatisfiable
-     for a per-generation one-shot; see the report for the analysis and the
-     candidate repairs.  Everything else in §17.3 (A) -- the arm-resident ½,
-     the restated ledger, the descriptor's generation field -- is landed and
-     is what makes the witness a one-line change to this definition once the
-     placement is re-ruled. *)
+     [ic_loaded] DOES NOT MOVE -- it is named in nineteen files and this is
+     why none of them changed; the generation rides HERE, where three files
+     name it, and so does the witness: [ity_shot g (di_type dn)] on the
+     LOADED polarity, [ity_pending g] on the UNLOADED one.
+
+     WHY THE PENDING RIDES HERE AND NOT ONE LEVEL DOWN.  §17.3 (B) put it
+     with [ipool_shape]'s ALLOCATED disjunct, on the argument that "ilock's
+     fill MUST take the allocated branch -- it is where [dinode_at] lives".
+     §16.4's CLAIM BOX refutes that: [ProofIlock]'s fill also completes on
+     the MARKER branch, through [InodeRegion.ireg_withdraw], whenever ialloc
+     has retagged the inum to a [fresh_shape] record.  Putting it on BOTH
+     pool disjuncts is what §17.3 (B) refuted from the other side.  And it
+     may NOT go into [ic_unloaded] either: [ic_mid_arm] holds [ic_unloaded]
+     DIRECTLY and is sealed at iget's +0x72 ([ic_mk_unloaded],
+     [ProofIget.v:1167]), six instructions before the slot enters [M] and any
+     unit is split -- there is no pending in existence to put there.
+
+     On this polarity the obligation lands exactly at iget's +0x7c
+     ([ic_close_mid_to_parked]), where the recycler is already carrying the
+     token by hand.  Both conjuncts are TIMELESS, so [ic_payload_timeless]
+     survives verbatim (§17.1 (iv), respected).
+
+     A GENERATION THEREFORE SEES AT MOST ONE FILL, which is the invariant
+     §17.5 proved necessary: the recycle mints a generation and its pending
+     ([IcacheInv.live_slot_alloc]); the fill spends it; and iput's free path
+     -- the second filler, via §17.6.1's reachable claim-and-hit sequence --
+     RETIRES the generation at +0x54 ([IcacheInv.live_slot_regen]) before it
+     re-parks UNLOADED with a fresh pending.  [ipool_shape], [imark],
+     [InodeRegion] and [ProofIalloc] are untouched, which is §16's standing
+     constraint respected by construction. *)
   Definition ic_payload (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (k : nat) (inum : mword 32) (g : gname)
       (v : bool) : iProp Σ :=
     (if v
      then ∃ (dn : dinode) (bm : blkmap),
-            ic_loaded γfs γi cov logstart k inum dn bm
-     else ic_unloaded γfs γi cov logstart k inum)%I.
+            ic_loaded γfs γi cov logstart k inum dn bm ∗
+            ity_shot g (di_type dn)
+     else ic_unloaded γfs γi cov logstart k inum ∗ ity_pending g)%I.
 
   Global Instance ic_payload_timeless γfs γi cov logstart k inum g v :
     Timeless (ic_payload γfs γi cov logstart k inum g v).
@@ -1320,8 +1333,12 @@ Section IcacheEscrow.
        the pool takes back *)
     iAssert (inode_raw (ientry k) ∗ ipool_shape γfs γi cov logstart inum)%I
       with "[Hpay]" as "[Hraw Hpool]".
-    { destruct v; [| iExact "Hpay" ].
-      iDestruct "Hpay" as (dn bm) "Hlk".
+    (* THE GENERATION'S ONE-SHOT DIES HERE, unspent or spent (design §17.6
+       (7)): an evicted slot leaves [M], its whole unit goes back to the free
+       arm, and the next recycle bumps again -- so a free slot carries no
+       obligation and dropping the token is exactly right. *)
+    { destruct v; [| iDestruct "Hpay" as "[Hpu _]"; iExact "Hpu" ].
+      iDestruct "Hpay" as (dn bm) "[Hlk _]".
       iDestruct "Hlk" as (data)
         "(%Hok & %Hdok & Hdat & Hmeta & Haddrs & Hind & Hblks)".
       pose proof Hok as Hok'.
@@ -1377,7 +1394,13 @@ Section IcacheEscrow.
      back into the arm's permanent half and the half the table retains, and
      the parked arm is deposited at v = false (the recycled entry is
      unloaded by construction).  Stating the split HERE is what keeps
-     iget's proof from having to know the budget. *)
+     iget's proof from having to know the budget.
+
+     THIS IS WHERE THE FRESH GENERATION'S PENDING ONE-SHOT LANDS (design
+     §17.6 (1)/(3)).  [IcacheInv.live_slot_alloc] minted it four instructions
+     earlier with the [sw 1] to [ip->ref]; the recycler carries it (and the
+     arm's 1/2) by hand from +0x78 to here, because MID was sealed before any
+     unit existed to split.  Until §17.6 this proof simply DROPPED it. *)
   Lemma ic_close_mid_to_parked cn γfs γi cov logstart k (dev inum : mword 32)
       (g : gname) :
     ic_mid cn k -∗
@@ -1387,14 +1410,21 @@ Section IcacheEscrow.
     i_valid (ientry k) ↦₄ valid_word false -∗
     ic_unloaded γfs γi cov logstart k inum -∗
     live_gen k (1/2) g -∗
+    ity_pending g -∗
     ic_escrow_body cn γfs γi cov logstart k ∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum.
   Proof.
-    iIntros "Hmt Hgid Hid Hin Hvld Hpay Hlv".
+    iIntros "Hmt Hgid Hid Hin Hvld Hpay Hlv Hpend".
     iDestruct (word4_pointsto_half_split with "Hin") as "[Hin1 Hin2]".
     iSplitR "Hin2"; [| iExact "Hin2"].
     iLeft. rewrite /ic_parked.
-    iExists dev, inum, false, g. iFrame.
+    iExists dev, inum, false, g.
+    iSplitL "Hid"; [iExact "Hid" |]. iSplitL "Hin1"; [iExact "Hin1" |].
+    iSplitL "Hvld"; [iExact "Hvld" |].
+    iSplitL "Hpay Hpend";
+      [rewrite /ic_payload; iSplitL "Hpay"; [iExact "Hpay" | iExact "Hpend"] |].
+    iSplitL "Hlv"; [iExact "Hlv" |].
+    iSplitL "Hmt"; [iExact "Hmt" | iExact "Hgid"].
   Qed.
 
   (* (f) BORROWING THE ARM'S REFERENCE, for a lock-free read INSIDE the
@@ -1494,21 +1524,32 @@ Section IcacheEscrow.
      strictly better credential anyway -- they are slot-keyed rather than
      inum-keyed, so the refutation no longer needs [ic_id_agree] to pin the
      two arms' inums first.) *)
+  (* the UNLOADED stock's own credential.  It is stated separately from
+     [ic_payload_size] because since §17.6 [ic_unloaded] is no longer
+     definitionally [ic_payload … false] -- the pending one-shot rides beside
+     it -- and [ic_mid_arm] holds the bare [ic_unloaded]. *)
+  Local Lemma ic_unloaded_size γfs γi cov logstart k inum :
+    ic_unloaded γfs γi cov logstart k inum -∗
+    ∃ w : bv 32, i_size (ientry k) ↦₄ w.
+  Proof.
+    rewrite /ic_unloaded /inode_raw.
+    iIntros "[[Hmeta _] _]".
+    iDestruct "Hmeta" as (d) "Hmeta".
+    rewrite /inode_meta. iDestruct "Hmeta" as "(_ & _ & _ & _ & Hsz)".
+    iExists (di_size d). iExact "Hsz".
+  Qed.
+
   Local Lemma ic_payload_size γfs γi cov logstart k inum g (v : bool) :
     ic_payload γfs γi cov logstart k inum g v -∗
     ∃ w : bv 32, i_size (ientry k) ↦₄ w.
   Proof.
     rewrite /ic_payload. destruct v.
     - iIntros "Hpay".
-      iDestruct "Hpay" as (dn bm) "Hlk".
+      iDestruct "Hpay" as (dn bm) "[Hlk _]".
       iDestruct "Hlk" as (data) "(_ & _ & _ & Hmeta & _)".
       rewrite /inode_meta. iDestruct "Hmeta" as "(_ & _ & _ & _ & Hsz)".
       iExists (di_size dn). iExact "Hsz".
-    - rewrite /ic_unloaded /inode_raw.
-      iIntros "[[Hmeta _] _]".
-      iDestruct "Hmeta" as (d) "Hmeta".
-      rewrite /inode_meta. iDestruct "Hmeta" as "(_ & _ & _ & _ & Hsz)".
-      iExists (di_size d). iExact "Hsz".
+    - iIntros "[Hu _]". iApply (ic_unloaded_size with "Hu").
   Qed.
 
   Lemma ic_payload_excl γfs γi cov logstart k inum1 inum2 g1 g2 (v1 v2 : bool) :
@@ -1518,6 +1559,18 @@ Section IcacheEscrow.
     iIntros "H1 H2".
     iDestruct (ic_payload_size with "H1") as (w1) "H1".
     iDestruct (ic_payload_size with "H2") as (w2) "H2".
+    iApply (iesc_word4_excl with "H1 H2").
+  Qed.
+
+  (* ...and the same against a bare MID stock, which is what [ic_open_held]'s
+     third branch meets (§17.6: [ic_mid_arm] holds [ic_unloaded] directly). *)
+  Lemma ic_payload_unloaded_excl γfs γi cov logstart k inum1 inum2 g1 (v1 : bool) :
+    ic_payload γfs γi cov logstart k inum1 g1 v1 -∗
+    ic_unloaded γfs γi cov logstart k inum2 -∗ False.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (ic_payload_size with "H1") as (w1) "H1".
+    iDestruct (ic_unloaded_size with "H2") as (w2) "H2".
     iApply (iesc_word4_excl with "H1 H2").
   Qed.
 
@@ -1548,9 +1601,23 @@ Section IcacheEscrow.
      q and the table's (½−q)), the stale valid word, the recycle token and
      the escrow's own identification half.  The escrow body is CONSUMED:
      the caller closes with [ic_close_out] (the checkout path) or rebuilds a
-     [ic_parked] and closes with [ic_close_parked] (the nlink path). *)
+     [ic_parked] and closes with [ic_close_parked] (the nlink path).
+
+     TWO GNAMES, NOT ONE (design §17.6 (4)).  At the +0x54 checkout iput has
+     already RETIRED the slot's generation ([IcacheInv.live_slot_regen]), so
+     the arm-half in its hand is at [g1] while the payload it is carrying is
+     still the LOADED one at [g2] -- and it must stay there, because
+     restating it at [g1] would mean shooting the fresh pending the +0x74
+     park needs.  This costs nothing: the payload is threaded through
+     untouched, its only use is refuting PARKED and MID via
+     [ic_payload_excl], which is already generic in both gnames, and the OUT
+     and EMPTY refutations use REF-1, the live mass and the ghost, never the
+     payload's generation.  The stale [ity_shot g2 ty] dies with the
+     generation that named it, on iput's own path: itrunc and [ip->type = 0]
+     turn [ic_loaded] into raw cells and a marker.  The +0x44 nlink-undo
+     caller, which takes no bump, passes the two equal. *)
   Lemma ic_open_held cn γfs γi cov logstart k (Eo : coPset)
-      (M : gmap nat (Qp * positive)) (q : Qp) (v : bool) (g : gname)
+      (M : gmap nat (Qp * positive)) (q : Qp) (v : bool) (g1 g2 : gname)
       (dev inum : mword 32) :
     ↑icacheN ⊆ Eo ->
     M !! k = Some (q, 1%positive) ->
@@ -1558,15 +1625,15 @@ Section IcacheEscrow.
     ic_escrow_body cn γfs γi cov logstart k -∗
     itable_half M -∗
     iref_tok k q -∗
-    live_gen k (1/2) g -∗
+    live_gen k (1/2) g1 -∗
     ic_id cn k (1/2) true dev inum -∗
-    ic_payload γfs γi cov logstart k inum g v -∗
+    ic_payload γfs γi cov logstart k inum g2 v -∗
     |={Eo}=>
     itable_half M ∗
     iref_tok k q ∗
-    live_gen k (1/2) g ∗
+    live_gen k (1/2) g1 ∗
     ic_id cn k (1/2) true dev inum ∗
-    ic_payload γfs γi cov logstart k inum g v ∗
+    ic_payload γfs γi cov logstart k inum g2 v ∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
     i_inum (ientry k) ↦₄ inum ∗
     (∃ w : mword 32, i_valid (ientry k) ↦₄{DfracOwn (1/2)} w) ∗
@@ -1606,7 +1673,7 @@ Section IcacheEscrow.
     - (* MID: its stock carries this entry's metadata cells too *)
       iDestruct "Hmid" as (dev' inum' w) "(_ & _ & _ & Hpay' & Hgt)".
       iExFalso.
-      iApply (ic_payload_excl γfs γi cov logstart k inum inum' g g v false
+      iApply (ic_payload_unloaded_excl γfs γi cov logstart k inum inum' g2 v
                 with "Hpay Hpay'").
     - (* EMPTY: the identification ghost *)
       iDestruct "Hvg" as (dev' inum' w) "(_ & _ & _ & _ & _ & Hgt)".

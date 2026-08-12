@@ -125,7 +125,7 @@ Section ProofIunlockputMain.
     pose proof HK as HK'. unfold K_iunlockput in HK'.
     assert (Hipe : ip = ientry k) by reflexivity.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
-              #Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk Hpar
+              #Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hpar
               Hbms Hins Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hlogop
               Hcont".
     iPoseProof (iulpi_00 with "Htext") as "Hi00".
@@ -279,7 +279,7 @@ Section ProofIunlockputMain.
               dn' bm' pidv dq R4 (K - 4)%nat eb pj C b
               ltac:(unfold K_iunlock; lia) Hk ltac:(rewrite HR4a0; exact Hipe)
               with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk Hstok Hpid Hppid
-                    Hprocs Hdep Hidev Hinumc Hvalid Hlk").
+                    Hprocs Hdep Hidev Hinumc Hvalid Hlk Hshot").
     iIntros (CID8 Hq8 mU) "%HcsU Hcg Hcnt Hpc Hppid Hshr".
     assert (Hpc10 : ret_pc (R4 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iunlockput + 0x10))

@@ -1366,6 +1366,72 @@ Section IcacheRefInv.
     iDestruct (live_frac_full_excl with "Hone Hs") as "[]".
   Qed.
 
+  (* THE SECOND GENERATION BUMP (design §17.6, ratified §17.7) -- and it is
+     [live_whole_share_absurd] read in the POSITIVE direction.
+
+     A generation may see AT MOST ONE FILL, or the type witness it carries is
+     not a function of the generation.  iget's recycle gives the FIRST fill
+     its own generation ([live_slot_alloc]); §17.6.1 exhibits a REACHABLE
+     second one -- iput's free path re-parks UNLOADED, ialloc's claim retags
+     the very same inum through the buffer, its [iget] hits the still-cached
+     entry, and [ProofIlock]'s third fill branch completes on the marker.  So
+     the free path must RETIRE the generation before it re-parks.
+
+     A bump needs the slot's WHOLE unit, and this is the second (and last)
+     instant at which it exists: at iput's REF-1 free window the closer's [qt]
+     is its own ([iref_lookup] off [M !! k = Some (qt, n)]), the escrow arm's
+     1/2 is in its hand (handed out with the payload by [ic_open_auth_ref],
+     since [ic_held] holds no slice -- §17.5's forced deviation), and the
+     table's [1/2 - qt] is in [live_slot].  Those are exactly the three
+     summands [live_whole_share_absurd] adds to a contradiction; here they are
+     added to ONE and spent on [live_frac_bump].
+
+     THE COUNT [n] IS A PARAMETER THIS LEMMA NEVER READS, exactly as in
+     [live_whole_share_absurd]: REF-1 is only how the caller comes to know
+     [q = qt].  And the itable lock -- held by iput from its [acquire] through
+     +0x5c, with this call inside that window -- is what makes the bump
+     airtight: every reference minted afterwards, INCLUDING the claim's, is
+     minted at the new generation, and every reference that existed before is
+     refuted by REF-1.
+
+     [live_slot]'s text does not move: it is stated over [live_frac], whose
+     generation is existential, so the table's remainder simply comes back
+     naming [g'] instead of [g]. *)
+  Lemma live_slot_regen (Eo : coPset) (M : gmap nat (Qp * positive))
+      (k : nat) (qt : Qp) (n : positive) :
+    ↑icacheN ⊆ Eo ->
+    M !! k = Some (qt, n) ->
+    itable_inv -∗ itable_half M -∗ live_frac k qt -∗ live_frac k (1/2)%Qp
+    ={Eo}=∗ ∃ g' : gname,
+      itable_half M ∗ live_gen k qt g' ∗ live_gen k (1/2)%Qp g' ∗
+      ity_pending g'.
+  Proof.
+    iIntros (HE HMk) "#Hinv Hhalf Hq Hh".
+    iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
+    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
+    iDestruct (itable_half_agree with "Ha Hhalf") as %->.
+    assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
+    iDestruct (live_pool_acc_upd M k Hk with "Hpool") as "[Hsl Hback]".
+    iDestruct (live_slot_some_inv M k qt n HMk with "Hsl") as (c) "[%Ec Hc]".
+    pose proof (proj1 (Qp.sub_Some (1/2)%Qp qt c) Ec) as Ec'. (* 1/2 = qt + c *)
+    assert (Hsum : (qt + c + (1/2)%Qp)%Qp = 1%Qp).
+    { rewrite -Ec'. apply Qp.half_half. }
+    iDestruct (live_frac_join with "Hq Hc") as "Hqc".
+    iDestruct (live_frac_join with "Hqc Hh") as "Hone".
+    iEval (rewrite Hsum) in "Hone".
+    iMod (live_frac_bump k with "Hone") as (g') "[Hg Hp]".
+    iEval (rewrite -Hsum) in "Hg".
+    rewrite live_gen_split. iDestruct "Hg" as "[Hqc' Hh']".
+    rewrite live_gen_split. iDestruct "Hqc'" as "[Hq' Hc']".
+    iMod ("Hclose" with "[Ha Hcells Hback Hc']") as "_".
+    { iNext. iExists M. iFrame "Ha". iSplitR; [iPureIntro; exact Hwf|].
+      iFrame "Hcells".
+      iApply ("Hback" $! M with "[%] [Hc']").
+      - intros j _. reflexivity.
+      - rewrite (live_slot_some M k qt n c HMk Ec). iExists g'. iExact "Hc'". }
+    iModIntro. iExists g'. iFrame.
+  Qed.
+
   (* THE SAME FACT FOR A LOCK HOLDER -- origin's [iref_share_lookup], ported.
      Theirs read a count-0 fragment against [itable_half] and needed no
      invariant; ours is a pool slice, so it opens [itable_inv] (and closes it

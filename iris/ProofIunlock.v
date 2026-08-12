@@ -154,7 +154,7 @@ Section ProofIunlockMain.
     assert (Hipnz : uint ip <> 0)
       by (rewrite Hipe; exact (iul_entry_nonzero k Hk)).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hitbl #Hesc #Hslk Hstok Hpid Hppid
-              #Hprocs Hdep Hidev Hinumc Hvalid Hlk Hcont".
+              #Hprocs Hdep Hidev Hinumc Hvalid Hlk #Hshot Hcont".
     iEval (rewrite Hipe) in "Hidev".
     iEval (rewrite Hipe) in "Hinumc".
     iEval (rewrite Hipe) in "Hvalid".
@@ -513,7 +513,8 @@ Section ProofIunlockMain.
        the sleeplock protects now -- and the caller's reference out. *)
     iApply fupd_wp.
     iAssert (ic_payload gfs gi cov logstart k inum g true)%I
-      with "[Hlk]" as "Hpay"; [iExists dn', bm'; iExact "Hlk" |].
+      with "[Hlk]" as "Hpay";
+      [iExists dn', bm'; iSplitL "Hlk"; [iExact "Hlk" | iExact "Hshot"] |].
     iInv "Hesc" as ">Hbody" "Hclose".
     iMod (ic_swap_park cn gfs gi cov logstart k (DepShr s dev inum g) g
                  true dev inum eq_refl with "Hbody Hdep Hidev Hinumc Hvalid Hpay")

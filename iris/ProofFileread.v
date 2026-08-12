@@ -1708,7 +1708,7 @@ Section ProofFileread.
                 (design §14.8) *)
              iIntros (CIDil Hsil mil dnl bml)
                "%Hcsil Hcg Hcnt Hpc Hppid Hsb Hbslot Hheld Hslpid Hdep
-                Hidev Hinum Hvalid Hlk".
+                Hidev Hinum Hvalid Hlk #Hshot".
              iDestruct ("Hpivbk" with "Hppid") as "Hpriv".
              assert (Hpc34 : ret_pc (I2 !!! Regidx Rra) = mword_of_int (FR + 0x34)).
              { rewrite HI2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -2074,7 +2074,7 @@ Section ProofFileread.
                           ltac:(rewrite HN2a0; exact Hipk)
                           with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk
                                 Hheld Hslpid Hppid Hprocs
-                                Hdep Hidev Hinum Hvalid Hlk [-]").
+                                Hdep Hidev Hinum Hvalid Hlk Hshot [-]").
                 iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout".
                 iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
                 assert (Hpc54 : ret_pc (N2 !!! Regidx Rra) = mword_of_int (FR + 0x54)).
@@ -2337,7 +2337,7 @@ Section ProofFileread.
                           ltac:(rewrite HN2a0; exact Hipk)
                           with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk
                                 Hheld Hslpid Hppid Hprocs
-                                Hdep Hidev Hinum Hvalid Hlk [-]").
+                                Hdep Hidev Hinum Hvalid Hlk Hshot [-]").
                 iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout".
                 iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
                 assert (Hpc54 : ret_pc (N2 !!! Regidx Rra) = mword_of_int (FR + 0x54)).

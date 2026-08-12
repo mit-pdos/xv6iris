@@ -171,6 +171,9 @@ Definition wp_iunlockput_sconf_body
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
   ic_loaded gfs gi cov logstart k inum dn' bm' -∗
+  (* the parked record's type witness -- SpecIunlock's new premise, threaded
+     verbatim (design fs-icache.md 17.6 (5), ratified 17.7) *)
+  ity_shot gy (di_type dn') -∗
   (* ---- THE RETAINED PARENT: what makes the seam close ---- *)
   (* the share [s] above was carved off THIS reference ([inode_ref_carve]);
      iunlock hands the share back and [inode_ref_gather] re-forms the

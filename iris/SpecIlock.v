@@ -260,11 +260,22 @@ Definition wp_ilock_sconf_body
       i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
       i_valid ip ↦₄ valid_word true -∗
       ic_loaded gfs gi cov logstart k inum dn bm -∗
-      (* THE FD-TYPE WITNESS IS NOT HERE YET.  It belongs exactly at this
-         line, as [IcacheRef.ity_shot g (di_type dn)] -- persistent, additive,
-         ignored by every existing caller.  What blocks it is the PLACEMENT
-         of the pending one-shot, not this contract: see [IcacheEscrow.
-         ic_payload]'s header and design fs-icache.md 17.5. *)
+      (* THE FD-TYPE WITNESS (design fs-icache.md 17.6 (5), ratified 17.7).
+         PERSISTENT, ADDITIVE, and ignored by every caller that does not
+         write: this generation's one-shot, spent by the fill against the
+         record the fill read.  It is stated at the CALLER'S [g] -- the one
+         its share names -- and nothing pins it to the arm's but
+         [IcacheRef.live_gen_agree], which needs no itable fact at all
+         (17.1's currency requirement, discharged).
+
+         What it is FOR: filewrite's re-park must know the inode it is
+         writing is not a directory, and "not a directory" is sys_open's
+         invariant, five frames up.  [FileInv.inode_pay] carries the fd's own
+         [ity_shot g ty] with [fc_wbool C = true -> ty <> T_DIR];
+         [IcacheRef.ity_shot_agree] joins the two, and [DirView.dir_ok] is
+         vacuous.  A generation sees at most one fill (17.6), which is what
+         makes that agreement sound. *)
+      ity_shot g (di_type dn) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

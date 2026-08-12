@@ -3420,3 +3420,83 @@ duplicated lemma, pre-approved), SpecIlock's additive post and the
 generation-premised iunlock family. The §17.6.6 unprobed step is
 authorized to resolve either way. Execution: one stage, icache half
 full-gated before inode_pay + SpecFilewrite/Proof/Link proceed.
+
+### 17.8 §17.6 IS BUILT (fs-sysfile S3f, 2026-08-12): the whole ruling
+### landed as written, and the ONE unprobed step resolved the easy way
+
+Five iterations of design, and the implementation found nothing to argue
+with.  Every mechanism in §17.6 (1)–(7) is in the tree and full-gated at
+1033 `.vo`; the eight cones' assumption sets are unchanged.  What follows
+is only what an implementer could not have read off §17.6.
+
+**§17.6.6's UNPROBED STEP RESOLVED IN FAVOUR OF THE GENERALISATION.**
+`ic_open_held` now takes `(g1 g2 : gname)` — `live_gen k (1/2) g1` for the
+arm-half and `ic_payload … g2 v` for the payload — and the proof needed
+**no change at all** beyond one explicit-argument line: the OUT branch's
+two refutations use the count fragment and `live_whole_share_absurd`
+(neither of which reads the arm's gname, because `iref_tok` carries its own
+`live_frac`), EMPTY uses `ic_id_agree`, and HELD frames.  The pre-approved
+fallback (a duplicated `ic_open_held_out`) is NOT needed and should be
+struck.  iput's +0x44 nlink undo passes the two equal, as predicted.
+
+**THE ONE THING §17.6 DID NOT SEE, and it is three lines.**  Putting the
+pending on `ic_payload`'s FALSE polarity makes `ic_payload … g false` stop
+being DEFINITIONALLY `ic_unloaded`, and `ic_open_held`'s MID branch was
+refuting `ic_mid_arm`'s bare `ic_unloaded` by handing it to
+`ic_payload_excl` at `v = false`.  That type-checks only under the old
+definition.  Repair: `IcacheEscrow.ic_unloaded_size` (the `i_size` cell out
+of a bare stock) and `ic_payload_unloaded_excl` beside `ic_payload_excl`,
+both trivial, and `ic_payload_size`'s false case now goes through the
+former.  §17.6.3 (1) was right that `ic_mid_arm` holds `ic_unloaded`
+directly — it just did not follow the consequence into the refutation that
+used the coincidence.
+
+**WHERE THE FILL'S `ity_shoot` ACTUALLY WENT, and why it is ONE `iMod`.**
+§17.6 said "on both payload-building branches of the `:974` split".  It is
+cleaner one line earlier: the shoot goes immediately after `clearbody dn`,
+inside the same `fupd_wp`, BEFORE the three-way pool split.  `dn` is fixed
+by then (it is `ds !!! islot inum`, decoded off the buffer), the resulting
+`#Hshot` is persistent and survives all three branches, and the type-0
+branch simply carries a spent token into a `panic_wp_any` divergence, which
+costs nothing.  Discharging it per-branch would have been two `iMod`s and a
+duplicated context.
+
+**`live_slot_regen` COMPILED AS THE PROBE PREDICTED**, first try, verbatim
+from §17.6.3 (2) — and so did the `ga → ga'` rename over
+`ProofIput.v:1688–2013` (§14.9's "one proof whose spec applications name
+their arguments" held: five sites, all mechanical).
+
+**THE CONSUMER END, measured.**  `SpecIlock`'s post gained
+`ity_shot g (di_type dn)` (§17.6 (5)'s form, not §17's older
+`∃ ty, … ∗ ⌜di_type dn = ty⌝` — the two are the same proposition and the
+shorter one is directly usable by `ity_shot_agree`).  `ProofIlock` needed
+FOUR lines beyond the `iMod`: `il_cont` and `il_epilogue` gain the
+conjunct, the CACHED arm destructs it out of the payload it already had,
+and the UNCACHED arm splits the pending out beside the
+`inode_raw`/`ipool_shape` pair.  The five iunlock-family consumers were one
+line each exactly as priced.
+
+**`inode_pay`, and the one place its shape is not §17.6's.**  §17.6 wrote
+the witness with `fc_wbool C` inside `inode_pay`, which has no `C`; the
+built form takes the bool as a parameter, exactly as the pipe arm takes
+`fc_wbool C` for `pipe_ref`:
+
+    inode_pay γx Q g v wr q := cinv fileipN γx (inode_held_short v Q) ∗
+                               cinv_own γx q ∗ inode_shr_held_gen v (q*Q) g ∗
+                               ∃ ty, ity_shot g ty ∗
+                                     ⌜wr = true -> bv_unsigned ty <> T_DIR_z⌝
+
+with `file_payload` calling it at `(fp_ig pn) (fc_ip C) (fc_wbool C)`.
+`inode_pay_alloc` had to change shape too, and the reason is worth
+recording: the publisher cannot NAME the generation until it has shed the
+reference, so the lemma now takes `inode_held_short v Q`,
+`inode_shr_held_gen v Q g` and `ity_shot g ty` rather than a whole
+`inode_held` — with `FileInvDefs.inode_held_shed_gen` supplying the first
+two.  sys_open therefore sheds, reads `g`, discharges the witness against
+ilock's postcondition, and only then installs the `fpnames`.
+
+**THE RIPPLE OF `inode_pay` WAS TWO FILES**, as §17.6.4 predicted for the
+payload and better than it predicted for the consumers: `ProofFileclose`
+(two argument lists) and `ProofPipealloc` (four `MkFPNames`, for the new
+field).  fileread, filestat, filedup and kexit carry the payload opaquely
+and did not move a character — the audit §17 asked for, done by the build.

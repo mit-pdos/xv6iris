@@ -510,6 +510,104 @@ forces `O_RDONLY`, i.e. `fc_wbool C = false`; and the fd's payload records
 the SHARE'S GENERATION `g` plus `ity_shot g ty` — the marker's type never
 enters, because the marker is never typed.
 
+## S3f — §17.6 BUILT AND FULL-GATED; `inode_pay` LANDED; `SpecFilewrite`
+## FROZEN (design/fs-icache.md §17.8)
+
+**Part 1, the icache half — LANDED WHOLE, exactly as §17.6/§17.7 ruled.**
+
+- `IcacheInv.live_slot_regen` — the second generation bump, at iput's REF-1
+  free window.  Compiled first try from §17.6.3 (2)'s statement.
+- `IcacheEscrow`: `ic_payload` carries `ity_shot g (di_type dn)` on TRUE and
+  `ity_pending g` on FALSE; `ic_close_mid_to_parked` gains the pending as a
+  premise (iget's recycler was DROPPING it); `ic_open_held` generalises to
+  TWO gnames — **the §17.6.6 unprobed step resolved in favour of the
+  generalisation, with no proof change; the pre-approved duplicated-lemma
+  fallback is struck.**
+- `ProofIget`: one line (`Hpend` into `ic_close_mid_to_parked`).
+- `ProofIlock`: one `iMod (ity_shoot …)` — placed just after `clearbody dn`
+  and BEFORE §16.4's three-way pool split rather than on each completing
+  branch, which is one `iMod` instead of two and lets the type-0 panic
+  branch carry a spent token into its divergence; plus `il_load`'s
+  `ity_pending g` premise and four threading lines.
+- `ProofIput`: one `iMod (live_slot_regen …)` at the +0x54 checkout and the
+  `ga -> ga'` rename over `:1688–2013` (mechanical, five sites).
+- `SpecIlock` +1 additive post line (`ity_shot g (di_type dn)`);
+  `SpecIunlock` / `SpecIunlockput` +1 premise; five consumers one line each.
+
+**Part 2a, `inode_pay` — LANDED.**  `fpnames` gains `fp_ig`; `inode_pay`
+takes the generation and the writable bool and carries
+`∃ ty, ity_shot g ty ∗ ⌜wr = true -> ty <> T_DIR⌝` beside a
+generation-named share.  `inode_pay_alloc` had to change shape (the
+publisher cannot name the generation before shedding — see §17.8), and
+`FileInvDefs.inode_held_shed_gen` is the new shed.  **Ripple: two files**
+(`ProofFileclose`, `ProofPipealloc`).  fileread / filestat / filedup /
+kexit carry the payload opaquely and did not move — §17's audit, done by
+the build.
+
+**Part 2b, `SpecFilewrite.v` — FROZEN and compiling.**  Four arms, the
+chunking loop, and S3a's four decode corrections built in (`!writable`
+before the prologue; `devsw[mj].write` at OFFSET 8, `a_devsw_write`;
++0x11e is the ELSE-arm panic; `max = 3072`).  Two things worth keeping:
+
+1. **filewrite does NOT inherit fileread's `MAXFILE*BSIZE + n < 2^31`
+   premise.**  The chunking makes writei's joint bound a CLOSED fact
+   (`fw_chunk_joint`: `n1 <= 3072` by construction, `off <= MAXFILE*BSIZE`
+   by `off_wf`), so sys_write may take `n` straight from user input where
+   sys_read cannot.  This is the one place the write side is better off.
+2. The fs environment is fileread's plus the LOG and the ALLOCATOR
+   (`log_ctx`, `fs_crash_seam`, `gen_cert`, `bitmap_res`, `sb.size`,
+   `sb.bmapstart`, `printk_env` + `printk_gen_contract`), and the share is
+   GENERATION-NAMED with the type witness beside it — `inode_shr_gen … g`
+   plus `ity_shot g ty` and `⌜fc_wbool Cf = true -> ty <> T_DIR⌝`, i.e.
+   exactly what an `inode_pay` holder already has, so sys_write owes
+   nothing new.  `bitmap_res` comes back at an existential `used'` with
+   `used ⊆ used'`.
+
+**NOT WRITTEN, parked green: `ProofFilewrite.v`, `LinkFilewrite.v`,
+`SpecConsolewrite.v`, `LinkConsolewrite.v`.**  filewrite is 308 bytes /
+~100 instructions with a loop and six saved callee registers -- fileread's
+2461-line proof plus a loop -- and the budget rule (spec frozen beats proof
+parked) applies.  S3g picks it up with the contract fixed.
+
+**Gate.**  Mirror `full.sh` `EXIT=0`, **1033 `.vo`** (1032 + the new
+`SpecFilewrite.vo`), zero `Error`.  `Print Assumptions` on all eight cones
+(Ilock, Iget, Iput, Iunlock, Fileread, Namex, Fileclose, Kexit): each
+exactly the 5 platform axioms + `functional_extensionality_dep`, with
+Fileread's known `Consoleread.wp_consoleread_sconf` — every set unchanged.
+`tools/lemma_diff.py --ref HEAD`: 18 files, ONE NEWAXIOM, the
+`Module Type FILEWRITE` seal (one seal per new Spec).  Nothing GONE,
+nothing ADMITTED.
+
+**`_CoqProject` note.**  `SpecFilewrite.v` was added to `iris/_CoqProject`
+(after `LinkFilestat.v`); the mirror's copy was patched IN PLACE with `sed`
+and its `CoqMakefile` regenerated — the file itself was never scp'd, per
+the standing rule.
+
+**sys_open's FINAL discharge obligations for S6, now that the resource
+shapes are frozen.**  A publisher of an FD_INODE fd must, in this order:
+
+  (a) hold `IcacheRef.inode_held v` for the inode (namei / create gives
+      it), and run `FileInvDefs.inode_held_shed_gen` to obtain `Q`, the
+      generation `g`, `inode_held_short v Q` and `inode_shr_held_gen v Q g`;
+  (b) produce `IcacheRef.ity_shot g ty` for that same `g` — and the ONLY
+      source is `SpecIlock`'s postcondition, so sys_open must ilock the
+      inode (which it does anyway, to read the type) while holding a share
+      generation-named at `g`.  `ty` is then `di_type dn`;
+  (c) discharge `⌜fc_wbool C = true -> bv_unsigned ty <> T_DIR_z⌝`:
+      * on the `O_CREATE` path the type is `T_FILE` by construction
+        (`ialloc_fresh`), so the implication is vacuous on its conclusion;
+      * on the open-existing path a `T_DIR` inode forces `O_RDONLY`, i.e.
+        `fc_wbool C = false`, so it is vacuous on its hypothesis.  This is
+        the branch that must be read off `sys_open`'s own
+        `(ip->type == T_DIR && omode != O_RDONLY)` test;
+  (d) `FileInvDefs.inode_pay_alloc` with those three, then install
+      `MkFPNames … Q g` via `fpay_tok_update` at the `sd` that writes
+      `f->ip`.
+
+  The marker's type never enters — the marker is never typed (§17.6.5 (a)).
+  These SUPERSEDE the S3b (a)–(c) list and the "under repair (a)" and §17.6
+  restatements above; they are now stated over resources that exist.
+
 ## The stage ladder
 
 - **S1** (agent): the DECODE stage — 13 Code files (the 12 targets +
@@ -537,6 +635,13 @@ enters, because the marker is never typed.
   forbids it on the marker disjunct — design/fs-icache.md §17.5 has the
   counterexample, the dead escapes and three candidate repairs.
   filewrite is still blocked and still unspecified.
+- **S3f** (agent) **— PARTIAL**: §17.6 BUILT WHOLE and full-gated (the
+  icache half + `inode_pay`); `SpecFilewrite.v` FROZEN and compiling;
+  `ProofFilewrite` / `LinkFilewrite` / `SpecConsolewrite` /
+  `LinkConsolewrite` parked green for S3g.  file.c stays 6/7.
+- **S3g** (agent): `ProofFilewrite` + `LinkFilewrite` against the frozen
+  contract, plus the ASSUMED `consolewrite` (LinkConsoleread-style named
+  Axiom).  Then file.c is 7/7.
 - **S3b** (agent) **— PARTIAL**: filestat PROVEN AND LINKED (file.c 6/7);
   §17's fd-type witness STOPPED-AND-REPORTED as unimplementable in the ruled
   shape — design/fs-icache.md §17.1 has the finding and the repair (§17′) to

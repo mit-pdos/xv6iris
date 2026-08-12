@@ -146,6 +146,13 @@ Definition wp_iunlock_sconf_body
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
   ic_loaded gfs gi cov logstart k inum dn' bm' -∗
+  (* THE GENERATION'S TYPE WITNESS, back where it came from (design
+     fs-icache.md 17.6 (5), ratified 17.7).  [ic_payload]'s TRUE polarity is
+     what this park rebuilds, so the witness for the record being parked is
+     part of what the parker owes.  Every existing caller threads ilock's
+     copy unchanged: none of the five (fileread, filestat, namex, ireclaim,
+     iunlockput) alters [di_type], so [dn'] is ilock's [dn]. *)
+  ity_shot g (di_type dn') -∗
   wp_next b p (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗

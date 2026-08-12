@@ -1275,8 +1275,12 @@ Section ProofIget.
               iDestruct "Harm" as (dev' inum' wv) "(Hd1 & Hincell & Hvld & Hpay & Hgid1)".
               iDestruct (ic_id_agree with "Hgid2 Hgid1") as %(_ & <- & <-).
               iModIntro. iExists wv. iFrame "Hvld". iIntros "Hvld".
+              (* the fresh generation's PENDING one-shot is deposited HERE
+                 (design §17.6 (1)/(3)): it was minted with the [sw 1] at
+                 +0x78, carried by hand across MID, and until §17.6 it was
+                 simply dropped at this line. *)
               iDestruct (ic_close_mid_to_parked cn γfs γi cov logstart e dev inum gnew
-                           with "Hmt Hgid1 Hd1 Hincell Hvld Hpay Hlvh")
+                           with "Hmt Hgid1 Hd1 Hincell Hvld Hpay Hlvh Hpend")
                 as "[Hbody Hinhalf]".
               iMod ("Hclose2" with "[Hbody]") as "_"; [by iNext |].
               iModIntro. iFrame "Hd2 Hinhalf Hgid2". }

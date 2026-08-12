@@ -3110,7 +3110,7 @@ Section ProofNamexMain.
                                    Hgeom Hdlk Hbs1").
                    iIntros (CIDil Hqil mil dnl bml)
                      "%Hcsil Hcg Hcnt Hpc Hppid Hinos Hbs1 Hslkd Hslpid Hdep
-                      Hidev Hiinum Hivalid Hload".
+                      Hidev Hiinum Hivalid Hload #Hshot".
                    assert (Hpcbc : ret_pc (V2 !!! Regidx Rra)
                             = mword_of_int (NX + 0xbc)).
                    { rewrite HV2ra. pcw. }
@@ -3319,7 +3319,7 @@ Section ProofNamexMain.
                                  Kiu Hik HP3a0
                                  with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesck
                                        Hslkk Hslkd Hslpid Hppid Hprocs Hdep
-                                       Hidev Hiinum Hivalid Hload").
+                                       Hidev Hiinum Hivalid Hload Hshot").
                        iIntros (CIDiu Hqiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid
                                                   Hshr".
                        assert (Hpc80 : ret_pc (NP3 !!! Regidx Rra)
@@ -3761,7 +3761,7 @@ Section ProofNamexMain.
                                      with "Hcg Hcnt Htext Hpc Hpanic Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg
                                            Hslkk Hslkd Hslpid Hdep Hidev
-                                           Hiinum Hivalid Hload Hkeep Hbmap
+                                           Hiinum Hivalid Hload Hshot Hkeep Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
                                            Hgeom Hdlk Hbslot Hlog").
                            iIntros (CIDup Hqup mup nup usedup)
@@ -3955,7 +3955,7 @@ Section ProofNamexMain.
                                      with "Hcg Hcnt Htext Hpc Hpanic Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg
                                            Hslkk Hslkd Hslpid Hdep Hidev
-                                           Hiinum Hivalid Hload Hkeep Hbmap
+                                           Hiinum Hivalid Hload Hshot Hkeep Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
                                            Hgeom Hdlk Hbslot Hlog").
                            iIntros (CIDup Hqup mup nup usedup)
@@ -4227,7 +4227,7 @@ Section ProofNamexMain.
                                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg Hslkk Hslkd
                                      Hslpid Hdep Hidev Hiinum Hivalid Hload
-                                     Hkeep Hbmap Hinos Hbits Hppid Hprocs
+                                     Hshot Hkeep Hbmap Hinos Hbits Hppid Hprocs
                                      Hdev Hgeom Hdlk Hbslot Hlog").
                      iIntros (CIDup Hqup mup nup usedup)
                        "%Hcsup Hcg Hcnt Hpc Hppid Hbmap Hinos %Husdup Hbits
