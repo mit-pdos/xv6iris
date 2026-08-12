@@ -7,9 +7,37 @@ at it (`iris/WeakWalkStale.v`), the racy absorption theorem
 phase-flip design (`W` parameter + `wstep_ok_racy_phase_mono` +
 `wstep_ok_racy_bind_false`, §8.3 item 6) that lets a walking STORE
 compose, and the SEQUENTIAL-WINDOW widening (`WeakStale` §9, see §8.2)
-that lets a fetch-miss + data-miss instruction compose.  What remains of
-this front is only the eventual 6b/6c consumer that wires the peel +
-absorption into a WP rule.
+that lets a fetch-miss + data-miss instruction compose.
+
+**AND THE CONSUMER'S FIRST SLICE IS IN (2026-08-12): the peel of the
+translation.**  `WeakKptStale` §4's `wwalk_peel_of_exports` (pure,
+`plat_term_write` only) turns the absorption theorem's exports into
+`wstep_ok_racy tid la 8 wak_plain (wwalk_filter w0 lw) wD_any True true
+(translateAddr …) σ` plus its `wadm_filter` — i.e. everything the racy
+side of a 6c leaf rule needs about the translation, ready for the §9
+seq/bind kit.  The plumbing that made it possible: `exec_stale_restrict`
+(`WeakStale` §6b — the footprint-restriction transport, which needs no
+`acc_wf`: the unpinned arm patches both maps identically), the
+absorption exports strengthened with the two slot-disjointness facts and
+a σ-uniform write-arm trace selector `wtr : bool` (the shape is
+hit-vs-miss determined, not per-member — a consumer choosing its
+producer route must know which), and `acc_win` (windows as `gset` built
+on the RIGHT `Countable` instance — in files importing
+`SailStdpp.Values`, a `gset Arch.pa` written in binder position
+elaborates against `Countable_mword` and mismatches `WeakCert`'s
+machinery; never spell the set type there, use `acc_win`).  Route per
+arm: read-only and miss-write (`wtr = true`) through the stale producer;
+hit-write (`wtr = false`, the `[excl-read; write]` trace with its
+pre-racy write) through ordinary certification + the §4 embedding +
+phase-mono — legal because that trace has NO unpinned read, so the
+backward transfer (`trace_off_win`, vacuous) applies and the family is
+constant.  NO `trace_stale` widening was needed.
+
+What remains of this front: the rest of the 6b/6c consumer — the S-mode
+fetch-chain restatement and the WP rule that composes this peel (via the
+§9 kit for the two-translation case) with the instruction's certified
+tail, plus the step-level ghost matching against the absorption
+theorem's register wand and log arms.
 
 **DECISION (2026-08-12, the φ-upgrade author, as §5 requested): take
 option (a), and do NOT start until the in-flight C/D/S points-to surgery

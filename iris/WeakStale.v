@@ -991,6 +991,197 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
+(** ** 6b. THE FOOTPRINT RESTRICTION
+
+    §5's family is demanded at the CONFINED state
+    [MState (wm_regs s) (wmem_restrict s W) (wm_dev s)], while every walk
+    lemma states its run at the FLAT one.  The gap is exactly this: a run
+    whose reads all land inside a SUBMAP [mm ⊆ mem s] is THE SAME RUN at
+    [mm] — same result, same trace — and its final memory is confined to
+    [dom mm] plus whatever the trace wrote.
+
+    Both halves are keyed on the trace, which is what makes the premise
+    checkable by a caller who knows the shapes ([trace_rdom] for the reads,
+    [trace_wdom] for the writes) and what makes the conclusion the
+    [dom (mem t') ⊆ W] the producer asks for.
+
+    The read arms are the only work, and the UNPINNED one is the only one
+    that is not literally [read_bytes] on a submap: it reads
+    [stale_mem = write_bytes _ ra rn w], and the patch is applied to BOTH
+    maps identically, so the submap survives it
+    ([WeakCert.write_bytes_mono]) and so does the footprint
+    ([WeakCert.write_bytes_dom_mono]).  No [acc_wf] is needed anywhere: this
+    transport never has to know where the window is. *)
+
+(** THE BYTE FOOTPRINT of a list of [n]-byte accesses — the window shape a
+    multi-slot certificate carries.  It lives HERE, on the [gset Arch.pa]
+    side of the [SailStdpp.Values] instance leak, so that a consumer that
+    imports the model's notations can use it without ever writing the type
+    (durable notes, the binder-position instance trap). *)
+Definition acc_win (l : list Arch.pa) (n : nat) : gset Arch.pa :=
+  list_to_set (l ≫= (fun a : Arch.pa => pa_add a <$> seq 0 n)).
+
+Lemma acc_win_in (l : list Arch.pa) (n : nat) (a : Arch.pa) (j : nat) :
+  a ∈ l -> (j < n)%nat -> pa_add a j ∈ acc_win l n.
+Proof.
+  intros Ha Hj. rewrite /acc_win elem_of_list_to_set elem_of_list_bind.
+  exists a. split; [|exact Ha].
+  apply elem_of_list_fmap. exists j. split; [reflexivity|apply elem_of_seq; lia].
+Qed.
+
+Lemma acc_win_inv (l : list Arch.pa) (n : nat) (b : Arch.pa) :
+  b ∈ acc_win l n ->
+  exists (a : Arch.pa) (j : nat), a ∈ l /\ (j < n)%nat /\ b = pa_add a j.
+Proof.
+  rewrite /acc_win elem_of_list_to_set elem_of_list_bind.
+  intros (a & Hb & Ha).
+  apply elem_of_list_fmap in Hb as (j & -> & Hj%elem_of_seq).
+  exists a, j. split_and!; [exact Ha|lia|reflexivity].
+Qed.
+
+(** Every byte of every READ of the trace is in the confined map ... *)
+Definition trace_rdom (mm : gmap Arch.pa (bv 8)) (es : list weff) : Prop :=
+  forall (ak : akinfo) (pa : Arch.pa) (n : N),
+    WEread ak pa n ∈ es ->
+    forall j : nat, (j < N.to_nat n)%nat -> pa_add pa j ∈ dom mm.
+
+(** ... and every byte of every WRITE is in the window. *)
+Definition trace_wdom (W : gset Arch.pa) (es : list weff) : Prop :=
+  forall (ak : akinfo) (pa : Arch.pa) (n : N) (v : bv (8 * n)),
+    WEwrite ak pa n v ∈ es ->
+    forall j : nat, (j < N.to_nat n)%nat -> pa_add pa j ∈ W.
+
+Lemma trace_rdom_tail mm e es : trace_rdom mm (e :: es) -> trace_rdom mm es.
+Proof.
+  intros H ak pa n Hin. apply (H ak pa n), elem_of_cons. by right.
+Qed.
+
+Lemma trace_rdom_head mm ak pa n es :
+  trace_rdom mm (WEread ak pa n :: es) ->
+  forall j : nat, (j < N.to_nat n)%nat -> pa_add pa j ∈ dom mm.
+Proof. intros H. apply (H ak pa n), elem_of_cons. by left. Qed.
+
+Lemma trace_rdom_mono mm mm2 es :
+  dom mm ⊆ dom mm2 -> trace_rdom mm es -> trace_rdom mm2 es.
+Proof. intros Hd H ak pa n Hin j Hj. apply Hd, (H ak pa n Hin j Hj). Qed.
+
+Lemma trace_wdom_tail W e es : trace_wdom W (e :: es) -> trace_wdom W es.
+Proof.
+  intros H ak pa n v Hin. apply (H ak pa n v), elem_of_cons. by right.
+Qed.
+
+Lemma trace_wdom_head W ak pa n (v : bv (8 * n)) es :
+  trace_wdom W (WEwrite ak pa n v :: es) ->
+  forall j : nat, (j < N.to_nat n)%nat -> pa_add pa j ∈ W.
+Proof. intros H. apply (H ak pa n v), elem_of_cons. by left. Qed.
+
+(** [WeakCert.read_bytes_mono]'s converse under a footprint hypothesis: a
+    read whose every byte is IN the submap reads the same word there. *)
+Lemma read_bytes_restrict (mm mm2 : gmap Arch.pa (bv 8)) (pa : Arch.pa)
+    (n : N) (v : bv (8 * n)) :
+  mm ⊆ mm2 -> read_bytes mm2 pa n = Some v ->
+  (forall j : nat, (j < N.to_nat n)%nat -> pa_add pa j ∈ dom mm) ->
+  read_bytes mm pa n = Some v.
+Proof.
+  intros Hsub Hr Hin. apply read_bytes_of_bytes. intros j Hj.
+  destruct (proj1 (elem_of_dom mm (pa_add pa j)) (Hin j Hj)) as [b Hb].
+  rewrite Hb. f_equal.
+  pose proof (read_bytes_spec mm2 pa n v Hr j ltac:(lia)) as Hr2.
+  rewrite (lookup_weaken mm mm2 _ _ Hb Hsub) in Hr2. by injection Hr2.
+Qed.
+
+Lemma exec_stale_restrict (ra : Arch.pa) (rn : N) (w : bv (8 * rn))
+    {X} (m : M X) :
+  forall (s : mstate) (mm : gmap Arch.pa (bv 8)) (W : gset Arch.pa)
+         (x : X) (t' : mstate) (es : list weff),
+    exec_stale ra rn w m s = Some (x, t', es) ->
+    mm ⊆ s.(mem) ->
+    dom mm ⊆ W ->
+    trace_rdom mm es ->
+    trace_wdom W es ->
+    exists t'' : mstate,
+      exec_stale ra rn w m (MState s.(sregs) mm s.(mdev)) = Some (x, t'', es) /\
+      sregs t'' = sregs t' /\ mdev t'' = mdev t' /\
+      mem t'' ⊆ mem t' /\ dom (mem t'') ⊆ W.
+Proof.
+  induction m as [y0 | T oc k IH];
+    intros s mm W x t' es Hex Hsub Hdom Hrd Hwd.
+  - simpl in Hex |- *. injection Hex as <- <- <-.
+    exists (MState s.(sregs) mm s.(mdev)).
+    split_and!; [reflexivity|reflexivity|reflexivity|exact Hsub|exact Hdom].
+  - destruct oc; simpl in Hex |- *; try discriminate;
+      try (exact (IH _ s mm W x t' es Hex Hsub Hdom Hrd Hwd)).
+    + (* RegWrite *)
+      exact (IH tt (set_reg s reg regval) mm W x t' es Hex Hsub Hdom Hrd Hwd).
+    + (* MemRead *)
+      destruct (dev_addr _).
+      * destruct (dev_read _ _ _) as [[v0 d']|] eqn:Hdr; [|discriminate].
+        exact (IH _ (MState s.(sregs) s.(mem) d') mm W x t' es
+                 Hex Hsub Hdom Hrd Hwd).
+      * destruct (read_bytes (stale_mem ra rn w _ s) _ _) as [v0|] eqn:Hrb;
+          [|discriminate].
+        destruct (exec_stale ra rn w (k _) s) as [[[x0 t0] es0]|] eqn:Hee;
+          [|discriminate].
+        injection Hex as <- <- <-.
+        assert (Hrb' : read_bytes
+                  (stale_mem ra rn w
+                     (classify (Interface.ReadReq.access_kind t))
+                     (MState s.(sregs) mm s.(mdev)))
+                  (Interface.ReadReq.pa t) n = Some v0).
+        { rewrite /stale_mem /= in Hrb |- *.
+          destruct (ak_pins (classify (Interface.ReadReq.access_kind t)))
+            eqn:Hpin.
+          - apply (read_bytes_restrict mm s.(mem)); [exact Hsub|exact Hrb|].
+            exact (trace_rdom_head mm _ _ n es0 Hrd).
+          - apply (read_bytes_restrict (write_bytes mm ra rn w)
+                     (write_bytes s.(mem) ra rn w));
+              [ exact (write_bytes_mono mm s.(mem) ra rn w Hsub)
+              | exact Hrb | ].
+            intros j Hj. apply (write_bytes_dom_mono mm ra rn w).
+            exact (trace_rdom_head mm _ _ n es0 Hrd j Hj). }
+        rewrite Hrb'.
+        destruct (IH _ s mm W x0 t0 es0 Hee Hsub Hdom
+                    (trace_rdom_tail _ _ _ Hrd) (trace_wdom_tail _ _ _ Hwd))
+          as (t'' & Hex'' & Hsr & Hdv & Hmsub & Hmdom).
+        rewrite Hex''. exists t''.
+        split_and!; [reflexivity|exact Hsr|exact Hdv|exact Hmsub|exact Hmdom].
+    + (* MemWrite *)
+      destruct (dev_addr _).
+      * destruct (dev_write _ _ _ _) as [d'|] eqn:Hdw; [|discriminate].
+        exact (IH _ (MState s.(sregs) s.(mem) d') mm W x t' es
+                 Hex Hsub Hdom Hrd Hwd).
+      * destruct (exec_stale ra rn w (k _) _) as [[[x0 t0] es0]|] eqn:Hee;
+          [|discriminate].
+        injection Hex as <- <- <-.
+        assert (Hwin : forall j : nat, (j < N.to_nat n)%nat ->
+                  pa_add (Interface.WriteReq.pa t) j ∈ W)
+          by exact (trace_wdom_head W _ _ n (Interface.WriteReq.value t) es0 Hwd).
+        destruct (IH _ (MState s.(sregs)
+                          (write_bytes s.(mem) (Interface.WriteReq.pa t) n
+                             (Interface.WriteReq.value t)) s.(mdev))
+                    (write_bytes mm (Interface.WriteReq.pa t) n
+                       (Interface.WriteReq.value t)) W x0 t0 es0 Hee
+                    (write_bytes_mono mm s.(mem) _ n _ Hsub)
+                    (write_bytes_dom_sub mm _ n _ W Hdom Hwin)
+                    (trace_rdom_mono mm _ es0
+                       (write_bytes_dom_mono mm _ n _)
+                       (trace_rdom_tail _ _ _ Hrd))
+                    (trace_wdom_tail _ _ _ Hwd))
+          as (t'' & Hex'' & Hsr & Hdv & Hmsub & Hmdom).
+        rewrite Hex''. exists t''.
+        split_and!; [reflexivity|exact Hsr|exact Hdv|exact Hmsub|exact Hmdom].
+    + (* Barrier *)
+      destruct (exec_stale ra rn w (k tt) s) as [[[x0 t0] es0]|] eqn:Hee;
+        [|discriminate].
+      injection Hex as <- <- <-.
+      destruct (IH tt s mm W x0 t0 es0 Hee Hsub Hdom
+                  (trace_rdom_tail _ _ _ Hrd) (trace_wdom_tail _ _ _ Hwd))
+        as (t'' & Hex'' & Hsr & Hdv & Hmsub & Hmdom).
+      rewrite Hex''. exists t''.
+      split_and!; [reflexivity|exact Hsr|exact Hdv|exact Hmsub|exact Hmdom].
+Qed.
+
+(* ====================================================================== *)
 (** ** 7. THE PEEL, IN CPS — how the walk composes into a whole step
 
     THE PROBLEM THIS SOLVES.  §5's family is over the WHOLE step monad, so

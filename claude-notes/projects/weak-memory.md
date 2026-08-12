@@ -258,10 +258,33 @@ HALF" slice.
    `T0 ≤ w_vrNew` become DYNAMIC (the cut travels as data in the parked
    -table/handoff payload; the resuming hart's floor coverage comes from
    the view transfer at the release/acquire, not from a boot horizon) —
-   and the TLB-maintenance obligation below.  Both are what the
-   two-hart MP toy (`WkUnmapMp`, WkStartedMp-shaped: zero store; fence;
-   flag store ∥ flag spin; sfence.vma; satp write; translation must
-   fault) is for.
+   and the TLB-maintenance obligation below.
+
+   **ALSO VALIDATED (2026-08-12, `iris/WkUnmapMp.v` — the pinnedness +
+   fault layer; axioms = closed / `plat_term_write` on the walk head).**
+   The finding that makes the unmap story CHEAP, mechanized: once the
+   zero store is DELIVERED (floor ≥ its timestamp) and nothing wrote the
+   slot since, the slot is PINNED for that hart — `wunmap_pinned` derives
+   `pinned_read` for all 8 bytes FROM THE LOG SHAPE alone (the unmap
+   write IS `latest_ts`; only the `w_vrNew` branch of the max, no `coh`
+   fact, no `wlog_wf`).  So the resuming hart's walk of an unmapped slot
+   needs NO racy machinery: `wunmap_walk_faults_eff` proves the
+   TLB-miss walk of a zeroed leaf takes `PTW_Invalid_PTE` at FULL
+   `translateAddr` altitude (the Err front existed:
+   `WeakWalkEff.exec_eff_translateAddr_pt_front_err`; state unchanged —
+   a fault walk fills no TLB and writes nothing), and
+   `wunmap_no_racy_needed` / `wunmap_walk_trace_pin` discharge
+   `WeakCert.trace_pin` for its three plain reads — the ordinary
+   confined-certification side condition, verbatim.  Two facts worth
+   keeping: the FAULT arm is cheaper in premises than the success arm
+   (no `misa`, no `menvcfg`, no write-PMP, no `pma_allows_pte_write` —
+   the Svnapot/PBMTE/ADUE gates all sit past the leaf check); and
+   `wak_plain` is NOT self-pinning (`wunmap`'s §3 records it — the
+   pinnedness must come from delivery, which is the whole point).
+   Remaining for the unmap story: the Iris MP handoff composition
+   (the advancing cut as handoff-payload data + the sfence/satp TLB
+   emptiness at the switch — the `WkStartedMp`-shaped end-to-end toy),
+   and the parked⇄installed ownership choreography.
 
    **WHERE THE TLB MAINTENANCE ACTUALLY IS — check this before designing
    the invariant.**  Six `sfence.vma` sites in the image, and NONE of them

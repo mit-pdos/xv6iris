@@ -47,7 +47,7 @@ Require Import WeakMem WeakInterp WeakLang WeakGhost WeakBridge.
 Require Import WeakView WeakVProp WeakFence WeakInstr WeakCert WeakEff.
 Require Import WeakEffSkel WeakFetchEff WeakLeafEffCommon WeakLeafEff8.
 Require Import WeakStore WeakRacy WeakWord8.
-Require Import WeakStale WeakWalkStale.
+Require Import WeakVarCert WeakStale WeakWalkStale.
 Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree UserPtTree PtTreeAdue.
 Require Import KptPt KMap SmodeCore KptTree KptGhost KptShare.
 Require Import WeakWalkEff WeakUpdEff.
@@ -173,6 +173,9 @@ Section WeakKptStaleDispatch.
     (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n sg.(sregs)) 0) * 4)%Z ->
     pma_allows_pte_read (register_lookup pma_regions sg.(sregs)) ->
     pma_allows_pte_write (register_lookup pma_regions sg.(sregs)) ->
+    (* the slot geometry the peel's trace conditions need — free by §1, so
+       exported rather than re-derived by every consumer *)
+    racc_disj la 8 a2w 8 /\ racc_disj la 8 a1w 8 /\
     ( (* READ-ONLY: no family member writes *)
       (forall av dv : mword 1,
          pte_ad_le (pte_set_ad w av dv) p0 ->
@@ -197,8 +200,10 @@ Section WeakKptStaleDispatch.
                      WEread (AkInfo false true false) la 8]))
       \/
       (* WRITE-BACK: every family member writes the SAME word, computed
-         from the resident (latest) leaf *)
-      (exists a1 d1 : mword 1,
+         from the resident (latest) leaf — and takes the SAME trace shape,
+         since which of the two shapes runs is decided by σ (TLB miss vs
+         hit), not by the family index.  Hence the bool OUTSIDE the ∀. *)
+      (exists (a1 d1 : mword 1) (wtr : bool),
          update_PTE_Bits (p0 : mword 64) acc = Some (pte_set_ad p0 a1 d1)
          /\ forall av dv : mword 1,
               pte_ad_le (pte_set_ad w av dv) p0 ->
@@ -214,14 +219,15 @@ Section WeakKptStaleDispatch.
                            (Some (u_walk_entry vpn p2 p1 (pte_set_ad w ae de)
                                     (mword_of_int 0))))
                         sg.(sregs))
-                /\ (es = [WEread wak_plain a2w 8; WEread wak_plain a1w 8;
-                          WEread wak_plain la 8;
-                          WEread (AkInfo false true false) la 8;
-                          WEwrite (AkInfo false true false) la 8
-                            (pte_set_ad p0 a1 d1 : mword 64)] \/
-                    es = [WEread (AkInfo false true false) la 8;
-                          WEwrite (AkInfo false true false) la 8
-                            (pte_set_ad p0 a1 d1 : mword 64)])) ).
+                /\ es = (if wtr
+                         then [WEread wak_plain a2w 8; WEread wak_plain a1w 8;
+                               WEread wak_plain la 8;
+                               WEread (AkInfo false true false) la 8;
+                               WEwrite (AkInfo false true false) la 8
+                                 (pte_set_ad p0 a1 d1 : mword 64)]
+                         else [WEread (AkInfo false true false) la 8;
+                               WEwrite (AkInfo false true false) la 8
+                                 (pte_set_ad p0 a1 d1 : mword 64)])) ).
   Proof.
     intros vpn p0 a2w a1w la Hchk Hval Hcanon Hout Hvarp Hwv2 Hwv1 Hbase Hmaps
            Htlbok Hsm2 Hsm1 Hsm0 Hmisa Hmenv Hhtif Hcp Htm Heff Hss Hsatp Hppn
@@ -242,6 +248,8 @@ Section WeakKptStaleDispatch.
     pose proof (pt_slot_mem_acc_wf sg _ _ Hsm0') as Hwf0.
     pose proof (pt_slot_racc_disj sg _ _ _ _ Hsm0' Hsm2' Hl0 Hn2) as Hd2.
     pose proof (pt_slot_racc_disj sg _ _ _ _ Hsm0' Hsm1' Hl0 Hn1) as Hd1.
+    (* the two exported disjointness conjuncts, discharged here *)
+    split; [exact Hd2|]. split; [exact Hd1|].
     (* the reads at the REAL state *)
     destruct (Hpmar a2w (pt_slot_ram_access _ _ _ Hsm2')) as (region2 & Hm2 & Hs2).
     destruct (Hpmar a1w (pt_slot_ram_access _ _ _ Hsm1')) as (region1 & Hm1 & Hs1).
@@ -363,7 +371,9 @@ Section WeakKptStaleDispatch.
       destruct (update_PTE_Bits (p0 : mword 64) acc) as [p0'|] eqn:Hup.
       - (* WRITE-BACK *)
         destruct (update_PTE_Bits_set_ad _ _ _ Hup) as (a1 & d1 & Hq).
-        right. exists a1, d1. split; [rewrite <- Hq; reflexivity|].
+        (* the MISS path's write-back shape is the five-event walk, for every
+           member alike *)
+        right. exists a1, d1, true. split; [rewrite <- Hq; reflexivity|].
         intros av dv Hle.
         destruct (Hfam av dv) as (sg' & es & Heq & Hmdev & Hsregs & Harm).
         destruct Harm as [(Hmem0 & [(Hg & Hes)|(Hg & Hes)]) | (q & Hq' & Hmem0 & Hes)].
@@ -378,7 +388,7 @@ Section WeakKptStaleDispatch.
           * exact Hmem0.
           * exact Hmdev.
           * exact Hsregs.
-          * left. exact Hes.
+          * exact Hes.
       - (* READ-ONLY *)
         left. intros av dv Hle.
         destruct (Hfam av dv) as (sg' & es & Heq & Hmdev & Hsregs & Harm).
@@ -478,14 +488,15 @@ Section WeakKptStaleDispatch.
                - exists a1, d1. rewrite sregs_set_reg Htlbv. rewrite <- Hqw. reflexivity.
                - rewrite <- Hq. reflexivity. }
              destruct Hhit as (sgh & esh & Hrun & Hmm & Hdd & Hss' & Hee).
-             right. exists a1, d1. split; [rewrite <- Hq; reflexivity|].
+             (* the HIT path's write-back shape is the adjacent CAS pair *)
+             right. exists a1, d1, false. split; [rewrite <- Hq; reflexivity|].
              intros av dv Hle. exists sgh, esh. split_and!.
              ++ apply (exec_stale_of_exec_eff la 8 (pte_set_ad w av dv) _ Hwf0 sg _ _ _ Hrun).
                 rewrite Hee. apply trace_off_win_pinned. pinned_trace.
              ++ exact Hmm.
              ++ exact Hdd.
              ++ exact Hss'.
-             ++ right. exact Hee.
+             ++ exact Hee.
           -- (* O2', hit path: refresh only — trace is the CAS read *)
              assert (Hhit : exists (sgh : mstate) (esh : list weff),
                  exec_eff (translateAddr (Virtaddr va) acc) sg
@@ -621,6 +632,7 @@ Section WeakKptStaleAbsorb.
        pt_slot_mem (wflat_st σ) la lw⌝ ∗
       ⌜forall j : nat, (j < 8)%nat ->
          pinned_read σ (acc_addr a2 j) /\ pinned_read σ (acc_addr a1 j)⌝ ∗
+      ⌜racc_disj la 8 a2 8 /\ racc_disj la 8 a1 8⌝ ∗
       ⌜forall (rak : akinfo) (wv : bv (8 * 8)%N),
          wadm σ rak la 8 wv ->
          (exists a d : mword 1,
@@ -661,7 +673,8 @@ Section WeakKptStaleAbsorb.
         (* WRITE-BACK: one message, the same for every family member *)
         (∃ (lw' : mword 64) (kcls : wm_class),
            ⌜update_PTE_Bits (lw : mword 64) acc = Some lw'⌝ ∗
-           ⌜forall av dv : mword 1,
+           ⌜exists wtr : bool,
+            forall av dv : mword 1,
               pte_ad_le (pte_set_ad w0 av dv) lw ->
               exists (sg' : mstate) (es : list weff),
                 exec_stale la 8 (pte_set_ad w0 av dv)
@@ -669,12 +682,13 @@ Section WeakKptStaleAbsorb.
                 = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sg', es) /\
                 mem sg' = write_bytes (wflat (wm_img σ) (wm_log σ)) (la : Arch.pa) 8 lw' /\
                 mdev sg' = wm_dev σ /\
-                (es = [WEread wak_plain a2 8; WEread wak_plain a1 8;
-                       WEread wak_plain la 8;
-                       WEread (AkInfo false true false) la 8;
-                       WEwrite (AkInfo false true false) la 8 (lw' : mword 64)] \/
-                 es = [WEread (AkInfo false true false) la 8;
-                       WEwrite (AkInfo false true false) la 8 (lw' : mword 64)])⌝ ∗
+                es = (if wtr
+                      then [WEread wak_plain a2 8; WEread wak_plain a1 8;
+                            WEread wak_plain la 8;
+                            WEread (AkInfo false true false) la 8;
+                            WEwrite (AkInfo false true false) la 8 (lw' : mword 64)]
+                      else [WEread (AkInfo false true false) la 8;
+                            WEwrite (AkInfo false true false) la 8 (lw' : mword 64)])⌝ ∗
            wlog_auth (wm_log σ ++ [wwrite_msg tid kcls (la : Arch.pa) 8 (lw' : mword 64)]) ∗
            wlat_interp (wm_img σ)
              (wm_log σ ++ [wwrite_msg tid kcls (la : Arch.pa) 8 (lw' : mword 64)]))).
@@ -811,7 +825,7 @@ Section WeakKptStaleAbsorb.
                 Hsm2 Hsm1 Hsm0 Hmisa Hmenv Hhtif Hcp Htm Heff Hss
                 Hsatpv Hppn Hasid Htlbv
                 HA' Hord' HR' HW' Hcov' Hpmar Hpmaw)
-      as [Hfam | (a1 & d1 & Hupd & Hfam)].
+      as (Hdj2 & Hdj1 & [Hfam | (a1 & d1 & wtr & Hupd & Hfam)]).
     - (* ================= READ-ONLY: nothing moved ================= *)
       assert (Hfam' : forall av dv : mword 1,
           pte_ad_le (pte_set_ad w0 av dv) lw ->
@@ -857,6 +871,7 @@ Section WeakKptStaleAbsorb.
       iSplitR; [iPureIntro; exists a0, d0; reflexivity|].
       iSplitR; [iPureIntro; rewrite -Ha2; auto|].
       iSplitR; [iPureIntro; rewrite -Ha2; exact Hpin|].
+      iSplitR; [iPureIntro; split; [exact Hdj2|exact Hdj1]|].
       iSplitR; [iPureIntro; exact Hcoll|].
       iSplitR; [iPureIntro; exact Hnvfree|].
       iFrame "Hri".
@@ -921,15 +936,16 @@ Section WeakKptStaleAbsorb.
                        (Some (u_walk_entry vpn p2 p1 (pte_set_ad w0 ae de)
                                 (mword_of_int 0))))
                     (wm_regs σ))
-            /\ (esx = [WEread wak_plain
-                         (u_pte_addr root_ppn (subrange_vec_dec vpn 26 18)) 8;
-                       WEread wak_plain
-                         (u_pte_addr (u_next_base p2) (subrange_vec_dec vpn 17 9)) 8;
-                       WEread wak_plain la 8;
-                       WEread (AkInfo false true false) la 8;
-                       WEwrite (AkInfo false true false) la 8 (lw' : mword 64)] \/
-                esx = [WEread (AkInfo false true false) la 8;
-                       WEwrite (AkInfo false true false) la 8 (lw' : mword 64)]))
+            /\ esx = (if wtr
+                      then [WEread wak_plain
+                              (u_pte_addr root_ppn (subrange_vec_dec vpn 26 18)) 8;
+                            WEread wak_plain
+                              (u_pte_addr (u_next_base p2) (subrange_vec_dec vpn 17 9)) 8;
+                            WEread wak_plain la 8;
+                            WEread (AkInfo false true false) la 8;
+                            WEwrite (AkInfo false true false) la 8 (lw' : mword 64)]
+                      else [WEread (AkInfo false true false) la 8;
+                            WEwrite (AkInfo false true false) la 8 (lw' : mword 64)]))
         by exact Hfam.
       clear Hfam.
       assert (Hv' : pte_valid lw')
@@ -1051,6 +1067,7 @@ Section WeakKptStaleAbsorb.
       iSplitR; [iPureIntro; exists a0, d0; reflexivity|].
       iSplitR; [iPureIntro; rewrite -Ha2; auto|].
       iSplitR; [iPureIntro; rewrite -Ha2; exact Hpin|].
+      iSplitR; [iPureIntro; split; [exact Hdj2|exact Hdj1]|].
       iSplitR; [iPureIntro; exact Hcoll|].
       iSplitR; [iPureIntro; exact Hnvfree|].
       iFrame "Hri".
@@ -1086,7 +1103,7 @@ Section WeakKptStaleAbsorb.
       iRight. iExists (lw' : mword 64), WCexcl.
       iSplitR; [iPureIntro; exact Hupd'|].
       iSplitR.
-      { iPureIntro. intros av dv Hle.
+      { iPureIntro. exists wtr. intros av dv Hle.
         destruct (Hfam' av dv Hle) as (sgx & esx & H1 & H2 & H3 & _ & H5).
         exists sgx, esx. split_and!; [exact H1|exact H2|exact H3|exact H5]. }
       iFrame "Hla Hi".
@@ -1095,8 +1112,414 @@ Section WeakKptStaleAbsorb.
 End WeakKptStaleAbsorb.
 
 (* ====================================================================== *)
-(** ** 4. Soundness checks *)
+(** ** 4. THE PEEL OF THE TRANSLATION
+
+    §3's exports, turned into a [WeakRacy.wstep_ok_racy] object for the
+    translation — the first slice of the WP rule, and the point of the whole
+    stale-mirror exercise.  It is PURE: the absorption theorem's exported
+    facts are taken as premises, so the Iris consumer opens the fupd once and
+    then hands the pure residue here.
+
+    THE VALUE FILTER is [wwalk_filter]: the words the window may hand the
+    walk are exactly the A/D variants of the canonical leaf that lie below
+    the coherence-latest one.  Its side condition ([wadm_filter]) IS the
+    collapse fact, verbatim.
+
+    THE ROUTES.  Five of the six trace shapes go through the stale
+    producer ([WeakStale.wstep_ok_racy_true_of_stale_window]): their racy
+    plain read of the leaf is preceded only by reads that are pinned or
+    disjoint, which is exactly [WeakStale.trace_stale].  The SIXTH — the
+    TLB-HIT write-back [excl-read; write], where the write PRECEDES nothing
+    because there is no racy read at all — is refused by [trace_stale] (a
+    pre-racy RAM write is [False] there), and needs none: its family is
+    constant, so the run transfers BACK to [exec_eff]
+    ([WeakStale.exec_eff_of_exec_stale]; its side condition is
+    [trace_off_win], which a trace whose only read is EXCLUSIVE satisfies
+    vacuously), and the ordinary confined producer
+    ([WeakCert.wstep_eff_confined_pin]) plus §4's embedding and §8's phase
+    monotonicity deliver the same conclusion.  Nothing is weakened on that
+    arm: the peel simply renounces the racy read it never takes. *)
+
+Definition wwalk_filter (w0 lw : mword 64) : (nat -> bv 8) -> Prop :=
+  fun bs => exists wv : bv (8 * 8)%N,
+    bs = (fun j : nat => nth_byte wv j) /\
+    (exists a d : mword 1, (wv : mword 64) = pte_set_ad w0 a d) /\
+    pte_ad_le (wv : mword 64) lw.
+
+(** *** 4a. The window: the 24 bytes of the three slots
+
+    [WeakStale.acc_win [a2;a1;la] 8], never spelled as a [gset Arch.pa] in
+    THIS file: the model's notations are imported here, so a [gset Arch.pa]
+    written in binder position elaborates against a different [Countable]
+    instance than the one [WeakCert]'s window machinery uses (durable notes,
+    the binder-position instance trap).  Taking the type off
+    [WeakStale.acc_win] sidesteps it. *)
+
+Lemma wwalk_slots_in2 (a2 a1 la : Arch.pa) (j : nat) :
+  (j < 8)%nat -> pa_add a2 j ∈ acc_win [a2; a1; la] 8.
+Proof. intros Hj. apply acc_win_in; [apply elem_of_list_here|lia]. Qed.
+
+Lemma wwalk_slots_in1 (a2 a1 la : Arch.pa) (j : nat) :
+  (j < 8)%nat -> pa_add a1 j ∈ acc_win [a2; a1; la] 8.
+Proof.
+  intros Hj. apply acc_win_in;
+    [apply elem_of_list_further, elem_of_list_here|lia].
+Qed.
+
+Lemma wwalk_slots_in0 (a2 a1 la : Arch.pa) (j : nat) :
+  (j < 8)%nat -> pa_add la j ∈ acc_win [a2; a1; la] 8.
+Proof.
+  intros Hj. apply acc_win_in;
+    [apply elem_of_list_further, elem_of_list_further, elem_of_list_here|lia].
+Qed.
+
+(** RAM starts at [0x80000000], so no byte of a slot is the null address. *)
+Lemma wwalk_win_nonzero (sg : mstate) (a2 a1 la : Arch.pa) (p2 p1 lw : mword 64) :
+  pt_slot_mem sg a2 p2 -> pt_slot_mem sg a1 p1 -> pt_slot_mem sg la lw ->
+  forall a, a ∈ acc_win [a2; a1; la] 8 -> pa_z a <> 0.
+Proof.
+  intros Hs2 Hs1 Hs0 a (b & j & Hb & Hj & ->)%acc_win_inv.
+  assert (Hram : addr_is_ram b /\ acc_wf b 8).
+  { apply elem_of_cons in Hb as [-> | Hb];
+      [ split; [exact (proj1 (proj2 Hs2))|exact (pt_slot_mem_acc_wf sg _ _ Hs2)]|].
+    apply elem_of_cons in Hb as [-> | Hb];
+      [ split; [exact (proj1 (proj2 Hs1))|exact (pt_slot_mem_acc_wf sg _ _ Hs1)]|].
+    apply elem_of_cons in Hb as [-> | Hb];
+      [ split; [exact (proj1 (proj2 Hs0))|exact (pt_slot_mem_acc_wf sg _ _ Hs0)]|].
+    by apply elem_of_nil in Hb. }
+  destruct Hram as [Hram Hacc].
+  rewrite (acc_wf_byte b 8 j Hacc ltac:(lia)) /acc_addr.
+  unfold addr_is_ram, ram_base, pa_z in Hram |- *. lia.
+Qed.
+
+(** The slot bytes ARE in the confined map: they are in the window and the
+    flat memory holds them ([pt_slot_mem]'s byte half). *)
+Lemma wwalk_win_conf (sigma : wmstate) (l : list Arch.pa) (b : Arch.pa)
+    (v : mword 64) :
+  pt_slot_mem (wflat_st sigma) b v -> b ∈ l ->
+  forall j : nat, (j < 8)%nat ->
+    pa_add b j ∈ dom (wmem_restrict sigma (acc_win l 8)).
+Proof.
+  intros [Hb _] Hbl j Hj. apply elem_of_dom. exists (nth_byte v j).
+  exact (wmem_restrict_lookup sigma _ _ _ (acc_win_in l 8 b j Hbl Hj)
+           (Hb j ltac:(lia))).
+Qed.
+
+(** *** 4b. The traces of the walk, classified
+
+    Every event of every shape the dispatch produces is an 8-byte access at
+    one of the three slots (writes only at the leaf), which is what confines
+    the run's footprint to the window; the ORDER-sensitive facts
+    ([trace_stale]) are proved per shape below. *)
+
+Definition wwalk_ev_ok (a2 a1 la : Arch.pa) (e : weff) : Prop :=
+  match e with
+  | WEread _ pa n => n = 8%N /\ (pa = a2 \/ pa = a1 \/ pa = la)
+  | WEwrite _ pa n _ => n = 8%N /\ pa = la
+  | WEbar _ => True
+  end.
+
+Ltac walk_evs :=
+  repeat (apply Forall_cons;
+          [ simpl; first [ exact I
+                         | split;
+                           [ reflexivity
+                           | first [ by left | by right; left | by right; right
+                                   | reflexivity ] ] ] | ]);
+  apply Forall_nil; exact I.
+
+Lemma trace_rdom_of_evs (sigma : wmstate) (a2 a1 la : Arch.pa)
+    (p2 p1 lw : mword 64) (es : list weff) :
+  Forall (wwalk_ev_ok a2 a1 la) es ->
+  pt_slot_mem (wflat_st sigma) a2 p2 ->
+  pt_slot_mem (wflat_st sigma) a1 p1 ->
+  pt_slot_mem (wflat_st sigma) la lw ->
+  trace_rdom (wmem_restrict sigma (acc_win [a2; a1; la] 8)) es.
+Proof.
+  intros Hall Hs2 Hs1 Hs0 ak pa n Hin j Hj.
+  rewrite Forall_forall in Hall.
+  specialize (Hall _ (proj1 (elem_of_list_In _ _) Hin)). simpl in Hall.
+  assert (Hj8 : (j < 8)%nat)
+    by (destruct Hall as (-> & _); change (N.to_nat 8) with 8%nat in Hj; lia).
+  destruct Hall as (_ & [-> | [-> | ->]]).
+  - exact (wwalk_win_conf sigma _ a2 p2 Hs2 (elem_of_list_here _ _) j Hj8).
+  - exact (wwalk_win_conf sigma _ a1 p1 Hs1
+             (elem_of_list_further _ _ _ (elem_of_list_here _ _)) j Hj8).
+  - exact (wwalk_win_conf sigma _ la lw Hs0
+             (elem_of_list_further _ _ _
+                (elem_of_list_further _ _ _ (elem_of_list_here _ _))) j Hj8).
+Qed.
+
+Lemma trace_wdom_of_evs (a2 a1 la : Arch.pa) (es : list weff) :
+  Forall (wwalk_ev_ok a2 a1 la) es ->
+  trace_wdom (acc_win [a2; a1; la] 8) es.
+Proof.
+  intros Hall ak pa n v Hin j Hj.
+  rewrite Forall_forall in Hall.
+  specialize (Hall _ (proj1 (elem_of_list_In _ _) Hin)). simpl in Hall.
+  destruct Hall as (-> & ->).
+  apply wwalk_slots_in0. change (N.to_nat 8) with 8%nat in Hj. lia.
+Qed.
+
+(** Pinnedness off the window: the two POINTER slots are pinned (the
+    invariant's receipt), and the leaf read — the window itself — is exempt
+    because [trace_pin_off] only asks about accesses disjoint from it. *)
+Lemma trace_pin_off_of_evs (σ : wmstate) (a2 a1 la : Arch.pa)
+    (es : list weff) :
+  Forall (wwalk_ev_ok a2 a1 la) es ->
+  (forall j : nat, (j < 8)%nat ->
+     pinned_read σ (acc_addr a2 j) /\ pinned_read σ (acc_addr a1 j)) ->
+  trace_pin_off σ la 8 es.
+Proof.
+  intros Hall Hpin ak pa n Hin Hnp Hdisj j Hj.
+  rewrite Forall_forall in Hall.
+  specialize (Hall _ (proj1 (elem_of_list_In _ _) Hin)). simpl in Hall.
+  assert (Hj8 : (j < 8)%nat)
+    by (destruct Hall as (Hn & _); rewrite Hn in Hj;
+        change (N.to_nat 8) with 8%nat in Hj; lia).
+  destruct Hall as (Hn & [-> | [-> | ->]]).
+  - exact (proj1 (Hpin j Hj8)).
+  - exact (proj2 (Hpin j Hj8)).
+  - rewrite Hn in Hdisj. by destruct (racc_disj_irrefl la 8 ltac:(lia) Hdisj).
+Qed.
+
+(** The five shapes the STALE producer accepts, and the one it does not.
+    Read it as the ordering claim: at most one unpinned read of the window,
+    everything before it pinned or disjoint, and no RAM write before it. *)
+Lemma trace_stale_walk_shapes (a2 a1 la : Arch.pa) (lw' : mword 64)
+    (es : list weff) :
+  racc_disj la 8 a2 8 -> racc_disj la 8 a1 8 ->
+  (es = [] \/
+   es = [WEread wak_plain a2 8; WEread wak_plain a1 8; WEread wak_plain la 8] \/
+   es = [WEread wak_excl la 8] \/
+   es = [WEread wak_plain a2 8; WEread wak_plain a1 8; WEread wak_plain la 8;
+         WEread wak_excl la 8] \/
+   es = [WEread wak_plain a2 8; WEread wak_plain a1 8; WEread wak_plain la 8;
+         WEread wak_excl la 8; WEwrite wak_excl la 8 (lw' : mword 64)]) ->
+  trace_stale wak_plain la 8 es.
+Proof.
+  intros Hd2 Hd1 [->|[->|[->|[->| ->]]]]; simpl.
+  - exact I.
+  - right; left. split_and!; [reflexivity|exact Hd2|].
+    right; left. split_and!; [reflexivity|exact Hd1|].
+    right; right. split_and!; [reflexivity|reflexivity|reflexivity|].
+    intros ak pa n Hin. by apply elem_of_nil in Hin.
+  - left. split; [reflexivity|exact I].
+  - right; left. split_and!; [reflexivity|exact Hd2|].
+    right; left. split_and!; [reflexivity|exact Hd1|].
+    right; right. split_and!; [reflexivity|reflexivity|reflexivity|].
+    apply trace_off_win_pinned. pinned_trace.
+  - right; left. split_and!; [reflexivity|exact Hd2|].
+    right; left. split_and!; [reflexivity|exact Hd1|].
+    right; right. split_and!; [reflexivity|reflexivity|reflexivity|].
+    apply trace_off_win_pinned. pinned_trace.
+Qed.
+
+(** *** 4c. ROUTE A: the stale producer, for any family of walk-shaped runs *)
+
+Lemma wstep_ok_racy_true_of_walk_family (tid : option nat) (σ : wmstate)
+    (a2 a1 la : Arch.pa) (p2 p1 w0 lw : mword 64) {X} (m : M X) :
+  wlog_wf (wm_log σ) ->
+  pt_slot_mem (wflat_st σ) a2 p2 ->
+  pt_slot_mem (wflat_st σ) a1 p1 ->
+  pt_slot_mem (wflat_st σ) la lw ->
+  (forall j : nat, (j < 8)%nat ->
+     pinned_read σ (acc_addr a2 j) /\ pinned_read σ (acc_addr a1 j)) ->
+  (exists a d : mword 1, lw = pte_set_ad w0 a d) ->
+  (forall av dv : mword 1,
+     pte_ad_le (pte_set_ad w0 av dv) lw ->
+     exists (x : X) (sg' : mstate) (es : list weff),
+       exec_stale la 8 (pte_set_ad w0 av dv) m (wflat_st σ) = Some (x, sg', es) /\
+       Forall (wwalk_ev_ok a2 a1 la) es /\
+       trace_stale wak_plain la 8 es) ->
+  wstep_ok_racy tid la 8 wak_plain (wwalk_filter w0 lw) wD_any True true m σ.
+Proof.
+  intros Hwf Hs2 Hs1 Hs0 Hpin Hvar Hfam.
+  pose proof (pt_slot_mem_acc_wf _ _ _ Hs0) as Hwf0.
+  assert (HW0 : forall a, a ∈ acc_win [a2; a1; la] 8 -> pa_z a <> 0)
+    by exact (wwalk_win_nonzero (wflat_st σ) a2 a1 la p2 p1 lw Hs2 Hs1 Hs0).
+  assert (Hwin : forall j : nat, (j < N.to_nat 8)%nat ->
+            pa_add la j ∈ acc_win [a2; a1; la] 8)
+    by (intros j Hj; apply wwalk_slots_in0;
+        change (N.to_nat 8) with 8%nat in Hj; lia).
+  apply (wstep_ok_racy_true_of_stale_window tid la 8 wak_plain
+           (wwalk_filter w0 lw) True m σ (acc_win [a2; a1; la] 8)
+           Hwf0 ltac:(lia) eq_refl).
+  - (* the filter is inhabited: the latest word is its own variant *)
+    destruct Hvar as (ad & dd & Hlw).
+    exists (lw : bv (8 * 8)%N), (lw : bv (8 * 8)%N). split_and!.
+    + reflexivity.
+    + exists ad, dd. exact Hlw.
+    + apply pte_ad_le_refl.
+  - exact Hwf.
+  - exact HW0.
+  - exact Hwin.
+  - (* the family, restricted to the window *)
+    intros w (wv & Hbs & (a & d & Hwv) & Hle).
+    assert (Hweq : w = wv).
+    { apply (bv_eq_of_bytes (n := 8%N)). intros j Hj.
+      exact (f_equal (fun f : nat -> bv 8 => f j) Hbs). }
+    assert (Hw : w = pte_set_ad w0 a d) by exact (eq_trans Hweq Hwv).
+    assert (Hle' : pte_ad_le (pte_set_ad w0 a d) lw)
+      by (rewrite -Hwv; exact Hle).
+    destruct (Hfam a d Hle') as (x & sg' & es & Hrun & Hev & Hst).
+    rewrite Hw.
+    destruct (exec_stale_restrict la 8 (pte_set_ad w0 a d) m
+                (wflat_st σ) (wmem_restrict σ (acc_win [a2; a1; la] 8))
+                (acc_win [a2; a1; la] 8) x sg' es Hrun
+                (wmem_restrict_sub σ _) (wmem_restrict_dom σ _)
+                (trace_rdom_of_evs σ a2 a1 la p2 p1 lw es Hev Hs2 Hs1 Hs0)
+                (trace_wdom_of_evs a2 a1 la es Hev))
+      as (t'' & Hrun'' & _ & _ & _ & Hdom'').
+    exists x, t'', es. split_and!.
+    + exact Hrun''.
+    + exact Hdom''.
+    + exact (trace_pin_off_of_evs σ a2 a1 la es Hev Hpin).
+    + exact Hst.
+Qed.
+
+(** *** 4d. THE PEEL *)
+
+Section WwalkPeel.
+  Context (acc : MemoryAccessType mem_payload).
+
+  Lemma wwalk_peel_of_exports (tid : option nat) (σ : wmstate)
+      (root_ppn : mword 44) (va pa : mword 64) (p2 p1 w0 lw : mword 64) :
+    let vpn := svpn_of va in
+    let a2 := u_pte_addr root_ppn (subrange_vec_dec vpn 26 18) in
+    let a1 := u_pte_addr (u_next_base p2) (subrange_vec_dec vpn 17 9) in
+    let la := u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0) in
+    (exists a d : mword 1, lw = pte_set_ad w0 a d) ->
+    wlog_wf (wm_log σ) ->
+    pt_slot_mem (wflat_st σ) a2 p2 ->
+    pt_slot_mem (wflat_st σ) a1 p1 ->
+    pt_slot_mem (wflat_st σ) la lw ->
+    (forall j : nat, (j < 8)%nat ->
+       pinned_read σ (acc_addr a2 j) /\ pinned_read σ (acc_addr a1 j)) ->
+    racc_disj la 8 a2 8 ->
+    racc_disj la 8 a1 8 ->
+    (forall (rak : akinfo) (wv : bv (8 * 8)%N),
+       wadm σ rak la 8 wv ->
+       (exists a d : mword 1, (wv : mword 64) = pte_set_ad w0 a d) /\
+       pte_ad_le (wv : mword 64) lw) ->
+    ( (* READ-ONLY *)
+      (forall av dv : mword 1,
+         pte_ad_le (pte_set_ad w0 av dv) lw ->
+         exists (sg' : mstate) (es : list weff),
+           exec_stale la 8 (pte_set_ad w0 av dv)
+             (translateAddr (Virtaddr va) acc) (wflat_st σ)
+           = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sg', es) /\
+           mem sg' = wflat (wm_img σ) (wm_log σ) /\
+           mdev sg' = wm_dev σ /\
+           (es = [] \/
+            es = [WEread wak_plain a2 8; WEread wak_plain a1 8;
+                  WEread wak_plain la 8] \/
+            es = [WEread wak_excl la 8] \/
+            es = [WEread wak_plain a2 8; WEread wak_plain a1 8;
+                  WEread wak_plain la 8; WEread wak_excl la 8]))
+      \/
+      (* WRITE-BACK *)
+      (exists (lw' : mword 64) (wtr : bool),
+         update_PTE_Bits (lw : mword 64) acc = Some lw' /\
+         forall av dv : mword 1,
+           pte_ad_le (pte_set_ad w0 av dv) lw ->
+           exists (sg' : mstate) (es : list weff),
+             exec_stale la 8 (pte_set_ad w0 av dv)
+               (translateAddr (Virtaddr va) acc) (wflat_st σ)
+             = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sg', es) /\
+             mem sg' = write_bytes (wflat (wm_img σ) (wm_log σ))
+                         (la : Arch.pa) 8 (lw' : mword 64) /\
+             mdev sg' = wm_dev σ /\
+             es = (if wtr
+                   then [WEread wak_plain a2 8; WEread wak_plain a1 8;
+                         WEread wak_plain la 8; WEread wak_excl la 8;
+                         WEwrite wak_excl la 8 (lw' : mword 64)]
+                   else [WEread wak_excl la 8;
+                         WEwrite wak_excl la 8 (lw' : mword 64)])) ) ->
+    wstep_ok_racy tid la 8 wak_plain (wwalk_filter w0 lw) wD_any True true
+      (translateAddr (Virtaddr va) acc) σ /\
+    wadm_filter σ wak_plain la 8 (wwalk_filter w0 lw).
+  Proof.
+    intros vpn a2 a1 la Hvar Hwf Hs2 Hs1 Hs0 Hpin Hd2 Hd1 Hcoll Harm.
+    pose proof (pt_slot_mem_acc_wf _ _ _ Hs0) as Hwf0.
+    split; [|].
+    - (* ---------------- the peel ---------------- *)
+      destruct Harm as [Hro | (lw' & wtr & Hupd & Hfam)].
+      + (* READ-ONLY: all four shapes are stale-friendly *)
+        apply (wstep_ok_racy_true_of_walk_family tid σ a2 a1 la p2 p1 w0 lw
+                 _ Hwf Hs2 Hs1 Hs0 Hpin Hvar).
+        intros av dv Hle.
+        destruct (Hro av dv Hle) as (sg' & es & Hrun & _ & _ & Hes).
+        exists (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)), sg', es.
+        split_and!.
+        * exact Hrun.
+        * destruct Hes as [->|[->|[->| ->]]]; walk_evs.
+        * apply (trace_stale_walk_shapes a2 a1 la lw es Hd2 Hd1).
+          destruct Hes as [-> | [-> | [-> | ->]]];
+            [by left | by right; left | by right; right; left
+            | by right; right; right; left].
+      + destruct wtr.
+        * (* MISS write-back: the five-event walk, still stale-friendly *)
+          apply (wstep_ok_racy_true_of_walk_family tid σ a2 a1 la p2 p1 w0 lw
+                   _ Hwf Hs2 Hs1 Hs0 Hpin Hvar).
+          intros av dv Hle.
+          destruct (Hfam av dv Hle) as (sg' & es & Hrun & _ & _ & Hes).
+          exists (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)), sg', es.
+          split_and!.
+          -- exact Hrun.
+          -- rewrite Hes. walk_evs.
+          -- apply (trace_stale_walk_shapes a2 a1 la lw' es Hd2 Hd1).
+             rewrite Hes. by right; right; right; right.
+        * (* ------ HIT write-back: the ORDINARY route ------ *)
+          (* the family is constant here (no unpinned read consults the
+             patch), so ONE member — the latest word's own variant — carries
+             the whole peel *)
+          destruct Hvar as (ad & dd & Hlw).
+          assert (Hle0 : pte_ad_le (pte_set_ad w0 ad dd) lw)
+            by (rewrite -Hlw; apply pte_ad_le_refl).
+          destruct (Hfam ad dd Hle0) as (sg' & es & Hrun & _ & _ & Hes).
+          assert (Hev : Forall (wwalk_ev_ok a2 a1 la) es)
+            by (rewrite Hes; walk_evs).
+          assert (Hoff : trace_off_win la 8 es)
+            by (rewrite Hes; apply trace_off_win_pinned; pinned_trace).
+          assert (Hpoff : trace_pin_off σ la 8 es)
+            by exact (trace_pin_off_of_evs σ a2 a1 la es Hev Hpin).
+          (* confine the run to the window, then transfer it back to
+             [exec_eff]: no unpinned read is left to see the patch *)
+          destruct (exec_stale_restrict la 8 (pte_set_ad w0 ad dd)
+                      (translateAddr (Virtaddr va) acc)
+                      (wflat_st σ) (wmem_restrict σ (acc_win [a2; a1; la] 8))
+                      (acc_win [a2; a1; la] 8) _ sg' es Hrun
+                      (wmem_restrict_sub σ _) (wmem_restrict_dom σ _)
+                      (trace_rdom_of_evs σ a2 a1 la p2 p1 lw es Hev Hs2 Hs1 Hs0)
+                      (trace_wdom_of_evs a2 a1 la es Hev))
+            as (t'' & Hrun'' & _ & _ & _ & Hdom'').
+          apply wstep_ok_racy_phase_mono.
+          apply (wstep_ok_racy_false_of_wstep_ok tid la 8 wak_plain
+                   (wwalk_filter w0 lw) True).
+          refine (proj1 (wstep_eff_confined_pin tid
+                    (translateAddr (Virtaddr va) acc) σ
+                    (wmem_restrict σ (acc_win [a2; a1; la] 8))
+                    (acc_win [a2; a1; la] 8)
+                    _ t'' es Hwf _ _ (wmem_restrict_dom σ _)
+                    (wmem_restrict_sub σ _) Hdom'' _)).
+          -- exact (wwalk_win_nonzero (wflat_st σ) a2 a1 la p2 p1 lw
+                      Hs2 Hs1 Hs0).
+          -- exact (trace_pin_of_off_win σ la 8 es Hoff Hpoff).
+          -- exact (exec_eff_of_exec_stale la 8 (pte_set_ad w0 ad dd) _
+                      Hwf0 _ _ _ _ Hrun'' Hoff).
+    - (* ---------------- the filter's side condition ---------------- *)
+      intros wv Hadm. exists wv. split; [reflexivity|].
+      exact (Hcoll wak_plain wv Hadm).
+  Qed.
+
+End WwalkPeel.
+
+(* ====================================================================== *)
+(** ** 5. Soundness checks *)
 
 Print Assumptions pt_slot_racc_disj.
 Print Assumptions wptree_translateAddr_stale_cases.
 Print Assumptions wtlb_res_pt_translateAddr_stale_at.
+Print Assumptions exec_stale_restrict.
+Print Assumptions wwalk_peel_of_exports.
