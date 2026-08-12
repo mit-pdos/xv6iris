@@ -19,6 +19,7 @@ From Kernel Require KernelSyms.
 Require Import KernelDecode01.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
+Require Import KernelDecode10.
 Require Import KernelDecode11.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
@@ -60,9 +61,9 @@ Section CodeKvminit.
   Proof. mk_base (KernelSyms.kvminit + 0xc) (mword_of_int 0x00009797 : mword 32)
     (mword_of_int (KernelSyms.kvminit + 0xc) : mword 64) (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_00009797. Qed.
 
-  Lemma kii_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvminit + 0x10) : mword 64) false (STORE (mword_of_int 218 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)).
-  Proof. mk_base (KernelSyms.kvminit + 0x10) (mword_of_int 0x0ca7bd23 : mword 32)
-    (mword_of_int (KernelSyms.kvminit + 0x10) : mword 64) (STORE (mword_of_int 218 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)) kd_0ca7bd23. Qed.
+  Lemma kii_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvminit + 0x10) : mword 64) false (STORE (mword_of_int 266 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)).
+  Proof. mk_base (KernelSyms.kvminit + 0x10) (mword_of_int 0x10a7b523 : mword 32)
+    (mword_of_int (KernelSyms.kvminit + 0x10) : mword 64) (STORE (mword_of_int 266 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)) kd_10a7b523. Qed.
 
   Lemma kii_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvminit + 0x14) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.kvminit + 0x14) (mword_of_int 0x60a2 : mword 16)

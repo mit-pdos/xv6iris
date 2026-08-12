@@ -17,6 +17,7 @@ Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode04.
+Require Import KernelDecode08.
 Require Import KernelDecode09.
 Require Import KernelDecode10.
 Require Import KernelDecode12.
@@ -26,7 +27,6 @@ Require Import KernelDecode15.
 Require Import KernelDecode19.
 Require Import KernelDecode21.
 Require Import KernelDecode23.
-Require Import KernelDecode26.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -61,9 +61,9 @@ Section CodeArgint.
   Proof. mk_rvc (KernelSyms.argint + 0xa) (mword_of_int 0x84ae : mword 16)
     (mword_of_int (KernelSyms.argint + 0xa) : mword 64) (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 9), ADD)) kd_84ae exec_execute_C_MV. Qed.
 
-  Lemma ai_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.argint + 0xc) : mword 64) false (JAL (mword_of_int 2096906 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.argint + 0xc) (mword_of_int 0xf0bff0ef : mword 32)
-    (mword_of_int (KernelSyms.argint + 0xc) : mword 64) (JAL (mword_of_int 2096906 : mword 21, Regidx (mword_of_int 1))) kd_f0bff0ef. Qed.
+  Lemma ai_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.argint + 0xc) : mword 64) false (JAL (mword_of_int 2096904 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.argint + 0xc) (mword_of_int 0xf09ff0ef : mword 32)
+    (mword_of_int (KernelSyms.argint + 0xc) : mword 64) (JAL (mword_of_int 2096904 : mword 21, Regidx (mword_of_int 1))) kd_f09ff0ef. Qed.
 
   Lemma ai_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.argint + 0x10) : mword 64) true (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 4)).
   Proof. mk_rvc (KernelSyms.argint + 0x10) (mword_of_int 0xc088 : mword 16)

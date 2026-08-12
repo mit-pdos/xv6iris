@@ -229,6 +229,22 @@ are working on that effort — the relevant `projects/` file.
   the four categories it deliberately does not cover, and the one open blocker
   (`kernel-defects.md` D2: upstream's new `tx_lock` sleeplock is never
   initialized, so `is_txlock` is unsatisfiable at boot).
+- **[`psz-bump.md`](projects/psz-bump.md)** — updating `XV6_REV` to
+  **`0024d4b`**, whose one real change is that `vmfault` stops conflating the
+  table it is handed with `myproc()->pagetable`: it takes the size as an
+  argument and maps into the table it was given, and `copyin` / `copyout` /
+  `copyinstr` gain a matching `psz` in a1 that shifts every later argument
+  down a register. Read it for **why that DELETES machinery rather than adding
+  it** — `p_sz` / `p_pagetable` (and the `dqs` / `dqp` fractions) were premises
+  of all four contracts only because the vmfault underneath read those cells,
+  and `SpecCopyout`'s whole `co_license` / `co_mapped` / `arm` / `COPYOUT_GEN`
+  apparatus existed solely to work around the conflation, so all of it goes and
+  **kexec's first upstream blocker is retired more cheaply than the workaround
+  was** (pass `psz`; pass `szv := 0` to kill the fault path outright). It also
+  carries the worked-out `ProofVmfault` transformation (48 of 55 offsets
+  reshaped, but it is the same algorithm with three reads deleted and the
+  registers reassigned), and the traps: `make -k` undercounts because files
+  downstream of a failure are never attempted, and data symbols move too.
 - **[`cwd-ref.md`](projects/cwd-ref.md)** — filling the `ProcInv.cwd_ref`
   hole (S5 of the above, promoted to its own file). `cwd_ref` is still `emp`
   while `SpecIdup.v` is now stated over the REAL inode cache, so the tree is

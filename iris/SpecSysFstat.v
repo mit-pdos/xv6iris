@@ -148,7 +148,7 @@ Import Defs.
 Local Open Scope Z_scope.
 
 (* sys_fstat's own frame is 4 slots ([c.addi sp,sp,-32]); below it filestat
-   wants [filestat_stack] = 60, which dominates argfd's 24 and argaddr's 18.
+   wants [filestat_stack] = 62, which dominates argfd's 24 and argaddr's 18.
    Written as an expression so that a change to filestat's budget cannot
    silently leave this one behind. *)
 Definition sys_fstat_stack : nat := (4 + filestat_stack)%nat.

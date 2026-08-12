@@ -23,9 +23,9 @@ Require Import KernelDecode07.
 Require Import KernelDecode11.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
-Require Import KernelDecode21.
 Require Import KernelDecode24.
 Require Import KernelDecode26.
+Require Import KernelDecode30.
 Require Import KernelDecode31.
 Local Open Scope Z_scope.
 Import Defs.
@@ -57,9 +57,9 @@ Section CodeTrapinithart.
   Proof. mk_base (KernelSyms.trapinithart + 0x8) (mword_of_int 0x00003797 : mword 32)
     (mword_of_int (KernelSyms.trapinithart + 0x8) : mword 64) (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_00003797. Qed.
 
-  Lemma tii_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinithart + 0xc) : mword 64) false (ITYPE (mword_of_int 78 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
-  Proof. mk_base (KernelSyms.trapinithart + 0xc) (mword_of_int 0x04e78793 : mword 32)
-    (mword_of_int (KernelSyms.trapinithart + 0xc) : mword 64) (ITYPE (mword_of_int 78 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_04e78793. Qed.
+  Lemma tii_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinithart + 0xc) : mword 64) false (ITYPE (mword_of_int 116 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
+  Proof. mk_base (KernelSyms.trapinithart + 0xc) (mword_of_int 0x07478793 : mword 32)
+    (mword_of_int (KernelSyms.trapinithart + 0xc) : mword 64) (ITYPE (mword_of_int 116 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_07478793. Qed.
 
   Lemma tii_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinithart + 0x10) : mword 64) false (CSRReg (mword_of_int 261 : mword 12, Regidx (mword_of_int 15), zreg, CSRRW)).
   Proof. mk_base (KernelSyms.trapinithart + 0x10) (mword_of_int 0x10579073 : mword 32)

@@ -16,16 +16,15 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelDecode01.
 Require Import KernelDecode04.
 Require Import KernelDecode07.
+Require Import KernelDecode08.
 Require Import KernelDecode09.
 Require Import KernelDecode10.
 Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
-Require Import KernelDecode16.
 Require Import KernelDecode17.
 Require Import KernelDecode19.
 Require Import KernelDecode21.
@@ -97,9 +96,9 @@ Section CodeProcFreepagetable.
   Proof. mk_rvc (KernelSyms.proc_freepagetable + 0x1a) (mword_of_int 0x05b2 : mword 16)
     (mword_of_int (KernelSyms.proc_freepagetable + 0x1a) : mword 64) (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 11), Regidx (mword_of_int 11), SLLI)) kd_05b2 exec_execute_C_SLLI. Qed.
 
-  Lemma pfi_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_freepagetable + 0x1c) : mword 64) false (JAL (mword_of_int 2094916 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.proc_freepagetable + 0x1c) (mword_of_int 0xf44ff0ef : mword 32)
-    (mword_of_int (KernelSyms.proc_freepagetable + 0x1c) : mword 64) (JAL (mword_of_int 2094916 : mword 21, Regidx (mword_of_int 1))) kd_f44ff0ef. Qed.
+  Lemma pfi_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_freepagetable + 0x1c) : mword 64) false (JAL (mword_of_int 2094882 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.proc_freepagetable + 0x1c) (mword_of_int 0xf22ff0ef : mword 32)
+    (mword_of_int (KernelSyms.proc_freepagetable + 0x1c) : mword 64) (JAL (mword_of_int 2094882 : mword 21, Regidx (mword_of_int 1))) kd_f22ff0ef. Qed.
 
   Lemma pfi_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_freepagetable + 0x20) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 13), ADDI)).
   Proof. mk_rvc (KernelSyms.proc_freepagetable + 0x20) (mword_of_int 0x4681 : mword 16)
@@ -125,9 +124,9 @@ Section CodeProcFreepagetable.
   Proof. mk_rvc (KernelSyms.proc_freepagetable + 0x2c) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.proc_freepagetable + 0x2c) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma pfi_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_freepagetable + 0x2e) : mword 64) false (JAL (mword_of_int 2094898 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.proc_freepagetable + 0x2e) (mword_of_int 0xf32ff0ef : mword 32)
-    (mword_of_int (KernelSyms.proc_freepagetable + 0x2e) : mword 64) (JAL (mword_of_int 2094898 : mword 21, Regidx (mword_of_int 1))) kd_f32ff0ef. Qed.
+  Lemma pfi_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_freepagetable + 0x2e) : mword 64) false (JAL (mword_of_int 2094864 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.proc_freepagetable + 0x2e) (mword_of_int 0xf10ff0ef : mword 32)
+    (mword_of_int (KernelSyms.proc_freepagetable + 0x2e) : mword 64) (JAL (mword_of_int 2094864 : mword 21, Regidx (mword_of_int 1))) kd_f10ff0ef. Qed.
 
   Lemma pfi_32 : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_freepagetable + 0x32) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (KernelSyms.proc_freepagetable + 0x32) (mword_of_int 0x85ca : mword 16)
@@ -137,9 +136,9 @@ Section CodeProcFreepagetable.
   Proof. mk_rvc (KernelSyms.proc_freepagetable + 0x34) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.proc_freepagetable + 0x34) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma pfi_36 : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_freepagetable + 0x36) : mword 64) false (JAL (mword_of_int 2095358 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.proc_freepagetable + 0x36) (mword_of_int 0x8ffff0ef : mword 32)
-    (mword_of_int (KernelSyms.proc_freepagetable + 0x36) : mword 64) (JAL (mword_of_int 2095358 : mword 21, Regidx (mword_of_int 1))) kd_8ffff0ef. Qed.
+  Lemma pfi_36 : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_freepagetable + 0x36) : mword 64) false (JAL (mword_of_int 2095324 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.proc_freepagetable + 0x36) (mword_of_int 0x8ddff0ef : mword 32)
+    (mword_of_int (KernelSyms.proc_freepagetable + 0x36) : mword 64) (JAL (mword_of_int 2095324 : mword 21, Regidx (mword_of_int 1))) kd_8ddff0ef. Qed.
 
   Lemma pfi_3a : kernel_text -∗ instr (mword_of_int (KernelSyms.proc_freepagetable + 0x3a) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.proc_freepagetable + 0x3a) (mword_of_int 0x60e2 : mword 16)

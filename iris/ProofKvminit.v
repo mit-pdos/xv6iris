@@ -5,7 +5,7 @@
 
    Structure: a 2-slot frame push (ra/s0 saves), the kvmmake jal, an
    auipc/sd pair writing the returned root byte address into the identity
-   8-byte [kernel_pagetable] cell (@ 0x8000a270), then the frame teardown
+   8-byte [kernel_pagetable] cell (@ 0x8000a2a0), then the frame teardown
    and ret.  The single functor [KvminitProof (KMK : KVMMAKE)] threads
    KMK.wp_kvmmake_sconf's post through verbatim (its budget premise
    [K_kvmmake < nb] forwards unchanged; the callee K = our K - 2). *)
@@ -178,11 +178,11 @@ Section KvminitBody.
     set (A0 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.kvminit + 0x0c) : mword 64) (auipc_off (mword_of_int 9 : mword 20)))]> mr).
     assert (Hp10 : add_vec_int (mword_of_int (KernelSyms.kvminit + 0x0c) : mword 64) 4 = mword_of_int (KernelSyms.kvminit + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp10) in "Hpc".
-    (* +0x10 sd a0,218(a5) : store root byte address into kernel_pagetable *)
-    assert (Haddr : add_vec (A0 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 218 : mword 12)) = mword_of_int KernelSyms.kernel_pagetable).
+    (* +0x10 sd a0,266(a5) : store root byte address into kernel_pagetable *)
+    assert (Haddr : add_vec (A0 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 266 : mword 12)) = mword_of_int KernelSyms.kernel_pagetable).
     { rewrite /A0 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     assert (HA0_10 : A0 !!! Regidx (mword_of_int 10 : mword 5) = mr !!! Regidx (mword_of_int 10)) by (rewrite /A0 upd_ne; [reflexivity | reg_neq]).
-    iApply (wp_sd_s_sconf (mword_of_int (KernelSyms.kvminit + 0x10)) (mword_of_int 10 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 218 : mword 12)
+    iApply (wp_sd_s_sconf (mword_of_int (KernelSyms.kvminit + 0x10)) (mword_of_int 10 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 266 : mword 12)
               A0 (K - 2)%nat kpt0 b with "Hcg Hpc Hi10 [Hcell] [-]").
     { (* the leaf's [pa] is [rget A0 rs1], let-bound outside its own
          [wp_next] -- read at the CALLER's ambient hart (CID7). *)

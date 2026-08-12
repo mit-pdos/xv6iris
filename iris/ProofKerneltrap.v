@@ -103,7 +103,7 @@ Section ProofKerneltrap.
     (* ---- +0x2a: jal devintr ---- *)
     iPoseProof (kti_2a with "Htext") as "Hi2a".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x2a)) ra_idx
-              (mword_of_int 2096730 : mword 21) M (av - 6)%nat false
+              (mword_of_int 2096728 : mword 21) M (av - 6)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi2a [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -112,7 +112,7 @@ Section ProofKerneltrap.
     change (<[Regidx ra_idx := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.kerneltrap + 0x2a) : mword 64) 4)]> M) with D0.
     assert (Hpcdi : add_vec (mword_of_int (KernelSyms.kerneltrap + 0x2a) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2096730 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2096728 : mword 21))
                     = mword_of_int KernelSyms.devintr) by pcw.
     iEval (rewrite Hpcdi) in "Hpc".
     assert (HD0ra : D0 !!! Regidx ra_idx
@@ -212,7 +212,7 @@ Section ProofKerneltrap.
       (* ---- +0x86: jal myproc ---- *)
       iPoseProof (kti_86 with "Htext") as "Hi86".
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x86)) ra_idx
-                (mword_of_int 2093504 : mword 21) D1 (av - 6)%nat false
+                (mword_of_int 2093494 : mword 21) D1 (av - 6)%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi86 [-]").
       iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -221,7 +221,7 @@ Section ProofKerneltrap.
       change (<[Regidx ra_idx := regval_into_reg
           (add_vec_int (mword_of_int (KernelSyms.kerneltrap + 0x86) : mword 64) 4)]> D1) with D2.
       assert (Hpcmp : add_vec (mword_of_int (KernelSyms.kerneltrap + 0x86) : mword 64)
-                        (sign_extend' 64 (mword_of_int 2093504 : mword 21))
+                        (sign_extend' 64 (mword_of_int 2093494 : mword 21))
                       = mword_of_int KernelSyms.myproc) by pcw.
       iEval (rewrite Hpcmp) in "Hpc".
       assert (HD2ra : D2 !!! Regidx ra_idx
@@ -324,7 +324,7 @@ Section ProofKerneltrap.
         (* ---- +0x8c: jal yield ---- *)
         iPoseProof (kti_8c with "Htext") as "Hi8c".
         iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x8c)) ra_idx
-                  (mword_of_int 2095000 : mword 21) mmp (av - 6)%nat false
+                  (mword_of_int 2094990 : mword 21) mmp (av - 6)%nat false
                   ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi8c [-]").
         iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -333,7 +333,7 @@ Section ProofKerneltrap.
         change (<[Regidx ra_idx := regval_into_reg
             (add_vec_int (mword_of_int (KernelSyms.kerneltrap + 0x8c) : mword 64) 4)]> mmp) with Y0.
         assert (Hpcyd : add_vec (mword_of_int (KernelSyms.kerneltrap + 0x8c) : mword 64)
-                          (sign_extend' 64 (mword_of_int 2095000 : mword 21))
+                          (sign_extend' 64 (mword_of_int 2094990 : mword 21))
                         = mword_of_int KernelSyms.yield) by pcw.
         iEval (rewrite Hpcyd) in "Hpc".
         assert (HY0ra : Y0 !!! Regidx ra_idx

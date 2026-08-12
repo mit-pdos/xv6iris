@@ -2,11 +2,12 @@
    its proof.  Requires only the definitional layer -- never a whole-function
    proof file -- so every function proof can be checked in parallel.
 
-     int copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len) {
+     int copyin(pagetable_t pagetable, uint64 psz, char *dst, uint64 srcva,
+                uint64 len) {
        while (len > 0) {
          va0 = PGROUNDDOWN(srcva);
          pa0 = walkaddr(pagetable, va0);
-         if (pa0 == 0 && (pa0 = vmfault(pagetable, va0, 1)) == 0) return -1;
+         if (pa0 == 0 && (pa0 = vmfault(pagetable, psz, va0, 1)) == 0) return -1;
          n = PGSIZE - (srcva - va0);  if (n > len) n = len;
          memmove(dst, (void * )(pa0 + (srcva - va0)), n);
          len -= n; dst += n; srcva = va0 + PGSIZE;
@@ -18,9 +19,9 @@
    valid-user-page-table predicate of the table it reads through, and -- as
    it may fault pages in on the way -- hands back a descriptor EXTENDING the
    one it was given ([uptd_ext_sz szv]: same root, same trapframe, a user map
-   that only gained entries, and every entry it gained BELOW [p->sz]).  The
+   that only gained entries, and every entry it gained BELOW [szv]).  The
    size bound is not extra work: vmfault backs a page only after ruling out
-   [va >= p->sz], so the fact is already in the loop; stating it is what lets
+   [va >= psz], so the fact is already in the loop; stating it is what lets
    a [proc_priv] caller rebuild its block (ProcInv.proc_priv_copy), which a
    bare [uptd_ext] cannot.  Both exits, 0 and -1, deliver that; a run that
    gives up part-way has still copied a prefix and still faulted in whatever
@@ -38,7 +39,22 @@
    what it read must validate the bytes itself.
 
    The kalloc tier and [cpu_own] are threaded through only because vmfault
-   needs them; copyin allocates nothing of its own. *)
+   needs them; copyin allocates nothing of its own.
+
+   *** THE SIZE IS AN ARGUMENT NOW, AND THE TWO PROC CELLS ARE GONE. ***
+   xv6 `4f2fc8b` gave copyin a [psz] parameter (a1, shifting dst/srcva/len
+   down to a2/a3/a4) and made the vmfault beneath it honest: it bounds
+   against the [psz] handed in rather than `myproc()->sz`, and maps into the
+   [pagetable] handed in rather than `myproc()->pagetable` (SpecVmfault.v).
+   copyin therefore touches NEITHER proc cell, so [p_sz p ↦₈{dqs} szv] and
+   [p_pagetable p ↦₈{dqp} …] are gone, and with them the [dqs]/[dqp]
+   parameters.  [szv] is simply the a1 register value.
+
+   That is not bookkeeping: [p_pagetable p ↦ page_base P.(ud_root)] was the
+   unstated claim "the table you are reading through IS the running
+   process's".  It was true of every caller, and it is why the contract could
+   not be used on a table built but not yet installed.  It is no longer
+   claimed, because it is no longer true of the code. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -66,18 +82,23 @@ Import Defs.
 Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
     (P : uptd) (szv : mword 64) (len : nat) (dst_olds : nat -> bv 8)
-    (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (dqs dqp : dfrac) (b : bool) :=
+    (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.copyin in
-  let dst := mm !!! Regidx (mword_of_int 11) in
+  (* a0 = pagetable, a1 = psz, a2 = dst, a3 = srcva, a4 = len *)
+  let dst := mm !!! Regidx (mword_of_int 12) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (* 12-slot frame + vmfault's 38 (walkaddr needs 10, memmove 2) *)
   (50 <= K)%nat ->
-  (* the pagetable argument is the table [proc_pt P] describes -- the same
-     table [p->pagetable] holds, which is what vmfault will map into *)
+  (* the pagetable argument is the table [proc_pt P] describes -- and that is
+     now the WHOLE requirement.  It used to have to be [p->pagetable] as
+     well, because the vmfault beneath mapped there regardless; it does not
+     any more (SpecVmfault.v). *)
   mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
-  mm !!! Regidx (mword_of_int 13) = (mword_of_int (Z.of_nat len) : mword 64) ->
+  (* the size argument, in a1 *)
+  mm !!! Regidx (mword_of_int 11) = szv ->
+  mm !!! Regidx (mword_of_int 14) = (mword_of_int (Z.of_nat len) : mword 64) ->
   (Z.of_nat len < 2 ^ 64)%Z ->
-  (* p->sz respects MAXVA (vmfault's premise) *)
+  (* it respects MAXVA (vmfault's premise) *)
   (uint szv <= 2 ^ 38)%Z ->
   (* vmfault's kalloc keeps its transient noff increment in int range;
      [lvl] is otherwise generic (usertrap calls at 0, the pipe loops at 1) *)
@@ -86,8 +107,6 @@ Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   cpu_own lvl eb p C b -∗
   kernel_text -∗
   pc_is pcE -∗
-  p_sz p ↦₈{dqs} szv -∗
-  p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
   proc_pt P -∗
   kalloc_env γa None -∗
   ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ dst_olds j) -∗
@@ -96,8 +115,6 @@ Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
     sie_cap_gpr mr K b p -∗
     cpu_own lvl eb p C b -∗
     pc_is ret_tgt -∗
-    p_sz p ↦₈{dqs} szv -∗
-    p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
     proc_pt P' -∗
     ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ dst_new j) -∗
     ⌜callee_saved mm mr⌝ -∗
@@ -112,6 +129,6 @@ Module Type COPYIN.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (dst_olds : nat -> bv 8)
-      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (dqs dqp : dfrac) (b : bool),
-      wp_copyin_sconf_body γa mm P szv len dst_olds K lvl eb p C dqs dqp b.
+      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool),
+      wp_copyin_sconf_body γa mm P szv len dst_olds K lvl eb p C b.
 End COPYIN.

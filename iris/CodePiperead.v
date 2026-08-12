@@ -20,7 +20,7 @@ Require Import KernelDecode00.
 Require Import KernelDecode01.
 Require Import KernelDecode02.
 Require Import KernelDecode03.
-Require Import KernelDecode04.
+Require Import KernelDecode05.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
 Require Import KernelDecode08.
@@ -55,7 +55,7 @@ Section CodePiperead.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* ---- piperead @ KernelSyms.piperead, 256 bytes ---- *)
+  (* ---- piperead @ KernelSyms.piperead, 260 bytes ---- *)
 
   Lemma pri_00 : kernel_text -∗ instr (mword_of_int KernelSyms.piperead : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 58 : mword 6), sp, sp, ADDI)).
   Proof. mk_rvc KernelSyms.piperead (mword_of_int 0x711d : mword 16)
@@ -97,29 +97,29 @@ Section CodePiperead.
   Proof. mk_rvc (KernelSyms.piperead + 0x12) (mword_of_int 0x84aa : mword 16)
     (mword_of_int (KernelSyms.piperead + 0x12) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) kd_84aa exec_execute_C_MV. Qed.
 
-  Lemma pri_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x14) : mword 64) true (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 18), ADD)).
-  Proof. mk_rvc (KernelSyms.piperead + 0x14) (mword_of_int 0x892e : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0x14) : mword 64) (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 18), ADD)) kd_892e exec_execute_C_MV. Qed.
+  Lemma pri_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x14) : mword 64) true (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 19), ADD)).
+  Proof. mk_rvc (KernelSyms.piperead + 0x14) (mword_of_int 0x89ae : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0x14) : mword 64) (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 19), ADD)) kd_89ae exec_execute_C_MV. Qed.
 
   Lemma pri_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x16) : mword 64) true (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 21), ADD)).
   Proof. mk_rvc (KernelSyms.piperead + 0x16) (mword_of_int 0x8ab2 : mword 16)
     (mword_of_int (KernelSyms.piperead + 0x16) : mword 64) (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 21), ADD)) kd_8ab2 exec_execute_C_MV. Qed.
 
-  Lemma pri_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x18) : mword 64) false (JAL (mword_of_int 2085586 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.piperead + 0x18) (mword_of_int 0xad2fd0ef : mword 32)
-    (mword_of_int (KernelSyms.piperead + 0x18) : mword 64) (JAL (mword_of_int 2085586 : mword 21, Regidx (mword_of_int 1))) kd_ad2fd0ef. Qed.
+  Lemma pri_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x18) : mword 64) false (JAL (mword_of_int 2085548 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.piperead + 0x18) (mword_of_int 0xaacfd0ef : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0x18) : mword 64) (JAL (mword_of_int 2085548 : mword 21, Regidx (mword_of_int 1))) kd_aacfd0ef. Qed.
 
-  Lemma pri_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x1c) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 20), ADD)).
-  Proof. mk_rvc (KernelSyms.piperead + 0x1c) (mword_of_int 0x8a2a : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0x1c) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 20), ADD)) kd_8a2a exec_execute_C_MV. Qed.
+  Lemma pri_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x1c) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)).
+  Proof. mk_rvc (KernelSyms.piperead + 0x1c) (mword_of_int 0x892a : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0x1c) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)) kd_892a exec_execute_C_MV. Qed.
 
   Lemma pri_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x1e) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.piperead + 0x1e) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.piperead + 0x1e) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma pri_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x20) : mword 64) false (JAL (mword_of_int 2082252 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.piperead + 0x20) (mword_of_int 0xdccfc0ef : mword 32)
-    (mword_of_int (KernelSyms.piperead + 0x20) : mword 64) (JAL (mword_of_int 2082252 : mword 21, Regidx (mword_of_int 1))) kd_dccfc0ef. Qed.
+  Lemma pri_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x20) : mword 64) false (JAL (mword_of_int 2082180 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.piperead + 0x20) (mword_of_int 0xd84fc0ef : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0x20) : mword 64) (JAL (mword_of_int 2082180 : mword 21, Regidx (mword_of_int 1))) kd_d84fc0ef. Qed.
 
   Lemma pri_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x24) : mword 64) false (LOAD (mword_of_int 536 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 14), false, 4)).
   Proof. mk_base (KernelSyms.piperead + 0x24) (mword_of_int 0x2184a703 : mword 32)
@@ -129,9 +129,9 @@ Section CodePiperead.
   Proof. mk_base (KernelSyms.piperead + 0x28) (mword_of_int 0x21c4a783 : mword 32)
     (mword_of_int (KernelSyms.piperead + 0x28) : mword 64) (LOAD (mword_of_int 540 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) kd_21c4a783. Qed.
 
-  Lemma pri_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x2c) : mword 64) false (ITYPE (mword_of_int 536 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 19), ADDI)).
-  Proof. mk_base (KernelSyms.piperead + 0x2c) (mword_of_int 0x21848993 : mword 32)
-    (mword_of_int (KernelSyms.piperead + 0x2c) : mword 64) (ITYPE (mword_of_int 536 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 19), ADDI)) kd_21848993. Qed.
+  Lemma pri_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x2c) : mword 64) false (ITYPE (mword_of_int 536 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 20), ADDI)).
+  Proof. mk_base (KernelSyms.piperead + 0x2c) (mword_of_int 0x21848a13 : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0x2c) : mword 64) (ITYPE (mword_of_int 536 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 20), ADDI)) kd_21848a13. Qed.
 
   Lemma pri_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x30) : mword 64) false (BTYPE (mword_of_int 60 : mword 13, Regidx (mword_of_int 15), Regidx (mword_of_int 14), BNE)).
   Proof. mk_base (KernelSyms.piperead + 0x30) (mword_of_int 0x02f71e63 : mword 32)
@@ -145,45 +145,45 @@ Section CodePiperead.
   Proof. mk_rvc (KernelSyms.piperead + 0x38) (mword_of_int 0xc3b9 : mword 16)
     (mword_of_int (KernelSyms.piperead + 0x38) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 35 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) kd_c3b9 exec_execute_C_BEQZ. Qed.
 
-  Lemma pri_3a : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x3a) : mword 64) true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)).
-  Proof. mk_rvc (KernelSyms.piperead + 0x3a) (mword_of_int 0x8552 : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0x3a) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)) kd_8552 exec_execute_C_MV. Qed.
+  Lemma pri_3a : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x3a) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)).
+  Proof. mk_rvc (KernelSyms.piperead + 0x3a) (mword_of_int 0x854a : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0x3a) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)) kd_854a exec_execute_C_MV. Qed.
 
-  Lemma pri_3c : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x3c) : mword 64) false (JAL (mword_of_int 2087696 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.piperead + 0x3c) (mword_of_int 0xb11fd0ef : mword 32)
-    (mword_of_int (KernelSyms.piperead + 0x3c) : mword 64) (JAL (mword_of_int 2087696 : mword 21, Regidx (mword_of_int 1))) kd_b11fd0ef. Qed.
+  Lemma pri_3c : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x3c) : mword 64) false (JAL (mword_of_int 2087658 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.piperead + 0x3c) (mword_of_int 0xaebfd0ef : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0x3c) : mword 64) (JAL (mword_of_int 2087658 : mword 21, Regidx (mword_of_int 1))) kd_aebfd0ef. Qed.
 
   Lemma pri_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x40) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 26 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BNE)).
   Proof. mk_rvc (KernelSyms.piperead + 0x40) (mword_of_int 0xe915 : mword 16)
     (mword_of_int (KernelSyms.piperead + 0x40) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 26 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BNE)) kd_e915 exec_execute_C_BNEZ. Qed.
 
-  Lemma pri_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x42) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 10), ADD)).
-  Proof. mk_rvc (KernelSyms.piperead + 0x42) (mword_of_int 0x854e : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0x42) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 10), ADD)) kd_854e exec_execute_C_MV. Qed.
+  Lemma pri_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x42) : mword 64) true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)).
+  Proof. mk_rvc (KernelSyms.piperead + 0x42) (mword_of_int 0x8552 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0x42) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)) kd_8552 exec_execute_C_MV. Qed.
 
-  Lemma pri_44 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x44) : mword 64) false (JAL (mword_of_int 2087088 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.piperead + 0x44) (mword_of_int 0x8b1fd0ef : mword 32)
-    (mword_of_int (KernelSyms.piperead + 0x44) : mword 64) (JAL (mword_of_int 2087088 : mword 21, Regidx (mword_of_int 1))) kd_8b1fd0ef. Qed.
+  Lemma pri_44 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x44) : mword 64) false (JAL (mword_of_int 2087050 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.piperead + 0x44) (mword_of_int 0x88bfd0ef : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0x44) : mword 64) (JAL (mword_of_int 2087050 : mword 21, Regidx (mword_of_int 1))) kd_88bfd0ef. Qed.
 
   Lemma pri_48 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x48) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.piperead + 0x48) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.piperead + 0x48) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma pri_4a : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x4a) : mword 64) false (JAL (mword_of_int 2082346 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.piperead + 0x4a) (mword_of_int 0xe2afc0ef : mword 32)
-    (mword_of_int (KernelSyms.piperead + 0x4a) : mword 64) (JAL (mword_of_int 2082346 : mword 21, Regidx (mword_of_int 1))) kd_e2afc0ef. Qed.
+  Lemma pri_4a : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x4a) : mword 64) false (JAL (mword_of_int 2082274 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.piperead + 0x4a) (mword_of_int 0xde2fc0ef : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0x4a) : mword 64) (JAL (mword_of_int 2082274 : mword 21, Regidx (mword_of_int 1))) kd_de2fc0ef. Qed.
 
-  Lemma pri_4e : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x4e) : mword 64) false (JAL (mword_of_int 2087138 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.piperead + 0x4e) (mword_of_int 0x8e3fd0ef : mword 32)
-    (mword_of_int (KernelSyms.piperead + 0x4e) : mword 64) (JAL (mword_of_int 2087138 : mword 21, Regidx (mword_of_int 1))) kd_8e3fd0ef. Qed.
+  Lemma pri_4e : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x4e) : mword 64) false (JAL (mword_of_int 2087100 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.piperead + 0x4e) (mword_of_int 0x8bdfd0ef : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0x4e) : mword 64) (JAL (mword_of_int 2087100 : mword 21, Regidx (mword_of_int 1))) kd_8bdfd0ef. Qed.
 
   Lemma pri_52 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x52) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.piperead + 0x52) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.piperead + 0x52) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma pri_54 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x54) : mword 64) false (JAL (mword_of_int 2082200 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.piperead + 0x54) (mword_of_int 0xd98fc0ef : mword 32)
-    (mword_of_int (KernelSyms.piperead + 0x54) : mword 64) (JAL (mword_of_int 2082200 : mword 21, Regidx (mword_of_int 1))) kd_d98fc0ef. Qed.
+  Lemma pri_54 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x54) : mword 64) false (JAL (mword_of_int 2082128 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.piperead + 0x54) (mword_of_int 0xd50fc0ef : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0x54) : mword 64) (JAL (mword_of_int 2082128 : mword 21, Regidx (mword_of_int 1))) kd_d50fc0ef. Qed.
 
   Lemma pri_58 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x58) : mword 64) false (LOAD (mword_of_int 536 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 14), false, 4)).
   Proof. mk_base (KernelSyms.piperead + 0x58) (mword_of_int 0x2184a703 : mword 32)
@@ -233,17 +233,17 @@ Section CodePiperead.
   Proof. mk_rvc (KernelSyms.piperead + 0x74) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.piperead + 0x74) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma pri_76 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x76) : mword 64) false (JAL (mword_of_int 2082302 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.piperead + 0x76) (mword_of_int 0xdfefc0ef : mword 32)
-    (mword_of_int (KernelSyms.piperead + 0x76) : mword 64) (JAL (mword_of_int 2082302 : mword 21, Regidx (mword_of_int 1))) kd_dfefc0ef. Qed.
+  Lemma pri_76 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x76) : mword 64) false (JAL (mword_of_int 2082230 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.piperead + 0x76) (mword_of_int 0xdb6fc0ef : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0x76) : mword 64) (JAL (mword_of_int 2082230 : mword 21, Regidx (mword_of_int 1))) kd_db6fc0ef. Qed.
 
-  Lemma pri_7a : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x7a) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 19), ADDI)).
-  Proof. mk_rvc (KernelSyms.piperead + 0x7a) (mword_of_int 0x59fd : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0x7a) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 19), ADDI)) kd_59fd exec_execute_C_LI. Qed.
+  Lemma pri_7a : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x7a) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 20), ADDI)).
+  Proof. mk_rvc (KernelSyms.piperead + 0x7a) (mword_of_int 0x5a7d : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0x7a) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 20), ADDI)) kd_5a7d exec_execute_C_LI. Qed.
 
-  Lemma pri_7c : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x7c) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 52 : mword 11) ('b"0")), zreg)).
-  Proof. mk_rvc (KernelSyms.piperead + 0x7c) (mword_of_int 0xa0a5 : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0x7c) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 52 : mword 11) ('b"0")), zreg)) kd_a0a5 exec_execute_C_J. Qed.
+  Lemma pri_7c : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x7c) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 54 : mword 11) ('b"0")), zreg)).
+  Proof. mk_rvc (KernelSyms.piperead + 0x7c) (mword_of_int 0xa0b5 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0x7c) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 54 : mword 11) ('b"0")), zreg)) kd_a0b5 exec_execute_C_J. Qed.
 
   Lemma pri_7e : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x7e) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), Regidx (mword_of_int 22), sp, 8)).
   Proof. mk_rvc (KernelSyms.piperead + 0x7e) (mword_of_int 0xf05a : mword 16)
@@ -257,9 +257,9 @@ Section CodePiperead.
   Proof. mk_rvc (KernelSyms.piperead + 0x82) (mword_of_int 0xe862 : mword 16)
     (mword_of_int (KernelSyms.piperead + 0x82) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 24), sp, 8)) kd_e862 exec_execute_C_SDSP. Qed.
 
-  Lemma pri_84 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x84) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 19), ADDI)).
-  Proof. mk_rvc (KernelSyms.piperead + 0x84) (mword_of_int 0x4981 : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0x84) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 19), ADDI)) kd_4981 exec_execute_C_LI. Qed.
+  Lemma pri_84 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x84) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 20), ADDI)).
+  Proof. mk_rvc (KernelSyms.piperead + 0x84) (mword_of_int 0x4a01 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0x84) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 20), ADDI)) kd_4a01 exec_execute_C_LI. Qed.
 
   Lemma pri_86 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x86) : mword 64) false (ITYPE (mword_of_int 4015 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 24), ADDI)).
   Proof. mk_base (KernelSyms.piperead + 0x86) (mword_of_int 0xfaf40c13 : mword 32)
@@ -273,9 +273,9 @@ Section CodePiperead.
   Proof. mk_rvc (KernelSyms.piperead + 0x8c) (mword_of_int 0x5b7d : mword 16)
     (mword_of_int (KernelSyms.piperead + 0x8c) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 22), ADDI)) kd_5b7d exec_execute_C_LI. Qed.
 
-  Lemma pri_8e : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x8e) : mword 64) false (BTYPE (mword_of_int 66 : mword 13, Regidx (mword_of_int 21), zreg, BGE)).
-  Proof. mk_base (KernelSyms.piperead + 0x8e) (mword_of_int 0x05505163 : mword 32)
-    (mword_of_int (KernelSyms.piperead + 0x8e) : mword 64) (BTYPE (mword_of_int 66 : mword 13, Regidx (mword_of_int 21), zreg, BGE)) kd_05505163. Qed.
+  Lemma pri_8e : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x8e) : mword 64) false (BTYPE (mword_of_int 70 : mword 13, Regidx (mword_of_int 21), zreg, BGE)).
+  Proof. mk_base (KernelSyms.piperead + 0x8e) (mword_of_int 0x05505363 : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0x8e) : mword 64) (BTYPE (mword_of_int 70 : mword 13, Regidx (mword_of_int 21), zreg, BGE)) kd_05505363. Qed.
 
   Lemma pri_92 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x92) : mword 64) false (LOAD (mword_of_int 536 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_base (KernelSyms.piperead + 0x92) (mword_of_int 0x2184a783 : mword 32)
@@ -285,9 +285,9 @@ Section CodePiperead.
   Proof. mk_base (KernelSyms.piperead + 0x96) (mword_of_int 0x21c4a703 : mword 32)
     (mword_of_int (KernelSyms.piperead + 0x96) : mword 64) (LOAD (mword_of_int 540 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 14), false, 4)) kd_21c4a703. Qed.
 
-  Lemma pri_9a : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x9a) : mword 64) false (BTYPE (mword_of_int 54 : mword 13, Regidx (mword_of_int 15), Regidx (mword_of_int 14), BEQ)).
-  Proof. mk_base (KernelSyms.piperead + 0x9a) (mword_of_int 0x02f70b63 : mword 32)
-    (mword_of_int (KernelSyms.piperead + 0x9a) : mword 64) (BTYPE (mword_of_int 54 : mword 13, Regidx (mword_of_int 15), Regidx (mword_of_int 14), BEQ)) kd_02f70b63. Qed.
+  Lemma pri_9a : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x9a) : mword 64) false (BTYPE (mword_of_int 58 : mword 13, Regidx (mword_of_int 15), Regidx (mword_of_int 14), BEQ)).
+  Proof. mk_base (KernelSyms.piperead + 0x9a) (mword_of_int 0x02f70d63 : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0x9a) : mword 64) (BTYPE (mword_of_int 58 : mword 13, Regidx (mword_of_int 15), Regidx (mword_of_int 14), BEQ)) kd_02f70d63. Qed.
 
   Lemma pri_9e : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x9e) : mword 64) false (ITYPE (mword_of_int 511 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)).
   Proof. mk_base (KernelSyms.piperead + 0x9e) (mword_of_int 0x1ff7f793 : mword 32)
@@ -305,132 +305,136 @@ Section CodePiperead.
   Proof. mk_base (KernelSyms.piperead + 0xa8) (mword_of_int 0xfaf407a3 : mword 32)
     (mword_of_int (KernelSyms.piperead + 0xa8) : mword 64) (STORE (mword_of_int 4015 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 8), 1)) kd_faf407a3. Qed.
 
-  Lemma pri_ac : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xac) : mword 64) true (RTYPE (Regidx (mword_of_int 23), zreg, Regidx (mword_of_int 13), ADD)).
-  Proof. mk_rvc (KernelSyms.piperead + 0xac) (mword_of_int 0x86de : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xac) : mword 64) (RTYPE (Regidx (mword_of_int 23), zreg, Regidx (mword_of_int 13), ADD)) kd_86de exec_execute_C_MV. Qed.
+  Lemma pri_ac : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xac) : mword 64) true (RTYPE (Regidx (mword_of_int 23), zreg, Regidx (mword_of_int 14), ADD)).
+  Proof. mk_rvc (KernelSyms.piperead + 0xac) (mword_of_int 0x875e : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0xac) : mword 64) (RTYPE (Regidx (mword_of_int 23), zreg, Regidx (mword_of_int 14), ADD)) kd_875e exec_execute_C_MV. Qed.
 
-  Lemma pri_ae : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xae) : mword 64) true (RTYPE (Regidx (mword_of_int 24), zreg, Regidx (mword_of_int 12), ADD)).
-  Proof. mk_rvc (KernelSyms.piperead + 0xae) (mword_of_int 0x8662 : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xae) : mword 64) (RTYPE (Regidx (mword_of_int 24), zreg, Regidx (mword_of_int 12), ADD)) kd_8662 exec_execute_C_MV. Qed.
+  Lemma pri_ae : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xae) : mword 64) true (RTYPE (Regidx (mword_of_int 24), zreg, Regidx (mword_of_int 13), ADD)).
+  Proof. mk_rvc (KernelSyms.piperead + 0xae) (mword_of_int 0x86e2 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0xae) : mword 64) (RTYPE (Regidx (mword_of_int 24), zreg, Regidx (mword_of_int 13), ADD)) kd_86e2 exec_execute_C_MV. Qed.
 
-  Lemma pri_b0 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xb0) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 11), ADD)).
-  Proof. mk_rvc (KernelSyms.piperead + 0xb0) (mword_of_int 0x85ca : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xb0) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 11), ADD)) kd_85ca exec_execute_C_MV. Qed.
+  Lemma pri_b0 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xb0) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)).
+  Proof. mk_rvc (KernelSyms.piperead + 0xb0) (mword_of_int 0x864e : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0xb0) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)) kd_864e exec_execute_C_MV. Qed.
 
-  Lemma pri_b2 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xb2) : mword 64) false (LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 10), false, 8)).
-  Proof. mk_base (KernelSyms.piperead + 0xb2) (mword_of_int 0x050a3503 : mword 32)
-    (mword_of_int (KernelSyms.piperead + 0xb2) : mword 64) (LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 10), false, 8)) kd_050a3503. Qed.
+  Lemma pri_b2 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xb2) : mword 64) false (LOAD (mword_of_int 72 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 11), false, 8)).
+  Proof. mk_base (KernelSyms.piperead + 0xb2) (mword_of_int 0x04893583 : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0xb2) : mword 64) (LOAD (mword_of_int 72 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 11), false, 8)) kd_04893583. Qed.
 
-  Lemma pri_b6 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xb6) : mword 64) false (JAL (mword_of_int 2084692 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.piperead + 0xb6) (mword_of_int 0xf55fc0ef : mword 32)
-    (mword_of_int (KernelSyms.piperead + 0xb6) : mword 64) (JAL (mword_of_int 2084692 : mword 21, Regidx (mword_of_int 1))) kd_f55fc0ef. Qed.
+  Lemma pri_b6 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xb6) : mword 64) false (LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 10), false, 8)).
+  Proof. mk_base (KernelSyms.piperead + 0xb6) (mword_of_int 0x05093503 : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0xb6) : mword 64) (LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 10), false, 8)) kd_05093503. Qed.
 
-  Lemma pri_ba : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xba) : mword 64) false (BTYPE (mword_of_int 62 : mword 13, Regidx (mword_of_int 22), Regidx (mword_of_int 10), BEQ)).
-  Proof. mk_base (KernelSyms.piperead + 0xba) (mword_of_int 0x03650f63 : mword 32)
-    (mword_of_int (KernelSyms.piperead + 0xba) : mword 64) (BTYPE (mword_of_int 62 : mword 13, Regidx (mword_of_int 22), Regidx (mword_of_int 10), BEQ)) kd_03650f63. Qed.
+  Lemma pri_ba : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xba) : mword 64) false (JAL (mword_of_int 2084420 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.piperead + 0xba) (mword_of_int 0xe45fc0ef : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0xba) : mword 64) (JAL (mword_of_int 2084420 : mword 21, Regidx (mword_of_int 1))) kd_e45fc0ef. Qed.
 
-  Lemma pri_be : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xbe) : mword 64) false (LOAD (mword_of_int 536 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
-  Proof. mk_base (KernelSyms.piperead + 0xbe) (mword_of_int 0x2184a783 : mword 32)
-    (mword_of_int (KernelSyms.piperead + 0xbe) : mword 64) (LOAD (mword_of_int 536 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) kd_2184a783. Qed.
+  Lemma pri_be : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xbe) : mword 64) false (BTYPE (mword_of_int 62 : mword 13, Regidx (mword_of_int 22), Regidx (mword_of_int 10), BEQ)).
+  Proof. mk_base (KernelSyms.piperead + 0xbe) (mword_of_int 0x03650f63 : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0xbe) : mword 64) (BTYPE (mword_of_int 62 : mword 13, Regidx (mword_of_int 22), Regidx (mword_of_int 10), BEQ)) kd_03650f63. Qed.
 
-  Lemma pri_c2 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xc2) : mword 64) true (ADDIW (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))).
-  Proof. mk_rvc (KernelSyms.piperead + 0xc2) (mword_of_int 0x2785 : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xc2) : mword 64) (ADDIW (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))) kd_2785 exec_execute_C_ADDIW. Qed.
+  Lemma pri_c2 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xc2) : mword 64) false (LOAD (mword_of_int 536 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
+  Proof. mk_base (KernelSyms.piperead + 0xc2) (mword_of_int 0x2184a783 : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0xc2) : mword 64) (LOAD (mword_of_int 536 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) kd_2184a783. Qed.
 
-  Lemma pri_c4 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xc4) : mword 64) false (STORE (mword_of_int 536 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)).
-  Proof. mk_base (KernelSyms.piperead + 0xc4) (mword_of_int 0x20f4ac23 : mword 32)
-    (mword_of_int (KernelSyms.piperead + 0xc4) : mword 64) (STORE (mword_of_int 536 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)) kd_20f4ac23. Qed.
+  Lemma pri_c6 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xc6) : mword 64) true (ADDIW (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))).
+  Proof. mk_rvc (KernelSyms.piperead + 0xc6) (mword_of_int 0x2785 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0xc6) : mword 64) (ADDIW (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))) kd_2785 exec_execute_C_ADDIW. Qed.
 
-  Lemma pri_c8 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xc8) : mword 64) true (ADDIW (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 19), Regidx (mword_of_int 19))).
-  Proof. mk_rvc (KernelSyms.piperead + 0xc8) (mword_of_int 0x2985 : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xc8) : mword 64) (ADDIW (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 19), Regidx (mword_of_int 19))) kd_2985 exec_execute_C_ADDIW. Qed.
+  Lemma pri_c8 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xc8) : mword 64) false (STORE (mword_of_int 536 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)).
+  Proof. mk_base (KernelSyms.piperead + 0xc8) (mword_of_int 0x20f4ac23 : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0xc8) : mword 64) (STORE (mword_of_int 536 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)) kd_20f4ac23. Qed.
 
-  Lemma pri_ca : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xca) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)).
-  Proof. mk_rvc (KernelSyms.piperead + 0xca) (mword_of_int 0x0905 : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xca) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)) kd_0905 exec_execute_C_ADDI. Qed.
+  Lemma pri_cc : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xcc) : mword 64) true (ADDIW (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 20), Regidx (mword_of_int 20))).
+  Proof. mk_rvc (KernelSyms.piperead + 0xcc) (mword_of_int 0x2a05 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0xcc) : mword 64) (ADDIW (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 20), Regidx (mword_of_int 20))) kd_2a05 exec_execute_C_ADDIW. Qed.
 
-  Lemma pri_cc : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xcc) : mword 64) false (BTYPE (mword_of_int 8134 : mword 13, Regidx (mword_of_int 19), Regidx (mword_of_int 21), BNE)).
-  Proof. mk_base (KernelSyms.piperead + 0xcc) (mword_of_int 0xfd3a93e3 : mword 32)
-    (mword_of_int (KernelSyms.piperead + 0xcc) : mword 64) (BTYPE (mword_of_int 8134 : mword 13, Regidx (mword_of_int 19), Regidx (mword_of_int 21), BNE)) kd_fd3a93e3. Qed.
+  Lemma pri_ce : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xce) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)).
+  Proof. mk_rvc (KernelSyms.piperead + 0xce) (mword_of_int 0x0985 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0xce) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)) kd_0985 exec_execute_C_ADDI. Qed.
 
-  Lemma pri_d0 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xd0) : mword 64) false (ITYPE (mword_of_int 540 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.piperead + 0xd0) (mword_of_int 0x21c48513 : mword 32)
-    (mword_of_int (KernelSyms.piperead + 0xd0) : mword 64) (ITYPE (mword_of_int 540 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)) kd_21c48513. Qed.
+  Lemma pri_d0 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xd0) : mword 64) false (BTYPE (mword_of_int 8130 : mword 13, Regidx (mword_of_int 20), Regidx (mword_of_int 21), BNE)).
+  Proof. mk_base (KernelSyms.piperead + 0xd0) (mword_of_int 0xfd4a91e3 : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0xd0) : mword 64) (BTYPE (mword_of_int 8130 : mword 13, Regidx (mword_of_int 20), Regidx (mword_of_int 21), BNE)) kd_fd4a91e3. Qed.
 
-  Lemma pri_d4 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xd4) : mword 64) false (JAL (mword_of_int 2087052 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.piperead + 0xd4) (mword_of_int 0x88dfd0ef : mword 32)
-    (mword_of_int (KernelSyms.piperead + 0xd4) : mword 64) (JAL (mword_of_int 2087052 : mword 21, Regidx (mword_of_int 1))) kd_88dfd0ef. Qed.
+  Lemma pri_d4 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xd4) : mword 64) false (ITYPE (mword_of_int 540 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.piperead + 0xd4) (mword_of_int 0x21c48513 : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0xd4) : mword 64) (ITYPE (mword_of_int 540 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)) kd_21c48513. Qed.
 
-  Lemma pri_d8 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xd8) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
-  Proof. mk_rvc (KernelSyms.piperead + 0xd8) (mword_of_int 0x8526 : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xd8) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
+  Lemma pri_d8 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xd8) : mword 64) false (JAL (mword_of_int 2087010 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.piperead + 0xd8) (mword_of_int 0x863fd0ef : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0xd8) : mword 64) (JAL (mword_of_int 2087010 : mword 21, Regidx (mword_of_int 1))) kd_863fd0ef. Qed.
 
-  Lemma pri_da : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xda) : mword 64) false (JAL (mword_of_int 2082202 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.piperead + 0xda) (mword_of_int 0xd9afc0ef : mword 32)
-    (mword_of_int (KernelSyms.piperead + 0xda) : mword 64) (JAL (mword_of_int 2082202 : mword 21, Regidx (mword_of_int 1))) kd_d9afc0ef. Qed.
+  Lemma pri_dc : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xdc) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
+  Proof. mk_rvc (KernelSyms.piperead + 0xdc) (mword_of_int 0x8526 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0xdc) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma pri_de : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xde) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 22), false, 8)).
-  Proof. mk_rvc (KernelSyms.piperead + 0xde) (mword_of_int 0x7b02 : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xde) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 22), false, 8)) kd_7b02 exec_execute_C_LDSP. Qed.
+  Lemma pri_de : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xde) : mword 64) false (JAL (mword_of_int 2082126 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.piperead + 0xde) (mword_of_int 0xd4efc0ef : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0xde) : mword 64) (JAL (mword_of_int 2082126 : mword 21, Regidx (mword_of_int 1))) kd_d4efc0ef. Qed.
 
-  Lemma pri_e0 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xe0) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 23), false, 8)).
-  Proof. mk_rvc (KernelSyms.piperead + 0xe0) (mword_of_int 0x6be2 : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xe0) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 23), false, 8)) kd_6be2 exec_execute_C_LDSP. Qed.
+  Lemma pri_e2 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xe2) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 22), false, 8)).
+  Proof. mk_rvc (KernelSyms.piperead + 0xe2) (mword_of_int 0x7b02 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0xe2) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 22), false, 8)) kd_7b02 exec_execute_C_LDSP. Qed.
 
-  Lemma pri_e2 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xe2) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 24), false, 8)).
-  Proof. mk_rvc (KernelSyms.piperead + 0xe2) (mword_of_int 0x6c42 : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xe2) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 24), false, 8)) kd_6c42 exec_execute_C_LDSP. Qed.
+  Lemma pri_e4 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xe4) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 23), false, 8)).
+  Proof. mk_rvc (KernelSyms.piperead + 0xe4) (mword_of_int 0x6be2 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0xe4) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 23), false, 8)) kd_6be2 exec_execute_C_LDSP. Qed.
 
-  Lemma pri_e4 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xe4) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 10), ADD)).
-  Proof. mk_rvc (KernelSyms.piperead + 0xe4) (mword_of_int 0x854e : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xe4) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 10), ADD)) kd_854e exec_execute_C_MV. Qed.
+  Lemma pri_e6 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xe6) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 24), false, 8)).
+  Proof. mk_rvc (KernelSyms.piperead + 0xe6) (mword_of_int 0x6c42 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0xe6) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 24), false, 8)) kd_6c42 exec_execute_C_LDSP. Qed.
 
-  Lemma pri_e6 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xe6) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
-  Proof. mk_rvc (KernelSyms.piperead + 0xe6) (mword_of_int 0x60e6 : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xe6) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) kd_60e6 exec_execute_C_LDSP. Qed.
+  Lemma pri_e8 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xe8) : mword 64) true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)).
+  Proof. mk_rvc (KernelSyms.piperead + 0xe8) (mword_of_int 0x8552 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0xe8) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)) kd_8552 exec_execute_C_MV. Qed.
 
-  Lemma pri_e8 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xe8) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
-  Proof. mk_rvc (KernelSyms.piperead + 0xe8) (mword_of_int 0x6446 : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xe8) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) kd_6446 exec_execute_C_LDSP. Qed.
+  Lemma pri_ea : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xea) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
+  Proof. mk_rvc (KernelSyms.piperead + 0xea) (mword_of_int 0x60e6 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0xea) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) kd_60e6 exec_execute_C_LDSP. Qed.
 
-  Lemma pri_ea : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xea) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)).
-  Proof. mk_rvc (KernelSyms.piperead + 0xea) (mword_of_int 0x64a6 : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xea) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)) kd_64a6 exec_execute_C_LDSP. Qed.
+  Lemma pri_ec : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xec) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
+  Proof. mk_rvc (KernelSyms.piperead + 0xec) (mword_of_int 0x6446 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0xec) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) kd_6446 exec_execute_C_LDSP. Qed.
 
-  Lemma pri_ec : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xec) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 8 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)).
-  Proof. mk_rvc (KernelSyms.piperead + 0xec) (mword_of_int 0x6906 : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xec) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 8 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)) kd_6906 exec_execute_C_LDSP. Qed.
+  Lemma pri_ee : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xee) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)).
+  Proof. mk_rvc (KernelSyms.piperead + 0xee) (mword_of_int 0x64a6 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0xee) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)) kd_64a6 exec_execute_C_LDSP. Qed.
 
-  Lemma pri_ee : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xee) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 7 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)).
-  Proof. mk_rvc (KernelSyms.piperead + 0xee) (mword_of_int 0x79e2 : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xee) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 7 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)) kd_79e2 exec_execute_C_LDSP. Qed.
+  Lemma pri_f0 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xf0) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 8 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)).
+  Proof. mk_rvc (KernelSyms.piperead + 0xf0) (mword_of_int 0x6906 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0xf0) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 8 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)) kd_6906 exec_execute_C_LDSP. Qed.
 
-  Lemma pri_f0 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xf0) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 6) ('b"000")), sp, Regidx (mword_of_int 20), false, 8)).
-  Proof. mk_rvc (KernelSyms.piperead + 0xf0) (mword_of_int 0x7a42 : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xf0) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 6) ('b"000")), sp, Regidx (mword_of_int 20), false, 8)) kd_7a42 exec_execute_C_LDSP. Qed.
+  Lemma pri_f2 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xf2) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 7 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)).
+  Proof. mk_rvc (KernelSyms.piperead + 0xf2) (mword_of_int 0x79e2 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0xf2) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 7 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)) kd_79e2 exec_execute_C_LDSP. Qed.
 
-  Lemma pri_f2 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xf2) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 21), false, 8)).
-  Proof. mk_rvc (KernelSyms.piperead + 0xf2) (mword_of_int 0x7aa2 : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xf2) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 21), false, 8)) kd_7aa2 exec_execute_C_LDSP. Qed.
+  Lemma pri_f4 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xf4) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 6) ('b"000")), sp, Regidx (mword_of_int 20), false, 8)).
+  Proof. mk_rvc (KernelSyms.piperead + 0xf4) (mword_of_int 0x7a42 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0xf4) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 6) ('b"000")), sp, Regidx (mword_of_int 20), false, 8)) kd_7a42 exec_execute_C_LDSP. Qed.
 
-  Lemma pri_f4 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xf4) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 6 : mword 6), sp, sp, ADDI)).
-  Proof. mk_rvc (KernelSyms.piperead + 0xf4) (mword_of_int 0x6125 : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xf4) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 6 : mword 6), sp, sp, ADDI)) kd_6125 exec_execute_C_ADDI16SP. Qed.
+  Lemma pri_f6 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xf6) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 21), false, 8)).
+  Proof. mk_rvc (KernelSyms.piperead + 0xf6) (mword_of_int 0x7aa2 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0xf6) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 21), false, 8)) kd_7aa2 exec_execute_C_LDSP. Qed.
 
-  Lemma pri_f6 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xf6) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
-  Proof. mk_rvc (KernelSyms.piperead + 0xf6) (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xf6) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) kd_8082 exec_execute_C_JR. Qed.
+  Lemma pri_f8 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xf8) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 6 : mword 6), sp, sp, ADDI)).
+  Proof. mk_rvc (KernelSyms.piperead + 0xf8) (mword_of_int 0x6125 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0xf8) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 6 : mword 6), sp, sp, ADDI)) kd_6125 exec_execute_C_ADDI16SP. Qed.
 
-  Lemma pri_f8 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xf8) : mword 64) false (BTYPE (mword_of_int 8152 : mword 13, zreg, Regidx (mword_of_int 19), BNE)).
-  Proof. mk_base (KernelSyms.piperead + 0xf8) (mword_of_int 0xfc099ce3 : mword 32)
-    (mword_of_int (KernelSyms.piperead + 0xf8) : mword 64) (BTYPE (mword_of_int 8152 : mword 13, zreg, Regidx (mword_of_int 19), BNE)) kd_fc099ce3. Qed.
+  Lemma pri_fa : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xfa) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
+  Proof. mk_rvc (KernelSyms.piperead + 0xfa) (mword_of_int 0x8082 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0xfa) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) kd_8082 exec_execute_C_JR. Qed.
 
-  Lemma pri_fc : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xfc) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 19), ADD)).
-  Proof. mk_rvc (KernelSyms.piperead + 0xfc) (mword_of_int 0x89aa : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xfc) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 19), ADD)) kd_89aa exec_execute_C_MV. Qed.
+  Lemma pri_fc : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xfc) : mword 64) false (BTYPE (mword_of_int 8152 : mword 13, zreg, Regidx (mword_of_int 20), BNE)).
+  Proof. mk_base (KernelSyms.piperead + 0xfc) (mword_of_int 0xfc0a1ce3 : mword 32)
+    (mword_of_int (KernelSyms.piperead + 0xfc) : mword 64) (BTYPE (mword_of_int 8152 : mword 13, zreg, Regidx (mword_of_int 20), BNE)) kd_fc0a1ce3. Qed.
 
-  Lemma pri_fe : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0xfe) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2025 : mword 11) ('b"0")), zreg)).
-  Proof. mk_rvc (KernelSyms.piperead + 0xfe) (mword_of_int 0xbfc9 : mword 16)
-    (mword_of_int (KernelSyms.piperead + 0xfe) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2025 : mword 11) ('b"0")), zreg)) kd_bfc9 exec_execute_C_J. Qed.
+  Lemma pri_100 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x100) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 20), ADD)).
+  Proof. mk_rvc (KernelSyms.piperead + 0x100) (mword_of_int 0x8a2a : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0x100) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 20), ADD)) kd_8a2a exec_execute_C_MV. Qed.
+
+  Lemma pri_102 : kernel_text -∗ instr (mword_of_int (KernelSyms.piperead + 0x102) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2025 : mword 11) ('b"0")), zreg)).
+  Proof. mk_rvc (KernelSyms.piperead + 0x102) (mword_of_int 0xbfc9 : mword 16)
+    (mword_of_int (KernelSyms.piperead + 0x102) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2025 : mword 11) ('b"0")), zreg)) kd_bfc9 exec_execute_C_J. Qed.
 
 End CodePiperead.

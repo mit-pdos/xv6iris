@@ -281,9 +281,9 @@ Section CodeKvmmake.
   Proof. mk_rvc (KernelSyms.kvmmake + 0x9c) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.kvmmake + 0x9c) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma kmki_9e : kernel_text -∗ instr (mword_of_int (KernelSyms.kvmmake + 0x9e) : mword 64) false (JAL (mword_of_int 1482 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.kvmmake + 0x9e) (mword_of_int 0x5ca000ef : mword 32)
-    (mword_of_int (KernelSyms.kvmmake + 0x9e) : mword 64) (JAL (mword_of_int 1482 : mword 21, Regidx (mword_of_int 1))) kd_5ca000ef. Qed.
+  Lemma kmki_9e : kernel_text -∗ instr (mword_of_int (KernelSyms.kvmmake + 0x9e) : mword 64) false (JAL (mword_of_int 1516 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.kvmmake + 0x9e) (mword_of_int 0x5ec000ef : mword 32)
+    (mword_of_int (KernelSyms.kvmmake + 0x9e) : mword 64) (JAL (mword_of_int 1516 : mword 21, Regidx (mword_of_int 1))) kd_5ec000ef. Qed.
 
   Lemma kmki_a2 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvmmake + 0xa2) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.kvmmake + 0xa2) (mword_of_int 0x8526 : mword 16)

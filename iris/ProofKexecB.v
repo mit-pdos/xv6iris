@@ -1,13 +1,13 @@
 (* ProofKexecB.v -- PHASE B of kexec, FIRST CHUNK: [kexec+0x090] ..
    [kexec+0x0cc] -- proc_pagetable, the seven remaining lazy register spills,
    the [elf.phnum] test and the phdr loop's SETUP -- plus the one [bad:] tail
-   that stretch owns, at +0x318.
+   that stretch owns, at +0x31c.
 
      +0x090  sd   s6,480(sp)         the LAZY spill of s6 -> slot 8
      +0x092  mv   a0,s1              a0 = p
      +0x094  jal  proc_pagetable     -> a0 = the NEW table root, or 0
      +0x098  mv   s6,a0
-     +0x09a  beqz a0, +0x318         failed -> the tail below
+     +0x09a  beqz a0, +0x31c         failed -> the tail below
      +0x09e  sd   s3,504(sp)   } the seven remaining LAZY spills:
      +0x0a0  sd   s5,488(sp)   }   slots 5,7,9,10,11,12,13
      +0x0a2  sd   s7,472(sp)   }   = s3,s5,s7,s8,s9,s10,s11
@@ -27,7 +27,7 @@
      +0x0ca  lui  s5,0x1             s5  = 4096
      +0x0cc  j    +0x12c             into the phdr loop BODY
 
-     [+0x318 tail:]  ld s6,480(sp) ; j +0x64   -- and +0x064 is phase A's
+     [+0x31c tail:]  ld s6,480(sp) ; j +0x64   -- and +0x064 is phase A's
      already-proven [ProofKexecA.KexecAProof.kxc_bad64].  It restores ONLY
      s6 because at that point s6 is the only one of s3..s11 this stretch has
      spilled: the [beqz] at +0x9a is BEFORE the other seven spills.  That is
@@ -38,7 +38,7 @@
    ---- WHAT IS PROVEN HERE ----------------------------------------------
 
    [kxc_b1]: the stretch above, with THREE continuation premises --
-   kexec's own [-1] exit (which the +0x318 tail discharges), the [+0x1a2]
+   kexec's own [-1] exit (which the +0x31c tail discharges), the [+0x1a2]
    fall-out (phnum = 0, skip the loop) and the [+0x12c] fall-through (the
    phdr loop's body entry).  Convention 3 of projects/kexec.md: a block owns
    every exit that reaches the epilogue and its only OUTPUTS are its
@@ -57,7 +57,7 @@
    kexec is precisely the caller that can use it, because it TESTS the result
    against 0 ([beqz a0] at +0x9a) and has a live [bad:] arm for the failure
    -- [ppt_post]'s failure arm hands back [rv = 0] and [kalloc_env ga None],
-   which is the +0x318 tail.  Its success arm joins the [proc_pt] tier with
+   which is the +0x31c tail.  Its success arm joins the [proc_pt] tier with
    [ProcPtOwn.proc_pt_intro_ppt]; the [page_valid (page_base tfp)] that lemma
    asks for is a PROJECTION of the process's own block
    ([ProofKforkParts.proc_priv_tfp_valid]), not a premise on the caller.
@@ -220,7 +220,7 @@ Notation KXB := KernelSyms.kexec (only parsing).
    slot reached is [68 - r] -- given here as [j] with [j + r = 68] so the
    caller's numerals are the two the instruction stream shows.  Eight
    instances below (uimm 60,63,61,59,58,57,56,55 -> slots 8,5,7,9,10,11,12,13)
-   plus the +0x318 reload. *)
+   plus the +0x31c reload. *)
 Lemma kxc_sp_slot (X : mword 64) (j r : nat) (v : mword 64) :
   (j + r = 68)%nat ->
   add_vec (mword_of_int (- (8 * Z.of_nat r)) : mword 64) v = mword_of_int 0 ->
@@ -308,10 +308,22 @@ Qed.
    and mapped as a VALID USER leaf.  It is true of the loop -- uvmalloc maps
    [PGROUNDUP(oldsz), newsz) and the previous iteration left [0, oldsz)
    covered, and [PGROUNDUP(oldsz) >= oldsz] means the two runs abut with no
-   hole -- and phase C is what needs it: [SpecCopyout.co_mapped] demands
-   [pte_vu] over the stack pages, and there is no other way to get it.
-   Stated page-granularly and multiplicatively, in [um_below]'s own shape, so
-   both halves talk to [lia] the same way. *)
+   hole.  Stated page-granularly and multiplicatively, in [um_below]'s own
+   shape, so both halves talk to [lia] the same way.
+
+   *** ITS STATED CONSUMER HAS EVAPORATED, and it is now dead weight. ***
+   This half existed for phase C: [SpecCopyout.co_mapped] demanded [pte_vu]
+   over the stack pages, and there was no other way to get it.  xv6
+   `4f2fc8b` made vmfault take the size as an argument and map into the
+   table it was handed, so copyout no longer needs to know anything about
+   the running process, [co_mapped] and the whole [arm] index are deleted
+   (SpecCopyout.v), and phase C simply passes [psz] in a1.  Nothing reads
+   [kxc_covered] any more except the loop invariant that carries it.
+
+   It is LEFT IN because removing it means reopening a proven loop
+   invariant, which an image bump has no business doing; it costs only the
+   two [kxc_covered_zero] discharges.  Drop it when phase C next touches
+   this invariant for its own reasons. *)
 Definition kxc_covered (szv : mword 64) (um : gmap (mword 27) (mword 64)) : Prop :=
   forall vpn : mword 27,
     (bv_unsigned vpn * 4096 < bv_unsigned szv)%Z ->
@@ -719,7 +731,7 @@ Section KexecBBody.
   Local Ltac nz := vm_compute; discriminate.
 
   (* =================================================================== *)
-  (*  +0x090 .. +0x0cc, PLUS the [bad:] tail at +0x318.                   *)
+  (*  +0x090 .. +0x0cc, PLUS the [bad:] tail at +0x31c.                   *)
   (* =================================================================== *)
   Lemma kxc_b1
       (gs : list gname) (jp : nat) (gl : gname)
@@ -795,7 +807,7 @@ Section KexecBBody.
     ([∗ list] i ∈ seq 0 na,
        [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
     kxc_frameA6 sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) -∗
-    (* ---- kexec's OWN continuation: the +0x318 tail closes the -1 arm ---- *)
+    (* ---- kexec's OWN continuation: the +0x31c tail closes the -1 arm ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
         (entry spv szv' : mword 64),
@@ -888,8 +900,8 @@ Section KexecBBody.
     iPoseProof (kxc_0c6 with "Htext") as "Hi0c6".
     iPoseProof (kxc_0ca with "Htext") as "Hi0ca".
     iPoseProof (kxc_0cc with "Htext") as "Hi0cc".
-    iPoseProof (kxc_318 with "Htext") as "Hi318".
-    iPoseProof (kxc_31a with "Htext") as "Hi31a".
+    iPoseProof (kxc_31c with "Htext") as "Hi31c".
+    iPoseProof (kxc_31e with "Htext") as "Hi31e".
     (* the entry values of the eight callee-saved registers this stretch
        spills, all of them still kexec's own ([HM90thr]) *)
     assert (HM90s3 : M90 !!! Regidx Rs3 = m !!! Regidx Rs3)
@@ -962,10 +974,10 @@ Section KexecBBody.
     iEval (rewrite Hpp094) in "Hpc".
     (* ---- +0x094: jal ra,proc_pagetable ---- *)
     assert (Htpp : add_vec (mword_of_int (KXB + 0x94) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2085452 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2085410 : mword 21))
                    = mword_of_int KernelSyms.proc_pagetable) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXB + 0x94)) Rra
-              (mword_of_int 2085452 : mword 21) G1 (K - 68)%nat true
+              (mword_of_int 2085410 : mword 21) G1 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htpp; vm_compute; reflexivity)
               with "Hcg Hpc Hi094 [-]").
@@ -1092,7 +1104,7 @@ Section KexecBBody.
         unfold neq_vec in Hne. destruct (eq_vec (page_base (ud_root P))
           (zero_reg : mword 64)); [discriminate | reflexivity]. }
       iApply (wp_beqz_x0_fall_s_sconf (mword_of_int (KXB + 0x9a))
-                (mword_of_int 638 : mword 13) Ra0 G3 (K - 68)%nat true
+                (mword_of_int 642 : mword 13) Ra0 G3 (K - 68)%nat true
                 ltac:(nz) Hnzero with "Hcg Hpc Hi09a [-]").
       iIntros (CID6 Hsq6) "Hcg Hpc".
       assert (Hpp09e : add_vec_int (mword_of_int (KXB + 0x9a) : mword 64) 4
@@ -1621,23 +1633,23 @@ Section KexecBBody.
         iSplitL "Hf65"; [iExact "Hf65" |].
         iSplitL "Hf66"; [iExact "Hf66" |].
         iSplitL "Hf67"; [iExact "Hf67" | iExact "Hf68"].
-    - (* ============ FAILURE: the +0x318 tail ============================
+    - (* ============ FAILURE: the +0x31c tail ============================
          [ppt_post]'s failure arm hands back [a0 = 0] and [kalloc_env ga None],
          and nothing was allocated -- so this exit owes nothing but the frame
          and the open inode, which phase A's [kxc_bad64] closes. ---------- *)
       assert (Hzero : eq_vec (rget G3 Ra0) (zero_reg : mword 64) = true).
       { rewrite Hrga0 HG3a0 Hptz. vm_compute; reflexivity. }
-      assert (Htgt318 : add_vec (mword_of_int (KXB + 0x9a) : mword 64)
-                (sign_extend' 64 (mword_of_int 638 : mword 13))
-              = mword_of_int (KXB + 0x318)) by pcw.
+      assert (Htgt31c : add_vec (mword_of_int (KXB + 0x9a) : mword 64)
+                (sign_extend' 64 (mword_of_int 642 : mword 13))
+              = mword_of_int (KXB + 0x31c)) by pcw.
       iApply (wp_beqz_x0_taken_s_sconf (mword_of_int (KXB + 0x9a))
-                (mword_of_int 638 : mword 13) Ra0 G3 (K - 68)%nat true
+                (mword_of_int 642 : mword 13) Ra0 G3 (K - 68)%nat true
                 ltac:(nz) Hzero
-                ltac:(rewrite Htgt318; vm_compute; reflexivity)
+                ltac:(rewrite Htgt31c; vm_compute; reflexivity)
                 with "Hcg Hpc Hi09a [-]").
       iIntros (CID6 Hsq6). iNext. iIntros "Hcg Hpc".
-      iEval (rewrite Htgt318) in "Hpc".
-      (* ---- +0x318: c.ldsp s6,480(sp) -- slot 8 back into s6 ---- *)
+      iEval (rewrite Htgt31c) in "Hpc".
+      (* ---- +0x31c: c.ldsp s6,480(sp) -- slot 8 back into s6 ---- *)
       assert (Hpa8' : add_vec (G3 !!! Regidx csp_rs1)
                         (zero_extend' 64 (concat_vec (mword_of_int 60 : mword 6)
                                                      ('b"000")))
@@ -1645,10 +1657,10 @@ Section KexecBBody.
       { rewrite HG3sp. apply (kxc_sp_slot sp0 8 60 _ ltac:(lia)).
         apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite -Hpa8') in "Hf8".
-      iApply (wp_cldsp_s_sconf (mword_of_int (KXB + 0x318))
+      iApply (wp_cldsp_s_sconf (mword_of_int (KXB + 0x31c))
                 (mword_of_int 60 : mword 6) Rs6 G3 (K - 68)%nat
                 (m !!! Regidx Rs6) true (dqm := DfracOwn 1)
-                ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi318 Hf8 [-]").
+                ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi31c Hf8 [-]").
       iIntros (CID7 Hsq7) "Hcg Hpc Hf8". iEval (rewrite Hpa8') in "Hf8".
       set (B1 := <[Regidx Rs6 := regval_into_reg (m !!! Regidx Rs6)]> G3).
       assert (HB1sp : B1 !!! Regidx csp_rs1 = pa_stk sp0 68)
@@ -1663,21 +1675,21 @@ Section KexecBBody.
         - rewrite /B1 upd_eq. reflexivity.
         - rewrite /B1 upd_ne; [| congruence].
           exact (HG3thr r Hr Nsp Ns0 Ns1 Ns2 Ns4 Ns6). }
-      assert (Hpp31a : add_vec_int (mword_of_int (KXB + 0x318) : mword 64) 2
-                       = mword_of_int (KXB + 0x31a)) by pcw.
-      iEval (rewrite Hpp31a) in "Hpc".
-      (* ---- +0x31a: c.j +0x64 -- into phase A's [bad:] tail ---- *)
-      assert (Htgt64 : add_vec (mword_of_int (KXB + 0x31a) : mword 64)
+      assert (Hpp31e : add_vec_int (mword_of_int (KXB + 0x31c) : mword 64) 2
+                       = mword_of_int (KXB + 0x31e)) by pcw.
+      iEval (rewrite Hpp31e) in "Hpc".
+      (* ---- +0x31e: c.j +0x64 -- into phase A's [bad:] tail ---- *)
+      assert (Htgt64 : add_vec (mword_of_int (KXB + 0x31e) : mword 64)
                 (sign_extend' 64
-                   (sign_extend' 21 (concat_vec (mword_of_int 1701 : mword 11)
+                   (sign_extend' 21 (concat_vec (mword_of_int 1699 : mword 11)
                                                 ('b"0"))))
               = mword_of_int (KXB + 0x64)) by pcw.
-      iApply (wp_cj_s_sconf (mword_of_int (KXB + 0x31a))
-                (sign_extend' 21 (concat_vec (mword_of_int 1701 : mword 11)
+      iApply (wp_cj_s_sconf (mword_of_int (KXB + 0x31e))
+                (sign_extend' 21 (concat_vec (mword_of_int 1699 : mword 11)
                                              ('b"0")))
                 B1 (K - 68)%nat true
                 ltac:(rewrite Htgt64; vm_compute; reflexivity)
-                with "Hcg Hpc Hi31a [-]").
+                with "Hcg Hpc Hi31e [-]").
       iIntros (CID8 Hsq8). iNext. iIntros "Hcg Hpc".
       iEval (rewrite Htgt64) in "Hpc".
       iDestruct ("Hpvbk" with "Htfc") as "Hpriv".

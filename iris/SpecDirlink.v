@@ -183,9 +183,16 @@ Import Defs.
 
 Local Open Scope Z_scope.
 
-(* dirlink's own frame is 80 bytes (10 slots); its deepest callees are
-   dirlookup (82) and writei (70). *)
-Definition K_dirlink : nat := 92%nat.
+(* dirlink's own frame is 80 bytes (10 slots); its deepest callee is
+   dirlookup (84); writei wants 70.
+
+   84, from the copyout chain: [psz] needs a callee-saved home in copyout, so
+   its frame grew to 14 slots and its bound went 50 -> 52 (SpecCopyout.v),
+   pushing either_copyout 56 -> 58, readi 70 -> 72 and dirlookup 82 -> 84.
+   writei is UNAFFECTED and still 70 -- it reaches either_copyIN, whose 56 did
+   not move -- so the two callees are no longer close and dirlookup alone
+   fixes this number. *)
+Definition K_dirlink : nat := 94%nat.
 
 (* writei's [wi_cost off 16] at a 16-aligned [off] (= 7), which dominates
    iput's 3. *)

@@ -703,13 +703,13 @@ Section ProofPrintk.
               with "Hcg Hpc Hi260 [-]").
     iIntros (CID1 Hs1) "Hcg Hpc".
     set (E1 := <[Regidx a5_idx := regval_into_reg (add_vec (mword_of_int (KernelSyms.printk + 0x260) : mword 64) (auipc_off (mword_of_int 10 : mword 20)))]> mc).
-    assert (Hpanaddr : add_vec (rget E1 a5_idx) (sign_extend' 64 (mword_of_int 2810 : mword 12))
+    assert (Hpanaddr : add_vec (rget E1 a5_idx) (sign_extend' 64 (mword_of_int 2858 : mword 12))
                        = (mword_of_int KernelSyms.panicking : mword 64)).
     { rgne. rewrite /E1 upd_eq. unfold regval_into_reg. apply bv_eq; vm_compute; reflexivity. }
     assert (Hp264 : add_vec_int (mword_of_int (KernelSyms.printk + 0x260) : mword 64) 4 = mword_of_int (KernelSyms.printk + 0x264)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp264) in "Hpc".
     iEval (rewrite -Hpanaddr) in "Hpanicking".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.printk + 0x264)) a5_idx a5_idx (mword_of_int 2810 : mword 12)
+    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.printk + 0x264)) a5_idx a5_idx (mword_of_int 2858 : mword 12)
               E1 (K - 24)%nat pv b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi264 Hpanicking [-]").
     iIntros (CID2 Hs2) "Hcg Hpc Hpanicking". iEval (rewrite Hpanaddr) in "Hpanicking".
@@ -1238,13 +1238,13 @@ Section ProofPrintk.
               with "Hcg Hpc Hi1e [-]").
     iIntros (CID1 Hst1) "Hcg Hpc".
     set (Q1 := <[Regidx a5_idx := regval_into_reg (add_vec (mword_of_int (KernelSyms.printk + 0x1e) : mword 64) (auipc_off (mword_of_int 10 : mword 20)))]> mp).
-    assert (Hpan : add_vec (rget Q1 a5_idx) (sign_extend' 64 (mword_of_int 3388 : mword 12))
+    assert (Hpan : add_vec (rget Q1 a5_idx) (sign_extend' 64 (mword_of_int 3436 : mword 12))
                    = (mword_of_int KernelSyms.panicking : mword 64)).
     { rgne. rewrite /Q1 upd_eq. unfold regval_into_reg. apply bv_eq; vm_compute; reflexivity. }
     assert (Hp22 : add_vec_int (mword_of_int (KernelSyms.printk + 0x1e) : mword 64) 4 = mword_of_int (KernelSyms.printk + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp22) in "Hpc".
     iEval (rewrite -Hpan) in "Hpanicking".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.printk + 0x22)) a5_idx a5_idx (mword_of_int 3388 : mword 12)
+    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.printk + 0x22)) a5_idx a5_idx (mword_of_int 3436 : mword 12)
               Q1 (K - 24)%nat pv b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi22 Hpanicking [-]").
     iIntros (CID2 Hst2) "Hcg Hpc Hpanicking". iEval (rewrite Hpan) in "Hpanicking".

@@ -32,16 +32,34 @@
    - Nothing distinguishing the two failure modes.  [-1] means either an
      unmapped page or [max] bytes with no NUL among them.  No caller
      separates them, and copyinstr's contract does not either.
-   - Nothing about [p->sz].  Unlike fetchaddr, fetchstr does NO range test:
-     it hands [addr] straight to copyinstr, whose only defence is walkaddr
-     returning 0.  So [proc_priv]'s [p->sz] never enters.
+   - Nothing about [p->sz].  Unlike fetchaddr, fetchstr does NO range test of
+     its own: it hands [addr] straight to copyinstr.  copyinstr's defences are
+     walkaddr returning 0 and -- now -- vmfault's [va >= psz] test, and the
+     [psz] it passes down is [pv_sz V], read out of the block fetchstr already
+     holds.  So no SIZE PREMISE enters this contract, even though a size now
+     reaches the machine.
 
-   WHY [proc_priv] COMES BACK UNCHANGED.  copyinstr does not fault pages in
-   (it has no vmfault / kalloc tier, see SpecCopyinstr.v), so the descriptor
-   that goes into [ProcInv.proc_priv_copy] is the descriptor that comes out --
-   no [uptd_ext], no [upd_upt] in the postcondition.  fetchstr is therefore
-   the one member of the fetch* family whose contract leaves the process
-   block literally alone.
+   *** [proc_priv] NO LONGER COMES BACK UNCHANGED. ***  It used to: copyinstr
+   did not fault pages in, so the descriptor that went into
+   [ProcInv.proc_priv_copy] was the descriptor that came out, and fetchstr was
+   the one member of the fetch* family whose contract left the process block
+   literally alone.  xv6 `4f2fc8b` gave copyinstr's [pa0 == 0] arm a
+   [vmfault] call (SpecCopyinstr.v), which lifts it to copyin's altitude and
+   takes fetchstr with it:
+
+     - the kalloc tier is threaded through ([!kallocG], [γa],
+       [kalloc_env γa None]) -- fetchstr allocates nothing of its own, it is
+       vmfault underneath that does;
+     - the process comes back with its descriptor EXTENDED, so the
+       postcondition quantifies [P'] under [uptd_ext (pv_upt V) P'] and
+       returns [proc_priv γf p pid (upd_upt V P')].  This is exactly
+       SpecFetchaddr.v's shape, and for exactly its reason;
+     - [fetchstr_stack] went 26 -> 56, because copyinstr's own budget went
+       20 -> 50 and fetchstr's frame is 6 slots (48 bytes).
+
+   The size copyinstr now demands is [pv_sz V], whose [<= 2^38] bound comes
+   from [ProcInv.proc_priv_sz_bound] -- so fetchstr still takes no [szv]
+   parameter and still does NO range test of its own.
 
    [max] IS BOUNDED BY 2^31, not 2^64.  copyinstr would take any [max] below
    2^64, but strlen's answer is a C [int] computed with a [subw]
@@ -65,6 +83,10 @@ Require Import WpNext.
 Require Import WpLock.
 Require Import CpuOwn.
 Require Import ByteBuf.
+Require Import KallocInv.
+Require Import KvmSpec.
+Require Import UserPtTree.
+Require Import ProcPtOwn.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 From Kernel Require KernelSyms.
@@ -74,7 +96,7 @@ Local Open Scope Z_scope.
 
 (* fetchstr's own frame is 6 slots; below it sit myproc's 10, copyinstr's 20
    (its own 10 plus walkaddr's 10) and strlen's 2, so 20 covers every call. *)
-Definition fetchstr_stack : nat := 26%nat.
+Definition fetchstr_stack : nat := 56%nat.
 
 (* fetchstr's answer, keyed by the returned a0 -- and, unlike copyinstr's,
    the success arm names the return value, because that value IS the [k] the
@@ -84,8 +106,8 @@ Definition fetchstr_ret (maxn : nat) (f : nat -> bv 8) (r : mword 64) : Prop :=
                    /\ r = (mword_of_int (Z.of_nat k) : mword 64))
   \/ r = (mword_of_int (-1) : mword 64).
 
-Definition wp_fetchstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γf : gname)
+Definition wp_fetchstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+    (γa : gname) (γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fetchstr in
@@ -100,14 +122,16 @@ Definition wp_fetchstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   cpu_own n eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
+  kalloc_env γa None -∗
   ([∗ list] j ∈ seq 0 maxn, (pa_add buf j) ↦ₘ buf_olds j) -∗
   wp_next b p (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (buf_new : nat -> bv 8),
+    ∀ (mf : regfile) (P' : uptd) (buf_new : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
+      ⌜uptd_ext (pv_upt V) P'⌝ -∗
       sie_cap_gpr mf av b p -∗
       cpu_own n eb p C b -∗
       pc_is ret_tgt -∗
-      proc_priv γf p pid V -∗
+      proc_priv γf p pid (upd_upt V P') -∗
       ([∗ list] j ∈ seq 0 maxn, (pa_add buf j) ↦ₘ buf_new j) -∗
       ⌜fetchstr_ret maxn buf_new (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -115,8 +139,8 @@ Definition wp_fetchstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
 
 Module Type FETCHSTR.
   Parameter wp_fetchstr_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γf : gname) (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+      (γa : gname) (γf : gname) (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool),
-      wp_fetchstr_sconf_body γf m av n eb p C pid V maxn buf_olds b.
+      wp_fetchstr_sconf_body γa γf m av n eb p C pid V maxn buf_olds b.
 End FETCHSTR.

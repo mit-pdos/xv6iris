@@ -999,12 +999,12 @@ Section ProofIupdateMain.
     iEval (rewrite Hpp18) in "Hpc".
     (* ===== +0x18 lw a1,1850(a1) : a1 := sb.inodestart ===== *)
     assert (Hsbadr : add_vec (rget R6 Ra1)
-                       (sign_extend' 64 (mword_of_int 1918 : mword 12))
+                       (sign_extend' 64 (mword_of_int 1920 : mword 12))
                      = sb_inodestart).
     { rgne. rewrite HR6a1. rewrite /sb_inodestart /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hsbadr) in "Hsb".
     iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.iupdate + 0x18)) Ra1 Ra1
-              (mword_of_int 1918 : mword 12) R6 (K - 4)%nat
+              (mword_of_int 1920 : mword 12) R6 (K - 4)%nat
               (mword_of_int inodestart : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi18 Hsb").
     iIntros (CID11 Hq11) "Hcg Hpc Hsb".
@@ -1621,14 +1621,14 @@ Section ProofIupdateMain.
     iEval (rewrite Hpp62) in "Hpc".
     (* ---- +0x62 jal ra,memmove ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iupdate + 0x62)) Rra
-              (mword_of_int 2087780 : mword 21) G2 (K - 4)%nat b
+              (mword_of_int 2087734 : mword 21) G2 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi62").
     iIntros (CID35 Hq35) "Hcg Hpc".
     set (G3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iupdate + 0x62) : mword 64) 4)]> G2).
     assert (Htgtmm : add_vec (mword_of_int (KernelSyms.iupdate + 0x62) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2087780 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2087734 : mword 21))
                      = mword_of_int KernelSyms.memmove) by pcw.
     iEval (rewrite Htgtmm) in "Hpc".
     assert (HG3a0 : G3 !!! Regidx Ra0

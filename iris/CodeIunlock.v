@@ -19,6 +19,7 @@ From Kernel Require KernelSyms.
 Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode07.
+Require Import KernelDecode08.
 Require Import KernelDecode10.
 Require Import KernelDecode11.
 Require Import KernelDecode12.
@@ -28,10 +29,9 @@ Require Import KernelDecode15.
 Require Import KernelDecode17.
 Require Import KernelDecode19.
 Require Import KernelDecode21.
-Require Import KernelDecode24.
 Require Import KernelDecode27.
 Require Import KernelDecode28.
-Require Import KernelDecode31.
+Require Import KernelDecode29.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -134,12 +134,12 @@ Section CodeIunlock.
   Proof. mk_base (KernelSyms.iunlock + 0x34) (mword_of_int 0x00004517 : mword 32)
     (mword_of_int (KernelSyms.iunlock + 0x34) : mword 64) (UTYPE (mword_of_int 4 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00004517. Qed.
 
-  Lemma iui2_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.iunlock + 0x38) : mword 64) false (ITYPE (mword_of_int 436 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.iunlock + 0x38) (mword_of_int 0x1b450513 : mword 32)
-    (mword_of_int (KernelSyms.iunlock + 0x38) : mword 64) (ITYPE (mword_of_int 436 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_1b450513. Qed.
+  Lemma iui2_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.iunlock + 0x38) : mword 64) false (ITYPE (mword_of_int 390 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.iunlock + 0x38) (mword_of_int 0x18650513 : mword 32)
+    (mword_of_int (KernelSyms.iunlock + 0x38) : mword 64) (ITYPE (mword_of_int 390 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_18650513. Qed.
 
-  Lemma iui2_3c : kernel_text -∗ instr (mword_of_int (KernelSyms.iunlock + 0x3c) : mword 64) false (JAL (mword_of_int 2086248 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.iunlock + 0x3c) (mword_of_int 0xd68fd0ef : mword 32)
-    (mword_of_int (KernelSyms.iunlock + 0x3c) : mword 64) (JAL (mword_of_int 2086248 : mword 21, Regidx (mword_of_int 1))) kd_d68fd0ef. Qed.
+  Lemma iui2_3c : kernel_text -∗ instr (mword_of_int (KernelSyms.iunlock + 0x3c) : mword 64) false (JAL (mword_of_int 2086202 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.iunlock + 0x3c) (mword_of_int 0xd3afd0ef : mword 32)
+    (mword_of_int (KernelSyms.iunlock + 0x3c) : mword 64) (JAL (mword_of_int 2086202 : mword 21, Regidx (mword_of_int 1))) kd_d3afd0ef. Qed.
 
 End CodeIunlock.

@@ -256,10 +256,10 @@ Section KforkB1Proof.
     iEval (rewrite Hpp84) in "Hpc".
     (* ---- +0x84: jal ra,release ---- *)
     assert (Htgt84 : add_vec (mword_of_int (KF + 0x84) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2092950 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2092916 : mword 21))
                      = mword_of_int KernelSyms.release)
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (wp_jal_s_sconf (mword_of_int (KF + 0x84)) Rra (mword_of_int 2092950 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KF + 0x84)) Rra (mword_of_int 2092916 : mword 21)
               T2 (trap_res b + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rewrite Htgt84; vm_compute; reflexivity)

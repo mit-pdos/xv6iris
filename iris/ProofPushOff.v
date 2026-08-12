@@ -324,7 +324,7 @@ Section ProofPushOff.
       by (rewrite upd_ne; [ reflexivity | vm_compute; discriminate ]).
     iIntros "Hcg #Htext Hpc Hnoff Hpp24 Hpp16 Hpp8 Hgap Hcont".
     iPoseProof (poi_18 with "Htext") as "Hi18".
-    iApply (Mycpu.wp_call_mycpu_sconf_cs P (mword_of_int 0xd00 : mword 21) ms av p
+    iApply (Mycpu.wp_call_mycpu_sconf_cs P (mword_of_int 0xd22 : mword 21) ms av p
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc Hi18 [-]").
@@ -732,7 +732,7 @@ Section ProofPushOff.
       rewrite /N2. rewrite upd_ne; [| vm_compute; discriminate].
       rewrite /N1. rewrite upd_ne; [| vm_compute; discriminate]. exact Hcsp0. }
     iPoseProof (poi_10 with "Htext") as "Hi10".
-    iApply (Mycpu.wp_call_mycpu_sconf_cs (mword_of_int (KernelSyms.push_off + 0x10)) (mword_of_int 0xd08 : mword 21) N3 (trap_res b + (av - 4))%nat p
+    iApply (Mycpu.wp_call_mycpu_sconf_cs (mword_of_int (KernelSyms.push_off + 0x10)) (mword_of_int 0xd2a : mword 21) N3 (trap_res b + (av - 4))%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc Hi10 [-]").
@@ -799,7 +799,7 @@ Section ProofPushOff.
       iEval (rewrite Htgt2c) in "Hpc".
       (* ---- 0x2c: jal ra,mycpu (jimm=0xcea) ---- *)
       iPoseProof (poi_2c with "Htext") as "Hi2c".
-      iApply (Mycpu.wp_call_mycpu_sconf_cs (mword_of_int (KernelSyms.push_off + 0x2c)) (mword_of_int 0xcec : mword 21) N5 (trap_res b + (av - 4))%nat p
+      iApply (Mycpu.wp_call_mycpu_sconf_cs (mword_of_int (KernelSyms.push_off + 0x2c)) (mword_of_int 0xd0e : mword 21) N5 (trap_res b + (av - 4))%nat p
                 ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
                 ltac:(lia)
                 with "Hcg Htext Hpc Hi2c [-]").
@@ -1311,7 +1311,7 @@ Section ProofPushOff.
     (* ---- 0x08: jal ra,mycpu ---- *)
     assert (Hcsp1 : P1 !!! Regidx csp_rs1 = spd)
       by (rewrite /P1 upd_ne; [exact Hcsp0 | vm_compute; discriminate]).
-    iApply (Mycpu.wp_call_mycpu_sconf_cs (mword_of_int (KernelSyms.pop_off + 0x08)) (mword_of_int 0xc96 : mword 21) P1 (trap_res bexit + (av - 2))%nat p
+    iApply (Mycpu.wp_call_mycpu_sconf_cs (mword_of_int (KernelSyms.pop_off + 0x08)) (mword_of_int 0xcb8 : mword 21) P1 (trap_res bexit + (av - 2))%nat p
  ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc Hi08 [-]").

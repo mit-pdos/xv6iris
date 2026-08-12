@@ -847,14 +847,14 @@ Section KforkPrologue.
       (* =================================================================
          +0x028: jal ra, uvmcopy
          ================================================================= *)
-      iApply (wp_jal_s_sconf (mword_of_int (KF + 0x28)) Rra (mword_of_int 2094952 : mword 21)
+      iApply (wp_jal_s_sconf (mword_of_int (KF + 0x28)) Rra (mword_of_int 2094918 : mword 21)
                 N4 (trap_res b + K1)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi028 [-]").
       iIntros (CID18 Hs18) "Hcg Hpc".
       set (N5 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KF + 0x28) : mword 64) 4)]> N4).
       assert (Hjuvc : add_vec (mword_of_int (KF + 0x28) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2094952 : mword 21)) = mword_of_int KernelSyms.uvmcopy)
+                       (sign_extend' 64 (mword_of_int 2094918 : mword 21)) = mword_of_int KernelSyms.uvmcopy)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjuvc) in "Hpc".
       assert (HN5sp : N5 !!! Regidx csp_rs1 = pa_stk sp0 8)

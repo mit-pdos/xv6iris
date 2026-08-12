@@ -765,28 +765,28 @@ Section ProofUartintr.
       iEval (rewrite P42) in "Hpc".
       assert (HT1rg : forall (CID' : CpuId), rget (CID := CID') T1 Ra0 = T1 !!! Regidx Ra0)
         by (intros CID'; rgne; reflexivity).
-      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartintr + 0x42)) Ra0 Ra0 (mword_of_int 2160 : mword 12)
+      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartintr + 0x42)) Ra0 Ra0 (mword_of_int 2208 : mword 12)
                 T1 (av - 4)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi42 [-]").
       iIntros (CIDW2 HsW2) "Hcg Hpc".
       iEval (rewrite HT1rg) in "Hcg".
       set (T2 := <[Regidx Ra0 := regval_into_reg
-          (add_vec (T1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 2160 : mword 12)))]> T1).
+          (add_vec (T1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 2208 : mword 12)))]> T1).
       change (<[Regidx Ra0 := regval_into_reg
-          (add_vec (T1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 2160 : mword 12)))]> T1) with T2.
+          (add_vec (T1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 2208 : mword 12)))]> T1) with T2.
       (* the sanity check that a0 really is the wait channel; wakeup's contract
          does not name it, so this is documentation, not a premise. *)
       assert (HT2a0 : T2 !!! Regidx Ra0 = a_tx_chan).
       { rewrite /T2 upd_eq. rewrite /T1 upd_eq. rewrite /a_tx_chan. pcw. }
       iEval (rewrite P46) in "Hpc".
       (* +0x46 jal ra,wakeup *)
-      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uartintr + 0x46)) Rra (mword_of_int 5448 : mword 21)
+      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uartintr + 0x46)) Rra (mword_of_int 5482 : mword 21)
                 T2 (av - 4)%nat b ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi46 [-]").
       iIntros (CIDW3 HsW3) "Hcg Hpc".
       set (T3 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.uartintr + 0x46) : mword 64) 4)]> T2).
       change (<[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.uartintr + 0x46) : mword 64) 4)]> T2) with T3.
       assert (Hjwk : add_vec (mword_of_int (KernelSyms.uartintr + 0x46) : mword 64)
-                       (sign_extend' 64 (mword_of_int 5448 : mword 21)) = mword_of_int KernelSyms.wakeup) by pcw.
+                       (sign_extend' 64 (mword_of_int 5482 : mword 21)) = mword_of_int KernelSyms.wakeup) by pcw.
       iEval (rewrite Hjwk) in "Hpc".
       assert (HT3ra : T3 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.uartintr + 0x46) : mword 64) 4)
         by (rewrite /T3 upd_eq; reflexivity).

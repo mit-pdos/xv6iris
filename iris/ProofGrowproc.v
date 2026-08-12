@@ -917,7 +917,7 @@ Section ProofGrowproc.
       iEval (rewrite Hpp2e) in "Hpc".
       (* ---- +0x2e: jal ra,uvmalloc ---- *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.growproc + 0x2e))
-                Rra (mword_of_int 2094732 : mword 21) C2 (av - 4)%nat b
+                Rra (mword_of_int 2094698 : mword 21) C2 (av - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi2e [-]").
       iIntros (CID20 Hn20) "Hcg Hpc".
@@ -926,7 +926,7 @@ Section ProofGrowproc.
       change (<[Regidx Rra := regval_into_reg
                 (add_vec_int (mword_of_int (KernelSyms.growproc + 0x2e) : mword 64) 4)]> C2) with C3.
       assert (Hjmpua : add_vec (mword_of_int (KernelSyms.growproc + 0x2e) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2094732 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2094698 : mword 21))
                        = mword_of_int KernelSyms.uvmalloc)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjmpua) in "Hpc".
@@ -1270,7 +1270,7 @@ Section ProofGrowproc.
     iEval (rewrite Hpp52) in "Hpc".
     (* ---- +0x52: jal ra,uvmdealloc ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.growproc + 0x52))
-              Rra (mword_of_int 2094628 : mword 21) E2 (av - 4)%nat b
+              Rra (mword_of_int 2094594 : mword 21) E2 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi52 [-]").
     iIntros (CID16 Hn16) "Hcg Hpc".
@@ -1279,7 +1279,7 @@ Section ProofGrowproc.
     change (<[Regidx Rra := regval_into_reg
               (add_vec_int (mword_of_int (KernelSyms.growproc + 0x52) : mword 64) 4)]> E2) with E3.
     assert (Hjmpud : add_vec (mword_of_int (KernelSyms.growproc + 0x52) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2094628 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2094594 : mword 21))
                      = mword_of_int KernelSyms.uvmdealloc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjmpud) in "Hpc".

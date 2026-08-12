@@ -64,7 +64,7 @@ SAIL_RISCV_REV ?= c32fbf4111b849061db1812355d6da9df8c2e396
 # addresses out from under every proof that names one (a few commits either
 # way already move most of them).  Verified: a kernel built here reproduces
 # kernel-rocq/*.v byte for byte and symbol for symbol.
-XV6_REV ?= ae96fd06d2b5c7d805157684eaefd931749cb36c
+XV6_REV ?= 0024d4b2bd5e521f83cca1ac97bb5591c4610b9a
 
 KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.v
 

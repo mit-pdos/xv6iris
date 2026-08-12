@@ -57,16 +57,26 @@ Require Import ProcGeom CpuOwn.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import SpecFetchstr.
+Require Import KallocInv.
+Require Import KvmSpec.
+Require Import UserPtTree.
+Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
 Import Defs.
 Local Open Scope Z_scope.
 
 
-(* 4 slots for argstr's own frame; fetchstr's 26 dominates argraw's 14. *)
-Definition argstr_stack : nat := 30%nat.
+(* 4 slots for argstr's own frame (`addi sp,sp,-32`); fetchstr's 56 dominates
+   argraw's 14.
 
-Definition wp_argstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γf : gname)
+   56, NOT 26, because copyinstr changed altitude: its `pa0 == 0` arm now calls
+   vmfault (SpecCopyinstr.v), so its own budget went 20 -> 50 and fetchstr's
+   went 26 -> 56 (SpecFetchstr.v).  argstr's whole body is the fetchstr call,
+   so it takes the rise straight through: 4 + 56 = 60. *)
+Definition argstr_stack : nat := 60%nat.
+
+Definition wp_argstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+    (γa : gname) (γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (i : nat) (v : mword 64)
     (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) :=
@@ -85,14 +95,16 @@ Definition wp_argstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
   cpu_own n eb p C b -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
+  kalloc_env γa None -∗
   ([∗ list] j ∈ seq 0 maxn, (pa_add buf j) ↦ₘ buf_olds j) -∗
   wp_next b p (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (buf_new : nat -> bv 8),
+    ∀ (mf : regfile) (P' : uptd) (buf_new : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
+      ⌜uptd_ext (pv_upt V) P'⌝ -∗
       sie_cap_gpr mf av b p -∗
       cpu_own n eb p C b -∗
       pc_is ret_tgt -∗
-      proc_priv γf p pid V -∗
+      proc_priv γf p pid (upd_upt V P') -∗
       ([∗ list] j ∈ seq 0 maxn, (pa_add buf j) ↦ₘ buf_new j) -∗
       ⌜fetchstr_ret maxn buf_new (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -100,9 +112,9 @@ Definition wp_argstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
 
 Module Type ARGSTR.
   Parameter wp_argstr_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γf : gname) (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+      (γa : gname) (γf : gname) (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (i : nat) (v : mword 64)
       (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool),
-      wp_argstr_sconf_body γf m av n eb p C i v pid V maxn buf_olds b.
+      wp_argstr_sconf_body γa γf m av n eb p C i v pid V maxn buf_olds b.
 End ARGSTR.

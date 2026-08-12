@@ -33,6 +33,7 @@ Require Import KernelDecode21.
 Require Import KernelDecode23.
 Require Import KernelDecode27.
 Require Import KernelDecode28.
+Require Import KernelDecode30.
 Require Import KernelDecode31.
 Local Open Scope Z_scope.
 Import Defs.
@@ -76,9 +77,9 @@ Section CodeFreeproc.
   Proof. mk_rvc (KernelSyms.freeproc + 0xe) (mword_of_int 0xc119 : mword 16)
     (mword_of_int (KernelSyms.freeproc + 0xe) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) kd_c119 exec_execute_C_BEQZ. Qed.
 
-  Lemma fri_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.freeproc + 0x10) : mword 64) false (JAL (mword_of_int 2092880 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.freeproc + 0x10) (mword_of_int 0xf51fe0ef : mword 32)
-    (mword_of_int (KernelSyms.freeproc + 0x10) : mword 64) (JAL (mword_of_int 2092880 : mword 21, Regidx (mword_of_int 1))) kd_f51fe0ef. Qed.
+  Lemma fri_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.freeproc + 0x10) : mword 64) false (JAL (mword_of_int 2092846 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.freeproc + 0x10) (mword_of_int 0xf2ffe0ef : mword 32)
+    (mword_of_int (KernelSyms.freeproc + 0x10) : mword 64) (JAL (mword_of_int 2092846 : mword 21, Regidx (mword_of_int 1))) kd_f2ffe0ef. Qed.
 
   Lemma fri_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.freeproc + 0x14) : mword 64) false (STORE (mword_of_int 88 : mword 12, zreg, Regidx (mword_of_int 9), 8)).
   Proof. mk_base (KernelSyms.freeproc + 0x14) (mword_of_int 0x0404bc23 : mword 32)

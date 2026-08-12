@@ -262,13 +262,13 @@ Qed.
    [wh_align4], re-derived: a Proof file may not import another one) *)
 Local Lemma bm_align_arith (kk qq : Z) :
   0 <= kk -> kk < 30 -> 0 <= qq -> qq <= 255 ->
-  (2147582464 + 1112 * kk + (88 + 4 * qq)) `mod` 4 = 0
-  /\ 0 <= 2147582464 + 1112 * kk + (88 + 4 * qq)
-  /\ 2147582464 + 1112 * kk + (88 + 4 * qq) < 18446744073709551616.
+  (2147582512 + 1112 * kk + (88 + 4 * qq)) `mod` 4 = 0
+  /\ 0 <= 2147582512 + 1112 * kk + (88 + 4 * qq)
+  /\ 2147582512 + 1112 * kk + (88 + 4 * qq) < 18446744073709551616.
 Proof.
   intros H1 H2 H3 H4. split_and!; [| lia | lia].
-  replace (2147582464 + 1112 * kk + (88 + 4 * qq))
-    with ((536895638 + 278 * kk + qq) * 4) by lia.
+  replace (2147582512 + 1112 * kk + (88 + 4 * qq))
+    with ((536895650 + 278 * kk + qq) * 4) by lia.
   apply Z_mod_mult.
 Qed.
 
@@ -285,8 +285,8 @@ Proof.
   destruct (bm_align_arith (Z.of_nat k) (Z.of_nat q)
               ltac:(lia) ltac:(unfold NBUF in Hk; lia) ltac:(lia) ltac:(lia))
     as (Hm & Hlo & Hhi).
-  replace (0x800181e8 + 24 + 1112 * Z.of_nat k + Z.of_nat (88 + 4 * q))
-    with (2147582464 + 1112 * Z.of_nat k + (88 + 4 * Z.of_nat q)) by lia.
+  replace (0x80018218 + 24 + 1112 * Z.of_nat k + Z.of_nat (88 + 4 * q))
+    with (2147582512 + 1112 * Z.of_nat k + (88 + 4 * Z.of_nat q)) by lia.
   apply bb_align_z; assumption.
 Qed.
 

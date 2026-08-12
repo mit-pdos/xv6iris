@@ -1274,12 +1274,12 @@ Section ProofBfreeMain.
     iEval (rewrite Hpp16) in "Hpc".
     (* ===== +0x16 lw a1,-1246(a1) : a1 := sb.bmapstart ===== *)
     assert (Hsbadr : add_vec (rget R5 Ra1)
-                       (sign_extend' 64 (mword_of_int 2932 : mword 12))
+                       (sign_extend' 64 (mword_of_int 2934 : mword 12))
                      = sb_bmapstart).
     { rgne. rewrite HR5a1. rewrite /sb_bmapstart /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hsbadr) in "Hsb".
     iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.bfree + 0x16)) Ra1 Ra1
-              (mword_of_int 2932 : mword 12) R5 (K - 4)%nat
+              (mword_of_int 2934 : mword 12) R5 (K - 4)%nat
               (mword_of_int bmapstart : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi16 Hsb").
     iIntros (CID10 Hq10) "Hcg Hpc Hsb".
