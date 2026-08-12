@@ -224,6 +224,12 @@ Definition wp_itrunc_sconf_body
      a type-0 flush is iput's free path instead.  iput, the only caller,
      has it from the locked inode's [InodeLock.inode_ok]. *)
   bv_unsigned (di_type dn) <> 0 ->
+  (* TYPE STABILITY (fs-icache.md §19.6 Part 1, fs-sysfile S5d): itrunc's
+     flush is [di_trunc dn], which keeps the type, and
+     [InodeRegion.ireg_write_au] now forbids a RETYPE of the region's
+     record -- so itrunc owes the agreement between the stale [dn0] and
+     [dn].  iput, its only caller, passes the two as the same record. *)
+  di_type_stable dn dn0 ->
   (* the map is well-formed: this is what says every block it names is a
      covered home block, and -- via injectivity -- that the 269 frees are
      269 DISTINCT blocks, so the free pool really does grow by

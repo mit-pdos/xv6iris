@@ -152,6 +152,16 @@ Definition wp_iupdate_sconf_body
      each.  This replaces the old [diblk_wf ds] premise -- the region owns
      the well-formedness of every block it holds. *)
   bv_unsigned inum < 16 * Z.of_nat nib ->
+  (* TYPE STABILITY (fs-icache.md §19.6 Part 1, fs-sysfile S5d).  The
+     region's [InodeRegion.ireg_write_au] now demands that a flush either
+     CLEAR the type or LEAVE IT ALONE, so that no-writer-retypes-an-
+     allocated-inode is a theorem of the model rather than a claim about
+     this tree's callers (§19.1(i)).  The premise travels through iupdate
+     unchanged: [dn0] is the stale on-disk record and [dn] the one being
+     flushed.  Every caller has it today -- iput's free path takes the LEFT
+     disjunct (its [ip->type = 0] store), writei/itrunc/create the
+     equation, since none of them ever moves the type field. *)
+  InodeRegion.di_type_stable dn dn0 ->
   (* ...and the record whose scalars [inode_meta] owns names exactly the
      thirteen addrs cells [inode_map] owns.  THE tie between the two
      resources; see the header. *)
@@ -293,6 +303,16 @@ Definition wp_iupdate_gen_body
      each.  This replaces the old [diblk_wf ds] premise -- the region owns
      the well-formedness of every block it holds. *)
   bv_unsigned inum < 16 * Z.of_nat nib ->
+  (* TYPE STABILITY (fs-icache.md §19.6 Part 1, fs-sysfile S5d).  The
+     region's [InodeRegion.ireg_write_au] now demands that a flush either
+     CLEAR the type or LEAVE IT ALONE, so that no-writer-retypes-an-
+     allocated-inode is a theorem of the model rather than a claim about
+     this tree's callers (§19.1(i)).  The premise travels through iupdate
+     unchanged: [dn0] is the stale on-disk record and [dn] the one being
+     flushed.  Every caller has it today -- iput's free path takes the LEFT
+     disjunct (its [ip->type = 0] store), writei/itrunc/create the
+     equation, since none of them ever moves the type field. *)
+  InodeRegion.di_type_stable dn dn0 ->
   (* ...and the record whose scalars [inode_meta] owns names exactly the
      thirteen addrs cells [inode_map] owns.  THE tie between the two
      resources; see the header. *)
@@ -434,6 +454,16 @@ Definition wp_iupdate_cred_body
      each.  This replaces the old [diblk_wf ds] premise -- the region owns
      the well-formedness of every block it holds. *)
   bv_unsigned inum < 16 * Z.of_nat nib ->
+  (* TYPE STABILITY (fs-icache.md §19.6 Part 1, fs-sysfile S5d).  The
+     region's [InodeRegion.ireg_write_au] now demands that a flush either
+     CLEAR the type or LEAVE IT ALONE, so that no-writer-retypes-an-
+     allocated-inode is a theorem of the model rather than a claim about
+     this tree's callers (§19.1(i)).  The premise travels through iupdate
+     unchanged: [dn0] is the stale on-disk record and [dn] the one being
+     flushed.  Every caller has it today -- iput's free path takes the LEFT
+     disjunct (its [ip->type = 0] store), writei/itrunc/create the
+     equation, since none of them ever moves the type field. *)
+  InodeRegion.di_type_stable dn dn0 ->
   (* ...and the record whose scalars [inode_meta] owns names exactly the
      thirteen addrs cells [inode_map] owns.  THE tie between the two
      resources; see the header. *)

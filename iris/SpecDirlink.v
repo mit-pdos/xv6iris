@@ -268,6 +268,12 @@ Definition wp_dirlink_sconf_body
      at [16*k0 <= size] and ends at [16*k0 + 16 <= size + 16]. *)
   bv_unsigned (di_size dn) + 16 <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
   (* ---- writei's premises ---- *)
+  (* TYPE STABILITY (fs-icache.md §19.6 Part 1, fs-sysfile S5d): writei's
+     new premise, travelling.  dirlink's own [Htype] fixes [di_type dn] at
+     T_DIR but says nothing about the region's stale [dn0]; the caller
+     holds the two as ONE record ([IcacheEscrow.ic_loaded]'s single
+     [dinode_at]) and discharges by [InodeRegion.di_type_stable_refl]. *)
+  di_type_stable dn dn0 ->
   log_geom_ok cov logstart ->
   blkmap_wf cov logstart bm ->
   blk_holes_zero bm data ->

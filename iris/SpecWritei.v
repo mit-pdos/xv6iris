@@ -419,6 +419,15 @@ Definition wp_writei_sconf_body
      inode's [InodeLock.inode_ok] carries it, and dirlink's own
      [di_type dn = T_DIR] is stronger. *)
   bv_unsigned (di_type dn) <> 0 ->
+  (* TYPE STABILITY (fs-icache.md §19.6 Part 1, fs-sysfile S5d).  The
+     record writei flushes keeps [dn]'s type ([wi_dinode] moves size and
+     addrs only), and [InodeRegion.ireg_write_au] now forbids a flush that
+     RETYPES the region's record -- so what writei owes is that the stale
+     [dn0] and the in-memory [dn] already agree on the type.  Every caller
+     has it for free: it holds the two as the SAME record, out of
+     [IcacheEscrow.ic_loaded]'s single [dinode_at] (filewrite passes
+     [dnl dnl]).  Same premise, same reason, as SpecIupdate.v's. *)
+  di_type_stable dn dn0 ->
   (* the file's block map, and the normalisation of its holes *)
   blkmap_wf cov logstart bm ->
   blk_holes_zero bm data ->
@@ -687,6 +696,15 @@ Definition wp_writei_gen_body
      inode's [InodeLock.inode_ok] carries it, and dirlink's own
      [di_type dn = T_DIR] is stronger. *)
   bv_unsigned (di_type dn) <> 0 ->
+  (* TYPE STABILITY (fs-icache.md §19.6 Part 1, fs-sysfile S5d).  The
+     record writei flushes keeps [dn]'s type ([wi_dinode] moves size and
+     addrs only), and [InodeRegion.ireg_write_au] now forbids a flush that
+     RETYPES the region's record -- so what writei owes is that the stale
+     [dn0] and the in-memory [dn] already agree on the type.  Every caller
+     has it for free: it holds the two as the SAME record, out of
+     [IcacheEscrow.ic_loaded]'s single [dinode_at] (filewrite passes
+     [dnl dnl]).  Same premise, same reason, as SpecIupdate.v's. *)
+  di_type_stable dn dn0 ->
   (* the file's block map, and the normalisation of its holes *)
   blkmap_wf cov logstart bm ->
   blk_holes_zero bm data ->
