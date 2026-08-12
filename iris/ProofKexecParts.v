@@ -283,6 +283,13 @@ Section ProofKexecParts.
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
+        (* ... AND EVERY OTHER REGISTER IS UNTOUCHED.  [callee_saved] says
+           nothing about [a0], so without this conjunct the RETURN VALUE does
+           not survive the epilogue and no exit could close a contract that
+           pins it.  Five registers are written here (the four loads and the
+           sp pop); everything else comes through. *)
+        ⌜forall r : mword 5, r <> csp_rs1 -> r <> Rra -> r <> Rs0 ->
+            r <> Rs1 -> r <> Rs2 -> mf !!! Regidx r = Mt !!! Regidx r⌝ -∗
         sie_cap_gpr mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -430,7 +437,14 @@ Section ProofKexecParts.
     iEval (rgne) in "Hpc".
     iEval (rewrite HT5ra) in "Hpc".
     iSpecialize ("Hcont" $! CID6 with "[]"); [iPureIntro; wp_next_chain|].
-    iApply ("Hcont" $! T5 with "[%] Hcg Hpc").
+    iApply ("Hcont" $! T5 with "[%] [%] Hcg Hpc").
+    2:{ intros r Nsp Nra Ns0 Ns1 Ns2.
+        rewrite /T5 upd_ne; [| congruence].
+        rewrite /T4 upd_ne; [| congruence].
+        rewrite /T3 upd_ne; [| congruence].
+        rewrite /T2 upd_ne; [| congruence].
+        rewrite /T1 upd_ne; [| congruence].
+        reflexivity. }
     assert (Hrest : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
                       r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rra ->
                       T5 !!! Regidx r = m !!! Regidx r).
@@ -549,6 +563,8 @@ Section ProofKexecParts.
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
+        ⌜forall r : mword 5, r <> csp_rs1 -> r <> Rra -> r <> Rs0 ->
+            r <> Rs1 -> r <> Rs2 -> mf !!! Regidx r = Mt !!! Regidx r⌝ -∗
         sie_cap_gpr mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗

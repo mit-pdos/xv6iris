@@ -243,13 +243,80 @@ first two are kexec-specific; the last two are the tree's existing shape
    contract's failure arm, whose `V' = V` is free because nothing before the
    commit touched the process. A block's only *output* is its fall-through.
 
-4. **The open inode travels as one bundle.** What `ilock` produces and
+4. **Pin `b = eb = true` FIRST, in every phase lemma.** namei, ilock, readi
+   and end_op all publish `wp_next true …`, and `wp_next_chain` cannot produce
+   the `pj = zero_reg` disjunct from a symbolic `b`, so the phase looks
+   unprovable at its first call. It is not: at `n = 0` the SIE eighth in
+   `sie_cap_gpr` and `cpu_hart` in `cpu_own` agree, so `b = eb`, and kexec's
+   `eb = true` premise closes it. `kxc_sie_b_agree` (ported from
+   `ProofFileclose.sie_b_agree`, itself `ProofIput`'s idiom) is the one-liner.
+   Do it before anything else or you will diagnose a phantom.
+
+5. **`stack_own` is the SEAM CURRENCY between blocks, not pre-made
+   `bytes_own` carves.** The tempting shape — carve the elf/ph/ustack buffers
+   once in the prologue and hand the byte runs along — does not close:
+   `kxc_epi_frame` needs `stack_own` *back*, and a byte run no longer carries
+   the per-slot alignment facts required to re-slot it (`bytes_own_slotsn`
+   demands them as a premise). So a block boundary carries the untouched
+   frame as one `stack_own` chunk, and **each block carves what it uses at the
+   one place it uses it**. Slots 1..13 (the spills) are the exception: they
+   travel pinned/existential through `kxc_frame`, because the exits disagree
+   about which of them are live.
+
+6. **The open inode travels as one bundle.** What `ilock` produces and
    `iunlockput` consumes — `sleeplocked`, `sl_pid`, `ic_deposit`, the two ½
    identity cells, `i_valid`, `ic_loaded`, and the retained
    `inode_ref_short` — is eight resources that phases A and B both carry and
    neither looks inside. Bundle it (`kxc_open`) for the same reason
    `fs_fabric` is bundled. Unlike `fs_fabric` it is NOT persistent, so it is
    threaded linearly.
+
+### The duplicate `icacheG`, and why the fix is ONE file and not seventeen
+
+`FileInvDefs.fileG` bundles `icacheG` and `icfg` as **field instances**
+(`file_icacheG ::`, `file_icfg ::`). A context binding both `!fileG Σ` and a
+standalone `ICFG : icfg, !icacheG Σ` therefore has *two* `icacheG`s — the
+second trap in `durable-notes.md`'s typeclass section, and **seventeen files
+in the tree bind both.** `ProcInv.v` binds no standalone one, so `cwd_ref`
+elaborates its `inode_held` through `fileG`, while `SpecNamei`'s premise
+elaborates through the standalone one. Machine-checked both ways:
+`cwd_ref v -∗ inode_held v` fails to frame in a context binding both, and
+closes by `iIntros "$"` in one binding only `fileG`.
+
+It never fired before because **kexec is the first caller ever to hand a
+process's cwd reference to namei.**
+
+**The fix is `SpecKexec.v` alone.** The obvious reading — sweep all seventeen —
+is wrong, and the reason is worth keeping: a callee's `Module Type` Parameter
+is *universally quantified* over `icacheG`, so a caller can instantiate it at
+whichever instance it has. Only the caller's OWN binder list has to be
+coherent. Dropping the standalone pair from `wp_kexec_sconf_body` and
+`Module Type KEXEC` (four occurrences, `!fileG Σ` then supplies both) makes
+`cwd_ref` and `inode_held` the same proposition and leaves namei, namex,
+dirlookup, fileread and the rest untouched.
+
+When this trap fires, check whether the mismatch is in a *statement you own*
+before sweeping the files it merely passes through.
+
+### A fourth over-ask that is NOT worth fixing — and how to tell
+
+`SpecNamei` demands the **whole** path buffer (`:162`) and `SpecCopyout`
+demands the **whole** source (`:174`), though each only reads what it is
+given. kexec's contract therefore owns the path and the argument strings
+outright, and keeps a fraction only on the argv pointer vector, which it just
+loads from.
+
+**This looks like blockers 1 and 2 and is not.** There, kexec genuinely could
+not pay the premise — it had no `p->pagetable` for the table it was building,
+and no sixteen bytes past `last`. Here it can pay: `sys_exec` has
+`char path[MAXPATH]` on its own stack and kalloc's a page per argument, so
+full ownership is available for free. An over-ask that every caller can
+afford is a no-consumer cleanup, not a blocker.
+
+That is the test to apply to the next one: **can the caller pay?** If yes,
+pay it and move on; if no, the callee's contract is wrong and generalizing it
+is the work. Relaxing namei/namex/nameiparent and copyout's source to a
+fraction remains available and is nobody's blocker.
 
 ## THE THREE UPSTREAM SPEC CHANGES — TWO DONE, ONE OPEN
 

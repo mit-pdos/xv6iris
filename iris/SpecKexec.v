@@ -335,7 +335,7 @@ Definition kexec_ok (V V' : pprivate) (r : mword 64)
 Definition fs_fabric
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (gs : list gname) (gu : uart_names) (gd : disk_names) (gk : gname)
     (pd pav pu : mword 64) (bn : bio_names)
@@ -359,7 +359,7 @@ Definition fs_fabric
 Global Instance fs_fabric_persistent
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     gs gu gd gk pd pav pu bn g gfs gi cn gtl cov logstart inodestart nib dev :
   Persistent (fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
@@ -372,7 +372,7 @@ Proof. apply _. Qed.
 Definition wp_kexec_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (jp : nat) (gl : gname)           (* the running process *)
@@ -446,11 +446,22 @@ Definition wp_kexec_sconf_body
      needs are all inside it (ProcInv.proc_priv_cwd_pid); so are the p->name
      bytes safestrcpy writes and the trapframe words the commit block writes. *)
   proc_priv gf pj pidv V -∗
-  (* the path buffer, and the argv vector with its strings *)
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ{dqa} pfun i) -∗
+  (* THE PATH AND THE ARGUMENT STRINGS ARE OWNED OUTRIGHT; only the argv
+     POINTER VECTOR is fractional.  Not a preference -- namei demands the whole
+     path buffer (SpecNamei.v:162) and copyout demands the whole source
+     (SpecCopyout.v:174), and kexec hands its path straight to the first and
+     each argument straight to the second.  Both callees only READ what they
+     are given, so both over-ask; but unlike safestrcpy's and copyout's
+     destination-table over-asks, THIS ONE COSTS KEXEC NOTHING -- sys_exec has
+     [char path[MAXPATH]] on its own stack and kalloc's a page per argument, so
+     it owns both outright.  Relaxing namei/namex/nameiparent and copyout's
+     source to a fraction is the "right" shape and has no consumer; recorded in
+     projects/kexec.md, not done.
+       The pointer vector stays at [dqa] because kexec only loads from it. *)
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
   ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
   ([∗ list] i ∈ seq 0 na,
-     [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqa} afun i j) -∗
+     [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
   bslots bn 3 -∗
   iref_slots 2 -∗
   wp_next b pj (fun (CID : CpuId) =>
@@ -468,10 +479,10 @@ Definition wp_kexec_sconf_body
       bitmap_res gfs bmapstart cov logstart size used' -∗
       kalloc_env ga None -∗
       proc_priv gf pj pidv V' -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ{dqa} pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
       ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
       ([∗ list] i ∈ seq 0 na,
-         [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqa} afun i j) -∗
+         [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
       bslots bn 3 -∗
       iref_slots 2 -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -481,7 +492,7 @@ Module Type KEXEC.
   Parameter wp_kexec_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
