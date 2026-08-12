@@ -225,14 +225,26 @@ Qed.
       image.  A checker tool over the enumerated racy/release sites is the
       recorded upgrade path.
 
-    - [pf_violation_free cls_of pub_of]: no promise-free run of the program
-      reaches a configuration in which a foreign agent's coherence floor has
-      reached an OWNED-UNPUBLISHED message.  This is the ONE place φ/Iris
-      remains load-bearing (W3's rescoping: the conjunct is deferred, and the
-      ↦w transfer-discipline rework is its upgrade path).  It is instantiated
-      at the MACHINE-SYNTACTIC [cls_of] (read off the message's inert [wm_ak])
-      and [pub_of] (read off the author's inert [w_pub] watermark), so it is
-      sharply checkable and Iris-refinable later. *)
+    - [pf_violation_free_hart cls_of pub_of n_disk]: no promise-free run of
+      the program reaches a configuration in which a foreign HART's coherence
+      floor has reached an OWNED-UNPUBLISHED message of a HART author.  This
+      is the ONE place φ/Iris remains load-bearing (W3's rescoping: the
+      conjunct is deferred, and the ↦w transfer-discipline rework is its
+      upgrade path).  It is instantiated at the MACHINE-SYNTACTIC [cls_of]
+      (read off the message's inert [wm_ak]) and [pub_of] (the log predicate
+      [WeakMem.wpublished]), so it is sharply checkable and Iris-refinable
+      later.
+
+      BOTH AGENTS ARE HART-RESTRICTED, at the bound [n_disk = NCPU] that the
+      first conjunct already passes to [main_premises].  The unrestricted
+      [pf_violation_free] would be REFUTABLE here rather than merely
+      undischarged: with the DMA-tid unification the disk is an ordinary
+      agent, so a hart reading DMA'd bytes is a [violation] with the disk as
+      AUTHOR, and a DMA over plainly-written hart bytes is one with the disk
+      as OBSERVER — neither is anything φ (a statement about harts) can say
+      a word about.  See [WeakRobust.violation_hart]; the exhibit
+      ([WeakRobustMain.bad_edge_violates]) produces exactly the restricted
+      form, because [bad] bounds both ends of its edge. *)
 Definition m6_side_conditions (next : bool → M unit) (img : image)
     (ps : list pxv6) : Prop :=
   (∀ (c mid : wpcfg pxv6) (TS : ptraces pxv6),
@@ -240,7 +252,7 @@ Definition m6_side_conditions (next : bool → M unit) (img : image)
      rtc (wp_promise_step (P := pxv6)) (wp_init img ps) mid →
      ptraces_of (pstep_xv6 next) TS mid c →
      main_premises n_disk TS)
-  ∧ pf_violation_free cls_of pub_of (pstep_xv6 next) img ps.
+  ∧ pf_violation_free_hart cls_of pub_of n_disk (pstep_xv6 next) img ps.
 
 (* ====================================================================== *)
 (** ** 4. THE HEADLINE THEOREM
@@ -501,25 +513,31 @@ Qed.
            test on both sides: [WeakMem.tid_hart] / [WeakLang.tid_is_hart],
            spent by [WeakGhost.wcds_clean]/[wcds_dirty] (which exempt
            non-hart authors, because a device never publishes) and by
-           [WeakRobustMain.bad]'s [e1.1 < nh] conjunct (instantiated at
-           [n_disk] in [m6_side_conditions]).  Likewise the DISK ARM itself
+           [WeakRobustMain.bad]'s [e1.1 < nh] / [e2.1 < nh] conjuncts
+           (instantiated at [n_disk] in [m6_side_conditions], and the reason
+           its exhibit concludes [WeakRobust.violation_hart]).  Likewise the DISK ARM itself
            is now a simulation rather than a superset (delta (i)), so (1b)'s
            regrouping has a 1:1 disk case to work with.
     UPGRADE PATH: a [WeakComposeLang.v] carrying (1a)–(1c) as one induction.
     Its cost is dominated by (1a); (1b)–(1c) are mechanical.
 
     ------------------------------------------------------------------------
-    (2) [pf_violation_free cls_of pub_of] — DECLARED (the second conjunct of
-    [m6_side_conditions]).
+    (2) [pf_violation_free_hart cls_of pub_of n_disk] — DECLARED (the second
+    conjunct of [m6_side_conditions]).
 
     This is the Layer-2 premise: no promise-free run of the program reaches a
-    configuration where some foreign agent's per-byte coherence floor has
-    reached an owned ([wm_ak = WCplain]) message its author has not yet
+    configuration where some foreign HART's per-byte coherence floor has
+    reached an owned ([wm_ak = WCplain]) message a HART author has not yet
     published.  PUBLICATION IS NOW THE LOG PREDICATE [WeakMem.wpublished]
     (L0(c), 2026-08-12): [WeakRobustMain.pub_of] no longer reads the author's
-    [w_pub] watermark out of the agent vector, so this premise and the Iris
-    side's exported [WeakGhost.no_violation] are the SAME statement modulo
-    the hart quantifier — which is what the DMA-tid unification lines up.
+    [w_pub] watermark out of the agent vector, and the HART RESTRICTION
+    (2026-08-12) closes the remaining gap, so this premise and the Iris side's
+    exported [WeakGhost.no_violation] are now the SAME statement — the DMA-tid
+    unification lines up the tids, and [WeakRobust.violation_hart] lines up
+    the quantifier.  Without the restriction the conjunct would be FALSE for
+    xv6 (the disk as author or as observer; see §3), i.e. the theorem would be
+    vacuous on every DMA-touching run.  [WeakComposeLang] DERIVES this
+    conjunct from the adequacy export.
     It is the ONE place φ/Iris remains load-bearing, and its use is sound as
     designed:
     [WeakRobustMain.bad_edge_violates] builds the violating configuration as a
@@ -599,7 +617,7 @@ Qed.
     existential [str] is that stream).  The retained MMIO-ordering assumption —
     which the final-footprint plan ALWAYS kept — covers the stream-run ↔
     real-device-run correspondence, in BOTH of its uses: the behavior factoring
-    and the [pf_violation_free] transport for exhibit prefixes.  This is
+    and the [pf_violation_free_hart] transport for exhibit prefixes.  This is
     well-posed because φ is device-OBLIVIOUS: the device arms touch neither the
     log nor any [wstate], so a violation is invariant under changing the
     device interleaving.

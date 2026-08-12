@@ -852,6 +852,22 @@ Section persist.
     ∃ p m i j a, violates_at c p m i j a.
   Proof. intros (p & m & i & j & a & ?). by exists p, m, i, j, a. Qed.
 
+  (** …and the HART-RESTRICTED violation ([WeakRobust.violation_hart] —
+      the form [WeakRobustMain]'s exhibit produces and the one φ can
+      refute) has such a witness with BOTH agent indices bounded. *)
+  Lemma violation_hart_violates_at nh c :
+    violation_hart cls_of (pub_of (P:=P)) nh c →
+    ∃ p m i j a, violates_at c p m i j a ∧ (i < nh)%nat ∧ (j < nh)%nat.
+  Proof.
+    intros (p & m & i & j & a &
+            Hlog & Htid & (i' & Hi' & Hilt) &
+            Hcls & Hpub & Hne & (j' & Hj' & Hjlt) & Hbyte & Hobs).
+    have Hii : i' = i by congruence. subst i'.
+    have Hjj : j' = j by congruence. subst j'.
+    exists p, m, i, j, a. split_and!; [|done|done].
+    by split_and!.
+  Qed.
+
   (* ---------------------------------------------------------------- *)
   (** ** THE PERSISTENCE CORE
 

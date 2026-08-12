@@ -23,6 +23,14 @@
     per-byte state witness of "some foreign agent observed the message",
     which is what the violation predicate needs (D-M6-2).
 
+    THE VIOLATION IS HART-RESTRICTED where it is CONSUMED.  [violation]
+    quantifies its author and observer over all agents; φ speaks only about
+    harts, and with the DMA-tid unification the disk is an ordinary agent,
+    so the unrestricted form is refutable for xv6 (see [violation_hart]
+    below for the two concrete DMA witnesses).  [violation_hart nh] /
+    [pf_violation_free_hart nh] are the forms [WeakRobustMain]'s exhibit
+    produces and [WeakCompose]'s premise bundle declares.
+
     Slice 1 (this file): definitions + the goal statement + the cheap
     sanity lemmas.  W2a (the dependency graph and its acyclicity from
     violation-freedom) and W2b (the π-permuted simulation) build on top;
@@ -80,13 +88,61 @@ Section violation.
       j ≠ i ∧ is_Some (msg_byte m a) ∧
       (S p ≤ obs_flr c j a)%nat.
 
+  (** THE HART-RESTRICTED VIOLATION, and the one every CONSUMER of this
+      file takes.  [nh] is the number of HART agents: both the AUTHOR
+      [i] and the OBSERVER [j] are required to be harts
+      ([WeakMem.tid_hart nh]).
+
+      WHY THE RESTRICTION IS NOT OPTIONAL.  [violation] above quantifies
+      both agents over ALL agents, while the Iris-side predicate that
+      refutes it ([WeakGhost.no_violation], and the C/D/S invariants
+      behind it) speaks only about HARTS — a device never publishes and
+      is exempt by construction ([WeakGhost.wcds_clean],
+      [WeakLang.n_disk_not_hart]).  With the DMA-tid unification (seam
+      1a) the disk is an ORDINARY agent with an ordinary index, so for
+      xv6 the unrestricted [pf_violation_free] is not merely
+      undischarged but REFUTABLE: a hart that reads a byte the virtio
+      DMA wrote raises its [coh] to that message's timestamp, and the
+      message is [WCplain] (hence [SCowned]) and never published, so
+      [violation] holds with [i = WeakLang.n_disk]; symmetrically the
+      disk's own DMA over a plainly-written hart byte gives [violation]
+      with [j = n_disk].  Both witnesses are outside φ's domain of
+      discourse, and both disappear under the hart restriction.
+      [WeakRobustMain.bad] already carries the author's bound, and its
+      [bad]/[edges_split] pair carries the reader's, so the exhibit
+      produces exactly this form. *)
+  Definition violation_hart (nh : nat) (c : wpcfg P) : Prop :=
+    ∃ (p : nat) (m : wmsg) (i j : agent) (a : Z),
+      pc_log c !! p = Some m ∧ wm_tid m = Some i ∧ tid_hart nh (wm_tid m) ∧
+      cls m = SCowned ∧ ¬ pub c (S p) ∧
+      j ≠ i ∧ tid_hart nh (Some j) ∧ is_Some (msg_byte m a) ∧
+      (S p ≤ obs_flr c j a)%nat.
+
+  Lemma violation_hart_violation nh c : violation_hart nh c → violation c.
+  Proof.
+    intros (p & m & i & j & a & ? & ? & _ & ? & ? & ? & _ & ? & ?).
+    by exists p, m, i, j, a.
+  Qed.
+
   (** The Layer-2 premise, as Layer 1 consumes it: no promise-free run of
       the program reaches a violating configuration.  Stated over
       [wp_pf_run] ([WeakPromiseBridge]'s fused promise-free fragment), the
-      object the Iris proof talks about through the bridge. *)
+      object the Iris proof talks about through the bridge.
+
+      [pf_violation_free] is the UNRESTRICTED form, kept for the goal
+      statements below and in [WeakRobustGraph]; [pf_violation_free_hart]
+      is what [WeakRobustMain] and [WeakCompose] actually consume. *)
   Definition pf_violation_free (pstep : P → wlabel → P → Prop)
       (img : image) (ps : list P) : Prop :=
     ∀ c, rtc (wp_pf_run pstep) (wp_init img ps) c → ¬ violation c.
+
+  Definition pf_violation_free_hart (nh : nat)
+      (pstep : P → wlabel → P → Prop) (img : image) (ps : list P) : Prop :=
+    ∀ c, rtc (wp_pf_run pstep) (wp_init img ps) c → ¬ violation_hart nh c.
+
+  Lemma pf_violation_free_hart_weaken nh pstep img ps :
+    pf_violation_free pstep img ps → pf_violation_free_hart nh pstep img ps.
+  Proof. intros H c Hrun Hv. by eapply H, violation_hart_violation. Qed.
 
   (** Sanity: the initial configuration violates nothing (empty log). *)
   Lemma violation_init img ps : ¬ violation (wp_init (P := P) img ps).

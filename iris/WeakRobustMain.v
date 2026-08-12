@@ -16,8 +16,10 @@
           bad-target-free strict ancestry ([bad_min]), the ancestor cone
           [U] of that target is sortable, the subset simulation replays
           it, and ONE more [wp_pf_step] appends the bad read — reaching
-          a promise-free configuration that VIOLATES, contradicting
-          [pf_violation_free].  Hence no bad edge exists at all,
+          a promise-free configuration that VIOLATES — with a HART
+          author and a HART observer, since [bad] bounds both agent
+          indices by [nh] — contradicting [pf_violation_free_hart].
+          Hence no bad edge exists at all,
           [rf_edges_ok] holds, [gdep2_acyclic] follows, and [sim_full]
           delivers the robustness conclusion;
       (3) the honest residue, carried as the premise [bad_wf]: whenever
@@ -46,7 +48,7 @@
       acyclicity from the STRONG form of the residue (recorded as
       [gdep2_acyclic_bad_free] — NOT used by the main theorem, which
       takes the weak [bad_wf] and spends the exhibit; the strong form
-      would make [pf_violation_free] unnecessary, which is not the
+      would make [pf_violation_free_hart] unnecessary, which is not the
       design).
 
     - NO [Decision (tc (gdep2 TS) e e2)] IS PROVED.  The design's
@@ -390,10 +392,11 @@ Definition pub_event_raises {P : Type} (TS : ptraces P) (e : gev) : Prop :=
        (lb_rl l = true ∨ w_relp (pre_ws TS e) = true).
 
 (** [bad nh TS e1 e2] — the OWNED-UNPUBLISHED CROSS READ.  [nh] is the
-    number of HART agents; the writer must be one of them.
+    number of HART agents; BOTH the writer and the reader must be one of
+    them.
 
-    THE HART CONJUNCT ([e1.1 < nh]) is the DMA-tid unification's Layer-1
-    half (seam 1a of the lift plan).  Now that the disk is an ORDINARY
+    THE HART CONJUNCTS ([e1.1 < nh], [e2.1 < nh]) are the DMA-tid
+    unification's Layer-1 half (seam 1a of the lift plan).  Now that the disk is an ORDINARY
     agent with an ordinary index ([WeakLang.n_disk = NCPU]), its
     [WCplain] DMA messages would otherwise be candidates for [bad] — and
     φ says nothing about them: the C/D/S invariants exempt every non-hart
@@ -404,9 +407,23 @@ Definition pub_event_raises {P : Type} (TS : ptraces P) (e : gev) : Prop :=
     conclusion is only ever consumed to turn [edges_split] back into
     [rf_edges_ok].  Layer 1 cannot name [NCPU] (it is stdpp-only and
     knows no [RiscvLang]), so the bound is a parameter; [WeakCompose]
-    fixes it. *)
+    fixes it.
+
+    THE READER'S BOUND ([e2.1 < nh]) is the SAME conjunct on the OTHER
+    end of the edge, and it is what makes the exhibit's conclusion
+    [WeakRobust.violation_hart] rather than the unrestricted
+    [violation]: the observer of the violating message is the reader of
+    the bad edge, and φ says nothing about a NON-hart observer either —
+    the disk's own DMA raises its [coh] over a plainly-written hart byte,
+    which is a [violation] with [j = n_disk] and no φ to refute it.  The
+    bound is FREE for xv6 at the site that discharges [edges_split]: a
+    [grf] edge's target executes a load or an rmw, and in
+    [WeakCompose.pstep_xv6] only the hart arms emit [LLoad]/[LRmw] (the
+    disk arm emits stores only — [WeakCompose.xv6_lat_free]'s disk
+    case).  Like the writer's bound it only NARROWS the [bad] escape
+    hatch of [edges_split]. *)
 Definition bad {P : Type} (nh : nat) (TS : ptraces P) (e1 e2 : gev) : Prop :=
-  grf TS e1 e2 ∧ e1.1 ≠ e2.1 ∧ (e1.1 < nh)%nat ∧
+  grf TS e1 e2 ∧ e1.1 ≠ e2.1 ∧ (e1.1 < nh)%nat ∧ (e2.1 < nh)%nat ∧
   (∃ ts m, gev_ts TS e1 = Some ts ∧ pt_log TS !! (ts - 1)%nat = Some m ∧
            wm_ak m = WCplain) ∧
   ¬ (∃ ep, ep.1 = e1.1 ∧ (e1.2 ≤ ep.2)%nat ∧ pub_event TS ep ∧
@@ -628,7 +645,7 @@ End walk.
 (** THE STRONG-RESIDUE SHORTCUT (recorded, not used below).  If the
     residue is taken in its STRONG form — no bad edge's target lies on
     ANY cycle — the walk closes globally with no exhibit and no
-    [pf_violation_free] at all: every cross edge whose reader is on a
+    [pf_violation_free_hart] at all: every cross edge whose reader is on a
     cycle is [edge_ok] by [edges_split], and that is the only place the
     walk looks.  The main theorem deliberately takes the WEAK form
     ([bad_wf]: some bad edge is minimal), which does NOT give this and
@@ -1036,15 +1053,19 @@ Section exhibit.
   Qed.
 
   (** THE EXHIBIT: a minimal bad edge builds a promise-free run to a
-      VIOLATING configuration. *)
+      VIOLATING configuration — and the violation is HART-RESTRICTED
+      ([WeakRobust.violation_hart]), which is what makes it refutable by
+      φ: the author is [bad]'s writer and the observer is its reader,
+      and [bad] bounds both by [nh]. *)
   Theorem bad_edge_violates b1 b2 :
     bad nh TS b1 b2 → bad_min nh TS b2 →
     ∃ cf, rtc (wp_pf_run pstep) (wp_init img ps) cf ∧
-          violation cls_of pub_of cf.
+          violation_hart cls_of pub_of nh cf.
   Proof.
     intros Hbad Hmin.
     have Hbad' := Hbad.
-    destruct Hbad' as (Hrf & Hne & _ & (t & m & Hts1 & Hlogm & Hak) & Hnopub).
+    destruct Hbad'
+      as (Hrf & Hne & Hh1 & Hh2 & (t & m & Hts1 & Hlogm & Hak) & Hnopub).
     have Hrf' := Hrf. destruct Hrf' as (t' & a & Hts1' & Hrd2).
     have Htt : t' = t by rewrite Hts1 in Hts1'; simplify_eq.
     subst t'.
@@ -1136,6 +1157,8 @@ Section exhibit.
     split_and!.
     - by rewrite Hclog Hp3 Hmsgeq.
     - by rewrite Hmeq.
+    - (* THE AUTHOR IS A HART: [bad]'s writer conjunct, verbatim *)
+      exists b1.1. by rewrite Hmeq.
     - by rewrite /cls_of Hak.
     - (* NOT PUBLISHED.  THE ALIGNMENT PAYOFF: [pub_of] is now the LOG
          predicate [wpublished], so this arm is a direct reading of
@@ -1187,13 +1210,15 @@ Section exhibit.
       + exists t0, (msg_at TS t0). split_and!; [exact Hepts|exact Heplog|exact Hrelq].
       + by apply Hmem.
     - done.
+    - (* THE OBSERVER IS A HART: [bad]'s reader conjunct, verbatim *)
+      by exists b2.1.
     - exact Hbyte.
     - rewrite /obs_flr Hlk2 /=. lia.
   Qed.
 
-  (** …hence, under [pf_violation_free], NO bad edge exists at all. *)
+  (** …hence, under [pf_violation_free_hart], NO bad edge exists at all. *)
   Theorem no_bad_edge :
-    pf_violation_free cls_of pub_of pstep img ps → bad_wf nh TS →
+    pf_violation_free_hart cls_of pub_of nh pstep img ps → bad_wf nh TS →
     ∀ e1 e2, ¬ bad nh TS e1 e2.
   Proof.
     intros Hvf Hbwf e1 e2 Hbad.
@@ -1205,7 +1230,7 @@ Section exhibit.
   (** …so the per-edge premise is the full [rf_edges_ok] after all, and
       the extended graph is acyclic. *)
   Theorem gdep2_acyclic_main :
-    pf_violation_free cls_of pub_of pstep img ps → bad_wf nh TS →
+    pf_violation_free_hart cls_of pub_of nh pstep img ps → bad_wf nh TS →
     gdep2_acyclic TS.
   Proof.
     intros Hvf Hbwf.
@@ -1240,7 +1265,8 @@ Section main.
 
   (** THE LAYER-1 ROBUSTNESS THEOREM.  A lat-free, timestamp-oblivious
       program whose promise-free runs never VIOLATE (the Layer-2 premise
-      [pf_violation_free], instantiated at [cls_of]/[pub_of]) and whose
+      [pf_violation_free_hart], instantiated at [cls_of]/[pub_of] and at
+      the hart count [nh]) and whose
       traced behaviors satisfy the per-edge split, the bad-SCC residue,
       the E-edge obligation and the byte classification, is ROBUST:
       every full-machine behavior is matched by a promise-free run with
@@ -1257,7 +1283,7 @@ Section main.
        rtc (wp_promise_step (P:=P)) (wp_init img ps) mid →
        ptraces_of pstep TS mid c →
        main_premises nh TS) →
-    pf_violation_free cls_of pub_of pstep img ps →
+    pf_violation_free_hart cls_of pub_of nh pstep img ps →
     ∃ cf, rtc (wp_pf_run pstep) (wp_init img ps) cf ∧
           prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
   Proof.
@@ -1332,7 +1358,7 @@ Section main.
        rtc (wp_promise_step (P:=P)) (wp_init img ps) mid →
        ptraces_of pstep TS mid cend →
        main_premises nh TS) →
-    pf_violation_free cls_of pub_of pstep img ps →
+    pf_violation_free_hart cls_of pub_of nh pstep img ps →
     ∃ cend cf,
       rtc (wpstep pstep) c cend ∧ no_promises cend ∧
       rtc (wp_pf_run pstep) (wp_init img ps) cf ∧
@@ -1354,7 +1380,8 @@ End main.
 
     - [cls_of] / [pub_of]: the instantiation of [WeakRobust]'s two
       Layer-2 parameters (D-M6-6's [wm_ak] and [w_pub]).  φ's obligation
-      on the Iris side is [pf_violation_free cls_of pub_of], nothing
+      on the Iris side is [pf_violation_free_hart cls_of pub_of nh],
+      nothing
       else — the trace-global premises are discharged per-site/static
       (D-M6-8).
 
@@ -1367,9 +1394,10 @@ End main.
 
     - [bad_edge_violates]: the exhibit, as a standalone theorem — a
       minimal bad edge yields a REAL [wp_pf_run] reaching a
-      [violation].  This is the only place Layer 1 hands Layer 2 a
+      [violation_hart nh] (hart author, hart observer — both bounds are
+      [bad]'s own).  This is the only place Layer 1 hands Layer 2 a
       concrete violating configuration, and it is the sole consumer of
-      [pf_violation_free].
+      [pf_violation_free_hart].
 
     - [gdep2_acyclic_on] / [rf_edges_ok_on]: the relativized walk, for
       any future argument that needs acyclicity only along a cone.

@@ -7,8 +7,8 @@
     ([WeakGhost.no_violation]) at every state of the [WeakLang] machine
     ([wgstate], [wprim_step]).  Seam (1) of [WeakCompose] §6 is the missing
     bridge between the two, and its ONE consumer is the second conjunct of
-    [WeakCompose.m6_side_conditions] — [WeakRobust.pf_violation_free], the
-    place φ/Iris is still load-bearing.  This file builds the bridge in the ⇐
+    [WeakCompose.m6_side_conditions] — [WeakRobust.pf_violation_free_hart],
+    the place φ/Iris is still load-bearing.  This file builds the bridge in the ⇐
     direction the consumption needs, and derives that conjunct.
 
     ------------------------------------------------------------------------
@@ -50,8 +50,9 @@
         invariant of every segment).
 
     (3) THE φ TRANSPORT ([xv6_blocks_no_hart_violation], §8).  φ at the
-        reached [WeakLang] state refutes a violation at the corresponding pf
-        configuration.  The transport is SYNTACTIC, and that is L0(c)'s
+        reached [WeakLang] state refutes a HART-AUTHORED, HART-OBSERVED
+        violation at the corresponding pf configuration — which, since the
+        Layer-1 fix of §B, is the only kind [WeakRobust.violation_hart] has.  The transport is SYNTACTIC, and that is L0(c)'s
         payoff: [WeakRobustMain.pub_of] IS [WeakMem.wpublished] at the
         configuration's log, the very predicate [no_violation] is stated with,
         and [WeakRobust.obs_flr] IS the agent's [coh].  Nothing is renamed.
@@ -59,16 +60,18 @@
     (4) THE φ-CONSUMPTION COROLLARY ([xv6_pf_violation_free], §10) and THE
         UPDATED COMPOSITION ([xv6_weak_robust_lifted] /
         [xv6_weak_robust_adequate], §11): [WeakCompose.xv6_weak_robust] with
-        [pf_violation_free] REPLACED by its derivation from the adequacy
+        [pf_violation_free_hart] REPLACED by its derivation from the adequacy
         export.  [xv6_weak_robust_adequate] takes [WeakAdequacy]'s own WP
         premise package and runs [weak_system_adequacy_phi] on the spot, so
         the composition's only Iris-side obligation is the thread pool's WPs.
 
     ------------------------------------------------------------------------
-    §B  THE TWO RESIDUES, STATED AS PREMISES — and what each really is.
+    §B  THE RESIDUE, STATED AS A PREMISE — and the FINDING that was the
+    second one until Layer 1 absorbed it.
 
-    Both are named definitions in §10, both are consumed in exactly one place,
-    and NEITHER is dressed up as a theorem.
+    (A) is a named definition in §10, consumed in exactly one place and NOT
+    dressed up as a theorem; (B) is now history, kept as a record of the bug
+    and of where its fix lives.
 
     (A) [xv6_block_cover] — BLOCK-ATOMICITY (the interleaving / mover residue,
         and the honest one).  A [wp_pf_run] interleaves the harts at EVENT
@@ -116,12 +119,14 @@
         [xv6_block_cover] going through the EXHIBIT (rather than through a
         commutation argument) would use.
 
-    (B) [xv6_violation_harts] — THE AGENT QUANTIFIER.  THIS ONE IS FALSE AS
-        STATED FOR xv6, and that is a finding about Layer 1's statement, not
-        about this file.  [WeakRobust.violation] quantifies the AUTHOR [i] and
-        the OBSERVER [j] over ALL agents, while [WeakGhost.no_violation] — and
-        the C/D/S invariants behind it — speak only about HARTS ([CPU]s),
-        because a device never publishes and is exempt by construction
+    (B) THE AGENT QUANTIFIER — FOUND HERE, FIXED IN LAYER 1, GONE FROM THE
+        PREMISE LIST (2026-08-12).  It was a premise of this file for exactly
+        one revision, under the name [xv6_violation_harts], and it was FALSE
+        AS STATED for xv6.  Recorded because the shape recurs:
+        [WeakRobust.violation] quantified the AUTHOR [i] and the OBSERVER [j]
+        over ALL agents, while [WeakGhost.no_violation] — and the C/D/S
+        invariants behind it — speak only about HARTS ([CPU]s), because a
+        device never publishes and is exempt by construction
         ([WeakGhost.wcds_clean], [WeakLang.n_disk_not_hart]).  Concretely:
           - a hart that READS a byte the virtio DMA wrote raises its [coh] to
             that message's timestamp; the message is [WCplain]
@@ -132,29 +137,26 @@
             [coh], so a DMA over a byte a hart wrote plainly gives
             [violation] with [j = n_disk].
         So [pf_violation_free cls_of pub_of (pstep_xv6 next) img (xv6_ps …)]
-        — the second conjunct of [m6_side_conditions] as it stands today — is
-        not merely undischarged: it is REFUTABLE for any run in which a hart
-        reads DMA'd data.  It is a DECLARED premise, so nothing downstream is
-        unsound; but it makes [xv6_weak_robust] vacuous on realistic runs.
-        THE FIX, and it is small and mechanical, belongs in Layer 1:
-        [WeakRobustMain.bad] ALREADY carries the hart conjunct [e1.1 < nh]
-        (the L0(a) unification put it there for exactly this reason), and the
-        reader of an [grf] edge in [pstep_xv6] is always a hart (the disk arm
-        emits no load and no rmw — see [WeakCompose.xv6_lat_free]'s disk
-        case).  So:
-          (i)   add [violation_hart nh] (= [violation] with
+        was not merely undischarged: it was REFUTABLE for any run in which a
+        hart reads DMA'd data, which made [xv6_weak_robust] VACUOUS on
+        realistic runs.  THE FIX, and it was small and mechanical, belonged in
+        Layer 1 and has landed there:
+          (i)   [WeakRobust.violation_hart nh] (= [violation] with
                 [WeakMem.tid_hart nh (wm_tid m)] and [tid_hart nh (Some j)])
-                and [pf_violation_free_hart nh] to [WeakRobust.v];
-          (ii)  strengthen [WeakRobustMain.bad_edge_violates]'s conclusion to
-                [violation_hart nh] — the author conjunct is [Hbad]'s third
-                component, verbatim; the reader conjunct needs the same
-                bound on [e2.1], which [edges_split] can carry;
-          (iii) weaken [no_bad_edge] / [gdep2_acyclic_main] / [robust_main] /
-                [robust_transport] and [m6_side_conditions] to the [_hart]
-                form.
-        After (i)–(iii) this premise DISAPPEARS from the corollaries below and
-        [xv6_pf_violation_free] closes with residue (A) alone.  The edit is
-        breaking across the Layer-1 stack, which is why L3 does not make it.
+                and [WeakRobust.pf_violation_free_hart nh];
+          (ii)  [WeakRobustMain.bad] carries the reader's bound [e2.1 < nh]
+                beside the author's [e1.1 < nh] (both are free at the site
+                that discharges [edges_split]: only the hart arms of
+                [pstep_xv6] emit [LLoad]/[LRmw], so a [grf] edge's reader is a
+                hart), and [bad_edge_violates] concludes [violation_hart nh]
+                — the author conjunct is [bad]'s third component and the
+                observer conjunct its fourth, verbatim;
+          (iii) [no_bad_edge] / [gdep2_acyclic_main] / [robust_main] /
+                [robust_transport] and [WeakCompose.m6_side_conditions] all
+                consume the [_hart] form.
+        [xv6_pf_violation_free] below therefore closes with residue (A)
+        alone: the two indices arrive bounded by [n_disk = NCPU] and
+        [nat_to_fin] hands the transport its [CPU]s.
 
     ------------------------------------------------------------------------
     §C  THE cls_canon / rmw_tight RESIDUE (L2's header) — ROUTE CHOSEN: (B).
@@ -198,12 +200,12 @@
          [wstate] (the wp machine has an agent [WeakLang] does not).
       3. THE ADEQUACY WP PACKAGE — the pool's WPs from the initial resources,
          verbatim [WeakAdequacy.weak_system_adequacy_phi]'s premise.
-      4. [xv6_block_cover] — residue (A) above.
-      5. [xv6_violation_harts] — residue (B) above.
-      6. The FIRST conjunct of [m6_side_conditions] (the per-bundle static
+      4. [xv6_block_cover] — residue (A) above, and THE ONLY RESIDUE: (B) is
+         gone, fixed in Layer 1 (see §B).
+      5. The FIRST conjunct of [m6_side_conditions] (the per-bundle static
          side conditions [main_premises n_disk], = [WeakCompose] §6 (3)),
-         unchanged.
-      7. Inside the segments, three DEVICE-SEAM side conditions, all of them
+         with [bad] now bounding the READER's agent index too.
+      6. Inside the segments, three DEVICE-SEAM side conditions, all of them
          seam (4) ([WeakCompose] §6) in sharper form:
          [WeakSailLTS2.oracle_consistent] per hart block (L2's, unchanged);
          [hart_dev_seam] — the post-block fabric IS the one the block's own
@@ -213,7 +215,7 @@
          [bool_to_bit (dev_seip …)], the interrupt-oracle twin of
          [oracle_consistent]); and [wa_dd u = wgdev g] inside [seg_disk] (the
          M5 device-view residue, [WeakCompose] delta (i)).
-      8. The 5 rv64d baseline axioms.  NO functional extensionality, NO
+      7. The 5 rv64d baseline axioms.  NO functional extensionality, NO
          classical axiom: [Print Assumptions xv6_weak_robust_adequate] lists
          exactly [rv64d.load_reservation], [match_reservation],
          [cancel_reservation], [valid_reservation], [plat_term_write].
@@ -222,8 +224,8 @@
     direction — L2 built it, §3 consumes it), (1b) (interleaving regrouping —
     §7, for block-atomic runs), (1c) (device and power arms — the plic and
     disk arms are built; uart and power are shown unnecessary rather than
-    assumed), and, MODULO the two residues, seam (2) ([pf_violation_free]
-    itself).
+    assumed), and, MODULO residue (A), seam (2)
+    ([pf_violation_free_hart] itself).
 
     NOTE ON NAMES.  [WeakAxiomatic] is imported FIRST so that [WeakPromise]'s
     [wlabel] constructors shadow its [lbl] ones (as in [WeakRobustBlocks]);
@@ -865,7 +867,7 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
-(** ** 10. THE TWO RESIDUES, and the derived [pf_violation_free] *)
+(** ** 10. THE RESIDUE, and the derived [pf_violation_free_hart] *)
 
 (** RESIDUE (A) — BLOCK-ATOMICITY (the interleaving/mover residue).  An
     arbitrary [wp_pf_run] interleaves the harts at EVENT granularity, while
@@ -882,42 +884,45 @@ Definition xv6_block_cover (g0 : wgstate) (u0 : wlaux) : Prop :=
     ∃ g' u', xv6_blocks (g0, u0) (g', u') ∧
              violates_at (wl_cfg g' u') p m i j a.
 
-(** RESIDUE (B) — THE AGENT QUANTIFIER.  [WeakRobust.violation] quantifies
-    the author and the observer over ALL agents, while [WeakGhost.no_violation]
-    (and the C/D/S invariants behind it) speak only about HARTS.  See the
-    header: this premise is NOT innocuous — it is false for the xv6 disk — and
-    the fix belongs in Layer 1's statement, not here. *)
-Definition xv6_violation_harts (g0 : wgstate) (u0 : wlaux) : Prop :=
-  ∀ (c : wpcfg pxv6) p m i j a,
-    rtc (wp_pf_run (pstep_xv6 riscv_step)) (wl_cfg g0 u0) c →
-    violates_at c p m i j a →
-    ∃ ci cj : CPU, i = fin_to_nat ci ∧ j = fin_to_nat cj.
+(** THE φ-CONSUMPTION COROLLARY: [pf_violation_free_hart] — the ONE conjunct
+    of [WeakCompose.m6_side_conditions] that φ/Iris was left carrying —
+    DERIVED from the adequacy export through the lift.
 
-(** THE φ-CONSUMPTION COROLLARY: [pf_violation_free] — the ONE conjunct of
-    [WeakCompose.m6_side_conditions] that φ/Iris was left carrying — DERIVED
-    from the adequacy export through the lift. *)
+    THE AGENT QUANTIFIER IS NO LONGER A PREMISE (the L3 finding of §B, fixed
+    in Layer 1 on 2026-08-12).  [WeakRobust.violation_hart] restricts BOTH the
+    author and the observer to harts, exactly as [WeakGhost.no_violation]
+    does, so the two indices arrive here already bounded by
+    [WeakLang.n_disk = NCPU] and [nat_to_fin] turns them into the [CPU]s the
+    transport wants.  The disk-authored and disk-observed DMA violations that
+    made the OLD, unrestricted conjunct refutable are simply not instances of
+    the statement any more. *)
 Theorem xv6_pf_violation_free (gen : nat) (g0 : wgstate) (u0 : wlaux) :
   (∀ b, sail_shaped (riscv_step b)) →
   wthread_live g0 gen →
   (∀ t2 g2, rtc (@erased_step weak_riscv_lang) (wpool gen, g0) (t2, g2) →
             no_violation (wglog g2) (wgws g2)) →
-  xv6_block_cover g0 u0 → xv6_violation_harts g0 u0 →
+  xv6_block_cover g0 u0 →
   ∀ c, rtc (wp_pf_run (pstep_xv6 riscv_step)) (wl_cfg g0 u0) c →
-       ¬ violation cls_of pub_of c.
+       ¬ violation_hart cls_of pub_of n_disk c.
 Proof.
-  intros Hsh Hlive Hphi Hcov Hharts c Hrun Hviol.
-  destruct (violation_violates_at c Hviol) as (p & m & i & j & a & Hv).
-  destruct (Hharts c p m i j a Hrun Hv) as (ci & cj & -> & ->).
-  destruct (Hcov c p m _ _ a Hrun Hv) as (g' & u' & Hbl & Hv').
-  exact (xv6_blocks_no_hart_violation gen g0 u0 g' u' p m ci cj a
-           Hsh Hlive Hphi Hbl Hv').
+  intros Hsh Hlive Hphi Hcov c Hrun Hviol.
+  destruct (violation_hart_violates_at n_disk c Hviol)
+    as (p & m & i & j & a & Hv & Hi & Hj).
+  destruct (Hcov c p m i j a Hrun Hv) as (g' & u' & Hbl & Hv').
+  set (ci := nat_to_fin Hi : CPU).
+  set (cj := nat_to_fin Hj : CPU).
+  have Hci : fin_to_nat ci = i by apply fin_to_nat_to_fin.
+  have Hcj : fin_to_nat cj = j by apply fin_to_nat_to_fin.
+  eapply (xv6_blocks_no_hart_violation gen g0 u0 g' u' p m ci cj a);
+    [exact Hsh|exact Hlive|exact Hphi|exact Hbl|].
+  by rewrite Hci Hcj.
 Qed.
 
 (* ====================================================================== *)
 (** ** 11. THE UPDATED COMPOSITION
 
-    [WeakCompose.xv6_weak_robust] with [pf_violation_free] REPLACED by its
-    derivation.  The full premise list is in the header. *)
+    [WeakCompose.xv6_weak_robust] with [pf_violation_free_hart] REPLACED by
+    its derivation.  The full premise list is in the header. *)
 
 Corollary xv6_weak_robust_lifted (gen : nat) (g0 : wgstate) (u0 : wlaux)
     (c : wpcfg pxv6) :
@@ -926,7 +931,7 @@ Corollary xv6_weak_robust_lifted (gen : nat) (g0 : wgstate) (u0 : wlaux)
   wglog g0 = [] → (∀ cc : CPU, wgws g0 cc = ws_init) → wa_dws u0 = ws_init →
   (∀ t2 g2, rtc (@erased_step weak_riscv_lang) (wpool gen, g0) (t2, g2) →
             no_violation (wglog g2) (wgws g2)) →
-  xv6_block_cover g0 u0 → xv6_violation_harts g0 u0 →
+  xv6_block_cover g0 u0 →
   (∀ (cb mid : wpcfg pxv6) (TS : ptraces pxv6),
      wp_behavior (pstep_xv6 riscv_step) (img_z (wgimg g0)) (xv6_ps0 g0 u0) cb →
      rtc (wp_promise_step (P := pxv6))
@@ -938,11 +943,11 @@ Corollary xv6_weak_robust_lifted (gen : nat) (g0 : wgstate) (u0 : wlaux)
           (wp_init (img_z (wgimg g0)) (xv6_ps0 g0 u0)) cf ∧
         prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
 Proof.
-  intros Hsh Hlive Hlog Hws Hdws Hphi Hcov Hharts Hprem Hbeh.
+  intros Hsh Hlive Hlog Hws Hdws Hphi Hcov Hprem Hbeh.
   apply (xv6_weak_robust riscv_step (img_z (wgimg g0)) (xv6_ps0 g0 u0) c);
     [|exact Hbeh].
   split; [exact Hprem|].
-  rewrite /pf_violation_free (wp_init_wl g0 u0 Hlog Hws Hdws).
+  rewrite /pf_violation_free_hart (wp_init_wl g0 u0 Hlog Hws Hdws).
   by eapply xv6_pf_violation_free.
 Qed.
 
@@ -971,7 +976,7 @@ Corollary xv6_weak_robust_adequate Σ `{!riscvGpreS Σ, !weakGpreS Σ}
        ={⊤}=∗
        ([∗ list] cc ∈ (enum CPU), WWP (LoopE gen_id cc) @ ⊤) ∗
        WWP UartLoop @ ⊤ ∗ WWP DiskLoop @ ⊤ ∗ WWP PlicLoop @ ⊤) →
-  xv6_block_cover g0 u0 → xv6_violation_harts g0 u0 →
+  xv6_block_cover g0 u0 →
   (∀ (cb mid : wpcfg pxv6) (TS : ptraces pxv6),
      wp_behavior (pstep_xv6 riscv_step) (img_z (wgimg g0)) (xv6_ps0 g0 u0) cb →
      rtc (wp_promise_step (P := pxv6))
@@ -983,9 +988,9 @@ Corollary xv6_weak_robust_adequate Σ `{!riscvGpreS Σ, !weakGpreS Σ}
           (wp_init (img_z (wgimg g0)) (xv6_ps0 g0 u0)) cf ∧
         prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
 Proof.
-  intros Hsh Hwp Hcov Hharts Hprem Hbeh.
+  intros Hsh Hwp Hcov Hprem Hbeh.
   eapply (xv6_weak_robust_lifted gen_id g0 u0 c Hsh);
-    [|exact Hlog|exact Hws|exact Hdws| |exact Hcov|exact Hharts|exact Hprem
+    [|exact Hlog|exact Hws|exact Hdws| |exact Hcov|exact Hprem
      |exact Hbeh].
   - split; [exact Hpow|]. by rewrite Hgen0 Hgid.
   - intros t2 g2 Hr.
