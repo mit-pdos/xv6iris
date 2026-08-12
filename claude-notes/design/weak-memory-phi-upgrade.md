@@ -314,6 +314,25 @@ owned points-to and move the upgrade INSIDE the leaf rules:
   never cross wp_next — documented as not-the-API, converts only
   through clean `↦w{1}`.
 
+**STAGE 1.7 — THE AMBIENT CONTEXT CLASS (user directive, 2026-08-12):**
+`Class CurCtx := cur_ctx : CtxId.` + notation making the bare owned
+points-to (`↦wo` and its width towers) elaborate to
+`wpt_own cur_ctx …` by typeclass search, so existing/ported proofs
+write access sites UNCHANGED and take `` `{CurCtx} `` once per
+lemma/section (arriving with `wrunning cur_ctx`, like `cur_proc`).
+SOUNDNESS OF THE AMBIENT TRICK: ξ is invariant across the whole
+function INCLUDING migration — the exact property `cpu_id` lacked
+(which is why explicit-cpuid had to go the other way).  ξ stays
+EXPLICIT at: lock invariants (mostly moot — payloads carry the
+context-free clean `↦w{1}` via the release flip), the
+scheduler/WeakCtx machinery (multiple contexts in scope), and any
+context-quantifying spec (yield's own).  DISCIPLINE (from the
+explicit-cpuid scar tissue): `Typeclasses Opaque` + single-instance
+hygiene so two `CurCtx` instances never silently coexist; two-context
+lemmas use the explicit spelling only.  Acceptance: the examples'
+access scripts written with bare `↦wo`, zero explicit ξ outside the
+yield/scheduler lemmas.
+
 **Stage 2 — the REAL migration test (a PORT TARGET, gated on the S-mode
 scheduler cone): the same program with the handoff replaced by
 `wp_next`/`p_sched`** — the parked-continuation crossing where the
