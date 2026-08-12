@@ -406,10 +406,23 @@ floor that sees every observation.
       (process events in topological order, predecessors always done).
       Pairwise per-agent monotonicity provided; the filter-subsequence
       form is a short corollary if needed.
-- [ ] **W2b — the simulation (coordinator; design REVISED 2026-08-12 —
+- [x] **W2b — the simulation LANDED, axiom-free (`WeakRobustSim.v`,
+      1480 lines, 2026-08-12): `sim_full`, `sim_prefix` (the subset
+      form over any `sub_ok` S), and `wp_behavior_robust` — the shape
+      W5 chains `WeakRobustAcyc2`/`WeakRobustSer`'s wrappers into.
+      Every case of the revised design closed as stated; finding (vi)
+      realized literally (`gdep2_acyclic` is a per-theorem argument,
+      no discipline premise anywhere).  Landing deltas recorded in the
+      file: `pf_log = msg_at <$> fl` (lookup-fmap, not omap-induction);
+      π factored through an abstract position list (`piL`, injective
+      WITHOUT NoDup — disjoint ranges); `Hpred` is the only carried
+      order fact; the cruxes factored as `read_ok_pf`/`excl_ok_pf`;
+      two local promise-phase lemmas (`log_ne`, `promise_run_shape`)
+      discharge the wrapper's premises.  (Design record below, kept.)**
+      (design REVISED 2026-08-12 —
       the 08-11 pinned design was tested against the mixed fresh/stale
       witness as instructed and FAILED; two machine-level
-      counterexamples found, both recorded here before building).**
+      counterexamples found, both recorded here before building).
 
       **COUNTEREXAMPLE 1 — floor inversion (kills "any toposort of
       gdep").**  x@ts by j; x@t'' by m; y@t by k, with ts < t < t''.
@@ -603,6 +616,24 @@ floor that sees every observation.
       read (its po-prefix ⊆ U when its target is chosen with
       bad-target-free strict ancestry) — its pf step reaches a
       violating state, contradicting `pf_violation_free`.
+      (2b) BAD'S EXACT SHAPE (pinned 2026-08-12): `bad(e1,e2)` :=
+      cross grf ∧ the message's `wm_ak = WCplain` ∧ NO PUBLISHING
+      EVENT of the author po-after f(ts_m) lies in ancestors(e2) —
+      where "publishing event" is detected by the LABEL's rl bit or
+      the message class WCrel (an rl-AMO raises `w_pub` while tagged
+      WCexcl, so the class alone is not the raise condition).  The
+      ancestry conjunct is what makes ¬pub hold at the exhibit state:
+      processed events ⊆ ancestors(e2), the author's pf `w_pub` is
+      the max over π of its processed raises, and author-po order
+      transports through π — no processed po-later raise ⇒ π-w_pub
+      below π(ts_m).  The third case (publish-ancestor via a third
+      party with an uncovered reader) is neither edge_ok nor bad —
+      it is claimed not to occur in the kernel and sits inside the
+      edge_ok premise's discharge obligations.  The appended bad
+      read's own pf-admissibility runs on the sim's readable crux
+      verbatim (its E-edges connect U events and the U-sort orders
+      them; multi-byte reads need all bytes' sources in U — they are,
+      by rf-closure).
       (3) THE HONEST RESIDUE: a "bad SCC" — bad edges lying on a
       mutual-reachability cycle, i.e. spontaneously mutually-justified
       owned-read LB — admits no minimal bad target and no exhibit
