@@ -890,6 +890,7 @@ WeakAxiomatic3.v
 WeakInterp.v
 WeakInterpProj.v
 WeakSailLTS.v
+WeakCompose.v
 WeakLang.v
 WeakGhost.v
 WeakExec.v
