@@ -481,6 +481,32 @@ drop-in replacement of the handoff.
   a value-flow argument (the SCC's reads' values must be produced by
   its own writes), research not plumbing.
 
+
+## 2b. The static-discipline delivery architecture (2026-08-12, user
+directive — supersedes "standalone whole-image side condition")
+
+Three layers: (1) GENERATED pure image-level site lemmas
+(`release_site`/`racy_load_site` predicates + the ∀-over-text
+whole-image lemma; same epistemic status as the generated decode
+catalogue — trusted-by-regeneration, no new category; gen_sites.py is
+the gen_code.py sibling); (2) DELIVERY VIA `instr`: the persistent
+single-message text facts carry the classification to each leaf, no
+side-condition threading; (3) two DYNAMIC interp conjuncts:
+`w_relp = true → SIE = 0 ∧ instr-at-pc is a release-flag store` (+
+the reader-flag analog) — the fence leaf establishes (site fact +
+the SIE resource its site holds), the flag store consumes, and
+PREEMPTION BETWEEN FENCE AND OPERATION IS UNREPRESENTABLE (a trap
+cannot fire while armed).  WHY THIS MATTERS FOR SOUNDNESS: an
+interposed handler store would CONSUME the armament — spuriously
+WCrel itself (harmless) but leaving the intended flag store WCplain
+= unpublished = φ-unprovable at the racy readers.  xv6's discipline
+sites are all interrupts-off (push_off CSs; started pre-scheduler),
+and THIS TREE MODELS SSTC (stimecmp; no M-mode timervec scratch
+stores), so SIE=0 genuinely excludes interposition.  The whole-image
+lemma remains load-bearing for the one thing interp exports cannot
+cover: it is SUPPORT-INDEPENDENT (value-blind), closing the
+pc-in-text half of D-M6-8's residue.
+
 ## 3. Sequencing (why this precedes the port)
 
 Land BEFORE the mass port, in order: (1) the C/D/S points-to surgery +
