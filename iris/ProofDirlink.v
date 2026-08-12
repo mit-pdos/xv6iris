@@ -960,7 +960,7 @@ Section ProofDirlinkMain.
   Proof.
     cbv beta delta [wp_dirlink_sconf_body].
     intros pcE pjv nb ret_tgt nrec s k0 HK Htype Hbmcov Hszb Hinums Hfit
-           Hstab Hlg Hbmwf Hholes Haddrs Hsz31 Hist0 Hiblk Hiblog Hdinb Hcinb Hbmgeo Hpkc
+           Hstab Hnlk Hlg Hbmwf Hholes Haddrs Hsz31 Hist0 Hiblk Hiblog Hdinb Hcinb Hbmgeo Hpkc
            Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb Hnc Hj Hgs Ha0 Ha2 Heb.
     (* [Hcinb] -- the LINKED inum's range -- is NOT used below: dirlink's
        [sh] stores sixteen bits whatever they are.  It rides in the contract
@@ -2063,7 +2063,7 @@ Section ProofDirlinkMain.
                         unfold dirlink_units in Hnc; lia)
                   Hlg Hist0 Hiblk Hiblog Hdinb Haddrs
                   ltac:(rewrite Htype; vm_compute; discriminate)
-                  Hstab
+                  Hstab Hnlk
                   Hbmwf Hholes Hbmcov
                   ltac:(change (Z.of_nat 16%nat) with 16;
                         exact (dl_lt31 _ Hk0fit))

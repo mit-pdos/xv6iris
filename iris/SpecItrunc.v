@@ -183,7 +183,7 @@ End ItruncSpec.
 
 Definition wp_itrunc_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
-      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -230,6 +230,12 @@ Definition wp_itrunc_sconf_body
      record -- so itrunc owes the agreement between the stale [dn0] and
      [dn].  iput, its only caller, passes the two as the same record. *)
   di_type_stable dn dn0 ->
+  (* NLINK STABILITY (fs-icache.md §20.6, fs-sysfile S5f): the link
+     ledger's twin of the premise above, travelling for the same reason --
+     the record the REGION holds at the iupdate below is the stale [dn0].
+     [InodeRegion.di_nlink_stable_refl] discharges it at any caller that
+     holds the two as ONE record with a nonzero type. *)
+  di_nlink_stable dn dn0 ->
   (* the map is well-formed: this is what says every block it names is a
      covered home block, and -- via injectivity -- that the 269 frees are
      269 DISTINCT blocks, so the free pool really does grow by
@@ -360,7 +366,7 @@ Definition wp_itrunc_sconf_body
 Module Type ITRUNC.
   Parameter wp_itrunc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
-             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
       `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (j : nat) (γl : gname)

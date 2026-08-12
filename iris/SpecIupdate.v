@@ -117,7 +117,7 @@ Definition K_iupdate : nat := 44%nat.
 
 Definition wp_iupdate_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
-      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -162,6 +162,17 @@ Definition wp_iupdate_sconf_body
      disjunct (its [ip->type = 0] store), writei/itrunc/create the
      equation, since none of them ever moves the type field. *)
   InodeRegion.di_type_stable dn dn0 ->
+  (* NLINK STABILITY (fs-icache.md §20.6, fs-sysfile S5f).  The link
+     ledger's (L1) will cap the live directory records naming this inum by
+     that inum's [nlink], so the region's flush must refuse to LOWER it:
+     sys_unlink's decrement is the one writer that does, and it goes
+     through [InodeRegion.ireg_write_unlink], which pays for the drop by
+     consuming a fragment.  Travels exactly as [di_type_stable] does, and
+     for the same reason: the record the REGION holds at iupdate's seam is
+     the STALE [dn0].  Every caller discharges it with
+     [InodeRegion.di_nlink_stable_refl] -- no writer at or below iupdate
+     moves [nlink] at all. *)
+  InodeRegion.di_nlink_stable dn dn0 ->
   (* ...and the record whose scalars [inode_meta] owns names exactly the
      thirteen addrs cells [inode_map] owns.  THE tie between the two
      resources; see the header. *)
@@ -268,7 +279,7 @@ Definition wp_iupdate_sconf_body
 (* ===================================================================== *)
 Definition wp_iupdate_gen_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
-      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -313,6 +324,17 @@ Definition wp_iupdate_gen_body
      disjunct (its [ip->type = 0] store), writei/itrunc/create the
      equation, since none of them ever moves the type field. *)
   InodeRegion.di_type_stable dn dn0 ->
+  (* NLINK STABILITY (fs-icache.md §20.6, fs-sysfile S5f).  The link
+     ledger's (L1) will cap the live directory records naming this inum by
+     that inum's [nlink], so the region's flush must refuse to LOWER it:
+     sys_unlink's decrement is the one writer that does, and it goes
+     through [InodeRegion.ireg_write_unlink], which pays for the drop by
+     consuming a fragment.  Travels exactly as [di_type_stable] does, and
+     for the same reason: the record the REGION holds at iupdate's seam is
+     the STALE [dn0].  Every caller discharges it with
+     [InodeRegion.di_nlink_stable_refl] -- no writer at or below iupdate
+     moves [nlink] at all. *)
+  InodeRegion.di_nlink_stable dn dn0 ->
   (* ...and the record whose scalars [inode_meta] owns names exactly the
      thirteen addrs cells [inode_map] owns.  THE tie between the two
      resources; see the header. *)
@@ -413,7 +435,7 @@ Definition wp_iupdate_gen_body
 (* ===================================================================== *)
 Definition wp_iupdate_cred_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
-      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -464,6 +486,17 @@ Definition wp_iupdate_cred_body
      disjunct (its [ip->type = 0] store), writei/itrunc/create the
      equation, since none of them ever moves the type field. *)
   InodeRegion.di_type_stable dn dn0 ->
+  (* NLINK STABILITY (fs-icache.md §20.6, fs-sysfile S5f).  The link
+     ledger's (L1) will cap the live directory records naming this inum by
+     that inum's [nlink], so the region's flush must refuse to LOWER it:
+     sys_unlink's decrement is the one writer that does, and it goes
+     through [InodeRegion.ireg_write_unlink], which pays for the drop by
+     consuming a fragment.  Travels exactly as [di_type_stable] does, and
+     for the same reason: the record the REGION holds at iupdate's seam is
+     the STALE [dn0].  Every caller discharges it with
+     [InodeRegion.di_nlink_stable_refl] -- no writer at or below iupdate
+     moves [nlink] at all. *)
+  InodeRegion.di_nlink_stable dn dn0 ->
   (* ...and the record whose scalars [inode_meta] owns names exactly the
      thirteen addrs cells [inode_map] owns.  THE tie between the two
      resources; see the header. *)
@@ -553,7 +586,7 @@ Definition wp_iupdate_cred_body
 Module Type IUPDATE.
   Parameter wp_iupdate_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
-             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
       `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
@@ -577,7 +610,7 @@ Module Type IUPDATE.
      is unchanged (wp_bmap_gen / wp_balloc_gen's pattern) *)
   Parameter wp_iupdate_gen :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
-             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
       `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
@@ -600,7 +633,7 @@ Module Type IUPDATE.
      [wp_iupdate_gen] is its [cru := false] instance. *)
   Parameter wp_iupdate_cred :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
-             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
       `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)

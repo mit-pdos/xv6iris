@@ -152,6 +152,109 @@ the logged state where it can be stated and reasoned about.
 
 ---
 
+## D2 — `namei("..")` from a deleted directory: `sys_unlink` orphans the `".."` record
+
+**Found:** 2026-08-12, designing the icache's link ledger
+(`design/fs-icache.md` §20.8), while proving that "an inum a live directory
+record names is an ALLOCATED inum" — the invariant `create` needs.
+**Status:** OPEN. Not fixed; the model records it instead (see below).
+
+### The code
+
+`sys_unlink`'s directory arm (`sysfile.c`):
+
+```c
+  if(ip->type == T_DIR){
+    dp->nlink--;
+    iupdate(dp);
+  }
+  ip->nlink--;
+  iupdate(ip);
+  iunlockput(ip);
+```
+
+`dp->nlink--` accounts for the `".."` record inside the child `ip`. But
+the child is NOT truncated here: `iput` frees an inode only when its last
+in-memory reference goes, so as long as anybody holds `ip` — a process
+whose cwd it is, most obviously — the child's data blocks, and its `".."`
+record, stay exactly as they were.
+
+### The mechanism
+
+Four stock system calls, no race required:
+
+1. `mkdir /a`, `mkdir /a/b` — `b`'s data holds `"." -> b` and `".." -> a`;
+2. a process `chdir /a/b`, so `b` has a live icache reference;
+3. `rmdir /a/b` — `isdirempty(b)` passes, `a`'s record for `b` is zeroed,
+   `a->nlink--`, `b->nlink--` reaches 0. **`b`'s `".."` record still names
+   `a`, and `a`'s `nlink` no longer accounts for it.** `b` is not freed:
+   the cwd holds a reference;
+4. `rmdir /a` — `a` is empty now, `a->nlink--` reaches 0, nobody holds a
+   reference, so `iput` frees it: `itrunc`, `type = 0`. `a`'s inum is on
+   the free list.
+
+### What is observable
+
+From the deleted cwd, `namei("..")` -> `dirlookup(b, "..")` returns `a`'s
+inum -> `iget` -> `ilock`, which breads a record whose `type` is 0 and
+takes **`panic("ilock: no type")`** — a kernel panic reachable from
+unprivileged user code.
+
+And the quieter outcome is worse: if any `ialloc` re-claimed that inum in
+between, `ilock` succeeds and the process's `".."` silently resolves to an
+**unrelated inode** — a directory traversal into a file it was never
+granted, with no error anywhere.
+
+### Why the proof surfaced it
+
+`design/fs-icache.md` §19.6 chartered the invariant as "`dir_ok`
+strengthened from *covers* to *allocated*": every live directory record
+names an inum whose region record has a nonzero type. That statement is
+FALSE of xv6, at exactly this one record, and the counterexample above is
+its refutation. The invariant is what `create` needs in order to prove that
+a just-claimed inum has no foreign referrer, so the defect is not
+incidental to the proof — it sits directly on the path.
+
+### What the model does instead
+
+The link ledger (§20.2) carries TWO colours per named inum: `ilink z`, a
+record whose target's `nlink` pays for it, and `igrey z`, a record that
+**nothing** pays for. At `dp->nlink--` the child's `".."` fragment is
+CONVERTED, `ilink -> igrey`, so the ledger's (L1) cap falls on both sides
+at once. A grey fragment carries no allocatedness — which is honest,
+because in the trace above the target genuinely is not allocated — and
+**every `igrey` fragment in a run is a witness to a reachable instance of
+this defect.**
+
+Both total repairs are dead for machine-reachability reasons, and it is
+worth recording why (§20.9 (h)/(i)): keeping the ledger total would leave
+`w >= 1` at the orphan's parent and BLOCK `iput`'s free of it, and scoping
+the payload's fragments by the directory's own `nlink` would leave a
+deleted cwd carrying none, so `dirlookup` from it — a reachable step —
+would be stuck. A resource may not forbid a machine-reachable step; it only
+wedges the proof.
+
+### What a fix would cost
+
+In the C, the honest fix is to make the child's `".."` stop naming the
+parent at the moment the parent's `nlink` stops paying for it — either by
+zeroing the `".."` record in `sys_unlink`'s directory arm (one `writei` of
+16 zero bytes, before `dp->nlink--`), or by refusing `..` lookups in a
+directory whose `nlink` is zero (a test in `dirlookup`, which then has to
+be told the directory's record). Both are small.
+
+In the PROOF, either fix retires the grey colour outright: `dir_links`
+becomes single-coloured, and `create`'s one remaining gated case — *no
+orphaned directory names the claimed inum* (§20.7's (b)) — becomes a
+theorem. Until then that case is **unproven but not false**: it holds on
+every trace that does not fire this defect.
+
+Any C change here is subject to `durable-notes.md` §"Changing the kernel
+SOURCE" — the pinned image, the reproducibility gate and the address
+sweep — so it is not cheap even at 16 bytes.
+
+---
+
 ## Near-misses and non-defects
 
 Recorded so the same ground is not re-covered.

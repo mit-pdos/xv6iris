@@ -274,6 +274,12 @@ Definition wp_dirlink_sconf_body
      holds the two as ONE record ([IcacheEscrow.ic_loaded]'s single
      [dinode_at]) and discharges by [InodeRegion.di_type_stable_refl]. *)
   di_type_stable dn dn0 ->
+  (* NLINK STABILITY (fs-icache.md §20.6, fs-sysfile S5f): the link
+     ledger's twin of the premise above, travelling for the same reason --
+     the record the REGION holds at the iupdate below is the stale [dn0].
+     [InodeRegion.di_nlink_stable_refl] discharges it at any caller that
+     holds the two as ONE record with a nonzero type. *)
+  di_nlink_stable dn dn0 ->
   log_geom_ok cov logstart ->
   blkmap_wf cov logstart bm ->
   blk_holes_zero bm data ->

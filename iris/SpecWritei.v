@@ -374,7 +374,7 @@ Definition wi_dinode (dn : dinode) (bm' : blkmap) (off tot : nat) : dinode :=
 
 Definition wp_writei_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
-      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -428,6 +428,12 @@ Definition wp_writei_sconf_body
      [IcacheEscrow.ic_loaded]'s single [dinode_at] (filewrite passes
      [dnl dnl]).  Same premise, same reason, as SpecIupdate.v's. *)
   di_type_stable dn dn0 ->
+  (* NLINK STABILITY (fs-icache.md §20.6, fs-sysfile S5f): the link
+     ledger's twin of the premise above, travelling for the same reason --
+     the record the REGION holds at the iupdate below is the stale [dn0].
+     [InodeRegion.di_nlink_stable_refl] discharges it at any caller that
+     holds the two as ONE record with a nonzero type. *)
+  di_nlink_stable dn dn0 ->
   (* the file's block map, and the normalisation of its holes *)
   blkmap_wf cov logstart bm ->
   blk_holes_zero bm data ->
@@ -651,7 +657,7 @@ Definition wp_writei_sconf_body
 (* ===================================================================== *)
 Definition wp_writei_gen_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
-      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -705,6 +711,12 @@ Definition wp_writei_gen_body
      [IcacheEscrow.ic_loaded]'s single [dinode_at] (filewrite passes
      [dnl dnl]).  Same premise, same reason, as SpecIupdate.v's. *)
   di_type_stable dn dn0 ->
+  (* NLINK STABILITY (fs-icache.md §20.6, fs-sysfile S5f): the link
+     ledger's twin of the premise above, travelling for the same reason --
+     the record the REGION holds at the iupdate below is the stale [dn0].
+     [InodeRegion.di_nlink_stable_refl] discharges it at any caller that
+     holds the two as ONE record with a nonzero type. *)
+  di_nlink_stable dn dn0 ->
   (* the file's block map, and the normalisation of its holes *)
   blkmap_wf cov logstart bm ->
   blk_holes_zero bm data ->
@@ -911,7 +923,7 @@ Definition wp_writei_gen_body
 Module Type WRITEI.
   Parameter wp_writei_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
-             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
       `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
@@ -942,7 +954,7 @@ Module Type WRITEI.
      is unchanged (wp_bmap_gen / wp_balloc_gen's pattern) *)
   Parameter wp_writei_gen :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
-             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
       `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)

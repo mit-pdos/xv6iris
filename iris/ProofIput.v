@@ -1963,6 +1963,7 @@ Section ProofIput.
               Hnib Htyne2
               (* §19.6 Part 1: iput hands itrunc ONE record for both slots. *)
               (InodeRegion.di_type_stable_refl dn2)
+              (InodeRegion.di_nlink_stable_refl dn2)
               Hbmwf2 Hcovb Hsized2 Hdiaddrs2 Hj Hgsj HJ2a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlogc Hidv Hinh Hmeta
                     [Haddrs Hind] Hblks Hbms Hins Hbm Hireg Hdat Hppid Hprocs
@@ -2063,6 +2064,11 @@ Section ProofIput.
                  record's type legitimately moves, and it moves to ZERO. *)
               (InodeRegion.di_type_stable_zero (di_free dn2) (di_trunc dn2)
                  (di_free_type dn2))
+              (* §20.6: [di_free] and [di_trunc] both rebuild the record
+                 with [di_nlink dn2] verbatim, so the ledger's monotone
+                 premise is a conversion. *)
+              (InodeRegion.di_nlink_stable_eq (di_free dn2) (di_trunc dn2)
+                 eq_refl)
               (di_free_addrs dn2) ltac:(reflexivity) Hj Hgsj HJ4a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlogc Hidv Hinh Hmeta Hmap
                     Hins Hireg Hdat Hppid Hprocs Hdevi Hdgeom Hdlock Hbs2 [Hop] [-]").

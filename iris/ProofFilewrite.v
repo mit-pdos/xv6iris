@@ -2052,6 +2052,7 @@ Section ProofFilewrite.
                  the in-memory and the region slot ([dnl dnl]), so writei's
                  type-stability premise is reflexivity. *)
               (InodeRegion.di_type_stable_refl dnl)
+              (InodeRegion.di_nlink_stable_refl dnl)
               Hbmwf Hholes Hbmcov
               (SpecFilewrite.fw_chunk_joint (Z.to_nat (bv_unsigned v))
                  (Z.to_nat c) Hoffb Hcb)

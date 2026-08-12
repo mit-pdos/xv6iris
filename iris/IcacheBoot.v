@@ -348,7 +348,8 @@ Proof.
 Qed.
 
 Section IcacheBootRegion.
-  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !icacheG Σ}.
+  Context `{ICFG : icfg}.
 
   (* [FsBoot.fs_L0_big], for this map *)
   Lemma ireg_M0_big (Phi : Z -> dinode -> iProp Σ)
@@ -447,10 +448,21 @@ Section IcacheBootRegion.
      exactly the two cases.  The mint is strictly CHEAPER than it was: an
      all-free image now needs no image-wf premise and no pool contents
      beyond markers ([ipool_alloc_all_free] below). *)
+  (* THE LEDGER'S BOOT MINT (design §20.6's boot row, fs-sysfile S5f).  The
+     region parks one link authority per inum, so the boot client owes them
+     -- one per inum of the region, at the EMPTY ledger.  It is an honest
+     image obligation of exactly [ipool_shape_alloc]'s kind: nothing in
+     this file can manufacture a ghost the ambient [icfg_link] names.
+
+     THEY ARE STATED AT [w = 0] because stage A mints no fragment: with the
+     directory payloads' [dir_links] (stage B) the same premise grows to
+     [w_z] per inum plus the fragments that stock each directory.  The
+     authority's shape does not change when it does. *)
   Lemma ireg_alloc (E : coPset) (γfs : fs_names) (inodestart : Z) (nib : nat)
       (bss : nat -> list (bv 8)) :
     16 * Z.of_nat nib <= 2 ^ 32 ->
     (forall bi : nat, (bi < nib)%nat -> length (bss bi) = 1024%nat) ->
+    ([∗ set] z ∈ region_inums nib, link_auth z 0 0 None 0) -∗
     ([∗ list] bi ∈ seq 0 nib,
        fsblock γfs (inodestart + Z.of_nat bi) (bss bi))
     ={E}=∗ ∃ (γi : gname) (dss : list (list dinode)),
@@ -462,7 +474,7 @@ Section IcacheBootRegion.
   Proof.
     intros Hnib Hlen.
     destruct (image_decode nib bss Hlen) as (dss & Hl & Hwf & He).
-    iIntros "Hblks".
+    iIntros "Hlk Hblks".
     iMod (ghost_map_alloc (ireg_M0 dss nib ∪ ireg_MK nib)) as (γi) "[Ha Hels]".
     iDestruct (big_sepM_union with "Hels") as "[Hels Hmks]";
       [apply ireg_M0_MK_disj |].
@@ -470,22 +482,27 @@ Section IcacheBootRegion.
       as "Hels".
     iDestruct (imark_of_marks γi nib with "Hmks") as "Hmks".
     iDestruct (big_sepS_sep_2 with "Hels Hmks") as "Hall".
+    iDestruct (big_sepS_sep_2 with "Hall Hlk") as "Hall".
     (* per inum: one of the two ghost entries stays in the region's arm and
-       the other one is the payout *)
+       the other one is the payout; the ledger authority stays with the
+       slot on BOTH arms (design §20.2) *)
     iAssert ([∗ set] z ∈ region_inums nib,
                (ireg_slot γi z (image_dinode dss z) ∗
                 ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)))%I
       with "[Hall]" as "Hall".
     { iApply (big_sepS_mono with "Hall"). intros z Hz.
-      iIntros "[Hfrag Hmk]".
+      iIntros "[[Hfrag Hmk] Hla]".
+      assert (Hok : ireg_link_ok (image_dinode dss z) 0) by exact I.
       rewrite /ireg_out /dinode_at (region_inum_faithful nib z Hnib Hz).
       case_decide as Hty.
       - iSplitR "Hmk"; [| iExact "Hmk"].
-        rewrite /ireg_slot. iLeft.
-        iSplitR; [iPureIntro; left; exact Hty | iExact "Hfrag"].
+        iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 None 0 Hok
+                  with "Hla").
+        iLeft. iSplitR; [iPureIntro; left; exact Hty | iExact "Hfrag"].
       - iSplitR "Hfrag"; [| iExact "Hfrag"].
-        rewrite /ireg_slot. iRight.
-        iSplitR; [iPureIntro; exact Hty | iExact "Hmk"]. }
+        iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 None 0 Hok
+                  with "Hla").
+        iRight. iSplitR; [iPureIntro; exact Hty | iExact "Hmk"]. }
     rewrite big_sepS_sep.
     iDestruct "Hall" as "[Hslots Hout]".
     iDestruct (ireg_slots_of_set γi dss nib with "Hslots") as "Hslots".

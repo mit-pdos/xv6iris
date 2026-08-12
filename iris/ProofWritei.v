@@ -209,7 +209,7 @@ Proof. set_solver. Qed.
 (* ===================================================================== *)
 Section WriteiDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
+            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
 
   (* writei's 112-byte frame.  Slot k sits at [sp0 - 8k], i.e. at
      [sp_new + (112 - 8k)]:
@@ -413,7 +413,7 @@ Definition wi_sp (m M : regfile) : Prop :=
 (* ===================================================================== *)
 Section WriteiRet.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
+            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
 
   Local Lemma wi_ret `{GEN : GenId} `{CID0 : CpuId} 
       (γfs : fs_names) (γi : gname) (bn : bio_names) (γ : log_names)
@@ -787,7 +787,7 @@ End WriteiRet.
 (* ===================================================================== *)
 Section WriteiJoin.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
+            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
 
   Local Lemma wi_join `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
@@ -813,6 +813,7 @@ Section WriteiJoin.
     bv_unsigned (di_type dn) <> 0 ->
     (* §19.6 Part 1: iupdate's type-stability premise, travelling. *)
     di_type_stable dn dn0 ->
+    di_nlink_stable dn dn0 ->
     di_addrs dn' = bm_cells bm' ->
     blkmap_wf cov logstart bm' ->
     blk_holes_zero bm' data' ->
@@ -887,7 +888,7 @@ Section WriteiJoin.
             m K eb C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hadr Hwf' Hhz' Hsz' Hcov'
+    intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hadr Hwf' Hhz' Hsz' Hcov'
            Hrngt Hsized'
            Hj Hgl Hsp Hs5 Hs3 Hs1 Hs8 Hs9 Hs10 Hs11 Hdb Hd0 Hdk Hrange Hker Htotn Hdneq
            Hlo Hhi Hsbsub Hext.
@@ -985,6 +986,7 @@ Section WriteiJoin.
               (* §19.6 Part 1: the flushed [dn'] keeps [dn]'s type ([Hdneq]),
                  and [Hstab] is writei's own premise about [dn] vs [dn0]. *)
               ltac:(rewrite Hdneq; exact Hstab)
+              ltac:(rewrite Hdneq; exact Hnlk)
               Hadr Hdirlen Hj Hgl HT1a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hidev Hinum Hmeta Hmap
                     Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom
@@ -1135,7 +1137,7 @@ End WriteiJoin.
 (* ===================================================================== *)
 Section WriteiSize.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
+            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
 
   Local Lemma wi_size `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
@@ -1161,6 +1163,7 @@ Section WriteiSize.
     bv_unsigned (di_type dn) <> 0 ->
     (* §19.6 Part 1: iupdate's type-stability premise, travelling. *)
     di_type_stable dn dn0 ->
+    di_nlink_stable dn dn0 ->
     blkmap_wf cov logstart bm' ->
     blk_holes_zero bm' data' ->
     (* COVERAGE, in the two halves the loop leaves it in: at the OLD size
@@ -1232,7 +1235,7 @@ Section WriteiSize.
             m K eb C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hwf' Hhz' HcovS HcovT Hszlt Hofflt
+    intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hwf' Hhz' HcovS HcovT Hszlt Hofflt
            Hrngt Hsized'
            Hj Hgl Hsp Hs5 Hs2 Hs3 Hdb Hd0 Hdk Hrange Hker Htotn Hlo Hhi Hsbsub Hext.
     pose proof HK as HK'. unfold K_writei in HK'.
@@ -1487,7 +1490,7 @@ Section WriteiSize.
                 cov logstart inodestart nib dev ip inum bm bm' data data' dn
                 (wi_dinode dn bm' off tot) dn0 user off n tot src_bytes wrote
                 dist dstb V P' ncount u Sb SbC pidv dq dqd dqn dqs A m QB5 K eb C b
-                HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab eq_refl Hwf' Hhz'
+                HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk eq_refl Hwf' Hhz'
                 ltac:(rewrite Hdsz; change (2 ^ 31)%Z with 2147483648%Z; exact Hszlt)
                 Hcovf Hrngt Hsized'
                 Hj Hgl HQB5sp HQB5s5 HQB5s3
@@ -1693,7 +1696,7 @@ Section WriteiSize.
                 cov logstart inodestart nib dev ip inum bm bm' data data' dn
                 (wi_dinode dn bm' off tot) dn0 user off n tot src_bytes wrote
                 dist dstb V P' ncount u Sb SbC pidv dq dqd dqn dqs A m QA5 K eb C b
-                HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab eq_refl Hwf' Hhz'
+                HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk eq_refl Hwf' Hhz'
                 ltac:(change (2 ^ 31)%Z with 2147483648%Z; exact Hszn)
                 Hcovf Hrngt Hsized'
                 Hj Hgl HQA5sp HQA5s5 HQA5s3
@@ -1724,7 +1727,7 @@ End WriteiSize.
 (* ===================================================================== *)
 Section WriteiLoop.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
+            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
 
   Local Ltac reg_neq := vm_compute; discriminate.
 
@@ -1763,6 +1766,7 @@ Section WriteiLoop.
     bv_unsigned (di_type dn) <> 0 ->
     (* §19.6 Part 1: iupdate's type-stability premise, travelling. *)
     di_type_stable dn dn0 ->
+    di_nlink_stable dn dn0 ->
     bv_unsigned (di_size dn) < 2 ^ 31 ->
     (Z.of_nat off < 2 ^ 31) ->
     (Z.of_nat n < 2 ^ 31) ->
@@ -1861,7 +1865,7 @@ Section WriteiLoop.
             m K eb C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hszdn Hofflt Hnlt Hrng Husv Hj Hgl.
+    intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hszdn Hofflt Hnlt Hrng Husv Hj Hgl.
     pose proof HK as HK'. unfold K_writei in HK'.
     change (2 ^ 31)%Z with 2147483648%Z in Hszdn, Hofflt, Hnlt.
     assert (Hgeom0 : log_geom_ok cov logstart) by exact Hgeom.
@@ -2142,7 +2146,7 @@ Section WriteiLoop.
                 user off n tot src_bytes wroteI 0%nat wroteI V PI ncount uX
                 Sb Sb2
                 pidv dq dqd dqn dqs A m B1 K eb C b
-                HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hstab Hwf2 Hhz2 HcovS2 HcovT2
+                HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hwf2 Hhz2 HcovS2 HcovT2
                 Hszdn ltac:(lia)
                 ltac:(lia)
                 ltac:(intros Hs; exact (wi_sized_bmap bmI dataI data2 fbn Hdep2
@@ -3139,7 +3143,7 @@ Section WriteiLoop.
                       V P2 ncount uY
                       Sb (Sb2 ∪ {[uint (blkmap_get bm2 fbn : mword 32)]})
                       pidv dq dqd dqn dqs A m G3 K eb C b
-                      HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hstab Hwf2 Hhz3 HcovS2 Hcov3
+                      HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hwf2 Hhz3 HcovS2 Hcov3
                       Hszdn ltac:(lia)
                       ltac:(lia)
                       ltac:(intros Hs;
@@ -3440,7 +3444,7 @@ Section WriteiLoop.
                     user off n tot src_bytes wroteI mm g V P2 ncount uY
                     Sb (Sb2 ∪ {[uint (blkmap_get bm2 fbn : mword 32)]})
                     pidv dq dqd dqn dqs A m mR K eb C b
-                    HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hstab Hwf2 Hhz3 HcovS2 HcovT2
+                    HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hwf2 Hhz3 HcovS2 HcovT2
                     Hszdn ltac:(lia)
                     ltac:(lia)
                     ltac:(intros Hs;
@@ -3575,7 +3579,7 @@ End WriteiLoop.
 (* ===================================================================== *)
 Section WriteiMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
+            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq := vm_compute; discriminate.
@@ -3615,7 +3619,7 @@ Section WriteiMain.
                          pidv dq dqd dqn dqs dqb dqbs m K eb C b.
   Proof.
     cbv beta delta [wp_writei_gen_body].
-    intros pcE pj src ret_tgt HK Hcost Hgeom Hist Hicov Hilog Hnib Hadr Hdtnz Hstab
+    intros pcE pj src ret_tgt HK Hcost Hgeom Hist Hicov Hilog Hnib Hadr Hdtnz Hstab Hnlk
            Hwf Hhz Hcovin Hsum Hszdn Hgok Hprkc Hj Hgl Ha0 Ha1 Ha3 Ha4.
     (* the whole allocation side travels as ONE record from here down *)
     set (A := MkBmAlloc γ bmapstart size used dqb dqbs γpr).
@@ -4332,7 +4336,7 @@ Section WriteiMain.
                 user off 0%nat 0%nat src_bytes (fun _ => bv_0 8)
                 0%nat (fun _ => bv_0 8) V (pv_upt V) (S unc) unc Sb Sb
                 pidv dq dqd dqn dqs A m Z1 K eb C b
-                HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hstab Hadr Hwf Hhz Hszdn Hcovin
+                HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hadr Hwf Hhz Hszdn Hcovin
                 ltac:(lia) ltac:(intros Hc; exact Hc) Hj Hgl
                 HZ1sp HZ1s5 HZ1s3 ltac:(lkp) ltac:(lkp) ltac:(lkp) ltac:(lkp)
                 ltac:(lkp) ltac:(unfold BSIZE; lia) ltac:(intros; reflexivity)
@@ -4537,7 +4541,7 @@ Section WriteiMain.
               cov logstart inodestart nib dev ip inum bm data dn dn0 user off n
               src_bytes V ncount Sb (m !!! Regidx Ra1 : mword 64)
               pidv dq dqd dqn dqs A m K eb C b
-              HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hstab Hszdn Hofflt Hnlt Hrng Ha1 Hj Hgl
+              HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hszdn Hofflt Hnlt Hrng Ha1 Hj Hgl
               (wi_blocks off n) 0%nat bm data (fun _ => bv_0 8) (pv_upt V) ncount Sb U3
               ltac:(lia) Hwf Hhz ltac:(intros Hc; exact Hc) Hcovin
               ltac:(apply (bm_covers_mono bm (bv_unsigned (di_size dn)) _ Hcovin);
@@ -4593,7 +4597,7 @@ Section WriteiMain.
                            pidv dq dqd dqn dqs dqb dqbs m K eb C b.
   Proof.
     cbv beta delta [wp_writei_sconf_body].
-    intros pcE pj src ret_tgt HK Hcost Hgeom Hist Hicov Hilog Hnib Hadr Hdtnz Hstab
+    intros pcE pj src ret_tgt HK Hcost Hgeom Hist Hicov Hilog Hnib Hadr Hdtnz Hstab Hnlk
            Hwf Hhz Hcovin Hsum Hszdn Hgok Hprkc Hj Hgl Ha0 Ha1 Ha3 Ha4.
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hkdata #Hprkenv #Hbio #Hlctx #Hkenv
               Hidev Hinum
@@ -4604,7 +4608,7 @@ Section WriteiMain.
               cov logstart inodestart nib bmapstart size dev used γpr
               ip inum bm data dn dn0 user off n src_bytes V ncount Sb0
               pidv dq dqd dqn dqs dqb dqbs m K eb C b
-              HK Hcost Hgeom Hist Hicov Hilog Hnib Hadr Hdtnz Hstab
+              HK Hcost Hgeom Hist Hicov Hilog Hnib Hadr Hdtnz Hstab Hnlk
               Hwf Hhz Hcovin Hsum Hszdn Hgok Hprkc Hj Hgl Ha0 Ha1 Ha3 Ha4
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hkdata Hprkenv Hbio Hlctx Hkenv
                     Hidev Hinum

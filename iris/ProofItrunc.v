@@ -81,7 +81,7 @@ Notation IT := KernelSyms.itrunc.
 (* ===================================================================== *)
 Section ItruncCont.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
 
   Definition it_cont `{GEN : GenId} `{CID0 : CpuId}
       (γ : log_names) (γfs : fs_names) (γi : gname) (bn : bio_names)
@@ -169,7 +169,7 @@ Proof. vm_compute; reflexivity. Qed.
 (* ===================================================================== *)
 Section ItruncTail.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
 
   Local Lemma it_tail `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
@@ -191,6 +191,7 @@ Section ItruncTail.
     bv_unsigned (di_type dn) <> 0 ->
     (* §19.6 Part 1: iupdate's type-stability premise, travelling. *)
     di_type_stable dn dn0 ->
+    di_nlink_stable dn dn0 ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
     it_sp m M ->
@@ -227,7 +228,7 @@ Section ItruncTail.
             used dev ip inum dn bm u pidv dq dqd dqn dqb dqs j m K C b eb -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hj Hgl Hsp Hthr Hs3.
+    intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hj Hgl Hsp Hthr Hs3.
     pose proof HK as HK'. unfold K_itrunc in HK'.
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hsbb Hsbi Hmeta Hmap Hblks Hbmr
               #Hireg Hdn #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
@@ -330,7 +331,7 @@ Section ItruncTail.
               HKiu Hgeom Hist Hicov Hilog Hnib
               (* §19.6 Part 1: [di_trunc] keeps the type, so itrunc's own
                  [Hstab] about [dn] vs [dn0] is exactly what iupdate wants. *)
-              Hstab
+              Hstab Hnlk
               (di_trunc_addrs dn) Hdirlen
               Hj Hgl HT1a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hidev Hinum Hmeta Hmap
@@ -626,7 +627,7 @@ End ItruncTail.
 (* ===================================================================== *)
 Section ItruncDLoop.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
 
   (* what the loop hands on at +0x32, once every direct entry is gone *)
   Definition it_dexit `{GEN : GenId} `{CID0 : CpuId} 
@@ -1195,7 +1196,7 @@ End ItruncDLoop.
 (* ===================================================================== *)
 Section ItruncELoop.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
 
   Definition it_eexit `{GEN : GenId} `{CID0 : CpuId} 
       (γ : log_names) (γfs : fs_names) (bn : bio_names) (γd : disk_names)
@@ -1722,7 +1723,7 @@ End ItruncELoop.
 (* ===================================================================== *)
 Section ItruncIArm.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
 
   (* what the arm hands to the tail: the inode names nothing at all *)
   Definition it_armexit `{GEN : GenId} `{CID0 : CpuId}
@@ -2439,7 +2440,7 @@ End ItruncIArm.
 (* ===================================================================== *)
 Section ItruncMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
 
   Lemma wp_itrunc_sconf `{GEN : GenId} `{CID : CpuId}       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -2460,7 +2461,7 @@ Section ItruncMain.
   Proof.
     cbv beta delta [wp_itrunc_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
-           Hnib Hdtnz Hstab Hwf Hbelow Hblen Hadr Hj Hgl Ha0.
+           Hnib Hdtnz Hstab Hnlk Hwf Hbelow Hblen Hadr Hj Hgl Ha0.
     pose proof HK as HK'. unfold K_itrunc in HK'.
     (* THE PER-SLOT RANGE FACT, no longer a premise: [blkmap_wf] already
        says every block the map names is covered, and [cov_below] bounds a
@@ -2834,7 +2835,7 @@ Section ItruncMain.
                 cov logstart bmapstart inodestart size nib dev used ip inum
                 dn dn0 bm
                 n1 pidv dq dqd dqn dqb dqs m R0 K C b eb
-                HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hj Hgl HR0sp HR0thr HR0s3
+                HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hj Hgl HR0sp HR0thr HR0s3
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs
                       Hframe Hppid Hidev Hinum Hsbb Hsbi
                       Hmeta Hmap Hblks Hbmr Hireg Hdn Hdevi Hdgeom Hdlock
@@ -2899,7 +2900,7 @@ Section ItruncMain.
                 cov logstart bmapstart inodestart size nib dev used ip inum
                 dn dn0 bm
                 n3 pidv dq dqd dqn dqb dqs m Mz K C b eb
-                HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hj Hgl HMzsp HMzthr HMzs3
+                HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hj Hgl HMzsp HMzthr HMzs3
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs
                       [Hf1 Hf2 Hf3 Hf4 Hf5 Hslot6] Hppid Hidev Hinum Hsbb
                       Hsbi Hmeta Hmap Hblks Hbmr Hireg Hdn Hdevi Hdgeom Hdlock

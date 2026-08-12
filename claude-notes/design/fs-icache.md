@@ -4622,3 +4622,68 @@ from §20.8's draft in stage A. Stage order A→E as proposed, E before
 D only if create's first landing must be unconditional (it need not —
 the gated grey case is acceptable at first landing). S7's unlink
 inherits its obligations from the preservation table.
+
+### 20.13 THE KNOT §20 DID NOT PRICE (fs-sysfile S5f, 2026-08-12): (L1) and
+### (L3) stand or fall together, and their single missing fact is
+### `di_nlink dn2 = 0` at `ProofIput`'s free
+
+Stage A built the algebra and parked the authority; the CLAUSES could not
+land, and the reason is one knot with one missing fact rather than a
+collection of gaps.
+
+1. **`ireg_claim_au` cannot re-establish (L1) without (L3).** The record
+   ialloc writes is `ialloc_fresh ty`, whose `nlink` is ZERO — it models
+   `memset(dip,0,64)`. So (L1) at the new record is `w ≤ 0`, i.e. `w = 0`,
+   and the claim's only handle is the type-0-ness its caller read out of the
+   buffer: it needs (L3) as an INVARIANT. ialloc never reads `nlink`, and
+   `ds` is discovered by the scan, so there is no premise slot for it
+   either.
+2. **(L3) is preserved by every writer but the free.** The ordinary flush
+   and the claim both write a nonzero type (vacuous); the withdraw writes
+   nothing. Only iput's `ip->type = 0` flush must SHOW `di_nlink = 0` of
+   the record it writes.
+3. **xv6 establishes exactly that, and the PROOF loses it.** The free is
+   guarded by `ip->nlink == 0` at iput+0x40 — `ProofIput.v:1529`'s `Hnl0`,
+   read off the record `dn` held BEFORE the window — and `ProofIput`
+   re-opens the payload after `acquiresleep` as a fresh existential `dn2`
+   (`:1938`) with no link back. §17.6's `ity_shot` pins the TYPE across the
+   window; nothing pins `nlink`.
+4. **No ghost route exists.** Lowering the ledger's authority is a
+   frame-preserving update, so nothing can "clear" `w` at a record whose
+   fragments are outstanding — §19.7's rule one level down.
+
+Every clause placement was tried against the four movers and each moves the
+red step rather than removing it: (L1) alone reds the claim; (L1)+(L3) reds
+`ProofIput`; (L1) on the marker arm with nothing on the in arm reds the
+withdraw; `w = 0` on the in arm reds the free again. **The free is always
+the red step, because the free is where the ledger has to CERTIFY
+"unnamed".**
+
+**§20.6's iput row is what under-priced it.** It says the free "gains TWO
+premises: `di_nlink dn' = 0` and `c = None`", prices (M1) for the second and
+treats the first as free. Both are facts about the record iput is about to
+write, and iput's proof does not have that record.
+
+**THE REPAIR, and it is a prerequisite rather than an extra.**
+`IcacheEscrow.ic_open_held` takes an `ic_payload … ga true` in and hands one
+back; make it parametric in the record (`… dn bm` in, the same out) so
+`dn2 = dn` and `Hnl0` reaches the free. It is §17-family, it is exactly
+xv6's own REF-1 argument, and it is ALSO the shape (M1) needs from the other
+end — both are "what a REF-1 holder may conclude about a record it is not
+currently holding". Carrying the zero in the payload instead is dead for
+§17.5's reason (the payload is re-parked and the conjunct would have to be
+re-established by whoever picks it up).
+
+**AND (M1)'s CLAUSE HAS NO HOME IN `itable_inv`.** §20.7 puts "one clause in
+`itable_inv` … ties `r z` to the count of the entry holding `z`".
+`itable_body`'s map is `M : gmap nat (Qp * positive)` (`IcacheInv.v:903`) —
+SLOT-keyed and INUM-BLIND. The slot→inum map is `ci`, which lives in
+`itable_res` behind the spinlock (`IcacheEscrow.v:1761`, `ic_ci_wf`), not in
+the invariant; and moving the clause there would need the ledger's authority
+under the lock, contradicting §20.2's parking. (M1) therefore needs a third
+design step, not the one-clause change §20.7 priced. `r` and `iref_lic` are
+landed in the algebra so that step costs no RA change.
+
+Everything else in §20 survives unchanged: the ambient gname, the RA, the
+parking placement, the two nlink-moving writes, the grey colour, the ten
+death certificates, and the `kernel-defects.md` entry (landed as D2).

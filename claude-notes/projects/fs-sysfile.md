@@ -3548,6 +3548,163 @@ traffic, `/tmp/union15.log` untouched.  Working tree carries exactly two
 edited notes files.
 
 
+## S5f — §20 STAGE A: the ledger's ALGEBRA and its REGION PARKING landed and
+## gated; **THE CLAUSES ARE STOPPED-AND-REPORTED.** (L1) and (L3) form one
+## knot whose single missing fact is `di_nlink dn2 = 0` at `ProofIput`'s
+## free — and §20 did not price it.  Stage B NOT started
+
+### What landed, green
+
+* **`IcacheRef.v` — the whole ledger algebra, exactly as §20.2 spells it.**
+  `linkUR := gmapUR Z (authR (((natUR * natUR) * optionUR (exclR unitO)) *
+  natUR))` — the four components are §20.2's `w`/`g`/`c` plus §20.7's (M1)
+  reference counter `r`, so the RA is FINAL and stage E reshapes nothing.
+  `icfg` gains `icfg_link : gname` (the ambient door, §20.9(e)); `icacheG`
+  gains the `inG`; `icfg_alloc` gains the boot map as an argument, because
+  a gname is only usable by `IcacheBoot` if the `own_alloc` that mints it
+  also mints the map.  Vocabulary: `link_auth`, `ilink`, `igrey`,
+  `iclaim`, `iref_lic`, with `link_agree` / `link_w_ge` / `link_r_ge` /
+  `link_claim_agree` / `iclaim_excl` and the six moves
+  (`link_mint_link`, `link_spend_link`, `link_grey_of_link`,
+  `link_mint_claim`, `link_spend_claim`, `link_mint_ref`,
+  `link_spend_ref`).  **Nothing in it is provisional.**
+* **`InodeRegion.v` — the authority PARKED in `ireg_slot`, on both arms**
+  (§20.2's placement, §20.9(c)/(d)'s two death certificates), with
+  `ireg_slot_intro` as the one constructor every arm move goes through.
+  All four existing arm moves (`ireg_write_au`, `ireg_claim_au`,
+  `ireg_free_au`, `ireg_withdraw`) carry it, and TWO NEW ONES land:
+  `ireg_write_link` (mkdir's `".."` / sys_link's `ip->nlink++` — mint an
+  `ilink` in the same ghost step as the count that pays for it) and
+  **`ireg_write_unlink`** (sys_unlink's decrement, the ONLY nlink-lowering
+  region write, which CONSUMES an `ilink` as it lowers).
+* **`di_nlink_stable` and its tour**, §19.9's lesson re-applied verbatim:
+  `SpecIupdate` (all three bodies), `SpecWritei`, `SpecItrunc`,
+  `SpecDirlink`, and one token in `ProofIupdate` / `ProofWritei` /
+  `ProofItrunc` / `ProofDirlink` / `ProofFilewrite` / `ProofIput`.
+* **`IcacheBoot.ireg_alloc`** takes the ledger's per-inum authorities as a
+  boot premise (`[∗ set] z ∈ region_inums nib, link_auth z 0 0 None 0`),
+  the same kind of honest image obligation `ipool_shape_alloc` already is.
+* **`kernel-defects.md` gains D2**, the dangling-`".."` panic, from §20.8's
+  draft.
+
+### The blocker, stated exactly
+
+`ireg_link_ok d w` — the named predicate every arm move re-establishes — is
+`True` today.  §20.2's clauses are not there, and this is why:
+
+1. **`ireg_claim_au` cannot re-establish (L1) without (L3).**  The record
+   ialloc writes is `ialloc_fresh ty`, whose `nlink` is ZERO (it models
+   `memset(dip,0,64)`).  So (L1) at the new record is `w <= 0`, i.e.
+   `w = 0`, and the only handle the claim has is the type-0-ness its
+   caller read out of the buffer — i.e. it needs (L3), "a free record's
+   link count is zero", as an INVARIANT.  ialloc never reads `nlink` and
+   cannot supply it as a premise; `ds` is discovered by the scan and is
+   not a contract parameter, so there is no place to state it either.
+2. **(L3) is preserved by every writer but the free.**  `ireg_write_au`
+   and `ireg_claim_au` write a nonzero type (vacuous); `ireg_withdraw`
+   writes nothing.  Only iput's `ip->type = 0` flush must SHOW
+   `di_nlink = 0` of the record it writes.
+3. **xv6 establishes exactly that, and `ProofIput` loses it.**  The free is
+   guarded by `ip->nlink == 0` at iput+0x40 — the proof reads that
+   halfword off the record `dn` it holds BEFORE the window
+   (`ProofIput.v:1529`, `Hnl0`) — and then re-opens the payload after
+   `acquiresleep` as a FRESH existential `dn2` (`ProofIput.v:1938`) with no
+   link back to `dn`.  `ity_shot` pins the TYPE across the window
+   (§17.6's whole point) and **nothing pins `nlink`.**
+4. **There is no ghost way around it.**  Lowering the ledger's authority is
+   a frame-preserving update, so nothing can "clear" `w` at a record whose
+   fragments are outstanding — §19.7's rule, one level down.
+
+So the three propositions {claim needs (L3)} → {(L3) needs the free's
+`nlink = 0`} → {`ProofIput` cannot see it} are ONE knot with ONE missing
+fact, and no re-shaping of the clauses breaks it.  Every variant was tried
+against the four movers and each one moves the red step without removing
+it: (L1) alone reds `ireg_claim_au`; (L1)+(L3) reds `ProofIput`; (L1) on
+the marker arm with `True` on the in arm reds `ireg_withdraw`; `w = 0` on
+the in arm reds the free again.  **The free is always the red step, because
+the free is where the ledger has to CERTIFY "unnamed".**
+
+### Two repairs, priced
+
+**(R1) PIN THE RECORD ACROSS IPUT'S WINDOW.**  `IcacheEscrow.ic_open_held`
+takes an `ic_payload … ga true` in and gives one back; make it parametric
+in the record (`ic_payload_at … dn bm` in, the same out) so `dn2 = dn` and
+`Hnl0` reaches the free.  This is the honest repair: it is §17-family, it
+is what xv6's own REF-1 argument says, and it costs one lemma plus its two
+call sites in `ProofIput`.  **RECOMMENDED**, and it is a prerequisite for
+§20 stage A's content, not an optional extra.
+
+**(R2) CARRY THE ZERO IN THE PAYLOAD.**  Add `⌜di_nlink dn = 0⌝`-shaped
+information to the loaded payload at the point iput tests it — dead, for
+§17.5's reason: the payload is re-parked and the conjunct would have to be
+re-established by whoever picks it up.
+
+Note that (R1) is ALSO the shape §20.7's (M1) needs, from the other end:
+both are "what a REF-1 holder may conclude about a record it is not
+currently holding".
+
+### What §20 got right, and what it under-priced
+
+§20.7 already names an open obligation at `ireg_free_au` — the `c = None`
+half of (L3) — and prices (M1) for it.  What it did NOT see is that the
+`nlink` half has the SAME shape and the same home: §20.6's iput row says
+the free "gains TWO premises: `di_nlink dn' = 0` and `c = None`" and treats
+the first as free.  It is not.  Both are facts about the record iput is
+about to write, and iput's proof does not have that record.
+
+Everything else in §20 survives this unchanged: the ambient gname, the RA,
+the parking placement, the two nlink-moving writes, the grey colour, the
+ten death certificates, and D2.
+
+### The M1 clause has no home in `itable_inv` either (a second finding)
+
+§20.7's (M1) puts "one clause in `itable_inv` … ties `r z` to the count of
+the entry holding `z`".  **`itable_body` cannot state it.**  Its map is
+`M : gmap nat (Qp * positive)` (`IcacheInv.v:903`) — SLOT-keyed and
+INUM-BLIND — and the slot -> inum map is `ci`, which lives in `itable_res`
+behind the spinlock (`IcacheEscrow.v:1761`, `ic_ci_wf`), not in the
+invariant.  §20.7's own justification says "under the itable lock, where
+both halves are in hand", which points at `itable_res`; but the ledger's
+AUTHORITY is parked in the region, so `itable_res` cannot state it either
+without undoing §20.2's placement.  So (M1) needs a third design step, and
+it is not the one-clause change §20.7 priced.  `r` and `iref_lic` are
+landed in the algebra so that step costs no RA change.
+
+### NOT STARTED
+
+**Stage B in full** — `dir_links`, the five DirView twins, the boot IOU's
+fragments, the re-park sites.  It was not begun, and it should not be until
+(R1) lands: a payload twin whose fragments carry no allocatedness is the
+same hollow shape the region half is in now.  The stage-B sizing in §20.10
+is unaffected.
+
+### Gate
+
+`~/one6.sh` (single files) and one detached `~/mk6.sh` (`/tmp/mk6.log`,
+`make -f CoqMakefile -j24 -k`) against the EC2 mirror at `d779b5df`; no
+`_CoqProject` edit, no git write on EC2, mirror quiet throughout.
+
+### Traps recorded
+
+1. **`Excl ()` parses `()` as the unit TYPE in an RA position.**  The error
+   is `The term "Excl' ()%type" has type "excl' Set" while it is expected
+   to have type "excl' ()"` — which reads like a universe problem.  Write
+   `Excl tt`.
+2. **`ε` IN A GOAL DEFEATS `lia`.**  `auth_update_alloc`'s local update is
+   stated at `(a, ε)`, and after `prod_local_update'` the `nat` component's
+   goal is `w + 1 = S w + ε` — `lia` answers *"Cannot find witness"* on
+   what looks like arithmetic.  Spell the unit (`lelem 0 0 None 0`) in the
+   wrapper's statement and let the conversion happen once, there.
+3. **`iFrame` DISCHARGES A TRIVIAL PURE CONJUNCT, so a following
+   `iPureIntro` fails with `No such goal`.**  Bites exactly when a clause
+   is a placeholder (`True`) and will un-bite when it is not — so write the
+   constructor as `iSplitL "H"; [iExact "H" |]; iPureIntro`, which is
+   stable under both.
+4. **`auth_both_valid_discrete` returns a CONJUNCTION**; `proj1` of it is
+   the inclusion *pair*, not the inclusion.
+
+
+
 ## UNSATISFIABLE, and that is the finding that matters
 
 ### B1 (proc_priv -> proc_priv_core) — DONE, and the composition probe passed first try
