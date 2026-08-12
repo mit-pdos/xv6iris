@@ -4612,3 +4612,13 @@ Expect A and B to be threading-shaped (S5d's rhythm), C and E to be the
 two that can surprise, and D to be the walk S5a scoped.  E may be
 sequenced BEFORE D if the coordinator prefers create's first landing to
 be unconditional; nothing in D depends on E's text, only on its truth.
+
+### 20.12 RATIFIED (coordinator, 2026-08-12): §20 as designed, with M1
+
+The link ledger, the six-licence iget, the iclaim payout, the grey
+class, and M1 (the count-tied fourth component) are adopted. The
+kernel-defects.md entry (the dangling-".." panic) is to be created
+from §20.8's draft in stage A. Stage order A→E as proposed, E before
+D only if create's first landing must be unconditional (it need not —
+the gated grey case is acceptable at first landing). S7's unlink
+inherits its obligations from the preservation table.
