@@ -2717,7 +2717,7 @@ scheduled before its design item is resolved.
 
 ## M6 — closing the store-reordering gap (research)
 
-**LIVE WORKLIST: [`projects/weak-memory-m6.md`](weak-memory-m6.md)** — the
+**COMPLETE (2026-08-12) — archived worklist with all outcomes: [`completed/weak-memory-m6.md`](../completed/weak-memory-m6.md); headline `WeakCompose.xv6_weak_robust`, closed under the global context, store-reordering assumption retired into the declared residue of `WeakCompose.v` §6.** The original tee-up below is kept as the historical record; its staged plan (2026-08-11)
 staged plan (2026-08-11), which also records the PARM-source resolutions of
 the two open questions below (`interference_certify`; can an exclusive write
 be promised — yes) and the Layer-2 mechanism decision (ghost trail, three

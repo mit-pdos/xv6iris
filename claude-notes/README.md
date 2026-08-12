@@ -273,24 +273,6 @@ are working on that effort — the relevant `projects/` file.
   what-this-stage-established block per landed stage. M0–M3 are landed on
   branch `weak-memory`; design in
   [`design/weak-memory.md`](design/weak-memory.md).
-- **[`weak-memory-m6.md`](projects/weak-memory-m6.md)** — the M6 robustness
-  theorem's staged plan (W1 full-promising machine natively → W2 violation
-  pattern + Layer 1 → W3 Layer-2 ghost trail ∥ W4 characterization lemma →
-  W5 composition). Opens with the PARM-source findings that unblocked it:
-  exclusive-conditional writes CAN be promised (the walker-CAS arm is real,
-  pinned by the fulfil rule's `Memory.exclusive` window), the
-  `interference_certify` tension dissolved (a pre-acquire CS-store promise
-  was never certifiable — the SC-result view flows through the branch into
-  `vcap` and every later `view_pre`), `state_exec` is per-thread over frozen
-  memory with no interleaving, and the Coq-8.15 toolchain seam that forces
-  the full machine to be restated natively.
-- **[`weak-memory-m6-w3-recon.md`](projects/weak-memory-m6-w3-recon.md)** —
-  the W3 adequacy-export recon (evidence + file:line map): no per-message
-  ghost exists; appends are per-leaf but a funnel chokepoint exists; trace
-  coherence is a QUANTIFIER problem (kill the ∃-tagging and prefix closure
-  makes a per-state φ a trace property — no adequacy variant); the class
-  belongs in the message (`wm_ak`), publication in an inert `w_pub`
-  watermark; the under-budgeted cost is the per-byte ownership reflection.
 - **[`weak-memory-porting.md`](projects/weak-memory-porting.md)** — the
   per-file recipe for the M4 sweep, written from the M3b slice: the mechanical
   spellings (`↦ₘ`→`↦w`, `instr`→`wkernel_text`, exec-facts over `wflat_st`),
@@ -314,6 +296,26 @@ are working on that effort — the relevant `projects/` file.
 
 ### `completed/` — finished projects, archived for reference
 
+- **[`weak-memory-m6.md`](completed/weak-memory-m6.md)** — the M6
+  store-reordering robustness theorem, COMPLETE (2026-08-12): the
+  full-promising machine restated natively (W1), the E-edge-extended
+  dependency graph, µ-milestone acyclicity, view provenance, write
+  serialization and the π-permuted subset simulation (W2), the
+  `wm_ak`/`w_pub`/`w_relp` machine-syntactic classification (W3's
+  landed half), the axiomatic characterization + projections (W4), and
+  the Sail-LTS composition (W5) — headline
+  `WeakCompose.xv6_weak_robust`, closed under the global context, with
+  the declared residue recorded in `WeakCompose.v` §6 (φ's
+  `pf_violation_free`, the D-M6-8 static side conditions, `bad_wf`, the
+  WeakLang ⇐-lift, MMIO, the PARM containment note).  Read it for: the
+  three counterexample-driven design revisions (floor inversion, the
+  post-fence store, the premise-discharge split D-M6-8), the deferred
+  φ mechanization's blocking analysis (`↦w` transfer-discipline
+  rework), and the per-file landing deltas.
+- **[`weak-memory-m6-w3-recon.md`](completed/weak-memory-m6-w3-recon.md)** —
+  the W3 adequacy-export recon (evidence + file:line map) that induced
+  D-M6-6; the ownership-reflection cost it flagged is exactly what the
+  φ deferral's blocking analysis later confirmed.
 - **[`crash.md`](completed/crash.md)** — the completed crash/power-cycling
   layer through M6. `SystemAdequacy.xv6_power_adequacy` proves reducibility
   across arbitrary power cycles, hart scheduling, and device steps; the FS

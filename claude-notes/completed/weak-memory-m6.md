@@ -1,6 +1,30 @@
-# M6 — the store-reordering robustness theorem (worklist)
+# M6 — the store-reordering robustness theorem (worklist — COMPLETE)
 
-**Status (2026-08-11): planned, nothing landed.** Entry points: read
+**Status (2026-08-12): COMPLETE — all five stages landed; this file is
+archived in `completed/`.**  The headline is
+`WeakCompose.xv6_weak_robust` (closed under the global context): every
+full-machine behavior of the Sail-instantiated program (harts + disk
+agent) under the declared premise bundle `m6_side_conditions` is matched
+by a promise-free run with the same program states and flat memory.
+Twelve new files (`WeakPromise*` from W1 predate this pass;
+`WeakRobustProv/Ser/Ord/Acyc2/Sim/Main`, `WeakLitmusProj`,
+`WeakInterpProj`, `WeakSailLTS`, `WeakCompose` landed in it, ~8,900
+lines, every one axiom-free except the two that inherit rv64d's 5
+baseline platform axioms via `riscv_step`), plus the quiet-point batch
+(`wm_ak`/`w_pub`/`w_relp` fields, 59 lemma lifts).  The store-reordering
+assumption is retired into the machine-checked Layer-1 theorem plus the
+DECLARED RESIDUE recorded in `WeakCompose.v` §6: (1) the multi-hart
+WeakLang↔wp correspondence's ⇐/interleaving half, (2)
+`pf_violation_free` (upgrade: the `↦w` transfer-discipline rework — see
+the φ entry below), (3) the D-M6-8 static side conditions + `bad_wf` +
+byte classification (upgrade: a per-site checker), (4) the retained
+MMIO-ordering assumption, (5) the D-M6-3 PARM containment note, (6) the
+rv64d decoder facts (`sail_shaped`).  Unchecked boxes below are either
+subsumed by the landed W1 "COMPLETE" note or explicitly re-scoped into
+that residue (the φ entry, the discipline exports, the funnel
+chokepoint move — the last deliberately not done).
+
+**Original opening (2026-08-11): planned, nothing landed.** Entry points: read
 [`design/weak-memory.md`](../design/weak-memory.md) Decision 1 for the gap,
 then [`design/weak-memory-m6-robustness.md`](../design/weak-memory-m6-robustness.md)
 for the end-state composition and the Layer-1/Layer-2 split. This file is the
@@ -938,10 +962,16 @@ Sail machine instantiates (exactly D-M6-5's rationale (2)):
   what makes the transport well-posed.  Do not build a device-aware
   full machine.
 
-- [ ] The final theorem: full-machine behaviors (completable prefixes, per
-      the tee-up §2(a)) transported through Layer 1 (premise from Layer 2)
-      to `weak_system_adequacy`'s promise-free reducibility; stated so the
-      promise-free machine visibly becomes scaffolding.
+- [x] The final theorem LANDED: `WeakCompose.xv6_weak_robust` (+ the
+      completable-prefix corollary), stated at `pstep_xv6` (harts =
+      `psail`, disk = a documented superset agent); the transport into
+      `weak_system_adequacy`'s reducibility is delivered up to seam (1)
+      of `WeakCompose.v` §6 — the pf-side per-instruction bridge
+      (`xv6_pf_instr`, plus `pf_step_frame`/`pf_run_frame`/
+      `wp_init_xv6`) is machine-checked; the ⇐/interleaving half is
+      declared, upgrade path `WeakComposeLang.v`.  Also recorded there:
+      the DMA tid renaming (WeakLang `None` vs wp `Some n_disk`) as
+      seam (1d).
 - [x] **`WeakSailLTS.v` LANDED (977 lines, 2026-08-12):** `psail`/
       `sail_step` (a `Definition` by match, mirroring `wrun`'s
       dependent-outcome idiom — an Inductive would fight the outcome
@@ -958,11 +988,13 @@ Sail machine instantiates (exactly D-M6-5's rationale (2)):
       would need silent-prefix determinism) and the
       `wprim_step`/`wgstate` multi-hart lift (composition file's
       job).
-- [ ] Final `Print Assumptions` diff: baseline axioms + MMIO-ordering +
-      no-icache; the store-reordering assumption RETIRED, replaced by the
-      D-M6-3 correspondence note at the PARM seam.
-- [ ] Notes upkeep: fold outcomes back into the design files; move this file
-      to `completed/` when done.
+- [x] Final `Print Assumptions`: `xv6_weak_robust` and the whole Layer-1
+      stack CLOSED under the global context; only `xv6_pf_instr` (via
+      `riscv_step`) carries the 5 rv64d baseline axioms.  The
+      store-reordering assumption is retired into `WeakCompose.v` §6's
+      declared residue (which subsumes the MMIO-ordering retention and
+      the D-M6-3 note anticipated here).
+- [x] Notes upkeep: outcomes folded; file moved to `completed/`.
 
 ## 3. Order and parallelism
 

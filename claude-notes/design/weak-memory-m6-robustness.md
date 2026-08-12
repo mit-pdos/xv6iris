@@ -1,7 +1,18 @@
 # M6 — closing the store-reordering gap (design)
 
-**Status (2026-08-11): planned; the live worklist is
-[`projects/weak-memory-m6.md`](../projects/weak-memory-m6.md).** Everything
+**Status (2026-08-12): COMPLETE — the archived worklist with all
+outcomes, landing deltas and the declared residue is
+[`completed/weak-memory-m6.md`](../completed/weak-memory-m6.md); the
+headline theorem is `WeakCompose.xv6_weak_robust` and the seam record is
+`WeakCompose.v` §6.**  Note two designs below were REVISED during the
+build (recorded in the archived worklist): the Layer-2 mechanism's
+premise-discharge story was split by decision D-M6-8 (machine facts /
+supported-pc site facts / a static residue — a φ conjunct alone cannot
+discharge trace-global premises), and §4b's ownership-reflection chain is
+deferred with a blocking analysis (the fragment-vs-hazard link needs a
+`↦w` transfer-discipline rework; `pf_violation_free` is a declared,
+precisely-stated premise until then).  Historic opening follows.
+Original status (2026-08-11): planned. Everything
 below is either (a) established and cited, (b) a decision already taken and
 recorded, or (c) explicitly marked OPEN. Read
 [`weak-memory.md`](weak-memory.md) Decision 1 first — it states the gap and
@@ -394,7 +405,7 @@ third class resolved (both above), and the Layer-2 mechanism decided —
 full-promising machine natively → W2 violation pattern + Layer 1 → W3
 Layer-2 ghost trail ∥ W4 characterization lemma → W5 composition), with
 its parallelism notes and risk register, lives in
-[`projects/weak-memory-m6.md`](../projects/weak-memory-m6.md).
+[`completed/weak-memory-m6.md`](../completed/weak-memory-m6.md).
 
 **Polarity check to keep in mind throughout** (Decision 1's closing note):
 dropping dependency tracking makes the model WEAKER than hardware — free for
