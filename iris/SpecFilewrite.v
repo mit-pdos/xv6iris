@@ -528,7 +528,13 @@ Definition wp_filewrite_sconf_body
   procs_inv γs -∗
   (* ...and what the file's TYPE selects *)
   filewrite_env γa γf k fn Cf -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS [true], NOT [b].  Every arm of this function parks, and
+     the porting guide's rule is that a PARKING function's [wp_next] index is
+     [true] unconditionally -- a swtch moves the hart whatever SIE was doing.
+     The [eb = true] premise above plus [cpu_own_eb_agree] at level 0 forces
+     [b = true] at the only constructible instance, so this is not a change of
+     strength today; it is the spelling the eb-generic sweep needs. *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (r : mword 64) (P' : uptd) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗

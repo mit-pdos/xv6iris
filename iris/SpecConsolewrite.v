@@ -140,7 +140,12 @@ Definition wp_consolewrite_sconf_body
   kalloc_env γa None -∗
   procs_inv γs -∗
   panic_wp_any -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS [true], NOT [b] -- consolewrite sleeps on the uart, so it
+     is a PARKING function and the porting guide's rule applies: a parking
+     function's [wp_next] index is [true] unconditionally.  With [eb = true]
+     above and [cpu_own_eb_agree] at level 0 the two spellings coincide at
+     every constructible instance. *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (r : Z) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗

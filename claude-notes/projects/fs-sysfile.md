@@ -2319,6 +2319,164 @@ the back edge and where `IH` is instantiated at `fw_i_advance`'s decrease.
 EndOp Consolewrite.` — that IS the functor's parameter order) and file.c is
 7/7.
 
+## S3t — **filewrite PROVEN AND LINKED; file.c is 7/7.**  The loop body
+## lands, `cheat_` is GONE, and the sanctioned crossing alignment went in
+## with it
+
+`iris/ProofFilewrite.v` compiles with NO axiom of its own.
+`iris/LinkFilewrite.v` exists.
+`Print Assumptions Filewrite.wp_filewrite_sconf` = **the 5 platform axioms
++ funext + `LinkConsolewrite.Consolewrite.wp_consolewrite_sconf` and
+NOTHING ELSE** (verbatim: `rv64d.valid_reservation`,
+`rv64d.plat_term_write`, `rv64d.match_reservation`,
+`rv64d.load_reservation`, `rv64d.cancel_reservation`,
+`FunctionalExtensionality.functional_extensionality_dep`, and the named
+consolewrite Axiom).  `lemma_diff.py --ref HEAD`: 4 files, ONE thing to
+justify -- `GONE Axiom cheat_`, which is the whole point of the stage.
+
+### The alignment (round 12's last two owed items) — CLEAN, first try
+
+`SpecFilewrite:531` and `SpecConsolewrite:143` moved from `wp_next b` to
+`wp_next true`, and the S3s ledger's prediction of what would have to move
+with them was PESSIMISTIC in one direction and right in another:
+
+- **`fw_test`'s internal bundle did NOT have to move.**  S3s guessed both
+  of `ProofFilewrite`'s bundles would; only `fw_loop`'s did, because
+  `fw_loop`'s crossing IS the contract's, forwarded.  `fw_test` is
+  straight-line and calls nothing, so a `b`-indexed crossing is strictly
+  better there: it hands its caller a `b`-indexed chain fact.
+- **The ~15 `iSpecialize … wp_next_chain` sites did not move either.**
+  `WpNext.wp_next_chain`'s mixed-index fallback is exactly this case and
+  fires unassisted.
+- **The `cpu_own_transport` guards DID move, all nine of them**, by the
+  recorded recipe: `cpu_own_eb_agree` at level 0 plus the contract's
+  `eb = true` gives `Hb : b = true` in one line, and `ltac:(rewrite Hb;
+  wp_next_chain)` replaces `ltac:(wp_next_chain)`.  Uniformly, including
+  at the sites whose chain facts are still `b`-indexed: after `rewrite Hb`
+  the goal's index is `true`, and branch 1 of `wp_next_chain` discharges a
+  `b`-indexed fact through `or_intror` with `discriminate` on `true =
+  false`.  Doing it uniformly is what makes the recipe mechanical.
+
+**The alignment compiled green BEFORE the frontier moved**, which is the
+order the brief demanded and the reason it cost nothing.
+
+### The stage's real product: THREE arm-joins, THREE different devices
+
+A Rocq proof cannot JOIN two arms, so every diamond in the CFG doubles
+everything after it.  filewrite's body has three, and they wanted three
+different answers — this is the generalisable part.
+
+1. **A lemma with the disagreement quantified** — `fw_offupd`
+   (+0xa6..+0xb0, the `r <= 0` skip of the `f->off` advance).  The arms
+   disagree about the register file (a5 is clobbered on one side) and
+   about the word the cell ends up holding, so the continuation is
+   `∀ P v', ⌜off_wf v' ∧ (∀ r, is_cs_idx r = true -> P !!! r = Mt !!! r)⌝`.
+   **What the continuation does NOT learn is the point**: nothing after
+   +0xb4 needs the new offset's VALUE, because the cell is checked
+   straight back into `off_inv` and the next iteration re-reads it.  That
+   is what keeps the lemma small.  `fw_test` (S3r) is the same device.
+   `ProofFileread.v`:1984 and :2143 are the two copies this avoids.
+2. **ONE `assert`, and no lemma at all** — writei's return disjunction.
+   Both arms produce a count `rz ∈ [-1, c]`, the two PURE re-park facts
+   (`InodeLock.inode_ok` and `DirView.dir_ok` at the record writei
+   returned) and `dn0' = dn'`; all four are Coq propositions, so the split
+   is confined to one `assert` and nothing below it mentions the arms.
+   **A diamond whose two arms differ only in PURE facts does not need a
+   lemma — it needs one `assert` whose statement is the join.**
+3. **Two copies, deliberately** — the short-write break (+0xc0 taken) and
+   the loop exit (+0xc8 taken).  These two really do reach `fw_tail` at
+   different `iz`, and everything after them is `fw_rest5` + `fw_tail`
+   (~35 lines each).  Lifting them would have cost more than copying.
+
+### Surprises, numbered, for the trap ledger
+
+1. **`wp_next` IS HART-INDEXED AND THE BACK EDGE MUST RETARGET IT.**  This
+   is `cpu_own_transport`'s twin and it had no precedent in this tree: a
+   loop's `IH` demands the contract's crossing at the hart the iteration is
+   RE-ENTERED on, while the body holds it at the hart the iteration
+   STARTED on.  `WpNext.wp_next_retarget CID0 CIDnew true pj
+   ltac:(wp_next_chain)` is the whole fix.  **The failure is
+   `iSpecialize: cannot instantiate (wp_next true pj (λ CID, …))` with a
+   term whose printed type is IDENTICAL except for one extra pair of
+   parentheses** — same tell as S3r's surprise 4, one tier up.  Any future
+   `∀`-fuel loop over a `wp_next`-carrying contract needs this line.
+2. **`KvmSpec.kalloc_env γ None` IS PERSISTENT, and a loop must introduce
+   it with `#`.**  writei CONSUMES it and does not return it, so a
+   `fw_loop` that intros it exclusively cannot instantiate its own `IH`
+   (`iSpecialize: "Hkenv" not found`).  `KvmSpec.v`:141 has the instance;
+   `ProofWritei` already intros it `#Hkenv`.  The error names the
+   hypothesis and not the reason.
+3. **`nat_scope` is the default and it bites the two places that have no
+   type to steer them.**  `destruct (decide (bv_unsigned (di_size dn) <
+   Z.of_nat (off + tot)))` reports *"The term `bv_unsigned (di_size dn)`
+   has type Z while it is expected to have type nat"* — an error about a
+   SUBTERM, naming neither `<` nor the scope.  Same for `assert (Hizn : iz
+   + c = n)` and for `Z.eq_dec rz (-1)` (*"Cannot interpret this number as
+   a value of type nat"*).  **Rule: any bare arithmetic inside `assert`'s
+   statement, inside `destruct`, or as a positional argument to a lemma
+   with no `Bind Scope` needs `%Z`.**  Everything with an `mword_of_int`
+   around it is fine; everything else is not.
+4. **`split_and!` splits `-1 <= rz <= c` into TWO goals** — the recorded
+   trap, hit exactly as recorded, and the error named the wrong branch (it
+   reported the FOURTH bullet's term against the THIRD goal).  A seven-
+   conjunct `exists`-body with one chained inequality needs EIGHT bullets.
+5. **`rewrite fw_maxfile_bsize in Hwf` cannot fire on an `off_wf`.**
+   `FileOff.off_wf` is a Definition, so `MAXFILE * BSIZE` is not a subterm
+   until it is unfolded; take the bound from `FileOff.off_wf_lt31`
+   instead, which is already in `Z`.
+6. **`fw_writei_src` is NOT applied at the call site and must not be.**
+   The `if user` bracket is at the literal `true` the decode forces and the
+   proofmode iota-reduces it before the goal is shown, so `rewrite
+   fw_writei_src` fails with *"all matches of the LHS are equal to the
+   RHS"* — which is the tell that the discharge is FREE (`iExact "Hpriv"`).
+   The lemma stays as the machine-checked statement that the premise AS
+   WRITTEN is what the walk holds.
+7. **`iEval (rgne; …)` must be counted against the leaf's `rget`s.**
+   `wp_addw4_s_sconf`'s `wval` has TWO, not three; a third `rgne` fails
+   with *"The LHS of rget_ne does not match any subterm"* and the position
+   points at the `iEval`, not at the arity.
+8. **The offset's `off_wf` step comes from the record writei RETURNS, not
+   from a premise.**  `SpecFilewrite.fw_off_advance` needs
+   `¬(MAXFILE*BSIZE < off + n)`, which the SUCCESS arm does not give.
+   `fw_off_tot_bound` gets it the other way: `wi_dinode`'s size is
+   `max (di_size dn) (off+tot)` and the size cap is one of the seven
+   `inode_ok` conjuncts the re-park has to re-establish anyway, so
+   `off + tot <= di_size dn' <= MAXFILE*BSIZE`.  `fw_off_advance` is
+   therefore NOT used by the walk.
+9. **`iAssert … as "H"` takes its rewrite in the GOAL, never `in "H"`.**
+   `rewrite /off_mark P8 in "Hmark"` is an ssreflect syntax error
+   (*"'|-' '*' or '*' or [ssrclausehyps] expected after 'in'"*); the shape
+   is `{ rewrite -P8. iExact "Hmark". }`, i.e. rewrite the GOAL back to the
+   hypothesis's spelling.  `ProofFileread.v`:2012 is the precedent.
+
+### The register-threading economy, since it is reusable
+
+The body tracks callee-saved registers **only against `B0`** (the frame at
++0x84) with ONE `∀ r, is_cs_idx r = true -> X !!! r = B0 !!! r` per step,
+instead of one `assert` per register per step.  It works because every
+callee is `callee_saved` and every straight-line instruction between the
+calls writes `ra` or an a-register; the only two exceptions (`c.mv s1,a0`
+at +0xa4 and `addw s4,s1,s4` at +0xc4) are stated in full.  That is worth
+perhaps 400 lines against `ProofFileread.v`'s per-register style.
+
+### Gate
+
+`ProofFilewrite.v` and `LinkFilewrite.v` compile clean; full-tree gate on
+the mirror re-run with the two Spec changes in.  `_CoqProject` carries
+`LinkFilewrite.v` immediately after `ProofFilewrite.v`.
+`LinkConsolewrite.vo` MUST be rebuilt when `SpecConsolewrite.v` moves --
+a stale one fails with *"makes inconsistent assumptions over library
+xv6iris.SpecConsolewrite"* at `LinkFilewrite`, not at itself.
+
+### S4 GO-SIGNAL
+
+**file.c is 7/7.**  The three S4 shells that were blocked on a linked
+`Filewrite` module -- sys_read, sys_write and sys_fstat -- unblock now:
+`LinkFilewrite.Filewrite` is a real module with a real contract, and the
+only assumption anywhere under it is the named consolewrite Axiom that
+`LinkConsoleread`'s twin already puts under `Fileread`.
+
+
 ## The stage ladder
 
 - **S1** (agent): the DECODE stage — 13 Code files (the 12 targets +
@@ -2521,6 +2679,17 @@ EndOp Consolewrite.` — that IS the functor's parameter order) and file.c is
   `fw_tail`; then delete `cheat_` and write `LinkFilewrite.v`.  The state
   the loop is handed is spelled out in the FRONTIER banner in
   `ProofFilewrite.v`.  Then file.c is 7/7 and S4's three shells unblock.
+  **— PARTIAL**: the loop lemma landed and the frontier moved into the body
+  at +0x84; `LinkFilewrite.v` still absent.
+- **S3s** (agent) **— LANDED**: the union gate repaired — four `wp_next b`
+  → `wp_next true` seams plus `ProofKexecA` against SpecIlock v5.
+- **S3t** (agent) **— LANDED**: **filewrite PROVEN AND LINKED, file.c is
+  7/7.**  The loop body +0x84..+0xc8 and its three joins, `cheat_` deleted,
+  `LinkFilewrite.v` written, and round 12's last two owed crossings
+  (`SpecFilewrite`, `SpecConsolewrite`) aligned to `wp_next true` in the
+  same pass.  `Print Assumptions Filewrite.wp_filewrite_sconf` = the 5
+  platform axioms + funext + the named consolewrite Axiom.  See the S3t
+  section for the three arm-join devices and the nine traps.
 - **S4** (agent): sys_read/sys_write/sys_fstat — argfd + the file.c
   contracts; thin shells.
 - **S5** (agent): create — the writing half's boss: namei/nameiparent

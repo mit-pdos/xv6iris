@@ -293,6 +293,24 @@ of `cpu_id`), `reg_interp`, `mstate_interp`, `gpr_file`, `gpr_pt_value`,
 `intr_inv`, `intr_handler_spec`, `sr_transform`, `sr_absorb`, `sr_tmode`,
 `trap_csrs`, and `intr_frame` (it holds `menvcfg ↦ᵣ`, so "it is only a stack
 carve and a TLB arm" is wrong).
+**`WpNext.wp_next` IS HART-INDEXED TOO, and a `∀`-fuel LOOP must RETARGET
+it on the back edge.** `cpu_own_transport`'s twin, and the first tree
+instance is `ProofFilewrite.fw_loop` (fs-sysfile S3t). A loop lemma holds
+its caller's crossing at the hart the iteration STARTED on and its own `IH`
+demands it at the hart the iteration is RE-ENTERED on; those are different
+propositions because `wp_next`'s guard names the anchor. One line fixes it:
+`iDestruct (wp_next_retarget CID0 CIDnew true pj _ ltac:(wp_next_chain)
+with "Hcont") as "Hcont"`. **The failure is `iSpecialize: cannot instantiate
+(wp_next … (λ CID, …))` with a term whose printed type is IDENTICAL** — same
+tell as the `cpu_own` one, and the only visible difference is an extra pair
+of parentheses the pretty-printer adds around the `∀`.
+
+**`KvmSpec.kalloc_env γ None` IS PERSISTENT (`KvmSpec.v`:141) and a loop
+must intro it with `#`.** writei/readi/copyin CONSUME it and do not return
+it, so a loop body that intros it exclusively cannot instantiate its own
+`IH`; the error is `iSpecialize: "Hkenv" not found`, which names the
+hypothesis and not the reason.
+
 Hart-FREE, despite appearances: `stack_own` (physical stack memory),
 `mem_pointsto` and the whole `word_pointsto` family (memory is shared),
 `ghost_var_agree` and the other generic Iris lemmas, and every

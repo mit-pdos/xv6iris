@@ -1038,6 +1038,7 @@ SpecConsolewrite.v
 LinkConsolewrite.v
 ProofFilewriteParts.v
 ProofFilewrite.v
+LinkFilewrite.v
 ProcdumpAux.v
 SpecProcdump.v
 CodeProcdump.v
