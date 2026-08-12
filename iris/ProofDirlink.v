@@ -1576,9 +1576,11 @@ Section ProofDirlinkMain.
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf true bm data dn dn0 nn uu 0%nat with
                 "[%] Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi
-                 Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] Hop [%]").
+                 Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] Hop [%] [%]").
       { exact Hcsf. }
       { exact (dl_budget3 ncount nn ncount Hnc (proj1 Hnn) (proj2 Hnn)). }
+      (* S5a finding 2: the found arm re-parks the IDENTICAL payload *)
+      { exact (fun H => H). }
       { split; [rewrite Hsome; discriminate |].
         split; [rewrite Ha0f; exact HE2a0 |].
         split_and!; try reflexivity. exact Huu. }
@@ -1703,6 +1705,7 @@ Section ProofDirlinkMain.
                          ⌜((ncount - dirlink_units)%nat <= n')%nat
                           /\ (n' <= ncount)%nat⌝ -∗
                          log_op g n' -∗
+                         ⌜inode_sized data -> inode_sized data'⌝ -∗
                          ⌜if found
                            then dir_first data nrec s <> None
                                 /\ mf !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)
@@ -2078,12 +2081,14 @@ Section ProofDirlinkMain.
            rest of dirlink threads *)
         iDestruct "Hsrc" as "[Hsrc Hppid]".
         (* writei's two PRESERVATION clauses (SpecWritei.v's header) are for a
-           caller that RE-PARKS the inode; dirlink forwards its record to its
-           own caller instead, so they are dropped at this boundary.  When
-           create needs them they are here, and both antecedents are already
-           dirlink's premises (the size cap literally, [inode_sized] once it
-           is added). *)
-        clear Hcap' Hsized'.
+           caller that RE-PARKS the inode.  Of the two, the SIZE CAP is
+           dropped at this boundary -- create recovers it arithmetically from
+           the append's own "the append fits" premise
+           ([ProofCreateParts.cr_size_cap]) -- and [inode_sized] is
+           FORWARDED, because nothing below dirlink can recover it (S5a
+           finding 2; the range clause is a per-BYTE view and pins no block's
+           length).  [Hsized'] therefore survives to the arm's continuation. *)
+        clear Hcap'.
         (* THE DISTURBED REGION IS EMPTY (fs-icache.md §15.1(i)): dirlink's
            source is its own stack record, so writei ran on the KERNEL arm
            and [dist = 0].  Substituting it here is what turns the range
@@ -2221,10 +2226,12 @@ Section ProofDirlinkMain.
         iSpecialize ("Hqc" $! CIDf with "[%]"); [wp_next_chain |].
         iApply ("Hqc" $! mf false bm' data' dn' dn0' nn used' tot with
                   "[%] Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi
-                   Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] Hop [%]").
+                   Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] Hop [%] [%]").
         { exact Hcsf. }
         { rewrite (dl_wi_cost_bmonly k0) in Hbud. unfold dirlink_units.
           destruct Hbud as [Hbud1 Hbud2]. split; lia. }
+        (* S5a finding 2: writei's own preservation, forwarded *)
+        { exact Hsized'. }
         { split; [exact Hnone |].
           split; [exact Hused |].
           split; [exact Hwf' |].
@@ -2464,6 +2471,7 @@ Section ProofDirlinkMain.
                     ⌜((ncount - dirlink_units)%nat <= n')%nat
                      /\ (n' <= ncount)%nat⌝ -∗
                     log_op g n' -∗
+                    ⌜inode_sized data -> inode_sized data'⌝ -∗
                     ⌜if found
                       then dir_first data nrec s <> None
                            /\ mf !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)

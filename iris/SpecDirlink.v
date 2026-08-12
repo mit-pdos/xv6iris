@@ -380,6 +380,26 @@ Definition wp_dirlink_sconf_body
       (* at most [dirlink_units] gone, and none gained *)
       ⌜((ncount - dirlink_units)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
       log_op γ n' -∗
+      (* ---- THE [inode_ok] CONJUNCT A RE-PARKER NEEDS, AS A PRESERVATION
+         (fs-sysfile S5a finding 2) ----
+         [InodeLock.inode_ok] has seven conjuncts and the arms below
+         re-establish five of them ([blkmap_wf], [bm_covers],
+         [di_addrs = bm_cells], [blk_holes_zero], and [di_type <> 0] through
+         [dn' = wi_dinode dn ...]).  Of the remaining two the SIZE CAP is
+         RECOVERABLE by the caller -- the append lands at slot
+         [k0 <= dir_nrec size] and writes at most sixteen bytes, so the new
+         size is at most [size + 16], which is this contract's own "the
+         append fits" premise, and [ProofCreateParts.cr_size_cap] is the
+         recovery.  [InodeInv.inode_sized] is NOT: the range clause above is
+         about [file_byte], a per-BYTE view, and pins no block's LENGTH.
+
+         So it is stated here exactly as [SpecWritei] states it (S3i), as a
+         PRESERVATION rather than a fact -- writei has handed it over since
+         S3i and the found arm has [data' = data], so it is free inside
+         [ProofDirlink].  It is a postcondition STRENGTHENING, so no existing
+         caller moves; without it create cannot re-park either inode after
+         any dirlink, which is every arm from +0xb4 on. *)
+      ⌜inode_sized data -> inode_sized data'⌝ -∗
       (* ---- THE TWO ARMS ---- *)
       ⌜if found
         then (* the name was already there: iput spent the child *)

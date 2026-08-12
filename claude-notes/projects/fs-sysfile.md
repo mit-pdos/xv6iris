@@ -3037,7 +3037,158 @@ no `Print Assumptions` to report (no linked module was produced).
 4. Nothing in `SpecCreate.v` moves under any of the three rulings — the
    contract is about create's behaviour, and the three findings are about
    what its callees are willing to say.
-## S4' — B1 SWEPT AND GATED; B2 LANDED FOR FILESTAT.  The ratified OPENER is
+
+## S5b — RULING 2 LANDED AND FULL-GATED; RULING 3's iupdate CREDIT LANDED;
+## **RULING 1 DOES NOT CLOSE AS SIZED, AND THE OBSTRUCTION IS STRUCTURAL**
+
+The stage's real product is the refutation in the last section: the claim
+receipt cannot be a fraction of *anything the region can later need back*,
+and that is not a detail of S5a's spelling — it rules out every variant.
+Read that section before re-attempting finding 1.
+
+### RULING 2 — LANDED, GREEN FIRST TRY (S5a finding 2)
+
+`SpecDirlink`'s postcondition gained S3i's second clause, spelled exactly
+as `SpecWritei` spells it and placed immediately after `log_op γ n'`:
+
+```
+⌜inode_sized data -> inode_sized data'⌝ -∗
+```
+
+`ProofDirlink` threads it in three edits and no new tactic: the two
+internal re-spellings of the continuation type (the `Hafter` bundle and
+the loop's), `clear Hcap' Hsized'` narrowed to `clear Hcap'` (the size cap
+is still dropped — `ProofCreateParts.cr_size_cap` recovers it from
+dirlink's own "the append fits" premise), `exact Hsized'` on the append
+arm and `exact (fun H => H)` on the found arm (`data' = data` there).
+
+**Gate.** `SpecDirlink.v`, `ProofDirlink.v` `DONE = 0`; then
+`LinkDirlink`, `SpecNameiparent`, `SpecNamei`, `SpecNamex`, `ProofNamex`,
+`SpecKexec`, `ProofKexecA`, `ProofKexecB` rebuilt `EXIT=0`, zero `Error`.
+`SpecDirlink` has **no caller yet** (only `LinkDirlink` requires it), so
+the postcondition strengthening cost nothing anywhere.
+
+### RULING 3 — `wp_iupdate_cred` LANDED (retrofit 2 of five); the other four NOT STARTED
+
+`SpecIupdate.wp_iupdate_cred_body` is `wp_iupdate_gen_body` plus a boolean
+`cru`, its honesty premise `cru = true -> IBLOCK inum inodestart ∈ Sb`,
+and the credited payout `log_opS γ (if cru then S u else u) (Sb ∪ {[IBLOCK
+inum inodestart]})` — exactly `CreateBudget.iu_spend cru`.  The NEED does
+not move: `log_write` takes `log_opS (S u)` on both arms, so the
+precondition is byte-identical.
+
+S5a's "threading, not proving" was right, and the reason is that
+`SpecLogWrite.wp_log_write_gen` **already carries the identical device**
+(`cr`, `cr = true -> uint bno ∈ Sb`, `log_opS (if cr then S u else u)`).
+`ProofIupdate`'s retrofit is five hunks: `iu_tail` gains `cru` + the
+honesty premise and hands its continuation at `(if cru then S u else u)`
+(`iu_cont` already took the count as a parameter, so it did not move);
+the one `LW.wp_log_write_au` call site passes `cru` instead of `false` and
+`ltac:(rewrite Hbno; exact Hcru)` instead of `ltac:(discriminate)`; the
+core lemma is renamed `wp_iupdate_cred`; and **`wp_iupdate_gen` is now a
+seven-line derivation at `cru := false`** (`if false then S u else u` IS
+`u`, so `iApply` closes it), which is why `ProofWritei:963` — the gen
+form's only consumer — did not move.  `Module Type IUPDATE` gained one
+`Parameter`; `LinkIupdate` needed no edit.
+
+**NOT STARTED:** retrofits 1 (`SpecWritei.wp_writei_cred`), 3
+(`SpecDirlink`'s `DIRLINK_GEN`), 4 (`SpecIput`/`SpecIunlockput`'s
+`ip_spend`), 5 (`SpecIalloc.wp_ialloc_gen`).  Retrofit 3 is the expensive
+one — it is a second walk of a 3150-line proof in set form, S3l/S3m's
+shape — and it is the only one of the four that is not mostly threading.
+
+### RULING 1 — **THE RATIFIED SIZING DOES NOT CLOSE.**  It breaks the
+### ORDINARY ilock, at `ProofIlock.v:1000`, and no variant repairs it
+
+S5a's sizing says: split `ireg_slot`'s first arm so the CLAIMED sub-case
+holds `z ↪[γi]{#1/2} d`, let `ireg_claim_au` pay the other half out as
+`iclaim γi inum d`, and add an ADDITIVE `wp_ilock_fresh` that consumes it.
+It then says "the fill's arm selection is unchanged in shape".  It is —
+**for the fresh fill.  It is not for the ordinary one.**
+
+`ProofIlock.v:1000` is the ORDINARY `wp_ilock_sconf`'s fill of a
+marker-parked entry whose buffer shows a nonzero type, i.e. §16.4's claim
+box, and it calls `InodeRegion.ireg_withdraw` to get a **full**
+`dinode_at γi inum dn` — which `IcacheEscrow.ic_loaded` holds at full
+fraction and which nineteen files name.  With the claimed arm at ½ that
+lemma can only pay ½, and ilock has nothing to complete it with: the
+missing half is in the claimant's hand.  `wp_ilock_sconf` therefore stops
+being provable, so the "existing ILOCK seal unmoved" constraint is not
+met — and giving `wp_ilock` an *optional* receipt does not help either,
+because the `None` instantiation is exactly the case that is stuck.
+
+**THE OBSTRUCTION, STATED SO IT IS NOT RE-DERIVED.**  Any per-inum receipt
+`R` minted by `ireg_claim_au` and consumed by `wp_ilock_fresh` must satisfy
+all four of:
+
+1. **`R` is exclusive.**  A persistent/duplicable "inum was claimed at `d`"
+   is unsound across a free-and-reclaim — S5a's own refutation (c), and
+   the hazard §17.6 built generations for.
+2. **The region holds a counterpart of `R`,** or the fresh fill cannot
+   *identify* the claimed record (an existence fact about the map is not
+   enough: a stale receipt satisfies it too, so the fill cannot tell its
+   own receipt from a dead one).
+3. **The ordinary `wp_ilock` must still fill a claimed slot**, because
+   nothing in its precondition excludes one — the entry, the deposit, the
+   `ipool_shape` marker and `ity_pending` are all satisfiable there — so
+   the region's claimed arm must yield a FULL `dinode_at` *without* `R`.
+4. **The slot must be re-claimable** after such an ordinary fill, i.e. the
+   region must reclaim `R`'s counterpart from a claimant that never
+   returned `R`.
+
+(2)+(3)+(4) are jointly unsatisfiable inside one ghost map, and the reason
+is (4): an outstanding exclusive resource cannot be reclaimed, so any
+counterpart the region parks is stranded the moment an ordinary fill runs.
+Every shape that was tried dies on it:
+
+| shape | dies on |
+|---|---|
+| receipt = ½ of the record fragment (S5a as sized) | (3) |
+| receipt = ½ of a shadow entry at a second key space | (4) |
+| receipt = full element at a second key space, arm asserts `m !! rkey z = None`/`Some d` purely | (4) — the ordinary fill cannot delete it, so `ireg_free_au` cannot restore `None` |
+| per-claim-FRESH keys (a claim counter in a fourth key space) | (2) — a stale receipt is indistinguishable from the live one |
+| receipt = the `imark` itself | unmintable: at claim time the marker is OUTSIDE the region (in the pool / the entry's `ic_unloaded`), and §16.2's claim is serialised by the BUFFER, so `ireg_claim_au` cannot reach it |
+| move the claim's ghost step to ialloc's `iget` (after the entry exists) | the region's coupling forbids it — the map value must equal the parked block's bytes, and the `log_write` has already changed those |
+
+**WHAT THE REAL KERNEL RELIES ON, AND HENCE WHERE THE REPAIR LIVES.**  The
+ordinary-fill-on-a-claimed-slot trace does not occur in xv6 because
+between `ialloc` and `ilock` the claimant holds the **only reference** to
+the fresh inum's entry: the inum is in no directory, so no other thread
+can `iget` it.  That is a REFCOUNT-UNIQUENESS fact, it lives in
+`IcacheRef`/`IcacheEscrow`, and it is the thing the region cannot see.  So
+finding 1 closes only if one of:
+
+* **(A)** the escrow exposes, at ialloc's `iget`, a consumable "this entry
+  has exactly one referrer and it is me" witness that `wp_ilock`'s fill can
+  use to refute the claimed arm — after which S5a's ½-fraction receipt
+  works verbatim.  **The algebra for this already exists** — REF-1
+  EXCLUSIVITY (`IcacheInv.v:609`, `IcacheRef.v:188`), which `ProofIput`
+  already uses as a refutation — but it is keyed by SLOT `k` while the
+  region is keyed by INUM, and the region never learns `k` (iget chooses
+  it).  Bridging the two indices is the actual work, and it is an
+  `IcacheEscrow` change, not an `InodeRegion` one; or
+* **(B)** `ipool_shape`'s marker branch is split into free/claimed and the
+  claimed variant carries the receipt's home — which needs `ireg_claim_au`
+  to reach the pool, i.e. §16.2's serialiser argument to move from the
+  buffer to the itable lock.  That is a §16 re-opening, not a retrofit.
+
+Neither is S5b's to make.  **`ProofCreate`/`LinkCreate` are NOT STARTED**
+and stay gated: without `di_type dn = ty` the mkdir arm cannot call
+`dirlink(ip, ".")` at all (its first premise), and `SpecCreate`'s `made`
+arm states the fact, so the walk cannot even be parked past +0xce.
+
+### Gate
+
+`~/one5.sh` only (no `full.sh`, `_CoqProject` never touched, never scp'd).
+`SpecDirlink.v`, `ProofDirlink.v`, `SpecIupdate.v`, `ProofIupdate.v`,
+`SpecCreate.v`, `CreateBudget.v`, `ProofCreateParts.v` each `DONE = 0`;
+two detached `make -f CoqMakefile -k` runs over the two downstream cones
+`EXIT=0`, zero `Error`.  `tools/lemma_diff.py --ref HEAD`: 4 files, ONE
+NEWAXIOM (`Parameter wp_iupdate_cred`, discharged by `ProofIupdate` and
+already carried by `LinkIupdate`), nothing GONE, nothing ADMITTED, no
+`cheat_`.
+
+
 ## UNSATISFIABLE, and that is the finding that matters
 
 ### B1 (proc_priv -> proc_priv_core) — DONE, and the composition probe passed first try
@@ -3402,6 +3553,17 @@ Second, smaller: `iFrame` cannot frame a folded `IcacheRef.inode_shr_gen`
   `log_op → log_opS` twin is necessary and NOT sufficient, the op needs
   ABSORPTION CREDITS, and both the mkdir success arm and the late fail
   arm close at EXACTLY `iput_units`.  No proof (S5b), no Link.
+- **S5b** (agent) **— PARTIAL (2 of 3 rulings; the walk NOT started)**:
+  ruling 2 landed and full-gated (`SpecDirlink`'s `inode_sized`
+  preservation + `ProofDirlink`'s three-edit threading), ruling 3's
+  retrofit 2 landed (`SpecIupdate.wp_iupdate_cred`, with `wp_iupdate_gen`
+  now derived at `cru := false` so `ProofWritei` did not move) and its
+  other four NOT started, and **ruling 1 STOPPED AND REPORTED: the
+  ratified ½-fraction receipt breaks the ORDINARY `wp_ilock_sconf` at
+  `ProofIlock.v:1000`, and the S5b section proves no variant repairs it —
+  the fact create needs is guarded in the real kernel by REFCOUNT
+  UNIQUENESS, which the region cannot see.**  `ProofCreate`/`LinkCreate`
+  stay gated on that ruling.
 - **S6** (agent): sys_open (create arm + open-existing arm + the
   device checks + fdalloc/filealloc) + sys_mkdir + sys_mknod +
   sys_chdir (idup/iput of cwd — inode_held swap via proc_priv).

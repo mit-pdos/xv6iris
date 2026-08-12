@@ -210,7 +210,7 @@ Section IupdateTail.
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32) (dn dn0 : dinode) (bm : blkmap)
-      (ds : list dinode) (u : nat) (Sb : gset Z)
+      (ds : list dinode) (u : nat) (Sb : gset Z) (cru : bool)
       (kk : nat) (bno : mword 32) (bsd : list (bv 8)) (d0 : bool)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) :
@@ -228,6 +228,9 @@ Section IupdateTail.
     bv_unsigned inum < 16 * Z.of_nat nib ->
     diblk_wf ds ->
     dinode_wf dn ->
+    (* THE ABSORPTION CREDIT (S5a finding 3): passed straight through to
+       log_write's own [cr], where it is honest for exactly this reason. *)
+    (cru = true -> IBLOCK inum inodestart ∈ Sb) ->
     sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 true (proc_addr j) C b -∗
     kernel_text -∗
@@ -249,12 +252,13 @@ Section IupdateTail.
     dinode_at γi inum dn0 -∗
     bio_held bn (fs_view γfs γd dev cov) kk pidv dev bno
        (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 -∗
-    iu_cont (CID0 := CID0) γfs γi bn γ inodestart ip inum dn bm u
+    iu_cont (CID0 := CID0) γfs γi bn γ inodestart ip inum dn bm
+            (if cru then S u else u)
             (Sb ∪ {[IBLOCK inum inodestart]})
             dev pidv dq dqd dqn dqs j m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hsp Hthr Hs2 Hkk Hbno Hcov Hlog Hnib Hdswf Hdnwf.
+    intros HK Hsp Hthr Hs2 Hkk Hbno Hcov Hlog Hnib Hdswf Hdnwf Hcru.
     pose proof HK as HK'. unfold K_iupdate in HK'.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hmeta Hmap Hsb Hsl Hop #Hireg Hdn Hheld Hcont".
     iPoseProof (iui_66 with "Htext") as "Hi66".
@@ -325,11 +329,12 @@ Section IupdateTail.
     iRename "Hop" into "HopS".
     iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bno
               (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 u
-              false Sb (⊤ ∖ ↑iregN) (ireg_out γi inum dn)
+              cru Sb (⊤ ∖ ↑iregN) (ireg_out γi inum dn)
               T1 0%nat true (proc_addr j) C (K - 4)%nat b
               HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HT1a0
               ltac:(rewrite Hbno; exact Hcov)
-              ltac:(rewrite Hbno; exact Hlog) ltac:(discriminate)
+              ltac:(rewrite Hbno; exact Hlog)
+              ltac:(rewrite Hbno; exact Hcru)
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl HopS [Hdn] Hheld").
     { iEval (rewrite Hbno).
       (* WHICH ARM MOVE (§16.4): a type-0 flush is iput's free path and it
@@ -639,10 +644,13 @@ Section ProofIupdateMain.
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* THE CORE, in SET FORM.  [wp_iupdate_sconf] below is this with the set
-     forgotten -- SpecBmap / SpecBalloc's pattern, and the reason no
-     existing caller of iupdate moves. *)
-  Lemma wp_iupdate_gen
+  (* THE CORE, in CREDITED SET FORM (fs-sysfile S5a finding 3).  The two
+     seals below are this lemma at [cru := false] ([wp_iupdate_gen]) and
+     then with the set forgotten ([wp_iupdate_sconf]) -- SpecBmap /
+     SpecBalloc's pattern, and the reason no existing caller of iupdate
+     moves.  The credit itself is threaded straight into log_write's own
+     [cr], where [CreateBudget.iu_spend] is the arithmetic it realises. *)
+  Lemma wp_iupdate_cred
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -652,16 +660,16 @@ Section ProofIupdateMain.
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
-      (u : nat) (Sb : gset Z)
+      (u : nat) (Sb : gset Z) (cru : bool)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
-    : wp_iupdate_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
-                          cov logstart inodestart nib dev ip inum dn dn0 bm u Sb
-                          pidv dq dqd dqn dqs m K eb C b.
+    : wp_iupdate_cred_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+                           cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
+                           pidv dq dqd dqn dqs m K eb C b.
   Proof.
-    cbv beta delta [wp_iupdate_gen_body].
-    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Heb.
+    cbv beta delta [wp_iupdate_cred_body].
+    intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Heb.
     subst eb.
     pose proof HK as HK'. unfold K_iupdate in HK'.
     destruct Hgeom as [Hcovok Hlogsub].
@@ -693,7 +701,8 @@ Section ProofIupdateMain.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
-    iAssert (iu_cont (CID0 := CID) γfs γi bn γ inodestart ip inum dn bm u
+    iAssert (iu_cont (CID0 := CID) γfs γi bn γ inodestart ip inum dn bm
+               (if cru then S u else u)
                (Sb ∪ {[IBLOCK inum inodestart]})
                dev pidv dq dqd dqn dqs j m K C b)%I with "[Hcont]" as "Hcont";
       [rewrite /iu_cont; iExact "Hcont" |].
@@ -1611,8 +1620,8 @@ Section ProofIupdateMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (iu_tail (CID0 := CID36) γs j γfs γi γd bn γ cov logstart inodestart
               nib dev
-              ip inum dn dn0 bm ds u Sb kk bno bsd0 d0 pidv dq dqd dqn dqs m mM K C b
-              HK HmMsp HmMthr HmMs2 Hkk Hbno Hcov Hlog Hnib Hdswf Hdnwf
+              ip inum dn dn0 bm ds u Sb cru kk bno bsd0 d0 pidv dq dqd dqn dqs m mM K C b
+              HK HmMsp HmMthr HmMs2 Hkk Hbno Hcov Hlog Hnib Hdswf Hdnwf Hcru
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe
                     Hppid Hidev Hinumc [Hmty Hmmaj Hmmin Hmnl Hmsz] Hmap Hsb
                     Hsl Hop Hireg Hdn Hheld [Hcont]").
@@ -1622,6 +1631,42 @@ Section ProofIupdateMain.
       iExact "Hmsz". }
     { iApply (wp_next_shift (b := true) (CIDa := CID14) (CIDb := CID36) ltac:(wp_next_chain)
                 with "Hcont"). }
+  Qed.
+
+  (* THE UNCREDITED SET-FORM SEAL: [wp_iupdate_cred] at [cru := false],
+     where [if false then S u else u] IS [u].  Kept as its own lemma so
+     that [ProofWritei]'s call site -- the only consumer of the gen form --
+     does not move. *)
+  Lemma wp_iupdate_gen
+      (γs : list gname) (j : nat) (γl : gname)
+      (γu : uart_names) (γd : disk_names) (γk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (dev : mword 32)
+      (ip : mword 64) (inum : mword 32)
+      (dn dn0 : dinode) (bm : blkmap)
+      (u : nat) (Sb : gset Z)
+      (pidv : mword 32) (dq dqd dqn dqs : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool)
+    : wp_iupdate_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+                          cov logstart inodestart nib dev ip inum dn dn0 bm u Sb
+                          pidv dq dqd dqn dqs m K eb C b.
+  Proof.
+    cbv beta delta [wp_iupdate_gen_body].
+    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Heb.
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
+              Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
+              #Hdlock Hsl Hop Hcont".
+    iApply (wp_iupdate_cred γs j γl γu γd γk pd pav pu bn γ γfs γi
+              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb false
+              pidv dq dqd dqn dqs m K eb C b
+              HK ltac:(discriminate) Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl
+              Ha0 Heb
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
+                    Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hop Hcont").
   Qed.
 
   (* THE COUNTED SEAL, derived at the [log_op] existential's OWN WITNESS
