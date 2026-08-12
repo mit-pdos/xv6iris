@@ -23,6 +23,87 @@ Prerequisites are all in place as of `74f28a7e`:
 So nothing about the *cones* blocks the proof any more. What blocks it is the
 BOUNDARY, and that is what this note is mostly about.
 
+## CHECKPOINT — where this stands, and how to pick it up
+
+State as of **`f8edc216`** on `main` (pushed; full `iris/` build green; no
+`Admitted`, no `Axiom` in anything below).
+
+**The design is done and machine-checked. The WP walk is not written.** That
+is the whole of the state: every question about *what usertrap's contract is*
+and *what resources it holds* is settled and compiled, and no instruction of
+the function has been stepped yet.
+
+### What is on disk
+
+| file | what |
+|---|---|
+| `iris/SpecUsertrap.v` | the boundary, **restated in the kernel tier** (the old one was unsatisfiable — §"THE BOUNDARY IS STATED IN THE WRONG WORLD"). `USERTRAP` now `Include`s a split-out `USERTRAP_RES`. |
+| `iris/UsertrapRes.v` | `usertrap_res` DEFINED (`ut_trap` / `ut_env` / `ut_res`), `K_usertrap = 4 + K_syscall`, and the `<:`-checked module fit `UtResFits (SY : SYSCALL)`. |
+| `iris/ProofUsertrapParts.v` | the pure obligations. |
+
+Seven proven lemmas, and it is worth knowing what each buys before touching
+anything:
+
+- `ut_sconf_open` — `ut_sconf_closer` really is "the rest of `sconf`". It is
+  `IntrDefs.sconf_at`'s idiom plus `cur_privilege` (userret's `sret` writes
+  that cell, so the boundary must expose it).
+- **`ut_trap_open`** — the boundary's raw machine state + `ut_trap` **is**
+  `sie_cap_gpr m av false pj ∗ cpu_own 0 false pj C false`, with the dangling
+  SIE quarter, the KPT receipt and the sret mirror falling out loose. *This is
+  the lemma that says the restated boundary is right.*
+- **`ut_exit_ms_ok`** — `usertrap_ret_ms` is DERIVABLE from what
+  prepare_return hands back, not something usertrap arranges.
+- **`ut_trap_csrs_fold`** — those three loose members + the written stvec cell
+  + the handler contract **are** `trap_csrs`. This is the `csrw stvec,
+  kernelvec` at +0x1e, i.e. the C comment, and its ORDER is a theorem.
+- `ut_spp_bit` / `ut_spp_clear_eq` / `ut_spp_clear_neq` — the panic arm is
+  dead. The last is the `neq_vec` spelling `wp_cbnez_fall_s_sconf` consumes.
+
+### Resume here
+
+Write the walk. §"Phase plan" has the per-instruction table for Phase A with
+every leaf and every pure fact named and **checked to exist** — it is a
+mechanical `iApply` chain, and `ProofPrepareReturn.v` (whose first four steps
+are usertrap's +0x00..+0x06 with a frame two slots smaller) is the template
+for the tactic idiom, the `set (M1 := …)` regfile tracking and the `pcw` /
+`nz` / `rdok` discharges. Read, in order: this checkpoint, §"The restated
+boundary", §"Phase plan", then `ProofPrepareReturn.v:105-235`.
+
+Two process rules from the neighbours apply from the first line: put
+`Set Printing Depth 40.` at the top of every proof file (usertrap proves over
+`proc_priv`, so a failing tactic otherwise prints `tf_page`'s 4096 conjuncts —
+a 40-minute non-answer), and close block seams by naming every conjunct rather
+than with `iFrame` (the >19 GB non-termination).
+
+`ProofUsertrap*.v` will be a functor over SYSCALL, PRINTK_GEN, MYPROC,
+KILLED, SETKILLED, DEVINTR, VMFAULT, YIELD, PREPARE_RETURN, KEXIT **and
+KERNELVEC** — the last because `intr_handler_spec kernelvec` is deliberately
+NOT in the bundle (see §"Phase plan"); it is derived where it is needed.
+
+### Settled — do not re-litigate
+
+- **usertrap lives in the SHARED kernel-table tier and does not mention the
+  kernel table at all.** Taking `tlb_inv_pt` as well would make the premises
+  jointly unsatisfiable and the proof vacuous. §A.
+- **The trapframe words and the parked user table are NOT in the contract**;
+  `proc_priv` inside `usertrap_res` is their only owner. §B.
+- **The post is a `wp_next true pj` crossing.** usertrap parks. §C.
+- **`uc_mie C = MIE_S` costs nothing** — `UCfg` is applied nowhere in the
+  tree, so no `ucfg` field changes. (Checked; conversion 3 below.)
+- The three conversions owed to the trampoline halves are §"What is OWED",
+  and the big one is kpt-share's already-predicted rework. **None of them
+  gates the walk.**
+
+### Two hoists owed (both deliberate, neither blocking)
+
+- `ut_sconf_closer` + `ut_sconf_open` belong beside `IntrDefs.sconf_at`;
+- `ut_spp_bit` / `ut_spp_clear_eq` belong beside `sstatus_read` in
+  `WpGprCsrwC.v`, together with `ProofKerneltrapParts`' opposite-polarity
+  `kt_spp_bit` / `kt_spp_set_neq`.
+
+Both are where they are because editing the bottom of the tree costs a
+near-total rebuild. Do them when something else has to touch those files.
+
 ## The CFG, read off the image
 
 Offsets are `usertrap + x`. `s1 = p`, `s2 = which_dev`, `a5/a4` scratch.
