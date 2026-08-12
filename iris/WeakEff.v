@@ -351,8 +351,8 @@ Qed.
 Definition qmsg (m : wmsg) : Prop := forall a, msg_byte m a = None.
 Definition qmsgs (l : list wmsg) : Prop := Forall qmsg l.
 
-Lemma wwrite_msg_qmsg tid (pa : Arch.pa) (n : N) {w : N} (v : bv w) :
-  (n = 0)%N -> qmsg (wwrite_msg tid pa n v).
+Lemma wwrite_msg_qmsg tid k (pa : Arch.pa) (n : N) {w : N} (v : bv w) :
+  (n = 0)%N -> qmsg (wwrite_msg tid k pa n v).
 Proof.
   intros -> a. rewrite /msg_byte /wwrite_msg /=.
   by destruct (bool_decide (pa_z pa ≤ a)).
@@ -365,9 +365,10 @@ Proof.
   destruct e as [ak pa n|ak pa n v|b]; intros Hq.
   - exists []. rewrite weff_apply_read wread_post_log app_nil_r.
     split; [reflexivity|constructor].
-  - exists [wwrite_msg tid pa n v]. rewrite weff_apply_write /wwrite_post /=.
+  - eexists [wwrite_msg tid _ pa n v].
+    rewrite weff_apply_write /wwrite_post /=.
     split; [reflexivity|]. constructor; [|constructor].
-    exact (wwrite_msg_qmsg tid pa n v Hq).
+    exact (wwrite_msg_qmsg tid _ pa n v Hq).
   - exists []. rewrite weff_apply_bar app_nil_r. split; [reflexivity|constructor].
 Qed.
 
@@ -554,13 +555,18 @@ Proof.
   assert (Hl1 : wm_log s1 = wm_log s)
     by exact (weffs_nowrite_log (Some cid) s pre Hpre).
   set (s2 := weff_apply (Some cid) s1 (WEwrite akw ea 4 v)).
-  assert (Hl2 : wm_log s2 = (wm_log s ++ [wwrite_msg (Some cid) ea 4 v])%list).
+  assert (Hl2 : wm_log s2
+                = (wm_log s ++ [wwrite_msg (Some cid)
+                     (wm_class_of akw (wm_ws s1)) ea 4 v])%list).
   { subst s2. rewrite weff_apply_write /wwrite_post /= Hl1. reflexivity. }
   assert (Hlpost : wm_log (weffs (Some cid) s2 post) = wm_log s2)
     by exact (weffs_nowrite_log (Some cid) s2 post Hpost).
-  assert (Hls' : wm_log s' = (wm_log s ++ [wwrite_msg (Some cid) ea 4 v])%list).
+  assert (Hls' : wm_log s'
+                 = (wm_log s ++ [wwrite_msg (Some cid)
+                      (wm_class_of akw (wm_ws s1)) ea 4 v])%list).
   { rewrite Hl weffs_app weffs_cons -/s1 -/s2 Hlpost Hl2. reflexivity. }
-  rewrite /wQ_store /wV_store. split_and!; [exact Hi|exact Hls'|exact Hle|].
+  rewrite /wQ_store /wV_store.
+  split_and!; [exact Hi|by eexists; exact Hls'|exact Hle|].
   intros j Hj.
   (* the floor reached at the store's own step survives the write-free tail *)
   assert (Hstep : (S (length (wm_log s))
@@ -642,7 +648,9 @@ Proof.
   { subst s2. rewrite weff_apply_read Hcts
       (wread_post_ws_weak s1 aka ea (coh_ts s ea 4) Hcoh) Hsync. reflexivity. }
   set (s3 := weff_apply (Some cid) s2 (WEwrite akw ea 4 v)).
-  assert (Hl3 : wm_log s3 = (wm_log s ++ [wwrite_msg (Some cid) ea 4 v])%list).
+  assert (Hl3 : wm_log s3
+                = (wm_log s ++ [wwrite_msg (Some cid)
+                     (wm_class_of akw (wm_ws s2)) ea 4 v])%list).
   { subst s3. rewrite weff_apply_write /wwrite_post /= Hl2. reflexivity. }
   assert (Hlpost : wm_log (weffs (Some cid) s3 post) = wm_log s3)
     by exact (weffs_nowrite_log (Some cid) s3 post Hpost).
@@ -653,7 +661,7 @@ Proof.
   rewrite /wQ_amo_aq. split.
   - rewrite /wQ_store /wV_store. split_and!.
     + exact Hi.
-    + rewrite Hls' Hlpost Hl3. reflexivity.
+    + eexists. rewrite Hls' Hlpost Hl3. reflexivity.
     + exact Hle.
     + intros j Hj.
       assert (Hstep : (S (length (wm_log s))

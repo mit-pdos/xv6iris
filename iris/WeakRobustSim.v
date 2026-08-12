@@ -213,7 +213,7 @@ Section book.
 
   (** The message a timestamp names (junk off the log — never consumed). *)
   Definition msg_at (t : nat) : wmsg :=
-    default (WMsg 0 [] None) (pt_log TS !! (t - 1)%nat).
+    default (WMsg 0 [] None WCplain) (pt_log TS !! (t - 1)%nat).
 
   (** THE PROMISE-FREE LOG.  Definitionally a [fmap] of [fl], so
       [pf_log done !! i] and [fl done !! i] move together. *)
@@ -532,7 +532,7 @@ Section sim.
          wm_tid (msg_at TS t) = Some e.1.
   Proof.
     intros Hq Ht. apply elem_of_fl in Ht as (e & He & Hts).
-    destruct (gev_ts_msg pstep TS e t Hwf Hts) as (base & data & Hm).
+    destruct (gev_ts_msg pstep TS e t Hwf Hts) as (base & data & kc & Hm).
     exists e. rewrite (msg_at_eq t _ Hm). by split_and!.
   Qed.
 
@@ -847,9 +847,9 @@ Section sim.
     split; [done|]. by exists (msg_at TS that).
   Qed.
 
-  Lemma msg_byte_run base data tid (jb : nat) :
+  Lemma msg_byte_run base data tid k (jb : nat) :
     (jb < length data)%nat →
-    is_Some (msg_byte (WMsg base data tid) (base + Z.of_nat jb)).
+    is_Some (msg_byte (WMsg base data tid k) (base + Z.of_nat jb)).
   Proof.
     intros Hj. rewrite /msg_byte /=. case_bool_decide as Hb; [|lia].
     replace (Z.to_nat (base + Z.of_nat jb - base)) with jb by lia.
@@ -872,7 +872,7 @@ Section sim.
     have Hgev : gev_ev TS e = Some ev by rewrite /gev_ev HT /=.
     have Hgts : gev_ts TS e = Some ts by rewrite /gev_ts Hgev /=.
     have Hok' := Hok. rewrite Hlbe Htse /= in Hok'.
-    destruct Hok' as (ts' & Hlen & _ & Hlog & _ & _ & _ & _ & Heq).
+    destruct Hok' as (ts' & kc & Hlen & _ & Hlog & _ & _ & _ & _ & Heq).
     injection Heq as <-.
     intros jb t' v Hjb.
     destruct (tlabel_ts_lookup_inv (pi TS done) tvs jb t' v Hjb)
@@ -884,7 +884,7 @@ Section sim.
     have Hjblt : (jb < length data)%nat.
     { rewrite -Hlen. by eapply lookup_lt_Some. }
     have Hwbe : writes_b TS (base + Z.of_nat jb) e ts.
-    { split; [done|]. exists (WMsg base data (Some e.1)). split; [done|].
+    { split; [done|]. exists (WMsg base data (Some e.1) kc). split; [done|].
       by apply msg_byte_run. }
     replace (S (length (pf_log TS done)) - 1)%nat
       with (length (pf_log TS done)) by lia.
@@ -1048,11 +1048,11 @@ Section sim.
                     false);
             [done|done|done|done|done|done|exact Hlbe|done|done|exact Hro|done].
     - (* ---- LStore ---- *)
-      destruct Hok as (ts & _ & Hlog & _ & Hf & Hts).
+      destruct Hok as (ts & kc & _ & Hlog & _ & Hf & Hts).
       have Hgts : gev_ts TS e = Some ts by rewrite /gev_ts Hgev /= Hts.
-      have Hmsg : msg_at TS ts = WMsg base data (Some e.1) by apply msg_at_eq.
+      have Hmsg : msg_at TS ts = WMsg base data (Some e.1) kc by apply msg_at_eq.
       have Hlogq : pf_log TS (done ++ [e])
-                   = pc_log cf ++ [WMsg base data (Some e.1)].
+                   = pc_log cf ++ [WMsg base data (Some e.1) kc].
       { by rewrite Hclog /pf_log (fl_app_some TS done e ts Hgts)
                    fmap_app /= Hmsg. }
       have Hpits : pi TS (done ++ [e]) ts = S (length (pc_log cf)).
@@ -1060,7 +1060,7 @@ Section sim.
         rewrite (fl_app_some TS done e ts Hgts) lookup_app_r; [lia|].
         by rewrite Nat.sub_diag. }
       have Hnedata : data ≠ []
-        by exact (Hdata (ts - 1)%nat (WMsg base data (Some e.1)) Hlog).
+        by exact (Hdata (ts - 1)%nat (WMsg base data (Some e.1) kc) Hlog).
       eexists. eapply (qcfg_step done e T ev ag2 cf
                  (store_post_run (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) rl base (length data)
                     (S (length (pc_log cf))))
@@ -1069,13 +1069,13 @@ Section sim.
       + rewrite Hstpost Hlogq.
         apply (PFStore pstep e.1 cf (WPAgent (pa_st ag)
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
-                 rl base data st'); [done| |done]. by simpl.
+                 rl base data kc st'); [done| |done]. by simpl.
     - (* ---- LRmw ---- *)
-      destruct Hok as (ts & Hlen & _ & Hlog & Hro & Hex & _ & Hf & Hts).
+      destruct Hok as (ts & kc & Hlen & _ & Hlog & Hro & Hex & _ & Hf & Hts).
       have Hgts : gev_ts TS e = Some ts by rewrite /gev_ts Hgev /= Hts.
-      have Hmsg : msg_at TS ts = WMsg base data (Some e.1) by apply msg_at_eq.
+      have Hmsg : msg_at TS ts = WMsg base data (Some e.1) kc by apply msg_at_eq.
       have Hlogq : pf_log TS (done ++ [e])
-                   = pc_log cf ++ [WMsg base data (Some e.1)].
+                   = pc_log cf ++ [WMsg base data (Some e.1) kc].
       { by rewrite Hclog /pf_log (fl_app_some TS done e ts Hgts)
                    fmap_app /= Hmsg. }
       have Hpits : pi TS (done ++ [e]) ts = S (length (pc_log cf)).
@@ -1083,7 +1083,7 @@ Section sim.
         rewrite (fl_app_some TS done e ts Hgts) lookup_app_r; [lia|].
         by rewrite Nat.sub_diag. }
       have Hnedata : data ≠ []
-        by exact (Hdata (ts - 1)%nat (WMsg base data (Some e.1)) Hlog).
+        by exact (Hdata (ts - 1)%nat (WMsg base data (Some e.1) kc) Hlog).
       have Hmap : (pi TS (done ++ [e])) <$> tvs.*1 = (pi TS done) <$> tvs.*1.
       { apply list_fmap_ext. intros i t Hi.
         rewrite list_lookup_fmap in Hi.
@@ -1102,7 +1102,7 @@ Section sim.
       + rewrite Hstpost Hlogq.
         apply (PFRmw pstep e.1 cf (WPAgent (pa_st ag)
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
-                 aq rl base (tlabel_ts (pi TS done) tvs) data st');
+                 aq rl base (tlabel_ts (pi TS done) tvs) data kc st');
           [done| |done| | |].
         * simpl. eapply (proj2 Hobl (pa_st ag) aq rl base tvs);
             [by rewrite tlabel_ts_snd|exact Hps].
@@ -1327,7 +1327,7 @@ Section wrapper.
   Proof.
     intros Hne Hs.
     destruct (wp_promise_step_inv c c' Hs)
-      as (j & agj & base & data & _ & Hnn & ->).
+      as (j & agj & base & data & kc & _ & Hnn & ->).
     intros p m Hp. simpl in Hp.
     destruct (decide (p < length (pc_log c))%nat) as [Hlt|Hge].
     - rewrite lookup_app_l in Hp; [done|]. by eapply Hne.
@@ -1355,7 +1355,7 @@ Section wrapper.
     induction 1 as [c|c y z Hs Hr IH].
     - split_and!; [done|done|]. intros i ag' Hlk. by exists ag'.
     - destruct (wp_promise_step_inv c y Hs)
-        as (j & agj & base & data & Hlkj & _ & ->).
+        as (j & agj & base & data & kc & Hlkj & _ & ->).
       destruct IH as (H1 & H2 & H3).
       have Hjlt : (j < length (pc_ags c))%nat by eapply lookup_lt_Some.
       split_and!.

@@ -67,11 +67,20 @@ Proof. rewrite /acc_addr. lia. Qed.
 
     - [LLoad aq base ts vs]   — a load of [|ts|] bytes at [base..], byte [j]
       reading timestamp [ts !! j] and obtaining value [vs !! j];
-    - [LStore rl base vs]     — a store appending ONE message;
+    - [LStore rl base vs k]   — a store appending ONE message of class [k];
     - [LFence pr pw sr sw]    — FENCE pred,succ with the four kind bits;
-    - [LRmw aq rl base ts rvs wvs] — an AMO: read half + write half in ONE
+    - [LRmw aq rl base ts rvs wvs k] — an AMO: read half + write half in ONE
       step (the design doc's AMO paragraph), with the read half constrained to
       the globally-latest message per byte.
+
+    THE CLASS FIELD [k : wm_class] (M6 D-M6-6) is INERT — no rule and no
+    relation of the axiomatic model inspects it.  It is on the LABEL rather
+    than computed from the state because [WeakAxiomatic2]'s replay makes the
+    post-state (and hence the appended message) a FUNCTION of the label
+    ([mnext], [es_msg]); the machines that project into [exec]
+    ([WeakInterp] via [WeakInterpProj], [WeakLitmus] via [WeakLitmusProj],
+    [WeakPromise] via [WeakPromiseBridge]) each supply the class their own
+    append used, which is what keeps the projected logs literally equal.
 
     What is deliberately NOT in the alphabet: LR/SC (the kernel uses none —
     design Decision 2), the [ak_coh] "coherent read" arm of [WeakInterp]
@@ -80,9 +89,10 @@ Proof. rewrite /acc_addr. lia. Qed.
     (Decision 3, and W4's scope decision). *)
 Inductive lbl :=
 | LLoad (aq : bool) (base : Z) (ts : list nat) (vs : list (bv 8))
-| LStore (rl : bool) (base : Z) (vs : list (bv 8))
+| LStore (rl : bool) (base : Z) (vs : list (bv 8)) (k : wm_class)
 | LFence (pr pw sr sw : bool)
-| LRmw (aq rl : bool) (base : Z) (ts : list nat) (rvs wvs : list (bv 8)).
+| LRmw (aq rl : bool) (base : Z) (ts : list nat) (rvs wvs : list (bv 8))
+       (k : wm_class).
 
 (** MODELLING CHOICE (agents).  A step names its agent; harts and the disk
     agent are the same kind of thing (decision D-M6-4: "devices = the simple
@@ -134,10 +144,10 @@ Inductive mstep (σ : mstate) (i : agent) : lbl → mstate → Prop :=
     mstep σ i (LLoad aq base ts vs)
       (MSt (ms_img σ) (ms_log σ)
          (upd_ws (ms_ws σ) i (load_post_run (ms_ws σ i) aq base ts)))
-| MStepStore rl base vs :
+| MStepStore rl base vs k :
     vs ≠ [] →
-    mstep σ i (LStore rl base vs)
-      (MSt (ms_img σ) (ms_log σ ++ [WMsg base vs (Some i)])
+    mstep σ i (LStore rl base vs k)
+      (MSt (ms_img σ) (ms_log σ ++ [WMsg base vs (Some i) k])
          (upd_ws (ms_ws σ) i
             (store_post_run (ms_ws σ i) rl base (length vs)
                (S (length (ms_log σ))))))
@@ -145,37 +155,42 @@ Inductive mstep (σ : mstate) (i : agent) : lbl → mstate → Prop :=
     mstep σ i (LFence pr pw sr sw)
       (MSt (ms_img σ) (ms_log σ)
          (upd_ws (ms_ws σ) i (fence_post (ms_ws σ i) pr pw sr sw)))
-| MStepRmw aq rl base ts rvs wvs :
+| MStepRmw aq rl base ts rvs wvs k :
     wvs ≠ [] → length wvs = length ts →
     rd_ok (ms_img σ) (ms_log σ) (ms_ws σ i) aq base ts rvs →
     rmw_latest (ms_img σ) (ms_log σ) base ts →
-    mstep σ i (LRmw aq rl base ts rvs wvs)
-      (MSt (ms_img σ) (ms_log σ ++ [WMsg base wvs (Some i)])
+    mstep σ i (LRmw aq rl base ts rvs wvs k)
+      (MSt (ms_img σ) (ms_log σ ++ [WMsg base wvs (Some i) k])
          (upd_ws (ms_ws σ) i
             (store_post_run (load_post_run (ms_ws σ i) aq base ts) rl base
                (length wvs) (S (length (ms_log σ)))))).
 
 (** Label classification. *)
 Definition lb_is_w (l : lbl) : bool :=
-  match l with LStore _ _ _ | LRmw _ _ _ _ _ _ => true | _ => false end.
+  match l with LStore _ _ _ _ | LRmw _ _ _ _ _ _ _ => true | _ => false end.
 Definition lb_is_r (l : lbl) : bool :=
-  match l with LLoad _ _ _ _ | LRmw _ _ _ _ _ _ => true | _ => false end.
+  match l with LLoad _ _ _ _ | LRmw _ _ _ _ _ _ _ => true | _ => false end.
 Definition lb_aq (l : lbl) : bool :=
-  match l with LLoad aq _ _ _ => aq | LRmw aq _ _ _ _ _ => aq | _ => false end.
+  match l with LLoad aq _ _ _ => aq | LRmw aq _ _ _ _ _ _ => aq | _ => false end.
+
+(** The INERT class the label's write half publishes (see the alphabet
+    comment); [WCplain] on the non-writing labels, where it is never read. *)
+Definition lb_cls (l : lbl) : wm_class :=
+  match l with LStore _ _ _ k => k | LRmw _ _ _ _ _ _ k => k | _ => WCplain end.
 
 (** The read footprint: base, per-byte timestamps, per-byte values. *)
 Definition lb_rd (l : lbl) : option (Z * list nat * list (bv 8)) :=
   match l with
   | LLoad _ base ts vs => Some (base, ts, vs)
-  | LRmw _ _ base ts rvs _ => Some (base, ts, rvs)
+  | LRmw _ _ base ts rvs _ _ => Some (base, ts, rvs)
   | _ => None
   end.
 
 (** The write footprint: base and the bytes written. *)
 Definition lb_wr (l : lbl) : option (Z * list (bv 8)) :=
   match l with
-  | LStore _ base vs => Some (base, vs)
-  | LRmw _ _ base _ _ wvs => Some (base, wvs)
+  | LStore _ base vs _ => Some (base, vs)
+  | LRmw _ _ base _ _ wvs _ => Some (base, wvs)
   | _ => None
   end.
 
@@ -199,7 +214,7 @@ Proof. by inversion 1. Qed.
 Lemma mstep_log_w σ i l σ' :
   mstep σ i l σ' → lb_is_w l = true →
   ∃ base vs, lb_wr l = Some (base, vs) ∧ vs ≠ [] ∧
-             ms_log σ' = ms_log σ ++ [WMsg base vs (Some i)].
+             ms_log σ' = ms_log σ ++ [WMsg base vs (Some i) (lb_cls l)].
 Proof. inversion 1; try done; intros _; eauto. Qed.
 
 Lemma mstep_log_prefix σ i l σ' : mstep σ i l σ' → ms_log σ `prefix_of` ms_log σ'.
@@ -348,106 +363,6 @@ Proof.
 Qed.
 
 (* ------------------------------------------------------------------ *)
-(** ** Missing [WeakMem] fold lemmas
-
-    [WeakMem] proves the [w_vrOld] and boundedness facts for the multi-byte
-    folds but not the [coh] / [w_vwOld] ones, and its [load_post_run_vrOld]
-    carries a stronger forward-bank side condition than the axiomatic proof can
-    supply.  These are the four missing instances, proved exactly like their
-    [WeakMem] siblings.  (They belong in [WeakMem.v]; they are here because
-    this slice may not edit it.) *)
-
-Lemma ws_le_coh w1 w2 a : ws_le w1 w2 → (coh w1 a ≤ coh w2 a)%nat.
-Proof. by intros (H & _). Qed.
-
-Lemma ws_le_vwOld w1 w2 : ws_le w1 w2 → (w_vwOld w1 ≤ w_vwOld w2)%nat.
-Proof. by intros (_ & _ & ? & _). Qed.
-
-Lemma ws_le_vrOld w1 w2 : ws_le w1 w2 → (w_vrOld w1 ≤ w_vrOld w2)%nat.
-Proof. by intros (_ & ? & _). Qed.
-
-Local Lemma load_post_fold_coh aq vpre ats ws a t :
-  (a, t) ∈ ats →
-  (t ≤ coh (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats) a)%nat.
-Proof.
-  revert ws. induction ats as [|p l IH]; intros ws Hin.
-  { by apply elem_of_nil in Hin. }
-  apply elem_of_cons in Hin as [<-|Hin]; [|by apply IH].
-  simpl. etrans; [apply (load_post_at_coh ws aq vpre a t)|].
-  apply ws_le_coh, (load_post_fold_le aq vpre l (load_post_at ws aq vpre a t)).
-Qed.
-
-Lemma load_post_run_coh ws aq base ts (j : nat) t :
-  ts !! j = Some t →
-  (t ≤ coh (load_post_run ws aq base ts) (acc_addr base j))%nat.
-Proof.
-  intros Ht. pose proof (lookup_lt_Some _ _ _ Ht) as Hj.
-  rewrite /load_post_run /load_post_bytes. apply load_post_fold_coh.
-  apply elem_of_list_lookup_2 with j.
-  rewrite lookup_zip_with (lookup_seq_lt 0 (length ts) j Hj) Ht //.
-Qed.
-
-Local Lemma store_post_fold_coh rl t as_ ws a :
-  a ∈ as_ → (t ≤ coh (foldl (λ w a, store_post w rl a t) ws as_) a)%nat.
-Proof.
-  revert ws. induction as_ as [|b l IH]; intros ws Hin.
-  { by apply elem_of_nil in Hin. }
-  apply elem_of_cons in Hin as [<-|Hin]; [|by apply IH].
-  simpl. etrans; [apply (store_post_coh ws rl a t)|].
-  apply ws_le_coh, (store_post_fold_le rl t l (store_post ws rl a t)).
-Qed.
-
-Lemma store_post_run_coh ws rl base n t (j : nat) :
-  (j < n)%nat → (t ≤ coh (store_post_run ws rl base n t) (acc_addr base j))%nat.
-Proof.
-  intros Hj. rewrite /store_post_run /store_post_bytes.
-  apply store_post_fold_coh, elem_of_list_In, in_map_iff.
-  exists j. split; [rewrite /acc_addr //|]. apply in_seq. lia.
-Qed.
-
-Local Lemma store_post_fold_vwOld rl t as_ ws :
-  as_ ≠ [] → (t ≤ w_vwOld (foldl (λ w a, store_post w rl a t) ws as_))%nat.
-Proof.
-  destruct as_ as [|a l]; [done|]. intros _. simpl.
-  etrans; [apply (store_post_vwOld ws rl a t)|].
-  apply ws_le_vwOld, (store_post_fold_le rl t l (store_post ws rl a t)).
-Qed.
-
-Lemma store_post_run_vwOld ws rl base n t :
-  (0 < n)%nat → (t ≤ w_vwOld (store_post_run ws rl base n t))%nat.
-Proof.
-  intros Hn. rewrite /store_post_run /store_post_bytes.
-  apply store_post_fold_vwOld. by destruct n; [lia|].
-Qed.
-
-(** The generalized [load_post_run_vrOld]: what the read floor gains is the
-    FORWARDED view, so the side condition needed is "this byte's read was not
-    forwarded", not [WeakMem]'s stronger "this agent never stored to it". *)
-Local Lemma load_post_fold_vrOld' aq vpre ats ws a t :
-  (a, t) ∈ ats → fwd_view ws aq a t = t →
-  (t ≤ w_vrOld (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats))%nat.
-Proof.
-  revert ws. induction ats as [|p l IH]; intros ws Hin Hfv.
-  { by apply elem_of_nil in Hin. }
-  apply elem_of_cons in Hin as [<-|Hin].
-  - simpl. etrans; [|apply ws_le_vrOld,
-      (load_post_fold_le aq vpre l (load_post_at ws aq vpre a t))].
-    rewrite /load_post_at /= Hfv. lia.
-  - apply IH; [exact Hin|]. by rewrite /fwd_view load_post_at_fwd.
-Qed.
-
-Lemma load_post_run_vrOld' ws aq base ts (j : nat) t :
-  ts !! j = Some t → fwd_view ws aq (acc_addr base j) t = t →
-  (t ≤ w_vrOld (load_post_run ws aq base ts))%nat.
-Proof.
-  intros Ht Hfv. pose proof (lookup_lt_Some _ _ _ Ht) as Hj.
-  rewrite /load_post_run /load_post_bytes.
-  apply (load_post_fold_vrOld' _ _ _ _ (acc_addr base j) t); [|exact Hfv].
-  apply elem_of_list_lookup_2 with j.
-  rewrite lookup_zip_with (lookup_seq_lt 0 (length ts) j Hj) Ht //.
-Qed.
-
-(* ------------------------------------------------------------------ *)
 (** ** Events
 
     MODELLING CHOICE (event identity).  An event is either the VIRTUAL INIT
@@ -519,7 +434,8 @@ Qed.
 (** The message a write step appends, located in the final log. *)
 Lemma exec_msg_at E k s base vs :
   exec_wf E → ex_tr E !! k = Some s → lb_wr (es_lb s) = Some (base, vs) →
-  ex_log E !! length (elog E k) = Some (WMsg base vs (Some (es_ag s))).
+  ex_log E !! length (elog E k)
+  = Some (WMsg base vs (Some (es_ag s)) (lb_cls (es_lb s))).
 Proof.
   intros Hwf Hs Hwr. pose proof (lookup_lt_Some _ _ _ Hs) as Hk.
   pose proof (exec_step_at E k s Hwf Hs) as Hstep.
@@ -533,7 +449,8 @@ Qed.
 
 Lemma ev_writes_at E k s base vs a :
   exec_wf E → ex_tr E !! k = Some s → lb_wr (es_lb s) = Some (base, vs) →
-  ev_writes E (ev_at k) a ↔ is_Some (msg_byte (WMsg base vs (Some (es_ag s))) a).
+  ev_writes E (ev_at k) a ↔
+  is_Some (msg_byte (WMsg base vs (Some (es_ag s)) (lb_cls (es_lb s))) a).
 Proof.
   intros Hwf Hs Hwr. rewrite /ev_writes. cbn [ev_ts]. rewrite log_byte_S.
   by rewrite (exec_msg_at E k s base vs Hwf Hs Hwr).
@@ -603,11 +520,11 @@ Qed.
 Lemma lb_rd_cases l base ts vs :
   lb_rd l = Some (base, ts, vs) →
   ∃ aq, lb_aq l = aq ∧
-        (l = LLoad aq base ts vs ∨ ∃ rl wvs, l = LRmw aq rl base ts vs wvs).
+        (l = LLoad aq base ts vs ∨ ∃ rl wvs k, l = LRmw aq rl base ts vs wvs k).
 Proof.
   destruct l; simpl; intros Hl; simplify_eq; eexists; (split; [reflexivity|]).
   - by left.
-  - right. by do 2 eexists.
+  - right. by do 3 eexists.
 Qed.
 
 Lemma exec_rd_ok E k s base ts vs :
@@ -616,12 +533,12 @@ Lemma exec_rd_ok E k s base ts vs :
 Proof.
   intros Hwf Hs Hrd. pose proof (exec_step_at E k s Hwf Hs) as Hstep.
   rewrite /eimg /elog /ews.
-  destruct (lb_rd_cases _ _ _ _ Hrd) as (aq & Haq & [Hl|(rl & wvs & Hl)]);
+  destruct (lb_rd_cases _ _ _ _ Hrd) as (aq & Haq & [Hl|(rl & wvs & kc & Hl)]);
     rewrite Haq; rewrite Hl in Hstep; inversion Hstep; simplify_eq; done.
 Qed.
 
-Lemma exec_rmw_latest E k s aq rl base ts rvs wvs :
-  exec_wf E → ex_tr E !! k = Some s → es_lb s = LRmw aq rl base ts rvs wvs →
+Lemma exec_rmw_latest E k s aq rl base ts rvs wvs kc :
+  exec_wf E → ex_tr E !! k = Some s → es_lb s = LRmw aq rl base ts rvs wvs kc →
   rmw_latest (eimg E k) (elog E k) base ts.
 Proof.
   intros Hwf Hs Hl. pose proof (exec_step_at E k s Hwf Hs) as Hstep.
@@ -843,8 +760,8 @@ Lemma mstep_ws_load σ i aq base ts vs σ' :
   ms_ws σ' i = load_post_run (ms_ws σ i) aq base ts.
 Proof. inversion 1; simplify_eq; simpl; by rewrite upd_ws_eq. Qed.
 
-Lemma mstep_ws_store σ i rl base vs σ' :
-  mstep σ i (LStore rl base vs) σ' →
+Lemma mstep_ws_store σ i rl base vs k σ' :
+  mstep σ i (LStore rl base vs k) σ' →
   ms_ws σ' i = store_post_run (ms_ws σ i) rl base (length vs)
                  (S (length (ms_log σ))).
 Proof. inversion 1; simplify_eq; simpl; by rewrite upd_ws_eq. Qed.
@@ -854,8 +771,8 @@ Lemma mstep_ws_fence σ i pr pw sr sw σ' :
   ms_ws σ' i = fence_post (ms_ws σ i) pr pw sr sw.
 Proof. inversion 1; simplify_eq; simpl; by rewrite upd_ws_eq. Qed.
 
-Lemma mstep_ws_rmw σ i aq rl base ts rvs wvs σ' :
-  mstep σ i (LRmw aq rl base ts rvs wvs) σ' →
+Lemma mstep_ws_rmw σ i aq rl base ts rvs wvs k σ' :
+  mstep σ i (LRmw aq rl base ts rvs wvs k) σ' →
   ms_ws σ' i = store_post_run (load_post_run (ms_ws σ i) aq base ts) rl base
                  (length wvs) (S (length (ms_log σ))).
 Proof. inversion 1; simplify_eq; simpl; by rewrite upd_ws_eq. Qed.
@@ -868,13 +785,13 @@ Proof.
   rewrite Hl in Hstep. exact (mstep_ws_load _ _ _ _ _ _ _ Hstep).
 Qed.
 
-Lemma exec_ws_store E k s rl base vs :
-  exec_wf E → ex_tr E !! k = Some s → es_lb s = LStore rl base vs →
+Lemma exec_ws_store E k s rl base vs kc :
+  exec_wf E → ex_tr E !! k = Some s → es_lb s = LStore rl base vs kc →
   ews E (S k) (es_ag s) =
     store_post_run (ews E k (es_ag s)) rl base (length vs) (ev_ts E (ev_at k)).
 Proof.
   intros Hwf Hs Hl. pose proof (exec_step_at E k s Hwf Hs) as Hstep.
-  rewrite Hl in Hstep. exact (mstep_ws_store _ _ _ _ _ _ Hstep).
+  rewrite Hl in Hstep. exact (mstep_ws_store _ _ _ _ _ _ _ Hstep).
 Qed.
 
 Lemma exec_ws_fence E k s pr pw sr sw :
@@ -885,19 +802,19 @@ Proof.
   rewrite Hl in Hstep. exact (mstep_ws_fence _ _ _ _ _ _ _ Hstep).
 Qed.
 
-Lemma exec_ws_rmw E k s aq rl base ts rvs wvs :
-  exec_wf E → ex_tr E !! k = Some s → es_lb s = LRmw aq rl base ts rvs wvs →
+Lemma exec_ws_rmw E k s aq rl base ts rvs wvs kc :
+  exec_wf E → ex_tr E !! k = Some s → es_lb s = LRmw aq rl base ts rvs wvs kc →
   ews E (S k) (es_ag s) =
     store_post_run (load_post_run (ews E k (es_ag s)) aq base ts) rl base
       (length wvs) (ev_ts E (ev_at k)).
 Proof.
   intros Hwf Hs Hl. pose proof (exec_step_at E k s Hwf Hs) as Hstep.
-  rewrite Hl in Hstep. exact (mstep_ws_rmw _ _ _ _ _ _ _ _ _ Hstep).
+  rewrite Hl in Hstep. exact (mstep_ws_rmw _ _ _ _ _ _ _ _ _ _ Hstep).
 Qed.
 
 (** A byte inside a message's range is byte [j] of it. *)
-Lemma msg_byte_index base vs tid a :
-  is_Some (msg_byte (WMsg base vs tid) a) →
+Lemma msg_byte_index base vs tid k a :
+  is_Some (msg_byte (WMsg base vs tid k) a) →
   ∃ j : nat, (j < length vs)%nat ∧ a = acc_addr base j.
 Proof.
   rewrite /msg_byte /=. case_bool_decide as Hle; [|by intros []].
@@ -935,7 +852,7 @@ Lemma touches_coh E k s a t :
   (t ≤ coh (ews E (S k) (es_ag s)) a)%nat.
 Proof.
   intros Hwf Hs Ht.
-  destruct (es_lb s) as [aq base ts vs|rl base vs|pr pw sr sw|aq rl base ts rvs wvs]
+  destruct (es_lb s) as [aq base ts vs|rl base vs kc|pr pw sr sw|aq rl base ts rvs wvs kc]
     eqn:Hl.
   - (* load *)
     destruct Ht as [[v Hr]|(HW & _ & _)]; last first.
@@ -952,8 +869,8 @@ Proof.
       assert (s' = s) as -> by (rewrite Hs in Hs'; by simplify_eq).
       by rewrite Hl /= in Hrd. }
     apply (ev_writes_at E k s base vs a Hwf Hs ltac:(by rewrite Hl)) in Hwr.
-    destruct (msg_byte_index base vs (Some (es_ag s)) a Hwr) as (j & Hj & ->).
-    rewrite (exec_ws_store E k s rl base vs Hwf Hs Hl).
+    destruct (msg_byte_index base vs (Some (es_ag s)) _ a Hwr) as (j & Hj & ->).
+    rewrite (exec_ws_store E k s rl base vs _ Hwf Hs Hl).
     by apply store_post_run_coh.
   - (* fence *)
     destruct Ht as [[v Hr]|(HW & _ & _)].
@@ -963,7 +880,7 @@ Proof.
     destruct HW as (s' & Hs' & Hw). rewrite Hs in Hs'. simplify_eq.
     by rewrite Hl in Hw.
   - (* rmw *)
-    rewrite (exec_ws_rmw E k s aq rl base ts rvs wvs Hwf Hs Hl).
+    rewrite (exec_ws_rmw E k s aq rl base ts rvs wvs _ Hwf Hs Hl).
     destruct Ht as [[v Hr]|(HW & Hwr & ->)].
     + destruct Hr as (s' & base' & ts' & vs' & j & Hs' & Hrd & Hj & Hv & ->).
       assert (s' = s) as -> by (rewrite Hs in Hs'; by simplify_eq).
@@ -971,7 +888,7 @@ Proof.
       etrans; [by apply load_post_run_coh|].
       apply ws_le_coh, store_post_run_le.
     + apply (ev_writes_at E k s base wvs a Hwf Hs ltac:(by rewrite Hl)) in Hwr.
-      destruct (msg_byte_index base wvs (Some (es_ag s)) a Hwr) as (j & Hj & ->).
+      destruct (msg_byte_index base wvs (Some (es_ag s)) _ a Hwr) as (j & Hj & ->).
       by apply store_post_run_coh.
 Qed.
 
@@ -1035,8 +952,8 @@ Qed.
     step — the atomicity constraint, read off the trace. *)
 Lemma lb_rw_rmw l :
   lb_is_w l = true → lb_is_r l = true →
-  ∃ aq rl base ts rvs wvs, l = LRmw aq rl base ts rvs wvs.
-Proof. destruct l; try done. intros _ _. by do 6 eexists. Qed.
+  ∃ aq rl base ts rvs wvs k, l = LRmw aq rl base ts rvs wvs k.
+Proof. destruct l; try done. intros _ _. by do 7 eexists. Qed.
 
 Lemma rmw_read_latest E kr a t v :
   exec_wf E → reads_at E kr a t v → is_W E (ev_at kr) →
@@ -1047,8 +964,8 @@ Proof.
   destruct HW as (s' & Hs' & Hw).
   assert (s' = s) as -> by (rewrite Hs in Hs'; by simplify_eq).
   destruct (lb_rw_rmw (es_lb s) Hw (lb_rd_is_r _ _ Hrd))
-    as (aq & rl & base' & ts' & rvs' & wvs' & Hl).
-  pose proof (exec_rmw_latest E kr s aq rl base' ts' rvs' wvs' Hwf Hs Hl) as Hlat.
+    as (aq & rl & base' & ts' & rvs' & wvs' & kc & Hl).
+  pose proof (exec_rmw_latest E kr s aq rl base' ts' rvs' wvs' _ Hwf Hs Hl) as Hlat.
   rewrite Hl /= in Hrd. simplify_eq. by apply (Hlat j).
 Qed.
 
@@ -1266,31 +1183,6 @@ Definition pub_r (E : exec) (e : ev) (t : nat) : Prop :=
 (* ------------------------------------------------------------------ *)
 (** ** The operational content: publications reach the reader's pre-view *)
 
-Lemma ws_le_vrNew w1 w2 : ws_le w1 w2 → (w_vrNew w1 ≤ w_vrNew w2)%nat.
-Proof. by intros (_ & _ & _ & ? & _). Qed.
-
-Local Lemma load_post_fold_vrNew_aq vpre ats ws a t :
-  (a, t) ∈ ats →
-  (t ≤ w_vrNew (foldl (λ w at_, load_post_at w true vpre at_.1 at_.2) ws ats))%nat.
-Proof.
-  revert ws. induction ats as [|p l IH]; intros ws Hin.
-  { by apply elem_of_nil in Hin. }
-  apply elem_of_cons in Hin as [<-|Hin]; [|by apply IH].
-  simpl. etrans; [apply (load_post_at_vrNew_aq ws vpre a t)|].
-  apply ws_le_vrNew,
-    (load_post_fold_le true vpre l (load_post_at ws true vpre a t)).
-Qed.
-
-Lemma load_post_run_vrNew_aq ws base ts (j : nat) t :
-  ts !! j = Some t → (t ≤ w_vrNew (load_post_run ws true base ts))%nat.
-Proof.
-  intros Ht. pose proof (lookup_lt_Some _ _ _ Ht) as Hj.
-  rewrite /load_post_run /load_post_bytes.
-  apply (load_post_fold_vrNew_aq _ _ _ (acc_addr base j) t).
-  apply elem_of_list_lookup_2 with j.
-  rewrite lookup_zip_with (lookup_seq_lt 0 (length ts) j Hj) Ht //.
-Qed.
-
 Lemma load_post_run_vrOld_aq ws base ts (j : nat) t :
   ts !! j = Some t → (t ≤ w_vrOld (load_post_run ws true base ts))%nat.
 Proof.
@@ -1305,13 +1197,13 @@ Lemma pub_w_vwOld E k s :
 Proof.
   intros Hwf Hs Hw. pose proof (exec_step_at E k s Hwf Hs) as Hstep.
   destruct (mstep_log_w _ _ _ _ Hstep Hw) as (base & vs & Hwr & Hne & _).
-  destruct (es_lb s) as [aq0 b0 t0 v0|rl b0 v0|p1 p2 p3 p4|aq0 rl b0 t0 rv0 wv0]
+  destruct (es_lb s) as [aq0 b0 t0 v0|rl b0 v0 kc|p1 p2 p3 p4|aq0 rl b0 t0 rv0 wv0 kc]
     eqn:Hl; [by simplify_eq/=| |by simplify_eq/=|].
-  - rewrite (exec_ws_store E k s rl b0 v0 Hwf Hs Hl).
+  - rewrite (exec_ws_store E k s rl b0 v0 _ Hwf Hs Hl).
     apply store_post_run_vwOld.
     assert (v0 ≠ []) as Hne0 by (simpl in Hwr; by simplify_eq).
     destruct v0; [done|simpl; lia].
-  - rewrite (exec_ws_rmw E k s aq0 rl b0 t0 rv0 wv0 Hwf Hs Hl).
+  - rewrite (exec_ws_rmw E k s aq0 rl b0 t0 rv0 wv0 _ Hwf Hs Hl).
     apply store_post_run_vwOld.
     assert (wv0 ≠ []) as Hne0 by (simpl in Hwr; by simplify_eq).
     destruct wv0; [done|simpl; lia].
@@ -1322,23 +1214,6 @@ Qed.
     A bank entry's timestamp is always one of THIS agent's own writes.  This is
     what turns "the rf edge is external" into "the read was not forwarded", and
     hence into a [w_vrOld] publication for a PLAIN read. *)
-
-Local Lemma store_post_fold_fwd rl t as_ ws a tf vf :
-  w_fwd (foldl (λ w a, store_post w rl a t) ws as_) !! a = Some (tf, vf) →
-  tf = t ∨ w_fwd ws !! a = Some (tf, vf).
-Proof.
-  revert ws. induction as_ as [|b l IH]; intros ws Hlk; [by right|].
-  destruct (IH _ Hlk) as [->|Hlk']; [by left|].
-  rewrite /store_post /= in Hlk'.
-  destruct (decide (a = b)) as [->|Hne].
-  - rewrite lookup_insert in Hlk'. simplify_eq. by left.
-  - rewrite lookup_insert_ne in Hlk'; [done|]. by right.
-Qed.
-
-Lemma store_post_run_fwd_inv ws rl base n t a tf vf :
-  w_fwd (store_post_run ws rl base n t) !! a = Some (tf, vf) →
-  tf = t ∨ w_fwd ws !! a = Some (tf, vf).
-Proof. rewrite /store_post_run /store_post_bytes. apply store_post_fold_fwd. Qed.
 
 Definition fwd_ok (E : exec) (k : nat) (i : agent) : Prop :=
   ∀ a tf vf, w_fwd (ews E k i) !! a = Some (tf, vf) →
@@ -1357,13 +1232,13 @@ Proof.
     destruct (IH ltac:(lia) a tf vf Hlk) as (k' & s' & ? & ? & ? & ? & ?).
     exists k', s'. split_and!; [lia|done|done|done|done]. }
   subst i.
-  destruct (es_lb s) as [aq0 b0 t0 v0|rl b0 v0|p1 p2 p3 p4|aq0 rl b0 t0 rv0 wv0]
+  destruct (es_lb s) as [aq0 b0 t0 v0|rl b0 v0 kc|p1 p2 p3 p4|aq0 rl b0 t0 rv0 wv0 kc]
     eqn:Hl.
   - rewrite (exec_ws_load E k s aq0 b0 t0 v0 Hwf Hs Hl)
             load_post_run_fwd in Hlk.
     destruct (IH ltac:(lia) a tf vf Hlk) as (k' & s' & ? & ? & ? & ? & ?).
     exists k', s'. split_and!; [lia|done|done|done|done].
-  - rewrite (exec_ws_store E k s rl b0 v0 Hwf Hs Hl) in Hlk.
+  - rewrite (exec_ws_store E k s rl b0 v0 _ Hwf Hs Hl) in Hlk.
     apply store_post_run_fwd_inv in Hlk as [->|Hlk].
     + exists k, s. split_and!; [lia|done|done|by rewrite Hl|done].
     + destruct (IH ltac:(lia) a tf vf Hlk) as (k' & s' & ? & ? & ? & ? & ?).
@@ -1372,7 +1247,7 @@ Proof.
             fence_post_fwd in Hlk.
     destruct (IH ltac:(lia) a tf vf Hlk) as (k' & s' & ? & ? & ? & ? & ?).
     exists k', s'. split_and!; [lia|done|done|done|done].
-  - rewrite (exec_ws_rmw E k s aq0 rl b0 t0 rv0 wv0 Hwf Hs Hl) in Hlk.
+  - rewrite (exec_ws_rmw E k s aq0 rl b0 t0 rv0 wv0 _ Hwf Hs Hl) in Hlk.
     apply store_post_run_fwd_inv in Hlk as [->|Hlk].
     + exists k, s. split_and!; [lia|done|done|by rewrite Hl|done].
     + rewrite load_post_run_fwd in Hlk.
@@ -1419,11 +1294,11 @@ Proof.
   destruct Hr as (s' & base & ts & vs & j & Hs' & Hrd & Hj & Hv & Ha).
   assert (s' = s) as -> by (rewrite Hs in Hs'; by simplify_eq).
   rewrite Ha in Hfv.
-  destruct (lb_rd_cases _ _ _ _ Hrd) as (aq & Haq' & [Hl|(rl & wvs & Hl)]);
+  destruct (lb_rd_cases _ _ _ _ Hrd) as (aq & Haq' & [Hl|(rl & wvs & kc & Hl)]);
     rewrite Haq' in Hfv.
   - rewrite (exec_ws_load E k s aq base ts vs Hwf Hs Hl).
     by apply (load_post_run_vrOld' _ _ _ _ j t Hj).
-  - rewrite (exec_ws_rmw E k s aq rl base ts vs wvs Hwf Hs Hl).
+  - rewrite (exec_ws_rmw E k s aq rl base ts vs wvs _ Hwf Hs Hl).
     etrans; [apply (load_post_run_vrOld' (ews E k (es_ag s)) aq base ts j t Hj Hfv)|].
     apply ws_le_vrOld, store_post_run_le.
 Qed.
@@ -1437,11 +1312,11 @@ Proof.
   assert (s0 = s) as -> by (rewrite Hs in Hs0; by simplify_eq).
   destruct Hr as (s' & base & ts & vs & j & Hs' & Hrd & Hj & Hv & Ha).
   assert (s' = s) as -> by (rewrite Hs in Hs'; by simplify_eq).
-  destruct (lb_rd_cases _ _ _ _ Hrd) as (aq & Haq' & [Hl|(rl & wvs & Hl)]);
+  destruct (lb_rd_cases _ _ _ _ Hrd) as (aq & Haq' & [Hl|(rl & wvs & kc & Hl)]);
     rewrite Haq in Haq'; subst aq.
   - rewrite (exec_ws_load E k s true base ts vs Hwf Hs Hl).
     by apply (load_post_run_vrNew_aq _ _ _ j).
-  - rewrite (exec_ws_rmw E k s true rl base ts vs wvs Hwf Hs Hl).
+  - rewrite (exec_ws_rmw E k s true rl base ts vs wvs _ Hwf Hs Hl).
     etrans; [apply (load_post_run_vrNew_aq (ews E k (es_ag s)) base ts j t Hj)|].
     apply ws_le_vrNew, store_post_run_le.
 Qed.
@@ -1803,3 +1678,155 @@ Qed.
       [w_vRel].  Vacuous for this kernel (the image contains no release store)
       but it is a place where this machine is WEAKER than RVWMO, which is the
       direction that needs an argument. *)
+
+(* ------------------------------------------------------------------ *)
+(** ** The machine invariant along a run, and the event pre-view
+
+    (Lifted here from [WeakAxiomatic2] by the W4 batch: [rd_ok] and [exec]
+    are defined in THIS file, so this is their home; slice 2 proved them
+    against a frozen [.vo].)
+
+    [WeakMem.ws_bounded] instantiated at the execution's own log, and
+    [evpre] — the [load_vpre] a step ran at, as a total function of the
+    event. *)
+
+(** The [Forall] shape [load_post_run_bounded] wants, from an [rd_ok]. *)
+Lemma rd_ok_ts_bounded img log ws aq base ts vs :
+  rd_ok img log ws aq base ts vs →
+  Forall (λ t, (t ≤ length log)%nat) ts.
+Proof.
+  intros [Hlen Hall]. apply Forall_lookup_2. intros j t Hj.
+  destruct (lookup_lt_is_Some_2 vs j) as [v Hv].
+  { rewrite Hlen. by eapply lookup_lt_Some. }
+  destruct (Hall j t v Hj Hv) as [Hb _].
+  eapply log_byte_bounded. by eexists.
+Qed.
+
+(* ================================================================== *)
+(** * 2. The machine invariant along a run: every view is a real timestamp
+
+    [WeakMem.ws_bounded] instantiated at the execution's own log.  Slice 1
+    never needed it (its measures were all timestamps read off the trace);
+    slice 2 does, because the read's position [opos] contains [load_vpre],
+    and "the position of a read is below the log" is what makes a later write
+    strictly above it. *)
+
+Lemma exec_ws_bounded E k i :
+  exec_wf E → (k ≤ length (ex_tr E))%nat →
+  ws_bounded (ews E k i) (length (elog E k)).
+Proof.
+  intros Hwf. induction k as [|k IH]; intros Hk.
+  { rewrite (exec_ws_init E i Hwf). apply ws_bounded_init. }
+  destruct (exec_tr_lookup E k ltac:(lia)) as [s Hs].
+  pose proof (exec_step_at E k s Hwf Hs) as Hstep.
+  pose proof (IH ltac:(lia)) as Hb.
+  pose proof (exec_log_len_le E k (S k) Hwf ltac:(lia) ltac:(lia)) as Hlen.
+  destruct (decide (i = es_ag s)) as [->|Hne]; last first.
+  { rewrite /ews (mstep_ws_ne _ _ _ _ i Hstep Hne).
+    eapply ws_bounded_mono; [exact Hb|exact Hlen]. }
+  destruct (es_lb s) as [aq base ts vs|rl base vs kc|pr pw sr sw|aq rl base ts rvs wvs kc]
+    eqn:Hl.
+  - (* load *)
+    rewrite (exec_ws_load E k s aq base ts vs Hwf Hs Hl).
+    pose proof (exec_rd_ok E k s base ts vs Hwf Hs ltac:(by rewrite Hl)) as Hrd.
+    eapply ws_bounded_mono; [|exact Hlen].
+    apply load_post_run_bounded; [exact Hb|].
+    by eapply rd_ok_ts_bounded.
+  - (* store *)
+    rewrite (exec_ws_store E k s rl base vs _ Hwf Hs Hl).
+    assert (Hts : ev_ts E (ev_at k) = length (elog E (S k))).
+    { symmetry. by apply (ev_ts_next E k s Hwf Hs); rewrite Hl. }
+    apply (store_post_run_bounded _ _ _ _ _ (length (elog E k)));
+      [exact Hb|rewrite Hts; lia|exact Hlen].
+  - (* fence *)
+    rewrite (exec_ws_fence E k s pr pw sr sw Hwf Hs Hl).
+    eapply ws_bounded_mono; [|exact Hlen]. by apply fence_post_bounded.
+  - (* rmw *)
+    rewrite (exec_ws_rmw E k s aq rl base ts rvs wvs _ Hwf Hs Hl).
+    pose proof (exec_rd_ok E k s base ts rvs Hwf Hs ltac:(by rewrite Hl)) as Hrd.
+    assert (Hts : ev_ts E (ev_at k) = length (elog E (S k))).
+    { symmetry. by apply (ev_ts_next E k s Hwf Hs); rewrite Hl. }
+    apply (store_post_run_bounded _ _ _ _ _ (length (elog E k)));
+      [|rewrite Hts; lia|exact Hlen].
+    apply load_post_run_bounded; [exact Hb|].
+    by eapply rd_ok_ts_bounded.
+Qed.
+
+(* ================================================================== *)
+(** * 3. [evpre]: the load pre-view an event ran at
+
+    A total function on events (junk off the run, like slice 1's [stt]).  For
+    a read event it is exactly the [load_vpre] its [readable] side conditions
+    were checked against. *)
+
+Definition evpre (E : exec) (e : ev) : nat :=
+  match e with
+  | ev_init => 0%nat
+  | ev_at k =>
+      match ex_tr E !! k with
+      | Some s => load_vpre (ews E k (es_ag s)) (lb_aq (es_lb s))
+      | None => 0%nat
+      end
+  end.
+
+Lemma evpre_at E k s :
+  ex_tr E !! k = Some s →
+  evpre E (ev_at k) = load_vpre (ews E k (es_ag s)) (lb_aq (es_lb s)).
+Proof. by move=> /= ->. Qed.
+
+(** Bounded, like every other view. *)
+Lemma evpre_le_log E k :
+  exec_wf E → (k ≤ length (ex_tr E))%nat →
+  (evpre E (ev_at k) ≤ length (elog E k))%nat.
+Proof.
+  intros Hwf Hk. rewrite /evpre. destruct (ex_tr E !! k) as [s|] eqn:Hs; [|lia].
+  apply load_vpre_bounded. by apply exec_ws_bounded.
+Qed.
+
+(** A READ's pre-view is under the agent's [w_vrNew] IMMEDIATELY AFTER the
+    step.  For a plain read this is trivial ([load_vpre] IS [w_vrNew] there);
+    for an ACQUIRE it is the content of [load_post_at]'s [aq] arm, and it is
+    what makes the pre-view monotone along an agent's program even though
+    [load_vpre] joins the (non-monotone-looking) [w_vRel]. *)
+Lemma evpre_le_vrNew_post E k s a t v :
+  exec_wf E → ex_tr E !! k = Some s → reads_at E k a t v →
+  (evpre E (ev_at k) ≤ w_vrNew (ews E (S k) (es_ag s)))%nat.
+Proof.
+  intros Hwf Hs Hr. rewrite (evpre_at E k s Hs).
+  destruct Hr as (s' & base & ts & vs & j & Hs' & Hrd & Hj & Hv & Ha).
+  assert (s' = s) as -> by (rewrite Hs in Hs'; by simplify_eq).
+  destruct (lb_aq (es_lb s)) eqn:Haq; last first.
+  { rewrite /load_vpre /= Nat.max_0_r.
+    apply ws_le_vrNew, (exec_ws_le E k (S k) (es_ag s) Hwf ltac:(lia)).
+    pose proof (lookup_lt_Some _ _ _ Hs). lia. }
+  destruct (lb_rd_cases _ _ _ _ Hrd) as (aq & Haq' & [Hl|(rl & wvs & kc & Hl)]);
+    rewrite Haq in Haq'; subst aq.
+  - rewrite (exec_ws_load E k s true base ts vs Hwf Hs Hl).
+    by apply (load_post_run_vrNew_aq_vpre _ _ _ j t).
+  - rewrite (exec_ws_rmw E k s true rl base ts vs wvs _ Hwf Hs Hl).
+    etrans; [by apply (load_post_run_vrNew_aq_vpre _ base ts j t)|].
+    apply ws_le_vrNew, store_post_run_le.
+Qed.
+
+(** ... hence the pre-view is monotone along one agent's program order. *)
+Lemma evpre_mono E k1 k2 s1 s2 a t v :
+  exec_wf E → (k1 < k2)%nat →
+  ex_tr E !! k1 = Some s1 → ex_tr E !! k2 = Some s2 → es_ag s1 = es_ag s2 →
+  reads_at E k1 a t v →
+  (evpre E (ev_at k1) ≤ evpre E (ev_at k2))%nat.
+Proof.
+  intros Hwf Hlt Hs1 Hs2 Hag Hr.
+  pose proof (lookup_lt_Some _ _ _ Hs2) as Hk2.
+  etrans; [by eapply evpre_le_vrNew_post|].
+  rewrite (evpre_at E k2 s2 Hs2) -Hag.
+  etrans; [apply ws_le_vrNew,
+    (exec_ws_le E (S k1) k2 (es_ag s1) Hwf ltac:(lia) ltac:(lia))|].
+  rewrite Hag. apply load_vpre_vrNew.
+Qed.
+
+(** The other half of the same fact: a publication delivered into the target's
+    [w_vrNew] is under the target's pre-view. *)
+Lemma vrNew_le_evpre E k s :
+  ex_tr E !! k = Some s →
+  (w_vrNew (ews E k (es_ag s)) ≤ evpre E (ev_at k))%nat.
+Proof. intros Hs. rewrite (evpre_at E k s Hs). apply load_vpre_vrNew. Qed.

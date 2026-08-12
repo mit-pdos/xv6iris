@@ -342,14 +342,14 @@ Proof.
 Qed.
 
 (** THE EIGHT-BYTE WINDOW UPDATE, pure: the [n := 8] instance of §1. *)
-Lemma wlat_agree_store8 img log (tid : option nat) (a : Arch.pa) (v : bv 64)
+Lemma wlat_agree_store8 img log (tid : option nat) k (a : Arch.pa) (v : bv 64)
     (mm : gmap Z (nat * bv 8)) :
   wlat_agree img log mm ->
-  wlat_agree img (log ++ [wwrite_msg tid a 8 v])
+  wlat_agree img (log ++ [wwrite_msg tid k a 8 v])
              (wins8 a (S (length log)) v mm).
 Proof.
   intros Hag. rewrite wins8_winsw.
-  by apply (wlat_agree_store_w img log tid a 8 v mm).
+  by apply (wlat_agree_store_w img log tid k a 8 v mm).
 Qed.
 
 Section store8.
@@ -359,7 +359,7 @@ Section store8.
       arbitrary pre-timestamps and pre-values, one eight-byte message
       appended: the authority moves to the new log and the eight elements
       come back as a [wlat8] bundle at the message's own timestamp. *)
-  Lemma wlat8_store_prim (tid : option nat) (σ : wmstate) (a : Arch.pa)
+  Lemma wlat8_store_prim (tid : option nat) k (σ : wmstate) (a : Arch.pa)
       (v : bv 64) (t0 t1 t2 t3 t4 t5 t6 t7 : nat)
       (b0 b1 b2 b3 b4 b5 b6 b7 : bv 8) :
     wlat_interp (wm_img σ) (wm_log σ) -∗
@@ -371,7 +371,7 @@ Section store8.
     wlat_pointsto (acc_addr a 5) (DfracOwn 1) t5 b5 -∗
     wlat_pointsto (acc_addr a 6) (DfracOwn 1) t6 b6 -∗
     wlat_pointsto (acc_addr a 7) (DfracOwn 1) t7 b7 ==∗
-    wlat_interp (wm_img σ) (wm_log σ ++ [wwrite_msg tid a 8 v]) ∗
+    wlat_interp (wm_img σ) (wm_log σ ++ [wwrite_msg tid k a 8 v]) ∗
     wlat8 a (DfracOwn 1) (S (length (wm_log σ))) v.
   Proof.
     iIntros "Hi H0 H1 H2 H3 H4 H5 H6 H7".
@@ -399,10 +399,10 @@ Section store8.
   Qed.
 
   (** THE BUNDLE UPDATE at an explicitly described post-state. *)
-  Lemma wlat8_store_gen (tid : option nat) (σ σ' : wmstate) (a : Arch.pa)
+  Lemma wlat8_store_gen (tid : option nat) k (σ σ' : wmstate) (a : Arch.pa)
       (t : nat) (w v : bv 64) :
     wm_img σ' = wm_img σ ->
-    wm_log σ' = (wm_log σ ++ [wwrite_msg tid a 8 v])%list ->
+    wm_log σ' = (wm_log σ ++ [wwrite_msg tid k a 8 v])%list ->
     wlat_interp (wm_img σ) (wm_log σ) -∗
     wlat8 a (DfracOwn 1) t w ==∗
     wlat_interp (wm_img σ') (wm_log σ') ∗
@@ -411,7 +411,7 @@ Section store8.
     intros Himg Hlog. rewrite /wlat8.
     iIntros "Hi (H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7)".
     rewrite Himg Hlog.
-    by iMod (wlat8_store_prim tid σ a v with "Hi H0 H1 H2 H3 H4 H5 H6 H7")
+    by iMod (wlat8_store_prim tid k σ a v with "Hi H0 H1 H2 H3 H4 H5 H6 H7")
       as "[$ $]".
   Qed.
 
@@ -430,7 +430,7 @@ Section store8.
     wlat8 a (DfracOwn 1) (S (length (wm_log σ))) v.
   Proof.
     intros _. iIntros "Hi Hl".
-    iApply (wlat8_store_gen tid σ (wwrite_post tid σ ak a 8 v) a t w v
+    iApply (wlat8_store_gen tid _ σ (wwrite_post tid σ ak a 8 v) a t w v
               (wwrite_post_img tid σ ak a 8 v) (wwrite_post_log tid σ ak a 8 v)
               with "Hi Hl").
   Qed.
@@ -451,7 +451,7 @@ Section store8.
     iDestruct (wpt8_at_elems with "Hpt") as "(%Hal & %Hacc & Hpt)".
     iDestruct "Hpt" as (t0 t1 t2 t3 t4 t5 t6 t7)
       "(H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7)".
-    iMod (wlat8_store_prim tid σ a v with "Hi H0 H1 H2 H3 H4 H5 H6 H7")
+    iMod (wlat8_store_prim tid (wm_class_of ak (wm_ws σ)) σ a v with "Hi H0 H1 H2 H3 H4 H5 H6 H7")
       as "[Hi Hl]".
     iModIntro.
     rewrite (wwrite_post_img tid σ ak a 8 v) (wwrite_post_log tid σ ak a 8 v).

@@ -60,20 +60,8 @@ Local Open Scope Z_scope.
 (* ------------------------------------------------------------------ *)
 (** ** Singleton collapses of the run-shaped post-states
 
-    [mstep] updates views with [load_post_run] / [store_post_run] (folds over
-    the bytes of a multi-byte access); [lstep] updates them with [load_post] /
-    [store_post] (one byte).  At a singleton the fold is one application, and
-    the byte address [base + Z.of_nat 0] normalizes to [base]. *)
-
-Lemma load_post_run_single ws aq base t :
-  load_post_run ws aq base [t] = load_post ws aq base t.
-Proof. rewrite /load_post_run /load_post_bytes /load_post /= Z.add_0_r //. Qed.
-
-(** Stated at [length [v]] rather than at [1] so that it matches [mstep]'s
-    store/rmw post-state syntactically ([MStepStore] writes [length vs]). *)
-Lemma store_post_run_single ws rl base (v : bv 8) t :
-  store_post_run ws rl base (length [v]) t = store_post ws rl base t.
-Proof. rewrite /store_post_run /store_post_bytes /= Z.add_0_r //. Qed.
+    [load_post_run_single] / [store_post_run_single] moved to [WeakMem.v]
+    with the W4 lift batch; they are used verbatim below. *)
 
 (* ------------------------------------------------------------------ *)
 (** ** Singleton instances of the two read side conditions *)
@@ -146,9 +134,9 @@ Qed.
 
     The four arms match 1:1 —
       [ILoad r a aq]      ↦ [LLoad aq a [t] [v]]        ([MStepLoad])
-      [IStore a v]        ↦ [LStore false a [v]]        ([MStepStore])
+      [IStore a v]        ↦ [LStore false a [v] WCplain] ([MStepStore])
       [IFence pr pw sr sw]↦ [LFence pr pw sr sw]        ([MStepFence])
-      [IAmoSwapAq r a v]  ↦ [LRmw true false a [t] [vv] [v]] ([MStepRmw]).
+      [IAmoSwapAq r a v]  ↦ [LRmw true false a [t] [vv] [v] WCexcl] ([MStepRmw]).
     The register file and the remaining program are simply forgotten. *)
 Lemma lstep_mstep c c' σ :
   lstep c c' → lcfg_match c σ →
@@ -168,7 +156,7 @@ Proof.
       * intros j Hne. by rewrite upd_ws_ne.
   - (* store *)
     destruct Harm as (-> & ->).
-    eexists i, (WeakAxiomatic.LStore false a [v]), _. split.
+    eexists i, (WeakAxiomatic.LStore false a [v] WCplain), _. split.
     + by apply MStepStore.
     + simpl. eapply (lcfg_match_upd_gen _ _ _ i h _ _ _ f); [done|done| |].
       * rewrite upd_ws_eq (store_post_run_single _ _ _ v) (Hmw i h Hlk) //.
@@ -182,7 +170,7 @@ Proof.
       * intros j Hne. by rewrite upd_ws_ne.
   - (* amoswap.aq: the atomicity conjunct IS [rmw_latest] at one byte *)
     destruct Harm as (t & vv & Hb & Hnw & Hr & -> & ->).
-    eexists i, (WeakAxiomatic.LRmw true false a [t] [vv] [v]), _. split.
+    eexists i, (WeakAxiomatic.LRmw true false a [t] [vv] [v] WCexcl), _. split.
     + apply MStepRmw.
       * done.
       * done.

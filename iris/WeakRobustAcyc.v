@@ -184,12 +184,12 @@ Section astep.
     - intros [-> _] w Hw. exact Hw.
     - intros (_ & -> & _) w Hw a tf vf. rewrite load_post_run_fwd.
       exact (Hw a tf vf).
-    - intros (ts & _ & Hlog & (_ & Hext) & -> & _) w Hw a tf vf Hlk.
+    - intros (ts & kc & _ & Hlog & (_ & Hext) & -> & _) w Hw a tf vf Hlk.
       apply store_post_run_fwd_inv in Hlk as [->|Hlk];
         [|exact (Hw a tf vf Hlk)].
       split; [rewrite /fulfil_vpre in Hext; lia|].
       eexists. split; [exact Hlog|done].
-    - intros (ts & _ & _ & Hlog & _ & _ & (_ & Hext) & -> & _) w Hw a tf vf Hlk.
+    - intros (ts & kc & _ & _ & Hlog & _ & _ & (_ & Hext) & -> & _) w Hw a tf vf Hlk.
       apply store_post_run_fwd_inv in Hlk as [->|Hlk].
       + split; [rewrite /fulfil_vpre in Hext; lia|].
         eexists. split; [exact Hlog|done].
@@ -208,9 +208,9 @@ Section astep.
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
-    - intros (ts' & _ & _ & (_ & Hext) & _ & Heq). simplify_eq.
+    - intros (ts' & kc & _ & _ & (_ & Hext) & _ & Heq). simplify_eq.
       rewrite /fulfil_vpre in Hext. lia.
-    - intros (ts' & _ & _ & _ & _ & _ & (_ & Hext) & _ & Heq). simplify_eq.
+    - intros (ts' & kc & _ & _ & _ & _ & _ & (_ & Hext) & _ & Heq). simplify_eq.
       rewrite /fulfil_vpre in Hext.
       have Hle : (w_vwNew (pa_ws ag)
                   ≤ w_vwNew (load_post_run (pa_ws ag) aq base (tvs.*1)))%nat
@@ -234,7 +234,7 @@ Section astep.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
     - intros _ Hin%elem_of_nil. done.
-    - intros (tsf & Hlen & _ & _ & _ & _ & (Hcoh & _) & _ & Heq)
+    - intros (tsf & kc & Hlen & _ & _ & _ & _ & (Hcoh & _) & _ & Heq)
              [j [v [Hj ->]]]%elem_of_tvs_reads.
       injection Heq as Heq. subst tsf.
       have Hts : (tvs.*1) !! j = Some ts by rewrite list_lookup_fmap Hj.
@@ -259,7 +259,7 @@ Section astep.
       have Hts : (tvs.*1) !! j = Some ts by rewrite list_lookup_fmap Hj.
       by apply (load_post_run_vwNew_aq (pa_ws ag) base (tvs.*1) j ts Hts).
     - intros _ _ Hin%elem_of_nil. done.
-    - intros (tsf & _ & _ & _ & _ & _ & _ & -> & _) ->
+    - intros (tsf & kc & _ & _ & _ & _ & _ & _ & -> & _) ->
              [j [v [Hj ->]]]%elem_of_tvs_reads. simpl.
       have Hts : (tvs.*1) !! j = Some ts by rewrite list_lookup_fmap Hj.
       etrans; [by apply (load_post_run_vwNew_aq (pa_ws ag) base (tvs.*1) j ts Hts)|].
@@ -283,7 +283,7 @@ Section astep.
       apply (load_post_run_vrOld' (pa_ws ag) aq base (tvs.*1) j ts Hts).
       rewrite /acc_addr. exact Hfv.
     - intros _ _ Hin%elem_of_nil. done.
-    - intros (tsf & _ & _ & _ & _ & _ & _ & -> & _) Hfv
+    - intros (tsf & kc & _ & _ & _ & _ & _ & _ & -> & _) Hfv
              [j [v [Hj ->]]]%elem_of_tvs_reads. simpl.
       have Hts : (tvs.*1) !! j = Some ts by rewrite list_lookup_fmap Hj.
       etrans; [|apply ws_le_vrOld, store_post_run_le].
@@ -614,7 +614,7 @@ Section acyc.
   Proof.
     intros H Hs.
     destruct (wp_promise_step_inv c c' Hs)
-      as (j & agj & base & data & Hlkj & _ & ->).
+      as (j & agj & base & data & kc & Hlkj & _ & ->).
     intros i ag Hlk. simpl in Hlk.
     destruct (decide (i = j)) as [->|Hne].
     - rewrite list_lookup_insert in Hlk;
@@ -695,9 +695,9 @@ Section acyc.
     destruct (gev_ts_ev TS x ts2 T HTx Hts2) as (ev2 & Hev2 & Hts2').
     (* the source of the ENTRY edge is foreign, so the read is not
        forwarded *)
-    destruct (gev_ts_msg pstep TS e1 ts Hwf Hts1) as (base & data & Hm).
+    destruct (gev_ts_msg pstep TS e1 ts Hwf Hts1) as (base & data & kc & Hm).
     have Hunf : read_unforwarded (pt_log TS) e2.1 (ae_lb ev) ts.
-    { right. exists (WMsg base data (Some e1.1)), e1.1.
+    { right. exists (WMsg base data (Some e1.1) kc), e1.1.
       split_and!; [exact Hm|done|exact Hne]. }
     (* S1 *)
     have Hlt : (ts < ts2)%nat.
@@ -726,7 +726,7 @@ Section acyc.
     (ts ≤ length (pt_log TS))%nat.
   Proof.
     intros Hwf (e1 & e2 & a & Hts1 & _).
-    destruct (gev_ts_msg pstep TS e1 ts Hwf Hts1) as (base & data & Hm).
+    destruct (gev_ts_msg pstep TS e1 ts Hwf Hts1) as (base & data & kc & Hm).
     apply lookup_lt_Some in Hm.
     have Hpos : (0 < ts)%nat by eapply (gev_ts_pos pstep TS).
     lia.

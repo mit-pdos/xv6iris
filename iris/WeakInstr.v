@@ -649,7 +649,14 @@ Definition wQ_store_w (n : N) (tid : option nat) (ea : Arch.pa) {m : N}
     (v : bv m) : wmstate → wmstate → Prop :=
   λ σ σ',
     wm_img σ' = wm_img σ ∧
-    wm_log σ' = (wm_log σ ++ [wwrite_msg tid ea n v])%list ∧
+    (* M6: the message's CLASS ([wm_ak], D-M6-6) is existential here.  It is
+       fixed by the operational semantics ([WeakInterp.wwrite_post] computes
+       [wm_class_of] from the access kind and the writer's own [w_relp]), and
+       it differs between a plain store ([WCplain]/[WCrel]) and the AMO's
+       write half ([WCexcl]) — so pinning it at this altitude would make
+       [wQ_amo_aq_w] unprovable, since it is defined THROUGH this predicate.
+       Nothing above the leaves reads the class; φ reads it off the log. *)
+    (∃ k, wm_log σ' = (wm_log σ ++ [wwrite_msg tid k ea n v])%list) ∧
     ws_le (wm_ws σ) (wm_ws σ') ∧
     wV_store_w n ea σ (wm_ws σ').
 

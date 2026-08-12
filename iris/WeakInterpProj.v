@@ -107,8 +107,8 @@ Proof.
   rewrite wbytes_length /= in Hc. lia.
 Qed.
 
-Lemma wwrite_msg_wbytes tid pa n {w : N} (v : bv w) :
-  wwrite_msg tid pa n v = WMsg (pa_z pa) (wbytes n v) tid.
+Lemma wwrite_msg_wbytes tid k pa n {w : N} (v : bv w) :
+  wwrite_msg tid k pa n v = WMsg (pa_z pa) (wbytes n v) tid k.
 Proof. reflexivity. Qed.
 
 (* ====================================================================== *)
@@ -267,9 +267,12 @@ Lemma exec_write E i s ak pa n (v : bv (8 * n)) :
   ∃ E', proj_ext i (wwrite_post (Some i) s ak pa n v) E E'.
 Proof.
   intros HE Hm Hn. pose proof Hm as (Himg & Hlog & Hws).
-  destruct (exec_extend E i (LStore (ak_sync ak) (pa_z pa) (wbytes n v)) _ HE
+  destruct (exec_extend E i
+              (LStore (ak_sync ak) (pa_z pa) (wbytes n v)
+                 (wm_class_of ak (wm_ws s))) _ HE
               (MStepStore _ _ (ak_sync ak) (pa_z pa) (wbytes n v)
-                 (wbytes_nonnil n v Hn))) as (E' & HE' & Hext & Hst).
+                 (wm_class_of ak (wm_ws s)) (wbytes_nonnil n v Hn)))
+    as (E' & HE' & Hext & Hst).
   exists E'. split_and!; [done|done| |]; rewrite Hst /=.
   - rewrite /ws_match /wwrite_post /=. split_and!.
     + done.

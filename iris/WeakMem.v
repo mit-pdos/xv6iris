@@ -43,12 +43,33 @@ Definition image : Type := Z → option (bv 8).
 (* ------------------------------------------------------------------ *)
 (** ** Messages and the global write log *)
 
+(** THE MESSAGE CLASS (M6 D-M6-6).  An INERT syntactic tag recording how the
+    write was issued, so that Layer 2's classification is a FUNCTION of the
+    machine state rather than a ghost existential (see
+    [claude-notes/projects/weak-memory-m6.md], W3).  No rule of any machine in
+    this tree inspects it — it exists only for the M6 statements, exactly like
+    [wm_tid].
+
+      - [WCexcl]  — the write half of an exclusive/[ak_latest] access
+                    (the walker's CAS, an AMO): SCexcl.
+      - [WCrel]   — a release-class publication: the store is an [.rl] store,
+                    or it is the first store after a [pw ∧ sw] fence
+                    ([w_relp], the RISC-V [fence rw,w; sd flag] idiom): SCfenced.
+      - [WCplain] — everything else, i.e. the [↦w{1}]-owned stores: SCowned. *)
+Inductive wm_class := WCplain | WCrel | WCexcl.
+
+Global Instance wm_class_eq_dec : EqDecision wm_class.
+Proof. solve_decision. Defined.
+
 (** One write event.  It covers the byte range [wm_pa, wm_pa + |wm_data|).
-    [wm_tid = None] is reserved for the DMA/boot-era agents. *)
+    [wm_tid = None] is reserved for the DMA/boot-era agents.  [wm_ak] is the
+    inert class field above; it is LAST so that positional literals that
+    predate it fail loudly rather than silently permuting. *)
 Record wmsg := WMsg {
   wm_pa   : Z;
   wm_data : list (bv 8);
   wm_tid  : option agent;
+  wm_ak   : wm_class;
 }.
 Add Printing Constructor wmsg.
 
@@ -242,6 +263,21 @@ Record wstate := WState {
   w_vwNew : nat;                (* pre-view floor for future stores *)
   w_vRel  : nat;                (* release view; inert until .rl appears *)
   w_fwd   : gmap Z (nat * nat); (* forward bank: timestamp + fwd view *)
+  (* THE TWO M6 INERT COMPONENTS (D-M6-6, revised semantics 2026-08-12).
+     Read by NO rule of any machine in this tree; they exist so that
+     "published" is a total function of the state.
+
+     [w_pub]  — the publication watermark: every log position [p] with
+                [S p ≤ w_pub] of this agent is PUBLISHED.  Raised to the
+                store's own timestamp at a store taken with [w_relp] set, and
+                at an [rl] store.  Raising it at the FENCE instead would leave
+                the flag store itself — the very message racy readers read —
+                forever unpublished.
+     [w_relp] — pending release: SET by a [pw ∧ sw] fence, CLEARED by the
+                agent's next store (which is the publication).  It TOGGLES, so
+                it is deliberately absent from [ws_le]. *)
+  w_pub   : nat;
+  w_relp  : bool;
 }.
 Add Printing Constructor wstate.
 
@@ -250,20 +286,22 @@ Definition coh (ws : wstate) (a : Z) : nat := default 0%nat (w_coh ws !! a).
 
 Definition ws_init : wstate :=
   {| w_coh := ∅; w_vrOld := 0; w_vwOld := 0; w_vrNew := 0; w_vwNew := 0;
-     w_vRel := 0; w_fwd := ∅ |}.
+     w_vRel := 0; w_fwd := ∅; w_pub := 0; w_relp := false |}.
 
 Lemma coh_init a : coh ws_init a = 0%nat.
 Proof. done. Qed.
 
-Lemma coh_upd_eq m vrO vwO vrN vwN vR fwd a n :
+Lemma coh_upd_eq m vrO vwO vrN vwN vR fwd pb rp a n :
   coh {| w_coh := <[a := n]> m; w_vrOld := vrO; w_vwOld := vwO;
-         w_vrNew := vrN; w_vwNew := vwN; w_vRel := vR; w_fwd := fwd |} a = n.
+         w_vrNew := vrN; w_vwNew := vwN; w_vRel := vR; w_fwd := fwd;
+         w_pub := pb; w_relp := rp |} a = n.
 Proof. rewrite /coh /= lookup_insert //. Qed.
 
-Lemma coh_upd_ne m vrO vwO vrN vwN vR fwd a a' n :
+Lemma coh_upd_ne m vrO vwO vrN vwN vR fwd pb rp a a' n :
   a' ≠ a →
   coh {| w_coh := <[a := n]> m; w_vrOld := vrO; w_vwOld := vwO;
-         w_vrNew := vrN; w_vwNew := vwN; w_vRel := vR; w_fwd := fwd |} a'
+         w_vrNew := vrN; w_vwNew := vwN; w_vRel := vR; w_fwd := fwd;
+         w_pub := pb; w_relp := rp |} a'
   = default 0%nat (m !! a').
 Proof. intros ?. rewrite /coh /= lookup_insert_ne //. Qed.
 
@@ -519,13 +557,25 @@ Definition load_post_at (ws : wstate) (aq : bool) (vpre : nat) (a : Z) (t : nat)
      w_vrNew := if aq then Nat.max (w_vrNew ws) vpost else w_vrNew ws;
      w_vwNew := if aq then Nat.max (w_vwNew ws) vpost else w_vwNew ws;
      w_vRel  := w_vRel ws;
-     w_fwd   := w_fwd ws |}.
+     w_fwd   := w_fwd ws;
+     w_pub   := w_pub ws;
+     w_relp  := w_relp ws |}.
 
 Definition load_post (ws : wstate) (aq : bool) (a : Z) (t : nat) : wstate :=
   load_post_at ws aq (load_vpre ws aq) a t.
 
 (** Stores.  Promise-free: the timestamp is always the log's fresh top, so the
     store rule has no admissibility condition to check. *)
+(** [w_pub]/[w_relp] (M6, inert): a store taken with the release-pending flag
+    set — or an [.rl] store — PUBLISHES, raising the watermark to its own
+    timestamp; the flag is cleared either way.
+
+    IDEMPOTENCE NOTE.  [store_post_bytes] folds [store_post] per byte at the
+    SAME timestamp [t], so the FIRST byte performs the raise and clears
+    [w_relp]; every later byte sees [w_relp = false] and (unless [rl]) leaves
+    [w_pub] alone.  With [rl] the later bytes redo [Nat.max _ t], which is
+    idempotent.  Net effect over a whole access: exactly one raise to [t] iff
+    the access publishes — which is what [published p := S p ≤ w_pub] needs. *)
 Definition store_post (ws : wstate) (rl : bool) (a : Z) (t : nat) : wstate :=
   {| w_coh   := <[a := Nat.max (coh ws a) t]> (w_coh ws);
      w_vrOld := w_vrOld ws;
@@ -533,7 +583,10 @@ Definition store_post (ws : wstate) (rl : bool) (a : Z) (t : nat) : wstate :=
      w_vrNew := w_vrNew ws;
      w_vwNew := w_vwNew ws;
      w_vRel  := if rl then Nat.max (w_vRel ws) t else w_vRel ws;
-     w_fwd   := <[a := (t, w_vwNew ws)]> (w_fwd ws) |}.
+     w_fwd   := <[a := (t, w_vwNew ws)]> (w_fwd ws);
+     w_pub   := if (w_relp ws || rl)%bool then Nat.max (w_pub ws) t
+                else w_pub ws;
+     w_relp  := false |}.
 
 (** FENCE pred,succ.  [pr]/[pw] are R/W ∈ pred; [sr]/[sw] are R/W ∈ succ.
     [fence.tso] = [fence r,r ; fence rw,w]. *)
@@ -546,7 +599,11 @@ Definition fence_post (ws : wstate) (pr pw sr sw : bool) : wstate :=
      w_vrNew := if sr then Nat.max (w_vrNew ws) v1 else w_vrNew ws;
      w_vwNew := if sw then Nat.max (w_vwNew ws) v1 else w_vwNew ws;
      w_vRel  := w_vRel ws;
-     w_fwd   := w_fwd ws |}.
+     w_fwd   := w_fwd ws;
+     w_pub   := w_pub ws;
+     (* M6, inert: a [pw ∧ sw] fence ([fence rw,w]) ARMS the next store as the
+        publication of everything it covers. *)
+     w_relp  := if (pw && sw)%bool then true else w_relp ws |}.
 
 (** Multi-byte accesses are per-byte folds.  [vpre] is computed once from the
     PRE-load state, which is why [load_post_at] takes it explicitly: folding
@@ -576,20 +633,45 @@ Definition store_post_run (ws : wstate) (rl : bool) (base : Z) (n : nat)
 (* ------------------------------------------------------------------ *)
 (** ** Monotonicity: every step function only raises views *)
 
+(** NOTE [w_relp] is NOT ordered: it TOGGLES (set by a fence, cleared by the
+    next store), so there is no conjunct for it.  [w_pub] only ever grows. *)
 Definition ws_le (w1 w2 : wstate) : Prop :=
   (∀ a, (coh w1 a ≤ coh w2 a)%nat) ∧
   (w_vrOld w1 ≤ w_vrOld w2)%nat ∧ (w_vwOld w1 ≤ w_vwOld w2)%nat ∧
   (w_vrNew w1 ≤ w_vrNew w2)%nat ∧ (w_vwNew w1 ≤ w_vwNew w2)%nat ∧
-  (w_vRel  w1 ≤ w_vRel  w2)%nat.
+  (w_vRel  w1 ≤ w_vRel  w2)%nat ∧ (w_pub w1 ≤ w_pub w2)%nat.
 
 Global Instance ws_le_refl : Reflexive ws_le.
 Proof. intros w. rewrite /ws_le. split_and!; auto with lia. Qed.
 
 Global Instance ws_le_trans : Transitive ws_le.
 Proof.
-  intros w1 w2 w3 (?&?&?&?&?&?) (?&?&?&?&?&?).
+  intros w1 w2 w3 (?&?&?&?&?&?&?) (?&?&?&?&?&?&?).
   rewrite /ws_le; split_and!; try lia. intros a. etrans; eauto.
 Qed.
+
+(** The projections.  (Lifted from [WeakAxiomatic]/[WeakRobustAcyc], which
+    proved them locally while this file was frozen.) *)
+Lemma ws_le_coh w1 w2 a : ws_le w1 w2 → (coh w1 a ≤ coh w2 a)%nat.
+Proof. by intros (H & _). Qed.
+
+Lemma ws_le_vrOld w1 w2 : ws_le w1 w2 → (w_vrOld w1 ≤ w_vrOld w2)%nat.
+Proof. by intros (_ & ? & _). Qed.
+
+Lemma ws_le_vwOld w1 w2 : ws_le w1 w2 → (w_vwOld w1 ≤ w_vwOld w2)%nat.
+Proof. by intros (_ & _ & ? & _). Qed.
+
+Lemma ws_le_vrNew w1 w2 : ws_le w1 w2 → (w_vrNew w1 ≤ w_vrNew w2)%nat.
+Proof. by intros (_ & _ & _ & ? & _). Qed.
+
+Lemma ws_le_vwNew w1 w2 : ws_le w1 w2 → (w_vwNew w1 ≤ w_vwNew w2)%nat.
+Proof. by intros (_ & _ & _ & _ & ? & _). Qed.
+
+Lemma ws_le_vRel w1 w2 : ws_le w1 w2 → (w_vRel w1 ≤ w_vRel w2)%nat.
+Proof. by intros (_ & _ & _ & _ & _ & ? & _). Qed.
+
+Lemma ws_le_pub w1 w2 : ws_le w1 w2 → (w_pub w1 ≤ w_pub w2)%nat.
+Proof. by intros (_ & _ & _ & _ & _ & _ & ?). Qed.
 
 Lemma load_post_at_le ws aq vpre a t : ws_le ws (load_post_at ws aq vpre a t).
 Proof.
@@ -604,7 +686,8 @@ Proof. apply load_post_at_le. Qed.
 
 Lemma store_post_le ws rl a t : ws_le ws (store_post ws rl a t).
 Proof.
-  rewrite /ws_le /store_post /=. split_and!; try (destruct rl; lia).
+  rewrite /ws_le /store_post /=.
+  split_and!; try (destruct rl, (w_relp ws); simpl; lia).
   intros a'. destruct (decide (a' = a)) as [->|Hne].
   - rewrite coh_upd_eq. lia.
   - rewrite coh_upd_ne //.
@@ -873,6 +956,7 @@ Qed.
 Definition ws_bounded (ws : wstate) (n : nat) : Prop :=
   (w_vrOld ws ≤ n)%nat ∧ (w_vwOld ws ≤ n)%nat ∧
   (w_vrNew ws ≤ n)%nat ∧ (w_vwNew ws ≤ n)%nat ∧ (w_vRel ws ≤ n)%nat ∧
+  (w_pub ws ≤ n)%nat ∧
   (∀ a, (coh ws a ≤ n)%nat) ∧
   (∀ a tv, w_fwd ws !! a = Some tv → (tv.1 ≤ n)%nat ∧ (tv.2 ≤ n)%nat).
 
@@ -886,7 +970,7 @@ Qed.
 Lemma ws_bounded_mono ws n n' :
   ws_bounded ws n → (n ≤ n')%nat → ws_bounded ws n'.
 Proof.
-  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hcoh & Hfwd) Hle.
+  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd) Hle.
   rewrite /ws_bounded. split_and!; try lia.
   - intros a. pose proof (Hcoh a). lia.
   - intros a tv Ha. destruct (Hfwd a tv Ha). split; lia.
@@ -894,10 +978,11 @@ Qed.
 
 (** The [coh] half of every preservation proof below: an insert stays bounded
     if the inserted value is. *)
-Local Lemma coh_upd_bounded ws vrO vwO vrN vwN vR fwd a v n :
+Local Lemma coh_upd_bounded ws vrO vwO vrN vwN vR fwd pb rp a v n :
   (∀ a', (coh ws a' ≤ n)%nat) → (v ≤ n)%nat →
   ∀ a', (coh {| w_coh := <[a := v]> (w_coh ws); w_vrOld := vrO; w_vwOld := vwO;
-                w_vrNew := vrN; w_vwNew := vwN; w_vRel := vR; w_fwd := fwd |} a'
+                w_vrNew := vrN; w_vwNew := vwN; w_vRel := vR; w_fwd := fwd;
+                w_pub := pb; w_relp := rp |} a'
          ≤ n)%nat.
 Proof.
   intros Hm Hv a'. destruct (decide (a' = a)) as [->|Hne].
@@ -907,14 +992,14 @@ Qed.
 
 Lemma load_vpre_bounded ws aq n : ws_bounded ws n → (load_vpre ws aq ≤ n)%nat.
 Proof.
-  intros (_ & _ & Hrn & _ & Hrel & _ & _).
+  intros (_ & _ & Hrn & _ & Hrel & _ & _ & _).
   rewrite /load_vpre. destruct aq; lia.
 Qed.
 
 Lemma fwd_view_bounded ws aq a t n :
   ws_bounded ws n → (t ≤ n)%nat → (fwd_view ws aq a t ≤ n)%nat.
 Proof.
-  intros (_ & _ & _ & _ & _ & _ & Hfwd) Ht. rewrite /fwd_view.
+  intros (_ & _ & _ & _ & _ & _ & _ & Hfwd) Ht. rewrite /fwd_view.
   destruct aq; [exact Ht|].
   destruct (w_fwd ws !! a) as [[tf vf]|] eqn:Hf; [|exact Ht].
   case_bool_decide; [|exact Ht].
@@ -927,7 +1012,7 @@ Lemma load_post_at_bounded ws aq vpre a t n :
 Proof.
   intros Hb Hvp Ht.
   pose proof (fwd_view_bounded ws aq a t n Hb Ht) as Hfv.
-  destruct Hb as (Hro & Hwo & Hrn & Hwn & Hrel & Hcoh & Hfwd).
+  destruct Hb as (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd).
   rewrite /ws_bounded /load_post_at /=.
   split_and!; try (destruct aq; lia).
   - apply coh_upd_bounded; [exact Hcoh|]. pose proof (Hcoh a). lia.
@@ -938,9 +1023,9 @@ Lemma store_post_bounded ws rl a t n n' :
   ws_bounded ws n → (t ≤ n')%nat → (n ≤ n')%nat →
   ws_bounded (store_post ws rl a t) n'.
 Proof.
-  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hcoh & Hfwd) Ht Hle.
+  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd) Ht Hle.
   rewrite /ws_bounded /store_post /=.
-  split_and!; try (destruct rl; lia).
+  split_and!; try (destruct rl, (w_relp ws); simpl; lia).
   - apply coh_upd_bounded.
     + intros a'. pose proof (Hcoh a'). lia.
     + pose proof (Hcoh a). lia.
@@ -953,7 +1038,7 @@ Qed.
 Lemma fence_post_bounded ws pr pw sr sw n :
   ws_bounded ws n → ws_bounded (fence_post ws pr pw sr sw) n.
 Proof.
-  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hcoh & Hfwd).
+  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd).
   rewrite /ws_bounded /fence_post /=.
   split_and!; try (destruct pr, pw, sr, sw; simpl; lia).
   - exact Hcoh.
@@ -1038,5 +1123,392 @@ Qed.
 Lemma ws_bounded_scl ws n :
   ws_bounded ws n → ∀ a, (Nat.max (w_vrNew ws) (coh ws a) ≤ n)%nat.
 Proof.
-  intros (_ & _ & Hrn & _ & _ & Hcoh & _) a. pose proof (Hcoh a). lia.
+  intros (_ & _ & Hrn & _ & _ & _ & Hcoh & _) a. pose proof (Hcoh a). lia.
+Qed.
+
+(* ================================================================== *)
+(** ** THE W4 LIFT BATCH — fold facts the consumers used to prove locally
+
+    Every lemma below was proved verbatim in a consumer file
+    ([WeakAxiomatic], [WeakAxiomatic2], [WeakAxiomatic3], [WeakLitmusProj],
+    [WeakPromiseLitmus], [WeakPromiseBridge], [WeakRobustAcyc],
+    [WeakRobustGraph]) with a header explaining that it belonged here and was
+    only elsewhere because this file was frozen while sibling [.vo]s were in
+    flight.  They are now here, and the local copies are gone.
+
+    Three kinds of fact about the step functions live in this file:
+    MONOTONE ([ws_le]), BOUNDED ([ws_bounded]), and — the third kind, added by
+    this batch — DOMINATED (an upper bound on each component in terms of the
+    step's inputs, §5 of [WeakAxiomatic3]). *)
+
+(* ------------------------------------------------------------------ *)
+(** *** Singleton collapses of the run-shaped post-states
+
+    The byte address [base + Z.of_nat 0] normalizes to [base].  The store form
+    is stated at [length [v]] rather than at [1] so that it matches the
+    step relations' post-states syntactically. *)
+
+Lemma load_post_run_single ws aq base t :
+  load_post_run ws aq base [t] = load_post ws aq base t.
+Proof. rewrite /load_post_run /load_post_bytes /load_post /= Z.add_0_r //. Qed.
+
+Lemma store_post_run_single ws rl base (v : bv 8) t :
+  store_post_run ws rl base (length [v]) t = store_post ws rl base t.
+Proof. rewrite /store_post_run /store_post_bytes /= Z.add_0_r //. Qed.
+
+(* ------------------------------------------------------------------ *)
+(** *** A message writes only inside its own byte range *)
+
+Lemma msg_byte_range m a :
+  is_Some (msg_byte m a) →
+  ∃ j : nat, (j < length (wm_data m))%nat ∧ a = wm_pa m + Z.of_nat j.
+Proof.
+  rewrite /msg_byte. case_bool_decide as Hle; [|by intros []].
+  intros Hs. exists (Z.to_nat (a - wm_pa m)). split.
+  - by eapply lookup_lt_is_Some_1.
+  - lia.
+Qed.
+
+(* ------------------------------------------------------------------ *)
+(** *** The missing [coh] / [w_vwOld] / forwarded-[w_vrOld] fold instances *)
+
+Local Lemma load_post_fold_coh aq vpre ats ws a t :
+  (a, t) ∈ ats →
+  (t ≤ coh (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats) a)%nat.
+Proof.
+  revert ws. induction ats as [|p l IH]; intros ws Hin.
+  { by apply elem_of_nil in Hin. }
+  apply elem_of_cons in Hin as [<-|Hin]; [|by apply IH].
+  simpl. etrans; [apply (load_post_at_coh ws aq vpre a t)|].
+  apply ws_le_coh, (load_post_fold_le aq vpre l (load_post_at ws aq vpre a t)).
+Qed.
+
+Lemma load_post_run_coh ws aq base ts (j : nat) t :
+  ts !! j = Some t →
+  (t ≤ coh (load_post_run ws aq base ts) (base + Z.of_nat j))%nat.
+Proof.
+  intros Ht. pose proof (lookup_lt_Some _ _ _ Ht) as Hj.
+  rewrite /load_post_run /load_post_bytes. apply load_post_fold_coh.
+  apply elem_of_list_lookup_2 with j.
+  rewrite lookup_zip_with (lookup_seq_lt 0 (length ts) j Hj) Ht //.
+Qed.
+
+Local Lemma store_post_fold_coh rl t as_ ws a :
+  a ∈ as_ → (t ≤ coh (foldl (λ w a, store_post w rl a t) ws as_) a)%nat.
+Proof.
+  revert ws. induction as_ as [|b l IH]; intros ws Hin.
+  { by apply elem_of_nil in Hin. }
+  apply elem_of_cons in Hin as [<-|Hin]; [|by apply IH].
+  simpl. etrans; [apply (store_post_coh ws rl a t)|].
+  apply ws_le_coh, (store_post_fold_le rl t l (store_post ws rl a t)).
+Qed.
+
+Lemma store_post_run_coh ws rl base n t (j : nat) :
+  (j < n)%nat → (t ≤ coh (store_post_run ws rl base n t) (base + Z.of_nat j))%nat.
+Proof.
+  intros Hj. rewrite /store_post_run /store_post_bytes.
+  apply store_post_fold_coh, elem_of_list_In, in_map_iff.
+  exists j. split; [reflexivity|]. apply in_seq. lia.
+Qed.
+
+Local Lemma store_post_fold_vwOld rl t as_ ws :
+  as_ ≠ [] → (t ≤ w_vwOld (foldl (λ w a, store_post w rl a t) ws as_))%nat.
+Proof.
+  destruct as_ as [|a l]; [done|]. intros _. simpl.
+  etrans; [apply (store_post_vwOld ws rl a t)|].
+  apply ws_le_vwOld, (store_post_fold_le rl t l (store_post ws rl a t)).
+Qed.
+
+Lemma store_post_run_vwOld ws rl base n t :
+  (0 < n)%nat → (t ≤ w_vwOld (store_post_run ws rl base n t))%nat.
+Proof.
+  intros Hn. rewrite /store_post_run /store_post_bytes.
+  apply store_post_fold_vwOld. by destruct n; [lia|].
+Qed.
+
+(** The generalized [load_post_run_vrOld]: what the read floor gains is the
+    FORWARDED view, so the side condition needed is "this byte's read was not
+    forwarded", not the stronger "this agent never stored to it". *)
+Local Lemma load_post_fold_vrOld' aq vpre ats ws a t :
+  (a, t) ∈ ats → fwd_view ws aq a t = t →
+  (t ≤ w_vrOld (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats))%nat.
+Proof.
+  revert ws. induction ats as [|p l IH]; intros ws Hin Hfv.
+  { by apply elem_of_nil in Hin. }
+  apply elem_of_cons in Hin as [<-|Hin].
+  - simpl. etrans; [|apply ws_le_vrOld,
+      (load_post_fold_le aq vpre l (load_post_at ws aq vpre a t))].
+    rewrite /load_post_at /= Hfv. lia.
+  - apply IH; [exact Hin|]. by rewrite /fwd_view load_post_at_fwd.
+Qed.
+
+Lemma load_post_run_vrOld' ws aq base ts (j : nat) t :
+  ts !! j = Some t → fwd_view ws aq (base + Z.of_nat j) t = t →
+  (t ≤ w_vrOld (load_post_run ws aq base ts))%nat.
+Proof.
+  intros Ht Hfv. pose proof (lookup_lt_Some _ _ _ Ht) as Hj.
+  rewrite /load_post_run /load_post_bytes.
+  apply (load_post_fold_vrOld' _ _ _ _ (base + Z.of_nat j) t); [|exact Hfv].
+  apply elem_of_list_lookup_2 with j.
+  rewrite lookup_zip_with (lookup_seq_lt 0 (length ts) j Hj) Ht //.
+Qed.
+
+(* ------------------------------------------------------------------ *)
+(** *** The acquire-load fold instances
+
+    An acquire load pushes every byte's timestamp — and its own pre-view —
+    into both [w_vrNew] and [w_vwNew]. *)
+
+Local Lemma load_post_fold_vrNew_aq vpre ats ws a t :
+  (a, t) ∈ ats →
+  (t ≤ w_vrNew (foldl (λ w at_, load_post_at w true vpre at_.1 at_.2) ws ats))%nat.
+Proof.
+  revert ws. induction ats as [|p l IH]; intros ws Hin.
+  { by apply elem_of_nil in Hin. }
+  apply elem_of_cons in Hin as [<-|Hin]; [|by apply IH].
+  simpl. etrans; [apply (load_post_at_vrNew_aq ws vpre a t)|].
+  apply ws_le_vrNew,
+    (load_post_fold_le true vpre l (load_post_at ws true vpre a t)).
+Qed.
+
+Lemma load_post_run_vrNew_aq ws base ts (j : nat) t :
+  ts !! j = Some t → (t ≤ w_vrNew (load_post_run ws true base ts))%nat.
+Proof.
+  intros Ht. pose proof (lookup_lt_Some _ _ _ Ht) as Hj.
+  rewrite /load_post_run /load_post_bytes.
+  apply (load_post_fold_vrNew_aq _ _ _ (base + Z.of_nat j) t).
+  apply elem_of_list_lookup_2 with j.
+  rewrite lookup_zip_with (lookup_seq_lt 0 (length ts) j Hj) Ht //.
+Qed.
+
+Local Lemma load_post_fold_vwNew_aq vpre ats ws a t :
+  (a, t) ∈ ats →
+  (t ≤ w_vwNew (foldl (λ w at_, load_post_at w true vpre at_.1 at_.2) ws ats))%nat.
+Proof.
+  revert ws. induction ats as [|p l IH]; intros ws Hin.
+  { by apply elem_of_nil in Hin. }
+  apply elem_of_cons in Hin as [<-|Hin]; [|by apply IH].
+  simpl. etrans; [apply (load_post_at_vwNew_aq ws vpre a t)|].
+  apply ws_le_vwNew,
+    (load_post_fold_le true vpre l (load_post_at ws true vpre a t)).
+Qed.
+
+Lemma load_post_run_vwNew_aq ws base ts (j : nat) t :
+  ts !! j = Some t → (t ≤ w_vwNew (load_post_run ws true base ts))%nat.
+Proof.
+  intros Ht. pose proof (lookup_lt_Some _ _ _ Ht) as Hj.
+  rewrite /load_post_run /load_post_bytes.
+  apply (load_post_fold_vwNew_aq _ _ _ (base + Z.of_nat j) t).
+  apply elem_of_list_lookup_2 with j.
+  rewrite lookup_zip_with (lookup_seq_lt 0 (length ts) j Hj) Ht //.
+Qed.
+
+(** An ACQUIRE load's own PRE-VIEW lands under its post-[w_vrNew] — needed
+    because [load_vpre] of an acquire joins [w_vRel], which is NOT below
+    [w_vrNew] before the step. *)
+Local Lemma load_post_fold_vrNew_aq_vpre vpre ats ws p :
+  p ∈ ats →
+  (vpre ≤ w_vrNew (foldl (λ w at_, load_post_at w true vpre at_.1 at_.2) ws ats))%nat.
+Proof.
+  revert ws. induction ats as [|q l IH]; intros ws Hin.
+  { by apply elem_of_nil in Hin. }
+  apply elem_of_cons in Hin as [<-|Hin]; [|by apply IH].
+  simpl. etrans; [|apply ws_le_vrNew,
+    (load_post_fold_le true vpre l (load_post_at ws true vpre p.1 p.2))].
+  rewrite /load_post_at /=. lia.
+Qed.
+
+Lemma load_post_run_vrNew_aq_vpre ws base ts (j : nat) t :
+  ts !! j = Some t →
+  (load_vpre ws true ≤ w_vrNew (load_post_run ws true base ts))%nat.
+Proof.
+  intros Ht. pose proof (lookup_lt_Some _ _ _ Ht) as Hj.
+  rewrite /load_post_run /load_post_bytes.
+  apply (load_post_fold_vrNew_aq_vpre _ _ _ (base + Z.of_nat j, t)).
+  apply elem_of_list_lookup_2 with j.
+  rewrite lookup_zip_with (lookup_seq_lt 0 (length ts) j Hj) Ht //.
+Qed.
+
+(* ------------------------------------------------------------------ *)
+(** *** The forward-bank inversion for a store fold *)
+
+Local Lemma store_post_fold_fwd rl t as_ ws a tf vf :
+  w_fwd (foldl (λ w a, store_post w rl a t) ws as_) !! a = Some (tf, vf) →
+  tf = t ∨ w_fwd ws !! a = Some (tf, vf).
+Proof.
+  revert ws. induction as_ as [|b l IH]; intros ws Hlk; [by right|].
+  destruct (IH _ Hlk) as [->|Hlk']; [by left|].
+  rewrite /store_post /= in Hlk'.
+  destruct (decide (a = b)) as [->|Hne].
+  - rewrite lookup_insert in Hlk'. simplify_eq. by left.
+  - rewrite lookup_insert_ne in Hlk'; [done|]. by right.
+Qed.
+
+Lemma store_post_run_fwd_inv ws rl base n t a tf vf :
+  w_fwd (store_post_run ws rl base n t) !! a = Some (tf, vf) →
+  tf = t ∨ w_fwd ws !! a = Some (tf, vf).
+Proof. rewrite /store_post_run /store_post_bytes. apply store_post_fold_fwd. Qed.
+
+(* ================================================================== *)
+(** ** DOMINATION: upper bounds for the step functions
+
+    The THIRD kind of step-function fact (§5 of [WeakAxiomatic3]): after this
+    step, each component is a join of the old component, the pre-view, and the
+    timestamps the step touched.  Stated once for an arbitrary predicate
+    closed under [Nat.max] and holding at 0, because the consumers instantiate
+    it at several different predicates. *)
+
+Definition maxcl (P : nat → Prop) : Prop :=
+  P 0%nat ∧ ∀ n1 n2, P n1 → P n2 → P (Nat.max n1 n2).
+
+Lemma maxcl_0 P : maxcl P → P 0%nat.
+Proof. by intros [? _]. Qed.
+Lemma maxcl_max P n1 n2 : maxcl P → P n1 → P n2 → P (Nat.max n1 n2).
+Proof. intros [_ H]. exact (H n1 n2). Qed.
+
+(** *** Pointwise shapes of the two per-byte updates *)
+
+Lemma coh_load_post_at_eq ws aq vpre a t :
+  coh (load_post_at ws aq vpre a t) a =
+  Nat.max (coh ws a) (Nat.max (Nat.max vpre (fwd_view ws aq a t)) t).
+Proof. rewrite /load_post_at coh_upd_eq //. Qed.
+
+Lemma coh_load_post_at_ne ws aq vpre a t a' :
+  a' ≠ a → coh (load_post_at ws aq vpre a t) a' = coh ws a'.
+Proof. intros Hne. rewrite /load_post_at coh_upd_ne // /coh //. Qed.
+
+Lemma coh_store_post_eq ws rl a t :
+  coh (store_post ws rl a t) a = Nat.max (coh ws a) t.
+Proof. rewrite /store_post coh_upd_eq //. Qed.
+
+Lemma coh_store_post_ne ws rl a t a' :
+  a' ≠ a → coh (store_post ws rl a t) a' = coh ws a'.
+Proof. intros Hne. rewrite /store_post coh_upd_ne // /coh //. Qed.
+
+(** *** The load fold: the components it does not touch *)
+
+Lemma load_fold_vwOld aq vpre ats ws :
+  w_vwOld (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats)
+  = w_vwOld ws.
+Proof. revert ws. induction ats as [|p l IH]; intros ws; [done|by rewrite /= IH]. Qed.
+
+Lemma load_fold_vRel aq vpre ats ws :
+  w_vRel (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats)
+  = w_vRel ws.
+Proof. revert ws. induction ats as [|p l IH]; intros ws; [done|by rewrite /= IH]. Qed.
+
+Lemma load_fold_vrNew_plain vpre ats ws :
+  w_vrNew (foldl (λ w at_, load_post_at w false vpre at_.1 at_.2) ws ats)
+  = w_vrNew ws.
+Proof. revert ws. induction ats as [|p l IH]; intros ws; [done|by rewrite /= IH]. Qed.
+
+(** *** The load fold: upper bounds, under "no byte of this load is
+    forwarded". *)
+
+Lemma load_fold_coh P aq vpre ats ws a :
+  maxcl P → (∀ p, p ∈ ats → fwd_view ws aq p.1 p.2 = p.2) →
+  P (coh ws a) → P vpre → (∀ p, p ∈ ats → p.1 = a → P p.2) →
+  P (coh (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats) a).
+Proof.
+  intros Hcl. revert ws. induction ats as [|p l IH]; intros ws Hfv Hc Hv Hts;
+    [exact Hc|].
+  simpl. apply IH.
+  - intros q Hq. rewrite /fwd_view load_post_at_fwd -/(fwd_view ws aq q.1 q.2).
+    apply Hfv, elem_of_cons; by right.
+  - destruct (decide (a = p.1)) as [Heq|Hne]; last first.
+    { rewrite (coh_load_post_at_ne _ _ _ _ _ _ Hne). exact Hc. }
+    assert (Hpa : P p.2).
+    { apply (Hts p); [apply elem_of_cons; by left|by rewrite -Heq]. }
+    rewrite Heq coh_load_post_at_eq (Hfv p ltac:(apply elem_of_cons; by left)).
+    apply maxcl_max; [done|rewrite -Heq; exact Hc|].
+    apply maxcl_max; [done| |exact Hpa].
+    apply maxcl_max; [done|exact Hv|exact Hpa].
+  - exact Hv.
+  - intros q Hq Hqa. apply (Hts q); [apply elem_of_cons; by right|exact Hqa].
+Qed.
+
+Lemma load_fold_vrOld P aq vpre ats ws :
+  maxcl P → (∀ p, p ∈ ats → fwd_view ws aq p.1 p.2 = p.2) →
+  P (w_vrOld ws) → P vpre → (∀ p, p ∈ ats → P p.2) →
+  P (w_vrOld (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats)).
+Proof.
+  intros Hcl. revert ws. induction ats as [|p l IH]; intros ws Hfv Hc Hv Hts;
+    [exact Hc|].
+  simpl. apply IH.
+  - intros q Hq. rewrite /fwd_view load_post_at_fwd -/(fwd_view ws aq q.1 q.2).
+    apply Hfv, elem_of_cons; by right.
+  - rewrite /load_post_at /= (Hfv p ltac:(apply elem_of_cons; by left)).
+    apply maxcl_max; [done|exact Hc|].
+    apply maxcl_max; [done|exact Hv|apply Hts, elem_of_cons; by left].
+  - exact Hv.
+  - intros q Hq. apply Hts, elem_of_cons; by right.
+Qed.
+
+Lemma load_fold_vrNew P aq vpre ats ws :
+  maxcl P → (∀ p, p ∈ ats → fwd_view ws aq p.1 p.2 = p.2) →
+  P (w_vrNew ws) → P vpre → (∀ p, p ∈ ats → P p.2) →
+  P (w_vrNew (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats)).
+Proof.
+  intros Hcl. revert ws. induction ats as [|p l IH]; intros ws Hfv Hc Hv Hts;
+    [exact Hc|].
+  simpl. apply IH.
+  - intros q Hq. rewrite /fwd_view load_post_at_fwd -/(fwd_view ws aq q.1 q.2).
+    apply Hfv, elem_of_cons; by right.
+  - rewrite /load_post_at /= (Hfv p ltac:(apply elem_of_cons; by left)).
+    destruct aq; [|exact Hc].
+    apply maxcl_max; [done|exact Hc|].
+    apply maxcl_max; [done|exact Hv|apply Hts, elem_of_cons; by left].
+  - exact Hv.
+  - intros q Hq. apply Hts, elem_of_cons; by right.
+Qed.
+
+(** *** The store fold *)
+
+Lemma store_fold_vrOld rl t as_ ws :
+  w_vrOld (foldl (λ w a, store_post w rl a t) ws as_) = w_vrOld ws.
+Proof. revert ws. induction as_ as [|a l IH]; intros ws; [done|by rewrite /= IH]. Qed.
+
+Lemma store_fold_vrNew rl t as_ ws :
+  w_vrNew (foldl (λ w a, store_post w rl a t) ws as_) = w_vrNew ws.
+Proof. revert ws. induction as_ as [|a l IH]; intros ws; [done|by rewrite /= IH]. Qed.
+
+Lemma store_fold_vRel_norl t as_ ws :
+  w_vRel (foldl (λ w a, store_post w false a t) ws as_) = w_vRel ws.
+Proof. revert ws. induction as_ as [|a l IH]; intros ws; [done|by rewrite /= IH]. Qed.
+
+Lemma store_fold_vwOld P rl t as_ ws :
+  maxcl P → P (w_vwOld ws) → P t →
+  P (w_vwOld (foldl (λ w a, store_post w rl a t) ws as_)).
+Proof.
+  intros Hcl. revert ws. induction as_ as [|a l IH]; intros ws Hc Ht; [exact Hc|].
+  simpl. apply IH; [|exact Ht]. rewrite /store_post /=. by apply maxcl_max.
+Qed.
+
+Lemma store_fold_coh P rl t as_ ws a :
+  maxcl P → P (coh ws a) → (a ∈ as_ → P t) →
+  P (coh (foldl (λ w a, store_post w rl a t) ws as_) a).
+Proof.
+  intros Hcl. revert ws. induction as_ as [|b l IH]; intros ws Hc Ht; [exact Hc|].
+  simpl. apply IH.
+  - destruct (decide (a = b)) as [->|Hne]; last first.
+    { rewrite (coh_store_post_ne _ _ _ _ _ Hne). exact Hc. }
+    rewrite coh_store_post_eq.
+    apply maxcl_max; [done|exact Hc|apply Ht, elem_of_cons; by left].
+  - intros Hin. apply Ht, elem_of_cons; by right.
+Qed.
+
+(** *** The fence *)
+
+Lemma fence_post_vrNew_pred P ws pr pw sr sw :
+  maxcl P → P (w_vrNew ws) →
+  (pr = true → sr = true → P (w_vrOld ws)) →
+  (pw = true → sr = true → P (w_vwOld ws)) →
+  P (w_vrNew (fence_post ws pr pw sr sw)).
+Proof.
+  intros Hcl Hn Hro Hwo. rewrite /fence_post /=.
+  destruct sr; [|exact Hn].
+  apply maxcl_max; [done|exact Hn|].
+  apply maxcl_max; [done| |].
+  - destruct pr; [by apply Hro|by apply maxcl_0].
+  - destruct pw; [by apply Hwo|by apply maxcl_0].
 Qed.

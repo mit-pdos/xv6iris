@@ -160,6 +160,68 @@ Definition excl_ok (log : list wmsg) (i : agent) (base : Z)
         t (ts - 1)%nat.
 
 (* ------------------------------------------------------------------ *)
+(** ** The side conditions under an end-extension of the log, and the
+       singleton collapse
+
+    (Lifted from [WeakPromiseFact]/[WeakPromiseLitmus] by the W4 batch: they
+    are statements about [read_ok]/[excl_ok]/[writes_in_by], all of which are
+    defined right above, so this is their home.) *)
+
+(** The [writes_in_by] analog of [WeakMem.writes_in_app_inv]. *)
+Lemma writes_in_by_app_inv log l Q a lo hi :
+  (hi ≤ length log)%nat →
+  writes_in_by (log ++ l) Q a lo hi → writes_in_by log Q a lo hi.
+Proof.
+  intros Hle (t & Hlo & Hhi & m & Hm & Hb & HQ).
+  rewrite lookup_app_l in Hm; [lia|].
+  exists t. split_and!; [done|done|]. exists m. done.
+Qed.
+
+(** A PLAIN (non-latest) read is stable under appending: the value it
+    reads is at an old timestamp ([log_byte_app]) and its coherence
+    window is bounded by the reader's views, which [ws_bounded] pins at
+    or below the old log length — strictly below the new message. *)
+Lemma read_ok_app img log l ws aq base tvs :
+  ws_bounded ws (length log) →
+  read_ok img log ws aq false base tvs →
+  read_ok img (log ++ l) ws aq false base tvs.
+Proof.
+  intros Hb Hr j t v Htv.
+  destruct (Hr j t v Htv) as (Hlb & [Hs Hn] & _).
+  have Ht : (t ≤ length log)%nat by eapply log_byte_bounded; eexists.
+  split_and!.
+  - rewrite log_byte_app //.
+  - split; [rewrite log_byte_app //|].
+    intros Hw. apply Hn. eapply writes_in_app_inv; [|done].
+    pose proof (load_vpre_bounded ws aq _ Hb) as Hv.
+    destruct Hb as (_&_&_&_&_&_&Hcoh&_).
+    pose proof (Hcoh (base + Z.of_nat j)). lia.
+  - done.
+Qed.
+
+(** The exclusivity window [(t, ts-1]] of an rmw ends at [ts - 1], and
+    [ts] is a promised timestamp, hence at most the old log length. *)
+Lemma excl_ok_app log l i base tvs ts :
+  (ts - 1 ≤ length log)%nat →
+  excl_ok log i base tvs ts → excl_ok (log ++ l) i base tvs ts.
+Proof.
+  intros Hle He j t v Htv Hw. eapply He; [done|].
+  by eapply writes_in_by_app_inv.
+Qed.
+
+(** A single-byte [read_ok]: [read_ok]'s [∀ j] collapses to [j = 0], where
+    the byte address [base + 0] is [base]. *)
+Lemma read_ok_single img log ws base t v :
+  log_byte img log t base = Some v →
+  readable img log ws (load_vpre ws false) base t →
+  read_ok img log ws false false base [(t, v)].
+Proof.
+  intros Hv Hr j t' v' Hj.
+  destruct j as [|j]; [|by simplify_eq/=].
+  simplify_eq/=. rewrite Z.add_0_r. split_and!; [done|done|done].
+Qed.
+
+(* ------------------------------------------------------------------ *)
 (** ** The machine *)
 
 Section machine.
@@ -177,12 +239,12 @@ Section machine.
       does not exist as a primitive: it is promise-then-fulfil, exactly
       as in PARM — see [wpstep_store_now] below for the fused form. *)
   Inductive wpstep : wpcfg P → wpcfg P → Prop :=
-  | WPPromise cfg i ag base data :
+  | WPPromise cfg i ag base data k :
       pc_ags cfg !! i = Some ag →
       data ≠ [] →
       wpstep cfg
         (WPCfg (pc_img cfg)
-               (pc_log cfg ++ [WMsg base data (Some i)])
+               (pc_log cfg ++ [WMsg base data (Some i) k])
                (<[i := WPAgent (pa_st ag) (pa_ws ag)
                          ({[S (length (pc_log cfg))]} ∪ pa_prom ag)]>
                   (pc_ags cfg)))
@@ -201,23 +263,23 @@ Section machine.
                (<[i := WPAgent st'
                          (load_post_run (pa_ws ag) aq base (tvs.*1))
                          (pa_prom ag)]> (pc_ags cfg)))
-  | WPFulfil cfg i ag rl base data ts st' :
+  | WPFulfil cfg i ag rl base data k ts st' :
       pc_ags cfg !! i = Some ag →
       pstep (pa_st ag) (LStore rl base data) st' →
       ts ∈ pa_prom ag →
-      pc_log cfg !! (ts - 1)%nat = Some (WMsg base data (Some i)) →
+      pc_log cfg !! (ts - 1)%nat = Some (WMsg base data (Some i) k) →
       fulfil_ok (pa_ws ag) rl base (length data) ts →
       wpstep cfg
         (WPCfg (pc_img cfg) (pc_log cfg)
                (<[i := WPAgent st'
                          (store_post_run (pa_ws ag) rl base (length data) ts)
                          (pa_prom ag ∖ {[ts]})]> (pc_ags cfg)))
-  | WPRmw cfg i ag aq rl base tvs data ts st' :
+  | WPRmw cfg i ag aq rl base tvs data k ts st' :
       pc_ags cfg !! i = Some ag →
       pstep (pa_st ag) (LRmw aq rl base tvs data) st' →
       length tvs = length data →
       ts ∈ pa_prom ag →
-      pc_log cfg !! (ts - 1)%nat = Some (WMsg base data (Some i)) →
+      pc_log cfg !! (ts - 1)%nat = Some (WMsg base data (Some i) k) →
       read_ok (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs →
       excl_ok (pc_log cfg) i base tvs ts →
       fulfil_ok (load_post_run (pa_ws ag) aq base (tvs.*1)) rl base
@@ -285,7 +347,7 @@ Section machine.
 
   (** Every read timestamp a [read_ok] admits is a real log position —
       the [Forall] shape [load_post_run_bounded] wants. *)
-  Local Lemma read_ok_ts_bounded img log ws aq lat base tvs :
+  Lemma read_ok_ts_bounded img log ws aq lat base tvs :
     read_ok img log ws aq lat base tvs →
     Forall (λ t, (t ≤ length log)%nat) (tvs.*1).
   Proof.
@@ -389,7 +451,7 @@ Section machine.
       inclusion, stated one rule at a time; slice 2's bridge composes
       them into a machine-level embedding. *)
 
-  Lemma wpstep_store_now cfg i ag rl base data st' :
+  Lemma wpstep_store_now cfg i ag rl base data k st' :
     pc_ags cfg !! i = Some ag →
     pstep (pa_st ag) (LStore rl base data) st' →
     data ≠ [] →
@@ -397,7 +459,7 @@ Section machine.
     S (length (pc_log cfg)) ∉ pa_prom ag →
     rtc wpstep cfg
       (WPCfg (pc_img cfg)
-             (pc_log cfg ++ [WMsg base data (Some i)])
+             (pc_log cfg ++ [WMsg base data (Some i) k])
              (<[i := WPAgent st'
                        (store_post_run (pa_ws ag) rl base (length data)
                           (S (length (pc_log cfg))))
@@ -408,22 +470,22 @@ Section machine.
     set ts := S (length (pc_log cfg)).
     (* step 1: promise the message at the fresh top *)
     eapply rtc_l.
-    { by eapply (WPPromise cfg i ag base data). }
+    { by eapply (WPPromise cfg i ag base data k). }
     (* step 2: fulfil it immediately *)
-    set mid := WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i)])
+    set mid := WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k])
                  (<[i := WPAgent (pa_st ag) (pa_ws ag)
                            ({[ts]} ∪ pa_prom ag)]> (pc_ags cfg)).
     eapply rtc_l; [|apply rtc_refl].
     have Hmidlk : pc_ags mid !! i
                   = Some (WPAgent (pa_st ag) (pa_ws ag) ({[ts]} ∪ pa_prom ag)).
     { rewrite /mid /= list_lookup_insert //. }
-    have Hmsg : pc_log mid !! (ts - 1)%nat = Some (WMsg base data (Some i)).
+    have Hmsg : pc_log mid !! (ts - 1)%nat = Some (WMsg base data (Some i) k).
     { rewrite /mid /=. apply list_lookup_middle. rewrite /ts. lia. }
-    pose proof (WPFulfil mid i _ rl base data ts st' Hmidlk Hp
+    pose proof (WPFulfil mid i _ rl base data k ts st' Hmidlk Hp
                   ltac:(set_solver) Hmsg) as Hful.
     have Hok : fulfil_ok (pa_ws ag) rl base (length data) ts.
     { split.
-      - intros j Hj. destruct Hb as (_&_&_&_&_&Hcoh&_).
+      - intros j Hj. destruct Hb as (_&_&_&_&_&_&Hcoh&_).
         pose proof (Hcoh (base + Z.of_nat j)). rewrite /ts. lia.
       - pose proof (fulfil_vpre_bounded _ rl _ Hb). rewrite /ts. lia. }
     specialize (Hful Hok).
@@ -434,13 +496,73 @@ Section machine.
     exact Hful.
   Qed.
 
+  (** The rmw sibling of [wpstep_store_now] (lifted from
+      [WeakPromiseBridge] by the W4 batch), proved the same way: the read
+      half and the exclusivity window survive the append because the read is
+      plain and the window ends at the old top. *)
+  Lemma wpstep_rmw_now cfg i ag aq rl base tvs data k st' :
+    pc_ags cfg !! i = Some ag →
+    pstep (pa_st ag) (LRmw aq rl base tvs data) st' →
+    data ≠ [] →
+    length tvs = length data →
+    ws_bounded (pa_ws ag) (length (pc_log cfg)) →
+    S (length (pc_log cfg)) ∉ pa_prom ag →
+    read_ok (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs →
+    excl_ok (pc_log cfg) i base tvs (S (length (pc_log cfg))) →
+    rtc wpstep cfg
+      (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k])
+             (<[i := WPAgent st'
+                       (store_post_run
+                          (load_post_run (pa_ws ag) aq base (tvs.*1))
+                          rl base (length data) (S (length (pc_log cfg))))
+                       (pa_prom ag)]> (pc_ags cfg))).
+  Proof.
+    intros Hlk Hps Hnn Hlen Hb Hfresh Hr He.
+    pose proof (lookup_lt_Some _ _ _ Hlk) as Hlt.
+    set ts := S (length (pc_log cfg)).
+    (* step 1: promise the message at the fresh top *)
+    eapply rtc_l.
+    { by eapply (WPPromise cfg i ag base data k). }
+    set mid := WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k])
+                 (<[i := WPAgent (pa_st ag) (pa_ws ag)
+                           ({[ts]} ∪ pa_prom ag)]> (pc_ags cfg)).
+    eapply rtc_l; [|apply rtc_refl].
+    have Hmidlk : pc_ags mid !! i
+                  = Some (WPAgent (pa_st ag) (pa_ws ag) ({[ts]} ∪ pa_prom ag)).
+    { rewrite /mid /= list_lookup_insert //. }
+    have Hmsg : pc_log mid !! (ts - 1)%nat
+                = Some (WMsg base data (Some i) k).
+    { rewrite /mid /=. apply list_lookup_middle. rewrite /ts. lia. }
+    (* the read half survives the append: it is a plain (lat-free) read *)
+    have Hr' : read_ok (pc_img mid) (pc_log mid) (pa_ws ag) aq false base tvs.
+    { rewrite /mid /=. by eapply read_ok_app. }
+    have He' : excl_ok (pc_log mid) i base tvs ts.
+    { rewrite /mid /=. eapply excl_ok_app; [rewrite /ts; lia|done]. }
+    (* the fulfil conditions, by construction at the fresh top *)
+    have Hbl : ws_bounded (load_post_run (pa_ws ag) aq base (tvs.*1))
+                 (length (pc_log cfg)).
+    { apply load_post_run_bounded; [done|by eapply read_ok_ts_bounded]. }
+    have Hok : fulfil_ok (load_post_run (pa_ws ag) aq base (tvs.*1)) rl base
+                 (length data) ts.
+    { split.
+      - intros j Hj. destruct Hbl as (_&_&_&_&_&_&Hcoh&_).
+        pose proof (Hcoh (base + Z.of_nat j)). rewrite /ts. lia.
+      - pose proof (fulfil_vpre_bounded _ rl _ Hbl). rewrite /ts. lia. }
+    pose proof (WPRmw mid i _ aq rl base tvs data k ts st'
+                  Hmidlk Hps Hlen ltac:(set_solver) Hmsg Hr' He' Hok) as Hrmw.
+    rewrite /mid /= in Hrmw.
+    have Hprom : ({[ts]} ∪ pa_prom ag) ∖ {[ts]} = pa_prom ag by set_solver.
+    rewrite Hprom list_insert_insert in Hrmw.
+    exact Hrmw.
+  Qed.
+
   (** A promise-free step never leaves promises behind: [wpstep_store_now]
       starts and ends [no_promises]-clean when the config was clean. *)
-  Lemma no_promises_store_now cfg i ag st' ws' :
+  Lemma no_promises_store_now cfg i ag k st' ws' :
     no_promises cfg →
     pc_ags cfg !! i = Some ag →
     no_promises
-      (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg (0%Z) [] (Some i)])
+      (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg (0%Z) [] (Some i) k])
              (<[i := WPAgent st' ws' (pa_prom ag)]> (pc_ags cfg))).
   Proof.
     intros Hnp Hlk i' ag' Hlk'. simpl in *.

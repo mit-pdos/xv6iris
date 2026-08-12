@@ -56,8 +56,8 @@ Proof. rewrite /img0 /img0m lookup_insert_ne // lookup_singleton //. Qed.
 (* ------------------------------------------------------------------ *)
 (** ** Single-byte messages *)
 
-Lemma msg_byte_single a v tid a' :
-  msg_byte (WMsg a [v] tid) a' = if bool_decide (a' = a) then Some v else None.
+Lemma msg_byte_single a v tid k a' :
+  msg_byte (WMsg a [v] tid k) a' = if bool_decide (a' = a) then Some v else None.
 Proof.
   rewrite /msg_byte /=.
   destruct (decide (a' = a)) as [->|Hne].
@@ -110,6 +110,20 @@ Record config := Cfg {
   c_harts : list hart;
 }.
 
+(** THE MESSAGE CLASS in the litmus miniature (M6, inert).  The AMO stamps
+    [WCexcl], exactly as the real machine does for an [ak_latest] write.  A
+    plain [IStore] stamps [WCplain] UNCONDITIONALLY — the real machine's
+    [WeakInterp.wm_class_of] would raise it to [WCrel] when the writer's
+    release-pending flag [w_relp] is set (the [fence rw,w; sd flag] idiom,
+    which the MPF variant below does contain), and that arm is DELIBERATELY
+    not modelled here: every litmus invariant in this file characterizes a
+    run by (remaining program, log) alone and never by the writer's
+    [wstate], so a state-dependent class would force every log-shape
+    invariant to quantify the class existentially.  Nothing in the litmus
+    outcomes depends on the class (it is inert), and the faithful
+    computation is [WeakInterp.wm_class_of], carried into the axiomatic
+    model on [WeakAxiomatic]'s label. *)
+
 (** One small step: pick a hart, execute its next instruction.  Loads
     ∃-quantify an admissible timestamp ([readable]); stores append at the log's
     fresh top; the AMO does both in one step under the atomicity constraint. *)
@@ -125,7 +139,7 @@ Definition lstep (c c' : config) : Prop :=
         c_harts c' = <[i := Hart rest (<[r := v]> (h_regs h))
                                  (load_post (h_ws h) aq a t)]> (c_harts c)
     | IStore a v :: rest =>
-        c_log c' = c_log c ++ [WMsg a [v] (Some i)] ∧
+        c_log c' = c_log c ++ [WMsg a [v] (Some i) WCplain] ∧
         c_harts c' = <[i := Hart rest (h_regs h)
                                  (store_post (h_ws h) false a
                                     (S (length (c_log c))))]> (c_harts c)
@@ -138,7 +152,7 @@ Definition lstep (c c' : config) : Prop :=
         (* atomicity: the read half takes the globally-latest write to [a] *)
         ¬ writes_in (c_log c) a t (length (c_log c)) ∧
         readable (c_img c) (c_log c) (h_ws h) (load_vpre (h_ws h) true) a t ∧
-        c_log c' = c_log c ++ [WMsg a [v] (Some i)] ∧
+        c_log c' = c_log c ++ [WMsg a [v] (Some i) WCexcl] ∧
         c_harts c' = <[i := Hart rest (<[r := vv]> (h_regs h))
                           (store_post (load_post (h_ws h) true a t) false a
                                       (S (length (c_log c))))]> (c_harts c)
@@ -172,7 +186,7 @@ Qed.
 
 Lemma step_store c i a v rest regs ws :
   c_harts c !! i = Some (Hart (IStore a v :: rest) regs ws) →
-  lstep c (Cfg (c_img c) (c_log c ++ [WMsg a [v] (Some i)])
+  lstep c (Cfg (c_img c) (c_log c ++ [WMsg a [v] (Some i) WCplain])
                (<[i := Hart rest regs
                         (store_post ws false a (S (length (c_log c))))]>
                   (c_harts c))).
@@ -386,8 +400,8 @@ Proof. rewrite img0_y. intros H. apply b0_ne_b1. congruence. Qed.
 (* ------------------------------------------------------------------ *)
 (** *** The MP family: shared message facts and read analyses *)
 
-Local Notation MX := (WMsg ax [b1] (Some 0%nat)).
-Local Notation MY := (WMsg ay [b1] (Some 0%nat)).
+Local Notation MX := (WMsg ax [b1] (Some 0%nat) WCplain).
+Local Notation MY := (WMsg ay [b1] (Some 0%nat) WCplain).
 
 Lemma mb_MX_x : msg_byte MX ax = Some b1.
 Proof. rewrite msg_byte_single //. Qed.
@@ -799,8 +813,8 @@ Qed.
 (** *** CoRR — read-read coherence.  Seeing x = 2 then x = 1 is FORBIDDEN
         (herd: forbidden; this is RVWMO's load-value/coherence axiom). *)
 
-Local Notation CX1 := (WMsg ax [b1] (Some 0%nat)).
-Local Notation CX2 := (WMsg ax [b2] (Some 0%nat)).
+Local Notation CX1 := (WMsg ax [b1] (Some 0%nat) WCplain).
+Local Notation CX2 := (WMsg ax [b2] (Some 0%nat) WCplain).
 Local Notation CORR_W0 := ([IStore ax b1; IStore ax b2]).
 Local Notation CORR_W1 := ([IStore ax b2]).
 Local Notation CORR_R0 := ([ILoad rg1 ax false; ILoad rg2 ax false]).
@@ -981,8 +995,8 @@ Proof. intros Hlb ->. rewrite log_byte_0 in Hlb. by destruct (img0_y_nb1 Hlb). Q
     LB gap of [design/weak-memory.md] Decision 1, retired by the M6 robustness
     theorem.  The proof below is the honest statement of that gap. *)
 
-Local Notation LY := (WMsg ay [b1] (Some 0%nat)).   (* hart 0 stores y *)
-Local Notation LX := (WMsg ax [b1] (Some 1%nat)).   (* hart 1 stores x *)
+Local Notation LY := (WMsg ay [b1] (Some 0%nat) WCplain).  (* hart 0 stores y *)
+Local Notation LX := (WMsg ax [b1] (Some 1%nat) WCplain).  (* hart 1 stores x *)
 Local Notation LB_P0 := ([ILoad rg1 ax false; IStore ay b1]).
 Local Notation LB_P1 := ([IStore ay b1]).
 Local Notation LB_Q0 := ([ILoad rg2 ay false; IStore ax b1]).
@@ -1203,8 +1217,8 @@ Qed.
     by [fence rw,rw].  Here that falls out of the single global log: "x entered
     the log before y" and "y entered before x" cannot both hold. *)
 
-Local Notation IX := (WMsg ax [b1] (Some 0%nat)).
-Local Notation IY := (WMsg ay [b1] (Some 1%nat)).
+Local Notation IX := (WMsg ax [b1] (Some 0%nat) WCplain).
+Local Notation IY := (WMsg ay [b1] (Some 1%nat) WCplain).
 
 Definition iriw_c0 : config :=
   Cfg img0 []
@@ -1445,7 +1459,7 @@ Lemma step_amo c i r a v rest regs ws t vv :
   log_byte (c_img c) (c_log c) t a = Some vv →
   ¬ writes_in (c_log c) a t (length (c_log c)) →
   readable (c_img c) (c_log c) ws (load_vpre ws true) a t →
-  lstep c (Cfg (c_img c) (c_log c ++ [WMsg a [v] (Some i)])
+  lstep c (Cfg (c_img c) (c_log c ++ [WMsg a [v] (Some i) WCexcl])
                (<[i := Hart rest (<[r := vv]> regs)
                      (store_post (load_post ws true a t) false a
                                  (S (length (c_log c))))]> (c_harts c))).

@@ -69,34 +69,12 @@ From xv6iris Require Import WeakMem WeakPromise WeakPromiseFact WeakAxiomatic.
 Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)
-(** ** Two small [WeakMem]-level facts
+(** ** [msg_byte_range] and [read_ok_ts_bounded]
 
-    (They belong in [WeakMem.v]; they are here because this slice may not
-    edit it — same convention as [WeakAxiomatic]'s fold lemmas.) *)
-
-(** A message writes only inside its own byte range. *)
-Lemma msg_byte_range m a :
-  is_Some (msg_byte m a) →
-  ∃ j : nat, (j < length (wm_data m))%nat ∧ a = wm_pa m + Z.of_nat j.
-Proof.
-  rewrite /msg_byte. case_bool_decide as Hle; [|by intros []].
-  intros Hs. exists (Z.to_nat (a - wm_pa m)). split.
-  - by eapply lookup_lt_is_Some_1.
-  - lia.
-Qed.
-
-(** The [Forall] shape [load_post_run_bounded] wants, from a [read_ok].
-    ([WeakPromise] proves this as a [Local Lemma], hence the copy.) *)
-Lemma read_ok_ts_bounded' img log ws aq lat base tvs :
-  read_ok img log ws aq lat base tvs →
-  Forall (λ t, (t ≤ length log)%nat) (tvs.*1).
-Proof.
-  intros Hr. apply Forall_lookup_2. intros j t Hj.
-  rewrite list_lookup_fmap in Hj.
-  destruct (tvs !! j) as [[t' v]|] eqn:Htv; simplify_eq/=.
-  destruct (Hr j t v Htv) as (Hb & _ & _).
-  eapply log_byte_bounded. by eexists.
-Qed.
+    Both moved with the W4 lift batch — [msg_byte_range] to [WeakMem.v] and
+    [read_ok_ts_bounded] (de-[Local]'d, so the local copy
+    [read_ok_ts_bounded] is gone) to [WeakPromise.v].  They are used
+    verbatim below. *)
 
 (* ================================================================== *)
 Section bridge.
@@ -131,17 +109,17 @@ Section bridge.
                (<[i := WPAgent st'
                          (load_post_run (pa_ws ag) aq base (tvs.*1))
                          (pa_prom ag)]> (pc_ags cfg)))
-  | PFStore cfg ag rl base data st' :
+  | PFStore cfg ag rl base data k st' :
       pc_ags cfg !! i = Some ag →
       pstep (pa_st ag) (WeakPromise.LStore rl base data) st' →
       data ≠ [] →
       wp_pf_step i (WeakPromise.LStore rl base data) cfg
-        (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i)])
+        (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k])
                (<[i := WPAgent st'
                          (store_post_run (pa_ws ag) rl base (length data)
                             (S (length (pc_log cfg))))
                          (pa_prom ag)]> (pc_ags cfg)))
-  | PFRmw cfg ag aq rl base tvs data st' :
+  | PFRmw cfg ag aq rl base tvs data k st' :
       pc_ags cfg !! i = Some ag →
       pstep (pa_st ag) (WeakPromise.LRmw aq rl base tvs data) st' →
       data ≠ [] →
@@ -149,7 +127,7 @@ Section bridge.
       read_ok (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs →
       excl_ok (pc_log cfg) i base tvs (S (length (pc_log cfg))) →
       wp_pf_step i (WeakPromise.LRmw aq rl base tvs data) cfg
-        (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i)])
+        (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k])
                (<[i := WPAgent st'
                          (store_post_run
                             (load_post_run (pa_ws ag) aq base (tvs.*1))
@@ -169,62 +147,8 @@ Section bridge.
   (** *** A pf step is one or two [wpstep]s
 
       The store arm is [WeakPromise.wpstep_store_now]; the rmw arm is its
-      missing sibling, proved here the same way. *)
-
-  Lemma wpstep_rmw_now cfg i ag aq rl base tvs data st' :
-    pc_ags cfg !! i = Some ag →
-    pstep (pa_st ag) (WeakPromise.LRmw aq rl base tvs data) st' →
-    data ≠ [] →
-    length tvs = length data →
-    ws_bounded (pa_ws ag) (length (pc_log cfg)) →
-    S (length (pc_log cfg)) ∉ pa_prom ag →
-    read_ok (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs →
-    excl_ok (pc_log cfg) i base tvs (S (length (pc_log cfg))) →
-    rtc (wpstep pstep) cfg
-      (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i)])
-             (<[i := WPAgent st'
-                       (store_post_run
-                          (load_post_run (pa_ws ag) aq base (tvs.*1))
-                          rl base (length data) (S (length (pc_log cfg))))
-                       (pa_prom ag)]> (pc_ags cfg))).
-  Proof.
-    intros Hlk Hps Hnn Hlen Hb Hfresh Hr He.
-    pose proof (lookup_lt_Some _ _ _ Hlk) as Hlt.
-    set ts := S (length (pc_log cfg)).
-    (* step 1: promise the message at the fresh top *)
-    eapply rtc_l.
-    { by eapply (WPPromise pstep cfg i ag base data). }
-    set mid := WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i)])
-                 (<[i := WPAgent (pa_st ag) (pa_ws ag)
-                           ({[ts]} ∪ pa_prom ag)]> (pc_ags cfg)).
-    eapply rtc_l; [|apply rtc_refl].
-    have Hmidlk : pc_ags mid !! i
-                  = Some (WPAgent (pa_st ag) (pa_ws ag) ({[ts]} ∪ pa_prom ag)).
-    { rewrite /mid /= list_lookup_insert //. }
-    have Hmsg : pc_log mid !! (ts - 1)%nat = Some (WMsg base data (Some i)).
-    { rewrite /mid /=. apply list_lookup_middle. rewrite /ts. lia. }
-    (* the read half survives the append: it is a plain (lat-free) read *)
-    have Hr' : read_ok (pc_img mid) (pc_log mid) (pa_ws ag) aq false base tvs.
-    { rewrite /mid /=. by eapply read_ok_app. }
-    have He' : excl_ok (pc_log mid) i base tvs ts.
-    { rewrite /mid /=. eapply excl_ok_app; [rewrite /ts; lia|done]. }
-    (* the fulfil conditions, by construction at the fresh top *)
-    have Hbl : ws_bounded (load_post_run (pa_ws ag) aq base (tvs.*1))
-                 (length (pc_log cfg)).
-    { apply load_post_run_bounded; [done|by eapply read_ok_ts_bounded']. }
-    have Hok : fulfil_ok (load_post_run (pa_ws ag) aq base (tvs.*1)) rl base
-                 (length data) ts.
-    { split.
-      - intros j Hj. destruct Hbl as (_&_&_&_&_&Hcoh&_).
-        pose proof (Hcoh (base + Z.of_nat j)). rewrite /ts. lia.
-      - pose proof (fulfil_vpre_bounded _ rl _ Hbl). rewrite /ts. lia. }
-    pose proof (WPRmw pstep mid i _ aq rl base tvs data ts st'
-                  Hmidlk Hps Hlen ltac:(set_solver) Hmsg Hr' He' Hok) as Hrmw.
-    rewrite /mid /= in Hrmw.
-    have Hprom : ({[ts]} ∪ pa_prom ag) ∖ {[ts]} = pa_prom ag by set_solver.
-    rewrite Hprom list_insert_insert in Hrmw.
-    exact Hrmw.
-  Qed.
+      sibling [WeakPromise.wpstep_rmw_now], which moved next to it with the
+      W4 lift batch. *)
 
   Lemma wp_pf_step_rtc_wpstep i l c c' :
     cfg_wf c → no_promises c → wp_pf_step i l c c' → rtc (wpstep pstep) c c'.
@@ -232,8 +156,8 @@ Section bridge.
     intros Hwf Hnp Hstep. destruct Hstep as
       [cfg ag st' Hlk Hps
       |cfg ag aq lat base tvs st' Hlk Hps Hr
-      |cfg ag rl base data st' Hlk Hps Hnn
-      |cfg ag aq rl base tvs data st' Hlk Hps Hnn Hlen Hr He
+      |cfg ag rl base data k st' Hlk Hps Hnn
+      |cfg ag aq rl base tvs data k st' Hlk Hps Hnn Hlen Hr He
       |cfg ag pr pw sr sw st' Hlk Hps].
     - apply rtc_once. by eapply WPSilent.
     - apply rtc_once. by eapply WPLoad.
@@ -295,15 +219,19 @@ Section bridge.
   (** ** (B) The projections *)
 
   (** [LSilent] has no image: the axiomatic execution simply skips it. *)
-  Definition proj_lbl (l : wlabel) : option WeakAxiomatic.lbl :=
+(** [k] is the class the pf step's append stamped on its message (a free
+    binder of the [PFStore]/[PFRmw] arms — the pf fragment mirrors the store
+    label and does not compute the class), which the axiomatic label carries
+    so that the projected LOG is literally equal. *)
+  Definition proj_lbl (k : wm_class) (l : wlabel) : option WeakAxiomatic.lbl :=
     match l with
     | LSilent => None
     | WeakPromise.LLoad aq lat base tvs =>
         Some (WeakAxiomatic.LLoad aq base (tvs.*1) (tvs.*2))
     | WeakPromise.LStore rl base data =>
-        Some (WeakAxiomatic.LStore rl base data)
+        Some (WeakAxiomatic.LStore rl base data k)
     | WeakPromise.LRmw aq rl base tvs data =>
-        Some (WeakAxiomatic.LRmw aq rl base (tvs.*1) (tvs.*2) data)
+        Some (WeakAxiomatic.LRmw aq rl base (tvs.*1) (tvs.*2) data k)
     | WeakPromise.LFence pr pw sr sw =>
         Some (WeakAxiomatic.LFence pr pw sr sw)
     end.
@@ -399,11 +327,11 @@ Section bridge.
   Qed.
 
   (** The appending arms (store, rmw). *)
-  Lemma own_coh_append c i ag st' w pr base data :
+  Lemma own_coh_append c i ag st' w pr base data kc :
     own_coh c → pc_ags c !! i = Some ag → ws_le (pa_ws ag) w →
     (∀ j : nat, (j < length data)%nat →
        (S (length (pc_log c)) ≤ coh w (base + Z.of_nat j))%nat) →
-    own_coh (WPCfg (pc_img c) (pc_log c ++ [WMsg base data (Some i)])
+    own_coh (WPCfg (pc_img c) (pc_log c ++ [WMsg base data (Some i) kc])
                (<[i := WPAgent st' w pr]> (pc_ags c))).
   Proof.
     intros Hoc Hlk Hle Hnew p m j agj a Hm Htid Hj Hb. simpl in *.
@@ -421,7 +349,7 @@ Section bridge.
       rewrite Nat.sub_diag /= in Hm. simplify_eq/=.
       rewrite list_lookup_insert in Hj;
         [by eapply lookup_lt_Some|simplify_eq/=].
-      destruct (msg_byte_range _ _ Hb) as (k & Hk & ->). simpl in Hk |- *.
+      destruct (msg_byte_range _ _ Hb) as (jb & Hjb & ->). simpl in Hjb |- *.
       by apply Hnew.
   Qed.
 
@@ -431,8 +359,8 @@ Section bridge.
     intros Hoc Hstep. destruct Hstep as
       [cfg ag st' Hlk Hps
       |cfg ag aq lat base tvs st' Hlk Hps Hr
-      |cfg ag rl base data st' Hlk Hps Hnn
-      |cfg ag aq rl base tvs data st' Hlk Hps Hnn Hlen Hr He
+      |cfg ag rl base data k st' Hlk Hps Hnn
+      |cfg ag aq rl base tvs data k st' Hlk Hps Hnn Hlen Hr He
       |cfg ag pr pw sr sw st' Hlk Hps].
     - eapply own_coh_upd; [done|done|reflexivity].
     - eapply own_coh_upd; [done|done|apply load_post_run_le].
@@ -482,7 +410,8 @@ Section bridge.
       all — the matching state is unchanged). *)
   Lemma wp_pf_step_mstep i l c c' σ :
     own_coh c → cfg_match c σ → wp_pf_step i l c c' →
-    match proj_lbl l with
+    ∃ k,
+    match proj_lbl k l with
     | None => cfg_match c' σ
     | Some lb => ∃ σ', mstep σ i lb σ' ∧ cfg_match c' σ'
     end.
@@ -492,9 +421,11 @@ Section bridge.
     destruct Hstep as
       [cfg ag st' Hlk Hps
       |cfg ag aq lat base tvs st' Hlk Hps Hr
-      |cfg ag rl base data st' Hlk Hps Hnn
-      |cfg ag aq rl base tvs data st' Hlk Hps Hnn Hlen Hr He
-      |cfg ag pr pw sr sw st' Hlk Hps]; subst img lg; simpl.
+      |cfg ag rl base data k st' Hlk Hps Hnn
+      |cfg ag aq rl base tvs data k st' Hlk Hps Hnn Hlen Hr He
+      |cfg ag pr pw sr sw st' Hlk Hps]; subst img lg;
+      [exists WCplain| exists WCplain| exists k| exists k| exists WCplain];
+      simpl.
     - (* silent: the projected state does not move *)
       eapply (cfg_match_upd_gen _ _ _ i ag st' (pa_ws ag) _ f f);
         [done|done|by apply Hf|done].
@@ -536,8 +467,8 @@ Section bridge.
           cfg_match c' (stt E' (length (ex_tr E'))).
   Proof.
     intros HE Hm Hoc Hstep.
-    pose proof (wp_pf_step_mstep i l c c' _ Hoc Hm Hstep) as Hpr.
-    destruct (proj_lbl l) as [lb|].
+    pose proof (wp_pf_step_mstep i l c c' _ Hoc Hm Hstep) as [k Hpr].
+    destruct (proj_lbl k l) as [lb|].
     - destruct Hpr as (σ' & Hms & Hm').
       exists (Exec (ex_st E ++ [σ']) (ex_tr E ++ [EStep i lb])).
       pose proof HE as (Hlen & _ & _).
@@ -618,9 +549,9 @@ Section bridge.
     match lb with
     | WeakAxiomatic.LLoad aq base ts vs =>
         WeakPromise.LLoad aq false base (zip ts vs)
-    | WeakAxiomatic.LStore rl base vs => WeakPromise.LStore rl base vs
+    | WeakAxiomatic.LStore rl base vs _ => WeakPromise.LStore rl base vs
     | WeakAxiomatic.LFence pr pw sr sw => WeakPromise.LFence pr pw sr sw
-    | WeakAxiomatic.LRmw aq rl base ts rvs wvs =>
+    | WeakAxiomatic.LRmw aq rl base ts rvs wvs _ =>
         WeakPromise.LRmw aq rl base (zip ts rvs) wvs
     end.
 
@@ -673,9 +604,9 @@ Section bridge.
       - intros j Hne. by rewrite upd_ws_ne. }
     inversion Hms as
       [aq base ts vs Hrd Hlb Hσ'
-      |rl base vs Hnn Hlb Hσ'
+      |rl base vs kc Hnn Hlb Hσ'
       |pr pw sr sw Hlb Hσ'
-      |aq rl base ts rvs wvs Hnn Hlen Hrd Hlat Hlb Hσ']; simplify_eq/=.
+      |aq rl base ts rvs wvs kc Hnn Hlen Hrd Hlat Hlb Hσ']; simplify_eq/=.
     - (* load *)
       pose proof Hrd as [Hlen _].
       eexists. split.
@@ -685,7 +616,7 @@ Section bridge.
       + rewrite fst_zip; [lia|]. rewrite (Hf i ag Hlk). apply Hmatch.
     - (* store *)
       eexists. split.
-      + apply (PFStore i c ag rl base vs (pa_st ag));
+      + apply (PFStore i c ag rl base vs kc (pa_st ag));
           [done|apply Hpf|done].
       + rewrite (Hf i ag Hlk). apply Hmatch.
     - (* fence *)
@@ -695,7 +626,7 @@ Section bridge.
     - (* rmw *)
       pose proof Hrd as [Hlen' _].
       eexists. split.
-      + apply (PFRmw i c ag aq rl base (zip ts rvs) wvs (pa_st ag));
+      + apply (PFRmw i c ag aq rl base (zip ts rvs) wvs kc (pa_st ag));
           [done|apply Hpf|done| | |].
         * rewrite length_zip_with. lia.
         * rewrite -(Hf i ag Hlk). by apply rd_ok_read_ok.

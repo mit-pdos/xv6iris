@@ -456,7 +456,7 @@ Proof. by intros w _. Qed.
 Lemma load_vpre_mono ws ws2 aq :
   ws_le ws ws2 -> (load_vpre ws aq <= load_vpre ws2 aq)%nat.
 Proof.
-  intros (_ & _ & _ & Hrn & _ & Hrel). rewrite /load_vpre. destruct aq; lia.
+  intros (_ & _ & _ & Hrn & _ & Hrel & _). rewrite /load_vpre. destruct aq; lia.
 Qed.
 
 Lemma readable_ws_down img log ws ws2 vpre vpre2 a t :

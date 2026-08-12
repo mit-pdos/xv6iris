@@ -188,32 +188,10 @@ Proof.
   pose proof (Hcoh a). lia.
 Qed.
 
-(** The write case: [t ≤ coh] at every byte the window store touches. *)
-Lemma store_post_bytes_coh (ws : wstate) (rl : bool) (l : list Z) (t : nat) (a : Z) :
-  a ∈ l -> (t ≤ coh (store_post_bytes ws rl l t) a)%nat.
-Proof.
-  revert ws. induction l as [|a0 l IH]; intros ws Hin.
-  { by apply elem_of_nil in Hin. }
-  apply elem_of_cons in Hin as [Heq|Hin].
-  - (* [a] is written by the head; later stores only raise [coh a] *)
-    subst a0.
-    change (store_post_bytes ws rl (a :: l) t)
-      with (store_post_bytes (store_post ws rl a t) rl l t).
-    pose proof (proj1 (store_post_bytes_le (store_post ws rl a t) rl l t) a) as Hle.
-    pose proof (store_post_coh ws rl a t) as Hc. lia.
-  - change (store_post_bytes ws rl (a0 :: l) t)
-      with (store_post_bytes (store_post ws rl a0 t) rl l t).
-    exact (IH _ Hin).
-Qed.
-
-Lemma store_post_run_coh (ws : wstate) (rl : bool) (base : Z) (n : nat)
-    (t : nat) (j : nat) :
-  (j < n)%nat -> (t ≤ coh (store_post_run ws rl base n t) (base + Z.of_nat j))%nat.
-Proof.
-  intros Hj. rewrite /store_post_run. apply store_post_bytes_coh.
-  apply elem_of_list_fmap. exists j. split; [reflexivity|].
-  apply elem_of_seq. lia.
-Qed.
+(** The write case ([t ≤ coh] at every byte the window store touches) is
+    [WeakMem.store_post_run_coh]: the W4 lift batch made that the canonical
+    copy, so this file's duplicate (and its [store_post_bytes_coh] helper)
+    are gone.  Uses below are against [WeakMem]'s. *)
 
 Lemma pinned_read_write tid (s : wmstate) ak (pa : Arch.pa) (n : N)
     (v : bv (8 * n)) (a : Z) :
@@ -221,7 +199,8 @@ Lemma pinned_read_write tid (s : wmstate) ak (pa : Arch.pa) (n : N)
 Proof.
   rewrite /pinned_read /wwrite_post /= => Hp.
   rewrite latest_ts_app.
-  destruct (msg_writesb (wwrite_msg tid pa n v) a) eqn:Hw.
+  destruct (msg_writesb (wwrite_msg tid (wm_class_of ak (wm_ws s)) pa n v) a)
+    eqn:Hw.
   - (* the new message writes [a]: it is in the window, and the store raised
        [coh a] to exactly the new top *)
     apply msg_writesb_true in Hw as [b Hb].
@@ -428,7 +407,8 @@ Proof.
   - rewrite /wread_post. destruct (ak_coh ak); simpl.
     + by split_and!.
     + split_and!; [exact Hi|exact Hl|]. by rewrite /coh_ts Hw Hl.
-  - rewrite /wwrite_post /=. split_and!; [exact Hi|by rewrite Hl|by rewrite Hw Hl].
+  - rewrite /wwrite_post /=.
+    split_and!; [exact Hi|by rewrite Hl Hw|by rewrite Hw Hl].
   - simpl. split_and!; [exact Hi|exact Hl|by rewrite Hw].
 Qed.
 
@@ -1235,7 +1215,7 @@ Proof. reflexivity. Qed.
 Lemma fence_post_mono ws1 ws2 pr pw sr sw :
   ws_le ws1 ws2 -> ws_le (fence_post ws1 pr pw sr sw) (fence_post ws2 pr pw sr sw).
 Proof.
-  intros (Hc & Hro & Hwo & Hrn & Hwn & Hrel).
+  intros (Hc & Hro & Hwo & Hrn & Hwn & Hrel & Hpub).
   rewrite /ws_le /fence_post /=. split_and!.
   - intros a. exact (Hc a).
   - exact Hro.
@@ -1243,6 +1223,7 @@ Proof.
   - destruct sr; destruct pr; destruct pw; lia.
   - destruct sw; destruct pr; destruct pw; lia.
   - exact Hrel.
+  - exact Hpub.
 Qed.
 
 Lemma barrier_post_mono ws1 ws2 b :
@@ -1316,7 +1297,8 @@ Proof.
   rewrite weffs_cons2 weff_apply_read weff_apply_write in Hl Hws.
   rewrite wwrite_post_log wread_post_log in Hl.
   rewrite wwrite_post_ws wread_post_log in Hws.
-  rewrite /wQ_store /wV_store. split_and!; [exact Hi|exact Hl|exact Hle|].
+  rewrite /wQ_store /wV_store.
+  split_and!; [exact Hi|by eexists; exact Hl|exact Hle|].
   intros j Hj. rewrite Hws flr_ws_view /acc_addr.
   etrans; [|apply Nat.le_max_r].
   apply (store_post_run_coh (wm_ws (wread_post s akf pf (coh_ts s pf nf)))
@@ -1345,7 +1327,8 @@ Proof.
   rewrite (wread_post_ws_weak (wread_post s akf pf (coh_ts s pf nf)) aka ea
              (coh_ts s ea 4) Hcoh) Hsync in Hws.
   rewrite /wQ_amo_aq. split.
-  - rewrite /wQ_store /wV_store. split_and!; [exact Hi|exact Hl|exact Hle|].
+  - rewrite /wQ_store /wV_store.
+    split_and!; [exact Hi|by eexists; exact Hl|exact Hle|].
     intros j Hj. rewrite Hws flr_ws_view /acc_addr.
     etrans; [|apply Nat.le_max_r].
     apply (store_post_run_coh
@@ -1415,7 +1398,8 @@ Proof.
   rewrite (wread_post_ws_weak (wread_post s akf pf (coh_ts s pf nf)) aka ea
              (coh_ts s ea 4) Hcoh) Hsync in Hws.
   rewrite /wQ_amo_aq /wQ_amo_aq_w. split.
-  - rewrite /wQ_store_w /wV_store_w. split_and!; [exact Hi|exact Hl|exact Hle|].
+  - rewrite /wQ_store_w /wV_store_w.
+    split_and!; [exact Hi|by eexists; exact Hl|exact Hle|].
     intros j Hj. rewrite Hws flr_ws_view /acc_addr.
     etrans; [|apply Nat.le_max_r].
     apply (store_post_run_coh

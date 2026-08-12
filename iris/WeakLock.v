@@ -232,14 +232,14 @@ Section weak_lock.
              ∨ ⌜v ≠ lock_zero⌝)).
   Proof.
     intros Hwf Hacc Heff.
-    destruct Heff as [(Himg & Hlog & Hle & Hflr) Hgain].
+    destruct Heff as [(Himg & [kc Hlog] & Hle & Hflr) Hgain].
     iIntros "Hi Hinv".
     iDestruct "Hinv" as (st t v) "(Hw & Ha & Harm)".
     iDestruct (wlat4_flat_gen σ lk (DfracOwn 1) t v Hwf Hacc with "Hi Hw")
       as %[Hflat Hts].
     iExists v. iSplitR; [by iPureIntro|].
     (* the machine's own write: the elements move to the fresh top, value 1 *)
-    iMod (wlat4_store_gen tid σ σ' lk t v lock_one Himg Hlog with "Hi Hw")
+    iMod (wlat4_store_gen tid kc σ σ' lk t v lock_one Himg Hlog with "Hi Hw")
       as "[Hi Hw]".
     iDestruct "Harm" as "[(-> & -> & Hfrag & HR)|(%Hst & %Hv)]".
     - (* the lock was FREE: take it, and thaw the payload *)
@@ -286,7 +286,7 @@ Section weak_lock.
     vwp_hold R (wm_ws σ) ==∗
     wlat_interp (wm_img σ') (wm_log σ') ∗ wlock_inv γ lk R.
   Proof.
-    intros (Himg & Hlog & Hle & Hflr) Hbnd.
+    intros (Himg & [kc Hlog] & Hle & Hflr) Hbnd.
     iIntros "Hi Hinv Htok HR".
     iDestruct "Hinv" as (st t v) "(Hw & Ha & _)".
     (* the holder's token says the lock is held by [i] *)
@@ -295,7 +295,7 @@ Section weak_lock.
        timestamp, so it may be frozen there and handed to the invariant *)
     iAssert (monPred_at R (view_scl (S (length (wm_log σ)))))%I with "[HR]" as "HR".
     { by iApply (wwp_release_deposit R σ Hbnd with "HR"). }
-    iMod (wlat4_store_gen tid σ σ' lk t v lock_zero Himg Hlog with "Hi Hw")
+    iMod (wlat4_store_gen tid kc σ σ' lk t v lock_zero Himg Hlog with "Hi Hw")
       as "[Hi Hw]".
     iMod (lock_clrcpu γ (Some (i, true)) i with "Ha Htok") as "(_ & Ha & Hpre)".
     iMod (lock_give γ (Some (i, false)) i with "Ha Hpre") as "(_ & Ha & Hfrag)".

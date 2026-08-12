@@ -1091,13 +1091,18 @@ Proof.
   assert (Hl2 : wm_log s2 = wm_log s)
     by (subst s2; rewrite weff_apply_read wread_post_log; exact Hl1).
   set (s3 := weff_apply (Some cid) s2 (WEwrite akw ea 8 v)).
-  assert (Hl3 : wm_log s3 = (wm_log s ++ [wwrite_msg (Some cid) ea 8 v])%list).
+  assert (Hl3 : wm_log s3
+                = (wm_log s ++ [wwrite_msg (Some cid)
+                     (wm_class_of akw (wm_ws s2)) ea 8 v])%list).
   { subst s3. rewrite weff_apply_write /wwrite_post /= Hl2. reflexivity. }
   assert (Hlpost : wm_log (weffs (Some cid) s3 post) = wm_log s3)
     by exact (weffs_nowrite_log (Some cid) s3 post Hpost).
-  assert (Hls' : wm_log s' = (wm_log s ++ [wwrite_msg (Some cid) ea 8 v])%list).
+  assert (Hls' : wm_log s'
+                 = (wm_log s ++ [wwrite_msg (Some cid)
+                      (wm_class_of akw (wm_ws s2)) ea 8 v])%list).
   { rewrite Hl !weffs_app !weffs_cons -/s1 -/s2 -/s3 Hlpost Hl3. reflexivity. }
-  rewrite /wQ_store_w /wV_store_w. split_and!; [exact Hi|exact Hls'|exact Hle|].
+  rewrite /wQ_store_w /wV_store_w.
+  split_and!; [exact Hi|by eexists; exact Hls'|exact Hle|].
   intros j Hj.
   (* the floor reached at the write's own step survives the write-free tail *)
   assert (Hstep : (S (length (wm_log s))
@@ -1131,13 +1136,18 @@ Proof.
   assert (Hl2 : wm_log s2 = wm_log s)
     by (subst s2; rewrite weff_apply_read wread_post_log; exact Hl1).
   set (s3 := weff_apply (Some cid) s2 (WEwrite akw ea 8 v)).
-  assert (Hl3 : wm_log s3 = (wm_log s ++ [wwrite_msg (Some cid) ea 8 v])%list).
+  assert (Hl3 : wm_log s3
+                = (wm_log s ++ [wwrite_msg (Some cid)
+                     (wm_class_of akw (wm_ws s2)) ea 8 v])%list).
   { subst s3. rewrite weff_apply_write /wwrite_post /= Hl2. reflexivity. }
   assert (Hlpost : wm_log (weffs (Some cid) s3 post) = wm_log s3)
     by exact (weffs_nowrite_log (Some cid) s3 post Hpost).
-  assert (Hls' : wm_log s' = (wm_log s ++ [wwrite_msg (Some cid) ea 8 v])%list).
+  assert (Hls' : wm_log s'
+                 = (wm_log s ++ [wwrite_msg (Some cid)
+                      (wm_class_of akw (wm_ws s2)) ea 8 v])%list).
   { rewrite Hl !weffs_app !weffs_cons -/s1 -/s2 -/s3 Hlpost Hl3. reflexivity. }
-  rewrite /wQ_store_w /wV_store_w. split_and!; [exact Hi|exact Hls'|exact Hle|].
+  rewrite /wQ_store_w /wV_store_w.
+  split_and!; [exact Hi|by eexists; exact Hls'|exact Hle|].
   intros j Hj.
   assert (Hstep : (S (length (wm_log s))
                    ≤ flr (ws_view (wm_ws s3)) (acc_addr ea j))%nat).

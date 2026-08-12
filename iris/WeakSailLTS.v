@@ -596,12 +596,12 @@ Section bracket.
     exists i, (WeakPromise.LLoad aq lat base tvs). by eapply PFLoad.
   Qed.
 
-  Lemma pf_store ags ag rl base data p1 img log img' log' fin :
+  Lemma pf_store ags ag rl base data k p1 img log img' log' fin :
     ags !! i = Some ag →
     sail_step next (pa_st ag) (WeakPromise.LStore rl base data) p1 →
     data ≠ [] →
     rtc (wp_pf_run (sail_step next))
-        (WPCfg img (log ++ [WMsg base data (Some i)])
+        (WPCfg img (log ++ [WMsg base data (Some i) k])
            (<[i := WPAgent p1
                      (store_post_run (pa_ws ag) rl base (length data)
                         (S (length log))) (pa_prom ag)]> ags))
@@ -618,7 +618,7 @@ Section bracket.
     exists i, (WeakPromise.LStore rl base data). by eapply PFStore.
   Qed.
 
-  Lemma pf_rmw ags ag aq rl base tvs data p1 img log img' log' fin :
+  Lemma pf_rmw ags ag aq rl base tvs data k p1 img log img' log' fin :
     ags !! i = Some ag →
     sail_step next (pa_st ag) (WeakPromise.LRmw aq rl base tvs data) p1 →
     data ≠ [] →
@@ -626,7 +626,7 @@ Section bracket.
     read_ok img log (pa_ws ag) aq false base tvs →
     excl_ok log i base tvs (S (length log)) →
     rtc (wp_pf_run (sail_step next))
-        (WPCfg img (log ++ [WMsg base data (Some i)])
+        (WPCfg img (log ++ [WMsg base data (Some i) k])
            (<[i := WPAgent p1
                      (store_post_run (load_post_run (pa_ws ag) aq base tvs.*1)
                         rl base (length data) (S (length log)))
@@ -679,7 +679,7 @@ Section bracket.
       amo_tail pa n m →
       wrun (Some i) m s x s' →
       ∃ (m1 m2 : M unit) (rs1 : regstate) (rl : bool) (data : list (bv 8))
-        (str : dstream),
+        (k : wm_class) (str : dstream),
         silent_run (m, wm_regs s) (m1, rs1) ∧
         wr_node m1 rl (pa_z pa) data m2 ∧
         length data = N.to_nat n ∧ data ≠ [] ∧
@@ -688,7 +688,7 @@ Section bracket.
                               (store_post_run (wm_ws s) rl (pa_z pa) (length data)
                                  (S (length (wm_log s)))) prom) →
            rtc (wp_pf_run (sail_step next))
-             (WPCfg (wimg s) (wm_log s ++ [WMsg (pa_z pa) data (Some i)]) ags)
+             (WPCfg (wimg s) (wm_log s ++ [WMsg (pa_z pa) data (Some i) k]) ags)
              (WPCfg (wimg s) (wm_log s')
                 (<[i := WPAgent (PSail (Some (Interface.Ret x)) (wm_regs s') tail None)
                           (wm_ws s') prom]> ags))).
@@ -710,9 +710,10 @@ Section bracket.
         let m1 := fresh "m1" in let m2 := fresh "m2" in
         let rs1 := fresh "rs1" in let rl := fresh "rl" in
         let data := fresh "data" in let str := fresh "str" in
+        let kc := fresh "kc" in
         destruct (proj2 (IH _) _ _ _ _ _ (Hsh _) Hrun)
-          as (m1 & m2 & rs1 & rl & data & str & Hsil & Hwr & Hlen & Hne & Hch);
-        exists m1, m2, rs1, rl, data, str;
+          as (m1 & m2 & rs1 & rl & data & kc & str & Hsil & Hwr & Hlen & Hne & Hch);
+        exists m1, m2, rs1, rl, data, kc, str;
         split_and!; [|exact Hwr|exact Hlen|exact Hne|exact Hch];
         eapply rtc_l; [|exact Hsil]; by rewrite /silent1 /=
     end.
@@ -758,7 +759,7 @@ Section bracket.
           + (* THE FUSED RMW *)
             destruct (proj2 (IH (inl (w, None))) (Interface.ReadReq.pa req) nn
                         _ _ _ (Hsh w) Hrun)
-              as (m1 & m2 & rs1 & rl & data & str & Hsil & Hwr & Hlend & Hne & Hch).
+              as (m1 & m2 & rs1 & rl & data & kc & str & Hsil & Hwr & Hlend & Hne & Hch).
             exists str. intros tail prom ags Hlk.
             pose proof Hok as (Hlents & _).
             eapply pf_rmw.
@@ -851,7 +852,9 @@ Section bracket.
         destruct (proj1 (IH (inl None)) _ _ _ (Hsh _) Hrun) as (str & Hch).
         exists (Interface.Next (Interface.MemWrite nn req) k), (k (inl None)),
                (wm_regs s), (ak_sync (classify (Interface.WriteReq.access_kind req))),
-               (wbytes nn (Interface.WriteReq.value req)), str.
+               (wbytes nn (Interface.WriteReq.value req)),
+               (wm_class_of (classify (Interface.WriteReq.access_kind req))
+                  (wm_ws s)), str.
         split_and!.
         - apply rtc_refl.
         - rewrite /wr_node. split_and!; [exact Hd|exact Hn0|exact Hlat|
@@ -862,8 +865,8 @@ Section bracket.
       { (* Choose *)
         destruct Hrun as (c & Hrun).
         destruct (proj2 (IH c) _ _ _ _ _ (Hsh _) Hrun)
-          as (m1 & m2 & rs1 & rl & data & str & Hsil & Hwr & Hlen & Hne & Hch).
-        exists m1, m2, rs1, rl, data, str.
+          as (m1 & m2 & rs1 & rl & data & kc & str & Hsil & Hwr & Hlen & Hne & Hch).
+        exists m1, m2, rs1, rl, data, kc, str.
         split_and!; [|exact Hwr|exact Hlen|exact Hne|exact Hch].
         eapply rtc_l; [|exact Hsil]. rewrite /silent1 /=. by exists c. }
   Qed.

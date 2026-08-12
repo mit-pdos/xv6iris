@@ -448,13 +448,28 @@ Qed.
     INSPECTS [wm_tid]: it exists for the M6 robustness statements and for the
     disk agent, and the own-store forwarding a hart needs is already carried by
     its own [wstate]'s forward bank. *)
-Definition wwrite_msg (tid : option nat) (pa : Arch.pa) (n : N) {w : N}
-    (v : bv w) : wmsg :=
-  WMsg (pa_z pa) (map (λ j : nat, nth_byte v j) (seq 0 (N.to_nat n))) tid.
+(** THE MESSAGE CLASS (M6, D-M6-6; inert — no rule reads it).  Computed at
+    the append from the access kind and the writer's own [wstate]:
 
-Lemma wwrite_msg_byte tid pa n {w : N} (v : bv w) (j : nat) :
+      - an exclusive / atomic-rmw write ([ak_latest]) is [WCexcl];
+      - otherwise a write taken with the release-pending flag [w_relp] set —
+        the RISC-V [fence rw,w; sd flag] idiom — or an [.rl] write
+        ([ak_sync]) is the PUBLICATION, [WCrel];
+      - everything else (the [↦w{1}]-owned stores) is [WCplain].
+
+    [ak_sync] is the same bit [wwrite_post] already passes to
+    [store_post_run] as [rl], so the two agree by construction. *)
+Definition wm_class_of (ak : akinfo) (ws : wstate) : wm_class :=
+  if ak_latest ak then WCexcl
+  else if (w_relp ws || ak_sync ak)%bool then WCrel else WCplain.
+
+Definition wwrite_msg (tid : option nat) (k : wm_class) (pa : Arch.pa) (n : N)
+    {w : N} (v : bv w) : wmsg :=
+  WMsg (pa_z pa) (map (λ j : nat, nth_byte v j) (seq 0 (N.to_nat n))) tid k.
+
+Lemma wwrite_msg_byte tid k pa n {w : N} (v : bv w) (j : nat) :
   (j < N.to_nat n)%nat →
-  msg_byte (wwrite_msg tid pa n v) (acc_addr pa j) = Some (nth_byte v j).
+  msg_byte (wwrite_msg tid k pa n v) (acc_addr pa j) = Some (nth_byte v j).
 Proof.
   intros Hj. rewrite /msg_byte /wwrite_msg /acc_addr /=.
   rewrite bool_decide_eq_true_2; [lia|].
@@ -462,18 +477,18 @@ Proof.
   rewrite Nat2Z.id list_lookup_fmap lookup_seq_lt //.
 Qed.
 
-Lemma wwrite_msg_pa tid pa n {w : N} (v : bv w) :
-  wm_pa (wwrite_msg tid pa n v) = pa_z pa.
+Lemma wwrite_msg_pa tid k pa n {w : N} (v : bv w) :
+  wm_pa (wwrite_msg tid k pa n v) = pa_z pa.
 Proof. reflexivity. Qed.
 
-Lemma wwrite_msg_length tid pa n {w : N} (v : bv w) :
-  length (wm_data (wwrite_msg tid pa n v)) = N.to_nat n.
+Lemma wwrite_msg_length tid k pa n {w : N} (v : bv w) :
+  length (wm_data (wwrite_msg tid k pa n v)) = N.to_nat n.
 Proof. rewrite /wwrite_msg /= length_map length_seq //. Qed.
 
 Definition wwrite_post (tid : option nat) (s : wmstate) (ak : akinfo)
     (pa : Arch.pa) (n : N) (v : bv (8 * n)) : wmstate :=
   WMState s.(wm_regs) s.(wm_img)
-          (s.(wm_log) ++ [wwrite_msg tid pa n v])
+          (s.(wm_log) ++ [wwrite_msg tid (wm_class_of ak s.(wm_ws)) pa n v])
           (store_post_run s.(wm_ws) (ak_sync ak) (pa_z pa) (N.to_nat n)
                           (S (length s.(wm_log))))
           s.(wm_dev).
@@ -704,7 +719,8 @@ Lemma wread_post_coh_id s ak pa ts :
 Proof. rewrite /wread_post. by move=> ->. Qed.
 
 Lemma wwrite_post_log tid s ak pa n v :
-  wm_log (wwrite_post tid s ak pa n v) = wm_log s ++ [wwrite_msg tid pa n v].
+  wm_log (wwrite_post tid s ak pa n v)
+  = wm_log s ++ [wwrite_msg tid (wm_class_of ak (wm_ws s)) pa n v].
 Proof. reflexivity. Qed.
 
 Lemma wread_post_ws_le s ak pa ts : ws_le (wm_ws s) (wm_ws (wread_post s ak pa ts)).
@@ -795,8 +811,8 @@ Proof.
         exact (IH _ _ _ _ Hrun).
       * destruct (IH _ _ _ _ Hrun) as (l & Hl).
         lazymatch goal with
-        | Hr0 : wrun _ _ (wwrite_post ?tt0 _ _ ?pa ?nn ?vv) _ _ |- _ =>
-            exists (wwrite_msg tt0 pa nn vv :: l)
+        | Hr0 : wrun _ _ (wwrite_post ?tt0 ?ss ?akk ?pa ?nn ?vv) _ _ |- _ =>
+            exists (wwrite_msg tt0 (wm_class_of akk (wm_ws ss)) pa nn vv :: l)
         end.
         rewrite Hl wwrite_post_log -app_assoc //.
 Qed.

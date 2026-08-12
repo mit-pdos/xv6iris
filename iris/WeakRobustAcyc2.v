@@ -217,12 +217,12 @@ Section acyc2.
     ptraces_wf pstep TS → mile_mu TS mu v u → (mu ≤ length (pt_log TS))%nat.
   Proof.
     intros Hwf [(a & Hts & _)|(r & a & Hra & ->)].
-    - destruct (gev_ts_msg pstep TS v mu Hwf Hts) as (base & data & Hm).
+    - destruct (gev_ts_msg pstep TS v mu Hwf Hts) as (base & data & kc & Hm).
       apply lookup_lt_Some in Hm.
       have Hpos : (0 < mu)%nat by eapply (gev_ts_pos pstep TS).
       lia.
     - destruct Hra as (l & ts & tstar & that & _ & _ & _ & _ & _ & H6 & _ & Hlt).
-      destruct (gev_ts_msg pstep TS u that Hwf H6) as (base & data & Hm).
+      destruct (gev_ts_msg pstep TS u that Hwf H6) as (base & data & kc & Hm).
       apply lookup_lt_Some in Hm.
       have Hpos : (0 < that)%nat by eapply (gev_ts_pos pstep TS).
       lia.
@@ -322,9 +322,9 @@ Section acyc2.
       destruct (gev_ts_ev TS x tx T HTx Htx) as (evx & Hevx & Htsx).
       (* the entry edge's source is FOREIGN, so the read is not
          forwarded *)
-      destruct (gev_ts_msg pstep TS v mu Hwf Hts1) as (base & data & Hm).
+      destruct (gev_ts_msg pstep TS v mu Hwf Hts1) as (base & data & kc & Hm).
       have Hunf : read_unforwarded (pt_log TS) u.1 (ae_lb ev) mu.
-      { right. exists (WMsg base data (Some v.1)), v.1.
+      { right. exists (WMsg base data (Some v.1) kc), v.1.
         split_and!; [exact Hm|done|exact Hne]. }
       eapply (atrace_S1_le pstep (pt_img TS) (pt_log TS) u.1 T u.2 x.2
                 ev evx a mu tx).

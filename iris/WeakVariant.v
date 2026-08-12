@@ -287,16 +287,16 @@ Proof.
 Qed.
 
 (** An appended whole-window write whose value is a variant. *)
-Lemma wmsg_variant_write (tid : option nat) (pa : Arch.pa)
+Lemma wmsg_variant_write (tid : option nat) k (pa : Arch.pa)
     (v : bv (8 * 8)%N) (a8 : Z) (w0 : mword 64) :
   pa_z pa = a8 ->
   (exists a d : mword 1, (v : mword 64) = pte_set_ad w0 a d) ->
-  wmsg_variant a8 w0 (wwrite_msg tid pa 8 v).
+  wmsg_variant a8 w0 (wwrite_msg tid k pa 8 v).
 Proof.
   intros Hpa (a & d & Hv). exists a, d. intros j Hj b Hb.
-  assert (Hab : msg_byte (wwrite_msg tid pa 8 v) (a8 + Z.of_nat j)
+  assert (Hab : msg_byte (wwrite_msg tid k pa 8 v) (a8 + Z.of_nat j)
                 = Some (nth_byte v j)).
-  { rewrite -Hpa. apply (wwrite_msg_byte tid pa 8 v j). exact Hj. }
+  { rewrite -Hpa. apply (wwrite_msg_byte tid k pa 8 v j). exact Hj. }
   rewrite Hab in Hb. injection Hb as <-.
   exact (f_equal (fun x : mword 64 => nth_byte x j) Hv).
 Qed.
@@ -318,7 +318,7 @@ Qed.
     writes [update_PTE_Bits fresh], and [fresh] — the CAS's exclusive read,
     i.e. the log-latest window word under the invariant — is itself a
     variant.  The closure survives the append. *)
-Lemma wlog_variants_writeback (tid : option nat) (pa : Arch.pa)
+Lemma wlog_variants_writeback (tid : option nat) k (pa : Arch.pa)
     (acc : MemoryAccessType mem_payload) (log : list wmsg) (a8 : Z)
     (w0 fresh w' : mword 64) (v : bv (8 * 8)%N) :
   pa_z pa = a8 ->
@@ -326,12 +326,12 @@ Lemma wlog_variants_writeback (tid : option nat) (pa : Arch.pa)
   update_PTE_Bits (fresh : mword 64) acc = Some w' ->
   (v : mword 64) = w' ->
   wlog_variants log a8 w0 ->
-  wlog_variants (log ++ [wwrite_msg tid pa 8 v]) a8 w0.
+  wlog_variants (log ++ [wwrite_msg tid k pa 8 v]) a8 w0.
 Proof.
   intros Hpa Hf Hup Hv Hlog.
   apply wlog_variants_app; [exact Hlog|].
   intros m Hm. apply elem_of_list_singleton in Hm as ->.
-  apply (wmsg_variant_write tid pa v a8 w0 Hpa).
+  apply (wmsg_variant_write tid k pa v a8 w0 Hpa).
   destruct (update_PTE_Bits_variant w0 fresh w' acc Hf Hup) as (a & d & Hw').
   exists a, d. rewrite Hv. exact Hw'.
 Qed.
@@ -801,22 +801,22 @@ Qed.
     closure).  [fresh] is the CAS's exclusive read = the latest window
     word; the appended value is [update_PTE_Bits fresh]. *)
 Lemma wbyte_fresh_derived_writeback (img : image) (log : list wmsg)
-    (tid : option nat) (pa : Arch.pa) (acc : MemoryAccessType mem_payload)
+    (tid : option nat) k (pa : Arch.pa) (acc : MemoryAccessType mem_payload)
     (fresh w' : mword 64) (v : bv (8 * 8)%N) :
   log_byte img log (latest_ts log (pa_z pa)) (pa_z pa)
     = Some (nth_byte fresh 0) ->
   update_PTE_Bits (fresh : mword 64) acc = Some w' ->
   (v : mword 64) = w' ->
   wbyte_fresh_derived img log (pa_z pa) ->
-  wbyte_fresh_derived img (log ++ [wwrite_msg tid pa 8 v]) (pa_z pa).
+  wbyte_fresh_derived img (log ++ [wwrite_msg tid k pa 8 v]) (pa_z pa).
 Proof.
   intros Hlat Hup Hv Hfd.
   apply (wbyte_fresh_derived_app img log _ _ Hfd).
   intros b Hb.
-  assert (Hb0 : msg_byte (wwrite_msg tid pa 8 v) (pa_z pa)
+  assert (Hb0 : msg_byte (wwrite_msg tid k pa 8 v) (pa_z pa)
                 = Some (nth_byte v 0)).
   { rewrite -(acc_addr_0 pa).
-    apply (wwrite_msg_byte tid pa 8 v 0%nat). lia. }
+    apply (wwrite_msg_byte tid k pa 8 v 0%nat). lia. }
   rewrite Hb0 in Hb. injection Hb as <-.
   exists (nth_byte fresh 0). split; [exact Hlat|].
   assert (Hle : ad_bits_le (nth_byte fresh 0) (nth_byte w' 0))

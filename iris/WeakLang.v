@@ -343,7 +343,7 @@ Qed.
     rather than per-run because the write set is a map, not a contiguous
     range; the order is irrelevant since the bytes are pairwise distinct. *)
 Definition wmsgs_of_map (w : gmap Arch.pa (bv 8)) : list wmsg :=
-  (fun ab : Arch.pa * bv 8 => WMsg (pa_z ab.1) [ab.2] None) <$> map_to_list w.
+  (fun ab : Arch.pa * bv 8 => WMsg (pa_z ab.1) [ab.2] None WCplain) <$> map_to_list w.
 
 Lemma wmsgs_of_map_empty : wmsgs_of_map ∅ = [].
 Proof. rewrite /wmsgs_of_map map_to_list_empty //. Qed.
@@ -358,9 +358,9 @@ Qed.
 (** ... and the harts' own messages fit too, as soon as the access does not
     wrap the address space (the [WeakInterp.pa_z_add] side condition, which
     [RiscvPtsto.addr_is_ram] gives every RAM access). *)
-Lemma wwrite_msg_wf tid pa n {w : N} (v : bv w) :
+Lemma wwrite_msg_wf tid k pa n {w : N} (v : bv w) :
   pa_z pa + Z.of_nat (N.to_nat n) <= 18446744073709551616 ->
-  wmsg_wf (wwrite_msg tid pa n v).
+  wmsg_wf (wwrite_msg tid k pa n v).
 Proof.
   intros Hfit. rewrite /wmsg_wf wwrite_msg_pa wwrite_msg_length.
   pose proof (pa_z_range pa). lia.

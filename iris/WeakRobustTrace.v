@@ -261,35 +261,10 @@ Section trace.
   (* ---------------------------------------------------------------- *)
   (** ** THE EXTRACTION: an [rtc] of one agent's steps IS a trace *)
 
-  (** Inversion for [wp_astep] in the shape the trace wants (the record
-      the step builds, not just "some [ag']" as in [wp_astep_shape]). *)
-  Lemma wp_astep_inv i l c c' :
-    wp_astep pstep i l c c' →
-    ∃ ag st' f D,
-      pc_ags c !! i = Some ag ∧
-      pstep (pa_st ag) l st' ∧
-      astep_ok (pc_img c) (pc_log c) i ag l f D ∧
-      c' = WPCfg (pc_img c) (pc_log c)
-             (<[i := WPAgent st' (f (pa_ws ag)) (prom_del D (pa_prom ag))]>
-                (pc_ags c)).
-  Proof. destruct 1. by eexists _, _, _, _. Qed.
-
-  (** The frozen-log / framing facts of a whole phase (the [rtc] form of
-      [WeakPromiseFact]'s [wp_astep_shape]). *)
-  Lemma astep_of_rtc_frozen i c c' :
-    rtc (wp_astep_of pstep i) c c' →
-    pc_log c' = pc_log c ∧ pc_img c' = pc_img c ∧
-    length (pc_ags c') = length (pc_ags c) ∧
-    (∀ j, j ≠ i → pc_ags c' !! j = pc_ags c !! j).
-  Proof.
-    induction 1 as [|x y z (l & Hs) _ IH]; [done|].
-    destruct (wp_astep_shape pstep i l x y Hs) as (ag & ag' & _ & Hi & Hl & Ha).
-    destruct IH as (H1 & H2 & H3 & H4). split_and!.
-    - by rewrite H1 Hl.
-    - by rewrite H2 Hi.
-    - by rewrite H3 Ha length_insert.
-    - intros j Hj. by rewrite H4 // Ha list_lookup_insert_ne //.
-  Qed.
+  (** [wp_astep_inv] (the record-building inversion) and
+      [astep_of_rtc_frozen] (the [rtc]-level frame + frozen-log facts) moved
+      to [WeakPromiseFact.v] with the W4 lift batch; they are used verbatim
+      below. *)
 
   (** THE EXTRACTION.  Agent [i]'s phase, as a trace against the frozen
       [(img, log)], with its first record [i]'s entry in [c] and its last
@@ -314,7 +289,7 @@ Section trace.
       have Hwf : atrace_wf (pc_img c) (pc_log c) i (ATr [ag] [])
         by apply asteps_wf_single.
       split_and!; [done|done|done|done|done|done|done|done|done].
-    - destruct (wp_astep_inv i l c y Hs)
+    - destruct (wp_astep_inv pstep i l c y Hs)
         as (ag0 & st' & f & D & Hlk0 & Hps & Hok & Hy).
       assert (ag0 = ag) as -> by congruence.
       have Hlt : (i < length (pc_ags c))%nat by eapply lookup_lt_Some.
@@ -396,7 +371,7 @@ Section trace.
     revert c c'. induction js as [|j js IH]; intros c c' Hph; simpl in Hph.
     - by subst c'.
     - destruct Hph as (mid & Hrun & Hph).
-      destruct (astep_of_rtc_frozen j c mid Hrun) as (H1 & H2 & H3 & _).
+      destruct (astep_of_rtc_frozen pstep j c mid Hrun) as (H1 & H2 & H3 & _).
       destruct (IH mid c' Hph) as (H1' & H2' & H3').
       split_and!; [by rewrite H1' H1|by rewrite H2' H2|by rewrite H3' H3].
   Qed.
@@ -409,7 +384,7 @@ Section trace.
     - by subst c'.
     - apply not_elem_of_cons in Hni as [Hne Hni].
       destruct Hph as (mid & Hrun & Hph).
-      destruct (astep_of_rtc_frozen j c mid Hrun) as (_ & _ & _ & Hfr).
+      destruct (astep_of_rtc_frozen pstep j c mid Hrun) as (_ & _ & _ & Hfr).
       rewrite (IH mid c' Hph Hni). by apply Hfr.
   Qed.
 
@@ -435,7 +410,7 @@ Section trace.
           as (T & ag' & Hwf & H0 & Hl & _ & Hmid & _).
         exists T, ag'. split_and!; [done|done|done|].
         by rewrite (wp_phases_frame js mid c' i Hph Hnj).
-      + destruct (astep_of_rtc_frozen j c mid Hrun)
+      + destruct (astep_of_rtc_frozen pstep j c mid Hrun)
           as (Hlog & Himg & _ & Hfr).
         have Hmid : pc_ags mid !! i = Some ag by rewrite Hfr //; congruence.
         destruct (IH mid c' ag Hnd Hph Hmid) as (T & ag' & Hwf & H0 & Hl & Hc').
@@ -537,7 +512,7 @@ Section trace.
   Proof.
     intros Hpc Hstep.
     destruct (wp_promise_step_inv c c' Hstep)
-      as (j & agj & base & data & Hlkj & _ & ->).
+      as (j & agj & base & data & kc & Hlkj & _ & ->).
     have Hjlt : (j < length (pc_ags c))%nat by eapply lookup_lt_Some.
     intros p m i Hp Hm. simpl in Hp |- *.
     destruct (decide (p < length (pc_log c))%nat) as [Hlt|Hge].

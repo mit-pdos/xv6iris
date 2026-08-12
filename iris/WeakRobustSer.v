@@ -129,14 +129,14 @@ Section astep.
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
-    - intros (ts' & _ & Hlog & _ & -> & Heq) Hm Hb.
+    - intros (ts' & kc & _ & Hlog & _ & -> & Heq) Hm Hb.
       injection Heq as Heq. subst ts'.
       rewrite Hlog in Hm. simplify_eq.
       destruct (msg_byte_in_range _ _ Hb) as (j & Hj & Ha).
       simpl in Hj, Ha. subst a.
       have Hacc : base + Z.of_nat j = acc_addr base j by rewrite /acc_addr.
       rewrite Hacc. by apply store_post_run_coh.
-    - intros (ts' & _ & _ & Hlog & _ & _ & _ & -> & Heq) Hm Hb.
+    - intros (ts' & kc & _ & _ & Hlog & _ & _ & _ & -> & Heq) Hm Hb.
       injection Heq as Heq. subst ts'.
       rewrite Hlog in Hm. simplify_eq.
       destruct (msg_byte_in_range _ _ Hb) as (j & Hj & Ha).
@@ -159,7 +159,7 @@ Section astep.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
     - intros _ Hin%elem_of_nil. done.
-    - intros (tsf & Hlen & _ & _ & _ & _ & (Hcoh & _) & _ & Heq)
+    - intros (tsf & kc & Hlen & _ & _ & _ & _ & (Hcoh & _) & _ & Heq)
              [j [v [Hj ->]]]%elem_of_tvs_reads.
       injection Heq as Heq. subst tsf.
       have Hts : (tvs.*1) !! j = Some tr by rewrite list_lookup_fmap Hj.
@@ -183,7 +183,7 @@ Section astep.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
     - intros _ Hin%elem_of_nil. done.
-    - intros (tsf & _ & _ & _ & _ & Hexcl & _ & _ & Heq)
+    - intros (tsf & kc & _ & _ & _ & _ & Hexcl & _ & _ & Heq)
              [j [v [Hj ->]]]%elem_of_tvs_reads.
       injection Heq as Heq. subst tsf.
       exact (Hexcl j tr v Hj).
@@ -301,8 +301,8 @@ Section ser.
          wm_tid m = Some e.1.
   Proof.
     intros Hwf Hw. have Hw' := Hw. destruct Hw' as (Hts & m & Hm & Hb).
-    destruct (gev_ts_msg pstep TS e t Hwf Hts) as (base & data & Hm').
-    rewrite Hm' in Hm. simplify_eq. by exists (WMsg base data (Some e.1)).
+    destruct (gev_ts_msg pstep TS e t Hwf Hts) as (base & data & kc & Hm').
+    rewrite Hm' in Hm. simplify_eq. by exists (WMsg base data (Some e.1) kc).
   Qed.
 
   (** Two events fulfilling the same timestamp are the same event — rf

@@ -417,34 +417,34 @@ Qed.
     value with bits only ORed ([WeakVariant.wbyte_fresh_derived_writeback]
     clipped: the new index is above the install by construction). *)
 Lemma wfresh_from_writeback (T0 : nat) (img : image) (log : list wmsg)
-    (tid : option nat) (pa : Arch.pa) (acc : MemoryAccessType mem_payload)
+    (tid : option nat) k (pa : Arch.pa) (acc : MemoryAccessType mem_payload)
     (fresh w' : mword 64) (v : bv (8 * 8)%N) :
   log_byte img log (latest_ts log (pa_z pa)) (pa_z pa)
     = Some (nth_byte fresh 0) ->
   update_PTE_Bits (fresh : mword 64) acc = Some w' ->
   (v : mword 64) = w' ->
   wfresh_from T0 img log (pa_z pa) ->
-  wfresh_from T0 img (log ++ [wwrite_msg tid pa 8 v]) (pa_z pa).
+  wfresh_from T0 img (log ++ [wwrite_msg tid k pa 8 v]) (pa_z pa).
 Proof.
   intros Hlat Hup Hv Hf i m b Hi HT0 Hb.
   destruct (decide (i < length log)%nat) as [Hlt|Hge].
   - rewrite (lookup_app_l _ _ _ Hlt) in Hi.
     destruct (Hf i m b Hi HT0 Hb) as (bf & Hbf & Hle).
     exists bf. split; [|exact Hle].
-    rewrite (take_app_le log [wwrite_msg tid pa 8 v] i ltac:(lia)). exact Hbf.
+    rewrite (take_app_le log [wwrite_msg tid k pa 8 v] i ltac:(lia)). exact Hbf.
   - assert (Hieq : i = length log).
     { apply lookup_lt_Some in Hi. rewrite length_app /= in Hi. lia. }
     subst i.
-    rewrite (lookup_app_r log [wwrite_msg tid pa 8 v] (length log)
+    rewrite (lookup_app_r log [wwrite_msg tid k pa 8 v] (length log)
                (Nat.le_refl _)) Nat.sub_diag /= in Hi.
     injection Hi as <-.
-    assert (Hb0 : msg_byte (wwrite_msg tid pa 8 v) (pa_z pa)
+    assert (Hb0 : msg_byte (wwrite_msg tid k pa 8 v) (pa_z pa)
                   = Some (nth_byte v 0)).
     { rewrite -(acc_addr_0 pa).
-      apply (wwrite_msg_byte tid pa 8 v 0%nat). lia. }
+      apply (wwrite_msg_byte tid k pa 8 v 0%nat). lia. }
     rewrite Hb0 in Hb. injection Hb as <-.
     exists (nth_byte fresh 0). split.
-    + rewrite (take_app_le log [wwrite_msg tid pa 8 v] (length log)
+    + rewrite (take_app_le log [wwrite_msg tid k pa 8 v] (length log)
                  (Nat.le_refl _)).
       rewrite (take_ge log (length log) (Nat.le_refl _)). exact Hlat.
     + assert (Hle : ad_bits_le (nth_byte fresh 0) (nth_byte w' 0))
@@ -1248,7 +1248,7 @@ Section WeakKptAbsorb.
            es = [WEread (AkInfo false true false) la 8])⌝ ∗
          wlog_auth (wm_log σ) ∗ wlat_interp (wm_img σ) (wm_log σ))
         ∨
-        (∃ lw' : mword 64,
+        (∃ (lw' : mword 64) (kcls : wm_class),
            ⌜update_PTE_Bits (lw : mword 64) acc = Some lw'⌝ ∗
            ⌜mem sg' = write_bytes (wflat (wm_img σ) (wm_log σ)) (la : Arch.pa) 8 lw'⌝ ∗
            ⌜es = [WEread wak_plain a2 8; WEread wak_plain a1 8;
@@ -1257,9 +1257,9 @@ Section WeakKptAbsorb.
                   WEwrite (AkInfo false true false) la 8 (lw' : mword 64)] \/
             es = [WEread (AkInfo false true false) la 8;
                   WEwrite (AkInfo false true false) la 8 (lw' : mword 64)]⌝ ∗
-           wlog_auth (wm_log σ ++ [wwrite_msg tid (la : Arch.pa) 8 (lw' : mword 64)]) ∗
+           wlog_auth (wm_log σ ++ [wwrite_msg tid kcls (la : Arch.pa) 8 (lw' : mword 64)]) ∗
            wlat_interp (wm_img σ)
-             (wm_log σ ++ [wwrite_msg tid (la : Arch.pa) 8 (lw' : mword 64)]))).
+             (wm_log σ ++ [wwrite_msg tid kcls (la : Arch.pa) 8 (lw' : mword 64)]))).
   Proof.
     intros HE Hchk Hval Hcanon Hid4k Hwlog Hmisa Hmenv Hhtif Hcp HSXL Heff Hss
            Hall Hrcpt.
@@ -1494,12 +1494,13 @@ Section WeakKptAbsorb.
         exact (tlb_ok_pt_set_leaf (mword_of_int 0) t tlbvec vpn p2 p1 lw a1 d1
                  Hmaps Hv' Hl' Hn' Hp' Htlbok). }
       (* ghost: append the message, retarget the leaf element *)
-      iMod (wlog_update (wm_log σ) [wwrite_msg tid (la : Arch.pa) 8 (lw' : mword 64)]
+      iMod (wlog_update (wm_log σ) [wwrite_msg tid WCexcl (la : Arch.pa) 8 (lw' : mword 64)]
               with "Hla") as "Hla".
       iDestruct (wlog_snapshot with "Hla") as "[Hla #Hlb'']".
       iEval (rewrite /wlat8) in "Hel0".
       iDestruct "Hel0" as "(E0 & E1 & E2 & E3 & E4 & E5 & E6 & E7)".
-      iMod (wlat8_store_prim tid σ (la : Arch.pa) (lw' : mword 64) ts ts ts ts ts ts ts ts
+      iMod (wlat8_store_prim tid WCexcl σ (la : Arch.pa) (lw' : mword 64)
+              ts ts ts ts ts ts ts ts
               with "Hi E0 E1 E2 E3 E4 E5 E6 E7") as "[Hi Hel0']".
       (* the new leaf bundle's clipped facts *)
       assert (Hlatbyte : forall img : image,
@@ -1513,21 +1514,21 @@ Section WeakKptAbsorb.
         pose proof (proj1 Hlv0) as Hlb.
         rewrite acc_addr_0 in Hlb. exact Hlb. }
       assert (Hvars' : wlog_variants_from T0
-                (wm_log σ ++ [wwrite_msg tid (la : Arch.pa) 8 (lw' : mword 64)])
+                (wm_log σ ++ [wwrite_msg tid WCexcl (la : Arch.pa) 8 (lw' : mword 64)])
                 (pa_z la) w0).
       { apply (wlog_variants_from_snoc T0 (wm_log σ) (pa_z la) w0 _ Hvars).
-        apply (wmsg_variant_write tid (la : Arch.pa) (lw' : mword 64) (pa_z la) w0
+        apply (wmsg_variant_write tid WCexcl (la : Arch.pa) (lw' : mword 64) (pa_z la) w0
                  eq_refl).
         exists a1, d1. exact Habs. }
       assert (Hfresh' : forall img : image,
                 wfresh_from T0 img
-                  (wm_log σ ++ [wwrite_msg tid (la : Arch.pa) 8 (lw' : mword 64)])
+                  (wm_log σ ++ [wwrite_msg tid WCexcl (la : Arch.pa) 8 (lw' : mword 64)])
                   (pa_z la)).
       { intros img.
-        exact (wfresh_from_writeback T0 img (wm_log σ) tid (la : Arch.pa) acc
+        exact (wfresh_from_writeback T0 img (wm_log σ) tid WCexcl (la : Arch.pa) acc
                  lw lw' (lw' : mword 64) (Hlatbyte img) Hupd eq_refl (Hfresh img)). }
       assert (Hinst' : wwin_install
-                (wm_log σ ++ [wwrite_msg tid (la : Arch.pa) 8 (lw' : mword 64)])
+                (wm_log σ ++ [wwrite_msg tid WCexcl (la : Arch.pa) 8 (lw' : mword 64)])
                 T0 la).
       { refine (wwin_install_prefix (wm_log σ) _ T0 la Hinst _).
         by eexists. }
@@ -1564,7 +1565,7 @@ Section WeakKptAbsorb.
             iSplitR; [iPureIntro; exact Hwv1|].
             iExact "Hel1". }
           iExists (S (length (wm_log σ))), T0,
-            ((wm_log σ ++ [wwrite_msg tid (la : Arch.pa) 8 (lw' : mword 64)])%list).
+            ((wm_log σ ++ [wwrite_msg tid WCexcl (la : Arch.pa) 8 (lw' : mword 64)])%list).
           iSplitR; [iPureIntro; exact Hg0|].
           iSplitR.
           { iPureIntro. split_and!; [lia|lia|lia|].
@@ -1597,7 +1598,7 @@ Section WeakKptAbsorb.
                   Hmode Hasid Hppn Htlbok' with "Hsatp Htlb Hlb' [Hpc Hpa] Hkinv").
         iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00
                   HA Hord HX HW HR Hcov with "Hpc Hpa"). }
-      iRight. iExists (lw' : mword 64).
+      iRight. iExists (lw' : mword 64), _.
       iSplitR; [iPureIntro; exact Hupd|].
       iSplitR; [iPureIntro; rewrite mem_set_reg /=; reflexivity|].
       iSplitR; [iPureIntro; exact Hes|].

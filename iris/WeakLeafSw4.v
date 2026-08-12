@@ -460,18 +460,18 @@ Section leaf.
     assert (Hdevt : mdev t = wm_dev σ) by (rewrite Hdevt0; reflexivity).
     destruct Hpost as (Hregs & Hdevs & Hmems & Himgs & Hlogs & Hwsle & Hwf'
                        & Hbnd').
-    destruct HQ as (HQi & HQl & HQle & HQv).
+    destruct HQ as (HQi & [kc HQl] & HQle & HQv).
     (* the release deposit: freeze R at the store's own timestamp *)
     iDestruct (wwp_release_deposit R σ Hbnd with "HR") as "HRdep".
     (* THE WINDOW UPDATE: retarget the four elements at the message [wQ_store]
        names (failure mode 3 of the porting guide, discharged) *)
     iDestruct (wpt4_at_elems with "Hpt") as "(%Halea2 & %Haccea & Hels)".
     iDestruct "Hels" as (t0 t1 t2 t3) "(H0 & H1 & H2 & H3)".
-    iMod (wlat4_store_prim (Some (fin_to_nat cpu_id)) σ ea vw
+    iMod (wlat4_store_prim (Some (fin_to_nat cpu_id)) kc σ ea vw
             with "Hlat H0 H1 H2 H3") as "[Hlat Hl4]".
     (* the log authority grows by the SAME message *)
     iMod (wlog_update (wm_log σ)
-            [wwrite_msg (Some (fin_to_nat cpu_id)) ea 4 vw]
+            [wwrite_msg (Some (fin_to_nat cpu_id)) kc ea 4 vw]
             with "Hlogauth") as "Hlogauth".
     (* the hart's own view cell moves to σ' *)
     iMod (hart_ws_update cpu_id (wm_ws σ) (wm_ws σ) (wm_ws σ')

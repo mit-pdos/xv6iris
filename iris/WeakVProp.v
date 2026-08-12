@@ -607,14 +607,14 @@ Section demo.
       ONE-BYTE store writes exactly the byte it should, which is what
       discharges the store rule's two [msg_byte] side conditions at the real
       interpreter. *)
-  Lemma wwrite_msg_byte1 tid (pa : Arch.pa) (v : bv (8 * 1)) :
-    msg_byte (wwrite_msg tid pa 1 v) (pa_z pa) = Some (nth_byte v 0).
+  Lemma wwrite_msg_byte1 tid k (pa : Arch.pa) (v : bv (8 * 1)) :
+    msg_byte (wwrite_msg tid k pa 1 v) (pa_z pa) = Some (nth_byte v 0).
   Proof.
-    rewrite -(acc_addr_0 pa). apply (wwrite_msg_byte tid pa 1 v 0). simpl. lia.
+    rewrite -(acc_addr_0 pa). apply (wwrite_msg_byte tid k pa 1 v 0). simpl. lia.
   Qed.
 
-  Lemma wwrite_msg_byte1_none tid (pa : Arch.pa) (v : bv (8 * 1)) a :
-    a ≠ pa_z pa → msg_byte (wwrite_msg tid pa 1 v) a = None.
+  Lemma wwrite_msg_byte1_none tid k (pa : Arch.pa) (v : bv (8 * 1)) a :
+    a ≠ pa_z pa → msg_byte (wwrite_msg tid k pa 1 v) a = None.
   Proof.
     intros Hne. rewrite /msg_byte /wwrite_msg /=.
     case_bool_decide as Hle; [|reflexivity].

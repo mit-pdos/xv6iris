@@ -42,53 +42,11 @@ Local Open Scope Z_scope.
 (* ------------------------------------------------------------------ *)
 (** ** Side conditions survive an end-extension of the log
 
-    The three lemmas below are the entire semantic content of the swap:
-    a message appended ABOVE everything the stepping agent can see
-    changes none of its admissibility checks.  [lat] reads are the
-    exception and are excluded by hypothesis ([read_ok] is transported
-    at [lat = false] only). *)
-
-(** The [writes_in_by] analog of [WeakMem.writes_in_app_inv]. *)
-Lemma writes_in_by_app_inv log l Q a lo hi :
-  (hi ≤ length log)%nat →
-  writes_in_by (log ++ l) Q a lo hi → writes_in_by log Q a lo hi.
-Proof.
-  intros Hle (t & Hlo & Hhi & m & Hm & Hb & HQ).
-  rewrite lookup_app_l in Hm; [lia|].
-  exists t. split_and!; [done|done|]. exists m. done.
-Qed.
-
-(** A PLAIN (non-latest) read is stable under appending: the value it
-    reads is at an old timestamp ([log_byte_app]) and its coherence
-    window is bounded by the reader's views, which [ws_bounded] pins at
-    or below the old log length — strictly below the new message. *)
-Lemma read_ok_app img log l ws aq base tvs :
-  ws_bounded ws (length log) →
-  read_ok img log ws aq false base tvs →
-  read_ok img (log ++ l) ws aq false base tvs.
-Proof.
-  intros Hb Hr j t v Htv.
-  destruct (Hr j t v Htv) as (Hlb & [Hs Hn] & _).
-  have Ht : (t ≤ length log)%nat by eapply log_byte_bounded; eexists.
-  split_and!.
-  - rewrite log_byte_app //.
-  - split; [rewrite log_byte_app //|].
-    intros Hw. apply Hn. eapply writes_in_app_inv; [|done].
-    pose proof (load_vpre_bounded ws aq _ Hb) as Hv.
-    destruct Hb as (_&_&_&_&_&Hcoh&_).
-    pose proof (Hcoh (base + Z.of_nat j)). lia.
-  - done.
-Qed.
-
-(** The exclusivity window [(t, ts-1]] of an rmw ends at [ts - 1], and
-    [ts] is a promised timestamp, hence at most the old log length. *)
-Lemma excl_ok_app log l i base tvs ts :
-  (ts - 1 ≤ length log)%nat →
-  excl_ok log i base tvs ts → excl_ok (log ++ l) i base tvs ts.
-Proof.
-  intros Hle He j t v Htv Hw. eapply He; [done|].
-  by eapply writes_in_by_app_inv.
-Qed.
+    [writes_in_by_app_inv], [read_ok_app] and [excl_ok_app] — the entire
+    semantic content of the swap (a message appended ABOVE everything the
+    stepping agent can see changes none of its admissibility checks) — moved
+    to [WeakPromise.v] with the W4 lift batch, next to the definitions they
+    are about.  They are used verbatim below. *)
 
 (* ------------------------------------------------------------------ *)
 (** ** Lat-freedom
@@ -125,11 +83,11 @@ Section fact.
 
   (** [WPPromise] alone. *)
   Inductive wp_promise_step : wpcfg P → wpcfg P → Prop :=
-  | WPPromStep cfg i ag base data :
+  | WPPromStep cfg i ag base data k :
       pc_ags cfg !! i = Some ag →
       data ≠ [] →
       wp_promise_step cfg
-        (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i)])
+        (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k])
                (<[i := prom_add (S (length (pc_log cfg))) ag]> (pc_ags cfg))).
 
   (** A state step deletes at most one timestamp from its own promise
@@ -152,14 +110,14 @@ Section fact.
         read_ok img log (pa_ws ag) aq lat base tvs ∧
         f = (λ w, load_post_run w aq base (tvs.*1)) ∧ D = None
     | LStore rl base data =>
-        ∃ ts, ts ∈ pa_prom ag ∧
-          log !! (ts - 1)%nat = Some (WMsg base data (Some i)) ∧
+        ∃ ts k, ts ∈ pa_prom ag ∧
+          log !! (ts - 1)%nat = Some (WMsg base data (Some i) k) ∧
           fulfil_ok (pa_ws ag) rl base (length data) ts ∧
           f = (λ w, store_post_run w rl base (length data) ts) ∧
           D = Some ts
     | LRmw aq rl base tvs data =>
-        ∃ ts, length tvs = length data ∧ ts ∈ pa_prom ag ∧
-          log !! (ts - 1)%nat = Some (WMsg base data (Some i)) ∧
+        ∃ ts k, length tvs = length data ∧ ts ∈ pa_prom ag ∧
+          log !! (ts - 1)%nat = Some (WMsg base data (Some i) k) ∧
           read_ok img log (pa_ws ag) aq false base tvs ∧
           excl_ok log i base tvs ts ∧
           fulfil_ok (load_post_run (pa_ws ag) aq base (tvs.*1)) rl base
@@ -206,8 +164,8 @@ Section fact.
       simpl in Hok.
     - destruct Hok as [-> ->]. by apply WPSilent.
     - destruct Hok as (Hr & -> & ->). by eapply WPLoad.
-    - destruct Hok as (ts & ? & ? & ? & -> & ->). by eapply WPFulfil.
-    - destruct Hok as (ts & ? & ? & ? & ? & ? & ? & -> & ->). by eapply WPRmw.
+    - destruct Hok as (ts & k & ? & ? & ? & -> & ->). by eapply WPFulfil.
+    - destruct Hok as (ts & k & ? & ? & ? & ? & ? & ? & -> & ->). by eapply WPRmw.
     - destruct Hok as [-> ->]. by apply WPFence.
   Qed.
 
@@ -241,12 +199,12 @@ Section fact.
     - right. exists i, (LStore rl base data).
       apply (WPAStep i _ cfg ag st'
                (λ w, store_post_run w rl base (length data) ts) (Some ts));
-        [done|done|]. by exists ts.
+        [done|done|]. by exists ts, k.
     - right. exists i, (LRmw aq rl base tvs data).
       apply (WPAStep i _ cfg ag st'
                (λ w, store_post_run (load_post_run w aq base (tvs.*1))
                        rl base (length data) ts) (Some ts));
-        [done|done|]. exists ts. done.
+        [done|done|]. exists ts, k. done.
     - right. exists i, (LFence pr pw sr sw).
       by apply (WPAStep i _ cfg ag st' (λ w, fence_post w pr pw sr sw) None).
   Qed.
@@ -307,11 +265,11 @@ Section fact.
       this is the form the swap can [destruct] against). *)
   Lemma wp_promise_step_inv c c' :
     wp_promise_step c c' →
-    ∃ j agj base data,
+    ∃ j agj base data k,
       pc_ags c !! j = Some agj ∧ data ≠ [] ∧
-      c' = WPCfg (pc_img c) (pc_log c ++ [WMsg base data (Some j)])
+      c' = WPCfg (pc_img c) (pc_log c ++ [WMsg base data (Some j) k])
              (<[j := prom_add (S (length (pc_log c))) agj]> (pc_ags c)).
-  Proof. destruct 1. eexists _, _, _, _. done. Qed.
+  Proof. destruct 1. eexists _, _, _, _, _. done. Qed.
 
   (** (L1) SHAPE: a state step freezes the image and the log and rewrites
       exactly its own agent's slot. *)
@@ -326,6 +284,20 @@ Section fact.
   Lemma wp_astep_log i l c c' :
     wp_astep i l c c' → pc_log c' = pc_log c.
   Proof. by intros (?&?&?&?&?&?)%wp_astep_shape. Qed.
+
+  (** Inversion for [wp_astep] in the shape a TRACE wants (the record the
+      step builds, not just "some [ag']" as in [wp_astep_shape]).  Lifted
+      from [WeakRobustTrace] by the W4 batch. *)
+  Lemma wp_astep_inv i l c c' :
+    wp_astep i l c c' →
+    ∃ ag st' f D,
+      pc_ags c !! i = Some ag ∧
+      pstep (pa_st ag) l st' ∧
+      astep_ok (pc_img c) (pc_log c) i ag l f D ∧
+      c' = WPCfg (pc_img c) (pc_log c)
+             (<[i := WPAgent st' (f (pa_ws ag)) (prom_del D (pa_prom ag))]>
+                (pc_ags c)).
+  Proof. destruct 1. by eexists _, _, _, _. Qed.
 
   (** The state phase runs against a FROZEN log — the property that makes
       PARM's [Machine.state_exec] framing available (see [wp_state_project]
@@ -354,12 +326,12 @@ Section fact.
     - done.
     - subst lat. intros (Hr & -> & ->). split_and!; [|done|done].
       by eapply read_ok_app.
-    - intros (ts & Hin & Hlog & Hful & -> & ->).
-      exists ts. split_and!; [done| |done|done|done].
+    - intros (ts & k & Hin & Hlog & Hful & -> & ->).
+      exists ts, k. split_and!; [done| |done|done|done].
       rewrite lookup_app_l; [by eapply lookup_lt_Some|done].
-    - intros (ts & Hlen & Hin & Hlog & Hr & He & Hful & -> & ->).
+    - intros (ts & k & Hlen & Hin & Hlog & Hr & He & Hful & -> & ->).
       pose proof (lookup_lt_Some _ _ _ Hlog) as Hlt.
-      exists ts. split_and!; [done|done| | | |done|done|done].
+      exists ts, k. split_and!; [done|done| | | |done|done|done].
       + rewrite lookup_app_l; [done|done].
       + by eapply read_ok_app.
       + eapply excl_ok_app; [lia|done].
@@ -416,9 +388,9 @@ Section fact.
     intros Hws Hpr.
     destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw];
       simpl; rewrite ?Hws; [done|done| | |done].
-    - intros (ts & ? & ? & ? & ? & ?). exists ts.
+    - intros (ts & k & ? & ? & ? & ? & ?). exists ts, k.
       split_and!; [by eapply elem_of_weaken|done|done|done|done].
-    - intros (ts & ? & ? & ? & ? & ? & ? & ? & ?). exists ts.
+    - intros (ts & k & ? & ? & ? & ? & ? & ? & ? & ?). exists ts, k.
       split_and!; [done|by eapply elem_of_weaken|done|done|done|done|done|done].
   Qed.
 
@@ -429,8 +401,8 @@ Section fact.
       simpl.
     - by intros [_ ->].
     - by intros (_ & _ & ->).
-    - intros (ts' & ? & _ & _ & _ & ->). by intros [= <-].
-    - intros (ts' & _ & ? & _ & _ & _ & _ & _ & ->). by intros [= <-].
+    - intros (ts' & k & ? & _ & _ & _ & ->). by intros [= <-].
+    - intros (ts' & k & _ & ? & _ & _ & _ & _ & _ & ->). by intros [= <-].
     - by intros [_ ->].
   Qed.
 
@@ -488,13 +460,14 @@ Section fact.
   Proof.
     intros Hwf Hlf Hs Hp.
     destruct (wp_astep_shape _ _ _ _ Hs) as (ag & agn & Hlk & Himg & Hlog & Hags).
-    destruct (wp_promise_step_inv _ _ Hp) as (j & agj & pb & pd & Hlkj & Hnn & ->).
+    destruct (wp_promise_step_inv _ _ Hp)
+      as (j & agj & pb & pd & pk & Hlkj & Hnn & ->).
     destruct (Hwf i ag Hlk) as [Hb Hpw].
     have Hlt : (i < length (pc_ags c1))%nat by eapply lookup_lt_Some.
     have HT : S (length (pc_log c1)) ∉ pa_prom ag.
     { intros Hin. destruct (Hpw _ Hin) as (_ & Hle & _). lia. }
     (* the state step, replayed against the extended log *)
-    pose proof (wp_astep_app _ _ _ _ (WMsg pb pd (Some j)) Hwf Hlf Hs) as Hs2.
+    pose proof (wp_astep_app _ _ _ _ (WMsg pb pd (Some j) pk) Hwf Hlf Hs) as Hs2.
     rewrite Himg Hlog Hags. simpl.
     destruct (decide (i = j)) as [Heq|Hne].
     - (* SAME agent: the promise is fresh, so (∪ then ∖) = (∖ then ∪) *)
@@ -502,28 +475,28 @@ Section fact.
       rewrite Hags list_lookup_insert in Hlkj; [done|].
       have Hagj : agj = agn by congruence.
       subst agj.
-      exists (WPCfg (pc_img c1) (pc_log c1 ++ [WMsg pb pd (Some i)])
+      exists (WPCfg (pc_img c1) (pc_log c1 ++ [WMsg pb pd (Some i) pk])
                 (<[i := prom_add (S (length (pc_log c1))) ag]> (pc_ags c1))).
       split.
-      { by apply (WPPromStep c1 i ag pb pd). }
+      { by apply (WPPromStep c1 i ag pb pd pk). }
       rewrite list_insert_insert.
-      have Hlk2 : pc_ags (WPCfg (pc_img c1) (pc_log c1 ++ [WMsg pb pd (Some i)])
+      have Hlk2 : pc_ags (WPCfg (pc_img c1) (pc_log c1 ++ [WMsg pb pd (Some i) pk])
                             (pc_ags c2)) !! i = Some agn.
       { simpl. rewrite Hags list_lookup_insert //. }
       pose proof (wp_astep_prom_add i l
-                    (WPCfg (pc_img c1) (pc_log c1 ++ [WMsg pb pd (Some i)])
+                    (WPCfg (pc_img c1) (pc_log c1 ++ [WMsg pb pd (Some i) pk])
                        (pc_ags c1))
-                    (WPCfg (pc_img c1) (pc_log c1 ++ [WMsg pb pd (Some i)])
+                    (WPCfg (pc_img c1) (pc_log c1 ++ [WMsg pb pd (Some i) pk])
                        (pc_ags c2))
                     (S (length (pc_log c1))) ag agn
                     Hlk Hlk2 HT Hs2) as Hs3.
       by simpl in Hs3.
     - (* DISTINCT agents: the two agent-list inserts commute *)
       rewrite Hags list_lookup_insert_ne in Hlkj; [done|].
-      exists (WPCfg (pc_img c1) (pc_log c1 ++ [WMsg pb pd (Some j)])
+      exists (WPCfg (pc_img c1) (pc_log c1 ++ [WMsg pb pd (Some j) pk])
                 (<[j := prom_add (S (length (pc_log c1))) agj]> (pc_ags c1))).
       split.
-      { by apply (WPPromStep c1 j agj pb pd). }
+      { by apply (WPPromStep c1 j agj pb pd pk). }
       pose proof (wp_astep_frame i l _ _ j
                     (prom_add (S (length (pc_log c1))) agj) Hne Hs2) as Hs3.
       rewrite Hags in Hs3. by simpl in Hs3.
@@ -646,6 +619,23 @@ Section fact.
 
   (** One agent's steps, and the steps of a SET of agents. *)
   Definition wp_astep_of (i : agent) c c' : Prop := ∃ l, wp_astep i l c c'.
+
+  (** The frozen-log / framing facts of a whole phase (the [rtc] form of
+      [wp_astep_shape]).  Lifted from [WeakRobustTrace] by the W4 batch. *)
+  Lemma astep_of_rtc_frozen i c c' :
+    rtc (wp_astep_of i) c c' →
+    pc_log c' = pc_log c ∧ pc_img c' = pc_img c ∧
+    length (pc_ags c') = length (pc_ags c) ∧
+    (∀ j, j ≠ i → pc_ags c' !! j = pc_ags c !! j).
+  Proof.
+    induction 1 as [|x y z (l & Hs) _ IH]; [done|].
+    destruct (wp_astep_shape i l x y Hs) as (ag & ag' & _ & Hi & Hl & Ha).
+    destruct IH as (H1 & H2 & H3 & H4). split_and!.
+    - by rewrite H1 Hl.
+    - by rewrite H2 Hi.
+    - by rewrite H3 Ha length_insert.
+    - intros j Hj. by rewrite H4 // Ha list_lookup_insert_ne //.
+  Qed.
   Definition wp_asteps_of (Q : agent → Prop) c c' : Prop :=
     ∃ i l, Q i ∧ wp_astep i l c c'.
   Definition wp_astep_other (i : agent) c c' : Prop :=

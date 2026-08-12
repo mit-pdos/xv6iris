@@ -972,17 +972,17 @@ Section leaves.
     assert (Hdevt : mdev t = wm_dev σ) by (rewrite Hdevt0; reflexivity).
     destruct Hpost as (Hregs & Hdevs & Hmems & Himgs & Hlogs & Hwsle & Hwf'
                        & Hbnd').
-    destruct HQ as (HQi & HQl & HQle & HQv).
+    destruct HQ as (HQi & [kc HQl] & HQle & HQv).
     (* the release deposit: freeze R at the store's own timestamp *)
     iDestruct (wwp_release_deposit R σ Hbnd with "HR") as "HRdep".
     (* THE WINDOW UPDATE: retarget the eight elements at the message *)
     iDestruct (wpt8_at_elems with "Hpt") as "(%Halea2 & %Haccea & Hels)".
     iDestruct "Hels" as (t0 t1 t2 t3 t4 t5 t6 t7)
       "(H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7)".
-    iMod (wlat8_store_prim (Some (fin_to_nat cpu_id)) σ ea rs2v
+    iMod (wlat8_store_prim (Some (fin_to_nat cpu_id)) kc σ ea rs2v
             with "Hlat H0 H1 H2 H3 H4 H5 H6 H7") as "[Hlat Hl8]".
     iMod (wlog_update (wm_log σ)
-            [wwrite_msg (Some (fin_to_nat cpu_id)) ea 8 rs2v]
+            [wwrite_msg (Some (fin_to_nat cpu_id)) kc ea 8 rs2v]
             with "Hlogauth") as "Hlogauth".
     iMod (hart_ws_update cpu_id (wm_ws σ) (wm_ws σ) (wm_ws σ')
             with "Hwsauth Hhws") as "[Hwsauth Hhws]".

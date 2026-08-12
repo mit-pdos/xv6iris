@@ -75,21 +75,13 @@ From xv6iris Require Import WeakMem WeakPromise WeakPromiseFact WeakRobustTrace
 Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)
-(** ** A [WeakMem]-level fact (owed to the W4 lift batch)
+(** ** A [WeakMem]-level fact — LIFTED
 
-    A message writes only inside its own byte range.  [WeakPromiseBridge]
-    proves the same lemma; it is repeated here rather than imported
-    because this file's import list deliberately stops at
-    [WeakAxiomatic]. *)
-Lemma msg_byte_in_range m a :
-  is_Some (msg_byte m a) →
-  ∃ j : nat, (j < length (wm_data m))%nat ∧ a = wm_pa m + Z.of_nat j.
-Proof.
-  rewrite /msg_byte. case_bool_decide as Hle; [|by intros []].
-  intros Hs. exists (Z.to_nat (a - wm_pa m)). split.
-  - by eapply lookup_lt_is_Some_1.
-  - lia.
-Qed.
+    "A message writes only inside its own byte range" is now
+    [WeakMem.msg_byte_range] (the W4 lift batch made it canonical there and
+    dropped this file's and [WeakPromiseBridge]'s copies).  The local name
+    is kept as an alias so the uses below read unchanged. *)
+Notation msg_byte_in_range := msg_byte_range (only parsing).
 
 (* ------------------------------------------------------------------ *)
 (** ** DELIVERABLE 2: what a label READS
@@ -145,8 +137,8 @@ Section astep.
       simpl.
     - intros [-> _] w. reflexivity.
     - intros (_ & -> & _) w. apply load_post_run_le.
-    - intros (ts & _ & _ & _ & -> & _) w. apply store_post_run_le.
-    - intros (ts & _ & _ & _ & _ & _ & _ & -> & _) w.
+    - intros (ts & kc & _ & _ & _ & -> & _) w. apply store_post_run_le.
+    - intros (ts & kc & _ & _ & _ & _ & _ & _ & -> & _) w.
       etrans; [apply load_post_run_le|apply store_post_run_le].
     - intros [-> _] w. apply fence_post_le.
   Qed.
@@ -161,8 +153,8 @@ Section astep.
     destruct l; simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
-    - intros (ts' & _ & _ & (_ & Hext) & _ & Heq). simplify_eq. lia.
-    - intros (ts' & _ & _ & _ & _ & _ & (_ & Hext) & _ & Heq).
+    - intros (ts' & kc & _ & _ & (_ & Hext) & _ & Heq). simplify_eq. lia.
+    - intros (ts' & kc & _ & _ & _ & _ & _ & (_ & Hext) & _ & Heq).
       simplify_eq. lia.
     - by intros [_ ?].
   Qed.
@@ -179,7 +171,7 @@ Section astep.
     - intros (Hro & _ & _) [j [v [Hj ->]]]%elem_of_tvs_reads.
       destruct (Hro j ts v Hj) as (Hb & _ & _). by eexists.
     - intros _ Hin%elem_of_nil. done.
-    - intros (ts' & _ & _ & _ & Hro & _) [j [v [Hj ->]]]%elem_of_tvs_reads.
+    - intros (ts' & kc & _ & _ & _ & Hro & _) [j [v [Hj ->]]]%elem_of_tvs_reads.
       destruct (Hro j ts v Hj) as (Hb & _ & _). by eexists.
     - intros _ Hin%elem_of_nil. done.
   Qed.
@@ -199,7 +191,7 @@ Section astep.
       have Hts : (tvs.*1) !! j = Some ts by rewrite list_lookup_fmap Hj.
       by apply (load_post_run_coh (pa_ws ag) aq base (tvs.*1) j ts Hts).
     - intros _ Hin%elem_of_nil. done.
-    - intros (ts' & _ & _ & _ & _ & _ & _ & -> & _)
+    - intros (ts' & kc & _ & _ & _ & _ & _ & _ & -> & _)
              [j [v [Hj ->]]]%elem_of_tvs_reads. simpl.
       have Hts : (tvs.*1) !! j = Some ts by rewrite list_lookup_fmap Hj.
       etrans; [by apply (load_post_run_coh (pa_ws ag) aq base (tvs.*1) j ts Hts)|].
@@ -211,14 +203,14 @@ Section astep.
       the message it fulfils. *)
   Lemma astep_ok_fulfil_msg img log i ag l f ts :
     astep_ok img log i ag l f (Some ts) →
-    ∃ base data, log !! (ts - 1)%nat = Some (WMsg base data (Some i)).
+    ∃ base data k, log !! (ts - 1)%nat = Some (WMsg base data (Some i) k).
   Proof.
     destruct l; simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
-    - intros (ts' & _ & Hlog & _ & _ & Heq). simplify_eq. by eexists _, _.
-    - intros (ts' & _ & _ & Hlog & _ & _ & _ & _ & Heq).
-      simplify_eq. by eexists _, _.
+    - intros (ts' & kc & _ & Hlog & _ & _ & Heq). simplify_eq. by eexists _, _, _.
+    - intros (ts' & kc & _ & _ & Hlog & _ & _ & _ & _ & Heq).
+      simplify_eq. by eexists _, _, _.
     - by intros [_ ?].
   Qed.
 
@@ -231,10 +223,10 @@ Section astep.
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
-    - intros (ts' & _ & Hlog & (Hcoh & _) & _ & Heq) Hm Hb. simplify_eq.
+    - intros (ts' & kc & _ & Hlog & (Hcoh & _) & _ & Heq) Hm Hb. simplify_eq.
       destruct (msg_byte_in_range _ _ Hb) as (j & Hj & ->). simpl in Hj |- *.
       by apply Hcoh.
-    - intros (ts' & Hlen & _ & Hlog & _ & _ & (Hcoh & _) & _ & Heq) Hm Hb.
+    - intros (ts' & kc & Hlen & _ & Hlog & _ & _ & (Hcoh & _) & _ & Heq) Hm Hb.
       simplify_eq.
       destruct (msg_byte_in_range _ _ Hb) as (j & Hj & ->). simpl in Hj |- *.
       eapply Nat.le_lt_trans; [|by apply Hcoh].
@@ -255,7 +247,7 @@ Section astep.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
     - intros _ Hin%elem_of_nil. done.
-    - intros (ts' & Hlen & _ & _ & _ & _ & (Hcoh & _) & _ & Heq)
+    - intros (ts' & kc & Hlen & _ & _ & _ & _ & (Hcoh & _) & _ & Heq)
              [j [v [Hj ->]]]%elem_of_tvs_reads.
       injection Heq as Heq. subst ts'.
       have Hts : (tvs.*1) !! j = Some ts by rewrite list_lookup_fmap Hj.
@@ -537,7 +529,7 @@ Section graph.
       fulfil rule matches the promised message EXACTLY, tid included. *)
   Lemma gev_ts_msg TS e ts :
     ptraces_wf TS → gev_ts TS e = Some ts →
-    ∃ base data, pt_log TS !! (ts - 1)%nat = Some (WMsg base data (Some e.1)).
+    ∃ base data k, pt_log TS !! (ts - 1)%nat = Some (WMsg base data (Some e.1) k).
   Proof.
     rewrite /gev_ts. intros Hwf Hts.
     destruct (gev_ev TS e) as [ev|] eqn:Hev; simpl in Hts; [|done].
@@ -555,8 +547,8 @@ Section graph.
     e1 = e2.
   Proof.
     intros Hwf H1 H2.
-    destruct (gev_ts_msg TS e1 ts Hwf H1) as (b1 & d1 & Hm1).
-    destruct (gev_ts_msg TS e2 ts Hwf H2) as (b2 & d2 & Hm2).
+    destruct (gev_ts_msg TS e1 ts Hwf H1) as (b1 & d1 & kc1 & Hm1).
+    destruct (gev_ts_msg TS e2 ts Hwf H2) as (b2 & d2 & kc2 & Hm2).
     rewrite Hm1 in Hm2. simplify_eq.
     have Hag : e1.1 = e2.1 by [].
     (* same agent: now the trace-level uniqueness applies *)
@@ -687,7 +679,7 @@ Section graph.
   Proof.
     intros Hla Hs.
     destruct (wp_promise_step_inv c c' Hs)
-      as (j & agj & base & data & _ & _ & ->).
+      as (j & agj & base & data & kc & _ & _ & ->).
     intros p m Hp. simpl in Hp.
     destruct (decide (p < length (pc_log c))%nat) as [Hlt|Hge].
     - rewrite lookup_app_l in Hp; [done|]. by eapply Hla.

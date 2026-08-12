@@ -45,10 +45,10 @@ Proof. rewrite /img0 /img0m lookup_insert_ne // lookup_singleton //. Qed.
 
 (** The two messages the test produces: hart 0's [y := 1] and hart 1's
     [x := 1].  Both are single-byte. *)
-Local Notation MY := (WMsg ay [b1] (Some 0%nat)).
-Local Notation MX := (WMsg ax [b1] (Some 1%nat)).
+Local Notation MY := (WMsg ay [b1] (Some 0%nat) WCplain).
+Local Notation MX := (WMsg ax [b1] (Some 1%nat) WCplain).
 
-Lemma msg_byte_hit a v tid : msg_byte (WMsg a [v] tid) a = Some v.
+Lemma msg_byte_hit a v tid k : msg_byte (WMsg a [v] tid k) a = Some v.
 Proof.
   rewrite /msg_byte /=.
   rewrite (bool_decide_eq_true_2 (a ≤ a)%Z); [lia|].
@@ -99,17 +99,8 @@ Definition lb_p1 : lbp := LBLoad ay ax.
 (* ------------------------------------------------------------------ *)
 (** ** Discharging the side conditions of the four memory steps *)
 
-(** A single-byte [read_ok]: [read_ok]'s [∀ j] collapses to [j = 0], where
-    the byte address [base + 0] is [base]. *)
-Lemma read_ok_single img log ws base t v :
-  log_byte img log t base = Some v →
-  readable img log ws (load_vpre ws false) base t →
-  read_ok img log ws false false base [(t, v)].
-Proof.
-  intros Hv Hr j t' v' Hj.
-  destruct j as [|j]; [|by simplify_eq/=].
-  simplify_eq/=. rewrite Z.add_0_r. split_and!; [done|done|done].
-Qed.
+(** [read_ok_single] (the [∀ j] collapse at one byte) moved to
+    [WeakPromise.v] with the W4 lift batch. *)
 
 (** Both LB loads read a message that sits ABOVE the reader's whole floor
     (the reader has observed nothing at all yet), so the coherence window
@@ -141,10 +132,8 @@ Proof.
   eapply readable_above_floor; [apply log_byte_MX|apply ws_init_floor].
 Qed.
 
-(** A single-byte load's post-state, unfolded once. *)
-Lemma load_post_run_single ws aq base t :
-  load_post_run ws aq base [t] = load_post_at ws aq (load_vpre ws aq) base t.
-Proof. rewrite /load_post_run /load_post_bytes /=. by rewrite Z.add_0_r. Qed.
+(** [load_post_run_single] (a single-byte load's post-state, unfolded once)
+    moved to [WeakMem.v] with the W4 lift batch. *)
 
 (** Hart 1's state after its load is still bounded by the one-message log —
     the [ws_bounded] premise of [wpstep_store_now]. *)
@@ -202,14 +191,14 @@ Proof.
   { (* ---- the interleaving ---- *)
     (* 1. hart 0 PROMISES y := 1; the log was empty, so ts = 1 *)
     eapply rtc_l.
-    { eapply (WPPromise lbstep _ 0%nat _ ay [b1]); [reflexivity|done]. }
+    { eapply (WPPromise lbstep _ 0%nat _ ay [b1] WCplain); [reflexivity|done]. }
     (* 2. hart 1 LOADS y and reads that promise *)
     eapply rtc_l.
     { eapply (WPLoad lbstep _ 1%nat _ false false ay [(1%nat, b1)]);
         [reflexivity|apply LBSLoad|apply read_ok_h1]. }
     (* 3. hart 1 STORES x := 1 (promise + immediate fulfil at the fresh top) *)
     eapply rtc_transitive.
-    { eapply (wpstep_store_now lbstep _ 1%nat _ false ax [b1]);
+    { eapply (wpstep_store_now lbstep _ 1%nat _ false ax [b1] WCplain);
         [reflexivity|apply LBSStore|done|apply ws_bounded_h1|set_solver]. }
     (* 4. hart 0 LOADS x and reads hart 1's store *)
     eapply rtc_l.
@@ -217,7 +206,7 @@ Proof.
         [reflexivity|apply LBSLoad|apply read_ok_h0]. }
     (* 5. hart 0 FULFILS its ts = 1 promise of y := 1 *)
     eapply rtc_l; [|apply rtc_refl].
-    eapply (WPFulfil lbstep _ 0%nat _ false ay [b1] 1%nat);
+    eapply (WPFulfil lbstep _ 0%nat _ false ay [b1] WCplain 1%nat);
       [reflexivity|apply LBSStore|set_solver|reflexivity|apply fulfil_ok_h0]. }
   { (* ---- every promise discharged ---- *)
     intros i ag Hlk. destruct i as [|[|i]]; simplify_eq/=; [set_solver|done]. }

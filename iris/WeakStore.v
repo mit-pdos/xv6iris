@@ -146,9 +146,9 @@ Qed.
 
 (** The general-width twin of [WeakVProp.wwrite_msg_byte1_none]: outside the
     half-open range the access covers, the message is silent. *)
-Lemma wwrite_msg_win_none tid (pa : Arch.pa) (n : N) {w : N} (v : bv w) (a : Z) :
+Lemma wwrite_msg_win_none tid k (pa : Arch.pa) (n : N) {w : N} (v : bv w) (a : Z) :
   ¬ (pa_z pa <= a < pa_z pa + Z.of_N n) ->
-  msg_byte (wwrite_msg tid pa n v) a = None.
+  msg_byte (wwrite_msg tid k pa n v) a = None.
 Proof.
   intros Hout. rewrite /msg_byte /wwrite_msg /=.
   case_bool_decide as Hle; [|reflexivity].
@@ -156,10 +156,10 @@ Proof.
 Qed.
 
 (** ... and it IS the one-byte lemma at [n = 1]. *)
-Lemma wwrite_msg_win_none1 tid (pa : Arch.pa) (v : bv (8 * 1)) (a : Z) :
-  a <> pa_z pa -> msg_byte (wwrite_msg tid pa 1 v) a = None.
+Lemma wwrite_msg_win_none1 tid k (pa : Arch.pa) (v : bv (8 * 1)) (a : Z) :
+  a <> pa_z pa -> msg_byte (wwrite_msg tid k pa 1 v) a = None.
 Proof.
-  intros Hne. apply (wwrite_msg_win_none tid pa 1 v a).
+  intros Hne. apply (wwrite_msg_win_none tid k pa 1 v a).
   change (Z.of_N 1) with 1. lia.
 Qed.
 
@@ -259,23 +259,23 @@ Qed.
     store's message and retargeting the [n] elements at the fresh top keeps
     the latest-write map accurate.  [wlat_agree_store4] and
     [WeakWord8.wlat_agree_store8] are the [n := 4] / [n := 8] instances. *)
-Lemma wlat_agree_store_w img log (tid : option nat) (a : Arch.pa) (n : N)
+Lemma wlat_agree_store_w img log (tid : option nat) k (a : Arch.pa) (n : N)
     {m : N} (v : bv m) (mm : gmap Z (nat * bv 8)) :
   wlat_agree img log mm ->
-  wlat_agree img (log ++ [wwrite_msg tid a n v])
+  wlat_agree img (log ++ [wwrite_msg tid k a n v])
              (winsw a (S (length log)) v (N.to_nat n) mm).
 Proof.
   intros Hag.
   apply (wlat_agree_store_win img log _
            (fun z => pa_z a <= z < pa_z a + Z.of_N n) mm).
-  - intros z Hz. by apply (wwrite_msg_win_none tid a n v z).
+  - intros z Hz. by apply (wwrite_msg_win_none tid k a n v z).
   - intros z tv Hz Hlk.
     assert (Hex : exists j : nat, (j < N.to_nat n)%nat /\ z = acc_addr a j).
     { exists (Z.to_nat (z - pa_z a)). rewrite /acc_addr. split; lia. }
     destruct Hex as (j & Hj & ->).
     rewrite (winsw_lookup_in a (S (length log)) v (N.to_nat n) mm j Hj) in Hlk.
     simplify_eq/=. split; [reflexivity|].
-    by apply (wwrite_msg_byte tid a n v j).
+    by apply (wwrite_msg_byte tid k a n v j).
   - intros z Hz. apply winsw_lookup_out. intros j Hj Heq.
     apply Hz. rewrite -Heq /acc_addr. lia.
   - exact Hag.
@@ -309,14 +309,14 @@ Proof.
 Qed.
 
 (** THE FOUR-BYTE WINDOW UPDATE, pure: the [n := 4] instance of §3. *)
-Lemma wlat_agree_store4 img log tid (a : Arch.pa) (v : bv 32)
+Lemma wlat_agree_store4 img log tid k (a : Arch.pa) (v : bv 32)
     (mm : gmap Z (nat * bv 8)) :
   wlat_agree img log mm ->
-  wlat_agree img (log ++ [wwrite_msg tid a 4 v])
+  wlat_agree img (log ++ [wwrite_msg tid k a 4 v])
              (wins4 a (S (length log)) v mm).
 Proof.
   intros Hag. rewrite wins4_winsw.
-  by apply (wlat_agree_store_w img log tid a 4 v mm).
+  by apply (wlat_agree_store_w img log tid k a 4 v mm).
 Qed.
 
 (* ====================================================================== *)
@@ -330,14 +330,14 @@ Section store.
       four-byte message appended: the authority moves to the new log and the
       four elements come back as a [wlat4] bundle at the message's own
       timestamp. *)
-  Lemma wlat4_store_prim (tid : option nat) (σ : wmstate) (a : Arch.pa)
+  Lemma wlat4_store_prim (tid : option nat) k (σ : wmstate) (a : Arch.pa)
       (v : bv 32) (t0 t1 t2 t3 : nat) (b0 b1 b2 b3 : bv 8) :
     wlat_interp (wm_img σ) (wm_log σ) -∗
     wlat_pointsto (acc_addr a 0) (DfracOwn 1) t0 b0 -∗
     wlat_pointsto (acc_addr a 1) (DfracOwn 1) t1 b1 -∗
     wlat_pointsto (acc_addr a 2) (DfracOwn 1) t2 b2 -∗
     wlat_pointsto (acc_addr a 3) (DfracOwn 1) t3 b3 ==∗
-    wlat_interp (wm_img σ) (wm_log σ ++ [wwrite_msg tid a 4 v]) ∗
+    wlat_interp (wm_img σ) (wm_log σ ++ [wwrite_msg tid k a 4 v]) ∗
     wlat4 a (DfracOwn 1) (S (length (wm_log σ))) v.
   Proof.
     iIntros "Hi H0 H1 H2 H3".
@@ -359,10 +359,10 @@ Section store.
   (** THE BUNDLE UPDATE at an explicitly described post-state — the shape
       [WeakVProp.wpt_store_rule] has, so a caller that knows only "the image
       did not move and the log grew by this message" can fire it. *)
-  Lemma wlat4_store_gen (tid : option nat) (σ σ' : wmstate) (a : Arch.pa)
+  Lemma wlat4_store_gen (tid : option nat) k (σ σ' : wmstate) (a : Arch.pa)
       (t : nat) (w v : bv 32) :
     wm_img σ' = wm_img σ ->
-    wm_log σ' = (wm_log σ ++ [wwrite_msg tid a 4 v])%list ->
+    wm_log σ' = (wm_log σ ++ [wwrite_msg tid k a 4 v])%list ->
     wlat_interp (wm_img σ) (wm_log σ) -∗
     wlat4 a (DfracOwn 1) t w ==∗
     wlat_interp (wm_img σ') (wm_log σ') ∗
@@ -370,7 +370,7 @@ Section store.
   Proof.
     intros Himg Hlog. rewrite /wlat4. iIntros "Hi (H0 & H1 & H2 & H3)".
     rewrite Himg Hlog.
-    by iMod (wlat4_store_prim tid σ a v with "Hi H0 H1 H2 H3") as "[$ $]".
+    by iMod (wlat4_store_prim tid k σ a v with "Hi H0 H1 H2 H3") as "[$ $]".
   Qed.
 
   (** ... and at the interpreter's OWN write post-state, which is what a leaf
@@ -388,7 +388,7 @@ Section store.
     wlat4 a (DfracOwn 1) (S (length (wm_log σ))) v.
   Proof.
     intros _. iIntros "Hi Hl".
-    iApply (wlat4_store_gen tid σ (wwrite_post tid σ ak a 4 v) a t w v
+    iApply (wlat4_store_gen tid _ σ (wwrite_post tid σ ak a 4 v) a t w v
               (wwrite_post_img tid σ ak a 4 v) (wwrite_post_log tid σ ak a 4 v)
               with "Hi Hl").
   Qed.
@@ -449,7 +449,8 @@ Section store.
     iIntros "Hi Hpt".
     iDestruct (wpt4_at_elems with "Hpt") as "(%Hal & %Hacc & Hpt)".
     iDestruct "Hpt" as (t0 t1 t2 t3) "(H0 & H1 & H2 & H3)".
-    iMod (wlat4_store_prim tid σ a v with "Hi H0 H1 H2 H3") as "[Hi Hl]".
+    iMod (wlat4_store_prim tid (wm_class_of ak (wm_ws σ)) σ a v
+            with "Hi H0 H1 H2 H3") as "[Hi Hl]".
     iModIntro.
     rewrite (wwrite_post_img tid σ ak a 4 v) (wwrite_post_log tid σ ak a 4 v).
     iFrame "Hi".

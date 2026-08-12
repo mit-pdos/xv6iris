@@ -108,8 +108,8 @@ Qed.
 
 (** The messages a wrap-free write appends are [WeakLang]-well-formed, which
     is what keeps [wflat] describing the log after the step. *)
-Lemma acc_wf_msg tid pa n {w : N} (v : bv w) :
-  acc_wf pa n -> wmsg_wf (wwrite_msg tid pa n v).
+Lemma acc_wf_msg tid k pa n {w : N} (v : bv w) :
+  acc_wf pa n -> wmsg_wf (wwrite_msg tid k pa n v).
 Proof.
   rewrite /acc_wf => Hwf. apply wwrite_msg_wf. lia.
 Qed.
@@ -300,7 +300,7 @@ Lemma wflat_write_wf tid s ak pa n (v : bv (8 * n)) :
   wlog_wf (wm_log (wwrite_post tid s ak pa n v)).
 Proof.
   intros Hwf Hacc. rewrite wwrite_post_log /wlog_wf Forall_app.
-  split; [exact Hwf|apply Forall_singleton, (acc_wf_msg tid pa n v Hacc)].
+  split; [exact Hwf|apply Forall_singleton, (acc_wf_msg tid _ pa n v Hacc)].
 Qed.
 
 (* ====================================================================== *)

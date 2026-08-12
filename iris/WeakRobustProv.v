@@ -137,8 +137,8 @@ Section fold.
     destruct lb as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw].
     - by intros [-> _] w.
     - intros (_ & -> & _) w. by rewrite list_fmap_id.
-    - intros (ts' & _ & _ & _ & -> & ->) w. done.
-    - intros (ts' & _ & _ & _ & _ & _ & _ & -> & ->) w.
+    - intros (ts' & kc & _ & _ & _ & -> & ->) w. done.
+    - intros (ts' & kc & _ & _ & _ & _ & _ & _ & -> & ->) w.
       by rewrite list_fmap_id.
     - by intros [-> _] w.
   Qed.

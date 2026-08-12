@@ -223,7 +223,7 @@ Qed.
 
 Definition es_wmsg (s : estep) : option wmsg :=
   match lb_wr (es_lb s) with
-  | Some (base, vs) => Some (WMsg base vs (Some (es_ag s)))
+  | Some (base, vs) => Some (WMsg base vs (Some (es_ag s)) (lb_cls (es_lb s)))
   | None => None
   end.
 
@@ -603,172 +603,17 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(** * 5. Upper bounds for the step functions
+(** * 5. Upper bounds for the step functions — LIFTED
 
-    [WeakMem] proves that every step function RAISES the views (monotonicity)
-    and that it keeps them BOUNDED by the log.  The domination induction needs
-    the third kind of fact, which is nowhere in the tree: an UPPER bound on
-    each component in terms of the inputs — "after this step, [w_vrOld] is a
-    join of old [w_vrOld], the pre-view, and the timestamps read".
-
-    Stated once, for an arbitrary predicate closed under [Nat.max] and holding
-    at 0, because the induction instantiates it at FOUR different predicates
-    (one per component of the invariant). *)
-
-Definition maxcl (P : nat → Prop) : Prop :=
-  P 0%nat ∧ ∀ n1 n2, P n1 → P n2 → P (Nat.max n1 n2).
-
-Lemma maxcl_0 P : maxcl P → P 0%nat.
-Proof. by intros [? _]. Qed.
-Lemma maxcl_max P n1 n2 : maxcl P → P n1 → P n2 → P (Nat.max n1 n2).
-Proof. intros [_ H]. exact (H n1 n2). Qed.
-
-(** *** Pointwise shapes of the two per-byte updates *)
-
-Lemma coh_load_post_at_eq ws aq vpre a t :
-  coh (load_post_at ws aq vpre a t) a =
-  Nat.max (coh ws a) (Nat.max (Nat.max vpre (fwd_view ws aq a t)) t).
-Proof. rewrite /load_post_at coh_upd_eq //. Qed.
-
-Lemma coh_load_post_at_ne ws aq vpre a t a' :
-  a' ≠ a → coh (load_post_at ws aq vpre a t) a' = coh ws a'.
-Proof. intros Hne. rewrite /load_post_at coh_upd_ne // /coh //. Qed.
-
-Lemma coh_store_post_eq ws rl a t :
-  coh (store_post ws rl a t) a = Nat.max (coh ws a) t.
-Proof. rewrite /store_post coh_upd_eq //. Qed.
-
-Lemma coh_store_post_ne ws rl a t a' :
-  a' ≠ a → coh (store_post ws rl a t) a' = coh ws a'.
-Proof. intros Hne. rewrite /store_post coh_upd_ne // /coh //. Qed.
-
-(** *** The load fold: the components it does not touch *)
-
-Lemma load_fold_vwOld aq vpre ats ws :
-  w_vwOld (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats)
-  = w_vwOld ws.
-Proof. revert ws. induction ats as [|p l IH]; intros ws; [done|by rewrite /= IH]. Qed.
-
-Lemma load_fold_vRel aq vpre ats ws :
-  w_vRel (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats)
-  = w_vRel ws.
-Proof. revert ws. induction ats as [|p l IH]; intros ws; [done|by rewrite /= IH]. Qed.
-
-Lemma load_fold_vrNew_plain vpre ats ws :
-  w_vrNew (foldl (λ w at_, load_post_at w false vpre at_.1 at_.2) ws ats)
-  = w_vrNew ws.
-Proof. revert ws. induction ats as [|p l IH]; intros ws; [done|by rewrite /= IH]. Qed.
-
-(** *** The load fold: upper bounds, under "no byte of this load is
-    forwarded" — which is what [cand_pub_clean] buys ([pub_r_fwd_view]). *)
-
-Lemma load_fold_coh P aq vpre ats ws a :
-  maxcl P → (∀ p, p ∈ ats → fwd_view ws aq p.1 p.2 = p.2) →
-  P (coh ws a) → P vpre → (∀ p, p ∈ ats → p.1 = a → P p.2) →
-  P (coh (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats) a).
-Proof.
-  intros Hcl. revert ws. induction ats as [|p l IH]; intros ws Hfv Hc Hv Hts;
-    [exact Hc|].
-  simpl. apply IH.
-  - intros q Hq. rewrite /fwd_view load_post_at_fwd -/(fwd_view ws aq q.1 q.2).
-    apply Hfv, elem_of_cons; by right.
-  - destruct (decide (a = p.1)) as [Heq|Hne]; last first.
-    { rewrite (coh_load_post_at_ne _ _ _ _ _ _ Hne). exact Hc. }
-    assert (Hpa : P p.2).
-    { apply (Hts p); [apply elem_of_cons; by left|by rewrite -Heq]. }
-    rewrite Heq coh_load_post_at_eq (Hfv p ltac:(apply elem_of_cons; by left)).
-    apply maxcl_max; [done|rewrite -Heq; exact Hc|].
-    apply maxcl_max; [done| |exact Hpa].
-    apply maxcl_max; [done|exact Hv|exact Hpa].
-  - exact Hv.
-  - intros q Hq Hqa. apply (Hts q); [apply elem_of_cons; by right|exact Hqa].
-Qed.
-
-Lemma load_fold_vrOld P aq vpre ats ws :
-  maxcl P → (∀ p, p ∈ ats → fwd_view ws aq p.1 p.2 = p.2) →
-  P (w_vrOld ws) → P vpre → (∀ p, p ∈ ats → P p.2) →
-  P (w_vrOld (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats)).
-Proof.
-  intros Hcl. revert ws. induction ats as [|p l IH]; intros ws Hfv Hc Hv Hts;
-    [exact Hc|].
-  simpl. apply IH.
-  - intros q Hq. rewrite /fwd_view load_post_at_fwd -/(fwd_view ws aq q.1 q.2).
-    apply Hfv, elem_of_cons; by right.
-  - rewrite /load_post_at /= (Hfv p ltac:(apply elem_of_cons; by left)).
-    apply maxcl_max; [done|exact Hc|].
-    apply maxcl_max; [done|exact Hv|apply Hts, elem_of_cons; by left].
-  - exact Hv.
-  - intros q Hq. apply Hts, elem_of_cons; by right.
-Qed.
-
-Lemma load_fold_vrNew P aq vpre ats ws :
-  maxcl P → (∀ p, p ∈ ats → fwd_view ws aq p.1 p.2 = p.2) →
-  P (w_vrNew ws) → P vpre → (∀ p, p ∈ ats → P p.2) →
-  P (w_vrNew (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats)).
-Proof.
-  intros Hcl. revert ws. induction ats as [|p l IH]; intros ws Hfv Hc Hv Hts;
-    [exact Hc|].
-  simpl. apply IH.
-  - intros q Hq. rewrite /fwd_view load_post_at_fwd -/(fwd_view ws aq q.1 q.2).
-    apply Hfv, elem_of_cons; by right.
-  - rewrite /load_post_at /= (Hfv p ltac:(apply elem_of_cons; by left)).
-    destruct aq; [|exact Hc].
-    apply maxcl_max; [done|exact Hc|].
-    apply maxcl_max; [done|exact Hv|apply Hts, elem_of_cons; by left].
-  - exact Hv.
-  - intros q Hq. apply Hts, elem_of_cons; by right.
-Qed.
-
-(** *** The store fold *)
-
-Lemma store_fold_vrOld rl t as_ ws :
-  w_vrOld (foldl (λ w a, store_post w rl a t) ws as_) = w_vrOld ws.
-Proof. revert ws. induction as_ as [|a l IH]; intros ws; [done|by rewrite /= IH]. Qed.
-
-Lemma store_fold_vrNew rl t as_ ws :
-  w_vrNew (foldl (λ w a, store_post w rl a t) ws as_) = w_vrNew ws.
-Proof. revert ws. induction as_ as [|a l IH]; intros ws; [done|by rewrite /= IH]. Qed.
-
-Lemma store_fold_vRel_norl t as_ ws :
-  w_vRel (foldl (λ w a, store_post w false a t) ws as_) = w_vRel ws.
-Proof. revert ws. induction as_ as [|a l IH]; intros ws; [done|by rewrite /= IH]. Qed.
-
-Lemma store_fold_vwOld P rl t as_ ws :
-  maxcl P → P (w_vwOld ws) → P t →
-  P (w_vwOld (foldl (λ w a, store_post w rl a t) ws as_)).
-Proof.
-  intros Hcl. revert ws. induction as_ as [|a l IH]; intros ws Hc Ht; [exact Hc|].
-  simpl. apply IH; [|exact Ht]. rewrite /store_post /=. by apply maxcl_max.
-Qed.
-
-Lemma store_fold_coh P rl t as_ ws a :
-  maxcl P → P (coh ws a) → (a ∈ as_ → P t) →
-  P (coh (foldl (λ w a, store_post w rl a t) ws as_) a).
-Proof.
-  intros Hcl. revert ws. induction as_ as [|b l IH]; intros ws Hc Ht; [exact Hc|].
-  simpl. apply IH.
-  - destruct (decide (a = b)) as [->|Hne]; last first.
-    { rewrite (coh_store_post_ne _ _ _ _ _ Hne). exact Hc. }
-    rewrite coh_store_post_eq.
-    apply maxcl_max; [done|exact Hc|apply Ht, elem_of_cons; by left].
-  - intros Hin. apply Ht, elem_of_cons; by right.
-Qed.
-
-(** *** The fence *)
-
-Lemma fence_post_vrNew_pred P ws pr pw sr sw :
-  maxcl P → P (w_vrNew ws) →
-  (pr = true → sr = true → P (w_vrOld ws)) →
-  (pw = true → sr = true → P (w_vwOld ws)) →
-  P (w_vrNew (fence_post ws pr pw sr sw)).
-Proof.
-  intros Hcl Hn Hro Hwo. rewrite /fence_post /=.
-  destruct sr; [|exact Hn].
-  apply maxcl_max; [done|exact Hn|].
-  apply maxcl_max; [done| |].
-  - destruct pr; [by apply Hro|by apply maxcl_0].
-  - destruct pw; [by apply Hwo|by apply maxcl_0].
-Qed.
+    [maxcl] and the whole family of upper-bound fold lemmas this section used
+    to prove locally ([coh_load_post_at_eq]/[_ne], [coh_store_post_eq]/[_ne],
+    [load_fold_vwOld] / [load_fold_vRel] / [load_fold_vrNew_plain],
+    [load_fold_coh] / [load_fold_vrOld] / [load_fold_vrNew],
+    [store_fold_vrOld] / [store_fold_vrNew] / [store_fold_vRel_norl] /
+    [store_fold_vwOld] / [store_fold_coh], and [fence_post_vrNew_pred]) now
+    live in [WeakMem.v] next to [ws_bounded]'s preservation lemmas — the W4
+    lift batch, exactly as this file's §14(3) asked.  Nothing is restated
+    here; the uses below are against [WeakMem]'s copies. *)
 
 (* ================================================================== *)
 (** * 6. The two premises that close the leaks, and the state calculus
@@ -780,8 +625,8 @@ Qed.
 
 Definition lb_rl (l : lbl) : bool :=
   match l with
-  | LStore rl _ _ => rl
-  | LRmw _ rl _ _ _ _ => rl
+  | LStore rl _ _ _ => rl
+  | LRmw _ rl _ _ _ _ _ => rl
   | _ => false
   end.
 
@@ -823,8 +668,8 @@ Lemma cand_ws_load c k s aq base ts vs :
   = load_post_run (ews (cand_exec c) k (es_ag s)) aq base ts.
 Proof. intros Hs Hl. rewrite /ews (cand_next c k s Hs) Hl /= upd_ws_eq //. Qed.
 
-Lemma cand_ws_store c k s rl base vs :
-  cd_tr c !! k = Some s → es_lb s = LStore rl base vs →
+Lemma cand_ws_store c k s rl base vs kc :
+  cd_tr c !! k = Some s → es_lb s = LStore rl base vs kc →
   ews (cand_exec c) (S k) (es_ag s)
   = store_post_run (ews (cand_exec c) k (es_ag s)) rl base (length vs)
       (ev_ts (cand_exec c) (ev_at k)).
@@ -836,8 +681,8 @@ Lemma cand_ws_fence c k s pr pw sr sw :
   = fence_post (ews (cand_exec c) k (es_ag s)) pr pw sr sw.
 Proof. intros Hs Hl. rewrite /ews (cand_next c k s Hs) Hl /= upd_ws_eq //. Qed.
 
-Lemma cand_ws_rmw c k s aq rl base ts rvs wvs :
-  cd_tr c !! k = Some s → es_lb s = LRmw aq rl base ts rvs wvs →
+Lemma cand_ws_rmw c k s aq rl base ts rvs wvs kc :
+  cd_tr c !! k = Some s → es_lb s = LRmw aq rl base ts rvs wvs kc →
   ews (cand_exec c) (S k) (es_ag s)
   = store_post_run (load_post_run (ews (cand_exec c) k (es_ag s)) aq base ts)
       rl base (length wvs) (ev_ts (cand_exec c) (ev_at k)).
@@ -1050,8 +895,9 @@ Proof.
   by rewrite cand_ex_tr.
 Qed.
 
-Lemma msg_byte_in_range base vs tid (j : nat) :
-  (j < length vs)%nat → is_Some (msg_byte (WMsg base vs tid) (acc_addr base j)).
+Lemma msg_byte_in_range base vs tid k (j : nat) :
+  (j < length vs)%nat →
+  is_Some (msg_byte (WMsg base vs tid k) (acc_addr base j)).
 Proof.
   intros Hj. rewrite /msg_byte /= bool_decide_eq_true_2; [rewrite /acc_addr; lia|].
   replace (Z.to_nat (acc_addr base j - base)) with j by (rewrite /acc_addr; lia).
@@ -1134,7 +980,7 @@ Lemma inv_store_fold k s base vs i ws :
                   (ev_ts E (ev_at k))).
 Proof.
   intros Hs Hag Hwr (Hc & Hrn & Hro & Hwo & Hrel).
-  assert (Hm : es_wmsg s = Some (WMsg base vs (Some (es_ag s)))).
+  assert (Hm : es_wmsg s = Some (WMsg base vs (Some (es_ag s)) (lb_cls (es_lb s)))).
   { rewrite /es_wmsg Hwr //. }
   assert (HW : is_W E (ev_at k)).
   { exists s. split; [by rewrite cand_ex_tr|by eapply lb_wr_is_w]. }
@@ -1195,22 +1041,22 @@ Proof.
   pose proof (Hshape k s Hs) as Hsh.
   pose proof (Hrlf k s Hs) as Hrl.
   rewrite /inv.
-  destruct (es_lb s) as [aq base ts vs|rl base vs|pr pw sr sw|
-                         aq rl base ts rvs wvs] eqn:Hl; simpl in Hsh, Hrl.
+  destruct (es_lb s) as [aq base ts vs|rl base vs kc|pr pw sr sw|
+                         aq rl base ts rvs wvs kc] eqn:Hl; simpl in Hsh, Hrl.
   - (* load *)
     rewrite (cand_ws_load c k s aq base ts vs Hs Hl).
     apply (inv_load_fold k s base ts vs aq (es_ag s) Hpc Hs eq_refl);
       [by rewrite Hl|exact Hsh|by rewrite Hl| |exact Hinv].
     intros a t v Hr. exact (Hnf a t v Hr).
   - (* store *)
-    subst rl. rewrite (cand_ws_store c k s false base vs Hs Hl).
+    subst rl. rewrite (cand_ws_store c k s false base vs kc Hs Hl).
     apply (inv_store_fold k s base vs (es_ag s)); [done|done|by rewrite Hl|].
     eapply invw_wk; [|exact Hinv]. lia.
   - (* fence *)
     rewrite (cand_ws_fence c k s pr pw sr sw Hs Hl).
     by apply (inv_fence k s pr pw sr sw (es_ag s)).
   - (* rmw: the load fold, then the store fold on top of it *)
-    subst rl. rewrite (cand_ws_rmw c k s aq false base ts rvs wvs Hs Hl).
+    subst rl. rewrite (cand_ws_rmw c k s aq false base ts rvs wvs kc Hs Hl).
     destruct Hsh as (Hne0 & Hlenw & Hlenr).
     apply (inv_store_fold k s base wvs (es_ag s)); [done|done|by rewrite Hl|].
     apply (inv_load_fold k s base ts rvs aq (es_ag s) Hpc Hs eq_refl);
@@ -1344,7 +1190,7 @@ Proof.
   assert (Hfloor : (Nat.max (load_vpre ws (lb_aq (es_lb s))) (coh ws a)
                     ≤ length (cd_log c n))%nat).
   { pose proof (load_vpre_bounded ws (lb_aq (es_lb s)) _ Hbnd).
-    destruct Hbnd as (_ & _ & _ & _ & _ & Hcoh' & _). pose proof (Hcoh' a). lia. }
+    destruct Hbnd as (_ & _ & _ & _ & _ & _ & Hcoh' & _). pose proof (Hcoh' a). lia. }
   rewrite Himg Hlog. split; [exact Hlb|]. split; [by eexists|].
   intros Hw.
   destruct (cand_writes_in_wr c n a t
@@ -1416,8 +1262,8 @@ Lemma cand_mstep_ok_at n s :
   cd_tr c !! n = Some s → mstep_ok (stt E n) (es_ag s) (es_lb s).
 Proof.
   intros Hn Hpc Hok Hs. pose proof (Hshape n s Hs) as Hsh.
-  destruct (es_lb s) as [aq base ts vs|rl base vs|pr pw sr sw|
-                         aq rl base ts rvs wvs] eqn:Hl; simpl in Hsh |- *.
+  destruct (es_lb s) as [aq base ts vs|rl base vs kc|pr pw sr sw|
+                         aq rl base ts rvs wvs kc] eqn:Hl; simpl in Hsh |- *.
   - pose proof (cand_rd_ok n s base ts vs Hn Hpc Hok Hs
                   ltac:(by rewrite Hl) Hsh) as HH.
     rewrite Hl /= in HH. exact HH.
@@ -1681,8 +1527,8 @@ Section ce_rl.
 Context (rl : bool) (v : bv 8).
 
 Definition ce_rl_tr : list estep :=
-  [EStep 1 (LStore false 0 [v]);
-   EStep 0 (LStore rl 1 [v]);
+  [EStep 1 (LStore false 0 [v] WCplain);
+   EStep 0 (LStore rl 1 [v] WCplain);
    EStep 0 (LLoad true 0 [0]%nat [v])].
 
 Definition ce_rl : cand := Cand (λ _, Some v) ce_rl_tr.
@@ -1722,8 +1568,8 @@ Proof.
   destruct (Hall 0%nat 0%nat v eq_refl eq_refl) as [_ [_ Hnw]].
   apply Hnw.
   (* the state after the first two steps, computed from the replay *)
-  rewrite (cand_next (ce_rl true v) 1%nat (EStep 0 (LStore true 1 [v])) eq_refl)
-          (cand_next (ce_rl true v) 0%nat (EStep 1 (LStore false 0 [v])) eq_refl)
+  rewrite (cand_next (ce_rl true v) 1%nat (EStep 0 (LStore true 1 [v] WCplain)) eq_refl)
+          (cand_next (ce_rl true v) 0%nat (EStep 1 (LStore false 0 [v] WCplain)) eq_refl)
           cand_stt_init /=.
   rewrite upd_ws_eq (upd_ws_ne _ 1%nat _ 0%nat ltac:(lia)) /=.
   rewrite /store_post_run /store_post_bytes /= /acc_addr /=.
@@ -1736,8 +1582,8 @@ Qed.
 Section ce_rl_ax.
 Context (rl : bool) (v : bv 8).
 
-Lemma msg_byte_single (b : Z) tid (a : Z) :
-  is_Some (msg_byte (WMsg b [v] tid) a) → a = b.
+Lemma msg_byte_single (b : Z) tid k (a : Z) :
+  is_Some (msg_byte (WMsg b [v] tid k) a) → a = b.
 Proof.
   rewrite /msg_byte /=. case_bool_decide as Hle; [|by intros []].
   intros [w Hw]. destruct (Z.to_nat (a - b)) as [|n] eqn:Hn; [lia|].
@@ -1746,8 +1592,8 @@ Qed.
 
 Lemma ce_rl_tr_inv k s :
   cd_tr (ce_rl rl v) !! k = Some s →
-  (k = 0%nat ∧ s = EStep 1 (LStore false 0 [v])) ∨
-  (k = 1%nat ∧ s = EStep 0 (LStore rl 1 [v])) ∨
+  (k = 0%nat ∧ s = EStep 1 (LStore false 0 [v] WCplain)) ∨
+  (k = 1%nat ∧ s = EStep 0 (LStore rl 1 [v] WCplain)) ∨
   (k = 2%nat ∧ s = EStep 0 (LLoad true 0 [0]%nat [v])).
 Proof.
   intros Hs. rewrite /ce_rl /ce_rl_tr /= in Hs.
@@ -1810,7 +1656,7 @@ Proof.
   destruct (ce_rl_tr_inv 1%nat s Hs) as [[Habs _]|[[_ ->]|[Habs _]]];
     [lia| |lia].
   rewrite /es_wmsg /= in Hm. simplify_eq.
-  by apply (msg_byte_single 1 (Some 0%nat)).
+  by apply (msg_byte_single 1 (Some 0%nat) WCplain).
 Qed.
 
 (** No same-byte program order, and no event both reads and writes a byte. *)
@@ -1899,8 +1745,8 @@ Lemma ce_rl_floor :
   Nat.max (load_vpre (ms_ws (stt (cand_exec (ce_rl true v)) 2%nat) 0%nat) true)
           (coh (ms_ws (stt (cand_exec (ce_rl true v)) 2%nat) 0%nat) 0) = 2%nat.
 Proof.
-  rewrite (cand_next (ce_rl true v) 1%nat (EStep 0 (LStore true 1 [v])) eq_refl)
-          (cand_next (ce_rl true v) 0%nat (EStep 1 (LStore false 0 [v])) eq_refl)
+  rewrite (cand_next (ce_rl true v) 1%nat (EStep 0 (LStore true 1 [v] WCplain)) eq_refl)
+          (cand_next (ce_rl true v) 0%nat (EStep 1 (LStore false 0 [v] WCplain)) eq_refl)
           cand_stt_init /=.
   rewrite upd_ws_eq (upd_ws_ne _ 1%nat _ 0%nat ltac:(lia)) /=.
   rewrite /store_post_run /store_post_bytes /= /acc_addr /=.
@@ -2000,10 +1846,10 @@ Qed.
 
 <<
       Definition ce_fwd_tr : list estep :=
-        [EStep 1 (LStore false 0 [v]);              (* ts 1: foreign write of byte 0 *)
-         EStep 0 (LStore false 1 [v]);              (* ts 2: own write of byte 1 *)
+        [EStep 1 (LStore false 0 [v] WCplain);              (* ts 1: foreign write of byte 0 *)
+         EStep 0 (LStore false 1 [v] WCplain);              (* ts 2: own write of byte 1 *)
          EStep 0 (LFence false true false true);    (* fence pw,sw : vwNew := 2 *)
-         EStep 0 (LStore false 2 [v]);              (* ts 3: banks fwd[2] = (3, 2) *)
+         EStep 0 (LStore false 2 [v] WCplain);              (* ts 3: banks fwd[2] = (3, 2) *)
          EStep 0 (LLoad false 2 [3]%nat [v]);       (* FORWARDED: vrOld := 2 *)
          EStep 0 (LFence true false true false);    (* fence pr,sr : vrNew := 2 *)
          EStep 0 (LLoad false 0 [0]%nat [v])].      (* blocked: 1 ∈ (0,2] writes byte 0 *)
