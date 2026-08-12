@@ -113,11 +113,31 @@ WCrel message raises nothing) — `wpub_covers_write` carries the
 nz-width premise explicitly, dovetailing with `WeakInterpProj`'s
 `nz_writes` and `sail_shaped`.
 
-The remaining C/D sweep (in flight): carry the effect trace through the
-certificate Q's (`wQ_pure` → `wQ_pure_fr es` family, ~30+30 sites), the
-`nv_hart` conjunct into the interp defs paid at ~50 sites, the
-non-funnel paths (racy/started/acquire/walk/Tor/Amo4) with their
-per-path evidence, then `weak_system_adequacy_phi`.
+**THE SWEEP IS COMPLETE (2026-08-12): φ IS EXPORTED.**
+`weak_system_adequacy_phi` delivers
+`no_violation (wglog g2) (wgws g2)` at every reachable state on exactly
+the 5 rv64d baseline axioms; `weak_system_adequacy` is its three-line
+projection (statement byte-identical; the vestigial unused `sieG`
+binder dropped from `_phi` only).  Landing shape worth knowing:
+`nv_hart` sits after `ws_bounded` in all four interpretations (device
+rules untouched); the certificate layer was upgraded GENERICALLY
+(`wQ_eff`/`wQ_fr`/`wstep_cert_fr` + `wstep_cert_pair`/`_fr_pin` for the
+AMO's `wP_eff_pin`) so no `wcert_*` was re-proved; the AMO path uses
+the option-2 callback interface (`wacq_cb`/`wrel_cb` return
+`wmstate_rest_nonv` + the leaf-minted fetch fact; `wwp_acquire_swap`
+pays the lock word from the retargeted clean bundle in `wlock_inv`);
+the fetch arm everywhere is `WeakFunnel.winstr_nv` (any-log form —
+store leaves must pay at the POST-store log); `nv_ok` (hart-indexed
+per-byte form) is the owned-byte arm — the clean/`nv_free` vs `nv_ok`
+gap IS the WDirty arm; `WeakKpt`'s walk leaf-slot mints `nv_free` at
+the pre-state before `Hclose` (consumer-free today — feeds the walk
+option-(a) work).  Gotcha: `iApply` SHELVES an unfilled Prop argument
+("No such goal") — `assert` footprint premises before the `iApply`.
+CONSEQUENCE FOR THE M6 RESIDUE: seam (2) (`pf_violation_free`) is now
+DISCHARGED at the WeakLang level — it remains a premise of
+`WeakCompose.xv6_weak_robust` only through seam (1) (the
+WeakLang ↔ wp-machine lift), which is where the export gets consumed
+when `WeakComposeLang.v` lands.
 
 ## 1c. The migration test: the ownership ping-pong (Stage 1 now, Stage 2 at the port)
 
