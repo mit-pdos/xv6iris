@@ -189,15 +189,25 @@ Section BmapKit.
      The allocation data travels as ONE record so that adding balloc's
      bitmap premises to this file cost no new binder on any interior lemma:
      they all quantify over [ak] already. *)
+  (* [Sb] -- THE OP'S LOGGED SET -- rides beside [n] rather than as a record
+     field or an existential.  The set-form ledger is what makes absorption
+     expressible at all (fs-icache.md section 18), and both directions of it
+     are load-bearing here: a LOWER bound is what a caller absorbs against,
+     and an UPPER bound is what the caller owes ITS caller.  An existential
+     with a fixed lower bound -- the [ba_used] trick this file uses for the
+     bitmap -- carries only the first, so the set is explicit.  It costs one
+     binder on each of the four interior lemmas, all of which already carry
+     [n] in exactly the same in/out positions. *)
   Definition bm_kit (ak : option bm_alloc) (bn : bio_names) (γfs : fs_names)
-      (cov : gset Z) (logstart : Z) (dev : mword 32) (n : nat) : iProp Σ :=
+      (cov : gset Z) (logstart : Z) (dev : mword 32) (n : nat) (Sb : gset Z)
+      : iProp Σ :=
     match ak with
     | Some a =>
         (* the geometry rides INSIDE the kit rather than as a premise, so no
            interior lemma gains a hypothesis either *)
         (⌜bitmap_geom_ok cov logstart (ba_bms a) (ba_size a)⌝ ∗
          log_ctx (ba_log a) bn γfs cov logstart dev ∗ bslots bn 2 ∗
-         log_op (ba_log a) n ∗
+         log_opS (ba_log a) n Sb ∗
          sb_size ↦₄{ba_dqs a} (mword_of_int (ba_size a) : mword 32) ∗
          sb_bmapstart ↦₄{ba_dqb a} (mword_of_int (ba_bms a) : mword 32) ∗
          bm_bitmap γfs cov logstart (ba_bms a) (ba_size a) (ba_used a))%I
@@ -206,11 +216,12 @@ Section BmapKit.
 
   Lemma bm_kit_elim (γ : log_names) (bms sz : Z) (uu : gset Z) (dqb dqs : dfrac)
       (γpr : gname) (ak : option bm_alloc) (bn : bio_names)
-      (γfs : fs_names) (cov : gset Z) (logstart : Z) (dev : mword 32) (n : nat) :
+      (γfs : fs_names) (cov : gset Z) (logstart : Z) (dev : mword 32) (n : nat)
+      (Sb : gset Z) :
     ak = Some (MkBmAlloc γ bms sz uu dqb dqs γpr) ->
-    bm_kit ak bn γfs cov logstart dev n -∗
+    bm_kit ak bn γfs cov logstart dev n Sb -∗
       ⌜bitmap_geom_ok cov logstart bms sz⌝ ∗
-      log_ctx γ bn γfs cov logstart dev ∗ bslots bn 2 ∗ log_op γ n ∗
+      log_ctx γ bn γfs cov logstart dev ∗ bslots bn 2 ∗ log_opS γ n Sb ∗
       sb_size ↦₄{dqs} (mword_of_int sz : mword 32) ∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bms : mword 32) ∗
       bm_bitmap γfs cov logstart bms sz uu.
@@ -218,14 +229,15 @@ Section BmapKit.
 
   Lemma bm_kit_intro (γ : log_names) (bms sz : Z) (uu : gset Z) (dqb dqs : dfrac)
       (γpr : gname) (ak : option bm_alloc) (bn : bio_names)
-      (γfs : fs_names) (cov : gset Z) (logstart : Z) (dev : mword 32) (n : nat) :
+      (γfs : fs_names) (cov : gset Z) (logstart : Z) (dev : mword 32) (n : nat)
+      (Sb : gset Z) :
     ak = Some (MkBmAlloc γ bms sz uu dqb dqs γpr) ->
     bitmap_geom_ok cov logstart bms sz ->
-    log_ctx γ bn γfs cov logstart dev -∗ bslots bn 2 -∗ log_op γ n -∗
+    log_ctx γ bn γfs cov logstart dev -∗ bslots bn 2 -∗ log_opS γ n Sb -∗
     sb_size ↦₄{dqs} (mword_of_int sz : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bms : mword 32) -∗
     bm_bitmap γfs cov logstart bms sz uu -∗
-      bm_kit ak bn γfs cov logstart dev n.
+      bm_kit ak bn γfs cov logstart dev n Sb.
   Proof.
     intros -> Hok. rewrite /bm_kit. iIntros "A B C D E F".
     iSplitR; [iPureIntro; exact Hok|].
@@ -235,9 +247,98 @@ Section BmapKit.
   Qed.
 
   Lemma bm_kit_none (bn : bio_names) (γfs : fs_names) (cov : gset Z)
-      (logstart : Z) (dev : mword 32) (n : nat) :
-    ⊢ bm_kit None bn γfs cov logstart dev n.
+      (logstart : Z) (dev : mword 32) (n : nat) (Sb : gset Z) :
+    ⊢ bm_kit None bn γfs cov logstart dev n Sb.
   Proof. rewrite /bm_kit. done. Qed.
+
+  (* the bitmap block, as a SET, so that the ledger clauses can be stated
+     without destructing [ak] -- [None] logs nothing and so contributes
+     nothing *)
+  Definition bm_bmsset (ak : option bm_alloc) : gset Z :=
+    match ak with Some a => {[ba_bms a]} | None => ∅ end.
+
+  (* ===================================================================== *)
+  (*  THE SET ALGEBRA, AS NAMED LEMMAS.                                     *)
+  (*  [set_solver] runs [set_unfold] over the WHOLE context, and inside     *)
+  (*  this file's proofs that context is several hundred hypotheses of      *)
+  (*  Iris proofmode state -- one call takes longer than the rest of the    *)
+  (*  file put together.  Every set obligation the ledger discharges is one *)
+  (*  of these eight shapes, each proved once here where the context is     *)
+  (*  three variables, and applied by name at the call sites.               *)
+  (* ===================================================================== *)
+  Lemma bmset_sing_in (x : Z) (S : gset Z) : {[x]} ⊆ S -> x ∈ S.
+  Proof. set_solver. Qed.
+
+  Lemma bmset_sing_sub (x : Z) (S : gset Z) : x ∈ S -> {[x]} ⊆ S.
+  Proof. set_solver. Qed.
+
+  Lemma bmset_sub_l3 (A B C : gset Z) : A ⊆ A ∪ B ∪ C.
+  Proof. set_solver. Qed.
+
+  Lemma bmset_sub_l4 (A B C D : gset Z) : A ⊆ A ∪ B ∪ C ∪ D.
+  Proof. set_solver. Qed.
+
+  Lemma bmset_in_l3 (x : Z) (A B C : gset Z) : x ∈ A -> x ∈ A ∪ B ∪ C.
+  Proof. set_solver. Qed.
+
+  Lemma bmset_in_m3 (x : Z) (A C : gset Z) : x ∈ A ∪ {[x]} ∪ C.
+  Proof. set_solver. Qed.
+
+  Lemma bmset_in_r3 (x : Z) (A B : gset Z) : x ∈ A ∪ B ∪ {[x]}.
+  Proof. set_solver. Qed.
+
+  Lemma bmset_in_m4 (x : Z) (A C D : gset Z) : x ∈ A ∪ {[x]} ∪ C ∪ D.
+  Proof. set_solver. Qed.
+
+  Lemma bmset_in_c4 (x : Z) (A B D : gset Z) : x ∈ A ∪ B ∪ {[x]} ∪ D.
+  Proof. set_solver. Qed.
+
+  Lemma bmset_sing_sub_m3 (x : Z) (A C : gset Z) : {[x]} ⊆ A ∪ {[x]} ∪ C.
+  Proof. set_solver. Qed.
+
+  Lemma bmset_ceil3 (A : gset Z) (x y z : Z) :
+    A ∪ {[x]} ∪ {[z]} ⊆ A ∪ {[x]} ∪ {[y]} ∪ {[z]}.
+  Proof. set_solver. Qed.
+
+  Lemma bmset_add_r (A D : gset Z) : A ⊆ A ∪ D.
+  Proof. set_solver. Qed.
+
+  (* the tail's ceiling: the caller logged at most the bitmap and the
+     indirect block, and the tail adds the bitmap (again) and the data
+     block it just allocated *)
+  Lemma bmset_tail_ceiling (Sb SbI : gset Z) (bms ind blk : Z) :
+    SbI ⊆ Sb ∪ {[bms]} ∪ {[ind]} ->
+    SbI ∪ {[bms]} ∪ {[blk]} ∪ {[ind]} ⊆ Sb ∪ {[bms]} ∪ {[ind]} ∪ {[blk]}.
+  Proof. set_solver. Qed.
+
+  (* THE LEDGER CLAUSE, once, so that the four interior lemmas carry it as
+     one hypothesis and the six discharge sites prove one thing.  It is
+     [SpecBmap.wp_bmap_gen_body]'s budget conjunct with [bmapstart] replaced
+     by [bm_bmsset ak], which is how the no-alloc instance (nothing logged,
+     nothing spent) satisfies it for free. *)
+  Definition bm_ledger_ok (ak : option bm_alloc) (cr : bool)
+      (bm bm' : blkmap) (fbn : nat) (n n' : nat) (Sb Sb' : gset Z) : Prop :=
+    (n <= n' + bmap_cost cr (bmap_alloced bm bm' fbn) (bmap_ind fbn))%nat
+    /\ (n' <= n)%nat
+    /\ Sb ⊆ Sb'
+    /\ Sb' ⊆ Sb ∪ bm_bmsset ak ∪ {[bv_unsigned (bm_ind bm')]}
+                ∪ {[bv_unsigned (blkmap_get bm' fbn)]}
+    /\ (bmap_alloced bm bm' fbn = true -> bm_bmsset ak ⊆ Sb')
+    /\ (bmap_ad bm bm' fbn = true -> bv_unsigned (blkmap_get bm' fbn) ∈ Sb').
+
+  (* NOTHING MOVED -- the whole ledger obligation of every arm that neither
+     allocates nor logs, and (at [ak = None]) of the no-alloc instance *)
+  Lemma bm_ledger_id (ak : option bm_alloc) (cr : bool) (bm : blkmap)
+      (fbn : nat) (n : nat) (Sb : gset Z) :
+    bm_ledger_ok ak cr bm bm fbn n n Sb Sb.
+  Proof.
+    rewrite /bm_ledger_ok (bmap_alloced_none bm bm fbn eq_refl eq_refl).
+    split; [cbn; lia|]. split; [lia|]. split; [set_solver|].
+    split; [set_solver|]. split; [intros Hc; discriminate Hc|].
+    intros Hc. exfalso.
+    unfold bmap_ad in Hc. apply bool_decide_eq_true_1 in Hc.
+    destruct Hc as [H1 H2]. exact (H2 H1).
+  Qed.
 
   (* THE TWO ALLOCATION-ONLY CALLEES, as propositions.  Verbatim the types
      of [BALLOC.wp_balloc_sconf] / [LOG_WRITE.wp_log_write_sconf]; passing
@@ -262,13 +363,13 @@ Section BmapKit.
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
       (used : gset Z) (γpr : gname)
-      (u : nat)
+      (u : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
-      wp_balloc_sconf_body (GEN := GENa) (CID := CIDa)
+      wp_balloc_gen_body (GEN := GENa) (CID := CIDa)
                             γs j γl γu γd γk pd pav pu bn γ γfs
-                           cov logstart bmapstart size dev used γpr u
+                           cov logstart bmapstart size dev used γpr u cr Sb
                            pidv dq dqb dqs m K eb C b.
 
   Definition log_write_contract : Prop :=
@@ -277,11 +378,11 @@ Section BmapKit.
       (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
-      (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
+      (bs bsl bsd : list (bv 8)) (d : bool) (u : nat) (cr : bool) (Sb : gset Z)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (K : nat) (b : bool),
-      wp_log_write_sconf_body (GEN := GENa) (CID := CIDa) bn γ γfs γd cov logstart dev k pidv bno
-                              bs bsl bsd d u m n eb p C K b.
+      wp_log_write_gen_body (GEN := GENa) (CID := CIDa) bn γ γfs γd cov logstart dev k pidv bno
+                              bs bsl bsd d u cr Sb m n eb p C K b.
 End BmapKit.
 
 (* THE CORE CONTRACT.  Deliberately NOT named [wp_..._body]: the coverage
@@ -299,7 +400,7 @@ Definition bm_gen_stmt
     (ak : option bm_alloc) (γfs : fs_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (fbn : nat)
-    (n : nat)
+    (n : nat) (cr : bool) (Sb : gset Z)
     (pidv : mword 32) (dq dqd : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
     (b : bool) :=
@@ -309,8 +410,11 @@ Definition bm_gen_stmt
   let bnw : mword 32 := mword_of_int (Z.of_nat fbn) in
   (K_bmap <= K)%nat ->
   (* the budget is only demanded of a caller that can allocate *)
-  (ak <> None -> (5 <= n)%nat) ->
-  (* ...and a caller that cannot must show the slot is already allocated *)
+  (ak <> None -> (bmap_need cr (bmap_ind fbn) <= n)%nat) ->
+  (* THE ONE CREDIT: the bitmap block, claimed already-logged *)
+  (cr = true -> bm_bmsset ak ⊆ Sb) ->
+  (* ...and a caller that cannot allocate must show the slot is already
+     allocated *)
   (ak = None -> bv_unsigned (blkmap_get bm fbn) <> 0) ->
   log_geom_ok cov logstart ->
   (fbn < MAXFILE)%nat ->
@@ -336,9 +440,10 @@ Definition bm_gen_stmt
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   (* bread's own unit, held across everything and returned by brelse *)
   bslots bn 1 -∗
-  bm_kit ak bn γfs cov logstart dev n -∗
+  bm_kit ak bn γfs cov logstart dev n Sb -∗
   wp_next b pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (bm' : blkmap) (n' : nat) (data' : nat -> list (bv 8)),
+  ∀ (mf : regfile) (bm' : blkmap) (n' : nat) (data' : nat -> list (bv 8))
+    (Sb' : gset Z),
       ⌜callee_saved m mf⌝ -∗
       ⌜blkmap_wf cov logstart bm'⌝ -∗
       ⌜forall i : nat, (i < MAXFILE)%nat -> i <> fbn ->
@@ -364,8 +469,8 @@ Definition bm_gen_stmt
            /\ data' = <[fbn := replicate BSIZE (bv_0 8)]> data)⌝ -∗
       inode_blocks γfs bm' data' -∗
       bslots bn 1 -∗
-      ⌜((n - 5)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
-      bm_kit ak bn γfs cov logstart dev n' -∗
+      ⌜bm_ledger_ok ak cr bm bm' fbn n n' Sb Sb'⌝ -∗
+      bm_kit ak bn γfs cov logstart dev n' Sb' -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -434,11 +539,12 @@ Section BmapDefs.
       (γfs : fs_names) (bn : bio_names) (ak : option bm_alloc)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8))
-      (fbn : nat) (n : nat)
+      (fbn : nat) (n : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqd : dfrac) (j : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
     wp_next b (proc_addr j) (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (bm' : blkmap) (n' : nat) (data' : nat -> list (bv 8)),
+      ∀ (mf : regfile) (bm' : blkmap) (n' : nat) (data' : nat -> list (bv 8))
+        (Sb' : gset Z),
         ⌜callee_saved m mf⌝ -∗
         ⌜blkmap_wf cov logstart bm'⌝ -∗
         ⌜forall i : nat, (i < MAXFILE)%nat -> i <> fbn ->
@@ -461,8 +567,8 @@ Section BmapDefs.
              /\ data' = <[fbn := replicate BSIZE (bv_0 8)]> data)⌝ -∗
         inode_blocks γfs bm' data' -∗
         bslots bn 1 -∗
-        ⌜((n - 5)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
-        bm_kit ak bn γfs cov logstart dev n' -∗
+        ⌜bm_ledger_ok ak cr bm bm' fbn n n' Sb Sb'⌝ -∗
+        bm_kit ak bn γfs cov logstart dev n' Sb' -∗
         WP (Loop : expr riscv_lang))%I.
 
 End BmapDefs.
@@ -496,7 +602,7 @@ Section BmapEpilogue.
       (j : nat) (γfs : fs_names) (bn : bio_names) (ak : option bm_alloc)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (ip : mword 64) (bm bm' : blkmap) (data data' : nat -> list (bv 8))
-      (fbn : nat) (n n' : nat) (rv : mword 32)
+      (fbn : nat) (n n' : nat) (cr : bool) (Sb Sb' : gset Z) (rv : mword 32)
       (pidv : mword 32) (dq dqd : dfrac)
       (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) :
     (K_bmap <= K)%nat ->
@@ -514,7 +620,7 @@ Section BmapEpilogue.
     (data' = data
      \/ (bv_unsigned (blkmap_get bm fbn) = 0
          /\ data' = <[fbn := replicate BSIZE (bv_0 8)]> data)) ->
-    ((n - 5)%nat <= n')%nat -> (n' <= n)%nat ->
+    bm_ledger_ok ak cr bm bm' fbn n n' Sb Sb' ->
     sie_cap_gpr M (K - 6)%nat b (proc_addr j) -∗
     cpu_own 0 true (proc_addr j) C b -∗
     kernel_text -∗
@@ -525,12 +631,12 @@ Section BmapEpilogue.
     inode_map γfs ip bm' -∗
     inode_blocks γfs bm' data' -∗
     bslots bn 1 -∗
-    bm_kit ak bn γfs cov logstart dev n' -∗
-    bm_cont (CID0 := CID0) γfs bn ak cov logstart dev ip bm data fbn n
+    bm_kit ak bn γfs cov logstart dev n' Sb' -∗
+    bm_cont (CID0 := CID0) γfs bn ak cov logstart dev ip bm data fbn n cr Sb
             pidv dq dqd j m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hsp Hthr Hs1 Hwf' Hag Hkeep Hnoal Hrv Hdat Hlo Hhi.
+    intros HK Hsp Hthr Hs1 Hwf' Hag Hkeep Hnoal Hrv Hdat Hled.
     unfold K_bmap in HK.
     iIntros "Hcg Hcnt #Htext Hpc Hframe Hppid Hidev Hmap Hblocks Hsl Hkit Hcont".
     iPoseProof (bmi_8a with "Htext") as "Hi8a".
@@ -796,7 +902,7 @@ Section BmapEpilogue.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     rewrite /bm_cont.
     iSpecialize ("Hcont" $! CID8 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! P6 bm' n' data' with "[%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc
+    iApply ("Hcont" $! P6 bm' n' data' Sb' with "[%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc
                      Hppid Hidev Hmap [%] Hblocks Hsl [%] Hkit").
     { unfold callee_saved. split_and!; assumption. }
     { exact Hwf'. }
@@ -807,7 +913,7 @@ Section BmapEpilogue.
       - left. split; [rewrite HP6a0; exact (bm_sext_zero rv Hz) | exact Hz'].
       - right. split; [rewrite HP6a0 He; reflexivity | exact Hne]. }
     { exact Hdat. }
-    { split; assumption. }
+    { exact Hled. }
   Qed.
 
 End BmapEpilogue.
@@ -825,7 +931,7 @@ Section BmapRelease.
       (γfs : fs_names) (γd : disk_names) (bn : bio_names) (ak : option bm_alloc)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (ip : mword 64) (bm bm' : blkmap) (data data' : nat -> list (bv 8))
-      (fbn : nat) (n n' : nat) (rv : mword 32)
+      (fbn : nat) (n n' : nat) (cr : bool) (Sb Sb' : gset Z) (rv : mword 32)
       (kk : nat) (ibn : mword 32) (bsX bsdX : list (bv 8)) (dX : bool)
       (pidv : mword 32) (dq dqd : dfrac)
       (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) :
@@ -846,7 +952,7 @@ Section BmapRelease.
     (data' = data
      \/ (bv_unsigned (blkmap_get bm fbn) = 0
          /\ data' = <[fbn := replicate BSIZE (bv_0 8)]> data)) ->
-    ((n - 5)%nat <= n')%nat -> (n' <= n)%nat ->
+    bm_ledger_ok ak cr bm bm' fbn n n' Sb Sb' ->
     sie_cap_gpr M (K - 6)%nat b (proc_addr j) -∗
     cpu_own 0 true (proc_addr j) C b -∗
     kernel_text -∗
@@ -859,13 +965,13 @@ Section BmapRelease.
     i_dev ip ↦₄{dqd} dev -∗
     inode_map γfs ip bm' -∗
     inode_blocks γfs bm' data' -∗
-    bm_kit ak bn γfs cov logstart dev n' -∗
+    bm_kit ak bn γfs cov logstart dev n' Sb' -∗
     bio_locked bn (fs_view γfs γd dev cov) kk pidv dev ibn bsX bsdX dX -∗
-    bm_cont (CID0 := CID0) γfs bn ak cov logstart dev ip bm data fbn n
+    bm_cont (CID0 := CID0) γfs bn ak cov logstart dev ip bm data fbn n cr Sb
             pidv dq dqd j m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hsp Hthr Hs1 Hs4 Hkk Hwf' Hag Hkeep Hnoal Hrv Hdat Hlo Hhi.
+    intros HK Hsp Hthr Hs1 Hs4 Hkk Hwf' Hag Hkeep Hnoal Hrv Hdat Hled.
     pose proof HK as HK'. unfold K_bmap in HK'.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hprocs Hframe Hppid
               Hidev Hmap Hblocks Hkit Hlk Hcont".
@@ -976,8 +1082,8 @@ Section BmapRelease.
     iDestruct (cpu_own_transport CID3 CID4 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (bm_epilogue (CID0 := CID4)  j γfs bn ak cov logstart dev ip bm bm'
-              data data' fbn n n' rv pidv dq dqd m T2 K C b
-              HK HT2sp HT2thr HT2s1 Hwf' Hag Hkeep Hnoal Hrv Hdat Hlo Hhi
+              data data' fbn n n' cr Sb Sb' rv pidv dq dqd m T2 K C b
+              HK HT2sp HT2thr HT2s1 Hwf' Hag Hkeep Hnoal Hrv Hdat Hled
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hidev Hmap
                     Hblocks [Hsl1] Hkit [Hcont]").
     { iExact "Hsl1". }
@@ -1002,7 +1108,7 @@ Section BmapTail.
       (γfs : fs_names) (bn : bio_names) (ak : option bm_alloc)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (ip : mword 64) (bm bmI : blkmap) (data : nat -> list (bv 8))
-      (fbn q : nat) (n nI : nat)
+      (fbn q : nat) (n nI : nat) (cr crb cri : bool) (Sb SbI : gset Z)
       (pidv : mword 32) (dq dqd : dfrac)
       (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) :
     (K_bmap <= K)%nat ->
@@ -1016,7 +1122,31 @@ Section BmapTail.
        code is about to read is already allocated *)
     (ak = None -> bmI = bm) ->
     (ak = None -> bv_unsigned (blkmap_get bmI fbn) <> 0) ->
-    (ak <> None -> (3 <= nI)%nat) -> ((n - 2)%nat <= nI)%nat -> (nI <= n)%nat ->
+    (* WHAT MUST BE IN HAND: balloc's two units, and one more for the
+       [log_write] at +0xb0 when the bitmap block has not been paid for *)
+    (ak <> None -> ((if crb then 2 else 3) <= nI)%nat) ->
+    (* the tail's TWO credits.  [crb] is the public one (the bitmap block);
+       [cri] -- the indirect block -- is INTERNAL: the caller sets it when it
+       has just balloc'd the indirect block itself, so that this lemma's own
+       [log_write] of it absorbs against that bzero, same call, same block.
+       Nothing outside this file ever sees it, so section 18's "one credit"
+       at the seam is intact. *)
+    (crb = true -> bm_bmsset ak ⊆ SbI) ->
+    (cri = true -> bv_unsigned (bm_ind bmI) ∈ SbI) ->
+    (* THE LEDGER ON ARRIVAL: what the caller has already spent and logged
+       leaves the outer clause satisfiable on the arms where this lemma
+       allocates nothing.  It is literally the conclusion at [bmI], which is
+       what makes those three arms discharge by [exact]. *)
+    bm_ledger_ok ak cr bm bmI fbn n nI Sb SbI ->
+    (* ...and the TWO extra facts the allocating arm needs: room for what the
+       tail itself will spend inside the outer arm's own charge, and a set
+       ceiling with no data-block term in it -- the caller cannot have
+       logged the data block for [fbn], only the bitmap and the indirect
+       block, and [bm_ledger_ok]'s own ceiling is too loose here because it
+       admits the ZERO entry this arm is standing on. *)
+    (n + (if crb then 1 else 2) + (if cri then 0 else 1)
+       <= nI + bmap_cost cr true (bmap_ind fbn))%nat ->
+    SbI ⊆ Sb ∪ bm_bmsset ak ∪ {[bv_unsigned (bm_ind bmI)]} ->
     (* the allocation arm's two callees, live only with a kit *)
     (ak <> None -> balloc_contract) ->
     (ak <> None -> log_write_contract) ->
@@ -1046,13 +1176,13 @@ Section BmapTail.
     ind_tok γfs bmI -∗
     inode_blocks γfs bmI data -∗
     bslots bn 1 -∗
-    bm_kit ak bn γfs cov logstart dev nI -∗
-    bm_cont (CID0 := CID0) γfs bn ak cov logstart dev ip bm data fbn n
+    bm_kit ak bn γfs cov logstart dev nI SbI -∗
+    bm_cont (CID0 := CID0) γfs bn ak cov logstart dev ip bm data fbn n cr Sb
             pidv dq dqd j m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hgeom HwfI Hfbn Hq Hagr Hindnz HakI Haknz Hn3i Hnlo Hnhi Hba Hlw
-           Hj Hgl Hsp Hthr Hs1 Hs2 Hs3.
+    intros HK Hgeom HwfI Hfbn Hq Hagr Hindnz HakI Haknz Hn3i Hcrb Hcri Hled0 Hbud2
+           HSbI Hba Hlw Hj Hgl Hsp Hthr Hs1 Hs2 Hs3.
     pose proof HK as HK'. unfold K_bmap in HK'.
     assert (Hgeom0 : log_geom_ok cov logstart) by exact Hgeom.
     destruct Hgeom as [Hcovok Hlogsub].
@@ -1401,7 +1531,7 @@ Section BmapTail.
       pose proof (Hba ltac:(discriminate)) as Hballoc.
       pose proof (Hlw ltac:(discriminate)) as Hlogwrite.
       iDestruct (bm_kit_elim γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev nI
-                   eq_refl with "Hkit")
+                   SbI eq_refl with "Hkit")
         as "(%Hbgok & #Hlctx & Hsl & Hop & Hsbsz & Hsbbm & Hbmg)".
       destruct Hbgok as (Hbgsz & Hbg0 & Hbgcov & Hbglog).
       iDestruct (bm_prk_elim (MkBmAlloc γ bms sz uu dqb dqs γpr) _ γu γd eq_refl
@@ -1480,13 +1610,25 @@ Section BmapTail.
       iDestruct (wp_next_shift (CIDa := CID3) (CIDb := CID14) ltac:(wp_next_chain)
                    with "Hcont") as "Hcont".
       assert (HKba : (K_balloc <= K - 6)%nat) by (unfold K_balloc; lia).
-      remember (nI - 3)%nat as w eqn:Hweq.
-      assert (Hnn : nI = (2 + S w)%nat) by lia.
+      (* the two units balloc wants in hand, out of what the tail's premise
+         guarantees; [w] is what is left AFTER balloc's own credited spend
+         and the [log_write] that follows it *)
+      remember (nI - 2)%nat as ub eqn:Hub.
+      assert (Hnn : nI = (2 + ub)%nat) by (destruct crb; lia).
+      (* what is left after balloc's credited spend: the unit [log_write]
+         must have in hand at +0xac *)
+      remember ((if crb then ub else ub - 1)%nat) as w eqn:Hweq.
+      assert (Hbal_w : (if crb then S ub else ub)%nat = S w)
+        by (destruct crb; subst w ub; lia).
       iEval (rewrite Hnn) in "Hop".
       iApply (Hballoc _ _ γs j γl γu γd γk pd pav pu bn γ γfs
-                cov logstart bms sz dev uc γpr (S w) pidv dq dqb dqs A1
+                cov logstart bms sz dev uc γpr ub crb SbI
+                pidv dq dqb dqs A1
                 (K - 6)%nat true C b
-                HKba Hgeom0 Hprkc Hbgsz Hbg0 Hbgcov Hbglog Hj Hgl HA1a0 eq_refl
+                HKba Hgeom0 Hprkc Hbgsz Hbg0 Hbgcov Hbglog
+                ltac:(intros Hc; specialize (Hcrb Hc); cbn in Hcrb;
+                      exact (bmset_sing_in _ _ Hcrb))
+                Hj Hgl HA1a0 eq_refl
                 with "Hcg Hcnt Htext Hpc Hpanic Hkdata Hprkenv Hbio Hlctx Hppid Hsbsz Hsbbm Hbmres
                       Hprocs Hdevi Hdgeom Hdlock Hsl Hop").
       iIntros (CID15 Hq15 mA) "%Hcs2 Hcg Hcnt Hpc Hppid Hsbsz Hsbbm Hsl Harm".
@@ -1566,10 +1708,10 @@ Section BmapTail.
         iDestruct (cpu_own_transport CID15 CID17 0 true (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iDestruct (bm_kit_intro γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev nI
-                     eq_refl (conj Hbgsz (conj Hbg0 (conj Hbgcov Hbglog)))
+                     SbI eq_refl (conj Hbgsz (conj Hbg0 (conj Hbgcov Hbglog)))
                      with "Hlctx Hsl Hop Hsbsz Hsbbm Hbmg") as "Hkit".
         iApply (bm_release (CID0 := CID17)  γs j γfs γd bn (Some (MkBmAlloc γ bms sz uu dqb dqs γpr)) cov logstart dev
-                  ip bm bmI data data fbn n nI (mword_of_int 0 : mword 32)
+                  ip bm bmI data data fbn n nI cr Sb SbI (mword_of_int 0 : mword 32)
                   kk (bm_ind bmI) (ind_bytes (bm_ent bmI)) bsd0 d0
                   pidv dq dqd m F0 K C b
                   HK HF0sp HF0thr HF0s1 HF0s4 Hkk HwfI
@@ -1579,7 +1721,7 @@ Section BmapTail.
                   ltac:(left; split;
                         [apply moi32_small; lia
                         | rewrite Hgetq; exact Hentz])
-                  ltac:(left; reflexivity) ltac:(lia) ltac:(lia)
+                  ltac:(left; reflexivity) Hled0
                   with "Hcg Hcnt Htext Hpc Hpanic Hbio Hprocs Hframe
                         Hppid Hidev Hmap Hblocks Hkit Hheld [Hcont]").
         iApply (wp_next_shift (CIDa := CID14) (CIDb := CID17) ltac:(wp_next_chain)
@@ -1587,6 +1729,11 @@ Section BmapTail.
       + (* ---------- balloc SUCCEEDED: install and log ---------- *)
         iDestruct "Hsucc" as (blk)
           "(%Ha0v & %Hblknz & %Hblkcov & %Hblklog & Hfsb & Htok & Hbmres & Hop)".
+        (* THE SET AFTER balloc: the bitmap block (paid or absorbed) and the
+           block balloc just bzero'd.  Naming it keeps the [log_write] call
+           and the two ledger discharges reading the same term. *)
+        remember (SbI ∪ {[bms]} ∪ {[bv_unsigned blk]}) as S1 eqn:HS1.
+        iEval (rewrite Hbal_w) in "Hop".
         iDestruct (bm_bitmap_intro γfs cov logstart bms sz uu
                      (uc ∪ {[bv_unsigned blk]})
                      (bm_used_grow uu uc (bv_unsigned blk) Huc)
@@ -1709,11 +1856,13 @@ Section BmapTail.
         iDestruct (bm_slots_split bn 1 1 with "Hsl") as "[Hsl1 Hslr]".
         iApply (Hlogwrite _ _ bn γ γfs γd cov logstart dev kk pidv
                   (bm_ind bmI) (ind_bytes (<[q := blk]> (bm_ent bmI)))
-                  (ind_bytes (bm_ent bmI)) bsd0 d0 w
+                  (ind_bytes (bm_ent bmI)) bsd0 d0 w cri S1
                   G2 0%nat true (proc_addr j) C (K - 6)%nat b
                   HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HG2a0
                   ltac:(rewrite Huind; exact Hicov)
                   ltac:(rewrite Huind; exact Hilog)
+                  ltac:(intros Hc; rewrite Huind HS1;
+                        exact (bmset_in_l3 _ _ _ _ (Hcri Hc)))
                   with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl1 Hop Hindblk Hheld").
         iIntros (CID21 Hq21 mL) "Hcg Hcnt Hpc %Hcs3 Hop Hindblk Hheld Hsl1".
         assert (Hpcb0 : ret_pc (G2 !!! Regidx Rra : mword 64)
@@ -1791,12 +1940,37 @@ Section BmapTail.
         iDestruct (bm_slots_join bn 1 1 with "Hslr Hsl1") as "Hsl".
         iDestruct (cpu_own_transport CID21 CID22 0 true (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iDestruct (bm_kit_intro γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev w
+        (* ---- THE LEDGER, on the one arm of this lemma that spends ---- *)
+        assert (HindJ : bm_ind bmJ = bm_ind bmI) by (rewrite /bmJ; reflexivity).
+        assert (Hgetbm : bv_unsigned (blkmap_get bm fbn) = 0)
+          by (rewrite -(Hagr fbn Hfbnlt) Hgetq; exact Hentz).
+        assert (Halloc : bmap_alloced bm bmJ fbn = true).
+        { apply bmap_alloced_of_ad. apply bmap_ad_true;
+            [exact Hgetbm | rewrite HgetJf; exact Hblknz]. }
+        assert (Hledger : bm_ledger_ok (Some (MkBmAlloc γ bms sz uu dqb dqs γpr))
+                            cr bm bmJ fbn n (if cri then S w else w)%nat
+                            Sb (S1 ∪ {[uint (bm_ind bmI : mword 32)]})).
+        { destruct Hled0 as (_ & Hhi0 & Hsub0 & _ & _ & _).
+          cbn [bm_bmsset ba_bms] in HSbI.
+          rewrite /bm_ledger_ok Halloc HindJ HgetJf Huind HS1.
+          cbn [bm_bmsset ba_bms].
+          split_and!.
+          - (* the spend, against what the caller left room for *)
+            destruct crb, cri; subst w ub; cbn in *; lia.
+          - destruct crb, cri; subst w ub; cbn in *; lia.
+          - exact (transitivity Hsub0 (bmset_sub_l4 _ _ _ _)).
+          - exact (bmset_tail_ceiling Sb SbI bms (bv_unsigned (bm_ind bmI))
+                     (bv_unsigned blk) HSbI).
+          - intros _. exact (bmset_sing_sub _ _ (bmset_in_m4 _ _ _ _)).
+          - intros _. exact (bmset_in_c4 _ _ _ _). }
+        iDestruct (bm_kit_intro γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev
+                     (if cri then S w else w)%nat (S1 ∪ {[uint (bm_ind bmI : mword 32)]})
                      eq_refl (conj Hbgsz (conj Hbg0 (conj Hbgcov Hbglog)))
                      with "Hlctx Hsl Hop Hsbsz Hsbbm Hbmg") as "Hkit".
         iApply (bm_release (CID0 := CID22)  γs j γfs γd bn (Some (MkBmAlloc γ bms sz uu dqb dqs γpr)) cov logstart dev
                   ip bm bmJ data (<[fbn := replicate BSIZE (bv_0 8)]> data)
-                  fbn n w blk kk (bm_ind bmI)
+                  fbn n (if cri then S w else w)%nat cr Sb
+                  (S1 ∪ {[uint (bm_ind bmI : mword 32)]}) blk kk (bm_ind bmI)
                   (ind_bytes (<[q := blk]> (bm_ent bmI))) bsd0 true
                   pidv dq dqd m mL K C b
                   HK HmLsp HmLthr HmLs1 HmLs4 Hkk HwfJ
@@ -1811,7 +1985,8 @@ Section BmapTail.
                         [exact (eq_sym HgetJf)
                         | rewrite HgetJf; exact Hblknz])
                   ltac:(right; split;
-                        [rewrite -(Hagr fbn Hfbnlt) Hgetq; exact Hentz | reflexivity]) ltac:(lia) ltac:(lia)
+                        [rewrite -(Hagr fbn Hfbnlt) Hgetq; exact Hentz | reflexivity])
+                  Hledger
                   with "Hcg Hcnt Htext Hpc Hpanic Hbio Hprocs Hframe
                         Hppid Hidev Hmap Hblocks Hkit Hheld [Hcont]").
         iApply (wp_next_shift (CIDa := CID14) (CIDb := CID22) ltac:(wp_next_chain)
@@ -1840,7 +2015,7 @@ Section BmapTail.
       iDestruct (cpu_own_transport CID4 CID12 0 true (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply (bm_release (CID0 := CID12)  γs j γfs γd bn ak cov logstart dev
-                ip bm bmI data data fbn n nI (bm_ent bmI !!! q)
+                ip bm bmI data data fbn n nI cr Sb SbI (bm_ent bmI !!! q)
                 kk (bm_ind bmI) (ind_bytes (bm_ent bmI)) bsd0 d0
                 pidv dq dqd m B7 K C b
                 HK HB7sp HB7thr HB7s1 HB7s4 Hkk HwfI
@@ -1849,7 +2024,7 @@ Section BmapTail.
                 ltac:(intros Hc; split; [exact (HakI Hc) | reflexivity])
                 ltac:(right; split;
                       [exact (eq_sym Hgetq) | rewrite Hgetq; exact Hentnz])
-                ltac:(left; reflexivity) ltac:(lia) ltac:(lia)
+                ltac:(left; reflexivity) Hled0
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hprocs Hframe
                       Hppid Hidev Hmap Hblocks Hkit Hheld [Hcont]").
       iApply (wp_next_shift (CIDa := CID3) (CIDb := CID12) ltac:(wp_next_chain)
@@ -1874,17 +2049,17 @@ Section ProofBmapMain.
       (ak : option bm_alloc) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (fbn : nat)
-      (n : nat)
+      (n : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqd : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
       (Hba : ak <> None -> balloc_contract)
       (Hlw : ak <> None -> log_write_contract)
     : bm_gen_stmt γs j γl γu γd γk pd pav pu bn ak γfs
-                  cov logstart dev ip bm data fbn n pidv dq dqd m K eb C b.
+                  cov logstart dev ip bm data fbn n cr Sb pidv dq dqd m K eb C b.
   Proof.
     cbv beta delta [bm_gen_stmt].
-    intros pcE pj ret_tgt bnw HK Hn5i Haknz Hgeom Hfbn Hwf Hj Hgl Ha0 Ha1 Heb.
+    intros pcE pj ret_tgt bnw HK Hn5i Hcr0 Haknz Hgeom Hfbn Hwf Hj Hgl Ha0 Ha1 Heb.
     subst eb.
     pose proof HK as HK'. unfold K_bmap in HK'.
     pose proof Hfbn as Hfbn0. unfold MAXFILE in Hfbn0.
@@ -1892,7 +2067,7 @@ Section ProofBmapMain.
     pose proof (blkmap_wf_ent_len cov logstart bm Hwf) as Hentlen.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hprk #Hbio Hidev Hmap Hblocks Hppid
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hkit Hcont".
-    iAssert (bm_cont (CID0 := CID) γfs bn ak cov logstart dev ip bm data fbn n
+    iAssert (bm_cont (CID0 := CID) γfs bn ak cov logstart dev ip bm data fbn n cr Sb
                pidv dq dqd j m K C b)%I with "[Hcont]" as "Hcont";
       [rewrite /bm_cont; iExact "Hcont"|].
     iDestruct "Hmap" as "[Haddrs [Hindblk Hindtok]]".
@@ -2221,7 +2396,7 @@ Section ProofBmapMain.
         pose proof (Hn5i ltac:(discriminate)) as Hn5.
         pose proof (Hba ltac:(discriminate)) as Hballoc.
         iDestruct (bm_kit_elim γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev n
-                     eq_refl with "Hkit")
+                     Sb eq_refl with "Hkit")
           as "(%Hbgok & #Hlctx & Hsl2 & Hop & Hsbsz & Hsbbm & Hbmg)".
         destruct Hbgok as (Hbgsz & Hbg0 & Hbgcov & Hbglog).
         iDestruct (bm_prk_elim (MkBmAlloc γ bms sz uu dqb dqs γpr) _ γu γd eq_refl
@@ -2296,12 +2471,16 @@ Section ProofBmapMain.
                      with "Hcont") as "Hcont".
         assert (HKba : (K_balloc <= K - 6)%nat) by (unfold K_balloc; lia).
         remember (n - 2)%nat as u2 eqn:Hu2eq.
-        assert (Hnn : n = (2 + u2)%nat) by lia.
+        assert (Hnn : n = (2 + u2)%nat)
+          by (pose proof (bmap_need_ge2 cr (bmap_ind fbn)); lia).
         iEval (rewrite Hnn) in "Hop".
         iApply (Hballoc _ _ γs j γl γu γd γk pd pav pu bn γ γfs
-                  cov logstart bms sz dev uc γpr u2 pidv dq dqb dqs D5
+                  cov logstart bms sz dev uc γpr u2 cr Sb pidv dq dqb dqs D5
                   (K - 6)%nat true C b
-                  HKba Hgeom Hprkc Hbgsz Hbg0 Hbgcov Hbglog Hj Hgl HD5a0 eq_refl
+                  HKba Hgeom Hprkc Hbgsz Hbg0 Hbgcov Hbglog
+                  ltac:(intros Hc; specialize (Hcr0 Hc); cbn in Hcr0;
+                        exact (bmset_sing_in _ _ Hcr0))
+                  Hj Hgl HD5a0 eq_refl
                   with "Hcg Hcnt Htext Hpc Hpanic Hkdata Hprkenv Hbio Hlctx Hppid Hsbsz Hsbbm Hbmres
                         Hprocs Hdevi Hdgeom Hdlock Hsl2 Hop").
         iIntros (CID18 Hq18 mD) "%Hcs1 Hcg Hcnt Hpc Hppid Hsbsz Hsbbm Hsl2 Harm".
@@ -2372,16 +2551,16 @@ Section ProofBmapMain.
           iDestruct (cpu_own_transport CID18 CID20 0 true (proc_addr j) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           iDestruct (bm_kit_intro γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev n
-                       eq_refl (conj Hbgsz (conj Hbg0 (conj Hbgcov Hbglog)))
+                       Sb eq_refl (conj Hbgsz (conj Hbg0 (conj Hbgcov Hbglog)))
                        with "Hlctx Hsl2 Hop Hsbsz Hsbbm Hbmg") as "Hkit".
           iApply (bm_epilogue (CID0 := CID20)  j γfs bn (Some (MkBmAlloc γ bms sz uu dqb dqs γpr)) cov logstart dev ip bm bm
-                    data data fbn n n (mword_of_int 0 : mword 32) pidv dq dqd m E0 K C b
+                    data data fbn n n cr Sb Sb (mword_of_int 0 : mword 32) pidv dq dqd m E0 K C b
                     HK HE0sp HE0thr HE0s1 Hwf
                     ltac:(intros i _ _; reflexivity)
                     ltac:(intros i _ _; reflexivity)
                     ltac:(intros Hc; discriminate Hc)
                     ltac:(left; split; [apply moi32_small; lia | exact Hdz])
-                    ltac:(left; reflexivity) ltac:(lia) ltac:(lia)
+                    ltac:(left; reflexivity) (bm_ledger_id _ cr bm fbn n Sb)
                     with "Hcg Hcnt Htext Hpc Hframe Hppid Hidev Hmap
                           Hblocks Hsl Hkit [Hcont]").
           iApply (wp_next_shift (CIDa := CID17) (CIDb := CID20) ltac:(wp_next_chain)
@@ -2496,11 +2675,34 @@ Section ProofBmapMain.
             iSplitL "Hf5"; [iExact "Hf5"|]. iExists _. iExact "Hf6". }
           iDestruct (cpu_own_transport CID18 CID22 0 true (proc_addr j) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-          iDestruct (bm_kit_intro γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev u2
+          (* ---- THE LEDGER on the direct allocating arm: one balloc, no
+                  log_write, so exactly the bitmap unit (or two) is gone ---- *)
+          assert (HindD : bm_ind bmD = bm_ind bm) by (rewrite /bmD; reflexivity).
+          assert (HledD : bm_ledger_ok (Some (MkBmAlloc γ bms sz uu dqb dqs γpr))
+                            cr bm bmD fbn n (if cr then S u2 else u2)%nat
+                            Sb (Sb ∪ {[bms]} ∪ {[bv_unsigned blk]})).
+          { rewrite /bm_ledger_ok (bmap_ind_lt fbn Hdir)
+              (bmap_alloced_of_ad bm bmD fbn
+                 (bmap_ad_true bm bmD fbn Hdz
+                    ltac:(rewrite HgetDf; exact Hblknz)))
+              HindD HgetDf.
+            cbn [bm_bmsset ba_bms].
+            split_and!.
+            - destruct cr; cbn; lia.
+            - destruct cr; cbn; lia.
+            - exact (bmset_sub_l3 _ _ _).
+            - exact (bmset_ceil3 _ _ _ _).
+            - intros _. exact (bmset_sing_sub _ _ (bmset_in_m3 _ _ _)).
+            - intros _. exact (bmset_in_r3 _ _ _). }
+          iDestruct (bm_kit_intro γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev
+                       (if cr then S u2 else u2)%nat
+                       (Sb ∪ {[bms]} ∪ {[bv_unsigned blk]})
                        eq_refl (conj Hbgsz (conj Hbg0 (conj Hbgcov Hbglog)))
                        with "Hlctx Hsl2 Hop Hsbsz Hsbbm Hbmg") as "Hkit".
           iApply (bm_epilogue (CID0 := CID22)  j γfs bn (Some (MkBmAlloc γ bms sz uu dqb dqs γpr)) cov logstart dev ip bm bmD
-                    data (<[fbn := replicate BSIZE (bv_0 8)]> data) fbn n u2 blk
+                    data (<[fbn := replicate BSIZE (bv_0 8)]> data) fbn n
+                    (if cr then S u2 else u2)%nat cr Sb
+                    (Sb ∪ {[bms]} ∪ {[bv_unsigned blk]}) blk
                     pidv dq dqd m N0 K C b
                     HK HN0sp HN0thr HN0s1 HwfD HgetD
                     ltac:(intros i Hi Hnz;
@@ -2509,7 +2711,7 @@ Section ProofBmapMain.
                     ltac:(intros Hc; discriminate Hc)
                     ltac:(right; split;
                           [exact (eq_sym HgetDf) | rewrite HgetDf; exact Hblknz])
-                    ltac:(right; split; [exact Hdz | reflexivity]) ltac:(lia) ltac:(lia)
+                    ltac:(right; split; [exact Hdz | reflexivity]) HledD
                     with "Hcg Hcnt Htext Hpc Hframe Hppid Hidev Hmap
                           Hblocks Hsl Hkit [Hcont]").
           iApply (wp_next_shift (CIDa := CID17) (CIDb := CID22) ltac:(wp_next_chain)
@@ -2544,13 +2746,13 @@ Section ProofBmapMain.
         iDestruct (cpu_own_transport CID CID15 0 true (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iApply (bm_epilogue (CID0 := CID15)  j γfs bn ak cov logstart dev ip bm bm
-                  data data fbn n n (blkmap_get bm fbn) pidv dq dqd m D3 K C b
+                  data data fbn n n cr Sb Sb (blkmap_get bm fbn) pidv dq dqd m D3 K C b
                   HK HD3sp HD3thr HD3s1 Hwf
                   ltac:(intros i _ _; reflexivity)
                   ltac:(intros i _ _; reflexivity)
                   ltac:(intros _; split; reflexivity)
                   ltac:(right; split; [reflexivity | exact Hdnz])
-                  ltac:(left; reflexivity) ltac:(lia) ltac:(lia)
+                  ltac:(left; reflexivity) (bm_ledger_id ak cr bm fbn n Sb)
                   with "Hcg Hcnt Htext Hpc Hframe Hppid Hidev Hmap
                         Hblocks Hsl Hkit [Hcont]").
         iApply (wp_next_shift (CIDa := CID) (CIDb := CID15) ltac:(wp_next_chain)
@@ -2739,7 +2941,7 @@ Section ProofBmapMain.
         pose proof (Hn5i ltac:(discriminate)) as Hn5.
         pose proof (Hba ltac:(discriminate)) as Hballoc.
         iDestruct (bm_kit_elim γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev n
-                     eq_refl with "Hkit")
+                     Sb eq_refl with "Hkit")
           as "(%Hbgok & #Hlctx & Hsl2 & Hop & Hsbsz & Hsbbm & Hbmg)".
         destruct Hbgok as (Hbgsz & Hbg0 & Hbgcov & Hbglog).
         iDestruct (bm_prk_elim (MkBmAlloc γ bms sz uu dqb dqs γpr) _ γu γd eq_refl
@@ -2819,12 +3021,16 @@ Section ProofBmapMain.
                      with "Hcont") as "Hcont".
         assert (HKba : (K_balloc <= K - 6)%nat) by (unfold K_balloc; lia).
         remember (n - 2)%nat as u2 eqn:Hu2eq.
-        assert (Hnn : n = (2 + u2)%nat) by lia.
+        assert (Hnn : n = (2 + u2)%nat)
+          by (pose proof (bmap_need_ge2 cr (bmap_ind fbn)); lia).
         iEval (rewrite Hnn) in "Hop".
         iApply (Hballoc _ _ γs j γl γu γd γk pd pav pu bn γ γfs
-                  cov logstart bms sz dev uc γpr u2 pidv dq dqb dqs P1
+                  cov logstart bms sz dev uc γpr u2 cr Sb pidv dq dqb dqs P1
                   (K - 6)%nat true C b
-                  HKba Hgeom Hprkc Hbgsz Hbg0 Hbgcov Hbglog Hj Hgl HP1a0 eq_refl
+                  HKba Hgeom Hprkc Hbgsz Hbg0 Hbgcov Hbglog
+                  ltac:(intros Hc; specialize (Hcr0 Hc); cbn in Hcr0;
+                        exact (bmset_sing_in _ _ Hcr0))
+                  Hj Hgl HP1a0 eq_refl
                   with "Hcg Hcnt Htext Hpc Hpanic Hkdata Hprkenv Hbio Hlctx Hppid Hsbsz Hsbbm Hbmres
                         Hprocs Hdevi Hdgeom Hdlock Hsl2 Hop").
         iIntros (CID20 Hq20 mP) "%Hcs1 Hcg Hcnt Hpc Hppid Hsbsz Hsbbm Hsl2 Harm".
@@ -2905,10 +3111,10 @@ Section ProofBmapMain.
           iDestruct (cpu_own_transport CID20 CID22 0 true (proc_addr j) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           iDestruct (bm_kit_intro γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev n
-                       eq_refl (conj Hbgsz (conj Hbg0 (conj Hbgcov Hbglog)))
+                       Sb eq_refl (conj Hbgsz (conj Hbg0 (conj Hbgcov Hbglog)))
                        with "Hlctx Hsl2 Hop Hsbsz Hsbbm Hbmg") as "Hkit".
           iApply (bm_epilogue (CID0 := CID22)  j γfs bn (Some (MkBmAlloc γ bms sz uu dqb dqs γpr)) cov logstart dev ip bm bm
-                    data data fbn n n (mword_of_int 0 : mword 32) pidv dq dqd m P2 K C b
+                    data data fbn n n cr Sb Sb (mword_of_int 0 : mword 32) pidv dq dqd m P2 K C b
                     HK HP2sp HP2thr HP2s1 Hwf
                     ltac:(intros i _ _; reflexivity)
                     ltac:(intros i _ _; reflexivity)
@@ -2918,7 +3124,7 @@ Section ProofBmapMain.
                           | rewrite (blkmap_get_ent bm fbn Hge) Hentzero
                               lookup_total_replicate_2;
                             [reflexivity | unfold NINDIRECT in *; lia]])
-                    ltac:(left; reflexivity) ltac:(lia) ltac:(lia)
+                    ltac:(left; reflexivity) (bm_ledger_id _ cr bm fbn n Sb)
                     with "Hcg Hcnt Htext Hpc Hframe Hppid Hidev Hmap
                           Hblocks Hsl Hkit [Hcont]").
           iApply (wp_next_shift (CIDa := CID19) (CIDb := CID22) ltac:(wp_next_chain)
@@ -3036,17 +3242,48 @@ Section ProofBmapMain.
             iSplitL "Hf5"; [iExact "Hf5"|]. iExact "Hf6". }
           iDestruct (cpu_own_transport CID20 CID25 0 true (proc_addr j) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-          iDestruct (bm_kit_intro γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev u2
+          (* THE INDIRECT BLOCK IS NOW IN THE OP'S SET (balloc bzero'd it),
+             so the tail runs with BOTH credits: the bitmap one it inherits
+             from this call's own balloc, and the internal indirect one that
+             makes the [log_write] at +0xb0 absorb against that bzero. *)
+          assert (HindI : bm_ind bmI = blk) by (rewrite /bmI; reflexivity).
+          assert (HindB : (2 <= (if cr then S u2 else u2))%nat)
+            by (rewrite (bmap_ind_ge fbn Hge) in Hn5; destruct cr; cbn in Hn5; lia).
+          assert (HallI : bmap_alloced bm bmI fbn = true).
+          { apply bmap_alloced_of_ai. apply bmap_ai_true;
+              [exact Hiz | rewrite HindI; exact Hblknz]. }
+          assert (HledI : bm_ledger_ok (Some (MkBmAlloc γ bms sz uu dqb dqs γpr))
+                            cr bm bmI fbn n (if cr then S u2 else u2)%nat
+                            Sb (Sb ∪ {[bms]} ∪ {[bv_unsigned blk]})).
+          { rewrite /bm_ledger_ok HallI (bmap_ind_ge fbn Hge) HindI
+              (bmap_ad_none bm bmI fbn (HgetI fbn Hfbn)).
+            cbn [bm_bmsset ba_bms]. split_and!.
+            - destruct cr; cbn; lia.
+            - destruct cr; cbn; lia.
+            - exact (bmset_sub_l3 _ _ _).
+            - exact (bmset_add_r _ _).
+            - intros _. exact (bmset_sing_sub _ _ (bmset_in_m3 _ _ _)).
+            - intros Hc; discriminate Hc. }
+          iDestruct (bm_kit_intro γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev
+                       (if cr then S u2 else u2)%nat (Sb ∪ {[bms]} ∪ {[bv_unsigned blk]})
                        eq_refl (conj Hbgsz (conj Hbg0 (conj Hbgcov Hbglog)))
                        with "Hlctx Hsl2 Hop Hsbsz Hsbbm Hbmg") as "Hkit".
           iApply (bm_indirect_tail (CID0 := CID25)  γs j γl γu γd γk pd pav pu
-                    γfs bn (Some (MkBmAlloc γ bms sz uu dqb dqs γpr)) cov logstart dev ip bm bmI data fbn q n u2
+                    γfs bn (Some (MkBmAlloc γ bms sz uu dqb dqs γpr)) cov logstart dev ip bm bmI data fbn q n
+                    (if cr then S u2 else u2)%nat cr true true
+                    Sb (Sb ∪ {[bms]} ∪ {[bv_unsigned blk]})
                     pidv dq dqd m P2 K C b
                     HK Hgeom HwfI Hfbnq Hqlt HgetI
                     ltac:(rewrite /bmI; cbn [bm_ind]; exact Hblknz)
                     ltac:(intros Hc; discriminate Hc)
                     ltac:(intros Hc; discriminate Hc)
-                    ltac:(intros _; lia) ltac:(lia) ltac:(lia)
+                    ltac:(intros _; exact HindB)
+                    ltac:(intros _; cbn [bm_bmsset ba_bms];
+                          exact (bmset_sing_sub_m3 _ _ _))
+                    ltac:(intros _; rewrite HindI; exact (bmset_in_r3 _ _ _))
+                    HledI
+                    ltac:(rewrite (bmap_ind_ge fbn Hge); destruct cr; cbn; lia)
+                    ltac:(rewrite HindI; cbn [bm_bmsset ba_bms]; reflexivity)
                     ltac:(intros _; exact Hballoc)
                     ltac:(intros _; exact (Hlw ltac:(discriminate)))
                     Hj Hgl HP2sp
@@ -3100,13 +3337,24 @@ Section ProofBmapMain.
           iSplitL "Hf5"; [iExact "Hf5"|]. iExact "Hf6". }
         iDestruct (cpu_own_transport CID CID18 0 true (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+        (* the indirect block was already there, so the tail gets the PUBLIC
+           credit only: its [log_write] at +0xb0 pays, and that unit is the
+           [+ if ind then 1] of [bmap_cost] *)
         iApply (bm_indirect_tail (CID0 := CID18)  γs j γl γu γd γk pd pav pu
                   γfs bn ak cov logstart dev ip bm bm data fbn q n n
+                  cr cr false Sb Sb
                   pidv dq dqd m J4 K C b
                   HK Hgeom Hwf Hfbnq Hqlt ltac:(intros i _; reflexivity) Hinz
                   ltac:(intros _; reflexivity)
                   Haknz
-                  ltac:(intros Hne; pose proof (Hn5i Hne); lia) ltac:(lia) ltac:(lia)
+                  ltac:(intros Hne; pose proof (Hn5i Hne) as HH;
+                        rewrite (bmap_ind_ge fbn Hge) in HH;
+                        destruct cr; cbn in HH; lia)
+                  Hcr0
+                  ltac:(intros Hc; discriminate Hc)
+                  (bm_ledger_id ak cr bm fbn n Sb)
+                  ltac:(rewrite (bmap_ind_ge fbn Hge); destruct cr; cbn; lia)
+                  ltac:(exact (bmset_sub_l3 _ _ _))
                   Hba Hlw
                   Hj Hgl HJ4sp
                   ltac:(intros c Hcs N2 N8 N9 N18 N19 N20;
@@ -3163,29 +3411,38 @@ Section BmapSeal.
     iDestruct (bm_slots_split bn 1 2 with "Hsl") as "[Hsl1 Hsl2]".
     iDestruct (bm_bitmap_intro γfs cov logstart bmapstart size used used
                  (reflexivity used) with "Hbmres") as "Hbmg".
+    (* THE COUNTED FORM'S SET is whatever the [log_op] existential is hiding:
+       nothing is claimed about it, and [cr := false] claims no credit -- this
+       is fs-icache.md section 18's "derived counted form", taken at the
+       witness rather than at the empty set so that no caller has to prove
+       its set empty -- which would be false as well as unnecessary. *)
+    iDestruct "Hop" as (Sb0) "Hop".
     iDestruct (bm_kit_intro γ bmapstart size used dqb dqs γpr _ bn γfs cov logstart
-                 dev n eq_refl Hbgok
+                 dev n Sb0 eq_refl Hbgok
                  with "Hlctx Hsl2 Hop Hsbsz Hsbbm Hbmg") as "Hkit".
     iAssert (bm_prk (Some (MkBmAlloc γ bmapstart size used dqb dqs γpr)) γu γd)
       as "#Hprk".
     { rewrite /bm_prk. iSplitR; [iPureIntro; exact Hprkc|]. iFrame "Hkdata Hprkenv". }
     iApply (Core.wp_bmap_gen γs j γl γu γd γk pd pav pu bn
               (Some (MkBmAlloc γ bmapstart size used dqb dqs γpr)) γfs
-              cov logstart dev ip bm data fbn n pidv dq dqd m K eb C b
+              cov logstart dev ip bm data fbn n false Sb0 pidv dq dqd m K eb C b
               ltac:(intros _ GEN0 CID0;
-                    exact (BA.wp_balloc_sconf (GEN := GEN0) (CID := CID0)))
+                    exact (BA.wp_balloc_gen (GEN := GEN0) (CID := CID0)))
               ltac:(intros _ GEN0 CID0;
-                    exact (LW.wp_log_write_sconf (GEN := GEN0) (CID := CID0)))
-              HK ltac:(intros _; exact Hn5) ltac:(intros Hc; discriminate Hc)
+                    exact (LW.wp_log_write_gen (GEN := GEN0) (CID := CID0)))
+              HK
+              ltac:(intros _; pose proof (bmap_need_le4 false (bmap_ind fbn)); lia)
+              ltac:(intros Hc; discriminate Hc)
+              ltac:(intros Hc; discriminate Hc)
               Hgeom Hfbn Hwf Hj Hgl Ha0 Ha1 Heb
               with "Hcg Hcnt Htext Hpc Hpanic Hprk Hbio Hidev Hmap Hblocks Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl1 Hkit [Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
-    iIntros (mf bm' n' data') "%Hcs %Hwf' %Hag %Hkeep %Hnoal %Harm
-              Hcg Hcnt Hpc Hppid Hidev Hmap %Hdat Hblocks Hsl1 %Hbud Hkit".
+    iIntros (mf bm' n' data' Sb') "%Hcs %Hwf' %Hag %Hkeep %Hnoal %Harm
+              Hcg Hcnt Hpc Hppid Hidev Hmap %Hdat Hblocks Hsl1 %Hled Hkit".
     iDestruct (bm_kit_elim γ bmapstart size used dqb dqs γpr _ bn γfs cov logstart
-                 dev n' eq_refl with "Hkit")
+                 dev n' Sb' eq_refl with "Hkit")
       as "(_ & _ & Hsl2 & Hop & Hsbsz & Hsbbm & Hbmg)".
     (* THE EXISTENTIAL THE PUBLIC CONTRACT PROMISES: the kit's invariant index
        [used] with the current set [used'] and [used ⊆ used'] beside it. *)
@@ -3193,6 +3450,83 @@ Section BmapSeal.
     iDestruct (bm_slots_join bn 1 2 with "Hsl1 Hsl2") as "Hsl".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf bm' n' data' used'
+              with "[%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hppid Hsbsz Hsbbm Hbmres Hidev Hmap [%] Hblocks [Hsl] [%] [Hop]").
+    { exact Hcs. }
+    { exact Hsub. }
+    { exact Hwf'. }
+    { exact Hag. }
+    { exact Hkeep. }
+    { exact Harm. }
+    { exact Hdat. }
+    { iExact "Hsl". }
+    { (* the counted clause, out of the arm-wise one: no arm costs more than
+         three, so five is a fortiori *)
+      destruct Hled as (Hlo & Hhi & _).
+      pose proof (bmap_cost_le3 false (bmap_alloced bm bm' fbn) (bmap_ind fbn)).
+      split; lia. }
+    { iApply (log_opS_op with "Hop"). }
+  Qed.
+
+  (* the SET-FORM contract: the core, sealed, with nothing weakened *)
+  Lemma wp_bmap_gen
+      (γs : list gname) (j : nat) (γl : gname)
+      (γu : uart_names) (γd : disk_names) (γk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (γ : log_names) (γfs : fs_names)
+      (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
+      (used : gset Z) (γpr : gname)
+      (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (fbn : nat)
+      (n : nat) (cr : bool) (Sb : gset Z)
+      (pidv : mword 32) (dq dqd dqb dqs : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool)
+    : wp_bmap_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
+                       cov logstart bmapstart size dev used γpr ip bm data fbn
+                       n cr Sb
+                       pidv dq dqd dqb dqs m K eb C b.
+  Proof.
+    cbv beta delta [wp_bmap_gen_body].
+    intros pcE pj ret_tgt bnw HK Hneed Hgeom Hbgok Hprkc Hcrp Hfbn Hwf Hj Hgl
+           Ha0 Ha1 Heb.
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hkdata #Hprkenv #Hbio #Hlctx
+              Hidev Hmap Hblocks Hppid
+              Hsbsz Hsbbm Hbmres
+              #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
+    iDestruct (bm_slots_split bn 1 2 with "Hsl") as "[Hsl1 Hsl2]".
+    iDestruct (bm_bitmap_intro γfs cov logstart bmapstart size used used
+                 (reflexivity used) with "Hbmres") as "Hbmg".
+    iDestruct (bm_kit_intro γ bmapstart size used dqb dqs γpr _ bn γfs cov logstart
+                 dev n Sb eq_refl Hbgok
+                 with "Hlctx Hsl2 Hop Hsbsz Hsbbm Hbmg") as "Hkit".
+    iAssert (bm_prk (Some (MkBmAlloc γ bmapstart size used dqb dqs γpr)) γu γd)
+      as "#Hprk".
+    { rewrite /bm_prk. iSplitR; [iPureIntro; exact Hprkc|]. iFrame "Hkdata Hprkenv". }
+    iApply (Core.wp_bmap_gen γs j γl γu γd γk pd pav pu bn
+              (Some (MkBmAlloc γ bmapstart size used dqb dqs γpr)) γfs
+              cov logstart dev ip bm data fbn n cr Sb pidv dq dqd m K eb C b
+              ltac:(intros _ GEN0 CID0;
+                    exact (BA.wp_balloc_gen (GEN := GEN0) (CID := CID0)))
+              ltac:(intros _ GEN0 CID0;
+                    exact (LW.wp_log_write_gen (GEN := GEN0) (CID := CID0)))
+              HK ltac:(intros _; exact Hneed)
+              ltac:(intros Hc; cbn [bm_bmsset ba_bms];
+                    exact (bmset_sing_sub _ _ (Hcrp Hc)))
+              ltac:(intros Hc; discriminate Hc)
+              Hgeom Hfbn Hwf Hj Hgl Ha0 Ha1 Heb
+              with "Hcg Hcnt Htext Hpc Hpanic Hprk Hbio Hidev Hmap Hblocks Hppid
+                    Hprocs Hdevi Hdgeom Hdlock Hsl1 Hkit [Hcont]").
+    iEval (rewrite /wp_next).
+    iIntros (CIDf) "%Hchain".
+    iIntros (mf bm' n' data' Sb') "%Hcs %Hwf' %Hag %Hkeep %Hnoal %Harm
+              Hcg Hcnt Hpc Hppid Hidev Hmap %Hdat Hblocks Hsl1 %Hled Hkit".
+    iDestruct (bm_kit_elim γ bmapstart size used dqb dqs γpr _ bn γfs cov logstart
+                 dev n' Sb' eq_refl with "Hkit")
+      as "(_ & _ & Hsl2 & Hop & Hsbsz & Hsbbm & Hbmg)".
+    iDestruct "Hbmg" as (used') "[%Hsub Hbmres]".
+    iDestruct (bm_slots_join bn 1 2 with "Hsl1 Hsl2") as "Hsl".
+    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iApply ("Hcont" $! mf bm' n' data' used' Sb'
               with "[%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hppid Hsbsz Hsbbm Hbmres Hidev Hmap [%] Hblocks [Hsl] [%] Hop").
     { exact Hcs. }
     { exact Hsub. }
@@ -3202,7 +3536,11 @@ Section BmapSeal.
     { exact Harm. }
     { exact Hdat. }
     { iExact "Hsl". }
-    { exact Hbud. }
+    { (* [bm_bmsset] at [Some _] IS the bitmap block's singleton *)
+      destruct Hled as (H1 & H2 & H3 & H4 & H5 & H6).
+      cbn [bm_bmsset ba_bms] in H4, H5.
+      split_and!; [exact H1 | exact H2 | exact H3 | exact H4 | | exact H6].
+      intros Hc. exact (bmset_sing_in _ _ (H5 Hc)). }
   Qed.
 
 End BmapSeal.
@@ -3237,10 +3575,11 @@ Section BmapNoallocSeal.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio Hidev Hmap Hblocks Hppid
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hcont".
     iApply (Core.wp_bmap_gen γs j γl γu γd γk pd pav pu bn None γfs
-              cov logstart dev ip bm data fbn 0%nat pidv dq dqd m K eb C b
+              cov logstart dev ip bm data fbn 0%nat false ∅ pidv dq dqd m K eb C b
               ltac:(intros Hc; exfalso; exact (Hc eq_refl))
               ltac:(intros Hc; exfalso; exact (Hc eq_refl))
               HK ltac:(intros Hc; exfalso; exact (Hc eq_refl))
+              ltac:(intros Hc; discriminate Hc)
               ltac:(intros _; exact Hnz)
               Hgeom Hfbn Hwf Hj Hgl Ha0 Ha1 Heb
               with "Hcg Hcnt Htext Hpc Hpanic [] Hbio Hidev Hmap Hblocks Hppid
@@ -3249,7 +3588,7 @@ Section BmapNoallocSeal.
     { iApply bm_kit_none. }
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
-    iIntros (mf bm' n' data') "%Hcs %Hwf' %Hag %Hkeep %Hnoal %Harm
+    iIntros (mf bm' n' data' Sb') "%Hcs %Hwf' %Hag %Hkeep %Hnoal %Harm
               Hcg Hcnt Hpc Hppid Hidev Hmap %Hdat Hblocks Hsl %Hbud Hkit".
     (* NOTHING MOVED: that is the whole content of the no-alloc contract *)
     destruct (Hnoal eq_refl) as [-> ->].

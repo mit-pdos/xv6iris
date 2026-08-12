@@ -132,6 +132,131 @@ Local Open Scope Z_scope.
    deepest callee is balloc (50); bread wants 40 and log_write 18. *)
 Definition K_bmap : nat := 56%nat.
 
+(* ===================================================================== *)
+(*  THE ARMS, AS THE CALLER READS THEM OFF THE BLOCK MAP                  *)
+(*  (fs-icache.md section 18: "bmap: ONE credit (the bitmap), arm-wise    *)
+(*  exact")                                                               *)
+(* ===================================================================== *)
+
+(* [wp_bmap_gen] below is the SET-FORM contract: it takes [LogInv.log_opS]
+   rather than [log_op], so the caller can see WHICH blocks this call put
+   into the transaction's logged set and absorb its own later writes of
+   them.  The counted [wp_bmap_sconf] above is this contract with the set
+   forgotten -- [log_op] IS [∃ Sb, log_opS], so the counted seal runs the
+   credited proof at whatever set that existential was hiding, claiming no
+   credit ([cr := false]).  [BMAP_NOALLOC] never had a budget at all and is
+   untouched.
+
+   THE ONE CREDIT IS THE BITMAP BLOCK.  There is exactly one
+   ([WriteiBudget.one_bitmap_block]), so every balloc of a transaction
+   log_writes the same block and only the first pays.  [cr] is the caller's
+   claim that it has already paid for it, and the premise
+   [cr = true -> bmapstart ∈ Sb] is what makes the claim honest.
+
+   THE COST IS ARM-WISE, and the arm is a FUNCTION of the block map going
+   in and coming out -- which is what makes it usable: a caller must be
+   able to COMPUTE what a call cost it, and [bm']/[bm] are exactly what it
+   already learns from the rest of the postcondition.  A per-call constant
+   is not an option: charging the maximum on the direct-hit arm busts
+   MAXOPBLOCKS for a four-block chunk of writei (the arm that allocates
+   nothing must cost nothing), which is [WriteiBudget]'s whole section 9.
+
+   THE SECOND CREDIT -- the indirect block, across ITERATIONS of a caller's
+   loop -- is deliberately NOT taken.  [WriteiBudget.wi_cost_bmonly] is the
+   accounting that follows (2B+2 = exactly 10 at B = 4, zero slack) and
+   [wi_cost_tight] (B+3 = 7) is what the second credit would buy; the
+   machinery for it is proven and parked in [WriteiBudget]. *)
+
+(* the file index is on the indirect path *)
+Definition bmap_ind (fbn : nat) : bool := bool_decide (NDIRECT <= fbn)%nat.
+
+(* bmap allocated the INDIRECT block on this call *)
+Definition bmap_ai (bm bm' : blkmap) : bool :=
+  bool_decide (bv_unsigned (bm_ind bm) = 0 /\ bv_unsigned (bm_ind bm') <> 0).
+
+(* bmap allocated the DATA block for [fbn] on this call *)
+Definition bmap_ad (bm bm' : blkmap) (fbn : nat) : bool :=
+  bool_decide (bv_unsigned (blkmap_get bm fbn) = 0
+               /\ bv_unsigned (blkmap_get bm' fbn) <> 0).
+
+(* ...either of them: the arm on which the bitmap block was log_written *)
+Definition bmap_alloced (bm bm' : blkmap) (fbn : nat) : bool :=
+  (bmap_ai bm bm' || bmap_ad bm bm' fbn)%bool.
+
+(* WHAT AN ARM COSTS THE LEDGER.  Nothing at all when nothing was
+   allocated.  Otherwise one unit for the bitmap block (two when the
+   caller had not already paid for it), plus, on the indirect path, ONE
+   more: either bmap's own [log_write] of the indirect block at +0xb0
+   (when the indirect block was already there), or balloc's [bzero] of the
+   indirect block it just allocated -- and never both, because in the
+   second case the [log_write] absorbs against the [bzero], same call,
+   same block.  That coincidence is why one number covers both. *)
+Definition bmap_cost (cr al ind : bool) : nat :=
+  (if al then (if cr then 1 else 2) + (if ind then 1 else 0) else 0)%nat.
+
+(* ...and what must be IN HAND on entry.  balloc wants two units even when
+   it absorbs (log_write's own "a unit in hand" survives the absorbing
+   arm), and the indirect path can run balloc twice with a log_write after
+   it, so the deepest requirement is balloc's two on top of what the
+   indirect allocation itself already spent. *)
+Definition bmap_need (cr ind : bool) : nat :=
+  (if ind then (if cr then 3 else 4) else 2)%nat.
+
+Lemma bmap_cost_le3 (cr al ind : bool) : (bmap_cost cr al ind <= 3)%nat.
+Proof. destruct cr, al, ind; vm_compute; lia. Qed.
+
+Lemma bmap_need_le4 (cr ind : bool) : (bmap_need cr ind <= 4)%nat.
+Proof. destruct cr, ind; vm_compute; lia. Qed.
+
+(* balloc's own two units are wanted on every allocating arm *)
+Lemma bmap_need_ge2 (cr ind : bool) : (2 <= bmap_need cr ind)%nat.
+Proof. destruct cr, ind; vm_compute; lia. Qed.
+
+Lemma bmap_ind_lt (fbn : nat) : (fbn < NDIRECT)%nat -> bmap_ind fbn = false.
+Proof. intros H. apply bool_decide_eq_false_2. lia. Qed.
+
+Lemma bmap_ind_ge (fbn : nat) : (NDIRECT <= fbn)%nat -> bmap_ind fbn = true.
+Proof. intros H. apply bool_decide_eq_true_2. exact H. Qed.
+
+(* the two shapes the interior proof discharges the arm booleans with *)
+Lemma bmap_alloced_none (bm bm' : blkmap) (fbn : nat) :
+  bm_ind bm' = bm_ind bm ->
+  blkmap_get bm' fbn = blkmap_get bm fbn ->
+  bmap_alloced bm bm' fbn = false.
+Proof.
+  intros Hi Hd. unfold bmap_alloced, bmap_ai, bmap_ad. rewrite Hi Hd.
+  case_bool_decide as H1; [exfalso; destruct H1 as [Ha Hb]; exact (Hb Ha)|].
+  case_bool_decide as H2; [exfalso; destruct H2 as [Ha Hb]; exact (Hb Ha)|].
+  reflexivity.
+Qed.
+
+Lemma bmap_ad_none (bm bm' : blkmap) (fbn : nat) :
+  blkmap_get bm' fbn = blkmap_get bm fbn -> bmap_ad bm bm' fbn = false.
+Proof.
+  intros Hd. unfold bmap_ad. rewrite Hd.
+  apply bool_decide_eq_false_2. intros [H1 H2]. exact (H2 H1).
+Qed.
+
+Lemma bmap_ad_true (bm bm' : blkmap) (fbn : nat) :
+  bv_unsigned (blkmap_get bm fbn) = 0 ->
+  bv_unsigned (blkmap_get bm' fbn) <> 0 ->
+  bmap_ad bm bm' fbn = true.
+Proof. intros H1 H2. apply bool_decide_eq_true_2. exact (conj H1 H2). Qed.
+
+Lemma bmap_alloced_of_ad (bm bm' : blkmap) (fbn : nat) :
+  bmap_ad bm bm' fbn = true -> bmap_alloced bm bm' fbn = true.
+Proof. intros H. unfold bmap_alloced. rewrite H. apply orb_true_r. Qed.
+
+Lemma bmap_alloced_of_ai (bm bm' : blkmap) (fbn : nat) :
+  bmap_ai bm bm' = true -> bmap_alloced bm bm' fbn = true.
+Proof. intros H. unfold bmap_alloced. rewrite H. reflexivity. Qed.
+
+Lemma bmap_ai_true (bm bm' : blkmap) :
+  bv_unsigned (bm_ind bm) = 0 ->
+  bv_unsigned (bm_ind bm') <> 0 ->
+  bmap_ai bm bm' = true.
+Proof. intros H1 H2. apply bool_decide_eq_true_2. exact (conj H1 H2). Qed.
+
 Definition wp_bmap_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}
@@ -292,6 +417,126 @@ Definition wp_bmap_sconf_body
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(*  THE CREDITED / SET-FORM CONTRACT                                      *)
+(*  Everything above the budget clause is verbatim [wp_bmap_sconf_body];  *)
+(*  only the ledger changes shape.  [wp_bmap_sconf] is derived from this  *)
+(*  at [cr := false] with the set forgotten, so no existing caller moves. *)
+(* ===================================================================== *)
+Definition wp_bmap_gen_body
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+
+    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+    (pd pav pu : mword 64)
+    (bn : bio_names)
+    (γ : log_names) (γfs : fs_names)
+    (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
+    (used : gset Z) (γpr : gname)
+    (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (fbn : nat)
+    (n : nat) (cr : bool) (Sb : gset Z)
+    (pidv : mword 32) (dq dqd dqb dqs : dfrac)
+    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (b : bool) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.bmap in
+  let pj := proc_addr j in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  let bnw : mword 32 := mword_of_int (Z.of_nat fbn) in
+  (K_bmap <= K)%nat ->
+  (* THE RESERVATION: enough for the deepest arm this index can take *)
+  (bmap_need cr (bmap_ind fbn) <= n)%nat ->
+  log_geom_ok cov logstart ->
+  bitmap_geom_ok cov logstart bmapstart size ->
+  printk_gen_contract γpr γu γd ->
+  (* THE CREDIT'S PREMISE: claiming the bitmap block is already paid for
+     means claiming this op has already logged it.  There is only one. *)
+  (cr = true -> bmapstart ∈ Sb) ->
+  (fbn < MAXFILE)%nat ->
+  blkmap_wf cov logstart bm ->
+  (j < NPROC)%nat ->
+  γs !! j = Some γl ->
+  m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bnw ->
+  eb = true ->
+  sie_cap_gpr m K b pj -∗
+  cpu_own 0 eb pj C b -∗
+  kernel_text -∗ pc_is pcE -∗
+  panic_wp_any -∗
+  kernel_data -∗
+  printk_env γpr γu γd -∗
+  bio_ctx bn (fs_view γfs γd dev cov) -∗
+  log_ctx γ bn γfs cov logstart dev -∗
+  i_dev ip ↦₄{dqd} dev -∗
+  inode_map γfs ip bm -∗
+  inode_blocks γfs bm data -∗
+  p_pid pj ↦₄{dq} pidv -∗
+  sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  bitmap_res γfs bmapstart cov logstart size used -∗
+  procs_inv γs -∗
+  dev_inv γu γd -∗
+  disk_geom γd pd pav pu -∗
+  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  bslots bn 3 -∗
+  log_opS γ n Sb -∗
+  wp_next b pj (fun (CID : CpuId) =>
+  ∀ (mf : regfile) (bm' : blkmap) (n' : nat) (data' : nat -> list (bv 8))
+    (used' : gset Z) (Sb' : gset Z),
+      ⌜callee_saved m mf⌝ -∗
+      ⌜used ⊆ used'⌝ -∗
+      ⌜blkmap_wf cov logstart bm'⌝ -∗
+      ⌜forall i : nat, (i < MAXFILE)%nat -> i <> fbn ->
+         blkmap_get bm' i = blkmap_get bm i⌝ -∗
+      ⌜forall i : nat, (i < MAXFILE)%nat -> bv_unsigned (blkmap_get bm i) <> 0 ->
+         blkmap_get bm' i = blkmap_get bm i⌝ -∗
+      ⌜(mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64)
+        /\ bv_unsigned (blkmap_get bm' fbn) = 0)
+       \/ (mf !!! Regidx (mword_of_int 10 : mword 5)
+             = sign_extend' 64 (blkmap_get bm' fbn : mword 32)
+           /\ bv_unsigned (blkmap_get bm' fbn) <> 0)⌝ -∗
+      sie_cap_gpr mf K b pj -∗
+      cpu_own 0 eb pj C b -∗
+      pc_is ret_tgt -∗
+      p_pid pj ↦₄{dq} pidv -∗
+      sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      bitmap_res γfs bmapstart cov logstart size used' -∗
+      i_dev ip ↦₄{dqd} dev -∗
+      inode_map γfs ip bm' -∗
+      ⌜data' = data
+       \/ (bv_unsigned (blkmap_get bm fbn) = 0
+           /\ data' = <[fbn := replicate BSIZE (bv_0 8)]> data)⌝ -∗
+      inode_blocks γfs bm' data' -∗
+      bslots bn 3 -∗
+      (* THE LEDGER, ARM-WISE.  Four clauses, and a caller needs all four:
+         the cost (what it may charge itself), the two set bounds (what it
+         may still absorb, and what it must own up to when IT has a caller),
+         and the two memberships that are the absorption itself. *)
+      ⌜(* (a) the spend, arm-wise exact -- as an upper bound, because bmap
+              cannot BURN a surplus it did not spend *)
+        (n <= n' + bmap_cost cr (bmap_alloced bm bm' fbn) (bmap_ind fbn))%nat
+        /\ (n' <= n)%nat
+        (* (b) the set only grows... *)
+        /\ Sb ⊆ Sb'
+        (* ...and grows by AT MOST the three blocks bmap can log: the one
+              bitmap block, the file's indirect block, and the data block
+              for this index *)
+        /\ Sb' ⊆ Sb ∪ {[bmapstart]} ∪ {[bv_unsigned (bm_ind bm')]}
+                    ∪ {[bv_unsigned (blkmap_get bm' fbn)]}
+        (* (c) any allocation at all logged THE BITMAP BLOCK, so the next
+              call may present [cr := true] *)
+        /\ (bmap_alloced bm bm' fbn = true -> bmapstart ∈ Sb')
+        (* (d) ...and a freshly allocated DATA block was log_written by
+              balloc's own bzero, which is what lets the caller absorb its
+              own [log_write] of the very same block *)
+        /\ (bmap_ad bm bm' fbn = true ->
+              bv_unsigned (blkmap_get bm' fbn) ∈ Sb')⌝ -∗
+      log_opS γ n' Sb' -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type BMAP.
   Parameter wp_bmap_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
@@ -313,6 +558,31 @@ Module Type BMAP.
       wp_bmap_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                          cov logstart bmapstart size dev used γpr ip bm data fbn n
                          pidv dq dqd dqb dqs m K eb C b.
+
+  (* the SET-FORM contract; [wp_bmap_sconf] above is its instance at
+     [cr := false] with the set forgotten, kept as its own parameter so
+     that every existing caller is unchanged (wp_balloc_gen's pattern) *)
+  Parameter wp_bmap_gen :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ}
+      `{GEN : GenId} `{CID : CpuId}
+
+      (γs : list gname) (j : nat) (γl : gname)
+      (γu : uart_names) (γd : disk_names) (γk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (γ : log_names) (γfs : fs_names)
+      (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
+      (used : gset Z) (γpr : gname)
+      (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (fbn : nat)
+      (n : nat) (cr : bool) (Sb : gset Z)
+      (pidv : mword 32) (dq dqd dqb dqs : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool),
+      wp_bmap_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
+                       cov logstart bmapstart size dev used γpr ip bm data fbn
+                       n cr Sb
+                       pidv dq dqd dqb dqs m K eb C b.
 End BMAP.
 
 (* ===================================================================== *)

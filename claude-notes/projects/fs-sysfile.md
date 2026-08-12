@@ -1363,6 +1363,155 @@ mirror, never scp'd. Step-0 probe deleted from the mirror.
    moves cost onto the empty arm. `vm_compute` both at the degenerate input
    before sizing the consumer ripple.
 
+## S3l — LINK 2 LANDED AND FULL-GATED: bmap is set-form, one credit,
+## arm-wise exact.  Link 3's loop algebra is PROVEN; links 3+4 NOT STARTED
+
+### What landed
+
+**`SpecBmap.v` (+~230): the arm vocabulary and `wp_bmap_gen_body`.**  The
+arm a caller can *read off the block map* is one boolean —
+
+```coq
+Definition bmap_ai  (bm bm' : blkmap)             : bool  (* indirect alloc'd *)
+Definition bmap_ad  (bm bm' : blkmap) (fbn : nat) : bool  (* data alloc'd     *)
+Definition bmap_alloced bm bm' fbn := (bmap_ai bm bm' || bmap_ad bm bm' fbn)%bool
+Definition bmap_ind (fbn : nat) : bool := bool_decide (NDIRECT <= fbn)%nat
+
+Definition bmap_cost (cr al ind : bool) : nat :=
+  (if al then (if cr then 1 else 2) + (if ind then 1 else 0) else 0)%nat
+Definition bmap_need (cr ind : bool) : nat :=
+  (if ind then (if cr then 3 else 4) else 2)%nat
+```
+
+`bmap_cost <= 3`, `bmap_need <= 4` (both machine-checked).  The post is
+five clauses: the spend `n <= n' + bmap_cost cr (bmap_alloced bm bm' fbn)
+(bmap_ind fbn)`, `n' <= n`, `Sb ⊆ Sb'`, the ceiling `Sb' ⊆ Sb ∪
+{[bmapstart]} ∪ {[ind']} ∪ {[dblk']}`, and the two memberships that ARE the
+absorption: any allocation puts `bmapstart` in the set (so the next call
+may present `cr := true`), and a freshly allocated data block is in the set
+(so the caller's own `log_write` of it absorbs).
+
+**Why ONE boolean and not a constant.**  Charging the maximum on the
+direct-hit arm busts MAXOPBLOCKS for a four-block chunk — the arm that
+allocates nothing must cost nothing.  Charging per *four-way disjunction*
+(§18's option (B) read literally) is not needed either: the SET outcomes
+collapse to four but the COST collapses to one function of `al` and `ind`,
+because `ai -> ind` makes "a second unit was spent" equal `al && ind`.
+That is the whole reason bmap's contract stayed one line of arithmetic.
+
+**`ProofBmap.v` (+~350/-90): the set threaded through `bm_kit`.**  Four
+interior lemmas (`bm_epilogue`, `bm_release`, `bm_indirect_tail`,
+`wp_bmap_gen`), six ledger-discharge sites, three balloc calls, one
+log_write call, and both seals.  `wp_bmap_sconf`'s STATEMENT IS UNCHANGED
+and is now DERIVED from the core at `cr := false` — see the deviation
+below for why not at `Sb := ∅`.  `BMAP_NOALLOC` and `ProofReadi` did not
+move at all.
+
+**`WriteiBudget.v` (+~150): link 3's loop algebra, proven.**  Section 10:
+`bm_pot bms S := if decide (bms ∈ S) then 0 else 1`, the two invariant
+clauses `wi_inv_bud` / `wi_inv_spent`, and the five lemmas that are the
+whole `ProofWritei` retrofit — `wi_inv_enter`, `wi_bmap_need_ok`,
+`wi_bmap_cost_le`, `wi_step_noalloc`, `wi_step_alloc`, `wi_inv_bud_pos`,
+`wi_inv_exit`, and `wi_inv_enter_maxop` (entering at MAXOPBLOCKS covers
+every chunk filewrite can ask for, four-block ones included).
+
+### The deviations from the brief, and why
+
+1. **`ba_cred` as a record field is UNIMPLEMENTABLE for this contract.**
+   The brief's shape — `∃ Sb, ⌜ba_cred a ⊆ Sb⌝ ∗ log_opS …`, the `ba_used`
+   invariant-index trick — carries only a LOWER bound on the current set.
+   That is exactly right for `used` (a caller wants `used ⊆ used'` and
+   nothing else) and exactly wrong here: writei's data-block absorption
+   needs `dblk ∈ Sb'`, which the ENTRY index cannot mention, and §18
+   clause 1 also demands an upper bound on `Sb' ∖ Sb`, which no
+   lower-bounded existential can express.  `Sb` therefore rides as an
+   EXPLICIT parameter of `bm_kit`, beside `n`, in the same in/out
+   positions.  The feared binder cost did not materialise: only four
+   interior lemmas mention the kit, and all four already carried `n`.
+2. **`wp_bmap_sconf` is derived at the `log_op` WITNESS, not at `Sb := ∅`.**
+   `log_op γ n` *is* `∃ Sb, log_opS γ n Sb`, so the counted seal destructs
+   it and runs the core at whatever set the existential was hiding, with
+   `cr := false`.  Deriving at `∅` would have required every counted caller
+   to prove its set empty, which is false and unnecessary.  This is
+   strictly stronger than the brief's `Sb := ∅` and costs nothing.
+3. **bmap carries a SECOND, INTERNAL credit.**  `bm_indirect_tail` takes
+   `cri` — "the indirect block is already in the op's set" — because on the
+   arm where bmap allocates the indirect block itself, its own `log_write`
+   at +0xb0 must absorb against balloc's bzero of that very block, or the
+   arm costs 4 and `bmap_cost` is wrong.  `cri` is a `Local Lemma`
+   parameter and never crosses the seal, so §18's "one credit at the seam"
+   is intact.  The public contract has exactly one, the bitmap.
+
+### FINDING: the set CEILING is decorative, and §18 should know it
+
+§18 clause 1 requires an explicit bound on `Sb' ∖ Sb`, and link 2 supplies
+one.  But **no proof obligation anywhere consumes it**, and none can: a
+ceiling is a statement that a block is NOT in the set, and the only thing
+callers ever do with the set is claim credits, which are MEMBERSHIPS.
+Budget soundness is carried entirely by the counter — `log_spend_step`
+already refuses to grow `Sb` without spending a unit — so the ceiling adds
+no soundness.  It cost link 2 one extra hypothesis on `bm_indirect_tail`
+(`bm_ledger_ok`'s own ceiling admits the ZERO entry the allocating arm is
+standing on, so the tail needs a data-block-free ceiling of its own).
+**Recommendation for link 3 and for create's S5 brief:** keep the ceiling
+where it is free, but do NOT let it drive the shape of writei's loop
+invariant — if it forces a block-set monotonicity lemma over the
+loop-carried `blkmap`, drop it and state the memberships only.
+
+### TRAP (new, and it cost this stage an hour): `set_solver` IS QUADRATIC
+### IN THE PROOF CONTEXT, AND AN IRIS GOAL HAS A HUGE ONE
+
+`set_solver` runs `set_unfold` over the WHOLE hypothesis context.  In
+`ProofBmap`'s interior — several hundred hypotheses of proofmode state,
+register-threading facts and mword equalities — a single call did not
+terminate in fifteen minutes; the file compiles in 90 seconds without one.
+Every set obligation in this retrofit is one of a dozen shapes
+(`x ∈ A ∪ {[x]} ∪ C`, `A ⊆ A ∪ B ∪ C`, …), so they are proved ONCE as
+named lemmas at the top of `ProofBmap` where the context is three
+variables, and applied by name.  **Never write `set_solver` inside a
+function-proof lemma in this tree.**  Corollary trap: the failure looks
+exactly like a hang, and a `coqc` launched over `ssh` without `nohup` dies
+with the connection, so the log stops mid-tactic and reads like a crash —
+launch mirror builds detached.
+
+### The remaining trap that bit: `uint` needs its mword ascription
+
+`{[uint (bm_ind bmI)]}` does not typecheck — `bm_ind` returns `bv 32` and
+`uint` wants `mword 32`.  The file's own older lines all write
+`uint (bm_ind bmI : mword 32)`; new ones must too.
+
+### Gate (link 2)
+
+Mirror `full.sh` **`EXIT=0`, 1037 `.vo`, zero `Error`**, on top of
+`8ceaf829`.  `WriteiBudget.v` green (`one.sh`).  `Print Assumptions` on
+`Bmap.wp_bmap_sconf` / `Bmap.wp_bmap_gen` /
+`BmapNoalloc.wp_bmap_noalloc_sconf` / `Balloc.*` / `Readi.wp_readi_sconf` /
+`Writei.wp_writei_sconf` / `Dirlink.wp_dirlink_sconf`: unchanged.
+
+### NOT STARTED: links 3 and 4
+
+`SpecWritei` / `ProofWritei` / `ProofDirlink` are UNTOUCHED — the tree is
+green with link 2 in it and links 3–4 out.  The shape is settled and the
+arithmetic is machine-checked; what remains is mechanical:
+
+1. `SpecWritei`: move `wi_cost_bmonly` up from `WriteiBudget` (which
+   imports `SpecWritei`, so it cannot stay there), swap the sconf body's
+   two `wi_cost` occurrences for it, and add `wp_writei_gen_body` taking
+   `log_opS γ ncount Sb` and returning `log_opS γ n' Sb'` with `Sb ⊆ Sb'`.
+   **writei needs NO credit parameter of its own** — `wi_inv_enter` holds
+   at any entry set, because the potential is what absorbs the unknown.
+2. `ProofWritei`: the loop's five numeric premises
+   (`6*W+1 <= nI`, `ncount <= nI + 6*(B-W)`, …) become
+   `wi_inv_bud` + `wi_inv_spent` + `nI <= ncount` + `Sb ⊆ SbI`; the bmap
+   call becomes `BM.wp_bmap_gen` at `cr := bool_decide (ba_bms A ∈ SbI)`;
+   the two `log_write`s become `LW.wp_log_write_gen` at
+   `cr := bool_decide (uint blk ∈ Sb2)`; the five budget `lia`s become
+   `wi_step_noalloc` / `wi_step_alloc` / `wi_inv_exit`.
+3. `ProofDirlink`: one call site, `wi_blocks = 1`, so the premise is
+   `wi_cost_bmonly = 4` against whatever it holds today.  **AUDIT ITS
+   EMPTY-RANGE ARM** — `wi_cost_bmonly 0 0 = 2` against `wi_cost 0 0 = 1`,
+   so the non-monotonicity trap is live here exactly as recorded above.
+
 ## The stage ladder
 
 - **S1** (agent): the DECODE stage — 13 Code files (the 12 targets +
@@ -1451,6 +1600,19 @@ mirror, never scp'd. Step-0 probe deleted from the mirror.
 - **S3k** (agent): the retrofit, bottom-up per the S3j sizing, then
   `ProofFilewrite` + `LinkFilewrite` on S3g's seven blocks + `fw_tail`.
   Then file.c is 7/7 and S4's three shells unblock.
+- **S3l** (agent) **— PARTIAL**: **link 2 LANDED and full-gated** — `SpecBmap`
+  grows `wp_bmap_gen_body` (set-form, ONE credit, arm-wise exact cost as a
+  function of one observable boolean) and `ProofBmap` threads `Sb` explicitly
+  through `bm_kit`; `wp_bmap_sconf`'s statement is unchanged and DERIVED, and
+  `BMAP_NOALLOC`/`ProofReadi` did not move.  Link 3's loop algebra
+  (`bm_pot`, `wi_inv_bud`/`wi_inv_spent` and the five step lemmas) landed
+  PROVEN in `WriteiBudget` section 10.  **Links 3 and 4 NOT STARTED** —
+  `SpecWritei`/`ProofWritei`/`ProofDirlink` untouched, tree green with link 2
+  in it.  Two shape deviations from the §18 brief (the `ba_cred` record field
+  cannot express the growth writei needs; the set CEILING is decorative and
+  should not drive link 3's invariant) and a new cross-cutting trap
+  (`set_solver` does not terminate inside this tree's function proofs) are in
+  the S3l section.  file.c stays 6/7.
 - **S3b** (agent) **— PARTIAL**: filestat PROVEN AND LINKED (file.c 6/7);
   §17's fd-type witness STOPPED-AND-REPORTED as unimplementable in the ruled
   shape — design/fs-icache.md §17.1 has the finding and the repair (§17′) to

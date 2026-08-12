@@ -94,6 +94,7 @@ Require Import InodeInv.      (* NDIRECT, NINDIRECT, MAXFILE *)
 Require Import LogInv.        (* MAXOPBLOCKS, log_op, log_opS *)
 Require Import BitmapInv.     (* BPB, bitmap_geom_ok, BBLOCK *)
 Require Import SpecWritei.    (* wi_blocks, wi_cost *)
+Require Import SpecBmap.      (* bmap_cost, bmap_need -- the link-2 contract *)
 
 Local Open Scope Z_scope.
 
@@ -721,3 +722,162 @@ Proof. vm_compute. reflexivity. Qed.
 Lemma wi_cost_tight_slack :
   (wi_cost_tight 1023 FW_MAX + 3 = MAXOPBLOCKS)%nat.
 Proof. vm_compute. reflexivity. Qed.
+
+(* ===================================================================== *)
+(*  10. writei's LOOP INVARIANT AGAINST THE ONE-CREDIT bmap               *)
+(* ===================================================================== *)
+
+(* Section 9 says the accounting fits at [2B + 2]; this section is that
+   accounting AS A LOOP INVARIANT, discharged arm by arm against
+   [SpecBmap.bmap_cost], so that the [ProofWritei] retrofit is an
+   application of five lemmas rather than five re-derivations.
+
+   THE POTENTIAL.  The bitmap block is paid for AT MOST ONCE in the whole
+   call, but WHICH iteration pays is not known in advance -- it is the
+   first one that allocates, and a call may never allocate at all.  A case
+   split on "has the bitmap been paid yet" would infect every clause of a
+   loop invariant that already has fourteen; instead the unpaid bitmap is
+   carried as ONE unit of held-back capacity, [bm_pot], which is 1 while
+   [bmapstart] is outside the op's logged set and 0 forever after.  Both
+   step lemmas below are then uniform in the arm.
+
+   This is [log_amort]'s potential (section 7) at [F = {[bmapstart]}],
+   written out on the raw set instead of behind the sealed predicate,
+   because the set-form contract of section 18 has to EXPOSE [Sb] and
+   [log_amort] hides it.  The sealed form stays for the two-credit day. *)
+Definition bm_pot (bms : Z) (S : gset Z) : nat :=
+  if decide (bms ∈ S) then 0%nat else 1%nat.
+
+Lemma bm_pot_le1 (bms : Z) (S : gset Z) : (bm_pot bms S <= 1)%nat.
+Proof. unfold bm_pot. destruct (decide (bms ∈ S)); lia. Qed.
+
+Lemma bm_pot_in (bms : Z) (S : gset Z) : bms ∈ S -> bm_pot bms S = 0%nat.
+Proof.
+  intros H. unfold bm_pot.
+  destruct (decide (bms ∈ S)); [reflexivity | contradiction].
+Qed.
+
+(* the set only grows, so the potential only falls: this is what makes the
+   two step lemmas monotone without a first-touch case split *)
+Lemma bm_pot_mono (bms : Z) (S S' : gset Z) :
+  S ⊆ S' -> (bm_pot bms S' <= bm_pot bms S)%nat.
+Proof.
+  intros Hsub. unfold bm_pot.
+  destruct (decide (bms ∈ S')) as [_|Hn']; [lia|].
+  destruct (decide (bms ∈ S)) as [Hi|_]; [| lia].
+  exfalso. apply Hn'. exact (elem_of_weaken _ _ _ Hi Hsub).
+Qed.
+
+(* THE TWO CLAUSES.  [W] is the number of straddled blocks still to come,
+   [B] the number the whole call straddles, [nI] the ledger's counter and
+   [SI] its set.  [wi_inv_bud] is what the rest of the loop can afford;
+   [wi_inv_spent] is what has been spent so far, and is what the public
+   spend-at-most postcondition is read off. *)
+Definition wi_inv_bud (bms : Z) (W nI : nat) (SI : gset Z) : Prop :=
+  (2 * W + 1 + bm_pot bms SI <= nI)%nat.
+
+Definition wi_inv_spent (bms : Z) (ncount nI B W : nat) (SI : gset Z) : Prop :=
+  (ncount + bm_pot bms SI <= nI + 2 * (B - W) + 1)%nat.
+
+(* ENTRY: the public premise [wi_cost_bmonly off n <= ncount] establishes
+   both clauses at [W = B], [nI = ncount], [SI = Sb] -- for ANY entry set,
+   which is why writei needs no credit parameter of its own. *)
+Lemma wi_inv_enter (bms : Z) (ncount off n : nat) (S : gset Z) :
+  (wi_cost_bmonly off n <= ncount)%nat ->
+  wi_inv_bud bms (wi_blocks off n) ncount S
+  /\ wi_inv_spent bms ncount ncount (wi_blocks off n) (wi_blocks off n) S.
+Proof.
+  intros H. unfold wi_inv_bud, wi_inv_spent, wi_cost_bmonly in *.
+  pose proof (bm_pot_le1 bms S). split; lia.
+Qed.
+
+(* the reservation bmap demands is exactly what the invariant supplies, at
+   either credit *)
+Lemma wi_bmap_need_ok (bms : Z) (W nI : nat) (SI : gset Z) (ind : bool) :
+  (1 <= W)%nat -> wi_inv_bud bms W nI SI ->
+  (bmap_need (bool_decide (bms ∈ SI)) ind <= nI)%nat.
+Proof.
+  intros HW H. unfold wi_inv_bud, bm_pot, bmap_need in *.
+  destruct (decide (bms ∈ SI)) as [Hi|Hn].
+  - rewrite (bool_decide_eq_true_2 _ Hi). destruct ind; lia.
+  - rewrite (bool_decide_eq_false_2 _ Hn). destruct ind; lia.
+Qed.
+
+(* ...and no arm of bmap costs more than the two units per straddled block
+   the accounting budgets, plus the one held back for the bitmap *)
+Lemma wi_bmap_cost_le (bms : Z) (SI : gset Z) (al ind : bool) :
+  (bmap_cost (bool_decide (bms ∈ SI)) al ind <= 2 + bm_pot bms SI)%nat.
+Proof.
+  unfold bmap_cost, bm_pot. destruct (decide (bms ∈ SI)) as [Hi|Hn].
+  - rewrite (bool_decide_eq_true_2 _ Hi). destruct al, ind; cbn; lia.
+  - rewrite (bool_decide_eq_false_2 _ Hn). destruct al, ind; cbn; lia.
+Qed.
+
+(* THE STEP, on the arm where bmap allocated NOTHING: bmap spent nothing,
+   and writei's own [log_write] of an already-existing data block spends at
+   most one. *)
+Lemma wi_step_noalloc (bms : Z) (ncount nI nI' B W : nat) (SI SI' : gset Z) :
+  (1 <= W)%nat -> (W <= B)%nat ->
+  wi_inv_bud bms W nI SI ->
+  wi_inv_spent bms ncount nI B W SI ->
+  SI ⊆ SI' ->
+  (nI <= nI' + 1)%nat -> (nI' <= nI)%nat ->
+  wi_inv_bud bms (W - 1) nI' SI'
+  /\ wi_inv_spent bms ncount nI' B (W - 1) SI'.
+Proof.
+  intros HW HWB H1 H2 Hsub Hlo Hhi.
+  pose proof (bm_pot_mono bms SI SI' Hsub).
+  unfold wi_inv_bud, wi_inv_spent in *. split; lia.
+Qed.
+
+(* THE STEP, on the arm where bmap ALLOCATED: at most [2 + bm_pot] gone
+   ([wi_bmap_cost_le]), writei's own [log_write] of the fresh block absorbs
+   against balloc's bzero of it, and the bitmap block is now in the set --
+   so the potential is discharged in the same breath that spends it. *)
+Lemma wi_step_alloc (bms : Z) (ncount nI nI' B W : nat) (SI SI' : gset Z) :
+  (1 <= W)%nat -> (W <= B)%nat ->
+  wi_inv_bud bms W nI SI ->
+  wi_inv_spent bms ncount nI B W SI ->
+  SI ⊆ SI' -> bms ∈ SI' ->
+  (nI <= nI' + 2 + bm_pot bms SI)%nat -> (nI' <= nI)%nat ->
+  wi_inv_bud bms (W - 1) nI' SI'
+  /\ wi_inv_spent bms ncount nI' B (W - 1) SI'.
+Proof.
+  intros HW HWB H1 H2 Hsub Hin Hlo Hhi.
+  pose proof (bm_pot_in bms SI' Hin) as Hz.
+  pose proof (bm_pot_le1 bms SI).
+  unfold wi_inv_bud, wi_inv_spent in *. split; lia.
+Qed.
+
+(* the trailing iupdate always has its unit: the invariant reserves one
+   past the straddled blocks, on EVERY exit including the [n = 0] one and
+   the out-of-blocks one *)
+Lemma wi_inv_bud_pos (bms : Z) (W nI : nat) (SI : gset Z) :
+  wi_inv_bud bms W nI SI -> (1 <= nI)%nat.
+Proof. unfold wi_inv_bud. lia. Qed.
+
+(* EXIT: the invariant, plus iupdate's one unit, IS the public
+   spend-at-most postcondition at [wi_cost_bmonly]. *)
+Lemma wi_inv_exit (bms : Z) (ncount nI nfin B W off n : nat) (SI : gset Z) :
+  (W <= B)%nat -> B = wi_blocks off n ->
+  wi_inv_spent bms ncount nI B W SI ->
+  (nI <= ncount)%nat ->
+  (nI <= nfin + 1)%nat -> (nfin <= nI)%nat ->
+  ((ncount - wi_cost_bmonly off n)%nat <= nfin)%nat /\ (nfin <= ncount)%nat.
+Proof.
+  intros HWB -> H2 Hnc Hlo Hhi.
+  unfold wi_inv_spent, wi_cost_bmonly in *.
+  pose proof (bm_pot_le1 bms SI). split; lia.
+Qed.
+
+(* and the whole point, restated at the numbers: entering at MAXOPBLOCKS --
+   what [begin_op] hands filewrite -- covers every chunk filewrite can ask
+   for, four-block ones included *)
+Lemma wi_inv_enter_maxop (bms : Z) (off n : nat) (S : gset Z) :
+  (n <= FW_MAX)%nat ->
+  wi_inv_bud bms (wi_blocks off n) MAXOPBLOCKS S
+  /\ wi_inv_spent bms MAXOPBLOCKS MAXOPBLOCKS
+                  (wi_blocks off n) (wi_blocks off n) S.
+Proof.
+  intros Hn. apply wi_inv_enter. exact (wi_cost_bmonly_fits off n Hn).
+Qed.
