@@ -1,11 +1,12 @@
 (* ProofFilewrite.v -- filewrite's own control flow and ghost steps.
-   ============================= WIP, S3q ==============================
+   ============================= WIP, S3r ==============================
 
-   STATUS (S3q): THE WALK IS WRITTEN AND PARKED AT THE LOOP TEST.
-   [FilewriteProof] exists at the bottom of this file and
-   [wp_filewrite_sconf] is proved for EVERY path except the FD_INODE loop
-   BODY, under ONE banered [Axiom cheat_] whose single occurrence is at
-   +0xcc.  Proved outright, instruction by instruction:
+   STATUS (S3r): THE LOOP LEMMA IS LANDED AND THE WALK IS PARKED INSIDE
+   THE BODY, at +0x84.  [FilewriteProof] exists at the bottom of this file
+   and [wp_filewrite_sconf] is proved for EVERY path except the STRAIGHT
+   LINE from the [jal begin_op] at +0x84 to the back edge at +0xc8, under
+   ONE banered [Axiom cheat_] whose single occurrence is inside
+   [fw_loop].  Proved outright, instruction by instruction:
 
      * +0x00/+0x04, the pre-prologue [f->writable] test, and its -1 return
        at +0x122 with sp and the whole frame untouched;
@@ -21,13 +22,33 @@
        +0x32, the whole ZERO-TRIP path (+0xe6 -> +0xf4 -> [fw_tail] ->
        [fw_epi]), and, on the other side of that test, the five late spills
        at +0x36..+0x3e, both [lui]/[addi] pairs for 3072, [i := 0],
-       [user := 1], and the [c.j] to the bottom test.
+       [user := 1], and the [c.j] to the bottom test;
+     * S3r: THE LOOP ITSELF, as far as its body's first instruction --
+       [fw_loop], the [forall]-fuel induction at [n - i], applied at +0xcc
+       against the real state the walk holds there, and [fw_test], the
+       +0xcc..+0xd8 chunk computation in BOTH of its arms, plus the
+       [sext.w s3,s3] at +0x82 that normalises the chunk.
 
-   WHAT IS LEFT is the loop BODY alone -- see the FRONTIER banner at the
-   [exact (cheat_ _)] near the end of this file for the exact state it is
-   handed and the exact shape it needs.  [LinkFilewrite.v] is DELIBERATELY
-   ABSENT: nothing outside this file may consume a parked walk, so file.c
-   stays 6/7 until the frontier closes.
+   WHAT S3r ACTUALLY BOUGHT, since it is one instruction of code and two
+   lemmas: the loop lemma's STATEMENT is now machine-checked against the
+   proof state at +0xcc rather than sketched in a note.  Three things are
+   loop-carried ([i], the page-table descriptor, the bitmap's marked set)
+   and -- the discovery -- almost nothing else is.  The inode is PARKED in
+   the escrow at the head of every iteration, so no [dinode], no [blkmap]
+   and no [data] appears in the invariant; ilock mints them inside the
+   iteration and iunlock parks them again.  [f->off] is likewise RESIDENT
+   in [off_inv] at the head, borrowed and returned within one iteration.
+   The environment splits cleanly: fourteen PERSISTENT invariants (all
+   fourteen verified persistent -- they are introduced with [#]) plus the
+   ten pure fields, threaded free, and an exclusive half that is exactly
+   [filewrite_fs_out fn Cf SI], i.e. the six resources the contract
+   itself returns.  That is why the exit needs no re-assembly.
+
+   WHAT IS LEFT is the straight line +0x84 .. +0xc8 and its three joins --
+   see the FRONTIER banner inside [fw_loop] for the exact state it is
+   handed and the exact order it must run.  [LinkFilewrite.v] is
+   DELIBERATELY ABSENT: nothing outside this file may consume a parked
+   walk, so file.c stays 6/7 until the frontier closes.
 
    =====================================================================
    S3p: BLOCKER SIX IS REPAIRED.  THE WALK HAS NOTHING OWED IN FRONT OF IT.
@@ -886,6 +907,496 @@ Section ProofFilewrite.
   Proof.
     intro H. rewrite /filewrite_dev_env. case_decide as H'; [| contradiction].
     iIntros "%Hd Hc". iSplitR; [iPureIntro; exact Hd | iExact "Hc"].
+  Qed.
+
+  (* ---- the FD_INODE arm's environment, opened and closed --------------
+     [fw_env_fs] is [fw_env_dev]'s twin at the third arm; [fw_env_out_fs]
+     is the exit, and it is stated at an ARBITRARY [used'] because the
+     bitmap only grows.  Neither does anything but reduce three
+     [bool_decide]s, and they exist so that no [vm_compute] on an
+     [fcontent] runs at a call site. ------------------------------------ *)
+  Local Lemma fw_env_fs (ga' gf' : gname) (k' : nat)
+      (fn' : fwrite_names) (Cf' : fcontent) :
+    fc_type Cf' = FD_INODE ->
+    filewrite_env ga' gf' k' fn' Cf' -∗ filewrite_fs_env ga' gf' k' fn' Cf'.
+  Proof.
+    intro Ht. rewrite /filewrite_env Ht.
+    rewrite bool_decide_eq_false_2; [| by vm_compute].
+    rewrite bool_decide_eq_false_2; [| by vm_compute].
+    rewrite bool_decide_eq_true_2; [| reflexivity].
+    by iIntros "$".
+  Qed.
+
+  Local Lemma fw_env_out_fs (fn' : fwrite_names) (Cf' : fcontent)
+      (used' : gset Z) :
+    fc_type Cf' = FD_INODE ->
+    filewrite_fs_out fn' Cf' used' -∗ filewrite_env_out fn' Cf' used'.
+  Proof.
+    intro Ht. rewrite /filewrite_env_out Ht.
+    rewrite bool_decide_eq_false_2; [| by vm_compute].
+    rewrite bool_decide_eq_false_2; [| by vm_compute].
+    rewrite bool_decide_eq_true_2; [| reflexivity].
+    by iIntros "$".
+  Qed.
+
+  (* =================================================================== *)
+  (*  THE LOOP TEST, +0xcc .. +0xd8 -- and the ONE reason it is a lemma   *)
+  (*  of its own.                                                        *)
+  (*                                                                     *)
+  (*  [subw a5,s5,s4] computes [n - i]; [c.mv s3,a5] parks it; [bge      *)
+  (*  s7,a5] is TAKEN to the body when the remainder fits in a chunk and *)
+  (*  otherwise [c.mv s3,s9 ; c.j] caps it at FW_MAX.  BOTH arms land at *)
+  (*  +0x82 -- and a Rocq proof cannot JOIN two arms.  So the block is   *)
+  (*  lifted out and its continuation is quantified over the chunk [c]   *)
+  (*  and the register map [P], which is the only thing the two arms     *)
+  (*  disagree about.  Without this the whole loop body (begin_op ..     *)
+  (*  end_op) would have to be written TWICE.                            *)
+  (*                                                                     *)
+  (*  The continuation is handed the state at +0x82 rather than at       *)
+  (*  +0x84: the [sext.w s3,s3] there is straight-line, so it costs the  *)
+  (*  caller one step and costs this lemma nothing.                      *)
+  (*                                                                     *)
+  (*  Note what is NOT a premise: [i < n] is, but nothing about the      *)
+  (*  resources -- the block touches only a5 and s3 and reads four       *)
+  (*  callee-saved registers, so it needs [sie_cap_gpr] and the text and *)
+  (*  nothing else.                                                      *)
+  (* =================================================================== *)
+  Local Lemma fw_test `{CID0 : CpuId}
+      (M : regfile) (Kn : nat) (nz iz : Z) (p : mword 64) (b : bool) :
+    (0 <= iz < nz)%Z -> (nz < 2 ^ 31)%Z ->
+    M !!! Regidx Rs4 = (mword_of_int iz : mword 64) ->
+    M !!! Regidx Rs5 = (mword_of_int nz : mword 64) ->
+    M !!! Regidx Rs7 = (mword_of_int SpecFilewrite.FW_MAX : mword 64) ->
+    M !!! Regidx Rs9 = (mword_of_int SpecFilewrite.FW_MAX : mword 64) ->
+    sie_cap_gpr M Kn b p -∗
+    kernel_text -∗
+    InstrBytes.pc_is (mword_of_int (FW + 0xcc) : mword 64) -∗
+    wp_next b p (fun (CID : CpuId) =>
+      ∀ (c : Z) (P : regfile),
+        ⌜(0 < c <= SpecFilewrite.FW_MAX)%Z /\ (c <= nz - iz)%Z
+          /\ P !!! Regidx Rs3 = (mword_of_int c : mword 64)
+          /\ (forall r : mword 5, is_cs_idx r = true -> r <> Rs3 ->
+                P !!! Regidx r = M !!! Regidx r)⌝ -∗
+        sie_cap_gpr P Kn b p -∗
+        InstrBytes.pc_is (mword_of_int (FW + 0x82) : mword 64) -∗
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hiz Hnz HMs4 HMs5 HMs7 HMs9.
+    iIntros "Hcg #Htext Hpc Hcont".
+    iPoseProof (fwri_0cc with "Htext") as "Hicc".
+    iPoseProof (fwri_0d0 with "Htext") as "Hid0".
+    iPoseProof (fwri_0d2 with "Htext") as "Hid2".
+    iPoseProof (fwri_0d6 with "Htext") as "Hid6".
+    iPoseProof (fwri_0d8 with "Htext") as "Hid8".
+    (* ---- +0xcc subw a5,s5,s4 : a5 := n - i ---- *)
+    iApply (wp_subw_s_sconf (mword_of_int (FW + 0xcc)) Ra5 Rs5 Rs4 M Kn b
+              ltac:(vm_compute; discriminate) ltac:(rdok)
+              with "Hcg Hpc Hicc [-]").
+    iIntros (CID1 Hq1) "Hcg Hpc". iEval (rgne) in "Hcg".
+    set (T1 := <[Regidx Ra5 := regval_into_reg
+                  (sign_extend' 64 (sub_vec
+                     (subrange_vec_dec (M !!! Regidx Rs5) 31 0 : mword 32)
+                     (subrange_vec_dec (M !!! Regidx Rs4) 31 0 : mword 32)))]> M).
+    assert (HT1a5 : T1 !!! Regidx Ra5 = (mword_of_int (nz - iz) : mword 64)).
+    { rewrite /T1 upd_eq. unfold regval_into_reg.
+      rewrite HMs5 HMs4. apply fw_subw_moi; lia. }
+    assert (Hppd0 : add_vec_int (mword_of_int (FW + 0xcc) : mword 64) 4
+                    = mword_of_int (FW + 0xd0))
+      by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hppd0) in "Hpc".
+    (* ---- +0xd0 c.mv s3,a5 ---- *)
+    iApply (wp_cmv_s_sconf (mword_of_int (FW + 0xd0)) Rs3 Ra5 T1 Kn b
+              ltac:(vm_compute; discriminate) ltac:(rdok)
+              with "Hcg Hpc Hid0 [-]").
+    iIntros (CID2 Hq2) "Hcg Hpc". iEval (rgne) in "Hcg".
+    set (T2 := <[Regidx Rs3 := regval_into_reg
+                  (add_vec zero_reg (T1 !!! Regidx Ra5))]> T1).
+    assert (HT2s3 : T2 !!! Regidx Rs3 = (mword_of_int (nz - iz) : mword 64)).
+    { rewrite /T2 upd_eq. unfold regval_into_reg.
+      rewrite add_vec_zero_l. exact HT1a5. }
+    assert (HT2a5 : T2 !!! Regidx Ra5 = (mword_of_int (nz - iz) : mword 64))
+      by (rewrite /T2 upd_ne; [exact HT1a5 | vm_compute; discriminate]).
+    assert (HT2s7 : T2 !!! Regidx Rs7
+                    = (mword_of_int SpecFilewrite.FW_MAX : mword 64)).
+    { rewrite /T2 upd_ne; [| vm_compute; discriminate].
+      rewrite /T1 upd_ne; [exact HMs7 | vm_compute; discriminate]. }
+    assert (HT2s9 : T2 !!! Regidx Rs9
+                    = (mword_of_int SpecFilewrite.FW_MAX : mword 64)).
+    { rewrite /T2 upd_ne; [| vm_compute; discriminate].
+      rewrite /T1 upd_ne; [exact HMs9 | vm_compute; discriminate]. }
+    assert (HT2thr : forall r : mword 5, is_cs_idx r = true -> r <> Rs3 ->
+              T2 !!! Regidx r = M !!! Regidx r).
+    { intros r Hr N3. rewrite /T2 upd_ne; [| regne].
+      rewrite /T1 upd_ne; [reflexivity | regne]. }
+    assert (Hppd2 : add_vec_int (mword_of_int (FW + 0xd0) : mword 64) 2
+                    = mword_of_int (FW + 0xd2))
+      by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hppd2) in "Hpc".
+    (* ---- +0xd2 bge s7,a5 : is 3072 >= n - i ? ---- *)
+    assert (Hcmp : zopz0zKzJ_s (rget T2 Rs7) (rget T2 Ra5)
+                   = Z.geb SpecFilewrite.FW_MAX (nz - iz)).
+    { rewrite (rget_ne T2 Rs7 ltac:(vm_compute; discriminate)).
+      rewrite (rget_ne T2 Ra5 ltac:(vm_compute; discriminate)).
+      rewrite HT2s7 HT2a5.
+      apply fw_bge_moi; unfold SpecFilewrite.FW_MAX;
+        change (2 ^ 31)%Z with 2147483648%Z; lia. }
+    assert (Htgt82 : add_vec (mword_of_int (FW + 0xd2) : mword 64)
+              (sign_extend' 64 (mword_of_int 8112 : mword 13))
+              = mword_of_int (FW + 0x82))
+      by (apply bv_eq; vm_compute; reflexivity).
+    destruct (Z.geb SpecFilewrite.FW_MAX (nz - iz)) eqn:Hge.
+    - (* ---- TAKEN: the chunk is the whole remainder ([fw_chunk_rem]) ---- *)
+      assert (Hrem : (0 < nz - iz <= SpecFilewrite.FW_MAX)%Z).
+      { apply fw_chunk_rem; [lia | apply Z.geb_le; exact Hge]. }
+      iApply (wp_bge_taken_s_sconf (mword_of_int (FW + 0xd2))
+                (mword_of_int 8112 : mword 13) Ra5 Rs7 T2 Kn b
+                ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                ltac:(exact Hcmp)
+                ltac:(rewrite Htgt82; vm_compute; reflexivity)
+                with "Hcg Hpc Hid2 [-]").
+      iNext. iIntros (CID3 Hq3) "Hcg Hpc".
+      iEval (rewrite Htgt82) in "Hpc".
+      iSpecialize ("Hcont" $! CID3 with "[]"); [iPureIntro; wp_next_chain|].
+      iApply ("Hcont" $! (nz - iz)%Z T2 with "[%] Hcg Hpc").
+      split_and!; [lia | lia | lia | exact HT2s3 | exact HT2thr].
+    - (* ---- FALL: the chunk is the CAP ([fw_chunk_cap]).  [Z.geb_le] is
+             the only direction that exists; the strict one is derived by
+             cases, NOT by a [Z.geb_gt] (there is no such lemma). ---- *)
+      assert (Hgt : (SpecFilewrite.FW_MAX < nz - iz)%Z).
+      { destruct (Z.le_gt_cases (nz - iz) SpecFilewrite.FW_MAX) as [Hle | Hgt']; [| lia].
+        exfalso.
+        rewrite (proj2 (Z.geb_le SpecFilewrite.FW_MAX (nz - iz)) Hle) in Hge.
+        discriminate. }
+      assert (Hcap : (0 < SpecFilewrite.FW_MAX <= SpecFilewrite.FW_MAX)%Z)
+        by (apply (fw_chunk_cap nz iz); [lia | exact Hgt]).
+      iApply (wp_bge_fall_s_sconf (mword_of_int (FW + 0xd2))
+                (mword_of_int 8112 : mword 13) Ra5 Rs7 T2 Kn b
+                ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                ltac:(exact Hcmp)
+                with "Hcg Hpc Hid2 [-]").
+      iIntros (CID3 Hq3) "Hcg Hpc".
+      assert (Hppd6 : add_vec_int (mword_of_int (FW + 0xd2) : mword 64) 4
+                      = mword_of_int (FW + 0xd6))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hppd6) in "Hpc".
+      (* ---- +0xd6 c.mv s3,s9 : n1 := FW_MAX ---- *)
+      iApply (wp_cmv_s_sconf (mword_of_int (FW + 0xd6)) Rs3 Rs9 T2 Kn b
+                ltac:(vm_compute; discriminate) ltac:(rdok)
+                with "Hcg Hpc Hid6 [-]").
+      iIntros (CID4 Hq4) "Hcg Hpc". iEval (rgne) in "Hcg".
+      set (T3 := <[Regidx Rs3 := regval_into_reg
+                    (add_vec zero_reg (T2 !!! Regidx Rs9))]> T2).
+      assert (HT3s3 : T3 !!! Regidx Rs3
+                      = (mword_of_int SpecFilewrite.FW_MAX : mword 64)).
+      { rewrite /T3 upd_eq. unfold regval_into_reg.
+        rewrite add_vec_zero_l. exact HT2s9. }
+      assert (HT3thr : forall r : mword 5, is_cs_idx r = true -> r <> Rs3 ->
+                T3 !!! Regidx r = M !!! Regidx r).
+      { intros r Hr N3. rewrite /T3 upd_ne; [| regne]. exact (HT2thr r Hr N3). }
+      assert (Hppd8 : add_vec_int (mword_of_int (FW + 0xd6) : mword 64) 2
+                      = mword_of_int (FW + 0xd8))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hppd8) in "Hpc".
+      (* ---- +0xd8 c.j -> +0x82.  THE NEGATIVE 21-BIT FIELD (S3o's leaf
+             table): 2 * 2005 has bit 11 SET, so the displacement is -86
+             and NOT +4010. ---- *)
+      assert (Htgt82b : add_vec (mword_of_int (FW + 0xd8) : mword 64)
+                (sign_extend' 64 (sign_extend' 21
+                   (concat_vec (mword_of_int 2005 : mword 11) ('b"0"))))
+                = mword_of_int (FW + 0x82))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iApply (wp_cj_s_sconf (mword_of_int (FW + 0xd8))
+                (sign_extend' 21 (concat_vec (mword_of_int 2005 : mword 11) ('b"0")))
+                T3 Kn b
+                ltac:(rewrite Htgt82b; vm_compute; reflexivity)
+                with "Hcg Hpc Hid8 [-]").
+      iIntros (CID5 Hq5). iNext. iIntros "Hcg Hpc".
+      iEval (rewrite Htgt82b) in "Hpc".
+      iSpecialize ("Hcont" $! CID5 with "[]"); [iPureIntro; wp_next_chain|].
+      iApply ("Hcont" $! SpecFilewrite.FW_MAX T3 with "[%] Hcg Hpc").
+      split_and!; [lia | lia | lia | exact HT3s3 | exact HT3thr].
+  Qed.
+
+  (* =================================================================== *)
+  (*  THE FD_INODE LOOP.                                                 *)
+  (*                                                                     *)
+  (*  Entry is the BOTTOM TEST at +0xcc, which is where the [c.j] at     *)
+  (*  +0x52 sends the first iteration and where the back edge at +0xc8   *)
+  (*  returns.  The shape is [ProofWritei.wi_loop]'s -- a [forall]-fuel  *)
+  (*  induction with every loop-carried value re-quantified UNDER the    *)
+  (*  fuel -- and NOT [ProofIreclaim.irc_loop]'s hart-closed wand: the   *)
+  (*  back edge re-enters with a DIFFERENT [i], so the invariant must be *)
+  (*  universally quantified over it, which is exactly what a [box]-tail *)
+  (*  does not give.  The fuel is [n - i] (S3g's ledger); the chunk      *)
+  (*  count would need [fw_chunk_cap]'s division and buys nothing.       *)
+  (*                                                                     *)
+  (*  WHAT IS LOOP-CARRIED, and it is remarkably little: the counter     *)
+  (*  [iz], the page-table descriptor [PI] (which writei's user arm      *)
+  (*  advances), and the bitmap's marked set [SI] (which balloc grows).  *)
+  (*  THE INODE IS NOT: at the head of every iteration it is PARKED in   *)
+  (*  the escrow, so its record, block map and data are inside           *)
+  (*  [ic_escrow] and ilock mints fresh ones -- which is why the         *)
+  (*  invariant names no [dinode] and no [blkmap] at all.  Likewise      *)
+  (*  [f->off] is RESIDENT in [off_inv] at the head and is borrowed and  *)
+  (*  returned inside a single iteration, so it too is absent here.      *)
+  (*                                                                     *)
+  (*  WHAT IS THREADED but not carried: the whole persistent half of     *)
+  (*  [filewrite_fs_env] (fourteen invariants and contexts) is passed as *)
+  (*  separate arguments rather than as the packed environment, because  *)
+  (*  the packed form is indexed by [fwn_used fn] and the loop's bitmap  *)
+  (*  set moves.  The EXCLUSIVE half is exactly [filewrite_fs_out fn Cf  *)
+  (*  SI] -- the same six resources the contract returns -- which is why *)
+  (*  the exit needs no re-assembly beyond [fw_env_out_fs].              *)
+  (* =================================================================== *)
+  Local Lemma fw_loop `{CID0 : CpuId}
+      (ga gf : gname) (gs : list gname) (jx : nat) (glp : gname)
+      (kx : nat) (qx : Qp) (Cf : fcontent) (fn : fwrite_names)
+      (pidv : mword 32) (V : pprivate)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool)
+      (sp0 w12 pj : mword 64) :
+    (* ---- the contract's own premises, unchanged ---- *)
+    (filewrite_stack <= K)%nat ->
+    (kx < NFILE)%nat ->
+    (jx < NPROC)%nat ->
+    gs !! jx = Some glp ->
+    length gs = NPROC ->
+    fwn_j fn = jx ->
+    fwn_procs fn = gs ->
+    (0 <= n < 2 ^ 31)%Z ->
+    eb = true ->
+    fc_type Cf = FD_INODE ->
+    fc_wbool Cf = true ->
+    m !!! Regidx csp_rs1 = sp0 ->
+    pj = proc_addr jx ->
+    (* ---- [filewrite_fs_env]'s ten PURE fields.  Pure, hence free: they
+       are Coq hypotheses and cost the induction nothing. ---- *)
+    log_geom_ok (fwn_cov fn) (fwn_logstart fn) ->
+    (0 <= fwn_inodestart fn)%Z ->
+    IBLOCK (fwn_inum fn) (fwn_inodestart fn) ∈ fwn_cov fn ->
+    IBLOCK (fwn_inum fn) (fwn_inodestart fn)
+      ∉ log_region_set (fwn_logstart fn) ->
+    (bv_unsigned (fwn_inum fn) < 16 * Z.of_nat (fwn_nib fn))%Z ->
+    BitmapInv.bitmap_geom_ok (fwn_cov fn) (fwn_logstart fn)
+      (fwn_bmapstart fn) (fwn_size fn) ->
+    SpecPrintkGen.printk_gen_contract (fwn_pr fn) (fwn_uart fn) (fwn_disk fn) ->
+    fc_ip Cf = ientry (fwn_ik fn) ->
+    (fwn_ik fn < NINODE)%nat ->
+    (fc_wbool Cf = true -> bv_unsigned (fwn_ty fn) <> T_DIR_z) ->
+    (* ---- THE FUEL, and everything the loop carries under it ---- *)
+    forall (W : nat) (iz : Z) (PI : uptd) (SI : gset Z) (M : regfile),
+    (n - iz <= Z.of_nat W)%Z ->
+    (0 <= iz < n)%Z ->
+    uptd_ext (pv_upt V) PI ->
+    M !!! Regidx csp_rs1 = pa_stk sp0 12 ->
+    M !!! Regidx Rs2 = fnode kx ->
+    M !!! Regidx Rs4 = (mword_of_int iz : mword 64) ->
+    M !!! Regidx Rs5 = (mword_of_int n : mword 64) ->
+    M !!! Regidx Rs6 = m !!! Regidx Ra1 ->
+    M !!! Regidx Rs7 = (mword_of_int SpecFilewrite.FW_MAX : mword 64) ->
+    M !!! Regidx Rs8 = (mword_of_int 1 : mword 64) ->
+    M !!! Regidx Rs9 = (mword_of_int SpecFilewrite.FW_MAX : mword 64) ->
+    (* s1 and s3 are the loop's own scratch and are EXCLUDED here as well
+       as the eight the entry set: [fw_rest5] puts the caller's values
+       back out of slots 3 and 5 before [fw_tail] ever looks. *)
+    (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
+       r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> r <> Rs4 -> r <> Rs5 ->
+       r <> Rs6 -> r <> Rs7 -> r <> Rs8 -> r <> Rs9 ->
+       M !!! Regidx r = m !!! Regidx r) ->
+    sie_cap_gpr M (K - 12)%nat b pj -∗
+    cpu_own 0%nat eb pj C b -∗
+    kernel_text -∗
+    InstrBytes.pc_is (mword_of_int (FW + 0xcc) : mword 64) -∗
+    panic_wp_any -∗
+    procs_inv gs -∗
+    (* the twelve frame slots, none of which the body touches *)
+    word_pointsto (pa_stk sp0 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
+    word_pointsto (pa_stk sp0 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
+    word_pointsto (pa_stk sp0 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
+    word_pointsto (pa_stk sp0 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
+    word_pointsto (pa_stk sp0 5) (DfracOwn 1) (m !!! Regidx Rs3) -∗
+    word_pointsto (pa_stk sp0 6) (DfracOwn 1) (m !!! Regidx Rs4) -∗
+    word_pointsto (pa_stk sp0 7) (DfracOwn 1) (m !!! Regidx Rs5) -∗
+    word_pointsto (pa_stk sp0 8) (DfracOwn 1) (m !!! Regidx Rs6) -∗
+    word_pointsto (pa_stk sp0 9) (DfracOwn 1) (m !!! Regidx Rs7) -∗
+    word_pointsto (pa_stk sp0 10) (DfracOwn 1) (m !!! Regidx Rs8) -∗
+    word_pointsto (pa_stk sp0 11) (DfracOwn 1) (m !!! Regidx Rs9) -∗
+    word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 -∗
+    file_ref gf kx qx Cf -∗
+    proc_priv gf pj pidv (upd_upt V PI) -∗
+    KvmSpec.kalloc_env ga None -∗
+    (* ---- the PERSISTENT half of [filewrite_fs_env] ---- *)
+    off_inv gf kx -∗
+    bio_ctx (fwn_bio fn)
+      (fs_view (fwn_fs fn) (fwn_disk fn) (fwn_dev fn) (fwn_cov fn)) -∗
+    log_ctx (fwn_log fn) (fwn_bio fn) (fwn_fs fn) (fwn_cov fn)
+      (fwn_logstart fn) (fwn_dev fn) -∗
+    fs_crash_seam (fwn_cov fn) (fwn_logstart fn) -∗
+    gen_cert -∗
+    KernelDataInv.kernel_data -∗
+    SpecPrintkGen.printk_env (fwn_pr fn) (fwn_uart fn) (fwn_disk fn) -∗
+    IcacheInv.itable_inv -∗
+    ic_escrow (fwn_ic fn) (fwn_fs fn) (fwn_ireg fn) (fwn_cov fn)
+      (fwn_logstart fn) (fwn_ik fn) -∗
+    ireg_inv (fwn_ireg fn) (fwn_fs fn) (fwn_inodestart fn) (fwn_nib fn) -∗
+    SleepLock.is_sleeplock (fwn_ilk fn) (fwn_islk fn) (i_lock (fc_ip Cf))
+      "inode"%string (ic_tok (fwn_ic fn) (fwn_ik fn)) -∗
+    ity_shot (fwn_g fn) (fwn_ty fn) -∗
+    dev_inv (fwn_uart fn) (fwn_disk fn) -∗
+    DiskInv.disk_geom (fwn_disk fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) -∗
+    is_lock (fwn_dlock fn) DiskInv.d_lock "virtio_disk"%string
+      (DiskInv.disk_res (fwn_disk fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)) -∗
+    (* ---- the EXCLUSIVE half, at the set the loop has reached ---- *)
+    filewrite_fs_out fn Cf SI -∗
+    (* ---- and the contract's own continuation ---- *)
+    wp_next b pj (fun (CID : CpuId) =>
+      ∀ (mf : regfile) (r : mword 64) (P' : uptd) (used' : gset Z),
+        ⌜callee_saved m mf⌝ -∗
+        ⌜uptd_ext (pv_upt V) P'⌝ -∗
+        ⌜filewrite_ret n r⌝ -∗
+        ⌜mf !!! Regidx Ra0 = r⌝ -∗
+        sie_cap_gpr mf K b pj -∗
+        cpu_own 0%nat eb pj C b -∗
+        InstrBytes.pc_is (ret_pc (m !!! Regidx Rra)) -∗
+        file_ref gf kx qx Cf -∗
+        proc_priv gf pj pidv (upd_upt V P') -∗
+        filewrite_env_out fn Cf used' -∗
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros HK Hkf Hjp Hgsj Hlens Hfnj Hfnps Hn Heb Htyi Hwb Hspm Hpjeq.
+    intros P1 P2 P3 P4 P5 P6 P7 P8 P9 P10.
+    intro W. revert CID0.
+    induction W as [| W IH];
+      intros CID0 iz PI SI M Hfuel Hiz Hext
+             HMsp HMs2 HMs4 HMs5 HMs6 HMs7 HMs8 HMs9 HMthr.
+    { (* NO FUEL.  The loop is entered only at [i < n], so [n - i] is at
+         least one and the zero case is vacuous. *)
+      exfalso. lia. }
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hprocs
+             Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
+             Href Hpriv Hkenv
+             #Hoff #Hbio #Hlog #Hcrash #Hgc #Hkd #Hpk #Hit #Hesc #Hireg
+             #Hslk #Hty #Hdev #Hgeo #Hdlk Hout Hcont".
+    (* =================================================================
+       +0xcc .. +0xd8 -- THE TEST, and the chunk it settles.
+       ================================================================= *)
+    iApply (fw_test (CID0 := CID0) M (K - 12)%nat n iz pj b
+              Hiz (proj2 Hn) HMs4 HMs5 HMs7 HMs9
+              with "Hcg Htext Hpc [-]").
+    iIntros (CIDt Hst c P) "%Hc Hcg Hpc".
+    destruct Hc as (Hcrange & Hcrem & HPs3 & HPthr).
+    (* the register facts travel through the test untouched *)
+    assert (HPsp : P !!! Regidx csp_rs1 = pa_stk sp0 12)
+      by (rewrite (HPthr csp_rs1 ltac:(vm_compute; reflexivity)
+                     ltac:(vm_compute; discriminate)); exact HMsp).
+    assert (HPs2 : P !!! Regidx Rs2 = fnode kx)
+      by (rewrite (HPthr Rs2 ltac:(vm_compute; reflexivity)
+                     ltac:(vm_compute; discriminate)); exact HMs2).
+    assert (HPs4 : P !!! Regidx Rs4 = (mword_of_int iz : mword 64))
+      by (rewrite (HPthr Rs4 ltac:(vm_compute; reflexivity)
+                     ltac:(vm_compute; discriminate)); exact HMs4).
+    assert (HPs5 : P !!! Regidx Rs5 = (mword_of_int n : mword 64))
+      by (rewrite (HPthr Rs5 ltac:(vm_compute; reflexivity)
+                     ltac:(vm_compute; discriminate)); exact HMs5).
+    assert (HPs6 : P !!! Regidx Rs6 = m !!! Regidx Ra1)
+      by (rewrite (HPthr Rs6 ltac:(vm_compute; reflexivity)
+                     ltac:(vm_compute; discriminate)); exact HMs6).
+    assert (HPs7 : P !!! Regidx Rs7
+                   = (mword_of_int SpecFilewrite.FW_MAX : mword 64))
+      by (rewrite (HPthr Rs7 ltac:(vm_compute; reflexivity)
+                     ltac:(vm_compute; discriminate)); exact HMs7).
+    assert (HPs8 : P !!! Regidx Rs8 = (mword_of_int 1 : mword 64))
+      by (rewrite (HPthr Rs8 ltac:(vm_compute; reflexivity)
+                     ltac:(vm_compute; discriminate)); exact HMs8).
+    assert (HPs9 : P !!! Regidx Rs9
+                   = (mword_of_int SpecFilewrite.FW_MAX : mword 64))
+      by (rewrite (HPthr Rs9 ltac:(vm_compute; reflexivity)
+                     ltac:(vm_compute; discriminate)); exact HMs9).
+    assert (HPthr' : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
+              r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> r <> Rs4 ->
+              r <> Rs5 -> r <> Rs6 -> r <> Rs7 -> r <> Rs8 -> r <> Rs9 ->
+              P !!! Regidx r = m !!! Regidx r).
+    { intros r Hr Nsp Ns0 Ns1 Ns2 Ns3 Ns4 Ns5 Ns6 Ns7 Ns8 Ns9.
+      rewrite (HPthr r Hr Ns3).
+      exact (HMthr r Hr Nsp Ns0 Ns1 Ns2 Ns3 Ns4 Ns5 Ns6 Ns7 Ns8 Ns9). }
+    (* =================================================================
+       +0x82 sext.w s3,s3 -- gcc's normalisation of [n1].  The chunk is
+       already a small non-negative literal, so this is the identity
+       ([fw_sextw_moi] at [fw_chunk_lt31]'s range).
+       ================================================================= *)
+    iPoseProof (fwri_082 with "Htext") as "Hi82".
+    iApply (wp_caddiw_s_sconf (mword_of_int (FW + 0x82)) Rs3
+              (mword_of_int 0 : mword 6) P (K - 12)%nat b
+              ltac:(vm_compute; discriminate) ltac:(rdok)
+              with "Hcg Hpc Hi82 [-]").
+    iIntros (CIDa Hsa) "Hcg Hpc". iEval (rgne) in "Hcg".
+    set (B0 := <[Regidx Rs3 := regval_into_reg
+                  (sign_extend' 64 (subrange_vec_dec
+                     (add_vec (P !!! Regidx Rs3)
+                        (sign_extend' 64 (sign_extend' 12
+                           (mword_of_int 0 : mword 6)))) 31 0))]> P).
+    assert (HB0s3 : B0 !!! Regidx Rs3 = (mword_of_int c : mword 64)).
+    { rewrite /B0 upd_eq. unfold regval_into_reg. rewrite HPs3.
+      apply fw_sextw_moi. exact (fw_chunk_lt31 c Hcrange). }
+    assert (HB0thr : forall r : mword 5, is_cs_idx r = true -> r <> Rs3 ->
+              B0 !!! Regidx r = P !!! Regidx r).
+    { intros r Hr N3. rewrite /B0 upd_ne; [reflexivity | regne]. }
+    assert (Hpp84 : add_vec_int (mword_of_int (FW + 0x82) : mword 64) 2
+                    = mword_of_int (FW + 0x84))
+      by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp84) in "Hpc".
+    (* ############### FRONTIER (S3r) ###############
+       PARKED AT +0x84, THE [jal begin_op], and everything from the
+       function's entry down to here is proved: the whole dispatch, the
+       three light arms, FD_INODE's entry and zero-trip, the loop TEST in
+       both its arms ([fw_test], which is what keeps the body from being
+       written twice), and the [sext.w] that normalises the chunk.
+
+       WHAT THIS STAGE LANDED, and why the statement above is the
+       expensive part: the loop lemma is now MACHINE-CHECKED against the
+       real state at +0xcc -- the [forall]-fuel shape, the three things
+       that are loop-carried ([iz], [PI], [SI]) and, more importantly,
+       the many that turned out NOT to be (the inode is parked, [f->off]
+       is resident, and every content variable is minted fresh by ilock
+       inside the iteration).  That is the design S3g/S3o could only
+       sketch, and it is now a typechecked signature rather than a note.
+
+       WHAT IS LEFT is the STRAIGHT-LINE body from +0x84 to +0xc8, in the
+       order S3o's leaf table gives:
+         +0x84 begin_op            (SpecBeginOp; [fw_av_begin_op]; the pid
+                                    quarter is BORROWED out of [Hpriv] by
+                                    [ProcInv.proc_priv_pid] and closed the
+                                    instant the call returns -- fileread's
+                                    discipline at ProofFileread.v:1685)
+         +0x88 ld a0,24(s2)        (f->ip, out of "Hcip" at [q/2])
+         +0x8c ilock               (SpecIlock v5, at [s/2] via
+                                    [fw_shr_gen_halve]; keeps the other
+                                    half so [fw_shr_regen] can pin the
+                                    generation on the way out)
+         +0x90..+0x9c              (a4 := n1, a3 := f->off via
+                                    [off_checkout], a2 := i + addr,
+                                    a1 := 1, a0 := f->ip)
+         +0xa0 writei              ([fw_writei_src] both directions;
+                                    [fw_budget_ok] + [fw_max_bridge] for
+                                    the cost premise; the re-park is
+                                    [fw_inode_ok_rebuild] + [fw_dir_ok_wi]
+                                    + [ity_shot_agree])
+         +0xa4..+0xb0              (s1 := r; the [r <= 0] skip; the
+                                    f->off advance and [off_checkin])
+         +0xb4..+0xbc              (iunlock via [fw_shr_regen], end_op at
+                                    a PARTIALLY SPENT reservation)
+         +0xc0 bne s3,s1           (the SHORT WRITE break -> +0xea)
+         +0xc4..+0xc8              (i += r; [bge s4,s5] -> +0xda, and the
+                                    FALL is the back edge, where [IH] is
+                                    instantiated at [fw_i_advance]'s
+                                    decrease)
+       and the three joins, which are [fw_rest5] into [fw_tail] and are
+       already proved.  Every premise of every one of those calls was
+       cleared by hand in S3o and the last of them discharged as
+       [fw_writei_src] in S3p, so nothing below is BLOCKED -- only
+       unwritten.  [IH] is in context and unused for exactly that reason. *)
+    exact (cheat_ _).
   Qed.
 
   Lemma wp_filewrite_sconf
@@ -2319,7 +2830,55 @@ Section ProofFilewrite.
                     hand in S3o and the last of them discharged as
                     [fw_writei_src] in S3p, so nothing below is BLOCKED --
                     only unwritten. *)
-                 exact (cheat_ _). }
+                 (* ---- THE FD_INODE LOOP.  [Hz0] left exactly one thing
+                    undone on this path: [0 < n].  [Z.geb_le] is the only
+                    direction that exists (there is no [Z.geb_gt]), so the
+                    strict form is derived by cases. ---- *)
+                 assert (Hpos : (0 < n)%Z).
+                 { destruct (Z.le_gt_cases n 0) as [Hle | Hgt]; [| exact Hgt].
+                   exfalso. rewrite (proj2 (Z.geb_le 0 n) Hle) in Hz0. discriminate. }
+                 iPoseProof (fw_env_fs _ _ _ _ _ Htyi with "Henv") as "Henv".
+                 iEval (rewrite /filewrite_fs_env) in "Henv".
+                 iDestruct "Henv" as "(%E1 & %E2 & %E3 & %E4 & %E5 & %E6 & %E7 & %E8 & %E9 & #E10 & #E11 & #E12 & #E13 & #E14 & #E15 & #E16 & #E17 & #E18 & #E19 & #E20 & E21 & #E22 & %E23 & E24 & E25 & E26 & E27 & #E28 & #E29 & #E30 & E31)".
+                 assert (HVid : upd_upt V (pv_upt V) = V) by apply fw_upd_upt_id.
+                 (* [cpu_own] IS HART-INDEXED and the loop lemma states it at
+                    ITS OWN [CID0]; the walk still holds the ENTRY hart's copy.
+                    One transport, exactly as the -1 exit does before [Hcont]. *)
+                 iDestruct (cpu_own_transport CID CID28 0%nat eb pj C b
+                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+                 iApply (fw_loop (CID0 := CID28) γa γf γs j γlp k q Cf fn pidv V
+                           m K eb C n b sp0 w12 pj
+                           HK Hk Hj Hgs Hlens Hfnj Hfnps Hn Heb Htyi Hwb Hspm
+                           ltac:(reflexivity)
+                           E1 E2 E3 E4 E5 E6 E7 E8 E9 E23
+                           (Z.to_nat n) 0%Z (pv_upt V) (fwn_used fn) L7
+                           ltac:(rewrite (Z2Nat.id n (proj1 Hn)); lia)
+                           ltac:(lia)
+                           ltac:(apply uptd_ext_refl)
+                           HL7sp HL7s2 HL7s4 HL7s5 HL7s6 HL7s7 HL7s8 HL7s9
+                           ltac:(intros r Hr A1 A2 A3 A4 A5 A6 A7 A8 A9 A10 A11;
+                                 exact (HL7thr r Hr A1 A2 A4 A6 A7 A8 A9 A10 A11))
+                           with "Hcg Hcnt Htext Hpc Hpanic Hprocs
+                                 Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
+                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
+                                 [Hpriv] Hkenv
+                                 E10 E11 E12 E13 E14 E15 E16 E17 E18 E19 E20 E22
+                                 E28 E29 E30 [E21 E24 E25 E26 E27 E31] [-]").
+                 { rewrite /file_ref /file_fields.
+                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
+                 { rewrite HVid. iExact "Hpriv". }
+                 { rewrite /filewrite_fs_out.
+                   iSplitR; [iPureIntro; reflexivity|].
+                   iFrame "E21 E24 E25 E26 E27 E31". }
+                 iIntros (CIDx Hsx mf rv P' used')
+                   "%Hcs %Hup %Hret %Hra Hcg Hcnt Hpc Href Hpriv Henvo".
+                 iSpecialize ("Hcont" $! CIDx with "[]"); [iPureIntro; wp_next_chain|].
+                 iApply ("Hcont" $! mf rv P' used'
+                           with "[%] [%] [%] [%] Hcg Hcnt Hpc Href Hpriv Henvo").
+                 { exact Hcs. }
+                 { exact Hup. }
+                 { exact Hret. }
+                 { exact Hra. } }
           -- (* ==================== THE ELSE ARM ======================
                 Neither pipe, nor device, nor inode: [panic("filewrite")]
                 at +0x11e, and [fw_panic] is the whole block from +0x10a. *)
