@@ -214,6 +214,90 @@ End rules.
 Notation "a ↦w dq v" := (wpt a dq v)
   (at level 20, dq custom dfrac at level 1, format "a  ↦w dq  v") : bi_scope.
 
+(* ====================================================================== *)
+(** ** 3''. THE AMBIENT CONTEXT — [CurCtx] and the bare [↦wo] (φ-upgrade §1.7)
+
+    [wpt_own] is indexed by the execution context, and a function's context is
+    the SAME value at every one of its access sites.  Threading it as an
+    explicit argument would therefore add a parameter that never varies —
+    which is exactly the shape [RiscvLang.CpuId] already has for the hart, and
+    this class is declared to that file's conventions, deliberately:
+
+      - a BARE singleton class ([Class CurCtx := cur_ctx : CtxId.]) and NOTHING
+        ELSE — no [Global Instance], no [Existing Instance], anywhere in the
+        tree.  A context is supplied the way a hart is: by a per-lemma or
+        per-section binder, so the instance is always a local hypothesis and
+        is discharged into an implicit argument at [End].  ALWAYS NAME THE
+        BINDER — [`{XI : CurCtx}], as [RiscvLang]'s users write
+        [`{CID : CpuId}] — because an anonymous [`{CurCtx}] is auto-named [H]
+        and then every [iIntros "… %H"] in the section fails with "H is
+        already used" (measured, 2026-08-12);
+      - the surface form is a NOTATION over the primitive, filling the class
+        argument by resolution — [RiscvLang]'s [Notation Loop :=
+        (LoopE gen_id cpu_id)] and [WeakStore]'s [↦w₄ₒ] / [WeakWord8]'s
+        [↦w₈ₒ] are the same construction at [CpuId];
+      - [Typeclasses Opaque cur_ctx] so instance search never unfolds the
+        projection (it is the identity on [CtxId], so a transparent one lets a
+        search see through every ambient context into the ghost names).
+
+    WHY THE AMBIENT TRICK IS SOUND HERE AND WAS NOT FOR THE HART.  The
+    explicit-CPUID refactor exists because a WP's hart is NOT invariant across
+    a function: a timer trap parks the thread and any hart's scheduler may
+    resume it, so an ambient [cpu_id] silently asserted "same hart before and
+    after", which is false.  [ξ] has the property [cpu_id] lacks — it is
+    invariant across the whole function INCLUDING the migration; that is the
+    entire content of §1.6.  So the ambient reading is not just convenient,
+    it is the one that states the truth: the [↦wo] before a yield and the
+    [↦wo] after it are the SAME proposition because they resolve to the SAME
+    instance.
+
+    ===================== THE ONE-CONTEXT CONVENTION =====================
+
+    THE BARE NOTATION IS FOR CODE WITH EXACTLY ONE CONTEXT IN SCOPE.  Where
+    two contexts meet, SPELL BOTH EXPLICITLY as [wpt_own ξ …] — the primitive
+    never went away, and an explicit-[ξ] term prints unsugared, so the two
+    spellings stay visually distinct in a goal.  The places that are always
+    explicit:
+
+      - the scheduler / [WeakCtx] machinery and any yield-shaped spec
+        ([WkYieldFrame]'s [wyield_park_core] / [wyield_resume_core] /
+        [wwp_yield_park]): they quantify over the context they park, and an
+        ambient caller passes its own in as [cur_ctx] at the call;
+      - ANY LEMMA THAT WOULD JOIN THE TWO SIDES OF A TRANSFER.  [WkOwnPingPong]
+        is ambient throughout only because each of its lemmas is ONE thread's
+        leg — the releasing side's [ξ] and the acquiring side's are different
+        contexts, and the medium between them is the lock body, whose payload
+        is the context-free clean [x ↦w{1} v].  A lemma composing a release
+        leg with an acquire leg has two contexts in scope and MUST spell both;
+        written ambiently it would compile, silently claiming one thread
+        handed the byte to itself.  That is the whole reason this paragraph
+        exists;
+      - the primitive rules themselves (everything in §4/§5 below), which stay
+        [ξ]-explicit so that a two-context proof can use them at both.  §5b's
+        [_cur] wrappers are the ambient face of the same rules.
+
+    THE HAZARD, MEASURED (2026-08-12), because it is silent: with TWO
+    [CurCtx] hypotheses in scope, [cur_ctx] resolves to the LAST-DECLARED one
+    and NOTHING IS REPORTED — no warning, no ambiguity error.  A later
+    [`{CurCtx}] therefore SHADOWS a section's, exactly as the explicit-CPUID
+    work recorded for a later [h : CpuId] shadowing a section [CpuId].  There
+    is no mechanism that can catch this; the convention is the mechanism.
+    Never introduce a second [CurCtx] binder — quantify over [CtxId] and pass
+    it to [wpt_own] instead. *)
+
+Class CurCtx := cur_ctx : CtxId.
+
+(** Instance search must not see through the projection (it is the identity
+    on [CtxId]). *)
+Typeclasses Opaque cur_ctx.
+
+(** The bare owned points-to: [wpt_own] with the context filled in ambiently.
+    [a ↦w{1} v] is its clean sibling; the subscripted [↦w₄ₒ] / [↦w₈ₒ] towers
+    are the HART-indexed [wpt_own_h] family (§3c''), which is not this and is
+    not the API. *)
+Notation "a ↦wo v" := (wpt_own cur_ctx a v)
+  (at level 20, format "a  ↦wo  v") : bi_scope.
+
 Section pointsto.
   Context `{!riscvGS Σ, !weakGS Σ}.
 
@@ -857,6 +941,97 @@ Section pointsto.
   Qed.
 
 End pointsto.
+
+(* ====================================================================== *)
+(** ** 5b. THE AMBIENT API (φ-upgrade §1.7)
+
+    The rules above, with the context read out of the [CurCtx] instance
+    instead of taken as an argument.  They are THIN WRAPPERS and nothing else
+    — each is its primitive applied at [cur_ctx] — and the primitives stay
+    exactly as they were, because a proof with two contexts in scope must be
+    able to use them at both (see §3'''s convention block).
+
+    What this buys is the property Stage 1.6 was for, at the surface: an
+    access site names neither a hart nor a context, so the SAME script runs
+    before and after a migration and the resource it acts on is literally the
+    same proposition. *)
+
+Section cur_ctx_api.
+  Context `{!riscvGS Σ, !weakGS Σ} `{XI : CurCtx}.
+
+  (** A clean full-fraction byte is owned by the ambient context — the
+      receiving side of a transfer, in one line. *)
+  Lemma wpt_own_of_wpt_cur a v : (a ↦w v : vProp Σ) ⊢ a ↦wo v.
+  Proof. apply wpt_own_of_wpt. Qed.
+
+  (** THE OWNED LOAD (§4'), ambient. *)
+  Lemma wpt_load_rule_own_cur σ σ' ak a v t' b :
+    ak_coh ak = false →
+    wbyte_ok σ ak a t' b →
+    wm_img σ' = wm_img σ →
+    wm_log σ' = wm_log σ →
+    (flr (ws_view (wm_ws σ)) a ≤ flr (ws_view (wm_ws σ')) a)%nat →
+    wlat_interp (wm_img σ) (wm_log σ) -∗ vwp_hold (a ↦wo v) (wm_ws σ) -∗
+    ⌜b = v⌝ ∗ wlat_interp (wm_img σ') (wm_log σ') ∗
+    vwp_hold (a ↦wo v) (wm_ws σ').
+  Proof. apply wpt_load_rule_own. Qed.
+
+  Lemma wpt_load_wread_own_cur σ ak a v pa ts t' b :
+    ak_coh ak = false →
+    wbyte_ok σ ak a t' b →
+    wlat_interp (wm_img σ) (wm_log σ) -∗ vwp_hold (a ↦wo v) (wm_ws σ) -∗
+    ⌜b = v⌝ ∗
+    wlat_interp (wm_img (wread_post σ ak pa ts)) (wm_log (wread_post σ ak pa ts)) ∗
+    vwp_hold (a ↦wo v) (wm_ws (wread_post σ ak pa ts)).
+  Proof. apply wpt_load_wread_own. Qed.
+
+  (** THE OWNED STORE (§5), ambient.  The hart [c] stays explicit: it is the
+      hart the STEP runs on, which the machine supplies and which genuinely
+      varies — it is not the thing §1.7 makes ambient. *)
+  Lemma wpt_store_rule_own_cur (c : CPU) σ σ' m a v v' :
+    msg_byte m a = Some v' →
+    (∀ a', a' ≠ a → msg_byte m a' = None) →
+    wm_tid m = Some (fin_to_nat c) →
+    wm_img σ' = wm_img σ →
+    wm_log σ' = (wm_log σ ++ [m])%list →
+    (S (length (wm_log σ)) ≤ flr (ws_view (wm_ws σ')) a)%nat →
+    wlog_auth (wm_log σ') -∗ ctx_migr cur_ctx c -∗
+    wlat_interp (wm_img σ) (wm_log σ) -∗
+    vwp_hold (a ↦wo v) (wm_ws σ) ==∗
+    wlog_auth (wm_log σ') ∗ ctx_migr cur_ctx c ∗
+    wlat_interp (wm_img σ') (wm_log σ') ∗
+    vwp_hold (a ↦wo v') (wm_ws σ').
+  Proof. apply wpt_store_rule_own. Qed.
+
+  Lemma wpt_store_post_own_cur (c : CPU) σ m a v v' rl :
+    msg_byte m a = Some v' →
+    (∀ a', a' ≠ a → msg_byte m a' = None) →
+    wm_tid m = Some (fin_to_nat c) →
+    wlog_auth ((wm_log σ ++ [m])%list) -∗ ctx_migr cur_ctx c -∗
+    wlat_interp (wm_img σ) (wm_log σ) -∗
+    vwp_hold (a ↦wo v) (wm_ws σ) ==∗
+    wlog_auth ((wm_log σ ++ [m])%list) ∗ ctx_migr cur_ctx c ∗
+    wlat_interp (wm_img σ) ((wm_log σ ++ [m])%list) ∗
+    vwp_hold (a ↦wo v')
+      (store_post (wm_ws σ) rl a (S (length (wm_log σ)))).
+  Proof. apply wpt_store_post_own. Qed.
+
+  (** THE φ PAYMENT (§3c'), ambient — the lemma every access site applies,
+      migrated or not. *)
+  Lemma nv_ok_of_wpt_own_cur (c : CPU) (a : Z) (v : bv 8) (V : view)
+      img (log logA : list wmsg) :
+    pub_transfer logA log c →
+    wlog_auth logA -∗ ctx_migr cur_ctx c -∗ wlat_interp img log -∗
+    monPred_at (a ↦wo v) V -∗ ⌜nv_ok log c a⌝.
+  Proof. apply nv_ok_of_wpt_own. Qed.
+
+  Lemma nv_ok_of_wpt_own_at_cur (c : CPU) (a : Z) (v : bv 8)
+      img (log : list wmsg) (ws : wstate) :
+    wlog_auth log -∗ ctx_migr cur_ctx c -∗ wlat_interp img log -∗
+    vwp_hold (a ↦wo v) ws -∗ ⌜nv_ok log c a⌝.
+  Proof. apply nv_ok_of_wpt_own_at. Qed.
+
+End cur_ctx_api.
 
 (* ====================================================================== *)
 (** ** 6. The monPred altitude

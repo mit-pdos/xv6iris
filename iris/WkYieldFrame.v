@@ -1,5 +1,15 @@
 (** * WkYieldFrame.v — THE FRAMING PATTERN: ownership across a [yield]
-      (φ-upgrade §1.5, Stage 1.5)
+      (φ-upgrade §1.5–§1.7)
+
+    THE CONTEXT IS AMBIENT HERE (§1.7): §4's section takes ONE [`{CurCtx}]
+    and every access site writes the bare [x ↦wo v].  The instance is THE SAME
+    ONE on both sides of the migration — that is not an ergonomic detail but
+    the claim the file exists to check: a thread's context is invariant across
+    a yield (its hart is not), so §4b's resource on hart A and §4d's resource
+    on hart B are literally the same proposition, and §4a's access block is
+    ONE lemma applied twice with no context argument at all.  [ξ] survives
+    explicitly only where it must: §2/§3/§5's park, resume and WP-altitude
+    lemmas, which quantify over the context they park.
 
     THE POINT, in one sentence: a thread's ownership facts FRAME AROUND a call
     to [yield] — they appear in NEITHER its precondition NOR its
@@ -313,6 +323,16 @@ End yield.
 
 Section example.
   Context `{!riscvGS Σ, !weakGS Σ, !lockG Σ}.
+  (** THREAD T'S CONTEXT, AMBIENT (φ-upgrade §1.7).  ONE instance for the
+      whole section, and that is the substance rather than the notation: §4b
+      runs on hart A and §4d runs on hart B, and both resolve [cur_ctx] to
+      THIS hypothesis — so the [x ↦wo 1] that §4c frames and the [x ↦wo 1]
+      that §4d thaws are not merely similar propositions, they are the SAME
+      one, and the frame rule applies with nothing to prove.  That is exactly
+      the property [CpuId] does not have (a thread's hart changes at the
+      migration; its context does not), which is why the hart stays an
+      explicit argument everywhere below and the context does not. *)
+  Context `{XI : CurCtx}.
 
 (* ---------------------------------------------------------------------- *)
 (** *** 4a. THE ACCESS BLOCK — [load x; x := 2; load z]
@@ -335,9 +355,15 @@ Section example.
         the post-log authority, which are threaded at EVERY store site,
         migrated or not, and does the retarget inside;
       - the framed points-to is [wpt_own ξ], which is literally the same
-        proposition on both harts, so it frames rather than converts. *)
+        proposition on both harts, so it frames rather than converts.
 
-  Lemma wyf_touch (ξ : CtxId) (c : CPU) (σ : wmstate) (m : wmsg)
+    AND SINCE §1.7 THE CONTEXT IS NOT AN ARGUMENT EITHER: the two rules are
+    quoted in their ambient form ([wpt_load_rule_own_cur],
+    [wpt_store_post_dirty_cur]) and the resource is the bare [x ↦wo vx], so
+    the statement below names a hart (which the machine supplies and which
+    really does change) and no context at all. *)
+
+  Lemma wyf_touch (c : CPU) (σ : wmstate) (m : wmsg)
       (x z : Z) (vx vz : bv 8) (q : dfrac)
       (akx akz : akinfo) (tx tz : nat) (bx bz : bv 8) (rl : bool) :
     ak_coh akx = false → wbyte_ok σ akx x tx bx →
@@ -346,14 +372,14 @@ Section example.
     (∀ a', a' ≠ x → msg_byte m a' = None) →
     wm_tid m = Some (fin_to_nat c) →
     wm_ak m = WCplain →
-    wlog_auth ((wm_log σ ++ [m])%list) -∗ ctx_migr ξ c -∗
+    wlog_auth ((wm_log σ ++ [m])%list) -∗ ctx_migr cur_ctx c -∗
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
-    vwp_hold (wpt_own ξ x vx) (wm_ws σ) -∗
+    vwp_hold (x ↦wo vx) (wm_ws σ) -∗
     vwp_hold (z ↦w{q} vz) (wm_ws σ) ==∗
-    wlog_auth ((wm_log σ ++ [m])%list) ∗ ctx_migr ξ c ∗
+    wlog_auth ((wm_log σ ++ [m])%list) ∗ ctx_migr cur_ctx c ∗
     wlat_interp (wm_img σ) ((wm_log σ ++ [m])%list) ∗
     ⌜bx = vx⌝ ∗ ⌜bz = vz⌝ ∗
-    vwp_hold (wpt_dirty ξ c x byte2)
+    vwp_hold (wpt_dirty cur_ctx c x byte2)
       (store_post (wm_ws σ) rl x (S (length (wm_log σ)))) ∗
     vwp_hold (z ↦w{q} vz)
       (store_post (wm_ws σ) rl x (S (length (wm_log σ)))).
@@ -361,7 +387,7 @@ Section example.
     intros Hcohx Hokx Hcohz Hokz Hmb Hother Htid Hk.
     iIntros "Hlg Hmg Hi Hx Hz".
     (* --- load [x]: THE OWNED LOAD RULE, and nothing else --- *)
-    iDestruct (wpt_load_rule_own ξ σ σ akx x vx tx bx
+    iDestruct (wpt_load_rule_own_cur σ σ akx x vx tx bx
                  Hcohx Hokx eq_refl eq_refl ltac:(lia) with "Hi Hx")
       as "(%Hbx & Hi & Hx)".
     (* --- load [z]: the ordinary clean rule --- *)
@@ -369,7 +395,7 @@ Section example.
                  Hcohz Hokz eq_refl eq_refl ltac:(lia) with "Hi Hz")
       as "(%Hbz & Hi & Hz)".
     (* --- [x := 2]: the ordinary owned store --- *)
-    iMod (wpt_store_post_dirty ξ c σ m x vx byte2 rl
+    iMod (wpt_store_post_dirty_cur c σ m x vx byte2 rl
             Hmb Hother Htid Hk with "Hlg Hmg Hi Hx") as "(Hlg & Hmg & Hi & Hx)".
     iModIntro. iFrame "Hlg Hmg Hi Hx".
     iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
@@ -385,7 +411,7 @@ Section example.
     then §4a's access block runs on hart A.  Keep this statement side by side
     with §4d's: they differ in the hart, the state and nothing else. *)
 
-  Lemma wyf_store_and_use (ξ : CtxId) (A : CPU) (σ σ2 : wmstate) (m m2 : wmsg)
+  Lemma wyf_store_and_use (A : CPU) (σ σ2 : wmstate) (m m2 : wmsg)
       (x z : Z) (v0 : bv 8) (vz : bv 8) (q : dfrac) (rl : bool)
       (akx akz : akinfo) (tx tz : nat) (bx bz : bv 8) :
     msg_byte m x = Some byte1 →
@@ -401,15 +427,15 @@ Section example.
     (∀ a', a' ≠ x → msg_byte m2 a' = None) →
     wm_tid m2 = Some (fin_to_nat A) →
     wm_ak m2 = WCplain →
-    wlog_auth ((wm_log σ ++ [m])%list) -∗ ctx_migr ξ A -∗
+    wlog_auth ((wm_log σ ++ [m])%list) -∗ ctx_migr cur_ctx A -∗
     wlog_auth ((wm_log σ2 ++ [m2])%list) -∗
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
-    vwp_hold (wpt_own ξ x v0) (wm_ws σ) -∗
+    vwp_hold (x ↦wo v0) (wm_ws σ) -∗
     vwp_hold (z ↦w{q} vz) (wm_ws σ) ==∗
-    wlog_auth ((wm_log σ2 ++ [m2])%list) ∗ ctx_migr ξ A ∗
+    wlog_auth ((wm_log σ2 ++ [m2])%list) ∗ ctx_migr cur_ctx A ∗
     wlat_interp (wm_img σ2) ((wm_log σ2 ++ [m2])%list) ∗
     ⌜bx = byte1⌝ ∗ ⌜bz = vz⌝ ∗
-    vwp_hold (wpt_dirty ξ A x byte2)
+    vwp_hold (wpt_dirty cur_ctx A x byte2)
       (store_post (wm_ws σ2) rl x (S (length (wm_log σ2)))) ∗
     vwp_hold (z ↦w{q} vz)
       (store_post (wm_ws σ2) rl x (S (length (wm_log σ2)))).
@@ -417,7 +443,7 @@ Section example.
     intros Hma Hother Htid Hk Himg Hlg Hle Hcohx Hokx Hcohz Hokz
            Hmb Hother2 Htid2 Hk2.
     iIntros "Hlg1 Hmg Hlg2 Hi Hx Hz".
-    iMod (wpt_store_post_dirty ξ A σ m x v0 byte1 rl
+    iMod (wpt_store_post_dirty_cur A σ m x v0 byte1 rl
             Hma Hother Htid Hk with "Hlg1 Hmg Hi Hx") as "(_ & Hmg & Hi & Hx)".
     (* the clean fact rides the same step's view growth, and nothing else *)
     iDestruct (vwp_hold_mono (z ↦w{q} vz)%I (wm_ws σ) _ (store_post_le _ _ _ _)
@@ -426,11 +452,11 @@ Section example.
     iDestruct (vwp_hold_mono _ _ _ Hle with "Hx") as "Hx".
     iDestruct (vwp_hold_mono _ _ _ Hle with "Hz") as "Hz".
     (* ---- THE ACCESS BLOCK, ON HART A ---- *)
-    iMod (wyf_touch ξ A σ2 m2 x z byte1 vz q akx akz tx tz bx bz rl
+    iMod (wyf_touch A σ2 m2 x z byte1 vz q akx akz tx tz bx bz rl
             Hcohx Hokx Hcohz Hokz Hmb Hother2 Htid2 Hk2
             with "Hlg2 Hmg Hi [Hx] Hz")
       as "($ & $ & $ & $ & $ & $ & $)"; [|done].
-    by iApply (vwp_hold_ent _ _ _ (wpt_dirty_own ξ A x byte1)).
+    by iApply (vwp_hold_ent _ _ _ (wpt_dirty_own cur_ctx A x byte1)).
   Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -449,28 +475,30 @@ Section example.
     used below — it is how a [vProp] crosses a state change at all — but it is
     now the same freeze for both. *)
 
-  Corollary wyf_park_frames (ξ : CtxId) (γ : gname) (hf : Arch.pa) (A : CPU)
+  Corollary wyf_park_frames (γ : gname) (hf : Arch.pa) (A : CPU)
       (σ σ' : wmstate) (x z : Z) (vx vz : bv 8) (q : dfrac) :
     wQ_store (Some (fin_to_nat A)) hf lock_zero σ σ' →
     wm_log σ' =
       (wm_log σ ++ [wwrite_msg (Some (fin_to_nat A)) WCrel hf 4 lock_zero])%list →
     ws_bounded (wm_ws σ) (length (wm_log σ)) →
-    wlog_auth (wm_log σ) -∗ ctx_migr ξ A -∗
+    wlog_auth (wm_log σ) -∗ ctx_migr cur_ctx A -∗
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
     wlock_inv γ hf (wbaton (ws_view (wm_ws σ))) -∗
     locked γ A -∗
     (* ------------------------ THE FRAME ------------------------ *)
-    monPred_at (wpt_own ξ x vx) (ws_view (wm_ws σ)) -∗
+    monPred_at (x ↦wo vx) (ws_view (wm_ws σ)) -∗
     monPred_at (z ↦w{q} vz) (ws_view (wm_ws σ)) ==∗
     (* ----------------------------------------------------------- *)
-    wlog_auth (wm_log σ') ∗ ctx_migr_all ξ ∗
+    wlog_auth (wm_log σ') ∗ ctx_migr_all cur_ctx ∗
     wlat_interp (wm_img σ') (wm_log σ') ∗
     wlock_inv γ hf (wbaton (ws_view (wm_ws σ))) ∗
-    monPred_at (wpt_own ξ x vx) (ws_view (wm_ws σ)) ∗
+    monPred_at (x ↦wo vx) (ws_view (wm_ws σ)) ∗
     monPred_at (z ↦w{q} vz) (ws_view (wm_ws σ)).
   Proof.
     intros HQ Hlog Hbnd. iIntros "Hlog Hmg Hi Hinv Htok Hx Hz".
-    iMod (wyield_park_core ξ γ hf (ws_view (wm_ws σ)) A σ σ' HQ Hlog Hbnd
+    (* the scheduler lemma is [ξ]-EXPLICIT — it quantifies over the context it
+       parks — so the seam between the two worlds is this one argument *)
+    iMod (wyield_park_core cur_ctx γ hf (ws_view (wm_ws σ)) A σ σ' HQ Hlog Hbnd
             ltac:(reflexivity) with "Hlog Hmg Hi Hinv Htok")
       as "($ & $ & $ & $)".
     by iFrame "Hx Hz".
@@ -486,18 +514,22 @@ Section example.
     COMPARE WITH §4b LINE BY LINE.  The access block's application is
     character-for-character the same:
 
-      §4b   iMod (wyf_touch ξ A σ2 m2 x z byte1 vz q akx akz tx tz bx bz rl
+      §4b   iMod (wyf_touch A σ2 m2 x z byte1 vz q akx akz tx tz bx bz rl
                     Hcohx Hokx Hcohz Hokz Hmb Hother2 Htid2 Hk2
                     with "Hlg2 Hmg Hi [Hx] Hz") …
-      §4d   iMod (wyf_touch ξ B σn mB x z byte1 vz q akx akz tx tz bx bz rl
+      §4d   iMod (wyf_touch B σn mB x z byte1 vz q akx akz tx tz bx bz rl
                     Hcohx Hokx Hcohz Hokz Hmb Hother Htid Hk
                     with "Hlog Hmg Hi Hx Hz") …
 
-    and in §4d the byte [x] is still [WDirty A] in the ghost map when that
+    and since §1.7 the context is not even an argument: both lines resolve
+    [cur_ctx] to the SECTION'S ONE INSTANCE, so the resource [x ↦wo …] that
+    §4b consumes and the one §4d consumes are the same proposition — which is
+    the whole reason the ambient reading is sound here and was not for the
+    hart.  In §4d the byte [x] is still [WDirty A] in the ghost map when that
     line runs.  There is no upgrade lemma in this proof, and no token
     threaded to make one possible. *)
 
-  Lemma wyf_resume_and_use (ξ : CtxId) (γ : gname) (hf : Arch.pa) (V : view)
+  Lemma wyf_resume_and_use (γ : gname) (hf : Arch.pa) (V : view)
       (B : CPU) (tid : option nat) (σ σ' σn : wmstate) (mB : wmsg)
       (x z : Z) (vz : bv 8) (q : dfrac)
       (akx akz : akinfo) (tx tz : nat) (bx bz : bv 8) (rl : bool) :
@@ -518,20 +550,21 @@ Section example.
     wlog_auth ((wm_log σn ++ [mB])%list) -∗
     (* the ONLY things the yield handed back: a lock body and a scheduler
        resource.  Neither mentions [x] or [z]. *)
-    ctx_migr_all ξ -∗
+    ctx_migr_all cur_ctx -∗
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
     wlock_inv γ hf (wbaton V) -∗
-    (* the FRAMED facts, still frozen at the parking index *)
-    monPred_at (wpt_own ξ x byte1) V -∗
+    (* the FRAMED facts, still frozen at the parking index — and [x ↦wo byte1]
+       is §4c's conjunct on the nose, the same instance on both sides *)
+    monPred_at (x ↦wo byte1) V -∗
     monPred_at (z ↦w{q} vz) V ==∗
-    wlog_auth ((wm_log σn ++ [mB])%list) ∗ ctx_migr ξ B ∗
+    wlog_auth ((wm_log σn ++ [mB])%list) ∗ ctx_migr cur_ctx B ∗
     wlat_interp (wm_img σn) ((wm_log σn ++ [mB])%list) ∗
     wlock_inv γ hf (wbaton V) ∗ locked γ B ∗
     (* the load of [x] returned what A wrote; [z] returned what T framed *)
     ⌜bx = byte1⌝ ∗ ⌜bz = vz⌝ ∗
     (* [x] is now DIRTY AT B — the author alternated across a migration with
        no transfer and no payload *)
-    vwp_hold (wpt_dirty ξ B x byte2)
+    vwp_hold (wpt_dirty cur_ctx B x byte2)
       (store_post (wm_ws σn) rl x (S (length (wm_log σn)))) ∗
     (* ... and [z] is still T's, clean, at the new hart *)
     vwp_hold (z ↦w{q} vz)
@@ -541,7 +574,7 @@ Section example.
            Hmb Hother Htid Hk.
     iIntros "Hlog Hall Hi Hinv Hx Hz".
     (* --- the resume: the index and the invariant arrive, and nothing else --- *)
-    iMod (wyield_resume_core ξ γ hf V B tid σ σ' Hwf Hacc HQ Hzero
+    iMod (wyield_resume_core cur_ctx γ hf V B tid σ σ' Hwf Hacc HQ Hzero
             with "Hi Hall Hinv") as "(Hi & Hbody & Htok & Hmg & %HV)".
     (* carry everything to the state T's own accesses run at *)
     assert (HVn : V ⊑ ws_view (wm_ws σn))
@@ -549,12 +582,12 @@ Section example.
     rewrite -Himg -Hlg.
     (* --- the FRAMED facts, thawed by the view alone.  TWO IDENTICAL LINES:
            the dirty byte and the clean byte cost exactly the same. --- *)
-    iDestruct (vwp_hold_intro V (wpt_own ξ x byte1)%I (wm_ws σn) HVn with "Hx")
+    iDestruct (vwp_hold_intro V (x ↦wo byte1)%I (wm_ws σn) HVn with "Hx")
       as "Hx".
     iDestruct (vwp_hold_intro V (z ↦w{q} vz)%I (wm_ws σn) HVn with "Hz")
       as "Hz".
     (* ---- THE ACCESS BLOCK, ON HART B — §4b's line, at the new hart ---- *)
-    iMod (wyf_touch ξ B σn mB x z byte1 vz q akx akz tx tz bx bz rl
+    iMod (wyf_touch B σn mB x z byte1 vz q akx akz tx tz bx bz rl
             Hcohx Hokx Hcohz Hokz Hmb Hother Htid Hk
             with "Hlog Hmg Hi Hx Hz")
       as "($ & $ & $ & $ & $ & $ & $)".
@@ -578,15 +611,15 @@ Section example.
     because a published owned store is not a violation to anybody.  Compare
     with §4b's φ obligation, which is this lemma at [c := A]. *)
 
-  Lemma wyf_phi_migrated (ξ : CtxId) (B : CPU) (V : view) (img : _)
+  Lemma wyf_phi_migrated (B : CPU) (V : view) (img : _)
       (log : list wmsg) (pcb x : Z) (vx : bv 8) :
     latest_ts log pcb = 0%nat →
-    wlog_auth log -∗ ctx_migr ξ B -∗ wlat_interp img log -∗
-    monPred_at (wpt_own ξ x vx) V -∗
+    wlog_auth log -∗ ctx_migr cur_ctx B -∗ wlat_interp img log -∗
+    monPred_at (x ↦wo vx) V -∗
     ⌜nv_ok log B pcb ∧ nv_ok log B x⌝.
   Proof.
     intros Htext. iIntros "Hlog Hmg Hi Hx".
-    iDestruct (nv_ok_of_wpt_own ξ B x vx V img log log
+    iDestruct (nv_ok_of_wpt_own_cur B x vx V img log log
                  (pub_transfer_refl log B) with "Hlog Hmg Hi Hx") as %Hnx.
     iPureIntro. split; [by apply nv_ok_unwritten|exact Hnx].
   Qed.
