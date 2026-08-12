@@ -749,6 +749,33 @@ End UsertrapRes.
 (* hart.  Chain the per-step equalities with [wp_next_chain] and apply this *)
 (* once per crossing.                                                      *)
 (* ---------------------------------------------------------------------- *)
+(* ---------------------------------------------------------------------- *)
+(* THE BOUNDARY'S [j] AND [usertrap_res]'s ARE NOT TIED, AND AT [true] IT   *)
+(* DOES NOT MATTER.                                                        *)
+(*                                                                         *)
+(* [SpecUsertrap.wp_usertrap_body] takes a slot index [j] and states its    *)
+(* crossing at [wp_next true (proc_addr j)], while [ut_res] existentially   *)
+(* packages its OWN [ut_names] and therefore its own [un_j].  Nothing ties  *)
+(* the two -- and nothing needs to, because at index [true] a crossing's    *)
+(* guard is [true = false \/ p = zero_reg -> …], whose antecedent is FALSE  *)
+(* for any real process: the [wp_next] does not depend on [p] at all there. *)
+(* So the walk runs entirely at [un_pj N] (which is where [ut_trap]'s       *)
+(* [sie_cap_gpr] / [cpu_own] / [cpu_claim] live, and those DO care) and the *)
+(* entry block swaps the boundary's crossing over with this one line.       *)
+(*                                                                         *)
+(* The alternative -- keying [ut_res] on [j] as well as on [(pt, ksp)] --   *)
+(* was rejected for the reason the key is [(pt, ksp)] in the first place:   *)
+(* those are the only two things the TRAMPOLINE knows.                      *)
+(* ---------------------------------------------------------------------- *)
+Lemma wp_next_true_swap `{!riscvGS Σ} `{GEN : GenId} `{CID0 : CpuId}
+    (p q : mword 64) (K : forall CID : CpuId, iProp Σ) :
+  p <> zero_reg ->
+  wp_next true p K -∗ wp_next true q K.
+Proof.
+  intros Hp. iIntros "H" (CIDx Hs). iApply "H". iPureIntro.
+  intros [Hb | Hz]; [discriminate Hb | exfalso; exact (Hp Hz)].
+Qed.
+
 Lemma ut_hold_transport
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,

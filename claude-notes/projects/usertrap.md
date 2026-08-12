@@ -26,9 +26,9 @@ Prerequisites are all in place:
 walk is written for the TAIL.** Everything below the horizontal rule in the
 "What is on disk" table compiles with no `Admitted` and no new `Axiom`.
 
-Writing the tail is what turned the remaining design questions up, and they
-were not in the instruction stepping — they were in three places the
-pre-proof design could not see. Read §"FIVE FINDINGS" before writing another
+Writing the walk is what turned the remaining design questions up, and they
+were not in the instruction stepping — they were in places the
+pre-proof design could not see. Read §"SIX FINDINGS" before writing another
 line of the walk; two of them change files you would otherwise not touch.
 
 ### What is on disk
@@ -90,7 +90,7 @@ SETKILLED, DEVINTR, VMFAULT, YIELD, PREPARE_RETURN, KEXIT **and KERNELVEC** —
 the last because `intr_handler_spec kernelvec` is deliberately NOT in the
 bundle (§"Phase plan"); it is derived where it is needed.
 
-## FIVE FINDINGS FROM WRITING THE WALK
+## SIX FINDINGS FROM WRITING THE WALK
 
 ### 1. `usertrap_res`'s ENVIRONMENT HAS TO BE HART-FREE, and two files had to change for it
 
@@ -177,6 +177,21 @@ block's index equation into `K_syscall <= nx`, which covers every callee.
   footprint from `ud_um` and so establishes the coverage by construction
   (`ProcPtOwn.ud_pas_cov`). Asking usertrap for it is asking it to prove a
   property of a resource it never holds.
+
+### 4b. The boundary's `j` and `usertrap_res`'s are not tied, and at `true` it does not matter
+
+`wp_usertrap_body` takes a slot index `j` and states its crossing at
+`wp_next true (proc_addr j)`, while `ut_res` existentially packages its OWN
+`ut_names` and therefore its own `un_j`. Nothing ties the two — and nothing
+needs to: at index `true` a crossing's guard is
+`true = false ∨ p = zero_reg → …`, whose antecedent is FALSE for any real
+process, so the `wp_next` does not depend on `p` there at all. The walk runs
+entirely at `un_pj N` (which is where `ut_trap`'s `sie_cap_gpr` / `cpu_own` /
+`cpu_claim` live, and *those* do care) and the entry block swaps the
+boundary's crossing over with `UsertrapRes.wp_next_true_swap`, one line whose
+only premise is `proc_addr j ≠ zero_reg`. Keying `ut_res` on `j` as well was
+rejected for the reason its key is `(pt, ksp)` in the first place: those are
+the only two things the trampoline knows.
 
 ### 5. `CpuId` IS A CLASS, so a crossing needs a NEW SECTION — not a `rename`
 
