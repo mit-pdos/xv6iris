@@ -3857,3 +3857,16 @@ mkdir arm at its `dirlink(ip, ".")` and the T_FILE arm at sys_open's fd-type
 witness (S5a finding 1's second bullet).  So S5d is a real stage under any
 ruling: build the six, take Part 1, and gate the two `made` arms behind the
 Part 3 hypothesis.
+
+### 19.6 RATIFIED (coordinator, 2026-08-12): §19's three parts
+
+Part 1 lands with S5d (the type-stability disjunct on ireg_write_au —
+six files, no signature moves). Part 3 unblocks create: the fresh-
+record fact rides as a NAMED assumed Prop premise (ialloc_fresh_fill,
+spelled ⌜dn = ialloc_fresh ty⌝ at create's fresh ilock), the
+printk_gen_contract precedent — visible in contract text, threaded
+by sys_open/mkdir/mknod, accepted at the adequacy client, RETIRED by
+Part 2. Part 2 (the allocatedness invariant) is a recorded frontier
+project beside crash recovery and the image-wf discharge. SpecCreate
+gains exactly the one additive premise; its freeze note is amended
+accordingly.
