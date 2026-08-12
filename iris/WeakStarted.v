@@ -453,10 +453,10 @@ Section weak_started.
     wmstate_interp σ ⊢ wmstate_interp σ ∗ wlog_lb (wm_log σ).
   Proof.
     rewrite /wmstate_interp.
-    iIntros "(%Hb & %Hw & Hr & Hd & Hl & Hlat & Hws)".
+    iIntros "(%Hb & %Hn & %Hw & Hr & Hd & Hl & Hlat & Hws)".
     iDestruct (wlog_snapshot with "Hl") as "[Hl #Hlb]".
     iFrame "Hlb". iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
-    iFrame.
+    iSplitR; [by iPureIntro|]. iFrame.
   Qed.
 
   (* ------------------------------------------------------------------ *)

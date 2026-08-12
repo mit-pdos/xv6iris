@@ -573,6 +573,281 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
+(** ** 1. The predicate
+
+    Three spellings of the same thing, in the three altitudes the
+    preservation proof works at:
+
+      - [nv_byte log c' a n] — ONE hart's floor at ONE byte.  Every arm of
+        the preservation argument is a fact about one byte, because that is
+        the granularity at which the C/D/S state lives.
+      - [nv_hart log c' ws] — one hart, all bytes: [nv_byte] at its own
+        [coh].  This is the shape a per-hart (focused) interpretation would
+        carry, the twin of [WeakMem.ws_bounded]'s per-hart conjunct.
+      - [no_violation log wsf] — the GLOBAL statement, and the one the
+        adequacy export is to produce.  Spelled exactly as the deliverable
+        asks, i.e. with the message quantified first and the foreign hart
+        last, so that the reading matches [WeakRobust.violation] term for
+        term. *)
+
+Definition nv_byte (log : list wmsg) (c' : CPU) (a : Z) (n : nat) : Prop :=
+  forall (p : nat) (m : wmsg) (c : CPU),
+    log !! p = Some m -> wm_tid m = Some (fin_to_nat c) ->
+    wm_ak m = WCplain -> ¬ wpublished log (wm_tid m) p ->
+    is_Some (msg_byte m a) -> c' <> c -> (n < S p)%nat.
+
+Definition nv_hart (log : list wmsg) (c' : CPU) (ws : wstate) : Prop :=
+  forall a : Z, nv_byte log c' a (coh ws a).
+
+Definition no_violation (log : list wmsg) (wsf : CPU -> wstate) : Prop :=
+  forall (p : nat) (m : wmsg) (c : CPU) (a : Z),
+    log !! p = Some m -> wm_tid m = Some (fin_to_nat c) ->
+    wm_ak m = WCplain -> ¬ wpublished log (wm_tid m) p ->
+    is_Some (msg_byte m a) ->
+    forall c' : CPU, c' <> c -> (coh (wsf c') a < S p)%nat.
+
+(** The global statement IS the per-hart one at every hart — the two are
+    the same quantifier prefix, reassociated.  Both directions are used:
+    [_hart] when a rule focuses one hart, [_intro] when it reassembles. *)
+Lemma no_violation_hart log wsf c' :
+  no_violation log wsf -> nv_hart log c' (wsf c').
+Proof. intros H a p m c Hp Ht Hk Hnp Hs Hne. exact (H p m c a Hp Ht Hk Hnp Hs c' Hne). Qed.
+
+Lemma no_violation_intro log wsf :
+  (forall c' : CPU, nv_hart log c' (wsf c')) -> no_violation log wsf.
+Proof. intros H p m c a Hp Ht Hk Hnp Hs c' Hne. exact (H c' a p m c Hp Ht Hk Hnp Hs Hne). Qed.
+
+(** The empty log violates nothing — [WeakRobust.violation_init]'s twin,
+    and the conjunct's boot case. *)
+Lemma no_violation_nil wsf : no_violation [] wsf.
+Proof. intros p m c a Hp. by rewrite lookup_nil in Hp. Qed.
+
+Lemma nv_hart_nil c' ws : nv_hart [] c' ws.
+Proof. intros a p m c Hp. by rewrite lookup_nil in Hp. Qed.
+
+(** Lowering a floor keeps it safe. *)
+Lemma nv_byte_mono log c' a n n' :
+  nv_byte log c' a n -> (n' <= n)%nat -> nv_byte log c' a n'.
+Proof. intros H Hle p m c Hp Ht Hk Hnp Hs Hne. pose proof (H p m c Hp Ht Hk Hnp Hs Hne). lia. Qed.
+
+(* ====================================================================== *)
+(** ** 2. The induction algebra
+
+    Everything the per-rule preservation argument needs that is NOT about
+    resources.  The resource-backed arm — a load's raising of [coh] at a
+    byte it read — is §3. *)
+
+(** *** 2a. APPENDS.  The obligation only ever gets WEAKER along an append:
+    publication is monotone ([WeakGhost.wpublished_app]), so a message that
+    is unpublished in the LONGER log was unpublished in the shorter one and
+    the old obligation applies verbatim.  What is new is the messages the
+    append itself added, and there the floor is below them by
+    [WeakMem.ws_bounded]. *)
+Lemma nv_byte_app log ms c' a n :
+  nv_byte log c' a n -> (n <= length log)%nat -> nv_byte (log ++ ms) c' a n.
+Proof.
+  intros H Hn p m c Hp Ht Hk Hnp Hs Hne.
+  apply lookup_app_Some in Hp as [Hp|[Hge _]].
+  - assert (Hnp' : ¬ wpublished log (wm_tid m) p)
+      by (intros Hpub; apply Hnp; by apply wpublished_app).
+    exact (H p m c Hp Ht Hk Hnp' Hs Hne).
+  - lia.
+Qed.
+
+Lemma nv_hart_app log ms c' ws :
+  nv_hart log c' ws -> ws_bounded ws (length log) -> nv_hart (log ++ ms) c' ws.
+Proof.
+  intros H (_ & _ & _ & _ & _ & _ & Hcoh & _) a.
+  apply (nv_byte_app log ms c' a _ (H a) (Hcoh a)).
+Qed.
+
+(** ... and the STEPPING hart's own append, where the floor bound is not
+    available (the hart's own [coh] has just been raised to the fresh top)
+    and is not needed: every message a hart appends carries ITS OWN tid, so
+    the new obligations quantify over [c' ≠ c'] and are vacuous.  This is
+    what makes a store free for its own author. *)
+Lemma nv_byte_app_own log ms c a n :
+  nv_byte log c a n ->
+  (forall m, m ∈ ms -> wm_tid m = Some (fin_to_nat c)) ->
+  nv_byte (log ++ ms) c a n.
+Proof.
+  intros H Hown p m c0 Hp Ht Hk Hnp Hs Hne.
+  apply lookup_app_Some in Hp as [Hp|[_ Hp]].
+  - assert (Hnp' : ¬ wpublished log (wm_tid m) p)
+      by (intros Hpub; apply Hnp; by apply wpublished_app).
+    exact (H p m c0 Hp Ht Hk Hnp' Hs Hne).
+  - exfalso. apply Hne. apply elem_of_list_lookup_2, Hown in Hp.
+    rewrite Hp in Ht. by simplify_eq.
+Qed.
+
+Lemma nv_hart_app_own log ms c ws :
+  nv_hart log c ws ->
+  (forall m, m ∈ ms -> wm_tid m = Some (fin_to_nat c)) ->
+  nv_hart (log ++ ms) c ws.
+Proof. intros H Hown a. exact (nv_byte_app_own log ms c a _ (H a) Hown). Qed.
+
+(** *** 2b. THE FLOOR MOVE.  A hart's [coh] only rises, and only at the
+    bytes its step touched; so the whole per-step obligation is "every byte
+    whose floor moved is one at which no foreign unpublished [WCplain]
+    message lives", which §3 reads off the mover's own C/D/S fragment. *)
+Lemma nv_hart_coh_step log c ws ws' :
+  nv_hart log c ws ->
+  (forall a : Z, (coh ws a < coh ws' a)%nat -> nv_byte log c a (coh ws' a)) ->
+  nv_hart log c ws'.
+Proof.
+  intros H Hmv a. destruct (decide (coh ws a < coh ws' a)%nat) as [Hlt|Hge].
+  - exact (Hmv a Hlt).
+  - apply (nv_byte_mono log c a (coh ws a)); [exact (H a)|lia].
+Qed.
+
+(** *** 2c. THE REASSEMBLY, in the shape [WeakExec.wp_wrun_step] closes the
+    global interpretation at: ONE hart stepped (its cell moved, its
+    messages were appended), every other hart's cell is untouched and its
+    floors are below the OLD log's top.  This is the exact twin of the
+    [ws_bounded] reassembly ([Hbnd2] there) and is meant to be applied the
+    same way. *)
+Lemma no_violation_step (log ms : list wmsg) (wsf wsf' : CPU -> wstate)
+    (c : CPU) :
+  no_violation log wsf ->
+  (forall c0 : CPU, ws_bounded (wsf c0) (length log)) ->
+  (forall m, m ∈ ms -> wm_tid m = Some (fin_to_nat c)) ->
+  (forall c0 : CPU, c0 <> c -> wsf' c0 = wsf c0) ->
+  nv_hart (log ++ ms) c (wsf' c) ->
+  no_violation (log ++ ms) wsf'.
+Proof.
+  intros Hnv Hbnd Hown Hfr Hc. apply no_violation_intro. intros c0.
+  destruct (decide (c0 = c)) as [->|Hne]; [exact Hc|].
+  rewrite (Hfr c0 Hne).
+  apply (nv_hart_app log ms c0 (wsf c0) (no_violation_hart log wsf c0 Hnv)
+           (Hbnd c0)).
+Qed.
+
+(** The DEVICE/DMA arm.  [WeakLang.wmsgs_of_map] stamps [wm_tid = None],
+    so a disk append adds no obligation at all, and no hart's floor moves:
+    the conjunct survives by [nv_hart_app] alone.  (The DMA messages are
+    [WCplain] but agent-less — the surgery's Delta 2.) *)
+Lemma no_violation_dma (log ms : list wmsg) (wsf : CPU -> wstate) :
+  no_violation log wsf ->
+  (forall c0 : CPU, ws_bounded (wsf c0) (length log)) ->
+  no_violation (log ++ ms) wsf.
+Proof.
+  intros Hnv Hbnd. apply no_violation_intro. intros c0.
+  apply (nv_hart_app log ms c0 (wsf c0) (no_violation_hart log wsf c0 Hnv)
+           (Hbnd c0)).
+Qed.
+
+(* ====================================================================== *)
+(** ** 3. THE THREE DISCHARGE ARMS, off the C/D/S invariants
+
+    The whole point of the surgery: at a byte whose state a load's own
+    fragment pins, the obligation is VACUOUS — there is no foreign
+    unpublished [WCplain] message there to be observed — so the floor may
+    move as far as the step likes.
+
+      - CLEAN  ([wcds_clean], what every [wlat_pointsto] carries at every
+        fraction): every [WCplain] writer of the byte is published.
+      - DIRTY BY ME ([wcds_dirty _ c], the [↦wo] path at [q = 1]): the
+        unpublished [WCplain] writers are all mine, and the obligation
+        quantifies over authors OTHER than the floor's owner.
+      - SYNC ([wcds_sync], the racy window): no [WCplain] writer at all. *)
+
+Lemma nv_byte_clean log c' a n : wcds_clean log a -> nv_byte log c' a n.
+Proof.
+  intros Hcl p m c Hp Ht Hk Hnp Hs _.
+  destruct (Hcl p m (conj Hp (conj Hs Hk))) as [Hn|Hpub].
+  - rewrite Ht in Hn. discriminate.
+  - by destruct (Hnp Hpub).
+Qed.
+
+Lemma nv_byte_dirty log c a n : wcds_dirty log a c -> nv_byte log c a n.
+Proof.
+  intros Hdi p m c0 Hp Ht Hk Hnp Hs Hne.
+  destruct (Hdi p m (conj Hp (conj Hs Hk))) as [Hn|[Hpub|Hc]].
+  - rewrite Ht in Hn. discriminate.
+  - by destruct (Hnp Hpub).
+  - exfalso. apply Hne. rewrite Ht in Hc. by simplify_eq.
+Qed.
+
+Lemma nv_byte_sync log c' a n : wcds_sync log a -> nv_byte log c' a n.
+Proof. intros Hsy p m c Hp Ht Hk Hnp Hs _. by destruct (Hsy p m (conj Hp (conj Hs Hk))). Qed.
+
+(** The uniform reading: any state a hart may legitimately PRESENT for a
+    byte — clean at any fraction, dirty by itself, or sync — discharges the
+    obligation at that byte.  [WeakGhost.wown_st] is exactly the first two,
+    which is why the owned store/load surface needs no case split. *)
+Lemma nv_byte_ok log c a n s :
+  wcds_ok log a s -> (s = WClean \/ s = WDirty c \/ s = WSync) ->
+  nv_byte log c a n.
+Proof.
+  intros Hok Hs. destruct Hs as [Hs|[Hs|Hs]]; subst s; simpl in Hok.
+  - by apply nv_byte_clean.
+  - by apply nv_byte_dirty.
+  - by apply nv_byte_sync.
+Qed.
+
+(** THE FETCH ARM, and the reason the ~50 register-only leaves pay nothing:
+    a byte NO message of the log ever writes carries no obligation at all,
+    whatever the floor.  Kernel text is exactly that ([WeakFunnel]'s
+    [winstr_unwritten]: [latest_ts = 0] this era), and the fetch is the only
+    memory access a register-only instruction makes. *)
+Lemma nv_byte_unwritten (log : list wmsg) (c : CPU) (a : Z) (n : nat) :
+  latest_ts log a = 0%nat -> nv_byte log c a n.
+Proof.
+  intros Hlt p m c0 Hp _ _ _ [b Hb] _. exfalso.
+  apply (latest_ts_top log a). rewrite Hlt.
+  apply (writes_in_log_byte (fun _ => None)). exists (S p).
+  apply lookup_lt_Some in Hp as Hlen. split_and!; [lia|lia|].
+  exists b. rewrite log_byte_S Hp /=. exact Hb.
+Qed.
+
+(** THE BYTE-LEVEL SUMMARY a resource-holder exports.  "Byte [a] carries no
+    foreign unpublished [WCplain] message, for ANY hart at ANY floor" — which
+    is exactly what a clean fragment, a sync witness, or an unwritten byte
+    gives, and exactly what a reassembly site needs per touched byte.  It is
+    PURE, so it survives the closing of the invariant the fragment came from
+    (the walk's leaf slot is minted this way: the element goes back into
+    [WeakKpt]'s invariant, the fact stays). *)
+Definition nv_free (log : list wmsg) (a : Z) : Prop :=
+  forall (c : CPU) (n : nat), nv_byte log c a n.
+
+(** ... and its HART-INDEXED form, which is what a leaf actually needs (the
+    floor whose move it must justify is its own).  Weaker than [nv_free] —
+    an OWNED byte is [nv_ok] for its owner but not [nv_free] — and that gap
+    is exactly the [WDirty] arm. *)
+Definition nv_ok (log : list wmsg) (c : CPU) (a : Z) : Prop :=
+  forall n : nat, nv_byte log c a n.
+
+Lemma nv_ok_of_free log c a : nv_free log a -> nv_ok log c a.
+Proof. intros H n. apply H. Qed.
+
+Lemma nv_ok_clean log c a : wcds_clean log a -> nv_ok log c a.
+Proof. intros H n. by apply nv_byte_clean. Qed.
+
+Lemma nv_ok_dirty log c a : wcds_dirty log a c -> nv_ok log c a.
+Proof. intros H n. by apply nv_byte_dirty. Qed.
+
+Lemma nv_ok_sync log c a : wcds_sync log a -> nv_ok log c a.
+Proof. intros H n. by apply nv_byte_sync. Qed.
+
+Lemma nv_ok_unwritten log c a : latest_ts log a = 0%nat -> nv_ok log c a.
+Proof. intros H n. by apply nv_byte_unwritten. Qed.
+
+Lemma nv_byte_of_ok log c a n : nv_ok log c a -> nv_byte log c a n.
+Proof. intros H. apply H. Qed.
+
+Lemma nv_free_clean log a : wcds_clean log a -> nv_free log a.
+Proof. intros H c n. by apply nv_byte_clean. Qed.
+
+Lemma nv_free_sync log a : wcds_sync log a -> nv_free log a.
+Proof. intros H c n. by apply nv_byte_sync. Qed.
+
+Lemma nv_free_unwritten log a : latest_ts log a = 0%nat -> nv_free log a.
+Proof. intros H c n. by apply nv_byte_unwritten. Qed.
+
+Lemma nv_byte_of_free log c a n : nv_free log a -> nv_byte log c a n.
+Proof. intros H. apply H. Qed.
+
+(* ====================================================================== *)
 (** ** 3. The resources *)
 
 Section resources.
@@ -740,6 +1015,81 @@ Section resources.
     wlat_interp img log -∗ sync_byte a -∗ ⌜wcds_sync log a⌝.
   Proof. iIntros "Hi #Hs". by iApply (wcds_lookup with "Hi Hs"). Qed.
 
+  (** The ghost readings of the three arms.  Each is one [wcds_lookup]. *)
+  Lemma nv_byte_of_clean img log c a dq n :
+    wlat_interp img log -∗ wclean a dq -∗ ⌜nv_byte log c a n⌝.
+  Proof.
+    iIntros "Hi He". iDestruct (wcds_lookup with "Hi He") as %Hok.
+    iPureIntro. by apply nv_byte_clean.
+  Qed.
+
+  Lemma nv_byte_of_pointsto img log c a dq t v n :
+    wlat_interp img log -∗ wlat_pointsto a dq t v -∗ ⌜nv_byte log c a n⌝.
+  Proof.
+    iIntros "Hi [_ He]". by iApply (nv_byte_of_clean with "Hi He").
+  Qed.
+
+  Lemma nv_byte_of_own_st img log c a n :
+    wlat_interp img log -∗ wown_st c a -∗ ⌜nv_byte log c a n⌝.
+  Proof.
+    iIntros "Hi He". iDestruct "He" as (s) "[Hel %Hs]".
+    iDestruct (wcds_lookup with "Hi Hel") as %Hok.
+    iPureIntro. apply (nv_byte_ok log c a n s Hok). destruct Hs; auto.
+  Qed.
+
+  Lemma nv_byte_of_sync img log c a n :
+    wlat_interp img log -∗ sync_byte a -∗ ⌜nv_byte log c a n⌝.
+  Proof.
+    iIntros "Hi #He". iDestruct (sync_byte_no_plain with "Hi He") as %Hsy.
+    iPureIntro. by apply nv_byte_sync.
+  Qed.
+
+  (** The [nv_free] forms — what a site EXPORTS when it is about to give the
+      fragment back (the pure fact outlives the element). *)
+  Lemma nv_free_of_clean img log a dq :
+    wlat_interp img log -∗ wclean a dq -∗ ⌜nv_free log a⌝.
+  Proof.
+    iIntros "Hi He". iDestruct (wcds_lookup with "Hi He") as %Hok.
+    iPureIntro. by apply nv_free_clean.
+  Qed.
+
+  Lemma nv_free_of_pointsto img log a dq t v :
+    wlat_interp img log -∗ wlat_pointsto a dq t v -∗ ⌜nv_free log a⌝.
+  Proof. iIntros "Hi [_ He]". by iApply (nv_free_of_clean with "Hi He"). Qed.
+
+  Lemma nv_free_of_sync img log a :
+    wlat_interp img log -∗ sync_byte a -∗ ⌜nv_free log a⌝.
+  Proof.
+    iIntros "Hi #He". iDestruct (sync_byte_no_plain with "Hi He") as %Hsy.
+    iPureIntro. by apply nv_free_sync.
+  Qed.
+
+  (** The hart-indexed readings.  [wown_st] — what a plain store consumes and
+      produces — pays through the [WDirty] arm. *)
+  Lemma nv_ok_of_own_st img log c a :
+    wlat_interp img log -∗ wown_st c a -∗ ⌜nv_ok log c a⌝.
+  Proof.
+    iIntros "Hi He". iDestruct "He" as (s) "[Hel %Hs]".
+    iDestruct (wcds_lookup with "Hi Hel") as %Hok.
+    iPureIntro. intros n. apply (nv_byte_ok log c a n s Hok).
+    destruct Hs; auto.
+  Qed.
+
+  Lemma nv_ok_of_pointsto img log c a dq t v :
+    wlat_interp img log -∗ wlat_pointsto a dq t v -∗ ⌜nv_ok log c a⌝.
+  Proof.
+    iIntros "Hi He". iDestruct (nv_free_of_pointsto with "Hi He") as %H.
+    iPureIntro. by apply nv_ok_of_free.
+  Qed.
+
+  Lemma nv_ok_of_sync img log c a :
+    wlat_interp img log -∗ sync_byte a -∗ ⌜nv_ok log c a⌝.
+  Proof.
+    iIntros "Hi #He". iDestruct (nv_free_of_sync with "Hi He") as %H.
+    iPureIntro. by apply nv_ok_of_free.
+  Qed.
+
+
   (** The accessor M2's store leaf uses: take the authority out, update the
       elements of the bytes the store wrote, put it back at the new log. *)
   Lemma wlat_interp_acc img log :
@@ -899,6 +1249,16 @@ Section resources.
   Definition weak_state_interp (g : wgstate) : iProp Σ :=
     (⌜wgen_pin g⌝ ∗
      ⌜∀ c : CPU, ws_bounded (wgws g c) (length (wglog g))⌝ ∗
+     (* THE φ CONJUNCT (violation-freedom).  Position: AFTER [ws_bounded],
+        for the same reason [ws_bounded] is second — the three device rules
+        of [WeakExec] destruct only the FIRST conjunct and pass the rest
+        along as one hypothesis, so anything added here leaves them
+        compiling unchanged.  Preserved across a hart step by
+        [no_violation_step] (the stepping hart's own messages carry its own
+        tid, [WeakInterp.wrun_log_tid]; every other hart's floors are below
+        the OLD log's top, [ws_bounded]); across a DMA append by
+        [no_violation_dma]. *)
+     ⌜no_violation (wglog g) (wgws g)⌝ ∗
      ⌜wlog_wf (wglog g)⌝ ∗
      gregs_interp (wgregs g) ∗
      dev_interp (wgdev g) ∗
@@ -914,12 +1274,26 @@ Section resources.
       the lifting rule hands out and takes back at the successor state. *)
   Definition wmstate_interp `{CpuId} (σ : wmstate) : iProp Σ :=
     (⌜ws_bounded σ.(wm_ws) (length σ.(wm_log))⌝ ∗
+     (* this hart's instance of the φ conjunct — the twin of the [ws_bounded]
+        conjunct above, handed out and taken back at the successor.  It is
+        the ONE conjunct a leaf cannot get from the machine: it is paid, per
+        byte the step touches, out of the leaf's own C/D/S evidence. *)
+     ⌜nv_hart σ.(wm_log) cpu_id σ.(wm_ws)⌝ ∗
      ⌜wlog_wf σ.(wm_log)⌝ ∗
      reg_interp σ.(wm_regs) ∗
      dev_interp σ.(wm_dev) ∗
      wlog_auth σ.(wm_log) ∗
      wlat_interp σ.(wm_img) σ.(wm_log) ∗
      wws_auth cpu_id σ.(wm_ws))%I.
+
+  (** THE φ EXPORT (deliverable D).  A trivial projection now that the
+      conjunct is in — and the whole point of the upgrade: whatever the
+      Iris proof was for, the state interpretation of ANY reachable
+      configuration certifies that no hart's coherence floor has reached a
+      foreign agent's unpublished owned store. *)
+  Lemma weak_state_interp_export (g : wgstate) :
+    weak_state_interp g ⊢ ⌜no_violation (wglog g) (wgws g)⌝.
+  Proof. iIntros "(_ & _ & $ & _)". Qed.
 
 End resources.
 

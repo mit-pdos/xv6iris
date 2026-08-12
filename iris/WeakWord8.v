@@ -915,6 +915,98 @@ Section leaves8.
     rewrite /vwp_hold. by iApply (monPred_mono R _ _ Hscl with "HR").
   Qed.
 
+  (** φ exporters at width 8 (φ-upgrade, deliverable C) — see
+      [WeakStore.nv_ok_wpt4] / [nv_ok_wlat4_own]. *)
+  Lemma nv_ok_wpt8 (c : CPU) img log (a : Arch.pa) (dq : dfrac) (w : bv 64)
+      (ws : wstate) :
+    wlat_interp img log -∗ vwp_hold (wpt8 a dq w) ws -∗
+    ⌜forall j : nat, (j < 8)%nat -> nv_ok log c (acc_addr a j)⌝.
+  Proof.
+    iIntros "Hi Hpt". iDestruct (wpt8_at_elems with "Hpt") as "(_ & _ & Hels)".
+    iDestruct "Hels" as (t0 t1 t2 t3 t4 t5 t6 t7)
+      "(H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7)".
+    iDestruct (nv_ok_of_pointsto _ _ c with "Hi H0") as %E0.
+    iDestruct (nv_ok_of_pointsto _ _ c with "Hi H1") as %E1.
+    iDestruct (nv_ok_of_pointsto _ _ c with "Hi H2") as %E2.
+    iDestruct (nv_ok_of_pointsto _ _ c with "Hi H3") as %E3.
+    iDestruct (nv_ok_of_pointsto _ _ c with "Hi H4") as %E4.
+    iDestruct (nv_ok_of_pointsto _ _ c with "Hi H5") as %E5.
+    iDestruct (nv_ok_of_pointsto _ _ c with "Hi H6") as %E6.
+    iDestruct (nv_ok_of_pointsto _ _ c with "Hi H7") as %E7.
+    iPureIntro. intros j Hj.
+    destruct j as [|[|[|[|[|[|[|[|j]]]]]]]];
+      [exact E0|exact E1|exact E2|exact E3|exact E4|exact E5|exact E6|exact E7
+      |lia].
+  Qed.
+
+  Lemma nv_ok_wpt8_own (c : CPU) img log (a : Arch.pa) (w : bv 64)
+      (ws : wstate) :
+    wlat_interp img log -∗ vwp_hold (wpt8_own c a w) ws -∗
+    ⌜forall j : nat, (j < 8)%nat -> nv_ok log c (acc_addr a j)⌝.
+  Proof.
+    iIntros "Hi Hpt".
+    iDestruct (wpt8_own_at_elems with "Hpt") as "(_ & _ & Hels)".
+    iDestruct "Hels" as (t0 t1 t2 t3 t4 t5 t6 t7)
+      "(H0 & S0 & H1 & S1 & H2 & S2 & H3 & S3
+        & H4 & S4 & H5 & S5 & H6 & S6 & H7 & S7)".
+    iDestruct (nv_ok_of_own_st with "Hi S0") as %E0.
+    iDestruct (nv_ok_of_own_st with "Hi S1") as %E1.
+    iDestruct (nv_ok_of_own_st with "Hi S2") as %E2.
+    iDestruct (nv_ok_of_own_st with "Hi S3") as %E3.
+    iDestruct (nv_ok_of_own_st with "Hi S4") as %E4.
+    iDestruct (nv_ok_of_own_st with "Hi S5") as %E5.
+    iDestruct (nv_ok_of_own_st with "Hi S6") as %E6.
+    iDestruct (nv_ok_of_own_st with "Hi S7") as %E7.
+    iPureIntro. intros j Hj.
+    destruct j as [|[|[|[|[|[|[|[|j]]]]]]]];
+      [exact E0|exact E1|exact E2|exact E3|exact E4|exact E5|exact E6|exact E7
+      |lia].
+  Qed.
+
+  (** ... and the [nv_free] form off a PLAIN eight-byte bundle — what a
+      shared, published slot (a page-table entry) exports.  Stronger than the
+      [nv_ok] forms above: it is agent-independent
+      ([WeakGhost.nv_ok_of_free]), which is what lets a walk leaf discharge
+      its read footprint without naming the walking hart. *)
+  Lemma nv_free_wlat8 img log (a : Arch.pa) (dq : dfrac) (t : nat) (w : bv 64) :
+    wlat_interp img log -∗ wlat8 a dq t w -∗
+    ⌜forall j : nat, (j < 8)%nat -> nv_free log (acc_addr a j)⌝.
+  Proof.
+    iIntros "Hi (H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7)".
+    iDestruct (nv_free_of_pointsto with "Hi H0") as %E0.
+    iDestruct (nv_free_of_pointsto with "Hi H1") as %E1.
+    iDestruct (nv_free_of_pointsto with "Hi H2") as %E2.
+    iDestruct (nv_free_of_pointsto with "Hi H3") as %E3.
+    iDestruct (nv_free_of_pointsto with "Hi H4") as %E4.
+    iDestruct (nv_free_of_pointsto with "Hi H5") as %E5.
+    iDestruct (nv_free_of_pointsto with "Hi H6") as %E6.
+    iDestruct (nv_free_of_pointsto with "Hi H7") as %E7.
+    iPureIntro. intros j Hj.
+    destruct j as [|[|[|[|[|[|[|[|j]]]]]]]];
+      [exact E0|exact E1|exact E2|exact E3|exact E4|exact E5|exact E6|exact E7
+      |lia].
+  Qed.
+
+  Lemma nv_ok_wlat8_own (c : CPU) img log (a : Arch.pa) (t : nat) (w : bv 64) :
+    wlat_interp img log -∗ wlat8_own c a t w -∗
+    ⌜forall j : nat, (j < 8)%nat -> nv_ok log c (acc_addr a j)⌝.
+  Proof.
+    iIntros "Hi (H0 & S0 & H1 & S1 & H2 & S2 & H3 & S3
+                 & H4 & S4 & H5 & S5 & H6 & S6 & H7 & S7)".
+    iDestruct (nv_ok_of_own_st with "Hi S0") as %E0.
+    iDestruct (nv_ok_of_own_st with "Hi S1") as %E1.
+    iDestruct (nv_ok_of_own_st with "Hi S2") as %E2.
+    iDestruct (nv_ok_of_own_st with "Hi S3") as %E3.
+    iDestruct (nv_ok_of_own_st with "Hi S4") as %E4.
+    iDestruct (nv_ok_of_own_st with "Hi S5") as %E5.
+    iDestruct (nv_ok_of_own_st with "Hi S6") as %E6.
+    iDestruct (nv_ok_of_own_st with "Hi S7") as %E7.
+    iPureIntro. intros j Hj.
+    destruct j as [|[|[|[|[|[|[|[|j]]]]]]]];
+      [exact E0|exact E1|exact E2|exact E3|exact E4|exact E5|exact E6|exact E7
+      |lia].
+  Qed.
+
 End leaves8.
 
 (* ====================================================================== *)

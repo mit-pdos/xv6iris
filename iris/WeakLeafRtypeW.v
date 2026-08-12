@@ -221,16 +221,16 @@ Section leaves.
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id))
                  [WEread wak_plain pc (if al4 then 4%N else 2%N)])
-              wQ_pure Hgid Haccpc Hpmp
-              (wcert_nowrite (fin_to_nat cpu_id) pc
+              (wQ_fr wQ_pure _ _) Hgid Haccpc Hpmp
+              (wstep_cert_fr _ _ _ _ (wcert_nowrite (fin_to_nat cpu_id) pc
                  [WEread wak_plain pc (if al4 then 4%N else 2%N)]
-                 (nowrite_read1 wak_plain pc (if al4 then 4%N else 2%N)))
+                 (nowrite_read1 wak_plain pc (if al4 then 4%N else 2%N))))
               with "Hmm Hpmpc Hpc [] ").
     { iApply (winstr_intro pc true
                 (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD))
                 (F_RVC h) eq_refl eq_refl Hdecf with "Hbs"). }
     rewrite /wwp_cb. iIntros (σ b) "%Lpc0 %Hcfg Hlat Hreg Hnorg".
-    iDestruct "Hnorg" as "(%Hbnd & %Hwf & Hdev & Hlogauth & Hwsauth)".
+    iDestruct "Hnorg" as "(%Hbnd & %Hnv & %Hwf & Hdev & Hlogauth & Hwsauth)".
     iDestruct (hart_ws_agree cpu_id (wm_ws σ) ws with "Hwsauth Hhws") as %Hws.
     destruct Hcfg as (Lpriv & Lhart & Lmisa & Lsec & Lpmpc & Lpma & Lhtif &
                       LmisaS & LmIE & Lmprv & Lpmm & Lelp).
@@ -239,6 +239,7 @@ Section leaves.
       by (rewrite Lmisa; vm_compute; reflexivity).
     iDestruct (winstr_flat σ pc (F_RVC h) Hwf with "Hlat Hbs") as %Hfok.
     iDestruct (winstr_pinned σ pc (F_RVC h) Hwf with "Hlat Hbs") as %Hpin.
+    iDestruct (winstr_unwritten σ pc (F_RVC h) Hwf with "Hlat Hbs") as %Hunw.
     destruct Hfok as (_ & Hram & w & [Hsub HisRVC] & Htext0).
     assert (Hag : forall r, D r = true ->
               register_lookup r (wm_regs σ) = register_lookup r dst.(sregs))
@@ -358,7 +359,7 @@ Section leaves.
     iNext. iIntros (tick σ' t) "%Hstep %Hdevt0 %Hpost %HQ Hmm' Hpmpc' Hpc'".
     destruct Hpost as (Hregs & Hdevs & Hmems & Himgs & Hlogs & Hwsle & Hwf' &
                        Hbnd').
-    destruct HQ as (HQi & HQl & HQw).
+    destruct HQ as ((HQi & HQl & HQw) & HQeff).
     destruct (load_sexec_facts (wflat_st σ) b (add_vec_int pc 2) rd
                 (regval_into_reg
                    (add_vec (m !!! Regidx rs1) (m !!! Regidx rs2))))
@@ -372,6 +373,12 @@ Section leaves.
     iSplitL "Hlat"; [by rewrite HQi HQl|].
     iSplitL "Hdev Hlogauth Hwsauth".
     { rewrite /wmstate_norg. iSplitR; [by iPureIntro|].
+      iSplitR.
+      { iPureIntro.
+        apply (nv_hart_of_wQ_eff_unwritten cpu_id σ σ' _ HQeff Hnv).
+        intros a Ha. rewrite HQl.
+        destruct (weffs_touch_read1 _ pc _ a Ha) as (j & Hj & ->).
+        apply Hunw. try destruct al4; cbn in Hj; lia. }
       iSplitR; [by iPureIntro|].
       rewrite Hdevs Hdevflat HQl. iFrame. }
     iApply ("Hcont" $! (wm_ws σ') with
@@ -442,16 +449,16 @@ Section leaves.
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id))
                  [WEread wak_plain pc (if al4 then 4%N else 2%N)])
-              wQ_pure Hgid Haccpc Hpmp
-              (wcert_nowrite (fin_to_nat cpu_id) pc
+              (wQ_fr wQ_pure _ _) Hgid Haccpc Hpmp
+              (wstep_cert_fr _ _ _ _ (wcert_nowrite (fin_to_nat cpu_id) pc
                  [WEread wak_plain pc (if al4 then 4%N else 2%N)]
-                 (nowrite_read1 wak_plain pc (if al4 then 4%N else 2%N)))
+                 (nowrite_read1 wak_plain pc (if al4 then 4%N else 2%N))))
               with "Hmm Hpmpc Hpc [] ").
     { iApply (winstr_intro pc true
                 (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR))
                 (F_RVC h) eq_refl eq_refl Hdecf with "Hbs"). }
     rewrite /wwp_cb. iIntros (σ b) "%Lpc0 %Hcfg Hlat Hreg Hnorg".
-    iDestruct "Hnorg" as "(%Hbnd & %Hwf & Hdev & Hlogauth & Hwsauth)".
+    iDestruct "Hnorg" as "(%Hbnd & %Hnv & %Hwf & Hdev & Hlogauth & Hwsauth)".
     iDestruct (hart_ws_agree cpu_id (wm_ws σ) ws with "Hwsauth Hhws") as %Hws.
     destruct Hcfg as (Lpriv & Lhart & Lmisa & Lsec & Lpmpc & Lpma & Lhtif &
                       LmisaS & LmIE & Lmprv & Lpmm & Lelp).
@@ -460,6 +467,7 @@ Section leaves.
       by (rewrite Lmisa; vm_compute; reflexivity).
     iDestruct (winstr_flat σ pc (F_RVC h) Hwf with "Hlat Hbs") as %Hfok.
     iDestruct (winstr_pinned σ pc (F_RVC h) Hwf with "Hlat Hbs") as %Hpin.
+    iDestruct (winstr_unwritten σ pc (F_RVC h) Hwf with "Hlat Hbs") as %Hunw.
     destruct Hfok as (_ & Hram & w & [Hsub HisRVC] & Htext0).
     assert (Hag : forall r, D r = true ->
               register_lookup r (wm_regs σ) = register_lookup r dst.(sregs))
@@ -574,7 +582,7 @@ Section leaves.
     iNext. iIntros (tick σ' t) "%Hstep %Hdevt0 %Hpost %HQ Hmm' Hpmpc' Hpc'".
     destruct Hpost as (Hregs & Hdevs & Hmems & Himgs & Hlogs & Hwsle & Hwf' &
                        Hbnd').
-    destruct HQ as (HQi & HQl & HQw).
+    destruct HQ as ((HQi & HQl & HQw) & HQeff).
     destruct (load_sexec_facts (wflat_st σ) b (add_vec_int pc 2) rd
                 (regval_into_reg
                    (or_vec (m !!! Regidx rs1) (m !!! Regidx rs2))))
@@ -588,6 +596,12 @@ Section leaves.
     iSplitL "Hlat"; [by rewrite HQi HQl|].
     iSplitL "Hdev Hlogauth Hwsauth".
     { rewrite /wmstate_norg. iSplitR; [by iPureIntro|].
+      iSplitR.
+      { iPureIntro.
+        apply (nv_hart_of_wQ_eff_unwritten cpu_id σ σ' _ HQeff Hnv).
+        intros a Ha. rewrite HQl.
+        destruct (weffs_touch_read1 _ pc _ a Ha) as (j & Hj & ->).
+        apply Hunw. try destruct al4; cbn in Hj; lia. }
       iSplitR; [by iPureIntro|].
       rewrite Hdevs Hdevflat HQl. iFrame. }
     iApply ("Hcont" $! (wm_ws σ') with
@@ -658,16 +672,16 @@ Section leaves.
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id))
                  [WEread wak_plain pc (if al4 then 4%N else 2%N)])
-              wQ_pure Hgid Haccpc Hpmp
-              (wcert_nowrite (fin_to_nat cpu_id) pc
+              (wQ_fr wQ_pure _ _) Hgid Haccpc Hpmp
+              (wstep_cert_fr _ _ _ _ (wcert_nowrite (fin_to_nat cpu_id) pc
                  [WEread wak_plain pc (if al4 then 4%N else 2%N)]
-                 (nowrite_read1 wak_plain pc (if al4 then 4%N else 2%N)))
+                 (nowrite_read1 wak_plain pc (if al4 then 4%N else 2%N))))
               with "Hmm Hpmpc Hpc [] ").
     { iApply (winstr_intro pc true
                 (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND))
                 (F_RVC h) eq_refl eq_refl Hdecf with "Hbs"). }
     rewrite /wwp_cb. iIntros (σ b) "%Lpc0 %Hcfg Hlat Hreg Hnorg".
-    iDestruct "Hnorg" as "(%Hbnd & %Hwf & Hdev & Hlogauth & Hwsauth)".
+    iDestruct "Hnorg" as "(%Hbnd & %Hnv & %Hwf & Hdev & Hlogauth & Hwsauth)".
     iDestruct (hart_ws_agree cpu_id (wm_ws σ) ws with "Hwsauth Hhws") as %Hws.
     destruct Hcfg as (Lpriv & Lhart & Lmisa & Lsec & Lpmpc & Lpma & Lhtif &
                       LmisaS & LmIE & Lmprv & Lpmm & Lelp).
@@ -676,6 +690,7 @@ Section leaves.
       by (rewrite Lmisa; vm_compute; reflexivity).
     iDestruct (winstr_flat σ pc (F_RVC h) Hwf with "Hlat Hbs") as %Hfok.
     iDestruct (winstr_pinned σ pc (F_RVC h) Hwf with "Hlat Hbs") as %Hpin.
+    iDestruct (winstr_unwritten σ pc (F_RVC h) Hwf with "Hlat Hbs") as %Hunw.
     destruct Hfok as (_ & Hram & w & [Hsub HisRVC] & Htext0).
     assert (Hag : forall r, D r = true ->
               register_lookup r (wm_regs σ) = register_lookup r dst.(sregs))
@@ -790,7 +805,7 @@ Section leaves.
     iNext. iIntros (tick σ' t) "%Hstep %Hdevt0 %Hpost %HQ Hmm' Hpmpc' Hpc'".
     destruct Hpost as (Hregs & Hdevs & Hmems & Himgs & Hlogs & Hwsle & Hwf' &
                        Hbnd').
-    destruct HQ as (HQi & HQl & HQw).
+    destruct HQ as ((HQi & HQl & HQw) & HQeff).
     destruct (load_sexec_facts (wflat_st σ) b (add_vec_int pc 2) rd
                 (regval_into_reg
                    (and_vec (m !!! Regidx rs1) (m !!! Regidx rs2))))
@@ -804,6 +819,12 @@ Section leaves.
     iSplitL "Hlat"; [by rewrite HQi HQl|].
     iSplitL "Hdev Hlogauth Hwsauth".
     { rewrite /wmstate_norg. iSplitR; [by iPureIntro|].
+      iSplitR.
+      { iPureIntro.
+        apply (nv_hart_of_wQ_eff_unwritten cpu_id σ σ' _ HQeff Hnv).
+        intros a Ha. rewrite HQl.
+        destruct (weffs_touch_read1 _ pc _ a Ha) as (j & Hj & ->).
+        apply Hunw. try destruct al4; cbn in Hj; lia. }
       iSplitR; [by iPureIntro|].
       rewrite Hdevs Hdevflat HQl. iFrame. }
     iApply ("Hcont" $! (wm_ws σ') with
@@ -876,15 +897,15 @@ Section leaves.
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id))
                  [WEread wak_plain pc (if al4 then 4%N else 2%N)])
-              wQ_pure Hgid Haccpc Hpmp
-              (wcert_nowrite (fin_to_nat cpu_id) pc
+              (wQ_fr wQ_pure _ _) Hgid Haccpc Hpmp
+              (wstep_cert_fr _ _ _ _ (wcert_nowrite (fin_to_nat cpu_id) pc
                  [WEread wak_plain pc (if al4 then 4%N else 2%N)]
-                 (nowrite_read1 wak_plain pc (if al4 then 4%N else 2%N)))
+                 (nowrite_read1 wak_plain pc (if al4 then 4%N else 2%N))))
               with "Hmm Hpmpc Hpc [] ").
     { iApply (winstr_intro pc true (ADDIW (immv, Regidx rs1, Regidx rd))
                 (F_RVC h) eq_refl eq_refl Hdecf with "Hbs"). }
     rewrite /wwp_cb. iIntros (σ b) "%Lpc0 %Hcfg Hlat Hreg Hnorg".
-    iDestruct "Hnorg" as "(%Hbnd & %Hwf & Hdev & Hlogauth & Hwsauth)".
+    iDestruct "Hnorg" as "(%Hbnd & %Hnv & %Hwf & Hdev & Hlogauth & Hwsauth)".
     iDestruct (hart_ws_agree cpu_id (wm_ws σ) ws with "Hwsauth Hhws") as %Hws.
     destruct Hcfg as (Lpriv & Lhart & Lmisa & Lsec & Lpmpc & Lpma & Lhtif &
                       LmisaS & LmIE & Lmprv & Lpmm & Lelp).
@@ -893,6 +914,7 @@ Section leaves.
       by (rewrite Lmisa; vm_compute; reflexivity).
     iDestruct (winstr_flat σ pc (F_RVC h) Hwf with "Hlat Hbs") as %Hfok.
     iDestruct (winstr_pinned σ pc (F_RVC h) Hwf with "Hlat Hbs") as %Hpin.
+    iDestruct (winstr_unwritten σ pc (F_RVC h) Hwf with "Hlat Hbs") as %Hunw.
     destruct Hfok as (_ & Hram & w & [Hsub HisRVC] & Htext0).
     assert (Hag : forall r, D r = true ->
               register_lookup r (wm_regs σ) = register_lookup r dst.(sregs))
@@ -1010,7 +1032,7 @@ Section leaves.
     iNext. iIntros (tick σ' t) "%Hstep %Hdevt0 %Hpost %HQ Hmm' Hpmpc' Hpc'".
     destruct Hpost as (Hregs & Hdevs & Hmems & Himgs & Hlogs & Hwsle & Hwf' &
                        Hbnd').
-    destruct HQ as (HQi & HQl & HQw).
+    destruct HQ as ((HQi & HQl & HQw) & HQeff).
     destruct (load_sexec_facts (wflat_st σ) b (add_vec_int pc 2) rd
                 (regval_into_reg (sign_extend' 64
                    (subrange_vec_dec
@@ -1026,6 +1048,12 @@ Section leaves.
     iSplitL "Hlat"; [by rewrite HQi HQl|].
     iSplitL "Hdev Hlogauth Hwsauth".
     { rewrite /wmstate_norg. iSplitR; [by iPureIntro|].
+      iSplitR.
+      { iPureIntro.
+        apply (nv_hart_of_wQ_eff_unwritten cpu_id σ σ' _ HQeff Hnv).
+        intros a Ha. rewrite HQl.
+        destruct (weffs_touch_read1 _ pc _ a Ha) as (j & Hj & ->).
+        apply Hunw. try destruct al4; cbn in Hj; lia. }
       iSplitR; [by iPureIntro|].
       rewrite Hdevs Hdevflat HQl. iFrame. }
     iApply ("Hcont" $! (wm_ws σ') with

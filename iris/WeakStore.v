@@ -1028,6 +1028,70 @@ Section store.
     by iMod (wlat4_sync_store_prim tid k σ a v t w Hk with "Hi Hw") as "[$ $]".
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (** *** 4e. THE φ EXPORTERS (φ-upgrade, deliverable C)
+
+      What a data leaf pays its violation-freedom obligation with: one
+      [WeakGhost.nv_ok] per byte of the window it touched, read off the very
+      bundle it is handing back.  A LOADED window presents clean fragments
+      (arm (a)); a STORED window presents the owned byte states the store
+      primitive just produced (arm (b), the [WDirty] arm — the obligation
+      quantifies over authors other than this hart). *)
+
+  Lemma nv_ok_wpt4 (c : CPU) img log (a : Arch.pa) (dq : dfrac) (w : bv 32)
+      (ws : wstate) :
+    wlat_interp img log -∗ vwp_hold (wpt4 a dq w) ws -∗
+    ⌜forall j : nat, (j < 4)%nat -> nv_ok log c (acc_addr a j)⌝.
+  Proof.
+    iIntros "Hi Hpt". iDestruct (wpt4_at_elems with "Hpt") as "(_ & _ & Hels)".
+    iDestruct "Hels" as (t0 t1 t2 t3) "(H0 & H1 & H2 & H3)".
+    iDestruct (nv_ok_of_pointsto _ _ c with "Hi H0") as %E0.
+    iDestruct (nv_ok_of_pointsto _ _ c with "Hi H1") as %E1.
+    iDestruct (nv_ok_of_pointsto _ _ c with "Hi H2") as %E2.
+    iDestruct (nv_ok_of_pointsto _ _ c with "Hi H3") as %E3.
+    iPureIntro. intros j Hj.
+    destruct j as [|[|[|[|j]]]]; [exact E0|exact E1|exact E2|exact E3|lia].
+  Qed.
+
+  Lemma nv_ok_wlat4_own (c : CPU) img log (a : Arch.pa) (t : nat) (w : bv 32) :
+    wlat_interp img log -∗ wlat4_own c a t w -∗
+    ⌜forall j : nat, (j < 4)%nat -> nv_ok log c (acc_addr a j)⌝.
+  Proof.
+    iIntros "Hi (H0 & S0 & H1 & S1 & H2 & S2 & H3 & S3)".
+    iDestruct (nv_ok_of_own_st with "Hi S0") as %E0.
+    iDestruct (nv_ok_of_own_st with "Hi S1") as %E1.
+    iDestruct (nv_ok_of_own_st with "Hi S2") as %E2.
+    iDestruct (nv_ok_of_own_st with "Hi S3") as %E3.
+    iPureIntro. intros j Hj.
+    destruct j as [|[|[|[|j]]]]; [exact E0|exact E1|exact E2|exact E3|lia].
+  Qed.
+
+  Lemma nv_ok_wlat4 (c : CPU) img log (a : Arch.pa) (dq : dfrac) (t : nat)
+      (w : bv 32) :
+    wlat_interp img log -∗ wlat4 a dq t w -∗
+    ⌜forall j : nat, (j < 4)%nat -> nv_ok log c (acc_addr a j)⌝.
+  Proof.
+    iIntros "Hi (H0 & H1 & H2 & H3)".
+    iDestruct (nv_ok_of_pointsto _ _ c with "Hi H0") as %E0.
+    iDestruct (nv_ok_of_pointsto _ _ c with "Hi H1") as %E1.
+    iDestruct (nv_ok_of_pointsto _ _ c with "Hi H2") as %E2.
+    iDestruct (nv_ok_of_pointsto _ _ c with "Hi H3") as %E3.
+    iPureIntro. intros j Hj.
+    destruct j as [|[|[|[|j]]]]; [exact E0|exact E1|exact E2|exact E3|lia].
+  Qed.
+
+  Lemma nv_ok_wlat4_sync (c : CPU) img log (a : Arch.pa) (t : nat) (w : bv 32) :
+    wlat_interp img log -∗ wlat4_sync a t w -∗
+    ⌜forall j : nat, (j < 4)%nat -> nv_ok log c (acc_addr a j)⌝.
+  Proof.
+    iIntros "Hi [_ #Hs]".
+    iAssert (⌜forall j : nat, (j < 4)%nat -> nv_ok log c (acc_addr a j)⌝)%I
+      as %H; [|by iPureIntro].
+    rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
+    iApply (nv_ok_of_sync _ _ c with "Hi").
+    by iApply (sync_win_byte a 4 j ltac:(simpl; lia) with "Hs").
+  Qed.
+
 End store.
 
 Notation "a ↦w₄ₒ w" := (wpt4_own cpu_id a w)

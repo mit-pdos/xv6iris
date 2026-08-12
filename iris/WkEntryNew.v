@@ -184,15 +184,21 @@ Section leaf_same.
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id))
                  ([WEread wak_plain pc 4] ++ [WEread wak_plain ea 8]))
-              (wQ_load_w 8 ea) Hgid Haccpc (pmp_all_off_allows_all _ Hpmp)
-              (wcert_load8_base4 (fin_to_nat cpu_id) pc wak_plain ea eq_refl)
+              (wQ_fr (wQ_load_w 8 ea) _ _) Hgid Haccpc
+              (pmp_all_off_allows_all _ Hpmp)
+              (wstep_cert_fr _ _ _ _
+                 (wcert_load8_base4 (fin_to_nat cpu_id) pc wak_plain ea eq_refl))
               with "Hmm Hpmpc Hpc [] ").
     { iApply (winstr_intro pc false
                 (LOAD (imm, Regidx rsd, Regidx rsd, false, 8))
                 (F_Base w) eq_refl eq_refl Hdecf with "Hbs"). }
     rewrite /wwp_cb. iIntros (σ b) "%Lpc0 %Hcfg Hlat Hreg Hnorg".
-    iDestruct "Hnorg" as "(%Hbnd & %Hwf & Hdev & Hlogauth & Hwsauth)".
+    iDestruct "Hnorg" as "(%Hbnd & %Hnv & %Hwf & Hdev & Hlogauth & Hwsauth)".
     iDestruct (hart_ws_agree cpu_id (wm_ws σ) ws with "Hwsauth Hhws") as %->.
+    iDestruct (winstr_nv cpu_id _ _ pc (F_Base w) with "Hlat Hbs")
+      as %Hnvpc.
+    iDestruct (nv_ok_wpt8 cpu_id _ _ ea dqv v (wm_ws σ)
+                 with "Hlat Hpt") as %Hnvea.
     destruct Hcfg as (Lpriv & Lhart & Lmisa & Lsec & Lpmpc & Lpma & Lhtif &
                       LmisaS & LmIE & Lmprv & Lpmm & Lelp).
     (* the ONE register the funnel does not read: this instruction's base *)
@@ -240,7 +246,7 @@ Section leaf_same.
                 (add_vec_int pc 4) rsd (regval_into_reg v)))))). }
     pose proof Hpost as Hpost0.
     destruct Hpost as (Hregs & Hdevs & Hmems & Himgs & Hlogs & Hwsle & Hwf' & Hbnd').
-    destruct HQ as (HQi & HQl & HQv).
+    destruct HQ as ((HQi & HQl & HQv) & HQeff).
     iMod (hart_ws_update cpu_id (wm_ws σ) (wm_ws σ) (wm_ws σ')
             with "Hwsauth Hhws") as "[Hwsauth Hhws]".
     iMod "Hclose" as "_". iModIntro.
@@ -250,6 +256,15 @@ Section leaf_same.
     iSplitL "Hlat"; [by rewrite HQi HQl|].
     iSplitL "Hdev Hlogauth Hwsauth".
     { rewrite /wmstate_norg. iSplitR; [by iPureIntro|].
+      iSplitR.
+      { iPureIntro.
+        apply (nv_hart_of_wQ_eff_ok cpu_id σ σ' _ HQeff Hnv).
+        intros a Ha. rewrite HQl.
+        apply weffs_touch_app in Ha as [Ha|Ha].
+        - destruct (weffs_touch_read1 _ pc _ a Ha) as (j & Hj & ->).
+          cbn in Hj. apply Hnvpc. lia.
+        - destruct (weffs_touch_read1 _ ea _ a Ha) as (j & Hj & ->).
+          cbn in Hj. apply Hnvea. lia. }
       iSplitR; [by iPureIntro|].
       rewrite Hdevs Hdevt HQl. iFrame. }
     iApply ("Hcont" $! (wm_ws σ') with
@@ -341,12 +356,13 @@ Section entry.
     iApply (wwp_instr pc_e0 false (UTYPE (imm_auipc, Regidx i_auipc, AUIPC))
               pmpcfg0 (dq := DfracOwn 1)
               (wP_eff (Some (fin_to_nat cpu_id)) [WEread wak_plain pc_e0 4])
-              wQ_pure Hgid Hacc_0 (pmp_all_off_allows_all _ Hpmp)
-              (wcert_nowrite (fin_to_nat cpu_id) pc_e0
-                 [WEread wak_plain pc_e0 4] (nowrite_read1 wak_plain pc_e0 4))
+              (wQ_fr wQ_pure _ _) Hgid Hacc_0 (pmp_all_off_allows_all _ Hpmp)
+              (wstep_cert_fr _ _ _ _
+                    (wcert_nowrite (fin_to_nat cpu_id) pc_e0
+                       [WEread wak_plain pc_e0 4] (nowrite_read1 wak_plain pc_e0 4)))
               with "Hmm Hpmpc Hpc Hin0").
     rewrite /wwp_cb. iIntros (σ1 b1) "%Lpc1 %Hcfg1 Hlat Hreg Hnorg".
-    iDestruct "Hnorg" as "(%Hbnd1 & %Hwf1 & Hdev & Hlogauth & Hwsauth)".
+    iDestruct "Hnorg" as "(%Hbnd1 & %Hnv1 & %Hwf1 & Hdev & Hlogauth & Hwsauth)".
     iDestruct (hart_ws_agree cpu_id (wm_ws σ1) ws with "Hwsauth Hhws") as %Hws1.
     destruct Hcfg1 as (Lpriv & Lhart & Lmisa & Lsec & Lpmpc & Lpma & Lhtif &
                        LmisaS & LmIE & Lmprv & Lpmm & Lelp).
@@ -354,6 +370,8 @@ Section entry.
       as %Hfok.
     iDestruct (winstr_pinned σ1 pc_e0 (F_Base w_auipc) Hwf1 with "Hlat Hbs0")
       as %Hpin.
+    iDestruct (winstr_nv cpu_id _ _ pc_e0 (F_Base w_auipc) with "Hlat Hbs0")
+      as %Hnvpc1.
     destruct Hfok as (_ & _ & w' & [Hww _] & Htext0). subst w'.
     (* premise (c) of the fetch-arm lemma, off the mirror *)
     assert (Hc : forall b' : bool, exists s_exec : mstate,
@@ -448,7 +466,7 @@ Section entry.
     iNext. iIntros (tick1 σ1' t1) "%Hstep1 %Hdevt1 %Hpost1 %HQ1 Hmm Hpmpc Hpc".
     destruct Hpost1 as (Hregs1 & Hdevs1 & Hmems1 & Himgs1 & Hlogs1 & Hwsle1 &
                         Hwf1' & Hbnd1').
-    destruct HQ1 as (HQi1 & HQl1 & HQw1).
+    destruct HQ1 as ((HQi1 & HQl1 & HQw1) & HQ1eff).
     assert (Hdevflat1 : mdev t1 = wm_dev σ1).
     { rewrite Hdevt1 -(wflat_st_dev σ1).
       exact (proj1 (proj2 (proj2 (proj2 (load_sexec_facts (wflat_st σ1) b1
@@ -462,6 +480,16 @@ Section entry.
     iSplitL "Hlat"; [by rewrite HQi1 HQl1|].
     iSplitL "Hdev Hlogauth Hwsauth".
     { rewrite /wmstate_norg. iSplitR; [by iPureIntro|].
+      iSplitR.
+      { iPureIntro.
+        apply (nv_hart_of_wQ_eff_ok cpu_id σ1 σ1' _ HQ1eff Hnv1).
+        intros a Ha. rewrite HQl1.
+        assert (Hin : exists j : nat, (j < 4)%nat /\ a = acc_addr pc_e0 j).
+        { first [ exact (weffs_touch_fetch2 _ pc_e0 a Hacc_0 Ha)
+                | destruct (weffs_touch_read1 _ pc_e0 _ a Ha)
+                    as (j & Hj & ->);
+                  exists j; split; [cbn in Hj; lia|reflexivity] ]. }
+        destruct Hin as (j & Hj & ->). apply Hnvpc1. lia. }
       iSplitR; [by iPureIntro|].
       rewrite Hdevs1 Hdevflat1 HQl1. iFrame. }
     iEval (rewrite Hws1) in "Hpt".
@@ -544,12 +572,13 @@ Section entry.
     iApply (wwp_instr pc_e2 true (UTYPE (sign_extend' 20 imm_clui, rd_clui, LUI))
               pmpcfg0 (dq := DfracOwn 1)
               (wP_eff (Some (fin_to_nat cpu_id)) [WEread wak_plain pc_e2 4])
-              wQ_pure Hgid Hacc_2 (pmp_all_off_allows_all _ Hpmp)
-              (wcert_nowrite (fin_to_nat cpu_id) pc_e2
-                 [WEread wak_plain pc_e2 4] (nowrite_read1 wak_plain pc_e2 4))
+              (wQ_fr wQ_pure _ _) Hgid Hacc_2 (pmp_all_off_allows_all _ Hpmp)
+              (wstep_cert_fr _ _ _ _
+                    (wcert_nowrite (fin_to_nat cpu_id) pc_e2
+                       [WEread wak_plain pc_e2 4] (nowrite_read1 wak_plain pc_e2 4)))
               with "Hmm Hpmpc Hpc Hin2").
     rewrite /wwp_cb. iIntros (s3 b3) "%Lpc3 %Hcfg3 Hlat Hreg Hnorg".
-    iDestruct "Hnorg" as "(%Hbnd3 & %Hwf3 & Hdev & Hlogauth & Hwsauth)".
+    iDestruct "Hnorg" as "(%Hbnd3 & %Hnv3 & %Hwf3 & Hdev & Hlogauth & Hwsauth)".
     iDestruct (hart_ws_agree cpu_id (wm_ws s3) ws2 with "Hwsauth Hhws") as %Hws3.
     destruct Hcfg3 as (Lpriv3 & Lhart3 & Lmisa3 & Lsec3 & Lpmpc3 & Lpma3 &
                        Lhtif3 & LmisaS3 & LmIE3 & Lmprv3 & Lpmm3 & Lelp3).
@@ -557,6 +586,8 @@ Section entry.
       as %Hfok3.
     iDestruct (winstr_pinned s3 pc_e2 (F_RVC h_lui) Hwf3 with "Hlat Hbs2")
       as %Hpin3.
+    iDestruct (winstr_nv cpu_id _ _ pc_e2 (F_RVC h_lui) with "Hlat Hbs2")
+      as %Hnvpc3.
     destruct Hfok3 as (_ & _ & w3 & [Hsub3 Hrvc3] & Htext3).
     assert (Hc3 : forall b' : bool, exists s_exec : mstate,
        exec_eff (execute (UTYPE (sign_extend' 20 imm_clui, rd_clui, LUI)))
@@ -648,7 +679,7 @@ Section entry.
     iNext. iIntros (tick3 s3' t3) "%Hstep3 %Hdevt3 %Hpost3 %HQ3 Hmm Hpmpc Hpc".
     destruct Hpost3 as (Hregs3 & Hdevs3 & Hmems3 & Himgs3 & Hlogs3 & Hwsle3 &
                         Hwf3' & Hbnd3').
-    destruct HQ3 as (HQi3 & HQl3 & HQw3).
+    destruct HQ3 as ((HQi3 & HQl3 & HQw3) & HQ3eff).
     assert (Hdevflat3 : mdev t3 = wm_dev s3).
     { rewrite Hdevt3 -(wflat_st_dev s3).
       exact (proj1 (proj2 (proj2 (proj2 (load_sexec_facts (wflat_st s3) b3
@@ -664,6 +695,16 @@ Section entry.
     iSplitL "Hlat"; [by rewrite HQi3 HQl3|].
     iSplitL "Hdev Hlogauth Hwsauth".
     { rewrite /wmstate_norg. iSplitR; [by iPureIntro|].
+      iSplitR.
+      { iPureIntro.
+        apply (nv_hart_of_wQ_eff_ok cpu_id s3 s3' _ HQ3eff Hnv3).
+        intros a Ha. rewrite HQl3.
+        assert (Hin : exists j : nat, (j < 4)%nat /\ a = acc_addr pc_e2 j).
+        { first [ exact (weffs_touch_fetch2 _ pc_e2 a Hacc_2 Ha)
+                | destruct (weffs_touch_read1 _ pc_e2 _ a Ha)
+                    as (j & Hj & ->);
+                  exists j; split; [cbn in Hj; lia|reflexivity] ]. }
+        destruct Hin as (j & Hj & ->). apply Hnvpc3. lia. }
       iSplitR; [by iPureIntro|].
       rewrite Hdevs3 Hdevflat3 HQl3. iFrame. }
     iEval (rewrite Hws3) in "Hpt".
@@ -706,14 +747,14 @@ Section entry.
               (wP_eff (Some (fin_to_nat cpu_id))
                  [WEread wak_plain pc_e3 2;
                   WEread wak_plain (add_vec_int pc_e3 2) 2])
-              wQ_pure Hgid Hacc_3 (pmp_all_off_allows_all _ Hpmp)
-              (wcert_nowrite (fin_to_nat cpu_id) pc_e3
+              (wQ_fr wQ_pure _ _) Hgid Hacc_3 (pmp_all_off_allows_all _ Hpmp)
+              (wstep_cert_fr _ _ _ _ (wcert_nowrite (fin_to_nat cpu_id) pc_e3
                  [WEread wak_plain pc_e3 2;
                   WEread wak_plain (add_vec_int pc_e3 2) 2]
-                 (nowrite_fetch2 pc_e3))
+                 (nowrite_fetch2 pc_e3)))
               with "Hmm Hpmpc Hpc Hin3").
     rewrite /wwp_cb. iIntros (s4 b4) "%Lpc4 %Hcfg4 Hlat Hreg Hnorg".
-    iDestruct "Hnorg" as "(%Hbnd4 & %Hwf4 & Hdev & Hlogauth & Hwsauth)".
+    iDestruct "Hnorg" as "(%Hbnd4 & %Hnv4 & %Hwf4 & Hdev & Hlogauth & Hwsauth)".
     iDestruct (hart_ws_agree cpu_id (wm_ws s4) (wm_ws s3') with "Hwsauth Hhws")
       as %Hws4.
     destruct Hcfg4 as (Lpriv4 & Lhart4 & Lmisa4 & Lsec4 & Lpmpc4 & Lpma4 &
@@ -722,6 +763,8 @@ Section entry.
       as %Hfok4.
     iDestruct (winstr_pinned s4 pc_e3 (F_Base w_csrr) Hwf4 with "Hlat Hbs3")
       as %Hpin4.
+    iDestruct (winstr_nv cpu_id _ _ pc_e3 (F_Base w_csrr) with "Hlat Hbs3")
+      as %Hnvpc4.
     destruct Hfok4 as (_ & _ & w4 & [Hww4 _] & Htext4). subst w4.
     (* the operand register the funnel does not read: mhartid *)
     iDestruct (reg_valid with "Hreg Hmh") as %Lmh4.
@@ -824,7 +867,7 @@ Section entry.
     iNext. iIntros (tick4 s4' t4) "%Hstep4 %Hdevt4 %Hpost4 %HQ4 Hmm Hpmpc Hpc".
     destruct Hpost4 as (Hregs4 & Hdevs4 & Hmems4 & Himgs4 & Hlogs4 & Hwsle4 &
                         Hwf4' & Hbnd4').
-    destruct HQ4 as (HQi4 & HQl4 & HQw4).
+    destruct HQ4 as ((HQi4 & HQl4 & HQw4) & HQ4eff).
     assert (Hdevflat4 : mdev t4 = wm_dev s4).
     { rewrite Hdevt4 -(wflat_st_dev s4).
       exact (proj1 (proj2 (proj2 (proj2 (load_sexec_facts (wflat_st s4) b4
@@ -838,6 +881,16 @@ Section entry.
     iSplitL "Hlat"; [by rewrite HQi4 HQl4|].
     iSplitL "Hdev Hlogauth Hwsauth".
     { rewrite /wmstate_norg. iSplitR; [by iPureIntro|].
+      iSplitR.
+      { iPureIntro.
+        apply (nv_hart_of_wQ_eff_ok cpu_id s4 s4' _ HQ4eff Hnv4).
+        intros a Ha. rewrite HQl4.
+        assert (Hin : exists j : nat, (j < 4)%nat /\ a = acc_addr pc_e3 j).
+        { first [ exact (weffs_touch_fetch2 _ pc_e3 a Hacc_3 Ha)
+                | destruct (weffs_touch_read1 _ pc_e3 _ a Ha)
+                    as (j & Hj & ->);
+                  exists j; split; [cbn in Hj; lia|reflexivity] ]. }
+        destruct Hin as (j & Hj & ->). apply Hnvpc4. lia. }
       iSplitR; [by iPureIntro|].
       rewrite Hdevs4 Hdevflat4 HQl4. iFrame. }
     iEval (rewrite Hws4) in "Hpt".
@@ -884,12 +937,12 @@ Section entry.
               (ITYPE (sign_extend' 12 imm_caddi, rsd_caddi, rsd_caddi, ADDI))
               pmpcfg0 (dq := DfracOwn 1)
               (wP_eff (Some (fin_to_nat cpu_id)) [WEread wak_plain pc_e4 2])
-              wQ_pure Hgid Hacc_4 (pmp_all_off_allows_all _ Hpmp)
-              (wcert_nowrite (fin_to_nat cpu_id) pc_e4
-                 [WEread wak_plain pc_e4 2] (nowrite_read1 wak_plain pc_e4 2))
+              (wQ_fr wQ_pure _ _) Hgid Hacc_4 (pmp_all_off_allows_all _ Hpmp)
+              (wstep_cert_fr _ _ _ _ (wcert_nowrite (fin_to_nat cpu_id) pc_e4
+                 [WEread wak_plain pc_e4 2] (nowrite_read1 wak_plain pc_e4 2)))
               with "Hmm Hpmpc Hpc Hin4").
     rewrite /wwp_cb. iIntros (s5 b5) "%Lpc5 %Hcfg5 Hlat Hreg Hnorg".
-    iDestruct "Hnorg" as "(%Hbnd5 & %Hwf5 & Hdev & Hlogauth & Hwsauth)".
+    iDestruct "Hnorg" as "(%Hbnd5 & %Hnv5 & %Hwf5 & Hdev & Hlogauth & Hwsauth)".
     iDestruct (hart_ws_agree cpu_id (wm_ws s5) (wm_ws s4') with "Hwsauth Hhws")
       as %Hws5.
     destruct Hcfg5 as (Lpriv5 & Lhart5 & Lmisa5 & Lsec5 & Lpmpc5 & Lpma5 &
@@ -898,6 +951,8 @@ Section entry.
       as %Hfok5.
     iDestruct (winstr_pinned s5 pc_e4 (F_RVC h_addi) Hwf5 with "Hlat Hbs4")
       as %Hpin5.
+    iDestruct (winstr_nv cpu_id _ _ pc_e4 (F_RVC h_addi) with "Hlat Hbs4")
+      as %Hnvpc5.
     destruct Hfok5 as (_ & _ & w5 & [Hsub5 Hrvc5] & Htext5).
     assert (Hc5 : forall b' : bool, exists s_exec : mstate,
        exec_eff (execute
@@ -1021,7 +1076,7 @@ Section entry.
     iNext. iIntros (tick5 s5' t5) "%Hstep5 %Hdevt5 %Hpost5 %HQ5 Hmm Hpmpc Hpc".
     destruct Hpost5 as (Hregs5 & Hdevs5 & Hmems5 & Himgs5 & Hlogs5 & Hwsle5 &
                         Hwf5' & Hbnd5').
-    destruct HQ5 as (HQi5 & HQl5 & HQw5).
+    destruct HQ5 as ((HQi5 & HQl5 & HQw5) & HQ5eff).
     assert (Hdevflat5 : mdev t5 = wm_dev s5).
     { rewrite Hdevt5 -(wflat_st_dev s5).
       exact (proj1 (proj2 (proj2 (proj2 (load_sexec_facts (wflat_st s5) b5
@@ -1043,6 +1098,16 @@ Section entry.
     iSplitL "Hlat"; [by rewrite HQi5 HQl5|].
     iSplitL "Hdev Hlogauth Hwsauth".
     { rewrite /wmstate_norg. iSplitR; [by iPureIntro|].
+      iSplitR.
+      { iPureIntro.
+        apply (nv_hart_of_wQ_eff_ok cpu_id s5 s5' _ HQ5eff Hnv5).
+        intros a Ha. rewrite HQl5.
+        assert (Hin : exists j : nat, (j < 4)%nat /\ a = acc_addr pc_e4 j).
+        { first [ exact (weffs_touch_fetch2 _ pc_e4 a Hacc_4 Ha)
+                | destruct (weffs_touch_read1 _ pc_e4 _ a Ha)
+                    as (j & Hj & ->);
+                  exists j; split; [cbn in Hj; lia|reflexivity] ]. }
+        destruct Hin as (j & Hj & ->). apply Hnvpc5. lia. }
       iSplitR; [by iPureIntro|].
       rewrite Hdevs5 Hdevflat5 HQl5. iFrame. }
     iEval (rewrite Hws5) in "Hpt".
@@ -1091,12 +1156,13 @@ Section entry.
                     mulop_mul))
               pmpcfg0 (dq := DfracOwn 1)
               (wP_eff (Some (fin_to_nat cpu_id)) [WEread wak_plain pc_e5 4])
-              wQ_pure Hgid Hacc_5 (pmp_all_off_allows_all _ Hpmp)
-              (wcert_nowrite (fin_to_nat cpu_id) pc_e5
-                 [WEread wak_plain pc_e5 4] (nowrite_read1 wak_plain pc_e5 4))
+              (wQ_fr wQ_pure _ _) Hgid Hacc_5 (pmp_all_off_allows_all _ Hpmp)
+              (wstep_cert_fr _ _ _ _
+                    (wcert_nowrite (fin_to_nat cpu_id) pc_e5
+                       [WEread wak_plain pc_e5 4] (nowrite_read1 wak_plain pc_e5 4)))
               with "Hmm Hpmpc Hpc Hin5").
     rewrite /wwp_cb. iIntros (s6 b6) "%Lpc6 %Hcfg6 Hlat Hreg Hnorg".
-    iDestruct "Hnorg" as "(%Hbnd6 & %Hwf6 & Hdev & Hlogauth & Hwsauth)".
+    iDestruct "Hnorg" as "(%Hbnd6 & %Hnv6 & %Hwf6 & Hdev & Hlogauth & Hwsauth)".
     iDestruct (hart_ws_agree cpu_id (wm_ws s6) (wm_ws s5') with "Hwsauth Hhws")
       as %Hws6.
     destruct Hcfg6 as (Lpriv6 & Lhart6 & Lmisa6 & Lsec6 & Lpmpc6 & Lpma6 &
@@ -1105,6 +1171,8 @@ Section entry.
       as %Hfok6.
     iDestruct (winstr_pinned s6 pc_e5 (F_Base w_mul) Hwf6 with "Hlat Hbs5")
       as %Hpin6.
+    iDestruct (winstr_nv cpu_id _ _ pc_e5 (F_Base w_mul) with "Hlat Hbs5")
+      as %Hnvpc6.
     destruct Hfok6 as (_ & _ & w6 & [Hww6 _] & Htext6). subst w6.
     assert (Hc6 : forall b' : bool, exists s_exec : mstate,
        exec_eff (execute (MUL (Regidx i_mul_rs2, Regidx i_mul_rs1,
@@ -1232,7 +1300,7 @@ Section entry.
     iNext. iIntros (tick6 s6' t6) "%Hstep6 %Hdevt6 %Hpost6 %HQ6 Hmm Hpmpc Hpc".
     destruct Hpost6 as (Hregs6 & Hdevs6 & Hmems6 & Himgs6 & Hlogs6 & Hwsle6 &
                         Hwf6' & Hbnd6').
-    destruct HQ6 as (HQi6 & HQl6 & HQw6).
+    destruct HQ6 as ((HQi6 & HQl6 & HQw6) & HQ6eff).
     assert (Hdevflat6 : mdev t6 = wm_dev s6).
     { rewrite Hdevt6 -(wflat_st_dev s6).
       exact (proj1 (proj2 (proj2 (proj2 (load_sexec_facts (wflat_st s6) b6
@@ -1258,6 +1326,16 @@ Section entry.
     iSplitL "Hlat"; [by rewrite HQi6 HQl6|].
     iSplitL "Hdev Hlogauth Hwsauth".
     { rewrite /wmstate_norg. iSplitR; [by iPureIntro|].
+      iSplitR.
+      { iPureIntro.
+        apply (nv_hart_of_wQ_eff_ok cpu_id s6 s6' _ HQ6eff Hnv6).
+        intros a Ha. rewrite HQl6.
+        assert (Hin : exists j : nat, (j < 4)%nat /\ a = acc_addr pc_e5 j).
+        { first [ exact (weffs_touch_fetch2 _ pc_e5 a Hacc_5 Ha)
+                | destruct (weffs_touch_read1 _ pc_e5 _ a Ha)
+                    as (j & Hj & ->);
+                  exists j; split; [cbn in Hj; lia|reflexivity] ]. }
+        destruct Hin as (j & Hj & ->). apply Hnvpc6. lia. }
       iSplitR; [by iPureIntro|].
       rewrite Hdevs6 Hdevflat6 HQl6. iFrame. }
     iEval (rewrite Hws6) in "Hpt".
@@ -1309,12 +1387,13 @@ Section entry.
     iApply (wwp_instr pc_e6 true (RTYPE (rs2_cadd, rsd_cadd, rsd_cadd, ADD))
               pmpcfg0 (dq := DfracOwn 1)
               (wP_eff (Some (fin_to_nat cpu_id)) [WEread wak_plain pc_e6 4])
-              wQ_pure Hgid Hacc_6 (pmp_all_off_allows_all _ Hpmp)
-              (wcert_nowrite (fin_to_nat cpu_id) pc_e6
-                 [WEread wak_plain pc_e6 4] (nowrite_read1 wak_plain pc_e6 4))
+              (wQ_fr wQ_pure _ _) Hgid Hacc_6 (pmp_all_off_allows_all _ Hpmp)
+              (wstep_cert_fr _ _ _ _
+                    (wcert_nowrite (fin_to_nat cpu_id) pc_e6
+                       [WEread wak_plain pc_e6 4] (nowrite_read1 wak_plain pc_e6 4)))
               with "Hmm Hpmpc Hpc Hin6").
     rewrite /wwp_cb. iIntros (s7 b7) "%Lpc7 %Hcfg7 Hlat Hreg Hnorg".
-    iDestruct "Hnorg" as "(%Hbnd7 & %Hwf7 & Hdev & Hlogauth & Hwsauth)".
+    iDestruct "Hnorg" as "(%Hbnd7 & %Hnv7 & %Hwf7 & Hdev & Hlogauth & Hwsauth)".
     iDestruct (hart_ws_agree cpu_id (wm_ws s7) (wm_ws s6') with "Hwsauth Hhws")
       as %Hws7.
     destruct Hcfg7 as (Lpriv7 & Lhart7 & Lmisa7 & Lsec7 & Lpmpc7 & Lpma7 &
@@ -1323,6 +1402,8 @@ Section entry.
       as %Hfok7.
     iDestruct (winstr_pinned s7 pc_e6 (F_RVC h_add) Hwf7 with "Hlat Hbs6")
       as %Hpin7.
+    iDestruct (winstr_nv cpu_id _ _ pc_e6 (F_RVC h_add) with "Hlat Hbs6")
+      as %Hnvpc7.
     destruct Hfok7 as (_ & _ & w7 & [Hsub7 Hrvc7] & Htext7).
     assert (Hc7 : forall b' : bool, exists s_exec : mstate,
        exec_eff (execute (RTYPE (rs2_cadd, rsd_cadd, rsd_cadd, ADD)))
@@ -1457,7 +1538,7 @@ Section entry.
     iNext. iIntros (tick7 s7' t7) "%Hstep7 %Hdevt7 %Hpost7 %HQ7 Hmm Hpmpc Hpc".
     destruct Hpost7 as (Hregs7 & Hdevs7 & Hmems7 & Himgs7 & Hlogs7 & Hwsle7 &
                         Hwf7' & Hbnd7').
-    destruct HQ7 as (HQi7 & HQl7 & HQw7).
+    destruct HQ7 as ((HQi7 & HQl7 & HQw7) & HQ7eff).
     assert (Hdevflat7 : mdev t7 = wm_dev s7).
     { rewrite Hdevt7 -(wflat_st_dev s7).
       exact (proj1 (proj2 (proj2 (proj2 (load_sexec_facts (wflat_st s7) b7
@@ -1481,6 +1562,16 @@ Section entry.
     iSplitL "Hlat"; [by rewrite HQi7 HQl7|].
     iSplitL "Hdev Hlogauth Hwsauth".
     { rewrite /wmstate_norg. iSplitR; [by iPureIntro|].
+      iSplitR.
+      { iPureIntro.
+        apply (nv_hart_of_wQ_eff_ok cpu_id s7 s7' _ HQ7eff Hnv7).
+        intros a Ha. rewrite HQl7.
+        assert (Hin : exists j : nat, (j < 4)%nat /\ a = acc_addr pc_e6 j).
+        { first [ exact (weffs_touch_fetch2 _ pc_e6 a Hacc_6 Ha)
+                | destruct (weffs_touch_read1 _ pc_e6 _ a Ha)
+                    as (j & Hj & ->);
+                  exists j; split; [cbn in Hj; lia|reflexivity] ]. }
+        destruct Hin as (j & Hj & ->). apply Hnvpc7. lia. }
       iSplitR; [by iPureIntro|].
       rewrite Hdevs7 Hdevflat7 HQl7. iFrame. }
     iEval (rewrite Hws7) in "Hpt".
@@ -1530,14 +1621,14 @@ Section entry.
               (wP_eff (Some (fin_to_nat cpu_id))
                  [WEread wak_plain pc_e7 2;
                   WEread wak_plain (add_vec_int pc_e7 2) 2])
-              wQ_pure Hgid Hacc_7 (pmp_all_off_allows_all _ Hpmp)
-              (wcert_nowrite (fin_to_nat cpu_id) pc_e7
+              (wQ_fr wQ_pure _ _) Hgid Hacc_7 (pmp_all_off_allows_all _ Hpmp)
+              (wstep_cert_fr _ _ _ _ (wcert_nowrite (fin_to_nat cpu_id) pc_e7
                  [WEread wak_plain pc_e7 2;
                   WEread wak_plain (add_vec_int pc_e7 2) 2]
-                 (nowrite_fetch2 pc_e7))
+                 (nowrite_fetch2 pc_e7)))
               with "Hmm Hpmpc Hpc Hin7").
     rewrite /wwp_cb. iIntros (s8 b8) "%Lpc8 %Hcfg8 Hlat Hreg Hnorg".
-    iDestruct "Hnorg" as "(%Hbnd8 & %Hwf8 & Hdev & Hlogauth & Hwsauth)".
+    iDestruct "Hnorg" as "(%Hbnd8 & %Hnv8 & %Hwf8 & Hdev & Hlogauth & Hwsauth)".
     iDestruct (hart_ws_agree cpu_id (wm_ws s8) (wm_ws s7') with "Hwsauth Hhws")
       as %Hws8.
     destruct Hcfg8 as (Lpriv8 & Lhart8 & Lmisa8 & Lsec8 & Lpmpc8 & Lpma8 &
@@ -1546,6 +1637,8 @@ Section entry.
       as %Hfok8.
     iDestruct (winstr_pinned s8 pc_e7 (F_Base w_jal) Hwf8 with "Hlat Hbs7")
       as %Hpin8.
+    iDestruct (winstr_nv cpu_id _ _ pc_e7 (F_Base w_jal) with "Hlat Hbs7")
+      as %Hnvpc8.
     destruct Hfok8 as (_ & _ & w8 & [Hww8 _] & Htext8). subst w8.
     assert (Hc8 : forall b' : bool, exists s_exec : mstate,
        exec_eff (execute (JAL (imm_jal, Regidx i_jal)))
@@ -1648,7 +1741,7 @@ Section entry.
     iNext. iIntros (tick8 s8' t8) "%Hstep8 %Hdevt8 %Hpost8 %HQ8 Hmm Hpmpc Hpc".
     destruct Hpost8 as (Hregs8 & Hdevs8 & Hmems8 & Himgs8 & Hlogs8 & Hwsle8 &
                         Hwf8' & Hbnd8').
-    destruct HQ8 as (HQi8 & HQl8 & HQw8).
+    destruct HQ8 as ((HQi8 & HQl8 & HQw8) & HQ8eff).
     destruct (jal_sexec_facts (wflat_st s8) b8 (add_vec_int pc_e7 4) pc_start
                 i_jal (add_vec_int pc_e7 4)) as (G1 & G2 & G3 & G4 & G5).
     assert (Hdevflat8 : mdev t8 = wm_dev s8).
@@ -1660,6 +1753,16 @@ Section entry.
     iSplitL "Hlat"; [by rewrite HQi8 HQl8|].
     iSplitL "Hdev Hlogauth Hwsauth".
     { rewrite /wmstate_norg. iSplitR; [by iPureIntro|].
+      iSplitR.
+      { iPureIntro.
+        apply (nv_hart_of_wQ_eff_ok cpu_id s8 s8' _ HQ8eff Hnv8).
+        intros a Ha. rewrite HQl8.
+        assert (Hin : exists j : nat, (j < 4)%nat /\ a = acc_addr pc_e7 j).
+        { first [ exact (weffs_touch_fetch2 _ pc_e7 a Hacc_7 Ha)
+                | destruct (weffs_touch_read1 _ pc_e7 _ a Ha)
+                    as (j & Hj & ->);
+                  exists j; split; [cbn in Hj; lia|reflexivity] ]. }
+        destruct Hin as (j & Hj & ->). apply Hnvpc8. lia. }
       iSplitR; [by iPureIntro|].
       rewrite Hdevs8 Hdevflat8 HQl8. iFrame. }
     iEval (rewrite Hws8) in "Hpt".

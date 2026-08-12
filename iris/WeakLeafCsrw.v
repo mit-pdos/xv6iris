@@ -409,20 +409,21 @@ Section leaf.
     iApply (wwp_instr_config pc false
               (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW)) pmpcfg0 ms0
               (wP_eff (Some (fin_to_nat cpu_id)) [WEread wak_plain pc 4])
-              wQ_pure Hgid Haccpc Hpmp HmIE HMPRV
-              (wcert_nowrite (fin_to_nat cpu_id) pc
-                 [WEread wak_plain pc 4] (nowrite_read1 wak_plain pc 4))
+              (wQ_fr wQ_pure _ _) Hgid Haccpc Hpmp HmIE HMPRV
+              (wstep_cert_fr _ _ _ _ (wcert_nowrite (fin_to_nat cpu_id) pc
+                 [WEread wak_plain pc 4] (nowrite_read1 wak_plain pc 4)))
               with "Hhw Hmiv Hhs Hpriv Hms0 Hpmpc Hpc [] ").
     { iApply (winstr_intro pc false
                 (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW))
                 (F_Base w) eq_refl eq_refl Hdecf with "Hbs"). }
     rewrite /wwp_cb_config. iIntros (σ b) "%Lpc0 %Hcfg %Lms0 Hpriv Hms Hpmpc Hlat Hreg Hnorg".
-    iDestruct "Hnorg" as "(%Hbnd & %Hwf & Hdev & Hlogauth & Hwsauth)".
+    iDestruct "Hnorg" as "(%Hbnd & %Hnv & %Hwf & Hdev & Hlogauth & Hwsauth)".
     iDestruct (hart_ws_agree cpu_id (wm_ws σ) ws with "Hwsauth Hhws") as %Hws.
     destruct Hcfg as (Lpriv & Lhart & Lmisa & Lsec & Lpmpc & Lpma & Lhtif &
                       LmisaS & LmIE & Lmprv & Lpmm & Lelp).
     iDestruct (winstr_flat σ pc (F_Base w) Hwf with "Hlat Hbs") as %Hfok.
     iDestruct (winstr_pinned σ pc (F_Base w) Hwf with "Hlat Hbs") as %Hpin.
+    iDestruct (winstr_unwritten σ pc (F_Base w) Hwf with "Hlat Hbs") as %Hunw.
     destruct Hfok as (_ & _ & w' & [Hww _] & Htext0). subst w'.
     (* the operand register the funnel does not read *)
     iDestruct (reg_valid with "Hreg Hrs1c") as %Lrs1_a.
@@ -564,7 +565,7 @@ Section leaf.
     iNext. iIntros (tick σ' t) "%Hstep %Hdevt0 %Hpost %HQ Hhs Hpc".
     destruct Hpost as (Hregs & Hdevs & Hmems & Himgs & Hlogs & Hwsle & Hwf' &
                        Hbnd').
-    destruct HQ as (HQi & HQl & HQw).
+    destruct HQ as ((HQi & HQl & HQw) & HQeff).
     destruct (csrw_sexec_facts (wflat_st σ) b (add_vec_int pc 4)
                 (mstatus_legalized ms0 rs1v)) as (G1 & G2 & G3 & G4 & G5).
     assert (Hdevflat : mdev t = wm_dev σ).
@@ -576,6 +577,12 @@ Section leaf.
     iSplitL "Hlat"; [by rewrite HQi HQl|].
     iSplitL "Hdev Hlogauth Hwsauth".
     { rewrite /wmstate_norg. iSplitR; [by iPureIntro|].
+      iSplitR.
+      { iPureIntro.
+        apply (nv_hart_of_wQ_eff_unwritten cpu_id σ σ' _ HQeff Hnv).
+        intros a Ha. rewrite HQl.
+        destruct (weffs_touch_read1 _ pc _ a Ha) as (j & Hj & ->).
+        apply Hunw. try destruct al4; cbn in Hj; lia. }
       iSplitR; [by iPureIntro|].
       rewrite Hdevs Hdevflat HQl. iFrame. }
     iApply ("Hcont" $! (wm_ws σ') with

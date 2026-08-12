@@ -89,6 +89,9 @@ Section rest.
 
   Definition wmstate_rest (σ : wmstate) : iProp Σ :=
     (⌜ws_bounded σ.(wm_ws) (length σ.(wm_log))⌝ ∗
+     (* the φ conjunct rides here, next to [ws_bounded], exactly as in
+        [WeakGhost.wmstate_interp] *)
+     ⌜nv_hart σ.(wm_log) cpu_id σ.(wm_ws)⌝ ∗
      ⌜wlog_wf σ.(wm_log)⌝ ∗
      reg_interp σ.(wm_regs) ∗
      dev_interp σ.(wm_dev) ∗
@@ -99,16 +102,49 @@ Section rest.
     wmstate_interp σ ⊣⊢ wlat_interp (wm_img σ) (wm_log σ) ∗ wmstate_rest σ.
   Proof.
     rewrite /wmstate_interp /wmstate_rest. iSplit.
-    - iIntros "(%Hb & %Hw & Hr & Hd & Hl & Hlat & Hws)". iFrame "Hlat".
-      iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|]. iFrame.
-    - iIntros "(Hlat & %Hb & %Hw & Hr & Hd & Hl & Hws)".
-      iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|]. iFrame.
+    - iIntros "(%Hb & %Hn & %Hw & Hr & Hd & Hl & Hlat & Hws)". iFrame "Hlat".
+      iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
+      iSplitR; [by iPureIntro|]. iFrame.
+    - iIntros "(Hlat & %Hb & %Hn & %Hw & Hr & Hd & Hl & Hws)".
+      iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
+      iSplitR; [by iPureIntro|]. iFrame.
   Qed.
 
   Lemma wmstate_rest_facts σ :
     wmstate_rest σ -∗
     ⌜ws_bounded σ.(wm_ws) (length σ.(wm_log)) ∧ wlog_wf σ.(wm_log)⌝.
-  Proof. iIntros "(% & % & _)". by iPureIntro. Qed.
+  Proof. iIntros "(% & % & % & _)". by iPureIntro. Qed.
+
+  Lemma wmstate_rest_nv σ :
+    wmstate_rest σ -∗ ⌜nv_hart σ.(wm_log) cpu_id σ.(wm_ws)⌝.
+  Proof. iIntros "(_ & % & _)". by iPureIntro. Qed.
+
+  (** THE φ-FREE REMAINDER (φ-upgrade, deliverable C, the AMO interface).
+      A racy/lock leaf holds neither the lock word's element bundle nor the
+      latest-write authority when it hands the borrowed state back — both
+      belong to the invariant its CALLER opened — so it cannot pay the
+      violation-freedom conjunct.  The split below is the interface fix: the
+      callback returns everything EXCEPT the conjunct (this is literally the
+      pre-φ [wmstate_rest]), and [wwp_acquire_swap] supplies it, where it
+      does hold the lock bundle at σ'.  The leaf keeps proving exactly what
+      it proved before. *)
+  Definition wmstate_rest_nonv (σ : wmstate) : iProp Σ :=
+    (⌜ws_bounded σ.(wm_ws) (length σ.(wm_log))⌝ ∗
+     ⌜wlog_wf σ.(wm_log)⌝ ∗
+     reg_interp σ.(wm_regs) ∗
+     dev_interp σ.(wm_dev) ∗
+     wlog_auth σ.(wm_log) ∗
+     wws_auth cpu_id σ.(wm_ws))%I.
+
+  Lemma wmstate_rest_of_nonv σ :
+    ⌜nv_hart σ.(wm_log) cpu_id σ.(wm_ws)⌝ -∗
+    wmstate_rest_nonv σ -∗ wmstate_rest σ.
+  Proof.
+    rewrite /wmstate_rest /wmstate_rest_nonv.
+    iIntros "%Hnv (%Hb & %Hw & Hr & Hd & Hl & Hws)".
+    iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
+    iSplitR; [by iPureIntro|]. iFrame.
+  Qed.
 
 End rest.
 
@@ -168,6 +204,9 @@ Section wp_lock.
          ⌜register_lookup PC (wm_regs σ) = pc⌝ ∗
          ⌜∀ j : nat, (j < 4)%nat → pinned_read σ (acc_addr pc j)⌝ ∗
          ⌜P σ⌝ ∗
+         (* φ-upgrade: the leaf proves the pure facts where it HOLDS the
+            resources — here the fetch window, off its own text bundle. *)
+         ⌜∀ j : nat, (j < 4)%nat → nv_ok (wm_log σ) cpu_id (acc_addr pc j)⌝ ∗
          wlat_interp (wm_img σ) (wm_log σ) ∗
          ∃ t0 t1 : mstate,
            ⌜exec (riscv_step false) (wflat_st σ) = Some (tt, t0)⌝ ∗
@@ -176,38 +215,49 @@ Section wp_lock.
                 ⌜wstep_post σ σ' (if tick then t1 else t0)⌝ -∗
                 ((⌜v = lock_zero⌝ ∗ vwp_hold R (wm_ws σ') ∗ locked γ cpu_id)
                  ∨ ⌜v ≠ lock_zero⌝) -∗
-                |={∅, ⊤ ∖ ↑wlockN}=> wmstate_rest σ' ∗
+                |={∅, ⊤ ∖ ↑wlockN}=> wmstate_rest_nonv σ' ∗
                   WWP Loop))%I.
 
   Lemma wwp_acquire_swap (γ : gname) (lk : Arch.pa) R
-      (pc : SailStdpp.Values.mword 64) (P : wmstate → Prop) :
+      (pc : SailStdpp.Values.mword 64) (P : wmstate → Prop) (es : list weff) :
     gen_id = 0%nat →
     acc_wf pc 4 →
     acc_wf lk 4 →
+    (* the trace's FOOTPRINT: the fetch window and the lock word, nothing
+       else.  This is what turns the coherence frame ([WeakEff.wQ_eff]) into
+       the two [nv_ok] obligations paid below. *)
+    (∀ a : Z, weffs_touch es a →
+       (∃ j : nat, (j < 4)%nat ∧ a = acc_addr pc j) ∨
+       (∃ j : nat, (j < 4)%nat ∧ a = acc_addr lk j)) →
     wstep_cert (fin_to_nat cpu_id) pc P
-      (wQ_amo_aq (Some (fin_to_nat cpu_id)) lk lock_one) →
+      (wQ_fr (wQ_amo_aq (Some (fin_to_nat cpu_id)) lk lock_one)
+             (Some (fin_to_nat cpu_id)) es) →
     inv wlockN (wlock_inv γ lk R) -∗
     wacq_cb γ lk R pc P -∗
     WWP Loop.
   Proof.
-    iIntros (Hgid Haccpc Hacclk Hcert) "#Hinv Hk". rewrite /wacq_cb.
-    iApply (wp_winstr pc P (wQ_amo_aq (Some (fin_to_nat cpu_id)) lk lock_one)
+    iIntros (Hgid Haccpc Hacclk Hfoot Hcert) "#Hinv Hk". rewrite /wacq_cb.
+    iApply (wp_winstr pc P
+              (wQ_fr (wQ_amo_aq (Some (fin_to_nat cpu_id)) lk lock_one)
+                     (Some (fin_to_nat cpu_id)) es)
               Hgid Haccpc Hcert).
     iIntros (σ) "Hσ".
     iDestruct (wmstate_interp_split σ with "Hσ") as "[Hlat Hrest]".
     iDestruct (wmstate_rest_facts with "Hrest") as %[Hbnd Hwf].
+    iDestruct (wmstate_rest_nv with "Hrest") as %Hnvσ.
     (* open the lock: ⊤ -> ⊤ ∖ ↑wlockN, held across the step *)
     iInv wlockN as (st t v) "(>Hw & Hlk)" "Hclose".
     (* the swap's return value, off the elements alone *)
     iDestruct (wlat4_flat_gen σ lk (DfracOwn 1) t v Hwf Hacclk with "Hlat Hw")
       as %[Hflat _].
     iMod ("Hk" $! σ v with "[%] Hlat Hrest")
-      as "(%Hpc & %Htext & %HP & Hlat & Hcont)"; [exact Hflat|].
+      as "(%Hpc & %Htext & %HP & %Hnvpc & Hlat & Hcont)"; [exact Hflat|].
     iModIntro. iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
     iSplitR; [by iPureIntro|].
     iDestruct "Hcont" as (t0 t1) "(%Hex0 & %Hex1 & Hcont)".
     iExists t0, t1. iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
-    iNext. iIntros (tick σ') "%Hpost %HQ".
+    iNext. iIntros (tick σ') "%Hpost %HQfr".
+    destruct HQfr as [HQ HQeff].
     (* past the step: reassemble the invariant body and fire the core *)
     iDestruct (wacquire_core γ lk R cpu_id (Some (fin_to_nat cpu_id)) σ σ'
                  Hwf Hacclk HQ with "Hlat [Hw Hlk]") as (v') "[%Hflat' Hupd]".
@@ -215,12 +265,31 @@ Section wp_lock.
     assert (Hvv : v = v') by exact (wflat_word_agree σ lk v v' Hflat Hflat').
     subst v'.
     iMod "Hupd" as "(Hlat & Hbody & Harm)".
+    (* THE PAYMENT.  Here — and only here — both halves of the footprint are
+       in hand: the lock word's retargeted bundle sits in [Hbody] (an
+       exclusive AMO write keeps the bytes CLEAN,
+       [WeakGhost.wcds_ok_store_nonplain]), and the fetch window's fact came
+       up from the leaf.  The [WCexcl] message the step appended is THIS
+       hart's, so the text fact transports across the append for free
+       ([WeakGhost.nv_byte_app_own]). *)
+    iAssert (⌜nv_hart (wm_log σ') cpu_id (wm_ws σ')⌝)%I as %Hnv'.
+    { iDestruct "Hbody" as (st' t' v'') "[Hw' Hlk']".
+      iDestruct (nv_ok_wlat4 cpu_id _ _ lk (DfracOwn 1) t' v''
+                   with "Hlat Hw'") as %Hnvlk.
+      iPureIntro.
+      apply (nv_hart_of_wQ_eff_ok cpu_id σ σ' es HQeff Hnvσ).
+      intros a Ha. destruct (Hfoot a Ha) as [(j & Hj & ->)|(j & Hj & ->)].
+      - destruct HQ as (_ & _ & Hlog'). rewrite Hlog'.
+        intros n. apply nv_byte_app_own; [by apply Hnvpc|].
+        intros m Hm. apply elem_of_list_singleton in Hm as ->. reflexivity.
+      - by apply Hnvlk. }
     iMod ("Hcont" $! tick σ' with "[%] [Harm]") as "[Hrest $]"; [exact Hpost| |].
     { iDestruct "Harm" as "[(-> & HR & Htok)|%Hne]".
       - iLeft. iFrame "HR Htok". by iPureIntro.
       - iRight. by iPureIntro. }
     iMod ("Hclose" with "[Hbody]") as "_"; [by iNext|].
-    iModIntro. iApply (wmstate_interp_split σ'). iFrame.
+    iModIntro. iApply (wmstate_interp_split σ'). iFrame "Hlat".
+    iApply (wmstate_rest_of_nonv σ' with "[%] Hrest"). exact Hnv'.
   Qed.
 
 (* ====================================================================== *)
@@ -258,21 +327,27 @@ Section wp_lock.
       back.  The success branch is inside the caller's callback, where the
       payload and the holder token arrive. *)
   Lemma wwp_acquire_loop (γ : gname) (lk : Arch.pa) R
-      (pc : SailStdpp.Values.mword 64) (P : wmstate → Prop) (K : iProp Σ) :
+      (pc : SailStdpp.Values.mword 64) (P : wmstate → Prop) (K : iProp Σ)
+      (es : list weff) :
     gen_id = 0%nat →
     acc_wf pc 4 →
     acc_wf lk 4 →
+    (∀ a : Z, weffs_touch es a →
+       (∃ j : nat, (j < 4)%nat ∧ a = acc_addr pc j) ∨
+       (∃ j : nat, (j < 4)%nat ∧ a = acc_addr lk j)) →
     wstep_cert (fin_to_nat cpu_id) pc P
-      (wQ_amo_aq (Some (fin_to_nat cpu_id)) lk lock_one) →
+      (wQ_fr (wQ_amo_aq (Some (fin_to_nat cpu_id)) lk lock_one)
+             (Some (fin_to_nat cpu_id)) es) →
     inv wlockN (wlock_inv γ lk R) -∗
     □ (K -∗ ▷ (K -∗ WWP Loop) -∗
          wacq_cb γ lk R pc P) -∗
     K -∗ WWP Loop.
   Proof.
-    iIntros (Hgid Haccpc Hacclk Hcert) "#Hinv #Hatt HK".
+    iIntros (Hgid Haccpc Hacclk Hfoot Hcert) "#Hinv #Hatt HK".
     iApply (wwp_spin_loop K with "[] HK").
     iModIntro. iIntros "HK Hrec".
-    iApply (wwp_acquire_swap γ lk R pc P Hgid Haccpc Hacclk Hcert with "Hinv").
+    iApply (wwp_acquire_swap γ lk R pc P es Hgid Haccpc Hacclk Hfoot Hcert
+              with "Hinv").
     iApply ("Hatt" with "HK Hrec").
   Qed.
 
@@ -299,6 +374,9 @@ Section wp_lock.
          ⌜register_lookup PC (wm_regs σ) = pc⌝ ∗
          ⌜∀ j : nat, (j < 4)%nat → pinned_read σ (acc_addr pc j)⌝ ∗
          ⌜P σ⌝ ∗
+         (* φ-upgrade: the fetch window's facts, proved where the resources
+            are (see [wacq_cb]) *)
+         ⌜∀ j : nat, (j < 4)%nat → nv_ok (wm_log σ) cpu_id (acc_addr pc j)⌝ ∗
          (* φ-upgrade §1: the release site witnesses its own [fence rw,w]
             here.  It is delivered at the store's PRE-state, which is the
             fence's post-state, so [wwp_release_fence_store] passes it
@@ -311,39 +389,63 @@ Section wp_lock.
            ⌜exec (riscv_step true) (wflat_st σ) = Some (tt, t1)⌝ ∗
            ▷ (∀ (tick : bool) (σ' : wmstate),
                 ⌜wstep_post σ σ' (if tick then t1 else t0)⌝ -∗
-                |={∅, ⊤ ∖ ↑N}=> wmstate_rest σ' ∗
+                |={∅, ⊤ ∖ ↑N}=> wmstate_rest_nonv σ' ∗
                   WWP Loop))%I.
 
   Lemma wwp_release_store (γ : gname) (lk : Arch.pa) R
-      (pc : SailStdpp.Values.mword 64) (P : wmstate → Prop) :
+      (pc : SailStdpp.Values.mword 64) (P : wmstate → Prop) (es : list weff) :
     gen_id = 0%nat →
     acc_wf pc 4 →
+    acc_wf lk 4 →
+    (∀ a : Z, weffs_touch es a →
+       (∃ j : nat, (j < 4)%nat ∧ a = acc_addr pc j) ∨
+       (∃ j : nat, (j < 4)%nat ∧ a = acc_addr lk j)) →
     wstep_cert (fin_to_nat cpu_id) pc P
-      (wQ_store (Some (fin_to_nat cpu_id)) lk lock_zero) →
+      (wQ_fr (wQ_store (Some (fin_to_nat cpu_id)) lk lock_zero)
+             (Some (fin_to_nat cpu_id)) es) →
     inv wlockN (wlock_inv γ lk R) -∗
     locked γ cpu_id -∗
     wrel_cb R pc P wlockN -∗
     WWP Loop.
   Proof.
-    iIntros (Hgid Haccpc Hcert) "#Hinv Htok Hk". rewrite /wrel_cb.
-    iApply (wp_winstr pc P (wQ_store (Some (fin_to_nat cpu_id)) lk lock_zero)
+    iIntros (Hgid Haccpc Hacclk Hfoot Hcert) "#Hinv Htok Hk". rewrite /wrel_cb.
+    iApply (wp_winstr pc P
+              (wQ_fr (wQ_store (Some (fin_to_nat cpu_id)) lk lock_zero)
+                     (Some (fin_to_nat cpu_id)) es)
               Hgid Haccpc Hcert).
     iIntros (σ) "Hσ".
     iDestruct (wmstate_interp_split σ with "Hσ") as "[Hlat Hrest]".
     iDestruct (wmstate_rest_facts with "Hrest") as %[Hbnd Hwf].
+    iDestruct (wmstate_rest_nv with "Hrest") as %Hnvσ.
     iInv wlockN as "Hbody" "Hclose".
     iMod ("Hk" $! σ with "Hlat Hrest")
-      as "(%Hpc & %Htext & %HP & %Hrelp & Hlat & HR & Hcont)".
+      as "(%Hpc & %Htext & %HP & %Hnvpc & %Hrelp & Hlat & HR & Hcont)".
     iModIntro. iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
     iSplitR; [by iPureIntro|].
     iDestruct "Hcont" as (t0 t1) "(%Hex0 & %Hex1 & Hcont)".
     iExists t0, t1. iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
-    iNext. iIntros (tick σ') "%Hpost %HQ".
+    iNext. iIntros (tick σ') "%Hpost %HQfr".
+    destruct HQfr as [HQ HQeff].
     iMod (wrelease_core γ lk R cpu_id (Some (fin_to_nat cpu_id)) σ σ' HQ
             Hrelp Hbnd with "Hlat Hbody Htok HR") as "[Hlat Hbody]".
+    (* the same payment as the acquire: the release's own message is a
+       [WCrel] store of THIS hart, so the fetch fact transports across the
+       append, and [wrelease_core] hands the lock bundle back CLEAN. *)
+    iAssert (⌜nv_hart (wm_log σ') cpu_id (wm_ws σ')⌝)%I as %Hnv'.
+    { iDestruct "Hbody" as (st' t' v'') "[Hw' Hlk']".
+      iDestruct (nv_ok_wlat4 cpu_id _ _ lk (DfracOwn 1) t' v''
+                   with "Hlat Hw'") as %Hnvlk.
+      iPureIntro.
+      apply (nv_hart_of_wQ_eff_ok cpu_id σ σ' es HQeff Hnvσ).
+      intros a Ha. destruct (Hfoot a Ha) as [(j & Hj & ->)|(j & Hj & ->)].
+      - destruct HQ as (_ & (kc & Hlog' & _) & _). rewrite Hlog'.
+        intros n. apply nv_byte_app_own; [by apply Hnvpc|].
+        intros m Hm. apply elem_of_list_singleton in Hm as ->. reflexivity.
+      - by apply Hnvlk. }
     iMod ("Hcont" $! tick σ' with "[%]") as "[Hrest $]"; [exact Hpost|].
     iMod ("Hclose" with "[Hbody]") as "_"; [by iNext|].
-    iModIntro. iApply (wmstate_interp_split σ'). iFrame.
+    iModIntro. iApply (wmstate_interp_split σ'). iFrame "Hlat".
+    iApply (wmstate_rest_of_nonv σ' with "[%] Hrest"). exact Hnv'.
   Qed.
 
 (* ====================================================================== *)
@@ -360,17 +462,24 @@ Section wp_lock.
     handoff ([WeakStarted.wstarted_deliver] over [WeakInstr.wwp_fence_scl]). *)
 
   Lemma wwp_started_set (a : Arch.pa) (Pl : vProp Σ)
-      (pc : SailStdpp.Values.mword 64) (P : wmstate → Prop) :
+      (pc : SailStdpp.Values.mword 64) (P : wmstate → Prop) (es : list weff) :
     gen_id = 0%nat →
     acc_wf pc 4 →
+    acc_wf a 4 →
+    (∀ z : Z, weffs_touch es z →
+       (∃ j : nat, (j < 4)%nat ∧ z = acc_addr pc j) ∨
+       (∃ j : nat, (j < 4)%nat ∧ z = acc_addr a j)) →
     wstep_cert (fin_to_nat cpu_id) pc P
-      (wQ_store (Some (fin_to_nat cpu_id)) a lock_one) →
+      (wQ_fr (wQ_store (Some (fin_to_nat cpu_id)) a lock_one)
+             (Some (fin_to_nat cpu_id)) es) →
     inv wstartedN (wstarted_body a Pl) -∗
     wrel_cb Pl pc P wstartedN -∗
     WWP Loop.
   Proof.
-    iIntros (Hgid Haccpc Hcert) "#Hinv Hk". rewrite /wrel_cb.
-    iApply (wp_winstr pc P (wQ_store (Some (fin_to_nat cpu_id)) a lock_one)
+    iIntros (Hgid Haccpc Hacca Hfoot Hcert) "#Hinv Hk". rewrite /wrel_cb.
+    iApply (wp_winstr pc P
+              (wQ_fr (wQ_store (Some (fin_to_nat cpu_id)) a lock_one)
+                     (Some (fin_to_nat cpu_id)) es)
               Hgid Haccpc Hcert).
     iIntros (σ) "Hσ".
     (* the escrow's one-shot conjunct is stored against a log SNAPSHOT, and
@@ -379,20 +488,35 @@ Section wp_lock.
     iDestruct (wmstate_interp_log_lb σ with "Hσ") as "[Hσ #Hlbσ]".
     iDestruct (wmstate_interp_split σ with "Hσ") as "[Hlat Hrest]".
     iDestruct (wmstate_rest_facts with "Hrest") as %[Hbnd Hwf].
+    iDestruct (wmstate_rest_nv with "Hrest") as %Hnvσ.
     iInv wstartedN as "Hbody" "Hclose".
     iMod ("Hk" $! σ with "Hlat Hrest")
-      as "(%Hpc & %Htext & %HP & %Hrelp & Hlat & HP0 & Hcont)".
+      as "(%Hpc & %Htext & %HP & %Hnvpc & %Hrelp & Hlat & HP0 & Hcont)".
     iModIntro. iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
     iSplitR; [by iPureIntro|].
     iDestruct "Hcont" as (t0 t1) "(%Hex0 & %Hex1 & Hcont)".
     iExists t0, t1. iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
-    iNext. iIntros (tick σ') "%Hpost %HQ".
+    iNext. iIntros (tick σ') "%Hpost %HQfr".
+    destruct HQfr as [HQ HQeff].
     iMod (wstarted_set a Pl (Some (fin_to_nat cpu_id)) σ σ' HQ Hrelp Hbnd
             with "Hlbσ Hlat Hbody HP0") as "[Hlat Hat]".
+    (* the escrow's word is SYNC, so its bytes pay through the [WSync] arm *)
+    iAssert (⌜nv_hart (wm_log σ') cpu_id (wm_ws σ')⌝)%I as %Hnv'.
+    { iDestruct "Hat" as "[Hw' Hhist']".
+      iDestruct (nv_ok_wlat4_sync cpu_id _ _ a (S (length (wm_log σ))) lock_one
+                   with "Hlat Hw'") as %Hnva.
+      iPureIntro.
+      apply (nv_hart_of_wQ_eff_ok cpu_id σ σ' es HQeff Hnvσ).
+      intros z Hz. destruct (Hfoot z Hz) as [(j & Hj & ->)|(j & Hj & ->)].
+      - destruct HQ as (_ & (kc & Hlog' & _) & _). rewrite Hlog'.
+        intros n. apply nv_byte_app_own; [by apply Hnvpc|].
+        intros m Hm. apply elem_of_list_singleton in Hm as ->. reflexivity.
+      - by apply Hnva. }
     iMod ("Hcont" $! tick σ' with "[%]") as "[Hrest $]"; [exact Hpost|].
     iMod ("Hclose" with "[Hat]") as "_".
     { iNext. iExists (S (length (wm_log σ))), lock_one. iExact "Hat". }
-    iModIntro. iApply (wmstate_interp_split σ'). iFrame.
+    iModIntro. iApply (wmstate_interp_split σ'). iFrame "Hlat".
+    iApply (wmstate_rest_of_nonv σ' with "[%] Hrest"). exact Hnv'.
   Qed.
 
 (* ====================================================================== *)
@@ -474,13 +598,19 @@ Section wp_lock.
     two rules' interfaces meet with no adapter.) *)
 
   Example wwp_release_seq (γ : gname) (lk : Arch.pa) R
-      (pcf pcs : SailStdpp.Values.mword 64) (Pf Ps : wmstate → Prop) :
+      (pcf pcs : SailStdpp.Values.mword 64) (Pf Ps : wmstate → Prop)
+      (ess : list weff) :
     gen_id = 0%nat →
     acc_wf pcf 4 →
     acc_wf pcs 4 →
+    acc_wf lk 4 →
+    (∀ a : Z, weffs_touch ess a →
+       (∃ j : nat, (j < 4)%nat ∧ a = acc_addr pcs j) ∨
+       (∃ j : nat, (j < 4)%nat ∧ a = acc_addr lk j)) →
     wstep_cert (fin_to_nat cpu_id) pcf Pf (wQ_fence Barrier_RISCV_rw_w) →
     wstep_cert (fin_to_nat cpu_id) pcs Ps
-      (wQ_store (Some (fin_to_nat cpu_id)) lk lock_zero) →
+      (wQ_fr (wQ_store (Some (fin_to_nat cpu_id)) lk lock_zero)
+             (Some (fin_to_nat cpu_id)) ess) →
     inv wlockN (wlock_inv γ lk R) -∗
     locked γ cpu_id -∗
     (∀ σ : wmstate, wmstate_interp σ ={⊤,∅}=∗
@@ -497,7 +627,7 @@ Section wp_lock.
               ={∅,⊤}=∗ wmstate_interp σ' ∗ wrel_cb R pcs Ps wlockN)) -∗
     WWP Loop.
   Proof.
-    iIntros (Hgid Haccf Haccs Hcertf Hcerts) "#Hinv Htok Hk".
+    iIntros (Hgid Haccf Haccs Hacclk Hfoot Hcertf Hcerts) "#Hinv Htok Hk".
     iApply (wwp_fence_step pcf Barrier_RISCV_rw_w Pf Hgid Haccf Hcertf).
     iIntros (σ) "Hσ".
     iMod ("Hk" $! σ with "Hσ") as "(%Hpc & %Htext & %HP & Hc)".
@@ -509,7 +639,7 @@ Section wp_lock.
     iMod ("Hcont" $! tick σ' with "[%] [%] [%]") as "[$ Hrel]";
       [exact Hpost|exact HQ|by apply HQrelp|].
     iModIntro.
-    iApply (wwp_release_store γ lk R pcs Ps Hgid Haccs Hcerts
+    iApply (wwp_release_store γ lk R pcs Ps ess Hgid Haccs Hacclk Hfoot Hcerts
               with "Hinv Htok Hrel").
   Qed.
 
@@ -539,16 +669,32 @@ Section wp_lock.
     ak_coh aka = false →
     ak_sync aka = true →
     ak_latest akw = true →
+    (* the FETCH read is generic in kind/address/width here, so its footprint
+       has to be tied to [pc] by the caller (for the real fetch it is
+       [pf := pc], [nf := 4] and this is [reflexivity]-cheap) *)
+    (∀ a : Z, weff_touches (WEread akf pf nf) a →
+       ∃ j : nat, (j < 4)%nat ∧ a = acc_addr pc j) →
     inv wlockN (wlock_inv γ lk R) -∗
     wacq_cb γ lk R pc
       (wP_eff (Some (fin_to_nat cpu_id))
          [WEread akf pf nf; WEread aka lk 4; WEwrite akw lk 4 lock_one]) -∗
     WWP Loop.
   Proof.
-    intros Hgid Haccpc Hacclk Hcoh Hsync Hlat. iIntros "#Hinv Hk".
-    iApply (wwp_acquire_swap γ lk R pc _ Hgid Haccpc Hacclk
-              (wcert_amo_aq (fin_to_nat cpu_id) pc akf pf nf aka akw lk lock_one
-                 Hcoh Hsync Hlat) with "Hinv Hk").
+    intros Hgid Haccpc Hacclk Hcoh Hsync Hlat Hfetch. iIntros "#Hinv Hk".
+    iApply (wwp_acquire_swap γ lk R pc
+              (wP_eff (Some (fin_to_nat cpu_id))
+                 [WEread akf pf nf; WEread aka lk 4; WEwrite akw lk 4 lock_one])
+              [WEread akf pf nf; WEread aka lk 4; WEwrite akw lk 4 lock_one]
+              Hgid Haccpc Hacclk with "Hinv Hk").
+    - intros a Ha. apply weffs_touch_cons in Ha as [Ha|Ha].
+      + left. by apply Hfetch.
+      + right. apply weffs_touch_cons in Ha as [Ha|Ha].
+        * destruct Ha as (j & Hj & ->). exists j. split; [cbn in Hj; lia|done].
+        * destruct (weffs_touch_write1 _ lk _ _ a Ha) as (j & Hj & ->).
+          exists j. split; [cbn in Hj; lia|done].
+    - apply wstep_cert_fr.
+      exact (wcert_amo_aq (fin_to_nat cpu_id) pc akf pf nf aka akw lk lock_one
+               Hcoh Hsync Hlat).
   Qed.
 
   Corollary wwp_release_store_cert (γ : gname) (lk : Arch.pa) R
@@ -556,6 +702,9 @@ Section wp_lock.
       (akf : akinfo) (pf : Arch.pa) (nf : N) (akw : akinfo) :
     gen_id = 0%nat →
     acc_wf pc 4 →
+    acc_wf lk 4 →
+    (∀ a : Z, weff_touches (WEread akf pf nf) a →
+       ∃ j : nat, (j < 4)%nat ∧ a = acc_addr pc j) →
     inv wlockN (wlock_inv γ lk R) -∗
     locked γ cpu_id -∗
     wrel_cb R pc
@@ -563,10 +712,18 @@ Section wp_lock.
          [WEread akf pf nf; WEwrite akw lk 4 lock_zero]) wlockN -∗
     WWP Loop.
   Proof.
-    intros Hgid Haccpc. iIntros "#Hinv Htok Hk".
-    iApply (wwp_release_store γ lk R pc _ Hgid Haccpc
-              (wcert_store (fin_to_nat cpu_id) pc akf pf nf akw lk lock_zero)
-              with "Hinv Htok Hk").
+    intros Hgid Haccpc Hacclk Hfetch. iIntros "#Hinv Htok Hk".
+    iApply (wwp_release_store γ lk R pc
+              (wP_eff (Some (fin_to_nat cpu_id))
+                 [WEread akf pf nf; WEwrite akw lk 4 lock_zero])
+              [WEread akf pf nf; WEwrite akw lk 4 lock_zero]
+              Hgid Haccpc Hacclk with "Hinv Htok Hk").
+    - intros a Ha. apply weffs_touch_cons in Ha as [Ha|Ha].
+      + left. by apply Hfetch.
+      + right. destruct (weffs_touch_write1 _ lk _ _ a Ha) as (j & Hj & ->).
+        exists j. split; [cbn in Hj; lia|done].
+    - apply wstep_cert_fr.
+      exact (wcert_store (fin_to_nat cpu_id) pc akf pf nf akw lk lock_zero).
   Qed.
 
   Corollary wwp_started_set_cert (a : Arch.pa) (Pl : vProp Σ)
@@ -574,16 +731,27 @@ Section wp_lock.
       (akf : akinfo) (pf : Arch.pa) (nf : N) (akw : akinfo) :
     gen_id = 0%nat →
     acc_wf pc 4 →
+    acc_wf a 4 →
+    (∀ z : Z, weff_touches (WEread akf pf nf) z →
+       ∃ j : nat, (j < 4)%nat ∧ z = acc_addr pc j) →
     inv wstartedN (wstarted_body a Pl) -∗
     wrel_cb Pl pc
       (wP_eff (Some (fin_to_nat cpu_id))
          [WEread akf pf nf; WEwrite akw a 4 lock_one]) wstartedN -∗
     WWP Loop.
   Proof.
-    intros Hgid Haccpc. iIntros "#Hinv Hk".
-    iApply (wwp_started_set a Pl pc _ Hgid Haccpc
-              (wcert_store (fin_to_nat cpu_id) pc akf pf nf akw a lock_one)
-              with "Hinv Hk").
+    intros Hgid Haccpc Hacca Hfetch. iIntros "#Hinv Hk".
+    iApply (wwp_started_set a Pl pc
+              (wP_eff (Some (fin_to_nat cpu_id))
+                 [WEread akf pf nf; WEwrite akw a 4 lock_one])
+              [WEread akf pf nf; WEwrite akw a 4 lock_one]
+              Hgid Haccpc Hacca with "Hinv Hk").
+    - intros z Hz. apply weffs_touch_cons in Hz as [Hz|Hz].
+      + left. by apply Hfetch.
+      + right. destruct (weffs_touch_write1 _ a _ _ z Hz) as (j & Hj & ->).
+        exists j. split; [cbn in Hj; lia|done].
+    - apply wstep_cert_fr.
+      exact (wcert_store (fin_to_nat cpu_id) pc akf pf nf akw a lock_one).
   Qed.
 
   (** ... and the loop, whose only premise is now the caller's retry edge. *)
@@ -596,6 +764,8 @@ Section wp_lock.
     ak_coh aka = false →
     ak_sync aka = true →
     ak_latest akw = true →
+    (∀ a : Z, weff_touches (WEread akf pf nf) a →
+       ∃ j : nat, (j < 4)%nat ∧ a = acc_addr pc j) →
     inv wlockN (wlock_inv γ lk R) -∗
     □ (K -∗ ▷ (K -∗ WWP Loop) -∗
          wacq_cb γ lk R pc
@@ -603,10 +773,20 @@ Section wp_lock.
               [WEread akf pf nf; WEread aka lk 4; WEwrite akw lk 4 lock_one])) -∗
     K -∗ WWP Loop.
   Proof.
-    intros Hgid Haccpc Hacclk Hcoh Hsync Hlat. iIntros "#Hinv #Hatt HK".
-    iApply (wwp_acquire_loop γ lk R pc _ K Hgid Haccpc Hacclk
-              (wcert_amo_aq (fin_to_nat cpu_id) pc akf pf nf aka akw lk lock_one
-                 Hcoh Hsync Hlat) with "Hinv Hatt HK").
+    intros Hgid Haccpc Hacclk Hcoh Hsync Hlat Hfetch.
+    iIntros "#Hinv #Hatt HK".
+    iApply (wwp_acquire_loop γ lk R pc _ K
+              [WEread akf pf nf; WEread aka lk 4; WEwrite akw lk 4 lock_one]
+              Hgid Haccpc Hacclk with "Hinv Hatt HK").
+    - intros a Ha. apply weffs_touch_cons in Ha as [Ha|Ha].
+      + left. by apply Hfetch.
+      + right. apply weffs_touch_cons in Ha as [Ha|Ha].
+        * destruct Ha as (j & Hj & ->). exists j. split; [cbn in Hj; lia|done].
+        * destruct (weffs_touch_write1 _ lk _ _ a Ha) as (j & Hj & ->).
+          exists j. split; [cbn in Hj; lia|done].
+    - apply wstep_cert_fr.
+      exact (wcert_amo_aq (fin_to_nat cpu_id) pc akf pf nf aka akw lk lock_one
+               Hcoh Hsync Hlat).
   Qed.
 
 End wp_lock.

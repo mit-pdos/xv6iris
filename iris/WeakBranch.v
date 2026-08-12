@@ -186,13 +186,20 @@ Section branch.
   Lemma wwp_acquire_loop_real (γ : gname) (lk : Arch.pa) R
       (pca pcb : SailStdpp.Values.mword 64)
       (Pa Pb : wmstate → Prop) (Qb : wmstate → wmstate → Prop)
-      (K Kb : iProp Σ) :
+      (K Kb : iProp Σ) (esa : list weff) :
     gen_id = 0%nat →
     acc_wf pca 4 →
     acc_wf pcb 4 →
     acc_wf lk 4 →
+    (* the ATTEMPT's footprint — the fetch window and the lock word, exactly
+       [WeakAcquire.wwp_acquire_swap]'s premise (the branch pays nothing: it
+       writes nothing, so [wQ_pure]/[wcert_nowrite] carry it) *)
+    (∀ a : Z, weffs_touch esa a →
+       (∃ j : nat, (j < 4)%nat ∧ a = acc_addr pca j) ∨
+       (∃ j : nat, (j < 4)%nat ∧ a = acc_addr lk j)) →
     wstep_cert (fin_to_nat cpu_id) pca Pa
-      (wQ_amo_aq (Some (fin_to_nat cpu_id)) lk lock_one) →
+      (wQ_fr (wQ_amo_aq (Some (fin_to_nat cpu_id)) lk lock_one)
+             (Some (fin_to_nat cpu_id)) esa) →
     wstep_cert (fin_to_nat cpu_id) pcb Pb Qb →
     inv wlockN (wlock_inv γ lk R) -∗
     □ (K -∗ ▷ (Kb -∗ WWP Loop) -∗
@@ -201,10 +208,11 @@ Section branch.
          wbr_cb pcb Pb Qb) -∗
     K -∗ WWP Loop.
   Proof.
-    iIntros (Hgid Hacca Haccb Hacclk Hcerta Hcertb) "#Hinv #Hatt #Hbr HK".
+    iIntros (Hgid Hacca Haccb Hacclk Hfoot Hcerta Hcertb)
+      "#Hinv #Hatt #Hbr HK".
     iApply (wwp_spin_loop K with "[] HK").
     iModIntro. iIntros "HK Hrec".
-    iApply (wwp_acquire_swap γ lk R pca Pa Hgid Hacca Hacclk Hcerta
+    iApply (wwp_acquire_swap γ lk R pca Pa esa Hgid Hacca Hacclk Hfoot Hcerta
               with "Hinv").
     iApply ("Hatt" with "HK [Hrec]").
     (* the retry edge, under the AMO's own later: from [Kb], the branch step
@@ -229,6 +237,8 @@ Section branch.
     ak_coh aka = false →
     ak_sync aka = true →
     ak_latest akw = true →
+    (∀ a : Z, weff_touches (WEread akf pf nf) a →
+       ∃ j : nat, (j < 4)%nat ∧ a = acc_addr pca j) →
     inv wlockN (wlock_inv γ lk R) -∗
     □ (K -∗ ▷ (Kb -∗ WWP Loop) -∗
          wacq_cb γ lk R pca
@@ -239,11 +249,25 @@ Section branch.
            (wP_eff (Some (fin_to_nat cpu_id)) [WEread akf2 pf2 nf2]) wQ_pure) -∗
     K -∗ WWP Loop.
   Proof.
-    intros Hgid Hacca Haccb Hacclk Hcoh Hsync Hlat. iIntros "#Hinv #Hatt #Hbr HK".
+    intros Hgid Hacca Haccb Hacclk Hcoh Hsync Hlat Hfetch.
+    assert (Hfoot : forall a : Z,
+              weffs_touch
+                [WEread akf pf nf; WEread aka lk 4; WEwrite akw lk 4 lock_one] a ->
+              (exists j : nat, (j < 4)%nat /\ a = acc_addr pca j) \/
+              (exists j : nat, (j < 4)%nat /\ a = acc_addr lk j)).
+    { intros a Ha. apply weffs_touch_cons in Ha as [Ha|Ha].
+      - left. by apply Hfetch.
+      - right. apply weffs_touch_cons in Ha as [Ha|Ha].
+        + destruct Ha as (j & Hj & ->). exists j. split; [cbn in Hj; lia|done].
+        + destruct (weffs_touch_write1 _ lk _ _ a Ha) as (j & Hj & ->).
+          exists j. split; [cbn in Hj; lia|done]. }
+    iIntros "#Hinv #Hatt #Hbr HK".
     iApply (wwp_acquire_loop_real γ lk R pca pcb _ _ _ K Kb
-              Hgid Hacca Haccb Hacclk
-              (wcert_amo_aq (fin_to_nat cpu_id) pca akf pf nf aka akw lk lock_one
-                 Hcoh Hsync Hlat)
+              [WEread akf pf nf; WEread aka lk 4; WEwrite akw lk 4 lock_one]
+              Hgid Hacca Haccb Hacclk Hfoot
+              (wstep_cert_fr _ _ _ _
+                 (wcert_amo_aq (fin_to_nat cpu_id) pca akf pf nf aka akw lk
+                    lock_one Hcoh Hsync Hlat))
               (wcert_nowrite (fin_to_nat cpu_id) pcb [WEread akf2 pf2 nf2]
                  (nowrite_trace_read akf2 pf2 nf2))
               with "Hinv Hatt Hbr HK").

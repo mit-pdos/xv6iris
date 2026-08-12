@@ -584,10 +584,11 @@ Section rule.
     iIntros (Hgid Haccpc Hcert) "H".
     iApply (wp_wexec_step with "[H]"); [exact Hgid|].
     iIntros (σ) "Hσ".
-    iDestruct "Hσ" as "(%Hbnd & %Hwf & Hrest)".
+    iDestruct "Hσ" as "(%Hbnd & %Hnv & %Hwf & Hrest)".
     iMod ("H" $! σ with "[Hrest]") as "(%Hpc & %Htext & %HP & Hk)".
     { rewrite /wmstate_interp.
       iSplitR; [iPureIntro; exact Hbnd|].
+      iSplitR; [iPureIntro; exact Hnv|].
       iSplitR; [iPureIntro; exact Hwf|]. iExact "Hrest". }
     iDestruct "Hk" as (t0 t1) "(%Hex0 & %Hex1 & Hk)".
     assert (Hc : ∀ tick : bool,

@@ -67,6 +67,7 @@ Require Import WeakInterp.
 Require Import WeakLang.
 Require Import WeakViewMono.
 Require Import WeakGhost.
+Require Import WeakViolation.
 Require Import WeakExec.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvAdequacy.   (* [riscvGpreS]/[riscvΣ], [reg_alloc_cpus],
@@ -88,7 +89,17 @@ Definition wcpu_pool `{GEN : GenId} (cs : list CPU)
 (* 2. The theorem.                                                          *)
 (* ---------------------------------------------------------------------- *)
 
-Theorem weak_system_adequacy Σ `{!riscvGpreS Σ, !weakGpreS Σ, !sieG Σ}
+(** THE φ FORM (φ-upgrade, deliverable D).  [weak_system_adequacy] with its
+    conclusion strengthened by the violation-freedom export: at EVERY
+    reachable configuration, no hart's coherence floor has reached a foreign
+    agent's unpublished owned store ([WeakViolation.no_violation], aligned
+    term-for-term with [WeakRobust.violation]).  It is the general form —
+    [weak_system_adequacy] below is its projection, with its statement
+    unchanged — and it costs exactly two lines over it: [no_violation_nil] at
+    the initial state, [WeakGhost.weak_state_interp_export] at the final
+    continuation.  Everything in between is the interpretation's own φ
+    conjunct, paid by the leaves. *)
+Theorem weak_system_adequacy_phi Σ `{!riscvGpreS Σ, !weakGpreS Σ}
     `{GEN : GenId}
     (cs : list CPU) (g : wgstate) (D : CPU -> gset register)
     (Hgid : gen_id = 0%nat)
@@ -114,15 +125,17 @@ Theorem weak_system_adequacy Σ `{!riscvGpreS Σ, !weakGpreS Σ, !sieG Σ}
        WWP UartLoop @ ⊤ ∗
        WWP DiskLoop @ ⊤ ∗
        WWP PlicLoop @ ⊤) ->
-  forall t2 g2 e2,
+  forall t2 g2,
     rtc erased_step (wcpu_pool cs, g) (t2, g2) ->
-    e2 ∈ t2 ->
-    reducible (Λ := weak_riscv_lang) e2 g2.
+    no_violation (wglog g2) (wgws g2) /\
+    (forall e2, e2 ∈ t2 -> reducible (Λ := weak_riscv_lang) e2 g2).
 Proof.
-  intros Hwp t2 g2 e2 Hrtc He2.
+  intros Hwp t2 g2 Hrtc.
   apply erased_steps_nsteps in Hrtc as (n & κs & Hsteps).
-  cut (forall e : expr weak_riscv_lang, e ∈ t2 -> not_stuck e g2).
-  { intros Hns. destruct (Hns e2 He2) as [[v Hv]|Hred];
+  cut (no_violation (wglog g2) (wgws g2) /\
+       (forall e : expr weak_riscv_lang, e ∈ t2 -> not_stuck e g2)).
+  { intros [Hnv Hns]. split; [exact Hnv|].
+    intros e2 He2. destruct (Hns e2 He2) as [[v Hv]|Hred];
       [discriminate Hv|exact Hred]. }
   eapply (wp_strong_adequacy Σ weak_riscv_lang NotStuck (wcpu_pool cs) g n κs
             t2 g2 _ (fun _ => 0%nat)); last exact Hsteps.
@@ -204,6 +217,9 @@ Proof.
     (* the fresh era: every hart is at [ws_init] over an EMPTY log *)
     iSplitR.
     { iPureIntro. intros c. rewrite (Hws c) Hlog. apply ws_bounded_init. }
+    (* φ: the empty log violates nothing *)
+    iSplitR.
+    { iPureIntro. rewrite Hlog. apply no_violation_nil. }
     iSplitR.
     { iPureIntro. rewrite Hlog. apply Forall_nil_2. }
     iSplitL "Hauths".
@@ -232,6 +248,43 @@ Proof.
     iSplitL "Hwpd"; [iExact "Hwpd"|].
     iSplitL "Hwpp"; [iExact "Hwpp"|done]. }
   iIntros (es' t2') "%Heq %Hlen %Hns Hsi Hes Hts".
+  (* THE EXPORT: the reachable state's own interpretation carries φ *)
+  iDestruct (weak_state_interp_export g2 with "Hsi") as %Hnv.
   iApply fupd_mask_intro; [set_solver|]. iIntros "_".
-  iPureIntro. intros e He. exact (Hns e eq_refl He).
+  iPureIntro. split; [exact Hnv|].
+  intros e He. exact (Hns e eq_refl He).
+Qed.
+
+(** The M1c theorem, verbatim, as the projection of the φ form. *)
+Theorem weak_system_adequacy Σ `{!riscvGpreS Σ, !weakGpreS Σ, !sieG Σ}
+    `{GEN : GenId}
+    (cs : list CPU) (g : wgstate) (D : CPU -> gset register)
+    (Hgid : gen_id = 0%nat)
+    (Hpow : wgpow g = true) (Hgen0 : wggen g = 0%nat)
+    (Hlog : wglog g = [])
+    (Hws : forall c : CPU, wgws g c = ws_init) :
+  (forall (HR : riscvGS Σ) (HW : weakGS Σ),
+     ⊢ ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
+          [∗ set] r ∈ D c,
+            reg_pointsto_at c r (DfracOwn 1)
+              (register_lookup r (wgregs g c))) ∗
+       ([∗ map] a ↦ b ∈ wgimg g, wlat_pointsto (pa_z a) (DfracOwn 1) 0%nat b) ∗
+       ([∗ set] c ∈ (fin_to_set CPU : gset CPU), hart_view c) ∗
+       wlog_lb [] ∗
+       uart_frag (wgdev g).(duart) ∗ plic_frag (wgdev g).(dplic) ∗
+       virtio_frag (wgdev g).(dvirtio)
+       ={⊤}=∗
+       ([∗ list] c ∈ cs,
+          WWP (LoopE gen_id c) @ ⊤) ∗
+       WWP UartLoop @ ⊤ ∗
+       WWP DiskLoop @ ⊤ ∗
+       WWP PlicLoop @ ⊤) ->
+  forall t2 g2 e2,
+    rtc erased_step (wcpu_pool cs, g) (t2, g2) ->
+    e2 ∈ t2 ->
+    reducible (Λ := weak_riscv_lang) e2 g2.
+Proof.
+  intros Hwp t2 g2 e2 Hrtc He2.
+  exact (proj2 (weak_system_adequacy_phi Σ cs g D Hgid Hpow Hgen0 Hlog Hws Hwp
+                  t2 g2 Hrtc) e2 He2).
 Qed.

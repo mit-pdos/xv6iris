@@ -61,6 +61,7 @@ Require Import WeakMem.
 Require Import WeakInterp.
 Require Import WeakLang.
 Require Import WeakBridge.
+Require Import WeakGhost.
 Require Import RiscvLang RiscvExec.
 
 Local Open Scope Z_scope.
@@ -1430,4 +1431,379 @@ Proof.
              (coh_ts s ea 4) j).
     + intros w a t. apply amo_acq_gain.
     + rewrite coh_ts_length. exact Hj.
+Qed.
+
+(* ====================================================================== *)
+(** ** 5b. THE COHERENCE FOOTPRINT of a trace (φ-upgrade, deliverable C)
+
+    THE MACHINE-LEVEL FACT the violation-freedom conjunct needs and that the
+    tree did not have: a step raises a hart's [WeakMem.coh] ONLY at the bytes
+    its effect trace names.  Everything else about φ's preservation is either
+    pure ([WeakViolation] §2) or a reading of the mover's own C/D/S fragment
+    ([WeakViolation] §3); this is the one piece that has to come from the
+    interpreter, and the effect trace is where it can be said, because
+    [WeakCert.wstep_cert_eff] pins the successor's [wstate] to
+    [WeakCert.weffs] on the nose.
+
+    WHY IT IS INDISPENSABLE.  [WeakInstr.wstep_post] carries only
+    [WeakMem.ws_le] about the successor's views, and monotonicity alone does
+    not bound the RISE at an untouched byte — while [WeakMem.load_post_at]
+    absorbs the whole pre-view [vpre] into [coh] at every byte it reads, so
+    a floor really can jump arbitrarily far at a byte the step touches.  With
+    the frame below, "which bytes may have jumped" is decidable from the
+    trace, and [WeakViolation.nv_hart_coh_step] turns the obligation into one
+    [nv_byte] per touched byte — which is exactly what a leaf can pay from
+    the points-to / sync witness it already holds for its own window. *)
+
+Definition weff_touches (e : weff) (a : Z) : Prop :=
+  match e with
+  | WEread _ pa n => exists j : nat, (j < N.to_nat n)%nat /\ a = acc_addr pa j
+  | WEwrite _ pa n _ => exists j : nat, (j < N.to_nat n)%nat /\ a = acc_addr pa j
+  | WEbar _ => False
+  end.
+
+Definition weffs_touch (es : list weff) (a : Z) : Prop :=
+  exists e, e ∈ es /\ weff_touches e a.
+
+(** Both are DECIDABLE — a window is an interval, and a trace is a list —
+    which is what lets the frame below be used in the contrapositive
+    direction without any classical reasoning. *)
+Global Instance weff_touches_dec (e : weff) (a : Z) : Decision (weff_touches e a).
+Proof.
+  assert (Hiv : forall (pa : Arch.pa) (n : N),
+            Decision (exists j : nat, (j < N.to_nat n)%nat /\ a = acc_addr pa j)).
+  { intros pa n.
+    destruct (decide (pa_z pa <= a /\ a < pa_z pa + Z.of_nat (N.to_nat n)))
+      as [[Hlo Hhi]|Hno].
+    - left. exists (Z.to_nat (a - pa_z pa)). rewrite /acc_addr. split; lia.
+    - right. intros (j & Hj & Heq). apply Hno. rewrite /acc_addr in Heq. lia. }
+  destruct e as [ak pa n|ak pa n v|b]; simpl; [apply Hiv|apply Hiv|right; tauto].
+Qed.
+
+Global Instance weffs_touch_dec (es : list weff) (a : Z)
+    : Decision (weffs_touch es a).
+Proof.
+  induction es as [|e es IH].
+  - right. intros (e & He & _). by apply elem_of_nil in He.
+  - destruct (decide (weff_touches e a)) as [H|H].
+    + left. exists e. split; [apply elem_of_list_here|exact H].
+    + destruct IH as [IH|IH].
+      * left. destruct IH as (e' & He' & Hp). exists e'.
+        split; [by apply elem_of_list_further|exact Hp].
+      * right. intros (e' & He' & Hp).
+        apply elem_of_cons in He' as [->|He']; [by apply H|].
+        apply IH. by exists e'.
+Qed.
+
+(** Decomposition, for the leaves that read their footprint off a literal
+    trace. *)
+Lemma weffs_touch_cons (e : weff) (es : list weff) (a : Z) :
+  weffs_touch (e :: es) a -> weff_touches e a \/ weffs_touch es a.
+Proof.
+  intros (e' & He' & Ht). apply elem_of_cons in He' as [->|He'];
+    [by left|right; by exists e'].
+Qed.
+
+Lemma weffs_touch_app (es1 es2 : list weff) (a : Z) :
+  weffs_touch (es1 ++ es2) a -> weffs_touch es1 a \/ weffs_touch es2 a.
+Proof.
+  intros (e & He & Ht). apply elem_of_app in He as [He|He];
+    [left|right]; by exists e.
+Qed.
+
+Lemma weffs_touch_nil (a : Z) : weffs_touch [] a -> False.
+Proof. intros (e & He & _). by apply elem_of_nil in He. Qed.
+
+Lemma weffs_touch_read1 (ak : akinfo) (pa : Arch.pa) (n : N) (a : Z) :
+  weffs_touch [WEread ak pa n] a ->
+  exists j : nat, (j < N.to_nat n)%nat /\ a = acc_addr pa j.
+Proof.
+  intros (e & He & Ht). apply elem_of_list_singleton in He as ->. exact Ht.
+Qed.
+
+Lemma weffs_touch_write1 (ak : akinfo) (pa : Arch.pa) (n : N)
+    (v : bv (8 * n)) (a : Z) :
+  weffs_touch [WEwrite ak pa n v] a ->
+  exists j : nat, (j < N.to_nat n)%nat /\ a = acc_addr pa j.
+Proof.
+  intros (e & He & Ht). apply elem_of_list_singleton in He as ->. exact Ht.
+Qed.
+
+(** The other fetch-trace shape the register-only family uses — a single
+    read of [pc], at width 4 or (compressed) 2.  Same conclusion as
+    [WeakLeafRegOnly.weffs_touch_regonly]: the footprint is inside the four text bytes. *)
+Lemma weffs_touch_read1_4 (ak : akinfo) (pc : Arch.pa) (n : N) (a : Z) :
+  (N.to_nat n <= 4)%nat ->
+  weffs_touch [WEread ak pc n] a ->
+  exists j : nat, (j < 4)%nat /\ a = acc_addr pc j.
+Proof.
+  intros Hn Ha. destruct (weffs_touch_read1 ak pc n a Ha) as (j & Hj & ->).
+  exists j. split; [lia|reflexivity].
+Qed.
+
+(** The COMPRESSED fetch trace (two 2-byte reads, the 2-not-4-aligned arm):
+    its footprint is still inside the four text bytes of [pc], which needs
+    the wrap-freedom of the window to move the high half's base. *)
+Lemma weffs_touch_fetch2 (ak : akinfo) (pc : Arch.pa) (a : Z) :
+  acc_wf pc 4 ->
+  weffs_touch [WEread ak pc 2; WEread ak (add_vec_int pc 2) 2] a ->
+  exists j : nat, (j < 4)%nat /\ a = acc_addr pc j.
+Proof.
+  intros Hacc Ha.
+  assert (Hhi : pa_z (add_vec_int pc 2) = pa_z pc + 2).
+  { replace (add_vec_int pc 2) with (pa_add pc 2)
+      by (rewrite /pa_add; f_equal).
+    rewrite (acc_wf_byte pc 4 2 Hacc ltac:(lia)) /acc_addr. lia. }
+  apply weffs_touch_cons in Ha as [Ha|Ha].
+  - destruct Ha as (j & Hj & ->). exists j. split; [cbn in Hj; lia|reflexivity].
+  - destruct (weffs_touch_read1 _ _ _ a Ha) as (j & Hj & ->).
+    exists (2 + j)%nat. cbn in Hj. split; [lia|].
+    rewrite /acc_addr Hhi. lia.
+Qed.
+
+(** The two per-byte frames, off [WeakMem.coh_upd_ne]. *)
+Lemma coh_load_post_at_ne ws aq vpre a' t a :
+  a <> a' -> coh (load_post_at ws aq vpre a' t) a = coh ws a.
+Proof. intros Hne. rewrite /load_post_at /coh /= lookup_insert_ne //. Qed.
+
+Lemma coh_store_post_ne ws rl a' t a :
+  a <> a' -> coh (store_post ws rl a' t) a = coh ws a.
+Proof. intros Hne. rewrite /store_post /coh /= lookup_insert_ne //. Qed.
+
+Lemma coh_foldl_load_ne (aq : bool) (vpre : nat) (ats : list (Z * nat)) (a : Z) :
+  (forall p, p ∈ ats -> a <> p.1) ->
+  forall w, coh (foldl (fun w at_ => load_post_at w aq vpre at_.1 at_.2) w ats) a
+            = coh w a.
+Proof.
+  induction ats as [|at_ ats IH]; intros Hno w; [reflexivity|].
+  simpl. rewrite IH; [|intros p Hp; apply Hno; by apply elem_of_list_further].
+  apply coh_load_post_at_ne, Hno, elem_of_list_here.
+Qed.
+
+Lemma coh_load_post_bytes_ne ws aq ats a :
+  (forall p, p ∈ ats -> a <> p.1) -> coh (load_post_bytes ws aq ats) a = coh ws a.
+Proof. intros Hno. by apply coh_foldl_load_ne. Qed.
+
+Lemma coh_foldl_store_ne (rl : bool) (as_ : list Z) (t : nat) (a : Z) :
+  (forall z, z ∈ as_ -> a <> z) ->
+  forall w, coh (foldl (fun w z => store_post w rl z t) w as_) a = coh w a.
+Proof.
+  induction as_ as [|z as_ IH]; intros Hno w; [reflexivity|].
+  simpl. rewrite IH; [|intros z' Hz'; apply Hno; by apply elem_of_list_further].
+  apply coh_store_post_ne, Hno, elem_of_list_here.
+Qed.
+
+Lemma coh_store_post_bytes_ne ws rl as_ t a :
+  (forall z, z ∈ as_ -> a <> z) -> coh (store_post_bytes ws rl as_ t) a = coh ws a.
+Proof. intros Hno. by apply coh_foldl_store_ne. Qed.
+
+(** ... and the two contiguous instances, at the [acc_addr] spelling of a
+    window that both [WeakInterp.wread_post] and [wwrite_post] use. *)
+Lemma coh_load_post_run_ne ws aq (pa : Arch.pa) (ts : list nat) (a : Z) :
+  (forall j : nat, (j < length ts)%nat -> a <> acc_addr pa j) ->
+  coh (load_post_run ws aq (pa_z pa) ts) a = coh ws a.
+Proof.
+  intros Hno. rewrite /load_post_run. apply coh_load_post_bytes_ne.
+  intros p Hp. apply elem_of_zip_with in Hp as (j & t & -> & Hj & _).
+  apply elem_of_seq in Hj as [_ Hj]. simpl.
+  apply (Hno j). lia.
+Qed.
+
+Lemma coh_store_post_run_ne ws rl (pa : Arch.pa) (n : nat) (t : nat) (a : Z) :
+  (forall j : nat, (j < n)%nat -> a <> acc_addr pa j) ->
+  coh (store_post_run ws rl (pa_z pa) n t) a = coh ws a.
+Proof.
+  intros Hno. rewrite /store_post_run. apply coh_store_post_bytes_ne.
+  intros z Hz. apply elem_of_list_fmap in Hz as (j & -> & Hj).
+  apply elem_of_seq in Hj as [_ Hj]. apply (Hno j). lia.
+Qed.
+
+(** THE FRAME, per effect and then along a whole trace. *)
+Lemma weff_apply_coh_frame tid s e a :
+  ¬ weff_touches e a -> coh (wm_ws (weff_apply tid s e)) a = coh (wm_ws s) a.
+Proof.
+  destruct e as [ak pa n|ak pa n v|b]; intros Hno.
+  - rewrite weff_apply_read /wread_post. destruct (ak_coh ak); [reflexivity|].
+    rewrite /wset_ws /=. apply coh_load_post_run_ne.
+    intros j Hj Heq. apply Hno. exists j.
+    split; [by rewrite coh_ts_length in Hj|exact Heq].
+  - rewrite weff_apply_write /wwrite_post /=. apply coh_store_post_run_ne.
+    intros j Hj Heq. apply Hno. by exists j.
+  - rewrite weff_apply_bar /wset_ws /= /barrier_post. by destruct b.
+Qed.
+
+Lemma weffs_coh_frame tid s es a :
+  ¬ weffs_touch es a -> coh (wm_ws (weffs tid s es)) a = coh (wm_ws s) a.
+Proof.
+  revert s. induction es as [|e es IH]; intros s Hno; [reflexivity|].
+  rewrite weffs_cons IH.
+  - apply weff_apply_coh_frame. intros Ht. apply Hno.
+    exists e. split; [apply elem_of_list_here|exact Ht].
+  - intros (e' & He' & Ht). apply Hno. exists e'.
+    split; [by apply elem_of_list_further|exact Ht].
+Qed.
+
+(** THE LOG SIDE: every message a trace appends carries the runner's own tid
+    ([WeakInterp.wwrite_msg] stamps the interpreter's [tid] parameter), which
+    is what makes a hart's own stores free for its own violation-freedom
+    obligation ([WeakViolation.nv_hart_app_own]). *)
+Lemma weffs_log_own tid s es :
+  exists ms, wm_log (weffs tid s es) = (wm_log s ++ ms)%list /\
+             (forall m, m ∈ ms -> wm_tid m = tid).
+Proof.
+  revert s. induction es as [|e es IH]; intros s.
+  - exists []. rewrite weffs_nil app_nil_r. split; [reflexivity|].
+    intros m Hm. by apply elem_of_nil in Hm.
+  - destruct (IH (weff_apply tid s e)) as (ms2 & Hms2 & Hown2).
+    assert (Hstep : exists ms1, wm_log (weff_apply tid s e)
+                                = (wm_log s ++ ms1)%list /\
+                                (forall m, m ∈ ms1 -> wm_tid m = tid)).
+    { destruct e as [ak pa n|ak pa n v|b].
+      - exists []. rewrite weff_apply_read wread_post_log app_nil_r.
+        split; [reflexivity|]. intros m Hm. by apply elem_of_nil in Hm.
+      - exists [wwrite_msg tid (wm_class_of ak (wm_ws s)) pa n v].
+        rewrite weff_apply_write /wwrite_post /=. split; [reflexivity|].
+        intros m Hm. apply elem_of_list_singleton in Hm as ->. reflexivity.
+      - exists []. rewrite weff_apply_bar app_nil_r.
+        split; [reflexivity|]. intros m Hm. by apply elem_of_nil in Hm. }
+    destruct Hstep as (ms1 & Hms1 & Hown1).
+    exists (ms1 ++ ms2)%list. rewrite weffs_cons Hms2 Hms1 -app_assoc.
+    split; [reflexivity|]. intros m Hm.
+    apply elem_of_app in Hm as [Hm|Hm]; [by apply Hown1|by apply Hown2].
+Qed.
+
+(** THE LEAF-FACING COMBINATOR, and the point of the whole section: a leaf's
+    violation-freedom obligation reduces to ONE [WeakViolation.nv_byte] per
+    byte of its own effect trace — which is precisely what
+    [WeakViolation.nv_byte_of_pointsto] / [_of_own_st] / [_of_sync] read off
+    the resources the leaf already holds for its window (and, for the FETCH,
+    what [WeakFunnel.winstr_flat]'s "the text is unwritten" gives for free:
+    a byte no message writes satisfies [nv_byte] vacuously). *)
+Lemma nv_hart_weffs (c : CPU) (s : wmstate) (es : list weff) :
+  nv_hart (wm_log s) c (wm_ws s) ->
+  (forall a : Z, weffs_touch es a ->
+     nv_byte (wm_log (weffs (Some (fin_to_nat c)) s es)) c a
+             (coh (wm_ws (weffs (Some (fin_to_nat c)) s es)) a)) ->
+  nv_hart (wm_log (weffs (Some (fin_to_nat c)) s es)) c
+          (wm_ws (weffs (Some (fin_to_nat c)) s es)).
+Proof.
+  intros Hnv Htouch.
+  destruct (weffs_log_own (Some (fin_to_nat c)) s es) as (ms & Hms & Hown).
+  rewrite Hms. apply (nv_hart_coh_step _ c (wm_ws s)).
+  - by apply nv_hart_app_own.
+  - intros a Hlt. rewrite -Hms. apply Htouch.
+    destruct (decide (weffs_touch es a)) as [Ht|Ht]; [exact Ht|exfalso].
+    rewrite (weffs_coh_frame (Some (fin_to_nat c)) s es a Ht) in Hlt. lia.
+Qed.
+
+(* ====================================================================== *)
+(** ** 5c. CARRYING THE TRACE THROUGH THE CERTIFICATE (φ-upgrade, (i))
+
+    [WeakCert.wstep_cert_eff] already PROVES that the successor's log and
+    weak state are the fold of the effect trace; every [wcert_*] below then
+    throws that away and keeps only the view arithmetic its leaf wants.  The
+    violation-freedom conjunct needs it back — [nv_hart_weffs] is stated
+    exactly at it — so [wQ_eff] names it and [wstep_cert_fr] pairs it with
+    ANY certificate the leaf already has, generically, so that no [wcert_*]
+    has to be restated. *)
+
+Definition wQ_eff (tid : option nat) (es : list weff) : wmstate -> wmstate -> Prop :=
+  fun s s' => wm_img s' = wm_img s /\
+              wm_log s' = wm_log (weffs tid s es) /\
+              wm_ws s' = wm_ws (weffs tid s es).
+
+Definition wQ_fr (Q : wmstate -> wmstate -> Prop) (tid : option nat)
+    (es : list weff) : wmstate -> wmstate -> Prop :=
+  fun s s' => Q s s' /\ wQ_eff tid es s s'.
+
+Lemma wcert_eff (cid : nat) (pc : SailStdpp.Values.mword 64) (es : list weff) :
+  wstep_cert cid pc (wP_eff (Some cid) es) (wQ_eff (Some cid) es).
+Proof.
+  apply wstep_cert_eff. intros s s' Hi Hl Hws. by split_and!.
+Qed.
+
+(** Two certificates over the SAME precondition conjoin — [wstep_cert]'s
+    "the step is admissible" half is shared and its post half is pointwise.
+    This is the whole content of pairing the trace onto a leaf's own
+    certificate, at either shape of the precondition. *)
+Lemma wstep_cert_pair (cid : nat) (pc : SailStdpp.Values.mword 64)
+    (P : wmstate -> Prop) (Q1 Q2 : wmstate -> wmstate -> Prop) :
+  wstep_cert cid pc P Q1 ->
+  wstep_cert cid pc P Q2 ->
+  wstep_cert cid pc P (fun s s' => Q1 s s' /\ Q2 s s').
+Proof.
+  intros H1 H2 s tick Hpc Hacc Htext HP.
+  destruct (H1 s tick Hpc Hacc Htext HP) as [Hok Hq1].
+  destruct (H2 s tick Hpc Hacc Htext HP) as [_ Hq2].
+  split; [exact Hok|]. intros χ s' χ' Hex.
+  split; [exact (Hq1 χ s' χ' Hex)|exact (Hq2 χ s' χ' Hex)].
+Qed.
+
+Lemma wstep_cert_fr (cid : nat) (pc : SailStdpp.Values.mword 64)
+    (es : list weff) (Q : wmstate -> wmstate -> Prop) :
+  wstep_cert cid pc (wP_eff (Some cid) es) Q ->
+  wstep_cert cid pc (wP_eff (Some cid) es) (wQ_fr Q (Some cid) es).
+Proof.
+  intros HQ. exact (wstep_cert_pair cid pc _ Q _ HQ (wcert_eff cid pc es)).
+Qed.
+
+(** ... and the same at the PIN shape of the precondition, which is what an
+    invariant-form leaf produces ([WeakFetchEff.wcert_amo_aq_pin_base4]): the
+    lock's AMO cannot present [wP_eff]'s every-read-pinned window (the lock
+    word is read out of the INVARIANT, not out of the hart's own bundle), so
+    the trace has to ride onto the pin certificate directly. *)
+Lemma wcert_eff_pin (cid : nat) (pc : SailStdpp.Values.mword 64)
+    (es : list weff) :
+  wstep_cert cid pc (wP_eff_pin (Some cid) es) (wQ_eff (Some cid) es).
+Proof.
+  apply wstep_cert_eff_pin. intros s s' Hi Hl Hws. by split_and!.
+Qed.
+
+Lemma wstep_cert_fr_pin (cid : nat) (pc : SailStdpp.Values.mword 64)
+    (es : list weff) (Q : wmstate -> wmstate -> Prop) :
+  wstep_cert cid pc (wP_eff_pin (Some cid) es) Q ->
+  wstep_cert cid pc (wP_eff_pin (Some cid) es) (wQ_fr Q (Some cid) es).
+Proof.
+  intros HQ. exact (wstep_cert_pair cid pc _ Q _ HQ (wcert_eff_pin cid pc es)).
+Qed.
+
+(** THE LEAF-FACING ONE-LINER.  With [wQ_eff] in hand, a leaf's whole
+    violation-freedom obligation is: for each byte its OWN effect trace
+    touches, one [WeakViolation.nv_byte] — paid by the fragment it already
+    holds for that byte ([nv_byte_of_pointsto] / [_of_own_st] / [_of_sync]),
+    or, for the FETCH window, for free ([nv_byte_unwritten]). *)
+Lemma nv_hart_of_wQ_eff (c : CPU) (σ σ' : wmstate) (es : list weff) :
+  wQ_eff (Some (fin_to_nat c)) es σ σ' ->
+  nv_hart (wm_log σ) c (wm_ws σ) ->
+  (forall a : Z, weffs_touch es a ->
+     nv_byte (wm_log σ') c a (coh (wm_ws σ') a)) ->
+  nv_hart (wm_log σ') c (wm_ws σ').
+Proof.
+  intros (_ & Hl & Hws) Hnv Ht. rewrite Hl Hws. rewrite Hl Hws in Ht.
+  by apply nv_hart_weffs.
+Qed.
+
+(** The [nv_ok] form — the one the DATA leaves use, since an owned byte is
+    safe for its owner but not for everyone. *)
+Lemma nv_hart_of_wQ_eff_ok (c : CPU) (σ σ' : wmstate) (es : list weff) :
+  wQ_eff (Some (fin_to_nat c)) es σ σ' ->
+  nv_hart (wm_log σ) c (wm_ws σ) ->
+  (forall a : Z, weffs_touch es a -> nv_ok (wm_log σ') c a) ->
+  nv_hart (wm_log σ') c (wm_ws σ').
+Proof.
+  intros HQ Hnv Ht. apply (nv_hart_of_wQ_eff c σ σ' es HQ Hnv).
+  intros a Ha. by apply nv_byte_of_ok, Ht.
+Qed.
+
+(** ... and its FETCH-ONLY instance, which is what every register-only leaf
+    (the bulk of the sweep) applies: the trace touches only the text window,
+    and text is unwritten. *)
+Lemma nv_hart_of_wQ_eff_unwritten (c : CPU) (σ σ' : wmstate) (es : list weff) :
+  wQ_eff (Some (fin_to_nat c)) es σ σ' ->
+  nv_hart (wm_log σ) c (wm_ws σ) ->
+  (forall a : Z, weffs_touch es a -> latest_ts (wm_log σ') a = 0%nat) ->
+  nv_hart (wm_log σ') c (wm_ws σ').
+Proof.
+  intros HQ Hnv Ht. apply (nv_hart_of_wQ_eff c σ σ' es HQ Hnv).
+  intros a Ha. by apply nv_byte_unwritten, Ht.
 Qed.

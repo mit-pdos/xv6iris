@@ -404,13 +404,14 @@ Section leaf.
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id))
                  ([WEread wak_plain pc 4] ++ [WEread wak_plain ea 4]))
-              (wQ_load ea) Hgid Haccpc (pmp_all_off_allows_all _ Hpmp)
-              (wcert_load_base4 (fin_to_nat cpu_id) pc wak_plain ea eq_refl)
+              (wQ_fr (wQ_load ea) _ _) Hgid Haccpc (pmp_all_off_allows_all _ Hpmp)
+              (wstep_cert_fr _ _ _ _
+                 (wcert_load_base4 (fin_to_nat cpu_id) pc wak_plain ea eq_refl))
               with "Hmm Hpmpc Hpc [] ").
     { iApply (winstr_intro pc false (LOAD (imm, Regidx rs1, Regidx rd, u, 4))
                 (F_Base w) eq_refl eq_refl Hdecf with "Hbs"). }
     rewrite /wwp_cb. iIntros (σ b) "%Lpc0 %Hcfg Hlat Hreg Hnorg".
-    iDestruct "Hnorg" as "(%Hbnd & %Hwf & Hdev & Hlogauth & Hwsauth)".
+    iDestruct "Hnorg" as "(%Hbnd & %Hnv & %Hwf & Hdev & Hlogauth & Hwsauth)".
     iDestruct (hart_ws_agree cpu_id (wm_ws σ) ws with "Hwsauth Hhws") as %->.
     (* the config, as the funnel read it (seam 2) *)
     destruct Hcfg as (Lpriv & Lhart & Lmisa & Lsec & Lpmpc & Lpma & Lhtif &
@@ -436,6 +437,9 @@ Section leaf.
                  Hram4 Hag_σ HDmi Hgood Hdec with "Hlat Hbs Hpt") as %HP.
     (* ---- the flat facts: the data word ---- *)
     iDestruct (wwp_lw4 σ ea dqv v Hwf with "Hlat Hpt") as %[_ Hflat4].
+    iDestruct (winstr_unwritten σ pc (F_Base w) Hwf with "Hlat Hbs") as %Hunw.
+    iDestruct (nv_ok_wpt4 cpu_id (wm_img σ) (wm_log σ) ea dqv v (wm_ws σ)
+                 with "Hlat Hpt") as %Hnvea.
     iDestruct (wpt4_align with "Hpt") as %Halea.
     (* ---- the run, at the FLAT state: the SC [execute] fact ---- *)
     pose proof (exec_eff_lw4_at (wflat_st σ) b u pc rs1 rd imm ea v Hrd Lpriv
@@ -464,7 +468,7 @@ Section leaf.
                 (add_vec_int pc 4) rd
                 (regval_into_reg (extend_value u (v : mword 32)))))))). }
     destruct Hpost as (Hregs & Hdevs & Hmems & Himgs & Hlogs & Hwsle & Hwf' & Hbnd').
-    destruct HQ as (HQi & HQl & HQv).
+    destruct HQ as ((HQi & HQl & HQv) & HQeff).
     (* the hart's own view cell moves to [σ']'s *)
     iMod (hart_ws_update cpu_id (wm_ws σ) (wm_ws σ) (wm_ws σ')
             with "Hwsauth Hhws") as "[Hwsauth Hhws]".
@@ -476,6 +480,15 @@ Section leaf.
     iSplitL "Hlat"; [by rewrite HQi HQl|].
     iSplitL "Hdev Hlogauth Hwsauth".
     { rewrite /wmstate_norg. iSplitR; [by iPureIntro|].
+      iSplitR.
+      { iPureIntro.
+        apply (nv_hart_of_wQ_eff_ok cpu_id σ σ' _ HQeff Hnv).
+        intros a Ha. rewrite HQl.
+        apply weffs_touch_app in Ha as [Ha|Ha].
+        - destruct (weffs_touch_read1 _ pc _ a Ha) as (j & Hj & ->).
+          cbn in Hj. apply nv_ok_unwritten, Hunw. lia.
+        - destruct (weffs_touch_read1 _ ea _ a Ha) as (j & Hj & ->).
+          cbn in Hj. apply Hnvea. lia. }
       iSplitR; [by iPureIntro|].
       rewrite Hdevs Hdevt HQl. iFrame. }
     (* the config comes back WHOLE from the funnel: nothing to recombine *)

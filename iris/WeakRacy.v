@@ -1145,11 +1145,12 @@ Section rule.
     iIntros (Hgid Haccpc Hracc Hcert) "#Hsync H".
     iApply (wp_wrun_step with "[H]"); [exact Hgid|].
     iIntros (σ) "Hσ".
-    iDestruct "Hσ" as "(%Hbnd & %Hwf & Hrest)".
+    iDestruct "Hσ" as "(%Hbnd & %Hnv & %Hwf & Hrest)".
     iMod ("H" $! σ with "[Hrest]")
       as "(%Hpc & %Htext & %HP & %HΦ & %Hrd & Ht0 & Hk)".
     { rewrite /wmstate_interp.
       iSplitR; [iPureIntro; exact Hbnd|].
+      iSplitR; [iPureIntro; exact Hnv|].
       iSplitR; [iPureIntro; exact Hwf|]. iExact "Hrest". }
     iDestruct "Ht0" as (t0) "%Hex0".
     assert (Hc : ∀ tick : bool,
@@ -1239,11 +1240,12 @@ Section rule.
     iIntros (Hgid Haccpc Hracc Hakc Hcert) "#Hsync H".
     iApply (wp_wrun_step with "[H]"); [exact Hgid|].
     iIntros (σ) "Hσ".
-    iDestruct "Hσ" as "(%Hbnd & %Hwf & Hrest)".
+    iDestruct "Hσ" as "(%Hbnd & %Hnv & %Hwf & Hrest)".
     iMod ("H" $! σ with "[Hrest]")
       as "(%Hpc & %Htext & %HP & %Hun & %HΦ & %Hrd & Ht0 & Hk)".
     { rewrite /wmstate_interp.
       iSplitR; [iPureIntro; exact Hbnd|].
+      iSplitR; [iPureIntro; exact Hnv|].
       iSplitR; [iPureIntro; exact Hwf|]. iExact "Hrest". }
     iDestruct "Ht0" as (t0) "%Hex0".
     assert (Hc : ∀ tick : bool,

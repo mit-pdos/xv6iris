@@ -446,6 +446,32 @@ Section winstr.
     rewrite -(acc_wf_byte pc 4 j Hacc ltac:(lia)). exact (Hts j Hj).
   Qed.
 
+  (** THE φ FORM, and the one the DATA leaves need: [nv_ok] at an ARBITRARY
+      log.  [winstr_unwritten] below is stated at [wm_log σ] and a STORE leaf
+      must pay at [wm_log σ'] — where the text is still untouched but proving
+      it would mean knowing the store's window misses the text.  The text
+      fragments are [DfracDiscarded], hence CLEAN and PERSISTENT, so arm (a)
+      pays at any log with no such side condition. *)
+  Lemma winstr_nv (c : CPU) (img : _) (log : list wmsg) pc r :
+    (wlat_interp img log : iProp Σ) -∗
+    winstr_bytes pc r -∗
+    ⌜forall j : nat, (j < 4)%nat -> nv_ok log c (acc_addr pc j)⌝.
+  Proof.
+    iIntros "Hi #Hb".
+    iDestruct (winstr_bytes_acc_wf with "Hb") as %Hacc.
+    iDestruct "Hb" as "(%H2 & %Hacc2 & %Hram & Hw)".
+    iDestruct "Hw" as (w) "[%Hr Hbytes]".
+    iAssert (⌜forall j : nat, (j < 4)%nat ->
+               nv_ok log c (pa_z (pa_add pc j))⌝)%I as %Hall.
+    { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
+      iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      iApply (nv_ok_of_pointsto img log c (pa_z (pa_add pc j)) DfracDiscarded
+                0%nat (nth_byte w j) with "Hi Hbj"). }
+    iPureIntro. intros j Hj.
+    rewrite -(acc_wf_byte pc 4 j Hacc ltac:(lia)). exact (Hall j Hj).
+  Qed.
+
   (** THE UNWRITTEN HALF (φ-upgrade, deliverable C).  [winstr_pinned] proves
       this on the way and throws it away; the violation-freedom conjunct
       needs it directly, because a byte no message writes carries no
@@ -533,6 +559,7 @@ Section funnel.
   (** [wmstate_rest] minus the registers. *)
   Definition wmstate_norg (σ : wmstate) : iProp Σ :=
     (⌜ws_bounded σ.(wm_ws) (length σ.(wm_log))⌝ ∗
+     ⌜nv_hart σ.(wm_log) cpu_id σ.(wm_ws)⌝ ∗
      ⌜wlog_wf σ.(wm_log)⌝ ∗
      dev_interp σ.(wm_dev) ∗
      wlog_auth σ.(wm_log) ∗
@@ -542,10 +569,12 @@ Section funnel.
     wmstate_rest σ ⊣⊢ reg_interp (wm_regs σ) ∗ wmstate_norg σ.
   Proof.
     rewrite /wmstate_rest /wmstate_norg. iSplit.
-    - iIntros "(%Hb & %Hw & Hr & Hd & Hl & Hws)". iFrame "Hr".
-      iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|]. iFrame.
-    - iIntros "(Hr & %Hb & %Hw & Hd & Hl & Hws)".
-      iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|]. iFrame.
+    - iIntros "(%Hb & %Hn & %Hw & Hr & Hd & Hl & Hws)". iFrame "Hr".
+      iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
+      iSplitR; [by iPureIntro|]. iFrame.
+    - iIntros "(Hr & %Hb & %Hn & %Hw & Hd & Hl & Hws)".
+      iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
+      iSplitR; [by iPureIntro|]. iFrame.
   Qed.
 
   Lemma wmstate_interp_split_regs σ :
@@ -560,7 +589,13 @@ Section funnel.
   Lemma wmstate_norg_facts σ :
     wmstate_norg σ -∗
     ⌜ws_bounded σ.(wm_ws) (length σ.(wm_log)) /\ wlog_wf σ.(wm_log)⌝.
-  Proof. iIntros "(% & % & _)". by iPureIntro. Qed.
+  Proof. iIntros "(% & % & % & _)". by iPureIntro. Qed.
+
+  (** The φ conjunct, read off the borrowed bundle: what a leaf STARTS from
+      when it re-establishes violation-freedom at its successor. *)
+  Lemma wmstate_norg_nv σ :
+    wmstate_norg σ -∗ ⌜nv_hart σ.(wm_log) cpu_id σ.(wm_ws)⌝.
+  Proof. iIntros "(_ & % & _)". by iPureIntro. Qed.
 
   (** The one register-tower fact the whole wrapper needs: the
       [minstret_increment] pre-write is invisible to every OTHER register. *)

@@ -495,14 +495,15 @@ Section leaf.
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id))
                  ([WEread wak_plain pc 4] ++ [WEwrite wak_plain ea 8 rs2v]))
-              (wQ_store8 (Some (fin_to_nat cpu_id)) ea rs2v)
+              (wQ_fr (wQ_store8 (Some (fin_to_nat cpu_id)) ea rs2v) _ _)
               Hgid Haccpc (pmp_all_off_allows_all _ Hpmp)
-              (wcert_store8_base4 (fin_to_nat cpu_id) pc wak_plain ea rs2v)
+              (wstep_cert_fr _ _ _ _
+                 (wcert_store8_base4 (fin_to_nat cpu_id) pc wak_plain ea rs2v))
               with "Hmm Hpmpc Hpc [] ").
     { iApply (winstr_intro pc false (STORE (imm, Regidx rs2, Regidx rs1, 8))
                 (F_Base w) eq_refl eq_refl Hdecf with "Hbs"). }
     rewrite /wwp_cb. iIntros (σ b) "%Lpc0 %Hcfg Hlat Hreg Hnorg".
-    iDestruct "Hnorg" as "(%Hbnd & %Hwf & Hdev & Hlogauth & Hwsauth)".
+    iDestruct "Hnorg" as "(%Hbnd & %Hnv & %Hwf & Hdev & Hlogauth & Hwsauth)".
     iDestruct (hart_ws_agree cpu_id (wm_ws σ) ws with "Hwsauth Hhws") as %->.
     (* the config, as the funnel read it (seam 2) *)
     destruct Hcfg as (Lpriv & Lhart & Lmisa & Lsec & Lpmpc & Lpma & Lhtif &
@@ -558,7 +559,7 @@ Section leaf.
     assert (Hdevt : mdev t = wm_dev σ) by (rewrite Hdevt0; reflexivity).
     destruct Hpost as (Hregs & Hdevs & Hmems & Himgs & Hlogs & Hwsle & Hwf'
                        & Hbnd').
-    destruct HQ as (HQi & (kc & HQl & _) & HQle & HQv).
+    destruct HQ as ((HQi & (kc & HQl & _) & HQle & HQv) & HQeff).
     (* the release deposit: freeze R at the store's own timestamp *)
     iDestruct (wwp_release_deposit R σ Hbnd with "HR") as "HRdep".
     (* THE WINDOW UPDATE: retarget the eight elements at the message [wQ_store8]
@@ -570,6 +571,9 @@ Section leaf.
     iMod (wlat8_store_prim_own cpu_id kc σ ea rs2v
             with "Hlat H0 S0 H1 S1 H2 S2 H3 S3 H4 S4 H5 S5 H6 S6 H7 S7")
       as "[Hlat Hl8]".
+    iDestruct (winstr_nv cpu_id _ _ pc (F_Base w) with "Hlat Hbs") as %Hnvpc.
+    iDestruct (nv_ok_wlat8_own cpu_id _ _ ea (S (length (wm_log σ))) rs2v
+                 with "Hlat Hl8") as %Hnvea.
     (* the log authority grows by the SAME message *)
     iMod (wlog_update (wm_log σ)
             [wwrite_msg (Some (fin_to_nat cpu_id)) kc ea 8 rs2v]
@@ -585,6 +589,15 @@ Section leaf.
     iSplitL "Hlat"; [by rewrite HQi HQl|].
     iSplitL "Hdev Hlogauth Hwsauth".
     { rewrite /wmstate_norg. iSplitR; [by iPureIntro|].
+      iSplitR.
+      { iPureIntro.
+        apply (nv_hart_of_wQ_eff_ok cpu_id σ σ' _ HQeff Hnv).
+        intros a Ha. rewrite HQl.
+        apply weffs_touch_app in Ha as [Ha|Ha].
+        - destruct (weffs_touch_read1 _ pc _ a Ha) as (j & Hj & ->).
+          cbn in Hj. apply Hnvpc. lia.
+        - destruct (weffs_touch_write1 _ ea _ _ a Ha) as (j & Hj & ->).
+          cbn in Hj. apply Hnvea. lia. }
       iSplitR; [by iPureIntro|].
       rewrite Hdevs Hdevt HQl. iFrame. }
     (* the config comes back WHOLE from the funnel: nothing to recombine *)

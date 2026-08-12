@@ -1239,6 +1239,12 @@ Section WeakKptAbsorb.
          (exists a d : mword 1,
             (wv : mword 64) = pte_set_ad (mk_pte ppn (kperm_flags pc)) a d) /\
          pte_ad_le (wv : mword 64) lw⌝ ∗
+      (* φ-upgrade (deliverable C): the walked LEAF SLOT's bytes are
+         violation-free AGENT-INDEPENDENTLY at the pre-state — the slot is a
+         published (CLEAN) byte, which is what a walk leaf pays its read
+         footprint with ([WeakGhost.nv_ok_of_free] turns this into the
+         walking hart's [nv_ok]).  Additive: nothing here consumes it. *)
+      ⌜forall j : nat, (j < 8)%nat -> nv_free (wm_log σ) (acc_addr la j)⌝ ∗
       reg_interp (sregs sg') ∗
       wtlb_res_pt root_ppn T_kpt ∗
       ( (⌜mem sg' = wflat (wm_img σ) (wm_log σ) /\
@@ -1363,6 +1369,10 @@ Section WeakKptAbsorb.
     (* ---- the racy-leaf collapse facts ---- *)
     iDestruct (wlat8_win_latest σ la (DfracOwn 1) ts lw with "Hi Hel0")
       as %Hwlat.
+    (* φ-upgrade: the leaf slot's [nv_free] export, minted HERE because
+       [Hel0] goes back into the invariant at [Hclose] below. *)
+    iDestruct (nv_free_wlat8 (wm_img σ) (wm_log σ) la (DfracOwn 1) ts lw
+                 with "Hi Hel0") as %Hnvfree.
     assert (Hcoll : forall (rak : akinfo) (wv : bv (8 * 8)%N),
               wadm σ rak la 8 wv ->
               (exists a d : mword 1, (wv : mword 64) = pte_set_ad w0 a d) /\
@@ -1412,6 +1422,7 @@ Section WeakKptAbsorb.
       iSplitR; [iPureIntro; rewrite -Ha2; auto|].
       iSplitR; [iPureIntro; rewrite -Ha2; exact Hpin|].
       iSplitR; [iPureIntro; exact Hcoll|].
+      iSplitR; [iPureIntro; exact Hnvfree|].
       rewrite Hsg'. iFrame "Hri".
       iSplitL "Hsatp Htlb Hpc Hpa".
       { iApply (wtlb_res_pt_intro root_ppn T_kpt satp0 tlbvec t
@@ -1449,6 +1460,7 @@ Section WeakKptAbsorb.
       iSplitR; [iPureIntro; rewrite -Ha2; auto|].
       iSplitR; [iPureIntro; rewrite -Ha2; exact Hpin|].
       iSplitR; [iPureIntro; exact Hcoll|].
+      iSplitR; [iPureIntro; exact Hnvfree|].
       rewrite Hsg' sregs_set_reg. iFrame "Hri".
       iSplitL "Hsatp Htlb Hpc Hpa".
       { iApply (wtlb_res_pt_intro root_ppn T_kpt satp0 _ t
@@ -1593,6 +1605,7 @@ Section WeakKptAbsorb.
       iSplitR; [iPureIntro; rewrite -Ha2; auto|].
       iSplitR; [iPureIntro; rewrite -Ha2; exact Hpin|].
       iSplitR; [iPureIntro; exact Hcoll|].
+      iSplitR; [iPureIntro; exact Hnvfree|].
       rewrite Hsg' sregs_set_reg. iFrame "Hri".
       iSplitL "Hsatp Htlb Hpc Hpa".
       { iApply (wtlb_res_pt_intro root_ppn T_kpt satp0 _ (ptree_set_leaf t vpn lw')

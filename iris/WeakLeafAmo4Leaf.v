@@ -533,7 +533,7 @@ Section leaf.
     rewrite /wacq_cb.
     iIntros (σ v) "%Hflatlk Hlat Hrest".
     iDestruct (wmstate_rest_split σ with "Hrest") as "[Hreg Hnorg]".
-    iDestruct "Hnorg" as "(%Hbnd & %Hwf & Hdev & Hlogauth & Hwsauth)".
+    iDestruct "Hnorg" as "(%Hbnd & %Hnv & %Hwf & Hdev & Hlogauth & Hwsauth)".
     iDestruct (hart_ws_agree cpu_id (wm_ws σ) ws with "Hwsauth Hhws") as %->.
     (* the config bundle, exactly as the funnel opens it *)
     iDestruct "Hmm" as "(#Hhw & #Hmiv0 & Hhs & Hpriv & Hmst0)".
@@ -601,6 +601,11 @@ Section leaf.
     (* the text facts *)
     iDestruct (winstr_flat σ pc (F_Base w) Hwf with "Hlat Hbs") as %Hfok.
     iDestruct (winstr_pinned σ pc (F_Base w) Hwf with "Hlat Hbs") as %Hpin.
+    (* φ-upgrade: the fetch window's violation-freedom, off the text bundle;
+       the lock word's half is the CALLER's ([wwp_acquire_swap] holds the
+       invariant's element bundle at σ'). *)
+    iDestruct (winstr_nv cpu_id (wm_img σ) (wm_log σ) pc (F_Base w)
+                 with "Hlat Hbs") as %Hnvpc.
     iAssert (⌜isRVC (subrange_vec_dec w 15 0) = false⌝)%I as %HnotRVC.
     { iDestruct "Hbs" as "(_ & _ & _ & Hbw)".
       iDestruct "Hbw" as (w0) "[%Hw0 _]". destruct Hw0 as [<- H].
@@ -776,6 +781,7 @@ Section leaf.
     iSplitR; [iPureIntro; exact Lpc|].
     iSplitR; [iPureIntro; exact Hpin|].
     iSplitR; [iPureIntro; exact HP|].
+    iSplitR; [iPureIntro; exact Hnvpc|].
     iFrame "Hlat".
     iExists t0, (set_reg (set_reg (set_reg t0 mcycle c') mtime ti') mip p').
     iSplitR; [iPureIntro; exact Hst0|].
@@ -813,7 +819,7 @@ Section leaf.
     iModIntro.
     (* [wmstate_rest σ'] back, then the continuation *)
     iSplitL "Hreg Hdev Hlogauth Hwsauth".
-    { rewrite /wmstate_rest.
+    { rewrite /wmstate_rest_nonv.
       iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
       iFrame "Hreg". rewrite Hdevt Hlogs. iFrame. }
     iApply ("Hcont" $! v (wm_ws σ') with
@@ -851,12 +857,33 @@ Section leaf.
            (wP_eff (Some (fin_to_nat cpu_id)) [WEread akf2 pf2 nf2]) wQ_pure) -∗
     K -∗ WWP Loop.
   Proof.
-    intros Hgid Hacca Haccb Hacclk. iIntros "#Hinv #Hatt #Hbr HK".
+    intros Hgid Hacca Haccb Hacclk.
+    (* the footprint, fully concrete here: the four text bytes of [pca] and
+       the four bytes of the lock word *)
+    assert (Hfoot : forall a : Z,
+              weffs_touch
+                ([WEread wak_plain pca 4]
+                 ++ [WEread (AkInfo false true true) lk 4;
+                     WEwrite (AkInfo false true false) lk 4 lock_one]) a ->
+              (exists j : nat, (j < 4)%nat /\ a = acc_addr pca j) \/
+              (exists j : nat, (j < 4)%nat /\ a = acc_addr lk j)).
+    { intros a Ha. apply weffs_touch_cons in Ha as [Ha|Ha].
+      - left. destruct Ha as (j & Hj & ->). exists j.
+        split; [cbn in Hj; lia|done].
+      - right. apply weffs_touch_cons in Ha as [Ha|Ha].
+        + destruct Ha as (j & Hj & ->). exists j. split; [cbn in Hj; lia|done].
+        + destruct (weffs_touch_write1 _ lk _ _ a Ha) as (j & Hj & ->).
+          exists j. split; [cbn in Hj; lia|done]. }
+    iIntros "#Hinv #Hatt #Hbr HK".
     iApply (wwp_acquire_loop_real γ lk R pca pcb _ _ _ K Kb
-              Hgid Hacca Haccb Hacclk
-              (wcert_amo_aq_pin_base4 (fin_to_nat cpu_id) pca
-                 (AkInfo false true true) (AkInfo false true false) lk lock_one
-                 eq_refl eq_refl eq_refl)
+              ([WEread wak_plain pca 4]
+               ++ [WEread (AkInfo false true true) lk 4;
+                   WEwrite (AkInfo false true false) lk 4 lock_one])
+              Hgid Hacca Haccb Hacclk Hfoot
+              (wstep_cert_fr_pin _ _ _ _
+                 (wcert_amo_aq_pin_base4 (fin_to_nat cpu_id) pca
+                    (AkInfo false true true) (AkInfo false true false) lk
+                    lock_one eq_refl eq_refl eq_refl))
               (wcert_nowrite (fin_to_nat cpu_id) pcb [WEread akf2 pf2 nf2]
                  (nowrite_trace_read akf2 pf2 nf2))
               with "Hinv Hatt Hbr HK").
