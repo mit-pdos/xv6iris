@@ -1004,6 +1004,7 @@ ProofPrepareReturn.v
 LinkPrepareReturn.v
 CodeUsertrap.v
 ProofUsertrapTail.v
+ProofUsertrapArms.v
 ProofUsertrapSys.v
 SpecSyscall.v
 LinkSyscall.v
