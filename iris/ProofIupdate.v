@@ -1789,8 +1789,8 @@ Qed.
               HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hcru
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont]").
-    { rewrite /trap_csrs_ext. iApply bi.emp_intro. }
-    { rewrite /cpu_claim_ext. iApply bi.emp_intro. }
+    { rewrite /trap_csrs_ext. done. }
+    { rewrite /cpu_claim_ext. done. }
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     iIntros (mf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap Hsb
