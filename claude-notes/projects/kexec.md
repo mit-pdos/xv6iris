@@ -267,12 +267,31 @@ live panic. **Phase C does**: `copyout`'s mapped arm needs `co_mapped` — with
 `pte_vu` — over the stack pages that phase C's own `uvmalloc` has just
 created, and there is no other way to get it.
 
-*The fix*, when phase C reaches it: strengthen uvmalloc's success arm to say
-the new leaves are `uvm_pte (Z.lor xperm 18) ppn` for some ppn (or at least
-`pte_vu`). The proof has it — `mappages` builds exactly that leaf, and the
-`uvm_perm_ok (Z.lor xperm 18)` premise is already there for it. Do it as part
-of phase C, not before: it is one file plus `ProofUvmalloc`, and phase C is
-the caller that tells you which form is actually wanted.
+*The fix*, when phase C reaches it: publish the new leaves' PERMISSION, i.e.
+
+```coq
+⌜forall i, (i < n)%nat -> exists ppn,
+   P'.(ud_um) !! vpn_at vpn0 i = uvm_pte (Z.lor xperm 18) ppn⌝
+```
+
+**Do not narrow this to `pte_vu`, tempting though it is.** `copyout`'s
+`co_mapped` wants only `pte_vu`, so on that evidence alone the weaker conjunct
+looks like the right minimal ask — but the call three instructions earlier
+settles it. `SpecUvmclear` takes
+
+```coq
+P.(ud_um) !! vpn = Some w -> uvm_perm_ok (Z.land (pte_flags10 w) 1007) -> …
+```
+
+so phase C has to exhibit the guard page's leaf and prove a predicate about
+its FLAG BITS, which `pte_vu` cannot give. Two consumers, and the second wants
+strictly more than the first — check both before choosing the shape. (This was
+narrowed to `pte_vu` and then reverted, on exactly that oversight.)
+
+The proof is immediate: mappages builds that leaf, and the
+`uvm_perm_ok (Z.lor xperm 18)` premise is already in uvmalloc's statement for
+it. Do it as part of phase C, not before: it is one file plus `ProofUvmalloc`,
+and phase C is the caller that pins the shape.
 
 ## Block-interface conventions (decided before the first block was written)
 
