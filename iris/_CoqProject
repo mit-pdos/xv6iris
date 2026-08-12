@@ -969,6 +969,7 @@ WkStartNew.v
 WeakKpt.v
 WkStartedLoad.v
 WkStartedMp.v
+WkOwnPingPong.v
 SpecReadi.v
 IcacheInv.v
 InodeLock.v
