@@ -33,11 +33,42 @@ phase-mono — legal because that trace has NO unpinned read, so the
 backward transfer (`trace_off_win`, vacuous) applies and the family is
 constant.  NO `trace_stale` widening was needed.
 
-What remains of this front: the rest of the 6b/6c consumer — the S-mode
-fetch-chain restatement and the WP rule that composes this peel (via the
-§9 kit for the two-translation case) with the instruction's certified
-tail, plus the step-level ghost matching against the absorption
-theorem's register wand and log arms.
+**AND THE FETCH PEEL IS IN (2026-08-12, `iris/WkFetchPeel.v` — 6a's
+restatement, the peel half, ALIGNED case).**  `wfetch_peel_of_exports`
+(+ the CPS `wfetch_peel_k`, the form 6c's funnel consumes; both
+`plat_term_write` only): the walk-peel premise bundle at
+`acc := InstructionFetch tt` plus a tail interface gives the peel of
+`fetch tt` at the PC page's leaf window.  THREE findings that shape the
+rest of 6a/6c:
+- **There is no `Defs.bind (translateAddr …) rest` seam in the base
+  monad** — the translation sits two `catch_early_return` levels down,
+  under `liftR`, in the early-return monad, and `try_catch` is a
+  fixpoint, not a bind.  The fix is generic and landed: `WkFetchPeel`
+  §1's **`wstep_ok_racy_kR`** — the CPS peel restated over
+  `Defs.monadR` (early return is a VALUE of the peel) with transports
+  to the `M`-level kit (`_kR_bind`, `_kR_liftR`, `_k_cer`).
+  Window-generic; anything else stated over `catch_early_return`
+  (i.e. every real instruction body) will peel through it.
+- **The 2-aligned (straddling) fetch is TWO translations at two
+  DIFFERENT leaf windows** (`fetch_bytes va va 2` then
+  `fetch_bytes va (va+2) 2`) — precisely the §9 seq-kit shape; TODO
+  recorded in the file header (aligned `F_Base` delivered; RVC-4 is
+  single-window and near-verbatim).
+- **The σ → post-translation pinnedness transport is NOT
+  peel-derivable** at `wD_any`/`W := True` (the write arm constrains no
+  address there, and the run-level exports sit at `W := False`), so the
+  tail rides an interface premise `wfetch_tail` at the post-translation
+  states — its READ half's producer is supplied
+  (`wfetch_tail_read`, from per-byte text pinnedness via
+  `wstep_eff_confined_pin`); its OUTCOME half (the translation's result
+  value and the post-state's text-pinnedness) is exactly what the IRIS
+  half of the restatement must discharge from the absorption theorem's
+  register wand + log arms.  That ghost half is 6a's remaining piece.
+
+What remains of this front: the Iris half of the fetch restatement
+(discharge `wfetch_tail` from the absorption theorem's ghost arms), the
+straddle/RVC fetch arms over §9 + `wstep_ok_racy_kR`, and 6c's funnel
+(`wwp_instr_s`) composing the CPS fetch peel with the execute phase.
 
 **DECISION (2026-08-12, the φ-upgrade author, as §5 requested): take
 option (a), and do NOT start until the in-flight C/D/S points-to surgery
