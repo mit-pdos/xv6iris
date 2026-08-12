@@ -83,6 +83,68 @@ HALF" slice.
    the M-mode bundle; `wwp_start` therefore ends holding a bare
    `wrunning ξ`, which is what `sconf` should pick up).
 
+2. **The USER page tables: prove `uvmalloc` / `uvmunmap` (and the rest of
+   `vm.c`'s mutators) IN CONCERT WITH THE WEAK WALK** (user request,
+   2026-08-12).  Not a port for its own sake — it is the CHECK that the
+   batch-6 walk design composes with SOFTWARE mutation of a page table,
+   which the kernel-table design deliberately does not cover.
+
+   **Why it is not free.**  The whole variant-collapse layer —
+   `WeakVariant.wlog_variants` / `wadm_variant`, `WeakKpt.wkpt_inv` — is
+   keyed to "every message to a leaf window is an A/D VARIANT of ONE
+   canonical word".  That holds for the kernel table (written once by
+   kvminit, then only walker A/D write-backs) and is FALSE for a user
+   table: `mappages` installs a PTE, `uvmunmap` writes `*pte = 0`,
+   `uvmalloc` grows the mapping.  Each of those is a message that is NOT a
+   variant of the previous canonical word, so `wadm_variant`'s premise
+   fails and the collapse that makes the walk tractable is unavailable as
+   stated.
+
+   **The design hook already exists.**  `WeakKpt` §1's CLIPPED layer
+   (`wlog_variants_from T0`, `wwin_install`, `wadm_variant_from`) was built
+   for a different reason — kalloc/memset junk precedes kvmmake's install —
+   but it is exactly the right shape here: the user cone wants the same
+   invariant with `T0` ADVANCING at every software install, i.e. "variants
+   of the CURRENT installation" rather than of a fixed one.  That is the
+   first thing to try, and it is why the clipped form should not be
+   collapsed back into the unclipped one.
+
+   **WHERE THE TLB MAINTENANCE ACTUALLY IS — check this before designing
+   the invariant.**  Six `sfence.vma` sites in the image, and NONE of them
+   is at a mutation site:
+
+   - the C helper `sfence_vma()` is called only from `kvminithart`
+     (`xv6-riscv/kernel/vm.c:78,83` → `kernel.asm` 0x80000f3a, 0x80000f52),
+     bracketing the kernel `satp` write;
+   - four more are written directly in assembly, in `trampoline.S` —
+     `uservec` brackets its `csrw satp, t1` (`:89`, `:95`) and `userret`
+     brackets its `csrw satp, a0` (`:110`, `:112`); in the image at
+     0x8000608e / 0x80006096 / 0x800060a0 / 0x800060a8.
+
+   So `uvmunmap` writes `*pte = 0` with no `sfence.vma` and no shootdown,
+   and the ONLY maintenance for user tables is the trampoline's brackets
+   around the user/kernel `satp` switch.  The soundness argument therefore
+   has to be "the mutating hart is the one using the table, and every entry
+   to and exit from user mode flushes" — which is plausible but is a real
+   obligation against the model's TLB, not a given.  If it does not hold,
+   the answer is a kernel fix, in the virtio precedent.  (Note the
+   RESURRECTION worry that used to sit here is dead: the landed model's
+   walker re-checks the fresh word under the CAS, so a zeroed PTE faults
+   rather than being written back.)
+
+   **Targets are ready.**  All seven are PROVEN on the SC side — `walk`,
+   `mappages`, `uvmunmap`, `uvmalloc`, `freewalk`, `uvmfree`, `uvmcopy`
+   (`tools/proof_coverage.py`) — so the weak side has concrete twins to
+   port rather than specs to invent.
+
+   **Sequencing.**  Gated on 6c like everything S-mode, and behind the walk
+   bridge decision ([`design/weak-memory-walk-bridge.md`](../design/weak-memory-walk-bridge.md)),
+   since a user-table walk hits the same racy leaf.  But the INVARIANT
+   design above is independent of both and can be worked out now — and
+   should be, because if the clipped-with-advancing-`T0` shape does not
+   work, that is a batch-6 design consequence and better learned early than
+   after 6c.
+
 **KNOWN LOOSE ENDS**, none blocking: M5 devices; M6 store-reordering gap.
 (`weak_view_name` is **DONE — removed 2026-08-11**; see the slice at the end.)
 
