@@ -491,17 +491,35 @@ file:line map for every item is
       ppo rule) and the `ord_pr` arm excludes a fused RMW's written
       bytes (the fence publishes the read half; the operation sits at
       the write half).
-- [ ] Completeness residue: the general replay construction and the
-      SC-candidate class LANDED (`cand_reachable`,
-      `sc_cand_reachable` — every SC behavior is promise-free
-      reachable; residue = exactly the stale reads);
-      `promise_free_complete` is stated in checkable form and needs ONE
-      lemma: VIEW DOMINATION (every replayed view value is ≤ `opos` of
-      an `ppo_op`-predecessor).  Key structural finding: this is NOT a
-      corollary of the local `ax_ord` — fence delivery is transitive
-      (a floor value is justified by an `ob`-PATH), so completeness
-      genuinely needs the global axiom.  Estimated 600–900 lines, one
-      conjunct per view component, forward bank fiddliest.
+- [x] **Completeness LANDED in corrected form, with the effort's THIRD
+      machine-checked refutation** (`WeakAxiomatic3.v`, 2026-08-12,
+      axiom-free): §9(1)'s `promise_free_complete` and the
+      view-domination lemma are both FALSE as stated
+      (`promise_free_complete_false`, `view_domination_false`) — a
+      3-step no-fence witness where an `rl` store feeds `w_vRel` into a
+      later acquire's pre-view: the machine orders release→acquire
+      UNCONDITIONALLY while the modelled ppo fragment omits RVWMO rule
+      7 entirely, so the machine is stronger than the modelled axioms —
+      free for soundness, fatal for completeness.  The corrected
+      theorem `promise_free_complete_clean` closes under two added
+      premises: `cand_rl_free` (no release store — vacuous for the
+      kernel image; the alternative fix, adding rule-7 rel→acq edges to
+      `ppo_op`, is noted for a future refinement) and `cand_pub_clean`
+      (reads acquire or externally sourced — never forwarded).
+      Non-vacuity is itself a theorem (`ce_rl_stale_reachable`: a
+      genuinely stale read outside the SC fragment is reachable BY the
+      theorem).  Two structural surprises, both recorded in-file:
+      domination is carried as `frdom_b` directly (per-predecessor
+      `opos` bounds cannot close the cycle), and **`ob`-acyclicity is
+      never used** — `promise_free_complete_local` needs only the four
+      local axioms, because `fence_between`/`acq_po` are monotone in
+      the target, so chained fence delivery collapses to a single `ord`
+      edge; the slice-2 prediction was wrong in our favor.  Honest
+      residue: the second (forwarding-path) leak §14(1) is argued but
+      not mechanized (~150 lines of §13 generalization); the §5
+      `maxcl` upper-bound fold lemmas are owed to the WeakMem lift
+      batch, and §12's finding that `cand_values` alone buys five of
+      `axiomatic_ok`'s eight conjuncts is worth reusing.
 - [ ] Projection lemmas — the load-bearing missing link for composition:
       `WeakLitmus.lstep → exec_wf` (cheap: the arms match 1:1) and
       `WeakInterp.wrun → exec_wf` (moderate: multi-byte + oracle; note a
