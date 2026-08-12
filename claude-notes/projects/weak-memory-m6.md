@@ -429,21 +429,43 @@ floor that sees every observation.
       final mem_of equality transport from per-byte co-monotonicity
       alone.
 
-      (iii) **Acyclicity of D⁺ (the W2a extension).**  Same
-      min-timestamp measure walk, now with E-milestones (each E edge
-      strictly increases the measure).  NEW PREMISE **S2 (the deposit
-      discipline)**: an OV-fulfil po-before a floor-relevant fulfil of
-      the same author has the SMALLER timestamp — discharged in Iris by
-      the release-fence shape (a pw∧sw fence between them ships the OV
-      timestamp from w_vwOld into w_vwNew, and EXT at the later fulfil
-      forces it below).  Counterexample 2 is exactly an S2 violation.
-      OPEN POINT for the proof: the walk's po-hops from an E-target to
-      the next E-source have unknown sign in general; candidate
-      resolutions are (a) S2 stated over FR := rf-sources ∪
-      E-left-endpoints, or (b) a floor-based measure (the E-hop jumps
-      from floor(r), which absorbs a po-earlier OV leaf whenever a
-      pw-fence intervenes).  Sharpen in the file; the Layer-1 premise
-      list may grow — record what closes.
+      (iii) **Acyclicity of D⁺ (the W2a extension) — WALK DESIGN
+      SETTLED (2026-08-12) after two more worked refutations.**  The
+      measure is a MILESTONE FLOOR µ, not the raw hop timestamp:
+      after a cross-rf hop reading ts, µ := ts; after a gE hop from
+      leaf t* out of read r, µ := F(r) (the read's whole floor — ≥ t*,
+      so entering the gE hop from any leaf still increases µ).  Exit
+      rules re-establishing "next milestone > µ":
+        - cross-rf-read then po-later fulfil y: S1/edge_ok (landed).
+        - gE-TARGET entry f(t̂) (edge floor F) then po-later cross-read
+          or gE-source fulfil y: need y > F, by the NEW per-triple
+          premise **ee_ok(r', t̂, y)**, a disjunction:
+          (a) FENCE-COVER: a pw∧sw fence sits po-between f(t̂) and
+          f(y), shipping t̂ ∈ w_vwOld into w_vwNew, so EXT gives
+          y > t̂ > F — the release/publish sites (counterexample 2 is
+          exactly a violation of this arm with no rescue);
+          (b) WAW-COVER: the writer's w_vwNew at f(t̂)'s pre-state was
+          already ≥ F — ownership transfer: before writing a byte a
+          prior reader had a floor on, the writer synchronized past
+          that reader's epoch (vwNew never decreases, and EXT at f(y)
+          finishes); TWO WORKED REFUTATIONS pin this arm: the
+          lock-epoch cycle (pre-acquire owned store t̂=100, acquire-AMO
+          y=5 cross-read by waiters, gE return path through a second
+          lock's reader) is killed by exactly this arithmetic — the L2
+          handoff j'→w forces vwNew ≥ R_L2 > F(r') before f(t̂), and
+          both L2 orders contradict; and
+          (c) F = 0 / no real leaves: a racy stale-pass by a reader
+          with an empty floor (the started spin: secondaries' floors
+          are all 0 at the stale read) generates NO gE edges at all
+          (t* = 0 is excluded — no fulfil of timestamp 0), so the
+          started shape needs no premise.
+      The earlier "S2/deposit" formulation is SUBSUMED by ee_ok arm
+      (a); the earlier OPEN POINT is resolved by the µ-measure.  The
+      Iris discharge per arm: (a) at release/publish sites (fence
+      before the flag store covers all earlier fulfils), (b) from the
+      ownership story (a WCplain write's byte came with a handoff that
+      shipped every prior reader's floor), (c) free.  W3's
+      writer-discipline export item should track ee_ok, not bare S2.
 
       (iv) **SCowned/φ via minimal bad edge.**  Per cross edge prove
       `edge_ok ∨ bad` (bad = owned-unpublished read).  If a bad edge
@@ -670,12 +692,25 @@ file:line map for every item is
       `maxcl` upper-bound fold lemmas are owed to the WeakMem lift
       batch, and §12's finding that `cand_values` alone buys five of
       `axiomatic_ok`'s eight conjuncts is worth reusing.
-- [ ] Projection lemmas — the load-bearing missing link for composition:
-      `WeakLitmus.lstep → exec_wf` (cheap: the arms match 1:1) and
-      `WeakInterp.wrun → exec_wf` (moderate: multi-byte + oracle; note a
-      pinned/ifetch `ak_latest` read projects to a plain `LLoad` since
-      `latest_readable` — the pinning is dropped, sound for this
-      direction).
+- [x] **Projection lemmas LANDED, both axiom-free (2026-08-12).**
+      `WeakLitmusProj.v` (277 lines): one `lstep` = exactly one `mstep`
+      (no silent arm), `lstep_exec_wf` + the `_sb` sanity corollary
+      fitting the litmus configs verbatim; the AMO arm's atomicity
+      conjunct IS `rmw_latest` unfolded, no own_coh dovetail needed.
+      `WeakInterpProj.v` (409 lines): `wrun_exec_wf` over
+      `rtc (wstep i)` with `ws_match`/`proj_ext` packaging.  THREE
+      deltas that matter downstream: (1) NEW PREMISE `nz_writes` (no
+      zero-width writes — an n=0 append grows the log with an empty
+      message no `mstep` can mirror; vacuous for real code, a caller
+      obligation in W5); (2) **AMOs project as separate LLoad+LStore —
+      the atomicity link is dropped** because the model emits the two
+      halves as separate outcomes; sound for exec_wf but the W5
+      composition needs the FUSED LRmw (D-M6-5), so W5's event-level
+      Sail LTS must bracket exclusive-read…conditional-write into one
+      label (the fix point is there, not in this file); (3) coherent
+      (ak_coh) reads are silent (dead for rv64d anyway).  Env note:
+      `by etrans` fails under this stdpp/ssreflect combo — use
+      `etrans; [exact H1|exact H2]`.
 - [ ] WeakMem/WeakPromise lemma lifts owed (ONE batch, when those files
       are next touched — not while sibling `.vo`s are in flight).  Into
       `WeakMem.v`: `load_post_run_coh`, `store_post_run_coh` (now used by
@@ -704,10 +739,44 @@ file:line map for every item is
 
 ### W5 — composition and retirement
 
+DESIGN (2026-08-12, coordinator).  The seam between `wp_behavior`
+(abstract per-agent LTS) and the real machine is an EVENT-LEVEL LTS the
+Sail machine instantiates (exactly D-M6-5's rationale (2)):
+
+- **`WeakSailLTS.v`** — `P_sail` := the residual instruction monad +
+  register state (the intra-instruction continuation); `pstep_sail`
+  mirrors `wrun`'s arms 1:1, memory outcomes emitting the label, all
+  others `LSilent`.  Prove: lat-freedom (rv64d never emits
+  AK_ifetch/AK_ttw — the W3 recon's finding (1)), TIMESTAMP-OBLIVIOUSNESS
+  (labels' timestamps are not consumed by the continuation — programs
+  see values only), and the BRACKETING lemmas: one `WeakLang` prim_step
+  ⇔ a completed `pstep_sail` event sequence, both directions.
+- **φ transport across bracketing**: adequacy exports φ at INSTRUCTION
+  boundaries; the violation predicate is needed at EVENT granularity.
+  Sound because a mid-instruction violation PERSISTS to the boundary:
+  within one hart's instruction only that hart steps (`wrun` is
+  thread-local), floors only grow, and other authors' `w_pub` cannot
+  move — so `pf_violation_free` at event granularity follows from the
+  boundary export.
+- **THE DEVICE SEAM (open, decision needed):** `wpcfg` has no device
+  component — agents interact only through the log — while the real
+  machine has shared MMIO device state as a second channel, and the
+  sim's changed interleaving does not literally preserve cross-hart
+  device-access order.  (Informally it does: device accesses sit in
+  lock CSs whose handoffs are rf-chained, so the toposort preserves
+  their order.)  RECOMMENDED: state W5 over the RAM/log projection and
+  DECLARE the MMIO seam (device accesses are synchronous/SC in both
+  machines) as a correspondence note in the same epistemic category as
+  the D-M6-3 PARM seam and the M5 deferral — do not build a
+  device-aware full machine.  Revisit only if the declared note proves
+  embarrassing to state.
+
 - [ ] The final theorem: full-machine behaviors (completable prefixes, per
       the tee-up §2(a)) transported through Layer 1 (premise from Layer 2)
       to `weak_system_adequacy`'s promise-free reducibility; stated so the
       promise-free machine visibly becomes scaffolding.
+- [ ] `WeakSailLTS.v` per the design block above (can start any time —
+      reads only existing files).
 - [ ] Final `Print Assumptions` diff: baseline axioms + MMIO-ordering +
       no-icache; the store-reordering assumption RETIRED, replaced by the
       D-M6-3 correspondence note at the PARM seam.
