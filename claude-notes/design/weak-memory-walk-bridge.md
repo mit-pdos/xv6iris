@@ -6,8 +6,10 @@ at it (`iris/WeakWalkStale.v`), the racy absorption theorem
 (`iris/WeakKptStale.v`, `wtlb_res_pt_translateAddr_stale_at`), and the
 phase-flip design (`W` parameter + `wstep_ok_racy_phase_mono` +
 `wstep_ok_racy_bind_false`, §8.3 item 6) that lets a walking STORE
-compose.  What remains of this front is only the eventual 6b/6c consumer
-that wires the peel + absorption into a WP rule.
+compose, and the SEQUENTIAL-WINDOW widening (`WeakStale` §9, see §8.2)
+that lets a fetch-miss + data-miss instruction compose.  What remains of
+this front is only the eventual 6b/6c consumer that wires the peel +
+absorption into a WP rule.
 
 **DECISION (2026-08-12, the φ-upgrade author, as §5 requested): take
 option (a), and do NOT start until the in-flight C/D/S points-to surgery
@@ -353,13 +355,32 @@ bookkeeping, no phase, and no second window.
   Consequences: (i) per-vpn "A already set" tracking in the invariant
   makes steady-state fetch walks read-only but does not remove the second
   window and does nothing for first touch — insufficient alone; (ii) the
-  cheapest widening shape is SEQUENTIAL windows via the CPS kit
-  (translations never interleave: a peel at window₁ whose post-racy
-  continuation is a fresh peel at window₂), with a new certifier rule for
-  nested peels and the `wadm` transport across the other window's write as
-  the price; (iii) the WP rule for a post-crossing instruction cannot be
-  stated without it — settle this widening's shape BEFORE the 6c leaf
-  rule.
+  widening shape is SEQUENTIAL windows via the CPS kit (translations never
+  interleave); (iii) the WP rule for a post-crossing instruction cannot be
+  stated without it.
+
+  **THE WIDENING IS LANDED (2026-08-12, `WeakStale` §9, closed under the
+  global context).**  No multi-window fixpoint: the two certification
+  traversals are generalized to `bind m f` over the NESTED CPS peel —
+  `wexec_of_exec_racy_kseq` / `wrun_wexec_racy_kseq`, which are the
+  `WeakRacy` single-window inductions with the `Ret` case deferred to a
+  TAIL-DISCHARGE premise ("whatever `K` holds at the seam, the tail's
+  `wexec` witness exists").  The tail can be certified by window₂'s
+  single-window traversal (`wexec_of_exec_racy_seq2` /
+  `wrun_wexec_racy_seq2`, the two-window instances with window₂'s peel
+  AND `wadm_filter` riding the seam continuation), by ordinary
+  certification, or by another nesting level — n windows by iteration.
+  Producer side: `wstep_ok_racy_k_seq_intro` (plain peel of the prefix +
+  per-run-result window₂ peel/filter ⟹ the nested object; the
+  continuation ignores window₁'s final phase, so `_k_of_run`'s
+  both-phases demand is trivial).  **And the predicted `wadm`-transport
+  price DISSOLVED**: window₂'s peel is produced AT THE SEAM STATE, after
+  window₁'s CAS write is already in the log, so the cross-window write
+  never crosses window₂'s admissibility analysis — the Iris consumer
+  simply sequences two absorption fupds.  What remains deliberately
+  unbuilt: a two-window PATCHED-exec bridge (the started cone's artifact;
+  the walk takes none) and interleaved windows (the machine never
+  produces them).
 - **`acc_wf` gymnastics at the window disappear** for the mirror: the patch
   is byte-addressed, so a partially-overlapping access needs no case split.
 - **It subsumes the `started` cone.** For a trace that reads the window once

@@ -1282,3 +1282,270 @@ Proof.
       wstep_ok_racy_k_triv. exact HK.
   - intros x s' Hrun. by apply wstep_ok_racy_k_triv, Hf.
 Qed.
+
+(* ====================================================================== *)
+(** ** 9. SEQUENTIAL WINDOWS: the certification traversals at the CPS form
+
+    The peel is single-window, and an S-mode instruction can open TWO racy
+    windows in one step — the fetch walk's leaf and the data walk's leaf —
+    SEQUENTIALLY (a translation completes before the next begins; kernel
+    PTEs are installed without A/D, so BOTH walks are racy on first touch
+    after every sfence/satp crossing — the common case, not a corner; see
+    the design note).  The widening that covers it needs no multi-window
+    fixpoint: certify [bind m f] by traversing [m] with window₁'s NESTED
+    peel ([wstep_ok_racy_k], the continuation [K] holding at the seam), and
+    discharge the tail [f] by WHATEVER machinery the caller has — window₂'s
+    single-window traversal, ordinary certification, or another nesting
+    level, so n windows come free by iteration.  [wexec_of_exec_racy_kseq]
+    and [wrun_wexec_racy_kseq] are [WeakRacy.wexec_of_exec_racy] /
+    [wrun_wexec_racy] with the [Ret] case deferred to the tail premise; the
+    [_seq2] corollaries are the two-window instances.
+
+    What this deliberately does NOT provide: a two-window PATCHED-exec
+    bridge (that is the started cone's artifact — the walk takes none), and
+    any interleaved-window shape (the machine never produces one). *)
+
+Lemma wexec_of_exec_racy_kseq (tid : option nat) (ra : Arch.pa) (rn : N)
+    (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) (D : Arch.pa -> N -> Prop)
+    (W : Prop) {X Y} (m : M X) (f : X -> M Y)
+    (K : X -> wmstate -> bool -> Prop) :
+  acc_wf ra rn ->
+  forall (b : bool) (s : wmstate),
+    wstep_ok_racy_k tid ra rn rak Φ D W b m s K ->
+    wlog_wf (wm_log s) ->
+    (b = true -> wadm_filter s rak ra rn Φ) ->
+    (forall (y : X) (s1 : wmstate) (b1 : bool),
+       K y s1 b1 -> wlog_wf (wm_log s1) ->
+       forall (z : Y) (t1 : mstate),
+         exec (f y) (wflat_st s1) = Some (z, t1) ->
+         exists χ1 s1' χ1',
+           wexec tid (f y) χ1 s1 = Some (z, s1', χ1') /\ wflat_st s1' = t1) ->
+  forall (z : Y) (t' : mstate),
+    exec (Defs.bind m f) (wflat_st s) = Some (z, t') ->
+    exists χ s' χ',
+      wexec tid (Defs.bind m f) χ s = Some (z, s', χ') /\ wflat_st s' = t'.
+Proof.
+  intros Hracc.
+  induction m as [y|T oc k IH]; intros b s Hok Hwf HΦ HK z t' Hex.
+  - (* the seam: the tail premise IS the [Ret] case *)
+    rewrite bind_Ret in Hex |- *. exact (HK y s b Hok Hwf z t' Hex).
+  - rewrite bind_Next in Hex |- *.
+    destruct oc; simpl in Hok, Hex; try discriminate;
+      try (exact (IH _ _ _ Hok Hwf ltac:(filt_step) HK _ _ Hex));
+      try (exfalso; exact Hok).
+    + (* MemRead *)
+      destruct (dev_addr _) eqn:Hd.
+      * destruct (dev_read _ _ _) as [[w0 d']|] eqn:Hdr; [|discriminate].
+        destruct (IH _ _ _ (Hok w0 d' eq_refl) Hwf ltac:(filt_step) HK _ _ Hex)
+          as (χ & s2 & χ' & Hw & Heq).
+        exists χ, s2, χ'. split; [|exact Heq]. simpl. by rewrite Hd Hdr.
+      * destruct (read_bytes _ _ _) as [w0|] eqn:Hrd; [|discriminate].
+        destruct Hok as (Hacc & [(Hdisj & Hpin & Hk)|(Hbt & Hpa & Hn & Hak & Hk)]).
+        -- lazymatch type of Hpin with
+           | ak_pins ?ak0 = false -> _ =>
+               pose proof (wread_bytes_read_bytes s ak0 _ _ Hwf Hacc) as Heqrb
+           end.
+           rewrite Hrd in Heqrb.
+           pose proof (Hk w0 Heqrb) as Hp2.
+           lazymatch type of Hp2 with
+           | wstep_ok_racy_k _ _ _ _ _ _ _ _ _ ?sr _ =>
+               assert (Hex2 : exec (Defs.bind (k (inl (w0, None))) f) (wflat_st sr)
+                              = Some (z, t'))
+                 by (rewrite wflat_st_read_post; exact Hex)
+           end.
+           destruct (IH _ _ _ Hp2 (wlog_wf_read_post _ _ _ _ Hwf)
+                       ltac:(filt_step) HK _ _ Hex2)
+             as (χ & s2 & χ' & Hw & Heq).
+           lazymatch type of Hpin with
+           | ak_pins ?ak0 = false -> _ => destruct (ak_coh ak0) eqn:Hcoh
+           end.
+           ++ exists χ, s2, χ'. split; [|exact Heq].
+              simpl. rewrite Hd Hcoh Heqrb. exact Hw.
+           ++ lazymatch type of Heqrb with
+              | wread_bytes _ _ _ _ ?ts0 = _ => exists (ts0 :: χ), s2, χ'
+              end.
+              split; [|exact Heq]. simpl. rewrite Hd Hcoh Heqrb. exact Hw.
+        -- subst n. rewrite Hpa in Hacc Hk Hrd. rewrite Hak in Hk.
+           pose proof (wread_bytes_read_bytes s rak ra rn Hwf Hacc) as Heqrb.
+           rewrite Hrd in Heqrb.
+           (* the CANONICAL word is admissible, so the filter accepts it *)
+           pose proof (Hk (coh_ts s ra rn) w0 Heqrb
+                        (HΦ Hbt w0
+                           (wadm_of_wread_ok _ _ _ _ _ _
+                              (wread_bytes_spec _ _ _ _ _ _ Heqrb)))) as Hp2.
+           lazymatch type of Hp2 with
+           | wstep_ok_racy_k _ _ _ _ _ _ _ _ _ ?sr _ =>
+               assert (Hex2 : exec (Defs.bind (k (inl (w0, None))) f) (wflat_st sr)
+                              = Some (z, t'))
+                 by (rewrite wflat_st_read_post; exact Hex)
+           end.
+           destruct (IH _ _ _ Hp2 (wlog_wf_read_post _ _ _ _ Hwf)
+                       ltac:(intros ?; discriminate) HK _ _ Hex2)
+             as (χ & s2 & χ' & Hw & Heq).
+           destruct (ak_coh rak) eqn:Hcoh.
+           ++ exists χ, s2, χ'. split; [|exact Heq].
+              simpl. rewrite Hd Hak Hpa Hcoh Heqrb. exact Hw.
+           ++ exists (coh_ts s ra rn :: χ), s2, χ'. split; [|exact Heq].
+              simpl. rewrite Hd Hak Hpa Hcoh Heqrb. exact Hw.
+    + (* MemWrite *)
+      destruct (dev_addr _) eqn:Hd.
+      * destruct (dev_write _ _ _ _) as [d'|] eqn:Hdw; [|discriminate].
+        destruct (IH _ _ _ (Hok d' eq_refl) Hwf ltac:(filt_step) HK _ _ Hex)
+          as (χ & s2 & χ' & Hw & Heq).
+        exists χ, s2, χ'. split; [|exact Heq]. simpl. by rewrite Hd Hdw.
+      * destruct Hok as (Hbf & Hacc & _ & Hok).
+        lazymatch type of Hok with
+        | wstep_ok_racy_k _ _ _ _ _ _ _ _ _ ?sw _ =>
+            assert (Hex2 : exec (Defs.bind (k (inl None)) f) (wflat_st sw)
+                           = Some (z, t'))
+              by (rewrite wflat_st_write_post; exact Hex)
+        end.
+        destruct (IH _ _ _ Hok (wflat_write_wf _ _ _ _ _ _ Hwf Hacc)
+                    ltac:(intros ?; congruence) HK _ _ Hex2)
+          as (χ & s2 & χ' & Hw & Heq).
+        exists χ, s2, χ'. split; [|exact Heq]. simpl. by rewrite Hd.
+Qed.
+
+Lemma wrun_wexec_racy_kseq (tid : option nat) (ra : Arch.pa) (rn : N)
+    (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) (D : Arch.pa -> N -> Prop)
+    (W : Prop) {X Y} (m : M X) (f : X -> M Y)
+    (K : X -> wmstate -> bool -> Prop) :
+  forall (b : bool) (s : wmstate),
+    wstep_ok_racy_k tid ra rn rak Φ D W b m s K ->
+    (b = true -> wadm_filter s rak ra rn Φ) ->
+    (forall (y : X) (s1 : wmstate) (b1 : bool),
+       K y s1 b1 ->
+       forall (z : Y) (s1' : wmstate),
+         wrun tid (f y) s1 z s1' ->
+         exists χ1 χ1', wexec tid (f y) χ1 s1 = Some (z, s1', χ1')) ->
+  forall (z : Y) (s' : wmstate),
+    wrun tid (Defs.bind m f) s z s' ->
+    exists χ χ', wexec tid (Defs.bind m f) χ s = Some (z, s', χ').
+Proof.
+  induction m as [y|T oc k IH]; intros b s Hok HΦ HK z s' Hrun.
+  - (* the seam: the tail premise IS the [Ret] case *)
+    rewrite bind_Ret in Hrun |- *. exact (HK y s b Hok z s' Hrun).
+  - rewrite bind_Next in Hrun |- *.
+    destruct oc; simpl in Hok, Hrun;
+      try (exact (IH _ _ _ Hok ltac:(filt_step) HK _ _ Hrun));
+      try (exfalso; exact Hrun);
+      try (exfalso; exact Hok).
+    + (* MemRead *)
+      destruct (dev_addr _) eqn:Hd.
+      * destruct (dev_read _ _ _) as [[w0 d']|] eqn:Hdr; [|exfalso; exact Hrun].
+        destruct (IH _ _ _ (Hok w0 d' eq_refl) ltac:(filt_step) HK _ _ Hrun)
+          as (χ & χ' & Hex).
+        exists χ, χ'. simpl. rewrite Hd Hdr. exact Hex.
+      * destruct Hrun as (w0 & ts & Hokr & Hrun).
+        destruct Hok as (Hacc & [(Hdisj & Hpin & Hk)|(Hbt & Hpa & Hn & Hak & Hk)]).
+        -- pose proof (wread_pinned_ts _ _ _ _ _ _ Hpin Hokr) as Hts.
+           rewrite Hts in Hokr, Hrun.
+           pose proof (wread_bytes_complete _ _ _ _ _ _ Hokr) as Hrb.
+           destruct (IH _ _ _ (Hk w0 Hrb) ltac:(filt_step) HK _ _ Hrun)
+             as (χ & χ' & Hex).
+           lazymatch type of Hpin with
+           | ak_pins ?ak0 = false -> _ => destruct (ak_coh ak0) eqn:Hcoh
+           end.
+           ++ exists χ, χ'. simpl. rewrite Hd Hcoh Hrb. exact Hex.
+           ++ lazymatch type of Hrb with
+              | wread_bytes _ _ _ _ ?ts0 = _ => exists (ts0 :: χ), χ'
+              end.
+              simpl. rewrite Hd Hcoh Hrb. exact Hex.
+        -- subst n. rewrite Hpa in Hacc Hk. rewrite Hak in Hk.
+           rewrite Hpa Hak in Hokr, Hrun.
+           pose proof (wread_bytes_complete _ _ _ _ _ _ Hokr) as Hrb.
+           (* the word the run actually read is admissible, so the filter
+              accepts it *)
+           destruct (IH _ _ _
+                       (Hk ts w0 Hrb
+                          (HΦ Hbt w0 (wadm_of_wread_ok _ _ _ _ _ _ Hokr)))
+                       ltac:(intros ?; discriminate) HK _ _ Hrun)
+             as (χ & χ' & Hex).
+           destruct (ak_coh rak) eqn:Hcoh.
+           ++ pose proof (wread_coh_ts _ _ _ _ _ _ Hcoh Hokr) as Hts.
+              exists χ, χ'. simpl. rewrite Hd Hak Hpa Hcoh -Hts Hrb. exact Hex.
+           ++ exists (ts :: χ), χ'. simpl.
+              rewrite Hd Hak Hpa Hcoh Hrb. exact Hex.
+    + (* MemWrite *)
+      destruct (dev_addr _) eqn:Hd.
+      * destruct (dev_write _ _ _ _) as [d'|] eqn:Hdw; [|exfalso; exact Hrun].
+        destruct (IH _ _ _ (Hok d' eq_refl) ltac:(filt_step) HK _ _ Hrun)
+          as (χ & χ' & Hex).
+        exists χ, χ'. simpl. rewrite Hd Hdw. exact Hex.
+      * destruct Hok as (Hbf & _ & _ & Hok).
+        destruct (IH _ _ _ Hok ltac:(intros ?; congruence) HK _ _ Hrun)
+          as (χ & χ' & Hex).
+        exists χ, χ'. simpl. rewrite Hd. exact Hex.
+Qed.
+
+(** The two-window instances: window₂'s peel and filter ride the seam
+    continuation, and its traversal discharges the tail. *)
+Lemma wexec_of_exec_racy_seq2 (tid : option nat)
+    (ra1 : Arch.pa) (rn1 : N) (rak1 : akinfo) (Φ1 : (nat -> bv 8) -> Prop)
+    (D1 : Arch.pa -> N -> Prop) (W1 : Prop)
+    (ra2 : Arch.pa) (rn2 : N) (rak2 : akinfo) (Φ2 : (nat -> bv 8) -> Prop)
+    (D2 : Arch.pa -> N -> Prop) (W2 : Prop)
+    {X Y} (m : M X) (f : X -> M Y) (s : wmstate) :
+  acc_wf ra1 rn1 -> acc_wf ra2 rn2 ->
+  wstep_ok_racy_k tid ra1 rn1 rak1 Φ1 D1 W1 true m s
+    (fun x s1 _ => wstep_ok_racy tid ra2 rn2 rak2 Φ2 D2 W2 true (f x) s1 /\
+                   wadm_filter s1 rak2 ra2 rn2 Φ2) ->
+  wlog_wf (wm_log s) ->
+  wadm_filter s rak1 ra1 rn1 Φ1 ->
+  forall (z : Y) (t' : mstate),
+    exec (Defs.bind m f) (wflat_st s) = Some (z, t') ->
+    exists χ s' χ',
+      wexec tid (Defs.bind m f) χ s = Some (z, s', χ') /\ wflat_st s' = t'.
+Proof.
+  intros Hw1 Hw2 Hok Hwf Hflt.
+  apply (wexec_of_exec_racy_kseq tid ra1 rn1 rak1 Φ1 D1 W1 m f _ Hw1 true s
+           Hok Hwf (fun _ => Hflt)).
+  intros y s1 b1 (Hok2 & Hflt2) Hwf1 z t1 Hex1.
+  exact (wexec_of_exec_racy tid ra2 rn2 rak2 Φ2 D2 W2 (f y) Hw2 true s1
+           Hok2 Hwf1 (fun _ => Hflt2) z t1 Hex1).
+Qed.
+
+Lemma wrun_wexec_racy_seq2 (tid : option nat)
+    (ra1 : Arch.pa) (rn1 : N) (rak1 : akinfo) (Φ1 : (nat -> bv 8) -> Prop)
+    (D1 : Arch.pa -> N -> Prop) (W1 : Prop)
+    (ra2 : Arch.pa) (rn2 : N) (rak2 : akinfo) (Φ2 : (nat -> bv 8) -> Prop)
+    (D2 : Arch.pa -> N -> Prop) (W2 : Prop)
+    {X Y} (m : M X) (f : X -> M Y) (s : wmstate) :
+  wstep_ok_racy_k tid ra1 rn1 rak1 Φ1 D1 W1 true m s
+    (fun x s1 _ => wstep_ok_racy tid ra2 rn2 rak2 Φ2 D2 W2 true (f x) s1 /\
+                   wadm_filter s1 rak2 ra2 rn2 Φ2) ->
+  wadm_filter s rak1 ra1 rn1 Φ1 ->
+  forall (z : Y) (s' : wmstate),
+    wrun tid (Defs.bind m f) s z s' ->
+    exists χ χ', wexec tid (Defs.bind m f) χ s = Some (z, s', χ').
+Proof.
+  intros Hok Hflt.
+  apply (wrun_wexec_racy_kseq tid ra1 rn1 rak1 Φ1 D1 W1 m f _ true s
+           Hok (fun _ => Hflt)).
+  intros y s1 b1 (Hok2 & Hflt2) z s1' Hrun1.
+  exact (wrun_wexec_racy tid ra2 rn2 rak2 Φ2 D2 W2 (f y) true s1
+           Hok2 (fun _ => Hflt2) z s1' Hrun1).
+Qed.
+
+(** Building the nested object: a plain peel of the prefix plus, at every
+    run result, window₂'s peel and filter for the tail.  The continuation
+    ignores window₁'s final phase, so [wstep_ok_racy_k_of_run]'s
+    both-phases demand is trivial. *)
+Lemma wstep_ok_racy_k_seq_intro (tid : option nat)
+    (ra1 : Arch.pa) (rn1 : N) (rak1 : akinfo) (Φ1 : (nat -> bv 8) -> Prop)
+    (D1 : Arch.pa -> N -> Prop) (W1 : Prop)
+    (ra2 : Arch.pa) (rn2 : N) (rak2 : akinfo) (Φ2 : (nat -> bv 8) -> Prop)
+    (D2 : Arch.pa -> N -> Prop) (W2 : Prop)
+    (b : bool) {X Y} (m : M X) (f : X -> M Y) (s : wmstate) :
+  wstep_ok_racy tid ra1 rn1 rak1 Φ1 D1 W1 b m s ->
+  (forall x s', wrun tid m s x s' ->
+     wstep_ok_racy tid ra2 rn2 rak2 Φ2 D2 W2 true (f x) s' /\
+     wadm_filter s' rak2 ra2 rn2 Φ2) ->
+  wstep_ok_racy_k tid ra1 rn1 rak1 Φ1 D1 W1 b m s
+    (fun x s1 _ => wstep_ok_racy tid ra2 rn2 rak2 Φ2 D2 W2 true (f x) s1 /\
+                   wadm_filter s1 rak2 ra2 rn2 Φ2).
+Proof.
+  intros Hok HK.
+  apply (wstep_ok_racy_k_of_run _ _ _ _ _ _ _ _ m s _ Hok).
+  intros x s' Hrun b'. exact (HK x s' Hrun).
+Qed.
