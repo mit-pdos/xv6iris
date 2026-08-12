@@ -892,6 +892,7 @@ WeakInterp.v
 WeakInterpProj.v
 WeakSailLTS.v
 WeakSailLTS2.v
+WeakComposeLang.v
 WeakCompose.v
 WeakLang.v
 WeakGhost.v
