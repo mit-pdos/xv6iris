@@ -4687,3 +4687,17 @@ landed in the algebra so that step costs no RA change.
 Everything else in §20 survives unchanged: the ambient gname, the RA, the
 parking placement, the two nlink-moving writes, the grey colour, the ten
 death certificates, and the `kernel-defects.md` entry (landed as D2).
+
+### 20.14 RATIFIED (coordinator, 2026-08-12): S5f's repair is a
+### prerequisite; M1's home is the escrow arm
+
+(R1) ic_open_held goes record-parametric (ic_payload_at dn bm in and
+out) so the free's proof carries Hnl0 across the sleeplock window —
+the §17-family edit S5f sized (one lemma + two call sites); then
+(L1)+(L3) land, then stage B. (R2) M1's clause homes in the ESCROW
+ARM, not itable_inv: the arm is per-slot and knows its inum via
+ic_id, so it can carry "outstanding iref_lic fragments for this inum
+≤ the slot's count" — work the exact clause in the implementing
+stage, stop-and-report if the arm's timelessness or the §17.5 mass
+ledger objects. Stage order: R1 → L1/L3 → B → C (with (L4)'s root
+clause and the ireg_read_blk-shaped accessor S5f described) → D.
