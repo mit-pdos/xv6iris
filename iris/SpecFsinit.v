@@ -148,16 +148,13 @@ Require Import BlockWords.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
-Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import SleepLock.
 Require Import IcacheBoot.
-Require Import SpecIreclaim.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -371,7 +368,15 @@ Definition wp_fsinit_sconf_body
   bslots bn ((LOGBLOCKS + 2) + 2 + 1)%nat -∗
   (* ONE ledger unit for ireclaim's iget/iput pair; it comes back *)
   iref_slot -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
+     (its bread / ilock / bwrite does), and a park moves the hart with
+     interrupts off, so the crossing has nothing to do with SIE -- the
+     porting guide's "a PARKING function's [wp_next] index is [true]
+     UNCONDITIONALLY".  Spelled [b] the two coincide at the only instance
+     the [eb = true] premise admits, which is why this went unnoticed; once
+     [eb = false] is reachable the [b] form would promise the caller it
+     comes back on the hart it called from, which a park makes false. *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗

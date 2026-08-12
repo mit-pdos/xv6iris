@@ -304,7 +304,8 @@ Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
-Require Import FileInv ProcInv.
+Require Import ProcInv.
+Require Import FileInvDefs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -527,7 +528,13 @@ Definition wp_writei_sconf_body
   bslots bn 3 -∗
   (* THE RESERVATION, spend-at-most *)
   log_op γ ncount -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP,
+     and a park moves the hart with interrupts off, so the crossing has
+     nothing to do with SIE.  Spelled [b] the two coincide at the only
+     instance the [eb = true] premise admits, which is why this went
+     unnoticed; once [eb = false] is reachable the [b] form would promise
+     the caller it comes back on the hart it called from. *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (tot : nat) (bm' : blkmap) (data' : nat -> list (bv 8))
     (dn' dn0' : dinode) (n' : nat)
     (wrote : nat -> bv 8) (dist : nat) (dstb : nat -> bv 8) (P' : uptd)

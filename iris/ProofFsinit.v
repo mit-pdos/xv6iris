@@ -61,7 +61,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RiscvModelBytes.
 Require Import RiscvExtras.
 Require Import InstrBytes.
-Require Import KernelText KernelDataInv.
+Require Import KernelText.
 Require Import KernelRvcDecode.
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
@@ -70,35 +70,30 @@ Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import VcGen.
 Require Import IntrDefs WpSmodeIntr.
-Require Import WpSmodeHalf.
 Require Import CpuOwn.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
+Require Import BufOwn.
 Require Import BufOwn.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
 Require Import ByteBuf.
 Require Import FdSlots.
 Require Import ProcGeom.
-Require Import SchedCtx.
+Require Import IcacheRef.
+Require Import IrefSlots.
 Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BlockWords.
 Require Import BitmapInv.
-Require Import DinodeEnc.
 Require Import DinodeSlot.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import SleepLock.
-Require Import IcacheBoot.
 Require Import CodeFsinit.
-Require Import SpecPanic.
-Require Import SpecPrintkGen.
 Require Import SpecBread SpecBrelse SpecMemmove.
 Require Import SpecInitlog SpecIreclaim.
 Require Import SpecFsinit.
@@ -207,7 +202,7 @@ Section FsinitDefs.
       (bs_sb : list (bv 8))
       (pidv : mword 32) (dq : dfrac) (j : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
-    wp_next b (proc_addr j) (fun (CID : CpuId) =>
+    wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (used' : gset Z),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K b (proc_addr j) -∗
@@ -792,7 +787,7 @@ Section FsinitMain.
       as "[Hsl34 Hsl1]".
     iDestruct (cpu_own_transport CID CID9 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID9) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID9) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bno dq
@@ -1154,7 +1149,7 @@ Section FsinitMain.
       rewrite /Q1 upd_ne; [| regne]. exact (HQ0thr c Hcs N2' N8 N9 N18). }
     iDestruct (cpu_own_transport CID10 CID19 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID9) (CIDb := CID19) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID9) (CIDb := CID19) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bno dq Q1 (K - 4)%nat true (proc_addr j) C
@@ -1372,7 +1367,7 @@ Section FsinitMain.
       rewrite /Q9 upd_ne; [| regne]. exact (HQ8thr c Hcs N2' N8 N9 N18). }
     iDestruct (cpu_own_transport CID20 CID29 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID19) (CIDb := CID29) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID19) (CIDb := CID29) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IL.wp_initlog_sconf γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev sb_base bs_hdr L D
@@ -1447,7 +1442,7 @@ Section FsinitMain.
     iDestruct "Hlctx" as (γlog) "#Hlctx".
     iDestruct (cpu_own_transport CID30 CID32 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID29) (CIDb := CID32) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID29) (CIDb := CID32) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IR.wp_ireclaim_sconf γs j γl γu γd γk pd pav pu bn
               γlog γfs γi cn gtl γpr cov logstart bmapstart inodestart
@@ -1479,7 +1474,7 @@ Section FsinitMain.
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hmg Hsz Hnb Hni Hnl Hls
                     Hist Hbms Hfsb [Hlctx] Hsl3 Hiref Hbm [Hcont]").
     { iExists γlog. iExact "Hlctx". }
-    { iApply (wp_next_shift (CIDa := CID32) (CIDb := CID33)
+    { iApply (wp_next_shift (b := true) (CIDa := CID32) (CIDb := CID33)
                 ltac:(wp_next_chain) with "Hcont"). }
   Qed.
 

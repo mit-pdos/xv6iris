@@ -38,7 +38,8 @@ Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto.
 Require Import SmodeCore.
 Require Import ProcGeom.
-Require Import WpLock KallocInv IcacheRef FileInv FdSlots.
+Require Import WpLock KallocInv IcacheRef FdSlots.
+Require Import FileInvDefs.
 Require Import DiskPtsto.
 Require Import WpUart.
 Require Import BootConfig.

@@ -470,7 +470,7 @@ Section WriteHeadDefs.
       (pidv : mword 32) (dq : dfrac) (j : nat)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool)
       (Q : iProp Σ) : iProp Σ :=
-    wp_next b (proc_addr j) (fun (CID : CpuId) =>
+    wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs' : list (bv 8)),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K b (proc_addr j) -∗
@@ -637,7 +637,7 @@ Section WriteHeadBlocks.
     iDestruct (wh_hold_to with "Hhold") as "Hhold".
     iDestruct (cpu_own_transport CID0 CID2 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbw : (K_bwrite <= K - 4)%nat)
       by (unfold K_bwrite, K_write_head in *; lia).
@@ -745,7 +745,7 @@ Section WriteHeadBlocks.
       rewrite /T4 upd_ne; [| regne]. exact (HT3thr c Hcs N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID3 CID5 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID2) (CIDb := CID5) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID2) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 4)%nat)
       by (unfold K_brelse, K_write_head in *; lia).
@@ -1223,7 +1223,7 @@ Section WriteHeadBlocks.
       iEval (rewrite Hpp46) in "Hpc".
       iDestruct (cpu_own_transport CID0 CID5 0 true (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID5) ltac:(wp_next_chain)
+      iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
       iApply (wh_tail (CID0 := CID5)  γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev n W L pidv dq kk bno bsh bs0 bsd0 d0 f' m S3 K C b Q
@@ -1255,7 +1255,7 @@ Section WriteHeadBlocks.
       assert (Hf' : (n - S i <= fuel)%nat) by (clear -Hi Hfuel Hmore; lia).
       iDestruct (cpu_own_transport CID0 CID5 0 true (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID5) ltac:(wp_next_chain)
+      iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
       iSpecialize ("IH" $! CID5 (S i) S3 f' Hi' Hf' Hf4' Henc' HS3regs HS3s1
                      HS3a4 HS3a5 HS3a2).
@@ -1545,7 +1545,7 @@ Section ProofWriteHead.
       rewrite /R1 upd_ne; [reflexivity | regne]. }
     iDestruct (cpu_own_transport CID CID11 0 true pj C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID11) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 4)%nat) by (unfold K_bread; lia).
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
@@ -1703,7 +1703,7 @@ Section ProofWriteHead.
       iEval (rewrite Htgt46) in "Hpc".
       iDestruct (cpu_own_transport CID12 CID16 0 true pj C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iDestruct (wp_next_shift (CIDa := CID11) (CIDb := CID16) ltac:(wp_next_chain)
+      iDestruct (wp_next_shift (b := true) (CIDa := CID11) (CIDb := CID16) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
       iApply (wh_tail (CID0 := CID16)  γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev 0%nat W L pidv dq kk (mword_of_int logstart : mword 32)
@@ -1864,7 +1864,7 @@ Section ProofWriteHead.
       iEval (rewrite Hpp3a) in "Hpc".
       iDestruct (cpu_own_transport CID12 CID21 0 true pj C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iDestruct (wp_next_shift (CIDa := CID11) (CIDb := CID21) ltac:(wp_next_chain)
+      iDestruct (wp_next_shift (b := true) (CIDa := CID11) (CIDb := CID21) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
       iApply (wh_loop (CID0 := CID21)  γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev (S n') W L pidv dq kk (mword_of_int logstart : mword 32)

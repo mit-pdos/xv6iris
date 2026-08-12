@@ -165,17 +165,77 @@ Section StackBytes.
 
      Slot [k] is the LOWEST address of the run ([pa_stk sp k = sp - 8k]), so
      slots [k], [k-1], ... are ascending 8-byte blocks and the byte run starts
-     at slot [k].  Stated for the two lengths the kernel's stack arrays need
-     (printint borrows three slots); the general [r] version would need
-     [pa_stk sp (k - i)] index arithmetic that buys nothing here. *)
+     at slot [k].  The run is therefore indexed DOWNWARD from its base: element
+     [i] of the [n]-slot run based at slot [k] is slot [k - i], and its bytes
+     start at [8*i].  (That is the opposite index direction from
+     [StackOwn.stack_own_slots], which enumerates a region from the sp end;
+     a caller that carves a buffer out of a frame converts once, at the split.)
 
-  Lemma pa_stk_next (sp : Arch.pa) (k : nat) :
-    (1 <= k)%nat -> pa_add (pa_stk sp k) 8 = pa_stk sp (k - 1).
+     [slotsn_bytes_own] / [bytes_own_slotsn] are the general pair; the
+     three-slot [slots3_*] below are their instances at [n := 3], kept because
+     [ProofPrintint.v] is written over them.  The bound is [n <= S k] -- the
+     deepest element is slot [k - (n-1)], so a run may reach slot 0 -- which is
+     why [slots3_*]'s [2 <= k] is exactly [3 <= S k]. *)
+
+  (* the general downward step: [8*j] bytes above slot [k]'s base is slot
+     [k-j]'s base.  [pa_stk_next] is the [j = 1] case. *)
+  Lemma pa_stk_addn (sp : Arch.pa) (k j : nat) :
+    (j <= k)%nat -> pa_add (pa_stk sp k) (8 * j) = pa_stk sp (k - j).
   Proof.
-    intro Hk. unfold pa_add, pa_stk, add_vec_int. apply bv_eq.
+    intro Hj. unfold pa_add, pa_stk, add_vec_int. apply bv_eq.
     rewrite !add_vec64_unsigned !moi64_unsigned.
     rewrite !bv_wrap_add_idemp_r. rewrite !bv_wrap_add_idemp_l.
     f_equal. lia.
+  Qed.
+
+  Lemma pa_stk_next (sp : Arch.pa) (k : nat) :
+    (1 <= k)%nat -> pa_add (pa_stk sp k) 8 = pa_stk sp (k - 1).
+  Proof. exact (pa_stk_addn sp k 1). Qed.
+
+  (* [n] frame slots, based at slot [k], ARE [8*n] bytes at slot [k]'s base.
+     The alignment facts travel out separately (see this file's header): a word
+     points-to carries alignment, a byte run does not. *)
+  Lemma slotsn_bytes_own (sp : Arch.pa) (k n : nat) :
+    (n <= S k)%nat ->
+    ([∗ list] i ∈ seq 0 n, ∃ w : mword 64, pa_stk sp (k - i) ↦₈ w) ⊢
+    ⌜forall i, (i < n)%nat ->
+       is_aligned_paddr (Physaddr (pa_stk sp (k - i))) 8 = true⌝ ∗
+    bytes_own (DfracOwn 1) (pa_stk sp k) (8 * n).
+  Proof.
+    revert k. induction n as [| n IH]; intros k Hk.
+    - iIntros "_". rewrite Nat.mul_0_r bytes_own_0.
+      iSplitR; [iPureIntro; intros i Hi; lia | done].
+    - rewrite seq_S big_sepL_app big_sepL_singleton.
+      iIntros "[Hhd Htl]".
+      iDestruct (IH k ltac:(lia) with "Hhd") as "[%Hal Hb]".
+      iDestruct "Htl" as (w) "Hw".
+      iDestruct (slot_bytes_own with "Hw") as "[%Han Hbn]".
+      iSplitR.
+      { iPureIntro. intros i Hi.
+        destruct (decide (i < n)%nat) as [Hlt | Hge]; [exact (Hal i Hlt) | ].
+        replace i with n by lia. exact Han. }
+      replace (8 * S n)%nat with (8 * n + 8)%nat by lia.
+      rewrite bytes_own_app (pa_stk_addn sp k n ltac:(lia)).
+      iFrame "Hb Hbn".
+  Qed.
+
+  (* ... and back, at the alignment facts the split handed out. *)
+  Lemma bytes_own_slotsn (sp : Arch.pa) (k n : nat) :
+    (n <= S k)%nat ->
+    (forall i, (i < n)%nat ->
+       is_aligned_paddr (Physaddr (pa_stk sp (k - i))) 8 = true) ->
+    bytes_own (DfracOwn 1) (pa_stk sp k) (8 * n) ⊢
+    [∗ list] i ∈ seq 0 n, ∃ w : mword 64, pa_stk sp (k - i) ↦₈ w.
+  Proof.
+    revert k. induction n as [| n IH]; intros k Hk Hal.
+    - iIntros "_". by rewrite big_sepL_nil.
+    - rewrite seq_S big_sepL_app big_sepL_singleton.
+      replace (8 * S n)%nat with (8 * n + 8)%nat by lia.
+      rewrite bytes_own_app (pa_stk_addn sp k n ltac:(lia)).
+      iIntros "[Hb Hbn]".
+      iSplitL "Hb".
+      + iApply (IH k ltac:(lia) ltac:(intros i Hi; apply Hal; lia) with "Hb").
+      + iApply (bytes_own_slot _ (Hal n ltac:(lia)) with "Hbn").
   Qed.
 
   Lemma slots3_bytes_own (sp : Arch.pa) (k : nat) (w1 w2 w3 : bv 64) :
@@ -186,22 +246,16 @@ Section StackBytes.
       is_aligned_paddr (Physaddr (pa_stk sp (k - 2))) 8 = true ⌝ ∗
     bytes_own (DfracOwn 1) (pa_stk sp k) 24.
   Proof.
-    intro Hk.
-    assert (E1 : pa_add (pa_stk sp k) 8 = pa_stk sp (k - 1))
-      by (apply pa_stk_next; lia).
-    assert (E2 : pa_add (pa_stk sp (k - 1)) 8 = pa_stk sp (k - 1 - 1))
-      by (apply pa_stk_next; lia).
-    assert (E2' : (k - 1 - 1)%nat = (k - 2)%nat) by lia.
-    rewrite E2' in E2.
+    intro Hk. change 24%nat with (8 * 3)%nat.
     iIntros "H1 H2 H3".
-    iDestruct (slot_bytes_own with "H1") as "[%Ha1 B1]".
-    iDestruct (slot_bytes_own with "H2") as "[%Ha2 B2]".
-    iDestruct (slot_bytes_own with "H3") as "[%Ha3 B3]".
-    iSplitR; [done | ].
-    change 24%nat with (8 + (8 + 8))%nat.
-    rewrite bytes_own_app. iSplitL "B1"; [iExact "B1" | ].
-    rewrite bytes_own_app E1. iSplitL "B2"; [iExact "B2" | ].
-    by rewrite E2.
+    iDestruct (slotsn_bytes_own sp k 3 ltac:(lia) with "[H1 H2 H3]") as "[%Hal Hb]".
+    { cbn [seq].
+      iSplitL "H1"; [iExists w1; rewrite Nat.sub_0_r; iExact "H1" | ].
+      iSplitL "H2"; [iExists w2; iExact "H2" | ].
+      iSplitL "H3"; [iExists w3; iExact "H3" | ]. done. }
+    iFrame "Hb". iPureIntro.
+    pose proof (Hal 0%nat ltac:(lia)) as Ha1. rewrite Nat.sub_0_r in Ha1.
+    split_and!; [exact Ha1 | exact (Hal 1%nat ltac:(lia)) | exact (Hal 2%nat ltac:(lia))].
   Qed.
 
   Lemma bytes_own_slots3 (sp : Arch.pa) (k : nat) :
@@ -214,20 +268,18 @@ Section StackBytes.
       (pa_stk sp k) ↦₈ w1 ∗ (pa_stk sp (k - 1)) ↦₈ w2 ∗ (pa_stk sp (k - 2)) ↦₈ w3.
   Proof.
     intros Hk Ha1 Ha2 Ha3.
-    assert (E1 : pa_add (pa_stk sp k) 8 = pa_stk sp (k - 1))
-      by (apply pa_stk_next; lia).
-    assert (E2 : pa_add (pa_stk sp (k - 1)) 8 = pa_stk sp (k - 1 - 1))
-      by (apply pa_stk_next; lia).
-    assert (E2' : (k - 1 - 1)%nat = (k - 2)%nat) by lia.
-    rewrite E2' in E2.
+    assert (Hal : forall i, (i < 3)%nat ->
+              is_aligned_paddr (Physaddr (pa_stk sp (k - i))) 8 = true).
+    { intros i Hi. destruct i as [| [| [| i]]];
+        [ rewrite Nat.sub_0_r; exact Ha1 | exact Ha2 | exact Ha3 | lia ]. }
+    change 24%nat with (8 * 3)%nat.
     iIntros "B".
-    change 24%nat with (8 + (8 + 8))%nat.
-    rewrite bytes_own_app. iDestruct "B" as "[B1 B]".
-    rewrite E1 bytes_own_app. iDestruct "B" as "[B2 B3]".
-    rewrite E2.
-    iDestruct (bytes_own_slot _ Ha1 with "B1") as (w1) "H1".
-    iDestruct (bytes_own_slot _ Ha2 with "B2") as (w2) "H2".
-    iDestruct (bytes_own_slot _ Ha3 with "B3") as (w3) "H3".
+    iDestruct (bytes_own_slotsn sp k 3 ltac:(lia) Hal with "B") as "H".
+    cbn [seq].
+    iDestruct "H" as "(H1 & H2 & H3 & _)".
+    iEval (rewrite Nat.sub_0_r) in "H1".
+    iDestruct "H1" as (w1) "H1". iDestruct "H2" as (w2) "H2".
+    iDestruct "H3" as (w3) "H3".
     iExists w1, w2, w3. iFrame.
   Qed.
 

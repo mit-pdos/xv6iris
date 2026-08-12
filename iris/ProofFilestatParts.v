@@ -56,7 +56,6 @@ Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
-Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import SpecStati.
 Require Import CodeFilestat.

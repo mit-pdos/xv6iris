@@ -62,7 +62,8 @@ Require Import KallocInv.
 Require Import ByteBuf.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
-Require Import FdSlots FileInv ProcInv.
+Require Import FdSlots ProcInv.
+Require Import FileInvDefs.
 Require Import CodeFetchaddr.
 Require Import SpecMyproc SpecCopyin.
 Require Import SpecFetchaddr.

@@ -131,17 +131,16 @@ Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import DirView.
 Require Import InodeInv.
-Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import KallocInv.
-Require Import UserPtTree.
 Require Import KvmSpec.
-Require Import ProcPtOwn.
-Require Import FileInv ProcInv.
+Require Import FileInvDefs.
+Require Import IcacheRef.
+Require Import IrefSlots.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -239,7 +238,12 @@ Definition wp_dirlookup_sconf_body
   ic_escrows cn γfs γi cov logstart -∗
   (* ONE ledger unit for the iget on the found arm; RETURNED on the other *)
   iref_slot -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
+     (through namex / dirlookup, down to ilock and sleep), so a park moves
+     the hart with interrupts off and the crossing has nothing to do with
+     SIE.  Spelled [b] the two coincide at the only instance the [eb = true]
+     premise admits, which is why this went unnoticed. *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (found : bool) (k : nat) (kslot : nat) (q : Qp),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗

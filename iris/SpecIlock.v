@@ -237,7 +237,14 @@ Definition wp_ilock_sconf_body
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   (* ONE slot unit: bread's reference, which brelse gives back *)
   bslot bn -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function PARKS (its
+     acquiresleep sleeps), and a park moves the hart with interrupts off, so
+     the crossing has nothing to do with SIE -- the porting guide's "a
+     PARKING function's [wp_next] index is [true] UNCONDITIONALLY".  While
+     the contract was pinned at [b = true] the two spellings coincided; at
+     [b = false] the [b] form would claim the function returns on the hart
+     that called it, which is false. *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (dn : dinode) (bm : blkmap),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗

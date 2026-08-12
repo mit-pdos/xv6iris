@@ -50,7 +50,7 @@ Require Import WpLock.
 Require Import ArrCursor.
 Require Import ProcGeom.
 Require Import FdSlots.
-Require Import FileInv.
+Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KvmMap.

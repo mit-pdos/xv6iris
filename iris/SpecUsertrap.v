@@ -57,7 +57,8 @@ Require Import KernelText MstatusBits.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import WpLock.
-Require Import FdSlots FileInv.
+Require Import FdSlots.
+Require Import FileInvDefs.
 Require Import ProcGeom.
 Require Import PtTree.
 Require Import TrampPt KptTree UptTree.

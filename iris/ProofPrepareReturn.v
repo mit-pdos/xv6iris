@@ -52,25 +52,22 @@ From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import PageGeom.
-Require Import RegFile InstrBytes WpMmodeLeafBase.
+Require Import RegFile WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import MstatusBits.
-Require Import StackOwn CalleeSaved KernelText.
+Require Import StackOwn CalleeSaved.
 Require Import KernelRvcDecode.
 Require Import VcGen.
-Require Import TrampPt.
-Require Import KptShare.
-Require Import WpGprCsrwCommon WpGprCsrwC WpGprCsrwA.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfCsr WpSmodeIntr.
+Require Import WpGprCsrwCommon.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfCsr.
 Require Import IntrDefs.
 Require Import HartTp WpNext CpuOwn.
 Require Import WpLock.
 Require Import ProcGeom.
-Require Import UserPtTree ProcPtOwn.
-Require Import FdSlots FileInv ProcInv.
+Require Import UserPtTree.
+Require Import FdSlots ProcInv.
+Require Import FileInvDefs.
 Require Import CodePrepareReturn.
 Require Import SpecMyproc.
 Require Import SpecPrepareReturn.

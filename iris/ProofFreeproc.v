@@ -59,7 +59,8 @@ Require Import CpuOwn.
 Require Import ProcGeom.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
-Require Import FdSlots FileInv.
+Require Import FdSlots.
+Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import InstrBytes.

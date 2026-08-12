@@ -32,7 +32,8 @@ Require Import RegFile.
    does not put them in scope transitively, and backtick generalization then
    silently invents fresh binders with those names (durable-notes.md, the
    typeclass-sweep traps). *)
-Require Import WpLock FdSlots FileInv IrefSlots.
+Require Import WpLock FdSlots IrefSlots.
+Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SpecSyscall.
 

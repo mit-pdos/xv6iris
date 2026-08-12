@@ -91,7 +91,6 @@ Require Import DiskPtsto DiskInv.
 Require Import BufOwn.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
-Require Import WpSconfSrliw.
 Require Import ByteBuf.
 Require Import PrintintArith.
 Require Import PrintkFmt.
@@ -102,7 +101,6 @@ Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import BlockWords.
 Require Import BitmapInv.
 Require Import DinodeEnc.
 Require Import DinodeSlot.
@@ -112,7 +110,6 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import SleepLock.
 Require Import IcacheBoot.
 Require Import CodeIreclaim.
 Require Import SpecPanic.
@@ -223,7 +220,9 @@ Section IreclaimDefs.
       (used : gset Z)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac) (j : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
-    wp_next b (proc_addr j) (fun (CID : CpuId) =>
+    (* the LITERAL [true], matching the contract's crossing: this function
+       can sleep, so its continuation is about an arbitrary hart. *)
+    wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (used' : gset Z),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K b (proc_addr j) -∗
@@ -854,7 +853,7 @@ Section IreclaimStep.
                 m S3 K C b HK Hsub HS3sp HS3thr
                 with "Hcg Hcnt Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl
                       Hiref Hbm [Hcont]").
-      { iApply (wp_next_shift (CIDa := CID0) (CIDb := CID4)
+      { iApply (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID4)
                   ltac:(wp_next_chain) with "Hcont"). }
     - (* ---- ANOTHER TURN: back to the body at +0x7c ---- *)
       assert (Hcmp : zopz0zKzJ_u (rget S3 Ra5) (rget S3 Ra4) = false).
@@ -889,7 +888,7 @@ Section IreclaimStep.
       { exact HS3s4. }
       { exact HS3s5. }
       { exact HS3s6. }
-      { iApply (wp_next_shift (CIDa := CID0) (CIDb := CID4)
+      { iApply (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID4)
                   ltac:(wp_next_chain) with "Hcont"). }
   Qed.
 
@@ -1110,7 +1109,7 @@ Section IreclaimOrphan.
       exact (HO2thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
     iDestruct (cpu_own_transport CID0 CID3 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID3) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iPoseProof (panic_wp_any_at CID3 with "Hpanic") as "Hpanic3".
     iApply (Hpk CID3 O3 (K - 8)%nat true (proc_addr j) C
@@ -1248,7 +1247,7 @@ Section IreclaimOrphan.
       exact (HO5thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
     iDestruct (cpu_own_transport CID4 CID7 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID3) (CIDb := CID7) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID3) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IG.wp_iget_sconf gtl cn γfs γi cov logstart nib dev inum
               O6 0%nat true (proc_addr j) C (K - 8)%nat b
@@ -1379,7 +1378,7 @@ Section IreclaimOrphan.
       exact (HO8thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
     iDestruct (cpu_own_transport CID8 CID11 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID7) (CIDb := CID11) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID7) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bno dq O9 (K - 8)%nat true (proc_addr j) C
@@ -1460,7 +1459,7 @@ Section IreclaimOrphan.
       exact (HmRthr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
     iDestruct (cpu_own_transport CID12 CID14 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID11) (CIDb := CID14) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID11) (CIDb := CID14) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (BO.wp_begin_op_sconf γs j γl bn γ γfs cov logstart dev pidv dq
               OA (K - 8)%nat true C b
@@ -1560,7 +1559,7 @@ Section IreclaimOrphan.
       exact (HOBthr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
     iDestruct (cpu_own_transport CID15 CID17 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID14) (CIDb := CID17) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID14) (CIDb := CID17) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iDestruct (iu_slots_split bn 2 1 with "Hsl") as "[Hsl Hsl1]".
     (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)) *)
@@ -1667,7 +1666,7 @@ Section IreclaimOrphan.
       exact (HODthr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
     iDestruct (cpu_own_transport CID18 CID20 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID17) (CIDb := CID20) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID17) (CIDb := CID20) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IU.wp_iunlock_sconf γs γfs γi cn gil gisl cov logstart kslot
               (q/2)%Qp gsh dev inum dnl bml pidv dq OE (K - 8)%nat true
@@ -1766,7 +1765,7 @@ Section IreclaimOrphan.
       exact (HOFthr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
     iDestruct (cpu_own_transport CID21 CID23 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID20) (CIDb := CID23) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID20) (CIDb := CID23) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IP.wp_iput_sconf γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
               gil gisl cov logstart bmapstart inodestart nib size dev usedn
@@ -1835,7 +1834,7 @@ Section IreclaimOrphan.
       exact (HmQthr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
     iDestruct (cpu_own_transport CID24 CID25 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID23) (CIDb := CID25) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID23) (CIDb := CID25) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (EO.wp_end_op_sconf γs j γl γu γd γk pd pav pu bn γ γfs cov logstart
               dev n' pidv dq OH (K - 8)%nat true C b
@@ -1878,7 +1877,7 @@ Section IreclaimOrphan.
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref
                     Hbm [Hloop] [Hcont]").
     { iExact "Hloop". }
-    { iApply (wp_next_shift (CIDa := CID25) (CIDb := CID26)
+    { iApply (wp_next_shift (b := true) (CIDa := CID25) (CIDb := CID26)
                 ltac:(wp_next_chain) with "Hcont"). }
   Qed.
 
@@ -2004,7 +2003,7 @@ Section IreclaimRelease.
       exact (HV1thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
     iDestruct (cpu_own_transport CID0 CID2 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bno dq V2 (K - 8)%nat true (proc_addr j) C
@@ -2057,7 +2056,7 @@ Section IreclaimRelease.
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref
                     Hbm [Hloop] [Hcont]").
     { iExact "Hloop". }
-    { iApply (wp_next_shift (CIDa := CID2) (CIDb := CID4)
+    { iApply (wp_next_shift (b := true) (CIDa := CID2) (CIDb := CID4)
                 ltac:(wp_next_chain) with "Hcont"). }
   Qed.
 
@@ -2375,7 +2374,7 @@ Section IreclaimScan.
         exact (HW5thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
       iDestruct (cpu_own_transport CIDn CID6 0 true (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iDestruct (wp_next_shift (CIDa := CIDn) (CIDb := CID6) ltac:(wp_next_chain)
+      iDestruct (wp_next_shift (b := true) (CIDa := CIDn) (CIDb := CID6) ltac:(wp_next_chain)
                    with "Hcont") as "Hcont".
       iDestruct (iu_slots_split bn 2 1 with "Hsl") as "[Hsl Hsl1]".
       iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
@@ -2701,7 +2700,7 @@ Section IreclaimScan.
                   with "Hcg Hcnt Htext Hpc Hpanic Hbio Hprocs Hframe Hppid
                         Hsbn Hsbi Hsbb Hsl Hiref Hbm Hlk [] [Hcont]").
         { iApply "IH". }
-        { iApply (wp_next_shift (CIDa := CID6) (CIDb := CID14)
+        { iApply (wp_next_shift (b := true) (CIDa := CID6) (CIDb := CID14)
                     ltac:(wp_next_chain) with "Hcont"). }
       + (* ---- TYPE nonzero: read the link count ---- *)
         assert (Hcmp : eq_vec (rget WC Ra4) (zero_reg : mword 64) = false).
@@ -2797,7 +2796,7 @@ Section IreclaimScan.
                           Hdgeom Hdlock Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref
                           Hbm Hlk [] [Hcont]").
           { iApply "IH". }
-          { iApply (wp_next_shift (CIDa := CID6) (CIDb := CID16)
+          { iApply (wp_next_shift (b := true) (CIDa := CID6) (CIDb := CID16)
                       ltac:(wp_next_chain) with "Hcont"). }
         * (* ---- LINKED: nothing to do, the brelse ---- *)
           assert (Hcmp2 : eq_vec (rget WD Ra5) (zero_reg : mword 64) = false).
@@ -2820,7 +2819,7 @@ Section IreclaimScan.
                     with "Hcg Hcnt Htext Hpc Hpanic Hbio Hprocs Hframe Hppid
                           Hsbn Hsbi Hsbb Hsl Hiref Hbm Hlk [] [Hcont]").
           { iApply "IH". }
-          { iApply (wp_next_shift (CIDa := CID6) (CIDb := CID16)
+          { iApply (wp_next_shift (b := true) (CIDa := CID6) (CIDb := CID16)
                       ltac:(wp_next_chain) with "Hcont"). }
   Qed.
 
@@ -3341,7 +3340,7 @@ Section IreclaimMain.
     iEval (rewrite Hjt) in "Hpc".
     iDestruct (cpu_own_transport CID CID21 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID21) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID21) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (Hunit1 : bv_unsigned (mword_of_int 1 : mword 32) = 1).
     { rewrite moi32_unsigned. apply bvw32_small.

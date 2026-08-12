@@ -261,6 +261,18 @@ are working on that effort — the relevant `projects/` file.
   the worklist for folding `UserPtTree.user_pt_inv` onto it. The CONSTRUCTION
   side is [`completed/proc-pagetable.md`](completed/proc-pagetable.md); they
   meet at `ProcPtOwn.proc_pt_intro_ppt`.
+- **[`eb-generic-sweep.md`](projects/eb-generic-sweep.md)** — making the
+  sleep cone callable with interrupts OFF, which is what `usertrap` needs to
+  reach `kexit`. The index-free restatement that drops `eb = true ->` (state
+  `trap_csrs ∗ cpu_claim`, or the `_ext` complement for a push/pop-balanced
+  function, and let `arm_pay_ext_split`/`_join` move between them), the
+  finding that **23 contracts spelled a parking function's crossing
+  `wp_next b` instead of the literal `true`** (vacuous rather than unsound,
+  and why that hid it), what moves with a crossing and what must NOT (a leaf
+  instruction's index stays `b`), the `Hb` scaffolding at the four
+  `cpu_own_transport` sites, the `wp_next_chain` mixed-index fix and the
+  probe that diagnoses such failures, and the remaining worklist in
+  dependency order down to `kexit`.
 - **[`uservec.md`](projects/uservec.md)** — uservec (the user-mode trap
   handler), PROVEN — trampoline.S is 100% covered: the boundary specs
   (SpecUserret/SpecUservec/SpecUsertrap, the userret→user-exec dovetail

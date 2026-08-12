@@ -82,7 +82,6 @@ Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import BlockWords.
 Require Import DinodeEnc.
-Require Import DirentEnc.
 Require Import DirView.
 Require Import InodeInv.
 Require Import InodeLock.

@@ -48,7 +48,8 @@ Require Import IntrDefs.
 Require Import PageGeom.
 Require Import ProcGeom.
 Require Import UserPtTree.
-Require Import FdSlots FileInv.
+Require Import FdSlots.
+Require Import FileInvDefs.
 Require Import WpLock.
 Require Import ProcInv.
 Require Import ProofKforkParts.

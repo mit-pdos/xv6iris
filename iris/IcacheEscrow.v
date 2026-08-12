@@ -160,7 +160,6 @@ Require Import WpLock.
 Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import DinodeEnc.
-Require Import DirentEnc.
 Require Import DirView.
 Require Import InodeInv.
 Require Import InodeLock.

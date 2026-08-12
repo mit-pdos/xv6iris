@@ -119,7 +119,6 @@ Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import FsCrash.
 Require Import InodeInv.
-Require Import DirentEnc.
 Require Import DirView.
 Require Import InodeLock.
 Require Import InodeRegion.
@@ -322,7 +321,11 @@ Section IlockDefs.
       (k : nat) (ip : mword 64) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac) (j : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
-    wp_next b (proc_addr j) (fun (CID : CpuId) =>
+    (* THE LITERAL [true], matching SpecIlock's crossing: ilock PARKS (its
+       acquiresleep sleeps), so its continuation is about an arbitrary hart
+       whatever SIE was doing.  Spelled [b] this was sound only because the
+       contract had no [b = false] instance. *)
+    wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (dn : dinode) (bm : blkmap),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K b (proc_addr j) -∗
@@ -909,7 +912,7 @@ Section IlockLoad.
       rewrite /L7 upd_ne; [| regne]. exact (HL6thr c Hcs N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID0 CID8 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID8) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID8) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 4)%nat) by (unfold K_bread; lia).
     iApply (BR.wp_bread_sconf gs j gl gu gd gk pd pav pu bn
@@ -1632,7 +1635,7 @@ Section IlockLoad.
       rewrite /H1 upd_ne; [| regne]. exact (HH0thr c Hcs N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID9 CID32 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID8) (CIDb := CID32) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID8) (CIDb := CID32) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 4)%nat) by (unfold K_brelse; lia).
     iApply (BL.wp_brelse_sconf gs bn (fs_view gfs gd dev cov) kk
@@ -1856,7 +1859,7 @@ Section IlockLoad.
         iExact "Hmsz". }
       iSplitL "Haddrs"; [iExact "Haddrs" |].
       iSplitL "Hindres"; [iExact "Hindres" | iExact "Hblocks"]. }
-    { iApply (wp_next_shift (CIDa := CID32) (CIDb := CID39) ltac:(wp_next_chain)
+    { iApply (wp_next_shift (b := true) (CIDa := CID32) (CIDb := CID39) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
 
@@ -2124,15 +2127,19 @@ Section ProofIlockMain.
       rewrite /R6 upd_ne; [| regne]. exact (HR5thr c Hcs N2 N8 N9). }
     iDestruct (cpu_own_transport CID CID11 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID11) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (ASL.wp_acquiresleep_sconf (dq := dq)  gs j gil gisl "inode"%string
               (ic_tok cn k) R6 pidv (K - 4)%nat true C b
-              Hj ltac:(lia) eq_refl
-              with "Hcg Hcnt Htext Hpc [] Hpanic Hppid Hprocs").
+              Hj ltac:(lia)
+              with "Hcg Hcnt [] [] Htext Hpc [] Hpanic Hppid Hprocs").
+    (* acquiresleep is index-generic now and takes the trap-CSR complement;
+       at the literal [true] it is [emp] and ilock owes nothing. *)
+    { rewrite /trap_csrs_ext. done. }
+    { rewrite /cpu_claim_ext. done. }
     { iEval (rewrite HR6a0). iExact "Hslk". }
     (* acquiresleep PARKS: it returns on hart [CIDa]. *)
-    iIntros (CIDa Hqa mf) "%Hcs1 Hcg Hcnt Hpc Hstok Hpid Htok Hppid".
+    iIntros (CIDa Hqa mf) "%Hcs1 Hcg Hcnt _ _ Hpc Hstok Hpid Htok Hppid".
     iEval (rewrite HR6a0) in "Hpid".
     assert (Hpc1a : ret_pc (R6 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ilock + 0x1a)) by (rewrite HR6ra; pcw).
@@ -2213,7 +2220,7 @@ Section ProofIlockMain.
       iDestruct "Hpay2" as (dnp bmp) "[Hlk #Hshot]".
       iDestruct (cpu_own_transport CIDa CID13 0 true (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iDestruct (wp_next_shift (CIDa := CID11) (CIDb := CID13) ltac:(wp_next_chain)
+      iDestruct (wp_next_shift (b := true) (CIDa := CID11) (CIDb := CID13) ltac:(wp_next_chain)
                    with "Hcont") as "Hcont".
       iApply (il_epilogue (CID0 := CID13)  j gfs gi gisl bn cn s g cov logstart
                 inodestart k ip dev inum dnp bmp pidv dq dqs m Q1 K C b
@@ -2243,7 +2250,7 @@ Section ProofIlockMain.
       iEval (rewrite -Hipe) in "Hraw".
       iDestruct (cpu_own_transport CIDa CID13 0 true (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iDestruct (wp_next_shift (CIDa := CID11) (CIDb := CID13) ltac:(wp_next_chain)
+      iDestruct (wp_next_shift (b := true) (CIDa := CID11) (CIDb := CID13) ltac:(wp_next_chain)
                    with "Hcont") as "Hcont".
       iApply (il_load (CID0 := CID13)  gs j gl gu gd gk pd pav pu bn gfs gi gisl
                 cn s g cov logstart inodestart nib dev k ip inum

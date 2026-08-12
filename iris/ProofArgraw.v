@@ -42,7 +42,8 @@ Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
 Require Import IntrDefs WpLock.
 Require Import HartTp WpNext.
 Require Import ProcGeom CpuOwn.
-Require Import FdSlots FileInv ProcInv.
+Require Import FdSlots ProcInv.
+Require Import FileInvDefs.
 Require Import SpecMyproc.
 Require Import RiscvModelBytes InstrBytes.
 Require Import ProcPtOwn.

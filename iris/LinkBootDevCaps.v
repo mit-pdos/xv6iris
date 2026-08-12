@@ -17,9 +17,9 @@ From iris.base_logic.lib Require Import ghost_var invariants.
 Require Import SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto.
-Require Import WpLock FdSlots IrefSlots ProcGeom DiskPtsto WpUart.
-Require Import SmodeCore TimerCap UartTxInv.
-Require Import SchedCtx SpecClockintr.
+Require Import WpLock FdSlots IrefSlots DiskPtsto WpUart.
+Require Import SmodeCore.
+Require Import IrefSlots.
 Require Import SpecBootDevCaps.
 Local Open Scope Z_scope.
 

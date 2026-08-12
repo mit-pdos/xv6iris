@@ -55,7 +55,6 @@ Require Import RegFile WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import IntrDefs.
-Require Import ByteBuf.
 Require Import DirentEnc.
 From Kernel Require KernelSyms.
 Import Defs.

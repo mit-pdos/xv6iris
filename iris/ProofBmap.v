@@ -441,7 +441,7 @@ Definition bm_gen_stmt
   (* bread's own unit, held across everything and returned by brelse *)
   bslots bn 1 -∗
   bm_kit ak bn γfs cov logstart dev n Sb -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (bm' : blkmap) (n' : nat) (data' : nat -> list (bv 8))
     (Sb' : gset Z),
       ⌜callee_saved m mf⌝ -∗
@@ -542,7 +542,7 @@ Section BmapDefs.
       (fbn : nat) (n : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqd : dfrac) (j : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
-    wp_next b (proc_addr j) (fun (CID : CpuId) =>
+    wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bm' : blkmap) (n' : nat) (data' : nat -> list (bv 8))
         (Sb' : gset Z),
         ⌜callee_saved m mf⌝ -∗
@@ -1022,7 +1022,7 @@ Section BmapRelease.
       rewrite /T1 upd_ne; [| regne]. exact (HT0thr c Hcs N2 N8 N9 N18 N19 N20). }
     iDestruct (cpu_own_transport CID0 CID2 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 6)%nat) by (unfold K_brelse; lia).
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
@@ -1087,7 +1087,7 @@ Section BmapRelease.
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hidev Hmap
                     Hblocks [Hsl1] Hkit [Hcont]").
     { iExact "Hsl1". }
-    { iApply (wp_next_shift (CIDa := CID2) (CIDb := CID4) ltac:(wp_next_chain)
+    { iApply (wp_next_shift (b := true) (CIDa := CID2) (CIDb := CID4) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
 
@@ -1289,7 +1289,7 @@ Section BmapTail.
       rewrite /I2 upd_ne; [| regne]. exact (HI1thr c Hcs N2 N8 N9 N18 N19 N20). }
     iDestruct (cpu_own_transport CID0 CID3 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID3) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 6)%nat) by (unfold K_bread; lia).
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
@@ -1607,7 +1607,7 @@ Section BmapTail.
         rewrite /A1 upd_ne; [| regne]. exact (HA0thr c Hcs N2 N8 N9 N18 N19 N20). }
       iDestruct (cpu_own_transport CID4 CID14 0 true (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iDestruct (wp_next_shift (CIDa := CID3) (CIDb := CID14) ltac:(wp_next_chain)
+      iDestruct (wp_next_shift (b := true) (CIDa := CID3) (CIDb := CID14) ltac:(wp_next_chain)
                    with "Hcont") as "Hcont".
       assert (HKba : (K_balloc <= K - 6)%nat) by (unfold K_balloc; lia).
       (* the two units balloc wants in hand, out of what the tail's premise
@@ -1724,7 +1724,7 @@ Section BmapTail.
                   ltac:(left; reflexivity) Hled0
                   with "Hcg Hcnt Htext Hpc Hpanic Hbio Hprocs Hframe
                         Hppid Hidev Hmap Hblocks Hkit Hheld [Hcont]").
-        iApply (wp_next_shift (CIDa := CID14) (CIDb := CID17) ltac:(wp_next_chain)
+        iApply (wp_next_shift (b := true) (CIDa := CID14) (CIDb := CID17) ltac:(wp_next_chain)
                   with "Hcont").
       + (* ---------- balloc SUCCEEDED: install and log ---------- *)
         iDestruct "Hsucc" as (blk)
@@ -1989,7 +1989,7 @@ Section BmapTail.
                   Hledger
                   with "Hcg Hcnt Htext Hpc Hpanic Hbio Hprocs Hframe
                         Hppid Hidev Hmap Hblocks Hkit Hheld [Hcont]").
-        iApply (wp_next_shift (CIDa := CID14) (CIDb := CID22) ltac:(wp_next_chain)
+        iApply (wp_next_shift (b := true) (CIDa := CID14) (CIDb := CID22) ltac:(wp_next_chain)
                   with "Hcont").
     - (* ================= the entry is PRESENT: brelse and return ====== *)
       iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.bmap + 0x80))
@@ -2027,7 +2027,7 @@ Section BmapTail.
                 ltac:(left; reflexivity) Hled0
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hprocs Hframe
                       Hppid Hidev Hmap Hblocks Hkit Hheld [Hcont]").
-      iApply (wp_next_shift (CIDa := CID3) (CIDb := CID12) ltac:(wp_next_chain)
+      iApply (wp_next_shift (b := true) (CIDa := CID3) (CIDb := CID12) ltac:(wp_next_chain)
                 with "Hcont").
   Qed.
 
@@ -2467,7 +2467,7 @@ Section ProofBmapMain.
           rewrite /D5 upd_ne; [| regne]. exact (HD4thr c Hcs N2 N8 N9 N18 N19). }
         iDestruct (cpu_own_transport CID CID17 0 true (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID17) ltac:(wp_next_chain)
+        iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID17) ltac:(wp_next_chain)
                      with "Hcont") as "Hcont".
         assert (HKba : (K_balloc <= K - 6)%nat) by (unfold K_balloc; lia).
         remember (n - 2)%nat as u2 eqn:Hu2eq.
@@ -2563,7 +2563,7 @@ Section ProofBmapMain.
                     ltac:(left; reflexivity) (bm_ledger_id _ cr bm fbn n Sb)
                     with "Hcg Hcnt Htext Hpc Hframe Hppid Hidev Hmap
                           Hblocks Hsl Hkit [Hcont]").
-          iApply (wp_next_shift (CIDa := CID17) (CIDb := CID20) ltac:(wp_next_chain)
+          iApply (wp_next_shift (b := true) (CIDa := CID17) (CIDb := CID20) ltac:(wp_next_chain)
                     with "Hcont").
         * (* ------ balloc SUCCEEDED: install into addrs[bn] ------ *)
           iDestruct "Hsucc" as (blk)
@@ -2714,7 +2714,7 @@ Section ProofBmapMain.
                     ltac:(right; split; [exact Hdz | reflexivity]) HledD
                     with "Hcg Hcnt Htext Hpc Hframe Hppid Hidev Hmap
                           Hblocks Hsl Hkit [Hcont]").
-          iApply (wp_next_shift (CIDa := CID17) (CIDb := CID22) ltac:(wp_next_chain)
+          iApply (wp_next_shift (b := true) (CIDa := CID17) (CIDb := CID22) ltac:(wp_next_chain)
                     with "Hcont").
       + (* ---------- the slot is ALREADY ALLOCATED: return it ---------- *)
         assert (Hjmp8a : add_vec (mword_of_int (KernelSyms.bmap + 0x26) : mword 64)
@@ -2755,7 +2755,7 @@ Section ProofBmapMain.
                   ltac:(left; reflexivity) (bm_ledger_id ak cr bm fbn n Sb)
                   with "Hcg Hcnt Htext Hpc Hframe Hppid Hidev Hmap
                         Hblocks Hsl Hkit [Hcont]").
-        iApply (wp_next_shift (CIDa := CID) (CIDb := CID15) ltac:(wp_next_chain)
+        iApply (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID15) ltac:(wp_next_chain)
                   with "Hcont").
     - (* ================ THE INDIRECT ARM (bn >= NDIRECT) ================ *)
       assert (Hge : (NDIRECT <= fbn)%nat) by lia.
@@ -3017,7 +3017,7 @@ Section ProofBmapMain.
           rewrite /P1 upd_ne; [| regne]. exact (HP0thr c Hcs N2 N8 N9 N18 N19). }
         iDestruct (cpu_own_transport CID CID19 0 true (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID19) ltac:(wp_next_chain)
+        iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID19) ltac:(wp_next_chain)
                      with "Hcont") as "Hcont".
         assert (HKba : (K_balloc <= K - 6)%nat) by (unfold K_balloc; lia).
         remember (n - 2)%nat as u2 eqn:Hu2eq.
@@ -3127,7 +3127,7 @@ Section ProofBmapMain.
                     ltac:(left; reflexivity) (bm_ledger_id _ cr bm fbn n Sb)
                     with "Hcg Hcnt Htext Hpc Hframe Hppid Hidev Hmap
                           Hblocks Hsl Hkit [Hcont]").
-          iApply (wp_next_shift (CIDa := CID19) (CIDb := CID22) ltac:(wp_next_chain)
+          iApply (wp_next_shift (b := true) (CIDa := CID19) (CIDb := CID22) ltac:(wp_next_chain)
                     with "Hcont").
         * (* ------ balloc SUCCEEDED: install the indirect block ------ *)
           iDestruct "Hsucc" as (blk)
@@ -3293,7 +3293,7 @@ Section ProofBmapMain.
                     with "Hcg Hcnt Htext Hpc Hpanic Hprk Hbio Hprocs
                           Hdevi Hdgeom Hdlock Hframe Hppid Hidev
                           Haddrs Hindblk2 Hindtok2 Hblocks Hsl Hkit [Hcont]").
-          iApply (wp_next_shift (CIDa := CID19) (CIDb := CID25) ltac:(wp_next_chain)
+          iApply (wp_next_shift (b := true) (CIDa := CID19) (CIDb := CID25) ltac:(wp_next_chain)
                     with "Hcont").
       + (* ------ the indirect block EXISTS ------ *)
         assert (Hjmp60 : add_vec (mword_of_int (KernelSyms.bmap + 0x4c) : mword 64)
@@ -3363,7 +3363,7 @@ Section ProofBmapMain.
                   with "Hcg Hcnt Htext Hpc Hpanic Hprk Hbio Hprocs
                         Hdevi Hdgeom Hdlock Hframe Hppid Hidev
                         Haddrs Hindblk Hindtok Hblocks Hsl Hkit [Hcont]").
-        iApply (wp_next_shift (CIDa := CID) (CIDb := CID18) ltac:(wp_next_chain)
+        iApply (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID18) ltac:(wp_next_chain)
                   with "Hcont").
   Qed.
 

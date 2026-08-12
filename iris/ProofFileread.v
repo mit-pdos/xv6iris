@@ -74,8 +74,9 @@ Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSmodeIntr WpSmodeHalf.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import FdSlots FileInv FileOff.
-Require Import PipeInv.
+Require Import FdSlots FileOff.
+Require Import FileInvDefs.
+Require Import PipeInvDefs.
 Require Import KallocInv.
 Require Import ProcPtOwn.
 Require Import SpecPanic.

@@ -596,7 +596,7 @@ Section EndOpDefs.
   Definition eo_cont `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) : iProp Σ :=
-    wp_next b (proc_addr j) (fun (CID : CpuId) =>
+    wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K b (proc_addr j) -∗
@@ -608,7 +608,8 @@ Section EndOpDefs.
   Lemma eo_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId}
        (j : nat) (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) :
-    (b = false \/ proc_addr j = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
+    (* the guard is at the LITERAL [true] now, matching eo_cont's own index *)
+    (true = false \/ proc_addr j = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
     eo_cont (CID0 := CIDa)  j pidv dq m K eb C b -∗
     eo_cont (CID0 := CIDb)  j pidv dq m K eb C b.
   Proof.

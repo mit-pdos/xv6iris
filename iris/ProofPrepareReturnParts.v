@@ -30,11 +30,9 @@ From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras.
+Require Import RiscvExtras.
 Require Import RiscvModelBytes.
 Require Import PageGeom.
-Require Import RegFile.
-Require Import MstatusBits.
 Require Import TrampPt.
 Require Import WpMmodeLeafBase.
 Require Import WpGprCsrwCommon.

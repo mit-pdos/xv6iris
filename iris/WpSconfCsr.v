@@ -28,7 +28,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import RegFile.
-Require Import MinstretInv InstrBytes WpGpr ExecCommon WpGprCsrwCommon WpGprCsrwB.
+Require Import InstrBytes WpGpr ExecCommon WpGprCsrwCommon WpGprCsrwB.
 Require Import SmodeCore WpMmodeLeafBase.
 (* [exec_execute_csrr_sstatus] is proved below -- it is the read-only csrr of
    ONE csr at ONE privilege, so it belongs with the S-mode csr leaves that use

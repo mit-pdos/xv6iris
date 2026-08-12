@@ -114,11 +114,8 @@ From iris.base_logic.lib Require Import gen_heap invariants own.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
-Require Import RiscvExtras.
 Require Import RiscvPtsto.
-Require Import InstrBytes.
 Require Import KallocInv.
-Require Import PageFields.
 Require Import WpLock.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.

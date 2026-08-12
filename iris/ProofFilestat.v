@@ -47,7 +47,6 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import RegFile.
@@ -56,26 +55,21 @@ Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn StackBytes.
 Require Import CalleeSaved.
-Require Import KernelRvcDecode.
-Require Import VcGen.
-Require Import InstrBytes KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
-Require Import WpSmodeIntr WpSmodeHalf.
+Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import ProcGeom.
-Require Import FdSlots FileInv.
+Require Import FdSlots.
+Require Import FileInvDefs.
 Require Import KallocInv.
 Require Import UserPtTree.
-Require Import KvmSpec.
 Require Import ProcPtOwn.
-Require Import SpecPanic.
 Require Import ProcInv.
-Require Import WpUart DiskPtsto BioInv FsBlocks LogInv FsCrash.
-Require Import DinodeEnc InodeInv InodeLock.
+Require Import WpUart DiskPtsto BioInv FsBlocks LogInv.
+Require Import DinodeEnc.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheInv.
 Require Import IcacheEscrow.
 (* RE-IMPORT: [IcacheInv.islot] shadows [DinodeEnc.islot] and
    [IcacheRef.inode_ref] shadows [FileInv]'s placeholder; neither icache name
@@ -173,6 +167,13 @@ Section ProofFilestat.
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Heb.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic Href Hpriv Hkenv #Hprocs Henv Hcont".
+    (* PIN THE INDEX.  This contract still carries [eb = true ->], and at
+       level 0 [cpu_own_eb_agree] gives [eb = b], so [b] IS the literal
+       [true] here -- which is what keeps the hart-chains uniform now that
+       the crossings below are [true].  Goes when filestat is generalized. *)
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
+    assert (Hb : b = true) by (rewrite -Hbm; exact Heb).
+    clear Hbm.
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.
     (* the reference, taken apart: the two content cells the body reads are
        fractions of it, and it is rebuilt unchanged at both exits. *)
@@ -357,7 +358,7 @@ Section ProofFilestat.
     assert (HR5ra : R5 !!! Regidx Rra
                     = add_vec_int (mword_of_int (FST + 0x10) : mword 64) 4)
       by (rewrite /R5; apply upd_eq).
-    iDestruct (cpu_own_transport CID CID9 0%nat eb pj C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID9 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Myproc.wp_myproc_sconf R5 (K - 10)%nat 0%nat eb pj C b
               fst_noff0 (fst_av_myproc K HK) with "Hcg Hcnt Htext Hpc [-]").
@@ -631,7 +632,7 @@ Section ProofFilestat.
         exact (HQ1thr c Hcs N2 N8 N9 N19 N20). }
       (* THE PID QUARTER, lent for the length of the ilock call *)
       iDestruct (proc_priv_pid γf pj pidv V with "Hpriv") as "[Hppid Hpivbk]".
-      iDestruct (cpu_own_transport CID10 CID19 0%nat eb pj C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID10 CID19 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)) *)
       iEval (rewrite inode_shr_gen_intro) in "Hshr".
@@ -909,7 +910,7 @@ Section ProofFilestat.
         rewrite /J1 upd_ne; [| regne].
         exact (Hmstthr c Hcs N2 N8 N9 N18 N19 N20). }
       iDestruct (proc_priv_pid γf pj pidv V with "Hpriv") as "[Hppid Hpivbk2]".
-      iDestruct (cpu_own_transport CIDil CID26 0%nat eb pj C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CIDil CID26 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply (Iunlock.wp_iunlock_sconf γs (fsn_fs fn) (fsn_ireg fn)
                 (fsn_ic fn) (fsn_ilk fn) (fsn_islk fn)
@@ -1062,7 +1063,7 @@ Section ProofFilestat.
                    with "Hstat Hhole") as "Hbuf".
       iDestruct (fst_bytes_name24 (pa_stk sp0 9) with "Hbuf") as (fbytes) "Hbuf".
       iEval (rewrite -HU5a2) in "Hbuf".
-      iDestruct (cpu_own_transport CIDiu CID31 0%nat eb pj C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CIDiu CID31 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply (Copyout.wp_copyout_sconf γa U5 (pv_upt V) (pv_sz V) 24%nat fbytes
                 (K - 10)%nat 0%nat eb pj C (DfracOwn 1) (DfracOwn 1) b
@@ -1183,7 +1184,7 @@ Section ProofFilestat.
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 [-]").
       iIntros (CIDe Hse mfin) "%Hcsr Hcg Hpc".
       destruct Hcsr as [Hcsf Hrv].
-      iDestruct (cpu_own_transport CID32 CIDe 0%nat eb pj C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID32 CIDe 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! mfin RV P' with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
@@ -1260,7 +1261,7 @@ Section ProofFilestat.
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 [-]").
       iIntros (CIDe Hse mfin) "%Hcsr Hcg Hpc".
       destruct Hcsr as [Hcsf Hrv].
-      iDestruct (cpu_own_transport CID10 CIDe 0%nat eb pj C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID10 CIDe 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
       assert (HVid : upd_upt V (pv_upt V) = V) by apply fst_upd_upt_id.

@@ -25,22 +25,18 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
-Require Import InstrBytes.
 Require Import RegFile.
 Require Import SmodeCore.
-Require Import CalleeSaved KernelText KernelDataInv.
+Require Import CalleeSaved.
 Require Import StackOwn.
-Require Import KernelRvcDecode.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import DiskPtsto WpUart.
 Require Import CpuOwn.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
+Require Import WpSconfCtl.
 Require Import ProcGeom.
-Require Import PrintkFmt.
 Require Import SpecPanic.
-Require Import SpecPrintk SpecPrintkGen.
 Require Import CodeProcdump.
 Require Import ProcdumpAux.
 Require Import SpecProcdump.

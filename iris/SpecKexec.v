@@ -91,11 +91,19 @@
      SpecNamei charges [(L+1) * iput_units] and guarantees only
      [n - (L+1)*iput_units] left; SpecIunlockput demands [iput_units].  With
      [iput_units = 3] that is [3L + 6 <= 10], i.e. L <= 1 path elements --
-     enough for "/init" and "sh", not for "/bin/sh".  The premise is stated
-     in the CONSTANTS rather than as [L <= 1] so that it relaxes on its own
-     when SpecNamei's SUCCESS arm is tightened to charge [L * iput_units]
-     (namex iputs the parents, not the inode it returns), which is the fix
-     this premise is waiting on and which belongs to the fs-namei project.
+     enough for "/init" and "sh", not for "/bin/sh".  THAT IS A BOUND ON WHAT
+     THE THEOREM COVERS, NOT ON WHETHER IT CAN BE PROVED: the short-path case
+     is fully provable today and is the one every boot path takes.
+       The premise is stated in the CONSTANTS rather than as [L <= 1] so that
+     it stays readable against the fix it is waiting on -- tightening
+     SpecNamei's SUCCESS arm to charge [L * iput_units], since namex iputs the
+     parents and RETURNS the last inode.  Note the relaxation is NOT automatic:
+     after that fix this premise is merely STRONGER than the composition needs,
+     so the proof keeps working but still admits only L <= 1, and widening to
+     L <= 2 is a one-line edit here.  Making it automatic would mean naming
+     namei's charge in SpecNamei.v (a [namei_charge L] both its premise and its
+     postcondition are stated over) and quoting that name here; worth doing as
+     part of the fs-namei fix, not before it.
 
    * [na <= MAXARG]: the argument-count bound the C enforces with its
      [bne s1,s8] against 32.  Above it the function takes [bad:], which is
@@ -152,7 +160,6 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import SleepLock.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
@@ -160,13 +167,9 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
 Require Import ByteBuf.
-Require Import ElfEnc.
-Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import PathElems.
-Require Import DirView.
 Require Import InodeInv.
-Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
@@ -175,14 +178,13 @@ Require Import IcacheEscrow.
 Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
-Require Import ProcPtOwn.
-Require Import FileInv ProcInv.
+Require Import ProcInv.
+Require Import FileInvDefs.
 Require Import SpecIput.
 (* [SpecNamex] for [ROOTDEV] -- a param.h constant that happens to live in a
    Spec file.  It should be hoisted the way [tf_epc_idx] was (see ProcGeom.v):
    a Spec should not have to require another function's Spec to name a
    constant.  Recorded in projects/kexec.md's cleanup list. *)
-Require Import SpecNamex.
 (* [SpecDirlink] for [ic_sleeplocks], and it must be THIS one: the definition
    exists three times, identically, in IcacheBoot.v / SpecFileclose.v /
    SpecDirlink.v, and in SpecNamei's import scope the name resolves to
@@ -190,7 +192,6 @@ Require Import SpecNamex.
    precondition must be the SYNTACTICALLY same proposition namei's is.  The
    three copies should be one; also in the cleanup list. *)
 Require Import SpecDirlink.
-Require Import SpecNamei.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -302,12 +303,69 @@ Definition kexec_ok (V V' : pprivate) (r : mword 64)
    (uint spv <= uint szv')%Z).
 
 (* ===================================================================== *)
+(*  THE FILE SYSTEM FABRIC, as one bundle.                                *)
+(* ===================================================================== *)
+(* Thirteen resources that every FS client's contract lists one by one --
+   SpecNamei, SpecIlock, SpecReadi and SpecIunlockput each spell out their
+   own subset, and kexec needs the union of all four.  EVERY ONE OF THEM IS
+   PERSISTENT (machine-checked: the two invariants, the two ctx's, the four
+   icache pieces, the crash seam, the era certificate, the disk lock and its
+   geometry, and procs_inv, which is a big-op of [is_lock]).  So the bundle
+   costs nothing to carry, nothing to split, and nothing to give back --
+   which is what makes it worth having: kexec's four phases would otherwise
+   each restate the thirteen, and a block statement that is thirteen lines of
+   fabric before its first real resource is unreadable.
+
+   A caller unbundles with one [iDestruct] at each callee call site.
+
+   ITS HOME IS HERE ONLY UNTIL A SECOND CONTRACT WANTS IT.  Nothing about
+   this is kexec-specific, and the right home is a shared [FsFabric.v] that
+   SpecNamei / SpecIlock / SpecReadi / SpecIunlockput are all restated over.
+   That is a sweep across eight Spec files and their proofs, it is not needed
+   to prove kexec, and the tree's rule is to promote on the second consumer
+   (as [ProcInv.proc_priv_name] and [InodeInv.ireg_blocks_ok] both were).
+   Promote it then. *)
+Definition fs_fabric
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !irefslotG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    (gs : list gname) (gu : uart_names) (gd : disk_names) (gk : gname)
+    (pd pav pu : mword 64) (bn : bio_names)
+    (g : log_names) (gfs : fs_names) (gi : gname) (cn : ic_names) (gtl : gname)
+    (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
+    : iProp Σ :=
+  (bio_ctx bn (fs_view gfs gd dev cov) ∗
+   log_ctx g bn gfs cov logstart dev ∗
+   fs_crash_seam cov logstart ∗
+   gen_cert ∗
+   is_itable2 gtl cn gfs gi cov logstart nib dev ∗
+   itable_inv ∗
+   ic_escrows cn gfs gi cov logstart ∗
+   ic_sleeplocks cn ∗
+   ireg_inv gi gfs inodestart nib ∗
+   procs_inv gs ∗
+   dev_inv gu gd ∗
+   disk_geom gd pd pav pu ∗
+   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu))%I.
+
+Global Instance fs_fabric_persistent
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !irefslotG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    gs gu gd gk pd pav pu bn g gfs gi cn gtl cov logstart inodestart nib dev :
+  Persistent (fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
+                        cov logstart inodestart nib dev).
+Proof. apply _. Qed.
+
+(* ===================================================================== *)
 (*  The contract.                                                         *)
 (* ===================================================================== *)
 Definition wp_kexec_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (jp : nat) (gl : gname)           (* the running process *)
@@ -371,20 +429,9 @@ Definition wp_kexec_sconf_body
   cpu_own 0 eb pj C b -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
-  bio_ctx bn (fs_view gfs gd dev cov) -∗
-  log_ctx g bn gfs cov logstart dev -∗
-  fs_crash_seam cov logstart -∗
-  gen_cert -∗
+  fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
+            cov logstart inodestart nib dev -∗
   kalloc_env ga None -∗
-  is_itable2 gtl cn gfs gi cov logstart nib dev -∗
-  itable_inv -∗
-  ic_escrows cn gfs gi cov logstart -∗
-  ic_sleeplocks cn -∗
-  ireg_inv gi gfs inodestart nib -∗
-  procs_inv gs -∗
-  dev_inv gu gd -∗
-  disk_geom gd pd pav pu -∗
-  is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   bitmap_res gfs bmapstart cov logstart size used -∗
@@ -392,11 +439,22 @@ Definition wp_kexec_sconf_body
      needs are all inside it (ProcInv.proc_priv_cwd_pid); so are the p->name
      bytes safestrcpy writes and the trapframe words the commit block writes. *)
   proc_priv gf pj pidv V -∗
-  (* the path buffer, and the argv vector with its strings *)
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ{dqa} pfun i) -∗
+  (* THE PATH AND THE ARGUMENT STRINGS ARE OWNED OUTRIGHT; only the argv
+     POINTER VECTOR is fractional.  Not a preference -- namei demands the whole
+     path buffer (SpecNamei.v:162) and copyout demands the whole source
+     (SpecCopyout.v:174), and kexec hands its path straight to the first and
+     each argument straight to the second.  Both callees only READ what they
+     are given, so both over-ask; but unlike safestrcpy's and copyout's
+     destination-table over-asks, THIS ONE COSTS KEXEC NOTHING -- sys_exec has
+     [char path[MAXPATH]] on its own stack and kalloc's a page per argument, so
+     it owns both outright.  Relaxing namei/namex/nameiparent and copyout's
+     source to a fraction is the "right" shape and has no consumer; recorded in
+     projects/kexec.md, not done.
+       The pointer vector stays at [dqa] because kexec only loads from it. *)
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
   ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
   ([∗ list] i ∈ seq 0 na,
-     [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqa} afun i j) -∗
+     [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
   bslots bn 3 -∗
   iref_slots 2 -∗
   wp_next b pj (fun (CID : CpuId) =>
@@ -414,10 +472,10 @@ Definition wp_kexec_sconf_body
       bitmap_res gfs bmapstart cov logstart size used' -∗
       kalloc_env ga None -∗
       proc_priv gf pj pidv V' -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ{dqa} pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
       ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
       ([∗ list] i ∈ seq 0 na,
-         [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqa} afun i j) -∗
+         [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
       bslots bn 3 -∗
       iref_slots 2 -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -427,7 +485,7 @@ Module Type KEXEC.
   Parameter wp_kexec_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)

@@ -54,7 +54,8 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import CpuOwn.
-Require Import FdSlots FileInv.
+Require Import FdSlots.
+Require Import FileInvDefs.
 Require Import ProcInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

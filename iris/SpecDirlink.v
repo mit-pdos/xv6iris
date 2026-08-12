@@ -164,7 +164,6 @@ Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import DirView.
 Require Import InodeInv.
-Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
@@ -172,10 +171,10 @@ Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import SleepLock.
 Require Import KallocInv.
-Require Import UserPtTree.
 Require Import KvmSpec.
-Require Import ProcPtOwn.
-Require Import FileInv ProcInv.
+Require Import FileInvDefs.
+Require Import IcacheRef.
+Require Import IrefSlots.
 Require Import SpecWritei.
 Require Import SpecDirlookup.
 From Kernel Require KernelSyms.
@@ -346,7 +345,13 @@ Definition wp_dirlink_sconf_body
   iref_slot -∗
   (* ---- THIS OPERATION'S RESERVATION ---- *)
   log_op γ ncount -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP,
+     and a park moves the hart with interrupts off, so the crossing has
+     nothing to do with SIE.  Spelled [b] the two coincide at the only
+     instance the [eb = true] premise admits, which is why this went
+     unnoticed; once [eb = false] is reachable the [b] form would promise
+     the caller it comes back on the hart it called from. *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (found : bool)
     (bm' : blkmap) (data' : nat -> list (bv 8)) (dn' dn0' : dinode)
     (n' : nat) (used' : gset Z)

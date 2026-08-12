@@ -561,7 +561,7 @@ Section BfreeDefs.
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z) (bi : Z)
       (Bud : iProp Σ) (pidv : mword 32) (dq dqb : dfrac) (j : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
-    wp_next b (proc_addr j) (fun (CID : CpuId) =>
+    wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K b (proc_addr j) -∗
@@ -673,7 +673,7 @@ Section BfreeTail.
       rewrite /T0 upd_ne; [| regne]. exact (Hthr c Hcs N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID0 CID1 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID1) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID1) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKlw : (K_log_write <= K - 4)%nat) by (unfold K_log_write; lia).
     iEval (rewrite -Hbno) in "Hfsb".
@@ -746,7 +746,7 @@ Section BfreeTail.
       rewrite /T2 upd_ne; [| regne]. exact (HT1thr c Hcs N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID2 CID4 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID1) (CIDb := CID4) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID1) (CIDb := CID4) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 4)%nat) by (unfold K_brelse; lia).
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
@@ -1328,7 +1328,7 @@ Section ProofBfreeMain.
       rewrite /RA upd_ne; [| regne]. exact (HR7thr c Hcs N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID CID12 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID12) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID12) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 4)%nat) by (unfold K_bread; lia).
     iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
@@ -1779,7 +1779,7 @@ Section ProofBfreeMain.
               Hcredit
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe
                     Hppid Hsb Hsl Hop Hfsbm Hpool Hheld [Hcont]").
-    { iApply (wp_next_shift (CIDa := CID12) (CIDb := CID27) ltac:(wp_next_chain)
+    { iApply (wp_next_shift (b := true) (CIDa := CID12) (CIDb := CID27) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
 

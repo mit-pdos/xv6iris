@@ -53,7 +53,8 @@ Require Import WpLock.
 Require Import KallocInv.
 Require Import SpecPanic.
 Require Import KptShare.
-Require Import CpuOwn SchedCtx FdSlots FileInv.
+Require Import CpuOwn SchedCtx FdSlots.
+Require Import FileInvDefs.
 Require Import DevModel DiskPtsto WpUart.
 Require Import PrintkFmt.
 Require Import SpecPanic StartedInv.

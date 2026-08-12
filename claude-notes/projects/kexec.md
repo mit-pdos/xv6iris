@@ -26,7 +26,11 @@ kexec-specific is the *composition*.
 | `SpecCopyout` generalized (`COPYOUT_GEN` + `co_license`) | **landed, proven** |
 | `SpecSafestrcpy` source relaxed (`ssc_src_ok`) | **landed, proven** |
 | `SpecWalkaddr` failure arm made informative | **landed, proven** |
-| `ProofKexec*.v` | NOT STARTED |
+| `StackBytes.slotsn_bytes_own` (general n-slot carve) | **landed, proven** |
+| `WpSconfAlu` base-encoded sp movers (width-generic) | **landed, proven** |
+| `ProofKexecParts.v` — frame carve, `kxc_epi`, `kxc_frame` | **landed, proven** |
+| `ProofKexecA.v` — **PHASE A PROVEN** (`kxc_a1`/`kxc_a2`/`kxc_phaseA`) | **landed, proven** |
+| `ProofKexecB/C/D.v` — phases B, C, D | NOT STARTED |
 
 `exec.c` is 1/2 functions, 32/892 bytes. `Print Assumptions
 Flags2perm.wp_flags2perm_sconf` is byte-identical to what every leaf carries
@@ -71,16 +75,59 @@ arm can hand the process back at the **identical** `pprivate`.
 
 ### The frame
 
-544 bytes / 68 slots. Four objects live in it and therefore do **not** appear
-in the contract — they are carved out of the frame with
-`StackBytes.slot_bytes_own`, exactly as namei's `name[DIRSIZ]` is:
+544 bytes / 68 slots, and `s0 = sp + 544`. **Derive every address from `sp`,
+not from `s0`** — the C's locals are `s0`-relative and the register spills are
+`sp`-relative, and the two sets of offsets look confusingly alike (`off` is
+`-504(s0)` = `sp+40`, while `s3`'s spill slot is `504(sp)`; they are 464 bytes
+apart). The complete map, recovered by extracting every frame-relative access
+in the disassembly rather than by reading the C:
 
-| object | address | size |
-| --- | --- | --- |
-| `struct elfhdr elf` | `s0-432` | 64 |
-| `struct proghdr ph` | `s0-488` | 56 |
-| `uint64 ustack[33]` | `s0-368` | 264 |
-| spilled `0xfff` / `path` / `sz1` / `argv` / `off` | `s0-536 … -504` | 8 each |
+| `sp+` | size | what | `s0-` |
+| --- | --- | --- | --- |
+| 0 | 8 | *unused* | 544 |
+| 8 | 8 | the `0xfff` PGSIZE-1 mask | 536 |
+| 16 | 8 | `path` (spilled arg) | 528 |
+| 24 | 8 | `sz1` | 520 |
+| 32 | 8 | `argv` (spilled arg, and BUMPED by the argv loop) | 512 |
+| 40 | 8 | `off` | 504 |
+| 48 | 8 | *unused* | 496 |
+| 56 | 56 | `struct proghdr ph` | 488 |
+| 112 | 64 | `struct elfhdr elf` | 432 |
+| 176 | 264 | `uint64 ustack[33]` | 368 |
+| 440…504 | 72 | `s11 s10 s9 s8 s7 s6 s5 s4 s3` (9 slots, in that order) | — |
+| 512…536 | 32 | `s2 s1 s0 ra` | — |
+
+**544 BYTES IS TOO BIG FOR THE COMPRESSED sp INSTRUCTIONS, AND KEXEC IS THE
+ONLY FUNCTION IN THE TREE WHERE THAT HAPPENS** (verified by grepping every
+`Code*.v`). `c.addi16sp` reaches ±512 and `c.ldsp` reaches 504, so the
+prologue's `addi sp,sp,-544`, the epilogue's `addi sp,sp,544` and the
+`ld ra,536(sp)` are all BASE-encoded — while every sp mover in the tree was
+compressed-only, `wp_gpr_write_s_sconf_cap` having `instr pc true` and `pc+2`
+hard-wired. `WpSconfAlu.v` now has `wp_gpr_write_s_sconf_cap_w`, generic in
+the encoding width, with the old compressed lemma as its `c := true` instance
+(statement unchanged, both existing callers untouched), plus
+`wp_addi_sp4_s_sconf` / `wp_addi_sp_push4_s_sconf` / `wp_addi_sp_pop4_s_sconf`
+beside the compressed push/pop pair. The funnel underneath
+(`wp_instr_s_sconf`) was already width-generic, so this is the same proof with
+`2` replaced by `if c then 2 else 4`. Expect any function with a frame over
+512 bytes to need the same leaves — there are none today.
+
+The three objects are carved out of the frame with the **general** n-slot
+carve `StackBytes.slotsn_bytes_own` / `bytes_own_slotsn` (new; the old
+`slots3_bytes_own` pair is now its `n := 3` corollary, statements unchanged,
+retiring that file's "the general-`r` version was skipped deliberately"
+note). Its premise is `(n <= S k)%nat`, not `n <= k`: a run may reach slot 0,
+and the tighter bound would exclude `slots3`'s own `2 <= k` at `k = 2`. The
+buffers therefore do **not** appear in the contract. `ustack` ends at `sp+439`,
+abutting `s11`'s slot at `sp+440` exactly — there is no slack, so an
+off-by-one in the carve collides with a callee-saved spill rather than
+landing in padding.
+
+**The field offsets in the instruction stream match `ElfEnc.v` exactly** —
+`magic@0 entry@24 phoff@32 phnum@56` off `sp+112`, and
+`type@0 flags@4 off@8 vaddr@16 filesz@32 memsz@40` off `sp+56` — which is an
+independent check of that file's geometry, derived from a different place in
+the dump than the one that wrote it.
 
 ### The register-spill hazard
 
@@ -115,7 +162,30 @@ The phdr loop's continuation is a genuine "return from inside a loop" shape —
 fabric verbatim (that is deliberate — kexec's phase A *is* namei's
 precondition) plus `proc_priv`, the path buffer and the argv vector.
 
-Two pure models live in `SpecKexec.v` because they are kexec-specific:
+### `fs_fabric` — the thirteen persistent resources, bundled
+
+`SpecNamei`, `SpecIlock`, `SpecReadi` and `SpecIunlockput` each spell out their
+own subset of the FS fabric, and kexec needs the union of all four. **Every one
+of the thirteen is persistent** — machine-checked, including the two that don't
+look it (`procs_inv`, which is a big-op of `is_lock`, and `gen_cert`). So
+`SpecKexec.fs_fabric` bundles them: nothing to split, nothing to give back, one
+`iDestruct` at each callee call site.
+
+That is not cosmetic. kexec's four phases would otherwise each restate thirteen
+resources, and a block statement that opens with thirteen lines of fabric
+before its first real resource is unreadable. It took the contract's
+precondition from thirteen lines to two.
+
+**Its home is `SpecKexec.v` only until a second contract wants it.** Nothing
+about it is kexec-specific; the right home is a shared `FsFabric.v` that the
+four FS specs above are restated over. That is a sweep across eight Spec files
+and their proofs, it is not needed to prove kexec, and the tree's rule is to
+promote on the second consumer — as `ProcInv.proc_priv_name` and
+`InodeInv.ireg_blocks_ok` both were. Promote it then, not before.
+
+### The two pure models
+
+Both live in `SpecKexec.v` because they are kexec-specific:
 
 - `kxc_sp` / `kxc_sp_final` / `kxc_stack_ok` — the argument-push recurrence,
   transcribed from the instructions (`sub`, then `andi ...,-16`) rather than
@@ -143,6 +213,111 @@ but it buys nothing while the contents are existential anyway.
 **It does not pin `p->name`** (existential at `PNAMELEN`). The only reader is
 `procdump`, which `design/proc-struct.md` already records as unprovable as
 written.
+
+## Block-interface conventions (decided before the first block was written)
+
+Four rules, so that A/B/C/D compose without renegotiating their seams. The
+first two are kexec-specific; the last two are the tree's existing shape
+(`ProofKforkB*.v`) restated so nobody has to re-derive them.
+
+1. **A block statement is relative to its OWN entry map `M`, never to
+   kexec's entry map `m`.** Pure premises name only the registers the block
+   reads (`M !!! Regidx Rs4 = ipv`); the continuation ends with the threading
+   conjunct `(forall r, is_cs_idx r = true -> r <> <regs this block writes> ->
+   Mx !!! Regidx r = M !!! Regidx r)`. `ProofKforkB7.v:102` is the model.
+
+2. **`proc_priv` is opened and closed INSIDE a block; a block boundary always
+   carries the whole block.** Phase A needs the pid quarter across six calls
+   (begin_op, namei, ilock, readi, iunlockput, end_op) and the cwd cell plus
+   `cwd_ref` for namei — all of which `ProcInv.proc_priv_cwd_pid` yields at
+   once, so open it once at the top of the phase and close it at each exit
+   with `upd_cwd V (pv_cwd V) = V`. Closing costs one wand application and
+   keeps every seam stated over plain `proc_priv`. (`upd_cwd_id` does not
+   exist yet; put it in the Parts file with `ProcInv` named as its home, the
+   way the copyout work parked its two `Local` lemmas — adding it to `ProcInv`
+   directly costs a mid-tree recompile for a one-liner.)
+
+3. **A block OWNS every exit that reaches the epilogue**, discharging it
+   against kexec's own continuation rather than handing it out. Phase A owns
+   two of the eight `bad:` entries (the namei-null tail at +0x88 and the
+   short-read / bad-magic tail at +0x64); both return −1, so both close the
+   contract's failure arm, whose `V' = V` is free because nothing before the
+   commit touched the process. A block's only *output* is its fall-through.
+
+4. **Pin `b = eb = true` FIRST, in every phase lemma.** namei, ilock, readi
+   and end_op all publish `wp_next true …`, and `wp_next_chain` cannot produce
+   the `pj = zero_reg` disjunct from a symbolic `b`, so the phase looks
+   unprovable at its first call. It is not: at `n = 0` the SIE eighth in
+   `sie_cap_gpr` and `cpu_hart` in `cpu_own` agree, so `b = eb`, and kexec's
+   `eb = true` premise closes it. `kxc_sie_b_agree` (ported from
+   `ProofFileclose.sie_b_agree`, itself `ProofIput`'s idiom) is the one-liner.
+   Do it before anything else or you will diagnose a phantom.
+
+5. **`stack_own` is the SEAM CURRENCY between blocks, not pre-made
+   `bytes_own` carves.** The tempting shape — carve the elf/ph/ustack buffers
+   once in the prologue and hand the byte runs along — does not close:
+   `kxc_epi_frame` needs `stack_own` *back*, and a byte run no longer carries
+   the per-slot alignment facts required to re-slot it (`bytes_own_slotsn`
+   demands them as a premise). So a block boundary carries the untouched
+   frame as one `stack_own` chunk, and **each block carves what it uses at the
+   one place it uses it**. Slots 1..13 (the spills) are the exception: they
+   travel pinned/existential through `kxc_frame`, because the exits disagree
+   about which of them are live.
+
+6. **The open inode travels as one bundle.** What `ilock` produces and
+   `iunlockput` consumes — `sleeplocked`, `sl_pid`, `ic_deposit`, the two ½
+   identity cells, `i_valid`, `ic_loaded`, and the retained
+   `inode_ref_short` — is eight resources that phases A and B both carry and
+   neither looks inside. Bundle it (`kxc_open`) for the same reason
+   `fs_fabric` is bundled. Unlike `fs_fabric` it is NOT persistent, so it is
+   threaded linearly.
+
+### The duplicate `icacheG`, and why the fix is ONE file and not seventeen
+
+`FileInvDefs.fileG` bundles `icacheG` and `icfg` as **field instances**
+(`file_icacheG ::`, `file_icfg ::`). A context binding both `!fileG Σ` and a
+standalone `ICFG : icfg, !icacheG Σ` therefore has *two* `icacheG`s — the
+second trap in `durable-notes.md`'s typeclass section, and **seventeen files
+in the tree bind both.** `ProcInv.v` binds no standalone one, so `cwd_ref`
+elaborates its `inode_held` through `fileG`, while `SpecNamei`'s premise
+elaborates through the standalone one. Machine-checked both ways:
+`cwd_ref v -∗ inode_held v` fails to frame in a context binding both, and
+closes by `iIntros "$"` in one binding only `fileG`.
+
+It never fired before because **kexec is the first caller ever to hand a
+process's cwd reference to namei.**
+
+**The fix is `SpecKexec.v` alone.** The obvious reading — sweep all seventeen —
+is wrong, and the reason is worth keeping: a callee's `Module Type` Parameter
+is *universally quantified* over `icacheG`, so a caller can instantiate it at
+whichever instance it has. Only the caller's OWN binder list has to be
+coherent. Dropping the standalone pair from `wp_kexec_sconf_body` and
+`Module Type KEXEC` (four occurrences, `!fileG Σ` then supplies both) makes
+`cwd_ref` and `inode_held` the same proposition and leaves namei, namex,
+dirlookup, fileread and the rest untouched.
+
+When this trap fires, check whether the mismatch is in a *statement you own*
+before sweeping the files it merely passes through.
+
+### A fourth over-ask that is NOT worth fixing — and how to tell
+
+`SpecNamei` demands the **whole** path buffer (`:162`) and `SpecCopyout`
+demands the **whole** source (`:174`), though each only reads what it is
+given. kexec's contract therefore owns the path and the argument strings
+outright, and keeps a fraction only on the argv pointer vector, which it just
+loads from.
+
+**This looks like blockers 1 and 2 and is not.** There, kexec genuinely could
+not pay the premise — it had no `p->pagetable` for the table it was building,
+and no sixteen bytes past `last`. Here it can pay: `sys_exec` has
+`char path[MAXPATH]` on its own stack and kalloc's a page per argument, so
+full ownership is available for free. An over-ask that every caller can
+afford is a no-consumer cleanup, not a blocker.
+
+That is the test to apply to the next one: **can the caller pay?** If yes,
+pay it and move on; if no, the callee's contract is wrong and generalizing it
+is the work. Relaxing namei/namex/nameiparent and copyout's source to a
+fraction remains available and is nobody's blocker.
 
 ## THE THREE UPSTREAM SPEC CHANGES — TWO DONE, ONE OPEN
 
@@ -273,10 +448,21 @@ walks *past* and RETURNS the last one — so a successful lookup of an
 depend on the `ok` flag (`L * iput_units` on success, `(L+1) * iput_units` on
 failure) gives `n' ≥ 10 - 6 = 4 ≥ 3` at `L = 2` and the composition closes.
 
+**This bounds what the theorem COVERS, not whether it can be proved.** The
+short-path case — `/init`, `sh` — is fully provable today, is what every boot
+path takes, and needs no change to anything. Do not treat blocker 3 as
+gating the `ProofKexec` work; it is not.
+
 `SpecKexec` states the premise in the CONSTANTS
-(`(L + 1) * iput_units + iput_units <= MAXOPBLOCKS`) rather than as `L ≤ 1`,
-precisely so that it relaxes on its own the day namei's success arm is
-tightened. **Do not** hard-code `L ≤ 1`.
+(`(L + 1) * iput_units + iput_units <= MAXOPBLOCKS`) rather than as `L ≤ 1`.
+**Do not** hard-code `L ≤ 1` — but note the relaxation is *not* automatic:
+after namei's success arm is tightened, that premise is merely *stronger* than
+the composition needs, so `ProofKexec` keeps compiling while still admitting
+only `L ≤ 1`, and widening to `L ≤ 2` is a one-line edit to it. To make it
+automatic, name namei's charge in `SpecNamei.v` — a `namei_charge L` that both
+its premise (`:136`) and its postcondition (`:182`) are stated over — and quote
+that name from `SpecKexec`. Worth folding into the fs-namei fix; not worth a
+separate sweep.
 
 ## What is NOT blocked
 

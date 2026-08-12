@@ -26,7 +26,8 @@ Require Import RiscvLang RiscvPtsto SmodeCore.
 Require Import RegFile.
 Require Import FdSlots WpLock.
 Require Import KallocInv.
-Require Import FileInv ProcInv.
+Require Import ProcInv.
+Require Import FileInvDefs.
 Require Import SpecConsoleread.
 
 Module Consoleread : CONSOLEREAD.

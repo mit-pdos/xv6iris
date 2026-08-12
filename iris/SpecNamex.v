@@ -196,32 +196,26 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import SleepLock.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import BitmapInv.
 Require Import ByteBuf.
-Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import PathElems.
-Require Import DirView.
 Require Import InodeInv.
-Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import KallocInv.
-Require Import UserPtTree.
 Require Import KvmSpec.
-Require Import ProcPtOwn.
-Require Import FileInv ProcInv.
+Require Import FileInvDefs.
+Require Import IcacheRef.
+Require Import IrefSlots.
 Require Import SpecIput.
-Require Import SpecDirlookup.
 Require Import SpecDirlink.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -413,7 +407,15 @@ Definition wp_namex_sconf_body
   (* ---- this operation's reservation ---- *)
   log_op g n -∗
   (* the continuation is SEALED as [namex_post]; see its header *)
-  wp_next b pj (fun (CIDc : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
+     (its bread / ilock / bwrite does), and a park moves the hart with
+     interrupts off, so the crossing has nothing to do with SIE -- the
+     porting guide's "a PARKING function's [wp_next] index is [true]
+     UNCONDITIONALLY".  Spelled [b] the two coincide at the only instance
+     the [eb = true] premise admits, which is why this went unnoticed; once
+     [eb = false] is reachable the [b] form would promise the caller it
+     comes back on the hart it called from, which a park makes false. *)
+  wp_next true pj (fun (CIDc : CpuId) =>
     namex_post (CID := CIDc) pj pv nb ret_tgt pl m K b eb C
                g gfs bn cov logstart bmapstart inodestart size used cwdv
                plen pfun npar n pidv dq dqb dqs dqc) -∗

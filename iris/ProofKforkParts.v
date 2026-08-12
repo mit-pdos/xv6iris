@@ -71,7 +71,8 @@ Require Import ProcGeom.
 Require Import PtBuild.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
-Require Import FdSlots FileInv.
+Require Import FdSlots.
+Require Import FileInvDefs.
 Require Import WpLock.
 Require Import SwtchCtx.
 Require Import ProcInv.

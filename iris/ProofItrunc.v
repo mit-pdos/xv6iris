@@ -91,7 +91,7 @@ Section ItruncCont.
       (u : nat)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac) (j : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
-    wp_next b (proc_addr j) (fun (CID : CpuId) =>
+    wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K b (proc_addr j) -∗
@@ -303,7 +303,7 @@ Section ItruncTail.
       exact (Hthr c Hcs N2 N8 N9 N18 N19). }
     iDestruct (cpu_own_transport CID0 CID3 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID3) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKiu : (K_iupdate <= K - 6)%nat) by (unfold K_iupdate; lia).
     (* iupdate wants two; the third is parked across the call *)
@@ -617,7 +617,7 @@ Section ItruncDLoop.
       (data : nat -> list (bv 8))
       (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat) (w : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
-    wp_next b (proc_addr j) (fun (CID : CpuId) =>
+    wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ Mx : regfile,
         ⌜it_sp m Mx⌝ -∗ ⌜it_thr m Mx⌝ -∗ ⌜Mx !!! Regidx Rs3 = ip⌝ -∗
         sie_cap_gpr Mx (K - 6)%nat b (proc_addr j) -∗
@@ -847,7 +847,7 @@ Section ItruncDLoop.
           by (clear - Hk Hfuel Hmore; unfold NDIRECT in *; lia).
         (* the continuation and the cpu token move forward to the CID the
            chain has reached; the IH, being CID-generic, is applied there *)
-        iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID4)
+        iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID4)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iDestruct (cpu_own_transport CID0 CID4 0 true (proc_addr jx) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -970,7 +970,7 @@ Section ItruncDLoop.
       iDestruct (bm_paid_use with "Hpaid") as (cr u' Sb) "(%Hcrin & %Hbud & Hop & Hback)".
       iDestruct (cpu_own_transport CID0 CID3 0 true (proc_addr jx) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID3)
+      iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3)
                    ltac:(wp_next_chain) with "Hexit") as "Hexit".
       assert (HKbf : (K_bfree <= K - 6)%nat) by (unfold K_bfree; lia).
       iApply (BF.wp_bfree_gen γs jx γl γu γd γk pd pav pu bn γ γfs
@@ -1105,7 +1105,7 @@ Section ItruncDLoop.
         rewrite /it_dexit.
         iDestruct (cpu_own_transport CID4 CID8 0 true (proc_addr jx) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iDestruct (wp_next_shift (CIDa := CID3) (CIDb := CID8)
+        iDestruct (wp_next_shift (b := true) (CIDa := CID3) (CIDb := CID8)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iSpecialize ("Hexit" $! CID8 with "[%]"); [wp_next_chain|].
         rewrite Hlast.
@@ -1130,7 +1130,7 @@ Section ItruncDLoop.
           by (clear - Hk Hfuel Hmore; unfold NDIRECT in *; lia).
         iDestruct (cpu_own_transport CID4 CID8 0 true (proc_addr jx) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iDestruct (wp_next_shift (CIDa := CID3) (CIDb := CID8)
+        iDestruct (wp_next_shift (b := true) (CIDa := CID3) (CIDb := CID8)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iApply (IH CID8 (S k) N1 Hk'' Hf'' HN1sp HN1thr HN1s1 HN1s2 HN1s3
                   with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
@@ -1160,7 +1160,7 @@ Section ItruncELoop.
       (data : nat -> list (bv 8)) (kk : nat) (dsk : mword 32)
       (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat) (w : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
-    wp_next b (proc_addr j) (fun (CID : CpuId) =>
+    wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ Mx : regfile,
         ⌜it_sp m Mx⌝ -∗ ⌜it_thr4 m Mx⌝ -∗ ⌜Mx !!! Regidx Rs3 = ip⌝ -∗
         ⌜Mx !!! Regidx Rs4 = bnode kk⌝ -∗
@@ -1366,7 +1366,7 @@ Section ItruncELoop.
         rewrite /it_eexit.
         iDestruct (cpu_own_transport CID0 CIDb 0 true (proc_addr jx) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CIDb)
+        iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDb)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iSpecialize ("Hexit" $! CIDb with "[%]"); [wp_next_chain|].
         rewrite Hlast.
@@ -1393,7 +1393,7 @@ Section ItruncELoop.
           by (clear - Hq Hfuel Hmore; unfold NINDIRECT in *; lia).
         iDestruct (cpu_own_transport CID0 CIDb 0 true (proc_addr jx) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CIDb)
+        iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDb)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iApply (IH CIDb (S q) E1 Hq'' Hf'' HE1sp HE1thr HE1s1 HE1s2 HE1s3 HE1s4
                   with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
@@ -1494,7 +1494,7 @@ Section ItruncELoop.
       iDestruct (bm_paid_use with "Hpaid") as (cr u' Sb) "(%Hcrin & %Hbud & Hop & Hback)".
       iDestruct (cpu_own_transport CID0 CIDz 0 true (proc_addr jx) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CIDz)
+      iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDz)
                    ltac:(wp_next_chain) with "Hexit") as "Hexit".
       assert (HKbf : (K_bfree <= K - 6)%nat) by (unfold K_bfree; lia).
       iApply (BF.wp_bfree_gen γs jx γl γu γd γk pd pav pu bn γ γfs
@@ -1606,7 +1606,7 @@ Section ItruncELoop.
         rewrite /it_eexit.
         iDestruct (cpu_own_transport CIDf CIDr 0 true (proc_addr jx) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iDestruct (wp_next_shift (CIDa := CIDz) (CIDb := CIDr)
+        iDestruct (wp_next_shift (b := true) (CIDa := CIDz) (CIDb := CIDr)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iSpecialize ("Hexit" $! CIDr with "[%]"); [wp_next_chain|].
         rewrite Hlastf.
@@ -1633,7 +1633,7 @@ Section ItruncELoop.
           by (clear - Hq Hfuel Hmoref; unfold NINDIRECT in *; lia).
         iDestruct (cpu_own_transport CIDf CIDr 0 true (proc_addr jx) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iDestruct (wp_next_shift (CIDa := CIDz) (CIDb := CIDr)
+        iDestruct (wp_next_shift (b := true) (CIDa := CIDz) (CIDb := CIDr)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iApply (IH CIDr (S q) F1 Hqf'' Hff'' HF1sp HF1thr HF1s1 HF1s2 HF1s3 HF1s4
                   with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
@@ -1662,7 +1662,7 @@ Section ItruncIArm.
       (dev : mword 32) (ip : mword 64) (bm : blkmap)
       (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat) (w : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
-    wp_next b (proc_addr j) (fun (CID : CpuId) =>
+    wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ Mx : regfile,
         ⌜it_sp m Mx⌝ -∗ ⌜it_thr m Mx⌝ -∗ ⌜Mx !!! Regidx Rs3 = ip⌝ -∗
         sie_cap_gpr Mx (K - 6)%nat b (proc_addr j) -∗
@@ -1861,7 +1861,7 @@ Section ItruncIArm.
       by (rewrite Huc; exact Hicov).
     iDestruct (cpu_own_transport CID0 CID3 0 true (proc_addr jx) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID3)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3)
                  ltac:(wp_next_chain) with "Hexit") as "Hexit".
     iApply (BR.wp_bread_sconf γs jx γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (bm_ind bm : mword 32) dq
@@ -2200,7 +2200,7 @@ Section ItruncIArm.
     iDestruct (cpu_own_transport CID12 CID15 0 true (proc_addr jx) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     (* Hexit was already moved to CID3 before the bread *)
-    iDestruct (wp_next_shift (CIDa := CID3) (CIDb := CID15)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID3) (CIDb := CID15)
                  ltac:(wp_next_chain) with "Hexit") as "Hexit".
     assert (HKbf2 : (K_bfree <= K - 6)%nat) by (unfold K_bfree; lia).
     iApply (BF.wp_bfree_gen γs jx γl γu γd γk pd pav pu bn γ γfs
@@ -2324,7 +2324,7 @@ Section ItruncIArm.
     rewrite /it_armexit.
     iDestruct (cpu_own_transport CID16 CID19 0 true (proc_addr jx) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID15) (CIDb := CID19)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID15) (CIDb := CID19)
                  ltac:(wp_next_chain) with "Hexit") as "Hexit".
     iSpecialize ("Hexit" $! CID19 with "[%]"); [wp_next_chain|].
     iAssert (bslots bn 3) with "[Hsl Hsl1]" as "Hsl3".
@@ -2726,7 +2726,7 @@ Section ItruncMain.
       destruct n0 as [|n1]; [exfalso; lia|].
       iDestruct (cpu_own_transport CID12x CID14x 0 true (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID14x)
+      iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID14x)
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (it_tail (CID0 := CID14x) γs j γl γu γd γk pd pav pu bn γ γfs γi
                 cov logstart bmapstart inodestart size nib dev used ip inum
@@ -2787,7 +2787,7 @@ Section ItruncMain.
                                  Hidev Hsbb Hslot6 Hmap Hblks Hbmr Hsl Hpaid".
       iDestruct (bm_paid_elim with "Hpaid") as (n2) "(%Hn2 & Hop)".
       destruct n2 as [|n3]; [exfalso; lia|].
-      iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID15y)
+      iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID15y)
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (it_tail (CID0 := CID15y) γs j γl γu γd γk pd pav pu bn γ γfs γi
                 cov logstart bmapstart inodestart size nib dev used ip inum

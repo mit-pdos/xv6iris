@@ -55,7 +55,8 @@ Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSconfVc WpSmodeIntr.
 Require Import StackOwn.
 Require Import ProcGeom CpuOwn.
-Require Import FdSlots FileInv ProcInv.
+Require Import FdSlots ProcInv.
+Require Import FileInvDefs.
 Require Import SpecArgfd SpecFdalloc SpecFiledup SpecSysDup.
 Require Import KernelRvcDecode.
 Require Import CodeSysDup.

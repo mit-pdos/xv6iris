@@ -33,54 +33,35 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
-Require Import RiscvFetchExec.
-Require Import InstrBytes.
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
-Require Import MinstretInv.
-Require Import KptGhost.
 Require Import SmodeCore.
-Require Import KernelText.
 Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import StackOwn StackBytes.
 Require Import CalleeSaved.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSconfVc.
-Require Import WpSmodeHalf.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import ByteBuf.
 Require Import FdSlots.
 Require Import ProcGeom.
-Require Import SchedCtx.
-Require Import SleepLock.
+Require Import IcacheRef.
+Require Import IrefSlots.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
-Require Import BitmapInv.
-Require Import DinodeEnc.
-Require Import DirentEnc.
-Require Import PathElems.
-Require Import DirView.
-Require Import InodeInv.
-Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import KallocInv.
-Require Import UserPtTree.
-Require Import KvmSpec.
-Require Import ProcPtOwn.
-Require Import FileInv ProcInv.
-Require Import SpecPanic.
-Require Import SpecIput.
-Require Import SpecDirlookup SpecDirlink.
+Require Import FileInvDefs.
+Require Import IcacheRef.
+Require Import IrefSlots.
 Require Import CodeNamei.
 Require Import SpecNamex.
 Require Import SpecNamei.
@@ -438,7 +419,7 @@ Section ProofNameiMain.
     iEval (rewrite -HR5a2) in "Hname".
     iDestruct (cpu_own_transport CID CID7 0%nat eb (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (NX.wp_namex_sconf gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib size dev used cwdv

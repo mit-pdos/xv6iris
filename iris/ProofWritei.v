@@ -65,7 +65,8 @@ Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
-Require Import FileInv ProcInv.
+Require Import ProcInv.
+Require Import FileInvDefs.
 Require Import CodeWritei.
 Require Import SpecPanic.
 Require Import SpecBmap SpecBread SpecBrelse SpecLogWrite SpecEitherCopyin
@@ -338,7 +339,7 @@ Section WriteiDefs.
       (V : pprivate) (ncount : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac) (A : bm_alloc) (j : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
-    wp_next b (proc_addr j) (fun (CID : CpuId) =>
+    wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (tot : nat) (bm' : blkmap) (data' : nat -> list (bv 8))
         (dn' dn0' : dinode) (n' : nat)
         (wrote : nat -> bv 8) (dist : nat) (dstb : nat -> bv 8) (P' : uptd)
@@ -941,7 +942,7 @@ Section WriteiJoin.
       by (rewrite /T1 upd_ne; [exact HT0s11 | nz]).
     iDestruct (cpu_own_transport CID0 CID2 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKiu : (K_iupdate <= K - 14)%nat) by (unfold K_iupdate; lia).
     assert (Hdirlen : length (bm_dir bm') = NDIRECT)
@@ -1095,7 +1096,7 @@ Section WriteiJoin.
               Hext
               with "Hcg Hcnt Htext Hpc Hframe Hidev Hinum
                     Hmeta Hmap Hblocks Hsb Hba Hdn Hsrc Hsl Hop [Hcont]").
-    iApply (wp_next_shift (CIDa := CID2) (CIDb := CID5) ltac:(wp_next_chain)
+    iApply (wp_next_shift (b := true) (CIDa := CID2) (CIDb := CID5) ltac:(wp_next_chain)
               with "Hcont").
   Qed.
 
@@ -1460,7 +1461,7 @@ Section WriteiSize.
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
-      iApply (wp_next_shift (CIDa := CID0) (CIDb := CIDz3) ltac:(wp_next_chain)
+      iApply (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDz3) ltac:(wp_next_chain)
                 with "Hcont").
     - (* ---------- IT IS NOT: store the new size, restore, fall through -- *)
       assert (Hltz : bv_unsigned (di_size dn) < Z.of_nat (off + tot)) by lia.
@@ -1662,7 +1663,7 @@ Section WriteiSize.
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
-      iApply (wp_next_shift (CIDa := CID0) (CIDb := CIDQA5) ltac:(wp_next_chain)
+      iApply (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDQA5) ltac:(wp_next_chain)
                 with "Hcont").
   Qed.
 
@@ -1909,7 +1910,7 @@ Section WriteiLoop.
     assert (HA3s8 : A3 !!! Regidx Rs8 = (mword_of_int (-1) : mword 64)) by lkp.
     iDestruct (cpu_own_transport CID0 CIDa3 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CIDa3) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDa3) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbm : (K_bmap <= K - 14)%nat) by (unfold K_bmap; lia).
     (* the allocation bundle opens for exactly this call and closes again
@@ -2110,7 +2111,7 @@ Section WriteiLoop.
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
-      iApply (wp_next_shift (CIDa := CIDa3) (CIDb := CIDa6) ltac:(wp_next_chain)
+      iApply (wp_next_shift (b := true) (CIDa := CIDa3) (CIDb := CIDa6) ltac:(wp_next_chain)
                 with "Hcont").
     - (* ============ bmap found a block: bread it ============ *)
       assert (Hbnzz : bv_unsigned (blkmap_get bm2 fbn) <> 0) by exact Hgetnz.
@@ -2348,7 +2349,7 @@ Section WriteiLoop.
       iEval (rewrite Hpp) in "Hpc". clear Hpp.
       iDestruct (cpu_own_transport CIDa9 CIDa14 0 true (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iDestruct (wp_next_shift (CIDa := CIDa3) (CIDb := CIDa14)
+      iDestruct (wp_next_shift (b := true) (CIDa := CIDa3) (CIDb := CIDa14)
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
 
       (* ================================================================ *)
@@ -3097,7 +3098,7 @@ Section WriteiLoop.
                       with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                             Hdgeom Hdlock Hframe Hidev Hinum Hmeta
                             Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
-            iApply (wp_next_shift (CIDa := CIDa14) (CIDb := CIDc11)
+            iApply (wp_next_shift (b := true) (CIDa := CIDa14) (CIDb := CIDc11)
                       ltac:(wp_next_chain) with "Hcont").
           * (* ---------- another block: back to the head at +0x82 ------- *)
             iApply (wp_bgeu_fall_s_sconf (mword_of_int (WI + 0x7e))
@@ -3127,7 +3128,7 @@ Section WriteiLoop.
               exact Hs. }
             iDestruct (cpu_own_transport CIDc7 CIDc11 0 true (proc_addr j) C b
                          ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-            iDestruct (wp_next_shift (CIDa := CIDa14) (CIDb := CIDc11)
+            iDestruct (wp_next_shift (b := true) (CIDa := CIDa14) (CIDb := CIDc11)
                          ltac:(wp_next_chain) with "Hcont") as "Hcont".
             iApply (IH CIDc11 (tot + mm)%nat bm2
                       (<[fbn := wi_splice (data2 fbn) o mm g]> data2) wrote2 P2 nL
@@ -3394,7 +3395,7 @@ Section WriteiLoop.
                     with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                           Hdgeom Hdlock Hframe Hidev Hinum Hmeta
                           Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
-          iApply (wp_next_shift (CIDa := CIDa14) (CIDb := CIDd7)
+          iApply (wp_next_shift (b := true) (CIDa := CIDa14) (CIDb := CIDd7)
                     ltac:(wp_next_chain) with "Hcont").
       }
       (* ===== +0xa8 bgeu a3,a4 : m = min(n - tot, BSIZE - off%BSIZE) ===== *)
@@ -4116,7 +4117,7 @@ Section WriteiMain.
                 ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(apply uptd_ext_refl)
                 with "Hcg Hcnt Htext Hpc Hframe Hidev Hinum
                       Hmeta Hmap Hblocks Hsb Hba Hdn Hsrc Hsl Hop [Hcont]").
-      iApply (wp_next_shift (CIDa := CID) (CIDb := CIDy3) ltac:(wp_next_chain)
+      iApply (wp_next_shift (b := true) (CIDa := CID) (CIDb := CIDy3) ltac:(wp_next_chain)
                 with "Hcont").
     }
     (* ===== +0x2a falls: off + n <= MAXFILE*BSIZE ===== *)
@@ -4261,7 +4262,7 @@ Section WriteiMain.
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
-      iApply (wp_next_shift (CIDa := CID) (CIDb := CIDz3) ltac:(wp_next_chain)
+      iApply (wp_next_shift (b := true) (CIDa := CID) (CIDb := CIDz3) ltac:(wp_next_chain)
                 with "Hcont").
     }
     (* ---- n <> 0: save the other five, initialise, enter the loop ---- *)
@@ -4442,7 +4443,7 @@ Section WriteiMain.
     assert (HU3s8 : U3 !!! Regidx Rs8 = (mword_of_int (-1) : mword 64)) by lkp.
     iDestruct (cpu_own_transport CID CIDp17 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID) (CIDb := CIDp17) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CIDp17) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (wi_loop (CID0 := CIDp17) γs j γl γu γd γk pd pav pu γfs γi bn γ γf γa
               cov logstart inodestart nib dev ip inum bm data dn dn0 user off n

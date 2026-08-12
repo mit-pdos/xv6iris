@@ -288,7 +288,9 @@ other arm is a NO-OP before assuming the contract is right.** The
   / `LinkSyscall.v` state syscall's contract as ASSUMED (one abstract
   `syscall_env γf pj` for the union of the twenty-two table entries'
   footprints, so usertrap threads it opaquely).
-  **ONE BLOCKER LEFT, and it is the same shape as prepare_return's was:**
+  **ONE BLOCKER LEFT** (tracked in its own file now,
+  [`eb-generic-sweep.md`](eb-generic-sweep.md), which has the recipe and the
+  worklist):
   `SpecKexit` has `eb = true ->`, which at level 0 forces `b = true`
   (`CpuOwn.cpu_own_eb_agree`), but usertrap's first `killed(p) → kexit(-1)`
   runs BEFORE `intr_on()` and the second is reachable from the devintr and

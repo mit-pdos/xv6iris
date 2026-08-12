@@ -31,7 +31,7 @@ Require Import KernelRvcDecode.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock.
 Require Import FdSlots.
-Require Import FileInv.
+Require Import FileInvDefs.
 Require Import SpecArgraw.
 Require Import SpecArgint.
 From Kernel Require KernelInstrs.

@@ -59,8 +59,9 @@ Require Import KallocInv.
 Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
-Require Import FdSlots FileInv ProcInv.
-Require Import PipeInv.
+Require Import FdSlots ProcInv.
+Require Import FileInvDefs.
+Require Import PipeInvDefs.
 Require Import SpecMyproc SpecAcquire SpecKilled SpecWakeup SpecSleep SpecCopyin SpecRelease.
 Require Import CodePipewrite.
 Require Import SpecPipewrite.

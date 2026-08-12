@@ -208,7 +208,7 @@ Section BallocDefs.
       (u : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs : dfrac) (j : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
-    wp_next b (proc_addr j) (fun (CID : CpuId) =>
+    wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K b (proc_addr j) -∗
@@ -867,7 +867,7 @@ Section BallocOut.
       rewrite /QA upd_ne; [| regne]. exact (HQ9thr c Hcs N2 N8 N9). }
     iDestruct (cpu_own_transport CID0 CID10 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID10) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID10) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iPoseProof (panic_wp_any_at CID10 with "Hpanic") as "Hpanic10".
     iApply (Hpk CID10 QA (K - 10)%nat true (proc_addr j) C
@@ -931,7 +931,7 @@ Section BallocOut.
     { rewrite /ba_arms. iLeft.
       iSplitR; [iPureIntro; vm_compute; reflexivity|].
       iSplitL "Hbmr"; [iExact "Hbmr"|]. iExact "Hop". }
-    { iApply (wp_next_shift (CIDa := CID10) (CIDb := CID13) ltac:(wp_next_chain)
+    { iApply (wp_next_shift (b := true) (CIDa := CID10) (CIDb := CID13) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
 
@@ -1049,7 +1049,7 @@ Section BallocExhaust.
       exact (HE0thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24). }
     iDestruct (cpu_own_transport CID0 CID2 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 10)%nat) by (unfold K_brelse; lia).
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
@@ -1151,7 +1151,7 @@ Section BallocExhaust.
               size used u cr Sb pidv dq dqb dqs m E3 K C b HK Hpk HE3sp HE3thr
               with "Hcg Hcnt Htext Hkdata Hpc Hpanic Hpenv Hframe
                     Hppid Hsbsz Hsbbm Hsl Hbmr Hop [Hcont]").
-    { iApply (wp_next_shift (CIDa := CID2) (CIDb := CID6) ltac:(wp_next_chain)
+    { iApply (wp_next_shift (b := true) (CIDa := CID2) (CIDb := CID6) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
 
@@ -1409,7 +1409,7 @@ Section BallocRestore.
       iSplitL "Hfsb"; [iExact "Hfsb"|].
       iSplitL "Hown"; [iExact "Hown"|].
       iSplitL "Hbmr"; [iExact "Hbmr"|]. iExact "Hop". }
-    { iApply (wp_next_shift (CIDa := CID0) (CIDb := CID7) ltac:(wp_next_chain)
+    { iApply (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID7) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
 
@@ -1583,7 +1583,7 @@ Section BallocBzero.
       exact (HZ1thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24). }
     iDestruct (cpu_own_transport CID0 CID3 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID3) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 10)%nat) by (unfold K_bread; lia).
     iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
@@ -1833,7 +1833,7 @@ Section BallocBzero.
       exact (HZ8thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24). }
     iDestruct (cpu_own_transport CID4 CID12 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID3) (CIDb := CID12) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID3) (CIDb := CID12) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKlw2 : (K_log_write <= K - 10)%nat) by (unfold K_log_write; lia).
     (* THE FRESH BLOCK'S log_write, UNCREDITED: a freshly allocated block is
@@ -1919,7 +1919,7 @@ Section BallocBzero.
       exact (HZAthr c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24). }
     iDestruct (cpu_own_transport CID13 CID15 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID12) (CIDb := CID15) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID12) (CIDb := CID15) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl2 : (K_brelse <= K - 10)%nat) by (unfold K_brelse; lia).
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk2
@@ -1955,7 +1955,7 @@ Section BallocBzero.
     { iEval (rewrite -bb_uint32 HbnoD). iExact "HfsbD". }
     { iEval (rewrite -bb_uint32 HbnoD). iExact "Hown". }
     { iEval (rewrite -bb_uint32 HbnoD). iExact "Hbmr". }
-    { iApply (wp_next_shift (CIDa := CID15) (CIDb := CID16) ltac:(wp_next_chain)
+    { iApply (wp_next_shift (b := true) (CIDa := CID15) (CIDb := CID16) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
 
@@ -2247,7 +2247,7 @@ Section BallocAlloc.
       exact (HA2thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24). }
     iDestruct (cpu_own_transport CID0 CID5 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID5) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKlw : (K_log_write <= K - 10)%nat) by (unfold K_log_write; lia).
     iEval (rewrite -HbnoB) in "Hfsbm".
@@ -2342,7 +2342,7 @@ Section BallocAlloc.
       exact (HA4thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24). }
     iDestruct (cpu_own_transport CID6 CID8 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID5) (CIDb := CID8) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID5) (CIDb := CID8) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 10)%nat) by (unfold K_brelse; lia).
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
@@ -2382,7 +2382,7 @@ Section BallocAlloc.
               HmRsp HmRthr HmRs1 HmRs7
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe Hppid Hsbsz Hsbbm Hdevi Hdgeom Hdlock Hsl Hop
                     Hbmr HfsbD Hown [Hcont]").
-    { iApply (wp_next_shift (CIDa := CID8) (CIDb := CID9) ltac:(wp_next_chain)
+    { iApply (wp_next_shift (b := true) (CIDa := CID8) (CIDb := CID9) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
 
@@ -2505,7 +2505,7 @@ Section BallocScan.
                 bmapstart size dev used u cr Sb kk bnoB (bitmap_bytes used) bsdX dX
                 pidv dq dqb dqs m M K C b HK Hpk Hsize Hsp Hthr Hs2 Hs5 Hs6 Hs8 Hkk
                 with "Hcg Hcnt Htext Hkdata Hpc Hpanic Hpenv Hbio Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hbmr Hop Hlk [Hcont]").
-      { iApply (wp_next_shift (CIDa := CIDx) (CIDb := CID1) ltac:(wp_next_chain)
+      { iApply (wp_next_shift (b := true) (CIDa := CIDx) (CIDb := CID1) ltac:(wp_next_chain)
                   with "Hcont"). }
     - (* ---- FUEL S: the full loop body ---- *)
       destruct (Z.geb bi size) eqn:Hge.
@@ -2530,7 +2530,7 @@ Section BallocScan.
                   bmapstart size dev used u cr Sb kk bnoB (bitmap_bytes used) bsdX dX
                   pidv dq dqb dqs m M K C b HK Hpk Hsize Hsp Hthr Hs2 Hs5 Hs6 Hs8 Hkk
                   with "Hcg Hcnt Htext Hkdata Hpc Hpanic Hpenv Hbio Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hbmr Hop Hlk [Hcont]").
-        { iApply (wp_next_shift (CIDa := CIDx) (CIDb := CID1) ltac:(wp_next_chain)
+        { iApply (wp_next_shift (b := true) (CIDa := CIDx) (CIDb := CID1) ltac:(wp_next_chain)
                     with "Hcont"). }
       + (* +0xb6 FALL-THROUGH: bi < sb.size, so this bit is in range *)
         (* [Z.geb_gt] does not exist; the contrapositive of [Z.geb_le] is the
@@ -3153,7 +3153,7 @@ Section BallocScan.
                        pidv dq dqb dqs m SA K C b HK Hpk Hsize HSAsp HSAthr HSAs2
                        HSAs5 HSAs6 HSAs8 Hkk
                        with "Hcg Hcnt Htext Hkdata Hpc Hpanic Hpenv Hbio Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hbmr Hop Hlk [Hcont]").
-             { iApply (wp_next_shift (CIDa := CIDx) (CIDb := CID15)
+             { iApply (wp_next_shift (b := true) (CIDa := CIDx) (CIDb := CID15)
                          ltac:(wp_next_chain) with "Hcont"). }
           -- (* bi + 1 < BPB: branch back to +0xb6, one fuel unit down *)
              apply Z.eqb_neq in Heqb.
@@ -3182,7 +3182,7 @@ Section BallocScan.
                        HSAs2 HSAs3 HSAs4 HSAs5 HSAs6 HSAs7 HSAs8
                        with "Hcg Hcnt Htext Hkdata Hpc Hpanic Hpenv Hbio Hlctx Hprocs Hframe Hppid Hsbsz Hsbbm Hdevi Hdgeom
                              Hdlock Hsl Hop Hfsbm Hpool Hlk [Hcont]").
-             { iApply (wp_next_shift (CIDa := CIDx) (CIDb := CID14)
+             { iApply (wp_next_shift (b := true) (CIDa := CIDx) (CIDb := CID14)
                          ltac:(wp_next_chain) with "Hcont"). }
         * (* the bit is CLEAR: take the branch to +0x38 and allocate *)
           assert (Hz1 : eq_vec (rget S8 Ra1) zero_reg = true).
@@ -3212,7 +3212,7 @@ Section BallocScan.
                     HS8s1 HS8s2 HS8s7 Hcred
                     with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe Hppid Hsbsz Hsbbm Hdevi Hdgeom Hdlock Hsl Hop
                           Hfsbm Hpool Hlk [Hcont]").
-          { iApply (wp_next_shift (CIDa := CIDx) (CIDb := CID11)
+          { iApply (wp_next_shift (b := true) (CIDa := CIDx) (CIDb := CID11)
                       ltac:(wp_next_chain) with "Hcont"). }
   Qed.
 
@@ -3944,7 +3944,7 @@ Section BallocMain.
       exact (HR15thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24). }
     iDestruct (cpu_own_transport CID CIDb28 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wp_next_shift (CIDa := CID) (CIDb := CIDb28) ltac:(wp_next_chain)
+    iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CIDb28) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 10)%nat) by (unfold K_bread; lia).
     iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
@@ -4153,7 +4153,7 @@ Section BallocMain.
               HW4a0 HW4a4 HW4s1 HW4s2 HW4s3 HW4s4 HW4s5 HW4s6 HW4s7 HW4s8
               with "Hcg Hcnt Htext Hkdata Hpc Hpanic Hpenv Hbio Hlctx Hprocs Hframe Hppid Hsbsz Hsbbm Hdevi Hdgeom
                     Hdlock Hsl Hop Hfsbm Hpool Hlk [Hcont]").
-    { iApply (wp_next_shift (CIDa := CIDb28) (CIDb := CIDb33)
+    { iApply (wp_next_shift (b := true) (CIDa := CIDb28) (CIDb := CIDb33)
                 ltac:(wp_next_chain) with "Hcont"). }
   Qed.
 

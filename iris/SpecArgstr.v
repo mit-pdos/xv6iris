@@ -54,7 +54,8 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
-Require Import FdSlots FileInv ProcInv.
+Require Import FdSlots ProcInv.
+Require Import FileInvDefs.
 Require Import SpecFetchstr.
 From Kernel Require KernelSyms.
 Import Defs.

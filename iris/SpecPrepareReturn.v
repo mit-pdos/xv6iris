@@ -105,14 +105,14 @@ Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile HartTp WpNext CalleeSaved.
 Require Import SmodeCore.
-Require Import MstatusBits.
 Require Import KernelText.
 Require Import TrampPt.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import CpuOwn.
 Require Import ProcGeom.
-Require Import FdSlots FileInv.
+Require Import FdSlots.
+Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import WpGprCsrwA.   (* [mepc_val]: the sepc write legalizes *)
 From Kernel Require KernelSyms.

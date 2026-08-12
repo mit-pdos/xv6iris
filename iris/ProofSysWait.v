@@ -40,7 +40,8 @@ Require Import WpLock.
 Require Import ProcGeom.
 Require Import KallocInv.
 Require Import UserPtTree.
-Require Import FdSlots FileInv.
+Require Import FdSlots.
+Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SpecArgaddr SpecKwait.
 Require Import SpecSysWait.

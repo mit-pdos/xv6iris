@@ -36,7 +36,8 @@ Require Import IntrDefs HartTp WpNext.
 Require Import WpLock.
 Require Import CpuOwn.
 Require Import KallocInv.
-Require Import FdSlots FileInv ProcInv.
+Require Import FdSlots ProcInv.
+Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import DiskPtsto.
 Require Import FsBlocks.

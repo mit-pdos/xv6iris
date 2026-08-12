@@ -61,7 +61,7 @@ Require Import WpLock.
 Require Import ArrCursor.
 Require Import ProcGeom.
 Require Import FdSlots.
-Require Import FileInv.
+Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import KvmMap.
 Require Import KstackArith.

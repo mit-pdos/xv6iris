@@ -63,20 +63,15 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
-Require Import RiscvFetchExec.
 Require Import InstrBytes.
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
-Require Import MinstretInv.
-Require Import KptGhost.
 Require Import SmodeCore.
-Require Import KernelText.
-Require Import KernelRvcDecode.
 Require Import VcGen.
-Require Import StackOwn StackBytes.
+Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSconfVc.
+Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSmodeHalf.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
@@ -84,27 +79,23 @@ Require Import CpuOwn.
 Require Import ByteBuf.
 Require Import FdSlots.
 Require Import ProcGeom.
-Require Import SchedCtx.
-Require Import SleepLock.
+Require Import ProcInv.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import DinodeEnc.
-Require Import DirentEnc.
 Require Import InodeInv.
-Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import KallocInv.
 Require Import UserPtTree.
-Require Import KvmSpec.
-Require Import ProcPtOwn.
-Require Import FileInv ProcInv.
+Require Import SpecPanic.
+Require Import ProcInv.
+Require Import FileInvDefs.
 Require Import DirView.
 Require Import SpecPanic.
 Require Import SpecReadi SpecNamecmp SpecIget.
@@ -258,6 +249,17 @@ Section ProofDirlookupMain.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hkenv Hidev Hmeta Hmap Hblocks
               Hnm Hpoff Hppid #Hprocs #Hdev #Hgeom #Hdlk Hbslot #Hitb2 #Hitbl
               #Hesc Hislot Hcont".
+    (* PIN THE INDEX.  This contract still carries [eb = true ->], and at
+       level 0 [cpu_own_eb_agree] gives [eb = b], so [b] IS the literal
+       [true] here.  Making that explicit is what keeps every hart-chain in
+       the body at ONE index: the crossings below are the literal [true]
+       (dirlookup parks, through readi down to sleep), and a [b]-indexed
+       [cpu_own_transport] cannot be discharged from a [true]-indexed
+       guard -- [b = false] tells you nothing about the hart.  When this
+       function is itself generalized, this derivation is what goes. *)
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
+    assert (Hb : b = true) by (rewrite -Hbm; exact Heb).
+    clear Hbm.
     iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
     iEval (rewrite /i_type) in "Hity".
     iEval (rewrite /i_size) in "Hisz".
@@ -666,7 +668,7 @@ Section ProofDirlookupMain.
     (*  which is what lets each arm keep its own [a0] claim.              *)
     (* ================================================================= *)
     assert (Hcsra : is_cs_idx Rra = false) by (vm_compute; reflexivity).
-    iAssert (□ wp_next (CID0 := CID) b pj (fun CIDt : CpuId =>
+    iAssert (□ wp_next (CID0 := CID) true pj (fun CIDt : CpuId =>
                ∀ (Mt : regfile) (uu10 : mword 64) (dnew : nat -> bv 8),
                  ⌜dlk_tregs m sp0 Mt⌝ -∗
                  sie_cap_gpr Mt (K - 12)%nat b pj -∗
@@ -682,7 +684,7 @@ Section ProofDirlookupMain.
                  (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
                  (pa_stk sp0 10) ↦₈ uu10 -∗
                  ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ dnew jj) -∗
-                 wp_next (CID0 := CIDt) b pj (fun CIDf : CpuId =>
+                 wp_next (CID0 := CIDt) true pj (fun CIDf : CpuId =>
                    ∀ mf : regfile,
                      ⌜callee_saved m mf⌝ -∗
                      ⌜mf !!! Regidx Ra0 = (Mt !!! Regidx Ra0 : mword 64)⌝ -∗
@@ -1020,7 +1022,7 @@ Section ProofDirlookupMain.
       { exact HR13tr. }
       iIntros (CIDf Hsf mf) "%Hcsf %Ha0f Hcg Hpc".
       iDestruct (cpu_own_transport CID CIDf 0%nat eb pj C b
-                   ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+                   ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf false 0%nat 0%nat 1%Qp with
                 "[%] Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks Hnm Hppid Hbslot
@@ -1036,7 +1038,7 @@ Section ProofDirlookupMain.
       (*  carry its own [CpuId].  The measure is [nrec - i].              *)
       (* =============================================================== *)
       iAssert (∀ fuel : nat,
-        wp_next (CID0 := CID) b pj (fun CIDl : CpuId =>
+        wp_next (CID0 := CID) true pj (fun CIDl : CpuId =>
           ∀ (i : nat) (Ml : regfile) (dol : nat -> bv 8) (mt10 : mword 64),
             ⌜(S nrec - i <= fuel)%nat⌝ -∗
             (* §15(b): THE LOOP TEST, not [i < nrec].  Without granularity
@@ -1068,7 +1070,7 @@ Section ProofDirlookupMain.
             p_pid pj ↦₄{dq} pidv -∗
             bslot bn -∗
             iref_slot -∗
-            wp_next (CID0 := CID) b pj (fun (CIDc : CpuId) =>
+            wp_next (CID0 := CID) true pj (fun (CIDc : CpuId) =>
               ∀ (mf : regfile) (found : bool) (kk : nat) (kslot : nat) (q : Qp),
                 ⌜callee_saved m mf⌝ -∗
                 sie_cap_gpr mf K b pj -∗
@@ -1115,7 +1117,7 @@ Section ProofDirlookupMain.
           by (rewrite Nat2Z.inj_mul; lia).
         assert (Hoffs : Z.of_nat (16 * S i) = Z.of_nat (16 * i) + 16) by lia.
         (* ------------- THE LATCH at +0x52 (both misses land here) ------- *)
-        iAssert (wp_next (CID0 := CIDl) b pj (fun CIDp : CpuId =>
+        iAssert (wp_next (CID0 := CIDl) true pj (fun CIDp : CpuId =>
                    ∀ (Mp : regfile) (dol' : nat -> bv 8) (mt10' : mword 64),
                      ⌜dlk_regs m sp0 ip nb pf (16 * i) Mp⌝ -∗
                      ⌜dir_first data (S i) s = None⌝ -∗
@@ -1142,7 +1144,7 @@ Section ProofDirlookupMain.
                      p_pid pj ↦₄{dq} pidv -∗
                      bslot bn -∗
                      iref_slot -∗
-                     wp_next (CID0 := CID) b pj (fun (CIDc : CpuId) =>
+                     wp_next (CID0 := CID) true pj (fun (CIDc : CpuId) =>
                        ∀ (mf : regfile) (found : bool) (kk : nat) (kslot : nat) (q : Qp),
                          ⌜callee_saved m mf⌝ -∗
                          sie_cap_gpr mf K b pj -∗
@@ -1298,7 +1300,7 @@ Section ProofDirlookupMain.
             { exact (dlk_tregs_of_regs m sp0 ip nb pf (16 * S i) Q3 HQ3regs). }
             iIntros (CIDf Hsf mf) "%Hcsf %Ha0f Hcg Hpc".
             iDestruct (cpu_own_transport CIDp CIDf 0%nat eb pj C b
-                         ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+                         ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
             iSpecialize ("Hqc" $! CIDf with "[%]"); [wp_next_chain |].
             iApply ("Hqc" $! mf false 0%nat 0%nat 1%Qp with
                       "[%] Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks Hnm Hppid
@@ -1325,7 +1327,7 @@ Section ProofDirlookupMain.
             assert (Hsile : (S i <= nrec)%nat)
               by exact (dlk_le_nrec (bv_unsigned (di_size dn)) (S i) Hsznn Hgtc).
             iDestruct (cpu_own_transport CIDp CIDP3 0%nat eb pj C b
-                         ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+                         ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
             iSpecialize ("IHf" $! CIDP3 with "[%]"); [wp_next_chain |].
             iApply ("IHf" $! (S i) Q2 dol' mt10' with
                       "[%] [%] [%] [%] Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7
@@ -1484,7 +1486,7 @@ Section ProofDirlookupMain.
                  ∗ p_pid (proc_addr j) ↦₄{dq} pidv)%I with "[Hde Hppid]" as "Hdst".
         { iEval (rewrite HL6a2 Hpjd). iFrame. }
         iDestruct (cpu_own_transport CIDl CIDB6 0%nat eb pj C b
-                     ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+                     ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         iApply (RD.wp_readi_sconf gs j gl gu gd gk pd pav pu bn gfs ga gf
                   cov logstart dev ip bm data dn
                   false (16 * i)%nat 16%nat dol dlk_dummyV
@@ -1649,7 +1651,7 @@ Section ProofDirlookupMain.
                               (dlk_align_8_2 _ Hal12))).
             iSplitL "Hdehi"; [iExact "Hdehi" | iExact "Hdenm"]. }
           iDestruct (cpu_own_transport CIDrd CIDB9 0%nat eb pj C b
-                       ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+                       ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
           iSpecialize ("Hlatch" $! CIDB9 with "[%]"); [wp_next_chain |].
           iApply ("Hlatch" $! N1 (fun jj => file_byte data (16 * i + jj)%nat)
                     mt10 with
@@ -1777,7 +1779,7 @@ Section ProofDirlookupMain.
             iAssert (sie_cap_gpr mnc (K - 12)%nat b pj -∗
                      pc_is (mword_of_int (DL + 0x7e)) -∗
                      (if hasp then pf ↦₄ pofv else emp) -∗
-                     wp_next (CID0 := CIDB13) b pj (fun CIDs : CpuId =>
+                     wp_next (CID0 := CIDB13) true pj (fun CIDs : CpuId =>
                        sie_cap_gpr mnc (K - 12)%nat b pj -∗
                        pc_is (mword_of_int (DL + 0x86)) -∗
                        (if hasp
@@ -1887,7 +1889,7 @@ Section ProofDirlookupMain.
             { rewrite (dlk_zext32_unsigned (dir_inum data i)).
               exact (Hinums i Hilt Hlive). }
             iDestruct (cpu_own_transport CIDrd CIDB17 0%nat eb pj C b
-                         ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+                         ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
             iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart nib dev
                       (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
                       N7 0%nat eb pj C (K - 12)%nat b
@@ -1932,7 +1934,7 @@ Section ProofDirlookupMain.
             { exact (dlk_tregs_of_regs m sp0 ip nb pf (16 * i) mig Higregs). }
             iIntros (CIDf Hsf mf) "%Hcsf %Ha0f Hcg Hpc".
             iDestruct (cpu_own_transport CIDig CIDf 0%nat eb pj C b
-                         ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+                         ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
             iSpecialize ("Hqc" $! CIDf with "[%]"); [wp_next_chain |].
             iApply ("Hqc" $! mf true i kslot q with
                       "[%] Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks Hnm Hppid
@@ -1961,7 +1963,7 @@ Section ProofDirlookupMain.
                                 (dlk_align_8_2 _ Hal12))).
               iSplitL "Hdehi"; [iExact "Hdehi" | iExact "Hdenm"]. }
             iDestruct (cpu_own_transport CIDrd CIDB13 0%nat eb pj C b
-                         ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+                         ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
             iSpecialize ("Hlatch" $! CIDB13 with "[%]"); [wp_next_chain |].
             iApply ("Hlatch" $! mnc (fun jj => file_byte data (16 * i + jj)%nat)
                       mt10 with
@@ -1981,7 +1983,7 @@ Section ProofDirlookupMain.
       iNext. iIntros (CID24 Hq24) "Hcg Hpc".
       iEval (rewrite Htgt5c) in "Hpc".
       iDestruct (cpu_own_transport CID CID24 0%nat eb pj C b
-                   ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+                   ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hloop" $! (S nrec) CID24 with "[%]"); [wp_next_chain |].
       iApply ("Hloop" $! 0%nat R13 dolds0 u10 with
                 "[%] [%] [%] [%] Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8

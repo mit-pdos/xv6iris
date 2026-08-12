@@ -108,6 +108,59 @@ change that produced it.
 - **A slow `Qed` is usually proof-term SIZE, not conversion — and `rocq compile -profile <f>.json` is what tells you which.** It breaks each `Qed` into `HConstr.of_constr` / `Typeops.execute` / `close_proof` / `sort_and_universes_of_constr`; measured across this tree only ~25 % is `Typeops` (real typechecking) and the rest is term-size-linear plumbing that re-walks every *occurrence* of a shared subterm. The one-command tell is **`Set Debug "hconstr".`**, which prints each `Qed`'s `tree size` and `bindings` (the DAG): a high **tree/bindings ratio** means a small proof with an exponentially unfolded term. To localise it inside a lemma, bisect with an `Axiom cheat_ : forall (A : Type), A.` stub (unlike `Admitted` this still runs `Qed`). See `optimization.md` for the whole method and for the `unfold set_reg` 3^N trap it found.
 - **`coqc` offloads `Qed` kernel-checking to an async `rocqworker` subprocess, and `coqc -time` does NOT count that worker's time.** So `-time`'s per-sentence sum can be tiny (e.g. 14 s) while the real `/usr/bin/time` wall is minutes — the gap is the async `Qed`, NOT machine contention. A pathological `Qed` (e.g. a whole-function proof term over a transparent, eagerly-reducible register-map tower) hides this way. To see it: `/usr/bin/time -v coqc …` (wall + RSS), not `-time`. Also: a killed/`pkill`-ed `coqc` can leave orphan/zombie `rocqworker`s (`ps -eo pid,ppid,stat,comm | grep rocqworker`; `Z`/defunct = harmless, a live orphan holds a worker slot and can stall the next build) — reap them before re-measuring, and prefer `pkill -x rocqworker`/kill-by-PID over `pkill -f coqc`.
 
+## A `[-]` SPEC PATTERN EATS THE HYPOTHESES NAMED *AFTER* IT
+
+`with "… [-] Hcont"` is self-defeating, and the error blames the wrong thing:
+it fails with **`iSpecialize: "Hcont" not found`** even though `Hcont` was
+introduced at the top of the proof and nothing since touched it. `[-]` is
+`envs_split` with the complement flag and an EMPTY exception list, so it
+moves *every* remaining spatial hypothesis into that premise's goal — the
+continuing context is empty by the time the parser reaches `Hcont`. The fix
+is one character class: **`[-Hcont] Hcont`** ("all remaining EXCEPT Hcont").
+Spaces are irrelevant (`-` is its own token), so `[- Hcont]` is the same.
+
+This is worth knowing because the natural diagnosis — "an earlier `[-]` in
+the straight-line run swallowed it" — is wrong and expensive: the `[-]`
+goals in a whole-function run each carry the WHOLE context forward, so a
+hypothesis crosses any number of them intact. Look at the failing `iApply`
+itself first. (Found in `ProofKexecA.kxc_a2`, at both `kxc_bad64` sites.)
+
+Directly behind it sits the hart trap, because the next error looks like a
+non-error: **`iSpecialize: cannot instantiate (X -∗ …) with (X)` where both
+`X`s print identically** means the implicit `CID0` differs. A lemma whose
+FIRST premise is hart-indexed (`sie_cap_gpr …`) pins its own `CID0` from the
+hypothesis you hand it — i.e. to the CURRENT hart, `CID15` — while the
+caller's exit continuation is still anchored at the section's `CID0`.
+Re-anchor it with `WpNext.wp_next_retarget`, and get the crossing fact by
+NAME (`assert (Hcr : true = false \/ p = zero_reg -> (CID15 : CPU) = (CID0 :
+CPU)) by wp_next_chain.`) rather than as an inline `ltac:` in argument
+position, where `K` is still an evar.
+
+## CHAINING TWO HALVES OF A FUNCTION: THE EXIT MUST BE HANDED BACK
+
+A single `wp_next` exit continuation is LINEAR, so if both halves of a split
+function own a failure tail, the second half's premise list cannot be
+satisfied by the caller's one copy — the two continuation premises of the
+first half are `∗`-separated and nothing duplicates a `wp_next`. The shape
+that works is `ProofKforkMain`'s: the first half's FALL-THROUGH continuation
+hands the exit BACK, so the exit is supplied once and whichever continuation
+runs receives it —
+
+```coq
+    wp_next b p (fun (CID : CpuId) =>
+      ∀ …, <the seam> -∗
+        wp_next (CID0 := CID) b p (fun CIDx => <the exit>) -∗
+        WP Loop) -∗
+```
+
+`(CID0 := CID)` is mandatory: written bare inside the binder, instance
+resolution anchors it at the innermost `CpuId` and the guard degrades to a
+tautology (WpNext.v's note on `wp_next_at`). And the chaining lemma itself
+needs its OWN section: applying the second half at the seam's hart requires
+`(CID0 := CIDs)`, which a still-open section rejects ("Wrong argument name
+CID0") because `Context CID0` is one shared variable, not a per-use argument.
+`ProofKexecA.kxc_phaseA` is the worked instance.
+
 ## `rewrite -(Qp.div_2 q)` INSIDE THE PROOFMODE PUTS THE SPLIT'S EVAR OUT OF SCOPE
 
 The idiom for "split a fractional resource in half" is to rewrite `q` into
@@ -583,6 +636,20 @@ Both cost real time in one session; check for them before believing a
   error is never seen -- and `echo $?` after the pipeline reports the LAST
   command's status, not make's.  Capture make's own exit status
   (`make proofs > log 2>&1; echo $?`) and grep the file afterwards.
+
+- **A green build BEFORE a rebase says nothing about the tree AFTER it, and
+  the commit most likely to break you cannot conflict textually.** The
+  nightly dead-import sweep (`.github/workflows/dead-imports.yml`) removes and
+  RE-POINTS imports across ~100 files at a time. It changes no statement and
+  no proof, so a rebase onto it is always clean — but what it changes is which
+  names arrive TRANSITIVELY, and its most likely victim is a brand-new file,
+  whose own import list nobody has ever pruned and which therefore names half
+  its vocabulary through chains that happen to carry it. Landing
+  `ProofKexecA.v` this way put main red at `The reference is_sleeplock was not
+  found` for a few minutes. **Rebase, THEN build, THEN push — never push while
+  the verification build is still running, however small the incoming delta
+  looks.** The fix is always the same: add the requires explicitly; the next
+  sweep will prune whatever is genuinely unused.
 
 ## Proof coverage report
 
