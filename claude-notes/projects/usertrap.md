@@ -39,17 +39,45 @@ line of the walk; two of them change files you would otherwise not touch.
 | `iris/UsertrapRes.v` | `usertrap_res` DEFINED, over a **`ut_names` record**; `ut_caps` / `ut_own` / `ut_env` / `ut_trap` / `ut_res`; the walk's vocabulary (`ut_frame`, `ut_cs`, `ut_csrs_raw`, `ut_hold`) and its transport. |
 | `iris/ProofUsertrapParts.v` | the pure obligations (the refuted panic arm) + `Notation UT`. |
 | `iris/UsertrapAux.v` | the two printk format strings of the unexpected-scause arm. |
-| `iris/ProofUsertrapTail.v` | **the tail**: `ut_kexit`, `ut_ret2`, `ut_ret` (and the two blocks named in §"Remaining"). |
+| `iris/ProofUsertrapTail.v` | **the tail, PROVEN**: `ut_kexit` (the kexit(-1) dead end), `ut_ret2` (+0xb2..+0xc6 and the exit), `ut_ret` (+0xae), `ut_a6`, `ut_fa`. All index-generic in `b`. |
+| `iris/ProofUsertrapSys.v` | **the syscall arm, PROVEN**: +0x90..+0xa2, i.e. the killed pre-check, the epc bump, the `csrsi` that pays finding 3's reserve, and `jal syscall`. |
+| `iris/ProofUsertrapArms.v` | the devintr / vmfault / unexpected-scause arms. |
 
 ### Resume here
 
-Write the remaining blocks, in this order — each is the same shape as
-`ProofUsertrapTail.ut_ret2`, which is the worked template:
+**`ProofUsertrap.v` — the entry + dispatch, +0x00..+0x54 — and then the seal.**
+That is the only block left, and it is the LONGEST (about thirty
+instructions), though not the hardest: like the other four arms it runs
+entirely at `b = false`, so not one `wp_next` in it moves the hart and not one
+`(CID := ...)` annotation is needed. It covers
 
-1. `ut_a6` (+0xa6) and `ut_fa` (+0xfa) — the last two tail blocks.
-2. `ProofUsertrapArms.v` — the devintr / vmfault / unexpected-scause arms.
-3. the syscall arm (+0x90..+0xa2).
-4. `ProofUsertrap.v` — the entry + dispatch, and the seal; `LinkUsertrap.v`.
+  the 32-byte prologue and the frame pointer (+0x00..+0x0a);
+  the SPP test, whose `c.bnez` is REFUTED (`ProofUsertrapParts`) (+0x0c..+0x14);
+  the `csrw stvec, kernelvec` (+0x16..+0x1e) — `wp_csrw_stvec_s_sconf` takes
+    the RAW cell, which is why `ut_csrs_raw` and not `trap_csrs` is what the
+    dispatch carries;
+  `jal myproc` and `c.mv s1,a0` (+0x22..+0x26);
+  `p->trapframe->epc = r_sepc()` (+0x28..+0x2e), the same
+    `proc_priv_tf_upd` / `tf_page_word_upd` pair `ProofUsertrapSys.v` uses for
+    the epc bump;
+  the scause dispatch: `== 8` → `UtSys.ut_90`, `jal devintr` and its
+    `c.bnez` → `UtArms.ut_e8`, `== 15` / `== 13` → `UtArms.ut_d0`, else
+    `UtArms.ut_56` (+0x30..+0x54).
+
+`UsertrapRes.ut_trap_open` is the entry assembly's resource half and is
+already proven: the boundary's raw machine state plus `ut_trap` *is*
+`sie_cap_gpr m av false pj ∗ cpu_own 0 false pj C false`, with the dangling
+quarter, the KPT receipt and the sret mirror falling out loose — three of
+`trap_csrs`' six members, which `ut_csrs_raw` then carries alongside the three
+CSR cells. `ProofPrepareReturn.v:105-235` is the tactic template for the
+prologue (its first four steps are usertrap's +0x00..+0x06 with a frame two
+slots smaller); `stk_push_32` / `stk_frm` / `stk_fp_32` are already in
+`KernelRvcDecode.v` for exactly a 32-byte frame.
+
+Then `Module UsertrapProof … : USERTRAP` (a functor over SYSCALL, PRINTK_GEN,
+MYPROC, KILLED, SETKILLED, DEVINTR, VMFAULT, YIELD, PREPARE_RETURN, KEXIT and
+KERNELVEC), whose `usertrap_res := ut_res SY.syscall_env`, and
+`LinkUsertrap.v`.
 
 Two process rules from the neighbours apply from the first line: put
 `Set Printing Depth 40.` at the top of every proof file (usertrap proves over
@@ -415,41 +443,55 @@ and each is a real piece of work with a known shape:
    (`0x220`), for which `uc_mm` holds at `mideleg = 0xffff`. No field change,
    no ripple; the seam needs only the premise.
 
-## Remaining
+## THE BLOCK VOCABULARY, so a new block does not have to be reverse-engineered
 
-In dependency order, and every one of them is `ut_ret2`'s shape:
+Every block lemma of the walk has the SAME nine pure premises and the same
+five resources, and that uniformity is the point — a block is identified by
+its pc and by which other block it hands control to, and by nothing else:
 
-- **`ut_a6`** (+0xa6): `c.mv a0,s1`; `jal killed`; `c.bnez a0` → +0xf2
-  (`c.li s2,0`; `c.li a0,-1`; `jal kexit` → `ut_kexit`) or fall through to
-  `ut_ret`. Index-generic; one hart epoch per crossing (killed's post
-  crosses), so either annotate or split as in §5.
-- **`ut_fa`** (+0xfa): `c.li a5,2`; `bne s2,a5` → `ut_ret`; else `jal yield`
-  (which CROSSES and hands its whole premise list back) then `c.j` → `ut_ret`.
-  Needs no premise about `s2` — it only branches on it.
-- **`ProofUsertrapArms.v`**: +0xe8 (the devintr arm's killed → `ut_fa` or
-  `ut_kexit`), +0xd0 (vmfault, over `ProcInv.proc_priv_copy` — the same
-  accessor copyin/copyout use), +0x56 (printk ×2 out of `UsertrapAux.v` +
-  setkilled → `ut_a6`). All at index `false`, so no crossings at all: at
-  `b = false` every `wp_next` collapses with `wp_next_off_intro` and the hart
-  never moves. That is what makes these the cheap arms.
-- **the syscall arm** (+0x90..+0xa2): `jal killed`; `bnez` → +0xc8
-  (`c.li a0,-1`; `jal kexit`); `ld a4,88(s1)`; `ld a5,24(a4)`; `addi a5,a5,4`;
-  `sd a5,24(a4)` (the epc bump, through `ProcInv.proc_priv_tf_upd`);
-  `csrsi sstatus,2` (`wp_csrsi_sstatus_x0_enable_s_sconf`, which is where
-  finding 3's reserve is paid and where `ut_csrs_raw` must already be folded);
-  `jal syscall`; rejoin at +0xa6 at index `true`.
-- **`ProofUsertrap.v`**: the prologue (`stk_push_32` / `stk_frm` / `stk_fp_32`
-  are already in `KernelRvcDecode.v` for exactly a 32-byte frame), the refuted
-  SPP test, the `csrw stvec` (`wp_csrw_stvec_s_sconf` takes the RAW cell),
-  `jal myproc`, `p->trapframe->epc = r_sepc()`, and the scause dispatch; then
-  `Module UsertrapProof : USERTRAP` and `LinkUsertrap.v`.
-  `UsertrapRes.ut_trap_open` is the entry assembly's resource half and it is
-  already proven: the boundary's raw machine state plus `ut_trap` *is*
-  `sie_cap_gpr m av false pj ∗ cpu_own 0 false pj C false`, with the dangling
-  quarter, the KPT receipt and the sret mirror falling out loose.
-  `ProofPrepareReturn.v:105-235` is the tactic template for the prologue
-  (its first four steps are usertrap's +0x00..+0x06 with a frame two slots
-  smaller).
+```coq
+  ut_wf N -> (K_usertrap <= av)%nat -> (trap_res b + nx)%nat = (av - 4)%nat ->
+  ud_tfp (pv_upt V) = ud_tfp pt ->
+  add_vec (un_ks N) (mword_of_int 4096) = ksp ->
+  m0 !!! Regidx csp_rs1 = ksp ->
+  m  !!! Regidx csp_rs1 = pa_stk ksp 4 ->      (* sp is below the frame  *)
+  m  !!! Regidx Rs1 = un_pj N ->               (* s1 holds p            *)
+  ut_cs m0 m ->                                (* the OTHER callee-saved *)
+  kernel_text -∗ pc_is (mword_of_int (UT + <off>)) -∗
+  sie_cap_gpr m nx b (un_pj N) -∗ ut_hold Rsys N V C b -∗
+  ut_frame ksp (m0 !!! Rra) (m0 !!! Rs0) (m0 !!! Rs1) (m0 !!! Rs2) -∗
+  wp_next true (un_pj N)
+    (fun CID' => usertrap_post (CID := CID') (ut_res Rsys) pt ksp m0) -∗
+  WP (Loop : expr riscv_lang)
+```
+
+`ut_cs m0 m` is the one piece of vocabulary worth understanding before writing
+another block: `CalleeSaved.callee_saved m0 m` is FALSE at every point inside
+usertrap (s1 holds `p` and s2 holds `which_dev` from +0x26 on), so what
+travels is the weaker relation that says nothing about sp / s0 / s1 / s2, and
+`ut_cs_to_callee_saved` turns it back into the real thing once the epilogue's
+four loads have run. Its four laws (`_refl`, `_trans`, `_insert` for a
+non-callee-saved destination, `_insert4` for one of the frame's own) are what
+every block threads it with.
+
+Four smaller things that cost a compile each to find:
+
+- `ltac:(lia)` cannot see through a `Definition`. Write
+  `ltac:(unfold K_kexit; lia)`, `ltac:(unfold K_prepare_return; lia)`.
+  `ut_nx_bound` gives `K_syscall <= nx` (= 82) from the entry budget, which
+  covers every callee's own bound; `ut_nx_bound_off` gives the stronger
+  `kv_frame_slots + K_syscall <= nx` that only the syscall arm needs.
+- A memory hypothesis has to be rewritten INTO the leaf's
+  `add_vec (rget m rs) imm` spelling before the leaf and BACK afterwards — the
+  leaf hands it out in its own spelling, so the NEXT consumer (`Hpvback`, the
+  frame's `stack_own_4_intro`, a second access) will not match it.
+- An address premise stated over `rget m rs` must be proved `by (rgne;
+  rewrite H…; reflexivity)` — plain `reflexivity` after `bv_eq; vm_compute`
+  will NOT close `p_pagetable (un_pj N)`, whose `un_j N` is symbolic.
+- Count a contract's pure `⌜⌝` premises exactly when writing
+  `with "[%] [%] …"`. One too few and the error blames the first RESOURCE
+  instead ("cannot instantiate … with `hart_state ↦ᵣ …`"), which reads exactly
+  like the hart trap and is not it.
 
 ### Two hoists owed (both deliberate, neither blocking)
 
