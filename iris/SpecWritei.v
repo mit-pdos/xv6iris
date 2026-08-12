@@ -491,15 +491,31 @@ Definition wp_writei_sconf_body
      resources, threaded through (design §11.3/§12) *)
   ireg_inv γi γfs inodestart nib -∗
   dinode_at γi inum dn0 -∗
-  (* THE SOURCE.  On the user arm a virtual address into the running
-     process's own space; on the kernel arm the caller's own byte buffer,
-     returned unchanged. *)
+  (* THE SOURCE, AND THE PID CELL THAT RIDES WITH IT.  On the user arm a
+     virtual address into the running process's own space; on the kernel arm
+     the caller's own byte buffer, returned unchanged.
+
+     THE PID FRACTION IS THE KERNEL ARM'S, AND ONLY THE KERNEL ARM'S.
+     bread's acquiresleep records the caller's pid, so writei needs a share
+     of [p->pid] either way -- but on the USER arm it borrows that share out
+     of [proc_priv] itself ([ProcInv.proc_priv_pid]) rather than asking for
+     it.  It has to: that accessor is a BORROW, it consumes the block and
+     returns a wand, so no caller can hold [proc_priv] and the fraction at
+     the same time.  The cell is fully accounted for --
+     [ProcInv.proc_priv_core] holds one half and [SchedCtx.proc_pub] the
+     other, behind [p->lock] -- so there is no third fragment anywhere for a
+     caller to reach.  A caller therefore supplies ONE OR THE OTHER and
+     never both.
+
+     (This contract asked for both at once until S3p, with a comment
+     claiming [proc_priv_pid] supplied the quarter alongside the block.  It
+     does not, and the user arm was UNCALLABLE; filewrite, its first
+     user-arm caller, is what forced the repair.  [SpecReadi.v]:244-267 is
+     the same fix, made one stage earlier by fileread.) *)
   (if user
    then proc_priv γf pj pidv V
-   else [∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) -∗
-  (* the caller's own pid cell (acquiresleep records it).  On the user arm
-     this is [proc_priv]'s own quarter (ProcInv.proc_priv_pid). *)
-  p_pid pj ↦₄{dq} pidv -∗
+   else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) ∗
+        p_pid pj ↦₄{dq} pidv) -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -568,7 +584,6 @@ Definition wp_writei_sconf_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      p_pid pj ↦₄{dq} pidv -∗
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗
       inode_meta ip dn' -∗
@@ -579,9 +594,12 @@ Definition wp_writei_sconf_body
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       bitmap_res γfs bmapstart cov logstart size used' -∗
       dinode_at γi inum dn0' -∗
+      (* the source goes back the way it came -- with the kernel arm's
+         buffer, or inside the user arm's block *)
       (if user
        then proc_priv γf pj pidv (upd_upt V P')
-       else [∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) -∗
+       else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) ∗
+            p_pid pj ↦₄{dq} pidv) -∗
       bslots bn 3 -∗
       log_op γ n' -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -715,15 +733,31 @@ Definition wp_writei_gen_body
      resources, threaded through (design §11.3/§12) *)
   ireg_inv γi γfs inodestart nib -∗
   dinode_at γi inum dn0 -∗
-  (* THE SOURCE.  On the user arm a virtual address into the running
-     process's own space; on the kernel arm the caller's own byte buffer,
-     returned unchanged. *)
+  (* THE SOURCE, AND THE PID CELL THAT RIDES WITH IT.  On the user arm a
+     virtual address into the running process's own space; on the kernel arm
+     the caller's own byte buffer, returned unchanged.
+
+     THE PID FRACTION IS THE KERNEL ARM'S, AND ONLY THE KERNEL ARM'S.
+     bread's acquiresleep records the caller's pid, so writei needs a share
+     of [p->pid] either way -- but on the USER arm it borrows that share out
+     of [proc_priv] itself ([ProcInv.proc_priv_pid]) rather than asking for
+     it.  It has to: that accessor is a BORROW, it consumes the block and
+     returns a wand, so no caller can hold [proc_priv] and the fraction at
+     the same time.  The cell is fully accounted for --
+     [ProcInv.proc_priv_core] holds one half and [SchedCtx.proc_pub] the
+     other, behind [p->lock] -- so there is no third fragment anywhere for a
+     caller to reach.  A caller therefore supplies ONE OR THE OTHER and
+     never both.
+
+     (This contract asked for both at once until S3p, with a comment
+     claiming [proc_priv_pid] supplied the quarter alongside the block.  It
+     does not, and the user arm was UNCALLABLE; filewrite, its first
+     user-arm caller, is what forced the repair.  [SpecReadi.v]:244-267 is
+     the same fix, made one stage earlier by fileread.) *)
   (if user
    then proc_priv γf pj pidv V
-   else [∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) -∗
-  (* the caller's own pid cell (acquiresleep records it).  On the user arm
-     this is [proc_priv]'s own quarter (ProcInv.proc_priv_pid). *)
-  p_pid pj ↦₄{dq} pidv -∗
+   else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) ∗
+        p_pid pj ↦₄{dq} pidv) -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -796,7 +830,6 @@ Definition wp_writei_gen_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      p_pid pj ↦₄{dq} pidv -∗
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗
       inode_meta ip dn' -∗
@@ -807,9 +840,12 @@ Definition wp_writei_gen_body
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       bitmap_res γfs bmapstart cov logstart size used' -∗
       dinode_at γi inum dn0' -∗
+      (* the source goes back the way it came -- with the kernel arm's
+         buffer, or inside the user arm's block *)
       (if user
        then proc_priv γf pj pidv (upd_upt V P')
-       else [∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) -∗
+       else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) ∗
+            p_pid pj ↦₄{dq} pidv) -∗
       bslots bn 3 -∗
       log_opS γ n' Sb' -∗
       WP (Loop : expr riscv_lang)) -∗

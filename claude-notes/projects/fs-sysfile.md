@@ -1994,6 +1994,211 @@ modified, nothing else; no scratch left.
    run's result as this one's.  `rm -f /tmp/one.log` from the LAUNCHING shell
    before the `nohup`, not only inside the script.
 
+## S3p — THE WRITEI PID REPAIR IS IN AND FULL-GATED.  The walk was NOT
+## started, and nothing is owed in front of it
+
+### What landed
+
+The OWED item from `design/file-table.md`, applied exactly as
+`SpecReadi.v`:244-267 does it.
+
+**`iris/SpecWritei.v` — 4 places.** The pid fraction folds into the `if user`
+bracket's KERNEL arm, in the precondition and the postcondition of BOTH
+`wp_writei_sconf_body` and `wp_writei_gen_body`:
+
+```coq
+  (if user
+   then proc_priv γf pj pidv V
+   else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) ∗
+        p_pid pj ↦₄{dq} pidv) -∗
+```
+
+and the standalone `p_pid pj ↦₄{dq} pidv -∗` premise is gone from all four.
+The stale comment that S3n read as authority is replaced by readi's, with the
+history in it.
+
+**`iris/ProofWritei.v`.** One new definition and one new lemma, in
+`WriteiDefs` next to `wi_cont`:
+
+```coq
+  Definition wi_q (user : bool) (dq : dfrac) : dfrac :=
+    if user then DfracOwn (1/4) else dq.
+
+  Lemma wi_src_pid … : <the bracket> -∗
+    p_pid (proc_addr j) ↦₄{wi_q user dq} pidv ∗
+    (p_pid (proc_addr j) ↦₄{wi_q user dq} pidv -∗ <the bracket>).
+```
+
+Then: the 5 in-file premise pairs (`wi_cont`, `wi_ret`, `wi_join`, `wi_size`,
+`wi_loop`) re-bracketed, the two public lemmas following `SpecWritei`
+automatically, four borrow/close pairs (bmap and bread in `wi_loop`'s head,
+the two brelses in its two arms, iupdate in `wi_join`) with `wi_q user dq`
+passed as the callee's dfrac, the two `either_copyin` bundling `iAssert`s
+grown, and the `Hppid` threads dropped everywhere else.
+
+**`iris/ProofDirlink.v`:2042** — `user = false`, one `iCombine` before the
+call and one `iDestruct` after.
+
+**`iris/ProofFilewrite.v`** — the S3o banner rewritten to "repaired", plus
+`fw_writei_src` — a `⊣⊢`, so one lemma is both what the walk must supply
+at `+0xa0` and what it gets back at `+0xa4`.
+
+### THE SIZING WAS RIGHT ABOUT THE SHAPE AND WRONG ABOUT THE COST — DOWNWARD
+
+S3o sized this as "carry `p_pid ↦₄{1/4} ∗ (p_pid ↦₄{1/4} -∗ proc_priv …)` in
+place of `proc_priv ∗ p_pid`, applying the wand before each `either_copyin`
+and re-splitting after", i.e. a `user`-dependent carrier threaded through the
+whole file.  **That is not what it takes.**  The observation that collapses it:
+
+> **Every callee that wants the fraction quantifies its `dq`.**  bmap, bread,
+> brelse and iupdate all take `p_pid pj ↦₄{dq} pidv` at an arbitrary dfrac,
+> so ONE accessor at a `user`-indexed dfrac (`wi_q`) serves both arms and
+> **no call site case-splits on `user` at all**.
+
+So the borrow is not carried; it is opened immediately before each of the four
+calls and closed the instant each returns, and in between the file carries the
+bracket under its existing name.  `wi_ret` and `wi_size` — which only ever
+threaded the fraction — lost a hypothesis and gained nothing.
+
+`ProofWritei.v` compiled on the FIRST attempt after the edit, and so did
+`ProofDirlink.v`.  There was no seventh blocker.
+
+### The two `either_copyin` bundling sites, which are the only real work
+
+`either_copyin` takes `proc_priv` and never the fraction, so the borrow must
+be CLOSED across the copy — and the two `iAssert`s that split the source
+around it are stated per-arm, so both had to grow the fraction into their
+kernel arm rather than case-split on it:
+
+* the pre-split (`Hsrcw` / `Hsrcrest`) parks `p_pid … ↦₄{dq}` in `Hsrcrest`'s
+  `else` branch, alongside the head and tail of the buffer that
+  `ProofWriteiParts.wi_split3` peels off;
+* the post-normalisation (`Hnorm`) puts it back, with one `iSplitR "Hppid"`
+  in front of the existing `wi_join3`.
+
+On the user arm both are `True` / the whole block, untouched.
+
+### The dirlink consumer: `iCombine`, not an `iAssert`
+
+`ProofDirlink` builds readi's kernel-arm bracket by hand at :2659 with an
+explicit `iAssert` naming the bigop.  For writei the cheaper form works and
+is shape-independent:
+
+```coq
+        iCombine "Hsrc Hppid" as "Hsrc".      (* before the call *)
+        …
+        iDestruct "Hsrc" as "[Hsrc Hppid]".   (* after it *)
+```
+
+`iCombine` produces the plain `∗` (no `CombineSepAs` instance fires between a
+bigop and a `p_pid` pointsto), and `IntoSep` sees through `if false then _
+else (_ ∗ _)` by iota, so neither direction needs the bigop written out.
+**Worth copying**: it means a kernel-arm consumer of one of these brackets
+does not have to know the buffer's exact printed form.
+
+### Gate
+
+* `ProofWriteiParts.v`, `WriteiBudget.v`, `ProofWritei.v`, `ProofDirlink.v`,
+  `ProofFilewrite.v`: each `DONE … = 0` (the `DONE` line, not the trailing
+  `EXIT=0` — S3n's trap 1).
+* `full.sh` `EXIT=0`, **1038 `.vo`** (no file added or removed).
+* `Print Assumptions` via the mirror's `audit.sh`:
+  `Writei.wp_writei_sconf`, `Writei.wp_writei_gen` and
+  `Dirlink.wp_dirlink_sconf` are each **exactly the six names S3n recorded**
+  — `rv64d.valid_reservation`, `rv64d.plat_term_write`,
+  `rv64d.match_reservation`, `rv64d.load_reservation`,
+  `rv64d.cancel_reservation`, `FunctionalExtensionality.functional_
+  extensionality_dep`.  Nothing added, nothing dropped: the new premise is
+  strictly weaker, so nothing above writei moved.
+* `tools/lemma_diff.py --ref HEAD`: CLEAN.  No `Admitted` / `Axiom` /
+  `cheat_` / `admit`.
+* md5 verified equal on both sides after every scp; `_CoqProject` NOT touched.
+
+### OWED, and deliberately not done here: ONE stale sentence in `SpecReadi.v`
+
+`iris/SpecReadi.v`:260-263 still reads
+
+> *"[SpecWritei.v] still has the same shape -- see
+> claude-notes/design/file-table.md."*
+
+which **is now false**, and this stage's own trap 1 (S3o's) says a stale
+comment is exactly how the next reader gets misled.  It is not fixed here for
+one reason: `SpecReadi.v` is at the bottom of the readi cone, so a
+comment-only edit re-digests `SpecReadi.vo` and forces a rebuild of
+`ProofReadi`, `ProofFileread`, `ProofDirlookup`, `ProofDirlink`, `ProofNamei`
+and everything above them — a whole-tree round trip for a sentence, with the
+risk of parking RED if it does not finish.  Park-green wins.
+
+**The replacement text, so it costs the next stage nothing** (any stage that
+rebuilds that cone for its own reasons should just apply it):
+
+```
+     (An earlier version of this contract asked for both at once, with a
+     comment claiming [proc_priv_pid] supplied the quarter alongside the
+     block.  It does not, and the user arm was uncallable; fileread, its
+     first caller, is what found it.  [SpecWritei.v] HAD THE SAME DEFECT and
+     was repaired the same way at fs-sysfile S3p, when filewrite -- its own
+     first user-arm caller -- hit it; both are now this shape.  See
+     claude-notes/design/file-table.md.) *)
+```
+
+### WHAT WAS NOT DONE: the walk
+
+`wp_filewrite_sconf`, `FilewriteProof` and `LinkFilewrite.v` are **not
+written**.  file.c stays 6/7 and S4 stays blocked.  This stage spent its
+budget on Part 1 and on the mirror round-trips it needed; the walk is
+~2500 lines of instruction-wise Iris over a 118-instruction function with a
+bottom-tested loop, and starting it without finishing it would have parked
+red.  Everything S3o staged for it is intact and now unobstructed.
+
+### Traps recorded
+
+1. **A `.vo` REBUILT BY `one.sh` IS NOT A REBUILT CONE, and the failure reads
+   like a proof error.**  Changing `SpecWritei.v` staled
+   `ProofWriteiParts.vo`, `WriteiBudget.vo` and `SpecFilewrite.vo`; `one.sh`
+   compiles the named files in the named order and nothing else, so the first
+   three attempts died on *"Compiled library X makes inconsistent assumptions
+   over library SpecWritei"* — once per stale prerequisite, one mirror
+   round-trip each.  Use `make -f CoqMakefile <target>.vo -j24` for anything
+   downstream of a changed Spec; `one.sh` is only safe for a leaf.  (A
+   `mk.sh` doing exactly that now sits next to `one.sh` on the mirror.)
+2. **`one.sh`'s trailing `EXIT=0` is FALSE GREEN — confirmed again, three
+   times in this stage.**  It is the script's own exit, not `coqc`'s.  Read
+   the `DONE <file> = N` line.  (S3n's trap 1, and it will keep biting
+   because the false line is the LAST one in the log.)
+3. **A `Definition` next to the premise it abbreviates is not always the
+   right move.**  `ProofReadi` names its bracket `rd_dst`; writei's is left
+   INLINE, matching `SpecWritei`'s statement literally, and only the borrow
+   is named.  The proofmode cost is the same (the bracket is two conjuncts,
+   not a continuation), and keeping the public lemmas' statements
+   syntactically identical to the spec body's is worth more than the
+   abbreviation.
+4. **durable-notes' "a class that is not IMPORTED becomes a fresh VARIABLE,
+   silently" — HIT AGAIN, and the documented tell is exact.**
+   `ProofFilewrite.v` does not `Require Import WpLock`, so
+   ``Context `{!riscvGS Σ, !lockG Σ, …}`` did not fail: it *invented* a
+   section variable `lockG`, and `proc_priv`'s real `WpLock.lockG` instance
+   then had nothing to resolve against.  That left the statement's `Σ`
+   unresolved and with it EVERY other instance in the lemma — eleven
+   `UNDEFINED EVARS` over `riscvGS`, `fileG`, `fdslotG`, `mem_pointsto` and
+   `big_opL`'s `Monoid`, not one of which names the real problem.  The tell
+   the durable note gives is the one that identifies it: **the printed local
+   context contains BOTH `lockG` and `lockG0`**, and the evar goal is
+   spelled QUALIFIED (`WpLock.lockG ?Σ`) where the binder is not.
+   *What this stage adds:* the note offers `Require Import`/`Require Export`
+   as the fix; **qualifying the binder in place (``!WpLock.lockG Σ``) is
+   better when the file is not yours to re-import**, because a new import
+   also silently re-resolves every other unqualified name in the file — and
+   this file's header already warns that an unqualified `FW_MAX` typechecks
+   in some goals and fails in others.
+5. **`ProcInv` does not `Export` `ProcGeom`, and `ProcPtOwn` does not
+   `Export` `UserPtTree`.**  So a file that has `proc_priv` in scope from
+   `Require Import ProcInv` still has neither `proc_addr` nor `p_pid`, and
+   one with `upd_upt` still has no `uptd`.  Three separate round-trips in
+   this stage, one per name.  Same family as S3o's trap 2 (`uint` lives in
+   `SailStdpp.Operators_mwords`): **in this tree, having the operation does
+   not mean having its argument type.**
+
 ## The stage ladder
 
 - **S1** (agent): the DECODE stage — 13 Code files (the 12 targets +
@@ -2126,16 +2331,24 @@ modified, nothing else; no scratch left.
   shape, and seventeen new lemmas including the re-park's two assemblies
   (`fw_inode_ok_rebuild`, `fw_dir_ok_wi`).  1038 `.vo`, lemma_diff clean.
   **file.c stays 6/7 and S4 stays blocked.**
-- **S3p** (agent): THE REPAIR, on `SpecReadi.v`:264-267's landed template —
-  move writei's pid fraction into the KERNEL arm of the `if user`, pre and
-  post, in both bodies; carry the borrow-wand inside `ProofWritei.v`.  Sized
-  in the S3o section (4 spec places, 5 in-file premise pairs, 2 public
-  lemmas, 3 `either_copyin` sites, 34 `Hppid` threads, ONE downstream
-  consumer).  Strictly weaker premise, so nothing above writei moves.
+- **S3p** (agent) **— PARTIAL**: **THE REPAIR IS IN, AND BLOCKER SIX IS
+  GONE.**  `SpecWritei` now carries `SpecReadi`'s shape verbatim (the pid
+  fraction inside the `if user` bracket's KERNEL arm, pre and post, both
+  bodies); `ProofWritei` borrows it back with ONE lemma, `wi_src_pid`, over a
+  `wi_q user dq` dfrac — no call site case-splits on `user`, because every
+  fraction-taking callee already quantified its `dq`.  `ProofDirlink`
+  (`user = false`) `iCombine`s its two arguments across the call.  Full-gated,
+  1038 `.vo`, `Print Assumptions` on Writei and Dirlink byte-identical,
+  lemma_diff clean.  `ProofFilewrite.v`'s banner is rewritten to "repaired",
+  and `fw_writei_src` is the discharge of the stopping premise — a `⊣⊢`,
+  machine-checked at the `user = true` the decode forces and stated with the
+  `if` UNREDUCED so the bracket cannot drift again unnoticed.
+  **THE WALK ITSELF WAS NOT STARTED** — see S3q.  file.c stays 6/7.
 - **S3q** (agent): the walk itself — `wp_filewrite_sconf` +
   `FilewriteProof` + `LinkFilewrite`, on S3g's seven blocks, `fw_tail`, and
-  S3n+S3o's preamble/leaf table.  Then file.c is 7/7 and S4's three shells
-  unblock.
+  S3n+S3o's preamble/leaf table.  **Nothing is owed in front of it**: S3o
+  cleared every premise of every call by hand and S3p repaired the one that
+  failed.  Then file.c is 7/7 and S4's three shells unblock.
 - **S4** (agent): sys_read/sys_write/sys_fstat — argfd + the file.c
   contracts; thin shells.
 - **S5** (agent): create — the writing half's boss: namei/nameiparent

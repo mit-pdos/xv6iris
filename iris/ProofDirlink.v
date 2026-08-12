@@ -2037,6 +2037,11 @@ Section ProofDirlinkMain.
                         = add_vec_int (mword_of_int (DK + 0x8c) : mword 64) 4)
           by (rewrite /V6; apply upd_eq).
         iEval (rewrite -HV6a2) in "Hsrc".
+        (* S3p: writei's source and the pid share are ONE premise now, the
+           same bracket readi already takes (the readi call below builds it
+           by hand at :2659).  [user = false] here, so it is the buffer and
+           the caller's own fraction, and the post returns both together. *)
+        iCombine "Hsrc Hppid" as "Hsrc".
         iDestruct (cpu_own_transport CIDa CIDA11 0%nat eb (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iApply (WI.wp_writei_sconf gs j gl gu gd gk pd pav pu bn g gfs gi ga gf
@@ -2060,13 +2065,16 @@ Section ProofDirlinkMain.
                   HV6a3 HV6a4 Heb
                   with "Hcg Hcnt Htext Hpc Hpanic Hkd Hpk Hbio Hlog Hkenv
                         Hidev Hiinum Hmeta Hmap Hblocks Hsbi Hsbs Hsbb Hbmr
-                        Hiregi Hdat Hsrc Hppid Hprocs Hdev Hgeom Hdlk Hbsl
+                        Hiregi Hdat Hsrc Hprocs Hdev Hgeom Hdlk Hbsl
                         Hop [-]").
         iIntros (CIDwi Hswi mwi tot bm' data' dn' dn0' nn wrote dist dstb P' used')
           "%Hcswi %Hused %Hwf' %Hholes' %Haddrs' %Hsz' %Hcov' %Hcap' %Hsized'
            %Hdistb %Hdist0
-           %Hdistk %Hrange %Htie %Harm %Hbud %Hupt Hcg Hcnt Hpc Hppid Hidev Hiinum
+           %Hdistk %Hrange %Htie %Harm %Hbud %Hupt Hcg Hcnt Hpc Hidev Hiinum
            Hmeta Hmap Hblocks Hsbi Hsbs Hsbb Hbmr Hdat Hsrc Hbsl Hop".
+        (* and they come back together: re-bracket into the two names the
+           rest of dirlink threads *)
+        iDestruct "Hsrc" as "[Hsrc Hppid]".
         (* writei's two PRESERVATION clauses (SpecWritei.v's header) are for a
            caller that RE-PARKS the inode; dirlink forwards its record to its
            own caller instead, so they are dropped at this boundary.  When

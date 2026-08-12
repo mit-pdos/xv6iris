@@ -1,5 +1,5 @@
 (* ProofFilewrite.v -- filewrite's own control flow and ghost steps.
-   ============================= WIP, S3o ==============================
+   ============================= WIP, S3p ==============================
 
    STATUS: THE ARITHMETIC PREAMBLE ONLY.  [wp_filewrite_sconf] and the
    [FilewriteProof] functor are NOT WRITTEN, so [LinkFilewrite.v] does not
@@ -7,53 +7,44 @@
    walk consumes at its call sites.
 
    =====================================================================
-   S3o STOPPED AND REPORTED: THE SIXTH BLOCKER IS REAL, AND IT IS THE ONE
-   [SpecReadi.v] ALREADY NAMED.  S3n's clearance (4) BELOW IS WRONG.
+   S3p: BLOCKER SIX IS REPAIRED.  THE WALK HAS NOTHING OWED IN FRONT OF IT.
    =====================================================================
 
-   S3n's point 4 says the [p_pid] quarter writei wants "arrives out of
-   [proc_priv] by [ProcInv.proc_priv_pid], exactly as SpecWritei's own
-   comment at the premise says".  SpecWritei's comment is the stale one --
-   [SpecReadi.v]:255-263 records that this exact claim is FALSE and that
-   "[SpecWritei.v] still has the same shape", and
-   claude-notes/design/file-table.md's section "OWED: SpecWritei.v cannot be
-   called on its user arm" specifies the repair and says in terms:
-   "[filewrite] is the function that will hit this, and it should be done
-   BEFORE that proof is started rather than during it."  S3o is that hit.
+   S3o stopped at ONE premise of ONE call -- writei's, at +0xa0 -- and S3p
+   fixed the contract.  [SpecWritei.v] now carries [SpecReadi.v]'s shape
+   verbatim: the pid fraction is the KERNEL arm's and rides INSIDE the
+   [if user] bracket, in the precondition and the postcondition of both
+   [wp_writei_sconf_body] and [wp_writei_gen_body].  So the walk, standing
+   at +0xa0 holding [proc_priv γf pj pidv V] and nothing else, satisfies the
+   source premise EXACTLY -- see [fw_writei_src] below, which is that
+   discharge, machine-checked, at the [user = true] the decode forces.
+   Inside writei the quarter is borrowed out of [proc_priv] by
+   [ProofWritei.wi_src_pid] and closed again around each of bmap / bread /
+   brelse / iupdate; [either_copyin] always sees the block whole.  Nothing
+   above writei moved -- the new premise is strictly weaker -- so the
+   [Print Assumptions] cones of Writei and Dirlink are unchanged.
 
-   THE PRECISE GOAL.  filewrite's writei call at +0xa0 passes [a1 = 1]
-   ([c.li s8,1] at +0x50, [c.mv a1,s8] at +0x9a), so writei's premise
-   [eq_vec (m !!! Ra1) zero_reg = negb user] forces [user = true].  On that
-   arm [SpecWritei.wp_writei_sconf_body] (SpecWritei.v:497-502) demands, as
-   two separate premises of the SAME call,
+   WHAT THE STOP WAS, kept because the lesson is the durable part.  S3n
+   cleared this call by reading SpecWritei's premise COMMENT ("on the user
+   arm this is proc_priv's own quarter"), which was the stale sentence
+   [SpecReadi.v]:255-263 had already refuted in terms.  The accessor's TYPE
+   refutes it in one line: [ProcInv.proc_priv_pid] is a BORROW
+   ([proc_priv -∗ p_pid ↦₄{1/4} ∗ (p_pid ↦₄{1/4} -∗ proc_priv)],
+   ProcInv.v:892), so it consumes the block; and the cell totals one, with
+   [ProcInv.proc_priv_core] holding a half and [SchedCtx.proc_pub] the
+   other behind [p->lock], so there was no third fragment to find.  A
+   premise justified by a comment is not cleared.  Clear it against a
+   signature, a lemma, or a [vm_compute].
 
-       (if user then proc_priv γf pj pidv V else <the caller's buffer>) -∗
-       p_pid pj ↦₄{dq} pidv -∗
-
-   and the walk, standing at +0xa0, holds exactly ONE of the two:
-   [wp_filewrite_sconf_body] hands it [proc_priv γf pj pidv V] and
-   [filewrite_fs_env] contains no [p_pid] cell at any fraction.  The residual
-   obligation is therefore
-
-       proc_priv γf (proc_addr j) pidv V
-         ⊢ proc_priv γf (proc_addr j) pidv V ∗ ∃ dq, p_pid (proc_addr j) ↦₄{dq} pidv
-
-   which is FALSE, not merely unproven: [ProcInv.proc_priv_pid] is a BORROW
-   ([proc_priv -∗ p_pid ↦₄{1/4} ∗ (p_pid ↦₄{1/4} -∗ proc_priv)], ProcInv.v:892),
-   so it consumes the block, and the cell totals one with
-   [ProcInv.proc_priv_core] holding a half (ProcInv.v:665) and
-   [SchedCtx.proc_pub] the other behind [p->lock] -- there is no third
-   fragment for a caller to reach.  Widening [SpecFilewrite] instead is not
-   an escape: sys_write is in the same position one frame up.
-
-   WHAT IS *NOT* BLOCKED.  This is the ONLY unsatisfiable premise in the
-   whole walk; S3o re-checked every other one by hand against what the walk
-   holds at each call, and the four other loop callees are clear because
-   none of them wants [proc_priv] at all -- [SpecBeginOp], [SpecIlock],
-   [SpecIunlock] and [SpecEndOp] each take the bare [p_pid pj ↦₄{dq} pidv]
-   at a universally quantified [dq], which the accessor supplies (lend
-   before the [jal], close the wand the instant it returns -- fileread's
-   discipline at ProofFileread.v:1685/1712).  In particular:
+   WHAT IS *NOT* BLOCKED.  S3o re-checked every other premise of every other
+   call by hand against what the walk holds at each instruction, and the pid
+   pair was the ONLY unsatisfiable one.  The four other loop callees are
+   clear because none of them wants [proc_priv] at all -- [SpecBeginOp],
+   [SpecIlock], [SpecIunlock] and [SpecEndOp] each take the bare
+   [p_pid pj ↦₄{dq} pidv] at a universally quantified [dq], which the
+   accessor supplies (lend before the [jal], close the wand the instant it
+   returns -- fileread's discipline at ProofFileread.v:1685/1712).  In
+   particular:
 
      - writei's eighteen numeric/pure premises all close: (2) by
        [fw_budget_ok], (13) by [SpecFilewrite.fw_chunk_joint], (14) by
@@ -76,24 +67,30 @@
      - the share algebra, the stack constants, the offset choreography and
        the two [FW_MAX]s are S3n's five clearances and stand.
 
-   THE REPAIR (S3p; NOT DONE HERE -- this stage edits no contract).
-   [SpecReadi.v]:264-267 is the landed template: move the pid fraction into
-   the KERNEL arm of the [if user], in the precondition AND the
-   postcondition, of BOTH [wp_writei_sconf_body] and [wp_writei_gen_body];
-   then inside [ProofWritei.v] carry [p_pid ↦₄{1/4} ∗ (p_pid ↦₄{1/4} -∗
-   proc_priv …)] instead of [proc_priv ∗ p_pid], applying the wand before
-   each [either_copyin] and re-splitting after.  Blast radius, counted:
-   five in-file premise pairs ([wi_cont] :339/:348, [wi_ret] :430/:439,
-   [wi_join] :810/:820, [wi_size] :1129/:1139, [wi_loop] :1745/:1755), the
-   two public lemmas ([wp_writei_gen] :3429, [wp_writei_sconf] :4390), the
-   three [either_copyin] bundling sites (:2463, :2539, :3642) and 34
-   [Hppid] threading occurrences; downstream, ONE consumer moves --
-   [ProofDirlink.v]:2042 is [user = false] and only re-brackets its two
-   arguments into the arm's pair.  Nothing above writei changes, because the
-   new premise is strictly WEAKER.  file-table.md's note becomes DONE.
+   THE REPAIR, AS LANDED (S3p).  [SpecReadi.v]:244-267 was the template and
+   it transferred without surprise: the pid fraction moved into the KERNEL
+   arm of the [if user], in the precondition AND the postcondition, of BOTH
+   [wp_writei_sconf_body] and [wp_writei_gen_body].  Inside [ProofWritei.v]
+   the borrow is ONE lemma over a [user]-indexed dfrac,
 
-   AFTER S3p, S3q RESUMES AT "THE RESUME POINT" BELOW WITH NOTHING ELSE
-   OWED: the walk is then a walk.
+       Definition wi_q (user : bool) (dq : dfrac) : dfrac :=
+         if user then DfracOwn (1/4) else dq.
+       Lemma wi_src_pid … : <the bracket> -∗
+         p_pid (proc_addr j) ↦₄{wi_q user dq} pidv ∗
+         (p_pid (proc_addr j) ↦₄{wi_q user dq} pidv -∗ <the bracket>).
+
+   -- which is cheaper than the sized version of this note predicted, because
+   every fraction-taking callee quantifies its [dq], so ONE accessor serves
+   both arms and NO call site case-splits on [user].  It is opened just
+   before each of bmap / bread / the two brelses / iupdate and closed the
+   instant each returns; [either_copyin] therefore always sees the bracket
+   whole, and the two [iAssert]s that split the source around the copy grew
+   the fraction into their kernel arm rather than case-splitting.
+   Downstream, ONE consumer moved -- [ProofDirlink.v]:2042 is [user = false]
+   and just [iCombine]s its two arguments across the call.  Nothing above
+   writei changed, because the new premise is strictly WEAKER, and the
+   [Print Assumptions] cones of Writei and Dirlink are byte-identical.
+   file-table.md's OWED note is now DONE.
 
    Why the split: the whole-function walk is ~2500 lines of instruction-wise
    Iris in [ProofFileread.v]'s style (that file's single lemma is 2139 lines
@@ -128,15 +125,16 @@
       [s/2] therefore leaves [inode_shr_gen k (s/2) .. g] in hand and gets
       [inode_shr k (s/2) ..] back, which is exactly [fw_shr_regen]'s two
       arguments, and [Qp.div_2] rejoins them at [s].  ([fw_qp_halves].)
-   4. **HALF OF THIS IS REFUTED -- SEE THE S3o BANNER ABOVE.**  The half
-      that HOLDS: [dinode_at gi inum dn0] is not in the environment and does
-      not need to be; it arrives inside ilock's [ic_loaded] payload
+   4. **HALF OF THIS WAS REFUTED AT S3o AND REPAIRED AT S3p.**  The half
+      that always HELD: [dinode_at gi inum dn0] is not in the environment
+      and does not need to be; it arrives inside ilock's [ic_loaded] payload
       (fileread destructs it as "Hdnat" at ProofFileread.v:1741), at
-      [dn0 := dn].  The half that is WRONG: [p_pid pj] canNOT be split out
-      of [proc_priv] alongside it.  [ProcInv.proc_priv_pid] is a BORROW, and
-      SpecWritei's comment at the premise -- which S3n read as authority --
-      is the very sentence [SpecReadi.v]:260-263 identifies as stale.  This
-      is S3o's stop.
+      [dn0 := dn].  The half that was WRONG: [p_pid pj] canNOT be split out
+      of [proc_priv] alongside it, because [ProcInv.proc_priv_pid] is a
+      BORROW.  S3p made that a non-question by moving the fraction into the
+      kernel arm of writei's bracket, so the walk never asks for it -- it
+      hands over [proc_priv] and writei does its own borrowing.  See the
+      banner and [fw_writei_src].
    5. end_op ACCEPTS A PARTIALLY SPENT RESERVATION.  [SpecEndOp] takes
       [log_op g u] for ANY [u] (its header says so at :30 and the premise is
       at :142), so the loop never has to prove that a chunk spent its whole
@@ -154,8 +152,8 @@
    will typecheck in some goals and fail in others with a [nat]-vs-[Z]
    mismatch that reads like a coercion problem.
 
-   THE RESUME POINT (S3q, after S3p's repair): the walk itself, in
-   [ProofFileread.v]'s shape --
+   THE RESUME POINT (S3p's repair IS IN; what is left is only the walk):
+   the walk itself, in [ProofFileread.v]'s shape --
    dispatch (!writable pre-prologue -> -1; FD_PIPE; FD_DEVICE via [fw_devidx]
    and the assumed contract at the [c.jalr]; the +0x11e ELSE = [fw_panic]),
    then the FD_INODE loop.  Per iteration: begin_op -> ilock at [s/2] ->
@@ -273,6 +271,8 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
+(* [pa_add] -- the buffer in writei's kernel arm is indexed with it *)
+Require Import RiscvModelBytes.
 Require Import FsCrash.
 Require Import DinodeEnc.
 Require Import InodeInv.
@@ -281,6 +281,9 @@ Require Import DirView.
 Require Import LogInv.
 Require Import BioInv.
 Require Import FdSlots FileInvDefs.
+(* [ProcGeom] for [proc_addr] / [p_pid]: [ProcInv] Requires but does not
+   Export it, so [proc_priv] is in scope here without them. *)
+Require Import ProcGeom.
 Require Import ProcPtOwn ProcInv.
 Require Import PipeInvDefs.
 Require Import SpecBeginOp SpecEndOp.
@@ -660,3 +663,48 @@ Section FwSlots.
     rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op.
   Qed.
 End FwSlots.
+
+(* ---- BLOCKER SIX, DISCHARGED -----------------------------------------
+   The premise S3o stopped on, at the [user] the decode forces, proved from
+   what the walk actually holds at +0xa0.
+
+   [c.li s8,1] at +0x50 and [c.mv a1,s8] at +0x9a put 1 in a1, so writei's
+   [eq_vec (m !!! Ra1) zero_reg = negb user] forces [user = true]; on that
+   arm SpecWritei's source premise is now [proc_priv] AND NOTHING ELSE,
+   which is exactly what [wp_filewrite_sconf_body] hands the walk.  Before
+   S3p the same call also demanded [p_pid pj ↦₄{dq} pidv] alongside, and
+   that conjunction was FALSE for any holder of [proc_priv] (the accessor is
+   a borrow and the cell totals one) -- the walk could not be started.
+
+   Stated with the [if] unreduced, and at a universally quantified [dq] and
+   buffer, so that it is a discharge of the premise AS WRITTEN rather than
+   of a hand-reduced paraphrase of it: if SpecWritei's bracket ever changes
+   shape again, this stops compiling.  ------------------------------------- *)
+Section FwWriteiSrc.
+  (* exactly [ProcInv]'s own context for [proc_priv].  [lockG] IS QUALIFIED
+     ON PURPOSE: this file does not [Require Import WpLock], so the plain
+     spelling does not fail -- Rocq's backtick binders generalize, and it
+     INVENTS a section variable [lockG] that [proc_priv]'s real instance can
+     never match (durable-notes, "a class that is not IMPORTED becomes a
+     fresh VARIABLE, silently").  The error is then eleven UNDEFINED EVARS
+     over riscvGS / fileG / fdslotG / mem_pointsto / big_opL, none of which
+     names [lockG]; the tell is [lockG] AND [lockG0] both in the printed
+     context.  Qualifying rather than importing, because a new import here
+     would also re-resolve every other unqualified name in the file -- see
+     the header's [FW_MAX] warning. *)
+  Context `{!riscvGS Σ, !WpLock.lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+
+  (* A BI-ENTAILMENT, so it covers both ends of the call at once: read left
+     to right it is what the walk must SUPPLY at +0xa0, right to left what
+     it GETS BACK at +0xa4 (instantiate [V := upd_upt V P']), which is what
+     lets the loop re-park [proc_priv] and carry it into the next iteration
+     without ever holding [p_pid] itself. *)
+  Lemma fw_writei_src (γf : gname) (j : nat) (pidv : mword 32) (V : pprivate)
+      (dq : dfrac) (src : mword 64) (n : nat) (src_bytes : nat -> bv 8) :
+    (if true
+     then proc_priv γf (proc_addr j) pidv V
+     else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) ∗
+          p_pid (proc_addr j) ↦₄{dq} pidv)
+    ⊣⊢ proc_priv γf (proc_addr j) pidv V.
+  Proof. reflexivity. Qed.
+End FwWriteiSrc.

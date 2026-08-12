@@ -541,30 +541,42 @@ Two consequences for `fileread`'s contract, both accepted:
 | `off_inv_alloc` / `off_invs_alloc` | boot, alongside `ftable_ghosts_alloc` (still uncalled: the ftable lock is not wired at boot) |
 | `off_invs_lookup` | slot `k` out of the `NFILE`-way persistent bundle |
 
-## OWED: `SpecWritei.v` cannot be called on its user arm
+## ~~OWED~~ DONE (fs-sysfile S3p): `SpecWritei.v` could not be called on its user arm
 
-> **STATUS (fs-sysfile S3o): CONFIRMED BY THE PREDICTED CALLER, AND NOW DUE.**
-> The last line of this section said filewrite would hit this and that it
-> should be repaired before that proof was started. Filewrite hit it, at
-> `+0xa0`, with the walk otherwise fully cleared: fs-sysfile S3o stopped there
-> and `iris/ProofFilewrite.v`'s header carries the precise residual goal and a
-> counted blast radius for the repair. The deferral reason below —
-> "`SpecWritei.v` and `ProofWritei.v` are mid-flight for the `balloc` contract
-> ripple" — **expired at S3m**, which landed that ripple. Fs-sysfile stage
-> **S3p** is the repair; **S3q** is the walk.
+> **STATUS: REPAIRED AND GATED (fs-sysfile S3p).** `SpecWritei.v` now carries
+> readi's shape verbatim — the pid fraction is the KERNEL arm's, folded into
+> the `if user` bracket in the precondition AND the postcondition of BOTH
+> `wp_writei_sconf_body` and `wp_writei_gen_body`. Inside `ProofWritei.v` the
+> borrow is one lemma, `wi_src_pid` (the twin of `ProofReadi.rd_dst_pid`),
+> over a `wi_q user dq` dfrac that is `1/4` on the user arm and the caller's
+> own share on the kernel one; it is opened immediately before each of the
+> four callees that want the fraction (bmap, bread, brelse, iupdate) and
+> closed the instant each returns, so `either_copyin` always sees the bracket
+> whole. The one downstream consumer, `ProofDirlink.v`, is `user = false` and
+> only brackets its two arguments together across the call.
+>
+> The repair is strictly WEAKENING, so nothing above writei moved: the
+> `Print Assumptions` cones of `Writei` and `Dirlink` are unchanged.
+>
+> **The history, kept because the lesson is the point.** The last line of this
+> section predicted that `filewrite` would hit this and said it should be
+> repaired before that proof was started. Filewrite hit it, at `+0xa0`, with
+> the walk otherwise fully cleared: fs-sysfile S3o stopped there. The
+> deferral reason — "`SpecWritei.v` and `ProofWritei.v` are mid-flight for the
+> `balloc` contract ripple" — had expired at S3m.
 >
 > S3o's addendum to this section's own lesson: an *unused* callee contract is
 > unverified, and a *comment* on one of its premises is verified by nothing at
 > all. fs-sysfile S3n cleared this very call by reading SpecWritei's premise
-> comment (which is the stale sentence this section refutes) instead of
-> `ProcInv.proc_priv_pid`'s type. Clear premises against signatures.
+> comment (the stale sentence this section refutes) instead of
+> `ProcInv.proc_priv_pid`'s type. **Clear premises against signatures.**
 
-**`writei`'s user arm is uncallable, for exactly the reason `readi`'s was, and
-the fix is known.** Recorded here rather than applied because `SpecWritei.v` and
-`ProofWritei.v` are mid-flight for the `balloc` contract ripple; do not fix them
-from two directions at once.
+**`writei`'s user arm WAS uncallable, for exactly the reason `readi`'s was.**
+What follows is the defect as it stood and the fix as applied at S3p; it is
+kept in full because the *reason* it went unnoticed for so long is the durable
+part.
 
-The defect. `SpecWritei.v` demands, on the same call,
+The defect. `SpecWritei.v` demanded, on the same call,
 
 ```coq
   (if user then proc_priv γf pj pidv V else <the caller's byte buffer>) -∗
@@ -606,6 +618,29 @@ fraction, at a universally quantified `dq`; `SpecEitherCopyin` takes only
 
 `filewrite` is the function that will hit this, and it should be done before
 that proof is started rather than during it.
+
+**APPLIED, S3p.** Exactly as written above, and the "wand-apply before each
+copy and a re-split after" turned out to be cheaper than that: because every
+fraction-taking callee quantifies its `dq`, ONE lemma serves both arms and no
+call site case-splits on `user`.
+
+```coq
+  Definition wi_q (user : bool) (dq : dfrac) : dfrac :=
+    if user then DfracOwn (1/4) else dq.
+
+  Lemma wi_src_pid … :
+    <the bracket> -∗
+      p_pid (proc_addr j) ↦₄{wi_q user dq} pidv ∗
+      (p_pid (proc_addr j) ↦₄{wi_q user dq} pidv -∗ <the bracket>).
+```
+
+Cost, measured: four statement sites in `SpecWritei.v`, five in-file premise
+pairs plus two public lemmas in `ProofWritei.v`, four borrow/close pairs (bmap,
+bread, and the two brelses; iupdate's is in `wi_join`), two `either_copyin`
+bundling `iAssert`s that had to grow the fraction into their kernel arm, and
+~30 threading occurrences that simply lost a name. `ProofWritei.v` compiled on
+the first attempt after the edit. **The whole thing is an afternoon; it sat
+owed for three stages because no caller existed to force it.**
 
 ## Open items
 
