@@ -3870,3 +3870,32 @@ Part 2. Part 2 (the allocatedness invariant) is a recorded frontier
 project beside crash recovery and the image-wf discharge. SpecCreate
 gains exactly the one additive premise; its freeze note is amended
 accordingly.
+
+### 19.7 §19.6 PART 3 SUSPENDED (coordinator + user, 2026-08-12): the
+### assumed Prop may be FALSE on a reachable trace
+
+The user challenged the named-assumption route, and following the
+token alternative to its end broke the assumption itself. Post-Part-1
+the type changes only by free or re-claim, so a token must block the
+WINDOW-FREE — but the stale holder's ilock/iunlockput inside ialloc's
+sixteen-byte window is machine-reachable (its iput sees ref==1,
+valid-by-its-own-fill, nlink==0 — ialloc leaves nlink 0), and a
+resource cannot forbid a machine-reachable step; it only wedges the
+escrow on the stale holder's proof (S5b's constraint 3, generalized:
+ANY blocker of a reachable step is dead, whether it blocks a fill or
+a free). After the window-free, a competing ialloc can RE-CLAIM the
+inum at another type: the fresh fill then sees ty₂ ≠ ty, so
+⌜dn = ialloc_fresh ty⌝ is falsifiable, not merely unprovable — a
+different beast from panic/printk's unproven-but-true contracts.
+
+Consequences: (a) SpecCreate stays frozen at S5a's form — no premise;
+(b) the expected re-ruling (S5e, after the in-flight walk's
+reachability read): create's made arm WEAKENS to the existential type
+with sys_open reading the actual type from its own ilock witness —
+the §15 precedent (make the ugly arm honest, don't assume it away);
+(c) if the object code genuinely admits the hijack (create building
+on an inum a racer re-typed), kernel-defects.md gains its first
+entry: O_CREATE can hand a writable fd to an inode a concurrent
+mkdir made a directory — exactly the unsoundness §17 guards, now
+guarded by sys_open checking what it SEES rather than what it
+assumed. Part 2 (allocatedness) remains the eventual cure.
