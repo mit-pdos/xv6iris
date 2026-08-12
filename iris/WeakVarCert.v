@@ -125,7 +125,7 @@ Lemma wstep_ok_racy_false_of_confined (tid : option nat) (ra : Arch.pa)
     mm ⊆ write_bytes (wflat (wm_img s) (wm_log s)) ra rn wp ->
     dom (mem t') ⊆ W ->
     exec_eff m (MState (wm_regs s) mm (wm_dev s)) = Some (x, t', es) ->
-    wstep_ok_racy tid ra rn rak Φ false m s.
+    wstep_ok_racy tid ra rn rak Φ (racc_disj ra rn) false m s.
 Proof.
   intros Hracc.
   induction m as [y|T oc k IH];
@@ -301,7 +301,7 @@ Lemma wstep_ok_racy_false_of_window (tid : option nat) (ra : Arch.pa) (rn : N)
   exec_eff m (MState (wm_regs s)
                 (write_bytes (wmem_restrict s W) ra rn wp) (wm_dev s))
     = Some (x, t', es) ->
-  wstep_ok_racy tid ra rn rak Φ false m s.
+  wstep_ok_racy tid ra rn rak Φ (racc_disj ra rn) false m s.
 Proof.
   intros Hracc Hwf HW0 Hwin Hpes Hdes Hdom' Hex.
   apply (wstep_ok_racy_false_of_confined tid ra rn rak Φ wp m Hracc s
@@ -468,7 +468,7 @@ Lemma wstep_ok_racy_true_of_confined (tid : option nat) (ra : Arch.pa)
          dom (mem t') ⊆ W /\
          trace_pin_off s ra rn es /\
          trace_racy rak ra rn es) ->
-    wstep_ok_racy tid ra rn rak Φ true m s.
+    wstep_ok_racy tid ra rn rak Φ (racc_disj ra rn) true m s.
 Proof.
   intros Hracc Hrn [w0 HΦ0].
   (* the patched memory holds the patch word AT the window — this is what
@@ -662,7 +662,7 @@ Lemma wstep_ok_racy_true_of_window (tid : option nat) (ra : Arch.pa) (rn : N)
        dom (mem t') ⊆ W /\
        trace_pin_off s ra rn es /\
        trace_racy rak ra rn es) ->
-  wstep_ok_racy tid ra rn rak Φ true m s.
+  wstep_ok_racy tid ra rn rak Φ (racc_disj ra rn) true m s.
 Proof.
   intros Hracc Hrn HΦ Hwf HW0 Hwin Hfam.
   exact (wstep_ok_racy_true_of_confined tid ra rn rak Φ m Hracc Hrn HΦ s

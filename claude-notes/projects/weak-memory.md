@@ -49,34 +49,59 @@ Measured: the weak proof bodies are **1.4× their SC twins**, down from
 LOAD-BEARING in `wQ_store_w`/`wQ_fence`.  Tree green after both; slices 1–2
 below were untouched by either.
 
-**⇒ THE LIVE FRONT — 6a's LAST ITEM, NOW UNBLOCKED AND CHEAP.**  Read
+**⇒ THE LIVE FRONT — 6a's LAST ITEM. SLICE 3 IS HALF IN (2026-08-12).**  Read
 [`design/weak-memory-walk-bridge.md`](../design/weak-memory-walk-bridge.md)
-end to end; it is one self-contained question and it is DECIDED.
+§§7–8 before touching any of it; §8 is where the plan changed.
 
 - *The issue:* the walk reads its leaf slot TWICE in one step — plain (racy)
-  then exclusive (`ak_latest`) with no intervening write — and the racy
-  bridge's single-patched-`exec` conclusion cannot express that, since
-  `RiscvExec.exec` is kind-blind and `wpatch_st` fixes ONE window value.  A
-  shape problem, not a strengthenable premise.  Exactly ONE of the
-  absorption theorem's five trace shapes is blocked (§2's table).
-- *Decided (φ-upgrade author, `37e90fd5`):* **option (a)** — give the walk a
-  bespoke peel over the absorption theorem that never produces a patched
-  `exec`.  Under C/D/S a translation is not a racy-rule consumer at all.
-  **The "wait for C/D/S" condition on that decision is now SATISFIED.**
-- *Measured, and it is what makes (a) cheap (§7):* the phase-`false`
-  disjointness demand — the thing that blocks shape 4 — serves ONLY the
-  bridge.  Blanking its binder at both phase-`false` destruct sites in
-  `wexec_of_exec_racy` and `wrun_wexec_racy` leaves `WeakRacy.v` compiling
-  with zero errors; `exec_of_wrun_win` uses it four times.  So an unbridged
-  peel supports REDUCIBILITY — what `WeakAdequacy` needs — verbatim.
-- *Implementation shape, ready to start (§7):* no second fixpoint.  Drop the
-  `racc_disj` conjunct from `wstep_ok_racy`'s phase-`false` read and write
-  arms; hand it back to `exec_of_wrun_win` / `exec_of_wrun_racy_gen` as an
-  explicit premise — `WeakVarCert.trace_disj` IS that predicate, transports
-  proved.  The `started` cone keeps the bridge by supplying it; the walk
-  supplies nothing and takes its outcome facts from
-  `WeakKpt.wtlb_res_pt_translateAddr_at`.  The split has to reach
-  `wp_wracy_load`/`wracy_cert`, which deliver peel and bridge together.
+  then exclusive (`ak_latest`) with no intervening write — and
+  `RiscvExec.exec` is kind-blind, so one memory answers both reads with one
+  value.  Exactly ONE of the absorption theorem's five trace shapes is
+  blocked (§2's table).
+- *LANDED, the peel half.*  §7's plan, in the form that costs the `started`
+  cone nothing: the phase-`false` disjointness is now the PARAMETER `D` of
+  the fixpoint — `wstep_ok_racy tid ra rn rak Φ D b` — with the five bridge
+  lemmas taking `∀ pa n, D pa n → racc_disj ra rn pa n` and the two
+  `wexec`-direction traversals `D`-generic (§7's measurement, now a typing
+  fact).  `wracy_cert` and both WP rules are stated at `D := racc_disj ra
+  rn`, so `WkStartedLoad`/`WeakVarCert` change only by instantiation.  The
+  walk's peel is `D := wD_any`, and shape 4 is STATABLE.
+- **⇒ THE FINDING THAT CHANGED THE PLAN (§8): option (a) as written does not
+  close shape 4.**  Liberating the peel is necessary and not sufficient — the
+  same obstruction reappears in the PRODUCER, where `D` cannot reach it.  The
+  peel's off-window disjunct hands the continuation the value at `coh_ts`
+  (the coherence-LATEST word); every producer we had supplies it from a
+  confined SC run at the memory PATCHED with the racy value, where that same
+  read returns the patch.  For shape 4 those two reads are the plain leaf
+  read and the CAS re-read, and `w ≠ lw` is the entire reason the shape
+  exists.  §8.4's table shows the naive fix (patch for the whole run) is not
+  just unprovable but WRONG: it clobbers the D bit the sail fork's atomic
+  recheck exists to preserve.
+- *LANDED, the fix (`iris/WeakStale.v`, axiom-free, tree green).*  Give the
+  SC mirror TWO memories, selected per read by the bit the weak machine
+  itself uses: `stale_mem ra rn w ak s := if ak_pins ak then mem s else
+  write_bytes (mem s) ra rn w`, and `exec_stale`, `WeakCert.exec_eff` arm for
+  arm over it.  The plain leaf read (`ak_pins = false`) returns the racy `w`;
+  the CAS re-read (`ak_latest`, so `ak_pins`) returns the real memory's `lw`,
+  which is what the peel demands.  With the TRANSFER (a run whose unpinned
+  reads all miss the window has `exec_stale … = exec_eff …`, both
+  directions) every existing lemma about a window-free sub-run carries over
+  with no re-proof — that is what keeps this from being a mirror of
+  `WeakWalkEff`.  **The producer `wstep_ok_racy_true_of_stale` is proved**:
+  a family of `exec_stale` runs, one per Φ-admissible window value, yields
+  `wstep_ok_racy … wD_any true`, with the post-racy tail going to
+  `WeakCert.wstep_eff_confined_pin` at the UNPATCHED memory through the
+  backward transfer and the phase-`false` embedding
+  (`wstep_ok_racy_false_of_wstep_ok`).  This is option (c) done right — the
+  patch sequence belongs in the READ ARM, not in the state.
+- *OWED, and it is the rest of slice 3* (§8.3 items 4–5): the walk's dispatch
+  at `exec_stale` — only `WeakKpt.wptree_translate_miss_eff_core` and the
+  `translate`/`translateAddr` heads that FEED the leaf read, since
+  `WeakUpdEff`'s arms already take the stale word as a parameter separate
+  from the freshly-read one — and then the racy absorption theorem, which
+  gains a SIXTH outcome: under a racy plain read the miss-path O-FRESH arm
+  becomes reachable and is read-only (`[read a2; read a1; read la;
+  read(excl) la]`, no write).
 
 **SLICES 1–2 ARE IN** (`iris/WeakVarCert.v`, `iris/WeakRacy.v`), green and
 axiom-free: the racy peel carries a value filter `Φ` with `wadm_filter`

@@ -277,13 +277,17 @@ are working on that effort — the relevant `projects/` file.
   then, and the ordering: this lands BEFORE the mass SC→weak port
   because it rewrites the leaf interfaces the port replicates.
 - **[`weak-memory-walk-bridge.md`](design/weak-memory-walk-bridge.md)** —
-  OPEN ISSUE, 6a's last item and the gate on 6b/6c: the page-table walk reads
-  its leaf slot twice in one step (plain, racy; then exclusive, latest) with
-  no write between, and the racy bridge describes a weak run as an SC run at
-  ONE patched memory — which a kind-blind `exec` cannot make return two
+  6a's last item and the gate on 6b/6c: the page-table walk reads its leaf
+  slot twice in one step (plain, racy; then exclusive, latest) with no write
+  between, and a kind-blind `exec` cannot make one memory return two
   different values.  Which trace shapes are affected (one of five), the three
-  ways out with a recommendation, why the recommended one also dissolves the
-  multi-window question, and how it sequences against the φ-upgrade surgery.
+  original options, and — §§7–8, the live part — the peel's disjointness
+  parameter `D`, the FINDING that liberating the peel leaves the PRODUCER
+  blocked by the same obstruction, and the fix that landed: an SC mirror with
+  a STALE memory for unpinned reads (`iris/WeakStale.v`), which is option (c)
+  done right and dissolves the multi-window question with it.  §8.4 works out
+  the A/D variant arithmetic and shows why patching the memory for the whole
+  run is not merely unprovable but wrong.
 - **[`weak-memory-m6-robustness.md`](design/weak-memory-m6-robustness.md)** —
   M6's tee-up: closing the store-reordering gap.  The promise-free machine is
   STRONGER than RVWMO (it excludes LB and observable W→W reordering), so
