@@ -468,8 +468,20 @@ floor that sees every observation.
       final mem_of equality transport from per-byte co-monotonicity
       alone.
 
-      (iii) **Acyclicity of D⁺ (the W2a extension) — WALK DESIGN
-      SETTLED (2026-08-12) after two more worked refutations.**  The
+      (iii) **Acyclicity of D⁺ — LANDED, axiom-free
+      (`WeakRobustAcyc2.v`, 514 lines): `gdep2_acyclic_edges_ok` under
+      ptraces_wf + fwd_own + rf_edges_ok + `ee_ok`, plus the behavior
+      wrapper `wp_behavior_gdep2_acyclic`.**  Landing notes: the two
+      milestone kinds collapsed into one `mile_mu` predicate (single
+      gain lemma); the first-milestone decomposition returns a
+      disjunction (a gE edge can be same-agent, so the no-milestone
+      arm is killed by the gain applied to the milestone's own
+      source); boundedness came free from the E edge's own
+      `rd_floor < that` conjunct — `ptraces_ws_init`/`rd_floor_ws`
+      are NOT premises.  `gE_ra` (byte hoisted out of `gE_at`'s
+      existential) is the premise-facing spelling; `gmile` /
+      `tc_gdep2_split` are reusable structural by-products.
+      The walk design that landed (kept for the record):  The
       measure is a MILESTONE FLOOR µ, not the raw hop timestamp:
       after a cross-rf hop reading ts, µ := ts; after a gE hop from
       leaf t* out of read r, µ := F(r) (the read's whole floor — ≥ t*,
