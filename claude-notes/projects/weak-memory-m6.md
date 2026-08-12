@@ -631,13 +631,25 @@ file:line map for every item is
       violation-freedom over (log, `wm_ak`, `published` via `w_pub`) — NOT
       a bare "everything is tagged", which rules out nothing.
 - [ ] **The ownership reflection — the real cost, budgeted as its own
-      item.**  To prove φ inductively the interpretation must know who
-      owns which byte; today `wlat_interp` is an agreement with no owner
-      or domain content.  Design a per-byte owner/hazard reflection minted
-      from the exclusive `↦w{1}` at store time and consulted at read time;
-      the racy-load rules (`WeakRacy.v`, `WkStartedLoad.v`) are where the
-      obligation is DISCHARGED (the started/first setters are `SCfenced`,
-      so their racy readers are exempt by class — verify, don't assume).
+      item.  DESIGN SKETCH (2026-08-12):** φ's induction needs the
+      interp conjunct "every unpublished WCplain message's bytes are
+      hazard-marked to their author", via (1) a per-byte HAZARD ghost
+      minted by the owned-store leaf (which holds `↦w{1}` anyway) and
+      cleared by the release/publish leaf (whose fence+EXT math shows
+      the author's WCplain positions land ≤ the new `w_pub`); (2) a
+      per-byte DISCIPLINE map (BDOwned/BDSync): WCplain stores only at
+      BDOwned bytes, racy-load rules only at BDSync bytes, BDSync
+      stores always WCrel/WCexcl; (3) the fragment-load rule excludes
+      foreign hazards through the points-to itself (fold the
+      hazard-freedom into `↦w`'s definition so fractional arithmetic
+      refutes a foreign unpublished-owned message on a byte anyone
+      else can read).  Violation-freedom then closes per rule: a load
+      raises `coh` only on the bytes it reads; each read is
+      fragment-backed (hazard-free byte) or racy (BDSync byte, no
+      WCplain messages at all).  The racy-load rules (`WeakRacy.v`,
+      `WkStartedLoad.v`) are where the obligation is DISCHARGED (the
+      started/first setters are WCrel by the `w_relp` rule — verify,
+      don't assume).
 - [ ] **The WRITER-discipline (S2/deposit) export — NEW, forced by
       W2b counterexample 2.**  The per-agent inert component records
       "an OV-class store since the last pw∧sw fence"; the exported φ

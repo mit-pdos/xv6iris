@@ -880,6 +880,7 @@ WeakRobustAcyc.v
 WeakRobustSer.v
 WeakRobustLin.v
 WeakRobustProv.v
+WeakRobustOrd.v
 WeakAxiomatic.v
 WeakAxiomatic2.v
 WeakAxiomatic3.v
