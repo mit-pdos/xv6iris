@@ -24,7 +24,7 @@ sweep's unit price.
 
 ---
 
-## ⇒ CHECKPOINT — WHERE THIS STANDS AND WHAT IS NEXT (2026-08-11)
+## ⇒ CHECKPOINT — WHERE THIS STANDS AND WHAT IS NEXT (2026-08-12)
 
 *Keep this block current; it is what someone opening this file should read
 first. The detail behind each line is in the dated slice named after it.
@@ -40,18 +40,61 @@ context-indexed (`WeakCtx`, `cobj`); the hart-indexed layer is gone.
 Measured: the weak proof bodies are **1.4× their SC twins**, down from
 2.5–4.4× (see the conversion slice at the end).
 
-**⇒ OPEN ISSUE, AND IT IS 6a's LAST ITEM:**
-[`design/weak-memory-walk-bridge.md`](../design/weak-memory-walk-bridge.md).
-The walk reads the leaf slot TWICE in one step — plain (racy) then exclusive
-(`ak_latest`) with no intervening write — and the racy bridge's
-single-patched-`exec` conclusion cannot express that, since
-`RiscvExec.exec` is kind-blind and `wpatch_st` fixes ONE window value.  Not
-a strengthenable premise; a shape problem.  Exactly one of the absorption
-theorem's five trace shapes is blocked (the TLB-miss walk WITH the A/D
-writeback); the other four are covered or need no racy window.  Three
-options, a recommendation, and a sequencing interaction with the φ-upgrade's
-site-predicate surgery are in that file.  **A decision is owed before any
-more code.**
+**ALSO DONE, ELSEWHERE, WHILE THE ABOVE WAS RUNNING.**  **M6** is landed —
+`WeakCompose.xv6_weak_robust`, closed under the global context, with
+`pf_violation_free` as a declared residue (worklist archived to
+`completed/weak-memory-m6.md`).  **The C/D/S points-to surgery** is landed
+(`b860f011`): `wcds` state map (Clean / Dirty CPU / Sync), `wpt_own` (`↦wo`)
++ width towers, publication as a log predicate, the release class now
+LOAD-BEARING in `wQ_store_w`/`wQ_fence`.  Tree green after both; slices 1–2
+below were untouched by either.
+
+**⇒ THE LIVE FRONT — 6a's LAST ITEM, NOW UNBLOCKED AND CHEAP.**  Read
+[`design/weak-memory-walk-bridge.md`](../design/weak-memory-walk-bridge.md)
+end to end; it is one self-contained question and it is DECIDED.
+
+- *The issue:* the walk reads its leaf slot TWICE in one step — plain (racy)
+  then exclusive (`ak_latest`) with no intervening write — and the racy
+  bridge's single-patched-`exec` conclusion cannot express that, since
+  `RiscvExec.exec` is kind-blind and `wpatch_st` fixes ONE window value.  A
+  shape problem, not a strengthenable premise.  Exactly ONE of the
+  absorption theorem's five trace shapes is blocked (§2's table).
+- *Decided (φ-upgrade author, `37e90fd5`):* **option (a)** — give the walk a
+  bespoke peel over the absorption theorem that never produces a patched
+  `exec`.  Under C/D/S a translation is not a racy-rule consumer at all.
+  **The "wait for C/D/S" condition on that decision is now SATISFIED.**
+- *Measured, and it is what makes (a) cheap (§7):* the phase-`false`
+  disjointness demand — the thing that blocks shape 4 — serves ONLY the
+  bridge.  Blanking its binder at both phase-`false` destruct sites in
+  `wexec_of_exec_racy` and `wrun_wexec_racy` leaves `WeakRacy.v` compiling
+  with zero errors; `exec_of_wrun_win` uses it four times.  So an unbridged
+  peel supports REDUCIBILITY — what `WeakAdequacy` needs — verbatim.
+- *Implementation shape, ready to start (§7):* no second fixpoint.  Drop the
+  `racc_disj` conjunct from `wstep_ok_racy`'s phase-`false` read and write
+  arms; hand it back to `exec_of_wrun_win` / `exec_of_wrun_racy_gen` as an
+  explicit premise — `WeakVarCert.trace_disj` IS that predicate, transports
+  proved.  The `started` cone keeps the bridge by supplying it; the walk
+  supplies nothing and takes its outcome facts from
+  `WeakKpt.wtlb_res_pt_translateAddr_at`.  The split has to reach
+  `wp_wracy_load`/`wracy_cert`, which deliver peel and bridge together.
+
+**SLICES 1–2 ARE IN** (`iris/WeakVarCert.v`, `iris/WeakRacy.v`), green and
+axiom-free: the racy peel carries a value filter `Φ` with `wadm_filter`
+replacing pinnedness (slice 1), and both halves of the producer —
+`wstep_ok_racy_{false,true}_of_confined` over `trace_pin_off` / `trace_racy`
+(slice 2).  Not wasted by the decision: they are what the `started` load
+needs, and trace shape 2 rides them unchanged.
+
+**OPEN FLAGS INHERITED FROM THE C/D/S LANDING** (see
+[`design/weak-memory-phi-upgrade.md`](../design/weak-memory-phi-upgrade.md)
+§1b) — neither is mine to close, but the first bites a file I own:
+`↦wo` is `CpuId`-indexed and does NOT cross `wp_next`, which makes
+**`WkMemmoveLoop`'s `wssb1_spec` hypothesis unrealisable as stated** — it
+still compiles, since those leaves are `Prop` hypotheses, so the prototype's
+parity claim reads stronger than it currently is.  Fix deliberately, not
+incidentally: the file's whole point is the measurement.  Second flag: DMA
+messages (tid `None`) are exempt from the clean/dirty invariants, so Layer
+1's `bad` must carry "the message's tid is a hart".
 
 **ALSO DONE (2026-08-11): BATCH 5's SECOND HALF.**  `wstarted_gain` is no
 longer a leaf premise — it is `WeakRacy.wgain`, PROVED from the model by
