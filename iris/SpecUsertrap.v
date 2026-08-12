@@ -197,8 +197,19 @@ Definition usertrap_post `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG
        below. *)
     ⌜ud_tfp pt' = ud_tfp pt⌝ -∗
     (* the pure facts the trampoline halves need about it, which the process
-       block's [proc_pt_at] carries *)
-    ⌜udata_cov (ud_um pt') (ud_data pt')⌝ -∗
+       block's [proc_pt_at] carries -- and there are TWO of them, not three.
+       [udata_cov (ud_um pt') (ud_data pt')] used to be here and is NOT
+       provable: [ProcPtOwn] deliberately retired the field-to-field coupling
+       between [ud_um] and [ud_data] ("the footprint derived from [um]", its
+       §1), so [proc_pt] says nothing about [ud_data]; and on the syscall arm
+       the descriptor is whatever the table entry left, of which
+       [SpecSyscall]'s post pins only [ud_tfp].  Nor is it usertrap's fact to
+       state: the trampoline needs it beside [udata_own (ud_data pt')], and
+       the conversion that BUILDS that resource -- the page-footprint side of
+       the dovetail, conversion 2 -- derives the footprint from [ud_um] and so
+       establishes the coverage by construction ([ProcPtOwn.ud_pas_cov]).
+       Asking for it here would be asking usertrap to prove a property of a
+       resource it never holds. *)
     ⌜upt_acc_wf (ud_um pt')⌝ -∗
     ⌜upt_map_wf (ud_um pt')⌝ -∗
     (* sret-ready, and still a legal S-mode configuration *)

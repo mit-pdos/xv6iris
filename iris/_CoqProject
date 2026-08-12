@@ -1003,6 +1003,7 @@ ProofPrepareReturnParts.v
 ProofPrepareReturn.v
 LinkPrepareReturn.v
 CodeUsertrap.v
+ProofUsertrapTail.v
 SpecSyscall.v
 LinkSyscall.v
 SpecIalloc.v

@@ -36,8 +36,12 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import MstatusBits.
 Require Import WpGprCsrwCommon WpGprCsrwC.
+From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
+
+(* the offset base, as ProofPrepareReturnParts does for [PRR] *)
+Notation UT := KernelSyms.usertrap (only parsing).
 
 Section UsertrapParts.
 

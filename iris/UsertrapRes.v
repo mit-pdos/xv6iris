@@ -52,7 +52,7 @@ Require Import SmodeCore.
 Require Import KernelText KernelDataInv MstatusBits.
 Require Import IntrDefs.
 Require Import WpLock.
-Require Import StackOwn.
+Require Import StackOwn CalleeSaved.
 Require Import WpMmodeLeafBase.   (* csp_rs1 -- sie_cap's stack key *)
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv.
@@ -409,14 +409,68 @@ Section UsertrapRes.
     length (un_s N) = NPROC /\
     log_geom_ok (un_cov N) (un_logstart N).
 
-  Definition ut_env (Rsys : gname -> mword 64 -> iProp Σ)
-      (N : ut_names) (V : pprivate) : iProp Σ :=
-    (* ---- persistent, so free to carry ---- *)
+  (* ------------------------------------------------------------------- *)
+  (* THE ONE MEMBER THAT IS PER-HART, IN ITS HART-GENERIC FORM.            *)
+  (* ------------------------------------------------------------------- *)
+  (* [SpecDevintr.devintr_caps] is genuinely hart-indexed -- [TimerCap.
+     timer_cap] holds THIS hart's mcounteren and stimecmp, and
+     [SpecClockintr.tick_keeper]'s left disjunct is [tick_hart = false],
+     which is a statement about THIS hart.  usertrap cannot carry it in that
+     form: everything on the syscall arm from the [csrsi] at +0x9e onwards
+     runs at [b = true], where every step may resume on a different hart, and
+     the environment is FRAMED across those steps rather than re-delivered by
+     a leaf.  [IntrDefs]' three transport lemmas do not help -- they work
+     because their propositions are [emp] at [true], which this one is not.
+
+     So the bundle carries the [∀ h] form, exactly as [SpecPanic.
+     panic_wp_any] carries panic's contract for the same reason (a function
+     that PARKS does not return on the hart it entered on).  It is
+     persistent, hence free to hand to devintr at whatever hart the call
+     happens on ([devintr_caps_any_at]), and it is satisfiable: of
+     [devintr_caps]' eight members six are hart-free outright, [timer_cap] is
+     available at every hart from [SpecBootDevCaps.boot_dev_caps] (whose
+     interface quantifies over the hart), and [tick_keeper]'s REAL arm --
+     which the boot hart brings up -- is hart-free too.  What it rules out is
+     satisfying the tick keeper with the left disjunct, and that is right: a
+     process can migrate onto hart 0. *)
+  Definition devintr_caps_any (γu : uart_names) (γv : disk_names)
+      (γtx γdk γtl : gname) (γs : list gname)
+      (pd pav pu : mword 64) : iProp Σ :=
+    (□ ∀ h : CPU,
+        devintr_caps (CID := h) γu γv γtx γdk γtl γs pd pav pu)%I.
+
+  Global Instance devintr_caps_any_persistent γu γv γtx γdk γtl γs pd pav pu :
+    Persistent (devintr_caps_any γu γv γtx γdk γtl γs pd pav pu).
+  Proof. rewrite /devintr_caps_any. apply _. Qed.
+
+  Lemma devintr_caps_any_at (h : CPU) (γu : uart_names) (γv : disk_names)
+      (γtx γdk γtl : gname) (γs : list gname) (pd pav pu : mword 64) :
+    devintr_caps_any γu γv γtx γdk γtl γs pd pav pu -∗
+    devintr_caps (CID := h) γu γv γtx γdk γtl γs pd pav pu.
+  Proof.
+    iIntros "#H". rewrite /devintr_caps_any.
+    iPoseProof (bi.forall_elim h with "H") as "H2". iExact "H2".
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* THE BUNDLE SPLITS BY PERSISTENCE, and that is not cosmetic.            *)
+  (* ------------------------------------------------------------------- *)
+  (* Eighteen of the twenty-five members are PERSISTENT -- every lock, every
+     invariant, every agreement -- and the walk leans on it in a way a flat
+     [∗] would hide: [killed] is called TWICE and takes [procs_inv] both
+     times without giving it back, [prepare_return] takes [is_kstack] and
+     does not return it, [vmfault] takes [kalloc_env] and does not return it.
+     None of those calls could be made from a bundle that had to be rebuilt
+     afterwards.  So the split is the statement of why they are callable, and
+     it makes every block lemma's environment handling two lines
+     ([iDestruct "Henv" as "[#Hcaps Hown]"] and the mirror) instead of a
+     twenty-five-way destructure and rebuild. *)
+  Definition ut_caps (N : ut_names) : iProp Σ :=
     (procs_inv (un_s N) ∗
      panic_wp_any ∗
      kernel_data ∗
      is_kstack (un_pj N) (un_ks N) ∗
-     devintr_caps (un_u N) (un_v N) (un_tx N) (un_k N) (un_tk N) (un_s N)
+     devintr_caps_any (un_u N) (un_v N) (un_tx N) (un_k N) (un_tk N) (un_s N)
        (un_pd N) (un_pav N) (un_pu N) ∗
      printk_env (un_pr N) (un_u N) (un_v N) ∗
      is_lock (un_w N) wait_lock_addr "wait_lock"%string wait_res ∗
@@ -431,10 +485,27 @@ Section UsertrapRes.
      gen_cert ∗
      dev_inv (un_u N) (un_v N) ∗
      disk_geom (un_v N) (un_pd N) (un_pav N) (un_pu N) ∗
-     (* ---- exclusive ---- *)
      kalloc_avail (un_ka N) None ∗
-     bslots (un_bn N) 3 ∗
-     fileclose_ic_env (un_fn N) ∗
+     fileclose_ic_env (un_fn N))%I.
+
+  Global Instance ut_caps_persistent N : Persistent (ut_caps N).
+  Proof. rewrite /ut_caps. apply _. Qed.
+
+  (* vmfault's and the kalloc cone's bundle, assembled out of three
+     persistent members of [ut_caps] rather than carried separately. *)
+  Lemma ut_caps_kalloc (N : ut_names) :
+    ut_caps N -∗ kalloc_env (un_kl N) None.
+  Proof.
+    iIntros "(_ & #Hp & _ & _ & _ & _ & _ & _ & #Hkm & _ & _ & _ & _ & _ & _ & _ & #Hav & _)".
+    iExists (un_ka N). iFrame "Hkm Hav Hp".
+  Qed.
+
+  (* the EXCLUSIVE remainder: what a callee can consume and must give back --
+     plus [proc_priv], which every callee gives back at a MOVED record, which
+     is why [V] is a parameter of this half and not of [ut_caps]. *)
+  Definition ut_own (Rsys : gname -> mword 64 -> iProp Σ)
+      (N : ut_names) (V : pprivate) : iProp Σ :=
+    (bslots (un_bn N) 3 ∗
      fileclose_bm (un_fn N) (un_us N) ∗
      (mword_of_int KernelSyms.initproc : mword 64) ↦₈{un_dqi N} (un_ip N) ∗
      fd_slots FDSPARE ∗
@@ -445,6 +516,27 @@ Section UsertrapRes.
      proc_priv (un_f N) (un_pj N) (un_pid N) V ∗
      (* everything the twenty-two syscall table entries consume, abstractly *)
      Rsys (un_f N) (un_pj N))%I.
+
+  Definition ut_env (Rsys : gname -> mword 64 -> iProp Σ)
+      (N : ut_names) (V : pprivate) : iProp Σ :=
+    (ut_caps N ∗ ut_own Rsys N V)%I.
+
+  (* the process block and the syscall environment, borrowed together and
+     handed back at a moved record: syscall wants both, prepare_return and
+     vmfault only the first. *)
+  Lemma ut_own_priv (Rsys : gname -> mword 64 -> iProp Σ) (N : ut_names)
+      (V : pprivate) :
+    ut_own Rsys N V -∗
+    proc_priv (un_f N) (un_pj N) (un_pid N) V ∗
+    Rsys (un_f N) (un_pj N) ∗
+    (∀ V' : pprivate,
+       proc_priv (un_f N) (un_pj N) (un_pid N) V' -∗
+       Rsys (un_f N) (un_pj N) -∗ ut_own Rsys N V').
+  Proof.
+    iIntros "(Hb & Hbm & Hip & Hfd & Hir & Hpv & Hsy)".
+    iFrame "Hpv Hsy". iIntros (V') "Hpv Hsy".
+    rewrite /ut_own. iFrame "Hb Hbm Hip Hfd Hir Hpv Hsy".
+  Qed.
 
   (* ------------------------------------------------------------------- *)
   (* [usertrap_res] itself.                                              *)
@@ -464,7 +556,191 @@ Section UsertrapRes.
        ut_trap (un_pj N) ksp av C ∗
        ut_env Rsys N V)%I.
 
+  (* ------------------------------------------------------------------- *)
+  (* THE WALK'S OWN VOCABULARY -- what the block lemmas of ProofUsertrap  *)
+  (* hand one another.  Definitional, so the phases do not depend on each *)
+  (* other's proofs.                                                      *)
+  (* ------------------------------------------------------------------- *)
+
+  (* THE SAVED FRAME.  The [c.addi sp,sp,-32] at +0x00 frees four slots and
+     +0x02..+0x08 fill them with ra / s0 / s1 / s2, in that order at
+     [pa_stk sp0 1..4].  ra is in here even though it is not callee-saved:
+     the epilogue's [c.ldsp ra,24(sp)] is what makes the [ret] land on the
+     boundary's [ret_pc (m !!! ra)]. *)
+  Definition ut_frame (sp0 : mword 64) (vra vs0 vs1 vs2 : mword 64) : iProp Σ :=
+    (pa_stk sp0 1 ↦₈ vra ∗ pa_stk sp0 2 ↦₈ vs0 ∗
+     pa_stk sp0 3 ↦₈ vs1 ∗ pa_stk sp0 4 ↦₈ vs2)%I.
+
+  (* CALLEE-SAVED MINUS THE FOUR THE FRAME HOLDS.  [CalleeSaved.callee_saved
+     m0 m] is FALSE at every point inside usertrap -- s1 holds [p] and s2
+     holds [which_dev] from +0x26 on -- so what travels through the walk is
+     this weaker relation, and the epilogue's four loads turn it back into
+     the real thing.  sp is excluded too: it is [pa_stk sp0 4] until +0xc4. *)
+  Definition ut_cs (m0 m : regfile) : Prop :=
+    forall c : mword 5, is_cs_idx c = true ->
+      Regidx c <> Regidx csp_rs1 ->
+      Regidx c <> Regidx (mword_of_int 8 : mword 5) ->
+      Regidx c <> Regidx (mword_of_int 9 : mword 5) ->
+      Regidx c <> Regidx (mword_of_int 18 : mword 5) ->
+      m !!! Regidx c = m0 !!! Regidx c.
+
+  Lemma ut_cs_refl (m0 : regfile) : ut_cs m0 m0.
+  Proof. intros c _ _ _ _ _. reflexivity. Qed.
+
+  Lemma ut_cs_trans (m0 m1 m2 : regfile) :
+    ut_cs m0 m1 -> ut_cs m1 m2 -> ut_cs m0 m2.
+  Proof.
+    intros H1 H2 c Hc H H0 H3 H4.
+    rewrite (H2 c Hc H H0 H3 H4). exact (H1 c Hc H H0 H3 H4).
+  Qed.
+
+  Lemma ut_cs_of_callee_saved (m0 m : regfile) : callee_saved m0 m -> ut_cs m0 m.
+  Proof. intros Hcs c Hc _ _ _ _. exact (callee_saved_lookup Hcs c Hc). Qed.
+
+  Lemma ut_cs_insert (k : mword 5) (v : mword 64) (m0 m : regfile) :
+    is_cs_idx k = false -> ut_cs m0 m -> ut_cs m0 (<[Regidx k := v]> m).
+  Proof.
+    intros Hk H c Hc H1 H2 H3 H4. rewrite upd_ne.
+    - exact (H c Hc H1 H2 H3 H4).
+    - apply not_eq_sym, (is_cs_idx_true_neq _ _ Hk). exact Hc.
+  Qed.
+
+  (* ...and the twin for the FOUR the frame holds.  A write to sp / s0 / s1 /
+     s2 is invisible to [ut_cs] by construction -- those are the registers it
+     says nothing about -- so it needs no [is_cs_idx] side condition, only
+     that the destination IS one of them. *)
+  Lemma ut_cs_insert4 (k : mword 5) (v : mword 64) (m0 m : regfile) :
+    (Regidx k = Regidx csp_rs1 \/ Regidx k = Regidx (mword_of_int 8 : mword 5) \/
+     Regidx k = Regidx (mword_of_int 9 : mword 5) \/
+     Regidx k = Regidx (mword_of_int 18 : mword 5)) ->
+    ut_cs m0 m -> ut_cs m0 (<[Regidx k := v]> m).
+  Proof.
+    intros Hk H c Hc H1 H2 H3 H4. rewrite upd_ne;
+      [ exact (H c Hc H1 H2 H3 H4) | ].
+    destruct Hk as [-> | [-> | [-> | ->]]]; congruence.
+  Qed.
+
+  (* THE EPILOGUE'S PAYOFF: [ut_cs] plus the four restored registers IS
+     [callee_saved].  This is where the frame stops being bookkeeping. *)
+  Lemma ut_cs_to_callee_saved (m0 m : regfile) :
+    ut_cs m0 m ->
+    m !!! Regidx csp_rs1 = m0 !!! Regidx csp_rs1 ->
+    m !!! Regidx (mword_of_int 8 : mword 5) = m0 !!! Regidx (mword_of_int 8 : mword 5) ->
+    m !!! Regidx (mword_of_int 9 : mword 5) = m0 !!! Regidx (mword_of_int 9 : mword 5) ->
+    m !!! Regidx (mword_of_int 18 : mword 5) = m0 !!! Regidx (mword_of_int 18 : mword 5) ->
+    callee_saved m0 m.
+  Proof.
+    intros H Hsp Hs0 Hs1 Hs2. unfold callee_saved. repeat apply conj;
+      [ exact Hsp | exact Hs0 | exact Hs1 | exact Hs2 | .. ];
+      (apply H; [ vm_compute; reflexivity
+                | vm_compute; discriminate | vm_compute; discriminate
+                | vm_compute; discriminate | vm_compute; discriminate ]).
+  Qed.
+
+  (* p->trapframe->epc EXISTS -- prepare_return's [pv_tf V !! tf_epc_idx =
+     Some epc] premise, read off the page's own length invariant rather than
+     asked of usertrap's caller. *)
+  Lemma ut_epc_exists (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv γf pa pid V -∗
+    ⌜ ∃ ep : mword 64, pv_tf V !! tf_epc_idx = Some ep ⌝.
+  Proof.
+    iIntros "Hpv".
+    iDestruct (proc_priv_tf with "Hpv") as "(_ & Htfp & _)".
+    rewrite /tf_page. iDestruct "Htfp" as "(%Hlen & _ & _)".
+    iPureIntro. apply lookup_lt_is_Some_2. rewrite Hlen.
+    unfold TFWORDS, tf_epc_idx. lia.
+  Qed.
+
+  (* the record eta a [proc_priv_copy] round trip that changed nothing needs,
+     the [upd_tf_id] of the descriptor field. *)
+  Lemma upd_upt_id (V : pprivate) : upd_upt V (pv_upt V) = V.
+  Proof. by destruct V. Qed.
+
+  (* THE TRAP CSRs, RAW -- what usertrap holds between the [csrw stvec] at
+     +0x1e and whichever later point on its path first wants the folded
+     bundle.  It cannot fold at +0x1e, because it READS scause three times,
+     sepc once and stval twice afterwards, and [trap_csrs] buries all three
+     under existentials.  [ut_trap_csrs_fold] above is the fold; the three
+     values are pinned here because the reads' results are what the dispatch
+     branches on. *)
+  Definition ut_csrs_raw (ep sc st : mword 64) : iProp Σ :=
+    (sepc ↦ᵣ ep ∗ scause ↦ᵣ sc ∗ stval ↦ᵣ st ∗
+     stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) ∗
+     ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
+     sret_bits ('b"0" : mword 1) ('b"1" : mword 1) ∗
+     strans_bit strans_bit_kpt)%I.
+
+  Lemma ut_csrs_raw_fold (ep sc st : mword 64) :
+    ut_csrs_raw ep sc st -∗
+    intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64) -∗
+    trap_csrs.
+  Proof.
+    iIntros "(Hep & Hsc & Hst & Hstv & Hq & Hsret & Hkpt) #Hih".
+    iApply (ut_trap_csrs_fold ep sc st with "Hep Hsc Hst Hsret Hstv Hq Hkpt Hih").
+  Qed.
+
+  (* EVERYTHING ELSE A BLOCK CARRIES, at its own SIE index: the per-cpu
+     bundle, the two arm complements, and the five cones' environment.  At
+     [b = false] the complements are the real trap-CSR set and the real
+     claim; at [b = true] both are [emp] because the enabled arm owns them.
+     That is what makes the tail blocks index-generic, which they have to be:
+     +0xa6 is reached at [true] from the syscall arm and at [false] from the
+     other four. *)
+  Definition ut_hold (Rsys : gname -> mword 64 -> iProp Σ)
+      (N : ut_names) (V : pprivate) (C : iProp Σ) (b : bool) : iProp Σ :=
+    (cpu_own 0%nat b (un_pj N) C b ∗
+     trap_csrs_ext b ∗
+     cpu_claim_ext b (un_pj N) ∗
+     ut_env Rsys N V)%I.
+
+  (* the index arithmetic, once.  [nx] is a block's own stack index and [av]
+     the entry budget; the four frame slots are spent and, on the syscall
+     arm, [kv_frame_slots] more sit in the enabled arm's reserve.  Either way
+     what is left covers every callee, because [K_usertrap] was chosen so:
+     see its definition. *)
+  Lemma ut_nx_bound (b : bool) (av nx : nat) :
+    (K_usertrap <= av)%nat -> (trap_res b + nx)%nat = (av - 4)%nat ->
+    (K_syscall <= nx)%nat.
+  Proof.
+    unfold K_usertrap, trap_res, kv_frame_slots. destruct b; lia.
+  Qed.
+
 End UsertrapRes.
+
+(* ---------------------------------------------------------------------- *)
+(* THE TRANSPORT, outside the section so both harts are free arguments --   *)
+(* [IntrDefs]' three transports' idiom exactly.                            *)
+(*                                                                         *)
+(* [ut_hold] is hart-indexed and the walk FRAMES it across steps that can   *)
+(* move the hart, so it needs one.  It has one for the same two-halves      *)
+(* reason its three components do: at [b = true] every hart-indexed member  *)
+(* is [emp] or a pure fact ([cpu_own]'s payload is inside [sie_arm],        *)
+(* [trap_csrs_ext true] and [cpu_claim_ext true] are [emp]) and [ut_env] is *)
+(* hart-FREE by construction -- which is exactly what [devintr_caps_any]    *)
+(* and [SpecSyscall]'s hart-free [syscall_env] are for.  At [b = false] no  *)
+(* trap can have been taken and [wp_next]'s conditional equality pins the   *)
+(* hart.  Chain the per-step equalities with [wp_next_chain] and apply this *)
+(* once per crossing.                                                      *)
+(* ---------------------------------------------------------------------- *)
+Lemma ut_hold_transport
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !kallocG Σ, !irefslotG Σ, !iregG Σ} `{GEN : GenId}
+    (CID0 CID1 : CpuId) (Rsys : gname -> mword 64 -> iProp Σ)
+    (N : ut_names) (V : pprivate) (C : iProp Σ) (b : bool) :
+  (b = false \/ un_pj N = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
+  ut_hold (CID := CID0) Rsys N V C b -∗ ut_hold (CID := CID1) Rsys N V C b.
+Proof.
+  intros Heq. rewrite /ut_hold. iIntros "(Hcpu & Hcsrs & Hclm & Henv)".
+  iDestruct (cpu_own_transport CID0 CID1 0%nat b (un_pj N) C b Heq
+               with "Hcpu") as "$".
+  iDestruct (trap_csrs_ext_transport CID0 CID1 b (un_pj N) Heq
+               with "Hcsrs") as "$".
+  iDestruct (cpu_claim_ext_transport CID0 CID1 b (un_pj N) Heq
+               with "Hclm") as "$".
+  iExact "Henv".
+Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* THE FIT, CHECKED HERE.                                                  *)
