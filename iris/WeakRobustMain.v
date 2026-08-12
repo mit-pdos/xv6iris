@@ -1,0 +1,1339 @@
+(** * WeakRobustMain.v — THE ASSEMBLED LAYER-1 ROBUSTNESS THEOREM (M6 W2c)
+
+    The pieces landed by W2a/W2b are: the dependency graph and its
+    extension ([WeakRobustGraph], [WeakRobustOrd]), the acyclicity walk
+    over [gdep2] from the per-edge discipline premises
+    ([WeakRobustAcyc2]), the byte-classification premises and
+    co-serialization ([WeakRobustSer]), and the π-permuted simulation
+    ([WeakRobustSim]).  This file assembles them into the theorem the
+    worklist's W2c block asks for:
+
+      (1) the per-edge premise WEAKENED from [rf_edges_ok] to
+          "[edge_ok] OR [bad]" ([edges_split]), where [bad] is the
+          owned-unpublished cross read — the shape the Layer-2
+          violation predicate φ refutes;
+      (2) THE EXHIBIT: given a [bad] edge whose target has
+          bad-target-free strict ancestry ([bad_min]), the ancestor cone
+          [U] of that target is sortable, the subset simulation replays
+          it, and ONE more [wp_pf_step] appends the bad read — reaching
+          a promise-free configuration that VIOLATES, contradicting
+          [pf_violation_free].  Hence no bad edge exists at all,
+          [rf_edges_ok] holds, [gdep2_acyclic] follows, and [sim_full]
+          delivers the robustness conclusion;
+      (3) the honest residue, carried as the premise [bad_wf]: whenever
+          a bad edge exists, SOME bad edge has bad-target-free strict
+          ancestry (a "bad SCC" — mutually-justified owned reads — has
+          no minimal element and no exhibit; same epistemic category as
+          D-M6-8's static residue);
+      (4) W2c proper: the transport corollary over completable prefixes.
+
+    DELTAS FROM THE DESIGN SKETCH (the landed files are ground truth):
+
+    - THE RELATIVIZED WALK IS TINY, and it is NOT a copy of
+      [WeakRobustAcyc2]'s whole section.  Reading that file's proof:
+      [rf_edges_ok] is consumed at exactly ONE place ([mile_mu_gain]'s
+      cross-rf arm), and both call sites ([on_cycle2_advance]) have the
+      milestone's TARGET [u] on a cycle.  So only [mile_mu_gain],
+      [on_cycle2_advance], [on_cycle2_empty] and the theorem are
+      restated here ([mile_mu_gain_on], [on_cycle2_advance_on],
+      [on_cycle2_on_empty], [gdep2_acyclic_on]), over an ABSTRACT
+      predicate [W] on readers ([rf_edges_ok_on]) closed under mutual
+      reachability; [mile_mu], [gmile], [tc_gdep2_split],
+      [rtc_gdep2_first_mile], [mile_mu_bounded], [mile_mu_src_ts] are
+      imported unchanged.  Instantiating [W] at "is a strict ancestor
+      of the bad read" gives the U-restricted acyclicity the exhibit
+      needs; instantiating it at "lies on a cycle" gives global
+      acyclicity from the STRONG form of the residue (recorded as
+      [gdep2_acyclic_bad_free] — NOT used by the main theorem, which
+      takes the weak [bad_wf] and spends the exhibit; the strong form
+      would make [pf_violation_free] unnecessary, which is not the
+      design).
+
+    - NO [Decision (tc (gdep2 TS) e e2)] IS PROVED.  The design's
+      alternative — the concrete predecessor closure — is taken: [anc]
+      iterates "add every carrier element with an edge into the current
+      set" [|carrier|] times, saturates (pigeonhole on a [NoDup]
+      sublist), and [e ∈ anc ↔ e = root ∨ tc R e root].  It is
+      developed generically ([Section closure]) over a decidable
+      relation and a finite carrier.
+
+    - [sim_prefix] IS NOT USED: it consumes GLOBAL [gdep2_acyclic],
+      which the exhibit does not have (the whole point of the exhibit
+      is that a bad edge may create cycles elsewhere).  Instead the
+      generic [WeakRobustLin.topo_sort] is instantiated at the
+      RESTRICTED relation [gdep2 ∩ U²] and [toposort_ind_S]'s prefix
+      induction is re-run over [Qinv] ([sim_prefix]'s own proof, with
+      the restricted order) — 40 lines, and [Qinv_step] does all the
+      work.
+
+    - [bad] CARRIES THE AUTHOR'S OWN FULFIL in its "no publishing
+      ancestor" conjunct ([e1.2 ≤ ep.2], not [<]).  At the [WeakPromise]
+      level the message class [wm_ak] is UNCONSTRAINED by the step rules
+      (the promise rule picks any class), so "[WCplain] ⇒ the store did
+      not raise [w_pub]" is not derivable — including the author's own
+      fulfil in the quantifier makes the exhibit close with no extra
+      premise, and it is faithful to the intent (a store that raises
+      [w_pub] publishes its own message, and Layer 2's [wm_class_of]
+      tags exactly those [WCrel]).
+
+    - THE PREMISE PACKAGE is [main_premises]: [edges_split] (the split),
+      [bad_wf] (the residue), [ee_ok] (W2b (iii)) and
+      [∃ sync, ptraces_bytes_ok TS sync] (the byte classification, which
+      [WeakRobustSer.co_serialized_pkg] turns into [co_tc]).
+      [ptraces_wf], [ptraces_ws_init], [ptraces_fwd_own],
+      [writes_fulfilled] and the shape facts are DERIVED from the
+      behavior, exactly as [WeakRobustSim]'s wrapper derives them;
+      [ts_oblivious] is worklist finding (v).
+
+    - [pub_event] reads the raise condition off the machine: [w_pub] is
+      raised by [store_post] iff the label's [rl] bit is set or the
+      PRE-state's [w_relp] is (a [pw ∧ sw] fence armed it).  The
+      pf-side fold and the behavior's own trace agree on [w_relp]
+      because [w_relp] is σ-INDEPENDENT ([w_relp_aevs_post_indep]) —
+      nothing in the [wstate] update reads a timestamp to compute it.
+
+    DEPENDENCY-FREE like its parents: stdpp only, no Iris, no Sail.
+    [WeakAxiomatic] is imported FIRST so that [WeakPromise]'s [wlabel]
+    constructors shadow its [lbl] ones. *)
+From Stdlib.ssr Require Import ssreflect.
+From stdpp Require Import gmap finite list relations.
+From stdpp Require Import bitvector.definitions.
+From xv6iris Require Import WeakAxiomatic.
+From xv6iris Require Import WeakMem WeakPromise WeakPromiseFact WeakPromiseBridge
+                            WeakRobustTrace WeakRobustGraph WeakRobust
+                            WeakRobustProv WeakRobustAcyc WeakRobustLin
+                            WeakRobustOrd WeakRobustSer WeakRobustAcyc2
+                            WeakRobustSim.
+
+Local Open Scope Z_scope.
+
+(* ------------------------------------------------------------------ *)
+(** ** LAYER 0: how a fold of trace events moves [w_pub] and [w_relp]
+
+    Two inert [wstate] fields carry the publication story (D-M6-6):
+    [w_relp] is armed by a [pw ∧ sw] fence and cleared by the next
+    store; [w_pub] is raised to the store's own timestamp at a store
+    taken with [w_relp] set or at an [rl] store.  The exhibit needs
+    exactly two facts about the π-transported fold [aevs_post]:
+
+    - [w_relp] does not depend on σ (nothing computes it from a
+      timestamp), so the pf-side fold and the behavior's own trace
+      agree on it;
+    - [w_pub] stays STRICTLY BELOW a bound [N] as long as every
+      RAISING event's transported timestamp does. *)
+
+(** The [rl] bit of a store/rmw label; [false] for everything else. *)
+Definition lb_rl (l : wlabel) : bool :=
+  match l with
+  | LStore rl _ _ => rl
+  | LRmw _ rl _ _ _ => rl
+  | _ => false
+  end.
+
+(* ---- the per-byte folds ---- *)
+
+Lemma w_relp_foldl_load (aq : bool) (v : nat) ats :
+  ∀ w, w_relp (foldl (λ w at_, load_post_at w aq v at_.1 at_.2) w ats)
+       = w_relp w.
+Proof. induction ats as [|at_ ats IH]; intros w; [done|by rewrite /= IH]. Qed.
+
+Lemma w_pub_foldl_load (aq : bool) (v : nat) ats :
+  ∀ w, w_pub (foldl (λ w at_, load_post_at w aq v at_.1 at_.2) w ats)
+       = w_pub w.
+Proof. induction ats as [|at_ ats IH]; intros w; [done|by rewrite /= IH]. Qed.
+
+Lemma w_relp_load_post_bytes ws aq ats :
+  w_relp (load_post_bytes ws aq ats) = w_relp ws.
+Proof. apply w_relp_foldl_load. Qed.
+
+Lemma w_pub_load_post_bytes ws aq ats :
+  w_pub (load_post_bytes ws aq ats) = w_pub ws.
+Proof. apply w_pub_foldl_load. Qed.
+
+Lemma w_relp_load_post_run ws aq base ts :
+  w_relp (load_post_run ws aq base ts) = w_relp ws.
+Proof. apply w_relp_load_post_bytes. Qed.
+
+Lemma w_pub_load_post_run ws aq base ts :
+  w_pub (load_post_run ws aq base ts) = w_pub ws.
+Proof. apply w_pub_load_post_bytes. Qed.
+
+(** [w_relp] after a store run depends on the PRE-state's [w_relp] and
+    on the byte list — never on the timestamp. *)
+Lemma w_relp_foldl_store (rl : bool) as_ :
+  ∀ w w' (t t' : nat), w_relp w = w_relp w' →
+    w_relp (foldl (λ w a, store_post w rl a t) w as_)
+    = w_relp (foldl (λ w a, store_post w rl a t') w' as_).
+Proof.
+  induction as_ as [|a as_ IH]; intros w w' t t' Heq; [done|].
+  simpl. by apply IH.
+Qed.
+
+Lemma w_pub_foldl_store (rl : bool) as_ (t : nat) :
+  ∀ w, (w_pub (foldl (λ w a, store_post w rl a t) w as_)
+        ≤ Nat.max (w_pub w) t)%nat.
+Proof.
+  induction as_ as [|a as_ IH]; intros w; [simpl; lia|].
+  simpl. have H := IH (store_post w rl a t).
+  have Hp : (w_pub (store_post w rl a t) ≤ Nat.max (w_pub w) t)%nat.
+  { rewrite /store_post /=. destruct (w_relp w || rl)%bool; lia. }
+  lia.
+Qed.
+
+Lemma w_pub_foldl_store_eq (rl : bool) as_ (t : nat) :
+  ∀ w, w_relp w = false → rl = false →
+    w_pub (foldl (λ w a, store_post w rl a t) w as_) = w_pub w.
+Proof.
+  induction as_ as [|a as_ IH]; intros w Hrp Hrl; [done|].
+  have Hrp' : w_relp (store_post w rl a t) = false by rewrite /store_post.
+  simpl. rewrite (IH (store_post w rl a t) Hrp' Hrl).
+  rewrite /store_post /= Hrp Hrl //.
+Qed.
+
+Lemma w_relp_store_post_bytes_indep (rl : bool) as_ w w' (t t' : nat) :
+  w_relp w = w_relp w' →
+  w_relp (store_post_bytes w rl as_ t) = w_relp (store_post_bytes w' rl as_ t').
+Proof. apply w_relp_foldl_store. Qed.
+
+Lemma w_pub_store_post_bytes_le (rl : bool) as_ (t : nat) w :
+  (w_pub (store_post_bytes w rl as_ t) ≤ Nat.max (w_pub w) t)%nat.
+Proof. apply w_pub_foldl_store. Qed.
+
+Lemma w_pub_store_post_bytes_eq (rl : bool) as_ (t : nat) w :
+  w_relp w = false → rl = false →
+  w_pub (store_post_bytes w rl as_ t) = w_pub w.
+Proof. apply w_pub_foldl_store_eq. Qed.
+
+Lemma w_relp_store_post_run_indep (rl : bool) base n :
+  ∀ w w' (t t' : nat), w_relp w = w_relp w' →
+    w_relp (store_post_run w rl base n t)
+    = w_relp (store_post_run w' rl base n t').
+Proof. intros. by apply w_relp_store_post_bytes_indep. Qed.
+
+Lemma w_pub_store_post_run_le (rl : bool) base n (t : nat) w :
+  (w_pub (store_post_run w rl base n t) ≤ Nat.max (w_pub w) t)%nat.
+Proof. apply w_pub_store_post_bytes_le. Qed.
+
+Lemma w_pub_store_post_run_eq (rl : bool) base n (t : nat) w :
+  w_relp w = false → rl = false →
+  w_pub (store_post_run w rl base n t) = w_pub w.
+Proof. intros. by apply w_pub_store_post_bytes_eq. Qed.
+
+(* ---- the event folds ---- *)
+
+(** σ-INDEPENDENCE of [w_relp]: no [wstate] rule computes the
+    release-pending flag from a timestamp. *)
+Lemma w_relp_aev_post_indep σ σ' ev w w' :
+  w_relp w = w_relp w' → w_relp (aev_post σ ev w) = w_relp (aev_post σ' ev w').
+Proof.
+  intros Heq. rewrite /aev_post.
+  destruct (ae_lb ev) as [|aq lat base tvs|rl base data|aq rl base tvs data
+                          |pr pw sr sw]; [done| | | |].
+  - by rewrite !w_relp_load_post_run.
+  - destruct (ae_ts ev) as [ts|]; [|done].
+    by apply w_relp_store_post_run_indep.
+  - destruct (ae_ts ev) as [ts|]; [|done].
+    apply w_relp_store_post_run_indep. by rewrite !w_relp_load_post_run.
+  - rewrite /fence_post /=. by destruct (pw && sw)%bool.
+Qed.
+
+Lemma w_relp_aevs_post_indep σ σ' evs :
+  ∀ w w', w_relp w = w_relp w' →
+    w_relp (aevs_post σ evs w) = w_relp (aevs_post σ' evs w').
+Proof.
+  induction evs as [|ev evs IH]; intros w w' Heq; [done|].
+  rewrite /aevs_post /=. apply IH. by apply w_relp_aev_post_indep.
+Qed.
+
+(** ONE event keeps [w_pub] below [N] unless it RAISES — and a raising
+    event is a fulfil whose label carries [rl] or whose pre-state has
+    [w_relp] armed. *)
+Lemma w_pub_aev_post_lt σ ev w (N : nat) :
+  (w_pub w < N)%nat →
+  (∀ ts, ae_ts ev = Some ts →
+     (lb_rl (ae_lb ev) = true ∨ w_relp w = true) → (σ ts < N)%nat) →
+  (w_pub (aev_post σ ev w) < N)%nat.
+Proof.
+  intros Hlt Hraise. rewrite /aev_post.
+  destruct (ae_lb ev) as [|aq lat base tvs|rl base data|aq rl base tvs data
+                          |pr pw sr sw] eqn:Hlb; [done| | | |].
+  - by rewrite w_pub_load_post_run.
+  - destruct (ae_ts ev) as [ts|] eqn:Hts; [|done].
+    destruct (decide (w_relp w = true ∨ rl = true)) as [Hr|Hr].
+    + have Hσ : (σ ts < N)%nat.
+      { apply (Hraise ts eq_refl). simpl. tauto. }
+      have := w_pub_store_post_run_le rl base (length data) (σ ts) w. lia.
+    + have Hrp : w_relp w = false.
+      { destruct (w_relp w) eqn:E; [|done]. destruct Hr. by left. }
+      have Hrl : rl = false.
+      { destruct rl eqn:E; [|done]. destruct Hr. by right. }
+      by rewrite (w_pub_store_post_run_eq rl base (length data) (σ ts) w Hrp Hrl).
+  - destruct (ae_ts ev) as [ts|] eqn:Hts; [|done].
+    set w0 := load_post_run w aq base (σ <$> tvs.*1).
+    have Hp0 : w_pub w0 = w_pub w by apply w_pub_load_post_run.
+    have Hr0 : w_relp w0 = w_relp w by apply w_relp_load_post_run.
+    destruct (decide (w_relp w = true ∨ rl = true)) as [Hr|Hr].
+    + have Hσ : (σ ts < N)%nat.
+      { apply (Hraise ts eq_refl). simpl. tauto. }
+      have := w_pub_store_post_run_le rl base (length data) (σ ts) w0. lia.
+    + have Hrp : w_relp w0 = false.
+      { rewrite Hr0. destruct (w_relp w) eqn:E; [|done]. destruct Hr. by left. }
+      have Hrl : rl = false.
+      { destruct rl eqn:E; [|done]. destruct Hr. by right. }
+      rewrite (w_pub_store_post_run_eq rl base (length data) (σ ts) w0 Hrp Hrl).
+      lia.
+  - by rewrite /fence_post /=.
+Qed.
+
+(** …hence a whole processed prefix does, provided every raising event
+    in it has its transported timestamp below [N]. *)
+Lemma w_pub_aevs_post_lt σ evs :
+  ∀ w (N : nat),
+    (w_pub w < N)%nat →
+    (∀ k ev ts, evs !! k = Some ev → ae_ts ev = Some ts →
+       (lb_rl (ae_lb ev) = true ∨
+        w_relp (aevs_post σ (take k evs) w) = true) →
+       (σ ts < N)%nat) →
+    (w_pub (aevs_post σ evs w) < N)%nat.
+Proof.
+  induction evs as [|ev evs IH]; intros w N Hw Hall; [done|].
+  rewrite /aevs_post /=. apply IH.
+  - apply (w_pub_aev_post_lt σ ev w N Hw).
+    intros ts Hts Hr. by apply (Hall 0%nat ev ts).
+  - intros k ev' ts Hk Hts Hr. apply (Hall (S k) ev' ts); [done|done|].
+    by rewrite /= in Hr |- *.
+Qed.
+
+(* ------------------------------------------------------------------ *)
+(** ** LAYER 1: the Layer-2 parameters, instantiated
+
+    [WeakRobust]'s [violation] takes the classification [cls] and the
+    publication predicate [pub] as PARAMETERS (D-M6-2/D-M6-6).  Here are
+    the instances Layer 2 will hand it: the class is read off the
+    message's inert [wm_ak] field, and publication off the AUTHOR's
+    inert [w_pub] watermark in the configuration. *)
+
+Definition cls_of (m : wmsg) : store_class :=
+  match wm_ak m with
+  | WCplain => SCowned
+  | WCrel => SCfenced
+  | WCexcl => SCexcl
+  end.
+
+(** [pub_of c ts]: the message at timestamp [ts] has been published by
+    ITS OWN author — the author's watermark has reached [ts].
+    [violation] uses it as [¬ pub c (S p)] for the message at log
+    position [p], so the author is found through the log. *)
+Definition pub_of {P : Type} (c : wpcfg P) (ts : nat) : Prop :=
+  ∃ p m i ag,
+    ts = S p ∧ pc_log c !! p = Some m ∧ wm_tid m = Some i ∧
+    pc_ags c !! i = Some ag ∧ (ts ≤ w_pub (pa_ws ag))%nat.
+
+(* ------------------------------------------------------------------ *)
+(** ** LAYER 2: the per-edge split — [edge_ok] or [bad]
+
+    [bad e1 e2] is the OWNED-UNPUBLISHED CROSS READ: a foreign agent
+    reads a [WCplain] message and NO publishing event of the author
+    lies, po-at-or-after the author's own fulfil, in the strict ancestry
+    of the reader.  Worklist item (2b) pins exactly this shape; the
+    "po-at-or-after" (rather than "strictly after") is this file's
+    delta — see the header. *)
+
+(** The author's pre-state at an event; [ws_init] off the trace (junk,
+    never reached: every use is under [gev_wf]). *)
+Definition pre_ws {P : Type} (TS : ptraces P) (e : gev) : wstate :=
+  match pt_trs TS !! e.1 with
+  | Some T => match at_ags T !! e.2 with
+              | Some ag => pa_ws ag
+              | None => ws_init
+              end
+  | None => ws_init
+  end.
+
+(** A PUBLISHING EVENT: a fulfil that RAISES [w_pub] — its label carries
+    [rl], or a [pw ∧ sw] fence armed [w_relp] before it.  (Detecting it
+    by the message class alone would be wrong: an [rl]-AMO raises
+    [w_pub] while being tagged [WCexcl].) *)
+Definition pub_event {P : Type} (TS : ptraces P) (e : gev) : Prop :=
+  is_Some (gev_ts TS e) ∧
+  ∃ l, gev_lb TS e = Some l ∧
+       (lb_rl l = true ∨ w_relp (pre_ws TS e) = true).
+
+Definition bad {P : Type} (TS : ptraces P) (e1 e2 : gev) : Prop :=
+  grf TS e1 e2 ∧ e1.1 ≠ e2.1 ∧
+  (∃ ts m, gev_ts TS e1 = Some ts ∧ pt_log TS !! (ts - 1)%nat = Some m ∧
+           wm_ak m = WCplain) ∧
+  ¬ (∃ ep, ep.1 = e1.1 ∧ (e1.2 ≤ ep.2)%nat ∧ pub_event TS ep ∧
+           tc (gdep2 TS) ep e2).
+
+(** THE WEAKENED PER-EDGE PREMISE.  Same quantification as
+    [WeakRobustAcyc.rf_edges_ok], with the conclusion weakened to a
+    disjunction. *)
+Definition edges_split {P : Type} (TS : ptraces P) : Prop :=
+  ∀ e1 e2 T ts a k' ev',
+    gev_ts TS e1 = Some ts → gev_reads TS e2 a ts → e1.1 ≠ e2.1 →
+    pt_trs TS !! e2.1 = Some T →
+    (e2.2 < k')%nat →
+    at_evs T !! k' = Some ev' → is_Some (ae_ts ev') →
+    edge_ok T e2.2 k' ts ∨ bad TS e1 e2.
+
+(** …and the RELATIVIZED strong premise: [edge_ok] at every cross edge
+    whose READER satisfies [W].  This is the shape the walk below
+    consumes, and the only shape the walk ever APPLIES. *)
+Definition rf_edges_ok_on {P : Type} (TS : ptraces P) (W : gev → Prop)
+    : Prop :=
+  ∀ e1 e2 T ts a k' ev',
+    gev_ts TS e1 = Some ts → gev_reads TS e2 a ts → e1.1 ≠ e2.1 → W e2 →
+    pt_trs TS !! e2.1 = Some T →
+    (e2.2 < k')%nat →
+    at_evs T !! k' = Some ev' → is_Some (ae_ts ev') →
+    edge_ok T e2.2 k' ts.
+
+Lemma rf_edges_ok_on_full {P : Type} (TS : ptraces P) (W : gev → Prop) :
+  rf_edges_ok TS → rf_edges_ok_on TS W.
+Proof.
+  intros H e1 e2 T ts a k' ev' Hts Hrd Hne _ HT Hlt Hev Hsome.
+  by eapply H.
+Qed.
+
+(** THE RESIDUE (worklist item (3)).  [bad_min TS e2]: no bad edge's
+    target is a STRICT ancestor of [e2] — the minimality the exhibit
+    picks.  [bad_wf]: whenever a bad edge exists, some bad edge is
+    minimal in that sense.  A "bad SCC" (mutually-justified owned reads)
+    is exactly what this excludes: it has no minimal element, its
+    events' pf-realization is circular, and its message never enters the
+    pf log, so no exhibit can be built. *)
+Definition bad_min {P : Type} (TS : ptraces P) (e2 : gev) : Prop :=
+  ∀ f1 f2, bad TS f1 f2 → ¬ tc (gdep2 TS) f2 e2.
+
+Definition bad_wf {P : Type} (TS : ptraces P) : Prop :=
+  ∀ e1 e2, bad TS e1 e2 → ∃ f1 f2, bad TS f1 f2 ∧ bad_min TS f2.
+
+(* ------------------------------------------------------------------ *)
+(** ** LAYER 3: THE RELATIVIZED WALK
+
+    [WeakRobustAcyc2]'s measure walk consumes [rf_edges_ok] at EXACTLY
+    ONE place — [mile_mu_gain]'s cross-rf arm — and both of
+    [on_cycle2_advance]'s call sites have the milestone's TARGET [u] on
+    a cycle.  So the walk relativizes to any predicate [W] on readers
+    that is CLOSED under mutual reachability, giving "no cycle through a
+    [W]-event".  Everything structural ([mile_mu], [gmile],
+    [tc_gdep2_split], [rtc_gdep2_first_mile], [mile_mu_bounded],
+    [mile_mu_src_ts]) is imported from that file unchanged.
+
+    KEEP IN SYNC with [WeakRobustAcyc2]: the three lemmas below are
+    line-for-line its [mile_mu_gain] / [on_cycle2_advance] /
+    [on_cycle2_empty] with [W]-guarded premises. *)
+
+Section walk.
+  Context {P : Type}.
+  Context (pstep : P → wlabel → P → Prop).
+
+  Implicit Types TS : ptraces P.
+  Implicit Types e : gev.
+
+  Lemma gmile_gdep2 TS x y : gmile TS x y → gdep2 TS x y.
+  Proof. intros [[Hd _]|HE]; [by apply gdep_gdep2|by apply gE_gdep2]. Qed.
+
+  (** THE GAIN LEMMA, relativized: the entry milestone's target [u] must
+      satisfy [W] (that is where the discipline premise is spent). *)
+  Lemma mile_mu_gain_on TS (W : gev → Prop) mu v u x tx :
+    ptraces_wf pstep TS → ptraces_fwd_own TS →
+    rf_edges_ok_on TS W → ee_ok TS →
+    W u → mile_mu TS mu v u → u.1 = x.1 → (u.2 ≤ x.2)%nat →
+    gev_ts TS x = Some tx →
+    (mu < tx)%nat.
+  Proof.
+    intros Hwf Hfo Hrf Hee HWu
+           [(a & Hts1 & Hrd & Hne)|(r & a & Hra & ->)] Hag Hle Htx.
+    - (* CROSS-RF ENTRY: S1, with the reader [u] satisfying [W]. *)
+      have Hwfu : gev_wf TS u by eapply gev_reads_wf.
+      apply gev_wf_bounds in Hwfu as (T & HT & _).
+      have HTx : pt_trs TS !! x.1 = Some T by rewrite -Hag.
+      destruct (gev_reads_ev TS u a mu T HT Hrd) as (ev & Hev & Hinr).
+      destruct (gev_ts_ev TS x tx T HTx Htx) as (evx & Hevx & Htsx).
+      destruct (gev_ts_msg pstep TS v mu Hwf Hts1) as (base & data & kc & Hm).
+      have Hunf : read_unforwarded (pt_log TS) u.1 (ae_lb ev) mu.
+      { right. exists (WMsg base data (Some v.1) kc), v.1.
+        split_and!; [exact Hm|done|exact Hne]. }
+      eapply (atrace_S1_le pstep (pt_img TS) (pt_log TS) u.1 T u.2 x.2
+                ev evx a mu tx).
+      + by eapply Hwf.
+      + intros n ag Hn. by eapply (Hfo u.1 T n ag HT Hn).
+      + exact Hev.
+      + exact Hinr.
+      + exact Hunf.
+      + exact Hevx.
+      + exact Htsx.
+      + exact Hle.
+      + intros Hklt. eapply (Hrf v u T mu a x.2 evx);
+          [exact Hts1|exact Hrd|exact Hne|exact HWu|exact HT|exact Hklt
+           |exact Hevx|].
+        rewrite Htsx. by eexists.
+    - (* gE ENTRY: no discipline premise at all. *)
+      destruct (decide (u.2 = x.2)) as [Heq|Hne].
+      + have Hux : u = x.
+        { destruct u as [i k], x as [i' k']. simpl in Hag, Heq. by subst. }
+        rewrite -Hux in Htx.
+        destruct Hra
+          as (l & ts & tstar & that & _ & _ & _ & _ & _ & H6 & _ & Hlt).
+        rewrite H6 in Htx. by simplify_eq.
+      + eapply (Hee r a v u x tx); [exact Hra|exact Hag|lia|exact Htx].
+  Qed.
+
+  Definition on_cycle2_on TS (W : gev → Prop) (mu : nat) : Prop :=
+    ∃ v u, mile_mu TS mu v u ∧ rtc (gdep2 TS) u v ∧ W u.
+
+  Lemma on_cycle2_advance_on TS (W : gev → Prop) mu :
+    ptraces_wf pstep TS → ptraces_fwd_own TS →
+    rf_edges_ok_on TS W → ee_ok TS →
+    (∀ u x, W u → rtc (gdep2 TS) u x → rtc (gdep2 TS) x u → W x) →
+    on_cycle2_on TS W mu → ∃ mu', (mu < mu')%nat ∧ on_cycle2_on TS W mu'.
+  Proof.
+    intros Hwf Hfo Hrf Hee Hcl (v & u & Hm & Hpath & HWu).
+    destruct (rtc_gdep2_first_mile pstep TS u v Hwf Hpath)
+      as [[Hag Hle]|(x & y & Hag & Hle & Hux & Hmile & Hyv)].
+    - exfalso.
+      destruct (mile_mu_src_ts TS mu v u Hm) as (tv & Htv & Hlev).
+      have Hgt := mile_mu_gain_on TS W mu v u v tv Hwf Hfo Hrf Hee HWu Hm
+                    Hag Hle Htv.
+      lia.
+    - have Hedge : gdep2 TS v u by eapply mile_mu_gdep2.
+      have Hyx : rtc (gdep2 TS) y x.
+      { eapply rtc_transitive; [exact Hyv|].
+        eapply rtc_l; [exact Hedge|exact Hux]. }
+      (* the exit milestone's TARGET inherits [W] *)
+      have HWy : W y.
+      { eapply (Hcl u y HWu).
+        - eapply rtc_r; [exact Hux|by apply gmile_gdep2].
+        - eapply rtc_r; [exact Hyv|exact Hedge]. }
+      destruct Hmile as [[Hd Hne]|HE].
+      + have Hrfxy : grf TS x y.
+        { destruct Hd as [(Hag' & _)|Hrf']; [by destruct (Hne Hag')|exact Hrf']. }
+        destruct Hrfxy as (ts2 & a2 & Hts2 & Hrd2).
+        have Hlt := mile_mu_gain_on TS W mu v u x ts2 Hwf Hfo Hrf Hee HWu Hm
+                      Hag Hle Hts2.
+        exists ts2. split; [exact Hlt|].
+        exists x, y. split_and!; [|exact Hyx|exact HWy].
+        left. exists a2. by split_and!.
+      + destruct HE as (r' & Hat).
+        destruct (gE_at_gE_ra TS r' x y Hat) as (a' & Hra').
+        have Hra'' := Hra'.
+        destruct Hra''
+          as (l' & ts' & tstar' & that' & _ & _ & Hleaf' & _ & H5' & _).
+        have Hlt := mile_mu_gain_on TS W mu v u x tstar' Hwf Hfo Hrf Hee HWu Hm
+                      Hag Hle H5'.
+        have Hle' : (tstar' ≤ rd_floor TS r' a')%nat
+          by apply (lval_ge id _ _ Hleaf').
+        exists (rd_floor TS r' a'). split; [lia|].
+        exists x, y. split_and!; [|exact Hyx|exact HWy].
+        right. by exists r', a'.
+  Qed.
+
+  Lemma on_cycle2_on_bounded TS W mu :
+    ptraces_wf pstep TS → on_cycle2_on TS W mu →
+    (mu ≤ length (pt_log TS))%nat.
+  Proof. intros Hwf (v & u & Hm & _). by eapply mile_mu_bounded. Qed.
+
+  Lemma on_cycle2_on_empty TS (W : gev → Prop) :
+    ptraces_wf pstep TS → ptraces_fwd_own TS →
+    rf_edges_ok_on TS W → ee_ok TS →
+    (∀ u x, W u → rtc (gdep2 TS) u x → rtc (gdep2 TS) x u → W x) →
+    ∀ mu, ¬ on_cycle2_on TS W mu.
+  Proof.
+    intros Hwf Hfo Hrf Hee Hcl.
+    have Hgen : ∀ n mu, (length (pt_log TS) - mu ≤ n)%nat →
+                        ¬ on_cycle2_on TS W mu.
+    { induction n as [|n IH]; intros mu Hn Hoc.
+      - have Hb := on_cycle2_on_bounded TS W mu Hwf Hoc.
+        destruct (on_cycle2_advance_on TS W mu Hwf Hfo Hrf Hee Hcl Hoc)
+          as (mu' & Hlt & Hoc').
+        have Hb' := on_cycle2_on_bounded TS W mu' Hwf Hoc'. lia.
+      - destruct (on_cycle2_advance_on TS W mu Hwf Hfo Hrf Hee Hcl Hoc)
+          as (mu' & Hlt & Hoc').
+        eapply (IH mu'); [|exact Hoc'].
+        have Hb' := on_cycle2_on_bounded TS W mu' Hwf Hoc'. lia. }
+    intros mu. by eapply (Hgen (length (pt_log TS) - mu)%nat).
+  Qed.
+
+  (** THE RELATIVIZED THEOREM: no [gdep2] cycle passes through a
+      [W]-event. *)
+  Theorem gdep2_acyclic_on TS (W : gev → Prop) :
+    ptraces_wf pstep TS → ptraces_fwd_own TS →
+    rf_edges_ok_on TS W → ee_ok TS →
+    (∀ u x, W u → rtc (gdep2 TS) u x → rtc (gdep2 TS) x u → W x) →
+    ∀ e, W e → ¬ tc (gdep2 TS) e e.
+  Proof.
+    intros Hwf Hfo Hrf Hee Hcl e HWe Hc.
+    destruct (tc_gdep2_split pstep TS e e Hwf Hc)
+      as [[_ Hlt]|(x & y & Hrx & Hmile & Hry)]; [lia|].
+    have HWy : W y.
+    { eapply (Hcl e y HWe).
+      - eapply rtc_r; [exact Hrx|by apply gmile_gdep2].
+      - exact Hry. }
+    destruct (gmile_mile_mu TS x y Hmile) as (mu & Hm).
+    eapply (on_cycle2_on_empty TS W Hwf Hfo Hrf Hee Hcl mu).
+    exists x, y. split_and!; [exact Hm| |exact HWy].
+    eapply rtc_transitive; [exact Hry|exact Hrx].
+  Qed.
+
+End walk.
+
+(** THE STRONG-RESIDUE SHORTCUT (recorded, not used below).  If the
+    residue is taken in its STRONG form — no bad edge's target lies on
+    ANY cycle — the walk closes globally with no exhibit and no
+    [pf_violation_free] at all: every cross edge whose reader is on a
+    cycle is [edge_ok] by [edges_split], and that is the only place the
+    walk looks.  The main theorem deliberately takes the WEAK form
+    ([bad_wf]: some bad edge is minimal), which does NOT give this and
+    is what the exhibit is for. *)
+Definition bad_wf_strong {P : Type} (TS : ptraces P) : Prop :=
+  ∀ e1 e2, bad TS e1 e2 → ¬ tc (gdep2 TS) e2 e2.
+
+Theorem gdep2_acyclic_bad_free {P : Type} (pstep : P → wlabel → P → Prop)
+    (TS : ptraces P) :
+  ptraces_wf pstep TS → ptraces_fwd_own TS → ee_ok TS →
+  edges_split TS → bad_wf_strong TS →
+  gdep2_acyclic TS.
+Proof.
+  intros Hwf Hfo Hee Hsplit Hbs.
+  have Hrf : rf_edges_ok_on TS (λ e, tc (gdep2 TS) e e).
+  { intros e1 e2 T ts a k' ev' Hts Hrd Hne HW HT Hlt Hev Hsome.
+    destruct (Hsplit e1 e2 T ts a k' ev' Hts Hrd Hne HT Hlt Hev Hsome)
+      as [Hok|Hbad]; [exact Hok|]. by destruct (Hbs e1 e2 Hbad HW). }
+  have Hcl : ∀ u x, tc (gdep2 TS) u u → rtc (gdep2 TS) u x →
+                    rtc (gdep2 TS) x u → tc (gdep2 TS) x x.
+  { intros u x HWu Hux Hxu. eapply tc_rtc_l; [exact Hxu|].
+    eapply tc_rtc_r; [exact HWu|exact Hux]. }
+  intros e He.
+  by eapply (gdep2_acyclic_on pstep TS (λ e0, tc (gdep2 TS) e0 e0)
+               Hwf Hfo Hrf Hee Hcl e He).
+Qed.
+
+(* ------------------------------------------------------------------ *)
+(** ** LAYER 4: THE ANCESTOR CONE, CONCRETELY
+
+    The exhibit sorts the STRICT ANCESTRY of the bad read, and the
+    subset sort needs that set to be DECIDABLE — [Decision (tc R e
+    root)] is not free.  Rather than reflecting [tc], the predecessor
+    closure is COMPUTED: start from [{root}] and repeatedly add every
+    carrier element with an edge into the current set.  After
+    [|carrier|] rounds the set has saturated (each non-saturated round
+    strictly grows a [NoDup] sublist of the carrier), and a saturated
+    set is predecessor-closed — which is exactly [tc]-completeness.
+
+    Generic in the relation and the carrier; nothing here mentions
+    [gev]. *)
+
+Section closure.
+  Context {A : Type} `{!EqDecision A}.
+  Context (R : A → A → Prop) `{!RelDecision R}.
+  Context (carrier : list A) (root : A).
+  Context (Hroot : root ∈ carrier).
+  Context (Hcar : ∀ x y, R x y → x ∈ carrier).
+  Context (Hnd : NoDup carrier).
+
+  Definition anc_new (l : list A) : list A :=
+    filter (λ e, e ∉ l ∧ Exists (λ y, R e y) l) carrier.
+
+  Definition anc_step (l : list A) : list A := l ++ anc_new l.
+
+  Fixpoint anc_iter (n : nat) : list A :=
+    match n with
+    | O => [root]
+    | S n => anc_step (anc_iter n)
+    end.
+
+  Definition anc : list A := anc_iter (length carrier).
+
+  Lemma elem_of_anc_new l x :
+    x ∈ anc_new l ↔ (x ∉ l ∧ (∃ y, y ∈ l ∧ R x y)) ∧ x ∈ carrier.
+  Proof.
+    rewrite /anc_new elem_of_list_filter. split.
+    - intros [[Hnin Hex] Hin]. split; [split; [done|]|done].
+      by apply list_relations.Exists_exists in Hex.
+    - intros [[Hnin Hex] Hin]. split; [split; [done|]|done].
+      by apply list_relations.Exists_exists.
+  Qed.
+
+  Lemma anc_iter_carrier n x : x ∈ anc_iter n → x ∈ carrier.
+  Proof.
+    induction n as [|n IH]; simpl.
+    - intros Hx. by apply elem_of_list_singleton in Hx as ->.
+    - rewrite /anc_step elem_of_app. intros [Hx|Hx]; [by apply IH|].
+      by apply elem_of_anc_new in Hx as [_ ?].
+  Qed.
+
+  Lemma anc_iter_nodup n : NoDup (anc_iter n).
+  Proof.
+    induction n as [|n IH]; simpl; [apply NoDup_singleton|].
+    rewrite /anc_step. apply list_relations.NoDup_app. split_and!.
+    - exact IH.
+    - intros x Hx Hx'. by apply elem_of_anc_new in Hx' as [[Hnin _] _].
+    - apply list_relations.NoDup_filter, Hnd.
+  Qed.
+
+  Lemma anc_iter_mono n x : x ∈ anc_iter n → x ∈ anc_iter (S n).
+  Proof. intros Hx. rewrite /= /anc_step elem_of_app. by left. Qed.
+
+  Lemma anc_iter_mono_le n m x : (n ≤ m)%nat → x ∈ anc_iter n → x ∈ anc_iter m.
+  Proof.
+    intros Hle Hx. induction m as [|m IH].
+    - have Hn : n = 0%nat by lia. by subst n.
+    - destruct (decide (n = S m)) as [->|Hne]; [done|].
+      apply anc_iter_mono, IH. lia.
+  Qed.
+
+  (** SOUNDNESS: everything the iteration collects is [root] or a
+      [tc]-predecessor of it. *)
+  Lemma anc_iter_sound n : ∀ x, x ∈ anc_iter n → x = root ∨ tc R x root.
+  Proof.
+    induction n as [|n IH]; simpl; intros x.
+    - intros Hx. left. by apply elem_of_list_singleton in Hx.
+    - rewrite /anc_step elem_of_app. intros [Hx|Hx]; [by apply IH|].
+      apply elem_of_anc_new in Hx as [[_ (y & Hy & HR)] _].
+      right. destruct (IH y Hy) as [->|Htc]; [by apply tc_once|].
+      by eapply tc_l.
+  Qed.
+
+  (** SATURATION: either the round-[n] set already has [n+1] elements or
+      the iteration has stopped by round [n]. *)
+  Lemma anc_grow n :
+    (S n ≤ length (anc_iter n))%nat ∨
+    ∃ m, (m ≤ n)%nat ∧ anc_new (anc_iter m) = [].
+  Proof.
+    induction n as [|n IH].
+    - left. by simpl.
+    - destruct IH as [Hlen|(m & Hm & Hnil)]; [|right; exists m; split; [lia|done]].
+      destruct (decide (anc_new (anc_iter n) = [])) as [Hnil|Hne].
+      + right. exists n. by split; [lia|].
+      + left. rewrite /= /anc_step length_app.
+        have Hpos : (0 < length (anc_new (anc_iter n)))%nat.
+        { destruct (anc_new (anc_iter n)); [done|simpl; lia]. }
+        lia.
+  Qed.
+
+  Lemma anc_new_nil : anc_new anc = [].
+  Proof.
+    destruct (anc_grow (length carrier)) as [Hlen|(m & Hm & Hnil)].
+    - exfalso.
+      have Hle : (length (anc_iter (length carrier)) ≤ length carrier)%nat.
+      { apply list_relations.submseteq_length.
+        apply list_relations.NoDup_submseteq; [apply anc_iter_nodup|].
+        apply anc_iter_carrier. }
+      lia.
+    - have Hstab : ∀ d, anc_iter (m + d) = anc_iter m.
+      { induction d as [|d IH]; [by rewrite Nat.add_0_r|].
+        rewrite Nat.add_succ_r /= /anc_step IH Hnil app_nil_r //. }
+      have Hd : length carrier = (m + (length carrier - m))%nat by lia.
+      rewrite /anc Hd Hstab //.
+  Qed.
+
+  Lemma root_in_anc : root ∈ anc.
+  Proof.
+    rewrite /anc. apply (anc_iter_mono_le 0%nat); [lia|].
+    apply elem_of_list_here.
+  Qed.
+
+  Lemma anc_closed x y : y ∈ anc → R x y → x ∈ anc.
+  Proof.
+    intros Hy HR. destruct (decide (x ∈ anc)) as [Hx|Hx]; [done|exfalso].
+    have Hin : x ∈ anc_new anc.
+    { apply elem_of_anc_new. split; [split; [done|by exists y]|].
+      by eapply Hcar. }
+    rewrite anc_new_nil in Hin. by apply elem_of_nil in Hin.
+  Qed.
+
+  (** COMPLETENESS: every [tc]-predecessor of an element of [anc] is in
+      [anc]. *)
+  Lemma anc_tc x y : tc R x y → y ∈ anc → x ∈ anc.
+  Proof.
+    induction 1 as [x y HR|x y z HR Htc IH]; intros Hin.
+    - by eapply anc_closed.
+    - eapply anc_closed; [|exact HR]. by apply IH.
+  Qed.
+
+  Lemma elem_of_anc x : x ∈ anc ↔ (x = root ∨ tc R x root).
+  Proof.
+    split.
+    - apply anc_iter_sound.
+    - intros [->|Htc]; [apply root_in_anc|].
+      eapply anc_tc; [exact Htc|apply root_in_anc].
+  Qed.
+
+End closure.
+
+(* ------------------------------------------------------------------ *)
+(** ** LAYER 5: THE CONE, SORTED — [Qinv] over the strict ancestry of one
+       event
+
+    [WeakRobustSim.sim_prefix] would do this in one line, but it
+    consumes GLOBAL [gdep2_acyclic] — which the exhibit does not have.
+    So the generic [WeakRobustLin.topo_sort] is instantiated at the
+    RESTRICTED relation [Rcone = gdep2 ∩ Ucone²] (whose acyclicity is
+    exactly the relativized walk's conclusion) and [toposort_ind_S]'s
+    prefix induction is re-run with [Qinv_step] — which needs no
+    acyclicity at all. *)
+
+Section cone.
+  Context {P : Type}.
+  Context (pstep : P → wlabel → P → Prop).
+  Context (TS : ptraces P) (img : image) (ps : list P).
+  Context (Hwf : ptraces_wf pstep TS).
+  Context (Hwsi : ptraces_ws_init TS).
+  Context (Hco : ∀ a, co_tc TS a).
+  Context (Hwfl : writes_fulfilled TS).
+  Context (Hlf : lat_free_prog pstep).
+  Context (Hobl : ts_oblivious pstep).
+  Context (Himg : pt_img TS = img).
+  Context (Hnag : length (pt_trs TS) = length ps).
+  Context (Hdata : ∀ p m, pt_log TS !! p = Some m → wm_data m ≠ []).
+  Context (Hps0 : ∀ j T ag0, pt_trs TS !! j = Some T →
+                    at_ags T !! 0%nat = Some ag0 → ps !! j = Some (pa_st ag0)).
+
+  (** The event whose ancestry is replayed (the bad read), and the three
+      facts about it the cone needs: it is a real event, it is not on a
+      cycle, and no cycle passes through its ancestry. *)
+  Context (r : gev).
+  Context (Hrwf : gev_wf TS r).
+  Context (Hrr : ¬ tc (gdep2 TS) r r).
+  Context (Hconeacyc : ∀ e, tc (gdep2 TS) e r → ¬ tc (gdep2 TS) e e).
+
+  Definition ancr : list gev := anc (gdep2 TS) (gev_enum TS) r.
+
+  Definition Ucone (e : gev) : Prop := e ∈ ancr ∧ e ≠ r.
+
+  Local Instance Ucone_dec e : Decision (Ucone e).
+  Proof. rewrite /Ucone. apply and_dec; apply _. Defined.
+
+  Lemma r_in_enum : r ∈ gev_enum TS.
+  Proof. by apply elem_of_gev_enum. Qed.
+
+  Lemma elem_of_ancr e : e ∈ ancr ↔ (e = r ∨ tc (gdep2 TS) e r).
+  Proof.
+    apply (elem_of_anc (gdep2 TS) (gev_enum TS) r r_in_enum).
+    - intros x y Hd. apply elem_of_gev_enum. by destruct (gdep2_wf TS x y Hd).
+    - apply NoDup_gev_enum.
+  Qed.
+
+  Lemma Ucone_iff e : Ucone e ↔ (gev_wf TS e ∧ tc (gdep2 TS) e r).
+  Proof.
+    split.
+    - intros [Hin Hne]. split.
+      + apply elem_of_gev_enum.
+        eapply (anc_iter_carrier (gdep2 TS) (gev_enum TS) r r_in_enum);
+          exact Hin.
+      + apply elem_of_ancr in Hin as [->|Htc]; [done|exact Htc].
+    - intros [Hwfe Htc]. split.
+      + apply elem_of_ancr. by right.
+      + intros ->. by apply Hrr.
+  Qed.
+
+  Lemma Ucone_wf e : Ucone e → gev_wf TS e.
+  Proof. intros H. by apply Ucone_iff in H as [? _]. Qed.
+
+  Lemma Ucone_dc : dc TS Ucone.
+  Proof.
+    intros e e' HU Hd Hwf'. apply Ucone_iff. apply Ucone_iff in HU as [_ Htc].
+    split; [done|]. by eapply tc_l.
+  Qed.
+
+  Lemma Ucone_sub_ok : sub_ok TS Ucone.
+  Proof. split; [apply Ucone_dc|apply Ucone_wf]. Qed.
+
+  (** The RESTRICTED relation and its acyclicity. *)
+  Definition Rcone (x y : gev) : Prop := gdep2 TS x y ∧ Ucone x ∧ Ucone y.
+
+  Local Instance Rcone_dec : RelDecision Rcone.
+  Proof. intros x y. rewrite /Rcone. apply and_dec; apply _. Defined.
+
+  Lemma tc_Rcone x y : tc Rcone x y → tc (gdep2 TS) x y ∧ Ucone x.
+  Proof.
+    induction 1 as [x y (Hd & Hx & Hy)|x y z (Hd & Hx & Hy) Htc IH].
+    - split; [by apply tc_once|done].
+    - split; [|done]. eapply tc_l; [exact Hd|apply IH].
+  Qed.
+
+  Lemma Rcone_acyc x : ¬ tc Rcone x x.
+  Proof.
+    intros Hc. destruct (tc_Rcone x x Hc) as (Htc & HU).
+    apply Ucone_iff in HU as [_ Hanc]. by eapply Hconeacyc.
+  Qed.
+
+  (** THE CONE ORDER: a topological order of the cone, and the
+      simulation invariant established over the whole of it. *)
+  Theorem cone_Qinv :
+    ∃ order,
+      Qinv pstep TS img ps order ∧
+      (∀ e, e ∈ order ↔ (gev_wf TS e ∧ tc (gdep2 TS) e r)).
+  Proof.
+    destruct (topo_sort Rcone (gev_enum_S TS Ucone) Rcone_acyc
+                (NoDup_gev_enum_S TS Ucone)) as (order & Hnd & Hmem0 & Hord).
+    have Hmem : ∀ e, e ∈ order ↔ (gev_wf TS e ∧ Ucone e).
+    { intros e. rewrite Hmem0. apply elem_of_gev_enum_S. }
+    have Hpre : ∀ n, (n ≤ length order)%nat → Qinv pstep TS img ps (take n order).
+    { intros n. induction n as [|n IH]; intros Hn.
+      { rewrite take_0. by apply (Qinv_nil pstep TS img ps Hwf Hnag Hps0). }
+      have [e He] : is_Some (order !! n) by apply lookup_lt_is_Some_2; lia.
+      rewrite (take_S_r order n e He).
+      have Hein : e ∈ order by eapply elem_of_list_lookup_2.
+      have Hes : gev_wf TS e ∧ Ucone e by apply Hmem.
+      eapply (Qinv_step pstep TS img ps Hwf Hwsi Hco Hwfl Hlf Hobl Himg Hnag
+                Hdata (take n order) e).
+      - apply IH. lia.
+      - apply Hes.
+      - (* not already processed *)
+        intros Hin. apply elem_of_take in Hin as (i & Hi & Hilt).
+        have : i = n by eapply list_relations.NoDup_lookup. lia.
+      - (* every predecessor is processed *)
+        intros e' Hd Hwf'.
+        have HU' : Ucone e' by eapply Ucone_dc; [apply Hes|exact Hd|exact Hwf'].
+        have He' : e' ∈ order by apply Hmem.
+        apply elem_of_list_lookup in He' as (i & Hi).
+        have Hlt : (i < n)%nat.
+        { eapply Hord; [exact Hi|exact He|]. split_and!; [done|done|apply Hes]. }
+        apply elem_of_take. by exists i. }
+    have HQ := Hpre (length order) (Nat.le_refl _).
+    have Hfull : take (length order) order = order by apply take_ge; lia.
+    rewrite Hfull in HQ.
+    exists order. split; [exact HQ|].
+    intros e. rewrite Hmem. split.
+    - intros [Hw HU]. apply Ucone_iff in HU. by split; [|apply HU].
+    - intros [Hw Htc]. split; [done|]. by apply Ucone_iff.
+  Qed.
+
+End cone.
+
+(* ------------------------------------------------------------------ *)
+(** ** LAYER 6: THE EXHIBIT
+
+    Two small helpers first: what a READING event does to the reader's
+    [coh] at the byte it read (the observation floor of [violation]),
+    and that the byte it read is a byte OF the message it read (the
+    [msg_byte] conjunct). *)
+
+Lemma aev_post_coh_read σ ev w (base : Z) tvs (jb : nat) (t : nat) (v : bv 8) :
+  tvs !! jb = Some (t, v) →
+  ((∃ aq lat, ae_lb ev = LLoad aq lat base tvs) ∨
+   (∃ aq rl data ts, ae_lb ev = LRmw aq rl base tvs data ∧
+                     ae_ts ev = Some ts)) →
+  (σ t ≤ coh (aev_post σ ev w) (base + Z.of_nat jb))%nat.
+Proof.
+  intros Htv Hlb.
+  have Hfm : (σ <$> tvs.*1) !! jb = Some (σ t)
+    by rewrite !list_lookup_fmap Htv.
+  destruct Hlb as [(aq & lat & Hlb)|(aq & rl & data & ts & Hlb & Hts)];
+    rewrite /aev_post Hlb.
+  - by apply load_post_run_coh.
+  - rewrite Hts. etrans; [by apply load_post_run_coh|].
+    apply ws_le_coh, store_post_run_le.
+Qed.
+
+Lemma astep_read_log_byte {P : Type} (img : image) log i (ag : wpagent P)
+    l f D (base : Z) tvs (jb : nat) (t : nat) (v : bv 8) :
+  astep_ok img log i ag l f D →
+  ((∃ aq lat, l = LLoad aq lat base tvs) ∨
+   (∃ aq rl data, l = LRmw aq rl base tvs data)) →
+  tvs !! jb = Some (t, v) →
+  log_byte img log t (base + Z.of_nat jb) = Some v.
+Proof.
+  intros Hok Hlb Htv.
+  destruct Hlb as [(aq & lat & ->)|(aq & rl & data & ->)]; simpl in Hok.
+  - destruct Hok as (Hro & _ & _). by destruct (Hro jb t v Htv) as (Hv & _).
+  - destruct Hok as (ts & k & _ & _ & _ & Hro & _).
+    by destruct (Hro jb t v Htv) as (Hv & _).
+Qed.
+
+Section exhibit.
+  Context {P : Type}.
+  Context (pstep : P → wlabel → P → Prop).
+  Context (TS : ptraces P) (img : image) (ps : list P).
+  Context (Hwf : ptraces_wf pstep TS).
+  Context (Hwsi : ptraces_ws_init TS).
+  Context (Hco : ∀ a, co_tc TS a).
+  Context (Hwfl : writes_fulfilled TS).
+  Context (Hlf : lat_free_prog pstep).
+  Context (Hobl : ts_oblivious pstep).
+  Context (Himg : pt_img TS = img).
+  Context (Hnag : length (pt_trs TS) = length ps).
+  Context (Hdata : ∀ p m, pt_log TS !! p = Some m → wm_data m ≠ []).
+  Context (Hps0 : ∀ j T ag0, pt_trs TS !! j = Some T →
+                    at_ags T !! 0%nat = Some ag0 → ps !! j = Some (pa_st ag0)).
+  Context (Hfo : ptraces_fwd_own TS).
+  Context (Hee : ee_ok TS).
+  Context (Hsplit : edges_split TS).
+
+  (** A MINIMAL bad target's ancestry carries no cycle: every cross edge
+      into it is [edge_ok] (a [bad] one would put a bad target in the
+      ancestry), so the relativized walk applies. *)
+  Lemma rf_edges_ok_on_min b2 :
+    bad_min TS b2 → rf_edges_ok_on TS (λ e, tc (gdep2 TS) e b2).
+  Proof.
+    intros Hmin f1 f2 T ts a k' ev' Hts Hrd Hne HW HT Hlt Hev Hsome.
+    destruct (Hsplit f1 f2 T ts a k' ev' Hts Hrd Hne HT Hlt Hev Hsome)
+      as [Hok|Hbad]; [exact Hok|].
+    by destruct (Hmin f1 f2 Hbad HW).
+  Qed.
+
+  Lemma anc_mr b2 :
+    ∀ u x, tc (gdep2 TS) u b2 → rtc (gdep2 TS) u x → rtc (gdep2 TS) x u →
+      tc (gdep2 TS) x b2.
+  Proof. intros u x HW _ Hxu. by eapply tc_rtc_l. Qed.
+
+  Lemma cone_acyc_of_min b2 :
+    bad_min TS b2 → ∀ e, tc (gdep2 TS) e b2 → ¬ tc (gdep2 TS) e e.
+  Proof.
+    intros Hmin.
+    apply (gdep2_acyclic_on pstep TS (λ e, tc (gdep2 TS) e b2) Hwf Hfo
+             (rf_edges_ok_on_min b2 Hmin) Hee (anc_mr b2)).
+  Qed.
+
+  (** THE EXHIBIT: a minimal bad edge builds a promise-free run to a
+      VIOLATING configuration. *)
+  Theorem bad_edge_violates b1 b2 :
+    bad TS b1 b2 → bad_min TS b2 →
+    ∃ cf, rtc (wp_pf_run pstep) (wp_init img ps) cf ∧
+          violation cls_of pub_of cf.
+  Proof.
+    intros Hbad Hmin.
+    have Hbad' := Hbad.
+    destruct Hbad' as (Hrf & Hne & (t & m & Hts1 & Hlogm & Hak) & Hnopub).
+    have Hrf' := Hrf. destruct Hrf' as (t' & a & Hts1' & Hrd2).
+    have Htt : t' = t by rewrite Hts1 in Hts1'; simplify_eq.
+    subst t'.
+    have Hrr : ¬ tc (gdep2 TS) b2 b2 by apply (Hmin b1 b2 Hbad).
+    have Hb2wf : gev_wf TS b2 by eapply gev_reads_wf.
+    have Hb1wf : gev_wf TS b1 by eapply gev_ts_wf.
+    have Htpos : (0 < t)%nat by eapply (gev_ts_pos pstep TS b1 t Hwf Hts1).
+    (* ---- the cone, sorted, plus the bad read itself ---- *)
+    destruct (cone_Qinv pstep TS img ps Hwf Hwsi Hco Hwfl Hlf Hobl Himg Hnag
+                Hdata Hps0 b2 Hb2wf Hrr (cone_acyc_of_min b2 Hmin))
+      as (order & HQ & Hmem).
+    have Hq : qorder TS order by eapply (Qinv_order pstep TS img ps).
+    have Hb2nin : b2 ∉ order.
+    { intros Hin. apply Hmem in Hin as [_ Htc]. by apply Hrr. }
+    have Hpre2 : ∀ e', gdep2 TS e' b2 → gev_wf TS e' → e' ∈ order.
+    { intros e' Hd Hw'. apply Hmem. split; [done|by apply tc_once]. }
+    have HQ' : Qinv pstep TS img ps (order ++ [b2]).
+    { by eapply (Qinv_step pstep TS img ps Hwf Hwsi Hco Hwfl Hlf Hobl Himg
+                   Hnag Hdata order b2). }
+    have Hq' : qorder TS (order ++ [b2]) by eapply (Qinv_order pstep TS img ps).
+    destruct (Qinv_run pstep TS img ps (order ++ [b2]) HQ')
+      as (cf & Hrun & Hcimg & Hclog & Hclen & Hcags).
+    exists cf. split; [exact Hrun|].
+    (* ---- the bad message and its pf position ---- *)
+    have Hb1in : b1 ∈ order.
+    { apply Hmem. split; [done|]. apply tc_once, grf_gdep2. by exists t, a. }
+    have Hb1in' : b1 ∈ order ++ [b2] by apply elem_of_app; left.
+    have Htfl : t ∈ fl TS (order ++ [b2]).
+    { apply elem_of_fl. by exists b1. }
+    destruct (pf_log_pi pstep TS ps Hwf Hnag (order ++ [b2]) t Hq' Htfl)
+      as (Hp1 & Hp2 & Hp3).
+    have Hmsgeq : msg_at TS t = m by apply msg_at_eq.
+    destruct (gev_ts_msg pstep TS b1 t Hwf Hts1) as (base0 & data0 & kc & Hm0).
+    have Hmeq : m = WMsg base0 data0 (Some b1.1) kc
+      by rewrite Hlogm in Hm0; simplify_eq.
+    (* ---- the reader's event and the byte it read ---- *)
+    destruct (proj1 (gev_wf_bounds TS b2) Hb2wf) as (T2 & HT2 & Hklt).
+    destruct (gev_reads_ev TS b2 a t T2 HT2 Hrd2) as (ev2 & Hev2 & Hinrd).
+    have Hatr2 : atrace_wf pstep (pt_img TS) (pt_log TS) b2.1 T2 by apply Hwf.
+    destruct (asteps_wf_step pstep (pt_img TS) (pt_log TS) b2.1 (at_ags T2)
+                (at_evs T2) b2.2 ev2 Hatr2 Hev2)
+      as (ag2 & ag2' & st2 & f2 & Hag2 & Hag2' & Hps2 & Hok2 & Hagn2).
+    have Hshape : ∃ (base : Z) tvs (jb : nat) (v : bv 8),
+        a = base + Z.of_nat jb ∧ tvs !! jb = Some (t, v) ∧
+        ((∃ aq lat, ae_lb ev2 = LLoad aq lat base tvs) ∨
+         (∃ aq rl data ts, ae_lb ev2 = LRmw aq rl base tvs data ∧
+                           ae_ts ev2 = Some ts)).
+    { remember (ae_lb ev2) as l2 eqn:Hlb2.
+      destruct l2 as [|aq lat base tvs|rl base data
+                     |aq rl base tvs data|pr pw sr sw];
+        simpl in Hinrd;
+        [by apply elem_of_nil in Hinrd| | by apply elem_of_nil in Hinrd
+        | |by apply elem_of_nil in Hinrd].
+      - apply elem_of_tvs_reads in Hinrd as (jb & v & Htv & ->).
+        exists base, tvs, jb, v.
+        split_and!; [done|done|left; by exists aq, lat].
+      - apply elem_of_tvs_reads in Hinrd as (jb & v & Htv & ->).
+        destruct Hok2 as (ts2 & k2 & _ & _ & _ & _ & _ & _ & _ & Hts2).
+        exists base, tvs, jb, v.
+        split_and!; [done|done|right; by exists aq, rl, data, ts2]. }
+    destruct Hshape as (base & tvs & jb & v & Ha & Htv & Hlbsh).
+    (* the message really writes that byte *)
+    have Hlbv : log_byte (pt_img TS) (pt_log TS) t (base + Z.of_nat jb)
+                = Some v.
+    { eapply (astep_read_log_byte (pt_img TS) (pt_log TS) b2.1 ag2
+                (ae_lb ev2) f2 (ae_ts ev2) base tvs jb t v Hok2); [|exact Htv].
+      destruct Hlbsh as [(aq & lat & Hl)|(aq & rl & data & ts & Hl & _)];
+        [left; by exists aq, lat|right; by exists aq, rl, data]. }
+    have Hbyte : is_Some (msg_byte m (base + Z.of_nat jb)).
+    { rewrite (log_byte_pos (pt_img TS) (pt_log TS) t m _ Htpos Hlogm) in Hlbv.
+      by exists v. }
+    (* ---- the reader's coherence floor ---- *)
+    have Hnproc2 : nproc (order ++ [b2]) b2.1 = S b2.2.
+    { rewrite (nproc_app_eq order b2).
+      by rewrite (nproc_cur TS ps Hnag order b2 Hq Hb2wf Hb2nin Hpre2). }
+    destruct (Hcags b2.1 T2 HT2) as (agn2 & Hagn2' & Hlk2).
+    rewrite Hnproc2 (take_S_r _ _ _ Hev2) aevs_post_app in Hlk2.
+    have Hcoh : (pi TS (order ++ [b2]) t ≤
+                 coh (aev_post (pi TS (order ++ [b2])) ev2
+                        (aevs_post (pi TS (order ++ [b2]))
+                           (take b2.2 (at_evs T2)) ws_init))
+                     (base + Z.of_nat jb))%nat.
+    { by eapply aev_post_coh_read. }
+    (* ---- the author's publication watermark ---- *)
+    destruct (proj1 (gev_wf_bounds TS b1) Hb1wf) as (T1 & HT1 & Hk1lt).
+    destruct (Hcags b1.1 T1 HT1) as (agn1 & Hagn1 & Hlk1).
+    have Hnproc1 : nproc (order ++ [b2]) b1.1 = nproc order b1.1
+      by apply (nproc_app_ne order b2 b1.1).
+    rewrite Hnproc1 in Hlk1.
+    have Hatr1 : atrace_wf pstep (pt_img TS) (pt_log TS) b1.1 T1 by apply Hwf.
+    have Hwpub : (w_pub (aevs_post (pi TS (order ++ [b2]))
+                           (take (nproc order b1.1) (at_evs T1)) ws_init)
+                  < pi TS (order ++ [b2]) t)%nat.
+    { apply w_pub_aevs_post_lt.
+      { rewrite /ws_init /=. apply pi_pos. lia. }
+      intros k ev ts0 Hk Hts0 Hraise.
+      apply lookup_take_Some in Hk as (Hk & HkK).
+      have Hgev : gev_ev TS (b1.1, k) = Some ev by rewrite /gev_ev /= HT1 /=.
+      have Hgwf : gev_wf TS (b1.1, k) by rewrite /gev_wf Hgev; eauto.
+      have Hgts : gev_ts TS (b1.1, k) = Some ts0
+        by rewrite /gev_ts Hgev /= Hts0.
+      have Hin : (b1.1, k) ∈ order
+        by apply (qorder_mem TS order b1.1 k Hq); split.
+      have Hin' : (b1.1, k) ∈ order ++ [b2] by apply elem_of_app; left.
+      have Htcb2 : tc (gdep2 TS) (b1.1, k) b2 by apply Hmem.
+      destruct (decide (k < b1.2)%nat) as [Hlt|Hge].
+      - (* po-EARLIER than the author's own fulfil: π-ordered below it *)
+        have Htcb1 : tc (gdep2 TS) (b1.1, k) b1.
+        { apply tc_once, gpo_gdep2. by split_and!. }
+        by eapply (pi_lt_of_tc pstep TS ps Hwf Hnag (order ++ [b2])
+                     (b1.1, k) b1 ts0 t Hq' Hb1in' Htcb1 Hgts Hts1).
+      - (* po-AT-OR-AFTER it: a raising event here is exactly what [bad]
+           forbids in the reader's ancestry *)
+        exfalso. apply Hnopub. exists (b1.1, k).
+        split_and!; [done|simpl; lia| |exact Htcb2].
+        split; [by exists ts0|].
+        exists (ae_lb ev). split; [by rewrite /gev_lb Hgev|].
+        destruct Hraise as [Hrl|Hrp]; [by left|right].
+        rewrite take_take Nat.min_l in Hrp; [lia|].
+        have [agk Hagk] : is_Some (at_ags T1 !! k).
+        { apply lookup_lt_is_Some_2.
+          have Hlen := asteps_wf_len pstep (pt_img TS) (pt_log TS) b1.1
+                         (at_ags T1) (at_evs T1) Hatr1.
+          have := lookup_lt_Some _ _ _ Hk. lia. }
+        have [ag0 Hag0] : is_Some (at_ags T1 !! 0%nat)
+          by eapply (atrace_first_is_Some pstep (pt_img TS) (pt_log TS) b1.1).
+        have Hws0 : pa_ws ag0 = ws_init by eapply Hwsi.
+        have Hfold : pa_ws agk
+                     = aevs_post id (take k (at_evs T1)) (pa_ws ag0)
+          by eapply (asteps_ws_fold pstep (pt_img TS) (pt_log TS) b1.1
+                       (at_ags T1) (at_evs T1) k ag0 agk).
+        rewrite /pre_ws /= HT1 Hagk Hfold Hws0.
+        rewrite -Hrp. by apply w_relp_aevs_post_indep. }
+    (* ---- the violating configuration ---- *)
+    have HSp : S (pi TS (order ++ [b2]) t - 1)%nat = pi TS (order ++ [b2]) t
+      by lia.
+    exists (pi TS (order ++ [b2]) t - 1)%nat, m, b1.1, b2.1,
+           (base + Z.of_nat jb).
+    split_and!.
+    - by rewrite Hclog Hp3 Hmsgeq.
+    - by rewrite Hmeq.
+    - by rewrite /cls_of Hak.
+    - (* NOT PUBLISHED *)
+      rewrite HSp.
+      intros (p' & m' & i' & ag' & Heq & Hlogp & Htid' & Hlkag & Hle).
+      have Hp' : p' = (pi TS (order ++ [b2]) t - 1)%nat by lia.
+      subst p'. rewrite Hclog Hp3 Hmsgeq in Hlogp. injection Hlogp as <-.
+      have Hi' : i' = b1.1 by rewrite Hmeq /= in Htid'; simplify_eq.
+      subst i'. rewrite Hlk1 in Hlkag. injection Hlkag as <-. simpl in Hle.
+      lia.
+    - done.
+    - exact Hbyte.
+    - rewrite /obs_flr Hlk2 /=. lia.
+  Qed.
+
+  (** …hence, under [pf_violation_free], NO bad edge exists at all. *)
+  Theorem no_bad_edge :
+    pf_violation_free cls_of pub_of pstep img ps → bad_wf TS →
+    ∀ e1 e2, ¬ bad TS e1 e2.
+  Proof.
+    intros Hvf Hbwf e1 e2 Hbad.
+    destruct (Hbwf e1 e2 Hbad) as (f1 & f2 & Hbadf & Hmin).
+    destruct (bad_edge_violates f1 f2 Hbadf Hmin) as (cf & Hrun & Hviol).
+    by eapply Hvf.
+  Qed.
+
+  (** …so the per-edge premise is the full [rf_edges_ok] after all, and
+      the extended graph is acyclic. *)
+  Theorem gdep2_acyclic_main :
+    pf_violation_free cls_of pub_of pstep img ps → bad_wf TS →
+    gdep2_acyclic TS.
+  Proof.
+    intros Hvf Hbwf.
+    eapply (gdep2_acyclic_edges_ok pstep TS Hwf Hfo); [|exact Hee].
+    intros e1 e2 T ts b k' ev' Hts Hrd Hne HT Hlt Hev Hsome.
+    destruct (Hsplit e1 e2 T ts b k' ev' Hts Hrd Hne HT Hlt Hev Hsome)
+      as [Hok|Hbad]; [exact Hok|].
+    by destruct (no_bad_edge Hvf Hbwf e1 e2 Hbad).
+  Qed.
+
+End exhibit.
+
+(* ------------------------------------------------------------------ *)
+(** ** LAYER 7: THE ASSEMBLED THEOREM, and W2c's transport
+
+    The premise package, per traced bundle: the weakened per-edge split,
+    the bad-SCC residue, the E-edge obligation, and the byte
+    classification.  [ptraces_fwd_own], [ptraces_ws_init],
+    [writes_fulfilled], [ptraces_wf] and the shape facts are DERIVED
+    from the behavior, exactly as [WeakRobustSim]'s wrapper derives
+    them. *)
+
+Definition main_premises {P : Type} (TS : ptraces P) : Prop :=
+  edges_split TS ∧ bad_wf TS ∧ ee_ok TS ∧ (∃ sync, ptraces_bytes_ok TS sync).
+
+Section main.
+  Context {P : Type}.
+  Context (pstep : P → wlabel → P → Prop).
+
+  Implicit Types c : wpcfg P.
+
+  (** THE LAYER-1 ROBUSTNESS THEOREM.  A lat-free, timestamp-oblivious
+      program whose promise-free runs never VIOLATE (the Layer-2 premise
+      [pf_violation_free], instantiated at [cls_of]/[pub_of]) and whose
+      traced behaviors satisfy the per-edge split, the bad-SCC residue,
+      the E-edge obligation and the byte classification, is ROBUST:
+      every full-machine behavior is matched by a promise-free run with
+      the same per-agent program states and the same flat memory.
+
+      This is [WeakRobust.robust]'s conclusion, with the honest premises
+      the M6 design pins ([WeakRobust.robust] itself is stated with
+      [cls]/[pub] abstract and no bundle premises, and is not provable
+      as stated — see the worklist's findings (v) and W2c (3)). *)
+  Theorem robust_main img ps c :
+    lat_free_prog pstep → ts_oblivious pstep →
+    wp_behavior pstep img ps c →
+    (∀ mid TS,
+       rtc (wp_promise_step (P:=P)) (wp_init img ps) mid →
+       ptraces_of pstep TS mid c →
+       main_premises TS) →
+    pf_violation_free cls_of pub_of pstep img ps →
+    ∃ cf, rtc (wp_pf_run pstep) (wp_init img ps) cf ∧
+          prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
+  Proof.
+    intros Hlf Hobl Hb Hprem Hvf.
+    destruct (wp_behavior_fulfil_once pstep img ps c Hlf Hb)
+      as (mid & TS & Hprom & Hof & Hnp & Hacct).
+    destruct (Hprem mid TS Hprom Hof)
+      as (Hsplit & Hbwf & Hee & (sync & Hbytes)).
+    (* the derived bundle facts — as in [wp_behavior_robust] *)
+    have Hwf : ptraces_wf pstep TS by eapply ptraces_of_wf.
+    have Hla : log_authored (pc_log mid).
+    { eapply log_authored_promise_run; [apply log_authored_init|exact Hprom]. }
+    have Hwfl : writes_fulfilled TS
+      by eapply (ptraces_of_writes_fulfilled pstep TS mid c).
+    have Hlne : log_ne (pc_log mid).
+    { eapply log_ne_promise_run; [apply log_ne_init|exact Hprom]. }
+    have Hinit : cfg_ws_init mid.
+    { eapply cfg_ws_init_promise_run; [apply cfg_ws_init_init|exact Hprom]. }
+    have Hwsi : ptraces_ws_init TS by eapply (ptraces_of_ws_init pstep TS mid c).
+    have Hfo : ptraces_fwd_own TS by eapply (ptraces_of_fwd_own pstep TS mid c).
+    have Hco : ∀ a, co_tc TS a
+      by eapply (co_serialized_pkg pstep TS sync Hwf Hwfl Hbytes).
+    destruct (promise_run_shape (wp_init img ps) mid Hprom)
+      as (Hpimg & Hplen & Hpst).
+    have Hof' := Hof.
+    destruct Hof' as (Himg0 & Hlog0 & Hlent & Hwft & Hfst & Hlst
+                      & Hclogc & Hcimgc & Hclenc).
+    have Himg1 : pt_img TS = img by rewrite Himg0 Hpimg.
+    have Hlen1 : length (pt_trs TS) = length ps.
+    { by rewrite Hlent Hplen /wp_init /= length_map. }
+    have Hdata1 : ∀ p m, pt_log TS !! p = Some m → wm_data m ≠ [].
+    { rewrite Hlog0. exact Hlne. }
+    have Hps1 : ∀ j T ag0, pt_trs TS !! j = Some T →
+                  at_ags T !! 0%nat = Some ag0 → ps !! j = Some (pa_st ag0).
+    { intros j T ag0 HT Hag0.
+      have Hmid : pc_ags mid !! j = Some ag0 by rewrite -(Hfst j T HT).
+      destruct (Hpst j ag0 Hmid) as (ag & Hag & Hst).
+      rewrite /wp_init /= list_lookup_fmap in Hag.
+      destruct (ps !! j) as [p0|] eqn:Hp0; simpl in Hag; [|done].
+      injection Hag as <-. by rewrite Hst. }
+    (* THE ACYCLICITY: the exhibit rules out every bad edge, so the
+       per-edge split IS [rf_edges_ok] and the W2b walk closes *)
+    have Hacyc : gdep2_acyclic TS.
+    { eapply (gdep2_acyclic_main pstep TS img ps Hwf Hwsi Hco Hwfl Hlf Hobl
+                Himg1 Hlen1 Hdata1 Hps1 Hfo Hee Hsplit Hvf Hbwf). }
+    eapply (sim_full pstep TS img ps Hwf Hwsi Hco Hwfl Hlf Hobl Himg1 Hlen1
+              Hdata1 Hps1 c Hacyc).
+    - by rewrite Himg0 Hcimgc.
+    - by rewrite Hlog0 Hclogc.
+    - by rewrite Hclenc Hplen /wp_init /= length_map.
+    - exact Hlst.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (** *** W2c PROPER: the transport, over COMPLETABLE prefixes
+
+      The full machine is never [wpstep]-stuck, so the statement W5
+      consumes is not about stuckness but about the OBSERVABLES of
+      completable prefixes: a prefix that can still drain its promises
+      has a completion whose program states and flat memory a
+      promise-free run reproduces. *)
+
+  Definition completable img ps c : Prop :=
+    rtc (wpstep pstep) (wp_init img ps) c ∧
+    ∃ cend, rtc (wpstep pstep) c cend ∧ no_promises cend.
+
+  Corollary robust_transport img ps c :
+    lat_free_prog pstep → ts_oblivious pstep →
+    completable img ps c →
+    (∀ cend mid TS,
+       wp_behavior pstep img ps cend →
+       rtc (wp_promise_step (P:=P)) (wp_init img ps) mid →
+       ptraces_of pstep TS mid cend →
+       main_premises TS) →
+    pf_violation_free cls_of pub_of pstep img ps →
+    ∃ cend cf,
+      rtc (wpstep pstep) c cend ∧ no_promises cend ∧
+      rtc (wp_pf_run pstep) (wp_init img ps) cf ∧
+      prog_of cf = prog_of cend ∧ (∀ a, mem_of cf a = mem_of cend a).
+  Proof.
+    intros Hlf Hobl (Hpre & cend & Hrest & Hnp) Hprem Hvf.
+    have Hbeh : wp_behavior pstep img ps cend.
+    { split; [by eapply rtc_transitive|exact Hnp]. }
+    destruct (robust_main img ps cend Hlf Hobl Hbeh
+                (λ mid TS, Hprem cend mid TS Hbeh) Hvf)
+      as (cf & Hrun & Hprog & Hmem).
+    by exists cend, cf.
+  Qed.
+
+End main.
+
+(* ------------------------------------------------------------------ *)
+(** ** What W3/W5 inherit from this file
+
+    - [cls_of] / [pub_of]: the instantiation of [WeakRobust]'s two
+      Layer-2 parameters (D-M6-6's [wm_ak] and [w_pub]).  φ's obligation
+      on the Iris side is [pf_violation_free cls_of pub_of], nothing
+      else — the trace-global premises are discharged per-site/static
+      (D-M6-8).
+
+    - [bad] / [edges_split] / [bad_wf]: the weakened per-edge premise
+      and the honest residue.  W3's writer-discipline export should
+      target [edges_split] (not [rf_edges_ok]): a racy read that the
+      kernel does NOT discipline is admissible as long as it is [bad],
+      because [bad_edge_violates] turns it into a φ-refutable
+      promise-free run.
+
+    - [bad_edge_violates]: the exhibit, as a standalone theorem — a
+      minimal bad edge yields a REAL [wp_pf_run] reaching a
+      [violation].  This is the only place Layer 1 hands Layer 2 a
+      concrete violating configuration, and it is the sole consumer of
+      [pf_violation_free].
+
+    - [gdep2_acyclic_on] / [rf_edges_ok_on]: the relativized walk, for
+      any future argument that needs acyclicity only along a cone.
+
+    - [robust_main] and [robust_transport]: the assembled theorem and
+      W2c's completable-prefix corollary. *)

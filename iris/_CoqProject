@@ -883,6 +883,7 @@ WeakRobustProv.v
 WeakRobustOrd.v
 WeakRobustSim.v
 WeakRobustAcyc2.v
+WeakRobustMain.v
 WeakAxiomatic.v
 WeakAxiomatic2.v
 WeakAxiomatic3.v
