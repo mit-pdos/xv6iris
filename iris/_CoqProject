@@ -1053,4 +1053,7 @@ ProofKexecB.v
 SpecSysFstat.v
 SpecSysRead.v
 SpecSysWrite.v
+SpecCreate.v
+CreateBudget.v
+ProofCreateParts.v
 ProofSysFstat.v
