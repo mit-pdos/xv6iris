@@ -75,7 +75,7 @@
    neither of which a lock-free reader may open. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
-From iris.algebra Require Import auth gmap frac numbers.
+From iris.algebra Require Import auth gmap frac numbers agree csum excl.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap invariants own ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
@@ -207,8 +207,53 @@ Definition icacheUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
    Because nothing is an authority, no lemma below is an [own_update]: a
    carve is a SPLIT and a gather is a JOIN.  §14.5's demand that carving be
    an auth-guarded EVENT was aimed at a LEDGER that has to count shares;
-   under §14.6 there is no ledger, and conservation does the counting. *)
-Definition iliveUR : ucmra := gmapUR nat fracR.
+   under §14.6 there is no ledger, and conservation does the counting.
+
+   ---- THE GENERATION RIDES HERE (design §17.1(iii)/§17.2 piece 1) ----
+
+   Each slot's unit carries an [agree]d GNAME beside its fraction: slot [k]'s
+   CURRENT GENERATION.  §17 wanted a persistent per-generation type witness
+   and §17.1(ii) killed it -- a persistent fragment cannot say "this
+   generation is the CURRENT one", and currency is the whole obligation.
+   Currency is a REVOCABLE, reference-tied fact, and the only reference-tied
+   fractional resources in the tree are [inode_ident] (which pins IDENTITY,
+   reused across a free + realloc, so it cannot key a type) and this pool.
+
+   The bump needs the WHOLE unit at the slot, which exists in exactly one
+   place -- [IcacheInv.live_slot]'s free arm, under the itable lock, i.e.
+   iget's recycle.  That is the right side condition BY CONSTRUCTION: a bump
+   is impossible while any reference or share exists.
+
+   [live_frac] keeps its ARITY by existentially quantifying the gname, so
+   [iref_tok], [inode_ref], [inode_shr], [inode_ref_short], [inode_held*] and
+   every Spec stated over them are TEXTUALLY UNCHANGED.  Two slices of one
+   slot AGREE on the generation ([live_gen_agree]) -- which is the mechanism
+   the whole §17' design runs on. *)
+Definition iliveUR : ucmra :=
+  gmapUR nat (prodR fracR (agreeR (leibnizO gname))).
+
+(* ---- THE PER-GENERATION TYPE ONE-SHOT (design §17.2 piece 2) ----------
+
+   THE TYPE CANNOT BE SET AT THE RECYCLE and that is what forces two levels.
+   iget's recycle is where the whole liveness unit exists, so it is where the
+   generation is bumped -- but at that instruction the type is UNKNOWN (iget
+   writes [valid = 0]; nothing reads the dinode until ilock's [bread]), and
+   after the recycle nobody holds the whole unit again until the last iput.
+   So the generation's [agree] carries a fresh GNAME rather than a type, and
+   the type attaches later, through a standard one-shot at that gname:
+   iget mints it PENDING, and ilock's fill -- the only instruction in the
+   kernel that knows [di_type dn] -- SPENDS it.
+
+   Soundness of "the type never changes under a live generation" is then not
+   an assertion but the one-shot's own exclusivity: 0 -> ty needs an
+   unallocated slot, ty -> 0 happens only at the last-reference iput's free
+   path (which exits the generation first), and ty -> ty' does not exist in
+   this kernel.
+
+   The RA is [KptGhost.kptR]'s, at [bv 16] ([DinodeEnc.di_type]'s width);
+   the vocabulary below is [kpt_unset]/[kpt_shoot]/[kpt_lb]/[kpt_lb_agree]
+   renamed, deliberately, so the shape is the one already proven here. *)
+Definition ityR : cmra := csumR (exclR unitO) (agreeR (leibnizO (bv 16))).
 
 (* ---- THE CHECKOUT DEPOSIT'S DESCRIPTOR (design §14.8) ----------------
 
@@ -251,10 +296,11 @@ Class icacheG (Σ : gFunctors) := IcacheG {
   icache_idG :: ghost_varG Σ (bool * mword 32 * mword 32);
   icache_liveG :: inG Σ iliveUR;
   icache_depG :: ghost_varG Σ ic_dep;
+  icache_ityG :: inG Σ ityR;
 }.
 Definition icacheΣ : gFunctors :=
   #[GFunctor icacheUR; ghost_varΣ (bool * mword 32 * mword 32);
-    GFunctor iliveUR; ghost_varΣ ic_dep].
+    GFunctor iliveUR; ghost_varΣ ic_dep; GFunctor ityR].
 Global Instance subG_icacheΣ {Σ} : subG icacheΣ Σ -> icacheG Σ.
 Proof. solve_inG. Qed.
 
@@ -290,13 +336,21 @@ Class icfg := MkIcfg {
 
 (* the pool at BOOT: one whole unit at each of the fifty slots, as ONE map,
    so a single [own_alloc] mints it and [big_opL_own] fans it out.  Stated
-   outside the section because [icfg_alloc] below is what builds it. *)
-Definition live_boot_map : iliveUR :=
-  ([^op list] k ∈ seq 0 NINODE, ({[ k := 1%Qp ]} : iliveUR)).
+   outside the section because [icfg_alloc] below is what builds it.
 
-Local Lemma live_seq_lookup_lt (n m i : nat) :
+   THE BOOT GENERATION is a parameter and ONE gname serves all fifty slots:
+   the agreement is per-KEY, so nothing distinguishes the slots at boot, and
+   nothing needs to -- every slot is FREE, no arm carries a per-generation
+   one-shot, and the first [iget] recycle bumps the slot it takes to a fresh
+   generation of its own. *)
+Definition live_boot_map (g : gname) : iliveUR :=
+  ([^op list] k ∈ seq 0 NINODE,
+     ({[ k := (1%Qp, to_agree (g : leibnizO gname)) ]} : iliveUR)).
+
+Local Lemma live_seq_lookup_lt (g : gname) (n m i : nat) :
   (i < n)%nat ->
-  ([^op list] k ∈ seq n m, ({[ k := 1%Qp ]} : iliveUR)) !! i = None.
+  ([^op list] k ∈ seq n m,
+     ({[ k := (1%Qp, to_agree (g : leibnizO gname)) ]} : iliveUR)) !! i = None.
 Proof.
   revert n. induction m as [|m IH]; intros n Hi.
   - assert (Hnil : seq n 0 = []) by reflexivity.
@@ -306,8 +360,9 @@ Proof.
             lookup_singleton_ne; [done | lia].
 Qed.
 
-Local Lemma live_seq_valid (n m : nat) :
-  ✓ ([^op list] k ∈ seq n m, ({[ k := 1%Qp ]} : iliveUR)).
+Local Lemma live_seq_valid (g : gname) (n m : nat) :
+  ✓ ([^op list] k ∈ seq n m,
+       ({[ k := (1%Qp, to_agree (g : leibnizO gname)) ]} : iliveUR)).
 Proof.
   revert n. induction m as [|m IH]; intros n.
   - assert (Hnil : seq n 0 = []) by reflexivity.
@@ -315,10 +370,11 @@ Proof.
   - assert (Hcons : seq n (S m) = n :: seq (S n) m) by reflexivity.
     rewrite Hcons big_opL_cons -insert_singleton_op;
       [| apply live_seq_lookup_lt; lia].
-    apply insert_valid; [by apply frac_valid | apply IH].
+    apply insert_valid; [| apply IH].
+    split; [by apply frac_valid | done].
 Qed.
 
-Lemma live_boot_map_valid : ✓ live_boot_map.
+Lemma live_boot_map_valid (g : gname) : ✓ live_boot_map g.
 Proof. apply live_seq_valid. Qed.
 
 (* ALLOCATING ONE, for a boot that wants to CREATE the authority rather
@@ -330,17 +386,74 @@ Proof. apply live_seq_valid. Qed.
    ambient [icfg], so the file table's payload is stated over THAT one, and
    tying the two together is the remaining half of the boot wiring.) *)
 Lemma icfg_alloc `{!icacheG Σ} (dv : mword 32) (nib : nat) :
-  ⊢ |==> ∃ ICFG : icfg,
+  ⊢ |==> ∃ (ICFG : icfg) (g0 : gname),
       ⌜icfg_dev = dv⌝ ∗ ⌜icfg_nib = nib⌝ ∗
       own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
-      own icfg_live live_boot_map.
+      own icfg_live (live_boot_map g0).
 Proof.
   iMod (own_alloc (● (∅ : gmap nat (Qp * positive)) : icacheUR)) as (γ) "Ha".
   { by apply auth_auth_valid. }
-  iMod (own_alloc live_boot_map) as (γl) "Hl".
+  (* the boot generation: a gname is all the pool needs, and minting it as a
+     PENDING one-shot is the cheapest way to get a fresh one.  It is dropped
+     here: at boot every slot is FREE, and a free slot's generation carries
+     no one-shot obligation at all (design §17.2 piece 2). *)
+  iMod (own_alloc (Cinl (Excl ()) : ityR)) as (g0) "_"; [done|].
+  iMod (own_alloc (live_boot_map g0)) as (γl) "Hl".
   { apply live_boot_map_valid. }
-  iModIntro. iExists (MkIcfg γ dv nib γl). by iFrame "Ha Hl".
+  iModIntro. iExists (MkIcfg γ dv nib γl), g0. by iFrame "Ha Hl".
 Qed.
+
+(* ===================================================================== *)
+(*  3c. THE ONE-SHOT'S VOCABULARY                                         *)
+(* ===================================================================== *)
+
+Section IcacheIty.
+  Context `{!icacheG Σ}.
+
+  (* minted at the recycle, parked at the slot's fresh generation *)
+  Definition ity_pending (g : gname) : iProp Σ :=
+    own g (Cinl (Excl ()) : ityR).
+
+  (* spent by ilock's fill; PERSISTENT, so it rides in a payload, in a
+     [FileInv.inode_pay] and in ilock's postcondition at no cost *)
+  Definition ity_shot (g : gname) (ty : bv 16) : iProp Σ :=
+    own g (Cinr (to_agree (ty : leibnizO (bv 16))) : ityR).
+
+  Global Instance ity_pending_timeless g : Timeless (ity_pending g).
+  Proof. apply _. Qed.
+  Global Instance ity_shot_timeless g ty : Timeless (ity_shot g ty).
+  Proof. apply _. Qed.
+  Global Instance ity_shot_persistent g ty : Persistent (ity_shot g ty).
+  Proof. rewrite /ity_shot. apply own_core_persistent, Cinr_core_id, _. Qed.
+
+  Lemma ity_shoot (g : gname) (ty : bv 16) : ity_pending g ==∗ ity_shot g ty.
+  Proof.
+    iIntros "H". iApply (own_update with "H").
+    apply cmra_update_exclusive. done.
+  Qed.
+
+  (* THE WHOLE POINT: a generation has ONE type, so a payload's recorded
+     type and a [FileInv.inode_pay]'s are the same type. *)
+  Lemma ity_shot_agree (g : gname) (ty ty' : bv 16) :
+    ity_shot g ty -∗ ity_shot g ty' -∗ ⌜ty = ty'⌝.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %Hv.
+    rewrite -Cinr_op Cinr_valid in Hv.
+    iPureIntro. exact (to_agree_op_inv_L _ _ Hv).
+  Qed.
+
+  Lemma ity_pending_excl (g : gname) : ity_pending g -∗ ity_pending g -∗ False.
+  Proof.
+    iIntros "H1 H2". by iDestruct (own_valid_2 with "H1 H2") as %[].
+  Qed.
+
+  Lemma ity_pending_shot_excl (g : gname) (ty : bv 16) :
+    ity_pending g -∗ ity_shot g ty -∗ False.
+  Proof.
+    iIntros "H1 H2". by iDestruct (own_valid_2 with "H1 H2") as %[].
+  Qed.
+End IcacheIty.
 
 Section IcacheRefGhost.
   Context `{!icacheG Σ}.
@@ -355,18 +468,57 @@ Section IcacheRefGhost.
 
   (* ---- the liveness pool's fragment ---- *)
 
-  (* [s] of slot [k]'s ONE unit.  A whole unit at [k] is what the invariant
-     holds while the slot is FREE, which is why owning ANY slice of it
-     refutes freeness ([IcacheInv.live_slot_live]).  Nothing here is an
-     authority, so this splits and joins with no fupd at all. *)
+  (* [s] of slot [k]'s ONE unit, AT A NAMED GENERATION.  A whole unit at [k]
+     is what the invariant holds while the slot is FREE, which is why owning
+     ANY slice of it refutes freeness ([IcacheInv.live_slot_live]).  Nothing
+     here is an authority, so this splits and joins with no fupd at all --
+     but the generation is an [agree], so a JOIN also PINS it. *)
+  Definition live_gen (k : nat) (s : Qp) (g : gname) : iProp Σ :=
+    own icfg_live
+      ({[ k := (s, to_agree (g : leibnizO gname)) ]} : iliveUR).
+
+  (* THE ARITY-PRESERVING WRAPPER (design §17.2 piece 1).  Every consumer of
+     the pool -- [iref_tok], [inode_shr], [inode_ref_short] and the thirty-odd
+     Specs stated over them -- uses THIS, so not one of their statements moved
+     when the generation went in. *)
   Definition live_frac (k : nat) (s : Qp) : iProp Σ :=
-    own icfg_live ({[ k := s ]} : gmap nat Qp).
+    (∃ g : gname, live_gen k s g)%I.
+
+  Lemma live_gen_split k s1 s2 g :
+    live_gen k (s1 + s2)%Qp g ⊣⊢ live_gen k s1 g ∗ live_gen k s2 g.
+  Proof.
+    rewrite /live_gen -own_op singleton_op -pair_op.
+    by rewrite (frac_op s1 s2) agree_idemp.
+  Qed.
+
+  (* TWO SLICES OF ONE SLOT NAME ONE GENERATION.  This is the mechanism the
+     whole §17' design runs on: a share held since sys_open and the escrow
+     arm's own slice cannot disagree, so a stale generation is not merely
+     unhelpful, it is UNOWNABLE. *)
+  Lemma live_gen_agree k s1 g1 s2 g2 :
+    live_gen k s1 g1 -∗ live_gen k s2 g2 -∗ ⌜g1 = g2⌝.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %Hv.
+    iPureIntro. specialize (Hv k).
+    rewrite singleton_op lookup_singleton -pair_op in Hv.
+    apply Some_valid, pair_valid in Hv as [_ Hag].
+    exact (to_agree_op_inv_L _ _ Hag).
+  Qed.
+
+  Lemma live_gen_join k s1 s2 g :
+    live_gen k s1 g -∗ live_gen k s2 g -∗ live_gen k (s1 + s2)%Qp g.
+  Proof. iIntros "H1 H2". rewrite live_gen_split. iFrame. Qed.
 
   Lemma live_frac_split k s1 s2 :
     live_frac k (s1 + s2)%Qp ⊣⊢ live_frac k s1 ∗ live_frac k s2.
   Proof.
-    rewrite /live_frac -own_op singleton_op.
-    by rewrite (frac_op s1 s2).
+    rewrite /live_frac. iSplit.
+    - iIntros "[%g H]". rewrite live_gen_split.
+      iDestruct "H" as "[H1 H2]". iSplitL "H1"; by iExists g.
+    - iIntros "[[%g1 H1] [%g2 H2]]".
+      iDestruct (live_gen_agree with "H1 H2") as %<-.
+      iExists g1. iApply (live_gen_join with "H1 H2").
   Qed.
 
   Lemma live_frac_join k s1 s2 :
@@ -380,14 +532,26 @@ Section IcacheRefGhost.
     live_frac k q -∗ live_frac k (q/2)%Qp ∗ live_frac k (q/2)%Qp.
   Proof. iIntros "H". rewrite -live_frac_split Qp.div_2. iFrame. Qed.
 
+  Lemma live_gen_halve k q g :
+    live_gen k q g -∗ live_gen k (q/2)%Qp g ∗ live_gen k (q/2)%Qp g.
+  Proof. iIntros "H". rewrite -live_gen_split Qp.div_2. iFrame. Qed.
+
+  Lemma live_gen_bound k s1 g1 s2 g2 :
+    live_gen k s1 g1 -∗ live_gen k s2 g2 -∗ ⌜(s1 + s2 ≤ 1)%Qp⌝.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %Hv.
+    iPureIntro. specialize (Hv k).
+    rewrite singleton_op lookup_singleton -pair_op in Hv.
+    apply Some_valid, pair_valid in Hv as [Hfr _].
+    by apply frac_valid in Hfr.
+  Qed.
+
   Lemma live_frac_bound k s1 s2 :
     live_frac k s1 -∗ live_frac k s2 -∗ ⌜(s1 + s2 ≤ 1)%Qp⌝.
   Proof.
-    iIntros "H1 H2".
-    iDestruct (live_frac_join with "H1 H2") as "H".
-    rewrite /live_frac. iDestruct (own_valid with "H") as %Hv.
-    iPureIntro. specialize (Hv k). rewrite lookup_singleton in Hv.
-    by apply Some_valid, frac_valid in Hv.
+    iIntros "[%g1 H1] [%g2 H2]".
+    iApply (live_gen_bound with "H1 H2").
   Qed.
 
   (* THE POOL'S WHOLE POINT, in one line: a slot whose unit is entire has no
@@ -402,9 +566,16 @@ Section IcacheRefGhost.
   Qed.
 
   (* the boot map fans out into the fifty units the invariant starts with *)
-  Lemma live_boot_split :
-    own icfg_live live_boot_map ⊢ [∗ list] k ∈ seq 0 NINODE, live_frac k 1%Qp.
-  Proof. rewrite /live_boot_map /live_frac. apply big_opL_own_1. Qed.
+  Lemma live_boot_split (g : gname) :
+    own icfg_live (live_boot_map g)
+      ⊢ [∗ list] k ∈ seq 0 NINODE, live_frac k 1%Qp.
+  Proof.
+    rewrite /live_boot_map.
+    iIntros "H".
+    iDestruct (big_opL_own_1 with "H") as "H".
+    iApply (big_sepL_mono with "H").
+    intros idx j _. iIntros "H". by iExists g.
+  Qed.
 
   (* ---- a reference's count fragment, and the reference token ---- *)
 
