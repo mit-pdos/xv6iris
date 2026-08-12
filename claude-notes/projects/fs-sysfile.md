@@ -3537,6 +3537,30 @@ Second, smaller: `iFrame` cannot frame a folded `IcacheRef.inode_shr_gen`
   because the descriptor's reference lives inside `proc_priv` and
   `flive_tok` (a `positiveR` fragment) makes `file_ref` unsplittable.  No
   proofs written; both repairs are the coordinator's ruling.
+- **S4c** (agent) **— PARTIAL**: **THE B2 CONVERSION IS COMPLETE FOR ALL
+  THREE OF file.c's BORROWERS, AND sys_fstat IS PROVEN AND LINKED.**
+  `SpecFileread`/`ProofFileread` and `SpecFilewrite`/`ProofFilewrite` converted
+  per S4'`s recipe (7 and 9 record fields dropped, both `*_fs_env` restated
+  content-independent, no share in either `*_fs_out`, both duplicate
+  `!icacheG Σ` binders gone, the carve at the env-open site, lend-half /
+  keep-half / regen); `SpecSysRead` and `SpecSysWrite` reshaped off their S4
+  opener wands onto the restated bundles; `ProofSysFstat.v` + `LinkSysFstat.v`
+  landed, `Print Assumptions SysFstat.wp_sys_fstat_sconf` = the 5 platform
+  axioms + funext, and Fileread / Filewrite / Filestat byte-identical to their
+  pre-conversion inventories.  `ProofSysRead` / `ProofSysWrite` and their Links
+  are **NOT STARTED** — see S4d.  ONE DESIGN FINDING, ruled and landed: the
+  devsw COLUMN (below).
+
+- **S4d** (agent): `ProofSysRead` + `LinkSysRead`, then `ProofSysWrite` +
+  `LinkSysWrite`.  `SpecSysRead`/`SpecSysWrite` are frozen and compiling and
+  `ProofSysFstat.v` is the worked template for the whole shape; the three
+  differences to budget for are a SIX-slot frame (`stk_push_48` in
+  `KernelRvcDecode.v`, and there is no `stack_own_6_elim` — use
+  `ProofSysPipe`'s `iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe"`
+  recipe), the `int n` in the UPPER WORD of slot 4 (`word_pointsto_split4` /
+  `_join4` across the argint call, sys_close's move), and one extra callee
+  (argint).  The two proofs are each other's copy bar three `jal` targets.
+
 - **S5** (agent): create — the writing half's boss: namei/nameiparent
   + ialloc + ilock's third arm + dirlink (+ the "." and ".." links on
   the mkdir path) + the found-arm early exit. Its contract's
@@ -3684,3 +3708,124 @@ Assumptions KexecA.kxc_phaseA` = the 5 platform axioms + funext AND NOTHING
 ELSE** — no consoleread, no named kexec axiom, no module-parameter residue.
 Phase A is genuinely assumption-clean; writing `LinkKexecA.v` when phase B
 lands will not add one.
+
+## S4c — THE CONVERSION IS MECHANICAL; THE devsw COLUMN IS NOT
+
+### The recipe held, and it is now three-for-three
+
+fileread and filewrite converted exactly as S4' sized them, and both compiled
+on the FIRST attempt after the edits.  The per-function counts:
+
+| | fields dropped | proof edit sites | rounds to green |
+|---|---|---|---|
+| filestat (S4', landed) | 7 | ~5 | — |
+| fileread | 7 | 12 + 1 import | 1 |
+| filewrite | 9 | 25 + 1 import | 1 |
+
+Three things S4' predicted and that came true verbatim: the duplicate
+`!icacheG Σ` binder had to go from BOTH files (it is now gone from every file
+in the cone); `iFrame` cannot see through a folded `IcacheRef.inode_shr_gen`,
+so every hand-off is `iSplitL "H"; [iExact "H"|]`; and the `ty` output the
+carve had to grow is the ONLY thing filewrite needed beyond fileread's.
+
+**THE CARVE IS ONE LEMMA, NOT THREE.**  `SpecFileread.fileread_pay_carve` is
+`SpecFilestat.filestat_pay_carve` grown by a `ty : bv 16` output plus the
+`⌜fc_wbool Cf = true -> bv_unsigned ty <> T_DIR_z⌝` side condition, and it
+lives in `SpecFileread.v` because `SpecFilewrite` already requires that file.
+So filewrite reuses it rather than making a third copy, and `ity_shot` comes
+out of the payload it was always in.  The share algebra
+(`inode_shr_gen_split2` / `_halve2` / `inode_shr_regen2` / `ic_escrows_acc2`)
+is stated there too; `SpecFilestat.v` still carries its own copy of the first
+four.  **THE OWED HOIST IS NOW TWO COPIES, NOT ONE** — homes unchanged
+(`IcacheRef.v` for the three share laws, `IcacheEscrow.v` for the escrow
+accessor, `FileInvDefs.v` for the carve), and retiring BOTH copies is one
+edit whenever the tree next takes a bottom-of-tree rebuild.
+
+**`off_inv γf k` BECAME `off_invs γf`, and that was forced, not chosen.**
+Content-independence is not enough: an environment a syscall can own may not
+name the fd SLOT either, because `ProcInv.ofile_slot` quantifies it
+existentially.  `FileOff.off_invs` + `off_invs_lookup` is the family and the
+selector; the lookup happens at the call, off the contract's own `k < NFILE`.
+The same argument turned `ic_escrow`/`is_sleeplock` into `ic_escrows` /
+`IcacheBoot.ic_sleeplocks` in both files, exactly as in filestat.
+
+**filewrite's loop carves PER ITERATION.**  `fw_loop` threads the
+`file_ref` whole, so the carve's outputs are local to one iteration and
+everything derived from them (the escrow, the sleeplock, the two point
+geometry facts) is re-derived on the next.  That is why the loop's ten pure
+premises became SIX: the two IBLOCK facts are now REGION-WIDE and quantified
+over the inum, and the four slot/type facts come out of the carve.  The loop
+invariant got strictly simpler — no share, no `ity_shot`, no slot.
+
+### THE FINDING: `devsw[major]` CANNOT BE MADE CONTENT-INDEPENDENT BY RESTATING IT
+
+Every other per-file thing in fileread's and filewrite's environments turned
+out to be inside the reference.  **The device arm's table entry is not**, and
+it cannot be: its ADDRESS is `a_devsw_read (dev_major Cf)` / `a_devsw_write
+(dev_major Cf)`, so one cell covers one major, and `fread_names`'s scalar
+`frn_rp`/`frn_dqv` could only ever describe the major the caller already knew.
+A syscall does not know it.
+
+Three shapes were considered and two are unsound:
+
+* `∀ Cf, fileread_dev_env fn Cf` as a spatial premise — **unsatisfiable**.
+  It claims the same cell for the infinitely many `Cf` sharing a major.
+* a `∀ Cf, P Cf ∗ (Q Cf -∗ P Cf)` "reusable bundle" — **unsound to restore**.
+  Handing out one instance consumes the whole `∀` (it is spatial), and the
+  instance's own wand cannot rebuild the quantifier.
+* **THE RULING: own the COLUMN.**  `frn_rp : Z -> mword 64` and
+  `frn_dqv : Z -> dfrac`; `fileread_devsw fn` is the `big_sepL` over majors
+  `0..NDEV_max`; `fileread_devsw_acc fn Cf` picks the entry the file names and
+  takes it straight back (the arm only READS it, which is exactly why
+  `fileread_dev_out` was already `fileread_dev_env`).  `filewrite_devsw` /
+  `filewrite_devsw_acc` are the write side's twins.
+
+Ten cells is the honest price of a syscall that may be handed any descriptor,
+and nothing smaller is ownable before the descriptor is resolved.  The ripple
+was 9 sites in `ProofFileread` and 5 in `ProofFilewrite`, all of the form
+`frn_rp fn` -> `frn_rp fn (dev_major Cf)`, and neither proof needed a tactic
+change.
+
+### FIVE TRAPS, all cheap once named
+
+1. **`lia` answers "Cannot find witness" in the column accessor** because
+   `fc_major Cf : mword 16` is merely IN CONTEXT (durable-notes' rule).  The
+   fix is the recorded one: `SpecFileread.devsw_idx_lt` is stated over plain
+   `Z`, at top level, outside every section, and applied as a closed fact.
+2. **`big_sepL_lookup_acc` needs an EXPLICIT `Φ`.**  With underscores the
+   destructuring pattern fails as *"iAndDestruct: (IAnon 1) not found"*,
+   which reads like a wrong pattern and is an unresolved typeclass evar.
+3. **`rewrite /X_dev_env /X_dev_out` UNFOLDS IN THE WRONG ORDER.**  ssreflect
+   applies left to right, so unfolding `_env` first leaves `_out`'s
+   expansion (which IS `_env`) folded, and the closing `iExact` fails on two
+   terms that differ only for that reason.  Put the OUTER definition first.
+4. **A syscall's `iIntros` after a callee's `wp_next` needs the GUARD binder.**
+   `iIntros (CID20 mf rv P')` silently binds `mf` to the crossing guard and
+   shifts everything by one; the error surfaces ~3 lines later as
+   `iSpecialize: cannot instantiate … with (proc_priv_core … (upd_upt V Hcsf))`
+   — the give-away being a PROOF TERM where a `uptd` belongs.
+5. **`KvmSpec.kalloc_env γa None` must be introduced with `#`.** filestat
+   consumes it and does not return it, and sys_fstat's postcondition owes it;
+   it is persistent, so `#Hkenv` is the whole fix.  Without it the failure is
+   `iSpecialize: "Hkenv" not found` at the very last `iApply`.
+
+### sys_fstat's shell, and what the other two inherit
+
+`ProofSysFstat.v` is the template for all three shells and shows the whole B1
+seam working with NO new lemma, exactly as S4'`s probe predicted:
+`ProcInv.proc_priv_lend` at the descriptor argfd resolved, `proc_priv_core`
+down to filestat, `proc_ofiles_repay` + `proc_priv_join` on the way back.  The
+`upd_upt` crossing is free (`pv_ofile (upd_upt V P') = pv_ofile V` by `cbn`),
+so the deficit the loan opens is literally the one the repayment closes even
+though filestat hands the core back at an EXTENDED page table.
+
+`sfs_env_frame` / `SpecSysRead.read_env_frame` / `SpecSysWrite.write_env_frame`
+are the whole of what the S4 opener was trying to be: the syscall OWNS both
+bundles, the callee's `if` decides which is consumed, and both come back.
+**One asymmetry worth knowing before writing sys_write's proof:** the write
+frame's return has to be `∃ used''`, because on the three arms that never
+reach the allocator `filewrite_env_out` is `emp` or a device cell and NO
+constraint on the caller's `used'` follows from it — so the only sound answer
+there is the set nothing touched, and the SYSCALL picks the witness for its
+own continuation.  That is why `wp_sys_write_sconf_body`'s `used'` is a
+∀-binder of the continuation and not a parameter of the contract.

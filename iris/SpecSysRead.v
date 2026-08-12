@@ -91,12 +91,48 @@
    ==== THE REST OF THE SHAPE ============================================
 
    [pfd] is NULL (sys_read wants the [struct file *] and not the descriptor
-   index), which is exactly the case [SpecArgfd.ofd_out] exists for; the
+   index), which is exactly the case [SpecArgfd.ofd_out] exists for; and the
    error return is hoisted above the branch so that both arms reach one
-   epilogue with the answer already in a0; and the descriptor environment is
-   an OPENER wand for the reason SpecSysFstat.v's header sets out at length
-   -- a syscall cannot name the content of the file its descriptor happens
-   to hold, so it cannot own a content-indexed environment up front. *)
+   epilogue with the answer already in a0.
+
+   ==== THE ENVIRONMENT IS OWNED, NOT OPENED (fs-sysfile S4c) ============
+
+   S4 froze this contract with an OPENER -- a wand turning the reference the
+   descriptor turned out to hold into fileread's environment for THAT file --
+   because [fileread_env] was indexed by the file's CONTENT and by its fd
+   SLOT, neither of which a syscall can name ([ProcInv.ofile_slot] quantifies
+   the slot, the fraction and the content existentially).  S4' overturned it,
+   and the reason is stronger than taste: the opener promised back a
+   [file_ref gf k q' Cf] at a SMALLER fraction, and NO SUCH THING EXISTS --
+   [FileInvDefs.fref_tok]'s reference COUNT rides in the same map entry as the
+   fraction, so two fragments at [q/2] compose to [(q, 2)] and not to
+   [(q, 1)].  Splitting a [file_ref] at all needs the ftable AUTHORITY, i.e.
+   filedup's ghost step, which is unsound without the physical [f->ref++].
+   The opener was satisfiable only at [q' = q], with the whole environment
+   already in the caller's hands: it deferred the problem rather than solving
+   it.  SpecSysFstat.v's header has the full account.
+
+   What this contract takes instead is [fileread_fs_env], which names neither
+   the content nor the slot: the escrow FAMILY, the sleeplock FAMILY, the
+   off-borrow FAMILY, the inode region, the block cache, the disk fabric and
+   the region-wide inum geometry.  The per-inode pieces the old
+   environment asked its caller for -- the itable slot, the inum, the device,
+   the region bound and the SHARE -- were inside the reference all along
+   ([FileInvDefs.inode_pay]); fileread carves them out itself
+   ([SpecFileread.fileread_pay_carve]) and gathers them back, so the syscall
+   owes nothing per-file at all.
+
+   ==== AND THE DEVICE TABLE'S READ COLUMN ================================
+
+   The FD_DEVICE arm's [devsw[major].read] cell is the one thing that could
+   NOT be made content-independent by restating it, because its ADDRESS is a
+   function of [dev_major Cf]: one cell covers one major.  The honest answer is
+   that a syscall which may be handed any descriptor owns the whole column --
+   ten cells, [fileread_devsw] -- and [fileread_devsw_acc] picks the entry
+   the file turns out to name and takes it straight back (the arm only READS
+   it).  That is not a hidden weakening: reading a device descriptor really
+   does require owning that table entry, and nothing smaller is ownable
+   before the descriptor is resolved. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -188,36 +224,39 @@ Definition sys_read_ret (V : pprivate) (v : mword 64) (n : Z) (r : mword 64) : P
 Section SpecSysRead.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* THE DESCRIPTOR ENVIRONMENT.  See SpecSysFstat.v's header for the whole
-     argument; in one line: [fileread_env γf k fn Cf] is indexed by the
-     file's CONTENT, and a syscall cannot name the content of the file its
-     descriptor happens to hold, so what it takes is the wand that turns the
-     reference it finds into that environment and back. *)
-  Definition read_fdenv (γf : gname) : iProp Σ :=
-    (∀ (k : nat) (q : Qp) (Cf : fcontent),
-       ⌜(k < NFILE)%nat⌝ -∗
-       file_ref γf k q Cf ==∗
-       ∃ (fn : fread_names) (q' : Qp),
-         fileread_env γf k fn Cf ∗ file_ref γf k q' Cf ∗
-         (file_ref γf k q' Cf -∗ fileread_env_out fn Cf ==∗
-            file_ref γf k q Cf))%I.
-
-  (* The trivial instance, and the check that the definition is not
-     accidentally unsatisfiable: a file whose type selects no arm costs its
-     reader nothing, so the opener is the identity there.  (The environment
-     that comes BACK is discarded rather than shown to be [emp] -- [iProp] is
-     affine, so a close that has nothing to do needs nothing to be true.) *)
-  Lemma read_fdenv_none (γf : gname) (fn0 : fread_names) :
-    (forall Cf : fcontent, fc_type Cf = FD_NONE) -> ⊢ read_fdenv γf.
+  (* THE ENVIRONMENT FILEREAD'S [if] ACTUALLY ASKS FOR, out of the two
+     content-independent bundles this contract owns.  This is the whole of
+     what the S4 opener was trying to be, and it is a few lines now that
+     neither bundle mentions the content: the syscall owns both, fileread's
+     type test decides which is consumed, and either way both come back.
+     ([SpecFileclose.fileclose_env_frame] is the same move one stage down.) *)
+  Lemma read_env_frame (γf : gname) (fn : fread_names) (Cf : fcontent) :
+    fileread_fs_env γf fn -∗ fileread_devsw fn -∗
+    fileread_env γf fn Cf ∗
+    (fileread_env_out fn Cf -∗ fileread_fs_out fn ∗ fileread_devsw fn).
   Proof.
-    intro Hno. rewrite /read_fdenv.
-    iIntros (k q Cf) "_ Href". iModIntro. iExists fn0, q.
-    iPoseProof (fileread_env_none γf k fn0 Cf (Hno Cf)) as "Henv".
-    iSplitL "Henv"; [iExact "Henv"|].
-    iFrame "Href". iIntros "Href _". iModIntro. iExact "Href".
+    iIntros "Hfs Hdev". rewrite /fileread_env /fileread_env_out.
+    case_bool_decide.
+    { (* FD_PIPE: nothing is asked for, and the fs half must still answer
+         [fileread_fs_out] -- which it does, [fileread_fs_env_out]. *)
+      iSplitR; [done|]. iIntros "_".
+      iDestruct (fileread_fs_env_out with "Hfs") as "$". iFrame "Hdev". }
+    case_bool_decide.
+    { (* FD_DEVICE: hand over the entry the major names, keep the column's
+         wand, and answer the fs half out of the bundle nothing touched. *)
+      iDestruct (fileread_devsw_acc fn Cf with "Hdev") as "[Hone Hback]".
+      iSplitL "Hone"; [iExact "Hone"|].
+      iIntros "Hout". iDestruct ("Hback" with "Hout") as "$".
+      iApply (fileread_fs_env_out with "Hfs"). }
+    case_bool_decide.
+    { (* FD_INODE: the fs half goes, the column stays *)
+      iSplitL "Hfs"; [iExact "Hfs"|]. iIntros "$". iFrame "Hdev". }
+    { (* the panic arm *)
+      iSplitR; [done|]. iIntros "_".
+      iDestruct (fileread_fs_env_out with "Hfs") as "$". iFrame "Hdev". }
   Qed.
 
 End SpecSysRead.
@@ -225,11 +264,12 @@ End SpecSysRead.
 Definition wp_sys_read_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
+    (fn : fread_names)                           (* the file system's ghosts *)
     (pidv : mword 32) (V : pprivate)
     (v v2 : mword 64)                            (* syscall arguments 0, 2  *)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
@@ -266,8 +306,10 @@ Definition wp_sys_read_sconf_body
   proc_priv γf pj pidv V -∗
   kalloc_env γa None -∗
   procs_inv γs -∗
-  (* ...and the environment for whatever file the descriptor names *)
-  read_fdenv γf -∗
+  (* ...and the file system in the form that does NOT name a file, plus the
+     device table's read column for whatever major the descriptor may name *)
+  fileread_fs_env γf fn -∗
+  fileread_devsw fn -∗
   (* THE CROSSING IS THE LITERAL [true]: fileread parks, and a park moves the
      hart with interrupts off, so the crossing has nothing to do with SIE. *)
   wp_next true pj (fun (CID : CpuId) =>
@@ -281,6 +323,13 @@ Definition wp_sys_read_sconf_body
       pc_is ret_tgt -∗
       proc_priv γf pj pidv (upd_upt V P') -∗
       kalloc_env γa None -∗
+      (* the file system, back.  fileread's own postcondition returns the
+         superblock fraction and the slot unit; everything else in the bundle
+         is persistent, which is why what comes back is [fileread_fs_out] and
+         not [fileread_fs_env].  The device column is returned whole -- the
+         arm only reads it. *)
+      fileread_fs_out fn -∗
+      fileread_devsw fn -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -288,13 +337,14 @@ Module Type SYSREAD.
   Parameter wp_sys_read_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
 
       (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
+      (fn : fread_names)
       (pidv : mword 32) (V : pprivate)
       (v v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool),
-      wp_sys_read_sconf_body γa γf γs j γlp pidv V v v2 m av eb C b.
+      wp_sys_read_sconf_body γa γf γs j γlp fn pidv V v v2 m av eb C b.
 End SYSREAD.

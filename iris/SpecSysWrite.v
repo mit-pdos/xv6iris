@@ -45,14 +45,32 @@
 
    ==== THE REST OF THE SHAPE ============================================
 
-   [pfd] is NULL, so argfd's [SpecArgfd.ofd_out] costs this caller nothing;
-   the error return is hoisted above the branch so both arms reach one
-   epilogue with the answer already in a0; and the descriptor environment is
-   an OPENER wand for the reason SpecSysFstat.v's header sets out -- a
-   syscall cannot name the content of the file its descriptor happens to
-   hold, so it cannot own a content-indexed environment up front.  The write
-   opener additionally pins [fwn_j] and [fwn_procs], which filewrite's
-   contract takes as equations rather than deriving. *)
+   [pfd] is NULL, so argfd's [SpecArgfd.ofd_out] costs this caller nothing,
+   and the error return is hoisted above the branch so both arms reach one
+   epilogue with the answer already in a0.
+
+   ==== THE ENVIRONMENT IS OWNED, NOT OPENED (fs-sysfile S4c) ============
+
+   S4 froze this contract with an OPENER wand, because [filewrite_env] was
+   indexed by the file's CONTENT and by its fd SLOT.  S4' overturned that,
+   and for a reason stronger than taste: the opener promised back a
+   [file_ref gf k q' Cf] at a SMALLER fraction, and no such thing exists --
+   [FileInvDefs.fref_tok]'s reference COUNT rides in the same map entry as
+   the fraction.  SpecSysFstat.v's and SpecSysRead.v's headers have the full
+   account.
+
+   What this contract takes instead is [filewrite_fs_env gf fn], which names
+   neither the content nor the slot, plus the device table's WRITE column
+   [filewrite_devsw fn] (whose cell address is a function of the major, so it
+   is the one thing that could not be made content-independent by restating
+   it -- see SpecSysRead.v).  Everything per-inode that the old environment
+   asked for -- the itable slot, the inum, the device, the region bound, the
+   share, its GENERATION and the fd's recorded TYPE -- comes out of the
+   reference itself, and filewrite carves it
+   ([SpecFileread.fileread_pay_carve], the read side's carve grown by the
+   [ty] output precisely so filewrite's [ity_shot] comes from the same
+   place).  The [fwn_j] / [fwn_procs] equations the opener used to promise
+   are now ordinary premises of this contract, where they belong. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -121,43 +139,48 @@ Definition sys_write_ret (V : pprivate) (v : mword 64) (n : Z) (r : mword 64) : 
 Section SpecSysWrite.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* THE DESCRIPTOR ENVIRONMENT.  SpecSysFstat.v's header has the argument;
-     the two differences from the read side are that filewrite's environment
-     also mentions the kalloc name (its FD_INODE arm allocates blocks) and
-     that filewrite's contract takes [fwn_j] / [fwn_procs] as EQUATIONS, so
-     the opener has to promise them.  The environment comes back at a bigger
-     [used'] -- the number of ballocs is not a function of anything the
-     caller holds -- so the close quantifies it. *)
-  Definition write_fdenv (γa γf : gname) (γs : list gname) (j : nat) : iProp Σ :=
-    (∀ (k : nat) (q : Qp) (Cf : fcontent),
-       ⌜(k < NFILE)%nat⌝ -∗
-       file_ref γf k q Cf ==∗
-       ∃ (fn : fwrite_names) (q' : Qp),
-         ⌜fwn_j fn = j /\ fwn_procs fn = γs⌝ ∗
-         filewrite_env γa γf k fn Cf ∗ file_ref γf k q' Cf ∗
-         (∀ used' : gset Z,
-            file_ref γf k q' Cf -∗ filewrite_env_out fn Cf used' ==∗
-              file_ref γf k q Cf))%I.
-
-  (* The trivial instance, and the check that the definition is not
-     accidentally unsatisfiable: a file whose type selects no arm costs its
-     writer nothing, so the opener is the identity there.  (The environment
-     that comes BACK is discarded rather than shown to be [emp] -- [iProp] is
-     affine, so a close that has nothing to do needs nothing to be true.) *)
-  Lemma write_fdenv_none (γa γf : gname) (γs : list gname) (j : nat)
-      (fn0 : fwrite_names) :
-    fwn_j fn0 = j -> fwn_procs fn0 = γs ->
-    (forall Cf : fcontent, fc_type Cf = FD_NONE) -> ⊢ write_fdenv γa γf γs j.
+  (* THE ENVIRONMENT FILEWRITE'S [if] ACTUALLY ASKS FOR, out of the two
+     content-independent bundles this contract owns.
+     [SpecSysRead.read_env_frame]'s twin, and the whole of what the S4 opener
+     was trying to be.  The [used'] the exclusive half comes back at is
+     whatever filewrite reached -- the number of ballocs is not a function of
+     anything the caller holds -- which is why it is a binder of the wand and
+     not of the frame. *)
+  Lemma write_env_frame (γf : gname) (fn : fwrite_names) (Cf : fcontent) :
+    filewrite_fs_env γf fn -∗ filewrite_devsw fn -∗
+    filewrite_env γf fn Cf ∗
+    (∀ used' : gset Z, filewrite_env_out fn Cf used' -∗
+       ∃ used'' : gset Z,
+         filewrite_fs_out fn used'' ∗ filewrite_devsw fn).
   Proof.
-    intros Hj Hp Hty. rewrite /write_fdenv.
-    iIntros (k q Cf) "_ Href". iModIntro. iExists fn0, q.
-    iSplitR; [iPureIntro; split; assumption|].
-    iPoseProof (filewrite_env_none γa γf k fn0 Cf (Hty Cf)) as "Henv".
-    iSplitL "Henv"; [iExact "Henv"|].
-    iFrame "Href". iIntros (used') "Href _". iModIntro. iExact "Href".
+    iIntros "Hfs Hdev". rewrite /filewrite_env /filewrite_env_out.
+    (* THE SET IS EXISTENTIAL ON THE WAY OUT, and it has to be: on the three
+       arms that do not reach the allocator [filewrite_env_out] is [emp] or a
+       device cell, from which NO constraint on the caller's [used'] follows
+       -- so the only sound answer there is the set nothing touched.  The
+       syscall picks the witness and hands it to its own continuation, which
+       is why [wp_sys_write_sconf_body]'s [used'] is a ∀-binder of the
+       continuation rather than a parameter of the contract. *)
+    case_bool_decide.
+    { iSplitR; [done|]. iIntros (used') "_". iExists (fwn_used fn).
+      iDestruct (filewrite_fs_env_out with "Hfs") as "Hout".
+      iSplitL "Hout"; [iExact "Hout" | iFrame "Hdev"]. }
+    case_bool_decide.
+    { iDestruct (filewrite_devsw_acc fn Cf with "Hdev") as "[Hone Hback]".
+      iSplitL "Hone"; [iExact "Hone"|].
+      iIntros (used') "Hout". iExists (fwn_used fn).
+      iDestruct ("Hback" with "Hout") as "Hdev".
+      iDestruct (filewrite_fs_env_out with "Hfs") as "Hfo".
+      iSplitL "Hfo"; [iExact "Hfo" | iFrame "Hdev"]. }
+    case_bool_decide.
+    { iSplitL "Hfs"; [iExact "Hfs"|]. iIntros (used') "Hout".
+      iExists used'. iSplitL "Hout"; [iExact "Hout" | iFrame "Hdev"]. }
+    { iSplitR; [done|]. iIntros (used') "_". iExists (fwn_used fn).
+      iDestruct (filewrite_fs_env_out with "Hfs") as "Hout".
+      iSplitL "Hout"; [iExact "Hout" | iFrame "Hdev"]. }
   Qed.
 
 End SpecSysWrite.
@@ -165,11 +188,12 @@ End SpecSysWrite.
 Definition wp_sys_write_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      !fsCrashG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !fsCrashG Σ, !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
+    (fn : fwrite_names)                          (* the file system's ghosts *)
     (pidv : mword 32) (V : pprivate)
     (v v2 : mword 64)                            (* syscall arguments 0, 2  *)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
@@ -180,6 +204,10 @@ Definition wp_sys_write_sconf_body
   (j < NPROC)%nat ->
   γs !! j = Some γlp ->
   length γs = NPROC ->
+  (* filewrite's contract takes these as EQUATIONS rather than deriving them;
+     they used to be promised by the opener and are ordinary premises now *)
+  fwn_j fn = j ->
+  fwn_procs fn = γs ->
   (* the three syscall arguments; argument 1 (the user source) is fetched
      but never inspected here *)
   pv_tf V !! tf_arg_idx 0 = Some v ->
@@ -202,11 +230,13 @@ Definition wp_sys_write_sconf_body
   proc_priv γf pj pidv V -∗
   kalloc_env γa None -∗
   procs_inv γs -∗
-  (* ...and the environment for whatever file the descriptor names *)
-  write_fdenv γa γf γs j -∗
+  (* ...and the file system in the form that does NOT name a file, plus the
+     device table's write column for whatever major the descriptor may name *)
+  filewrite_fs_env γf fn -∗
+  filewrite_devsw fn -∗
   (* THE CROSSING IS THE LITERAL [true]: filewrite parks. *)
   wp_next true pj (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (r : mword 64) (P' : uptd),
+    ∀ (mf : regfile) (r : mword 64) (P' : uptd) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜sys_write_ret V v (sys_rw_count v2) r⌝ -∗
@@ -216,6 +246,9 @@ Definition wp_sys_write_sconf_body
       pc_is ret_tgt -∗
       proc_priv γf pj pidv (upd_upt V P') -∗
       kalloc_env γa None -∗
+      (* the file system, back, at a bitmap set that only GREW *)
+      filewrite_fs_out fn used' -∗
+      filewrite_devsw fn -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -223,13 +256,14 @@ Module Type SYSWRITE.
   Parameter wp_sys_write_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !fsCrashG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             !fsCrashG Σ, !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
 
       (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
+      (fn : fwrite_names)
       (pidv : mword 32) (V : pprivate)
       (v v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool),
-      wp_sys_write_sconf_body γa γf γs j γlp pidv V v v2 m av eb C b.
+      wp_sys_write_sconf_body γa γf γs j γlp fn pidv V v v2 m av eb C b.
 End SYSWRITE.

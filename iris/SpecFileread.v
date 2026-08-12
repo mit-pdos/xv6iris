@@ -59,6 +59,30 @@
                   cache and disk fabric, and the off-borrow invariant.
    * anything else -> nothing; the arm is [panic], closed by [panic_wp_any].
 
+   ==== THE FS ENVIRONMENT IS CONTENT-INDEPENDENT (fs-sysfile S4') =======
+
+   [fileread_fs_env] names NEITHER the file's content NOR its descriptor
+   slot: it is [SpecFilestat.filestat_fs_env]'s form (which is
+   [SpecFileclose.fileclose_fs_env]'s), plus the off-borrow FAMILY.  That is
+   what makes it ownable by a SYSCALL, which is the whole point -- a
+   descriptor borrowed out of [ProcInv.ofile_slot] comes with its slot, its
+   fraction and its content existentially quantified, so a caller can supply
+   nothing that mentions any of them.
+
+   Everything per-inode that the old, content-indexed form asked its caller
+   for -- the itable slot, the inum, the device, the region bound and the
+   lent SHARE -- comes out of the reference itself: [FileInvDefs.inode_pay]
+   carries [IcacheRef.inode_shr_held_gen (fc_ip Cf) (q * Q) g], which names
+   the slot, the device and the inum and IS the share ilock wants.
+   [fileread_pay_carve] below hands them out and takes the share back; the
+   per-slot escrow and sleeplock then come out of the two FAMILIES
+   ([ic_escrows], [IcacheBoot.ic_sleeplocks]) at the slot the payload named,
+   and the off-borrow invariant out of [FileOff.off_invs] at the slot the
+   CONTRACT names.  The postcondition carries no share at all, so nothing is
+   left for the generation to be lost through
+   ([SpecIunlock] returns the arity-preserving [inode_shr]; the LEND-HALF /
+   KEEP-HALF discipline is what re-pins it -- [inode_shr_regen2]).
+
    ==== WHAT IS AMBIENT RATHER THAN PER-ARM =============================
 
    THREE of the four arms copy into user memory, so [proc_priv], the kalloc
@@ -89,9 +113,10 @@
    fileread is the whole reason that protocol exists.  Two consequences for
    this contract:
 
-   * the fs environment carries [off_inv γf k], and nothing else about the
-     offset -- the value is existential in the invariant, and the invariant's
-     [off_wf] bound is what makes it usable;
+   * the fs environment carries [off_invs γf] -- the FAMILY, since the
+     environment may not name a slot (see above) -- and nothing else about
+     the offset: the value is existential in the invariant, and the
+     invariant's [off_wf] bound is what makes it usable;
    * readi's joint numeric premise [off + n < 2^31] has to be discharged from
      a bound on [n] ALONE, because nothing in memory bounds a freshly loaded
      offset.  Hence [MAXFILE * BSIZE + n < 2^31] below.  THIS IS AN
@@ -133,9 +158,18 @@ Require Import FsCrash.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeRegion.
+Require Import DirView.      (* [T_DIR_z]: the carve's non-directory witness,
+                                which is [FileInvDefs.inode_pay]'s own clause.
+                                FileInvDefs imports DirView without exporting
+                                it, so naming the constant needs this line;
+                                the build cone is unchanged. *)
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
+Require Import IcacheBoot.   (* [ic_sleeplocks]: the canonical entry-sleeplock
+                                family -- a contract that cannot know WHICH
+                                entry its descriptor points at takes the
+                                family, exactly as SpecFilestat does. *)
 Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
@@ -165,6 +199,14 @@ Definition fileread_stack : nat := (6 + K_readi)%nat.
 Definition NDEV_max : Z := 9.
 
 Definition dev_major (Cf : fcontent) : Z := bv_unsigned (fc_major Cf).
+
+(* THE COLUMN INDEX, over plain [Z].  Stated here, outside every section and
+   with no [mword] anywhere, because [lia] answers "Cannot find witness" the
+   moment an [mword] is merely IN CONTEXT (durable-notes.md) -- and the
+   accessor below has [fc_major Cf : mword 16] in context by construction. *)
+Lemma devsw_idx_lt (z : Z) :
+  0 <= z -> z <= NDEV_max -> (Z.to_nat z < Z.to_nat NDEV_max + 1)%nat.
+Proof. unfold NDEV_max. lia. Qed.
 
 (* &devsw[mj].read.  [struct devsw] is two function pointers, [read] first,
    so the entry is 16 bytes and the field is at offset 0 -- which is what the
@@ -213,6 +255,16 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 (*  The ghost names and geometry the two heavy arms are indexed by          *)
 (* ---------------------------------------------------------------------- *)
+(* NOTHING PER-INODE IS IN HERE, and that is the point (fs-sysfile S4' /
+   blocker 2's ratified alternative; [SpecFilestat.fstat_names] is the
+   landed template).  The itable SLOT, the inum, the lent share's fraction,
+   the entry's two sleeplock gnames, the device and the region's block count
+   are all things a CALLER cannot know: a reference borrowed out of
+   [ProcInv.ofile_slot] comes with its slot, fraction and content
+   existentially quantified.  Every one of them comes out of the reference
+   itself ([fileread_pay_carve]), or is the ambient cache's
+   ([IcacheRef.icfg_dev] / [icfg_nib]), or is existential under the sleeplock
+   FAMILY. *)
 Record fread_names := MkFReadNames {
   frn_procs      : list gname;    (* the proc table's per-slot lock names   *)
   frn_j          : nat;           (* the running process's index            *)
@@ -227,19 +279,20 @@ Record fread_names := MkFReadNames {
   frn_fs         : fs_names;
   frn_ireg       : gname;         (* the inode region (InodeRegion.v)       *)
   frn_ic         : ic_names;      (* the icache's names (IcacheEscrow.v)    *)
-  frn_ilk        : gname;         (* ip->lock's inner spinlock              *)
-  frn_islk       : gname;         (* ip->lock's holder token                *)
   frn_cov        : gset Z;
   frn_logstart   : Z;
   frn_inodestart : Z;
-  frn_dev        : mword 32;
-  frn_inum       : mword 32;
-  frn_nib        : nat;           (* the inode region's block count         *)
-  frn_ik         : nat;           (* the itable SLOT this inode is           *)
-  frn_s          : Qp;            (* the LENT SHARE's fraction (v3)          *)
   frn_dqs        : dfrac;         (* sb.inodestart                          *)
-  frn_rp         : mword 64;      (* devsw[major].read                      *)
-  frn_dqv        : dfrac;         (* ...and that cell's fraction            *)
+  (* THE DEVICE TABLE'S READ COLUMN, AS FUNCTIONS OF THE MAJOR.  Scalars
+     until fs-sysfile S4c, and they could not stay scalar: the device arm's
+     cell address is [a_devsw_read (dev_major Cf)], so ONE cell covers ONE
+     major, and a SYSCALL cannot know which major its descriptor names.  A
+     caller that must be ready for any of them owns the whole column
+     ([fileread_devsw] below) and [fileread_devsw_acc] picks the entry.
+     Nothing about fileread's own proof changes: it works at one major
+     throughout, and now spells it [frn_rp fn (dev_major Cf)]. *)
+  frn_rp         : Z -> mword 64; (* devsw[mj].read                         *)
+  frn_dqv        : Z -> dfrac;    (* ...and that cell's fraction            *)
 }.
 
 (* Spelled out rather than derived, exactly as [SpecFileclose.fclose_names]
@@ -261,14 +314,21 @@ Global Instance fread_names_inhabited : Inhabited fread_names :=
     (MkFsNames 1%positive 1%positive 1%positive)
     1%positive (MkIcNames (fun _ => 1%positive) (fun _ => 1%positive)
                           (fun _ => 1%positive))
-    1%positive 1%positive
-    ∅ 0 0 (mword_of_int 0) (mword_of_int 0) 0%nat 0%nat 1%Qp (DfracOwn 1)
-    (mword_of_int 0) (DfracOwn 1)).
+    ∅ 0 0 (DfracOwn 1)
+    (fun _ => mword_of_int 0) (fun _ => DfracOwn 1)).
 
+(* THE DUPLICATE [!icacheG Σ] IS GONE, and it had to be: [fileG] BUNDLES
+   [icacheG] (and the [icfg]), so binding both gives TWO instances,
+   propositions that print identically and do not unify
+   (durable-notes.md, "a class that carries another class as a FIELD instance
+   must not be bound alongside it").  It was invisible while nothing in this
+   file mixed the two; the carve does -- the payload's share is at [fileG]'s
+   [icfg_dev], and a freshly written [icfg_dev] here would be the standalone
+   instance's.  Same edit as SpecFilestat's. *)
 Section SpecFileread.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- the FD_DEVICE arm's environment ---- *)
@@ -280,70 +340,105 @@ Section SpecFileread.
      ASSUMED, LinkConsoleread.v). *)
   Definition fileread_dev_env (fn : fread_names) (Cf : fcontent) : iProp Σ :=
     (if decide (dev_major Cf <= NDEV_max)
-     then ⌜frn_rp fn = (zero_reg : mword 64)
-           \/ frn_rp fn = (mword_of_int KernelSyms.consoleread : mword 64)⌝ ∗
-          a_devsw_read (dev_major Cf) ↦₈{frn_dqv fn} frn_rp fn
+     then ⌜frn_rp fn (dev_major Cf) = (zero_reg : mword 64)
+           \/ frn_rp fn (dev_major Cf)
+               = (mword_of_int KernelSyms.consoleread : mword 64)⌝ ∗
+          a_devsw_read (dev_major Cf) ↦₈{frn_dqv fn (dev_major Cf)}
+            frn_rp fn (dev_major Cf)
      else emp)%I.
 
   (* it is only READ, so it comes back as it went in *)
   Definition fileread_dev_out (fn : fread_names) (Cf : fcontent) : iProp Σ :=
     fileread_dev_env fn Cf.
 
-  (* ---- the FD_INODE arm's environment: ilock's, readi's and iunlock's ---- *)
-  Definition fileread_fs_env  (γf : gname) (k : nat)
-      (fn : fread_names) (Cf : fcontent) : iProp Σ :=
+  (* ---- THE WHOLE COLUMN, and how one entry comes out of it ----
+
+     What a CALLER that cannot name its descriptor's major must own.  It is
+     content-independent -- the point of S4c -- and it is not a weakening
+     dressed up: a syscall that may read any descriptor really can be handed
+     a device file with any major in range, and the entry it would then index
+     is a resource somebody has to hold.  Ten cells is what that costs.
+
+     [fileread_dev_env] at an OUT-OF-RANGE major is [emp], so the accessor is
+     total: the code returns -1 before the table is indexed. *)
+  Definition fileread_devsw (fn : fread_names) : iProp Σ :=
+    ([∗ list] i ∈ seq 0 (Z.to_nat NDEV_max + 1),
+       ⌜frn_rp fn (Z.of_nat i) = (zero_reg : mword 64)
+         \/ frn_rp fn (Z.of_nat i)
+             = (mword_of_int KernelSyms.consoleread : mword 64)⌝ ∗
+       a_devsw_read (Z.of_nat i) ↦₈{frn_dqv fn (Z.of_nat i)}
+         frn_rp fn (Z.of_nat i))%I.
+
+  Lemma fileread_devsw_acc (fn : fread_names) (Cf : fcontent) :
+    fileread_devsw fn -∗
+    fileread_dev_env fn Cf ∗ (fileread_dev_out fn Cf -∗ fileread_devsw fn).
+  Proof.
+    (* THE UNFOLD ORDER MATTERS: [/fileread_dev_out] rewrites to [fileread_dev_env], so
+       unfolding [fileread_dev_env] FIRST leaves the out side folded and the
+       closing [iExact] fails on two terms that print differently for that
+       reason alone. *)
+    rewrite /fileread_dev_out /fileread_dev_env.
+    iIntros "H". case_decide as Hle; [| iSplitR; [done | by iIntros "_"]].
+    (* the major is a [bv_unsigned], hence non-negative, so it IS the index
+       [Z.to_nat] of it names *)
+    pose proof (proj1 (bv_unsigned_in_range _ (fc_major Cf))) as Hnn.
+    rewrite /dev_major in Hle Hnn |- *.
+    set (i := Z.to_nat (bv_unsigned (fc_major Cf))).
+    assert (Hid : Z.of_nat i = bv_unsigned (fc_major Cf))
+      by (rewrite /i; apply Z2Nat.id; exact Hnn).
+    assert (Hlk : seq 0 (Z.to_nat NDEV_max + 1) !! i = Some i).
+    { rewrite lookup_seq. split; [reflexivity|].
+      rewrite /i. exact (devsw_idx_lt _ Hnn Hle). }
+    (* an EXPLICIT [Phi]: underscores leave the big-op's typeclass evars
+       unresolved and the destructuring pattern then fails (durable-notes.md) *)
+    iDestruct (big_sepL_lookup_acc
+                 (fun (_ : nat) (jj : nat) =>
+                    (⌜frn_rp fn (Z.of_nat jj) = (zero_reg : mword 64)
+                      \/ frn_rp fn (Z.of_nat jj)
+                          = (mword_of_int KernelSyms.consoleread : mword 64)⌝ ∗
+                     a_devsw_read (Z.of_nat jj) ↦₈{frn_dqv fn (Z.of_nat jj)}
+                       frn_rp fn (Z.of_nat jj))%I)
+                 _ i i Hlk with "H") as "[Hone Hback]".
+    iEval (rewrite Hid) in "Hone".
+    iSplitL "Hone"; [iExact "Hone"|].
+    iIntros "Hone". iApply "Hback". rewrite Hid. iExact "Hone".
+  Qed.
+
+  (* ---- the FD_INODE arm's environment: ilock's, readi's and iunlock's ----
+
+     CONTENT-INDEPENDENT, in [SpecFilestat.filestat_fs_env]'s form (which is
+     [SpecFileclose.fileclose_fs_env]'s): the escrow FAMILY, the sleeplock
+     FAMILY, the off-borrow FAMILY, the inode region, the block cache, the
+     disk fabric, and the region-WIDE inum geometry (quantified, because the
+     inum is existential in the reference).  It mentions neither [Cf] nor any
+     slot -- neither an itable slot nor an fd slot -- so a syscall that has
+     not yet borrowed its descriptor can own it, which is the whole point.
+     The per-inode pieces come out of the reference at the call
+     ([fileread_pay_carve] below). *)
+  Definition fileread_fs_env (γf : gname) (fn : fread_names) : iProp Σ :=
     (⌜log_geom_ok (frn_cov fn) (frn_logstart fn)⌝ ∗
      ⌜0 <= frn_inodestart fn⌝ ∗
-     ⌜IBLOCK (frn_inum fn) (frn_inodestart fn) ∈ frn_cov fn⌝ ∗
-     (* the inum is inside the inode region: [ireg_read]'s premise *)
-     ⌜bv_unsigned (frn_inum fn) < 16 * Z.of_nat (frn_nib fn)⌝ ∗
-     (* THE INODE IS ITABLE SLOT [frn_ik fn].  This replaces v1's
-        [uint (fc_ip Cf) <> 0]: [IcacheRef.ientry_unsigned] refutes ilock's
-        and iunlock's null test outright.  Their [ref < 1] test is refuted
-        from [itable_inv] by [iref_live_load_au] (v3 -- a share carries no
-        count fragment, §14.6), so v1's [0 < refv < 2^31]
-        premise about a caller-owned [i_ref] fraction is gone too.  And
-        readi's [size <= MAXFILE*BSIZE] premise is gone because ilock's
-        record is now an OUTPUT: the bound travels with it, as the fifth
-        conjunct of [InodeLock.inode_ok] (design §13.5). *)
-     ⌜fc_ip Cf = ientry (frn_ik fn)⌝ ∗
-     ⌜(frn_ik fn < NINODE)%nat⌝ ∗
-     (* THE OFF-BORROW INVARIANT for this slot -- persistent, and the whole
-        reason design/file-table.md's stage 2 exists *)
-     off_inv γf k ∗
+     (* EVERY inum the region covers has its block inside [cov] -- the
+        quantified form, since the reference names the inum existentially *)
+     ⌜forall inum : mword 32,
+        bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
+        IBLOCK inum (frn_inodestart fn) ∈ frn_cov fn⌝ ∗
+     (* THE OFF-BORROW INVARIANTS -- persistent, and the whole reason
+        design/file-table.md's stage 2 exists.  The FAMILY, not the slot's:
+        an environment that may not name the descriptor cannot name [k].
+        [FileOff.off_invs_lookup] selects the slot at the call. *)
+     off_invs γf ∗
      bio_ctx (frn_bio fn)
-       (fs_view (frn_fs fn) (frn_disk fn) (frn_dev fn) (frn_cov fn)) ∗
-     (* THE THREE PERSISTENT INVARIANTS SpecIlock v2 / SpecIunlock v2 take:
-        the [ref] words, the entry's content escrow, the inode region.  They
-        replace v1's [inode_parked] sleeplock, its [inode_key] shadow half,
-        its [i_ref] fraction and its whole-inode-block [fsblock]. *)
+       (fs_view (frn_fs fn) (frn_disk fn) icfg_dev (frn_cov fn)) ∗
+     (* THE THREE PERSISTENT INVARIANTS SpecIlock / SpecIunlock take: the
+        [ref] words, the entries' content escrows, the inode region -- the
+        escrow at the FAMILY where it was per-slot. *)
      itable_inv ∗
-     ic_escrow (frn_ic fn) (frn_fs fn) (frn_ireg fn) (frn_cov fn)
-               (frn_logstart fn) (frn_ik fn) ∗
-     ireg_inv (frn_ireg fn) (frn_fs fn) (frn_inodestart fn) (frn_nib fn) ∗
-     (* THE ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
-     is_sleeplock (frn_ilk fn) (frn_islk fn) (i_lock (fc_ip Cf)) "inode"%string
-       (ic_tok (frn_ic fn) (frn_ik fn)) ∗
-     (* THE LENT SHARE (v3, design §14.6/§14.8).  SpecIlock v3 takes a
-        SHARE, not a reference: a share is a slice of the two identity cells
-        plus the matching slice of the slot's liveness unit, carved from a
-        reference by [IcacheRef.inode_ref_carve] -- a pure resource split, no
-        fupd and no invariant opening.  ilock deposits it into the escrow and
-        iunlock brings it back AT THE SAME FRACTION (the checkout descriptor
-        pins it, §14.8), so fileread neither loses nor invents mass.
-
-        WHERE IT COMES FROM, in the eventual design: sys_read's cone carves
-        it off the FD_INODE file payload's cinv-parked reference at entry and
-        gathers it back at exit ([inode_ref_gather]) -- the bracket discipline
-        of §14.1, made a resource by the canonical pairing.  The parent
-        reference is [inode_ref_short] while the share is out, so it cannot
-        be spent (iput above all) until the gather, which is exactly what
-        makes shares unable to outlive their parent.  Stating the share HERE
-        rather than a reference is what lets that carve happen at the file
-        table's altitude, where [fp_iq]'s proportional accounting lives; that
-        wiring is B3's, and nothing in this file's cone needs it. *)
-     IcacheRef.inode_shr (frn_ik fn) (frn_s fn)
-               (frn_dev fn) (frn_inum fn) ∗
+     ic_escrows (frn_ic fn) (frn_fs fn) (frn_ireg fn) (frn_cov fn)
+                (frn_logstart fn) ∗
+     ireg_inv (frn_ireg fn) (frn_fs fn) (frn_inodestart fn) icfg_nib ∗
+     (* EVERY ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
+     ic_sleeplocks (frn_ic fn) ∗
      sb_inodestart ↦₄{frn_dqs fn}
        (mword_of_int (frn_inodestart fn) : mword 32) ∗
      (* the disk fabric *)
@@ -355,53 +450,44 @@ Section SpecFileread.
         readi's does the same, one after the other *)
      bslot (frn_bio fn))%I.
 
-  (* What comes back: THE SAME SHARE, at the same fraction.  v2 had to say
-     [∃ q'] here -- the two early returns (not readable; a type that is not
-     FD_INODE) never reach ilock and hand the caller's own reference back
-     untouched, while the arm that ran got one out of [ic_swap_park], which
-     pinned the device and the inum but not the fraction.  The checkout
-     descriptor (§14.8) pins the fraction too, so both arms now return
-     literally [frn_s fn] and the existential is gone.  That matters beyond
-     tidiness: B3's [fp_iq] accounting has to re-gather this share into the
-     payload's parent reference, and a gather needs the fraction to be the
-     one that was carved. *)
-  Definition fileread_fs_out (fn : fread_names) (Cf : fcontent) : iProp Σ :=
-    (IcacheRef.inode_shr (frn_ik fn) (frn_s fn)
-                           (frn_dev fn) (frn_inum fn) ∗
-     sb_inodestart ↦₄{frn_dqs fn}
+  (* What comes back: the superblock fraction and the slot unit.  NO SHARE --
+     the share never left the reference's payload, so there is nothing here
+     for it to be returned through, and hence no generation to lose (which is
+     what made the old [inode_shr] return ungatherable). *)
+  Definition fileread_fs_out (fn : fread_names) : iProp Σ :=
+    (sb_inodestart ↦₄{frn_dqs fn}
        (mword_of_int (frn_inodestart fn) : mword 32) ∗
      bslot (frn_bio fn))%I.
 
   (* ---- and the three, selected by the file's type ---- *)
-  Definition fileread_env  (γf : gname) (k : nat)
+  Definition fileread_env (γf : gname)
       (fn : fread_names) (Cf : fcontent) : iProp Σ :=
     (if bool_decide (fc_type Cf = FD_PIPE) then emp
      else if bool_decide (fc_type Cf = FD_DEVICE) then fileread_dev_env fn Cf
      else if bool_decide (fc_type Cf = FD_INODE)
-     then fileread_fs_env γf k fn Cf
+     then fileread_fs_env γf fn
      else emp)%I.
 
   Definition fileread_env_out (fn : fread_names) (Cf : fcontent) : iProp Σ :=
     (if bool_decide (fc_type Cf = FD_PIPE) then emp
      else if bool_decide (fc_type Cf = FD_DEVICE) then fileread_dev_out fn Cf
-     else if bool_decide (fc_type Cf = FD_INODE) then fileread_fs_out fn Cf
+     else if bool_decide (fc_type Cf = FD_INODE) then fileread_fs_out fn
      else emp)%I.
 
   (* THE EARLY RETURN'S OBLIGATION, checked here rather than discovered in
      the proof: [f->readable == 0] returns before the type is ever tested, so
      the environment must already contain everything the postcondition
-     promises.  This is what forced the existential [vv'] above. *)
-  Lemma fileread_fs_env_out γf k fn Cf :
-    fileread_fs_env γf k fn Cf -∗ fileread_fs_out fn Cf.
+     promises. *)
+  Lemma fileread_fs_env_out γf fn :
+    fileread_fs_env γf fn -∗ fileread_fs_out fn.
   Proof.
     rewrite /fileread_fs_env /fileread_fs_out.
-    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hshr & Hsb &
-              _ & _ & _ & Hbs)".
-    iFrame "Hsb Hbs Hshr".
+    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & Hsb & _ & _ & _ & Hbs)".
+    iFrame "Hsb Hbs".
   Qed.
 
-  Lemma fileread_env_out_of_env γf k fn Cf :
-    fileread_env γf k fn Cf -∗ fileread_env_out fn Cf.
+  Lemma fileread_env_out_of_env γf fn Cf :
+    fileread_env γf fn Cf -∗ fileread_env_out fn Cf.
   Proof.
     rewrite /fileread_env /fileread_env_out.
     case_bool_decide; [by iIntros "$"|].
@@ -412,8 +498,8 @@ Section SpecFileread.
 
   (* A file that is neither a pipe, nor a device, nor an inode costs its
      reader nothing -- the arm is [panic], and [panic_wp_any] closes it. *)
-  Lemma fileread_env_none γf k fn Cf :
-    fc_type Cf = FD_NONE -> ⊢ fileread_env γf k fn Cf.
+  Lemma fileread_env_none γf fn Cf :
+    fc_type Cf = FD_NONE -> ⊢ fileread_env γf fn Cf.
   Proof.
     intro Ht. rewrite /fileread_env Ht.
     rewrite bool_decide_eq_false_2; [|by vm_compute].
@@ -422,14 +508,138 @@ Section SpecFileread.
     done.
   Qed.
 
+  (* ==================================================================== *)
+  (*  THE CARVE, AND THE SHARE ALGEBRA IT NEEDS                           *)
+  (* ==================================================================== *)
+  (* OWED CLEANUP (fs-sysfile S4' item 2, and STILL OWED after S4c): none of
+     the five below is about fileread.  They are the file-table / icache
+     algebra every [file.c] function that locks its fd's inode needs, and
+     their homes are [IcacheRef.v] (the three share laws -- with
+     [ProofFilewriteParts.fw_shr_*], which are the same lemmas),
+     [IcacheEscrow.v] ([ic_escrows_acc]) and [FileInvDefs.v] (the carve).
+     They are stated HERE rather than there because those files are
+     bottom-of-tree (a full rebuild) AND, at S4c, adjacent to a concurrently
+     owned effort.  [SpecFilestat.v] carries a copy of the first four for the
+     same reason and predates this one; retiring BOTH copies into the three
+     homes is one edit when the tree next takes a bottom-of-tree rebuild.
+     SpecFilewrite requires this file, so filewrite reuses these rather than
+     making a third copy. *)
+
+  (* the generation-named share splits, exactly as its ∃-form does *)
+  Lemma inode_shr_gen_split2 (ik : nat) (s1 s2 : Qp) (dev inum : mword 32)
+      (g : gname) :
+    IcacheRef.inode_shr_gen ik (s1 + s2)%Qp dev inum g ⊣⊢
+    IcacheRef.inode_shr_gen ik s1 dev inum g ∗
+    IcacheRef.inode_shr_gen ik s2 dev inum g.
+  Proof.
+    rewrite /IcacheRef.inode_shr_gen IcacheRef.inode_ident_split
+            IcacheRef.live_gen_split.
+    iSplit; [iIntros "[[$ $] [$ $]]" | iIntros "[[$ $] [$ $]]"].
+  Qed.
+
+  (* halving, as its OWN lemma -- durable-notes' [rewrite -(Qp.div_2 q)]
+     trap: written at a call site inside the proofmode the split's evar lands
+     out of [s]'s scope. *)
+  Lemma inode_shr_gen_halve2 (ik : nat) (s : Qp) (dev inum : mword 32)
+      (g : gname) :
+    IcacheRef.inode_shr_gen ik s dev inum g ⊣⊢
+    IcacheRef.inode_shr_gen ik (s/2)%Qp dev inum g ∗
+    IcacheRef.inode_shr_gen ik (s/2)%Qp dev inum g.
+  Proof. rewrite -inode_shr_gen_split2 Qp.div_2. reflexivity. Qed.
+
+  (* THE REGEN.  iunlock returns the arity-preserving [IcacheRef.inode_shr]
+     (its [∃ g] form), and a payload's slice is generation-NAMED, so the two
+     cannot be rejoined blind.  Any other slice of the same entry pins it
+     ([IcacheRef.live_gen_agree]), and the half that was NOT lent is exactly
+     such a slice -- which is why the carve lends [s/2] and keeps [s/2].
+     Verbatim [ProofFilewriteParts.fw_shr_regen]. *)
+  Lemma inode_shr_regen2 (ik : nat) (s1 s2 : Qp) (dev inum : mword 32)
+      (g : gname) :
+    IcacheRef.inode_shr_gen ik s1 dev inum g -∗
+    IcacheRef.inode_shr ik s2 dev inum -∗
+    IcacheRef.inode_shr_gen ik (s1 + s2)%Qp dev inum g.
+  Proof.
+    iIntros "H1 H2".
+    iEval (rewrite IcacheRef.inode_shr_gen_intro) in "H2".
+    iDestruct "H2" as (g2) "H2".
+    iDestruct "H1" as "[Hid1 Hlv1]". iDestruct "H2" as "[Hid2 Hlv2]".
+    iDestruct (IcacheRef.live_gen_agree with "Hlv1 Hlv2") as %<-.
+    rewrite inode_shr_gen_split2. iFrame.
+  Qed.
+
+  (* the per-entry escrow, out of the family *)
+  Lemma ic_escrows_acc2 (cn : ic_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (ik : nat) :
+    (ik < NINODE)%nat ->
+    (ic_escrows cn γfs γi cov logstart -∗ ic_escrow cn γfs γi cov logstart ik
+     : iProp Σ).
+  Proof.
+    iIntros (Hk) "H". rewrite /ic_escrows.
+    assert (Hl : seq 0 NINODE !! ik = Some ik) by (rewrite lookup_seq; lia).
+    iDestruct (big_sepL_lookup _ _ ik ik Hl with "H") as "$".
+  Qed.
+
+  (* THE CARVE ITSELF -- [SpecFilestat.filestat_pay_carve] GROWN BY THE TYPE
+     WITNESS.  An FD_INODE / FD_DEVICE file's payload IS a share of its
+     inode's reference, generation-named, parked beside the cancel token
+     ([FileInvDefs.inode_pay]) TOGETHER WITH that generation's [ity_shot] and
+     the "a writable fd is not a directory" fact.  So a function that holds
+     the descriptor's reference already holds everything the old,
+     content-indexed environment asked its caller for: the slot, the device,
+     the inum, the region bound, the share, the type witness and its
+     non-directory side condition.  This hands them out and takes the share
+     back ([ity_shot] is persistent, so it needs no return).
+
+     fileread uses only the first six outputs; filewrite needs [ty] and the
+     [fc_wbool] implication as well, which is why the GROWN form lives here
+     rather than a second, smaller copy living in SpecFilewrite. *)
+  Lemma fileread_pay_carve (γf : gname) (k : nat) (q : Qp) (Cf : fcontent) :
+    fc_type Cf = FD_INODE \/ fc_type Cf = FD_DEVICE ->
+    file_pay γf k q Cf -∗
+    ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16),
+      ⌜fc_ip Cf = ientry ik⌝ ∗ ⌜(ik < NINODE)%nat⌝ ∗
+      ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
+      ⌜fc_wbool Cf = true -> bv_unsigned ty <> T_DIR_z⌝ ∗
+      IcacheRef.ity_shot g ty ∗
+      IcacheRef.inode_shr_gen ik s icfg_dev inum g ∗
+      (IcacheRef.inode_shr_gen ik s icfg_dev inum g -∗ file_pay γf k q Cf).
+  Proof.
+    intros Hty. iIntros "(%pn & Hpn & Hpl)".
+    assert (Hnp : bool_decide (fc_type Cf = FD_PIPE) = false).
+    { apply bool_decide_eq_false_2.
+      destruct Hty as [Hc | Hc]; rewrite Hc; by vm_compute. }
+    assert (Hyes : (bool_decide (fc_type Cf = FD_INODE)
+                    || bool_decide (fc_type Cf = FD_DEVICE))%bool = true).
+    { destruct Hty as [Hc | Hc]; rewrite Hc.
+      - by rewrite (bool_decide_eq_true_2 (FD_INODE = FD_INODE) eq_refl).
+      - by rewrite (bool_decide_eq_true_2 (FD_DEVICE = FD_DEVICE) eq_refl)
+                   orb_true_r. }
+    rewrite /file_payload Hnp Hyes /inode_pay.
+    iDestruct "Hpl" as "(#Hci & Hown & Hs & Hwt)".
+    iDestruct "Hs" as (ik inum) "(%Hipk & %Hik & %Hinb & Hshr)".
+    iDestruct "Hwt" as (ty) "[#Hshot %Hnd]".
+    iExists ik, inum, (q * fp_iq pn)%Qp, (fp_ig pn), ty.
+    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+    iSplitR; [iExact "Hshot"|].
+    (* [iExact], not [iFrame]: both sides are the same FOLDED
+       [IcacheRef.inode_shr_gen] and conversion closes it, while the [Frame]
+       instance search does not see through the definition. *)
+    iSplitL "Hshr"; [iExact "Hshr"|].
+    iIntros "Hshr". iExists pn. iFrame "Hpn".
+    rewrite /file_payload Hnp Hyes /inode_pay.
+    iSplitR; [iExact "Hci"|]. iSplitL "Hown"; [iExact "Hown"|].
+    iSplitL "Hshr"; [iExists ik, inum; iFrame "%"; iExact "Hshr"|].
+    iExists ty. iSplitR; [iExact "Hshot"|]. done.
+  Qed.
+
 End SpecFileread.
 
 Definition wp_fileread_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    
+
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (k : nat) (q : Qp) (Cf : fcontent)           (* the borrowed reference  *)
@@ -467,7 +677,7 @@ Definition wp_fileread_sconf_body
   kalloc_env γa None -∗
   procs_inv γs -∗
   (* ...and what the file's TYPE selects *)
-  fileread_env γf k fn Cf -∗
+  fileread_env γf fn Cf -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (its bread / ilock / bwrite does), and a park moves the hart with
      interrupts off, so the crossing has nothing to do with SIE -- the
@@ -495,9 +705,9 @@ Module Type FILEREAD.
   Parameter wp_fileread_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      
+
       (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (Cf : fcontent)
