@@ -300,6 +300,63 @@ green the notes warn about, arriving from a direction nobody was watching.
 Re-check the md5 of every tracked file you have scp'd before believing a gate,
 not just after the scp.
 
+## S3c — §17' RETROFIT: piece 1 LANDED and full-gated; pieces 2+3
+## STOPPED-AND-REPORTED (design/fs-icache.md §17.3)
+
+**Landed (piece 1, whole, exactly as §17.2 ruled).**  `IcacheRef.v` only:
+
+- `iliveUR := gmapUR nat (prodR fracR (agreeR (leibnizO gname)))`;
+  `live_gen k s g` is the new primitive, `live_frac k s := ∃ g, live_gen k s g`
+  the arity-preserving wrapper.  `live_gen_agree` (two slices of one slot name
+  one generation) is the mechanism the whole of §17' runs on; `live_gen_split`
+  / `live_gen_join` / `live_gen_halve` / `live_gen_bound` are its family, and
+  `live_frac_split` survives as a `⊣⊢` COROLLARY (the ⇐ direction now goes
+  through `live_gen_agree`, which is the only proof in the file that got
+  longer).
+- The one-shot's vocabulary beside it, modelled on `KptGhost.v`'s and named
+  to match: `ityR := csumR (exclR unitO) (agreeR (leibnizO (bv 16)))`
+  (`DinodeEnc.di_type`'s width), `ity_pending` / `ity_shot` / `ity_shoot` /
+  `ity_shot_agree` / `ity_pending_excl` / `ity_pending_shot_excl`, with
+  `ity_shot` PERSISTENT and both TIMELESS.  `icacheG` gains `icache_ityG`
+  and `icacheΣ` a `GFunctor ityR`.
+- `live_boot_map` takes the boot generation as a parameter; ONE gname serves
+  all fifty slots (the agreement is per-KEY, every slot is FREE at boot, and
+  no free slot carries a one-shot obligation).  `icfg_alloc` mints it and
+  now returns it; `live_boot_split` is unchanged in force.
+
+**THE RIPPLE WAS ZERO FILES.**  `IcacheRef.v` is the only file that moved:
+the arity-preserving claim in §17.2 piece 1 held exactly, and no `iref_tok`,
+`inode_ref`, `inode_shr`, `inode_ref_short`, `inode_held*` or Spec over them
+changed a character.
+
+**Not landed, and why (full argument in design §17.3, both verified against
+the code rather than reasoned about):**
+
+- **(A)** §17.2 piece 3's placement of the ½ slice INSIDE `ic_loaded` makes
+  `IcacheEscrow.ic_open_auth_ref`'s REF-1 refutation of the OUT/`DepShr` arm
+  unprovable: the live mass in hand drops from `q + (1-q) + s` to
+  `q + (1/2-q) + s = 1/2 + s`, and §14.8's inventory of alternative
+  discriminators is already recorded exhausted.  Repair: the ½ lives in the
+  ARM (all four live arms), `ic_loaded` stays untouched, the generation and
+  the type witness go on `ic_payload` instead — which is named in 3 files
+  where `ic_loaded` is named in 19.
+- **(B)** §17.2 piece 2's parking of the pending one-shot on the `v = false`
+  polarity is refuted by `ProofIput.v:1965-1990`: iput's free path retypes in
+  place and re-parks UNLOADED inside the SAME generation, after ilock's fill
+  has already spent that generation's one-shot — a shot→pending transition.
+  Repair: park the pending with `ipool_shape`'s ALLOCATED disjunct inside
+  `ic_unloaded`, which is §17's own sentence and is exactly what the code
+  does (`ProofIput.v:1989` is `rewrite /ipool_shape. iRight.`, the marker).
+
+**Gate.**  Mirror `full.sh` `EXIT=0`, **1025 `.vo`** (unchanged).
+`tools/lemma_diff.py --ref HEAD`: CLEAN — nothing dropped, nothing admitted,
+no new assumption.  `Print Assumptions` on all eight cones (Ilock, Iget,
+Iput, Iunlock, Fileread, Namex, Fileclose, Kexit): each exactly the 5
+platform axioms + `functional_extensionality_dep`, with Fileread's known
+`Consoleread.wp_consoleread_sconf` — every set unchanged.
+`iris/IcacheRef.v` md5 `d62349202b867501f9b3ae709c5b192f`, verified equal on
+both sides after the scp and re-verified after the gate.
+
 ## The stage ladder
 
 - **S1** (agent): the DECODE stage — 13 Code files (the 12 targets +
@@ -312,6 +369,11 @@ not just after the scp.
 - **S3** (agent) **— PARTIAL**: SpecFilestat + ProofFilestatParts landed;
   filewrite BLOCKED on the dir_ok ruling (see the S3 section). Its Spec is
   deliberately unfrozen; ProofFilestat is parked. file.c stays 5/7.
+- **S3c** (agent) **— PARTIAL**: §17' piece 1 (the liveness generation +
+  the one-shot algebra) LANDED and full-gated with a ZERO-file ripple;
+  pieces 2+3 STOPPED-AND-REPORTED (design/fs-icache.md §17.3 has both
+  findings and both repairs, each checked against the code).  filewrite
+  is still blocked and still unspecified.
 - **S3b** (agent) **— PARTIAL**: filestat PROVEN AND LINKED (file.c 6/7);
   §17's fd-type witness STOPPED-AND-REPORTED as unimplementable in the ruled
   shape — design/fs-icache.md §17.1 has the finding and the repair (§17′) to

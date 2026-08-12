@@ -2720,3 +2720,144 @@ obligations are exactly S3b's report (a)–(c), recorded for S6.
 Sequencing: S3c = this retrofit, full-gated. S3d = SpecFilewrite +
 Proof + Link on top. sys_fstat/sys_read are NOT blocked and may be
 folded into S4 whenever the pipeline has room; only sys_write waits.
+
+### 17.3 §17.2 PIECES 2 AND 3 DO NOT CLOSE AS RULED (fs-sysfile S3c,
+### 2026-08-12) — piece 1 LANDED and full-gated; the repair, checked
+### against the code, is below
+
+Piece 1 went in exactly as ruled and the tree is green at 1025 `.vo`
+with all eight cones' assumption sets unchanged.  Pieces 2 and 3 were
+then worked forward against the code and each hit a wall.  Both walls
+are sharp, both have a repair, and both repairs are things §17's own
+PROSE already said — §17.2's MECHANISM just did not carry them.
+
+**(A) THE ½ MAY NOT TRAVEL WITH THE PAYLOAD: `ic_open_auth_ref`'s
+REF-1 refutation of the OUT arm dies.**  §17.2 piece 3 puts the slice
+inside `ic_loaded`, i.e. inside `ic_payload`, i.e. it LEAVES the escrow
+with the checked-out thread.  `IcacheInv.live_whole_share_absurd` is
+the REF-1 refutation §14.9 built to replace §14.6's identity-mass one,
+and it works today because the invariant's arm is the EXACT complement
+of the caller's `qt`.  Under the new ledger it is not: at
+`IcacheEscrow.ic_open_auth_ref`, branch OUT / `DepShr s dv nu`, the
+goal is `|={Eo}=> False` from
+
+    Hinv  : itable_inv                    (so live_slot M k, i.e. 1/2 - q)
+    Hhalf : itable_half M                 (HMk : M !! k = Some (q, 1))
+    Htok  : iref_tok k q                  (carries live_frac k q)
+    Hid   : inode_ident k (DfracOwn qi) dev inum
+    Hres  : inode_shr k s dev' inum'      (carries live_frac k s)
+
+and the live mass available is `q + (1/2 - q) + s = 1/2 + s ≤ 1`,
+satisfiable for every `s ≤ 1/2`.  Today it is `q + (1 - q) + s`, which
+is `1 + s` and absurd.  §14.8's inventory of alternative
+discriminators is exhaustive and already recorded dead: `ic_tok` and
+`ic_mid` are in both arms by construction, `ic_id` is `true` in both,
+OUT holds no memory cell at all, and the identity mass is
+`qi + (1/2 - q) + s ≤ 1`.  Note `ic_open_held` is NOT affected — it
+takes `ic_payload` as a premise, so under §17.2's placement iput holds
+the ½ there and the sum is `1 + s` again.  It is `ic_open_auth_ref`
+alone, and it is the opener that has no payload BY DESIGN (§13.13: the
+payload is what it is going in to fetch).
+
+*The repair:* **the ½ stays in the ARM.**  `ic_parked`, `ic_mid_arm`
+and `ic_held` gain `live_gen k (1/2) g`; `ic_dep_res` carries the
+arm's ½ beside the deposit, at the descriptor's generation, so
+`ic_out`'s text does not move.  Then EVERY live arm holds the exact
+complement, including OUT, and `live_whole_share_absurd` merely gains
+a `live_frac k (1/2)` premise that both openers supply from the arm
+they have just destructed.  `live_slot`'s live case is `1/2 - qt` —
+§17.2's restated ledger VERBATIM; only the slice's home moves.
+
+*What that costs, and what it saves.*  `ic_loaded` then cannot be
+self-contained, so the generation must be a PARAMETER rather than an
+existential — but it belongs on `ic_payload`, not on `ic_loaded`:
+
+    ic_payload γfs γi cov logstart k inum g v :=
+      if v then ∃ dn bm, ic_loaded γfs γi cov logstart k inum dn bm ∗
+                         ity_shot g (di_type dn)
+           else ic_unloaded γfs γi cov logstart k inum g
+
+**`ic_loaded` is then UNTOUCHED**, which retires §17.2's "~23
+`ic_loaded` sites gain the slice" line entirely.  Measured at
+4dc4a8c9: `ic_loaded` is named in 19 files (ProofFileread ×6,
+ProofNamex ×6, ProofIlock ×5, SpecStati ×5, ProofFilestat, SpecIput,
+SpecDirlookup, SpecDirlink, …) and `ic_payload` in THREE
+(IcacheEscrow ×28, ProofIput ×9, ProofIlock ×1), `ic_unloaded` in
+three (IcacheEscrow ×15, InodeLock, ProofIput).  The
+type witness is exposed ADDITIVELY out of the payload at v=true, which
+is the shape §17.2 piece 4 asked for anyway.
+
+Two consequences to rule on with it:
+
+  (A1) `ic_dep` (§14.9's deposit descriptor) gains a `gname` field.
+       §14.8's two-parkers inventory is explicit that a PARKER holds no
+       `live_frac` at all — so `ghost_var_agree` on the descriptor is
+       the only handle by which `ic_swap_park` can pin the returning
+       payload's generation to the arm's.  §14.9 already has the
+       descriptor pinning kind, fraction and identity; generation is
+       the fourth, and it costs nothing new.
+  (A2) `live_slot_close_last` gains the same `live_frac k (1/2)`
+       premise (the eviction's arm comes home through `ic_open_held`,
+       which iput already calls).  `live_slot_alloc` becomes a fupd
+       (it mints the fresh generation and the pending token) and its
+       side condition tightens from `q ≤ 1/2` to `q < 1/2`, matching
+       `islot_rest_at`'s identity budget exactly — the two ledgers
+       become the SAME shape, which is the real endorsement of the
+       restated conservation law.
+
+**(B) THE ONE-SHOT MAY NOT BE KEYED ON `v = false`: iput's free path
+performs a shot→pending transition, and no one-shot admits one.**
+§17.2 piece 2 parks the pending token in `ic_unloaded`, i.e. on the
+`v = false` polarity.  But iput's free path (§13.13's truncate arm)
+RETYPES IN PLACE and re-parks UNLOADED **inside the same generation** —
+a bump needs the free arm's whole unit and the slot is still live
+here.  `ProofIput.v:1965-1990`:
+
+    (* +0x70 sw zero, valid *)   Hsv70 : trunc32 … = valid_word false
+    iAssert (ic_payload gfs gi cov logstart k inum false) …
+    iMod (ic_swap_park cn … k (DepRef q dev inum) false dev inum …)
+
+and the payload it is rebuilding was LOADED a moment earlier on iput's
+own path (`ProofIput.v:1670` builds `ic_payload … true`), so ilock's
+fill has already SPENT that generation's one-shot.  The goal at 1981
+would be `… ⊢ ity_pending g` with `ity_shot g ty` outstanding, and
+`own g (Cinr _) ~~> own g (Cinl (Excl ()))` is not a frame-preserving
+update at any mask.
+
+*The repair, and it is §17's own sentence:* **park the pending token
+with `ipool_shape`'s ALLOCATED disjunct inside `ic_unloaded`, not with
+the valid polarity.**  §17 wrote "the free path exits the generation
+before retagging, VIA THE POOL ARM WHICH CARRIES NO RECORD CLAUSE",
+and that is literally what the code does — `ProofIput.v:1989` is
+`rewrite /ipool_shape. iRight.`, the `imark` marker.  So:
+
+    ic_pool_gen γfs γi cov logstart inum g :=
+      (ipool_alloc γfs γi cov logstart inum ∗ ity_pending g)
+      ∨ imark γi (bv_unsigned inum)
+    ic_unloaded γfs γi cov logstart k inum g :=
+      inode_raw (ientry k) ∗ ic_pool_gen γfs γi cov logstart inum g
+
+(`ipool_alloc` is `ipool_shape`'s existing left disjunct, named; the
+POOL's own `ipool_shape` is untouched — a pooled inum has no
+generation and must not acquire one).  Then: iget's recycle takes the
+bundle from the pool and mints the pending on the allocated branch
+only; ilock's fill MUST take the allocated branch (it is where
+`dinode_at` lives), so it always finds a pending to spend; and iput's
+free-path park takes the marker branch and owes nothing.  No new
+ghost, no re-check, and `ProofIput.v:1989`'s `iRight` still typechecks.
+
+*The route NOT taken, recorded so nobody re-derives it:* bumping the
+generation at the retype instead.  It needs the slot's whole unit —
+the parker's `qt`, the arm's ½ and the table's `1/2 - qt` — and iput
+has released the itable lock at +0x5c, so it holds no `itable_half`
+and cannot know the map's `qt` is still its own `q` (a concurrent
+`iget` cache-hit on the same (dev,inum) would have moved it).  It
+would need a REF-1 RE-CHECK at +0x70 that xv6 does not perform.  Dead.
+
+**WHAT S3C LANDED.** Piece 1, whole, full-gated: `iliveUR` carries the
+agreed gname, `live_gen` / `live_gen_agree` / `live_gen_split` are the
+mechanism the rest of §17' runs on, `live_frac k s := ∃ g, live_gen k
+s g` preserved every arity as promised (the ripple was ZERO files —
+`IcacheRef.v` alone), and the one-shot's vocabulary (`ityR`,
+`ity_pending`, `ity_shot`, `ity_shoot`, `ity_shot_agree`) is in beside
+it, modelled on `KptGhost.v`'s.  Pieces 2-4 wait on the ruling above.
