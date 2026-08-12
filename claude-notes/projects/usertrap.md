@@ -216,10 +216,14 @@ and each is a real piece of work with a known shape:
    trampoline halves is now cheaper than it was when `ProcInv.v`'s note was
    written.
 3. **`user_cfg C` ⟷ `sconf`'s config cells.** Plain cells on both sides;
-   needs `uc_mie C = MIE_S` (sconf pins mie, `ucfg` only constrains
-   `mie & ~mideleg = 0`), so the composition must instantiate `C` at
-   `MIE_S`. Cheapest of the three, and it should be checked FIRST — it is the
-   one that could turn out to need a `ucfg` field change.
+   needs `uc_mie C = MIE_S`, since `sconf` PINS mie while `ucfg` only
+   constrains `mie & ~mideleg = 0`. **Checked, and it is free**: the record
+   constructor `UCfg` appears NOWHERE in the tree — no concrete `ucfg` is
+   ever built (every user-tier statement carries `C` as a parameter), so the
+   composition that eventually builds one just sets `uc_mie := MIE_S`
+   (`0x220`), for which `uc_mm` holds at `mideleg = 0xffff`. No field change,
+   no ripple; the seam needs only the premise. This was the one item that
+   could have forced a `ucfg` change, so it was worth checking first.
 
 ## Phase plan for the proof itself
 
