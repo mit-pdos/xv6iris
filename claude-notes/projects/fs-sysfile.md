@@ -2689,6 +2689,355 @@ genuinely thin — the contracts in this stage do not change under either
 ruling, because a syscall that splits `proc_priv` still PRESENTS `proc_priv`
 to its own caller, and the opener is a premise either way.
 
+## S5a — create's DESIGN + FROZEN SPEC + parts layer.  Three files green;
+## THREE findings, two of them blockers for S5b
+
+**Landed, compiling on the mirror (`one5.sh`, never `full.sh` — S4b was
+live on the same box):** `iris/SpecCreate.v` (the frozen contract, full
+decode in the header), `iris/ProofCreateParts.v` (the record surgery, the
+size-cap recovery, the two name literals out of `kernel_data`, the frame
+constants), `iris/CreateBudget.v` (the op-wide ledger, arm by arm,
+machine checked).  No proof, no Link, no `_CoqProject` row (the
+coordinator adds three, after `SpecSysWrite.v`).
+
+### THE DECODE, READ OFF `CodeCreate.v` IN FULL — and it is NOT stock xv6
+
+80-byte frame (`addi sp,sp,-80` at +0x00, `addi s0,sp,80` at +0x12),
+EIGHT callee-saves (ra 72, s0 64, s1 56, s2 48, s3 40, s4 32, s5 24,
+s6 16) and `char name[DIRSIZ]` at sp+0 = **s0-80** — the four
+`addi a1,s0,-80` at +0x1c/+0x30/+0xae/+0xfc.  ONE epilogue, ONE `ret`
+(+0x74).  s1 = dp, s3 = THE ANSWER, s2 = type then ip, s4 = type's
+surviving copy, s5/s6 = major/minor.  All 19 calls resolve
+(nameiparent 0x80003a2a, ilock 0x800031dc ×3, dirlookup 0x8000377c,
+iunlockput 0x800033e8 ×6, ialloc 0x8000306c, iupdate 0x80003128 ×3,
+dirlink 0x80003966 ×4); ten forward branches, six backward `c.j`s, no
+`iput`, no `iunlock`, no panic.  Inode offsets in play: dev +0, inum +4,
+type +68, major +70, minor +72, nlink +74.
+
+**SURPRISE 1 — FOUR dirlink SITES, THREE SOURCE CALLS.**  The compiler
+DUPLICATED `dirlink(dp, name, ip->inum)` into both arms of the
+`type == T_DIR` test: +0xb4 on the non-directory path, +0x102 after the
+`.`/`..` pair.  S1's "one for the entry, three for the `.`/`..`/parent
+link" reading is wrong — there is no fourth *source* link, and the parent
+is never linked to anything but the child.
+
+**SURPRISE 2 — `dp->nlink++` COMES LAST, and this kernel is the NEWER
+xv6.**  +0x10a..+0x116 (`lhu 74(s1)`, `addiw +1`, `sh 74(s1)`,
+`iupdate(dp)`) sit AFTER the third dirlink has succeeded, then `j +0xbc`.
+The stock-sketch order (bump before the `.`/`..` links, with the cleanup
+arm owing an un-bump) does not occur.  **Consequence: no cleanup arm ever
+touches the parent's link count**, `fail:` writes only the CHILD's, and
+the "mkdir nlink++ subtlety" the brief asked about is a one-store
+`cr_setf` on dp with `inode_ok`/`dir_ok` preserved for free
+(`ProofCreateParts.cr_setf_inode_ok` / `_dir_ok` — neither predicate
+mentions nlink).
+
+**SURPRISE 3 — create NEVER STORES `ip->type`.**  +68 is READ once
+(+0x50, the found arm) and never written.  The new inode's type is
+installed on DISK by `ialloc` and reaches memory only through ilock's
+fill.  This is finding 1 below, and it is the stage's main product.
+
+**SURPRISE 4 — `s3` carries the answer and the two `return 0` arms at
++0xc6 and +0x132 never re-zero it.**  They are 0 only because control
+reached them through the +0x3c `c.beqz` whose +0x3a `mv s3,a0` stored
+dirlookup's 0.  `s3 = 0` is a live invariant across the whole
++0x80..+0x132 region and the walk must carry it.
+
+**SURPRISE 5 — `a0` is not reloaded before the ilock at +0x2a nor the one
+at +0x8c**: it is the live return value of nameiparent / ialloc.
+
+### THE ARM GRAPH (eight arms, verified instruction by instruction)
+
+| arm | entry | what runs | a0 out |
+|---|---|---|---|
+| **N** | +0x26 `beqz` | nothing | 0 |
+| **F-OK** | fall through +0x5c | iunlockput(dp), ilock(ip) | `ip`, **LOCKED** |
+| **F-BAD** | +0x4c / +0x5c | + iunlockput(ip) | 0 |
+| **A-FAIL** | +0x8a `c.beqz` | iunlockput(dp) | 0 |
+| **C-OK-FILE** | +0xb8 not taken | ialloc, ilock, 3 stores, iupdate, dirlink(dp), iunlockput(dp) | `ip`, **LOCKED** |
+| **C-OK-DIR** | +0x106 not taken | + dirlink(ip,"."), dirlink(ip,".."), dp->nlink++, iupdate(dp) | `ip`, **LOCKED** |
+| **FAIL** | +0xb8/+0xe0/+0xf4/+0x106 | nlink:=0, iupdate(ip), iunlockput(ip), iunlockput(dp) | 0 |
+
+`fail:` releases **ip before dp** (+0x128 then +0x12e) — the reverse of
+the acquisition order, which is fine because both are checkouts, not
+spinlocks.
+
+### THE LOCKED RETURN — what sys_open actually receives
+
+create is the only fs.c function that returns with a sleeplock HELD.
+`SpecCreate.create_locked` is the payout and it is, verbatim,
+`SpecIunlock`'s / `SpecIunlockput`'s PRECONDITION over the returned slot:
+
+```
+∃ γil γisl,
+  is_sleeplock γil γisl (i_lock (ientry k)) "inode" (ic_tok cn k) ∗
+  sleeplocked γisl ∗ sl_pid (i_lock (ientry k)) ↦₄ pidv ∗
+  ic_deposit cn k (DepShr s dev inum g) ∗
+  i_dev ↦₄{1/2} dev ∗ i_inum ↦₄{1/2} inum ∗ i_valid ↦₄ valid_word true ∗
+  ic_loaded γfs γi cov logstart k inum dn bm ∗
+  ity_shot g (di_type dn) ∗
+  inode_ref_short k (qi + s) qi dev inum
+```
+
+Three things to note.  (i) The `inode_ref_short` is the RETAINED PARENT
+of the share the deposit holds — `IcacheRef.inode_ref_gather` re-forms the
+canonical reference, which is what sys_open spends into the file struct
+and what sys_mkdir/sys_mknod hand to `iunlockput`.  (ii) `ic_loaded`
+carries the region fragment `dinode_at γi inum dn` at FULL fraction; that
+is why finding 1 cannot be repaired by handing create a second fragment.
+(iii) `ity_shot g (di_type dn)` is ilock's own payout and is exactly the
+fd-type witness §17.6 built — sys_open joins it to `FileInv.inode_pay`'s
+copy with `IcacheRef.ity_shot_agree`.  It is only USABLE if `di_type dn`
+is known, i.e. finding 1 again.
+
+The contract takes **`ProcInv.proc_priv γf pj pidv V` WHOLE** and returns
+it at the same `V`: create copies nothing to or from user memory, and
+what it needs — the pid quarter every sleeplock records, the `p->cwd`
+cell and the cwd REFERENCE namex starts from — is exactly
+`ProcInv.proc_priv_cwd_pid`'s payout.  It takes **no `file_ref`**, so S4's
+blocker 2 does not reach it, and it is insensitive to the
+`proc_priv_core` sweep either way (a splitter still PRESENTS `proc_priv`).
+
+### FINDING 1 (BLOCKER for S5b) — ilock cannot tell create what it just allocated
+
+create must know `di_type dn = ty` after `ilock(ip)`, and today it cannot.
+
+* The mkdir path calls `dirlink(ip, ".")`, whose FIRST premise is
+  `di_type dn = T_DIR`; without it dirlookup's `panic("dirlookup not
+  DIR")` is live and create — which calls no panic — cannot refute it.
+  Its other three dirlink premises (`bm_covers`, `dir_inums_ok`,
+  `size + 16 <= MAXFILE*BSIZE`) all follow from `di_size dn = 0`, which is
+  equally unavailable.
+* The T_FILE path needs it one level up: sys_open's fd carries
+  `ity_shot g ty` with `fc_wbool = true -> ty <> T_DIR`, and create's
+  `ity_shot g (di_type dn)` is worthless at an unknown `dn`.
+* `SpecIalloc`'s payout is deliberately resource-free (§16: "the claim
+  takes no region resource and pays none back"); its `ialloc_fresh ty` is
+  documentation, and its own header says so ("it says nothing about the
+  region's state at RETURN time").  `SpecIlock`'s postcondition binds
+  `dn` EXISTENTIALLY.  So no resource create holds connects the two.
+
+**Why the obvious repairs die.**  (a) ialloc cannot publish
+`ity_shot g ty`: the generation's pending lives in the entry's payload
+under the SLEEPLOCK and iget does not hold it.  (b) ialloc cannot pay out
+`dinode_at γi inum (ialloc_fresh ty)`: `ic_loaded` holds that element at
+FULL fraction after the fill, so create would have to give it up before
+ilock — i.e. ilock must consume it — i.e. ilock's arity changes anyway.
+(c) A persistent "the claim wrote d" fact is unsound across a
+free-and-reclaim, which is the exact hazard §17.6 built generations for.
+
+**THE REPAIR, sized.**  A per-inum CLAIM RECEIPT, filed in the region's
+own ghost map (no new gname, so `ireg_inv`'s and `ic_escrow`'s signatures
+stay byte-identical — §16.5's whole packaging argument), plus a SECOND,
+ADDITIVE ilock contract:
+
+1. `InodeRegion.v` — split `ireg_slot`'s first arm at the claimed
+   sub-case: `(⌜di_type d = 0⌝ ∗ z ↪[γi] d) ∨ (⌜fresh_shape d⌝ ∗
+   z ↪[γi]{#1/2} d) ∨ (⌜di_type d ≠ 0⌝ ∗ imark γi z)`, with
+   `iclaim γi inum d := bv_unsigned inum ↪[γi]{#1/2} d`.  The claimant's
+   half REFUTES the free arm (3/2 > 1) and the marker the fill already
+   holds refutes the OUT arm (`imark_excl`, §16.5), so the fill's arm
+   selection is unchanged in shape.  `ireg_claim_au` stops paying `True`
+   and pays the half.
+2. `SpecIalloc.v` — the alloc arm gains `iclaim γi inum (ialloc_fresh ty)`.
+   Additive conjunct; `ProofIalloc` re-discharges at the one AU.
+3. `SpecIlock.v` — a NEW `wp_ilock_fresh` (its own `Module Type
+   ILOCK_FRESH`, so no existing sealer moves) taking `iclaim γi inum d`
+   and adding `⌜dn = d⌝` to the post.  `ProofIlock` proves it by forcing
+   the third fill case; every existing ilock caller is untouched.
+4. `SpecCreate.v` needs NO change — its `made = true` arm already states
+   the true post-state.
+
+Ripple: 3 Spec/definition files + `ProofIalloc` + `ProofIlock` +
+`IcacheBoot`'s mint (the arm gained a disjunct) + whatever destructs
+`ireg_slot` (`ProofIupdate`'s `ireg_out`, `ProofIput`).  Stage-sized, no
+new invariant, no mask discipline.
+
+### FINDING 2 (BLOCKER for S5b, one line) — SpecDirlink's post cannot re-park `ic_loaded`
+
+`InodeLock.inode_ok` has seven conjuncts.  dirlink's postcondition
+re-establishes five (`blkmap_wf`, `bm_covers`, `di_addrs = bm_cells`,
+`blk_holes_zero`, and `di_type ≠ 0` through `dn' = wi_dinode dn …`), and
+is MISSING the two S3h found missing in writei and S3i repaired there:
+
+* `bv_unsigned (di_size dn') <= MAXFILE * BSIZE` — **RECOVERABLE by the
+  caller**, and `ProofCreateParts.cr_size_cap` is the recovery: the append
+  lands at slot `k0 <= dir_nrec size` and writes at most 16 bytes, so the
+  new size is at most `size + 16`, which is dirlink's own "the append
+  fits" premise.  Nothing is owed.
+* `InodeInv.inode_sized data'` — **NOT recoverable.**  dirlink's range
+  clause is about `file_byte`, a per-BYTE view; it pins no block's LENGTH.
+
+So `SpecDirlink` owes exactly S3i's second clause, as a PRESERVATION:
+`⌜inode_sized data -> inode_sized data'⌝` in the postcondition.  It is
+free inside `ProofDirlink` (writei has handed it over since S3i; the
+found arm has `data' = data`), it is a postcondition STRENGTHENING so no
+existing caller moves, and without it create cannot re-park either inode
+after any dirlink — which is every arm from +0xb4 on.
+
+### FINDING 3 — THE `SpecDirlink` GEN QUESTION, RESOLVED: a gen twin is
+### NECESSARY AND NOT SUFFICIENT.  The op needs ABSORPTION CREDITS
+
+The brief asked whether `SpecDirlink` needs a one-line `log_op → log_opS`
+twin.  It does, and it does not close create.  `iris/CreateBudget.v` is
+the machine-checked accounting; the headline numbers:
+
+* **The verdict is "xv6 is log-sound at create."**  The op's distinct
+  block set is at most SIX — `IBLOCK(ip)`, `IBLOCK(dp)`, `bmapstart` (one
+  bitmap block, `bitmap_geom_ok`'s `0 < size <= BPB`), ip's block 0,
+  dp's entry block, dp's indirect — against `MAXOPBLOCKS = 10`.  Nothing
+  for `kernel-defects.md`.
+* **Counted busts by 18** (`cr_budget_counted_busts`: `4 * dirlink_units
+  = 28 > 10`).
+* **SET FORM AS LANDED ALSO BUSTS** (`cr_budget_loose_busts`).
+  `wp_writei_gen` threads `log_opS` and promises `Sb ⊆ Sb'`, but its
+  SPEND bound is still the loose per-call constant `ncount -
+  wi_cost_bmonly off n <= n'`.  `10 - 1 - 1 - 4 - 4 = 0 < 4`: the third
+  dirlink cannot even be called.  This is the clause of §18 that S3l/S3m
+  consciously left ("no obligation anywhere consumes a ceiling") and
+  create is the obligation that does.
+* **What closes it is three absorption-credit booleans**, exactly
+  `SpecBmap`'s device (`bmap_cost cr al ind`, honest because of
+  `cr = true -> bmapstart ∈ Sb`) extended to the two other blocks a
+  dirlink logs:
+
+  | credit | meaning | who supplies it in create |
+  |---|---|---|
+  | `crb` | `bmapstart ∈ Sb` | any earlier allocating call |
+  | `crd` | the written data block `∈ Sb` | `dirlink(ip,".")` for `dirlink(ip,"..")` |
+  | `cru` | `IBLOCK dinum inodestart ∈ Sb` | the previous iupdate of that inode |
+
+  `CreateBudget.cr_budget_needs_data_credit` and `_needs_inode_credit`
+  are machine-checked refutations of dropping either one.
+
+**The ledger, arm by arm** (`cr_budget_mkdir`, `_file`, `_fail_late`,
+`_fail_early`, `_found`), starting from the caller's `begin_op`:
+
+```
+u=10  ialloc            -1   IBLOCK(ip) new                        -> 9
+      iupdate(ip)       -0   IBLOCK(ip) ∈ Sb                        -> 9
+      dirlink(ip,".")   -3   bitmap+block new, its iupdate absorbs  -> 6
+      dirlink(ip,"..")  -0   same block, same inode block           -> 6
+      dirlink(dp,name)  -3   worst: allocates THROUGH the indirect  -> 3
+      iupdate(dp)       -0   dirlink's own writei already flushed dp-> 3
+      iunlockput(dp)    needs iput_units = 3                        -> EXACTLY
+```
+
+and the FAIL arm entered from the last dirlink starts at that same 3,
+spends 0 across `iupdate(ip)` (absorbs) and `iunlockput(ip)` (it frees,
+but its bfrees hit the paid bitmap and its iupdate the paid inode block),
+and hands `iunlockput(dp)` exactly its 3.  **Both the success and the
+late failure close with ZERO slack at `iput_units`** — which is why
+iput's accounting has to be credited too, not just dirlink's: with iput's
+landed spend-at-most-three, `iunlockput(ip)` is *allowed* to leave zero
+and the `iunlockput(dp)` after it cannot be called at all.
+
+**THE RETROFIT, in dependency order** (each is additive; none moves a
+landed statement, so S4b and every other consumer are untouched):
+
+1. `SpecWritei.v` — `wp_writei_cred`: `wp_writei_gen` plus the three
+   booleans, their honesty premises, and a CREDITED spend lower bound.
+   The NEED premise does not move (`log_write` takes `log_opS (S u)` on
+   both arms, so a unit is in hand even to absorb).  The machinery is
+   already proven and parked: `WriteiBudget`'s `log_amort_present` /
+   `_adopt` / `wi_inv_enter` ("a caller that has already logged the
+   bitmap simply gets a call that spends one less than its budget
+   allowed" — the contract just has to SAY so).
+2. `SpecIupdate.v` — `wp_iupdate_cred`: `wp_iupdate_gen` with a `cru`
+   boolean, `cru = true -> IBLOCK inum inodestart ∈ Sb`, and
+   `log_opS (if cru then S u else u)` out.  This is `wp_log_write_gen`'s
+   shape lifted through a straight-line function; `ProofIupdate` already
+   destructs to `log_opS` internally (S3m), so it is threading, not
+   proving.
+3. `SpecDirlink.v` — `wp_dirlink_gen` (its own `Module Type
+   DIRLINK_GEN`, so `LinkDirlink` need not move until the proof lands):
+   `log_opS` in and out, `Sb ⊆ Sb'`, the three credits passed to writei,
+   the arm-wise spend `dl_spend`, and `dl_need` (4, or 5/6 on the
+   indirect path) instead of `dirlink_units = 7` — which was computed
+   from the RETIRED `wi_cost off 16 = 7` and is stale by three.
+4. `SpecIput.v` / `SpecIunlockput.v` — `ip_spend crb cru freed`: zero
+   unless the inode is actually freed.
+5. `SpecIalloc.v` — `wp_ialloc_gen`: the pure `log_op → log_opS` swap
+   with determinate growth `Sb ∪ {[IBLOCK inum inodestart]}` (the inum is
+   the scan's, so no credit is possible and the spend is unconditional).
+
+`iris/CreateBudget.v` already holds every cost and need function, so each
+retrofit has a fixed target to hit.
+
+### WHAT `ProofCreateParts.v` GIVES THE WALK
+
+* `cr_setf` — the ONE shape of dinode update create performs (major,
+  minor, nlink move; type, size and addrs do not).  All five inode stores
+  are instances: +0x90/+0x94/+0x9a, the fail arm's +0x11c, and the
+  parent's +0x110.  `cr_setf_inode_ok`, `cr_setf_dir_ok`,
+  `cr_setf_type_nz` (the region's arm selector — the fail arm's
+  `nlink := 0` does NOT move `iupdate`'s `ireg_out` arm, which is keyed on
+  the TYPE), `cr_setf_compose`, `cr_setf_clear`, and `cr_made_setf`
+  (`cr_setf (ialloc_fresh ty) mj mn 1 = create_made ty mj mn`, the identity
+  that ties the contract's `made` arm to the walk).
+* `cr_size_cap` + the two fresh instances — finding 2's recoverable half.
+* `cr_kd_bytes` — the byte-window analogue of
+  `KernelDataInv.kernel_data_window` (a name literal is a byte string that
+  is NOT NUL-terminated inside its 14-byte window, so neither that lemma
+  nor `kernel_data_string` applies), and `cr_dot_window` /
+  `cr_dotdot_window` at 0x800075c0 / 0x800075c8.  **Both windows run into
+  their neighbours** — "." 's contains the ".." two bytes further on
+  (offsets 8,9), ".." 's contains the head of "unlink" (offsets 8..13) —
+  and `cr_dot_name` / `cr_dotdot_name` show `DirentEnc.bname` cuts at the
+  first NUL anyway.  Both are PERSISTENT (`↦ₘ□` out of `kernel_data`), so
+  create pays nothing to produce them and nothing to get them back, and
+  dirlink's `dqn` is instantiated at `DfracDiscarded`.
+* the frame constants (80 bytes, ten slots, `name` at `s0-80 = sp+0`).
+
+### THE CONTRACT'S OTHER SHAPE DECISIONS
+
+* **No ceiling on `Sb' ∖ Sb` and no floor on `u'`.**  The ceiling would
+  have to name loop-carried block maps (S3l's recommendation, restated);
+  the floor is pointless because create's caller runs `end_op`, which
+  takes `log_op` at any count.  What the caller gets is `Sb ⊆ Sb'` and
+  `u' <= u`.
+* **`bitmap_res` comes back with NO ordering on `used'`** — create both
+  allocates (balloc under dirlink) and frees (itrunc under the fail arm's
+  iunlockput of a link-count-zero inode).  nameiparent's `used' ⊆ used`
+  and dirlink's `used ⊆ used'` cancel.
+* **`iref_slots` is spend-at-most `create_slots = 3`**: nameiparent wants
+  two and returns one, dirlookup's iget takes the second on the found arm,
+  ialloc takes one on the allocate half, dirlink is net zero but wants one
+  in hand; every iunlockput returns one, and a success arm keeps exactly
+  one out — the reference to the inode it returns.
+* **`K_create = 106`** = ten slots over nameiparent's 96 (dirlink 92,
+  dirlookup 82, iunlockput 64, ialloc 48, ilock/iupdate 44).
+* The crossing is the literal `true` (create parks), per round 12.
+
+### Gate
+
+`SpecCreate.v`, `ProofCreateParts.v`, `CreateBudget.v` each `DONE = 0`,
+zero `Error`, via `~/one5.sh` (a copy of the mirror's `one.sh` logging to
+`/tmp/one5.log`) so that S4b's `one.sh`/`full.sh` were never touched.  No
+`full.sh` was run and `_CoqProject` was not edited, per the coexistence
+rules.  `tools/lemma_diff.py --ref HEAD` over the three new files: ONE
+NEWAXIOM, the `Module Type CREATE` seal.  Nothing GONE, nothing ADMITTED,
+no `Print Assumptions` to report (no linked module was produced).
+
+### S5B'S BRIEF, IN ORDER
+
+1. The coordinator rules on finding 1 (the claim receipt +
+   `wp_ilock_fresh`) and finding 2 (`SpecDirlink`'s `inode_sized`
+   preservation).  Both are prerequisites; neither is create's to make.
+2. The budget retrofit of finding 3, bottom-up: writei's credited spend,
+   iupdate's credit, dirlink's `DIRLINK_GEN`, iput's, ialloc's gen.
+   `CreateBudget.v` is the specification of what each must achieve.
+3. Then the walk, BACK TO FRONT: the `ret` is at +0x74, a quarter into the
+   body, and six of the eight arms reach it by a backward `c.j` to +0x60.
+   Build the epilogue join (`mv a0,s3`) once, then `fail:`
+   (+0x11c..+0x132), then the two iunlockput-and-return tails (+0x76,
+   +0xc6), then the success tail at +0xbc, then walk forward from +0x00
+   into them.  `s3 = 0` is the invariant that has to survive from +0x3a
+   to +0x132.
+4. Nothing in `SpecCreate.v` moves under any of the three rulings — the
+   contract is about create's behaviour, and the three findings are about
+   what its callees are willing to say.
+
 ## The stage ladder
 
 - **S1** (agent): the DECODE stage — 13 Code files (the 12 targets +
@@ -2916,6 +3265,18 @@ to its own caller, and the opener is a premise either way.
   + ialloc + ilock's third arm + dirlink (+ the "." and ".." links on
   the mkdir path) + the found-arm early exit. Its contract's
   found/created arms mirror dirlink's.
+- **S5a** (agent) **— PARTIAL (design + spec + parts)**: `SpecCreate.v`
+  FROZEN and compiling (locked return, `proc_priv` whole, set-form
+  `log_opS`), `ProofCreateParts.v` and `CreateBudget.v` landed green.
+  THREE findings in the S5a section: (1) ilock's existential `dn` means
+  create cannot learn `di_type dn = ty` from its own ialloc — BLOCKER,
+  repaired by a region-filed claim receipt plus an additive
+  `wp_ilock_fresh`; (2) `SpecDirlink`'s post is missing S3i's
+  `inode_sized` preservation, so no dirlink result can be re-parked —
+  BLOCKER, one line; (3) the §18 gen question resolved: a
+  `log_op → log_opS` twin is necessary and NOT sufficient, the op needs
+  ABSORPTION CREDITS, and both the mkdir success arm and the late fail
+  arm close at EXACTLY `iput_units`.  No proof (S5b), no Link.
 - **S6** (agent): sys_open (create arm + open-existing arm + the
   device checks + fdalloc/filealloc) + sys_mkdir + sys_mknod +
   sys_chdir (idup/iput of cwd — inode_held swap via proc_priv).
