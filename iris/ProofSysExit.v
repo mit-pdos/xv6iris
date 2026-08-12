@@ -309,10 +309,12 @@ Section ProofSysExit.
               cov logstart dev ip dqi γkl γka
               γi cn γtl bmapstart inodestart nib size dqb dqs us
               on fn B2 (av - 4)%nat eb C b pid V
-              Hfn Hj Hgl (sex_Kke av Hav) Hgeo Heb
-              with "Hcg Hcpu Htext Hpc Hprocs Hpanic Hlk
+              Hfn Hj Hgl (sex_Kke av Hav) Hgeo
+              with "Hcg Hcpu [] [] Htext Hpc Hprocs Hpanic Hlk
                     Hft Hkl Hkav Hbio Hlog Hcrash Hcert Hdev Hgeom Hdlk Hbs
                     Hicenv Hbm Hip Hfds Hirs Hpriv").
+    { rewrite Heb /trap_csrs_ext. done. }
+    { rewrite Heb /cpu_claim_ext. done. }
   Qed.
 
 End ProofSysExit.

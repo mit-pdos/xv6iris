@@ -72,12 +72,17 @@
 
    ==== WHAT ITS CALLER MUST HOLD ======================================
 
-   [eb = true], the parking premise every function that sleeps or parks has
-   (SpecSched.v): at level 0 with an enabled base the pushing acquire hands
-   out the trap CSRs the chain payload demands.  kexit's own
+   THE TRAP-CSR COMPLEMENT [trap_csrs_ext eb] / [cpu_claim_ext eb pj], and
+   NOT [eb = true ->].  At level 0 with an enabled base the pushing acquire
+   hands out the trap CSRs the chain payload demands: kexit's own
    acquire(&wait_lock) produces that pay and the release(&wait_lock) before
-   sched() spends the SECOND acquire's, so kexit is balanced and asks the
-   caller for no [arm_pay] -- the sys_pause rule.
+   sched() spends the SECOND acquire's, so at [eb = true] kexit is balanced,
+   the complement is [emp], and it asks the caller for no [arm_pay] -- the
+   sys_pause rule.  With the base DISABLED the acquire mints nothing, and
+   the pair has to come from the caller, which is the trap.  That is what
+   lets usertrap call kexit(-1) on the paths that have not run intr_on() --
+   the whole point of the eb-generic sweep.  Nothing is handed back, because
+   kexit does not return.
 
    [is_lock γw wait_lock_addr ... wait_res] -- kexit is the second consumer
    of the parent table after kwait, and takes it exactly as kwait does.
@@ -168,8 +173,6 @@ Definition wp_kexit_sconf_body
   (K_kexit <= av)%nat ->
   (* the covered range's block-number bounds, and the log's own storage *)
   log_geom_ok cov logstart ->
-  (* the PARKING premise: everything that sleeps or parks needs it *)
-  eb = true ->
   (* THE PROCESS HAS A WORKING DIRECTORY.  [begin_op(); iput(p->cwd);] is
      unconditional in xv6 -- there is no null test -- so a caller that
      cannot exhibit one is calling iput on a null pointer.  IT IS NOT A
@@ -179,6 +182,20 @@ Definition wp_kexit_sconf_body
   sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
   cpu_own 0 eb pj C b -∗
+  (* THE TRAP-CSR COMPLEMENT, WHERE [eb = true ->] USED TO BE -- the whole
+     point of the sweep.  usertrap calls kexit(-1) on paths that have not
+     run intr_on(): the first killed(p) check runs before it, and the second
+     is reachable from the devintr and vmfault arms.  At [eb = true] both
+     conjuncts are [emp] and kexit's own acquire(&wait_lock) mints what the
+     interior sleeps need, so no existing caller gains an obligation; at
+     [eb = false] the acquire mints nothing and the pair can only have come
+     from the TRAP.
+     THERE IS NO GIVE-BACK, and that is not an oversight: kexit does not
+     return (see the header), so the pair is spent along with everything
+     else the dead process was holding.
+     See claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   (* the proc table, and the scheduler chain the park hands itself to *)
   procs_inv γs -∗

@@ -271,3 +271,140 @@ For `ProofBmap.v` this reduced a 3900-line re-derivation to 28 small conflict
 regions (~400 lines), and in essentially every one the resolution is *both
 sides*, not a choice between them. The pre-rebase sweep tip is worth keeping
 on a branch (`wip/eb-sweep-N`) precisely so this is available.
+
+## Round 14: fileclose, and where the complement must NOT live
+
+`fileclose`'s `eb = true` was not a top-level premise. It sat as a pure
+conjunct **inside** `SpecFileclose.fileclose_fs_env_nopid`, the FD_INODE /
+FD_DEVICE arm's environment bundle — which is why `SpecFileclose` greps clean
+for `eb = true ->` while still being pinned.
+
+The obvious move is to replace that conjunct in place with
+`trap_csrs_ext eb ∗ cpu_claim_ext eb p`, keeping the complement in the arm
+that actually needs it (the pipe arm never parks). **That does not work, and
+the reason is worth keeping.**
+
+`fileclose`'s crossing has to become the literal `true` — the FS arm parks
+through begin_op / iput / end_op. A `true` crossing is free for the CALLEE to
+consume at any hart; the obligation it creates is on the **caller**, which
+must supply its continuation hart-generically. Now consider kexit's loop
+closing a PIPE descriptor: `fileclose_env` hands over the pipe bundle and
+kexit **frames the FS bundle across the call**. If the complement is inside
+that framed bundle, it has to be transported to an arbitrary hart with no
+chain fact available — underivable at `eb = false`.
+
+So the complement belongs at the **top level of the contract**, handed in and
+given back on every arm, never framed:
+
+```coq
+  cpu_own n eb p C b -∗
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb p -∗
+  …
+  wp_next true p (fun CID => ∀ mr, … -∗ cpu_own n eb p C b -∗
+                                    trap_csrs_ext eb -∗ cpu_claim_ext eb p -∗ …)
+```
+
+**Rule: a resource that is hart-indexed may not live in a bundle a caller can
+FRAME across the call.** It has to be threaded — in the argument list, out in
+the continuation — so the callee re-indexes it. Check every arm, not just the
+one being generalized: the arm that does not use the resource is the one that
+frames it.
+
+### `wp_next b`'s polarity, since it is easy to get backwards
+
+`wp_next b p K = ∀ CID, ⌜b = false ∨ p = zero_reg → CID = CID0⌝ -∗ K CID`,
+and in a contract it appears as a **premise the callee consumes**, not a goal
+the callee proves.
+
+- Consuming `wp_next true p` (p ≠ zero_reg): guard vacuous, so the callee may
+  consume it at ANY hart. Cheap for the callee.
+- Consuming `wp_next false p`: guard forces `CID = CID0`, so only at the
+  entry hart.
+
+So moving a crossing `b → true` **weakens nothing for the callee and costs
+the caller**: the caller must now build its continuation hart-generically,
+which means everything it holds live across the call must be either
+hart-free, threaded through the callee, or transportable. That is the whole
+reason a crossing move ripples upward, and it is why `fileclose`'s move drags
+`sys_close`, `pipealloc` and `sys_pipe` with it.
+
+### kexit takes the complement and never gives it back
+
+`SpecKexit` has no continuation at all — kexit does not return. So its
+conversion is the simplest in the sweep: drop `eb = true ->`, add the two
+premises after `cpu_own`, and add nothing to any postcondition. The pair is
+spent along with everything else the dead process was holding.
+
+### `Hebf`: the bridge from an `eb`-indexed guard to a `b`-indexed chain
+
+The complement's transports have an **`eb`-indexed** guard —
+`trap_csrs_ext_transport CID0 CID1 eb p` wants `eb = false ∨ p = zero_reg →
+CID1 = CID0` — while every chain fact a straight-line stretch produces is
+**`b`-indexed**. `wp_next_chain` cannot bridge that on its own: its
+mixed-index fallback discriminates a literal `true = false`, and `b = false`
+with `b` a variable is not discriminable, so it fails in *both* branches.
+
+One fact bridges it, and it is available in any function that holds both
+halves, at ANY nesting depth:
+
+```coq
+  iDestruct (sie_b_agree m n K eb b p C with "Hcg Hcnt") as %Houtb.
+  (* Houtb : b = match n with O => eb | S _ => false end *)
+  assert (Hebf : eb = false -> b = false)
+    by (intro Hx; rewrite Houtb Hx; by destruct n).
+```
+
+`eb = false` forces `b = false` whether or not a lock is held, so the `eb`
+guard reduces to the `b` one and the ordinary chain closes it. Note this is
+strictly more than `CpuOwn.cpu_own_eb_agree`, which gives `eb = b` but only
+at level 0; `Hebf` is the one direction that survives nesting, and nesting is
+exactly where a lock-holding function needs it.
+
+`ProofFileclose.v` wraps the reduction in a two-argument
+`Local Ltac ext_chain Hf Bv` (taking `Hebf` and the proof's `b` by name, so
+it still works inside an arm that has substituted `n` and `p`). Every
+remaining function that carries the complement past a callee which does not
+thread it will hit this; lift the tactic rather than re-deriving it.
+
+**Where the spans go.** Never let a complement transport cross a park. In an
+arm that never parks, one wide hop from the entry hart covers the whole arm
+(fileclose's fast path, its pipe arm and its FD_NONE arm each take exactly
+one, spanning acquire / release / pipeclose, all of which cross at `b`). In
+an arm that parks, use matched-span hops beside each `cpu_own_transport`,
+between the parking calls — across a `wp_next true` crossing the `eb` guard
+is genuinely underivable at `eb = false`, which is precisely why the sleeping
+callees thread the pair instead of letting the caller frame it.
+
+### A local continuation bundle must TAKE the pair, not capture it
+
+`ProofPipealloc`'s three block continuations (`EPI`, `T8`, `T4C`) and
+`ProofSysPipe`'s `sp_close2` are proof-file `Definition`s wrapping a
+`wp_next`. Each used to close over the resources it would hand back. Once the
+crossing moves to `true` that stops being provable, for the same reason a
+caller may not FRAME the complement: a bundle built at the entry hart cannot
+transport a hart-indexed resource to the arbitrary hart it is later consumed
+at. Each must take the pair as an explicit argument and hand it back in its
+own continuation — the same in-and-out threading the public contracts use.
+
+This is the local-bundle form of the Round 14 rule. When a crossing moves,
+audit every `*_cont` / `*_exit` / named block continuation in the file for
+captured hart-indexed state, not just the public contract.
+
+### `Hebf` again, and the level-0 shortcut that is NOT always available
+
+Two agents converging on the same bridge independently is worth recording.
+Where the contract pins the push_off level, `CpuOwn.cpu_own_eb_agree` gives
+the strong fact `eb = b` and a `rewrite` at the transport guards is enough:
+
+- `sys_pipe` — `cpu_own 0%nat` is literal, so `eb = b` directly.
+- `sys_close` — `n` is a parameter, but `fileclose_fs_env` carries `⌜n = 0⌝`;
+  extract it (`iAssert ⌜n = 0⌝ as %Hn0`) and the same shortcut applies.
+- `pipealloc` — **`n` is free and nothing pins it, so `eb = b` is simply not
+  available.** Fall back to the weak direction, which holds at every level:
+  `eb = false -> b = false`. It is exactly enough to weaken the `eb`-guard
+  into the `b`-guard, and it is what `ProofFileclose`'s `ext_chain` and
+  `ProofPipealloc`'s local `Ltac ext_chain Hbf` both package.
+
+Prefer the weak form when writing new code: it needs no premise about the
+nesting level and works in both situations.

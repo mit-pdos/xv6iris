@@ -113,6 +113,17 @@ Definition wp_sys_close_sconf_body
   (sys_close_stack <= av)%nat ->
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b -∗
+  (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true], so no existing
+     call site changes; at [eb = false] the real pair, which can only have
+     come from the TRAP.  sys_close mints nothing itself -- it holds no lock
+     whose acquire would -- so it is a pure PASS-THROUGH to fileclose, whose
+     FS arm parks through begin_op / iput / end_op and needs it there.  It
+     has to be threaded rather than framed: fileclose's crossing is the
+     literal [true], so a hart-indexed resource held across the call could
+     not be transported to the arbitrary hart it may return on.  See
+     claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   is_ftable γl γf -∗
   panic_wp_any -∗
@@ -125,11 +136,18 @@ Definition wp_sys_close_sconf_body
      smaller: closing an inode file writes the disk and sleeps. *)
   fileclose_pipe_env fn on n -∗
   fileclose_fs_env fn us n eb p -∗
-  wp_next b p (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  sys_close calls fileclose,
+     whose FD_INODE / FD_DEVICE arm parks, so sys_close can return on another
+     hart whatever SIE was doing.  The cost is the CALLER's: it must supply
+     its continuation hart-generically (WpNext.wp_next's guard is vacuous at
+     [true], so consuming it here is free).  *)
+  wp_next true p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf av b p -∗
       cpu_own n eb p C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb p -∗
       pc_is ret_tgt -∗
       sys_close_post γf p pid V v (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       (* the whole environment back: the page count may have moved (the

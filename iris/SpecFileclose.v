@@ -338,7 +338,15 @@ Section SpecFileclose.
      one call. *)
   Definition fileclose_fs_env_nopid (fn : fclose_names) (us : gset Z)
       (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
-    (⌜(n = 0)%nat⌝ ∗ ⌜eb = true⌝ ∗ ⌜p = proc_addr (fcn_j fn)⌝ ∗
+    (* [⌜eb = true⌝] USED TO BE HERE, and is now the TOP-LEVEL complement
+       on [wp_fileclose_sconf_body] instead.  It cannot live in this bundle:
+       a caller closing a PIPE descriptor frames the FS bundle across the
+       call rather than handing it over, and fileclose's crossing is the
+       literal [true] on every arm -- so anything hart-indexed left in here
+       would have to be transported to an arbitrary hart with no chain fact
+       to do it with.  The complement is handed in and given back on EVERY
+       arm instead.  See claude-notes/projects/eb-generic-sweep.md. *)
+    (⌜(n = 0)%nat⌝ ∗ ⌜p = proc_addr (fcn_j fn)⌝ ∗
      ⌜(fcn_j fn < NPROC)%nat⌝ ∗
      ⌜fcn_procs fn !! fcn_j fn = Some (fcn_plock fn)⌝ ∗
      ⌜log_geom_ok (fcn_cov fn) (fcn_logstart fn)⌝ ∗
@@ -429,7 +437,7 @@ Section SpecFileclose.
     fileclose_fs_env fn us n eb p -∗ fileclose_fs_out fn us.
   Proof.
     rewrite /fileclose_fs_env /fileclose_fs_env_nopid /fileclose_fs_out.
-    iIntros "[(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+    iIntros "[(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
                Hbs & _ & Hbm) Hpid]".
     iSplitL "Hpid"; [iExact "Hpid"|].
     iSplitL "Hbs"; [iExact "Hbs"|].
@@ -483,12 +491,12 @@ Section SpecFileclose.
     □ (fileclose_fs_out fn us -∗ ∃ us', fileclose_fs_env fn us' n eb p).
   Proof.
     rewrite /fileclose_fs_env /fileclose_fs_env_nopid /fileclose_fs_out.
-    iIntros "[(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & #Hpr & #Hbio & #Hlog &
+    iIntros "[(%H1 & %H2 & %H3 & %H4 & %H5 & #Hpr & #Hbio & #Hlog &
                #Hseam & #Hcert & #Hdev & #Hgeom & #Hdlk & Hbs & #Hic & Hbm)
               Hpid]".
     iSplitL "Hbs Hpid Hbm".
     { iSplitR "Hpid"; [| iExact "Hpid"].
-      do 6 (iSplitR; [iPureIntro; assumption|]).
+      do 5 (iSplitR; [iPureIntro; assumption|]).
       (* Split STRUCTURALLY before framing, front to back -- a named [iFrame]
          still walks the whole goal per hypothesis (measured ~7 s a side
          here); [iSplitL]/[iExact] name both sides, so nothing is
@@ -505,7 +513,7 @@ Section SpecFileclose.
       iSplitR; [iExact "Hic"|]. iExact "Hbm". }
     iModIntro. iIntros "(Hpid & Hbs & %us' & _ & Hbm)".
     iExists us'. iSplitR "Hpid"; [| iExact "Hpid"].
-    do 6 (iSplitR; [iPureIntro; assumption|]).
+    do 5 (iSplitR; [iPureIntro; assumption|]).
     iSplitL "Hpr"; [iExact "Hpr"|].
     iSplitL "Hbio"; [iExact "Hbio"|].
     iSplitL "Hlog"; [iExact "Hlog"|].
@@ -619,15 +627,36 @@ Definition wp_fileclose_sconf_body
   m !!! Regidx (mword_of_int 10 : mword 5) = fnode k ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b -∗
+  (* THE TRAP-CSR COMPLEMENT, ON EVERY ARM.  [emp] at [eb = true], where
+     fileclose's own acquire mints what the FS arm's interior sleeps need;
+     the real pair at [eb = false], where the acquire mints nothing and it
+     can only have come from the TRAP.  Top-level rather than inside
+     [fileclose_fs_env] -- see that bundle's banner for why the FS arm is
+     the wrong home for it.  See
+     claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb p -∗
   kernel_text -∗ pc_is pcE -∗
   is_ftable γfl γf -∗
   panic_wp_any -∗
   file_ref γf k q Cf -∗
   fileclose_env fn on us n eb p Cf -∗
-  wp_next b p (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  The FD_INODE / FD_DEVICE
+     arm parks (begin_op / iput / end_op), so fileclose can return on
+     another hart whatever SIE was doing.  It used to say [b], which was
+     VACUOUS rather than wrong: the FS bundle carried [⌜eb = true⌝], so
+     [CpuOwn.cpu_own_eb_agree] forced [b = true] on the only arm that could
+     park.  Dropping that premise is exactly what makes the two spellings
+     differ.  (The fast path and the pipe arm do not migrate, and neither
+     is harmed: a [true] crossing is FREE to consume at any hart -- the
+     obligation it adds is on the CALLER, which must supply its
+     continuation hart-generically.) *)
+  wp_next true p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b p -∗
     cpu_own n eb p C b -∗
+    trap_csrs_ext eb -∗
+    cpu_claim_ext eb p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     fd_slot -∗
