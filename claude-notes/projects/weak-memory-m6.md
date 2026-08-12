@@ -871,8 +871,22 @@ Sail machine instantiates (exactly D-M6-5's rationale (2)):
       the tee-up §2(a)) transported through Layer 1 (premise from Layer 2)
       to `weak_system_adequacy`'s promise-free reducibility; stated so the
       promise-free machine visibly becomes scaffolding.
-- [ ] `WeakSailLTS.v` per the design block above (can start any time —
-      reads only existing files).
+- [x] **`WeakSailLTS.v` LANDED (977 lines, 2026-08-12):** `psail`/
+      `sail_step` (a `Definition` by match, mirroring `wrun`'s
+      dependent-outcome idiom — an Inductive would fight the outcome
+      types), the fused-RMW arm with a GENERAL silent prefix
+      (`silent_run`), fence.tso split via a parked `sp_fence` that
+      gates every arm, `sail_lat_free` + `sail_ts_oblivious(_rmw)` by
+      construction, and the ⇒ bracket against `wp_pf_step`
+      (`wrun_sail_bracket` / `sail_instr_bracket(_single)`) under
+      `sail_shaped` (= no coherent reads + nz write widths + AMO
+      pairing; dead-arm exclusions for rv64d).  Only
+      `sail_instr_bracket` carries rv64d's baseline axioms (via
+      `riscv_step`); everything else closed.  Scoped out and recorded
+      in its header: the ⇐ direction (composition needs only ⇒; ⇐
+      would need silent-prefix determinism) and the
+      `wprim_step`/`wgstate` multi-hart lift (composition file's
+      job).
 - [ ] Final `Print Assumptions` diff: baseline axioms + MMIO-ordering +
       no-icache; the store-reordering assumption RETIRED, replaced by the
       D-M6-3 correspondence note at the PARM seam.
