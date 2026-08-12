@@ -868,6 +868,7 @@ ProofWriteiParts.v
 ProofWritei.v
 WeakMem.v
 WeakLitmus.v
+WeakLitmusProj.v
 WeakPromise.v
 WeakPromiseLitmus.v
 WeakPromiseFact.v
@@ -876,11 +877,14 @@ WeakRobust.v
 WeakRobustTrace.v
 WeakRobustGraph.v
 WeakRobustAcyc.v
+WeakRobustSer.v
 WeakRobustLin.v
+WeakRobustProv.v
 WeakAxiomatic.v
 WeakAxiomatic2.v
 WeakAxiomatic3.v
 WeakInterp.v
+WeakInterpProj.v
 WeakLang.v
 WeakGhost.v
 WeakExec.v
