@@ -273,10 +273,21 @@ walks *past* and RETURNS the last one — so a successful lookup of an
 depend on the `ok` flag (`L * iput_units` on success, `(L+1) * iput_units` on
 failure) gives `n' ≥ 10 - 6 = 4 ≥ 3` at `L = 2` and the composition closes.
 
+**This bounds what the theorem COVERS, not whether it can be proved.** The
+short-path case — `/init`, `sh` — is fully provable today, is what every boot
+path takes, and needs no change to anything. Do not treat blocker 3 as
+gating the `ProofKexec` work; it is not.
+
 `SpecKexec` states the premise in the CONSTANTS
-(`(L + 1) * iput_units + iput_units <= MAXOPBLOCKS`) rather than as `L ≤ 1`,
-precisely so that it relaxes on its own the day namei's success arm is
-tightened. **Do not** hard-code `L ≤ 1`.
+(`(L + 1) * iput_units + iput_units <= MAXOPBLOCKS`) rather than as `L ≤ 1`.
+**Do not** hard-code `L ≤ 1` — but note the relaxation is *not* automatic:
+after namei's success arm is tightened, that premise is merely *stronger* than
+the composition needs, so `ProofKexec` keeps compiling while still admitting
+only `L ≤ 1`, and widening to `L ≤ 2` is a one-line edit to it. To make it
+automatic, name namei's charge in `SpecNamei.v` — a `namei_charge L` that both
+its premise (`:136`) and its postcondition (`:182`) are stated over — and quote
+that name from `SpecKexec`. Worth folding into the fs-namei fix; not worth a
+separate sweep.
 
 ## What is NOT blocked
 

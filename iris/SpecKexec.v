@@ -91,11 +91,19 @@
      SpecNamei charges [(L+1) * iput_units] and guarantees only
      [n - (L+1)*iput_units] left; SpecIunlockput demands [iput_units].  With
      [iput_units = 3] that is [3L + 6 <= 10], i.e. L <= 1 path elements --
-     enough for "/init" and "sh", not for "/bin/sh".  The premise is stated
-     in the CONSTANTS rather than as [L <= 1] so that it relaxes on its own
-     when SpecNamei's SUCCESS arm is tightened to charge [L * iput_units]
-     (namex iputs the parents, not the inode it returns), which is the fix
-     this premise is waiting on and which belongs to the fs-namei project.
+     enough for "/init" and "sh", not for "/bin/sh".  THAT IS A BOUND ON WHAT
+     THE THEOREM COVERS, NOT ON WHETHER IT CAN BE PROVED: the short-path case
+     is fully provable today and is the one every boot path takes.
+       The premise is stated in the CONSTANTS rather than as [L <= 1] so that
+     it stays readable against the fix it is waiting on -- tightening
+     SpecNamei's SUCCESS arm to charge [L * iput_units], since namex iputs the
+     parents and RETURNS the last inode.  Note the relaxation is NOT automatic:
+     after that fix this premise is merely STRONGER than the composition needs,
+     so the proof keeps working but still admits only L <= 1, and widening to
+     L <= 2 is a one-line edit here.  Making it automatic would mean naming
+     namei's charge in SpecNamei.v (a [namei_charge L] both its premise and its
+     postcondition are stated over) and quoting that name here; worth doing as
+     part of the fs-namei fix, not before it.
 
    * [na <= MAXARG]: the argument-count bound the C enforces with its
      [bne s1,s8] against 32.  Above it the function takes [bad:], which is
