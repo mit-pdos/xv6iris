@@ -1,6 +1,42 @@
-# The walk's racy leaf: the peel/bridge split (OPEN ISSUE)
+# The walk's racy leaf: the peel/bridge split (DECIDED: option (a))
 
-**Status (2026-08-12): BLOCKED on a design decision, analysis complete, no
+**DECISION (2026-08-12, the φ-upgrade author, as §5 requested): take
+option (a), and do NOT start until the in-flight C/D/S points-to surgery
+lands.**  Rationale beyond §4's (which stands):
+
+- **Under C/D/S a translation is not a racy-window consumer at all.**
+  The PTE bytes' wlat elements live in the kpt/proc-pt resources as
+  CLEAN fragments (the surgery leaves `wlat_pointsto`'s meaning
+  unchanged), and BOTH of the walk's reads — plain-stale and
+  exclusive-latest — discharge the φ obligation through the clean arm
+  of the new load trichotomy (clean element ⟹ clean-purity ⟹ every
+  WCplain message on the byte is published ⟹ no violation whichever
+  timestamp is read).  The patched-`exec` bridge and the sync-token
+  racy rules are for genuine single-occurrence racy windows (`started`);
+  the walk fits neither, so (b)/(c) would weld walk handling into
+  machinery whose premises the surgery and the upcoming site-predicate
+  work keep churning.  (a) is the only shape CONSISTENT with the φ
+  upgrade, not merely the smallest.
+- **The two-reads divergence is absorbed for the same reason M6's
+  SCexcl arm worked**: the translation's result is a function of the
+  coherence-latest PTE (the stale first read only decides whether the
+  CAS fires; the CAS re-reads the latest), which is what the absorption
+  theorem already states off the canonical tree — a structure-only peel
+  with no patched-`exec` conclusion is sound and sufficient.
+- **Sequencing**: (a) is additive and design-independent of the
+  surgery, but the surgery's agent is editing `WeakRacy.v`/`WeakKpt.v`/
+  the started cone RIGHT NOW — wait for it to land (file conflicts, not
+  design).  §5's caution on (b)/(c) stands permanently.
+- **New obligation inherited from C/D/S — put it on the walk worklist:**
+  kernel PTE STORES are WCplain and come out DIRTY; their publication
+  points are the boot `started` release (kernel table) and the
+  scheduler/lock releases that migrate a user table's process — the
+  FLIP BUNDLES at those release sites must include the PTE bytes, after
+  which the kpt/proc-pt invariants hold the elements clean, which is
+  exactly what the walker's clean-fragment reads consume.  General port
+  recipe, no walker special-case.
+
+**Original status (2026-08-12): BLOCKED on a design decision, analysis complete, no
 code owed until the decision is taken.** This is 6a's last item — the S-mode
 fetch-chain restatement — and it is the gate on 6b/6c and therefore on every
 real S-mode weak proof.
