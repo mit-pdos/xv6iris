@@ -1117,6 +1117,13 @@ Section rule.
     acc_wf pc 4 ->
     acc_wf ra rn ->
     wracy_cert (fin_to_nat cpu_id) pc ra rn rak Φ P Q ->
+    (* φ-upgrade, deliverable A: THE RACY WINDOW IS SYNC.  Persistent, and
+       not consumed by the proof below — it is what §C's violation-freedom
+       preservation reads at this rule ([WeakGhost.wcds_sync]: a sync byte
+       carries no [WCplain] message at all, so a racy read of it can observe
+       no unpublished owned store), and it is stated here so that the rule's
+       INTERFACE already carries the obligation. *)
+    sync_win ra rn -∗
     (∀ σ, wmstate_interp σ ={⊤,∅}=∗
        ⌜register_lookup PC (wm_regs σ) = pc⌝ ∗
        ⌜∀ j : nat, (j < 4)%nat → pinned_read σ (acc_addr pc j)⌝ ∗
@@ -1135,7 +1142,7 @@ Section rule.
                      WWP Loop)) -∗
     WWP Loop.
   Proof.
-    iIntros (Hgid Haccpc Hracc Hcert) "H".
+    iIntros (Hgid Haccpc Hracc Hcert) "#Hsync H".
     iApply (wp_wrun_step with "[H]"); [exact Hgid|].
     iIntros (σ) "Hσ".
     iDestruct "Hσ" as "(%Hbnd & %Hwf & Hrest)".
@@ -1204,6 +1211,8 @@ Section rule.
     acc_wf ra rn ->
     ak_coh rak = false ->
     wracy_cert (fin_to_nat cpu_id) pc ra rn rak Φ P Q ->
+    (* φ-upgrade, deliverable A — see [wp_wracy_load]. *)
+    sync_win ra rn -∗
     (∀ σ, wmstate_interp σ ={⊤,∅}=∗
        ⌜register_lookup PC (wm_regs σ) = pc⌝ ∗
        ⌜∀ j : nat, (j < 4)%nat → pinned_read σ (acc_addr pc j)⌝ ∗
@@ -1227,7 +1236,7 @@ Section rule.
                      WWP Loop)) -∗
     WWP Loop.
   Proof.
-    iIntros (Hgid Haccpc Hracc Hakc Hcert) "H".
+    iIntros (Hgid Haccpc Hracc Hakc Hcert) "#Hsync H".
     iApply (wp_wrun_step with "[H]"); [exact Hgid|].
     iIntros (σ) "Hσ".
     iDestruct "Hσ" as "(%Hbnd & %Hwf & Hrest)".

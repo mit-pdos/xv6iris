@@ -81,6 +81,7 @@ Require Import WeakMem.
 Require Import WeakInterp.
 Require Import WeakLang.
 Require Import WeakGhost.
+Require Import WeakViolation.
 Require Import WeakBridge.
 Require Import WeakView WeakVProp WeakFence.
 Require Import WeakInstr.
@@ -521,6 +522,203 @@ Proof. apply flr_ws_le, weffs_ws_le. Qed.
 Lemma weffs_view_mono tid s es (V : view) :
   V ⊑ ws_view (wm_ws s) -> V ⊑ ws_view (wm_ws (weffs tid s es)).
 Proof. intros HV. etrans; [exact HV|]. apply ws_view_mono, weffs_ws_le. Qed.
+
+(* ====================================================================== *)
+(** ** 5b. THE COHERENCE FOOTPRINT of a trace (φ-upgrade, deliverable C)
+
+    THE MACHINE-LEVEL FACT the violation-freedom conjunct needs and that the
+    tree did not have: a step raises a hart's [WeakMem.coh] ONLY at the bytes
+    its effect trace names.  Everything else about φ's preservation is either
+    pure ([WeakViolation] §2) or a reading of the mover's own C/D/S fragment
+    ([WeakViolation] §3); this is the one piece that has to come from the
+    interpreter, and the effect trace is where it can be said, because
+    [WeakCert.wstep_cert_eff] pins the successor's [wstate] to
+    [WeakCert.weffs] on the nose.
+
+    WHY IT IS INDISPENSABLE.  [WeakInstr.wstep_post] carries only
+    [WeakMem.ws_le] about the successor's views, and monotonicity alone does
+    not bound the RISE at an untouched byte — while [WeakMem.load_post_at]
+    absorbs the whole pre-view [vpre] into [coh] at every byte it reads, so
+    a floor really can jump arbitrarily far at a byte the step touches.  With
+    the frame below, "which bytes may have jumped" is decidable from the
+    trace, and [WeakViolation.nv_hart_coh_step] turns the obligation into one
+    [nv_byte] per touched byte — which is exactly what a leaf can pay from
+    the points-to / sync witness it already holds for its own window. *)
+
+Definition weff_touches (e : weff) (a : Z) : Prop :=
+  match e with
+  | WEread _ pa n => exists j : nat, (j < N.to_nat n)%nat /\ a = acc_addr pa j
+  | WEwrite _ pa n _ => exists j : nat, (j < N.to_nat n)%nat /\ a = acc_addr pa j
+  | WEbar _ => False
+  end.
+
+Definition weffs_touch (es : list weff) (a : Z) : Prop :=
+  exists e, e ∈ es /\ weff_touches e a.
+
+(** Both are DECIDABLE — a window is an interval, and a trace is a list —
+    which is what lets the frame below be used in the contrapositive
+    direction without any classical reasoning. *)
+Global Instance weff_touches_dec (e : weff) (a : Z) : Decision (weff_touches e a).
+Proof.
+  assert (Hiv : forall (pa : Arch.pa) (n : N),
+            Decision (exists j : nat, (j < N.to_nat n)%nat /\ a = acc_addr pa j)).
+  { intros pa n.
+    destruct (decide (pa_z pa <= a /\ a < pa_z pa + Z.of_nat (N.to_nat n)))
+      as [[Hlo Hhi]|Hno].
+    - left. exists (Z.to_nat (a - pa_z pa)). rewrite /acc_addr. split; lia.
+    - right. intros (j & Hj & Heq). apply Hno. rewrite /acc_addr in Heq. lia. }
+  destruct e as [ak pa n|ak pa n v|b]; simpl; [apply Hiv|apply Hiv|right; tauto].
+Qed.
+
+Global Instance weffs_touch_dec (es : list weff) (a : Z)
+    : Decision (weffs_touch es a).
+Proof.
+  induction es as [|e es IH].
+  - right. intros (e & He & _). by apply elem_of_nil in He.
+  - destruct (decide (weff_touches e a)) as [H|H].
+    + left. exists e. split; [apply elem_of_list_here|exact H].
+    + destruct IH as [IH|IH].
+      * left. destruct IH as (e' & He' & Hp). exists e'.
+        split; [by apply elem_of_list_further|exact Hp].
+      * right. intros (e' & He' & Hp).
+        apply elem_of_cons in He' as [->|He']; [by apply H|].
+        apply IH. by exists e'.
+Qed.
+
+(** The two per-byte frames, off [WeakMem.coh_upd_ne]. *)
+Lemma coh_load_post_at_ne ws aq vpre a' t a :
+  a <> a' -> coh (load_post_at ws aq vpre a' t) a = coh ws a.
+Proof. intros Hne. rewrite /load_post_at /coh /= lookup_insert_ne //. Qed.
+
+Lemma coh_store_post_ne ws rl a' t a :
+  a <> a' -> coh (store_post ws rl a' t) a = coh ws a.
+Proof. intros Hne. rewrite /store_post /coh /= lookup_insert_ne //. Qed.
+
+Lemma coh_foldl_load_ne (aq : bool) (vpre : nat) (ats : list (Z * nat)) (a : Z) :
+  (forall p, p ∈ ats -> a <> p.1) ->
+  forall w, coh (foldl (fun w at_ => load_post_at w aq vpre at_.1 at_.2) w ats) a
+            = coh w a.
+Proof.
+  induction ats as [|at_ ats IH]; intros Hno w; [reflexivity|].
+  simpl. rewrite IH; [|intros p Hp; apply Hno; by apply elem_of_list_further].
+  apply coh_load_post_at_ne, Hno, elem_of_list_here.
+Qed.
+
+Lemma coh_load_post_bytes_ne ws aq ats a :
+  (forall p, p ∈ ats -> a <> p.1) -> coh (load_post_bytes ws aq ats) a = coh ws a.
+Proof. intros Hno. by apply coh_foldl_load_ne. Qed.
+
+Lemma coh_foldl_store_ne (rl : bool) (as_ : list Z) (t : nat) (a : Z) :
+  (forall z, z ∈ as_ -> a <> z) ->
+  forall w, coh (foldl (fun w z => store_post w rl z t) w as_) a = coh w a.
+Proof.
+  induction as_ as [|z as_ IH]; intros Hno w; [reflexivity|].
+  simpl. rewrite IH; [|intros z' Hz'; apply Hno; by apply elem_of_list_further].
+  apply coh_store_post_ne, Hno, elem_of_list_here.
+Qed.
+
+Lemma coh_store_post_bytes_ne ws rl as_ t a :
+  (forall z, z ∈ as_ -> a <> z) -> coh (store_post_bytes ws rl as_ t) a = coh ws a.
+Proof. intros Hno. by apply coh_foldl_store_ne. Qed.
+
+(** ... and the two contiguous instances, at the [acc_addr] spelling of a
+    window that both [WeakInterp.wread_post] and [wwrite_post] use. *)
+Lemma coh_load_post_run_ne ws aq (pa : Arch.pa) (ts : list nat) (a : Z) :
+  (forall j : nat, (j < length ts)%nat -> a <> acc_addr pa j) ->
+  coh (load_post_run ws aq (pa_z pa) ts) a = coh ws a.
+Proof.
+  intros Hno. rewrite /load_post_run. apply coh_load_post_bytes_ne.
+  intros p Hp. apply elem_of_zip_with in Hp as (j & t & -> & Hj & _).
+  apply elem_of_seq in Hj as [_ Hj]. simpl.
+  apply (Hno j). lia.
+Qed.
+
+Lemma coh_store_post_run_ne ws rl (pa : Arch.pa) (n : nat) (t : nat) (a : Z) :
+  (forall j : nat, (j < n)%nat -> a <> acc_addr pa j) ->
+  coh (store_post_run ws rl (pa_z pa) n t) a = coh ws a.
+Proof.
+  intros Hno. rewrite /store_post_run. apply coh_store_post_bytes_ne.
+  intros z Hz. apply elem_of_list_fmap in Hz as (j & -> & Hj).
+  apply elem_of_seq in Hj as [_ Hj]. apply (Hno j). lia.
+Qed.
+
+(** THE FRAME, per effect and then along a whole trace. *)
+Lemma weff_apply_coh_frame tid s e a :
+  ¬ weff_touches e a -> coh (wm_ws (weff_apply tid s e)) a = coh (wm_ws s) a.
+Proof.
+  destruct e as [ak pa n|ak pa n v|b]; intros Hno.
+  - rewrite weff_apply_read /wread_post. destruct (ak_coh ak); [reflexivity|].
+    rewrite /wset_ws /=. apply coh_load_post_run_ne.
+    intros j Hj Heq. apply Hno. exists j.
+    split; [by rewrite coh_ts_length in Hj|exact Heq].
+  - rewrite weff_apply_write /wwrite_post /=. apply coh_store_post_run_ne.
+    intros j Hj Heq. apply Hno. by exists j.
+  - rewrite weff_apply_bar /wset_ws /= /barrier_post. by destruct b.
+Qed.
+
+Lemma weffs_coh_frame tid s es a :
+  ¬ weffs_touch es a -> coh (wm_ws (weffs tid s es)) a = coh (wm_ws s) a.
+Proof.
+  revert s. induction es as [|e es IH]; intros s Hno; [reflexivity|].
+  rewrite weffs_cons IH.
+  - apply weff_apply_coh_frame. intros Ht. apply Hno.
+    exists e. split; [apply elem_of_list_here|exact Ht].
+  - intros (e' & He' & Ht). apply Hno. exists e'.
+    split; [by apply elem_of_list_further|exact Ht].
+Qed.
+
+(** THE LOG SIDE: every message a trace appends carries the runner's own tid
+    ([WeakInterp.wwrite_msg] stamps the interpreter's [tid] parameter), which
+    is what makes a hart's own stores free for its own violation-freedom
+    obligation ([WeakViolation.nv_hart_app_own]). *)
+Lemma weffs_log_own tid s es :
+  exists ms, wm_log (weffs tid s es) = (wm_log s ++ ms)%list /\
+             (forall m, m ∈ ms -> wm_tid m = tid).
+Proof.
+  revert s. induction es as [|e es IH]; intros s.
+  - exists []. rewrite weffs_nil app_nil_r. split; [reflexivity|].
+    intros m Hm. by apply elem_of_nil in Hm.
+  - destruct (IH (weff_apply tid s e)) as (ms2 & Hms2 & Hown2).
+    assert (Hstep : exists ms1, wm_log (weff_apply tid s e)
+                                = (wm_log s ++ ms1)%list /\
+                                (forall m, m ∈ ms1 -> wm_tid m = tid)).
+    { destruct e as [ak pa n|ak pa n v|b].
+      - exists []. rewrite weff_apply_read wread_post_log app_nil_r.
+        split; [reflexivity|]. intros m Hm. by apply elem_of_nil in Hm.
+      - exists [wwrite_msg tid (wm_class_of ak (wm_ws s)) pa n v].
+        rewrite weff_apply_write /wwrite_post /=. split; [reflexivity|].
+        intros m Hm. apply elem_of_list_singleton in Hm as ->. reflexivity.
+      - exists []. rewrite weff_apply_bar app_nil_r.
+        split; [reflexivity|]. intros m Hm. by apply elem_of_nil in Hm. }
+    destruct Hstep as (ms1 & Hms1 & Hown1).
+    exists (ms1 ++ ms2)%list. rewrite weffs_cons Hms2 Hms1 -app_assoc.
+    split; [reflexivity|]. intros m Hm.
+    apply elem_of_app in Hm as [Hm|Hm]; [by apply Hown1|by apply Hown2].
+Qed.
+
+(** THE LEAF-FACING COMBINATOR, and the point of the whole section: a leaf's
+    violation-freedom obligation reduces to ONE [WeakViolation.nv_byte] per
+    byte of its own effect trace — which is precisely what
+    [WeakViolation.nv_byte_of_pointsto] / [_of_own_st] / [_of_sync] read off
+    the resources the leaf already holds for its window (and, for the FETCH,
+    what [WeakFunnel.winstr_flat]'s "the text is unwritten" gives for free:
+    a byte no message writes satisfies [nv_byte] vacuously). *)
+Lemma nv_hart_weffs (c : CPU) (s : wmstate) (es : list weff) :
+  nv_hart (wm_log s) c (wm_ws s) ->
+  (forall a : Z, weffs_touch es a ->
+     nv_byte (wm_log (weffs (Some (fin_to_nat c)) s es)) c a
+             (coh (wm_ws (weffs (Some (fin_to_nat c)) s es)) a)) ->
+  nv_hart (wm_log (weffs (Some (fin_to_nat c)) s es)) c
+          (wm_ws (weffs (Some (fin_to_nat c)) s es)).
+Proof.
+  intros Hnv Htouch.
+  destruct (weffs_log_own (Some (fin_to_nat c)) s es) as (ms & Hms & Hown).
+  rewrite Hms. apply (nv_hart_coh_step _ c (wm_ws s)).
+  - by apply nv_hart_app_own.
+  - intros a Hlt. rewrite -Hms. apply Htouch.
+    destruct (decide (weffs_touch es a)) as [Ht|Ht]; [exact Ht|exfalso].
+    rewrite (weffs_coh_frame (Some (fin_to_nat c)) s es a Ht) in Hlt. lia.
+Qed.
 
 (** *** 6a. A memory-effect-free instruction (branch / jump / ALU)
 

@@ -831,6 +831,203 @@ Section store.
     iPureIntro. intros j Hj. exact (proj2 (Hall j Hj)).
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (** *** 4d. THE SYNC ALTITUDE — [wlat4_sync] (φ-upgrade, deliverable A)
+
+      A byte the kernel RACY-READS (the [started] flag) has to be in the S
+      state, or [WeakRacy]'s load rules cannot be given their new
+      [WeakGhost.sync_win] premise.  S is entered by DISCARDING the state
+      element, so the four-byte bundle for such a word is:
+
+        the four VALUE elements at full fraction — a store still consumes
+        and retargets them — plus the four PERSISTENT sync witnesses, which
+        it does not.
+
+      What the S state buys is exactly what the racy rules need and what
+      §C's preservation reads: [WeakGhost.wcds_sync] says NO [WCplain]
+      message ever writes the byte, so no racy read of it can observe an
+      unpublished owned store.  And it is self-enforcing: a plain store
+      needs the full-fraction state element, which a sync byte does not
+      have ([WeakGhost.wcds_el_sync_excl]), so the only stores that can
+      reach the word are the non-plain ones — precisely the class
+      [wlat4_store_prim] already requires. *)
+
+  Definition wlat4_el (a : Arch.pa) (dq : dfrac) (t : nat) (w : bv 32)
+      : iProp Σ :=
+    (wlat_elem (acc_addr a 0) dq t (nth_byte w 0) ∗
+     wlat_elem (acc_addr a 1) dq t (nth_byte w 1) ∗
+     wlat_elem (acc_addr a 2) dq t (nth_byte w 2) ∗
+     wlat_elem (acc_addr a 3) dq t (nth_byte w 3))%I.
+
+  Lemma wlat4_el_of_wlat4 (a : Arch.pa) (dq : dfrac) (t : nat) (w : bv 32) :
+    wlat4 a dq t w -∗ wlat4_el a dq t w.
+  Proof.
+    rewrite /wlat4 /wlat4_el /wlat_pointsto.
+    iIntros "([H0 _] & [H1 _] & [H2 _] & [H3 _])". iFrame "H0 H1 H2 H3".
+  Qed.
+
+  Definition wlat4_sync (a : Arch.pa) (t : nat) (w : bv 32) : iProp Σ :=
+    (wlat4_el a (DfracOwn 1) t w ∗ sync_win a 4)%I.
+
+  Lemma wlat4_sync_win (a : Arch.pa) (t : nat) (w : bv 32) :
+    wlat4_sync a t w -∗ sync_win a 4.
+  Proof. iIntros "[_ #$]". Qed.
+
+  (** The elementwise reading, the twin of [WeakStarted.wlat4_latest_val]
+      over the bare elements. *)
+  Lemma wlat4_el_latest_val (img : _) (log : list wmsg) (a : Arch.pa)
+      (dq : dfrac) (t : nat) (w : bv 32) :
+    wlat_interp img log -∗ wlat4_el a dq t w -∗
+    ⌜forall j : nat, (j < 4)%nat ->
+       latest_val (img_z img) log (acc_addr a j) t (nth_byte w j)⌝.
+  Proof.
+    iIntros "Hi (H0 & H1 & H2 & H3)".
+    iDestruct (wlat_lookup_elem with "Hi H0") as %E0.
+    iDestruct (wlat_lookup_elem with "Hi H1") as %E1.
+    iDestruct (wlat_lookup_elem with "Hi H2") as %E2.
+    iDestruct (wlat_lookup_elem with "Hi H3") as %E3.
+    iPureIntro. intros j Hj.
+    destruct j as [|[|[|[|j]]]]; [exact E0|exact E1|exact E2|exact E3|lia].
+  Qed.
+
+  (** THE MINT.  A word no message has ever written — which is every [.bss]
+      word at boot, and exactly what the escrow's own allocation premise
+      says — may be turned sync once and for all, giving up the four clean
+      states for the four persistent witnesses. *)
+  Lemma wlat4_sync_mint (img : _) (log : list wmsg) (a : Arch.pa) (t : nat)
+      (w : bv 32) :
+    (forall j : nat, (j < 4)%nat -> wcds_sync log (acc_addr a j)) ->
+    wlat_interp img log -∗ wlat4 a (DfracOwn 1) t w ==∗
+    wlat_interp img log ∗ wlat4_sync a t w.
+  Proof.
+    intros Hsy. rewrite /wlat4 /wlat_pointsto.
+    iIntros "Hi ([E0 C0] & [E1 C1] & [E2 C2] & [E3 C3])".
+    rewrite /wclean.
+    iMod (sync_mint img log _ _ (Hsy 0%nat ltac:(lia)) with "Hi C0")
+      as "[Hi #S0]".
+    iMod (sync_mint img log _ _ (Hsy 1%nat ltac:(lia)) with "Hi C1")
+      as "[Hi #S1]".
+    iMod (sync_mint img log _ _ (Hsy 2%nat ltac:(lia)) with "Hi C2")
+      as "[Hi #S2]".
+    iMod (sync_mint img log _ _ (Hsy 3%nat ltac:(lia)) with "Hi C3")
+      as "[Hi #S3]".
+    iModIntro. iFrame "Hi". rewrite /wlat4_sync /wlat4_el. iFrame "E0 E1 E2 E3".
+    by iApply (sync_win4 a with "S0 S1 S2 S3").
+  Qed.
+
+  (** THE SYNC STORE.  [wlat4_store_prim]'s twin: the state map is untouched
+      (the sync entries survive by [WeakGhost.wcds_ok_store_nonplain]), only
+      the four value elements move to the fresh message's timestamp. *)
+  Lemma wlat4_sync_store_prim (tid : option nat) k (σ : wmstate) (a : Arch.pa)
+      (v : bv 32) (t : nat) (w : bv 32) :
+    k <> WCplain ->
+    wlat_interp (wm_img σ) (wm_log σ) -∗
+    wlat4_sync a t w ==∗
+    wlat_interp (wm_img σ) (wm_log σ ++ [wwrite_msg tid k a 4 v]) ∗
+    wlat4_sync a (S (length (wm_log σ))) v.
+  Proof.
+    intros Hk. iIntros "Hi [(H0 & H1 & H2 & H3) #Hs]".
+    iDestruct "Hi" as (mm mc) "(Hauth & %Hag & Hc & %Hagc)".
+    rewrite /wlat_elem.
+    iMod (ghost_map_update (S (length (wm_log σ)), nth_byte v 0)
+            with "Hauth H0") as "[Hauth H0]".
+    iMod (ghost_map_update (S (length (wm_log σ)), nth_byte v 1)
+            with "Hauth H1") as "[Hauth H1]".
+    iMod (ghost_map_update (S (length (wm_log σ)), nth_byte v 2)
+            with "Hauth H2") as "[Hauth H2]".
+    iMod (ghost_map_update (S (length (wm_log σ)), nth_byte v 3)
+            with "Hauth H3") as "[Hauth H3]".
+    iModIntro. iSplitL "Hauth Hc".
+    - iExists (wins4 a (S (length (wm_log σ))) v mm), mc. iFrame "Hauth Hc".
+      iSplitR; [iPureIntro; by apply wlat_agree_store4|].
+      iPureIntro. by apply wcds_agree_nonplain.
+    - rewrite /wlat4_sync /wlat4_el /wlat_elem. by iFrame "H0 H1 H2 H3 Hs".
+  Qed.
+
+  (** The FLAT reading of the sync bundle — [WeakLock.wlat4_flat_gen]'s twin
+      over the bare elements, which is what the racy waiter needs to know
+      the flag word is in memory. *)
+  Lemma wlat_el_flat_pin (σ : wmstate) (a : Arch.pa) (dq : dfrac) (t : nat)
+      (v : bv 8) :
+    wlog_wf (wm_log σ) ->
+    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
+    wlat_elem (pa_z a) dq t v -∗
+    ⌜wflat (wm_img σ) (wm_log σ) !! a = Some v /\
+     latest_ts (wm_log σ) (pa_z a) = t⌝.
+  Proof.
+    intros Hwf. iIntros "Hi He".
+    iDestruct (wlat_lookup_elem with "Hi He") as %Hlat.
+    iDestruct (wlat_flat_lookup_e σ a dq t v Hwf with "Hi He") as %Hfl.
+    iPureIntro. split; [exact Hfl|]. exact (latest_val_ts _ _ _ _ _ Hlat).
+  Qed.
+
+  Lemma wlat4_el_flat_gen (σ : wmstate) (a : Arch.pa) (dq : dfrac) (t : nat)
+      (w : bv 32) :
+    wlog_wf (wm_log σ) -> acc_wf a 4 ->
+    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
+    wlat4_el a dq t w -∗
+    ⌜(forall j : nat, (j < 4)%nat ->
+        wflat (wm_img σ) (wm_log σ) !! pa_add a j = Some (nth_byte w j)) /\
+     (forall j : nat, (j < 4)%nat -> latest_ts (wm_log σ) (acc_addr a j) = t)⌝.
+  Proof.
+    intros Hwf Hacc. iIntros "Hi (H0 & H1 & H2 & H3)".
+    iAssert (⌜wflat (wm_img σ) (wm_log σ) !! pa_add a 0 = Some (nth_byte w 0)
+               /\ latest_ts (wm_log σ) (acc_addr a 0) = t⌝)%I as %E0.
+    { rewrite -(acc_wf_byte a 4 0 Hacc ltac:(lia)).
+      iApply (wlat_el_flat_pin σ (pa_add a 0) dq t (nth_byte w 0) Hwf
+                with "Hi [H0]").
+      rewrite (acc_wf_byte a 4 0 Hacc ltac:(lia)). iExact "H0". }
+    iAssert (⌜wflat (wm_img σ) (wm_log σ) !! pa_add a 1 = Some (nth_byte w 1)
+               /\ latest_ts (wm_log σ) (acc_addr a 1) = t⌝)%I as %E1.
+    { rewrite -(acc_wf_byte a 4 1 Hacc ltac:(lia)).
+      iApply (wlat_el_flat_pin σ (pa_add a 1) dq t (nth_byte w 1) Hwf
+                with "Hi [H1]").
+      rewrite (acc_wf_byte a 4 1 Hacc ltac:(lia)). iExact "H1". }
+    iAssert (⌜wflat (wm_img σ) (wm_log σ) !! pa_add a 2 = Some (nth_byte w 2)
+               /\ latest_ts (wm_log σ) (acc_addr a 2) = t⌝)%I as %E2.
+    { rewrite -(acc_wf_byte a 4 2 Hacc ltac:(lia)).
+      iApply (wlat_el_flat_pin σ (pa_add a 2) dq t (nth_byte w 2) Hwf
+                with "Hi [H2]").
+      rewrite (acc_wf_byte a 4 2 Hacc ltac:(lia)). iExact "H2". }
+    iAssert (⌜wflat (wm_img σ) (wm_log σ) !! pa_add a 3 = Some (nth_byte w 3)
+               /\ latest_ts (wm_log σ) (acc_addr a 3) = t⌝)%I as %E3.
+    { rewrite -(acc_wf_byte a 4 3 Hacc ltac:(lia)).
+      iApply (wlat_el_flat_pin σ (pa_add a 3) dq t (nth_byte w 3) Hwf
+                with "Hi [H3]").
+      rewrite (acc_wf_byte a 4 3 Hacc ltac:(lia)). iExact "H3". }
+    iPureIntro. split; intros j Hj;
+      destruct j as [|[|[|[|j]]]];
+      solve [ exact (proj1 E0) | exact (proj1 E1) | exact (proj1 E2)
+            | exact (proj1 E3) | exact (proj2 E0) | exact (proj2 E1)
+            | exact (proj2 E2) | exact (proj2 E3) | lia ].
+  Qed.
+
+  Lemma wlat4_sync_flat_gen (σ : wmstate) (a : Arch.pa) (t : nat) (w : bv 32) :
+    wlog_wf (wm_log σ) -> acc_wf a 4 ->
+    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
+    wlat4_sync a t w -∗
+    ⌜(forall j : nat, (j < 4)%nat ->
+        wflat (wm_img σ) (wm_log σ) !! pa_add a j = Some (nth_byte w j)) /\
+     (forall j : nat, (j < 4)%nat -> latest_ts (wm_log σ) (acc_addr a j) = t)⌝.
+  Proof.
+    intros Hwf Hacc. iIntros "Hi [He _]".
+    by iApply (wlat4_el_flat_gen σ a (DfracOwn 1) t w Hwf Hacc with "Hi He").
+  Qed.
+
+  Lemma wlat4_sync_store_gen (tid : option nat) k (σ σ' : wmstate)
+      (a : Arch.pa) (t : nat) (w v : bv 32) :
+    k <> WCplain ->
+    wm_img σ' = wm_img σ ->
+    wm_log σ' = (wm_log σ ++ [wwrite_msg tid k a 4 v])%list ->
+    wlat_interp (wm_img σ) (wm_log σ) -∗
+    wlat4_sync a t w ==∗
+    wlat_interp (wm_img σ') (wm_log σ') ∗
+    wlat4_sync a (S (length (wm_log σ))) v.
+  Proof.
+    intros Hk Himg Hlog. iIntros "Hi Hw". rewrite Himg Hlog.
+    by iMod (wlat4_sync_store_prim tid k σ a v t w Hk with "Hi Hw") as "[$ $]".
+  Qed.
+
 End store.
 
 Notation "a ↦w₄ₒ w" := (wpt4_own cpu_id a w)

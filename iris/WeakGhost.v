@@ -632,6 +632,32 @@ Section resources.
 
   Global Instance sync_byte_persistent a : Persistent (sync_byte a).
   Proof. rewrite /sync_byte /wcds_el. apply _. Qed.
+
+  (** A WHOLE ACCESS WINDOW is sync — the shape the racy load rules take as
+      a premise (φ-upgrade, deliverable A).  Persistent, so threading it
+      costs a caller nothing but the obligation to have minted it. *)
+  Definition sync_win (a : Arch.pa) (n : N) : iProp Σ :=
+    ([∗ list] j ∈ seq 0 (N.to_nat n), sync_byte (acc_addr a j))%I.
+
+  Global Instance sync_win_persistent a n : Persistent (sync_win a n).
+  Proof. rewrite /sync_win. apply _. Qed.
+
+  Lemma sync_win_byte (a : Arch.pa) (n : N) (j : nat) :
+    (j < N.to_nat n)%nat -> sync_win a n -∗ sync_byte (acc_addr a j).
+  Proof.
+    intros Hj. rewrite /sync_win.
+    iIntros "H". iApply (big_sepL_lookup _ _ j j with "H").
+    by rewrite lookup_seq_lt.
+  Qed.
+
+  (** The four-byte constructor, which is the only width any racy site in
+      this tree uses (the [started] flag). *)
+  Lemma sync_win4 (a : Arch.pa) :
+    sync_byte (acc_addr a 0) -∗ sync_byte (acc_addr a 1) -∗
+    sync_byte (acc_addr a 2) -∗ sync_byte (acc_addr a 3) -∗ sync_win a 4.
+  Proof.
+    iIntros "#H0 #H1 #H2 #H3". rewrite /sync_win /=. iFrame "H0 H1 H2 H3".
+  Qed.
   Global Instance wcds_el_timeless a dq s : Timeless (wcds_el a dq s).
   Proof. rewrite /wcds_el. apply _. Qed.
 

@@ -893,6 +893,7 @@ WeakSailLTS.v
 WeakCompose.v
 WeakLang.v
 WeakGhost.v
+WeakViolation.v
 WeakExec.v
 WeakAdequacy.v
 WeakView.v

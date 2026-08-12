@@ -330,6 +330,20 @@ Section weak_started.
   Qed.
 
   (** Two log lower bounds are comparable (mono-list). *)
+  (** ... and its [wlat4_sync] instance, which is what the escrow's own
+      elements are since the φ-upgrade's deliverable A. *)
+  Lemma wlat4_sync_latest_val (σ : wmstate) (a : Arch.pa) (t : nat)
+      (w : bv 32) :
+    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
+    wlat4_sync a t w -∗
+    ⌜forall j : nat, (j < 4)%nat ->
+       latest_val (wimg σ) (wm_log σ) (acc_addr a j) t (nth_byte w j)⌝.
+  Proof.
+    iIntros "Hi [He _]".
+    by iApply (wlat4_el_latest_val (wm_img σ) (wm_log σ) a (DfracOwn 1) t w
+                 with "Hi He").
+  Qed.
+
   Lemma wlog_lb_compare (l1 l2 : list wmsg) :
     wlog_lb l1 -∗ wlog_lb l2 -∗ ⌜l1 `prefix_of` l2 \/ l2 `prefix_of` l1⌝.
   Proof.
@@ -364,7 +378,13 @@ Section weak_started.
         ∨ (⌜v = lock_one⌝ ∗ ⌜(T <= t)%nat⌝ ∗ monPred_at P (view_scl T))))%I.
 
   Definition wstarted_at (a : Arch.pa) P (t : nat) (v : bv 32) : iProp Σ :=
-    (wlat4 a (DfracOwn 1) t v ∗ wstarted_hist a P t v)%I.
+    (wlat4_sync a t v ∗ wstarted_hist a P t v)%I.
+
+  (** The flag word is a SYNC window (φ-upgrade, deliverable A), and the
+      witness is persistent, so it can be read out of the escrow and handed
+      to [WeakRacy]'s load rules without disturbing anything. *)
+  Lemma wstarted_at_sync a P t v : wstarted_at a P t v -∗ sync_win a 4.
+  Proof. iIntros "[Hw _]". by iApply wlat4_sync_win. Qed.
 
   (** ... and the invariant body: an [iProp], hence objective, hence
       admissible in an [inv]. *)
@@ -389,7 +409,7 @@ Section weak_started.
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
     wlat4 a (DfracOwn 1) 0 lock_zero
     ={E}=∗ (wlat_interp (wm_img σ) (wm_log σ) ∗
-            ⌜wstarted_img_clear σ a⌝ ∗ wstarted_inv a P).
+            ⌜wstarted_img_clear σ a⌝ ∗ sync_win a 4 ∗ wstarted_inv a P).
   Proof.
     iIntros "#Hlb Hi Hw".
     iDestruct (wlat4_latest_val σ a (DfracOwn 1) 0 lock_zero with "Hi Hw")
@@ -404,7 +424,22 @@ Section weak_started.
       apply (writes_in_log_byte (wimg σ)). exists (S i).
       apply lookup_lt_Some in Hm as Hlt.
       split_and!; [lia|lia|]. exists b. rewrite log_byte_S Hm /=. exact Hbb. }
-    iFrame "Hi". iSplitR; [by iPureIntro|].
+    (* THE S MINT (φ-upgrade, deliverable A).  The very fact just proved —
+       no message of the log writes the flag — IS [WeakGhost.wcds_sync] at
+       each of the four bytes, so the escrow's own allocation premise pays
+       for turning the word sync.  No boot-bundle parameter is needed: the
+       mint is local to the site that knows the word is untouched. *)
+    assert (Hsy : forall j : nat, (j < 4)%nat ->
+              wcds_sync (wm_log σ) (acc_addr a j)).
+    { intros j Hj p m (Hp & [b Hb] & _).
+      destruct (Hlv j Hj) as [_ Hno]. apply Hno.
+      apply (writes_in_log_byte (wimg σ)). exists (S p).
+      apply lookup_lt_Some in Hp as Hlt.
+      split_and!; [lia|lia|]. exists b. rewrite log_byte_S Hp /=. exact Hb. }
+    iMod (wlat4_sync_mint (wm_img σ) (wm_log σ) a 0 lock_zero Hsy
+            with "Hi Hw") as "[Hi Hw]".
+    iDestruct (wlat4_sync_win with "Hw") as "#Hsw".
+    iFrame "Hi". iSplitR; [by iPureIntro|]. iFrame "Hsw".
     iApply inv_alloc. iNext.
     iExists 0%nat, lock_zero. rewrite /wstarted_at. iFrame "Hw".
     iExists (S (length (wm_log σ))), (wm_log σ). iFrame "Hlb".
@@ -463,7 +498,7 @@ Section weak_started.
     iDestruct "Hbody" as (t v) "[Hw Hhist]".
     iDestruct "Hhist" as (T log0) "(#Hlb0 & %Hcov & %Hlbf & Hdisj)".
     iDestruct (wlog_lb_compare with "Hlb0 Hlbσ") as %Hcmp.
-    iDestruct (wlat4_latest_val σ a (DfracOwn 1) t v with "Hi Hw") as %Hlv.
+    iDestruct (wlat4_sync_latest_val σ a t v with "Hi Hw") as %Hlv.
     (* the element is a write of the log, so the escrow's timestamp is one
        the fresh snapshot covers *)
     assert (Htlen : (t <= length (wm_log σ))%nat \/ t = 0%nat).
@@ -477,8 +512,8 @@ Section weak_started.
     - (* CLEAR: nothing non-clear was ever written, so the deposit is ours *)
       pose proof (wstarted_lb_now (wimg σ) (wm_log σ) log0 a T t lock_zero
                     Hcov Hlbf Hcmp Hlv (or_introl (conj eq_refl HT))) as Hnow.
-      iMod (wlat4_store_gen tid kc σ σ' a t lock_zero lock_one Hnp Himg Hlog
-              with "Hi Hw") as "[Hi Hw]".
+      iMod (wlat4_sync_store_gen tid kc σ σ' a t lock_zero lock_one Hnp Himg
+              Hlog with "Hi Hw") as "[Hi Hw]".
       iModIntro. iFrame "Hi". rewrite /wstarted_at. iFrame "Hw".
       iExists (S (length (wm_log σ))), (wm_log σ). iFrame "Hlbσ".
       iSplitR; [iPureIntro; lia|]. iSplitR.
@@ -502,8 +537,8 @@ Section weak_started.
     - (* ALREADY SET: keep the earlier deposit, and with it the earlier [T] *)
       pose proof (wstarted_lb_now (wimg σ) (wm_log σ) log0 a T t lock_one
                     Hcov Hlbf Hcmp Hlv (or_intror (conj eq_refl HT))) as Hnow.
-      iMod (wlat4_store_gen tid kc σ σ' a t lock_one lock_one Hnp Himg Hlog
-              with "Hi Hw") as "[Hi Hw]".
+      iMod (wlat4_sync_store_gen tid kc σ σ' a t lock_one lock_one Hnp Himg
+              Hlog with "Hi Hw") as "[Hi Hw]".
       iModIntro. iFrame "Hi". rewrite /wstarted_at. iFrame "Hw".
       iExists T, (wm_log σ). iFrame "Hlbσ".
       iSplitR; [iPureIntro; lia|]. iSplitR; [by iPureIntro|].
@@ -597,7 +632,7 @@ Section weak_started.
     iDestruct "Hbody" as (te v) "[Hw Hhist]".
     iDestruct "Hhist" as (T log0) "(#Hlb0 & %Hcov & %Hlbf & Hdisj)".
     iDestruct (wlog_lb_compare with "Hlb0 Hlbσ") as %Hcmp.
-    iDestruct (wlat4_latest_val σ a (DfracOwn 1) te v with "Hi Hw") as %Hlv.
+    iDestruct (wlat4_sync_latest_val σ a te v with "Hi Hw") as %Hlv.
     iDestruct "Hdisj" as "[[-> %HT]|(-> & %HT & #HP0)]".
     - (* the flag is still clear, so nothing non-clear is readable at all *)
       iExFalso. iPureIntro.
