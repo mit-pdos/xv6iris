@@ -219,6 +219,133 @@ Definition wp_iunlockput_sconf_body
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* =====================================================================  *)
+(*  THE CREDITED SET-FORM CONTRACT (fs-sysfile GR-2b, retrofit 4b)        *)
+(*                                                                        *)
+(*  iunlockput is iunlock followed by iput, so this is [SpecIput]'s gen    *)
+(*  contract threaded through one wrapper and nothing more.  It is the    *)
+(*  form create's arms actually call: [CreateBudget.ip_spend crb cru      *)
+(*  true = 0] at [crb = cru = true], and the post above then pins          *)
+(*  [n' = n] -- the FAIL arm's freeing [iunlockput] spends nothing.        *)
+(* ===================================================================== *)
+Definition wp_iunlockput_gen_body
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+
+    (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
+    (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
+    (pd pav pu : mword 64)
+    (bn : bio_names)
+    (g : log_names) (gfs : fs_names) (gi : gname)
+    (cn : ic_names)                                    (* the icache's names  *)
+    (gtl : gname)                                      (* itable.lock         *)
+    (gil gisl : gname)                                 (* ip->lock            *)
+    (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+    (size : Z) (dev : mword 32)
+    (used : gset Z)
+    (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+    (dn' : dinode) (bm' : blkmap)
+    (n : nat) (Sb : gset Z) (crb cru : bool)
+    (pidv : mword 32) (dq dqb dqs : dfrac)
+    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (b : bool) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.iunlockput in
+  let ip : mword 64 := ientry k in
+  let pj := proc_addr j in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (K_iunlockput <= K)%nat ->
+  (* ENTRY BY SLOT -- iunlock's null test and iput's [ientry_inj] both *)
+  (k < NINODE)%nat ->
+  (* the two absorption credits, threaded verbatim to iput *)
+  (crb = true -> bmapstart ∈ Sb) ->
+  (cru = true -> IBLOCK inum inodestart ∈ Sb) ->
+  (* --- iput's geometry, threaded verbatim (SpecIput.v) --- *)
+  log_geom_ok cov logstart ->
+  0 < size <= BPB ->
+  0 <= bmapstart ->
+  bmapstart ∈ cov ->
+  ~ (bmapstart ∈ log_region_set logstart) ->
+  0 <= inodestart ->
+  IBLOCK inum inodestart ∈ cov ->
+  ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
+  bv_unsigned inum < 16 * Z.of_nat nib ->
+  cov_below cov size ->
+  (iput_units <= n)%nat ->
+  (j < NPROC)%nat ->
+  gs !! j = Some gl ->
+  (* a0 = ip *)
+  m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  sie_cap_gpr m K b pj -∗
+  cpu_own 0 eb pj C b -∗
+  (* the trap-CSR complement, threaded straight from iput's own precondition
+     (SpecIput.v): [emp] at [eb = true], where iput's own acquire mints what
+     its interior sleeps need; the real pair at [eb = false], where the
+     caller holds it because the TRAP gave it to it.  See
+     claude-notes/projects/eb-generic-sweep.md. *)
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
+  kernel_text -∗ pc_is pcE -∗
+  panic_wp_any -∗
+  bio_ctx bn (fs_view gfs gd dev cov) -∗
+  log_ctx g bn gfs cov logstart dev -∗
+  (* ---- THE ICACHE'S PERSISTENT SET ---- *)
+  is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+  itable_inv -∗
+  ic_escrow cn gfs gi cov logstart k -∗
+  ireg_inv gi gfs inodestart nib -∗
+  is_sleeplock gil gisl (i_lock ip) "inode"%string (ic_tok cn k) -∗
+  (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
+  sleeplocked gisl -∗
+  sl_pid (i_lock ip) ↦₄ pidv -∗
+  ic_deposit cn k (DepShr s dev inum gy) -∗
+  i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
+  i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
+  i_valid ip ↦₄ valid_word true -∗
+  ic_loaded gfs gi cov logstart k inum dn' bm' -∗
+  (* the parked record's type witness -- SpecIunlock's new premise, threaded
+     verbatim (design fs-icache.md 17.6 (5), ratified 17.7) *)
+  ity_shot gy (di_type dn') -∗
+  (* ---- THE RETAINED PARENT: what makes the seam close ---- *)
+  (* the share [s] above was carved off THIS reference ([inode_ref_carve]);
+     iunlock hands the share back and [inode_ref_gather] re-forms the
+     canonical [inode_ref k (qi + s)] that iput then spends. *)
+  inode_ref_short k (qi + s)%Qp qi dev inum -∗
+  (* ---- iput's own resources ---- *)
+  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  bitmap_res gfs bmapstart cov logstart size used -∗
+  p_pid pj ↦₄{dq} pidv -∗
+  procs_inv gs -∗
+  dev_inv gu gd -∗
+  disk_geom gd pd pav pu -∗
+  is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+  bslots bn 3 -∗
+  log_opS g n Sb -∗
+  (* THE CROSSING IS THE LITERAL [true]: iunlockput parks (through iput,
+     down to sleep), so it can return on another hart whatever SIE was
+     doing. *)
+  wp_next true pj (fun (CID : CpuId) =>
+  ∀ (mf : regfile) (n' : nat) (used' Sb' : gset Z),
+      ⌜callee_saved m mf⌝ -∗
+      sie_cap_gpr mf K b pj -∗
+      cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
+      pc_is ret_tgt -∗
+      p_pid pj ↦₄{dq} pidv -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      ⌜used' ⊆ used⌝ -∗
+      bitmap_res gfs bmapstart cov logstart size used' -∗
+      bslots bn 3 -∗
+      ⌜Sb ⊆ Sb'⌝ -∗
+      ⌜((n - ip_spend_max crb cru)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
+      log_opS g n' Sb' -∗
+      iref_slot -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type IUNLOCKPUT.
   Parameter wp_iunlockput_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
@@ -243,4 +370,30 @@ Module Type IUNLOCKPUT.
                                gil gisl cov logstart bmapstart inodestart nib
                                size dev used k qi s gy inum dn' bm' n
                                pidv dq dqb dqs m K eb C b.
+  (* the credited set-form contract; [wp_iunlockput_sconf] is this at
+     [crb := cru := false], derived at the [log_op] existential's own
+     witness. *)
+  Parameter wp_iunlockput_gen :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId}
+      (gs : list gname) (j : nat) (gl : gname)
+      (gu : uart_names) (gd : disk_names) (gk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (g : log_names) (gfs : fs_names) (gi : gname)
+      (cn : ic_names) (gtl : gname) (gil gisl : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (size : Z) (dev : mword 32)
+      (used : gset Z)
+      (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (dn' : dinode) (bm' : blkmap)
+      (n : nat) (Sb : gset Z) (crb cru : bool)
+      (pidv : mword 32) (dq dqb dqs : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool),
+      wp_iunlockput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+                             gil gisl cov logstart bmapstart inodestart nib
+                             size dev used k qi s gy inum dn' bm' n Sb crb cru
+                             pidv dq dqb dqs m K eb C b.
 End IUNLOCKPUT.

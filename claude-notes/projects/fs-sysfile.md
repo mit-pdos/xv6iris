@@ -5442,3 +5442,251 @@ algebra over `log_opS`, in the same sense GR-1's audit found the ledger
 work carried none of origin's 1762 moved immediates.  Finding 2's claim is
 "every namex log site is an iput or an iunlockput", which is a property of
 fs.c's source that the copyout/vmfault rework does not touch.
+
+## GR-2b — the set-form retrofit, run on the converged base in GR-2a's
+## corrected order.  **4a and 4b LAND**; the walk cost came in far under
+## the five-walk sizing, and the two questions GR-2a left open are both
+## answered — one of them by refuting the design it shipped
+
+### RESUME HEADER
+
+| # | contract | state |
+|---|----------|-------|
+| 2 | `SpecIupdate.wp_iupdate_cred` | landed (S5b), unmoved |
+| 5 | `SpecIalloc.wp_ialloc_gen` | landed (S5i), unmoved |
+| — | `SpecIupdate.wp_iupdate_credgen` | **NEW, LANDED** (the gate 4a hit) |
+| 4a | `SpecItrunc.wp_itrunc_gen` | **LANDED** |
+| 4b | `SpecIput.wp_iput_gen` / `SpecIunlockput.wp_iunlockput_gen` | **LANDED** |
+| 6 | namex/namei/nameiparent gen | not started (now unblocked) |
+| 1 | `SpecWritei.wp_writei_cred` | not started |
+| 3 | `SpecDirlink` `DIRLINK_GEN` | not started |
+
+### FINDING 1 — **THE 4a POSTCONDITION IN GR-2a's DESIGN IS WRONG, and it
+### fails in the one direction that matters: it does not imply the contract
+### it has to derive**
+
+GR-2a shipped the post's counter clause as
+
+```coq
+⌜(it_entry crb u - it_spend crb cru <= u')%nat /\ (u' <= it_entry crb u)%nat⌝
+```
+
+and claimed "at `crb := false, cru := false` this is the landed range
+`u <= u' <= S u` verbatim".  It is not.  At those values `it_entry` is
+`S (S u)`, so the upper bound reads `u' <= S (S u)` where the counted
+contract says `u' <= S u` — and since the counted form is DERIVED from the
+gen form, a loose upper bound there is not a harmless weakening, it makes
+`wp_itrunc_sconf` unprovable and the whole retrofit non-additive.
+
+The cause is that **the tail `iupdate` ALWAYS runs**, so `it_iu cru` is
+spent unconditionally whatever the loops did; only the BITMAP unit is
+data-dependent.  The correct clause is
+
+```coq
+⌜(it_entry crb u - it_spend crb cru <= u')%nat
+ /\ (u' + it_iu cru <= it_entry crb u)%nat⌝
+```
+
+(stated additively so nat truncation never enters), which collapses to
+exactly `u <= u' <= S u` uncredited and is tight on all four corners.  The
+general rule worth carrying: **when a gen form must imply a landed counted
+form, check the derivation at the uncredited corner BEFORE writing the
+walk** — a bound that is merely "true" is not enough, it has to be the
+same bound.
+
+### FINDING 2 — **`bm_paidS` NEEDS A `crb` GUARD ON THE UNPAID DISJUNCT**,
+### and without it create's zero-spend arm is unreachable
+
+GR-2a's `bm_paidS` was a plain two-disjunct set-indexed `bm_paid`.  But the
+paid disjunct is ABSORBING (`bm_paidS_use` returns `iLeft` from both arms),
+so a caller entering already-paid never had the spare unit — and a bare
+disjunction cannot say so, leaving the elim only the loose
+`n <= S (S u)`.  Guarding the unpaid arm with `⌜crb = false⌝` pins the
+level to `S u` for the whole of a credited run, and makes the elim's range
+uniformly `S u <= n <= it_entry crb u`.  That is what makes
+`CreateBudget.ip_spend true true true = 0` reachable: create's FAIL arm
+needs its freeing `iunlockput` to spend **exactly** zero.  The guard costs
+nothing — it is established once at the intro and never re-established,
+because nothing ever returns to the unpaid arm.
+
+Landed shape (`SpecItrunc.v`):
+
+```coq
+Definition bm_paidS (γ : log_names) (bmapstart : Z) (crb : bool)
+    (u : nat) (Sb : gset Z) : iProp Σ :=
+  ((∃ Sb', ⌜Sb ⊆ Sb'⌝ ∗ ⌜bmapstart ∈ Sb'⌝ ∗ log_opS γ (S u) Sb')
+   ∨ (⌜crb = false⌝ ∗ ∃ Sb', ⌜Sb ⊆ Sb'⌝ ∗ log_opS γ (S (S u)) Sb'))%I.
+```
+
+with `it_entry crb u := if crb then S u else S (S u)`,
+`it_iu cru := if cru then 0 else 1` and
+`it_spend crb cru := (if crb then 0 else 1) + it_iu cru`.  The last two are
+definitionally `CreateBudget.iu_spend` and `CreateBudget.ip_spend _ _ true`,
+spelled locally so `SpecItrunc` need not import the ledger (which would
+have been a new edge into `SpecIput`'s cone for two `if`s).
+
+### FINDING 3 — **THE `freed` BOOLEAN IS NOT LOAD-BEARING, and an
+### existential one is VACUOUS.**  4b's open question, closed
+
+GR-2a left open whether iput's credited post must expose `ip_spend`'s
+`freed`, existentially or by two-arming the budget clause the way
+`used' ⊆ used` already is.  It must do **neither**:
+
+* `ip_spend crb cru false = 0 <= ip_spend crb cru true`, so
+  `∃ freed, n - ip_spend crb cru freed <= n'` is satisfied by
+  `freed := true` whatever ran — it says exactly what the unconditional
+  worst case says, and no caller can extract more from it.
+* Two-arming it would be useless anyway, for the same reason the parking
+  premise is unconditional: **no caller can know in advance which arm
+  runs.**
+
+So the spend is stated at the worst case, unconditionally
+(`SpecIput.ip_spend_max crb cru`), and that is *enough*, because at
+`crb = cru = true` the worst case IS zero.  The general lesson: an
+existential over a monotone cost parameter is not information; check
+whether the disjunction you are about to add has a maximum before paying
+for it.
+
+### THE GATE 4a HIT, and why it is one added Parameter and not a widening
+
+`it_tail`'s flush needs the CREDITED iupdate at an `eb` itrunc's own
+contract quantifies over — itrunc is a pure pass-through, threading
+`trap_csrs_ext eb` / `cpu_claim_ext eb` to its sleeping callees.  But the
+landed `wp_iupdate_cred` pins `eb := true` (all create needs), and the
+landed `wp_iupdate_gen` is eb-generic but pinned at `cru := false`.  The
+generic core the proof already had — `ProofIupdate.iu_main_gen` — is both,
+and was simply not in the Module Type.
+
+`SpecIupdate` therefore gains a FOURTH parameter, `wp_iupdate_credgen`,
+proven by a ~20-line seal off `iu_main_gen`.  **Added beside the other
+three, not by widening one**: `ProofWritei.v:982` applies
+`IU.wp_iupdate_gen` positionally, so changing that body's arity would have
+rippled into chain two before chain two was even read.  The blast radius
+of the addition is five files (`SpecIupdate` → `{ProofIupdate, ProofIput,
+ProofItrunc}` → `{LinkIupdate, LinkItrunc}`), three of which 4a/4b touch
+anyway.
+
+### WALK COST ACTUALS vs THE FIVE-WALK SIZING
+
+GR-2a sized the relaunch at "five proof walks, no derivations", with
+ProofItrunc (2922) and ProofIput (2381) two of the five.  **Both came in
+at a small fraction of a walk**, and the reason generalises:
+
+| file | lines | what the retrofit actually was | compiles to green |
+|------|-------|-------------------------------|-------------------|
+| `ProofItruncParts.v` | 786 | 2 params on each loop state + `bm_paidS_use` (a copy of `bm_paid_use` with one `⊆` added per arm) | 1st try |
+| `ProofItrunc.v` | 2922 | ~30 threaded sites, all mechanical; 3 real seams (entry intro, 2 tail joins) | **1st try** |
+| `ProofIput.v` | 2381 | 2 tail lemmas re-parameterised + 4 call sites + the truncate arm's 2 credited calls | 2nd try (one `S (u'-1)` vs `u'` rewrite) |
+| `ProofIunlockput.v` | 556 | one call site | 1st try |
+
+**The sizing was wrong because `Sb` is THREADED, not proven.**  GR-2a
+already said this for `bm_paid` ("one extra parameter on the two loop
+invariants, threaded, not proving") but then priced the stage as five
+walks anyway.  The honest unit is not "lines in the file" but "seams where
+the ledger is opened" — itrunc has six (`bm_paidS_intro`, three
+`bm_paidS_use`, two `bm_paidS_elim`), iput has four.  Everything else is
+parameter plumbing a script does.  **Price the remaining four contracts by
+counting `log_op`/`log_opS` occurrences in the proof file, not by its
+length.**  On that measure ProofNamex's 5713 lines are still only its four
+iput/iunlockput call sites.
+
+### THE EXACT COMPOSED SHAPE `ProofCreate` WILL CONSUME
+
+For the op-wide 6-of-10 distinct-set bound (S5a), the two landed contracts
+present:
+
+```coq
+(* itrunc, at entry set Sb and credits crb cru *)
+log_opS γ (it_entry crb u) Sb
+  ⊢ ∃ u' Sb', ⌜Sb ⊆ Sb'⌝ ∗ ⌜IBLOCK inum inodestart ∈ Sb'⌝ ∗
+              ⌜it_entry crb u - it_spend crb cru <= u'
+                /\ u' + it_iu cru <= it_entry crb u⌝ ∗
+              log_opS γ u' Sb'
+
+(* iput / iunlockput, at entry set Sb and the SAME two credits *)
+log_opS g n Sb
+  ⊢ ∀ n' used' Sb', ⌜used' ⊆ used⌝ -∗ ⌜Sb ⊆ Sb'⌝ -∗
+      ⌜n - ip_spend_max crb cru <= n' <= n⌝ -∗ log_opS g n' Sb' -∗ …
+```
+
+with `ip_spend_max crb cru = (if crb then 0 else 1) + (if cru then 0 else 1)`,
+i.e. **definitionally `CreateBudget.ip_spend crb cru true`** — so create's
+arms compose against the ledger theorems already proven, unchanged.  The
+three corners create actually uses:
+
+* `crb = cru = true` (the FAIL arm's freeing `iunlockput`): `n' = n`,
+  spend **zero**, which is what `cr_budget` needs and what finding 2's
+  guard buys.
+* `crb = true, cru = false`: spend 1.
+* `crb = cru = false` (the counted seal): spend ≤ 2, and iput's own third
+  unit makes `iput_units = 3` — the landed contract, unmoved.
+
+**The NEED did not move**: iput's precondition is still `iput_units <= n`,
+so every `CreateBudget` arm is stated at `ip_need` exactly as before.  The
+credited arms could honestly ask for as little as
+`1 + ip_spend_max crb cru`, and deliberately do not — nothing needs it and
+keeping the premise fixed keeps the ledger's theorems verbatim.
+
+**What makes iput's own flush free**, and it is the one non-mechanical
+step in 4b: `wp_itrunc_gen`'s post exposes
+`IBLOCK inum inodestart ∈ Sb'` DETERMINATELY (itrunc's tail iupdate logs
+it unconditionally), so iput's `ip->type = 0; iupdate(ip)` runs at
+`cru := true` and spends nothing.  Without that exposed membership 4b
+cannot hit `ip_spend_max` and the whole credited chain collapses to the
+counted one.
+
+### `it_tail`'s PARAMETERISATION — the GR-2a unchecked item, resolved
+
+It takes the credit as a parameter with no change to `it_cont` beyond one
+extra `gset` argument.  The reason is that `it_cont` was ALREADY
+instantiated at a concrete level at both tail joins (`iExists n1` /
+`iExists n3` adapt it to the contract's range right at the call site), so
+the determinate pair `(if cru then S n1 else n1, Sb0 ∪ {[IBLOCK …]})`
+drops straight in and the widening to the contract's existential stays
+where it always was — in the main lemma, not in the tail.  The two
+`iExists` re-packings needed no tracing at all.
+
+### Traps recorded
+
+* **`Local Open Scope Z_scope` eats a `nat` definition's literals.**
+  `Definition it_iu (cru : bool) : nat := if cru then 0 else 1` fails with
+  *"The term `0` has type `Z` while it is expected to have type `nat`"* —
+  the ascription on the DEFINITION does not reach the branches.  Write
+  `0%nat` / `1%nat` per branch, and `( … + … )%nat` on any sum.
+* **A `bm_paid_use`-style destructuring pattern collides with the lemma
+  binder you just added.**  `as (cr u' Sb)` inside a lemma that now takes
+  `Sb` as a parameter is *"Sb is already used"* — the same family as the
+  `iIntros (CID …)` shadowing trap.  Rename the RUNNING set (`Sq`), never
+  the parameter: the parameter's name is what every call site spells.
+* **A credited callee's post is `S (u' - 1)`, and the next callee wants
+  `u'`.**  They are the same nat and not the same term, so the tail's
+  `iApply` fails with *"iSpecialize: cannot instantiate"* printing two
+  levels that differ only in that shape.  One `iEval (rewrite Hu'1) in
+  "Hop"` before the application; do not try to make the arithmetic line up
+  by choosing the other spelling at the call site, because the bound goals
+  then carry `S (u' - 1)` into `lia` under a `destruct crb, cru`.
+* **A positional parameter group added mid-list must be added at the same
+  place in every call site, and the compiler will NOT always say so.**
+  `ip_tail` grew `(used used' Sb Sb' : gset Z)`; one call site was written
+  `… used used' k q inum Mt ci Sb Sb' …`, which is four `gset`-typed
+  arguments in a different order and fails far away.  When a script does
+  the threading, have it rewrite the ARGUMENT LIST as one unit rather than
+  appending.
+* **A base checkout can leave the whole tree stale while a per-file
+  `coqc` loop stays green.**  The mirror reported 1061 `.vo` and every
+  single-file build passed in minutes, because each only rebuilt its own
+  dependency chain; the first full `make` then recompiled from
+  `WpGprCsrwA.v` upward.  A per-file loop is a check of the file, never of
+  the tree — and `make -q` is not the tell either (it returns 1 on the
+  phony `pre-all`/`real-all` targets even when nothing needs building).
+  Use `make -n` and look for `COQC` lines.
+
+### What 6 is now unblocked on
+
+Finding 2 of GR-2a stands: namex's four log sites are all `iput` or
+`iunlockput`, and both now have set-form contracts that carry
+`Sb ⊆ Sb'` across a call.  The loop can therefore thread the set the way
+itrunc's loops do.  `ProofNamex.v` is 5713 lines but has only those four
+seams; by the sizing rule above that is roughly `ProofIput`'s cost, not
+`ProofItrunc`'s.  **Single-file `coqc` loop is still mandatory there**
+(~3 min / 5.3 GB per compile).
