@@ -111,6 +111,24 @@
          one, the open one must already be at a boundary or finished.
          The reader's block is last, and its tail completion closes it.
 
+         AN INTERRUPT DELIVERY IS NOT A CASE OF THAT WALK.  Since stage B
+         a delivery is an ordinary step of the segment the agent is in
+         ([xstep] = [pf_xsolo] or [pf_xirq]), carrying with it the
+         seip-freedom of the residual it interrupts unless it landed at a
+         boundary ([xseip_ok], supplied by [Hseip]).  So [seg_build] has
+         ONE step case, not two, and the hart segments it exports may
+         contain deliveries; [WeakComposeLang]'s refinement is what
+         commutes them out to their block boundaries
+         ([WeakSailComplete] §9), where they become [SegIrq] segments.
+         What this file provides for that is §10b: the [pxv6] delivery
+         step [pf_xirq], its forward commutation past a solo step
+         ([pf_xirq_commute_step], [xirq_run_commute]) and the
+         configuration equivalence [xcfg_eqv] the commutation lands in
+         (pointwise-equal register files -- no funext) together with the
+         transport of everything the cone exports across it
+         ([xcfg_eqv_violates], [xcfg_eqv_violation_hart], [at_pbnd_eqv],
+         [seg2_irq_ok_eqv], [seg2_disk_ok_eqv], [pf_xsolo_eqv]).
+
     ------------------------------------------------------------------------
     WHAT IS DELIVERED.
 
@@ -145,11 +163,22 @@
     ([img_total]).  Layer-1's two side conditions are NOT premises —
     [WeakCompose.xv6_lat_free] and [xv6_ts_oblivious] discharge them.
 
-    STAGE B5a ADDS EXACTLY TWO: [Hirqb] (a trace step that is an
-    [irq_deliver] has a boundary PRE-state) and [Hcls] (every logged
-    message carries the class its own author's pre-record computes --
-    [WeakSailLTS2.lbl_class] at the trace's own [wstate]).  [rmw_tight]
-    is NOT a premise; it is derived from [own_coh].
+    STAGE B5a ADDS EXACTLY TWO: [Hseip] (a trace step that is an
+    [irq_deliver] from a NON-boundary pre-state interrupts a residual
+    that never touches [sig_seip] -- [WeakSailComplete.seip_free_psail])
+    and [Hcls] (every logged message carries the class its own author's
+    pre-record computes -- [WeakSailLTS2.lbl_class] at the trace's own
+    [wstate]).  [rmw_tight] is NOT a premise; it is derived from
+    [own_coh].
+
+    [Hseip] REPLACED [Hirqb] ("a delivery has a boundary pre-state"),
+    which was a COVERAGE GAP rather than an assumption about the program:
+    hardware asserts SEIP mid-instruction, so [Hirqb] excluded those
+    behaviors outright.  [Hcls] is not a premise of the CAPSTONE any more
+    either -- [WeakComposeLang] hands it in, having brought the behavior
+    into canonical form with [WeakRetag] -- but it is still this section's
+    hypothesis, since the retag is a whole-behavior operation and this
+    file works one bundle at a time.
 
     NOTE ON NAMES.  [WeakAxiomatic] is imported FIRST so that
     [WeakPromise]'s [wlabel] constructors shadow its [lbl] ones, exactly
@@ -1306,6 +1335,647 @@ Proof.
   by destruct (Hlat j t Hj) as (_ & Hnw).
 Qed.
 
+(* ---------------------------------------------------------------- *)
+(** *** THE DELIVERY AS A CONFIGURATION STEP, AND THE MIXED SEGMENT STEP
+
+    Stage B's coverage fix (the premise [Hseip] of §12): the hardware
+    asserts SEIP mid-instruction, so [WeakSailLTS.sail_step]'s
+    [irq_deliver] arm may fire STRICTLY INSIDE a block.  A hart segment's
+    run is therefore a MIX of irq-free solo steps and deliveries
+    ([xstep]), each delivery carrying the SEIP-FREEDOM of the residual it
+    interrupts — unless it lands at an instruction boundary, where there
+    is no residual to speak of ([xseip_ok]).  [WeakComposeLang]'s
+    refinement pass commutes every mid-block delivery FORWARD to its
+    block's end (the kit of [WeakSailComplete] §9), so nothing downstream
+    of the refinement ever sees one inside a block, and [seg2_irq_ok]
+    keeps its boundary shape. *)
+
+(** "agent [i] is at an instruction boundary in [c]". *)
+Definition at_pbnd (i : agent) (c : wpcfg pxv6) : Prop :=
+  ∀ ag, pc_ags c !! i = Some ag → pbnd (pa_st ag).
+
+Definition pf_xirq (i : agent) (c c' : wpcfg pxv6) : Prop :=
+  ∃ ag q q', pc_ags c !! i = Some ag ∧ pa_st ag = PHart q ∧
+    irq_deliver q WeakPromise.LSilent q' ∧
+    c' = WPCfg (pc_img c) (pc_log c)
+           (<[i := WPAgent (PHart q') (pa_ws ag) (pa_prom ag)]> (pc_ags c)).
+
+(** The delivery arm of [WeakSailLTS.sail_step] is GATED on [sp_fence =
+    None] (a parked [fence.tso] admits nothing else), so [pf_xirq] is a
+    real step only where the gate is open.  The gate is NOT part of
+    [pf_xirq] because the forward commutation may move a delivery past a
+    [Barrier], which PARKS a fence: what the refinement needs is that the
+    gate is open where the delivery finally FIRES, i.e. at a block
+    boundary, and [pbnd] says exactly that. *)
+Definition xfence_free (i : agent) (c : wpcfg pxv6) : Prop :=
+  ∀ ag q, pc_ags c !! i = Some ag → pa_st ag = PHart q → sp_fence q = None.
+
+(** "this agent's residual never touches the pin" — and its conditional
+    form, which is exactly what [Hseip] supplies. *)
+Definition xseip_free (i : agent) (c : wpcfg pxv6) : Prop :=
+  ∀ ag q, pc_ags c !! i = Some ag → pa_st ag = PHart q → seip_free_psail q.
+
+Definition xseip_ok (i : agent) (c : wpcfg pxv6) : Prop :=
+  ∀ ag q, pc_ags c !! i = Some ag → pa_st ag = PHart q →
+    ¬ pbnd (PHart q) → seip_free_psail q.
+
+(** ONE STEP OF A HART SEGMENT. *)
+Definition xstep (i : agent) (c c' : wpcfg pxv6) : Prop :=
+  pf_xsolo riscv_step i c c' ∨
+  (xseip_ok i c ∧ xfence_free i c ∧ pf_xirq i c c').
+
+Lemma irq_deliver_shape q q' :
+  irq_deliver q WeakPromise.LSilent q' →
+  sp_m q' = sp_m q ∧ sp_fence q' = sp_fence q ∧ sp_dev q' = sp_dev q.
+Proof. intros (_ & v & iq & _ & ->). by split_and!. Qed.
+
+Lemma sail_step_irq next p l p' :
+  sp_fence p = None → irq_deliver p l p' → sail_step next p l p'.
+Proof. intros Hf Hd. rewrite /sail_step Hf. by left. Qed.
+
+Lemma pf_xirq_pf_step (next : bool → M unit) i c c' :
+  xfence_free i c → pf_xirq i c c' →
+  wp_pf_step (pstep_xv6 next) i WeakPromise.LSilent c c'.
+Proof.
+  intros Hf (ag & q & q' & Hlk & Hst & Hdel & ->).
+  apply (PFSilent (pstep_xv6 next) i c ag (PHart q') Hlk).
+  rewrite /pstep_xv6 Hst.
+  exact (sail_step_irq next q WeakPromise.LSilent q' (Hf ag q Hlk Hst) Hdel).
+Qed.
+
+Lemma pf_xirq_run (next : bool → M unit) i c c' :
+  xfence_free i c → pf_xirq i c c' → wp_pf_run (pstep_xv6 next) c c'.
+Proof. intros Hf H. exists i, WeakPromise.LSilent. by eapply pf_xirq_pf_step. Qed.
+
+Lemma xfence_free_bnd i c : at_pbnd i c → xfence_free i c.
+Proof.
+  intros Hb ag q Hlk Hst. have Hp := Hb ag Hlk. rewrite Hst in Hp. by apply Hp.
+Qed.
+
+Lemma xfence_free_irq i c c' :
+  pf_xirq i c c' → xfence_free i c → xfence_free i c'.
+Proof.
+  intros (ag & q & q0 & Hlk & Hst & Hdel & ->) Hf ag' q' Hlk' Hst'.
+  simpl in Hlk'. rewrite (lookup_insert_self (pc_ags c) i _ ag Hlk) in Hlk'.
+  injection Hlk' as <-. simpl in Hst'. injection Hst' as <-.
+  destruct (irq_deliver_shape q q0 Hdel) as (_ & Hfe & _).
+  rewrite Hfe. exact (Hf ag q Hlk Hst).
+Qed.
+
+Lemma pf_xirq_frame i c c' :
+  pf_xirq i c c' →
+  pc_img c' = pc_img c ∧ pc_log c' = pc_log c ∧
+  length (pc_ags c') = length (pc_ags c) ∧
+  (∀ j, j ≠ i → pc_ags c' !! j = pc_ags c !! j).
+Proof.
+  intros (ag & q & q' & Hlk & _ & _ & ->). split_and!; [done|done| |].
+  - simpl. by rewrite length_insert.
+  - intros j Hj. simpl. by apply lookup_insert_other.
+Qed.
+
+Lemma pf_xirq_at i c c' :
+  pf_xirq i c c' →
+  ∃ ag ag' q q', pc_ags c !! i = Some ag ∧ pa_st ag = PHart q ∧
+     pc_ags c' !! i = Some ag' ∧ pa_st ag' = PHart q' ∧
+     pa_ws ag' = pa_ws ag ∧ pa_prom ag' = pa_prom ag ∧
+     irq_deliver q WeakPromise.LSilent q'.
+Proof.
+  intros (ag & q & q' & Hlk & Hst & Hdel & ->).
+  exists ag, (WPAgent (PHart q') (pa_ws ag) (pa_prom ag)), q, q'.
+  split_and!; [exact Hlk|exact Hst| |done|done|done|exact Hdel].
+  simpl. by eapply lookup_insert_self, Hlk.
+Qed.
+
+Lemma pf_xirq_obs i c c' j a : pf_xirq i c c' → obs_flr c' j a = obs_flr c j a.
+Proof.
+  intros Hirq. rewrite /obs_flr.
+  destruct (pf_xirq_frame i c c' Hirq) as (_ & _ & _ & Hfr).
+  destruct (decide (j = i)) as [->|Hj].
+  - destruct (pf_xirq_at i c c' Hirq)
+      as (ag & ag' & q & q' & Hlk & _ & Hlk' & _ & Hws & _).
+    by rewrite Hlk Hlk' Hws.
+  - by rewrite (Hfr j Hj).
+Qed.
+
+Lemma xstep_run i c c' : xstep i c c' → wp_pf_run (pstep_xv6 riscv_step) c c'.
+Proof.
+  intros [Hs|(_ & Hf & Hirq)]; [by apply (pf_xsolo_run riscv_step i)|].
+  by eapply pf_xirq_run.
+Qed.
+
+Lemma xstep_rtc_run i c c' :
+  rtc (xstep i) c c' → rtc (wp_pf_run (pstep_xv6 riscv_step)) c c'.
+Proof.
+  induction 1 as [|x y z Hxy _ IH]; [apply rtc_refl|].
+  eapply rtc_l; [exact (xstep_run i x y Hxy)|exact IH].
+Qed.
+
+Lemma pf_xsolo_rtc_xstep i c c' :
+  rtc (pf_xsolo riscv_step i) c c' → rtc (xstep i) c c'.
+Proof.
+  induction 1 as [|x y z Hxy _ IH]; [apply rtc_refl|].
+  eapply rtc_l; [by left|exact IH].
+Qed.
+
+(* ================================================================== *)
+(** *** CONFIGURATIONS THAT AGREE UP TO POINTWISE REGISTER EQUALITY
+
+    The forward commutation of a delivery cannot end at a LITERALLY equal
+    configuration ([WeakSailComplete] §9, deviation (b): [regstate]'s
+    fields are functions, and swapping two [register_set]s of the same
+    field group needs functional extensionality, which this chain does
+    not use).  [xcfg_eqv] is the [pxv6] twin of the kit's [cfg_eqv],
+    globalised over agents (successive segments move different agents):
+    image, log, every [wstate] and promise set and every program state
+    EXCEPT the raw register files, which agree register by register.
+    Everything the cone exports — [violates_at], [violation_hart],
+    boundary-ness, [obs_flr] — is blind to the difference. *)
+
+Definition pxv6_eqv (p q : pxv6) : Prop :=
+  match p, q with
+  | PHart a, PHart b => psail_eqv a b
+  | PDisk d1 l1, PDisk d2 l2 => d1 = d2 ∧ l1 = l2
+  | _, _ => False
+  end.
+
+Lemma pxv6_eqv_refl p : pxv6_eqv p p.
+Proof. destruct p; simpl; [apply psail_eqv_refl|by split]. Qed.
+
+Lemma pxv6_eqv_sym p q : pxv6_eqv p q → pxv6_eqv q p.
+Proof.
+  destruct p, q; simpl; try done; [apply psail_eqv_sym|by intros [-> ->]].
+Qed.
+
+Lemma pxv6_eqv_trans p q r : pxv6_eqv p q → pxv6_eqv q r → pxv6_eqv p r.
+Proof.
+  destruct p, q, r; simpl; try done;
+    [apply psail_eqv_trans|by intros [-> ->] [-> ->]].
+Qed.
+
+Lemma pxv6_eqv_pbnd p q : pxv6_eqv p q → pbnd p → pbnd q.
+Proof.
+  destruct p as [a|d1 l1], q as [b|d2 l2]; simpl; try done.
+  - intros ((Hm & _ & Hf & _) & _) (H1 & H2). rewrite -Hm -Hf. by split.
+  - by intros [-> ->].
+Qed.
+
+Lemma pxv6_eqv_hart a q : pxv6_eqv (PHart a) q → ∃ b, q = PHart b ∧ psail_eqv a b.
+Proof. destruct q as [b|??]; [by exists b|done]. Qed.
+
+Definition xag_eqv (ag ag' : wpagent pxv6) : Prop :=
+  pa_ws ag' = pa_ws ag ∧ pa_prom ag' = pa_prom ag ∧
+  pxv6_eqv (pa_st ag) (pa_st ag').
+
+Lemma xag_eqv_refl ag : xag_eqv ag ag.
+Proof. split_and!; [done|done|apply pxv6_eqv_refl]. Qed.
+
+Lemma xag_eqv_sym ag ag' : xag_eqv ag ag' → xag_eqv ag' ag.
+Proof.
+  intros (H1 & H2 & H3). split_and!; [by rewrite H1|by rewrite H2
+                                     |by apply pxv6_eqv_sym].
+Qed.
+
+Definition xcfg_eqv (c d : wpcfg pxv6) : Prop :=
+  pc_img d = pc_img c ∧ pc_log d = pc_log c ∧
+  length (pc_ags d) = length (pc_ags c) ∧
+  (∀ j ag, pc_ags c !! j = Some ag →
+     ∃ ag', pc_ags d !! j = Some ag' ∧ xag_eqv ag ag').
+
+Lemma xcfg_eqv_refl c : xcfg_eqv c c.
+Proof.
+  split_and!; [done|done|done|]. intros j ag Hlk.
+  exists ag. split; [exact Hlk|apply xag_eqv_refl].
+Qed.
+
+Lemma xcfg_eqv_lookup c d j ag :
+  xcfg_eqv c d → pc_ags c !! j = Some ag →
+  ∃ ag', pc_ags d !! j = Some ag' ∧ xag_eqv ag ag'.
+Proof. intros (_ & _ & _ & H). exact (H j ag). Qed.
+
+Lemma xcfg_eqv_sym c d : xcfg_eqv c d → xcfg_eqv d c.
+Proof.
+  intros (Hi & Hl & Hlen & Hag). split_and!;
+    [by rewrite Hi|by rewrite Hl|by rewrite Hlen|].
+  intros j ag' Hlk'.
+  have Hlt : (j < length (pc_ags c))%nat.
+  { rewrite -Hlen. by eapply lookup_lt_Some. }
+  have [ag Hlk] : is_Some (pc_ags c !! j) by apply lookup_lt_is_Some_2.
+  destruct (Hag j ag Hlk) as (ag2 & Hlk2 & Heq).
+  rewrite Hlk' in Hlk2. injection Hlk2 as <-.
+  exists ag. split; [exact Hlk|by apply xag_eqv_sym].
+Qed.
+
+Lemma xcfg_eqv_trans c d e : xcfg_eqv c d → xcfg_eqv d e → xcfg_eqv c e.
+Proof.
+  intros (Hi1 & Hl1 & Hn1 & Ha1) (Hi2 & Hl2 & Hn2 & Ha2). split_and!;
+    [by rewrite Hi2|by rewrite Hl2|by rewrite Hn2|].
+  intros j ag Hlk.
+  destruct (Ha1 j ag Hlk) as (ag1 & Hlk1 & (H1 & H2 & H3)).
+  destruct (Ha2 j ag1 Hlk1) as (ag2 & Hlk2 & (G1 & G2 & G3)).
+  exists ag2. split; [exact Hlk2|].
+  split_and!; [by rewrite G1|by rewrite G2|by eapply pxv6_eqv_trans].
+Qed.
+
+Lemma xcfg_eqv_obs c d j a : xcfg_eqv c d → obs_flr d j a = obs_flr c j a.
+Proof.
+  intros Heq. have Heq2 := Heq. destruct Heq2 as (_ & _ & Hlen & Hag).
+  rewrite /obs_flr. destruct (pc_ags c !! j) as [ag|] eqn:Hlk.
+  - destruct (Hag j ag Hlk) as (ag' & Hlk' & (Hws & _ & _)).
+    by rewrite Hlk' Hws.
+  - destruct (pc_ags d !! j) as [ag'|] eqn:Hlk'; [|done].
+    exfalso. have Hlt : (j < length (pc_ags c))%nat.
+    { rewrite -Hlen. by eapply lookup_lt_Some. }
+    destruct (lookup_lt_is_Some_2 (pc_ags c) j Hlt) as (agz & Hagz).
+    by rewrite Hlk in Hagz.
+Qed.
+
+Lemma xcfg_eqv_bnd c d :
+  xcfg_eqv c d → (∀ j ag, pc_ags c !! j = Some ag → pbnd (pa_st ag)) →
+  ∀ j ag, pc_ags d !! j = Some ag → pbnd (pa_st ag).
+Proof.
+  intros Heq Hb j ag' Hlk'.
+  destruct (xcfg_eqv_lookup d c j ag' (xcfg_eqv_sym c d Heq) Hlk')
+    as (ag & Hlk & (_ & _ & Hst)).
+  apply (pxv6_eqv_pbnd (pa_st ag') (pa_st ag')); [apply pxv6_eqv_refl|].
+  eapply pxv6_eqv_pbnd; [exact (pxv6_eqv_sym _ _ Hst)|].
+  exact (Hb j ag Hlk).
+Qed.
+
+Lemma xcfg_eqv_violates c d p m i j a :
+  xcfg_eqv c d → violates_at c p m i j a → violates_at d p m i j a.
+Proof.
+  intros Heq (Hlog & Htid & Hcls & Hpub & Hne & Hbyte & Hobs).
+  have Hl : pc_log d = pc_log c by destruct Heq as (_ & H & _).
+  split_and!; [by rewrite Hl|done|done| |done|done|].
+  - intros (p2 & m2 & Heq2 & Hlog2 & Hwp). apply Hpub.
+    exists p2, m2. rewrite -Hl. by split_and!.
+  - by rewrite (xcfg_eqv_obs c d j a Heq).
+Qed.
+
+Lemma xcfg_eqv_violation_hart nh c d :
+  xcfg_eqv c d →
+  violation_hart cls_of pub_of nh c → violation_hart cls_of pub_of nh d.
+Proof.
+  intros Heq (p & m & i & j & a & Hlog & Htid & Hh1 & Hcls & Hpub & Hne & Hh2
+              & Hbyte & Hobs).
+  have Hv : violates_at c p m i j a by split_and!.
+  destruct (xcfg_eqv_violates c d p m i j a Heq Hv)
+    as (Hlog' & Htid' & Hcls' & Hpub' & Hne' & Hbyte' & Hobs').
+  exists p, m, i, j, a. by split_and!.
+Qed.
+
+(** The one construction: two configurations that agree except in ONE
+    agent's slot, whose two records are [xag_eqv]. *)
+Lemma xcfg_eqv_ins (c d : wpcfg pxv6) i x y :
+  xcfg_eqv c d → is_Some (pc_ags c !! i) → xag_eqv x y →
+  ∀ (img : image) (lg : list wmsg),
+    xcfg_eqv (WPCfg img lg (<[i := x]> (pc_ags c)))
+             (WPCfg img lg (<[i := y]> (pc_ags d))).
+Proof.
+  intros Heq [ag0 Hag0] Hxy img lg. have Heq2 := Heq.
+  destruct Heq2 as (_ & _ & Hlen & Hag).
+  split_and!; [done|done|by rewrite /= !length_insert Hlen|].
+  intros j ag Hlk. simpl in Hlk |- *.
+  destruct (decide (j = i)) as [->|Hj].
+  - rewrite (lookup_insert_self (pc_ags c) i x ag0 Hag0) in Hlk.
+    injection Hlk as <-. destruct (Hag i ag0 Hag0) as (ag1 & Hag1 & _).
+    exists y. split; [by eapply lookup_insert_self, Hag1|exact Hxy].
+  - rewrite (lookup_insert_other (pc_ags c) i x j Hj) in Hlk.
+    rewrite (lookup_insert_other (pc_ags d) i y j Hj). by apply Hag.
+Qed.
+
+(* ---------------------------------------------------------------- *)
+(** *** The LTS is blind to the difference *)
+
+Lemma sail_step_eqv next p q l p' :
+  psail_eqv p q → sail_step next p l p' →
+  ∃ q', sail_step next q l q' ∧ psail_eqv p' q'.
+Proof.
+  intros Heqv Hstep.
+  destruct (sail_step_irq_or_ni next p l p' Hstep)
+    as [[Hf (-> & v & iq & Hiq & ->)]|Hni].
+  - have Heqv2 := Heqv. destruct Heqv2 as ((Hm & Hd & Hfe & Hr) & Hirq).
+    exists (PSail (sp_m q) (register_set sig_seip v (sp_regs q)) (sp_dev q)
+              (sp_fence q) iq).
+    have Hfq : sp_fence q = None by rewrite -Hfe.
+    split.
+    + apply (sail_step_irq next q WeakPromise.LSilent _ Hfq).
+      apply irq_deliver_intro. by rewrite -Hirq.
+    + split; [split_and!|]; simpl;
+        [by rewrite Hm|by rewrite Hd|by rewrite Hfe|by apply regs_agree_set
+        |done].
+  - destruct (sail_step_ni_frame (λ _, False) next p q l p' (proj1 Heqv)
+                (regs_free_psail_triv p) Hni) as (q' & Hq' & Hag & Hirq').
+    exists q'. split; [by apply sail_step_ni_step|]. split; [exact Hag|].
+    rewrite (sail_step_ni_irq next p l p' Hni) Hirq'. exact (proj2 Heqv).
+Qed.
+
+Lemma pstep_xv6_eqv next p q l p' :
+  pxv6_eqv p q → pstep_xv6 next p l p' →
+  ∃ q', pstep_xv6 next q l q' ∧ pxv6_eqv p' q'.
+Proof.
+  destruct p as [a|d1 l1], q as [b|d2 l2]; simpl; try done.
+  - intros Heqv Hstep. destruct p' as [a'|dd pend]; [|done].
+    destruct (sail_step_eqv next a b l a' Heqv Hstep) as (b' & H1 & H2).
+    by exists (PHart b').
+  - intros [-> ->] Hstep. exists p'. split; [exact Hstep|apply pxv6_eqv_refl].
+Qed.
+
+Lemma pstep_ni_xv6_eqv next p q l p' :
+  pxv6_eqv p q → pstep_ni_xv6 next p l p' →
+  ∃ q', pstep_ni_xv6 next q l q' ∧ pxv6_eqv p' q'.
+Proof.
+  destruct p as [a|d1 l1], q as [b|d2 l2]; simpl; try done.
+  - intros Heqv Hstep. destruct p' as [a'|dd pend]; [|done].
+    destruct (sail_step_ni_frame (λ _, False) next a b l a' (proj1 Heqv)
+                (regs_free_psail_triv a) Hstep) as (b' & Hb' & Hag & Hirq').
+    exists (PHart b'). split; [exact Hb'|]. split; [exact Hag|].
+    rewrite (sail_step_ni_irq next a l a' Hstep) Hirq'. exact (proj2 Heqv).
+  - intros [-> ->] Hstep. exists p'. split; [exact Hstep|apply pxv6_eqv_refl].
+Qed.
+
+Lemma wp_pf_step_agent {P : Type} (pstep : P → wlabel → P → Prop)
+    i l (c c' : wpcfg P) :
+  wp_pf_step pstep i l c c' → ∃ ag, pc_ags c !! i = Some ag.
+Proof.
+  intros Hstep. destruct Hstep as
+    [cfg ag st' Hlk Hps
+    |cfg ag aq lat base tvs st' Hlk Hps Hr
+    |cfg ag rl base data kk st' Hlk Hps Hne
+    |cfg ag aq rl base tvs data kk st' Hlk Hps Hne Hlen Hr He
+    |cfg ag pr pw sr sw st' Hlk Hps]; by exists ag.
+Qed.
+
+(** THE BISIMULATION for a solo step: same label, same log growth, same
+    [wstate], and a twinned successor. *)
+Lemma pf_xsolo_eqv i c d c' :
+  xcfg_eqv c d → pf_xsolo riscv_step i c c' →
+  ∃ d', pf_xsolo riscv_step i d d' ∧ xcfg_eqv c' d'.
+Proof.
+  intros Heq (l & Hstep & Hcls & Hrmw).
+  destruct (wp_pf_step_agent (pstep_ni_xv6 riscv_step) i l c c' Hstep)
+    as (ag & Hlk).
+  destruct (xcfg_eqv_lookup c d i ag Heq Hlk)
+    as (agd & Hlkd & Hws & Hprom & Hst).
+  destruct (wp_pf_step_inv (pstep_ni_xv6 riscv_step) i l c c' ag Hstep Hlk)
+    as (st' & ms & Hps & Himg' & Hlog' & Hags' & Hre).
+  destruct (pstep_ni_xv6_eqv riscv_step (pa_st ag) (pa_st agd) l st' Hst Hps)
+    as (stD & HpsD & HstD).
+  have Heq2 := Heq. destruct Heq2 as (Himgd & Hlogd & Hlend & _).
+  exists (WPCfg (pc_img c) (pc_log c ++ ms)
+            (<[i := WPAgent stD (post_ws l (pa_ws ag) (length (pc_log c)))
+                      (pa_prom ag)]> (pc_ags d))).
+  split.
+  - exists l. split_and!.
+    + exact (Hre d agd stD Hlkd Hws Hprom Himgd Hlogd HpsD).
+    + intros ag2 msg Hag2 Heq2. simpl in Heq2, Hag2.
+      rewrite Hlkd in Hag2. injection Hag2 as <-.
+      rewrite Hlogd in Heq2. apply app_inv_head in Heq2. subst ms.
+      rewrite Hws. apply (Hcls ag msg Hlk). by rewrite Hlog'.
+    + rewrite /xrmw_tight in Hrmw |- *. destruct l; try done.
+      intros ag2 Hag2. rewrite Hlkd in Hag2. injection Hag2 as <-.
+      rewrite Himgd Hlogd Hws. exact (Hrmw ag Hlk).
+  - have Hc' : c' = WPCfg (pc_img c) (pc_log c ++ ms)
+                      (<[i := WPAgent st'
+                                (post_ws l (pa_ws ag) (length (pc_log c)))
+                                (pa_prom ag)]> (pc_ags c)).
+    { destruct c' as [i' l' a']; simpl in Himg', Hlog', Hags'.
+      by rewrite Himg' Hlog' Hags'. }
+    rewrite Hc'. apply (xcfg_eqv_ins c d i _ _ Heq); [by exists ag|].
+    by split_and!.
+Qed.
+
+Lemma pf_xsolo_rtc_eqv i c d c' :
+  xcfg_eqv c d → rtc (pf_xsolo riscv_step i) c c' →
+  ∃ d', rtc (pf_xsolo riscv_step i) d d' ∧ xcfg_eqv c' d'.
+Proof.
+  intros Heq Hrun. revert d Heq.
+  induction Hrun as [x|x y z Hxy _ IH]; intros d Heq.
+  { exists d. split; [apply rtc_refl|exact Heq]. }
+  destruct (pf_xsolo_eqv i x d y Heq Hxy) as (dy & Hdy & Heqy).
+  destruct (IH dy Heqy) as (dz & Hdz & Heqz).
+  exists dz. split; [by eapply rtc_l|exact Heqz].
+Qed.
+
+Lemma pf_xirq_eqv i c d c' :
+  xcfg_eqv c d → pf_xirq i c c' → ∃ d', pf_xirq i d d' ∧ xcfg_eqv c' d'.
+Proof.
+  intros Heq (ag & q & q' & Hlk & Hst & Hdel & ->).
+  destruct (xcfg_eqv_lookup c d i ag Heq Hlk)
+    as (agd & Hlkd & Hws & Hprom & Hstd).
+  rewrite Hst in Hstd. destruct (pxv6_eqv_hart q (pa_st agd) Hstd) as (b & Hb & Hqb).
+  have Hqb2 := Hqb. destruct Hqb2 as ((Hm & Hdv & Hfe & Hr) & Hirq).
+  destruct Hdel as (_ & v & iq & Hiq & ->).
+  have Heq2 := Heq. destruct Heq2 as (Himgd & Hlogd & Hlend & _).
+  exists (WPCfg (pc_img c) (pc_log c)
+            (<[i := WPAgent
+                      (PHart (PSail (sp_m b) (register_set sig_seip v (sp_regs b))
+                                (sp_dev b) (sp_fence b) iq))
+                      (pa_ws ag) (pa_prom ag)]> (pc_ags d))).
+  split.
+  - exists agd, b,
+      (PSail (sp_m b) (register_set sig_seip v (sp_regs b)) (sp_dev b)
+         (sp_fence b) iq).
+    split_and!; [exact Hlkd|exact Hb| |].
+    + apply irq_deliver_intro. by rewrite -Hirq.
+    + by rewrite Himgd Hlogd Hws Hprom.
+  - apply (xcfg_eqv_ins c d i _ _ Heq); [by exists ag|].
+    split_and!; [done|done|]. simpl. split; [split_and!|]; simpl;
+      [by rewrite Hm|by rewrite Hdv|by rewrite Hfe|by apply regs_agree_set|done].
+Qed.
+
+Lemma pf_xirq_rtc_eqv i c d c' :
+  xcfg_eqv c d → rtc (pf_xirq i) c c' →
+  ∃ d', rtc (pf_xirq i) d d' ∧ xcfg_eqv c' d'.
+Proof.
+  intros Heq Hrun. revert d Heq.
+  induction Hrun as [x|x y z Hxy _ IH]; intros d Heq.
+  { exists d. split; [apply rtc_refl|exact Heq]. }
+  destruct (pf_xirq_eqv i x d y Heq Hxy) as (dy & Hdy & Heqy).
+  destruct (IH dy Heqy) as (dz & Hdz & Heqz).
+  exists dz. split; [by eapply rtc_l|exact Heqz].
+Qed.
+
+(* ---------------------------------------------------------------- *)
+(** *** SEIP-freedom: transport and preservation *)
+
+Lemma xseip_free_eqv i c d : xcfg_eqv c d → xseip_free i c → xseip_free i d.
+Proof.
+  intros Heq Hfr ag' q' Hlk' Hst'.
+  destruct (xcfg_eqv_lookup d c i ag' (xcfg_eqv_sym c d Heq) Hlk')
+    as (ag & Hlk & (_ & _ & Hst)).
+  rewrite Hst' in Hst.
+  destruct (pxv6_eqv_hart q' (pa_st ag) Hst) as (q & Hq & Hqq).
+  have Hm : sp_m q' = sp_m q by apply (proj1 (proj1 Hqq)).
+  rewrite /seip_free_psail /regs_free_psail Hm.
+  exact (Hfr ag q Hlk Hq).
+Qed.
+
+Lemma xseip_free_irq i c c' :
+  pf_xirq i c c' → xseip_free i c → xseip_free i c'.
+Proof.
+  intros Hirq Hfr ag' q' Hlk' Hst'.
+  destruct (pf_xirq_at i c c' Hirq)
+    as (ag & ag2 & q & q2 & Hlk & Hst & Hlk2 & Hst2 & _ & _ & Hdel).
+  rewrite Hlk' in Hlk2. injection Hlk2 as <-.
+  rewrite Hst' in Hst2. injection Hst2 as <-.
+  destruct (irq_deliver_shape q q' Hdel) as (Hm & _ & _).
+  rewrite /seip_free_psail /regs_free_psail Hm. exact (Hfr ag q Hlk Hst).
+Qed.
+
+Lemma xseip_free_irq_back i c c' :
+  pf_xirq i c c' → xseip_free i c' → xseip_free i c.
+Proof.
+  intros Hirq Hfr ag q Hlk Hst.
+  destruct (pf_xirq_at i c c' Hirq)
+    as (ag0 & ag2 & q0 & q2 & Hlk0 & Hst0 & Hlk2 & Hst2 & _ & _ & Hdel).
+  rewrite Hlk in Hlk0. injection Hlk0 as <-.
+  rewrite Hst in Hst0. injection Hst0 as <-.
+  destruct (irq_deliver_shape q q2 Hdel) as (Hm & _ & _).
+  rewrite /seip_free_psail /regs_free_psail -Hm. exact (Hfr ag2 q2 Hlk2 Hst2).
+Qed.
+
+Lemma xseip_free_irq_rtc_back i c c' :
+  rtc (pf_xirq i) c c' → xseip_free i c' → xseip_free i c.
+Proof.
+  induction 1 as [|x y z Hxy _ IH]; [done|].
+  intros Hfr. eapply xseip_free_irq_back; [exact Hxy|by apply IH].
+Qed.
+
+Lemma xseip_free_step i c c' :
+  (∀ ag q, pc_ags c !! i = Some ag → pa_st ag = PHart q → sp_m q ≠ None) →
+  xseip_free i c → pf_xsolo riscv_step i c c' → xseip_free i c'.
+Proof.
+  intros Hin Hfr (l & Hstep & _ & _) ag' q' Hlk' Hst'.
+  destruct (wp_pf_step_agent (pstep_ni_xv6 riscv_step) i l c c' Hstep)
+    as (ag & Hlk).
+  destruct (wp_pf_step_inv (pstep_ni_xv6 riscv_step) i l c c' ag Hstep Hlk)
+    as (st' & ms & Hps & _ & _ & Hags & _).
+  rewrite Hags in Hlk'.
+  rewrite (lookup_insert_self (pc_ags c) i _ ag Hlk) in Hlk'.
+  injection Hlk' as <-. simpl in Hst'. subst st'.
+  destruct (pa_st ag) as [q|dd pend] eqn:Hst; [|by destruct Hps].
+  simpl in Hps.
+  exact (seip_free_res_step riscv_step q l q' (Hin ag q Hlk Hst)
+           (Hfr ag q Hlk Hst) Hps).
+Qed.
+
+(* ---------------------------------------------------------------- *)
+(** *** THE FORWARD COMMUTATION, at [pxv6]
+
+    [WeakSailComplete.irq_commute_step] is the LTS-level core; this is
+    its configuration-level packaging, and then the run form: a whole
+    chain of pending deliveries commutes past ONE solo step. *)
+
+(** A step that REACHES a boundary leaves no parked fence: the only arm
+    that parks one is [Barrier], and it leaves the residual in flight. *)
+Lemma sail_step_ni_bnd_fence next p l p' :
+  sail_step_ni next p l p' → sp_m p' = None → sp_fence p' = None.
+Proof.
+  rewrite /sail_step_ni.
+  destruct (sp_fence p) as [[[[pr pw] sr] sw]|]; [by intros [_ ->] Hm|].
+  destruct (sp_m p) as [m|]; [|by intros [_ [tick ->]] Hm].
+  rewrite /sail_mstep. destruct m as [y|T oc k]; [by intros [_ ->] Hm|].
+  destruct oc; simpl;
+    try (by intros [_ ->] Hm);
+    try (by intros [_ [ch ->]] Hm);
+    try done;
+    destruct (dev_addr _); try (by intros [_ ->] Hm).
+  - (* MemRead, RAM *)
+    intros [_ H].
+    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
+                  |pr pw sr sw]; try done.
+    + destruct lat; [done|].
+      by destruct H as (_ & _ & _ & _ & w & _ & ->).
+    + by destruct H as (_ & _ & _ & _ & _ & w & m1 & m2 & rs1 & _ & _ & _ & ->).
+  - (* MemWrite, RAM *)
+    by intros (_ & _ & _ & ->).
+Qed.
+
+(** …and its configuration form, which is what the refinement reads off
+    the LAST step of a block. *)
+Lemma pf_xsolo_bnd_fence i c c' :
+  pf_xsolo riscv_step i c c' →
+  (∀ ag q, pc_ags c' !! i = Some ag → pa_st ag = PHart q → sp_m q = None) →
+  xfence_free i c'.
+Proof.
+  intros (l & Hstep & _ & _) Hbnd ag' q' Hlk' Hst'.
+  have Hm : sp_m q' = None := Hbnd ag' q' Hlk' Hst'.
+  destruct (wp_pf_step_agent (pstep_ni_xv6 riscv_step) i l c c' Hstep)
+    as (ag & Hlk).
+  destruct (wp_pf_step_inv (pstep_ni_xv6 riscv_step) i l c c' ag Hstep Hlk)
+    as (st' & ms & Hps & _ & _ & Hags & _).
+  rewrite Hags in Hlk'.
+  rewrite (lookup_insert_self (pc_ags c) i _ ag Hlk) in Hlk'.
+  injection Hlk' as <-. simpl in Hst'. subst st'.
+  destruct (pa_st ag) as [q|dd pend]; [|by destruct Hps]. simpl in Hps.
+  exact (sail_step_ni_bnd_fence riscv_step q l q' Hps Hm).
+Qed.
+
+Lemma pf_xirq_commute_step i c c1 c2 :
+  xseip_free i c → pf_xirq i c c1 → pf_xsolo riscv_step i c1 c2 →
+  ∃ c1' c2', pf_xsolo riscv_step i c c1' ∧ pf_xirq i c1' c2' ∧
+             xcfg_eqv c2 c2'.
+Proof.
+  intros Hfr (ag & q & q1 & Hlk & Hst & Hdel & ->) (l & Hstep & Hcc & Hrt).
+  set (ag1 := WPAgent (PHart q1) (pa_ws ag) (pa_prom ag)).
+  have Hlk1 : pc_ags (WPCfg (pc_img c) (pc_log c) (<[i := ag1]> (pc_ags c)))
+                !! i = Some ag1
+    := lookup_insert_self (pc_ags c) i ag1 ag Hlk.
+  destruct (wp_pf_step_inv (pstep_ni_xv6 riscv_step) i l _ c2 ag1 Hstep Hlk1)
+    as (st2 & ms & Hps & Himg2 & Hlog2 & Hags2 & Hre).
+  simpl in Hps, Himg2, Hlog2, Hags2, Hre.
+  destruct st2 as [q2|dd pend]; [|by destruct Hps]. simpl in Hps.
+  destruct (irq_commute_step riscv_step q q1 l q2 (Hfr ag q Hlk Hst) Hdel Hps)
+    as (q1' & q2' & Hstep1' & Hdel' & Heqv2).
+  set (wsp := post_ws l (pa_ws ag) (length (pc_log c))).
+  exists (WPCfg (pc_img c) (pc_log c ++ ms)
+            (<[i := WPAgent (PHart q1') wsp (pa_prom ag)]> (pc_ags c))),
+         (WPCfg (pc_img c) (pc_log c ++ ms)
+            (<[i := WPAgent (PHart q2') wsp (pa_prom ag)]> (pc_ags c))).
+  split_and!.
+  - exists l. split_and!.
+    + refine (Hre c ag (PHart q1') Hlk eq_refl eq_refl eq_refl eq_refl _).
+      by rewrite Hst.
+    + intros ag0 msg Hag0 Heq. simpl in Heq.
+      rewrite Hlk in Hag0. injection Hag0 as <-.
+      apply app_inv_head in Heq. subst ms.
+      exact (Hcc ag1 msg Hlk1 Hlog2).
+    + rewrite /xrmw_tight in Hrt |- *. destruct l; try done.
+      intros ag0 Hag0. rewrite Hlk in Hag0. injection Hag0 as <-.
+      exact (Hrt ag1 Hlk1).
+  - exists (WPAgent (PHart q1') wsp (pa_prom ag)), q1', q2'.
+    split_and!.
+    + simpl. by eapply lookup_insert_self, Hlk.
+    + reflexivity.
+    + exact Hdel'.
+    + by rewrite /= list_insert_insert.
+  - have Hc2 : c2 = WPCfg (pc_img c) (pc_log c ++ ms)
+                     (<[i := WPAgent (PHart q2) wsp (pa_prom ag)]> (pc_ags c)).
+    { destruct c2 as [ci cl ca]; simpl in Himg2, Hlog2, Hags2.
+      rewrite Himg2 Hlog2 Hags2 /= list_insert_insert. reflexivity. }
+    rewrite Hc2.
+    apply (xcfg_eqv_ins c c i _ _ (xcfg_eqv_refl c)); [by exists ag|].
+    split_and!; [done|done|]. simpl. exact (psail_eqv_sym _ _ Heqv2).
+Qed.
+
+Lemma xirq_run_commute i : ∀ z0 zd, rtc (pf_xirq i) z0 zd →
+  ∀ x, xseip_free i z0 → pf_xsolo riscv_step i zd x →
+  ∃ z0' xd, pf_xsolo riscv_step i z0 z0' ∧ rtc (pf_xirq i) z0' xd ∧
+            xcfg_eqv x xd.
+Proof.
+  intros z0 zd Hrun. induction Hrun as [z|z z1 zd Hz1 _ IH];
+    intros x Hfr Hsolo.
+  - exists x, x. split_and!; [exact Hsolo|apply rtc_refl|apply xcfg_eqv_refl].
+  - destruct (IH x (xseip_free_irq i z z1 Hz1 Hfr) Hsolo)
+      as (z1' & xd1 & Hsolo1 & Hirq1 & Heq1).
+    destruct (pf_xirq_commute_step i z z1 z1' Hfr Hz1 Hsolo1)
+      as (w1 & w2 & Hsolow & Hirqw & Heqw).
+    destruct (pf_xirq_rtc_eqv i z1' w2 xd1 Heqw Hirq1) as (xd2 & Hxd2 & Heq2).
+    exists w1, xd2. split_and!;
+      [exact Hsolow|by eapply rtc_l|by eapply xcfg_eqv_trans].
+Qed.
+
 (** *** (d) The irq split, at the configuration level *)
 
 Lemma pstep_xv6_ni_or_irq next p l p' :
@@ -1323,13 +1993,7 @@ Qed.
 Lemma pf_step_ni_or_irq next i l (c c' : wpcfg pxv6) :
   wp_pf_step (pstep_xv6 next) i l c c' →
   wp_pf_step (pstep_ni_xv6 next) i l c c' ∨
-  (∃ ag ag' q q',
-     pc_ags c !! i = Some ag ∧ pa_st ag = PHart q ∧
-     pc_ags c' !! i = Some ag' ∧ pa_st ag' = PHart q' ∧
-     sp_fence q = None ∧ irq_deliver q l q' ∧
-     pa_ws ag' = pa_ws ag ∧
-     pc_img c' = pc_img c ∧ pc_log c' = pc_log c ∧
-     (∀ j, j ≠ i → pc_ags c' !! j = pc_ags c !! j)).
+  (l = WeakPromise.LSilent ∧ xfence_free i c ∧ pf_xirq i c c').
 Proof.
   intros Hstep.
   destruct Hstep as
@@ -1342,11 +2006,12 @@ Proof.
       as [Hni|(q & q' & Hq & Hq' & Hf & Hirq)];
     try (by left; econstructor; eauto);
     try (by destruct Hirq as [Hc _]; inversion Hc).
-  right. exists ag, (WPAgent st' (pa_ws ag) (pa_prom ag)), q, q'.
-  split_and!; [exact Hlk|exact Hq| | |exact Hf|exact Hirq|done|done|done|].
-  - simpl. by eapply lookup_insert_self, Hlk.
-  - by simpl.
-  - intros j Hj. simpl. by apply lookup_insert_other.
+  right. split_and!; [reflexivity| |].
+  - intros ag0 q0 Hlk0 Hst0.
+    have Ha : ag0 = ag by congruence. subst ag0.
+    have Hq0 : q0 = q by congruence. by subst q0.
+  - exists ag, q, q'.
+    split_and!; [exact Hlk|exact Hq|exact Hirq|by rewrite Hq'].
 Qed.
 
 (* ====================================================================== *)
@@ -1376,8 +2041,6 @@ Definition seg2_src (s : seg2) : wpcfg pxv6 :=
 Definition seg2_dst (s : seg2) : wpcfg pxv6 :=
   match s with SegHart _ _ c' | SegIrq _ _ c' | SegDisk _ _ c' => c' end.
 
-Definition at_pbnd (i : agent) (c : wpcfg pxv6) : Prop :=
-  ∀ ag, pc_ags c !! i = Some ag → pbnd (pa_st ag).
 
 (** The disk's emitted messages carry the EMITTING AGENT's index as their
     author; [WeakLang.wmsgs_of_map] stamps [WeakLang.n_disk].  At the
@@ -1396,18 +2059,13 @@ Qed.
 
 Definition seg2_hart_ok (i : agent) (c c' : wpcfg pxv6) : Prop :=
   (∃ ag q, pc_ags c !! i = Some ag ∧ pa_st ag = PHart q) ∧
-  at_pbnd i c ∧ at_pbnd i c' ∧ rtc (pf_xsolo riscv_step i) c c'.
+  at_pbnd i c ∧ at_pbnd i c' ∧ rtc (xstep i) c c'.
 
+(** A delivery AT A BOUNDARY — the shape [WeakComposeLang]'s lift consumes,
+    and (since stage B) the shape the REFINEMENT produces: [seg_build] itself
+    keeps every delivery inside the hart segment it interrupts. *)
 Definition seg2_irq_ok (i : agent) (c c' : wpcfg pxv6) : Prop :=
-  ∃ ag ag' q q',
-    pc_ags c !! i = Some ag ∧ pa_st ag = PHart q ∧
-    pc_ags c' !! i = Some ag' ∧ pa_st ag' = PHart q' ∧
-    pbnd (PHart q) ∧ pbnd (PHart q') ∧
-    sp_fence q = None ∧ irq_deliver q WeakPromise.LSilent q' ∧
-    pa_ws ag' = pa_ws ag ∧
-    pc_img c' = pc_img c ∧ pc_log c' = pc_log c ∧
-    (∀ j, j ≠ i → pc_ags c' !! j = pc_ags c !! j) ∧
-    wp_pf_step (pstep_xv6 riscv_step) i WeakPromise.LSilent c c'.
+  at_pbnd i c ∧ pf_xirq i c c'.
 
 Definition seg2_disk_ok (i : agent) (c c' : wpcfg pxv6) : Prop :=
   ∃ d d' mem w,
@@ -1442,9 +2100,9 @@ Lemma seg2_run (s : seg2) :
   seg2_ok s → rtc (wp_pf_run (pstep_xv6 riscv_step)) (seg2_src s) (seg2_dst s).
 Proof.
   destruct s as [i c c'|i c c'|i c c']; simpl.
-  - intros (_ & _ & _ & Hrun). exact (pf_xsolo_rtc_run riscv_step i c c' Hrun).
-  - intros (?&?&?&?& _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hstep).
-    by apply rtc_once; exists i, WeakPromise.LSilent.
+  - intros (_ & _ & _ & Hrun). exact (xstep_rtc_run i c c' Hrun).
+  - intros (Hb & Hirq). apply rtc_once.
+    eapply pf_xirq_run; [by apply xfence_free_bnd|exact Hirq].
   - intros (?&?&?&?& _ & _ & Hrun & _). exact (pf_xsolo_rtc_run riscv_step i c c' Hrun).
 Qed.
 
@@ -1457,6 +2115,54 @@ Proof.
   destruct Hch as (Hs & Hch).
   apply list_relations.Forall_cons in Hall as [Hok Hall].
   rewrite -Hs. etrans; [exact (seg2_run s Hok)|by apply IH].
+Qed.
+
+(* ---------------------------------------------------------------- *)
+(** *** The two OTHER segment kinds transport across [xcfg_eqv]
+
+    (The hart kind does not — its refinement into single blocks is where
+    the deliveries are commuted out, and that is [WeakComposeLang]'s.) *)
+
+Lemma at_pbnd_eqv i c d : xcfg_eqv c d → at_pbnd i c → at_pbnd i d.
+Proof.
+  intros Heq Hb ag' Hlk'.
+  destruct (xcfg_eqv_lookup d c i ag' (xcfg_eqv_sym c d Heq) Hlk')
+    as (ag & Hlk & (_ & _ & Hst)).
+  eapply pxv6_eqv_pbnd; [exact (pxv6_eqv_sym _ _ Hst)|exact (Hb ag Hlk)].
+Qed.
+
+Lemma pxv6_eqv_disk dd pend q :
+  pxv6_eqv (PDisk dd pend) q → q = PDisk dd pend.
+Proof. destruct q as [?|d2 l2]; [done|by intros [-> ->]]. Qed.
+
+Lemma seg2_irq_ok_eqv i c c' d :
+  seg2_irq_ok i c c' → xcfg_eqv c d →
+  ∃ d', seg2_irq_ok i d d' ∧ xcfg_eqv c' d'.
+Proof.
+  intros (Hb & Hirq) Heq.
+  destruct (pf_xirq_eqv i c d c' Heq Hirq) as (d' & Hd' & Heq').
+  exists d'. split; [split; [by eapply at_pbnd_eqv|exact Hd']|exact Heq'].
+Qed.
+
+Lemma seg2_disk_ok_eqv i c c' d :
+  seg2_disk_ok i c c' → xcfg_eqv c d →
+  ∃ d', seg2_disk_ok i d d' ∧ xcfg_eqv c' d'.
+Proof.
+  intros (dd & dd' & mem & w & (ag & Hlk & Hst) & (ag2 & Hlk2 & Hst2)
+          & Hrun & Hws & Hlog) Heq.
+  destruct (pf_xsolo_rtc_eqv i c d c' Heq Hrun) as (d' & Hrun' & Heq').
+  destruct (xcfg_eqv_lookup c d i ag Heq Hlk) as (agd & Hlkd & (_ & _ & Hsd)).
+  destruct (xcfg_eqv_lookup c' d' i ag2 Heq' Hlk2)
+    as (agd2 & Hlkd2 & (_ & _ & Hsd2)).
+  rewrite Hst in Hsd. rewrite Hst2 in Hsd2.
+  exists d'. split; [|exact Heq'].
+  exists dd, dd', mem, w. split_and!.
+  - exists agd. split; [exact Hlkd|by apply pxv6_eqv_disk].
+  - exists agd2. split; [exact Hlkd2|by apply pxv6_eqv_disk].
+  - exact Hrun'.
+  - exact Hws.
+  - destruct Heq as (_ & Hl & _). destruct Heq' as (_ & Hl' & _).
+    by rewrite Hl' Hlog Hl.
 Qed.
 
 (* ---------------------------------------------------------------- *)
@@ -2002,12 +2708,18 @@ Section package.
 
       Two further premises, and nothing else. *)
 
-  (** (B5a-1) an interrupt DELIVERY lands at an instruction boundary. *)
-  Context (Hirqb : ∀ i T k ag ag' q q' l,
+  (** (B5a-1) an interrupt DELIVERY is either at an instruction boundary
+      or its RESIDUAL never touches the pin ([WeakSailComplete] §9's
+      [seip_free]).  Stage B's coverage fix: the old premise [Hirqb]
+      demanded the boundary outright, which EXCLUDED the behaviors real
+      hardware produces (SEIP is asserted mid-instruction); this one only
+      constrains what the interrupted residual may do, and a mid-block
+      delivery is COMMUTED FORWARD to the block's end. *)
+  Context (Hseip : ∀ i T k ag ag' q q' l,
              pt_trs TS !! i = Some T →
              at_ags T !! k = Some ag → at_ags T !! S k = Some ag' →
              pa_st ag = PHart q → pa_st ag' = PHart q' →
-             irq_deliver q l q' → pbnd (PHart q)).
+             irq_deliver q l q' → ¬ pbnd (PHart q) → seip_free_psail q).
 
   (** (B5a-2) every logged message carries the class its own author's
       pre-state computes ([WeakSailLTS2.lbl_class]). *)
@@ -2213,39 +2925,70 @@ Section package.
   (* ---------------------------------------------------------------- *)
   (** *** An OPEN segment, and how it is closed *)
 
+  (** The open segment: a MIXED run ([xstep]) of the one agent, its disk
+      group still accounted for, and — for a DISK segment, which cannot
+      contain a delivery — the pure solo run [seg2_disk_ok] wants. *)
   Definition seg_run (i : agent) (dstart d : wpcfg pxv6) : Prop :=
     is_Some (pc_ags dstart !! i) ∧ at_pbnd i dstart ∧
-    rtc (pf_xsolo riscv_step i) dstart d ∧ dopen i dstart d.
+    rtc (xstep i) dstart d ∧ dopen i dstart d ∧
+    (∀ ag dd, pc_ags dstart !! i = Some ag → pa_st ag = PDisk dd [] →
+       rtc (pf_xsolo riscv_step i) dstart d).
 
   Lemma seg_run_refl i d : is_Some (pc_ags d !! i) → at_pbnd i d →
     seg_run i d d.
   Proof.
-    intros Hs Hb. split_and!; [exact Hs|exact Hb|apply rtc_refl|apply dopen_refl].
+    intros Hs Hb. split_and!;
+      [exact Hs|exact Hb|apply rtc_refl|apply dopen_refl|by intros].
+  Qed.
+
+  (** A DISK segment is delivery-free by species: the delivery arm needs a
+      [PHart], and [dopen] already refutes a hart where a disk started. *)
+  Lemma dsolo_hart i dstart d d' ag q :
+    dopen i dstart d → pc_ags d !! i = Some ag → pa_st ag = PHart q →
+    ∀ ag0 dd, pc_ags dstart !! i = Some ag0 → pa_st ag0 = PDisk dd [] →
+      rtc (pf_xsolo riscv_step i) dstart d'.
+  Proof.
+    intros Hdo Hlk Hst ag0 dd Hlk0 Hst0. exfalso.
+    destruct (Hdo ag0 dd Hlk0 Hst0)
+      as (ag' & dd' & pend & ns1 & mem & w & Hlk' & Hst' & _).
+    rewrite Hlk in Hlk'. injection Hlk' as <-. by rewrite Hst in Hst'.
   Qed.
 
   Lemma seg_run_step i dstart d d2 :
     disk_relp d → seg_run i dstart d →
     (∀ ag, pc_ags d !! i = Some ag → ¬ pbnd (pa_st ag)) →
-    pf_xsolo riscv_step i d d2 → seg_run i dstart d2.
+    xstep i d d2 → seg_run i dstart d2.
   Proof.
-    intros Hdr (Hs & Hb & Hrun & Hdo) Hnb Hstep.
-    split_and!; [exact Hs|exact Hb|by eapply rtc_r|].
-    by eapply dopen_step.
+    intros Hdr (Hs & Hb & Hrun & Hdo & Hds) Hnb Hstep.
+    have Hrun2 : rtc (xstep i) dstart d2 by eapply rtc_r.
+    destruct Hstep as [Hsolo|(_ & _ & Hirq)].
+    - split_and!; [exact Hs|exact Hb|exact Hrun2|by eapply dopen_step|].
+      intros ag0 dd Hlk0 Hst0.
+      eapply rtc_r; [by eapply Hds|exact Hsolo].
+    - destruct (pf_xirq_at i d d2 Hirq) as (ag & _ & q & _ & Hlk & Hst & _).
+      split_and!; [exact Hs|exact Hb|exact Hrun2|by eapply dopen_hart|].
+      by eapply dsolo_hart.
   Qed.
 
   Lemma seg_run_start i d d2 :
-    is_Some (pc_ags d !! i) → at_pbnd i d → pf_xsolo riscv_step i d d2 →
-    seg_run i d d2.
+    is_Some (pc_ags d !! i) → at_pbnd i d → xstep i d d2 → seg_run i d d2.
   Proof.
-    intros Hs Hb Hstep. split_and!;
-      [exact Hs|exact Hb|by apply rtc_once|by eapply dopen_start].
+    intros Hs Hb Hstep.
+    have Hrun : rtc (xstep i) d d2 by apply rtc_once.
+    destruct Hstep as [Hsolo|(_ & _ & Hirq)].
+    - split_and!; [exact Hs|exact Hb|exact Hrun|by eapply dopen_start|].
+      intros ag0 dd Hlk0 Hst0. by apply rtc_once.
+    - destruct (pf_xirq_at i d d2 Hirq) as (ag & _ & q & _ & Hlk & Hst & _).
+      split_and!; [exact Hs|exact Hb|exact Hrun| |].
+      + eapply dopen_hart; [apply dopen_refl|exact Hlk|exact Hst].
+      + eapply (dsolo_hart i d d d2 ag q); [apply dopen_refl|exact Hlk|exact Hst].
   Qed.
 
   Lemma seg_close (i : agent) (dstart d : wpcfg pxv6) :
     seg_run i dstart d → at_pbnd i d →
     ∃ s, seg2_src s = dstart ∧ seg2_dst s = d ∧ seg2_ok s.
   Proof.
-    intros (Hsome & Hbs & Hrun & Hdo) Hbd.
+    intros (Hsome & Hbs & Hrun & Hdo & Hds) Hbd.
     destruct Hsome as [ag Hag].
     have Hpb := Hbs ag Hag.
     destruct (pa_st ag) as [q|dd pend] eqn:Hst.
@@ -2253,7 +2996,8 @@ Section package.
       split_and!; [by exists ag, q|exact Hbs|exact Hbd|exact Hrun].
     - try (rewrite Hst in Hpb). simpl in Hpb. subst pend.
       exists (SegDisk i dstart d). split_and!; [done|done|].
-      by eapply dopen_close.
+      eapply dopen_close; [exact Hdo|exact Hag|exact Hst|exact Hbd|].
+      by eapply Hds.
   Qed.
 
 
@@ -2399,10 +3143,34 @@ Section package.
     have Hopi : ∀ j, op = Some j → j = e.1.
     { intros j Hj. rewrite Hj in Hop.
       destruct Hop as (_ & _ & Hnx & _). by rewrite (Hnx e He). }
-    (* ---- interrupt delivery, or an ordinary irq-free step ---- *)
-    destruct (pf_step_ni_or_irq riscv_step e.1 l d d2 Hstd) as [Hni|Hirq].
-    - (* ============ AN IRQ-FREE STEP ============ *)
-      have Hsolo : pf_xsolo riscv_step e.1 d d2 by (exists l; split_and!).
+    (* ---- ONE SEGMENT STEP: irq-free, or an interrupt delivery ----
+
+       Since stage B the two are NOT separate cases of the invariant: a
+       delivery is an ordinary [xstep] of the agent's segment, carried
+       inside the hart segment it interrupts (and commuted out of it by
+       [WeakComposeLang]'s refinement).  All [Hseip] has to supply is the
+       seip-freedom of the residual, and only when there IS one. *)
+    have Hsolo : xstep e.1 d d2.
+    { destruct (pf_step_ni_or_irq riscv_step e.1 l d d2 Hstd)
+        as [Hni|(Hlsil & Hfen & Hirq)].
+      - left. by exists l.
+      - right. split_and!; [|exact Hfen|exact Hirq].
+        intros agz qz Hlkz Hstz Hnbz.
+        destruct (pf_xirq_at e.1 d d2 Hirq)
+          as (agD & agD' & qD & qD' & HlkD & HstD & HlkD' & HstD'
+              & _ & _ & Hdel).
+        have HzagD : agD = agz by congruence. subst agD.
+        have HzqD : qD = qz by congruence. subst qD.
+        have Hzagx : agD' = agx by (rewrite Hd2i in HlkD'; by injection HlkD').
+        have Hzstx : pa_st agx = pa_st agn1
+          by (rewrite Hci in Hclk1; injection Hclk1 as Hx; by rewrite Hx).
+        have HzagDn : pa_st agz = pa_st agn.
+        { rewrite Hdi Hclk0 in Hlkz. injection Hlkz as Hx. by rewrite -Hx. }
+        have Hzq : pa_st agn = PHart qz by rewrite -HzagDn.
+        have Hzq' : pa_st agn1 = PHart qD'.
+        { rewrite -Hzstx -Hzagx. exact HstD'. }
+        exact (Hseip e.1 T e.2 agn agn1 qz qD' WeakPromise.LSilent
+                 HT Hagn Hagn1 Hzq Hzq' Hdel Hnbz). }
       (* open or extend *)
       have Hsr : ∃ ds, chained2 segs (wp_init img ps) ds ∧
                        seg_run e.1 ds d2 ∧
@@ -2515,9 +3283,13 @@ Section package.
              have Hrunall : rtc (wp_pf_run (pstep_xv6 riscv_step)) d2 d3
                := pf_xsolo_rtc_run riscv_step e.1 d2 d3 Hxrun.
              have Hsrun3 : seg_run e.1 ds d3.
-             { destruct Hsrun2 as (Hs & Hb & Hr0 & Hdo). split_and!;
-                 [exact Hs|exact Hb|by etrans; [exact Hr0|exact Hxrun]|].
-               by eapply (dopen_hart e.1 ds d2 d3 agx q). }
+             { destruct Hsrun2 as (Hs & Hb & Hr0 & Hdo & _). split_and!;
+                 [exact Hs|exact Hb
+                 |by etrans;
+                    [exact Hr0|exact (pf_xsolo_rtc_xstep e.1 d2 d3 Hxrun)]
+                 |by eapply (dopen_hart e.1 ds d2 d3 agx q)|].
+               eapply (dsolo_hart e.1 ds d2 d3 agx q);
+                 [exact Hdo|exact Hd2i|by rewrite Hstx]. }
              have Hbd3 : at_pbnd e.1 d3.
              { intros ag Hag. rewrite Hlk3 in Hag. injection Hag as <-.
                rewrite Hst3. by split. }
@@ -2540,45 +3312,6 @@ Section package.
                   [by apply Hbd3|].
                 rewrite (Hfr3 j Hjne) in Hlkj. by eapply Hbddd2.
              ++ intros j a. etrans; [by apply Hobs2|by apply Hobs3].
-    - (* ============ AN INTERRUPT DELIVERY ============ *)
-      destruct Hirq as (agD & agD' & q & q' & HlkD & HstD & HlkD' & HstD'
-                        & HfD & Hdel & HwsD & HimgD & HlogD & HfrD).
-      have HlkD0 := HlkD.
-      have HagD' : agD' = agx by (rewrite Hd2i in HlkD'; by injection HlkD').
-      have HagD : pa_st agD = pa_st agn.
-      { rewrite Hdi Hclk0 in HlkD. injection HlkD as Hx. by rewrite -Hx. }
-      have Hstx : pa_st agx = pa_st agn1
-        by (rewrite Hci in Hclk1; injection Hclk1 as Hx; by rewrite Hx).
-      have Hstq : pa_st agn = PHart q by rewrite -HagD.
-      have Hstq' : pa_st agn1 = PHart q'
-        by (rewrite -Hstx -HagD'; exact HstD').
-      have Hpb : pbnd (PHart q)
-        := Hirqb e.1 T e.2 agn agn1 q q' l HT Hagn Hagn1 Hstq Hstq' Hdel.
-      have Hl : l = WeakPromise.LSilent by (destruct Hdel as (Hx & _); exact Hx).
-      have Hpb' : pbnd (PHart q').
-      { have Hd2' := Hdel. destruct Hd2' as (_ & v & iq & _ & Hq').
-        by rewrite Hq'. }
-      have Hopn : op = None.
-      { destruct op as [j|]; [|done]. exfalso.
-        have Hje : j = e.1 by apply Hopi. subst j.
-        destruct Hop as (_ & Hnb & _ & _).
-        apply (Hnb agD); [exact HlkD0|by rewrite HstD]. }
-      rewrite Hopn in Hop. subst dstart.
-      apply (seg_inv_intro order (S n) c (segs ++ [SegIrq e.1 d d2])
-               d2 d2 None);
-        [by eapply chained2_app; [exact Hch|rewrite /=; by split]
-        | |exact Hrun2|done|done|done|exact Hlend2|exact Hfr2| |exact Hobs2].
-      + apply Forall_app; split; [exact Hall|apply Forall_singleton].
-        exists agD, agD', q, q'. split_and!;
-          [exact HlkD0|exact HstD|exact HlkD'|exact HstD'|exact Hpb|exact Hpb'
-          |exact HfD| |exact HwsD|exact HimgD|exact HlogD|exact HfrD|].
-        * by rewrite -Hl.
-        * by rewrite -Hl.
-      + intros j ag _ Hlkj. destruct (decide (j = e.1)) as [->|Hj].
-        * rewrite Hd2i in Hlkj. injection Hlkj as <-.
-          by rewrite Hstx Hstq'.
-        * rewrite (Hd2fr j Hj) in Hlkj. apply (Hbdd j ag); [by rewrite Hopn|].
-          exact Hlkj.
   Qed.
 
 
@@ -2683,9 +3416,12 @@ Section package.
       destruct Hcompl as (d3 & ms & Hrun3 & Hbd3 & Hlog3 & Hall3 & Hfr3 & Hobs3
                           & (ag3 & q3 & Hlk3 & Hst3)).
       have Hsrun3 : seg_run b2.1 dstart d3.
-      { destruct Hsrun as (Hs & Hb & Hr0 & Hdo). split_and!;
-          [exact Hs|exact Hb|by etrans; [exact Hr0|exact Hrun3]|].
-        exact (dopen_hart b2.1 dstart d d3 agr qr Hdo Hlkd Hstr). }
+      { destruct Hsrun as (Hs & Hb & Hr0 & Hdo & _). split_and!;
+          [exact Hs|exact Hb
+          |by etrans;
+             [exact Hr0|exact (pf_xsolo_rtc_xstep b2.1 d d3 Hrun3)]
+          |exact (dopen_hart b2.1 dstart d d3 agr qr Hdo Hlkd Hstr)|].
+        exact (dsolo_hart b2.1 dstart d d3 agr qr Hdo Hlkd Hstr). }
       destruct (seg_close b2.1 dstart d3 Hsrun3 Hbd3)
         as (sg & Hsrc & Hdst & Hokg).
       exists (segs ++ [sg]), d3. split_and!.
