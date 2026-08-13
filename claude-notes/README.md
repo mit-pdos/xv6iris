@@ -26,6 +26,10 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   `XV6_REV`: the mechanical steps and their silent no-ops, how to CLASSIFY a
   change before touching a proof, the two relayout tools, the categories of
   breakage, and the finishing checks. Read before any bump.
+- **[`remote-build-gcp.md`](remote-build-gcp.md)** — building on the GCP VM:
+  the two scripts, daily use, pulling `.vo` back for a local single-file
+  recheck, preemption and cost, and the two things that silently break (the
+  VM's Ubuntu must match, and the opam switch must be byte-identical).
 - **[`kernel-defects.md`](kernel-defects.md)** — how to tell a defect in the xv6
   SOURCE from a problem in a spec, plus the register of open ones (currently
   empty) and the provably dead code.
