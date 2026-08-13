@@ -334,10 +334,10 @@ stranded). Fractional splits (a ½ standing in `P_fs`) merely leak ½ per
 crash. So the CURRENT stage-1–3 volatile design cannot boot twice; any
 resolution must make the stranded pieces RE-CREATABLE, i.e.:
 
-1. **Per-era client disk ghosts — LANDED (Phase A).** Each boot allocates
+1. **Per-era client disk ghosts.** Each boot allocates
    a fresh era image ghost (auth + full fragments, minted at the current
    disk content); bio's `bv_gd` points at the ERA ghost; a crash abandons
-   it wholesale — nothing to reclaim, next boot mints fresh. What landed
+   it wholesale — nothing to reclaim, next boot mints fresh. The pieces
    (see `design/crash.md`, "The disk image ghost"):
    - `riscvEraGS.era_disk_name`; the typing class stays fixed-layer
      (`riscvF_diskGS`, the unique instance source). The fixed
@@ -408,8 +408,7 @@ resolution must make the stranded pieces RE-CREATABLE, i.e.:
      that proposition, not its innards, so a half parked inside `P_fs`
      is unreachable to the mechanical update — and at `Pc := True` it
      does not exist at all, which makes the conjunct unmaintainable.
-     **LANDED FIX (phase C2a): index the crash predicate by the DISK
-     IMAGE.** `riscv_crash_pred : (Z -> bv 8) -> iProp Σ` with
+     **THE FIX: index the crash predicate by the DISK IMAGE.** `riscv_crash_pred : (Z -> bv 8) -> iProp Σ` with
      `crash_inv := inv crashN (∃ dk, disk_tie dk ∗ riscv_crash_pred dk)`,
      and `state_interp`'s new FIXED conjunct `fs_tie_interp g :=
      disk_tie (v_disk (dvirtio (gdev g)))`. The half is a SIBLING of the

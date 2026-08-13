@@ -590,7 +590,7 @@ Section IntrDefsBase.
         bits 5 and 9 can ever be pending and the scause a trap writes is
         one of [s_cause_ok]'s two literals.  That fact is what keeps
         kerneltrap's [printk] arm dead, hence printk-general out of the
-        cone; see claude-notes/projects/kerneltrap.md.  [mideleg] stays
+        cone; see claude-notes/completed/kerneltrap.md.  [mideleg] stays
         existential: `mideleg = 0xffff` removes nothing, so the restriction
         comes entirely from [mie] and no proof needs the value. *)
      (∃ mdv0 : mword 64,
@@ -1320,7 +1320,7 @@ Section IntrDefs.
   (* ================================================================== *)
   (* THE CONTRACT IS A BANACH FIXPOINT, AND THE RECURSION IS SPLIT IN TWO. *)
   (*                                                                      *)
-  (* The cycle is inherent (projects/kerneltrap.md, "THE CYCLE IS REAL"):  *)
+  (* The cycle is inherent (completed/kerneltrap.md, "THE CYCLE IS REAL"):  *)
   (* enabled execution HERE means a handler is installed HERE, and the     *)
   (* handler restores enabled execution ANYWHERE.  So the contract's own   *)
   (* pre and post mention [intr_res], whose body carries [▷ contract].     *)
@@ -1506,7 +1506,7 @@ Section IntrDefs.
   (*                                                                      *)
   (* THE [▷] IS LOAD-BEARING AND IS NOT CONSERVATISM.  Once                *)
   (* [intr_handler_spec] becomes the Banach fixpoint the handler contract  *)
-  (* needs (projects/kerneltrap.md, "THE CYCLE IS REAL"), the recursive    *)
+  (* needs (completed/kerneltrap.md, "THE CYCLE IS REAL"), the recursive    *)
   (* occurrence reached through this resource has to sit under a guard.    *)
   (* It used to sit under [inv] ([inv_contractive]); with the invariant    *)
   (* gone, this [▷] IS the guard, and without it [ihs_pre] is not          *)

@@ -404,7 +404,7 @@ Proof. intros H. exact (cms5_kernel_facts _ (st_ms1_kernel_facts _ H)). Qed.
    relation with mideleg, because the S-mode config bundle ([IntrDefs.sconf])
    pins it in turn: the set of interrupt causes that can ever be DELIVERED is
    masked by [mie], so only at a known [mie] is that set computable at all --
-   see claude-notes/projects/kerneltrap.md. *)
+   see claude-notes/completed/kerneltrap.md. *)
 Lemma st_boot_csr_facts (menvcfg0 mie0 mideleg0 satp0 : mword 64) :
   menvcfg0 = (mword_of_int 0 : mword 64) ->
   mie0 = (mword_of_int 0 : mword 64) ->

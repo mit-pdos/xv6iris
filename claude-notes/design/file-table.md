@@ -127,7 +127,7 @@ properties:
   `type`/`ip`/… , for free;
 - **`file_ref γ k 1 C` is writable** — the exclusive/uninitialized state.
 
-### `file_payload`: the thing the file is a reference *to* (BUILT)
+### `file_payload`: the thing the file is a reference *to*
 
 A `struct file` owns a reference on its pipe or its inode, created when the
 file is initialized and consumed by `fileclose`'s `pipeclose`/`iput`. Parking
@@ -412,7 +412,7 @@ undischargeable for every file that had ever been `dup`ed.)
   construction: reaching `n = 0` requires holding the only fragment, and any
   concurrent reader would be a second fragment.
 
-## `off` — the borrow protocol (BUILT)
+## `off` — the borrow protocol
 
 `off` is the one field that is neither lock-free-immutable nor ftable-protected,
 and it is the only genuinely hard part of the model. It is **not** needed by
@@ -582,93 +582,79 @@ fraction and closed the instant it returns — so `either_copyin`, which wants
 site case-splits on `user`**, because every fraction-taking callee (bmap, bread,
 brelse, iupdate) quantifies its own `dq`.
 
-## Open items
+## What kind of thing a descriptor names is NOT an ftable question
 
-- **The payload link is BUILT** (see "`file_payload`" above). What it changed,
-  as a checklist for the next layer that adds a payload kind (`sys_open`'s
-  inode files):
-  * `pipealloc` now folds the two ends INTO the two `file_ref`s — its
-    postcondition no longer mentions `is_pipe`/`pipe_ref`, and `sys_pipe` no
-    longer drops them on the floor. A descriptor sys_pipe creates now really
-    does own its end of the pipe in the model.
-  * `filealloc`/`filedup` were unaffected in their CONTRACTS — the payload of
-    a fresh file is `emp` (type FD_NONE), and `filedup` splits whatever is
-    there. Only the ghost steps' statements grew a conjunct.
-  * `fdalloc`, `ofile_slot`, `proc_priv` and the ~100 files above them did not
-    change at all: the names ghost is a component of the existing `γf` and
-    `pipeG` became a superclass of `fileG`.
+A reference borrowed out of `ProcInv.ofile_slot` comes with its `fcontent`
+existentially quantified, so the holder cannot tell a pipe from an inode file.
+That knowledge is **per-`ofile` ghost state in `struct proc`** — not a
+persistent content witness on the ftable authority, which is the tempting and
+wrong fix (it is cheap to build on top of the payload-names component, which is
+exactly why it needs refusing in writing). The rule the two sides divide on:
 
-- **WHAT KIND OF THING A DESCRIPTOR NAMES IS NOT AN FTABLE QUESTION, and the
-  file layer must not try to answer it.** A reference borrowed out of
-  `ProcInv.ofile_slot` comes with its `fcontent` existentially quantified, so
-  the holder cannot tell a pipe from an inode file. That knowledge is going to
-  be **per-`ofile` ghost state in `struct proc`** — not a persistent content
-  witness on the ftable authority, which is the tempting and wrong fix (it is
-  cheap to build on top of the payload-names component, which is exactly why
-  it needs refusing in writing). The rule the two sides divide on:
+> The RESOURCE travels with the reference; the FACT travels with the
+> descriptor.
 
-  > The RESOURCE travels with the reference; the FACT travels with the
-  > descriptor.
+The pipe end rides inside `file_ref`, because references migrate between
+processes (`fork`, `filedup`) and whoever closes the last one frees the page.
+The kind is a thread-local fact about a thread-local array, and it stays true
+for exactly as long as the descriptor holds its reference: a held reference
+keeps `ref > 0`, and the type cannot change while `ref > 0` — the same argument
+that makes the content fields stable.
 
-  The pipe end has to ride inside `file_ref`, because references migrate
-  between processes (`fork`, `filedup`) and whoever closes the last one frees
-  the page. The kind is a thread-local fact about a thread-local array, and it
-  stays true for exactly as long as the descriptor holds its reference: a held
-  reference keeps `ref > 0`, and the type cannot change while `ref > 0` — the
-  same argument that makes the content fields stable.
+### `file_ref` DOES NOT SPLIT BY FRACTION
 
-- **`sys_read` / `sys_write` on a pipe fd are blocked on that ghost state**,
-  and NOT on the payload link. The reference a descriptor hands them does now
-  carry the pipe end, but under the same existential, so `piperead` /
-  `pipewrite` still cannot be given their `pipe_ref`. `fileclose`'s callers
-  want the identical fact for the identical reason
-  ([`../completed/fileclose.md`](../completed/fileclose.md) §3b), so one piece
-  of ghost state settles both.
+`fref_tok γ k q = fref_own γ (◯ {[k := (q, 1%positive)]})` carries the
+reference COUNT in the same map entry as the fraction, so two halves compose to
+`(q, 2)`, not `(q, 1)`. The only splitter is the ftable AUTHORITY, i.e.
+`FileInv.file_dup_step` — filedup's ghost step, unsound without the physical
+`f->ref++`.
 
-  **fs-sysfile S4' RULED AND BUILT IT (option (ii)), and found the opener was
-  never an option at all.**  `file_ref` DOES NOT SPLIT BY FRACTION:
-  `fref_tok γ k q = fref_own γ (◯ {[k := (q, 1%positive)]})` carries the
-  reference COUNT in the same map entry, so two halves compose to `(q, 2)`.
-  The only splitter is the ftable authority, i.e. `FileInv.file_dup_step` —
-  filedup's ghost step, unsound without the physical `f->ref++`.  An opener
-  promising `file_ref γ k q' C` at `q' < q` is therefore UNSATISFIABLE, and
-  option (i) collapses into "the caller already holds the whole environment".
+That kills the shape a syscall contract naturally reaches for: an OPENER wand,
+premised on the syscall, turning the reference actually found into the
+environment for that file and back at a SMALLER `q'`. It is unsatisfiable at
+any `q' < q`, and at `q' = q` it only defers the problem to a caller already
+holding the whole environment.
 
-  What option (ii) looks like, built for filestat and identical for the other
-  two: the contract's environment is `SpecFileclose.fileclose_fs_env`'s form
-  (escrow family, sleeplock family, region, cache, fabric, and the
-  region-WIDE inum geometry), the record loses every per-inode field, and the
-  function carves its share out of `FileInvDefs.inode_pay` itself
-  (`SpecFilestat.filestat_pay_carve`).  Two things the sizing missed:
-  * the generation is lost at **iunlock** (`SpecIunlock` returns the
-    arity-preserving `inode_shr`), not at the file.c boundary, so the fix is
-    not a stronger postcondition but `ProofFilewriteParts.fw_shr_regen`'s
-    trick — lend `s/2`, keep `s/2` generation-named, pin the returned half
-    with `live_gen_agree`.  With the share never leaving the reference, the
-    postcondition carries no share at all;
-  * `SpecFilestat`/`SpecFileread`/`SpecFilewrite` all bind BOTH `!fileG Σ`
-    and `!icacheG Σ`, which are two `icfg` instances (durable-notes' bundling
-    trap).  Harmless until something in the file mixes a payload's share with
-    a written `icfg_dev` — the carve does.  Drop the standalone binder.
+### So a `file.c` environment must be CONTENT-INDEPENDENT
 
-  **fs-sysfile S4 sharpened this and found it is not only the pipe arm.**
-  Every arm's environment is content-indexed: `filestat_env fn Cf` and its
-  two siblings name the itable SLOT (`fc_ip Cf = ientry (fsn_ik fn)`), that
-  slot's escrow and sleeplock, and a share of that inode's reference — so an
-  inode fd is in exactly the same position as a pipe fd, and taking `Cf` as
-  a contract parameter does not help (`file_ref_agree` identifies two
-  contents only for a holder of a second fraction of the SAME slot, which no
-  syscall has). The two answers on the table are (i) an OPENER wand, a
-  premise of the syscall contract that turns the reference actually found
-  into the environment for that file and back — what S4's three Specs do —
-  or (ii) restating the three environments in `fileclose_fs_env`'s
-  content-INDEPENDENT form and letting each `file.c` function take its
-  per-slot share out of the `inode_pay` already inside the `file_ref` it
-  holds, which would delete the opener. Under (ii), note that
-  `filestat_fs_out` and `fileread_fs_out` return a NON-generation-named
-  `inode_shr`, which cannot be gathered back into `inode_pay`'s
-  `inode_shr_held_gen … g`; `filewrite_fs_out` is already gen-named, so that
-  is a one-line fix in each of the other two postconditions.
+The shape that works is `SpecFileclose.fileclose_fs_env`'s: escrow family,
+sleeplock family, region, cache, fabric, and the region-WIDE inum geometry
+(`∀ inum, bv_unsigned inum < 16 * icfg_nib -> IBLOCK inum inodestart ∈ cov`).
+The names record loses every per-inode field, and the function CARVES its
+per-slot share out of the `FileInvDefs.inode_pay` already inside the
+`file_ref` it holds (`SpecFileread.fileread_pay_carve`, which filewrite reuses
+— it is one lemma, not three). Two non-obvious parts:
+
+- **The generation is lost at IUNLOCK**, not at the file.c boundary —
+  `SpecIunlock` returns the arity-preserving `inode_shr`. So the fix is not a
+  stronger postcondition but `ProofFilewriteParts.fw_shr_regen`'s move: lend
+  `s/2`, keep `s/2` generation-named, and let `live_gen_agree` pin the returned
+  half. With the share never leaving the reference, the postcondition carries
+  no share at all.
+- **Do not bind both `!fileG Σ` and `!icacheG Σ`** — `fileG` BUNDLES `icacheG`
+  (and the `icfg`), so those are two different instances (durable-notes'
+  bundling trap). Harmless until something in the file mixes a payload's share
+  with a written `icfg_dev`; the carve does exactly that.
+
+An environment a SYSCALL can own may not name the fd SLOT either, because
+`ProcInv.ofile_slot` quantifies it existentially — hence `FileOff.off_invs` +
+`off_invs_lookup` (a family and a selector, with the lookup happening at the
+call off the contract's own `k < NFILE`) rather than `off_inv γf k`, and
+likewise `ic_escrows` / `IcacheBoot.ic_sleeplocks` rather than the per-slot
+`ic_escrow` / `is_sleeplock`.
+
+### The one thing that CANNOT be made content-independent: `devsw[major]`
+
+The device arm's table entry has address `a_devsw_read (dev_major Cf)`, so one
+cell covers one major and a scalar field could only ever describe the major the
+caller already knew — which a syscall does not. Two shapes are unsound: a
+`∀ Cf, fileread_dev_env fn Cf` spatial premise claims the same cell for the
+infinitely many `Cf` sharing a major, and a `∀ Cf, P Cf ∗ (Q Cf -∗ P Cf)`
+bundle is consumed whole by handing out one instance. **Own the COLUMN**: the
+record's fields become `Z -> mword 64` / `Z -> dfrac`, `fileread_devsw fn` is
+the `big_sepL` over majors `0..NDEV_max`, and an accessor picks the entry the
+file names and takes it straight back (the arm only READS it). Ten cells is the
+honest price of a syscall that may be handed any descriptor.
 
 ## A FUNCTION THAT TAKES A DESCRIPTOR'S REFERENCE MUST NOT TAKE `proc_priv`
 

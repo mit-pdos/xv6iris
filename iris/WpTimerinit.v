@@ -123,7 +123,7 @@ Definition ti_mcen1 (mcen0 : mword 32) : mword 64 :=
    only be stated where the written value is still concrete -- which is here.
    The S-mode side needs it because [timer_cap] is what clockintr runs under,
    hence one of the credentials kerneltrap's cone closes over
-   (claude-notes/projects/kerneltrap.md).
+   (claude-notes/completed/kerneltrap.md).
 
    THE PROOF IS A WIDTH-CROSSING TOWER (64 -> 32 -> 1) AND [tb1] DOES NOT CLOSE
    IT.  [MstatusBits]' [tb_rw] is tuned for [update_slice] towers; this one is

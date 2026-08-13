@@ -473,7 +473,7 @@ Proof. qu_disj. Qed.
    them in [mstatus_legalized] / [lift_sstatus] are needed -- the chains
    stop at the field's own setter -- which is why these two rows are short
    next to MPRV's or SXL's.  Both fields are what an [sret] reads, so the
-   trap-handler contract ([projects/kerneltrap.md]) is what wants them. *)
+   trap-handler contract ([completed/kerneltrap.md]) is what wants them. *)
 Lemma qSPP_uSD (w : mword 64) x : _get_Mstatus_SPP (_update_Mstatus_SD w x) = _get_Mstatus_SPP w.
 Proof. qu_disj. Qed.
 Lemma qSPP_uSIE (w : mword 64) x : _get_Mstatus_SPP (_update_Mstatus_SIE w x) = _get_Mstatus_SPP w.
