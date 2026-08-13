@@ -1013,6 +1013,8 @@ ProofUsertrapArms.v
 ProofUsertrapSys.v
 SpecSyscall.v
 LinkSyscall.v
+ProofUsertrap.v
+LinkUsertrap.v
 SpecIalloc.v
 ProofIalloc.v
 LinkIalloc.v
