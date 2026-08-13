@@ -1218,3 +1218,42 @@ structural reason iput is the only depositor.
 Sequencing: the lb bundle commits now as G-2a2; GR-6 (upstream: panic
 proven, kexec B2, the ProofIput/ProofItrunc profile restyle) merges next;
 G-2 items 2-4 relaunch on the merged base under these rulings.
+
+
+### G.16 G-2b's stop, RATIFIED (2026-08-13) — the receipt gates on a
+### per-generation one-shot, and the tie moves to icfg
+
+**Blocker 1 (soundness):** §G.14's tie as a GLOBAL payload invariant is
+FALSE across slot recycling — the counter-trace (ialloc a zero at epoch 5;
+commit; walker raises slot k's v to 6 on inode A; recycle k to B; fill
+from disk: the clause demands a witness at e ≥ 6 that cannot exist) kills
+it, and ilock's fill could never discharge it anyway (no log resource at
+a disk read).  RULED: the receipt is GATED on a per-generation one-shot —
+widen the generation gname g's ityR to prodR (optionUR ityR) (optionUR
+nlzR); fresh generations mint nlz_pending g; the parked LOADED payload
+carries (nlz_pending g ∨ nlz_shot g ∗ receipt); fill moves the pending in
+with NO obligation; the MINT (guard, nlink ≠ 0, log_opSe e0) shoots it
+and raises v; the DEPOSIT is SpecIupdate credgen exactly as ruled;
+CONSUMPTION: shot kills the left arm, slot auth gives e0 ≤ v, receipt
+gives v ≤ e — the crz shape exactly.  nlz_obs gains the generation index
+g (free; G-3 unbuilt, both ends hold g).  iget/iput park at fresh
+generations with fresh pendings; the auth is homed in ic_empty_arm and
+hand-carried across the MID window (G.15 item 3's "fresh at v = 0" is
+corrected — boot-only).
+
+**Blocker 2 (usability):** the is_itable2-body tie is unusable (a body
+existential admits no agreement with a consumer's own γ).  RULED: door 1
+— `icfg_log : log_names` and `icfg_ist : Z` join the ambient icfg class;
+the escrow states its receipt over icfg_log; the tie is the pure premise
+⌜γ = icfg_log⌝ on exactly the new contracts (mint/deposit/crz), true at
+boot by construction.  ic_names keeps ONLY icn_slotep of G.15's four
+fields.  Accepted costs: the logG context sweep (13 files, six Spec
+Context lines — statement-level, enumerated, approved) and the four
+MkIcNames dummies.
+
+ProofIput's park at :2214 is a FRESH-GENERATION no-receipt parker (the
+free path re-tags via live_slot_regen); the only depositor is inside
+iupdate's credgen, and the landed tree has NO consuming depositor yet
+(unlink and create's fail arm are unproven) — credgen's post is produced
+and carried.  The two missing escrow sites (ic_open_empty_free /
+ic_close_to_empty) join the worklist.
