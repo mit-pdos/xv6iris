@@ -32,6 +32,7 @@ Require Import KernelDecode14.
 Require Import KernelDecode15.
 Require Import KernelDecode17.
 Require Import KernelDecode19.
+Require Import KernelDecode20.
 Require Import KernelDecode21.
 Require Import KernelDecode22.
 Require Import KernelDecode23.
@@ -104,9 +105,9 @@ Section CodeStart.
   Proof. mk_base (KernelSyms.start + 0x20) (mword_of_int 0x00001797 : mword 32)
     (mword_of_int (KernelSyms.start + 0x20) : mword 64) (UTYPE (mword_of_int 1 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_00001797. Qed.
 
-  Lemma sti_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.start + 0x24) : mword 64) false (ITYPE (mword_of_int 3494 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
-  Proof. mk_base (KernelSyms.start + 0x24) (mword_of_int 0xda678793 : mword 32)
-    (mword_of_int (KernelSyms.start + 0x24) : mword 64) (ITYPE (mword_of_int 3494 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_da678793. Qed.
+  Lemma sti_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.start + 0x24) : mword 64) false (ITYPE (mword_of_int 3512 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
+  Proof. mk_base (KernelSyms.start + 0x24) (mword_of_int 0xdb878793 : mword 32)
+    (mword_of_int (KernelSyms.start + 0x24) : mword 64) (ITYPE (mword_of_int 3512 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_db878793. Qed.
 
   Lemma sti_28 : kernel_text -∗ instr (mword_of_int (KernelSyms.start + 0x28) : mword 64) false (CSRReg (mword_of_int 833 : mword 12, Regidx (mword_of_int 15), zreg, CSRRW)).
   Proof. mk_base (KernelSyms.start + 0x28) (mword_of_int 0x34179073 : mword 32)

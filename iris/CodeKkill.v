@@ -25,11 +25,11 @@ Require Import KernelDecode07.
 Require Import KernelDecode10.
 Require Import KernelDecode11.
 Require Import KernelDecode12.
+Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
 Require Import KernelDecode18.
 Require Import KernelDecode19.
-Require Import KernelDecode21.
 Require Import KernelDecode23.
 Require Import KernelDecode24.
 Require Import KernelDecode25.
@@ -83,17 +83,17 @@ Section CodeKkill.
   Proof. mk_base (KernelSyms.kkill + 0x10) (mword_of_int 0x00010497 : mword 32)
     (mword_of_int (KernelSyms.kkill + 0x10) : mword 64) (UTYPE (mword_of_int 16 : mword 20, Regidx (mword_of_int 9), AUIPC)) kd_00010497. Qed.
 
-  Lemma kki_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.kkill + 0x14) : mword 64) false (ITYPE (mword_of_int 1800 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
-  Proof. mk_base (KernelSyms.kkill + 0x14) (mword_of_int 0x70848493 : mword 32)
-    (mword_of_int (KernelSyms.kkill + 0x14) : mword 64) (ITYPE (mword_of_int 1800 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) kd_70848493. Qed.
+  Lemma kki_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.kkill + 0x14) : mword 64) false (ITYPE (mword_of_int 1814 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
+  Proof. mk_base (KernelSyms.kkill + 0x14) (mword_of_int 0x71648493 : mword 32)
+    (mword_of_int (KernelSyms.kkill + 0x14) : mword 64) (ITYPE (mword_of_int 1814 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) kd_71648493. Qed.
 
   Lemma kki_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.kkill + 0x18) : mword 64) false (UTYPE (mword_of_int 22 : mword 20, Regidx (mword_of_int 19), AUIPC)).
   Proof. mk_base (KernelSyms.kkill + 0x18) (mword_of_int 0x00016997 : mword 32)
     (mword_of_int (KernelSyms.kkill + 0x18) : mword 64) (UTYPE (mword_of_int 22 : mword 20, Regidx (mword_of_int 19), AUIPC)) kd_00016997. Qed.
 
-  Lemma kki_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.kkill + 0x1c) : mword 64) false (ITYPE (mword_of_int 256 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)).
-  Proof. mk_base (KernelSyms.kkill + 0x1c) (mword_of_int 0x10098993 : mword 32)
-    (mword_of_int (KernelSyms.kkill + 0x1c) : mword 64) (ITYPE (mword_of_int 256 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)) kd_10098993. Qed.
+  Lemma kki_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.kkill + 0x1c) : mword 64) false (ITYPE (mword_of_int 270 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)).
+  Proof. mk_base (KernelSyms.kkill + 0x1c) (mword_of_int 0x10e98993 : mword 32)
+    (mword_of_int (KernelSyms.kkill + 0x1c) : mword 64) (ITYPE (mword_of_int 270 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)) kd_10e98993. Qed.
 
   Lemma kki_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.kkill + 0x20) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.kkill + 0x20) (mword_of_int 0x8526 : mword 16)

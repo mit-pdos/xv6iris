@@ -21,6 +21,7 @@ Require Import KernelDecode01.
 Require Import KernelDecode02.
 Require Import KernelDecode04.
 Require Import KernelDecode05.
+Require Import KernelDecode06.
 Require Import KernelDecode07.
 Require Import KernelDecode08.
 Require Import KernelDecode10.
@@ -29,7 +30,6 @@ Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
-Require Import KernelDecode16.
 Require Import KernelDecode18.
 Require Import KernelDecode19.
 Require Import KernelDecode20.
@@ -324,12 +324,12 @@ Section CodeBmap.
   Proof. mk_base (KernelSyms.bmap + 0xb4) (mword_of_int 0x00004517 : mword 32)
     (mword_of_int (KernelSyms.bmap + 0xb4) : mword 64) (UTYPE (mword_of_int 4 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00004517. Qed.
 
-  Lemma bmi_b8 : kernel_text -∗ instr (mword_of_int (KernelSyms.bmap + 0xb8) : mword 64) false (ITYPE (mword_of_int 1202 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.bmap + 0xb8) (mword_of_int 0x4b250513 : mword 32)
-    (mword_of_int (KernelSyms.bmap + 0xb8) : mword 64) (ITYPE (mword_of_int 1202 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_4b250513. Qed.
+  Lemma bmi_b8 : kernel_text -∗ instr (mword_of_int (KernelSyms.bmap + 0xb8) : mword 64) false (ITYPE (mword_of_int 1184 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.bmap + 0xb8) (mword_of_int 0x4a050513 : mword 32)
+    (mword_of_int (KernelSyms.bmap + 0xb8) : mword 64) (ITYPE (mword_of_int 1184 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_4a050513. Qed.
 
-  Lemma bmi_bc : kernel_text -∗ instr (mword_of_int (KernelSyms.bmap + 0xbc) : mword 64) false (JAL (mword_of_int 2087078 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.bmap + 0xbc) (mword_of_int 0x8a7fd0ef : mword 32)
-    (mword_of_int (KernelSyms.bmap + 0xbc) : mword 64) (JAL (mword_of_int 2087078 : mword 21, Regidx (mword_of_int 1))) kd_8a7fd0ef. Qed.
+  Lemma bmi_bc : kernel_text -∗ instr (mword_of_int (KernelSyms.bmap + 0xbc) : mword 64) false (JAL (mword_of_int 2087060 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.bmap + 0xbc) (mword_of_int 0x895fd0ef : mword 32)
+    (mword_of_int (KernelSyms.bmap + 0xbc) : mword 64) (JAL (mword_of_int 2087060 : mword 21, Regidx (mword_of_int 1))) kd_895fd0ef. Qed.
 
 End CodeBmap.

@@ -70,9 +70,10 @@ SAIL_RISCV_REV ?= c32fbf4111b849061db1812355d6da9df8c2e396
 # revision this tree was proved against; converging on the branch tip retired
 # that apparatus, and the pin has tracked the tip since (d80e61c5: tx_lock
 # becomes a spinlock, panic path removed; a28e94b: no procdump from the
-# console).  Nothing here is a local commit: `git -C xv6-riscv checkout
-# --detach $(XV6_REV)` reproduces the image, and that is the whole recipe.
-XV6_REV ?= a28e94b02c04b3d2b7585b327e326de4e2f71702
+# console; 2691300: unreachable() split out of panic()).  Nothing here is a
+# local commit: `git -C xv6-riscv checkout --detach $(XV6_REV)` reproduces the
+# image, and that is the whole recipe.
+XV6_REV ?= 2691300c196b19a2965682fc6147220be85a50af
 
 KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.v
 
