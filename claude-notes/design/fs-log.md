@@ -1007,3 +1007,24 @@ The two post-landing findings move work between stages:
   log_epoch_lb / log_epoch_lb_le (persistent "the log epoch has reached
   e"), minted at the escrow park — this is what produces the e0 <= e
   premise for G-3's spend half.
+
+
+### G.13 The lb-mint ruling (2026-08-13): the lb rides log_opSe, minted at begin_op
+
+RATIFIED from the G-2 opener's analysis.  A lock-free mint is impossible
+(the lb comes only from the auth, which lives in log_res); the universal
+mint point is log_begin_step, where every op passes with the auth open.
+So:  log_opSe γ u Sb e0 := (∃ i, i ↪ (u,Sb,e0)) ∗ log_epoch_lb γ e0
+— the lb is PERSISTENT, so the bundle is ABI-invisible (log_opS arity and
+every conversion lemma hold verbatim; no Spec statement moves), free at
+the mint, and stale copies stay true (a LOWER bound needs no revocation —
+unlike the refuted birth-epoch token).  This is the formal referent of
+§G.4's "the walker's open op freezes the epoch".  PRICED COST: 
+log_begin_step takes/returns the ln_ep auth, so ProofBeginOp's three
+sites re-open (the G-1 consumer agent owns them).
+
+ALSO RULED — nlz_obs carries the OBSERVATION EPOCH: nlz_obs cn k e0, and
+G-3's crz honesty premise is `nlz_obs cn k e0 ∗ log_opSe γ u Sb e0` at
+the SAME e0 (one resource + one shared binder; nothing else can tie the
+per-slot token to the per-op entry, and making nlz_obs carry the entry
+would force it linear when it wants persistence-within-op).

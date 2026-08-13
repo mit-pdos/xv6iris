@@ -797,6 +797,43 @@ Section LogInv.
     rewrite Hee in Hin. iPureIntro. exact (Hreg b Hin).
   Qed.
 
+  (* ---------------------------------------------------------------- *)
+  (*  THE CLIENT-SIDE EPOCH LOWER BOUND (fs-log.md §G.3)                *)
+  (* ---------------------------------------------------------------- *)
+
+  (* "the batch epoch has reached [e]".  PERSISTENT and monotone, so a copy
+     taken under the lock stays true forever outside it -- which is the
+     whole point: a PARKER does not hold the log spinlock and can never
+     read the auth, so every lb it will ever have must have been minted
+     while some ghost step had the auth open. *)
+  Definition log_epoch_lb (γ : log_names) (e : nat) : iProp Σ :=
+    mono_nat_lb_own (ln_ep γ) e.
+
+  Global Instance log_epoch_lb_persistent γ e : Persistent (log_epoch_lb γ e).
+  Proof. apply _. Qed.
+
+  Global Instance log_epoch_lb_timeless γ e : Timeless (log_epoch_lb γ e).
+  Proof. apply _. Qed.
+
+  (* MINTING, where the auth is open (every log ghost step, and begin_op's
+     in particular).  Free: the auth is handed straight back. *)
+  Lemma log_epoch_lb_get (γ : log_names) (E : nat) :
+    mono_nat_auth_own (ln_ep γ) 1 E -∗
+    mono_nat_auth_own (ln_ep γ) 1 E ∗ log_epoch_lb γ E.
+  Proof.
+    iIntros "Ha".
+    iDestruct (mono_nat_lb_own_get with "Ha") as "#Hlb".
+    iFrame "Ha". iApply "Hlb".
+  Qed.
+
+  (* ...and USING one, back under the auth: the bound is real. *)
+  Lemma log_epoch_lb_le (γ : log_names) (E e : nat) :
+    mono_nat_auth_own (ln_ep γ) 1 E -∗ log_epoch_lb γ e -∗ ⌜(e <= E)%nat⌝.
+  Proof.
+    iIntros "Ha Hl".
+    iDestruct (mono_nat_lb_own_valid with "Ha Hl") as %[_ Hle]. done.
+  Qed.
+
   (* THE BUMP, at the commit re-deposit (ProofEndOp's [Hommt] arm): nothing
      physical moves, and no live entry can be falsified because [out = 0]
      there forces [om = ∅]. *)
