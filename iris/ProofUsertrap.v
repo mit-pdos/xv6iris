@@ -392,16 +392,16 @@ Section UtEntry.
     iEval (rewrite Hp1a) in "Hpc".
     (* ---- +0x1a: addi a5,a5,3722 -- the pair sums to kernelvec ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (UT + 0x1a)) Ra5 Ra5
-              (mword_of_int 3894 : mword 12) M5 (av - 4)%nat false
+              (mword_of_int 3892 : mword 12) M5 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1a [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (M6 := <[Regidx Ra5 := regval_into_reg
                    (add_vec (rget M5 Ra5)
-                      (sign_extend' 64 (mword_of_int 3894 : mword 12)))]> M5).
+                      (sign_extend' 64 (mword_of_int 3892 : mword 12)))]> M5).
     change (<[Regidx Ra5 := regval_into_reg
                (add_vec (rget M5 Ra5)
-                  (sign_extend' 64 (mword_of_int 3894 : mword 12)))]> M5) with M6.
+                  (sign_extend' 64 (mword_of_int 3892 : mword 12)))]> M5) with M6.
     assert (HM6sp : M6 !!! Regidx csp_rs1 = pa_stk ksp 4)
       by (rewrite /M6 upd_ne; [exact HM5sp | reg_neq]).
     assert (HM6a5 : rget M6 Ra5

@@ -95,13 +95,13 @@ Notation KF := KernelSyms.kfork (only parsing).
 (* ------------------------------------------------------------------ *)
 Lemma kfkb5_wladdr1 :
   add_vec (add_vec (mword_of_int (KF + 0xc8) : mword 64) (auipc_off (mword_of_int 16 : mword 20)))
-          (sign_extend' 64 (mword_of_int 1696 : mword 12))
+          (sign_extend' 64 (mword_of_int 1710 : mword 12))
   = SpecProcinit.wait_lock_addr.
 Proof. unfold SpecProcinit.wait_lock_addr. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Lemma kfkb5_wladdr2 :
   add_vec (add_vec (mword_of_int (KF + 0xd8) : mword 64) (auipc_off (mword_of_int 16 : mword 20)))
-          (sign_extend' 64 (mword_of_int 1680 : mword 12))
+          (sign_extend' 64 (mword_of_int 1694 : mword 12))
   = SpecProcinit.wait_lock_addr.
 Proof. unfold SpecProcinit.wait_lock_addr. apply bv_eq; vm_compute; reflexivity. Qed.
 
@@ -275,13 +275,13 @@ Section ProofKforkB5.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp_cc) in "Hpc".
     iPoseProof (kfk_0cc with "Htext") as "Hi_cc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KF + 0xcc)) Ra0 Ra0 (mword_of_int 1696 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KF + 0xcc)) Ra0 Ra0 (mword_of_int 1710 : mword 12)
               M3 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi_cc").
     iIntros (CID3 Hs3) "Hcg Hpc".
     iClear "Hi_cc".
     set (M4 := <[Regidx Ra0 := regval_into_reg
-                  (add_vec (rget M3 Ra0) (sign_extend' 64 (mword_of_int 1696 : mword 12)))]> M3).
+                  (add_vec (rget M3 Ra0) (sign_extend' 64 (mword_of_int 1710 : mword 12)))]> M3).
     assert (HM4a0 : M4 !!! Regidx Ra0 = SpecProcinit.wait_lock_addr).
     { rewrite /M4 upd_eq. rgne. rewrite HM3a0. exact kfkb5_wladdr1. }
     assert (Hpp_d0 : add_vec_int (mword_of_int (KF + 0xcc) : mword 64) 4 = mword_of_int (KF + 0xd0))
@@ -369,13 +369,13 @@ Section ProofKforkB5.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp_dc) in "Hpc".
     iPoseProof (kfk_0dc with "Htext") as "Hi_dc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KF + 0xdc)) Ra0 Ra0 (mword_of_int 1680 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KF + 0xdc)) Ra0 Ra0 (mword_of_int 1694 : mword 12)
               M6 (trap_res b + (K - 8))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi_dc").
               iClear "Hi_dc".
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (M7 := <[Regidx Ra0 := regval_into_reg
-                  (add_vec (rget M6 Ra0) (sign_extend' 64 (mword_of_int 1680 : mword 12)))]> M6).
+                  (add_vec (rget M6 Ra0) (sign_extend' 64 (mword_of_int 1694 : mword 12)))]> M6).
     assert (HM7a0 : M7 !!! Regidx Ra0 = SpecProcinit.wait_lock_addr).
     { rewrite /M7 upd_eq. rgne. rewrite HM6a0. exact kfkb5_wladdr2. }
     assert (Hpp_e0 : add_vec_int (mword_of_int (KF + 0xdc) : mword 64) 4 = mword_of_int (KF + 0xe0))

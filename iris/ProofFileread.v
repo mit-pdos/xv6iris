@@ -1160,13 +1160,13 @@ Section ProofFileread.
                              = mword_of_int (FR + 0x88)) by (apply bv_eq; vm_compute; reflexivity).
              iEval (rewrite Hpp88) in "Hpc".
              iApply (wp_addi4_s_sconf (mword_of_int (FR + 0x88)) Ra4 Ra4
-                       (mword_of_int 418 : mword 12) D6 (K - 6)%nat b
+                       (mword_of_int 432 : mword 12) D6 (K - 6)%nat b
                        ltac:(vm_compute; discriminate) ltac:(rdok)
                        with "Hcg Hpc Hi88").
              iIntros (CID53 Hs53) "Hcg Hpc". iEval (rgne) in "Hcg".
              set (D7 := <[Regidx Ra4 := regval_into_reg
                            (add_vec (D6 !!! Regidx Ra4)
-                              (sign_extend' 64 (mword_of_int 418 : mword 12)))]> D6).
+                              (sign_extend' 64 (mword_of_int 432 : mword 12)))]> D6).
              assert (HD7a4 : D7 !!! Regidx Ra4
                              = (mword_of_int KernelSyms.devsw : mword 64)).
              { rewrite /D7 upd_eq /D6 upd_eq.
@@ -2491,23 +2491,23 @@ Section ProofFileread.
                              = mword_of_int (FR + 0xa2)) by (apply bv_eq; vm_compute; reflexivity).
              iEval (rewrite Hppa2) in "Hpc".
              iApply (wp_addi4_s_sconf (mword_of_int (FR + 0xa2)) Ra0 Ra0
-                       (mword_of_int 800 : mword 12) P1 (K - 6)%nat b
+                       (mword_of_int 782 : mword 12) P1 (K - 6)%nat b
                        ltac:(vm_compute; discriminate) ltac:(rdok)
                        with "Hcg Hpc Hia2").
              iIntros (CID21 Hs21) "Hcg Hpc". iEval (rgne) in "Hcg".
              set (P2 := <[Regidx Ra0 := regval_into_reg
                            (add_vec (P1 !!! Regidx Ra0)
-                              (sign_extend' 64 (mword_of_int 800 : mword 12)))]> P1).
+                              (sign_extend' 64 (mword_of_int 782 : mword 12)))]> P1).
              assert (Hppa6 : add_vec_int (mword_of_int (FR + 0xa2) : mword 64) 4
                              = mword_of_int (FR + 0xa6)) by (apply bv_eq; vm_compute; reflexivity).
              iEval (rewrite Hppa6) in "Hpc".
              iApply (wp_jal_s_sconf (mword_of_int (FR + 0xa6)) Rra
-                       (mword_of_int 2082196 : mword 21) P2 (K - 6)%nat b
+                       (mword_of_int 2082178 : mword 21) P2 (K - 6)%nat b
                        ltac:(vm_compute; discriminate) ltac:(rdok)
                        ltac:(vm_compute; reflexivity) with "Hcg Hpc Hia6").
              iIntros (CID22 Hs22) "Hcg Hpc".
              assert (Htgtpanic : add_vec (mword_of_int (FR + 0xa6) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2082196 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2082178 : mword 21))
                        = mword_of_int KernelSyms.panic)
                by (apply bv_eq; vm_compute; reflexivity).
              iEval (rewrite Htgtpanic) in "Hpc".

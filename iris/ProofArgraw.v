@@ -1414,15 +1414,15 @@ Section ProofArgraw.
     assert (Hp1c : add_vec_int (mword_of_int (KernelSyms.argraw + 0x18) : mword 64) 4 = mword_of_int (KernelSyms.argraw + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp1c) in "Hpc".
     iPoseProof (ari_1c with "Htext") as "Hi1c".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.argraw + 0x1c)) ar_a4 ar_a4 (mword_of_int 66 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.argraw + 0x1c)) ar_a4 ar_a4 (mword_of_int 48 : mword 12)
               B2 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c").
     iIntros (CID13 Hs13) "Hcg Hpc".
     set (B3 := <[Regidx ar_a4 := regval_into_reg
-        (add_vec (B2 !!! Regidx ar_a4) (sign_extend' 64 (mword_of_int 66 : mword 12)))]> B2).
+        (add_vec (B2 !!! Regidx ar_a4) (sign_extend' 64 (mword_of_int 48 : mword 12)))]> B2).
     change (<[Regidx ar_a4 := regval_into_reg
-        (add_vec (B2 !!! Regidx ar_a4) (sign_extend' 64 (mword_of_int 66 : mword 12)))]> B2) with B3.
+        (add_vec (B2 !!! Regidx ar_a4) (sign_extend' 64 (mword_of_int 48 : mword 12)))]> B2) with B3.
     assert (Hp20 : add_vec_int (mword_of_int (KernelSyms.argraw + 0x1c) : mword 64) 4 = mword_of_int (KernelSyms.argraw + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp20) in "Hpc".
     assert (HB3a4 : B3 !!! Regidx ar_a4 = mword_of_int ar_tbl).

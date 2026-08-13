@@ -396,6 +396,27 @@ and stay stuck. After any bump that changes WHICH function is called, grep the
 touched proofs for `= mword_of_int KernelSyms.` and check each names the
 function its immediate actually reaches.
 
+**AND THAT GREP IS ALSO THE SCOPE ESTIMATE — the C diff is not.** A callee
+swap changes no instruction SHAPE (same `auipc`/`addi`/`jal`, different target),
+so the `UNALIGNED` sweep stays empty and the size of the job is set entirely by
+how many proofs ASSERT the old callee. Those two numbers differ by an order of
+magnitude, because a proof that has already refuted the branch never reaches
+the call and so never names it. `unreachable()` — a callee with deliberately
+NO WP, so that reaching it is an unprovable obligation rather than a licensed
+divergence — landed as 30 call sites across 20 functions; only **5** proofs
+named `panic` at one, the other 15 functions having already proven their arms
+dead. Count the assertions before promising anybody a schedule:
+
+```sh
+grep -c "mword_of_int KernelSyms.<oldcallee>" iris/Proof*.v
+```
+
+The corollary for a no-WP callee: each surviving assertion is a REAL proof
+obligation (refute the guard), not a relayout, and it is usually a spec-level
+change with caller obligations rather than a local edit — so the honest split
+is "N sites that are already dead" versus "M that need a precondition
+threaded", and only M matters.
+
 ### 4a-ter. THE SHIFT IS NOT ALWAYS A SHIFT
 
 `relayout_shift.py` reports one old->new offset map, which suits a function that

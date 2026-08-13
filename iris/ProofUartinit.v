@@ -529,13 +529,13 @@ Section ProofUartinit.
     assert (Hpp3e : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x3a) : mword 64) 4 = mword_of_int (KernelSyms.uartinit + 0x3e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp3e) in "Hpc".
     (* +0x3e addi a1,a1,1942 : a1 := &"uart" *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartinit + 0x3e)) (mword_of_int 11 : mword 5) (mword_of_int 11 : mword 5) (mword_of_int 1942 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartinit + 0x3e)) (mword_of_int 11 : mword 5) (mword_of_int 11 : mword 5) (mword_of_int 1924 : mword 12)
               A1 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi3e").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (A2 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (A1 !!! Regidx (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 1942 : mword 12)))]> A1).
+    set (A2 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (A1 !!! Regidx (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 1924 : mword 12)))]> A1).
     assert (HA2a1 : A2 !!! Regidx (mword_of_int 11 : mword 5) = name_uart).
     { rewrite /A2 upd_eq. rewrite /A1 upd_eq. unfold name_uart, uart_name_str.
       apply bv_eq; vm_compute; reflexivity. }
@@ -551,13 +551,13 @@ Section ProofUartinit.
     assert (Hpp46 : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x42) : mword 64) 4 = mword_of_int (KernelSyms.uartinit + 0x46)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp46) in "Hpc".
     (* +0x46 addi a0,a0,2734 (= -1370) : a0 := &tx_lock *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartinit + 0x46)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 2734 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartinit + 0x46)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 2748 : mword 12)
               A3 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi46").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (A4 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (A3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2734 : mword 12)))]> A3).
+    set (A4 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (A3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2748 : mword 12)))]> A3).
     assert (HA4a0 : A4 !!! Regidx (mword_of_int 10 : mword 5) = a_tx_lock).
     { rewrite /A4 upd_eq. rewrite /A3 upd_eq. unfold a_tx_lock, KernelSyms.tx_lock.
       apply bv_eq; vm_compute; reflexivity. }

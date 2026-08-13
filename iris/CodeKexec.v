@@ -330,13 +330,13 @@ Section CodeKexec.
   Proof. mk_base (KernelSyms.kexec + 0xce) (mword_of_int 0x00003517 : mword 32)
     (mword_of_int (KernelSyms.kexec + 0xce) : mword 64) (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00003517. Qed.
 
-  Lemma kxc_0d2 : kernel_text -∗ instr (mword_of_int (KernelSyms.kexec + 0xd2) : mword 64) false (ITYPE (mword_of_int 3514 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.kexec + 0xd2) (mword_of_int 0xdba50513 : mword 32)
-    (mword_of_int (KernelSyms.kexec + 0xd2) : mword 64) (ITYPE (mword_of_int 3514 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_dba50513. Qed.
+  Lemma kxc_0d2 : kernel_text -∗ instr (mword_of_int (KernelSyms.kexec + 0xd2) : mword 64) false (ITYPE (mword_of_int 3496 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.kexec + 0xd2) (mword_of_int 0xda850513 : mword 32)
+    (mword_of_int (KernelSyms.kexec + 0xd2) : mword 64) (ITYPE (mword_of_int 3496 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_da850513. Qed.
 
-  Lemma kxc_0d6 : kernel_text -∗ instr (mword_of_int (KernelSyms.kexec + 0xd6) : mword 64) false (JAL (mword_of_int 2080774 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.kexec + 0xd6) (mword_of_int 0x806fc0ef : mword 32)
-    (mword_of_int (KernelSyms.kexec + 0xd6) : mword 64) (JAL (mword_of_int 2080774 : mword 21, Regidx (mword_of_int 1))) kd_806fc0ef. Qed.
+  Lemma kxc_0d6 : kernel_text -∗ instr (mword_of_int (KernelSyms.kexec + 0xd6) : mword 64) false (JAL (mword_of_int 2080756 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.kexec + 0xd6) (mword_of_int 0xff5fb0ef : mword 32)
+    (mword_of_int (KernelSyms.kexec + 0xd6) : mword 64) (JAL (mword_of_int 2080756 : mword 21, Regidx (mword_of_int 1))) kd_ff5fb0ef. Qed.
 
   Lemma kxc_0da : kernel_text -∗ instr (mword_of_int (KernelSyms.kexec + 0xda) : mword 64) true (ADDIW (sign_extend' 12 (mword_of_int 0 : mword 6), Regidx (mword_of_int 18), Regidx (mword_of_int 18))).
   Proof. mk_rvc (KernelSyms.kexec + 0xda) (mword_of_int 0x2901 : mword 16)

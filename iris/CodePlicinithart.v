@@ -55,9 +55,9 @@ Section CodePlicinithart.
   Proof. mk_rvc (KernelSyms.plicinithart + 0x6) (mword_of_int 0x0800 : mword 16)
     (mword_of_int (KernelSyms.plicinithart + 0x6) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) kd_0800 exec_execute_C_ADDI4SPN. Qed.
 
-  Lemma phi_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x8) : mword 64) false (JAL (mword_of_int 2081604 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.plicinithart + 0x8) (mword_of_int 0xb44fc0ef : mword 32)
-    (mword_of_int (KernelSyms.plicinithart + 0x8) : mword 64) (JAL (mword_of_int 2081604 : mword 21, Regidx (mword_of_int 1))) kd_b44fc0ef. Qed.
+  Lemma phi_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x8) : mword 64) false (JAL (mword_of_int 2081606 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.plicinithart + 0x8) (mword_of_int 0xb46fc0ef : mword 32)
+    (mword_of_int (KernelSyms.plicinithart + 0x8) : mword 64) (JAL (mword_of_int 2081606 : mword 21, Regidx (mword_of_int 1))) kd_b46fc0ef. Qed.
 
   Lemma phi_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0xc) : mword 64) false (SHIFTIWOP (mword_of_int 8 : mword 5, Regidx (mword_of_int 10), Regidx (mword_of_int 14), SLLIW)).
   Proof. mk_base (KernelSyms.plicinithart + 0xc) (mword_of_int 0x0085171b : mword 32)
