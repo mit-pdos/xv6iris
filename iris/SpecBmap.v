@@ -572,7 +572,18 @@ Definition wp_bmap_gen_body
               balloc's own bzero, which is what lets the caller absorb its
               own [log_write] of the very same block *)
         /\ (bmap_ad bm bm' fbn = true ->
-              bv_unsigned (blkmap_get bm' fbn) ∈ Sb')⌝ -∗
+              bv_unsigned (blkmap_get bm' fbn) ∈ Sb')
+        (* (e) THE DIRECT PATH DOES NOT TOUCH THE INDIRECT SLOT.  Honest
+              frame fact both direct arms hold literally (the allocating
+              one builds its map at [bm_ind bm]; the other returns [bm]),
+              and the clause that makes [wi16_spend]'s single [al] boolean
+              derivable at the caller: with it, [bmap_ind fbn = false]
+              gives [bmap_ai = false], so [bmap_alloced = bmap_ad] and
+              clause (d) pays the caller's own log_write of the target.
+              Without it, "allocated an INDIRECT block for a DIRECT index"
+              is physically impossible but not contract-refutable (GR-3
+              stage-3 W2 stop report, projects/fs-sysfile.md). *)
+        /\ (bmap_ind fbn = false -> bm_ind bm' = bm_ind bm)⌝ -∗
       log_opS γ n' Sb' -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

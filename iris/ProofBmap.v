@@ -324,7 +324,12 @@ Section BmapKit.
     /\ Sb' ⊆ Sb ∪ bm_bmsset ak ∪ {[bv_unsigned (bm_ind bm')]}
                 ∪ {[bv_unsigned (blkmap_get bm' fbn)]}
     /\ (bmap_alloced bm bm' fbn = true -> bm_bmsset ak ⊆ Sb')
-    /\ (bmap_ad bm bm' fbn = true -> bv_unsigned (blkmap_get bm' fbn) ∈ Sb').
+    /\ (bmap_ad bm bm' fbn = true -> bv_unsigned (blkmap_get bm' fbn) ∈ Sb')
+    (* (e) THE DIRECT PATH DOES NOT TOUCH THE INDIRECT SLOT -- the frame
+       fact every arm holds literally, and the one the caller needs in
+       order to read [bmap_alloced] as [bmap_ad] on the direct path.  See
+       [SpecBmap.wp_bmap_gen_body]'s clause (e). *)
+    /\ (bmap_ind fbn = false -> bm_ind bm' = bm_ind bm).
 
   (* [bm_indirect_tail]'s allocating arm proves [bm_ledger_ok]'s first two
      conjuncts (the spend against the caller's budget, and "spending never
@@ -356,6 +361,7 @@ Section BmapKit.
     rewrite /bm_ledger_ok (bmap_alloced_none bm bm fbn eq_refl eq_refl).
     split; [cbn; lia|]. split; [lia|]. split; [set_solver|].
     split; [set_solver|]. split; [intros Hc; discriminate Hc|].
+    split; [| intros _; reflexivity].
     intros Hc. exfalso.
     unfold bmap_ad in Hc. apply bool_decide_eq_true_1 in Hc.
     destruct Hc as [H1 H2]. exact (H2 H1).
@@ -2019,7 +2025,7 @@ Section BmapTail.
         assert (Hledger : bm_ledger_ok (Some (MkBmAlloc γ bms sz uu dqb dqs γpr))
                             cr bm bmJ fbn n (if cri then S w else w)%nat
                             Sb (S1 ∪ {[uint (bm_ind bmI : mword 32)]})).
-        { destruct Hled0 as (_ & Hhi0 & Hsub0 & _ & _ & _).
+        { destruct Hled0 as (_ & Hhi0 & Hsub0 & _ & _ & _ & Hfrm0).
           cbn [bm_bmsset ba_bms] in HSbI.
           rewrite /bm_ledger_ok Halloc HindJ HgetJf Huind HS1.
           cbn [bm_bmsset ba_bms].
@@ -2038,7 +2044,10 @@ Section BmapTail.
           - exact (bmset_tail_ceiling Sb SbI bms (bv_unsigned (bm_ind bmI))
                      (bv_unsigned blk) HSbI).
           - intros _. exact (bmset_sing_sub _ _ (bmset_in_m4 _ _ _ _)).
-          - intros _. exact (bmset_in_c4 _ _ _ _). }
+          - intros _. exact (bmset_in_c4 _ _ _ _).
+          - (* (e): the tail splices an ENTRY, so [bm_ind] is [bmI]'s, and
+               the incoming ledger already carries the fact against [bm] *)
+            exact Hfrm0. }
         iDestruct (bm_kit_intro γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev
                      (if cri then S w else w)%nat (S1 ∪ {[uint (bm_ind bmI : mword 32)]})
                      eq_refl (conj Hbgsz (conj Hbg0 (conj Hbgcov Hbglog)))
@@ -2791,7 +2800,9 @@ Section ProofBmapMain.
             - exact (bmset_sub_l3 _ _ _).
             - exact (bmset_ceil3 _ _ _ _).
             - intros _. exact (bmset_sing_sub _ _ (bmset_in_m3 _ _ _)).
-            - intros _. exact (bmset_in_r3 _ _ _). }
+            - intros _. exact (bmset_in_r3 _ _ _).
+            - (* (e): [bmD] is [bm] with one DIRECT entry replaced *)
+              intros _. reflexivity. }
           iDestruct (bm_kit_intro γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev
                        (if cr then S u2 else u2)%nat
                        (Sb ∪ {[bms]} ∪ {[bv_unsigned blk]})
@@ -3383,7 +3394,9 @@ Section ProofBmapMain.
             - exact (bmset_sub_l3 _ _ _).
             - exact (bmset_add_r _ _).
             - intros _. exact (bmset_sing_sub _ _ (bmset_in_m3 _ _ _)).
-            - intros Hc; discriminate Hc. }
+            - intros Hc; discriminate Hc.
+            - (* (e): this arm IS the indirect path *)
+              intros Hc; discriminate Hc. }
           iDestruct (bm_kit_intro γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev
                        (if cr then S u2 else u2)%nat (Sb ∪ {[bms]} ∪ {[bv_unsigned blk]})
                        eq_refl (conj Hbgsz (conj Hbg0 (conj Hbgcov Hbglog)))
@@ -3661,9 +3674,9 @@ Section BmapSeal.
     { exact Hdat. }
     { iExact "Hsl". }
     { (* [bm_bmsset] at [Some _] IS the bitmap block's singleton *)
-      destruct Hled as (H1 & H2 & H3 & H4 & H5 & H6).
+      destruct Hled as (H1 & H2 & H3 & H4 & H5 & H6 & H7).
       cbn [bm_bmsset ba_bms] in H4, H5.
-      split_and!; [exact H1 | exact H2 | exact H3 | exact H4 | | exact H6].
+      split_and!; [exact H1 | exact H2 | exact H3 | exact H4 | | exact H6 | exact H7].
       intros Hc. exact (bmset_sing_in _ _ (H5 Hc)). }
   Qed.
 

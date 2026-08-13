@@ -298,6 +298,7 @@ Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import BitmapInv.
+Require Import SpecBmap.
 Require Import KernelDataInv.
 Require Import SpecPrintkGen.
 Require Import KallocInv.
@@ -360,6 +361,79 @@ Definition wi_cost (off n : nat) : nat := (6 * wi_blocks off n + 1)%nat.
    ([WriteiBudget.wi_cost_tight_incomparable] records the same trap for the
    two-credit cost.) *)
 Definition wi_cost_bmonly (off n : nat) : nat := (2 * wi_blocks off n + 2)%nat.
+
+(* ===================================================================== *)
+(*  THE SIXTEEN-BYTE SEAM -- the credit-aware spend for a single-block    *)
+(*  write (GR-3 stage-3 ruling, projects/fs-sysfile.md §GR-3).            *)
+(*                                                                        *)
+(*  dirlink's only writei shape is a 16-aligned sixteen-byte window       *)
+(*  (1024 = 64 * 16, so a record never straddles), and create's ledger    *)
+(*  needs that call priced at its ABSORPTIONS, not at the coarse bound:   *)
+(*  the bitmap-only amortization provably cannot close cr_budget_mkdir    *)
+(*  (CreateBudget.wi16_bmonly_amort_insufficient).  The figure below is   *)
+(*  bmap's arm-wise cost, plus writei's own log_write of the target       *)
+(*  block -- free when balloc just bzero'ed it ([al]) or when the caller  *)
+(*  had already logged it ([crd]) -- plus the trailing iupdate ([cru]).   *)
+(*                                                                        *)
+(*    [crb] : bmapstart ∈ Sb            (SpecBmap's [cr], verbatim)       *)
+(*    [crd] : the target block ∈ Sb                                       *)
+(*    [cru] : IBLOCK inum inodestart ∈ Sb                                 *)
+(*    [al]  : bmap allocated ([bmap_alloced bm bm' fbn] -- DERIVED, both  *)
+(*            maps are already post variables, so no new existential)     *)
+(*    [ind] : the window is on the indirect path ([bmap_ind fbn])         *)
+Definition wi16_spend (crb crd cru al ind : bool) : nat :=
+  (bmap_cost crb al ind + (if (al || crd)%bool then 0 else 1)
+   + (if cru then 0 else 1))%nat.
+
+(* ...and what must be IN HAND on entry.  Credits do NOT lower this:
+   log_write's contract takes [log_opS (S u)] on BOTH arms (a unit in hand
+   even to absorb) and so does iupdate's.  bmap's own requirement is
+   [SpecBmap.bmap_need]. *)
+Definition wi16_need (crb ind : bool) : nat := (bmap_need crb ind + 2)%nat.
+
+Lemma wi16_need_value_dir : wi16_need false false = 4%nat.
+Proof. reflexivity. Qed.
+
+(* For comparison with the LANDED loose bound: whenever the sixteen bytes
+   sit inside one block, [wi_blocks off 16 = 1] and [wi_cost_bmonly off 16
+   = 4] -- the same number [wi16_need false false] gives.  THE NEED WAS
+   NEVER THE PROBLEM; the SPEND bound is. *)
+Lemma wi16_need_matches_landed (off : nat) :
+  wi_blocks off 16 = 1%nat ->
+  wi16_need false false = wi_cost_bmonly off 16.
+Proof.
+  intros H. unfold wi16_need, bmap_need, wi_cost_bmonly.
+  rewrite H. reflexivity.
+Qed.
+
+(* the disk block the single-block window lands on, as [log_write] names
+   it in the ledger ([uint bno] -- SpecLogWrite's union element, verbatim,
+   so the membership clause below is literal). *)
+Definition wi_tgt_blk (bm : blkmap) (off : nat) : Z :=
+  uint (blkmap_get bm (off `div` BSIZE)%nat : mword 32).
+
+(* THE EXPOSED CLAUSE, as one named Prop so the contract grows by exactly
+   one pure wand.  Guarded by the SUCCESS arm ([0 < tot] -- on the
+   early-exit arm nothing is logged and the memberships are false) and by
+   the single-block shape ([wi_blocks off n = 1] -- the multi-block loop
+   invariant is deliberately NOT strengthened; the LogAmort third
+   amortization stays parked and the coarse [wi_cost_bmonly] clause above
+   stays).  The membership half is what lets a caller derive the NEXT
+   call's credit booleans: [Sb ⊆ Sb'] alone provably cannot
+   (projects/fs-sysfile.md §GR-3, derivation 2). *)
+Definition wi16_post (bmapstart : Z) (inum : mword 32) (inodestart : Z)
+    (ncount n' off n tot : nat) (bm bm' : blkmap) (Sb Sb' : gset Z) : Prop :=
+  (0 < tot)%nat -> wi_blocks off n = 1%nat ->
+  let fbn := (off `div` BSIZE)%nat in
+  let al := bmap_alloced bm bm' fbn in
+  let ind := bmap_ind fbn in
+  let crb := bool_decide (bmapstart ∈ Sb) in
+  let crd := bool_decide (wi_tgt_blk bm' off ∈ Sb) in
+  let cru := bool_decide (IBLOCK inum inodestart ∈ Sb) in
+  ((ncount - wi16_spend crb crd cru al ind)%nat <= n')%nat
+  /\ wi_tgt_blk bm' off ∈ Sb'
+  /\ IBLOCK inum inodestart ∈ Sb'
+  /\ (al = true -> bmapstart ∈ Sb').
 
 (* the on-disk inode writei flushes: the caller's metadata with the size
    raised to the advanced offset when the write went past the old end, and
@@ -893,6 +967,10 @@ Definition wp_writei_gen_body
       ⌜((ncount - wi_cost_bmonly off n)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
       (* THE SET ONLY GROWS.  No ceiling -- see the header. *)
       ⌜Sb ⊆ Sb'⌝ -∗
+      (* ...and on a single-block success, the spend is the credit-aware
+         [wi16_spend] and the three logged blocks are IN the returned set.
+         ADDITIVE -- see [wi16_post]'s header. *)
+      ⌜wi16_post bmapstart inum inodestart ncount n' off n tot bm bm' Sb Sb'⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗

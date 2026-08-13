@@ -5926,3 +5926,114 @@ to the orchestrator.
 
 Nothing was edited for stage 3.  `SpecDirlink.v` / `ProofDirlink.v` are
 untouched.
+
+## GR-3 — the second grand reconciliation (2026-08-13), and STAGE 3's RULING
+
+Origin moved to xv6 `d80e61c5` (a descendant of our `9da28f5` pin: uart's
+tx_lock becomes a SPINLOCK, the panic path is gone, plus `make fmt`) with
+their own restyle+re-address sweep, while our line carried GR-1..GR-2d.
+229 conflicts, resolved by classification — merge commit `GR-3` has the
+per-class recipe.  Three facts worth keeping: origin INDEPENDENTLY proved
+the namex nlink guard at the same offsets (so ProofNamex's merge was
+ours-dominant with zero guard rework); the d80e61c5 spinlock change
+OBSOLETED GR-1d's initsleeplock walk outright (origin's initlock-shaped
+uartinit cone taken wholesale — a kernel change can retire a proof, not
+just break it); and `fix_proof_imms` on the merged tree reports
+byte-identically to origin's own baseline, which is the cheap whole-tree
+chimera audit the GR-1 notes asked for.  Owed item: ProofIput keeps the
+direct `ic_swap_park`+`iNext` idiom; origin's `ip_swap_park_later` is not
+ported.
+
+### STAGE 3 RULING — FINDING 6's candidate 1 is REFUTED; candidate 2, ADDITIVE
+
+Candidate 1 (`wi_cost_bmonly - bm_pot` as the exposed spend) cannot close
+`cr_budget_mkdir`: the three dirlinks would bound at 4/3/3 where the true
+vector spends are 3/0/3, and `10 - 1 - (4+3+3) = -1 < iput_units`.  The
+`bm_pot` device credits only the BITMAP block; create's arithmetic lives
+on the `crd` (same-target-block) and `cru` (inode-block) absorptions,
+which no bitmap-only figure expresses.  Machine-checkable in the
+`CreateBudget` vocabulary — worth landing as a refutation lemma beside
+`wi16_need_matches_landed`.
+
+So writei exposes the `wi16_spend`-shaped figure, and ADDITIVELY: the
+landed `wi_cost_bmonly` clause stays (the LogAmort third amortization
+stays parked; no zero-slack budget reopens).  Three load-bearing
+derivations:
+
+1. **No new existentials.** `bm`/`bm'` are already post variables, so
+   `al := bmap_alloced bm bm' (off/BSIZE)` and `ind := bmap_ind (off/BSIZE)`
+   are DERIVED terms — FINDING 6's worry that al/crd "would have to be
+   existentially reported" dissolves.
+2. **`⌜Sb ⊆ Sb'⌝` alone is NOT enough.**  dirlink #2/#3's credit booleans
+   (`crb`/`crd`/`cru` at the NEXT call) are derivable only from
+   MEMBERSHIP, so the new clause must also state what LANDED:
+   al = true -> bmapstart ∈ Sb'; the target block ∈ Sb'; cru's
+   IBLOCK ∈ Sb' after the tail iupdate.
+3. **Every callee already delivers.**  `wp_bmap_gen` promises the spend at
+   `bmap_cost cr al ind` AND `bmap_alloced = true -> bmapstart ∈ Sb'`
+   (SpecBmap.v:570); set-form `log_write` returns the literal
+   `Sb ∪ {[bno]}` (SpecLogWrite.v:154); `wp_iupdate_credgen` returns
+   `Sb ∪ {[IBLOCK inum inodestart]}` (SpecIupdate.v:680).  The exposure is
+   genuinely only at writei's seam; the new clause is conditional on
+   `wi_blocks off n = 1` (dirlink's aligned-16 shape), so the multi-block
+   loop invariant is untouched.
+
+### The GR-3 gate (mirror, 2026-08-13)
+
+Full build `EXIT=0`, **1069 `.vo`**, `make -n` staleness **0**.  Two chimeras
+surfaced and fixed (`7f5ab8f8`): BootCarveMain's auto-merged sleeplock carve
+(obsolete class), and ProofIput's gen-seal goal selector — upstream's `3:{`
+displaced our `4:{` because **goal-selector numerals are numeric twins to a
+composer but their meaning depends on conjunct count**; a selector audit of
+all five composed files against the ours-parent shows that was the only
+instance.  Coverage on the merged tree: **172/189 fns proven (91%), 83% of
+text bytes** — the union of both lines (ours-parent was 151); fs.c and
+uart.c at 100%.  `Print Assumptions` (audit10.v + 10b, 34 linked
+theorems incl. the gen forms, kexit/kfork, main/uartinit/uartwrite): the
+standing six on every lemma, plus only the documented extras — consoleread
+/ consolewrite on the file r/w cones, forkret_park on kfork, and
+`wp_main_boot_sconf` carrying the assumed consoleintr / printk_gen /
+userinit contracts (the same leaves proof_coverage lists as assumed).
+Nothing entered from the merge.
+
+### The staged work
+
+| step | what | who | state |
+|------|------|-----|-------|
+| W1 | SpecWritei: wi16_spend/wi16_need/wi_tgt_blk/wi16_post + ONE new pure wand in wp_writei_gen_body; CreateBudget slimmed to import them + wi16_bmonly_amort_insufficient | design (Fable) | **LANDED** (SpecWritei/SpecDirlink/CreateBudget green on mirror) |
+| W2 | ProofWritei: thread the single-iteration ledger to wi16_post; absorb the wand in the sconf derivation | agent (Opus) | **LANDED** |
+| W3 | DIRLINK_GEN on top — iput-sized by the GR-2b seam count (6 log_op occurrences in ProofDirlink.v) | agent (Opus) | queued |
+
+### W2 as landed (agent report, 2026-08-13)
+
+The agent STOPPED first, correctly: wi16_post's clause (a) was unprovable on
+one arm — wi16_spend's single `al` serves two roles, and "allocated an
+INDIRECT block for a DIRECT index" is physically impossible but was not
+contract-refutable, leaving the direct-path absorption one unit short.  The
+ruling (fix B): `wp_bmap_gen` gained clause (e),
+`bmap_ind fbn = false -> bm_ind bm' = bm_ind bm` — the honest frame fact
+both direct arms held literally.  With it, wi16_post went through VERBATIM
+at the five-boolean figure; no seam weakened.
+
+Proof shapes: `wi16_pre` (the receipt at the join — wi16_post minus the
+iupdate term, at the count in hand), `wi16_fresh` (what the loop carries —
+re-established BY REFUTATION off the pinned fuel, so the multi-block
+wi_inv_* ledger is untouched), three top-of-file arithmetic lemmas, the
+tail flush switched to `wp_iupdate_credgen`, `+1 %D` in the sconf
+derivation.  ProofWritei ~2 min/compile on the mirror (far under the 5-8
+min budgeted).  Whole SpecBmap cone rebuilt green: ProofBmap, ProofReadi,
+LinkBmap, LinkWritei, SpecFilewrite, ProofFilewrite, ProofDirlink.
+
+Two traps from the run, recorded verbatim:
+
+* **`destruct (f x) eqn:H` substitutes the scrutinee into hypotheses that
+  mention it**, so a follow-up `rewrite H in Hyp` fails with *"The LHS of H
+  does not match any subterm of the goal"* — reads like the equation is
+  wrong; the rewrite is simply already done.
+* **A callee contract that RETURNS a credit raises the caller's
+  `n' <= ncount` obligation by one**, and the failure surfaces at the
+  CALLER'S seal, not at the switched call — the mirror image of GR-2c
+  FINDING 5 (there a stronger callee bound needed weakening at the seam;
+  here a stronger callee payout needs a strengthened premise at the seam).
+  wi_size/wi_join each gained `(S u <= ncount)` beside `(u <= ncount)`,
+  named fresh so nothing downstream moved.
