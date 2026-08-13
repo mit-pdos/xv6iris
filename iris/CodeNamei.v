@@ -21,7 +21,6 @@ Require Import KernelDecode10.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
-Require Import KernelDecode17.
 Require Import KernelDecode19.
 Require Import KernelDecode21.
 Require Import KernelDecode26.
@@ -59,9 +58,9 @@ Section CodeNamei.
   Proof. mk_rvc (KernelSyms.namei + 0xc) (mword_of_int 0x4581 : mword 16)
     (mword_of_int (KernelSyms.namei + 0xc) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 11), ADDI)) kd_4581 exec_execute_C_LI. Qed.
 
-  Lemma nmi_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.namei + 0xe) : mword 64) false (JAL (mword_of_int 2096650 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.namei + 0xe) (mword_of_int 0xe0bff0ef : mword 32)
-    (mword_of_int (KernelSyms.namei + 0xe) : mword 64) (JAL (mword_of_int 2096650 : mword 21, Regidx (mword_of_int 1))) kd_e0bff0ef. Qed.
+  Lemma nmi_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.namei + 0xe) : mword 64) false (JAL (mword_of_int 2096634 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.namei + 0xe) (mword_of_int 0xdfbff0ef : mword 32)
+    (mword_of_int (KernelSyms.namei + 0xe) : mword 64) (JAL (mword_of_int 2096634 : mword 21, Regidx (mword_of_int 1))) kd_dfbff0ef. Qed.
 
   Lemma nmi_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.namei + 0x12) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.namei + 0x12) (mword_of_int 0x60e2 : mword 16)

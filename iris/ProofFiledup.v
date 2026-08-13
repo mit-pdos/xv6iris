@@ -245,14 +245,14 @@ Section ProofFiledup.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp14) in "Hpc".
     (* ===== +0x14 jal ra,acquire ===== *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.filedup + 0x14)) Rra (mword_of_int 0x1fcb38 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.filedup + 0x14)) Rra (mword_of_int 0x1fcb28 : mword 21)
               R5 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi14 [-]").
     iIntros (CID9 Hs9) "Hcg Hpc".
     set (mA := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.filedup + 0x14) : mword 64) 4)]> R5).
     assert (Htgtacq : add_vec (mword_of_int (KernelSyms.filedup + 0x14) : mword 64)
-                        (sign_extend' 64 (mword_of_int 0x1fcb38 : mword 21))
+                        (sign_extend' 64 (mword_of_int 0x1fcb28 : mword 21))
                       = mword_of_int KernelSyms.acquire)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtacq) in "Hpc".
@@ -413,14 +413,14 @@ Section ProofFiledup.
     assert (Hpp2a : add_vec_int (mword_of_int (KernelSyms.filedup + 0x26) : mword 64) 4 = mword_of_int (KernelSyms.filedup + 0x2a))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp2a) in "Hpc".
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.filedup + 0x2a)) Rra (mword_of_int 0x1fcbaa : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.filedup + 0x2a)) Rra (mword_of_int 0x1fcb9a : mword 21)
               D4 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi2a [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (D5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.filedup + 0x2a) : mword 64) 4)]> D4).
     assert (Htgtrel : add_vec (mword_of_int (KernelSyms.filedup + 0x2a) : mword 64)
-                        (sign_extend' 64 (mword_of_int 0x1fcbaa : mword 21))
+                        (sign_extend' 64 (mword_of_int 0x1fcb9a : mword 21))
                       = mword_of_int KernelSyms.release)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtrel) in "Hpc".

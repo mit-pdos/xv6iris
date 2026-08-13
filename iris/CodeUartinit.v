@@ -31,7 +31,6 @@ Require Import KernelDecode16.
 Require Import KernelDecode19.
 Require Import KernelDecode23.
 Require Import KernelDecode24.
-Require Import KernelDecode25.
 Require Import KernelDecode26.
 Require Import KernelDecode28.
 Require Import KernelDecode30.
@@ -130,13 +129,13 @@ Section CodeUartinit.
   Proof. mk_base (KernelSyms.uartinit + 0x42) (mword_of_int 0x00012517 : mword 32)
     (mword_of_int (KernelSyms.uartinit + 0x42) : mword 64) (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00012517. Qed.
 
-  Lemma uii_46 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartinit + 0x46) : mword 64) false (ITYPE (mword_of_int 2730 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.uartinit + 0x46) (mword_of_int 0xaaa50513 : mword 32)
-    (mword_of_int (KernelSyms.uartinit + 0x46) : mword 64) (ITYPE (mword_of_int 2730 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_aaa50513. Qed.
+  Lemma uii_46 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartinit + 0x46) : mword 64) false (ITYPE (mword_of_int 2746 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.uartinit + 0x46) (mword_of_int 0xaba50513 : mword 32)
+    (mword_of_int (KernelSyms.uartinit + 0x46) : mword 64) (ITYPE (mword_of_int 2746 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_aba50513. Qed.
 
-  Lemma uii_4a : kernel_text -∗ instr (mword_of_int (KernelSyms.uartinit + 0x4a) : mword 64) false (JAL (mword_of_int 13872 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.uartinit + 0x4a) (mword_of_int 0x630030ef : mword 32)
-    (mword_of_int (KernelSyms.uartinit + 0x4a) : mword 64) (JAL (mword_of_int 13872 : mword 21, Regidx (mword_of_int 1))) kd_630030ef. Qed.
+  Lemma uii_4a : kernel_text -∗ instr (mword_of_int (KernelSyms.uartinit + 0x4a) : mword 64) false (JAL (mword_of_int 13888 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.uartinit + 0x4a) (mword_of_int 0x640030ef : mword 32)
+    (mword_of_int (KernelSyms.uartinit + 0x4a) : mword 64) (JAL (mword_of_int 13888 : mword 21, Regidx (mword_of_int 1))) kd_640030ef. Qed.
 
   Lemma uii_4e : kernel_text -∗ instr (mword_of_int (KernelSyms.uartinit + 0x4e) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.uartinit + 0x4e) (mword_of_int 0x60a2 : mword 16)

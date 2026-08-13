@@ -2786,14 +2786,14 @@ Section WriteiLoop.
           iEval (rewrite Hpp) in "Hpc". clear Hpp.
           (* ===== +0x6a jal ra,log_write ===== *)
           iApply (wp_jal_s_sconf (mword_of_int (WI + 0x6a)) Rra
-                    (mword_of_int 1746 : mword 21) F1 (K - 14)%nat b
+                    (mword_of_int 1762 : mword 21) F1 (K - 14)%nat b
                     ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc Hi6a").
           iIntros (CIDc3 Hqc3) "Hcg Hpc".
           set (F2 := <[Regidx Rra := regval_into_reg
                         (add_vec_int (mword_of_int (WI + 0x6a) : mword 64) 4)]> F1).
           assert (Htgtlw : add_vec (mword_of_int (WI + 0x6a) : mword 64)
-                             (sign_extend' 64 (mword_of_int 1746 : mword 21))
+                             (sign_extend' 64 (mword_of_int 1762 : mword 21))
                            = mword_of_int KernelSyms.log_write) by pcw.
           iEval (rewrite Htgtlw) in "Hpc".
           assert (HF2ra : F2 !!! Regidx Rra
@@ -3250,14 +3250,14 @@ Section WriteiLoop.
           iEval (rewrite Hpp) in "Hpc". clear Hpp.
           (* ===== +0xb2 jal ra,log_write  -- THE FIX ===== *)
           iApply (wp_jal_s_sconf (mword_of_int (WI + 0xb2)) Rra
-                    (mword_of_int 1674 : mword 21) J1 (K - 14)%nat b
+                    (mword_of_int 1690 : mword 21) J1 (K - 14)%nat b
                     ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc Hib2").
           iIntros (CIDd3 Hqd3) "Hcg Hpc".
           set (J2 := <[Regidx Rra := regval_into_reg
                         (add_vec_int (mword_of_int (WI + 0xb2) : mword 64) 4)]> J1).
           assert (Htgtlw : add_vec (mword_of_int (WI + 0xb2) : mword 64)
-                             (sign_extend' 64 (mword_of_int 1674 : mword 21))
+                             (sign_extend' 64 (mword_of_int 1690 : mword 21))
                            = mword_of_int KernelSyms.log_write) by pcw.
           iEval (rewrite Htgtlw) in "Hpc".
           assert (HJ2ra : J2 !!! Regidx Rra

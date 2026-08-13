@@ -39,6 +39,7 @@ Require Import KernelDecode22.
 Require Import KernelDecode23.
 Require Import KernelDecode24.
 Require Import KernelDecode26.
+Require Import KernelDecode27.
 Require Import KernelDecode28.
 Require Import KernelDecode29.
 Require Import KernelDecode30.
@@ -89,13 +90,13 @@ Section CodeUartwrite.
   Proof. mk_base (KernelSyms.uartwrite + 0x10) (mword_of_int 0x00012517 : mword 32)
     (mword_of_int (KernelSyms.uartwrite + 0x10) : mword 64) (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00012517. Qed.
 
-  Lemma uwi_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartwrite + 0x14) : mword 64) false (ITYPE (mword_of_int 2694 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.uartwrite + 0x14) (mword_of_int 0xa8650513 : mword 32)
-    (mword_of_int (KernelSyms.uartwrite + 0x14) : mword 64) (ITYPE (mword_of_int 2694 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_a8650513. Qed.
+  Lemma uwi_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartwrite + 0x14) : mword 64) false (ITYPE (mword_of_int 2710 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.uartwrite + 0x14) (mword_of_int 0xa9650513 : mword 32)
+    (mword_of_int (KernelSyms.uartwrite + 0x14) : mword 64) (ITYPE (mword_of_int 2710 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_a9650513. Qed.
 
-  Lemma uwi_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartwrite + 0x18) : mword 64) false (JAL (mword_of_int 13890 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.uartwrite + 0x18) (mword_of_int 0x642030ef : mword 32)
-    (mword_of_int (KernelSyms.uartwrite + 0x18) : mword 64) (JAL (mword_of_int 13890 : mword 21, Regidx (mword_of_int 1))) kd_642030ef. Qed.
+  Lemma uwi_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartwrite + 0x18) : mword 64) false (JAL (mword_of_int 13906 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.uartwrite + 0x18) (mword_of_int 0x652030ef : mword 32)
+    (mword_of_int (KernelSyms.uartwrite + 0x18) : mword 64) (JAL (mword_of_int 13906 : mword 21, Regidx (mword_of_int 1))) kd_652030ef. Qed.
 
   Lemma uwi_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.uartwrite + 0x1c) : mword 64) false (BTYPE (mword_of_int 82 : mword 13, Regidx (mword_of_int 18), zreg, BGE)).
   Proof. mk_base (KernelSyms.uartwrite + 0x1c) (mword_of_int 0x05205963 : mword 32)
@@ -125,9 +126,9 @@ Section CodeUartwrite.
   Proof. mk_base (KernelSyms.uartwrite + 0x2a) (mword_of_int 0x0000aa17 : mword 32)
     (mword_of_int (KernelSyms.uartwrite + 0x2a) : mword 64) (UTYPE (mword_of_int 10 : mword 20, Regidx (mword_of_int 20), AUIPC)) kd_0000aa17. Qed.
 
-  Lemma uwi_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.uartwrite + 0x2e) : mword 64) false (ITYPE (mword_of_int 2436 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)).
-  Proof. mk_base (KernelSyms.uartwrite + 0x2e) (mword_of_int 0x984a0a13 : mword 32)
-    (mword_of_int (KernelSyms.uartwrite + 0x2e) : mword 64) (ITYPE (mword_of_int 2436 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)) kd_984a0a13. Qed.
+  Lemma uwi_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.uartwrite + 0x2e) : mword 64) false (ITYPE (mword_of_int 2452 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)).
+  Proof. mk_base (KernelSyms.uartwrite + 0x2e) (mword_of_int 0x994a0a13 : mword 32)
+    (mword_of_int (KernelSyms.uartwrite + 0x2e) : mword 64) (ITYPE (mword_of_int 2452 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)) kd_994a0a13. Qed.
 
   Lemma uwi_32 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartwrite + 0x32) : mword 64) false (UTYPE (mword_of_int 65536 : mword 20, Regidx (mword_of_int 19), LUI)).
   Proof. mk_base (KernelSyms.uartwrite + 0x32) (mword_of_int 0x100009b7 : mword 32)
@@ -213,13 +214,13 @@ Section CodeUartwrite.
   Proof. mk_base (KernelSyms.uartwrite + 0x6e) (mword_of_int 0x00012517 : mword 32)
     (mword_of_int (KernelSyms.uartwrite + 0x6e) : mword 64) (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00012517. Qed.
 
-  Lemma uwi_72 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartwrite + 0x72) : mword 64) false (ITYPE (mword_of_int 2600 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.uartwrite + 0x72) (mword_of_int 0xa2850513 : mword 32)
-    (mword_of_int (KernelSyms.uartwrite + 0x72) : mword 64) (ITYPE (mword_of_int 2600 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_a2850513. Qed.
+  Lemma uwi_72 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartwrite + 0x72) : mword 64) false (ITYPE (mword_of_int 2616 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.uartwrite + 0x72) (mword_of_int 0xa3850513 : mword 32)
+    (mword_of_int (KernelSyms.uartwrite + 0x72) : mword 64) (ITYPE (mword_of_int 2616 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_a3850513. Qed.
 
-  Lemma uwi_76 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartwrite + 0x76) : mword 64) false (JAL (mword_of_int 13880 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.uartwrite + 0x76) (mword_of_int 0x638030ef : mword 32)
-    (mword_of_int (KernelSyms.uartwrite + 0x76) : mword 64) (JAL (mword_of_int 13880 : mword 21, Regidx (mword_of_int 1))) kd_638030ef. Qed.
+  Lemma uwi_76 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartwrite + 0x76) : mword 64) false (JAL (mword_of_int 13896 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.uartwrite + 0x76) (mword_of_int 0x648030ef : mword 32)
+    (mword_of_int (KernelSyms.uartwrite + 0x76) : mword 64) (JAL (mword_of_int 13896 : mword 21, Regidx (mword_of_int 1))) kd_648030ef. Qed.
 
   Lemma uwi_7a : kernel_text -∗ instr (mword_of_int (KernelSyms.uartwrite + 0x7a) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 7 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.uartwrite + 0x7a) (mword_of_int 0x70e2 : mword 16)

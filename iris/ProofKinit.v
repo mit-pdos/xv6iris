@@ -163,12 +163,12 @@ Section ProofKinit.
     iEval (rewrite Hpp14) in "Hpc".
     iPoseProof (kii_14 with "Htext") as "Hi14".
     (* +0x14 addi a0,a0,-2018  (a0 := &kmem = lk) *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kinit + 0x14)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 2246 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kinit + 0x14)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 2262 : mword 12)
               R5 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi14 [-]").
     iIntros (CID8 Hs8) "Hcg Hpc".
     iClear "Hi14".
-    set (R6 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R5 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2246 : mword 12)))]> R5).
+    set (R6 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R5 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2262 : mword 12)))]> R5).
     assert (Hpp18 : add_vec_int (mword_of_int (KernelSyms.kinit + 0x14) : mword 64) 4 = mword_of_int (KernelSyms.kinit + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp18) in "Hpc".
     assert (HR6a0 : R6 !!! Regidx (mword_of_int 10 : mword 5) = lk).
@@ -268,12 +268,12 @@ Section ProofKinit.
     iEval (rewrite Hpp24) in "Hpc".
     iPoseProof (kii_24 with "Htext") as "Hi24".
     (* +0x24 addi a0,a0,-1474  (a0 := end) *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kinit + 0x24)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 2790 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kinit + 0x24)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 2806 : mword 12)
               R10 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi24 [-]").
     iIntros (CID13 Hs13) "Hcg Hpc".
     iClear "Hi24".
-    set (R11 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R10 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2790 : mword 12)))]> R10).
+    set (R11 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R10 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2806 : mword 12)))]> R10).
     assert (Hpp28 : add_vec_int (mword_of_int (KernelSyms.kinit + 0x24) : mword 64) 4 = mword_of_int (KernelSyms.kinit + 0x28)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp28) in "Hpc".
     assert (HR11a0 : R11 !!! Regidx (mword_of_int 10 : mword 5) = endaddr).

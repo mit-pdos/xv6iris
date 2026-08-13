@@ -560,7 +560,7 @@ Section LogWriteBlocks.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppb6) in "Hpc".
     (* ===== +0xb6 jal ra,release ===== *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.log_write + 0xb6)) Rra (mword_of_int 2084310 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.log_write + 0xb6)) Rra (mword_of_int 2084294 : mword 21)
               E2 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hib6 [-]").
     iApply wp_next_off_intro.
@@ -568,7 +568,7 @@ Section LogWriteBlocks.
     set (E3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.log_write + 0xb6) : mword 64) 4)]> E2).
     assert (Htgtrel : add_vec (mword_of_int (KernelSyms.log_write + 0xb6) : mword 64)
-                        (sign_extend' 64 (mword_of_int 2084310 : mword 21))
+                        (sign_extend' 64 (mword_of_int 2084294 : mword 21))
                       = mword_of_int KernelSyms.release)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtrel) in "Hpc".
@@ -789,7 +789,7 @@ Section LogWriteBlocks.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp68) in "Hpc".
     (* ===== +0x68 jal ra,bpin ===== *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.log_write + 0x68)) Rra (mword_of_int 2092748 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.log_write + 0x68)) Rra (mword_of_int 2092732 : mword 21)
               A1 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi68 [-]").
     iApply wp_next_off_intro.
@@ -797,7 +797,7 @@ Section LogWriteBlocks.
     set (A2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.log_write + 0x68) : mword 64) 4)]> A1).
     assert (Htgtbp : add_vec (mword_of_int (KernelSyms.log_write + 0x68) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2092748 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2092732 : mword 21))
                      = mword_of_int KernelSyms.bpin)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtbp) in "Hpc".
@@ -1878,14 +1878,14 @@ Section ProofLogWrite.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp14) in "Hpc".
     (* ===== +0x14 jal ra,acquire ===== *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.log_write + 0x14)) Rra (mword_of_int 2084336 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.log_write + 0x14)) Rra (mword_of_int 2084320 : mword 21)
               R5 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi14 [-]").
     iIntros (CID9 Hs9) "Hcg Hpc".
     set (mA := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.log_write + 0x14) : mword 64) 4)]> R5).
     assert (Htgtacq : add_vec (mword_of_int (KernelSyms.log_write + 0x14) : mword 64)
-                        (sign_extend' 64 (mword_of_int 2084336 : mword 21))
+                        (sign_extend' 64 (mword_of_int 2084320 : mword 21))
                       = mword_of_int KernelSyms.acquire)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtacq) in "Hpc".

@@ -560,13 +560,13 @@ Section ProofUartinit.
     assert (Hpp46 : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x42) : mword 64) 4 = mword_of_int (KernelSyms.uartinit + 0x46)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp46) in "Hpc".
     (* +0x46 addi a0,a0,2730 (= -1366) : a0 := &tx_lock *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartinit + 0x46)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 2730 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartinit + 0x46)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 2746 : mword 12)
               A3 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi46 [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (A4 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (A3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2730 : mword 12)))]> A3).
+    set (A4 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (A3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2746 : mword 12)))]> A3).
     assert (HA4a0 : A4 !!! Regidx (mword_of_int 10 : mword 5) = a_tx_lock).
     { rewrite /A4 upd_eq. rewrite /A3 upd_eq. unfold a_tx_lock, KernelSyms.tx_lock.
       apply bv_eq; vm_compute; reflexivity. }
@@ -581,14 +581,14 @@ Section ProofUartinit.
     assert (Hpp4a : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x46) : mword 64) 4 = mword_of_int (KernelSyms.uartinit + 0x4a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp4a) in "Hpc".
     (* +0x4a jal ra,initsleeplock *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uartinit + 0x4a)) (mword_of_int 1 : mword 5) (mword_of_int 13872 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uartinit + 0x4a)) (mword_of_int 1 : mword 5) (mword_of_int 13888 : mword 21)
               A4 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi4a [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (A5 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.uartinit + 0x4a) : mword 64) 4)]> A4).
-    assert (Htgtisl : add_vec (mword_of_int (KernelSyms.uartinit + 0x4a) : mword 64) (sign_extend' 64 (mword_of_int 13872 : mword 21)) = mword_of_int KernelSyms.initsleeplock)
+    assert (Htgtisl : add_vec (mword_of_int (KernelSyms.uartinit + 0x4a) : mword 64) (sign_extend' 64 (mword_of_int 13888 : mword 21)) = mword_of_int KernelSyms.initsleeplock)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtisl) in "Hpc".
     assert (HA5a0 : A5 !!! Regidx (mword_of_int 10 : mword 5) = a_tx_lock)

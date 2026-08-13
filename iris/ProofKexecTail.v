@@ -1286,10 +1286,10 @@ Section KexecABad.
     iEval (rewrite Hpp066) in "Hpc".
     (* ---- +0x066: jal ra,iunlockput ---- *)
     assert (Htiu : add_vec (mword_of_int (KXA + 0x66) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2092130 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2092114 : mword 21))
                    = mword_of_int KernelSyms.iunlockput) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x66)) Rra
-              (mword_of_int 2092130 : mword 21) B1 (K - 68)%nat true
+              (mword_of_int 2092114 : mword 21) B1 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htiu; vm_compute; reflexivity)
               with "Hcg Hpc Hi066 [-]").

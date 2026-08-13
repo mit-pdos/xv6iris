@@ -129,9 +129,9 @@ Section CodeUartintr.
   Proof. mk_base (KernelSyms.uartintr + 0x3e) (mword_of_int 0x0000a517 : mword 32)
     (mword_of_int (KernelSyms.uartintr + 0x3e) : mword 64) (UTYPE (mword_of_int 10 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_0000a517. Qed.
 
-  Lemma uii2_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartintr + 0x42) : mword 64) false (ITYPE (mword_of_int 2188 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.uartintr + 0x42) (mword_of_int 0x88c50513 : mword 32)
-    (mword_of_int (KernelSyms.uartintr + 0x42) : mword 64) (ITYPE (mword_of_int 2188 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_88c50513. Qed.
+  Lemma uii2_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartintr + 0x42) : mword 64) false (ITYPE (mword_of_int 2204 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.uartintr + 0x42) (mword_of_int 0x89c50513 : mword 32)
+    (mword_of_int (KernelSyms.uartintr + 0x42) : mword 64) (ITYPE (mword_of_int 2204 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_89c50513. Qed.
 
   Lemma uii2_46 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartintr + 0x46) : mword 64) false (JAL (mword_of_int 5482 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.uartintr + 0x46) (mword_of_int 0x56a010ef : mword 32)

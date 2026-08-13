@@ -765,14 +765,14 @@ Section ProofUartintr.
       iEval (rewrite P42) in "Hpc".
       assert (HT1rg : forall (CID' : CpuId), rget (CID := CID') T1 Ra0 = T1 !!! Regidx Ra0)
         by (intros CID'; rgne; reflexivity).
-      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartintr + 0x42)) Ra0 Ra0 (mword_of_int 2188 : mword 12)
+      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartintr + 0x42)) Ra0 Ra0 (mword_of_int 2204 : mword 12)
                 T1 (av - 4)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi42 [-]").
       iIntros (CIDW2 HsW2) "Hcg Hpc".
       iEval (rewrite HT1rg) in "Hcg".
       set (T2 := <[Regidx Ra0 := regval_into_reg
-          (add_vec (T1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 2188 : mword 12)))]> T1).
+          (add_vec (T1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 2204 : mword 12)))]> T1).
       change (<[Regidx Ra0 := regval_into_reg
-          (add_vec (T1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 2188 : mword 12)))]> T1) with T2.
+          (add_vec (T1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 2204 : mword 12)))]> T1) with T2.
       (* the sanity check that a0 really is the wait channel; wakeup's contract
          does not name it, so this is documentation, not a premise. *)
       assert (HT2a0 : T2 !!! Regidx Ra0 = a_tx_chan).

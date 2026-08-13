@@ -663,15 +663,15 @@ Section ProofAllocproc.
     assert (Hp10 : add_vec_int (mword_of_int (KernelSyms.allocproc + 0x0c) : mword 64) 4 = mword_of_int (KernelSyms.allocproc + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp10) in "Hpc".
     iPoseProof (api_10 with "Htext") as "Hi10".
-    iApply (wp_addi4_s_sconf (CID := CID7) (mword_of_int (KernelSyms.allocproc + 0x10)) ap_s1 ap_s1 (mword_of_int 3264 : mword 12) A2 (K - 4)%nat b
+    iApply (wp_addi4_s_sconf (CID := CID7) (mword_of_int (KernelSyms.allocproc + 0x10)) ap_s1 ap_s1 (mword_of_int 3280 : mword 12) A2 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10 [-]").
     iIntros (CID8 Hs8) "Hcg Hpc".
     iEval (rewrite ap_rg_s1) in "Hcg".
     set (A3 := <[Regidx ap_s1 := regval_into_reg
-        (add_vec (A2 !!! Regidx ap_s1) (sign_extend' 64 (mword_of_int 3264 : mword 12)))]> A2).
+        (add_vec (A2 !!! Regidx ap_s1) (sign_extend' 64 (mword_of_int 3280 : mword 12)))]> A2).
     change (<[Regidx ap_s1 := regval_into_reg
-        (add_vec (A2 !!! Regidx ap_s1) (sign_extend' 64 (mword_of_int 3264 : mword 12)))]> A2) with A3.
+        (add_vec (A2 !!! Regidx ap_s1) (sign_extend' 64 (mword_of_int 3280 : mword 12)))]> A2) with A3.
     assert (Hp14 : add_vec_int (mword_of_int (KernelSyms.allocproc + 0x10) : mword 64) 4 = mword_of_int (KernelSyms.allocproc + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp14) in "Hpc".
     assert (HA3s1 : A3 !!! Regidx ap_s1 = proc_addr 0).
@@ -689,15 +689,15 @@ Section ProofAllocproc.
     assert (Hp18 : add_vec_int (mword_of_int (KernelSyms.allocproc + 0x14) : mword 64) 4 = mword_of_int (KernelSyms.allocproc + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp18) in "Hpc".
     iPoseProof (api_18 with "Htext") as "Hi18".
-    iApply (wp_addi4_s_sconf (CID := CID9) (mword_of_int (KernelSyms.allocproc + 0x18)) ap_s2 ap_s2 (mword_of_int 1720 : mword 12) A4 (K - 4)%nat b
+    iApply (wp_addi4_s_sconf (CID := CID9) (mword_of_int (KernelSyms.allocproc + 0x18)) ap_s2 ap_s2 (mword_of_int 1736 : mword 12) A4 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 [-]").
     iIntros (CID10 Hs10) "Hcg Hpc".
     iEval (rewrite ap_rg_s2) in "Hcg".
     set (A5 := <[Regidx ap_s2 := regval_into_reg
-        (add_vec (A4 !!! Regidx ap_s2) (sign_extend' 64 (mword_of_int 1720 : mword 12)))]> A4).
+        (add_vec (A4 !!! Regidx ap_s2) (sign_extend' 64 (mword_of_int 1736 : mword 12)))]> A4).
     change (<[Regidx ap_s2 := regval_into_reg
-        (add_vec (A4 !!! Regidx ap_s2) (sign_extend' 64 (mword_of_int 1720 : mword 12)))]> A4) with A5.
+        (add_vec (A4 !!! Regidx ap_s2) (sign_extend' 64 (mword_of_int 1736 : mword 12)))]> A4) with A5.
     assert (Hp1c : add_vec_int (mword_of_int (KernelSyms.allocproc + 0x18) : mword 64) 4 = mword_of_int (KernelSyms.allocproc + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp1c) in "Hpc".
     assert (HA5s2 : A5 !!! Regidx ap_s2 = proc_addr NPROC).

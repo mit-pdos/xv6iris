@@ -17,6 +17,16 @@ are working on that effort — the relevant `projects/` file.
   principle (clean specs over rework), how to maintain these notes, build /
   opam / profiling instructions, the `tools/proof_coverage.py` coverage report,
   proofmode & bitvector gotchas, and durable spec-design preferences.
+- **[`xv6-bump-playbook.md`](xv6-bump-playbook.md)** — how to move the
+  development to a new upstream `XV6_REV`: the mechanical steps and the two
+  Makefile no-ops that make a bump silently do nothing, how to CLASSIFY the
+  change (which functions changed shape vs merely moved) before touching a
+  proof, the two relayout tools and which to reach for, the categories of
+  breakage (immediates, `.rodata` addresses spelled three ways, data symbols,
+  stack-budget cascades, register roles that are not renames, Link functor
+  arity), why `make -k` undercounts and per-file errors from a `-j` log lie,
+  how to parallelize safely, and the finishing checks. Read it before any
+  bump; it is mostly a list of ways the job looks finished when it is not.
 - **[`optimization.md`](optimization.md)** — proof performance rules: the
   performance pitfalls and the tactics/patterns that fix them (apply proactively
   when writing new proofs). Starts with the two diagnosis rules — run `-time`

@@ -16,7 +16,6 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelDecode00.
 Require Import KernelDecode02.
 Require Import KernelDecode04.
 Require Import KernelDecode07.
@@ -68,9 +67,9 @@ Section CodeFdalloc.
   Proof. mk_rvc (KernelSyms.fdalloc + 0xa) (mword_of_int 0x84aa : mword 16)
     (mword_of_int (KernelSyms.fdalloc + 0xa) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) kd_84aa exec_execute_C_MV. Qed.
 
-  Lemma fdi_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.fdalloc + 0xc) : mword 64) false (JAL (mword_of_int 2084314 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.fdalloc + 0xc) (mword_of_int 0xddbfc0ef : mword 32)
-    (mword_of_int (KernelSyms.fdalloc + 0xc) : mword 64) (JAL (mword_of_int 2084314 : mword 21, Regidx (mword_of_int 1))) kd_ddbfc0ef. Qed.
+  Lemma fdi_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.fdalloc + 0xc) : mword 64) false (JAL (mword_of_int 2084298 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.fdalloc + 0xc) (mword_of_int 0xdcbfc0ef : mword 32)
+    (mword_of_int (KernelSyms.fdalloc + 0xc) : mword 64) (JAL (mword_of_int 2084298 : mword 21, Regidx (mword_of_int 1))) kd_dcbfc0ef. Qed.
 
   Lemma fdi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.fdalloc + 0x10) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 12), ADD)).
   Proof. mk_rvc (KernelSyms.fdalloc + 0x10) (mword_of_int 0x862a : mword 16)

@@ -94,9 +94,9 @@ Section CodeUsertrap.
   Proof. mk_base (KernelSyms.usertrap + 0x16) (mword_of_int 0x00003797 : mword 32)
     (mword_of_int (KernelSyms.usertrap + 0x16) : mword 64) (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_00003797. Qed.
 
-  Lemma uti_01a : kernel_text -∗ instr (mword_of_int (KernelSyms.usertrap + 0x1a) : mword 64) false (ITYPE (mword_of_int 3862 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
-  Proof. mk_base (KernelSyms.usertrap + 0x1a) (mword_of_int 0xf1678793 : mword 32)
-    (mword_of_int (KernelSyms.usertrap + 0x1a) : mword 64) (ITYPE (mword_of_int 3862 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_f1678793. Qed.
+  Lemma uti_01a : kernel_text -∗ instr (mword_of_int (KernelSyms.usertrap + 0x1a) : mword 64) false (ITYPE (mword_of_int 3894 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
+  Proof. mk_base (KernelSyms.usertrap + 0x1a) (mword_of_int 0xf3678793 : mword 32)
+    (mword_of_int (KernelSyms.usertrap + 0x1a) : mword 64) (ITYPE (mword_of_int 3894 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_f3678793. Qed.
 
   Lemma uti_01e : kernel_text -∗ instr (mword_of_int (KernelSyms.usertrap + 0x1e) : mword 64) false (CSRReg (mword_of_int 261 : mword 12, Regidx (mword_of_int 15), zreg, CSRRW)).
   Proof. mk_base (KernelSyms.usertrap + 0x1e) (mword_of_int 0x10579073 : mword 32)

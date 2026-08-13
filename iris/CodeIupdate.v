@@ -30,6 +30,7 @@ Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
+Require Import KernelDecode18.
 Require Import KernelDecode19.
 Require Import KernelDecode20.
 Require Import KernelDecode21.
@@ -87,9 +88,9 @@ Section CodeIupdate.
   Proof. mk_base (KernelSyms.iupdate + 0x14) (mword_of_int 0x0001d597 : mword 32)
     (mword_of_int (KernelSyms.iupdate + 0x14) : mword 64) (UTYPE (mword_of_int 29 : mword 20, Regidx (mword_of_int 11), AUIPC)) kd_0001d597. Qed.
 
-  Lemma iui_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.iupdate + 0x18) : mword 64) false (LOAD (mword_of_int 1900 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), false, 4)).
-  Proof. mk_base (KernelSyms.iupdate + 0x18) (mword_of_int 0x76c5a583 : mword 32)
-    (mword_of_int (KernelSyms.iupdate + 0x18) : mword 64) (LOAD (mword_of_int 1900 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), false, 4)) kd_76c5a583. Qed.
+  Lemma iui_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.iupdate + 0x18) : mword 64) false (LOAD (mword_of_int 1916 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), false, 4)).
+  Proof. mk_base (KernelSyms.iupdate + 0x18) (mword_of_int 0x77c5a583 : mword 32)
+    (mword_of_int (KernelSyms.iupdate + 0x18) : mword 64) (LOAD (mword_of_int 1916 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), false, 4)) kd_77c5a583. Qed.
 
   Lemma iui_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.iupdate + 0x1c) : mword 64) true (RTYPEW (creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 3)), creg2reg_idx (Cregidx (mword_of_int 3)), ADDW)).
   Proof. mk_rvc (KernelSyms.iupdate + 0x1c) (mword_of_int 0x9dbd : mword 16)
@@ -187,9 +188,9 @@ Section CodeIupdate.
   Proof. mk_rvc (KernelSyms.iupdate + 0x66) (mword_of_int 0x854a : mword 16)
     (mword_of_int (KernelSyms.iupdate + 0x66) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)) kd_854a exec_execute_C_MV. Qed.
 
-  Lemma iui_68 : kernel_text -∗ instr (mword_of_int (KernelSyms.iupdate + 0x68) : mword 64) false (JAL (mword_of_int 3084 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.iupdate + 0x68) (mword_of_int 0x40d000ef : mword 32)
-    (mword_of_int (KernelSyms.iupdate + 0x68) : mword 64) (JAL (mword_of_int 3084 : mword 21, Regidx (mword_of_int 1))) kd_40d000ef. Qed.
+  Lemma iui_68 : kernel_text -∗ instr (mword_of_int (KernelSyms.iupdate + 0x68) : mword 64) false (JAL (mword_of_int 3100 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.iupdate + 0x68) (mword_of_int 0x41d000ef : mword 32)
+    (mword_of_int (KernelSyms.iupdate + 0x68) : mword 64) (JAL (mword_of_int 3100 : mword 21, Regidx (mword_of_int 1))) kd_41d000ef. Qed.
 
   Lemma iui_6c : kernel_text -∗ instr (mword_of_int (KernelSyms.iupdate + 0x6c) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.iupdate + 0x6c) (mword_of_int 0x854a : mword 16)

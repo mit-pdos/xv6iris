@@ -1300,24 +1300,24 @@ Section ProofFilewriteParts.
                      = mword_of_int (FW + 0x11a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp11a) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (FW + 0x11a)) Ra0 Ra0
-              (mword_of_int 452 : mword 12) P1 K b
+              (mword_of_int 436 : mword 12) P1 K b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi11a [-]").
     iIntros (CID8 Hq8) "Hcg Hpc". iEval (rgne) in "Hcg".
     set (P2 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (P1 !!! Regidx Ra0)
-                     (sign_extend' 64 (mword_of_int 452 : mword 12)))]> P1).
+                     (sign_extend' 64 (mword_of_int 436 : mword 12)))]> P1).
     assert (Hpp11e : add_vec_int (mword_of_int (FW + 0x11a) : mword 64) 4
                      = mword_of_int (FW + 0x11e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp11e) in "Hpc".
     (* ---- +0x11e jal ra,panic ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (FW + 0x11e)) Rra
-              (mword_of_int 2081864 : mword 21) P2 K b
+              (mword_of_int 2081848 : mword 21) P2 K b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi11e [-]").
     iIntros (CID9 Hq9) "Hcg Hpc".
     assert (Htgtpanic : add_vec (mword_of_int (FW + 0x11e) : mword 64)
-              (sign_extend' 64 (mword_of_int 2081864 : mword 21))
+              (sign_extend' 64 (mword_of_int 2081848 : mword 21))
               = mword_of_int KernelSyms.panic)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtpanic) in "Hpc".

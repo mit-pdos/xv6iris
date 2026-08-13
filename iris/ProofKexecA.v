@@ -436,10 +436,10 @@ Section KexecABody.
     (* ---- +0x020: jal ra,myproc ---- *)
     iPoseProof (kxc_020 with "Htext") as "Hi020".
     assert (Htmp : add_vec (mword_of_int (KXA + 0x20) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2085248 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2085232 : mword 21))
                    = mword_of_int KernelSyms.myproc) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x20)) Rra
-              (mword_of_int 2085248 : mword 21) M1 (K - 68)%nat true
+              (mword_of_int 2085232 : mword 21) M1 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htmp; vm_compute; reflexivity)
               with "Hcg Hpc Hi020 [-]").
@@ -1007,10 +1007,10 @@ Section KexecABody.
     iEval (rewrite Hpp036) in "Hpc".
     (* ---- +0x036: jal ra,ilock ---- *)
     assert (Htil : add_vec (mword_of_int (KXA + 0x36) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2091654 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2091638 : mword 21))
                    = mword_of_int KernelSyms.ilock) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x36)) Rra
-              (mword_of_int 2091654 : mword 21) Q1 (K - 68)%nat true
+              (mword_of_int 2091638 : mword 21) Q1 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htil; vm_compute; reflexivity)
               with "Hcg Hpc Hi036 [-]").
@@ -1137,10 +1137,10 @@ Section KexecABody.
     iEval (rewrite Hpp048) in "Hpc".
     (* ---- +0x048: jal ra,readi ---- *)
     assert (Htrd : add_vec (mword_of_int (KXA + 0x48) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2092550 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2092534 : mword 21))
                    = mword_of_int KernelSyms.readi) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x48)) Rra
-              (mword_of_int 2092550 : mword 21) Q7 (K - 68)%nat true
+              (mword_of_int 2092534 : mword 21) Q7 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htrd; vm_compute; reflexivity)
               with "Hcg Hpc Hi048 [-]").
