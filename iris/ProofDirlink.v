@@ -980,7 +980,7 @@ Section ProofDirlinkMain.
       (dqs : dfrac) (inodestart : Z) (dqbs : dfrac) (size : Z)
       (dqb : dfrac) (bmapstart : Z) (cov : gset Z) (logstart : Z)
       (used : gset Z) (gi : gname) (dq : dfrac) (pidv : mword 32)
-      (bn : bio_names) (g : log_names) (ncount : nat) (K : nat)
+      (bn : bio_names) (g : log_names) (ncount : nat) (Sb : gset Z) (K : nat)
       (b eb : bool) (C : iProp Σ) (k0 : nat) (inum : mword 16) (nrec : nat)
       (s : list (bv 8)) (ret_tgt : mword 64)
       (CIDa : CpuId) : iProp Σ :=
@@ -1014,11 +1014,11 @@ Section ProofDirlinkMain.
        p_pid (proc_addr j) ↦₄{dq} pidv -∗
        bslots bn 3 -∗
        iref_slot -∗
-       log_op g ncount -∗
+       log_opS g ncount Sb -∗
        wp_next (CID0 := CID) true (proc_addr j) (fun CIDc : CpuId =>
          ∀ (mf : regfile) (found : bool)
            (bm' : blkmap) (data' : nat -> list (bv 8))
-           (dn' dn0' : dinode) (n' : nat) (used' : gset Z)
+           (dn' dn0' : dinode) (n' : nat) (used' : gset Z) (Sb' : gset Z)
            (tot : nat),
              ⌜callee_saved m mf⌝ -∗
              sie_cap_gpr mf K b (proc_addr j) -∗
@@ -1040,7 +1040,10 @@ Section ProofDirlinkMain.
              iref_slot -∗
              ⌜((ncount - dirlink_units)%nat <= n')%nat
               /\ (n' <= ncount)%nat⌝ -∗
-             log_op g n' -∗
+             ⌜Sb ⊆ Sb'⌝ -∗
+             ⌜dl16_post bmapstart dinum inodestart ncount n' k0 tot found
+                        bm bm' Sb Sb'⌝ -∗
+             log_opS g n' Sb' -∗
              ⌜inode_sized data -> inode_sized data'⌝ -∗
              ⌜if found
                then dir_first data nrec s <> None
@@ -1082,6 +1085,7 @@ Section ProofDirlinkMain.
       (size : Z) (dqb : dfrac) (bmapstart : Z) (cov : gset Z) (logstart : Z)
       (used : gset Z) (gi : gname) (dn0 : dinode) (dq : dfrac)
       (pidv : mword 32) (bn : bio_names) (g : log_names) (ncount : nat)
+      (Sb : gset Z)
       (k0 : nat) (s : list (bv 8)) (ret_tgt : mword 64) (dqd : dfrac)
       (fuel : nat) (CIDl : CpuId) : iProp Σ :=
     (∀ (i : nat) (Ml : regfile) (dol : nat -> bv 8),
@@ -1120,11 +1124,11 @@ Section ProofDirlinkMain.
        bslot bn -∗
        bslots bn 2 -∗
        iref_slot -∗
-       log_op g ncount -∗
+       log_opS g ncount Sb -∗
        wp_next (CID0 := CID) true (proc_addr j) (fun CIDc : CpuId =>
          ∀ (mf : regfile) (found : bool)
            (bm' : blkmap) (data' : nat -> list (bv 8))
-           (dn' dn0' : dinode) (n' : nat) (used' : gset Z)
+           (dn' dn0' : dinode) (n' : nat) (used' : gset Z) (Sb' : gset Z)
            (tot : nat),
              ⌜callee_saved m mf⌝ -∗
              sie_cap_gpr mf K b (proc_addr j) -∗
@@ -1146,7 +1150,10 @@ Section ProofDirlinkMain.
              iref_slot -∗
              ⌜((ncount - dirlink_units)%nat <= n')%nat
               /\ (n' <= ncount)%nat⌝ -∗
-             log_op g n' -∗
+             ⌜Sb ⊆ Sb'⌝ -∗
+             ⌜dl16_post bmapstart dinum inodestart ncount n' k0 tot found
+                        bm bm' Sb Sb'⌝ -∗
+             log_opS g n' Sb' -∗
              ⌜inode_sized data -> inode_sized data'⌝ -∗
              ⌜if found
                then dir_first data nrec s <> None
@@ -1179,7 +1186,9 @@ Section ProofDirlinkMain.
              WP (Loop : expr riscv_lang)) -∗
        WP (Loop : expr riscv_lang))%I.
 
-  Lemma wp_dirlink_sconf
+  (* THE CORE, in SET FORM (fs-icache.md section 18 clause 1).
+     [wp_dirlink_sconf] below is this with the set forgotten. *)
+  Lemma wp_dirlink_gen
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -1195,17 +1204,17 @@ Section ProofDirlinkMain.
       (dn dn0 : dinode)
       (fn : nat -> bv 8)
       (inum : mword 16)
-      (ncount : nat)
+      (ncount : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
-    : wp_dirlink_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
-                            ga gf gpr cov logstart inodestart nib bmapstart
-                            size dev used ip dinum bm data dn dn0 fn inum
-                            ncount pidv dq dqd dqn dqs dqb dqbs dqf
-                            m K eb C b.
+    : wp_dirlink_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+                          ga gf gpr cov logstart inodestart nib bmapstart
+                          size dev used ip dinum bm data dn dn0 fn inum
+                          ncount Sb pidv dq dqd dqn dqs dqb dqbs dqf
+                          m K eb C b.
   Proof.
-    cbv beta delta [wp_dirlink_sconf_body].
+    cbv beta delta [wp_dirlink_gen_body].
     intros pcE pjv nb ret_tgt nrec s k0 HK Htype Hbmcov Hszb Hinums Hfit
            Hstab Hnlk Hlg Hbmwf Hholes Haddrs Hsz31 Hist0 Hiblk Hiblog Hdinb Hcinb Hbmgeo Hpkc
            Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb Hnc Hj Hgs Ha0 Ha2 Heb.
@@ -1747,11 +1756,17 @@ Section ProofDirlinkMain.
         [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
       iDestruct (cpu_own_transport CIDdl CID14 0%nat eb (proc_addr j) C b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply (IP.wp_iput_sconf gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      (* THE SET-FORM iput, at BOTH credits false -- dirlink presents no
+         absorption of its own; what it needs from the gen form is the
+         [Sb ⊆ Sb'] its own contract must promise past the child's flush. *)
+      iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                 gil gisl cov logstart bmapstart inodestart nib size dev used
                 kslot qq (zero_extend' 32 (dir_inum data kk : mword 16) : mword 32)
-                ncount pidv dq dqb dqs E1 (K - 10)%nat eb C b
-                ltac:(exact HKip) Hkslot Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0
+                ncount Sb false false pidv dq dqb dqs E1 (K - 10)%nat eb C b
+                ltac:(exact HKip) Hkslot
+                ltac:(intros Hc; discriminate Hc)
+                ltac:(intros Hc; discriminate Hc)
+                Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0
                 Hcblk Hcblog Hinb Hcovb ltac:(exact (dl_3le ncount Hnc)) Hj Hgs
                 HE1a0
                 with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlog Hitb2 Hitbl Hesck
@@ -1759,8 +1774,16 @@ Section ProofDirlinkMain.
                       Hdlk Hbsl Hop").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
-      iIntros (CIDip Hsip mip nn uu)
-        "%Hcsip Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Huu Hbmr Hbsl %Hnn Hop Hislot".
+      iIntros (CIDip Hsip mip nn uu Sbp)
+        "%Hcsip Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Huu Hbmr Hbsl %Hsbp %Hnn Hop
+         Hislot".
+      (* GR-2c FINDING 5, verbatim: the credited bound is STRONGER
+         ([ip_spend_max false false = 2] against [iput_units = 3]), and
+         dirlink's own clause is stated at the coarse figure.  One weakening
+         at the seam, KEEPING the name, so nothing downstream moves. *)
+      assert (Hnnw : ((ncount - iput_units)%nat <= nn)%nat /\ (nn <= ncount)%nat)
+        by (unfold ip_spend_max, iput_units in Hnn |- *; simpl in Hnn; lia).
+      clear Hnn. rename Hnnw into Hnn.
       assert (Hpcip : ret_pc (E1 !!! Regidx Rra : mword 64)
                       = mword_of_int (DK + 0x5c)) by (rewrite HE1ra; pcw).
       iEval (rewrite Hpcip) in "Hpc".
@@ -1804,11 +1827,14 @@ Section ProofDirlinkMain.
       iDestruct (cpu_own_transport CIDip CIDf 0%nat eb (proc_addr j) C b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! mf true bm data dn dn0 nn uu 0%nat with
+      iApply ("Hcont" $! mf true bm data dn dn0 nn uu Sbp 0%nat with
                 "[%] Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi
-                 Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] Hop [%] [%]").
+                 Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] [%] [%] Hop [%] [%]").
       { exact Hcsf. }
       { exact (dl_budget3 ncount nn ncount Hnc (proj1 Hnn) (proj2 Hnn)). }
+      { exact Hsbp. }
+      (* the sixteen-byte clause is guarded by the APPEND arm *)
+      { intros Hc; discriminate Hc. }
       (* S5a finding 2: the found arm re-parks the IDENTICAL payload *)
       { exact (fun H => H). }
       { split; [rewrite Hsome; discriminate |].
@@ -1880,7 +1906,7 @@ Section ProofDirlinkMain.
       iAssert (□ wp_next (CID0 := CID) true (proc_addr j) (fun CIDa : CpuId =>
                  dl_after_body j m sp0 ip nb dqd dev dqf dinum dn dn0 gfs bm
                    data dqn fn dqs inodestart dqbs size dqb bmapstart cov
-                   logstart used gi dq pidv bn g ncount K b eb C k0 inum
+                   logstart used gi dq pidv bn g ncount Sb K b eb C k0 inum
                    nrec s ret_tgt CIDa))%I
         with "[]" as "#Hafter".
       { iModIntro.
@@ -2196,12 +2222,16 @@ Section ProofDirlinkMain.
         iCombine "Hsrc Hppid" as "Hsrc".
         iDestruct (cpu_own_transport CIDa CIDA11 0%nat eb (proc_addr j) C b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-        iApply (WI.wp_writei_sconf gs j gl gu gd gk pd pav pu bn g gfs gi ga gf
+        (* THE SET-FORM writei.  Its [wi16_post] IS [dl16_post] at this
+           call's own window -- same offset, same booleans, same entry set,
+           because dirlookup's readi prefix and the scan above log NOTHING
+           and so the count and the set here are still the caller's. *)
+        iApply (WI.wp_writei_gen gs j gl gu gd gk pd pav pu bn g gfs gi ga gf
                   cov logstart inodestart nib bmapstart size dev used gpr
                   ip dinum bm data dn dn0
                   false (16 * k0)%nat 16%nat
                   (fun jj => dirent_bytes (de_of_name inum s) !!! jj)
-                  dl_dummyV ncount
+                  dl_dummyV ncount Sb
                   pidv dq dqd dqf dqs dqb dqbs V6 (K - 10)%nat eb C b
                   ltac:(exact HKwi)
                   ltac:(rewrite (dl_wi_cost_bmonly k0);
@@ -2222,10 +2252,12 @@ Section ProofDirlinkMain.
                         Hop").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
-        iIntros (CIDwi Hswi mwi tot bm' data' dn' dn0' nn wrote dist dstb P' used')
+        iIntros (CIDwi Hswi mwi tot bm' data' dn' dn0' nn wrote dist dstb P' used'
+                 Sbw)
           "%Hcswi %Hused %Hwf' %Hholes' %Haddrs' %Hsz' %Hcov' %Hcap' %Hsized'
            %Hdistb %Hdist0
-           %Hdistk %Hrange %Htie %Harm %Hbud %Hupt Hcg Hcnt _ _ Hpc Hidev Hiinum
+           %Hdistk %Hrange %Htie %Harm %Hbud %Hsbw %Hwi16 %Hupt
+           Hcg Hcnt _ _ Hpc Hidev Hiinum
            Hmeta Hmap Hblocks Hsbi Hsbs Hsbb Hbmr Hdat Hsrc Hbsl Hop".
         (* and they come back together: re-bracket into the two names the
            rest of dirlink threads *)
@@ -2374,12 +2406,19 @@ Section ProofDirlinkMain.
         iDestruct (cpu_own_transport CIDwi CIDf 0%nat eb (proc_addr j) C b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         iSpecialize ("Hqc" $! CIDf with "[%]"); [wp_next_chain |].
-        iApply ("Hqc" $! mf false bm' data' dn' dn0' nn used' tot with
+        iApply ("Hqc" $! mf false bm' data' dn' dn0' nn used' Sbw tot with
                   "[%] Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi
-                   Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] Hop [%] [%]").
+                   Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] [%] [%] Hop [%] [%]").
         { exact Hcsf. }
         { rewrite (dl_wi_cost_bmonly k0) in Hbud. unfold dirlink_units.
           destruct Hbud as [Hbud1 Hbud2]. split; lia. }
+        { exact Hsbw. }
+        (* THE SEAM: [wi16_post] at [off := 16 * k0], [n := 16] IS
+           [dl16_post] -- the two let-chains are the same terms.  The only
+           work is the two guards: [tot = 16] gives [0 < tot], and
+           [dl_wi_blocks] is the sixteen-at-16-aligned fact the file already
+           carries for both cost functions. *)
+        { intros _ Htot16. exact (Hwi16 ltac:(lia) (dl_wi_blocks k0)). }
         (* S5a finding 2: writei's own preservation, forwarded *)
         { exact Hsized'. }
         { split; [exact Hnone |].
@@ -2560,7 +2599,7 @@ Section ProofDirlinkMain.
           wp_next (CID0 := CID) true (proc_addr j) (fun CIDl : CpuId =>
             dl_scan_body j nrec dn data m sp0 ip nb inum K b eb C dev dqf
               dinum gfs bm dqn fn dqs inodestart dqbs size dqb bmapstart cov
-              logstart used gi dn0 dq pidv bn g ncount k0 s ret_tgt dqd
+              logstart used gi dn0 dq pidv bn g ncount Sb k0 s ret_tgt dqd
               fuel CIDl))%I
           with "[]" as "Hloop".
         { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
@@ -3211,6 +3250,75 @@ Section ProofDirlinkMain.
         { exact (dlk_off0_lt (bv_unsigned (di_size dn)) Hsznn Hszn). }
         { unfold dir_free_first. apply dfirst_0. }
         { exact HQ4r. }
+  Qed.
+
+  (* THE COUNTED SEAL, derived at the [log_op] existential's OWN WITNESS
+     (fs-icache.md section 18; wp_writei_sconf / wp_bmap_sconf, same shape).
+     [log_op γ ncount] IS [∃ Sb, log_opS γ ncount Sb], so the counted form
+     destructs it, runs the core at whatever set was hiding there, and
+     forgets the grown set again via [log_opS_op].  Every existing caller of
+     dirlink is therefore unmoved. *)
+  Lemma wp_dirlink_sconf
+      (gs : list gname) (j : nat) (gl : gname)
+      (gu : uart_names) (gd : disk_names) (gk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (g : log_names) (gfs : fs_names) (gi : gname)
+      (cn : ic_names) (gtl : gname)
+      (ga : gname) (gf : gname) (gpr : gname)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (bmapstart : Z) (size : Z) (dev : mword 32)
+      (used : gset Z)
+      (ip : mword 64) (dinum : mword 32)
+      (bm : blkmap) (data : nat -> list (bv 8))
+      (dn dn0 : dinode)
+      (fn : nat -> bv 8)
+      (inum : mword 16)
+      (ncount : nat)
+      (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool)
+    : wp_dirlink_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+                            ga gf gpr cov logstart inodestart nib bmapstart
+                            size dev used ip dinum bm data dn dn0 fn inum
+                            ncount pidv dq dqd dqn dqs dqb dqbs dqf
+                            m K eb C b.
+  Proof.
+    cbv beta delta [wp_dirlink_sconf_body].
+    intros pcE pjv nb ret_tgt nrec s k0 HK Htype Hbmcov Hszb Hinums Hfit
+           Hstab Hnlk Hlg Hbmwf Hholes Haddrs Hsz31 Hist0 Hiblk Hiblog Hdinb
+           Hcinb Hbmgeo Hpkc
+           Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb Hnc Hj Hgs Ha0 Ha2 Heb.
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hkd #Hpk #Hbio #Hlog #Hkenv
+              Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb Hbmr
+              #Hiregi Hdat Hppid #Hprocs #Hdev #Hgeom #Hdlk Hbsl
+              #Hitb2 #Hitbl #Hesc #Hslks Hislot Hop Hcont".
+    iDestruct "Hop" as (Sb0) "Hop".
+    iApply (wp_dirlink_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+              ga gf gpr cov logstart inodestart nib bmapstart size dev used
+              ip dinum bm data dn dn0 fn inum ncount Sb0
+              pidv dq dqd dqn dqs dqb dqbs dqf m K eb C b
+              HK Htype Hbmcov Hszb Hinums Hfit Hstab Hnlk Hlg Hbmwf Hholes
+              Haddrs Hsz31 Hist0 Hiblk Hiblog Hdinb Hcinb Hbmgeo Hpkc
+              Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb Hnc Hj Hgs Ha0 Ha2 Heb
+              with "Hcg Hcnt Htext Hpc Hpanic Hkd Hpk Hbio Hlog Hkenv
+                    Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb Hbmr
+                    Hiregi Hdat Hppid Hprocs Hdev Hgeom Hdlk Hbsl
+                    Hitb2 Hitbl Hesc Hslks Hislot Hop [Hcont]").
+    iEval (rewrite /wp_next).
+    iIntros (CIDf) "%Hchain".
+    iIntros (mf found bm' data' dn' dn0' n' used' Sb' tot)
+      "%E1 Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb
+       Hbmr Hdat Hppid Hbsl Hislot %E2 %Esb %Ewi Hop %E3 %E4".
+    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iApply ("Hcont" $! mf found bm' data' dn' dn0' n' used' tot
+              with "[%] Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi
+                    Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] [Hop] [%] [%]").
+    { exact E1. }
+    { exact E2. }
+    { iApply (log_opS_op with "Hop"). }
+    { exact E3. }
+    { exact E4. }
   Qed.
 
 End ProofDirlinkMain.

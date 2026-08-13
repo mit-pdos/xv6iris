@@ -6002,7 +6002,48 @@ Nothing entered from the merge.
 |------|------|-----|-------|
 | W1 | SpecWritei: wi16_spend/wi16_need/wi_tgt_blk/wi16_post + ONE new pure wand in wp_writei_gen_body; CreateBudget slimmed to import them + wi16_bmonly_amort_insufficient | design (Fable) | **LANDED** (SpecWritei/SpecDirlink/CreateBudget green on mirror) |
 | W2 | ProofWritei: thread the single-iteration ledger to wi16_post; absorb the wand in the sconf derivation | agent (Opus) | **LANDED** |
-| W3 | DIRLINK_GEN on top — iput-sized by the GR-2b seam count (6 log_op occurrences in ProofDirlink.v) | agent (Opus) | queued |
+| W3 | DIRLINK_GEN on top — iput-sized by the GR-2b seam count (6 log_op occurrences in ProofDirlink.v) | agent (Opus) | **LANDED** (first-try green on both files) |
+
+### W3 as landed (agent report, 2026-08-13)
+
+`dl16_post` (SpecDirlink.v, beside dirlink_units): guarded by
+`found = false -> tot = 16` (tot is the arm's own a0 = 0 witness, keeping
+the Prop free of the register file); the slot is the body's own `k0`
+parameter (`off := 16 * k0`); spend + membership trio exactly wi16_post's
+at that window.  **The entire writei seam is one `exact`** — wi16_post IS
+dl16_post at `off := 16*k0`, with `dl_wi_blocks : wi_blocks (16*k) 16 = 1`
+already in the file.  The two inner iAsserted continuations gained `Sb` as
+a PLAIN PARAMETER (the scan logs nothing, so it is invariant across the
+fuel induction and the IH stays folded).  iput switched to wp_iput_gen at
+false credits — GR-2c FINDING 5 fired for the third time (weaken at the
+seam, keep the name).  wp_dirlink_sconf derives from gen at the
+existential witness; no consumer moved (full SpecDirlink dependent set
+rebuilt green, LinkDirlink unchanged).
+
+**LOAD-BEARING, recorded on the agent's flag: dl16_post's spend clause is
+stated at ncount, dirlink's own entry count, which is sound only because
+NOTHING LOGS BEFORE THE APPEND's writei** (dirlookup/readi are read-only).
+If a future dirlink ever logs during the scan, the clause becomes FALSE,
+not loose.  And `dirlink_units` still says 7 while the append arm provably
+spends wi16_spend <= 4 — the slack is real and unclaimed; CREATE is the
+stage that consumes it.
+
+### W3 design ruling (Fable, 2026-08-13)
+
+DIRLINK_GEN mirrors the wi16 shape, not the boolean-parameter shape (GR-2c
+stage-3 design, reaffirmed): premise `log_opS γ ncount Sb`; post binds
+`Sb'`, returns `log_opS γ n' Sb'` with `⌜Sb ⊆ Sb'⌝`, KEEPS the counted
+`dirlink_units` clause, and adds one named Prop `dl16_post` — on the
+success-append arm (found = false, a0 = 0), the spend at
+`wi16_spend crb crd cru al ind` instantiated at dirlink's OWN writei
+window (the append slot's file block), with al/ind DERIVED from the post's
+bm/bm', credit booleans read at the ENTRY set, and the membership trio
+create's next call needs: the append's target block ∈ Sb',
+IBLOCK dinum inodestart ∈ Sb', and al = true -> bmapstart ∈ Sb'.  The
+found arm stays at the counted net-zero clause.  CreateBudget.dl_spend is
+already wi16_spend, so create's arithmetic connects without a bridge.
+Exact Rocq drafting delegated to the W2 agent (which carries the full
+wi16 context) with standing stop-and-report on any spec doubt.
 
 ### W2 as landed (agent report, 2026-08-13)
 
