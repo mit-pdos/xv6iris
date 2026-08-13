@@ -1067,6 +1067,7 @@ LinkProcdump.v
 LinkSysFstat.v
 ProofKexecParts.v
 ProofKexecTail.v
+ProofKexecSeam.v
 ProofKexecA.v
 ProofKexecB.v
 SpecSysFstat.v
