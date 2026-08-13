@@ -669,3 +669,122 @@ recovery spec/proof; sys_sync.
   deep into the device stack, and it leaned on xv6's commit
   serialization for tag-freshness — three costs the client-fupd shape
   simply doesn't have.
+
+## §G — GROUP-WIDE ABSORPTION: the epoch design (drafted 2026-08-13, Fable;
+## audit + spec deltas for the create re-model.  NOT YET LANDED.)
+
+### G.1 The audit that shapes everything
+
+`log_opS`'s set is PER-OP (`op_entry := (nat * gset Z)`), and the header's
+revocation rationale is load-bearing: any client-held absorption witness
+must be dead by commit, and the op entry is the log's only handle on a
+client at commit time.  The kernel's absorption is GROUP-wide (log_write
+scans the shared lh), so the model under-claims — which is exactly what
+made create's composition unprovable (nameiparent's freeing iupdates are
+absorbed in the kernel against the arming unlink's entries, and the model
+cannot say so).  Any group extension must be revocation-sound by the
+header's own argument.
+
+### G.2 The device: epoch-indexed witnesses (self-invalidating, so nothing
+### needs revoking)
+
+* `ln_epoch : mono_natR` joins the log ghost.  The AUTH lives in
+  `log_res`; it bumps by one at commit (the same ghost step that clears
+  the lh cells).  Nothing physical moves — lh has no generation counter —
+  the epoch is pure ghost.
+* `logged_at γ e b : iProp`, PERSISTENT: "block b was appended to lh in
+  epoch e".  Minted by the non-absorbed arm of every log_write ghost step
+  (the auth knows the current epoch).  Never revoked: a stale witness is
+  simply unusable, below.
+* `op_entry` grows a birth-epoch field: `(u, Sb, e0)`, with the auth
+  invariant `every live entry has e0 = current epoch` — maintained for
+  free, because entries die at end_op and commit requires out = 0, so a
+  bump never has a live entry to falsify.
+* THE USE LEMMA (under the log lock, where every log_write ghost step
+  already runs):
+      log_use_group : auth ∗ log_opS γ u Sb e0 ∗ logged_at γ e b ∗ ⌜e0 <= e⌝
+                      ==∗ ⌜b ∈ lh-now⌝ (∗ everything back)
+  Soundness: live entry ⟹ e0 = E (current); e0 <= e and epochs are
+  monotone and logged_at is only minted at its epoch ⟹ e = E ⟹ b was
+  appended THIS batch, and lh only clears at a bump ⟹ b ∈ lh.  A witness
+  from an old batch has e < e0 of every later op and can never be used.
+  This is the header's revocation argument satisfied by INDEXING instead
+  of revocation.
+
+### G.3 The receipt: zeros carry their log witness (option-(iii)'s shape,
+### third use this week)
+
+The icache escrow's parked payload gains one clause (IcacheEscrow, the
+same place the B′ colour clause lives):
+
+    zero_receipt dn inum :=
+      ⌜bv_unsigned (di_nlink dn) = 0⌝ →
+        ∃ e, logged_at γ e (IBLOCK inum inodestart) ∗ ic_epoch_lb cn k e
+
+* Depositors: the only writers of a zero nlink follow it with iupdate
+  under the same sleeplock (unlink, create's fail arm) — their credgen
+  iupdate's log_write mints `logged_at` at the current epoch.  Free.
+* `ic_epoch_lb cn k e` is a per-slot monotone epoch lower bound riding the
+  escrow payload: every PARKER refreshes it to its own current epoch.
+  This is what carries "the zero was parked no earlier than …" through
+  the lock protocol, resource-fully.
+
+### G.4 The credit: crz on iput/iunlockput
+
+`wp_iput_gen` / `wp_iunlockput_gen` gain one boolean `crz` with honesty
+premise: `crz = true →` the caller holds (i) its own `log_opS … e0` and
+(ii) the pure fact that it OBSERVED `di_nlink ≠ 0` for this inode under
+this sleeplock at an epoch ≥ e0 — which is literally the nlink guard both
+walkers already execute (namex +0xce, create +0x2a: the lh/lhu is the
+observation; the walker's open op freezes the epoch, so "at an epoch ≥ e0"
+is its own frozen epoch).  The contract's free arm then prices the
+freeing iupdate at `if crz then 0 else 1`: the zero, if present at the
+iput, was parked after the observation (same lock, ordered by the escrow's
+epoch-lb ≥ e0), so its zero_receipt's witness satisfies `e0 <= e` and
+`log_use_group` turns it into membership — the iupdate absorbs.  The
+bfree side is unchanged: bitmap-block only, already credited via the
+op's own set once it pays once.
+
+### G.5 The re-priced walkers, and create's budget row
+
+`wp_namex_gen` / `wp_namei_gen` / `wp_nameiparent_gen` success posts
+re-price from `(L+1) * iput_units` to:
+
+    walk_spend := bm_touch   (* <= 1: the group bitmap unit, if the walk
+                                frees at all and nobody priced it yet *)
+
+stated exactly like wi16: spend `<= 1 + 0*...`, with the membership
+clause `bmapstart ∈ Sb'` when it paid (so create's own balloc absorbs).
+Every per-level iunlockput runs at `crz := true` — the guard is at every
+level.  CreateBudget adds the row `nameiparent : walk_spend <= 1` to its
+call list; the zero-slack chains tolerate exactly this because the bitmap
+unit was already priced (whoever pays first, the other absorbs — the
+team's refutation, now a ledger fact).
+
+In the SAME post reshape: Blocker B's `ity_shot g T_DIR` for the returned
+parent (the namex trio's posts move once).
+
+### G.6 Per-file delta table
+
+| file | delta | size |
+|---|---|---|
+| LogInv.v | ln_epoch mono_nat in auth + bump at the commit clear; op_entry gains e0; log_mint/log_end_step re-thread; `logged_at`, `log_use_group` | the real ghost work; ~150 lines |
+| SpecLogWrite.v | non-absorbed arm's post mints `logged_at` (additive wand) | small |
+| SpecBeginOp/SpecEndOp | entry birth-epoch threading (statement-level: log_opS arity ± a hidden field — prefer keeping `log_opS γ u Sb` ABI and hiding e0 inside the entry ghost, exposed only by a projection lemma, so NO existing caller moves) | small if the ABI holds |
+| IcacheEscrow.v | zero_receipt + ic_epoch_lb on the parked payload; park/checkout lemmas re-thread | option-(iii)-sized |
+| SpecIupdate.v | credgen's zero-writing arm deposits the receipt (post clause) | small |
+| SpecIput/SpecIunlockput | crz boolean + honesty premise + free-arm pricing | FINDING-5-shaped at consumers |
+| SpecNamex/Namei/Nameiparent | posts re-priced to walk_spend + ity_shot g T_DIR (Blocker B) | 6 statements |
+| ProofNamex + ProofIput + ProofIget/Ilock (escrow sites) | the re-threads | the proving campaign |
+| CreateBudget.v | nameiparent row + re-run the four arm theorems at it | small, vm_compute |
+
+### G.7 The open design questions (for the human, before proving starts)
+
+1. The `log_opS` ABI: hiding e0 inside the ghost keeps every landed
+   caller byte-stable — confirm no lemma needs e0 SYNTACTICALLY (only
+   log_use_group consumes it, under the log lock where the auth is open).
+2. `ic_epoch_lb` granularity: per-slot (proposed) vs per-cache.  Per-slot
+   matches the lock protocol; per-cache would be coarser but one ghost.
+3. Whether the walkers' guard observation should be packaged as its own
+   named token (`nlz_obs`) minted by the guard's decode block, so crz's
+   honesty premise is one resource rather than a pure conjunction.
