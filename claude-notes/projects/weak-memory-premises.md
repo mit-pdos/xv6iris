@@ -52,6 +52,43 @@ M5), not eliminations.
   (lr/sc, AMOs, `update_and_write_pte`).  Not a vm_compute checker —
   `∀ r` continuations over `bv` cannot be computed through.
 
+## FINDING (2026-08-13): the ∀-path oracle premise is UNSATISFIABLE —
+## `Horc` is not to be proven, it is to be DELETED
+
+`oracle_consistent`'s RAM-read arm quantifies over every read value —
+including the FETCHED WORD (ifetch is a plain RAM read) and every
+page-walk PTE value.  One positional stream must therefore serve, from
+one device state, every instruction any junk fetch decodes to along
+every junk-but-valid-PTE translation path: two fetched words decoding
+to `lw`/`lb` at the same VA, steered by the same junk PTE path to a
+device address, demand the same stream head have length 4 and 1 —
+contradiction; an empty stream fails on any junk path reaching a device
+read.  So `∃ d, oracle_consistent d (riscv_step b) str` is FALSE at
+essentially every S-mode record, for any stream: `Horc`, L2/L3's
+`seg_hart` `Hoc`, and `cone_liftable`'s hart conjunct are
+vacuity-making premises (a third finding of the false-premise genre,
+present since L3).  Request-keyed entries cannot fix it — answer #2
+depends on how request #1 evolved the device, i.e. on the path; the
+only oracle that answers arbitrary request sequences is the device
+automaton itself.
+
+**Fix (stage D, replaces the old batch-B plan's seam handling):**
+`sp_dev : dstream` becomes a per-hart `dev_state`, served by TOTALIZED
+`dev_read`/`dev_write` (unmapped device-range accesses return
+junk-and-unchanged — the virtio lesson: model undefined device
+behavior as "anything", never "nothing").  Then per-instruction oracle
+consistency is definitionally true (`oracle_consistent`/`ocons_res`/
+`Horc` deleted; `tail_complete`'s device arms non-stuck by totality),
+and the retained MMIO assumption shrinks to its satisfiable core: the
+hart's private fabric agrees with the wl fabric at each hart segment
+(an equality conjunct in `wl_lift`'s SegHart, twin of the disk's
+`wa_dd u = wgdev g`).  Ripple: WeakSailLTS (psail + sail_mstep device
+arms), WeakSailLTS2 (delete oracle_consistent; sail_block_wrun's Hoc
+becomes fabric agreement), WeakSailComplete (ocons_res gone),
+WeakSailCone (Hres derivation loses its oracle conjunct),
+WeakComposeLang (hag/wl_cfg carry the fabric; cone_liftable
+restated), WeakCompose §6 (4) prose.
+
 ## Stages
 
 - **A1 `WeakRetag.v`** — the retag simulation: `retag_log`,
