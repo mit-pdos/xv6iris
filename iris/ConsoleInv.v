@@ -32,23 +32,34 @@
      [cons.buf[cons.r % INPUT_BUF_SIZE]], and [% 128] is compiled as
      [andi a3,a5,127], so the index is in range for EVERY value of [cons.r].
      A pipe's [nread % PIPESIZE] is the same, but a pipe's writer has to know
-     the slot it is about to fill is free, and the console's writer is
-     consoleintr, which is not proved.
-   * NOTHING COULD ESTABLISH IT.  [cons.w] moves only in consoleintr
-     (LinkConsoleintr.v, an [Axiom]), so any coupling stated here would be a
-     property of an assumed function -- an assumption dressed up as an
-     invariant.  And consoleread would still have to preserve it across its
-     own [cons.r--] (the end-of-file push-back at +0xe6), which is a
-     DECREMENT: [r] moves backwards there, so "r never passes w" is not even
-     locally obvious.
+     the slot it is about to fill is free; the console's writer tests
+     [cons.e - cons.r < INPUT_BUF_SIZE] at run time instead.
+   * NOTHING CONSUMES IT.  A coupling would be a statement about the console's
+     LINE DISCIPLINE ("what was typed is what is read"), and no contract in
+     the tree is in a position to observe one: consoleread's bytes leave
+     through either_copyout into user memory, which this layer does not model.
+
+   IT IS NOW ESTABLISHABLE, THOUGH, AND THAT IS A CHANGE.  Until xv6 `a28e94b`
+   consoleintr called procdump, which is why it was assumed and why any
+   coupling stated here would have been a property of an axiom.  That call is
+   gone; consoleintr's callees are now exactly acquire / consputc / release /
+   wakeup, all four proven and linked, so the writer of this ring is provable
+   and the "nobody could" half of the argument has expired.  What is left is
+   the "nobody needs" half above, which is the honest reason to keep the
+   resource flat.
 
    So what the console publishes is exactly what it can back: the memory is
    there, one writer at a time reaches it, and a byte read out of it is some
    byte.  That is enough for consoleread's contract, which promises a RETURN
    VALUE RANGE and nothing about the bytes -- see SpecConsoleread.v, and
-   [SpecFileread.fileread_ret], which is where the range is consumed.  When
-   consoleintr is proved, THIS is the file that grows a coupling, and
-   consoleread's proof will have to re-establish it at the [cons.r--].
+   [SpecFileread.fileread_ret], which is where the range is consumed.
+
+   WHEN A CONSUMER ARRIVES, this is the file that grows the coupling, and
+   there are exactly two places that must then maintain it: consoleintr's
+   [cons.e - cons.r < INPUT_BUF_SIZE] guard before it appends, and
+   consoleread's [cons.r--] end-of-file push-back at +0xe6 -- a DECREMENT, so
+   "r never passes w" is not locally obvious there.  It is nonetheless safe:
+   the push-back only ever undoes the [cons.r++] two instructions earlier.
 
    ---- WHAT IS OWED AT BOOT -------------------------------------------
 
