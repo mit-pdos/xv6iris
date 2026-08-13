@@ -125,12 +125,33 @@ matched-load pairs) for folding three continuations** (`dl_tail_body` /
 `dl_loop_body` / `dl_latch_body`, plus `dl_found_cont`, the ~26-line
 found/exhausted tail both loop statements embedded).  ~160 lines of statement
 live at the loop's deepest point became ~9.  Exactly as with namex, no use
-site needed an `iEval` unfold and the proof scripts did not change.  The
-remaining audited candidates with ≥15-line unnamed continuation bodies, by
-file cost: `ProofDirlink` (3 sites), `ProofProcdumpLoop` (3), and 2 each in
-`ProofIget`, `ProofPiperead`, `ProofScheduler`, `ProofCopyinstr`,
-`ProofReadi`, `ProofCopyin`, `ProofCopyout`, `ProofWakeup`, `ProofFilealloc`,
-`ProofUvmunmap`, `ProofUvmcopy`.
+site needed an `iEval` unfold and the proof scripts did not change.
+
+**The 2026-08-13 wave then folded most of the candidate list** (dirlink −21 %,
+procdumploop −12 %, piperead −16 %, wakeup −13 %, readi/copyin/copyout/
+uvmunmap small — the payoff scales with folded statement lines × steps they
+survive, and those four had 16–33-line bodies).  Two portable findings: when
+`GEN`/`CID0` are LEMMA binders rather than Section context, the body
+definitions must take them explicitly; and a continuation with NO `wp_next`
+wrapper (a pinned-hart stretch, index `false`) cannot be folded — the next
+leaf's implicit process pointer stops unifying once `pj` is only reachable
+through the folded body (ProofPiperead's WXP/CLOOP stay inline; its header
+records this).
+
+**STILL TO DO — three files, with the analysis already paid for:**
+- `ProofIget` (~150 s): fold the fuel-indexed scan invariant
+  `iAssert (∀ (fuel j : nat) (Mr : regfile), … TAILC -∗ WP …)` (~line 888,
+  ~29 lines) into an `ig_loop_body` (fuel/j kept outside, rule 3), and the
+  nested `iAssert (∀ (Ms : regfile), …)` (~line 925, ~27 lines, applied at 4
+  later sites) into `ig_step_body`; both parameterize over
+  `γl cn γfs γi cov logstart nib dev inum n eb p C K b macq spr M ci TAILC`.
+  The `TAILC` pose at ~685 is 13 lines — under threshold, skip.  Warm
+  baseline 72.4 s.
+- `ProofScheduler`: four `iAssert (□ (∀ …))` blocks at ~797/998/1538/1587,
+  sizes not yet measured against the threshold.
+- `ProofFilealloc`: candidates at ~356 and ~551 (the second fuel-indexed).
+Candidate-grep gotcha: the binders come BUNDLED (`∀ (fuel j : nat)`), so a
+grep for `iAssert (∀ fuel` misses them — scan for `iAssert (∀ (` too.
 
 ## RULE ZERO: run `-time` FIRST, before believing any theory
 
