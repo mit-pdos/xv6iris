@@ -92,6 +92,10 @@
           class step wrappers), [tail_step], [tail_run], [tail_complete].
       §8  [pf_local_commute], [pf_run_insert_local], and the bridge
           [pf_solo_q_run_quiet_run].
+      §9  THE SEIP KIT (stage A3): [seip_free] and its frame/stability
+          simulation, and the forward commutation of a mid-block interrupt
+          delivery ([irq_commute_step], [irq_commute_fwd]).  §9 has its own
+          index and its own deviation notes, at its head.
 
     DEPENDENCIES: [WeakSailLTS]/[WeakSailLTS2] (the LTS, [pf_solo],
     [oracle_consistent]) and [WeakRobustBlocks] ([img_total],
@@ -1576,4 +1580,941 @@ Lemma pf_solo_q_run_quiet_run next i c c' :
 Proof.
   induction 1 as [|x y z Hxy _ IH]; [apply rtc_refl|].
   eapply rtc_l; [exact (pf_solo_q_quiet_run next i x y Hxy)|exact IH].
+Qed.
+
+(* ====================================================================== *)
+(** ** 9. THE SEIP KIT: a mid-block interrupt delivery commutes FORWARD
+       (lift stage A3 of [claude-notes/projects/weak-memory-premises.md])
+
+    [WeakSailLTS.sail_step]'s [irq_deliver] arm fires at ANY point, including
+    strictly inside an instruction — which is what the hardware does, and
+    what the lift's [Hirqb] premise ("deliveries only at block boundaries")
+    excludes.  This section is the reusable core of the fix: a delivery
+    landing mid-block is MOVED FORWARD to the next instruction boundary,
+    which is sound exactly when the residual monad neither reads nor writes
+    the delivered pin.  Stage B consumes (a) [seip_free] and its
+    preservation along in-block steps, and (b) the packaged reordering
+    [irq_commute_fwd].
+
+    THE ARGUMENT.  [irq_deliver] is [register_set sig_seip v] and nothing
+    else.  If the rest of the block never READS [sig_seip], running it from
+    [rs] and from [register_set sig_seip v rs] produces THE SAME LABELS and
+    THE SAME residual monads, with register files agreeing off [sig_seip]
+    ([sail_mstep_frame], [sail_step_ni_frame]); if it never WRITES
+    [sig_seip] either, the pin still holds [v] at the boundary
+    ([sail_step_ni_stable]), so re-appending the delivery there lands on the
+    same state.  Everything is proved for an ARBITRARY excluded-register set
+    [X] ([regs_agree X] / [regs_free X]), because the [X := ∅] instance is
+    the register-file congruence the reordering also needs (§9.7).
+
+    ------------------------------------------------------------------------
+    THREE DEVIATIONS, all forced; read them before consuming the kit.
+
+    (a) [seip_free] FORBIDS [RegWrite sig_seip] AS WELL AS [RegRead
+        sig_seip], where the stage-A3 statement asked only for the read.
+        The write restriction is NOT a convenience: without it the
+        reordering is FALSE.  If the block writes the pin ([y]) after the
+        delivery ([v]), then delivery-then-block ends with [y] and
+        block-then-delivery ends with [v], and the difference is visible to
+        the next instruction — the two orders are genuinely different
+        behaviors, and no bookkeeping recovers one from the other.  (rv64d
+        writes [sig_seip] in exactly two places: the [plat_sig_base] MMIO
+        window of the platform's interrupt-injection register, and
+        [reset].  Both are the premise's business — [Hseip] is a
+        per-image, checker-style fact, exactly like [sail_shaped].)
+
+    (b) THE FINAL CONFIGURATION IS EQUAL UP TO POINTWISE REGISTER EQUALITY
+        ([cfg_eqv]), NOT UP TO [=].  [regstate]'s fields are FUNCTIONS
+        ([register_bitvector_1 → mword 1] &c.), so for two distinct
+        registers of the SAME field group
+          [register_set r y (register_set sig_seip v rs)]
+        and
+          [register_set sig_seip v (register_set r y rs)]
+        are two distinct lambda terms whose equality needs FUNCTIONAL
+        EXTENSIONALITY — and the whole weak-memory chain is deliberately
+        funext-free (see [claude-notes/completed/weak-memory-lift.md]: "no
+        funext, no classical axiom"), which is worth more than a syntactic
+        equality here.  So the reordered run ends at a configuration
+        [cfg_eqv]-related to the original: the image, the log, every other
+        agent's slot, the promise set, the [wstate] and the residual monad
+        are LITERALLY equal, and agent [i]'s register file is equal at every
+        register.  The cost to the consumer is zero, because [cfg_eqv] is
+        (i) transitive ([cfg_eqv_trans]), (ii) a STRONG BISIMULATION for
+        [pf_solo] / [pf_in_block] ([pf_solo_eqv], [pf_in_block_eqv] — same
+        label, same log growth, same [wstate]), and (iii) preserved by and
+        transparent to [at_boundary] / [in_block] / [seip_free_cfg].
+
+    (c) The frame's PRESERVATION lemma ([seip_free_res_step]) and the
+        commutation runs are scoped to IN-BLOCK steps ([sp_m p ≠ None] /
+        [pf_in_block]), for the same reason as §6's [*_res_step]: at a
+        boundary the step loads [next tick], about which nothing is known.
+        The frame ([sail_step_ni_frame]) and the stability lemma
+        ([sail_step_ni_stable]) themselves need no such restriction — the
+        boundary arm copies the register file.
+
+    ------------------------------------------------------------------------
+    THE INDEX.
+
+      §9.1 [register_beq_true]/[register_beq_ne]/[register_lookup_set_ne];
+           [regs_agree] (+refl/sym/trans), [regs_agree_set],
+           [regs_agree_set_excluded].
+      §9.2 [regs_free] (the [quiet_tail]-style Fixpoint), [regs_free_triv]
+           (the [X := ∅] instance), [regs_free_psail].
+      §9.3 [regs_free_silent1]/[_silent_run]/[_wr_node] (descent),
+           [silent1_frame], [silent_run_frame], [psail_agree] (+refl/sym/
+           trans/[psail_agree_regs]), [sail_mstep_frame],
+           [sail_step_ni_frame], [regs_free_res_step]; the stability chain
+           [silent1_stable], [silent_run_stable], [sail_mstep_stable],
+           [sail_step_ni_stable].
+      §9.4 the instances: [seip_reg], [seip_free], [seip_free_psail],
+           [regs_seip_eq], [regs_eqv], [psail_eqv] (+refl/sym/trans),
+           [seip_free_res_step], [irq_deliver_intro].
+      §9.5 [irq_commute_step] — ONE delivery past ONE step, at the LTS
+           level; [sail_mstep_seip_frame] (the [X := sig_seip] frame).
+      §9.6 [post_ws], [wp_pf_step_inv] — the one-shot inversion/re-taking
+           lemma for a pf step of a GIVEN agent (all five arms, once).
+      §9.7 [cfg_eqv] (+[cfg_eqv_lookup]/[_refl]/[_trans]),
+           [regs_free_psail_triv], [pf_solo_eqv], [in_block_eqv],
+           [at_boundary_eqv], [pf_in_block_eqv].
+      §9.8 [pf_irq] (the delivery as a configuration step), [pf_irq_pf_step],
+           [pf_irq_frame], [wp_pf_step_irq_or_ni], [seip_free_cfg] (+its
+           three preservation lemmas), [pf_irq_commute_step],
+           [pf_irq_commute_run], and the packaged [irq_commute_fwd].
+
+    All of §9 is "Closed under the global context". *)
+
+
+(** *** 9.1 register-file algebra *)
+
+Lemma register_beq_true (r r' : register) : register_beq r r' = true → r = r'.
+Proof.
+  destruct r, r'; simpl; try discriminate; intro H;
+    autorewrite with register_beq_iffs in H; subst; reflexivity.
+Qed.
+
+Lemma register_beq_ne (r r' : register) : r ≠ r' → register_beq r r' = false.
+Proof.
+  intros Hne. destruct (register_beq r r') eqn:Hb; [|done].
+  by destruct (Hne (register_beq_true r r' Hb)).
+Qed.
+
+Lemma register_lookup_set_ne (r0 r : register) (v : type_of_register r)
+    (rs : regstate) :
+  r0 ≠ r → register_lookup r0 (register_set r v rs) = register_lookup r0 rs.
+Proof. intros Hne. by apply irrelevant_register_set, register_beq_ne. Qed.
+
+Definition regs_agree (X : register → Prop) (rs rs' : regstate) : Prop :=
+  ∀ r : register, ¬ X r → register_lookup r rs = register_lookup r rs'.
+
+Lemma regs_agree_refl X rs : regs_agree X rs rs.
+Proof. by intros r _. Qed.
+
+Lemma regs_agree_sym X rs rs' : regs_agree X rs rs' → regs_agree X rs' rs.
+Proof. intros H r Hr. by rewrite (H r Hr). Qed.
+
+Lemma regs_agree_trans X rs1 rs2 rs3 :
+  regs_agree X rs1 rs2 → regs_agree X rs2 rs3 → regs_agree X rs1 rs3.
+Proof. intros H1 H2 r Hr. by rewrite (H1 r Hr) (H2 r Hr). Qed.
+
+Lemma regs_agree_set X rs rs' (r : register) (v : type_of_register r) :
+  regs_agree X rs rs' →
+  regs_agree X (register_set r v rs) (register_set r v rs').
+Proof.
+  intros H r0 Hr0. destruct (decide (r0 = r)) as [->|Hne].
+  - by rewrite !register_lookup_set.
+  - rewrite !(register_lookup_set_ne r0 r v _ Hne). by apply H.
+Qed.
+
+Lemma regs_agree_set_excluded X rs (r : register) (v : type_of_register r) :
+  X r → regs_agree X rs (register_set r v rs).
+Proof.
+  intros HX r0 Hr0. symmetry. apply register_lookup_set_ne.
+  intros ->. exact (Hr0 HX).
+Qed.
+
+(** *** 9.2 the monad predicate *)
+
+Fixpoint regs_free (X : register → Prop) (m : M unit) {struct m} : Prop :=
+  match m with
+  | Interface.Ret _ => True
+  | Interface.Next oc k =>
+      (match oc in Interface.outcome _ T return (T → M unit) → Prop with
+       | Interface.RegRead r _ => λ k, ¬ X r ∧ ∀ v, regs_free X (k v)
+       | Interface.RegWrite r _ _ => λ k, ¬ X r ∧ ∀ u, regs_free X (k u)
+       | _ => λ k, ∀ r, regs_free X (k r)
+       end) k
+  end.
+
+Fixpoint regs_free_triv (m : M unit) {struct m} : regs_free (λ _, False) m.
+Proof.
+  destruct m as [x|T oc k]; [exact I|].
+  destruct oc; simpl; try (by intros r; apply regs_free_triv);
+    (split; [exact (λ H, H)|intros r; apply regs_free_triv]).
+Defined.
+
+Definition regs_free_psail (X : register → Prop) (p : psail) : Prop :=
+  match sp_m p with None => True | Some m => regs_free X m end.
+
+(** *** 9.3 descent and the register frame *)
+
+Lemma regs_free_silent1 X (m : M unit) rs (b : M unit * regstate) :
+  regs_free X m → silent1 (m, rs) b → regs_free X b.1.
+Proof.
+  destruct m as [y|T oc k]; [by intros _ []|].
+  destruct oc; simpl; try (by intros _ []);
+    try (by intros Hfr ->; simpl; apply Hfr);
+    try (by intros Hfr [ch ->]; simpl; apply Hfr);
+    try (by intros [_ Hfr] ->; simpl; apply Hfr).
+Qed.
+
+Lemma silent1_frame X (m : M unit) rs rs' (b : M unit * regstate) :
+  regs_agree X rs rs' → regs_free X m → silent1 (m, rs) b →
+  ∃ rs2, silent1 (m, rs') (b.1, rs2) ∧ regs_agree X b.2 rs2.
+Proof.
+  intros Hag Hfr Hst. destruct m as [y|T oc k]; [by destruct Hst|].
+  destruct oc as [rg akk|rg akk rv|nn req|nn req|op|szb bpa|bk|co|to|flt
+                 |epa|tst|tnd|A eo|msg| | |ty| |msg2]; simpl in Hfr, Hst;
+    try (by destruct Hst);
+    try (by rewrite Hst; exists rs'; split; [reflexivity|exact Hag]).
+  - (* RegRead *)
+    destruct Hfr as [Hne Hk]. rewrite Hst. exists rs'.
+    rewrite /silent1 /= (Hag rg Hne). by split.
+  - (* RegWrite *)
+    rewrite Hst. exists (register_set rg rv rs').
+    split; [reflexivity|by apply regs_agree_set].
+  - (* Choose *)
+    destruct Hst as [ch ->]. exists rs'. split; [by exists ch|exact Hag].
+Qed.
+
+Lemma silent_run_frame X (a b : M unit * regstate) :
+  silent_run a b → regs_free X a.1 → ∀ rs',
+  regs_agree X a.2 rs' →
+  ∃ rs2, silent_run (a.1, rs') (b.1, rs2) ∧ regs_agree X b.2 rs2 ∧
+         regs_free X b.1.
+Proof.
+  induction 1 as [x|x y z Hxy _ IH]; intros Hfr rs' Hag.
+  { exists rs'. split_and!; [apply rtc_refl|exact Hag|exact Hfr]. }
+  destruct x as [mx rsx]. simpl in Hfr, Hag.
+  destruct (silent1_frame X mx rsx rs' y Hag Hfr Hxy) as (rs2 & Hs2 & Hag2).
+  have Hfy : regs_free X y.1 := regs_free_silent1 X mx rsx y Hfr Hxy.
+  destruct (IH Hfy rs2 Hag2) as (rs3 & Hs3 & Hag3 & Hfz).
+  exists rs3. split_and!; [|exact Hag3|exact Hfz].
+  eapply rtc_l; [|exact Hs3]. destruct y. exact Hs2.
+Qed.
+
+Lemma regs_free_wr_node X m1 rl base data m2 :
+  regs_free X m1 → wr_node m1 rl base data m2 → regs_free X m2.
+Proof.
+  destruct m1 as [y|T oc k]; [done|].
+  destruct oc; try done. simpl.
+  intros Hfr (_ & _ & _ & _ & _ & _ & ->). by apply Hfr.
+Qed.
+
+Definition psail_agree (X : register → Prop) (p q : psail) : Prop :=
+  sp_m p = sp_m q ∧ sp_dev p = sp_dev q ∧ sp_fence p = sp_fence q ∧
+  regs_agree X (sp_regs p) (sp_regs q).
+
+Lemma psail_agree_refl X p : psail_agree X p p.
+Proof. split_and!; [done|done|done|apply regs_agree_refl]. Qed.
+
+Lemma psail_agree_sym X p q : psail_agree X p q → psail_agree X q p.
+Proof.
+  intros (H1 & H2 & H3 & H4). split_and!; [done|done|done|by apply regs_agree_sym].
+Qed.
+
+Lemma psail_agree_trans X p q r :
+  psail_agree X p q → psail_agree X q r → psail_agree X p r.
+Proof.
+  intros (H1 & H2 & H3 & H4) (G1 & G2 & G3 & G4).
+  split_and!; [by rewrite H1|by rewrite H2|by rewrite H3
+              |exact (regs_agree_trans X _ _ _ H4 G4)].
+Qed.
+
+Lemma psail_agree_regs X m dv fo rs rs' iq iq' :
+  regs_agree X rs rs' →
+  psail_agree X (PSail m rs dv fo iq) (PSail m rs' dv fo iq').
+Proof. intros Hag. by split_and!. Qed.
+
+Local Ltac pafin :=
+  first [reflexivity | by apply psail_agree_regs
+        | by apply psail_agree_regs, regs_agree_set | assumption].
+
+Lemma sail_mstep_frame X (m : M unit) rs rs' d iq iq' l p' :
+  regs_agree X rs rs' → regs_free X m → sail_mstep m rs d iq l p' →
+  ∃ p'', sail_mstep m rs' d iq' l p'' ∧ psail_agree X p' p'' ∧ sp_irq p'' = iq'.
+Proof.
+  intros Hag Hfr Hstep. rewrite /sail_mstep in Hstep |- *.
+  destruct m as [y|T oc k].
+  { destruct Hstep as [-> ->]. exists (PSail None rs' d None iq').
+    split_and!; pafin. }
+  destruct oc as [rg akk|rg akk rv|nn req|nn req|op|szb bpa|bk|co|to|flt
+                 |epa|tst|tnd|A eo|msg| | |ty| |msg2]; simpl in Hfr, Hstep |- *;
+    try (by destruct Hstep);
+    try (by destruct Hstep as [-> ->]; eexists; split_and!;
+           pafin).
+  - (* RegRead *)
+    destruct Hfr as [Hne Hk]. destruct Hstep as [-> ->].
+    exists (PSail (Some (k (register_lookup rg rs'))) rs' d None iq').
+    rewrite (Hag rg Hne). split_and!; pafin.
+  - (* MemRead *)
+    destruct (dev_addr (Interface.ReadReq.pa req)) eqn:Hd.
+    + destruct Hstep as (-> & e & d2 & w2 & He & Hlen & Hbytes & ->).
+      exists (PSail (Some (k (inl (w2, None)))) rs' d2 None iq').
+      split.
+      { split; [reflexivity|]. exists e, d2, w2.
+        split_and!; [exact He|exact Hlen|exact Hbytes|reflexivity]. }
+      split_and!; pafin.
+    + destruct Hstep as (Hcoh & Hstep).
+      destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
+                    |pr pw sr sw]; try (by destruct Hstep).
+      * destruct lat; [by destruct Hstep|].
+        destruct Hstep as (Hlat & Haq & Hbase & Hlent & w & Hw & ->).
+        exists (PSail (Some (k (inl (w, None)))) rs' d None iq').
+        split.
+        { split; [exact Hcoh|]. split_and!;
+            [exact Hlat|exact Haq|exact Hbase|exact Hlent|].
+          exists w. split; [exact Hw|reflexivity]. }
+        split_and!; pafin.
+      * destruct Hstep as (Hlat & Haq & Hbase & Hlent & Hlend & w & m1 & m2
+                           & rs1 & Hw & Hsil & Hwr & ->).
+        destruct (silent_run_frame X (k (inl (w, None)), rs) (m1, rs1)
+                    Hsil (Hfr (inl (w, None))) rs' Hag)
+          as (rs2 & Hs2 & Hag2 & _). simpl in Hs2.
+        exists (PSail (Some m2) rs2 d None iq').
+        split.
+        { split; [exact Hcoh|]. split_and!;
+            [exact Hlat|exact Haq|exact Hbase|exact Hlent|exact Hlend|].
+          exists w, m1, m2, rs2.
+          split_and!; [exact Hw|exact Hs2|exact Hwr|reflexivity]. }
+        split_and!; pafin.
+  - (* MemWrite *)
+    destruct (dev_addr (Interface.WriteReq.pa req)) eqn:Hd.
+    + destruct Hstep as [-> ->].
+      eexists. split_and!; pafin.
+    + destruct Hstep as (-> & Hn & Hlat & ->).
+      eexists. split_and!; pafin.
+  - (* Choose *)
+    destruct Hstep as [-> [ch ->]].
+    exists (PSail (Some (k ch)) rs' d None iq').
+    split.
+    { split; [reflexivity|]. by exists ch. }
+    split_and!; pafin.
+Qed.
+
+Lemma sail_step_ni_frame X next p q l p' :
+  psail_agree X p q → regs_free_psail X p →
+  sail_step_ni next p l p' →
+  ∃ q', sail_step_ni next q l q' ∧ psail_agree X p' q' ∧ sp_irq q' = sp_irq q.
+Proof.
+  intros (Hm & Hd & Hf & Hr) Hfr Hstep.
+  rewrite /sail_step_ni in Hstep |- *. rewrite /regs_free_psail in Hfr.
+  rewrite -?Hf -?Hd -?Hm.
+  destruct (sp_fence p) as [[[[pr pw] sr] sw]|].
+  { destruct Hstep as [-> ->].
+    exists (PSail (sp_m p) (sp_regs q) (sp_dev p) None (sp_irq q)).
+    split_and!; pafin. }
+  destruct (sp_m p) as [m|] eqn:Hmp.
+  - destruct (sail_mstep_frame X m (sp_regs p) (sp_regs q) (sp_dev p)
+                (sp_irq p) (sp_irq q) l p' Hr Hfr Hstep)
+      as (q' & Hq' & Hag' & Hirq').
+    by exists q'.
+  - destruct Hstep as [-> [tick ->]].
+    exists (PSail (Some (next tick)) (sp_regs q) (sp_dev p) None (sp_irq q)).
+    split_and!; [reflexivity|by exists tick|by apply psail_agree_regs
+                |reflexivity].
+Qed.
+
+Lemma regs_free_silent_run X (m m1 : M unit) rs rs1 :
+  regs_free X m → silent_run (m, rs) (m1, rs1) → regs_free X m1.
+Proof.
+  intros Hfr Hrun.
+  change m with (m, rs).1 in Hfr. change m1 with (m1, rs1).1.
+  remember (m, rs) as a. remember (m1, rs1) as b. clear Heqa Heqb m rs m1 rs1.
+  revert Hfr. induction Hrun as [|x y z Hxy _ IH]; [done|].
+  intros Hfr. apply IH. destruct x as [mx rsx].
+  exact (regs_free_silent1 X mx rsx y Hfr Hxy).
+Qed.
+
+(** PRESERVATION: the residual of an IN-BLOCK step is again free (header
+    deviation (b): at a boundary the step loads [next tick]). *)
+Lemma regs_free_res_step X next p l p' :
+  sp_m p ≠ None → regs_free_psail X p → sail_step_ni next p l p' →
+  regs_free_psail X p'.
+Proof.
+  intros Hne Hfr Hstep.
+  rewrite /sail_step_ni in Hstep. rewrite /regs_free_psail in Hfr |- *.
+  destruct (sp_fence p) as [[[[pr pw] sr] sw]|].
+  { destruct Hstep as [_ ->]. simpl. exact Hfr. }
+  destruct (sp_m p) as [m|]; [|by destruct (Hne eq_refl)].
+  rewrite /sail_mstep in Hstep.
+  destruct m as [y|T oc k]; [by destruct Hstep as [_ ->]; simpl|].
+  destruct oc as [rg akk|rg akk rv|nn req|nn req|op|szb bpa|bk|co|to|flt
+                 |epa|tst|tnd|A eo|msg| | |ty| |msg2]; simpl in Hstep, Hfr;
+    try (by destruct Hstep);
+    try (by destruct Hstep as [_ ->]; simpl; apply Hfr).
+  - (* MemRead *)
+    destruct (dev_addr (Interface.ReadReq.pa req)) eqn:Hd.
+    + destruct Hstep as (_ & e & d2 & w2 & _ & _ & _ & ->). simpl. by apply Hfr.
+    + destruct Hstep as (_ & Hstep).
+      destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
+                    |pr pw sr sw]; try (by destruct Hstep).
+      * destruct lat; [by destruct Hstep|].
+        destruct Hstep as (_ & _ & _ & _ & w & _ & ->). simpl. by apply Hfr.
+      * destruct Hstep as (_ & _ & _ & _ & _ & w & m1 & m2 & rs1
+                           & _ & Hsil & Hwr & ->).
+        simpl. eapply regs_free_wr_node; [|exact Hwr].
+        eapply regs_free_silent_run; [apply (Hfr (inl (w, None)))|exact Hsil].
+  - (* MemWrite *)
+    destruct (dev_addr (Interface.WriteReq.pa req)) eqn:Hd.
+    + destruct Hstep as [_ ->]. simpl. by apply Hfr.
+    + destruct Hstep as (_ & _ & _ & ->). simpl. by apply Hfr.
+  - (* Choose *)
+    destruct Hstep as (_ & ch & ->). simpl. by apply Hfr.
+Qed.
+
+(** STABILITY: a free monad never WRITES an excluded register either, so the
+    value the delivery installed is still there at the end of the block. *)
+Lemma silent1_stable X (m : M unit) rs (b : M unit * regstate) (r0 : register) :
+  X r0 → regs_free X m → silent1 (m, rs) b →
+  register_lookup r0 b.2 = register_lookup r0 rs.
+Proof.
+  intros HX Hfr Hst. destruct m as [y|T oc k]; [by destruct Hst|].
+  destruct oc as [rg akk|rg akk rv|nn req|nn req|op|szb bpa|bk|co|to|flt
+                 |epa|tst|tnd|A eo|msg| | |ty| |msg2]; simpl in Hfr, Hst;
+    try (by destruct Hst); try (by rewrite Hst).
+  - (* RegWrite: the only arm that moves the register file *)
+    destruct Hfr as [Hne _]. rewrite Hst /=.
+    apply register_lookup_set_ne. intros ->. exact (Hne HX).
+  - (* Choose *)
+    by destruct Hst as [ch ->].
+Qed.
+
+Lemma silent_run_stable X (a b : M unit * regstate) (r0 : register) :
+  silent_run a b → X r0 → regs_free X a.1 →
+  register_lookup r0 b.2 = register_lookup r0 a.2.
+Proof.
+  induction 1 as [x|x y z Hxy _ IH]; intros HX Hfr; [reflexivity|].
+  destruct x as [mx rsx]. simpl in Hfr |- *.
+  rewrite (IH HX (regs_free_silent1 X mx rsx y Hfr Hxy)).
+  exact (silent1_stable X mx rsx y r0 HX Hfr Hxy).
+Qed.
+
+Lemma sail_mstep_stable X (m : M unit) rs d iq l p' (r0 : register) :
+  X r0 → regs_free X m → sail_mstep m rs d iq l p' →
+  register_lookup r0 (sp_regs p') = register_lookup r0 rs.
+Proof.
+  intros HX Hfr Hstep. rewrite /sail_mstep in Hstep.
+  destruct m as [y|T oc k]; [by destruct Hstep as [_ ->]|].
+  destruct oc as [rg akk|rg akk rv|nn req|nn req|op|szb bpa|bk|co|to|flt
+                 |epa|tst|tnd|A eo|msg| | |ty| |msg2]; simpl in Hfr, Hstep;
+    try (by destruct Hstep);
+    try (by destruct Hstep as [_ ->]).
+  - (* RegWrite *)
+    destruct Hfr as [Hne _]. destruct Hstep as [_ ->]. simpl.
+    apply register_lookup_set_ne. intros ->. exact (Hne HX).
+  - (* MemRead *)
+    destruct (dev_addr (Interface.ReadReq.pa req)) eqn:Hd.
+    + by destruct Hstep as (_ & e & d2 & w2 & _ & _ & _ & ->).
+    + destruct Hstep as (_ & Hstep).
+      destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
+                    |pr pw sr sw]; try (by destruct Hstep).
+      * destruct lat; [by destruct Hstep|].
+        by destruct Hstep as (_ & _ & _ & _ & w & _ & ->).
+      * destruct Hstep as (_ & _ & _ & _ & _ & w & m1 & m2 & rs1
+                           & _ & Hsil & _ & ->).
+        exact (silent_run_stable X (k (inl (w, None)), rs) (m1, rs1) r0
+                 Hsil HX (Hfr (inl (w, None)))).
+  - (* MemWrite *)
+    destruct (dev_addr (Interface.WriteReq.pa req)) eqn:Hd.
+    + by destruct Hstep as [_ ->].
+    + by destruct Hstep as (_ & _ & _ & ->).
+  - (* Choose *)
+    by destruct Hstep as (_ & ch & ->).
+Qed.
+
+Lemma sail_step_ni_stable X next p l p' (r0 : register) :
+  X r0 → regs_free_psail X p → sail_step_ni next p l p' →
+  register_lookup r0 (sp_regs p') = register_lookup r0 (sp_regs p).
+Proof.
+  intros HX Hfr Hstep.
+  rewrite /sail_step_ni in Hstep. rewrite /regs_free_psail in Hfr.
+  destruct (sp_fence p) as [[[[pr pw] sr] sw]|].
+  { by destruct Hstep as [_ ->]. }
+  destruct (sp_m p) as [m|].
+  - exact (sail_mstep_stable X m (sp_regs p) (sp_dev p) (sp_irq p) l p' r0
+             HX Hfr Hstep).
+  - by destruct Hstep as [_ [tick ->]].
+Qed.
+
+(** *** 9.4 the seip instances *)
+
+Definition seip_reg (r : register) : Prop := r = (sig_seip : register).
+
+Definition seip_free : M unit → Prop := regs_free seip_reg.
+Definition seip_free_psail : psail → Prop := regs_free_psail seip_reg.
+Definition regs_seip_eq : regstate → regstate → Prop := regs_agree seip_reg.
+
+Definition regs_eqv : regstate → regstate → Prop := regs_agree (λ _, False).
+
+Definition psail_eqv (p q : psail) : Prop :=
+  psail_agree (λ _, False) p q ∧ sp_irq p = sp_irq q.
+
+Lemma psail_eqv_refl p : psail_eqv p p.
+Proof. split; [apply psail_agree_refl|reflexivity]. Qed.
+
+Lemma psail_eqv_sym p q : psail_eqv p q → psail_eqv q p.
+Proof. intros [H1 H2]. split; [by apply psail_agree_sym|by rewrite H2]. Qed.
+
+Lemma psail_eqv_trans p q r : psail_eqv p q → psail_eqv q r → psail_eqv p r.
+Proof.
+  intros [H1 H2] [G1 G2].
+  split; [exact (psail_agree_trans _ _ _ _ H1 G1)|by rewrite H2].
+Qed.
+
+Lemma seip_free_res_step next p l p' :
+  sp_m p ≠ None → seip_free_psail p → sail_step_ni next p l p' →
+  seip_free_psail p'.
+Proof. apply regs_free_res_step. Qed.
+
+Lemma irq_deliver_intro p v iq :
+  sp_irq p = v :: iq →
+  irq_deliver p WeakPromise.LSilent
+    (PSail (sp_m p) (register_set sig_seip v (sp_regs p)) (sp_dev p)
+           (sp_fence p) iq).
+Proof. intros H. split; [reflexivity|]. by exists v, iq. Qed.
+
+(** *** 9.5 ONE DELIVERY COMMUTES FORWARD PAST ONE IN-BLOCK STEP *)
+Lemma sail_mstep_seip_frame (m : M unit) rs rs' d iq l p' :
+  regs_seip_eq rs rs' → seip_free m → sail_mstep m rs d iq l p' →
+  ∃ p'', sail_mstep m rs' d iq l p'' ∧ psail_agree seip_reg p' p''.
+Proof.
+  intros Hag Hfr Hstep.
+  destruct (sail_mstep_frame seip_reg m rs rs' d iq iq l p' Hag Hfr Hstep)
+    as (p'' & H1 & H2 & _). by exists p''.
+Qed.
+
+Lemma irq_commute_step next q q1 l q2 :
+  seip_free_psail q →
+  irq_deliver q WeakPromise.LSilent q1 →
+  sail_step_ni next q1 l q2 →
+  ∃ q1' q2', sail_step_ni next q l q1' ∧
+             irq_deliver q1' WeakPromise.LSilent q2' ∧ psail_eqv q2' q2.
+Proof.
+  intros Hfr [_ (v & iq & Hiq & ->)] Hstep.
+  have Hag : psail_agree seip_reg
+               (PSail (sp_m q) (register_set sig_seip v (sp_regs q)) (sp_dev q)
+                      (sp_fence q) iq) q.
+  { split_and!; [reflexivity|reflexivity|reflexivity|].
+    simpl. apply regs_agree_sym, regs_agree_set_excluded. reflexivity. }
+  have Hfr1 : regs_free_psail seip_reg
+                (PSail (sp_m q) (register_set sig_seip v (sp_regs q)) (sp_dev q)
+                       (sp_fence q) iq) := Hfr.
+  destruct (sail_step_ni_frame seip_reg next _ q l q2 Hag Hfr1 Hstep)
+    as (q1' & Hq1' & (Hm2 & Hd2 & Hf2 & Hr2) & Hirq1').
+  have Hiq1' : sp_irq q1' = v :: iq by rewrite Hirq1'.
+  exists q1', (PSail (sp_m q1') (register_set sig_seip v (sp_regs q1'))
+                 (sp_dev q1') (sp_fence q1') iq).
+  split_and!; [exact Hq1'|by apply irq_deliver_intro|].
+  have Hseip : register_lookup sig_seip (sp_regs q2) = v.
+  { rewrite (sail_step_ni_stable seip_reg next _ l q2 sig_seip
+               eq_refl Hfr1 Hstep) /=.
+    exact (register_lookup_set (sig_seip : register) (sp_regs q) v). }
+  have Hirq2 : sp_irq q2 = iq.
+  { by rewrite (sail_step_ni_irq next _ l q2 Hstep). }
+  split; [split_and!|by rewrite /= Hirq2].
+  - by rewrite /= Hm2.
+  - by rewrite /= Hd2.
+  - by rewrite /= Hf2.
+  - intros r0 _. simpl. destruct (decide (r0 = (sig_seip : register))) as [->|Hne].
+    + by rewrite register_lookup_set Hseip.
+    + rewrite (register_lookup_set_ne r0 sig_seip v _ Hne).
+      symmetry. by apply Hr2.
+Qed.
+
+(** *** 9.6 re-taking a pf step of the SAME agent from a modified state *)
+
+Definition post_ws (l : wlabel) (ws : wstate) (n : nat) : wstate :=
+  match l with
+  | WeakPromise.LSilent => ws
+  | WeakPromise.LLoad aq lat base tvs => load_post_run ws aq base tvs.*1
+  | WeakPromise.LStore rl base data =>
+      store_post_run ws rl base (length data) (S n)
+  | WeakPromise.LRmw aq rl base tvs data =>
+      store_post_run (load_post_run ws aq base tvs.*1) rl base (length data)
+        (S n)
+  | WeakPromise.LFence pr pw sr sw => fence_post ws pr pw sr sw
+  end.
+
+Lemma wp_pf_step_inv {P : Type} (pstep : P → wlabel → P → Prop)
+    i l (c c' : wpcfg P) ag :
+  wp_pf_step pstep i l c c' → pc_ags c !! i = Some ag →
+  ∃ st' ms,
+    pstep (pa_st ag) l st' ∧
+    pc_img c' = pc_img c ∧ pc_log c' = pc_log c ++ ms ∧
+    pc_ags c' = <[i := WPAgent st' (post_ws l (pa_ws ag) (length (pc_log c)))
+                          (pa_prom ag)]> (pc_ags c) ∧
+    (∀ (d : wpcfg P) agd stD,
+       pc_ags d !! i = Some agd → pa_ws agd = pa_ws ag →
+       pa_prom agd = pa_prom ag →
+       pc_img d = pc_img c → pc_log d = pc_log c →
+       pstep (pa_st agd) l stD →
+       wp_pf_step pstep i l d
+         (WPCfg (pc_img c) (pc_log c ++ ms)
+            (<[i := WPAgent stD (post_ws l (pa_ws ag) (length (pc_log c)))
+                       (pa_prom ag)]> (pc_ags d)))).
+Proof.
+  intros Hstep Hlk0.
+  destruct Hstep as
+    [cfg ag0 st' Hlk Hps
+    |cfg ag0 aq lat base tvs st' Hlk Hps Hr
+    |cfg ag0 rl base data kk st' Hlk Hps Hne
+    |cfg ag0 aq rl base tvs data kk st' Hlk Hps Hne Hlen Hr He
+    |cfg ag0 pr pw sr sw st' Hlk Hps];
+    rewrite Hlk0 in Hlk; injection Hlk as <-.
+  - exists st', []. split_and!;
+      [exact Hps|reflexivity|by rewrite app_nil_r|reflexivity|].
+    intros d agd stD Hlkd Hws Hprom Himg Hlog Hpsd.
+    rewrite app_nil_r -Himg -Hlog -Hws -Hprom.
+    exact (PFSilent pstep i d agd stD Hlkd Hpsd).
+  - exists st', []. split_and!;
+      [exact Hps|reflexivity|by rewrite app_nil_r|reflexivity|].
+    intros d agd stD Hlkd Hws Hprom Himg Hlog Hpsd.
+    have Hr' : read_ok (pc_img d) (pc_log d) (pa_ws agd) aq lat base tvs
+      by rewrite Himg Hlog Hws.
+    rewrite app_nil_r -Himg -Hlog -Hws -Hprom.
+    exact (PFLoad pstep i d agd aq lat base tvs stD Hlkd Hpsd Hr').
+  - exists st', [WMsg base data (Some i) kk]. split_and!;
+      [exact Hps|reflexivity|reflexivity|reflexivity|].
+    intros d agd stD Hlkd Hws Hprom Himg Hlog Hpsd.
+    rewrite -Himg -{1}Hlog -{1}Hlog -Hws -Hprom.
+    exact (PFStore pstep i d agd rl base data kk stD Hlkd Hpsd Hne).
+  - exists st', [WMsg base data (Some i) kk]. split_and!;
+      [exact Hps|reflexivity|reflexivity|reflexivity|].
+    intros d agd stD Hlkd Hws Hprom Himg Hlog Hpsd.
+    have Hr' : read_ok (pc_img d) (pc_log d) (pa_ws agd) aq false base tvs
+      by rewrite Himg Hlog Hws.
+    have He' : excl_ok (pc_log d) i base tvs (S (length (pc_log d)))
+      by rewrite Hlog.
+    rewrite -Himg -{1}Hlog -{1}Hlog -Hws -Hprom.
+    exact (PFRmw pstep i d agd aq rl base tvs data kk stD
+             Hlkd Hpsd Hne Hlen Hr' He').
+  - exists st', []. split_and!;
+      [exact Hps|reflexivity|by rewrite app_nil_r|reflexivity|].
+    intros d agd stD Hlkd Hws Hprom Himg Hlog Hpsd.
+    rewrite app_nil_r -Himg -Hlog -Hws -Hprom.
+    exact (PFFence pstep i d agd pr pw sr sw stD Hlkd Hpsd).
+Qed.
+
+(** *** 9.7 configurations that differ only in one agent's register file *)
+
+Definition cfg_eqv (i : agent) (c d : wpcfg psail) : Prop :=
+  pc_img d = pc_img c ∧ pc_log d = pc_log c ∧
+  ∃ ag ag', pc_ags c !! i = Some ag ∧ pc_ags d = <[i := ag']> (pc_ags c) ∧
+            pa_ws ag' = pa_ws ag ∧ pa_prom ag' = pa_prom ag ∧
+            psail_eqv (pa_st ag) (pa_st ag').
+
+Lemma cfg_eqv_lookup i c d ag :
+  cfg_eqv i c d → pc_ags c !! i = Some ag →
+  ∃ ag', pc_ags d !! i = Some ag' ∧ pa_ws ag' = pa_ws ag ∧
+         pa_prom ag' = pa_prom ag ∧ psail_eqv (pa_st ag) (pa_st ag').
+Proof.
+  intros (_ & _ & ag0 & ag' & Hlk0 & Hags & Hws & Hprom & Heqv) Hlk.
+  rewrite Hlk in Hlk0. injection Hlk0 as <-.
+  exists ag'. split_and!; [|exact Hws|exact Hprom|exact Heqv].
+  rewrite Hags. by eapply lookup_insert_at, Hlk.
+Qed.
+
+Lemma cfg_eqv_refl i c ag : pc_ags c !! i = Some ag → cfg_eqv i c c.
+Proof.
+  intros Hlk. split_and!; [reflexivity|reflexivity|].
+  exists ag, ag. split_and!;
+    [exact Hlk|by rewrite (list_insert_id _ _ _ Hlk)|reflexivity|reflexivity
+    |apply psail_eqv_refl].
+Qed.
+
+Lemma regs_free_psail_triv p : regs_free_psail (λ _, False) p.
+Proof.
+  rewrite /regs_free_psail. destruct (sp_m p) as [m|];
+    [apply regs_free_triv|exact I].
+Qed.
+
+(** THE BISIMULATION.  Registers that agree everywhere are indistinguishable
+    to the LTS, so a [pf_solo] step of the SAME agent is available from the
+    twinned configuration, with the same label, the same log growth, and a
+    twinned successor. *)
+Lemma pf_solo_eqv next i c d c' :
+  cfg_eqv i c d → pf_solo next i c c' →
+  ∃ d', pf_solo next i d d' ∧ cfg_eqv i c' d'.
+Proof.
+  intros Heq Hsolo.
+  destruct Heq as (Himg & Hlog & ag & ag' & Hlk & Hags & Hws & Hprom & Heqv).
+  have Hlkd : pc_ags d !! i = Some ag'
+    by rewrite Hags; eapply lookup_insert_at, Hlk.
+  destruct Hsolo as (l & Hstep & Hcc & Hrt).
+  destruct (wp_pf_step_inv (sail_step_ni next) i l c c' ag Hstep Hlk)
+    as (st' & ms & Hps & Himg' & Hlog' & Hags' & Hre).
+  destruct Heqv as (Hpa & Hirq).
+  destruct (sail_step_ni_frame (λ _, False) next (pa_st ag) (pa_st ag') l st'
+              Hpa (regs_free_psail_triv _) Hps)
+    as (stD & HpsD & HagD & HirqD).
+  have HeqvD : psail_eqv st' stD.
+  { split; [exact HagD|].
+    rewrite (sail_step_ni_irq next (pa_st ag) l st' Hps) HirqD. exact Hirq. }
+  set (wsp := post_ws l (pa_ws ag) (length (pc_log c))).
+  exists (WPCfg (pc_img c) (pc_log c ++ ms)
+            (<[i := WPAgent stD wsp (pa_prom ag)]> (pc_ags d))).
+  split.
+  - exists l. split_and!.
+    + exact (Hre d ag' stD Hlkd Hws Hprom Himg Hlog HpsD).
+    + intros ag2 msg Hag2 Heq2. simpl in Heq2.
+      rewrite Hlkd in Hag2. injection Hag2 as <-.
+      rewrite Hlog in Heq2. apply app_inv_head in Heq2. subst ms.
+      rewrite Hws. apply (Hcc ag msg Hlk). by rewrite Hlog'.
+    + rewrite /rmw_tight in Hrt |- *. destruct l; try done.
+      intros ag2 Hag2. rewrite Hlkd in Hag2. injection Hag2 as <-.
+      rewrite Himg Hlog Hws. exact (Hrt ag Hlk).
+  - split_and!; [by rewrite /= Himg'|by rewrite /= Hlog'|].
+    exists (WPAgent st' wsp (pa_prom ag)), (WPAgent stD wsp (pa_prom ag)).
+    split_and!; [by rewrite Hags'; eapply lookup_insert_at, Hlk| |done|done
+                |exact HeqvD].
+    rewrite /= Hags' Hags !list_insert_insert. reflexivity.
+Qed.
+
+Lemma cfg_eqv_trans i c d e : cfg_eqv i c d → cfg_eqv i d e → cfg_eqv i c e.
+Proof.
+  intros (Hi1 & Hl1 & ag & ag1 & Hlk & Hags1 & Hws1 & Hp1 & He1).
+  intros (Hi2 & Hl2 & ag1' & ag2 & Hlk1 & Hags2 & Hws2 & Hp2 & He2).
+  have Hlk1' : pc_ags d !! i = Some ag1
+    by rewrite Hags1; eapply lookup_insert_at, Hlk.
+  rewrite Hlk1 in Hlk1'. injection Hlk1' as <-.
+  split_and!; [by rewrite Hi2|by rewrite Hl2|].
+  exists ag, ag2. split_and!;
+    [exact Hlk|by rewrite Hags2 Hags1 list_insert_insert
+    |by rewrite Hws2|by rewrite Hp2|exact (psail_eqv_trans _ _ _ He1 He2)].
+Qed.
+
+Lemma in_block_eqv i c d : cfg_eqv i c d → in_block i c → in_block i d.
+Proof.
+  intros Heq (ag & Hlk & Hm).
+  destruct (cfg_eqv_lookup i c d ag Heq Hlk) as (ag' & Hlk' & _ & _ & Heqv).
+  exists ag'. split; [exact Hlk'|]. destruct Heqv as ((Hm' & _) & _).
+  by rewrite -Hm'.
+Qed.
+
+Lemma at_boundary_eqv i c d : cfg_eqv i c d → at_boundary i c → at_boundary i d.
+Proof.
+  intros Heq (ag & Hlk & Hm).
+  destruct (cfg_eqv_lookup i c d ag Heq Hlk) as (ag' & Hlk' & _ & _ & Heqv).
+  exists ag'. split; [exact Hlk'|]. destruct Heqv as ((Hm' & _) & _).
+  by rewrite -Hm'.
+Qed.
+
+Lemma pf_in_block_eqv next i c d c' :
+  cfg_eqv i c d → pf_in_block next i c c' →
+  ∃ d', pf_in_block next i d d' ∧ cfg_eqv i c' d'.
+Proof.
+  intros Heq (Hin & Hsolo).
+  destruct (pf_solo_eqv next i c d c' Heq Hsolo) as (d' & Hd' & Heq').
+  exists d'.
+  split; [split; [exact (in_block_eqv i c d Heq Hin)|exact Hd']|exact Heq'].
+Qed.
+
+(** *** 9.8 the delivery as a configuration step, and the commutation *)
+
+Definition pf_irq (i : agent) (c c' : wpcfg psail) : Prop :=
+  ∃ ag st', pc_ags c !! i = Some ag ∧
+            irq_deliver (pa_st ag) WeakPromise.LSilent st' ∧
+            c' = WPCfg (pc_img c) (pc_log c)
+                   (<[i := WPAgent st' (pa_ws ag) (pa_prom ag)]> (pc_ags c)).
+
+(** A delivery IS a [wp_pf_step] of the FULL LTS (the [irq_deliver] arm is
+    gated by [sp_fence = None], delta (c) of [WeakSailLTS]). *)
+Lemma pf_irq_pf_step next i c c' :
+  pf_irq i c c' →
+  (∀ ag, pc_ags c !! i = Some ag → sp_fence (pa_st ag) = None) →
+  wp_pf_step (sail_step next) i WeakPromise.LSilent c c'.
+Proof.
+  intros (ag & st' & Hlk & Hdel & ->) Hf.
+  apply (PFSilent (sail_step next) i c ag st' Hlk).
+  rewrite /sail_step (Hf ag Hlk). by left.
+Qed.
+Lemma pf_irq_frame i c c' :
+  pf_irq i c c' →
+  pc_img c' = pc_img c ∧ pc_log c' = pc_log c ∧
+  (∀ j, j ≠ i → pc_ags c' !! j = pc_ags c !! j).
+Proof.
+  intros (ag & st' & Hlk & _ & ->). split_and!; [done|done|].
+  intros j Hj. simpl. by apply lookup_insert_other.
+Qed.
+
+Lemma wp_pf_step_irq_or_ni next i l c c' :
+  wp_pf_step (sail_step next) i l c c' →
+  (l = WeakPromise.LSilent ∧ pf_irq i c c')
+  ∨ wp_pf_step (sail_step_ni next) i l c c'.
+Proof.
+  intros Hstep.
+  destruct Hstep as
+    [cfg ag st' Hlk Hps
+    |cfg ag aq lat base tvs st' Hlk Hps Hr
+    |cfg ag rl base data kk st' Hlk Hps Hne
+    |cfg ag aq rl base tvs data kk st' Hlk Hps Hne Hlen Hr He
+    |cfg ag pr pw sr sw st' Hlk Hps];
+    destruct (sail_step_irq_or_ni next (pa_st ag) _ st' Hps)
+      as [[Hf Hirq]|Hni];
+    try (by destruct Hirq as [Hx _]; inversion Hx).
+  - left. split; [reflexivity|]. by exists ag, st'.
+  - right. by eapply PFSilent.
+  - right. by eapply PFLoad.
+  - right. by eapply PFStore.
+  - right. by eapply PFRmw.
+  - right. by eapply PFFence.
+Qed.
+
+
+Definition seip_free_cfg (i : agent) (c : wpcfg psail) : Prop :=
+  ∀ ag, pc_ags c !! i = Some ag → seip_free_psail (pa_st ag).
+
+Lemma seip_free_cfg_eqv i c d :
+  cfg_eqv i c d → seip_free_cfg i c → seip_free_cfg i d.
+Proof.
+  intros Heq Hfr ag' Hlk'.
+  destruct Heq as (_ & _ & ag0 & ag1 & Hlk0 & Hags & _ & _ & (Hpa & _)).
+  have Hlk1 : pc_ags d !! i = Some ag1
+    by rewrite Hags; eapply lookup_insert_at, Hlk0.
+  rewrite Hlk' in Hlk1. injection Hlk1 as <-.
+  rewrite /seip_free_psail /regs_free_psail -(proj1 Hpa).
+  exact (Hfr ag0 Hlk0).
+Qed.
+
+Lemma seip_free_cfg_irq i c c' :
+  pf_irq i c c' → seip_free_cfg i c → seip_free_cfg i c'.
+Proof.
+  intros (ag & st' & Hlk & [_ (v & iq & Hiq & ->)] & ->) Hfr ag2 Hlk2.
+  simpl in Hlk2. rewrite (lookup_insert_at (pc_ags c) i ag _ Hlk) in Hlk2.
+  injection Hlk2 as <-. exact (Hfr ag Hlk).
+Qed.
+
+Lemma seip_free_cfg_step next i c c' :
+  in_block i c → seip_free_cfg i c → pf_solo next i c c' → seip_free_cfg i c'.
+Proof.
+  intros (ag & Hlk & Hm) Hfr (l & Hstep & _ & _).
+  destruct (wp_pf_step_inv (sail_step_ni next) i l c c' ag Hstep Hlk)
+    as (st' & ms & Hps & _ & _ & Hags & _).
+  intros ag2 Hlk2. rewrite Hags in Hlk2.
+  rewrite (lookup_insert_at (pc_ags c) i ag _ Hlk) in Hlk2.
+  injection Hlk2 as <-. simpl.
+  exact (seip_free_res_step next (pa_st ag) l st' Hm (Hfr ag Hlk) Hps).
+Qed.
+
+(** ONE DELIVERY COMMUTES FORWARD PAST ONE SOLO IN-BLOCK STEP OF THE SAME
+    AGENT: same label, same log growth, same [wstate]; the successor differs
+    only in that agent's register file, and only where the pin was written
+    (which the delivery re-appended at the end restores). *)
+Lemma pf_irq_commute_step next i c c1 c2 :
+  seip_free_cfg i c → pf_irq i c c1 → pf_solo next i c1 c2 →
+  ∃ c1' c2', pf_solo next i c c1' ∧ pf_irq i c1' c2' ∧ cfg_eqv i c2 c2'.
+Proof.
+  intros Hfr (ag & stD & Hlk & Hdel & ->) (l & Hstep & Hcc & Hrt).
+  have Hlk1 : pc_ags (WPCfg (pc_img c) (pc_log c)
+                        (<[i := WPAgent stD (pa_ws ag) (pa_prom ag)]>
+                           (pc_ags c))) !! i
+              = Some (WPAgent stD (pa_ws ag) (pa_prom ag))
+    := lookup_insert_at (pc_ags c) i ag _ Hlk.
+  destruct (wp_pf_step_inv (sail_step_ni next) i l _ c2 _ Hstep Hlk1)
+    as (st2 & ms & Hps & Himg2 & Hlog2 & Hags2 & Hre).
+  simpl in Hps, Himg2, Hlog2, Hags2, Hre.
+  destruct (irq_commute_step next (pa_st ag) stD l st2 (Hfr ag Hlk) Hdel Hps)
+    as (st1' & st2' & Hstep1' & Hdel' & Heqv2).
+  exists (WPCfg (pc_img c) (pc_log c ++ ms)
+            (<[i := WPAgent st1' (post_ws l (pa_ws ag) (length (pc_log c)))
+                      (pa_prom ag)]> (pc_ags c))).
+  eexists. split_and!.
+  - exists l. split_and!.
+    + exact (Hre c ag st1' Hlk eq_refl eq_refl eq_refl eq_refl Hstep1').
+    + intros ag0 msg Hag0 Heq. simpl in Heq.
+      rewrite Hlk in Hag0. injection Hag0 as <-.
+      apply app_inv_head in Heq. subst ms.
+      exact (Hcc _ msg Hlk1 Hlog2).
+    + rewrite /rmw_tight in Hrt |- *. destruct l; try done.
+      intros ag0 Hag0. rewrite Hlk in Hag0. injection Hag0 as <-.
+      exact (Hrt _ Hlk1).
+  - exists (WPAgent st1' (post_ws l (pa_ws ag) (length (pc_log c)))
+              (pa_prom ag)), st2'.
+    split_and!; [by eapply lookup_insert_at, Hlk|exact Hdel'|reflexivity].
+  - split_and!; [by rewrite Himg2|by rewrite Hlog2|].
+    exists (WPAgent st2 (post_ws l (pa_ws ag) (length (pc_log c))) (pa_prom ag)),
+           (WPAgent st2' (post_ws l (pa_ws ag) (length (pc_log c))) (pa_prom ag)).
+    split_and!.
+    + rewrite Hags2. by eapply lookup_insert_at, Hlk1.
+    + rewrite /= Hags2 !list_insert_insert. reflexivity.
+    + reflexivity.
+    + reflexivity.
+    + exact (psail_eqv_sym _ _ Heqv2).
+Qed.
+
+Lemma in_block_irq i c c' : pf_irq i c c' → in_block i c' → in_block i c.
+Proof.
+  intros (ag & st' & Hlk & [_ (v & iq & Hiq & ->)] & ->) (ag2 & Hlk2 & Hm2).
+  simpl in Hlk2. rewrite (lookup_insert_at (pc_ags c) i ag _ Hlk) in Hlk2.
+  injection Hlk2 as <-. simpl in Hm2. by exists ag.
+Qed.
+
+Lemma at_boundary_irq i c c' :
+  pf_irq i c c' → at_boundary i c' → at_boundary i c.
+Proof.
+  intros (ag & st' & Hlk & [_ (v & iq & Hiq & ->)] & ->) (ag2 & Hlk2 & Hm2).
+  simpl in Hlk2. rewrite (lookup_insert_at (pc_ags c) i ag _ Hlk) in Hlk2.
+  injection Hlk2 as <-. simpl in Hm2. by exists ag.
+Qed.
+
+(** THE RUN FORM: a delivery in front of a whole in-block run of the same
+    agent commutes to the END of that run. *)
+Lemma pf_irq_commute_run next i : ∀ c1 c2, rtc (pf_in_block next i) c1 c2 →
+  ∀ c d, seip_free_cfg i c → pf_irq i c d → cfg_eqv i c1 d →
+  ∃ c1' c2', rtc (pf_in_block next i) c c1' ∧ pf_irq i c1' c2' ∧
+             cfg_eqv i c2 c2'.
+Proof.
+  intros c1 c2 Hrun.
+  induction Hrun as [x|x y z Hxy _ IH]; intros c d Hfr Hdel Heq.
+  - exists c, d. split_and!; [apply rtc_refl|exact Hdel|exact Heq].
+  - destruct (pf_in_block_eqv next i x d y Heq Hxy) as (yd & Hyd & Heqy).
+    destruct Hyd as (Hind & Hsolod).
+    destruct (pf_irq_commute_step next i c d yd Hfr Hdel Hsolod)
+      as (c1' & y'' & Hsolo & Hdel'' & Heqy'').
+    have Hin : in_block i c := in_block_irq i c d Hdel Hind.
+    have Hfr' : seip_free_cfg i c1'
+      := seip_free_cfg_step next i c c1' Hin Hfr Hsolo.
+    destruct (IH c1' y'' Hfr' Hdel''
+                (cfg_eqv_trans i y yd y'' Heqy Heqy''))
+      as (c2' & c3' & Hrun' & Hdel3 & Heq3).
+    exists c2', c3'. split_and!; [|exact Hdel3|exact Heq3].
+    eapply rtc_l; [split; [exact Hin|exact Hsolo]|exact Hrun'].
+Qed.
+
+(** THE PACKAGED REORDERING (what stage B splices).  A delivery landing
+    STRICTLY INSIDE a block, followed by the rest of the block, is the same
+    block followed by the delivery at the instruction boundary — same
+    labels, same log, same [wstate]s, and a final configuration that differs
+    from the original in NOTHING (registers included: the pin the delivery
+    installs is the one the original block carried, by
+    [sail_step_ni_stable]) except that the equality of the register files is
+    POINTWISE ([cfg_eqv]) rather than Leibniz. *)
+Theorem irq_commute_fwd next i c c1 c2 :
+  seip_free_cfg i c →
+  pf_irq i c c1 →
+  rtc (pf_in_block next i) c1 c2 →
+  at_boundary i c2 →
+  ∃ c1' c2', rtc (pf_in_block next i) c c1' ∧ at_boundary i c1' ∧
+             pf_irq i c1' c2' ∧ cfg_eqv i c2 c2'.
+Proof.
+  intros Hfr Hdel Hrun Hbd.
+  have Hlk1 : ∃ ag1, pc_ags c1 !! i = Some ag1.
+  { destruct Hdel as (ag & st' & Hlk & _ & ->). eexists.
+    by eapply lookup_insert_at, Hlk. }
+  destruct Hlk1 as (ag1 & Hlk1).
+  destruct (pf_irq_commute_run next i c1 c2 Hrun c c1 Hfr Hdel
+              (cfg_eqv_refl i c1 ag1 Hlk1))
+    as (c1' & c2' & Hrun' & Hdel' & Heq').
+  exists c1', c2'. split_and!; [exact Hrun'| |exact Hdel'|exact Heq'].
+  exact (at_boundary_irq i c1' c2' Hdel' (at_boundary_eqv i c2 c2' Heq' Hbd)).
 Qed.
