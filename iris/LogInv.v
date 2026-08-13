@@ -27,8 +27,8 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import auth gmap frac.
-From iris.base_logic.lib Require Import ghost_map ghost_var invariants.
+From iris.algebra Require Import auth gmap gset frac.
+From iris.base_logic.lib Require Import ghost_map ghost_var invariants mono_nat.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
@@ -171,41 +171,63 @@ Qed.
    presentable in the NEXT batch, where the block is no longer logged, and
    the absorb arm would then skip a spend while lh.n actually grew.  So the
    set is a field of the entry, and it dies with it. *)
-Definition op_entry : Type := (nat * gset Z)%type.
+(* ...AND THE BIRTH EPOCH, which is how §G's group extension stays
+   revocation-sound WITHOUT revoking anything (fs-log.md §G.2/§G.9).  The
+   entry records the epoch it was minted in; [log_res]'s auth invariant
+   pins every LIVE entry's [e0] to the current epoch, and the bump at the
+   commit re-deposit cannot falsify that because [out = 0] there forces
+   [om = ∅].  A witness from an older batch then has [e < e0] of every
+   later op and is simply unusable -- indexing instead of revocation.
 
+   NOTE THE RE-ASSOCIATION: [(nat * gset Z * nat)] is
+   [((nat * gset Z) * nat)], so the budget is [e.1.1], the already-logged
+   set is [e.1.2] and the birth epoch is [e.2]. *)
+Definition op_entry : Type := (nat * gset Z * nat)%type.
+
+(* THE EPOCH USES THE AMBIENT [mono_natG] FROM [riscvGS] (the power layer's
+   [riscvF_genGS], RiscvPtsto.v) -- NOT a new field here.  A second
+   [mono_natG] in the same context is the duplicate-class trap of
+   claude-notes/durable-notes.md: the two instances make propositions that
+   print character-for-character identically fail to unify.  Only the
+   [logged_at] registry needs a new functor. *)
 Class logG (Σ : gFunctors) := LogG {
   logops_inG :: ghost_mapG Σ nat op_entry;
+  loglg_inG :: inG Σ (authR (gsetUR (nat * Z)));
 }.
-Definition logΣ : gFunctors := #[ghost_mapΣ nat op_entry].
+Definition logΣ : gFunctors :=
+  #[ghost_mapΣ nat op_entry; GFunctor (authR (gsetUR (nat * Z)))].
 Global Instance subG_logΣ {Σ} : subG logΣ Σ -> logG Σ.
 Proof. solve_inG. Qed.
 
 Record log_names := MkLogNames {
   ln_lk  : gname;   (* the "log" spinlock *)
-  ln_ops : gname;   (* the ledger: op id -> (budget, blocks already logged) *)
+  ln_ops : gname;   (* the ledger: op id -> (budget, logged set, birth epoch) *)
+  ln_ep  : gname;   (* the BATCH EPOCH, a mono_nat: bumped at every commit *)
+  ln_lg  : gname;   (* the append registry: which (epoch, block) pairs were
+                       appended.  Fragments are the persistent [logged_at]. *)
 }.
 
 (* the sum of all remaining budgets -- the SETS play no part in the tie *)
 Definition op_sum (om : gmap nat op_entry) : nat :=
-  map_fold (fun _ e acc => (e.1 + acc)%nat) 0%nat om.
+  map_fold (fun _ e acc => (e.1.1 + acc)%nat) 0%nat om.
 
 Lemma op_sum_empty : op_sum ∅ = 0%nat.
 Proof. reflexivity. Qed.
 
 Lemma op_sum_insert (om : gmap nat op_entry) (i : nat) (e : op_entry) :
   om !! i = None ->
-  op_sum (<[i := e]> om) = (e.1 + op_sum om)%nat.
+  op_sum (<[i := e]> om) = (e.1.1 + op_sum om)%nat.
 Proof.
   intros Hi. rewrite /op_sum.
   apply (map_fold_insert_L
-           (fun (_ : nat) (e : op_entry) (acc : nat) => (e.1 + acc)%nat));
+           (fun (_ : nat) (e : op_entry) (acc : nat) => (e.1.1 + acc)%nat));
     [|exact Hi].
   intros j1 j2 z1 z2 y _ _ _. lia.
 Qed.
 
 Lemma op_sum_delete (om : gmap nat op_entry) (i : nat) (e : op_entry) :
   om !! i = Some e ->
-  op_sum om = (e.1 + op_sum (delete i om))%nat.
+  op_sum om = (e.1.1 + op_sum (delete i om))%nat.
 Proof.
   intros Hi.
   rewrite -{1}(insert_delete om i e Hi).
@@ -215,14 +237,14 @@ Qed.
 (* the conservative bound begin_op's guard reasons with: every entry is
    at most b, so the sum is at most size * b *)
 Lemma op_sum_bound (om : gmap nat op_entry) (b : nat) :
-  (forall i e, om !! i = Some e -> (e.1 <= b)%nat) ->
+  (forall i e, om !! i = Some e -> (e.1.1 <= b)%nat) ->
   (op_sum om <= size om * b)%nat.
 Proof.
   induction om as [|i e om Hi IH] using map_ind.
   { intros _. rewrite op_sum_empty map_size_empty. lia. }
   intros Hb.
   rewrite op_sum_insert // map_size_insert_None //.
-  assert (Hu : (e.1 <= b)%nat).
+  assert (Hu : (e.1.1 <= b)%nat).
   { apply (Hb i). rewrite lookup_insert //. }
   assert (Hrest : (op_sum om <= size om * b)%nat).
   { apply IH. intros j v Hj. apply (Hb j).
@@ -234,30 +256,32 @@ Qed.
 (* SPENDING at an entry whose budget is a successor: the sum drops by one.
    Stated on the ENTRY so the set component is free to change at the same
    time, which is exactly what the append path does. *)
-Lemma op_sum_spend (om : gmap nat op_entry) (i u : nat) (Sb Sb' : gset Z) :
-  om !! i = Some (S u, Sb) ->
-  op_sum (<[i := (u, Sb')]> om) = (op_sum om - 1)%nat.
+Lemma op_sum_spend (om : gmap nat op_entry) (i u : nat) (Sb Sb' : gset Z)
+    (e0 : nat) :
+  om !! i = Some (S u, Sb, e0) ->
+  op_sum (<[i := (u, Sb', e0)]> om) = (op_sum om - 1)%nat.
 Proof.
   intros Hi.
-  assert (Hj : <[i := (u, Sb')]> om !! i = Some (u, Sb'))
+  assert (Hj : <[i := (u, Sb', e0)]> om !! i = Some (u, Sb', e0))
     by apply lookup_insert.
-  rewrite (op_sum_delete om i (S u, Sb) Hi).
-  rewrite (op_sum_delete (<[i := (u, Sb')]> om) i (u, Sb') Hj).
+  rewrite (op_sum_delete om i (S u, Sb, e0) Hi).
+  rewrite (op_sum_delete (<[i := (u, Sb', e0)]> om) i (u, Sb', e0) Hj).
   rewrite delete_insert_delete. cbn. lia.
 Qed.
 
 (* ABSORBING changes the set only, so the sum is untouched -- which is the
    whole point: the tie [n + op_sum om <= LOGBLOCKS] survives a log_write
    that does not grow [n]. *)
-Lemma op_sum_absorb (om : gmap nat op_entry) (i u : nat) (Sb Sb' : gset Z) :
-  om !! i = Some (u, Sb) ->
-  op_sum (<[i := (u, Sb')]> om) = op_sum om.
+Lemma op_sum_absorb (om : gmap nat op_entry) (i u : nat) (Sb Sb' : gset Z)
+    (e0 : nat) :
+  om !! i = Some (u, Sb, e0) ->
+  op_sum (<[i := (u, Sb', e0)]> om) = op_sum om.
 Proof.
   intros Hi.
-  assert (Hj : <[i := (u, Sb')]> om !! i = Some (u, Sb'))
+  assert (Hj : <[i := (u, Sb', e0)]> om !! i = Some (u, Sb', e0))
     by apply lookup_insert.
-  rewrite (op_sum_delete om i (u, Sb) Hi).
-  rewrite (op_sum_delete (<[i := (u, Sb')]> om) i (u, Sb') Hj).
+  rewrite (op_sum_delete om i (u, Sb, e0) Hi).
+  rewrite (op_sum_delete (<[i := (u, Sb', e0)]> om) i (u, Sb', e0) Hj).
   rewrite delete_insert_delete. reflexivity.
 Qed.
 
@@ -275,8 +299,23 @@ Section LogInv.
   (* one ledger entry with remaining budget u AND the blocks this op has
      already appended; the id is existential -- no client ever needs it,
      and the ghost steps below re-locate the entry by ownership. *)
+  (* THE NAMED FORM: the same entry ownership with the birth epoch EXPOSED.
+     [log_use_group] cannot be stated without it -- the client has to write
+     [e0 <= e] -- and it must NOT be a separate persistent token: such a
+     token outlives its op, so a stale small [e0] would admit a stale
+     witness and re-open exactly the hole the header's revocation argument
+     closes (fs-log.md §G.9, FINDING 1).  Exposing it on the LINEAR entry
+     is what keeps it honest: holding this IS holding the live entry. *)
+  Definition log_opSe (γ : log_names) (u : nat) (Sb : gset Z) (e0 : nat)
+    : iProp Σ :=
+    (∃ i : nat, i ↪[ln_ops γ] (u, Sb, e0))%I.
+
+  (* ...AND THE FROZEN ABI.  Three arguments, exactly as before: every
+     landed threader ([ProofWritei], [ProofItrunc], [ProofDirlink], and the
+     begin/end pair) stays byte-stable, because a client that does not
+     compare epochs never names one. *)
   Definition log_opS (γ : log_names) (u : nat) (Sb : gset Z) : iProp Σ :=
-    (∃ i : nat, i ↪[ln_ops γ] (u, Sb))%I.
+    (∃ e0 : nat, log_opSe γ u Sb e0)%I.
 
   (* THE FORM EVERY EXISTING CALLER USES.  Forgetting the set is what keeps
      this change additive: balloc, bmap, iupdate, writei, begin_op and
@@ -288,8 +327,68 @@ Section LogInv.
   Definition log_op (γ : log_names) (u : nat) : iProp Σ :=
     (∃ Sb : gset Z, log_opS γ u Sb)%I.
 
+  Global Instance log_opSe_timeless γ u Sb e0 : Timeless (log_opSe γ u Sb e0).
+  Proof. apply _. Qed.
+
   Global Instance log_opS_timeless γ u Sb : Timeless (log_opS γ u Sb).
   Proof. apply _. Qed.
+
+  (* the two conversions; [log_opS_named] is how a client that must compare
+     epochs gets a name for its own, and it loses nothing *)
+  Lemma log_opSe_opS γ u Sb e0 : log_opSe γ u Sb e0 -∗ log_opS γ u Sb.
+  Proof. iIntros "H". iExists e0. iFrame. Qed.
+
+  Lemma log_opS_named γ u Sb : log_opS γ u Sb -∗ ∃ e0, log_opSe γ u Sb e0.
+  Proof. iIntros "H". iDestruct "H" as (e0) "H". iExists e0. iFrame. Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  THE EPOCH AND THE APPEND REGISTRY (fs-log.md §G.2)               *)
+  (* ---------------------------------------------------------------- *)
+
+  (* "block [b] was appended to lh in epoch [e]".  PERSISTENT and never
+     revoked: a witness from an old batch is not wrong, it is unusable --
+     [log_use_group] can only fire when [e] is the CURRENT epoch, and the
+     only way to know that is to hold a live entry, whose [e0] the auth
+     pins to it.  Persistence is sound precisely because the epoch index,
+     not the token's lifetime, carries the soundness. *)
+  Definition logged_at (γ : log_names) (e : nat) (b : Z) : iProp Σ :=
+    own (ln_lg γ) (◯ ({[(e, b)]} : gset (nat * Z))).
+
+  Global Instance logged_at_persistent γ e b : Persistent (logged_at γ e b).
+  Proof. apply _. Qed.
+
+  Global Instance logged_at_timeless γ e b : Timeless (logged_at γ e b).
+  Proof. apply _. Qed.
+
+  (* the registry's two operations, over the [gset] auth: minting is an
+     allocation into a union (idempotent, so the fragment is core-id and
+     the token duplicates for free) and using it is [gset_included]. *)
+  Lemma log_mint_logged (γ : log_names) (X : gset (nat * Z)) (e : nat) (b : Z) :
+    own (ln_lg γ) (● X) ==∗
+    own (ln_lg γ) (● (X ∪ {[(e, b)]})) ∗ logged_at γ e b.
+  Proof.
+    iIntros "H".
+    iMod (own_update _ _ (● (X ∪ {[(e, b)]} : gset (nat * Z))
+                          ⋅ ◯ (X ∪ {[(e, b)]} : gset (nat * Z))) with "H")
+      as "[$ Hf]".
+    { apply auth_update_alloc.
+      apply local_update_unital_discrete. intros z _ Hz.
+      split; [done|]. rewrite left_id in Hz. rewrite -Hz.
+      rewrite /op /cmra_op /=. set_solver. }
+    iModIntro. rewrite /logged_at.
+    iApply (own_mono with "Hf"). apply auth_frag_mono.
+    apply gset_included. set_solver.
+  Qed.
+
+  Lemma logged_at_in (γ : log_names) (X : gset (nat * Z)) (e : nat) (b : Z) :
+    own (ln_lg γ) (● X) -∗ logged_at γ e b -∗ ⌜(e, b) ∈ X⌝.
+  Proof.
+    iIntros "Ha Hf".
+    iDestruct (own_valid_2 with "Ha Hf") as %Hv.
+    iPureIntro.
+    apply auth_both_valid_discrete in Hv as [Hincl _].
+    apply gset_included in Hincl. set_solver.
+  Qed.
 
   Global Instance log_op_timeless γ u : Timeless (log_op γ u).
   Proof. apply _. Qed.
@@ -408,17 +507,29 @@ Section LogInv.
   Definition log_res (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) : iProp Σ :=
     (∃ (out : nat) (cmt : bool) (nc : SailStdpp.Values.mword 32)
-       (om : gmap nat op_entry),
+       (om : gmap nat op_entry) (E : nat) (X : gset (nat * Z)),
        l_out ↦₄ (mword_of_int (Z.of_nat out) : mword 32) ∗
        l_cmt ↦₄ (mword_of_int (if cmt then 1 else 0) : mword 32) ∗
        l_ncommit ↦₄ nc ∗
        ghost_map_auth (ln_ops γ) 1 om ∗
        ⌜size om = out⌝ ∗
-       ⌜forall i e, om !! i = Some e -> (e.1 <= MAXOPBLOCKS)%nat⌝ ∗
+       ⌜forall i e, om !! i = Some e -> (e.1.1 <= MAXOPBLOCKS)%nat⌝ ∗
        (* from the guard: (out+1)*MAXOPBLOCKS <= LOGBLOCKS at every
           increment, so the cell word stays a faithful small int *)
        ⌜(out <= 3)%nat⌝ ∗
        ⌜cmt = true -> out = 0%nat⌝ ∗
+       (* THE EPOCH AND THE APPEND REGISTRY (fs-log.md §G.2/§G.9) *)
+       mono_nat_auth_own (ln_ep γ) 1 E ∗
+       own (ln_lg γ) (● X) ∗
+       (* THE SOUNDNESS CORE: every LIVE entry was born in the CURRENT
+          epoch.  Maintained for free by the bump's placement -- the commit
+          re-deposit runs with [out = 0], hence [om = ∅], so a bump never
+          has a live entry to falsify (ProofEndOp's own [Hommt]). *)
+       ⌜forall i e, om !! i = Some e -> e.2 = E⌝ ∗
+       (* ...and the registry never runs ahead of the epoch: every row was
+          minted at the epoch current when it was minted, and the epoch only
+          grows.  This is the half that turns [e0 <= e] into [e = E]. *)
+       ⌜forall e' b', ((e', b') : nat * Z) ∈ X -> (e' <= E)%nat⌝ ∗
        (if cmt then emp
         else ∃ (n : nat) (LB : gset Z),
           ⌜(n + op_sum om <= LOGBLOCKS)%nat⌝ ∗
@@ -429,7 +540,12 @@ Section LogInv.
              after all), lh.n would grow, and no budget unit would be
              spent -- breaking the tie above.  Vacuous while committing,
              where out = 0 forces om = empty. *)
-          ⌜forall i e, om !! i = Some e -> e.2 ⊆ LB⌝ ∗
+          ⌜forall i e, om !! i = Some e -> e.1.2 ⊆ LB⌝ ∗
+          (* ...and the registry's twin of it: a witness minted THIS epoch
+             names a block that really is in the header.  Older rows are
+             unconstrained, which is exactly the self-invalidation -- they
+             can never be used, because using one needs [e = E]. *)
+          ⌜forall b : Z, (E, b) ∈ X -> b ∈ LB⌝ ∗
           log_batch bn γfs cov logstart n LB))%I.
 
   (* the persistent bundle every log function shares: the sealed lock and
@@ -485,26 +601,26 @@ Section LogInv.
      just read the guard true, so it holds
      n + (out+1) * MAXOPBLOCKS <= LOGBLOCKS; [log_reserve_ok] below turns
      that into the new sum tie. *)
-  Lemma log_begin_step γ (om : gmap nat op_entry) :
+  Lemma log_begin_step γ (om : gmap nat op_entry) (E : nat) :
     ghost_map_auth (ln_ops γ) 1 om ==∗
     ∃ i, ⌜om !! i = None⌝ ∗
-      ghost_map_auth (ln_ops γ) 1 (<[i := (MAXOPBLOCKS, ∅)]> om) ∗
-      log_opS γ MAXOPBLOCKS ∅.
+      ghost_map_auth (ln_ops γ) 1 (<[i := (MAXOPBLOCKS, ∅, E)]> om) ∗
+      log_opSe γ MAXOPBLOCKS ∅ E.
   Proof.
     iIntros "Ha".
     set (i := fresh (dom om)).
     assert (Hi : om !! i = None).
     { apply not_elem_of_dom. apply is_fresh. }
-    iMod (ghost_map_insert i (MAXOPBLOCKS, ∅) Hi with "Ha") as "[Ha He]".
+    iMod (ghost_map_insert i (MAXOPBLOCKS, ∅, E) Hi with "Ha") as "[Ha He]".
     iModIntro. iExists i. iSplitR; [done|]. iFrame "Ha".
-    rewrite /log_opS. iExists i. iFrame.
+    rewrite /log_opSe. iExists i. iFrame.
   Qed.
 
   (* the guard arithmetic: with every entry bounded, the conservative
      (out+1)*MAXOPBLOCKS test implies the exact sum tie after the mint *)
   Lemma log_reserve_ok (n out : nat) (om : gmap nat op_entry) :
     size om = out ->
-    (forall i e, om !! i = Some e -> (e.1 <= MAXOPBLOCKS)%nat) ->
+    (forall i e, om !! i = Some e -> (e.1.1 <= MAXOPBLOCKS)%nat) ->
     (n + (out + 1) * MAXOPBLOCKS <= LOGBLOCKS)%nat ->
     (n + (MAXOPBLOCKS + op_sum om) <= LOGBLOCKS)%nat.
   Proof.
@@ -519,15 +635,15 @@ Section LogInv.
      lh.block[] -- lh.n grows by one and the tie is preserved because the
      sum drops by one ([op_sum_spend]). *)
   Lemma log_spend_step γ (om : gmap nat op_entry) (u : nat) (Sb : gset Z)
-      (b : Z) :
-    ghost_map_auth (ln_ops γ) 1 om -∗ log_opS γ (S u) Sb ==∗
-    ∃ i, ⌜om !! i = Some (S u, Sb)⌝ ∗
-      ghost_map_auth (ln_ops γ) 1 (<[i := (u, Sb ∪ {[b]})]> om) ∗
-      log_opS γ u (Sb ∪ {[b]}).
+      (e0 : nat) (b : Z) :
+    ghost_map_auth (ln_ops γ) 1 om -∗ log_opSe γ (S u) Sb e0 ==∗
+    ∃ i, ⌜om !! i = Some (S u, Sb, e0)⌝ ∗
+      ghost_map_auth (ln_ops γ) 1 (<[i := (u, Sb ∪ {[b]}, e0)]> om) ∗
+      log_opSe γ u (Sb ∪ {[b]}) e0.
   Proof.
-    iIntros "Ha He". rewrite /log_opS. iDestruct "He" as (i) "He".
+    iIntros "Ha He". rewrite /log_opSe. iDestruct "He" as (i) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
-    iMod (ghost_map_update (u, Sb ∪ {[b]}) with "Ha He") as "[Ha He]".
+    iMod (ghost_map_update (u, Sb ∪ {[b]}, e0) with "Ha He") as "[Ha He]".
     iModIntro. iExists i. iSplitR; [done|]. iFrame "Ha".
     iExists i. iFrame.
   Qed.
@@ -536,11 +652,12 @@ Section LogInv.
      [b] in lh.block[].  Pure lookup -- nothing is spent and nothing moves;
      the caller combines the returned entry with [log_res]'s
      [e.2 ⊆ LB] clause to place [b] in the header. *)
-  Lemma log_absorb_step γ (om : gmap nat op_entry) (u : nat) (Sb : gset Z) :
-    ghost_map_auth (ln_ops γ) 1 om -∗ log_opS γ u Sb -∗
-    ∃ i, ⌜om !! i = Some (u, Sb)⌝.
+  Lemma log_absorb_step γ (om : gmap nat op_entry) (u : nat) (Sb : gset Z)
+      (e0 : nat) :
+    ghost_map_auth (ln_ops γ) 1 om -∗ log_opSe γ u Sb e0 -∗
+    ∃ i, ⌜om !! i = Some (u, Sb, e0)⌝.
   Proof.
-    iIntros "Ha He". rewrite /log_opS. iDestruct "He" as (i) "He".
+    iIntros "Ha He". rewrite /log_opSe. iDestruct "He" as (i) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
     iExists i. done.
   Qed.
@@ -550,14 +667,14 @@ Section LogInv.
      drops by exactly the returned budget *)
   Lemma log_end_step γ (om : gmap nat op_entry) (u : nat) :
     ghost_map_auth (ln_ops γ) 1 om -∗ log_op γ u ==∗
-    ∃ i Sb, ⌜om !! i = Some (u, Sb)⌝ ∗
+    ∃ i Sb e0, ⌜om !! i = Some (u, Sb, e0)⌝ ∗
       ghost_map_auth (ln_ops γ) 1 (delete i om).
   Proof.
-    iIntros "Ha He". rewrite /log_op /log_opS.
-    iDestruct "He" as (Sb i) "He".
+    iIntros "Ha He". rewrite /log_op /log_opS /log_opSe.
+    iDestruct "He" as (Sb e0 i) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
     iMod (ghost_map_delete with "Ha He") as "Ha".
-    iModIntro. iExists i, Sb. by iFrame.
+    iModIntro. iExists i, Sb, e0. by iFrame.
   Qed.
 
   (* an op token against the authority: out >= 1 (kills log_write's
@@ -568,7 +685,8 @@ Section LogInv.
     ghost_map_auth (ln_ops γ) 1 om -∗ log_opS γ u Sb -∗
     ⌜(1 <= size om)%nat⌝.
   Proof.
-    iIntros "Ha He". rewrite /log_opS. iDestruct "He" as (i) "He".
+    iIntros "Ha He". rewrite /log_opS /log_opSe.
+    iDestruct "He" as (e0 i) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
     iPureIntro.
     assert (Hne : om ≠ ∅).
@@ -582,8 +700,8 @@ Section LogInv.
     ghost_map_auth (ln_ops γ) 1 om -∗ log_op γ u -∗
     ⌜(1 <= size om)%nat⌝.
   Proof.
-    iIntros "Ha He". rewrite /log_op /log_opS.
-    iDestruct "He" as (Sb i) "He".
+    iIntros "Ha He". rewrite /log_op /log_opS /log_opSe.
+    iDestruct "He" as (Sb e0 i) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
     iPureIntro.
     assert (Hne : om ≠ ∅).
@@ -594,8 +712,71 @@ Section LogInv.
   Qed.
 
   (* ---------------------------------------------------------------- *)
+  (*  THE GROUP-ABSORPTION USE LEMMA (fs-log.md §G.2)                   *)
+  (* ---------------------------------------------------------------- *)
+
+  (* "a witness at least as new as my op's birth names a block that is in
+     the header RIGHT NOW".  Stated over the OPENED authority, because that
+     is where every log_write ghost step already runs -- under the log
+     spinlock, with [log_res] taken apart.
+
+     THE ARGUMENT, in three steps: my entry is live, so the auth pins its
+     birth epoch to the current one ([e0 = E]); the registry never runs
+     ahead ([e <= E]); and [e0 <= e] closes the sandwich, so [e = E] and the
+     row is one of THIS batch's.  A witness from an older batch has
+     [e < E = e0] and fails the premise -- which is the header's revocation
+     requirement met by INDEXING, with nothing ever revoked. *)
+  Lemma log_use_group (γ : log_names) (om : gmap nat op_entry) (E : nat)
+      (X : gset (nat * Z)) (LB : gset Z)
+      (u : nat) (Sb : gset Z) (e0 e : nat) (b : Z) :
+    (forall i x, om !! i = Some x -> x.2 = E) ->
+    (forall e' b', ((e', b') : nat * Z) ∈ X -> (e' <= E)%nat) ->
+    (forall c : Z, ((E, c) : nat * Z) ∈ X -> c ∈ LB) ->
+    (e0 <= e)%nat ->
+    ghost_map_auth (ln_ops γ) 1 om -∗
+    own (ln_lg γ) (● X) -∗
+    log_opSe γ u Sb e0 -∗
+    logged_at γ e b -∗
+    ⌜b ∈ LB⌝.
+  Proof.
+    intros Hlive Hcap Hreg Hle.
+    iIntros "Hao Hax He Hw".
+    iDestruct (log_absorb_step γ om u Sb e0 with "Hao He") as (i) "%Hi".
+    assert (He0 : e0 = E) by exact (Hlive i (u, Sb, e0) Hi).
+    iDestruct (logged_at_in with "Hax Hw") as %Hin.
+    assert (HeE : (e <= E)%nat) by exact (Hcap e b Hin).
+    assert (Hee : e = E) by lia.
+    rewrite Hee in Hin. iPureIntro. exact (Hreg b Hin).
+  Qed.
+
+  (* THE BUMP, at the commit re-deposit (ProofEndOp's [Hommt] arm): nothing
+     physical moves, and no live entry can be falsified because [out = 0]
+     there forces [om = ∅]. *)
+  Lemma log_epoch_bump (γ : log_names) (E : nat) :
+    mono_nat_auth_own (ln_ep γ) 1 E ==∗ mono_nat_auth_own (ln_ep γ) 1 (S E).
+  Proof.
+    iIntros "H". iMod (mono_nat_own_update (S E) with "H") as "[$ _]";
+      [lia | done].
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
   (*  Allocation                                                       *)
   (* ---------------------------------------------------------------- *)
+
+  Lemma log_epoch_alloc :
+    ⊢ |==> ∃ γe : gname, mono_nat_auth_own γe 1 0%nat.
+  Proof.
+    iMod (mono_nat_own_alloc 0%nat) as (γ) "[Ha _]".
+    iModIntro. iExists γ. iFrame.
+  Qed.
+
+  Lemma log_reg_alloc :
+    ⊢ |==> ∃ γl : gname, own γl (● (∅ : gset (nat * Z))).
+  Proof.
+    iMod (own_alloc (● (∅ : gset (nat * Z)))) as (γ) "Ha".
+    { apply auth_auth_valid. done. }
+    iModIntro. iExists γ. iFrame.
+  Qed.
 
   Lemma log_ledger_alloc :
     ⊢ |==> ∃ γops : gname, ghost_map_auth γops 1 (∅ : gmap nat op_entry).

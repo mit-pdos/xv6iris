@@ -830,3 +830,28 @@ LogInv is the small half.  op_entry's re-association makes e.1/e.2
 projections fail loudly (the good case).  log_names gains a field: the
 two Spec-file DUMMIES (SpecFileclose:202, SpecFilewrite:298, numeric
 MkLogNames constants) are one-token edits, approved as non-contract.
+
+
+### G.10 G-1 ghost core LANDED (2026-08-13); consumer re-thread in flight
+
+LogInv.v +233/−52, green.  Beyond §G.9: a FIFTH invariant clause proved
+load-bearing — ⌜∀ (e',b') ∈ X, e' <= E⌝ — without it log_use_group's
+sandwich has no upper half (a forged future-epoch row would pass); §G.2's
+"epochs are monotone and logged_at is only minted at its epoch" is this
+clause and had to be STATED, not prose.  Maintained trivially (mint
+inserts at E; bump only raises E).  logged_at is authR (gsetUR (nat*Z))
+(fragment duplication = persistence for free).  RULED on the absorbed
+arm: mint on the NON-absorbed arm only for G-1 (the absorbed-arm mint is
+sound but costs a real re-proof of (E,b)∈X → b∈LB from the credit rather
+than the append; add in G-2 only if a consumer wants it).
+
+Consumer worklist (enumerated by the G-1 agent; 13 sites): ProofBeginOp
+:1333/:1605/:1638 constructions + :1279 open (log_begin_step gains E; the
+entry literal grows ∅,E); ProofEndOp :1513 (THE BUMP — Hommt : om = ∅
+proved four lines above) /:4188/:4549 + :1299/:3922 opens; ProofLogWrite
+:2293 (absorb) /:2356 (append — THE MINT) + :1960 open; ProofInitlog
+:1440 + MkLogNames :1438/:1454/:1457.  Then SpecLogWrite's additive post
+and the two approved Spec dummies.  Gotchas: annotate (γ : log_names) on
+every new lemma (implicit generalization eats a bare γ into a Finite
+instance); grep e\.1|e\.2 in each consumer BEFORE editing — the
+re-association makes e.2 read the EPOCH silently.
