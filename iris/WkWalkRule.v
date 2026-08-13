@@ -332,7 +332,7 @@ Definition wwalk_site (tid : option nat) (root_ppn : mword 44)
   (forall bmi : bool, wexec_tail tid (wmi σ bmi)) /\
   (forall bmi : bool, wstep_post_tail tid (wmi σ bmi)) /\
   wstep_tick_tail tid σ tick /\
-  wstep_family_ready tid σ la va pa w tick.
+  wstep_family_ready tid σ la va pa w0 lw w tick.
 
 (** THE INHABITATION.  [P] is the caller's site predicate; the two premises
     are "every [P]-state is a walking-fetch site" and the Q-half. *)

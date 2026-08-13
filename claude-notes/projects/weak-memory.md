@@ -49,7 +49,21 @@ Measured: the weak proof bodies are **1.4× their SC twins**, down from
 LOAD-BEARING in `wQ_store_w`/`wQ_fence`.  Tree green after both; slices 1–2
 below were untouched by either.
 
-**⇒ THE LIVE FRONT — 6a's LAST ITEM. SLICE 3 IS HALF IN (2026-08-12).**  Read
+**⇒ THIS FRONT IS DONE (2026-08-13): the racy fetch-walk is proven model-to-WP
+with its validation capstone.**  The status blocks at the top of
+[`design/weak-memory-walk-bridge.md`](../design/weak-memory-walk-bridge.md)
+are the authoritative record: absorption → peels → ⇐-bridge (with the log
+identity) → whole-step certificate → `wp_wwalk_step` (`iris/WkWalkRule.v`),
+the minstret-flag widening of the exports, the tail-discharger ladder
+(`iris/WkWalkTails.v`), and the capstone leaf — a complete WP proof of a
+fetch-walking S-mode `addi` (`iris/WkWalkCapstone.v`, `wwp_walk_addi`;
+axioms = platform + funext + reservation quartet).  What remains on the
+walk front (recorded there): the 6c funnel/leaf sweep proper, straddle/RVC
+fetch arms, the writing-execute constancy export, and the φ clean-arm
+wiring.  The narrative below is kept as the historical record of how the
+design was found.
+
+**THE (previously) LIVE FRONT — 6a's LAST ITEM. SLICE 3 IS HALF IN (2026-08-12).**  Read
 [`design/weak-memory-walk-bridge.md`](../design/weak-memory-walk-bridge.md)
 §§7–8 before touching any of it; §8 is where the plan changed.
 

@@ -906,10 +906,21 @@ Qed.
     reach; this is its mirror twin, keyed on the states a family member's
     [exec_stale] run reaches.  Both say the same thing — "the text word is
     readable there, and the rest of the step is window-free" — on the two
-    sides of the bridge. *)
+    sides of the bridge.
+
+    THE LEAF WORD IS GUARDED BY THE WALK FILTER, and that guard is not
+    cosmetic: the landed walk layer describes a stale walk only at an A/D
+    VARIANT of the invariant's word (the absorption theorem's family is
+    indexed by [av dv] with [pte_ad_le], and so is [WeakKptStale]'s pure
+    dispatch), so a run at a WILD [u] that still returns [Ok] has nothing
+    pinning its post-registers or its post-memory — which is exactly what a
+    discharger needs.  §5i only ever USES this interface at a
+    filter-accepted word (its [Hcore] is applied right after
+    [wwalk_filter_inv]), so the guard costs the consumer nothing. *)
 Definition wstep_family_ready (tid : option nat) (σ : wmstate) (la : Arch.pa)
-    (va pa : mword 64) (w : mword 32) (tick : bool) : Prop :=
+    (va pa w0 lw : mword 64) (w : mword 32) (tick : bool) : Prop :=
   forall (bmi : bool) (u : bv (8 * 8)%N) (sg' : mstate) (esw : list weff),
+    wwalk_filter w0 lw (fun j : nat => nth_byte u j) ->
     exec_stale la 8 u (translateAddr (Virtaddr va) (InstructionFetch tt))
       (wflat_st (wmi σ bmi))
       = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sg', esw) ->
@@ -947,7 +958,7 @@ Lemma wstep_family_fetchwalk (tid : option nat) (σ : wmstate)
   isRVC (subrange_vec_dec w 15 0) = false ->
   acc_wf pa 4 ->
   racc_disj la 8 pa 4 ->
-  wstep_family_ready tid σ la va pa w tick ->
+  wstep_family_ready tid σ la va pa w0 lw w tick ->
   (forall u : bv (8 * 8)%N, wwalk_filter w0 lw (fun j : nat => nth_byte u j) ->
      exists (y : unit) (t' : mstate) (es : list weff),
        exec_stale la 8 u (riscv_step tick) (wflat_st σ) = Some (y, t', es) /\
@@ -985,6 +996,7 @@ Proof.
                (wm_regs σ) bmi ltac:(vm_compute; reflexivity)). exact Hhart. }
   (* ONE family member, run through the whole step *)
   assert (Hcore : forall (u : bv (8 * 8)%N) (sgm : mstate) (esm : list weff),
+            wwalk_filter w0 lw (fun j : nat => nth_byte u j) ->
             exec_stale la 8 u (translateAddr (Virtaddr va) (InstructionFetch tt))
               (wflat_st (wmi σ bmi))
               = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sgm, esm) ->
@@ -992,8 +1004,8 @@ Proof.
               exec_stale la 8 u (riscv_step tick) (wflat_st σ)
                 = Some (tt, t', (esm ++ ([WEread wak_plain pa 4] ++ est))%list) /\
               trace_off_win la 8 est /\ trace_stale wak_plain la 8 est).
-  { intros u sgm esm Hex.
-    destruct (Hready bmi u sgm esm Hex) as [Hmr Htail].
+  { intros u sgm esm Hu Hex.
+    destruct (Hready bmi u sgm esm Hu Hex) as [Hmr Htail].
     rewrite wflat_st_wmi in Hex.
     exact (exec_stale_step_of_walk la u tick (wflat_st σ) sgm bmi va pa w esm
              Hacc Haccp Hdisj Hpriv Hsi Hpriva Hpca Hharta (Hdisp bmi)
@@ -1003,8 +1015,8 @@ Proof.
     left. intros u Hu.
     destruct (wwalk_filter_inv w0 lw u Hu) as (av & dv & Hw & Hle).
     destruct (Hro av dv Hle) as (sgm & esm & Hex & _ & _ & Hes).
-    rewrite Hw.
-    destruct (Hcore _ sgm esm Hex) as (t' & est & Hstep & Hoffe & Hste).
+    rewrite Hw in Hu. rewrite Hw.
+    destruct (Hcore _ sgm esm Hu Hex) as (t' & est & Hstep & Hoffe & Hste).
     exists tt, t', (esm ++ ([WEread wak_plain pa 4] ++ est))%list.
     split; [exact Hstep|].
     apply trace_stale_app.
@@ -1021,8 +1033,8 @@ Proof.
       left. intros u Hu.
       destruct (wwalk_filter_inv w0 lw u Hu) as (av & dv & Hw & Hle).
       destruct (Hfam av dv Hle) as (sgm & esm & Hex & _ & _ & Hes).
-      rewrite Hw.
-      destruct (Hcore _ sgm esm Hex) as (t' & est & Hstep & Hoffe & Hste).
+      rewrite Hw in Hu. rewrite Hw.
+      destruct (Hcore _ sgm esm Hu Hex) as (t' & est & Hstep & Hoffe & Hste).
       exists tt, t', (esm ++ ([WEread wak_plain pa 4] ++ est))%list.
     split; [exact Hstep|].
       apply trace_stale_app.
@@ -1036,8 +1048,8 @@ Proof.
       right. intros u Hu.
       destruct (wwalk_filter_inv w0 lw u Hu) as (av & dv & Hw & Hle).
       destruct (Hfam av dv Hle) as (sgm & esm & Hex & _ & _ & Hes).
-      rewrite Hw.
-      destruct (Hcore _ sgm esm Hex) as (t' & est & Hstep & Hoffe & Hste).
+      rewrite Hw in Hu. rewrite Hw.
+      destruct (Hcore _ sgm esm Hu Hex) as (t' & est & Hstep & Hoffe & Hste).
       exists tt, t', (esm ++ ([WEread wak_plain pa 4] ++ est))%list.
     split; [exact Hstep|].
       apply trace_off_win_app.
@@ -1167,7 +1179,7 @@ Lemma wstep_outcome_fetchwalk (tid : option nat) (σ : wmstate)
   (forall bmi : bool, wexec_tail tid (wmi σ bmi)) ->
   (forall bmi : bool, wstep_post_tail tid (wmi σ bmi)) ->
   wstep_tick_tail tid σ tick ->
-  wstep_family_ready tid σ la va pa w tick ->
+  wstep_family_ready tid σ la va pa w0 lw w tick ->
   forall (x : unit) (s' : wmstate), wrun tid (riscv_step tick) σ x s' ->
     exists (u : bv (8 * 8)%N) (es : list weff),
       wadm σ wak_plain la 8 u /\

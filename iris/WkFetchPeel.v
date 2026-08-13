@@ -1376,11 +1376,33 @@ Section WfetchGates.
     rewrite Hfe. cbn match. reflexivity.
   Qed.
 
-  (** *** 5b. THE GATES.  The region is not a parameter: [pma_allows_all]
-      produces it, together with the [PMA_executable] fact the capstone's
-      read needs, so the two travel out together. *)
-  Lemma wfetch_gates_of_regs (tid : option nat) (σ : wmstate)
-      (root_ppn : mword 44) (va pa p2 p1 w0 lw : mword 64) :
+  (** *** 5b0. THE TEXT WORD'S REGION, from the PMA table alone.  Split out
+      of 5b because a consumer that needs the gates at SEVERAL states — the
+      two post-[minstret_increment]-write states, say — needs ONE region for
+      all of them, and the region is decided by the [pma_regions] lookup and
+      the address, both of which those states share.  Minting it per state
+      would leave two existential witnesses no equation relates. *)
+  Lemma wfetch_region_of_regs (pa : mword 64) (regions : list PMA_Region) :
+    addr_is_ram pa ->
+    addr_is_ram (pa_add pa 3) ->
+    pma_allows_all regions ->
+    exists region : PMA_Region,
+      matching_pma_region regions (Physaddr pa) 4 = Some region /\
+      (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true.
+  Proof.
+    intros Hram Hram3 Hall.
+    assert (Hacc : pma_ram_access pa 4).
+    { exact (pma_access_ram pa 4 3%nat Hram Hram3
+               (pma_width_ok 4 eq_refl eq_refl) eq_refl eq_refl). }
+    destruct (pma_all_ram Hall pa 4 Hacc) as (region & Hmatch & Hexec & _).
+    exists region. split; [exact Hmatch | exact Hexec].
+  Qed.
+
+  (** *** 5b. THE GATES, AT A GIVEN REGION.  5b0's witness is an INPUT here,
+      so the same region serves every state whose [pma_regions] agrees with
+      σ's. *)
+  Lemma wfetch_gates_of_region (tid : option nat) (σ : wmstate)
+      (root_ppn : mword 44) (va pa p2 p1 w0 lw : mword 64) (region : PMA_Region) :
     wwalk_exports tid σ root_ppn va pa p2 p1 w0 lw ->
     (* the text word's RAM geometry *)
     addr_is_ram pa ->
@@ -1394,21 +1416,15 @@ Section WfetchGates.
       ('b"1") = true ->
     (ram_base + ram_size
      <= uint (vec_access_dec (register_lookup pmpaddr_n (wm_regs σ)) 0) * 4)%Z ->
-    (* the PMA table, and the two remaining register facts, at σ *)
-    pma_allows_all (register_lookup pma_regions (wm_regs σ)) ->
+    (* the region, and the two remaining register facts, at σ *)
+    matching_pma_region (register_lookup pma_regions (wm_regs σ))
+      (Physaddr pa) 4 = Some region ->
     register_lookup htif_tohost_base (wm_regs σ) = None ->
     register_lookup cur_privilege (wm_regs σ) = Supervisor ->
-    exists region : PMA_Region,
-      wfetch_gates tid σ va pa region /\
-      (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true.
+    wfetch_gates tid σ va pa region.
   Proof.
-    intros Hexp Hram Hram3 HA Hord HX Hcov Hall Hhtif Hpriv.
-    (* the region, from the RAM class *)
-    assert (Hacc : pma_ram_access pa 4).
-    { exact (pma_access_ram pa 4 3%nat Hram Hram3
-               (pma_width_ok 4 eq_refl eq_refl) eq_refl eq_refl). }
-    destruct (pma_all_ram Hall pa 4 Hacc) as (region & Hmatch & Hexec & _).
-    (* the range test, from the same geometry *)
+    intros Hexp Hram Hram3 HA Hord HX Hcov Hmatch Hhtif Hpriv.
+    (* the range test, from the text word's geometry *)
     assert (Hnw : (uint pa + Z.of_nat 3 < 18446744073709551616)%Z).
     { destruct Hram as [_ Hh]. unfold ram_base, ram_size in Hh.
       change (Z.of_nat 3) with 3%Z. lia. }
@@ -1424,7 +1440,6 @@ Section WfetchGates.
     { apply (ram_pmp_match_w pa _ 4);
         [lia | vm_compute; reflexivity | | exact Hfit | exact Hcov].
       destruct Hram as [Hlo _]. exact Hlo. }
-    exists region. split; [|exact Hexec].
     (* ---- and now at every post-translation state ---- *)
     intros x s' Hrun.
     destruct (wwalk_run_outcome tid σ root_ppn va pa p2 p1 w0 lw Hexp x s' Hrun)
@@ -1455,6 +1470,39 @@ Section WfetchGates.
     - apply exec_eff_within_sig_false;
         [apply addr_is_ram_not_in_sig; exact Hram | lia].
     - apply exec_eff_within_htif_false. cbn [sregs]. exact Hhtif'.
+  Qed.
+
+  (** *** 5b'. THE GATES, region and all, from σ's registers — 5b0 + 5b, and
+      the form §5c consumes. *)
+  Lemma wfetch_gates_of_regs (tid : option nat) (σ : wmstate)
+      (root_ppn : mword 44) (va pa p2 p1 w0 lw : mword 64) :
+    wwalk_exports tid σ root_ppn va pa p2 p1 w0 lw ->
+    (* the text word's RAM geometry *)
+    addr_is_ram pa ->
+    addr_is_ram (pa_add pa 3) ->
+    (* the PMP grant's four facts, at σ's registers *)
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n (wm_regs σ)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64)
+      (vec_access_dec (register_lookup pmpaddr_n (wm_regs σ)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n (wm_regs σ)) 0))
+      ('b"1") = true ->
+    (ram_base + ram_size
+     <= uint (vec_access_dec (register_lookup pmpaddr_n (wm_regs σ)) 0) * 4)%Z ->
+    (* the PMA table, and the two remaining register facts, at σ *)
+    pma_allows_all (register_lookup pma_regions (wm_regs σ)) ->
+    register_lookup htif_tohost_base (wm_regs σ) = None ->
+    register_lookup cur_privilege (wm_regs σ) = Supervisor ->
+    exists region : PMA_Region,
+      wfetch_gates tid σ va pa region /\
+      (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true.
+  Proof.
+    intros Hexp Hram Hram3 HA Hord HX Hcov Hall Hhtif Hpriv.
+    destruct (wfetch_region_of_regs pa (register_lookup pma_regions (wm_regs σ))
+                Hram Hram3 Hall) as (region & Hmatch & Hexec).
+    exists region. split; [|exact Hexec].
+    exact (wfetch_gates_of_region tid σ root_ppn va pa p2 p1 w0 lw region
+             Hexp Hram Hram3 HA Hord HX Hcov Hmatch Hhtif Hpriv).
   Qed.
 
   (** *** 5c. THE CAPSTONE, FROM σ's REGISTERS.
@@ -1522,14 +1570,19 @@ End WfetchGates.
     added.  Nothing here is a new certificate: the whole section is the
     plumbing between the two halves that were built to meet.
 
-    THE PEEL IS EXPORTED CONDITIONALLY, as
-    [racc_disj la 8 pa 4 -> …].  [la] is produced INSIDE the fupd (it is
-    computed from the invariant's own [p2]/[p1]), so a premise about it
-    cannot be stated by the caller; and the honest cheap forms of "kernel
-    text is disjoint from every page-table slot" are either false in general
-    or a re-statement of region geometry the funnel has and this file does
-    not.  The implication hands the funnel exactly the obligation it can
-    discharge once [la] is in its hands. *)
+    WHAT IT EXPORTS FOR THE FETCH is not the peel itself but the two bundles
+    the S-mode racy WP rule's site predicate is stated over
+    ([WkStepPeel]'s [wfetch_ready]): [wwalk_exports] and [wfetch_gates] AT
+    THE POST-[minstret_increment]-WRITE STATES, for both flag values, plus
+    the region's [PMA_executable].  Two reasons the peel itself is not the
+    export: [try_step] writes that flag before fetching, so the site's
+    obligations sit at [wmi σ b] and not at σ; and [la] is produced INSIDE
+    the fupd (it is computed from the invariant's own [p2]/[p1]), so the
+    peel's text-vs-slot disjointness [racc_disj la 8 pa 4] cannot be a
+    premise here at all.  The funnel owns that geometry, and with these
+    bundles it runs [wfetch_peel_of_regs] / [wstep_peel_fetchwalk] itself.
+    THE REGION IS BOUND BY THE EXISTENTIAL and is uniform in the flag — see
+    §5b0. *)
 
 Section WkFetchFupd.
   Context `{!riscvGS Σ, !weakGS Σ}.
@@ -1555,11 +1608,15 @@ Section WkFetchFupd.
     register_lookup htif_tohost_base (wm_regs σ) = None ->
     register_lookup cur_privilege (wm_regs σ) = Supervisor ->
     _get_Mstatus_SXL (register_lookup mstatus (wm_regs σ)) = 'b"10" ->
-    exec_eff (effectivePrivilege (InstructionFetch tt)
-                (register_lookup mstatus (wm_regs σ)) Supervisor)
-      (wflat_st σ) = Some (Supervisor, wflat_st σ, []) ->
-    exec_eff (is_shadow_stack_access (InstructionFetch tt)) (wflat_st σ)
-      = Some (false, wflat_st σ, []) ->
+    (forall bf : bool,
+       exec_eff (effectivePrivilege (InstructionFetch tt)
+                   (register_lookup mstatus (wm_regs σ)) Supervisor)
+         (set_reg (wflat_st σ) (R_bool minstret_increment) bf)
+       = Some (Supervisor, set_reg (wflat_st σ) (R_bool minstret_increment) bf, [])) ->
+    (forall bf : bool,
+       exec_eff (is_shadow_stack_access (InstructionFetch tt))
+         (set_reg (wflat_st σ) (R_bool minstret_increment) bf)
+       = Some (false, set_reg (wflat_st σ) (R_bool minstret_increment) bf, [])) ->
     pma_allows_all (register_lookup pma_regions (wm_regs σ)) ->
     (T_kpt <= w_vrNew (wm_ws σ))%nat ->
     (* ---- the FETCH-side pure premises the absorption exports do not carry ---- *)
@@ -1588,7 +1645,7 @@ Section WkFetchFupd.
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
     wtlb_res_pt root_ppn T_kpt
     ={E}=∗
-    ∃ (p2 p1 lw : mword 64),
+    ∃ (p2 p1 lw : mword 64) (region : PMA_Region),
       let vpn := svpn_of va in
       let w0 := mk_pte ppn (kperm_flags pc) in
       let a2 := u_pte_addr root_ppn (subrange_vec_dec vpn 26 18) in
@@ -1606,30 +1663,40 @@ Section WkFetchFupd.
             (wv : mword 64) = pte_set_ad w0 a d) /\
          pte_ad_le (wv : mword 64) lw⌝ ∗
       ⌜forall j : nat, (j < 8)%nat -> nv_free (wm_log σ) (acc_addr la j)⌝ ∗
-      (* THE PEEL OF THE FETCH — the one new conjunct *)
-      ⌜racc_disj la 8 pa 4 ->
-       wstep_ok_racy tid la 8 wak_plain (wwalk_filter w0 lw) wD_any True true
-         (fetch tt) σ /\
-       wadm_filter σ wak_plain la 8 (wwalk_filter w0 lw)⌝ ∗
+      (* THE WALK EXPORTS AND THE FETCH'S GATES, at the POST-FLAG-WRITE
+         states — [WkStepPeel]'s [wfetch_ready], which is what the S-mode
+         racy WP rule's site predicate owes.  The region is σ-level: it is
+         decided by the [pma_regions] lookup, which the flag write frames. *)
+      ⌜forall bf : bool,
+         wwalk_exports tid (wset_reg σ (R_bool minstret_increment) bf)
+           root_ppn va pa p2 p1 w0 lw⌝ ∗
+      ⌜forall bf : bool,
+         wfetch_gates tid (wset_reg σ (R_bool minstret_increment) bf) va pa region⌝ ∗
+      ⌜(override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true⌝ ∗
       reg_interp (wm_regs σ) ∗
-      (∀ (av dv : mword 1) (sg' : mstate) (es : list weff),
+      (∀ (bf : bool) (av dv : mword 1) (sg' : mstate) (es : list weff),
          ⌜pte_ad_le (pte_set_ad w0 av dv) lw⌝ -∗
          ⌜exec_stale la 8 (pte_set_ad w0 av dv)
-            (translateAddr (Virtaddr va) (InstructionFetch tt)) (wflat_st σ)
+            (translateAddr (Virtaddr va) (InstructionFetch tt))
+            (set_reg (wflat_st σ) (R_bool minstret_increment) bf)
             = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sg', es)⌝ -∗
-         reg_interp (wm_regs σ) ==∗
+         reg_interp (register_set (R_bool minstret_increment) bf (wm_regs σ)) ==∗
          reg_interp (sregs sg') ∗ wtlb_res_pt root_ppn T_kpt) ∗
       ( (* READ-ONLY *)
         (⌜forall av dv : mword 1,
             pte_ad_le (pte_set_ad w0 av dv) lw ->
+            forall bf : bool,
             exists (sg' : mstate) (es : list weff),
               exec_stale la 8 (pte_set_ad w0 av dv)
-                (translateAddr (Virtaddr va) (InstructionFetch tt)) (wflat_st σ)
+                (translateAddr (Virtaddr va) (InstructionFetch tt))
+                (set_reg (wflat_st σ) (R_bool minstret_increment) bf)
               = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sg', es) /\
               mem sg' = wflat (wm_img σ) (wm_log σ) /\
               mdev sg' = wm_dev σ /\
               (forall r : register, register_beq r tlb = false ->
-                 register_lookup r (sregs sg') = register_lookup r (wm_regs σ)) /\
+                 register_lookup r (sregs sg')
+                 = register_lookup r
+                     (sregs (set_reg (wflat_st σ) (R_bool minstret_increment) bf))) /\
               (es = [] \/
                es = [WEread wak_plain a2 8; WEread wak_plain a1 8;
                      WEread wak_plain la 8] \/
@@ -1639,32 +1706,87 @@ Section WkFetchFupd.
          wlog_auth (wm_log σ) ∗ wlat_interp (wm_img σ) (wm_log σ))
         ∨
         (* WRITE-BACK *)
-        (∃ (lw' : mword 64) (kcls : wm_class),
+        (* the class is [WCexcl], not an existential — see [WeakKptStale] §3 *)
+        (∃ lw' : mword 64,
            ⌜update_PTE_Bits (lw : mword 64) (InstructionFetch tt) = Some lw'⌝ ∗
            ⌜exists wtr : bool,
             forall av dv : mword 1,
               pte_ad_le (pte_set_ad w0 av dv) lw ->
+              forall bf : bool,
               exists (sg' : mstate) (es : list weff),
                 exec_stale la 8 (pte_set_ad w0 av dv)
-                  (translateAddr (Virtaddr va) (InstructionFetch tt)) (wflat_st σ)
+                  (translateAddr (Virtaddr va) (InstructionFetch tt))
+                  (set_reg (wflat_st σ) (R_bool minstret_increment) bf)
                 = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sg', es) /\
                 mem sg' = write_bytes (wflat (wm_img σ) (wm_log σ)) (la : Arch.pa) 8 lw' /\
                 mdev sg' = wm_dev σ /\
                 (forall r : register, register_beq r tlb = false ->
-                   register_lookup r (sregs sg') = register_lookup r (wm_regs σ)) /\
+                   register_lookup r (sregs sg')
+                   = register_lookup r
+                       (sregs (set_reg (wflat_st σ) (R_bool minstret_increment) bf))) /\
                 es = (if wtr
                       then [WEread wak_plain a2 8; WEread wak_plain a1 8;
                             WEread wak_plain la 8; WEread wak_excl la 8;
                             WEwrite wak_excl la 8 (lw' : mword 64)]
                       else [WEread wak_excl la 8;
                             WEwrite wak_excl la 8 (lw' : mword 64)])⌝ ∗
-           wlog_auth (wm_log σ ++ [wwrite_msg tid kcls (la : Arch.pa) 8 (lw' : mword 64)]) ∗
+           wlog_auth (wm_log σ ++ [wwrite_msg tid WCexcl (la : Arch.pa) 8 (lw' : mword 64)]) ∗
            wlat_interp (wm_img σ)
-             (wm_log σ ++ [wwrite_msg tid kcls (la : Arch.pa) 8 (lw' : mword 64)]))).
+             (wm_log σ ++ [wwrite_msg tid WCexcl (la : Arch.pa) 8 (lw' : mword 64)]))).
   Proof.
     intros HE Hchk Hval Hcanon Hid4k Hwlog Hmisa Hmenv Hhtif Hcp HSXL Heff Hss
            Hall Hrcpt Hpcv Halv Halp Hram Hram3 Haccp HW0 Hpin Hbytes
            HA Hord HX Hcov.
+    (* THE REGION IS σ-LEVEL, and that is what makes it uniform in the flag:
+       it is decided by the [pma_regions] lookup and the text address, and a
+       register write frames the first (§5b0). *)
+    destruct (wfetch_region_of_regs pa (register_lookup pma_regions (wm_regs σ))
+                Hram Hram3 Hall) as (region & Hmatch & Hexecp).
+    (* every gate register past the [minstret_increment] write *)
+    assert (Hregb : forall (bf : bool) (r : register),
+              register_beq r (R_bool minstret_increment) = false ->
+              register_lookup r (wm_regs (wset_reg σ (R_bool minstret_increment) bf))
+              = register_lookup r (wm_regs σ))
+      by (intros bf r Hr;
+          exact (irrelevant_register_set r (R_bool minstret_increment)
+                   (wm_regs σ) bf Hr)).
+    assert (HAb : forall bf : bool, pmpAddrMatchType_encdec_backwards
+              (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n
+                 (wm_regs (wset_reg σ (R_bool minstret_increment) bf))) 0)) = TOR).
+    { intros bf. rewrite (Hregb bf pmpcfg_n ltac:(vm_compute; reflexivity)).
+      exact HA. }
+    assert (Hordb : forall bf : bool, zopz0zKzJ_u (zeros' 64)
+              (vec_access_dec (register_lookup pmpaddr_n
+                 (wm_regs (wset_reg σ (R_bool minstret_increment) bf))) 0) = false).
+    { intros bf. rewrite (Hregb bf pmpaddr_n ltac:(vm_compute; reflexivity)).
+      exact Hord. }
+    assert (HXb : forall bf : bool, eq_vec (_get_Pmpcfg_ent_X
+              (vec_access_dec (register_lookup pmpcfg_n
+                 (wm_regs (wset_reg σ (R_bool minstret_increment) bf))) 0)) ('b"1") = true).
+    { intros bf. rewrite (Hregb bf pmpcfg_n ltac:(vm_compute; reflexivity)).
+      exact HX. }
+    assert (Hcovb : forall bf : bool, (ram_base + ram_size
+              <= uint (vec_access_dec (register_lookup pmpaddr_n
+                    (wm_regs (wset_reg σ (R_bool minstret_increment) bf))) 0) * 4)%Z).
+    { intros bf. rewrite (Hregb bf pmpaddr_n ltac:(vm_compute; reflexivity)).
+      exact Hcov. }
+    assert (Hmatchb : forall bf : bool,
+              matching_pma_region (register_lookup pma_regions
+                 (wm_regs (wset_reg σ (R_bool minstret_increment) bf)))
+                (Physaddr pa) 4 = Some region).
+    { intros bf. rewrite (Hregb bf pma_regions ltac:(vm_compute; reflexivity)).
+      exact Hmatch. }
+    assert (Hhtifb : forall bf : bool,
+              register_lookup htif_tohost_base
+                (wm_regs (wset_reg σ (R_bool minstret_increment) bf)) = None).
+    { intros bf.
+      rewrite (Hregb bf htif_tohost_base ltac:(vm_compute; reflexivity)).
+      exact Hhtif. }
+    assert (Hcpb : forall bf : bool,
+              register_lookup cur_privilege
+                (wm_regs (wset_reg σ (R_bool minstret_increment) bf)) = Supervisor).
+    { intros bf. rewrite (Hregb bf cur_privilege ltac:(vm_compute; reflexivity)).
+      exact Hcp. }
     iIntros "Hat Hri Hla Hi Hres".
     iMod (wtlb_res_pt_translateAddr_stale_at (InstructionFetch tt) root_ppn T_kpt
             tid va pa ppn pc σ E HE Hchk Hval Hcanon Hid4k Hwlog Hmisa Hmenv
@@ -1673,65 +1795,77 @@ Section WkFetchFupd.
          "(%Hvar & %Hslots & %Hpins & %Hdj & %Hcoll & %Hnv & Hri & Hwand & Harm)".
     destruct Hslots as (Hs2 & Hs1 & Hs0).
     destruct Hdj as (Hd2 & Hd1).
-    (* the pure bundle, and with it the peel — assembled in each arm from the
-       family that arm exports (the two families differ, the nine other fields
-       do not) *)
+    (* the gates, from the exports, at whichever flag state — the exports
+       bundle is the only per-arm input, so this is stated once *)
+    assert (Hgof : forall bf : bool,
+              wwalk_exports tid (wset_reg σ (R_bool minstret_increment) bf)
+                root_ppn va pa p2 p1 (mk_pte ppn (kperm_flags pc)) lw ->
+              wfetch_gates tid (wset_reg σ (R_bool minstret_increment) bf)
+                va pa region).
+    { intros bf Hexpb.
+      exact (wfetch_gates_of_region tid (wset_reg σ (R_bool minstret_increment) bf)
+               root_ppn va pa p2 p1 (mk_pte ppn (kperm_flags pc)) lw region
+               Hexpb Hram Hram3 (HAb bf) (Hordb bf) (HXb bf) (Hcovb bf)
+               (Hmatchb bf) (Hhtifb bf) (Hcpb bf)). }
+    (* the pure bundle — assembled in each arm from the family that arm
+       exports (the two families differ, the nine other fields do not).  Every
+       σ-level field of [wwalk_exports] holds at the flag-modified state BY
+       CONVERSION: [wm_log], [wm_img], [wm_ws], [wm_dev] and the flat memory
+       of a [wset_reg] state are definitionally σ's. *)
     iDestruct "Harm" as "[(%Hro & Hlog & Hlat) | Hw]".
-    - assert (Hexp : wwalk_exports tid σ root_ppn va pa p2 p1
-                       (mk_pte ppn (kperm_flags pc)) lw).
-      { rewrite /wwalk_exports.
+    - assert (Hexpb : forall bf : bool,
+                wwalk_exports tid (wset_reg σ (R_bool minstret_increment) bf)
+                  root_ppn va pa p2 p1 (mk_pte ppn (kperm_flags pc)) lw).
+      { intros bf. rewrite /wwalk_exports.
         split_and!; [exact Hvar|exact Hwlog|exact Hs2|exact Hs1|exact Hs0
                     |exact Hpins|exact Hd2|exact Hd1|exact Hcoll| |].
         - left. intros av dv Hle.
-          destruct (Hro av dv Hle) as (sg' & es & H1 & H2 & H3 & _ & H5).
+          destruct (Hro av dv Hle bf) as (sg' & es & H1 & H2 & H3 & _ & H5).
           exists sg', es. split_and!; [exact H1|exact H2|exact H3|exact H5].
         - intros av dv sg' es Hle Hrun r Hr.
-          destruct (Hro av dv Hle) as (sgx & esx & H1 & _ & _ & H4 & _).
+          destruct (Hro av dv Hle bf) as (sgx & esx & H1 & _ & _ & H4 & _).
           rewrite Hrun in H1.
           assert (Hsg : sgx = sg') by congruence. subst sgx.
           exact (H4 r Hr). }
-      iModIntro. iExists p2, p1, lw.
+      iModIntro. iExists p2, p1, lw, region.
       iSplitR; [iPureIntro; exact Hvar|].
       iSplitR; [iPureIntro; exact (conj Hs2 (conj Hs1 Hs0))|].
       iSplitR; [iPureIntro; exact Hpins|].
       iSplitR; [iPureIntro; exact (conj Hd2 Hd1)|].
       iSplitR; [iPureIntro; exact Hcoll|].
       iSplitR; [iPureIntro; exact Hnv|].
-      iSplitR.
-      { iPureIntro.
-        exact (wfetch_peel_of_regs tid σ root_ppn va pa p2 p1 _ lw w
-                 Hpcv Halv Hexp Halp Hram Hram3 Haccp HW0 Hpin Hbytes
-                 HA Hord HX Hcov Hall Hhtif Hcp). }
+      iSplitR; [iPureIntro; exact Hexpb|].
+      iSplitR; [iPureIntro; intros bf; exact (Hgof bf (Hexpb bf))|].
+      iSplitR; [iPureIntro; exact Hexecp|].
       iFrame "Hri Hwand". iLeft. iFrame "Hlog Hlat". iPureIntro. exact Hro.
-    - iDestruct "Hw" as (lw' kcls) "(%Hupd & %Hfam & Hlog & Hlat)".
+    - iDestruct "Hw" as (lw') "(%Hupd & %Hfam & Hlog & Hlat)".
       destruct Hfam as (wtr & Hfam).
-      assert (Hexp : wwalk_exports tid σ root_ppn va pa p2 p1
-                       (mk_pte ppn (kperm_flags pc)) lw).
-      { rewrite /wwalk_exports.
+      assert (Hexpb : forall bf : bool,
+                wwalk_exports tid (wset_reg σ (R_bool minstret_increment) bf)
+                  root_ppn va pa p2 p1 (mk_pte ppn (kperm_flags pc)) lw).
+      { intros bf. rewrite /wwalk_exports.
         split_and!; [exact Hvar|exact Hwlog|exact Hs2|exact Hs1|exact Hs0
                     |exact Hpins|exact Hd2|exact Hd1|exact Hcoll| |].
         - right. exists lw', wtr. split; [exact Hupd|].
           intros av dv Hle.
-          destruct (Hfam av dv Hle) as (sg' & es & H1 & H2 & H3 & _ & H5).
+          destruct (Hfam av dv Hle bf) as (sg' & es & H1 & H2 & H3 & _ & H5).
           exists sg', es. split_and!; [exact H1|exact H2|exact H3|exact H5].
         - intros av dv sg' es Hle Hrun r Hr.
-          destruct (Hfam av dv Hle) as (sgx & esx & H1 & _ & _ & H4 & _).
+          destruct (Hfam av dv Hle bf) as (sgx & esx & H1 & _ & _ & H4 & _).
           rewrite Hrun in H1.
           assert (Hsg : sgx = sg') by congruence. subst sgx.
           exact (H4 r Hr). }
-      iModIntro. iExists p2, p1, lw.
+      iModIntro. iExists p2, p1, lw, region.
       iSplitR; [iPureIntro; exact Hvar|].
       iSplitR; [iPureIntro; exact (conj Hs2 (conj Hs1 Hs0))|].
       iSplitR; [iPureIntro; exact Hpins|].
       iSplitR; [iPureIntro; exact (conj Hd2 Hd1)|].
       iSplitR; [iPureIntro; exact Hcoll|].
       iSplitR; [iPureIntro; exact Hnv|].
-      iSplitR.
-      { iPureIntro.
-        exact (wfetch_peel_of_regs tid σ root_ppn va pa p2 p1 _ lw w
-                 Hpcv Halv Hexp Halp Hram Hram3 Haccp HW0 Hpin Hbytes
-                 HA Hord HX Hcov Hall Hhtif Hcp). }
-      iFrame "Hri Hwand". iRight. iExists lw', kcls. iFrame "Hlog Hlat".
+      iSplitR; [iPureIntro; exact Hexpb|].
+      iSplitR; [iPureIntro; intros bf; exact (Hgof bf (Hexpb bf))|].
+      iSplitR; [iPureIntro; exact Hexecp|].
+      iFrame "Hri Hwand". iRight. iExists lw'. iFrame "Hlog Hlat".
       iSplitR; [iPureIntro; exact Hupd|].
       iPureIntro. exists wtr. exact Hfam.
   Qed.
