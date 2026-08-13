@@ -216,6 +216,162 @@ Section ProofDirlookupMain.
             (UPTD (mword_of_int 0) (mword_of_int 0) ∅ ∅)
             [] [] (mword_of_int 0) [].
 
+  (* ---- THE BLOCK STATEMENTS, NAMED (claude-notes/optimization.md, RULE
+     ONE) -- [Htail]/[Hloop]/[Hlatch] are each stated below as a
+     [wp_next]-wrapped [iAssert] whose continuation body is tens of lines
+     of ∀/wands; spelled out in place, EVERY proofmode step of the walk
+     re-embeds that whole statement in the proof term (the cost is
+     |Δ| times the number of steps).  Naming the inner body turns each
+     into a constant applied to its arguments in the context.
+
+     They are TRANSPARENT ON PURPOSE and only the part AFTER
+     [fun CIDx : CpuId =>] is named: the [wp_next]/[□]/[∀ fuel] at each
+     use site stay syntactically visible, which is what lets
+     [iSpecialize]/[iApply] unify through them without an extra
+     [iEval (rewrite /...)], and what lets [iInduction fuel] leave
+     [dl_loop_body]'s own induction hypothesis folded. *)
+
+  Definition dl_tail_body
+      (m : regfile) (sp0 pj ret_tgt : mword 64) (K : nat) (b : bool)
+      (CIDt : CpuId) : iProp Σ :=
+    (∀ (Mt : regfile) (uu10 : mword 64) (dnew : nat -> bv 8),
+       ⌜dlk_tregs m sp0 Mt⌝ -∗
+       sie_cap_gpr Mt (K - 12)%nat b pj -∗
+       pc_is (mword_of_int (DL + 0x96)) -∗
+       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
+       (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
+       (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
+       (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
+       (pa_stk sp0 10) ↦₈ uu10 -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ dnew jj) -∗
+       wp_next (CID0 := CIDt) true pj (fun CIDf : CpuId =>
+         ∀ mf : regfile,
+           ⌜callee_saved m mf⌝ -∗
+           ⌜mf !!! Regidx Ra0 = (Mt !!! Regidx Ra0 : mword 64)⌝ -∗
+           sie_cap_gpr mf K b pj -∗
+           pc_is ret_tgt -∗
+           WP (Loop : expr riscv_lang)) -∗
+       WP (Loop : expr riscv_lang))%I.
+
+  (* the FOUND/EXHAUSTED continuation both [dl_loop_body] and
+     [dl_latch_body] hand [wp_next] at their tail: identical in both, and
+     what "Hqc" is bound to for the whole span of either body's own proof
+     (readi, namecmp, iget...), so it is worth folding on its own even
+     though it is not itself an [iAssert] site. *)
+  Definition dl_found_cont
+      (nrec : nat) (dn : dinode) (data : nat -> list (bv 8)) (s : list (bv 8))
+      (m : regfile) (ip nb pf pj ret_tgt : mword 64) (K : nat)
+      (b eb hasp : bool) (C : iProp Σ) (dq dqd dqn : dfrac)
+      (dev pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
+      (gfs : fs_names) (bm : blkmap) (CIDc : CpuId) : iProp Σ :=
+    (∀ (mf : regfile) (found : bool) (kk : nat) (kslot : nat) (q : Qp),
+       ⌜callee_saved m mf⌝ -∗
+       sie_cap_gpr mf K b pj -∗
+       cpu_own 0 eb pj C b -∗
+       pc_is ret_tgt -∗
+       i_dev ip ↦₄{dqd} dev -∗
+       inode_meta ip dn -∗
+       inode_map gfs ip bm -∗
+       inode_blocks gfs bm data -∗
+       ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ{dqn} fn ii) -∗
+       p_pid pj ↦₄{dq} pidv -∗
+       bslot bn -∗
+       (if found
+        then ⌜dir_first data nrec s = Some kk
+              /\ (kslot < NINODE)%nat
+              /\ mf !!! Regidx Ra0 = ientry kslot⌝ ∗
+             inode_ref kslot q dev
+               (zero_extend' 32 (dir_inum data kk : mword 16) : mword 32) ∗
+             (if hasp
+              then pf ↦₄ (mword_of_int (Z.of_nat (16 * kk)) : mword 32)
+              else emp)
+        else ⌜dir_first data nrec s = None
+              /\ mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)⌝ ∗
+             iref_slot ∗
+             (if hasp then pf ↦₄ pofv else emp)) -∗
+       WP (Loop : expr riscv_lang))%I.
+
+  Definition dl_loop_body
+      (nrec : nat) (dn : dinode) (data : nat -> list (bv 8)) (s : list (bv 8))
+      (m : regfile) (sp0 ip nb pf pj ret_tgt : mword 64) (K : nat)
+      (b eb hasp : bool) (C : iProp Σ) (dq dqd dqn : dfrac)
+      (dev pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
+      (gfs : fs_names) (bm : blkmap) (fuel : nat) (CIDl : CpuId) : iProp Σ :=
+    (∀ (i : nat) (Ml : regfile) (dol : nat -> bv 8) (mt10 : mword 64),
+       ⌜(S nrec - i <= fuel)%nat⌝ -∗
+       ⌜Z.of_nat i * 16 < bv_unsigned (di_size dn)⌝ -∗
+       ⌜dir_first data i s = None⌝ -∗
+       ⌜dlk_regs m sp0 ip nb pf (16 * i) Ml⌝ -∗
+       sie_cap_gpr Ml (K - 12)%nat b pj -∗
+       cpu_own 0 eb pj C b -∗
+       pc_is (mword_of_int (DL + 0x5c)) -∗
+       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
+       (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
+       (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
+       (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
+       (pa_stk sp0 10) ↦₈ mt10 -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ dol jj) -∗
+       i_dev ip ↦₄{dqd} dev -∗
+       inode_meta ip dn -∗
+       inode_map gfs ip bm -∗
+       inode_blocks gfs bm data -∗
+       ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ{dqn} fn ii) -∗
+       (if hasp then pf ↦₄ pofv else emp) -∗
+       p_pid pj ↦₄{dq} pidv -∗
+       bslot bn -∗
+       iref_slot -∗
+       wp_next (CID0 := CID) true pj (fun (CIDc : CpuId) =>
+         dl_found_cont nrec dn data s m ip nb pf pj ret_tgt K b eb hasp C
+           dq dqd dqn dev pofv pidv fn bn gfs bm CIDc) -∗
+       WP (Loop : expr riscv_lang))%I.
+
+  Definition dl_latch_body
+      (nrec : nat) (dn : dinode) (data : nat -> list (bv 8)) (s : list (bv 8))
+      (m : regfile) (sp0 ip nb pf pj ret_tgt : mword 64) (K : nat)
+      (b eb hasp : bool) (C : iProp Σ) (dq dqd dqn : dfrac)
+      (dev pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
+      (gfs : fs_names) (bm : blkmap) (i : nat) (CIDp : CpuId) : iProp Σ :=
+    (∀ (Mp : regfile) (dol' : nat -> bv 8) (mt10' : mword 64),
+       ⌜dlk_regs m sp0 ip nb pf (16 * i) Mp⌝ -∗
+       ⌜dir_first data (S i) s = None⌝ -∗
+       sie_cap_gpr Mp (K - 12)%nat b pj -∗
+       cpu_own 0 eb pj C b -∗
+       pc_is (mword_of_int (DL + 0x52)) -∗
+       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
+       (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
+       (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
+       (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
+       (pa_stk sp0 10) ↦₈ mt10' -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ dol' jj) -∗
+       i_dev ip ↦₄{dqd} dev -∗
+       inode_meta ip dn -∗
+       inode_map gfs ip bm -∗
+       inode_blocks gfs bm data -∗
+       ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ{dqn} fn ii) -∗
+       (if hasp then pf ↦₄ pofv else emp) -∗
+       p_pid pj ↦₄{dq} pidv -∗
+       bslot bn -∗
+       iref_slot -∗
+       wp_next (CID0 := CID) true pj (fun (CIDc : CpuId) =>
+         dl_found_cont nrec dn data s m ip nb pf pj ret_tgt K b eb hasp C
+           dq dqd dqn dev pofv pidv fn bn gfs bm CIDc) -∗
+       WP (Loop : expr riscv_lang))%I.
+
   Lemma wp_dirlookup_sconf
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -669,29 +825,7 @@ Section ProofDirlookupMain.
     (* ================================================================= *)
     assert (Hcsra : is_cs_idx Rra = false) by (vm_compute; reflexivity).
     iAssert (□ wp_next (CID0 := CID) true pj (fun CIDt : CpuId =>
-               ∀ (Mt : regfile) (uu10 : mword 64) (dnew : nat -> bv 8),
-                 ⌜dlk_tregs m sp0 Mt⌝ -∗
-                 sie_cap_gpr Mt (K - 12)%nat b pj -∗
-                 pc_is (mword_of_int (DL + 0x96)) -∗
-                 (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-                 (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-                 (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-                 (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-                 (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-                 (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
-                 (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-                 (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-                 (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
-                 (pa_stk sp0 10) ↦₈ uu10 -∗
-                 ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ dnew jj) -∗
-                 wp_next (CID0 := CIDt) true pj (fun CIDf : CpuId =>
-                   ∀ mf : regfile,
-                     ⌜callee_saved m mf⌝ -∗
-                     ⌜mf !!! Regidx Ra0 = (Mt !!! Regidx Ra0 : mword 64)⌝ -∗
-                     sie_cap_gpr mf K b pj -∗
-                     pc_is ret_tgt -∗
-                     WP (Loop : expr riscv_lang)) -∗
-                 WP (Loop : expr riscv_lang)))%I with "[]" as "#Htail".
+               dl_tail_body m sp0 pj ret_tgt K b CIDt))%I with "[]" as "#Htail".
     { iModIntro.
       iIntros (CIDt Hst Mt uu10 dnew) "%HTr Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7
                                       Hb8 Hb9 Hb10 Hde Hqc".
@@ -1039,65 +1173,8 @@ Section ProofDirlookupMain.
       (* =============================================================== *)
       iAssert (∀ fuel : nat,
         wp_next (CID0 := CID) true pj (fun CIDl : CpuId =>
-          ∀ (i : nat) (Ml : regfile) (dol : nat -> bv 8) (mt10 : mword 64),
-            ⌜(S nrec - i <= fuel)%nat⌝ -∗
-            (* §15(b): THE LOOP TEST, not [i < nrec].  Without granularity
-               the two part ways at [i = nrec], where the code takes one
-               more turn and its readi comes back SHORT. *)
-            ⌜Z.of_nat i * 16 < bv_unsigned (di_size dn)⌝ -∗
-            ⌜dir_first data i s = None⌝ -∗
-            ⌜dlk_regs m sp0 ip nb pf (16 * i) Ml⌝ -∗
-            sie_cap_gpr Ml (K - 12)%nat b pj -∗
-            cpu_own 0 eb pj C b -∗
-            pc_is (mword_of_int (DL + 0x5c)) -∗
-            (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-            (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-            (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-            (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-            (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-            (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
-            (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-            (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-            (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
-            (pa_stk sp0 10) ↦₈ mt10 -∗
-            ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ dol jj) -∗
-            i_dev ip ↦₄{dqd} dev -∗
-            inode_meta ip dn -∗
-            inode_map gfs ip bm -∗
-            inode_blocks gfs bm data -∗
-            ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ{dqn} fn ii) -∗
-            (if hasp then pf ↦₄ pofv else emp) -∗
-            p_pid pj ↦₄{dq} pidv -∗
-            bslot bn -∗
-            iref_slot -∗
-            wp_next (CID0 := CID) true pj (fun (CIDc : CpuId) =>
-              ∀ (mf : regfile) (found : bool) (kk : nat) (kslot : nat) (q : Qp),
-                ⌜callee_saved m mf⌝ -∗
-                sie_cap_gpr mf K b pj -∗
-                cpu_own 0 eb pj C b -∗
-                pc_is ret_tgt -∗
-                i_dev ip ↦₄{dqd} dev -∗
-                inode_meta ip dn -∗
-                inode_map gfs ip bm -∗
-                inode_blocks gfs bm data -∗
-                ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ{dqn} fn ii) -∗
-                p_pid pj ↦₄{dq} pidv -∗
-                bslot bn -∗
-                (if found
-                 then ⌜dir_first data nrec s = Some kk
-                       /\ (kslot < NINODE)%nat
-                       /\ mf !!! Regidx Ra0 = ientry kslot⌝ ∗
-                      inode_ref kslot q dev
-                        (zero_extend' 32 (dir_inum data kk : mword 16) : mword 32) ∗
-                      (if hasp
-                       then pf ↦₄ (mword_of_int (Z.of_nat (16 * kk)) : mword 32)
-                       else emp)
-                 else ⌜dir_first data nrec s = None
-                       /\ mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)⌝ ∗
-                      iref_slot ∗
-                      (if hasp then pf ↦₄ pofv else emp)) -∗
-                WP (Loop : expr riscv_lang)) -∗
-            WP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
+          dl_loop_body nrec dn data s m sp0 ip nb pf pj ret_tgt K b eb hasp C
+            dq dqd dqn dev pofv pidv fn bn gfs bm fuel CIDl))%I with "[]" as "Hloop".
       { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
         { iIntros (CIDl Hsl i Ml dol mt10)
             "%Hfuel %Hilt16 %Hnone %Hregs Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7
@@ -1118,60 +1195,9 @@ Section ProofDirlookupMain.
         assert (Hoffs : Z.of_nat (16 * S i) = Z.of_nat (16 * i) + 16) by lia.
         (* ------------- THE LATCH at +0x52 (both misses land here) ------- *)
         iAssert (wp_next (CID0 := CIDl) true pj (fun CIDp : CpuId =>
-                   ∀ (Mp : regfile) (dol' : nat -> bv 8) (mt10' : mword 64),
-                     ⌜dlk_regs m sp0 ip nb pf (16 * i) Mp⌝ -∗
-                     ⌜dir_first data (S i) s = None⌝ -∗
-                     sie_cap_gpr Mp (K - 12)%nat b pj -∗
-                     cpu_own 0 eb pj C b -∗
-                     pc_is (mword_of_int (DL + 0x52)) -∗
-                     (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-                     (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-                     (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-                     (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-                     (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-                     (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
-                     (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-                     (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-                     (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
-                     (pa_stk sp0 10) ↦₈ mt10' -∗
-                     ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ dol' jj) -∗
-                     i_dev ip ↦₄{dqd} dev -∗
-                     inode_meta ip dn -∗
-                     inode_map gfs ip bm -∗
-                     inode_blocks gfs bm data -∗
-                     ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ{dqn} fn ii) -∗
-                     (if hasp then pf ↦₄ pofv else emp) -∗
-                     p_pid pj ↦₄{dq} pidv -∗
-                     bslot bn -∗
-                     iref_slot -∗
-                     wp_next (CID0 := CID) true pj (fun (CIDc : CpuId) =>
-                       ∀ (mf : regfile) (found : bool) (kk : nat) (kslot : nat) (q : Qp),
-                         ⌜callee_saved m mf⌝ -∗
-                         sie_cap_gpr mf K b pj -∗
-                         cpu_own 0 eb pj C b -∗
-                         pc_is ret_tgt -∗
-                         i_dev ip ↦₄{dqd} dev -∗
-                         inode_meta ip dn -∗
-                         inode_map gfs ip bm -∗
-                         inode_blocks gfs bm data -∗
-                         ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ{dqn} fn ii) -∗
-                         p_pid pj ↦₄{dq} pidv -∗
-                         bslot bn -∗
-                         (if found
-                          then ⌜dir_first data nrec s = Some kk
-                                /\ (kslot < NINODE)%nat
-                                /\ mf !!! Regidx Ra0 = ientry kslot⌝ ∗
-                               inode_ref kslot q dev
-                                 (zero_extend' 32 (dir_inum data kk : mword 16) : mword 32) ∗
-                               (if hasp
-                                then pf ↦₄ (mword_of_int (Z.of_nat (16 * kk)) : mword 32)
-                                else emp)
-                          else ⌜dir_first data nrec s = None
-                                /\ mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)⌝ ∗
-                               iref_slot ∗
-                               (if hasp then pf ↦₄ pofv else emp)) -∗
-                         WP (Loop : expr riscv_lang)) -∗
-                     WP (Loop : expr riscv_lang)))%I with "[]" as "Hlatch".
+                   dl_latch_body nrec dn data s m sp0 ip nb pf pj ret_tgt K b
+                     eb hasp C dq dqd dqn dev pofv pidv fn bn gfs bm i CIDp))%I
+          with "[]" as "Hlatch".
         { iIntros (CIDp Hsp Mp dol' mt10')
             "%Hpregs %Hnone2 Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9
              Hb10 Hde Hidev Hmeta Hmap Hblocks Hnm Hpoff Hppid Hbslot Hislot Hqc".
