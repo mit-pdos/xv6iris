@@ -128,8 +128,64 @@ discharge it).
   `main_premises ∧ (Hcq ∧ Horc ∧ Hseip) ∧ cone_liftable` quantified
   over CANONICAL-CLASS bundles (retag precomposition), with group-3
   facts still `∀ b` hypotheses until stage C.
-- **C** — the shape-typing sweep discharging
-  `∀ b, sail_shaped/sail_live (riscv_step b)` (retires seam (6)).
+- **C1 (LANDED)** — `WeakShape.v`: the compositional kit.  `gwalk`
+  unifies `sail_shaped`/`amo_tail` as ONE window-indexed walk (one
+  lemma per combinator, not two); `glive` indexed by ExtraOutcome
+  fatality; `gquiet` crosses exclusive windows at binds
+  (`gwalk (Some _) (Ret _) = False` forbids carrying a window into a
+  continuation).  Calibration: 1–3 s per generated function with
+  `shape_solve`; the monolithic route measured (347 s, one unlocalised
+  stuck goal) and rejected.  Call graph: 358 monadic defs reachable
+  from `try_step`, 2 touching memory, 0 `ChooseReal`.
+
+## FINDINGS (2026-08-13, C1 — machine-checked): BOTH stage-C goals are
+## FALSE as stated, and the LTS has an exclusive-window coverage gap
+
+- **(O1)** `∀ b, sail_live (riscv_step b)` is REFUTABLE
+  (`WeakShape.read_ram_not_live`): `sail_live`'s memory arms quantify
+  over every answer INCLUDING the abort `inr ab`, which `read_ram`
+  maps to `exit tt` = `GenericFail`; `sail_mstep` only ever supplies
+  `inl (w, None)` / `inl None`.  Fourth finding of the
+  over-quantified-∀ genre.  FIX: narrow `sail_live`'s (and, for
+  symmetry, `sail_shaped`'s) MemRead/MemWrite arms to the
+  LTS-supplied answers.
+- **(O2)** `∀ b, sail_shaped (riscv_step b)` is REFUTABLE: `amo_tail`
+  demands a conditional write before `Ret`, but `execute_LOADRES`
+  (bare `lr`), `execute_AMO`'s fault/mismatch arms and
+  `update_and_write_pte`'s error arms abandon the window.  The LTS is
+  also STUCK there (`sail_mstep` steps an `ak_latest` read only by
+  fusion) — hardware executes bare `lr` and failing `sc`, so this is a
+  MACHINE coverage gap, not just a predicate bug.  FIX (decided):
+  (i) weaken `amo_tail`'s `Ret` arm to allow window abandonment while
+  keeping "any conditional write is same-address/width"; (ii) ADD a
+  bare-exclusive-read arm to `sail_mstep` (pf side only, like the
+  totalization): the read steps as a PLAIN `LLoad` (lat := false —
+  an abandoned reservation read has ordinary load semantics; the
+  machine only GAINS behaviors, the safe direction).  The ⇐
+  reconstruction gains a run-local side condition ("no bare exclusive
+  reads in the block" — TARGET-INDEXED like `dev_ok_blk`, per the
+  recorded lesson), joining the seam family; per-image discharge:
+  kernel AMOs target mapped lock words and do not fault.
+  `tail_complete` takes the bare arm at abandoned windows, restoring
+  totality.
+- **(O3)** liveness is NOT loop-compositional (`untilMT` guards end in
+  `fail`), and ~100 `exit`/`internal_error`/`assert_exp` sites need
+  reachability arguments — but ONLY for the liveness half; `gwalk` is
+  immune (a `GenericFail` continuation is `False → _`).  So expect
+  the `sail_shaped` sweep to be clean and the `sail_live` sweep to
+  carry per-site reachability facts (same checker family as D-M6-8).
+
+- **C2 (next)** — the spec fixes: narrow the predicates per (O1), the
+  `amo_tail` weakening + bare-exclusive-read arm per (O2), adapt
+  `WeakShape`'s `gwalk`/`glive` arms, ripple (WeakSailLTS →
+  WeakSailLTS2 (⇐ side condition) → WeakSailComplete (tail_complete)
+  → WeakSailCone → WeakComposeLang), capstones re-audited at the 5
+  axioms.
+- **C3** — `tools/gen_shape.py` emitting the 358 per-function lemmas
+  in topological order (`Hint Resolve` as the dependency mechanism)
+  + the hand-written override list (memory wrappers, 4 loop sites,
+  exclusive sites, O3's reachability facts) → discharge the two
+  `∀ b` facts and DELETE them from the capstones (retiring seam (6)).
   Start only after B lands and is green.
 
 Keep the tree green per commit; findings in commit messages and here.
