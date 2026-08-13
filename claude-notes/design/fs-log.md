@@ -800,3 +800,33 @@ parent (the namex trio's posts move once).
 | G-3 | crz on SpecIput/SpecIunlockput (+ consumers' FINDING-5 seams) | agent (Opus) |
 | G-4 | the trio reshape: walk_spend (<= the group bitmap unit, membership-conditional) + ity_shot g T_DIR (Blocker B) out of SpecNamex/Namei/Nameiparent; ProofNamex re-thread; CreateBudget's nameiparent row | agent (Opus) |
 | — | D0 relaunch on the corrected staging (the +0xb2 cut, dl_need premise, lhu decision pair, cr_budget_fail_file) | after G-4 gates |
+
+
+### G.9 G-1's stop-report, RATIFIED (2026-08-13) — four corrections to §G.2/G.6
+
+1. **The named alias `log_opSe`** (e0 EXPOSED, non-persistent): log_use_group
+   cannot be stated under the frozen ABI — both hiding latitudes leave e0
+   unnameable at the call site, and the tempting persistent birth-epoch
+   token is UNSOUND by the header's own revocation argument (it would
+   outlive its op and validate a stale logged_at).  Adopted:
+   op_entry := (nat * gset Z * nat); log_opSe exposes e0;
+   log_opS := ∃ e0, log_opSe (arity frozen, every landed caller
+   byte-stable); only G-3's iput threads log_opSe.
+2. **No mono_natG in logG**: riscvGS already carries one
+   (RiscvPtsto.v:316); a second instance is the duplicate-class trap.
+   ln_ep uses the ambient instance with its own gname.
+3. **logged_at needs its own ghost**: ghost_mapG Σ (nat * Z) unit, auth in
+   log_res, invariant (E,b) ∈ dom -> b ∈ LB; stale rows unconstrained =
+   the self-invalidation.  logΣ has no external consumers, so growing it
+   is boot/adequacy-free.
+4. **The bump site is ProofEndOp's commit RE-DEPOSIT** (:1512, lock
+   re-held, om = ∅ already proved on that line with the soundness comment
+   verbatim), NOT the lh-clearing step (which runs with the batch checked
+   out, outside the lock).
+
+Honest sizing: 11 log_res construction/destruction sites across
+ProofBeginOp/ProofEndOp/ProofLogWrite/ProofInitlog is the real G-1;
+LogInv is the small half.  op_entry's re-association makes e.1/e.2
+projections fail loudly (the good case).  log_names gains a field: the
+two Spec-file DUMMIES (SpecFileclose:202, SpecFilewrite:298, numeric
+MkLogNames constants) are one-token edits, approved as non-contract.
