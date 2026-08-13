@@ -1844,6 +1844,160 @@ Proof.
   by rewrite (msg_writesb_wwrite_ne tid _ pa n v a Hne).
 Qed.
 
+(** WHICH MESSAGES, not just which bytes moved: the LOG-IDENTITY export.
+
+    [latest_ts]-preservation is not enough for a consumer that has to
+    RE-ESTABLISH A LOG AUTHORITY at the successor.  The WP rule's continuation
+    owns [wlog_auth (wm_log σ)] and must produce [wlog_auth (wm_log σ')], and
+    the flat memory does NOT force the tail: a same-value rewrite appends a
+    message and moves no byte, so [wflat_st σ' = write_bytes …] leaves the log
+    unpinned.  [WeakInterp.wrun_log_app] names the tail existentially, which
+    is likewise not enough — the authority has to be updated with the EXACT
+    list.  So the traversal exports the list itself, as a function of the
+    trace it already reports.
+
+    ONE SUBTLETY DECIDES THE PROJECTION'S SHAPE.  The class [wwrite_post]
+    stamps on a message is [wm_class_of ak (wm_ws s)], which reads the
+    WRITER'S OWN STATE — the pending-release flag [w_relp] — and not only the
+    access kind the trace event records.  The EVENT ALONE THEREFORE DOES NOT
+    DETERMINE THE CLASS.  What does is the event PLUS that one boolean, and
+    the boolean is itself a function of the trace prefix: [w_relp] is SET by a
+    [pw ∧ sw] fence, CLEARED by the agent's next (non-empty) store, and left
+    alone by loads — exactly the three effects a [weff] records.  So
+    [wtrace_msgs] threads it, and the elims report the identity at the flag of
+    the state the run started in.  Nothing is existentially quantified.
+
+    (The class IS event-determined on the one shape this bridge's consumer
+    cares about: an exclusive / atomic-rmw write is [WCexcl] whatever the flag
+    says — [wm_class_rp_latest] — which is the walk's CAS write-back.) *)
+
+(** The class, as a function of the access kind and the flag. *)
+Definition wm_class_rp (ak : akinfo) (rp : bool) : wm_class :=
+  if ak_latest ak then WCexcl
+  else if (rp || ak_sync ak)%bool then WCrel else WCplain.
+
+Lemma wm_class_of_rp (ak : akinfo) (ws : wstate) :
+  wm_class_of ak ws = wm_class_rp ak (w_relp ws).
+Proof. reflexivity. Qed.
+
+Lemma wm_class_rp_latest (ak : akinfo) (rp : bool) :
+  ak_latest ak = true -> wm_class_rp ak rp = WCexcl.
+Proof. rewrite /wm_class_rp => -> //. Qed.
+
+(** The flag's evolution, effect by effect.  A fence with [pw ∧ sw] arms it; a
+    store of at least one byte clears it (the first byte does, and the rest see
+    it already clear — [store_post_bytes]'s fold); a load never moves it. *)
+Definition wrelp_bar (b : barrier_kind) (rp : bool) : bool :=
+  match b with
+  | Barrier_RISCV_rw_rw | Barrier_RISCV_rw_w | Barrier_RISCV_w_w
+  | Barrier_RISCV_w_rw  | Barrier_RISCV_tso => true
+  | _ => rp
+  end.
+
+Definition wrelp_write (n : N) (rp : bool) : bool :=
+  match N.to_nat n with O => rp | S _ => false end.
+
+Lemma barrier_post_relp (ws : wstate) (b : barrier_kind) :
+  w_relp (barrier_post ws b) = wrelp_bar b (w_relp ws).
+Proof. by destruct b. Qed.
+
+Lemma foldl_load_post_at_relp (aq : bool) (vpre : nat)
+    (ats : list (Z * nat)) (ws : wstate) :
+  w_relp (foldl (fun w at_ => load_post_at w aq vpre at_.1 at_.2) ws ats)
+  = w_relp ws.
+Proof.
+  revert ws. induction ats as [|a ats IH]; intros ws; [reflexivity|].
+  simpl. by rewrite IH.
+Qed.
+
+Lemma load_post_bytes_relp (ws : wstate) (aq : bool) (ats : list (Z * nat)) :
+  w_relp (load_post_bytes ws aq ats) = w_relp ws.
+Proof. apply foldl_load_post_at_relp. Qed.
+
+Lemma wset_ws_relp (s : wmstate) (ws : wstate) :
+  w_relp (wm_ws (wset_ws s ws)) = w_relp ws.
+Proof. reflexivity. Qed.
+
+Lemma wread_post_relp (s : wmstate) (ak : akinfo) (pa : Arch.pa)
+    (ts : list nat) :
+  w_relp (wm_ws (wread_post s ak pa ts)) = w_relp (wm_ws s).
+Proof.
+  rewrite /wread_post. destruct (ak_coh ak); [reflexivity|].
+  rewrite wset_ws_relp /load_post_run load_post_bytes_relp //.
+Qed.
+
+Lemma store_post_bytes_relp (ws : wstate) (rl : bool) (as_ : list Z) (t : nat) :
+  w_relp (store_post_bytes ws rl as_ t)
+  = match as_ with [] => w_relp ws | _ :: _ => false end.
+Proof.
+  rewrite /store_post_bytes. revert ws.
+  induction as_ as [|a as_ IH]; intros ws; [reflexivity|].
+  simpl. rewrite IH. by destruct as_.
+Qed.
+
+Lemma wwrite_post_relp (tid : option nat) (s : wmstate) (ak : akinfo)
+    (pa : Arch.pa) (n : N) (v : bv (8 * n)) :
+  w_relp (wm_ws (wwrite_post tid s ak pa n v))
+  = wrelp_write n (w_relp (wm_ws s)).
+Proof.
+  rewrite /wwrite_post /= /store_post_run store_post_bytes_relp /wrelp_write.
+  by destruct (N.to_nat n).
+Qed.
+
+(** THE PROJECTION: the messages a run whose trace is [es] appended, in order.
+    [rp] is the pending-release flag of the state the run starts in. *)
+Fixpoint wtrace_msgs (tid : option nat) (rp : bool) (es : list weff)
+    : list wmsg :=
+  match es with
+  | [] => []
+  | WEread _ _ _ :: es' => wtrace_msgs tid rp es'
+  | WEbar b :: es' => wtrace_msgs tid (wrelp_bar b rp) es'
+  | WEwrite ak pa n v :: es' =>
+      wwrite_msg tid (wm_class_rp ak rp) pa n v
+        :: wtrace_msgs tid (wrelp_write n rp) es'
+  end.
+
+(** A write-free trace appends nothing — the read-only arms, in the shape a
+    consumer that owns [wtrace_wonly]-style information states it.  With
+    [app_nil_r] this is "the log did not move at all". *)
+Lemma wtrace_msgs_reads_nil (tid : option nat) (rp : bool) (es : list weff) :
+  (forall (ak : akinfo) (pa : Arch.pa) (n : N) (v : bv (8 * n)),
+     WEwrite ak pa n v ∈ es -> False) ->
+  wtrace_msgs tid rp es = [].
+Proof.
+  revert rp. induction es as [|e es IH]; intros rp Hno; [reflexivity|].
+  destruct e as [ak pa n|ak pa n v|b]; simpl.
+  - apply IH. intros ak' pa' n' v' Hin.
+    apply (Hno ak' pa' n' v'), elem_of_cons. by right.
+  - destruct (Hno ak pa n v). apply elem_of_cons. by left.
+  - apply IH. intros ak' pa' n' v' Hin.
+    apply (Hno ak' pa' n' v'), elem_of_cons. by right.
+Qed.
+
+(** ... and a trace whose ONLY write is a trailing EXCLUSIVE one appends
+    exactly that one message, at a class the event determines
+    ([wm_class_rp_latest]).  This is the write-back shapes' arm: it is what
+    lets a leaf match the projection against the absorption theorem's
+    appended-log arm, whose existential class the theorem's own proof
+    instantiates at [WCexcl]. *)
+Lemma wtrace_msgs_snoc_write (tid : option nat) (rp : bool) (rs : list weff)
+    (ak : akinfo) (pa : Arch.pa) (n : N) (v : bv (8 * n)) :
+  (forall (ak' : akinfo) (pa' : Arch.pa) (n' : N) (v' : bv (8 * n')),
+     WEwrite ak' pa' n' v' ∈ rs -> False) ->
+  ak_latest ak = true ->
+  wtrace_msgs tid rp (rs ++ [WEwrite ak pa n v])
+  = [wwrite_msg tid WCexcl pa n v].
+Proof.
+  revert rp. induction rs as [|e rs IH]; intros rp Hno Hak; simpl.
+  - by rewrite (wm_class_rp_latest _ _ Hak).
+  - destruct e as [ak' pa' n'|ak' pa' n' v'|b].
+    + apply IH; [|exact Hak]. intros ak2 pa2 n2 v2 Hin.
+      apply (Hno ak2 pa2 n2 v2), elem_of_cons. by right.
+    + destruct (Hno ak' pa' n' v'). apply elem_of_cons. by left.
+    + apply IH; [|exact Hak]. intros ak2 pa2 n2 v2 Hin.
+      apply (Hno ak2 pa2 n2 v2), elem_of_cons. by right.
+Qed.
+
 (** *** 10a. The core, at a FIXED [w].
 
     PHASE-GENERIC: [trace_off_win] refutes the peel's racy arm outright (an
@@ -1869,14 +2023,16 @@ Lemma wrun_exec_stale_elim_off (tid : option nat) (ra : Arch.pa) (rn : N)
        wtrace_wonly (fun (pa : Arch.pa) (n : N) =>
                        forall j : nat, (j < N.to_nat n)%nat -> pa_add pa j <> a)
          es ->
-       latest_ts (wm_log s') (pa_z a) = latest_ts (wm_log s) (pa_z a)).
+       latest_ts (wm_log s') (pa_z a) = latest_ts (wm_log s) (pa_z a)) /\
+    wm_log s' = (wm_log s ++ wtrace_msgs tid (w_relp (wm_ws s)) es)%list.
 Proof.
   intros Hracc Hrn Hrk.
   induction m as [y|T oc k IH];
     intros b s x0 t0 es Hex0 Hoff Hok Hwf x s' Hrun.
   - simpl in Hex0 |- *. injection Hex0 as <- <- <-.
     destruct Hrun as [-> ->].
-    split_and!; [reflexivity|exact Hwf|intros a _; reflexivity].
+    split_and!; [reflexivity|exact Hwf|intros a _; reflexivity
+                |simpl; by rewrite List.app_nil_r].
   - destruct oc; simpl in Hex0, Hok, Hrun |- *; try discriminate;
       try (exact (IH _ b s x0 t0 es Hex0 Hoff Hok Hwf x s' Hrun));
       try (exfalso; exact Hrun);
@@ -1926,11 +2082,12 @@ Proof.
                        ltac:(rewrite wflat_st_read_post; exact Hee0)
                        (trace_off_win_tail _ _ _ _ Hoff) (Hk v Hrbw)
                        (wlog_wf_read_post _ _ _ _ Hwf) x s' Hrun)
-             as (Hexf & Hwf' & Hlt').
+             as (Hexf & Hwf' & Hlt' & Hlog').
            rewrite wflat_st_read_post Hee0 in Hexf. injection Hexf as <- <-.
-           split_and!; [reflexivity|exact Hwf'|].
-           intros a Hwo. rewrite (Hlt' a (wtrace_wonly_tail _ _ _ Hwo)).
-           by rewrite wread_post_log.
+           split_and!; [reflexivity|exact Hwf'| |].
+           { intros a Hwo. rewrite (Hlt' a (wtrace_wonly_tail _ _ _ Hwo)).
+             by rewrite wread_post_log. }
+           by rewrite Hlog' wread_post_log wread_post_relp.
         -- (* the racy arm is REFUTED by [trace_off_win] *)
            exfalso. subst n.
            destruct (trace_off_win_head ra rn _ _ rn es1 Hoff
@@ -1955,21 +2112,25 @@ Proof.
                     ltac:(rewrite wflat_st_write_post; exact Hee0)
                     (trace_off_win_tail _ _ _ _ Hoff) Hok
                     (wflat_write_wf _ _ _ _ _ _ Hwf Hacc) x s' Hrun)
-          as (Hexf & Hwf' & Hlt').
+          as (Hexf & Hwf' & Hlt' & Hlog').
         rewrite wflat_st_write_post Hee0 in Hexf. injection Hexf as <- <-.
-        split_and!; [reflexivity|exact Hwf'|].
-        intros a Hwo. rewrite (Hlt' a (wtrace_wonly_tail _ _ _ Hwo)).
-        apply latest_ts_write_post_ne. exact (wtrace_wonly_head _ _ _ _ _ _ Hwo).
+        split_and!; [reflexivity|exact Hwf'| |].
+        { intros a Hwo. rewrite (Hlt' a (wtrace_wonly_tail _ _ _ Hwo)).
+          apply latest_ts_write_post_ne.
+          exact (wtrace_wonly_head _ _ _ _ _ _ Hwo). }
+        by rewrite Hlog' wwrite_post_log wwrite_post_relp -app_assoc.
     + (* Barrier *)
       destruct (exec_stale ra rn w (k tt) (wflat_st s))
         as [[[x1 t1] es1]|] eqn:Hee0; [|discriminate].
       injection Hex0 as <- <- <-.
       destruct (IH tt b (wset_ws s (barrier_post (wm_ws s) b0)) x1 t1 es1 Hee0
                   (trace_off_win_tail _ _ _ _ Hoff)
-                  Hok Hwf x s' Hrun) as (Hexf & Hwf' & Hlt').
+                  Hok Hwf x s' Hrun) as (Hexf & Hwf' & Hlt' & Hlog').
       rewrite Hee0 in Hexf. injection Hexf as <- <-.
-      split_and!; [reflexivity|exact Hwf'|].
-      intros a Hwo. rewrite (Hlt' a (wtrace_wonly_tail _ _ _ Hwo)). reflexivity.
+      split_and!; [reflexivity|exact Hwf'| |].
+      { intros a Hwo. rewrite (Hlt' a (wtrace_wonly_tail _ _ _ Hwo)).
+        reflexivity. }
+      by rewrite Hlog' wset_ws_relp barrier_post_relp.
 Qed.
 
 (** *** 10b. The front: the phase-[true] traversal, which CHOOSES the witness.
@@ -2012,7 +2173,8 @@ Lemma wrun_exec_stale_elim_gen (tid : option nat) (ra : Arch.pa) (rn : N)
          wtrace_wonly (fun (pa : Arch.pa) (n : N) =>
                          forall j : nat, (j < N.to_nat n)%nat -> pa_add pa j <> a)
            es ->
-         latest_ts (wm_log s') (pa_z a) = latest_ts (wm_log s) (pa_z a)).
+         latest_ts (wm_log s') (pa_z a) = latest_ts (wm_log s) (pa_z a)) /\
+      wm_log s' = (wm_log s ++ wtrace_msgs tid (w_relp (wm_ws s)) es)%list.
 Proof.
   intros Hracc Hrn Hrk.
   induction m as [y|T oc k IH];
@@ -2026,7 +2188,7 @@ Proof.
                   (wread_bytes_spec _ _ _ _ _ _ Hwcw)) as Hadmc.
     exists wc, []. split_and!;
       [exact Hadmc|exact (HΦ wc Hadmc)|reflexivity|exact Hwf
-      |intros a _; reflexivity].
+      |intros a _; reflexivity|simpl; by rewrite List.app_nil_r].
   - destruct oc; simpl in Hok, Hrun, Hfam |- *;
       try (exact (IH _ s0 s HΦ Hok Himg Hlog Hle Hwf Hrd Hfam x s' Hrun));
       try (exfalso; exact Hrun);
@@ -2102,14 +2264,15 @@ Proof.
                           ltac:(rewrite wread_post_log; exact Hlog)
                           ltac:(etrans; [exact Hle|apply wread_post_ws_le])
                           (wlog_wf_read_post _ _ _ _ Hwf) Hrd Hfam2 x s' Hrun)
-                as (w & es & Hadm & HΦw & Hexw & Hwf' & Hlt').
+                as (w & es & Hadm & HΦw & Hexw & Hwf' & Hlt' & Hlog').
               exists w, (WEread (classify (Interface.ReadReq.access_kind t))
                           (Interface.ReadReq.pa t) n :: es).
-              split_and!; [exact Hadm|exact HΦw| |exact Hwf'|].
+              split_and!; [exact Hadm|exact HΦw| |exact Hwf'| |].
               { rewrite (Hstm w) /=. rewrite wflat_st_read_post in Hexw.
                 rewrite Hexw. reflexivity. }
-              intros a Hwo. rewrite (Hlt' a (wtrace_wonly_tail _ _ _ Hwo)).
-              by rewrite wread_post_log.
+              { intros a Hwo. rewrite (Hlt' a (wtrace_wonly_tail _ _ _ Hwo)).
+                by rewrite wread_post_log. }
+              by rewrite Hlog' wread_post_log wread_post_relp.
            ++ assert (Hdec : racc_disj ra rn (Interface.ReadReq.pa t) n \/
                              ~ racc_disj ra rn (Interface.ReadReq.pa t) n)
                 by (rewrite /racc_disj; lia).
@@ -2148,14 +2311,15 @@ Proof.
                              ltac:(rewrite wread_post_log; exact Hlog)
                              ltac:(etrans; [exact Hle|apply wread_post_ws_le])
                              (wlog_wf_read_post _ _ _ _ Hwf) Hrd Hfam2 x s' Hrun)
-                   as (w & es & Hadm & HΦw & Hexw & Hwf' & Hlt').
+                   as (w & es & Hadm & HΦw & Hexw & Hwf' & Hlt' & Hlog').
                  exists w, (WEread (classify (Interface.ReadReq.access_kind t))
                              (Interface.ReadReq.pa t) n :: es).
-                 split_and!; [exact Hadm|exact HΦw| |exact Hwf'|].
+                 split_and!; [exact Hadm|exact HΦw| |exact Hwf'| |].
                  { rewrite (Hstm w) /=. rewrite wflat_st_read_post in Hexw.
                    rewrite Hexw. reflexivity. }
-                 intros a Hwo. rewrite (Hlt' a (wtrace_wonly_tail _ _ _ Hwo)).
-                 by rewrite wread_post_log.
+                 { intros a Hwo. rewrite (Hlt' a (wtrace_wonly_tail _ _ _ Hwo)).
+                   by rewrite wread_post_log. }
+                 by rewrite Hlog' wread_post_log wread_post_relp.
               ** (* THE WINDOW, taken at the AWAY arm: the peel PINNED it, so
                     the machine read the coherence-latest word — and that word
                     is the witness *)
@@ -2179,17 +2343,18 @@ Proof.
                              ltac:(rewrite wflat_st_read_post; exact Heec)
                              Hoffc (Hk wc Hrbw)
                              (wlog_wf_read_post _ _ _ _ Hwf) x s' Hrun)
-                   as (Hexf & Hwf' & Hlt').
+                   as (Hexf & Hwf' & Hlt' & Hlog').
                  exists wc, (WEread (classify (Interface.ReadReq.access_kind t))
                               ra rn :: esc2).
-                 split_and!; [exact Hadmc|exact HΦc| |exact Hwf'|].
+                 split_and!; [exact Hadmc|exact HΦc| |exact Hwf'| |].
                  { rewrite (read_bytes_stale_win ra rn wc
                               (classify (Interface.ReadReq.access_kind t))
                               (wflat_st s) Hracc Hpk) /=.
                    rewrite wflat_st_read_post in Hexf. rewrite Hexf.
                    reflexivity. }
-                 intros a Hwo. rewrite (Hlt' a (wtrace_wonly_tail _ _ _ Hwo)).
-                 by rewrite wread_post_log.
+                 { intros a Hwo. rewrite (Hlt' a (wtrace_wonly_tail _ _ _ Hwo)).
+                   by rewrite wread_post_log. }
+                 by rewrite Hlog' wread_post_log wread_post_relp.
         -- (* THE RACY READ: the run's own value is the witness *)
            subst n. rewrite Hpa in Hacc, Hk, Hokr, Hrun, Hfam.
            rewrite Hak in Hk, Hokr, Hrun, Hfam. rewrite Hpa Hak.
@@ -2211,13 +2376,14 @@ Proof.
                        ltac:(rewrite wflat_st_read_post; exact Heev)
                        Hoffv (Hk ts v Hrbw HΦv)
                        (wlog_wf_read_post _ _ _ _ Hwf) x s' Hrun)
-             as (Hexf & Hwf' & Hlt').
+             as (Hexf & Hwf' & Hlt' & Hlog').
            exists v, (WEread rak ra rn :: esv2).
-           split_and!; [exact Hadm0|exact HΦv| |exact Hwf'|].
+           split_and!; [exact Hadm0|exact HΦv| |exact Hwf'| |].
            { rewrite (read_bytes_stale_win ra rn v rak (wflat_st s) Hracc Hrk) /=.
              rewrite wflat_st_read_post in Hexf. rewrite Hexf. reflexivity. }
-           intros a Hwo. rewrite (Hlt' a (wtrace_wonly_tail _ _ _ Hwo)).
-           by rewrite wread_post_log.
+           { intros a Hwo. rewrite (Hlt' a (wtrace_wonly_tail _ _ _ Hwo)).
+             by rewrite wread_post_log. }
+           by rewrite Hlog' wread_post_log wread_post_relp.
     + (* MemWrite *)
       destruct (dev_addr _) eqn:Hd.
       * destruct (dev_write _ _ _ _) as [d'|] eqn:Hdw; [|exfalso; exact Hrun].
@@ -2251,11 +2417,14 @@ Proof.
         exists y2, t2, es2. split; [exact Hee1|exact Hst1]. }
       destruct (IH tt s0 (wset_ws s (barrier_post (wm_ws s) b)) HΦ Hok Himg Hlog
                   ltac:(etrans; [exact Hle|apply barrier_post_le]) Hwf Hrd Hfam2
-                  x s' Hrun) as (w & es & Hadm & HΦw & Hexw & Hwf' & Hlt').
+                  x s' Hrun)
+        as (w & es & Hadm & HΦw & Hexw & Hwf' & Hlt' & Hlog').
       exists w, (WEbar b :: es).
-      split_and!; [exact Hadm|exact HΦw| |exact Hwf'|].
+      split_and!; [exact Hadm|exact HΦw| |exact Hwf'| |].
       { rewrite wflat_st_ws in Hexw. rewrite Hexw. reflexivity. }
-      intros a Hwo. rewrite (Hlt' a (wtrace_wonly_tail _ _ _ Hwo)). reflexivity.
+      { intros a Hwo. rewrite (Hlt' a (wtrace_wonly_tail _ _ _ Hwo)).
+        reflexivity. }
+      by rewrite Hlog' wset_ws_relp barrier_post_relp.
 Qed.
 
 (** *** 10c. THE ⇐-BRIDGE, as a consumer states it.
@@ -2269,7 +2438,47 @@ Qed.
     THE FAMILY PREMISE IS THE PRODUCER'S OWN (§5): a consumer that built the
     peel out of a family of [trace_stale] runs — which is the only way to
     build it at a re-touched window — has it already.  It cannot be dropped:
-    see the header of §10. *)
+    see the header of §10.
+
+    THE [_msgs] SUFFIX, and why the plain name survives beside it.  The
+    LOG-IDENTITY conjunct is delivered by [wrun_exec_stale_elim_msgs]; the
+    unsuffixed [wrun_exec_stale_elim] is its five-conjunct view, kept
+    STATEMENT-FOR-STATEMENT as it was because [WkFetchPeel] destructures it
+    positionally ([as (u & es & _ & HΦu & Hexu & Hwf' & Hlt)]), so a sixth
+    conjunct there would silently rebind that file's last name to a
+    conjunction and break its [exact]s.  Nothing is duplicated: the plain form
+    is one [proj] away from the [_msgs] one.  Same for [_const] / [_const_msgs]
+    below.  A later sweep that owns [WkFetchPeel] can widen the two patterns
+    and collapse the pairs. *)
+Lemma wrun_exec_stale_elim_msgs (tid : option nat) (ra : Arch.pa) (rn : N)
+    (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) (W : Prop) {X} (m : M X) :
+  acc_wf ra rn -> (0 < rn)%N -> ak_pins rak = false ->
+  forall s : wmstate,
+    wstep_ok_racy tid ra rn rak Φ wD_any W true m s ->
+    wlog_wf (wm_log s) ->
+    wadm_filter s rak ra rn Φ ->
+    is_Some (read_bytes (wflat (wm_img s) (wm_log s)) ra rn) ->
+    (forall u : bv (8 * rn), Φ (fun j : nat => nth_byte u j) ->
+       exists (y : X) (t' : mstate) (es : list weff),
+         exec_stale ra rn u m (wflat_st s) = Some (y, t', es) /\
+         trace_stale rak ra rn es) ->
+  forall (x : X) (s' : wmstate), wrun tid m s x s' ->
+    exists (w : bv (8 * rn)) (es : list weff),
+      wadm s rak ra rn w /\ Φ (fun j : nat => nth_byte w j) /\
+      exec_stale ra rn w m (wflat_st s) = Some (x, wflat_st s', es) /\
+      wlog_wf (wm_log s') /\
+      (forall a : Arch.pa,
+         wtrace_wonly (fun (pa : Arch.pa) (n : N) =>
+                         forall j : nat, (j < N.to_nat n)%nat -> pa_add pa j <> a)
+           es ->
+         latest_ts (wm_log s') (pa_z a) = latest_ts (wm_log s) (pa_z a)) /\
+      wm_log s' = (wm_log s ++ wtrace_msgs tid (w_relp (wm_ws s)) es)%list.
+Proof.
+  intros Hracc Hrn Hrk s Hok Hwf HΦ Hrd Hfam x s' Hrun.
+  exact (wrun_exec_stale_elim_gen tid ra rn rak Φ W m Hracc Hrn Hrk s s HΦ Hok
+           eq_refl eq_refl (reflexivity _) Hwf Hrd Hfam x s' Hrun).
+Qed.
+
 Lemma wrun_exec_stale_elim (tid : option nat) (ra : Arch.pa) (rn : N)
     (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) (W : Prop) {X} (m : M X) :
   acc_wf ra rn -> (0 < rn)%N -> ak_pins rak = false ->
@@ -2294,8 +2503,11 @@ Lemma wrun_exec_stale_elim (tid : option nat) (ra : Arch.pa) (rn : N)
          latest_ts (wm_log s') (pa_z a) = latest_ts (wm_log s) (pa_z a)).
 Proof.
   intros Hracc Hrn Hrk s Hok Hwf HΦ Hrd Hfam x s' Hrun.
-  exact (wrun_exec_stale_elim_gen tid ra rn rak Φ W m Hracc Hrn Hrk s s HΦ Hok
-           eq_refl eq_refl (reflexivity _) Hwf Hrd Hfam x s' Hrun).
+  destruct (wrun_exec_stale_elim_msgs tid ra rn rak Φ W m Hracc Hrn Hrk s Hok
+              Hwf HΦ Hrd Hfam x s' Hrun)
+    as (w & es & Hadm & HΦw & Hexw & Hwf' & Hlt & _).
+  exists w, es. split_and!;
+    [exact Hadm|exact HΦw|exact Hexw|exact Hwf'|exact Hlt].
 Qed.
 
 (** The [wexec] corollary, through [WeakInterp.wexec_wrun]: the FUNCTIONAL
@@ -2322,11 +2534,12 @@ Lemma wexec_exec_stale_elim (tid : option nat) (ra : Arch.pa) (rn : N)
          wtrace_wonly (fun (pa : Arch.pa) (n : N) =>
                          forall j : nat, (j < N.to_nat n)%nat -> pa_add pa j <> a)
            es ->
-         latest_ts (wm_log s') (pa_z a) = latest_ts (wm_log s) (pa_z a)).
+         latest_ts (wm_log s') (pa_z a) = latest_ts (wm_log s) (pa_z a)) /\
+      wm_log s' = (wm_log s ++ wtrace_msgs tid (w_relp (wm_ws s)) es)%list.
 Proof.
   intros Hracc Hrn Hrk s Hok Hwf HΦ Hrd Hfam χ x s' χ' Hex.
-  exact (wrun_exec_stale_elim tid ra rn rak Φ W m Hracc Hrn Hrk s Hok Hwf HΦ
-           Hrd Hfam x s' (wexec_wrun tid m χ s x s' χ' Hex)).
+  exact (wrun_exec_stale_elim_msgs tid ra rn rak Φ W m Hracc Hrn Hrk s Hok Hwf
+           HΦ Hrd Hfam x s' (wexec_wrun tid m χ s x s' χ' Hex)).
 Qed.
 
 (** *** 10d. The CONSTANT-family arm, in the same shape.
@@ -2339,6 +2552,46 @@ Qed.
     §10c's shape, so a consumer case-splitting on the absorption theorem's
     arms gets ONE post-condition out of both routes.  Phase-generic, since
     that arm's peel is delivered at either phase (§8's [phase_mono]). *)
+Lemma wrun_exec_stale_elim_const_msgs (tid : option nat) (ra : Arch.pa) (rn : N)
+    (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) (W : Prop) (b : bool)
+    {X} (m : M X) :
+  acc_wf ra rn -> (0 < rn)%N -> ak_pins rak = false ->
+  forall s : wmstate,
+    wstep_ok_racy tid ra rn rak Φ wD_any W b m s ->
+    wlog_wf (wm_log s) ->
+    wadm_filter s rak ra rn Φ ->
+    is_Some (read_bytes (wflat (wm_img s) (wm_log s)) ra rn) ->
+    (forall u : bv (8 * rn), Φ (fun j : nat => nth_byte u j) ->
+       exists (y : X) (t' : mstate) (es : list weff),
+         exec_stale ra rn u m (wflat_st s) = Some (y, t', es) /\
+         trace_off_win ra rn es) ->
+  forall (x : X) (s' : wmstate), wrun tid m s x s' ->
+    exists (w : bv (8 * rn)) (es : list weff),
+      wadm s rak ra rn w /\ Φ (fun j : nat => nth_byte w j) /\
+      exec_stale ra rn w m (wflat_st s) = Some (x, wflat_st s', es) /\
+      wlog_wf (wm_log s') /\
+      (forall a : Arch.pa,
+         wtrace_wonly (fun (pa : Arch.pa) (n : N) =>
+                         forall j : nat, (j < N.to_nat n)%nat -> pa_add pa j <> a)
+           es ->
+         latest_ts (wm_log s') (pa_z a) = latest_ts (wm_log s) (pa_z a)) /\
+      wm_log s' = (wm_log s ++ wtrace_msgs tid (w_relp (wm_ws s)) es)%list.
+Proof.
+  intros Hracc Hrn Hrk s Hok Hwf HΦ [wc Hwc] Hfam x s' Hrun.
+  assert (Hwcw : wread_bytes s rak ra rn (coh_ts s ra rn) = Some wc)
+    by (rewrite (wread_bytes_read_bytes s rak ra rn Hwf Hracc); exact Hwc).
+  pose proof (wadm_of_wread_ok _ _ _ _ _ _
+                (wread_bytes_spec _ _ _ _ _ _ Hwcw)) as Hadmc.
+  destruct (Hfam wc (HΦ wc Hadmc)) as (yc & tc & esc & Hexc & Hoffc).
+  destruct (wrun_exec_stale_elim_off tid ra rn rak Φ W wc m Hracc Hrn Hrk
+              b s yc tc esc Hexc Hoffc Hok Hwf x s' Hrun)
+    as (Hexf & Hwf' & Hlt & Hlog).
+  exists wc, esc. split_and!;
+    [exact Hadmc|exact (HΦ wc Hadmc)|exact Hexf|exact Hwf'|exact Hlt
+    |exact Hlog].
+Qed.
+
+(** The five-conjunct view, for the positional consumer — see §10c's note. *)
 Lemma wrun_exec_stale_elim_const (tid : option nat) (ra : Arch.pa) (rn : N)
     (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) (W : Prop) (b : bool)
     {X} (m : M X) :
@@ -2363,14 +2616,10 @@ Lemma wrun_exec_stale_elim_const (tid : option nat) (ra : Arch.pa) (rn : N)
            es ->
          latest_ts (wm_log s') (pa_z a) = latest_ts (wm_log s) (pa_z a)).
 Proof.
-  intros Hracc Hrn Hrk s Hok Hwf HΦ [wc Hwc] Hfam x s' Hrun.
-  assert (Hwcw : wread_bytes s rak ra rn (coh_ts s ra rn) = Some wc)
-    by (rewrite (wread_bytes_read_bytes s rak ra rn Hwf Hracc); exact Hwc).
-  pose proof (wadm_of_wread_ok _ _ _ _ _ _
-                (wread_bytes_spec _ _ _ _ _ _ Hwcw)) as Hadmc.
-  destruct (Hfam wc (HΦ wc Hadmc)) as (yc & tc & esc & Hexc & Hoffc).
-  destruct (wrun_exec_stale_elim_off tid ra rn rak Φ W wc m Hracc Hrn Hrk
-              b s yc tc esc Hexc Hoffc Hok Hwf x s' Hrun) as (Hexf & Hwf' & Hlt).
-  exists wc, esc. split_and!;
-    [exact Hadmc|exact (HΦ wc Hadmc)|exact Hexf|exact Hwf'|exact Hlt].
+  intros Hracc Hrn Hrk s Hok Hwf HΦ Hrd Hfam x s' Hrun.
+  destruct (wrun_exec_stale_elim_const_msgs tid ra rn rak Φ W b m Hracc Hrn Hrk
+              s Hok Hwf HΦ Hrd Hfam x s' Hrun)
+    as (w & es & Hadm & HΦw & Hexw & Hwf' & Hlt & _).
+  exists w, es. split_and!;
+    [exact Hadm|exact HΦw|exact Hexw|exact Hwf'|exact Hlt].
 Qed.

@@ -1078,8 +1078,19 @@ Qed.
     weak machine's run of a WALKING instruction did exactly what ONE
     admissible leaf word's mirror run does — same result, same post-state
     (registers, memory AND device, through [wflat_st]), same trace — and any
-    byte the trace does not write keeps its [latest_ts].  That last conjunct
-    is what a consumer turns back into pinnedness ([WkFetchPeel] §4a).
+    byte the trace does not write keeps its [latest_ts].  That conjunct is
+    what a consumer turns back into pinnedness ([WkFetchPeel] §4a).
+
+    ... and the LOG-IDENTITY conjunct on top of it ([WeakStale] §10-0's
+    [wtrace_msgs]): the successor's log is the pre-log with EXACTLY the
+    messages the trace's writes append, in order.  Flat-memory equality does
+    not force that — a same-value rewrite appends a message and moves no byte
+    — so the WP layer's continuation, which has to re-establish a log
+    AUTHORITY at σ', needs the tail named rather than existentially
+    quantified.  On the walk's four read-only shapes the projection computes
+    to [[]] (so the log is unmoved, by [app_nil_r]); on the two write-back
+    shapes to the single [WCexcl] message the absorption theorem's
+    appended-log arm hands out — see [WkWalkRule] §4.
 
     Both arms of §5i's disjunction land here: the five stale-friendly walk
     shapes through [wrun_exec_stale_elim], the TLB-hit write-back through
@@ -1111,12 +1122,13 @@ Lemma wstep_outcome_of_peel (tid : option nat) (σ : wmstate) (la : Arch.pa)
       (forall a : Arch.pa,
          wtrace_wonly (fun (pa : Arch.pa) (n : N) =>
              forall j : nat, (j < N.to_nat n)%nat -> pa_add pa j <> a) es ->
-         latest_ts (wm_log s') (pa_z a) = latest_ts (wm_log σ) (pa_z a)).
+         latest_ts (wm_log s') (pa_z a) = latest_ts (wm_log σ) (pa_z a)) /\
+      wm_log s' = (wm_log σ ++ wtrace_msgs tid (w_relp (wm_ws σ)) es)%list.
 Proof.
   intros Hacc Hwf Hrd Hpeel Hfilt [Hst|Hoff] x s' Hrun.
-  - exact (wrun_exec_stale_elim tid la 8 wak_plain Φ True (riscv_step tick)
+  - exact (wrun_exec_stale_elim_msgs tid la 8 wak_plain Φ True (riscv_step tick)
              Hacc ltac:(lia) ak_pins_plain σ Hpeel Hwf Hfilt Hrd Hst x s' Hrun).
-  - exact (wrun_exec_stale_elim_const tid la 8 wak_plain Φ True true
+  - exact (wrun_exec_stale_elim_const_msgs tid la 8 wak_plain Φ True true
              (riscv_step tick) Hacc ltac:(lia) ak_pins_plain σ Hpeel Hwf Hfilt
              Hrd Hoff x s' Hrun).
 Qed.
@@ -1166,7 +1178,8 @@ Lemma wstep_outcome_fetchwalk (tid : option nat) (σ : wmstate)
       (forall a : Arch.pa,
          wtrace_wonly (fun (pa0 : Arch.pa) (n : N) =>
              forall j : nat, (j < N.to_nat n)%nat -> pa_add pa0 j <> a) es ->
-         latest_ts (wm_log s') (pa_z a) = latest_ts (wm_log σ) (pa_z a)).
+         latest_ts (wm_log s') (pa_z a) = latest_ts (wm_log σ) (pa_z a)) /\
+      wm_log s' = (wm_log σ ++ wtrace_msgs tid (w_relp (wm_ws σ)) es)%list.
 Proof.
   intros vpn a2 a1 la Hpriv Hhart Hpc Hdisp Hready Hal HnotRVC Hdisj Haccp HW0
     Hpin Hbytes Halign Hexecp Hdev Hexec Hpost Htick Hfam.
@@ -1215,7 +1228,8 @@ Lemma wexec_outcome_of_peel (tid : option nat) (σ : wmstate) (la : Arch.pa)
       (forall a : Arch.pa,
          wtrace_wonly (fun (pa : Arch.pa) (n : N) =>
              forall j : nat, (j < N.to_nat n)%nat -> pa_add pa j <> a) es ->
-         latest_ts (wm_log s') (pa_z a) = latest_ts (wm_log σ) (pa_z a)).
+         latest_ts (wm_log s') (pa_z a) = latest_ts (wm_log σ) (pa_z a)) /\
+      wm_log s' = (wm_log σ ++ wtrace_msgs tid (w_relp (wm_ws σ)) es)%list.
 Proof.
   intros Hacc Hwf Hrd Hpeel Hfilt Hfam χ x s' χ' Hex.
   exact (wstep_outcome_of_peel tid σ la Φ tick Hacc Hwf Hrd Hpeel Hfilt Hfam

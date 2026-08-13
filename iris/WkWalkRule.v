@@ -26,8 +26,21 @@
         [exec_stale la 8 w (riscv_step tick) (wflat_st σ)
            = Some (tt, wflat_st σ', es)]
         for ONE admissible leaf word [w], together with the §10 preservation
-        conjuncts ([wlog_wf], and [latest_ts] unmoved off the trace's writes,
-        which is what a consumer turns back into pinnedness).
+        conjuncts ([wlog_wf]; [latest_ts] unmoved off the trace's writes,
+        which is what a consumer turns back into pinnedness; and the
+        LOG-IDENTITY equation [wm_log σ' = wm_log σ ++ wtrace_msgs …, which
+        names the appended messages themselves).
+
+      - THE LOG-IDENTITY CONJUNCT IS WHAT LETS THE LEAF MOVE ITS LOG
+        AUTHORITY.  Re-establishing [wmstate_interp σ'] means owning
+        [wlog_auth (wm_log σ')], and the [exec_stale] equation does NOT force
+        the log: it pins the FLAT memory, and a same-value rewrite appends a
+        message while moving no byte.  §4 below computes the projection on the
+        walk's six trace shapes — [[]] on the four read-only ones (so the
+        authority is unchanged), and the single [WCexcl] message on the two
+        write-back ones, which is precisely the tail the absorption theorem's
+        appended-log arm ([WeakKptStale]'s [wtlb_res_pt_translateAddr_stale_at])
+        already hands out.
 
     ==================================================================
     THE φ-UPGRADE OBLIGATION AT THIS RULE IS THE *CLEAN-WINDOW* ARM,
@@ -193,6 +206,9 @@ Section rule.
                wtrace_wonly (fun (pa : Arch.pa) (n : N) =>
                    ∀ j : nat, (j < N.to_nat n)%nat → pa_add pa j ≠ a) es →
                latest_ts (wm_log σ') (pa_z a) = latest_ts (wm_log σ) (pa_z a)⌝ -∗
+            ⌜wm_log σ' = (wm_log σ
+                          ++ wtrace_msgs (Some (fin_to_nat cpu_id))
+                               (w_relp (wm_ws σ)) es)%list⌝ -∗
             ⌜wstep_post_racy σ σ'⌝ -∗
             ⌜Q σ σ'⌝
             ={∅,⊤}=∗ wmstate_interp σ' ∗
@@ -246,12 +262,13 @@ Section rule.
     destruct (wexec_outcome_of_peel (Some (fin_to_nat cpu_id)) σ la Φ tick
                 Hacc Hwf Hrd (proj1 (Hc tick)) HΦ (proj1 (proj2 (Hc tick)))
                 χ tt σ' χ' Hwex)
-      as (u & es & Hadm & HΦu & Hex & Hwf' & Hlat).
-    iApply ("Hk" $! tick σ' u es with "[%] [%] [%] [%] [%] [%]").
+      as (u & es & Hadm & HΦu & Hex & Hwf' & Hlat & Hlog).
+    iApply ("Hk" $! tick σ' u es with "[%] [%] [%] [%] [%] [%] [%]").
     - exact Hadm.
     - exact HΦu.
     - exact Hex.
     - exact Hlat.
+    - exact Hlog.
     - rewrite /wstep_post_racy. split_and!.
       + exact (wrun_img _ _ _ _ _ Hrun).
       + exact (wrun_log_app _ _ _ _ _ Hrun).
@@ -367,7 +384,77 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
-(** ** 4. Soundness checks *)
+(** ** 4. THE LOG-IDENTITY CONJUNCT, ON THE WALK'S SIX TRACE SHAPES
+
+    The rule's continuation is handed [wm_log σ' = wm_log σ ++ wtrace_msgs …
+    es] at the run's OWN trace [es], and the caller pins [es] by rewriting the
+    [exec_stale] equation against the family it owns — which is the absorption
+    theorem's, whose traces are six literal shapes.  These four lemmas compute
+    the projection on all six, so the leaf never unfolds [wtrace_msgs].
+
+    THE CLASS AGREES ON BOTH SIDES.  The walk's write-back event is
+    [WEwrite (AkInfo false true false) la 8 lw'] — [wak_excl], i.e.
+    [ak_latest = true] — and [wm_class_rp] sends every [ak_latest] write to
+    [WCexcl] regardless of the writer's pending-release flag
+    ([WeakStale.wm_class_rp_latest]).  So the message the projection names is
+    [wwrite_msg tid WCexcl la 8 lw'], which is exactly what the absorption
+    theorem's appended-log arm carries (its [kcls] existential is instantiated
+    at [WCexcl] by its own proof).  No mismatch: the two sides model the CAS
+    write-back at the same class, and the walk's write is the ONE case where
+    the class is recoverable from the trace event alone. *)
+
+(** (a) THE FOUR READ-ONLY SHAPES: nothing is appended. *)
+Lemma wtrace_msgs_walk_ro (tid : option nat) (rp : bool)
+    (a2 a1 la : Arch.pa) (es : list weff) :
+  (es = [] \/
+   es = [WEread wak_plain a2 8; WEread wak_plain a1 8; WEread wak_plain la 8] \/
+   es = [WEread (AkInfo false true false) la 8] \/
+   es = [WEread wak_plain a2 8; WEread wak_plain a1 8; WEread wak_plain la 8;
+         WEread (AkInfo false true false) la 8]) ->
+  wtrace_msgs tid rp es = [].
+Proof. intros [->|[->|[-> | ->]]]; reflexivity. Qed.
+
+(** ... so the successor's log IS the pre-log, which is what re-establishing
+    an UNCHANGED [wlog_auth] needs. *)
+Lemma wm_log_of_msgs_nil (tid : option nat) (rp : bool) (σ σ' : wmstate)
+    (es : list weff) :
+  wtrace_msgs tid rp es = [] ->
+  wm_log σ' = (wm_log σ ++ wtrace_msgs tid rp es)%list ->
+  wm_log σ' = wm_log σ.
+Proof. intros Hnil ->. rewrite Hnil List.app_nil_r //. Qed.
+
+(** (b) THE TWO WRITE-BACK SHAPES: exactly the one [WCexcl] message. *)
+Lemma wtrace_msgs_walk_wb (tid : option nat) (rp : bool)
+    (a2 a1 la : Arch.pa) (lw' : mword 64) (wtr : bool) (es : list weff) :
+  es = (if wtr
+        then [WEread wak_plain a2 8; WEread wak_plain a1 8; WEread wak_plain la 8;
+              WEread (AkInfo false true false) la 8;
+              WEwrite (AkInfo false true false) la 8 (lw' : mword 64)]
+        else [WEread (AkInfo false true false) la 8;
+              WEwrite (AkInfo false true false) la 8 (lw' : mword 64)]) ->
+  wtrace_msgs tid rp es
+  = [wwrite_msg tid WCexcl (la : Arch.pa) 8 (lw' : mword 64)].
+Proof. intros ->. by destruct wtr. Qed.
+
+(** ... so the successor's log is the pre-log plus that message — the shape
+    [WeakKptStale]'s appended-log arm states its [wlog_auth] in. *)
+Lemma wm_log_of_walk_wb (tid : option nat) (rp : bool) (a2 a1 la : Arch.pa)
+    (lw' : mword 64) (wtr : bool) (σ σ' : wmstate) (es : list weff) :
+  es = (if wtr
+        then [WEread wak_plain a2 8; WEread wak_plain a1 8; WEread wak_plain la 8;
+              WEread (AkInfo false true false) la 8;
+              WEwrite (AkInfo false true false) la 8 (lw' : mword 64)]
+        else [WEread (AkInfo false true false) la 8;
+              WEwrite (AkInfo false true false) la 8 (lw' : mword 64)]) ->
+  wm_log σ' = (wm_log σ ++ wtrace_msgs tid rp es)%list ->
+  wm_log σ' = (wm_log σ
+               ++ [wwrite_msg tid WCexcl (la : Arch.pa) 8 (lw' : mword 64)])%list.
+Proof.
+  intros Hes ->. by rewrite (wtrace_msgs_walk_wb tid rp a2 a1 la lw' wtr es Hes).
+Qed.
+
+(* ====================================================================== *)
+(** ** 5. Soundness checks *)
 
 Print Assumptions wp_wwalk_step.
 Print Assumptions wp_wwalk_step_cert_of_peel.
