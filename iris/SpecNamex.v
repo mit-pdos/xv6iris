@@ -216,6 +216,7 @@ Require Import FileInvDefs.
 Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import SpecIput.
+Require Import SpecDirlookup.
 Require Import SpecDirlink.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -232,6 +233,49 @@ Local Open Scope Z_scope.
    pushing either_copyout 56 -> 58, readi 70 -> 72 and dirlookup 82 -> 84.
    Nothing else in namex's list moved. *)
 Definition K_namex : nat := 96%nat.
+
+(* ===================================================================== *)
+(*  THE WALK'S LEDGER FIGURES (fs-log.md §G.24/§G.25)                     *)
+(*                                                                        *)
+(*  WHAT THE WALK SPENDS is ONE unit for the whole walk, not one per      *)
+(*  level: every per-level [iunlockput] runs [crz := true] on the inode   *)
+(*  block (the receipt minted at the +0xce nlink guard) and [crb := w]    *)
+(*  on the bitmap, so the only thing a freeing level can fail to absorb   *)
+(*  is THE bitmap block -- and whoever pays for it first puts it in the   *)
+(*  op's set, which is what [w] reports.  Definitionally                  *)
+(*  [CreateBudget.np_spend].                                              *)
+(*                                                                        *)
+(*  THE FAILURE ARMS COST ONE MORE, and honestly so: [L_notdir] (+0x54)   *)
+(*  runs BEFORE the nlink guard and [L_nlink] (+0x7a) runs AT it, so      *)
+(*  neither is downstream of a mint and neither can be credited, and      *)
+(*  [L_done]'s [iput] (+0x140) is at an inode this walk never locked.     *)
+(*  All three are TERMINAL, so the walk pays it at most once -- and the   *)
+(*  SUCCESS arms pay it never: namei returns at +0x140 without an iput    *)
+(*  and nameiparent returns through [L_par] (+0x84), which calls          *)
+(*  [iunlock].  That asymmetry is why the figure is indexed by [ok], and  *)
+(*  it is what makes create's row [CreateBudget.cr_uw w] exact: create    *)
+(*  proceeds only on success.                                            *)
+(*                                                                        *)
+(*  WHAT THE WALK MUST HAVE IN HAND is likewise NOT linear: one iput's    *)
+(*  worth, plus the single unit the walk may spend before the deepest     *)
+(*  level runs.  [walk_need 0 = iput_units] because the loop body never   *)
+(*  runs at an empty path -- which is what keeps the counted contract's   *)
+(*  own premise sufficient at every path length.                          *)
+(* ===================================================================== *)
+Definition walk_spend (w : bool) : nat := if w then 1%nat else 0%nat.
+
+Definition walk_need (L : nat) : nat :=
+  match L with O => iput_units | S _ => S iput_units end.
+
+Lemma walk_need_counted (L n : nat) :
+  ((L + 1) * iput_units <= n)%nat -> (walk_need L <= n)%nat.
+Proof. destruct L; unfold walk_need, iput_units; lia. Qed.
+
+Lemma walk_spend_counted (L n n' : nat) (w ok : bool) :
+  ((L + 1) * iput_units <= n)%nat ->
+  ((n - (walk_spend w + (if ok then 0%nat else 1%nat)))%nat <= n')%nat ->
+  ((n - (L + 1) * iput_units)%nat <= n')%nat.
+Proof. destruct w, ok; unfold walk_spend, iput_units; lia. Qed.
 
 (* The two immediates of the absolute arm, read off [li a1,1] at +0x48 and
    the [mv a0,a1] at +0x4a that makes the device argument the same word.
@@ -327,7 +371,7 @@ Definition namex_postS
     (npar : bool) (n : nat) (Sb : gset Z) (pidv : mword 32)
     (dq dqb dqs dqc : dfrac) : iProp Σ :=
   (∀ (mf : regfile) (n' : nat) (used' Sb' : gset Z)
-     (ok : bool) (nf : nat -> bv 8) (ipv : mword 64),
+     (ok : bool) (nf : nat -> bv 8) (ipv : mword 64) (w : bool),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
@@ -345,22 +389,31 @@ Definition namex_postS
          branch leaves the bytes above [len] alone *)
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nf i) -∗
       bslots bn 3 -∗
-      (* THE SET ONLY GROWS.  namex takes no absorption credit of its
-         own -- its four log sites are iput/iunlockput calls at inums
-         it discovers as it walks, so it cannot know in advance which
-         blocks they touch.  What it MUST do is not LOSE the caller's
-         set across the loop, which against the counted contract is
-         impossible (GR-2a finding 1). *)
+      (* THE SET ONLY GROWS.  What the walk MUST do is not LOSE the
+         caller's set across the loop, which against the counted contract
+         is impossible (GR-2a finding 1). *)
       ⌜Sb ⊆ Sb'⌝ -∗
-      ⌜((n - (length (path_elems pl) + 1) * iput_units)%nat <= n')%nat
+      (* THE PAID-BITMAP REPORT.  [w] is "the walk paid for the bitmap
+         block", and it comes with the membership -- which is exactly what
+         create's FIRST dirlink then claims as its own [crb]
+         (CreateBudget's mkdir row: at [w = true] the walk's unit comes off
+         the top and that dirlink gives it straight back). *)
+      ⌜w = true -> bmapstart ∈ Sb'⌝ -∗
+      ⌜((n - (walk_spend w + (if ok then 0%nat else 1%nat)))%nat <= n')%nat
        /\ (n' <= n)%nat⌝ -∗
       log_opS g n' Sb' -∗
-      (* THE TWO ARMS *)
+      (* THE TWO ARMS.  The success arm's reference is BUNDLED when the
+         walk was a nameiparent one: that return is [L_par], reached only
+         through the +0xc4 type test, so the walk KNOWS the record is a
+         directory and hands the fact on at the reference's own generation
+         (fs-icache §17.6's one-shot).  create performs no parent type test
+         of its own -- fs-sysfile's Blocker B -- and this is what closes
+         it.  namei's return is the plain form: nothing tested its type. *)
       (if ok
        then ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = ipv
              /\ (npar = true ->
                  exists es e, nameiparent_of pl es e /\ bname 14 nf = e)⌝ ∗
-            inode_held ipv ∗
+            (if npar then inode_held_ty ipv T_DIR else inode_held ipv) ∗
             iref_slots 1
        else ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
              = (mword_of_int 0 : mword 64)⌝ ∗
@@ -399,9 +452,16 @@ Definition wp_namex_sconf_body
   let pl := bview plen pfun in
   let L := length (path_elems pl) in
   (K_namex <= K)%nat ->
-  (* (1) the cache's identity -- see the header *)
+  (* (1) the cache's identity -- see the header.  THE REGION'S TWO TIES
+     ride here too (fs-log.md §G.25): the walk MINTS the group receipt at
+     its nlink guard and cashes it at every per-level iunlockput, and
+     [InodeRegion]'s vocabulary is ambient -- [icfg_log] and [icfg_ist] --
+     so a contract that threads its own [g] and [inodestart] meets it only
+     through a pure equation.  True at boot by [IcacheRef.icfg_alloc]. *)
   dev = icfg_dev ->
   nib = icfg_nib ->
+  g = icfg_log ->
+  inodestart = icfg_ist ->
   (* (2) the absolute arm's two immediates *)
   dev = ROOTDEV ->
   (0 < nib)%nat ->
@@ -536,9 +596,16 @@ Definition wp_namex_gen_body
   let pl := bview plen pfun in
   let L := length (path_elems pl) in
   (K_namex <= K)%nat ->
-  (* (1) the cache's identity -- see the header *)
+  (* (1) the cache's identity -- see the header.  THE REGION'S TWO TIES
+     ride here too (fs-log.md §G.25): the walk MINTS the group receipt at
+     its nlink guard and cashes it at every per-level iunlockput, and
+     [InodeRegion]'s vocabulary is ambient -- [icfg_log] and [icfg_ist] --
+     so a contract that threads its own [g] and [inodestart] meets it only
+     through a pure equation.  True at boot by [IcacheRef.icfg_alloc]. *)
   dev = icfg_dev ->
   nib = icfg_nib ->
+  g = icfg_log ->
+  inodestart = icfg_ist ->
   (* (2) the absolute arm's two immediates *)
   dev = ROOTDEV ->
   (0 < nib)%nat ->
@@ -560,8 +627,12 @@ Definition wp_namex_gen_body
      the short branch fails memmove's own 2^32 bound).  SpecFetchstr's
      header records the identical premise for strlen's [subw]. *)
   (Z.of_nat plen < 2 ^ 31)%Z ->
-  (* (4) the budget, linear in the element count *)
-  ((L + 1) * iput_units <= n)%nat ->
+  (* (4) THE BUDGET IS NOT LINEAR ANY MORE (fs-log.md §G.24): the walk
+     needs one iput's worth plus the single unit it may spend, whatever
+     the path length.  The counted contract's premise implies this one at
+     both shapes ([walk_need_counted]), which is what keeps
+     [wp_namex_sconf] byte-stable. *)
+  (walk_need L <= n)%nat ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   (* a1 = nameiparent, reflected into a ghost boolean the way dirlookup's

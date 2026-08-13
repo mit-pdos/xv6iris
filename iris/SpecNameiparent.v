@@ -67,7 +67,10 @@ Require Import FileInvDefs.
 Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import SpecIput.
+Require Import SpecDirlookup.
 Require Import SpecDirlink.
+(* [walk_spend] / [walk_need] and the two ties, from the walker itself *)
+Require Import SpecNamex.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -110,6 +113,10 @@ Definition wp_nameiparent_sconf_body
   (K_nameiparent <= K)%nat ->
   dev = icfg_dev ->
   nib = icfg_nib ->
+  (* the region's two ambient ties, threaded verbatim to namex
+     (fs-log.md §G.25) *)
+  g = icfg_log ->
+  inodestart = icfg_ist ->
   dev = ROOTDEV ->
   (0 < nib)%nat ->
   log_geom_ok cov logstart ->
@@ -231,6 +238,10 @@ Definition wp_nameiparent_gen_body
   (K_nameiparent <= K)%nat ->
   dev = icfg_dev ->
   nib = icfg_nib ->
+  (* the region's two ambient ties, threaded verbatim to namex
+     (fs-log.md §G.25) *)
+  g = icfg_log ->
+  inodestart = icfg_ist ->
   dev = ROOTDEV ->
   (0 < nib)%nat ->
   log_geom_ok cov logstart ->
@@ -247,7 +258,9 @@ Definition wp_nameiparent_gen_body
      the short branch fails memmove's own 2^32 bound).  SpecFetchstr's
      header records the identical premise for strlen's [subw]. *)
   (Z.of_nat plen < 2 ^ 31)%Z ->
-  ((L + 1) * iput_units <= n)%nat ->
+  (* the walk's need, no longer linear in the path length
+     (fs-log.md §G.24; [SpecNamex.walk_need]) *)
+  (walk_need L <= n)%nat ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   eb = true ->
@@ -285,7 +298,7 @@ Definition wp_nameiparent_gen_body
      premise admits, which is why this went unnoticed. *)
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (n' : nat) (used' Sb' : gset Z)
-    (ok : bool) (nf : nat -> bv 8) (ipv : mword 64),
+    (ok : bool) (nf : nat -> bv 8) (ipv : mword 64) (w : bool),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
@@ -303,12 +316,22 @@ Definition wp_nameiparent_gen_body
       (* the set only GROWS; namex takes no credit and neither does
          this wrapper, so the counter clause is untouched *)
       ⌜Sb ⊆ Sb'⌝ -∗
-      ⌜((n - (L + 1) * iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
+      (* the walk's paid-bitmap report and the membership that makes it an
+         honest read (fs-log.md §G.24), namex's verbatim *)
+      ⌜w = true -> bmapstart ∈ Sb'⌝ -∗
+      ⌜((n - (walk_spend w + (if ok then 0%nat else 1%nat)))%nat <= n')%nat
+       /\ (n' <= n)%nat⌝ -∗
       log_opS g n' Sb' -∗
       (if ok
        then ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = ipv
              /\ (exists es e, nameiparent_of pl es e /\ bname 14 nf = e)⌝ ∗
-            inode_held ipv ∗
+            (* THE PARENT IS A DIRECTORY, and it says so (fs-log.md §G.24).
+               The walk tested the type under the lock at +0xc4 and returns
+               through [L_par]; create performs no parent type test at all,
+               so this is what closes fs-sysfile's Blocker B.  Cashed by
+               shedding a share at this generation and joining ilock's own
+               one-shot with [IcacheRef.ity_shot_agree]. *)
+            inode_held_ty ipv T_DIR ∗
             iref_slots 1
        else ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
              = (mword_of_int 0 : mword 64)⌝ ∗

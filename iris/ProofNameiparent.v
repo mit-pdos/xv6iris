@@ -59,6 +59,7 @@ Require Import FileInvDefs.
 Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import CodeNameiparent.
+Require Import SpecDirlookup.
 Require Import SpecNamex.
 Require Import SpecNameiparent.
 From Kernel Require KernelSyms.
@@ -176,8 +177,8 @@ Section ProofNameiparentMain.
   Proof.
     cbv beta delta [wp_nameiparent_gen_body].
     intros pcE pjv pv nb ret_tgt pl L
-           HK Hdev Hnib Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
-           Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Heb.
+           HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
+           Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Heb.
     destruct (npi_kb K HK) as (Knx & K2 & Kpop).
     (* N3d trap 1's whole-function fix: fold [proc_addr j] into every
        resource ONCE, and never write [pjv] again. *)
@@ -354,15 +355,15 @@ Section ProofNameiparentMain.
     iApply (NX.wp_namex_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib size dev used cwdv
               plen pfun nfun true n Sb pidv dq dqb dqs dqc R5 (K - 2)%nat eb C b
-              Knx Hdev Hnib Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
-              Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs
+              Knx Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
+              Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs
               ltac:(rewrite HR5a1; exact npi_a1_true) Heb
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hkenv Hitb2 Hitbl
                     Hesc Hslks Hireg Hprocs Hdev Hgeom Hdlk Hbmap Hinos
                     Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog").
-    iIntros (CID8 Hq8 mf n' used' Sb' ok nf ipv)
+    iIntros (CID8 Hq8 mf n' used' Sb' ok nf ipv w)
             "%Hcs Hcg Hcnt Hpc Hbmap Hinos %Hsub Hbits Hppid Hcwdc Hcwdr
-             Hpath Hname Hbslot %Hssub %Hbudo Hlog Hok".
+             Hpath Hname Hbslot %Hssub %Hwbm %Hbudo Hlog Hok".
     iEval (rewrite HR5a0) in "Hpath".
     iEval (rewrite HR5a2) in "Hname".
     assert (Hpc10 : ret_pc (R5 !!! Regidx Rra : mword 64)
@@ -512,7 +513,7 @@ Section ProofNameiparentMain.
     iAssert (if ok
              then ⌜(P3 !!! Regidx Ra0 : mword 64) = ipv
                    /\ (exists es e, nameiparent_of pl es e /\ bname 14 nf = e)⌝ ∗
-                  inode_held ipv ∗ iref_slots 1
+                  inode_held_ty ipv T_DIR ∗ iref_slots 1
              else ⌜(P3 !!! Regidx Ra0 : mword 64) = (mword_of_int 0 : mword 64)⌝ ∗
                   iref_slots 2)%I with "[Hok]" as "Hok".
     { destruct ok.
@@ -524,12 +525,13 @@ Section ProofNameiparentMain.
     iDestruct (cpu_own_transport CID8 CID12 0%nat eb (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! P3 n' used' Sb' ok nf ipv
+    iApply ("Hcont" $! P3 n' used' Sb' ok nf ipv w
               with "[%] Hcg Hcnt Hpc Hbmap Hinos [%] Hbits Hppid Hcwdc Hcwdr
-                    Hpath Hname Hbslot [%] [%] Hlog Hok").
+                    Hpath Hname Hbslot [%] [%] [%] Hlog Hok").
     { unfold callee_saved. split_and!; assumption. }
     { exact Hsub. }
     { exact Hssub. }
+    { exact Hwbm. }
     { exact Hbudo. }
   Qed.
 
@@ -564,8 +566,8 @@ Section ProofNameiparentMain.
   Proof.
     cbv beta delta [wp_nameiparent_sconf_body].
     intros pcE pjv pv nb ret_tgt pl L
-           HK Hdev Hnib Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
-           Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Heb.
+           HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
+           Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Heb.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl
               #Hesc #Hslks #Hireg #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
               Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog Hcont".
@@ -574,20 +576,34 @@ Section ProofNameiparentMain.
               ga gf cov logstart bmapstart inodestart nib
               size dev used cwdv plen pfun nfun n Sb0
               pidv dq dqb dqs dqc m K eb C b
-              HK Hdev Hnib Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Heb
+              HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen (walk_need_counted L n Hbud) Hj Hgs Heb
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hkenv Hitb2 Hitbl Hesc Hslks Hireg Hprocs Hdev Hgeom Hdlk Hbmap Hinos Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog [Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
-    iIntros (mf n' used' Sb' ok nf ipv)
+    iIntros (mf n' used' Sb' ok nf ipv w)
       "%Hcs Hcg Hcnt Hpc Hbmap Hinos %Husub Hbits Hppid Hcwdc Hcwdr
-       Hpath Hname Hbslot %Hssub %Hbnd Hlog Hok".
+       Hpath Hname Hbslot %Hssub %Hwbm %Hbnd Hlog Hok".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    (* the counted caller asked for a plain reference; the type witness
+       the gen post now carries is dropped here (fs-log.md §G.24) *)
+    iAssert (if ok
+             then ⌜(mf !!! Regidx (mword_of_int 10 : mword 5) : mword 64) = ipv
+                   /\ (exists es e, nameiparent_of pl es e /\ bname 14 nf = e)⌝ ∗
+                  inode_held ipv ∗ iref_slots 1
+             else ⌜(mf !!! Regidx (mword_of_int 10 : mword 5) : mword 64)
+                   = (mword_of_int 0 : mword 64)⌝ ∗ iref_slots 2)%I
+      with "[Hok]" as "Hok".
+    { destruct ok; [| iExact "Hok"].
+      iDestruct "Hok" as "(%Hp & Hip & Hsl)".
+      iSplitR; [iPureIntro; exact Hp |]. iSplitR "Hsl"; [| iExact "Hsl"].
+      iApply (inode_held_ty_forget with "Hip"). }
     iApply ("Hcont" $! mf n' used' ok nf ipv
               with "[%] Hcg Hcnt Hpc Hbmap Hinos [%] Hbits Hppid Hcwdc Hcwdr
                     Hpath Hname Hbslot [%] [Hlog] Hok").
     { exact Hcs. }
     { exact Husub. }
-    { exact Hbnd. }
+    { split; [exact (walk_spend_counted L n n' w ok Hbud (proj1 Hbnd))
+             | exact (proj2 Hbnd)]. }
     { iApply (log_opS_op with "Hlog"). }
   Qed.
 

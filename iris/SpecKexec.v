@@ -409,6 +409,13 @@ Definition wp_kexec_sconf_body
   (* ---- the file system's geometry, verbatim from SpecNamei ---- *)
   dev = icfg_dev ->
   nib = icfg_nib ->
+  (* ...including the inode region's two ambient ties (fs-log.md §G.25):
+     namei's walk MINTS the group receipt at its nlink guard, and
+     [InodeRegion]'s vocabulary is ambient, so a contract that threads its
+     own [g] and [inodestart] meets it through a pure equation.  Same
+     pattern as the two above, and true at boot by [IcacheRef.icfg_alloc]. *)
+  g = icfg_log ->
+  inodestart = icfg_ist ->
   dev = ROOTDEV ->
   (0 < nib)%nat ->
   log_geom_ok cov logstart ->

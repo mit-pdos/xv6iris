@@ -474,7 +474,7 @@ Section IputTail.
       (cn : ic_names) (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32) (used used' Sb Sb' : gset Z)
-      (k n n' : nat) (spf : bool -> nat) (wb : bool)
+      (k n n' : nat) (spf : bool -> nat) (wb crb0 : bool)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m D : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 vg4 : mword 64) :
@@ -490,8 +490,10 @@ Section IputTail.
     used' ⊆ used ->
     Sb ⊆ Sb' ->
     (* THE PAID-BITMAP REPORT (G-4c): what this run of iput did with the
-       bitmap unit, carried to the contract's post verbatim. *)
+       bitmap unit, carried to the contract's post verbatim, with §G.25's
+       credited-caller clause beside it. *)
     (wb = true -> bmapstart ∈ Sb') ->
+    (crb0 = true -> wb = false) ->
     kernel_text -∗
     is_lock gtl itable_lock "itable"%string
       (itable_res2 cn gfs gi cov logstart nib dev) -∗
@@ -535,13 +537,14 @@ Section IputTail.
         bslots bn 3 -∗
         ⌜Sb ⊆ Sb''⌝ -∗
         ⌜w = true -> bmapstart ∈ Sb''⌝ -∗
+        ⌜crb0 = true -> w = false⌝ -∗
         ⌜((n - spf w)%nat <= n'')%nat /\ (n'' <= n)%nat⌝ -∗
         log_opS g n'' Sb'' -∗
         iref_slot -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros pj ret_tgt spd HK Hanch Hsp0 Hregs Hlo Hhi Hsub Hssub Hwm.
+    intros pj ret_tgt spd HK Hanch Hsp0 Hregs Hlo Hhi Hsub Hssub Hwm Hwc.
     unfold K_iput in HK.
     destruct Hregs as (HDs1 & HDsp & H18 & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
     iIntros "#Htext #Hlock Hpc Hcg Hcnt Hpay Hextc Hextm Htok HRres Hislot
@@ -719,8 +722,9 @@ Section IputTail.
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     iSpecialize ("Hcont" $! CIDe5 with "[]"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! P4 n' used' Sb' wb
-              with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hbms Hins [%] Hbm Hbslots [%] [%] [%] Hop Hislot").
-    5:{ split; [exact Hlo | exact Hhi]. }
+              with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hbms Hins [%] Hbm Hbslots [%] [%] [%] [%] Hop Hislot").
+    6:{ split; [exact Hlo | exact Hhi]. }
+    5:{ exact Hwc. }
     4:{ exact Hwm. }
     3:{ exact Hssub. }
     2:{ exact Hsub. }
@@ -758,7 +762,7 @@ Section IputTail.
       (size : Z) (dev : mword 32) (used used' Sb Sb' : gset Z)
       (k : nat) (q : Qp) (inum : mword 32)
       (Mt : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32))
-      (n n' : nat) (spf : bool -> nat) (wb : bool)
+      (n n' : nat) (spf : bool -> nat) (wb crb0 : bool)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 vg4 : mword 64) :
@@ -777,8 +781,10 @@ Section IputTail.
     used' ⊆ used ->
     Sb ⊆ Sb' ->
     (* THE PAID-BITMAP REPORT (G-4c): what this run of iput did with the
-       bitmap unit, carried to the contract's post verbatim. *)
+       bitmap unit, carried to the contract's post verbatim, with §G.25's
+       credited-caller clause beside it. *)
     (wb = true -> bmapstart ∈ Sb') ->
+    (crb0 = true -> wb = false) ->
     kernel_text -∗
     is_lock gtl itable_lock "itable"%string
       (itable_res2 cn gfs gi cov logstart nib dev) -∗
@@ -823,13 +829,14 @@ Section IputTail.
         bslots bn 3 -∗
         ⌜Sb ⊆ Sb''⌝ -∗
         ⌜w = true -> bmapstart ∈ Sb''⌝ -∗
+        ⌜crb0 = true -> w = false⌝ -∗
         ⌜((n - spf w)%nat <= n'')%nat /\ (n'' <= n)%nat⌝ -∗
         log_opS g n'' Sb'' -∗
         iref_slot -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros pj ret_tgt spd HK Hk Hanch Hsp0 Hregs Hwf Hciwf Hlo Hhi Hsub Hssub Hwm.
+    intros pj ret_tgt spd HK Hk Hanch Hsp0 Hregs Hwf Hciwf Hlo Hhi Hsub Hssub Hwm Hwc.
     pose proof HK as HK'. unfold K_iput in HK'.
     pose proof Hregs as Hregs0.
     destruct Hregs as (HMs1 & HMsp & H18 & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
@@ -984,8 +991,8 @@ Section IputTail.
       assert (Hp1 : Pos.to_nat 1 = 1%nat) by reflexivity.
       iEval (rewrite Hp1) in "Hiu".
       iApply (ip_tail_exit CID0 j bn g gfs gi cn gtl cov logstart bmapstart inodestart
-                nib size dev used used' Sb Sb' k n n' spf wb pidv dq dqb dqs m D2 K eb C sp0 vg4
-                HK Hanch Hsp0 HD2regs Hlo Hhi Hsub Hssub Hwm
+                nib size dev used used' Sb Sb' k n n' spf wb crb0 pidv dq dqb dqs m D2 K eb C sp0 vg4
+                HK Hanch Hsp0 HD2regs Hlo Hhi Hsub Hssub Hwm Hwc
                 with "Htext Hlock Hpc Hcg Hcnt Hpay Hextc Hextm Htok [-Hiu Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm Hbslots Hop Hcont] Hiu
                       Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm Hbslots Hop Hcont").
       iExists (delete k Mt), (delete k ci). iFrame "Hhalf Hiauth Hslots Hpool".
@@ -1045,8 +1052,8 @@ Section IputTail.
       { intros i Hi. reflexivity. }
       { rewrite /islot2 lookup_insert Hcik. iFrame. }
       iApply (ip_tail_exit CID0 j bn g gfs gi cn gtl cov logstart bmapstart inodestart
-                nib size dev used used' Sb Sb' k n n' spf wb pidv dq dqb dqs m D2 K eb C sp0 vg4
-                HK Hanch Hsp0 HD2regs Hlo Hhi Hsub Hssub Hwm
+                nib size dev used used' Sb Sb' k n n' spf wb crb0 pidv dq dqb dqs m D2 K eb C sp0 vg4
+                HK Hanch Hsp0 HD2regs Hlo Hhi Hsub Hssub Hwm Hwc
                 with "Htext Hlock Hpc Hcg Hcnt Hpay Hextc Hextm Htok [-Hislot Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm Hbslots Hop Hcont] Hislot
                       Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm Hbslots Hop Hcont").
       iExists (<[k := (qrest, npred)]> Mt), ci. iFrame "Hhalf Hiauth Hslots Hpool".
@@ -1407,11 +1414,11 @@ Section ProofIput.
       iDestruct (log_opSe_opS with "Hop") as "Hop".
       iApply (ip_tail (CID := CIDacq) CID j bn g gfs gi cn gtl cov logstart bmapstart
                 inodestart nib size dev used used Sb Sb k q inum Mt ci n n
-                (fun w => ip_spend_w w cru crz) false pidv dq dqb dqs
+                (fun w => ip_spend_w w cru crz) false crb pidv dq dqb dqs
                 m E2 K eb C sp0 vg4
                 HK Hk ltac:(wp_next_chain) Hsp0eq HE2regs Hwf Hciwf
                 ltac:(cbn; lia) ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
-                ltac:(discriminate)
+                ltac:(discriminate) ltac:(intros _; reflexivity)
                 with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Hextc Hextm Htok Hhalf Hiauth Hslots
                       Hpool [Hrtok Hrident] Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm
                       Hbslots Hop Hcont").
@@ -1549,11 +1556,11 @@ Section ProofIput.
       iDestruct (log_opSe_opS with "Hop") as "Hop".
       iApply (ip_tail (CID := CIDacq) CID j bn g gfs gi cn gtl cov logstart bmapstart
                 inodestart nib size dev used used Sb Sb k q inum Mt ci n n
-                (fun w => ip_spend_w w cru crz) false pidv dq dqb dqs
+                (fun w => ip_spend_w w cru crz) false crb pidv dq dqb dqs
                 m F1 K eb C sp0 vg4
                 HK Hk ltac:(wp_next_chain) Hsp0eq HF1regs Hwf Hciwf
                 ltac:(cbn; lia) ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
-                ltac:(discriminate)
+                ltac:(discriminate) ltac:(intros _; reflexivity)
                 with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Hextc Hextm Htok Hhalf Hiauth Hslots
                       Hpool [Hrtok Hrident] Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm
                       Hbslots Hop Hcont").
@@ -1659,11 +1666,11 @@ Section ProofIput.
       iDestruct (log_opSe_opS with "Hop") as "Hop".
       iApply (ip_tail (CID := CIDacq) CID j bn g gfs gi cn gtl cov logstart bmapstart
                 inodestart nib size dev used used Sb Sb k q inum Mt ci n n
-                (fun w => ip_spend_w w cru crz) false pidv dq dqb dqs
+                (fun w => ip_spend_w w cru crz) false crb pidv dq dqb dqs
                 m F2 K eb C sp0 vg4
                 HK Hk ltac:(wp_next_chain) Hsp0eq HF2regs Hwf Hciwf
                 ltac:(cbn; lia) ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
-                ltac:(discriminate)
+                ltac:(discriminate) ltac:(intros _; reflexivity)
                 with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Hextc Hextm Htok Hhalf Hiauth Hslots
                       Hpool [Hrtok Hrd Hrn] Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm
                       Hbslots Hop Hcont").
@@ -2125,7 +2132,8 @@ Section ProofIput.
        stated at it verbatim: the bitmap unit is itrunc's to spend and iput
        adds nothing to it, so the report travels through unchanged and only
        the set it is read against grows. *)
-    iDestruct "Hopx" as (wit u' Sb1) "(%Hsub1 & %Hib1 & %Hwbm & %Hu' & Hop)".
+    iDestruct "Hopx" as (wit u' Sb1)
+      "(%Hsub1 & %Hib1 & %Hwbm & %Hwitc & %Hu' & Hop)".
     assert (Hpc66 : ret_pc (J2 !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x66))
       by (rewrite HJ2ra; pcw).
     iEval (rewrite Hpc66) in "Hpc".
@@ -2510,10 +2518,10 @@ Section ProofIput.
     iApply (ip_tail (CID := CIDac2) CID j bn g gfs gi cn gtl cov logstart bmapstart
               inodestart nib size dev used (used ∖ bm_blocks bm)
               Sb (Sb1 ∪ {[IBLOCK inum inodestart]}) k q inum Mt2 ci2
-              n u' (fun w => ip_spend_w w cru crz) wit pidv dq dqb dqs m J10 K eb C sp0
+              n u' (fun w => ip_spend_w w cru crz) wit crb pidv dq dqb dqs m J10 K eb C sp0
               (m !!! Regidx Rs2)
               HK Hk ltac:(wp_next_chain) Hsp0eq HJ10regs Hwf2 Hciwf2
-              Hblo Hbhi Hdsub Hssub Hwbm2
+              Hblo Hbhi Hdsub Hssub Hwbm2 Hwitc
               with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Hextc Hextm Htok Hhalf2 Hiauth2
                     Hslots2 Hpool2 Href Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm
                     [Hbs2 Hbs1] Hop Hcont").
@@ -2570,7 +2578,7 @@ Section ProofIput.
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     iIntros (mf n' used' Sb' wf) "%Hcs Hcg Hcnt Hextc Hextm Hpc Hppid Hbms Hins
-                               %Husub Hbm Hbslots %Hssub %Hwbm %Hbnd Hop Hislot".
+                               %Husub Hbm Hbslots %Hssub %Hwbm %Hwc %Hbnd Hop Hislot".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf n' used' with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hbms Hins
                      [%] Hbm Hbslots [%] [Hop] Hislot").

@@ -261,6 +261,7 @@ Section ItruncSpec.
     bm_paidS γ bmapstart crb u Sb e0 -∗
       ∃ (w : bool) (n : nat) (Sb' : gset Z),
         ⌜Sb ⊆ Sb'⌝ ∗ ⌜w = true -> bmapstart ∈ Sb'⌝ ∗
+        ⌜crb = true -> w = false⌝ ∗
         ⌜(it_entry crb u - it_bm w <= n <= it_entry crb u)%nat
          /\ (S u <= n)%nat⌝ ∗
         log_opSe γ n Sb' e0.
@@ -269,9 +270,11 @@ Section ItruncSpec.
     - iDestruct "H" as (Sb') "(%Hsub & %Hin & H)".
       iExists (negb crb), (S u), Sb'. iSplitR; [iPureIntro; exact Hsub|].
       iSplitR; [iPureIntro; intros _; exact Hin|].
+      iSplitR; [iPureIntro; intros ->; reflexivity|].
       iSplitR; [iPureIntro; destruct crb; simpl; lia|]. iFrame "H".
     - subst crb. iDestruct "H" as (Sb') "(%Hsub & H)".
       iExists false, (S (S u)), Sb'. iSplitR; [iPureIntro; exact Hsub|].
+      iSplitR; [iPureIntro; discriminate|].
       iSplitR; [iPureIntro; discriminate|].
       iSplitR; [iPureIntro; simpl; lia|]. iFrame "H".
   Qed.
@@ -622,6 +625,11 @@ Definition wp_itrunc_gen_body
          ⌜Sb ⊆ Sb'⌝ ∗
          ⌜IBLOCK inum inodestart ∈ Sb'⌝ ∗
          ⌜w = true -> bmapstart ∈ Sb'⌝ ∗
+         (* A CREDITED CALLER IS NEVER CHARGED ITS OWN CREDIT BACK
+            (fs-log.md §G.25): at [crb = true] the paid disjunct pins the
+            level, so the report is [false] -- which is what lets a walk's
+            next level be FREE rather than merely bounded. *)
+         ⌜crb = true -> w = false⌝ ∗
          ⌜(it_entry crb u - (it_bm w + it_iu cru) <= u')%nat
           /\ (u' + it_iu cru <= it_entry crb u)%nat⌝ ∗
          log_opS γ u' Sb') -∗

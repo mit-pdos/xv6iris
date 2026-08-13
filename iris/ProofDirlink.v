@@ -1779,7 +1779,7 @@ Section ProofDirlinkMain.
       { rewrite Heb /cpu_claim_ext. done. }
       { iEval (cbn beta iota). iEmpIntro. }
       iIntros (CIDip Hsip mip nn uu Sbp wdl)
-        "%Hcsip Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Huu Hbmr Hbsl %Hsbp %Hwdl %Hnn Hop
+        "%Hcsip Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Huu Hbmr Hbsl %Hsbp %Hwdl %Hwdc %Hnn Hop
          Hislot".
       (* GR-2c FINDING 5, verbatim: the credited bound is STRONGER
          ([ip_spend_w w false false <= 2] against [iput_units = 3]), and

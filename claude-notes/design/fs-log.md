@@ -1858,3 +1858,86 @@ keep.  It is out of the sanctioned statement set by exactly one file
   `inode_ref_short_shr_gen_agree` right after `inode_shr_gen_intro`), and
   to `inode_ref_short_gen_forget` at the four `iunlockput` sites that
   consume it.
+
+
+### G.25 THE TIE RULING (2026-08-13, coordinator): AMBIENT TIES, option (ii)
+
+`⌜g = icfg_log⌝` and `⌜inodestart = icfg_ist⌝` are PURE PREMISES of the
+namex trio — both forms, counted and gen — beside the `dev = icfg_dev` /
+`nib = icfg_nib` pair premise (1) already carries.  `SpecKexec` takes the
+same two (it already carries that pair, it has no external consumer, and
+its four proof files take one intro line each), and `SpecCreate` will
+carry four.  The `cz`-indexed alternative is REJECTED: a boolean that
+exists only so one caller can opt out of a fact true everywhere — there is
+one log and one inode region — is the interface the guiding principle says
+never to keep.
+
+Also ruled: the G-4c posts gain the pure clause `⌜crb = true -> w = false⌝`
+(`wp_itrunc_gen`, `wp_iput_gen`, `wp_iunlockput_gen`, and
+`bm_paidS_elim`, which is where it is proven — the elim's own `w` IS
+`negb crb && paid`).  It is load-bearing, not decoration: without it a
+CREDITED level's post admits `w = true`, and the walk's budget step
+`n - walk_spend w_cur <= n_cur` cannot be re-established after a level
+that was supposed to be free.
+
+
+### G.26 G-4d LANDED (2026-08-13): the trio's SINGLE move — the walk is
+### priced at ONE unit, and nameiparent's parent carries its type
+
+**THE CONTRACT, AS LANDED.**  `SpecNamex` / `SpecNamei` / `SpecNameiparent`,
+gen forms; the counted forms are BYTE-STABLE and derive from them.
+
+| clause | shape |
+|---|---|
+| premises (1) | `dev = icfg_dev`, `nib = icfg_nib`, **`g = icfg_log`, `inodestart = icfg_ist`** (§G.25's ruling) |
+| premise (4) | `walk_need L <= n` — `iput_units` at `L = 0`, `S iput_units` otherwise.  FOUR units, whatever the path length; `walk_need_counted` derives it from the counted premise, which is why the sconf statements did not move |
+| post, ledger | `⌜w = true -> bmapstart ∈ Sb'⌝` and `n - (walk_spend w + (if ok then 0 else 1)) <= n' <= n` |
+| post, success | `if npar then inode_held_ty ipv T_DIR else inode_held ipv` |
+
+**WHY THE FIGURE IS INDEXED BY `ok`, AND WHY THAT IS EXACT FOR create.**
+Three of the walk's five iput sites cannot be credited: `L_notdir` (+0x54)
+runs BEFORE the nlink guard and `L_nlink` (+0x7a) runs AT it, so neither is
+downstream of the mint, and `L_done`'s `iput` (+0x140) is at an inode this
+walk never locked.  All three are TERMINAL, so the walk pays that unit at
+most once — and never on a SUCCESS arm: namei returns at +0x140 without an
+iput and nameiparent returns through `L_par` (+0x84), which calls
+`iunlock`.  create proceeds only on success, so `CreateBudget.cr_uw w =
+cr_u0 - np_spend w` is exactly right and its five arms closed UNCHANGED.
+
+**THE LOOP'S INVARIANT — FIVE CLAUSES, and one of them is not optional.**
+`wc` (paid), `n - walk_spend wc <= ncur`, `ncur <= n`, **`iput_units <=
+ncur` UNCONDITIONALLY**, `0 < Lr -> iput_units + (if wc then 0 else 1) <=
+ncur`, `wc = true -> bmapstart ∈ Scur`.  The unconditional clause is the
+one the first attempt lacked: the `L_done` iput runs at `Lr = 0`, where the
+guarded clause says nothing, and `wc = true -> 0 < L` is not a fact the
+invariant carries.  Per level: `crb := wc`, `crz := true`, `w_next :=
+wc || w'` — and `nx_wi_step` closes only because of §G.25's
+`crb = true -> w = false`.
+
+**THE MINT IS ONE fupd AT THE GUARD'S FALL-THROUGH.**  `log_opS_named`
+opens the op's epoch once per turn, `log_opSe_lb` reads the lower bound off
+it, and `InodeRegion.ireg_obs_mint` deposits the observation against the
+`dinode_at` that `ic_loaded` was already destructed into (`Hdiat`).  The
+result is persistent and inum-keyed, so the two credited sites below the
+guard (found +0xec, miss +0x8c) present it as `crz` with the two ties, and
+nothing has to be threaded.  `L_par` closes the epoch again
+(`log_opSe_opS`) because it calls no iput and the post is `log_opS`.
+
+**THE BUNDLED PARENT, AND THE ONE MOVE THAT MAKES IT POSSIBLE.**  iunlock
+hands the share back generation-ERASED, so the name has to be carried on
+the OTHER side of the window: the shed now opens the retained parent's
+generation (`inode_ref_short_gen_intro`) and pins it to the share's by
+`inode_ref_short_shr_gen_agree`, the four `iunlockput` sites forget it
+again (`inode_ref_short_gen_forget`), and `L_par` re-forms the reference
+with `inode_ref_gather_gen` at that name and pairs it with ilock's own
+`ity_shot`.  **The two agreements must eliminate the SAME variable**: at
+the shed keep ilock's `gsh` (`as %->`), at `L_par` keep it again by
+eliminating the freshly-opened one (`as %<-`) — get it backwards and the
+error is `The variable gsh was not found`, hundreds of lines away.
+
+**Per-file cost** (16 files, +577/−242).  The kexec ripple was two premises
+on `SpecKexec` and three inline lemma statements plus four intro lines in
+`ProofKexecA` — nothing else in the tree consumes the trio.
+
+Gate: MAKE_EXIT=0, 1086 `.vo`, staleness 0, `make -n` 0 `COQC`, md5s
+verified on all sixteen files.

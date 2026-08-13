@@ -2884,7 +2884,7 @@ Section ItruncMain.
       iEval (rewrite Hisempty) in "Hblks".
       iEval (rewrite -Hblkempty) in "Hbmr".
       iDestruct (bm_paidS_elim with "Hpaid") as (wq n0 Sq)
-        "(%Hqsub & %Hqbm & %Hn0 & Hop)".
+        "(%Hqsub & %Hqbm & %Hwqc & %Hn0 & Hop)".
       (* iupdate wants a successor; bm_paidS guarantees at least S u *)
       destruct n0 as [|n1]; [exfalso; unfold it_entry in Hn0; lia|].
       (* the tail flush's credit travels through the loop's growth: the
@@ -2935,6 +2935,7 @@ Section ItruncMain.
          bitmap membership the loops established is still there after the
          flush, because the set only grew. *)
       iSplitR; [iPureIntro; intros Hw; apply elem_of_union_l; exact (Hqbm Hw)|].
+      iSplitR; [iPureIntro; exact Hwqc|].
       iSplitR; [iPureIntro; unfold it_entry, it_spend, it_iu, it_bm in *;
                 destruct crb, cru, wq; simpl in *; lia|].
       iExact "Hop".
@@ -2978,7 +2979,7 @@ Section ItruncMain.
       iIntros (CID15y Hq15y Mz) "%HMzsp %HMzthr %HMzs3 Hcg Hcnt Hextc Hextm Hpc Hppid
                                  Hidev Hsbb Hslot6 Hmap Hblks Hbmr Hsl Hpaid".
       iDestruct (bm_paidS_elim with "Hpaid") as (wr n2 Sr)
-        "(%Hrsub & %Hrbm & %Hn2 & Hop)".
+        "(%Hrsub & %Hrbm & %Hwrc & %Hn2 & Hop)".
       destruct n2 as [|n3]; [exfalso; unfold it_entry in Hn2; lia|].
       iPoseProof (log_credit_mono γ cru Sb Sr e0 (IBLOCK inum inodestart) Hrsub
                     with "Hcru") as "#Hcru2".
@@ -3008,6 +3009,7 @@ Section ItruncMain.
       iSplitR; [iPureIntro; exact (it_sub_union_l _ _ _ Hrsub)|].
       iSplitR; [iPureIntro; exact (it_in_union_sing _ _)|].
       iSplitR; [iPureIntro; intros Hw; apply elem_of_union_l; exact (Hrbm Hw)|].
+      iSplitR; [iPureIntro; exact Hwrc|].
       iSplitR; [iPureIntro; unfold it_entry, it_spend, it_iu, it_bm in *;
                 destruct crb, cru, wr; simpl in *; lia|].
       iExact "Hop".
@@ -3073,7 +3075,7 @@ Section ItruncMain.
     iIntros (mf) "%Hcs Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hinum Hsbb Hsbi
                   Hmeta Hmap Hblks Hbmr Hdn Hsl Hop".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
-    iDestruct "Hop" as (wf u' Sb') "(_ & _ & _ & %Hbnd & Hop)".
+    iDestruct "Hop" as (wf u' Sb') "(_ & _ & _ & _ & %Hbnd & Hop)".
     iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hinum
                      Hsbb Hsbi Hmeta Hmap Hblks Hbmr Hdn Hsl [Hop]");
       [exact Hcs |].

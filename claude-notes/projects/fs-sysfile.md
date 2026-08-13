@@ -6267,3 +6267,48 @@ For the D₀ brief, what its relaunch may assume, verbatim:
   path length.  G-4c (design/fs-log.md §G.22's table) is what unblocks it.
 * **`CreateBudget` is untouched and still closes** — all five arm
   theorems are `forall w` and were not re-run against anything new here.
+
+
+### G-4c/G-4d LANDED (2026-08-13) — **D₀'s two blockers are both closed.**
+### The full record is design/fs-log.md §G.22-§G.26.
+
+**WHAT D₀ MAY NOW ASSUME FROM `wp_nameiparent_gen`'s SUCCESS ARM, verbatim:**
+
+* **SPEND: `n - (walk_spend w + 0) <= n' <= n`** on the success arm
+  (`ok = true`), i.e. **at most ONE unit for the whole walk**, whatever the
+  path length.  `SpecNamex.walk_spend w` is `if w then 1 else 0`,
+  definitionally `CreateBudget.np_spend w`.
+* **MEMBERSHIP: `⌜w = true -> bmapstart ∈ Sb'⌝`** — so create's FIRST
+  `dirlink` runs at `crb := w` honestly, which is exactly the row
+  `CreateBudget.cr_budget_mkdir`/`_file` are stated at.  All five arm
+  theorems close UNCHANGED at both values of `w`.
+* **THE PARENT IS `IcacheRef.inode_held_ty ipv T_DIR`** — the reference
+  with its generation NAMED and that generation's type one-shot beside it.
+  create cashes it by shedding a share at the same generation
+  (`inode_shr_gen`, which is what `SpecIlock` takes), calling ilock, and
+  joining the two one-shots with `IcacheRef.ity_shot_agree`; the generation
+  cannot have moved under it, because a regen needs the whole liveness unit
+  and this reference holds a slice.  **Blocker B is CLOSED**: create needs
+  no parent type test of its own, and it never had one.
+  `inode_held_ty_forget` recovers the plain `inode_held` wherever the type
+  is not wanted.
+* **THE PREMISES create must now discharge**: the two ambient ties
+  `g = icfg_log` and `inodestart = icfg_ist` beside the `dev`/`nib` pair
+  `SpecCreate` already carries, and the budget premise
+  `SpecNamex.walk_need L <= n` — FOUR units, not `(L+1) * iput_units`.
+  create begins at `cr_u0 = MAXOPBLOCKS = 10`, so it is satisfied
+  outright.  **Blocker A's ledger stage is CLOSED.**
+* **What the FAILURE arm costs** (`ok = false`, i.e. create's ARM N):
+  `walk_spend w + 1`.  create returns immediately on that arm and needs
+  nothing from the figure.
+
+The `iunlockput`/`iput` contracts create itself calls also moved (§G.22,
+§G.23): they take `crz` + the birth epoch and REPORT the paid-bitmap
+boolean, so create's own freeing `iunlockput` at `crb = cru = true` still
+spends exactly zero (`ip_spend_w w true false` at the report `w = false`
+the credited entry pins).
+
+**D₀'s remaining restage items are unchanged** and are the ones listed
+under "Restage rulings" above: the +0xb2 T_DIR sub-branch cut,
+`wp_dirlink_gen`'s `dl_need`-shaped premise, the found arm's own decision
+pair, and the prose corrections.

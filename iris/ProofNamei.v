@@ -239,8 +239,8 @@ Section ProofNameiMain.
   Proof.
     cbv beta delta [wp_namei_gen_body].
     intros pcE pjv pv ret_tgt pl L
-           HK Hdev Hnib Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
-           Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Heb.
+           HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
+           Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Heb.
     destruct (nam_kb K HK) as (Knx & K4 & Kpop).
     (* N3d trap 1's whole-function fix: fold [proc_addr j] into every
        resource ONCE, and never write [pjv] again. *)
@@ -425,15 +425,15 @@ Section ProofNameiMain.
     iApply (NX.wp_namex_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib size dev used cwdv
               plen pfun nfun false n Sb pidv dq dqb dqs dqc R5 (K - 4)%nat eb C b
-              Knx Hdev Hnib Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
-              Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs
+              Knx Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
+              Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs
               ltac:(rewrite HR5a1; exact nam_a1_false) Heb
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hkenv Hitb2 Hitbl
                     Hesc Hslks Hireg Hprocs Hdev Hgeom Hdlk Hbmap Hinos
                     Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog").
-    iIntros (CID8 Hq8 mf n' used' Sb' ok nf ipv)
+    iIntros (CID8 Hq8 mf n' used' Sb' ok nf ipv w)
             "%Hcs Hcg Hcnt Hpc Hbmap Hinos %Hsub Hbits Hppid Hcwdc Hcwdr
-             Hpath Hname Hbslot %Hssub %Hbudo Hlog Hok".
+             Hpath Hname Hbslot %Hssub %Hwbm %Hbudo Hlog Hok".
     iEval (rewrite HR5a0) in "Hpath".
     iEval (rewrite HR5a2) in "Hname".
     (* THE CARVE, UNDONE: fourteen written bytes plus the two spare ones are
@@ -597,12 +597,13 @@ Section ProofNameiMain.
     iDestruct (cpu_own_transport CID8 CID12 0%nat eb (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! P3 n' used' Sb' ok ipv
+    iApply ("Hcont" $! P3 n' used' Sb' ok ipv w
               with "[%] Hcg Hcnt Hpc Hbmap Hinos [%] Hbits Hppid Hcwdc Hcwdr
-                    Hpath Hbslot [%] [%] Hlog Hok").
+                    Hpath Hbslot [%] [%] [%] Hlog Hok").
     { unfold callee_saved. split_and!; assumption. }
     { exact Hsub. }
     { exact Hssub. }
+    { exact Hwbm. }
     { exact Hbudo. }
   Qed.
 
@@ -636,8 +637,8 @@ Section ProofNameiMain.
   Proof.
     cbv beta delta [wp_namei_sconf_body].
     intros pcE pjv pv ret_tgt pl L
-           HK Hdev Hnib Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
-           Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Heb.
+           HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
+           Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Heb.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl
               #Hesc #Hslks #Hireg #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
               Hbits Hppid Hcwdc Hcwdr Hpath Hbslot Hislot Hlog Hcont".
@@ -646,20 +647,21 @@ Section ProofNameiMain.
               ga gf cov logstart bmapstart inodestart nib
               size dev used cwdv plen pfun n Sb0
               pidv dq dqb dqs dqc m K eb C b
-              HK Hdev Hnib Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Heb
+              HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen (walk_need_counted L n Hbud) Hj Hgs Heb
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hkenv Hitb2 Hitbl Hesc Hslks Hireg Hprocs Hdev Hgeom Hdlk Hbmap Hinos Hbits Hppid Hcwdc Hcwdr Hpath Hbslot Hislot Hlog [Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
-    iIntros (mf n' used' Sb' ok ipv)
+    iIntros (mf n' used' Sb' ok ipv w)
       "%Hcs Hcg Hcnt Hpc Hbmap Hinos %Husub Hbits Hppid Hcwdc Hcwdr
-       Hpath Hbslot %Hssub %Hbnd Hlog Hok".
+       Hpath Hbslot %Hssub %Hwbm %Hbnd Hlog Hok".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf n' used' ok ipv
               with "[%] Hcg Hcnt Hpc Hbmap Hinos [%] Hbits Hppid Hcwdc Hcwdr
                     Hpath Hbslot [%] [Hlog] Hok").
     { exact Hcs. }
     { exact Husub. }
-    { exact Hbnd. }
+    { split; [exact (walk_spend_counted L n n' w ok Hbud (proj1 Hbnd))
+             | exact (proj2 Hbnd)]. }
     { iApply (log_opS_op with "Hlog"). }
   Qed.
 

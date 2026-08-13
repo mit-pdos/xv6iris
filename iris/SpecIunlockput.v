@@ -351,6 +351,10 @@ Definition wp_iunlockput_gen_body
          unit", and it comes with the membership that makes a walker's next
          level able to claim [crb := true]. *)
       ⌜w = true -> bmapstart ∈ Sb'⌝ -∗
+      (* ...and a CREDITED caller is never charged its own credit back
+         (fs-log.md §G.25): at [crb = true] the report is [false], which is
+         what makes a walk's next level FREE and not merely bounded. *)
+      ⌜crb = true -> w = false⌝ -∗
       ⌜((n - ip_spend_w w cru crz)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_opS g n' Sb' -∗
       iref_slot -∗

@@ -313,6 +313,10 @@ Section KexecABody.
     (K_kexec <= K)%nat ->
     dev = icfg_dev ->
     nib = icfg_nib ->
+    (* the inode region's two ambient ties, threaded to namei (fs-log.md
+       §G.25) *)
+    g = icfg_log ->
+    inodestart = icfg_ist ->
     dev = ROOTDEV ->
     (0 < nib)%nat ->
     log_geom_ok cov logstart ->
@@ -414,7 +418,7 @@ Section KexecABody.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros L HK Hdev Hnib Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
+    intros L HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
            Hiregb Hcstr Hplen Hbudget Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2 Ha0 Ha1.
     unfold K_kexec in HK.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hfab #Hka Hbm Hins Hbits Hpriv
@@ -553,7 +557,7 @@ Section KexecABody.
               ga gf cov logstart bmapstart inodestart nib size dev used
               (pv_cwd V) plen pfun MAXOPBLOCKS pidv (DfracOwn (1/4)) dqb dqs
               (DfracOwn 1) N5 (K - 68)%nat true C true
-              ltac:(unfold K_namei; lia) Hdev Hnib Hroot Hnib0 Hlg Hsz Hbm0
+              ltac:(unfold K_namei; lia) Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0
               Hbmc Hbml Hins0 Hcovb Hiregb Hcstr Hplen
               ltac:(unfold iput_units, MAXOPBLOCKS in *; lia) Hjp Hgs eq_refl
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hka Hitab Hitinv Hesc
@@ -809,6 +813,10 @@ Section KexecABody.
     (K_kexec <= K)%nat ->
     dev = icfg_dev ->
     nib = icfg_nib ->
+    (* the inode region's two ambient ties, threaded to namei (fs-log.md
+       §G.25) *)
+    g = icfg_log ->
+    inodestart = icfg_ist ->
     dev = ROOTDEV ->
     (0 < nib)%nat ->
     log_geom_ok cov logstart ->
@@ -905,7 +913,7 @@ Section KexecABody.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros L HK Hdev Hnib Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
+    intros L HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
            Hiregb Hbudget Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2.
     pose proof HK as HK'. unfold K_kexec in HK'.
     iIntros "#Htext #Hpanic #Hfab Hseam Hcont Hcont90".
@@ -1627,6 +1635,10 @@ Section KexecAMain.
     (K_kexec <= K)%nat ->
     dev = icfg_dev ->
     nib = icfg_nib ->
+    (* the inode region's two ambient ties, threaded to namei (fs-log.md
+       §G.25) *)
+    g = icfg_log ->
+    inodestart = icfg_ist ->
     dev = ROOTDEV ->
     (0 < nib)%nat ->
     log_geom_ok cov logstart ->
@@ -1737,7 +1749,7 @@ Section KexecAMain.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros L HK Hdev Hnib Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
+    intros L HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
            Hiregb Hcstr Hplen Hbudget Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2 Ha0 Ha1.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hfab #Hka Hbm Hins Hbits Hpriv
              Hpath Hargv Hargs Hbs Hirs Hcont Hcont90".
@@ -1745,7 +1757,7 @@ Section KexecAMain.
               cov logstart bmapstart inodestart nib size dev used
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa
               m K eb C b sp0 ra0 s00 s10 s20 pv av
-              HK Hdev Hnib Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
+              HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
               Hiregb Hcstr Hplen Hbudget Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2
               Ha0 Ha1
               with "Hcg Hcnt Htext Hpc Hpanic Hfab Hka Hbm Hins Hbits Hpriv
@@ -1758,7 +1770,7 @@ Section KexecAMain.
               cov logstart bmapstart inodestart nib size dev used used1
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa
               m M32 K eb C b sp0 ra0 s00 s10 s20 pv av ipv n1
-              HK Hdev Hnib Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
+              HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
               Hiregb Hbudget Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2
               with "Htext Hpanic Hfab Hseam Hexit Hcont90").
   Qed.
