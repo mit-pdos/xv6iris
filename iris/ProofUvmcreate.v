@@ -43,16 +43,20 @@ Proof. lia. Qed.
 
 (* Z-only (bv-free) node-page range arithmetic, so [lia] never sees a bv --
    the heavy-import context breaks lia's zify hook otherwise. *)
+(* The lower bound is [PageGeom.kmem_lo] -- kalloc's own [page_in_range]
+   floor, which IS the dumped `end` symbol -- rather than a transcribed
+   address: its body is a [Z] literal computed from [KernelSyms.end_], so
+   [unfold kmem_lo] leaves [lia] a number to work with. *)
 Lemma uvc_kdata_bound_arith (z : Z) :
-  (z mod 4096 = 0)%Z -> (0x80023558 <= z)%Z -> (z < 0x88000000)%Z ->
+  (z mod 4096 = 0)%Z -> (kmem_lo <= z)%Z -> (z < 0x88000000)%Z ->
   (ram_base <= z)%Z /\ (z + 4096 <= ram_base + ram_size)%Z.
 Proof.
   intros Hm Hlo Hhi. apply Z.mod_divide in Hm; [| lia]. destruct Hm as [k Hk].
-  unfold ram_base, ram_size. lia.
+  unfold kmem_lo in Hlo. unfold ram_base, ram_size. lia.
 Qed.
 
-Lemma uvc_kda_arith (z : Z) : (0x80023558 <= z)%Z -> (text_end <= z)%Z.
-Proof. unfold text_end. lia. Qed.
+Lemma uvc_kda_arith (z : Z) : (kmem_lo <= z)%Z -> (text_end <= z)%Z.
+Proof. unfold text_end, kmem_lo. lia. Qed.
 
 
 Module UvmcreateProof (AK : KALLOC) (MS : MEMSET) : UVMCREATE.

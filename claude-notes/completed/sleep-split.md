@@ -272,10 +272,13 @@ against `kernel.asm` — read `iris/wip/README.md` first. Proving uartwrite
 replaces `LinkUartwrite.v` with the real functor instantiation and nothing
 else.
 
-**D2 IS ASSUMED SEPARATELY**, in `iris/LinkTxLockInit.v`: one `Axiom` giving
-`is_txlock` from the transmitter token and the frozen DLAB fact — exactly what
-the missing `initsleeplock(&tx_lock, "uart")` plus the usual newlock step
-would give. Deliberately a different file from `LinkUartwrite.v`, because the
+**D2 WAS ASSUMED SEPARATELY**, in `iris/LinkTxLockInit.v`: one `Axiom` giving
+`is_txlock` from the transmitter token and the frozen DLAB fact. *(Historical:
+that file is DELETED. Its statement omitted the lock's storage —
+`SpecProcinit.lk_fresh`, which `WpLock.newlock` needs — so it was never
+provable as written, independently of the missing C; and it had no consumer.
+D2 itself was fixed upstream by `b7c25cf`/`d80e61c5`, and `uartwrite` is now
+proven. See `projects/uart-driver.md`.)* Deliberately a different file from `LinkUartwrite.v`, because the
 two are different kinds of debt (a proof that is not written vs. a line of C
 that is not there) and they retire independently; keeping them apart stops
 either from hiding the other.

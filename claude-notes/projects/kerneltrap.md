@@ -1229,8 +1229,9 @@ resource the credential is made of, and stop dropping it.**
   **at `d80e61c5` uartintr takes no lock**, so `is_txlock` left `devintr_caps`
   entirely and the `tx_busy` cell it protected is gone from the image.  The
   UART's ownership question survives, but it is no longer on kerneltrap's cone —
-  it is `LinkTxLockInit.v`'s assumed boot step, on the *printk* effort's ledger
-  (`projects/uart-driver.md`).
+  it is the boot step that mints `is_txlock`, on the *printk* effort's ledger
+  (`projects/uart-driver.md`).  No axiom stands in for it any more —
+  `LinkTxLockInit.v` is deleted — it is simply not wired up yet.
 - **`timer_cap` — DISCHARGED.**  Three edits, exactly where the diagnosis said:
   `SpecEntry.wp_entry_boot`'s post gained the ninth pure conjunct
   (`_get_Counteren_TM mcounterenf = '1'`), `ProofEntry` closes it with one

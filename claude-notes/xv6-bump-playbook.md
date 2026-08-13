@@ -254,8 +254,11 @@ cache produced confidently wrong answers twice.
 `kmem`, `pid_lock`, `wait_lock`, `ticks` all move. A proof reaching one through
 an `lw` displacement goes stale **even when the symbol itself is symbolic**
 (`sb_inodestart` is `KernelSyms.sb + 24`, but the displacement that reaches it
-is a literal). Prefer replacing a literal with `KernelSyms.<sym>` when the
-surrounding proof can still close — but check first: an opaque constant breaks
+is a literal). FOR `end` SPECIFICALLY THE CANONICAL HANDLE IS `PageGeom.kmem_lo`, which
+already is `ltac:(eval vm_compute in KernelSyms.end_)` and is in scope almost
+everywhere (`KallocInv` and `PtTree` both `Require Export PageGeom`) — do not
+write a second copy of the idiom. Otherwise prefer replacing a literal with
+`KernelSyms.<sym>` when the surrounding proof can still close — but check first: an opaque constant breaks
 a `lia` that needs the concrete value. `ltac:(eval vm_compute in KernelSyms.x)`
 gives you both.
 

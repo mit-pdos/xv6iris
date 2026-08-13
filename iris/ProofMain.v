@@ -699,7 +699,8 @@ Section ProofMain.
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) :
     (50 <= n)%nat ->
     phystop = (mword_of_int 0x88000000 : mword 64) ->
-    s1entry = add_vec (and_vec (add_vec (mword_of_int 0x80023558 : mword 64)
+    (* [kmem_lo] IS the dumped `end` symbol -- see [SpecMain]'s premise *)
+    s1entry = add_vec (and_vec (add_vec (mword_of_int kmem_lo : mword 64)
                         (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv ->
     prun phystop s1entry ps ->
     (K_kvmmake + 64 + 3 < length ps)%nat ->

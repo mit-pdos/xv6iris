@@ -333,9 +333,13 @@ Section SpecMain.
        the boot path exactly when cpuid() returns 0. *)
     cid_word = (zero_reg : mword 64) ->
     (K_main <= K)%nat ->
-    (* kinit's free-page run: [end .. PHYSTOP), page-aligned *)
+    (* kinit's free-page run: [end .. PHYSTOP), page-aligned.  The cursor is
+       PGROUNDUP(end) + PGSIZE, and [PageGeom.kmem_lo] IS the dumped `end`
+       symbol (a plain [Z] literal computed from [KernelSyms.end_] at its own
+       definition, so [vm_compute]/[lia] see a number here) -- never a
+       transcribed address, which goes stale on every image bump. *)
     phystop = (mword_of_int 0x88000000 : mword 64) ->
-    s1entry = add_vec (and_vec (add_vec (mword_of_int 0x80023558 : mword 64)
+    s1entry = add_vec (and_vec (add_vec (mword_of_int kmem_lo : mword 64)
                         (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv ->
     prun phystop s1entry ps ->
     (* enough pages for kvmmake's 102 nodes, the 64 kstacks and the disk's 3 *)

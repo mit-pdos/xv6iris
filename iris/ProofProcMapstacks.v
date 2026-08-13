@@ -925,7 +925,11 @@ Section ProofPMS.
       assert (Hqlt : (q < 557056)%Z) by nia.
       split.
       - rewrite Hpp. unfold ram_base.
-        apply (Z.le_trans _ 0x80023558); [apply Z.leb_le; vm_compute; reflexivity | rewrite Hq; nia].
+        (* via kalloc's own floor [PageGeom.kmem_lo] (= the dumped `end`
+           symbol, a [Z] literal by definition), which [Hplo] gives us --
+           NOT a transcribed address. *)
+        apply (Z.le_trans _ kmem_lo); [apply Z.leb_le; vm_compute; reflexivity
+                                      | unfold kmem_lo; rewrite Hq; nia].
       - rewrite Hpp. unfold ram_base, ram_size. rewrite Hq. nia. }
     (* case on i+1 = 64 (fall to epilogue) or < 64 (recurse) *)
     destruct rem' as [| rem''].
