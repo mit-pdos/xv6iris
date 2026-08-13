@@ -87,7 +87,7 @@ Section ProofWakeupPartsEpi.
     (* +0x54 c.ldsp ra,56(sp) *)
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.wakeup + 0x54)) (mword_of_int 7 : mword 6) (mword_of_int 1 : mword 5)
               M (K - 8)%nat vra b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi54 [Hf7] [-]").
+              with "Hcg Hpc Hi54 [Hf7]").
     { unfold wk_fcell. iExact "Hf7". }
     iIntros (CID1 Hst1) "Hcg Hpc Hf7".
     set (E1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg vra]> M).
@@ -97,7 +97,7 @@ Section ProofWakeupPartsEpi.
     (* +0x56 c.ldsp s0,48(sp) *)
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.wakeup + 0x56)) (mword_of_int 6 : mword 6) (mword_of_int 8 : mword 5)
               E1 (K - 8)%nat vs0 b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi56 [Hf6] [-]").
+              with "Hcg Hpc Hi56 [Hf6]").
     { unfold wk_fcell. iEval (rewrite HspE1). iExact "Hf6". }
     iIntros (CID2 Hst2) "Hcg Hpc Hf6".
     iEval (rewrite HspE1) in "Hf6".
@@ -108,7 +108,7 @@ Section ProofWakeupPartsEpi.
     (* +0x58 c.ldsp s1,40(sp) *)
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.wakeup + 0x58)) (mword_of_int 5 : mword 6) (mword_of_int 9 : mword 5)
               E2 (K - 8)%nat vs1 b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi58 [Hf5] [-]").
+              with "Hcg Hpc Hi58 [Hf5]").
     { unfold wk_fcell. iEval (rewrite HspE2). iExact "Hf5". }
     iIntros (CID3 Hst3) "Hcg Hpc Hf5".
     iEval (rewrite HspE2) in "Hf5".
@@ -119,7 +119,7 @@ Section ProofWakeupPartsEpi.
     (* +0x5a c.ldsp s2,32(sp) *)
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.wakeup + 0x5a)) (mword_of_int 4 : mword 6) (mword_of_int 18 : mword 5)
               E3 (K - 8)%nat vs2 b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi5a [Hf4] [-]").
+              with "Hcg Hpc Hi5a [Hf4]").
     { unfold wk_fcell. iEval (rewrite HspE3). iExact "Hf4". }
     iIntros (CID4 Hst4) "Hcg Hpc Hf4".
     iEval (rewrite HspE3) in "Hf4".
@@ -130,7 +130,7 @@ Section ProofWakeupPartsEpi.
     (* +0x5c c.ldsp s3,24(sp) *)
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.wakeup + 0x5c)) (mword_of_int 3 : mword 6) (mword_of_int 19 : mword 5)
               E4 (K - 8)%nat vs3 b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi5c [Hf3] [-]").
+              with "Hcg Hpc Hi5c [Hf3]").
     { unfold wk_fcell. iEval (rewrite HspE4). iExact "Hf3". }
     iIntros (CID5 Hst5) "Hcg Hpc Hf3".
     iEval (rewrite HspE4) in "Hf3".
@@ -141,7 +141,7 @@ Section ProofWakeupPartsEpi.
     (* +0x5e c.ldsp s4,16(sp) *)
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.wakeup + 0x5e)) (mword_of_int 2 : mword 6) (mword_of_int 20 : mword 5)
               E5 (K - 8)%nat vs4 b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi5e [Hf2] [-]").
+              with "Hcg Hpc Hi5e [Hf2]").
     { unfold wk_fcell. iEval (rewrite HspE5). iExact "Hf2". }
     iIntros (CID6 Hst6) "Hcg Hpc Hf2".
     iEval (rewrite HspE5) in "Hf2".
@@ -152,7 +152,7 @@ Section ProofWakeupPartsEpi.
     (* +0x60 c.ldsp s5,8(sp) *)
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.wakeup + 0x60)) (mword_of_int 1 : mword 6) (mword_of_int 21 : mword 5)
               E6 (K - 8)%nat vs5 b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi60 [Hf1] [-]").
+              with "Hcg Hpc Hi60 [Hf1]").
     { unfold wk_fcell. iEval (rewrite HspE6). iExact "Hf1". }
     iIntros (CID7 Hst7) "Hcg Hpc Hf1".
     iEval (rewrite HspE6) in "Hf1".
@@ -200,7 +200,7 @@ Section ProofWakeupPartsEpi.
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.wakeup + 0x62)) (mword_of_int 4 : mword 6)
               E7 (K - 8)%nat 8 b Hup
-              with "Hcg Hpc Hi62 Hframe [-]").
+              with "Hcg Hpc Hi62 Hframe").
     iIntros (CID8 Hst8) "Hcg Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec (E7 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))))]> E7) with E8.
     assert (HKfix : ((K - 8) + 8)%nat = K) by lia.
@@ -219,7 +219,7 @@ Section ProofWakeupPartsEpi.
       rewrite /E1 upd_eq. reflexivity. }
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.wakeup + 0x64)) (mword_of_int 1 : mword 5) E8 K b
               ltac:(vm_compute; discriminate)
-              with "Hcg Hpc Hi64 [-]").
+              with "Hcg Hpc Hi64").
     iIntros (CID9 Hst9) "Hcg Hpc".
     (* [wp_cret_s_sconf]'s target is [ret_pc (rget m ra)]: bridge from the
        plain map fact via [rgne], pinned at the hart we were on right before
@@ -278,7 +278,7 @@ Section ProofWakeupPartsPro.
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spF) by (rewrite /R1 upd_eq; reflexivity).
     iApply (wp_caddi16sp_push_s_sconf (mword_of_int KernelSyms.wakeup) (mword_of_int 60 : mword 6) m K 8 b HK8 Hsp1
-              with "Hcg Hpc Hi00 [-]").
+              with "Hcg Hpc Hi00").
     iIntros (CID1 Hst1) "Hcg Hframe Hpc".
     assert (Hsp0f : m !!! Regidx csp_rs1 = sp0) by reflexivity.
     iEval (rewrite Hsp0f stack_own_slots; cbn [seq]) in "Hframe".
@@ -323,7 +323,7 @@ Section ProofWakeupPartsPro.
     assert (Hra_rg : rget (CID := CID1) R1 (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1 : mword 5))
       by (rgne; exact Hra).
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.wakeup + 0x02)) (mword_of_int 7 : mword 6) (mword_of_int 1 : mword 5) R1 (K - 8)%nat v1 b
-              with "Hcg Hpc Hi02 [Hc1] [-]").
+              with "Hcg Hpc Hi02 [Hc1]").
     { iEval (rewrite HspR1). iExact "Hc1". }
     iIntros (CID2 Hst2) "Hcg Hpc Hc1".
     iEval (rewrite HspR1 Hra_rg) in "Hc1".
@@ -333,7 +333,7 @@ Section ProofWakeupPartsPro.
     assert (Hs0_rg : rget (CID := CID2) R1 (mword_of_int 8 : mword 5) = m !!! Regidx (mword_of_int 8 : mword 5))
       by (rgne; exact Hs0).
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.wakeup + 0x04)) (mword_of_int 6 : mword 6) (mword_of_int 8 : mword 5) R1 (K - 8)%nat v2 b
-              with "Hcg Hpc Hi04 [Hc2] [-]").
+              with "Hcg Hpc Hi04 [Hc2]").
     { iEval (rewrite HspR1). iExact "Hc2". }
     iIntros (CID3 Hst3) "Hcg Hpc Hc2".
     iEval (rewrite HspR1 Hs0_rg) in "Hc2".
@@ -343,7 +343,7 @@ Section ProofWakeupPartsPro.
     assert (Hs1_rg : rget (CID := CID3) R1 (mword_of_int 9 : mword 5) = m !!! Regidx (mword_of_int 9 : mword 5))
       by (rgne; exact Hs1).
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.wakeup + 0x06)) (mword_of_int 5 : mword 6) (mword_of_int 9 : mword 5) R1 (K - 8)%nat v3 b
-              with "Hcg Hpc Hi06 [Hc3] [-]").
+              with "Hcg Hpc Hi06 [Hc3]").
     { iEval (rewrite HspR1). iExact "Hc3". }
     iIntros (CID4 Hst4) "Hcg Hpc Hc3".
     iEval (rewrite HspR1 Hs1_rg) in "Hc3".
@@ -353,7 +353,7 @@ Section ProofWakeupPartsPro.
     assert (Hs2_rg : rget (CID := CID4) R1 (mword_of_int 18 : mword 5) = m !!! Regidx (mword_of_int 18 : mword 5))
       by (rgne; exact Hs2).
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.wakeup + 0x08)) (mword_of_int 4 : mword 6) (mword_of_int 18 : mword 5) R1 (K - 8)%nat v4 b
-              with "Hcg Hpc Hi08 [Hc4] [-]").
+              with "Hcg Hpc Hi08 [Hc4]").
     { iEval (rewrite HspR1). iExact "Hc4". }
     iIntros (CID5 Hst5) "Hcg Hpc Hc4".
     iEval (rewrite HspR1 Hs2_rg) in "Hc4".
@@ -363,7 +363,7 @@ Section ProofWakeupPartsPro.
     assert (Hs3_rg : rget (CID := CID5) R1 (mword_of_int 19 : mword 5) = m !!! Regidx (mword_of_int 19 : mword 5))
       by (rgne; exact Hs3).
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.wakeup + 0x0a)) (mword_of_int 3 : mword 6) (mword_of_int 19 : mword 5) R1 (K - 8)%nat v5 b
-              with "Hcg Hpc Hi0a [Hc5] [-]").
+              with "Hcg Hpc Hi0a [Hc5]").
     { iEval (rewrite HspR1). iExact "Hc5". }
     iIntros (CID6 Hst6) "Hcg Hpc Hc5".
     iEval (rewrite HspR1 Hs3_rg) in "Hc5".
@@ -373,7 +373,7 @@ Section ProofWakeupPartsPro.
     assert (Hs4_rg : rget (CID := CID6) R1 (mword_of_int 20 : mword 5) = m !!! Regidx (mword_of_int 20 : mword 5))
       by (rgne; exact Hs4).
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.wakeup + 0x0c)) (mword_of_int 2 : mword 6) (mword_of_int 20 : mword 5) R1 (K - 8)%nat v6 b
-              with "Hcg Hpc Hi0c [Hc6] [-]").
+              with "Hcg Hpc Hi0c [Hc6]").
     { iEval (rewrite HspR1). iExact "Hc6". }
     iIntros (CID7 Hst7) "Hcg Hpc Hc6".
     iEval (rewrite HspR1 Hs4_rg) in "Hc6".
@@ -383,7 +383,7 @@ Section ProofWakeupPartsPro.
     assert (Hs5_rg : rget (CID := CID7) R1 (mword_of_int 21 : mword 5) = m !!! Regidx (mword_of_int 21 : mword 5))
       by (rgne; exact Hs5).
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.wakeup + 0x0e)) (mword_of_int 1 : mword 6) (mword_of_int 21 : mword 5) R1 (K - 8)%nat v7 b
-              with "Hcg Hpc Hi0e [Hc7] [-]").
+              with "Hcg Hpc Hi0e [Hc7]").
     { iEval (rewrite HspR1). iExact "Hc7". }
     iIntros (CID8 Hst8) "Hcg Hpc Hc7".
     iEval (rewrite HspR1 Hs5_rg) in "Hc7".
@@ -392,7 +392,7 @@ Section ProofWakeupPartsPro.
     (* +0x10 c.addi4spn s0,sp,64 *)
     iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.wakeup + 0x10)) (Cregidx (mword_of_int 0)) (mword_of_int 16 : mword 8) (mword_of_int 8 : mword 5)
               R1 (K - 8)%nat b ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi10 [-]").
+              with "Hcg Hpc Hi10").
     iIntros (CID9 Hst9) "Hcg Hpc".
     set (R2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (R1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 16 : mword 8))))]> R1).
     assert (Hpp12 : add_vec_int (mword_of_int (KernelSyms.wakeup + 0x10) : mword 64) 2 = mword_of_int (KernelSyms.wakeup + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
@@ -403,7 +403,7 @@ Section ProofWakeupPartsPro.
        folding the map chain with [set], mirroring the csdsp sites above. *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.wakeup + 0x12)) (mword_of_int 18 : mword 5) (mword_of_int 10 : mword 5)
               R2 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi12 [-]").
+              with "Hcg Hpc Hi12").
     iIntros (CID10 Hst10) "Hcg Hpc".
     assert (Ha0_rg : rget (CID := CID9) R2 (mword_of_int 10 : mword 5) = R2 !!! Regidx (mword_of_int 10 : mword 5))
       by (rgne; reflexivity).
@@ -414,21 +414,21 @@ Section ProofWakeupPartsPro.
     (* +0x14 auipc s1,0x11 ; +0x18 addi s1,s1,2178 : s1 := &proc[0] *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.wakeup + 0x14)) (mword_of_int 9 : mword 5) (mword_of_int 0x11 : mword 20)
               R3 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi14 [-]").
+              with "Hcg Hpc Hi14").
     iIntros (CID11 Hst11) "Hcg Hpc".
     set (R4 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.wakeup + 0x14) : mword 64) (auipc_off (mword_of_int 0x11 : mword 20)))]> R3).
     assert (Hpp18 : add_vec_int (mword_of_int (KernelSyms.wakeup + 0x14) : mword 64) 4 = mword_of_int (KernelSyms.wakeup + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp18) in "Hpc".
     (* [wp_addi4_s_sconf]'s written value is [add_vec (rget m rs1) ...] (rs1
        generic) -- same bridge as c.mv, at the hart we called it at (CID11). *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.wakeup + 0x18)) (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 2158 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.wakeup + 0x18)) (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 2142 : mword 12)
               R4 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi18 [-]").
+              with "Hcg Hpc Hi18").
     iIntros (CID12 Hst12) "Hcg Hpc".
     assert (Haddi_s1_rg : rget (CID := CID11) R4 (mword_of_int 9 : mword 5) = R4 !!! Regidx (mword_of_int 9 : mword 5))
       by (rgne; reflexivity).
     iEval (rewrite Haddi_s1_rg) in "Hcg".
-    set (R5 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec (R4 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 2158 : mword 12)))]> R4).
+    set (R5 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec (R4 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 2142 : mword 12)))]> R4).
     assert (Hs1proc : R5 !!! Regidx (mword_of_int 9 : mword 5) = proc_addr 0).
     { rewrite /R5 upd_eq. rewrite /R4 upd_eq. unfold proc_addr, proc_base, proc_size.
       apply bv_eq; vm_compute; reflexivity. }
@@ -437,7 +437,7 @@ Section ProofWakeupPartsPro.
     (* +0x1c c.li s4,2 *)
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.wakeup + 0x1c)) (mword_of_int 20 : mword 5) (mword_of_int 2 : mword 6) (mword_of_int 2 : mword 64)
               R5 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(apply bv_eq; vm_compute; reflexivity)
-              with "Hcg Hpc Hi1c [-]").
+              with "Hcg Hpc Hi1c").
     iIntros (CID13 Hst13) "Hcg Hpc".
     set (R6 := <[Regidx (mword_of_int 20 : mword 5) := regval_into_reg (mword_of_int 2 : mword 64)]> R5).
     assert (Hpp1e : add_vec_int (mword_of_int (KernelSyms.wakeup + 0x1c) : mword 64) 2 = mword_of_int (KernelSyms.wakeup + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
@@ -445,7 +445,7 @@ Section ProofWakeupPartsPro.
     (* +0x1e c.li s5,3 *)
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.wakeup + 0x1e)) (mword_of_int 21 : mword 5) (mword_of_int 3 : mword 6) (mword_of_int 3 : mword 64)
               R6 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(apply bv_eq; vm_compute; reflexivity)
-              with "Hcg Hpc Hi1e [-]").
+              with "Hcg Hpc Hi1e").
     iIntros (CID14 Hst14) "Hcg Hpc".
     set (R7 := <[Regidx (mword_of_int 21 : mword 5) := regval_into_reg (mword_of_int 3 : mword 64)]> R6).
     assert (Hpp20 : add_vec_int (mword_of_int (KernelSyms.wakeup + 0x1e) : mword 64) 2 = mword_of_int (KernelSyms.wakeup + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
@@ -453,19 +453,19 @@ Section ProofWakeupPartsPro.
     (* +0x20 auipc s3,0x16 ; +0x24 addi s3,s3,630 : s3 := &proc[64] *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.wakeup + 0x20)) (mword_of_int 19 : mword 5) (mword_of_int 0x16 : mword 20)
               R7 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi20 [-]").
+              with "Hcg Hpc Hi20").
     iIntros (CID15 Hst15) "Hcg Hpc".
     set (R8 := <[Regidx (mword_of_int 19 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.wakeup + 0x20) : mword 64) (auipc_off (mword_of_int 0x16 : mword 20)))]> R7).
     assert (Hpp24 : add_vec_int (mword_of_int (KernelSyms.wakeup + 0x20) : mword 64) 4 = mword_of_int (KernelSyms.wakeup + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp24) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.wakeup + 0x24)) (mword_of_int 19 : mword 5) (mword_of_int 19 : mword 5) (mword_of_int 610 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.wakeup + 0x24)) (mword_of_int 19 : mword 5) (mword_of_int 19 : mword 5) (mword_of_int 594 : mword 12)
               R8 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi24 [-]").
+              with "Hcg Hpc Hi24").
     iIntros (CID16 Hst16) "Hcg Hpc".
     assert (Haddi_s3_rg : rget (CID := CID15) R8 (mword_of_int 19 : mword 5) = R8 !!! Regidx (mword_of_int 19 : mword 5))
       by (rgne; reflexivity).
     iEval (rewrite Haddi_s3_rg) in "Hcg".
-    set (R9 := <[Regidx (mword_of_int 19 : mword 5) := regval_into_reg (add_vec (R8 !!! Regidx (mword_of_int 19 : mword 5)) (sign_extend' 64 (mword_of_int 610 : mword 12)))]> R8).
+    set (R9 := <[Regidx (mword_of_int 19 : mword 5) := regval_into_reg (add_vec (R8 !!! Regidx (mword_of_int 19 : mword 5)) (sign_extend' 64 (mword_of_int 594 : mword 12)))]> R8).
     assert (Hs3proc : R9 !!! Regidx (mword_of_int 19 : mword 5) = proc_addr NPROC).
     { rewrite /R9 upd_eq. rewrite /R8 upd_eq. unfold proc_addr, proc_base, NPROC, proc_size.
       apply bv_eq; vm_compute; reflexivity. }
@@ -475,7 +475,7 @@ Section ProofWakeupPartsPro.
     iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.wakeup + 0x28))
               (sign_extend' 21 (concat_vec (mword_of_int 8 : mword 11) ('b"0")))
               R9 (K - 8)%nat b ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi28 [-]").
+              with "Hcg Hpc Hi28").
     iIntros (CID17 Hst17).
     iNext. iIntros "Hcg Hpc".
     assert (Htgtj : add_vec (mword_of_int (KernelSyms.wakeup + 0x28) : mword 64) (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 8 : mword 11) ('b"0")))) = mword_of_int (KernelSyms.wakeup + 0x38))

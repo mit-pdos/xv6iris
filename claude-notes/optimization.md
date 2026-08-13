@@ -1,5 +1,36 @@
 # Proof performance & build optimization
 
+## THE GENERATED DECODE BAND: the cost was the proofmode, not the vm_computes (2026-08-13)
+
+The `Code*.v` band (176 generated files, one `instr` lemma per instruction) was
+**1,869 s of the build's 15,617 s ΣCPU — 12 %** — and the per-lemma Ltac profile
+put **~76 % of it in generic Iris proofmode plumbing** (`typeclasses eauto`,
+`notypeclasses refine`, `pm_eval`/`pm_reduce`, `iIntros`/`iSplitR`/`iExists`
+bookkeeping), re-paid identically by every one of the ~8,500 `mk_rvc`/`mk_base`
+calls.  The `vm_compute`-closed side conditions everyone suspects first were
+**~9 %**.
+
+**The fix (landed): `KernelText.instr_intro_rvc` / `instr_intro_base`** state
+the whole `instr` introduction as ONE lemma over `(A, h/w, pc, ast)` plus pure
+premises (the alignment/isRVC/window-byte facts and the decode obligation as a
+`forall s : mstate, … -> …` hypothesis).  All the proofmode work happens once,
+inside those two proofs; `mk_rvc`/`mk_base` keep their signatures but become a
+plain `apply (instr_intro_… A h pc ast)` followed by pure side goals, so
+neither the 176 generated files nor `tools/gen_code.py` changed at all.
+Measured on `CodeBmap.v` under identical load: **17.5 s → 6.1 s (2.8×)**; the
+same factor applies to the Code-band rebuild an `XV6_REV` bump forces.
+
+**NEGATIVE RESULT — do not "fix" the vm_computes with `vm_cast_no_check`.**
+Both variants were measured (only-`Hbytes`, and every assert): `Qed` drops
+~22 % but elaboration rises ~11 % — `vm_cast_no_check` still performs the same
+VM reduction up front to build the cast term, so it only MOVES the cost.  Net
+wash (8.49 s vs 8.43/8.86 s).
+
+Still open in the same family: `KernelDecode*`'s `decode_bridge_ms` runs FOUR
+`vm_compute`s per word (read-set + concrete-decode check, × the M and S
+reference-state arms) = 219 s tree-wide; a shared pure decode fact could
+roughly halve it.
+
 ## RULE ONE: when `-time` finds NOTHING, count the `iAssert` STATEMENTS
 
 Rule Zero below is still the first move, but a whole-function proof can be the
@@ -88,6 +119,39 @@ and `ProofPrintk` all carry block continuations.  **Before hunting a hot
 statement in one of them, count the lines of `iAssert` statement live at the
 deepest point; if they outweigh the resources, the file's cost is its own
 continuations.**
+
+**Second instance (2026-08-13): `ProofDirlookup`, −24 % (107.8 s → 81.9 s,
+matched-load pairs) for folding three continuations** (`dl_tail_body` /
+`dl_loop_body` / `dl_latch_body`, plus `dl_found_cont`, the ~26-line
+found/exhausted tail both loop statements embedded).  ~160 lines of statement
+live at the loop's deepest point became ~9.  Exactly as with namex, no use
+site needed an `iEval` unfold and the proof scripts did not change.
+
+**The 2026-08-13 wave then folded most of the candidate list** (dirlink −21 %,
+procdumploop −12 %, piperead −16 %, wakeup −13 %, readi/copyin/copyout/
+uvmunmap small — the payoff scales with folded statement lines × steps they
+survive, and those four had 16–33-line bodies).  Two portable findings: when
+`GEN`/`CID0` are LEMMA binders rather than Section context, the body
+definitions must take them explicitly; and a continuation with NO `wp_next`
+wrapper (a pinned-hart stretch, index `false`) cannot be folded — the next
+leaf's implicit process pointer stops unifying once `pj` is only reachable
+through the folded body (ProofPiperead's WXP/CLOOP stay inline; its header
+records this).
+
+**STILL TO DO — three files, with the analysis already paid for:**
+- `ProofIget` (~150 s): fold the fuel-indexed scan invariant
+  `iAssert (∀ (fuel j : nat) (Mr : regfile), … TAILC -∗ WP …)` (~line 888,
+  ~29 lines) into an `ig_loop_body` (fuel/j kept outside, rule 3), and the
+  nested `iAssert (∀ (Ms : regfile), …)` (~line 925, ~27 lines, applied at 4
+  later sites) into `ig_step_body`; both parameterize over
+  `γl cn γfs γi cov logstart nib dev inum n eb p C K b macq spr M ci TAILC`.
+  The `TAILC` pose at ~685 is 13 lines — under threshold, skip.  Warm
+  baseline 72.4 s.
+- `ProofScheduler`: four `iAssert (□ (∀ …))` blocks at ~797/998/1538/1587,
+  sizes not yet measured against the threshold.
+- `ProofFilealloc`: candidates at ~356 and ~551 (the second fuel-indexed).
+Candidate-grep gotcha: the binders come BUNDLED (`∀ (fuel j : nat)`), so a
+grep for `iAssert (∀ fuel` misses them — scan for `iAssert (∀ (` too.
 
 ## RULE ZERO: run `-time` FIRST, before believing any theory
 
@@ -1095,9 +1159,11 @@ In descending value, the remaining levers are:
 - **Strip only the GOAL's later with `iApply bi.later_intro`; reach for `iNext` only when a HYPOTHESIS's `▷` has to come off too.** `iNext` is `iModIntro` at `▷`, so it runs `MaybeIntoLaterN` over every hypothesis in both environments: its cost tracks the proof's CONTEXT, not the goal, and in a whole-function WP proof that is ~1.1 s per call — once per instruction whose leaf leaves a `▷` on the goal. `bi.later_intro : P ⊢ ▷ P` turns the goal `▷ Q` into `Q` and touches nothing else: ~0.06 s, a ~20× difference for the same effect. In practice the only steps that need the real `iNext` are the **Löb back edges**, where `IH` (and any `▷`-guarded exits bundle like `HEX`) must be stripped before it can be applied.
   - **The tell that a file has this backwards** is an `iNext` followed, a few lines later, by `iAssert (▷ X)%I with "[H]" as "H". { iNext. iExact "H". }` — that block is *repairing* a `▷` the `iNext` stripped and the proof still wanted, so BOTH tactics are the expensive one and the pair does no net work. `▷ sched_vc` (the scheduler valid-context every S-mode whole-function proof carries) is the usual victim; grep `{ iNext. iExact` to find them. Replacing the pair with a single `iApply bi.later_intro` — keeping a real `iNext` at the 1–3 back-edge sites per file — measured **ProofPiperead 144 s → 96 s (−33 %)**, **ProofPipewrite 97 s → 74 s (−24 %)**, and the same edit applies to `ProofSysPause`. The inner `{ iNext. iExact "H". }` alone is ALWAYS safe to swap (goal `▷ X`, hypothesis `X`); the outer one is not, so convert it and let the build tell you which sites are the back edges.
   - **A/B this one with `-async-proofs off`.** With the async `Qed` worker on, the two variants hide different amounts of kernel work where `-time-file` cannot see it, and the per-sentence sums ranked them BACKWARDS here (they made the slower variant look 3 % faster). With async off the same comparison, interleaved over three reps, was unambiguous in both files.
+  - **SWEPT TREE-WIDE 2026-08-13** over the 39 Proof files with >4 s of `iNext` in the baseline profile (`iNext` was 608 s of ΣCPU, ~1–1.5 s a call in the big files): **~280 sites converted, ZERO needed reverting** — every site tree-wide was a goal-only strip; even `ProofPipewrite`'s two Löb-adjacent sites converted clean. Spot-measured −17 %/−13 %/−10 % on ProofIget/ProofFilewrite/ProofFileread. `WpSconfBtype` (4.1 s of iNext across small-context leaf lemmas) was deliberately left alone — the payoff tracks context size, so leaf libraries are not worth the churn. Write NEW proofs with `iApply bi.later_intro` from the start and reach for `iNext` only at a genuine Löb back edge.
 - **Prove a big `Timeless`/`Persistent` instance STRUCTURALLY, never with one `apply _`.** One `apply _` over an `∃/∗/∨` tower backtracks across the whole space: 49 s for `FileOff.off_body_timeless`, 2-3 s each for `IcacheEscrow`'s five arms. Peel one connective per step (`bi.exist_timeless` / `bi.sep_timeless` / `bi.or_timeless`) with `apply _` only at the leaves — same proof, ~0 s. A recursive helper (`IcacheEscrow`'s `tl_struct`) does it uniformly across a file — but its dispatch MUST be a syntactic `lazymatch goal with |- Timeless (bi_sep _ _) => …`, never `first [apply bi.sep_timeless | …]`: `apply` unifies up to delta, so the `first` form peels straight *through* a named abstraction that already has an instance and then backtracks over everything underneath it (measured 33 s and 42 s on `ic_mid_arm`/`ic_escrow_body` — an order of magnitude WORSE than the monolithic `apply _` it replaced).
 - **Give every big-resource abstraction with a `Persistent`/`Timeless` instance a `Typeclasses Opaque` right next to it** — otherwise each `#`-intro/`iDestruct` re-derives the instance by unfolding and descending into the resource. Measured at **5.1 s for one `iIntros "#Hdlock"`** on `is_lock … (disk_res …)`; see the `ProofEndOp`/`ProofPiperead` section above for the diagnostic (split the `iIntros` one name per sentence) and the candidate list.
 - **Do not write `[-]` as the last element of a leaf `iApply`'s spec pattern.** `iApply (wp_X … with "Hcg Hpc Hi [-]")` and `… with "Hcg Hpc Hi")` leave the same goal, but `[-]` forces an explicit `envs_split` of the whole spatial context on every instruction. −13 % on `ProofEndOp` over 110 sites. Safe whenever the omitted premise is the last one, which for a `wp_next`-continuation leaf it always is.
+  - **SWEPT TREE-WIDE 2026-08-13: 6,510 trailing sites dropped (`sed 's/ \[-\]")/")/g'` over every `Proof*.v`), ZERO reverts.** Piloted with per-file A/B on the three heaviest files first — ProofKwait ~−35 % (its context is widest), ProofVirtioDiskInit −4 %, ProofPrintk −1 % — then applied blind and validated by the full rebuild. The 7 mid-pattern `[-]` occurrences (`with "A [-] B"`) are NOT this shape and stay. Do not write a trailing `[-]` in new proofs.
 - **AND THE GOAL SIDE: give every multi-conjunct resource abstraction a CONSTRUCTOR lemma when you define it.** Naming the hypotheses fixes only the context-side scan; framing also searches the GOAL, so a named `iFrame` at a goal whose conjuncts include a big payload is just as slow — 172 s, 107 s, 98 s, 92 s and 88 s across the icache arms, whose `ic_payload` hides a 268-element big-op (`IcacheEscrow.ic_mk_parked` / `ic_mk_mid_arm` / `ic_mk_unloaded` are the fix, and the 2026-08-11 section at the top of this file has the numbers).
 - **Never bare `iFrame` in a large Iris context — name the hypotheses.** `iFrame` searches the WHOLE spatial context for something to match each conjunct of the goal, so its cost scales with (context size × #conjuncts). Rebuilding `pipe_res` (9 separating conjuncts) with a bare `iFrame` in `ProofPipeclose`'s arm — a context holding the three join wands (`EPI`/`JOIN`/`TAILS`), ~20 `instr` facts and the frame cells — **did not terminate** (RSS climbing through 2.6 GB while `coqc -time` sat on that one sentence). `iFrame "Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack"` — the same nine, by name — is instant. Diagnostic: `coqc -time` flushes per sentence as it goes, so a stalled build's *last printed* sentence is the one BEFORE the culprit; the culprit is the next one in the file.
 - **Never `vm_compute` a goal containing a symbolic `mword` variable** (a ∀-quantified pointer `p`/`head`/`spr`) or a concrete built-up `mstate` (a tower of `set_reg`/`update_subrange`) — it tries to normalize 64-bit modular arithmetic symbolically and does not terminate (looks like a multi-minute hang). Compute only the CLOSED offset (`replace (<offset> : mword 64) with (mword_of_int 0) by (apply bv_eq; vm_compute; reflexivity)`, then close `add_vec p 0 = p` with `avi0`/`kv_addv_zero`); or prove the pure fact against an ABSTRACT state and `apply` it. Diagnostic: two `coqc -time` runs dying at the exact same char = the next sentence hangs (not a wall-clock cap).

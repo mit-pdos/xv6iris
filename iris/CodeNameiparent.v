@@ -23,8 +23,8 @@ Require Import KernelDecode07.
 Require Import KernelDecode11.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
-Require Import KernelDecode15.
 Require Import KernelDecode24.
+Require Import KernelDecode27.
 Require Import KernelDecode31.
 Local Open Scope Z_scope.
 Import Defs.
@@ -60,9 +60,9 @@ Section CodeNameiparent.
   Proof. mk_rvc (KernelSyms.nameiparent + 0xa) (mword_of_int 0x4585 : mword 16)
     (mword_of_int (KernelSyms.nameiparent + 0xa) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 11), ADDI)) kd_4585 exec_execute_C_LI. Qed.
 
-  Lemma npi_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.nameiparent + 0xc) : mword 64) false (JAL (mword_of_int 2096626 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.nameiparent + 0xc) (mword_of_int 0xdf3ff0ef : mword 32)
-    (mword_of_int (KernelSyms.nameiparent + 0xc) : mword 64) (JAL (mword_of_int 2096626 : mword 21, Regidx (mword_of_int 1))) kd_df3ff0ef. Qed.
+  Lemma npi_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.nameiparent + 0xc) : mword 64) false (JAL (mword_of_int 2096610 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.nameiparent + 0xc) (mword_of_int 0xde3ff0ef : mword 32)
+    (mword_of_int (KernelSyms.nameiparent + 0xc) : mword 64) (JAL (mword_of_int 2096610 : mword 21, Regidx (mword_of_int 1))) kd_de3ff0ef. Qed.
 
   Lemma npi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.nameiparent + 0x10) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.nameiparent + 0x10) (mword_of_int 0x60a2 : mword 16)

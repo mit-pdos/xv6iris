@@ -294,7 +294,7 @@ Section ProofSwtch.
     { iPureIntro. exact Hadm. }
     { iPureIntro. exact Hcallee_new. }
     iExists Ao, oldc. iSplitL "Hvoldc".
-    { iNext. iExact "Hvoldc". }
+    { iApply bi.later_intro. iExact "Hvoldc". }
     { rewrite Hm4. iExact "HP". }
   Qed.
 

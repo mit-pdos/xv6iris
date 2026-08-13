@@ -1,5 +1,8 @@
 (* LinkPrintk.v -- instantiates the Printk proof against its callees'
-   proofs.  Sealed, so this is the only place the three ever meet. *)
-Require Import LinkConsputc LinkPrintint ProofPrintk.
+   proofs.  Sealed, so this is the only place the four ever meet.
 
-Module Printk := PrintkProof Consputc Printint.
+   printk gained [acquire]/[release] as callees with upstream d80e61c5: the
+   [panicking] flag is gone, so pr.lock is now taken unconditionally. *)
+Require Import LinkConsputc LinkPrintint LinkAcquire LinkRelease ProofPrintk.
+
+Module Printk := PrintkProof Consputc Printint Acquire Release.

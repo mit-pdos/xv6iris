@@ -932,6 +932,253 @@ Section ProofDirlinkMain.
             (UPTD (mword_of_int 0) (mword_of_int 0) ∅ ∅)
             [] [] (mword_of_int 0) [].
 
+  (* ---- THE BLOCK STATEMENTS, NAMED (claude-notes/optimization.md, RULE
+     ONE) -- [Htail]/[Hafter]/[Hloop] are each stated below as a
+     [wp_next]-wrapped [iAssert] whose continuation body is tens of lines
+     of ∀/wands; spelled out in place, EVERY proofmode step of the walk
+     re-embeds that whole statement in the proof term (the cost is
+     |Δ| times the number of steps).  Naming the inner body turns each
+     into a constant applied to its arguments in the context.
+
+     They are TRANSPARENT ON PURPOSE and only the part AFTER
+     [fun CIDx : CpuId =>] is named: the [wp_next]/[□]/[∀ fuel] at each
+     use site stay syntactically visible, which is what lets
+     [iSpecialize]/[iApply] unify through them without an extra
+     [iEval (rewrite /...)], and what lets [iInduction fuel] leave
+     [dl_scan_body]'s own induction hypothesis folded. *)
+
+  Definition dl_tail_body
+      (j : nat) (m : regfile) (sp0 ret_tgt : mword 64) (K : nat) (b : bool)
+      (CIDt : CpuId) : iProp Σ :=
+    (∀ (Mt : regfile) (w3 w5 w6 : mword 64) (dnew : nat -> bv 8),
+       ⌜dl_tregs m sp0 Mt⌝ -∗
+       sie_cap_gpr Mt (K - 10)%nat b (proc_addr j) -∗
+       pc_is (mword_of_int (DK + 0x9c)) -∗
+       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈ w3 -∗
+       (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈ w5 -∗
+       (pa_stk sp0 6) ↦₈ w6 -∗
+       (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ dnew jj) -∗
+       wp_next (CID0 := CIDt) true (proc_addr j) (fun CIDf : CpuId =>
+         ∀ mf : regfile,
+           ⌜callee_saved m mf⌝ -∗
+           ⌜mf !!! Regidx Ra0 = (Mt !!! Regidx Ra0 : mword 64)⌝ -∗
+           sie_cap_gpr mf K b (proc_addr j) -∗
+           pc_is ret_tgt -∗
+           WP (Loop : expr riscv_lang)) -∗
+       WP (Loop : expr riscv_lang))%I.
+
+  Definition dl_after_body
+      (j : nat) (m : regfile) (sp0 ip nb : mword 64)
+      (dqd : dfrac) (dev : mword 32) (dqf : dfrac) (dinum : mword 32)
+      (dn dn0 : dinode) (gfs : fs_names) (bm : blkmap)
+      (data : nat -> list (bv 8)) (dqn : dfrac) (fn : nat -> bv 8)
+      (dqs : dfrac) (inodestart : Z) (dqbs : dfrac) (size : Z)
+      (dqb : dfrac) (bmapstart : Z) (cov : gset Z) (logstart : Z)
+      (used : gset Z) (gi : gname) (dq : dfrac) (pidv : mword 32)
+      (bn : bio_names) (g : log_names) (ncount : nat) (K : nat)
+      (b eb : bool) (C : iProp Σ) (k0 : nat) (inum : mword 16) (nrec : nat)
+      (s : list (bv 8)) (ret_tgt : mword 64)
+      (CIDa : CpuId) : iProp Σ :=
+    (∀ (Mp : regfile) (dolz : nat -> bv 8) (w5 w6 : mword 64),
+       ⌜dl_pregs m sp0 ip nb
+          (zero_extend' 64 (inum : mword 16) : mword 64)
+          (mword_of_int (Z.of_nat (16 * k0)%nat) : mword 64) Mp⌝ -∗
+       sie_cap_gpr Mp (K - 10)%nat b (proc_addr j) -∗
+       cpu_own 0 eb (proc_addr j) C b -∗
+       pc_is (mword_of_int (DK + 0x70)) -∗
+       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈ w5 -∗
+       (pa_stk sp0 6) ↦₈ w6 -∗
+       (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ dolz jj) -∗
+       i_dev ip ↦₄{dqd} dev -∗
+       i_inum ip ↦₄{dqf} dinum -∗
+       inode_meta ip dn -∗
+       inode_map gfs ip bm -∗
+       inode_blocks gfs bm data -∗
+       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
+       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+       bitmap_res gfs bmapstart cov logstart size used -∗
+       dinode_at gi dinum dn0 -∗
+       p_pid (proc_addr j) ↦₄{dq} pidv -∗
+       bslots bn 3 -∗
+       iref_slot -∗
+       log_op g ncount -∗
+       wp_next (CID0 := CID) true (proc_addr j) (fun CIDc : CpuId =>
+         ∀ (mf : regfile) (found : bool)
+           (bm' : blkmap) (data' : nat -> list (bv 8))
+           (dn' dn0' : dinode) (n' : nat) (used' : gset Z)
+           (tot : nat),
+             ⌜callee_saved m mf⌝ -∗
+             sie_cap_gpr mf K b (proc_addr j) -∗
+             cpu_own 0 eb (proc_addr j) C b -∗
+             pc_is ret_tgt -∗
+             i_dev ip ↦₄{dqd} dev -∗
+             i_inum ip ↦₄{dqf} dinum -∗
+             inode_meta ip dn' -∗
+             inode_map gfs ip bm' -∗
+             inode_blocks gfs bm' data' -∗
+             ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
+             sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+             sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+             sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+             bitmap_res gfs bmapstart cov logstart size used' -∗
+             dinode_at gi dinum dn0' -∗
+             p_pid (proc_addr j) ↦₄{dq} pidv -∗
+             bslots bn 3 -∗
+             iref_slot -∗
+             ⌜((ncount - dirlink_units)%nat <= n')%nat
+              /\ (n' <= ncount)%nat⌝ -∗
+             log_op g n' -∗
+             ⌜inode_sized data -> inode_sized data'⌝ -∗
+             ⌜if found
+               then dir_first data nrec s <> None
+                    /\ mf !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)
+                    /\ bm' = bm /\ data' = data /\ dn' = dn /\ dn0' = dn0
+                    /\ used' ⊆ used
+                    /\ tot = 0%nat
+               else dir_first data nrec s = None
+                    /\ used ⊆ used'
+                    /\ blkmap_wf cov logstart bm'
+                    /\ blk_holes_zero bm' data'
+                    /\ di_addrs dn' = bm_cells bm'
+                    /\ bv_unsigned (di_size dn') < 2 ^ 31
+                    /\ bm_covers bm' (bv_unsigned (di_size dn'))
+                    /\ dn' = wi_dinode dn bm' (16 * k0)%nat tot
+                    /\ dn0' = dn'
+                    /\ (tot <= 16)%nat
+                    /\ (forall x : nat,
+                          file_byte data' x
+                          = if decide ((16 * k0 <= x)%nat
+                                       /\ (x < 16 * k0 + tot)%nat)
+                            then dirent_bytes (de_of_name inum s)
+                                   !!! (x - 16 * k0)%nat
+                            else file_byte data x)
+                    /\ ((mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)
+                         /\ tot = 16%nat)
+                        \/ (mf !!! Regidx Ra0
+                              = (mword_of_int (-1) : mword 64)
+                           /\ (tot < 16)%nat))⌝ -∗
+             WP (Loop : expr riscv_lang)) -∗
+       WP (Loop : expr riscv_lang))%I.
+
+  Definition dl_scan_body
+      (j : nat) (nrec : nat) (dn : dinode) (data : nat -> list (bv 8))
+      (m : regfile) (sp0 ip nb : mword 64) (inum : mword 16) (K : nat)
+      (b eb : bool) (C : iProp Σ) (dev : mword 32) (dqf : dfrac)
+      (dinum : mword 32) (gfs : fs_names) (bm : blkmap) (dqn : dfrac)
+      (fn : nat -> bv 8) (dqs : dfrac) (inodestart : Z) (dqbs : dfrac)
+      (size : Z) (dqb : dfrac) (bmapstart : Z) (cov : gset Z) (logstart : Z)
+      (used : gset Z) (gi : gname) (dn0 : dinode) (dq : dfrac)
+      (pidv : mword 32) (bn : bio_names) (g : log_names) (ncount : nat)
+      (k0 : nat) (s : list (bv 8)) (ret_tgt : mword 64) (dqd : dfrac)
+      (fuel : nat) (CIDl : CpuId) : iProp Σ :=
+    (∀ (i : nat) (Ml : regfile) (dol : nat -> bv 8),
+       ⌜(S nrec - i <= fuel)%nat⌝ -∗
+       (* §15(b): THE LOOP TEST, not [i < nrec] -- without
+          granularity the code takes one turn past [nrec], whose
+          readi is short and whose next branch panics. *)
+       ⌜Z.of_nat i * 16 < bv_unsigned (di_size dn)⌝ -∗
+       ⌜dir_free_first data i = None⌝ -∗
+       ⌜dl_regs m sp0 ip nb
+          (zero_extend' 64 (inum : mword 16) : mword 64) (16 * i)%nat Ml⌝ -∗
+       sie_cap_gpr Ml (K - 10)%nat b (proc_addr j) -∗
+       cpu_own 0 eb (proc_addr j) C b -∗
+       pc_is (mword_of_int (DK + 0x30)) -∗
+       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
+       (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
+       (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ dol jj) -∗
+       i_dev ip ↦₄{dqd} dev -∗
+       i_inum ip ↦₄{dqf} dinum -∗
+       inode_meta ip dn -∗
+       inode_map gfs ip bm -∗
+       inode_blocks gfs bm data -∗
+       ([∗ list] i0 ∈ seq 0 14, pa_add nb i0 ↦ₘ{dqn} fn i0) -∗
+       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+       bitmap_res gfs bmapstart cov logstart size used -∗
+       dinode_at gi dinum dn0 -∗
+       p_pid (proc_addr j) ↦₄{dq} pidv -∗
+       bslot bn -∗
+       bslots bn 2 -∗
+       iref_slot -∗
+       log_op g ncount -∗
+       wp_next (CID0 := CID) true (proc_addr j) (fun CIDc : CpuId =>
+         ∀ (mf : regfile) (found : bool)
+           (bm' : blkmap) (data' : nat -> list (bv 8))
+           (dn' dn0' : dinode) (n' : nat) (used' : gset Z)
+           (tot : nat),
+             ⌜callee_saved m mf⌝ -∗
+             sie_cap_gpr mf K b (proc_addr j) -∗
+             cpu_own 0 eb (proc_addr j) C b -∗
+             pc_is ret_tgt -∗
+             i_dev ip ↦₄{dqd} dev -∗
+             i_inum ip ↦₄{dqf} dinum -∗
+             inode_meta ip dn' -∗
+             inode_map gfs ip bm' -∗
+             inode_blocks gfs bm' data' -∗
+             ([∗ list] i0 ∈ seq 0 14, pa_add nb i0 ↦ₘ{dqn} fn i0) -∗
+             sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+             sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+             sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+             bitmap_res gfs bmapstart cov logstart size used' -∗
+             dinode_at gi dinum dn0' -∗
+             p_pid (proc_addr j) ↦₄{dq} pidv -∗
+             bslots bn 3 -∗
+             iref_slot -∗
+             ⌜((ncount - dirlink_units)%nat <= n')%nat
+              /\ (n' <= ncount)%nat⌝ -∗
+             log_op g n' -∗
+             ⌜inode_sized data -> inode_sized data'⌝ -∗
+             ⌜if found
+               then dir_first data nrec s <> None
+                    /\ mf !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)
+                    /\ bm' = bm /\ data' = data /\ dn' = dn /\ dn0' = dn0
+                    /\ used' ⊆ used
+                    /\ tot = 0%nat
+               else dir_first data nrec s = None
+                    /\ used ⊆ used'
+                    /\ blkmap_wf cov logstart bm'
+                    /\ blk_holes_zero bm' data'
+                    /\ di_addrs dn' = bm_cells bm'
+                    /\ bv_unsigned (di_size dn') < 2 ^ 31
+                    /\ bm_covers bm' (bv_unsigned (di_size dn'))
+                    /\ dn' = wi_dinode dn bm' (16 * k0)%nat tot
+                    /\ dn0' = dn'
+                    /\ (tot <= 16)%nat
+                    /\ (forall x : nat,
+                          file_byte data' x
+                          = if decide ((16 * k0 <= x)%nat
+                                       /\ (x < 16 * k0 + tot)%nat)
+                            then dirent_bytes (de_of_name inum s)
+                                   !!! (x - 16 * k0)%nat
+                            else file_byte data x)
+                    /\ ((mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)
+                         /\ tot = 16%nat)
+                        \/ (mf !!! Regidx Ra0
+                              = (mword_of_int (-1) : mword 64)
+                           /\ (tot < 16)%nat))⌝ -∗
+             WP (Loop : expr riscv_lang)) -∗
+       WP (Loop : expr riscv_lang))%I.
+
   Lemma wp_dirlink_sconf
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -1208,27 +1455,8 @@ Section ProofDirlinkMain.
     (*  they get here, which is what [dl_tregs] says.                     *)
     (* ================================================================= *)
     iAssert (□ wp_next (CID0 := CID) true (proc_addr j) (fun CIDt : CpuId =>
-               ∀ (Mt : regfile) (w3 w5 w6 : mword 64) (dnew : nat -> bv 8),
-                 ⌜dl_tregs m sp0 Mt⌝ -∗
-                 sie_cap_gpr Mt (K - 10)%nat b (proc_addr j) -∗
-                 pc_is (mword_of_int (DK + 0x9c)) -∗
-                 (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-                 (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-                 (pa_stk sp0 3) ↦₈ w3 -∗
-                 (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-                 (pa_stk sp0 5) ↦₈ w5 -∗
-                 (pa_stk sp0 6) ↦₈ w6 -∗
-                 (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-                 (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-                 ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ dnew jj) -∗
-                 wp_next (CID0 := CIDt) true (proc_addr j) (fun CIDf : CpuId =>
-                   ∀ mf : regfile,
-                     ⌜callee_saved m mf⌝ -∗
-                     ⌜mf !!! Regidx Ra0 = (Mt !!! Regidx Ra0 : mword 64)⌝ -∗
-                     sie_cap_gpr mf K b (proc_addr j) -∗
-                     pc_is ret_tgt -∗
-                     WP (Loop : expr riscv_lang)) -∗
-                 WP (Loop : expr riscv_lang)))%I with "[]" as "#Htail".
+               dl_tail_body j m sp0 ret_tgt K b CIDt))%I
+      with "[]" as "#Htail".
     { iModIntro.
       iIntros (CIDt Hst Mt w3 w5 w6 dnew)
         "%HTr Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hde Hqc".
@@ -1408,10 +1636,10 @@ Section ProofDirlinkMain.
     (*  +0x16 jal dirlookup(dp, name, 0)                                  *)
     (* ================================================================= *)
     assert (Htgtdl : add_vec (mword_of_int (DK + 0x16) : mword 64)
-              (sign_extend' 64 (mword_of_int 2096640 : mword 21))
+              (sign_extend' 64 (mword_of_int 2096624 : mword 21))
               = mword_of_int KernelSyms.dirlookup) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (DK + 0x16)) Rra
-              (mword_of_int 2096640 : mword 21) R6 (K - 10)%nat b
+              (mword_of_int 2096624 : mword 21) R6 (K - 10)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi16").
     iIntros (CID12 Hq12) "Hcg Hpc".
@@ -1448,7 +1676,7 @@ Section ProofDirlinkMain.
               Heb
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
                     Hblocks Hnm [] Hppid Hprocs Hdev Hgeom Hdlk Hbs1
-                    Hitb2 Hitbl Hesc Hislot [-]").
+                    Hitb2 Hitbl Hesc Hislot").
     { done. }
     iIntros (CIDdl Hsdl mdl found kk kslot qq)
       "%Hcsdl Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks Hnm Hppid Hbs1 Hres".
@@ -1476,17 +1704,17 @@ Section ProofDirlinkMain.
                       rewrite Hcz; exact dlk_zero_moi)
                 ltac:(rewrite Htgt58; vm_compute; reflexivity)
                 with "Hcg Hpc Hi1a").
-      iNext. iIntros (CID13 Hq13) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID13 Hq13) "Hcg Hpc".
       iEval (rewrite Htgt58) in "Hpc".
       iPoseProof (dki_58 with "Htext") as "Hi58".
       iPoseProof (dki_5c with "Htext") as "Hi5c".
       iPoseProof (dki_5e with "Htext") as "Hi5e".
       (* +0x58 jal ra,iput *)
       assert (Htgtip : add_vec (mword_of_int (DK + 0x58) : mword 64)
-                (sign_extend' 64 (mword_of_int 2095520 : mword 21))
+                (sign_extend' 64 (mword_of_int 2095504 : mword 21))
                 = mword_of_int KernelSyms.iput) by pcw.
       iApply (wp_jal_s_sconf (mword_of_int (DK + 0x58)) Rra
-                (mword_of_int 2095520 : mword 21) mdl (K - 10)%nat b
+                (mword_of_int 2095504 : mword 21) mdl (K - 10)%nat b
                 ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi58").
       iIntros (CID14 Hq14) "Hcg Hpc".
@@ -1528,7 +1756,7 @@ Section ProofDirlinkMain.
                 HE1a0
                 with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlog Hitb2 Hitbl Hesck
                       Hiregi Hslk Href Hsbb Hsbi Hbmr Hppid Hprocs Hdev Hgeom
-                      Hdlk Hbsl Hop [-]").
+                      Hdlk Hbsl Hop").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iIntros (CIDip Hsip mip nn uu)
@@ -1565,12 +1793,12 @@ Section ProofDirlinkMain.
                 E2 (K - 10)%nat b
                 ltac:(rewrite Htgt9c; vm_compute; reflexivity)
                 with "Hcg Hpc Hi5e").
-      iIntros (CID16 Hq16). iNext. iIntros "Hcg Hpc".
+      iIntros (CID16 Hq16). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt9c) in "Hpc".
       iPoseProof ("Htail" $! CID16) as "Ht".
       iSpecialize ("Ht" with "[%]"); [wp_next_chain |].
       iApply ("Ht" $! E2 u3 u5 u6 dolds0 with
-                "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hde [-]").
+                "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hde").
       { exact (dl_tregs_of_eregs m sp0 ip nb _ E2 HE2e). }
       iIntros (CIDf Hsf mf) "%Hcsf %Ha0f Hcg Hpc".
       iDestruct (cpu_own_transport CIDip CIDf 0%nat eb (proc_addr j) C b
@@ -1650,94 +1878,11 @@ Section ProofDirlinkMain.
       (*  own continuation.                                                 *)
       (* ================================================================= *)
       iAssert (□ wp_next (CID0 := CID) true (proc_addr j) (fun CIDa : CpuId =>
-                 ∀ (Mp : regfile) (dolz : nat -> bv 8) (w5 w6 : mword 64),
-                   ⌜dl_pregs m sp0 ip nb
-                      (zero_extend' 64 (inum : mword 16) : mword 64)
-                      (mword_of_int (Z.of_nat (16 * k0)%nat) : mword 64) Mp⌝ -∗
-                   sie_cap_gpr Mp (K - 10)%nat b (proc_addr j) -∗
-                   cpu_own 0 eb (proc_addr j) C b -∗
-                   pc_is (mword_of_int (DK + 0x70)) -∗
-                   (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-                   (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-                   (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-                   (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-                   (pa_stk sp0 5) ↦₈ w5 -∗
-                   (pa_stk sp0 6) ↦₈ w6 -∗
-                   (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-                   (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-                   ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ dolz jj) -∗
-                   i_dev ip ↦₄{dqd} dev -∗
-                   i_inum ip ↦₄{dqf} dinum -∗
-                   inode_meta ip dn -∗
-                   inode_map gfs ip bm -∗
-                   inode_blocks gfs bm data -∗
-                   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
-                   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-                   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-                   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-                   bitmap_res gfs bmapstart cov logstart size used -∗
-                   dinode_at gi dinum dn0 -∗
-                   p_pid (proc_addr j) ↦₄{dq} pidv -∗
-                   bslots bn 3 -∗
-                   iref_slot -∗
-                   log_op g ncount -∗
-                   wp_next (CID0 := CID) true (proc_addr j) (fun CIDc : CpuId =>
-                     ∀ (mf : regfile) (found : bool)
-                       (bm' : blkmap) (data' : nat -> list (bv 8))
-                       (dn' dn0' : dinode) (n' : nat) (used' : gset Z)
-                       (tot : nat),
-                         ⌜callee_saved m mf⌝ -∗
-                         sie_cap_gpr mf K b (proc_addr j) -∗
-                         cpu_own 0 eb (proc_addr j) C b -∗
-                         pc_is ret_tgt -∗
-                         i_dev ip ↦₄{dqd} dev -∗
-                         i_inum ip ↦₄{dqf} dinum -∗
-                         inode_meta ip dn' -∗
-                         inode_map gfs ip bm' -∗
-                         inode_blocks gfs bm' data' -∗
-                         ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
-                         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-                         sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-                         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-                         bitmap_res gfs bmapstart cov logstart size used' -∗
-                         dinode_at gi dinum dn0' -∗
-                         p_pid (proc_addr j) ↦₄{dq} pidv -∗
-                         bslots bn 3 -∗
-                         iref_slot -∗
-                         ⌜((ncount - dirlink_units)%nat <= n')%nat
-                          /\ (n' <= ncount)%nat⌝ -∗
-                         log_op g n' -∗
-                         ⌜inode_sized data -> inode_sized data'⌝ -∗
-                         ⌜if found
-                           then dir_first data nrec s <> None
-                                /\ mf !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)
-                                /\ bm' = bm /\ data' = data /\ dn' = dn /\ dn0' = dn0
-                                /\ used' ⊆ used
-                                /\ tot = 0%nat
-                           else dir_first data nrec s = None
-                                /\ used ⊆ used'
-                                /\ blkmap_wf cov logstart bm'
-                                /\ blk_holes_zero bm' data'
-                                /\ di_addrs dn' = bm_cells bm'
-                                /\ bv_unsigned (di_size dn') < 2 ^ 31
-                                /\ bm_covers bm' (bv_unsigned (di_size dn'))
-                                /\ dn' = wi_dinode dn bm' (16 * k0)%nat tot
-                                /\ dn0' = dn'
-                                /\ (tot <= 16)%nat
-                                /\ (forall x : nat,
-                                      file_byte data' x
-                                      = if decide ((16 * k0 <= x)%nat
-                                                   /\ (x < 16 * k0 + tot)%nat)
-                                        then dirent_bytes (de_of_name inum s)
-                                               !!! (x - 16 * k0)%nat
-                                        else file_byte data x)
-                                /\ ((mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)
-                                     /\ tot = 16%nat)
-                                    \/ (mf !!! Regidx Ra0
-                                          = (mword_of_int (-1) : mword 64)
-                                        /\ (tot < 16)%nat))⌝ -∗
-                         WP (Loop : expr riscv_lang)) -∗
-                   WP (Loop : expr riscv_lang)))%I with "[]" as "#Hafter".
+                 dl_after_body j m sp0 ip nb dqd dev dqf dinum dn dn0 gfs bm
+                   data dqn fn dqs inodestart dqbs size dqb bmapstart cov
+                   logstart used gi dq pidv bn g ncount K b eb C k0 inum
+                   nrec s ret_tgt CIDa))%I
+        with "[]" as "#Hafter".
       { iModIntro.
         iIntros (CIDa Hsa Mp dolz w5 w6)
           "%Hpr Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hde Hidev Hiinum
@@ -1819,10 +1964,10 @@ Section ProofDirlinkMain.
         iEval (rewrite Hqq78) in "Hpc".
         (* +0x78 jal ra,strncpy *)
         assert (Htgtsn : add_vec (mword_of_int (DK + 0x78) : mword 64)
-                  (sign_extend' 64 (mword_of_int 2085776 : mword 21))
+                  (sign_extend' 64 (mword_of_int 2085760 : mword 21))
                   = mword_of_int KernelSyms.strncpy) by pcw.
         iApply (wp_jal_s_sconf (mword_of_int (DK + 0x78)) Rra
-                  (mword_of_int 2085776 : mword 21) W3 (K - 10)%nat b
+                  (mword_of_int 2085760 : mword 21) W3 (K - 10)%nat b
                   ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi78").
         iIntros (CIDA4 HqA4) "Hcg Hpc".
@@ -1851,7 +1996,7 @@ Section ProofDirlinkMain.
         iApply (SNC.wp_strncpy_sconf W4 14%nat fn (fun jj => dolz (2 + jj)%nat)
                   (K - 10)%nat dqn b (proc_addr j)
                   ltac:(exact HK2) HW4a2 ltac:(vm_compute; reflexivity)
-                  with "Hcg Htext Hpc Hnm Hdenm [-]").
+                  with "Hcg Htext Hpc Hnm Hdenm").
         iIntros (CIDsn Hssn msn hh) "Hcg Hpc Hnm Hdenm %Hcssn %Hsna0 %Hsnp".
         iEval (rewrite HW4a1) in "Hnm".
         iEval (rewrite HW4a0) in "Hdenm".
@@ -2014,10 +2159,10 @@ Section ProofDirlinkMain.
         iEval (rewrite Hqq8c) in "Hpc".
         (* +0x8c jal ra,writei *)
         assert (Htgtwi : add_vec (mword_of_int (DK + 0x8c) : mword 64)
-                  (sign_extend' 64 (mword_of_int 2096238 : mword 21))
+                  (sign_extend' 64 (mword_of_int 2096222 : mword 21))
                   = mword_of_int KernelSyms.writei) by pcw.
         iApply (wp_jal_s_sconf (mword_of_int (DK + 0x8c)) Rra
-                  (mword_of_int 2096238 : mword 21) V5 (K - 10)%nat b
+                  (mword_of_int 2096222 : mword 21) V5 (K - 10)%nat b
                   ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi8c").
         iIntros (CIDA11 HqA11) "Hcg Hpc".
@@ -2074,7 +2219,7 @@ Section ProofDirlinkMain.
                   with "Hcg Hcnt [] [] Htext Hpc Hpanic Hkd Hpk Hbio Hlog Hkenv
                         Hidev Hiinum Hmeta Hmap Hblocks Hsbi Hsbs Hsbb Hbmr
                         Hiregi Hdat Hsrc Hprocs Hdev Hgeom Hdlk Hbsl
-                        Hop [-]").
+                        Hop").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         iIntros (CIDwi Hswi mwi tot bm' data' dn' dn0' nn wrote dist dstb P' used')
@@ -2223,7 +2368,7 @@ Section ProofDirlinkMain.
         iSpecialize ("Ht" with "[%]"); [wp_next_chain |].
         iApply ("Ht" $! V10 (m !!! Regidx Rs1 : mword 64) w5 w6
                   (fun jj => dirent_bytes (de_of_name inum s) !!! jj) with
-                  "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hsrc [-]").
+                  "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hsrc").
         { exact HV10t. }
         iIntros (CIDf Hsf mf) "%Hcsf %Ha0f Hcg Hpc".
         iDestruct (cpu_own_transport CIDwi CIDf 0%nat eb (proc_addr j) C b
@@ -2276,7 +2421,7 @@ Section ProofDirlinkMain.
                   ltac:(rgne; rewrite HQ1s1; exact (dl_sz_eqz _ Hsz0))
                   ltac:(rewrite Htgt70; vm_compute; reflexivity)
                   with "Hcg Hpc Hi22").
-        iNext. iIntros (CID16 Hq16) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID16 Hq16) "Hcg Hpc".
         iEval (rewrite Htgt70) in "Hpc".
         assert (Hk00 : k0 = 0%nat)
           by exact (eq_trans (f_equal (dir_slot data) (dl_nrec_zero _ Hsz0))
@@ -2413,100 +2558,11 @@ Section ProofDirlinkMain.
         (* =============================================================== *)
         iAssert (∀ fuel : nat,
           wp_next (CID0 := CID) true (proc_addr j) (fun CIDl : CpuId =>
-            ∀ (i : nat) (Ml : regfile) (dol : nat -> bv 8),
-              ⌜(S nrec - i <= fuel)%nat⌝ -∗
-              (* §15(b): THE LOOP TEST, not [i < nrec] -- without
-                 granularity the code takes one turn past [nrec], whose
-                 readi is short and whose next branch panics. *)
-              ⌜Z.of_nat i * 16 < bv_unsigned (di_size dn)⌝ -∗
-              ⌜dir_free_first data i = None⌝ -∗
-              ⌜dl_regs m sp0 ip nb
-                 (zero_extend' 64 (inum : mword 16) : mword 64) (16 * i)%nat Ml⌝ -∗
-              sie_cap_gpr Ml (K - 10)%nat b (proc_addr j) -∗
-              cpu_own 0 eb (proc_addr j) C b -∗
-              pc_is (mword_of_int (DK + 0x30)) -∗
-              (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-              (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-              (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-              (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-              (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-              (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
-              (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-              (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-              ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ dol jj) -∗
-              i_dev ip ↦₄{dqd} dev -∗
-              i_inum ip ↦₄{dqf} dinum -∗
-              inode_meta ip dn -∗
-              inode_map gfs ip bm -∗
-              inode_blocks gfs bm data -∗
-              ([∗ list] i0 ∈ seq 0 14, pa_add nb i0 ↦ₘ{dqn} fn i0) -∗
-              sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-              sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-              sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-              bitmap_res gfs bmapstart cov logstart size used -∗
-              dinode_at gi dinum dn0 -∗
-              p_pid (proc_addr j) ↦₄{dq} pidv -∗
-              bslot bn -∗
-              bslots bn 2 -∗
-              iref_slot -∗
-              log_op g ncount -∗
-              wp_next (CID0 := CID) true (proc_addr j) (fun CIDc : CpuId =>
-                ∀ (mf : regfile) (found : bool)
-                  (bm' : blkmap) (data' : nat -> list (bv 8))
-                  (dn' dn0' : dinode) (n' : nat) (used' : gset Z)
-                  (tot : nat),
-                    ⌜callee_saved m mf⌝ -∗
-                    sie_cap_gpr mf K b (proc_addr j) -∗
-                    cpu_own 0 eb (proc_addr j) C b -∗
-                    pc_is ret_tgt -∗
-                    i_dev ip ↦₄{dqd} dev -∗
-                    i_inum ip ↦₄{dqf} dinum -∗
-                    inode_meta ip dn' -∗
-                    inode_map gfs ip bm' -∗
-                    inode_blocks gfs bm' data' -∗
-                    ([∗ list] i0 ∈ seq 0 14, pa_add nb i0 ↦ₘ{dqn} fn i0) -∗
-                    sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-                    sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-                    sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-                    bitmap_res gfs bmapstart cov logstart size used' -∗
-                    dinode_at gi dinum dn0' -∗
-                    p_pid (proc_addr j) ↦₄{dq} pidv -∗
-                    bslots bn 3 -∗
-                    iref_slot -∗
-                    ⌜((ncount - dirlink_units)%nat <= n')%nat
-                     /\ (n' <= ncount)%nat⌝ -∗
-                    log_op g n' -∗
-                    ⌜inode_sized data -> inode_sized data'⌝ -∗
-                    ⌜if found
-                      then dir_first data nrec s <> None
-                           /\ mf !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)
-                           /\ bm' = bm /\ data' = data /\ dn' = dn /\ dn0' = dn0
-                           /\ used' ⊆ used
-                           /\ tot = 0%nat
-                      else dir_first data nrec s = None
-                           /\ used ⊆ used'
-                           /\ blkmap_wf cov logstart bm'
-                           /\ blk_holes_zero bm' data'
-                           /\ di_addrs dn' = bm_cells bm'
-                           /\ bv_unsigned (di_size dn') < 2 ^ 31
-                           /\ bm_covers bm' (bv_unsigned (di_size dn'))
-                           /\ dn' = wi_dinode dn bm' (16 * k0)%nat tot
-                           /\ dn0' = dn'
-                           /\ (tot <= 16)%nat
-                           /\ (forall x : nat,
-                                 file_byte data' x
-                                 = if decide ((16 * k0 <= x)%nat
-                                              /\ (x < 16 * k0 + tot)%nat)
-                                   then dirent_bytes (de_of_name inum s)
-                                          !!! (x - 16 * k0)%nat
-                                   else file_byte data x)
-                           /\ ((mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)
-                                /\ tot = 16%nat)
-                               \/ (mf !!! Regidx Ra0
-                                     = (mword_of_int (-1) : mword 64)
-                                   /\ (tot < 16)%nat))⌝ -∗
-                    WP (Loop : expr riscv_lang)) -∗
-              WP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
+            dl_scan_body j nrec dn data m sp0 ip nb inum K b eb C dev dqf
+              dinum gfs bm dqn fn dqs inodestart dqbs size dqb bmapstart cov
+              logstart used gi dn0 dq pidv bn g ncount k0 s ret_tgt dqd
+              fuel CIDl))%I
+          with "[]" as "Hloop".
         { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
           { iIntros (CIDl Hsl i Ml dol)
               "%Hfuel %Hilt16 %Hffn %Hregs Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6
@@ -2648,10 +2704,10 @@ Section ProofDirlinkMain.
           iEval (rewrite Hbb3a) in "Hpc".
           (* +0x3a jal ra,readi *)
           assert (Htgtrd : add_vec (mword_of_int (DK + 0x3a) : mword 64)
-                    (sign_extend' 64 (mword_of_int 2096078 : mword 21))
+                    (sign_extend' 64 (mword_of_int 2096062 : mword 21))
                     = mword_of_int KernelSyms.readi) by pcw.
           iApply (wp_jal_s_sconf (mword_of_int (DK + 0x3a)) Rra
-                    (mword_of_int 2096078 : mword 21) L5 (K - 10)%nat b
+                    (mword_of_int 2096062 : mword 21) L5 (K - 10)%nat b
                     ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc Hj3a").
           iIntros (CIDB6 HqB6) "Hcg Hpc".
@@ -2695,7 +2751,7 @@ Section ProofDirlinkMain.
                           exact (eq_vec_refl _))
                     HL6a3 HL6a4
                     with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
-                          Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbs1 [-]").
+                          Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbs1").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
           iIntros (CIDrd Hsrd mrd tot P')
@@ -2745,7 +2801,7 @@ Section ProofDirlinkMain.
                             exact (dlk_neq16 tot Htlt))
                       ltac:(rewrite Htk60; vm_compute; reflexivity)
                       with "Hcg Hpc Hj3e").
-            iNext. iIntros (CIDpa1 Hqpa1) "Hcg Hpc".
+            iApply bi.later_intro. iIntros (CIDpa1 Hqpa1) "Hcg Hpc".
             iEval (rewrite Htk60) in "Hpc".
             (* +0x60 auipc a0,0x4 *)
             iApply (wp_auipc_s_sconf (mword_of_int (DK + 0x60)) Ra0
@@ -2760,23 +2816,23 @@ Section ProofDirlinkMain.
             iEval (rewrite Hpp64) in "Hpc".
             (* +0x64 addi a0,a0,2790 *)
             iApply (wp_addi4_s_sconf (mword_of_int (DK + 0x64)) Ra0 Ra0
-                      (mword_of_int 2778 : mword 12) PB1 (K - 10)%nat b
+                      (mword_of_int 2818 : mword 12) PB1 (K - 10)%nat b
                       ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj64").
             iIntros (CIDpa3 Hqpa3) "Hcg Hpc".
             set (PB2 := <[Regidx Ra0 := regval_into_reg
                            (add_vec (rget PB1 Ra0)
-                              (sign_extend' 64 (mword_of_int 2778 : mword 12)))]> PB1).
+                              (sign_extend' 64 (mword_of_int 2818 : mword 12)))]> PB1).
             assert (Hpp68 : add_vec_int (mword_of_int (DK + 0x64) : mword 64) 4
                             = mword_of_int (DK + 0x68)) by pcw.
             iEval (rewrite Hpp68) in "Hpc".
             (* +0x68 jal ra,panic -- and panic() never returns *)
             iApply (wp_jal_s_sconf (mword_of_int (DK + 0x68)) Rra
-                      (mword_of_int 2084382 : mword 21) PB2 (K - 10)%nat b
+                      (mword_of_int 2084398 : mword 21) PB2 (K - 10)%nat b
                       ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                       with "Hcg Hpc Hj68").
             iIntros (CIDpa4 Hqpa4) "Hcg Hpc".
             assert (Htgtpn : add_vec (mword_of_int (DK + 0x68) : mword 64)
-                               (sign_extend' 64 (mword_of_int 2084382 : mword 21))
+                               (sign_extend' 64 (mword_of_int 2084398 : mword 21))
                              = mword_of_int KernelSyms.panic) by pcw.
             iEval (rewrite Htgtpn) in "Hpc".
             iPoseProof (panic_wp_any_at CIDpa4 with "Hpanic") as "Hpan".
@@ -2843,7 +2899,7 @@ Section ProofDirlinkMain.
                       ltac:(rgne; rewrite HN1a5; exact (dlk_eqz_true _ Hfree))
                       ltac:(rewrite Htgt6c; vm_compute; reflexivity)
                       with "Hcg Hpc Hj46").
-            iNext. iIntros (CIDB9 HqB9) "Hcg Hpc".
+            iApply bi.later_intro. iIntros (CIDB9 HqB9) "Hcg Hpc".
             iEval (rewrite Htgt6c) in "Hpc".
             iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj
                        ↦ₘ file_byte data (16 * i + jj)%nat)%I
@@ -3021,7 +3077,7 @@ Section ProofDirlinkMain.
                                first [ exact Hge | reflexivity ])
                          ltac:(rewrite Htgt30; vm_compute; reflexivity)
                          with "Hcg Hpc Hj4e").
-               iNext. iIntros (CIDB12 HqB12) "Hcg Hpc".
+               iApply bi.later_intro. iIntros (CIDB12 HqB12) "Hcg Hpc".
                iEval (rewrite Htgt30) in "Hpc".
                assert (Hgtc : Z.of_nat (S i) * 16 < bv_unsigned (di_size dn)).
                { rewrite -(dl_offmul (S i)). apply Z.ltb_lt. exact Hge. }
@@ -3128,7 +3184,7 @@ Section ProofDirlinkMain.
                          (K - 10)%nat b
                          ltac:(rewrite Htgt70b; vm_compute; reflexivity)
                          with "Hcg Hpc Hj56").
-               iIntros (CIDB15 HqB15). iNext. iIntros "Hcg Hpc".
+               iIntros (CIDB15 HqB15). iApply bi.later_intro. iIntros "Hcg Hpc".
                iEval (rewrite Htgt70b) in "Hpc".
                iDestruct (dl_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
                  [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].

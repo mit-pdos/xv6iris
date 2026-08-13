@@ -202,7 +202,18 @@ Section UsertrapRes.
     iIntros "Hhs Hpriv Hms Hgpr Ht".
     iDestruct "Ht" as "(Hstk & Hstr & Harm & Hkpt & Hcl & Hgh & Hcpu & Hclm)".
     iDestruct "Hgh" as "(Hhalf & Hq & Htie & Htrav)".
-    iFrame "Hcpu Hclm Hq Hkpt Htrav".
+    (* A named [iFrame] here still makes the tactic hunt these five atoms
+       through the WHOLE goal, including the [sie_cap_gpr] conjunct that is
+       about to be unfolded below -- and [sie_cap_gpr] is transparent and
+       wraps [gpr_file], a [big_sepM] over the entire register file, so every
+       failed match against it pays a real unfold.  [iSplitR] pays nothing
+       extra: the goal is already a literal top-level [sie_cap_gpr ∗ (...)],
+       so peeling it off costs one syntactic step, and the five atoms then
+       get framed into a goal that no longer mentions [sie_cap_gpr] at all.
+       The first branch is left open (empty in the bracket) so the rest of
+       this proof, which is entirely about the [sie_cap_gpr] side, is
+       unchanged. *)
+    iSplitR "Hcpu Hclm Hq Hkpt Htrav"; [ | iFrame "Hcpu Hclm Hq Hkpt Htrav" ].
     rewrite /sie_cap_gpr. iFrame "Hhs".
     iSplitL "Hpriv Hms Hhalf Htie Hcl".
     { iApply ("Hcl" $! ms with "Hpriv [Hms Hhalf Htie]").

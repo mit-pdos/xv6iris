@@ -72,7 +72,7 @@ Section KvminithartBody.
     iPoseProof (kvi_00 with "Htext") as "Hi00".
     (* ============ +0x00 addi sp,sp,-16 : 2-slot frame push ============ *)
     iApply (wp_caddi_sp_push_s_sconf (mword_of_int KernelSyms.kvminithart) (mword_of_int 48 : mword 6) mm K 2 false HK Hpush
-              with "Hcg Hpc Hi00 [-]").
+              with "Hcg Hpc Hi00").
               iClear "Hi00".
     iApply wp_next_off_intro.
     iIntros "Hcg Hframe Hpc".
@@ -87,7 +87,7 @@ Section KvminithartBody.
     iPoseProof (kvi_02 with "Htext") as "Hi02".
     (* +0x02 sd ra,8(sp) -> slot 1 *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.kvminithart + 0x02)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
-              W1 (K - 2)%nat v1 false with "Hcg Hpc Hi02 [Hc1] [-]").
+              W1 (K - 2)%nat v1 false with "Hcg Hpc Hi02 [Hc1]").
               iClear "Hi02".
     { iEval (rewrite HspW1 Hb1). iExact "Hc1". }
     iApply wp_next_off_intro.
@@ -99,7 +99,7 @@ Section KvminithartBody.
     iPoseProof (kvi_04 with "Htext") as "Hi04".
     (* +0x04 sd s0,0(sp) -> slot 2 *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.kvminithart + 0x04)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
-              W1 (K - 2)%nat v2 false with "Hcg Hpc Hi04 [Hc2] [-]").
+              W1 (K - 2)%nat v2 false with "Hcg Hpc Hi04 [Hc2]").
               iClear "Hi04".
     { iEval (rewrite HspW1 Hb2). iExact "Hc2". }
     iApply wp_next_off_intro.
@@ -112,7 +112,7 @@ Section KvminithartBody.
     (* +0x06 addi s0,sp,16 (value unused) *)
     iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.kvminithart + 0x06)) (Cregidx (mword_of_int 0)) (mword_of_int 4 : mword 8) (mword_of_int 8 : mword 5)
               W1 (K - 2)%nat false ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi06 [-]").
+              with "Hcg Hpc Hi06").
               iClear "Hi06".
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
@@ -170,7 +170,7 @@ Section KvminithartBody.
     (* ============ +0x0c auipc a5,0x9 ============ *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.kvminithart + 0x0c)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 20)
               W2 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0c [-]").
+              with "Hcg Hpc Hi0c").
               iClear "Hi0c".
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
@@ -178,13 +178,13 @@ Section KvminithartBody.
     assert (Hp10 : add_vec_int (mword_of_int (KernelSyms.kvminithart + 0x0c) : mword 64) 4 = mword_of_int (KernelSyms.kvminithart + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp10) in "Hpc".
     (* ============ +0x10 ld a5,764(a5) : a5 := root_b ============ *)
-    assert (Haddr : add_vec (A0 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 898 : mword 12)) = mword_of_int KernelSyms.kernel_pagetable).
+    assert (Haddr : add_vec (A0 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 914 : mword 12)) = mword_of_int KernelSyms.kernel_pagetable).
     { rewrite /A0 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iPoseProof (kvi_10 with "Htext") as "Hi10".
-    iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.kvminithart + 0x10)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 898 : mword 12)
+    iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.kvminithart + 0x10)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 914 : mword 12)
               A0 (K - 2)%nat (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi10 [] [-]").
+              with "Hcg Hpc Hi10 []").
               iClear "Hi10".
     { iEval (rgne; rewrite Haddr). iExact "Hcell". }
     iApply wp_next_off_intro.
@@ -197,7 +197,7 @@ Section KvminithartBody.
     iEval (rewrite Hc7) in "Hi14".
     iApply (wp_csrli_s_sconf (mword_of_int (KernelSyms.kvminithart + 0x14)) (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) (mword_of_int 12 : mword 6)
               L (K - 2)%nat false Hc7 ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi14 [-]").
+              with "Hcg Hpc Hi14").
               iClear "Hi14".
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
@@ -210,7 +210,7 @@ Section KvminithartBody.
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.kvminithart + 0x16)) (mword_of_int 14 : mword 5) (mword_of_int 63 : mword 6)
               (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6))))
               S1 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) eq_refl
-              with "Hcg Hpc Hi16 [-]").
+              with "Hcg Hpc Hi16").
               iClear "Hi16".
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
@@ -222,7 +222,7 @@ Section KvminithartBody.
     (* ============ +0x18 slli a4,a4,0x3f ============ *)
     iApply (wp_cslli_s_sconf (mword_of_int (KernelSyms.kvminithart + 0x18)) (Regidx (mword_of_int 14 : mword 5)) (mword_of_int 14 : mword 5) (mword_of_int 63 : mword 6)
               S2 (K - 2)%nat false eq_refl ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi18 [-]").
+              with "Hcg Hpc Hi18").
               iClear "Hi18".
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
@@ -244,7 +244,7 @@ Section KvminithartBody.
       rewrite H15 H14. unfold kvi_satp_word. reflexivity. }
     iApply (wp_cor_s_sconf (mword_of_int (KernelSyms.kvminithart + 0x1a)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5)
               (kvi_satp_word root) S3 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) Hor
-              with "Hcg Hpc Hi1a [-]").
+              with "Hcg Hpc Hi1a").
               iClear "Hi1a".
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
@@ -408,7 +408,7 @@ Section KvminithartBody.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.kvminithart + 0x24)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
               S4 (K - 2)%nat (mm !!! Regidx (mword_of_int 1)) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi24 [Hc1] [-]").
+              with "Hcg Hpc Hi24 [Hc1]").
               iClear "Hi24".
     { iEval (rewrite HS4sp Hb1). iExact "Hc1". }
     iApply wp_next_off_intro.
@@ -422,7 +422,7 @@ Section KvminithartBody.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.kvminithart + 0x26)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
               L1 (K - 2)%nat (mm !!! Regidx (mword_of_int 8)) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi26 [Hc2] [-]").
+              with "Hcg Hpc Hi26 [Hc2]").
               iClear "Hi26".
     { iEval (rewrite HL1sp Hb2). iExact "Hc2". }
     iApply wp_next_off_intro.
@@ -444,7 +444,7 @@ Section KvminithartBody.
     iEval (rewrite -Hwv) in "Hframe".
     iPoseProof (kvi_28 with "Htext") as "Hi28".
     iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.kvminithart + 0x28)) (mword_of_int 16 : mword 6)
-              L2 (K - 2)%nat 2 false Hpop with "Hcg Hpc Hi28 Hframe [-]").
+              L2 (K - 2)%nat 2 false Hpop with "Hcg Hpc Hi28 Hframe").
               iClear "Hi28".
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
@@ -458,7 +458,7 @@ Section KvminithartBody.
     { rewrite /Efin upd_ne; [| reg_neq]. rewrite /L2 upd_ne; [| reg_neq]. rewrite /L1 upd_eq. reflexivity. }
     iPoseProof (kvi_2a with "Htext") as "Hi2a".
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.kvminithart + 0x2a)) (mword_of_int 1 : mword 5) Efin K false
-              ltac:(vm_compute; discriminate) with "Hcg Hpc Hi2a [-]").
+              ltac:(vm_compute; discriminate) with "Hcg Hpc Hi2a").
               iClear "Hi2a".
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc". iEval (rgne; rewrite HEfin1) in "Hpc".

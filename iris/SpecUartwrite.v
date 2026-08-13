@@ -89,7 +89,7 @@ Definition uartwrite_stack : nat := 34%nat.
 Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names) 
-    (γs : list gname) (j : nat) (γlp : gname) (γl γsl : gname)
+    (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
     (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool)
     (pidv : mword 32) (dqp : dfrac) :=
@@ -119,7 +119,7 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      Its resource is just the token -- the [tx_busy] certificate is gone,
      because the writer polls THRE itself before every byte. *)
   dev_inv γu γv -∗
-  is_txlock γl γsl γu -∗
+  is_txlock γl γu -∗
   (* acquiresleep records the holder's pid in the lock, so the running
      process's pid cell rides through at an arbitrary fraction *)
   p_pid pj ↦₄{dqp} pidv -∗
@@ -144,9 +144,9 @@ Module Type UARTWRITE.
   Parameter wp_uartwrite_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γu : uart_names) (γv : disk_names) (γs : list gname) (j : nat) (γlp : gname) (γl γsl : gname)
+      (γu : uart_names) (γv : disk_names) (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool)
       (pidv : mword 32) (dqp : dfrac),
-      wp_uartwrite_sconf_body γu γv γs j γlp γl γsl m av eb C n f dq b pidv dqp.
+      wp_uartwrite_sconf_body γu γv γs j γlp γl m av eb C n f dq b pidv dqp.
 End UARTWRITE.
