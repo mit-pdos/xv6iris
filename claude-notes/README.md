@@ -195,22 +195,29 @@ are working on that effort — the relevant `projects/` file.
   uncounted regime (uvmcreate -> proc_pagetable -> freeproc), plus
   `proc_priv_owe`, the payload-deficit predicate `sys_dup` needs.
 - **[`kexec.md`](projects/kexec.md)** — `kexec()`, the exec() system call and
-  **the largest function in the tree** (287 instructions / 860 bytes, 3× the
-  next one), where the FS, the page-table builder and `struct proc` meet. The
-  definitional layer has LANDED — `CodeKexec.v`, `ElfEnc.v` (the fifth byte
+  **the largest function in the tree** (289 instructions / 864 bytes, 3× the
+  next one), where the FS, the page-table builder and `struct proc` meet.
+  **`+0x000..+0x0cc` is PROVEN** — phase A entire (`ProofKexecA.kxc_phaseA`:
+  the prologue, myproc, begin_op, namei, ilock, the ELF-header readi and the
+  magic test, plus two of the eight `bad:` tails) and phase B's first chunk
+  (`kxc_b1`: proc_pagetable on the UNCOUNTED contract, the seven lazy spills,
+  the loop setup). The file opens with a CHECKPOINT and ends with an ordered
+  worklist; phase B2, the phdr + inlined-loadseg loops, is next and starts
+  from an already-fixed seam. Also here: `ElfEnc.v` (the fifth byte
   vocabulary, a pure READER since kexec never writes these bytes),
   `ProcInv.proc_priv_newspace` (the address-space bridge that does NOT pin
   `ud_root`, which every existing one does because every previous caller grew
-  the table it already had) and `SpecKexec.v` — and `flags2perm` is proven;
-  the whole-function proof has not started. Read it for the four-phase
-  decomposition, the four-point lazy callee-saved spill that makes
-  `callee_saved` an epilogue premise, and above all **the three upstream spec
-  changes kexec is blocked on**, each found by trying to compose the callees:
-  copyout's contract assumes the destination table IS the running process's
-  (vmfault maps into `p->pagetable`, not the table it is passed), safestrcpy
-  over-asks its source by 16 bytes where kexec can only own the string, and
-  the log budget does not close for a two-element path because namei charges
-  one iput too many on its SUCCESS arm.
+  the table it already had), `SpecKexec.fs_fabric` (the thirteen FS resources
+  as one persistent bundle), and the verified 68-slot frame map.
+  **Read it above all for the copyout story**, which is the most transferable
+  thing this project produced: the contract assumed the destination table was
+  the running process's, an elaborate two-armed `co_license` apparatus was
+  built and proven to work around that — and then xv6 `0024d4b` DELETED the
+  whole apparatus by fixing the kernel, more cheaply than the workaround.
+  The divergence had been spotted and explicitly ruled "not a kernel-defects
+  entry" because it was unreachable from kexec. **When a spec needs
+  scaffolding to model a gap between what the code does and what every caller
+  wants, suspect the code** — unreachability makes it safe, not correct.
 - **[`sleep-split.md`](projects/sleep-split.md)** — updating `XV6_REV` to
   **`ae96fd0`**, which splits `sleep(chan, lk)` into `sleep_prepare(chan)` +
   `sleep(void)` and rewrites the UART transmit path. Read it for the design
