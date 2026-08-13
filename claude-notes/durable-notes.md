@@ -413,6 +413,18 @@ across the whole kernel and take every proof with it, and you would be
 debugging that instead of your change. This is the same discipline the
 README already mandates for regenerating the Sail model.
 
+> **DIFF THE DUMPS OR THE `objcopy -O binary` IMAGE — NEVER THE ELF's md5.**
+> The kernel ELF's md5 is **build-path dependent**: `-gdwarf-2` records the
+> compilation directory, so the same source built by the same compiler in two
+> different checkouts gives two different ELF md5s while the loadable image is
+> identical to the byte. Measured 2026-08-13 on this very bump: `0ad3ab3c…`
+> from one tree and `4157542e…` from another, with
+> `objcopy -O binary` giving `ede58124230dab1309153b9c59e980da` on **both**.
+> Comparing ELF md5s therefore manufactures a phantom reproducibility failure
+> at exactly the moment the gate above is supposed to be reassuring you — and
+> the honest checks are cheap: the three `kernel-rocq/*.v` (what the proofs
+> actually read) and the objcopy'd image.
+
 **2. Take the MINIMAL source change.** Cherry-pick the one commit onto the
 pinned rev; do not move to a branch head. The `riscv` branch was 13 commits
 ahead touching 8 kernel files including `trampoline.S`, `memlayout.h` and

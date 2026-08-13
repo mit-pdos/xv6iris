@@ -5010,3 +5010,113 @@ constraint on the caller's `used'` follows from it — so the only sound answer
 there is the set nothing touched, and the SYSCALL picks the witness for its
 own continuation.  That is why `wp_sys_write_sconf_body`'s `used'` is a
 ∀-binder of the continuation and not a parameter of the contract.
+
+## GR-1 — the grand reconciliation, and the nlink guard's walk (2026-08-12/13)
+
+Origin's round 16 (`d334423a` xv6 `ae96fd0` + the split sleep protocol,
+`e9cf27bf` the generated image constants) merged with the S5e–S5i ledger, and
+the kernel moved under all of it. **The image this project is proved against is
+no longer an upstream commit**: it is `ae96fd0` plus a cherry-pick of upstream
+`9da28f5`, pinned as `XV6_REV = 1c7ccafc`, with the reproduction recipe (the
+committer identity and date are what make the sha deterministic) in the
+Makefile beside it.
+
+### The reconciliation's facts, because they bear on how the next one is run
+
+- **The merge was a union, not a chimera, and that had to be proved.** Only
+  `kernel-defects.md` conflicted textually; the other thirteen collision-cone
+  files auto-merged, which is exactly when a chimera is cheapest to acquire.
+  Three audits: all 132 of origin's re-addressed lines survived; all 1136 of
+  our added lines survived; and **0 of our added lines carry any of the 1762
+  immediates origin's sweep moved** — the ledger work is resource algebra and
+  names no image address. That last number is what licensed a SINGLE
+  re-addressing map instead of composing two.
+- **Origin's side of all eleven both-sides proofs was pure numeric
+  re-addressing** (line-for-line, numerals-only, N-for-N). Worth re-checking
+  mechanically next time before trusting an auto-merge: it is a two-minute
+  script and it decides the whole strategy.
+- **`kernel-defects.md` had two different D2s.** Ours (the dangling `".."`)
+  keeps D2; origin's (`tx_lock` never initialized) became **D3**.
+
+### D2 IS FIXED IN THE SOURCE — and what that does and does not retire
+
+`9da28f5` is D2's fix. It repairs the defect at the WALK, not at the record:
+`namex` and `create` each refuse a directory whose `nlink` has reached zero,
+immediately after the `ilock` that makes the field readable. That kills all
+three of D2's outcomes at once — the `panic("ilock: no type")`, the silent
+resolution to a re-claimed inum, and S5h's third outcome where a stranger's
+`iput` frees an inode a live `create` has already allocated — because the
+dangling `".."` is never followed.
+
+**It does not remove the record.** `b`'s `".."` still names `a` on disk and
+`a`'s `nlink` still does not pay for it, so any invariant stated over the
+RECORDS is still false at exactly that fragment. **`igrey` is therefore a live
+design question, not a deletion.** The colour models "a record nothing pays
+for", and such a record still exists; what changed is that no reachable step
+consumes one. Settling it means restating §20's (b) over REACHABILITY rather
+than over records — and only then does the grey colour retire (or narrow to an
+unreachable-by-construction case). Do not open GR-2 assuming it is gone.
+
+### The guard's walk (ProofNamex, GR-1b)
+
+namex grew 16 bytes and create 20; 80 of 223 symbols moved (`dirlink`..`create`
++0x10, `sys_dup`..`sys_pipe` +0x24, `kernelvec`.. +0x20 by alignment, data
++0x10). namex's own map came out provably complete — **0 reshaped, 0 unmapped,
+and exactly six new offsets**, which are the guard's six instructions — so 576
+offset references and 48 immediates moved mechanically and only the walk was
+left.
+
+The arm itself: `+0xce lh a5,74(s4)` / `+0xd2 c.beqz a5 -> +0x7a`, then
+`L_nlink` at `+0x7a`: `c.mv a0,s4 / jal iunlockput / c.li s4,0 / c.j +0x5c`.
+Three things made it cheap, and all three are worth expecting next time:
+
+1. **The field resource was already in hand.** `Hinl` is the `i_nlink` conjunct
+   of `Hmeta`, destructed alongside the `Hity` the type test consumes, so the
+   guard needed no resource the walk did not already hold and nothing above the
+   splice changed.
+2. **gcc emitted a FRESH block rather than sharing `L_notdir`'s** — because
+   `+0x54` falls through into the epilogue and a branch from `+0xd2` must jump.
+   So the arm is `L_notdir` instruction-for-instruction plus one `c.j`, and the
+   proof is likewise: the copy differs only in the offsets, the `jal`'s
+   immediate (a different pc), the register map, and that one `wp_cj_s_sconf`.
+   Coq names are branch-local and the two arms are disjoint branches of the
+   `di_nlink` destruct, so every `ND1`/`CIDN1`/`"Hj54"` was reused verbatim.
+3. **The contract did not move.** `SpecNamex.v` is byte-identical: the arm
+   returns 0 having released the inode through the very same `iunlockput`,
+   which is `L_notdir`'s postcondition and which the failure arm already
+   admitted.
+
+The one cost not in the sizing: the nlink read writes a5, so every step after
+it runs on a new map — a scoped `V3 -> W0` rename of the directory branch's
+body (21 sites). `HV3a5` was not among them, which is the check that a5 is dead
+there. Two new decision lemmas, `nx_nlz_eq` / `nx_nlz_ne`, in `nx_tdir_*`'s
+shape but over `eq_vec _ zero_reg` because `c.beqz` compares against x0.
+
+Sizing was ~200 lines; actual was 243, and the only error on the way was a
+name clash (`"Hjce"` is taken 400 lines later). ProofNamex compiles in **2:49 /
+5.3 GB**, so the single-file loop is the right one for this file.
+
+### The gate
+
+`EXIT=0`, **1062 `.vo`**, nothing unbuilt and nothing stale. `Print
+Assumptions` on Namex, Namei, Nameiparent and the fs cones: **the standing six**
+(funext + the five Sail externs), with fileread's `consoleread` and filewrite's
+`consolewrite` as the two documented device extras. No axiom entered from the
+merge; neither `LinkTxLockInit` nor `LinkUartwrite` reaches an fs cone.
+
+### The GR-2 queue
+
+- **create's walk on the new image.** The guard is at `create+0x2a lh a5,74(s1)`
+  / `+0x2e c.beqz a5,+0x76`, and the taken arm at `+0x76` is
+  `c.mv a0,s1 / jal iunlockput / c.li s2,0 / c.j +0x62` — the same fresh-block
+  shape as namex's, adjacent to the `iunlockput(ip)` arm at `+0x80`, sharing
+  only the epilogue at `+0x62`. `CodeCreate` has **87 reshaped offsets**, which
+  cost nothing so far because nothing walks create's instructions yet
+  (`ProofCreateParts.v` and `CreateBudget.v` name neither `KernelSyms.create`
+  nor `cri_`, and both are byte-unchanged across the bump).
+- **`SpecCreate.K_create` will have to grow.** It is `106` and it compiles
+  untouched — the spec has no hardcoded offsets — but it is a leaf-count budget
+  and the guard adds instructions plus an `iunlockput` call on the path. It is
+  not breaking anything today only because nothing proves against it.
+- **The `igrey` / reachability question above**, which is the one that decides
+  how much of §20 stage E comes back.
