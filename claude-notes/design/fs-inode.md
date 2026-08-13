@@ -617,6 +617,43 @@ so a larger size would drive bmap past MAXFILE into its out-of-range panic.
 No `log_op`, no `log_ctx`, no `γ : log_names`, and ONE `bslot` (bmap's and
 bread's uses do not overlap).
 
+### readi takes `off` and `n` at the FULL 32-bit range
+
+Both are C `uint`s and the contract admits every 32-bit value of each, under
+one joint premise — `Z.of_nat off + Z.of_nat n < 2^32`, the sum in the
+MATHEMATICAL integers. Three things make that cheap, and they are the shape
+to copy for any other `uint` parameter (`writei` has the same one and still
+asks `< 2^31`, because its callers can pay):
+
+- **the register premise is the ABI's, not the value's.** RV64 passes a
+  32-bit argument SIGN-EXTENDED, `uint` included, so the premise is
+  `m a3 = sign_extend' 64 (mword_of_int (Z.of_nat off) : mword 32)` — a
+  NEGATIVE 64-bit word once `off` reaches 2^31. Below 2^31 it is the plain
+  literal (`SpecReadi.rd_arg32_small`), which is why the four existing
+  callers each cost one `assert`. A premise that pinned a3 to
+  `mword_of_int (Z.of_nat off)` at the wider range would be a different and
+  WRONG contract: no compiled caller ever produces that word.
+- **the postcondition does not move.** `rd_clamp` is already 0 at
+  `off > size` and a size is at most `MAXFILE*BSIZE ≈ 274432`, so every
+  newly admitted `off` lands on the pre-frame exit that was already proven.
+- **the sign extension is invisible to the arithmetic that follows.** The
+  three compares are 64-bit unsigned, and a sign-extended-negative word is
+  ABOVE any file size as an unsigned word, so they decide the 32-bit
+  unsigned compares the C is written in. `ProofReadiParts.rd_u32` is that
+  word's value and its three orderings (`_lb`, `_gt`, `_le`) are every use
+  the compares make of it. The `c.addw a4,a3` at `+0x022` truncates both
+  operands before adding (`rd_addw32`), so only the SUM needs a bound —
+  that is the one place the joint premise is used, and the reason it is
+  joint rather than two separate bounds. Past the size test
+  `off ≤ size < 2^31`, so a3 is the literal again and the whole loop below
+  is untouched; only `n` stays wide, in a4 and s5, until the clamp.
+
+What the premise still excludes is a WRAPPING sum. The code is total there —
+`off + n < off` fires and it returns 0 — but admitting it would move the
+postcondition: at a small `off` and an `n` near 2^32 the sum wraps while
+`rd_clamp` is not 0, so `rd_clamp` would need an overflow arm of its own and
+every caller would have to discharge it.
+
 ### `writei` PRESERVES `bm_covers`
 
 `writei` takes `bm_covers bm (bv_unsigned (di_size dn))` as a PREMISE and

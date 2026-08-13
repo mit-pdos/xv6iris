@@ -167,7 +167,7 @@ Definition wp_pipealloc_sconf_body
      park), but fileclose's crossing is the literal [true] on EVERY arm, and a
      hart-indexed resource cannot be framed across such a call -- it has to be
      handed over and given back.  See
-     claude-notes/projects/eb-generic-sweep.md. *)
+     claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗

@@ -173,7 +173,7 @@ Definition wp_iput_sconf_body
   (* the trap-CSR complement: [emp] at [eb = true], where iput's own
      acquire mints what the interior sleeps need; the real pair at
      [eb = false], where the caller holds it because the TRAP gave it
-     to it.  See claude-notes/projects/eb-generic-sweep.md. *)
+     to it.  See claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
@@ -220,7 +220,7 @@ Definition wp_iput_sconf_body
   (* the trap-CSR complement: [emp] at [eb = true], where iput's own
      acquire mints what the interior sleeps need; the real pair at
      [eb = false], where the caller holds it because the TRAP gave it
-     to it.  See claude-notes/projects/eb-generic-sweep.md. *)
+     to it.  See claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗

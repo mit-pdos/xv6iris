@@ -121,24 +121,27 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   story**, the most transferable thing this project produced.
 - **[`main-boot.md`](projects/main-boot.md)** — `main()`, both arms proven: the
   `started` one-shot escrow, the deposit as a □-wand, the hart-generic init
-  chain. Remaining: the whole-system adequacy composition.
+  chain. Remaining: the whole-system adequacy composition, and (§G2) retiring
+  `LinkPrintkGen.v`'s `Axiom` now that the two printk paths have merged —
+  the last open piece of the printk cone, whose wiring is main's.
 - **[`uservec.md`](projects/uservec.md)** — uservec, proven (trampoline.S is
   100 % covered): the boundary specs, the TVM/TSR mstatus-pin extension, the
   proof's file split. Remaining: the whole-trap-loop Löb theorem.
 - **[`panic.md`](projects/panic.md)** — `panic()`, proven: the contract the two
   printk calls force, the Löb self-jump, and the one thing left — splicing it
   into the 169 files that still thread `PanicStub.v`'s placeholder credential.
-- **[`printk.md`](projects/printk.md)** — the formatted-output cone, all proven
-  and linked: `pk_held`, `PrintkFmt.v`, the fuel inductions, the loop-assembly
-  architecture. Only the general (non-panic) path remains.
+- **[`console.md`](projects/console.md)** — console.c: consolewrite (proven,
+  axiom-clean), consoleread (specified, proof owed) and consoleintr; the
+  `cons` module's own state in `ConsoleInv.v` and why its resource is
+  deliberately unconstrained.
 - **[`uart-driver.md`](projects/uart-driver.md)** — the interrupt-driven UART
   driver; uart.c is 4/4 functions. Read it for the transmit path's shape and for
   the rotated-loop / nested-iLöb / `uart_sent_sub` techniques. Remaining:
   consolewrite, consoleread, consoleintr, and the boot `newlock`.
-- **[`eb-generic-sweep.md`](projects/eb-generic-sweep.md)** — making the sleep
-  cone callable with interrupts OFF, which is what `usertrap` needs to reach
-  `kexit`: the index-free restatement, what moves with a crossing and what must
-  not, and the remaining worklist in dependency order.
+- **[`lock-set.md`](projects/lock-set.md)** — the per-CPU held-lock set: what
+  landed hidden, and the tree-wide `cpu_own`-index sweep that turns it into
+  acquire's no-reentrance premise and the "interrupts on ⟹ no locks held"
+  theorem.
 - **[`user-verified.md`](projects/user-verified.md)** — VERIFIED user-mode
   execution (the Umode tier): the `uv_cap` capability, the concrete-image memory
   layer, the interrupt-absorbing step engine, and the sync program's proofs.

@@ -42,6 +42,7 @@ Require Import InstrBytes.
 Require Import RiscvExtras.
 Require Import PrintintArith.
 Require Import VcGen.
+Require Export W32Arith.
 Require Import ByteCursor.
 Require Import ByteBuf.
 Require Import WpLock.
@@ -111,10 +112,12 @@ Proof. rewrite -Nat2Z.inj_div Nat2Z.id. reflexivity. Qed.
 (*  (1) Arithmetic                                                        *)
 (* ===================================================================== *)
 
+(* the small-argument law, at the literal bound readi's own facts are
+   stated over; [W32Arith.w32_sext_moi] is the general one *)
 Lemma rd_sext32 (z : Z) : 0 <= z -> z < 2147483648 ->
   (sign_extend' 64 (mword_of_int z : mword 32) : mword 64) = mword_of_int z.
 Proof.
-  intros H0 H1. apply PrintintArith.sext32_64_small.
+  intros H0 H1. apply w32_sext_moi.
   split; [lia | change (2 ^ 31)%Z with 2147483648%Z; lia].
 Qed.
 
@@ -196,6 +199,12 @@ Proof.
     rewrite Zminus_mod_idemp_l Zminus_mod_idemp_r. reflexivity. }
   rewrite Hsub. apply rd_sext32; lia.
 Qed.
+
+(* NOTE: the ABI's 32-bit ARGUMENT -- a [uint] at or above 2^31, which
+   arrives sign-extended and hence NEGATIVE, as [SpecReadi]'s register
+   premises spell it -- is not readi vocabulary and does not live here.  It
+   is [W32Arith]'s [w32_uarg] (the word's unsigned value), its three
+   orderings and [w32_addw_arg], required above. *)
 
 (* [andi a5,s1,1023] : off % BSIZE *)
 Lemma rd_andi1023 (z : Z) : 0 <= z -> z < 2147483648 ->

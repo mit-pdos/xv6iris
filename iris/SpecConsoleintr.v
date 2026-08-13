@@ -8,25 +8,47 @@
    in cons.buf, wakes a blocked consoleread() when a whole line has arrived,
    and releases cons.lock.  @ KernelSyms.consoleintr = 0x800002bc.
 
-   *** THIS CONTRACT IS ASSUMED (LinkConsoleintr.v). ***  consoleintr is the
-   one callee of uartintr with no proof, and this is the shape uartintr needs:
-   a well-behaved kernel function that takes the running-thread bundle
-   ([procs_inv] + [panic_wp], for the [wakeup] it performs) and gives back
-   every callee-saved register, the interrupt-nesting level it was entered at,
-   and the register file's totality.  It is stated in exactly [wakeup]'s shape
-   because that is consoleintr's deepest sub-call.
+   ---- THE CREDENTIAL, AND WHY IT IS ONE EXISTENTIAL BUNDLE -------------
 
-   WHAT THE ASSUMPTION HIDES, and why it is worth naming: the echo path
-   ([consputc], hence [uartputc_sync]) really does touch the UART, so a proven
-   consoleintr could NOT have a contract silent about the transmitter -- it
-   would need the transmitter token, which uartintr has just given back with
-   tx_lock.  In the C that is a genuine race (uartputc_sync deliberately does
-   not take tx_lock), and it is the same seam recorded in
-   claude-notes/projects/uartwrite.md.  So this assumption is not merely
-   "consoleintr is unproven": it also asserts that the echo is invisible to
-   uartintr's caller, which is true of the register/lock state but not of the
-   device.  Proving consoleintr will have to face that; nothing else in the
-   uartintr proof depends on it. *)
+   This contract used to be ASSUMED, and what the assumption hid was the
+   ECHO: [consputc] reaches [uartputc_sync], which really does take tx_lock
+   and write the THR, so a contract silent about the transmitter was
+   asserting something false about the device.  A proof cannot be silent
+   about it, so consoleintr asks for exactly what its four callees ask for:
+
+     acquire / release   [ConsoleInv.is_conslock]
+     consputc            [WpUart.dev_inv] ∗ [UartTxInv.is_txlock] ∗ a
+                         [UartTxInv.uart_sent_sub] to extend
+     wakeup              [procs_inv] ∗ [panic_wp_any]
+
+   ALL OF THEM ARE PERSISTENT, which is what makes the ripple cheap: the two
+   lock credentials and the trace baseline are bundled here as
+   [console_caps], with the two ghost NAMES existentially quantified, so a
+   caller threading it gains a conjunct and NO new parameter.  uartintr's
+   contract gains [console_caps], [SpecDevintr.devintr_caps] gains it, and
+   the eight files that merely pass that bundle along do not change at all.
+
+   [uart_sent_sub γu []] rather than a threaded [bs]: consoleintr's echo is
+   of no interest to any caller, so there is nothing to thread -- the empty
+   claim is the baseline each [consputc] call extends and then discards.
+   Keeping it INSIDE the bundle rather than minting it from [dev_inv] is
+   deliberate: minting costs a fupd that opens the device invariant, and the
+   boot assembly that will eventually build this bundle has the real
+   [uart_sent] in hand anyway (consoleinit hands it back).
+
+   *** THE CONTRACT BELOW HAS NOT YET GROWN THE BUNDLE. ***  It is still the
+   ASSUMED shape uartintr was written against; [console_caps] is defined here
+   because ProofConsoleintr.v's blocks already consume it, and moving it into
+   the contract is a one-conjunct change to [SpecDevintr.devintr_caps] that
+   waits on the whole-function proof landing.
+
+   WHAT IS OWED FOR IT: nothing constructs [console_caps] yet.  Both halves
+   are [WpLock.newlock]s whose raw material exists and whose consumer did
+   not -- [is_txlock] over [UartTxInv.tx_res] (ProofMain.v names the three
+   pieces: [Hlkfresh], [Htx], [Hdoff]) and [is_conslock] over
+   [ConsoleInv.cons_res], which additionally needs the ring's .bss cells in
+   [SpecMain]'s boot bundle.  Until that lands the bundle is a premise of
+   main; see claude-notes/projects/console.md. *)
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -47,14 +69,31 @@ Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import CpuOwn.
 Require Import SchedCtx.
+Require Import DiskPtsto WpUart.
+Require Import UartTxInv.
+Require Import ConsoleInv.
 From Kernel Require KernelSyms.
 
 (* consoleintr's own frame (48 bytes = 6 slots) plus its deepest callee
-   (wakeup, 18) is 24; this is that with slack, and the slack is deliberate --
-   the contract is ASSUMED, so an over-approximation is the safe direction and
-   uartintr is already stated against it.  consputc (16) and the two lock
-   calls are all shallower than wakeup. *)
+   (wakeup, 18) is 24; this is that with slack.  consputc (16) and the two
+   lock calls (10) are all shallower than wakeup. *)
 Definition consoleintr_stack : nat := 32%nat.
+
+Section ConsoleCaps.
+  Context `{!riscvGS Σ, !lockG Σ} `{!uartGhostG Σ}.
+
+  (* The two locks the console's interrupt path takes, plus the trace
+     baseline its echo extends.  The ghost NAMES are existential: nothing
+     above consoleintr names either lock, so binding them here keeps the
+     bundle parameter-free in [γu] alone. *)
+  Definition console_caps (γu : uart_names) : iProp Σ :=
+    (∃ γtx γc : gname,
+       is_txlock γtx γu ∗ is_conslock γc ∗ uart_sent_sub γu [])%I.
+
+  Global Instance console_caps_persistent γu : Persistent (console_caps γu).
+  Proof. rewrite /console_caps. apply _. Qed.
+
+End ConsoleCaps.
 
 Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
      (m : regfile) (γs : list gname)

@@ -1464,11 +1464,13 @@ Section ProofInitlog.
       iSplitL "Hxa"; [iExact "Hxa"|].
       (* both new clauses are vacuous at genesis: no entry, no registry row *)
       iSplitR; [iPureIntro; intros i e Hi; rewrite lookup_empty in Hi; discriminate|].
-      iSplitR; [iPureIntro; intros e' b' Hi; set_solver|].
+      iSplitR; [iPureIntro; intros e' b' Hi;
+                exfalso; exact (not_elem_of_empty _ Hi)|].
       iExists 0%nat, ∅.
       iSplitR; [iPureIntro; rewrite op_sum_empty; unfold LOGBLOCKS; lia|].
       iSplitR; [iPureIntro; intros i e Hi; rewrite lookup_empty in Hi; discriminate|].
-      iSplitR; [iPureIntro; intros b' Hi; set_solver|].
+      iSplitR; [iPureIntro; intros b' Hi;
+                exfalso; exact (not_elem_of_empty _ Hi)|].
       iExact "Hbatch". }
     iMod ("Hmk" $! (log_res (MkLogNames γlk γops γep γlg) bn γfs cov logstart)
             with "Hres") as "#Hislk".

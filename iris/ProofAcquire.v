@@ -542,13 +542,21 @@ Section ProofAcquire.
        Fix 1), instantiating it at the ambient [cpu_id] gives exactly the
        credential this leaf wants, at no cost to [AcquireOfGen] below
        ([lock_refute_False] is hart-generic already). *)
+    (* THE SET-ADDING INSTRUCTION.  The hart's held-lock set is hidden inside
+       [cpu_own] (IntrDefs.cpu_hart), so it is opened HERE, handed to the
+       leaf, and put back with [lk0] in it -- which is why acquire's contract
+       says nothing about it.  No [lk0 ∉ S] obligation appears: the leaf
+       derives it from the cpu field this very instruction is about
+       (LockSet.cpu_locks_fresh). *)
+    iDestruct (cpu_own_locks_acc with "Hown") as (Slk) "[Hlks Hownback]".
     iApply (wp_csd_lkcpu_lockopen_s_sconf γl lk0 R Dc (mword_of_int (KernelSyms.acquire + 0x28))
               (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
-              (mword_of_int 16 : mword 12) Cm (trap_res b + (av - 4))%nat false
+              (mword_of_int 16 : mword 12) Cm (trap_res b + (av - 4))%nat false Slk
               Hpacpu Ha0C (Hrefpre cpu_id)
-              with "Hcg Hpc Hi28 Hlock Htokp").
+              with "Hcg Hpc Hi28 Hlock Htokp Hlks").
     iApply wp_next_off_intro.
-    iIntros "Hcg Hpc Htok".
+    iIntros "Hcg Hpc Htok Hlks".
+    iDestruct ("Hownback" with "Hlks") as "Hown".
     assert (Hpc2a : add_vec_int (mword_of_int (KernelSyms.acquire + 0x28) : mword 64) 2 = mword_of_int (KernelSyms.acquire + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2a) in "Hpc".
     (* ---- 0x2a/0x2c/0x2e: c.ldsp ra/s0/s1 ---- *)

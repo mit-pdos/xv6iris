@@ -2772,6 +2772,16 @@ Section ProofDirlinkMain.
           assert (HL6ra : L6 !!! Regidx Rra
                           = add_vec_int (mword_of_int (DK + 0x3a) : mword 64) 4)
             by (rewrite /L6; apply upd_eq).
+          (* readi takes its two uints in the ABI's sign-extended form; both
+             of these are far below 2^31, where that is the identity *)
+          assert (HL6a3' : L6 !!! Regidx Ra3
+                           = sign_extend' 64
+                               (mword_of_int (Z.of_nat (16 * i)%nat) : mword 32))
+            by (rewrite HL6a3; apply rd_arg32_small; lia).
+          assert (HL6a4' : L6 !!! Regidx Ra4
+                           = sign_extend' 64
+                               (mword_of_int (Z.of_nat 16%nat) : mword 32))
+            by (rewrite HL6a4; apply rd_arg32_small; lia).
           iAssert (([∗ list] ii ∈ seq 0 16,
                       pa_add (L6 !!! Regidx Ra2 : mword 64) ii ↦ₘ dol ii)
                    ∗ p_pid (proc_addr j) ↦₄{dq} pidv)%I
@@ -2784,11 +2794,12 @@ Section ProofDirlinkMain.
                     false (16 * i)%nat 16%nat dol dl_dummyV
                     pidv dq dqd L6 (K - 10)%nat eb C b
                     ltac:(exact HKrd) Hlg Hbmwf Hbmcov Hszb
-                    ltac:(change (Z.of_nat 16%nat) with 16; exact Hoff31)
+                    ltac:(lia)
+                    ltac:(intros _; change (Z.of_nat 16%nat) with 16; lia)
                     Hj Hgs HL6a0
                     ltac:(cbn [negb]; rewrite HL6a1 dlk_zero_moi;
                           exact (eq_vec_refl _))
-                    HL6a3 HL6a4
+                    HL6a3' HL6a4'
                     with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
                           Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbs1").
           { rewrite Heb /trap_csrs_ext. done. }

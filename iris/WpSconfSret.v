@@ -116,7 +116,7 @@ Section WpSconfSret.
        one.  A caller has it from its own [intr_off], which is where the
        matching csrci put it. *)
     strans_bit strans_bit_kpt -∗
-    cpu_cells 0 true p -∗
+    cpu_priv 0 true p -∗
     cpu_claim p -∗
     pc_is pc -∗
     instr pc false (SRET tt) -∗

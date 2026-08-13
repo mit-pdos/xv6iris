@@ -82,6 +82,7 @@ Require Import ProcPtOwn.
 Require Import PanicStub.
 Require Import ProcInv.
 Require Import WpUart DiskPtsto BioInv FsBlocks LogInv FsCrash.
+Require Import ConsoleInv.
 Require Import DinodeEnc InodeInv InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
@@ -287,9 +288,11 @@ Section ProofFileread.
       \/ frn_rp fn' (dev_major Cf')
           = (mword_of_int KernelSyms.consoleread : mword 64)⌝ ∗
     a_devsw_read (dev_major Cf') ↦₈{frn_dqv fn' (dev_major Cf')}
-      frn_rp fn' (dev_major Cf').
+      frn_rp fn' (dev_major Cf') ∗
+    is_conslock (frn_cons fn').
   Proof.
-    intro H. rewrite /fileread_dev_env. case_decide as H'; [by iIntros "$" | contradiction].
+    intro H. rewrite /fileread_dev_env /fileread_dev_caps.
+    case_decide as H'; [by iIntros "$" | contradiction].
   Qed.
 
   Local Lemma fr_dev_in_back (fn' : fread_names) (Cf' : fcontent) :
@@ -299,10 +302,13 @@ Section ProofFileread.
           = (mword_of_int KernelSyms.consoleread : mword 64)⌝ -∗
     a_devsw_read (dev_major Cf') ↦₈{frn_dqv fn' (dev_major Cf')}
       frn_rp fn' (dev_major Cf') -∗
+    is_conslock (frn_cons fn') -∗
     fileread_dev_env fn' Cf'.
   Proof.
-    intro H. rewrite /fileread_dev_env. case_decide as H'; [| contradiction].
-    iIntros "%Hd Hc". iSplitR; [iPureIntro; exact Hd | iExact "Hc"].
+    intro H. rewrite /fileread_dev_env /fileread_dev_caps.
+    case_decide as H'; [| contradiction].
+    iIntros "%Hd Hc #Hcl".
+    iSplitR; [iPureIntro; exact Hd |]. iFrame "Hc Hcl".
   Qed.
 
   Local Lemma fr_env_fs (γf' : gname)
@@ -1111,7 +1117,8 @@ Section ProofFileread.
              { change (2 ^ 15)%Z with 32768%Z.
                exact (Z.le_lt_trans (bv_unsigned (fc_major Cf)) 9 32768 Hin
                         ltac:(reflexivity)). }
-             iDestruct (fr_dev_in fn Cf Hin with "Henv") as "[%Hrp Hslot]".
+             iDestruct (fr_dev_in fn Cf Hin with "Henv")
+               as "(%Hrp & Hslot & #Hconslk)".
              iPoseProof (fri_82 with "Htext") as "Hi82".
              iPoseProof (fri_84 with "Htext") as "Hi84".
              iPoseProof (fri_88 with "Htext") as "Hi88".
@@ -1305,7 +1312,7 @@ Section ProofFileread.
                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                 { rewrite HVid. iExact "Hpriv". }
                 { iApply (fr_env_out_dev fn Cf Htyd).
-                  iApply (fr_dev_in_back fn Cf Hin with "[%] Hslot").
+                  iApply (fr_dev_in_back fn Cf Hin with "[%] Hslot Hconslk").
                   by left. }
              ** (* ---- the console's read: the INDIRECT CALL at +0x94 ---- *)
                 iPoseProof (fri_92 with "Htext") as "Hi92".
@@ -1375,10 +1382,12 @@ Section ProofFileread.
                 iDestruct (cpu_own_transport CID CID58 0%nat eb pj C b ltac:(wp_next_chain)
                              with "Hcnt") as "Hcnt".
                 iApply (Consoleread.wp_consoleread_sconf γa γf γs j γlp
+                          (frn_cons fn)
                           E2 (K - 6)%nat eb C pidv V n b
                           Hj Hgs Hlens HE2a0 HE2a2 (fr_n_range n Hn0 Hnb)
                           (fr_av_cons K HK) Heb
-                          with "Hcg Hcnt Htext Hpc Hpriv Hkenv Hprocs Hpanic").
+                          with "Hcg Hcnt Htext Hpc Hconslk Hpriv Hkenv
+                                Hprocs Hpanic").
                 iIntros (CIDcr Hscr mf r P') "%Hcscr %Hupt %Hrr %Hra0 Hcg Hcnt Hpc
                                               Hpriv".
                 assert (Hpc96 : ret_pc (E2 !!! Regidx Rra) = mword_of_int (FR + 0x96)).
@@ -1461,13 +1470,13 @@ Section ProofFileread.
                                 Hpriv [Hslot]").
                 { exact Hcsf. }
                 { exact Hupt. }
-                { exact (fr_ret_of_cons n r Hn0 Hrr). }
+                { apply (fr_ret_of_cons n r Hn0). rewrite Z.max_r in Hrr; lia. }
                 { exact Hrv. }
                 { iEval (rewrite /ret_tgt). iExact "Hpc". }
                 { rewrite /file_ref /file_fields.
                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                 { iApply (fr_env_out_dev fn Cf Htyd).
-                  iApply (fr_dev_in_back fn Cf Hin with "[%] Hslot").
+                  iApply (fr_dev_in_back fn Cf Hin with "[%] Hslot Hconslk").
                   by right. }
           ++ (* --------- the major is OUT OF RANGE: return -1 ------------
                 The [bltu] is taken before the table is ever indexed, so the
@@ -1932,6 +1941,31 @@ Section ProofFileread.
              assert (Hjoint : (Z.of_nat (Z.to_nat (bv_unsigned v))
                                + Z.of_nat (Z.to_nat n) < 2 ^ 31)%Z).
              { rewrite Hoffz Hnz. exact (fr_off_n_lt31 _ _ Hwf Hnb). }
+             (* readi's own premises are the 32-bit ones: [off] alone, and
+                the sum GUARDED by the size test -- fileread's [f->off] is
+                below 2^31 and its count is bounded, so both are the joint
+                bound above, and the guard is discarded. *)
+             assert (Hoff32 : (Z.of_nat (Z.to_nat (bv_unsigned v))
+                               < 2 ^ 32)%Z) by lia.
+             assert (Hjoint32 : (Z.of_nat (Z.to_nat (bv_unsigned v))
+                                 <= bv_unsigned (di_size dnl) ->
+                                 Z.of_nat (Z.to_nat (bv_unsigned v))
+                                 + Z.of_nat (Z.to_nat n) < 2 ^ 32)%Z)
+               by (intros _; lia).
+             (* readi takes its two uints in the ABI's sign-extended form;
+                fileread's are both below 2^31 (the joint bound above), where
+                that is the identity *)
+             assert (HJ6a3' : J6 !!! Regidx Ra3
+                              = sign_extend' 64
+                                  (mword_of_int
+                                     (Z.of_nat (Z.to_nat (bv_unsigned v)))
+                                   : mword 32))
+               by (rewrite HJ6a3; apply rd_arg32_small; lia).
+             assert (HJ6a4' : J6 !!! Regidx Ra4
+                              = sign_extend' 64
+                                  (mword_of_int (Z.of_nat (Z.to_nat n))
+                                   : mword 32))
+               by (rewrite HJ6a4; apply rd_arg32_small; lia).
              iDestruct (cpu_own_transport CIDil CID78 0%nat eb pj C b ltac:(wp_next_chain)
                           with "Hcnt") as "Hcnt".
              iApply (Readi.wp_readi_sconf γs j γlp (frn_uart fn) (frn_disk fn)
@@ -1943,8 +1977,9 @@ Section ProofFileread.
                        (fun _ => (mword_of_int 0 : mword 8)) V
                        pidv (DfracOwn 1) (DfracOwn (1/2))
                        J6 (K - 6)%nat eb C b
-                       (fr_av_readi K HK) Hlg Hbmwf Hbmcov Hszb Hjoint Hj Hgs
-                       HJ6a0 ltac:(rewrite HJ6a1; by vm_compute) HJ6a3 HJ6a4
+                       (fr_av_readi K HK) Hlg Hbmwf Hbmcov Hszb
+                       Hoff32 Hjoint32 Hj Hgs
+                       HJ6a0 ltac:(rewrite HJ6a1; by vm_compute) HJ6a3' HJ6a4'
                        with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
                              Hblocks Hpriv Hprocs Hdevi Hdgeom
                              Hdlock Hbslot").

@@ -257,7 +257,7 @@ Section IupdateTail.
     (* THE COMPLEMENT, PURE PASS-THROUGH: log_write and brelse are not in the
        ALREADY-GENERALIZED set, so neither touches it -- it rides untouched
        from here to the final [Hcont] specialization (one wide transport,
-       not three narrow ones, per claude-notes/projects/eb-generic-sweep.md). *)
+       not three narrow ones, per claude-notes/completed/eb-generic-sweep.md). *)
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
@@ -814,7 +814,7 @@ Section ProofIupdateMain.
     iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl #Hvlb #Hcrd0 Hop Hcont".
-    (* THE eb/b BRIDGE (claude-notes/projects/eb-generic-sweep.md): derived
+    (* THE eb/b BRIDGE (claude-notes/completed/eb-generic-sweep.md): derived
        once, used only to guard the [_ext_transport]s below -- [b] is never
        [subst]ed, it is spelled by name in dozens of leaf-instruction calls. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.

@@ -193,7 +193,7 @@ Definition wp_kexit_sconf_body
      THERE IS NO GIVE-BACK, and that is not an oversight: kexit does not
      return (see the header), so the pair is spent along with everything
      else the dead process was holding.
-     See claude-notes/projects/eb-generic-sweep.md. *)
+     See claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗

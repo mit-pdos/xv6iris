@@ -110,7 +110,7 @@ Definition wp_bread_sconf_body
      [eb = false] the acquire's push_off mints nothing, so the pair the
      sleepers need can only come from here, and the caller holds it because
      the TRAP handed it over.  See claude-notes/completed/sched-hart-generic.md
-     and claude-notes/projects/eb-generic-sweep.md. *)
+     and claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗

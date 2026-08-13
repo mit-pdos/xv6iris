@@ -190,7 +190,7 @@ Definition wp_sys_pipe_sconf_body
      fileclose calls, both of whose crossings are the literal [true].  It has
      to be threaded rather than framed -- a hart-indexed resource held across
      a [true] crossing could not be transported back.  See
-     claude-notes/projects/eb-generic-sweep.md. *)
+     claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗

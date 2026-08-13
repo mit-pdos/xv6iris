@@ -2533,7 +2533,7 @@ the two contracts owe is therefore:
 |---|---|---|---|
 | `sys_rw_count v2 < 2^31` | FREE | FREE | `bv_signed` of a 32-bit word (`sys_rw_count_lt`, proved in `SpecSysRead.v`) |
 | `0 <= sys_rw_count v2` | **owed** | **owed** | both `SpecFileread` and `SpecFilewrite` take it |
-| `MAXFILE*BSIZE + n < 2^31` | **owed** | not taken | readi's joint bound, inherited through fileread; filewrite's chunking closes writei's (S3f, `fw_chunk_joint`) |
+| `MAXFILE*BSIZE + n < 2^31` | **owed, but now RETIREABLE** (see below) | not taken | readi's joint bound, inherited through fileread; filewrite's chunking closes writei's (S3f, `fw_chunk_joint`) |
 
 So the S3f bank is confirmed and SHARPENED: the asymmetry is real but it is
 only the second row.  `0 <= n` is carried by BOTH, and it is a MODELLING
@@ -2543,10 +2543,17 @@ returns 0), it is only `SpecReadi`/`SpecWritei`'s `nat`-typed `n` that
 cannot express it.  Retiring `0 <= n` is much cheaper than retiring the
 MAXFILE bound and should be done first.  The MAXFILE bound is
 design/file-table.md's already-recorded debt ("to be settled at sys_read"),
-whose two options are unchanged: prove readi's overflow arm (needs a
-wrapping-`addw` reading the tree does not have), or bound `n` at the syscall
-boundary — which the object code says the kernel does NOT do, so option (a)
-is the only faithful one.
+and it is now RETIREABLE without either of the two options that were on the
+table (proving readi's wrapping-`addw` arm, or bounding `n` at a boundary
+the object code does not check). **`SpecReadi`'s joint premise is now
+`off + n < 2^32`**, so from `n < 2^31` — which sys_read has FREE, first row
+— `MAXFILE*BSIZE + n < 274432 + 2^31 < 2^32` is arithmetic. What is left is
+to restate `SpecFileread`'s own premise from `MAXFILE*BSIZE + n < 2^31` to
+`0 <= n < 2^31` and re-thread it: fileread's proof uses that premise in
+three places, and only ONE of them is readi's (`fr_off_n_lt31` at the readi
+call); the other two are `fr_n_range` feeding piperead's and consoleread's
+`int` contracts, which want `n < 2^31` and nothing more. Do that before
+sys_read's contract is written, not after.
 
 Both premises are stated in the contracts, about the trapframe word, so
 nothing is hidden: a caller sees exactly what is owed.

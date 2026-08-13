@@ -193,7 +193,7 @@ Definition wp_iupdate_sconf_body
      by the caller because the TRAP handed it over, and iupdate threads it
      straight through to bread and back, unused, all the way to its own
      exit.  See claude-notes/completed/sched-hart-generic.md and
-     claude-notes/projects/eb-generic-sweep.md. *)
+     claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
@@ -350,7 +350,7 @@ Definition wp_iupdate_gen_body
      [wp_iupdate_sconf_body] above -- required so that a caller reaching
      iupdate through the SET form (writei's own loop, deriving its counted
      [wp_writei_sconf] from [wp_writei_gen]) can reach this contract at
-     [eb = false] too.  See claude-notes/projects/eb-generic-sweep.md. *)
+     [eb = false] too.  See claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗

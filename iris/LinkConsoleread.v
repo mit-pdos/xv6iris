@@ -1,21 +1,16 @@
-(* LinkConsoleread.v -- the one place consoleread's contract is ASSUMED.
+(* LinkConsoleread.v -- consoleread's proof, instantiated against its
+   callees'.
 
-   The third file of its kind (LinkKerneltrap.v and LinkConsoleintr.v are the
-   others).  Every other link file in the tree instantiates a proof functor
-   against its callees' PROOFS; consoleread has none, so this link supplies
-   the interface with an [Axiom] instead -- the single assumption the fileread
-   cone rests on ([tools/proof_coverage.py] reports it as such).  Isolating it
-   here means [ProofFileread.v] itself is axiom-free: it is a functor over
-   [CONSOLEREAD], and proving consoleread later replaces this file, nothing
-   else.
+   It WAS an [Axiom] -- the single assumption the fileread cone rested on --
+   because consoleread had no proof.  It has one now (ProofConsoleread.v), so
+   this file is an ordinary functor application over the seven contracts
+   consoleread actually calls, and [tools/proof_coverage.py] no longer reports
+   an axiom here.
 
-   Written out with an explicit [Axiom] rather than a [Declare Module]: both
-   are visible to [Print Assumptions], but only the keyword is visible to the
-   coverage tool's textual axiom scan.
-
-   What the assumption does and does not say: see SpecConsoleread.v -- in
-   particular, it is silent about the console's ring buffer, which is what
-   the (also assumed) consoleintr fills. *)
+   What consoleread asks of a caller is unchanged by the proof:
+   [ConsoleInv.is_conslock] and nothing else about the console -- see
+   SpecConsoleread.v.  The ring's CONTENTS are still not promised, and that is
+   a property of [ConsoleInv.cons_res] rather than of this link. *)
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -28,15 +23,11 @@ Require Import FdSlots WpLock.
 Require Import KallocInv.
 Require Import ProcInv.
 Require Import FileInvDefs.
+Require Import ConsoleInv.
+Require Import LinkMyproc LinkAcquire LinkKilled LinkSleepPrepare LinkSleep.
+Require Import LinkEitherCopyout LinkRelease.
+Require Import ProofConsoleread.
 Require Import SpecConsoleread.
 
-Module Consoleread : CONSOLEREAD.
-  Axiom wp_consoleread_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ}
-      `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γf : gname)
-      (γs : list gname) (j : nat) (γlp : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (n : Z) (b : bool),
-      wp_consoleread_sconf_body γa γf γs j γlp m av eb C pid V n b.
-End Consoleread.
+Module Consoleread :=
+  ConsolereadProof Myproc Acquire Killed SleepPrepare Sleep EitherCopyout Release.

@@ -60,6 +60,11 @@ Require Import KptGhost.   (* kptN: named in the mask premise *)
 Require Import KptShare.   (* tlb_res_pt: the SHARED table's per-hart residue *)
 Require Import SRegime.
 Require Import ProcGeom.   (* a_cpu_noff / a_cpu_int / a_cpu_proc: the enabled arm owns them *)
+(* EXPORTED: [cpu_locks] is named inside [cpu_hart]'s body, so every file that
+   unfolds [cpu_hart] (push_off, sched, the scheduler, the sret/csr leaves)
+   needs LockSet's names in scope -- promoting the link here is what keeps
+   those ~15 sites from each needing their own Require. *)
+Require Export LockSet.
 Require Import MstatusBits WpIntrCore.
 Require Import MstatusFacts.
 (* have_nom_val: kept QUALIFIED (no Import) so the WpGprCsrwCommon
@@ -853,13 +858,58 @@ Section IntrDefsBase.
       end) ∗
      cur_proc p)%I.
 
-  (* the cells PLUS the counting token -- the whole per-cpu bundle minus
-     the caller's context-slot payload [C] (which is an ordinary caller
-     FRAME: an opaque [iProp Σ] crosses a migration for free, and every
-     live instantiation that can reach the enabled arm is [emp]).  This is
-     exactly what push_off / pop_off move between the arm and the code. *)
+  (* ------------------------------------------------------------------- *)
+  (* THIS HART'S HELD-LOCK SET (LockSet.v), CARRIED EXISTENTIALLY.        *)
+  (*                                                                      *)
+  (* [cpu_locks S] is the authority naming the spinlocks this hart holds,  *)
+  (* and each held lock's invariant keeps the matching fragment beside     *)
+  (* half of its own [lk->cpu] cell -- so the ghost set and the C field    *)
+  (* are one fact.  acquire adds, release removes, and both do it by       *)
+  (* opening THIS conjunct out of [cpu_hart]: no acquire/release/push_off/ *)
+  (* pop_off contract mentions the set.                                    *)
+  (*                                                                      *)
+  (* WHY IT RIDES HERE.  The set belongs to the HART, exactly as the noff  *)
+  (* and intena cells do -- xv6 records the owner as a [struct cpu]        *)
+  (* pointer -- so it goes wherever they go: with the running thread while *)
+  (* interrupts are off, and inside [sie_arm true] (which owns             *)
+  (* [cpu_hart 0 true p]) while they are on.  That is already the          *)
+  (* placement "the ownership lives in the interrupt invariant", with no   *)
+  (* separate conjunct in the arm.                                         *)
+  (*                                                                      *)
+  (* WHY EXISTENTIAL, FOR NOW.  Making [S] an INDEX of [CpuOwn.cpu_own] is *)
+  (* what lets acquire demand [lk ∉ S] (and later a lock ORDER), and what  *)
+  (* makes "interrupts enabled implies the set is empty" statable -- the   *)
+  (* enabled arm holds [cpu_hart 0 true p], so the constraint would land   *)
+  (* there for free.  It is also a sweep of every one of the ~312 files    *)
+  (* that name [cpu_own], so it is the NEXT phase; until then the set is   *)
+  (* tracked and tied but says nothing to a caller.  A named constant,     *)
+  (* not a bare [∃], so the ~15 sites that build or take apart [cpu_hart]  *)
+  (* can frame it by name.                                                 *)
+  (* ------------------------------------------------------------------- *)
+  Definition cpu_locks_any : iProp Σ :=
+    (∃ S : gset (mword 64), cpu_locks S)%I.
+
+  Lemma cpu_locks_any_intro (S : gset (mword 64)) :
+    cpu_locks S -∗ cpu_locks_any.
+  Proof. iIntros "H". iExists S. iExact "H". Qed.
+
+  (* THIS HART'S PRIVATE STATE: the [cpus[cid]] cells and the held-lock set.
+     They are ONE conjunct because they travel together and must: every seam
+     that hands the cells across (push_off/pop_off, the sret and csrsi
+     leaves, sched's park, the boot bridge) is a seam the set has to cross
+     too, and bundling them is what keeps a leaf from taking one and
+     stranding the other.  It also means the [cpu_hart] pair below still has
+     TWO conjuncts, so nothing that destructures it changed shape. *)
+  Definition cpu_priv (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
+    (cpu_cells n eb p ∗ cpu_locks_any)%I.
+
+  (* the private state PLUS the counting token -- the whole per-cpu bundle
+     minus the caller's context-slot payload [C] (which is an ordinary caller
+     FRAME: an opaque [iProp Σ] crosses a migration for free, and every live
+     instantiation that can reach the enabled arm is [emp]).  This is exactly
+     what push_off / pop_off move between the arm and the code. *)
   Definition cpu_hart (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
-    (cpu_cells n eb p ∗ intr_count n eb)%I.
+    (cpu_priv n eb p ∗ intr_count n eb)%I.
 
   (* THE SIE ARM IS AN INDEX, NOT AN INTERNAL DISJUNCTION.  It used to be
      [A ∨ B], which made every leaf SIE-agnostic at the price of hiding the

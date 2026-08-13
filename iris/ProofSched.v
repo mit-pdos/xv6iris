@@ -252,8 +252,8 @@ Section SchedPostSwtch.
     (* the returned cpu bundle came back at the RESUMER's base [eb'] (the wand
        is [∀ eb']); unfold it -- the intena-restore store + a ghost retune below
        bring it back to this thread's own saved base [eb]. *)
-    iEval (rewrite cpu_own_off /cpu_hart /cpu_cells) in "Hcpu".
-    iDestruct "Hcpu" as "(((_ & Hnoff2 & Hint2 & Hcur2) & Hcnt2) & _)".
+    iEval (rewrite cpu_own_off /cpu_hart /cpu_priv /cpu_cells) in "Hcpu".
+    iDestruct "Hcpu" as "((((_ & Hnoff2 & Hint2 & Hcur2) & Hlks2) & Hcnt2) & _)".
     set (iv' := intena_val eb' : mword 32).
     (* ------------------------------------------------------------------ *)
     (* +0x72..+0x7a: restore c->intena := s3.                             *)
@@ -355,9 +355,9 @@ Section SchedPostSwtch.
       - iApply (intr_count_retune_on 0 eb' with "Hcnt2").
       - iApply (intr_count_retune_off 0 eb' with "Hcnt2"). }
     (* refold [cpu_own 1 eb pj emp false]. *)
-    iAssert (cpu_own 1 eb pj emp false) with "[Hcur2 Hnoff2 Hint2 Hcnt2]" as "Hcpu".
-    { rewrite cpu_own_off /cpu_hart /cpu_cells.
-      iFrame "Hnoff2 Hcnt2 Hcur2 Hint2". iPureIntro; vm_compute; reflexivity. }
+    iAssert (cpu_own 1 eb pj emp false) with "[Hcur2 Hnoff2 Hint2 Hlks2 Hcnt2]" as "Hcpu".
+    { rewrite cpu_own_off /cpu_hart /cpu_priv /cpu_cells.
+      iFrame "Hnoff2 Hcnt2 Hcur2 Hint2 Hlks2". iPureIntro; vm_compute; reflexivity. }
     (* ------------------------------------------------------------------ *)
     (* +0x7e..+0x8a: epilogue -- restore ra/s0/s1/s2/s3, pop frame, ret.   *)
     (* ------------------------------------------------------------------ *)
@@ -697,8 +697,8 @@ Section ProofSched.
     destruct Hmp as [Hcs_mp Ha0_mp].
     (* re-unfold the (unchanged) returned bundle into the individual cells the
        check-chain reads, and name the level-1 intena value. *)
-    iEval (rewrite cpu_own_off /cpu_hart /cpu_cells) in "Hcpu".
-    iDestruct "Hcpu" as "(((_ & Hnoff & Hint & Hcur) & Hcnt) & _)".
+    iEval (rewrite cpu_own_off /cpu_hart /cpu_priv /cpu_cells) in "Hcpu".
+    iDestruct "Hcpu" as "((((_ & Hnoff & Hint & Hcur) & Hlks) & Hcnt) & _)".
     set (iv := intena_val eb : mword 32).
     assert (Hpc12 : ret_pc (A2 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.sched + 0x12)) by (rewrite HA2ra; apply bv_eq; vm_compute; reflexivity).
@@ -1288,9 +1288,9 @@ Section ProofSched.
     (* FULL-BUNDLE swtch: hand [sie_cap_gpr] and [cpu_own] whole (the swtch
        proof internally carves the stack/off-eighth and parks them in the OLD
        record).  Refold the check-chain cells into the level-1 [cpu_own]. *)
-    iAssert (cpu_own 1 eb pj emp false) with "[Hnoff Hint Hcnt Hcur]" as "Hcpu".
-    { rewrite cpu_own_off /cpu_hart /cpu_cells.
-      iFrame "Hnoff Hint Hcnt Hcur". iPureIntro; vm_compute; reflexivity. }
+    iAssert (cpu_own 1 eb pj emp false) with "[Hnoff Hint Hlks Hcnt Hcur]" as "Hcpu".
+    { rewrite cpu_own_off /cpu_hart /cpu_priv /cpu_cells.
+      iFrame "Hnoff Hint Hcnt Hcur Hlks". iPureIntro; vm_compute; reflexivity. }
     (* build the parking-proc payload (proc-held facts only; the cpu bundle
        now crosses at the swtch's [cpu_own] interface, not in the payload). *)
     iPoseProof (p_sched_to_cpu γs cpu_id j γl st ch Hj Hgl Hneeds
@@ -1607,8 +1607,8 @@ Section ProofSched.
     destruct Hmp as [Hcs_mp Ha0_mp].
     (* re-unfold the (unchanged) returned bundle into the individual cells the
        check-chain reads, and name the level-1 intena value. *)
-    iEval (rewrite cpu_own_off /cpu_hart /cpu_cells) in "Hcpu".
-    iDestruct "Hcpu" as "(((_ & Hnoff & Hint & Hcur) & Hcnt) & _)".
+    iEval (rewrite cpu_own_off /cpu_hart /cpu_priv /cpu_cells) in "Hcpu".
+    iDestruct "Hcpu" as "((((_ & Hnoff & Hint & Hcur) & Hlks) & Hcnt) & _)".
     set (iv := intena_val eb : mword 32).
     assert (Hpc12 : ret_pc (A2 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.sched + 0x12)) by (rewrite HA2ra; apply bv_eq; vm_compute; reflexivity).

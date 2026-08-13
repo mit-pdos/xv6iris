@@ -97,7 +97,7 @@
    exactly as SpecBread.v does: procs_inv / p_pid, the disk fabric
    (dev_inv / disk_geom / the virtio_disk lock), and the trap-CSR complement
    ([trap_csrs_ext eb] / [cpu_claim_ext eb pj], index-free -- see
-   claude-notes/projects/eb-generic-sweep.md) that bread's own contract now
+   claude-notes/completed/eb-generic-sweep.md) that bread's own contract now
    demands.  It enters and returns at noff 0 but PARKS internally, so its
    own crossing is the literal [true], not [b].  The parked scheduler record
    is not threaded -- it lives in the running proc's own [p->lock]. *)
@@ -194,7 +194,7 @@ Definition wp_balloc_sconf_body
      [eb = false] it is the honest pair, held by the caller because the TRAP
      handed it over, and passed to bread exactly as bread's own contract
      wants it.  See claude-notes/completed/sched-hart-generic.md and
-     claude-notes/projects/eb-generic-sweep.md. *)
+     claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
@@ -343,7 +343,7 @@ Definition wp_balloc_gen_body
      counted one) is what lets bmap keep a SINGLE core -- bmap's credited
      path routes here, and a core pinned at [eb = true] would have forced
      a second, independent proof of the same 70 instructions.  See
-     claude-notes/projects/eb-generic-sweep.md. *)
+     claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗

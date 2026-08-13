@@ -374,40 +374,40 @@ Local Open Scope Z_scope.
 (* ---------------------------------------------------------------------- *)
 
 Lemma fw_K12 (K : nat) : (filewrite_stack <= K)%nat -> (12 <= K)%nat.
-Proof. unfold filewrite_stack, K_writei. lia. Qed.
+Proof. unfold filewrite_stack, consolewrite_stack. lia. Qed.
 
 Lemma fw_av_writei (K : nat) :
   (filewrite_stack <= K)%nat -> (K_writei <= K - 12)%nat.
-Proof. unfold filewrite_stack. lia. Qed.
+Proof. unfold filewrite_stack, consolewrite_stack, K_writei. lia. Qed.
 
 Lemma fw_av_pipe (K : nat) :
   (filewrite_stack <= K)%nat -> (pipewrite_stack <= K - 12)%nat.
-Proof. unfold filewrite_stack, K_writei, pipewrite_stack. lia. Qed.
+Proof. unfold filewrite_stack, consolewrite_stack, pipewrite_stack. lia. Qed.
 
 Lemma fw_av_cons (K : nat) :
   (filewrite_stack <= K)%nat -> (consolewrite_stack <= K - 12)%nat.
-Proof. unfold filewrite_stack, K_writei, consolewrite_stack. lia. Qed.
+Proof. unfold filewrite_stack, consolewrite_stack. lia. Qed.
 
 Lemma fw_av_ilock (K : nat) :
   (filewrite_stack <= K)%nat -> (K_ilock <= K - 12)%nat.
-Proof. unfold filewrite_stack, K_writei, K_ilock. lia. Qed.
+Proof. unfold filewrite_stack, consolewrite_stack, K_ilock. lia. Qed.
 
 Lemma fw_av_iunlock (K : nat) :
   (filewrite_stack <= K)%nat -> (K_iunlock <= K - 12)%nat.
-Proof. unfold filewrite_stack, K_writei, K_iunlock. lia. Qed.
+Proof. unfold filewrite_stack, consolewrite_stack, K_iunlock. lia. Qed.
 
 Lemma fw_av_begin_op (K : nat) :
   (filewrite_stack <= K)%nat -> (K_begin_op <= K - 12)%nat.
-Proof. unfold filewrite_stack, K_writei, K_begin_op. lia. Qed.
+Proof. unfold filewrite_stack, consolewrite_stack, K_begin_op. lia. Qed.
 
 Lemma fw_av_end_op (K : nat) :
   (filewrite_stack <= K)%nat -> (K_end_op <= K - 12)%nat.
-Proof. unfold filewrite_stack, K_writei, K_end_op. lia. Qed.
+Proof. unfold filewrite_stack, consolewrite_stack, K_end_op. lia. Qed.
 
 (* The frame trade-back, at the arity the epilogue wants. *)
 Lemma fw_K_back (K : nat) :
   (filewrite_stack <= K)%nat -> ((K - 12) + 12)%nat = K.
-Proof. unfold filewrite_stack, K_writei. lia. Qed.
+Proof. unfold filewrite_stack, consolewrite_stack. lia. Qed.
 
 (* ---------------------------------------------------------------------- *)
 (*  THE BUDGET.                                                            *)
@@ -819,6 +819,7 @@ Require Import FileInv FileOff.
    three more, none of which names the missing file.  Same tell as the
    [lockG]/[lockG0] one in [fw_writei_src]'s comment, one tier up. *)
 Require Import WpUart DiskPtsto BioInv FsBlocks LogInv FsCrash.
+Require Import UartTxInv.
 Require Import DinodeEnc InodeInv InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
@@ -1004,9 +1005,11 @@ Section ProofFilewrite.
       \/ fwn_wp fn' (dev_major Cf')
           = (mword_of_int KernelSyms.consolewrite : mword 64)⌝ ∗
     a_devsw_write (dev_major Cf') ↦₈{fwn_dqv fn' (dev_major Cf')}
-      fwn_wp fn' (dev_major Cf').
+      fwn_wp fn' (dev_major Cf') ∗
+    dev_inv (fwn_uart fn') (fwn_disk fn') ∗
+    is_txlock (fwn_txlock fn') (fwn_uart fn').
   Proof.
-    intro H. rewrite /filewrite_dev_env.
+    intro H. rewrite /filewrite_dev_env /filewrite_dev_caps.
     case_decide as H'; [by iIntros "$" | contradiction].
   Qed.
 
@@ -1017,10 +1020,14 @@ Section ProofFilewrite.
           = (mword_of_int KernelSyms.consolewrite : mword 64)⌝ -∗
     a_devsw_write (dev_major Cf') ↦₈{fwn_dqv fn' (dev_major Cf')}
       fwn_wp fn' (dev_major Cf') -∗
+    dev_inv (fwn_uart fn') (fwn_disk fn') -∗
+    is_txlock (fwn_txlock fn') (fwn_uart fn') -∗
     filewrite_dev_env fn' Cf'.
   Proof.
-    intro H. rewrite /filewrite_dev_env. case_decide as H'; [| contradiction].
-    iIntros "%Hd Hc". iSplitR; [iPureIntro; exact Hd | iExact "Hc"].
+    intro H. rewrite /filewrite_dev_env /filewrite_dev_caps.
+    case_decide as H'; [| contradiction].
+    iIntros "%Hd Hc #Hdi #Htx".
+    iSplitR; [iPureIntro; exact Hd |]. iFrame "Hc Hdi Htx".
   Qed.
 
   (* ---- the FD_INODE arm's environment, opened and closed --------------
@@ -3262,7 +3269,8 @@ Section ProofFilewrite.
              { change (2 ^ 15)%Z with 32768%Z.
                exact (Z.le_lt_trans (bv_unsigned (fc_major Cf)) 9 32768 Hin
                         ltac:(reflexivity)). }
-             iDestruct (fw_dev_in fn Cf Hin with "Henv") as "[%Hwp Hslot]".
+             iDestruct (fw_dev_in fn Cf Hin with "Henv")
+               as "(%Hwp & Hslot & #Hdevinv & #Htxlk)".
              iPoseProof (fwri_07a with "Htext") as "Hi7a".
              iApply (wp_bltu_fall_s_sconf (mword_of_int (FW + 0x68))
                        (mword_of_int 190 : mword 13) Ra3 Ra4 D4 (K - 12)%nat b
@@ -3363,7 +3371,7 @@ Section ProofFilewrite.
                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                 { rewrite HVid. iExact "Hpriv". }
                 { iApply (fw_env_out_dev fn Cf (fwn_used fn) Htyd).
-                  iApply (fw_dev_in_back fn Cf Hin with "[%] Hslot").
+                  iApply (fw_dev_in_back fn Cf Hin with "[%] Hslot Hdevinv Htxlk").
                   by left. }
              ** (* ---- consolewrite: the INDIRECT CALL at +0x7e ---- *)
                 iPoseProof (fwri_07c with "Htext") as "Hi7c".
@@ -3442,10 +3450,12 @@ Section ProofFilewrite.
                 iDestruct (cpu_own_transport CID CID20 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
                              with "Hcnt") as "Hcnt".
                 iApply (Consolewrite.wp_consolewrite_sconf γa γf γs j γlp
+                          (fwn_uart fn) (fwn_disk fn) (fwn_txlock fn)
                           E2 (K - 12)%nat eb C pidv V n b
                           Hj Hgs Hlens HE2a0 HE2a2 (fw_n_range n Hn)
                           (fw_av_cons K HK) Heb
-                          with "Hcg Hcnt Htext Hpc Hpriv Hkenv Hprocs Hpanic").
+                          with "Hcg Hcnt Htext Hpc Hpriv Hkenv Hdevinv Htxlk
+                                Hprocs Hpanic").
                 iIntros (CIDcw Hscw mf r P') "%Hcscw %Hupt %Hrr %Hra0 Hcg Hcnt Hpc Hpriv".
                 assert (Hpc80 : ret_pc (E2 !!! Regidx Rra) = mword_of_int (FW + 0x80)).
                 { rewrite HE2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -3492,13 +3502,14 @@ Section ProofFilewrite.
                                 Hpriv [Hslot]").
                 { exact Hcsf. }
                 { exact Hupt. }
-                { exact (fw_ret_of_dev n r (mword_of_int r) (proj1 Hn) Hrr eq_refl). }
+                { apply (fw_ret_of_dev n r (mword_of_int r) (proj1 Hn));
+                    [pose proof (proj1 Hn); lia | reflexivity]. }
                 { exact Hrv. }
                 { iEval (rewrite /ret_tgt). iExact "Hpc". }
                 { rewrite /file_ref /file_fields.
                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                 { iApply (fw_env_out_dev fn Cf (fwn_used fn) Htyd).
-                  iApply (fw_dev_in_back fn Cf Hin with "[%] Hslot").
+                  iApply (fw_dev_in_back fn Cf Hin with "[%] Hslot Hdevinv Htxlk").
                   by right. }
           ++ (* ---------- OUT OF RANGE: the [bltu] is taken to +0x126 ------- *)
              assert (Hmjgt : (9 < bv_unsigned (fc_major Cf))%Z)

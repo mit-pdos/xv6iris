@@ -2,7 +2,7 @@
 
    The panic path is proven ([LinkPrintk.v], over [ProofPrintk.v]); the general
    path is not -- it is blocked on uartputc_sync's general contract
-   (claude-notes/projects/printk.md).  So this link supplies [PRINTK_GEN] with
+   (claude-notes/completed/printk.md).  So this link supplies [PRINTK_GEN] with
    an [Axiom], the way [LinkKerneltrap.v] does for kerneltrap, which keeps every
    caller's proof (main's, first) a functor over the interface and axiom-free.
    Discharging it later replaces this file and nothing else.

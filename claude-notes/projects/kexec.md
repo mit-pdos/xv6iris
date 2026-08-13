@@ -41,16 +41,19 @@ out. The clause was in `kxc_at_12c` when B1 published it, because it is true
 at the one state B1 could see — **a seam a loop has not yet been written
 against is a conjecture about that loop.**
 
-**PHASE B2 IS BLOCKED, ON `SpecReadi`.** Its contract takes `off` as a `nat`
-below `2^31`, and BOTH of B2's readi calls pass a 32-bit value read out of an
-untrusted ELF (`elf.phoff + 56*i` at `+0x13a`, `ph.off + i` at `+0x0e6`) that
-`exec` never checks and the caller therefore cannot bound. Generalizing
-`SpecReadi`'s `off` is the first task in the worklist, ahead of the loops —
-see blocker §4, which also has the reason the fix is smaller than it looks.
-Of the other three blockers two were fixed and the third does not gate the
-proof — it only bounds which pathnames the theorem covers (`L ≤ 1`, so
-`/init` and `sh`, not `/bin/sh`). Read "THE SIZE BOUND IS THE COVERAGE
-INVARIANT" below before writing any phase that calls `uvmalloc`.
+**`SpecReadi` NOW TAKES A 32-BIT `off`, AND ITS SUM PREMISE IS GUARDED BY
+THE SIZE TEST**, so B2's two readi calls (`elf.phoff + 56*i` at `+0x13a`,
+`ph.off + i` at `+0x0e6` — both 32-bit fields out of an untrusted ELF that
+`exec` never checks) cost the loops **nothing**: a3 and a4 take the ABI's
+sign-extended form, which is what `ProofKexecSeam.kxc_off` already produces,
+and the sum bound is `off <= size -> off + n < 2^32`, discharged at each
+call site by `intros _; lia` from `size <= MAXFILE*BSIZE`. **No loop
+invariant here carries a conjunct about the ELF's offsets.** See blocker §4
+for why the guard is sound and why it does not move the postcondition.
+Nothing else is blocked: §3 (the log budget) is open but only bounds which
+pathnames the theorem covers (`L ≤ 1`, so `/init` and `sh`, not `/bin/sh`).
+Read "THE SIZE BOUND IS THE COVERAGE INVARIANT" below before writing any
+phase that calls `uvmalloc`.
 
 ## Status
 
@@ -464,25 +467,21 @@ pay it and move on; if no, the callee's contract is wrong and generalizing it
 is the work. Relaxing namei/namex/nameiparent and copyout's source to a
 fraction remains available and is nobody's blocker.
 
-## THE FOUR UPSTREAM BLOCKERS — TWO FIXED, ONE OPEN AND NOT GATING, ONE OPEN AND GATING B2
+## THE FOUR UPSTREAM BLOCKERS — THREE FIXED, ONE OPEN AND NOT GATING
 
 None of these is kexec's own design going wrong; each is a callee contract
 that was stated for the callers it had, and all four were found by trying to
-compose them. **§1 (copyout) and §2 (safestrcpy) are FIXED and the tree is
-green; §3 (the log budget) is open** and belongs to the fs-namei project;
-**§4 (readi's `off`) is open and is the first thing phase B2 hits.**
+compose them. **§1 (copyout), §2 (safestrcpy) and §4 (readi's `off`) are
+FIXED and the tree is green; §3 (the log budget) is open** and belongs to
+the fs-namei project — it does not gate the proof, it only bounds which
+pathnames the theorem covers.
 
-### 4. `SpecReadi` cannot express a 32-bit `off` — **OPEN, AND IT GATES PHASE B2**
+### 4. `SpecReadi` could not express a 32-bit `off` — **FIXED**
 
-`SpecReadi` takes `off` as a **`nat`** and pins the register:
-
-```coq
-  (Z.of_nat off + Z.of_nat n < 2 ^ 31) ->
-  m !!! Regidx (mword_of_int 13) = (mword_of_int (Z.of_nat off) : mword 64) ->
-```
-
-so `off ∈ [0, 2^31)`. Both of kexec's phase-B readi calls hand a3 a value
-that **can be negative**, and neither can be bounded:
+`SpecReadi` took `off` as a **`nat`** below `2^31` and pinned a3 to
+`mword_of_int (Z.of_nat off)`, so a caller could not hand it a 32-bit value
+it could not bound — and both of kexec's phase-B readi calls do exactly
+that:
 
 - the phdr read at `+0x13a` passes `off = elf.phoff + 56*i`, computed by
   `lw a3,-400(s0)` then `addiw a3,a5,56` — the seam file already spells it
@@ -491,39 +490,55 @@ that **can be negative**, and neither can be bounded:
 - the loadseg read at `+0x0e6` passes `ph.off + i`, `lw s7,-480(s0)` then
   `addw a3,s7,s1`.
 
-`exec` checks nothing about either — not `elf.phoff`, not `ph.off`. So this
-fails the project's own test (**"can the caller pay?"**): it cannot, and the
-callee's contract is therefore wrong.
+`exec` checks neither. **THE KERNEL WAS NOT AT FAULT — unlike §1, this one
+really was spec-only.** `readi`'s C parameter is `uint off`, its first
+statement is `if (off > ip->size || off + n < off) return 0;`, and loadseg's
+`!= n` test sends a bogus offset straight to `bad:` (`+0x0ea`, an exit B2
+has to prove anyway).
 
-**THE KERNEL IS NOT AT FAULT — unlike §1, this one really is spec-only.**
-`readi`'s C parameter is `uint off`, and its first statement is
-`if (off > ip->size || off + n < off) return 0;`, so it is total for every
-32-bit `off`; loadseg's `!= n` test then sends a bogus offset straight to
-`bad:`, which is `+0x0ea`, an exit B2 already has to prove. Run the §1 lesson
-in reverse before doing the work: there is no scaffolding here modelling a
-gap between what the code does and what its callers want, so do not go
-looking for a kernel fix.
+**The contract now takes `off` AND `n` at the full 32-bit range**, with a3
+and a4 pinned to the ABI's sign-extended form — the same shape `kxc_off`
+produces (`Z_to_bv 32 z` and `mword_of_int z : mword 32` are the same
+function, convertible but not syntactically equal, so expect a `change` or
+a one-line bridge at the seam). The postcondition did not move, exactly as
+predicted: `rd_clamp` is 0 at `off > size`, and every newly admitted `off`
+is past the end of every file. How it is proven is in
+[`../design/fs-inode.md`](../design/fs-inode.md), "readi takes `off` and `n`
+at the FULL 32-bit range"; `SpecReadi.rd_arg32_small` is the bridge a caller
+with a small argument uses, and the four existing callers each needed one
+`assert`.
 
-**AND THE FIX IS SMALLER THAN IT LOOKS, because the postcondition already
-covers the case.** `SpecReadi.rd_clamp` is `if size < off + n then size - off
-else n`, which is `0` at `off > size` — its own header says so ("Zero when
-`off` is already past the end, which is exactly what the pre-frame exit
-returns"), and `off > ip->size` is *already reachable* inside the current
-premises (`off = 2^30`, `size = 512`). So the early-return arm is proved.
-What has to move is the REPRESENTATION premise:
+**THE SUM IS GUARDED BY THE SIZE TEST, AND THAT IS WHY B2 OWES NOTHING.**
+The numeric premise `Z.of_nat off + Z.of_nat n < 2 ^ 32` — in the
+mathematical integers, not mod 2^32 — is what makes the `c.addw a4,a3` at
+readi's `+0x022` non-wrapping, and what keeps xv6's own `off + n < off`
+overflow test dead. Asked outright it is unpayable here: neither of B2's
+loops can bound `elf.phoff + 56*i` or `ph.off + i`, because nothing in
+`exec` checks either field. It is therefore stated as
 
-- `m a3 = sign_extend' 64 (Z_to_bv 32 (Z.of_nat off))` with `off < 2^32`,
-  in place of `mword_of_int (Z.of_nat off)` with `off < 2^31`;
-- the joint `off + n < 2^31` conjunct survives only where it is really used
-  (the `addw a4,a3` at readi's `+0x022`), and **after** the size test it is
-  free: that test leaves `off ≤ size ≤ MAXFILE*BSIZE ≈ 274432`, so the sum
-  cannot wrap for any sane `n`. The work is re-proving the size comparison
-  itself for a sign-extended-negative a3.
+```coq
+  (Z.of_nat off <= bv_unsigned (di_size dn) ->
+   Z.of_nat off + Z.of_nat n < 2 ^ 32) ->
+```
 
-`writei` has the same `off` shape and the same two-line premise; check it
-while the file is open, and check whether `SpecFileread`/`SpecFilewrite` (the
-only other consumers) would rather keep a `nat`-shaped corollary than take
-the general form — that is what `ssc_src_ok_full` did for safestrcpy in §2.
+which is what the instruction order already says: `+0x022` sits BEHIND the
+`bltu a5,a3` at `+0x002`, so the add is reached only for an `off` inside the
+file. **Every caller then discharges it by `intros _; lia`** from
+`off <= size <= MAXFILE*BSIZE = 274432` — B2's two calls have `n = 56` and
+`n <= 4096`, so the sum is under 278528 and no bound on the untrusted field
+is needed anywhere in either loop invariant.
+
+**THE GUARD DOES NOT MOVE THE POSTCONDITION, and the direction is the whole
+argument.** It opens only `off > size`, which is where `rd_clamp` is already
+0 and the pre-frame exit returns 0. The case that WOULD move it — a small
+`off` with an `n` near 2^32, where the sum wraps while `rd_clamp` is not 0 —
+sits under the guard and still owes the bound. `ProofReadi` needed one
+relocation for it: the `Hsumu` reading of the sum moves into the
+fall-through arm of the `destruct (Nat.ltb_spec szn off)` that was already
+there, which is the arm where the guard is discharged.
+
+`writei` has the same `off` shape and still asks `off + n < 2^31`; its
+callers (filewrite, and sysfile's writers) can pay it, so it was left alone.
 
 ### 1. copyout assumed the destination table is the RUNNING process's — **FIXED IN THE KERNEL, and that is the lesson**
 
@@ -751,13 +766,6 @@ first one to name it.
 
 Ordered. Each step ends at a seam the next one starts from.
 
-### 0. GENERALIZE `SpecReadi`'s `off` TO 32 BITS — blocker §4
-
-Do this first: both of B2's readi calls need it, so the loops cannot even be
-stated against the current contract. §4 has the shape of the fix, why the
-postcondition needs no change, and the two sibling contracts to check while
-the file is open.
-
 ### 1. PHASE B2 — the phdr loop and the inlined loadseg loop (`+0x0ce .. +0x1ac`)
 
 The biggest single chunk left, and its interface is fixed and proven-into on
@@ -802,6 +810,10 @@ Specific things already established for it:
 - `off` is stated through the `int` truncation
   (`sign_extend' 64 (Z_to_bv 32 (ph_at ef i))`) — the C's `int off` makes the
   machine use `lw`/`addiw`, so the register only ever holds the low 32 bits.
+  **That is now the form `SpecReadi` asks for**, so the seam term goes
+  straight in; what the loop owes instead is the SUM bound
+  `off + n < 2^32` (blocker §4), which is the one numeric premise readi
+  still carries.
 - The elf buffer travels NAMED from `+0x12c` on, not as existential-contents
   `stack_own`: the loop re-reads `elf.phnum` and phase D reads `elf.entry`.
 - `readi` here is on its KERNEL arm into a physical user page; get the bytes

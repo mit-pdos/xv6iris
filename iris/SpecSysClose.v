@@ -121,7 +121,7 @@ Definition wp_sys_close_sconf_body
      has to be threaded rather than framed: fileclose's crossing is the
      literal [true], so a hart-indexed resource held across the call could
      not be transported to the arbitrary hart it may return on.  See
-     claude-notes/projects/eb-generic-sweep.md. *)
+     claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗

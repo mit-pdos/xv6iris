@@ -170,6 +170,15 @@ worth 20× on individual files.
   "Hd Hn Hv Hp Hm Hg")`. Otherwise every user pays a search.
 - Where no constructor exists, close a seam by naming every conjunct
   (`iSplitL "H"; [iExact "H" |]` chains), never with `iFrame`.
+- **`proc_priv_core` IS THE WORST INSTANCE IN THE TREE, and it is reached by
+  every syscall-altitude proof**: its last conjunct is `ProcInv.tf_page`, a
+  **4096**-element big-op, so a bare `iFrame` rebuilding it does not
+  terminate in any useful time. Do not destructure the tail at all — intro it
+  as ONE hypothesis (`iIntros "(%H1 & %H2 & Hpid & Hrest)"`) and close with
+  `iExact "Hrest"`, which is a syntactic check. This is the twin of
+  durable-notes.md's `Set Printing Depth 40` rule: same 4096 conjuncts, one
+  makes a FAILING tactic slow, this one makes a SUCCEEDING one slow, and a
+  file that proves over `proc_priv` needs both guards.
 
 ## Typeclass search
 

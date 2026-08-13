@@ -209,10 +209,10 @@ Lemma sc_cpu_own_open `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
   a_cpu_noff cid_word ↦₄ noff_val 0 ∗
   (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) ∗
   intr_count 0 eb ∗
-  cur_proc px ∗ C.
+  cur_proc px ∗ cpu_locks_any ∗ C.
 Proof.
-  rewrite cpu_own_off /cpu_hart /cpu_cells.
-  iIntros "(((_ & Hn & Hi & Hp) & Hc) & HC)". iFrame.
+  rewrite cpu_own_off /cpu_hart /cpu_priv /cpu_cells.
+  iIntros "((((_ & Hn & Hi & Hp) & Hl) & Hc) & HC)". iFrame.
 Qed.
 
 Lemma sc_cpu_own_mk `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (px : mword 64) :
@@ -220,18 +220,19 @@ Lemma sc_cpu_own_mk `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (px :
   (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
   intr_count 0 false -∗
   cur_proc px -∗
+  cpu_locks_any -∗
   cpu_own 0 false px emp false.
 Proof.
-  iIntros "Hn Hi Hc Hp". rewrite cpu_own_off /cpu_hart /cpu_cells.
-  iFrame "Hn Hi Hc Hp". iPureIntro. vm_compute. reflexivity.
+  iIntros "Hn Hi Hc Hp Hl". rewrite cpu_own_off /cpu_hart /cpu_priv /cpu_cells.
+  iFrame "Hn Hi Hc Hp Hl". iPureIntro. vm_compute. reflexivity.
 Qed.
 
 Lemma sc_cpu_own_of_cells `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (px : mword 64) (eb : bool) :
-  cpu_cells 0 eb px -∗ intr_count 0 false -∗ cpu_own 0 false px emp false.
+  cpu_priv 0 eb px -∗ intr_count 0 false -∗ cpu_own 0 false px emp false.
 Proof.
-  rewrite cpu_own_off /cpu_hart /cpu_cells.
-  iIntros "(_ & Hn & Hi & Hp) Hc". iFrame "Hn Hi Hc Hp".
+  rewrite cpu_own_off /cpu_hart /cpu_priv /cpu_cells.
+  iIntros "((_ & Hn & Hi & Hp) & Hl) Hc". iFrame "Hn Hi Hc Hp Hl".
   iPureIntro. vm_compute. reflexivity.
 Qed.
 
@@ -244,12 +245,12 @@ Qed.
 Lemma sc_flip_pre `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (px : mword 64) (eb : bool) :
   cpu_own 0 eb px emp eb -∗
   (if eb then emp else intr_count 0 false) ∗
-  (if eb then emp else cpu_cells 0 true px).
+  (if eb then emp else cpu_priv 0 true px).
 Proof.
   destruct eb.
   - iIntros "_". iSplitR; done.
-  - iIntros "H". iDestruct (sc_cpu_own_open with "H") as "(Hn & Hi & Hc & Hp & _)".
-    iFrame "Hc". rewrite /cpu_cells. iFrame "Hn Hi Hp".
+  - iIntros "H". iDestruct (sc_cpu_own_open with "H") as "(Hn & Hi & Hc & Hp & Hl & _)".
+    iFrame "Hc". rewrite /cpu_priv /cpu_cells. iFrame "Hn Hi Hp Hl".
     iPureIntro. vm_compute. reflexivity.
 Qed.
 
@@ -291,7 +292,7 @@ Section ProofScheduler.
     (* split the entry cpu bundle: the context save area becomes [own_ctx],
        the slot becomes [emp], and the proc cell comes out for the c->proc
        store the setup block performs. *)
-    iDestruct (sc_cpu_own_open with "Hcpu") as "(Hnoff & Hint & Hcnt & Hproc & Hfree)".
+    iDestruct (sc_cpu_own_open with "Hcpu") as "(Hnoff & Hint & Hcnt & Hproc & Hlks & Hfree)".
     iDestruct "Hfree" as (ctx0) "[%Hctx0len Hctx0]".
     iAssert (own_ctx (a_cpu_ctx cid_word)) with "[Hctx0]" as "Hown".
     { rewrite /own_ctx. iExists ctx0. iSplit; [iPureIntro; exact Hctx0len | iExact "Hctx0"]. }
@@ -789,8 +790,8 @@ Section ProofScheduler.
     (* (the tp pin is no longer a fact about the MAP -- see HartTp.v -- so
        the sixth loop-head pin is simply gone.) *)
     (* refold the cpu bundle at [zero_reg] with an [emp] context slot. *)
-    iAssert (cpu_own 0 false zero_reg emp false) with "[Hnoff Hint Hcnt Hproc]" as "Hcpu".
-    { iApply (sc_cpu_own_mk with "Hnoff Hint Hcnt Hproc"). }
+    iAssert (cpu_own 0 false zero_reg emp false) with "[Hnoff Hint Hcnt Hproc Hlks]" as "Hcpu".
+    { iApply (sc_cpu_own_mk with "Hnoff Hint Hcnt Hproc Hlks"). }
     (* ================================================================== *)
     (* THE RELEASE TAIL, +0x4a..+0x54, over an arbitrary arrival map.      *)
     (* ================================================================== *)
@@ -1621,7 +1622,7 @@ Section ProofScheduler.
       (* +0x8a csrci sstatus,2 : intr_off *)
       (* the disable leaf's premise is [intr_count_pre true 0 true], the PURE
          fact the (now enabled) arm bakes in; it hands the freed cells back as
-         [cpu_cells_pay true zero_reg].  Its post index [trap_res true + n] is
+         [cpu_priv_pay true zero_reg].  Its post index [trap_res true + n] is
          the reserve coming BACK into the usable count -- the scan below runs
          interrupts-off at the full carve [av - 10], which is what [sc_carve]
          re-spells. *)
@@ -1815,15 +1816,15 @@ Section ProofScheduler.
         iEval (rewrite Hb82) in "Hpc".
         (* +0x82 wfi -- the ONE leaf with no [wp_next] wrapper (it never
            migrates the hart) *)
-        iDestruct (sc_cpu_own_open with "Hcpu") as "(Hnoff & Hint & Hcnt & Hproc & _)".
+        iDestruct (sc_cpu_own_open with "Hcpu") as "(Hnoff & Hint & Hcnt & Hproc & Hlks & _)".
         iApply (wp_wfi_s_sconf (mword_of_int (KernelSyms.scheduler + 0x82)) Me n2 false
                   with "Hcg Hcnt Hpc Hi82").
         iNext. iIntros "Hcg Hcnt Hpc".
         assert (Hb86b : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x82) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x86))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hb86b) in "Hpc".
-        iAssert (cpu_own 0 false zero_reg emp false) with "[Hnoff Hint Hcnt Hproc]" as "Hcpu".
-        { iApply (sc_cpu_own_mk with "Hnoff Hint Hcnt Hproc"). }
+        iAssert (cpu_own 0 false zero_reg emp false) with "[Hnoff Hint Hcnt Hproc Hlks]" as "Hcpu".
+        { iApply (sc_cpu_own_mk with "Hnoff Hint Hcnt Hproc Hlks"). }
         iApply ("IHo" $! Me false n2 with "[%] [%] Hcg Hpc Hcpu Hcsrs Hown").
         { split_and!; assumption. }
         { exact Hn2. } }

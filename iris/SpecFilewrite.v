@@ -168,6 +168,8 @@ Require Import KernelDataInv.
 Require Import SpecPrintkGen.
 Require Import SpecWritei.
 Require Import SpecFileread.
+Require Import SpecConsolewrite.
+Require Import UartTxInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -175,11 +177,16 @@ Import Defs.
 Local Open Scope Z_scope.
 
 (* filewrite's own frame is 12 slots ([c.addi16sp sp,sp,-96]: ra, s0, s1,
-   s2..s9 saved), and its deepest callee is writei.  The others are smaller:
-   pipewrite and consolewrite 62, begin_op / end_op / ilock / iunlock all far
-   below.  A CONSTANT, not a per-arm bound: the stack a function may need is a
-   property of the function (durable-notes.md). *)
-Definition filewrite_stack : nat := (12 + K_writei)%nat.
+   s2..s9 saved), and its deepest callee is CONSOLEWRITE at 72 -- not writei
+   at [K_writei] = 70, which is what it used to be.  consolewrite's own
+   sixteen-slot frame (a 32-byte bounce buffer lives in it) sits under
+   either_copyin's 56, and neither of its calls is made with interrupts off,
+   so nothing of [IntrDefs.trap_res] is spendable there;
+   [SpecConsolewrite.consolewrite_stack] has the accounting.  pipewrite (64),
+   begin_op / end_op / ilock / iunlock are all below both.  A CONSTANT, not a
+   per-arm bound: the stack a function may need is a property of the function
+   (durable-notes.md). *)
+Definition filewrite_stack : nat := (12 + consolewrite_stack)%nat.
 
 (* &devsw[mj].write.  [struct devsw] is two function pointers with [read]
    FIRST, so the entry is 16 bytes and this field is at offset 8 -- which is
@@ -254,6 +261,7 @@ Record fwrite_names := MkFWriteNames {
   fwn_uart       : uart_names;
   fwn_disk       : disk_names;
   fwn_dlock      : gname;         (* virtio_disk.lock                       *)
+  fwn_txlock     : gname;         (* uart tx_lock -- the DEVICE arm's        *)
   fwn_pd         : mword 64;
   fwn_pav        : mword 64;
   fwn_pu         : mword 64;
@@ -290,7 +298,7 @@ Global Instance fwrite_names_inhabited : Inhabited fwrite_names :=
     (UartNames 1%positive 1%positive 1%positive 1%positive)
     (DiskNames 1%positive 1%positive 1%positive 1%positive 1%positive
                1%positive 1%positive)
-    1%positive
+    1%positive 1%positive
     (mword_of_int 0) (mword_of_int 0) (mword_of_int 0)
     (MkBioNames 1%positive 1%positive 1%positive
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
@@ -317,6 +325,21 @@ Section SpecFilewrite.
 
   (* ---- the FD_DEVICE arm's environment ---- *)
 
+  (* WHAT THE CALLEE NEEDS, as opposed to what the DISPATCH needs.  The cell
+     below is how filewrite finds consolewrite; this is what consolewrite
+     itself asks for (SpecConsolewrite.v) -- uartwrite's whole credential,
+     the device fabric and the transmit lock.  Both are PERSISTENT, so a
+     caller pays for them once and the loop carries them for free, and the
+     read side's twin ([SpecFileread.fileread_dev_caps]) is one conjunct
+     rather than two because consoleread never touches the UART. *)
+  Definition filewrite_dev_caps (fn : fwrite_names) : iProp Σ :=
+    (dev_inv (fwn_uart fn) (fwn_disk fn) ∗
+     is_txlock (fwn_txlock fn) (fwn_uart fn))%I.
+
+  Global Instance filewrite_dev_caps_persistent fn :
+    Persistent (filewrite_dev_caps fn).
+  Proof. apply _. Qed.
+
   (* ONE cell, and only when the major is in range.  The disjunction is the
      honest statement of what the kernel installs: [consoleinit] fills
      [devsw[CONSOLE]] and nothing fills any other entry, so a write slot is
@@ -330,7 +353,8 @@ Section SpecFilewrite.
            \/ fwn_wp fn (dev_major Cf)
                = (mword_of_int KernelSyms.consolewrite : mword 64)⌝ ∗
           a_devsw_write (dev_major Cf) ↦₈{fwn_dqv fn (dev_major Cf)}
-            fwn_wp fn (dev_major Cf)
+            fwn_wp fn (dev_major Cf) ∗
+          filewrite_dev_caps fn
      else emp)%I.
 
   (* it is only READ, so it comes back as it went in *)
@@ -342,7 +366,8 @@ Section SpecFilewrite.
      same reason: it is what a caller that cannot name its descriptor's major
      must own. *)
   Definition filewrite_devsw (fn : fwrite_names) : iProp Σ :=
-    ([∗ list] i ∈ seq 0 (Z.to_nat NDEV_max + 1),
+    (filewrite_dev_caps fn ∗
+     [∗ list] i ∈ seq 0 (Z.to_nat NDEV_max + 1),
        ⌜fwn_wp fn (Z.of_nat i) = (zero_reg : mword 64)
          \/ fwn_wp fn (Z.of_nat i)
              = (mword_of_int KernelSyms.consolewrite : mword 64)⌝ ∗
@@ -357,8 +382,10 @@ Section SpecFilewrite.
        unfolding [filewrite_dev_env] FIRST leaves the out side folded and the
        closing [iExact] fails on two terms that print differently for that
        reason alone. *)
-    rewrite /filewrite_dev_out /filewrite_dev_env.
-    iIntros "H". case_decide as Hle; [| iSplitR; [done | by iIntros "_"]].
+    rewrite /filewrite_dev_out /filewrite_dev_env /filewrite_devsw.
+    iIntros "[#Hcaps H]".
+    case_decide as Hle;
+      [| iSplitR; [done | iIntros "_"; iFrame "Hcaps"; iExact "H"]].
     (* the major is a [bv_unsigned], hence non-negative, so it IS the index
        [Z.to_nat] of it names *)
     pose proof (proj1 (bv_unsigned_in_range _ (fc_major Cf))) as Hnn.
@@ -380,8 +407,10 @@ Section SpecFilewrite.
                        fwn_wp fn (Z.of_nat jj))%I)
                  _ i i Hlk with "H") as "[Hone Hback]".
     iEval (rewrite Hid) in "Hone".
-    iSplitL "Hone"; [iExact "Hone"|].
-    iIntros "Hone". iApply "Hback". rewrite Hid. iExact "Hone".
+    iSplitL "Hone".
+    { iDestruct "Hone" as "[Hp Hc]". iFrame "Hp Hc". iExact "Hcaps". }
+    iIntros "(Hp & Hc & _)". iFrame "Hcaps".
+    iApply "Hback". rewrite Hid. iFrame "Hp Hc".
   Qed.
 
   (* ---- the FD_INODE arm's environment ----------------------------------

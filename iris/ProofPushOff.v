@@ -221,7 +221,7 @@ Section ProofPushOff.
   (* its caller had, so its prologue (KernelSyms.push_off+0x00..0x08) runs at a generic     *)
   (* [b] and the [csrrci] at KernelSyms.push_off+0x0a is where the arm is dismantled.       *)
   (* [WpSconfCsr]'s flip leaf takes [intr_count_pre b n eb] and hands back *)
-  (* [cpu_cells_pay b p]: at [b = true] the counting token and the per-cpu *)
+  (* [cpu_priv_pay b p]: at [b = true] the counting token and the per-cpu *)
   (* cells are BOTH inside [sie_arm true p] and [cpu_own] is only the pure *)
   (* fact plus the frame [C], so what goes in is that fact and what comes  *)
   (* out is the freed cells; at [b = false] the token goes in off          *)
@@ -233,7 +233,7 @@ Section ProofPushOff.
     cpu_own k ebx px Cx bx -∗
     ⌜ bx = true -> k = 0%nat /\ ebx = true ⌝ ∗
     intr_count_pre bx k ebx ∗
-    (if bx then emp else cpu_cells k ebx px) ∗
+    (if bx then emp else cpu_priv k ebx px) ∗
     Cx.
   Proof.
     destruct bx.
@@ -254,8 +254,8 @@ Section ProofPushOff.
   Lemma po_cells_transport (CID0 CID1 : CpuId) (k : nat) (ebx : bool)
       (px : mword 64) (bx : bool) :
     (bx = false \/ px = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
-    (if bx then emp else cpu_cells (CID := CID0) k ebx px) -∗
-    (if bx then emp else cpu_cells (CID := CID1) k ebx px).
+    (if bx then emp else cpu_priv (CID := CID0) k ebx px) -∗
+    (if bx then emp else cpu_priv (CID := CID1) k ebx px).
   Proof.
     intros Heq. destruct bx.
     - iIntros "H". iExact "H".
@@ -604,7 +604,7 @@ Section ProofPushOff.
   (* [b = false] the hart cannot move.  At the flip, [po_own_split] hands *)
   (* the leaf what it needs on each arm ([intr_count_pre]) and            *)
   (* an inline [iAssert] puts the cells back together from the caller's   *)
-  (* half and the freed [cpu_cells_pay].  From KernelSyms.push_off+0x0e on, [b] is LITERALLY    *)
+  (* half and the freed [cpu_priv_pay].  From KernelSyms.push_off+0x0e on, [b] is LITERALLY    *)
   (* false and every [wp_next] collapses by [wp_next_off].                *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_push_off_sconf `{GEN : GenId} `{CID : CpuId}
@@ -701,12 +701,12 @@ Section ProofPushOff.
        equalities: with exactly one [CpuId] left in context the ambient
        instance -- and hence [cid_word], [cpu_cells], [rget_tp] -- is
        unambiguous, and the rest of the proof reads hart-free. *)
-    iAssert (cpu_cells (CID := CID6) n eb p) with "[Hcells0 Hpay]" as "Hcells".
+    iAssert (cpu_priv (CID := CID6) n eb p) with "[Hcells0 Hpay]" as "Hcells".
     { destruct b.
       - destruct (Hbon eq_refl) as [Hn0 Heb0]. rewrite Hn0 Heb0.
-        iEval (rewrite cpu_cells_pay_on) in "Hpay". iExact "Hpay".
+        iEval (rewrite cpu_priv_pay_on) in "Hpay". iExact "Hpay".
       - iExact "Hcells0". }
-    iDestruct "Hcells" as "(_ & Hnoff & Hint & Hproc)".
+    iDestruct "Hcells" as "((_ & Hnoff & Hint & Hproc) & Hlks)".
     (* from here on b is LITERALLY false *)
     pose (a0f := mycpu_ret cid_word : mword 64).
     set (N2 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sstatus_read mstatus0)]> N1).
@@ -897,13 +897,14 @@ Section ProofPushOff.
       destruct Hp as (Hra & Hs0 & Hs1 & Hsp & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hs9 & Hs10 & Hs11).
       assert (Hav4 : (trap_res b + (av - 4) + 4)%nat = (trap_res b + av)%nat) by lia.
       iEval (rewrite Hav4) in "Hcg".
-      iApply ("Hcont" $! mstatus0 mfin with "[%] Hcg [Hnoff Hintena Hcnt Hproc HC] [$Htcp $Hclm] Hpc [%]").
+      iApply ("Hcont" $! mstatus0 mfin with "[%] Hcg [Hnoff Hintena Hlks Hcnt Hproc HC] [$Htcp $Hclm] Hpc [%]").
       { exact Hmsf. }
       { (* cpu_own (S 0) eb p C false *)
-        rewrite /cpu_own /cpu_hart /cpu_cells.
-        iSplitL "Hnoff Hintena Hcnt Hproc".
-        { iSplitL "Hnoff Hintena Hproc".
-          { iSplitR. { iPureIntro. change (Z.of_nat (S 0)) with 1%Z. lia. }
+        rewrite /cpu_own /cpu_hart /cpu_priv /cpu_cells.
+        iSplitL "Hnoff Hintena Hlks Hcnt Hproc".
+        { iSplitL "Hnoff Hintena Hlks Hproc".
+          { iSplitL "Hnoff Hintena Hproc"; [| iExact "Hlks" ].
+            iSplitR. { iPureIntro. change (Z.of_nat (S 0)) with 1%Z. lia. }
             iSplitL "Hnoff".
             { assert (Hstore1 : (autocast (T := mword) (subrange_vec_dec (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0)) (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = noff_val (S 0)).
               { change noff with (noff_val 0). apply push_storeval_succ. change (Z.of_nat 0) with 0%Z. lia. }
@@ -1073,13 +1074,14 @@ Section ProofPushOff.
       destruct Hp as (Hra & Hs0 & Hs1 & Hsp & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hs9 & Hs10 & Hs11).
       assert (Hav4 : (trap_res b + (av - 4) + 4)%nat = (trap_res b + av)%nat) by lia.
       iEval (rewrite Hav4) in "Hcg".
-      iApply ("Hcont" $! mstatus0 mfin with "[%] Hcg [Hnoff Hintena Hcnt Hproc HC] [$Htcp $Hclm] Hpc [%]").
+      iApply ("Hcont" $! mstatus0 mfin with "[%] Hcg [Hnoff Hintena Hlks Hcnt Hproc HC] [$Htcp $Hclm] Hpc [%]").
       { exact Hmsf. }
       { (* cpu_own (S (S n')) eb p C false *)
-        rewrite /cpu_own /cpu_hart /cpu_cells.
-        iSplitL "Hnoff Hintena Hcnt Hproc".
-        { iSplitL "Hnoff Hintena Hproc".
-          { iSplitR. { iPureIntro. rewrite Nat2Z.inj_succ in Hbound |- *. lia. }
+        rewrite /cpu_own /cpu_hart /cpu_priv /cpu_cells.
+        iSplitL "Hnoff Hintena Hlks Hcnt Hproc".
+        { iSplitL "Hnoff Hintena Hlks Hproc".
+          { iSplitL "Hnoff Hintena Hproc"; [| iExact "Hlks" ].
+            iSplitR. { iPureIntro. rewrite Nat2Z.inj_succ in Hbound |- *. lia. }
             iSplitL "Hnoff".
             { assert (Hstoref : (autocast (T := mword) (subrange_vec_dec (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0)) (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = noff_val (S (S n'))).
               { change noff with (noff_val (S n')). apply push_storeval_succ. exact Hnbound. }
@@ -1224,8 +1226,8 @@ Section ProofPushOff.
         (add_vec (P0 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 4 : mword 8))))]> P0).
     iIntros "Hcg Hcpu Hap #Htext Hpc Hcont".
     iDestruct (arm_pay_parts with "Hap") as "[Htcp Hclm]".
-    iEval (rewrite cpu_own_off /cpu_hart /cpu_cells) in "Hcpu".
-    iDestruct "Hcpu" as "(((%Hbound & Hnoff & Hint & Hproc) & Hcnt) & HC)".
+    iEval (rewrite cpu_own_off /cpu_hart /cpu_priv /cpu_cells) in "Hcpu".
+    iDestruct "Hcpu" as "((((%Hbound & Hnoff & Hint & Hproc) & Hlks) & Hcnt) & HC)".
     assert (Hcoup : neq_vec nv1 zero_reg = false <-> n = 0%nat)
       by (apply pop_nv1_zero_iff; exact Hbound).
     assert (Hnoffpos : zopz0zKzJ_s zero_reg (sign_extend' 64 noffv) = false)
@@ -1498,12 +1500,13 @@ Section ProofPushOff.
       subst mf.
       (* still nested: neq nv1 0 = true, so n = S n'; the token rides
          through un-flipped, repacked one level lower. *)
-      iApply ("Hcont" with "Hcg [Hnoff Hint Htok Hproc HC] Hpc [%]").
+      iApply ("Hcont" with "Hcg [Hnoff Hint Hlks Htok Hproc HC] Hpc [%]").
       { (* cpu_own (S n') eb p C false *)
-        rewrite /cpu_own /cpu_hart /cpu_cells.
-        iSplitL "Hnoff Hint Htok Hproc".
-        { iSplitL "Hnoff Hint Hproc".
-          { iSplitR.
+        rewrite /cpu_own /cpu_hart /cpu_priv /cpu_cells.
+        iSplitL "Hnoff Hint Hlks Htok Hproc".
+        { iSplitL "Hnoff Hint Hlks Hproc".
+          { iSplitL "Hnoff Hint Hproc"; [| iExact "Hlks" ].
+            iSplitR.
             { iPureIntro. rewrite Nat2Z.inj_succ in Hbound |- *. lia. }
             iSplitL "Hnoff".
             { assert (Hdec : noff_val (S n') = storeval).
@@ -1677,11 +1680,12 @@ Section ProofPushOff.
         assert (Hav2 : (av - 2 + 2)%nat = av) by lia.
         iEval (rewrite Hav2) in "Hcg".
         subst mf.
-        iApply ("Hcont" with "Hcg [Hnoff Hint Htok Hproc HC] Hpc [%]").
-        { rewrite /cpu_own /cpu_hart /cpu_cells.
-          iSplitL "Hnoff Hint Htok Hproc".
-          { iSplitL "Hnoff Hint Hproc".
-            { iSplitR. { iPureIntro. change (Z.of_nat 0) with 0%Z. lia. }
+        iApply ("Hcont" with "Hcg [Hnoff Hint Hlks Htok Hproc HC] Hpc [%]").
+        { rewrite /cpu_own /cpu_hart /cpu_priv /cpu_cells.
+          iSplitL "Hnoff Hint Hlks Htok Hproc".
+          { iSplitL "Hnoff Hint Hlks Hproc".
+            { iSplitL "Hnoff Hint Hproc"; [| iExact "Hlks" ].
+              iSplitR. { iPureIntro. change (Z.of_nat 0) with 0%Z. lia. }
               iSplitL "Hnoff".
               { assert (Hdec : noff_val 0 = storeval).
                 { symmetry. rewrite /storeval /nv1. change noffv with (noff_val 1).
@@ -1842,9 +1846,10 @@ Section ProofPushOff.
         { symmetry. rewrite /storeval /nv1. change noffv with (noff_val 1).
           apply pop_storeval_pred. exact Hbound. }
         iApply (wp_csrsi_sstatus_x0_s_sconf (mword_of_int (KernelSyms.pop_off + 0x24)) P7 (av - 2)%nat false
-                  with "Hcg [Htok] Htcp [Hnoff Hint Hproc] Hclm Hpc Hi24").
+                  with "Hcg [Htok] Htcp [Hnoff Hint Hproc Hlks] Hclm Hpc Hi24").
         { iApply (intr_count_pack_S_on 0 with "Htok"). }
-        { rewrite /cpu_cells.
+        { rewrite /cpu_priv /cpu_cells.
+          iSplitL "Hnoff Hint Hproc"; [| iExact "Hlks" ].
           iSplitR. { iPureIntro. change (Z.of_nat 0) with 0%Z. lia. }
           iSplitL "Hnoff". { iEval (rewrite Hdec). iExact "Hnoff". }
           iSplitL "Hint". { iExists intenav. iExact "Hint". }

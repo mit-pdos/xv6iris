@@ -498,7 +498,7 @@ Section IputTail.
        caller's own entry straight to release's continuation -- iput never
        itself needs the bare pair, since every one of its sleeping callees
        (acquiresleep_nested excepted -- it never parks) takes the complement
-       directly.  See claude-notes/projects/eb-generic-sweep.md. *)
+       directly.  See claude-notes/completed/eb-generic-sweep.md. *)
     trap_csrs_ext eb -∗
     cpu_claim_ext eb pj -∗
     locked gtl cpu_id -∗
