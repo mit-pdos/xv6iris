@@ -260,7 +260,7 @@ Section ProofSwtch.
                     Hpc Hfile Hret
                     [Hnewwand Hvoldc Hnewpart HP Hhalf Hspp Hq0 Hcpuown Hstk_t]").
     (* ---- the ▷ continuation: iNext strips it AND the record's ▷'d pieces ---- *)
-    iApply bi.later_intro.
+    iNext.
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htr Hpc Hfile".
     (* ---- rebuild sconf ---- *)
     iAssert sconf with "[Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv]" as "Hsc".

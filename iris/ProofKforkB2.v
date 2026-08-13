@@ -301,7 +301,7 @@ Section KforkTfLoop.
       iApply (wp_cld_s_sconf (mword_of_int (KF + 0x4a) : mword 64) Ra0 Ra5 (mword_of_int 0 : mword 12)
                 Mk n w0 false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi04a [Hr0] [-]").
+                with "Hcg Hpc Hi04a [Hr0]").
       { iEval (rgne; rewrite Ha0). iExact "Hr0". }
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hr0". iEval (rgne; rewrite Ha0) in "Hr0".
@@ -325,7 +325,7 @@ Section KforkTfLoop.
       iApply (wp_cld_s_sconf (mword_of_int (KF + 0x4c) : mword 64) Ra1 Ra5 (mword_of_int 8 : mword 12)
                 M1 n w1 false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi04c [Hr1] [-]").
+                with "Hcg Hpc Hi04c [Hr1]").
       { iEval (rgne; rewrite HM1a5 Ha1). iExact "Hr1". }
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hr1". iEval (rgne; rewrite HM1a5 Ha1) in "Hr1".
@@ -351,7 +351,7 @@ Section KforkTfLoop.
       iApply (wp_cld_s_sconf (mword_of_int (KF + 0x4e) : mword 64) Ra2 Ra5 (mword_of_int 16 : mword 12)
                 M2 n w2 false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi04e [Hr2] [-]").
+                with "Hcg Hpc Hi04e [Hr2]").
       { iEval (rgne; rewrite HM2a5 Ha2). iExact "Hr2". }
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hr2". iEval (rgne; rewrite HM2a5 Ha2) in "Hr2".
@@ -381,7 +381,7 @@ Section KforkTfLoop.
       iDestruct (tf_page_word_upd tfdst cur ((4*k+0)%nat) c0 Hc0 with "Hdstp") as "[Hw0 Hback0]".
       iApply (wp_csd_s_sconf (mword_of_int (KF + 0x50) : mword 64) Ra0 Ra4 (mword_of_int 0 : mword 12)
                 M3 n c0 false
-                with "Hcg Hpc Hi050 [Hw0] [-]").
+                with "Hcg Hpc Hi050 [Hw0]").
       { iEval (rgne; rewrite HM3a4 Hd0). iExact "Hw0". }
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hw0".
@@ -398,7 +398,7 @@ Section KforkTfLoop.
       iDestruct (tf_page_word_upd tfdst cur1 ((4*k+1)%nat) c1 Hc1 with "Hdstp") as "[Hw1 Hback1]".
       iApply (wp_csd_s_sconf (mword_of_int (KF + 0x52) : mword 64) Ra1 Ra4 (mword_of_int 8 : mword 12)
                 M3 n c1 false
-                with "Hcg Hpc Hi052 [Hw1] [-]").
+                with "Hcg Hpc Hi052 [Hw1]").
       { iEval (rgne; rewrite HM3a4 Hd1). iExact "Hw1". }
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hw1".
@@ -415,7 +415,7 @@ Section KforkTfLoop.
       iDestruct (tf_page_word_upd tfdst cur2 ((4*k+2)%nat) c2 Hc2 with "Hdstp") as "[Hw2 Hback2]".
       iApply (wp_csd_s_sconf (mword_of_int (KF + 0x54) : mword 64) Ra2 Ra4 (mword_of_int 16 : mword 12)
                 M3 n c2 false
-                with "Hcg Hpc Hi054 [Hw2] [-]").
+                with "Hcg Hpc Hi054 [Hw2]").
       { iEval (rgne; rewrite HM3a4 Hd2). iExact "Hw2". }
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hw2".
@@ -433,7 +433,7 @@ Section KforkTfLoop.
       iApply (wp_cld_s_sconf (mword_of_int (KF + 0x56) : mword 64) Ra2 Ra5 (mword_of_int 24 : mword 12)
                 M3 n w3 false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi056 [Hr3] [-]").
+                with "Hcg Hpc Hi056 [Hr3]").
       { iEval (rgne; rewrite HM3a5 Ha3). iExact "Hr3". }
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hr3". iEval (rgne; rewrite HM3a5 Ha3) in "Hr3".
@@ -460,7 +460,7 @@ Section KforkTfLoop.
       iDestruct (tf_page_word_upd tfdst cur3 ((4*k+3)%nat) c3 Hc3 with "Hdstp") as "[Hw3 Hback3]".
       iApply (wp_csd_s_sconf (mword_of_int (KF + 0x58) : mword 64) Ra2 Ra4 (mword_of_int 24 : mword 12)
                 M4 n c3 false
-                with "Hcg Hpc Hi058 [Hw3] [-]").
+                with "Hcg Hpc Hi058 [Hw3]").
       { iEval (rgne; rewrite HM4a4 Hd3). iExact "Hw3". }
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hw3".
@@ -484,7 +484,7 @@ Section KforkTfLoop.
       iApply (wp_addi4_s_sconf (mword_of_int (KF + 0x5a) : mword 64) Ra5 Ra5 (mword_of_int 32 : mword 12)
                 M4 n false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi05a [-]").
+                with "Hcg Hpc Hi05a").
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc". iEval (rgne) in "Hcg".
       set (M5 := <[Regidx Ra5 := regval_into_reg
@@ -508,7 +508,7 @@ Section KforkTfLoop.
       iApply (wp_addi4_s_sconf (mword_of_int (KF + 0x5e) : mword 64) Ra4 Ra4 (mword_of_int 32 : mword 12)
                 M5 n false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi05e [-]").
+                with "Hcg Hpc Hi05e").
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc". iEval (rgne) in "Hcg".
       set (M6 := <[Regidx Ra4 := regval_into_reg
@@ -551,7 +551,7 @@ Section KforkTfLoop.
                   Ra3 Ra5 M6 n false
                   ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                   ltac:(rgne; rgne; exact Hfall)
-                  with "Hcg Hpc Hi062 [-]").
+                  with "Hcg Hpc Hi062").
         iApply wp_next_off_intro.
         iIntros "Hcg Hpc".
         assert (Hp66 : add_vec_int (mword_of_int (KF + 0x62) : mword 64) 4 = mword_of_int (KF + 0x66))
@@ -603,7 +603,7 @@ Section KforkTfLoop.
                   ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                   ltac:(rgne; rgne; exact Htaken)
                   ltac:(vm_compute; reflexivity)
-                  with "Hcg Hpc Hi062 [-]").
+                  with "Hcg Hpc Hi062").
         iNext. iApply wp_next_off_intro.
         iIntros "Hcg Hpc". iEval (rewrite Htgt) in "Hpc".
         iApply ("IHf" $! (S k) M6 cur4

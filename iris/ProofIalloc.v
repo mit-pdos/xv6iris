@@ -1804,7 +1804,7 @@ Section IallocClaim.
     iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.ialloc + 0xba))
               (sign_extend' 21 (concat_vec (mword_of_int 2019 : mword 11) ('b"0")))
               V6 (K - 8)%nat b ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hiba [-]").
+              with "Hcg Hpc Hiba").
     iIntros (CID23 Hq23). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Hjt : add_vec (mword_of_int (KernelSyms.ialloc + 0xba) : mword 64)
                     (sign_extend' 64 (sign_extend' 21
@@ -2409,7 +2409,7 @@ Section IallocScan.
         iApply (wp_cbeqz_taken_s_sconf (mword_of_int (KernelSyms.ialloc + 0x52))
                   (mword_of_int 27 : mword 8) (Cregidx (mword_of_int 7)) Ra5
                   GA (K - 8)%nat b ltac:(vm_compute; reflexivity) ltac:(nz) Hcmp
-                  ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi52 [-]").
+                  ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi52").
         iApply bi.later_intro. iIntros (CID13 Hq13) "Hcg Hpc".
         assert (Hjt : add_vec (mword_of_int (KernelSyms.ialloc + 0x52) : mword 64)
                         (sign_extend' 64 (sign_extend' 13
@@ -2624,7 +2624,7 @@ Section IallocScan.
           iApply (wp_bltu_taken_s_sconf (mword_of_int (KernelSyms.ialloc + 0x62))
                     (mword_of_int 8142 : mword 13) Ra4 Ra5 GE (K - 8)%nat b
                     ltac:(nz) ltac:(nz) Hcmp2 ltac:(vm_compute; reflexivity)
-                    with "Hcg Hpc Hi62 [-]").
+                    with "Hcg Hpc Hi62").
           iApply bi.later_intro. iIntros (CID19 Hq19) "Hcg Hpc".
           assert (Hjt : add_vec (mword_of_int (KernelSyms.ialloc + 0x62) : mword 64)
                           (sign_extend' 64 (mword_of_int 8142 : mword 13))

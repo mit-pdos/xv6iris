@@ -345,7 +345,7 @@ Section ProofCopyinstr.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x4e))
               (mword_of_int 11 : mword 6) Rra Mt (av - 12)%nat ra0 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi4e Hb1 [-]").
+              with "Hcg Hpc Hi4e Hb1").
     iIntros (CIDe1 Hse1) "Hcg Hpc Hb1". iEval (rewrite Hpa1) in "Hb1".
     set (T1 := <[Regidx Rra := regval_into_reg ra0]> Mt).
     assert (Hq50 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x4e) : mword 64) 2
@@ -360,7 +360,7 @@ Section ProofCopyinstr.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x50))
               (mword_of_int 10 : mword 6) Rs0 T1 (av - 12)%nat s00 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi50 Hb2 [-]").
+              with "Hcg Hpc Hi50 Hb2").
     iIntros (CIDe2 Hse2) "Hcg Hpc Hb2". iEval (rewrite Hpa2) in "Hb2".
     set (T2 := <[Regidx Rs0 := regval_into_reg s00]> T1).
     assert (Hq52 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x50) : mword 64) 2
@@ -375,7 +375,7 @@ Section ProofCopyinstr.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x52))
               (mword_of_int 9 : mword 6) Rs1 T2 (av - 12)%nat s10 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi52 Hb3 [-]").
+              with "Hcg Hpc Hi52 Hb3").
     iIntros (CIDe3 Hse3) "Hcg Hpc Hb3". iEval (rewrite Hpa3) in "Hb3".
     set (T3 := <[Regidx Rs1 := regval_into_reg s10]> T2).
     assert (Hq54 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x52) : mword 64) 2
@@ -390,7 +390,7 @@ Section ProofCopyinstr.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x54))
               (mword_of_int 8 : mword 6) Rs2 T3 (av - 12)%nat s20 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi54 Hb4 [-]").
+              with "Hcg Hpc Hi54 Hb4").
     iIntros (CIDe4 Hse4) "Hcg Hpc Hb4". iEval (rewrite Hpa4) in "Hb4".
     set (T4 := <[Regidx Rs2 := regval_into_reg s20]> T3).
     assert (Hq56 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x54) : mword 64) 2
@@ -405,7 +405,7 @@ Section ProofCopyinstr.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x56))
               (mword_of_int 7 : mword 6) Rs3 T4 (av - 12)%nat s30 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi56 Hb5 [-]").
+              with "Hcg Hpc Hi56 Hb5").
     iIntros (CIDe5 Hse5) "Hcg Hpc Hb5". iEval (rewrite Hpa5) in "Hb5".
     set (T5 := <[Regidx Rs3 := regval_into_reg s30]> T4).
     assert (Hq58 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x56) : mword 64) 2
@@ -420,7 +420,7 @@ Section ProofCopyinstr.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x58))
               (mword_of_int 6 : mword 6) Rs4 T5 (av - 12)%nat s40 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi58 Hb6 [-]").
+              with "Hcg Hpc Hi58 Hb6").
     iIntros (CIDe6 Hse6) "Hcg Hpc Hb6". iEval (rewrite Hpa6) in "Hb6".
     set (T6 := <[Regidx Rs4 := regval_into_reg s40]> T5).
     assert (Hq5a : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x58) : mword 64) 2
@@ -435,7 +435,7 @@ Section ProofCopyinstr.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x5a))
               (mword_of_int 5 : mword 6) Rs5 T6 (av - 12)%nat s50 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi5a Hb7 [-]").
+              with "Hcg Hpc Hi5a Hb7").
     iIntros (CIDe7 Hse7) "Hcg Hpc Hb7". iEval (rewrite Hpa7) in "Hb7".
     set (T7 := <[Regidx Rs5 := regval_into_reg s50]> T6).
     assert (Hq5c : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x5a) : mword 64) 2
@@ -450,7 +450,7 @@ Section ProofCopyinstr.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x5c))
               (mword_of_int 4 : mword 6) Rs6 T7 (av - 12)%nat s60 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi5c Hb8 [-]").
+              with "Hcg Hpc Hi5c Hb8").
     iIntros (CIDe8 Hse8) "Hcg Hpc Hb8". iEval (rewrite Hpa8) in "Hb8".
     set (T8 := <[Regidx Rs6 := regval_into_reg s60]> T7).
     assert (Hq5e : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x5c) : mword 64) 2
@@ -465,7 +465,7 @@ Section ProofCopyinstr.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x5e))
               (mword_of_int 3 : mword 6) Rs7 T8 (av - 12)%nat s70 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi5e Hb9 [-]").
+              with "Hcg Hpc Hi5e Hb9").
     iIntros (CIDe9 Hse9) "Hcg Hpc Hb9". iEval (rewrite Hpa9) in "Hb9".
     set (T9 := <[Regidx Rs7 := regval_into_reg s70]> T8).
     assert (Hq60 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x5e) : mword 64) 2
@@ -480,7 +480,7 @@ Section ProofCopyinstr.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x60))
               (mword_of_int 2 : mword 6) Rs8 T9 (av - 12)%nat s80 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi60 Hb10 [-]").
+              with "Hcg Hpc Hi60 Hb10").
     iIntros (CIDe9a Hse9a) "Hcg Hpc Hb10". iEval (rewrite Hpa10) in "Hb10".
     set (T10 := <[Regidx Rs8 := regval_into_reg s80]> T9).
     assert (Hq62 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x60) : mword 64) 2
@@ -495,7 +495,7 @@ Section ProofCopyinstr.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x62))
               (mword_of_int 1 : mword 6) Rs9 T10 (av - 12)%nat s90 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi62 Hb11 [-]").
+              with "Hcg Hpc Hi62 Hb11").
     iIntros (CIDe9b Hse9b) "Hcg Hpc Hb11". iEval (rewrite Hpa11) in "Hb11".
     set (T11 := <[Regidx Rs9 := regval_into_reg s90]> T10).
     assert (Hq64 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x62) : mword 64) 2
@@ -529,7 +529,7 @@ Section ProofCopyinstr.
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x64))
               (mword_of_int 6 : mword 6) T11 (av - 12)%nat 12 b Hpop
-              with "Hcg Hpc Hi64 Hframe [-]").
+              with "Hcg Hpc Hi64 Hframe").
     iIntros (CIDe10 Hse10) "Hcg Hpc".
     assert (Hnk : ((av - 12) + 12)%nat = av) by lia.
     iEval (rewrite Hnk) in "Hcg".
@@ -541,7 +541,7 @@ Section ProofCopyinstr.
     (* ---- +0x48: c.ret ---- *)
     assert (HTAra : TA !!! Regidx Rra = ra0) by lkp.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x66)) Rra TA av b
-              ltac:(vm_compute; discriminate) with "Hcg Hpc Hi66 [-]").
+              ltac:(vm_compute; discriminate) with "Hcg Hpc Hi66").
     iIntros (CIDe11 Hse11) "Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite HTAra) in "Hpc".
@@ -612,7 +612,7 @@ Section ProofCopyinstr.
               (mword_of_int 1 : mword 12) fl M Kv b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rgne; rewrite /fl Ha5; reflexivity)
-              with "Hcg Hpc Hi46 [-]").
+              with "Hcg Hpc Hi46").
     iIntros (CIDr1 Hsr1) "Hcg Hpc".
     set (N1 := <[Regidx Ra5 := regval_into_reg fl]> M).
     assert (Hq4a : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x46) : mword 64) 4
@@ -623,7 +623,7 @@ Section ProofCopyinstr.
       as "[%Hz0 Hcg]".
     iApply (wp_subw_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x4a)) Ra0 Rx0 Ra5 N1 Kv b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi4a [-]").
+              with "Hcg Hpc Hi4a").
     iIntros (CIDr2 Hsr2) "Hcg Hpc".
     set (N2 := <[Regidx Ra0 := regval_into_reg
                   (sign_extend' 64 (sub_vec (subrange_vec_dec (rget N1 Rx0) 31 0 : mword 32)
@@ -728,7 +728,7 @@ Section ProofCopyinstr.
     (* ---- +0x88: c.mv a1,a5 ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.copyinstr + 0xa6)) Ra1 Ra5 M Kv b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hia6 [-]").
+              with "Hcg Hpc Hia6").
     iIntros (CIDn1 Hsn1) "Hcg Hpc".
     set (I1 := <[Regidx Ra1 := regval_into_reg (add_vec zero_reg (rget M Ra5))]> M).
     assert (Hqa8 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0xa6) : mword 64) 2
@@ -743,7 +743,7 @@ Section ProofCopyinstr.
               (pa_add srcp i) I1 Kv b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rgne; rgne; rewrite HI1a2 HI1a5; apply pa_add_delta)
-              with "Hcg Hpc Hia8 [-]").
+              with "Hcg Hpc Hia8").
     iIntros (CIDn2 Hsn2) "Hcg Hpc".
     set (I2 := <[Regidx Ra4 := regval_into_reg (pa_add srcp i)]> I1).
     assert (Hqac : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0xa8) : mword 64) 4
@@ -755,7 +755,7 @@ Section ProofCopyinstr.
     iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.copyinstr + 0xac)) Ra3 Ra4
               (mword_of_int 0 : mword 12) I2 Kv (fsrc i : mword 8) b (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hiac [Hsb] [-]").
+              with "Hcg Hpc Hiac [Hsb]").
     { iEval (rgne; rewrite HI2a4 addv_sext0). iExact "Hsb". }
     iIntros (CIDn3 Hsn3) "Hcg Hpc Hsb".
     iEval (rgne; rewrite HI2a4 addv_sext0) in "Hsb".
@@ -781,7 +781,7 @@ Section ProofCopyinstr.
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rgne; rewrite HI3a4 Hz; exact bc_zext8_iszero)
                 ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hib0 [-]").
+                with "Hcg Hpc Hib0").
       iApply bi.later_intro. iIntros (CIDn4 Hsn4) "Hcg Hpc".
       assert (Htgt40 : add_vec (mword_of_int (KernelSyms.copyinstr + 0xb0) : mword 64)
                 (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 200 : mword 8) ('b"0"))))
@@ -796,7 +796,7 @@ Section ProofCopyinstr.
                 (mword_of_int 200 : mword 8) (Cregidx (mword_of_int 5)) Ra3 I3 Kv b
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rgne; rewrite HI3a4; exact (bc_zext8_nonzero _ Hnz))
-                with "Hcg Hpc Hib0 [-]").
+                with "Hcg Hpc Hib0").
       iIntros (CIDn4 Hsn4) "Hcg Hpc".
       assert (Hqb2 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0xb0) : mword 64) 2
                      = mword_of_int (KernelSyms.copyinstr + 0xb2)) by (apply bv_eq; vm_compute; reflexivity).
@@ -809,7 +809,7 @@ Section ProofCopyinstr.
         as "[Hdb Hdback]".
       iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.copyinstr + 0xb2)) Ra3 Ra5
                 (mword_of_int 0 : mword 12) I3 Kv (f (done + i)%nat) b
-                with "Hcg Hpc Hib2 [Hdb] [-]").
+                with "Hcg Hpc Hib2 [Hdb]").
       { iEval (rgne; rewrite HI3a5 addv_sext0 Hcur). iExact "Hdb". }
       iIntros (CIDn5 Hsn5) "Hcg Hpc Hdb".
       iEval (rgne; rgne; rewrite HI3a5 addv_sext0 Hcur HI3a4 trunc8_zext8) in "Hdb".
@@ -826,7 +826,7 @@ Section ProofCopyinstr.
       iApply (wp_caddi_s_sconf (mword_of_int (KernelSyms.copyinstr + 0xb6)) Ra5
                 (mword_of_int 1 : mword 6) I3 Kv b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hib6 [-]").
+                with "Hcg Hpc Hib6").
       iIntros (CIDn6 Hsn6) "Hcg Hpc".
       set (I4 := <[Regidx Ra5 := regval_into_reg
                     (add_vec (rget I3 Ra5)
@@ -854,7 +854,7 @@ Section ProofCopyinstr.
                   ltac:(rgne; rgne; rewrite HI4a5 HI4a3; unfold neq_vec;
                         rewrite (pa_add_eqb _ (S i) n HSi64 Hn64);
                         rewrite Hend Nat.eqb_refl; reflexivity)
-                  with "Hcg Hpc Hib8 [-]").
+                  with "Hcg Hpc Hib8").
         iIntros (CIDn7 Hsn7) "Hcg Hpc".
         assert (Hqbc : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0xb8) : mword 64) 4
                        = mword_of_int (KernelSyms.copyinstr + 0xbc)) by (apply bv_eq; vm_compute; reflexivity).
@@ -863,7 +863,7 @@ Section ProofCopyinstr.
         iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.copyinstr + 0xbc))
                   (sign_extend' 21 (concat_vec (mword_of_int 2006 : mword 11) ('b"0")))
                   I4 Kv b ltac:(vm_compute; reflexivity)
-                  with "Hcg Hpc Hibc [-]").
+                  with "Hcg Hpc Hibc").
         iIntros (CIDn8 Hsn8). iApply bi.later_intro. iIntros "Hcg Hpc".
         assert (Htgt68 : add_vec (mword_of_int (KernelSyms.copyinstr + 0xbc) : mword 64)
                   (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2006 : mword 11) ('b"0"))))
@@ -886,7 +886,7 @@ Section ProofCopyinstr.
                         rewrite (pa_add_eqb _ (S i) n HSi64 Hn64);
                         rewrite (proj2 (Nat.eqb_neq (S i) n) Hmore); reflexivity)
                   ltac:(vm_compute; reflexivity)
-                  with "Hcg Hpc Hib8 [-]").
+                  with "Hcg Hpc Hib8").
         iApply bi.later_intro. iIntros (CIDn9 Hsn9) "Hcg Hpc".
         assert (Htgta6 : add_vec (mword_of_int (KernelSyms.copyinstr + 0xb8) : mword 64)
                   (sign_extend' 64 (mword_of_int 8174 : mword 13))
@@ -1008,7 +1008,7 @@ Section ProofCopyinstr.
     iApply (wp_and_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x7c)) Rs2 Rs1 Rs7 va0 m (K - 12)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rgne; rgne; rewrite Hs6; reflexivity)
-              with "Hcg Hpc Hi7c [-]").
+              with "Hcg Hpc Hi7c").
     iIntros (CIDl1 Hsl1) "Hcg Hpc".
     set (W1 := <[Regidx Rs2 := regval_into_reg va0]> m).
     assert (Hq80 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x7c) : mword 64) 4
@@ -1017,7 +1017,7 @@ Section ProofCopyinstr.
     (* ---- +0x62: c.mv a1,s2 ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x80)) Ra1 Rs2 W1 (K - 12)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi80 [-]").
+              with "Hcg Hpc Hi80").
     iIntros (CIDl2 Hsl2) "Hcg Hpc".
     set (W2 := <[Regidx Ra1 := regval_into_reg (add_vec zero_reg (rget W1 Rs2))]> W1).
     assert (Hq82 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x80) : mword 64) 2
@@ -1026,7 +1026,7 @@ Section ProofCopyinstr.
     (* ---- +0x64: c.mv a0,s5 ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x82)) Ra0 Rs6 W2 (K - 12)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi82 [-]").
+              with "Hcg Hpc Hi82").
     iIntros (CIDl3 Hsl3) "Hcg Hpc".
     set (W3 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (rget W2 Rs6))]> W2).
     assert (Hq84 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x82) : mword 64) 2
@@ -1037,7 +1037,7 @@ Section ProofCopyinstr.
               (mword_of_int 2095280 : mword 21) W3 (K - 12)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi84 [-]").
+              with "Hcg Hpc Hi84").
     iIntros (CIDl4 Hsl4) "Hcg Hpc".
     set (W4 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x84) : mword 64) 4)]> W3).
@@ -1058,7 +1058,7 @@ Section ProofCopyinstr.
                       = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))).
     { rewrite HW4a0 -Hrootc Hbase. reflexivity. }
     iApply (Walkaddr.wp_walkaddr_sconf W4 t m_ad (K - 12)%nat (DfracOwn 1) b pcur
-              ltac:(lia) HW4root Hrep with "Hcg Htext Hpc Hptree [-]").
+              ltac:(lia) HW4root Hrep with "Hcg Htext Hpc Hptree").
     iIntros (CIDl5 Hsl5 mw) "Hcg Hpc Hptree %Hwcs %Hwv".
     rewrite HW4a1 in Hwv.
     iDestruct (proc_pt_rebuild Pc t m_ad Hwf Hview Hrep Hbase with "Hptree Hown") as "Hpt".
@@ -1165,7 +1165,7 @@ Section ProofCopyinstr.
                   (mword_of_int 22 : mword 8) (Cregidx (mword_of_int 4)) Ra2 mb (K - 12)%nat b
                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                   ltac:(rgne; rewrite Hba3; exact (bc_moi_nonzero n Hn64 ltac:(lia)))
-                  with "Hcg Hpc Hi96 [-]").
+                  with "Hcg Hpc Hi96").
         iIntros (CIDm1 Hsm1) "Hcg Hpc".
         assert (Hq98 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x96) : mword 64) 2
                        = mword_of_int (KernelSyms.copyinstr + 0x98)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1175,7 +1175,7 @@ Section ProofCopyinstr.
                   (mword_of_int (Z.of_nat off) : mword 64) mb (K - 12)%nat b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   ltac:(rgne; rgne; rewrite Hbs7 Hbs2; exact Hoffv)
-                  with "Hcg Hpc Hi98 [-]").
+                  with "Hcg Hpc Hi98").
         iIntros (CIDm2 Hsm2) "Hcg Hpc".
         set (C1 := <[Regidx Rs1 := regval_into_reg
                       (mword_of_int (Z.of_nat off) : mword 64)]> mb).
@@ -1185,7 +1185,7 @@ Section ProofCopyinstr.
         (* ---- +0x9c: c.add s1,s1,a0 -- p = pa0 + (srcva - va0) ---- *)
         iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x9c)) Rs1 Ra0 C1 (K - 12)%nat b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
-                  with "Hcg Hpc Hi9c [-]").
+                  with "Hcg Hpc Hi9c").
         iIntros (CIDm3 Hsm3) "Hcg Hpc".
         set (C2 := <[Regidx Rs1 := regval_into_reg
                       (add_vec (rget C1 Rs1) (rget C1 Ra0))]> C1).
@@ -1201,7 +1201,7 @@ Section ProofCopyinstr.
         (* ---- +0x82: c.mv a5,s1 ---- *)
         iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x9e)) Ra5 Rs3 C2 (K - 12)%nat b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
-                  with "Hcg Hpc Hi9e [-]").
+                  with "Hcg Hpc Hi9e").
         iIntros (CIDm4 Hsm4) "Hcg Hpc".
         set (C3 := <[Regidx Ra5 := regval_into_reg (add_vec zero_reg (rget C2 Rs3))]> C2).
         assert (Hqa0 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x9e) : mword 64) 2
@@ -1216,7 +1216,7 @@ Section ProofCopyinstr.
                           by (rewrite /C3 upd_ne; [exact HC2p | reg_neq]);
                         assert (HC3d : C3 !!! Regidx Rs3 = pa_add dst done) by lkp;
                         rewrite HC3p HC3d; reflexivity)
-                  with "Hcg Hpc Hia0 [-]").
+                  with "Hcg Hpc Hia0").
         iIntros (CIDm5 Hsm5) "Hcg Hpc".
         set (C4 := <[Regidx Rs1 := regval_into_reg
                       (sub_vec (pa_add pa0 off) (pa_add dst done))]> C3).
@@ -1226,7 +1226,7 @@ Section ProofCopyinstr.
         (* ---- +0x86: c.add a3,a3,s1 -- the end pointer ---- *)
         iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.copyinstr + 0xa4)) Ra2 Rs3 C4 (K - 12)%nat b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
-                  with "Hcg Hpc Hia4 [-]").
+                  with "Hcg Hpc Hia4").
         iIntros (CIDm6 Hsm6) "Hcg Hpc".
         set (C5 := <[Regidx Ra2 := regval_into_reg
                       (add_vec (rget C4 Ra2) (rget C4 Rs3))]> C4).
@@ -1260,7 +1260,7 @@ Section ProofCopyinstr.
                   Hdn Hmax64 n 0%nat CIDm6 C5 f
                   ltac:(lia) ltac:(lia) ltac:(rewrite Nat.add_0_r; exact Hnul)
                   HC5a5 HC5a3 HC5a2 HthrC5
-                  with "Hcg Htext Hpc Hsrc Hdst [-]").
+                  with "Hcg Htext Hpc Hsrc Hdst").
         iIntros (CIDci Hsci). iSplit.
         { (* ---------- the NUL exit, at +0x26 ---------- *)
           iIntros (Mn i' g) "%Hi'n %Hnulg %Hna5 %Hnthr Hcg Hpc Hsrc Hdst".
@@ -1282,7 +1282,7 @@ Section ProofCopyinstr.
             as "[Hdb Hdback]".
           iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x40)) Rx0 Ra5
                     (mword_of_int 0 : mword 12) Mn (K - 12)%nat (g (done + i')%nat) b
-                    with "Hcg Hpc Hi40 [Hdb] [-]").
+                    with "Hcg Hpc Hi40 [Hdb]").
           { iEval (rgne; rewrite Hna5 addv_sext0 Hcur). iExact "Hdb". }
           iIntros (CIDn1 Hsn1) "Hcg Hpc Hdb".
           iEval (rgne; rgne; rewrite Hna5 addv_sext0 Hcur Hz0 trunc8_zero) in "Hdb".
@@ -1298,7 +1298,7 @@ Section ProofCopyinstr.
                     (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 64) Mn (K - 12)%nat b
                     ltac:(vm_compute; discriminate) ltac:(rdok)
                     ltac:(apply bv_eq; vm_compute; reflexivity)
-                    with "Hcg Hpc Hi44 [-]").
+                    with "Hcg Hpc Hi44").
           iIntros (CIDn2 Hsn2) "Hcg Hpc".
           set (G1 := <[Regidx Ra5 := regval_into_reg (mword_of_int 1 : mword 64)]> Mn).
           assert (Hq46 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x44) : mword 64) 2
@@ -1309,7 +1309,7 @@ Section ProofCopyinstr.
                     (mword_of_int 0 : mword 64) b pcur
                     ltac:(rewrite /G1 upd_eq; reflexivity)
                     ltac:(left; split; [exact cs_xor_1 | reflexivity])
-                    with "Hcg Htext Hpc [-]").
+                    with "Hcg Htext Hpc").
           iIntros (CIDn3 Hsn3 Mo) "%Hoa0 %Hothr Hcg Hpc".
           (* the answer: the buffer now holds a NUL-terminated string *)
           assert (Hcstr : bb_cstr (bb_upd g (done + i')%nat (mword_of_int 0 : mword 8))
@@ -1374,7 +1374,7 @@ Section ProofCopyinstr.
           iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x68)) Ra4 Rs4
                     (mword_of_int 4095 : mword 12) Mc (K - 12)%nat b
                     ltac:(vm_compute; discriminate) ltac:(rdok)
-                    with "Hcg Hpc Hi68 [-]").
+                    with "Hcg Hpc Hi68").
           iIntros (CIDd1 Hsd1) "Hcg Hpc".
           set (D1 := <[Regidx Ra4 := regval_into_reg
                         (add_vec (rget Mc Rs4)
@@ -1393,7 +1393,7 @@ Section ProofCopyinstr.
           (* ---- +0x4e: c.add a4,a4,s1 ---- *)
           iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x6c)) Ra4 Rs3 D1 (K - 12)%nat b
                     ltac:(vm_compute; discriminate) ltac:(rdok)
-                    with "Hcg Hpc Hi6c [-]").
+                    with "Hcg Hpc Hi6c").
           iIntros (CIDd2 Hsd2) "Hcg Hpc".
           set (D2 := <[Regidx Ra4 := regval_into_reg
                         (add_vec (rget D1 Ra4) (rget D1 Rs3))]> D1).
@@ -1413,7 +1413,7 @@ Section ProofCopyinstr.
                           rewrite (pa_add_diff _ (rem - 1) (n - 1) ltac:(lia) Hrm164);
                           replace (rem - 1 - (n - 1))%nat with (rem - n)%nat by lia;
                           reflexivity)
-                    with "Hcg Hpc Hi6e [-]").
+                    with "Hcg Hpc Hi6e").
           iIntros (CIDd3 Hsd3) "Hcg Hpc".
           set (D3 := <[Regidx Rs4 := regval_into_reg
                         (mword_of_int (Z.of_nat (rem - n)) : mword 64)]> D2).
@@ -1428,7 +1428,7 @@ Section ProofCopyinstr.
                           assert (E1 : D3 !!! Regidx Rs2 = va0) by lkp;
                           assert (E2 : D3 !!! Regidx Rs5 = (mword_of_int 4096 : mword 64)) by lkp;
                           rewrite E1 E2; reflexivity)
-                    with "Hcg Hpc Hi72 [-]").
+                    with "Hcg Hpc Hi72").
           iIntros (CIDd4 Hsd4) "Hcg Hpc".
           set (D4 := <[Regidx Rs1 := regval_into_reg (add_vec va0 (mword_of_int 4096))]> D3).
           assert (Hq76 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x72) : mword 64) 4
@@ -1451,7 +1451,7 @@ Section ProofCopyinstr.
                             rewrite (pa_add_eqb _ (n - 1) (rem - 1) Hn164 Hrm164);
                             rewrite Heq Nat.eqb_refl; reflexivity)
                       ltac:(vm_compute; reflexivity)
-                      with "Hcg Hpc Hi76 [-]").
+                      with "Hcg Hpc Hi76").
             iApply bi.later_intro. iIntros (CIDd5 Hsd5) "Hcg Hpc".
             assert (Htgtbe : add_vec (mword_of_int (KernelSyms.copyinstr + 0x76) : mword 64)
                       (sign_extend' 64 (mword_of_int 72 : mword 13))
@@ -1462,7 +1462,7 @@ Section ProofCopyinstr.
                       (mword_of_int 0 : mword 6) (mword_of_int 0 : mword 64) D4 (K - 12)%nat b
                       ltac:(vm_compute; discriminate) ltac:(rdok)
                       ltac:(apply bv_eq; vm_compute; reflexivity)
-                      with "Hcg Hpc Hibe [-]").
+                      with "Hcg Hpc Hibe").
             iIntros (CIDd6 Hsd6) "Hcg Hpc".
             set (E1 := <[Regidx Ra5 := regval_into_reg (mword_of_int 0 : mword 64)]> D4).
             assert (Hqc0 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0xbe) : mword 64) 2
@@ -1472,7 +1472,7 @@ Section ProofCopyinstr.
             iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.copyinstr + 0xc0))
                       (sign_extend' 21 (concat_vec (mword_of_int 1987 : mword 11) ('b"0")))
                       E1 (K - 12)%nat b ltac:(vm_compute; reflexivity)
-                      with "Hcg Hpc Hic0 [-]").
+                      with "Hcg Hpc Hic0").
             iIntros (CIDd7 Hsd7). iApply bi.later_intro. iIntros "Hcg Hpc".
             assert (Htgt46 : add_vec (mword_of_int (KernelSyms.copyinstr + 0xc0) : mword 64)
                       (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 1987 : mword 11) ('b"0"))))
@@ -1482,7 +1482,7 @@ Section ProofCopyinstr.
                       (mword_of_int (-1) : mword 64) b pcur
                       ltac:(rewrite /E1 upd_eq; reflexivity)
                       ltac:(right; split; [exact cs_xor_0 | reflexivity])
-                      with "Hcg Htext Hpc [-]").
+                      with "Hcg Htext Hpc").
             iIntros (CIDd8 Hsd8 Mo) "%Hoa0 %Hothr Hcg Hpc".
             iDestruct (cpu_own_transport CIDc CIDd8 lvl eb pcur C b ltac:(wp_next_chain)
                          with "Hcnt") as "Hcnt".
@@ -1502,7 +1502,7 @@ Section ProofCopyinstr.
                       ltac:(rgne; rgne; rewrite HD4a1 HD4a4;
                             rewrite (pa_add_eqb _ (n - 1) (rem - 1) Hn164 Hrm164);
                             exact (proj2 (Nat.eqb_neq (n - 1) (rem - 1)) Hne))
-                      with "Hcg Hpc Hi76 [-]").
+                      with "Hcg Hpc Hi76").
             iIntros (CIDd5 Hsd5) "Hcg Hpc".
             assert (Hq7a : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x76) : mword 64) 4
                            = mword_of_int (KernelSyms.copyinstr + 0x7a)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1510,7 +1510,7 @@ Section ProofCopyinstr.
             (* ---- +0x5c: c.mv s1,a5 -- dst += n ---- *)
             iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x7a)) Rs3 Ra5 D4 (K - 12)%nat b
                       ltac:(vm_compute; discriminate) ltac:(rdok)
-                      with "Hcg Hpc Hi7a [-]").
+                      with "Hcg Hpc Hi7a").
             iIntros (CIDd6 Hsd6) "Hcg Hpc".
             set (D5 := <[Regidx Rs3 := regval_into_reg
                           (add_vec zero_reg (rget D4 Ra5))]> D4).
@@ -1549,7 +1549,7 @@ Section ProofCopyinstr.
                 (sub_vec va0 cur) mc (K - 12)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(rgne; rgne; rewrite Hz2 Hz1; reflexivity)
-                with "Hcg Hpc Hi8a [-]").
+                with "Hcg Hpc Hi8a").
       iIntros (CIDv2 Hsv2) "Hcg Hpc".
       set (V1 := <[Regidx Ra2 := regval_into_reg (sub_vec va0 cur)]> mc).
       assert (Hq8e : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x8a) : mword 64) 4
@@ -1558,7 +1558,7 @@ Section ProofCopyinstr.
       (* ---- +0x70: c.add a3,a3,s4 -- n0 = PGSIZE - off ---- *)
       iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x8e)) Ra2 Rs5 V1 (K - 12)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi8e [-]").
+                with "Hcg Hpc Hi8e").
       iIntros (CIDv3 Hsv3) "Hcg Hpc".
       set (V2 := <[Regidx Ra2 := regval_into_reg
                     (add_vec (rget V1 Ra2) (rget V1 Rs5))]> V1).
@@ -1585,7 +1585,7 @@ Section ProofCopyinstr.
                         rewrite (bc_ge_moi rem (4096 - off) Hrem64 Hpg64);
                         exact (proj2 (Nat.leb_le (4096 - off) rem) Hle))
                   ltac:(vm_compute; reflexivity)
-                  with "Hcg Hpc Hi90 [-]").
+                  with "Hcg Hpc Hi90").
         iApply bi.later_intro. iIntros (CIDv4 Hsv4) "Hcg Hpc".
         assert (Htgt96 : add_vec (mword_of_int (KernelSyms.copyinstr + 0x90) : mword 64)
                   (sign_extend' 64 (mword_of_int 6 : mword 13))
@@ -1603,7 +1603,7 @@ Section ProofCopyinstr.
                   ltac:(rgne; rgne; rewrite HV2s3 HV2a3;
                         rewrite (bc_ge_moi rem (4096 - off) Hrem64 Hpg64);
                         exact (proj2 (Nat.leb_gt (4096 - off) rem) Hgt))
-                  with "Hcg Hpc Hi90 [-]").
+                  with "Hcg Hpc Hi90").
         iIntros (CIDv4 Hsv4) "Hcg Hpc".
         assert (Hq94 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x90) : mword 64) 4
                        = mword_of_int (KernelSyms.copyinstr + 0x94)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1611,7 +1611,7 @@ Section ProofCopyinstr.
         (* ---- +0x76: c.mv a3,s3 ---- *)
         iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x94)) Ra2 Rs4 V2 (K - 12)%nat b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
-                  with "Hcg Hpc Hi94 [-]").
+                  with "Hcg Hpc Hi94").
         iIntros (CIDv5 Hsv5) "Hcg Hpc".
         set (V3 := <[Regidx Ra2 := regval_into_reg (add_vec zero_reg (rget V2 Rs4))]> V2).
         assert (Hq96 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x94) : mword 64) 2
@@ -1641,7 +1641,7 @@ Section ProofCopyinstr.
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rgne; rewrite Ha0z; exact bc_moi_iszero)
                 ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi88 [-]").
+                with "Hcg Hpc Hi88").
       iApply bi.later_intro. iIntros (CIDu1 Hsu1) "Hcg Hpc".
       assert (Htgt2e : add_vec (mword_of_int (KernelSyms.copyinstr + 0x88) : mword 64)
                 (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 211 : mword 8) ('b"0"))))
@@ -1650,7 +1650,7 @@ Section ProofCopyinstr.
       (* ---- +0x2e: c.mv a3,s9 -- vmfault's [read] argument ---- *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x2e)) Ra3 Rs9 mw (K - 12)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi2e [-]").
+                with "Hcg Hpc Hi2e").
       iIntros (CIDu2 Hsu2) "Hcg Hpc".
       set (F1 := <[Regidx Ra3 := regval_into_reg (add_vec zero_reg (rget mw Rs9))]> mw).
       assert (Hq30 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x2e) : mword 64) 2
@@ -1659,7 +1659,7 @@ Section ProofCopyinstr.
       (* ---- +0x30: c.mv a2,s2 -- the faulting va ---- *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x30)) Ra2 Rs2 F1 (K - 12)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi30 [-]").
+                with "Hcg Hpc Hi30").
       iIntros (CIDu3 Hsu3) "Hcg Hpc".
       set (F2 := <[Regidx Ra2 := regval_into_reg (add_vec zero_reg (rget F1 Rs2))]> F1).
       assert (Hq32 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x30) : mword 64) 2
@@ -1668,7 +1668,7 @@ Section ProofCopyinstr.
       (* ---- +0x32: c.mv a1,s8 -- the SIZE, an argument now ---- *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x32)) Ra1 Rs8 F2 (K - 12)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi32 [-]").
+                with "Hcg Hpc Hi32").
       iIntros (CIDu4 Hsu4) "Hcg Hpc".
       set (F3 := <[Regidx Ra1 := regval_into_reg (add_vec zero_reg (rget F2 Rs8))]> F2).
       assert (Hq34 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x32) : mword 64) 2
@@ -1677,7 +1677,7 @@ Section ProofCopyinstr.
       (* ---- +0x34: c.mv a0,s6 ---- *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x34)) Ra0 Rs6 F3 (K - 12)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi34 [-]").
+                with "Hcg Hpc Hi34").
       iIntros (CIDu5 Hsu5) "Hcg Hpc".
       set (F4 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (rget F3 Rs6))]> F3).
       assert (Hq36 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x34) : mword 64) 2
@@ -1688,7 +1688,7 @@ Section ProofCopyinstr.
                 (mword_of_int 2096620 : mword 21) F4 (K - 12)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi36 [-]").
+                with "Hcg Hpc Hi36").
       iIntros (CIDu6 Hsu6) "Hcg Hpc".
       set (F5 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x36) : mword 64) 4)]> F4).
@@ -1718,7 +1718,7 @@ Section ProofCopyinstr.
         by (rewrite (tp_pin_ne (CIDx := CIDu6) F5 Ra2 ltac:(ridx_neq)); exact HF5a2).
       iApply (Vmfault.wp_vmfault_sconf γa (tp_pin F5) Pc szv (K - 12)%nat lvl eb pcur C b
                 ltac:(lia) HF5tp HF5a0' HF5a1' Hszb Hlvl
-                with "Hcg Hcnt Htext Hpc Hpt Henv [-]").
+                with "Hcg Hcnt Htext Hpc Hpt Henv").
       iIntros (CIDvf Hsvf mv) "Hcg Hcnt Hpc %Hvcs Hvpost".
       iEval (rewrite HF5a2' Hidem) in "Hvpost".
       assert (Hret3a : ret_pc (tp_pin (CID:=CIDu6) F5 !!! Regidx Rra)
@@ -1773,7 +1773,7 @@ Section ProofCopyinstr.
                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                   ltac:(rgne; rewrite Hva0r; exact (page_valid_neq_zero _ Hpvr))
                   ltac:(vm_compute; reflexivity)
-                  with "Hcg Hpc Hi3a [-]").
+                  with "Hcg Hpc Hi3a").
         iApply bi.later_intro. iIntros (CIDvf2 Hsvf2) "Hcg Hpc".
         assert (Htgt8a : add_vec (mword_of_int (KernelSyms.copyinstr + 0x3a) : mword 64)
                   (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 40 : mword 8) ('b"0"))))
@@ -1807,7 +1807,7 @@ Section ProofCopyinstr.
                 (mword_of_int 40 : mword 8) (Cregidx (mword_of_int 2)) Ra0 mv (K - 12)%nat b
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rgne; rewrite Hvz; vm_compute; reflexivity)
-                with "Hcg Hpc Hi3a [-]").
+                with "Hcg Hpc Hi3a").
       iIntros (CIDx0 Hsx0) "Hcg Hpc".
       assert (Hq3c : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x3a) : mword 64) 2
                      = mword_of_int (KernelSyms.copyinstr + 0x3c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1816,7 +1816,7 @@ Section ProofCopyinstr.
                 (mword_of_int 63 : mword 6) (mword_of_int (-1) : mword 64) mv (K - 12)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(apply bv_eq; vm_compute; reflexivity)
-                with "Hcg Hpc Hi3c [-]").
+                with "Hcg Hpc Hi3c").
       iIntros (CIDx1 Hsx1) "Hcg Hpc".
       set (U1 := <[Regidx Ra0 := regval_into_reg (mword_of_int (-1) : mword 64)]> mv).
       assert (Hq3e : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x3c) : mword 64) 2
@@ -1825,7 +1825,7 @@ Section ProofCopyinstr.
       iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x3e))
                 (sign_extend' 21 (concat_vec (mword_of_int 8 : mword 11) ('b"0")))
                 U1 (K - 12)%nat b ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi3e [-]").
+                with "Hcg Hpc Hi3e").
       iIntros (CIDx2 Hsx2). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htgt4e : add_vec (mword_of_int (KernelSyms.copyinstr + 0x3e) : mword 64)
                 (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 8 : mword 11) ('b"0"))))
@@ -1858,7 +1858,7 @@ Section ProofCopyinstr.
       iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x88))
                 (mword_of_int 211 : mword 8) (Cregidx (mword_of_int 2)) Ra0 mw (K - 12)%nat b
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) Hnz0
-                with "Hcg Hpc Hi88 [-]").
+                with "Hcg Hpc Hi88").
       iIntros (CIDv1 Hsv1) "Hcg Hpc".
       assert (Hq8a : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x88) : mword 64) 2
                      = mword_of_int (KernelSyms.copyinstr + 0x8a)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1925,7 +1925,7 @@ Section ProofCopyinstr.
                 ltac:(rgne; rewrite Hmaxr; rewrite (bc_eqz_moi maxn Hmax64);
                       rewrite Hz; reflexivity)
                 ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi00 [-]").
+                with "Hcg Hpc Hi00").
       iApply bi.later_intro. iIntros (CIDz1 Hsz1) "Hcg Hpc".
       assert (Htgtca : add_vec (pcE : mword 64)
                 (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 101 : mword 8) ('b"0"))))
@@ -1936,7 +1936,7 @@ Section ProofCopyinstr.
                 (mword_of_int 0 : mword 6) (mword_of_int 0 : mword 64) mm K b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(apply bv_eq; vm_compute; reflexivity)
-                with "Hcg Hpc Hica [-]").
+                with "Hcg Hpc Hica").
       iIntros (CIDz2 Hsz2) "Hcg Hpc".
       set (Z1 := <[Regidx Ra5 := regval_into_reg (mword_of_int 0 : mword 64)]> mm).
       assert (Hqcc : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0xca) : mword 64) 2
@@ -1948,7 +1948,7 @@ Section ProofCopyinstr.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(rgne; assert (E : Z1 !!! Regidx Ra5 = (mword_of_int 0 : mword 64)) by lkp;
                       rewrite E; exact cs_xor_0)
-                with "Hcg Hpc Hicc [-]").
+                with "Hcg Hpc Hicc").
       iIntros (CIDz3 Hsz3) "Hcg Hpc".
       set (Z2 := <[Regidx Ra5 := regval_into_reg (mword_of_int 1 : mword 64)]> Z1).
       assert (Hqd0 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0xcc) : mword 64) 4
@@ -1959,7 +1959,7 @@ Section ProofCopyinstr.
         as "[%Hz0 Hcg]".
       iApply (wp_subw_s_sconf (mword_of_int (KernelSyms.copyinstr + 0xd0)) Ra0 Rx0 Ra5 Z2 K b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hid0 [-]").
+                with "Hcg Hpc Hid0").
       iIntros (CIDz4 Hsz4) "Hcg Hpc".
       set (Z3 := <[Regidx Ra0 := regval_into_reg
                     (sign_extend' 64 (sub_vec (subrange_vec_dec (rget Z2 Rx0) 31 0 : mword 32)
@@ -1975,7 +1975,7 @@ Section ProofCopyinstr.
       (* ---- +0xba: c.ret ---- *)
       assert (HZ3ra : Z3 !!! Regidx Rra = mm !!! Regidx Rra) by lkp.
       iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.copyinstr + 0xd4)) Rra Z3 K b
-                ltac:(vm_compute; discriminate) with "Hcg Hpc Hid4 [-]").
+                ltac:(vm_compute; discriminate) with "Hcg Hpc Hid4").
       iIntros (CIDz5 Hsz5) "Hcg Hpc".
       iEval (rgne) in "Hpc".
       assert (Hretfin : ret_pc (Z3 !!! Regidx Rra) = ret_tgt) by (rewrite HZ3ra; reflexivity).
@@ -2016,7 +2016,7 @@ Section ProofCopyinstr.
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rgne; rewrite Hmaxr; rewrite (bc_eqz_moi maxn Hmax64);
                       exact (proj2 (Nat.eqb_neq maxn 0) Hnz))
-                with "Hcg Hpc Hi00 [-]").
+                with "Hcg Hpc Hi00").
       iIntros (CIDp0 Hsp0') "Hcg Hpc".
       assert (Hq02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.copyinstr + 0x02))
         by (apply bv_eq; vm_compute; reflexivity).
@@ -2025,7 +2025,7 @@ Section ProofCopyinstr.
       iApply (wp_caddi16sp_push_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x02))
                 (mword_of_int 58 : mword 6) mm K 12 b
                 ltac:(lia) (cs_push (mm !!! Regidx csp_rs1))
-                with "Hcg Hpc Hi02 [-]").
+                with "Hcg Hpc Hi02").
       iIntros (CIDp1 Hsp1) "Hcg Hframe Hpc".
       set (M1 := <[Regidx csp_rs1 := regval_into_reg
                     (add_vec (mm !!! Regidx csp_rs1)
@@ -2081,7 +2081,7 @@ Section ProofCopyinstr.
       iEval (rewrite -Hpa1) in "Hb1".
       iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x04))
                 (mword_of_int 11 : mword 6) Rra M1 (K - 12)%nat u1 b
-                with "Hcg Hpc Hi04 Hb1 [-]").
+                with "Hcg Hpc Hi04 Hb1").
       iIntros (CIDp2 Hsp2) "Hcg Hpc Hb1".
       assert (Hq06 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x04) : mword 64) 2
                      = mword_of_int (KernelSyms.copyinstr + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2089,7 +2089,7 @@ Section ProofCopyinstr.
       iEval (rewrite -Hpa2) in "Hb2".
       iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x06))
                 (mword_of_int 10 : mword 6) Rs0 M1 (K - 12)%nat u2 b
-                with "Hcg Hpc Hi06 Hb2 [-]").
+                with "Hcg Hpc Hi06 Hb2").
       iIntros (CIDp3 Hsp3) "Hcg Hpc Hb2".
       assert (Hq08 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x06) : mword 64) 2
                      = mword_of_int (KernelSyms.copyinstr + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2097,7 +2097,7 @@ Section ProofCopyinstr.
       iEval (rewrite -Hpa3) in "Hb3".
       iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x08))
                 (mword_of_int 9 : mword 6) Rs1 M1 (K - 12)%nat u3 b
-                with "Hcg Hpc Hi08 Hb3 [-]").
+                with "Hcg Hpc Hi08 Hb3").
       iIntros (CIDp4 Hsp4) "Hcg Hpc Hb3".
       assert (Hq0a : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x08) : mword 64) 2
                      = mword_of_int (KernelSyms.copyinstr + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2105,7 +2105,7 @@ Section ProofCopyinstr.
       iEval (rewrite -Hpa4) in "Hb4".
       iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x0a))
                 (mword_of_int 8 : mword 6) Rs2 M1 (K - 12)%nat u4 b
-                with "Hcg Hpc Hi0a Hb4 [-]").
+                with "Hcg Hpc Hi0a Hb4").
       iIntros (CIDp5 Hsp5) "Hcg Hpc Hb4".
       assert (Hq0c : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x0a) : mword 64) 2
                      = mword_of_int (KernelSyms.copyinstr + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2113,7 +2113,7 @@ Section ProofCopyinstr.
       iEval (rewrite -Hpa5) in "Hb5".
       iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x0c))
                 (mword_of_int 7 : mword 6) Rs3 M1 (K - 12)%nat u5 b
-                with "Hcg Hpc Hi0c Hb5 [-]").
+                with "Hcg Hpc Hi0c Hb5").
       iIntros (CIDp6 Hsp6) "Hcg Hpc Hb5".
       assert (Hq0e : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x0c) : mword 64) 2
                      = mword_of_int (KernelSyms.copyinstr + 0x0e)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2121,7 +2121,7 @@ Section ProofCopyinstr.
       iEval (rewrite -Hpa6) in "Hb6".
       iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x0e))
                 (mword_of_int 6 : mword 6) Rs4 M1 (K - 12)%nat u6 b
-                with "Hcg Hpc Hi0e Hb6 [-]").
+                with "Hcg Hpc Hi0e Hb6").
       iIntros (CIDp7 Hsp7) "Hcg Hpc Hb6".
       assert (Hq10 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x0e) : mword 64) 2
                      = mword_of_int (KernelSyms.copyinstr + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2129,7 +2129,7 @@ Section ProofCopyinstr.
       iEval (rewrite -Hpa7) in "Hb7".
       iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x10))
                 (mword_of_int 5 : mword 6) Rs5 M1 (K - 12)%nat u7 b
-                with "Hcg Hpc Hi10 Hb7 [-]").
+                with "Hcg Hpc Hi10 Hb7").
       iIntros (CIDp8 Hsp8) "Hcg Hpc Hb7".
       assert (Hq12 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x10) : mword 64) 2
                      = mword_of_int (KernelSyms.copyinstr + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2137,7 +2137,7 @@ Section ProofCopyinstr.
       iEval (rewrite -Hpa8) in "Hb8".
       iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x12))
                 (mword_of_int 4 : mword 6) Rs6 M1 (K - 12)%nat u8 b
-                with "Hcg Hpc Hi12 Hb8 [-]").
+                with "Hcg Hpc Hi12 Hb8").
       iIntros (CIDp9 Hsp9) "Hcg Hpc Hb8".
       assert (Hq14 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x12) : mword 64) 2
                      = mword_of_int (KernelSyms.copyinstr + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2145,7 +2145,7 @@ Section ProofCopyinstr.
       iEval (rewrite -Hpa9) in "Hb9".
       iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x14))
                 (mword_of_int 3 : mword 6) Rs7 M1 (K - 12)%nat u9 b
-                with "Hcg Hpc Hi14 Hb9 [-]").
+                with "Hcg Hpc Hi14 Hb9").
       iIntros (CIDp10 Hsp10) "Hcg Hpc Hb9".
       assert (Hq16 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x14) : mword 64) 2
                      = mword_of_int (KernelSyms.copyinstr + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2153,7 +2153,7 @@ Section ProofCopyinstr.
       iEval (rewrite -Hpa10) in "Hb10".
       iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x16))
                 (mword_of_int 2 : mword 6) Rs8 M1 (K - 12)%nat u10 b
-                with "Hcg Hpc Hi16 Hb10 [-]").
+                with "Hcg Hpc Hi16 Hb10").
       iIntros (CIDp10a Hsp10a) "Hcg Hpc Hb10".
       assert (Hq18 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x16) : mword 64) 2
                      = mword_of_int (KernelSyms.copyinstr + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2161,7 +2161,7 @@ Section ProofCopyinstr.
       iEval (rewrite -Hpa11) in "Hb11".
       iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x18))
                 (mword_of_int 1 : mword 6) Rs9 M1 (K - 12)%nat u11 b
-                with "Hcg Hpc Hi18 Hb11 [-]").
+                with "Hcg Hpc Hi18 Hb11").
       iIntros (CIDp10b Hsp10b) "Hcg Hpc Hb11".
       assert (Hq1a : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x18) : mword 64) 2
                      = mword_of_int (KernelSyms.copyinstr + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2194,7 +2194,7 @@ Section ProofCopyinstr.
                 (Cregidx (mword_of_int 0)) (mword_of_int 24 : mword 8) Rs0 M1 (K - 12)%nat b
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rdok)
-                with "Hcg Hpc Hi1a [-]").
+                with "Hcg Hpc Hi1a").
       iIntros (CIDp11 Hsp11) "Hcg Hpc".
       set (M2 := <[Regidx Rs0 := regval_into_reg
                     (add_vec (M1 !!! Regidx csp_rs1)
@@ -2205,7 +2205,7 @@ Section ProofCopyinstr.
       (* ---- +0x1c: c.mv s6,a0 -- the page table ---- *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x1c)) Rs6 Ra0 M2 (K - 12)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi1c [-]").
+                with "Hcg Hpc Hi1c").
       iIntros (CIDp12 Hsp12) "Hcg Hpc".
       set (M3 := <[Regidx Rs6 := regval_into_reg (add_vec zero_reg (rget M2 Ra0))]> M2).
       assert (Hq1e : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x1c) : mword 64) 2
@@ -2214,7 +2214,7 @@ Section ProofCopyinstr.
       (* ---- +0x1e: c.mv s8,a1 -- psz, parked for the whole loop ---- *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x1e)) Rs8 Ra1 M3 (K - 12)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi1e [-]").
+                with "Hcg Hpc Hi1e").
       iIntros (CIDp12a Hsp12a) "Hcg Hpc".
       set (M3b := <[Regidx Rs8 := regval_into_reg (add_vec zero_reg (rget M3 Ra1))]> M3).
       assert (Hq20 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x1e) : mword 64) 2
@@ -2223,7 +2223,7 @@ Section ProofCopyinstr.
       (* ---- +0x20: c.mv s3,a2 -- dst ---- *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x20)) Rs3 Ra2 M3b (K - 12)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi20 [-]").
+                with "Hcg Hpc Hi20").
       iIntros (CIDp13 Hsp13) "Hcg Hpc".
       set (M4 := <[Regidx Rs3 := regval_into_reg (add_vec zero_reg (rget M3b Ra2))]> M3b).
       assert (Hq22 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x20) : mword 64) 2
@@ -2232,7 +2232,7 @@ Section ProofCopyinstr.
       (* ---- +0x22: c.mv s1,a3 -- srcva ---- *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x22)) Rs1 Ra3 M4 (K - 12)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi22 [-]").
+                with "Hcg Hpc Hi22").
       iIntros (CIDp14 Hsp14) "Hcg Hpc".
       set (M5 := <[Regidx Rs1 := regval_into_reg (add_vec zero_reg (rget M4 Ra3))]> M4).
       assert (Hq24 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x22) : mword 64) 2
@@ -2241,7 +2241,7 @@ Section ProofCopyinstr.
       (* ---- +0x24: c.mv s4,a4 -- max ---- *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x24)) Rs4 Ra4 M5 (K - 12)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi24 [-]").
+                with "Hcg Hpc Hi24").
       iIntros (CIDp15 Hsp15) "Hcg Hpc".
       set (M6 := <[Regidx Rs4 := regval_into_reg (add_vec zero_reg (rget M5 Ra4))]> M5).
       assert (Hq26 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x24) : mword 64) 2
@@ -2252,7 +2252,7 @@ Section ProofCopyinstr.
                 (sign_extend' 20 (mword_of_int 63 : mword 6))
                 (mword_of_int (-4096) : mword 64) M6 (K - 12)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                lui_m4096 with "Hcg Hpc Hi26 [-]").
+                lui_m4096 with "Hcg Hpc Hi26").
       iIntros (CIDp16 Hsp16) "Hcg Hpc".
       set (M7 := <[Regidx Rs7 := regval_into_reg (mword_of_int (-4096) : mword 64)]> M6).
       assert (Hq28 : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x26) : mword 64) 2
@@ -2263,7 +2263,7 @@ Section ProofCopyinstr.
                 (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 64) M7 (K - 12)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(apply bv_eq; vm_compute; reflexivity)
-                with "Hcg Hpc Hi28 [-]").
+                with "Hcg Hpc Hi28").
       iIntros (CIDp16a Hsp16a) "Hcg Hpc".
       set (M7b := <[Regidx Rs9 := regval_into_reg (mword_of_int 1 : mword 64)]> M7).
       assert (Hq2a : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x28) : mword 64) 2
@@ -2274,7 +2274,7 @@ Section ProofCopyinstr.
                 (sign_extend' 20 (mword_of_int 1 : mword 6))
                 (mword_of_int 4096 : mword 64) M7b (K - 12)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                lui_4096 with "Hcg Hpc Hi2a [-]").
+                lui_4096 with "Hcg Hpc Hi2a").
       iIntros (CIDp17 Hsp17) "Hcg Hpc".
       set (M8 := <[Regidx Rs5 := regval_into_reg (mword_of_int 4096 : mword 64)]> M7b).
       assert (Hq2c : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x2a) : mword 64) 2
@@ -2284,7 +2284,7 @@ Section ProofCopyinstr.
       iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x2c))
                 (sign_extend' 21 (concat_vec (mword_of_int 40 : mword 11) ('b"0")))
                 M8 (K - 12)%nat b ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi2c [-]").
+                with "Hcg Hpc Hi2c").
       iIntros (CIDp18 Hsp18). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htgt7c : add_vec (mword_of_int (KernelSyms.copyinstr + 0x2c) : mword 64)
                 (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 40 : mword 11) ('b"0"))))
@@ -2328,7 +2328,7 @@ Section ProofCopyinstr.
                 Hg1 Hmax1 Hg3 (bb_nonul_0 dst_olds) (uptd_ext_sz_refl szv P)
                 HM8sp HM8s1 HM8s3 HM8s4 HM8s5 HM8s6
                 HM8s8 HM8s9 HM8s10 HM8s11
-                with "Hcg Hcnt Htext Hpc Hpt Henv Hdst [-]").
+                with "Hcg Hcnt Htext Hpc Hpt Henv Hdst").
       iIntros (CIDj Hsj mj res P' g)
         "%Hjsp %Hj10 %Hj11 %Hja0 %Hjret %Hjext Hcg Hcnt Hpc Hpt Hdst".
       (* ---- the epilogue ---- *)
@@ -2336,7 +2336,7 @@ Section ProofCopyinstr.
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 Hjsp Hja0 Hj10 Hj11
-                with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12 [-]").
+                with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12").
       iIntros (CIDf Hsf mf) "[%Hcsf %Hfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CIDj CIDf lvl eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".

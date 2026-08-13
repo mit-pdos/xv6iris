@@ -1152,7 +1152,7 @@ Section ProofDirlookupMain.
       iPoseProof ("Htail" $! CID25) as "Ht".
       iSpecialize ("Ht" with "[%]"); [wp_next_chain |].
       iApply ("Ht" $! R13 u10 dolds0 with
-                "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hde [-]").
+                "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hde").
       { exact HR13tr. }
       iIntros (CIDf Hsf mf) "%Hcsf %Ha0f Hcg Hpc".
       iDestruct (cpu_own_transport CID CIDf 0%nat eb pj C b
@@ -1322,7 +1322,7 @@ Section ProofDirlookupMain.
             iSpecialize ("Ht" with "[%]"); [wp_next_chain |].
             iApply ("Ht" $! Q3 mt10' dol' with
                       "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10
-                       Hde [-]").
+                       Hde").
             { exact (dlk_tregs_of_regs m sp0 ip nb pf (16 * S i) Q3 HQ3regs). }
             iIntros (CIDf Hsf mf) "%Hcsf %Ha0f Hcg Hpc".
             iDestruct (cpu_own_transport CIDp CIDf 0%nat eb pj C b
@@ -1522,7 +1522,7 @@ Section ProofDirlookupMain.
                   ltac:(rewrite HL6a1 dlk_zero_moi; exact (eq_vec_refl _))
                   HL6a3 HL6a4
                   with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
-                        Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbslot [-]").
+                        Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbslot").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         iIntros (CIDrd Hsrd mrd tot P')
@@ -1758,7 +1758,7 @@ Section ProofDirlookupMain.
           iEval (rewrite -HN4a1) in "Hdenm".
           iApply (NC.wp_namecmp_sconf N4 fn (dir_name data i) (K - 12)%nat
                     dqn (DfracOwn 1) b pj ltac:(unfold K_namecmp; lia)
-                    with "Hcg Htext Hpc Hnm Hdenm [-]").
+                    with "Hcg Htext Hpc Hnm Hdenm").
           iIntros (CIDnc Hsnc mnc) "%Hcsnc Hcg Hpc Hnm Hdenm %Hiff".
           iEval (rewrite HN4a0) in "Hnm".
           iEval (rewrite HN4a1) in "Hdenm".
@@ -1847,7 +1847,7 @@ Section ProofDirlookupMain.
                 iEval (rewrite Htgt86) in "Hpc".
                 iSpecialize ("Hk" $! CIDS1 with "[%]"); [wp_next_chain |].
                 iApply ("Hk" with "Hcg Hpc Hpv"). }
-            iApply ("Hpoffst" with "Hcg Hpc Hpoff [-]").
+            iApply ("Hpoffst" with "Hcg Hpc Hpoff").
             iIntros (CIDB14 HqB14) "Hcg Hpc Hpoff".
             (* +0x86 lhu a1,-96(s0) : the inum again *)
             iApply (wp_lhu_s_sconf (mword_of_int (DL + 0x86)) Ra1 Rs0
@@ -1924,7 +1924,7 @@ Section ProofDirlookupMain.
                       ltac:(unfold K_iget; lia)
                       ltac:(vm_compute; reflexivity) Hinumb HN7a0
                       ltac:(rewrite dlk_sext_zext_16_32_64; exact HN7a1)
-                      with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hislot [-]").
+                      with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hislot").
             iIntros (CIDig Hsig mig kslot q) "Hcg Hcnt Hpc %Higp Href".
             destruct Higp as (Hcsig & Hkslot & Higa0).
             assert (Higregs : dlk_regs m sp0 ip nb pf (16 * i) mig)
@@ -1958,7 +1958,7 @@ Section ProofDirlookupMain.
             iSpecialize ("Ht" with "[%]"); [wp_next_chain |].
             iApply ("Ht" $! mig mt10 (fun jj => file_byte data (16 * i + jj)%nat)
                       with "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10
-                            Hde [-]").
+                            Hde").
             { exact (dlk_tregs_of_regs m sp0 ip nb pf (16 * i) mig Higregs). }
             iIntros (CIDf Hsf mf) "%Hcsf %Ha0f Hcg Hpc".
             iDestruct (cpu_own_transport CIDig CIDf 0%nat eb pj C b

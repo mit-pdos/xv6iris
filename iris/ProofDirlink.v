@@ -1448,7 +1448,7 @@ Section ProofDirlinkMain.
               Heb
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
                     Hblocks Hnm [] Hppid Hprocs Hdev Hgeom Hdlk Hbs1
-                    Hitb2 Hitbl Hesc Hislot [-]").
+                    Hitb2 Hitbl Hesc Hislot").
     { done. }
     iIntros (CIDdl Hsdl mdl found kk kslot qq)
       "%Hcsdl Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks Hnm Hppid Hbs1 Hres".
@@ -1528,7 +1528,7 @@ Section ProofDirlinkMain.
                 HE1a0
                 with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlog Hitb2 Hitbl Hesck
                       Hiregi Hslk Href Hsbb Hsbi Hbmr Hppid Hprocs Hdev Hgeom
-                      Hdlk Hbsl Hop [-]").
+                      Hdlk Hbsl Hop").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iIntros (CIDip Hsip mip nn uu)
@@ -1570,7 +1570,7 @@ Section ProofDirlinkMain.
       iPoseProof ("Htail" $! CID16) as "Ht".
       iSpecialize ("Ht" with "[%]"); [wp_next_chain |].
       iApply ("Ht" $! E2 u3 u5 u6 dolds0 with
-                "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hde [-]").
+                "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hde").
       { exact (dl_tregs_of_eregs m sp0 ip nb _ E2 HE2e). }
       iIntros (CIDf Hsf mf) "%Hcsf %Ha0f Hcg Hpc".
       iDestruct (cpu_own_transport CIDip CIDf 0%nat eb (proc_addr j) C b
@@ -1851,7 +1851,7 @@ Section ProofDirlinkMain.
         iApply (SNC.wp_strncpy_sconf W4 14%nat fn (fun jj => dolz (2 + jj)%nat)
                   (K - 10)%nat dqn b (proc_addr j)
                   ltac:(exact HK2) HW4a2 ltac:(vm_compute; reflexivity)
-                  with "Hcg Htext Hpc Hnm Hdenm [-]").
+                  with "Hcg Htext Hpc Hnm Hdenm").
         iIntros (CIDsn Hssn msn hh) "Hcg Hpc Hnm Hdenm %Hcssn %Hsna0 %Hsnp".
         iEval (rewrite HW4a1) in "Hnm".
         iEval (rewrite HW4a0) in "Hdenm".
@@ -2074,7 +2074,7 @@ Section ProofDirlinkMain.
                   with "Hcg Hcnt [] [] Htext Hpc Hpanic Hkd Hpk Hbio Hlog Hkenv
                         Hidev Hiinum Hmeta Hmap Hblocks Hsbi Hsbs Hsbb Hbmr
                         Hiregi Hdat Hsrc Hprocs Hdev Hgeom Hdlk Hbsl
-                        Hop [-]").
+                        Hop").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         iIntros (CIDwi Hswi mwi tot bm' data' dn' dn0' nn wrote dist dstb P' used')
@@ -2223,7 +2223,7 @@ Section ProofDirlinkMain.
         iSpecialize ("Ht" with "[%]"); [wp_next_chain |].
         iApply ("Ht" $! V10 (m !!! Regidx Rs1 : mword 64) w5 w6
                   (fun jj => dirent_bytes (de_of_name inum s) !!! jj) with
-                  "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hsrc [-]").
+                  "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hsrc").
         { exact HV10t. }
         iIntros (CIDf Hsf mf) "%Hcsf %Ha0f Hcg Hpc".
         iDestruct (cpu_own_transport CIDwi CIDf 0%nat eb (proc_addr j) C b
@@ -2695,7 +2695,7 @@ Section ProofDirlinkMain.
                           exact (eq_vec_refl _))
                     HL6a3 HL6a4
                     with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
-                          Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbs1 [-]").
+                          Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbs1").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
           iIntros (CIDrd Hsrd mrd tot P')

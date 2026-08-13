@@ -207,7 +207,7 @@ Section ProofVirtioDiskRwDSeam.
               (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false)
               bs_buf bs_disk (1024 * uint bno)%Z
               Hok Hdisj0 Hch Hcm Hct Hlenbuf Hlendisk Hbufkd Hoff Ha0 Ha5
-              with "Hcg Htext Hpc Hdinv Hgeom Hbody Hchain Hbuf Hdisk Hpend [-]").
+              with "Hcg Htext Hpc Hdinv Hgeom Hbody Hchain Hbuf Hdisk Hpend").
     iIntros (M1 pin) "%F %Hpinr Hcg Hpc Hbody Hclaim Hrm Hrt".
     destruct F as (Hcs & H1a1).
     iSpecialize ("Hexit" $! CIDx with "[%]"); [wp_next_chain|].

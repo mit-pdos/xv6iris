@@ -137,7 +137,7 @@ Section ProofSysUptime.
     assert (Hpush : add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) = pa_stk (m !!! Regidx csp_rs1) 4).
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 32 : mword 6) m av 4 b ltac:(lia) Hpush
-              with "Hcg Hpc Hi00 [-]").
+              with "Hcg Hpc Hi00").
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     iEval (rewrite Hspm) in "Hframe".
     change (<[Regidx csp_rs1 := regval_into_reg
@@ -166,7 +166,7 @@ Section ProofSysUptime.
     iPoseProof (sui_02 with "Htext") as "Hi02".
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x02)) (mword_of_int 3 : mword 6) (mword_of_int 1 : mword 5)
               A0 (av - 4)%nat vr24 b
-              with "Hcg Hpc Hi02 [Hr24] [-]").
+              with "Hcg Hpc Hi02 [Hr24]").
     { iEval (rewrite HcspA0 -Hb1). iExact "Hr24". }
     iIntros (CID2 Hs2) "Hcg Hpc Hr24".
     assert (Hpc04 : add_vec_int (mword_of_int (KernelSyms.sys_uptime + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.sys_uptime + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
@@ -174,7 +174,7 @@ Section ProofSysUptime.
     iPoseProof (sui_04 with "Htext") as "Hi04".
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x04)) (mword_of_int 2 : mword 6) (mword_of_int 8 : mword 5)
               A0 (av - 4)%nat vr16 b
-              with "Hcg Hpc Hi04 [Hr16] [-]").
+              with "Hcg Hpc Hi04 [Hr16]").
     { iEval (rewrite HcspA0 -Hb2). iExact "Hr16". }
     iIntros (CID3 Hs3) "Hcg Hpc Hr16".
     assert (Hpc06 : add_vec_int (mword_of_int (KernelSyms.sys_uptime + 0x04) : mword 64) 2 = mword_of_int (KernelSyms.sys_uptime + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
@@ -182,7 +182,7 @@ Section ProofSysUptime.
     iPoseProof (sui_06 with "Htext") as "Hi06".
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x06)) (mword_of_int 1 : mword 6) (mword_of_int 9 : mword 5)
               A0 (av - 4)%nat vr8 b
-              with "Hcg Hpc Hi06 [Hr8] [-]").
+              with "Hcg Hpc Hi06 [Hr8]").
     { iEval (rewrite HcspA0 -Hb3). iExact "Hr8". }
     iIntros (CID4 Hs4) "Hcg Hpc Hr8".
     assert (Hpc08 : add_vec_int (mword_of_int (KernelSyms.sys_uptime + 0x06) : mword 64) 2 = mword_of_int (KernelSyms.sys_uptime + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
@@ -192,7 +192,7 @@ Section ProofSysUptime.
     iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x08)) (Cregidx (mword_of_int 0)) (mword_of_int 8 : mword 8) (mword_of_int 8 : mword 5)
               A0 (av - 4)%nat b
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi08 [-]").
+              with "Hcg Hpc Hi08").
     iIntros (CID5 Hs5) "Hcg Hpc".
     set (A1 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
         (add_vec (A0 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> A0).
@@ -206,7 +206,7 @@ Section ProofSysUptime.
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x0a)) (mword_of_int 10 : mword 5) (mword_of_int 0x15 : mword 20)
               A1 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0a [-]").
+              with "Hcg Hpc Hi0a").
     iIntros (CID6 Hs6) "Hcg Hpc".
     set (A2 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
         (add_vec (mword_of_int (KernelSyms.sys_uptime + 0x0a) : mword 64) (auipc_off (mword_of_int 0x15 : mword 20)))]> A1).
@@ -219,7 +219,7 @@ Section ProofSysUptime.
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x0e)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x73c : mword 12)
               A2 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0e [-]").
+              with "Hcg Hpc Hi0e").
     iIntros (CID7 Hs7) "Hcg Hpc".
     set (A3 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
         (add_vec (A2 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 1852 : mword 12)))]> A2).
@@ -232,7 +232,7 @@ Section ProofSysUptime.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x12)) (mword_of_int 1 : mword 5) (mword_of_int 2089228 : mword 21)
               A3 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi12 [-]").
+              with "Hcg Hpc Hi12").
     iIntros (CID8 Hs8) "Hcg Hpc".
     set (A4 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.sys_uptime + 0x12) : mword 64) 4)]> A3).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.sys_uptime + 0x12) : mword 64) 4)]> A3) with A4.
@@ -257,7 +257,7 @@ Section ProofSysUptime.
               n eb p C (av - 4)%nat b
               ltac:(exact Hn)
               ltac:(lia)
-              with "Hcg Hcnt Htext Hpc [Hlk] Hpanic [-]").
+              with "Hcg Hcnt Htext Hpc [Hlk] Hpanic").
     { iEval (rewrite HA4a0). iExact "Hlk". }
     iIntros (CID9 Hs9 ms MA) "%Hms Hcg Hpc %HcsA Htok HR Hcnt Hpay".
     assert (Hpc16 : ret_pc (A4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_uptime + 0x16))
@@ -273,7 +273,7 @@ Section ProofSysUptime.
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x16)) (mword_of_int 15 : mword 5) (mword_of_int 0x7 : mword 20)
               MA (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi16 [-]").
+              with "Hcg Hpc Hi16").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (B0 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
@@ -289,7 +289,7 @@ Section ProofSysUptime.
     iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x1a)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5)
               (mword_of_int 0x7e0 : mword 12) B0 (trap_res b + (av - 4))%nat t false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1a [Hticks] [-]").
+              with "Hcg Hpc Hi1a [Hticks]").
     { iEval (rewrite Haddrt). iExact "Hticks". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hticks".
@@ -303,7 +303,7 @@ Section ProofSysUptime.
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x1e)) (mword_of_int 9 : mword 5) (mword_of_int 15 : mword 5)
               B1 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1e [-]").
+              with "Hcg Hpc Hi1e").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (B2 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec zero_reg (B1 !!! Regidx (mword_of_int 15 : mword 5)))]> B1).
@@ -318,7 +318,7 @@ Section ProofSysUptime.
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x20)) (mword_of_int 10 : mword 5) (mword_of_int 0x15 : mword 20)
               B2 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi20 [-]").
+              with "Hcg Hpc Hi20").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (B3 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
@@ -332,7 +332,7 @@ Section ProofSysUptime.
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x24)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x726 : mword 12)
               B3 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi24 [-]").
+              with "Hcg Hpc Hi24").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (B4 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
@@ -346,7 +346,7 @@ Section ProofSysUptime.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x28)) (mword_of_int 1 : mword 5) (mword_of_int 2089342 : mword 21)
               B4 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi28 [-]").
+              with "Hcg Hpc Hi28").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (B5 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.sys_uptime + 0x28) : mword 64) 4)]> B4).
@@ -380,7 +380,7 @@ Section ProofSysUptime.
               n eb p C (av - 4)%nat
               ltac:(rewrite HB5a0; apply addv_sext0)
               ltac:(lia)
-              with "Hcg Htext Hpc [Hlk] [Htok] [HR] Hcnt Hpay [-]").
+              with "Hcg Htext Hpc [Hlk] [Htok] [HR] Hcnt Hpay").
     { iExact "Hlk". }
     { iExact "Htok". }
     { iExact "HR". }
@@ -407,7 +407,7 @@ Section ProofSysUptime.
               (shift_bits_left (MR !!! Regidx (mword_of_int 9 : mword 5)) su_sh32)
               MR (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity)
-              with "Hcg Hpc Hi2c [-]").
+              with "Hcg Hpc Hi2c").
     iIntros (CID11 Hs11) "Hcg Hpc".
     set (C0 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
         (shift_bits_left (MR !!! Regidx (mword_of_int 9 : mword 5)) su_sh32)]> MR).
@@ -420,7 +420,7 @@ Section ProofSysUptime.
     iApply (wp_csrli_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x30)) (Cregidx (mword_of_int 2)) (mword_of_int 10 : mword 5)
               (mword_of_int 32 : mword 6) C0 (av - 4)%nat b
               creg_c2 ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi30 [-]").
+              with "Hcg Hpc Hi30").
     iIntros (CID12 Hs12) "Hcg Hpc".
     set (C1 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
         (shift_bits_right (C0 !!! Regidx (mword_of_int 10 : mword 5)) su_sh32)]> C0).
@@ -452,7 +452,7 @@ Section ProofSysUptime.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x32)) (mword_of_int 3 : mword 6) (mword_of_int 1 : mword 5)
               C1 (av - 4)%nat (m !!! Regidx (mword_of_int 1 : mword 5)) b (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi32 [Hr24] [-]").
+              with "Hcg Hpc Hi32 [Hr24]").
     { iEval (rewrite HC1csp). iExact "Hr24". }
     iIntros (CID13 Hs13) "Hcg Hpc Hr24".
     set (E1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 1 : mword 5))]> C1).
@@ -465,7 +465,7 @@ Section ProofSysUptime.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x34)) (mword_of_int 2 : mword 6) (mword_of_int 8 : mword 5)
               E1 (av - 4)%nat (m !!! Regidx (mword_of_int 8 : mword 5)) b (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi34 [Hr16] [-]").
+              with "Hcg Hpc Hi34 [Hr16]").
     { iEval (rewrite HE1csp). iExact "Hr16". }
     iIntros (CID14 Hs14) "Hcg Hpc Hr16".
     set (E2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 8 : mword 5))]> E1).
@@ -478,7 +478,7 @@ Section ProofSysUptime.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x36)) (mword_of_int 1 : mword 6) (mword_of_int 9 : mword 5)
               E2 (av - 4)%nat (m !!! Regidx (mword_of_int 9 : mword 5)) b (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi36 [Hr8] [-]").
+              with "Hcg Hpc Hi36 [Hr8]").
     { iEval (rewrite HE2csp). iExact "Hr8". }
     iIntros (CID15 Hs15) "Hcg Hpc Hr8".
     set (E3 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 9 : mword 5))]> E2).
@@ -513,7 +513,7 @@ Section ProofSysUptime.
       done. }
     iEval (rewrite -Hwv) in "Hframe4".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x38)) (mword_of_int 2 : mword 6) E3 (av - 4)%nat 4 b Hpop
-              with "Hcg Hpc Hi38 Hframe4 [-]").
+              with "Hcg Hpc Hi38 Hframe4").
     iIntros (CID16 Hs16) "Hcg Hpc".
     assert (Hnk : ((av - 4) + 4)%nat = av) by lia.
     iEval (rewrite Hnk) in "Hcg".
@@ -530,7 +530,7 @@ Section ProofSysUptime.
     iPoseProof (sui_3a with "Htext") as "Hi3a".
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.sys_uptime + 0x3a)) (mword_of_int 1 : mword 5) E4 av b
               ltac:(vm_compute; discriminate)
-              with "Hcg Hpc Hi3a [-]").
+              with "Hcg Hpc Hi3a").
     iIntros (CID17 Hs17) "Hcg Hpc".
     assert (Hretfin : ret_pc (E4 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE4ra; reflexivity).

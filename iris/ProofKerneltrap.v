@@ -93,7 +93,7 @@ Section ProofKerneltrap.
     iIntros "Hcg Hmir Havail Hkptr Hcpu #Htext Hpc Hsepc Hscause Hstval #Hcaps Hclm Hcont".
     (* ---- the head: prologue, the three reads, both panic tests ---- *)
     iApply (kt_pro m av ep sc ltac:(unfold kerneltrap_stack in Hav; lia) Hepal
-              with "Hcg Hmir Htext Hpc Hsepc Hscause [-]").
+              with "Hcg Hmir Htext Hpc Hsepc Hscause").
     iIntros (M ms0) "%HMsp %HMs2 %HMs1 %Hms0f %Hsie0 %Hspp0 %Hspie0 %Hthr
                      Hcg Hmir Hsepc Hscause Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6".
     (* name the gap slot's word NOW: left as an [_] at the three [kt_epi]
@@ -105,7 +105,7 @@ Section ProofKerneltrap.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x2a)) ra_idx
               (mword_of_int 2096728 : mword 21) M (av - 6)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi2a [-]").
+              with "Hcg Hpc Hi2a").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (D0 := <[Regidx ra_idx := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.kerneltrap + 0x2a) : mword 64) 4)]> M).
@@ -129,7 +129,7 @@ Section ProofKerneltrap.
               D0 (av - 6)%nat 0 false p C (DfracOwn 1) sc
               Hlen ltac:(change (2^31)%Z with 2147483648%Z; lia)
               ltac:(unfold kerneltrap_stack in Hav; unfold devintr_stack; lia)
-              with "Hcg Hcpu Htext Hpc Hscause Hcaps [-]").
+              with "Hcg Hcpu Htext Hpc Hscause Hcaps").
     iIntros (mdi) "[%Hcs_di %Hdia0] Hcg Hcpu Hscause Hpc".
     assert (Hpc2e : ret_pc (D0 !!! Regidx ra_idx)
                     = mword_of_int (KernelSyms.kerneltrap + 0x2e))
@@ -157,7 +157,7 @@ Section ProofKerneltrap.
               ltac:(rgne; rewrite Hdia0; apply not_true_iff_false; intro Hz;
                     apply eq_vec_true_iff in Hz; apply Hsc;
                     rewrite Hz; apply bv_eq; vm_compute; reflexivity)
-              with "Hcg Hpc Hi2e [-]").
+              with "Hcg Hpc Hi2e").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     assert (Hpc30 : add_vec_int (mword_of_int (KernelSyms.kerneltrap + 0x2e) : mword 64) 2
                     = mword_of_int (KernelSyms.kerneltrap + 0x30)) by pcw.
@@ -169,7 +169,7 @@ Section ProofKerneltrap.
               (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6))))
               mdi (av - 6)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) eq_refl
-              with "Hcg Hpc Hi30 [-]").
+              with "Hcg Hpc Hi30").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (D1 := <[Regidx a5_idx := regval_into_reg
         (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6))))]> mdi).
@@ -203,7 +203,7 @@ Section ProofKerneltrap.
                 (mword_of_int 84 : mword 13) a5_idx a0_idx D1 (av - 6)%nat false
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 Htim ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi32 [-]").
+                with "Hcg Hpc Hi32").
       iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Hpc86 : add_vec (mword_of_int (KernelSyms.kerneltrap + 0x32) : mword 64)
                         (sign_extend' 64 (mword_of_int 84 : mword 13))
@@ -214,7 +214,7 @@ Section ProofKerneltrap.
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x86)) ra_idx
                 (mword_of_int 2093494 : mword 21) D1 (av - 6)%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi86 [-]").
+                with "Hcg Hpc Hi86").
       iApply wp_next_off_intro. iIntros "Hcg Hpc".
       set (D2 := <[Regidx ra_idx := regval_into_reg
           (add_vec_int (mword_of_int (KernelSyms.kerneltrap + 0x86) : mword 64) 4)]> D1).
@@ -239,7 +239,7 @@ Section ProofKerneltrap.
       iApply (Myproc.wp_myproc_sconf D2 (av - 6)%nat 0 false p C false
                 ltac:(change (2^31)%Z with 2147483648%Z; lia)
               ltac:(unfold kerneltrap_stack in Hav; unfold devintr_stack; lia)
-                with "Hcg Hcpu Htext Hpc [-]").
+                with "Hcg Hcpu Htext Hpc").
       iApply wp_next_off_intro.
       iIntros (msmp mmp) "%Hmpf Hcg Hcpu Hpc [%Hcs_mp %Hmpa0]".
       assert (Hpc8a : ret_pc (D2 !!! Regidx ra_idx)
@@ -262,7 +262,7 @@ Section ProofKerneltrap.
                   mmp (av - 6)%nat false
                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                   Hp0 ltac:(vm_compute; reflexivity)
-                  with "Hcg Hpc Hi8a [-]").
+                  with "Hcg Hpc Hi8a").
         iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
         assert (Hpcb : add_vec (mword_of_int (KernelSyms.kerneltrap + 0x8a) : mword 64)
                          (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 214 : mword 8) ('b"0"))))
@@ -275,7 +275,7 @@ Section ProofKerneltrap.
                   ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                   ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                   Hmpsp Hmps2 Hmps1 Hepal Hms0f Hsie0 Hspp0 Hspie0 Hmpthr
-                  with "Hcg Hmir Hcpu Htext Hpc Hsepc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 [-]").
+                  with "Hcg Hmir Hcpu Htext Hpc Hsepc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
         iIntros (mf ms_f) "%Hcsf %Hsppf %Hspief %Hsief Hcgat Hmir Hcpu Hsepc Hpc".
         assert (Hav6 : ((av - 6) + 6)%nat = av)
           by (unfold kerneltrap_stack in Hav; lia).
@@ -297,7 +297,7 @@ Section ProofKerneltrap.
                   mmp (av - 6)%nat false
                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                   ltac:(apply not_true_iff_false; exact Hp0)
-                  with "Hcg Hpc Hi8a [-]").
+                  with "Hcg Hpc Hi8a").
         iApply wp_next_off_intro. iIntros "Hcg Hpc".
         assert (Hpc8c : add_vec_int (mword_of_int (KernelSyms.kerneltrap + 0x8a) : mword 64) 2
                         = mword_of_int (KernelSyms.kerneltrap + 0x8c)) by pcw.
@@ -326,7 +326,7 @@ Section ProofKerneltrap.
         iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x8c)) ra_idx
                   (mword_of_int 2094990 : mword 21) mmp (av - 6)%nat false
                   ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
-                  with "Hcg Hpc Hi8c [-]").
+                  with "Hcg Hpc Hi8c").
         iApply wp_next_off_intro. iIntros "Hcg Hpc".
         set (Y0 := <[Regidx ra_idx := regval_into_reg
             (add_vec_int (mword_of_int (KernelSyms.kerneltrap + 0x8c) : mword 64) 4)]> mmp).
@@ -358,7 +358,7 @@ Section ProofKerneltrap.
         iApply (Yield.wp_yield_sconf γs j γl Y0 (av - 6)%nat false C
                   Hj Hgl ltac:(unfold kerneltrap_stack in Hav; lia)
                   with "Hcg Hcpu Htext Hpc Hprocs Hpanic
-                        [Hsepc Hscause Hstval Hmir Havail Hkptr] [Hclm] [-]").
+                        [Hsepc Hscause Hstval Hmir Havail Hkptr] [Hclm]").
         (* THE HANDLER RESOURCE GOES INTO THE PARK, as the fifth member of
            [trap_csrs] -- and comes back out of yield's post as the RESUMING
            hart's.  It used to be a persistent credential framed around the
@@ -400,7 +400,7 @@ Section ProofKerneltrap.
         iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x90))
                   (sign_extend' 21 (concat_vec (mword_of_int 2003 : mword 11) ('b"0")))
                   myd (av - 6)%nat false ltac:(vm_compute; reflexivity)
-                  with "Hcg Hpc Hi90 [-]").
+                  with "Hcg Hpc Hi90").
         iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
         assert (Hpcj : add_vec (mword_of_int (KernelSyms.kerneltrap + 0x90) : mword 64)
                          (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2003 : mword 11) ('b"0"))))
@@ -413,7 +413,7 @@ Section ProofKerneltrap.
                   ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                   ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                   Hydsp Hyds2 Hyds1 Hepal Hms0f Hsie0 Hspp0 Hspie0 Hydthr
-                  with "Hcg Hmir Hcpu Htext Hpc Hsepc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 [-]").
+                  with "Hcg Hmir Hcpu Htext Hpc Hsepc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
         iIntros (mf ms_f) "%Hcsf %Hsppf %Hspief %Hsief Hcgat Hmir Hcpu Hsepc Hpc".
         assert (Hav6 : ((av - 6) + 6)%nat = av)
           by (unfold kerneltrap_stack in Hav; lia).
@@ -438,7 +438,7 @@ Section ProofKerneltrap.
                 (mword_of_int 84 : mword 13) a5_idx a0_idx D1 (av - 6)%nat false
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 ltac:(apply not_true_iff_false; exact Htim)
-                with "Hcg Hpc Hi32 [-]").
+                with "Hcg Hpc Hi32").
       iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Hpc36 : add_vec_int (mword_of_int (KernelSyms.kerneltrap + 0x32) : mword 64) 4
                       = mword_of_int (KernelSyms.kerneltrap + 0x36)) by pcw.
@@ -450,7 +450,7 @@ Section ProofKerneltrap.
                 ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 HD1sp HD1s2 HD1s1 Hepal Hms0f Hsie0 Hspp0 Hspie0 HD1thr
-                with "Hcg Hmir Hcpu Htext Hpc Hsepc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 [-]").
+                with "Hcg Hmir Hcpu Htext Hpc Hsepc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
       iIntros (mf ms_f) "%Hcsf %Hsppf %Hspief %Hsief Hcgat Hmir Hcpu Hsepc Hpc".
         assert (Hav6 : ((av - 6) + 6)%nat = av)
           by (unfold kerneltrap_stack in Hav; lia).
