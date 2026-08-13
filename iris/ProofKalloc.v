@@ -557,8 +557,20 @@ Section ProofKalloc.
       assert (HR12ra : R12 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.kalloc + 0x32) : mword 64) 4)
         by (rewrite /R12; apply upd_eq).
       assert (HR12s1 : R12 !!! Regidx (mword_of_int 9 : mword 5) = pg).
+      (* [repeat (rewrite upd_ne; …)] here costs ~6 s: R7 -- one layer below
+         the five named above -- is itself an s1 (reg 9) write, so once the
+         five real peels are done, [repeat]'s next iteration DOES unify
+         [upd_ne] against R7 (its `set` body deltas open to `<[Regidx 9 :=
+         head]> R6`), only to land the false side goal [Regidx 9 <> Regidx 9]
+         that [vm_compute; discriminate] then fails to close.  Contrast
+         [HR12csp] two asserts up: its peel also ends with a spurious
+         [repeat] iteration, but at [macq], an opaque `iIntros`-bound
+         variable with no `set` body to delta into, so the extra attempt
+         fails to even unify and costs nothing.  [do 5] stops at exactly the
+         five real peels [Hs1R7] is already stated over, so the goal never
+         reaches R7 and [repeat]'s expensive misfire never fires. *)
       { rewrite /R12 /R11 /R10 /R9 /R8;
-        repeat (rewrite upd_ne; [| vm_compute; discriminate]); exact Hs1R7. }
+        do 5 (rewrite upd_ne; [| vm_compute; discriminate]); exact Hs1R7. }
       (* the acquire handed the window index out as [trap_res b + N]; release
          wants it as [trap_res outb + N] with [outb = match n with O => eb
          | S _ => false end].  Those are the same bool -- [cpu_own] forces

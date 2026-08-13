@@ -326,6 +326,27 @@ Section BmapKit.
     /\ (bmap_alloced bm bm' fbn = true -> bm_bmsset ak ⊆ Sb')
     /\ (bmap_ad bm bm' fbn = true -> bv_unsigned (blkmap_get bm' fbn) ∈ Sb').
 
+  (* [bm_indirect_tail]'s allocating arm proves [bm_ledger_ok]'s first two
+     conjuncts (the spend against the caller's budget, and "spending never
+     gains credits") by [destruct crb, cri; subst w ub; cbn in *; lia] at the
+     call site -- measured 10.1s / 10.4s isolated (33.5s / 31.9s in CI),
+     because at that point the context is the WHOLE ~900-line tail proof and
+     [cbn in *] renormalises every hypothesis in it, four times over from the
+     [destruct crb, cri], for a fact that only ever depends on four of them.
+     Proved once here, over exactly those four hypotheses (RULE ZERO / the
+     [set_solver]-in-a-wide-context shape from claude-notes/optimization.md,
+     minus the [set_solver]: same "closer pays for the whole context" cost,
+     from [cbn in *] instead), the case split costs nothing. *)
+  Lemma bmap_tail_ledger_budget (n nI ub w : nat) (crb cri : bool) (c : nat)
+      (Hnn : nI = (2 + ub)%nat)
+      (Hbal_w : (if crb then S ub else ub)%nat = S w)
+      (Hhi0 : (nI <= n)%nat)
+      (Hbud2 : (n + (if crb then 1 else 2) + (if cri then 0 else 1)
+                  <= nI + c)%nat) :
+    (n <= (if cri then S w else w) + c)%nat
+    /\ ((if cri then S w else w) <= n)%nat.
+  Proof. destruct crb, cri; lia. Qed.
+
   (* NOTHING MOVED -- the whole ledger obligation of every arm that neither
      allocates nor logs, and (at [ak = None]) of the no-alloc instance *)
   Lemma bm_ledger_id (ak : option bm_alloc) (cr : bool) (bm : blkmap)
@@ -2003,9 +2024,16 @@ Section BmapTail.
           rewrite /bm_ledger_ok Halloc HindJ HgetJf Huind HS1.
           cbn [bm_bmsset ba_bms].
           split_and!.
-          - (* the spend, against what the caller left room for *)
-            destruct crb, cri; subst w ub; cbn in *; lia.
-          - destruct crb, cri; subst w ub; cbn in *; lia.
+          - (* the spend, against what the caller left room for -- via
+               [bmap_tail_ledger_budget], proved once over four hypotheses
+               instead of [destruct crb, cri; subst w ub; cbn in *; lia]
+               against this proof's whole context (see that lemma's comment) *)
+            exact (proj1 (bmap_tail_ledger_budget n nI ub w crb cri
+                            (bmap_cost cr true (bmap_ind fbn))
+                            Hnn Hbal_w Hhi0 Hbud2)).
+          - exact (proj2 (bmap_tail_ledger_budget n nI ub w crb cri
+                            (bmap_cost cr true (bmap_ind fbn))
+                            Hnn Hbal_w Hhi0 Hbud2)).
           - exact (transitivity Hsub0 (bmset_sub_l4 _ _ _ _)).
           - exact (bmset_tail_ceiling Sb SbI bms (bv_unsigned (bm_ind bmI))
                      (bv_unsigned blk) HSbI).

@@ -244,7 +244,23 @@ Section KexecAFrame.
     rewrite stack_own_slots. cbn [seq big_opL].
     iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11 & H12
               & H13 & _)".
-    iFrame.
+    (* A bare [iFrame] here still pays a GOAL-side search over this
+       13-conjunct existential tuple (optimization.md #3): 4.5 s for what an
+       explicit, positionally-matched split does for free, because each
+       hypothesis is already exactly one conjunct's witness -- [iExact] does
+       not need to find that out by trying the rest. *)
+    iSplitL "H1"; [iExact "H1" |].
+    iSplitL "H2"; [iExact "H2" |].
+    iSplitL "H3"; [iExact "H3" |].
+    iSplitL "H4"; [iExact "H4" |].
+    iSplitL "H5"; [iExact "H5" |].
+    iSplitL "H6"; [iExact "H6" |].
+    iSplitL "H7"; [iExact "H7" |].
+    iSplitL "H8"; [iExact "H8" |].
+    iSplitL "H9"; [iExact "H9" |].
+    iSplitL "H10"; [iExact "H10" |].
+    iSplitL "H11"; [iExact "H11" |].
+    iSplitL "H12"; [iExact "H12" | iExact "H13"].
   Qed.
 
   (* ---- 496(sp) is slot 6, at the c.sdsp / c.ldsp encoding.  Used twice:
@@ -943,6 +959,65 @@ Section KexecAExit.
   Qed.
 
   (* =================================================================== *)
+  (*  [fs_fabric]'s CONSTRUCTOR.                                          *)
+  (*                                                                      *)
+  (*  BELONGS NEXT TO [fs_fabric]'s definition in SpecKexec.v, right      *)
+  (*  after its [Persistent] instance -- it lives here only because this  *)
+  (*  is a file phase A and phase B's call sites can require without      *)
+  (*  touching a Spec file, and [fs_fabric]'s own header already says its *)
+  (*  home is a shared file once a second contract wants it (promote on   *)
+  (*  the second consumer).  MOVE IT to SpecKexec.v when that happens.    *)
+  (*                                                                      *)
+  (*  Both of [T.kxc_bad64]'s call sites in ProofKexecA.v hand its        *)
+  (*  [fs_fabric] premise over as a [[]]-bullet closed with [rewrite      *)
+  (*  /fs_fabric; iFrame "<the same thirteen names>"].  [fs_fabric]        *)
+  (*  unfolds to a flat 13-conjunct [∗] (IcacheEscrow's arms, BioInv's    *)
+  (*  ctx's, the crash seam, the era cert, the itable pair, the two       *)
+  (*  icache families, [ireg_inv], [procs_inv] -- a big-op of [is_lock]   *)
+  (*  over every proc -- and the disk fabric), and a NAMED [iFrame] still *)
+  (*  pays a GOAL-side search over that whole bundle (optimization.md's   *)
+  (*  icache-files entry, "#3"): 107.7 s and 90.6 s, two single sentences *)
+  (*  inside kexec's whole-function proof, where [Qed]'s term-size law    *)
+  (*  charges the search once per surviving proof step.  Assembled HERE,  *)
+  (*  where the context is exactly the thirteen pieces and nothing else,  *)
+  (*  the same search is a no-op; a caller then writes one [iApply].      *)
+  (* =================================================================== *)
+  Lemma fs_fabric_mk gs gu gd gk pd pav pu bn g gfs gi cn gtl
+      cov logstart inodestart nib dev :
+    bio_ctx bn (fs_view gfs gd dev cov) -∗
+    log_ctx g bn gfs cov logstart dev -∗
+    fs_crash_seam cov logstart -∗
+    gen_cert -∗
+    is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+    itable_inv -∗
+    ic_escrows cn gfs gi cov logstart -∗
+    ic_sleeplocks cn -∗
+    ireg_inv gi gfs inodestart nib -∗
+    procs_inv gs -∗
+    dev_inv gu gd -∗
+    disk_geom gd pd pav pu -∗
+    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+    fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
+              cov logstart inodestart nib dev.
+  Proof.
+    iIntros "Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc Hslks Hireg Hprocs
+             Hdevi Hdgeom Hdlock".
+    rewrite /fs_fabric.
+    iSplitL "Hbio"; [iExact "Hbio" |].
+    iSplitL "Hlogc"; [iExact "Hlogc" |].
+    iSplitL "Hcrash"; [iExact "Hcrash" |].
+    iSplitL "Hcert"; [iExact "Hcert" |].
+    iSplitL "Hitab"; [iExact "Hitab" |].
+    iSplitL "Hitinv"; [iExact "Hitinv" |].
+    iSplitL "Hesc"; [iExact "Hesc" |].
+    iSplitL "Hslks"; [iExact "Hslks" |].
+    iSplitL "Hireg"; [iExact "Hireg" |].
+    iSplitL "Hprocs"; [iExact "Hprocs" |].
+    iSplitL "Hdevi"; [iExact "Hdevi" |].
+    iSplitL "Hdgeom"; [iExact "Hdgeom" | iExact "Hdlock"].
+  Qed.
+
+  (* =================================================================== *)
   (*  THE SHARED [-1] EXIT, at +0x072.                                    *)
   (*                                                                      *)
   (*  Both of phase A's [bad:] entries end identically: a0 = -1, the frame *)
@@ -1370,10 +1445,18 @@ Section KexecABad.
       change 55%nat with (50 + 5)%nat.
       rewrite stack_own_app (pa_stk_assoc sp0 13 50).
       iSplitL "Hmid"; [iExact "Hmid" | iExact "Htop"]. }
+    (* [used3 ⊆ used]: [Hu3 : used3 ⊆ used2] (iunlockput's own shrink) chained
+       with [Hu2 : used2 ⊆ used] (kxc_bad64's premise).  A positional
+       [ltac:(set_solver)] here paid the RULE-ZERO tax (optimization.md's
+       "trap"): [naive_solver] scans every hypothesis in a whole-function
+       proof's context -- ~13.4 s of this one sentence, most of the file.
+       [used3]/[used]/[used2] are plain [gset Z]s, so two named [⊆] facts and
+       [transitivity] discharge it without touching the rest of Δ. *)
     iApply (kxc_exit_m1 (proc_addr jp) bn gfs ga gf cov logstart bmapstart
               inodestart size used used3 plen pfun na avf alen aslen afun pidv V
               dqb dqs dqa m B5 K true C true sp0 ra0 s00 s10 s20 pv av
-              ltac:(lia) ltac:(set_solver) Hsp Hra Hs0 Hs1 Hs2 HB5sp HB5a0 HB5thr
+              ltac:(lia) ltac:(transitivity used2; [exact Hu3 | exact Hu2])
+              Hsp Hra Hs0 Hs1 Hs2 HB5sp HB5a0 HB5thr
               with "Hcg Hcnt Htext Hpc Hfr Hbm Hins Hbits Hka Hpriv Hpath Hargv
                     Hargs Hbs Hirs2 [-]").
     iIntros (CIDf Hsf mf used4 V' entry spv szv') "%Hcs2 %Hok Hcg Hcnt Hpc

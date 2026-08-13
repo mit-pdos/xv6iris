@@ -1094,7 +1094,12 @@ Section ProofSysPipe.
        [b = false].  Each also THREADS the complement rather than capturing
        it -- a bundle built at the entry hart cannot transport a hart-indexed
        resource to the arbitrary hart it is later consumed at. *)
-    set (EPI := (wp_next true p (fun (CIDe : CpuId) =>
+    (* [pose], not [set]: EPI is a BRAND NEW continuation, not an abstraction
+       of something already sitting in the goal, so [set]'s occurrence search
+       over the whole-function goal (by this point dozens of frame/register
+       hypotheses wide) buys nothing but pays O(|goal|) anyway.  [pose] adds
+       the same transparent local definition without the search. *)
+    pose (EPI := (wp_next true p (fun (CIDe : CpuId) =>
       ∀ (mj : regfile) (P' : uptd) (res : mword 64),
         ⌜ mj !!! Regidx csp_rs1 = pa_stk sp0 8
           /\ mj !!! Regidx Ra5 = res
@@ -2224,7 +2229,12 @@ Section ProofSysPipe.
     (*  -- BOTH copyouts branch to it, so it is built once, before the    *)
     (*  first test, over the page-table descriptor the arm arrives with.  *)
     (* ================================================================= *)
-    set (T7C := (wp_next true p (fun (CIDt : CpuId) =>
+    (* [pose], not [set] -- same reasoning as EPI above, and by here the
+       context is wider still (every frame slot and register fact from the
+       whole prologue plus both fdallocs is live), which is exactly why this
+       one [set] alone was 9+ seconds: an occurrence search over a goal that
+       never contains a T7C occurrence to find. *)
+    pose (T7C := (wp_next true p (fun (CIDt : CpuId) =>
       ∀ (Mt : regfile) (P' : uptd),
         ⌜ Mt !!! Regidx csp_rs1 = pa_stk sp0 8
           /\ Mt !!! Regidx Rs0 = sp0

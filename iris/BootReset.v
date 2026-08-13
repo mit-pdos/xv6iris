@@ -281,20 +281,51 @@ Ltac pcrack :=
       let v := eval vm_compute in (neq_vec a b) in change (neq_vec a b) with v
   end.
 
+(* Branch order measured with [coqc -time] plus a per-branch [time]-wrapped
+   copy of this dispatch, on the two sites CI's build-profile step summary
+   flagged at 6fe694ea (both `peel.`: exec_config_is_valid, 15.06s CI / 20.2s
+   isolated here; exec_init_model's first peel, 3.9s).  On
+   exec_config_is_valid, with [phnf] tried before the named-blocker checks,
+   roughly HALF of [phnf]'s own time was calls that made NO PROGRESS -- the
+   goal was already in whnf (a [to_bits_checked]/[eq_vec] blocker sitting at
+   the surface with nothing left to unfold), so [hnf] spent several seconds
+   walking the term only to discover that and fall through to
+   [pcrack]/[pvm_named] anyway, which then closed it in under 5ms every time.
+   [pcrack]/[pvm_named]/[punfold] are a syntactic [match goal with
+   context[...]] against a handful of NAMED heads, not a search over the
+   whole context (playbook shape #6's `set_solver`-in-a-wide-context trap does
+   not apply here), so trying them before [phnf] costs ~0 when they don't
+   apply and skips the expensive failed [hnf] entirely when they do.
+   [pdispatch] stays first: it is the one branch that is free AND is what
+   actually drives most steps.  Result: exec_config_is_valid's [peel.]
+   20.21s -> 0.16s (single-process -time, isolated from any sibling
+   `vm_compute`-heavy run per the measurement discipline).
+
+   exec_init_model's first [peel.] did NOT move (3.94s -> 3.91s, inside
+   noise): re-run with the same per-branch [time] instrumentation, its [phnf]
+   calls succeed 42 times out of 43 -- there is no wasted branch here to
+   reorder away.  That peel's cost is instead ~141 [pdispatch] calls into
+   [lkres], each walking a [register_set] nest that is one layer deeper than
+   the last (this phase's own writes stack on top of [board_init]'s ten), so
+   the per-lookup cost grows with how many prior writes a miss has to skip --
+   exactly the "OPEN base" tower cost this file's header says the kit cannot
+   avoid, just not yet doubled into an unresolved-read explosion.  Left as
+   is: not a [pstep]-ordering problem, and reshaping [regstate]/[lkres] to
+   amortise it is out of a drop-in fix's scope. *)
 Ltac pstep :=
   lazymatch goal with
   | |- pfin _ _ ?P _ =>
       first [ pdispatch P
-            | progress phnf; lkres
             | progress pcrack
             | progress pvm_named
-            | progress punfold ]
+            | progress punfold
+            | progress phnf; lkres ]
   | |- exec ?P _ = _ =>
       first [ pdispatch P
-            | progress phnf; lkres
             | progress pcrack
             | progress pvm_named
-            | progress punfold ]
+            | progress punfold
+            | progress phnf; lkres ]
   end.
 Ltac peel := repeat pstep.
 

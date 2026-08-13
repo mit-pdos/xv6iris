@@ -550,6 +550,30 @@ Section PwPieces.
     iFrame "Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack". done.
   Qed.
 
+  (* [pw_res_intro] with the five fields the pipewrite loop body never reads
+     between the initial [iDestruct] and reassembly ([Hnm], [Hwo], the two
+     [pipe_endstate]s, [Hslack]) pre-combined into one hypothesis.  The
+     whole-function proof [iCombine]s them into "Hrest" right after
+     destructuring [Hres], so every instruction step in between carries FIVE
+     pipe hypotheses (Hrest, Hnr, Hnw, Hro, Hdat) instead of nine -- each
+     [iApply]'s own environment bookkeeping is |Δ|-proportional (see
+     optimization.md's account of ProofNamex's [iApply] cost), so this is
+     five fewer entries at EVERY step of a ~700-line stretch, not just at the
+     point of reassembly. *)
+  Lemma pw_res_intro_rest (γp : pipe_names) (pi : mword 64)
+      (nr nw ro wo : mword 32) (vname : mword 64) (bs : list (bv 8)) :
+    pipe_count_ok nr nw -> length bs = PIPESIZE ->
+    (lock_name_field pi ↦₈ vname ∗ a_popen pi true ↦₄ wo ∗
+     pipe_endstate γp false ro ∗ pipe_endstate γp true wo ∗ pipe_slack pi) -∗
+    a_pnread pi ↦₄ nr -∗ a_pnwrite pi ↦₄ nw -∗
+    a_popen pi false ↦₄ ro -∗
+    pipe_data pi bs -∗ pipe_res γp pi.
+  Proof.
+    intros Hc Hl. iIntros "(Hnm & Hwo & Hst0 & Hst1 & Hslack) Hnr Hnw Hro Hdat".
+    iApply (pw_res_intro γp pi nr nw ro wo vname bs Hc Hl
+              with "Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack").
+  Qed.
+
   (* borrow byte [idx] of the pipe buffer and put a new one back *)
   Lemma pw_data_acc (pi : mword 64) (bs : list (bv 8)) (idx : nat) (b : bv 8) :
     bs !! idx = Some b ->
@@ -671,6 +695,18 @@ Section PwConts.
        kalloc_env γa None -∗
        pw_exits CID0 γf γs j γl γp w q m av eb C pid V n sp0 pi -∗
        WP (Loop : expr riscv_lang)))%I.
+
+  (* MEASURED AND REJECTED (2026-08-13): routing the +0xde back edge's [▷]
+     strip through a two-hypothesis lemma [(P -∗ Q) -∗ ▷ P -∗ ▷ Q], to spare
+     [iNext] its context-wide [IntoLaterN] search, DOES NOT WORK HERE.  The
+     back edge does not merely need the later off [IH]: [iApply
+     pw_guard_step ... with "... IH"] wants IH *and* [HEX] and the goal all
+     un-latered together, so the [iRevert "IH"] the lemma needs leaves IH in
+     the way of its own re-introduction ("iIntro: IH not fresh").  The three
+     sites the file header names keep their [iNext] for exactly this reason.
+     Do not re-attempt without a lemma that strips both IH and HEX; the
+     [bi.later_intro] swap at every OTHER instruction step is the part of
+     this idea that pays, and it is landed. *)
 
 End PwConts.
 
@@ -1983,6 +2019,12 @@ Section ProofPipewrite.
         assert (Hi1 : (i + 1 < 2 ^ 31)%Z) by (rewrite H31; lia).
         iDestruct "Hres" as (nr nw ro wo vname bs)
           "(Hnm & Hnr & Hnw & Hro & Hwo & Hst0 & Hst1 & %Hcnt & %Hbslen & Hdat & Hslack)".
+        (* [Hnm]/[Hwo]/the two [pipe_endstate]s/[Hslack] are read nowhere in
+           the loop body between here and whichever [pw_res_intro_rest] call
+           reassembles them; bundling them now keeps them out of every
+           instruction step's Δ until then (see [pw_res_intro_rest]'s
+           comment). *)
+        iCombine "Hnm Hwo Hst0 Hst1 Hslack" as "Hrest".
         (* ---- +0x8c  lw a5,544(s1)  : readopen ---- *)
         assert (Hroaddr : add_vec (M !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 544 : mword 12)) = a_popen pi false)
           by (rewrite Hs1; reflexivity).
@@ -2017,14 +2059,14 @@ Section ProofPipewrite.
           iEval (rewrite Hj46) in "Hpc".
           iDestruct "HEX" as "[_ MIN]". rewrite /pw_minus1.
           iSpecialize ("MIN" $! CIDlp with "[%]"); [wp_next_chain|].
-          iApply ("MIN" $! L1 Pc with "[%] [%] HF7 HF5 HCH Hcg Hown Hpay Hlocked [Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack] Hpc Href Hpriv").
+          iApply ("MIN" $! L1 Pc with "[%] [%] HF7 HF5 HCH Hcg Hown Hpay Hlocked [Hrest Hnr Hnw Hro Hdat] Hpc Href Hpriv").
           + unfold pw_min_regs. split_and!.
             { rewrite (callee_saved_lookup HcsML1 csp_rs1 ltac:(vm_compute; reflexivity)). exact Hsp. }
             { rewrite (callee_saved_lookup HcsML1 (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact Hs1. }
             { rewrite (callee_saved_lookup HcsML1 (mword_of_int 27) ltac:(vm_compute; reflexivity)). exact Hs11. }
           + exact Hext.
-          + iApply (pw_res_intro γp pi nr nw ro wo vname bs Hcnt Hbslen
-                      with "Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack").
+          + iApply (pw_res_intro_rest γp pi nr nw ro wo vname bs Hcnt Hbslen
+                      with "Hrest Hnr Hnw Hro Hdat").
         - (* ==== readopen /= 0 : ask killed() ==== *)
           iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.pipewrite + 0x90)) (mword_of_int 219 : mword 8)
                     (Cregidx (mword_of_int 7)) Ra5 L1 (trap_res true + (av - 14))%nat false
@@ -2100,11 +2142,11 @@ Section ProofPipewrite.
             iEval (rewrite Hj46) in "Hpc".
             iDestruct "HEX" as "[_ MIN]". rewrite /pw_minus1.
             iSpecialize ("MIN" $! CIDlp with "[%]"); [wp_next_chain|].
-            iApply ("MIN" $! K0 Pc with "[%] [%] HF7 HF5 HCH Hcg Hown Hpay Hlocked [Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack] Hpc Href Hpriv").
+            iApply ("MIN" $! K0 Pc with "[%] [%] HF7 HF5 HCH Hcg Hown Hpay Hlocked [Hrest Hnr Hnw Hro Hdat] Hpc Href Hpriv").
             * unfold pw_min_regs. split_and!; assumption.
             * exact Hext.
-            * iApply (pw_res_intro γp pi nr nw ro wo vname bs Hcnt Hbslen
-                        with "Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack").
+            * iApply (pw_res_intro_rest γp pi nr nw ro wo vname bs Hcnt Hbslen
+                        with "Hrest Hnr Hnw Hro Hdat").
           + (* ==== alive: read the counters ==== *)
             iApply (wp_cbnez_fall_s_sconf (mword_of_int (KernelSyms.pipewrite + 0x98)) (mword_of_int 215 : mword 8)
                       (Cregidx (mword_of_int 2)) Ra0 K0 (trap_res true + (av - 14))%nat false
@@ -2187,9 +2229,9 @@ Section ProofPipewrite.
                              = mword_of_int (KernelSyms.pipewrite + 0x6c)) by (apply bv_eq; vm_compute; reflexivity).
               iEval (rewrite Hj6c) in "Hpc".
               (* the pipe goes back together untouched *)
-              iAssert (pipe_res γp pi) with "[Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack]" as "Hres".
-              { iApply (pw_res_intro γp pi nr nw ro wo vname bs Hcnt Hbslen
-                          with "Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack"). }
+              iAssert (pipe_res γp pi) with "[Hrest Hnr Hnw Hro Hdat]" as "Hres".
+              { iApply (pw_res_intro_rest γp pi nr nw ro wo vname bs Hcnt Hbslen
+                          with "Hrest Hnr Hnw Hro Hdat"). }
               (* +0x6c c.mv a0,s10 *)
               iPoseProof (pwi_6c with "Htext") as "Hi6c".
               iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.pipewrite + 0x6c)) Ra0 Rs10 K3 (trap_res true + (av - 14))%nat false
@@ -2675,21 +2717,21 @@ Section ProofPipewrite.
                    iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.pipewrite + 0xfc))
                              (sign_extend' 21 (concat_vec (mword_of_int 6 : mword 11) ('b"0")))
                              M' (trap_res true + (av - 14))%nat false ltac:(vm_compute; reflexivity) with "Hcg Hpc Hifc [-]").
-                   iApply wp_next_off_intro. iNext. iIntros "Hcg Hpc". rgall.
+                   iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
                    assert (Hjt1 : add_vec (mword_of_int (KernelSyms.pipewrite + 0xfc) : mword 64)
                                     (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 6 : mword 11) ('b"0"))))
                                   = mword_of_int (KernelSyms.pipewrite + 0x108)) by (apply bv_eq; vm_compute; reflexivity).
                    iEval (rewrite Hjt1) in "Hpc".
                    iDestruct "HEX" as "[TAIL _]". rewrite /pw_tail.
                    iSpecialize ("TAIL" $! CIDlp with "[%]"); [wp_next_chain|].
-                   iApply ("TAIL" $! M' P' with "[%] [%] [%] [%] HF7 [HF5 HCH] Hcg Hown Hpay Hlocked [Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack] Hpc Href Hpriv").
+                   iApply ("TAIL" $! M' P' with "[%] [%] [%] [%] HF7 [HF5 HCH] Hcg Hown Hpay Hlocked [Hrest Hnr Hnw Hro Hdat] Hpc Href Hpriv").
                    --- unfold pw_base_regs. split_and!; assumption.
                    --- exact Hs1'.
                    --- rewrite Hs2'. left. reflexivity.
                    --- exact Hext'.
                    --- iApply (pw_stack7_of m sp0 with "HF5 HCH").
-                   --- iApply (pw_res_intro γp pi nr nw ro wo vname bs Hcnt Hbslen
-                                 with "Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack"). }
+                   --- iApply (pw_res_intro_rest γp pi nr nw ro wo vname bs Hcnt Hbslen
+                                 with "Hrest Hnr Hnw Hro Hdat"). }
                  (* ---- i /= 0: beqz falls through, keep the partial count ---- *)
                  iApply (wp_beqz_x0_fall_s_sconf (mword_of_int (KernelSyms.pipewrite + 0xe0)) (mword_of_int 16 : mword 13)
                            Rs2 mr (trap_res true + (av - 14))%nat false ltac:(nz)
@@ -2730,21 +2772,21 @@ Section ProofPipewrite.
                  iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.pipewrite + 0xee))
                            (sign_extend' 21 (concat_vec (mword_of_int 13 : mword 11) ('b"0")))
                            M' (trap_res true + (av - 14))%nat false ltac:(vm_compute; reflexivity) with "Hcg Hpc Hiee [-]").
-                 iApply wp_next_off_intro. iNext. iIntros "Hcg Hpc". rgall.
+                 iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
                  assert (Hje6 : add_vec (mword_of_int (KernelSyms.pipewrite + 0xee) : mword 64)
                                   (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 13 : mword 11) ('b"0"))))
                                 = mword_of_int (KernelSyms.pipewrite + 0x108)) by (apply bv_eq; vm_compute; reflexivity).
                  iEval (rewrite Hje6) in "Hpc".
                  iDestruct "HEX" as "[TAIL _]". rewrite /pw_tail.
                  iSpecialize ("TAIL" $! CIDlp with "[%]"); [wp_next_chain|].
-                 iApply ("TAIL" $! M' P' with "[%] [%] [%] [%] HF7 [HF5 HCH] Hcg Hown Hpay Hlocked [Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack] Hpc Href Hpriv").
+                 iApply ("TAIL" $! M' P' with "[%] [%] [%] [%] HF7 [HF5 HCH] Hcg Hown Hpay Hlocked [Hrest Hnr Hnw Hro Hdat] Hpc Href Hpriv").
                  --- unfold pw_base_regs. split_and!; assumption.
                  --- exact Hs1'.
                  --- rewrite Hs2'. right. exists i. split; [reflexivity | lia].
                  --- exact Hext'.
                  --- iApply (pw_stack7_of m sp0 with "HF5 HCH").
-                 --- iApply (pw_res_intro γp pi nr nw ro wo vname bs Hcnt Hbslen
-                               with "Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack").
+                 --- iApply (pw_res_intro_rest γp pi nr nw ro wo vname bs Hcnt Hbslen
+                               with "Hrest Hnr Hnw Hro Hdat").
               ** (* ==== copyin succeeded: nwrite++, store the byte, i++ ==== *)
                  iApply (wp_beq_fall_s_sconf (mword_of_int (KernelSyms.pipewrite + 0xbe)) (mword_of_int 34 : mword 13)
                            Rs6 Ra0 mr (trap_res true + (av - 14))%nat false ltac:(nz) ltac:(nz) Hfail
@@ -2930,10 +2972,10 @@ Section ProofPipewrite.
                    { rewrite /P6 upd_ne; [exact Q13 | reg_neq]. }
                    { rewrite /P6 upd_ne; [exact Q14 | reg_neq]. } }
                  (* the pipe goes back together with the incremented counter *)
-                 iAssert (pipe_res γp pi) with "[Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack]" as "Hres".
-                 { iApply (pw_res_intro γp pi nr (add_vec nw (mword_of_int 1 : mword 32)) ro wo vname
+                 iAssert (pipe_res γp pi) with "[Hrest Hnr Hnw Hro Hdat]" as "Hres".
+                 { iApply (pw_res_intro_rest γp pi nr (add_vec nw (mword_of_int 1 : mword 32)) ro wo vname
                              (<[idx := trunc8 (P5 !!! Regidx Ra4)]> bs) Hcnt' Hbslen'
-                             with "Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack"). }
+                             with "Hrest Hnr Hnw Hro Hdat"). }
                  (* +0xde c.j -> the guard, with i+1 *)
                  iPoseProof (pwi_de with "Htext") as "Hide".
                  iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.pipewrite + 0xde))

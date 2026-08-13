@@ -1048,6 +1048,49 @@ Section ProofIput.
   Lemma di_free_addrs (d : dinode) : di_addrs (di_free d) = bm_cells bm_empty.
   Proof. reflexivity. Qed.
 
+  (* [ic_swap_park] (IcacheEscrow.v) hands the escrow body back bare (its
+     conclusion is a plain [|==>], since bupd doesn't care about laters), but
+     every caller immediately feeds it to an invariant's [Hclose], which
+     wants the body back UNDER A LATER.  Done at iput's own park call site --
+     deep in the whole-function proof, at the point wp_iput_sconf's Iris
+     context is at its widest -- producing that later needs an [iNext] on the
+     "with" bracket's implied side-goal (see the call site below: [iMod (H
+     with "[Hbody]")] always leaves that goal for you to close, matched or
+     not), and [iNext] re-normalises the WHOLE ambient environment to strip a
+     later, which is context-proportional regardless of what closes the goal
+     after it.  Paying that step HERE instead, over the same six hypotheses
+     [ic_swap_park] itself takes, makes it O(1) rather than O(|Δ|); the call
+     site's own side-goal then needs nothing but [iExact].  See
+     claude-notes/optimization.md, "A modality step at a ▷ costs the
+     CONTEXT, so pay it in a lemma".  This constructor belongs next to
+     [ic_swap_park] in IcacheEscrow.v -- it lives here only because this file
+     owns no edits to that one. *)
+  Local Lemma ip_swap_park_later cn γfs γi cov logstart k (d : ic_dep)
+      (g : gname) (v : bool) (dev inum : mword 32) :
+    ic_dep_gname d = Some g ->
+    ic_escrow_body cn γfs γi cov logstart k -∗
+    ic_deposit cn k d -∗
+    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
+    i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
+    i_valid (ientry k) ↦₄ valid_word v -∗
+    ic_payload γfs γi cov logstart k inum g v -∗
+    |==> ▷ ic_escrow_body cn γfs γi cov logstart k ∗
+      ic_tok cn k ∗
+      ic_dep_own k d dev inum.
+  Proof.
+    iIntros (Hdg) "Hbody Hdep Hid Hin Hvld Hpay".
+    iMod (ic_swap_park cn γfs γi cov logstart k d g v dev inum Hdg
+            with "Hbody Hdep Hid Hin Hvld Hpay") as "(Hbody & Htok & Hown)".
+    (* NOT a bare/named [iFrame] for the ▷ conjunct: [Frame]'s automatic
+       later-insertion has to find an [IntoLaterN] instance for
+       [ic_escrow_body], which means unifying against its five-armed
+       disjunction (the same "GOAL-side search" this whole file's fixes are
+       about) -- measured at 99 s even in this six-hypothesis lemma, i.e. the
+       cost here is the RESOURCE's shape, not the context.  [iNext] on a
+       goal restricted to just [Hbody] is direct term construction instead. *)
+    iModIntro. iSplitL "Hbody"; [iNext; iExact "Hbody" | iFrame].
+  Qed.
+
   Lemma wp_iput_sconf
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -1430,7 +1473,14 @@ Section ProofIput.
         { iNext. iApply ic_close_held. rewrite /ic_held.
           iExists dev, inum, (valid_word true). iFrame. }
         iModIntro. iExists true. iFrame "Hhalf Hrtok Hrd Htd Hvb".
-        iSplitR; [done |]. iExists ga. iFrame.
+        (* the bare [iFrame] here used to re-search the WHOLE ambient
+           whole-function context (~150 hypotheses by this point) for a
+           frame of the two-conjunct goal, even though [Hpayl]/[Hlvh] are
+           already the exact, named resources it needs -- see
+           claude-notes/optimization.md, "A named iFrame still pays a
+           GOAL-side search" (and its context-side twin, Rule Zero).
+           [iSplitL]/[iExact] name the match directly and pay nothing. *)
+        iSplitR; [done |]. iExists ga. iSplitL "Hpayl"; [iExact "Hpayl" | iExact "Hlvh"].
       - (* UNLOADED: read-only, everything goes straight back *)
         iMod ("Hclose" with "[Hidv Hinh Hvld Hpayl Hlvh Hmt Hgida]") as "_".
         { iNext. iApply ic_close_parked.
@@ -1805,7 +1855,13 @@ Section ProofIput.
                        dev inum with "Hdepa [Hfrg Hlvr Hlvh Hrd Hrn] Hmt Hgida").
       rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
       iSplitR "Hlvh"; [| iExact "Hlvh"].
-      iSplitR; [iPureIntro; done |].
+      (* the pure conjunct is [dev = dev /\ inum = inum] -- [DepRef]'s own
+         [dev]/[inum] fields ARE the ones supplied to [ic_close_out] two
+         lines up, so it is [conj eq_refl eq_refl] by construction.  A bare
+         [done] here re-runs [eauto] against the whole-function proof's ~150
+         pure hypotheses looking for that (Rule Zero: "done with a wide hint
+         database"); naming the trivial proof skips the search entirely. *)
+      iSplitR; [iPureIntro; exact (conj eq_refl eq_refl) |].
       rewrite /IcacheRef.inode_ref_gen /IcacheRef.inode_ident. iFrame. }
     iModIntro.
     (* the lock's resource re-forms, unchanged, and is released at +0x5c *)
@@ -2129,10 +2185,19 @@ Section ProofIput.
         iExists (bm_cells bm_empty). iSplitR; [iPureIntro; reflexivity |].
         iExact "Haddrs".
       - rewrite /ipool_shape. iRight. iExact "Hdat". }
-    iMod (ic_swap_park cn gfs gi cov logstart k (DepRef q dev inum ga') ga'
+    (* [ip_swap_park_later] does the [ic_swap_park] call and its later in one
+       small-context step (see its comment above the section start), so
+       [Hbody] already has the ▷ this [Hclose] wants -- the bracket's implied
+       obligation is a literal [iExact], not [iNext].  [iMod (_ with
+       "[Hbody]")] still generates that obligation as a separate goal (this
+       codebase's uniform idiom, see ProofIput.v:1429/1435's plain
+       [ic_swap_park]/[iNext] pair for the shape it replaces), but closing it
+       with [iExact] skips [iNext]'s context-wide later-instance search
+       instead of merely relocating it. *)
+    iMod (ip_swap_park_later cn gfs gi cov logstart k (DepRef q dev inum ga') ga'
                  false dev inum eq_refl with "Hbody Hdepk Hidv Hinh Hvld Hpayf")
       as "(Hbody & Hictok & Hrefo)".
-    iMod ("Hclose" with "[Hbody]") as "_"; [by iNext |].
+    iMod ("Hclose" with "[Hbody]") as "_"; [iExact "Hbody" |].
     iModIntro.
     (* the descriptor pins the fraction: what comes back is the reference we
        deposited, at [q], not at some existential [q2] (§14.8) -- and its

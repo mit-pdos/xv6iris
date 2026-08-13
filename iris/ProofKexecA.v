@@ -1459,8 +1459,8 @@ Section KexecABody.
                   with "Hcg Hcnt Htext Hpanic Hpc [] Hslkk Hslkd Hslpid Hdep
                         Hidev Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits Hka
                         Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
-        { rewrite /fs_fabric. iFrame "Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
-                                      Hslks Hireg Hprocs Hdevi Hdgeom Hdlock". }
+        { iApply (T.fs_fabric_mk with "Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
+                                       Hslks Hireg Hprocs Hdevi Hdgeom Hdlock"). }
         rewrite /kxc_frameA6.
         iDestruct (kxc_mid_join sp0 with "Hust Helf Hph") as "Hmid".
         iSplitL "Hf1"; [iExact "Hf1" |].
@@ -1528,8 +1528,8 @@ Section KexecABody.
                 with "Hcg Hcnt Htext Hpanic Hpc [] Hslkk Hslkd Hslpid Hdep
                       Hidev Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits Hka
                       Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
-      { rewrite /fs_fabric. iFrame "Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
-                                    Hslks Hireg Hprocs Hdevi Hdgeom Hdlock". }
+      { iApply (T.fs_fabric_mk with "Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
+                                     Hslks Hireg Hprocs Hdevi Hdgeom Hdlock"). }
       rewrite /kxc_frameA6.
       iDestruct (kxc_mid_join sp0 with "Hust Helf Hph") as "Hmid".
       iSplitL "Hf1"; [iExact "Hf1" |].
