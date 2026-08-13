@@ -206,14 +206,14 @@ sleeplock window in the boot carve, not the old 24-byte spinlock one), and
 `ProofMain` binds the result as `Hslfresh`. Stack budgets rose with it:
 uartinit 4 -> 8, consoleinit 6 -> 10.
 
-`LinkTxLockInit.tx_lock_init` is nevertheless STILL AN AXIOM, for a reason
-that is a design decision rather than a gap: `sl_fresh_new` also wants the
-resource the lock will own, and for `is_txlock` that is
-`UartTxInv.tx_res γd = ∃ l, uart_tx_own γd l`. main holds that token and then
-gives it to printk's `pr.lock`, since `SpecPrintkGen.pr_res γd` contains
-`uart_tx_own` as well. The token is exclusive, so `tx_lock` and `pr.lock`
-cannot both own the transmitter. Which one should is the standing question in
-`projects/uart-driver.md`; settling it is what finally retires the axiom.
+`iris/LinkTxLockInit.v` is DELETED. Its axiom was never provable as stated
+(it omitted the lock's STORAGE, `SpecProcinit.lk_fresh`, which
+`WpLock.newlock` needs) and it had no consumer. The design question it was
+parked on is settled too: `d80e61c5` put `uartputc_sync` behind `tx_lock`, so
+`SpecPrintkGen.pr_res` is `emp` and the transmitter is `tx_lock`'s alone.
+What is left is a boot ASSEMBLY — a `WpLock.newlock` over uartinit's
+`lk_fresh a_tx_lock "uart"` plus the token from `uart_ghosts_alloc`, and
+`is_txlock` in main's deposit payload. See `projects/uart-driver.md`.
 
 ### The code
 
@@ -285,14 +285,11 @@ Neither is cheap, and the choice is the maintainer's.
 
 ### Where it is assumed meanwhile
 
-`iris/LinkTxLockInit.v`, one `Axiom` (`tx_lock_init`) handing back
-`UartTxInv.is_txlock` for the transmitter token and the frozen DLAB fact —
-exactly what the missing `initsleeplock` plus the usual newlock step would
-give. It is deliberately a **different file** from `LinkUartwrite.v`, which
-assumes uartwrite's contract for the unrelated reason that its proof is not
-written: proving uartwrite does not fix D2 and fixing D2 does not prove
-uartwrite, so keeping them apart is what stops either from hiding the other
-in `Print Assumptions`.
+NOWHERE ANY MORE. `iris/LinkTxLockInit.v` is deleted (see above), and
+`LinkUartwrite.v` is a real functor instantiation now that uartwrite is
+proven — so neither `is_txlock` nor uartwrite's contract is assumed. The
+only thing between the tree and a boot-wired `is_txlock` is the `newlock`
+assembly in `ProofMain`.
 
 ---
 

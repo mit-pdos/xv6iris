@@ -50,7 +50,7 @@
    [lk_raw a_tx_lock] down through consoleinit into uartinit, which returns
    [lk_fresh a_tx_lock "uart"], and [newlock] turns that into the [is_lock]
    half of [is_txlock] below.  What is still owed is only the boot ASSEMBLY
-   that runs that step -- [LinkTxLockInit.tx_lock_init] -- and the resource it
+   that runs that step -- a [WpLock.newlock] -- and the resource it
    must supply, [tx_res], which is the printk cone's business now that
    [SpecPrintkGen.pr_res] no longer holds the transmitter. *)
 From Stdlib Require Import ZArith List.

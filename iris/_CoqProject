@@ -787,8 +787,8 @@ LinkEitherCopyin.v
 UartTxInv.v
 SpecUartwrite.v
 CodeUartwrite.v
+ProofUartwrite.v
 LinkUartwrite.v
-LinkTxLockInit.v
 SpecConsoleintr.v
 SpecBootDevCaps.v
 LinkBootDevCaps.v

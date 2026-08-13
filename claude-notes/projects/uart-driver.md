@@ -5,36 +5,43 @@
 `uartputc_sync` are older work; the device model itself is
 `claude-notes/design/device.md`.)
 
-> **REWRITTEN UPSTREAM at `ae96fd0`.**  The whole transmit path changed shape:
-> `tx_busy` is gone, the transmit spinlock became a *sleeplock*, `uartinit` no
-> longer initializes it (which is [`../kernel-defects.md`](../kernel-defects.md)
-> **D2**, an OPEN blocker), and `uartintr` takes no lock at all.  The status
-> table below is about the new code; the protocol change that drove it is
+> **THE TRANSMIT PATH WAS REWRITTEN TWICE UPSTREAM.**  `ae96fd0` split the
+> sleep protocol, deleted `tx_busy` and made `tx_lock` a *sleeplock* held
+> across the whole byte loop; `d80e61c5` then settled the design: `tx_lock`
+> is a SPINLOCK again (`initlock(&tx_lock,"uart")`, so
+> [`../kernel-defects.md`](../kernel-defects.md) D2 is CLOSED), taken and
+> released *inside* the loop, once per byte, with the park outside it.  The
+> table below is about that final shape; the protocol split that drove it is
 > [`sleep-split.md`](sleep-split.md).
 
 | function | where | status |
 |---|---|---|
-| `uartwrite(char buf[], int n)` | SpecUartwrite / CodeUartwrite / **`iris/wip/`**ProofUartwrite / **LinkUartwrite (`Axiom`)** | contract restated and compiling; proof BODY NOT WRITTEN, so the contract is **ASSUMED** in `LinkUartwrite.v` — see `iris/wip/README.md` |
+| `uartwrite(char buf[], int n)` | SpecUartwrite / CodeUartwrite / ProofUartwrite / LinkUartwrite | **PROVEN + LINKED, axiom-clean** (5 platform axioms + funext only) |
 | `uartintr(void)` | SpecUartintr / CodeUartintr / ProofUartintr / LinkUartintr | proven + linked; contract LOST its lock premise (over an ASSUMED consoleintr) |
-| `uartinit(void)` | SpecUartinit / ProofUartinit / LinkUartinit | proven + linked; contract LOST its lock cells (uartinit is now straight-line, no calls at all) |
+| `uartinit(void)` | SpecUartinit / ProofUartinit / LinkUartinit | proven + linked |
+| `uartputc_sync(int)` | SpecUartPutc / ProofUartPutc / LinkUartPutc | proven + linked; takes `tx_lock` too, which is what makes the two transmit paths agree |
 | `uartgetc(void)` — **inlined, no symbol** | WpUartgetc | proven as a block lemma, unaffected |
+
+**uart.c is 4/4 functions and 100 % of its bytes.**
 
 All of them rest on the definitional layer `UartTxInv.v`, whose header is the
 authoritative statement of the new design.
 
 ```c
-static struct sleeplock tx_lock;   /* NEVER INITIALIZED -- defect D2 */
-static int tx_chan;
+static struct spinlock tx_lock;      /* initlock(&tx_lock, "uart") in uartinit */
+static int tx_chan;                  /* its ADDRESS is the sleep channel */
 
 void uartwrite(char buf[], int n) {
-  acquiresleep(&tx_lock);
   int i = 0;
   while (i < n) {
     sleep_prepare(&tx_chan);
-    if (ReadReg(LSR) & LSR_TX_IDLE) { WriteReg(THR, buf[i]); i += 1; }
-    else                            { sleep(); }
+    acquire(&tx_lock);
+    if (ReadReg(LSR) & LSR_TX_IDLE) {
+      WriteReg(THR, buf[i]); release(&tx_lock); i += 1;
+    } else {
+      release(&tx_lock); sleep();
+    }
   }
-  releasesleep(&tx_lock);
 }
 
 void uartintr(void) {
@@ -76,35 +83,29 @@ things follow, and they are the whole delta:
   premise outright.  The two functions now meet in the SLEEP CHANNEL rather
   than in a resource.
 
-What the lock is still for is SERIALIZING WRITERS, and that is why it had to
-become a sleeplock: uartwrite parks between bytes, and a spinlock cannot be
-held across `sched()` (which demands noff = 1).  Hence
-`is_txlock γl γsl γu` is the WHOLE credential a caller passes: the SLEEPLOCK
-(whose resource is the token, and whose two ghost names are the inner
-spinlock's and the sleeplock's own) plus the persistent `uart_dlab_off`.
+What the lock is still for is SERIALIZING WRITERS — and, since `d80e61c5`, it
+serializes *both* of them: uartputc_sync takes `tx_lock` too, so THR access is
+behind one lock on every path and `SpecPrintkGen.pr_res` no longer holds the
+transmitter.  The old tension between the two transmit paths is therefore
+GONE, and so is the reason the lock had to be a sleeplock: uartwrite drops it
+before it parks.  `is_txlock γl γu` is the WHOLE credential a caller passes —
+ONE ghost, the spinlock's, whose resource is the token — plus the persistent
+`uart_dlab_off`.
 
-**And it is currently unsatisfiable.**  `is_sleeplock` requires both NAME
-fields to point at real strings, and upstream never calls `initsleeplock` on
-`tx_lock`, so they are NULL.  See [`../kernel-defects.md`](../kernel-defects.md)
-D2 for the write-up and the two ways out.  Everything above is stated and
-proved against `is_txlock` regardless, so closing D2 closes the cone — and in
-the meantime the gap is one `Axiom`, in `iris/LinkTxLockInit.v`, which hands
-back `is_txlock` for the transmitter token and the frozen DLAB fact.
+**And it is satisfiable at boot**: uartinit runs `initlock(&tx_lock,"uart")`,
+so [`../kernel-defects.md`](../kernel-defects.md) D2 is closed and the storage
+is carried end to end (`lk_raw` in through consoleinit, `lk_fresh` back out).
+The one thing still owed is the boot ASSEMBLY that runs `WpLock.newlock` and
+puts `is_txlock` into main's deposit payload; the old stopgap
+`iris/LinkTxLockInit.v` is deleted (its axiom omitted `lk_fresh` and had no
+consumer).
 
-## uartwrite
+## uartwrite — PROVEN
 
-### Open tension with uartputc_sync (for whoever wires up boot)
-
-`SpecUartPutc.wp_uartputc_sconf` takes `uart_tx_own γd l` FROM ITS CALLER, and
-the token is exclusive.  Once `tx_lock` owns the token, the printk cone
-(printk → consputc → uartputc_sync) has no way to obtain one — which is
-accurate about the C, where `uartputc_sync` deliberately does not take
-`tx_lock` and really can interleave its bytes with `uartwrite`'s.  Nothing is
-broken today (neither cone is linked to a boot proof yet), but the two specs
-cannot both be discharged from one `uart_ghosts_alloc`.  When that seam
-matters, the likely fix is to let the PANIC path (`panicking != 0`, which is
-all uartputc_sync is verified for) take the token out of `tx_res` — a panicking
-hart is not sharing the UART with anyone — rather than to weaken the token.
+`iris/ProofUartwrite.v` (~1700 lines, 21 `Qed`s, ~75 s / 1.4 GB to compile);
+`iris/LinkUartwrite.v` instantiates
+`UartwriteProof Acquire Release Sleep SleepPrepare Uart`.  `Print Assumptions`
+gives the 5 platform axioms + funext and nothing else.
 
 ## The contract's output claim: `uart_sent_sub`, not `uart_sent`
 
@@ -129,50 +130,53 @@ takes):
 `n` is a `nat` in the spec (a caller with a non-positive count has nothing to
 pass), so the C's `n <= 0` guard is exactly the `n = 0` arm.
 
-## Proof structure (ProofUartwrite.v, ~1500 lines)
-
-> **The table and the recipes below describe the PRE-`ae96fd0` proof**, whose
-> loop was `while (tx_busy) sleep(&tx_chan, &tx_lock);` around an
-> unconditional push. The new body is one loop with an `if` — poll THRE, push
-> or park — so there is no inner sleep-retry loop and no `tx_busy` read, and
-> the outer induction is now over bytes remaining with the park INSIDE it
-> rather than nested under it. Everything here about the *shapes* still
-> applies (the `nat` induction on bytes remaining, the iLöb for the unbounded
-> park, the shrink-wrapped restores, the `uart_sent_sub` accumulation); the
-> line/offset detail does not.
+## Proof structure (ProofUartwrite.v)
 
 | lemma | covers | technique |
 |---|---|---|
-| `uw_tail` | +0x7c → return | release, 4 restores, frame pop, `c.ret` |
-| `uw_one` | one iteration: head +0x6c, sleep retry, body | two nested iAsserts |
-| `uw_iter` | the whole loop | `nat` induction on bytes remaining |
-| `wp_uartwrite_sconf` | prologue, acquire, `blez`, setup, loop, 5 restores | — |
+| `uw_tail` | +0x76 → return | nine `c.ldsp` restores, frame pop, `c.ret` |
+| `uw_one` | one head entry at +0x4a | **iLöb** for the unbounded park at a fixed `i` |
+| `uw_iter` | the whole loop | `nat` induction on bytes remaining (`i + S k = n`) |
+| `wp_uartwrite_sconf` | `blez`, prologue, setup, loop, exit | — |
 
-- **The two loops are different beasts.**  The outer one is bounded by `n`, so
-  it is an INDUCTION (`uw_iter`, on `k` with `i + S k = n` — the `S` matters:
-  the head is only ever entered with at least one byte left, so a plain
-  `i + k = n` would leave an unprovable `k = 0` case).  The inner
-  `while (tx_busy) sleep()` is unbounded, so it is an iLöb (`SleepLoop`, an
-  iAssert inside `uw_one` proved `with "[]"` from the persistent context).
-- **`Body` is an iAssert because TWO edges arrive at +0x5a**: the `c.j` at
-  +0x70 (tx_busy was already 0) and the sleep loop's fall-through at +0x58.
-- **THE TWO LOOP EXITS ARE OFFERED AS A CONJUNCTION**, not a separating one:
-  `uw_next_cont ... ∧ uw_exit_cont ...`.  Exactly one is taken, and both need
-  the caller's tail continuation, so `∗` is unprovable and `∧` is exactly
-  right (`iSplit` at the supply site duplicates the context; `iDestruct "H" as
-  "[H _]"` picks a side at the use site).  Same recipe as pipewrite's
-  `pw_exits`.  This is what let the induction supply a DEAD back edge in the
-  `k = 0` case (`iIntros (M') "%Hlt". exfalso. lia.` — `exfalso` works because
-  an Iris goal is `envs_entails Δ P : Prop`).
-- **The shrink-wrapped registers are what makes the two paths joinable.**
-  gcc saves s2/s3/s4/s6/s7 AFTER the `blez` and restores them before the
-  release, so on the `n = 0` path those five slots are never written.  The
-  epilogue therefore owns them EXISTENTIALLY (`uw_gap5`) and both paths hand it
-  the same shape; `uw_saved5_gap` weakens the loop path's version.
-- `subst n` is the move at the loop exit and on the `n = 0` arm: with
-  `S i = n` (resp. `n = 0`) in hand it makes `uw_bytes f (S i)` and the goal's
-  `uw_bytes f n` the same term, instead of fighting `rewrite` over an `n` that
-  also appears in `buf n`/`uw_buf`.
+- **THE LOOP IS ROTATED.**  The head is +0x4a (the `c.mv a0,s5` that sets up
+  sleep_prepare's argument) and the TEST is +0x46, reached from BOTH arms —
+  from the park arm with `i` unchanged, from the byte arm with `S i`.  So
+  +0x46 is handled INLINE in each arm and only +0x4a is a real join.  The two
+  levels are: an iLöb at +0x4a (the park can repeat forever at one `i`) nested
+  inside a `nat` induction on the bytes remaining.  The `S` in `i + S k = n`
+  matters: the head is only ever entered with at least one byte left.
+- **NOTHING LINEAR CROSSES THE BACK EDGE.**  This is the real difference from
+  every earlier version of this proof.  The lock is acquired and released
+  *inside* one turn, so no `locked`, no `tx_res` and no `arm_pay` ride the
+  loop; what does is the register/frame state, the read-only buffer, the
+  caller's pid cell and the PERSISTENT `uart_sent_sub`.  That is also what
+  makes the park legal: `sleep()` is reached at noff = 0.
+- **THE TWO LOOP EXITS ARE OFFERED AS A CONJUNCTION**, `uw_next_cont ∧
+  uw_exit_cont`, not a separating one: exactly one is taken and both need the
+  caller's tail.  Same recipe as pipewrite's `pw_exits`; it is what lets the
+  induction supply a DEAD back edge in the `k = 0` case (`iIntros … "%Hlt".
+  exfalso. lia.`).
+- **NO SHRINK-WRAPPING.**  The `blez a1` is the function's FIRST instruction,
+  *before* the prologue, so the `n = 0` path is two instructions (`bge`,
+  `c.ret`) and builds no frame at all; all nine callee-saved registers are
+  saved unconditionally on the `n > 0` path.  That deletes the whole `uw_gapN`
+  / `uw_savedN_gap` apparatus the pre-`ae96fd0` proof needed.
+- **The `n = 0` path still owes an output claim, and cannot get it from the
+  lock** — it never takes it, so it never holds a token to snapshot.
+  `uw_sent_sub_empty` (local to ProofUartwrite.v) opens `dev_inv` and reads
+  `uart_sent γu (uart_acc u)` straight out of the authority; `[]` is a sublist
+  of anything.  Reach for this whenever a driver's trivial arm has to produce
+  a trace claim.
+- **`subst n` at the loop exit**, not `rewrite -Hendn`: the goal AND the
+  register-shape hypothesis both mention `n`, and rewriting only the goal
+  leaves `uw_loop_regs … n (S i)` facing `uw_loop_regs … (S i) (S i)`.
+- The index: `cpu_own_eb_agree` at level 0 with `eb = true` pins the entry
+  index to `true`; it is the literal `false` only between acquire's return and
+  release's call, where every leaf is a `wp_next_off_intro`.  Elsewhere each
+  leaf yields a fresh hart, so `cpu_own` is moved with `cpu_own_transport`
+  before each callee and the two loop continuations stay anchored at the
+  function's entry hart.
 
 ## Gotchas paid for here (reusable)
 
@@ -187,41 +191,43 @@ pass), so the C's `n <= 0` guard is exactly the `n = 0` arm.
 - `rewrite bv_zero_extend_unsigned`'s side goal is an `N` inequality that
   `lia` cannot do under the bitvector zify hook — `first [done | vm_compute;
   discriminate | lia]`.
-- `destruct (…) eqn:H` REWRITES the matched scrutinee in every hypothesis
-  mentioning it, so a comparison fact asserted beforehand (`Hcmp0 : … = Z.geb 0 n`)
-  already reads `… = true` in the branch — pass `Hcmp0`, not the `eqn` fact.
+- **`destruct (…) eqn:H` REWRITES THE SCRUTINEE INSIDE THE IRIS CONTEXT TOO** —
+  the proofmode goal is `envs_entails Δ P`, so `Δ` is part of what `destruct`
+  abstracts.  Two consequences, both paid for here: a comparison fact asserted
+  beforehand (`Hcmp0 : … = Z.geb 0 n`) already reads `… = true` in the branch,
+  so pass `Hcmp0` and not the `eqn` fact; and a WAND whose premise is the
+  scrutinee (`Hwlb : ⌜lsr_thre_clear bt = false⌝ -∗ uart_out_lb γu l`) comes out
+  as `⌜false = false⌝ -∗ …`, so it is discharged with `done`, not with the
+  `eqn` hypothesis — whose type no longer matches, and whose error message
+  ("expected `false = false`") reads as if the goal were nonsense.
+- **Do not `rewrite` a computed value INSIDE `sie_cap_gpr`** (`iEval (rewrite
+  (uw_addiw_p1 i …)) in "Hcg"`): the register map there is a `<[r := …]>`
+  under a `let`-expanded `wval`, and the pattern often fails to match for
+  reasons that are invisible.  `set` the map with the RAW `wval`, then state
+  the value as a SEPARATE `!!!` equation (`HG5s1 : G5 !!! Regidx Rs1 = …`)
+  proved by `rewrite /G5 upd_eq; unfold regval_into_reg; …`.  Everything
+  downstream wants the `!!!` form anyway.
 - A `split_and!` followed by a uniform peel tactic can close MORE goals than
   expected; when the leftover count is not obvious, use
   `split_and!; first [ exact <the odd one> | <the uniform peel> ]` rather than
   bullets (a wrong bullet count reads as "Wrong bullet -: Try unfocusing").
-- `pa_add_eqb` (ByteCursor.v) reads the `beq s4,s5` loop-exit test back as
-  `Nat.eqb (S i) n` with NO no-wrap assumption on the buffer — do not re-derive
-  a canonicality argument for it.
-- uartwrite's 80-byte frame is BYTE-IDENTICAL to copyinstr's (same slots, same
-  registers, same order), so the whole prologue/epilogue decode layer is
-  KernelRvcDecode's shared `cdec_*` helpers.
+- The loop test is a two-register `bge s1,s3` on the INDEX and the COUNT, not
+  a `beq` on a moving pointer against its end, so `ByteCursor.pa_add_eqb` has
+  no role here; `uw_geb_nn` (via `uw_sint_moi`) is what replaces it.
+- **A lemma that `subst eb` is a textual trap**: after `subst eb` every later
+  tactic that spells `eb` fails with "The variable eb was not found", including
+  the body of an `iAssert` you typed with `eb` in it.  Either subst and write
+  the literal `true` throughout, or do not subst and `rewrite Heb` at the two
+  or three places the callee contracts need it (release's exit index
+  `match n with O => eb | S _ => false end` is one).
 
-## uartintr — the other half of `tx_res`
+## uartintr — no longer the other half of anything
 
-```c
-void uartintr(void) {
-  ReadReg(ISR);                       // acknowledge
-  acquire(&tx_lock);
-  if (ReadReg(LSR) & LSR_TX_IDLE) { tx_busy = 0; wakeup(&tx_chan); }
-  release(&tx_lock);
-  while (1) { int c = uartgetc(); if (c == -1) break; consoleintr(c); }
-}
-```
-
-uartintr is what makes the invariant's implication ever TRUE again after
-uartwrite has set the flag, and the proof is exactly that step: the LSR read
-is taken WITH the transmitter token (borrowed out of `tx_res`), so the leaf
-hands back `⌜lsr_thre_clear b = false⌝ -∗ uart_out_lb γu l`; on the arm where
-the branch is taken that hypothesis holds, so the certificate is in hand two
-instructions before the `sw zero` that clears `tx_busy`, and `tx_res_idle`
-re-closes the invariant with it.  The other arm re-closes with the cell and
-the wand it borrowed.  **That single move is the whole reason both functions
-exist in one design.**
+uartintr takes NO lock and touches NO device ghost (see the C at the top of
+this file): it observes ISR and LSR with `DevModel.uart_read_stable`, calls
+`wakeup(&tx_chan)`, and drains the receive FIFO.  `SpecUartintr` lost its
+`is_txlock` premise outright.  The two functions meet in the SLEEP CHANNEL,
+not in a resource — which is why proving uartwrite needed nothing from here.
 
 - **The rx half needs no ghosts at all.**  `DevModel.uart_read_stable` — new,
   and the one model fact this work added — says NO uart read moves
@@ -278,16 +284,15 @@ usual reason.  Reach for this shape for any other `static` helper gcc inlines.
   bounce buffer filled by `either_copyin`); its proof is what would first
   exercise that contract.  **consoleread** and **consoleintr** are the rest of
   console.c; proving consoleintr retires this cone's only assumption.
-- **Boot wiring**: `new_txlock` (UartTxInv.v) is the ghost step that turns
-  uartinit's postcondition — the zeroed lock word, the `tx_busy` cell and the
-  transmitter token from `uart_ghosts_alloc` — into `is_txlock`.  Nothing calls
-  it yet; it belongs with the rest of the parked boot wiring
+- **Boot wiring**: a `WpLock.newlock` over uartinit's `lk_fresh a_tx_lock
+  "uart"` and the transmitter token from `uart_ghosts_alloc`, producing
+  `is_txlock`, plus putting `is_txlock` into main's deposit payload.  Nothing
+  runs it yet; it belongs with the rest of the parked boot wiring
   (`completed/interrupt-sweep.md`).
 - ~~**devintr**~~ — DONE.  uartintr's caller is proven and linked; the handler
   is on the trap path as far as devintr, and its whole axiom footprint is this
   cone's `consoleintr` (plus the model baseline).  See
   [`../design/interrupts.md`](../design/interrupts.md).
-- The `uartputc_sync` token tension above.
 - Decode hygiene: four base words (`lui a5,0x10000`, `andi a5,a5,32`,
   `auipc a5,0xa`, `lbu a0,0(s2)`) moved into KernelBaseDecode.v for uartintr;
   the private copies in CodeUartinit.v / CodeUartPutcSync.v /

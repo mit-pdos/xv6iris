@@ -444,8 +444,8 @@ Section ProofMain.
        [initlock(&tx_lock, "uart")], so [Hltx]'s three raw fields go DOWN this
        call and come back as [Hlkfresh : lk_fresh a_tx_lock "uart"], which is
        exactly [WpLock.newlock]'s premise.  It is named rather than dropped
-       into a [_] because it is the LOCK half of
-       [LinkTxLockInit.tx_lock_init]: [newlock] over [UartTxInv.tx_res γd]
+       into a [_] because it is the LOCK half of what a boot assembly would
+       need here: [WpLock.newlock] over [UartTxInv.tx_res γd]
        plus [Hdoff] (the frozen DLAB) is [is_txlock].  What is not available
        for it here is the RESOURCE -- the transmitter token [Htx] -- which is
        the printk cone's business, so [Hlkfresh] is dropped at the end of this
@@ -490,12 +490,17 @@ Section ProofMain.
        [uart_tx_own] / [uart_sent] pair that used to be this lock's payload
        ([Htx] / [Hsent], back from consoleinit) is therefore NOT consumed
        here.  Nor does it go to the tx_lock side in this file: the step that
-       would turn [Hlkfresh] into [UartTxInv.is_txlock] is the assumed boot
-       assembly [LinkTxLockInit.tx_lock_init], and nothing main promises --
-       neither its (absent) postcondition nor the deposit wand, which asks
-       for [printk_env] -- mentions [is_txlock].  So both are simply DROPPED
-       at the end of this group, like the [lk_fresh]es.  Retiring that axiom
-       here would mean adding [is_txlock] to the deposit payload first. *)
+       would turn [Hlkfresh] into [UartTxInv.is_txlock] is a [WpLock.newlock]
+       over [UartTxInv.tx_res γd], and nothing main promises -- neither its
+       (absent) postcondition nor the deposit wand, which asks for
+       [printk_env] -- mentions [is_txlock].  So both are simply DROPPED at
+       the end of this group, like the [lk_fresh]es.
+         THE PIECES ARE ALL HERE: [Hlkfresh], [Htx], [Hdoff].  What is missing
+       is a CONSUMER -- put [is_txlock] in the deposit payload (so secondaries
+       get it) and the [newlock] belongs exactly at this point.  There is no
+       longer an axiom standing in for it; the old [LinkTxLockInit.v] was
+       deleted, because its statement omitted the [lk_fresh] premise and so
+       was never provable as written. *)
     iApply fupd_wp.
     iMod (newlock ⊤ (mword_of_int KernelSyms.pr) "pr"%string (pr_res γd)
             with "Hprnm Hprw Hprcpu []") as (γpr) "#Hprlk".

@@ -41,8 +41,10 @@ are working on that effort — the relevant `projects/` file.
   after we reported it — and `d80e61c5` then settled on `initlock`, tx_lock
   being a SPINLOCK again. The proof side carries the lock end to end
   (`lk_raw` in through consoleinit, `lk_fresh` back out).
-  `LinkTxLockInit.tx_lock_init` REMAINS AN AXIOM, but only for want of the boot
-  ASSEMBLY that runs `newlock` — the design obstruction is gone. It used to be
+  `iris/LinkTxLockInit.v` is DELETED (its axiom omitted the lock's storage,
+  `lk_fresh`, and had no consumer); what is still owed is only the boot
+  ASSEMBLY that runs `newlock` and puts `is_txlock` in main's deposit — the
+  design obstruction is gone. It used to be
   that `is_txlock` wanted the transmitter token and printk's `pr.lock` owned it
   via `pr_res`, and the token is exclusive; `d80e61c5` put `uartputc_sync`
   behind `tx_lock` too, so THR access is behind that one lock on both paths and
@@ -391,26 +393,25 @@ are working on that effort — the relevant `projects/` file.
   continuations, the Umode leaf WPs, and the sync program's function proofs
   (start/main + the sync/exit ecall stubs).
 - **[`uart-driver.md`](projects/uart-driver.md)** — the interrupt-driven UART
-  driver: uartwrite, uartintr and uartgetc. **Upstream `ae96fd0` rewrote the
-  transmit path**, and the file is the record of what that changed. The old
-  design's crux was the `tx_lock` invariant (`UartTxInv.v`) whose implication
-  "`tx_busy == 0` ⟹ everything accepted has been transmitted" licensed
-  uartwrite's THR store with no THRE poll — a certificate uartintr wrote and
-  uartwrite read, which is *why* the transmitter token had to live in a lock
-  shared with the interrupt handler. The new uartwrite **polls THRE itself**
-  before every byte, so the certificate, the flag and the sharing are all gone:
-  `tx_res` is just the token, uartintr takes no lock at all, and the two
-  functions meet in the sleep channel. What the lock is still for is
-  serializing writers — hence a *sleeplock*, because uartwrite now parks
-  between bytes. Read it also for the `uart_sent_sub` SUBLIST output claim a
-  driver that sleeps between bytes can honestly make, the ghost-free UART read
-  leaf (`uart_read_stable`) that lets the rx drain run outside the critical
-  section, how to state a `static` helper that gcc INLINED away (uartgetc has
-  no symbol), and the standing tension with uartputc_sync's caller-held token.
-  consoleintr is the cone's one assumption. **Blocked on `kernel-defects.md`
-  D2**: the new `tx_lock` is never `initsleeplock`ed, so `is_txlock` is
-  unsatisfiable at boot. Remaining: consolewrite, consoleintr, devintr, boot
-  wiring.
+  driver: uartwrite, uartintr and uartgetc. **uart.c is 4/4 functions and
+  100 % of its bytes**: `uartwrite` is now PROVEN AND LINKED
+  (`ProofUartwrite.v`/`LinkUartwrite.v`, axiom-clean — 5 platform axioms +
+  funext), so the tree has one `Link*` `Axiom` fewer. Read it for what the
+  transmit path settled into after two upstream rewrites: `tx_lock` is a
+  SPINLOCK taken and released INSIDE the byte loop, the writer POLLS THRE
+  itself (so the old `tx_busy` certificate, and the reason uartintr had to
+  share the token, are gone — uartintr takes no lock and the two functions
+  meet in the sleep channel), and uartputc_sync is behind the same lock, which
+  retires the printk-cone token tension. The proof's transferable parts: a
+  ROTATED loop whose head and test are different addresses, an iLöb for the
+  unbounded park nested inside a `nat` induction on bytes remaining, the fact
+  that NOTHING LINEAR crosses the back edge (which is what makes parking at
+  noff = 0 legal), the `uart_sent_sub` SUBLIST claim a driver that sleeps
+  between bytes can honestly make, `uw_sent_sub_empty` (a trivial arm that
+  owes a trace claim can read one straight out of `dev_inv`), and the
+  `destruct … eqn:` gotcha that rewrites inside the Iris context. consoleintr
+  is the cone's one assumption. Remaining: consolewrite, consoleread,
+  consoleintr, and the boot `newlock` that mints `is_txlock`.
 
 
 ### `completed/` — finished projects, archived for reference

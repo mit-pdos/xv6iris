@@ -49,7 +49,7 @@
    resource, so the caller's ghost step
    [lk_fresh a_tx_lock "uart" ∗ tx_res γd ==∗ is_lock … a_tx_lock "uart"
    (tx_res γd)] plus the [uart_dlab_off] below is [UartTxInv.is_txlock] --
-   the thing [LinkTxLockInit.v]'s axiom currently assumes.
+   what a boot assembly feeds to [WpLock.newlock].
 
    ProofUartinit.v proves it by running each of the seven writes through the
    invariant-opening ACCESSOR-form UART store leaf

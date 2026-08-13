@@ -38,7 +38,7 @@
    [initlock] is no deeper than the frame consoleinit already reserves for
    uartinit.  What it BUYS is that [lk_fresh] reaches a caller that can run
    [WpLock.newlock], which is the missing half of
-   [LinkTxLockInit.tx_lock_init].
+   [WpLock.newlock], once a boot assembly wants the transmit lock.
 
    ProofConsoleinit.v proves it as a functor over [INITLOCK] and [UARTINIT];
    consoleinit touches no MMIO of its own, so the device side is pure transit
@@ -142,7 +142,7 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
     c_ccpu ↦₈ (zero_reg : mword 64) -∗
     (* and back out initialized: [WpLock.newlock]'s raw material, which is
        what lets a boot assembly mint [UartTxInv.is_txlock]
-       (LinkTxLockInit.v). *)
+       ([WpLock.newlock] over [UartTxInv.tx_res]). *)
     lk_fresh UartTxInv.a_tx_lock "uart"%string -∗
     devsw_console_read ↦₈ (mword_of_int KernelSyms.consoleread : mword 64) -∗
     devsw_console_write ↦₈ (mword_of_int KernelSyms.consolewrite : mword 64) -∗
