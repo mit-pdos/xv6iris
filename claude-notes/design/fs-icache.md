@@ -5453,7 +5453,7 @@ home's `nlink` has already reached zero.
 | `DirLinks.v` | `dir_links_eq` gains `⌜di_nlink dn' = di_nlink dn⌝` (or the weaker implication) | **zero today** — it has no consumer in the tree yet |
 | `DirLinks.v` | NEW, three lines: `dir_link_at_live : bv_unsigned (di_nlink dn) <> 0 -> dir_link_at self dn data k -∗ …ilink…`, and its big-op lift `dir_links_live` | this IS the theorem |
 | `IcacheEscrow.v`, `IcacheBoot.v`, `ProofIlock.v`, `ProofFilewrite.v`, `ProofIput.v` | **nothing** — `dir_links`'s arity is unchanged and the three collapse lemmas they use are unchanged | zero |
-| every Spec file | **nothing** | zero |
+| every Spec file | **nothing** (verified at B′: includes SpecCreate.v, which references `dir_links` and recompiled untouched) | zero |
 
 **ONE FILE, ZERO CONTRACTS, ZERO LANDED PROOFS REOPENED.**  Against option
 (i)-lite's four contracts and three landed proofs including `ProofNamex`.

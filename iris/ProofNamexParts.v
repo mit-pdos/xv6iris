@@ -472,3 +472,73 @@ Lemma nx_bud_tail (L n n' : nat) :
   ((n - iput_units)%nat <= n')%nat -> (n' <= n)%nat ->
   ((n - (L + 1) * iput_units)%nat <= n')%nat /\ (n' <= n)%nat.
 Proof. unfold iput_units. lia. Qed.
+
+(* ===================================================================== *)
+(*  THE HALFWORD DECISIONS -- hoisted out of [ProofNamex.v] (fs-icache.md  *)
+(*  §20.17.9).  [sign_extend' 64] is injective on [mword 16], so a         *)
+(*  branch on a sign-extended halfword decides the FIELD exactly.  Three   *)
+(*  fields ride on it -- [di_type] (the [bne] against s7 = 1) and          *)
+(*  [di_nlink] (the [c.beqz] against x0) -- and [ProofCreate] takes the    *)
+(*  same two tests at its own +0x2a/+0x2e, which is why these live in the  *)
+(*  definitional layer rather than inside a whole-function proof.  The     *)
+(*  cluster moves whole: splitting it would leave [nx_tdir_*] a file away  *)
+(*  from the injectivity lemma they are three-line corollaries of.         *)
+(* ===================================================================== *)
+(* ---- THE TYPE TEST at +0xc6/+0xca: [lh] leaves [sign_extend' 64], and
+   the [bne] against s7 = 1 decides [di_type dn = T_DIR] exactly.  The
+   route is [CommonWalk.u_sext45_inj]'s, one width down. *)
+Lemma nx_sext16_inj (x y : mword 16) :
+  (sign_extend' 64 x : mword 64) = (sign_extend' 64 y : mword 64) -> x = y.
+Proof.
+  intros H. apply (f_equal bv_signed) in H.
+  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
+       to_word get_word MachineWord.MachineWord.sign_extend] in H.
+  rewrite !bv_sign_extend_signed in H;
+    [| apply N.leb_le; vm_compute; reflexivity ..].
+  apply bv_eq_signed. exact H.
+Qed.
+
+Lemma nx_sext_one :
+  (sign_extend' 64 (mword_of_int 1 : mword 16) : mword 64)
+  = (mword_of_int 1 : mword 64).
+Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+
+Lemma nx_tdir_eq (t : mword 16) : t = (mword_of_int 1 : mword 16) ->
+  neq_vec (sign_extend' 64 t : mword 64) (mword_of_int 1 : mword 64) = false.
+Proof.
+  intros ->. unfold neq_vec. rewrite nx_sext_one.
+  rewrite (proj2 (eq_vec_true_iff _ _) eq_refl). reflexivity.
+Qed.
+
+Lemma nx_tdir_ne (t : mword 16) : t <> (mword_of_int 1 : mword 16) ->
+  neq_vec (sign_extend' 64 t : mword 64) (mword_of_int 1 : mword 64) = true.
+Proof.
+  intro Hne. unfold neq_vec.
+  rewrite (proj2 (eq_vec_false_iff _ _)); [reflexivity |].
+  intro Hc. apply Hne. apply nx_sext16_inj. rewrite Hc nx_sext_one.
+  reflexivity.
+Qed.
+
+(* The nlink guard's decision (upstream 9da28f5, kernel-defects.md D2).  The
+   [c.beqz] at +0xd2 compares against x0, so unlike the type test -- which is a
+   [bne] against s7 = 1 -- the condition is an [eq_vec _ zero_reg], the shape
+   [nx_nul_eq]/[nx_nul_ne] have for the path bytes.  Same injectivity argument
+   as [nx_tdir_ne]: [sign_extend' 64] is injective on [mword 16], so the
+   halfword decides the branch exactly. *)
+Lemma nx_sext_zero :
+  (sign_extend' 64 (mword_of_int 0 : mword 16) : mword 64)
+  = (zero_reg : mword 64).
+Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+
+Lemma nx_nlz_eq (t : mword 16) : t = (mword_of_int 0 : mword 16) ->
+  eq_vec (sign_extend' 64 t : mword 64) (zero_reg : mword 64) = true.
+Proof.
+  intros ->. apply (proj2 (eq_vec_true_iff _ _)). exact nx_sext_zero.
+Qed.
+
+Lemma nx_nlz_ne (t : mword 16) : t <> (mword_of_int 0 : mword 16) ->
+  eq_vec (sign_extend' 64 t : mword 64) (zero_reg : mword 64) = false.
+Proof.
+  intro Hne. apply (proj2 (eq_vec_false_iff _ _)). intro Hc. apply Hne.
+  apply nx_sext16_inj. rewrite Hc nx_sext_zero. reflexivity.
+Qed.

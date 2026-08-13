@@ -75,16 +75,32 @@ Section DirLinks.
 
      A FREE record (inum 0) carries nothing: [dir_liveb] is exactly the
      predicate [dirlookup]'s scan skips on. *)
-  Definition dir_link_at (self : Z) (data : nat -> list (bv 8)) (k : nat)
+  Definition dir_link_at (self : Z) (dn : dinode)
+      (data : nat -> list (bv 8)) (k : nat)
     : iProp Σ :=
     (if dir_liveb data k
         && negb (bool_decide (bv_unsigned (dir_inum data k) = self))
      then (ilink (bv_unsigned (dir_inum data k))
-           ∨ igrey (bv_unsigned (dir_inum data k)))
+           ∨ (igrey (bv_unsigned (dir_inum data k))
+              ∗ ⌜bv_unsigned (di_nlink dn) = 0⌝))
      else emp)%I.
 
-  Global Instance dir_link_at_timeless self data k :
-    Timeless (dir_link_at self data k).
+  (* THE GREY DISJUNCT CARRIES ITS OWN HOME CONDITION (§20.17.7, option
+     (iii)).  Grey is §20.8's orphaned [".."], and the ONLY way a record can
+     be grey is that its HOME's link count has already reached zero -- that
+     is §20.17.4's theorem, at exactly the placement §20.17.4(a) forces: a
+     payload conjunct, obligated at the park, where [nlink] is already 0.
+     Carrying it here rather than at the caller is what makes "a fragment
+     consumed under a LIVE home is [ilink]" a lemma ([dir_link_at_live]
+     below) instead of a paragraph.
+
+     [dn] IS A PARAMETER ITS ONLY CALLER ALREADY HAS.  [dir_links] takes
+     [dn] for the type test and for [dir_nrec (di_size dn)], so this new
+     argument costs no arity anywhere above -- §17.6.3's move, one level
+     down.  Both disjuncts stay timeless, so [ic_loaded_timeless] /
+     [ipool_alloc_timeless] survive verbatim. *)
+  Global Instance dir_link_at_timeless self dn data k :
+    Timeless (dir_link_at self dn data k).
   Proof.
     rewrite /dir_link_at.
     destruct (dir_liveb data k
@@ -110,7 +126,7 @@ Section DirLinks.
     : iProp Σ :=
     (if decide (bv_unsigned (di_type dn) = T_DIR_z)
      then ([∗ list] k ∈ seq 0 (dir_nrec (bv_unsigned (di_size dn))),
-             dir_link_at self data k)
+             dir_link_at self dn data k)
      else emp)%I.
 
   Global Instance dir_links_timeless self dn data :
@@ -175,12 +191,13 @@ Section DirLinks.
      [dir_links_dirlink] (stage D, §20.6's dirlink row) will iterate over:
      dirlink touches exactly one slot, so every OTHER index rides by this
      lemma and only the written one moves a fragment. *)
-  Lemma dir_link_at_agree (self : Z) (data data' : nat -> list (bv 8))
-      (k : nat) :
+  Lemma dir_link_at_agree (self : Z) (dn dn' : dinode)
+      (data data' : nat -> list (bv 8)) (k : nat) :
+    di_nlink dn' = di_nlink dn ->
     dir_inum data' k = dir_inum data k ->
-    dir_link_at self data k -∗ dir_link_at self data' k.
+    dir_link_at self dn data k -∗ dir_link_at self dn' data' k.
   Proof.
-    intros Heq. rewrite /dir_link_at /dir_liveb /dir_freeb Heq.
+    intros Hnl Heq. rewrite /dir_link_at /dir_liveb /dir_freeb Heq Hnl.
     iIntros "H". iExact "H".
   Qed.
 
@@ -223,6 +240,9 @@ Section DirLinks.
     (tot <= 16)%nat ->
     (* writei preserves the type and installs [max(size, off+tot)] *)
     di_type dn' = di_type dn ->
+    (* the nlink half of "writei moved neither" -- [wi_dinode] touches only
+       size and addrs, so every caller closes this by [reflexivity] *)
+    di_nlink dn' = di_nlink dn ->
     bv_unsigned (di_size dn')
       = Z.max (bv_unsigned (di_size dn)) (Z.of_nat (16 * k0 + tot)) ->
     (* dirlink's TIGHTENED range clause: no disturbed region *)
@@ -231,10 +251,10 @@ Section DirLinks.
        = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + tot)%nat)
          then dirent_bytes (de_of_name inum s) !!! (x - 16 * k0)%nat
          else file_byte data x) ->
-    dir_link_at self data' k0 -∗
+    dir_link_at self dn' data' k0 -∗
     dir_links self dn data -∗ dir_links self dn' data'.
   Proof.
-    intros Hnrec Hk0 Htot Hty Hsz Hrng.
+    intros Hnrec Hk0 Htot Hty Hnl Hsz Hrng.
     (* the type is unmoved, so the two big-ops are both live or both [emp] *)
     rewrite /dir_links Hty.
     destruct (decide (bv_unsigned (di_type dn) = T_DIR_z)) as [_ | _];
@@ -266,7 +286,7 @@ Section DirLinks.
       destruct (Nat.lt_ge_cases k0 nrec) as [Hlt | Hge].
       + (* the written slot is one of the goal's indices: swap it *)
         rewrite (big_sepL_delete
-                   (fun _ k => dir_link_at self data' k) (seq 0 nrec) k0 k0).
+                   (fun _ k => dir_link_at self dn' data' k) (seq 0 nrec) k0 k0).
         2:{ apply lookup_seq; lia. }
         iSplitL "Hk0"; [iExact "Hk0" |].
         iApply (big_sepL_mono with "H"). intros i k Hik.
@@ -274,20 +294,23 @@ Section DirLinks.
         destruct (decide (i = k0)) as [_ | Hne]; [by iIntros "_" |].
         assert (Heq : dir_inum data' k = dir_inum data k)
           by (apply Hagree; lia).
-        iIntros "Hx". iApply (dir_link_at_agree with "Hx"). exact Heq.
+        iIntros "Hx".
+        iApply (dir_link_at_agree self dn dn' data data' k Hnl Heq with "Hx").
       + (* the written slot is at or past the end: nothing in range moved *)
         iApply (big_sepL_mono with "H"). intros i k Hik.
         apply lookup_seq in Hik. destruct Hik as [Hk Hi].
         assert (Heq : dir_inum data' k = dir_inum data k)
           by (apply Hagree; lia).
-        iIntros "Hx". iApply (dir_link_at_agree with "Hx"). exact Heq.
+        iIntros "Hx".
+        iApply (dir_link_at_agree self dn dn' data data' k Hnl Heq with "Hx").
     - (* ======== ONE record was appended, at [k0 = nrec] ======== *)
       rewrite seq_S big_sepL_app. iSplitL "H".
       + iApply (big_sepL_mono with "H"). intros i k Hik.
         apply lookup_seq in Hik. destruct Hik as [Hk Hi].
         assert (Heq : dir_inum data' k = dir_inum data k)
           by (apply Hagree; lia).
-        iIntros "Hx". iApply (dir_link_at_agree with "Hx"). exact Heq.
+        iIntros "Hx".
+        iApply (dir_link_at_agree self dn dn' data data' k Hnl Heq with "Hx").
       + simpl. iSplitL "Hk0"; [| done].
         rewrite <- Hkn. iExact "Hk0".
   Qed.
@@ -297,7 +320,8 @@ Section DirLinks.
      puts [inum] there.  If the linked inum is the directory's OWN (mkdir's
      ["."]) or is zero, the ticket is [emp] and the fragment is simply
      dropped -- affine, and the self-record exemption is the whole point. *)
-  Lemma dir_link_at_dirlink (self : Z) (data data' : nat -> list (bv 8))
+  Lemma dir_link_at_dirlink (self : Z) (dn : dinode)
+      (data data' : nat -> list (bv 8))
       (inum : bv 16) (s : list (bv 8)) (k0 tot : nat) :
     (2 <= tot)%nat ->
     (forall x : nat,
@@ -305,7 +329,7 @@ Section DirLinks.
        = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + tot)%nat)
          then dirent_bytes (de_of_name inum s) !!! (x - 16 * k0)%nat
          else file_byte data x) ->
-    ilink (bv_unsigned inum) -∗ dir_link_at self data' k0.
+    ilink (bv_unsigned inum) -∗ dir_link_at self dn data' k0.
   Proof.
     intros Htot Hrng.
     assert (Hrec : dir_inum data' k0 = inum).
@@ -331,6 +355,7 @@ Section DirLinks.
     nrec = dir_nrec (bv_unsigned (di_size dn)) ->
     k0 = dir_slot data nrec ->
     di_type dn' = di_type dn ->
+    di_nlink dn' = di_nlink dn ->
     bv_unsigned (di_size dn')
       = Z.max (bv_unsigned (di_size dn)) (Z.of_nat (16 * k0 + 0)) ->
     (forall x : nat,
@@ -340,7 +365,7 @@ Section DirLinks.
          else file_byte data x) ->
     dir_links self dn data -∗ dir_links self dn' data'.
   Proof.
-    intros Hnrec Hk0 Hty Hsz Hrng.
+    intros Hnrec Hk0 Hty Hnl Hsz Hrng.
     (* the range clause degenerates: EVERY byte agrees *)
     assert (Hall : forall x : nat, file_byte data' x = file_byte data x).
     { intros x. rewrite (Hrng x). rewrite decide_False; [reflexivity | lia]. }
@@ -359,7 +384,58 @@ Section DirLinks.
     destruct (decide (bv_unsigned (di_type dn) = T_DIR_z)) as [_ | _];
       [| by iIntros "_"].
     iIntros "H". iApply (big_sepL_mono with "H"). intros i k Hik.
-    iIntros "Hx". iApply (dir_link_at_agree with "Hx"). apply Hagree.
+    iIntros "Hx".
+    iApply (dir_link_at_agree self dn dn' data data' k Hnl (Hagree k) with "Hx").
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  (vi) THE THEOREM: A LIVE HOME HAS NO GREY RECORDS                   *)
+  (*       design: fs-icache.md §20.17.7, option (iii)                    *)
+  (* ------------------------------------------------------------------ *)
+
+  (* the ticket with the grey disjunct GONE.  Named so the consumer's
+     statement is two lines rather than an [if] inside a big-op inside an
+     [if], and so [ProofCreate]'s guard arm has something to write down. *)
+  Definition dir_ilink_at (self : Z) (data : nat -> list (bv 8)) (k : nat)
+    : iProp Σ :=
+    (if dir_liveb data k
+        && negb (bool_decide (bv_unsigned (dir_inum data k) = self))
+     then ilink (bv_unsigned (dir_inum data k))
+     else emp)%I.
+
+  (* THIS IS D2's FIX, FORMALISED.  Grey now carries [di_nlink dn = 0]
+     (see [dir_link_at]'s header), so under a LIVE home the right disjunct
+     is refuted where it stands and every record's ticket collapses to the
+     allocatedness witness.  The guard the caller supplies is exactly the
+     [c.beqz] it just fell through. *)
+  Lemma dir_link_at_live (self : Z) (dn : dinode)
+      (data : nat -> list (bv 8)) (k : nat) :
+    bv_unsigned (di_nlink dn) <> 0 ->
+    dir_link_at self dn data k -∗ dir_ilink_at self data k.
+  Proof.
+    intros Hnz. rewrite /dir_link_at /dir_ilink_at.
+    destruct (dir_liveb data k
+              && negb (bool_decide (bv_unsigned (dir_inum data k) = self)));
+      [| by iIntros "_"].
+    iIntros "[H | [_ %Hz]]"; [iExact "H" | destruct (Hnz Hz)].
+  Qed.
+
+  (* ...and the payload-level lift, which is what a walk holding
+     [ic_loaded]'s [dir_links] applies. *)
+  Lemma dir_links_live (self : Z) (dn : dinode)
+      (data : nat -> list (bv 8)) :
+    bv_unsigned (di_nlink dn) <> 0 ->
+    dir_links self dn data -∗
+      (if decide (bv_unsigned (di_type dn) = T_DIR_z)
+       then ([∗ list] k ∈ seq 0 (dir_nrec (bv_unsigned (di_size dn))),
+               dir_ilink_at self data k)
+       else emp)%I.
+  Proof.
+    intros Hnz. rewrite /dir_links.
+    destruct (decide (bv_unsigned (di_type dn) = T_DIR_z)) as [_ | _];
+      [| by iIntros "_"].
+    iIntros "H". iApply (big_sepL_mono with "H"). intros i k Hik.
+    iIntros "Hx". iApply (dir_link_at_live self dn data k Hnz with "Hx").
   Qed.
 
 End DirLinks.

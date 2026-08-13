@@ -6078,3 +6078,44 @@ Two traps from the run, recorded verbatim:
   here a stronger callee payout needs a strengthened premise at the seam).
   wi_size/wi_join each gained `(S u <= ncount)` beside `(u <= ncount)`,
   named fresh so nothing downstream moved.
+
+
+## Stage 4 — THE CREATE WALK, staged per fs-icache.md §20.17.7's ruled table (2026-08-13)
+
+The contract side is DONE: wp_create_sconf_body admits ARM G unchanged
+(§20.17.1, five conjuncts checked), K_create = 108 landed, the body is
+already set-form (log_opS, Sb ⊆ Sb', u' <= u), and every callee contract is
+proven and credit-aware after stage 3 (dirlink_gen/dl16_post being the last).
+CreateBudget's four arm theorems close the arithmetic at exactly iput_units.
+
+| stage | what | who | state |
+|---|---|---|---|
+| B' | option (iii): DirLinks.dir_link_at's grey disjunct gains `⌜di_nlink dn = 0⌝`; dir_link_at_live / dir_links_live; re-thread dn through the four named lemmas; PLUS hoist nx_nlz_eq / nx_nlz_ne out of ProofNamex into a shared home (both walkers need them) | agent (Opus) | **LANDED** (first-try green; full tree 1070 .vo, staleness 0) |
+
+### B' as landed (agent report, 2026-08-13)
+
+§20.17.7's Coq verbatim, plus one definition beyond the letter:
+`dir_ilink_at` names the live conclusion so `dir_links_live`'s statement is
+two lines and D₀'s guard arm has a name to write down.  `dir_links_eq`
+UNCHANGED (its `dn = dn'` premise already subsumes the nlink clause; the
+anticipated weakening never happened — a consumer wanting the `dn ≠ dn'`
+form is really asking for `dir_links_dirlink_nop`).  `dir_link_at_agree`
+takes TWO dinodes + `di_nlink dn' = di_nlink dn` — forced by the dirlink
+twins; every caller closes the new premise by reflexivity.  The hoist moved
+the whole SEVEN-lemma decision cluster (nx_sext16_inj, nx_sext_one,
+nx_tdir_eq/_ne, nx_sext_zero, nx_nlz_eq/_ne) to ProofNamexParts.v — no new
+Require on either side; D₀ gets the found arm's type tests for free.
+Zero-cost claim VERIFIED BY BUILDING; the §20.17.7 table's Spec row
+amended (SpecCreate references dir_links, needed nothing).  Mirror note
+worth keeping: -j30 is safe only because 246 GB ≥ 2× per-file peak; on a
+smaller box the failure is `Error 137` with no Coq error at all.
+| D0 | ProofCreate's walk on the a28e94b decode: prologue + the five-arm failure family (N / G / F-BAD / A-FAIL / FAIL) first, then C-OK-FILE / C-OK-DIR with the credited budget chain; the fresh-type fact stays GATED per §19.9.2 (visible hypothesis, not an admit); LinkCreate + coverage flip from assumed to proven | agent (Opus), fresh context, after B' gates | queued |
+| C' | SpecIget licence | — | BLOCKED on (A), unchanged |
+
+Sizing notes for D0: 332 bytes, 10-slot frame, one epilogue funnel at the
+answer register s2 (NOT s3 — §20.17.2); four dirlink call sites for three
+source calls; dp->nlink++ last; a0 not reloaded before either ilock.  The
+budget threading consumes dl16_post at each dirlink (the slack under
+dirlink_units = 7 is what makes the chain close) and cru at the iupdates via
+wp_iupdate_credgen.  ARM G's decision lemmas are namex's verbatim once
+hoisted (B').
