@@ -5268,3 +5268,177 @@ the failure was the classic one from `durable-notes.md`: *`iSpecialize: cannot
 instantiate (P -∗ Q) with P`* where both sides print CHARACTER-FOR-CHARACTER
 the same. When cloning a call sequence between whole-function proofs, check
 which convention the target file uses before copying the intro pattern.
+
+## GR-2a — **STOPPED BEFORE ANY EDIT** (base superseded by origin `6ea54b92`).
+## No `.v` file was touched and nothing was synced to the mirror.  What this
+## section carries is the DESIGN the relaunch starts from: the dependency
+## order of the eight contracts is INVERTED in the S5i table, and `bm_paid`
+## is the one algebra that has to move
+
+### RESUME HEADER
+
+| # | contract | state at stop |
+|---|---|---|
+| 2 | `SpecIupdate.wp_iupdate_cred` | LANDED (S5b), unmoved |
+| 5 | `SpecIalloc.wp_ialloc_gen` | LANDED (S5i), unmoved |
+| 1 | `SpecWritei.wp_writei_cred` | not started |
+| 3 | `SpecDirlink` `DIRLINK_GEN` | not started |
+| 4a | `SpecItrunc.wp_itrunc_gen` | **DESIGNED, not written** (below) |
+| 4b | `SpecIput`/`SpecIunlockput` `_cred` | not started |
+| 6 | namex/namei/nameiparent gen | not started |
+
+Zero `.v` files created or edited; zero files scp'd; zero mirror jobs.
+Mirror verified quiet and clean at `4bfde083`, 1062 `.vo`, `git status`
+empty.
+
+### FINDING 1 — **DERIVATION IS IMPOSSIBLE FOR ALL EIGHT, and the proof is
+### two lines.**  Every gen form must be walked; the COUNTED form is the
+### derived one
+
+`LogInv.v:278-289`: `log_opS γ u Sb := ∃ i, i ↪[ln_ops γ] (u, Sb)` and
+`log_op γ u := ∃ Sb, log_opS γ u Sb`.  The set therefore lives in a
+`ghost_map` ELEMENT — exclusive, with no auth-monotone shadow anywhere in
+the file — so a counted postcondition `log_op γ n'` hands back an element
+at an existentially chosen `Sb'` with **no** relation to the caller's
+`Sb`, and nothing in the algebra recovers one.  S5i stated this for
+nameiparent; it is general, and it settles the brief's
+"derive-outside-the-walk-if-the-algebra-permits" question for every one of
+the eight: **it does not permit, for any of them.**
+
+The direction that IS free is the other one, and it is the whole reason
+the retrofit stays additive: prove the gen/cred form as the core, then
+derive the counted seal from it **at the `log_op` existential's own
+witness** (S3l deviation 2 — destruct the caller's `log_op` and run the
+core at whatever set was hiding there, at `cr := false`), never at
+`Sb := ∅`.  `wp_bmap_sconf`, `wp_writei_sconf`, `wp_iupdate_gen` and
+`wp_ialloc_sconf` are the four landed instances.
+
+So the honest sizing for the relaunch is **five proof walks, no
+derivations**: ProofItrunc (2922), ProofIput (2381), ProofNamex (5713) on
+one chain, ProofWritei (4640), ProofDirlink (3162) on the other.  Only the
+counted SEALS are derivations, ~20 lines each.
+
+### FINDING 2 — **THE S5i DEPENDENCY ORDER IS INVERTED.**  (6) is not
+### "first and cheapest"; it is LAST on its chain
+
+The brief and the S5i table both put the namex trio first, "cheapest and
+gating".  Gating it is; first it cannot be.  `wp_namex_gen` must carry
+`log_opS g n Sb` -> `log_opS g n' Sb'` with `Sb ⊆ Sb'` across **four**
+call sites, and every one of them is an iput or an iunlockput
+(`SpecNamex.v`'s header: three iunlockputs in the loop, one iput on the
+nameiparent-of-`"/"` arm; ilock and dirlookup take no reservation at all).
+Against `SpecIput`'s landed counted post (`SpecIput.v:239`, `log_op g n'`)
+the set is lost at the FIRST turn of namex's loop, by exactly the argument
+in finding 1.  So the chain is strictly
+
+```
+4a wp_itrunc_gen  ->  4b wp_iput_cred / wp_iunlockput_cred  ->  6 namex trio
+1  wp_writei_cred ->  3  DIRLINK_GEN
+```
+
+and the two chains are independent (dirlink's cone does not reach iput's).
+The relaunch can run them as two parallel threads; `wp_iupdate_cred` (2)
+is already landed and is a shared prerequisite of both.
+
+### THE 4a DESIGN, worked out and ready to write
+
+`SpecItrunc.bm_paid` (`SpecItrunc.v:159`) is the whole obstruction, and it
+is exactly the shape S5i named: set-form but with the set EXISTENTIAL on
+both disjuncts, so the caller's `Sb` is forgotten at `bm_paid_intro`
+(`:164`) and never recovered at `bm_paid_elim` (`:172`).  Index it by the
+ENTRY set and the forgetting stops:
+
+```coq
+Definition bm_paidS (γ : log_names) (bmapstart : Z) (u : nat) (Sb : gset Z)
+  : iProp Σ :=
+  ((∃ Sb', ⌜Sb ⊆ Sb'⌝ ∗ ⌜bmapstart ∈ Sb'⌝ ∗ log_opS γ (S u) Sb')
+   ∨ (∃ Sb', ⌜Sb ⊆ Sb'⌝ ∗ log_opS γ (S (S u)) Sb'))%I.
+```
+
+Three facts make this cheap, and all three were checked against the file:
+
+1. **`Sb` is CONSTANT across both loops.**  It is the entry set, never the
+   running one — the running set is the existential `Sb'` — so the
+   retrofit is one extra parameter on `it_dir_state` / `it_ent_state`
+   (`ProofItruncParts.v:567`) and the two loop invariants
+   (`ProofItrunc.v:1751`, `:1805`), threaded, not proven.  This is
+   `ProofIalloc`'s pattern from S5i verbatim.
+2. **`bm_paid_use` (`ProofItruncParts.v:591`) does not change shape at
+   all.**  It already existentially opens the running set and closes its
+   wand at `Sb0 ∪ {[bmapstart]}`; the twin adds `⌜Sb ⊆ Sb0⌝` to what it
+   yields and re-establishes `Sb ⊆ Sb0 ∪ {[bmapstart]}` by transitivity in
+   the same two `iLeft` arms.  Both arms already land in the PAID
+   disjunct, so the growth clause is proved once per arm and never inside
+   the loop.  **The two `set_solver`s at `:605`/`:612` are inside a
+   three-variable definitional lemma, which is where S3l's rule says they
+   are fine — do not move them, and do not add one at a call site.**
+3. **The three `bm_paid_use` call sites (`ProofItrunc.v:1003`, `:1552`,
+   `:2282`) pass the set straight to `SpecBfree.wp_bfree_gen`, which is
+   ALREADY set-form** — that is what `Sb` is doing in each of those
+   `iDestruct` patterns today.  So no callee contract below itrunc moves.
+
+**The CREDITS itrunc must take, and why both are forced by
+`CreateBudget.ip_spend crb cru freed` (`CreateBudget.v:133`).**  create's
+FAIL arm needs `iunlockput(ip)` to spend **zero** while actually freeing,
+so itrunc must be able to spend zero:
+
+* `crb` (`crb = true -> bmapstart ∈ Sb`) enters `bm_paidS` at the PAID
+  disjunct with `Sb' := Sb`, so the precondition is
+  `log_opS γ (if crb then S u else S (S u)) Sb` and the bitmap unit is
+  never spent.  No new algebra: `bm_paidS_intro_cred` is the `iLeft` twin
+  of the existing `bm_paid_intro`.
+* `cru` (`cru = true -> IBLOCK inum inodestart ∈ Sb`) is passed straight
+  to the tail `iupdate` — `wp_iupdate_cred` is LANDED and takes exactly
+  this boolean — at `ProofItrunc.v:2823`/`:2895`, the two `bm_paid_elim`
+  sites that feed `it_tail`.  Those sites `destruct n0 as [|n1]` to
+  produce iupdate's successor; the credited form keeps that step.
+
+**And the post must EXPOSE `IBLOCK inum inodestart ∈ Sb'`**, determinately
+— itrunc's own tail iupdate logs it unconditionally — because that
+membership is what makes iput's OWN `iupdate` (the `ip->type = 0` flush,
+which runs immediately after itrunc returns) absorb for free.  That is the
+second `iu_spend` term of `ip_spend`, and without the exposed membership
+4b cannot hit its target.  `wp_ialloc_gen`'s determinate-union growth
+(S5i part 2) is the precedent for stating it as a membership rather than
+as a `⊆`.
+
+Postcondition shape, replacing `SpecItrunc.v:362`'s
+`(∃ u', ⌜u <= u' <= S u⌝ ∗ log_op γ u')`:
+
+```coq
+(∃ (u' : nat) (Sb' : gset Z),
+   ⌜Sb ⊆ Sb'⌝ ∗ ⌜IBLOCK inum inodestart ∈ Sb'⌝ ∗
+   ⌜(it_entry crb u - it_spend crb cru <= u')%nat
+    /\ (u' <= it_entry crb u)%nat⌝ ∗
+   log_opS γ u' Sb')
+```
+
+with `it_entry crb u := if crb then S u else S (S u)` and
+`it_spend crb cru := (if crb then 0 else 1) + iu_spend cru`.  At
+`crb := false, cru := false` this is the landed range `u <= u' <= S u`
+verbatim, which is what makes `wp_itrunc_sconf` a witness-derivation and
+leaves `ProofIput`'s current call unmoved until 4b walks it.
+
+### WHAT DID NOT GET CHECKED, and should be first at relaunch
+
+* Whether `it_tail` (the lemma `ProofItrunc.v:2834`/`:2899` apply) can take
+  the credit as a parameter without touching `it_cont` — it looked like it
+  can (`it_cont` already takes the count), but the two `iExists n1` /
+  `iExists n3` re-packings at `:2855`/`:2917` were not traced through.
+* 4b's own shape.  `ip_spend` has a `freed` boolean that iput's
+  postcondition does not currently expose, so the credited post must
+  either quantify it existentially or two-arm the budget clause the way
+  `used' ⊆ used` (`SpecIput.v:234`) is already two-armed.  That choice was
+  not made.
+* Nothing was read of `ProofWritei` / `ProofDirlink`; chain two is
+  unexamined.
+
+### THE SUPERSEDING BUMP, and what of the above survives it
+
+Origin `6ea54b92` (upstream `0024d4b`) moves twelve stack budgets, namex
+`94 -> 96` among them (`SpecNamex.K_namex`).  **None of the design above
+names an image address, an offset or a `K` constant** — it is resource
+algebra over `log_opS`, in the same sense GR-1's audit found the ledger
+work carried none of origin's 1762 moved immediates.  Finding 2's claim is
+"every namex log site is an iput or an iunlockput", which is a property of
+fs.c's source that the copyout/vmfault rework does not touch.
