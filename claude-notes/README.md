@@ -142,12 +142,6 @@ are working on that effort — the relevant `projects/` file.
 
 ### `projects/` — ongoing worklists & plans (one per effort)
 
-- **[`weak-memory-lift.md`](projects/weak-memory-lift.md)** — the plan to
-  close M6 residue seam (1): the WeakLang ↔ wp-machine lift, staged
-  L0–L4 with the three resolved obstacles (cone-cut theorem, completion
-  under img_total, log-based pub_of) and the pre-port breaking batch
-  (DMA tid, mip-oracle, PDisk dev_state).
-
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
   crash instantiation) only; stages 1–3 are finished and archived in
   [`completed/fs-log-bio-and-logc.md`](completed/fs-log-bio-and-logc.md).
@@ -326,6 +320,17 @@ are working on that effort — the relevant `projects/` file.
 
 ### `completed/` — finished projects, archived for reference
 
+- **[`weak-memory-lift.md`](completed/weak-memory-lift.md)** — the
+  WeakLang ↔ wp-machine lift (M6 residue seam (1)), COMPLETE
+  (2026-08-13): `WeakComposeLang.xv6_weak_robust_lifted`/`_adequate` on
+  EXACTLY the 5 rv64d baseline axioms, `xv6_block_cover` deleted.  Read
+  it for the two findings — `pf_violation_free_hart`/block-cover are
+  REFUTABLE at event granularity (the dangling walker-CAS-under-`w_relp`
+  counterexample), and same-agent fulfil timestamps are not
+  program-order monotone — the final premise ledger
+  (`xv6_cone_premises`, `cone_liftable`, `sail_live`, `img_total`) with
+  its discharge stories, and the reusable recipes (the `Acc`-on-a-free-
+  monad kit, contracted-acyclicity-for-free, splice-by-transplant).
 - **[`weak-memory-m6.md`](completed/weak-memory-m6.md)** — the M6
   store-reordering robustness theorem, COMPLETE (2026-08-12): the
   full-promising machine restated natively (W1), the E-edge-extended
@@ -337,7 +342,10 @@ are working on that effort — the relevant `projects/` file.
   `WeakCompose.xv6_weak_robust`, closed under the global context, with
   the declared residue recorded in `WeakCompose.v` §6 (φ's
   `pf_violation_free`, the D-M6-8 static side conditions, `bad_wf`, the
-  WeakLang ⇐-lift, MMIO, the PARM containment note).  Read it for: the
+  WeakLang ⇐-lift, MMIO, the PARM containment note).  Seams (1)/(2)
+  have since been CLOSED by the lift
+  ([`weak-memory-lift.md`](completed/weak-memory-lift.md)); the live
+  composition is `WeakComposeLang.xv6_weak_robust_lifted`/`_adequate`.  Read it for: the
   three counterexample-driven design revisions (floor inversion, the
   post-fence store, the premise-discharge split D-M6-8), the deferred
   φ mechanization's blocking analysis (`↦w` transfer-discipline

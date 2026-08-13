@@ -482,28 +482,29 @@ Qed.
     [whart_write_regs_ne]).  So [xv6_pf_instr] IS that arm's image under the
     correspondence, with the other harts framed at their own indices.
 
-    DECLARED, i.e. what is NOT built:
-      (1a) the ⇐ direction — every [wp_pf_run] sequence of hart [i] that
-           starts and ends at an instruction boundary is a [wrun].  This needs
-           a determinism argument for the fused-RMW arm's silent prefix, which
-           [WeakSailLTS]'s header (g) records as the reason it stopped at ⇒.
-           The composition as designed needs only ⇒ — the promise-free machine
-           is the SOURCE of the Iris program logic's steps, not its target —
-           but a fully bidirectional statement would let the two machines be
-           interchanged freely.
-      (1b) INTERLEAVING REGROUPING.  An [erased_step] sequence interleaves the
-           five arms across harts and devices arbitrarily; the pf run produced
-           by concatenating per-instruction brackets is the SAME interleaving,
-           so this is bookkeeping, not mathematics: an induction on
-           [rtc erased_step] that dispatches each step to its arm's bracket and
-           concatenates.  It is not built because it also needs (1c) and (1d).
-      (1c) THE DEVICE AND POWER ARMS.  [wprim_step]'s uart, plic and power arms
-           touch neither the log nor any [wstate], so they map to the identity
-           on [wpcfg] — but "map to the identity" must be stated, and the power
-           arm's reboot ([wboot_shape]) resets the era, i.e. it starts a NEW
-           [wp_init].  M6 is stated per-era, which is the right scope (a
-           reboot's fresh era has an empty log), but the per-era decomposition
-           of a whole [erased_step] sequence is unstated.
+    CLOSED (the lift, stages L2/L3/B, 2026-08-12/13) — every sub-item is
+    now machine-checked; the entries are kept for the record:
+      (1a) the ⇐ direction — BUILT ([WeakSailLTS2.sail_block_wrun]): a
+           boundary-to-boundary solo pf block IS a [wrun].  No determinism
+           argument was needed after all — [silent_run] existentially
+           contains the Choose values, so the inverse walks the block and
+           supplies them.
+      (1b) INTERLEAVING REGROUPING — BUILT, in the direction the
+           φ-consumption needs ([WeakComposeLang]: the block-contiguous
+           cone replay [WeakRobustCone]/[WeakSailCone] + [wl_lift]).  The
+           naive reading of this entry ("bookkeeping, not mathematics")
+           was WRONG: an arbitrary pf run does NOT regroup — see the
+           [xv6_block_cover] refutability finding in [WeakComposeLang] §B
+           — and the honest statement goes through the minimal-bad-edge
+           cone, where cross-edge sources are block-last and the
+           contracted block graph inherits acyclicity.
+      (1c) THE DEVICE AND POWER ARMS — BUILT where needed: the plic arm
+           is [wl_lift]'s [SegIrq] case, the disk arm its [SegDisk] case
+           (1:1 by delta (i)); the uart arm has no wp-side agent and the
+           power arm is vacuous at a pinned generation, so the produced
+           WeakLang runs simply never take them (existence is all the
+           consumption needs).  The per-era decomposition across reboots
+           remains out of scope, as before: M6 is stated per-era.
       (1d) THE TID RENAMING — RESOLVED (L0(a), 2026-08-12), NOTHING IS
            DECLARED HERE ANY MORE.  [WeakLang.wmsgs_of_map] stamps
            [Some WeakLang.n_disk] with [n_disk = NCPU], which IS the disk's
@@ -518,8 +519,11 @@ Qed.
            its exhibit concludes [WeakRobust.violation_hart]).  Likewise the DISK ARM itself
            is now a simulation rather than a superset (delta (i)), so (1b)'s
            regrouping has a 1:1 disk case to work with.
-    UPGRADE PATH: a [WeakComposeLang.v] carrying (1a)–(1c) as one induction.
-    Its cost is dominated by (1a); (1b)–(1c) are mechanical.
+    The carrier is [WeakComposeLang.v]; the residue that replaces this
+    seam is the sharply-scoped premise family listed there (§D): the
+    per-trace cone premises ([xv6_cone_premises]) and the per-segment
+    device seam ([cone_liftable]), both in the same epistemic slot as
+    (3)'s static side conditions and (4)'s MMIO assumption.
 
     ------------------------------------------------------------------------
     (2) [pf_violation_free_hart cls_of pub_of n_disk] — DECLARED (the second
@@ -531,36 +535,38 @@ Qed.
     published.  PUBLICATION IS NOW THE LOG PREDICATE [WeakMem.wpublished]
     (L0(c), 2026-08-12): [WeakRobustMain.pub_of] no longer reads the author's
     [w_pub] watermark out of the agent vector, and the HART RESTRICTION
-    (2026-08-12) closes the remaining gap, so this premise and the Iris side's
-    exported [WeakGhost.no_violation] are now the SAME statement — the DMA-tid
-    unification lines up the tids, and [WeakRobust.violation_hart] lines up
-    the quantifier.  Without the restriction the conjunct would be FALSE for
-    xv6 (the disk as author or as observer; see §3), i.e. the theorem would be
-    vacuous on every DMA-touching run.  [WeakComposeLang] DERIVES this
-    conjunct from the adequacy export.
-    It is the ONE place φ/Iris remains load-bearing, and its use is sound as
-    designed:
-    [WeakRobustMain.bad_edge_violates] builds the violating configuration as a
-    REAL [wp_pf_run] (the exhibit prefix is pf-real by construction), so the
-    premise is applied only to configurations the Iris side actually covers.
+    (2026-08-12) closes the remaining gap.  Without the restriction the
+    conjunct would be FALSE for xv6 (the disk as author or as observer; see
+    §3), i.e. the theorem would be vacuous on every DMA-touching run.
 
-    WHY DECLARED rather than proved: W3's φ analysis found that stores,
-    fences, register steps and every non-fragment-backed load preserve
-    violation-freedom for free, and the whole obligation concentrates in ONE
-    arm — a fragment-backed load of a byte carrying a foreign unpublished
-    [WCplain] message.  Refuting that needs the state interpretation to
-    observe the DISTRIBUTION of outstanding [↦w] fractions, which an authority
-    element cannot do; every escrow variant examined either breaks the leaves'
-    [↦w{1}]-in/[↦w{1}]-out contract on re-stores inside a critical section, or
-    tags [↦w] itself and sweeps lock payloads tree-wide.
-    UPGRADE PATH: the [↦w] TRANSFER-DISCIPLINE REWORK — retention tokens
-    travelling through the ~4 enumerated egress lemmas
-    ([WeakInstr.wwp_release_deposit], [WeakFence.release_deposit], …), plus
-    the ownership reflection (a per-byte hazard ghost minted by the owned-store
-    leaf and cleared by the publish leaf, and a per-byte BDOwned/BDSync
-    discipline map).  The original wiring plan survives verbatim: a conjunct at
-    [WeakGhost.v:458] and a three-line export at [WeakAdequacy.v:225-227] — NO
-    adequacy variant is needed (D-M6-6).
+    SUPERSEDED AS THE COMPOSITION'S ROUTE (stage B, 2026-08-13).  Even
+    hart-restricted, this premise is NOT derivable from φ — and is
+    REFUTABLE for kernels with the wrong code shape: at EVENT granularity
+    a pf run can park an author mid-instruction between its walker A/D
+    CAS and its release-pending ([w_relp]) data store, and a foreign
+    hart's observation through that dangling CAS is a real pf-reachable
+    hart violation that NO instruction-atomic WeakLang run exhibits
+    ([WeakComposeLang] §B, finding 2).  [xv6_weak_robust] below is kept
+    as the archived M6 statement over this premise; the composition to
+    USE is [WeakComposeLang.xv6_weak_robust_lifted] / [_adequate], which
+    consume φ directly through the minimal-bad-edge cone (block-contiguous
+    replay + completion + [wl_lift]) and need this conjunct nowhere.  The
+    exhibit machinery ([bad_edge_violates], [no_bad_edge],
+    [gdep2_acyclic_main]) likewise remains valid over the premise but is
+    bypassed by [robust_main_no_bad] + [gdep2_acyclic_bad_free].
+
+    HISTORICAL (why it was declared rather than proved, at the pf level):
+    W3's φ analysis found the whole pf-level obligation concentrates in
+    ONE arm — a fragment-backed load of a byte carrying a foreign
+    unpublished [WCplain] message — and refuting that arm needs the state
+    interpretation to observe the DISTRIBUTION of outstanding [↦w]
+    fractions, the analysis that motivated the [↦w] transfer-discipline /
+    three-state-protocol work.  The supersession above makes the pf-level
+    statement unnecessary: the lift consumes the WEAKLANG-level export
+    ([WeakAdequacy.weak_system_adequacy_phi] → [WeakGhost.no_violation]),
+    which quantifies at instruction granularity, where φ is actually
+    provable — and the refutability finding shows the pf-level form was
+    never going to be provable at all.
 
     ------------------------------------------------------------------------
     (3) [main_premises] PER TRACED BUNDLE — DECLARED (the first conjunct of

@@ -65,7 +65,7 @@ Proof. solve_decision. Defined.
     [wm_tid] names the AGENT that appended the message; every agent of the
     composed machine — harts AND the disk — has an index, so [None] is now
     only the never-used boot-era slot (the DMA-tid unification, seam 1a of
-    [claude-notes/projects/weak-memory-lift.md]: [WeakLang.wmsgs_of_map]
+    [claude-notes/completed/weak-memory-lift.md]: [WeakLang.wmsgs_of_map]
     stamps [Some WeakLang.n_disk], matching the disk's index in
     [WeakCompose.xv6_ps]).  Predicates that used to exempt [wm_tid = None]
     are re-keyed on IS-A-HART ([tid_hart] below).  [wm_ak] is the inert class

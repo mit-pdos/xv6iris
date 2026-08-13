@@ -1,6 +1,6 @@
 (** * WeakRobustBlocks.v — BLOCK STRUCTURE, THE CONE CUT, and COMPLETION
       (lift stage L1 — obstacles 1 and 2 of
-       [claude-notes/projects/weak-memory-lift.md])
+       [claude-notes/completed/weak-memory-lift.md])
 
     THE GAP THIS FILE CLOSES.  φ is exported at INSTRUCTION boundaries
     (the WP steps whole instructions); the Layer-1 exhibit
@@ -1044,7 +1044,7 @@ Global Arguments violates_at {P} _ _ _ _ _ _.
 (** * WHAT L3 CONSUMES, AND WHICH OBSTACLE EACH ITEM CLOSES
 
     Against the lift plan's obstacle list
-    ([claude-notes/projects/weak-memory-lift.md]):
+    ([claude-notes/completed/weak-memory-lift.md]):
 
     OBSTACLE 1 (granularity — φ is exported at instruction boundaries,
     the exhibit stops at event boundaries):

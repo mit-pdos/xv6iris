@@ -338,7 +338,7 @@ Proof.
 Qed.
 
 (** THE DISK'S AGENT INDEX (the DMA-tid unification, seam 1a of
-    [claude-notes/projects/weak-memory-lift.md]).  The composed wp machine
+    [claude-notes/completed/weak-memory-lift.md]).  The composed wp machine
     ([WeakCompose.xv6_ps]) lays the agents out as [n] harts at indices
     [0 .. n-1] and the DISK at index [n]; with [n = NCPU] that index is
     [NCPU], and [n_disk] is that number.  Making the disk an ORDINARY agent

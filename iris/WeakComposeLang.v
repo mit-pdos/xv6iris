@@ -1,6 +1,6 @@
 (** * WeakComposeLang.v — L3/B5b: THE CONE-ROUTE φ-CONSUMPTION AND THE
       LIFTED COMPOSITION
-      (lift stages L3 + B5b of [claude-notes/projects/weak-memory-lift.md])
+      (lift stages L3 + B5b of [claude-notes/completed/weak-memory-lift.md])
 
     WHAT THIS FILE IS.  [WeakCompose.xv6_weak_robust] is the M6 headline
     theorem over the wp machine ([wpcfg pxv6]); [WeakAdequacy] exports φ

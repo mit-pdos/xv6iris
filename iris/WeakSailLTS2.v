@@ -5,7 +5,7 @@
     LTS ([wrun_sail_bracket], [sail_instr_bracket]).  Its header delta (g)
     records what is NOT there: the ⇐ half — every COMPLETED [sail_step] block
     is a [wrun].  THIS FILE IS THAT HALF, stage L2 of
-    [claude-notes/projects/weak-memory-lift.md].
+    [claude-notes/completed/weak-memory-lift.md].
 
     It is a NEW file rather than an extension of [WeakSailLTS.v] so that the
     latter's [.vo] stays byte-stable for the other in-flight lift stages; it

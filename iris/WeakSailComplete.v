@@ -1,6 +1,6 @@
 (** * WeakSailComplete.v — the SAIL-LEVEL COMPLETION KIT (lift stage B1+B2)
 
-    Stage B of [claude-notes/projects/weak-memory-lift.md] re-derives the
+    Stage B of [claude-notes/completed/weak-memory-lift.md] re-derives the
     φ-consumption inside the minimal-bad-edge exhibit.  Two of its pieces are
     purely local to the Sail LTS and are delivered here:
 

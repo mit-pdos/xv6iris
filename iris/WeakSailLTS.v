@@ -52,7 +52,7 @@
         from [str ++ tail] to [tail]).
 
     (b') THE INTERRUPT ORACLE ([sp_irq], [irq_deliver]; L0(b) of
-        [claude-notes/projects/weak-memory-lift.md], landed 2026-08-12).
+        [claude-notes/completed/weak-memory-lift.md], landed 2026-08-12).
         [RiscvLang.plic_step] writes ANOTHER agent's register file
         ([PlicStepWire] sets hart [c]'s [sig_seip] from [dev_seip]), which a
         per-agent LTS whose only shared channel is the log cannot express at
