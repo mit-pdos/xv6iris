@@ -358,6 +358,94 @@ Section ProofProcdumpLoop.
   Notation Rs6 := (mword_of_int 22 : mword 5).
   Notation Rs7 := (mword_of_int 23 : mword 5).
 
+  (* ---- THE BLOCK STATEMENTS, NAMED (claude-notes/optimization.md, RULE
+     ONE) -- [Hloop]/[Hadv]/[Hprint] are each stated below as a
+     [wp_next]-wrapped [iAssert] whose continuation body is tens of lines
+     of ∀/wands; spelled out in place, EVERY proofmode step of the walk
+     re-embeds that whole statement in the proof term (the cost is
+     |Δ| times the number of steps).  Naming the inner body turns each
+     into a constant applied to its arguments in the context.
+
+     They are TRANSPARENT ON PURPOSE and only the part AFTER
+     [fun CIDx : CpuId =>] is named: the [wp_next]/[□]/[∀ fuel] at each
+     use site stay syntactically visible, which is what lets
+     [iSpecialize]/[iApply] unify through them without an extra
+     [iEval (rewrite /...)], and what lets [iInduction fuel] leave
+     [pdl_loop_body]'s own induction hypothesis folded.  [GEN]/[CID0] are
+     bound by [wp_pd_loop] itself, not by the section, so unlike the
+     dirlink/dirlookup/namex families these definitions take them as
+     explicit parameters. *)
+
+  Definition pdl_loop_body `{GEN : GenId} (CID0 : CpuId)
+      (spv p : mword 64) (m0 : regfile) (K' : nat) (eb b : bool)
+      (C : iProp Σ) (fuel : nat) (CIDf : CpuId) : iProp Σ :=
+    (∀ (j : nat) (M : regfile),
+       ⌜ (NPROC - j <= fuel)%nat ⌝ -∗
+       ⌜ (j < NPROC)%nat ⌝ -∗
+       ⌜ pd_regs_loop M spv j /\ pd_regs_hi m0 M ⌝ -∗
+       wp_next (CID0 := CID0) b p (fun (CIDq : CpuId) =>
+         ∀ (Mx : regfile),
+           ⌜ Mx !!! pdR 2 = spv /\ pd_regs_hi m0 Mx ⌝ -∗
+           sie_cap_gpr Mx K' b p -∗
+           cpu_own 0%nat eb p C b -∗
+           pc_is (mword_of_int (KernelSyms.procdump + 0x8e)) -∗
+           procdump_view -∗
+           WP (Loop : expr riscv_lang)) -∗
+       sie_cap_gpr M K' b p -∗
+       cpu_own 0%nat eb p C b -∗
+       pc_is (mword_of_int (KernelSyms.procdump + 0x6e)) -∗
+       ([∗ list] k ∈ seq 0 j, proc_dump_slot (proc_addr k)) -∗
+       ([∗ list] k ∈ seq j (NPROC - j), proc_dump_slot (proc_addr k)) -∗
+       WP (Loop : expr riscv_lang))%I.
+
+  Definition pdl_adv_body `{GEN : GenId} (CID0 : CpuId)
+      (spv p : mword 64) (m0 : regfile) (K' : nat) (eb b : bool)
+      (C : iProp Σ) (j : nat) (CIDa : CpuId) : iProp Σ :=
+    (∀ (Ma : regfile),
+       ⌜ pd_regs_loop Ma spv j /\ pd_regs_hi m0 Ma ⌝ -∗
+       wp_next (CID0 := CID0) b p (fun (CIDq : CpuId) =>
+         ∀ (Mx : regfile),
+           ⌜ Mx !!! pdR 2 = spv /\ pd_regs_hi m0 Mx ⌝ -∗
+           sie_cap_gpr Mx K' b p -∗
+           cpu_own 0%nat eb p C b -∗
+           pc_is (mword_of_int (KernelSyms.procdump + 0x8e)) -∗
+           procdump_view -∗
+           WP (Loop : expr riscv_lang)) -∗
+       sie_cap_gpr Ma K' b p -∗
+       cpu_own 0%nat eb p C b -∗
+       pc_is (mword_of_int (KernelSyms.procdump + 0x66)) -∗
+       ([∗ list] k ∈ seq 0 (S j), proc_dump_slot (proc_addr k)) -∗
+       ([∗ list] k ∈ seq (S j) (NPROC - S j), proc_dump_slot (proc_addr k)) -∗
+       WP (Loop : expr riscv_lang))%I.
+
+  Definition pdl_print_body `{GEN : GenId} (CID0 : CpuId)
+      (spv p : mword 64) (m0 : regfile) (K' : nat) (eb b : bool)
+      (C : iProp Σ) (j : nat) (CIDp : CpuId) : iProp Σ :=
+    (∀ (Mp : regfile) (sptr : mword 64) (ss nm2 : string)
+       (dq1 dq2 dq3 : dfrac) (st2 pid2 : mword 32),
+       ⌜ pd_regs_loop Mp spv j /\ pd_regs_hi m0 Mp ⌝ -∗
+       ⌜ Mp !!! Regidx Ra2 = sptr /\ Mp !!! Regidx Ra3 = pd_cur j ⌝ -∗
+       ⌜ nonul ss = true /\ eq_vec sptr (zero_reg : mword 64) = false
+         /\ nonul nm2 = true ⌝ -∗
+       sptr ↦ₛ□ ss -∗
+       wp_next (CID0 := CID0) b p (fun (CIDq : CpuId) =>
+         ∀ (Mx : regfile),
+           ⌜ Mx !!! pdR 2 = spv /\ pd_regs_hi m0 Mx ⌝ -∗
+           sie_cap_gpr Mx K' b p -∗
+           cpu_own 0%nat eb p C b -∗
+           pc_is (mword_of_int (KernelSyms.procdump + 0x8e)) -∗
+           procdump_view -∗
+           WP (Loop : expr riscv_lang)) -∗
+       sie_cap_gpr Mp K' b p -∗
+       cpu_own 0%nat eb p C b -∗
+       pc_is (mword_of_int (KernelSyms.procdump + 0x56)) -∗
+       p_state (proc_addr j) ↦₄{dq1} st2 -∗
+       p_pid (proc_addr j) ↦₄{dq2} pid2 -∗
+       p_name (proc_addr j) 0 ↦ₛ{dq3} nm2 -∗
+       ([∗ list] k ∈ seq 0 j, proc_dump_slot (proc_addr k)) -∗
+       ([∗ list] k ∈ seq (S j) (NPROC - S j), proc_dump_slot (proc_addr k)) -∗
+       WP (Loop : expr riscv_lang))%I.
+
   Lemma wp_pd_loop `{GEN : GenId} `{CID0 : CpuId}
       (γpr : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (spv p : mword 64) (K' : nat) (eb b : bool) (C : iProp Σ) :
@@ -386,24 +474,8 @@ Section ProofProcdumpLoop.
     iIntros "#Hkt #Hkd #Hpenv #Hpanic Hqexit".
     iAssert (∀ (fuel : nat),
       wp_next (CID0 := CID0) b p (fun (CIDf : CpuId) =>
-        ∀ (j : nat) (M : regfile),
-          ⌜ (NPROC - j <= fuel)%nat ⌝ -∗
-          ⌜ (j < NPROC)%nat ⌝ -∗
-          ⌜ pd_regs_loop M spv j /\ pd_regs_hi m0 M ⌝ -∗
-          wp_next (CID0 := CID0) b p (fun (CIDq : CpuId) =>
-            ∀ (Mx : regfile),
-              ⌜ Mx !!! pdR 2 = spv /\ pd_regs_hi m0 Mx ⌝ -∗
-              sie_cap_gpr Mx K' b p -∗
-              cpu_own 0%nat eb p C b -∗
-              pc_is (mword_of_int (KernelSyms.procdump + 0x8e)) -∗
-              procdump_view -∗
-              WP (Loop : expr riscv_lang)) -∗
-          sie_cap_gpr M K' b p -∗
-          cpu_own 0%nat eb p C b -∗
-          pc_is (mword_of_int (KernelSyms.procdump + 0x6e)) -∗
-          ([∗ list] k ∈ seq 0 j, proc_dump_slot (proc_addr k)) -∗
-          ([∗ list] k ∈ seq j (NPROC - j), proc_dump_slot (proc_addr k)) -∗
-          WP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
+        pdl_loop_body CID0 spv p m0 K' eb b C fuel CIDf))%I
+      with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
       { iIntros (CIDf Hsf j M) "%Hfuel %Hj %Hregs Hqx Hcg Hown Hpc Hpre Hsuf".
         exfalso. exact (pdl_no_fuel j Hfuel Hj). }
@@ -436,22 +508,8 @@ Section ProofProcdumpLoop.
       (* THE ADVANCE JOIN, +0x66 .. +0x6a                                  *)
       (* ================================================================ *)
       iAssert (□ wp_next (CID0 := CIDf) b p (fun (CIDa : CpuId) =>
-        ∀ (Ma : regfile),
-          ⌜ pd_regs_loop Ma spv j /\ pd_regs_hi m0 Ma ⌝ -∗
-          wp_next (CID0 := CID0) b p (fun (CIDq : CpuId) =>
-            ∀ (Mx : regfile),
-              ⌜ Mx !!! pdR 2 = spv /\ pd_regs_hi m0 Mx ⌝ -∗
-              sie_cap_gpr Mx K' b p -∗
-              cpu_own 0%nat eb p C b -∗
-              pc_is (mword_of_int (KernelSyms.procdump + 0x8e)) -∗
-              procdump_view -∗
-              WP (Loop : expr riscv_lang)) -∗
-          sie_cap_gpr Ma K' b p -∗
-          cpu_own 0%nat eb p C b -∗
-          pc_is (mword_of_int (KernelSyms.procdump + 0x66)) -∗
-          ([∗ list] k ∈ seq 0 (S j), proc_dump_slot (proc_addr k)) -∗
-          ([∗ list] k ∈ seq (S j) (NPROC - S j), proc_dump_slot (proc_addr k)) -∗
-          WP (Loop : expr riscv_lang)))%I with "[]" as "#Hadv".
+        pdl_adv_body CID0 spv p m0 K' eb b C j CIDa))%I
+        with "[]" as "#Hadv".
       { iModIntro. iIntros (CIDa Hsa Ma) "%Hra Hqx2 Hcg Hown Hpc Hpre2 Hsuf2".
         destruct Hra as [Hral Hrah].
         (* ---- +0x66 addi s1,s1,360 ---- *)
@@ -535,30 +593,8 @@ Section ProofProcdumpLoop.
       (* THE PRINT JOIN, +0x56 .. +0x64                                    *)
       (* ================================================================ *)
       iAssert (□ wp_next (CID0 := CIDf) b p (fun (CIDp : CpuId) =>
-        ∀ (Mp : regfile) (sptr : mword 64) (ss nm2 : string)
-          (dq1 dq2 dq3 : dfrac) (st2 pid2 : mword 32),
-          ⌜ pd_regs_loop Mp spv j /\ pd_regs_hi m0 Mp ⌝ -∗
-          ⌜ Mp !!! Regidx Ra2 = sptr /\ Mp !!! Regidx Ra3 = pd_cur j ⌝ -∗
-          ⌜ nonul ss = true /\ eq_vec sptr (zero_reg : mword 64) = false
-            /\ nonul nm2 = true ⌝ -∗
-          sptr ↦ₛ□ ss -∗
-          wp_next (CID0 := CID0) b p (fun (CIDq : CpuId) =>
-            ∀ (Mx : regfile),
-              ⌜ Mx !!! pdR 2 = spv /\ pd_regs_hi m0 Mx ⌝ -∗
-              sie_cap_gpr Mx K' b p -∗
-              cpu_own 0%nat eb p C b -∗
-              pc_is (mword_of_int (KernelSyms.procdump + 0x8e)) -∗
-              procdump_view -∗
-              WP (Loop : expr riscv_lang)) -∗
-          sie_cap_gpr Mp K' b p -∗
-          cpu_own 0%nat eb p C b -∗
-          pc_is (mword_of_int (KernelSyms.procdump + 0x56)) -∗
-          p_state (proc_addr j) ↦₄{dq1} st2 -∗
-          p_pid (proc_addr j) ↦₄{dq2} pid2 -∗
-          p_name (proc_addr j) 0 ↦ₛ{dq3} nm2 -∗
-          ([∗ list] k ∈ seq 0 j, proc_dump_slot (proc_addr k)) -∗
-          ([∗ list] k ∈ seq (S j) (NPROC - S j), proc_dump_slot (proc_addr k)) -∗
-          WP (Loop : expr riscv_lang)))%I with "[]" as "#Hprint".
+        pdl_print_body CID0 spv p m0 K' eb b C j CIDp))%I
+        with "[]" as "#Hprint".
       { iModIntro.
         iIntros (CIDp Hsp Mp sptr ss nm2 dq1 dq2 dq3 st2 pid2)
           "%Hrp %Hav %Hstr #Hss Hqx2 Hcg Hown Hpc Hst2 Hpid2 Hnmc2 Hpre2 Hsuf2".
