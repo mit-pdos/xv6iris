@@ -17,6 +17,7 @@ Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode01.
+Require Import KernelDecode03.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
 Require Import KernelDecode08.
@@ -58,17 +59,17 @@ Section CodeKinit.
   Proof. mk_base (KernelSyms.kinit + 0x8) (mword_of_int 0x00006597 : mword 32)
     (mword_of_int (KernelSyms.kinit + 0x8) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 11), AUIPC)) kd_00006597. Qed.
 
-  Lemma kii_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.kinit + 0xc) : mword 64) false (ITYPE (mword_of_int 1430 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
-  Proof. mk_base (KernelSyms.kinit + 0xc) (mword_of_int 0x59658593 : mword 32)
-    (mword_of_int (KernelSyms.kinit + 0xc) : mword 64) (ITYPE (mword_of_int 1430 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_59658593. Qed.
+  Lemma kii_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.kinit + 0xc) : mword 64) false (ITYPE (mword_of_int 1438 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
+  Proof. mk_base (KernelSyms.kinit + 0xc) (mword_of_int 0x59e58593 : mword 32)
+    (mword_of_int (KernelSyms.kinit + 0xc) : mword 64) (ITYPE (mword_of_int 1438 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_59e58593. Qed.
 
   Lemma kii_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.kinit + 0x10) : mword 64) false (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (KernelSyms.kinit + 0x10) (mword_of_int 0x00012517 : mword 32)
     (mword_of_int (KernelSyms.kinit + 0x10) : mword 64) (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00012517. Qed.
 
-  Lemma kii_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.kinit + 0x14) : mword 64) false (ITYPE (mword_of_int 2230 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.kinit + 0x14) (mword_of_int 0x8b650513 : mword 32)
-    (mword_of_int (KernelSyms.kinit + 0x14) : mword 64) (ITYPE (mword_of_int 2230 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_8b650513. Qed.
+  Lemma kii_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.kinit + 0x14) : mword 64) false (ITYPE (mword_of_int 2238 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.kinit + 0x14) (mword_of_int 0x8be50513 : mword 32)
+    (mword_of_int (KernelSyms.kinit + 0x14) : mword 64) (ITYPE (mword_of_int 2238 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_8be50513. Qed.
 
   Lemma kii_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.kinit + 0x18) : mword 64) false (JAL (mword_of_int 118 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.kinit + 0x18) (mword_of_int 0x076000ef : mword 32)
@@ -86,9 +87,9 @@ Section CodeKinit.
   Proof. mk_base (KernelSyms.kinit + 0x20) (mword_of_int 0x00023517 : mword 32)
     (mword_of_int (KernelSyms.kinit + 0x20) : mword 64) (UTYPE (mword_of_int 35 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00023517. Qed.
 
-  Lemma kii_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.kinit + 0x24) : mword 64) false (ITYPE (mword_of_int 2774 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.kinit + 0x24) (mword_of_int 0xad650513 : mword 32)
-    (mword_of_int (KernelSyms.kinit + 0x24) : mword 64) (ITYPE (mword_of_int 2774 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_ad650513. Qed.
+  Lemma kii_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.kinit + 0x24) : mword 64) false (ITYPE (mword_of_int 2782 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.kinit + 0x24) (mword_of_int 0xade50513 : mword 32)
+    (mword_of_int (KernelSyms.kinit + 0x24) : mword 64) (ITYPE (mword_of_int 2782 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_ade50513. Qed.
 
   Lemma kii_28 : kernel_text -∗ instr (mword_of_int (KernelSyms.kinit + 0x28) : mword 64) false (JAL (mword_of_int 2097040 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.kinit + 0x28) (mword_of_int 0xf91ff0ef : mword 32)

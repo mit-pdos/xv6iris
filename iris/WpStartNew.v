@@ -26,7 +26,7 @@
      40 0x80000072 0x8fd9     c.or    a5, a4           [RVC]
      41 0x80000074 0x30079073 csrw    mstatus, a5      [F_Base, 4-aligned]
      42 0x80000078 0x00001797 auipc   a5, 0x1          [F_Base, 4-aligned]
-     43 0x8000007c 0xdf878793 addi    a5, a5, -520     [F_Base, 4-aligned]
+     43 0x8000007c 0xda678793 addi    a5, a5, -602     [F_Base, 4-aligned]
      44 0x80000080 0x34179073 csrw    mepc, a5         [F_Base, 4-aligned]
      45 0x80000084 0x4781     c.li    a5, 0            [RVC]
      46 0x80000086 0x18079073 csrw    satp, a5         [F_Base, 2-aligned]

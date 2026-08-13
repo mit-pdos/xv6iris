@@ -287,7 +287,7 @@ Section ProofKvmmap.
           (add_vec (mword_of_int (KernelSyms.kvmmap + 0x1c) : mword 64) (auipc_off (mword_of_int 6 : mword 20)))]> mr).
       assert (Hpp20 : add_vec_int (mword_of_int (KernelSyms.kvmmap + 0x1c) : mword 64) 4 = mword_of_int (KernelSyms.kvmmap + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp20) in "Hpc".
-      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kvmmap + 0x20)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x6c : mword 12)
+      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kvmmap + 0x20)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x74 : mword 12)
                 Q1 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi20").
       iIntros (CIDc Hsc) "Hcg Hpc".
@@ -296,7 +296,7 @@ Section ProofKvmmap.
          CIDb).  [rgne] peels it to the CID-free lookup. *)
       iEval (rgne) in "Hcg".
       set (Q2 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
-          (add_vec (Q1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 108 : mword 12)))]> Q1).
+          (add_vec (Q1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 116 : mword 12)))]> Q1).
       assert (Hpp24 : add_vec_int (mword_of_int (KernelSyms.kvmmap + 0x20) : mword 64) 4 = mword_of_int (KernelSyms.kvmmap + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp24) in "Hpc".
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.kvmmap + 0x24)) (mword_of_int 1 : mword 5) (mword_of_int 2094952 : mword 21)

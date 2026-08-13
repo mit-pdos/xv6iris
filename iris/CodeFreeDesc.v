@@ -19,6 +19,7 @@ From Kernel Require KernelSyms.
 Require Import KernelDecode00.
 Require Import KernelDecode01.
 Require Import KernelDecode02.
+Require Import KernelDecode05.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
 Require Import KernelDecode08.
@@ -155,9 +156,9 @@ Section CodeFreeDesc.
   Proof. mk_base (KernelSyms.free_desc + 0x4e) (mword_of_int 0xe6450513 : mword 32)
     (mword_of_int (KernelSyms.free_desc + 0x4e) : mword 64) (ITYPE (mword_of_int 3684 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_e6450513. Qed.
 
-  Lemma fdi_52 : kernel_text -∗ instr (mword_of_int (KernelSyms.free_desc + 0x52) : mword 64) false (JAL (mword_of_int 2083122 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.free_desc + 0x52) (mword_of_int 0x933fc0ef : mword 32)
-    (mword_of_int (KernelSyms.free_desc + 0x52) : mword 64) (JAL (mword_of_int 2083122 : mword 21, Regidx (mword_of_int 1))) kd_933fc0ef. Qed.
+  Lemma fdi_52 : kernel_text -∗ instr (mword_of_int (KernelSyms.free_desc + 0x52) : mword 64) false (JAL (mword_of_int 2083114 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.free_desc + 0x52) (mword_of_int 0x92bfc0ef : mword 32)
+    (mword_of_int (KernelSyms.free_desc + 0x52) : mword 64) (JAL (mword_of_int 2083114 : mword 21, Regidx (mword_of_int 1))) kd_92bfc0ef. Qed.
 
   Lemma fdi_56 : kernel_text -∗ instr (mword_of_int (KernelSyms.free_desc + 0x56) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.free_desc + 0x56) (mword_of_int 0x60a2 : mword 16)
@@ -183,9 +184,9 @@ Section CodeFreeDesc.
   Proof. mk_base (KernelSyms.free_desc + 0x62) (mword_of_int 0x01050513 : mword 32)
     (mword_of_int (KernelSyms.free_desc + 0x62) : mword 64) (ITYPE (mword_of_int 16 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_01050513. Qed.
 
-  Lemma fdi_66 : kernel_text -∗ instr (mword_of_int (KernelSyms.free_desc + 0x66) : mword 64) false (JAL (mword_of_int 2077172 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.free_desc + 0x66) (mword_of_int 0x9f4fb0ef : mword 32)
-    (mword_of_int (KernelSyms.free_desc + 0x66) : mword 64) (JAL (mword_of_int 2077172 : mword 21, Regidx (mword_of_int 1))) kd_9f4fb0ef. Qed.
+  Lemma fdi_66 : kernel_text -∗ instr (mword_of_int (KernelSyms.free_desc + 0x66) : mword 64) false (JAL (mword_of_int 2077164 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.free_desc + 0x66) (mword_of_int 0x9ecfb0ef : mword 32)
+    (mword_of_int (KernelSyms.free_desc + 0x66) : mword 64) (JAL (mword_of_int 2077164 : mword 21, Regidx (mword_of_int 1))) kd_9ecfb0ef. Qed.
 
   Lemma fdi_6a : kernel_text -∗ instr (mword_of_int (KernelSyms.free_desc + 0x6a) : mword 64) false (UTYPE (mword_of_int 2 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (KernelSyms.free_desc + 0x6a) (mword_of_int 0x00002517 : mword 32)
@@ -195,8 +196,8 @@ Section CodeFreeDesc.
   Proof. mk_base (KernelSyms.free_desc + 0x6e) (mword_of_int 0x01450513 : mword 32)
     (mword_of_int (KernelSyms.free_desc + 0x6e) : mword 64) (ITYPE (mword_of_int 20 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_01450513. Qed.
 
-  Lemma fdi_72 : kernel_text -∗ instr (mword_of_int (KernelSyms.free_desc + 0x72) : mword 64) false (JAL (mword_of_int 2077160 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.free_desc + 0x72) (mword_of_int 0x9e8fb0ef : mword 32)
-    (mword_of_int (KernelSyms.free_desc + 0x72) : mword 64) (JAL (mword_of_int 2077160 : mword 21, Regidx (mword_of_int 1))) kd_9e8fb0ef. Qed.
+  Lemma fdi_72 : kernel_text -∗ instr (mword_of_int (KernelSyms.free_desc + 0x72) : mword 64) false (JAL (mword_of_int 2077152 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.free_desc + 0x72) (mword_of_int 0x9e0fb0ef : mword 32)
+    (mword_of_int (KernelSyms.free_desc + 0x72) : mword 64) (JAL (mword_of_int 2077152 : mword 21, Regidx (mword_of_int 1))) kd_9e0fb0ef. Qed.
 
 End CodeFreeDesc.

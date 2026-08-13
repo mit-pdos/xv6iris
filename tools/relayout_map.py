@@ -225,8 +225,13 @@ def apply_map(proof_file, changes, syms, aliases=()):
     for s in syms:
         for a in {s} | set(find_aliases(text, s)):
             alias_of[a] = s
+    # `aliases` may be a plain sequence (every name stands for the file's first
+    # symbol -- the command-line form) or a {alias: symbol} mapping, which is
+    # what a caller resolving aliases across a proof family must pass: a Code
+    # file covering several functions would otherwise attribute the second
+    # function's alias to the first's map.
     for a in aliases:
-        alias_of.setdefault(a, syms[0])
+        alias_of.setdefault(a, aliases[a] if isinstance(aliases, dict) else syms[0])
     names = sorted(alias_of, key=len, reverse=True)
     anchor_re = re.compile(r'(?:KernelSyms\.)?\b(' + '|'.join(map(re.escape, names))
                            + r')\b\s*\+\s*(0x[0-9a-fA-F]+|\d+)')

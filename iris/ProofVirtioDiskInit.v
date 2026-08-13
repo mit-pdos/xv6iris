@@ -908,14 +908,14 @@ Section ProofVirtioDiskInit.
     (* +0x01c jal initlock *)
     iPoseProof (vdi_01c with "Htext") as "Hi".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x01c)) (mword_of_int 1 : mword 5)
-              (mword_of_int 2077916 : mword 21) W6 (K - 4)%nat false ltac:(nzd) ltac:(rdok)
+              (mword_of_int 2077908 : mword 21) W6 (K - 4)%nat false ltac:(nzd) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi").
               iApply wp_next_off_intro.
     iIntros "Hcg Hpc". iClear "Hi".
     pose (W7 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x01c) : mword 64) 4)]> W6).
     assert (Htgtil : add_vec (mword_of_int (KernelSyms.virtio_disk_init + 0x01c) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2077916 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2077908 : mword 21))
                      = mword_of_int KernelSyms.initlock) by bvc.
     iEval (rewrite Htgtil) in "Hpc".
     assert (HW7a0 : W7 !!! Regidx (mword_of_int 10 : mword 5) = disk_lock)
@@ -1565,14 +1565,14 @@ Section ProofVirtioDiskInit.
     (* +0x0be jal kalloc *)
     iPoseProof (vdi_0be with "Htext") as "Hi".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x0be)) (mword_of_int 1 : mword 5)
-              (mword_of_int 2077664 : mword 21) B38 (K - 4)%nat false ltac:(nzd) ltac:(rdok)
+              (mword_of_int 2077656 : mword 21) B38 (K - 4)%nat false ltac:(nzd) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi").
               iApply wp_next_off_intro.
     iIntros "Hcg Hpc". iClear "Hi".
     pose (B39 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x0be) : mword 64) 4)]> B38).
     assert (Htgk1 : add_vec (mword_of_int (KernelSyms.virtio_disk_init + 0x0be) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2077664 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2077656 : mword 21))
                     = mword_of_int KernelSyms.kalloc) by bvc.
     iEval (rewrite Htgk1) in "Hpc".
     assert (HB39sp : B39 !!! Regidx csp_rs1 = spr) by (peel; exact Hmilsp).
@@ -1637,14 +1637,14 @@ Section ProofVirtioDiskInit.
     (* +0x0cc jal kalloc *)
     iPoseProof (vdi_0cc with "Htext") as "Hi".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x0cc)) (mword_of_int 1 : mword 5)
-              (mword_of_int 2077650 : mword 21) C2 (K - 4)%nat false ltac:(nzd) ltac:(rdok)
+              (mword_of_int 2077642 : mword 21) C2 (K - 4)%nat false ltac:(nzd) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi").
               iApply wp_next_off_intro.
     iIntros "Hcg Hpc". iClear "Hi".
     pose (C3 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x0cc) : mword 64) 4)]> C2).
     assert (Htgk2 : add_vec (mword_of_int (KernelSyms.virtio_disk_init + 0x0cc) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2077650 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2077642 : mword 21))
                     = mword_of_int KernelSyms.kalloc) by bvc.
     iEval (rewrite Htgk2) in "Hpc".
     assert (HC3sp : C3 !!! Regidx csp_rs1 = spr) by (peel; exact Hk1sp).
@@ -1690,14 +1690,14 @@ Section ProofVirtioDiskInit.
     (* +0x0d2 jal kalloc *)
     iPoseProof (vdi_0d2 with "Htext") as "Hi".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x0d2)) (mword_of_int 1 : mword 5)
-              (mword_of_int 2077644 : mword 21) mk2 (K - 4)%nat false ltac:(nzd) ltac:(rdok)
+              (mword_of_int 2077636 : mword 21) mk2 (K - 4)%nat false ltac:(nzd) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi").
               iApply wp_next_off_intro.
     iIntros "Hcg Hpc". iClear "Hi".
     pose (D2 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x0d2) : mword 64) 4)]> mk2).
     assert (Htgk3 : add_vec (mword_of_int (KernelSyms.virtio_disk_init + 0x0d2) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2077644 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2077636 : mword 21))
                     = mword_of_int KernelSyms.kalloc) by bvc.
     iEval (rewrite Htgk3) in "Hpc".
     assert (HD2sp : D2 !!! Regidx csp_rs1 = spr) by (peel; exact Hk2sp).
@@ -1854,13 +1854,13 @@ Section ProofVirtioDiskInit.
     assert (Hp0f0 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x0ee) : mword 64) 2 = mword_of_int (KernelSyms.virtio_disk_init + 0x0f0)) by pcs.
     iEval (rewrite Hp0f0) in "Hpc".
     iPoseProof (vdi_0f0 with "Htext") as "Hi".
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x0f0)) (mword_of_int 1 : mword 5) (mword_of_int 2078024 : mword 21) E6 (K - 4)%nat false
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x0f0)) (mword_of_int 1 : mword 5) (mword_of_int 2078016 : mword 21) E6 (K - 4)%nat false
               ltac:(nzd) ltac:(rdok) ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi").
               iApply wp_next_off_intro.
     iIntros "Hcg Hpc". iClear "Hi".
     pose (E7 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x0f0) : mword 64) 4)]> E6).
     assert (Htgm1 : add_vec (mword_of_int (KernelSyms.virtio_disk_init + 0x0f0) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2078024 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2078016 : mword 21))
                     = mword_of_int KernelSyms.memset) by bvc.
     iEval (rewrite Htgm1) in "Hpc".
     assert (HE7a0 : E7 !!! Regidx (mword_of_int 10 : mword 5) = pd) by (peel; reflexivity).
@@ -1936,13 +1936,13 @@ Section ProofVirtioDiskInit.
     assert (Hp102 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x100) : mword 64) 2 = mword_of_int (KernelSyms.virtio_disk_init + 0x102)) by pcs.
     iEval (rewrite Hp102) in "Hpc".
     iPoseProof (vdi_102 with "Htext") as "Hi".
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x102)) (mword_of_int 1 : mword 5) (mword_of_int 2078006 : mword 21) F5 (K - 4)%nat false
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x102)) (mword_of_int 1 : mword 5) (mword_of_int 2077998 : mword 21) F5 (K - 4)%nat false
               ltac:(nzd) ltac:(rdok) ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi").
               iApply wp_next_off_intro.
     iIntros "Hcg Hpc". iClear "Hi".
     pose (F6 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x102) : mword 64) 4)]> F5).
     assert (Htgm2 : add_vec (mword_of_int (KernelSyms.virtio_disk_init + 0x102) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2078006 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2077998 : mword 21))
                     = mword_of_int KernelSyms.memset) by bvc.
     iEval (rewrite Htgm2) in "Hpc".
     assert (HF6a0 : F6 !!! Regidx (mword_of_int 10 : mword 5) = pav) by (peel; reflexivity).
@@ -1999,13 +1999,13 @@ Section ProofVirtioDiskInit.
     assert (Hp10c : add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x10a) : mword 64) 2 = mword_of_int (KernelSyms.virtio_disk_init + 0x10c)) by pcs.
     iEval (rewrite Hp10c) in "Hpc".
     iPoseProof (vdi_10c with "Htext") as "Hi".
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x10c)) (mword_of_int 1 : mword 5) (mword_of_int 2077996 : mword 21) G3 (K - 4)%nat false
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x10c)) (mword_of_int 1 : mword 5) (mword_of_int 2077988 : mword 21) G3 (K - 4)%nat false
               ltac:(nzd) ltac:(rdok) ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi").
               iApply wp_next_off_intro.
     iIntros "Hcg Hpc". iClear "Hi".
     pose (G4 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x10c) : mword 64) 4)]> G3).
     assert (Htgm3 : add_vec (mword_of_int (KernelSyms.virtio_disk_init + 0x10c) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2077996 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2077988 : mword 21))
                     = mword_of_int KernelSyms.memset) by bvc.
     iEval (rewrite Htgm3) in "Hpc".
     assert (HG4a0 : G4 !!! Regidx (mword_of_int 10 : mword 5) = pu) by (peel; reflexivity).

@@ -226,7 +226,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Lemma vdrwf_jrel :
   add_vec (mword_of_int (KernelSyms.virtio_disk_rw + 0x218) : mword 64)
-          (sign_extend' 64 (mword_of_int 2077216 : mword 21))
+          (sign_extend' 64 (mword_of_int 2077208 : mword 21))
   = (mword_of_int KernelSyms.release : mword 64).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
@@ -1382,7 +1382,7 @@ Section VdrwfP6.
                     = mword_of_int (KernelSyms.virtio_disk_rw + 0x218)) by pcstep.
     iEval (rewrite Hp1f6) in "Hpc".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x218) : mword 64) Rra
-              (mword_of_int 2077216 : mword 21) H2 (trap_res eb + (K - 12))%nat false
+              (mword_of_int 2077208 : mword 21) H2 (trap_res eb + (K - 12))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi1f6").
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.

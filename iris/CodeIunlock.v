@@ -134,9 +134,9 @@ Section CodeIunlock.
   Proof. mk_base (KernelSyms.iunlock + 0x34) (mword_of_int 0x00004517 : mword 32)
     (mword_of_int (KernelSyms.iunlock + 0x34) : mword 64) (UTYPE (mword_of_int 4 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00004517. Qed.
 
-  Lemma iui2_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.iunlock + 0x38) : mword 64) false (ITYPE (mword_of_int 434 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.iunlock + 0x38) (mword_of_int 0x1b250513 : mword 32)
-    (mword_of_int (KernelSyms.iunlock + 0x38) : mword 64) (ITYPE (mword_of_int 434 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_1b250513. Qed.
+  Lemma iui2_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.iunlock + 0x38) : mword 64) false (ITYPE (mword_of_int 442 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.iunlock + 0x38) (mword_of_int 0x1ba50513 : mword 32)
+    (mword_of_int (KernelSyms.iunlock + 0x38) : mword 64) (ITYPE (mword_of_int 442 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_1ba50513. Qed.
 
   Lemma iui2_3c : kernel_text -∗ instr (mword_of_int (KernelSyms.iunlock + 0x3c) : mword 64) false (JAL (mword_of_int 2086214 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.iunlock + 0x3c) (mword_of_int 0xd46fd0ef : mword 32)

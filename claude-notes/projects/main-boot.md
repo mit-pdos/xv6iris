@@ -315,7 +315,7 @@ a SECONDARY hart can also pay, so `pr_res` held the transmitter
 same exclusive token in `tx_lock`'s invariant
 ([`uart-driver.md`](uart-driver.md)). The two homes could not both link into
 one system, and that clash is exactly what made `LinkTxLockInit.tx_lock_init`
-an axiom. **xv6 `d80e61c5` settled it in the kernel**: `panicking`/`panicked`
+an axiom (that file is now deleted; see below). **xv6 `d80e61c5` settled it in the kernel**: `panicking`/`panicked`
 are deleted, printk always takes `pr.lock`, and uartputc_sync always takes
 `tx_lock` — so the transmitter is unambiguously `UartTxInv.tx_res`'s,
 `pr.lock` guards no C data and no ghost resource, and `pr_res` collapses to
@@ -343,8 +343,10 @@ Two consequences for main's proof, both live:
   merge having unblocked it — makes main need `is_txlock`. At that point the
   `newlock` over `UartTxInv.tx_res` belongs in `mn_grp_printk`, paid with
   exactly the `Hlkfresh` + `Htx`/`Hsent` it drops today, and
-  `LinkTxLockInit.tx_lock_init` retires with it (`is_txlock` also has to join
-  the deposit payload so the secondaries get it).
+  and the axiom that used to stand in for it is already gone —
+  `LinkTxLockInit.v` was deleted, its statement having omitted the `lk_fresh`
+  premise `newlock` needs. What is left is purely the wiring: `is_txlock` has
+  to join the deposit payload so the secondaries get it.
 
 The contract threads `cpu_own` net-zero and the tp premise (it acquires
 `pr.lock`), and its post is minimal: `callee_saved` + ra restored, no `a0`

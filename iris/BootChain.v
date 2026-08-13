@@ -603,9 +603,11 @@ Section BootPrimary.
     (* the BOOT hart: this is what makes main's [beqz a0] take the boot path *)
     (fin_to_nat cpu_id = 0)%nat ->
     (* kinit's free-page run, and enough pages for kvmmake + the 64 kstacks
-       + the disk's 3 *)
+       + the disk's 3.  [kmem_lo] IS the dumped `end` symbol (see [SpecMain]'s
+       premise), so the cursor is PGROUNDUP(end) + PGSIZE and tracks the
+       image. *)
     prun (mword_of_int 0x88000000 : mword 64)
-      (add_vec (and_vec (add_vec (mword_of_int 0x80023558 : mword 64)
+      (add_vec (and_vec (add_vec (mword_of_int kmem_lo : mword 64)
          (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv) ps ->
     (K_kvmmake + 64 + 3 < length ps)%nat ->
     (* the disk's protocol is in its not-live arm at boot *)
@@ -637,7 +639,7 @@ Section BootPrimary.
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hcpu Hg Hraw #Htimc Hpc".
     iApply (Main.wp_main_boot_sconf mf (kv_frame_slots + K_main)%nat zero_reg ps
-              (add_vec (and_vec (add_vec (mword_of_int 0x80023558 : mword 64)
+              (add_vec (and_vec (add_vec (mword_of_int kmem_lo : mword 64)
                  (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv)
               (mword_of_int 0x88000000 : mword 64) γd γv l0 b0 c0
               (register_lookup tlb rs) (main_deposit γd γv)

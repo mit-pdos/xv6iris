@@ -456,13 +456,13 @@ Section ProofAcquire.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp38) in "Hpc".
       iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.acquire + 0x38)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5)
-                (mword_of_int 0x464 : mword 12) P1 (trap_res b + (av - 4))%nat false
+                (mword_of_int 0x46c : mword 12) P1 (trap_res b + (av - 4))%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi38").
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
       set (P2 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
-          (add_vec (P1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x464 : mword 12)))]> P1).
+          (add_vec (P1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x46c : mword 12)))]> P1).
       assert (Hpp3c : add_vec_int (mword_of_int (KernelSyms.acquire + 0x38) : mword 64) 4 = mword_of_int (KernelSyms.acquire + 0x3c))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3c) in "Hpc".

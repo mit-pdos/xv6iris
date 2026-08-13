@@ -68,11 +68,11 @@ SAIL_RISCV_REV ?= c32fbf4111b849061db1812355d6da9df8c2e396
 # THE PIN IS A CLEAN UPSTREAM TIP.  It was briefly a local cherry-pick
 # (ae96fd0 + 9da28f5) while the fix for kernel-defects.md D2 was ahead of the
 # revision this tree was proved against; converging on the branch tip retired
-# that apparatus.  d80e61c5 additionally makes uart's tx_lock a spinlock and
-# removes the panic path, so both D2's and D3's fixes are upstream source.
-# Nothing here is a local commit: `git -C xv6-riscv checkout --detach
-# $(XV6_REV)` reproduces the image, and that is the whole recipe.
-XV6_REV ?= d80e61c5b13758173d592faebefdd2099d2ead81
+# that apparatus, and the pin has tracked the tip since (d80e61c5: tx_lock
+# becomes a spinlock, panic path removed; a28e94b: no procdump from the
+# console).  Nothing here is a local commit: `git -C xv6-riscv checkout
+# --detach $(XV6_REV)` reproduces the image, and that is the whole recipe.
+XV6_REV ?= a28e94b02c04b3d2b7585b327e326de4e2f71702
 
 KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.v
 

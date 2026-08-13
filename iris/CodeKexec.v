@@ -330,9 +330,9 @@ Section CodeKexec.
   Proof. mk_base (KernelSyms.kexec + 0xce) (mword_of_int 0x00003517 : mword 32)
     (mword_of_int (KernelSyms.kexec + 0xce) : mword 64) (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00003517. Qed.
 
-  Lemma kxc_0d2 : kernel_text -∗ instr (mword_of_int (KernelSyms.kexec + 0xd2) : mword 64) false (ITYPE (mword_of_int 3506 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.kexec + 0xd2) (mword_of_int 0xdb250513 : mword 32)
-    (mword_of_int (KernelSyms.kexec + 0xd2) : mword 64) (ITYPE (mword_of_int 3506 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_db250513. Qed.
+  Lemma kxc_0d2 : kernel_text -∗ instr (mword_of_int (KernelSyms.kexec + 0xd2) : mword 64) false (ITYPE (mword_of_int 3514 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.kexec + 0xd2) (mword_of_int 0xdba50513 : mword 32)
+    (mword_of_int (KernelSyms.kexec + 0xd2) : mword 64) (ITYPE (mword_of_int 3514 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_dba50513. Qed.
 
   Lemma kxc_0d6 : kernel_text -∗ instr (mword_of_int (KernelSyms.kexec + 0xd6) : mword 64) false (JAL (mword_of_int 2080774 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.kexec + 0xd6) (mword_of_int 0x806fc0ef : mword 32)

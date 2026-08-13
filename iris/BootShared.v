@@ -334,9 +334,12 @@ Proof. lia. Qed.
 
 (* kinit's free-page run, as [SpecMain]'s premises spell it: the cursor
    [PGROUNDUP(end) + PGSIZE], PHYSTOP, and the page count that puts the cursor
-   exactly one page past PHYSTOP. *)
+   exactly one page past PHYSTOP.  [PageGeom.kmem_lo] IS the dumped `end`
+   symbol (computed from [KernelSyms.end_] into a [Z] literal at its own
+   definition), so [s1entry_uint] below tracks the image instead of a
+   transcription of it. *)
 Definition s1entry_val : mword 64 :=
-  add_vec (and_vec (add_vec (mword_of_int 0x80023558 : mword 64)
+  add_vec (and_vec (add_vec (mword_of_int kmem_lo : mword 64)
      (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv.
 Definition phystop_val : mword 64 := mword_of_int 0x88000000.
 Definition kinit_pages : nat := 32732%nat.
@@ -602,7 +605,14 @@ Section BootBssChain.
     iDestruct (bss_cut g (KernelSyms.disk + 168 + 16 * Z.of_nat 8%nat)
                  (KernelSyms.disk + 296) (KernelSyms.disk + 296 + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hlk11 H]".
-    (* ---- and kinit's free-page run, to PHYSTOP ---- *)
+    (* ---- and kinit's free-page run, to PHYSTOP ----
+       [0x80024000] here is PGROUNDUP(end) = [uint s1entry_val - 4096], NOT a
+       transcription of the `end` symbol: it is a page BOUNDARY, so it only
+       moves when [KernelSyms.end_] crosses one.  It is kept a literal because
+       [bss_cut]'s ordering side conditions are closed by [zlit] on literals,
+       and it is self-checking -- [s1entry_uint] (which now computes from the
+       dumped symbol) and the [boot_ran_eq] equation just below both fail to
+       compile if [end] ever lands in a different page. *)
     iDestruct (bss_cut g (KernelSyms.disk + 296 + 24) 0x80024000 ram_hi ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hrun _]".
     iDestruct (boot_ran_eq g 0x80024000 ram_hi

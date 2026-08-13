@@ -129,11 +129,13 @@ Definition kvm_M (pas : nat -> mword 44) : gmap (mword 27) (mword 44 * kperm) :=
 
 (* legal stack pas: each is a whole kernel-data page -- exactly PtTree's
    [node_kdata] ("ppn's 4096-byte page lies wholly in RAM").  This is what
-   kalloc's [page_valid] guarantees (kalloc returns pages at [kmem_lo =
-   0x80023558 >= text_end], so every stack page sits in kernel data); the
-   RAM lower bound [ram_base] recorded here is the part the downstream
-   [page_own_kstack] capstone needs (per-byte [addr_is_ram], which combines
-   with the byte's own KP_rw claim to re-key it onto the kstack VA). *)
+   kalloc's [page_valid] guarantees (kalloc returns pages at or above
+   [kmem_lo], which IS the dumped `end` symbol and is > [text_end] -- see
+   [PageGeom.page_in_range_addr_is_kdata] -- so every stack page sits in
+   kernel data); the RAM lower bound [ram_base] recorded here is the part
+   the downstream [page_own_kstack] capstone needs (per-byte [addr_is_ram],
+   which combines with the byte's own KP_rw claim to re-key it onto the
+   kstack VA). *)
 Definition kvm_pas_ok (pas : nat -> mword 44) : Prop :=
   forall i : nat, (i < 64)%nat -> node_kdata (pas i).
 
