@@ -110,9 +110,29 @@ Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
      for a lazily-grown process (sbrk raises [p->sz] and maps nothing), which
      is exactly why this is a disjunction and not a replacement. *)
   ((uint newsz <= uvm_maxsz)%Z \/ um_covered oldsz P.(ud_um)) ->
-  (* the run is unmapped to begin with (mappages panics on a remap, and it
-     is what makes the failure arm's rollback exact) *)
-  (forall i, (i < n)%nat -> P.(ud_um) !! vpn_at vpn0 i = None) ->
+  (* THE RUN IS UNMAPPED TO BEGIN WITH -- mappages panics on a remap, and
+     this is also what makes the failure arm's rollback exact.  GUARDED BY
+     THE ADDRESS BOUND, for the same reason SpecReadi's sum premise is
+     guarded by the size test: asked outright it is UNPAYABLE by kexec.
+       [vpn_at] wraps at 2^27 entries, so for a run longer than that the
+     unguarded claim is not merely hard, it is FALSE -- the run comes back
+     round and lands on a page the caller really has mapped.  growproc never
+     gets there because it tests ([sz + n > TRAPFRAME] returns -1); kexec
+     cannot, because its [newsz] is [ph.vaddr + ph.memsz] out of an
+     untrusted file and may be anywhere below 2^64.
+       What the loop actually needs is freshness at the iterations it
+     REACHES, and it reaches iteration [i] only after mapping [i] pages --
+     which, by the counting argument in [UmCovered.v], bounds the address it
+     is about to map.  That bound is exactly this guard, it is already
+     derived inside ProofUvmalloc (as [Habi], from whichever disjunct of the
+     premise above the caller holds), and it is what
+     [ProcPtOwn.um_below_run_fresh] asks for.  So a caller discharges this
+     by [intros i Hi Hbnd; apply um_below_run_fresh] with [n := S i] and
+     needs no bound on the untrusted field at all.
+       Every existing caller pays it by ignoring the guard. *)
+  (forall i, (i < n)%nat ->
+     (bv_unsigned (pgroundup oldsz) + 4096 * Z.of_nat i + 4096 <= uvm_maxsz)%Z ->
+     P.(ud_um) !! vpn_at vpn0 i = None) ->
   sie_cap_gpr mm K b p -∗
   cpu_own 0%nat eb p C b -∗
   kernel_text -∗

@@ -482,14 +482,52 @@ pay it and move on; if no, the callee's contract is wrong and generalizing it
 is the work. Relaxing namei/namex/nameiparent and copyout's source to a
 fraction remains available and is nobody's blocker.
 
-## THE FOUR UPSTREAM BLOCKERS — THREE FIXED, ONE OPEN AND NOT GATING
+## THE FIVE UPSTREAM BLOCKERS — FOUR FIXED, ONE OPEN AND NOT GATING
 
 None of these is kexec's own design going wrong; each is a callee contract
-that was stated for the callers it had, and all four were found by trying to
-compose them. **§1 (copyout), §2 (safestrcpy) and §4 (readi's `off`) are
-FIXED and the tree is green; §3 (the log budget) is open** and belongs to
-the fs-namei project — it does not gate the proof, it only bounds which
-pathnames the theorem covers.
+that was stated for the callers it had, and all five were found by trying to
+compose them. **§1 (copyout), §2 (safestrcpy), §4 (readi's `off`) and §5
+(uvmalloc's freshness) are FIXED and the tree is green; §3 (the log budget)
+is open** and belongs to the fs-namei project — it does not gate the proof,
+it only bounds which pathnames the theorem covers.
+
+**THE RECURRING SHAPE, AND IT IS WORTH RECOGNISING ON SIGHT.** §4 and §5 are
+the same defect twice: a callee premise stated over a quantity the CALLEE
+tests and the caller cannot bound. Both are fixed the same way — GUARD the
+premise by the test the code already performs, so it asks only about the
+states the code actually reaches. Neither guard moves a postcondition, and
+every existing caller pays by ignoring it. When a premise looks unpayable,
+ask what the callee's own instruction order already guarantees before
+strengthening anything in the caller.
+
+### 5. `SpecUvmalloc`'s freshness premise was stated over the WHOLE run — **FIXED**
+
+`uvmalloc` demanded `forall i < n, P.(ud_um) !! vpn_at vpn0 i = None` — the
+whole run unmapped up front, `n = uvma_np oldsz newsz`. growproc pays it
+because it TESTS (`sz + n > TRAPFRAME` returns −1). kexec cannot: its
+`newsz` is `ph.vaddr + ph.memsz` out of an untrusted ELF and may be anywhere
+below 2^64, so `n` runs to ~2^52 — and **`vpn_at` wraps at 2^27 entries**, so
+past that the run comes back round onto a page the process really has
+mapped. The premise is not merely hard there, it is FALSE.
+
+The code is nevertheless safe, by the same counting argument
+[`UmCovered.v`](../../iris/UmCovered.v) is built on: the loop reaches
+iteration `i` only after kalloc'ing `i` pages, so `i` is bounded by physical
+memory long before the vpn can wrap. That bound was **already derived inside
+`ProofUvmalloc`** — `Hab` / `Habi`, from whichever disjunct of the size
+premise the caller holds — and it is exactly what
+`ProcPtOwn.um_below_run_fresh` asks for. So the premise is now
+
+```coq
+  (forall i, (i < n)%nat ->
+     (bv_unsigned (pgroundup oldsz) + 4096 * Z.of_nat i + 4096 <= uvm_maxsz)%Z ->
+     P.(ud_um) !! vpn_at vpn0 i = None) ->
+```
+
+and kexec discharges it by `intros i Hi Hbnd; apply um_below_run_fresh` at
+`n := S i`, with no bound on the untrusted field anywhere in the loop
+invariant. growproc's call site gained one `_` in its `intros`. The whole
+fix is three files and no new invariant conjunct.
 
 ### 4. `SpecReadi` could not express a 32-bit `off` — **FIXED**
 
