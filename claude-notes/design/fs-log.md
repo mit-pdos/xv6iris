@@ -1257,3 +1257,45 @@ iupdate's credgen, and the landed tree has NO consuming depositor yet
 (unlink and create's fail arm are unproven) — credgen's post is produced
 and carried.  The two missing escrow sites (ic_open_empty_free /
 ic_close_to_empty) join the worklist.
+
+
+### G.17 The receipt's FINAL home (2026-08-13): InodeRegion's invariant.
+### The escrow placement is retired, and the §G.16 gate with it.
+
+G-2b's second stop, RATIFIED on both blockers:
+
+**Blocker 3** — the escrow cannot carry the receipt: checkout (ilock) and
+park (iunlock) are different functions, so the resource crosses through
+every caller holding the locked bundle — the 25-statement surface §G.14
+exists to avoid — and while checked out the escrow cannot name the
+record at all.  RULED: the receipt moves to `InodeRegion.ireg_inv` — a
+genuine invariant, freely openable, whose ireg_slot HOLDS the record;
+`dinode_at` is the agreeing fragment every holder already carries.
+Per-INUM key = stable key = no recycle = **no nlz_pending/nlz_shot gate
+needed at all** (§G.16's device is retired before it shipped; its
+counter-trace concern is structurally void at a stable key).  Shape:
+ireg_slot's body gains ∃ v, mono_nat_auth_own (icfg_iep z) 1 v ∗
+log_epoch_lb icfg_log v ∗ (⌜nlink d = 0⌝ → ⌜v = 0⌝ ∨ ∃ e, logged_at
+icfg_log e (IBLOCK …) ∗ ⌜v <= e⌝); icfg_iep : Z → gname joins
+icfg_log/icfg_ist on the ambient class; mint/use open the invariant with
+dinode_at agreement; the deposit lands in ireg_write_au (iupdate's
+existing accessor); the boot/free-inode corner is the ⌜v = 0⌝ disjunct,
+sound with genesis epoch >= 1 (one token in ProofInitlog).  ZERO
+SpecIlock/SpecIunlock change — the whole point.
+
+**Blocker 4** — the deposit's ⌜v <= e⌝ can only be cashed against the
+ln_ep auth, which lives behind the log spinlock: `wp_log_write_au` gains
+the persistent premise log_epoch_lb γ v and `log_opSw` grows the v
+argument with ⌜v <= e0⌝ inside; _gen/_sconf derive at v := 0 via
+mono_nat_lb_own_0.  (§G.16's own text described this discharge without
+naming the file; now it is named and approved.)
+
+KEEP from the landed G-2b work: icfg_log/icfg_ist on the ambient class
+(the region receipt states over them) and SpecIupdate's credgen edit
+(survives verbatim — the deposit runs inside iupdate).  REVERT: the ityR
+widening and all nlz_* machinery in IcacheRef, the escrow's ic_ep_*
+layer, ic_names' icn_slotep, the MkIcNames dummies, and the escrow-side
+logG sweep (the region placement needs logG only where the new contracts
+live).  The ityR-widening technique and its two traps (the `change` for
+component ops; the pair-exclusivity refutation patterns) are recorded
+here for the day a per-generation gate is genuinely needed.
