@@ -885,6 +885,7 @@ WeakRobustSim.v
 WeakRobustAcyc2.v
 WeakRobustMain.v
 WeakRobustBlocks.v
+WeakRobustCone.v
 WeakAxiomatic.v
 WeakAxiomatic2.v
 WeakAxiomatic3.v
@@ -892,6 +893,7 @@ WeakInterp.v
 WeakInterpProj.v
 WeakSailLTS.v
 WeakSailLTS2.v
+WeakSailComplete.v
 WeakComposeLang.v
 WeakCompose.v
 WeakLang.v
