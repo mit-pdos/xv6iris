@@ -70,6 +70,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - weak memory: need execution context notion, to soundly frame resources across migration to different CPU; locks also have context for lock inv resources
 - namei(/a/../b/../c/../etc) exceeds MAXOPBLOCKS if namei keeps racing with unlink/rmdir and iput falls through to iupdate each time
 - xv6 bug: cwd could be unlinked with dangling .., accessing .. can panic
+- why kexec can't panic by calling uvmalloc(TRAPFRAME): will run out of memory before getting to such a high address
 
 Big things that still need to be done/explored:
 
