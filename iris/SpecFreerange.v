@@ -18,7 +18,7 @@ Require Import KernelText.
 Require Import WpLock.
 Require Import KallocInv.
 Require Import IntrDefs.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import CpuOwn.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

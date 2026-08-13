@@ -86,7 +86,7 @@ Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import CodeWriteHead.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecBread SpecBwrite SpecBrelse.
 Require Import FsCrash.
 Require Import SpecWriteHead.

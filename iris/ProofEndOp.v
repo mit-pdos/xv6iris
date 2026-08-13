@@ -109,7 +109,7 @@ Require Import DiskPtsto DiskInv.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import CodeEndOp.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecAcquire SpecRelease SpecWakeup.
 Require Import SpecBread SpecBwrite SpecBrelse SpecMemmove.
 Require Import SpecWriteHead SpecInstallTrans.

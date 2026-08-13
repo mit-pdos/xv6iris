@@ -81,7 +81,7 @@ Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import CodeIupdate.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecBread SpecBrelse SpecLogWrite SpecMemmove.
 Require Import DinodeSlot.
 Require Import SpecIupdate.

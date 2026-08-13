@@ -51,7 +51,7 @@ Require Import IntrDefs HartTp WpNext.
 Require Import DevModel DiskPtsto WpUart.
 Require Import SpecUart WpSconfUartAccess WpUartgetc.
 Require Import UartTxInv.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SchedCtx.
 Require Import FdSlots.
 Require Import SpecWakeup SpecConsoleintr.

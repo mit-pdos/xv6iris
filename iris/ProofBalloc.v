@@ -95,7 +95,7 @@ Require Import FsCrash.
 Require Import DinodeSlot.
 Require Import BitmapEnc BitmapInv.
 Require Import CodeBalloc.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecPrintkGen.
 Require Import SpecBread SpecBrelse SpecLogWrite SpecMemset.
 Require Import ProofBallocParts.

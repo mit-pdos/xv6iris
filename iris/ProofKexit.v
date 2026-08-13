@@ -84,7 +84,7 @@ Require Import IrefSlots InodeRegion IcacheRef IcacheInv IcacheEscrow.
 Require Import BitmapInv DinodeEnc InodeInv.
 Require Import SpecFileclose SpecReparent SpecWakeup.
 Require Import SpecBeginOp SpecEndOp SpecIput.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecProcinit.
 Require Import SpecKexit.
 From Kernel Require KernelInstrs KernelSyms.

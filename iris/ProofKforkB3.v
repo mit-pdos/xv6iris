@@ -79,7 +79,7 @@ Require Import WpLock.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SpecFiledup.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import CpuOwn.
 Require Import CodeKfork.
 From Kernel Require KernelSyms.

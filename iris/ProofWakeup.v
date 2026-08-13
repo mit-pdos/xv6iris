@@ -62,7 +62,7 @@ Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import ProcGeom.
 Require Import SpecWakeup.
-Require Import SpecPanic.
+Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Local Open Scope Z_scope.

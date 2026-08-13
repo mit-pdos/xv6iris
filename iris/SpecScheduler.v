@@ -39,7 +39,7 @@ Require Import SmodeCore.
 Require Import KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import CpuOwn.

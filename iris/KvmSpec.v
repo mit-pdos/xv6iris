@@ -86,7 +86,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import SmodeCore KallocInv WpLock.
-Require Export SpecPanic.
+Require Export PanicStub.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

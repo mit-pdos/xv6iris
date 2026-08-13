@@ -150,7 +150,7 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import SleepLock.
 Require Import WpLock.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.

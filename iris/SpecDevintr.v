@@ -72,7 +72,7 @@ Require Import WpLock.
 Require Import FdSlots.
 Require Import ProcGeom CpuOwn.
 Require Import SchedCtx.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import DiskPtsto WpUart DiskInv.
 Require Import UartTxInv.
 Require Import TimerCap.

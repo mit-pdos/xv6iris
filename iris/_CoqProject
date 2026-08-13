@@ -217,7 +217,7 @@ WpIntenaBits.v
 SpecPushOff.v
 ProofPushOff.v
 LinkPushOff.v
-SpecPanic.v
+PanicStub.v
 SpecHolding.v
 ProofHolding.v
 LinkHolding.v
@@ -716,6 +716,7 @@ ProofConsputc.v
 LinkConsputc.v
 PrintkFmt.v
 SpecPrintint.v
+PrintkArgs.v
 SpecPrintk.v
 CodePrintint.v
 PrintintArith.v
@@ -728,6 +729,10 @@ LinkPrintint.v
 CodePrintk.v
 ProofPrintk.v
 LinkPrintk.v
+SpecPanic.v
+ProofPanic.v
+LinkPanic.v
+CodePanic.v
 SpecPrintkGen.v
 LinkPrintkGen.v
 SpecArgaddr.v
@@ -850,7 +855,7 @@ LinkSysSbrk.v
 SpecUserinit.v
 LinkUserinit.v
 StartedInv.v
-LinkPanic.v
+LinkPanicStub.v
 CodeMain.v
 SpecMain.v
 ProofMain.v

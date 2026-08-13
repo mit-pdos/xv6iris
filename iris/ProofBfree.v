@@ -78,7 +78,7 @@ Require Import FsBlocks LogInv.
 Require Import DinodeSlot.
 Require Import BitmapEnc BitmapInv.
 Require Import CodeBfree.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecBread SpecBrelse SpecLogWrite.
 Require Import SpecBfree.
 From Kernel Require KernelSyms.

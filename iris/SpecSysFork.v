@@ -63,7 +63,7 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import CpuOwn.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.

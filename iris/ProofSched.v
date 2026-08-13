@@ -17,7 +17,7 @@ Require Import InstrBytes KernelText.
 Require Import IntrDefs HartTp WpNext WpSmodeIntr.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfCsr.
 Require Import WpLock.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SwtchCtx.

@@ -59,7 +59,7 @@ Require Import CodeFreerange.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecFreerange.
-Require Import SpecPanic.
+Require Import PanicStub.
 Local Open Scope Z_scope.
 Import Defs.
 

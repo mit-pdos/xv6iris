@@ -36,7 +36,7 @@ Require Import DiskPtsto WpUart.
 Require Import CpuOwn.
 Require Import WpSconfCtl.
 Require Import ProcGeom.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import CodeProcdump.
 Require Import ProcdumpAux.
 Require Import SpecProcdump.

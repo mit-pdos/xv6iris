@@ -93,7 +93,7 @@ Require Import DiskPtsto DiskInv.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import CodeInstallTrans.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecBread SpecBwrite SpecBunpin SpecBrelse SpecMemmove.
 Require Import SpecInstallTrans.
 From Kernel Require KernelSyms.

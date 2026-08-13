@@ -32,7 +32,7 @@ Require Import VirtioProto VirtioModel VirtioQueue DiskPtsto.
 Require Import PlicPlan WpUart WireInv.
 Require Import SpecConsoleinit SpecIinit.
 Require Import SpecFreerange KvmSpec BcacheInv.
-Require Import StartedInv SpecPanic LinkPanic.
+Require Import StartedInv PanicStub LinkPanicStub.
 Require Import SpecMain SpecMainSecondary.
 Require Import BootConfig PowerBoot.
 Require Import BootCarve BootCarveMain.

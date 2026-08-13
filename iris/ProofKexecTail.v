@@ -76,7 +76,7 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import SleepLock.   (* [is_sleeplock]: the nightly dead-import sweep re-pointed the chain that used to carry it *)
 Require Import WpLock.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.

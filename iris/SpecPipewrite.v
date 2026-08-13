@@ -65,7 +65,7 @@ Require Import ProcPtOwn.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import PipeInvDefs.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SchedCtx.
 Require Export SwtchCtx.
 From Kernel Require KernelSyms.

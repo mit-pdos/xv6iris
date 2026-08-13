@@ -126,7 +126,7 @@ Require Import ProofBreadParts.
 Require Import CodeBread.
 Require Import SpecAcquire SpecRelease SpecAcquiresleep.
 Require Import SpecVirtioDiskRw.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecBread.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

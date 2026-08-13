@@ -109,7 +109,7 @@ Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import CodeIget.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecIget.
 From Kernel Require KernelSyms.

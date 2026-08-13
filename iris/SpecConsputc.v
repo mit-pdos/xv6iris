@@ -57,7 +57,7 @@ Require Import IntrDefs WpNext.
 Require Import WpLock.
 Require Import CpuOwn.
 Require Import UartTxInv.
-Require Import SpecPanic.
+Require Import PanicStub.
 From Kernel Require KernelSyms.
 
 
