@@ -1740,3 +1740,526 @@ Proof.
   apply (wstep_ok_racy_k_of_run _ _ _ _ _ _ _ _ m s _ Hok).
   intros x s' Hrun b'. exact (HK x s' Hrun).
 Qed.
+
+(* ====================================================================== *)
+(** ** 10. THE ⇐-BRIDGE: every weak run of a peeled program lands on a
+    FAMILY MEMBER's [exec_stale] outcome
+
+    §5 PRODUCES the peel out of a family of mirror runs; this ELIMINATES it,
+    and it is what a walk WP rule's Q-half needs.  The started cone
+    characterises machine outcomes through the patched-[exec] bridge
+    ([WeakRacy.exec_of_wrun_racy]); the walk cannot, because the window is
+    RE-TOUCHED (design note §1).  What replaces it: given the peel and an
+    ACTUAL weak run, exhibit one admissible, [Φ]-accepted word [w] such that
+    the run's result and post-state ARE [exec_stale ra rn w]'s at the FLAT
+    memory.  Since [exec_stale] is a function, the consumer then pins the
+    result, the post-registers, the post-memory and the trace by rewriting
+    against the family it already owns.
+
+    THE TRACE PREMISE, and why it is not optional.  A weak run can read the
+    window UNPINNED TWICE with two different values without any racy arm
+    being taken: read it racily (stale), then fence — or write it — and read
+    it again, now pinned, hence LATEST.  The peel permits this (its away arm
+    only demands [pinned_read], which the fence/the writer's own [coh] make
+    TRUE), and no single [w] describes both reads, so the conclusion is FALSE
+    without a premise that excludes it.  The premise that excludes it is the
+    PRODUCER's own: the family, with [trace_stale] traces.  It costs the
+    consumer nothing — [WeakKptStale.wwalk_peel_of_exports] takes exactly
+    that bundle (five concrete trace shapes, all [trace_stale]) to build the
+    peel in the first place, so the ⇐-bridge is discharged from the same
+    hypothesis as the ⇒-direction.
+
+    The split mirrors [WeakRacy]'s [exec_of_wrun_racy_gen] / [exec_of_wrun_win]:
+    §10a is the traversal at a FIXED witness (the regime where the mirror
+    never unpinned-reads the window again — [trace_off_win], which is exactly
+    [trace_stale]'s post-racy tail), and §10b is the phase-[true] front that
+    CHOOSES the witness: the run's own value at the racy arm, and the
+    COHERENT word otherwise. *)
+
+(** *** 10a. The core, at a FIXED [w].
+
+    PHASE-GENERIC: [trace_off_win] refutes the peel's racy arm outright (an
+    unpinned read of the window is not disjoint from it), so the front can
+    hand off from either phase — which it must, since the away arm does not
+    flip the phase.  No disjointness is needed at the WRITE arm: the mirror
+    runs at the UNPATCHED flat memory, so [wflat_st_write_post] commutes it
+    for free (this is where the stale mirror pays off against
+    [WeakRacy.wpatch_st_write_post]'s [racc_disj] side condition). *)
+Lemma wrun_exec_stale_elim_off (tid : option nat) (ra : Arch.pa) (rn : N)
+    (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) (W : Prop)
+    (w : bv (8 * rn)) {X} (m : M X) :
+  acc_wf ra rn -> (0 < rn)%N -> ak_pins rak = false ->
+  forall (b : bool) (s : wmstate) (x0 : X) (t0 : mstate) (es : list weff),
+    exec_stale ra rn w m (wflat_st s) = Some (x0, t0, es) ->
+    trace_off_win ra rn es ->
+    wstep_ok_racy tid ra rn rak Φ wD_any W b m s ->
+    wlog_wf (wm_log s) ->
+  forall (x : X) (s' : wmstate), wrun tid m s x s' ->
+    exec_stale ra rn w m (wflat_st s) = Some (x, wflat_st s', es) /\
+    wlog_wf (wm_log s').
+Proof.
+  intros Hracc Hrn Hrk.
+  induction m as [y|T oc k IH];
+    intros b s x0 t0 es Hex0 Hoff Hok Hwf x s' Hrun.
+  - simpl in Hex0 |- *. injection Hex0 as <- <- <-.
+    destruct Hrun as [-> ->]. split; [reflexivity|exact Hwf].
+  - destruct oc; simpl in Hex0, Hok, Hrun |- *; try discriminate;
+      try (exact (IH _ b s x0 t0 es Hex0 Hoff Hok Hwf x s' Hrun));
+      try (exfalso; exact Hrun);
+      try (exfalso; exact Hok).
+    + (* RegWrite *)
+      exact (IH tt b (wset_reg s reg regval) x0 t0 es Hex0 Hoff Hok Hwf x s' Hrun).
+    + (* MemRead *)
+      destruct (dev_addr _) eqn:Hd.
+      * (* device *)
+        destruct (dev_read _ _ _) as [[v0 d']|] eqn:Hdr; [|exfalso; exact Hrun].
+        exact (IH _ b (wset_dev s d') x0 t0 es Hex0 Hoff (Hok v0 d' eq_refl)
+                 Hwf x s' Hrun).
+      * (* RAM *)
+        destruct (read_bytes (stale_mem _ _ _ _ _) _ _) as [v0|] eqn:Hrb0;
+          [|discriminate].
+        destruct (exec_stale ra rn w (k (inl (v0, None))) (wflat_st s))
+          as [[[x1 t1] es1]|] eqn:Hee0; [|discriminate].
+        injection Hex0 as <- <- <-.
+        destruct Hrun as (v & ts & Hokr & Hrun).
+        destruct Hok as (Hacc & [(_ & Hpin & Hk)|(_ & Hpa & Hn & Hak & Hk)]).
+        -- (* the away arm: the machine is pinned to [coh_ts] *)
+           pose proof (wread_pinned_ts _ _ _ _ _ _ Hpin Hokr) as Hts.
+           rewrite Hts in Hokr, Hrun.
+           pose proof (wread_bytes_complete _ _ _ _ _ _ Hokr) as Hrbw.
+           assert (Hrbf : read_bytes (wflat (wm_img s) (wm_log s))
+                            (Interface.ReadReq.pa t) n = Some v)
+             by (rewrite -(wread_bytes_read_bytes s
+                             (classify (Interface.ReadReq.access_kind t))
+                             (Interface.ReadReq.pa t) n Hwf Hacc); exact Hrbw).
+           assert (Hstm : read_bytes (stale_mem ra rn w
+                            (classify (Interface.ReadReq.access_kind t))
+                            (wflat_st s)) (Interface.ReadReq.pa t) n = Some v).
+           { destruct (ak_pins (classify (Interface.ReadReq.access_kind t)))
+               eqn:Hpk.
+             - rewrite (stale_mem_pins ra rn w _ _ Hpk) wflat_st_mem. exact Hrbf.
+             - rewrite (stale_mem_unpinned ra rn w _ _ Hpk) wflat_st_mem.
+               destruct (trace_off_win_head ra rn _ _ n es1 Hoff Hpk)
+                 as [Haccp Hdisj].
+               rewrite (read_bytes_patch_disj (wflat (wm_img s) (wm_log s))
+                          ra rn w _ n Hracc Haccp Hdisj).
+               exact Hrbf. }
+           rewrite Hstm in Hrb0. injection Hrb0 as <-.
+           destruct (IH _ b (wread_post s
+                         (classify (Interface.ReadReq.access_kind t))
+                         (Interface.ReadReq.pa t)
+                         (coh_ts s (Interface.ReadReq.pa t) n)) x1 t1 es1
+                       ltac:(rewrite wflat_st_read_post; exact Hee0)
+                       (trace_off_win_tail _ _ _ _ Hoff) (Hk v Hrbw)
+                       (wlog_wf_read_post _ _ _ _ Hwf) x s' Hrun)
+             as (Hexf & Hwf').
+           rewrite wflat_st_read_post Hee0 in Hexf. injection Hexf as <- <-.
+           split; [reflexivity|exact Hwf'].
+        -- (* the racy arm is REFUTED by [trace_off_win] *)
+           exfalso. subst n.
+           destruct (trace_off_win_head ra rn _ _ rn es1 Hoff
+                       ltac:(rewrite Hak; exact Hrk)) as [_ Hdisj].
+           rewrite Hpa in Hdisj. exact (racc_disj_irrefl ra rn Hrn Hdisj).
+    + (* MemWrite *)
+      destruct (dev_addr _) eqn:Hd.
+      * destruct (dev_write _ _ _ _) as [d'|] eqn:Hdw; [|exfalso; exact Hrun].
+        exact (IH _ b (wset_dev s d') x0 t0 es Hex0 Hoff (Hok d' eq_refl)
+                 Hwf x s' Hrun).
+      * destruct Hok as (_ & Hacc & _ & Hok).
+        lazymatch type of Hex0 with
+        | context [@exec_stale _ _ _ _ _ ?st] =>
+            destruct (exec_stale ra rn w (k (inl None)) st)
+              as [[[x1 t1] es1]|] eqn:Hee0
+        end; [|discriminate].
+        injection Hex0 as <- <- <-.
+        destruct (IH _ false (wwrite_post tid s
+                       (classify (Interface.WriteReq.access_kind t))
+                       (Interface.WriteReq.pa t) n (Interface.WriteReq.value t))
+                    x1 t1 es1
+                    ltac:(rewrite wflat_st_write_post; exact Hee0)
+                    (trace_off_win_tail _ _ _ _ Hoff) Hok
+                    (wflat_write_wf _ _ _ _ _ _ Hwf Hacc) x s' Hrun)
+          as (Hexf & Hwf').
+        rewrite wflat_st_write_post Hee0 in Hexf. injection Hexf as <- <-.
+        split; [reflexivity|exact Hwf'].
+    + (* Barrier *)
+      destruct (exec_stale ra rn w (k tt) (wflat_st s))
+        as [[[x1 t1] es1]|] eqn:Hee0; [|discriminate].
+      injection Hex0 as <- <- <-.
+      destruct (IH tt b (wset_ws s (barrier_post (wm_ws s) b0)) x1 t1 es1 Hee0
+                  (trace_off_win_tail _ _ _ _ Hoff)
+                  Hok Hwf x s' Hrun) as (Hexf & Hwf').
+      rewrite Hee0 in Hexf. injection Hexf as <- <-.
+      split; [reflexivity|exact Hwf'].
+Qed.
+
+(** *** 10b. The front: the phase-[true] traversal, which CHOOSES the witness.
+
+    Two choices, and the induction cannot know in advance which the run will
+    force, so it carries neither: at the peel's RACY arm the witness is the
+    value the run's read returned (admissible by the machine's own [wread_ok],
+    [Φ]-accepted through [wadm_filter]); everywhere else — including a run
+    that ends, or that reads the window at the AWAY arm because the trace says
+    the window is where the read is but the peel pinned it — it is the
+    COHERENT word, which is admissible at every kind ([wbyte_read_latest_ts])
+    and is what a pinned read of the window returns anyway.  In both cases the
+    handoff is to §10a, whose [trace_off_win] premise is [trace_stale]'s
+    post-racy tail ([trace_stale_win]).
+
+    [s0] is the state the WHOLE step started in, [s] the intermediate one (the
+    pre-racy phase moves only views — a RAM write is refuted outright here,
+    since [trace_stale] gives a pre-racy [WEwrite] no arm), so the reported
+    admissibility transports down by [wadm_down] exactly as in
+    [WeakRacy.exec_of_wrun_racy_gen]. *)
+Lemma wrun_exec_stale_elim_gen (tid : option nat) (ra : Arch.pa) (rn : N)
+    (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) (W : Prop) {X} (m : M X) :
+  acc_wf ra rn -> (0 < rn)%N -> ak_pins rak = false ->
+  forall (s0 s : wmstate),
+    wadm_filter s0 rak ra rn Φ ->
+    wstep_ok_racy tid ra rn rak Φ wD_any W true m s ->
+    wm_img s = wm_img s0 -> wm_log s = wm_log s0 -> ws_le (wm_ws s0) (wm_ws s) ->
+    wlog_wf (wm_log s) ->
+    is_Some (read_bytes (wflat (wm_img s0) (wm_log s0)) ra rn) ->
+    (forall u : bv (8 * rn), Φ (fun j : nat => nth_byte u j) ->
+       exists (y : X) (t' : mstate) (es : list weff),
+         exec_stale ra rn u m (wflat_st s) = Some (y, t', es) /\
+         trace_stale rak ra rn es) ->
+  forall (x : X) (s' : wmstate), wrun tid m s x s' ->
+    exists (w : bv (8 * rn)) (es : list weff),
+      wadm s0 rak ra rn w /\ Φ (fun j : nat => nth_byte w j) /\
+      exec_stale ra rn w m (wflat_st s) = Some (x, wflat_st s', es) /\
+      wlog_wf (wm_log s').
+Proof.
+  intros Hracc Hrn Hrk.
+  induction m as [y|T oc k IH];
+    intros s0 s HΦ Hok Himg Hlog Hle Hwf Hrd Hfam x s' Hrun.
+  - (* the run ended with the racy read still ahead: the COHERENT word *)
+    destruct Hrun as [-> ->]. destruct Hrd as [wc Hwc].
+    assert (Hwcw : wread_bytes s0 rak ra rn (coh_ts s0 ra rn) = Some wc)
+      by (rewrite (wread_bytes_read_bytes s0 rak ra rn
+                     ltac:(rewrite -Hlog; exact Hwf) Hracc); exact Hwc).
+    pose proof (wadm_of_wread_ok _ _ _ _ _ _
+                  (wread_bytes_spec _ _ _ _ _ _ Hwcw)) as Hadmc.
+    exists wc, []. split_and!;
+      [exact Hadmc|exact (HΦ wc Hadmc)|reflexivity|exact Hwf].
+  - destruct oc; simpl in Hok, Hrun, Hfam |- *;
+      try (exact (IH _ s0 s HΦ Hok Himg Hlog Hle Hwf Hrd Hfam x s' Hrun));
+      try (exfalso; exact Hrun);
+      try (exfalso; exact Hok).
+    + (* RegWrite *)
+      exact (IH tt s0 (wset_reg s reg regval) HΦ Hok Himg Hlog Hle Hwf Hrd
+               Hfam x s' Hrun).
+    + (* MemRead *)
+      destruct (dev_addr _) eqn:Hd.
+      * (* device *)
+        destruct (dev_read _ _ _) as [[v0 d']|] eqn:Hdr; [|exfalso; exact Hrun].
+        exact (IH _ s0 (wset_dev s d') HΦ (Hok v0 d' eq_refl) Himg Hlog Hle Hwf
+                 Hrd Hfam x s' Hrun).
+      * (* RAM *)
+        destruct Hrd as [wc Hwc].
+        assert (Hwcw : wread_bytes s0 rak ra rn (coh_ts s0 ra rn) = Some wc)
+          by (rewrite (wread_bytes_read_bytes s0 rak ra rn
+                         ltac:(rewrite -Hlog; exact Hwf) Hracc); exact Hwc).
+        pose proof (wadm_of_wread_ok _ _ _ _ _ _
+                      (wread_bytes_spec _ _ _ _ _ _ Hwcw)) as Hadmc.
+        pose proof (HΦ wc Hadmc) as HΦc.
+        pose proof (mk_is_Some _ _ Hwc) as Hrd.
+        destruct Hrun as (v & ts & Hokr & Hrun).
+        destruct Hok as (Hacc & [(_ & Hpin & Hk)|(_ & Hpa & Hn & Hak & Hk)]).
+        -- (* THE PEEL'S AWAY ARM: the machine is pinned to [coh_ts] *)
+           pose proof (wread_pinned_ts _ _ _ _ _ _ Hpin Hokr) as Hts.
+           rewrite Hts in Hokr, Hrun.
+           pose proof (wread_bytes_complete _ _ _ _ _ _ Hokr) as Hrbw.
+           assert (Hrbf : read_bytes (wflat (wm_img s) (wm_log s))
+                            (Interface.ReadReq.pa t) n = Some v)
+             by (rewrite -(wread_bytes_read_bytes s
+                             (classify (Interface.ReadReq.access_kind t))
+                             (Interface.ReadReq.pa t) n Hwf Hacc); exact Hrbw).
+           (* the CLASSIFYING member: the head's arm is decided by the read's
+              kind, address and width — never by the patch value (§8.5) *)
+           destruct (Hfam wc HΦc) as (yc & tc & esc & Hexc & Hstc).
+           destruct (read_bytes (stale_mem ra rn wc
+                       (classify (Interface.ReadReq.access_kind t))
+                       (wflat_st s)) (Interface.ReadReq.pa t) n) as [vc|] eqn:Hrbc;
+             [|discriminate].
+           destruct (exec_stale ra rn wc (k (inl (vc, None))) (wflat_st s))
+             as [[[yc2 tc2] esc2]|] eqn:Heec; [|discriminate].
+           injection Hexc as <- <- <-.
+           destruct (ak_pins (classify (Interface.ReadReq.access_kind t))) eqn:Hpk.
+           ++ (* PINNED kind (the CAS re-read): the mirror reads the REAL
+                 memory, so EVERY member returns the machine's word *)
+              assert (Hstm : forall u : bv (8 * rn),
+                        read_bytes (stale_mem ra rn u
+                          (classify (Interface.ReadReq.access_kind t))
+                          (wflat_st s)) (Interface.ReadReq.pa t) n = Some v).
+              { intros u. rewrite (stale_mem_pins ra rn u _ _ Hpk) wflat_st_mem.
+                exact Hrbf. }
+              rewrite (Hstm wc) in Hrbc. injection Hrbc as <-.
+              assert (Hfam2 : forall u : bv (8 * rn),
+                        Φ (fun j : nat => nth_byte u j) ->
+                        exists (y : X) (t' : mstate) (es : list weff),
+                          exec_stale ra rn u (k (inl (v, None)))
+                            (wflat_st (wread_post s
+                               (classify (Interface.ReadReq.access_kind t))
+                               (Interface.ReadReq.pa t)
+                               (coh_ts s (Interface.ReadReq.pa t) n)))
+                          = Some (y, t', es) /\ trace_stale rak ra rn es).
+              { intros u Hu. destruct (Hfam u Hu) as (y1 & t1 & es1 & Hex1 & Hst1).
+                rewrite (Hstm u) /= in Hex1.
+                destruct (exec_stale ra rn u (k (inl (v, None))) (wflat_st s))
+                  as [[[y2 t2] es2]|] eqn:Hee1; [|discriminate].
+                injection Hex1 as <- <- <-.
+                exists y2, t2, es2. split.
+                - rewrite wflat_st_read_post. exact Hee1.
+                - exact (trace_stale_pin_tail rak ra rn _ _ n es2 Hrk Hpk Hst1). }
+              destruct (IH _ s0 _ HΦ (Hk v Hrbw)
+                          ltac:(rewrite wread_post_img; exact Himg)
+                          ltac:(rewrite wread_post_log; exact Hlog)
+                          ltac:(etrans; [exact Hle|apply wread_post_ws_le])
+                          (wlog_wf_read_post _ _ _ _ Hwf) Hrd Hfam2 x s' Hrun)
+                as (w & es & Hadm & HΦw & Hexw & Hwf').
+              exists w, (WEread (classify (Interface.ReadReq.access_kind t))
+                          (Interface.ReadReq.pa t) n :: es).
+              split_and!; [exact Hadm|exact HΦw| |exact Hwf'].
+              rewrite (Hstm w) /=. rewrite wflat_st_read_post in Hexw.
+              rewrite Hexw. reflexivity.
+           ++ assert (Hdec : racc_disj ra rn (Interface.ReadReq.pa t) n \/
+                             ~ racc_disj ra rn (Interface.ReadReq.pa t) n)
+                by (rewrite /racc_disj; lia).
+              destruct Hdec as [Hdisj|Hndisj].
+              ** (* UNPINNED, OFF the window: the patch is invisible *)
+                 assert (Hstm : forall u : bv (8 * rn),
+                           read_bytes (stale_mem ra rn u
+                             (classify (Interface.ReadReq.access_kind t))
+                             (wflat_st s)) (Interface.ReadReq.pa t) n = Some v).
+                 { intros u.
+                   rewrite (stale_mem_unpinned ra rn u _ _ Hpk) wflat_st_mem
+                           (read_bytes_patch_disj (wflat (wm_img s) (wm_log s))
+                              ra rn u _ n Hracc Hacc Hdisj).
+                   exact Hrbf. }
+                 rewrite (Hstm wc) in Hrbc. injection Hrbc as <-.
+                 assert (Hfam2 : forall u : bv (8 * rn),
+                           Φ (fun j : nat => nth_byte u j) ->
+                           exists (y : X) (t' : mstate) (es : list weff),
+                             exec_stale ra rn u (k (inl (v, None)))
+                               (wflat_st (wread_post s
+                                  (classify (Interface.ReadReq.access_kind t))
+                                  (Interface.ReadReq.pa t)
+                                  (coh_ts s (Interface.ReadReq.pa t) n)))
+                             = Some (y, t', es) /\ trace_stale rak ra rn es).
+                 { intros u Hu. destruct (Hfam u Hu) as (y1 & t1 & es1 & Hex1 & Hst1).
+                   rewrite (Hstm u) /= in Hex1.
+                   destruct (exec_stale ra rn u (k (inl (v, None))) (wflat_st s))
+                     as [[[y2 t2] es2]|] eqn:Hee1; [|discriminate].
+                   injection Hex1 as <- <- <-.
+                   exists y2, t2, es2. split.
+                   - rewrite wflat_st_read_post. exact Hee1.
+                   - exact (trace_stale_disj_tail rak ra rn _ _ n es2 Hrn Hpk
+                              Hdisj Hst1). }
+                 destruct (IH _ s0 _ HΦ (Hk v Hrbw)
+                             ltac:(rewrite wread_post_img; exact Himg)
+                             ltac:(rewrite wread_post_log; exact Hlog)
+                             ltac:(etrans; [exact Hle|apply wread_post_ws_le])
+                             (wlog_wf_read_post _ _ _ _ Hwf) Hrd Hfam2 x s' Hrun)
+                   as (w & es & Hadm & HΦw & Hexw & Hwf').
+                 exists w, (WEread (classify (Interface.ReadReq.access_kind t))
+                             (Interface.ReadReq.pa t) n :: es).
+                 split_and!; [exact Hadm|exact HΦw| |exact Hwf'].
+                 rewrite (Hstm w) /=. rewrite wflat_st_read_post in Hexw.
+                 rewrite Hexw. reflexivity.
+              ** (* THE WINDOW, taken at the AWAY arm: the peel PINNED it, so
+                    the machine read the coherence-latest word — and that word
+                    is the witness *)
+                 destruct (trace_stale_win rak ra rn _ _ n esc2 Hpk Hndisj Hstc)
+                   as (Hak & Hpa & Hn & Hoffc).
+                 subst n.
+                 rewrite Hpa in Hacc, Hk, Hrbc, Heec, Hrbf, Hrbw, Hokr, Hrun.
+                 rewrite Hpa.
+                 assert (Hvc : vc = wc).
+                 { rewrite (read_bytes_stale_win ra rn wc
+                              (classify (Interface.ReadReq.access_kind t))
+                              (wflat_st s) Hracc Hpk) in Hrbc. congruence. }
+                 subst vc.
+                 rewrite Himg Hlog in Hrbf.
+                 assert (Hvw : v = wc) by congruence. subst v.
+                 destruct (wrun_exec_stale_elim_off tid ra rn rak Φ W wc _
+                             Hracc Hrn Hrk true
+                             (wread_post s
+                                (classify (Interface.ReadReq.access_kind t))
+                                ra (coh_ts s ra rn)) yc2 tc2 esc2
+                             ltac:(rewrite wflat_st_read_post; exact Heec)
+                             Hoffc (Hk wc Hrbw)
+                             (wlog_wf_read_post _ _ _ _ Hwf) x s' Hrun)
+                   as (Hexf & Hwf').
+                 exists wc, (WEread (classify (Interface.ReadReq.access_kind t))
+                              ra rn :: esc2).
+                 split_and!; [exact Hadmc|exact HΦc| |exact Hwf'].
+                 rewrite (read_bytes_stale_win ra rn wc
+                            (classify (Interface.ReadReq.access_kind t))
+                            (wflat_st s) Hracc Hpk) /=.
+                 rewrite wflat_st_read_post in Hexf. rewrite Hexf. reflexivity.
+        -- (* THE RACY READ: the run's own value is the witness *)
+           subst n. rewrite Hpa in Hacc, Hk, Hokr, Hrun, Hfam.
+           rewrite Hak in Hk, Hokr, Hrun, Hfam. rewrite Hpa Hak.
+           pose proof (wread_bytes_complete _ _ _ _ _ _ Hokr) as Hrbw.
+           assert (Hadm0 : wadm s0 rak ra rn v).
+           { eapply wadm_down; [exact Himg|exact Hlog|exact Hle|].
+             exact (wadm_of_wread_ok _ _ _ _ _ _ Hokr). }
+           pose proof (HΦ v Hadm0) as HΦv.
+           destruct (Hfam v HΦv) as (yv & tv & esv & Hexv & Hstv).
+           rewrite (read_bytes_stale_win ra rn v rak (wflat_st s) Hracc Hrk) /=
+             in Hexv.
+           destruct (exec_stale ra rn v (k (inl (v, None))) (wflat_st s))
+             as [[[yv2 tv2] esv2]|] eqn:Heev; [|discriminate].
+           injection Hexv as <- <- <-.
+           destruct (trace_stale_win rak ra rn rak ra rn esv2 Hrk
+                       (racc_disj_irrefl ra rn Hrn) Hstv) as (_ & _ & _ & Hoffv).
+           destruct (wrun_exec_stale_elim_off tid ra rn rak Φ W v _
+                       Hracc Hrn Hrk false (wread_post s rak ra ts) yv2 tv2 esv2
+                       ltac:(rewrite wflat_st_read_post; exact Heev)
+                       Hoffv (Hk ts v Hrbw HΦv)
+                       (wlog_wf_read_post _ _ _ _ Hwf) x s' Hrun)
+             as (Hexf & Hwf').
+           exists v, (WEread rak ra rn :: esv2).
+           split_and!; [exact Hadm0|exact HΦv| |exact Hwf'].
+           rewrite (read_bytes_stale_win ra rn v rak (wflat_st s) Hracc Hrk) /=.
+           rewrite wflat_st_read_post in Hexf. rewrite Hexf. reflexivity.
+    + (* MemWrite *)
+      destruct (dev_addr _) eqn:Hd.
+      * destruct (dev_write _ _ _ _) as [d'|] eqn:Hdw; [|exfalso; exact Hrun].
+        exact (IH _ s0 (wset_dev s d') HΦ (Hok d' eq_refl) Himg Hlog Hle Hwf
+                 Hrd Hfam x s' Hrun).
+      * (* a RAM write BEFORE the racy read: [trace_stale] gives it no arm *)
+        exfalso. destruct Hrd as [wc Hwc].
+        assert (Hwcw : wread_bytes s0 rak ra rn (coh_ts s0 ra rn) = Some wc)
+          by (rewrite (wread_bytes_read_bytes s0 rak ra rn
+                         ltac:(rewrite -Hlog; exact Hwf) Hracc); exact Hwc).
+        pose proof (HΦ wc (wadm_of_wread_ok _ _ _ _ _ _
+                             (wread_bytes_spec _ _ _ _ _ _ Hwcw))) as HΦc.
+        destruct (Hfam wc HΦc) as (yc & tc & esc & Hexc & Hstc).
+        lazymatch type of Hexc with
+        | context [@exec_stale _ _ _ _ _ ?st] =>
+            destruct (exec_stale ra rn wc (k (inl None)) st)
+              as [[[y1 t1] es1]|] eqn:Hee
+        end; [|discriminate].
+        injection Hexc as <- <- <-. exact Hstc.
+    + (* Barrier *)
+      assert (Hfam2 : forall u : bv (8 * rn),
+                Φ (fun j : nat => nth_byte u j) ->
+                exists (y : X) (t' : mstate) (es : list weff),
+                  exec_stale ra rn u (k tt)
+                    (wflat_st (wset_ws s (barrier_post (wm_ws s) b)))
+                  = Some (y, t', es) /\ trace_stale rak ra rn es).
+      { intros u Hu. destruct (Hfam u Hu) as (y1 & t1 & es1 & Hex1 & Hst1).
+        destruct (exec_stale ra rn u (k tt) (wflat_st s))
+          as [[[y2 t2] es2]|] eqn:Hee1; [|discriminate].
+        injection Hex1 as <- <- <-.
+        exists y2, t2, es2. split; [exact Hee1|exact Hst1]. }
+      destruct (IH tt s0 (wset_ws s (barrier_post (wm_ws s) b)) HΦ Hok Himg Hlog
+                  ltac:(etrans; [exact Hle|apply barrier_post_le]) Hwf Hrd Hfam2
+                  x s' Hrun) as (w & es & Hadm & HΦw & Hexw & Hwf').
+      exists w, (WEbar b :: es). split_and!; [exact Hadm|exact HΦw| |exact Hwf'].
+      rewrite wflat_st_ws in Hexw. rewrite Hexw. reflexivity.
+Qed.
+
+(** *** 10c. THE ⇐-BRIDGE, as a consumer states it.
+
+    Read it as: whatever the racy run did, it did what ONE family member's
+    mirror run does — same result, same post-state (registers, memory AND
+    device), same trace.  [exec_stale] being a function, the consumer pins all
+    four by rewriting the equation against the family it already owns; that is
+    what replaces the patched-[exec] bridge for a window the step re-touches.
+
+    THE FAMILY PREMISE IS THE PRODUCER'S OWN (§5): a consumer that built the
+    peel out of a family of [trace_stale] runs — which is the only way to
+    build it at a re-touched window — has it already.  It cannot be dropped:
+    see the header of §10. *)
+Lemma wrun_exec_stale_elim (tid : option nat) (ra : Arch.pa) (rn : N)
+    (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) (W : Prop) {X} (m : M X) :
+  acc_wf ra rn -> (0 < rn)%N -> ak_pins rak = false ->
+  forall s : wmstate,
+    wstep_ok_racy tid ra rn rak Φ wD_any W true m s ->
+    wlog_wf (wm_log s) ->
+    wadm_filter s rak ra rn Φ ->
+    is_Some (read_bytes (wflat (wm_img s) (wm_log s)) ra rn) ->
+    (forall u : bv (8 * rn), Φ (fun j : nat => nth_byte u j) ->
+       exists (y : X) (t' : mstate) (es : list weff),
+         exec_stale ra rn u m (wflat_st s) = Some (y, t', es) /\
+         trace_stale rak ra rn es) ->
+  forall (x : X) (s' : wmstate), wrun tid m s x s' ->
+    exists (w : bv (8 * rn)) (es : list weff),
+      wadm s rak ra rn w /\ Φ (fun j : nat => nth_byte w j) /\
+      exec_stale ra rn w m (wflat_st s) = Some (x, wflat_st s', es) /\
+      wlog_wf (wm_log s').
+Proof.
+  intros Hracc Hrn Hrk s Hok Hwf HΦ Hrd Hfam x s' Hrun.
+  exact (wrun_exec_stale_elim_gen tid ra rn rak Φ W m Hracc Hrn Hrk s s HΦ Hok
+           eq_refl eq_refl (reflexivity _) Hwf Hrd Hfam x s' Hrun).
+Qed.
+
+(** The [wexec] corollary, through [WeakInterp.wexec_wrun]: the FUNCTIONAL
+    interpreter's outcomes are a fortiori covered, at every oracle. *)
+Lemma wexec_exec_stale_elim (tid : option nat) (ra : Arch.pa) (rn : N)
+    (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) (W : Prop) {X} (m : M X) :
+  acc_wf ra rn -> (0 < rn)%N -> ak_pins rak = false ->
+  forall s : wmstate,
+    wstep_ok_racy tid ra rn rak Φ wD_any W true m s ->
+    wlog_wf (wm_log s) ->
+    wadm_filter s rak ra rn Φ ->
+    is_Some (read_bytes (wflat (wm_img s) (wm_log s)) ra rn) ->
+    (forall u : bv (8 * rn), Φ (fun j : nat => nth_byte u j) ->
+       exists (y : X) (t' : mstate) (es : list weff),
+         exec_stale ra rn u m (wflat_st s) = Some (y, t', es) /\
+         trace_stale rak ra rn es) ->
+  forall (χ : list (list nat)) (x : X) (s' : wmstate) (χ' : list (list nat)),
+    wexec tid m χ s = Some (x, s', χ') ->
+    exists (w : bv (8 * rn)) (es : list weff),
+      wadm s rak ra rn w /\ Φ (fun j : nat => nth_byte w j) /\
+      exec_stale ra rn w m (wflat_st s) = Some (x, wflat_st s', es) /\
+      wlog_wf (wm_log s').
+Proof.
+  intros Hracc Hrn Hrk s Hok Hwf HΦ Hrd Hfam χ x s' χ' Hex.
+  exact (wrun_exec_stale_elim tid ra rn rak Φ W m Hracc Hrn Hrk s Hok Hwf HΦ
+           Hrd Hfam x s' (wexec_wrun tid m χ s x s' χ' Hex)).
+Qed.
+
+(** *** 10d. The CONSTANT-family arm, in the same shape.
+
+    The absorption theorem's sixth trace shape — the TLB-HIT write-back
+    [[excl-read; write]] — has no racy read at all, so [trace_stale] refuses
+    it (a pre-racy [WEwrite] is [False] there) and §10c does not apply.  It
+    needs nothing: its only read is EXCLUSIVE, so [trace_off_win] holds
+    vacuously and the family is constant.  This states §10a's conclusion in
+    §10c's shape, so a consumer case-splitting on the absorption theorem's
+    arms gets ONE post-condition out of both routes.  Phase-generic, since
+    that arm's peel is delivered at either phase (§8's [phase_mono]). *)
+Lemma wrun_exec_stale_elim_const (tid : option nat) (ra : Arch.pa) (rn : N)
+    (rak : akinfo) (Φ : (nat -> bv 8) -> Prop) (W : Prop) (b : bool)
+    {X} (m : M X) :
+  acc_wf ra rn -> (0 < rn)%N -> ak_pins rak = false ->
+  forall s : wmstate,
+    wstep_ok_racy tid ra rn rak Φ wD_any W b m s ->
+    wlog_wf (wm_log s) ->
+    wadm_filter s rak ra rn Φ ->
+    is_Some (read_bytes (wflat (wm_img s) (wm_log s)) ra rn) ->
+    (forall u : bv (8 * rn), Φ (fun j : nat => nth_byte u j) ->
+       exists (y : X) (t' : mstate) (es : list weff),
+         exec_stale ra rn u m (wflat_st s) = Some (y, t', es) /\
+         trace_off_win ra rn es) ->
+  forall (x : X) (s' : wmstate), wrun tid m s x s' ->
+    exists (w : bv (8 * rn)) (es : list weff),
+      wadm s rak ra rn w /\ Φ (fun j : nat => nth_byte w j) /\
+      exec_stale ra rn w m (wflat_st s) = Some (x, wflat_st s', es) /\
+      wlog_wf (wm_log s').
+Proof.
+  intros Hracc Hrn Hrk s Hok Hwf HΦ [wc Hwc] Hfam x s' Hrun.
+  assert (Hwcw : wread_bytes s rak ra rn (coh_ts s ra rn) = Some wc)
+    by (rewrite (wread_bytes_read_bytes s rak ra rn Hwf Hracc); exact Hwc).
+  pose proof (wadm_of_wread_ok _ _ _ _ _ _
+                (wread_bytes_spec _ _ _ _ _ _ Hwcw)) as Hadmc.
+  destruct (Hfam wc (HΦ wc Hadmc)) as (yc & tc & esc & Hexc & Hoffc).
+  destruct (wrun_exec_stale_elim_off tid ra rn rak Φ W wc m Hracc Hrn Hrk
+              b s yc tc esc Hexc Hoffc Hok Hwf x s' Hrun) as (Hexf & Hwf').
+  exists wc, esc. split_and!;
+    [exact Hadmc|exact (HΦ wc Hadmc)|exact Hexf|exact Hwf'].
+Qed.

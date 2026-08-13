@@ -65,10 +65,45 @@ rest of 6a/6c:
   half of the restatement must discharge from the absorption theorem's
   register wand + log arms.  That ghost half is 6a's remaining piece.
 
+**AND THE ⇐-BRIDGE IS IN (2026-08-13, `WeakStale` §10 — the
+ghost-matching keystone, all exports closed under the global context).**
+`wrun_exec_stale_elim` (+ `wexec_exec_stale_elim`): peel + the actual
+weak run ⇒ the run's result and post-state MATCH some Φ-admissible
+family member — `exec_stale ra rn w m (wflat_st s) = Some (x,
+wflat_st s', es)` — so a consumer pins result / post-registers /
+post-memory / trace by rewriting against the family it already owns
+(`exec_stale` is a function).  This is the walk's replacement for the
+started cone's patched-exec bridge.  THREE things to know:
+- **The correspondence needs the family's `trace_stale` traces as a
+  premise — nothing weaker works.**  Two irrefutable failure modes kill
+  any "no window read after a window write" attempt: (i) write-then-read
+  (a store raises the writer's own `coh`, making `pinned_read` true and
+  the machine read its own write while the mirror reads the patch), and
+  (ii) READ-ONLY — after a stale racy read, observing ANY newer message
+  anywhere (or a fence) pushes `w_vrNew` past the window's `latest_ts`,
+  `pinned_read` flips true, and a second unpinned window read returns
+  the latest while the mirror still returns the patch.  So the post-racy
+  tail must be `trace_off_win` — i.e. exactly `trace_stale`'s tail —
+  and the ⇐-bridge takes the SAME family-with-`trace_stale` bundle the
+  peel producer consumes.  One hypothesis serves both directions.
+- **The peel can take the AWAY arm at the window** (with `D := wD_any`
+  nothing forbids treating a pinned window read as ordinary), so the
+  witness discipline has three sources: the racy arm's value, the
+  coherent word when the run ends pre-racy, and the coherent word at an
+  away-arm window read.  The core elim is phase-GENERIC for this reason.
+- **The sixth shape (TLB-hit write-back `[excl; write]`) is refused by
+  `trace_stale`** (pre-racy write) and needs its own constant-family
+  elim `wrun_exec_stale_elim_const` (§10d) — vacuous `trace_off_win`,
+  no witness quantification — mirroring the peel side where that arm
+  also takes the non-stale route.  A consumer case-splitting on the
+  absorption arms gets ONE postcondition shape from both routes.
+
 What remains of this front: the Iris half of the fetch restatement
-(discharge `wfetch_tail` from the absorption theorem's ghost arms), the
-straddle/RVC fetch arms over §9 + `wstep_ok_racy_kR`, and 6c's funnel
-(`wwp_instr_s`) composing the CPS fetch peel with the execute phase.
+(discharge `wfetch_tail` — its outcome half now follows from the
+⇐-bridge + the family's Ok-result equations), the straddle/RVC fetch
+arms over §9 + `wstep_ok_racy_kR`, and 6c's funnel (`wwp_instr_s`)
+composing the CPS fetch peel with the execute phase, whose Q-half is
+now statable by rewriting against the family.
 
 **DECISION (2026-08-12, the φ-upgrade author, as §5 requested): take
 option (a), and do NOT start until the in-flight C/D/S points-to surgery
