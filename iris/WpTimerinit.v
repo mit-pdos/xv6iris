@@ -42,7 +42,7 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import SailStdpp.Base.
+Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec RiscvExtras WpGpr.
 Require Import WpMmodeShiftiop.
 Require Import WpMmodeLeafBase.
@@ -65,6 +65,9 @@ Local Open Scope Z_scope.
 
 Require Import CodeTimerinitAux.
 Require Import MbootVocab.
+(* [mw_prep] / [zn_norm] / [bv_eq_testbit], for [ti_mcen1_TM] below.  Safe at
+   this altitude: MstatusBits.v has no intra-[iris] requires at all. *)
+Require Import MstatusBits.
 (* ===================================================================== *)
 (* Symbolic values of the run (functions of the entry state).             *)
 (* ===================================================================== *)
@@ -113,6 +116,52 @@ Definition ti_bit63 : mword 64 := mword_of_int 0x8000000000000000.
 Definition ti_menv1 (menv0 : mword 64) : mword 64 := or_vec menv0 ti_bit63.
 Definition ti_mcen1 (mcen0 : mword 32) : mword 64 :=
   or_vec (zero_extend' 64 mcen0) (sign_extend' 64 i19).
+(* THE TM BIT IS SET IN THE mcounteren timerinit WRITES, at ANY entry value.
+   [i19 = 2] is the TM bit, the [ori] sets it, and the CSR's legalization masks
+   with [sys_mcounteren_writable_bits] = all ones, so it survives.  This is the
+   one fact [TimerCap.timer_cap_intro] wants of timerinit's output, and it can
+   only be stated where the written value is still concrete -- which is here.
+   The S-mode side needs it because [timer_cap] is what clockintr runs under,
+   hence one of the credentials kerneltrap's cone closes over
+   (claude-notes/completed/kerneltrap.md).
+
+   THE PROOF IS A WIDTH-CROSSING TOWER (64 -> 32 -> 1) AND [tb1] DOES NOT CLOSE
+   IT.  [MstatusBits]' [tb_rw] is tuned for [update_slice] towers; this one is
+   [bv_extract] / [bv_and] / [bv_or], so the rewrite chain is driven linearly
+   and by hand.  The closing move is the point: at the leaf exactly ONE bit is
+   symbolic (mcen0's bit 1), so case-splitting it makes both branches closed
+   and [vm_compute] finishes -- and the subterm must be taken from what the
+   [context] match RETURNS, because rebuilding it from the pattern elaborates
+   [@bv_unsigned] at a different (convertible, not equal) width index and then
+   [destruct] abstracts nothing.  Measured at 0.25 s. *)
+Lemma ti_mcen1_TM (mcen0 : mword 32) :
+  eq_vec (_get_Counteren_TM (legalize_mcounteren mcen0 (ti_mcen1 mcen0)))
+         ('b"1" : mword 1) = true.
+Proof.
+  apply eq_vec_true_iff.
+  unfold ti_mcen1, i19, _get_Counteren_TM, legalize_mcounteren, Mk_Counteren,
+         sys_mcounteren_writable_bits, and_vec, or_vec, word_binop,
+         zero_extend', sign_extend', zero_extend, sign_extend, extz_vec, exts_vec.
+  mw_prep.
+  unfold with_word', with_word, MachineWord.and, MachineWord.or,
+         MachineWord.zero_extend, MachineWord.sign_extend.
+  zn_norm.
+  apply (bv_eq_testbit 1); intros k Hk;
+    assert (k = 0) as Hk0; [ lia | subst k ].
+  rewrite bv_extract_unsigned bv_and_unsigned bv_extract_unsigned
+          bv_or_unsigned bv_zero_extend_unsigned' bv_sign_extend_unsigned.
+  rewrite bv_wrap_spec_low; [| lia].
+  rewrite Z.shiftr_spec; [| lia].
+  rewrite Z.land_spec.
+  rewrite bv_wrap_spec_low; [| lia].
+  rewrite Z.shiftr_spec; [| lia].
+  rewrite Z.lor_spec.
+  rewrite (bv_wrap_spec_low 64); [| lia].
+  match goal with
+  | |- context [ orb ?t _ ] => destruct t
+  end; vm_compute; reflexivity.
+Qed.
+
 Definition ti_interval : mword 64 := mword_of_int 1000000.
 Definition ti_deadline (mtime0 : mword 64) : mword 64 := add_vec mtime0 ti_interval.
 

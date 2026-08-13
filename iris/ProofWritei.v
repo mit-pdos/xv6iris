@@ -1314,7 +1314,7 @@ Section WriteiSize.
                       rewrite Hszu Hoffu; exact Hge)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hiba").
-      iNext. iIntros (CIDz2 Hqz2) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDz2 Hqz2) "Hcg Hpc".
       assert (Htgtec : add_vec (mword_of_int (WI + 0xc0) : mword 64)
                          (sign_extend' 64 (mword_of_int 50 : mword 13))
                        = mword_of_int (WI + 0xf2)) by pcw.
@@ -1454,7 +1454,7 @@ Section WriteiSize.
                 (sign_extend' 21 (concat_vec (mword_of_int 2027 : mword 11) ('b"0")))
                 QB5 (K - 14)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hif6").
-      iIntros (CIDz3 Hqz3). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDz3 Hqz3). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htgtcc : add_vec (mword_of_int (WI + 0xfc) : mword 64)
                 (sign_extend' 64 (sign_extend' 21
                    (concat_vec (mword_of_int 2027 : mword 11) ('b"0"))))
@@ -2129,7 +2129,7 @@ Section WriteiLoop.
                 B1 (K - 14)%nat b ltac:(vm_compute; reflexivity) ltac:(nz)
                 ltac:(rgne; exact Hbeqz) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi8e").
-      iNext. iIntros (CIDa6 Hqa6) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDa6 Hqa6) "Hcg Hpc".
       assert (Htgtbc : add_vec (mword_of_int (WI + 0x8e) : mword 64)
                 (sign_extend' 64 (sign_extend' 13
                    (concat_vec (mword_of_int 23 : mword 8) ('b"0"))))
@@ -3120,7 +3120,7 @@ Section WriteiLoop.
                             rewrite (bc_ge_moi (tot + mm) n ltac:(lia) ltac:(lia));
                             apply Nat.leb_le; lia)
                       ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi7e").
-            iNext. iIntros (CIDc11 Hqc11) "Hcg Hpc".
+            iApply bi.later_intro. iIntros (CIDc11 Hqc11) "Hcg Hpc".
             assert (Htgtbc : add_vec (mword_of_int (WI + 0x7e) : mword 64)
                       (sign_extend' 64 (mword_of_int 62 : mword 13))
                     = mword_of_int (WI + 0xbc)) by pcw.
@@ -3236,7 +3236,7 @@ Section WriteiLoop.
                     ltac:(nz) ltac:(nz)
                     ltac:(rgne; rgne; rewrite Hrm1 HEs8; vm_compute; reflexivity)
                     ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi64").
-          iNext. iIntros (CIDd1 Hqd1) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDd1 Hqd1) "Hcg Hpc".
           assert (Htgtb0 : add_vec (mword_of_int (WI + 0x64) : mword 64)
                     (sign_extend' 64 (mword_of_int 76 : mword 13))
                   = mword_of_int (WI + 0xb0)) by pcw.
@@ -3504,7 +3504,7 @@ Section WriteiLoop.
                         rewrite (bc_ge_moi (n - tot) (BSIZE - o) ltac:(lia) ltac:(lia));
                         apply Nat.leb_le; lia)
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hia8").
-        iNext. iIntros (CIDa15 Hqa15) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDa15 Hqa15) "Hcg Hpc".
         assert (Htgt4c : add_vec (mword_of_int (WI + 0xa8) : mword 64)
                   (sign_extend' 64 (mword_of_int 8100 : mword 13))
                 = mword_of_int (WI + 0x4c)) by pcw.
@@ -3543,7 +3543,7 @@ Section WriteiLoop.
                   (sign_extend' 21 (concat_vec (mword_of_int 1999 : mword 11) ('b"0")))
                   E6 (K - 14)%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hiae").
-        iIntros (CIDa17 Hqa17). iNext. iIntros "Hcg Hpc".
+        iIntros (CIDa17 Hqa17). iApply bi.later_intro. iIntros "Hcg Hpc".
         assert (Htgt4c : add_vec (mword_of_int (WI + 0xae) : mword 64)
                   (sign_extend' 64 (sign_extend' 21
                      (concat_vec (mword_of_int 1999 : mword 11) ('b"0"))))
@@ -3738,7 +3738,7 @@ Section WriteiMain.
                       rewrite (wi_ltu_read _ _ _ _ Hszu Hoffu);
                       apply Z.ltb_lt; exact Hsml)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi02").
-      iNext. iIntros (CIDx1 Hqx1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDx1 Hqx1) "Hcg Hpc".
       assert (Htgt : add_vec (mword_of_int (WI + 0x2) : mword 64)
                 (sign_extend' 64 (mword_of_int 252 : mword 13))
               = mword_of_int (WI + 0xfe)) by pcw.
@@ -4133,7 +4133,7 @@ Section WriteiMain.
                       rewrite (wi_ltu_read _ _ _ _ Hu274 Husum);
                       apply Z.ltb_lt; exact Htoobig)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi2a").
-      iNext. iIntros (CIDy1 Hqy1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDy1 Hqy1) "Hcg Hpc".
       assert (Htgt : add_vec (mword_of_int (WI + 0x2a) : mword 64)
                 (sign_extend' 64 (mword_of_int 216 : mword 13))
               = mword_of_int (WI + 0x102)) by pcw.
@@ -4157,7 +4157,7 @@ Section WriteiMain.
                 (sign_extend' 21 (concat_vec (mword_of_int 2028 : mword 11) ('b"0")))
                 Y1 (K - 14)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi104").
-      iIntros (CIDy3 Hqy3). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDy3 Hqy3). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htgtdc : add_vec (mword_of_int (WI + 0x104) : mword 64)
                 (sign_extend' 64 (sign_extend' 21
                    (concat_vec (mword_of_int 2028 : mword 11) ('b"0"))))
@@ -4274,7 +4274,7 @@ Section WriteiMain.
                 ltac:(rgne; rewrite HT2s6;
                       rewrite (bc_eqz_moi 0%nat ltac:(lia)); reflexivity)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi34").
-      iNext. iIntros (CIDz1 Hqz1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDz1 Hqz1) "Hcg Hpc".
       assert (Htgtee : add_vec (mword_of_int (WI + 0x34) : mword 64)
                 (sign_extend' 64 (mword_of_int 186 : mword 13))
               = mword_of_int (WI + 0xee)) by pcw.
@@ -4298,7 +4298,7 @@ Section WriteiMain.
                 (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")))
                 Z1 (K - 14)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hif0").
-      iIntros (CIDz3 Hqz3). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDz3 Hqz3). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htgtd2 : add_vec (mword_of_int (WI + 0xf0) : mword 64)
                 (sign_extend' 64 (sign_extend' 21
                    (concat_vec (mword_of_int 2033 : mword 11) ('b"0"))))
@@ -4496,7 +4496,7 @@ Section WriteiMain.
               (sign_extend' 21 (concat_vec (mword_of_int 28 : mword 11) ('b"0")))
               U3 (K - 14)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi4a").
-    iIntros (CIDp17 Hqp17). iNext. iIntros "Hcg Hpc".
+    iIntros (CIDp17 Hqp17). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htgt82 : add_vec (mword_of_int (WI + 0x4a) : mword 64)
               (sign_extend' 64 (sign_extend' 21
                  (concat_vec (mword_of_int 28 : mword 11) ('b"0"))))

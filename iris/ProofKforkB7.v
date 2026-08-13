@@ -142,7 +142,7 @@ Section KforkB7.
     iApply (wp_ld_s_sconf (mword_of_int (KF + 0x66) : mword 64) Ra5 Rs4 (mword_of_int 88 : mword 12)
               M n (page_base (ud_tfp (pv_upt V))) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi066 [Htf] [-]").
+              with "Hcg Hpc Hi066 [Htf]").
     { iEval (rgne; rewrite Htgt66). iExact "Htf". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Htf". iEval (rgne; rewrite Htgt66) in "Htf".
@@ -162,7 +162,7 @@ Section KforkB7.
       by (rewrite HT1a5; apply kfkb7_tf14_addr).
     iApply (wp_sd_zero_s_sconf (mword_of_int (KF + 0x6a) : mword 64) Ra5 (mword_of_int 112 : mword 12)
               T1 n w14 false
-              with "Hcg Hpc Hi06a [Hcell] [-]").
+              with "Hcg Hpc Hi06a [Hcell]").
     { iEval (rgne; rewrite Htgt6a). iExact "Hcell". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hcell". iEval (rgne; rewrite Htgt6a) in "Hcell".
@@ -176,7 +176,7 @@ Section KforkB7.
     iApply (wp_addi4_s_sconf (mword_of_int (KF + 0x6e) : mword 64) Rs1 Rs5 (mword_of_int 208 : mword 12)
               T1 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi06e [-]").
+              with "Hcg Hpc Hi06e").
     iApply wp_next_off_intro. iIntros "Hcg Hpc". iEval (rgne) in "Hcg".
     set (T2 := <[Regidx Rs1 := regval_into_reg
                   (add_vec (T1 !!! Regidx Rs5) (sign_extend' 64 (mword_of_int 208 : mword 12)))]> T1).
@@ -193,7 +193,7 @@ Section KforkB7.
     iApply (wp_addi4_s_sconf (mword_of_int (KF + 0x72) : mword 64) Rs2 Rs4 (mword_of_int 208 : mword 12)
               T2 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi072 [-]").
+              with "Hcg Hpc Hi072").
     iApply wp_next_off_intro. iIntros "Hcg Hpc". iEval (rgne) in "Hcg".
     set (T3 := <[Regidx Rs2 := regval_into_reg
                   (add_vec (T2 !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 208 : mword 12)))]> T2).
@@ -212,7 +212,7 @@ Section KforkB7.
     iApply (wp_addi4_s_sconf (mword_of_int (KF + 0x76) : mword 64) Rs3 Rs5 (mword_of_int 336 : mword 12)
               T3 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi076 [-]").
+              with "Hcg Hpc Hi076").
     iApply wp_next_off_intro. iIntros "Hcg Hpc". iEval (rgne) in "Hcg".
     set (T4 := <[Regidx Rs3 := regval_into_reg
                   (add_vec (T3 !!! Regidx Rs5) (sign_extend' 64 (mword_of_int 336 : mword 12)))]> T3).
@@ -239,7 +239,7 @@ Section KforkB7.
               (sign_extend' 21 (concat_vec (mword_of_int 14 : mword 11) ('b"0")))
               T4 n false
               ltac:(rewrite Htgt7a; vm_compute; reflexivity)
-              with "Hcg Hpc Hi07a [-]").
+              with "Hcg Hpc Hi07a").
     iApply wp_next_off_intro. iNext. iIntros "Hcg Hpc".
     iEval (rewrite Htgt7a) in "Hpc".
     (* ---- assemble the exit and hand off to Hcont ---- *)

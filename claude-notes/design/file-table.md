@@ -127,7 +127,7 @@ properties:
   `type`/`ip`/… , for free;
 - **`file_ref γ k 1 C` is writable** — the exclusive/uninitialized state.
 
-### `file_payload`: the thing the file is a reference *to* (BUILT)
+### `file_payload`: the thing the file is a reference *to*
 
 A `struct file` owns a reference on its pipe or its inode, created when the
 file is initialized and consumed by `fileclose`'s `pipeclose`/`iput`. Parking
@@ -412,7 +412,7 @@ undischargeable for every file that had ever been `dup`ed.)
   construction: reaching `n = 0` requires holding the only fragment, and any
   concurrent reader would be a second fragment.
 
-## `off` — the borrow protocol (BUILT)
+## `off` — the borrow protocol
 
 `off` is the one field that is neither lock-free-immutable nor ftable-protected,
 and it is the only genuinely hard part of the model. It is **not** needed by
@@ -554,66 +554,10 @@ Two consequences for `fileread`'s contract, both accepted:
 | `off_inv_alloc` / `off_invs_alloc` | boot, alongside `ftable_ghosts_alloc` (still uncalled: the ftable lock is not wired at boot) |
 | `off_invs_lookup` | slot `k` out of the `NFILE`-way persistent bundle |
 
-## ~~OWED~~ DONE (fs-sysfile S3p): `SpecWritei.v` could not be called on its user arm
+## The pid fraction lives in the KERNEL arm — `SpecReadi` / `SpecWritei`
 
-> **STATUS: REPAIRED AND GATED (fs-sysfile S3p).** `SpecWritei.v` now carries
-> readi's shape verbatim — the pid fraction is the KERNEL arm's, folded into
-> the `if user` bracket in the precondition AND the postcondition of BOTH
-> `wp_writei_sconf_body` and `wp_writei_gen_body`. Inside `ProofWritei.v` the
-> borrow is one lemma, `wi_src_pid` (the twin of `ProofReadi.rd_dst_pid`),
-> over a `wi_q user dq` dfrac that is `1/4` on the user arm and the caller's
-> own share on the kernel one; it is opened immediately before each of the
-> four callees that want the fraction (bmap, bread, brelse, iupdate) and
-> closed the instant each returns, so `either_copyin` always sees the bracket
-> whole. The one downstream consumer, `ProofDirlink.v`, is `user = false` and
-> only brackets its two arguments together across the call.
->
-> The repair is strictly WEAKENING, so nothing above writei moved: the
-> `Print Assumptions` cones of `Writei` and `Dirlink` are unchanged.
->
-> **The history, kept because the lesson is the point.** The last line of this
-> section predicted that `filewrite` would hit this and said it should be
-> repaired before that proof was started. Filewrite hit it, at `+0xa0`, with
-> the walk otherwise fully cleared: fs-sysfile S3o stopped there. The
-> deferral reason — "`SpecWritei.v` and `ProofWritei.v` are mid-flight for the
-> `balloc` contract ripple" — had expired at S3m.
->
-> S3o's addendum to this section's own lesson: an *unused* callee contract is
-> unverified, and a *comment* on one of its premises is verified by nothing at
-> all. fs-sysfile S3n cleared this very call by reading SpecWritei's premise
-> comment (the stale sentence this section refutes) instead of
-> `ProcInv.proc_priv_pid`'s type. **Clear premises against signatures.**
-
-**`writei`'s user arm WAS uncallable, for exactly the reason `readi`'s was.**
-What follows is the defect as it stood and the fix as applied at S3p; it is
-kept in full because the *reason* it went unnoticed for so long is the durable
-part.
-
-The defect. `SpecWritei.v` demanded, on the same call,
-
-```coq
-  (if user then proc_priv γf pj pidv V else <the caller's byte buffer>) -∗
-  p_pid pj ↦₄{dq} pidv -∗
-```
-
-and a caller cannot supply both. `ProcInv.proc_priv_pid` is an ACCESSOR —
-`proc_priv -∗ p_pid ↦₄{1/4} ∗ (p_pid ↦₄{1/4} -∗ proc_priv)` — so it consumes
-the block and returns a wand. And there is no third fragment to find: the cell
-totals one, `ProcInv.proc_priv_core` holding a half and `SchedCtx.proc_pub` the
-other, behind `p->lock`. So a holder of `proc_priv` can produce the fraction
-only by giving `proc_priv` up.
-
-Why nobody noticed: **until `fileread`, nothing in the tree called `readi` or
-`writei` at all.** A whole-function contract that no caller has ever
-instantiated is not type-checked against reality by anything — the proof of the
-callee goes through regardless, because it only ever *consumes* the premise. The
-general lesson, worth more than this instance: **a spec's premise set is only
-validated by its first caller, so an unused callee contract is an unverified
-one.** Prefer landing a caller, even a thin one, over accumulating callees.
-
-The fix, already applied to `SpecReadi.v` and proved out there — put the pid
-fraction in the KERNEL arm only, and let the callee borrow it internally on the
-user arm:
+Both contracts fold the `p_pid` fraction into the KERNEL arm of their `if user`
+source/destination bracket, in the precondition and the postcondition:
 
 ```coq
   (if user
@@ -622,126 +566,95 @@ user arm:
         p_pid pj ↦₄{dq} pidv) -∗
 ```
 
-same shape in the postcondition, and inside the proof carry
-`p_pid ↦₄{1/4} ∗ (p_pid ↦₄{1/4} -∗ proc_priv …)` rather than
-`proc_priv ∗ p_pid`. It composes because the callees never want both at once:
-`SpecBmap`/`SpecBread`/`SpecBrelse`/`SpecLogWrite`/`SpecIupdate` take only the
-fraction, at a universally quantified `dq`; `SpecEitherCopyin` takes only
-`proc_priv`. So it is a wand-apply before each copy and a re-split after.
+**A standalone `p_pid pj ↦₄{dq} pidv` premise alongside `proc_priv` would be
+unsatisfiable**, and that is a fact about the algebra, not an inconvenience:
+`ProcInv.proc_priv_pid` is an ACCESSOR (`proc_priv -∗ p_pid ↦₄{1/4} ∗ (p_pid
+↦₄{1/4} -∗ proc_priv)`), so it consumes the block and returns a wand, and there
+is no third fragment to find — the cell totals one, `proc_priv_core` holding a
+half and `SchedCtx.proc_pub` the other behind `p->lock`. A holder of `proc_priv`
+produces the fraction only by giving `proc_priv` up.
 
-`filewrite` is the function that will hit this, and it should be done before
-that proof is started rather than during it.
+Inside the proof the borrow is one lemma at a `user`-indexed dfrac
+(`ProofWritei.wi_src_pid` over `wi_q user dq`, the twin of
+`ProofReadi.rd_dst_pid`), opened immediately before each callee that wants the
+fraction and closed the instant it returns — so `either_copyin`, which wants
+`proc_priv` and never the fraction, always sees the bracket whole. **No call
+site case-splits on `user`**, because every fraction-taking callee (bmap, bread,
+brelse, iupdate) quantifies its own `dq`.
 
-**APPLIED, S3p.** Exactly as written above, and the "wand-apply before each
-copy and a re-split after" turned out to be cheaper than that: because every
-fraction-taking callee quantifies its `dq`, ONE lemma serves both arms and no
-call site case-splits on `user`.
+## What kind of thing a descriptor names is NOT an ftable question
 
-```coq
-  Definition wi_q (user : bool) (dq : dfrac) : dfrac :=
-    if user then DfracOwn (1/4) else dq.
+A reference borrowed out of `ProcInv.ofile_slot` comes with its `fcontent`
+existentially quantified, so the holder cannot tell a pipe from an inode file.
+That knowledge is **per-`ofile` ghost state in `struct proc`** — not a
+persistent content witness on the ftable authority, which is the tempting and
+wrong fix (it is cheap to build on top of the payload-names component, which is
+exactly why it needs refusing in writing). The rule the two sides divide on:
 
-  Lemma wi_src_pid … :
-    <the bracket> -∗
-      p_pid (proc_addr j) ↦₄{wi_q user dq} pidv ∗
-      (p_pid (proc_addr j) ↦₄{wi_q user dq} pidv -∗ <the bracket>).
-```
+> The RESOURCE travels with the reference; the FACT travels with the
+> descriptor.
 
-Cost, measured: four statement sites in `SpecWritei.v`, five in-file premise
-pairs plus two public lemmas in `ProofWritei.v`, four borrow/close pairs (bmap,
-bread, and the two brelses; iupdate's is in `wi_join`), two `either_copyin`
-bundling `iAssert`s that had to grow the fraction into their kernel arm, and
-~30 threading occurrences that simply lost a name. `ProofWritei.v` compiled on
-the first attempt after the edit. **The whole thing is an afternoon; it sat
-owed for three stages because no caller existed to force it.**
+The pipe end rides inside `file_ref`, because references migrate between
+processes (`fork`, `filedup`) and whoever closes the last one frees the page.
+The kind is a thread-local fact about a thread-local array, and it stays true
+for exactly as long as the descriptor holds its reference: a held reference
+keeps `ref > 0`, and the type cannot change while `ref > 0` — the same argument
+that makes the content fields stable.
 
-## Open items
+### `file_ref` DOES NOT SPLIT BY FRACTION
 
-- **The payload link is BUILT** (see "`file_payload`" above). What it changed,
-  as a checklist for the next layer that adds a payload kind (`sys_open`'s
-  inode files):
-  * `pipealloc` now folds the two ends INTO the two `file_ref`s — its
-    postcondition no longer mentions `is_pipe`/`pipe_ref`, and `sys_pipe` no
-    longer drops them on the floor. A descriptor sys_pipe creates now really
-    does own its end of the pipe in the model.
-  * `filealloc`/`filedup` were unaffected in their CONTRACTS — the payload of
-    a fresh file is `emp` (type FD_NONE), and `filedup` splits whatever is
-    there. Only the ghost steps' statements grew a conjunct.
-  * `fdalloc`, `ofile_slot`, `proc_priv` and the ~100 files above them did not
-    change at all: the names ghost is a component of the existing `γf` and
-    `pipeG` became a superclass of `fileG`.
+`fref_tok γ k q = fref_own γ (◯ {[k := (q, 1%positive)]})` carries the
+reference COUNT in the same map entry as the fraction, so two halves compose to
+`(q, 2)`, not `(q, 1)`. The only splitter is the ftable AUTHORITY, i.e.
+`FileInv.file_dup_step` — filedup's ghost step, unsound without the physical
+`f->ref++`.
 
-- **WHAT KIND OF THING A DESCRIPTOR NAMES IS NOT AN FTABLE QUESTION, and the
-  file layer must not try to answer it.** A reference borrowed out of
-  `ProcInv.ofile_slot` comes with its `fcontent` existentially quantified, so
-  the holder cannot tell a pipe from an inode file. That knowledge is going to
-  be **per-`ofile` ghost state in `struct proc`** — not a persistent content
-  witness on the ftable authority, which is the tempting and wrong fix (it is
-  cheap to build on top of the payload-names component, which is exactly why
-  it needs refusing in writing). The rule the two sides divide on:
+That kills the shape a syscall contract naturally reaches for: an OPENER wand,
+premised on the syscall, turning the reference actually found into the
+environment for that file and back at a SMALLER `q'`. It is unsatisfiable at
+any `q' < q`, and at `q' = q` it only defers the problem to a caller already
+holding the whole environment.
 
-  > The RESOURCE travels with the reference; the FACT travels with the
-  > descriptor.
+### So a `file.c` environment must be CONTENT-INDEPENDENT
 
-  The pipe end has to ride inside `file_ref`, because references migrate
-  between processes (`fork`, `filedup`) and whoever closes the last one frees
-  the page. The kind is a thread-local fact about a thread-local array, and it
-  stays true for exactly as long as the descriptor holds its reference: a held
-  reference keeps `ref > 0`, and the type cannot change while `ref > 0` — the
-  same argument that makes the content fields stable.
+The shape that works is `SpecFileclose.fileclose_fs_env`'s: escrow family,
+sleeplock family, region, cache, fabric, and the region-WIDE inum geometry
+(`∀ inum, bv_unsigned inum < 16 * icfg_nib -> IBLOCK inum inodestart ∈ cov`).
+The names record loses every per-inode field, and the function CARVES its
+per-slot share out of the `FileInvDefs.inode_pay` already inside the
+`file_ref` it holds (`SpecFileread.fileread_pay_carve`, which filewrite reuses
+— it is one lemma, not three). Two non-obvious parts:
 
-- **`sys_read` / `sys_write` on a pipe fd are blocked on that ghost state**,
-  and NOT on the payload link. The reference a descriptor hands them does now
-  carry the pipe end, but under the same existential, so `piperead` /
-  `pipewrite` still cannot be given their `pipe_ref`. `fileclose`'s callers
-  want the identical fact for the identical reason
-  ([`../completed/fileclose.md`](../completed/fileclose.md) §3b), so one piece
-  of ghost state settles both.
+- **The generation is lost at IUNLOCK**, not at the file.c boundary —
+  `SpecIunlock` returns the arity-preserving `inode_shr`. So the fix is not a
+  stronger postcondition but `ProofFilewriteParts.fw_shr_regen`'s move: lend
+  `s/2`, keep `s/2` generation-named, and let `live_gen_agree` pin the returned
+  half. With the share never leaving the reference, the postcondition carries
+  no share at all.
+- **Do not bind both `!fileG Σ` and `!icacheG Σ`** — `fileG` BUNDLES `icacheG`
+  (and the `icfg`), so those are two different instances (durable-notes'
+  bundling trap). Harmless until something in the file mixes a payload's share
+  with a written `icfg_dev`; the carve does exactly that.
 
-  **fs-sysfile S4' RULED AND BUILT IT (option (ii)), and found the opener was
-  never an option at all.**  `file_ref` DOES NOT SPLIT BY FRACTION:
-  `fref_tok γ k q = fref_own γ (◯ {[k := (q, 1%positive)]})` carries the
-  reference COUNT in the same map entry, so two halves compose to `(q, 2)`.
-  The only splitter is the ftable authority, i.e. `FileInv.file_dup_step` —
-  filedup's ghost step, unsound without the physical `f->ref++`.  An opener
-  promising `file_ref γ k q' C` at `q' < q` is therefore UNSATISFIABLE, and
-  option (i) collapses into "the caller already holds the whole environment".
+An environment a SYSCALL can own may not name the fd SLOT either, because
+`ProcInv.ofile_slot` quantifies it existentially — hence `FileOff.off_invs` +
+`off_invs_lookup` (a family and a selector, with the lookup happening at the
+call off the contract's own `k < NFILE`) rather than `off_inv γf k`, and
+likewise `ic_escrows` / `IcacheBoot.ic_sleeplocks` rather than the per-slot
+`ic_escrow` / `is_sleeplock`.
 
-  What option (ii) looks like, built for filestat and identical for the other
-  two: the contract's environment is `SpecFileclose.fileclose_fs_env`'s form
-  (escrow family, sleeplock family, region, cache, fabric, and the
-  region-WIDE inum geometry), the record loses every per-inode field, and the
-  function carves its share out of `FileInvDefs.inode_pay` itself
-  (`SpecFilestat.filestat_pay_carve`).  Two things the sizing missed:
-  * the generation is lost at **iunlock** (`SpecIunlock` returns the
-    arity-preserving `inode_shr`), not at the file.c boundary, so the fix is
-    not a stronger postcondition but `ProofFilewriteParts.fw_shr_regen`'s
-    trick — lend `s/2`, keep `s/2` generation-named, pin the returned half
-    with `live_gen_agree`.  With the share never leaving the reference, the
-    postcondition carries no share at all;
-  * `SpecFilestat`/`SpecFileread`/`SpecFilewrite` all bind BOTH `!fileG Σ`
-    and `!icacheG Σ`, which are two `icfg` instances (durable-notes' bundling
-    trap).  Harmless until something in the file mixes a payload's share with
-    a written `icfg_dev` — the carve does.  Drop the standalone binder.
+### The one thing that CANNOT be made content-independent: `devsw[major]`
 
-  **fs-sysfile S4 sharpened this and found it is not only the pipe arm.**
-  Every arm's environment is content-indexed: `filestat_env fn Cf` and its
-  two siblings name the itable SLOT (`fc_ip Cf = ientry (fsn_ik fn)`), that
-  slot's escrow and sleeplock, and a share of that inode's reference — so an
-  inode fd is in exactly the same position as a pipe fd, and taking `Cf` as
-  a contract parameter does not help (`file_ref_agree` identifies two
-  contents only for a holder of a second fraction of the SAME slot, which no
-  syscall has). The two answers on the table are (i) an OPENER wand, a
-  premise of the syscall contract that turns the reference actually found
-  into the environment for that file and back — what S4's three Specs do —
-  or (ii) restating the three environments in `fileclose_fs_env`'s
-  content-INDEPENDENT form and letting each `file.c` function take its
-  per-slot share out of the `inode_pay` already inside the `file_ref` it
-  holds, which would delete the opener. Under (ii), note that
-  `filestat_fs_out` and `fileread_fs_out` return a NON-generation-named
-  `inode_shr`, which cannot be gathered back into `inode_pay`'s
-  `inode_shr_held_gen … g`; `filewrite_fs_out` is already gen-named, so that
-  is a one-line fix in each of the other two postconditions.
+The device arm's table entry has address `a_devsw_read (dev_major Cf)`, so one
+cell covers one major and a scalar field could only ever describe the major the
+caller already knew — which a syscall does not. Two shapes are unsound: a
+`∀ Cf, fileread_dev_env fn Cf` spatial premise claims the same cell for the
+infinitely many `Cf` sharing a major, and a `∀ Cf, P Cf ∗ (Q Cf -∗ P Cf)`
+bundle is consumed whole by handing out one instance. **Own the COLUMN**: the
+record's fields become `Z -> mword 64` / `Z -> dfrac`, `fileread_devsw fn` is
+the `big_sepL` over majors `0..NDEV_max`, and an accessor picks the entry the
+file names and takes it straight back (the arm only READS it). Ten cells is the
+honest price of a syscall that may be handed any descriptor.
 
 ## A FUNCTION THAT TAKES A DESCRIPTOR'S REFERENCE MUST NOT TAKE `proc_priv`
 

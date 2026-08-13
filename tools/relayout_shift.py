@@ -31,10 +31,20 @@ alignment.  From the alignment it derives:
              function and the proof needs a human
   UNALIGNED  the inserted/deleted instructions themselves
 
-THE `UNALIGNED` LIST IS THE CHECK, and it is also the most useful output in
-the file: it should be exactly the instructions the C change added or removed,
-and if it is bigger than that, the alignment is wrong and nothing else here
-should be trusted.  On the psz bump it was 1 entry for kwait, 2 for sys_pipe
+THE `UNALIGNED` LIST IS THE MOST USEFUL OUTPUT, BUT IT IS NECESSARY AND NOT
+SUFFICIENT: it should be exactly the instructions the C change added or
+removed, and if it is bigger than that the alignment is wrong and nothing else
+here should be trusted -- but it can also look exactly right and BE wrong.
+Alignment is on NUMBER-NORMALISED ASTs, so when the new code duplicates a shape
+already present, difflib can pair the wrong copy.  On `namex` (03e5422a) the
+new bail block is `mv a0,s4 ; jal iunlockput` and the pre-existing `L_par` arm
+is `mv a0,s4 ; jal iunlock` -- identical with the numbers blanked.  difflib
+matched them, so 0x7a/0x7c mapped to THEMSELVES instead of +0x84/+0x86 and the
+map proposed rewriting `L_par`'s `jal iunlock` into `jal iunlockput`, a
+well-typed immediate nothing downstream would catch -- while UNALIGNED showed
+exactly the 6 entries the C change predicted.  So on such a function, check the
+SHIFT MAP against the disassembly too; the cheap tell is an offset that maps to
+itself inside a range where everything around it moved.  On the psz bump it was 1 entry for kwait, 2 for sys_pipe
 (two copyout call sites), 1 for filestat -- and on vmfault it printed, with no
 help, precisely the semantic diff: the deleted `jal myproc`, the deleted
 `ld a5,72(a0)` (p->sz), the deleted `ld a0,80(s1)` (p->pagetable) and the
@@ -61,8 +71,8 @@ Usage:
 
 ALWAYS finish with `relayout_map.py residue <Code> <Proof> [ALIAS...]`.
 """
-import sys, os, re, difflib
-sys.path.insert(0, '/shared/xv6iris-4/tools')
+import sys, os, os, re, difflib
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import relayout_map as R
 
 def align(code_file, sym):
@@ -142,7 +152,11 @@ def apply(proof_file, sym, prefix, offmap, immmap, aliases, write):
         v = int(mo.group(1), 16)
         nv = offmap.get(v)
         if nv is None: return mo.group(0)
-        return prefix + ('%02x' % nv)
+        # PRESERVE THE FAMILY'S OWN DIGIT WIDTH.  Hardcoding %02x mangles a
+        # Code<F>.v that numbers its lemmas to three digits: `nxi_08a` came
+        # back as `nxi_8a`, which then silently does not resolve.  The width
+        # is whatever the name being replaced already used.
+        return prefix + ('%0*x' % (len(mo.group(1)), nv))
     text2 = lem.sub(lrep, text2)
     if write:
         open(path, 'w').write(text2)

@@ -16,14 +16,13 @@
    -- and with it printk's panic path -- out of usertrap's cone, exactly as
    kerneltrap's three panic arms keep it out of that one.
 
-   THIS IS THE MIRROR OF ProofKerneltrapParts' [kt_spp_bit] /
-   [kt_spp_set_neq], which prove the OPPOSITE polarity: kerneltrap's
-   [if ((sstatus & SPP) == 0) panic] needs the mask NONZERO from SPP = 1, and
-   usertrap's [!= 0] needs it ZERO from SPP = 0.  The two pairs belong
-   together, and the honest place for all four is beside [sstatus_read] in
-   WpGprCsrwC.v; they are split only because neither function's parts file may
-   import the other's.  Hoist them together whenever something else has to
-   touch that file. *)
+   IT IS ONE READING OF [WpGprCsrwC.sstatus_spp_mask].  kerneltrap's
+   [if ((sstatus & SPP) == 0) panic] needs the mask NONZERO from SPP = 1 and
+   usertrap's [!= 0] needs it ZERO from SPP = 0, so what was two
+   near-identical lemma pairs -- one in each parts file, split only because
+   neither may import the other's -- is one hypothesis-free equation beside
+   [sstatus_read], of which [ut_spp_clear_eq] and
+   [ProofKerneltrapParts.kt_spp_set_neq] are the two instances. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -36,61 +35,26 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import MstatusBits.
 Require Import WpGprCsrwCommon WpGprCsrwC.
+From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
 
+(* the offset base, as ProofPrepareReturnParts does for [PRR] *)
+Notation UT := KernelSyms.usertrap (only parsing).
+
 Section UsertrapParts.
 
-  (* the mirror of [ProofKerneltrapParts.kt_spp_bit]: a CLEAR SPP is a clear
-     bit 8 of the word.  Same script, read at 'b"0". *)
-  Lemma ut_spp_bit (w : mword 64) :
-    _get_Sstatus_SPP w = ('b"0" : mword 1) ->
-    Z.testbit (bv_unsigned w) 8 = false.
-  Proof.
-    intro HS.
-    apply (f_equal bv_unsigned) in HS.
-    unfold _get_Sstatus_SPP, subrange_vec_dec in HS.
-    rewrite autocast_refl in HS.
-    unfold to_word_idx, to_word, get_word in HS.
-    rewrite MachineWord.MachineWord.cast_idx_refl in HS.
-    unfold MachineWord.MachineWord.slice in HS.
-    rewrite bv_extract_unsigned in HS.
-    change (bv_unsigned ('b"0" : mword 1)) with 0 in HS.
-    apply (f_equal (fun z => Z.testbit z 0)) in HS.
-    change (Z.testbit 0 0) with false in HS.
-    rewrite <- HS.
-    unfold bv_wrap, bv_modulus.
-    rewrite (Z.mod_pow2_bits_low _ (Z.of_N (MachineWord.MachineWord.Z_idx (8 - 8 + 1))));
-      [| vm_compute; reflexivity].
-    rewrite Z.shiftr_spec; [| lia]. reflexivity.
-  Qed.
-
   (* SPP = 0 in the trapped mstatus makes [andi a5,a5,256] ZERO, so the
-     "not from user mode" [c.bnez] falls through and the panic is dead. *)
+     "not from user mode" [c.bnez] falls through and the panic is dead.
+     One instance of [WpGprCsrwC.sstatus_spp_mask], which is the
+     hypothesis-free form both handlers read at their own polarity. *)
   Lemma ut_spp_clear_eq (ms : mword 64) :
     _get_Mstatus_SPP ms = ('b"0" : mword 1) ->
     eq_vec (and_vec (sstatus_read ms)
               (sign_extend' 64 (mword_of_int 256 : mword 12))) zero_reg = true.
   Proof.
     intro HSPP.
-    assert (Hb8 : Z.testbit (bv_unsigned (sstatus_read ms)) 8 = false).
-    { apply ut_spp_bit. unfold sstatus_read. rewrite WpGprCsrwC.subrange_full.
-      rewrite WpGprCsrwC.sSPP_lower. exact HSPP. }
-    assert (Hmask : bv_unsigned (sign_extend' 64 (mword_of_int 256 : mword 12) : mword 64) = 256)
-      by (vm_compute; reflexivity).
-    apply eq_vec_true_iff. apply bv_eq.
-    rewrite WpGprCsrwC.and_vec_unsigned Hmask.
-    change (bv_unsigned (zero_reg : mword 64)) with 0.
-    apply Z.bits_inj_0. intro n.
-    destruct (Z_lt_le_dec n 0) as [Hn | Hn].
-    { apply Z.testbit_neg_r. lia. }
-    rewrite Z.land_spec.
-    destruct (Z.eq_dec n 8) as [-> | Hne].
-    - rewrite Hb8. reflexivity.
-    - replace (Z.testbit 256 n) with false; [apply andb_false_r |].
-      change 256 with (2 ^ 8). symmetry.
-      rewrite Z.pow2_bits_eqb; [| lia].
-      apply Z.eqb_neq. lia.
+    rewrite WpGprCsrwC.sstatus_spp_mask HSPP. reflexivity.
   Qed.
 
   (* the same fact in the form the BRANCH LEAF consumes.

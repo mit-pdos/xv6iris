@@ -17,6 +17,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base.
 Require Import RiscvPtsto RiscvExtras.
+Require Import RiscvLang RiscvExec.
 Require Import InstrBytes.
 (* for [MISA_C], which [close_dec] reads misa bits out of *)
 Require Import RiscvFetchExec.
@@ -155,6 +156,75 @@ Section KernelText.
       rewrite Nat.add_0_l. rewrite (Hb k ltac:(lia)). iExact "Hk".
   Qed.
 
+
+  (* ---- whole-[instr] constructors: all the proofmode plumbing of a
+     [Code<F>.v] decode lemma, paid ONCE here instead of once per generated
+     instruction lemma.  [mk_rvc]/[mk_base] below apply these and discharge
+     only pure side conditions, so a generated lemma's proof term carries no
+     proofmode trace at all (measured: the per-lemma proofmode plumbing was
+     ~76% of the Code band's tactic time). *)
+  Lemma instr_intro_rvc (A : Z) (h : mword 16) (pc : mword 64) (i : instruction) :
+    is_lpad_instruction i = false ->
+    pc = mword_of_int A ->
+    is_aligned_vaddr (Virtaddr pc) 2 = true ->
+    isRVC h = true ->
+    subrange_vec_dec (kb_word_at A) 15 0 = h ->
+    (forall j, (j < 4)%nat ->
+       KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte (kb_word_at A) j)) ->
+    (forall s : mstate,
+       priv_mSU (register_lookup cur_privilege s.(sregs)) = true ->
+       eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+       eq_vec (_get_Misa_A (register_lookup misa s.(sregs))) ('b"1") = true ->
+       register_lookup misa s.(sregs) = MISA_C ->
+       cfg_ok s ->
+       exists i0 : instruction,
+         exec (decode_fetch (F_RVC h)) s = Some (i0, s) /\
+         is_lpad_instruction i0 = false /\
+         (forall s0 : mstate, exec (execute i0) s0 = Some (ExecuteAs i, s0))) ->
+    kernel_text -∗ instr pc true i.
+  Proof.
+    intros Hlpad Hpc H2al Hrvc Hsub Hbytes Hob.
+    iIntros "#Ht". rewrite /instr.
+    iSplitR; [iPureIntro; exact Hlpad|].
+    iExists (F_RVC h).
+    iSplitR; [iPureIntro; reflexivity|].
+    iSplitL "".
+    { iApply (instr_bytes_rvc_any pc h (kb_word_at A) H2al Hrvc Hsub).
+      iApply (kernel_window_pc A (kb_word_at A) 4 pc Hpc Hbytes with "Ht"). }
+    iIntros (s CID) "_". iPureIntro.
+    intros Hpriv HmC HmA Hmisa Hcfg. cbn [fetch_is_rvc].
+    exact (Hob s Hpriv HmC HmA Hmisa Hcfg).
+  Qed.
+
+  Lemma instr_intro_base (A : Z) (w : mword 32) (pc : mword 64) (i : instruction) :
+    is_lpad_instruction i = false ->
+    pc = mword_of_int A ->
+    is_aligned_vaddr (Virtaddr pc) 2 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall j, (j < 4)%nat ->
+       KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j)) ->
+    (forall s : mstate,
+       priv_mSU (register_lookup cur_privilege s.(sregs)) = true ->
+       eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+       eq_vec (_get_Misa_A (register_lookup misa s.(sregs))) ('b"1") = true ->
+       register_lookup misa s.(sregs) = MISA_C ->
+       cfg_ok s ->
+       exec (decode_fetch (F_Base w)) s = Some (i, s)) ->
+    kernel_text -∗ instr pc false i.
+  Proof.
+    intros Hlpad Hpc H2al Hnrvc Hbytes Hob.
+    iIntros "#Ht". rewrite /instr.
+    iSplitR; [iPureIntro; exact Hlpad|].
+    iExists (F_Base w).
+    iSplitR; [iPureIntro; reflexivity|].
+    iSplitL "".
+    { iApply (instr_bytes_base pc w H2al Hnrvc).
+      iApply (kernel_window_pc A w 4 pc Hpc Hbytes with "Ht"). }
+    iIntros (s CID) "_". iPureIntro.
+    intros Hpriv HmC HmA Hmisa Hcfg. cbn [fetch_is_rvc].
+    exact (Hob s Hpriv HmC HmA Hmisa Hcfg).
+  Qed.
+
 End KernelText.
 
 (* ===================================================================== *)
@@ -190,45 +260,32 @@ Ltac close_dec decname :=
           end ].
 
 Ltac mk_rvc A h pc ast decname expname :=
-  let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
-  let Hrvc := fresh "Hrvc" in let Hsub := fresh "Hsub" in
-  let Hbytes := fresh "Hbytes" in
-  assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
-  assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
-  assert (Hrvc : isRVC h = true) by (vm_compute; reflexivity);
-  assert (Hsub : subrange_vec_dec (kb_word_at A) 15 0 = h)
-    by (apply bv_eq; vm_compute; reflexivity);
-  assert (Hbytes : forall j, (j < 4)%nat ->
-      KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte (kb_word_at A) j))
-    by (intros j Hj;
-        do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
-  iIntros "#Ht"; rewrite /instr;
-  iSplitR; [iPureIntro; exact Hlpad|];
-  iExists (F_RVC h);
-  iSplitR; [iPureIntro; reflexivity|];
-  iSplitL "";
-  [ iApply (instr_bytes_rvc_any pc h (kb_word_at A) H2al Hrvc Hsub);
-    iApply (kernel_window_pc A (kb_word_at A) 4 pc eq_refl Hbytes with "Ht")
-  | iIntros (? ?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
+  apply (instr_intro_rvc A h pc ast);
+  [ vm_compute; reflexivity
+  | first [ reflexivity | apply bv_eq; vm_compute; reflexivity ]
+  | vm_compute; reflexivity
+  | vm_compute; reflexivity
+  | apply bv_eq; vm_compute; reflexivity
+  | let j := fresh "j" in let Hj := fresh "Hj" in
+    intros j Hj;
+    do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia
+  | let s := fresh "s" in let Hpriv := fresh "Hpriv" in let HmC := fresh "HmC" in
+    let HmA := fresh "HmA" in let Hmisa := fresh "Hmisa" in let Hcfg := fresh "Hcfg" in
+    intros s Hpriv HmC HmA Hmisa Hcfg;
     eexists; (split; [ close_dec decname
                      | split; [ vm_compute; reflexivity
                               | intro; apply expname ] ]) ].
 
 Ltac mk_base A w pc ast decname :=
-  let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
-  let Hnrvc := fresh "Hnrvc" in let Hbytes := fresh "Hbytes" in
-  assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
-  assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
-  assert (Hnrvc : isRVC (subrange_vec_dec w 15 0) = false) by (vm_compute; reflexivity);
-  assert (Hbytes : forall j, (j < 4)%nat ->
-      KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j))
-    by (intros j Hj;
-        do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
-  iIntros "#Ht"; rewrite /instr;
-  iSplitR; [iPureIntro; exact Hlpad|];
-  iExists (F_Base w);
-  iSplitR; [iPureIntro; reflexivity|];
-  iSplitL "";
-  [ iApply (instr_bytes_base pc w H2al Hnrvc);
-    iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-  | iIntros (? ?) "_"; iPureIntro; intros; close_dec decname ].
+  apply (instr_intro_base A w pc ast);
+  [ vm_compute; reflexivity
+  | first [ reflexivity | apply bv_eq; vm_compute; reflexivity ]
+  | vm_compute; reflexivity
+  | vm_compute; reflexivity
+  | let j := fresh "j" in let Hj := fresh "Hj" in
+    intros j Hj;
+    do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia
+  | let s := fresh "s" in let Hpriv := fresh "Hpriv" in let HmC := fresh "HmC" in
+    let HmA := fresh "HmA" in let Hmisa := fresh "Hmisa" in let Hcfg := fresh "Hcfg" in
+    intros s Hpriv HmC HmA Hmisa Hcfg;
+    close_dec decname ].

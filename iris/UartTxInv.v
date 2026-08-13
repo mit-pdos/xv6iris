@@ -4,8 +4,8 @@
 
    Geometry (uart.c's two remaining file-static objects):
 
-     a_tx_lock   -- &tx_lock   (a struct sleeplock; it serializes uartwrite
-                                callers and nothing else)
+     a_tx_lock   -- &tx_lock   (a struct SPINLOCK; it serializes every THR
+                                write -- uartwrite's and uartputc_sync's)
      a_tx_chan   -- &tx_chan   (int: its ADDRESS is the sleep channel; the
                                 cell itself is never read or written, so
                                 nothing here owns it)
@@ -37,19 +37,22 @@
    two functions no longer meet in a shared resource; they meet in the sleep
    channel.
 
-   *** OWED: [is_txlock] IS NOT CONSTRUCTIBLE AT BOOT AS THE SOURCE STANDS. ***
-   uart.c declares [static struct sleeplock tx_lock] and NEVER CALLS
-   [initsleeplock] on it -- uartinit's [initlock(&tx_lock, "uart")] went away
-   with the spinlock and nothing replaced it.  The C works (a zero-initialized
-   sleeplock reads as unlocked), but the zeroed [name] fields are NULL
-   POINTERS, and both [WpLock.lock_name] and [SleepLock.sl_name] say the field
-   points at a real NUL-terminated string -- which no address in this model's
-   memory map can satisfy.  So [is_txlock] below is a premise no caller can
-   discharge, exactly like [SpecIlock]'s [i_ref] (design/fs-icache.md).  See
-   claude-notes/kernel-defects.md D2 for the two ways out (fix the C, or make
-   a lock's NAME optional so an anonymous lock can be minted from zeroed
-   bytes).  Everything else in the cone is stated and proved against
-   [is_txlock] as if it were available, so closing D2 closes the cone. *)
+   *** THE D2 OBSTRUCTION IS GONE. ***  This paragraph used to say [is_txlock]
+   was not constructible at boot: `ae96fd0` made tx_lock a sleeplock and
+   deleted uartinit's [initlock(&tx_lock,"uart")] without replacing it, so the
+   zeroed [name] fields were NULL POINTERS and no address in this model's
+   memory map could satisfy [lock_name] (kernel-defects.md D2, which we
+   reported).  Upstream fixed it -- `b7c25cf` added [initsleeplock], and
+   `d80e61c5` settled on [initlock(&tx_lock, "uart")] with tx_lock back to a
+   spinlock -- so the name is written and [lock_name] is satisfiable.
+
+   The boot chain now carries the storage end to end: [main_locks_raw] hands
+   [lk_raw a_tx_lock] down through consoleinit into uartinit, which returns
+   [lk_fresh a_tx_lock "uart"], and [newlock] turns that into the [is_lock]
+   half of [is_txlock] below.  What is still owed is only the boot ASSEMBLY
+   that runs that step -- a [WpLock.newlock] -- and the resource it
+   must supply, [tx_res], which is the printk cone's business now that
+   [SpecPrintkGen.pr_res] no longer holds the transmitter. *)
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -96,27 +99,42 @@ Section UartTxInv.
      DLAB is set, so "the byte was transmitted" is false without it.  A client
      that holds the lock therefore holds everything the store leaf wants.
 
-     A SLEEPLOCK, not a spinlock: uartwrite parks between bytes, and it must
-     keep the transmitter across the park -- which a spinlock cannot do
-     (sched() demands noff = 1).  [γl] is the inner spinlock's ghost, [γsl] the
-     sleeplock's own. *)
-  Definition is_txlock (γl γsl : gname) (γu : uart_names) : iProp Σ :=
-    (is_sleeplock γl γsl a_tx_lock "uart"%string (tx_res γu) ∗
+     A SPINLOCK AGAIN, and the reason the sleeplock existed is gone.  It was a
+     sleeplock because the old uartwrite parked BETWEEN bytes while holding the
+     transmitter, which a spinlock cannot do (sched() demands noff = 1).  The
+     `verified` branch's uartwrite takes and releases the lock AROUND EACH
+     LSR-check/THR-write pair and parks outside it:
+
+         sleep_prepare(&tx_chan);
+         acquire(&tx_lock);
+         if (LSR & TX_IDLE) { WriteReg(THR, buf[i]); release(...); i++; }
+         else               { release(...); sleep(); }
+
+     so nothing is held across the park and one ghost suffices.  uartputc_sync
+     takes the same lock, which is what makes the two transmit paths agree --
+     and is why [SpecPrintkGen.pr_res] no longer needs the transmitter at all.
+
+     THE COST IS BORNE BY THE CALLERS' TRACE CLAIM, not by this predicate:
+     a driver that re-acquires per byte cannot claim a CONTIGUOUS
+     [uart_sent], because another hart may interleave between two of its
+     bytes.  That is what [uart_sent_sub] below is for. *)
+  Definition is_txlock (γl : gname) (γu : uart_names) : iProp Σ :=
+    (is_lock γl a_tx_lock "uart"%string (tx_res γu) ∗
      uart_dlab_off γu)%I.
 
-  Global Instance is_txlock_persistent γl γsl γu : Persistent (is_txlock γl γsl γu).
+  Global Instance is_txlock_persistent γl γu : Persistent (is_txlock γl γu).
   Proof. apply _. Qed.
 
-  Lemma is_txlock_lock γl γsl γu :
-    is_txlock γl γsl γu -∗ is_sleeplock γl γsl a_tx_lock "uart"%string (tx_res γu).
+  Lemma is_txlock_lock γl γu :
+    is_txlock γl γu -∗ is_lock γl a_tx_lock "uart"%string (tx_res γu).
   Proof. iIntros "[$ _]". Qed.
 
-  Lemma is_txlock_dlab γl γsl γu : is_txlock γl γsl γu -∗ uart_dlab_off γu.
+  Lemma is_txlock_dlab γl γu : is_txlock γl γu -∗ uart_dlab_off γu.
   Proof. iIntros "[_ $]". Qed.
 
-  Lemma is_txlock_intro γl γsl γu :
-    is_sleeplock γl γsl a_tx_lock "uart"%string (tx_res γu) -∗
-    uart_dlab_off γu -∗ is_txlock γl γsl γu.
+  Lemma is_txlock_intro γl γu :
+    is_lock γl a_tx_lock "uart"%string (tx_res γu) -∗
+    uart_dlab_off γu -∗ is_txlock γl γu.
   Proof. iIntros "#Hl #Ho". by iFrame "Hl Ho". Qed.
 
   (* ===================================================================== *)

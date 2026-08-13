@@ -123,6 +123,7 @@ Section ProofEntry.
     - exact Hmiepin.
     - exact Hsatpf.
     - exact (st_pmp_open pmpcfg0 pmpaddr00 Hpmp).
+    - exact (ti_mcen1_TM mcounteren0).
   Qed.
 
 End ProofEntry.

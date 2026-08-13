@@ -11,11 +11,11 @@
        while (--i >= 0) consputc(buf[i]);
      }
 
-   Like consputc's, the post says only that SOME byte list was appended to the
-   UART's accepted trace -- the caller (printk) never depends on which digits
-   came out.  That is the whole reason this spec is short: a digit-accurate post
-   would have to name the base-[base] representation of [xx] and thread it up
-   through printk's format recursion.
+   Like consputc's, the post says only that SOME byte list was appended to what
+   this caller has provably sent -- the caller (printk) never depends on which
+   digits came out.  That is the whole reason this spec is short: a
+   digit-accurate post would have to name the base-[base] representation of [xx]
+   and thread it up through printk's format recursion.
 
    THE ONE PRECONDITION THAT IS NOT BOILERPLATE is the range of [base]:
 
@@ -33,9 +33,18 @@
      the frame, so this is a genuine caller obligation, and printk (which calls
      only with 10 and 16) discharges it.
 
-   [kernel_data] supplies the [digits] table itself.  Like the rest of the
-   printk cone this is the PANIC path ([panicking <> 0], [panicked = 0]) -- see
-   SpecConsputc.v. *)
+   [kernel_data] supplies the [digits] table itself.
+
+   THE PANIC PATH IS GONE, and with it everything this contract used to carry
+   because of it: printk.c's [panicking]/[panicked] globals are deleted, so
+   there are no flag cells and no [eq_vec]/[neq_vec] refutation premises.  What
+   arrives in their place is what every consputc byte now costs -- a [tx_lock]
+   acquire/release round trip per byte -- so printint threads the ordinary
+   spinlock-caller accounting ([cpu_own] net-zero, the [noff] transient bound,
+   [panic_wp_any]) and brings the persistent [UartTxInv.is_txlock] rather than
+   the transmitter token, which lives under that lock.  The digit loop takes the
+   lock once per digit, so the trace claim is the sublist form
+   [UartTxInv.uart_sent_sub] -- see SpecConsputc.v. *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -52,42 +61,49 @@ Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import DiskPtsto WpUart.
 Require Import IntrDefs.
+Require Import WpLock.
+Require Import CpuOwn.
+Require Import UartTxInv.
+Require Import SpecPanic.
 From Kernel Require KernelSyms.
 
 
-Definition wp_printint_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-    (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 : dfrac) (b : bool) (p : mword 64) :=
+(* printint's own frame is 8 slots ([c.addi16sp sp,-64] at 0x80000474), over
+   consputc's 16. *)
+Definition printint_stack : nat := 24%nat.
+
+Definition wp_printint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+    (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
+    (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let a1_idx : mword 5 := mword_of_int 11 in
   let pcE := mword_of_int KernelSyms.printint in
   let ra0 := m0 !!! Regidx ra_idx in
   let ret_tgt := ret_pc ra0 in
-  (* printint's own 8-slot frame, over consputc's 6 *)
-  (14 <= K)%nat ->
+  (printint_stack <= K)%nat ->
   (10 <= uint (m0 !!! Regidx a1_idx) <= 16)%Z ->
-  eq_vec (sign_extend' 64 pv) zero_reg = false ->
-  neq_vec (sign_extend' 64 pkv) zero_reg = false ->
+  (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   sie_cap_gpr m0 K b p -∗
+  cpu_own n eb p C b -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
-  (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-  dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+  panic_wp_any -∗
+  dev_inv γd γv -∗
+  is_txlock γl γd -∗
+  uart_sent_sub γd bs -∗
   wp_next b p (fun (CID : CpuId) =>
-    ∀ mf bs,
+    ∀ mf cs,
     sie_cap_gpr mf K b p -∗
+    cpu_own n eb p C b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
-    (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
-    (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    uart_tx_own γd (l ++ bs) -∗ uart_sent γd (l ++ bs) -∗
+    uart_sent_sub γd (bs ++ cs) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type PRINTINT.
   Parameter wp_printint_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-      (l : list (bv 8)) (pv pkv : mword 32) {dqm dqm2 : dfrac} (b : bool) (p : mword 64),
-      wp_printint_sconf_body γd γv m0 K l pv pkv dqm dqm2 b p.
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+      (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
+      (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64),
+      wp_printint_sconf_body γl γd γv m0 K bs n eb C b p.
 End PRINTINT.

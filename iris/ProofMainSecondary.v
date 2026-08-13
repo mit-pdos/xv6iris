@@ -61,7 +61,7 @@ Require Import SpecPanic StartedInv.
 Require Import SpecCpuid SpecPrintk SpecPrintkGen.
 Require Import SpecKvminithart SpecTrapinithart SpecPlicinithart.
 Require Import SpecScheduler SpecKernelvec.
-Require Import SpecBootDevCaps SpecDevintr SpecClockintr DiskInv.
+Require Import SpecDevintr SpecClockintr DiskInv TimerCap.
 Require Import SpecMainSecondary.
 Require Import CodeMain.
 Require Import KernelRvcDecode.
@@ -106,7 +106,6 @@ Module MainSecondaryProof
   (Cpuid : CPUID) (PrintkGen : PRINTK_GEN) (Kvminithart : KVMINITHART)
   (Trapinithart : TRAPINITHART) (Plicinithart : PLICINITHART)
   (Scheduler : SCHEDULER) (Kernelvec : KERNELVEC)
-  (BootDevCaps : BOOT_DEV_CAPS)
   : MAIN_SECONDARY.
 
 Section ProofMainSecondary.
@@ -271,7 +270,7 @@ Section ProofMainSecondary.
     assert (Hp10 : add_vec_int (mword_of_int (KernelSyms.main + 0x0c) : mword 64) 4
                    = mword_of_int (KernelSyms.main + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp10) in "Hpc".
-    (* +0x10 addi a4,a4,1090 : a4 := &started, which the spin loop reads *)
+    (* +0x10 addi a4,a4,1094 : a4 := &started, which the spin loop reads *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.main + 0x10)) (mword_of_int 14 : mword 5)
               (mword_of_int 14 : mword 5) (mword_of_int 1090 : mword 12) W5 (K - 2)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -506,14 +505,14 @@ Section ProofMainSecondary.
                    = mword_of_int (KernelSyms.main + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp2a) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.main + 0x2a)) (mword_of_int 10 : mword 5)
-              (mword_of_int 10 : mword 5) (mword_of_int 532 : mword 12) P3 n false
+              (mword_of_int 10 : mword 5) (mword_of_int 588 : mword 12) P3 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2a").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (P4 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
         (add_vec (rget P3 (mword_of_int 10 : mword 5))
-           (sign_extend' 64 (mword_of_int 532 : mword 12)))]> P3).
+           (sign_extend' 64 (mword_of_int 588 : mword 12)))]> P3).
     assert (HP4a0 : P4 !!! Regidx (mword_of_int 10 : mword 5)
                     = (mword_of_int ms_hart_addr : mword 64)).
     { rewrite /P4 upd_eq. rgne. rewrite /P3 upd_eq /ms_hart_addr.
@@ -523,7 +522,7 @@ Section ProofMainSecondary.
     iEval (rewrite Hp2e) in "Hpc".
     (* ---- +0x2e jal printk ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x2e)) (mword_of_int 1 : mword 5)
-              (mword_of_int 2094718 : mword 21) P4 n false
+              (mword_of_int 2094774 : mword 21) P4 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi2e").
     iApply wp_next_off_intro.
@@ -531,7 +530,7 @@ Section ProofMainSecondary.
     pose (P5 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.main + 0x2e) : mword 64) 4)]> P4).
     assert (Htgtpk : add_vec (mword_of_int (KernelSyms.main + 0x2e) : mword 64)
-              (sign_extend' 64 (mword_of_int 2094718 : mword 21))
+              (sign_extend' 64 (mword_of_int 2094774 : mword 21))
               = (mword_of_int KernelSyms.printk : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtpk) in "Hpc".
@@ -588,10 +587,12 @@ Section ProofMainSecondary.
        not this hart's to make.  Persistent, so they simply ride in. *)
     is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
     disk_geom γv pd pav pu -∗
+    (* this hart's timer capability, allocated in the boot chain *)
+    timer_cap -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hdc Hcidne Hp0.
-    iIntros "Hcg #Htext #Hpanic Hpc Hcpu Hq Hsbit Htlb Htcsr #Hkinv #Hkptp #Hdev #Hpinv #Hdlock #Hgeom".
+    iIntros "Hcg #Htext #Hpanic Hpc Hcpu Hq Hsbit Htlb Htcsr #Hkinv #Hkptp #Hdev #Hpinv #Hdlock #Hgeom #Htimc".
     iPoseProof (mni_32 with "Htext") as "Hi32".
     iPoseProof (mni_36 with "Htext") as "Hi36".
     iPoseProof (mni_3a with "Htext") as "Hi3a".
@@ -646,11 +647,9 @@ Section ProofMainSecondary.
            the cell to make [intr_res].  Was an [inv_alloc] under an
            [fupd_wp]. ---- *)
     iDestruct (ms_dup_hw with "Hcg") as "(#Hhw & #Hmin & Hcg)".
-    (* the handler contract's credentials: six in hand, one assumed --
-       SpecBootDevCaps.v says which and why. *)
+    (* the handler contract's credentials: all seven in hand, none assumed.
+       [timer_cap] rides in from the boot chain, which mints one per hart. *)
     iDestruct (procs_inv_len with "Hpinv") as %Hnproc.
-    iPoseProof (BootDevCaps.boot_dev_caps γd) as "Hbdc".
-    iDestruct "Hbdc" as "#Htimc".
     (* THE TICK KEEPER IS NOT ASSUMED HERE EITHER, and on a secondary it is
        free: [tick_hart] is [cpuid() == 0] and this arm's premise is
        [cid_word <> zero_reg], so the left disjunct closes it and the ghost
@@ -669,7 +668,7 @@ Section ProofMainSecondary.
     { iApply bi.later_intro. iExact "Hkvs". }
     (* ---- +0x3a jal plicinithart ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x3a)) (mword_of_int 1 : mword 5)
-              (mword_of_int 18160 : mword 21) mth n false
+              (mword_of_int 18152 : mword 21) mth n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi3a").
     iApply wp_next_off_intro.
@@ -677,7 +676,7 @@ Section ProofMainSecondary.
     pose (Q3 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.main + 0x3a) : mword 64) 4)]> mth).
     assert (Htgtph : add_vec (mword_of_int (KernelSyms.main + 0x3a) : mword 64)
-              (sign_extend' 64 (mword_of_int 18160 : mword 21))
+              (sign_extend' 64 (mword_of_int 18152 : mword 21))
               = (mword_of_int KernelSyms.plicinithart : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtph) in "Hpc".
@@ -729,7 +728,7 @@ Section ProofMainSecondary.
     cbv beta delta [wp_main_secondary_sconf_body].
     intros pcE Hcid Hdc HK Hp0.
     pose proof (ms_bounds K HK) as (Hc2 & Hn38 & Hn20).
-    iIntros "Hcg Hcpu Hq #Htext #Hkdata Hpc #Hpany #Hsinv Hhart".
+    iIntros "Hcg Hcpu Hq #Htext #Hkdata Hpc #Hpany #Hsinv #Htimc Hhart".
     (* printk wants the ambient form; the scheduler join wants the generic one
        (its acquire does), so keep both. *)
     iPoseProof (panic_wp_any_at cpu_id with "Hpany") as "#Hpanic".
@@ -741,14 +740,14 @@ Section ProofMainSecondary.
     iDestruct "Hdep" as (γpr γk γs pd pav pu root pas)
       "(#Hpenv & #Hpinv & #Hdlock & #Hgeom & #Hkinv & #Hkptp & #Htramp & #Hkstx)".
     iPoseProof "Hpenv" as "Hpenv2".
-    iDestruct "Hpenv2" as "(_ & _ & #Hdev & _)".
+    iDestruct "Hpenv2" as "(_ & _ & #Hdev)".
     iApply (ms_printk γpr γd γv m2 (K - 2)%nat p0 Hn38
               with "Hcg Htext Hkdata Hpanic Hpc Hcpu Hpenv").
     iIntros (m3) "Hcg Hpc Hcpu".
     iApply (ms_inithart_sched γd γv γs γk pd pav pu m3 (K - 2)%nat p0 root tlbvec0
               Hn20 Hdc Hcid Hp0
               with "Hcg Htext Hpany Hpc Hcpu Hq Hsbit Htlb Htcsr Hkinv Hkptp Hdev Hpinv
-                    Hdlock Hgeom").
+                    Hdlock Hgeom Htimc").
   Qed.
 
 End ProofMainSecondary.

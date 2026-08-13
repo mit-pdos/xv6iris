@@ -128,6 +128,7 @@ Require Import HartTp.
    the 65 claims are what the deposit wand carries to the secondaries *)
 Require Import KptGhost KptShare KptExecMap KvmMap.
 Require Import KMap.
+Require Import TimerCap.
 Require Import SpecPanic.
 Require Import StartedInv.
 (* the callees, for the vocabulary main's precondition is stated in *)
@@ -186,15 +187,23 @@ Section SpecMain.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
-  (* The nine spinlocks and two standalone locks the init sequence brings *)
-  (* up, each as [SpecProcinit.lk_raw] -- the three cells [lk ↦₄ _],      *)
+  (* The eleven [struct spinlock]s the init sequence brings up, each as   *)
+  (* [SpecProcinit.lk_raw] -- the three cells [lk ↦₄ _],                  *)
   (* [lock_name_field lk ↦₈ _], [lk_cpu lk ↦₈ _] bundled with their       *)
   (* values existentially quantified, which is the only shape a caller    *)
   (* can honestly claim about a static global it has never written.       *)
+  (*                                                                     *)
+  (* [tx_lock] IS ONE OF THEM: it is a [struct spinlock] (uartwrite takes *)
+  (* and releases it around each LSR-check/THR-write pair and parks       *)
+  (* OUTSIDE it, so nothing is held across a park), and uartinit's        *)
+  (* trailing [initlock(&tx_lock, "uart")] is what consumes this entry.   *)
+  (* Its boot-carve window is 24 bytes like every other one here          *)
+  (* ([BootCarveMain.boot_lk_raw]), which the layout confirms:            *)
+  (* [pr + 24 = tx_lock] exactly and [tx_lock + 24 = kmem] exactly.       *)
   (* ------------------------------------------------------------------- *)
   Definition main_locks_raw : iProp Σ :=
     (lk_raw (mword_of_int KernelSyms.cons) ∗       (* consoleinit: cons.lock  *)
-     sl_raw (mword_of_int KernelSyms.tx_lock) ∗    (* consoleinit: uart tx    *)
+     lk_raw (mword_of_int KernelSyms.tx_lock) ∗    (* -> uartinit: uart tx    *)
      lk_raw (mword_of_int KernelSyms.pr) ∗         (* printkinit              *)
      lk_raw (mword_of_int KernelSyms.kmem) ∗       (* kinit                   *)
      lk_raw pid_lock_addr ∗                        (* procinit                *)
@@ -221,27 +230,27 @@ Section SpecMain.
   (* precedent as the [kmem+24 ↦₈ 0] conjunct above; the others stay       *)
   (* contents-existential, which is all [free_slot_res] needs.            *)
   (*                                                                     *)
-  (* PLUS three groups that no callee's precondition names but a caller-  *)
+  (* PLUS two groups that no callee's precondition names but a caller-    *)
   (* side ASSEMBLY does, and which therefore have nowhere else to come    *)
   (* from:                                                               *)
-  (*  - [panicking] / [panicked], the two flag cells                       *)
-  (*    [SpecPrintkGen.printk_flags_inv] is an [inv] over.  main allocates *)
-  (*    that invariant before its first printk call, so it must own the    *)
-  (*    cells; contents-existential, since the invariant asserts nothing   *)
-  (*    about either value.                                               *)
   (*  - per process, the two PUBLIC cells procinit never touches:          *)
   (*    [p_chan] and [SchedCtx.proc_pub] (killed / xstate / the           *)
   (*    invariant's permanent HALF of the pid cell -- [proc_raw] carries   *)
   (*    the other half).  [SpecProcinit.procs_inv_alloc] consumes exactly  *)
   (*    [proc_ready i] plus these two, so they are main's to supply.       *)
   (*  - [initproc], the one global userinit writes.                        *)
+  (*                                                                     *)
+  (* WHAT IS NO LONGER HERE: the two [volatile int] flag cells            *)
+  (* [panicking] / [panicked].  main used to own them because it          *)
+  (* allocated the invariant printk's general path read them through;     *)
+  (* upstream d80e61c5 DELETED both globals (printk always takes pr.lock  *)
+  (* now, uartputc_sync always takes tx_lock), so there is no such symbol *)
+  (* to carve and no invariant to allocate -- [printk_env] is three       *)
+  (* conjuncts, not four.                                                 *)
   (* ------------------------------------------------------------------- *)
   Definition main_globals_raw : iProp Σ :=
     ((∃ r w : mword 64,
         devsw_console_read ↦₈ r ∗ devsw_console_write ↦₈ w) ∗
-     (∃ pv pkv : mword 32,
-        (mword_of_int KernelSyms.panicking : mword 64) ↦₄ pv ∗
-        (mword_of_int KernelSyms.panicked : mword 64) ↦₄ pkv) ∗
      (mword_of_int (KernelSyms.kmem + 24) : mword 64) ↦₈ (mword_of_int 0 : mword 64) ∗
      (* the kernel page-table root: RAW here (kvminit writes it), and
         PERSISTED by main in its publication assembly right after, before
@@ -393,6 +402,12 @@ Section SpecMain.
        postcondition these are exactly [DiskBoot.disk_res_boot]'s inputs. *)
     ghost_map_auth (dn_claim γv) 1 (∅ : gmap nat dclaim) -∗
     disk_done_lb γv 0%nat -∗
+    (* THE TIMER CAPABILITY, this hart's.  [timer_cap] is the sstc pin plus the
+       stimecmp invariant (TimerCap.v), allocated in the boot chain out of the
+       two cells timerinit wrote and the M->S bridge used to drop.  main needs
+       it because it is a member of [SpecDevintr.devintr_caps], which the
+       handler contract closes over -- clockintr is on kerneltrap's cone. *)
+    timer_cap -∗
     main_hart_raw tlbvec0 -∗
     (* the shared kernel page table's one-shot, minted at adequacy beside the
        per-hart strans halves and spent exactly once -- by MAIN'S OWN BOOT

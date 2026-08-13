@@ -590,7 +590,7 @@ Section IntrDefsBase.
         bits 5 and 9 can ever be pending and the scause a trap writes is
         one of [s_cause_ok]'s two literals.  That fact is what keeps
         kerneltrap's [printk] arm dead, hence printk-general out of the
-        cone; see claude-notes/projects/kerneltrap.md.  [mideleg] stays
+        cone; see claude-notes/completed/kerneltrap.md.  [mideleg] stays
         existential: `mideleg = 0xffff` removes nothing, so the restriction
         comes entirely from [mie] and no proof needs the value. *)
      (∃ mdv0 : mword 64,
@@ -668,6 +668,41 @@ Section IntrDefsBase.
   Proof.
     iIntros "[(_ & _ & Htie & _) _] Hc".
     iDestruct (sret_bits_agree with "Htie Hc") as %[-> ->]. done.
+  Qed.
+
+  (* THE TRAMPOLINE'S FLAVOUR: [sconf_at] with the PRIVILEGE cell handed out
+     as well.  [sconf_at]'s closer keeps [cur_privilege] inside, which is
+     right for kernel code -- no kernel instruction changes the privilege --
+     and wrong for the trap boundary, where userret's [sret] writes it and
+     the trap writes it back.  So a boundary that hands the kernel interior
+     [sconf] has to own that cell outside the bundle, and needs a closer that
+     takes it.  Same accessor shape as [sconf_at], one more cell; the closer
+     is a wand rather than a restatement of [sconf]'s body for the same
+     reason, so [sconf] can still grow a conjunct without touching this.
+
+     [SpecUsertrap]'s boundary is the one consumer: it delivers
+     [cur_privilege ↦ᵣ Supervisor] beside the raw CSR cells and takes it
+     back at the exit, and [UsertrapRes.ut_trap] parks the closer across the
+     whole of usertrap. *)
+  Definition sconf_priv_closer : iProp Σ :=
+    (∀ ms' : mword 64,
+       cur_privilege ↦ᵣ Supervisor -∗ sconf_msown ms' -∗ sconf)%I.
+
+  (* the opener that makes it faithful: if this proof breaks, the closer
+     above is no longer "the rest of [sconf]". *)
+  Lemma sconf_priv_open :
+    sconf -∗ ∃ ms : mword 64,
+      sconf_priv_closer ∗ cur_privilege ↦ᵣ Supervisor ∗ sconf_msown ms.
+  Proof.
+    iIntros "(#Hhw & #Hminv & Hpriv & Hmsx & Hmie & Hmenv)".
+    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Htie & %Hmsf)".
+    iExists ms. iSplitR "Hpriv Hms Hhalf Htie".
+    { rewrite /sconf_priv_closer. iIntros (ms') "Hpriv' Hown'".
+      iDestruct "Hown'" as "(Hms' & Hhalf' & Htie' & %Hmsf')".
+      iFrame "Hhw Hminv Hpriv' Hmie Hmenv".
+      iExists ms'. iFrame "Hms' Hhalf' Htie'". iPureIntro. exact Hmsf'. }
+    iFrame "Hpriv". rewrite /sconf_msown. iFrame "Hms Hhalf Htie".
+    iPureIntro. exact Hmsf.
   Qed.
 
   (* [sie_cap] -- the kernel-code capability that EXPOSES the SIE mode as
@@ -1285,7 +1320,7 @@ Section IntrDefs.
   (* ================================================================== *)
   (* THE CONTRACT IS A BANACH FIXPOINT, AND THE RECURSION IS SPLIT IN TWO. *)
   (*                                                                      *)
-  (* The cycle is inherent (projects/kerneltrap.md, "THE CYCLE IS REAL"):  *)
+  (* The cycle is inherent (completed/kerneltrap.md, "THE CYCLE IS REAL"):  *)
   (* enabled execution HERE means a handler is installed HERE, and the     *)
   (* handler restores enabled execution ANYWHERE.  So the contract's own   *)
   (* pre and post mention [intr_res], whose body carries [▷ contract].     *)
@@ -1471,7 +1506,7 @@ Section IntrDefs.
   (*                                                                      *)
   (* THE [▷] IS LOAD-BEARING AND IS NOT CONSERVATISM.  Once                *)
   (* [intr_handler_spec] becomes the Banach fixpoint the handler contract  *)
-  (* needs (projects/kerneltrap.md, "THE CYCLE IS REAL"), the recursive    *)
+  (* needs (completed/kerneltrap.md, "THE CYCLE IS REAL"), the recursive    *)
   (* occurrence reached through this resource has to sit under a guard.    *)
   (* It used to sit under [inv] ([inv_contractive]); with the invariant    *)
   (* gone, this [▷] IS the guard, and without it [ihs_pre] is not          *)

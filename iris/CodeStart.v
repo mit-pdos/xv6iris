@@ -104,9 +104,9 @@ Section CodeStart.
   Proof. mk_base (KernelSyms.start + 0x20) (mword_of_int 0x00001797 : mword 32)
     (mword_of_int (KernelSyms.start + 0x20) : mword 64) (UTYPE (mword_of_int 1 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_00001797. Qed.
 
-  Lemma sti_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.start + 0x24) : mword 64) false (ITYPE (mword_of_int 3558 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
-  Proof. mk_base (KernelSyms.start + 0x24) (mword_of_int 0xde678793 : mword 32)
-    (mword_of_int (KernelSyms.start + 0x24) : mword 64) (ITYPE (mword_of_int 3558 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_de678793. Qed.
+  Lemma sti_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.start + 0x24) : mword 64) false (ITYPE (mword_of_int 3502 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
+  Proof. mk_base (KernelSyms.start + 0x24) (mword_of_int 0xdae78793 : mword 32)
+    (mword_of_int (KernelSyms.start + 0x24) : mword 64) (ITYPE (mword_of_int 3502 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_dae78793. Qed.
 
   Lemma sti_28 : kernel_text -∗ instr (mword_of_int (KernelSyms.start + 0x28) : mword 64) false (CSRReg (mword_of_int 833 : mword 12, Regidx (mword_of_int 15), zreg, CSRRW)).
   Proof. mk_base (KernelSyms.start + 0x28) (mword_of_int 0x34179073 : mword 32)

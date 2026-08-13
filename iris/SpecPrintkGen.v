@@ -15,29 +15,33 @@
 
    Everything about the format string and the varargs is UNCHANGED and reused
    from SpecPrintk.v ([pk_arg_desc], [pk_desc_res], [pk_vararg], [pk_kinds]) --
-   the caller's obligations do not depend on which path runs.  Three things
-   differ:
+   the caller's obligations do not depend on which contract is used.
 
-   1. THE FLAGS ARE NOT THREADED.  The general contract must NOT require
-      [panicking = 0]: requiring it would force a fraction of the cell into
-      every caller's precondition AND forbid panic() from ever writing it.
-      printk works whichever way the flag reads -- it only decides whether the
-      lock is taken -- so both flag cells live in their own invariant
-      ([printk_flags_inv]) inside [printk_env], and no caller mentions them.
+   *** THE TWO PATHS HAVE MERGED UPSTREAM (d80e61c5), and this file has not
+   caught up. *** [panicking] and [panicked] are DELETED from printk.c, so
+   printk always acquires pr.lock and uartputc_sync always acquires tx_lock:
+   SpecPrintk.v now states that one path, lock accounting and all.  What is
+   left here that SpecPrintk.v does not have is (a) the [Prop]-shaped
+   [printk_gen_contract] / [PRINTK_GEN] packaging its ~15 consumers carry, and
+   (b) a post that promises NOTHING about the trace, which is why those
+   consumers need no [uart_sent_sub] threading.  Folding this file into
+   SpecPrintk.v and retiring [LinkPrintkGen]'s [Axiom] is now a real
+   possibility rather than a blocked one; it is a separate sweep.
 
-   2. THE TRANSMITTER RIDES UNDER pr.lock.  On the panic path the caller owns
-      [uart_tx_own]/[uart_sent] outright and printk threads them.  On the
-      general path pr.lock is what serializes output, so the exclusive
-      transmitter token is exactly what it protects ([pr_res]) -- that is the
-      only transmit-rights story available, since uartputc_sync's proven
-      contract takes token + receipt and nothing else can mint them.  The
-      consequence for the post is that printk promises nothing about the trace:
-      the receipt it earned went back under the lock.
+   Two things consequently differ from what this header used to say:
 
-   3. THE GENERAL PATH TAKES A LOCK, so acquire's cone comes with it:
-      [cpu_own] threaded net-zero (printk leaves the interrupt level as it
-      found it) plus the tp/cid convention, and [panic_wp] for acquire's
-      "already holding" arm.  No [sched_vc]/[procs_inv]: printk never sleeps.
+   1. THERE ARE NO FLAGS.  [printk_flags_inv] -- the invariant that owned the
+      two [volatile int] cells so no caller had to -- is DELETED with them.
+      [printk_env] is three conjuncts now, not four.
+
+   2. THE TRANSMITTER NO LONGER RIDES UNDER pr.lock.  It belongs to [tx_lock]
+      ([UartTxInv.tx_res]), which uartputc_sync takes for itself, so [pr_res]
+      collapses to [emp] -- see the comment on it below.
+
+   What is unchanged: the general path TAKES A LOCK, so acquire's cone comes
+   with it -- [cpu_own] threaded net-zero (printk leaves the interrupt level as
+   it found it) plus the tp/cid convention, and [panic_wp] for acquire's
+   "already holding" arm.  No [sched_vc]/[procs_inv]: printk never sleeps.
 
    Requires only the definitional layer plus SpecPrintk.v's vocabulary -- never
    a [Proof*] file. *)
@@ -77,33 +81,28 @@ Section SpecPrintkGen.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
-  (* The two panic flags, in their OWN invariant.                         *)
-  (* Nothing about the pair is asserted -- the invariant exists so that    *)
-  (* printk can read [panicking] (and, on the panicked path, spin on       *)
-  (* [panicked]) without any caller owning either cell, and so that        *)
-  (* panic() remains free to write both.                                  *)
+  (* What pr.lock protects: NOTHING.                                      *)
+  (*                                                                      *)
+  (* It used to be THE TRANSMITTER -- the exclusive [uart_tx_own] token    *)
+  (* plus its [uart_sent] receipt -- because on the general path pr.lock   *)
+  (* was the only thing serializing output, and uartputc_sync's contract   *)
+  (* took the token from its caller.  Upstream d80e61c5 moved that:        *)
+  (* uartputc_sync now takes [tx_lock] itself (a spinlock again), so the   *)
+  (* transmitter is [UartTxInv.tx_res]'s and the two transmit paths        *)
+  (* (uartputc_sync and uartwrite) meet in that lock rather than in the    *)
+  (* caller.  pr.lock is left guarding no C data and no ghost resource:    *)
+  (* what it still buys is that two harts' format walks do not interleave  *)
+  (* mid-line, which is real but has no separation-logic content.  Hence   *)
+  (* [emp] -- chosen over [True] because it is the unit of [∗], so         *)
+  (* [newlock]'s resource argument is discharged by nothing at all and     *)
+  (* release's give-back goal closes the same way; and it is what makes    *)
+  (* printk's new UNCONDITIONAL [acquire(&pr.lock)] nearly free.           *)
+  (*                                                                      *)
+  (* [γd] is kept as a parameter although the body no longer mentions it,  *)
+  (* so that [printk_env]'s arity and every caller's [is_lock γpr pr_lock  *)
+  (* "pr" (pr_res γd)] read unchanged.                                     *)
   (* ------------------------------------------------------------------- *)
-  Definition printkFlagsN : namespace := nroot .@ "printkflags".
-
-  Definition printk_flags_inv : iProp Σ :=
-    inv printkFlagsN
-      (∃ pv pkv : mword 32,
-         (mword_of_int KernelSyms.panicking : mword 64) ↦₄ pv ∗
-         (mword_of_int KernelSyms.panicked : mword 64) ↦₄ pkv).
-
-  Global Instance printk_flags_inv_persistent : Persistent printk_flags_inv.
-  Proof. apply _. Qed.
-
-  (* ------------------------------------------------------------------- *)
-  (* What pr.lock protects: THE TRANSMITTER.                              *)
-  (* pr.lock does not guard any C data -- it exists to keep two harts'     *)
-  (* output from interleaving mid-line.  In separation logic that is       *)
-  (* exactly "it owns the right to push bytes": the exclusive token plus   *)
-  (* the mono-list receipt for what has been pushed so far, which is the   *)
-  (* pair uartputc_sync's contract consumes and returns.                  *)
-  (* ------------------------------------------------------------------- *)
-  Definition pr_res (γd : uart_names) : iProp Σ :=
-    (∃ l : list (bv 8), uart_tx_own γd l ∗ uart_sent γd l)%I.
+  Definition pr_res (γd : uart_names) : iProp Σ := emp%I.
 
   (* ------------------------------------------------------------------- *)
   (* The whole general-path credential, and it is PERSISTENT -- which is   *)
@@ -113,8 +112,7 @@ Section SpecPrintkGen.
   Definition printk_env (γpr : gname) (γd : uart_names) (γv : disk_names) : iProp Σ :=
     (is_lock γpr pr_lock "pr"%string (pr_res γd) ∗
      uart_dlab_off γd ∗
-     dev_inv γd γv ∗
-     printk_flags_inv)%I.
+     dev_inv γd γv)%I.
 
   Global Instance printk_env_persistent γpr γd γv : Persistent (printk_env γpr γd γv).
   Proof. apply _. Qed.

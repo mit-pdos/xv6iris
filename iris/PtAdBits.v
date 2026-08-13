@@ -366,6 +366,60 @@ Proof.
     [ apply Z.log2_le_mono; lia | rewrite Z.log2_1; lia ].
 Qed.
 
+(* THE bit-level projection of a zero-extended (p:44 ++ 10-bit-value) word,
+   proved ONCE for an arbitrary 10-bit payload [g] and reused for BOTH sides
+   of [pte_set_ad_zext_concat] below.  Without this, each of the lemma's two
+   [zero_extend'/concat_vec] occurrences had to be unfolded and testbit-chased
+   in place -- and [pte_set_ad] itself writes its 8-bit flags back into [w]
+   with [update_subrange_vec_dec w 7 0 (...)], mentioning [w] TWICE (once
+   directly, once inside the [subrange_vec_dec w 7 0] that reads the old
+   flags), so the left-hand side alone re-triggered the chase twice.  Landing
+   this projection once cut the call site's cost from ~16s to ~0.5s
+   (`coqc -time`, isolated) -- see claude-notes/optimization.md's "unfold
+   set_reg is a 3^N tree bomb" entry for the general shape.
+
+   Gotcha this lemma exists to paper over: after [apply (bv_eq_testbit 64)]
+   the goal's RIGHT-hand [bv_unsigned] carries the WIDTH literally as [64%N]
+   (substituted from [bv_eq_testbit]'s own [n] argument), while a WIDTH that
+   arrives via a later [rewrite] (as [pte_set_ad_testbit] below produces on
+   the LEFT-hand side) carries it as [MachineWord.Z_idx 64] (the "natural"
+   elaboration of [mword 64]) -- definitionally equal, not syntactically
+   equal, so a plain [rewrite] with this lemma finds only one of the two
+   occurrences.  The call site normalises both to the [64%N] form (with
+   [cbn [MachineWord.Z_idx Z.to_N]]) before applying this lemma, and this
+   lemma is stated in that same normalised form so ONE [rewrite] finds
+   both. *)
+(* [tbk]'s stock [tbk_step] never has to cross a [zero_extend]/[Z_to_word]
+   (no other lemma in this file unfolds one); [zext_concat_testbit]'s proof
+   does, so it needs the two extra projections for THOSE MachineWord
+   primitives on top of [tbk_step]'s usual set. *)
+Local Ltac zct_step := first [ tbk_step | rewrite bv_zero_extend_unsigned'
+                                         | rewrite Z_to_bv_unsigned ].
+Local Ltac zct := zn_norm; repeat zct_step;
+                   first [ reflexivity | f_equal; lia | lia ].
+
+Local Lemma zext_concat_testbit (p : mword 44) (g : Z) (k : Z) :
+  0 <= k < 64 ->
+  Z.testbit (@bv_unsigned (64%N) (zero_extend' 64 (concat_vec p (mword_of_int g : mword 10)))) k
+  = if Z.ltb k 10 then Z.testbit g k
+    else if Z.ltb k 54 then Z.testbit (bv_unsigned p) (k - 10)
+    else false.
+Proof.
+  intros Hk.
+  unfold zero_extend', Operators_mwords.zero_extend, extz_vec, concat_vec,
+    mword_of_int, Values.mword_of_int.
+  cbn [get_word].
+  mw_prep.
+  unfold MachineWord.MachineWord.zero_extend, MachineWord.MachineWord.concat,
+    MachineWord.MachineWord.Z_to_word.
+  destruct (decide (k < 10)) as [Hlt10|Hge10].
+  - rewrite (proj2 (Z.ltb_lt k 10) Hlt10). zct.
+  - rewrite (proj2 (Z.ltb_ge k 10) ltac:(lia)).
+    destruct (decide (k < 54)) as [Hlt54|Hge54].
+    + rewrite (proj2 (Z.ltb_lt k 54) Hlt54). zct.
+    + rewrite (proj2 (Z.ltb_ge k 54) ltac:(lia)). zct.
+Qed.
+
 Lemma pte_set_ad_zext_concat (p : mword 44) (f : Z) (a d : mword 1) :
   0 <= f < 1024 ->
   pte_set_ad (zero_extend' 64 (concat_vec p (mword_of_int f : mword 10))) a d
@@ -375,42 +429,44 @@ Lemma pte_set_ad_zext_concat (p : mword 44) (f : Z) (a d : mword 1) :
                     (Z.shiftl (bv_unsigned d) 7))) : mword 10)).
 Proof.
   intros Hf.
-  (* a,d stay symbolic; [mword1_testbit_high] zeroes their high bits. *)
-  (unfold pte_set_ad, _update_PTE_Flags_D, _update_PTE_Flags_A, Mk_PTE_Flags;
-   unfold zero_extend', Operators_mwords.zero_extend, extz_vec, concat_vec,
-     mword_of_int, Values.mword_of_int;
-   cbn [get_word];
-   mw_prep;
-   unfold MachineWord.MachineWord.zero_extend, MachineWord.MachineWord.concat,
-     MachineWord.MachineWord.Z_to_word;
-   apply (bv_eq_testbit 64); intros k Hk;
-   destruct (decide (k = 0)) as [->|];
-   [| destruct (decide (k = 1)) as [->|];
-   [| destruct (decide (k = 2)) as [->|];
-   [| destruct (decide (k = 3)) as [->|];
-   [| destruct (decide (k = 4)) as [->|];
-   [| destruct (decide (k = 5)) as [->|];
-   [| destruct (decide (k = 6)) as [->|];
-   [| destruct (decide (k = 7)) as [->|];
-   [| destruct (decide (k = 8)) as [->|];
-   [| destruct (decide (k = 9)) as [->|];
-   [| destruct (decide (k < 54)) ]]]]]]]]]];
-   repeat (first
-     [ rewrite bv_extract_unsigned
-     | rewrite bv_concat_unsigned'
-     | rewrite bv_zero_extend_unsigned'
-     | rewrite Z_to_bv_unsigned
-     | rewrite Z.sub_0_r
+  (* Read both sides bit-by-bit via the two projection lemmas above instead
+     of unfolding [pte_set_ad]/[zero_extend'/concat_vec] in place -- see
+     [zext_concat_testbit]'s comment for why this is the fix and what the
+     [cbn]/[64%N] dance right below is for. *)
+  apply (bv_eq_testbit 64); intros k Hk.
+  assert (Hk' : 0 <= k < 64) by (change (Z.of_N 64) with 64 in Hk; lia).
+  rewrite (pte_set_ad_testbit _ a d k Hk').
+  cbn [MachineWord.Z_idx Z.to_N].
+  repeat match goal with
+  | |- context [Z.testbit (@bv_unsigned (64%N) (zero_extend' 64 (@concat_vec 44 10 p (@mword_of_int 10 ?g)))) k] =>
+      rewrite (zext_concat_testbit p g k Hk')
+  end.
+  (* a,d stay symbolic; [mword1_testbit_high] zeroes their high bits.
+     Everything below is now pure Z arithmetic -- no more bitvector
+     plumbing, so the case split is cheap regardless of its branch count. *)
+  destruct (decide (k = 0)) as [->|];
+  [| destruct (decide (k = 1)) as [->|];
+  [| destruct (decide (k = 2)) as [->|];
+  [| destruct (decide (k = 3)) as [->|];
+  [| destruct (decide (k = 4)) as [->|];
+  [| destruct (decide (k = 5)) as [->|];
+  [| destruct (decide (k = 6)) as [->|];
+  [| destruct (decide (k = 7)) as [->|];
+  [| destruct (decide (k = 8)) as [->|];
+  [| destruct (decide (k = 9)) as [->|];
+  [| destruct (decide (k < 54)) ]]]]]]]]]].
+  all: repeat (first
+     [ match goal with |- context [Z.eqb ?a ?b] => progress reduce_closed (Z.eqb a b) end
+     | match goal with |- context [Z.ltb ?a ?b] => progress reduce_closed (Z.ltb a b) end
+     | match goal with H : ?kk <> ?c |- context [Z.eqb ?kk ?c] =>
+         rewrite (proj2 (Z.eqb_neq kk c) H) end
+     | match goal with |- context [Z.ltb ?kk 10] =>
+         rewrite (proj2 (Z.ltb_ge kk 10) ltac:(lia)) end
+     | progress cbv iota
      | rewrite Z.lor_spec
      | rewrite Z.land_spec
-     | match goal with |- context [Z.testbit (bv_wrap ?n ?z) ?i] =>
-         rewrite (bv_wrap_spec_low n z i) by lia end
-     | match goal with |- context [Z.testbit (bv_wrap ?n ?z) ?i] =>
-         rewrite (bv_wrap_spec_high n z i) by lia end
      | match goal with |- context [Z.testbit (Z.shiftl ?z ?m) ?i] =>
          rewrite (Z.shiftl_spec z m i) by lia end
-     | match goal with |- context [Z.testbit (Z.shiftr ?z ?m) ?i] =>
-         rewrite (Z.shiftr_spec z m i) by lia end
      | match goal with |- context [Z.testbit ?z ?i] =>
          rewrite (Z.testbit_neg_r z i) by lia end
      | rewrite Z.bits_0
@@ -419,13 +475,13 @@ Proof.
      | progress zn_norm
      | progress rewrite ?orb_false_l, ?orb_false_r, ?andb_true_l,
          ?andb_false_l, ?andb_true_r, ?andb_false_r
-     ]);
-   repeat match goal with
+     ]).
+  all: repeat match goal with
    | |- context [Z.testbit ?x ?i] => progress reduce_closed (Z.testbit x i)
-   end;
-   rewrite ?andb_true_r, ?andb_false_r, ?andb_true_l, ?andb_false_l,
-     ?orb_false_l, ?orb_false_r, ?orb_true_l, ?orb_true_r;
-   first [ reflexivity | f_equal; lia | lia ]).
+   end.
+  all: rewrite ?andb_true_r, ?andb_false_r, ?andb_true_l, ?andb_false_l,
+     ?orb_false_l, ?orb_false_r, ?orb_true_l, ?orb_true_r.
+  all: first [ reflexivity | f_equal; lia | lia ].
 Qed.
 
 

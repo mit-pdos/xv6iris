@@ -417,30 +417,23 @@ Section BootBssChain.
   Proof.
     intro Hbf. pose proof (boot_mem_of_facts g Hbf) as Hmem.
     iIntros "#Hcl Hfd Hir H".
-    (* ---- 0x8000a220 panicked, 0x8000a224 panicking ---- *)
-    iDestruct (bss_cut g img_end KernelSyms.panicked (KernelSyms.panicked + 4)
-                 ram_hi ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H")
-      as "[Hpkd H]".
-    iDestruct (boot_ran_cell4 g KernelSyms.panicked Hmem ltac:(zlit) ltac:(zlit)
-                 ltac:(zeq) with "Hcl Hpkd") as (vpkd) "Hpkd".
-    iDestruct (bss_cut g (KernelSyms.panicked + 4) KernelSyms.panicking
-                 (KernelSyms.panicking + 4) ram_hi
-                 ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hpki H]".
-    iDestruct (boot_ran_cell4 g KernelSyms.panicking Hmem ltac:(zlit)
-                 ltac:(zlit) ltac:(zeq) with "Hcl Hpki") as (vpki) "Hpki".
-    (* [tx_chan] (panicking + 4) is NOT carved: ae96fd0 deleted [tx_busy], so
-       the word after [panicking] is the sleep channel, whose ADDRESS is all
-       anyone uses -- the cell itself is never read or written and belongs to
-       nobody (UartTxInv.v).  It is one of the gaps this chain skips. *)
-    (* ---- 0x8000a2ac started: PINNED zero, the escrow's left disjunct ---- *)
-    iDestruct (bss_cut g (KernelSyms.panicking + 4) KernelSyms.started
+    (* THE FLAG CELLS ARE GONE.  This chain used to open with two 4-byte cuts
+       for [panicked] and [panicking]; upstream d80e61c5 deleted both globals
+       from printk.c, so there is no such symbol and nothing to carve.  .bss
+       now BEGINS at [tx_chan] ([img_end] is exactly its address), and
+       [tx_chan] is itself not carved: only its ADDRESS is used, as the sleep
+       channel -- the cell is never read or written and belongs to nobody
+       (UartTxInv.v).  So the first thing the walk takes is [started], four
+       bytes above it, and the leading gap is that one word.
+       ---- started: PINNED zero, the escrow's left disjunct ---- *)
+    iDestruct (bss_cut g img_end KernelSyms.started
                  (KernelSyms.started + 4) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hst H]".
     iDestruct (boot_ran_cell4_bss g KernelSyms.started started_clear Hmem
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) ltac:(zeq)
                  ltac:(intros j _; apply nth_byte_zero; zeq)
                  with "Hcl Hst") as "Hst".
-    (* ---- 0x8000a238 kernel_pagetable, 0x8000a270 initproc ---- *)
+    (* ---- 0x8000a238 kernel_pagetable, 0x8000a240 initproc ---- *)
     iDestruct (bss_cut g (KernelSyms.started + 4) KernelSyms.kernel_pagetable
                  (KernelSyms.kernel_pagetable + 8) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hkpt H]".
@@ -460,7 +453,7 @@ Section BootBssChain.
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Htk H]".
     iDestruct (boot_ran_cell4 g KernelSyms.ticks Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Htk") as (vtk) "Htk".
-    (* ---- 0x8000a280 stack0[8][4096]: the per-hart stack family ---- *)
+    (* ---- 0x8000a250 stack0[8][4096]: the per-hart stack family ---- *)
     iDestruct (bss_cut g (KernelSyms.ticks + 4) KernelSyms.stack0
                  (KernelSyms.stack0 + 4096 * Z.of_nat NCPU) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hstk H]".
@@ -482,12 +475,14 @@ Section BootBssChain.
     iDestruct (bss_cut g (KernelSyms.cons + 24) KernelSyms.pr
                  (KernelSyms.pr + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hlk2 H]".
-    (* tx_lock is a sleeplock: 44 bytes, not 24.  The residue closes exactly
-       -- kmem sits at tx_lock + 48, so the next cut still starts below it. *)
+    (* tx_lock's window is 24 bytes like the rest: it is a [struct spinlock],
+       and [boot_main_locks_raw] discharges it with [boot_lk_raw].  The
+       linker left exactly 24 bytes between [pr] and [kmem]'s neighbour, so
+       the cut is tight on both sides -- [main_lock_windows] is that check. *)
     iDestruct (bss_cut g (KernelSyms.pr + 24) KernelSyms.tx_lock
-                 (KernelSyms.tx_lock + 44) ram_hi
+                 (KernelSyms.tx_lock + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hlk3 H]".
-    iDestruct (bss_cut g (KernelSyms.tx_lock + 44) KernelSyms.kmem
+    iDestruct (bss_cut g (KernelSyms.tx_lock + 24) KernelSyms.kmem
                  (KernelSyms.kmem + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hlk4 H]".
     iDestruct (bss_cut g (KernelSyms.kmem + 24) (KernelSyms.kmem + 24)
@@ -631,13 +626,12 @@ Section BootBssChain.
     iSplitL "Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11".
     { iApply (boot_main_locks_raw g Hmem with
                 "Hcl Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11"). }
-    iSplitL "Hdr Hdw Hpkd Hpki Hkm Hkpt Hpr1 Hpr2 Hfd Hir Hip Htk Hbsl Hbln Hhd Hino
+    iSplitL "Hdr Hdw Hkm Hkpt Hpr1 Hpr2 Hfd Hir Hip Htk Hbsl Hbln Hhd Hino
              Hient Hdd Hda Hdu Hdf Hdi Hslots".
     { rewrite /main_globals_raw.
       iSplitL "Hdr Hdw".
       { iExists vdr, vdw. rewrite /devsw_console_read /devsw_console_write.
         iFrame "Hdr Hdw". }
-      iSplitL "Hpki Hpkd"; [iExists vpki, vpkd; iFrame "Hpki Hpkd" |].
       iSplitL "Hkm"; [iExact "Hkm" |].
       iSplitL "Hkpt"; [iExists vkpt; iExact "Hkpt" |].
       iSplitL "Hpr1"; [iExact "Hpr1" |].

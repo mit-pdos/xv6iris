@@ -333,7 +333,12 @@ Proof. exact (bnode_of_z NBUF). Qed.
    eleven out of the one .bss range with [boot_ran_split] alone.  Every step
    is [x + 24 <= y] on two literals, so the whole check is one [vm_compute]
    per conjunct.  (The full .bss decomposition -- which of these gaps holds
-   which other bundle -- is tabulated in claude-notes/completed/crash.md.) *)
+   which other bundle -- is tabulated in claude-notes/completed/crash.md.)
+
+   ALL ELEVEN WINDOWS ARE 24 BYTES, [tx_lock] included: it is a [struct
+   spinlock], which the layout confirms exactly -- [pr] = 0x80012338,
+   [tx_lock] = 0x80012350 and [kmem] = 0x80012368, so the linker left 24
+   bytes on each side of it and there is no slack in either direction. *)
 Lemma main_lock_windows :
   img_end <= KernelSyms.cons /\
   KernelSyms.cons + 24 <= KernelSyms.pr /\

@@ -237,8 +237,8 @@ Section WpMemsetArray.
               ltac:(intros j; exact (ms_incr_step p j))
               ltac:(intros j Hj; exact (pa_add_cmp_bound p len j Hlen64 Hj))
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              ltac:(vm_compute; discriminate)
+              (* the three tp exclusions are [SrcOk] instances now, resolved *)
               minstr_014 minstr_018 minstr_01a
               len 0%nat m6 ltac:(reflexivity) ltac:(lia) Hcur Hm4 Hm1
               with "Hcg Htext Hpc Hbuf [-]").

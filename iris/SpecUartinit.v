@@ -38,6 +38,19 @@
    uartinit writes no THR, so the accepted trace is unchanged and the token and
    receipt come back at the same [l].
 
+   AND IT INITIALIZES THE TRANSMIT LOCK, WHICH IS A SPINLOCK.  [tx_lock] is a
+   [struct spinlock] again -- the new [uartwrite] takes and releases it around
+   each LSR-check/THR-write pair and parks OUTSIDE it, so nothing is held
+   across a park and a spinlock suffices -- and uartinit's trailing call is
+   [initlock(&tx_lock, "uart")].  The contract therefore takes the raw storage
+   of that one lock and hands back the zeroed cells plus the persistent name,
+   in [SpecProcinit.v]'s vocabulary: [lk_raw] in (three cells, 24 bytes),
+   [lk_fresh] out.  Those are exactly [WpLock.newlock]'s premises minus the
+   resource, so the caller's ghost step
+   [lk_fresh a_tx_lock "uart" ∗ tx_res γd ==∗ is_lock … a_tx_lock "uart"
+   (tx_res γd)] plus the [uart_dlab_off] below is [UartTxInv.is_txlock] --
+   what a boot assembly feeds to [WpLock.newlock].
+
    ProofUartinit.v proves it by running each of the seven writes through the
    invariant-opening ACCESSOR-form UART store leaf
    [SpecUart.wp_sb_uart_uinv_s_sconf] and doing one ghost step per write, out
@@ -57,9 +70,12 @@ Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import KernelText KernelDataInv.
 Require Import WpLock.
-Require Import SleepLock.
 Require Import WpUart.
 Require Import UartTxInv.
+(* [lk_raw] / [lk_fresh] -- the three-cell spinlock bundle, before and after
+   [initlock].  They live in SpecProcinit.v with the rest of the boot-time
+   lock vocabulary; nothing else in that file is used here. *)
+Require Import SpecProcinit.
 Require Import IntrDefs.
 Require Import RegFile.
 From Kernel Require KernelSyms.
@@ -80,18 +96,21 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
    contract is stated at the literal index [false] rather than a generic
    [b], with no [wp_next] wrapper at all (it would collapse via
    [wp_next_off] anyway, since the hart cannot move). *)
-Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!lockG Σ}
-    `{!uartGhostG Σ}
+Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γd : uart_names) (m : regfile) (K : nat)
     (l : list (bv 8)) (b0 : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
-  (8 <= K)%nat ->
+  (* THE FRAME PLUS THE CALLEE.  uartinit's own frame is [addi sp,sp,-16] = 2
+     slots, and [initlock] demands [(2 <= av)] of what is left, so the budget
+     is 2 + 2. *)
+  (4 <= K)%nat ->
   sie_cap_gpr m K false p -∗
-  (* [kernel_data] supplies the two string literals initsleeplock needs: the
-     "uart" one uartinit's [auipc a1 / addi a1] points at, and the fixed
-     "sleep lock" the inner spinlock takes. *)
+  (* [kernel_data] is load-bearing again: it is where the "uart" string
+     literal that the [auipc a1 / addi a1] pair points at comes from -- the
+     name uartinit hands [initsleeplock] -- alongside the device-register
+     writes, which are stated over the same image resources. *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the UART fabric, borrowed from the invariant around each write *)
   uart_inv γd -∗
@@ -100,12 +119,9 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!lockG Σ}
   uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_sent γd l -∗
   (* the UNFROZEN DLAB half, at an arbitrary power-on value *)
   uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
-  (* THE TRANSMIT LOCK'S STORAGE.  b7c25cf restored uartinit's
-     [initsleeplock(&tx_lock, "uart")], so uartinit writes this struct and the
-     boot chain must own it first -- the six raw cells of a [struct
-     sleeplock], exactly what [SpecInitsleeplock] consumes.  kinit takes its
-     [kmem] lock's cells the same way. *)
-  sl_raw a_tx_lock -∗
+  (* the transmit lock's storage, uninitialized: all three fields of
+     [struct spinlock tx_lock], contents arbitrary. *)
+  lk_raw a_tx_lock -∗
   ( ∀ mr,
     sie_cap_gpr mr K false p -∗
     pc_is ret_tgt -∗
@@ -114,51 +130,21 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!lockG Σ}
     uart_tx_own γd l -∗ uart_sent γd l -∗
     (* the final LCR write cleared DLAB, so the half is frozen for good *)
     uart_dlab_off γd -∗
-    (* ---- THE LOCK COMES BACK INITIALIZED, AND THAT IS ALL THIS SAYS ----
-
-       [sl_fresh] is initsleeplock's result verbatim: the four zeroed cells
-       plus the two persistent names, which is exactly [new_sleeplock]'s
-       premises MINUS the resource.  The post is therefore truthful (the lock
-       really is initialized -- b7c25cf, kernel-defects.md D3) and SILENT
-       about what the lock protects.  That silence is deliberate.
-
-       WHY NOT [UartTxInv.is_txlock] HERE.  Minting the lock means choosing
-       its resource, and the obvious choice collides:
-
-         SpecPrintkGen.pr_res γd := exists l, uart_tx_own γd l * uart_sent γd l
-         UartTxInv.tx_res    γd := exists l, uart_tx_own γd l
-
-       both want the SAME transmitter token, and only one lock can own it.
-       That mirrors something real in the C: printk -> consputc ->
-       uartputc_sync POLLS the THR while holding pr.lock, while uartwrite
-       drives the THR from interrupts while holding tx_lock.  Two locks
-       serialize one device register; xv6 tolerates the interleaving because
-       printk is the panic/debug path.  The model has one token and cannot.
-
-       THE CHOICE, when it is made, is one of:
-         (A) the token goes to tx_lock -- what the source forces if is_txlock
-             keeps tx_res -- and pr_res loses it, so printk can no longer
-             justify a THR write;
-         (B) the token stays with printk and tx_lock is minted over a weaker
-             resource -- which edits UartTxInv, i.e. uartwrite's interface;
-         (C) the token is split fractionally between the two locks -- cheapest
-             textually, but "exclusive right to the transmitter" is not
-             obviously halvable.
-
-       It belongs to the uart/console campaign (claude-notes/projects/
-       uart-console.md), alongside LinkUartwrite's disposition, and NOTHING
-       consumes is_txlock today -- uartintr took no lock after ae96fd0 and
-       uartwrite's proof is not written -- so deferring costs nothing now.
-       STRENGTHENING THIS IS A TWO-FILE EDIT: this line, and the mint in
-       ProofUartinit that currently stops at [sl_fresh]. *)
-    sl_fresh a_tx_lock "uart"%string -∗
+    (* THE TRANSMIT LOCK COMES BACK OUT, INITIALIZED -- the "newlock" ghost
+       step's raw material.  [initlock(&tx_lock, "uart")] zeroes [locked] and
+       [cpu] and writes [name], which is then DISCARDED in favour of the
+       persistent [lock_name a_tx_lock "uart"] -- tx_lock is a static global
+       that is never freed, so nothing needs the field back owned.
+       [WpLock.newlock] seals the bundle into [is_lock … a_tx_lock "uart" R]
+       for the caller's choice of R ([UartTxInv.tx_res γd] is the one the
+       driver wants). *)
+    lk_fresh a_tx_lock "uart"%string -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type UARTINIT.
   Parameter wp_uartinit_sconf :
-    forall `{!riscvGS Σ} `{!sieG Σ} `{!lockG Σ} `{!uartGhostG Σ}
-      `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γd : uart_names) (m : regfile) (K : nat)
       (l : list (bv 8)) (b0 : bool) (p : mword 64),
       wp_uartinit_sconf_body γd m K l b0 p.

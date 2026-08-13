@@ -186,13 +186,30 @@ Definition usertrap_post `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG
   let ret_tgt : mword 64 := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   ( ∀ (pt' : uptd) (mf : regfile)
       (ms' usatp uepc sc' stval' : mword 64),
-    (* the user table as usertrap leaves it: vmfault may have mapped new
-       pages, the root and the trapframe page never move *)
-    ⌜ud_root pt' = ud_root pt⌝ -∗
+    (* THE TRAPFRAME PAGE IS THE ONE THING THAT CANNOT MOVE, and the ROOT IS
+       NOT.  The first draft promised [ud_root pt' = ud_root pt] as well, on
+       the strength of the vmfault arm (which only inserts leaves).  It is
+       FALSE on the syscall arm: exec() replaces the address space wholesale,
+       so [SpecSyscall]'s post pins [ud_tfp] and nothing else, and no proof of
+       the stronger conjunct exists.  Nothing wanted it either -- what the
+       trampoline needs is that the satp usertrap RETURNS is rooted at the
+       table it hands over, which is [satp_rooted usatp (ud_root pt')]
+       below. *)
     ⌜ud_tfp pt' = ud_tfp pt⌝ -∗
     (* the pure facts the trampoline halves need about it, which the process
-       block's [proc_pt_at] carries *)
-    ⌜udata_cov (ud_um pt') (ud_data pt')⌝ -∗
+       block's [proc_pt_at] carries -- and there are TWO of them, not three.
+       [udata_cov (ud_um pt') (ud_data pt')] used to be here and is NOT
+       provable: [ProcPtOwn] deliberately retired the field-to-field coupling
+       between [ud_um] and [ud_data] ("the footprint derived from [um]", its
+       §1), so [proc_pt] says nothing about [ud_data]; and on the syscall arm
+       the descriptor is whatever the table entry left, of which
+       [SpecSyscall]'s post pins only [ud_tfp].  Nor is it usertrap's fact to
+       state: the trampoline needs it beside [udata_own (ud_data pt')], and
+       the conversion that BUILDS that resource -- the page-footprint side of
+       the dovetail, conversion 2 -- derives the footprint from [ud_um] and so
+       establishes the coverage by construction ([ProcPtOwn.ud_pas_cov]).
+       Asking for it here would be asking usertrap to prove a property of a
+       resource it never holds. *)
     ⌜upt_acc_wf (ud_um pt')⌝ -∗
     ⌜upt_map_wf (ud_um pt')⌝ -∗
     (* sret-ready, and still a legal S-mode configuration *)
@@ -219,8 +236,21 @@ Definition usertrap_post `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG
     R pt' ksp -∗
     WP (Loop : expr riscv_lang)).
 
+(* [R] IS A HART-INDEXED FAMILY, AND IT HAS TO BE.  usertrap is handed the
+   kernel-side bundle at the hart the TRAP came in on and gives it back at the
+   hart it RESUMES on -- the two are different whenever the function parks
+   (yield, and every sleeping syscall through [SpecSyscall]'s own crossing),
+   and everything inside [UsertrapRes.ut_res] except the stack is per-hart
+   ([sie_arm], [cpu_own], [cpu_claim], the [sconf] closer's register cells,
+   the SIE ghost).  Written as a plain [uptd -> mword 64 -> iProp Σ] the
+   post's [R] is pinned to the ENTRY hart, and no proof of it exists: the tail
+   rebuilds the bundle out of what prepare_return handed back, which is at the
+   resuming hart ([ProofUsertrapTail.ut_ret2], whose whole reason for being
+   its own section is that hart).  So [R] takes the hart: [R CID] going in,
+   [R CID'] coming out, where [CID'] is the crossing's own binder.  The
+   module type below supplies [fun h => usertrap_res (CID := h)]. *)
 Definition wp_usertrap_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (R : uptd -> mword 64 -> iProp Σ)
+    (R : CpuId -> uptd -> mword 64 -> iProp Σ)
     (pt : uptd) (j : nat)
     (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.usertrap in
@@ -246,11 +276,13 @@ Definition wp_usertrap_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fi
      [R] -- see the header. *)
   stvec ↦ᵣ (mword_of_int TRAMPOLINE : mword 64) -∗
   gpr_file m -∗
-  (* everything kernel-side, abstractly *)
-  R pt ksp -∗
+  (* everything kernel-side, abstractly, AT THE ENTRY HART *)
+  R CID pt ksp -∗
   (* THE CROSSING: usertrap parks (yield, and every sleeping syscall), so it
-     may return on a different hart. *)
-  wp_next true pj (fun (CID' : CpuId) => usertrap_post (CID := CID') R pt ksp m) -∗
+     may return on a different hart -- and the bundle comes back at THAT
+     hart, which is why [R] is a family (see the note above). *)
+  wp_next true pj (fun (CID' : CpuId) =>
+    usertrap_post (CID := CID') (R CID') pt ksp m) -∗
   WP (Loop : expr riscv_lang).
 
 (* THE MODULE TYPE'S INSTANCE LIST IS THE UNION OF THE FIVE CONES', NOT THE
@@ -292,5 +324,6 @@ Module Type USERTRAP.
       `{GEN : GenId} `{CID : CpuId}
       (pt : uptd) (j : nat)
       (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64),
-      wp_usertrap_body usertrap_res pt j m ms_v sc_v stval_v sepc_v ksp.
+      wp_usertrap_body (fun h : CpuId => usertrap_res (CID := h))
+        pt j m ms_v sc_v stval_v sepc_v ksp.
 End USERTRAP.

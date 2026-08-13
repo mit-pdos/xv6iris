@@ -1,20 +1,14 @@
 # Design: the block bitmap — `balloc`, `bfree`, and the free pool
 
-STATUS: **DONE.** `balloc` and `bfree` are both PROVEN AND LINKED, and
-`LinkBalloc.v`'s `Axiom` is gone. `Print Assumptions` for `Balloc`,
-`Bfree`, `Bmap` and `Writei` is the standing six for all four -- so bmap and
-writei have lost the `!` they carried since `BMAP_NOALLOC` landed, which was
-the point of the whole effort. The one caveat to read honestly is recorded in
-section 0 below: balloc's six are modulo a THREADED printk obligation.
-
-Historical status line: the vocabulary and the invariant were LANDED (`iris/BitmapEnc.v`,
-`iris/BitmapInv.v`, `iris/SpecBfree.v`, all compiling, all axiom-free).
-The two WP proofs are NOT: they are blocked on two things, both of which
-need a decision above this file — see "What is blocking the proofs".
+`balloc` and `bfree` are both proven and linked. `Print Assumptions` for
+`Balloc`, `Bfree`, `Bmap` and `Writei` is the standing six for all four —
+**modulo a THREADED printk obligation** in balloc's case, which is a real
+caveat and is explained under "printk on the out-of-blocks arm" below. Do not
+read those six as "depends on nothing else".
 
 Layers below: [`fs-log.md`](fs-log.md) (the logged view `fsblock`, the bio
 handles, `log_write`) and [`fs-inode.md`](fs-inode.md) (`blk_own`,
-`blkmap_wf`, and "balloc's contract — ASSUMED for now").
+`blkmap_wf`, `balloc`'s contract).
 
 ## The geometry
 
@@ -46,7 +40,7 @@ iteration: `b` starts at 0, the inner scan exits either on
 `bzero` is `static` with one caller, so gcc INLINED it into balloc's 262
 bytes: there is no `bzero` symbol. `bfree` is 108 bytes.
 
-## `BitmapEnc.v` — bits in a block (LANDED)
+## `BitmapEnc.v` — bits in a block
 
 The third vocabulary of its kind after `BlockWords`' words and
 `DinodeEnc`'s records, and it keeps the same discipline: the block content
@@ -81,7 +75,7 @@ files, and cannot leak the `Countable` instances that break unrelated
 proofs). The block SIZE is a parameter — `BSIZE` lives in `FsCrash.v`,
 which is not iris-free; `BitmapInv.bitmap_bytes u := bm_bytes BSIZE u`.
 
-## `BitmapInv.v` — the resource and the free pool (LANDED)
+## `BitmapInv.v` — the resource and the free pool
 
 ```coq
   bitmap_ok cov logstart size used :=
@@ -131,7 +125,7 @@ updated.** In xv6 the discipline is the buffer sleeplock on the bitmap
 block — `bread` gives exclusive access for the critical section — so a
 later free-space layer can seat it there. Do not design that layer here.
 
-## `bfree` — PROVEN AND LINKED (`ProofBfree.v`, `LinkBfree.v`)
+## `bfree` (`ProofBfree.v` / `LinkBfree.v`)
 
 `Print Assumptions Bfree.wp_bfree_sconf` is **the standing six alone**: all
 three callees (bread, log_write, brelse) are proven, so bfree carries no
@@ -169,7 +163,7 @@ the piece the design was built for.
   bfree, balloc and writei alike; bfree carries a local 20-line wrapper
   instead.
 
-## `bfree`'s contract (`SpecBfree.v`, LANDED)
+## `bfree`'s contract (`SpecBfree.v`)
 
 Consumes `fsblock γfs b bs` (block-sized) and `blk_own γfs b`, takes
 `bitmap_res … used` and returns `bitmap_res … (used ∖ {[b]})`.
@@ -179,7 +173,7 @@ held across `log_write`); budget **spend-exactly** `log_op (S u)` →
 so it needs none of bmap's spend-at-most weakening. It does NOT read
 `sb.size`, so no `sb_size` cell appears in it.
 
-## The caller side: how the bitmap threads through bmap and writei (LANDED)
+## The caller side: how the bitmap threads through bmap and writei
 
 `balloc`'s contract gained the two superblock cells and `bitmap_res`, so
 every caller above it has to carry them. The naive shape — thread the
@@ -217,138 +211,65 @@ block; and a replacement whose pattern is a SUBSTRING of an earlier one
 (`"    sb_inodestart …"` inside `"        sb_inodestart …"`) silently
 inserts twice.
 
-## What is blocking the proofs
+## printk on the out-of-blocks arm, and the honesty caveat
 
-### 0. RESOLVED — `balloc`'s out-of-blocks arm calls `printk`
-
-**Resolution: printk's contract is carried as a `Prop` HYPOTHESIS
-(`SpecPrintkGen.printk_gen_contract`), never as a functor argument, plus the
-two PERSISTENT credentials `kernel_data` and `printk_env γpr γu γd`.**
-
-`wp_printk_gen_sconf_body` has Coq-arrow premises, so unlike
-`SpecPanic.panic_wp_any` it is not an `iProp` and cannot be boxed; the `Prop`
-form is the same idiom `ProofBmap.balloc_contract` already uses. The format
+balloc's out-of-blocks arm reaches `printk`, and **printk's contract is carried
+as a `Prop` HYPOTHESIS** (`SpecPrintkGen.printk_gen_contract`), never as a
+functor argument, plus the two PERSISTENT credentials `kernel_data` and
+`printk_env γpr γu γd`. `wp_printk_gen_sconf_body` has Coq-arrow premises, so
+unlike `SpecPanic.panic_wp_any` it is not an `iProp` and cannot be boxed; the
+`Prop` form is the idiom `ProofBmap.balloc_contract` already uses. The format
 string needs no premise — `KernelDataInv.kernel_data_string` mints its
 persistent `↦ₛ□` out of `kernel_data`.
 
-**Why the hypothesis form, and the honesty caveat that comes with it:**
-`PRINTK_GEN`'s only instance is `LinkPrintkGen`'s own `Axiom`, so a functor
-argument would put a SEVENTH entry in `Print Assumptions` for balloc — and,
-through the ripple, for bmap and writei. Carrying it as a hypothesis keeps
-all three at the standing six and pushes the obligation to whoever finally
-discharges it. **That is not self-containment**: balloc's six are modulo a
-threaded printk obligation, exactly the standing `panic_wp_any` already has
-throughout this tree. `SpecBalloc.v`'s header says so prominently; do not
-let a reader take the six for "depends on nothing else".
+**Why the hypothesis form, and what it costs in honesty.** `PRINTK_GEN`'s only
+instance is `LinkPrintkGen`'s own `Axiom`, so a functor argument would put a
+SEVENTH entry in `Print Assumptions` for balloc and, through the ripple, for
+bmap and writei. Carrying it as a hypothesis keeps all three at the standing
+six and pushes the obligation to whoever finally discharges it — exactly as
+`panic_wp_any` is carried throughout this tree.
 
 The ripple is cheap because everything involved is persistent or pure: in
-`ProofBmap` it is `bm_prk ak γu γd` (a persistent, `ak`-guarded bundle
-carried by only the TWO lemmas that reach a balloc call site, so the
-return-path lemmas are untouched, and `bm_prk None = emp` keeps
-`BMAP_NOALLOC` free of it); in `ProofWritei` it is two persistent premises
-on `wi_loop` alone, with `γpr` read off the `bm_alloc` record's new
-`ba_pr` field rather than a new binder.
+`ProofBmap` it is `bm_prk ak γu γd`, a persistent `ak`-guarded bundle carried
+by only the TWO lemmas that reach a balloc call site (so the return-path lemmas
+are untouched, and `bm_prk None = emp` keeps `BMAP_NOALLOC` free of it); in
+`ProofWritei` it is two persistent premises on `wi_loop` alone, with `γpr` read
+off the `bm_alloc` record's `ba_pr` field rather than a new binder.
 
-### 0b. HISTORICAL: why the contract could not pay for it
+## What `balloc`'s contract has to own, and why
 
-**The `+0x0f6` arm is LIVE**, not dead: nothing in `bitmap_res` prevents
-every bit below `sb.size` being set (`free_pool` is then the empty big-op
-and `bitmap_ok` is vacuous), and the scan then reaches
-`auipc a0,0x4 / addi a0,a0,1350 / jal printk` on `"balloc: out of blocks\n"`.
-
-Neither printk interface is applicable from balloc's precondition:
-`SpecPrintk.v` is the PANIC path (it premises `panicking <> 0` and takes
-both flag cells), and `SpecPrintkGen.v` — the path balloc actually runs —
-needs `kernel_data` (the only way to mint the format string's `↦ₛ`) and
-the persistent `printk_env γpr γu γd`. `SpecBalloc.v` has neither, and
-nothing in `bio_ctx` / `log_ctx` / `dev_inv` yields them. No fs-layer spec
-threads `printk_env` today; it appears only in `SpecMain*.v`.
-
-Proposed delta: a `γpr : gname` binder plus `kernel_data -∗` and
-`printk_env γpr γu γd -∗` (both PERSISTENT, so threading them costs
-nothing), and printk's contract carried the way `panic_wp_any` already is
-— as a persistent premise that is never discharged inside the function —
-rather than as a functor argument. That last point decides the ACCEPTANCE
-CRITERION: `PRINTK_GEN`'s only instance is `LinkPrintkGen`'s own `Axiom`,
-so a functor would put a seventh entry in
-`Print Assumptions Balloc.wp_balloc_sconf`, whereas the premise form keeps
-balloc, bmap and writei at the standing six and pushes the obligation to
-whoever eventually discharges it — the same place `panic_wp_any` lands.
-Ripples into `SpecBmap.v` and `SpecWritei.v` (two persistent premises each).
-
-### 1. THE EXISTING `Module Type BALLOC` CANNOT HOLD UNCHANGED
-
-`SpecBalloc.v`'s precondition has no superblock cells and no bitmap
-resource, and balloc reads BOTH superblock fields out of memory and
-rewrites the bitmap block. The contract is not merely inconvenient, it is
-**unprovable as written**: there is no points-to for `sb + 4` or `sb + 28`
-anywhere in the precondition (the only `sb` cell in the tree is
-`InodeInv.sb_inodestart` at `sb + 24`), and no resource that could yield
-the allocated block's `fsblock` half or its `blk_own` — the two things the
-postcondition promises. This is the "STOP AND REPORT" case; the minimal
-delta is:
+balloc reads BOTH superblock fields out of memory and rewrites the bitmap
+block, so its precondition carries the two cells and the bitmap resource:
 
 ```
-  + (bmapstart size : Z) (used : gset Z) (dqb dqs : dfrac)     -- new binders
-  + 0 < size <= BPB ->  0 <= bmapstart ->
-  + bmapstart ∈ cov ->  ~ (bmapstart ∈ log_region_set logstart) ->
-  + sb_size      ↦₄{dqs} (mword_of_int size      : mword 32) -∗
-  + sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  + bitmap_res γfs bmapstart cov logstart size used -∗
+  (bmapstart size : Z) (used : gset Z) (dqb dqs : dfrac)
+  0 < size <= BPB ->  0 <= bmapstart ->
+  bmapstart ∈ cov ->  ~ (bmapstart ∈ log_region_set logstart) ->
+  sb_size      ↦₄{dqs} (mword_of_int size      : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  bitmap_res γfs bmapstart cov logstart size used -∗
     ... post: both cells back, and
-  + FAILURE arm: bitmap_res γfs bmapstart cov logstart size used
-  + SUCCESS arm: bitmap_res γfs bmapstart cov logstart size
+    FAILURE arm: bitmap_res γfs bmapstart cov logstart size used
+    SUCCESS arm: bitmap_res γfs bmapstart cov logstart size
                             (used ∪ {[bv_unsigned blk]})
 ```
 
-Everything already in the contract survives: `bslots bn 2` is still the
-peak (bread + `log_write`'s bpin, twice, non-overlapping), the budget is
-still `log_op (2+u)` in with `2+u` refunded on failure and `u` on success,
-`K_balloc = 50` is unchanged, and the success arm's
+`bslots bn 2` is the peak (bread + `log_write`'s bpin, twice,
+non-overlapping); the budget is `log_op (2+u)` in, with `2+u` refunded on
+failure and `u` on success; `K_balloc = 50`; and the success arm's
 `fsblock … (replicate BSIZE 0)` + `blk_own` come straight out of
 `free_pool_take` plus the inlined bzero.
 
-**The ripple, which is why this is a decision and not a patch:**
-`SpecBmap.v` gains the same three resources (bmap has two balloc call
-sites, so its postcondition needs `∃ used', ⌜used ⊆ used'⌝`), and
-`SpecWritei.v` gains them too — with `used'` inside `writei`'s LOOP
-INVARIANT, which is the expensive part. `ProofBmap.v` has three
-`iApply (Hballoc …)` sites; `ProofWritei.v` threads bmap through its loop.
+**`0 < size` is load-bearing twice over**: it is what makes the single-bitmap-
+block simplification sound, and it is what kills balloc's own `beqz a5` arm at
++0x12 (the `sb.size == 0` jump straight to `printk`), which is otherwise a live
+path with no s2–s8 restore.
 
-The `0 < size` premise is also what kills balloc's own `beqz a5` arm at
-+0x12 (the `sb.size == 0` jump straight to `printk`), which is otherwise a
-live path with no s2–s8 restore.
+Because bmap has two balloc call sites, `SpecBmap.v` carries the same three
+resources with `∃ used', ⌜used ⊆ used'⌝` in its postcondition, and
+`SpecWritei.v` carries `used'` inside its LOOP INVARIANT.
 
-### 2. `CodeBalloc.v` / `CodeBfree.v` — DONE, but the generator has a bug
-
-The manifest rows and `make gen-code` landed both files. The regeneration
-also exposed a REAL GENERATOR BUG that made three decode shards fail to
-compile, so `CodeBalloc.vo` / `CodeBfree.vo` could not be built at all:
-`gen_code.py` picks each `kd_` lemma's closing tactic from a whitelist of
-AST heads and **`SHIFTIWOP` is missing**, so balloc's three `sraiw` words
-got `decode_bridge_ms` where only `decode_bridge_ms_bv` closes. Patched in
-the three shards (verified, 1.9 s); the permanent fix is the selection line
-in `tools/gen_code.py`, and until it lands the next `make gen-code` silently
-reverts the patch. Full write-up in `claude-notes/durable-notes.md`.
-
-### 2b. HISTORICAL: what generating them cost
-
-Needs two `tools/code_manifest.json` rows —
-
-```
-  ["CodeBalloc.v", "balloc", "bai_", 3]     (262 bytes, so width 3)
-  ["CodeBfree.v",  "bfree",  "bfi_", 2]     (108 bytes)
-```
-
-— and a full `tools/gen_code.py` run. Measured by running the generator
-into a scratch directory against the tracked dump: the two functions add
-**56 distinct decode words** (12 compressed, 44 base) spread over **27 of
-the 32 `KernelDecode*.v` shards**. That is why it cannot be done as an
-isolated edit; per durable-notes, run the FULL generator into a scratch
-dir and copy out what changed, confirming every pre-existing Code file
-comes back byte-identical and the shard diffs are pure additions.
-
-## The instruction map, for whoever proves them
+## The instruction map
 
 `bfree` (0x80002d38, 108 B) — straight line, one dead arm:
 
@@ -386,10 +307,8 @@ comes back byte-identical and the shard diffs are pure additions.
   +0xe8 pop s2..s8 ; +0xf6 printk("balloc: out of blocks") ; s1 = 0 ; j +0x7e
 ```
 
-The inner scan is the only induction: invariant "every bit in `[0, bi)` is
-in `used`", carried against `bitmap_res`'s `bitmap_ok`, with the loop's
-`fsblock` half parked in the `bio_held`/`bio_locked` handle from `bread`.
-`ProofWriteHead.v` (bread → store into `bp->data` → callee → brelse) and
-`ProofIupdate.v` are the byte-store precedents; `ByteBuf.bb_byte_acc` is
-the single-byte accessor (`bb_word4_acc` is the word-granular twin bmap
-used).
+The inner scan is the only induction: invariant "every bit in `[0, bi)` is in
+`used`", carried against `bitmap_res`'s `bitmap_ok`, with the loop's `fsblock`
+half parked in the `bio_held`/`bio_locked` handle from `bread`.
+`ByteBuf.bb_byte_acc` is the single-byte accessor; `bb_word4_acc` is the
+word-granular twin bmap uses.

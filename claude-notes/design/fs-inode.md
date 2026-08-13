@@ -161,7 +161,7 @@ uniformly on both paths. The allocating path is visible in the *map*
 (`blkmap_get bm' bn ≠ 0` where it was 0), which is where a caller that cares
 should look.
 
-## Words inside a block — `BlockWords.v` (LANDED)
+## Words inside a block — `BlockWords.v`
 
 The indirect block is 256 little-endian `uint`s in 1024 bytes. `ByteBuf.v`
 is byte-granular and does not cover this.
@@ -186,13 +186,9 @@ That file is iris-free, so `BlockWords.v` is proofmode- and ssreflect-free
 and stays usable from the `Pt4kWalk`-style vanilla-rewrite files
 (durable-notes' ssreflect rule).
 
-## `balloc`'s contract — ASSUMED for now
+## `balloc`'s contract
 
-`balloc` is stated as a `Module Type` and left unproven, the sanctioned
-pattern already used for `myproc`/`panic`/`kerneltrap`. `bmap` linked
-against it counts as proven-with-caveat in `proof_coverage.py`.
-
-It sleeps (it `bread`s), so it threads the full running-process bundle.
+`balloc` sleeps (it `bread`s), so it threads the full running-process bundle.
 Its two arms:
 
 - **success** — returns `b ≠ 0` with `⌜b ∈ cov⌝`, `⌜b ∉ log_region⌝`,
@@ -208,12 +204,10 @@ Its two arms:
 The arm-dependent budget costs nothing to state because the postcondition
 is already a two-arm disjunction on the return value.
 
-**The open question this defers**: where free blocks' `fsblock` halves live
-while free. `FsBoot.v` mints one per covered block at boot, so they exist;
-proving `balloc` means designing the bitmap invariant that holds them and
-tying bit `b` of the bitmap to "block `b`'s half is in the pool". Stating
-`balloc` does not need that, which is exactly why it is worth assuming
-first — the shape of `bmap`'s proof is independent of it.
+Where a free block's `fsblock` half lives while free is the FREE POOL, in
+[`fs-bitmap.md`](fs-bitmap.md): bit `b` of the bitmap being clear is tied to
+block `b`'s half sitting in the pool alongside its exclusive `blk_own` token,
+and that token's exclusivity is what makes this handshake sound.
 
 ## `bmap`'s contract
 
@@ -281,7 +275,7 @@ families — the direct arm never writes s4 and keeps the push's existential
 slot, and the indirect arm restores s4 at +0x088, one instruction before
 the join. No per-arm `callee_saved` duplication beyond that premise.
 
-### Confirmed by working the proof plan
+### The measured numbers
 
 `K_bmap = 56` (frame 6 slots + `K_balloc = 50`, which dominates `bread` 40,
 `brelse` 26, `log_write` 18). `bslots bn 3` is **exactly tight** — the peak
@@ -330,22 +324,24 @@ Take that field the way `SpecInitlog.v` already takes `sb + 20` for
 threaded in and back out untouched. **Do not build a superblock
 abstraction for one field** — there is a precedent and it is one line.
 
-### What it needs that does not exist
+### The three pieces it is built on
 
-- **A dinode-block encoding.** A block is 16 dinodes; the write targets
-  slot `inum mod 16`. Same shape as `BlockWords.ind_bytes`: keep the
-  block content in the image of an encoding function over a list of 16
-  pure `dinode` records, so an update is an `<[k := d]>` on that list and
-  the byte level is only ever read back.
-- **An addrs-cells-as-byte-buffer bridge.** `memmove`'s source is the 13
-  `i_addr` word cells viewed as 52 contiguous bytes. `ByteBuf.bb_word4_acc`
-  goes the other way (borrow a word out of a byte buffer); this needs the
-  converse. memmove's own contract is fine as-is — its non-overlap is
-  carried by SEPARATION, and source (the inode) and destination (the
-  buffer) are separate conjuncts.
-- **`inode_meta`** — the five metadata cells at the values of a pure
-  `dinode`. `InodeInv.v` already defines the accessors
-  (`i_type`/`i_major`/`i_minor`/`i_nlink`/`i_size`); this bundles them.
+- **`DinodeEnc.v`** — a block is 16 dinodes and the write targets slot
+  `inum mod 16`, so the block content is kept in the image of an encoding
+  function over a list of 16 pure `dinode` records: an update is an
+  `<[k := d]>` on that list and the byte level is only ever read back. Same
+  shape as `BlockWords.ind_bytes`, and the third of this tree's
+  bytes-in-a-block vocabularies alongside `BlockWords` (words) and
+  `BitmapEnc` (bits).
+- **An addrs-cells-as-byte-buffer bridge.** memmove's source is the 13
+  `i_addr` word cells viewed as 52 contiguous bytes — the converse of
+  `ByteBuf.bb_word4_acc`, which borrows a word out of a byte buffer.
+  memmove's own contract needs nothing: its non-overlap is carried by
+  SEPARATION, and source (the inode) and destination (the buffer) are
+  separate conjuncts.
+- **`inode_meta`** — the five metadata cells at the values of a pure `dinode`,
+  bundling `InodeInv.v`'s `i_type`/`i_major`/`i_minor`/`i_nlink`/`i_size`
+  accessors.
 
 ### The budget: iupdate CAN promise spend-exactly
 
@@ -378,12 +374,11 @@ the map — that is the case the phantom would actually hurt.
 
 ### Who owns an inode block
 
-Deferred, like the bitmap. The block holds **16 different inodes'**
-dinodes, so an icache/inode-table invariant will eventually have to
-manage that sharing. iupdate's contract simply takes the whole block's
-`fsblock` half and hands it back updated at one slot — correct, and it
-does not prejudge the sharing design. No `blk_own` is needed: iupdate
-establishes no injectivity.
+An inode block holds **16 different inodes'** dinodes, and the sharing is
+`InodeRegion.v`'s: the coarse whole-block `fsblock` premise is refined into a
+per-inum `dinode_at γi inum dn`, an exclusive `ghost_map` fragment, with the
+region invariant coupling the fragments to the block's bytes. No `blk_own` is
+needed anywhere here — iupdate establishes no injectivity.
 
 ## `writei` — the loop, and what a PARTIAL write may claim
 
@@ -476,7 +471,7 @@ so it cannot be handled by the same epilogue lemma as everything else and
 must not be given frame ownership. Nothing else in the inode layer has
 this shape.
 
-## `readi`, and why it forced a no-alloc `bmap` (PROVEN 2026-08-07)
+## `readi`, and why it forced a no-alloc `bmap`
 
 242 bytes, 97 instructions, structurally writei's twin. `readi` calls
 `bmap`, and `bmap` allocates when the slot is zero — which calls
@@ -622,7 +617,7 @@ so a larger size would drive bmap past MAXFILE into its out-of-range panic.
 No `log_op`, no `log_ctx`, no `γ : log_names`, and ONE `bslot` (bmap's and
 bread's uses do not overlap).
 
-### `writei` PRESERVES `bm_covers` (LANDED 2026-08-07)
+### `writei` PRESERVES `bm_covers`
 
 `writei` takes `bm_covers bm (bv_unsigned (di_size dn))` as a PREMISE and
 returns `bm_covers bm' (bv_unsigned (di_size dn'))` — at the NEW size — so a
@@ -658,18 +653,7 @@ scope. On the copy-failure arm the disturbed block is in fact allocated
 anyway (bmap succeeded before the copy ran), so the claim would have held
 even if it had been in scope.
 
-## Order of work
-
-1. `BlockWords.v` — the `ind_*` vocabulary and its four laws.
-2. `InodeInv.v` — geometry, `blkmap`, `blkmap_wf`, `inode_map`, `inode_blocks`,
-   the one-block accessor.
-3. `SpecBalloc.v` (assumed), `SpecBmap.v`.
-4. `CodeBmap.v` — 69 instructions; check `KernelRvcDecode`/`KernelBaseDecode`
-   first per the decode-dedup rule.
-5. `ProofBmap.v` / `LinkBmap.v`.
-6. Then `iupdate`, and `writei` on top of both.
-
-## `ilock` / `iunlock` — the LOAD, and the icache seam (PROVEN 2026-08-07)
+## `ilock` / `iunlock` — the LOAD, and the icache seam
 
 `iupdate` is the flush; `ilock` is the load. Same geometry, same `IBLOCK`
 arithmetic, same `DinodeEnc` encoding, `memmove` running the other way.
@@ -881,40 +865,23 @@ the fourth time in this effort a contract was nearly written with a premise
 its only caller could not supply; the check is always the same — *name the
 caller and the resource it would hand over*.
 
-### OWED: an inode names only real block numbers
+### The two premises `itrunc` names, and where each belongs
 
-`bfree` needs `0 <= b < size`, and **nothing in the model says so**:
+`bfree` needs `0 <= b < size`, and the inode model does not say it: `blkmap_wf`
+records covered / not-in-log / injective but takes no `size`; `cov_ok` bounds a
+covered block only by `2^31`; `bitmap_ok` runs the other way. The two obvious
+homes — putting `size` into `blkmap_wf`, or making it whatever invariant
+`ilock` establishes — are BOTH wrong, and [`fs-icache.md`](fs-icache.md) §6 is
+the argument:
 
-- `blkmap_wf` records covered / not-in-log / injective, but takes no `size`;
-- `cov_ok` bounds a covered block only by `2^31`;
-- `bitmap_ok` runs the other way — clear bits *below* `size` are covered.
-
-So `itrunc` takes it as an explicit premise, one clause per named slot.
-That is honest but it pushes the obligation onto the caller, and `iput` has
-nowhere to get it either. It wants to live in one of two places:
-
-- in `blkmap_wf`, which would have to take `size` — ripples to `bmap`,
-  `writei`, `readi`, every `blkmap_wf` site; or
-- in whatever invariant `ilock` establishes when it reads an inode off the
-  disk, which is where an out-of-range block number would actually enter.
-
-The second is the real home — it is a statement about what a *disk* inode
-may contain — but it needs the icache design first, so it is recorded here
-rather than guessed at. Until then `itrunc`'s premise is a hypothesis, and
-`iput` will inherit it.
-
-**ANSWERED, and the guess above is wrong in both branches** — see
-[`fs-icache.md`](fs-icache.md) §6. The range premise needs neither: it is a
-PURE geometry fact `cov_below cov size` ("every covered block is below the
-FS size"), of exactly the same character as `log_geom_ok` and supplied from
-the same place, after which the per-slot claim is a two-line corollary of
-the `blkmap_wf` that already exists (`IcacheInv.blkmap_slot_inrange`), with
-no invariant moving anywhere. The `length (data i) = BSIZE` premise IS an
-inode-layer invariant and does belong beside `blk_holes_zero` in
-`inode_ok` (`IcacheInv.inode_sized`, with its three laws) — better still,
-folded into `FsBlocks.fsblock`, which retires it everywhere at once.
-
-The length premise was originally stated for every `i : nat`, which no
-holder of `inode_locked` can supply — both `inode_blocks` and
-`blk_holes_zero` stop at `MAXFILE`. It was narrowed to `i < MAXFILE` when
-`itrunc` landed; that part is done.
+- **The range premise is a PURE GEOMETRY fact**, `cov_below cov size` ("every
+  covered block is below the FS size"), of exactly the same character as
+  `log_geom_ok` and supplied from the same place. After it, the per-slot claim
+  is a two-line corollary of the `blkmap_wf` that already exists
+  (`IcacheInv.blkmap_slot_inrange`), and no invariant moves anywhere.
+- **`length (data i) = BSIZE` IS an inode-layer invariant** and belongs beside
+  `blk_holes_zero` in `inode_ok` (`IcacheInv.inode_sized`, with its three
+  laws) — better still folded into `FsBlocks.fsblock`, which retires it
+  everywhere at once. It is stated at `i < MAXFILE`, not for every `i : nat`:
+  both `inode_blocks` and `blk_holes_zero` stop there, so no holder of
+  `inode_locked` could supply the unbounded form.

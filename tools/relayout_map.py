@@ -56,10 +56,13 @@ Without --write, `apply` prints a unified diff and changes nothing.
 """
 import re, subprocess, sys, difflib, os
 
-# The repo root, and the git revision the "old" (pre-relayout) Code files are
-# read from.  Both are overridable, because a relayout is not always measured
-# against HEAD: during a MERGE the pre-bump generation lives in the index
-# (RELAYOUT_OLD_REV=''), and a two-step reconciliation needs the merge base.
+# The repo root and the git revision the "old" (pre-relayout) Code files are
+# read from.  ROOT is derived from this script's own location (the tool is
+# checked in and every agent runs it from a different worktree, so an absolute
+# path here fails naming somebody else's checkout); both are overridable,
+# because a relayout is not always measured against HEAD: during a MERGE the
+# pre-bump generation lives in the index (RELAYOUT_OLD_REV=''), and a two-step
+# reconciliation needs the merge base.
 ROOT = os.environ.get('RELAYOUT_ROOT',
                       os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OLD_REV = os.environ.get('RELAYOUT_OLD_REV', 'HEAD')
@@ -83,6 +86,16 @@ NUM_RE = re.compile(r'\b(0x[0-9a-fA-F]+|\d+)\b')
 # registers and offset +0x1e had 14 -> 15 and 15 -> 11 colliding.)  So register
 # fields are tracked separately and reported as a reallocation warning instead.
 REGIDX_RE = re.compile(r'(?:Regidx|creg2reg_idx)\s*\(\s*mword_of_int\s+(0x[0-9a-fA-F]+|\d+)')
+
+# A bitvector WIDTH is never an instruction immediate, and it shows up in
+# several positions: `(mword_of_int 12 : mword 12)` carries the number twice,
+# and `sign_extend' 64 (...)` / `zero_extend' 12 (...)` / `ones 0` carry it as
+# a leading argument.  Rewriting any of them is silent corruption -- see the
+# note at the substitution site.
+WIDTH_RE = re.compile(
+    r'\bmword\s+(\d+)'
+    r"|\b(?:sign_extend|zero_extend|truncate|truncateLSB)'?\s+(\d+)"
+    r"|\b(?:ones|zeros)'?\s+(\d+)")
 
 
 def _num_kinds(ast):
@@ -225,7 +238,17 @@ def apply_map(proof_file, changes, syms, aliases=()):
         # rewriting the 0x18 because 24 happens to be a moved immediate at the
         # anchor is the tool's one real footgun, so blank those spans out before
         # substituting and splice them back afterwards.
-        spans = [m.span(2) for m in anchor_re.finditer(line)]
+        # A BITVECTOR WIDTH IS NOT AN IMMEDIATE EITHER.  `(mword_of_int 12 :
+        # mword 12)` carries the same number twice, and only the FIRST one is
+        # the instruction's immediate; the second is the type.  Rewriting both
+        # (procdump+0x2e moved 12 -> 4088) produced `mword_of_int 4088 :
+        # mword 4088` -- a 4088-BIT WORD.  That one happened to fail loudly,
+        # but a width that stays plausible would not: `mword 12` -> `mword 20`
+        # is a well-typed lie.  Same rule as the register fields: freeze them.
+        spans = [m.span(2) for m in anchor_re.finditer(line)] \
+              + [m.span(g) for m in WIDTH_RE.finditer(line)
+                 for g in (1, 2, 3) if m.group(g) is not None]
+        spans.sort()
         # re-anchor on the LAST symbol reference in the line
         anchors = [((alias_of[m.group(1)], int(m.group(2), 0)), m.start())
                    for m in anchor_re.finditer(line)]
@@ -264,16 +287,26 @@ def apply_map(proof_file, changes, syms, aliases=()):
             for lit in bad:
                 repl.pop(lit, None)
             if repl:
-                pat = re.compile(r'(?<![\w.])('
-                                 + '|'.join(re.escape(l) for l in
-                                            sorted(repl, key=len, reverse=True))
-                                 + r')(?![\w])')
+                # SUBSTITUTE ONLY THE OPERAND OF [mword_of_int], never a bare
+                # number.  Every immediate a proof spells goes through it --
+                # `mword_of_int 1378`, `caddi16sp_imm (mword_of_int 61 : ...)`,
+                # `auipc_off (mword_of_int 6 : ...)` -- while an anchored line
+                # is full of numbers that are NOT immediates and must not move:
+                # frame arithmetic (`K - 4`, and a map entry 4 -> 4076 really
+                # did turn it into `K - 4076`), bitvector widths (`mword 12`,
+                # `sign_extend' 64`), loop counts, `%nat` indices.  Freezing
+                # each such context as it was discovered was whack-a-mole; this
+                # is the closed form of the same rule.
+                MOI = re.compile(r'(mword_of_int\s+)(0x[0-9a-fA-F]+|\d+)')
 
                 def _sub(m, _i=i):
-                    log.append((_i + 1, m.group(1), repl[m.group(1)]))
-                    return repl[m.group(1)]
+                    lit = m.group(2)
+                    if lit not in repl:
+                        return m.group(0)
+                    log.append((_i + 1, lit, repl[lit]))
+                    return m.group(1) + repl[lit]
 
-                new_line = pat.sub(_sub, new_line)
+                new_line = MOI.sub(_sub, new_line)
             for k, s in enumerate(frozen):
                 new_line = new_line.replace(f'\x00{k}\x00', s)
             line = new_line

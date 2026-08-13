@@ -41,7 +41,7 @@ All offsets corroborated by disassembly (`addi a5,a0,208` + stride 8 × 16 in
 | `trapframe` | 88 | 8 | `proc_priv` / `proc_dormant` (pointer only) |
 | `context` | 96 | 112 | `own_ctx` / `proc_ctx` |
 | `ofile[16]` | 208 | 128 | `proc_ofiles` (a `file_ref` per non-null slot) |
-| `cwd` | 336 | 8 | `proc_priv`; `cwd_ref` still `emp` |
+| `cwd` | 336 | 8 | `proc_priv`, incl. `cwd_ref` (an inode reference) |
 | `name[16]` | 344 | 16 | `proc_priv` |
 
 `NOFILE = 16`, `NPROC = 64` (`param.h`).
@@ -62,7 +62,7 @@ This is the group `proc_lock_res` already covers (`state`, `chan`); `killed`
 and `xstate` join it unchanged.
 
 **`chan` is the WAKEUP FLAG, not bookkeeping** (upstream `ae96fd0`; see
-[`../projects/sleep-split.md`](../projects/sleep-split.md)). `sleep_prepare`
+[`../projects/sleep-split.md`](../completed/sleep-split.md)). `sleep_prepare`
 records it, `sleep` parks only if it is still non-zero, and `wakeup` clears it
 for every matching slot whether or not that slot is SLEEPING — which is what
 closes the window the split protocol opens between a waiter's registration and
@@ -98,7 +98,7 @@ fraction** gives agreement for free (`word4_pointsto_agree`). Half stays in the
 lock resource so `kkill()` can always read it; half travels with the running
 process. `allocproc` reunites both halves in the `UNUSED` arm and so may write.
 
-### 3. A different lock — `parent` (`WaitInv.v`, BUILT)
+### 3. A different lock — `parent` (`WaitInv.v`)
 
 `wait_lock`, not `p->lock`, and it is read/written *across* processes
 (`exit()` reparents its children onto `initproc`). It has its own global
@@ -170,10 +170,10 @@ touch this group:
   child's `trapframe` and `pagetable` under the child's lock.
 - **`procdump()`** reads `p->state`, `p->pid` and `p->name` with no lock, for
   any p. This is racy debug code by design; it is not a counterexample to the
-  disciplines below. It is now specified and proved, and what its contract had
-  to do about the race — a per-slot read-share supplied by the caller, and why
-  neither an invariant-based atomic peek nor a permanent read-share can work —
-  is [`projects/procdump.md`](../projects/procdump.md).
+  disciplines below. It is specified and proved anyway, and what its contract
+  had to do about the race — a per-slot read-share supplied by the caller,
+  whose being unsatisfiable from anything in the tree IS the statement that
+  procdump is racy — is [`completed/procdump.md`](../completed/procdump.md).
 
 So the right statement is: **the group is exclusively owned, and the owner is
 whoever last took the slot out of the lock invariant.** The lock invariant must
@@ -341,6 +341,23 @@ Definition proc_priv (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivat
    proc_ofiles γf pa (pv_ofile V) ∗
    cwd_ref (pv_cwd V))%I.
 ```
+
+**`cwd_ref` HAS NO NULL ARM.** `cwd_ref v := IcacheRef.inode_held v`, so
+`cwd_ref v ⊢ ⌜v ≠ 0⌝` (`cwd_ref_nonzero`) is a free projection of `proc_priv`
+— which is why it is a projection and not a conjunct anywhere near
+`proc_slots`: `SchedCtx.proc_slots_recast` moves SLEEPING → RUNNABLE → RUNNING
+for free, and stays free only because `proc_slots` mentions neither
+`proc_ctx`'s nor `proc_dormant`'s contents. A null arm would cost the opposite
+trade — `proc_priv` would stop implying `pv_cwd V ≠ 0`, and `SpecKexit`,
+`SpecKfork`, `SpecSysFork` and `SpecSysExit` would each have to carry it as a
+premise.
+
+The one window where a LIVE process has a null `cwd` is between allocproc's
+return and kfork's `sd a0,336(s4)`. `proc_priv_nocwd` / `proc_priv_split_cwd`
+span it by splitting off the REFERENCE — not the `p_cwd` CELL, which stays
+inside `proc_fields`, so `proc_dormant`, `SpecFreeproc` and every other
+consumer of `proc_fields` is untouched and a holder of the deficit block still
+owns and writes the cell.
 
 **THE TWO SIZE CONJUNCTS.** `p->sz` never exceeds TRAPFRAME, and — the
 one that carries weight — **nothing is mapped at or above it**
@@ -922,66 +939,36 @@ taken by `allocproc` and `kill` on procs the holder is *not* running.
   `proc_dormant`, no recasting needed, which is the payoff for not indexing
   it by `st`.
 
-## What is built
-
-Landed and compiling:
-
-The two fd-slot conjuncts are what make `FDSLOTS` add up exactly: procinit
-routes `NPROC * (NOFILE + FDSPARE)` — the WHOLE minted supply — and each
-dormant block parks one process's share. `proc_dormant_unused` hands the
-`FDSPARE` allowance out as its own conjunct, because for a live process it
-travels *beside* `proc_priv` rather than inside it (see
-[`file-table.md`](file-table.md) for why: `proc_priv`'s accessors all swallow
-the block, so a syscall could not hold its allowance and still pass
-`proc_priv` to a callee).
+## Where each piece lives
 
 - **`ProcGeom.v`** — all 15 field addresses, `NOFILE`/`PNAMELEN`, the three
-  missing state codes, `inv_dormant` + its six `vm_compute` facts, and the
-  `p_ofile` cursor lemmas (`p_ofile_zero` / `_succ` / `_shift_form`).
-- **`ProcInv.v`** (new, between `FileInv.v` and the spec files) — `pprivate`
-  and its updaters, `proc_fields`, `pname_cells`, `ofile_cells`, `ofile_slot`
-  (+ `ofile_slot_null` / `ofile_slot_file`), `proc_ofiles`, `cwd_ref`,
-  **`proc_priv`**, its projections (`proc_priv_pid`, `proc_priv_ofile`,
-  `proc_priv_ofile_read`, `proc_priv_pid_agree`, `proc_priv_cwd`, and
-  `proc_priv_cwd_pid` — the cwd cell, its `cwd_ref` and the pid quarter
-  handed out TOGETHER, because each single accessor swallows the whole block
-  and kexit needs both at once: `begin_op`/`iput`/`end_op` each want the pid
-  cell, and the cwd cell has to stay out across all three), **`proc_dormant`** +
-  `proc_dormant_to_priv`, and `is_kstack`.  Plus, from allocproc: the one
-  producer `proc_priv_intro` (+ `upd_pt`), `tf_page_of_page_own` (kalloc's
-  page IS a trapframe page), the `ctx_cells` ⇄ byte-buffer accessor
-  (`ctx_cells_run` / `wcells_bytes_acc` / `own_ctx_bytes`, which is what
-  `memset(&p->context, 0, 112)` runs over), and `p_pid_join` /
-  `p_pid_split`.
+  state codes `proc.h` omits, `inv_dormant` + its six `vm_compute` facts, and
+  the `p_ofile` cursor lemmas (`p_ofile_zero` / `_succ` / `_shift_form`).
+- **`ProcInv.v`** (between `FileInv.v` and the spec files) — `pprivate` and its
+  updaters, `proc_fields`, `pname_cells`, `ofile_cells`, `ofile_slot`,
+  `proc_ofiles`, `cwd_ref`, **`proc_priv`** and its projections,
+  **`proc_dormant`** + `proc_dormant_to_priv`, `is_kstack`, the one producer
+  `proc_priv_intro` (+ `upd_pt`), `tf_page_of_page_own` (kalloc's page IS a
+  trapframe page), the `ctx_cells` ⇄ byte-buffer accessor that
+  `memset(&p->context, 0, 112)` runs over, and `p_pid_split`/`_join`.
 
-**`procs_inv` also carries every proc's kstack.** `p->kstack` is write-once
-at procinit, so `is_kstack` is persistent and `SchedCtx.procs_inv` holds one
-per slot (`procs_inv_kstack`). It has to live there rather than in a
-caller's precondition because allocproc reads `p->kstack` of the slot its
-SCAN found — an index no premise could have named in advance — and being
-persistent it costs every existing consumer nothing.
-- **`sys_getpid`** — `SpecSysGetpid.v` / `ProofSysGetpid.v` /
-  `LinkSysGetpid.v`, in the standard spec-module shape. The whole function,
-  entry to return, over `proc_priv`. `Print Assumptions` shows only the Sail
-  model's declared primitives and the standard classical axioms — no
-  kernel-level axiom, and `proof_coverage.py` picks it up as `proven`.
+**Each accessor swallows the whole block**, which is why the ones that hand out
+two things exist at all: `proc_priv_cwd_pid` gives the cwd cell, its `cwd_ref`
+and the pid quarter TOGETHER because kexit needs all of them at once —
+`begin_op`/`iput`/`end_op` each want the pid cell and the cwd cell has to stay
+out across all three. The same reasoning puts the `FDSPARE` allowance BESIDE
+`proc_priv` rather than inside it (`proc_dormant_unused`): a syscall could not
+hold its allowance and still pass `proc_priv` to a callee. The two fd-slot
+conjuncts are what make `FDSLOTS` add up exactly — procinit routes
+`NPROC * (NOFILE + FDSPARE)`, the WHOLE minted supply, and each dormant block
+parks one process's share. See [`file-table.md`](file-table.md).
 
-`sys_getpid` is the smallest thing that exercises the split, and it exercises
-exactly one edge of it: `cpu_own` supplies `cur_proc p` for `myproc()`, and
-`proc_priv_pid`'s read-only ¼ fraction serves the `c.lw a0,48(a0)` — with no
-lock, no `procs_inv`, no `γl` anywhere in the spec. The two fresh instruction
-decodes are the `jal ra,myproc` and that `c.lw`; the 16-byte frame is
-byte-identical to `cpuid`'s, so its eight decodes and its frame-cancel lemma
-are reused. One wrinkle worth knowing: ra/s0 are saved and restored *across*
-the `myproc` call, so the final `callee_saved` does not factor through
-`callee_saved_trans` and each of the fourteen conjuncts is discharged on its
-own (the `cs_through` shape, as in `ProofHoldingsleep.v`).
-
-Not yet done — the `proc_lock_res` rewiring. `proc_slots` and the new
-`proc_lock_res` belong in `SchedCtx.v` (they mention `proc_ctx`), and swapping
-them in re-proves yield/sched/sleep/wakeup. Nothing in `ProcInv.v` depends on
-that swap, so it can land on its own; see
-[`projects/proc-struct-resources.md`](../projects/proc-struct-resources.md).
+**`procs_inv` carries every proc's kstack.** `p->kstack` is write-once at
+procinit, so `is_kstack` is persistent and `SchedCtx.procs_inv` holds one per
+slot (`procs_inv_kstack`). It lives there rather than in a caller's
+precondition because allocproc reads `p->kstack` of the slot its SCAN found —
+an index no premise could have named in advance — and being persistent it costs
+every consumer nothing.
 
 ## The trapframe page, and where the page table lives
 
@@ -1070,36 +1057,24 @@ slot, deriving "this stack address is not null", indexing `p_ofile` at a
 symbolic fd, and factoring a branch join) are in
 [`../projects/proc-struct-resources.md`](../projects/proc-struct-resources.md).
 
-## Holes to be honest about
+## `wait_lock`, and where the lock ordering shows up
 
-- **`cwd` has no `inode_ref`.** There is no inode model in the tree
-  (`git log`: "started fs, but not crash reasoning"; no `Inode*.v`). The
-  `cwd_ref γi ip` above is a placeholder with the same shape as `file_ref`
-  — a per-slot fractional auth over `itable`. Until it exists, `pv_cwd`'s
-  validity clause should be literally `emp` and the cell owned bare, so the
-  bundle can land now and gain the clause later without restating callers.
-- **`p_trapframe` owns only the pointer.** The 35-word trapframe *page* is a
-  separate resource keyed by that pointer value; the current tree's user-mode
-  work assumes one fixed trapframe at `TRAMPOLINE - PGSIZE`, so per-proc
-  trapframe pages are a seam, not a solved problem.
-- **`wait_lock` IS a lock now, and `kwait` is where the ordering shows up.**
-  `SpecKwait.v` takes `is_lock γw wait_lock_addr "wait_lock" wait_res` as a
-  premise, so `WaitInv.wait_res` is the lock invariant and a caller's
-  obligation to be holding the lock is represented by the `locked` token.
-  kwait holds wait_lock across its whole scan and takes each candidate
-  child's `p->lock` *inside* it, which is the documented order; nothing in
-  the resources enforces it, but nothing in the proof can invert it either,
-  because the child's lock is acquired from `procs_inv` while wait_lock's
-  contents are already out.  `reparent` still takes the cells rather than
-  the lock (it acquires nothing), and `kexit` will want both.
-  `wait_lock_addr` lives in `SpecProcinit.v` — procinit is what initialises
-  the lock — which is why `SpecKwait.v` requires that file; moving the
-  constant into `WaitInv.v` with a `Require Export` would be tidier.
-- **`procdump` is unprovable as written** (unlocked reads of `name` and `pid`
-  on arbitrary procs). Making `name` persistent-after-`allocproc` would fix
-  the `name` half but not `pid`; the honest answer is to leave `procdump`
-  unverified.
-- **`USED`/`RUNNING` mapping to `emp` leaks rather than fails.** A thread that
-  sets `state = USED` and releases without a matching re-acquire drops the
-  private bundle on the floor. That is a safety-preserving leak, and proving it
-  cannot happen would need a ghost token per slot — not worth it.
+`SpecKwait.v` takes `is_lock γw wait_lock_addr "wait_lock" wait_res` as a
+premise, so `WaitInv.wait_res` is the lock invariant and a caller's obligation
+to be holding the lock is the `locked` token. kwait holds wait_lock across its
+whole scan and takes each candidate child's `p->lock` *inside* it, which is the
+documented order; nothing in the resources ENFORCES that order, but nothing in
+the proof can invert it either, because the child's lock is acquired from
+`procs_inv` while wait_lock's contents are already out. `reparent` takes the
+cells rather than the lock (it acquires nothing).
+
+`wait_lock_addr` lives in `SpecProcinit.v` — procinit is what initialises the
+lock — which is why `SpecKwait.v` requires that file; moving the constant into
+`WaitInv.v` with a `Require Export` would be tidier.
+
+## The one hole to be honest about
+
+**`USED`/`RUNNING` mapping to `emp` LEAKS rather than fails.** A thread that
+sets `state = USED` and releases without a matching re-acquire drops the
+private bundle on the floor. That is a safety-preserving leak, and proving it
+cannot happen would need a ghost token per slot — not worth it.

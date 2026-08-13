@@ -11,7 +11,7 @@
    rewired onto [KERNELTRAP] (explicit-cpuid Stage 2: the handler contract
    has to start handing the handler the trap CSRs, [cpu_hart], a deeper
    stack carve and a hart-generic Loeb -- see
-   claude-notes/projects/kerneltrap.md).  THE DAY THAT LANDS, DELETE
+   claude-notes/completed/kerneltrap.md).  THE DAY THAT LANDS, DELETE
    [KERNELTRAP_RETURNS], [kv_cell], [kt_clobbered] AND [LinkKerneltrap.v]'s
    axiom; nothing else refers to them.
 
@@ -181,7 +181,7 @@ End KERNELTRAP_RETURNS.
    (`w_sie(r_sie() | SIE_SEIE | SIE_STIE)`, bits 9 and 5), never writes
    [mie], and starts from 0.  So no cause but S-external and S-timer can ever
    be pending, which is exactly devintr's two.  See
-   [claude-notes/projects/kerneltrap.md].
+   [claude-notes/completed/kerneltrap.md].
 
    HOW THE SPP FACT REACHES THE CHECK: [sret_bits], the ghost mirror of
    mstatus.SPP and SPIE (IntrDefs).  The check runs FOUR instructions after

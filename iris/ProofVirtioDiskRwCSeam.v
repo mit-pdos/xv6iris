@@ -148,7 +148,7 @@ Section ProofVirtioDiskRwCSeam.
     iDestruct "Hgeom" as "(Hdp & _)".
     iApply (wp_vdrw_p3 (CID := CIDx) (proc_addr j) M (trap_res eb + (K - 12))%nat pd sp0 b wr sector h m2 t dsk0
               Hh8 Hm8 Ht8 Hregs
-              with "Hcg Htext Hpc Hdp Hidx Hbh Hbm Hbt Hbd [-]").
+              with "Hcg Htext Hpc Hdp Hidx Hbh Hbm Hbt Hbd").
     iIntros (M1) "%F Hcg Hpc Hidx Hchain".
     destruct F as (Hcs & H1a0 & H1a1 & H1a5).
     iSpecialize ("Hexit" $! CIDx with "[%]"); [wp_next_chain|].

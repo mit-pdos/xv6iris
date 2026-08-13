@@ -935,7 +935,7 @@ Section ReadiExit.
     (* ===== c.j +0xd8 ===== *)
     iApply (wp_cj_s_sconf (mword_of_int zf) jimm Q5 (K - 14)%nat b Hal
               with "Hcg Hpc Hif").
-    iIntros (CID6 Hq6). iNext. iIntros "Hcg Hpc".
+    iIntros (CID6 Hq6). iApply bi.later_intro. iIntros "Hcg Hpc".
     iEval (rewrite Htgt) in "Hpc".
     iAssert (rd_fr8 m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 HfA HfB HfC HfD HfE]"
       as "Hframe".
@@ -1003,7 +1003,35 @@ Section ReadiLoop.
     repeat rewrite add_vec_zero_l;
     first [ reflexivity | assumption ].
 
-  Local Lemma rd_loop `{GEN : GenId} `{CID0 : CpuId} 
+  (* RULE ONE (claude-notes/optimization.md): the +0x4c chunk body both
+     arms of [rd_loop]'s [bgeu a3,a4] branch to (a full block copies
+     linearly either way) -- named so the walk's proofmode steps stop
+     re-embedding ~20 lines of ∀/wands per step.  The ∀ binders stay
+     visible at the [iAssert] below; only what they quantify over is
+     folded here. *)
+  Definition rd_chunk_body `{GEN : GenId}
+      (j : nat) (b : bool) (K : nat) (m : regfile) (nc tot o : nat)
+      (kkb : nat) (usv ip : mword 64) (off : nat) (CIDa14 : CpuId)
+      (CIDb : CpuId) (Mb : regfile) (mm : nat) : iProp Σ :=
+    (⌜b = false \/ proc_addr j = zero_reg -> (CIDb : CPU) = (CIDa14 : CPU)⌝ -∗
+     ⌜mm = Nat.min (nc - tot) (BSIZE - o)⌝ -∗
+     ⌜rd_sp m Mb⌝ -∗
+     ⌜Mb !!! Regidx Rs10 = (mword_of_int (Z.of_nat mm) : mword 64)⌝ -∗
+     ⌜Mb !!! Regidx Ra5 = (mword_of_int (Z.of_nat o) : mword 64)⌝ -∗
+     ⌜Mb !!! Regidx Rs2 = bnode kkb⌝ -∗
+     ⌜Mb !!! Regidx Rs4 = pa_add (m !!! Regidx Ra2 : mword 64) tot⌝ -∗
+     ⌜Mb !!! Regidx Rs7 = usv⌝ -∗
+     ⌜Mb !!! Regidx Rs6 = ip⌝ -∗
+     ⌜Mb !!! Regidx Rs1 = (mword_of_int (Z.of_nat (off + tot)) : mword 64)⌝ -∗
+     ⌜Mb !!! Regidx Rs5 = (mword_of_int (Z.of_nat nc) : mword 64)⌝ -∗
+     ⌜Mb !!! Regidx Rs3 = (mword_of_int (Z.of_nat tot) : mword 64)⌝ -∗
+     ⌜Mb !!! Regidx Rs9 = (mword_of_int 1024 : mword 64)⌝ -∗
+     ⌜Mb !!! Regidx Rs8 = (mword_of_int (-1) : mword 64)⌝ -∗
+     sie_cap_gpr Mb (K - 14)%nat b (proc_addr j) -∗
+     pc_is (mword_of_int (RI + 0x4c) : mword 64) -∗
+     WP (Loop : expr riscv_lang))%I.
+
+  Local Lemma rd_loop `{GEN : GenId} `{CID0 : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1488,23 +1516,7 @@ Section ReadiLoop.
     (*  travel as wands.                                                 *)
     (* ================================================================ *)
     iAssert (∀ (CIDb : CpuId) (Mb : regfile) (mm : nat),
-        ⌜b = false \/ proc_addr j = zero_reg -> (CIDb : CPU) = (CIDa14 : CPU)⌝ -∗
-        ⌜mm = Nat.min (nc - tot) (BSIZE - o)⌝ -∗
-        ⌜rd_sp m Mb⌝ -∗
-        ⌜Mb !!! Regidx Rs10 = (mword_of_int (Z.of_nat mm) : mword 64)⌝ -∗
-        ⌜Mb !!! Regidx Ra5 = (mword_of_int (Z.of_nat o) : mword 64)⌝ -∗
-        ⌜Mb !!! Regidx Rs2 = bnode kkb⌝ -∗
-        ⌜Mb !!! Regidx Rs4 = pa_add (m !!! Regidx Ra2 : mword 64) tot⌝ -∗
-        ⌜Mb !!! Regidx Rs7 = usv⌝ -∗
-        ⌜Mb !!! Regidx Rs6 = ip⌝ -∗
-        ⌜Mb !!! Regidx Rs1 = (mword_of_int (Z.of_nat (off + tot)) : mword 64)⌝ -∗
-        ⌜Mb !!! Regidx Rs5 = (mword_of_int (Z.of_nat nc) : mword 64)⌝ -∗
-        ⌜Mb !!! Regidx Rs3 = (mword_of_int (Z.of_nat tot) : mword 64)⌝ -∗
-        ⌜Mb !!! Regidx Rs9 = (mword_of_int 1024 : mword 64)⌝ -∗
-        ⌜Mb !!! Regidx Rs8 = (mword_of_int (-1) : mword 64)⌝ -∗
-        sie_cap_gpr Mb (K - 14)%nat b (proc_addr j) -∗
-        pc_is (mword_of_int (RI + 0x4c) : mword 64) -∗
-        WP (Loop : expr riscv_lang))%I
+        rd_chunk_body j b K m nc tot o kkb usv ip off CIDa14 CIDb Mb mm)%I
       with "[Hcnt Hextc Hextm Hcont Hframe Hidev Hmeta Hmap Hdst
              Hbuf Hheldback Hfsb1 Htok1 Hblback]" as "BODY".
     { iIntros (CIDb Mb mm) "%Hanch %Hmmd %Hbsp %Hbs10 %Hba5 %Hbs2 %Hbs4 %Hbs7
@@ -2015,7 +2027,7 @@ Section ReadiLoop.
                           rewrite (bc_ge_moi (tot + mm) nc ltac:(lia) ltac:(lia));
                           apply Nat.leb_le; lia)
                     ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi78").
-          iNext. iIntros (CIDc11 Hqc11) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDc11 Hqc11) "Hcg Hpc".
           assert (Htgtbe : add_vec (mword_of_int (RI + 0x78) : mword 64)
                     (sign_extend' 64 (mword_of_int 70 : mword 13))
                   = mword_of_int (RI + 0xbe)) by pcw.
@@ -2108,7 +2120,7 @@ Section ReadiLoop.
                   ltac:(nz) ltac:(nz)
                   ltac:(rgne; rgne; rewrite Hrm1 HEs8; vm_compute; reflexivity)
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi64").
-        iNext. iIntros (CIDd1 Hqd1) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDd1 Hqd1) "Hcg Hpc".
         assert (Htgtaa : add_vec (mword_of_int (RI + 0x64) : mword 64)
                   (sign_extend' 64 (mword_of_int 70 : mword 13))
                 = mword_of_int (RI + 0xaa)) by pcw.
@@ -2246,7 +2258,7 @@ Section ReadiLoop.
                       rewrite (bc_ge_moi (nc - tot) (BSIZE - o) ltac:(lia) ltac:(lia));
                       apply Nat.leb_le; lia)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hia2").
-      iNext. iIntros (CIDa15 Hqa15) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDa15 Hqa15) "Hcg Hpc".
       assert (Htgt4c : add_vec (mword_of_int (RI + 0xa2) : mword 64)
                 (sign_extend' 64 (mword_of_int 8106 : mword 13))
               = mword_of_int (RI + 0x4c)) by pcw.
@@ -2285,7 +2297,7 @@ Section ReadiLoop.
                 (sign_extend' 21 (concat_vec (mword_of_int 2002 : mword 11) ('b"0")))
                 E6 (K - 14)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hia8").
-      iIntros (CIDa17 Hqa17). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDa17 Hqa17). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htgt4c : add_vec (mword_of_int (RI + 0xa8) : mword 64)
                 (sign_extend' 64 (sign_extend' 21
                    (concat_vec (mword_of_int 2002 : mword 11) ('b"0"))))
@@ -2334,6 +2346,34 @@ Section ReadiMain.
       | match goal with |- context [ ?M !!! _ ] => is_var M; progress unfold M end ];
     repeat rewrite add_vec_zero_l;
     first [ reflexivity | assumption ].
+
+  (* RULE ONE (claude-notes/optimization.md): the +0x34-onwards tail both
+     clamp arms of [wp_readi_sconf] hand off to, named so the walk's
+     proofmode steps stop re-embedding ~20 lines of ∀/wands per step.
+     The ∀ binders stay visible at the [iAssert] below; only what they
+     quantify over is folded here. *)
+  Definition rd_readtail_body
+      (j : nat) (b : bool) (K : nat) (m : regfile) (ip : mword 64)
+      (dn : dinode) (off n szn : nat) (CIDs5 : CpuId)
+      (CIDt : CpuId) (Mt : regfile) (nc : nat) : iProp Σ :=
+    (⌜b = false \/ proc_addr j = zero_reg -> (CIDt : CPU) = (CIDs5 : CPU)⌝ -∗
+     ⌜nc = rd_clamp (di_size dn) off n⌝ -∗
+     ⌜(nc <= n)%nat⌝ -∗
+     ⌜(off + nc <= szn)%nat⌝ -∗
+     ⌜rd_sp m Mt⌝ -∗
+     ⌜Mt !!! Regidx Rs5 = (mword_of_int (Z.of_nat nc) : mword 64)⌝ -∗
+     ⌜Mt !!! Regidx Rs6 = ip⌝ -∗
+     ⌜Mt !!! Regidx Rs7 = (m !!! Regidx Ra1 : mword 64)⌝ -∗
+     ⌜Mt !!! Regidx Rs4 = pa_add (m !!! Regidx Ra2 : mword 64) 0%nat⌝ -∗
+     ⌜Mt !!! Regidx Rs1 = (mword_of_int (Z.of_nat (off + 0)) : mword 64)⌝ -∗
+     ⌜Mt !!! Regidx Rs2 = (m !!! Regidx Rs2 : mword 64)⌝ -∗
+     ⌜Mt !!! Regidx Rs8 = (m !!! Regidx Rs8 : mword 64)⌝ -∗
+     ⌜Mt !!! Regidx Rs9 = (m !!! Regidx Rs9 : mword 64)⌝ -∗
+     ⌜Mt !!! Regidx Rs10 = (m !!! Regidx Rs10 : mword 64)⌝ -∗
+     ⌜Mt !!! Regidx Rs11 = (m !!! Regidx Rs11 : mword 64)⌝ -∗
+     sie_cap_gpr Mt (K - 14)%nat b (proc_addr j) -∗
+     pc_is (mword_of_int (RI + 0x34) : mword 64) -∗
+     WP (Loop : expr riscv_lang))%I.
 
   Lemma wp_readi_sconf 
       (γs : list gname) (j : nat) (γl : gname)
@@ -2457,7 +2497,7 @@ Section ReadiMain.
                       rewrite (rd_ltu_read _ _ _ _ Hszu Hoffu);
                       apply Z.ltb_lt; lia)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi02").
-      iNext. iIntros (CIDx1 Hqx1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDx1 Hqx1) "Hcg Hpc".
       assert (Htgt : add_vec (mword_of_int (RI + 0x2) : mword 64)
                 (sign_extend' 64 (mword_of_int 236 : mword 13))
               = mword_of_int (RI + 0xee)) by pcw.
@@ -2881,24 +2921,7 @@ Section ReadiMain.
     (*  register file and the clamped count travel.                      *)
     (* ================================================================ *)
     iAssert (∀ (CIDt : CpuId) (Mt : regfile) (nc : nat),
-        ⌜b = false \/ proc_addr j = zero_reg -> (CIDt : CPU) = (CIDs5 : CPU)⌝ -∗
-        ⌜nc = rd_clamp (di_size dn) off n⌝ -∗
-        ⌜(nc <= n)%nat⌝ -∗
-        ⌜(off + nc <= szn)%nat⌝ -∗
-        ⌜rd_sp m Mt⌝ -∗
-        ⌜Mt !!! Regidx Rs5 = (mword_of_int (Z.of_nat nc) : mword 64)⌝ -∗
-        ⌜Mt !!! Regidx Rs6 = ip⌝ -∗
-        ⌜Mt !!! Regidx Rs7 = (m !!! Regidx Ra1 : mword 64)⌝ -∗
-        ⌜Mt !!! Regidx Rs4 = pa_add (m !!! Regidx Ra2 : mword 64) 0%nat⌝ -∗
-        ⌜Mt !!! Regidx Rs1 = (mword_of_int (Z.of_nat (off + 0)) : mword 64)⌝ -∗
-        ⌜Mt !!! Regidx Rs2 = (m !!! Regidx Rs2 : mword 64)⌝ -∗
-        ⌜Mt !!! Regidx Rs8 = (m !!! Regidx Rs8 : mword 64)⌝ -∗
-        ⌜Mt !!! Regidx Rs9 = (m !!! Regidx Rs9 : mword 64)⌝ -∗
-        ⌜Mt !!! Regidx Rs10 = (m !!! Regidx Rs10 : mword 64)⌝ -∗
-        ⌜Mt !!! Regidx Rs11 = (m !!! Regidx Rs11 : mword 64)⌝ -∗
-        sie_cap_gpr Mt (K - 14)%nat b (proc_addr j) -∗
-        pc_is (mword_of_int (RI + 0x34) : mword 64) -∗
-        WP (Loop : expr riscv_lang))%I
+        rd_readtail_body j b K m ip dn off n szn CIDs5 CIDt Mt nc)%I
       with "[Hcnt Hextc Hextm Hcont Hframe Hidev Hmeta Hmap Hblocks
              Hdst Hsl]" as "TAIL".
     { iIntros (CIDt Mt nc) "%Hanch %Hncdef %Hncn %Hoffnc %Htsp %Hts5 %Hts6 %Hts7
@@ -2913,7 +2936,7 @@ Section ReadiMain.
                   ltac:(rgne; rewrite Hts5;
                         rewrite (bc_eqz_moi 0%nat ltac:(lia)); reflexivity)
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi34").
-        iNext. iIntros (CIDz1 Hqz1) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDz1 Hqz1) "Hcg Hpc".
         assert (Htgtca : add_vec (mword_of_int (RI + 0x34) : mword 64)
                   (sign_extend' 64 (mword_of_int 150 : mword 13))
                 = mword_of_int (RI + 0xca)) by pcw.
@@ -2947,7 +2970,7 @@ Section ReadiMain.
                   (sign_extend' 21 (concat_vec (mword_of_int 6 : mword 11) ('b"0")))
                   Z1 (K - 14)%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hicc").
-        iIntros (CIDz3 Hqz3). iNext. iIntros "Hcg Hpc".
+        iIntros (CIDz3 Hqz3). iApply bi.later_intro. iIntros "Hcg Hpc".
         assert (Htgtd8 : add_vec (mword_of_int (RI + 0xcc) : mword 64)
                   (sign_extend' 64 (sign_extend' 21
                      (concat_vec (mword_of_int 6 : mword 11) ('b"0"))))
@@ -3096,7 +3119,7 @@ Section ReadiMain.
                 (sign_extend' 21 (concat_vec (mword_of_int 25 : mword 11) ('b"0")))
                 U3 (K - 14)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi4a").
-      iIntros (CIDu9 Hqu9). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDu9 Hqu9). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htgt7c : add_vec (mword_of_int (RI + 0x4a) : mword 64)
                 (sign_extend' 64 (sign_extend' 21
                    (concat_vec (mword_of_int 25 : mword 11) ('b"0"))))
@@ -3164,7 +3187,7 @@ Section ReadiMain.
                 ltac:(rgne; rgne; rewrite HT2a5 HT2a4; apply bc_geu;
                       rewrite Hszu Hsumu; lia)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi2c").
-      iNext. iIntros (CIDv1 Hqv1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDv1 Hqv1) "Hcg Hpc".
       assert (Htgt34 : add_vec (mword_of_int (RI + 0x2c) : mword 64)
                 (sign_extend' 64 (mword_of_int 8 : mword 13))
               = mword_of_int (RI + 0x34)) by pcw.

@@ -102,6 +102,7 @@ LinkUservec.v
 SpecUsertrap.v
 UsertrapRes.v
 ProofUsertrapParts.v
+UsertrapAux.v
 UserretUser.v
 LinkUserretUser.v
 SRegime.v
@@ -788,10 +789,9 @@ LinkEitherCopyin.v
 UartTxInv.v
 SpecUartwrite.v
 CodeUartwrite.v
+ProofUartwrite.v
 LinkUartwrite.v
 SpecConsoleintr.v
-SpecBootDevCaps.v
-LinkBootDevCaps.v
 LinkConsoleintr.v
 WpUartgetc.v
 SpecUartintr.v
@@ -1007,8 +1007,13 @@ ProofPrepareReturnParts.v
 ProofPrepareReturn.v
 LinkPrepareReturn.v
 CodeUsertrap.v
+ProofUsertrapTail.v
+ProofUsertrapArms.v
+ProofUsertrapSys.v
 SpecSyscall.v
 LinkSyscall.v
+ProofUsertrap.v
+LinkUsertrap.v
 SpecIalloc.v
 ProofIalloc.v
 LinkIalloc.v
@@ -1055,6 +1060,7 @@ ProofProcdump.v
 LinkProcdump.v
 LinkSysFstat.v
 ProofKexecParts.v
+ProofKexecTail.v
 ProofKexecA.v
 ProofKexecB.v
 SpecSysFstat.v

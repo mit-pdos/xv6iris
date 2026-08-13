@@ -75,21 +75,23 @@ Local Open Scope Z_scope.
 (* uartwrite's own frame is 8 slots ([c.addi16sp sp,-64] at the prologue), and
    the deepest callee is now ACQUIRESLEEP at 26 (releasesleep 22, sleep 20,
    sleep_prepare 14) -- so the body's first call needs [26 <= av - 8], i.e.
-   [av >= 34], and the bound is exactly tight.
+   [av >= 30], and the bound is exactly tight: a TEN-slot frame
+   ([addi sp,sp,-80]) over [sleep]'s 20, which is the deepest thing below --
+   [sleep_prepare] wants 14 and acquire/release 10 apiece.
 
-   It used to be 10 + 22: a ten-slot frame over sleep, which was then the
-   deepest thing below.  Both numbers moved at ae96fd0 -- the frame shrank
-   because the register set the body needs changed, and the floor rose
-   because uartwrite now takes a SLEEPLOCK (it must hold the transmitter
-   across a park, which a spinlock cannot do) and acquiresleep's own budget
-   is what dominates.  Nothing downstream constrains this constant:
-   consolewrite, uartwrite's only caller, is unproven. *)
-Definition uartwrite_stack : nat := 34%nat.
+   IT WAS 34, AND THAT WAS THE SLEEPLOCK ERA'S NUMBER.  `ae96fd0` made
+   uartwrite hold a SLEEPLOCK across the park, so [acquiresleep]'s own budget
+   dominated; `d80e61c5` takes and releases a SPINLOCK around each
+   LSR-check/THR-write and parks outside it, so [sleep] is the floor again.
+   34 was not wrong, only loose -- it over-charged every caller by four slots.
+   Nothing downstream constrains this constant: consolewrite, uartwrite's only
+   caller, is unproven. *)
+Definition uartwrite_stack : nat := 30%nat.
 
 Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names) 
-    (γs : list gname) (j : nat) (γlp : gname) (γl γsl : gname)
+    (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
     (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool)
     (pidv : mword 32) (dqp : dfrac) :=
@@ -115,13 +117,18 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   kernel_text -∗ pc_is pcE -∗
   (* the device, and the transmitter's lock -- the whole credential.  The
      lock is a SLEEPLOCK now (UartTxInv.v): uartwrite parks between bytes and
-     has to keep the transmitter across the park, which a spinlock cannot do.
      Its resource is just the token -- the [tx_busy] certificate is gone,
-     because the writer polls THRE itself before every byte. *)
+     because the writer polls THRE itself before every byte.  NOTE this is a
+     SPINLOCK again (`d80e61c5`): nothing is held across the park, because
+     the lock is taken and released around each LSR-check/THR-write and the
+     [sleep()] happens outside it. *)
   dev_inv γu γv -∗
-  is_txlock γl γsl γu -∗
-  (* acquiresleep records the holder's pid in the lock, so the running
-     process's pid cell rides through at an arbitrary fraction *)
+  is_txlock γl γu -∗
+  (* PURE PASSTHROUGH as of `d80e61c5`.  It was here because [acquiresleep]
+     recorded the holder's pid in the sleeplock; a spinlock has no such field
+     and no callee below now reads it.  Kept because it costs a caller
+     nothing and dropping it would churn every call site, but it is no longer
+     motivated -- delete it when the cone is next touched. *)
   p_pid pj ↦₄{dqp} pidv -∗
   (* the buffer, read-only *)
   ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ{dq} f k) -∗
@@ -144,9 +151,9 @@ Module Type UARTWRITE.
   Parameter wp_uartwrite_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γu : uart_names) (γv : disk_names) (γs : list gname) (j : nat) (γlp : gname) (γl γsl : gname)
+      (γu : uart_names) (γv : disk_names) (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool)
       (pidv : mword 32) (dqp : dfrac),
-      wp_uartwrite_sconf_body γu γv γs j γlp γl γsl m av eb C n f dq b pidv dqp.
+      wp_uartwrite_sconf_body γu γv γs j γlp γl m av eb C n f dq b pidv dqp.
 End UARTWRITE.

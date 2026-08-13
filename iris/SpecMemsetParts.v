@@ -100,7 +100,21 @@ Definition wp_memset_setup_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
-Definition wp_memset_loop_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5) (imm_bne : mword 13) (olds : nat -> bv 8) (n : nat) (b : bool) (pcur : mword 64) :=
+(* LOOP (memset+0x14..+0x1a).
+   THE THREE tp EXCLUSIONS ARE [IntrDefs.SrcOk] INSTANCES, not premises.  Every
+   register the three instructions touch is read through [rget], which at tp
+   answers the HART's id rather than the map's slot -- ra1 as the [sb] leaf's
+   store value, ra4 as the [bne]'s other operand, ra5 as both the [c.addi]'s
+   source and (via [rd_ok]) its destination -- so the plain map premises
+   [m !!! Regidx ra1 = cval] / [m !!! Regidx ra4 = e] below reach what the
+   leaves actually read only through [rget_ne], whose side condition is exactly
+   [Regidx _ <> Regidx Rtp].  Carried as the CLASS rather than as three
+   positional premises for the reason the class exists (IntrDefs' [SrcOk]
+   header): it is filled in by a [Hint Extern] at zero call-site cost, and it
+   keeps this file spelling the condition the same way the ~2173 leaf
+   references do.  Costless for the real caller either way: memset's operands
+   are a1 / a4 / a5. *)
+Definition wp_memset_loop_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5) `{!SrcOk ra1, !SrcOk ra4, !SrcOk ra5} (imm_bne : mword 13) (olds : nat -> bv 8) (n : nat) (b : bool) (pcur : mword 64) :=
   let pc0 := mword_of_int (KernelSyms.memset + 0x14) in
   let pc4 := add_vec_int pc0 4 in
   let pc6 := add_vec_int pc0 6 in
@@ -118,17 +132,7 @@ Definition wp_memset_loop_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{C
   (forall j : nat, (j < N)%nat -> neq_vec (ms_addr p (S j)) e = negb (Nat.eqb (S j) N)) ->
   (* register indices of a1/a4 are distinct from a5 (so c.addi a5 leaves them) *)
   Regidx ra4 <> Regidx ra5 -> Regidx ra1 <> Regidx ra5 ->
-  ra5 <> csp_rs1 -> Regidx ra5 <> Regidx Rtp ->
-  (* ... and ra1 / ra4 are distinct from tp.  [ra5]'s exclusion rides in the
-     [rd_ok] of the [c.addi a5,a5,1] that WRITES it, but ra1 and ra4 are only
-     ever READ -- ra1 as the [sb] leaf's store value ([trunc8 (rget m ra1)]),
-     ra4 as the [bne]'s other operand ([rget m' ra4]) -- and every such read
-     goes through [rget], which at tp answers the HART's id rather than the
-     map's slot.  So the plain map premises [m !!! Regidx ra1 = cval] /
-     [m !!! Regidx ra4 = e] below can only be bridged to what the leaves
-     actually read via [rget_ne], whose side condition is exactly this.
-     Costless for the real caller: memset's operands are a1 / a4. *)
-  Regidx ra1 <> Regidx Rtp -> Regidx ra4 <> Regidx Rtp ->
+  ra5 <> csp_rs1 ->
   (* the three loop instructions, fetched fresh each iteration from kernel_text *)
   (⊢ kernel_text -∗ instr pc0 false (STORE (mword_of_int 0, Regidx ra1, Regidx ra5, 1))) ->
   (⊢ kernel_text -∗ instr pc4 true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx ra5, Regidx ra5, ADDI))) ->
@@ -182,7 +186,7 @@ Module Type MEMSET_PARTS.
     forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (M : regfile) (n : nat) (shamt_l shamt_r : mword 6) (imm8_beqz : mword 8) (wval_add : mword 64) (b : bool) (pcur : mword 64),
       wp_memset_setup_sconf_body M n shamt_l shamt_r imm8_beqz wval_add b pcur.
   Parameter wp_memset_loop_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5) (imm_bne : mword 13) (olds : nat -> bv 8) (n : nat) (b : bool) (pcur : mword 64),
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5) `{!SrcOk ra1, !SrcOk ra4, !SrcOk ra5} (imm_bne : mword 13) (olds : nat -> bv 8) (n : nat) (b : bool) (pcur : mword 64),
       wp_memset_loop_sconf_body N p e cval ra1 ra4 ra5 imm_bne olds n b pcur.
   Parameter wp_memset_suffix_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (M : regfile) (n : nat) (ra0e s00e : mword 64) (b : bool) (pcur : mword 64),

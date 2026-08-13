@@ -122,10 +122,6 @@ MANIFEST_ASSUMED = {
                    "only 'it returns' is assumed; the Axiom is LinkKerneltrap.v"),
     "consoleintr": ("SpecConsoleintr.v", "wp_consoleintr_sconf_body",
                     "uartintr's one unproven callee; the Axiom is LinkConsoleintr.v"),
-    "uartwrite": ("SpecUartwrite.v", "wp_uartwrite_sconf_body",
-                  "contract written; body not, after ae96fd0 rewrote the "
-                  "transmit path -- the Axiom is LinkUartwrite.v and the "
-                  "definitional layer + proof plan are in iris/wip/"),
 }
 
 PROVEN, ASSUMED, PARTIAL, NONE = "proven", "assumed", "partial", "none"
@@ -255,6 +251,19 @@ def runs_to_end(text: str, entry: str, local_defs: dict | None = None) -> bool:
             if any(re.search(rf"\b{re.escape(n)}\b", args) and pc_of(dtext, n)
                    for n in names):
                 return True
+        # ... or the predicate DERIVES the return target itself, from the
+        # register map it is passed, instead of being handed the address.
+        # [SpecUsertrap.usertrap_post] does: usertrap returns straight into
+        # userret, so its post opens `let ret_tgt := ret_pc (m !!! ra)` and
+        # pins `pc_is ret_tgt` there, and the body's application passes `m`
+        # and never names an address at all.  This stays narrow for the same
+        # reason the argument-passing case does -- the bound name has to be
+        # RA-DERIVED, and a fragment's factored continuation pins a
+        # mid-function address, which no `ret_pc (… ra)` can be.
+        if re.search(rf"\b{re.escape(dname)}\b", text):
+            for n in return_targets(dtext) | exit_targets(dtext, entry):
+                if pc_of(dtext, n):
+                    return True
     # The DIVERGING shape: a function that never returns and never transfers
     # out (scheduler's infinite dispatch loop) has no continuation at all --
     # its conclusion is a bare `WP Loop {{Φ}}`.  Such a spec's ONLY `pc_is`

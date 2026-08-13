@@ -473,7 +473,7 @@ Proof. qu_disj. Qed.
    them in [mstatus_legalized] / [lift_sstatus] are needed -- the chains
    stop at the field's own setter -- which is why these two rows are short
    next to MPRV's or SXL's.  Both fields are what an [sret] reads, so the
-   trap-handler contract ([projects/kerneltrap.md]) is what wants them. *)
+   trap-handler contract ([completed/kerneltrap.md]) is what wants them. *)
 Lemma qSPP_uSD (w : mword 64) x : _get_Mstatus_SPP (_update_Mstatus_SD w x) = _get_Mstatus_SPP w.
 Proof. qu_disj. Qed.
 Lemma qSPP_uSIE (w : mword 64) x : _get_Mstatus_SPP (_update_Mstatus_SIE w x) = _get_Mstatus_SPP w.
@@ -1300,6 +1300,87 @@ Proof.
   unfold bv_wrap, bv_modulus.
   rewrite (Z.mod_pow2_bits_low _ (Z.of_N (MachineWord.MachineWord.Z_idx (1 - 1 + 1)))); [| vm_compute; reflexivity].
   rewrite Z.shiftr_spec; [| lia]. reflexivity.
+Qed.
+
+(* ==================================================================== *)
+(*  THE SPP TEST, ONCE, FOR BOTH POLARITIES.                             *)
+(*                                                                      *)
+(*  Both trap handlers open by testing SPP of a FRESH [csrr sstatus]     *)
+(*  with [andi a5,a5,256], and read the result the opposite way round:   *)
+(*                                                                      *)
+(*    kerneltrap  if ((sstatus & SPP) == 0) panic("not from supervisor") *)
+(*    usertrap    if ((sstatus & SPP) != 0) panic("not from user mode")  *)
+(*                                                                      *)
+(*  so kerneltrap needs the masked word NONZERO from SPP = 1 and         *)
+(*  usertrap needs it ZERO from SPP = 0.  Those were two near-identical  *)
+(*  lemma PAIRS, one in each function's parts file, split only because   *)
+(*  neither parts file may import the other's.  They are one equation    *)
+(*  read at a literal bit, and this is it: no hypothesis, so each        *)
+(*  handler's own refutation is one [rewrite] away                       *)
+(*  ([ProofKerneltrapParts.kt_spp_set_neq],                              *)
+(*   [ProofUsertrapParts.ut_spp_clear_eq]).                              *)
+(* ==================================================================== *)
+
+(* SPP lives in bit 8, which is what the sstatus GETTER extracts. *)
+Lemma sstatus_spp_bit (w : mword 64) :
+  Z.testbit (bv_unsigned w) 8
+  = Z.testbit (bv_unsigned (_get_Sstatus_SPP w)) 0.
+Proof.
+  unfold _get_Sstatus_SPP, subrange_vec_dec.
+  rewrite autocast_refl.
+  unfold to_word_idx, to_word, get_word.
+  rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.slice.
+  rewrite bv_extract_unsigned.
+  unfold bv_wrap, bv_modulus.
+  rewrite (Z.mod_pow2_bits_low _ (Z.of_N (MachineWord.MachineWord.Z_idx (8 - 8 + 1))));
+    [| vm_compute; reflexivity].
+  rewrite Z.shiftr_spec; [| lia]. reflexivity.
+Qed.
+
+(* [andi a5,a5,256] on a fresh sstatus read is zero exactly when SPP is. *)
+Lemma sstatus_spp_mask (ms : mword 64) :
+  eq_vec (and_vec (sstatus_read ms)
+            (sign_extend' 64 (mword_of_int 256 : mword 12))) zero_reg
+  = negb (Z.testbit (bv_unsigned (_get_Mstatus_SPP ms)) 0).
+Proof.
+  assert (Hmask : bv_unsigned
+                    (sign_extend' 64 (mword_of_int 256 : mword 12) : mword 64) = 256)
+    by (vm_compute; reflexivity).
+  (* Move the goal's SPP FIELD onto the WORD's bit 8 first, so the case split
+     below is on a term the goal contains and [Hb8] comes out of it already
+     read at a literal.  Splitting on the field instead leaves two facts about
+     the same boolean whose shapes depend on what [destruct ... eqn:] chose to
+     abstract, which is exactly the kind of dependence not to write down. *)
+  replace (Z.testbit (bv_unsigned (_get_Mstatus_SPP ms)) 0)
+    with (Z.testbit (bv_unsigned (sstatus_read ms)) 8).
+  2:{ rewrite sstatus_spp_bit. do 2 f_equal.
+      unfold sstatus_read. rewrite subrange_full. apply sSPP_lower. }
+  destruct (Z.testbit (bv_unsigned (sstatus_read ms)) 8) eqn:Hb8; simpl.
+  - (* SPP set: the masked word has bit 8, so it is not zero *)
+    apply not_true_iff_false. intro Heq.
+    apply eq_vec_true_iff in Heq.
+    apply (f_equal bv_unsigned) in Heq.
+    rewrite and_vec_unsigned Hmask in Heq.
+    change (bv_unsigned (zero_reg : mword 64)) with 0 in Heq.
+    apply (f_equal (fun z => Z.testbit z 8)) in Heq.
+    rewrite Z.land_spec Z.bits_0 Hb8 in Heq.
+    change (Z.testbit 256 8) with true in Heq.
+    discriminate Heq.
+  - (* SPP clear: bit 8 is the only bit the mask keeps, so the word is zero *)
+    apply eq_vec_true_iff. apply bv_eq.
+    rewrite and_vec_unsigned Hmask.
+    change (bv_unsigned (zero_reg : mword 64)) with 0.
+    apply Z.bits_inj_0. intro n.
+    destruct (Z_lt_le_dec n 0) as [Hn | Hn].
+    { apply Z.testbit_neg_r. lia. }
+    rewrite Z.land_spec.
+    destruct (Z.eq_dec n 8) as [-> | Hne].
+    + rewrite Hb8. reflexivity.
+    + replace (Z.testbit 256 n) with false; [apply andb_false_r |].
+      change 256 with (2 ^ 8). symmetry.
+      rewrite Z.pow2_bits_eqb; [| lia].
+      apply Z.eqb_neq. lia.
 Qed.
 
 (* Phase 1 core: ANDing with ~2 leaves a word whose SIE bit is already 0. *)
