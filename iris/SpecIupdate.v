@@ -594,14 +594,18 @@ Definition wp_iupdate_cred_body
 (*  [cru] credit.  So the credited walk has to be exposed at the SAME      *)
 (*  altitude the counted one already is.                                   *)
 (*                                                                        *)
-(*  This is verbatim [wp_iupdate_cred_body] with the [eb = true] premise   *)
-(*  dropped and the two complements threaded, i.e. it is exactly the       *)
-(*  generic core the proof already had.  Everything else that exists is    *)
-(*  an instance of it: [wp_iupdate_cred] is this at [eb := true],          *)
-(*  [wp_iupdate_gen] is this at [cru := false], and [wp_iupdate_sconf]     *)
-(*  is [wp_iupdate_gen] at the [log_op] existential's own witness.  Added  *)
-(*  as a FOURTH parameter rather than by widening one of the three, so no  *)
-(*  existing caller's arity moves ([ProofWritei] applies                   *)
+(*  This is [wp_iupdate_cred_body] with the [eb = true] premise dropped,   *)
+(*  the two complements threaded, and -- since fs-log.md §G.4 -- the       *)
+(*  absorption credit taken as a RESOURCE against a NAMED birth epoch      *)
+(*  rather than as the pure own-set premise.  It is the STRONGEST of the   *)
+(*  four and the other three are derived from it: [wp_iupdate_cred] is     *)
+(*  this at [eb := true], [wp_iupdate_gen] is this at [cru := false], and  *)
+(*  [wp_iupdate_sconf] is [wp_iupdate_gen] at the [log_op] existential's   *)
+(*  own witness; each derivation opens the epoch ([LogInv.log_opS_named])  *)
+(*  and builds the credit with [LogInv.log_credit_own], so all three       *)
+(*  statements -- and every one of their callers -- are byte-stable.       *)
+(*  Kept as a FOURTH parameter rather than by widening one of the three,   *)
+(*  so no existing caller's arity moves ([ProofWritei] applies             *)
 (*  [wp_iupdate_gen] positionally).                                        *)
 (* ===================================================================== *)
 Definition wp_iupdate_credgen_body
@@ -617,7 +621,7 @@ Definition wp_iupdate_credgen_body
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
-    (u : nat) (Sb : gset Z) (cru : bool) (v : nat)
+    (u : nat) (Sb : gset Z) (cru : bool) (e0 : nat) (v : nat)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
     (b : bool) :=
@@ -625,8 +629,21 @@ Definition wp_iupdate_credgen_body
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_iupdate <= K)%nat ->
-  (* the absorption credit's honesty premise, exactly as [wp_iupdate_cred] *)
-  (cru = true -> IBLOCK inum inodestart ∈ Sb) ->
+  (* the absorption credit's honesty premise is a RESOURCE here, not the
+     pure own-set claim the other three carry (fs-log.md §G.19/§G.4).
+     [LogInv.log_credit] admits BOTH ways of knowing that this op's batch
+     already holds this inode's block: the own-set fact every landed
+     claimant has ([log_credit_own], one line, which is what keeps
+     [wp_iupdate_cred] / [wp_iupdate_gen] and their callers byte-stable),
+     and the GROUP witness -- [∃ e, logged_at γ e b ∗ ⌜e0 <= e⌝] -- that no
+     caller can convert to a membership outside the log spinlock.  The
+     second is the whole point: it is what [InodeRegion.ireg_obs_use] pays
+     out at a [crz] iput, and this contract FORWARDS it to [log_write]
+     rather than rebuilding it.
+
+     It travels beside [log_opSe] (the birth epoch NAMED) and not
+     [log_opS] (it buried), because the credit is only sound against the
+     epoch of the op presenting it -- §G.9 finding 1. *)
   log_geom_ok cov logstart ->
   0 <= inodestart ->
   IBLOCK inum inodestart ∈ cov ->
@@ -667,7 +684,8 @@ Definition wp_iupdate_credgen_body
      caller nothing to keep, and every caller that has no use for the
      receipt passes [v := 0], where the bound is the unit. *)
   log_epoch_lb γ v -∗
-  log_opS γ (S u) Sb -∗
+  log_credit γ cru Sb e0 (IBLOCK inum inodestart) -∗
+  log_opSe γ (S u) Sb e0 -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
@@ -684,6 +702,10 @@ Definition wp_iupdate_credgen_body
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       ireg_out γi inum dn -∗
       bslots bn 2 -∗
+      (* EPOCH-CLOSED ON THE WAY OUT.  The credit above is an ENTRY-side
+         premise -- it is spent by the flush -- and [log_write]'s own post
+         re-closes the birth-epoch existential ([LogInv.log_opSw]), so the
+         contract is asymmetric on purpose: [log_opSe] in, [log_opS] out. *)
       log_opS γ (if cru then S u else u) (Sb ∪ {[IBLOCK inum inodestart]}) -∗
       (* THE DEPOSIT'S OUT-HALF.  iupdate is straight-line and always
          log_writes, so this is unconditional: the witness is minted by the
@@ -766,10 +788,12 @@ Module Type IUPDATE.
                            cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
                            pidv dq dqd dqn dqs m K eb C b.
   (* the credited set-form contract at itrunc's altitude: eb-generic, so a
-     pure pass-through caller can hand its own complements through.  Both
+     pure pass-through caller can hand its own complements through, and
+     RESOURCE-credited, so a caller holding the group witness rather than
+     the own-set fact can claim the absorption too (fs-log.md §G.4).  Both
      [wp_iupdate_gen] ([cru := false]) and [wp_iupdate_cred] ([eb := true])
-     are instances; it is stated separately so neither of their arities
-     moves. *)
+     are derived from it through [LogInv.log_credit_own]; it is stated
+     separately so neither of their arities moves. *)
   Parameter wp_iupdate_credgen :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
@@ -783,11 +807,11 @@ Module Type IUPDATE.
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
-      (u : nat) (Sb : gset Z) (cru : bool) (v : nat)
+      (u : nat) (Sb : gset Z) (cru : bool) (e0 : nat) (v : nat)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
       wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
-                              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru v
+                              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
                               pidv dq dqd dqn dqs m K eb C b.
 End IUPDATE.

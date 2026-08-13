@@ -799,6 +799,13 @@ parent (the namex trio's posts move once).
 | G-2 | IcacheEscrow: zero_receipt + per-slot ic_epoch_lb on the parked payload; SpecIupdate's credgen deposits the receipt on its zero-writing arm; `nlz_obs` minted at the guard shape | agent (Opus) |
 | G-3 | crz on SpecIput/SpecIunlockput (+ consumers' FINDING-5 seams) | agent (Opus) |
 | G-4 | the trio reshape: walk_spend (<= the group bitmap unit, membership-conditional) + ity_shot g T_DIR (Blocker B) out of SpecNamex/Namei/Nameiparent; ProofNamex re-thread; CreateBudget's nameiparent row | agent (Opus) |
+
+**THE TABLE IS MISSING A TIER — see §G.20.**  G-4 landed credgen's lift and
+create's `nameiparent` budget row and then STOPPED: the unit `crz` has to
+buy is charged inside ITRUNC, not inside iput, and the birth epoch dies at
+every contract boundary below iput.  A **G-3b, "the epoch tier"**
+(SpecLogWrite `_gene`, SpecBfree, SpecItrunc) has to run before G-4's
+stages 2–3 are reachable.
 | — | D0 relaunch on the corrected staging (the +0xb2 cut, dl_need premise, lhu decision pair, cr_budget_fail_file) | after G-4 gates |
 
 
@@ -1417,3 +1424,118 @@ is exactly this stage's shape one tier up: credgen's premise becomes
 FORWARDS it instead of building it with `log_credit_own`, and credgen's
 three consumers (ProofItrunc :339, ProofWritei :1120, ProofIput :2125)
 convert with `log_credit_own` exactly as the `_gen` callers do here.
+
+
+### G.20 G-4 STOPPED: credgen's lift and create's walk row LAND; **the crz
+### credit cannot reach the unit it has to buy, because that unit is
+### charged inside ITRUNC and the birth epoch dies at every contract
+### boundary below iput**
+
+**WHAT LANDED** (gate: EXIT=0, 1077 .vo, staleness 0, `make -n` 0):
+
+* *Stage 1, credgen's lift, exactly as §G.19 predicted.*  `SpecIupdate`'s
+  `wp_iupdate_credgen_body` takes `log_credit γ cru Sb e0 (IBLOCK inum
+  inodestart)` beside `log_opSe γ (S u) Sb e0` (one new binder `e0`,
+  placed after `cru`) in place of the pure `cru = true -> …∈ Sb`;
+  `ProofIupdate` FORWARDS it to `wp_log_write_au`.  The other three
+  contracts (`_gen`, `_cred`, `_sconf`) are byte-stable, each derived by
+  three lines — `log_opS_named`, `log_credit_own`, apply — and so are the
+  three consumers (`ProofItrunc`, `ProofWritei`, `ProofIput`).
+* *Stage 4, create's `nameiparent` row.*  `CreateBudget.np_spend w`,
+  `cr_uw w = cr_u0 - np_spend w`, and all five arm theorems re-stated
+  `forall (w : bool)` with the walk's row at the front and create's FIRST
+  dirlink's `crb := w`.  All close (`destruct w; vm_compute; lia`).
+
+**THE ARITHMETIC IS RATIFIED, AND IT IS EXACTLY §G.5's CLAIM.**  The row
+is NOT a plain `-1`: at `w = true` the walk's unit comes off the top AND
+create's first dirlink — the one that allocates ip's block 0 and was
+paying for the bitmap itself — runs credited and gives it straight back.
+Net zero, at every arm.  mkdir still closes at EXACTLY `u6 = 3 = ip_need`
+at both values of `w`; the membership clause on the walk's post (`it paid
+⟹ bmapstart ∈ Sb'`) is what makes `w` an honest read and is therefore
+load-bearing, not decorative.
+
+**THE BLOCKER, STATED EXACTLY.**  `crz` has to buy the INODE-BLOCK unit at
+every level of the walk — the bitmap unit is bought once for the whole
+walk by set growth, so without the inode-block credit the walk spends one
+unit PER FREEING LEVEL and `walk_spend <= 1` is false at every path
+length.  But that unit is not charged where §G.4 pictured it:
+
+    ip_spend_max crb cru  =  (if crb then 0 else 1) + (if cru then 0 else 1)
+                          =  it_spend crb cru          (ProofIput.v:322)
+
+i.e. **iput spends exactly what itrunc spends**, and its own `ip->type = 0`
+flush at +0x6c is ALREADY free — `ProofIput` passes `cru := true` there
+from `Hib1`, itrunc's determinate `IBLOCK inum inodestart ∈ Sb'`.  So the
+`cru` term is ITRUNC's TAIL FLUSH, and `crz` must credit that.
+
+`SpecItrunc`'s `cru` premise is the pure `cru = true -> IBLOCK inum
+inodestart ∈ Sb`, which a `crz` caller cannot satisfy: outside the log
+spinlock a group witness cannot be turned into a set membership (§G.19).
+Making it a `log_credit` requires the birth epoch `e0` at itrunc's TAIL —
+and **there is no way to recover `e0` once it has been existentially
+closed.**  The credit is `∃ e, logged_at γ e b ∗ ⌜e0 <= e⌝`; a tail that
+re-opens its own entry with `log_opS_named` gets some `e1`, and although
+`e1 = e0` as a fact (same live entry, no bump while an op is outstanding),
+NOTHING relates them in the logic: two lower bounds on `ln_ep` are
+incomparable, the entry is exclusive so the two forms cannot be held at
+once, and a persistent birth-epoch token is the shape §G.9 finding 1
+refuted as unsound.  `⌜e1 <= e⌝` therefore cannot be derived, and the
+epoch must be threaded SYNTACTICALLY from the observer to the log_write
+that claims the credit.
+
+The threading path is `namex → iunlockput → iput → itrunc → iupdate →
+log_write_au`.  Stage 1 has just done `iupdate`; stage 2 would do `iput`.
+**`itrunc` is a tier the §G.8 campaign table does not have**, and inside
+it the epoch dies twice more:
+
+* `bm_paidS` (SpecItrunc.v:198) holds `log_opS`, so both bfree loops close
+  the existential;
+* `wp_bfree_gen` (SpecBfree.v:191) takes and returns `log_opS`, so even a
+  `bm_paidSe` would lose it at every `bfree`;
+* `wp_log_write_gen` under bfree does the same (its `_au` form has `e0` and
+  its derivation drops it, deliberately, to keep callers byte-stable).
+
+**THE PRICED FIX — a stage of its own, call it G-3b, "the epoch tier".**
+Additive throughout (every existing statement derives from the new one by
+`log_opS_named` + `log_credit_own`), so nothing outside these files moves:
+
+| file | delta | size |
+|---|---|---|
+| SpecLogWrite / ProofLogWrite | `wp_log_write_gene`: `log_opSe` in, `log_credit` premise; the `_au` form already has both, so the derivation is `wp_log_write_gen`'s minus the forgetting | ~50 + ~20 lines |
+| SpecBfree / ProofBfree | lift the gen contract to `log_opSe` and derive today's; ~4 ledger sites, ONE `log_write` | small |
+| SpecItrunc | `bm_paidS` gains `e0` (constant across both loops, exactly as `Sb` already is); `wp_itrunc_gen_body`'s `cru` premise becomes `log_credit γ cru Sb e0 (IBLOCK …)` | the real statement work |
+| ProofItrunc | the re-thread: 5 `bm_paidS_intro/use/elim` sites, `it_tail`'s premise, the two `Hcru` weakenings (`log_credit` is set-monotone the same way the pure claim is) | ~20 sites |
+
+**A THIRD ITEM THE TIER OWES, found while pricing stage 2: NOTHING TODAY
+CARRIES `⌜1 <= e0⌝` TO A CLIENT.**  `ireg_obs_use` needs it — it is what
+kills the receipt's `⌜v = 0⌝` boot corner (§G.18) — and `log_epoch_lb γ e0`
+does not give it (that bounds `e0` from BELOW, and a `log_ctx` holder can
+only mint `log_epoch_lb γ 1`, i.e. `1 <= E`, which is the wrong epoch).
+`log_epoch_alloc` starts the counter at one on purpose (LogInv.v:1063) but
+the fact never reaches an op.  The fix is one pure conjunct on `log_opSe`
+— it already bundles the lb, `⌜1 <= e0⌝` is free at `log_begin_step` where
+the auth says `1 <= E = e0`, and a pure clause is ABI-invisible, so every
+landed caller stays byte-stable.  Do it in the tier, not at iput's
+premise list, or every `crz` caller has to prove it.
+
+Only THEN do G-4's stages 2–3 close, and their arithmetic is already
+machine-checked by the `CreateBudget` row above.  Note the ASYMMETRY that
+stage 1 discovered and that the whole tier inherits: the credit is an
+ENTRY-side premise only — `log_write`'s post re-closes the epoch
+(`LogInv.log_opSw`) and nothing downstream of a flush compares epochs — so
+every one of these contracts is `log_opSe` IN, `log_opS` OUT.  Do not
+"fix" the post; making `log_opSw` epoch-indexed buys nothing and moves two
+more files.
+
+**NOT STARTED, and honestly so:** stage 2 (iput's `crz`) — it would be
+provable but would buy ZERO, since the flush it can credit is already
+free; stage 3 (the trio's re-price + `ity_shot`).  The `ity_shot` half is
+independent of all of the above and is the one piece that could land
+early — the fact is in `ProofNamex`'s context at `L_par` — but §G.5's
+"the trio's posts move once" is the reason it did not: it would force a
+second move of six statements and a second `ProofNamex` cone.  Its one
+open design question, for whoever takes it: `IcacheRef.inode_held` hides
+the generation, so the success post needs a generation-NAMED form beside
+it (`inode_shr_held_gen`'s shape, at a full reference rather than a
+share), and that definition lives in `IcacheRef.v` — a 350-file cone.

@@ -154,7 +154,15 @@ Section IupdateDefs.
         (* SET FORM throughout the interior: the OUT set is a parameter, so
            the counted seal instantiates it at the caller's own witness
            unioned with the inode block, and forgets it again on the way
-           out.  See SpecIupdate's set-form banner. *)
+           out.  See SpecIupdate's set-form banner.
+
+           EPOCH-CLOSED ON THE WAY OUT (fs-log.md §G.4).  The credit is an
+           ENTRY-side premise: a credit is only sound against the epoch of
+           the op presenting it, so the entry goes IN with its birth epoch
+           named -- but log_write's own post re-closes the existential
+           ([LogInv.log_opSw]), the credit is spent by then, and nothing
+           downstream of the flush compares epochs.  So the contract is
+           asymmetric on purpose: [log_opSe] in, [log_opS] out. *)
         log_opS γ u Sbo -∗
         (* THE DEPOSIT'S OUT-HALF (fs-log.md §G.17).  iupdate is
            straight-line and always log_writes, so the witness is
@@ -218,7 +226,7 @@ Section IupdateTail.
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32) (dn dn0 : dinode) (bm : blkmap)
-      (ds : list dinode) (u : nat) (Sb : gset Z) (cru : bool) (v : nat)
+      (ds : list dinode) (u : nat) (Sb : gset Z) (cru : bool) (e0 v : nat)
       (kk : nat) (bno : mword 32) (bsd : list (bv 8)) (d0 : bool)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) :
@@ -244,9 +252,6 @@ Section IupdateTail.
        premise BOTH arms below want -- the ordinary flush needs (L1) not to
        fall, the free needs (L3)'s zero. *)
     di_nlink_stable dn dn0 ->
-    (* THE ABSORPTION CREDIT (S5a finding 3): passed straight through to
-       log_write's own [cr], where it is honest for exactly this reason. *)
-    (cru = true -> IBLOCK inum inodestart ∈ Sb) ->
     sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b -∗
     (* THE COMPLEMENT, PURE PASS-THROUGH: log_write and brelse are not in the
@@ -270,7 +275,13 @@ Section IupdateTail.
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bslots bn 1 -∗
     log_epoch_lb γ v -∗
-    log_opS γ (S u) Sb -∗
+    (* THE ABSORPTION CREDIT (S5a finding 3, RESOURCE-FORM since fs-log.md
+       §G.4): passed straight through to log_write's own [cr], where it is
+       honest for exactly this reason.  This lemma no longer BUILDS it --
+       the own-set claimants build it at the three derived seals below,
+       and a [crz] iput hands in the group witness instead. *)
+    log_credit γ cru Sb e0 (IBLOCK inum inodestart) -∗
+    log_opSe γ (S u) Sb e0 -∗
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn0 -∗
     bio_held bn (fs_view γfs γd dev cov) kk pidv dev bno
@@ -281,9 +292,9 @@ Section IupdateTail.
             dev pidv dq dqd dqn dqs j m K eb C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hsp Hthr Hs2 Hkk Hbno Hcov Hlog Hnib Hdswf Hdnwf Hstab Hnlk Hcru.
+    intros HK Hsp Hthr Hs2 Hkk Hbno Hcov Hlog Hnib Hdswf Hdnwf Hstab Hnlk.
     pose proof HK as HK'. unfold K_iupdate in HK'.
-    iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hmeta Hmap Hsb Hsl #Hvlb Hop #Hireg Hdn Hheld Hcont".
+    iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hmeta Hmap Hsb Hsl #Hvlb #Hcrd0 Hop #Hireg Hdn Hheld Hcont".
     (* THE eb/b BRIDGE, once per top-level lemma (eb-generic-sweep.md). *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     iPoseProof (iui_66 with "Htext") as "Hi66".
@@ -352,15 +363,13 @@ Section IupdateTail.
        logged, but its CALLER does, so the set is threaded rather than
        forgotten.  The counted seal below is what forgets it. *)
     iRename "Hop" into "HopS".
-    (* THE CREDIT, IN ITS OWN-SET FORM (fs-log.md §G.19).  log_write's
-       credited arm takes a RESOURCE now, so that the group's witness form
-       can be presented there too; iupdate's own claim is the pure own-set
-       one it always was, and [log_credit_own] is the whole conversion.  The
-       birth epoch has to be opened for it -- the contract states the credit
-       against the caller's own [e0] -- but nothing below looks at it. *)
-    iDestruct (log_opS_named with "HopS") as (e0) "HopS".
-    iPoseProof (log_credit_own γ cru Sb e0 (uint bno)
-                  ltac:(rewrite Hbno; exact Hcru)) as "#Hcrd".
+    (* THE CREDIT, FORWARDED (fs-log.md §G.4).  log_write's credited arm
+       takes a RESOURCE, and so does this contract, so there is nothing to
+       build here: the caller's credit is already stated at the block this
+       flush writes, only spelled [IBLOCK inum inodestart] where log_write
+       spells it [uint bno].  [Hbno] is that one equation. *)
+    iAssert (log_credit γ cru Sb e0 (uint bno)) as "#Hcrd";
+      [rewrite Hbno; iExact "Hcrd0" |].
     iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bno
               (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 u
               cru Sb e0 v (⊤ ∖ ↑iregN) (ireg_out γi inum dn)
@@ -708,7 +717,7 @@ Section ProofIupdateMain.
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
-      (u : nat) (Sb : gset Z) (cru : bool) (v : nat)
+      (u : nat) (Sb : gset Z) (cru : bool) (e0 v : nat)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
@@ -728,7 +737,6 @@ Section ProofIupdateMain.
       (j < NPROC)%nat ->
       γs !! j = Some γl ->
       m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
-      (cru = true -> IBLOCK inum inodestart ∈ Sb) ->
       sie_cap_gpr m K b pj -∗
       cpu_own 0 eb pj C b -∗
       trap_csrs_ext eb -∗
@@ -751,7 +759,8 @@ Section ProofIupdateMain.
       is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
       bslots bn 2 -∗
       log_epoch_lb γ v -∗
-      log_opS γ (S u) Sb -∗
+      log_credit γ cru Sb e0 (IBLOCK inum inodestart) -∗
+      log_opSe γ (S u) Sb e0 -∗
       wp_next true pj (fun (CID : CpuId) =>
       ∀ mf : regfile,
           ⌜callee_saved m mf⌝ -∗
@@ -773,7 +782,7 @@ Section ProofIupdateMain.
           WP (Loop : expr riscv_lang)) -∗
       WP (Loop : expr riscv_lang).
   Proof.
-    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Hcru.
+    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0.
     pose proof HK as HK'. unfold K_iupdate in HK'.
     destruct Hgeom as [Hcovok Hlogsub].
     destruct (Hcovok _ Hcov) as [Hibpos Hiblt].
@@ -803,7 +812,7 @@ Section ProofIupdateMain.
       by (rewrite /bm_cells length_app Hdirlen; reflexivity).
     iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
-              #Hdlock Hsl #Hvlb Hop Hcont".
+              #Hdlock Hsl #Hvlb #Hcrd0 Hop Hcont".
     (* THE eb/b BRIDGE (claude-notes/projects/eb-generic-sweep.md): derived
        once, used only to guard the [_ext_transport]s below -- [b] is never
        [subst]ed, it is spelled by name in dozens of leaf-instruction calls. *)
@@ -1735,11 +1744,11 @@ Section ProofIupdateMain.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hclm") as "Hclm".
     iApply (iu_tail (CID0 := CID36) γs j γfs γi γd bn γ cov logstart inodestart
               nib dev
-              ip inum dn dn0 bm ds u Sb cru v kk bno bsd0 d0 pidv dq dqd dqn dqs m mM K eb C b
-              HK HmMsp HmMthr HmMs2 Hkk Hbno Hcov Hlog Hnib Hdswf Hdnwf Hstab Hnlk Hcru
+              ip inum dn dn0 bm ds u Sb cru e0 v kk bno bsd0 d0 pidv dq dqd dqn dqs m mM K eb C b
+              HK HmMsp HmMthr HmMs2 Hkk Hbno Hcov Hlog Hnib Hdswf Hdnwf Hstab Hnlk
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe
                     Hppid Hidev Hinumc [Hmty Hmmaj Hmmin Hmnl Hmsz] Hmap Hsb
-                    Hsl Hvlb Hop Hireg Hdn Hheld [Hcont]").
+                    Hsl Hvlb Hcrd0 Hop Hireg Hdn Hheld [Hcont]").
     { rewrite /inode_meta.
       iSplitL "Hmty"; [iExact "Hmty" |]. iSplitL "Hmmaj"; [iExact "Hmmaj" |].
       iSplitL "Hmmin"; [iExact "Hmmin" |]. iSplitL "Hmnl"; [iExact "Hmnl" |].
@@ -1774,12 +1783,22 @@ Qed.
     (* the trivial anchor: a lower bound of zero is the unit, so the three
        derived seals cost their callers nothing (fs-log.md §G.17) *)
     iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
+    (* THE EPOCH, OPENED AND RE-CLOSED (fs-log.md §G.4, and §G.19's shape
+       one tier down).  The core states its credit against a NAMED birth
+       epoch; this seal has no credit to make ([cru := false], where the
+       resource is [emp]), so the name is opened here, used by
+       [log_credit_own], and forgotten again on the way out.  That is what
+       keeps this statement -- and ProofWritei / ProofDirlink / ProofIalloc
+       under it -- byte-stable. *)
+    iDestruct (log_opS_named with "Hop") as (e0) "Hop".
+    iPoseProof (log_credit_own γ false Sb e0 (IBLOCK inum inodestart)
+                  ltac:(discriminate)) as "#Hcrd".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
-              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb false 0%nat
+              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb false e0 0%nat
               pidv dq dqd dqn dqs m K eb C b
-              HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 ltac:(discriminate)
+              HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
-                    Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hop
+                    Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
                     [Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
@@ -1806,25 +1825,25 @@ Qed.
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
-      (u : nat) (Sb : gset Z) (cru : bool) (v : nat)
+      (u : nat) (Sb : gset Z) (cru : bool) (e0 v : nat)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
     : wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
-                              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru v
+                              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
                               pidv dq dqd dqn dqs m K eb C b.
   Proof.
     cbv beta delta [wp_iupdate_credgen_body].
-    intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0.
+    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0.
     iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
-              #Hdlock Hsl #Hvlb Hop Hcont".
+              #Hdlock Hsl #Hvlb #Hcrd Hop Hcont".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
-              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru v
+              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
               pidv dq dqd dqn dqs m K eb C b
-              HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Hcru
+              HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
-                    Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hvlb Hop
+                    Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hvlb Hcrd Hop
                     [Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
@@ -1867,12 +1886,17 @@ Qed.
     (* the trivial anchor: a lower bound of zero is the unit, so the three
        derived seals cost their callers nothing (fs-log.md §G.17) *)
     iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
+    (* the own-set credit, at the epoch opened here and forgotten again *)
+    iDestruct (log_opS_named with "Hop") as (e0) "Hop".
+    iPoseProof (log_credit_own γ cru Sb e0 (IBLOCK inum inodestart) Hcru)
+      as "#Hcrd".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
-              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru 0%nat
+              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat
               pidv dq dqd dqn dqs m K true C b
-              HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Hcru
+              HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
-                    Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hop [Hcont]").
+                    Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
+                    [Hcont]").
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iEval (rewrite /wp_next).
@@ -1918,12 +1942,15 @@ Qed.
               #Hdlock Hsl Hop Hcont".
     iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
     iDestruct "Hop" as (Sb0) "Hop".
+    iDestruct (log_opS_named with "Hop") as (e0) "Hop".
+    iPoseProof (log_credit_own γ false Sb0 e0 (IBLOCK inum inodestart)
+                  ltac:(discriminate)) as "#Hcrd".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
-              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb0 false 0%nat
+              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb0 false e0 0%nat
               pidv dq dqd dqn dqs m K eb C b
-              HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 ltac:(discriminate)
+              HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
-                    Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hop
+                    Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
                     [Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".

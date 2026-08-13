@@ -26,6 +26,16 @@
    of its predecessors already logged.  Nothing goes in
    claude-notes/kernel-defects.md.
 
+   THE SIX SURVIVE nameiparent (fs-sysfile "BLOCKER A, RESOLVED";
+   fs-log.md §G.5).  create's walk is a thirteenth logging call and it is
+   now on the list below ([np_spend]), but it adds no SEVENTH block: a
+   level that frees writes only [bmapstart] -- already one of the six --
+   and the freed inode's own block, which is in the group's header
+   already, since the unlink that armed the free had to run inside this
+   same op window to have emptied it.  That is what [crz] claims and what
+   the region's zero receipt proves.  So the walk's whole contribution to
+   the ledger is at most ONE unit on a block that was already priced.
+
    ==== WHAT THE ARITHMETIC SHOWS THE CONTRACTS MUST DO ==================
 
    The counted sums are hopeless: [4 * dirlink_units = 28] on its own.
@@ -110,6 +120,29 @@ Definition ip_need : nat := iput_units.
 Lemma ip_need_value : ip_need = 3.
 Proof. reflexivity. Qed.
 
+(* ---- nameiparent (fs-log.md §G.5): create's FIRST call, and until group
+   absorption it was not on this list at all.  Under group absorption the
+   whole walk spends AT MOST ONE unit -- THE bitmap block -- because every
+   per-level [iunlockput] runs credited on the inode block ([crz], minted
+   at namex's +0xce nlink guard and cashed by the region's receipt), so
+   the only thing a freeing level can fail to absorb is the bitmap; and
+   the first level that does pay puts [bmapstart] in the op's set, so
+   every later level absorbs that too.  (The trio's post does not expose
+   this figure YET -- see fs-log.md §G.20 for what still blocks it -- so,
+   exactly as when this file was written, the arithmetic lands first and
+   the contract is checked against it.)
+
+   [w] is the ONE observable the walk's post exposes: "it paid", which is
+   the same fact as [bmapstart ∈ Sb'] afterwards.  It is what makes the
+   arms below close, and it is why the row does not simply subtract one:
+   whoever pays for the bitmap first, the other absorbs, so the walk's
+   unit is create's own first [dirlink]'s unit and not a second one.
+   That is the team's refutation of BLOCKER A as an inequality. *)
+Definition np_spend (w : bool) : nat := if w then 1 else 0.
+
+Lemma np_spend_le1 (w : bool) : np_spend w <= 1.
+Proof. destruct w; vm_compute; lia. Qed.
+
 (* ===================================================================== *)
 (*  2. THE LEDGER, ARM BY ARM                                             *)
 (* ===================================================================== *)
@@ -120,6 +153,15 @@ Definition cr_u0 : nat := MAXOPBLOCKS.
 
 Lemma cr_u0_value : cr_u0 = 10.
 Proof. reflexivity. Qed.
+
+(* ...and what is left when [nameiparent] -- create's first call, and the
+   only one that runs before the body -- hands the parent back.  Every arm
+   below is stated at THIS level and quantifies over [w]; at [w = false]
+   the arm is the landed one verbatim. *)
+Definition cr_uw (w : bool) : nat := cr_u0 - np_spend w.
+
+Lemma cr_uw_values : cr_uw false = 10 /\ cr_uw true = 9.
+Proof. vm_compute. lia. Qed.
 
 (* ---- ARM C-OK-DIR, the mkdir success path: the longest arm, and the one
    section 18 was written for.  In order (decode offsets in brackets):
@@ -137,24 +179,29 @@ Proof. reflexivity. Qed.
                                             flushed dp's inode block
 
    It closes at EXACTLY [iput_units], with [iunlockput(dp)] at +0xbe as
-   the last claim on the ledger.                                          *)
-Theorem cr_budget_mkdir :
-  let u1 := cr_u0 - ia_spend in
+   the last claim on the ledger -- AND IT STILL DOES with the walk's row in
+   front of it, at either value of [w].  That is the whole content of
+   §G.5's "the zero-slack chains tolerate exactly this": at [w = true] the
+   walk's unit comes off the top, and the FIRST dirlink -- the one that
+   allocates ip's block 0 and was paying for the bitmap itself -- runs at
+   [crb := true] and gives it straight back.  Zero net.               *)
+Theorem cr_budget_mkdir (w : bool) :
+  let u1 := cr_uw w - ia_spend in
   let u2 := u1 - iu_spend true in
-  let u3 := u2 - dl_spend false false false true false in
+  let u3 := u2 - dl_spend w false false true false in
   let u4 := u3 - dl_spend true true true false false in
   let u5 := u4 - dl_spend true false false true true in
   let u6 := u5 - iu_spend true in
   (* every call had what it needed IN HAND when it ran ... *)
-  ia_spend <= cr_u0 /\
+  ia_spend <= cr_uw w /\
   1 <= u1 /\
-  dl_need false false <= u2 /\
+  dl_need w false <= u2 /\
   dl_need true false <= u3 /\
   dl_need true true <= u4 /\
   1 <= u5 /\
   (* ... and the parent's iunlockput at +0xbe closes the arm, EXACTLY *)
   ip_need <= u6 /\ u6 = 3.
-Proof. vm_compute. lia. Qed.
+Proof. destruct w; vm_compute; lia. Qed.
 
 (* ---- ARM C-OK-FILE, the non-directory success path.  Shorter, but the
    ONE dirlink pays for the bitmap block itself -- nothing preceded it --
@@ -163,15 +210,15 @@ Proof. vm_compute. lia. Qed.
 
      [+0x84]  ialloc / [+0xa0] iupdate(ip) / [+0xb4] dirlink(dp, name)
      [+0xbe]  iunlockput(dp)                                                *)
-Theorem cr_budget_file :
-  let u1 := cr_u0 - ia_spend in
+Theorem cr_budget_file (w : bool) :
+  let u1 := cr_uw w - ia_spend in
   let u2 := u1 - iu_spend true in
-  let u3 := u2 - dl_spend false false false true true in
-  ia_spend <= cr_u0 /\
+  let u3 := u2 - dl_spend w false false true true in
+  ia_spend <= cr_uw w /\
   1 <= u1 /\
-  dl_need false true <= u2 /\
+  dl_need w true <= u2 /\
   ip_need <= u3.
-Proof. vm_compute. lia. Qed.
+Proof. destruct w; vm_compute; lia. Qed.
 
 (* ---- ARM FAIL, entered from the LAST dirlink of the mkdir path: the
    tightest arm in create.  It runs
@@ -187,32 +234,32 @@ Proof. vm_compute. lia. Qed.
    credited iput accounting non-optional: with iput's landed
    spend-at-most-three, [iunlockput(ip)] is allowed to leave zero and the
    [iunlockput(dp)] that follows cannot be called at all. *)
-Theorem cr_budget_fail_late :
-  let u1 := cr_u0 - ia_spend in
+Theorem cr_budget_fail_late (w : bool) :
+  let u1 := cr_uw w - ia_spend in
   let u2 := u1 - iu_spend true in
-  let u3 := u2 - dl_spend false false false true false in
+  let u3 := u2 - dl_spend w false false true false in
   let u4 := u3 - dl_spend true true true false false in
   let u5 := u4 - dl_spend true false false true true in
   let u6 := u5 - iu_spend true in
   let u7 := u6 - ip_spend true true true in
   ip_need <= u6 /\ ip_need <= u7 /\ u7 = 3.
-Proof. vm_compute. lia. Qed.
+Proof. destruct w; vm_compute; lia. Qed.
 
 (* ---- ARM FAIL entered EARLY (the "." link failed): strictly slacker *)
-Theorem cr_budget_fail_early :
-  let u1 := cr_u0 - ia_spend in
+Theorem cr_budget_fail_early (w : bool) :
+  let u1 := cr_uw w - ia_spend in
   let u2 := u1 - iu_spend true in
-  let u3 := u2 - dl_spend false false false true false in
+  let u3 := u2 - dl_spend w false false true false in
   let u4 := u3 - iu_spend true in
   let u5 := u4 - ip_spend true true true in
   ip_need <= u4 /\ ip_need <= u5.
-Proof. vm_compute. lia. Qed.
+Proof. destruct w; vm_compute; lia. Qed.
 
 (* ---- ARMS N / F-OK / F-BAD / A-FAIL: nothing is logged at all before
    them, so the two iunlockputs of F-BAD are the only requirement. *)
-Theorem cr_budget_found :
-  ip_need <= cr_u0 /\ ip_need <= cr_u0 - ip_spend true true false.
-Proof. vm_compute. lia. Qed.
+Theorem cr_budget_found (w : bool) :
+  ip_need <= cr_uw w /\ ip_need <= cr_uw w - ip_spend true true false.
+Proof. destruct w; vm_compute; lia. Qed.
 
 (* ===================================================================== *)
 (*  3. WHAT THE LANDED (UNCREDITED) CONTRACTS GIVE, AND WHY IT IS NOT     *)

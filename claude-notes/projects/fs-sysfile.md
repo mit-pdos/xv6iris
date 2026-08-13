@@ -6212,3 +6212,25 @@ is priced once per op regardless of who pays first.
    already priced).
 4. Blocker B's ity_shot fix lands in the SAME post-reshape pass (the
    namex trio's posts move once, for both).
+
+
+### G-4 STOPPED (2026-08-13) — credgen's lift and create's `nameiparent`
+### budget row LAND; the `crz` credit cannot reach the unit it must buy.
+### **The full record is design/fs-log.md §G.20; read that, not this.**
+
+For the D₀ brief, the two facts that matter:
+
+* **What D₀ may now assume from the trio's posts: NOTHING NEW.**
+  `SpecNamex` / `SpecNamei` / `SpecNameiparent` are byte-identical.  The
+  success post still spends the counted `(L + 1) * iput_units`, still
+  offers no `bmapstart ∈ Sb'`, and still returns a generation-FREE
+  `IcacheRef.inode_held`, so **Blocker B is still open** and Blocker A's
+  ledger stage is still in front of every create arm.  D₀ does not
+  relaunch.
+* **The arithmetic D₀ was waiting on is now machine-checked.**
+  `CreateBudget` prices the walk at `np_spend w <= 1` with create's first
+  `dirlink` at `crb := w`, and all five arm theorems close at BOTH values
+  of `w` (mkdir still lands on `u6 = 3 = ip_need` exactly).  So when the
+  contract does arrive, no create arm has to be re-priced -- and the shape
+  the trio's post must expose is fixed: the spend bound, plus "it paid
+  ⟹ `bmapstart ∈ Sb'`", which is what makes `w` an honest read.

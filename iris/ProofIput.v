@@ -2147,13 +2147,20 @@ Section ProofIput.
     iDestruct (cpu_claim_ext_transport CIDit CIDm4 eb pj
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     iApply fupd_wp. iMod (log_epoch_lb_0 g) as "#Hlb0". iModIntro.
+    (* THE CREDIT, IN ITS OWN-SET FORM (fs-log.md §G.4).  credgen takes a
+       RESOURCE now; iput's own claim on THIS flush is the determinate
+       membership itrunc's tail already handed it ([Hib1]), so
+       [log_credit_own] is the whole conversion.  The birth epoch is opened
+       for it here and re-closed by iupdate's own post. *)
+    iDestruct (log_opS_named with "Hop") as (e0) "Hop".
+    iPoseProof (log_credit_own g true Sb1 e0 (IBLOCK inum inodestart)
+                  ltac:(intros _; exact Hib1)) as "#Hcrdu".
     iApply (IU.wp_iupdate_credgen gs j gl gu gd gk pd pav pu bn g gfs gi
               cov logstart inodestart nib dev (ientry k) inum
-              (di_free dn) (di_trunc dn) bm_empty (u' - 1)%nat Sb1 true 0%nat
+              (di_free dn) (di_trunc dn) bm_empty (u' - 1)%nat Sb1 true e0 0%nat
               pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqs J4 (K - 4)%nat
               eb C eb
               ltac:(unfold K_iupdate; lia)
-              ltac:(intros _; exact Hib1)
               Hgeom Hist Hicov Hilog Hnib
               (* §19.6 Part 1, THE LEFT DISJUNCT: this is the free path's
                  [ip->type = 0] flush, the one place in the kernel where a
@@ -2172,7 +2179,8 @@ Section ProofIput.
                  eq_refl (ip_nlink_zero (di_nlink dn) Hnl0))
               (di_free_addrs dn) ltac:(reflexivity) Hj Hgsj HJ4a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlogc Hidv Hinh Hmeta Hmap
-                    Hins Hireg Hdat Hppid Hprocs Hdevi Hdgeom Hdlock Hbs2 Hlb0 [Hop]").
+                    Hins Hireg Hdat Hppid Hprocs Hdevi Hdgeom Hdlock Hbs2 Hlb0
+                    Hcrdu [Hop]").
     { rewrite Hu'1. iExact "Hop". }
     iIntros (CIDiu Hsiu mfu)
       "%Hcsu Hcg Hcnt Hextc Hextm Hpc Hppid Hidv Hinh Hmeta Hmap Hins Hdat Hbs2 Hop Hwit".

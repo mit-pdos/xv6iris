@@ -354,11 +354,20 @@ Section ItruncTail.
     (* itrunc wants no zero-receipt: the anchor is the unit and the
        witness is dropped (fs-log.md §G.17) *)
     iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
+    (* THE CREDIT, IN ITS OWN-SET FORM (fs-log.md §G.4).  credgen takes a
+       RESOURCE now, so that a [crz] iput can present the GROUP witness
+       there instead; itrunc's own claim is the pure own-set one it always
+       was, and [log_credit_own] is the whole conversion.  The birth epoch
+       is opened for it -- the credit is only sound against the epoch of
+       the op presenting it -- and re-closed by iupdate's own post. *)
+    iDestruct (log_opS_named with "Hop") as (e0) "Hop".
+    iPoseProof (log_credit_own γ cru Sb0 e0 (IBLOCK inum inodestart) Hcru)
+      as "#Hcrdu".
     iApply (IU.wp_iupdate_credgen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum (di_trunc dn) dn0
-              bm_empty u Sb0 cru 0%nat
+              bm_empty u Sb0 cru e0 0%nat
               pidv dq dqd dqn dqs T1 (K - 6)%nat eb C b
-              HKiu Hcru Hgeom Hist Hicov Hilog Hnib
+              HKiu Hgeom Hist Hicov Hilog Hnib
               (* §19.6 Part 1: [di_trunc] keeps the type, so itrunc's own
                  [Hstab] about [dn] vs [dn0] is exactly what iupdate wants. *)
               Hstab Hnlk
@@ -366,7 +375,7 @@ Section ItruncTail.
               Hj Hgl HT1a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hidev Hinum Hmeta Hmap
                     Hsbi Hireg Hdn Hppid Hprocs Hdevi Hdgeom
-                    Hdlock Hsl Hlb0 Hop").
+                    Hdlock Hsl Hlb0 Hcrdu Hop").
     iIntros (CID4 Hq4 mI) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hinum
                            Hmeta Hmap Hsbi Hdn Hsl Hop Hwit".
     (* §16.4: iupdate's payout is conditional on the flushed record's type,

@@ -1118,12 +1118,19 @@ Section WriteiJoin.
        The credit is a DECIDABLE READ of the running set, so no case split
        reaches the walk -- only the returned count carries the [if]. *)
     iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
+    (* THE CREDIT, IN ITS OWN-SET FORM (fs-log.md §G.4): credgen takes a
+       RESOURCE now, and [log_credit_own] converts the decidable read.  The
+       birth epoch is opened for it and re-closed by iupdate's own post. *)
+    iDestruct (log_opS_named with "Hop") as (e0) "Hop".
+    iPoseProof (log_credit_own γ (bool_decide (IBLOCK inum inodestart ∈ SbC))
+                  SbC e0 (IBLOCK inum inodestart)
+                  ltac:(intros Hc; exact (proj1 (bool_decide_eq_true _) Hc)))
+      as "#Hcrdu".
     iApply (IU.wp_iupdate_credgen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn' dn0 bm' u SbC
-              (bool_decide (IBLOCK inum inodestart ∈ SbC)) 0%nat
+              (bool_decide (IBLOCK inum inodestart ∈ SbC)) e0 0%nat
               pidv (wi_q user dq) dqd dqn dqs T1 (K - 14)%nat eb C b
               HKiu
-              ltac:(intros Hc; exact (proj1 (bool_decide_eq_true _) Hc))
               Hgeom Hist Hicov Hilog Hnib
               (* §19.6 Part 1: the flushed [dn'] keeps [dn]'s type ([Hdneq]),
                  and [Hstab] is writei's own premise about [dn] vs [dn0]. *)
@@ -1132,7 +1139,7 @@ Section WriteiJoin.
               Hadr Hdirlen Hj Hgl HT1a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hidev Hinum Hmeta Hmap
                     Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom
-                    Hdlock Hsl2 Hlb0 Hop").
+                    Hdlock Hsl2 Hlb0 Hcrdu Hop").
     iIntros (CID3 Hq3 mI) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hinum
                            Hmeta Hmap Hsb Hdn Hsl2 Hop Hwit".
     (* the borrow closes: nothing below wi_join wants the fraction *)
