@@ -98,12 +98,34 @@ started cone's patched-exec bridge.  THREE things to know:
   also takes the non-stale route.  A consumer case-splitting on the
   absorption arms gets ONE postcondition shape from both routes.
 
-What remains of this front: the Iris half of the fetch restatement
-(discharge `wfetch_tail` — its outcome half now follows from the
-⇐-bridge + the family's Ok-result equations), the straddle/RVC fetch
-arms over §9 + `wstep_ok_racy_kR`, and 6c's funnel (`wwp_instr_s`)
-composing the CPS fetch peel with the execute phase, whose Q-half is
-now statable by rewriting against the family.
+**`wfetch_tail` IS DISCHARGED (2026-08-13) — the aligned fetch peel is
+SELF-CONTAINED.**  `WkFetchPeel` §4: `wfetch_peel_selfcontained` (+ the
+CPS `_k_` form; both `plat_term_write` only) — exports + text
+pins/contents + pure register gates in, the peel of the whole `fetch tt`
+out, no interface premises left.  The pieces: §10-0's log-append
+characterization (the ⇐-bridge elims now export "`latest_ts` unchanged
+at bytes no trace write touches" — the negative-case `latest_ts` append
+lemma did not exist and does now), `wwalk_run_outcome` (every run of a
+peeled translation returns `Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)`,
+with dev unchanged, `ws_le`, and latest_ts/flat preservation off the
+leaf window), and `pinned_read_ts_mono` (pinnedness transports along a
+run from the byte's OWN latest_ts stability + view growth alone).  The
+text-vs-window disjointness is the cheap premise `racc_disj la 8 pa 4`.
+ONE residual, deliberate: `wfetch_gates` (the tail's pure register
+facts, stated at post-translation states) stays a premise — the
+exports bundle drops the walk's `sregs` disjunct (tlb-only update), so
+recovering the gates σ-locally would need either a bundle extension or
+an `exec_eff` register-frame lemma; none of the gate registers is
+`tlb`, and the Iris layer will hold them from register ownership
+anyway.
+
+What remains of this front: the Iris fupd packaging of the fetch
+restatement (the weak twin of `tlb_inv_pt_fetch` over the state
+interpretation, consuming the self-contained peel + the absorption
+theorem's ghost arms), the straddle/RVC fetch arms over §9 +
+`wstep_ok_racy_kR`, and 6c's funnel (`wwp_instr_s`) composing the CPS
+fetch peel with the execute phase, whose Q-half is now statable by
+rewriting against the family.
 
 **DECISION (2026-08-12, the φ-upgrade author, as §5 requested): take
 option (a), and do NOT start until the in-flight C/D/S points-to surgery

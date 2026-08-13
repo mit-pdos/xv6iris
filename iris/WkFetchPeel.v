@@ -854,6 +854,415 @@ Section WfetchPeel.
 End WfetchPeel.
 
 (* ====================================================================== *)
+(** ** 4. THE TAIL, DISCHARGED FROM THE WALK EXPORTS
+    (the pure gap the header's finding (e) left open)
+
+    The header records why [wfetch_tail] had to be a premise: the peel runs
+    at [D := wD_any] and [W := True], so [wstep_ok_racy]'s write arm
+    constrains no address, and [WeakRacy.exec_of_wrun_racy] — the only
+    bridge that DOES pin the write to [la] — is stated at [W := False].
+    [WeakStale] §10's ⇐-bridge is the missing link: it says the weak run of
+    a PEELED program lands on a family member's [exec_stale] outcome, so the
+    family's own trace description — which pins the write to [la] and
+    nothing else — transports to the weak run.  §10-0's log-footprint
+    conjunct is what turns that into the statement a consumer can use:
+
+        A BYTE NO TRACE WRITE TOUCHES KEEPS ITS [latest_ts].
+
+    That, plus [WeakInterp.wrun_ws_le], is exactly [pinned_read]'s two
+    ingredients, so pinnedness of the four TEXT bytes transports from [σ] to
+    every post-translation [s']; the contents transport through the family's
+    memory description ([write_bytes_lookup_ne] off the leaf window).
+
+    WHAT REMAINS A PREMISE, and why.  The REGISTERS at [s']: the exports
+    bundle ([wwalk_exports], landed and not touched here) describes the
+    member's [mem] and [mdev] but not its [sregs], and the walk really does
+    write one register on a TLB miss (the absorption theorem's §2 dispatch
+    reports [sregs sg' = sg.(sregs) \/ sregs sg' = register_set tlb … ]).
+    So the fetch's register-only gates are taken at the post-states, as
+    [wfetch_gates] — a premise with NO memory, view or pinnedness content,
+    which is what the capstone below means by "gates".
+
+    THE DISJOINTNESS is taken as the premise [racc_disj la 8 pa 4]: kernel
+    TEXT and a page-table slot are different regions, and this is the cheap
+    spelling of that for the caller. *)
+
+Section WfetchTail.
+
+  (** *** 4a. Pinnedness transports along a run that MISSES the byte.
+
+      [WeakCert.pinned_read_mono] wants the log unchanged; this wants only
+      the byte's own [latest_ts] unchanged, which is what §10-0 exports. *)
+  Lemma pinned_read_ts_mono (s s' : wmstate) (a : Z) :
+    latest_ts (wm_log s') a = latest_ts (wm_log s) a ->
+    ws_le (wm_ws s) (wm_ws s') ->
+    pinned_read s a -> pinned_read s' a.
+  Proof.
+    intros Hts Hle Hp. destruct Hle as (Hcoh & _ & _ & Hnew & _ & _).
+    rewrite /pinned_read Hts. rewrite /pinned_read in Hp.
+    pose proof (Hcoh a). lia.
+  Qed.
+
+  (** *** 4b. Reading the filter backwards: a [Φ]-accepted word IS an A/D
+      variant, in the shape the exports' family takes its arguments.  This is
+      [WeakKptStale.wstep_ok_racy_true_of_walk_family]'s opening move, named. *)
+  Lemma wwalk_filter_inv (w0 lw : mword 64) (u : bv (8 * 8)%N) :
+    wwalk_filter w0 lw (fun j : nat => nth_byte u j) ->
+    exists av dv : mword 1,
+      u = pte_set_ad w0 av dv /\ pte_ad_le (pte_set_ad w0 av dv) lw.
+  Proof.
+    intros (wv & Hbs & (av & dv & Hwv) & Hle).
+    assert (Hweq : u = wv).
+    { apply (bv_eq_of_bytes (n := 8%N)). intros j Hj.
+      exact (f_equal (fun f : nat -> bv 8 => f j) Hbs). }
+    exists av, dv. split; [exact (eq_trans Hweq Hwv)|rewrite -Hwv; exact Hle].
+  Qed.
+
+  (** *** 4c. The walk's trace footprint, in §10-0's shape.
+
+      Every write of every shape the absorption theorem produces is the
+      8-byte leaf store ([WeakKptStale.wwalk_ev_ok]), so a byte off the leaf
+      window is written by no trace write at all. *)
+  Lemma wtrace_wonly_of_evs (a2 a1 la : Arch.pa) (es : list weff) (a : Arch.pa) :
+    Forall (wwalk_ev_ok a2 a1 la) es ->
+    (forall j : nat, (j < 8)%nat -> pa_add la j <> a) ->
+    wtrace_wonly (fun (pa : Arch.pa) (n : N) =>
+                    forall j : nat, (j < N.to_nat n)%nat -> pa_add pa j <> a) es.
+  Proof.
+    intros Hall Hoff ak pa n v Hin j Hj.
+    assert (Hev : wwalk_ev_ok a2 a1 la (WEwrite ak pa n v)).
+    { rewrite ->Forall_forall in Hall. apply Hall.
+      first [exact Hin | exact (proj1 (elem_of_list_In _ _) Hin)]. }
+    simpl in Hev. destruct Hev as (Hn & Hpa). subst n pa.
+    apply Hoff. change (N.to_nat 8) with 8%nat in Hj. lia.
+  Qed.
+
+  (** *** 4d. THE OUTCOME OF THE WEAK TRANSLATION RUN.
+
+      Case on the exports' ghost arms: the read-only and MISS write-back
+      shapes are [trace_stale] (five of the six shapes — exactly
+      [WeakKptStale.trace_stale_walk_shapes]) and go through
+      [WeakStale.wrun_exec_stale_elim]; the HIT write-back's only read is
+      EXCLUSIVE, so its family is constant and [trace_off_win] holds
+      vacuously — [WeakStale.wrun_exec_stale_elim_const].  In every case
+      [exec_stale] is a FUNCTION, so the family's own equation pins the
+      result, the post-memory, the post-device and the trace. *)
+  Lemma wwalk_run_outcome (tid : option nat) (σ : wmstate)
+      (root_ppn : mword 44) (va pa p2 p1 w0 lw : mword 64) :
+    let vpn := svpn_of va in
+    let a2 := u_pte_addr root_ppn (subrange_vec_dec vpn 26 18) in
+    let a1 := u_pte_addr (u_next_base p2) (subrange_vec_dec vpn 17 9) in
+    let la := u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0) in
+    wwalk_exports tid σ root_ppn va pa p2 p1 w0 lw ->
+    forall (x : result (physaddr * page_based_mem_type * unit)
+                       (ExceptionType * unit)) (s' : wmstate),
+      wrun tid (translateAddr (Virtaddr va) (InstructionFetch tt)) σ x s' ->
+      x = Ok (Physaddr pa, PBMT_PMA, init_ext_ptw) /\
+      wlog_wf (wm_log s') /\
+      ws_le (wm_ws σ) (wm_ws s') /\
+      wm_dev s' = wm_dev σ /\
+      (forall a : Arch.pa,
+         (forall j : nat, (j < 8)%nat -> pa_add la j <> a) ->
+         latest_ts (wm_log s') (pa_z a) = latest_ts (wm_log σ) (pa_z a)) /\
+      (forall a : Arch.pa,
+         (forall j : nat, (j < 8)%nat -> pa_add la j <> a) ->
+         wflat (wm_img s') (wm_log s') !! a = wflat (wm_img σ) (wm_log σ) !! a).
+  Proof.
+    intros vpn a2 a1 la Hexp x s' Hrun.
+    pose proof Hexp as Hexp'.
+    destruct Hexp' as (Hvar & Hwf & Hs2 & Hs1 & Hs0 & Hpin & Hd2 & Hd1 & Hcoll
+                       & Harm).
+    pose proof (pt_slot_mem_acc_wf _ _ _ Hs0) as Hwf0.
+    destruct (wwalk_peel_of_exports (InstructionFetch tt) tid σ root_ppn va pa
+                p2 p1 w0 lw Hvar Hwf Hs2 Hs1 Hs0 Hpin Hd2 Hd1 Hcoll Harm)
+      as [Hpeel Hfilt].
+    assert (Hrd : is_Some (read_bytes (wflat (wm_img σ) (wm_log σ)) la 8)).
+    { exists (lw : bv (8 * 8)%N). apply read_bytes_of_bytes. intros j Hj.
+      rewrite -(wflat_st_mem σ). apply (proj1 Hs0). lia. }
+    (* ---- the member the run landed on, and everything it says ---- *)
+    assert (Hcore : exists (sg' : mstate) (es : list weff),
+              x = Ok (Physaddr pa, PBMT_PMA, init_ext_ptw) /\
+              wflat_st s' = sg' /\
+              mdev sg' = wm_dev σ /\
+              (mem sg' = wflat (wm_img σ) (wm_log σ) \/
+               exists lw' : mword 64,
+                 mem sg' = write_bytes (wflat (wm_img σ) (wm_log σ))
+                             (la : Arch.pa) 8 lw') /\
+              wlog_wf (wm_log s') /\
+              Forall (wwalk_ev_ok a2 a1 la) es /\
+              (forall a : Arch.pa,
+                 wtrace_wonly (fun (pa0 : Arch.pa) (n : N) =>
+                    forall j : nat, (j < N.to_nat n)%nat -> pa_add pa0 j <> a) es ->
+                 latest_ts (wm_log s') (pa_z a) = latest_ts (wm_log σ) (pa_z a))).
+    { destruct Harm as [Hro | (lw' & wtr & Hupd & Hfam)].
+      - (* ---------- READ-ONLY: four stale-friendly shapes ---------- *)
+        assert (Hst : forall u : bv (8 * 8)%N,
+                  wwalk_filter w0 lw (fun j : nat => nth_byte u j) ->
+                  exists (y : result (physaddr * page_based_mem_type * unit)
+                                     (ExceptionType * unit))
+                         (t' : mstate) (es : list weff),
+                    exec_stale la 8 u
+                      (translateAddr (Virtaddr va) (InstructionFetch tt))
+                      (wflat_st σ) = Some (y, t', es) /\
+                    trace_stale wak_plain la 8 es).
+        { intros u Hu. destruct (wwalk_filter_inv w0 lw u Hu) as (av & dv & Hw & Hle).
+          destruct (Hro av dv Hle) as (sgm & esm & Hex & _ & _ & Hes).
+          exists (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)), sgm, esm.
+          split; [rewrite Hw; exact Hex|].
+          apply (trace_stale_walk_shapes a2 a1 la lw esm Hd2 Hd1).
+          destruct Hes as [->|[->|[-> | ->]]];
+            [by left|by right; left|by right; right; left
+            |by right; right; right; left]. }
+        destruct (wrun_exec_stale_elim tid la 8 wak_plain (wwalk_filter w0 lw)
+                    True (translateAddr (Virtaddr va) (InstructionFetch tt))
+                    Hwf0 ltac:(lia) ak_pins_plain σ Hpeel Hwf Hfilt Hrd Hst
+                    x s' Hrun)
+          as (u & es & _ & HΦu & Hexu & Hwf' & Hlt).
+        destruct (wwalk_filter_inv w0 lw u HΦu) as (av & dv & Hw & Hle).
+        destruct (Hro av dv Hle) as (sgm & esm & Hex & Hmem & Hmdev & Hes).
+        rewrite Hw Hex in Hexu. injection Hexu as Hx Hst' Hes'.
+        exists sgm, es. split_and!.
+        + by rewrite -Hx.
+        + by rewrite -Hst'.
+        + exact Hmdev.
+        + left. exact Hmem.
+        + exact Hwf'.
+        + rewrite -Hes'. destruct Hes as [->|[->|[-> | ->]]]; walk_evs.
+        + exact Hlt.
+      - destruct wtr.
+        + (* ---------- MISS write-back: the five-event walk ---------- *)
+          assert (Hst : forall u : bv (8 * 8)%N,
+                    wwalk_filter w0 lw (fun j : nat => nth_byte u j) ->
+                    exists (y : result (physaddr * page_based_mem_type * unit)
+                                       (ExceptionType * unit))
+                           (t' : mstate) (es : list weff),
+                      exec_stale la 8 u
+                        (translateAddr (Virtaddr va) (InstructionFetch tt))
+                        (wflat_st σ) = Some (y, t', es) /\
+                      trace_stale wak_plain la 8 es).
+          { intros u Hu. destruct (wwalk_filter_inv w0 lw u Hu)
+              as (av & dv & Hw & Hle).
+            destruct (Hfam av dv Hle) as (sgm & esm & Hex & _ & _ & Hes).
+            exists (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)), sgm, esm.
+            split; [rewrite Hw; exact Hex|].
+            apply (trace_stale_walk_shapes a2 a1 la lw' esm Hd2 Hd1).
+            rewrite Hes. by right; right; right; right. }
+          destruct (wrun_exec_stale_elim tid la 8 wak_plain (wwalk_filter w0 lw)
+                      True (translateAddr (Virtaddr va) (InstructionFetch tt))
+                      Hwf0 ltac:(lia) ak_pins_plain σ Hpeel Hwf Hfilt Hrd Hst
+                      x s' Hrun)
+            as (u & es & _ & HΦu & Hexu & Hwf' & Hlt).
+          destruct (wwalk_filter_inv w0 lw u HΦu) as (av & dv & Hw & Hle).
+          destruct (Hfam av dv Hle) as (sgm & esm & Hex & Hmem & Hmdev & Hes).
+          rewrite Hw Hex in Hexu. injection Hexu as Hx Hst' Hes'.
+          exists sgm, es. split_and!.
+          * by rewrite -Hx.
+          * by rewrite -Hst'.
+          * exact Hmdev.
+          * right. exists lw'. exact Hmem.
+          * exact Hwf'.
+          * rewrite -Hes' Hes. walk_evs.
+          * exact Hlt.
+        + (* ---------- HIT write-back: the CONSTANT family ---------- *)
+          assert (Hst : forall u : bv (8 * 8)%N,
+                    wwalk_filter w0 lw (fun j : nat => nth_byte u j) ->
+                    exists (y : result (physaddr * page_based_mem_type * unit)
+                                       (ExceptionType * unit))
+                           (t' : mstate) (es : list weff),
+                      exec_stale la 8 u
+                        (translateAddr (Virtaddr va) (InstructionFetch tt))
+                        (wflat_st σ) = Some (y, t', es) /\
+                      trace_off_win la 8 es).
+          { intros u Hu. destruct (wwalk_filter_inv w0 lw u Hu)
+              as (av & dv & Hw & Hle).
+            destruct (Hfam av dv Hle) as (sgm & esm & Hex & _ & _ & Hes).
+            exists (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)), sgm, esm.
+            split; [rewrite Hw; exact Hex|].
+            rewrite Hes. apply trace_off_win_pinned. pinned_trace. }
+          destruct (wrun_exec_stale_elim_const tid la 8 wak_plain
+                      (wwalk_filter w0 lw) True true
+                      (translateAddr (Virtaddr va) (InstructionFetch tt))
+                      Hwf0 ltac:(lia) ak_pins_plain σ Hpeel Hwf Hfilt Hrd Hst
+                      x s' Hrun)
+            as (u & es & _ & HΦu & Hexu & Hwf' & Hlt).
+          destruct (wwalk_filter_inv w0 lw u HΦu) as (av & dv & Hw & Hle).
+          destruct (Hfam av dv Hle) as (sgm & esm & Hex & Hmem & Hmdev & Hes).
+          rewrite Hw Hex in Hexu. injection Hexu as Hx Hst' Hes'.
+          exists sgm, es. split_and!.
+          * by rewrite -Hx.
+          * by rewrite -Hst'.
+          * exact Hmdev.
+          * right. exists lw'. exact Hmem.
+          * exact Hwf'.
+          * rewrite -Hes' Hes. walk_evs.
+          * exact Hlt. }
+    (* ---- and now the post-state facts the fetch's tail needs ---- *)
+    destruct Hcore as (sgm & es & Hx & Hsg & Hmdev & Hmem & Hwf' & Hev & Hlt).
+    split_and!.
+    - exact Hx.
+    - exact Hwf'.
+    - exact (wrun_ws_le tid _ σ x s' Hrun).
+    - rewrite -(wflat_st_dev s') Hsg. exact Hmdev.
+    - intros a Hoff. apply Hlt.
+      exact (wtrace_wonly_of_evs a2 a1 la es a Hev Hoff).
+    - intros a Hoff. rewrite -(wflat_st_mem s') Hsg.
+      destruct Hmem as [Hmem | (lw' & Hmem)]; rewrite Hmem; [reflexivity|].
+      apply write_bytes_lookup_ne. intros j Hj Heq.
+      apply (Hoff j ltac:(change (N.to_nat 8) with 8%nat in Hj; lia)).
+      by rewrite Heq.
+  Qed.
+
+  (** *** 4e. The fetch's REGISTER-ONLY gates, at the post-translation states.
+
+      [wfetch_tail_read]'s gate premises verbatim, moved to the states the
+      peel's bind premise quantifies over — see §4's header for why they, and
+      only they, stay premises. *)
+  Definition wfetch_gates (tid : option nat) (σ : wmstate) (va pa : mword 64)
+      (region : PMA_Region) : Prop :=
+    forall (x : result (physaddr * page_based_mem_type * unit)
+                       (ExceptionType * unit)) (s' : wmstate),
+      wrun tid (translateAddr (Virtaddr va) (InstructionFetch tt)) σ x s' ->
+      (forall mm : gmap Arch.pa (bv 8),
+         let t := MState (wm_regs s') mm (wm_dev s') in
+         exec_eff (pmpCheck (Physaddr pa) 4 (InstructionFetch tt) Supervisor) t
+           = Some (None, t, []) /\
+         matching_pma_region (register_lookup pma_regions (wm_regs s'))
+           (Physaddr pa) 4 = Some region /\
+         exec_eff (within_clint (Physaddr pa) 4) t = Some (false, t, []) /\
+         exec_eff (within_sig (Physaddr pa) 4) t = Some (false, t, []) /\
+         exec_eff (within_htif_readable (Physaddr pa) 4) t = Some (false, t, [])) /\
+      register_lookup cur_privilege (wm_regs s') = Supervisor.
+
+  (** *** 4f. THE TAIL ITSELF. *)
+  Lemma wfetch_tail_of_exports (tid : option nat) (σ : wmstate)
+      (root_ppn : mword 44) (va pa p2 p1 w0 lw : mword 64)
+      (region : PMA_Region) (w : bv 32) :
+    let vpn := svpn_of va in
+    let a2 := u_pte_addr root_ppn (subrange_vec_dec vpn 26 18) in
+    let a1 := u_pte_addr (u_next_base p2) (subrange_vec_dec vpn 17 9) in
+    let la := u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0) in
+    wwalk_exports tid σ root_ppn va pa p2 p1 w0 lw ->
+    (* the four TEXT bytes are not window bytes *)
+    racc_disj la 8 pa 4 ->
+    acc_wf pa 4 ->
+    (forall j : nat, (j < 4)%nat -> pa_z (pa_add pa j) <> 0) ->
+    (* kernel text is single-message, hence pinned, and holds [w] — at σ *)
+    (forall j : nat, (j < 4)%nat -> pinned_read σ (acc_addr pa j)) ->
+    (forall j : nat, (N.of_nat j < 4)%N ->
+       wflat (wm_img σ) (wm_log σ) !! (pa_add pa j) = Some (nth_byte w j)) ->
+    (* the register-only gates *)
+    wfetch_gates tid σ va pa region ->
+    is_aligned_paddr (Physaddr pa) 4 = true ->
+    (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true ->
+    dev_addr pa = false ->
+    wfetch_tail tid σ va pa.
+  Proof.
+    intros vpn a2 a1 la Hexp Hdisj Haccp HW0 Hpin Hbytes Hgates Halign Hexecp Hdev.
+    pose proof Hexp as Hexp'.
+    destruct Hexp' as (_ & _ & _ & _ & Hs0 & _).
+    pose proof (pt_slot_mem_acc_wf _ _ _ Hs0) as Hwf0.
+    (* the leaf window and the text window are byte-wise apart *)
+    assert (Hne : forall i j : nat, (i < 8)%nat -> (j < 4)%nat ->
+              pa_add la i <> pa_add pa j).
+    { intros i j Hi Hj Heq.
+      apply (pa_add_neq pa la 4 8 j i Haccp Hwf0 Hdisj
+               ltac:(change (N.to_nat 4) with 4%nat; lia)
+               ltac:(change (N.to_nat 8) with 8%nat; lia)).
+      by rewrite Heq. }
+    intros x s' Hrun.
+    destruct (wwalk_run_outcome tid σ root_ppn va pa p2 p1 w0 lw Hexp x s' Hrun)
+      as (Hx & Hwf' & Hws & _ & Hlt & Hmem).
+    destruct (Hgates x s' Hrun) as (Hg & Hpriv).
+    split; [exact Hx|].
+    refine (wfetch_tail_read tid s' pa region w Hwf' Haccp HW0 _ _ Hg
+              Halign Hexecp Hdev Hpriv).
+    - (* the four text bytes are still PINNED at [s'] *)
+      intros j Hj.
+      refine (pinned_read_ts_mono σ s' (acc_addr pa j) _ Hws (Hpin j Hj)).
+      rewrite -(acc_wf_byte pa 4 j Haccp
+                  ltac:(change (N.to_nat 4) with 4%nat; lia)).
+      apply Hlt. intros i Hi. exact (Hne i j Hi Hj).
+    - (* ... and still hold [w] *)
+      intros j Hj. rewrite (Hmem (pa_add pa j)); [apply Hbytes; exact Hj|].
+      intros i Hi. apply Hne; [exact Hi|lia].
+  Qed.
+
+  (** *** 4g. THE CAPSTONE: the fetch peel from the exports, the text pins
+      and the gates — [wfetch_tail] is no longer a premise anywhere. *)
+  Lemma wfetch_peel_selfcontained (tid : option nat) (σ : wmstate)
+      (root_ppn : mword 44) (va pa p2 p1 w0 lw : mword 64)
+      (region : PMA_Region) (w : bv 32) :
+    let vpn := svpn_of va in
+    let a2 := u_pte_addr root_ppn (subrange_vec_dec vpn 26 18) in
+    let a1 := u_pte_addr (u_next_base p2) (subrange_vec_dec vpn 17 9) in
+    let la := u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0) in
+    (* --- the fetch's register-only prefix --- *)
+    register_lookup PC σ.(wm_regs) = va ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    (* --- the walk exports for the PC's page --- *)
+    wwalk_exports tid σ root_ppn va pa p2 p1 w0 lw ->
+    (* --- the text window, and its disjointness from the leaf slot --- *)
+    racc_disj la 8 pa 4 ->
+    acc_wf pa 4 ->
+    (forall j : nat, (j < 4)%nat -> pa_z (pa_add pa j) <> 0) ->
+    (forall j : nat, (j < 4)%nat -> pinned_read σ (acc_addr pa j)) ->
+    (forall j : nat, (N.of_nat j < 4)%N ->
+       wflat (wm_img σ) (wm_log σ) !! (pa_add pa j) = Some (nth_byte w j)) ->
+    (* --- the register-only gates --- *)
+    wfetch_gates tid σ va pa region ->
+    is_aligned_paddr (Physaddr pa) 4 = true ->
+    (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true ->
+    dev_addr pa = false ->
+    wstep_ok_racy tid la 8 wak_plain (wwalk_filter w0 lw) wD_any True true
+      (fetch tt) σ /\
+    wadm_filter σ wak_plain la 8 (wwalk_filter w0 lw).
+  Proof.
+    intros vpn a2 a1 la Hpc Hal Hexp Hdisj Haccp HW0 Hpin Hbytes Hgates
+      Halign Hexecp Hdev.
+    apply (wfetch_peel_of_exports tid σ root_ppn va pa p2 p1 w0 lw Hpc Hal Hexp).
+    exact (wfetch_tail_of_exports tid σ root_ppn va pa p2 p1 w0 lw region w
+             Hexp Hdisj Haccp HW0 Hpin Hbytes Hgates Halign Hexecp Hdev).
+  Qed.
+
+  (** The CPS form, likewise self-contained — what 6c's funnel consumes. *)
+  Lemma wfetch_peel_k_selfcontained (tid : option nat) (σ : wmstate)
+      (root_ppn : mword 44) (va pa p2 p1 w0 lw : mword 64)
+      (region : PMA_Region) (w : bv 32)
+      (K : FetchResult -> wmstate -> bool -> Prop) :
+    let vpn := svpn_of va in
+    let a2 := u_pte_addr root_ppn (subrange_vec_dec vpn 26 18) in
+    let a1 := u_pte_addr (u_next_base p2) (subrange_vec_dec vpn 17 9) in
+    let la := u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0) in
+    register_lookup PC σ.(wm_regs) = va ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    wwalk_exports tid σ root_ppn va pa p2 p1 w0 lw ->
+    racc_disj la 8 pa 4 ->
+    acc_wf pa 4 ->
+    (forall j : nat, (j < 4)%nat -> pa_z (pa_add pa j) <> 0) ->
+    (forall j : nat, (j < 4)%nat -> pinned_read σ (acc_addr pa j)) ->
+    (forall j : nat, (N.of_nat j < 4)%N ->
+       wflat (wm_img σ) (wm_log σ) !! (pa_add pa j) = Some (nth_byte w j)) ->
+    wfetch_gates tid σ va pa region ->
+    is_aligned_paddr (Physaddr pa) 4 = true ->
+    (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true ->
+    dev_addr pa = false ->
+    (forall (r : FetchResult) (s' : wmstate),
+       wrun tid (fetch tt) σ r s' -> forall b' : bool, K r s' b') ->
+    wstep_ok_racy_k tid la 8 wak_plain (wwalk_filter w0 lw) wD_any True true
+      (fetch tt) σ K /\
+    wadm_filter σ wak_plain la 8 (wwalk_filter w0 lw).
+  Proof.
+    intros vpn a2 a1 la Hpc Hal Hexp Hdisj Haccp HW0 Hpin Hbytes Hgates
+      Halign Hexecp Hdev HK.
+    apply (wfetch_peel_k tid σ root_ppn va pa p2 p1 w0 lw K Hpc Hal Hexp);
+      [|exact HK].
+    exact (wfetch_tail_of_exports tid σ root_ppn va pa p2 p1 w0 lw region w
+             Hexp Hdisj Haccp HW0 Hpin Hbytes Hgates Halign Hexecp Hdev).
+  Qed.
+
+End WfetchTail.
+
+(* ====================================================================== *)
 (** ** 3. Soundness checks *)
 
 Print Assumptions wstep_ok_racy_kR_bind.
@@ -863,3 +1272,7 @@ Print Assumptions exec_eff_mem_read_fetch_gen.
 Print Assumptions wfetch_tail_read.
 Print Assumptions wfetch_peel_of_exports.
 Print Assumptions wfetch_peel_k.
+Print Assumptions wwalk_run_outcome.
+Print Assumptions wfetch_tail_of_exports.
+Print Assumptions wfetch_peel_selfcontained.
+Print Assumptions wfetch_peel_k_selfcontained.
