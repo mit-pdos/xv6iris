@@ -413,8 +413,9 @@ Section UsertrapRes.
      persistent, hence free to hand to devintr at whatever hart the call
      happens on ([devintr_caps_any_at]), and it is satisfiable: of
      [devintr_caps]' eight members six are hart-free outright, [timer_cap] is
-     available at every hart from [SpecBootDevCaps.boot_dev_caps] (whose
-     interface quantifies over the hart), and [tick_keeper]'s REAL arm --
+     available at every hart because the boot chain mints one PER HART out of
+     timerinit's own [mcounteren] / [stimecmp] cells ([BootChain], via
+     [TimerCap.timer_cap_intro]), and [tick_keeper]'s REAL arm --
      which the boot hart brings up -- is hart-free too.  What it rules out is
      satisfying the tick keeper with the left disjunct, and that is right: a
      process can migrate onto hart 0. *)
