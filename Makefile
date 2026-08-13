@@ -208,7 +208,7 @@ dump-force: xv6-rev-check
 # ---- 4. The Iris proofs (depend on the model and the kernel dump) ----
 $(IRIS)/CoqMakefile: $(IRIS)/_CoqProject
 	cd $(IRIS) && $(RUN) coq_makefile -f _CoqProject -o CoqMakefile
-proofs: model kernel-rocq $(IRIS)/CoqMakefile
+proofs: model kernel-rocq user-rocq $(IRIS)/CoqMakefile
 	$(RUN) $(MAKE) -C $(IRIS) -f CoqMakefile -j$(JOBS)
 
 # ---- cleaning ----
