@@ -1026,7 +1026,11 @@ Section ProofGrowproc.
       iApply (Uvmalloc.wp_uvmalloc_sconf γa C3p (pv_upt V) 4 (av - 4)%nat eb p C b
                 ltac:(lia) HC3ptp HC3pa0 HC3pa3 gp_xperm_rng gp_perm_ok
                 ltac:(rewrite HC3pa1 uint_unsigned uvm_maxsz_val; exact Hszmaxz)
-                ltac:(rewrite HC3pa2 uint_unsigned uvm_maxsz_val; exact Hnewle)
+                (* growproc TESTS the bound ([sz + n > TRAPFRAME] returns -1),
+                   so it pays uvmalloc's left disjunct; the coverage arm is
+                   for kexec, whose newsz comes out of a file. *)
+                ltac:(left; rewrite HC3pa2 uint_unsigned uvm_maxsz_val;
+                      exact Hnewle)
                 ltac:(rewrite HC3pa1 HC3pa2; exact Hfresh)
                 with "Hcg Hcpu Htext Hpc Hpt Henv").
       iIntros (CID21 Hn21 mr) "Hcg Hcpu Hpc %Hcsr Hpost".

@@ -638,6 +638,7 @@ CodeProcPagetable.v
 ProofProcPagetable.v
 LinkProcPagetable.v
 ProcPtOwn.v
+UmCovered.v
 PtFree.v
 BarePt.v
 BitmapEnc.v

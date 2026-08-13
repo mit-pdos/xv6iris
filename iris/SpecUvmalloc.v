@@ -68,6 +68,7 @@ Require Import KallocInv.
 Require Import PtBuild KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
+Require Import UmCovered.
 From Kernel Require KernelSyms.
 Import Defs.
 
@@ -96,7 +97,19 @@ Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
      exactly legal -- and it is the size growproc's own check
      ([sz + n > TRAPFRAME] returns -1) lets through. *)
   (uint oldsz <= uvm_maxsz)%Z ->
-  (uint newsz <= uvm_maxsz)%Z ->
+  (* THE SAME BOUND ON [newsz] -- *OR* THE COVERAGE THAT IMPLIES IT.
+     Testing is what growproc does and what every caller here used to do; the
+     one caller that cannot test is kexec, whose [newsz] is
+     [ph.vaddr + ph.memsz] read out of an untrusted ELF.  It does not have to:
+     for this loop to march its
+     [a] up to TRAPFRAME it must first MAP every page below it, one kalloc
+     per page, and physical memory holds nowhere near that many -- so kalloc
+     fails first and the [rv = 0] arm fires.  [UmCovered.v] is that argument,
+     and [um_covered oldsz] -- every page below [oldsz] already mapped -- is
+     what a caller supplies to invoke it.  Note the right disjunct is FALSE
+     for a lazily-grown process (sbrk raises [p->sz] and maps nothing), which
+     is exactly why this is a disjunction and not a replacement. *)
+  ((uint newsz <= uvm_maxsz)%Z \/ um_covered oldsz P.(ud_um)) ->
   (* the run is unmapped to begin with (mappages panics on a remap, and it
      is what makes the failure arm's rollback exact) *)
   (forall i, (i < n)%nat -> P.(ud_um) !! vpn_at vpn0 i = None) ->
