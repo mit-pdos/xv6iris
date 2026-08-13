@@ -526,6 +526,39 @@ not move at all. Assuming "everything above the change shifts" flagged 92
 literals in 70 files where the true set was 14; shifting the other 78 would have
 broken working proofs.
 
+## A PREMISE SET CAN BE UNSATISFIABLE AND STILL COMPILE — state register agreement POSITIVELY
+
+A block lemma in the middle of a function has to say which registers still
+hold their entry values, and the tempting way to say it is by EXCEPTION:
+
+```coq
+    forall r, is_cs_idx r = true -> r <> Rs1 -> r <> Rs2 -> r <> Rs3 ->
+      M !!! Regidx r = m0 !!! Regidx r          (* WRONG *)
+```
+
+`CalleeSaved.is_cs_idx` contains **sp (x2) and s0 (x8)**, and a prologue
+moves both — sp to `pa_stk sp0 k`, s0 to the frame pointer.  So the premise
+also demands `M !!! sp = m0 !!! sp`, which is false the moment the frame is
+pushed.  The lemma is then *easier* to prove (it has a contradictory
+hypothesis) and **no caller can ever apply it**; `coqc` is green and the
+block is dead.  It surfaced in `ProofConsoleintr`'s kill-line loop and its
+restore stub, both of which had compiled for a whole commit.
+
+State the claim POSITIVELY instead — the explicit list of the registers that
+really are untouched (`ct_cs_top` = s4..s11) — and account for sp and s0
+separately, sp by the explicit `pa_stk` equation the block already carries
+and s0 by the epilogue's reload.  Transport lemmas
+(`ct_cs_hi_thr`-style: "a run that writes no callee-saved register carries
+the claim") make the positive form as cheap at the call sites as the
+quantified one looked, and they replace the ten-way `split_and!` each site
+would otherwise repeat.
+
+**The general rule: a hypothesis of the form "everything in <set> except
+<list>" is a claim about a set you have to go and read.**  Two cheap
+defences — write a one-line `Lemma foo_refl : P m m` and check it still
+applies where you expect, and grep for a caller that can supply the premise
+BEFORE building on top of it.
+
 ## A WEAKENING IS CHEAP TO PROVE AND EXPENSIVE TO USE — plan the sweep accordingly
 
 Strengthening a lemma's HYPOTHESIS weakens the lemma, so it stays provable from
@@ -747,6 +780,13 @@ and axioms each proven function rests on. `--format text|md|html|json`.
   a `--check` error that fails CI, not a silent adjustment. So **adding a file
   to `iris/` means adding it to `_CoqProject`**; without the check, forgetting
   is invisible in both directions at once (never built, still counted).
+- **THE PROOF FUNCTOR NEEDS ITS `: <MODTYPE>` ASCRIPTION, and without it the
+  function reads `assumed` with the build green.** `module_status` matches a
+  `Link` instance to a spec through `Module <F>Proof (…) : <MODTYPE>.`; a
+  functor with no ascription is never connected to anything, and the `Link`
+  that applies it type-checks anyway (the signature is checked at the
+  CONSUMER's functor application instead — `LinkUartintr.v` for consoleintr).
+  So the report is the only thing that notices. Ascribe the functor.
 - **AND SPELL THE `Link` INSTANTIATION UNQUALIFIED.** The script matches a
   functor application with `^\s*Module\s+(\w+)\s*:=\s*(\w+)((?:\s+\w+)*)\s*\.`,
   and `(\w+)` does not match a DOTTED name — so
@@ -773,7 +813,7 @@ and axioms each proven function rests on. `--format text|md|html|json`.
   contract — `_entry` through `start` into S-mode at `main` — IS in the module
   shape: `SpecEntry.v` / `ProofEntry.v` / `LinkEntry.v`, over those lemmas.)
   Also listed are the deliberately-assumed
-  contracts (`myproc`, `panic`, `kerneltrap`) in `MANIFEST_ASSUMED`. Every
+  contracts (`kerneltrap`) in `MANIFEST_ASSUMED`. Every
   entry is verified against the tree and a stale one is reported as a manifest
   error rather than silently counted — fix those when they appear.
 

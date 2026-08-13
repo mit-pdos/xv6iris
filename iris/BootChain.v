@@ -52,6 +52,7 @@ Require Import MstatusFacts.
 Require Import SmodeCore.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn SchedCtx.
+Require Import ConsoleInv SpecConsoleintr.
 Require Import SpecMain.
 Require Import BootConfig BootBridge PowerBoot.
 Require Import LinkEntry.
@@ -657,10 +658,10 @@ Section BootPrimary.
        is intro + exists + frame and nothing else. *)
     iModIntro.
     iIntros (γpr γs γk pd pav pu root pas)
-      "Hpr Hpi Hdl Hgeom Hkpti Hroot Htramp Hkst".
+      "Hpr Hpi Hcc Hdl Hgeom Hkpti Hroot Htramp Hkst".
     rewrite /main_deposit.
     iExists γpr, γk, γs, pd, pav, pu, root, pas.
-    iFrame "Hpr Hpi Hdl Hgeom Hkpti Hroot Htramp Hkst".
+    iFrame "Hpr Hpi Hcc Hdl Hgeom Hkpti Hroot Htramp Hkst".
   Qed.
 
 End BootPrimary.

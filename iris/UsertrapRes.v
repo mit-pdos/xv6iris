@@ -412,7 +412,7 @@ Section UsertrapRes.
      that PARKS does not return on the hart it entered on).  It is
      persistent, hence free to hand to devintr at whatever hart the call
      happens on ([devintr_caps_any_at]), and it is satisfiable: of
-     [devintr_caps]' eight members six are hart-free outright, [timer_cap] is
+     [devintr_caps]' nine members seven are hart-free outright, [timer_cap] is
      available at every hart because the boot chain mints one PER HART out of
      timerinit's own [mcounteren] / [stimecmp] cells ([BootChain], via
      [TimerCap.timer_cap_intro]), and [tick_keeper]'s REAL arm --

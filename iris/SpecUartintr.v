@@ -36,8 +36,7 @@
    file's totality.  The rx loop is UNBOUNDED (the device may keep supplying
    bytes), so the WP is, as always, partial correctness.
 
-   Callees: acquire, release, wakeup, and consoleintr -- the last ASSUMED
-   (SpecConsoleintr.v / LinkConsoleintr.v). *)
+   Callees: acquire, release, wakeup, and consoleintr -- all four proven. *)
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -60,6 +59,8 @@ Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import DiskPtsto WpUart.
 Require Import UartTxInv.
+Require Import ConsoleInv.
+Require Import SpecConsoleintr.
 From Kernel Require KernelSyms.
 
 
@@ -93,6 +94,13 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   (* the running-thread bundle (wakeup / consoleintr) *)
   procs_inv γs -∗
   panic_wp_any -∗
+  (* CONSOLEINTR'S OWN CREDENTIAL, and the one premise the rx loop adds.
+     The handler itself touches neither lock; [console_caps] is passed
+     straight through to [consoleintr], which takes cons.lock and -- through
+     [consputc] -- tx_lock.  All persistent and bundled with the two ghost
+     names existential (SpecConsoleintr.v), so threading it costs this
+     contract one conjunct and no parameter. *)
+  console_caps γu -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf)) ⌝ -∗

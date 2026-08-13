@@ -37,6 +37,7 @@ Require Import BootCarve.
 Require Import PageGeom KallocInv.
 Require Import SpecFreerange.
 Require Import WpLock SpecProcinit.
+Require Import ConsoleInv.
 (* the vocabulary of the STRUCTURED conjuncts (slice 2b).  [Import] is not
    transitive, so each file whose predicate is named below has to be imported
    here even though [SpecMain] already requires all of them. *)
@@ -505,6 +506,73 @@ Section BootCarveMain.
                  with "Hcl H2") as (vcpu) "H2".
     rewrite /lk_raw /lock_name_field /lk_cpu E8 E16 !off_of_z.
     iExists vlock, vname, vcpu. iFrame "H0 H1 H2".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE CONSOLE RING, out of [cons + 24 .. cons + 164).                 *)
+  (*                                                                    *)
+  (* [ConsoleInv.cons_res] is what cons.lock protects: the 128 input     *)
+  (* bytes and the three index words r/w/e at +152/+156/+160.  It is the *)
+  (* one piece of [SpecConsoleintr.console_caps] the boot supply did not *)
+  (* carry, and without it main cannot run [WpLock.newlock] over the     *)
+  (* lock consoleinit has just initialised.  The four bytes of padding   *)
+  (* between the ring's end and [pr] are dropped, as everywhere.         *)
+  (* ------------------------------------------------------------------ *)
+  Lemma boot_cons_res (g : gstate) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= KernelSyms.cons ->
+    KernelSyms.cons + 164 <= ram_hi ->
+    KernelSyms.cons mod 4 = 0 ->
+    kmap_static_claims -∗
+    boot_raw_ran g (KernelSyms.cons + 24) (KernelSyms.cons + 164) -∗
+    cons_res.
+  Proof.
+    intros Hmem Hlo Hhi Hal. iIntros "#Hcl H".
+    assert (Hal4 : forall k : Z, k mod 4 = 0 -> (KernelSyms.cons + k) mod 4 = 0)
+      by (intros k Hk; rewrite Z.add_mod; [| lia]; rewrite Hal Hk; reflexivity).
+    (* the four windows, in address order *)
+    iDestruct (boot_ran_split g (KernelSyms.cons + 24) (KernelSyms.cons + 152)
+                 (KernelSyms.cons + 164) ltac:(lia) ltac:(lia) with "H") as "[Hb H]".
+    iDestruct (boot_ran_split g (KernelSyms.cons + 152) (KernelSyms.cons + 156)
+                 (KernelSyms.cons + 164) ltac:(lia) ltac:(lia) with "H") as "[Hr H]".
+    iDestruct (boot_ran_split g (KernelSyms.cons + 156) (KernelSyms.cons + 160)
+                 (KernelSyms.cons + 164) ltac:(lia) ltac:(lia) with "H") as "[Hw He]".
+    (* the three index words *)
+    iDestruct (boot_ran_cell4 g (KernelSyms.cons + 152) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(apply Hal4; reflexivity) with "Hcl Hr") as (rr) "Hr".
+    iDestruct (boot_ran_cell4 g (KernelSyms.cons + 156) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(apply Hal4; reflexivity) with "Hcl Hw") as (ww) "Hw".
+    iDestruct (boot_ran_eq g (KernelSyms.cons + 160) (KernelSyms.cons + 164)
+                 (KernelSyms.cons + 160) (KernelSyms.cons + 160 + 4)
+                 eq_refl ltac:(lia) with "He") as "He".
+    iDestruct (boot_ran_cell4 g (KernelSyms.cons + 160) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(apply Hal4; reflexivity) with "Hcl He") as (ee) "He".
+    (* the 128 ring bytes *)
+    assert (Hb128 : KernelSyms.cons + 152
+                    = KernelSyms.cons + 24 + Z.of_nat INPUT_BUF_SIZE)
+      by (unfold INPUT_BUF_SIZE; cbn; lia).
+    iDestruct (boot_ran_eq g (KernelSyms.cons + 24) (KernelSyms.cons + 152)
+                 (KernelSyms.cons + 24) (KernelSyms.cons + 24 + Z.of_nat INPUT_BUF_SIZE)
+                 eq_refl Hb128 with "Hb") as "Hb".
+    iDestruct (boot_ran_mem_run g (KernelSyms.cons + 24) INPUT_BUF_SIZE Hmem
+                 ltac:(lia) ltac:(unfold INPUT_BUF_SIZE; cbn; lia) with "Hcl Hb") as "Hb".
+    (* re-anchor every address on [a_cons] *)
+    assert (Hbyte : forall j : nat,
+              pa_add (pa_of_z (KernelSyms.cons + 24)) j
+              = pa_add a_cons (cons_buf_off + j)).
+    { intro j. rewrite !pa_add_of_z. f_equal. unfold cons_buf_off. lia. }
+    iDestruct (cons_data_of_run (fun j => boot_byte (KernelSyms.cons + 24 + Z.of_nat j))
+                 (pa_of_z (KernelSyms.cons + 24)) Hbyte with "Hb") as (bs) "[%Hlen Hb]".
+    assert (Hcell : forall o : Z,
+              (sign_extend' 64 (mword_of_int o : mword 12) : mword 64) = mword_of_int o ->
+              pa_of_z (KernelSyms.cons + o) = coff_of a_cons o).
+    { intros o Ho. rewrite /coff_of Ho off_of_z. reflexivity. }
+    iEval (rewrite (Hcell 152 ltac:(apply bv_eq; vm_compute; reflexivity))) in "Hr".
+    iEval (rewrite (Hcell 156 ltac:(apply bv_eq; vm_compute; reflexivity))) in "Hw".
+    iEval (rewrite (Hcell 160 ltac:(apply bv_eq; vm_compute; reflexivity))) in "He".
+    rewrite /cons_res /a_cons_r /a_cons_w /a_cons_e.
+    iExists rr, ww, ee, bs. iFrame "Hr Hw He Hb". iPureIntro. exact Hlen.
   Qed.
 
   (* ------------------------------------------------------------------ *)

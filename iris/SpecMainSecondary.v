@@ -17,10 +17,11 @@
    ABSTRACT persistent payload [P] plus a □-wand recipe for paying it in --
    main's boot arm must not depend on what the secondaries want.  This file is
    where the payload gets its canonical concrete shape: [main_deposit] is the
-   existential package of exactly the eight persistent facts the wand's
+   existential package of exactly the nine persistent facts the wand's
    arguments assemble -- the printk credential, the hart-generic proc
-   protocol, the disk lock + geometry, and the shared kernel page table
-   (invariant + persisted root cell + the 65 mapping claims).  The client
+   protocol, the console's [console_caps], the disk lock + geometry, and the
+   shared kernel page table (invariant + persisted root cell + the 65
+   mapping claims).  The client
    (adequacy) allocates [started_inv (main_deposit γd γv Φ)] once, hands it to
    every hart, and discharges the boot arm's wand by packing the existentials.
    The ghost names / pages / root / kstack pas are existential HERE because a
@@ -77,6 +78,8 @@ Require Import WpLock.
 Require Import FileInvDefs.
 (* the boot-arm interface, for the per-hart bundle [main_hart_raw] (and the
    □-wand whose arguments [main_deposit] packages) *)
+Require Import ConsoleInv.
+Require Import SpecConsoleintr.
 Require Import SpecMain.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import TimerCap.
@@ -96,7 +99,7 @@ Section SpecMainSecondary.
 
   (* ------------------------------------------------------------------- *)
   (* THE DEPOSIT: the canonical instantiation of SpecMain's payload [P].  *)
-  (* Exactly the eight facts the boot arm's □-wand takes as arguments,     *)
+  (* Exactly the nine facts the boot arm's □-wand takes as arguments,      *)
   (* packaged with their ghost names / pages / root / pas existential.     *)
   (* Every conjunct is persistent, which is what lets the whole package    *)
   (* ride the one-shot [started] escrow to up to NCPU-1 readers.           *)
@@ -107,6 +110,10 @@ Section SpecMainSecondary.
        (root : mword 44) (pas : nat -> mword 44),
        printk_env γpr γd γv ∗
        procs_inv γs ∗
+       (* consoleintr's credential, which the kernelvec handler contract
+          closes over ([SpecDevintr.devintr_caps]) and which no hart can make
+          for itself: both halves are locks over static globals. *)
+       console_caps γd ∗
        is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) ∗
        disk_geom γv pd pav pu ∗
        kpt_inv root ∗

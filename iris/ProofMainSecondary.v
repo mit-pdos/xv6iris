@@ -62,6 +62,7 @@ Require Import SpecCpuid SpecPrintk SpecPrintkGen.
 Require Import SpecKvminithart SpecTrapinithart SpecPlicinithart.
 Require Import SpecScheduler SpecKernelvec.
 Require Import SpecDevintr SpecClockintr DiskInv TimerCap.
+Require Import ConsoleInv SpecConsoleintr.
 Require Import SpecMainSecondary.
 Require Import CodeMain.
 Require Import KernelRvcDecode.
@@ -581,10 +582,12 @@ Section ProofMainSecondary.
       (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗
     dev_inv γd γv -∗
     procs_inv γs -∗
-    (* THE LAST TWO [devintr_caps] MEMBERS, out of the [started] deposit: the
+    (* THE LAST THREE [devintr_caps] MEMBERS, out of the [started] deposit: the
        handler contract this block folds into [intr_res] closes over the whole
-       credential, and the disk lock and geometry are the two pieces that are
-       not this hart's to make.  Persistent, so they simply ride in. *)
+       credential, and the console's two lock credentials, the disk lock and
+       the geometry are the pieces that are not this hart's to make.
+       Persistent, so they simply ride in. *)
+    console_caps γd -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
     disk_geom γv pd pav pu -∗
     (* this hart's timer capability, allocated in the boot chain *)
@@ -592,7 +595,7 @@ Section ProofMainSecondary.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hdc Hcidne Hp0.
-    iIntros "Hcg #Htext #Hpanic Hpc Hcpu Hq Hsbit Htlb Htcsr #Hkinv #Hkptp #Hdev #Hpinv #Hdlock #Hgeom #Htimc".
+    iIntros "Hcg #Htext #Hpanic Hpc Hcpu Hq Hsbit Htlb Htcsr #Hkinv #Hkptp #Hdev #Hpinv #Hccaps #Hdlock #Hgeom #Htimc".
     iPoseProof (mni_32 with "Htext") as "Hi32".
     iPoseProof (mni_36 with "Htext") as "Hi36".
     iPoseProof (mni_3a with "Htext") as "Hi3a".
@@ -659,7 +662,7 @@ Section ProofMainSecondary.
       apply eq_vec_false_iff. exact Hcidne. }
     iAssert (devintr_caps γd γv γk γk γs pd pav pu) as "#Hcaps".
     { rewrite /devintr_caps.
-      iFrame "Hdev Hgeom Hdlock Htimc Htick Hpinv Hpanic". }
+      iFrame "Hdev Hccaps Hgeom Hdlock Htimc Htick Hpinv Hpanic". }
     iPoseProof (Kernelvec.kernelvec_handler_spec γd γv γk γk γs pd pav pu
                   Hnproc with "Hhw Hmin Htext Hcaps") as "#Hkvs".
     iDestruct (intr_res_intro (mword_of_int KernelSyms.kernelvec : mword 64) _
@@ -738,7 +741,7 @@ Section ProofMainSecondary.
     iApply (ms_spin γd γv m1 (K - 2)%nat p0 Ha4 with "Hcg Htext Hpc Hsinv").
     iIntros (m2) "Hcg Hpc #Hdep".
     iDestruct "Hdep" as (γpr γk γs pd pav pu root pas)
-      "(#Hpenv & #Hpinv & #Hdlock & #Hgeom & #Hkinv & #Hkptp & #Htramp & #Hkstx)".
+      "(#Hpenv & #Hpinv & #Hccaps & #Hdlock & #Hgeom & #Hkinv & #Hkptp & #Htramp & #Hkstx)".
     iPoseProof "Hpenv" as "Hpenv2".
     iDestruct "Hpenv2" as "(_ & _ & #Hdev)".
     iApply (ms_printk γpr γd γv m2 (K - 2)%nat p0 Hn38
@@ -747,7 +750,7 @@ Section ProofMainSecondary.
     iApply (ms_inithart_sched γd γv γs γk pd pav pu m3 (K - 2)%nat p0 root tlbvec0
               Hn20 Hdc Hcid Hp0
               with "Hcg Htext Hpany Hpc Hcpu Hq Hsbit Htlb Htcsr Hkinv Hkptp Hdev Hpinv
-                    Hdlock Hgeom Htimc").
+                    Hccaps Hdlock Hgeom Htimc").
   Qed.
 
 End ProofMainSecondary.

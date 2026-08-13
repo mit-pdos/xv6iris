@@ -26,6 +26,10 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   `XV6_REV`: the mechanical steps and their silent no-ops, how to CLASSIFY a
   change before touching a proof, the two relayout tools, the categories of
   breakage, and the finishing checks. Read before any bump.
+- **[`remote-build-gcp.md`](remote-build-gcp.md)** — building on the GCP VM:
+  the two scripts, daily use, pulling `.vo` back for a local single-file
+  recheck, preemption and cost, and the two things that silently break (the
+  VM's Ubuntu must match, and the opam switch must be byte-identical).
 - **[`kernel-defects.md`](kernel-defects.md)** — how to tell a defect in the xv6
   SOURCE from a problem in a spec, plus the register of open ones (currently
   empty) and the provably dead code.
@@ -130,14 +134,16 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 - **[`panic.md`](projects/panic.md)** — `panic()`, proven: the contract the two
   printk calls force, the Löb self-jump, and the one thing left — splicing it
   into the 169 files that still thread `PanicStub.v`'s placeholder credential.
-- **[`console.md`](projects/console.md)** — console.c: consolewrite (proven,
-  axiom-clean), consoleread (specified, proof owed) and consoleintr; the
-  `cons` module's own state in `ConsoleInv.v` and why its resource is
-  deliberately unconstrained.
+- **[`console.md`](projects/console.md)** — console.c, 5/5 functions proven
+  and linked: the `cons` module's own state in `ConsoleInv.v` and why its
+  resource is deliberately unconstrained, consoleintr's block decomposition,
+  and the `console_caps` credential + the boot `newlock`s that mint it.
+  **Read the `ct_cs_top` section before writing a mid-function register
+  premise.**
 - **[`uart-driver.md`](projects/uart-driver.md)** — the interrupt-driven UART
-  driver; uart.c is 4/4 functions. Read it for the transmit path's shape and for
-  the rotated-loop / nested-iLöb / `uart_sent_sub` techniques. Remaining:
-  consolewrite, consoleread, consoleintr, and the boot `newlock`.
+  driver; uart.c is 4/4 functions and the cone is axiom-clean. Read it for the
+  transmit path's shape and for the rotated-loop / nested-iLöb /
+  `uart_sent_sub` techniques.
 - **[`lock-set.md`](projects/lock-set.md)** — the per-CPU held-lock set: what
   landed hidden, and the tree-wide `cpu_own`-index sweep that turns it into
   acquire's no-reentrance premise and the "interrupts on ⟹ no locks held"

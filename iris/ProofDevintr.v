@@ -409,7 +409,7 @@ Section ProofDevintr.
     set (s00 := (m !!! Regidx s0_idx : mword 64)).
     set (s10 := (m !!! Regidx s1_idx : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc Hsc #Hcaps".
-    iDestruct "Hcaps" as "(#Hdev & #Hgeom & #Hdlk & #Htcap & #Htk & #Hpinv & #Hpanic)".
+    iDestruct "Hcaps" as "(#Hdev & #Hccaps & #Hgeom & #Hdlk & #Htcap & #Htk & #Hpinv & #Hpanic)".
     iIntros "Hcont".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1)
@@ -872,7 +872,7 @@ Section ProofDevintr.
           by (rewrite /U0 upd_eq; reflexivity).
         iApply (Uartintr.wp_uartintr_sconf γu γv γs U0 (av - 4)%nat lvl eb p C false
                   Hlen ltac:(lia) ltac:(unfold devintr_stack, uartintr_stack in *; lia)
-                  with "Hcg Hcnt Htext Hpc Hdev Hpinv Hpanic").
+                  with "Hcg Hcnt Htext Hpc Hdev Hpinv Hpanic Hccaps").
         iApply wp_next_off_intro. iIntros (MU) "%HcsU Hcg Hcnt Hpc".
         destruct HcsU as [HcsU HdomU].
         assert (Hpc4c : ret_pc (U0 !!! Regidx ra_idx) = mword_of_int (KernelSyms.devintr + 0x4c))

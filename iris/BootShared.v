@@ -475,7 +475,15 @@ Section BootBssChain.
     iDestruct (bss_cut g (KernelSyms.stack0 + 4096 * Z.of_nat NCPU)
                  KernelSyms.cons (KernelSyms.cons + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hlk1 H]".
-    iDestruct (bss_cut g (KernelSyms.cons + 24) KernelSyms.pr
+    (* the console RING, immediately after cons.lock's own 24 bytes: the
+       128 input bytes and the three index words, i.e. [ConsoleInv.cons_res].
+       Four bytes of padding separate its end from [pr]. *)
+    iDestruct (bss_cut g (KernelSyms.cons + 24) (KernelSyms.cons + 24)
+                 (KernelSyms.cons + 164) ram_hi
+                 ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hring H]".
+    iDestruct (boot_cons_res g Hmem ltac:(zlit) ltac:(zlit) ltac:(zeq)
+                 with "Hcl Hring") as "Hring".
+    iDestruct (bss_cut g (KernelSyms.cons + 164) KernelSyms.pr
                  (KernelSyms.pr + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hlk2 H]".
     (* tx_lock's window is 24 bytes like the rest: it is a [struct spinlock],
@@ -637,7 +645,7 @@ Section BootBssChain.
     { iApply (boot_main_locks_raw g Hmem with
                 "Hcl Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11"). }
     iSplitL "Hdr Hdw Hkm Hkpt Hpr1 Hpr2 Hfd Hir Hip Htk Hbsl Hbln Hhd Hino
-             Hient Hdd Hda Hdu Hdf Hdi Hslots".
+             Hient Hdd Hda Hdu Hdf Hdi Hslots Hring".
     { rewrite /main_globals_raw.
       iSplitL "Hdr Hdw".
       { iExists vdr, vdw. rewrite /devsw_console_read /devsw_console_write.
@@ -663,7 +671,8 @@ Section BootBssChain.
       { iExists (fun j : nat => boot_byte (KernelSyms.disk + 24 + Z.of_nat j)).
         rewrite disk_free_of_z. iExact "Hdf". }
       iSplitL "Hdi"; [rewrite d_used_idx_of_z; iExact "Hdi" |].
-      iExact "Hslots". }
+      iSplitL "Hslots"; [iExact "Hslots" |].
+      iExact "Hring". }
     iDestruct (big_sepL_sep with "[Hstk Hcpus]") as "Hharts";
       [iSplitL "Hstk"; [iExact "Hstk" | iExact "Hcpus"] |].
     iAssert ([∗ list] i ∈ seq 0 NCPU,

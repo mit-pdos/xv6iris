@@ -77,6 +77,8 @@ Require Import DiskPtsto WpUart DiskInv.
 Require Import UartTxInv.
 Require Import TimerCap.
 Require Import SpecClockintr.
+Require Import ConsoleInv.
+Require Import SpecConsoleintr.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -119,10 +121,16 @@ Section DevintrCaps.
        [dev_inv]      the memory-mapped device invariant (UART + PLIC +
                       virtio-mmio), which plic_claim/plic_complete open around
                       their MMIO transactions and which the UART leaves need.
-                      IT IS ALSO ALL uartintr WANTS NOW: ae96fd0's handler takes
-                      no lock and moves no device ghost, so [is_txlock] -- which
-                      used to sit here and which nothing can currently build
-                      (kernel-defects.md D2) -- is GONE from this bundle;
+                      IT IS ALSO ALL uartintr ITSELF WANTS: ae96fd0's handler
+                      takes no lock and moves no device ghost;
+       [console_caps]  what uartintr PASSES ON.  consoleintr is proven now, and
+                      its proof cannot be silent about the echo: it takes
+                      cons.lock and, through consputc, tx_lock.  So the two
+                      lock credentials come back into this bundle -- bundled,
+                      with both ghost names existential, so this is one
+                      conjunct and no parameter (SpecConsoleintr.v).  NOTHING
+                      CONSTRUCTS IT YET: see claude-notes/projects/console.md
+                      for the boot wiring it waits on;
        [disk_geom]    +
        [is_lock ... disk_res]
                       virtio_disk_intr's;
@@ -141,6 +149,7 @@ Section DevintrCaps.
       (γdk γtl : gname)  (γs : list gname)
       (pd pav pu : mword 64) : iProp Σ :=
     ( dev_inv γu γv ∗
+      console_caps γu ∗
       disk_geom γv pd pav pu ∗
       is_lock γdk d_lock "virtio_disk"%string (disk_res γv pd pav pu) ∗
       timer_cap ∗

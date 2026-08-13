@@ -26,29 +26,37 @@
    [console_caps], with the two ghost NAMES existentially quantified, so a
    caller threading it gains a conjunct and NO new parameter.  uartintr's
    contract gains [console_caps], [SpecDevintr.devintr_caps] gains it, and
-   the eight files that merely pass that bundle along do not change at all.
+   every file that merely passes that bundle along changes by one name.
 
    [uart_sent_sub γu []] rather than a threaded [bs]: consoleintr's echo is
    of no interest to any caller, so there is nothing to thread -- the empty
    claim is the baseline each [consputc] call extends and then discards.
    Keeping it INSIDE the bundle rather than minting it from [dev_inv] is
    deliberate: minting costs a fupd that opens the device invariant, and the
-   boot assembly that will eventually build this bundle has the real
-   [uart_sent] in hand anyway (consoleinit hands it back).
+   boot assembly that builds this bundle has the real [uart_sent] in hand
+   anyway (consoleinit hands it back).
 
-   *** THE CONTRACT BELOW HAS NOT YET GROWN THE BUNDLE. ***  It is still the
-   ASSUMED shape uartintr was written against; [console_caps] is defined here
-   because ProofConsoleintr.v's blocks already consume it, and moving it into
-   the contract is a one-conjunct change to [SpecDevintr.devintr_caps] that
-   waits on the whole-function proof landing.
+   [dev_inv] stays OUTSIDE the bundle: uartintr already holds it (its rx poll
+   reads the device), so folding it in would make the caller's own hypothesis
+   unreachable behind an existential pair of ghost names it does not know.
 
-   WHAT IS OWED FOR IT: nothing constructs [console_caps] yet.  Both halves
-   are [WpLock.newlock]s whose raw material exists and whose consumer did
-   not -- [is_txlock] over [UartTxInv.tx_res] (ProofMain.v names the three
-   pieces: [Hlkfresh], [Htx], [Hdoff]) and [is_conslock] over
-   [ConsoleInv.cons_res], which additionally needs the ring's .bss cells in
-   [SpecMain]'s boot bundle.  Until that lands the bundle is a premise of
-   main; see claude-notes/projects/console.md. *)
+   WHERE IT COMES FROM: [ProofMain.mn_grp_printk], right after the
+   consoleinit call that initializes both locks.  Both halves are
+   [WpLock.newlock]s -- [is_txlock] over [UartTxInv.tx_res] (out of
+   consoleinit's [lk_fresh] for tx_lock plus the transmitter token, both of
+   which that block already held) and [is_conslock] over
+   [ConsoleInv.cons_res] (out of consoleinit's own postcondition plus the
+   ring's .bss cells, now a conjunct of [SpecMain.main_globals_raw]).  It
+   then rides the [started] deposit to the secondaries.  Nothing is assumed;
+   see claude-notes/projects/console.md.
+
+   ---- WHAT THE CONTRACT NO LONGER ASKS ---------------------------------
+
+   Two premises of the ASSUMED shape were vacuous and are gone: the register
+   file's totality ([RegFile.rf_to_gmap_dom] proves it for every [m], with no
+   hypothesis) and the non-null [mycpu_ret] of the entry [tp] -- nothing
+   below consoleintr reads either.  Both were supplied at uartintr's call
+   site by an [ltac:] that named the lemma; that is the tell. *)
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -95,20 +103,21 @@ Section ConsoleCaps.
 
 End ConsoleCaps.
 
-Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-     (m : regfile) (γs : list gname)
+Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+    `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+     (γu : uart_names) (γv : disk_names) (m : regfile) (γs : list gname)
     (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
   let rettgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (consoleintr_stack <= K)%nat ->
-  (forall r : regidx, r ∈ dom (rf_to_gmap m)) ->
   length γs = NPROC ->
-  eq_vec (zero_reg : mword 64) (mycpu_ret (rget m (mword_of_int 4 : mword 5))) = false ->
   (* cons.lock's and wakeup's transient noff increments stay in int range *)
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.consoleintr) -∗
   panic_wp_any -∗ procs_inv γs -∗
+  dev_inv γu γv -∗
+  console_caps γu -∗
   wp_next b pme (fun (CID : CpuId) =>
   ∀ Mf : regfile,
       ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
@@ -120,8 +129,9 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !ire
 
 Module Type CONSOLEINTR.
   Parameter wp_consoleintr_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-       (m : regfile) (γs : list gname)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+      `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+       (γu : uart_names) (γv : disk_names) (m : regfile) (γs : list gname)
       (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool),
-      wp_consoleintr_sconf_body m γs pme lvl K eb C b.
+      wp_consoleintr_sconf_body γu γv m γs pme lvl K eb C b.
 End CONSOLEINTR.
