@@ -3327,7 +3327,7 @@ Section BallocMain.
      Keeping the CREDITED form eb-generic is not a luxury: bmap's credited
      path routes through it, and pinning it at [eb = true] would have
      forced a second, independent proof of bmap's 70 instructions.  See
-     claude-notes/projects/eb-generic-sweep.md. *)
+     claude-notes/completed/eb-generic-sweep.md. *)
   Lemma ba_main
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

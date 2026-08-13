@@ -44,7 +44,7 @@
 
    - [trap_csrs_ext eb] / [cpu_claim_ext eb pj] (iput's complement,
      UNCONDITIONAL: iput may truncate and no caller can know in advance
-     which arm runs -- see claude-notes/projects/eb-generic-sweep.md);
+     which arm runs -- see claude-notes/completed/eb-generic-sweep.md);
    - the whole disk/log/bitmap environment, because iput's last-close arm
      truncates;
    - the budget interval [(n - iput_units) <= n' <= n], spend-at-most,
@@ -156,7 +156,7 @@ Definition wp_iunlockput_sconf_body
      (SpecIput.v): [emp] at [eb = true], where iput's own acquire mints what
      its interior sleeps need; the real pair at [eb = false], where the
      caller holds it because the TRAP gave it to it.  See
-     claude-notes/projects/eb-generic-sweep.md. *)
+     claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
@@ -282,7 +282,7 @@ Definition wp_iunlockput_gen_body
      (SpecIput.v): [emp] at [eb = true], where iput's own acquire mints what
      its interior sleeps need; the real pair at [eb = false], where the
      caller holds it because the TRAP gave it to it.  See
-     claude-notes/projects/eb-generic-sweep.md. *)
+     claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗

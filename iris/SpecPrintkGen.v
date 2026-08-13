@@ -10,7 +10,7 @@
    with interrupts as it finds them.  Every ordinary caller -- main()'s four
    calls among them -- runs the GENERAL path, which acquires [pr.lock] around
    the whole format walk.  That path is blocked on uartputc_sync's general
-   contract (claude-notes/projects/printk.md), so it is assumed here and main's
+   contract (claude-notes/completed/printk.md), so it is assumed here and main's
    proof is a functor over it; proving it later replaces exactly the [Axiom].
 
    Everything about the format string and the varargs is UNCHANGED and reused

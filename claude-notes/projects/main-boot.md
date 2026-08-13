@@ -537,7 +537,8 @@ half of SpecMain's precondition: `sie_cap_gpr γ mf K` + the tp fact +
    and hart 0 via ENTRY ∘ boot-bridge ∘ MAIN-boot vs harts ≠ 0 via
    ENTRY ∘ boot-bridge ∘ MAIN-secondary.
 2. The two ASSUMED callees, each of which replaces exactly one file:
-   printk-general ([`printk.md`](printk.md), blocked on uartputc_sync's general
-   path) and `userinit`. (The five loop-sleeper re-proofs in
+   printk-general ([`printk.md`](../completed/printk.md); no longer blocked —
+   `d80e61c5` merged the paths and the proven contract is `SpecPrintk`'s, so
+   this is now the re-statement sweep §G2 describes) and `userinit`. (The five loop-sleeper re-proofs in
    [`sched-hart-generic.md`](../completed/sched-hart-generic.md) are that project's tail,
    not main's.)

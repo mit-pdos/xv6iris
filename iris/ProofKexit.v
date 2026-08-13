@@ -392,7 +392,7 @@ Section KexitLoop.
        live across the call is either hart-free, transported, or -- for the
        trap-CSR complement -- THREADED through fileclose, which is why the
        pair below is in the argument list and in the exit rather than framed.
-       See claude-notes/projects/eb-generic-sweep.md, Round 14. *)
+       See claude-notes/completed/eb-generic-sweep.md, Round 14. *)
     wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ (Mx : regfile) (Vx : pprivate),
         ⌜ kxt_regs Mx pj sv ⌝ -∗
@@ -687,7 +687,7 @@ Section KexitLoop.
            earlier attempt put it inside [fileclose_fs_env_nopid] and framed
            that bundle across the PIPE arm; there is no chain fact that could
            discharge the resulting transport.  Round 14 in
-           claude-notes/projects/eb-generic-sweep.md.) *)
+           claude-notes/completed/eb-generic-sweep.md.) *)
         iDestruct (trap_csrs_ext_transport CIDk CIDn eb pj
                      ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
         iDestruct (cpu_claim_ext_transport CIDk CIDn eb pj

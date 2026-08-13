@@ -778,3 +778,39 @@ no resource.
 `coqc`/`make`, as `durable-notes.md` says. A fresh shell here defaults to the
 `xv6iris` switch (Rocq 9.1.1), which has no `stdpp.bitvector` and fails with
 "Cannot find a physical path bound to logical path bitvector.definitions".
+
+## THE PROJECT IS DONE — and the one thing left is NOT panic's
+
+The cone is proven and linked: `LinkConsputc.v`, `LinkPrintint.v` and
+`LinkPrintk.v` seal `PrintkProof Consputc Printint Acquire Release : PRINTK`
+with no `Axiom` and `Print Assumptions` = the 5 platform externs + funext.
+`ProofPrintkinit.v` / `LinkPrintkinit.v` cover `printkinit` the same way.
+There is no remaining path in printk.c, printint or consputc.
+
+**What survives this file is `LinkPrintkGen.v`'s `Axiom
+wp_printk_gen_sconf`,** and it is neither a printk.c proof nor part of the
+panic project. `SpecPrintkGen.v` states a SECOND interface to the same
+function — `Prop`-shaped (`printk_gen_contract` / `PRINTK_GEN`, so ~15
+consumers carry it as a hypothesis rather than a functor argument) with a
+post that promises nothing about the trace, which is why those consumers
+thread no `uart_sent_sub`. It was assumed because the general path was
+blocked; upstream `d80e61c5` merged the two paths and unblocked it, so
+retiring the `Axiom` is now a re-statement sweep, not a proof:
+
+- fold `SpecPrintkGen` into `SpecPrintk` (or derive the `Prop` form from the
+  proven contract), delete `LinkPrintkGen.v`;
+- the cost lands on the ~15 consumers (`LinkBalloc`, `LinkFsinit`,
+  `LinkIalloc`, `LinkIreclaim`, `LinkMain`, `LinkMainSecondary`,
+  `LinkProcdump`, `LinkSyscall`, `LinkUartwrite`, `LinkUsertrap` and their
+  proofs), which gain `is_txlock` and the `uart_sent_sub` threading;
+- **the wiring is main's**, and it is written up there rather than here:
+  [`projects/main-boot.md`](../projects/main-boot.md) §G2 — main must then
+  mint the `tx_lock` `newlock` in `mn_grp_printk` (paid with the `lk_fresh`
+  + `uart_tx_own`/`uart_sent` it drops today) and put `is_txlock` in the
+  deposit payload so the secondaries get it.
+
+The PANIC project's leftover is a different sweep with a similar shape —
+retiring `PanicStub.v`'s placeholder credential across 169 files, whose real
+cost is in `acquire` ([`projects/panic.md`](../projects/panic.md)). Neither
+subsumes the other: one is about which contract printk's ~15 assumed-callee
+consumers see, the other about which contract every panic arm sees.

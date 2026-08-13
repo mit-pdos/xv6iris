@@ -313,7 +313,7 @@ Definition wp_bmap_sconf_body
      obligation; at [eb = false] it is the honest pair, held by the caller
      because the TRAP handed it over.  See
      claude-notes/completed/sched-hart-generic.md and
-     claude-notes/projects/eb-generic-sweep.md. *)
+     claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
@@ -480,7 +480,7 @@ Definition wp_bmap_gen_body
      [eb = true].  It no longer is: it was generalized in the same round
      as this one, so the allocating arm is reachable at either index and
      the restriction is gone.  See
-     claude-notes/projects/eb-generic-sweep.md ("Round 13"). *)
+     claude-notes/completed/eb-generic-sweep.md ("Round 13"). *)
   (fbn < MAXFILE)%nat ->
   blkmap_wf cov logstart bm ->
   (j < NPROC)%nat ->
@@ -495,7 +495,7 @@ Definition wp_bmap_gen_body
      bmap calls within its own loop and therefore cannot go through the
      counted/sconf form, which has no [cr]/[Sb] at all) can reach this
      contract at [eb = false] too.  See
-     claude-notes/projects/eb-generic-sweep.md. *)
+     claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗

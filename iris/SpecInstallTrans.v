@@ -177,7 +177,7 @@ Definition wp_install_trans_sconf_body
      exactly as [SpecBwrite.v] does: at [eb = true] this is [emp] (the
      callee's own acquire mints what it needs) and at [eb = false] it is the
      honest pair, held because the TRAP handed it over.  See
-     claude-notes/projects/eb-generic-sweep.md. *)
+     claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗

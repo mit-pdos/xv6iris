@@ -312,7 +312,7 @@ Definition wp_readi_sconf_body
      is [emp] and no existing caller gains an obligation; at [eb = false]
      the caller holds it because the trap handed it over, and readi
      threads it to bmap and bread unchanged and takes it back from each in
-     turn.  See claude-notes/projects/eb-generic-sweep.md. *)
+     turn.  See claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗

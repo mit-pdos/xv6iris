@@ -362,7 +362,7 @@ Definition wp_itrunc_sconf_body
      caller because the TRAP handed it over, and itrunc threads it straight
      through to each callee and back, unused, all the way to its own exit.
      See claude-notes/completed/sched-hart-generic.md and
-     claude-notes/projects/eb-generic-sweep.md. *)
+     claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗

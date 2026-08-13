@@ -157,7 +157,7 @@ Definition wp_bfree_gen_body
      caller because the TRAP handed it over, and bfree just threads it
      unchanged to bread and back.  See
      claude-notes/completed/sched-hart-generic.md and
-     claude-notes/projects/eb-generic-sweep.md. *)
+     claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
@@ -270,7 +270,7 @@ Definition wp_bfree_sconf_body
      caller because the TRAP handed it over, and bfree just threads it
      unchanged to bread and back.  See
      claude-notes/completed/sched-hart-generic.md and
-     claude-notes/projects/eb-generic-sweep.md. *)
+     claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗

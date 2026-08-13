@@ -345,7 +345,7 @@ Section SpecFileclose.
        literal [true] on every arm -- so anything hart-indexed left in here
        would have to be transported to an arbitrary hart with no chain fact
        to do it with.  The complement is handed in and given back on EVERY
-       arm instead.  See claude-notes/projects/eb-generic-sweep.md. *)
+       arm instead.  See claude-notes/completed/eb-generic-sweep.md. *)
     (⌜(n = 0)%nat⌝ ∗ ⌜p = proc_addr (fcn_j fn)⌝ ∗
      ⌜(fcn_j fn < NPROC)%nat⌝ ∗
      ⌜fcn_procs fn !! fcn_j fn = Some (fcn_plock fn)⌝ ∗
@@ -633,7 +633,7 @@ Definition wp_fileclose_sconf_body
      can only have come from the TRAP.  Top-level rather than inside
      [fileclose_fs_env] -- see that bundle's banner for why the FS arm is
      the wrong home for it.  See
-     claude-notes/projects/eb-generic-sweep.md. *)
+     claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb p -∗
   kernel_text -∗ pc_is pcE -∗

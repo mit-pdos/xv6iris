@@ -555,7 +555,7 @@ Definition wp_writei_sconf_body
      balloc's CREDITED contract, and that one was still pinned at
      [eb = true].  Both have since been generalized, so the allocating
      path is reachable at either index and the restriction is gone.  See
-     claude-notes/projects/eb-generic-sweep.md ("Round 13"). *)
+     claude-notes/completed/eb-generic-sweep.md ("Round 13"). *)
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  writei holds no lock of
@@ -568,7 +568,7 @@ Definition wp_writei_sconf_body
      caller gains an obligation; at [eb = false] it is the honest pair, held
      by the caller because the TRAP handed it over.  See
      claude-notes/completed/sched-hart-generic.md and
-     claude-notes/projects/eb-generic-sweep.md. *)
+     claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
@@ -841,7 +841,7 @@ Definition wp_writei_gen_body
      bitmap-block credit to bmap across several iterations, which only the
      SET form ([bmap]'s [cr]/[Sb]) can express, so the derivation has to
      reach through here at whatever [eb] the counted caller was given.  See
-     claude-notes/projects/eb-generic-sweep.md. *)
+     claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗

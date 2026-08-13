@@ -214,7 +214,7 @@ Then `usertrap` itself: its contract is the assumed-but-stated
 `SpecUsertrap.v` boundary layer, the decode layer is `CodeUsertrap.v` (90
 instructions), and `SpecSyscall.v` / `LinkSyscall.v` state syscall's
 contract as ASSUMED with one abstract `syscall_env γf pj`. See
-[`uservec.md`](uservec.md).
+[`uservec.md`](../projects/uservec.md).
 
 `prepare_return` is already index-generic (`WpIntrOff.v`), so usertrap's
 other blocker is gone.
@@ -408,3 +408,41 @@ the strong fact `eb = b` and a `rewrite` at the transport guards is enough:
 
 Prefer the weak form when writing new code: it needs no premise about the
 nesting level and works in both situations.
+
+## THE PROJECT IS DONE — the whole worklist landed, and usertrap calls kexit
+
+Every function in the "REMAINING, in dependency order" list above is
+eb-generic: `virtio_disk_rw`, `bread`, `bwrite`, `ilock`, `begin_op`,
+`install_trans`, `write_head`, `end_op`, `iupdate`, `balloc`, `bfree`,
+`bmap`, `itrunc`, `readi`, `writei`, `iput`, `iunlockput`, `fileclose`,
+`kexit`. None of their `Spec*.v` carries a live `eb = true ->` any more
+(the string survives only in the comments that record where it used to be —
+grep with comments stripped before believing a hit).
+
+The goal is met at the consumer: **`usertrap` is proven and linked**
+(`ProofUsertrap*.v` / `LinkUsertrap.v`, no `Axiom` of its own), and
+`ProofUsertrapTail.v` applies `wp_kexit_sconf` on the disabled-base arms
+that motivated the sweep. `LinkKexit.v`, `LinkIput.v` and `LinkFileclose.v`
+are axiom-free.
+
+**One deliberate pin, so nobody reads it as a leftover.**
+`SpecIupdate.wp_iupdate_cred_body` still says `eb = true ->`. It is an
+INSTANCE of the eb-generic `wp_iupdate_credgen_body` (Round 13's rule was
+followed: the generic credited core exists, and `wp_iupdate_cred` is it at
+`eb := true`, kept as its own parameter so create's positional applications
+do not move). Do not "fix" it.
+
+**What is still pinned above the cone, and why that is not this project.**
+~25 contracts outside the kexit dependency chain still carry `eb = true ->`:
+`namei` / `nameiparent` / `namex`, `dirlookup` / `dirlink`, `create`,
+`ialloc`, `ireclaim`, `fileread` / `filewrite` / `filestat`, `piperead` /
+`pipewrite`, `consoleread` / `consolewrite`, `uartwrite`, `kwait`, `kexec`,
+`fsinit`, `initlog` and the `sys_*` wrappers. Each is reached from a syscall
+or from boot with an enabled base, so the premise is true of every caller
+that exists and nothing is blocked on dropping it. If one of them ever needs
+to be callable with interrupts off, this file is the recipe — in particular
+the complement (`trap_csrs_ext` / `cpu_claim_ext`) threading, the Round 14
+rule that it may not live in a bundle a caller can FRAME, `Hebf` /
+`ext_chain` for the eb-guard-to-b-guard bridge, and the note that
+`dirlookup` / `dirlink` / `namex` / `filestat` still carry the `Hb`
+scaffolding that goes away when they are generalized in their own right.
