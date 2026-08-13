@@ -204,7 +204,7 @@ takes the real reference. (The kfork line's `InodeRef.iref_at` /
 `iref_shr_at` were a second spelling of the same idea over a `natR`
 algebra with count-0 shares; `InodeRef.v` survives the merge as a thin
 re-export of `IcacheRef`/`IrefSlots`, and the share vocabulary is
-deferred to the T5 cycle — see projects/reconcile-fork-icache.md.)
+deferred to the T5 cycle — see completed/reconcile-fork-icache.md.)
 
 ### The lock's resource
 
@@ -1572,7 +1572,7 @@ practice; we do not prove that, we permit it — the ilock/iget live
 panics are the precedent.
 
 > **(2) STOPPED BEING TRUE at xv6 `ae96fd0`** — see
-> [`../projects/sleep-split.md`](../projects/sleep-split.md). The split
+> [`../projects/sleep-split.md`](../completed/sleep-split.md). The split
 > protocol's `sleep()` parks only when `p->chan` is still non-zero, so a
 > thread that enters it with a lock held either panics (chan armed) or
 > RETURNS having done nothing (a wakeup cleared it). Nothing can rule the
@@ -2129,7 +2129,7 @@ liveness twin). Kept deliberately as the reference-side form.
 ### idup's mint, and the one thing a short parent cannot do
 
 Tree green (937 `.vo`), coverage unchanged, assumption sets unchanged.
-`projects/reconcile-fork-icache.md`'s "What B3 actually landed" is the WHAT;
+`completed/reconcile-fork-icache.md`'s "What B3 actually landed" is the WHAT;
 this is the design half.
 
 **§14.6's third shape, as built.** The FD_INODE payload is

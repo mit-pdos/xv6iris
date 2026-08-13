@@ -62,7 +62,7 @@ This is the group `proc_lock_res` already covers (`state`, `chan`); `killed`
 and `xstate` join it unchanged.
 
 **`chan` is the WAKEUP FLAG, not bookkeeping** (upstream `ae96fd0`; see
-[`../projects/sleep-split.md`](../projects/sleep-split.md)). `sleep_prepare`
+[`../projects/sleep-split.md`](../completed/sleep-split.md)). `sleep_prepare`
 records it, `sleep` parks only if it is still non-zero, and `wakeup` clears it
 for every matching slot whether or not that slot is SLEEPING — which is what
 closes the window the split protocol opens between a waiter's registration and
@@ -173,7 +173,7 @@ touch this group:
   disciplines below. It is now specified and proved, and what its contract had
   to do about the race — a per-slot read-share supplied by the caller, and why
   neither an invariant-based atomic peek nor a permanent read-share can work —
-  is [`projects/procdump.md`](../projects/procdump.md).
+  is [`projects/procdump.md`](../completed/procdump.md).
 
 So the right statement is: **the group is exclusively owned, and the owner is
 whoever last took the slot out of the lock invariant.** The lock invariant must

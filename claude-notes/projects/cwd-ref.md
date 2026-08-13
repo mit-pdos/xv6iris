@@ -17,7 +17,7 @@
 > (p->cwd), the caller-side "gather first" story cannot tell iput that
 > `q` is the whole slice; the whole-outstanding-share WITNESS remains
 > the unsolved design on both lines. See
-> projects/reconcile-fork-icache.md, round 2.
+> completed/reconcile-fork-icache.md, round 2.
 
 > **MERGE NOTE (2026-08-10, reconcile-fork-icache).** This file records the
 > kfork line's design and is kept verbatim as that line's record. Three of

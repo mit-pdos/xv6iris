@@ -421,7 +421,7 @@ supplies). The two original instances, for the record:
 
 Both halves now have their own project files —
 [`kpt-share.md`](../completed/kpt-share.md) and
-[`sched-hart-generic.md`](sched-hart-generic.md); read those before touching
+[`sched-hart-generic.md`](../completed/sched-hart-generic.md); read those before touching
 either.
 
 Also worth recording: `strans_name : gname` in `riscvGS` is GLOBAL (5 use sites:
@@ -537,5 +537,5 @@ half of SpecMain's precondition: `sie_cap_gpr γ mf K` + the tp fact +
 2. The two ASSUMED callees, each of which replaces exactly one file:
    printk-general ([`printk.md`](printk.md), blocked on uartputc_sync's general
    path) and `userinit`. (The five loop-sleeper re-proofs in
-   [`sched-hart-generic.md`](sched-hart-generic.md) are that project's tail,
+   [`sched-hart-generic.md`](../completed/sched-hart-generic.md) are that project's tail,
    not main's.)
