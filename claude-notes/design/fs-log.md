@@ -1539,3 +1539,95 @@ open design question, for whoever takes it: `IcacheRef.inode_held` hides
 the generation, so the success post needs a generation-NAMED form beside
 it (`inode_shr_held_gen`'s shape, at a full reference rather than a
 share), and that definition lives in `IcacheRef.v` — a 350-file cone.
+
+
+### G.21 G-3b LANDED (2026-08-13): the epoch tier — the birth epoch is
+### threaded syntactically from iput's entry down to the log_write that
+### claims the credit, and `log_opSe` now carries genesis-positivity
+
+**THE VOCABULARY.**  `LogInv`:
+
+    log_opSe γ u Sb e0 := (∃ i, i ↪[ln_ops γ] (u,Sb,e0)) ∗ log_epoch_lb γ e0
+                          ∗ ⌜1 <= e0⌝
+    log_opSwe γ u Sb b v e0 := log_opSe γ u Sb e0 ∗ logged_at γ e0 b ∗ ⌜v <= e0⌝
+    log_opSw  γ u Sb b v    := ∃ e0, log_opSwe γ u Sb b v e0
+
+`log_opSwe` is the PRIMITIVE and `log_opSw` its epoch-closed reading —
+`log_opSwe_opSw` / `log_opSwe_opSe` are the two exits, and closing is what
+a receipt's depositor wants while a WALKER keeps the name.  Also new:
+`log_opSe_pos` (the positivity read off an entry — this is what a client
+hands `InodeRegion.ireg_obs_use`, whose `⌜1 <= e0⌝` premise nothing could
+satisfy before), and `log_credit_mono` (set-monotone, exactly as the pure
+own-set claim it generalises is; itrunc's two tail sites need it because
+the loops hand the tail their RUNNING set).
+
+**POSITIVITY IS NOT FREE AT THE MINT — IT NEEDS A LEDGER CLAUSE, AND
+§G.20's "free at `log_begin_step`" WAS WRONG ABOUT WHERE.**  A `mono_nat`
+auth says nothing about its own value, and an lb bounds the epoch from
+below only where the holder already knows the epoch; `log_epoch_alloc`
+starting at one is a fact that reaches nothing.  So `log_res` carries
+`⌜1 <= E⌝` (beside the `ln_ep` auth), `log_begin_step` takes it as a
+hypothesis and stamps it into the new entry, and it is re-established for
+free at the only two transitions: initlog sets `E = 1`, and the commit
+bump goes `E -> S E`.  Cost: one conjunct and one line at each of the
+thirteen `log_res` open/close sites (ProofBeginOp 1 open + 3 closes — one of
+them spells the resource out INLINE rather than through `/log_res`, which
+is easy to miss — ProofEndOp 2 + 3, ProofLogWrite 1 + 2, ProofInitlog 1).
+No Spec statement moves; `log_res` is invisible above the log's own proofs.
+
+**THE POST HAD TO MOVE AFTER ALL, AND IT COST TWO LINES, NOT TWO FILES.**
+§G.20 said not to touch `log_write`'s post.  That is right about
+`log_opSw` — no depositor compares epochs — but a WALKER cannot derive its
+own `e0` from an existential, and `wp_log_write_gene` is underivable
+without it.  `wp_log_write_au`'s post is therefore `log_opSwe … e0` at the
+caller's own `e0`, and its two landed callers (ProofIupdate, ProofIalloc)
+each gained ONE `log_opSwe_opSw`.  Everything else about §G.20's
+asymmetry stands: each contract is `log_opSe` IN and, above log_write,
+`log_opS` OUT.
+
+**e0-PRESERVATION IS THE TRUTH STATED, NOT A NEW PROOF OBLIGATION.**
+ProofLogWrite already derives `e0 = Ep` from `log_res`'s live-entry clause
+(`forall i e, om !! i = Some e -> e.2 = E`) and `subst`s it; both ledger
+steps (`log_spend_step`, `log_record_step`) update the entry IN PLACE at
+the same `e0`, and the epoch's only transition — the commit bump — runs
+with `out = 0`, hence no live entry.  So naming the epoch in the post cost
+the whole-function proof exactly two lines (the `Bud` pose and its
+`iAssert`).  `Bud` being an opaque `iProp` threaded through every `lw_*`
+block is what kept it that cheap; `subst e0` substitutes into a
+`pose`d let-body without complaint.
+
+**THE CONTRACTS, AS LANDED.**
+
+| contract | shape |
+|---|---|
+| `wp_log_write_au` | `log_credit γ cr Sb e0 (uint bno)` + `log_opSe γ (S u) Sb e0` in; `log_opSwe γ u' Sb' (uint bno) vlb e0` out |
+| `wp_log_write_gene` | as `_gen` but the credit is the RESOURCE, the ledger is `log_opSe`, and the post is `log_opSe … e0` + `logged_at γ e0 (uint bno)` |
+| `wp_log_write_gen` | UNCHANGED; derived from `_gene` by `log_opS_named` + `log_credit_own` + dropping both |
+| `wp_bfree_gen` | LIFTED IN PLACE (its only caller is itrunc): credit resource + `log_opSe` in, `log_opSe … e0` out.  `wp_bfree_sconf` unchanged, derived through it |
+| `bm_paidS` | one more parameter `e0`, threaded through `it_dir_state` / `it_ent_state` / `bm_paidS_intro/use/elim` — constant across both loops for exactly the reason `Sb` is |
+| `wp_itrunc_gen` | the `cru` premise becomes `log_credit γ cru Sb e0 (IBLOCK inum inodestart)`, the reservation `log_opSe γ (it_entry crb u) Sb e0`; `crb` stays PURE (the bitmap block is one this op logs itself) and the POST still closes the epoch |
+| `wp_itrunc_sconf`, `wp_iput_gen`, and every counted caller | UNCHANGED |
+
+Two contracts were lifted IN PLACE rather than twinned (`wp_bfree_gen`,
+`wp_itrunc_gen`) because their only callers move in the same stage;
+`wp_log_write_gen` was twinned because bmap/balloc/writei/dirlink hold it.
+The rule: twin only where a landed caller would otherwise move.
+
+**Per-file cost** (14 files, +532/−206): LogInv +112/−20, SpecLogWrite
++106/−5, ProofLogWrite +70/−29, SpecBfree +25/−14, ProofBfree +33/−22,
+SpecItrunc +41/−18, ProofItrunc +86/−68, ProofItruncParts +23/−20,
+ProofIput +13/−3, ProofBeginOp +12/−5, ProofEndOp +5/−2, ProofInitlog
++4/−0, ProofIupdate/ProofIalloc +1 each.  §G.20 priced the tier at
+"~50 + ~20 lines, small, the real statement work, ~20 sites"; the two
+under-prices were the `log_res` positivity clause (a file set §G.20 did
+not name) and `ProofItruncParts`, and neither is a 2× miss on the tier.
+
+**WHAT THIS UNBLOCKS.**  The ledger side of the `crz` chain is now
+CONTINUOUS below iput: `nlz_obs cn k e0` → `ireg_obs_use` (its `⌜1 <= e0⌝`
+premise discharged by `log_opSe_pos`) → `log_credit_group` →
+`wp_itrunc_gen`'s `cru` → both bfree loops (`bm_paidS` at a fixed `e0`,
+`log_credit_mono` for the running set's growth) → `it_tail` →
+`wp_iupdate_credgen` → `wp_log_write_au` → `log_credit_use`/`log_use_group`.
+G-4 stage 2 (iput's own contract taking the credit and the epoch instead
+of building them with `log_credit_own`) is now the same three-line
+movement one tier up, with nothing further owed below it.

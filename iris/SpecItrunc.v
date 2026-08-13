@@ -193,11 +193,19 @@ Section ItruncSpec.
   (*  which needs [iunlockput] to spend EXACTLY ZERO while actually        *)
   (*  freeing ([CreateBudget.ip_spend crb cru true = 0] at [crb = cru =    *)
   (*  true]), would not close.                                            *)
+  (*  AND THE BIRTH EPOCH IS THREADED THROUGH IT (fs-log.md §G.20).  [e0]   *)
+  (*  is CONSTANT across both loops for exactly the reason [Sb] is: it is   *)
+  (*  what the caller had on the way in, and nothing an open operation can  *)
+  (*  do moves it.  Without it the tail flush could not present a GROUP     *)
+  (*  credit at all -- a credit is a claim at a NAMED epoch, and every      *)
+  (*  bfree in the loops would otherwise close the existential (§G.20's     *)
+  (*  blocker).  Threaded, not proven: one more parameter on the two loop   *)
+  (*  states.                                                              *)
   Definition bm_paidS (γ : log_names) (bmapstart : Z) (crb : bool)
-      (u : nat) (Sb : gset Z) : iProp Σ :=
-    ((∃ Sb' : gset Z, ⌜Sb ⊆ Sb'⌝ ∗ ⌜bmapstart ∈ Sb'⌝ ∗ log_opS γ (S u) Sb')
+      (u : nat) (Sb : gset Z) (e0 : nat) : iProp Σ :=
+    ((∃ Sb' : gset Z, ⌜Sb ⊆ Sb'⌝ ∗ ⌜bmapstart ∈ Sb'⌝ ∗ log_opSe γ (S u) Sb' e0)
      ∨ (⌜crb = false⌝ ∗
-        ∃ Sb' : gset Z, ⌜Sb ⊆ Sb'⌝ ∗ log_opS γ (S (S u)) Sb'))%I.
+        ∃ Sb' : gset Z, ⌜Sb ⊆ Sb'⌝ ∗ log_opSe γ (S (S u)) Sb' e0))%I.
 
   (* the level itrunc is HANDED, as a function of the bitmap credit: paid
      up front costs one unit less, because the bitmap block's slot is
@@ -218,9 +226,9 @@ Section ItruncSpec.
   (* entering the loops CREDITED: the paid disjunct at the caller's own set,
      so no unit is spent on the bitmap at all.  At [crb = false] this is
      [bm_paid_intro] with the set remembered. *)
-  Lemma bm_paidS_intro γ bmapstart crb u Sb :
+  Lemma bm_paidS_intro γ bmapstart crb u Sb e0 :
     (crb = true -> bmapstart ∈ Sb) ->
-    log_opS γ (it_entry crb u) Sb -∗ bm_paidS γ bmapstart crb u Sb.
+    log_opSe γ (it_entry crb u) Sb e0 -∗ bm_paidS γ bmapstart crb u Sb e0.
   Proof.
     intros Hcrb. iIntros "H". rewrite /bm_paidS /it_entry.
     destruct crb.
@@ -233,10 +241,10 @@ Section ItruncSpec.
   (* leaving them: at least the [S u] units iupdate still needs, and never
      more than what came in.  The [crb] guard is what makes the upper bound
      tight on the credited arm. *)
-  Lemma bm_paidS_elim γ bmapstart crb u Sb :
-    bm_paidS γ bmapstart crb u Sb -∗
+  Lemma bm_paidS_elim γ bmapstart crb u Sb e0 :
+    bm_paidS γ bmapstart crb u Sb e0 -∗
       ∃ (n : nat) (Sb' : gset Z),
-        ⌜Sb ⊆ Sb'⌝ ∗ ⌜(S u <= n <= it_entry crb u)%nat⌝ ∗ log_opS γ n Sb'.
+        ⌜Sb ⊆ Sb'⌝ ∗ ⌜(S u <= n <= it_entry crb u)%nat⌝ ∗ log_opSe γ n Sb' e0.
   Proof.
     rewrite /bm_paidS /it_entry. iIntros "[H|[%Hc H]]".
     - iDestruct "H" as (Sb') "(%Hsub & _ & H)".
@@ -485,7 +493,7 @@ Definition wp_itrunc_gen_body
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
     (data : nat -> list (bv 8))
-    (u : nat) (Sb : gset Z) (crb cru : bool)
+    (u : nat) (Sb : gset Z) (crb cru : bool) (e0 : nat)
     (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
     (b : bool) :=
@@ -493,11 +501,13 @@ Definition wp_itrunc_gen_body
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_itrunc <= K)%nat ->
-  (* THE TWO ABSORPTION CREDITS' HONESTY PREMISES.  Same device
+  (* THE BITMAP CREDIT'S HONESTY PREMISE.  Same device
      [SpecBmap]/[SpecLogWrite]/[SpecIupdate] all carry: the claim is only
-     usable when the block really is in the op's set. *)
+     usable when the block really is in the op's set.  It stays PURE
+     because the bitmap block is one this op logs itself -- the credit is
+     handed straight to [bm_paidS_intro]'s paid disjunct, never to a group
+     claimant. *)
   (crb = true -> bmapstart ∈ Sb) ->
-  (cru = true -> IBLOCK inum inodestart ∈ Sb) ->
   log_geom_ok cov logstart ->
   0 < size <= BPB ->
   0 <= bmapstart ->
@@ -541,10 +551,23 @@ Definition wp_itrunc_gen_body
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslots bn 3 -∗
-  (* THE RESERVATION, SET FORM: [it_entry crb u] units at the caller's own
-     set.  Credited, that is ONE unit less than the counted contract asks
-     for -- which is the whole point. *)
-  log_opS γ (it_entry crb u) Sb -∗
+  (* THE TAIL FLUSH'S CREDIT, AS A RESOURCE AT A NAMED EPOCH (fs-log.md
+     §G.20).  [cru] says "this inode's block is already in lh.block[]", and
+     the claim goes straight through both loops to the closing iupdate.  It
+     is a [log_credit] rather than the pure [IBLOCK … ∈ Sb] because THIS is
+     the unit a [crz] caller has to buy with a GROUP witness: outside the log
+     spinlock a group claim cannot be turned into a set membership (§G.19),
+     so a pure premise here is a premise no [crz] caller could ever satisfy.
+     [LogInv.log_credit_own] converts for every caller that does hold the
+     own-set fact, so the counted and create paths are unchanged. *)
+  log_credit γ cru Sb e0 (IBLOCK inum inodestart) -∗
+  (* THE RESERVATION, SET FORM AND EPOCH-NAMED: [it_entry crb u] units at the
+     caller's own set, at the birth epoch the credit above is ordered
+     against.  Credited, that is ONE unit less than the counted contract asks
+     for -- which is the whole point.  The POST closes the epoch again
+     ([log_opS]): nothing downstream of the flush compares epochs, and the
+     asymmetry is deliberate (§G.20). *)
+  log_opSe γ (it_entry crb u) Sb e0 -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
@@ -621,12 +644,12 @@ Module Type ITRUNC.
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (data : nat -> list (bv 8))
-      (u : nat) (Sb : gset Z) (crb cru : bool)
+      (u : nat) (Sb : gset Z) (crb cru : bool) (e0 : nat)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
       wp_itrunc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                          cov logstart bmapstart inodestart nib size dev used
-                         ip inum dn dn0 bm data u Sb crb cru
+                         ip inum dn dn0 bm data u Sb crb cru e0
                          pidv dq dqd dqn dqb dqs m K eb C b.
 End ITRUNC.

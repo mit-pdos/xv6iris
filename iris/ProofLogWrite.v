@@ -1737,8 +1737,8 @@ Section ProofLogWrite.
     intros pcE ret_tgt HK Hnoff Hk Ha0 Hcovbno Hnotlog.
     (* the budget resource this run delivers, threaded opaquely through the
        lw_* helpers -- none of them inspects it *)
-    pose (Bud := (log_opSw γ (if cr then S u else u) (Sb ∪ {[uint bno]})
-                    (uint bno) vlb)%I).
+    pose (Bud := (log_opSwe γ (if cr then S u else u) (Sb ∪ {[uint bno]})
+                    (uint bno) vlb e0)%I).
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hbslot #Hvlb #Hcredit Hop Hau Hheld Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbeq.
@@ -1960,7 +1960,7 @@ Section ProofLogWrite.
     (* ================= THE CRITICAL SECTION ================= *)
     rewrite /log_res.
     iDestruct "HRres" as (out cmt nc om Ep Xr)
-      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & Hxa & %Hlive & %Hcap & Hbatch)".
+      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Hbatch)".
     (* THIS OP'S BIRTH EPOCH ARRIVES NAMED (fs-log.md §G.19): the credit's
        group form is stated against it, so the contract takes [log_opSe] and
        [e0] is a parameter.  The auth's own soundness clause is about to pin
@@ -2143,7 +2143,7 @@ Section ProofLogWrite.
     iDestruct (log_epoch_lb_le γ Ep vlb with "Hepa Hvlb") as %Hvle.
     iAssert Bud with "[Hop]" as "Hop".
     { rewrite /Bud.
-      iApply (log_opSw_intro γ _ _ Ep (uint bno) vlb Hvle with "Hop").
+      iApply (log_opSwe_intro γ _ _ Ep (uint bno) vlb Hvle with "Hop").
       iExact "Hwit". }
     assert (Hnl : (nl <= 29)%nat) by (unfold LOGBLOCKS in Hsum; lia).
     (* ...and in the header's terms: this is what refutes the append
@@ -2376,7 +2376,9 @@ Section ProofLogWrite.
           iSplitR; [iPureIntro; exact HbndL|].
           iSplitR; [iPureIntro; exact Hout3|].
           iSplitR; [iPureIntro; intros Hc; discriminate|].
-          iFrame "Hepa Hxa".
+          iFrame "Hepa".
+          iSplitR; [iPureIntro; exact Hepos|].
+          iFrame "Hxa".
           iSplitR; [iPureIntro; exact HliveL|].
           (* the new row carries the CURRENT epoch, so the cap still holds *)
           iSplitR.
@@ -2457,7 +2459,9 @@ Section ProofLogWrite.
           iSplitR; [iPureIntro; exact HbndL|].
           iSplitR; [iPureIntro; exact Hout3|].
           iSplitR; [iPureIntro; intros Hc; discriminate|].
-          iFrame "Hepa Hxa".
+          iFrame "Hepa".
+          iSplitR; [iPureIntro; exact Hepos|].
+          iFrame "Hxa".
           iSplitR; [iPureIntro; exact HliveL|].
           iSplitR.
           { iPureIntro. intros e' b' Hin.
@@ -2679,10 +2683,53 @@ Section ProofLogWrite.
                       HW Hjhead Hncell Hcl Hcont").
   Qed.
 
-  (* THE HELD-fsblock CONTRACT, derived from the atomic-update one: a caller
-     that already owns the half runs the update at [Efs := ⊤] and pays itself
-     the half straight back, so the fupd is two [iModIntro]s and the two
-     continuations coincide verbatim. *)
+  (* THE EPOCH-EXPOSED CONTRACT (fs-log.md §G.20), derived from the
+     atomic-update one at a held [fsblock] and the trivial anchor
+     ([vlb := 0], so the [⌜vlb <= e0⌝] the post carries is free and gets
+     dropped here).  NOTHING IS FORGOTTEN: the entry comes back at the very
+     [e0] that went in, which is the one thing [wp_log_write_gen] below
+     cannot say and the reason this form exists. *)
+  Lemma wp_log_write_gene
+      (bn : bio_names)
+      (γ : log_names) (γfs : fs_names) (γd : disk_names)
+      (cov : gset Z) (logstart : Z) (dev : mword 32)
+      (k : nat) (pidv bno : mword 32)
+      (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
+      (cr : bool) (Sb : gset Z) (e0 : nat)
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (K : nat) (b : bool)
+    : wp_log_write_gene_body bn γ γfs γd cov logstart dev k pidv bno
+                             bs bsl bsd d u cr Sb e0 m n eb p C K b.
+  Proof.
+    cbv beta delta [wp_log_write_gene_body].
+    intros pcE ret_tgt HK Hnoff Hk Ha0 Hcovbno Hnotlog.
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hbslot #Hcred Hop Hfsb Hheld Hcont".
+    (* the anchor at 0: a lower bound of zero is the unit, so this form costs
+       its callers no epoch anchor of their own *)
+    iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
+    iApply (wp_log_write_au bn γ γfs γd cov logstart dev k pidv bno
+              bs bsl bsd d u cr Sb e0 0%nat ⊤ (fsblock γfs (uint bno) bs)%I
+              m n eb p C K b
+              HK Hnoff Hk Ha0 Hcovbno Hnotlog
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hbslot Hlb0 Hcred Hop [Hfsb] Hheld [Hcont]").
+    2: { iIntros (CIDx) "%Hchain".
+         iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
+         iIntros (mr) "Hsie Hcnt Hpc %Hcs HopW Hfsb Hlk Hslot".
+         rewrite /log_opSwe.
+         iDestruct "HopW" as "(HopS & #Hwit & _)".
+         iApply ("Hcont" $! mr with "Hsie Hcnt Hpc [%] HopS Hwit Hfsb Hlk Hslot").
+         exact Hcs. }
+    iModIntro. iExists bsl. iFrame "Hfsb".
+    iIntros (_) "Hfsb". iModIntro. iExact "Hfsb".
+  Qed.
+
+  (* THE HELD-fsblock CONTRACT, derived from the epoch-exposed one by
+     CLOSING the epoch: a caller that threads [log_opS] opens its own [e0]
+     with [log_opS_named], builds the credit's own-set disjunct from the pure
+     premise it already had ([log_credit_own]), and drops both the epoch and
+     the registry row on the way out.  That forgetting is what keeps every
+     landed caller -- bfree's credited arm, balloc's bitmap write, writei's
+     [bool_decide] -- byte-stable. *)
   Lemma wp_log_write_gen
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γd : disk_names)
@@ -2698,9 +2745,6 @@ Section ProofLogWrite.
     cbv beta delta [wp_log_write_gen_body].
     intros pcE ret_tgt HK Hnoff Hk Ha0 Hcovbno Hnotlog Hcredit.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hbslot Hop Hfsb Hheld Hcont".
-    (* the anchor at 0: a lower bound of zero is the unit, so the derived
-       form costs its callers nothing and keeps every landed one byte-stable *)
-    iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
     (* THE CREDIT, IN ITS OWN-SET FORM (fs-log.md §G.19).  This form's
        premise is the PURE one it always was, and [log_credit_own] is the
        whole conversion: the birth epoch is opened here (the group form
@@ -2709,23 +2753,20 @@ Section ProofLogWrite.
        write, writei's [bool_decide] -- stays byte-stable. *)
     iDestruct (log_opS_named with "Hop") as (e0) "Hop".
     iPoseProof (log_credit_own γ cr Sb e0 (uint bno) Hcredit) as "#Hcred".
-    iApply (wp_log_write_au bn γ γfs γd cov logstart dev k pidv bno
-              bs bsl bsd d u cr Sb e0 0%nat ⊤ (fsblock γfs (uint bno) bs)%I
-              m n eb p C K b
+    iApply (wp_log_write_gene bn γ γfs γd cov logstart dev k pidv bno
+              bs bsl bsd d u cr Sb e0 m n eb p C K b
               HK Hnoff Hk Ha0 Hcovbno Hnotlog
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hbslot Hlb0 Hcred Hop [Hfsb] Hheld [Hcont]").
-    2: { (* the witness is DROPPED here, which is what keeps every landed
-            [wp_log_write_gen] caller byte-stable: only the atomic-update
-            form -- the one iupdate/ialloc use, and the one §G.3's receipt
-            is deposited from -- carries the epoch-stamped row. *)
-         iIntros (CIDx) "%Hchain".
-         iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
-         iIntros (mr) "Hsie Hcnt Hpc %Hcs HopW Hfsb Hlk Hslot".
-         iDestruct (log_opSw_opS with "HopW") as "HopS".
-         iApply ("Hcont" $! mr with "Hsie Hcnt Hpc [%] HopS Hfsb Hlk Hslot").
-         exact Hcs. }
-    iModIntro. iExists bsl. iFrame "Hfsb".
-    iIntros (_) "Hfsb". iModIntro. iExact "Hfsb".
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hbslot Hcred Hop Hfsb Hheld [Hcont]").
+    (* the epoch and the witness are DROPPED here, which is what keeps every
+       landed [wp_log_write_gen] caller byte-stable: only the epoch-exposed
+       and atomic-update forms -- the walkers', and the one §G.3's receipt is
+       deposited from -- carry the epoch-stamped row. *)
+    iIntros (CIDx) "%Hchain".
+    iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
+    iIntros (mr) "Hsie Hcnt Hpc %Hcs HopS _ Hfsb Hlk Hslot".
+    iDestruct (log_opSe_opS with "HopS") as "HopS".
+    iApply ("Hcont" $! mr with "Hsie Hcnt Hpc [%] HopS Hfsb Hlk Hslot").
+    exact Hcs.
   Qed.
 
   (* THE SET-FORGETTING CONTRACT, derived from the general one at

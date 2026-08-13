@@ -1468,6 +1468,7 @@ Section IallocClaim.
        named and the epoch-stamped registry row attached (fs-log.md §G.3);
        iupdate/ialloc do not spend it yet, so it is forgotten right here and
        everything below is unchanged.  G-2 replaces this line. *)
+    iDestruct (log_opSwe_opSw with "HopS") as "HopS".
     iDestruct (log_opSw_opS with "HopS") as "Hop".
     assert (Hpc9e : ret_pc (W5 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ialloc + 0x9e)) by (rewrite HW5ra; pcw).

@@ -109,7 +109,7 @@ Definition wp_bfree_gen_body
     (γ : log_names) (γfs : fs_names)
     (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
     (used : gset Z) (bno : mword 32) (bs : list (bv 8))
-    (u : nat) (cr : bool) (Sb : gset Z)
+    (u : nat) (cr : bool) (Sb : gset Z) (e0 : nat)
     (pidv : mword 32) (dq dqb : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
     (b : bool) :=
@@ -137,11 +137,6 @@ Definition wp_bfree_gen_body
   ~ (bv_unsigned bno ∈ log_region_set logstart) ->
   (* ...and it really is a block's worth of bytes *)
   length bs = BSIZE ->
-  (* THE CREDIT'S PREMISE: claiming the free arm means claiming this op has
-     already logged THE BITMAP BLOCK in this batch.  There is only one --
-     FSSIZE = 2000 < BPB = 8192 -- which is why itrunc can free 269 blocks
-     against a single credit. *)
-  (cr = true -> bmapstart ∈ Sb) ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* the two uint arguments arrive sign-extended (RV64 ABI) *)
@@ -184,11 +179,27 @@ Definition wp_bfree_gen_body
   (* TWO slot units: bread's reference is held across log_write, which wants
      one of its own; brelse gives it back *)
   bslots bn 2 -∗
-  (* THE RESERVATION.  A unit must be in hand either way (log_write's own
-     requirement -- it is what bounds lh.n).  Uncredited it is spent on the
-     bitmap block's first log_write of this batch; credited, that block is
-     already in the header, log_write ABSORBS, and the unit comes back. *)
-  log_opS γ (S u) Sb -∗
+  (* THE CREDIT, AS A RESOURCE AT A NAMED EPOCH (fs-log.md §G.19/§G.20).
+     Claiming the free arm means claiming THE BITMAP BLOCK is already in
+     lh.block[] -- there is only one, FSSIZE = 2000 < BPB = 8192, which is
+     why itrunc can free 269 blocks against a single credit -- and
+     [LogInv.log_credit] admits both ways of knowing it: this op logged it
+     itself ([LogInv.log_credit_own] from the pure claim a counted caller
+     already has) or somebody did, this batch, no older than [e0]. *)
+  log_credit γ cr Sb e0 bmapstart -∗
+  (* THE RESERVATION, WITH THE BIRTH EPOCH NAMED.  A unit must be in hand
+     either way (log_write's own requirement -- it is what bounds lh.n).
+     Uncredited it is spent on the bitmap block's first log_write of this
+     batch; credited, that block is already in the header, log_write
+     ABSORBS, and the unit comes back.
+
+     THE EPOCH IS THREADED, NOT CLOSED (fs-log.md §G.20).  itrunc's loops
+     free an unknown number of blocks and mean to present a GROUP credit at
+     the tail flush; a credit is a claim at a NAMED epoch, so an [∃ e0] on
+     the way out would lose the very thing the walk is carrying.  Nothing
+     moves an open op's birth epoch, so this is the truth stated: the same
+     [e0] comes back. *)
+  log_opSe γ (S u) Sb e0 -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (its bread / ilock / bwrite does), and a park moves the hart with
      interrupts off, so the crossing has nothing to do with SIE -- the
@@ -211,7 +222,7 @@ Definition wp_bfree_gen_body
          token are back in the pool *)
       bitmap_res γfs bmapstart cov logstart size (used ∖ {[ bv_unsigned bno ]}) -∗
       bslots bn 2 -∗
-      log_opS γ (if cr then S u else u) (Sb ∪ {[bmapstart]}) -∗
+      log_opSe γ (if cr then S u else u) (Sb ∪ {[bmapstart]}) e0 -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -341,12 +352,12 @@ Module Type BFREE.
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
       (used : gset Z) (bno : mword 32) (bs : list (bv 8))
-      (u : nat) (cr : bool) (Sb : gset Z)
+      (u : nat) (cr : bool) (Sb : gset Z) (e0 : nat)
       (pidv : mword 32) (dq dqb : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
       wp_bfree_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
-                        cov logstart bmapstart size dev used bno bs u cr Sb
+                        cov logstart bmapstart size dev used bno bs u cr Sb e0
                         pidv dq dqb m K eb C b.
 
   Parameter wp_bfree_sconf :

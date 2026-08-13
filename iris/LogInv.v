@@ -350,16 +350,34 @@ Section LogInv.
      arity is untouched, every conversion below holds verbatim, and the
      only ghost step that pays for it is the mint itself.  A LOWER bound
      also needs no revocation -- unlike the refuted persistent birth-epoch
-     token, a stale copy stays TRUE, and truth is all it claims. *)
+     token, a stale copy stays TRUE, and truth is all it claims.
+
+     ...AND IT CARRIES GENESIS-POSITIVITY (fs-log.md §G.20).  [⌜1 <= e0⌝]
+     is what kills the region receipt's [⌜v = 0⌝] boot corner at
+     [InodeRegion.ireg_ep_use] -- records nobody has ever observed -- and
+     NOTHING ELSE CAN CARRY IT to a client: [log_epoch_lb γ e0] bounds
+     [e0] from below, and the only lb a context holder could mint on its
+     own would be about the CURRENT epoch, not this op's birth.  It is
+     free at the mint ([log_begin_step], where the ledger authority's own
+     [⌜1 <= E⌝] clause and [e0 = E] give it), pure, and therefore
+     ABI-invisible: every landed caller stays byte-stable. *)
   Definition log_opSe (γ : log_names) (u : nat) (Sb : gset Z) (e0 : nat)
     : iProp Σ :=
-    ((∃ i : nat, i ↪[ln_ops γ] (u, Sb, e0)) ∗ log_epoch_lb γ e0)%I.
+    ((∃ i : nat, i ↪[ln_ops γ] (u, Sb, e0)) ∗ log_epoch_lb γ e0 ∗
+     ⌜(1 <= e0)%nat⌝)%I.
 
   (* the lb read off an entry, which is what a parker/observer actually
      carries out of the op's scope *)
   Lemma log_opSe_lb (γ : log_names) (u : nat) (Sb : gset Z) (e0 : nat) :
     log_opSe γ u Sb e0 -∗ log_epoch_lb γ e0.
-  Proof. iIntros "[_ #H]". iApply "H". Qed.
+  Proof. iIntros "(_ & #H & _)". iApply "H". Qed.
+
+  (* ...and GENESIS-POSITIVITY, the conjunct's whole purpose: an op's birth
+     epoch is at least one, so an observation counter's "never observed"
+     zero can never be an epoch this op could have written in. *)
+  Lemma log_opSe_pos (γ : log_names) (u : nat) (Sb : gset Z) (e0 : nat) :
+    log_opSe γ u Sb e0 -∗ ⌜(1 <= e0)%nat⌝.
+  Proof. iIntros "(_ & _ & %H)". iPureIntro. exact H. Qed.
 
   (* ...AND THE FROZEN ABI.  Three arguments, exactly as before: every
      landed threader ([ProofWritei], [ProofItrunc], [ProofDirlink], and the
@@ -488,20 +506,61 @@ Section LogInv.
      there.  A caller with no receipt to build passes [v := 0].
 
      [log_opSw_opS] forgets the whole thing, so a caller that does not want
-     a witness threads [log_opS] exactly as before. *)
+     a witness threads [log_opS] exactly as before.
+
+     THE EPOCH-NAMED FORM IS THE PRIMITIVE (fs-log.md §G.20, the epoch
+     tier), and [log_opSw] is it with the epoch CLOSED.  Closing is what a
+     receipt's depositor wants -- it compares against its own anchor [v] and
+     never against the op's identity -- but it is exactly what a WALKER
+     cannot afford: a caller in the middle of a walk has to get its OWN
+     [e0] back, because a credit is a claim at a named epoch and two lower
+     bounds on one counter are incomparable (§G.14).  Nothing in the ghost
+     steps ever moves an open op's birth epoch (every one of them updates
+     the entry IN PLACE at the same [e0], and the counter's only transition
+     is the commit bump, which runs with no live entry), so naming it costs
+     the log_write proof nothing and is simply the truth stated. *)
+  Definition log_opSwe (γ : log_names) (u : nat) (Sb : gset Z)
+      (b : Z) (v : nat) (e0 : nat) : iProp Σ :=
+    (log_opSe γ u Sb e0 ∗ logged_at γ e0 b ∗ ⌜(v <= e0)%nat⌝)%I.
+
   Definition log_opSw (γ : log_names) (u : nat) (Sb : gset Z)
       (b : Z) (v : nat) : iProp Σ :=
-    (∃ e0 : nat, log_opSe γ u Sb e0 ∗ logged_at γ e0 b ∗ ⌜(v <= e0)%nat⌝)%I.
+    (∃ e0 : nat, log_opSwe γ u Sb b v e0)%I.
+
+  Lemma log_opSwe_intro (γ : log_names) (u : nat) (Sb : gset Z)
+      (e0 : nat) (b : Z) (v : nat) :
+    (v <= e0)%nat ->
+    log_opSe γ u Sb e0 -∗ logged_at γ e0 b -∗ log_opSwe γ u Sb b v e0.
+  Proof. intros Hv. iIntros "H Hw". iFrame. iPureIntro. exact Hv. Qed.
+
+  (* the epoch closed: what a depositor threads *)
+  Lemma log_opSwe_opSw (γ : log_names) (u : nat) (Sb : gset Z)
+      (b : Z) (v : nat) (e0 : nat) :
+    log_opSwe γ u Sb b v e0 -∗ log_opSw γ u Sb b v.
+  Proof. iIntros "H". iExists e0. iFrame. Qed.
+
+  (* ...and the entry alone, at the epoch it came back at: what a WALKER
+     threads, and the whole point of the named form *)
+  Lemma log_opSwe_opSe (γ : log_names) (u : nat) (Sb : gset Z)
+      (b : Z) (v : nat) (e0 : nat) :
+    log_opSwe γ u Sb b v e0 -∗ log_opSe γ u Sb e0.
+  Proof. iIntros "(H & _ & _)". iFrame. Qed.
 
   Lemma log_opSw_intro (γ : log_names) (u : nat) (Sb : gset Z)
       (e0 : nat) (b : Z) (v : nat) :
     (v <= e0)%nat ->
     log_opSe γ u Sb e0 -∗ logged_at γ e0 b -∗ log_opSw γ u Sb b v.
-  Proof. intros Hv. iIntros "H Hw". iExists e0. iFrame. iPureIntro. exact Hv. Qed.
+  Proof.
+    intros Hv. iIntros "H Hw". iExists e0.
+    iApply (log_opSwe_intro γ u Sb e0 b v Hv with "H Hw").
+  Qed.
 
   Lemma log_opSw_opS (γ : log_names) (u : nat) (Sb : gset Z) (b : Z) (v : nat) :
     log_opSw γ u Sb b v -∗ log_opS γ u Sb.
-  Proof. iIntros "H". iDestruct "H" as (e0) "(H & _ & _)". iExists e0. iFrame. Qed.
+  Proof.
+    iIntros "H". iDestruct "H" as (e0) "H".
+    iApply (log_opSe_opS with "[H]"). iApply (log_opSwe_opSe with "H").
+  Qed.
 
   (* the receipt the region's depositor spends: the witness with the
      caller's own anchor already ordered against it (fs-log.md §G.17). *)
@@ -510,6 +569,7 @@ Section LogInv.
     log_opSw γ u Sb b v -∗
     log_opS γ u Sb ∗ ∃ e : nat, logged_at γ e b ∗ ⌜(v <= e)%nat⌝.
   Proof.
+    rewrite /log_opSw /log_opSwe.
     iIntros "H". iDestruct "H" as (e0) "(H & #Hw & %Hv)".
     iSplitL "H"; [iExists e0; iFrame |].
     iExists e0. iFrame "Hw". iPureIntro. exact Hv.
@@ -577,6 +637,22 @@ Section LogInv.
   Proof.
     intros Hle. iIntros "#Hw". rewrite /log_credit. destruct cr; [| iEmpIntro].
     iRight. iExists e. iFrame "Hw". iPureIntro. exact Hle.
+  Qed.
+
+  (* SET-MONOTONE, exactly as the pure claim it generalises is: a walk that
+     has logged MORE blocks since the credit was taken still holds it.  This
+     is what itrunc's two tail sites need -- the loops hand the tail their
+     RUNNING set, which only grows (fs-log.md §G.20).  The group disjunct
+     does not mention the set at all; only the own-set one moves, by
+     [elem_of_weaken]. *)
+  Lemma log_credit_mono (γ : log_names) (cr : bool) (Sb Sb' : gset Z)
+      (e0 : nat) (b : Z) :
+    Sb ⊆ Sb' -> log_credit γ cr Sb e0 b -∗ log_credit γ cr Sb' e0 b.
+  Proof.
+    intros Hsub. rewrite /log_credit. destruct cr; [| iIntros "_"; iEmpIntro].
+    iIntros "[%Hin | Hw]".
+    - iLeft. iPureIntro. exact (elem_of_weaken _ _ _ Hin Hsub).
+    - iRight. iExact "Hw".
   Qed.
 
   Global Instance log_op_timeless γ u : Timeless (log_op γ u).
@@ -709,6 +785,16 @@ Section LogInv.
        ⌜cmt = true -> out = 0%nat⌝ ∗
        (* THE EPOCH AND THE APPEND REGISTRY (fs-log.md §G.2/§G.9) *)
        mono_nat_auth_own (ln_ep γ) 1 E ∗
+       (* GENESIS IS EPOCH ONE, AND THE COUNTER NEVER GOES BACK (§G.20).
+          [log_epoch_alloc] starts at one on purpose, but a [mono_nat] auth
+          says nothing about its own value, so without this clause the fact
+          is unreachable from anywhere -- and [log_begin_step], the one mint
+          point every op passes through, is where an op's birth epoch has to
+          inherit it ([log_opSe]'s [⌜1 <= e0⌝], which is what refutes the
+          region receipt's never-observed zero).  Maintained for free:
+          initlog establishes it at [E = 1] and the only transition is the
+          commit bump, [E -> S E]. *)
+       ⌜(1 <= E)%nat⌝ ∗
        own (ln_lg γ) (● X) ∗
        (* THE SOUNDNESS CORE: every LIVE entry was born in the CURRENT
           epoch.  Maintained for free by the bump's placement -- the commit
@@ -797,6 +883,7 @@ Section LogInv.
      the auth is taken and handed straight back, and [log_epoch_lb_get]
      pays for the bound with nothing. *)
   Lemma log_begin_step (γ : log_names) (om : gmap nat op_entry) (E : nat) :
+    (1 <= E)%nat ->
     ghost_map_auth (ln_ops γ) 1 om -∗
     mono_nat_auth_own (ln_ep γ) 1 E ==∗
     ∃ i, ⌜om !! i = None⌝ ∗
@@ -804,14 +891,15 @@ Section LogInv.
       mono_nat_auth_own (ln_ep γ) 1 E ∗
       log_opSe γ MAXOPBLOCKS ∅ E.
   Proof.
-    iIntros "Ha Hep".
+    intros Hpos. iIntros "Ha Hep".
     set (i := fresh (dom om)).
     assert (Hi : om !! i = None).
     { apply not_elem_of_dom. apply is_fresh. }
     iMod (ghost_map_insert i (MAXOPBLOCKS, ∅, E) Hi with "Ha") as "[Ha He]".
     iDestruct (log_epoch_lb_get with "Hep") as "[Hep #Hlb]".
     iModIntro. iExists i. iSplitR; [done|]. iFrame "Ha Hep".
-    rewrite /log_opSe. iSplitL "He"; [iExists i; iFrame | iApply "Hlb"].
+    rewrite /log_opSe. iSplitL "He"; [iExists i; iFrame|].
+    iSplitR; [iApply "Hlb"|]. iPureIntro. exact Hpos.
   Qed.
 
   (* the guard arithmetic: with every entry bounded, the conservative
@@ -840,13 +928,15 @@ Section LogInv.
       log_opSe γ u (Sb ∪ {[b]}) e0.
   Proof.
     iIntros "Ha He". rewrite /log_opSe.
-    (* the lb is PERSISTENT, so every step below is a re-pack, not a
-       transfer: it survives the update untouched at the SAME [e0] *)
-    iDestruct "He" as "[He #Hlb]". iDestruct "He" as (i) "He".
+    (* the lb is PERSISTENT and the positivity clause PURE, so every step
+       below is a re-pack, not a transfer: both survive the update
+       untouched at the SAME [e0] *)
+    iDestruct "He" as "(He & #Hlb & %Hpos)". iDestruct "He" as (i) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
     iMod (ghost_map_update (u, Sb ∪ {[b]}, e0) with "Ha He") as "[Ha He]".
     iModIntro. iExists i. iSplitR; [done|]. iFrame "Ha".
-    iSplitL "He"; [iExists i; iFrame | iApply "Hlb"].
+    iSplitL "He"; [iExists i; iFrame|].
+    iSplitR; [iApply "Hlb"|]. iPureIntro. exact Hpos.
   Qed.
 
   (* log_write's ABSORB read: an op that holds a credit for [b] really has
@@ -858,7 +948,7 @@ Section LogInv.
     ghost_map_auth (ln_ops γ) 1 om -∗ log_opSe γ u Sb e0 -∗
     ∃ i, ⌜om !! i = Some (u, Sb, e0)⌝.
   Proof.
-    iIntros "Ha [He _]". iDestruct "He" as (i) "He".
+    iIntros "Ha (He & _ & _)". iDestruct "He" as (i) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
     iExists i. done.
   Qed.
@@ -882,12 +972,14 @@ Section LogInv.
       log_opSe γ u (Sb ∪ {[b]}) e0.
   Proof.
     iIntros "Ha He". rewrite /log_opSe.
-    (* the lb is PERSISTENT, so this is a re-pack, not a transfer *)
-    iDestruct "He" as "[He #Hlb]". iDestruct "He" as (i) "He".
+    (* the lb is PERSISTENT and the positivity clause PURE, so this is a
+       re-pack, not a transfer *)
+    iDestruct "He" as "(He & #Hlb & %Hpos)". iDestruct "He" as (i) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
     iMod (ghost_map_update (u, Sb ∪ {[b]}, e0) with "Ha He") as "[Ha He]".
     iModIntro. iExists i. iSplitR; [done|]. iFrame "Ha".
-    iSplitL "He"; [iExists i; iFrame | iApply "Hlb"].
+    iSplitL "He"; [iExists i; iFrame|].
+    iSplitR; [iApply "Hlb"|]. iPureIntro. exact Hpos.
   Qed.
 
   (* end_op's retire: the whole entry goes -- SET AND ALL, which is what
@@ -899,7 +991,7 @@ Section LogInv.
       ghost_map_auth (ln_ops γ) 1 (delete i om).
   Proof.
     iIntros "Ha He". rewrite /log_op /log_opS /log_opSe.
-    iDestruct "He" as (Sb e0) "[He _]". iDestruct "He" as (i) "He".
+    iDestruct "He" as (Sb e0) "(He & _ & _)". iDestruct "He" as (i) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
     iMod (ghost_map_delete with "Ha He") as "Ha".
     iModIntro. iExists i, Sb, e0. by iFrame.
@@ -917,7 +1009,7 @@ Section LogInv.
     ⌜(1 <= size om)%nat⌝.
   Proof.
     iIntros "Ha He". rewrite /log_opSe.
-    iDestruct "He" as "[He _]". iDestruct "He" as (i) "He".
+    iDestruct "He" as "(He & _ & _)". iDestruct "He" as (i) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
     iPureIntro.
     assert (Hne : om ≠ ∅).
@@ -940,7 +1032,7 @@ Section LogInv.
     ⌜(1 <= size om)%nat⌝.
   Proof.
     iIntros "Ha He". rewrite /log_op /log_opS /log_opSe.
-    iDestruct "He" as (Sb e0) "[He _]". iDestruct "He" as (i) "He".
+    iDestruct "He" as (Sb e0) "(He & _ & _)". iDestruct "He" as (i) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
     iPureIntro.
     assert (Hne : om ≠ ∅).

@@ -1278,7 +1278,7 @@ Section BoBodies.
     (* open the lock's resource for the committing test *)
     rewrite /log_res.
     iDestruct "Hres" as (out cmt nc om Ep Xr)
-      "(Hout & Hcmt & Hnc & Hauth & %Hsz & %Hbnd & %Hout3 & %Hcmtout & Hepa & Hxa & %Hlive & %Hcap & Hrest)".
+      "(Hout & Hcmt & Hnc & Hauth & %Hsz & %Hbnd & %Hout3 & %Hcmtout & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Hrest)".
     assert (Hacmt : add_vec (rget M (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 32 : mword 12)) = l_cmt).
     { rgne. rewrite Hs1. exact bo_addr_cmt. }
     (* +0x2c c.lw a5,32(s1) : a5 := log.committing *)
@@ -1327,6 +1327,7 @@ Section BoBodies.
                  ⌜(out <= 3)%nat⌝ ∗
                  ⌜cmt = true -> out = 0%nat⌝ ∗
                  mono_nat_auth_own (ln_ep γ) 1 E ∗
+                 ⌜(1 <= E)%nat⌝ ∗
                  own (ln_lg γ) (● X) ∗
                  ⌜forall i e, om !! i = Some e -> e.2 = E⌝ ∗
                  ⌜forall e' b', ((e', b') : nat * Z) ∈ X -> (e' <= E)%nat⌝ ∗
@@ -1342,7 +1343,9 @@ Section BoBodies.
         iSplitR; [iPureIntro; exact Hbnd|].
         iSplitR; [iPureIntro; exact Hout3|].
         iSplitR; [iPureIntro; exact Hcmtout|].
-        iFrame "Hepa Hxa".
+        iFrame "Hepa".
+        iSplitR; [iPureIntro; exact Hepos|].
+        iFrame "Hxa".
         iSplitR; [iPureIntro; exact Hlive|].
         iSplitR; [iPureIntro; exact Hcap|].
         iExact "Hrest". }
@@ -1623,7 +1626,7 @@ Section BoBodies.
            costs the step one extra resource in and one out and nothing
            else -- which is why every other log ghost step below merely
            re-packs it. *)
-        iMod (log_begin_step γ om Ep with "Hauth Hepa")
+        iMod (log_begin_step γ om Ep Hepos with "Hauth Hepa")
           as (i Hi) "(Hauth & Hepa & HopS)".
         iDestruct (log_opSe_opS with "HopS") as "HopS".
         iDestruct (log_opS_op with "HopS") as "Hop".
@@ -1643,7 +1646,9 @@ Section BoBodies.
             - rewrite lookup_insert_ne in Hk; [| exact (not_eq_sym Hne)]. exact (Hbnd k e Hk). }
           iSplitR; [iPureIntro; exact (bo_guard_out3 out n Hle)|].
           iSplitR; [iPureIntro; discriminate|].
-          iFrame "Hepa Hxa".
+          iFrame "Hepa".
+          iSplitR; [iPureIntro; exact Hepos|].
+          iFrame "Hxa".
           (* the new entry's birth epoch IS the current one, by construction *)
           iSplitR.
           { iPureIntro. intros k e Hk.
@@ -1682,7 +1687,9 @@ Section BoBodies.
           iSplitR; [iPureIntro; exact Hbnd|].
           iSplitR; [iPureIntro; exact Hout3|].
           iSplitR; [iPureIntro; exact Hcmtout|].
-          iFrame "Hepa Hxa".
+          iFrame "Hepa".
+          iSplitR; [iPureIntro; exact Hepos|].
+          iFrame "Hxa".
           iSplitR; [iPureIntro; exact Hlive|].
           iSplitR; [iPureIntro; exact Hcap|].
           iExists n, LB. iSplitR; [iPureIntro; exact Hsum|].

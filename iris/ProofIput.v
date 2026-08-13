@@ -2039,12 +2039,22 @@ Section ProofIput.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDacq CIDm2 eb pj
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
+    (* itrunc's tail-flush credit is a RESOURCE at a NAMED birth epoch now
+       (fs-log.md §G.20): the epoch must reach the log_write that claims the
+       credit syntactically, and iput is one link of that thread.  iput's own
+       claim is the pure own-set one it always was, so [log_opS_named] +
+       [log_credit_own] is the whole conversion and iput's CONTRACT does not
+       move.  A [crz] caller one tier up presents a GROUP witness here
+       instead -- which is the point of the tier. *)
+    iDestruct (log_opS_named with "Hop") as (eit) "Hop".
+    iPoseProof (log_credit_own g cru Sb eit (IBLOCK inum inodestart) Hcru)
+      as "#Hcrui".
     iApply (IT.wp_itrunc_gen gs j gl gu gd gk pd pav pu bn g gfs gi
               cov logstart bmapstart inodestart nib size dev used
-              (ientry k) inum dn dn bm data2 uit Sb crb cru
+              (ientry k) inum dn dn bm data2 uit Sb crb cru eit
               pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqb dqs J2 (K - 4)%nat
               eb C eb
-              ltac:(unfold K_itrunc; lia) Hcrb Hcru
+              ltac:(unfold K_itrunc; lia) Hcrb
               Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
               Hnib Htyne2
               (* §19.6 Part 1: iput hands itrunc ONE record for both slots. *)
@@ -2053,7 +2063,7 @@ Section ProofIput.
               Hbmwf2 Hcovb Hsized2 Hdiaddrs2 Hj Hgsj HJ2a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlogc Hidv Hinh Hmeta
                     [Haddrs Hind] Hblks Hbms Hins Hbm Hireg Hdat Hppid Hprocs
-                    Hdevi Hdgeom Hdlock [Hbs2 Hbs1] [Hop]").
+                    Hdevi Hdgeom Hdlock [Hbs2 Hbs1] Hcrui [Hop]").
     { rewrite /inode_map. iFrame. }
     { iApply (bslots_op bn 2 1). iFrame. }
     { rewrite Hun. iExact "Hop". }

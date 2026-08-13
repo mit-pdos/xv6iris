@@ -253,10 +253,13 @@ Definition wp_log_write_au_body
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     (* THE ENTRY, WITH ITS BIRTH EPOCH NAMED, PLUS THE LOG WITNESS
-       (fs-log.md §G.3).  [LogInv.log_opSw] is [log_opS] with two things
-       added under the SAME existential: a name [e0] for this op's birth
-       epoch, and [logged_at γ e0 (uint bno)] -- "this block is in the
-       header of the batch my op belongs to".
+       (fs-log.md §G.3/§G.20).  [LogInv.log_opSwe] is [log_opS] with two
+       things added at the caller's OWN [e0] -- the birth epoch it handed
+       in, LITERALLY the same one -- and [logged_at γ e0 (uint bno)]:
+       "this block is in the header of the batch my op belongs to".
+       A depositor that only wants to order the witness against its own
+       anchor closes the epoch again with [LogInv.log_opSwe_opSw]; a WALKER
+       keeps it, which is the whole of the epoch tier.
        The witness's epoch IS the caller's own entry's, which is the only
        shape a later [log_use_group] can spend: an unmoored [∃ e] would be
        satisfied by a dead batch's row and the header's revocation argument
@@ -264,10 +267,92 @@ Definition wp_log_write_au_body
        arm because it just wrote the slot, the absorb arm because its scan
        FOUND the block already there.  A caller that wants none of this
        applies [LogInv.log_opSw_opS] and is otherwise unchanged. *)
-    log_opSw γ (if cr then S u else u) (Sb ∪ {[uint bno]}) (uint bno) vlb -∗
+    log_opSwe γ (if cr then S u else u) (Sb ∪ {[uint bno]}) (uint bno) vlb e0 -∗
     (* the caller's receipt: what its closing fupd paid out *)
     Φfsb -∗
     (* the handle re-indexed at the written bytes and now DIRTY *)
+    bio_locked bn (fs_view γfs γd dev cov) k pidv dev bno bs bsd true -∗
+    (* the slot unit comes back UNCONDITIONALLY *)
+    bslot bn -∗
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
+(* THE EPOCH-EXPOSED GENERAL FORM (fs-log.md §G.20, the epoch tier).
+   [wp_log_write_gen] with the birth epoch left OPEN on both sides: the
+   ledger premise is [log_opSe] rather than [log_opS], the credit is the
+   RESOURCE [log_credit] rather than the pure own-set claim, and the post
+   hands the entry back AT THE SAME [e0].
+
+   WHY BOTH SIDES.  A credit is a claim at a NAMED epoch -- its group
+   disjunct is [∃ e, logged_at γ e b ∗ ⌜e0 <= e⌝] -- so a caller in the
+   middle of a walk that means to spend one later must still be holding the
+   entry at the [e0] its observation was ordered against.  [wp_log_write_gen]
+   closes that existential on the way out, and once closed it cannot be
+   recovered: a re-opened entry yields SOME [e1], and although [e1 = e0] is
+   true (the ghost steps update the entry in place, and the epoch's only
+   transition is the commit bump, which runs with no live entry), NOTHING in
+   the logic relates two lower bounds on one counter (§G.14, §G.20).  So the
+   epoch is threaded SYNTACTICALLY, from the observer down to the log_write
+   that claims the credit, and this is the bottom of that thread.
+
+   The witness comes out too, at the same epoch: it is free (the atomic-update
+   form already mints it on both arms) and it is exactly what makes a SECOND
+   write of this block by this op creditable.  A caller that wants neither
+   applies [LogInv.log_opSe_opS] and is [wp_log_write_gen] again -- which is
+   how that contract is derived, so no landed caller moves. *)
+Definition wp_log_write_gene_body
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    (bn : bio_names)
+    (γ : log_names) (γfs : fs_names) (γd : disk_names)
+    (cov : gset Z) (logstart : Z) (dev : mword 32)
+    (k : nat) (pidv bno : mword 32)
+    (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
+    (cr : bool) (Sb : gset Z) (e0 : nat)
+    (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+    (K : nat) (b : bool) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.log_write in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
+  (K_log_write <= K)%nat ->
+  (Z.of_nat n + 2 < 2 ^ 31)%Z ->
+  (* a0 is the buffer being logged *)
+  (k < NBUF)%nat ->
+  m !!! Regidx (mword_of_int 10 : mword 5) = bnode k ->
+  (* the block is a covered HOME block: never the log's own storage *)
+  uint bno ∈ cov ->
+  ~ (uint bno ∈ log_region_set logstart) ->
+  sie_cap_gpr m K b p -∗
+  cpu_own n eb p C b -∗
+  kernel_text -∗ pc_is pcE -∗
+  panic_wp_any -∗
+  bio_ctx bn (fs_view γfs γd dev cov) -∗
+  log_ctx γ bn γfs cov logstart dev -∗
+  (* the slot unit backing the (possible) bpin *)
+  bslot bn -∗
+  (* THE CREDIT, AS A RESOURCE (fs-log.md §G.19): either this op logged the
+     block itself ([uint bno ∈ Sb], which [LogInv.log_credit_own] builds from
+     the pure claim every counted caller already has) or SOMEBODY did, this
+     batch, no older than this op's birth. *)
+  log_credit γ cr Sb e0 (uint bno) -∗
+  (* THE RESERVATION, WITH THE BIRTH EPOCH NAMED *)
+  log_opSe γ (S u) Sb e0 -∗
+  (* the caller's own view of the block, at its OLD content *)
+  fsblock γfs (uint bno) bsl -∗
+  (* the checked-out buffer, payload still indexed at the old content *)
+  bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
+  wp_next b p (fun (CID : CpuId) =>
+    ∀ mr,
+    sie_cap_gpr mr K b p -∗
+    cpu_own n eb p C b -∗
+    pc_is ret_tgt -∗
+    ⌜ callee_saved m mr ⌝ -∗
+    (* THE ENTRY BACK AT THE SAME [e0] -- the whole point -- and this op's
+       own registry row for the block it just logged *)
+    log_opSe γ (if cr then S u else u) (Sb ∪ {[uint bno]}) e0 -∗
+    logged_at γ e0 (uint bno) -∗
+    (* L(bno) is now the bytes the caller wrote *)
+    fsblock γfs (uint bno) bs -∗
+    (* the handle re-indexed at those bytes and now DIRTY: brelse-able *)
     bio_locked bn (fs_view γfs γd dev cov) k pidv dev bno bs bsd true -∗
     (* the slot unit comes back UNCONDITIONALLY *)
     bslot bn -∗
@@ -353,6 +438,22 @@ Module Type LOG_WRITE.
       (K : nat) (b : bool),
       wp_log_write_au_body bn γ γfs γd cov logstart dev k pidv bno
                            bs bsl bsd d u cr Sb e0 vlb Efs Φfsb m n eb p C K b.
+
+  (* THE EPOCH-EXPOSED GENERAL FORM (fs-log.md §G.20).  Derived from the
+     atomic-update one at a held [fsblock] and the trivial anchor, and it is
+     [wp_log_write_gen] that is derived from THIS, by closing the epoch. *)
+  Parameter wp_log_write_gene :
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
+      `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
+      (γ : log_names) (γfs : fs_names) (γd : disk_names)
+      (cov : gset Z) (logstart : Z) (dev : mword 32)
+      (k : nat) (pidv bno : mword 32)
+      (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
+      (cr : bool) (Sb : gset Z) (e0 : nat)
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (K : nat) (b : bool),
+      wp_log_write_gene_body bn γ γfs γd cov logstart dev k pidv bno
+                             bs bsl bsd d u cr Sb e0 m n eb p C K b.
 
   (* THE CREDITED / GENERAL FORM.  [wp_log_write_sconf] below is the
      set-forgetting instance of this at [cr = false]; it is kept as its own

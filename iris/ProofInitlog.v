@@ -1457,6 +1457,10 @@ Section ProofInitlog.
       iSplitR; [iPureIntro; lia|].
       iSplitR; [iPureIntro; discriminate|].
       iSplitL "Hepa"; [iExact "Hepa"|].
+      (* GENESIS IS EPOCH ONE, and this is where the ledger's [1 <= E]
+         clause is established -- once, at the only place the counter is
+         set rather than bumped. *)
+      iSplitR; [iPureIntro; lia|].
       iSplitL "Hxa"; [iExact "Hxa"|].
       (* both new clauses are vacuous at genesis: no entry, no registry row *)
       iSplitR; [iPureIntro; intros i e Hi; rewrite lookup_empty in Hi; discriminate|].

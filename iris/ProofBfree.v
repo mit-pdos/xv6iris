@@ -604,7 +604,7 @@ Section BfreeTail.
       (γs : list gname) (j : nat)
       (γfs : fs_names) (γd : disk_names) (bn : bio_names) (γ : log_names)
       (cov : gset Z) (logstart bmapstart size : Z) (dev : mword 32)
-      (used : gset Z) (bi : Z) (u : nat) (cr : bool) (Sb : gset Z)
+      (used : gset Z) (bi : Z) (u : nat) (cr : bool) (Sb : gset Z) (e0 : nat)
       (kk : nat) (bnoB : mword 32) (bsd : list (bv 8)) (d0 : bool)
       (pidv : mword 32) (dq dqb : dfrac)
       (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) :
@@ -618,7 +618,6 @@ Section BfreeTail.
     bmapstart ∈ cov ->
     ~ (bmapstart ∈ log_region_set logstart) ->
     bitmap_ok cov logstart size (used ∖ {[ bi ]}) ->
-    (cr = true -> bmapstart ∈ Sb) ->
     sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 b (proc_addr j) C b -∗
     trap_csrs_ext b -∗
@@ -633,19 +632,20 @@ Section BfreeTail.
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     bslots bn 1 -∗
-    log_opS γ (S u) Sb -∗
+    log_credit γ cr Sb e0 bmapstart -∗
+    log_opSe γ (S u) Sb e0 -∗
     fsblock γfs bmapstart (bitmap_bytes used) -∗
     free_pool γfs size (used ∖ {[ bi ]}) -∗
     bio_held bn (fs_view γfs γd dev cov) kk pidv dev bnoB
        (bitmap_bytes (used ∖ {[ bi ]})) (bitmap_bytes used) bsd d0 -∗
     bf_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size used bi
-            (log_opS γ (if cr then S u else u) (Sb ∪ {[bmapstart]}))
+            (log_opSe γ (if cr then S u else u) (Sb ∪ {[bmapstart]}) e0)
             pidv dq dqb j m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hsp Hthr Ha0 Hs2 Hkk Hbno Hcov Hlog Hokdel Hcredit.
+    intros HK Hsp Hthr Ha0 Hs2 Hkk Hbno Hcov Hlog Hokdel.
     pose proof HK as HK'. unfold K_bfree in HK'.
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hsb Hsl Hop Hfsb Hpool Hheld Hcont".
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hsb Hsl #Hcredit Hop Hfsb Hpool Hheld Hcont".
     iPoseProof (bfi_4a with "Htext") as "Hi4a".
     iPoseProof (bfi_4e with "Htext") as "Hi4e".
     iPoseProof (bfi_50 with "Htext") as "Hi50".
@@ -685,18 +685,23 @@ Section BfreeTail.
                  with "Hcont") as "Hcont".
     assert (HKlw : (K_log_write <= K - 4)%nat) by (unfold K_log_write; lia).
     iEval (rewrite -Hbno) in "Hfsb".
+    (* the credit travels under the block's OWN name, and [Hbno] is the one
+       fact tying bfree's [bmapstart] to the register the buffer carries *)
+    iEval (rewrite -Hbno) in "Hcredit".
     (* log_write does not thread the trap-CSR complement at all: [Hextc]/
        [Hextm] are stranded at bf_tail's entry hart and are not touched
        here -- transported across the whole span, right before [bf_cont]. *)
-    iApply (LW.wp_log_write_gen bn γ γfs γd cov logstart dev kk pidv bnoB
-              (bitmap_bytes (used ∖ {[ bi ]})) (bitmap_bytes used) bsd d0 u cr Sb
+    iApply (LW.wp_log_write_gene bn γ γfs γd cov logstart dev kk pidv bnoB
+              (bitmap_bytes (used ∖ {[ bi ]})) (bitmap_bytes used) bsd d0 u cr Sb e0
               T0 0%nat b (proc_addr j) C (K - 4)%nat b
               HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HT0a0
               ltac:(rewrite Hbno; exact Hcov)
               ltac:(rewrite Hbno; exact Hlog)
-              ltac:(intros Hc; rewrite Hbno; exact (Hcredit Hc))
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl Hop Hfsb Hheld").
-    iIntros (CID2 Hq2 mL) "Hcg Hcnt Hpc %Hcs1 Hop Hfsb Hlk Hsl".
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl Hcredit Hop Hfsb Hheld").
+    (* the registry row log_write hands back is dropped here: bfree's caller
+       threads the ENTRY, at its own epoch, and nothing below the bitmap
+       needs a witness *)
+    iIntros (CID2 Hq2 mL) "Hcg Hcnt Hpc %Hcs1 Hop _ Hfsb Hlk Hsl".
     (* log_write recorded the block under its own name; it is the bitmap
        block, which is how the credit bfree returns matches the one its
        caller threads *)
@@ -1018,17 +1023,17 @@ Section ProofBfreeMain.
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
       (used : gset Z) (bno : mword 32) (bs : list (bv 8))
-      (u : nat) (cr : bool) (Sb : gset Z)
+      (u : nat) (cr : bool) (Sb : gset Z) (e0 : nat)
       (pidv : mword 32) (dq dqb : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
     : wp_bfree_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
-                        cov logstart bmapstart size dev used bno bs u cr Sb
+                        cov logstart bmapstart size dev used bno bs u cr Sb e0
                         pidv dq dqb m K eb C b.
   Proof.
     cbv beta delta [wp_bfree_gen_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
-           Hbirange Hbicov Hbilog Hbslen Hcredit Hj Hgl Ha0 Ha1.
+           Hbirange Hbicov Hbilog Hbslen Hj Hgl Ha0 Ha1.
     pose proof HK as HK'. unfold K_bfree in HK'.
     destruct Hgeom as [Hcovok Hlogsub].
     destruct (Hcovok _ Hbmcov) as [Hbmpos Hbmlt].
@@ -1056,7 +1061,7 @@ Section ProofBfreeMain.
     assert (HbnoBcov : uint bnoB ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite HbnoB; exact Hbmcov).
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx Hsb Hbmr Hfsb Hown Hppid
-              #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
+              #Hprocs #Hdevi #Hdgeom #Hdlock Hsl #Hcredit Hop Hcont".
     (* bfree enters at level 0, so the live index IS the saved base -- one
        variable [b] carries both from here on (the porting guide's "derive
        the SIE index rather than stating it"); bfree does no acquire of its
@@ -1064,7 +1069,7 @@ Section ProofBfreeMain.
        entry. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbe. cbn in Hbe. subst eb.
     iAssert (bf_cont (CID0 := CID) γfs bn γ cov logstart bmapstart size used bi
-               (log_opS γ (if cr then S u else u) (Sb ∪ {[bmapstart]}))
+               (log_opSe γ (if cr then S u else u) (Sb ∪ {[bmapstart]}) e0)
                pidv dq dqb j m K C b)%I with "[Hcont]" as "Hcont";
       [rewrite /bf_cont; iExact "Hcont" |].
     (* ---- THE PANIC REFUTATION, done before a single instruction ---- *)
@@ -1815,11 +1820,10 @@ Section ProofBfreeMain.
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     assert (HB11a0' : B11 !!! Regidx Ra0 = bnode kk) by exact HB11a0.
     iApply (bf_tail (CID0 := CID27)  γs j γfs γd bn γ cov logstart bmapstart size
-              dev used bi u cr Sb kk bnoB bsd0 d0 pidv dq dqb m B11 K C b
+              dev used bi u cr Sb e0 kk bnoB bsd0 d0 pidv dq dqb m B11 K C b
               HK HB11sp HB11thr HB11a0' HB11s2 Hkk HbnoB Hbmcov Hbmlog Hokdel
-              Hcredit
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe
-                    Hppid Hsb Hsl Hop Hfsbm Hpool Hheld [Hcont]").
+                    Hppid Hsb Hsl Hcredit Hop Hfsbm Hpool Hheld [Hcont]").
     { iApply (wp_next_shift (b := true) (CIDa := CID12) (CIDb := CID27) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
@@ -1849,15 +1853,22 @@ Section ProofBfreeMain.
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx Hsb Hbmr Hfsb Hown Hppid
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
     rewrite /log_op. iDestruct "Hop" as (Sb) "Hop".
+    (* the counted form opens its own birth epoch and presents the EMPTY
+       credit ([cr = false], where [log_credit] is [emp]); closing it again
+       on the way out is what keeps every counted caller byte-stable *)
+    iDestruct (log_opS_named with "Hop") as (e0) "Hop".
+    iPoseProof (log_credit_own γ false Sb e0 bmapstart ltac:(discriminate))
+      as "#Hcredit".
     iApply (wp_bfree_gen γs j γl γu γd γk pd pav pu bn γ γfs
-              cov logstart bmapstart size dev used bno bs u false Sb
+              cov logstart bmapstart size dev used bno bs u false Sb e0
               pidv dq dqb m K eb C b
               HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
-              Hbirange Hbicov Hbilog Hbslen ltac:(discriminate) Hj Hgl Ha0 Ha1
+              Hbirange Hbicov Hbilog Hbslen Hj Hgl Ha0 Ha1
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hsb Hbmr Hfsb Hown Hppid
-                    Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont]").
+                    Hprocs Hdevi Hdgeom Hdlock Hsl Hcredit Hop [Hcont]").
     iIntros (CIDx) "%Hchain". iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
     iIntros (mf) "%Hcs Hsie Hcnt Hextc Hextm Hpc Hppid Hsb Hbmr Hsl HopS".
+    iDestruct (log_opSe_opS with "HopS") as "HopS".
     iDestruct (log_opS_op with "HopS") as "Hop".
     iApply ("Hcont" $! mf with "[%] Hsie Hcnt Hextc Hextm Hpc Hppid Hsb Hbmr Hsl Hop").
     exact Hcs.

@@ -1298,7 +1298,7 @@ Section EndOpBlocks.
     (* ================= THE CRITICAL SECTION ================= *)
     rewrite /log_res.
     iDestruct "HRres" as (out cmt nc om Ep Xr)
-      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & Hxa & %Hlive & %Hcap & Hrest)".
+      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Hrest)".
     (* committing IS still set: the committer holds the batch's fs_L
        AUTHORITY, and log_res's cmt = false arm holds one too. *)
     destruct cmt.
@@ -1530,6 +1530,7 @@ Section EndOpBlocks.
       iSplitR; [iPureIntro; exact Hout3|].
       iSplitR; [iPureIntro; discriminate|].
       iSplitL "Hepa"; [iExact "Hepa"|].
+      iSplitR; [iPureIntro; lia|].
       iSplitL "Hxa"; [iExact "Hxa"|].
       (* vacuous: [Hommt] says there is no live entry to re-date *)
       iSplitR.
@@ -3946,7 +3947,7 @@ Section ProofEndOp.
     (* ================= THE ACCOUNTING CRITICAL SECTION ================= *)
     rewrite /log_res.
     iDestruct "HRres" as (out cmt nc om Ep Xr)
-      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & Hxa & %Hlive & %Hcap & Hrest)".
+      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Hrest)".
     iDestruct (log_op_positive with "Hoauth Hop") as %Hpos.
     (* the "log.committing" PANIC IS DEAD: an op token forces out >= 1, and
        log_res's own conjunct then refutes committing. *)
@@ -4226,6 +4227,7 @@ Section ProofEndOp.
         (* the batch is checked out but the EPOCH does not move here -- the
            bump belongs to the re-deposit, where om is provably empty *)
         iSplitL "Hepa"; [iExact "Hepa"|].
+        iSplitR; [iPureIntro; exact Hepos|].
         iSplitL "Hxa"; [iExact "Hxa"|].
         iSplitR; [iPureIntro; exact Hlived|].
         iSplitR; [iPureIntro; exact Hcap|]. done. }
@@ -4593,6 +4595,7 @@ Section ProofEndOp.
         (* THE FAST PATH DOES NOT COMMIT, so the epoch stands: the other
            open ops' entries and every witness they hold stay live. *)
         iSplitL "Hepa"; [iExact "Hepa"|].
+        iSplitR; [iPureIntro; exact Hepos|].
         iSplitL "Hxa"; [iExact "Hxa"|].
         iSplitR; [iPureIntro; exact Hlived|].
         iSplitR; [iPureIntro; exact Hcap|].
