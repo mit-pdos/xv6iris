@@ -113,6 +113,72 @@ Section ProofFilealloc.
       apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
   Qed.
 
+  (* ---- THE BLOCK CONTINUATIONS, NAMED (RULE ONE, claude-notes/
+     optimization.md): [wp_filealloc_sconf] states two large [iAssert]s
+     ([Hepi], the shared epilogue, and [Hloop], the fuel-indexed scan) whose
+     bodies are spelled out inline; every proofmode step in the ~600-line
+     proof that follows re-embeds them, so naming the bodies here turns each
+     live hypothesis into a small constant application in the context.
+
+     Only [Hepi] folds.  [fa_epi_body] stays TRANSPARENT ON PURPOSE (never
+     [Typeclasses Opaque]) so the later [iApply ("Hepi" $! ..)] use sites
+     keep unifying through it without any extra [rewrite /..], and the
+     [{ .. }] proof script at its original [iAssert] site is UNCHANGED
+     byte-for-byte -- only the stated type moved out.
+
+     [Hloop] (the scan) does NOT fold, matching ProofPiperead.v's [WXP]/
+     [CLOOP] negative (lines ~432-457 there): the whole scan runs at the
+     PINNED index [false] with no [wp_next] wrapper (file header), and a
+     [Definition fa_loop_body ... (fuel j : nat) : iProp Σ := (∀ M, ...)%I]
+     folded the same way as [fa_epi_body] MEASURED broke the first leaf
+     instruction lemma inside the induction: [iApply (wp_clw_s_sconf ...
+     with "Hcg Hpc Hi26 Hcell")] failed at the very first [iInduction]
+     branch with
+
+       Error: Tactic failure: iSpecialize: cannot instantiate
+       (sie_cap_gpr M (trap_res b + (K - 4)) false ?p -∗ ... -∗
+        wp_next false ?p (λ CID0 : CpuId, ...) -∗ WP Loop)%I
+       with (sie_cap_gpr M (trap_res b + (K - 4)) false p).
+
+     -- the leaf's implicit process pointer [p] no longer unifies once it
+     is reached only through the folded body instead of appearing unfolded
+     in the surrounding statement, exactly [ProofPiperead]'s
+     "cannot instantiate ... false ?p" signature.  Per the file's fallback
+     rule, [Hloop] is left as its original inline [iAssert] below. *)
+
+  (* [fa_epi_body]: the shared epilogue at [+0x52..+0x5c].  [CID0] is an
+     explicit trailing parameter (mirroring ProofDirlookup's [dl_tail_body]
+     / its [CIDt]) rather than folded inside the body, because [Hepi] is a
+     genuinely hart-GENERIC proposition -- entered from TWO different
+     post-release call sites at two different concrete harts, so there is
+     no ambient [CID0] to fix it at (worked example
+     ProofConsputc.wp_consputc_epi; file header for the full reason [Hepi]
+     is stated this way and takes its own [wp_next]-shaped continuation
+     rather than invoking [Hcont] directly). *)
+  Definition fa_epi_body
+      (γf : gname) (m : regfile) (spr : mword 64) (K : nat) (b : bool)
+      (p : mword 64) (C : iProp Σ) (n : nat) (eb : bool) (ret_tgt : mword 64)
+      (CID0 : CpuId) : iProp Σ :=
+    (∀ (mj : regfile) (res : mword 64),
+        ⌜ mj !!! Regidx csp_rs1 = spr
+          /\ mj !!! Regidx Rs1 = res
+          /\ (forall c : mword 5, is_cs_idx c = true ->
+                c <> mword_of_int 9 -> c <> csp_rs1 -> c <> mword_of_int 8 ->
+                mj !!! Regidx c = m !!! Regidx c) ⌝ -∗
+        sie_cap_gpr (CID := CID0) mj (K - 4)%nat b p -∗
+        pc_is (CID := CID0) (mword_of_int (KernelSyms.filealloc + 0x52)) -∗
+        cpu_own (CID := CID0) n eb p C b -∗
+        filealloc_post γf res -∗
+        wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
+          ∀ mfin,
+          sie_cap_gpr mfin K b p -∗
+          cpu_own n eb p C b -∗
+          pc_is ret_tgt -∗
+          ⌜ callee_saved m mfin ⌝ -∗
+          filealloc_post γf (mfin !!! Regidx Ra0) -∗
+          WP (Loop : expr riscv_lang)) -∗
+        WP (Loop : expr riscv_lang))%I.
+
   Lemma wp_filealloc_sconf
       (γl γf : gname) (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool)
@@ -353,35 +419,17 @@ Section ProofFilealloc.
     iPoseProof (fai_58 with "Htext") as "Hi58".
     iPoseProof (fai_5a with "Htext") as "Hi5a".
     iPoseProof (fai_5c with "Htext") as "Hi5c".
-    iAssert (∀ (CID0 : CpuId) (mj : regfile) (res : mword 64),
-        ⌜ mj !!! Regidx csp_rs1 = spr
-          /\ mj !!! Regidx Rs1 = res
-          /\ (forall c : mword 5, is_cs_idx c = true ->
-                c <> mword_of_int 9 -> c <> csp_rs1 -> c <> mword_of_int 8 ->
-                mj !!! Regidx c = m !!! Regidx c) ⌝ -∗
-        sie_cap_gpr (CID := CID0) mj (K - 4)%nat b p -∗
-        pc_is (CID := CID0) (mword_of_int (KernelSyms.filealloc + 0x52)) -∗
-        cpu_own (CID := CID0) n eb p C b -∗
-        filealloc_post γf res -∗
-        (* [Hepi] does NOT invoke the OUTER [Hcont] itself: [CID0] is a truly
-           arbitrary hart from [Hepi]'s own point of view (it is proved once,
-           generically), so [wp_next_chain] could only ever relate its own
-           six internal steps back to [CID0] -- never all the way back to the
-           function's entry hart, which [Hepi] has no way to know about.  So
-           [Hepi] instead takes its OWN wp_next-shaped continuation as an
-           argument (mirroring ProofConsputc.wp_consputc_epi exactly) and
-           closes THAT via [wp_next_chain] relative to [CID0]; the CALLER,
-           at each concrete call site, is the one who both knows the full
-           chain back to entry and holds the real [Hcont]. *)
-        wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
-          ∀ mfin,
-          sie_cap_gpr mfin K b p -∗
-          cpu_own n eb p C b -∗
-          pc_is ret_tgt -∗
-          ⌜ callee_saved m mfin ⌝ -∗
-          filealloc_post γf (mfin !!! Regidx Ra0) -∗
-          WP (Loop : expr riscv_lang)) -∗
-        WP (Loop : expr riscv_lang))%I
+    (* [Hepi] does NOT invoke the OUTER [Hcont] itself: [CID0] is a truly
+       arbitrary hart from [Hepi]'s own point of view (it is proved once,
+       generically), so [wp_next_chain] could only ever relate its own
+       six internal steps back to [CID0] -- never all the way back to the
+       function's entry hart, which [Hepi] has no way to know about.  So
+       [Hepi] instead takes its OWN wp_next-shaped continuation as an
+       argument (mirroring ProofConsputc.wp_consputc_epi exactly) and
+       closes THAT via [wp_next_chain] relative to [CID0]; the CALLER,
+       at each concrete call site, is the one who both knows the full
+       chain back to entry and holds the real [Hcont]. *)
+    iAssert (∀ (CID0 : CpuId), fa_epi_body γf m spr K b p C n eb ret_tgt CID0)%I
       with "[Hr24 Hr16 Hr8 Hg4]" as "Hepi".
     { iIntros (CID0 mj res) "(%Hjsp & %Hjs1 & %Hjthr) Hcg Hpc Hcnt Hpost Kont".
       (* +0x52 c.mv a0,s1 *)
