@@ -126,6 +126,12 @@
   3
  ],
  [
+  "CodeConsoleintr.v",
+  "consoleintr",
+  "cnti_",
+  3
+ ],
+ [
   "CodeConsolewrite.v",
   "consolewrite",
   "cnwi_",

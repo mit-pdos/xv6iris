@@ -801,6 +801,7 @@ W32Arith.v
 ConsoleInv.v
 CodeConsolewrite.v
 CodeConsoleread.v
+CodeConsoleintr.v
 SpecConsoleintr.v
 LinkConsoleintr.v
 WpUartgetc.v
