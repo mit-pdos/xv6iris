@@ -886,6 +886,7 @@ WeakRobustAcyc2.v
 WeakRobustMain.v
 WeakRobustBlocks.v
 WeakRobustCone.v
+WeakSailCone.v
 WeakAxiomatic.v
 WeakAxiomatic2.v
 WeakAxiomatic3.v

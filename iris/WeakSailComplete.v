@@ -58,24 +58,28 @@
         hypothesis on [next] itself; the consumers (this file's §7, and
         stage B3/B4) only ever run inside a block.
 
-    (c) AN AUDIT NOTE FOR STAGE B6.  A completion has to CHOOSE a value at
-        every [Interface.Choose] node (the LTS's arm is existential in it),
-        and the only inhabitant available is [SailStdpp.Values]'
-        [choose_type_inhabited].  At [ChooseReal] that is a real number, so
-        [quiet_complete] / [tail_complete] and everything above them carry
-        Stdlib's [ClassicalDedekindReals.sig_forall_dec] in their
-        [Print Assumptions] output.  It is a STDLIB axiom inherited through
-        [R], not a project assumption, and it is unavoidable while the choice
-        value must be produced rather than supplied; rv64d never emits
-        [ChooseReal].  Expect it in the B6 audit list and do not mistake it
-        for a lift residue.
+    (c) [Values.ChooseReal] IS EXCLUDED BY THE SHAPE PREDICATES, AND THAT IS
+        AN AXIOM-FOOTPRINT DECISION.  A completion has to CHOOSE a value at
+        every [Interface.Choose] node (the LTS's arm is existential in it).
+        Taking [SailStdpp.Values]' [choose_type_inhabited] means building an
+        [R] at [Values.ChooseReal], which alone puts Stdlib's
+        [ClassicalDedekindReals.sig_forall_dec] into the [Print Assumptions]
+        output of [quiet_complete] / [tail_complete] and of everything above
+        them.  So [quiet_tail] and [sail_live] refute the [Values.ChooseReal]
+        node outright (their [Interface.Choose] arm is [False] there and
+        [∀ r, …] at every other choose type), and [choose_val] produces the
+        value per constructor with no [R] anywhere.  rv64d never emits
+        [Values.ChooseReal], so this costs nothing and it is in the same
+        epistemic slot as the rest of the shape predicate.  All four exports
+        are now "Closed under the global context".
 
     ------------------------------------------------------------------------
     THE INDEX (what stage B3/B4/B5 will name).
 
       §1  [mchild], [macc], [mchild_wf], [msub_wf] — the [iMon] subterm kit;
           [silent_run_mchild] (the fused window descends).
-      §2  [quiet_tail], [sail_live], [psail_quiet], [shaped_res],
+      §2  [quiet_tail], [sail_live], [quiet_tail_choose], [sail_live_choose],
+          [choose_val], [choose_val_q], [psail_quiet], [shaped_res],
           [live_res], [ocons_res].
       §3  [pf_solo_q] (a [pf_solo] step with a quiet label), [qframe] /
           [tframe] and their run forms, [pf_solo_run_bnd].
@@ -110,14 +114,15 @@ From xv6iris Require Import WeakRobust WeakRobustBlocks.
 
 Local Open Scope Z_scope.
 
-(** A VALUE FOR EVERY [Interface.Choose].  The completions have to pick one
-    (the LTS's [Choose] arm is existential in it); [SailStdpp.Values] proves
-    every choose type inhabited.  The instance is named EXPLICITLY rather
-    than found by typeclass search because [SailStdpp.Values] may not be
-    [Import]ed here — importing it rebinds [++] to [String.append] and
-    silently breaks every list append in the file. *)
-Definition chosen (ty : Values.ChooseType) : Values.choose_type ty :=
-  @inhabitant _ (@Values.choose_type_inhabited ty).
+(** A VALUE FOR EVERY [Interface.Choose] BUT [Values.ChooseReal].  The
+    completions have to pick one (the LTS's [Choose] arm is existential in
+    it).  [SailStdpp.Values]' [choose_type_inhabited] would serve, but at
+    [Values.ChooseReal] its inhabitant is a REAL NUMBER, and merely BUILDING
+    an [R] drags Stdlib's [ClassicalDedekindReals.sig_forall_dec] into the
+    axiom footprint of everything above (see the header's note (c)).  So the
+    shape predicates of §2 EXCLUDE [Values.ChooseReal] outright — rv64d never
+    emits it — and the value is then produced per constructor by [choose_val]
+    (§2), no arm of which mentions [R]. *)
 
 (* ====================================================================== *)
 (** ** 1. The [iMon] well-foundedness kit
@@ -201,6 +206,11 @@ Fixpoint quiet_tail (m : M unit) {struct m} : Prop :=
        | Interface.ExtraOutcome _ => λ _, False
        | Interface.GenericFail _ => λ _, False
        | Interface.Discard => λ _, False
+       | Interface.Choose ty =>
+           match ty as t return (Values.choose_type t → M unit) → Prop with
+           | Values.ChooseReal => λ _, False
+           | _ => λ k, ∀ r, quiet_tail (k r)
+           end
        | _ => λ k, ∀ r, quiet_tail (k r)
        end) k
   end.
@@ -213,9 +223,56 @@ Fixpoint sail_live (m : M unit) {struct m} : Prop :=
        | Interface.ExtraOutcome _ => λ _, False
        | Interface.GenericFail _ => λ _, False
        | Interface.Discard => λ _, False
+       | Interface.Choose ty =>
+           match ty as t return (Values.choose_type t → M unit) → Prop with
+           | Values.ChooseReal => λ _, False
+           | _ => λ k, ∀ r, sail_live (k r)
+           end
        | _ => λ k, ∀ r, sail_live (k r)
        end) k
   end.
+
+(** The three CHOOSE lemmas.  [quiet_tail] / [sail_live] at a [Choose] node
+    still give the continuation at EVERY value (so the LTS's adversarial
+    choice is covered); and they give a VALUE, produced without touching
+    [R] — which is what a completion needs to step the node. *)
+
+Lemma quiet_tail_choose (ty : Values.ChooseType)
+    (k : Values.choose_type ty → M unit) :
+  quiet_tail (Interface.Next (Interface.Choose ty) k) →
+  ∀ r, quiet_tail (k r).
+Proof. destruct ty; simpl; intros H; (exact H || destruct H). Qed.
+
+Lemma sail_live_choose (ty : Values.ChooseType)
+    (k : Values.choose_type ty → M unit) :
+  sail_live (Interface.Next (Interface.Choose ty) k) → ∀ r, sail_live (k r).
+Proof. destruct ty; simpl; intros H; (exact H || destruct H). Qed.
+
+(** A value at every choose type the shape predicates admit.  [choose_prop]
+    is NOT enforced by the LTS's [Choose] arm (it is existential in the
+    value), so any inhabitant serves; the point is that none of these is an
+    [R]. *)
+Lemma choose_val (ty : Values.ChooseType)
+    (k : Values.choose_type ty → M unit) :
+  sail_live (Interface.Next (Interface.Choose ty) k) →
+  ∃ r : Values.choose_type ty, True.
+Proof.
+  destruct ty; simpl; intros H;
+    [by exists false|by exists 0%Z|by exists 0%Z|destruct H
+    |by exists String.EmptyString|by exists 0%Z
+    |by exists (Values.mword_of_int 0)].
+Qed.
+
+Lemma choose_val_q (ty : Values.ChooseType)
+    (k : Values.choose_type ty → M unit) :
+  quiet_tail (Interface.Next (Interface.Choose ty) k) →
+  ∃ r : Values.choose_type ty, True.
+Proof.
+  destruct ty; simpl; intros H;
+    [by exists false|by exists 0%Z|by exists 0%Z|destruct H
+    |by exists String.EmptyString|by exists 0%Z
+    |by exists (Values.mword_of_int 0)].
+Qed.
 
 (** The agent-state readings. *)
 Definition psail_quiet (p : psail) : Prop :=
@@ -516,11 +573,13 @@ Section complete.
       exists (barrier_lbl bk).1, (k tt), rs, (barrier_lbl bk).2.
       split_and!; [rewrite /sail_step_ni /=; by split
                   |by apply barrier_lbl_quiet|by eexists|by apply Hq].
-    - (* Choose: any inhabitant will do *)
-      exists WeakPromise.LSilent, (k (chosen ty)), rs, None.
+    - (* Choose: any inhabitant that is not a real will do *)
+      destruct (choose_val_q ty k Hq) as (v & _).
+      exists WeakPromise.LSilent, (k v), rs, None.
       split_and!; [rewrite /sail_step_ni /=; split;
-                     [reflexivity|by exists (chosen ty)]
-                  |by left|by eexists|by apply Hq].
+                     [reflexivity|by exists v]
+                  |by left|by eexists
+                  |by apply (quiet_tail_choose ty k Hq)].
   Qed.
 
   (** *** The silent-epilogue run
@@ -643,9 +702,12 @@ Lemma sail_live_silent1 (m : M unit) rs (b : M unit * regstate) :
   sail_live m → silent1 (m, rs) b → sail_live b.1.
 Proof.
   destruct m as [y|T oc k]; [by intros _ []|].
-  destruct oc; simpl; try (by intros _ []);
-    try (by intros Hlv ->; simpl; apply Hlv);
-    try (by intros Hlv [ch ->]; simpl; apply Hlv).
+  destruct oc as [rg akk|rg akk rv|nn req|nn req|op|szb bpa|bk|co|to|flt
+                 |epa|tst|tnd|A eo|msg| | |ty| |msg2]; simpl;
+    try (by intros _ []);
+    try (by intros Hlv ->; simpl; apply Hlv).
+  (* Choose *)
+  intros Hlv [ch ->]. simpl. by apply (sail_live_choose ty k Hlv).
 Qed.
 
 Lemma sail_live_silent_run (m m1 : M unit) rs rs1 :
@@ -745,9 +807,10 @@ Proof.
     + by apply Hsh.
     + by apply Hlv.
   - (* Choose *)
-    right. exists (k (chosen ty)), rs.
-    split_and!; [rewrite /silent1 /=; by exists (chosen ty)
-                |by apply Hat|by apply Hlv].
+    destruct (choose_val ty k Hlv) as (v & _).
+    right. exists (k v), rs.
+    split_and!; [rewrite /silent1 /=; by exists v
+                |by apply Hat|by apply (sail_live_choose ty k Hlv)].
 Qed.
 
 (** THE WINDOW, WALKED: from an [amo_tail] the LTS reaches its conditional
@@ -903,7 +966,8 @@ Section residual.
       + destruct Hstep as [_ ->]. simpl. by apply Hlv.
       + destruct Hstep as (_ & _ & _ & ->). simpl. by apply Hlv.
     - (* Choose *)
-      destruct Hstep as (_ & ch & ->). simpl. by apply Hlv.
+      destruct Hstep as (_ & ch & ->). simpl.
+      by apply (sail_live_choose ty k Hlv).
   Qed.
 
 End residual.
@@ -1252,11 +1316,13 @@ Section tail.
         |apply tc_once; by eexists|by apply Hsh|by apply Hlv
         |exists dv; by apply Hoc].
     - (* Choose *)
-      apply (tail_qcase i c ag WeakPromise.LSilent _ (k (chosen ty)) rs d None
+      destruct (choose_val ty k Hlv) as (v & _).
+      apply (tail_qcase i c ag WeakPromise.LSilent _ (k v) rs d None
                iq Hlk (or_introl eq_refl));
         [rewrite Hst /sail_step_ni /=; split;
-           [reflexivity|by exists (chosen ty)]
-        |apply tc_once; by eexists|by apply Hsh|by apply Hlv
+           [reflexivity|by exists v]
+        |apply tc_once; by eexists|by apply Hsh
+        |by apply (sail_live_choose ty k Hlv)
         |exists dv; by apply Hoc].
     - (* Message *)
       apply (tail_qcase i c ag WeakPromise.LSilent _ (k tt) rs d None iq
