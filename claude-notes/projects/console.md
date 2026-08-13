@@ -8,8 +8,8 @@ is [`uart-driver.md`](uart-driver.md).
 | function | where | status |
 |---|---|---|
 | `consolewrite(int,uint64,int)` | SpecConsolewrite / CodeConsolewrite / ProofConsolewrite / LinkConsolewrite | **PROVEN + LINKED, axiom-clean** (5 platform axioms + funext only) |
-| `consoleread(int,uint64,int)` | SpecConsoleread / CodeConsoleread / LinkConsoleread | **spec written; proof owed.** The Link file is still an `Axiom` |
-| `consoleintr(int)` | SpecConsoleintr / LinkConsoleintr | assumed — but **now provable**: xv6 `a28e94b` removed its `procdump` call, so its callees are exactly acquire / consputc / release / wakeup, all four proven and linked |
+| `consoleread(int,uint64,int)` | SpecConsoleread / CodeConsoleread / ProofConsoleread / LinkConsoleread | **PROVEN + LINKED, axiom-clean** (5 platform axioms + funext only) |
+| `consoleintr(int)` | SpecConsoleintr / CodeConsoleintr / LinkConsoleintr | assumed — but **provable**: xv6 `a28e94b` removed its `procdump` call, so its callees are exactly acquire / consputc / release / wakeup, all four proven and linked |
 | `consputc(int)` | SpecConsputc / ProofConsputc / LinkConsputc | proven + linked |
 | `consoleinit(void)` | SpecConsoleinit / ProofConsoleinit / LinkConsoleinit | proven + linked |
 
@@ -101,28 +101,38 @@ A CHUNKED COPY LOOP, filewrite's shape one tier down.
 - `rewrite a b` (space-separated) and `by tac` are ssreflect, so a file that
   does not import the proofmode must use `rewrite a, b`.
 
-## consoleread — WHAT IS LEFT
+## consoleread — PROVEN
 
-The contract is written (SpecConsoleread.v) and is `SpecPiperead.v`'s conjunct
-for conjunct, with `is_pipe`/`pipe_ref` replaced by the single persistent
-`is_conslock`. **ProofPiperead.v is the template and the two functions are the
-same animal** — a blocking read into user memory under a spinlock an interrupt
-handler also takes. What differs, in the order a proof meets it:
+`iris/ProofConsoleread.v` (~2400 lines, 8 `Qed`s, ~45 s to compile).
+`ProofPiperead.v` is its template and the two functions are the same animal;
+what differs, and what the difference cost:
 
-- `either_copyout` rather than `copyout` (one more frame, and the flag is the
-  literal 1 — the contract is stated only for the user arm);
-- NO `wakeup` on the way out (piperead wakes the writer; the console does not);
-- the outer `while (n > 0)` wraps the wait loop, so there are THREE loops'
-  worth of structure, not two: an iLöb for the unbounded wait (+0x48), a fuel
-  induction on `n` for the outer copy loop, and the `^D` / `'\n'` early breaks;
-- the `^D` arm's `cons.r--` at +0xe6, guarded by `bgeu` on `n` vs `target` at
-  +0xe2 — the one place a future ring invariant will have to be re-established;
-- `killed(myproc())` at +0x48/+0x4c, which piperead also has.
-
-`consoleread_stack` is 62, piperead's, and should hold for the same reason: the
-copy happens under `cons.lock`, i.e. interrupts off, where `trap_res true` is
-spendable stack; the calls made with interrupts ON are `sleep` (22) and the
-re-`acquire` (10), both well inside `62 - 12`.
+- **THE EXITS ARE THREADED AS ONE `∧`-BUNDLE, NOT REBUILT PER BLOCK.**
+  `cr_exits = cr_retx_prop ∧ cr_epi_prop` carries the eight saved frame slots
+  and the caller's `wp_next`, and every block below (the head loop, the park,
+  the copy block) takes it as a PREMISE and hands it to whichever successor it
+  jumps to. `iSplit` on `∧` gives both branches the same slots, which is what
+  makes five exits share one frame.
+- **BECAUSE THE BLOCKS TAKE THE BUNDLE RATHER THAN HOLDING IT, THEY ARE
+  PROVABLE FROM PERSISTENT CONTEXT ALONE** — so each is an `iAssert … with "[]"`
+  and the copy block can be built fresh (`□`) inside the wait loop's Löb
+  without threading it round the back edge. That is the structural difference
+  from piperead, which threads `EX ∧ CP` through its wait loop.
+- three loops' worth of structure: a fuel induction on the remaining count for
+  the outer `while (n > 0)` (+0x38), an iLöb for the unbounded wait (+0x48),
+  and the `^D` / `'\n'` early breaks. The fuel premise is
+  `Z.to_nat nc < fl` at the head and `Z.to_nat nc <= fl` in the blocks below
+  it, which is what makes the base case VACUOUS instead of a duplicated exit.
+- `either_copyout` rather than `copyout`: its contract takes `proc_priv_core`
+  WHOLE (copyout's takes the carved pieces), so unlike piperead this proof
+  never opens the process block — one fewer thing to reassemble at five exits.
+- the `^D` arm's `cons.r--` at +0xe6, guarded by an UNSIGNED `bgeu` on `n` vs
+  `target` at +0xe2 (gcc knows both are non-negative) — the one place a future
+  ring invariant will have to be re-established.
+- `consoleread_stack` is 62, piperead's: the copy happens under `cons.lock`,
+  i.e. interrupts off, where `trap_res true` is spendable stack, and the calls
+  made with interrupts ON are `sleep` (20) and the re-`acquire` (10), both well
+  inside `62 - 12`.
 
 ## consoleintr — NOW IN SCOPE
 
@@ -144,6 +154,25 @@ no iLöb and no park — easier than either of the other two.
 Proving it retires this cone's last assumption and makes
 `LinkConsoleintr.v` an ordinary functor application; it is also what would
 make a line-discipline coupling in `cons_res` worth stating (see above).
+
+The decode layer is already generated (`CodeConsoleintr.v`, prefix `cnti_`).
+Two things the proof has to decide before the first instruction:
+
+- **THE CREDENTIAL RIPPLE.** consputc needs `dev_inv` ∗ `is_txlock` ∗ a
+  `uart_sent_sub` to extend, and acquire/release need `is_conslock`; uartintr
+  today holds only `dev_inv`. All four are PERSISTENT, so the honest shape is
+  one existential bundle — `console_caps γu := ∃ γtx γc, is_txlock γtx γu ∗
+  is_conslock γc ∗ uart_sent_sub γu []` — which adds a conjunct to
+  `SpecDevintr.devintr_caps` and NO new parameter, so the eight files that
+  merely thread that bundle do not change. `ProofMain` / `ProofMainSecondary`
+  are the two that CONSTRUCT it, and they cannot: minting the two locks is the
+  boot debt below.
+- **THE KILL-LINE LOOP AT +0xb8 IS AN iLöb, NOT A FUEL INDUCTION**, and this
+  is the one place the flat `cons_res` shows: with no relation between
+  `cons.e` and `cons.w` the loop's decrement bounds nothing. It does not need
+  one — the back edge is the TAKEN arm of the `bne` at +0xda, and
+  `wp_bne_taken_s_sconf` hands out a `▷ wp_next`, which is exactly what the
+  Löb IH is under. Nothing is returned, so no count has to survive the loop.
 
 ## What a relayout costs this cone — measured
 

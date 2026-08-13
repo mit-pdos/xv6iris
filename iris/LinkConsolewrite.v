@@ -1,8 +1,8 @@
 (* LinkConsolewrite.v -- consolewrite's proof, instantiated against its
    callees'.
 
-   It WAS an [Axiom] (the fourth of its kind, beside LinkKerneltrap.v,
-   LinkConsoleintr.v and LinkConsoleread.v), because filewrite's FD_DEVICE arm
+   It WAS an [Axiom] (beside LinkKerneltrap.v and LinkConsoleintr.v, which
+   are what is left of the kind), because filewrite's FD_DEVICE arm
    dispatches through [devsw[f->major].write], the console is the only device
    xv6 installs, and consolewrite had no proof.  It has one now
    (ProofConsolewrite.v), so this file is an ordinary two-argument functor

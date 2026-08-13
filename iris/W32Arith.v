@@ -65,17 +65,20 @@ Qed.
 
 (* ---- the three instructions ---- *)
 
-(* [subw rd,ra,rc] : the two operands are small non-negative and so is the
-   difference -- a loop's [n - i]. *)
+(* [subw rd,ra,rc] : a loop's [n - i].  THE DIFFERENCE is the only thing
+   that has to be in [int] range -- the operands wrap away, so a counter
+   pair like consoleread's [target - n] is covered even where [n] itself is
+   negative (a non-positive request never enters the loop and the answer is
+   still 0). *)
 Lemma w32_subw_moi (a c : Z) :
-  (0 <= c <= a)%Z -> (a < 2 ^ 31)%Z ->
+  (0 <= a - c < 2 ^ 31)%Z ->
   sign_extend' 64 (sub_vec (subrange_vec_dec (mword_of_int a : mword 64) 31 0 : mword 32)
                            (subrange_vec_dec (mword_of_int c : mword 64) 31 0 : mword 32))
   = (mword_of_int (a - c) : mword 64).
 Proof.
-  intros Hc Ha.
+  intro Hac.
   rewrite <- !trunc32_subrange. rewrite !trunc32_mword_of_int.
-  rewrite w32_subv. apply w32_sext_moi. lia.
+  rewrite w32_subv. apply w32_sext_moi. exact Hac.
 Qed.
 
 (* [addw rd,rc,ra] : a loop's [i + nn].  The argument order is the one the
@@ -154,6 +157,36 @@ Proof.
   assert (Hz : (zero_reg : mword 64) = (mword_of_int 0 : mword 64))
     by (apply bv_eq; vm_compute; reflexivity).
   rewrite Hz. apply w32_bge_moi; [lia | exact Hc].
+Qed.
+
+(* The UNSIGNED compare, for a [bgeu] whose two operands are non-negative
+   [int]s -- which is how gcc spells "did we copy anything yet?" when both
+   sides are known non-negative and it can save the sign analysis
+   (consoleread's [if (n < target)] at +0xe2). *)
+Lemma w32_bgeu_moi (a c : Z) :
+  (0 <= a < 2 ^ 64)%Z -> (0 <= c < 2 ^ 64)%Z ->
+  zopz0zKzJ_u (mword_of_int a : mword 64) (mword_of_int c : mword 64) = Z.geb a c.
+Proof.
+  intros Ha Hc. unfold zopz0zKzJ_u.
+  rewrite !uint_unsigned !moi64_unsigned !bvw64_small;
+    [reflexivity | exact Hc | exact Ha].
+Qed.
+
+(* [c.addiw rd,rd,k] on a small non-negative counter: the COMPRESSED
+   immediate is a 6-bit field sign-extended twice, so the law is stated over
+   the 64-bit value [k] that field denotes rather than over the field --
+   which keeps one lemma for every [c.addiw] rather than one per constant.
+   [w32_addw_moi]'s twin for the immediate form. *)
+Lemma w32_caddiw_moi (z k : Z) (i6 : mword 6) :
+  (sign_extend' 64 (sign_extend' 12 i6) : mword 64) = (mword_of_int k : mword 64) ->
+  (0 <= z + k < 2 ^ 31)%Z ->
+  sign_extend' 64 (subrange_vec_dec
+     (add_vec (mword_of_int z : mword 64) (sign_extend' 64 (sign_extend' 12 i6))) 31 0 : mword 32)
+  = (mword_of_int (z + k) : mword 64).
+Proof.
+  intros Hk Hzk. rewrite Hk.
+  rewrite <- trunc32_subrange. rewrite trunc32_add !trunc32_mword_of_int w32_addv.
+  apply w32_sext_moi. exact Hzk.
 Qed.
 
 (* [add_vec zero_reg x = x] -- what every [c.mv] produces. *)
