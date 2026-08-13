@@ -18,9 +18,10 @@
 
     (1) THE CORRESPONDENCE, as a FUNCTION rather than a relation (§1).
         [wl_cfg g u] is the [wpcfg pxv6] a [WeakLang] state [g] denotes, given
-        the per-agent data a [wgstate] does NOT carry: the two ORACLE STREAMS
-        of [WeakSailLTS.psail] ([wa_dstr], [wa_iq]) and the disk agent's own
-        fabric state and [wstate] ([wa_dd], [wa_dws]).  Harts sit at
+        the per-agent data a [wgstate] does NOT carry: each hart's PRIVATE
+        DEVICE FABRIC and interrupt oracle ([wa_dev], [wa_iq] — the two
+        [WeakSailLTS.psail] fields the machine state has no image of) and the
+        disk agent's own fabric state and [wstate] ([wa_dd], [wa_dws]).  Harts sit at
         [0 .. NCPU-1] and the disk at [NCPU = WeakLang.n_disk] — exactly
         [WeakCompose.xv6_ps]'s layout, which is what keeps every [wm_tid]
         stable across the seam.  The two facts the transport reads off it are
@@ -52,9 +53,13 @@
         from the [wrun] that [WeakSailLTS2.sail_block_wrun] reconstructs).
         Per segment it carries exactly the DEVICE-SEAM residue and nothing
         else:
-          - [SegHart]: [WeakSailLTS2.oracle_consistent] of that hart's stream
-            against [wgdev g], plus a continuation quantified over the
-            [wrun]s whose [WeakLang] successor MATCHES the segment's target;
+          - [SegHart]: FABRIC AGREEMENT ([wa_dev u cpu = wgdev g] — the twin
+            of [SegDisk]'s [wa_dd u = wgdev g]) and DEVICE DECODABILITY along
+            this segment's own run ([WeakSailLTS2.dev_ok_blk]), plus a
+            continuation quantified over the [wrun]s whose [WeakLang]
+            successor MATCHES the segment's target.  The successor updates
+            that hart's private fabric to the block's own [wm_dev s'], which
+            is exactly what [WeakLang.whart_write] does to [wgdev];
           - [SegIrq]: the wire fact — the delivered value is
             [bool_to_bit (dev_seip (wgdev g) i)] — and the continuation;
           - [SegDisk]: [wa_dd u = wgdev g] (the M5 device-view residue) and,
@@ -102,9 +107,9 @@
         into, the [WeakLang] machine can follow along — i.e. [wl_lift] holds
         at the initial state.  It is a named definition, consumed in exactly
         one place, and NOT dressed up as a theorem.  What it really assumes
-        is only what §A(4) lists: per hart block an [oracle_consistent]
-        stream, per delivery the plic wire, per disk group the device view
-        and the true-memory [wdisk_step].  Everything else about the
+        is only what §A(4) lists: per hart block the fabric agreement and
+        the block's device decodability, per delivery the plic wire, per disk
+        group the device view and the true-memory [wdisk_step].  Everything else about the
         correspondence — the log, the registers, the [wstate]s, the agent
         vector — is DERIVED (that is what [wl_lift_sound] is).
 
@@ -129,7 +134,29 @@
         reachable one but the one the EXHIBIT builds, and
         [WeakSailCone.cone_segments2] hands it over already segmented.
 
-    (C) THE AGENT QUANTIFIER — FOUND HERE, FIXED IN LAYER 1, GONE FROM THE
+    (C) THE ∀-PATH DEVICE ORACLE WAS UNSATISFIABLE — THE FINDING THAT
+        RETIRED THE STREAM (2026-08-13).  Until stage D each hart's MMIO
+        responses came from a positional ORACLE STREAM
+        ([WeakSailLTS.psail]'s old [sp_dev : dstream]) and the ⇐ direction
+        needed [WeakSailLTS2.oracle_consistent] — "this stream is what the
+        device would have answered, ALONG EVERY PATH of the instruction".
+        That premise is FALSE at essentially every S-mode record, and had
+        been since L3: [WeakInterp.wrun]'s RAM reads quantify over every read
+        value, including the FETCHED WORD and every page-walk PTE, so one
+        stream would have to serve, from one device state, every device
+        access every junk fetch decodes to along every junk-but-valid
+        translation path — two fetched words decoding to [lw]/[lb] at one VA
+        demand the same stream head have length 4 and length 1.  It appeared
+        here as [cone_liftable]'s hart conjunct and in
+        [WeakSailCone] as [horc_prem]; both are gone.  THE FIX (stage D):
+        the hart carries a private copy of the DEVICE AUTOMATON, read and
+        written through totalized accessors, and the retained assumption
+        shrinks to the two satisfiable halves listed in §A(4) — fabric
+        agreement at each segment, and decodability along the segment's OWN
+        run.  Third finding of the false-premise genre in this file; cf. (B)
+        and (D).
+
+    (D) THE AGENT QUANTIFIER — FOUND HERE, FIXED IN LAYER 1, GONE FROM THE
         PREMISE LIST (2026-08-12).  It was a premise of this file for exactly
         one revision, under the name [xv6_violation_harts], and it was FALSE
         AS STATED for xv6.  Recorded because the shape recurs:
@@ -177,7 +204,10 @@
     §D  THE PREMISE LIST OF [xv6_weak_robust_adequate] — the composition's
     assumptions inventory (against [WeakCompose] §6's):
 
-      1. [∀ b, sail_shaped (riscv_step b)] — seam (6), unchanged.
+      1. [∀ b, sail_shaped (riscv_step b)] AND
+         [∀ b, sail_live (riscv_step b)] — seam (6)'s two group-3 model
+         facts.  [sail_live] is NEW at this level (stage D): it used to
+         arrive inside [Hres], which is now derived rather than assumed.
       2. THE FRESH ERA: [gen_id = 0], [wgpow g0 = true], [wggen g0 = 0],
          [wglog g0 = []], [∀ c, wgws g0 c = ws_init], [wa_dws u0 = ws_init]
          — literally [weak_system_adequacy_phi]'s, plus the disk agent's own
@@ -190,15 +220,22 @@
       5. The per-traced-bundle static package: [main_premises n_disk TS]
          (= [WeakCompose] §6 (3), with [bad] now bounding the READER's agent
          index too) AND [xv6_cone_premises TS] — [Hcq] (a cross-edge source's
-         post-state is quiet), [Hres] ([sail_shaped]/[sail_live]/oracle
-         consistency of every trace record's residual), [Hirqb] (a delivery
-         has a boundary pre-state) and [Hcls] (a logged message carries its
-         author's computed class), stated exactly as [WeakSailCone] §11-§12's
-         section context.
+         post-state is quiet), [Hirqb] (a delivery has a boundary pre-state)
+         and [Hcls] (a logged message carries its author's computed class),
+         stated exactly as [WeakSailCone] §11-§12's section context.
+         [Hres] IS NO LONGER A CONJUNCT: [WeakSailCone.hres_derived] proves
+         it inside [xv6_no_bad_edge] from premise 1 and the trace
+         well-formedness of [tb_facts] (stage D — with the device residue
+         gone, the derivation has no leftover input).
       6. [cone_liftable] — residue (A) of §B, and THE ONLY LIFT RESIDUE:
          the MMIO/M5 device seam, per decomposition.
       7. The 5 rv64d baseline axioms.  NO functional extensionality, NO
          classical axiom.
+
+    WHAT IS GONE relative to the previous revision: [Hres] (derived, §D 5)
+    and the per-hart oracle-stream conjunct of [cone_liftable] (§B(C)); what
+    replaced the latter is an equality and a run-local side condition, both
+    inside [wl_lift].
 
     WHAT IS GONE relative to [WeakCompose] §6: seam (1a) (the ⇐ hart
     direction — L2 built it, §6 consumes it), (1b) (interleaving regrouping —
@@ -258,7 +295,7 @@ Proof.
   apply cpu_enum_lookup.
 Qed.
 
-(** A pointwise function update on [CPU] (the [dstream] / [istream] twin of
+(** A pointwise function update on [CPU] (the [dev_state] / [istream] twin of
     [RiscvLang.greg_insert] and [WeakLang.gws_insert]). *)
 Definition cupd {A} (c : CPU) (x : A) (f : CPU → A) : CPU → A :=
   λ c', if decide (c' = c) then x else f c'.
@@ -343,14 +380,14 @@ Qed.
     ([WeakLang.n_disk], [WeakCompose.xv6_ps]'s layout). *)
 
 Record wlaux := WLAux {
-  wa_dstr : CPU → dstream;
+  wa_dev  : CPU → dev_state;
   wa_iq   : CPU → istream;
   wa_dd   : dev_state;
   wa_dws  : wstate;
 }.
 
 Definition hag (g : wgstate) (u : wlaux) (c : CPU) : wpagent psail :=
-  WPAgent (PSail None (wgregs g c) (wa_dstr u c) None (wa_iq u c))
+  WPAgent (PSail None (wgregs g c) (wa_dev u c) None (wa_iq u c))
           (wgws g c) (∅ : gset nat).
 
 (** The HART-ONLY configuration, at the [psail] program type. *)
@@ -440,16 +477,17 @@ Definition wdisk_write (g : wgstate) (d' : dev_state)
   WGState (wgregs g) (wgimg g) (wglog g ++ wmsgs_of_map w) (wgws g)
           d' (wggen g) (wgpow g).
 
-(** The three [wlaux] updates: a hart's device stream advances, a hart's
-    interrupt stream advances, the disk's own fabric/[wstate] are replaced. *)
-Definition wl_dstr (cpu : CPU) (dtl : dstream) (u : wlaux) : wlaux :=
-  WLAux (cupd cpu dtl (wa_dstr u)) (wa_iq u) (wa_dd u) (wa_dws u).
+(** The three [wlaux] updates: a hart's private device fabric advances to
+    what its own block's accesses produced, a hart's interrupt stream
+    advances, the disk's own fabric/[wstate] are replaced. *)
+Definition wl_dev (cpu : CPU) (d' : dev_state) (u : wlaux) : wlaux :=
+  WLAux (cupd cpu d' (wa_dev u)) (wa_iq u) (wa_dd u) (wa_dws u).
 
 Definition wl_iq (cpu : CPU) (iq' : istream) (u : wlaux) : wlaux :=
-  WLAux (wa_dstr u) (cupd cpu iq' (wa_iq u)) (wa_dd u) (wa_dws u).
+  WLAux (wa_dev u) (cupd cpu iq' (wa_iq u)) (wa_dd u) (wa_dws u).
 
 Definition wl_dk (d' : dev_state) (ws' : wstate) (u : wlaux) : wlaux :=
-  WLAux (wa_dstr u) (wa_iq u) d' ws'.
+  WLAux (wa_dev u) (wa_iq u) d' ws'.
 
 (** REASSEMBLY, for a step that moved ONE HART: the configuration whose
     agent [cpu] has been replaced IS the corresponding configuration of the
@@ -886,13 +924,22 @@ Fixpoint wl_lift (gen : nat) (segs : list seg2) (g : wgstate) (u : wlaux)
   | [] => True
   | SegHart i c c' :: rest =>
       ∃ cpu : CPU, i = fin_to_nat cpu ∧
-        (** the MMIO seam: this hart's oracle stream is what the fabric
-            [wgdev g] answers, along every path of every instruction *)
-        (∀ b, oracle_consistent (wgdev g) (riscv_step b) (wa_dstr u cpu)) ∧
-        (∀ (tick : bool) (x : unit) (s' : wmstate) (dtl : dstream),
+        (** THE MMIO SEAM, in its two satisfiable halves (WeakCompose §6(4)).
+            (i) FABRIC AGREEMENT: this hart's private device automaton is
+            the machine's at the start of the segment — the exact twin of
+            [SegDisk]'s [wa_dd u = wgdev g]. *)
+        wa_dev u cpu = wgdev g ∧
+        (** (ii) DEVICE DECODABILITY along the segment's OWN run: every
+            device access the block actually performed is one the partial
+            [dev_read]/[dev_write] accepts.  Stated on the run, not on the
+            monad — the ∀-path form is unsatisfiable (WeakCompose §6(4)). *)
+        dev_ok_blk riscv_step i
+          (prj_cfg (PSail None (wgregs g cpu) (wa_dev u cpu) None (wa_iq u cpu))
+             c') ∧
+        (∀ (tick : bool) (x : unit) (s' : wmstate),
            wrun (Some i) (riscv_step tick) (whart_view g cpu) x s' →
-           wl_cfg (whart_write g cpu s') (wl_dstr cpu dtl u) = c' →
-           wl_lift gen rest (whart_write g cpu s') (wl_dstr cpu dtl u))
+           wl_cfg (whart_write g cpu s') (wl_dev cpu (wm_dev s') u) = c' →
+           wl_lift gen rest (whart_write g cpu s') (wl_dev cpu (wm_dev s') u))
   | SegIrq i c c' :: rest =>
       ∃ cpu : CPU, i = fin_to_nat cpu ∧
         (** the PLIC WIRE: the delivered value is the fabric's [seip] pin *)
@@ -932,19 +979,20 @@ Proof.
   destruct s as [i c c'|i c c'|i c c']; simpl in Hch, Hfine, Hlift;
     destruct Hch as (Hsrc & Hch); subst c.
   - (* ---------------- ONE HART INSTRUCTION BLOCK ---------------- *)
-    destruct Hlift as (cpu & -> & Hoc & Hcont).
-    set (q0 := PSail None (wgregs g cpu) (wa_dstr u cpu) None (wa_iq u cpu)).
+    destruct Hlift as (cpu & -> & Hfab & Hdev & Hcont).
+    set (q0 := PSail None (wgregs g cpu) (wa_dev u cpu) None (wa_iq u cpu)).
     have Hlkp : pc_ags (prj_cfg q0 (wl_cfg g u)) !! (fin_to_nat cpu)
-              = Some (WPAgent (PSail None (wgregs g cpu) (wa_dstr u cpu) None
-                                 (wa_iq u cpu)) (wgws g cpu) ∅)
-      := prj_lookup q0 _ _ _ (wl_cfg_hart_lookup g u cpu).
+              = Some (WPAgent (PSail None (wgregs g cpu) (wgdev g) None
+                                 (wa_iq u cpu)) (wgws g cpu) ∅).
+    { rewrite -Hfab.
+      exact (prj_lookup q0 _ _ _ (wl_cfg_hart_lookup g u cpu)). }
     have Hblk : sail_block riscv_step (fin_to_nat cpu)
                   (prj_cfg q0 (wl_cfg g u)) (prj_cfg q0 c')
       := xblk_prj riscv_step q0 (fin_to_nat cpu) (wl_cfg g u) c' Hfine.
-    destruct (wprim_hart_block_bwd cpu gen g (wa_dstr u cpu) (wa_iq u cpu) ∅
+    destruct (wprim_hart_block_bwd cpu gen g (wa_iq u cpu) ∅
                 (prj_ag q0 <$> pc_ags (wl_cfg g u)) (prj_cfg q0 c')
-                Hsh Hoc Hlive Hlkp Hblk)
-      as (g2 & dtl & Hstep & Heq).
+                Hsh Hdev Hlive Hlkp Hblk)
+      as (g2 & Hstep & Heq).
     have Hstep2 := Hstep.
     apply wprim_step_loop_inv in Hstep2
       as (_ & _ & _ & [(_ & tick & xx & s' & Hrun & Hg2)|(Hnl & _)]);
@@ -963,16 +1011,16 @@ Proof.
       as (agc & qc & Hlkc & Hstc).
     have Hagsc : prj_ag q0 <$> pc_ags c'
                = <[fin_to_nat cpu :=
-                     WPAgent (PSail None (wgregs (whart_write g cpu s') cpu) dtl None (wa_iq u cpu))
+                     WPAgent (PSail None (wgregs (whart_write g cpu s') cpu) (wm_dev s') None (wa_iq u cpu))
                        (wgws (whart_write g cpu s') cpu) ∅]>
                    (prj_ag q0 <$> pc_ags (wl_cfg g u))
       := f_equal (@pc_ags psail) Heq.
     have Hcpu : prj_ag q0 agc
-              = WPAgent (PSail None (wgregs (whart_write g cpu s') cpu) dtl None (wa_iq u cpu))
+              = WPAgent (PSail None (wgregs (whart_write g cpu s') cpu) (wm_dev s') None (wa_iq u cpu))
                   (wgws (whart_write g cpu s') cpu) ∅.
     { have H : (prj_ag q0 <$> pc_ags c') !! fin_to_nat cpu
              = (<[fin_to_nat cpu :=
-                    WPAgent (PSail None (wgregs (whart_write g cpu s') cpu) dtl None (wa_iq u cpu))
+                    WPAgent (PSail None (wgregs (whart_write g cpu s') cpu) (wm_dev s') None (wa_iq u cpu))
                       (wgws (whart_write g cpu s') cpu) ∅]>
                  (prj_ag q0 <$> pc_ags (wl_cfg g u))) !! fin_to_nat cpu
         by rewrite Hagsc.
@@ -983,14 +1031,14 @@ Proof.
       rewrite list_lookup_fmap Hlkc /= in H.
       rewrite list_lookup_insert in H; [|exact Hlen].
       apply (inj Some) in H. exact H. }
-    have Hagc : agc = WPAgent (PHart (PSail None (wgregs (whart_write g cpu s') cpu) dtl None
+    have Hagc : agc = WPAgent (PHart (PSail None (wgregs (whart_write g cpu s') cpu) (wm_dev s') None
                                         (wa_iq u cpu))) (wgws (whart_write g cpu s') cpu) ∅.
     { destruct agc as [st ws pr]. simpl in Hstc, Hcpu. rewrite Hstc in Hcpu |- *.
       by injection Hcpu as -> -> ->. }
-    have Hceq : wl_cfg (whart_write g cpu s') (wl_dstr cpu dtl u) = c'.
+    have Hceq : wl_cfg (whart_write g cpu s') (wl_dev cpu (wm_dev s') u) = c'.
     { symmetry.
-      rewrite -(wl_cfg_hart_upd g u cpu (whart_write g cpu s') (wl_dstr cpu dtl u)
-                  (PSail None (wgregs (whart_write g cpu s') cpu) dtl None (wa_iq u cpu))
+      rewrite -(wl_cfg_hart_upd g u cpu (whart_write g cpu s') (wl_dev cpu (wm_dev s') u)
+                  (PSail None (wgregs (whart_write g cpu s') cpu) (wm_dev s') None (wa_iq u cpu))
                   (wgws (whart_write g cpu s') cpu)).
       - apply wpcfg_eq; cbn [pc_img pc_log pc_ags].
         + rewrite Hximg. done.
@@ -1004,14 +1052,14 @@ Proof.
       - done.
       - intros cc Hcc. rewrite /hag /whart_write /=.
         by rewrite (greg_insert_ne _ _ _ _ Hcc) (gws_insert_ne _ _ _ _ Hcc)
-                   /wl_dstr /= (cupd_ne _ _ _ _ Hcc).
-      - by rewrite /hag /wl_dstr /= cupd_eq. }
+                   /wl_dev /= (cupd_ne _ _ _ _ Hcc).
+      - by rewrite /hag /wl_dev /= cupd_eq. }
     have Hlive2 : wthread_live (whart_write g cpu s') gen.
     { destruct Hlive as [Hp Hg]. rewrite /wthread_live /whart_write /=.
       by split. }
-    destruct (IH (whart_write g cpu s') (wl_dstr cpu dtl u) cf
+    destruct (IH (whart_write g cpu s') (wl_dev cpu (wm_dev s') u) cf
                 ltac:(by rewrite Hceq) Hall Hlive2
-                (Hcont tick xx s' dtl Hrun Hceq))
+                (Hcont tick xx s' Hrun Hceq))
       as (g' & u' & Hcf & Hlive' & Hrun').
     exists g', u'. split_and!; [done|done|].
     eapply rtc_l; [|exact Hrun'].
@@ -1142,7 +1190,7 @@ Qed.
 
 (** The hart vector [WeakCompose.xv6_ps] is applied to. *)
 Definition xv6_harts (g : wgstate) (u : wlaux) : list psail :=
-  (λ c, PSail None (wgregs g c) (wa_dstr u c) None (wa_iq u c)) <$> enum CPU.
+  (λ c, PSail None (wgregs g c) (wa_dev u c) None (wa_iq u c)) <$> enum CPU.
 
 Definition xv6_ps0 (g : wgstate) (u : wlaux) : list pxv6 :=
   xv6_ps (wa_dd u) (xv6_harts g u).
@@ -1208,15 +1256,6 @@ Definition xv6_cone_premises (TS : ptraces pxv6) : Prop :=
   (∀ e1 e2, gdep2 TS e1 e2 → e1.1 ≠ e2.1 →
      ∀ T ag', pt_trs TS !! e1.1 = Some T →
        at_ags T !! S e1.2 = Some ag' → pquiet (pa_st ag')) ∧
-  (** [Hres]: every record's residual is shaped, live and oracle-consistent *)
-  (∀ i T k ag q,
-     pt_trs TS !! i = Some T → at_ags T !! k = Some ag →
-     pa_st ag = PHart q →
-     match sp_m q with
-     | None => True
-     | Some m => sail_shaped m ∧ sail_live m ∧
-                 ∃ d, oracle_consistent d m (sp_dev q)
-     end) ∧
   (** [Hirqb]: an interrupt delivery has a boundary pre-state *)
   (∀ i T k ag ag' q q' l,
      pt_trs TS !! i = Some T →
@@ -1251,6 +1290,7 @@ Definition tb_facts {P : Type} (pstep : P → wlabel → P → Prop) (nh : nat)
 Theorem xv6_no_bad_edge (gen : nat) (g0 : wgstate) (u0 : wlaux)
     (TS : ptraces pxv6) :
   (∀ b, sail_shaped (riscv_step b)) →
+  (∀ b, sail_live (riscv_step b)) →
   wthread_live g0 gen →
   wglog g0 = [] → (∀ cc : CPU, wgws g0 cc = ws_init) → wa_dws u0 = ws_init →
   img_total (img_z (wgimg g0)) →
@@ -1262,9 +1302,15 @@ Theorem xv6_no_bad_edge (gen : nat) (g0 : wgstate) (u0 : wlaux)
   cone_liftable gen g0 u0 TS →
   ∀ e1 e2, ¬ bad n_disk TS e1 e2.
 Proof.
-  intros Hsh Hlive Hlog0 Hws0 Hdws0 Himgt Hphi Hbwf
+  intros Hsh Hslv Hlive Hlog0 Hws0 Hdws0 Himgt Hphi Hbwf
     (Hwf & Hwsi & Hco & Hwfl & Himg & Hnag & Hdata & Hps0 & Hfo & Hee & Hsplit)
-    (Hcq & Hres & Hirqb & Hcls) Hcl e1 e2 Hbad.
+    (Hcq & Hirqb & Hcls) Hcl e1 e2 Hbad.
+  (** [Hres] IS DERIVED (WeakSailCone §13): the residual invariant follows
+      from the two group-3 facts and the trace well-formedness already in
+      hand.  Since stage D there is no device residue to re-establish, so
+      the old [horc_prem] input is gone with it. *)
+  have Hres : hres_prem TS
+    := hres_derived TS (xv6_ps0 g0 u0) Hwf Hps0 (xv6_ps0_bnd g0 u0) Hsh Hslv.
   destruct (Hbwf e1 e2 Hbad) as (f1 & f2 & Hbad' & Hmin).
   destruct (cone_segments2 TS (img_z (wgimg g0)) (xv6_ps0 g0 u0)
               Hwf Hwsi Hco Hwfl Himg Hnag Hdata Hps0 Hfo Hee n_disk Hsplit
@@ -1366,6 +1412,7 @@ Qed.
 Corollary xv6_weak_robust_lifted (gen : nat) (g0 : wgstate) (u0 : wlaux)
     (c : wpcfg pxv6) :
   (∀ b, sail_shaped (riscv_step b)) →
+  (∀ b, sail_live (riscv_step b)) →
   wthread_live g0 gen →
   wglog g0 = [] → (∀ cc : CPU, wgws g0 cc = ws_init) → wa_dws u0 = ws_init →
   img_total (img_z (wgimg g0)) →
@@ -1383,7 +1430,7 @@ Corollary xv6_weak_robust_lifted (gen : nat) (g0 : wgstate) (u0 : wlaux)
           (wp_init (img_z (wgimg g0)) (xv6_ps0 g0 u0)) cf ∧
         prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
 Proof.
-  intros Hsh Hlive Hlog0 Hws0 Hdws0 Himgt Hphi Hprem Hbeh.
+  intros Hsh Hslv Hlive Hlog0 Hws0 Hdws0 Himgt Hphi Hprem Hbeh.
   eapply (robust_main_no_bad (pstep_xv6 riscv_step) n_disk
             (img_z (wgimg g0)) (xv6_ps0 g0 u0) c
             (xv6_lat_free riscv_step) (xv6_ts_oblivious riscv_step) Hbeh).
@@ -1391,8 +1438,8 @@ Proof.
     by destruct (Hprem c mid TS Hbeh Hprom Hof) as (H & _ & _).
   - intros mid TS Hprom Hof Htb.
     destruct (Hprem c mid TS Hbeh Hprom Hof) as ((_ & Hbwf & _ & _) & Hcp & Hcl).
-    by eapply (xv6_no_bad_edge gen g0 u0 TS Hsh Hlive Hlog0 Hws0 Hdws0 Himgt
-                 Hphi Hbwf Htb Hcp Hcl).
+    by eapply (xv6_no_bad_edge gen g0 u0 TS Hsh Hslv Hlive Hlog0 Hws0 Hdws0
+                 Himgt Hphi Hbwf Htb Hcp Hcl).
 Qed.
 
 (** …and the same with the φ export produced ON THE SPOT by
@@ -1407,6 +1454,7 @@ Corollary xv6_weak_robust_adequate Σ `{!riscvGpreS Σ, !weakGpreS Σ}
     (Hws : forall cc : CPU, wgws g0 cc = ws_init)
     (Hdws : wa_dws u0 = ws_init) :
   (∀ b, sail_shaped (riscv_step b)) →
+  (∀ b, sail_live (riscv_step b)) →
   (forall (HR : riscvGS Σ) (HW : weakGS Σ),
      ⊢@{iPropI Σ} ([∗ set] cc ∈ (fin_to_set CPU : gset CPU),
           [∗ set] r ∈ D cc,
@@ -1433,8 +1481,8 @@ Corollary xv6_weak_robust_adequate Σ `{!riscvGpreS Σ, !weakGpreS Σ}
           (wp_init (img_z (wgimg g0)) (xv6_ps0 g0 u0)) cf ∧
         prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
 Proof.
-  intros Hsh Hwp Himgt Hprem Hbeh.
-  eapply (xv6_weak_robust_lifted gen_id g0 u0 c Hsh);
+  intros Hsh Hslv Hwp Himgt Hprem Hbeh.
+  eapply (xv6_weak_robust_lifted gen_id g0 u0 c Hsh Hslv);
     [|exact Hlog|exact Hws|exact Hdws|exact Himgt| |exact Hprem|exact Hbeh].
   - split; [exact Hpow|]. by rewrite Hgen0 Hgid.
   - intros t2 g2 Hr.

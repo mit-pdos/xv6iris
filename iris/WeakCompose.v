@@ -417,9 +417,10 @@ Qed.
     sits at index [i], every other hart is framed, and the disk agents [dks]
     are framed.
 
-    [sail_shaped] is the caller's obligation (rv64d facts, seam (6)); [str] is
-    the MMIO oracle prefix the instruction consumes, produced existentially by
-    the run and consumed exactly (delta (b) of [WeakSailLTS]).  [iq] is the
+    [sail_shaped] is the caller's obligation (rv64d facts, seam (6)).  The
+    hart's DEVICE FABRIC ([WeakSailLTS] delta (b)) travels with the
+    interpreter's: the agent starts at [wm_dev s] and lands at [wm_dev s'],
+    so there is no oracle stream and nothing existential about it.  [iq] is the
     INTERRUPT ORACLE (delta (b') there), framed: one [wrun] instruction never
     consumes an entry, because delivery is its own silent LTS arm — which is
     exactly what makes [RiscvLang.plic_step]'s cross-hart register write
@@ -428,22 +429,20 @@ Corollary xv6_pf_instr (i : agent) (tick : bool) (s : wmstate) (x : unit)
     (s' : wmstate) (dks : list (wpagent pxv6)) :
   sail_shaped (riscv_step tick) →
   wrun (Some i) (riscv_step tick) s x s' →
-  ∃ str : dstream,
-    ∀ (tail : dstream) (iq : istream) (prom : gset nat)
-      (ags : list (wpagent psail)),
-      ags !! i = Some (WPAgent (PSail None (wm_regs s) (str ++ tail) None iq)
-                         (wm_ws s) prom) →
-      rtc (wp_pf_run (pstep_xv6 riscv_step))
-        (WPCfg (wimg s) (wm_log s) ((lift_ag <$> ags) ++ dks))
-        (WPCfg (wimg s) (wm_log s')
-           (<[i := WPAgent (PHart (PSail None (wm_regs s') tail None iq))
-                     (wm_ws s') prom]> ((lift_ag <$> ags) ++ dks))).
+  ∀ (iq : istream) (prom : gset nat) (ags : list (wpagent psail)),
+    ags !! i = Some (WPAgent (PSail None (wm_regs s) (wm_dev s) None iq)
+                       (wm_ws s) prom) →
+    rtc (wp_pf_run (pstep_xv6 riscv_step))
+      (WPCfg (wimg s) (wm_log s) ((lift_ag <$> ags) ++ dks))
+      (WPCfg (wimg s) (wm_log s')
+         (<[i := WPAgent (PHart (PSail None (wm_regs s') (wm_dev s') None iq))
+                   (wm_ws s') prom]> ((lift_ag <$> ags) ++ dks))).
 Proof.
   intros Hsh Hrun.
-  destruct (sail_instr_bracket i tick s x s' Hsh Hrun) as (str & Hch).
-  exists str. intros tail iq prom ags Hlk.
+  pose proof (sail_instr_bracket i tick s x s' Hsh Hrun) as Hch.
+  intros iq prom ags Hlk.
   have Hlt : (i < length ags)%nat by exact (lookup_lt_Some _ _ _ Hlk).
-  have Hr := pf_run_frame riscv_step dks _ _ (Hch tail iq prom ags Hlk).
+  have Hr := pf_run_frame riscv_step dks _ _ (Hch iq prom ags Hlk).
   rewrite /lift_cfg in Hr. cbn [pc_img pc_log pc_ags] in Hr.
   rewrite (lift_ags_insert dks ags i _ Hlt) in Hr.
   exact Hr.
@@ -611,27 +610,63 @@ Qed.
     the reader/writer discipline exports of W3 are built.
 
     ------------------------------------------------------------------------
-    (4) THE MMIO / DEVICE ORACLE-STREAM SEAM — the RETAINED MMIO-ORDERING
-    ASSUMPTION (resolved as such 2026-08-12; it is not new machinery).
+    (4) THE MMIO / DEVICE-FABRIC SEAM — the RETAINED MMIO-ORDERING
+    ASSUMPTION (resolved as such 2026-08-12; restated 2026-08-13, stage D).
 
     [wpcfg] has no device component, while the real machine carries shared
     MMIO state as a second communication channel.  The composition therefore
-    scopes M6 to the harts plus the disk agent OVER THE LOG, and absorbs each
-    hart's MMIO-read responses as a per-behavior ORACLE STREAM inside the
-    program state: [WeakSailLTS.psail]'s [sp_dev], consumed silently by device
-    reads, with device writes silent and consuming nothing ([xv6_pf_instr]'s
-    existential [str] is that stream).  The retained MMIO-ordering assumption —
-    which the final-footprint plan ALWAYS kept — covers the stream-run ↔
-    real-device-run correspondence, in BOTH of its uses: the behavior factoring
-    and the [pf_violation_free_hart] transport for exhibit prefixes.  This is
-    well-posed because φ is device-OBLIVIOUS: the device arms touch neither the
-    log nor any [wstate], so a violation is invariant under changing the
-    device interleaving.
+    scopes M6 to the harts plus the disk agent OVER THE LOG, and gives each
+    hart a PRIVATE COPY OF THE DEVICE AUTOMATON inside its program state:
+    [WeakSailLTS.psail]'s [sp_dev : dev_state], read and written silently
+    through the TOTALIZED [dev_read_t]/[dev_write_t].  This is well-posed
+    because φ is device-OBLIVIOUS: the device arms touch neither the log nor
+    any [wstate], so a violation is invariant under changing the device
+    interleaving.
+
+    FINDING (2026-08-13) — WHAT THIS REPLACED, AND WHY IT HAD TO BE REPLACED.
+    Until stage D the hart's device responses came from a per-behavior ORACLE
+    STREAM ([sp_dev : dstream], one little-endian byte list per read), and the
+    ⇐ direction needed a premise saying the stream is what the device would
+    have answered — [WeakSailLTS2.oracle_consistent], threaded as [Horc] /
+    [seg_hart]'s [Hoc] / [cone_liftable]'s hart conjunct.  That premise is
+    UNSATISFIABLE, and had been since L3.  [WeakInterp.wrun]'s RAM-read arm
+    quantifies over EVERY read value — including the fetched word (ifetch is a
+    plain RAM read) and every page-walk PTE — so stream consistency "along
+    every path" demands ONE positional stream serve, from ONE device state,
+    every device access every junk fetch decodes to along every
+    junk-but-valid-PTE translation: two fetched words decoding to [lw] and
+    [lb] at the same VA, steered by the same junk PTE path to a device
+    address, demand the same stream head have length 4 AND length 1.  An empty
+    stream fails on any junk path reaching a device read.  So
+    [∃ d, oracle_consistent d (riscv_step b) str] is FALSE at essentially
+    every S-mode record, for any stream, and every premise built on it was
+    vacuity-making (the third finding of that genre; cf. §B(B)/(D) of
+    [WeakComposeLang]).  Request-keyed entries do not fix it — answer #2
+    depends on how request #1 evolved the device, i.e. on the path; the only
+    oracle that answers an arbitrary request sequence IS the device automaton.
+
+    THE RETAINED ASSUMPTION, in its new and satisfiable form, is per hart
+    SEGMENT rather than per path:
+      (i)  FABRIC AGREEMENT — the hart's private fabric equals the machine's
+           at the start of each of its segments ([WeakComposeLang]'s
+           [wl_lift] SegHart carries [wa_dev u cpu = wgdev g], the exact twin
+           of the disk agent's [wa_dd u = wgdev g]); the segment's successor
+           re-establishes it for that hart by construction, since
+           [WeakLang.whart_write] sets [wgdev] to the block's own [wm_dev s'].
+      (ii) DEVICE DECODABILITY ALONG THE SEGMENT'S OWN RUN —
+           [WeakSailLTS2.dev_ok_blk], i.e. every device access the block
+           ACTUALLY performed is one [DevModel.dev_read]/[dev_write] accepts.
+           This is a predicate on the run, not on the monad, which is what
+           keeps it satisfiable where the ∀-path form was not.
+    Nothing else about the device is assumed: the ⇒ direction needs nothing at
+    all (a [wrun] cannot take an access the partial functions decline), and
+    the reader-tail completion needs nothing (the pf-side arms are total).
     NOT DONE, deliberately: a device-aware full promising machine.  Richer
     device memory models are deferred with M5.
     UPGRADE PATH: M5's device views, at which point the disk agent's DMA
-    appends get real classes ([WeakExec.wp_wdisk_step]) and the oracle stream
-    can be replaced by a device component in [wpcfg].
+    appends get real classes ([WeakExec.wp_wdisk_step]) and the per-hart
+    fabric can be replaced by a shared device component in [wpcfg] — which
+    retires (i) outright.
 
     ------------------------------------------------------------------------
     (5) THE D-M6-3 PARM CORRESPONDENCE NOTE — [full machine ≡ axiomatic RVWMO],

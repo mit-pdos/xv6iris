@@ -80,14 +80,14 @@
           [silent_run_mchild] (the fused window descends).
       §2  [quiet_tail], [sail_live], [quiet_tail_choose], [sail_live_choose],
           [choose_val], [choose_val_q], [psail_quiet], [shaped_res],
-          [live_res], [ocons_res].
+          [live_res].
       §3  [pf_solo_q] (a [pf_solo] step with a quiet label), [qframe] /
           [tframe] and their run forms, [pf_solo_run_bnd].
       §4  [pf_qstep], [pf_unpark] (the parked [fence.tso] half),
           [quiet_step], [quiet_run].
       §5  [quiet_complete_q] / [quiet_complete].
       §6  [amo_reach] (walk the fused window), [sail_shaped_res_step],
-          [oracle_consistent_res_step], [sail_live_res_step].
+          [sail_live_res_step].
       §7  [bytes_to_word], [pf_lstep]/[pf_sstep]/[pf_rstep] (the canonical-
           class step wrappers), [tail_step], [tail_run], [tail_complete].
       §8  [pf_local_commute], [pf_run_insert_local], and the bridge
@@ -98,7 +98,7 @@
           index and its own deviation notes, at its head.
 
     DEPENDENCIES: [WeakSailLTS]/[WeakSailLTS2] (the LTS, [pf_solo],
-    [oracle_consistent]) and [WeakRobustBlocks] ([img_total],
+    [dev_ok_blk]) and [WeakRobustBlocks] ([img_total],
     [read_latest_*], [cfg_bnd], the pf-step frame lemmas).
 
     NOTE ON NAMES.  [WeakPromise] and [WeakAxiomatic] both export
@@ -288,11 +288,6 @@ Definition shaped_res (p : psail) : Prop :=
 Definition live_res (p : psail) : Prop :=
   match sp_m p with None => True | Some m => sail_live m end.
 
-Definition ocons_res (p : psail) : Prop :=
-  match sp_m p with
-  | None => True
-  | Some m => ∃ d : dev_state, oracle_consistent d m (sp_dev p)
-  end.
 
 (* ====================================================================== *)
 (** ** 3. Packaging a step as [pf_solo], and the two frames
@@ -679,8 +674,8 @@ End complete.
     The only arm of [sail_step_ni] that does NOT descend to an immediate
     continuation is the fused RMW, which jumps across a whole [silent_run]
     window and a [wr_node].  Three little lemmas carry [amo_tail],
-    [sail_shaped]/[sail_live] and [oracle_consistent] across it; they are
-    what both preservation lemmas and the reader-tail completion need. *)
+    [sail_shaped]/[sail_live] across it; they are what both preservation
+    lemmas and the reader-tail completion need. *)
 
 Lemma amo_tail_silent1 pa n (m : M unit) rs (b : M unit * regstate) :
   amo_tail pa n m → silent1 (m, rs) b → amo_tail pa n b.1.
@@ -747,37 +742,6 @@ Proof.
   destruct m1 as [y|T oc k]; [done|].
   destruct oc; try done. simpl.
   intros Hlv (_ & _ & _ & _ & _ & _ & ->). by apply Hlv.
-Qed.
-
-Lemma oracle_consistent_silent1 dv (m : M unit) rs (b : M unit * regstate) str :
-  oracle_consistent dv m str → silent1 (m, rs) b →
-  oracle_consistent dv b.1 str.
-Proof.
-  destruct m as [y|T oc k]; [by intros _ []|].
-  destruct oc; simpl; try (by intros _ []);
-    try (by intros Hoc ->; simpl; apply Hoc);
-    try (by intros Hoc [ch ->]; simpl; apply Hoc).
-Qed.
-
-Lemma oracle_consistent_silent_run dv (m m1 : M unit) rs rs1 str :
-  oracle_consistent dv m str → silent_run (m, rs) (m1, rs1) →
-  oracle_consistent dv m1 str.
-Proof.
-  intros Hoc Hrun.
-  change m with (m, rs).1 in Hoc. change m1 with (m1, rs1).1.
-  remember (m, rs) as a. remember (m1, rs1) as b. clear Heqa Heqb m rs m1 rs1.
-  revert Hoc. induction Hrun as [|x y z Hxy _ IH]; [done|].
-  intros Hoc. apply IH. destruct x as [mx rsx].
-  exact (oracle_consistent_silent1 dv mx rsx y str Hoc Hxy).
-Qed.
-
-Lemma oracle_consistent_wr_node dv m1 rl base data m2 str :
-  oracle_consistent dv m1 str → wr_node m1 rl base data m2 →
-  oracle_consistent dv m2 str.
-Proof.
-  destruct m1 as [y|T oc k]; [done|].
-  destruct oc; try done. simpl.
-  intros Hoc (Hd & _ & _ & _ & _ & _ & ->). rewrite Hd in Hoc. by apply Hoc.
 Qed.
 
 (** ONE STEP OF AN AMO TAIL: either the conditional write is here, or one
@@ -871,7 +835,7 @@ Section residual.
       try (by destruct Hstep as [_ ->]; simpl; apply Hsh).
     - (* MemRead *)
       destruct (dev_addr (Interface.ReadReq.pa req)) eqn:Hd.
-      + destruct Hstep as (_ & e & d2 & w2 & _ & _ & _ & ->). simpl. by apply Hsh.
+      + destruct Hstep as [_ ->]. simpl. by apply Hsh.
       + destruct Hsh as (Hcoh & Hsh). destruct Hstep as (_ & Hstep).
         destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
                       |pr pw sr sw]; try (by destruct Hstep).
@@ -892,53 +856,6 @@ Section residual.
       destruct Hstep as (_ & ch & ->). simpl. by apply Hsh.
   Qed.
 
-  Lemma oracle_consistent_res_step p l p' :
-    sp_m p ≠ None → ocons_res p → sail_step_ni next p l p' → ocons_res p'.
-  Proof.
-    intros Hne Hoc Hstep.
-    rewrite /sail_step_ni in Hstep. rewrite /ocons_res in Hoc |- *.
-    destruct (sp_fence p) as [[[[pr pw] sr] sw]|].
-    { destruct Hstep as [_ ->]. simpl. exact Hoc. }
-    destruct (sp_m p) as [m|]; [|by destruct (Hne eq_refl)].
-    destruct Hoc as (dv & Hoc).
-    rewrite /sail_mstep in Hstep.
-    destruct m as [y|T oc k]; [by destruct Hstep as [_ ->]; simpl|].
-    destruct oc as [rg akk|rg akk rv|nn req|nn req|op|szb bpa|bk|co|to|flt
-                   |epa|tst|tnd|A eo|msg| | |ty| |msg2]; simpl in Hstep, Hoc;
-      try (by destruct Hstep);
-      try (by destruct Hstep as [_ ->]; simpl; exists dv; apply Hoc).
-    - (* MemRead *)
-      destruct (dev_addr (Interface.ReadReq.pa req)) eqn:Hd.
-      + destruct Hoc as (w & dv' & str' & Hdr & Hstr & Hoc').
-        destruct Hstep as (_ & e & d2 & w2 & He & Hlen & Hbytes & ->).
-        rewrite Hstr in He. injection He as He1 He2. subst e d2.
-        have -> : w2 = w.
-        { apply bv_eq_of_bytes. intros j Hj.
-          have Hb := Hbytes j ltac:(lia).
-          rewrite (wbytes_lookup nn w j ltac:(lia)) in Hb.
-          apply Some_inj in Hb. by rewrite Hb. }
-        simpl. by exists dv'.
-      + destruct Hstep as (_ & Hstep).
-        destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
-                      |pr pw sr sw]; try (by destruct Hstep).
-        * destruct lat; [by destruct Hstep|].
-          destruct Hstep as (_ & _ & _ & _ & w & _ & ->). simpl.
-          exists dv. by apply Hoc.
-        * destruct Hstep as (_ & _ & _ & _ & _ & w & m1 & m2 & rs1
-                             & _ & Hsil & Hwr & ->).
-          simpl. exists dv.
-          eapply oracle_consistent_wr_node; [|exact Hwr].
-          eapply oracle_consistent_silent_run;
-            [apply (Hoc (inl (w, None)))|exact Hsil].
-    - (* MemWrite *)
-      destruct (dev_addr (Interface.WriteReq.pa req)) eqn:Hd.
-      + destruct Hoc as (dv' & Hdw & Hoc').
-        destruct Hstep as [_ ->]. simpl. by exists dv'.
-      + destruct Hstep as (_ & _ & _ & ->). simpl. exists dv. by apply Hoc.
-    - (* Choose *)
-      destruct Hstep as (_ & ch & ->). simpl. exists dv. by apply Hoc.
-  Qed.
-
   Lemma sail_live_res_step p l p' :
     sp_m p ≠ None → live_res p → sail_step_ni next p l p' → live_res p'.
   Proof.
@@ -955,7 +872,7 @@ Section residual.
       try (by destruct Hstep as [_ ->]; simpl; apply Hlv).
     - (* MemRead *)
       destruct (dev_addr (Interface.ReadReq.pa req)) eqn:Hd.
-      + destruct Hstep as (_ & e & d2 & w2 & _ & _ & _ & ->). simpl. by apply Hlv.
+      + destruct Hstep as [_ ->]. simpl. by apply Hlv.
       + destruct Hstep as (_ & Hstep).
         destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
                       |pr pw sr sw]; try (by destruct Hstep).
@@ -1087,16 +1004,17 @@ Section tail.
 
   (** The residual after one step of the tail: either the agent has reached
       the boundary, or it sits at a STRICTLY SMALLER residual which is still
-      shaped, live and oracle-consistent (with a possibly parked fence, which
-      [pf_unpark] fires). *)
+      shaped and live (with a possibly parked fence, which [pf_unpark]
+      fires).  NO DEVICE SIDE CONDITION: since stage D the device arms are
+      TOTAL, so a completion never gets stuck at one and never has to know
+      what the fabric would answer. *)
   Definition tail_post (i : agent) (m : M unit) (iq : istream)
       (c' : wpcfg psail) (ag' : wpagent psail) : Prop :=
     (sp_m (pa_st ag') = None ∧ sp_fence (pa_st ag') = None) ∨
-    ∃ (m' : M unit) (rs' : regstate) (d' : dstream)
+    ∃ (m' : M unit) (rs' : regstate) (d' : dev_state)
       (fo : option (bool * bool * bool * bool)),
       pa_st ag' = PSail (Some m') rs' d' fo iq ∧
-      tc mchild m' m ∧ sail_shaped m' ∧ sail_live m' ∧
-      (∃ dv, oracle_consistent dv m' d').
+      tc mchild m' m ∧ sail_shaped m' ∧ sail_live m'.
 
   (** The QUIET arms of the tail, factored: one silent (or barrier) step to a
       smaller residual. *)
@@ -1105,28 +1023,27 @@ Section tail.
     pc_ags c !! i = Some ag → lbl_quiet l →
     sail_step_ni next (pa_st ag) l (PSail (Some m') rs' d' fo iq) →
     tc mchild m' m → sail_shaped m' → sail_live m' →
-    (∃ dv, oracle_consistent dv m' d') →
     ∃ c' ag', pf_solo next i c c' ∧ pc_ags c' !! i = Some ag' ∧
               tail_post i m iq c' ag'.
   Proof.
-    intros Hlk Hql Hstep Hch Hsh Hlv Hoc.
+    intros Hlk Hql Hstep Hch Hsh Hlv.
     destruct (pf_qstep next i c ag l _ Hlk Hql Hstep)
       as (c1 & ag1 & Hs1 & Hlk1 & Hpa1).
     exists c1, ag1. split_and!;
       [exact (pf_solo_q_solo next i c c1 Hs1)|exact Hlk1|].
     right. exists m', rs', d', fo.
-    split_and!; [exact Hpa1|exact Hch|exact Hsh|exact Hlv|exact Hoc].
+    split_and!; [exact Hpa1|exact Hch|exact Hsh|exact Hlv].
   Qed.
 
   (** ONE STEP OF THE READER TAIL. *)
-  Lemma tail_step (i : agent) c ag (m : M unit) rs d iq :
+  Lemma tail_step (i : agent) c ag (m : M unit) rs (d : dev_state) iq :
     img_total (pc_img c) → cfg_bnd c →
     pc_ags c !! i = Some ag → pa_st ag = PSail (Some m) rs d None iq →
-    sail_shaped m → sail_live m → (∃ dv, oracle_consistent dv m d) →
+    sail_shaped m → sail_live m →
     ∃ c' ag', pf_solo next i c c' ∧ pc_ags c' !! i = Some ag' ∧
               tail_post i m iq c' ag'.
   Proof.
-    intros Him Hbnd Hlk Hst Hsh Hlv (dv & Hoc).
+    intros Him Hbnd Hlk Hst Hsh Hlv.
     have Hws : ws_bounded (pa_ws ag) (length (pc_log c)) := Hbnd i ag Hlk.
     destruct m as [y|T oc k].
     { (* Ret: the last silent step, back to the boundary *)
@@ -1139,31 +1056,26 @@ Section tail.
       left. by rewrite Hpa1. }
     destruct oc as [rg akk|rg akk rv|nn req|nn req|op|szb bpa|bk|co|to|flt
                    |epa|tst|tnd|A eo|msg| | |ty| |msg2];
-      simpl in Hsh, Hlv, Hoc; try (by destruct Hlv).
+      simpl in Hsh, Hlv; try (by destruct Hlv).
     - (* RegRead *)
       apply (tail_qcase i c ag WeakPromise.LSilent _
                (k (register_lookup rg rs)) rs d None iq Hlk (or_introl eq_refl));
         [rewrite Hst /sail_step_ni /=; by split
-        |apply tc_once; by eexists|by apply Hsh|by apply Hlv
-        |exists dv; by apply Hoc].
+        |apply tc_once; by eexists|by apply Hsh|by apply Hlv].
     - (* RegWrite *)
       apply (tail_qcase i c ag WeakPromise.LSilent _
                (k tt) (register_set rg rv rs) d None iq Hlk (or_introl eq_refl));
         [rewrite Hst /sail_step_ni /=; by split
-        |apply tc_once; by eexists|by apply Hsh|by apply Hlv
-        |exists dv; by apply Hoc].
+        |apply tc_once; by eexists|by apply Hsh|by apply Hlv].
     - (* MemRead *)
       destruct (dev_addr (Interface.ReadReq.pa req)) eqn:Hd.
-      + (* MMIO: the oracle serves it, silently *)
-        destruct Hoc as (w & dv' & str' & Hdr & Hstr & Hoc').
+      + (* MMIO: the hart's own fabric serves it, silently and TOTALLY *)
         apply (tail_qcase i c ag WeakPromise.LSilent _
-                 (k (inl (w, None))) rs str' None iq Hlk (or_introl eq_refl));
-          [rewrite Hst /sail_step_ni /sail_mstep /= Hd; split; [reflexivity|];
-           exists (wbytes nn w), str', w;
-           split_and!; [exact Hstr|apply wbytes_length
-                       |intros j Hj; by apply wbytes_lookup|reflexivity]
-          |apply tc_once; by eexists|by apply Hsh|by apply Hlv
-          |by exists dv'].
+                 (k (inl ((dev_read_t d (Interface.ReadReq.pa req) nn).1, None)))
+                 rs (dev_read_t d (Interface.ReadReq.pa req) nn).2 None iq
+                 Hlk (or_introl eq_refl));
+          [rewrite Hst /sail_step_ni /sail_mstep /= Hd; by split
+          |apply tc_once; by eexists|by apply Hsh|by apply Hlv].
       + (* RAM *)
         destruct Hsh as (Hcoh & Hsh).
         destruct (read_latest_exists (pc_img c) (pc_log c)
@@ -1205,11 +1117,8 @@ Section tail.
             as (c1 & ag1 & Hs1 & Hlk1 & Hpa1).
           exists c1, ag1. split_and!; [exact Hs1|exact Hlk1|].
           right. exists m2, rs1, d, None.
-          split_and!; [exact Hpa1| |exact Hsh2|exact Hlv2|].
-          { eapply tc_rtc_step; [exact Hdesc|by eexists]. }
-          { exists dv. eapply oracle_consistent_wr_node; [|exact Hwr].
-            eapply oracle_consistent_silent_run;
-              [apply (Hoc (inl (w, None)))|exact Hsil]. }
+          split_and!; [exact Hpa1| |exact Hsh2|exact Hlv2].
+          eapply tc_rtc_step; [exact Hdesc|by eexists].
         * (* a plain load: every byte at its latest write *)
           have Hro : read_ok (pc_img c) (pc_log c) (pa_ws ag)
                        (ak_sync (classify (Interface.ReadReq.access_kind req)))
@@ -1229,15 +1138,17 @@ Section tail.
           exists c1, ag1. split_and!; [exact Hs1|exact Hlk1|].
           right. exists (k (inl (w, None))), rs, d, None.
           split_and!; [exact Hpa1|apply tc_once; by eexists
-                      |by apply Hsh|by apply Hlv|exists dv; by apply Hoc].
+                      |by apply Hsh|by apply Hlv].
     - (* MemWrite *)
       destruct Hsh as (Hn & Hsh).
       destruct (dev_addr (Interface.WriteReq.pa req)) eqn:Hd.
-      + destruct Hoc as (dv' & Hdw & Hoc').
-        apply (tail_qcase i c ag WeakPromise.LSilent _
-                 (k (inl None)) rs d None iq Hlk (or_introl eq_refl));
+      + apply (tail_qcase i c ag WeakPromise.LSilent _
+                 (k (inl None)) rs
+                 (dev_write_t d (Interface.WriteReq.pa req) nn
+                    (Interface.WriteReq.value req)) None iq
+                 Hlk (or_introl eq_refl));
           [rewrite Hst /sail_step_ni /sail_mstep /= Hd; by split
-          |apply tc_once; by eexists|by apply Hsh|by apply Hlv|by exists dv'].
+          |apply tc_once; by eexists|by apply Hsh|by apply Hlv].
       + destruct Hn as (Hn0 & Hnlat).
         destruct (pf_sstep i c ag
                     (ak_sync (classify (Interface.WriteReq.access_kind req)))
@@ -1252,73 +1163,62 @@ Section tail.
         exists c1, ag1. split_and!; [exact Hs1|exact Hlk1|].
         right. exists (k (inl None)), rs, d, None.
         split_and!; [exact Hpa1|apply tc_once; by eexists
-                    |by apply Hsh|by apply Hlv|exists dv; by apply Hoc].
+                    |by apply Hsh|by apply Hlv].
     - (* InstrAnnounce *)
       apply (tail_qcase i c ag WeakPromise.LSilent _ (k tt) rs d None iq
                Hlk (or_introl eq_refl));
         [rewrite Hst /sail_step_ni /=; by split
-        |apply tc_once; by eexists|by apply Hsh|by apply Hlv
-        |exists dv; by apply Hoc].
+        |apply tc_once; by eexists|by apply Hsh|by apply Hlv].
     - (* BranchAnnounce *)
       apply (tail_qcase i c ag WeakPromise.LSilent _ (k tt) rs d None iq
                Hlk (or_introl eq_refl));
         [rewrite Hst /sail_step_ni /=; by split
-        |apply tc_once; by eexists|by apply Hsh|by apply Hlv
-        |exists dv; by apply Hoc].
+        |apply tc_once; by eexists|by apply Hsh|by apply Hlv].
     - (* Barrier: the label table, and the possible parked second fence *)
       apply (tail_qcase i c ag (barrier_lbl bk).1 _ (k tt) rs d
                (barrier_lbl bk).2 iq Hlk (barrier_lbl_quiet bk));
         [rewrite Hst /sail_step_ni /=; by split
-        |apply tc_once; by eexists|by apply Hsh|by apply Hlv
-        |exists dv; by apply Hoc].
+        |apply tc_once; by eexists|by apply Hsh|by apply Hlv].
     - (* CacheOp *)
       apply (tail_qcase i c ag WeakPromise.LSilent _ (k tt) rs d None iq
                Hlk (or_introl eq_refl));
         [rewrite Hst /sail_step_ni /=; by split
-        |apply tc_once; by eexists|by apply Hsh|by apply Hlv
-        |exists dv; by apply Hoc].
+        |apply tc_once; by eexists|by apply Hsh|by apply Hlv].
     - (* TlbOp *)
       apply (tail_qcase i c ag WeakPromise.LSilent _ (k tt) rs d None iq
                Hlk (or_introl eq_refl));
         [rewrite Hst /sail_step_ni /=; by split
-        |apply tc_once; by eexists|by apply Hsh|by apply Hlv
-        |exists dv; by apply Hoc].
+        |apply tc_once; by eexists|by apply Hsh|by apply Hlv].
     - (* TakeException *)
       apply (tail_qcase i c ag WeakPromise.LSilent _ (k tt) rs d None iq
                Hlk (or_introl eq_refl));
         [rewrite Hst /sail_step_ni /=; by split
-        |apply tc_once; by eexists|by apply Hsh|by apply Hlv
-        |exists dv; by apply Hoc].
+        |apply tc_once; by eexists|by apply Hsh|by apply Hlv].
     - (* ReturnException *)
       apply (tail_qcase i c ag WeakPromise.LSilent _ (k tt) rs d None iq
                Hlk (or_introl eq_refl));
         [rewrite Hst /sail_step_ni /=; by split
-        |apply tc_once; by eexists|by apply Hsh|by apply Hlv
-        |exists dv; by apply Hoc].
+        |apply tc_once; by eexists|by apply Hsh|by apply Hlv].
     - (* TranslationStart *)
       apply (tail_qcase i c ag WeakPromise.LSilent _ (k tt) rs d None iq
                Hlk (or_introl eq_refl));
         [rewrite Hst /sail_step_ni /=; by split
-        |apply tc_once; by eexists|by apply Hsh|by apply Hlv
-        |exists dv; by apply Hoc].
+        |apply tc_once; by eexists|by apply Hsh|by apply Hlv].
     - (* TranslationEnd *)
       apply (tail_qcase i c ag WeakPromise.LSilent _ (k tt) rs d None iq
                Hlk (or_introl eq_refl));
         [rewrite Hst /sail_step_ni /=; by split
-        |apply tc_once; by eexists|by apply Hsh|by apply Hlv
-        |exists dv; by apply Hoc].
+        |apply tc_once; by eexists|by apply Hsh|by apply Hlv].
     - (* CycleCount *)
       apply (tail_qcase i c ag WeakPromise.LSilent _ (k tt) rs d None iq
                Hlk (or_introl eq_refl));
         [rewrite Hst /sail_step_ni /=; by split
-        |apply tc_once; by eexists|by apply Hsh|by apply Hlv
-        |exists dv; by apply Hoc].
+        |apply tc_once; by eexists|by apply Hsh|by apply Hlv].
     - (* GetCycleCount *)
       apply (tail_qcase i c ag WeakPromise.LSilent _ (k 0%Z) rs d None iq
                Hlk (or_introl eq_refl));
         [rewrite Hst /sail_step_ni /=; by split
-        |apply tc_once; by eexists|by apply Hsh|by apply Hlv
-        |exists dv; by apply Hoc].
+        |apply tc_once; by eexists|by apply Hsh|by apply Hlv].
     - (* Choose *)
       destruct (choose_val ty k Hlv) as (v & _).
       apply (tail_qcase i c ag WeakPromise.LSilent _ (k v) rs d None
@@ -1326,33 +1226,31 @@ Section tail.
         [rewrite Hst /sail_step_ni /=; split;
            [reflexivity|by exists v]
         |apply tc_once; by eexists|by apply Hsh
-        |by apply (sail_live_choose ty k Hlv)
-        |exists dv; by apply Hoc].
+        |by apply (sail_live_choose ty k Hlv)].
     - (* Message *)
       apply (tail_qcase i c ag WeakPromise.LSilent _ (k tt) rs d None iq
                Hlk (or_introl eq_refl));
         [rewrite Hst /sail_step_ni /=; by split
-        |apply tc_once; by eexists|by apply Hsh|by apply Hlv
-        |exists dv; by apply Hoc].
+        |apply tc_once; by eexists|by apply Hsh|by apply Hlv].
   Qed.
 
   (** THE READER TAIL, run to the boundary.  The induction is on
       [tc mchild]: every arm but the fused RMW descends to an immediate
       continuation, and the fused arm descends across the whole
       [silent_run] window and the [wr_node] ([amo_reach]'s [rtc mchild]). *)
-  Lemma tail_run : ∀ (m : M unit) (i : agent) c ag rs d iq,
+  Lemma tail_run : ∀ (m : M unit) (i : agent) c ag rs (d : dev_state) iq,
     img_total (pc_img c) → cfg_bnd c →
     pc_ags c !! i = Some ag → pa_st ag = PSail (Some m) rs d None iq →
-    sail_shaped m → sail_live m → (∃ dv, oracle_consistent dv m d) →
+    sail_shaped m → sail_live m →
     ∃ c' ag', rtc (pf_solo next i) c c' ∧ pc_ags c' !! i = Some ag' ∧
               sp_m (pa_st ag') = None ∧ sp_fence (pa_st ag') = None.
   Proof.
     intros m. induction m as [m IH] using (well_founded_ind msub_wf).
-    intros i c ag rs d iq Him Hbnd Hlk Hst Hsh Hlv Hoc.
-    destruct (tail_step i c ag m rs d iq Him Hbnd Hlk Hst Hsh Hlv Hoc)
+    intros i c ag rs d iq Him Hbnd Hlk Hst Hsh Hlv.
+    destruct (tail_step i c ag m rs d iq Him Hbnd Hlk Hst Hsh Hlv)
       as (c1 & ag1 & Hs1 & Hlk1
           & [[Hm1 Hf1]
-            |(m' & rs' & d' & fo & Hpa1 & Hch & Hsh' & Hlv' & Hoc')]).
+            |(m' & rs' & d' & fo & Hpa1 & Hch & Hsh' & Hlv')]).
     - exists c1, ag1.
       split_and!; [by apply rtc_once|exact Hlk1|exact Hm1|exact Hf1].
     - destruct (pf_unpark next i c1 ag1 Hlk1) as (c2 & ag2 & Hs2 & Hlk2 & Hpa2).
@@ -1363,7 +1261,7 @@ Section tail.
       have Him2 : img_total (pc_img c2).
       { destruct (pf_solo_run_tframe next i c c2 Hrun) as (_ & Himg & _ & _).
         by rewrite Himg. }
-      destruct (IH m' Hch i c2 ag2 rs' d' iq Him2 Hbnd2 Hlk2 Hpa2 Hsh' Hlv' Hoc')
+      destruct (IH m' Hch i c2 ag2 rs' d' iq Him2 Hbnd2 Hlk2 Hpa2 Hsh' Hlv')
         as (c3 & ag3 & Hs3 & Hlk3 & Hm3 & Hf3).
       exists c3, ag3. split_and!;
         [by etrans; [exact Hrun|exact Hs3]|exact Hlk3|exact Hm3|exact Hf3].
@@ -1380,7 +1278,6 @@ Section tail.
     img_total (pc_img c) → cfg_bnd c →
     pc_ags c !! i = Some ag → sp_m (pa_st ag) = Some m →
     sail_shaped m → sail_live m →
-    (∃ dv, oracle_consistent dv m (sp_dev (pa_st ag))) →
     ∃ c' ag' ms,
       rtc (pf_solo next i) c c' ∧
       pc_ags c' !! i = Some ag' ∧ at_boundary i c' ∧
@@ -1391,7 +1288,7 @@ Section tail.
       (∀ j, j ≠ i → pc_ags c' !! j = pc_ags c !! j) ∧
       (∀ j a, (obs_flr c j a ≤ obs_flr c' j a)%nat).
   Proof.
-    intros Him Hbnd Hlk Hm Hsh Hlv Hoc.
+    intros Him Hbnd Hlk Hm Hsh Hlv.
     destruct (pf_unpark next i c ag Hlk) as (c1 & ag1 & Hs1 & Hlk1 & Hpa1).
     have Hrun01 : rtc (pf_solo next i) c c1
       := pf_solo_q_run_solo next i c c1 Hs1.
@@ -1401,7 +1298,7 @@ Section tail.
       by rewrite Himg. }
     rewrite Hm in Hpa1.
     destruct (tail_run m i c1 ag1 (sp_regs (pa_st ag)) (sp_dev (pa_st ag))
-                (sp_irq (pa_st ag)) Him1 Hbnd1 Hlk1 Hpa1 Hsh Hlv Hoc)
+                (sp_irq (pa_st ag)) Him1 Hbnd1 Hlk1 Hpa1 Hsh Hlv)
       as (c2 & ag2 & Hs2 & Hlk2 & Hm2 & Hf2).
     have Hrun : rtc (pf_solo next i) c c2
       by etrans; [exact Hrun01|exact Hs2].
@@ -1858,12 +1755,7 @@ Proof.
     rewrite (Hag rg Hne). split_and!; pafin.
   - (* MemRead *)
     destruct (dev_addr (Interface.ReadReq.pa req)) eqn:Hd.
-    + destruct Hstep as (-> & e & d2 & w2 & He & Hlen & Hbytes & ->).
-      exists (PSail (Some (k (inl (w2, None)))) rs' d2 None iq').
-      split.
-      { split; [reflexivity|]. exists e, d2, w2.
-        split_and!; [exact He|exact Hlen|exact Hbytes|reflexivity]. }
-      split_and!; pafin.
+    + destruct Hstep as [-> ->]. eexists. split_and!; pafin.
     + destruct Hstep as (Hcoh & Hstep).
       destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
                     |pr pw sr sw]; try (by destruct Hstep).
@@ -1954,7 +1846,7 @@ Proof.
     try (by destruct Hstep as [_ ->]; simpl; apply Hfr).
   - (* MemRead *)
     destruct (dev_addr (Interface.ReadReq.pa req)) eqn:Hd.
-    + destruct Hstep as (_ & e & d2 & w2 & _ & _ & _ & ->). simpl. by apply Hfr.
+    + destruct Hstep as [_ ->]. simpl. by apply Hfr.
     + destruct Hstep as (_ & Hstep).
       destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
                     |pr pw sr sw]; try (by destruct Hstep).
@@ -2014,7 +1906,7 @@ Proof.
     apply register_lookup_set_ne. intros ->. exact (Hne HX).
   - (* MemRead *)
     destruct (dev_addr (Interface.ReadReq.pa req)) eqn:Hd.
-    + by destruct Hstep as (_ & e & d2 & w2 & _ & _ & _ & ->).
+    + by destruct Hstep as [_ ->].
     + destruct Hstep as (_ & Hstep).
       destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
                     |pr pw sr sw]; try (by destruct Hstep).

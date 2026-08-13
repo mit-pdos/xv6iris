@@ -141,7 +141,7 @@
     THE PREMISE LEDGER of §11-§12, beyond the mirrored [WeakRobustCone] context:
     [Hps_bnd] (initial states are boundaries), [Hcq] (the post-state of a
     cross-edge source is quiet), [Hres] (every trace record's residual is
-    [sail_shaped], [sail_live] and oracle-consistent), [Himgt]
+    [sail_shaped] and [sail_live]), [Himgt]
     ([img_total]).  Layer-1's two side conditions are NOT premises —
     [WeakCompose.xv6_lat_free] and [xv6_ts_oblivious] discharge them.
 
@@ -756,21 +756,20 @@ Section xcomplete.
     img_total (pc_img c) → cfg_bnd c →
     pc_ags c !! i = Some ag → pa_st ag = PHart q → sp_m q = Some m →
     sail_shaped m → sail_live m →
-    (∃ dv, oracle_consistent dv m (sp_dev q)) →
     ∃ c' ag' q',
       rtc (pf_xsolo next i) c c' ∧
       pc_ags c' !! i = Some ag' ∧ pa_st ag' = PHart q' ∧
       sp_m q' = None ∧ sp_fence q' = None ∧
       xtframe i c c' ∧ cfg_bnd c'.
   Proof.
-    intros Him Hbnd Hlk Hst Hm Hsh Hlv Hoc.
+    intros Him Hbnd Hlk Hst Hm Hsh Hlv.
     have Hl : hlink i c (prj_cfg q c) := prj_hlink q i c ag Hlk Hst.
     have Hlks : pc_ags (prj_cfg q c) !! i = Some (prj_ag q ag)
       by rewrite /= list_lookup_fmap Hlk.
     destruct (tail_complete next i (prj_cfg q c) (prj_ag q ag) m Him
                 (prj_cfg_bnd q c Hbnd) Hlks
                 ltac:(by rewrite /prj_ag /= Hst)
-                Hsh Hlv ltac:(by rewrite /prj_ag /= Hst))
+                Hsh Hlv)
       as (cs' & ags' & ms & Hrun & Hlk2 & (agb & Hagb & Hmb) & Hf2 & _).
     destruct (pf_solo_run_lift next i c (prj_cfg q c) cs' Hrun Hl)
       as (c' & Hxrun & (Himg' & Hlog' & agx & ags & Hax & Has & Hpst & Hpws & Hppr)
@@ -867,8 +866,8 @@ Qed.
 
       [Hps_bnd]  the initial agent states are at instruction boundaries;
       [Hcq]      the post-state of a cross-edge source is [pquiet];
-      [Hres]     every trace record's residual is shaped, live and
-                 oracle-consistent (the reader-tail completion's fuel);
+      [Hres]     every trace record's residual is shaped and live (the
+                 reader-tail completion's fuel);
       [Himgt]    [img_total] (the boot image covers every RAM byte). *)
 
 Section cone.
@@ -899,8 +898,7 @@ Section cone.
              pa_st ag = PHart q →
              match sp_m q with
              | None => True
-             | Some m => sail_shaped m ∧ sail_live m ∧
-                         ∃ d, oracle_consistent d m (sp_dev q)
+             | Some m => sail_shaped m ∧ sail_live m
              end).
   (** (B4-4) the image is total *)
   Context (Himgt : img_total img).
@@ -1773,8 +1771,7 @@ Section package.
              pa_st ag = PHart q →
              match sp_m q with
              | None => True
-             | Some m => sail_shaped m ∧ sail_live m ∧
-                         ∃ d, oracle_consistent d m (sp_dev q)
+             | Some m => sail_shaped m ∧ sail_live m
              end).
   Context (Himgt : img_total img).
 
@@ -1914,9 +1911,9 @@ Section package.
         (∀ j a, (obs_flr cmid j a ≤ obs_flr c1 j a)%nat).
     { destruct (sp_m qr) as [mr|] eqn:Hm.
       - have Hr := Hres b2.1 T2 (S b2.2) agn2 qr HT2 Hagn2 Hqr.
-        rewrite Hm in Hr. destruct Hr as (Hsh & Hlv & Hoc).
+        rewrite Hm in Hr. destruct Hr as (Hsh & Hlv).
         destruct (xtail_complete riscv_step b2.1 cmid agr qr mr
-                    ltac:(by rewrite Hcimg) Hbndm Hlkr2 Hstr Hm Hsh Hlv Hoc)
+                    ltac:(by rewrite Hcimg) Hbndm Hlkr2 Hstr Hm Hsh Hlv)
           as (c1 & ag1 & q1 & Hrun1 & Hlk1 & Hst1 & Hm1 & Hf1
               & ((msx & Hlogx & Hallx) & Himgx & Hfrx & Hobsx) & _).
         exists c1, ag1, q1, msx. split_and!;
@@ -2660,10 +2657,9 @@ Section package.
           by (apply (pf_run_bnd _ _ _ Hrun); apply cfg_bnd_init).
         destruct (sp_m qr) as [mr|] eqn:Hm.
         - have Hr := Hres b2.1 T2 (S b2.2) agn2 qr HT2 Hagn2 Hqr.
-          rewrite Hm in Hr. destruct Hr as (Hsh & Hlv & Hoc).
+          rewrite Hm in Hr. destruct Hr as (Hsh & Hlv).
           destruct (xtail_complete riscv_step b2.1 d agr qr mr
-                      ltac:(by rewrite Himgd Hcimg) Hbndd Hlkd Hstr Hm Hsh Hlv
-                      Hoc)
+                      ltac:(by rewrite Himgd Hcimg) Hbndd Hlkd Hstr Hm Hsh Hlv)
             as (d3 & ag3 & q3 & Hrun3 & Hlk3 & Hst3 & Hm3 & Hf3
                 & ((msx & Hlogx & Hallx) & Himgx & Hfrx & Hobsx) & _).
           exists d3, msx. split_and!;
@@ -2728,76 +2724,64 @@ End package.
 (** ** 13. [Hres] IS A DERIVATION, NOT A PREMISE
 
     §11–§12 take [Hres] — EVERY record of EVERY trace whose state is a
-    hart with an in-flight residual has that residual [sail_shaped],
-    [sail_live] and oracle-consistent — as an opaque premise.  It is not
-    one: it is a trace INVARIANT whose only inputs are the two group-3
-    model facts and a much smaller device-seam premise.
+    hart with an in-flight residual has that residual [sail_shaped] and
+    [sail_live] — as an opaque premise.  It is not one: it is a trace
+    INVARIANT whose only inputs are the two group-3 model facts.
 
     THE THREE ARMS OF A [PHart] STEP.  [pstep_xv6]'s hart arm is
     [WeakSailLTS.sail_step], and each of its arms does one of three
     things to the reading:
 
       - the PARKED FENCE arm and [WeakSailLTS.irq_deliver] rebuild the
-        record with [sp_m] and [sp_dev] LITERALLY unchanged (a fence fires
-        and clears [sp_fence]; a delivery writes [sig_seip] and pops
-        [sp_irq]) — so all three properties are preserved outright
-        ([res_ok_frame]);
+        record with [sp_m] LITERALLY unchanged (a fence fires and clears
+        [sp_fence]; a delivery writes [sig_seip] and pops [sp_irq]) — so
+        both properties are preserved outright ([res_ok_frame]);
       - an IN-BLOCK step ([sp_m ≠ None], no parked fence) is exactly a
-        [WeakSailLTS2.sail_step_ni], where [WeakSailComplete]'s three
+        [WeakSailLTS2.sail_step_ni], where [WeakSailComplete]'s two
         preservation lemmas apply verbatim;
       - the BOUNDARY arm ([sp_m = None]) is the only one that ESTABLISHES
         a residual, and it establishes [next tick] — about which the
-        group-3 facts say everything except the device seam.
+        group-3 facts say everything.
 
-    So the device seam is the whole residue, and it is needed only AT
-    BOUNDARY RECORDS: [horc_prem] below.  That is strictly smaller than
-    [Hres] in three ways — it constrains one record per INSTRUCTION rather
-    than one per micro-step; it drops the two shape properties entirely;
-    and it never has to guess how a mid-instruction stream has been
-    advanced (the [∃ d] is re-chosen at each block start, which is exactly
-    what [oracle_consistent_res_step]'s [∃ d]-form provides going forward).
+    SINCE STAGE D THERE IS NO RESIDUE AT ALL.  The old derivation kept a
+    third conjunct (oracle consistency of the record's device stream) and
+    therefore a boundary-record premise [horc_prem] to re-establish it at
+    each instruction.  That premise was UNSATISFIABLE (see [WeakSailLTS]
+    delta (b)) and, with the stream replaced by the hart's own device
+    automaton, it is also unnecessary: the device arms are total, so no
+    property of the fabric has to travel with the residual.  [horc_prem]
+    is deleted and [hres_derived] takes the two group-3 facts alone.
 
     The base case is free: an initial record is [pbnd] (§11's [Hps_bnd]),
     hence [sp_m = None], hence the match is [True].
 
-    EXPORTS.  [horc_prem] and [hres_prem] are standalone [Prop]s over
-    [TS], and [hres_prem]'s body is [WeakComposeLang.xv6_cone_premises]'
-    second conjunct VERBATIM, so the swap there is one line:
-    [hres_derived] produces it from [horc_prem]. *)
+    EXPORTS.  [hres_prem] is a standalone [Prop] over [TS] whose body is
+    §11/§12's [Hres] context hypothesis VERBATIM, so the capstone
+    ([WeakComposeLang.xv6_no_bad_edge]) discharges that hypothesis with
+    [hres_derived] rather than assuming it. *)
 
 (** The per-record reading.  Definitionally the conjunction of
-    [WeakSailComplete]'s [shaped_res], [live_res] and [ocons_res]
-    ([res_ok_split]), and definitionally the body of [Hres]. *)
+    [WeakSailComplete]'s [shaped_res] and [live_res] ([res_ok_split]), and
+    definitionally the body of [Hres]. *)
 Definition res_ok (q : psail) : Prop :=
   match sp_m q with
   | None => True
-  | Some m => sail_shaped m ∧ sail_live m ∧ ∃ d, oracle_consistent d m (sp_dev q)
+  | Some m => sail_shaped m ∧ sail_live m
   end.
 
-Lemma res_ok_split q : res_ok q ↔ shaped_res q ∧ live_res q ∧ ocons_res q.
+Lemma res_ok_split q : res_ok q ↔ shaped_res q ∧ live_res q.
 Proof.
-  rewrite /res_ok /shaped_res /live_res /ocons_res. destruct (sp_m q); tauto.
+  rewrite /res_ok /shaped_res /live_res. destruct (sp_m q); tauto.
 Qed.
 
-(** THE NEW PREMISE.  At a record sitting at an instruction boundary,
-    every instruction the generator can produce is oracle-consistent with
-    that record's remaining device stream, from SOME device state. *)
-Definition horc_prem (TS : ptraces pxv6) : Prop :=
-  ∀ i T k ag q,
-    pt_trs TS !! i = Some T → at_ags T !! k = Some ag →
-    pa_st ag = PHart q → sp_m q = None →
-    ∀ b, ∃ d, oracle_consistent d (riscv_step b) (sp_dev q).
-
-(** …and what it buys: [WeakComposeLang.xv6_cone_premises]' second
-    conjunct, verbatim. *)
+(** [WeakComposeLang]'s [Hres], as a standalone [Prop]. *)
 Definition hres_prem (TS : ptraces pxv6) : Prop :=
   ∀ i T k ag q,
     pt_trs TS !! i = Some T → at_ags T !! k = Some ag →
     pa_st ag = PHart q →
     match sp_m q with
     | None => True
-    | Some m => sail_shaped m ∧ sail_live m ∧
-                ∃ d, oracle_consistent d m (sp_dev q)
+    | Some m => sail_shaped m ∧ sail_live m
     end.
 
 (* ---------------------------------------------------------------- *)
@@ -2815,44 +2799,40 @@ Lemma pstep_xv6_hart_post (next : bool → M unit) q l p' :
   pstep_xv6 next (PHart q) l p' → ∃ q', p' = PHart q' ∧ sail_step next q l q'.
 Proof. destruct p' as [q'|d pend]; [by exists q'|done]. Qed.
 
-(** An arm that rebuilds the record with the same residual and the same
-    device stream preserves the reading — the parked fence and the
-    interrupt delivery. *)
+(** An arm that rebuilds the record with the same residual preserves the
+    reading — the parked fence and the interrupt delivery. *)
 Lemma res_ok_frame q q' :
-  sp_m q' = sp_m q → sp_dev q' = sp_dev q → res_ok q → res_ok q'.
-Proof. intros Hm Hd Hr. rewrite /res_ok Hm Hd. exact Hr. Qed.
+  sp_m q' = sp_m q → res_ok q → res_ok q'.
+Proof. intros Hm Hr. rewrite /res_ok Hm. exact Hr. Qed.
 
-(** THE STEP LEMMA.  All three properties are preserved-or-established by
-    every [sail_step], given the two group-3 facts about the generator and
-    the device seam AT THIS RECORD (only used when it is a boundary). *)
+(** THE STEP LEMMA.  Both properties are preserved-or-established by every
+    [sail_step], given the two group-3 facts about the generator.  NO
+    DEVICE SIDE CONDITION (stage D). *)
 Lemma res_ok_step (next : bool → M unit)
     (Hnsh : ∀ b, sail_shaped (next b)) (Hnlv : ∀ b, sail_live (next b))
     q l q' :
-  res_ok q →
-  (sp_m q = None → ∀ b, ∃ d, oracle_consistent d (next b) (sp_dev q)) →
-  sail_step next q l q' → res_ok q'.
+  res_ok q → sail_step next q l q' → res_ok q'.
 Proof.
-  intros Hr Horc Hstep. rewrite /sail_step in Hstep.
+  intros Hr Hstep. rewrite /sail_step in Hstep.
   destruct (sp_fence q) as [[[[pr pw] sr] sw]|] eqn:Hf.
-  { (* the parked second fence: [sp_m] and [sp_dev] survive *)
-    destruct Hstep as [_ ->]. exact (res_ok_frame q _ eq_refl eq_refl Hr). }
+  { (* the parked second fence: [sp_m] survives *)
+    destruct Hstep as [_ ->]. exact (res_ok_frame q _ eq_refl Hr). }
   destruct Hstep as [Hirq|Hstep].
   { (* an interrupt delivery: ditto *)
     destruct Hirq as (_ & v & iq & _ & ->).
-    exact (res_ok_frame q _ eq_refl eq_refl Hr). }
+    exact (res_ok_frame q _ eq_refl Hr). }
   destruct (sp_m q) as [m|] eqn:Hm.
-  - (* IN-BLOCK: [WeakSailComplete]'s three preservation lemmas *)
+  - (* IN-BLOCK: [WeakSailComplete]'s two preservation lemmas *)
     have Hni : sail_step_ni next q l q'
       by rewrite /sail_step_ni Hf Hm.
     have Hne : sp_m q ≠ None by rewrite Hm.
-    apply res_ok_split in Hr as (Hs & Hl & Ho). apply res_ok_split.
+    apply res_ok_split in Hr as (Hs & Hl). apply res_ok_split.
     split_and!.
     + exact (sail_shaped_res_step next q l q' Hne Hs Hni).
     + exact (sail_live_res_step next q l q' Hne Hl Hni).
-    + exact (oracle_consistent_res_step next q l q' Hne Ho Hni).
-  - (* BOUNDARY: the fresh instruction, from group 3 + the seam *)
+  - (* BOUNDARY: the fresh instruction, from group 3 *)
     destruct Hstep as (_ & tick & ->). rewrite /res_ok /=.
-    split_and!; [apply Hnsh|apply Hnlv|exact (Horc eq_refl tick)].
+    split_and!; [apply Hnsh|apply Hnlv].
 Qed.
 
 (* ---------------------------------------------------------------- *)
@@ -2866,13 +2846,12 @@ Section hres.
   Context (Hps_bnd : ∀ i p, ps !! i = Some p → pbnd p).
   Context (Hnsh : ∀ b, sail_shaped (riscv_step b)).
   Context (Hnlv : ∀ b, sail_live (riscv_step b)).
-  Context (Horc : horc_prem TS).
 
   (** The invariant, by induction on the record index.  Every consecutive
       pair of records is a [pstep_xv6] step ([asteps_wf_step]); the
       pre-record of a step landing in a hart state is itself a hart
-      record, so [horc_prem] and the induction hypothesis both apply to
-      it, and §13's step lemma closes. *)
+      record, so the induction hypothesis applies to it, and §13's step
+      lemma closes. *)
   Lemma res_ok_trace i T k ag q :
     pt_trs TS !! i = Some T → at_ags T !! k = Some ag →
     pa_st ag = PHart q → res_ok q.
@@ -2894,11 +2873,10 @@ Section hres.
       destruct (pstep_xv6_hart_pre riscv_step (pa_st ag0) (ae_lb ev) q Hps)
         as (q0 & Hst0 & Hsl).
       apply (res_ok_step riscv_step Hnsh Hnlv q0 (ae_lb ev) q);
-        [by apply (IH ag0 q0)| |exact Hsl].
-      intros Hm0. exact (Horc i T k ag0 q0 HT Hag0 Hst0 Hm0).
+        [by apply (IH ag0 q0)|exact Hsl].
   Qed.
 
-  (** THE EXPORT.  [Hres] from the two group-3 facts, [horc_prem] and the
+  (** THE EXPORT.  [Hres] from the two group-3 facts and the
       trace/initial-state well-formedness §11 already has in context. *)
   Theorem hres_derived : hres_prem TS.
   Proof.

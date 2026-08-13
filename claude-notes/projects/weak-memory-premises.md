@@ -72,7 +72,8 @@ depends on how request #1 evolved the device, i.e. on the path; the
 only oracle that answers arbitrary request sequences is the device
 automaton itself.
 
-**Fix (stage D, replaces the old batch-B plan's seam handling):**
+**Fix (stage D — LANDED 2026-08-13; replaces the old batch-B plan's seam
+handling):**
 `sp_dev : dstream` becomes a per-hart `dev_state`, served by TOTALIZED
 `dev_read`/`dev_write` (unmapped device-range accesses return
 junk-and-unchanged — the virtio lesson: model undefined device
@@ -88,6 +89,25 @@ becomes fabric agreement), WeakSailComplete (ocons_res gone),
 WeakSailCone (Hres derivation loses its oracle conjunct),
 WeakComposeLang (hag/wl_cfg carry the fabric; cone_liftable
 restated), WeakCompose §6 (4) prose.
+
+**How it landed, and the one shape worth reusing.**  The ⇒ bracket lost its
+existential stream outright: the agent now starts at `wm_dev s` and ends at
+`wm_dev s'`, because a `wrun` can only take device accesses the PARTIAL
+`dev_read`/`dev_write` accepted, so the totalized and partial answers
+coincide there.  The ⇐ bracket keeps ONE side condition,
+`WeakSailLTS2.dev_ok_blk next i c'` = "every configuration from which the
+block reaches `c'` has agent `i`'s current monad node decodable by the
+partial functions".  **INDEX A RUN-LOCAL SIDE CONDITION BY THE RUN'S TARGET,
+NOT ITS SOURCE.**  Every peel of the unbracket induction hands back an `rtc`
+to the SAME `c'`, so a target-indexed predicate is a CONSTANT of the whole
+mutual induction and needs no threading at all; a source-indexed one would
+have to be re-established at each step, i.e. every forcing lemma
+(`block_forced_silent`/`_fence`/`_stuck`) would have to export the peeled
+step.  Two things it must NOT be: a ∀-path predicate on the monad (same
+unsatisfiability as the oracle — junk paths make device accesses of every
+width), and a conjunct of `pf_solo` (WeakSailComplete's reader-tail
+completion CONSTRUCTS `pf_solo` steps over an arbitrary residual and cannot
+discharge it).
 
 ## Stages
 

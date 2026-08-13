@@ -9,8 +9,8 @@
 
     Three things are delivered:
 
-    (1) the LTS ([psail], [sail_step] — with the MMIO oracle [sp_dev] and
-        the INTERRUPT oracle [sp_irq]) and its two Layer-1 side conditions —
+    (1) the LTS ([psail], [sail_step] — with the PER-HART DEVICE FABRIC
+        [sp_dev] and the INTERRUPT oracle [sp_irq]) and its two Layer-1 side conditions —
         LAT-FREEDOM ([sail_lat_free]) and TIMESTAMP-OBLIVIOUSNESS
         ([sail_ts_oblivious], [sail_ts_oblivious_rmw]);
     (2) the FUSED RMW arm, which is the fix point [WeakInterpProj.v]'s header
@@ -40,16 +40,38 @@
         [Definition], inversion is [destruct]+[simpl] rather than
         [inversion], which is also what keeps the proofs below small.
 
-    (b) THE MMIO ORACLE.  [wpcfg] has no device component (design decision
-        recorded in the W5 notes block: the retained MMIO-ordering assumption
-        covers the stream ↔ real-device seam), so device reads are served
-        from a per-agent stream [sp_dev : dstream] carried INSIDE the program
-        state and consumed silently; device writes are silent and consume
-        nothing.  One entry is the little-endian byte list of the word the
-        device returned, so the bracket's stream is existentially produced by
-        the run — one [wbytes n w] entry per device read, appended in the
-        order the run performs them, and CONSUMED EXACTLY (the bracket runs
-        from [str ++ tail] to [tail]).
+    (b) THE PER-HART DEVICE FABRIC ([sp_dev : dev_state]).  [wpcfg] has no
+        device component (design decision recorded in the W5 notes block: the
+        retained MMIO-ordering assumption covers the private-fabric ↔
+        real-device seam), so device accesses are served from a per-agent
+        COPY OF THE DEVICE AUTOMATON carried INSIDE the program state, and are
+        silent.
+
+        THIS REPLACES AN EARLIER ORACLE STREAM ([sp_dev : dstream]), and the
+        replacement is a soundness fix, not a convenience.  A positional
+        stream needs a consistency premise ("this stream is what the device
+        would have answered") that, to be usable at all, had to hold ALONG
+        EVERY PATH of the instruction monad — and [WeakInterp]'s RAM reads
+        quantify over every read value, including the FETCHED WORD and every
+        page-walk PTE.  One stream would then have to serve, from one device
+        state, every device access every junk fetch decodes to along every
+        junk-but-valid translation path: two fetched words decoding to [lw]
+        and [lb] at the same VA demand the same stream head have length 4 and
+        1.  The ∀-path premise is therefore UNSATISFIABLE at essentially every
+        record (2026-08-13 finding); the only oracle that can answer an
+        arbitrary request sequence is the device automaton itself, so that is
+        what the hart now carries.
+
+        The accessors are TOTALIZED ([dev_read_t]/[dev_write_t] below):
+        an access [dev_read]/[dev_write] does not decode (bad width or
+        unmapped offset inside a device window) returns junk and leaves the
+        fabric alone, rather than being stuck.  Modelling undefined device
+        behaviour as "anything" rather than "nothing" is what makes the
+        device arms of this LTS total — [sail_step] never gets stuck at a
+        device access, and no per-path premise is needed to know that.  The
+        residual seam is now just an EQUALITY: the hart's private fabric
+        agrees with the machine's at each hart segment
+        ([WeakComposeLang]'s [wl_lift]).
 
     (b') THE INTERRUPT ORACLE ([sp_irq], [irq_deliver]; L0(b) of
         [claude-notes/completed/weak-memory-lift.md], landed 2026-08-12).
@@ -160,11 +182,36 @@ Local Open Scope Z_scope.
 (** ** 1. The program state
 
     The residual monad ([None] = at an instruction boundary), the register
-    file (what [wrun] threads through [wm_regs]), the remaining MMIO oracle
-    entries, and the parked second fence of a [fence.tso]. *)
+    file (what [wrun] threads through [wm_regs]), the hart's private copy of
+    the device fabric, and the parked second fence of a [fence.tso]. *)
 
-(** One oracle entry: the little-endian bytes one device read returns. *)
-Definition dstream := list (list (bv 8)).
+(** THE TOTALIZED DEVICE ACCESSORS (delta (b)).  [DevModel.dev_read] /
+    [dev_write] are PARTIAL — they decline a bad width or an undecoded offset
+    inside a device window.  This LTS's device arms must be total (that is
+    the whole point of carrying the automaton rather than a stream), so a
+    declined access reads junk and leaves the fabric unchanged.  Both are
+    defined HERE, not in [DevModel], so that [WeakInterp]'s [wrun] keeps the
+    partial (stuck-on-undecoded) reading it has always had: the two coincide
+    exactly on the accesses [wrun] can take, which is what the ⇐ bracket's
+    [dev_ok] side condition records ([WeakSailLTS2] §2). *)
+Definition dev_read_t (d : dev_state) (pa : Arch.pa) (n : N)
+  : bv (8 * n) * dev_state :=
+  match dev_read d pa n with
+  | Some (w, d') => (w, d')
+  | None => (bv_0 (8 * n), d)
+  end.
+
+Definition dev_write_t (d : dev_state) (pa : Arch.pa) (n : N)
+    (v : bv (8 * n)) : dev_state :=
+  default d (dev_write d pa n v).
+
+Lemma dev_read_t_Some d pa n w d' :
+  dev_read d pa n = Some (w, d') → dev_read_t d pa n = (w, d').
+Proof. rewrite /dev_read_t. by intros ->. Qed.
+
+Lemma dev_write_t_Some d pa n v d' :
+  dev_write d pa n v = Some d' → dev_write_t d pa n v = d'.
+Proof. rewrite /dev_write_t. by intros ->. Qed.
 
 (** THE INTERRUPT ORACLE (delta (b') below).  One entry is one delivery of an
     external interrupt pin to this hart — the value [RiscvLang.plic_step]'s
@@ -175,7 +222,7 @@ Definition istream := list (type_of_register sig_seip).
 Record psail := PSail {
   sp_m     : option (M unit);
   sp_regs  : regstate;
-  sp_dev   : dstream;
+  sp_dev   : dev_state;
   sp_fence : option (bool * bool * bool * bool);
   sp_irq   : istream;
 }.
@@ -255,10 +302,10 @@ Definition barrier_lbl (b : barrier_kind)
 (** ** 2. The step relation
 
     [sail_mstep m rs d l p'] is the step of a hart whose residual monad is
-    [m], registers [rs], oracle [d] and no parked fence.  Every arm sits
-    opposite the [wrun] arm of the same outcome. *)
+    [m], registers [rs], device fabric [d] and no parked fence.  Every arm
+    sits opposite the [wrun] arm of the same outcome. *)
 
-Definition sail_mstep (m : M unit) (rs : regstate) (d : dstream)
+Definition sail_mstep (m : M unit) (rs : regstate) (d : dev_state)
     (iq : istream) (l : wlabel) (p' : psail) : Prop :=
   match m with
   | Interface.Ret _ =>
@@ -275,12 +322,13 @@ Definition sail_mstep (m : M unit) (rs : regstate) (d : dstream)
        | Interface.MemRead n req => λ k,
            if dev_addr (Interface.ReadReq.pa req)
            then
-             (* MMIO: silent, one oracle entry consumed *)
+             (* MMIO: silent and DETERMINISTIC — the hart's own fabric
+                answers, totalized (delta (b)) *)
              l = WeakPromise.LSilent ∧
-             ∃ (e : list (bv 8)) (d' : dstream) (w : bv (8 * n)),
-               d = e :: d' ∧ length e = N.to_nat n ∧
-               (∀ j : nat, (j < N.to_nat n)%nat → e !! j = Some (nth_byte w j)) ∧
-               p' = PSail (Some (k (inl (w, None)))) rs d' None iq
+             p' = PSail
+                    (Some (k (inl ((dev_read_t d (Interface.ReadReq.pa req) n).1,
+                                   None))))
+                    rs (dev_read_t d (Interface.ReadReq.pa req) n).2 None iq
            else
              ak_coh (classify (Interface.ReadReq.access_kind req)) = false ∧
              match l with
@@ -313,7 +361,9 @@ Definition sail_mstep (m : M unit) (rs : regstate) (d : dstream)
        | Interface.MemWrite n req => λ k,
            if dev_addr (Interface.WriteReq.pa req)
            then l = WeakPromise.LSilent ∧
-                p' = PSail (Some (k (inl None))) rs d None iq
+                p' = PSail (Some (k (inl None))) rs
+                       (dev_write_t d (Interface.WriteReq.pa req) n
+                          (Interface.WriteReq.value req)) None iq
            else
              l = WeakPromise.LStore
                    (ak_sync (classify (Interface.WriteReq.access_kind req)))
@@ -720,9 +770,13 @@ Section bracket.
   (** *** The two mutually-inductive bracket statements
 
       [sail_bracket m]: running [m] to completion is a pf run ending at the
-      residual [Interface.Ret x], with the interpreter's final log, [wstate]
-      and registers.  The oracle stream the run consumes is EXISTENTIAL and
-      is consumed exactly ([str ++ tail] in, [tail] out).
+      residual [Interface.Ret x], with the interpreter's final log, [wstate],
+      registers AND DEVICE FABRIC.  The agent starts with the interpreter's
+      device state ([wm_dev s]) and ends with the interpreter's ([wm_dev s']);
+      there is no existential stream any more (delta (b)) — the two sides
+      compute the same answers because [wrun] took every device access it
+      reached, so [dev_read]/[dev_write] said [Some] there and the totalized
+      accessors agree.
 
       [amo_bracket pa n m]: [m] is the tail of an AMO (an [amo_tail]); it
       reaches the conditional write by silent steps, and the REST of the
@@ -735,41 +789,42 @@ Section bracket.
     ∀ (s : wmstate) (x : unit) (s' : wmstate),
       sail_shaped m →
       wrun (Some i) m s x s' →
-      ∃ str : dstream,
-        ∀ (tail : dstream) (iq : istream) (prom : gset nat) ags,
-          ags !! i = Some (WPAgent (PSail (Some m) (wm_regs s) (str ++ tail) None iq)
-                             (wm_ws s) prom) →
-          rtc (wp_pf_run (sail_step next))
-            (WPCfg (wimg s) (wm_log s) ags)
-            (WPCfg (wimg s) (wm_log s')
-               (<[i := WPAgent (PSail (Some (Interface.Ret x)) (wm_regs s') tail None iq)
-                         (wm_ws s') prom]> ags)).
+      ∀ (iq : istream) (prom : gset nat) ags,
+        ags !! i = Some (WPAgent (PSail (Some m) (wm_regs s) (wm_dev s) None iq)
+                           (wm_ws s) prom) →
+        rtc (wp_pf_run (sail_step next))
+          (WPCfg (wimg s) (wm_log s) ags)
+          (WPCfg (wimg s) (wm_log s')
+             (<[i := WPAgent (PSail (Some (Interface.Ret x)) (wm_regs s')
+                                (wm_dev s') None iq)
+                       (wm_ws s') prom]> ags)).
 
   Definition amo_bracket (pa : Arch.pa) (n : N) (m : M unit) : Prop :=
     ∀ (s : wmstate) (x : unit) (s' : wmstate),
       amo_tail pa n m →
       wrun (Some i) m s x s' →
       ∃ (m1 m2 : M unit) (rs1 : regstate) (rl : bool) (data : list (bv 8))
-        (k : wm_class) (str : dstream),
+        (k : wm_class),
         silent_run (m, wm_regs s) (m1, rs1) ∧
         wr_node m1 rl (pa_z pa) data m2 ∧
         length data = N.to_nat n ∧ data ≠ [] ∧
-        (∀ (tail : dstream) (iq : istream) (prom : gset nat) ags,
-           ags !! i = Some (WPAgent (PSail (Some m2) rs1 (str ++ tail) None iq)
+        (∀ (iq : istream) (prom : gset nat) ags,
+           ags !! i = Some (WPAgent (PSail (Some m2) rs1 (wm_dev s) None iq)
                               (store_post_run (wm_ws s) rl (pa_z pa) (length data)
                                  (S (length (wm_log s)))) prom) →
            rtc (wp_pf_run (sail_step next))
              (WPCfg (wimg s) (wm_log s ++ [WMsg (pa_z pa) data (Some i) k]) ags)
              (WPCfg (wimg s) (wm_log s')
-                (<[i := WPAgent (PSail (Some (Interface.Ret x)) (wm_regs s') tail None iq)
+                (<[i := WPAgent (PSail (Some (Interface.Ret x)) (wm_regs s')
+                                   (wm_dev s') None iq)
                           (wm_ws s') prom]> ags))).
 
   Local Ltac sbr_silent :=
     match goal with
     | Hsh : ∀ _, sail_shaped _, Hrun : wrun _ _ _ _ _, IH : ∀ _, _ ∧ _ |- _ =>
-        let str := fresh "str" in let Hch := fresh "Hch" in
-        destruct (proj1 (IH _) _ _ _ (Hsh _) Hrun) as (str & Hch);
-        exists str; intros tail iq prom ags Hlk;
+        let Hch := fresh "Hch" in
+        pose proof (proj1 (IH _) _ _ _ (Hsh _) Hrun) as Hch;
+        intros iq prom ags Hlk;
         eapply pf_silent;
           [exact Hlk | by (rewrite /sail_step /=; right; split; reflexivity) |];
         apply Hch; by apply (lookup_insert_i _ _ _ Hlk)
@@ -780,11 +835,11 @@ Section bracket.
     | Hsh : ∀ _, amo_tail _ _ _, Hrun : wrun _ _ _ _ _, IH : ∀ _, _ ∧ _ |- _ =>
         let m1 := fresh "m1" in let m2 := fresh "m2" in
         let rs1 := fresh "rs1" in let rl := fresh "rl" in
-        let data := fresh "data" in let str := fresh "str" in
+        let data := fresh "data" in
         let kc := fresh "kc" in
         destruct (proj2 (IH _) _ _ _ _ _ (Hsh _) Hrun)
-          as (m1 & m2 & rs1 & rl & data & kc & str & Hsil & Hwr & Hlen & Hne & Hch);
-        exists m1, m2, rs1, rl, data, kc, str;
+          as (m1 & m2 & rs1 & rl & data & kc & Hsil & Hwr & Hlen & Hne & Hch);
+        exists m1, m2, rs1, rl, data, kc;
         split_and!; [|exact Hwr|exact Hlen|exact Hne|exact Hch];
         eapply rtc_l; [|exact Hsil]; by rewrite /silent1 /=
     end.
@@ -798,7 +853,7 @@ Section bracket.
   Proof.
     induction m as [y|T oc k IH].
     { split.
-      - intros s x s' _ [-> ->]. exists []. intros tail iq prom ags Hlk.
+      - intros s x s' _ [-> ->]. intros iq prom ags Hlk.
         rewrite (list_insert_id _ _ _ Hlk). apply rtc_refl.
       - intros pa n s x s' Hamo. destruct Hamo. }
     split.
@@ -809,18 +864,14 @@ Section bracket.
         try (by sbr_silent); try (by exfalso; exact Hrun).
       { (* MemRead *)
         destruct (dev_addr (Interface.ReadReq.pa req)) eqn:Hd.
-        - (* MMIO: consume one oracle entry, silently *)
+        - (* MMIO: the hart's own fabric answers, silently *)
           destruct (dev_read (wm_dev s) (Interface.ReadReq.pa req) nn)
             as [[w d']|] eqn:Hdr; [|by exfalso; exact Hrun].
-          destruct (proj1 (IH (inl (w, None))) _ _ _ (Hsh _) Hrun) as (str & Hch).
-          exists (wbytes nn w :: str). intros tail iq prom ags Hlk.
+          pose proof (proj1 (IH (inl (w, None))) _ _ _ (Hsh _) Hrun) as Hch.
+          intros iq prom ags Hlk.
           eapply pf_silent; [exact Hlk| |].
-          + rewrite /sail_step /= Hd. right. split; [reflexivity|].
-            exists (wbytes nn w), (str ++ tail), w. split_and!.
-            * reflexivity.
-            * apply wbytes_length.
-            * intros j Hj. by apply wbytes_lookup.
-            * reflexivity.
+          + rewrite /sail_step /= Hd (dev_read_t_Some _ _ _ _ _ Hdr) /=.
+            right. split; reflexivity.
           + apply Hch. by apply (lookup_insert_i _ _ _ Hlk).
         - destruct Hsh as (Hcoh & Hsh).
           destruct Hrun as (w & ts & Hok & Hrun).
@@ -830,8 +881,8 @@ Section bracket.
           + (* THE FUSED RMW *)
             destruct (proj2 (IH (inl (w, None))) (Interface.ReadReq.pa req) nn
                         _ _ _ (Hsh w) Hrun)
-              as (m1 & m2 & rs1 & rl & data & kc & str & Hsil & Hwr & Hlend & Hne & Hch).
-            exists str. intros tail iq prom ags Hlk.
+              as (m1 & m2 & rs1 & rl & data & kc & Hsil & Hwr & Hlend & Hne & Hch).
+            intros iq prom ags Hlk.
             pose proof Hok as (Hlents & _).
             eapply pf_rmw.
             * exact Hlk.
@@ -850,9 +901,8 @@ Section bracket.
             * rewrite (mk_tvs_fst nn ts w Hlents).
               apply Hch. by apply (lookup_insert_i _ _ _ Hlk).
           + (* a plain load *)
-            destruct (proj1 (IH (inl (w, None))) _ _ _ (Hsh _) Hrun)
-              as (str & Hch).
-            exists str. intros tail iq prom ags Hlk.
+            pose proof (proj1 (IH (inl (w, None))) _ _ _ (Hsh _) Hrun) as Hch.
+            intros iq prom ags Hlk.
             pose proof Hok as (Hlents & _).
             eapply pf_load with (lat := false).
             * exact Hlk.
@@ -872,14 +922,15 @@ Section bracket.
         - destruct (dev_write (wm_dev s) (Interface.WriteReq.pa req) nn
                       (Interface.WriteReq.value req)) as [d'|] eqn:Hdw;
             [|by exfalso; exact Hrun].
-          destruct (proj1 (IH (inl None)) _ _ _ (Hsh _) Hrun) as (str & Hch).
-          exists str. intros tail iq prom ags Hlk.
+          pose proof (proj1 (IH (inl None)) _ _ _ (Hsh _) Hrun) as Hch.
+          intros iq prom ags Hlk.
           eapply pf_silent; [exact Hlk| |].
-          + rewrite /sail_step /= Hd. right. split; reflexivity.
+          + rewrite /sail_step /= Hd (dev_write_t_Some _ _ _ _ _ Hdw).
+            right. split; reflexivity.
           + apply Hch. by apply (lookup_insert_i _ _ _ Hlk).
         - destruct Hn as (Hn0 & Hnlat).
-          destruct (proj1 (IH (inl None)) _ _ _ (Hsh _) Hrun) as (str & Hch).
-          exists str. intros tail iq prom ags Hlk.
+          pose proof (proj1 (IH (inl None)) _ _ _ (Hsh _) Hrun) as Hch.
+          intros iq prom ags Hlk.
           eapply pf_store.
           + exact Hlk.
           + rewrite /sail_step /= Hd. right.
@@ -888,8 +939,8 @@ Section bracket.
           + rewrite wbytes_length. apply Hch.
             by apply (lookup_insert_i _ _ _ Hlk). }
       { (* Barrier *)
-        destruct (proj1 (IH tt) _ _ _ (Hsh _) Hrun) as (str & Hch).
-        exists str. intros tail iq prom ags Hlk. destruct bk.
+        pose proof (proj1 (IH tt) _ _ _ (Hsh _) Hrun) as Hch.
+        intros iq prom ags Hlk. destruct bk.
         1-9: eapply pf_fence;
                [exact Hlk | by (rewrite /sail_step /=; right; split; reflexivity) |];
              apply Hch; by apply (lookup_insert_i _ _ _ Hlk).
@@ -908,8 +959,8 @@ Section bracket.
           apply Hch. by apply (lookup_insert_i _ _ _ Hlk). }
       { (* Choose *)
         destruct Hrun as (c & Hrun).
-        destruct (proj1 (IH c) _ _ _ (Hsh _) Hrun) as (str & Hch).
-        exists str. intros tail iq prom ags Hlk.
+        pose proof (proj1 (IH c) _ _ _ (Hsh _) Hrun) as Hch.
+        intros iq prom ags Hlk.
         eapply pf_silent; [exact Hlk| |].
         - rewrite /sail_step /=. right. split; [reflexivity|]. by exists c.
         - apply Hch. by apply (lookup_insert_i _ _ _ Hlk). }
@@ -922,12 +973,12 @@ Section bracket.
       { (* the conditional write: the fused arm's second half *)
         destruct Hsh as (Hd & Hpa & Hn & Hn0 & Hlat & Hsh).
         rewrite Hd in Hrun. subst pa n.
-        destruct (proj1 (IH (inl None)) _ _ _ (Hsh _) Hrun) as (str & Hch).
+        pose proof (proj1 (IH (inl None)) _ _ _ (Hsh _) Hrun) as Hch.
         exists (Interface.Next (Interface.MemWrite nn req) k), (k (inl None)),
                (wm_regs s), (ak_sync (classify (Interface.WriteReq.access_kind req))),
                (wbytes nn (Interface.WriteReq.value req)),
                (wm_class_of (classify (Interface.WriteReq.access_kind req))
-                  (wm_ws s)), str.
+                  (wm_ws s)).
         split_and!.
         - apply rtc_refl.
         - rewrite /wr_node. split_and!; [exact Hd|exact Hn0|exact Hlat|
@@ -938,8 +989,8 @@ Section bracket.
       { (* Choose *)
         destruct Hrun as (c & Hrun).
         destruct (proj2 (IH c) _ _ _ _ _ (Hsh _) Hrun)
-          as (m1 & m2 & rs1 & rl & data & kc & str & Hsil & Hwr & Hlen & Hne & Hch).
-        exists m1, m2, rs1, rl, data, kc, str.
+          as (m1 & m2 & rs1 & rl & data & kc & Hsil & Hwr & Hlen & Hne & Hch).
+        exists m1, m2, rs1, rl, data, kc.
         split_and!; [|exact Hwr|exact Hlen|exact Hne|exact Hch].
         eapply rtc_l; [|exact Hsil]. rewrite /silent1 /=. by exists c. }
   Qed.
@@ -949,15 +1000,15 @@ Section bracket.
   Theorem wrun_sail_bracket (m : M unit) s x s' :
     sail_shaped m →
     wrun (Some i) m s x s' →
-    ∃ str : dstream,
-      ∀ (tail : dstream) (iq : istream) (prom : gset nat) ags,
-        ags !! i = Some (WPAgent (PSail (Some m) (wm_regs s) (str ++ tail) None iq)
-                           (wm_ws s) prom) →
-        rtc (wp_pf_run (sail_step next))
-          (WPCfg (wimg s) (wm_log s) ags)
-          (WPCfg (wimg s) (wm_log s')
-             (<[i := WPAgent (PSail (Some (Interface.Ret x)) (wm_regs s') tail None iq)
-                       (wm_ws s') prom]> ags)).
+    ∀ (iq : istream) (prom : gset nat) ags,
+      ags !! i = Some (WPAgent (PSail (Some m) (wm_regs s) (wm_dev s) None iq)
+                         (wm_ws s) prom) →
+      rtc (wp_pf_run (sail_step next))
+        (WPCfg (wimg s) (wm_log s) ags)
+        (WPCfg (wimg s) (wm_log s')
+           (<[i := WPAgent (PSail (Some (Interface.Ret x)) (wm_regs s')
+                              (wm_dev s') None iq)
+                     (wm_ws s') prom]> ags)).
   Proof. apply (proj1 (sail_bracket_all m)). Qed.
 
 End bracket.
@@ -1003,21 +1054,19 @@ Section instr.
   Theorem sail_instr_bracket (tick : bool) s x s' :
     sail_shaped (riscv_step tick) →
     wrun (Some i) (riscv_step tick) s x s' →
-    ∃ str : dstream,
-      ∀ (tail : dstream) (iq : istream) (prom : gset nat)
-        (ags : list (wpagent psail)),
-        ags !! i = Some (WPAgent (PSail None (wm_regs s) (str ++ tail) None iq)
-                           (wm_ws s) prom) →
-        rtc (wp_pf_run (sail_step riscv_step))
-          (WPCfg (wimg s) (wm_log s) ags)
-          (WPCfg (wimg s) (wm_log s')
-             (<[i := WPAgent (PSail None (wm_regs s') tail None iq)
-                       (wm_ws s') prom]> ags)).
+    ∀ (iq : istream) (prom : gset nat) (ags : list (wpagent psail)),
+      ags !! i = Some (WPAgent (PSail None (wm_regs s) (wm_dev s) None iq)
+                         (wm_ws s) prom) →
+      rtc (wp_pf_run (sail_step riscv_step))
+        (WPCfg (wimg s) (wm_log s) ags)
+        (WPCfg (wimg s) (wm_log s')
+           (<[i := WPAgent (PSail None (wm_regs s') (wm_dev s') None iq)
+                     (wm_ws s') prom]> ags)).
   Proof.
     intros Hsh Hrun.
-    destruct (wrun_sail_bracket riscv_step i (riscv_step tick) s x s' Hsh Hrun)
-      as (str & Hch).
-    exists str. intros tail iq prom ags Hlk.
+    pose proof (wrun_sail_bracket riscv_step i (riscv_step tick) s x s' Hsh Hrun)
+      as Hch.
+    intros iq prom ags Hlk.
     have Hlt : (i < length ags)%nat by exact (lookup_lt_Some _ _ _ Hlk).
     eapply pf_silent.
     - exact Hlk.
@@ -1037,18 +1086,17 @@ End instr.
 Corollary sail_instr_bracket_single (tick : bool) s x s' :
   sail_shaped (riscv_step tick) →
   wrun (Some 0%nat) (riscv_step tick) s x s' →
-  ∃ str : dstream,
-    ∀ (tail : dstream) (iq : istream) (prom : gset nat),
-      rtc (wp_pf_run (sail_step riscv_step))
-        (WPCfg (wimg s) (wm_log s)
-           [WPAgent (PSail None (wm_regs s) (str ++ tail) None iq) (wm_ws s) prom])
-        (WPCfg (wimg s) (wm_log s')
-           [WPAgent (PSail None (wm_regs s') tail None iq) (wm_ws s') prom]).
+  ∀ (iq : istream) (prom : gset nat),
+    rtc (wp_pf_run (sail_step riscv_step))
+      (WPCfg (wimg s) (wm_log s)
+         [WPAgent (PSail None (wm_regs s) (wm_dev s) None iq) (wm_ws s) prom])
+      (WPCfg (wimg s) (wm_log s')
+         [WPAgent (PSail None (wm_regs s') (wm_dev s') None iq) (wm_ws s') prom]).
 Proof.
   intros Hsh Hrun.
-  destruct (sail_instr_bracket 0%nat tick s x s' Hsh Hrun) as (str & Hch).
-  exists str. intros tail iq prom.
-  apply (Hch tail iq prom
-           [WPAgent (PSail None (wm_regs s) (str ++ tail) None iq) (wm_ws s) prom]).
+  pose proof (sail_instr_bracket 0%nat tick s x s' Hsh Hrun) as Hch.
+  intros iq prom.
+  apply (Hch iq prom
+           [WPAgent (PSail None (wm_regs s) (wm_dev s) None iq) (wm_ws s) prom]).
   reflexivity.
 Qed.
