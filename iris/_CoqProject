@@ -975,6 +975,7 @@ ProofSafestrcpy.v
 ProofStrncpy.v
 SpecBfree.v
 SpecConsoleread.v
+ProofConsoleread.v
 SpecFileread.v
 SpecForkretPark.v
 SpecIdup.v
