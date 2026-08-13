@@ -1007,7 +1007,7 @@ Section ProofMain.
        contract's credentials are finally all in hand. *)
     (* ---- +0x86 jal plicinit ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x86)) (mword_of_int 1 : mword 5)
-              (mword_of_int 18056 : mword 21) mth n false
+              (mword_of_int 18072 : mword 21) mth n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi86").
     iApply wp_next_off_intro.
@@ -1015,7 +1015,7 @@ Section ProofMain.
     pose (T3 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.main + 0x86) : mword 64) 4)]> mth).
     assert (Htgtpl : add_vec (mword_of_int (KernelSyms.main + 0x86) : mword 64)
-              (sign_extend' 64 (mword_of_int 18056 : mword 21))
+              (sign_extend' 64 (mword_of_int 18072 : mword 21))
               = (mword_of_int KernelSyms.plicinit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtpl) in "Hpc".
@@ -1030,7 +1030,7 @@ Section ProofMain.
     iEval (rewrite Hretpl) in "Hpc".
     (* ---- +0x8a jal plicinithart ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x8a)) (mword_of_int 1 : mword 5)
-              (mword_of_int 18078 : mword 21) mpl n false
+              (mword_of_int 18094 : mword 21) mpl n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi8a").
     iApply wp_next_off_intro.
@@ -1038,7 +1038,7 @@ Section ProofMain.
     pose (T4 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.main + 0x8a) : mword 64) 4)]> mpl).
     assert (Htgtph : add_vec (mword_of_int (KernelSyms.main + 0x8a) : mword 64)
-              (sign_extend' 64 (mword_of_int 18078 : mword 21))
+              (sign_extend' 64 (mword_of_int 18094 : mword 21))
               = (mword_of_int KernelSyms.plicinithart : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtph) in "Hpc".
@@ -1172,7 +1172,7 @@ Section ProofMain.
     iEval (rewrite Hretii) in "Hpc".
     (* ---- +0x96 jal fileinit ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x96)) (mword_of_int 1 : mword 5)
-              (mword_of_int 12598 : mword 21) mii n false
+              (mword_of_int 12612 : mword 21) mii n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi96").
     iApply wp_next_off_intro.
@@ -1180,7 +1180,7 @@ Section ProofMain.
     pose (F3 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.main + 0x96) : mword 64) 4)]> mii).
     assert (Htgtfi : add_vec (mword_of_int (KernelSyms.main + 0x96) : mword 64)
-              (sign_extend' 64 (mword_of_int 12598 : mword 21))
+              (sign_extend' 64 (mword_of_int 12612 : mword 21))
               = (mword_of_int KernelSyms.fileinit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtfi) in "Hpc".
@@ -1194,7 +1194,7 @@ Section ProofMain.
     iEval (rewrite Hretfi) in "Hpc".
     (* ---- +0x9a jal virtio_disk_init ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x9a)) (mword_of_int 1 : mword 5)
-              (mword_of_int 18302 : mword 21) mfi n false
+              (mword_of_int 18318 : mword 21) mfi n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi9a").
     iApply wp_next_off_intro.
@@ -1202,7 +1202,7 @@ Section ProofMain.
     pose (F4 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.main + 0x9a) : mword 64) 4)]> mfi).
     assert (Htgtvd : add_vec (mword_of_int (KernelSyms.main + 0x9a) : mword 64)
-              (sign_extend' 64 (mword_of_int 18302 : mword 21))
+              (sign_extend' 64 (mword_of_int 18318 : mword 21))
               = (mword_of_int KernelSyms.virtio_disk_init : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtvd) in "Hpc".

@@ -159,6 +159,13 @@ against the C diff rather than re-running the tools. (consoleintr is proven
 now and HAS a `CodeConsoleintr.v`, so the same bump today would cost its
 whole cone; the rule is about the decode layer, not about that function.)
 
+A function that HAS a `Code<F>.v` but no proof is the same answer one step
+later: the sweep names it, `relayout_batch.py` then refuses to run at all, and
+the classification that unblocks it is "nothing anchors on this symbol".
+`grep -l 'KernelSyms\.<sym>' iris/*.v` outside `Code*.v` decides it in one
+command; record the answer with `--allow-shape=Code<F>.v` (§3) rather than
+working around the guard.
+
 **AND THE SHIFT NEED NOT REACH THE END OF `.text`.** Everything after a
 function that changed size moves by the delta *until an alignment boundary
 absorbs it*. Here `consoleintr` lost 8 bytes, 170 symbols moved `-0x8`, and
@@ -217,6 +224,14 @@ python3 tools/relayout_batch.py            # dry run
 python3 tools/relayout_batch.py --write
 python3 tools/relayout_batch.py --residue  # the mandatory post-step, every pair
 ```
+
+`--allow-shape=Code<F>.v` (repeatable) is how a classified shape change stops
+blocking the run. It does not weaken the guard: the file still contributes its
+QUARANTINED map, and the batch prints which hand-written files that map would
+reach, so the flag is free only when it prints `no hand-written file`. Anything
+else on that line is the list to check by hand before trusting the run — the
+quarantine keeps offsets above the first reshape out of the map, but says
+nothing about whether the offsets BELOW it still mean what the proof thinks.
 
 ### AN ALIAS DECLARED IN A SIBLING FILE MAKES THE BATCH REPORT A TRUTHFUL "0"
 

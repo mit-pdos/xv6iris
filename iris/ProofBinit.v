@@ -901,13 +901,13 @@ Section ProofBinit.
       assert (Hpp60 : add_vec_int (mword_of_int (KernelSyms.binit + 0x5c) : mword 64) 4 = mword_of_int (KernelSyms.binit + 0x60)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp60) in "Hpc".
       (* +0x60 jal ra,initsleeplock *)
-      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.binit + 0x60)) (mword_of_int 1 : mword 5) (mword_of_int 5048 : mword 21)
+      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.binit + 0x60)) (mword_of_int 1 : mword 5) (mword_of_int 5062 : mword 21)
                 M3 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi60").
       iIntros (CIDm6 Hsm6) "Hcg Hpc".
       set (M4 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.binit + 0x60) : mword 64) 4)]> M3).
-      assert (Htgtisl : add_vec (mword_of_int (KernelSyms.binit + 0x60) : mword 64) (sign_extend' 64 (mword_of_int 5048 : mword 21)) = mword_of_int KernelSyms.initsleeplock)
+      assert (Htgtisl : add_vec (mword_of_int (KernelSyms.binit + 0x60) : mword 64) (sign_extend' 64 (mword_of_int 5062 : mword 21)) = mword_of_int KernelSyms.initsleeplock)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtisl) in "Hpc".
       assert (HM4a0 : M4 !!! Regidx (mword_of_int 10 : mword 5) = buf_lock (bnode j))

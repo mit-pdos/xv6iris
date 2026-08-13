@@ -1770,14 +1770,14 @@ Section ProofIput.
     iEval (rewrite Hpp50) in "Hpc".
     (* ===== +0x50 jal acquiresleep -- THE NESTED ONE (§13.12(a)) ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iput + 0x50)) Rra
-              (mword_of_int 2910 : mword 21) G3 (trap_res eb + (K - 4))%nat false
+              (mword_of_int 2924 : mword 21) G3 (trap_res eb + (K - 4))%nat false
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi50").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (G4 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iput + 0x50) : mword 64) 4)]> G3).
     assert (Htgtasl : add_vec (mword_of_int (KernelSyms.iput + 0x50) : mword 64)
-                        (sign_extend' 64 (mword_of_int 2910 : mword 21))
+                        (sign_extend' 64 (mword_of_int 2924 : mword 21))
                       = mword_of_int KernelSyms.acquiresleep) by pcw.
     iEval (rewrite Htgtasl) in "Hpc".
     assert (HG4a0 : G4 !!! Regidx Ra0 = i_lock (ientry k))
@@ -2344,14 +2344,14 @@ Section ProofIput.
                     = mword_of_int (KernelSyms.iput + 0x76)) by pcw.
     iEval (rewrite Hpp76) in "Hpc".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iput + 0x76)) Rra
-              (mword_of_int 2956 : mword 21) J5 (K - 4)%nat eb
+              (mword_of_int 2970 : mword 21) J5 (K - 4)%nat eb
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi76").
     iIntros (CIDm6 Hsm6) "Hcg Hpc".
     set (J6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iput + 0x76) : mword 64) 4)]> J5).
     assert (Htgtrs : add_vec (mword_of_int (KernelSyms.iput + 0x76) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2956 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2970 : mword 21))
                      = mword_of_int KernelSyms.releasesleep) by pcw.
     iEval (rewrite Htgtrs) in "Hpc".
     assert (HJ6a0 : J6 !!! Regidx Ra0 = i_lock (ientry k))

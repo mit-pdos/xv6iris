@@ -65,9 +65,9 @@ Section CodeSysFstat.
   Proof. mk_rvc (KernelSyms.sys_fstat + 0xc) (mword_of_int 0x4505 : mword 16)
     (mword_of_int (KernelSyms.sys_fstat + 0xc) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) kd_4505 exec_execute_C_LI. Qed.
 
-  Lemma sfsi_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_fstat + 0xe) : mword 64) false (JAL (mword_of_int 2087546 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_fstat + 0xe) (mword_of_int 0xa7bfd0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_fstat + 0xe) : mword 64) (JAL (mword_of_int 2087546 : mword 21, Regidx (mword_of_int 1))) kd_a7bfd0ef. Qed.
+  Lemma sfsi_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_fstat + 0xe) : mword 64) false (JAL (mword_of_int 2087532 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_fstat + 0xe) (mword_of_int 0xa6dfd0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_fstat + 0xe) : mword 64) (JAL (mword_of_int 2087532 : mword 21, Regidx (mword_of_int 1))) kd_a6dfd0ef. Qed.
 
   Lemma sfsi_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_fstat + 0x12) : mword 64) false (ITYPE (mword_of_int 4072 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 12), ADDI)).
   Proof. mk_base (KernelSyms.sys_fstat + 0x12) (mword_of_int 0xfe840613 : mword 32)

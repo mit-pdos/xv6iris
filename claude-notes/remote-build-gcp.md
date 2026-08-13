@@ -172,7 +172,27 @@ idle. Measured, 90 is ~19% slower on the `iris` phase (375s vs 315s) at half
 the price — about 40% cheaper per build. Revisit only if several agents
 routinely build at once.
 
-## Things that will bite you
+## The VM is where a bump's reproducibility check is free
+
+The push excludes `xv6-riscv/`, so a fresh work tree has none and the first
+`make` clones it at `$(XV6_REV)` and builds the ELF itself. That makes the VM a
+SECOND, independent build of the image from the same pin — run `make
+dump-force` there and compare digests with the local tree:
+
+```sh
+run-on-gcp --no-sync bash -c 'make dump-force >/dev/null && md5sum kernel-rocq/Kernel*.v user-rocq/Sync*.v'
+md5sum kernel-rocq/Kernel*.v user-rocq/Sync*.v
+```
+
+Six equal digests is the toolchain-match proof the playbook asks for, obtained
+on a machine that shares nothing with yours but the pin.
+
+**`git status` is not available to check this.** `SYNC_GIT=0`, so the remote
+tree is not a git repository at all — `git status kernel-rocq/` there dies with
+*"not a git repository (or any parent up to mount point /mnt)"*, which reads
+like a broken tree and is only the sync policy. Compare digests, not
+`git status`. The same reason makes any remote step that shells out to git
+fail; do the git half locally.
 
 **The VM's Ubuntu must match the dev container's.** Both are 26.04. This is not
 cosmetic: 24.04 ships riscv64 gcc 13.3.0, 26.04 ships 15.2.0, and building the

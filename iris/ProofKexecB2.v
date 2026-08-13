@@ -518,10 +518,10 @@ Section KexecB2Body.
     iEval (rewrite Hpp32a) in "Hpc".
     (* ---- +0x32a: jal ra,proc_freepagetable ---- *)
     assert (Htpf : add_vec (mword_of_int (KXB + 0x32a) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2084864 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2084850 : mword 21))
                    = mword_of_int KernelSyms.proc_freepagetable) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXB + 0x32a)) Rra
-              (mword_of_int 2084864 : mword 21) T2 (K - 68)%nat true
+              (mword_of_int 2084850 : mword 21) T2 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htpf; vm_compute; reflexivity)
               with "Hcg Hpc Hi32a").

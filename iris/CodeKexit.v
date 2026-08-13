@@ -34,7 +34,6 @@ Require Import KernelDecode18.
 Require Import KernelDecode19.
 Require Import KernelDecode20.
 Require Import KernelDecode24.
-Require Import KernelDecode25.
 Require Import KernelDecode27.
 Require Import KernelDecode29.
 Require Import KernelDecode30.
@@ -140,9 +139,9 @@ Section CodeKexit.
   Proof. mk_rvc (KernelSyms.kexit + 0x40) (mword_of_int 0xdd65 : mword 16)
     (mword_of_int (KernelSyms.kexit + 0x40) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 252 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) kd_dd65 exec_execute_C_BEQZ. Qed.
 
-  Lemma kxi_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.kexit + 0x42) : mword 64) false (JAL (mword_of_int 8310 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.kexit + 0x42) (mword_of_int 0x076020ef : mword 32)
-    (mword_of_int (KernelSyms.kexit + 0x42) : mword 64) (JAL (mword_of_int 8310 : mword 21, Regidx (mword_of_int 1))) kd_076020ef. Qed.
+  Lemma kxi_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.kexit + 0x42) : mword 64) false (JAL (mword_of_int 8324 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.kexit + 0x42) (mword_of_int 0x084020ef : mword 32)
+    (mword_of_int (KernelSyms.kexit + 0x42) : mword 64) (JAL (mword_of_int 8324 : mword 21, Regidx (mword_of_int 1))) kd_084020ef. Qed.
 
   Lemma kxi_46 : kernel_text -∗ instr (mword_of_int (KernelSyms.kexit + 0x46) : mword 64) false (STORE (mword_of_int 0 : mword 12, zreg, Regidx (mword_of_int 9), 8)).
   Proof. mk_base (KernelSyms.kexit + 0x46) (mword_of_int 0x0004b023 : mword 32)
