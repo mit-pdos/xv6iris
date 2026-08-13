@@ -1,20 +1,17 @@
-(* LinkConsoleintr.v -- the one place consoleintr's contract is ASSUMED.
+(* LinkConsoleintr.v -- consoleintr's proof, instantiated against its callees'.
 
-   The second file of its kind (LinkKerneltrap.v is the first).  Every other
-   link file in the tree instantiates a proof functor against its callees'
-   PROOFS; consoleintr has none, so this link supplies the interface with an
-   [Axiom] instead -- the single assumption the uartintr cone rests on
-   ([tools/proof_coverage.py] reports it as such).  Isolating it here means
-   [ProofUartintr.v] itself is axiom-free: it is a functor over [CONSOLEINTR],
-   and proving consoleintr later replaces this file, nothing else.
+   It WAS an [Axiom] -- the one assumption the uartintr cone rested on --
+   because consoleintr had no proof.  xv6 `a28e94b` deleted its
+   [case C('P'): procdump()] arm, which left its callees at exactly acquire /
+   consputc / release / wakeup; all four are proven and linked, so this file
+   is now an ordinary functor application and [tools/proof_coverage.py] no
+   longer reports an axiom here.
 
-   Written out with an explicit [Axiom] rather than a [Declare Module]: both
-   are visible to [Print Assumptions], but only the keyword is visible to the
-   coverage tool's textual axiom scan.
-
-   What the assumption does and does not say: see SpecConsoleintr.v -- in
-   particular, it is silent about the UART, which the echo path really does
-   touch. *)
+   WHAT THE PROOF CHANGED IN THE CONTRACT: the assumption was silent about
+   the UART, and the echo path is not -- [consputc] reaches
+   [uartputc_sync], which takes tx_lock and writes the THR.  So
+   SpecConsoleintr.v's contract grew [WpUart.dev_inv] and the bundled
+   [console_caps], and lost two premises that were vacuous.  See that file. *)
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -24,13 +21,10 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto SmodeCore.
 Require Import RegFile.
 Require Import FdSlots WpLock.
-Require Import SpecConsoleintr.
 Require Import IrefSlots.
+Require Import ConsoleInv.
+Require Import LinkAcquire LinkConsputc LinkRelease LinkWakeup.
+Require Import ProofConsoleintr.
+Require Import SpecConsoleintr.
 
-Module Consoleintr : CONSOLEINTR.
-  Axiom wp_consoleintr_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-       (m : regfile) (γs : list gname)
-      (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool),
-      wp_consoleintr_sconf_body m γs pme lvl K eb C b.
-End Consoleintr.
+Module Consoleintr := ConsoleintrProof Acquire Consputc Release Wakeup.

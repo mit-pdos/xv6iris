@@ -61,16 +61,16 @@
    "r never passes w" is not locally obvious there.  It is nonetheless safe:
    the push-back only ever undoes the [cons.r++] two instructions earlier.
 
-   ---- WHAT IS OWED AT BOOT -------------------------------------------
+   ---- WHERE IT COMES FROM AT BOOT ------------------------------------
 
-   Nothing mints [is_conslock] yet.  consoleinit's contract
-   ([SpecConsoleinit.v]) already hands back the initialized lock word, the
-   sealed [lock_name] and the cpu field -- i.e. exactly [WpLock.newlock]'s
-   raw material -- but the ring's own storage (the 128 bytes and the three
-   words carved here) belongs to whoever owns the .bss, and the boot assembly
-   that runs [newlock] over [cons_res] does not exist.  This is the same debt
-   [UartTxInv.is_txlock] carries, and it is discharged in the same place; see
-   claude-notes/projects/uart-driver.md. *)
+   [is_conslock] is minted in [ProofMain.mn_grp_printk], immediately after the
+   consoleinit call: that contract hands back the initialized lock word, the
+   sealed [lock_name] and the cpu field -- exactly [WpLock.newlock]'s raw
+   material -- and [cons_res] itself is a conjunct of
+   [SpecMain.main_globals_raw], carved out of .bss by
+   [BootCarveMain.boot_cons_res].  [UartTxInv.is_txlock] is minted in the same
+   fupd, out of the [lk_fresh] the same call threads through from uartinit;
+   the pair is [SpecConsoleintr.console_caps]. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -186,6 +186,25 @@ Section ConsoleInv.
                     (pa_add a_cons (cons_buf_off + j) ↦ₘ c)%I) bs i b Hlk
                  with "H") as "[Hb Hcl]".
     iFrame "Hb". iIntros "Hb". iApply ("Hcl" $! b' with "Hb").
+  Qed.
+
+  (* ---- the boot carve's shape --------------------------------------
+     [BootCarve.boot_ran_mem_run] hands out a run indexed by a FUNCTION over
+     [seq 0 n]; [cons_data] is stated over a LIST, because a single-byte
+     update has to be an [insert] with the length premise preserved.  The
+     two are the same big-op at [bs := f <$> seq 0 n], since [seq 0 n]'s
+     element at position [j] IS [j].  This is the last piece the boot
+     assembly needs to run [WpLock.newlock] over [cons_res]. *)
+  Lemma cons_data_of_run (f : nat -> bv 8) (base : mword 64) :
+    (forall j : nat, pa_add base j = pa_add a_cons (cons_buf_off + j)) ->
+    ([∗ list] j ∈ seq 0 INPUT_BUF_SIZE, pa_add base j ↦ₘ f j)
+    -∗ ∃ bs : list (bv 8), ⌜length bs = INPUT_BUF_SIZE⌝ ∗ cons_data bs.
+  Proof.
+    intro Hbase. iIntros "H". iExists (f <$> seq 0 INPUT_BUF_SIZE).
+    iSplit; [iPureIntro; rewrite length_fmap length_seq; reflexivity |].
+    rewrite /cons_data big_sepL_fmap.
+    iApply (big_sepL_mono with "H").
+    intros k j Hk. apply lookup_seq in Hk as [-> _]. rewrite Hbase. done.
   Qed.
 
   (* a ring index is always in range, so a byte is always there to be read *)

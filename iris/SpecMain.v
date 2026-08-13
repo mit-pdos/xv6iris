@@ -132,6 +132,8 @@ Require Import TimerCap.
 Require Import PanicStub.
 Require Import StartedInv.
 (* the callees, for the vocabulary main's precondition is stated in *)
+Require Import ConsoleInv.
+Require Import SpecConsoleintr.
 Require Import SpecConsoleinit.
 Require Import SpecProcinit.
 (* [IcacheBoot.ientry_raw] -- the fifty itable ENTRIES' cells, which iinit
@@ -295,7 +297,13 @@ Section SpecMain.
      (∃ free0 : nat -> bv 8,
         [∗ list] j ∈ seq 0 8, (pa_add disk_free j) ↦ₘ free0 j) ∗
      d_used_idx ↦₂ wrap16 0%nat ∗
-     ([∗ list] i ∈ seq 0 8, disk_slot_raw i))%I.
+     ([∗ list] i ∈ seq 0 8, disk_slot_raw i) ∗
+     (* the console ring, [cons+24 .. cons+164): the 128 input bytes and the
+        three index words.  It is here for the same reason [ticks] is -- a
+        static global the init sequence brings under a lock -- and main needs
+        it to run the [WpLock.newlock] that turns consoleinit's postcondition
+        into [ConsoleInv.is_conslock], one half of [console_caps]. *)
+     cons_res)%I.
 
   (* ------------------------------------------------------------------- *)
   (* This hart's own translation and trap resources.  [strans_bit bare]   *)
@@ -372,6 +380,7 @@ Section SpecMain.
          (root : mword 44) (pas : nat -> mword 44),
          printk_env γpr γd γv -∗
          procs_inv γs -∗
+         console_caps γd -∗
          is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
          disk_geom γv pd pav pu -∗
          kpt_inv root -∗

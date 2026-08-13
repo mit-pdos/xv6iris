@@ -85,6 +85,8 @@ Require Import SpecBinit SpecIinit SpecFileinit SpecVirtioDiskInit.
 Require Import SpecUserinit SpecScheduler SpecKernelvec SpecFreerange.
 Require Import SpecDevintr SpecClockintr TicksInv.
 Require Import KMap.
+Require Import UartTxInv.
+Require Import ConsoleInv SpecConsoleintr.
 Require Import SpecMain.
 Require Import CodeMain.
 Require Import KernelRvcDecode.
@@ -385,6 +387,8 @@ Section ProofMain.
     lk_raw (mword_of_int KernelSyms.tx_lock) -∗
     lk_raw (mword_of_int KernelSyms.pr) -∗
     (∃ r w : mword 64, devsw_console_read ↦₈ r ∗ devsw_console_write ↦₈ w) -∗
+    (* the console RING, which this group locks up behind cons.lock *)
+    cons_res -∗
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
     ( ∀ (γpr : gname) (m' : regfile),
@@ -392,12 +396,13 @@ Section ProofMain.
         pc_is (mword_of_int (KernelSyms.main + 0x6e) : mword 64) -∗
         cpu_own 0 false p0 cpu_ctx_free false -∗
         printk_env γpr γd γv -∗
+        console_caps γd -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn.
     iIntros "Hcg #Htext #Hkdata #Hpanic #Hdev Hpc Hcpu Hlcons Hltx Hlpr".
-    iIntros "Hdevsw Htx Hsent Hlb Hdlab Hcont".
+    iIntros "Hdevsw Hring Htx Hsent Hlb Hdlab Hcont".
     iPoseProof (dev_inv_uart with "Hdev") as "#Huinv".
     iPoseProof (mni_42 with "Htext") as "Hi42".
     iPoseProof (mni_46 with "Htext") as "Hi46".
@@ -439,21 +444,18 @@ Section ProofMain.
               = (mword_of_int KernelSyms.consoleinit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtci) in "Hpc".
-    (* THE TRANSMIT LOCK IS BROUGHT UP HERE.  uartinit ends with
-       [initlock(&tx_lock, "uart")], so [Hltx]'s three raw fields go DOWN this
-       call and come back as [Hlkfresh : lk_fresh a_tx_lock "uart"], which is
-       exactly [WpLock.newlock]'s premise.  It is named rather than dropped
-       into a [_] because it is the LOCK half of what a boot assembly would
-       need here: [WpLock.newlock] over [UartTxInv.tx_res γd]
-       plus [Hdoff] (the frozen DLAB) is [is_txlock].  What is not available
-       for it here is the RESOURCE -- the transmitter token [Htx] -- which is
-       the printk cone's business, so [Hlkfresh] is dropped at the end of this
-       group like the other [lk_fresh]es. *)
+    (* BOTH CONSOLE LOCKS ARE BROUGHT UP HERE.  consoleinit runs
+       [initlock(&cons.lock,"cons")] itself and, through uartinit,
+       [initlock(&tx_lock,"uart")] -- so [Hlcons]'s three fields come back as
+       [Hclw]/[Hclnm]/[Hclcpu] and [Hltx]'s as [Hlkfresh], and those are
+       exactly [WpLock.newlock]'s premises.  The two [newlock]s are taken
+       twenty lines below, once [printkinit] has returned; together they are
+       [SpecConsoleintr.console_caps]. *)
     iApply (Consoleinit.wp_consoleinit_sconf γd C0 n l0 b0
               vcl vcn vcc dr0 dw0 p0 ltac:(lia)
               with "Hcg Htext Hkdata Hpc Huinv Htx Hlb Hsent Hdlab
                     Hcw Hcn Hcc Hltx Hdr Hdw").
-    iIntros (mc) "Hcg Hpc %Hcsci Htx Hsent #Hdoff _ _ _ Hlkfresh _ _".
+    iIntros (mc) "Hcg Hpc %Hcsci Htx Hsent #Hdoff Hclw #Hclnm Hclcpu Hlkfresh _ _".
     assert (Hretci : ret_pc (C0 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
                      = (mword_of_int (KernelSyms.main + 0x46) : mword 64)).
     { rewrite /C0 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -480,26 +482,14 @@ Section ProofMain.
                      = (mword_of_int (KernelSyms.main + 0x4a) : mword 64)).
     { rewrite /C1 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretpi) in "Hpc".
-    (* ---- the two ghost steps: pr.lock, then printk_env ----
+    (* ---- the ghost steps: three [newlock]s and [printk_env] ----
 
-       THE [newlock] IS PAID FOR WITH NOTHING.  [SpecPrintkGen.pr_res] is
-       [emp]: d80e61c5 put uartputc_sync's THR write under [tx_lock], so the
-       transmitter belongs to [UartTxInv.tx_res] and pr.lock is left
-       serializing format walks, which has no separation-logic content.  The
-       [uart_tx_own] / [uart_sent] pair that used to be this lock's payload
-       ([Htx] / [Hsent], back from consoleinit) is therefore NOT consumed
-       here.  Nor does it go to the tx_lock side in this file: the step that
-       would turn [Hlkfresh] into [UartTxInv.is_txlock] is a [WpLock.newlock]
-       over [UartTxInv.tx_res γd], and nothing main promises -- neither its
-       (absent) postcondition nor the deposit wand, which asks for
-       [printk_env] -- mentions [is_txlock].  So both are simply DROPPED at
-       the end of this group, like the [lk_fresh]es.
-         THE PIECES ARE ALL HERE: [Hlkfresh], [Htx], [Hdoff].  What is missing
-       is a CONSUMER -- put [is_txlock] in the deposit payload (so secondaries
-       get it) and the [newlock] belongs exactly at this point.  There is no
-       longer an axiom standing in for it; the old [LinkTxLockInit.v] was
-       deleted, because its statement omitted the [lk_fresh] premise and so
-       was never provable as written. *)
+       PR.LOCK'S [newlock] IS PAID FOR WITH NOTHING.  [SpecPrintkGen.pr_res]
+       is [emp]: d80e61c5 put uartputc_sync's THR write under [tx_lock], so
+       the transmitter belongs to [UartTxInv.tx_res] and pr.lock is left
+       serializing format walks, which has no separation-logic content.  That
+       is what frees the [uart_tx_own] this block hands to tx_lock's
+       [newlock] instead. *)
     iApply fupd_wp.
     iMod (newlock ⊤ (mword_of_int KernelSyms.pr) "pr"%string (pr_res γd)
             with "Hprnm Hprw Hprcpu []") as (γpr) "#Hprlk".
@@ -507,6 +497,27 @@ Section ProofMain.
     iAssert (printk_env γpr γd γv) as "#Hpenv".
     { rewrite /printk_env /pr_lock. iSplitR; [iExact "Hprlk"|].
       iSplitR; [iExact "Hdoff" | iExact "Hdev"]. }
+    (* ---- THE OTHER TWO [newlock]s, and this is the point of the group.
+       consoleinit has just run [initlock] on cons.lock and, through uartinit,
+       on tx_lock; both come back as [WpLock.newlock]'s raw material, and both
+       RESOURCES are in hand -- the ring out of [main_globals_raw], the
+       transmitter token [Htx] straight back from consoleinit (d80e61c5 left
+       [pr_res] empty, so nothing else wants it).  Together the two are
+       [SpecConsoleintr.console_caps], which the kernelvec handler contract
+       closes over ([SpecDevintr.devintr_caps]) because devintr -> uartintr ->
+       consoleintr takes both locks.  Nothing consumed it before consoleintr
+       was proven, which is why the two steps sat here un-taken. ---- *)
+    iDestruct "Hlkfresh" as "(Htxw & #Htxnm & Htxcpu)".
+    iMod (newlock ⊤ UartTxInv.a_tx_lock "uart"%string (tx_res γd)
+            with "Htxnm Htxw Htxcpu [Htx]") as (γtx) "#Htxinv".
+    { iApply (tx_res_intro γd l0 with "Htx"). }
+    iMod (newlock ⊤ a_cons "cons"%string cons_res
+            with "Hclnm Hclw Hclcpu Hring") as (γcl) "#Hconslk".
+    iAssert (console_caps γd) as "#Hccaps".
+    { rewrite /console_caps. iExists γtx, γcl.
+      iSplitR; [rewrite /is_txlock; iSplitR; [iExact "Htxinv" | iExact "Hdoff"] |].
+      iSplitR; [iExact "Hconslk" |].
+      iApply (uart_sent_sub_nil γd l0 with "Hsent"). }
     iModIntro.
     (* ---- +0x4a auipc a0,0x6 / +0x4e addi a0,a0,476 : a0 := &"\n" ---- *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.main + 0x4a)) (mword_of_int 10 : mword 5)
@@ -680,7 +691,7 @@ Section ProofMain.
     { rewrite /D3 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretpk3) in "Hpc".
     destruct Hcsk3 as (Hcsk3 & _).
-    iApply ("Hcont" $! γpr mk3 with "Hcg Hpc Hcpu Hpenv").
+    iApply ("Hcont" $! γpr mk3 with "Hcg Hpc Hcpu Hpenv Hccaps").
   Qed.
 
   (* =================================================================== *)
@@ -1302,6 +1313,7 @@ Section ProofMain.
          (root' : mword 44) (pas' : nat -> mword 44),
          printk_env γpr' γd γv -∗
          procs_inv γs' -∗
+         console_caps γd -∗
          is_lock γk' d_lock "virtio_disk"%string (disk_res γv pd' pav' pu') -∗
          disk_geom γv pd' pav' pu' -∗
          kpt_inv root' -∗
@@ -1312,6 +1324,7 @@ Section ProofMain.
          P) -∗
     printk_env γpr γd γv -∗
     procs_inv γs -∗
+    console_caps γd -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
     disk_geom γv pd pav pu -∗
     kpt_inv root -∗
@@ -1323,7 +1336,7 @@ Section ProofMain.
   Proof.
     intros Hn Hp0.
     iIntros "Hcg #Htext #Hpanic Hpc Hcpu Htcsr #Hsinv #Hwand".
-    iIntros "#Hpenv #Hpinv #Hdlock #Hgeom #Hkinv #Hkptp #Htramp #Hkstx".
+    iIntros "#Hpenv #Hpinv #Hccaps #Hdlock #Hgeom #Hkinv #Hkptp #Htramp #Hkstx".
     iPoseProof (mni_a2 with "Htext") as "Hia2".
     iPoseProof (mni_a6 with "Htext") as "Hia6".
     iPoseProof (mni_aa with "Htext") as "Hiaa".
@@ -1334,7 +1347,7 @@ Section ProofMain.
     (* the deposit itself: everything main built, through the □-wand *)
     iAssert P as "#HP".
     { iApply ("Hwand" $! γpr γs γk pd pav pu root pas
-                with "Hpenv Hpinv Hdlock Hgeom Hkinv Hkptp Htramp Hkstx"). }
+                with "Hpenv Hpinv Hccaps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx"). }
     (* The release sequence.  Note the shape: the address is materialized
        BEFORE the barrier and the store is the compressed [c.sw], so the
        fence separates the whole deposit from the store alone -- and it is
@@ -1482,7 +1495,7 @@ Section ProofMain.
        See claude-notes/projects/fs-icache.md, C7 owed (ii). *)
     iDestruct "Hglobals" as "(Hdevsw & Hkmem24 & Hkpt & Hprocs & Hppub &
                              Hfds & Hirs & Hinitproc & Hticks & Hbufl & Hbufn & Hbhead & Hinl &
-                             Hient & Hdiskptr & Hdiskfree & Hdusedidx & Hdslots)".
+                             Hient & Hdiskptr & Hdiskfree & Hdusedidx & Hdslots & Hring)".
     iDestruct "Hhart" as "(Hsbit & Htlb & Htcsr)".
     iDestruct "Hdiskfree" as (free0) "Hdiskfree".
     (* main's boot arm reaches kinit -> freerange -> kfree -> acquire and
@@ -1498,8 +1511,8 @@ Section ProofMain.
     (* --- 0x42 .. 0x6a : console / printk --- *)
     iApply (mn_grp_printk γd γv m1 (K - 2)%nat p0 l0 b0 Hn50
               with "Hcg Htext Hkdata Hpanic Hdev Hpc Hcpu Hlcons Hltx Hlpr
-                    Hdevsw Htx Hsent Hlb Hdlab").
-    iIntros (γpr m2) "Hcg Hpc Hcpu #Hpenv".
+                    Hdevsw Hring Htx Hsent Hlb Hdlab").
+    iIntros (γpr m2) "Hcg Hpc Hcpu #Hpenv #Hccaps".
     (* --- 0x6e .. 0x7a : kinit / kvminit / kvminithart / procinit --- *)
     iApply (mn_grp_kvm m2 (K - 2)%nat p0 ps s1entry phystop tlbvec0
               Hn50 Hphystop Hs1 Hprun Hlen
@@ -1535,7 +1548,7 @@ Section ProofMain.
     { iRight. iFrame "Htl Hpinv Hpany". }
     iAssert (devintr_caps γd γv γk γtl γs pd pav pu) as "#Hcaps".
     { rewrite /devintr_caps.
-      iFrame "Hdev Hgeom Hdlock Htimc Htick Hpinv Hpany". }
+      iFrame "Hdev Hccaps Hgeom Hdlock Htimc Htick Hpinv Hpany". }
     iDestruct (mn_dup_hw with "Hcg") as "(#Hhw & #Hmin & Hcg)".
     iPoseProof (Kernelvec.kernelvec_handler_spec γd γv γk γtl γs pd pav pu
                   Hnproc with "Hhw Hmin Htext Hcaps") as "#Hkvs".
@@ -1547,7 +1560,7 @@ Section ProofMain.
     iApply (mn_grp_started γpr γk γa γs γd γv m5 (K - 2)%nat p0 pd pav pu
               root pas P ltac:(lia) Hp0
               with "Hcg Htext Hpany Hpc Hcpu [Htcsr Hintr Hkpt] Hsinv Hwand Hpenv
-                    Hpinv Hdlock Hgeom Hkinv Hkptp Htramp Hkstx").
+                    Hpinv Hccaps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx").
     (* fold the boot cells and the freshly built handler resource into the
        [trap_csrs] the scheduler consumes. *)
     iApply (trap_csrs_of_raw with "Htcsr Hintr Hkpt").

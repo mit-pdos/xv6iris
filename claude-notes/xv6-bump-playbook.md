@@ -152,10 +152,12 @@ not, suspect the tooling, not gcc.
 
 **A SHAPE CHANGE IN AN UNPROVEN FUNCTION COSTS NOTHING**, and the sweep says so
 directly: a function with no `Code<F>.v` cannot appear in it. On `a28e94b` the
-only reshaped function was `consoleintr`, which is assumed rather than proven
-(`LinkConsoleintr.v`), so the whole bump was pure relayout and the sweep
-printed nothing at all. An empty sweep is a real answer, not a broken command
-— confirm it against the C diff rather than re-running the tools.
+only reshaped function was `consoleintr`, which had no decode layer at the
+time, so the whole bump was pure relayout and the sweep printed nothing at
+all. An empty sweep is a real answer, not a broken command — confirm it
+against the C diff rather than re-running the tools. (consoleintr is proven
+now and HAS a `CodeConsoleintr.v`, so the same bump today would cost its
+whole cone; the rule is about the decode layer, not about that function.)
 
 **AND THE SHIFT NEED NOT REACH THE END OF `.text`.** Everything after a
 function that changed size moves by the delta *until an alignment boundary

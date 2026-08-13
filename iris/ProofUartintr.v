@@ -31,8 +31,9 @@
    obligation are re-anchored with [cpu_own_transport] / [ui_ret_cont_shift]
    at each crossing.
 
-   A functor over WAKEUP / CONSOLEINTR / UART.  Only consoleintr is assumed
-   (LinkConsoleintr.v). *)
+   A functor over WAKEUP / CONSOLEINTR / UART, all three now PROVEN: the
+   contract's [console_caps] premise is what consoleintr's proof cost this
+   one, and it is passed straight through to the call at +0x38. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -357,6 +358,7 @@ Section ProofUartintr.
       ⌜ M !!! Regidx Rs1 = uart_pa 5 ⌝ -∗
       ⌜ M !!! Regidx Rs2 = uart_pa 0 ⌝ -∗
       kernel_text -∗ dev_inv γu γv -∗ procs_inv γs -∗ panic_wp_any -∗
+      console_caps γu -∗
       sie_cap_gpr (CID := CIDe) M (av - 4) b pme -∗
       cpu_own (CID := CIDe) lvl eb pme C b -∗
       pc_is (mword_of_int (KernelSyms.uartintr + 0x2c)) -∗
@@ -365,7 +367,7 @@ Section ProofUartintr.
       WP (Loop : expr riscv_lang).
   Proof.
     intros Hsp0 Hlen Hlvl Hav.
-    iIntros (CIDe M) "%Hregs %Hs1 %Hs2 #Ht #Hdinv #Hpinv #Hpanic".
+    iIntros (CIDe M) "%Hregs %Hs1 %Hs2 #Ht #Hdinv #Hpinv #Hpanic #Hccaps".
     iIntros "Hcg Hcnt Hpc Hfr Hcont".
     iPoseProof (uii2_2c with "Ht") as "#Hi2c".
     iPoseProof (uii2_30 with "Ht") as "#Hi30".
@@ -444,13 +446,10 @@ Section ProofUartintr.
           apply callee_saved_insert_r; [vm_compute; reflexivity|].
           apply callee_saved_refl. }
         iDestruct (cpu_own_transport CIDk CIDj lvl eb pme C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iApply (Consoleintr.wp_consoleintr_sconf G1 γs pme lvl (av - 4)%nat eb C b
+        iApply (Consoleintr.wp_consoleintr_sconf γu γv G1 γs pme lvl (av - 4)%nat eb C b
                   ltac:(unfold consoleintr_stack, uartintr_stack in *; lia)
-                  ltac:(intro r; apply rf_to_gmap_dom)
-                  Hlen
-                  ltac:(rewrite rget_tp; exact (mycpu_ret_nonzero _ (tp_ok_cid_of _)))
-                  ltac:(lia)
-                  with "Hcg Hcnt Ht Hpc Hpanic Hpinv").
+                  Hlen ltac:(lia)
+                  with "Hcg Hcnt Ht Hpc Hpanic Hpinv Hdinv Hccaps").
         iIntros (CIDc Hsc Mf) "[%Hcsf %Hdomf] Hcg Hcnt Ht2 Hpc".
         iEval (rewrite HG1ra) in "Hpc".
         assert (P3c : ret_pc (add_vec_int (mword_of_int (KernelSyms.uartintr + 0x38) : mword 64) 4)
@@ -489,7 +488,7 @@ Section ProofUartintr.
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     (uartintr_stack <= av)%nat ->
     kernel_text -∗ dev_inv γu γv -∗
-    procs_inv γs -∗ panic_wp_any -∗
+    procs_inv γs -∗ panic_wp_any -∗ console_caps γu -∗
     sie_cap_gpr M (av - 4)%nat b pme -∗
     cpu_own lvl eb pme C b -∗
     pc_is (mword_of_int (KernelSyms.uartintr + 0x22)) -∗
@@ -498,7 +497,7 @@ Section ProofUartintr.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hregs Hsp0 Hlen Hlvl Hav.
-    iIntros "#Ht #Hdinv #Hpinv #Hpanic Hcg Hcnt Hpc Hfr Hcont".
+    iIntros "#Ht #Hdinv #Hpinv #Hpanic #Hccaps Hcg Hcnt Hpc Hfr Hcont".
     iPoseProof (uii2_22 with "Ht") as "Hi22".
     iPoseProof (uii2_26 with "Ht") as "Hi26".
     iPoseProof (uii2_28 with "Ht") as "Hi28".
@@ -546,7 +545,7 @@ Section ProofUartintr.
     iDestruct (ui_ret_cont_shift CID0 CIDT3 m0 av lvl eb pme C b
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iPoseProof (ui_rx γu γv γs m0 av lvl eb pme C sp0 b Hsp0 Hlen Hlvl Hav) as "Rx".
-    iApply ("Rx" $! CIDT3 S2 with "[%] [%] [%] Ht Hdinv Hpinv Hpanic Hcg Hcnt Hpc Hfr Hcont");
+    iApply ("Rx" $! CIDT3 S2 with "[%] [%] [%] Ht Hdinv Hpinv Hpanic Hccaps Hcg Hcnt Hpc Hfr Hcont");
       [exact HS2regs | exact HS2s1 | exact HS2s2].
   Qed.
 
@@ -560,7 +559,7 @@ Section ProofUartintr.
   Proof.
     cbv beta delta [wp_uartintr_sconf_body].
     intros pcE ret_tgt Hlen Hlvl Hav.
-    iIntros "Hcg Hcnt #Ht Hpc #Hdinv #Hpinv #Hpanic Hcont".
+    iIntros "Hcg Hcnt #Ht Hpc #Hdinv #Hpinv #Hpanic #Hccaps Hcont".
     iAssert (ui_ret_cont m av lvl eb pme C b) with "[Hcont]" as "Hcont".
     { iExact "Hcont". }
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
@@ -738,7 +737,7 @@ Section ProofUartintr.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ui_rx_setup γu γv γs m B2 av lvl eb pme C sp0 b
                 HB2regs Hspm Hlen Hlvl Hav
-                with "Ht Hdinv Hpinv Hpanic Hcg Hcnt Hpc Hfr Hcont").
+                with "Ht Hdinv Hpinv Hpanic Hccaps Hcg Hcnt Hpc Hfr Hcont").
     - (* THRE: wake the writers, then join the rx setup *)
       assert (Jtx : add_vec (mword_of_int (KernelSyms.uartintr + 0x20) : mword 64)
                       (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 15 : mword 8) ('b"0"))))
@@ -821,7 +820,7 @@ Section ProofUartintr.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ui_rx_setup γu γv γs m Mw av lvl eb pme C sp0 b
                 HregsW Hspm Hlen Hlvl Hav
-                with "Ht Hdinv Hpinv Hpanic Hcg Hcnt Hpc Hfr Hcont").
+                with "Ht Hdinv Hpinv Hpanic Hccaps Hcg Hcnt Hpc Hfr Hcont").
   Qed.
 
 End ProofUartintr.

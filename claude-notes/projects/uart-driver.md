@@ -17,7 +17,7 @@
 | function | where | status |
 |---|---|---|
 | `uartwrite(char buf[], int n)` | SpecUartwrite / CodeUartwrite / ProofUartwrite / LinkUartwrite | **PROVEN + LINKED, axiom-clean** (5 platform axioms + funext only) |
-| `uartintr(void)` | SpecUartintr / CodeUartintr / ProofUartintr / LinkUartintr | proven + linked; contract LOST its lock premise (over an ASSUMED consoleintr) |
+| `uartintr(void)` | SpecUartintr / CodeUartintr / ProofUartintr / LinkUartintr | **PROVEN + LINKED, axiom-clean**; its own body takes no lock, but the contract carries `console_caps` for the callee |
 | `uartinit(void)` | SpecUartinit / ProofUartinit / LinkUartinit | proven + linked |
 | `uartputc_sync(int)` | SpecUartPutc / ProofUartPutc / LinkUartPutc | proven + linked; takes `tx_lock` too, which is what makes the two transmit paths agree |
 | `uartgetc(void)` — **inlined, no symbol** | WpUartgetc | proven as a block lemma, unaffected |
@@ -248,20 +248,21 @@ not in a resource — which is why proving uartwrite needed nothing from here.
   The old zero-displacement name survives as a restatement (the WRAPPER
   RECIPE), so ProofUartPutc did not change.
 
-### consoleintr is ASSUMED — and what that hides
+### what consoleintr's proof cost this contract
 
-`SpecConsoleintr.v` + `LinkConsoleintr.v` (an `Axiom`, the second file of that
-kind after LinkKerneltrap.v; `MANIFEST_ASSUMED` in `tools/proof_coverage.py`
-reports it).  The contract is `wakeup`'s shape: the running-thread bundle in,
-every callee-saved register and the nesting level back out.
+**uartintr's body takes no lock, and its contract carries two anyway** — bundled
+as `SpecConsoleintr.console_caps γu` (cons.lock's and tx_lock's credentials,
+with both ghost names existential).  Nothing here consumes it; it is passed
+straight through to the `consoleintr` call at +0x38.
 
-What it hides is worth naming: consoleintr ECHOES, so it calls consputc and
-hence uartputc_sync, which really does touch the UART — a proven consoleintr
-could not have a contract silent about the transmitter.  In the C that is a
-genuine race (uartputc_sync deliberately does not take tx_lock).  So the
-assumption asserts more than "consoleintr is unproven": it asserts that the
-echo is invisible to uartintr's caller, which is true of the register and lock
-state but not of the device.  Same seam as the uartputc_sync tension above.
+That conjunct is the price of the callee being PROVEN rather than assumed, and
+it is worth naming why the assumption could not have carried it: consoleintr
+ECHOES, so it calls consputc and hence uartputc_sync, which really does touch
+the UART.  A contract silent about the transmitter was asserting something
+false about the device, and no proof can be silent about it.  The general
+rule: **an assumed contract's premise list is the one thing the assumption
+cannot be checked against, so it is where an assumption quietly asserts more
+than "this function is unproven".**
 
 ## uartgetc — a function with no address
 
@@ -280,19 +281,15 @@ usual reason.  Reach for this shape for any other `static` helper gcc inlines.
 
 ## Remaining work
 
-- ~~**consolewrite**~~ — DONE.  uartwrite's only caller is proven and linked
-  (a 32-byte bounce buffer in its own frame, filled by `either_copyin`), so
-  the transmit contract is exercised end to end.  What is left of console.c
-  is **consoleread** and **consoleintr**; proving consoleintr retires this
-  cone's only assumption.  See [`console.md`](console.md).
-- **Boot wiring**: a `WpLock.newlock` over uartinit's `lk_fresh a_tx_lock
-  "uart"` and the transmitter token from `uart_ghosts_alloc`, producing
-  `is_txlock`, plus putting `is_txlock` into main's deposit payload.  Nothing
-  runs it yet; it belongs with the rest of the parked boot wiring
-  (`completed/interrupt-sweep.md`).
+- ~~**consolewrite / consoleread / consoleintr**~~ — DONE.  console.c is 5/5
+  functions, so this cone has no assumption left.  See [`console.md`](console.md).
+- ~~**Boot wiring**~~ — DONE.  `ProofMain.mn_grp_printk` runs the
+  `WpLock.newlock` over uartinit's `lk_fresh a_tx_lock "uart"` and the
+  transmitter token, and a second one over consoleinit's `lk_fresh` and the
+  console ring; together they are `console_caps`, which rides the `started`
+  deposit to the secondaries.  See [`console.md`](console.md).
 - ~~**devintr**~~ — DONE.  uartintr's caller is proven and linked; the handler
-  is on the trap path as far as devintr, and its whole axiom footprint is this
-  cone's `consoleintr` (plus the model baseline).  See
+  is on the trap path as far as devintr, and the cone is axiom-clean.  See
   [`../design/interrupts.md`](../design/interrupts.md).
 - Decode hygiene: four base words (`lui a5,0x10000`, `andi a5,a5,32`,
   `auipc a5,0xa`, `lbu a0,0(s2)`) moved into KernelBaseDecode.v for uartintr;
