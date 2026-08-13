@@ -82,7 +82,7 @@ line.  Both are cheap and neither is findable by name.
 
 ## What it closed elsewhere
 
-`projects/kerneltrap.md` recorded an OPEN FORK: preemption needs the
+`completed/kerneltrap.md` recorded an OPEN FORK: preemption needs the
 interrupted thread's `own_ctx` and park receipt, both ordinary frames the
 handler cannot reach, and the two candidate homes were `sie_arm true`
 (measured at 66 files) or a per-hart invariant.  Neither was needed — the

@@ -477,7 +477,7 @@ Section BootRun.
                     Hmenv Hmcen Hstc Hgot Hstk Htext").
     (* Everything the M-mode side computed arrives ABSTRACT, with the eight
        facts the bridge wants (the eighth is [mief = MIE_S], the pin
-       [IntrDefs.sconf] needs -- see claude-notes/projects/kerneltrap.md);
+       [IntrDefs.sconf] needs -- see claude-notes/completed/kerneltrap.md);
        the two mstatus premises are one lemma each off the exported
        [mstatus_kernel_facts]. *)
     iIntros (Mf msf satpf medelegf midelegf mief menvcfgf stimecmpf mcounterenf

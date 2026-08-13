@@ -8,7 +8,7 @@
    [KERNELTRAP_RETURNS] -- the handler contract did not hand the handler the
    trap CSRs, the per-cpu bookkeeping, a deep enough stack carve or a
    hart-generic Loeb, so kernelvec could not consume the real thing.  It can
-   now (claude-notes/projects/kerneltrap.md step 10), and with it the last
+   now (claude-notes/completed/kerneltrap.md step 10), and with it the last
    assumption in the interrupt cone is retired. *)
 From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.

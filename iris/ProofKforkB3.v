@@ -260,7 +260,7 @@ Section KforkB3Proof.
      instantiation, and it would tie the carve to the wrong arm.  So the block
      is index-generic in an opaque [rsv] that it never inspects; the
      caller instantiates [rsv := trap_res b] at its own arm.  (Same shape as
-     [ProofAllocproc.ap_tail]; see claude-notes/projects/kerneltrap.md.) *)
+     [ProofAllocproc.ap_tail]; see claude-notes/completed/kerneltrap.md.) *)
   Lemma kfkb3_fd_loop
       (γl γf : gname) (pme npa : mword 64) (pid_p pid_c : mword 32)
       (Vp V0 : pprivate) (m0 : regfile) (rsv K n : nat) (eb b : bool)

@@ -215,7 +215,7 @@ Qed.
 (* [findPendingInterrupt] therefore can only answer S-timer or S-external, *)
 (* which is exactly the pair [devintr] recognises -- and THAT is what      *)
 (* keeps kerneltrap's [printk] arm dead, hence printk-general out of the   *)
-(* handler's cone.  See claude-notes/projects/kerneltrap.md.               *)
+(* handler's cone.  See claude-notes/completed/kerneltrap.md.               *)
 (*                                                                        *)
 (* The confinement is proved bit by bit, and THE BIT LEMMA CANNOT BE       *)
 (* GENERIC IN THE BIT INDEX: [subrange_vec_dec v k k : mword (k - k + 1)]  *)

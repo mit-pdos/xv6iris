@@ -122,11 +122,6 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 - **[`main-boot.md`](projects/main-boot.md)** — `main()`, both arms proven: the
   `started` one-shot escrow, the deposit as a □-wand, the hart-generic init
   chain. Remaining: the whole-system adequacy composition.
-- **[`kerneltrap.md`](projects/kerneltrap.md)** — `kerneltrap()` and the handler
-  contract above it, both proven: the SPP/SPIE ghost mirror on the trap-payload
-  discipline, the `eb` generalization it forced, and `intr_handler_spec` as a
-  Banach fixpoint over the folded bundle. `KERNELTRAP_RETURNS` and the boot
-  credential axiom are deleted; three cosmetic cleanups remain.
 - **[`uservec.md`](projects/uservec.md)** — uservec, proven (trampoline.S is
   100 % covered): the boundary specs, the TVM/TSR mstatus-pin extension, the
   proof's file split. Remaining: the whole-trap-loop Löb theorem.

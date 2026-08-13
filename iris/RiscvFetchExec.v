@@ -236,7 +236,7 @@ Definition MENVCFG_S : mword 64 := mword_of_int 0xA000000000000000.
    What pinning it buys: the S-mode dispatch set is masked by [mie], so at
    this value only S-timer (5) and S-external (9) can ever be delivered --
    which is exactly the pair [devintr] recognises, and hence what keeps
-   kerneltrap's [printk] arm dead.  See claude-notes/projects/kerneltrap.md. *)
+   kerneltrap's [printk] arm dead.  See claude-notes/completed/kerneltrap.md. *)
 Definition MIE_S : mword 64 := mword_of_int 0x220.
 
 (* [cfg_ok s]: the config precondition the fast concrete-state decode bridge
