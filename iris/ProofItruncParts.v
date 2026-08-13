@@ -511,17 +511,23 @@ Section ItruncDefs.
      has lost exactly the entries below the cursor -- which is why it is
      indexed at the ZEROED map, whose [blk_res] at those indices is [True].
 
-     The budget is [bm_paid], NOT a unit count: that is the whole point of
+     The budget is [bm_paidS], NOT a unit count: that is the whole point of
      the credited arms.  It is idempotent under bfree, so this assertion is
-     literally unchanged from k = 0 to k = NDIRECT. *)
+     literally unchanged from k = 0 to k = NDIRECT.
+
+     [crb] and [Sb] are the CALLER's -- the credit it entered with and the
+     set it entered at -- and both are CONSTANT across the loop (the running
+     set is the existential inside [bm_paidS]).  So the set retrofit here is
+     two threaded parameters, not a proof obligation; this is
+     [ProofIalloc]'s pattern. *)
   Definition it_dir_state (γ : log_names) (γfs : fs_names)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8))
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
-      (bn : bio_names) (w : nat) (k : nat) : iProp Σ :=
+      (bn : bio_names) (crb : bool) (Sb : gset Z) (w : nat) (k : nat) : iProp Σ :=
     (inode_map γfs ip (bm_dir_zeroed bm k) ∗
      inode_blocks γfs (bm_dir_zeroed bm k) data ∗
      bitmap_res γfs bmapstart cov logstart size (used ∖ bm_dir_freed bm k) ∗
-     bm_paid γ bmapstart w)%I.
+     bm_paidS γ bmapstart crb w Sb)%I.
 
   (* Opened and closed by LEMMA, never by [rewrite /it_dir_state]: the Iris
      context is part of the goal term, so unfolding the definition in the
@@ -530,23 +536,23 @@ Section ItruncDefs.
   Lemma it_dir_state_open (γ : log_names) (γfs : fs_names)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8))
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
-      (bn : bio_names) (w : nat) (k : nat) :
-    it_dir_state γ γfs ip bm data cov logstart bmapstart size used bn w k -∗
+      (bn : bio_names) (crb : bool) (Sb : gset Z) (w : nat) (k : nat) :
+    it_dir_state γ γfs ip bm data cov logstart bmapstart size used bn crb Sb w k -∗
       inode_map γfs ip (bm_dir_zeroed bm k) ∗
       inode_blocks γfs (bm_dir_zeroed bm k) data ∗
       bitmap_res γfs bmapstart cov logstart size (used ∖ bm_dir_freed bm k) ∗
-      bm_paid γ bmapstart w.
+      bm_paidS γ bmapstart crb w Sb.
   Proof. iIntros "H". iExact "H". Qed.
 
   Lemma it_dir_state_close (γ : log_names) (γfs : fs_names)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8))
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
-      (bn : bio_names) (w : nat) (k : nat) :
+      (bn : bio_names) (crb : bool) (Sb : gset Z) (w : nat) (k : nat) :
     inode_map γfs ip (bm_dir_zeroed bm k) -∗
     inode_blocks γfs (bm_dir_zeroed bm k) data -∗
     bitmap_res γfs bmapstart cov logstart size (used ∖ bm_dir_freed bm k) -∗
-    bm_paid γ bmapstart w -∗
-    it_dir_state γ γfs ip bm data cov logstart bmapstart size used bn w k.
+    bm_paidS γ bmapstart crb w Sb -∗
+    it_dir_state γ γfs ip bm data cov logstart bmapstart size used bn crb Sb w k.
   Proof. iIntros "A B C D". rewrite /it_dir_state. iFrame "A B C D". Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -567,11 +573,11 @@ Section ItruncDefs.
   Definition it_ent_state (γ : log_names) (γfs : fs_names)
       (bm : blkmap) (data : nat -> list (bv 8))
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
-      (w : nat) (q : nat) : iProp Σ :=
+      (crb : bool) (Sb : gset Z) (w : nat) (q : nat) : iProp Σ :=
     (it_ent_res γfs bm data q ∗
      bitmap_res γfs bmapstart cov logstart size
        (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm q)) ∗
-     bm_paid γ bmapstart w)%I.
+     bm_paidS γ bmapstart crb w Sb)%I.
 
   (* THE ONE STEP bfree TAKES, and why the loops never case-split.
 
@@ -609,6 +615,47 @@ Section ItruncDefs.
       iSplitR; [iPureIntro; discriminate|].
       iSplitR; [iPureIntro; reflexivity|].
       iFrame "Hop". iIntros "Hop". iLeft. iExists (Sb ∪ {[bmapstart]}).
+      iSplitR; [iPureIntro; set_solver|]. iFrame "Hop".
+  Qed.
+
+  (* THE SET-INDEXED TWIN of the step above (GR-2b, retrofit 4a).  The shape
+     does not change AT ALL: the running set was already opened
+     existentially and the wand already closes at [Sb0 ∪ {[bmapstart]}].
+     All the twin adds is the caller's [Sb ⊆ Sb0] on the way out and its
+     re-establishment by transitivity on the way back -- and since BOTH arms
+     land in the PAID disjunct, the growth clause is discharged once per arm
+     and never inside the loop.  The [crb] guard is likewise never
+     re-established, because the paid disjunct does not carry it.
+
+     The two [set_solver]s are inside a small definitional lemma, which is
+     where they belong (S3l's rule); do not lift one to a call site. *)
+  Lemma bm_paidS_use (γ : log_names) (bmapstart : Z) (crb : bool)
+      (u : nat) (Sb : gset Z) :
+    bm_paidS γ bmapstart crb u Sb -∗ ∃ (cr : bool) (u' : nat) (Sb0 : gset Z),
+      ⌜cr = true -> bmapstart ∈ Sb0⌝ ∗
+      ⌜(if cr then S u' else u') = S u⌝ ∗
+      ⌜Sb ⊆ Sb0⌝ ∗
+      log_opS γ (S u') Sb0 ∗
+      (log_opS γ (S u) (Sb0 ∪ {[bmapstart]}) -∗ bm_paidS γ bmapstart crb u Sb).
+  Proof.
+    rewrite /bm_paidS. iIntros "[H|[%Hc H]]".
+    - (* already paid: present the credit, keep the unit *)
+      iDestruct "H" as (Sb0) "(%Hsub & %Hin & Hop)".
+      iExists true, u, Sb0.
+      iSplitR; [iPureIntro; intros _; exact Hin|].
+      iSplitR; [iPureIntro; reflexivity|].
+      iSplitR; [iPureIntro; exact Hsub|].
+      iFrame "Hop". iIntros "Hop". iLeft. iExists (Sb0 ∪ {[bmapstart]}).
+      iSplitR; [iPureIntro; set_solver|].
+      iSplitR; [iPureIntro; set_solver|]. iFrame "Hop".
+    - (* not yet: spend the spare unit and become paid *)
+      iDestruct "H" as (Sb0) "(%Hsub & Hop)".
+      iExists false, (S u), Sb0.
+      iSplitR; [iPureIntro; discriminate|].
+      iSplitR; [iPureIntro; reflexivity|].
+      iSplitR; [iPureIntro; exact Hsub|].
+      iFrame "Hop". iIntros "Hop". iLeft. iExists (Sb0 ∪ {[bmapstart]}).
+      iSplitR; [iPureIntro; set_solver|].
       iSplitR; [iPureIntro; set_solver|]. iFrame "Hop".
   Qed.
 
@@ -713,22 +760,24 @@ Section ItruncDefs.
      loop's state *)
   Lemma it_ent_state_open (γ : log_names) (γfs : fs_names) (bm : blkmap)
       (data : nat -> list (bv 8)) (cov : gset Z)
-      (logstart bmapstart size : Z) (used : gset Z) (w : nat) (q : nat) :
-    it_ent_state γ γfs bm data cov logstart bmapstart size used w q -∗
+      (logstart bmapstart size : Z) (used : gset Z)
+      (crb : bool) (Sb : gset Z) (w : nat) (q : nat) :
+    it_ent_state γ γfs bm data cov logstart bmapstart size used crb Sb w q -∗
       it_ent_res γfs bm data q ∗
       bitmap_res γfs bmapstart cov logstart size
         (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm q)) ∗
-      bm_paid γ bmapstart w.
+      bm_paidS γ bmapstart crb w Sb.
   Proof. iIntros "H". iExact "H". Qed.
 
   Lemma it_ent_state_close (γ : log_names) (γfs : fs_names) (bm : blkmap)
       (data : nat -> list (bv 8)) (cov : gset Z)
-      (logstart bmapstart size : Z) (used : gset Z) (w : nat) (q : nat) :
+      (logstart bmapstart size : Z) (used : gset Z)
+      (crb : bool) (Sb : gset Z) (w : nat) (q : nat) :
     it_ent_res γfs bm data q -∗
     bitmap_res γfs bmapstart cov logstart size
       (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm q)) -∗
-    bm_paid γ bmapstart w -∗
-    it_ent_state γ γfs bm data cov logstart bmapstart size used w q.
+    bm_paidS γ bmapstart crb w Sb -∗
+    it_ent_state γ γfs bm data cov logstart bmapstart size used crb Sb w q.
   Proof. iIntros "A B C". rewrite /it_ent_state. iFrame "A B C". Qed.
 
   (* THE HANDOFF from the direct loop to the indirect one.  After the direct

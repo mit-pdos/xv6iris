@@ -168,6 +168,85 @@ Section ItruncSpec.
     iRight. iExists Sb. iFrame.
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (*  THE SET-INDEXED TWIN (fs-sysfile GR-2a's 4a design)                 *)
+  (*                                                                      *)
+  (*  [bm_paid] above is set-form but with the set EXISTENTIAL on both     *)
+  (*  disjuncts, so the caller's [Sb] is forgotten at [bm_paid_intro] and  *)
+  (*  is not recoverable at [bm_paid_elim].  That is exactly the shape     *)
+  (*  GR-2a finding 1 rules out for a gen contract: [log_opS] is an        *)
+  (*  exclusive ghost_map element with no auth-monotone shadow, so a set   *)
+  (*  handed back at an unrelated existential relates to nothing.          *)
+  (*                                                                      *)
+  (*  Indexing by the ENTRY set stops the forgetting.  [Sb] is CONSTANT    *)
+  (*  across both of itrunc's loops -- it is what the caller had on the    *)
+  (*  way in, never the running set, which stays the existential [Sb'] --  *)
+  (*  so the retrofit is one extra parameter on the two loop states,       *)
+  (*  THREADED rather than proven.                                        *)
+  (*                                                                      *)
+  (*  THE [crb] GUARD ON THE UNPAID DISJUNCT IS LOAD-BEARING.  A caller    *)
+  (*  that enters ALREADY PAID ([crb = true]) never had the spare unit at  *)
+  (*  all, and the paid disjunct is absorbing -- [bm_paidS_use] returns to *)
+  (*  it from both arms -- so at [crb = true] the level is pinned to       *)
+  (*  [S u] all the way to the tail.  Without the guard the elim below     *)
+  (*  could only offer the loose [n <= S (S u)], and create's FAIL arm,    *)
+  (*  which needs [iunlockput] to spend EXACTLY ZERO while actually        *)
+  (*  freeing ([CreateBudget.ip_spend crb cru true = 0] at [crb = cru =    *)
+  (*  true]), would not close.                                            *)
+  Definition bm_paidS (γ : log_names) (bmapstart : Z) (crb : bool)
+      (u : nat) (Sb : gset Z) : iProp Σ :=
+    ((∃ Sb' : gset Z, ⌜Sb ⊆ Sb'⌝ ∗ ⌜bmapstart ∈ Sb'⌝ ∗ log_opS γ (S u) Sb')
+     ∨ (⌜crb = false⌝ ∗
+        ∃ Sb' : gset Z, ⌜Sb ⊆ Sb'⌝ ∗ log_opS γ (S (S u)) Sb'))%I.
+
+  (* the level itrunc is HANDED, as a function of the bitmap credit: paid
+     up front costs one unit less, because the bitmap block's slot is
+     already bought. *)
+  Definition it_entry (crb : bool) (u : nat) : nat :=
+    if crb then S u else S (S u).
+
+  (* iupdate's own spend -- definitionally [CreateBudget.iu_spend], spelled
+     here so this file need not import the ledger. *)
+  Definition it_iu (cru : bool) : nat := if cru then 0%nat else 1%nat.
+
+  (* what itrunc spends AT MOST: the bitmap unit (unless already paid) plus
+     the tail flush (unless already credited).  Definitionally
+     [CreateBudget.ip_spend crb cru true]. *)
+  Definition it_spend (crb cru : bool) : nat :=
+    ((if crb then 0%nat else 1%nat) + it_iu cru)%nat.
+
+  (* entering the loops CREDITED: the paid disjunct at the caller's own set,
+     so no unit is spent on the bitmap at all.  At [crb = false] this is
+     [bm_paid_intro] with the set remembered. *)
+  Lemma bm_paidS_intro γ bmapstart crb u Sb :
+    (crb = true -> bmapstart ∈ Sb) ->
+    log_opS γ (it_entry crb u) Sb -∗ bm_paidS γ bmapstart crb u Sb.
+  Proof.
+    intros Hcrb. iIntros "H". rewrite /bm_paidS /it_entry.
+    destruct crb.
+    - iLeft. iExists Sb. iSplitR; [iPureIntro; set_solver|].
+      iSplitR; [iPureIntro; exact (Hcrb eq_refl)|]. iFrame "H".
+    - iRight. iSplitR; [done|]. iExists Sb.
+      iSplitR; [iPureIntro; set_solver|]. iFrame "H".
+  Qed.
+
+  (* leaving them: at least the [S u] units iupdate still needs, and never
+     more than what came in.  The [crb] guard is what makes the upper bound
+     tight on the credited arm. *)
+  Lemma bm_paidS_elim γ bmapstart crb u Sb :
+    bm_paidS γ bmapstart crb u Sb -∗
+      ∃ (n : nat) (Sb' : gset Z),
+        ⌜Sb ⊆ Sb'⌝ ∗ ⌜(S u <= n <= it_entry crb u)%nat⌝ ∗ log_opS γ n Sb'.
+  Proof.
+    rewrite /bm_paidS /it_entry. iIntros "[H|[%Hc H]]".
+    - iDestruct "H" as (Sb') "(%Hsub & _ & H)".
+      iExists (S u), Sb'. iSplitR; [iPureIntro; exact Hsub|].
+      iSplitR; [iPureIntro; destruct crb; lia|]. iFrame "H".
+    - subst crb. iDestruct "H" as (Sb') "(%Hsub & H)".
+      iExists (S (S u)), Sb'. iSplitR; [iPureIntro; exact Hsub|].
+      iSplitR; [iPureIntro; lia|]. iFrame "H".
+  Qed.
+
   (* leaving them: at least the [S u] units iupdate still needs *)
   Lemma bm_paid_elim γ bmapstart u :
     bm_paid γ bmapstart u -∗ ∃ n : nat, ⌜(S u <= n <= S (S u))%nat⌝ ∗ log_op γ n.
@@ -363,6 +442,141 @@ Definition wp_itrunc_sconf_body
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(*  THE CREDITED SET-FORM CONTRACT (fs-sysfile GR-2b, retrofit 4a)        *)
+(*                                                                        *)
+(*  Verbatim [wp_itrunc_sconf_body] except for the ledger.  Three things   *)
+(*  move, and every one of them is forced by [CreateBudget.ip_spend]:      *)
+(*                                                                        *)
+(*  (1) [crb] -- "this op has already logged the bitmap block".  It enters *)
+(*      [bm_paidS] at the PAID disjunct with [Sb' := Sb], so the bitmap    *)
+(*      unit is never spent and the entry level is [S u] rather than       *)
+(*      [S (S u)].                                                        *)
+(*  (2) [cru] -- "this op has already logged THIS inode's block".  It goes *)
+(*      straight to the tail flush, which is [SpecIupdate]'s landed        *)
+(*      credited walk.                                                    *)
+(*  (3) the post EXPOSES [IBLOCK inum inodestart ∈ Sb'], DETERMINATELY --  *)
+(*      itrunc's tail iupdate logs it unconditionally.  That membership is *)
+(*      what lets iput's OWN [ip->type = 0] flush, which runs immediately  *)
+(*      after itrunc returns, absorb for free; it is the second [iu_spend] *)
+(*      term of [ip_spend], and without it 4b cannot hit [iput_units].     *)
+(*      Stated as a membership rather than as a [⊆], following             *)
+(*      [SpecIalloc.wp_ialloc_gen]'s determinate-union growth.             *)
+(*                                                                        *)
+(*  At [crb := false, cru := false] this is the counted contract:          *)
+(*  [it_entry false u = S (S u)] is its precondition's level, and the      *)
+(*  bounds collapse to [u <= u' <= S u] -- which is what makes             *)
+(*  [wp_itrunc_sconf] a witness-derivation (GR-2a finding 1) and leaves    *)
+(*  every counted caller unmoved.                                         *)
+(* ===================================================================== *)
+Definition wp_itrunc_gen_body
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
+    `{GEN : GenId} `{CID : CpuId}
+
+    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+    (pd pav pu : mword 64)
+    (bn : bio_names)
+    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (cov : gset Z) (logstart : Z) (bmapstart : Z) (inodestart : Z) (nib : nat)
+    (size : Z) (dev : mword 32)
+    (used : gset Z)
+    (ip : mword 64) (inum : mword 32)
+    (dn dn0 : dinode) (bm : blkmap)
+    (data : nat -> list (bv 8))
+    (u : nat) (Sb : gset Z) (crb cru : bool)
+    (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
+    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (b : bool) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.itrunc in
+  let pj := proc_addr j in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (K_itrunc <= K)%nat ->
+  (* THE TWO ABSORPTION CREDITS' HONESTY PREMISES.  Same device
+     [SpecBmap]/[SpecLogWrite]/[SpecIupdate] all carry: the claim is only
+     usable when the block really is in the op's set. *)
+  (crb = true -> bmapstart ∈ Sb) ->
+  (cru = true -> IBLOCK inum inodestart ∈ Sb) ->
+  log_geom_ok cov logstart ->
+  0 < size <= BPB ->
+  0 <= bmapstart ->
+  bmapstart ∈ cov ->
+  ~ (bmapstart ∈ log_region_set logstart) ->
+  0 <= inodestart ->
+  IBLOCK inum inodestart ∈ cov ->
+  ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
+  bv_unsigned inum < 16 * Z.of_nat nib ->
+  bv_unsigned (di_type dn) <> 0 ->
+  di_type_stable dn dn0 ->
+  di_nlink_stable dn dn0 ->
+  blkmap_wf cov logstart bm ->
+  cov_below cov size ->
+  (forall i : nat, (i < MAXFILE)%nat -> length (data i) = BSIZE) ->
+  di_addrs dn = bm_cells bm ->
+  (j < NPROC)%nat ->
+  γs !! j = Some γl ->
+  m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  sie_cap_gpr m K b pj -∗
+  cpu_own 0 eb pj C b -∗
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
+  kernel_text -∗ pc_is pcE -∗
+  panic_wp_any -∗
+  bio_ctx bn (fs_view γfs γd dev cov) -∗
+  log_ctx γ bn γfs cov logstart dev -∗
+  i_dev ip ↦₄{dqd} dev -∗
+  i_inum ip ↦₄{dqn} inum -∗
+  inode_meta ip dn -∗
+  inode_map γfs ip bm -∗
+  inode_blocks γfs bm data -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  bitmap_res γfs bmapstart cov logstart size used -∗
+  ireg_inv γi γfs inodestart nib -∗
+  dinode_at γi inum dn0 -∗
+  p_pid pj ↦₄{dq} pidv -∗
+  procs_inv γs -∗
+  dev_inv γu γd -∗
+  disk_geom γd pd pav pu -∗
+  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  bslots bn 3 -∗
+  (* THE RESERVATION, SET FORM: [it_entry crb u] units at the caller's own
+     set.  Credited, that is ONE unit less than the counted contract asks
+     for -- which is the whole point. *)
+  log_opS γ (it_entry crb u) Sb -∗
+  wp_next true pj (fun (CID : CpuId) =>
+  ∀ mf : regfile,
+      ⌜callee_saved m mf⌝ -∗
+      sie_cap_gpr mf K b pj -∗
+      cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
+      pc_is ret_tgt -∗
+      p_pid pj ↦₄{dq} pidv -∗
+      i_dev ip ↦₄{dqd} dev -∗
+      i_inum ip ↦₄{dqn} inum -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      inode_meta ip (di_trunc dn) -∗
+      inode_map γfs ip bm_empty -∗
+      inode_blocks γfs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
+      bitmap_res γfs bmapstart cov logstart size (used ∖ bm_blocks bm) -∗
+      dinode_at γi inum (di_trunc dn) -∗
+      bslots bn 3 -∗
+      (* THE LEDGER, SET FORM.  The set only GROWS, it provably contains
+         this inode's block, and the counter is bracketed by the two
+         [CreateBudget] figures: at most [it_spend crb cru] is gone, and the
+         tail flush's own [it_iu cru] is gone for certain. *)
+      (∃ (u' : nat) (Sb' : gset Z),
+         ⌜Sb ⊆ Sb'⌝ ∗
+         ⌜IBLOCK inum inodestart ∈ Sb'⌝ ∗
+         ⌜(it_entry crb u - it_spend crb cru <= u')%nat
+          /\ (u' + it_iu cru <= it_entry crb u)%nat⌝ ∗
+         log_opS γ u' Sb') -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type ITRUNC.
   Parameter wp_itrunc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
@@ -388,4 +602,31 @@ Module Type ITRUNC.
                            cov logstart bmapstart inodestart nib size dev used
                            ip inum dn dn0 bm data u
                            pidv dq dqd dqn dqb dqs m K eb C b.
+  (* the credited set-form contract; [wp_itrunc_sconf] is this at
+     [crb := cru := false], derived at the [log_op] existential's own
+     witness. *)
+  Parameter wp_itrunc_gen :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
+      `{GEN : GenId} `{CID : CpuId}
+
+      (γs : list gname) (j : nat) (γl : gname)
+      (γu : uart_names) (γd : disk_names) (γk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (bmapstart : Z) (inodestart : Z) (nib : nat)
+      (size : Z) (dev : mword 32)
+      (used : gset Z)
+      (ip : mword 64) (inum : mword 32)
+      (dn dn0 : dinode) (bm : blkmap)
+      (data : nat -> list (bv 8))
+      (u : nat) (Sb : gset Z) (crb cru : bool)
+      (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool),
+      wp_itrunc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+                         cov logstart bmapstart inodestart nib size dev used
+                         ip inum dn dn0 bm data u Sb crb cru
+                         pidv dq dqd dqn dqb dqs m K eb C b.
 End ITRUNC.

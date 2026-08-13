@@ -1767,6 +1767,51 @@ Qed.
     exact Hcs.
   Qed.
 
+  (* THE CREDITED eb-GENERIC SEAL (fs-sysfile GR-2b): [iu_main_gen] with
+     NOTHING pinned -- it IS the generic core, so the seal is the same
+     plumbing [wp_iupdate_gen] does with [cru] passed through instead of
+     [false].  itrunc's tail flush needs exactly this: the credit, at an
+     [eb] its own pass-through contract quantifies over. *)
+  Lemma wp_iupdate_credgen
+      (γs : list gname) (j : nat) (γl : gname)
+      (γu : uart_names) (γd : disk_names) (γk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (dev : mword 32)
+      (ip : mword 64) (inum : mword 32)
+      (dn dn0 : dinode) (bm : blkmap)
+      (u : nat) (Sb : gset Z) (cru : bool)
+      (pidv : mword 32) (dq dqd dqn dqs : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool)
+    : wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+                              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
+                              pidv dq dqd dqn dqs m K eb C b.
+  Proof.
+    cbv beta delta [wp_iupdate_credgen_body].
+    intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0.
+    iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
+              Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
+              #Hdlock Hsl Hop Hcont".
+    iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
+              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
+              pidv dq dqd dqn dqs m K eb C b
+              HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Hcru
+              with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
+                    Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hop
+                    [Hcont]").
+    iEval (rewrite /wp_next).
+    iIntros (CIDf) "%Hchain".
+    iIntros (mf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap Hsb
+                  Hiout Hsl Hop".
+    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iApply ("Hcont" $! mf with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap
+                     Hsb Hiout Hsl Hop").
+    exact Hcs.
+  Qed.
+
   (* THE CREDITED SEAL (fs-sysfile S5b's Module obligation): [iu_main_gen]
      pinned at [eb := true], where both complements are [emp] by definition
      ([trap_csrs_ext true] / [cpu_claim_ext true]); the callback drops the
