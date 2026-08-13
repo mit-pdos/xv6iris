@@ -1,15 +1,17 @@
-(** * WeakComposeLang.v — L3: THE pf-RUN ⇒ WeakLang REGROUPING and the
-      φ-CONSUMPTION COROLLARY
-      (lift stage L3 of [claude-notes/projects/weak-memory-lift.md])
+(** * WeakComposeLang.v — L3/B5b: THE CONE-ROUTE φ-CONSUMPTION AND THE
+      LIFTED COMPOSITION
+      (lift stages L3 + B5b of [claude-notes/projects/weak-memory-lift.md])
 
     WHAT THIS FILE IS.  [WeakCompose.xv6_weak_robust] is the M6 headline
     theorem over the wp machine ([wpcfg pxv6]); [WeakAdequacy] exports φ
     ([WeakGhost.no_violation]) at every state of the [WeakLang] machine
     ([wgstate], [wprim_step]).  Seam (1) of [WeakCompose] §6 is the missing
-    bridge between the two, and its ONE consumer is the second conjunct of
-    [WeakCompose.m6_side_conditions] — [WeakRobust.pf_violation_free_hart],
-    the place φ/Iris is still load-bearing.  This file builds the bridge in the ⇐
-    direction the consumption needs, and derives that conjunct.
+    bridge between the two, and its ONE consumer is
+    [WeakRobust.pf_violation_free_hart] — the place φ/Iris is still
+    load-bearing.  This file builds the bridge in the ⇐ direction the
+    consumption needs, and uses it to refute EVERY BAD EDGE of every traced
+    behavior, which is what the acyclicity (and hence the robustness)
+    actually needs.
 
     ------------------------------------------------------------------------
     §A  WHAT IS DELIVERED (all machine-checked; no [Axiom], no [Admitted]).
@@ -25,101 +27,109 @@
         [wl_cfg_log] ([pc_log (wl_cfg g u) = wglog g]) and [wl_cfg_obs_flr]
         ([obs_flr (wl_cfg g u) (fin_to_nat cpu) a = coh (wgws g cpu) a]).
 
-    (2) THE SEGMENTS (§3) and THE REGROUPING THEOREM ([xv6_blocks_lang], §7).
-        [xv6_seg g u g' u'] is one of:
-          - [seg_hart]: an irq-free INSTRUCTION BLOCK of one hart —
-            [WeakSailLTS2.sail_block], i.e. boundary to boundary, solo,
-            faithfully classed ([cls_canon]/[rmw_tight] live inside
-            [pf_solo]) — mapped to [wprim_step]'s hart arm by
-            [WeakSailLTS2.sail_block_wrun];
-          - [seg_plic]: ONE interrupt delivery ([WeakSailLTS.irq_deliver]),
-            mapped to [RiscvLang.plic_step]'s [PlicStepWire];
-          - [seg_disk]: ONE disk burst plus its emit group — L0(d) buffers a
-            [WeakLang.wdisk_step]'s write set and emits it one message at a
-            time, so one [WeakLang] disk arm is [1 + |w|] pf steps; [emit_run]
-            inverts that, appending EXACTLY [WeakLang.wmsgs_of_map w].
-        [xv6_blocks] is their [rtc], and [xv6_blocks_lang] says such a run is
-        BOTH an [rtc (wp_pf_run (pstep_xv6 riscv_step))] between the
-        corresponding configurations AND an [rtc erased_step] of
-        [WeakLang.weak_riscv_lang] over the standard pool
-        ([wpool gen_id = WeakAdequacy.wcpu_pool (enum CPU)]).
-        NO UART SEGMENT and NO POWER SEGMENT, deliberately: the wp machine has
-        no uart agent at all (so the produced [WeakLang] runs are uart-free,
-        which is the free direction — we only need EXISTENCE of a run), and
+    (2) THE pxv6 → psail PROJECTION OF A SOLO HART RUN (§3), the mirror image
+        of [WeakSailCone]'s [pf_step_lift]/[hlink]: a [pf_xsolo] step of a
+        HART agent projects along [WeakSailCone.prj_cfg] to a
+        [WeakSailLTS2.pf_solo] step (the disk agent is inert filler
+        throughout), carrying [cls_canon] and [rmw_tight] with it.  Plus THE
+        BLOCK DECOMPOSITION ([xsolo_run_blocks]): a solo run between two
+        [sp_m = None] points is an [rtc] of SINGLE INSTRUCTION BLOCKS
+        ([xblk], the [pxv6] twin of [WeakSailLTS2.sail_block]), obtained by
+        cutting at the first internal boundary and recursing.
+
+    (3) THE SEGMENT REFINEMENT (§4).  [WeakSailCone.cone_segments2] exports a
+        chain of [seg2] segments whose HART segments are boundary-to-boundary
+        but possibly MANY instructions long, while one [WeakLang] hart step
+        is exactly ONE instruction.  [seg2_refine] re-cuts such a chain into
+        one whose hart segments are single blocks, keeping the same start,
+        the same END CONFIGURATION [cf], and the same per-segment data for
+        the irq and disk kinds ([seg2_fine]).  Nothing else about the chain
+        moves — in particular the violation at [cf] is untouched.
+
+    (4) THE LIFT ([wl_lift], §6) AND ITS SOUNDNESS ([wl_lift_sound]).
+        [wl_lift gen segs g u] is a PREDICATE on the [WeakLang] start state
+        (no successor: the successor is CONSTRUCTED by the soundness proof,
+        from the [wrun] that [WeakSailLTS2.sail_block_wrun] reconstructs).
+        Per segment it carries exactly the DEVICE-SEAM residue and nothing
+        else:
+          - [SegHart]: [WeakSailLTS2.oracle_consistent] of that hart's stream
+            against [wgdev g], plus a continuation quantified over the
+            [wrun]s whose [WeakLang] successor MATCHES the segment's target;
+          - [SegIrq]: the wire fact — the delivered value is
+            [bool_to_bit (dev_seip (wgdev g) i)] — and the continuation;
+          - [SegDisk]: [wa_dd u = wgdev g] (the M5 device-view residue) and,
+            for the segment's OWN [(d', w)], the [WeakLang] disk arm at the
+            TRUE flat memory (premise (P4): [pstep_xv6]'s burst arm is
+            existential in the memory, [WeakLang.wdisk_step] is not).
+        NO [hart_dev_seam] CONJUNCT: because the successor is built from the
+        chosen [wrun], the post-block fabric IS [wm_dev s'] by construction.
+        [wl_lift_sound] turns such a chain into an
+        [rtc erased_step] of [WeakLang.weak_riscv_lang] over the standard
+        pool ([wpool gen = WeakAdequacy.wcpu_pool (enum CPU)]) ending at a
+        state [g'] with [cf = wl_cfg g' u'].  NO UART SEGMENT and NO POWER
+        SEGMENT, deliberately: the wp machine has no uart agent at all, and
         the power arm is vacuous at a pinned generation ([wthread_live] is an
         invariant of every segment).
 
-    (3) THE φ TRANSPORT ([xv6_blocks_no_hart_violation], §8).  φ at the
-        reached [WeakLang] state refutes a HART-AUTHORED, HART-OBSERVED
-        violation at the corresponding pf configuration — which, since the
-        Layer-1 fix of §B, is the only kind [WeakRobust.violation_hart] has.  The transport is SYNTACTIC, and that is L0(c)'s
-        payoff: [WeakRobustMain.pub_of] IS [WeakMem.wpublished] at the
-        configuration's log, the very predicate [no_violation] is stated with,
-        and [WeakRobust.obs_flr] IS the agent's [coh].  Nothing is renamed.
+    (5) THE φ TRANSPORT ([wl_no_hart_violation], §7).  φ at the reached
+        [WeakLang] state refutes a HART-AUTHORED, HART-OBSERVED violation at
+        the corresponding pf configuration — which, since the Layer-1 fix of
+        §B, is the only kind [WeakRobust.violation_hart] has.  The transport
+        is SYNTACTIC, and that is L0(c)'s payoff: [WeakRobustMain.pub_of] IS
+        [WeakMem.wpublished] at the configuration's log, the very predicate
+        [no_violation] is stated with, and [WeakRobust.obs_flr] IS the
+        agent's [coh].  Nothing is renamed.
 
-    (4) THE φ-CONSUMPTION COROLLARY ([xv6_pf_violation_free], §10) and THE
-        UPDATED COMPOSITION ([xv6_weak_robust_lifted] /
-        [xv6_weak_robust_adequate], §11): [WeakCompose.xv6_weak_robust] with
-        [pf_violation_free_hart] REPLACED by its derivation from the adequacy
-        export.  [xv6_weak_robust_adequate] takes [WeakAdequacy]'s own WP
-        premise package and runs [weak_system_adequacy_phi] on the spot, so
-        the composition's only Iris-side obligation is the thread pool's WPs.
+    (6) THE BAD-EDGE REFUTATION ([xv6_no_bad_edge], §9) and THE UPDATED
+        COMPOSITION ([xv6_weak_robust_lifted] / [xv6_weak_robust_adequate],
+        §10).  A bad edge would give (via [bad_wf], [cone_segments2], the
+        refinement and the lift) a [WeakLang] run whose final state violates
+        φ; so there is NO bad edge, so [gdep2_acyclic_bad_free] applies and
+        the robustness follows by [robust_main_no_bad] — [WeakRobustMain]'s
+        [robust_main] with [pf_violation_free_hart] replaced by "no bad
+        edge", proved here over a generic [pstep] so that
+        [WeakRobustMain.v] is untouched.  [xv6_weak_robust_adequate] takes
+        [WeakAdequacy]'s own WP premise package and runs
+        [weak_system_adequacy_phi] on the spot, so the composition's only
+        Iris-side obligation is the thread pool's WPs.
 
     ------------------------------------------------------------------------
-    §B  THE RESIDUE, STATED AS A PREMISE — and the FINDING that was the
-    second one until Layer 1 absorbed it.
+    §B  THE RESIDUE, STATED AS A PREMISE — and the two FINDINGS behind its
+    present shape.
 
-    (A) is a named definition in §10, consumed in exactly one place and NOT
-    dressed up as a theorem; (B) is now history, kept as a record of the bug
-    and of where its fix lives.
+    (A) [cone_liftable] (§9) — THE MMIO/M5 SEAM, IN PER-DECOMPOSITION FORM.
+        It says: for the segment chain a MINIMAL BAD EDGE's cone decomposes
+        into, the [WeakLang] machine can follow along — i.e. [wl_lift] holds
+        at the initial state.  It is a named definition, consumed in exactly
+        one place, and NOT dressed up as a theorem.  What it really assumes
+        is only what §A(4) lists: per hart block an [oracle_consistent]
+        stream, per delivery the plic wire, per disk group the device view
+        and the true-memory [wdisk_step].  Everything else about the
+        correspondence — the log, the registers, the [wstate]s, the agent
+        vector — is DERIVED (that is what [wl_lift_sound] is).
 
-    (A) [xv6_block_cover] — BLOCK-ATOMICITY (the interleaving / mover residue,
-        and the honest one).  A [wp_pf_run] interleaves the harts at EVENT
-        granularity; [WeakLang] executes whole instructions atomically.  The
-        regrouping therefore consumes runs that ALREADY are a concatenation of
-        segments, and the premise says a violating pf-reachable configuration
-        has a block-atomic witness of the SAME violation.
-        WHY IT IS BELIEVABLE, and how it is meant to be discharged: for rv64d
-        a hart block contains AT MOST ONE log-touching event (ifetch and page
-        walks are never emitted — [WeakSailLTS] delta (d) / [WeakInterp] §3's
-        finding (1) — so an instruction has at most its one data access, plus
-        the walker A/D CAS that [WeakRobustBlocks.blk_shape] admits).  Every
-        other step of a block is silent: it neither reads nor appends to the
-        log, and [WeakPromiseBridge.wp_pf_step]'s [PFSilent]/[PFFence] arms
-        touch only the stepping agent.  Such steps COMMUTE with any other
-        agent's step, so an arbitrary pf run can be sorted into block-atomic
-        form without changing the log.  That commutation lemma plus the
-        "≤ one memory event per rv64d block" shape premise is the missing
-        theorem; it is a self-contained piece of work at the
-        [WeakPromiseBridge] layer and is NOT attempted here.
-        WHY [WeakRobustBlocks]'s COMPLETION MACHINERY IS *NOT* USED FOR IT.
-        [complete_block] needs [blk_fin], whose [bf_prog] conjunct ("off a
-        boundary the program always has a step") is FALSE for [sail_step] as
-        it stands: a device read with an EXHAUSTED oracle stream
-        ([sp_dev = []]) is stuck, and so is a monad node whose shape premise
-        fails.  Completing a Sail block therefore needs additional honest
-        premises (infinite oracle streams, and a nat measure on the residual
-        instruction monad — the free monad has no structural one, since a
-        continuation is indexed by an infinite value type).  That is recorded
-        here as a finding: L1's completion lemmas apply to the abstract LTS,
-        but the [sail_step] instantiation of [blk_fin] is NOT free.  (The
-        other L1 instantiation obligation, [WeakRobustBlocks.lts_enabled],
-        is value-input-enabledness — [WeakRobustSim.ts_oblivious]'s big
-        sibling; it looks provable for [sail_step] modulo a surjectivity
-        lemma for [WeakInterpProj.wbytes], but nothing on the route taken
-        here consumes it without [blk_fin], so it is not proved.)
-        THE AUTHOR CORNER, correspondingly: it does not arise in this route.
-        [xv6_block_cover]'s conclusion is stated at a BLOCK-ATOMIC run, and
-        every such run ends with EVERY hart at an instruction boundary (each
-        segment leaves its own agent at [sp_m = None] and moves no other), so
-        no agent — the violating message's author included — ever has to be
-        completed, and [cone_boundary_sub]'s sub-block reading is not needed
-        either.  L1's [complete_cut]/[complete_agents]/[cone_boundary_thm]
-        remain the route for a mid-block cut and are what a proof of
-        [xv6_block_cover] going through the EXHIBIT (rather than through a
-        commutation argument) would use.
+    (B) [xv6_block_cover] IS REFUTABLE — THE FINDING THAT RETIRED THE OLD
+        ROUTE (2026-08-13).  The previous revision of this file consumed φ
+        through a premise [xv6_block_cover g0 u0]: "any [wp_pf_run]-reachable
+        violating configuration has a BLOCK-ATOMIC witness of the same
+        violation".  That premise is FALSE for xv6.  Counterexample shape:
+        hart [i] does a plain store [m] to an owned, unpublished byte; then a
+        [fence rw,w] (which sets [w_relp], so [i]'s NEXT store publishes
+        [m]); then it BEGINS a store instruction whose page walk CASes a PTE
+        (the fork's atomic A/D update, a fused mid-block [LRmw] of class
+        [WCexcl]) and the pf run switches away — the CAS is in the log, the
+        publishing data store is not.  Hart [j] then reads that dangling CAS,
+        branches on the A bit, and racily reads [m].  At EVENT granularity
+        this is pf-reachable and [violates_at] holds; in ANY
+        instruction-atomic ([WeakLang]) run the author's instruction is
+        atomic, so either the CAS is absent (j branches the other way) or the
+        [WCrel] data store landed with it (m is published) — no block-atomic
+        witness exists.  The coarse premise is therefore replaced by the cone
+        route of §A: the violating configuration is not an arbitrary
+        reachable one but the one the EXHIBIT builds, and
+        [WeakSailCone.cone_segments2] hands it over already segmented.
 
-    (B) THE AGENT QUANTIFIER — FOUND HERE, FIXED IN LAYER 1, GONE FROM THE
+    (C) THE AGENT QUANTIFIER — FOUND HERE, FIXED IN LAYER 1, GONE FROM THE
         PREMISE LIST (2026-08-12).  It was a premise of this file for exactly
         one revision, under the name [xv6_violation_harts], and it was FALSE
         AS STATED for xv6.  Recorded because the shape recurs:
@@ -136,61 +146,35 @@
           - symmetrically, the DISK agent's own [store_post_run] raises its
             [coh], so a DMA over a byte a hart wrote plainly gives
             [violation] with [j = n_disk].
-        So [pf_violation_free cls_of pub_of (pstep_xv6 next) img (xv6_ps …)]
-        was not merely undischarged: it was REFUTABLE for any run in which a
-        hart reads DMA'd data, which made [xv6_weak_robust] VACUOUS on
-        realistic runs.  THE FIX, and it was small and mechanical, belonged in
-        Layer 1 and has landed there:
+        THE FIX belonged in Layer 1 and has landed there:
           (i)   [WeakRobust.violation_hart nh] (= [violation] with
                 [WeakMem.tid_hart nh (wm_tid m)] and [tid_hart nh (Some j)])
                 and [WeakRobust.pf_violation_free_hart nh];
           (ii)  [WeakRobustMain.bad] carries the reader's bound [e2.1 < nh]
-                beside the author's [e1.1 < nh] (both are free at the site
-                that discharges [edges_split]: only the hart arms of
-                [pstep_xv6] emit [LLoad]/[LRmw], so a [grf] edge's reader is a
-                hart), and [bad_edge_violates] concludes [violation_hart nh]
-                — the author conjunct is [bad]'s third component and the
-                observer conjunct its fourth, verbatim;
-          (iii) [no_bad_edge] / [gdep2_acyclic_main] / [robust_main] /
-                [robust_transport] and [WeakCompose.m6_side_conditions] all
-                consume the [_hart] form.
-        [xv6_pf_violation_free] below therefore closes with residue (A)
-        alone: the two indices arrive bounded by [n_disk = NCPU] and
-        [nat_to_fin] hands the transport its [CPU]s.
+                beside the author's [e1.1 < nh], and [bad_edge_violates]
+                concludes [violation_hart nh];
+          (iii) [no_bad_edge] / [gdep2_acyclic_main] / [robust_main] and
+                [WeakCompose.m6_side_conditions] all consume the [_hart] form.
+        §9 below therefore closes with residue (A) alone: the two indices
+        arrive bounded by [n_disk = NCPU] and [nat_to_fin] hands the
+        transport its [CPU]s.
 
     ------------------------------------------------------------------------
-    §C  THE cls_canon / rmw_tight RESIDUE (L2's header) — ROUTE CHOSEN: (B).
+    §C  THE cls_canon / rmw_tight RESIDUE (L2's header) — PAID, NOT ASSUMED.
 
     [WeakPromiseBridge.wp_pf_step] carries a message's [wm_class] as a FREE
     BINDER, while [WeakInterp.wrun] COMPUTES it; L2 records the gap as
     [WeakSailLTS2.cls_canon] (and [rmw_tight] for the exclusive read window),
-    both side conditions of [pf_solo] and hence of [sail_block].  The task
-    offered two ways to pay for it:
-
-      (A) a RETAG lemma — map an arbitrary pf run to a canonically classed one
-          with the same log shape and the same [wstate]s.  It is sound in the
-          direction that matters (retagging DOWN, [WCrel] ↦ [WCplain], only
-          REMOVES publications, and [¬ pub] is exactly what the violation
-          needs, so a violation survives), but retagging UP would destroy it,
-          and the canonical class of a store is [WCrel] whenever the author's
-          [w_relp] is set — i.e. the retag is NOT uniformly downward.  Making
-          it work needs the [w_relp] bookkeeping of the whole run, which is a
-          [WeakPromiseBridge]-level induction.
-
-      (B) CLASS-CANONICITY AS A CONDITION ON THE RUNS BEING MAPPED.  This is
-          what is taken here, and it costs nothing extra: [cls_canon] is
-          already inside [sail_block] (so the HART side is paid by residue
-          (A)'s provider), and the DISK side is paid OUTRIGHT — [emit_run]
-          instantiates [PFStore]'s class binder at the message's own
-          [wm_ak], and [seg_disk] pins the emitted list to
-          [WeakLang.wmsgs_of_map w], whose messages are [WCplain] by
-          construction.  So the disk's classes are canonical by CONSTRUCTION
-          here, not by assumption.
-    Nothing is added to [WeakCompose.m6_side_conditions]: [WeakCompose.v] is
-    UNCHANGED by this file.
+    both side conditions of [pf_solo] and hence of [sail_block].  Neither is
+    a premise HERE: [WeakSailCone.pf_xsolo] already carries both at every
+    step of every segment it exports ([xcls_canon] / [xrmw_tight]), and §3's
+    projection transports them verbatim to the [psail] side.  On the disk
+    side the classes are canonical by CONSTRUCTION ([wmsgs_of_map]'s messages
+    are [WCplain], and a disk agent's [w_relp] is always [false] —
+    [WeakSailCone.disk_relp]).  [WeakCompose.v] is UNCHANGED by this file.
 
     ------------------------------------------------------------------------
-    §D  THE PREMISE LIST OF [xv6_weak_robust_adequate] — the composition's new
+    §D  THE PREMISE LIST OF [xv6_weak_robust_adequate] — the composition's
     assumptions inventory (against [WeakCompose] §6's):
 
       1. [∀ b, sail_shaped (riscv_step b)] — seam (6), unchanged.
@@ -200,32 +184,29 @@
          [wstate] (the wp machine has an agent [WeakLang] does not).
       3. THE ADEQUACY WP PACKAGE — the pool's WPs from the initial resources,
          verbatim [WeakAdequacy.weak_system_adequacy_phi]'s premise.
-      4. [xv6_block_cover] — residue (A) above, and THE ONLY RESIDUE: (B) is
-         gone, fixed in Layer 1 (see §B).
-      5. The FIRST conjunct of [m6_side_conditions] (the per-bundle static
-         side conditions [main_premises n_disk], = [WeakCompose] §6 (3)),
-         with [bad] now bounding the READER's agent index too.
-      6. Inside the segments, three DEVICE-SEAM side conditions, all of them
-         seam (4) ([WeakCompose] §6) in sharper form:
-         [WeakSailLTS2.oracle_consistent] per hart block (L2's, unchanged);
-         [hart_dev_seam] — the post-block fabric IS the one the block's own
-         [wrun] produces (the companion of [oracle_consistent]: a [wpcfg] has
-         no device component, so this is not a function of the pf state);
-         the PLIC WIRE premise inside [seg_plic] (the delivered value is
-         [bool_to_bit (dev_seip …)], the interrupt-oracle twin of
-         [oracle_consistent]); and [wa_dd u = wgdev g] inside [seg_disk] (the
-         M5 device-view residue, [WeakCompose] delta (i)).
+      4. [img_total (img_z (wgimg g0))] — the boot image covers every byte
+         (discharged by [WeakAdequacy]'s [wlat_init]); consumed by the cone's
+         reader-tail completion.
+      5. The per-traced-bundle static package: [main_premises n_disk TS]
+         (= [WeakCompose] §6 (3), with [bad] now bounding the READER's agent
+         index too) AND [xv6_cone_premises TS] — [Hcq] (a cross-edge source's
+         post-state is quiet), [Hres] ([sail_shaped]/[sail_live]/oracle
+         consistency of every trace record's residual), [Hirqb] (a delivery
+         has a boundary pre-state) and [Hcls] (a logged message carries its
+         author's computed class), stated exactly as [WeakSailCone] §11-§12's
+         section context.
+      6. [cone_liftable] — residue (A) of §B, and THE ONLY LIFT RESIDUE:
+         the MMIO/M5 device seam, per decomposition.
       7. The 5 rv64d baseline axioms.  NO functional extensionality, NO
-         classical axiom: [Print Assumptions xv6_weak_robust_adequate] lists
-         exactly [rv64d.load_reservation], [match_reservation],
-         [cancel_reservation], [valid_reservation], [plat_term_write].
+         classical axiom.
 
     WHAT IS GONE relative to [WeakCompose] §6: seam (1a) (the ⇐ hart
-    direction — L2 built it, §3 consumes it), (1b) (interleaving regrouping —
-    §7, for block-atomic runs), (1c) (device and power arms — the plic and
-    disk arms are built; uart and power are shown unnecessary rather than
-    assumed), and, MODULO residue (A), seam (2)
-    ([pf_violation_free_hart] itself).
+    direction — L2 built it, §6 consumes it), (1b) (interleaving regrouping —
+    the cone route replaced the block-atomicity premise outright, §B(B)),
+    (1c) (device and power arms — the plic and disk arms are built; uart and
+    power are shown unnecessary rather than assumed), and seam (2)
+    ([pf_violation_free_hart] itself, which is not merely discharged but
+    BYPASSED: its one consumer, the bad-edge refutation, is proved directly).
 
     NOTE ON NAMES.  [WeakAxiomatic] is imported FIRST so that [WeakPromise]'s
     [wlabel] constructors shadow its [lbl] ones (as in [WeakRobustBlocks]);
@@ -240,9 +221,13 @@ Require Import RiscvModelBytes.
 Require Import DevModel.
 From xv6iris Require Import WeakAxiomatic.
 From xv6iris Require Import WeakMem WeakPromise WeakPromiseFact WeakPromiseBridge.
-From xv6iris Require Import WeakRobust WeakRobustTrace WeakRobustSim WeakRobustMain.
-From xv6iris Require Import WeakRobustBlocks.
+From xv6iris Require Import WeakRobust WeakRobustTrace WeakRobustGraph
+                            WeakRobustProv WeakRobustLin WeakRobustOrd
+                            WeakRobustSer WeakRobustAcyc WeakRobustAcyc2
+                            WeakRobustSim WeakRobustMain WeakRobustBlocks
+                            WeakRobustCone.
 From xv6iris Require Import WeakInterp WeakInterpProj WeakSailLTS WeakSailLTS2.
+From xv6iris Require Import WeakSailComplete WeakSailCone.
 Require Import RiscvLang WeakLang.
 From xv6iris Require Import WeakCompose.
 From iris.algebra Require Import dfrac.
@@ -324,6 +309,30 @@ Proof.
       rewrite Hs /=. done.
 Qed.
 
+(** A list that agrees with another off [i] and holds [x] at [i] IS the
+    insert — the shape every "the segment moved only agent [i]" argument
+    below reassembles through. *)
+Lemma list_eq_insert {A} (l l' : list A) (i : nat) (x : A) :
+  l' !! i = Some x → is_Some (l !! i) →
+  (∀ j, j ≠ i → l' !! j = l !! j) → l' = <[i := x]> l.
+Proof.
+  intros Hi Hs Hne. apply list_eq. intros k.
+  destruct (decide (k = i)) as [->|Hk].
+  - rewrite Hi. symmetry. destruct Hs as (y & Hy).
+    exact (lookup_insert_self l i x y Hy).
+  - by rewrite (lookup_insert_other l i x k Hk) (Hne k Hk).
+Qed.
+
+Lemma map_fmap_eq {A B} (f : A → B) (l : list A) : map f l = f <$> l.
+Proof. by induction l as [|x l IH]; simpl; [|rewrite IH]. Qed.
+
+Lemma fmap_ext_l {A B} (f h : A → B) (l : list A) :
+  (∀ x, f x = h x) → f <$> l = h <$> l.
+Proof.
+  intros H. induction l as [|x l IH]; [done|].
+  by rewrite !fmap_cons H IH.
+Qed.
+
 (* ====================================================================== *)
 (** ** 1. THE CORRESPONDENCE
 
@@ -344,8 +353,7 @@ Definition hag (g : wgstate) (u : wlaux) (c : CPU) : wpagent psail :=
   WPAgent (PSail None (wgregs g c) (wa_dstr u c) None (wa_iq u c))
           (wgws g c) (∅ : gset nat).
 
-(** The HART-ONLY configuration, at the [psail] program type: this is what
-    [WeakSailLTS2]'s ⇐ bracket is stated over. *)
+(** The HART-ONLY configuration, at the [psail] program type. *)
 Definition hcfg (g : wgstate) (u : wlaux) : wpcfg psail :=
   WPCfg (img_z (wgimg g)) (wglog g) (hag g u <$> enum CPU).
 
@@ -396,6 +404,28 @@ Lemma wl_cfg_obs_flr g u (cpu : CPU) (a : Z) :
   obs_flr (wl_cfg g u) (fin_to_nat cpu) a = coh (wgws g cpu) a.
 Proof. by rewrite /obs_flr wl_cfg_hart_lookup. Qed.
 
+(** The corresponding configuration carries no promises — every agent of it
+    is built with [∅]. *)
+Lemma wl_cfg_no_promises g u : no_promises (wl_cfg g u).
+Proof.
+  intros j ag Hj. rewrite wl_cfg_alt in Hj. cbn [pc_ags] in Hj.
+  destruct (decide (j < NCPU)%nat) as [Hlt|Hge].
+  - rewrite lookup_app_l in Hj; [|by rewrite wl_cfg_harts_len].
+    rewrite list_lookup_fmap in Hj.
+    destruct (enum CPU !! j) as [c|]; simplify_eq/=; done.
+  - rewrite lookup_app_r in Hj; [|by rewrite wl_cfg_harts_len; lia].
+    rewrite wl_cfg_harts_len in Hj.
+    destruct (j - NCPU)%nat as [|k]; simpl in Hj;
+      [by simplify_eq|by destruct k; simplify_eq].
+Qed.
+
+Lemma pf_run_no_promises (c c' : wpcfg pxv6) :
+  rtc (wp_pf_run (pstep_xv6 riscv_step)) c c' → no_promises c → no_promises c'.
+Proof.
+  induction 1 as [|x y z (i & l & Hs) _ IH]; [done|].
+  intros Hnp. apply IH. by eapply wp_pf_step_no_promises.
+Qed.
+
 (* ====================================================================== *)
 (** ** 2. The three [wgstate] transitions the segments land on *)
 
@@ -410,136 +440,389 @@ Definition wdisk_write (g : wgstate) (d' : dev_state)
   WGState (wgregs g) (wgimg g) (wglog g ++ wmsgs_of_map w) (wgws g)
           d' (wggen g) (wgpow g).
 
-(** The disk agent's own [wstate] after emitting a burst: one
-    [store_post_run] per buffered message, at consecutive timestamps. *)
-Fixpoint emit_ws (ws : wstate) (t : nat) (ms : list wmsg) : wstate :=
-  match ms with
-  | [] => ws
-  | m :: ms' =>
-      emit_ws (store_post_run ws false (wm_pa m) (length (wm_data m)) (S t))
-              (S t) ms'
-  end.
+(** The three [wlaux] updates: a hart's device stream advances, a hart's
+    interrupt stream advances, the disk's own fabric/[wstate] are replaced. *)
+Definition wl_dstr (cpu : CPU) (dtl : dstream) (u : wlaux) : wlaux :=
+  WLAux (cupd cpu dtl (wa_dstr u)) (wa_iq u) (wa_dd u) (wa_dws u).
 
-(* ====================================================================== *)
-(** ** 3. THE THREE SEGMENTS
+Definition wl_iq (cpu : CPU) (iq' : istream) (u : wlaux) : wlaux :=
+  WLAux (wa_dstr u) (cupd cpu iq' (wa_iq u)) (wa_dd u) (wa_dws u).
 
-    A block-atomic pf run is a concatenation of three kinds of segment, one
-    per [WeakLang.wprim_step] arm the wp machine can express: a hart's
-    irq-free INSTRUCTION BLOCK, one INTERRUPT DELIVERY, and one DISK BURST
-    with its emit group.  (The uart arm has no wp-side agent at all, and the
-    power arm is vacuous at a pinned generation — see the header.) *)
+Definition wl_dk (d' : dev_state) (ws' : wstate) (u : wlaux) : wlaux :=
+  WLAux (wa_dstr u) (wa_iq u) d' ws'.
 
-(** THE DEVICE SEAM OF THE HART ARM (seam (4) of [WeakCompose] §6, here in
-    its sharpest form).  A [wpcfg] has no device component: the pf machine
-    serves a hart's MMIO from the oracle stream [sp_dev] and NEVER moves a
-    shared fabric, while [wrun] threads [wm_dev].  The post-block fabric is
-    therefore not a function of the pf configuration, and the segment must
-    name it.  [hart_dev_seam g cpu g'] says [wgdev g'] IS the fabric the
-    block's own [wrun] produces — the exact companion of L2's
-    [oracle_consistent], which says the stream IS what that fabric returns. *)
-Definition hart_dev_seam (g : wgstate) (cpu : CPU) (g' : wgstate) : Prop :=
-  ∀ (tick : bool) (x : unit) (s' : wmstate),
-    wrun (Some (fin_to_nat cpu)) (riscv_step tick) (whart_view g cpu) x s' →
-    wm_log s' = wglog g' → wm_regs s' = wgregs g' cpu → wm_ws s' = wgws g' cpu →
-    wm_dev s' = wgdev g'.
-
-(** ONE HART BLOCK.  [sail_block] is L2's boundary-to-boundary,
-    solo, irq-free, faithfully-classed block ([cls_canon] / [rmw_tight] are
-    inside [pf_solo]); the frame conditions say the block moves only its own
-    hart's registers and weak state, and nothing of the disk agent. *)
-Definition seg_hart (g : wgstate) (u : wlaux) (cpu : CPU)
-    (g' : wgstate) (u' : wlaux) : Prop :=
-  (∀ b, oracle_consistent (wgdev g) (riscv_step b) (wa_dstr u cpu)) ∧
-  sail_block riscv_step (fin_to_nat cpu) (hcfg g u) (hcfg g' u') ∧
-  wgimg g' = wgimg g ∧ wggen g' = wggen g ∧ wgpow g' = wgpow g ∧
-  wgregs g' = <[cpu := wgregs g' cpu]> (wgregs g) ∧
-  wgws g' = <[cpu := wgws g' cpu]> (wgws g) ∧
-  wa_dd u' = wa_dd u ∧ wa_dws u' = wa_dws u ∧
-  hart_dev_seam g cpu g'.
-
-(** ONE INTERRUPT DELIVERY.  [RiscvLang.plic_step]'s [PlicStepWire] writes
-    hart [cpu]'s [sig_seip] from [dev_seip]; the wp side's [irq_deliver]
-    consumes the head of that hart's interrupt oracle.  THE WIRE PREMISE is
-    that the two carry the same value — the [plic_consistent] slot, the
-    interrupt-oracle twin of [oracle_consistent]. *)
-Definition seg_plic (g : wgstate) (u : wlaux) (cpu : CPU)
-    (g' : wgstate) (u' : wlaux) : Prop :=
-  (∃ (v : type_of_register sig_seip) (iq' : istream),
-     wa_iq u cpu = v :: iq' ∧
-     v = bool_to_bit (dev_seip (wgdev g) (fin_to_nat cpu)) ∧
-     u' = WLAux (wa_dstr u) (cupd cpu iq' (wa_iq u)) (wa_dd u) (wa_dws u)) ∧
-  g' = wplic_write g cpu.
-
-(** ONE DISK STEP.  L0(d) buffers a [wdisk_step]'s write set in the disk
-    agent and emits it one message at a time, so ONE [WeakLang] disk arm is
-    [1 + |w|] pf steps; this segment is that whole group.  [wa_dd u = wgdev
-    g] is the M5 device-view residue (delta (i) of [WeakCompose]): the pf
-    disk agent's fabric is the machine's at a DMA. *)
-Definition seg_disk (g : wgstate) (u : wlaux) (g' : wgstate) (u' : wlaux)
-    : Prop :=
-  wa_dd u = wgdev g ∧
-  ∃ (d' : dev_state) (w : gmap Arch.pa (bv 8)),
-    wdisk_step (wgdev g) (wflat (wgimg g) (wglog g)) d' w ∧
-    g' = wdisk_write g d' w ∧
-    u' = WLAux (wa_dstr u) (wa_iq u) d'
-           (emit_ws (wa_dws u) (length (wglog g)) (wmsgs_of_map w)).
-
-Definition xv6_seg (g : wgstate) (u : wlaux) (g' : wgstate) (u' : wlaux)
-    : Prop :=
-  (∃ cpu, seg_hart g u cpu g' u') ∨ (∃ cpu, seg_plic g u cpu g' u')
-  ∨ seg_disk g u g' u'.
-
-Definition xv6_stepR (x y : wgstate * wlaux) : Prop := xv6_seg x.1 x.2 y.1 y.2.
-
-(** A BLOCK-ATOMIC RUN. *)
-Definition xv6_blocks : relation (wgstate * wlaux) := rtc xv6_stepR.
-
-(* ====================================================================== *)
-(** ** 4. Each segment IS a promise-free run of [pstep_xv6] *)
-
-Lemma sail_block_pf_run (i : agent) (c c' : wpcfg psail) :
-  sail_block riscv_step i c c' → rtc (wp_pf_run (sail_step riscv_step)) c c'.
+(** REASSEMBLY, for a step that moved ONE HART: the configuration whose
+    agent [cpu] has been replaced IS the corresponding configuration of the
+    updated [WeakLang] state.  (The old file's [wl_cfg_hart_update], with the
+    log freed — a hart block appends to it.) *)
+Lemma wl_cfg_hart_upd g u cpu (g' : wgstate) (u' : wlaux) (st' : psail)
+    (ws' : wstate) :
+  wgimg g' = wgimg g → wa_dd u' = wa_dd u → wa_dws u' = wa_dws u →
+  (∀ c, c ≠ cpu → hag g' u' c = hag g u c) →
+  hag g' u' cpu = WPAgent st' ws' ∅ →
+  WPCfg (pc_img (wl_cfg g u)) (wglog g')
+    (<[fin_to_nat cpu := WPAgent (PHart st') ws' (∅ : gset nat)]>
+       (pc_ags (wl_cfg g u)))
+  = wl_cfg g' u'.
 Proof.
-  intros (_ & _ & c0 & Hsolo & Hrtc).
-  eapply rtc_l; [by eapply pf_solo_run|].
-  clear Hsolo. induction Hrtc as [|x y z [_ Hs] _ IH]; [done|].
-  eapply rtc_l; [by eapply pf_solo_run|exact IH].
+  intros Himg Hdd Hdws Hne Hcpu.
+  rewrite !wl_cfg_alt. cbn [pc_img pc_log pc_ags].
+  rewrite Himg /dkag Hdd Hdws. f_equal.
+  rewrite insert_app_l; [|rewrite wl_cfg_harts_len; apply fin_to_nat_lt].
+  f_equal.
+  have Hx : WPAgent (PHart st') ws' (∅ : gset nat) = lift_ag (hag g' u' cpu)
+    by rewrite Hcpu.
+  rewrite Hx.
+  apply (cpu_fmap_insert (λ c, lift_ag (hag g u c))
+           (λ c, lift_ag (hag g' u' c)) cpu).
+  intros c Hc. by rewrite (Hne c Hc).
 Qed.
 
-(** The emit group: one [PFStore] per buffered message, appending EXACTLY
-    the messages [WeakLang.wmsgs_of_map] would.  The class binder of
-    [PFStore] is instantiated at the message's own [wm_ak] — that is the
-    disk half of the [cls_canon] residue (see the header). *)
-Lemma emit_run (img : image) (hags : list (wpagent pxv6)) (d : dev_state)
-    (ms : list wmsg) :
-  Forall (λ m, wm_tid m = Some (length hags) ∧ wm_data m ≠ []) ms →
-  ∀ (log : list wmsg) (ws : wstate),
-  rtc (wp_pf_run (pstep_xv6 riscv_step))
-    (WPCfg img log (hags ++ [WPAgent (PDisk d ms) ws ∅]))
-    (WPCfg img (log ++ ms)
-       (hags ++ [WPAgent (PDisk d []) (emit_ws ws (length log) ms) ∅])).
+(** …and its DISK twin. *)
+Lemma wl_cfg_disk_upd g u (g' : wgstate) (u' : wlaux) (st' : pxv6)
+    (ws' : wstate) :
+  wgimg g' = wgimg g →
+  (∀ c, hag g' u' c = hag g u c) →
+  dkag u' = WPAgent st' ws' ∅ →
+  WPCfg (pc_img (wl_cfg g u)) (wglog g')
+    (<[n_disk := WPAgent st' ws' (∅ : gset nat)]> (pc_ags (wl_cfg g u)))
+  = wl_cfg g' u'.
 Proof.
-  induction ms as [|m ms' IH]; intros Hall log ws.
-  { rewrite app_nil_r /=. apply rtc_refl. }
-  apply Forall_cons in Hall as [[Htid Hdata] Hall'].
-  have Hm : WMsg (wm_pa m) (wm_data m) (Some (length hags)) (wm_ak m) = m.
-  { destruct m as [pa dat tid ak]; simpl in Htid; by rewrite Htid. }
-  eapply rtc_l.
-  { exists (length hags), (WeakPromise.LStore false (wm_pa m) (wm_data m)).
-    eapply (PFStore (pstep_xv6 riscv_step) (length hags)
-              (WPCfg img log (hags ++ [WPAgent (PDisk d (m :: ms')) ws ∅]))
-              (WPAgent (PDisk d (m :: ms')) ws ∅) false (wm_pa m) (wm_data m)
-              (wm_ak m) (PDisk d ms')).
-    - cbn [pc_ags]. apply lookup_app_last.
-    - cbn [pa_st]. right. by exists m, ms'.
-    - exact Hdata. }
-  cbn [pc_img pc_log pc_ags pa_ws pa_prom].
-  rewrite Hm insert_app_last.
-  have Hlen : length (log ++ [m]) = S (length log) by rewrite length_app /=; lia.
-  have HIH := IH Hall' (log ++ [m])
-                (store_post_run ws false (wm_pa m) (length (wm_data m))
-                   (S (length log))).
-  rewrite Hlen -app_assoc /= in HIH. exact HIH.
+  intros Himg Hne Hdk.
+  rewrite !wl_cfg_alt. cbn [pc_img pc_log pc_ags].
+  rewrite Himg. f_equal.
+  have Hl : length ((λ c, lift_ag (hag g u c)) <$> enum CPU) = n_disk
+    by rewrite wl_cfg_harts_len.
+  rewrite -Hl insert_app_last -Hdk.
+  f_equal. apply fmap_ext_l. intros c. by rewrite Hne.
+Qed.
+
+(* ====================================================================== *)
+(** ** 3. pxv6 ⇒ psail: PROJECTING A SOLO HART RUN, AND CUTTING IT INTO
+       INSTRUCTION BLOCKS
+
+    [WeakSailCone.pf_step_lift] moves a [psail] step to [pxv6]; this is the
+    mirror.  [WeakSailCone.prj_cfg] is the projection (the disk agent gets an
+    inert filler state, never stepped and never read), and a [pf_xsolo] step
+    of a HART agent projects to a [WeakSailLTS2.pf_solo] step — with
+    [cls_canon]/[rmw_tight] carried across, since [prj_cfg] preserves the
+    image, the log and every agent's [wstate].
+
+    Then [xblk] — the [pxv6] twin of [WeakSailLTS2.sail_block] — and the
+    decomposition of a boundary-to-boundary solo run into [xblk]s. *)
+
+Section prj.
+  Context (next : bool → M unit).
+
+  Definition xhart (i : agent) (c : wpcfg pxv6) : Prop :=
+    ∃ ag q, pc_ags c !! i = Some ag ∧ pa_st ag = PHart q.
+
+  Definition xat_bnd (i : agent) (c : wpcfg pxv6) : Prop :=
+    ∃ ag q, pc_ags c !! i = Some ag ∧ pa_st ag = PHart q ∧ sp_m q = None.
+
+  Definition xin_blk (i : agent) (c : wpcfg pxv6) : Prop :=
+    ∃ ag q, pc_ags c !! i = Some ag ∧ pa_st ag = PHart q ∧ sp_m q ≠ None.
+
+  Definition xpf_in_blk (i : agent) (c c' : wpcfg pxv6) : Prop :=
+    xin_blk i c ∧ pf_xsolo next i c c'.
+
+  (** ONE INSTRUCTION BLOCK at [pxv6]: boundary, one step that loads the
+      instruction, its events, boundary — no interior boundary. *)
+  Definition xblk (i : agent) (c c' : wpcfg pxv6) : Prop :=
+    xat_bnd i c ∧ xat_bnd i c' ∧
+    ∃ c0, pf_xsolo next i c c0 ∧ rtc (xpf_in_blk i) c0 c'.
+
+  Lemma xat_bnd_hart i c : xat_bnd i c → xhart i c.
+  Proof. intros (ag & q & H1 & H2 & _). by exists ag, q. Qed.
+
+  Lemma xin_blk_hart i c : xin_blk i c → xhart i c.
+  Proof. intros (ag & q & H1 & H2 & _). by exists ag, q. Qed.
+
+  Lemma xhart_cases i c : xhart i c → xat_bnd i c ∨ xin_blk i c.
+  Proof.
+    intros (ag & q & Hlk & Hst). destruct (sp_m q) as [m|] eqn:Hm.
+    - right. exists ag, q. split_and!; [done|done|by rewrite Hm].
+    - left. by exists ag, q.
+  Qed.
+
+  Lemma xat_bnd_not_in i c : xat_bnd i c → xin_blk i c → False.
+  Proof.
+    intros (ag & q & Hlk & Hst & Hm) (ag' & q' & Hlk' & Hst' & Hm').
+    apply Hm'. rewrite Hlk in Hlk'. injection Hlk' as <-.
+    rewrite Hst in Hst'. by injection Hst' as <-.
+  Qed.
+
+  Lemma prj_lookup (q0 : psail) (i : agent) (c : wpcfg pxv6) ag :
+    pc_ags c !! i = Some ag → pc_ags (prj_cfg q0 c) !! i = Some (prj_ag q0 ag).
+  Proof. intros H. by rewrite /prj_cfg /= list_lookup_fmap H. Qed.
+
+  (** SPECIES IS PRESERVED: a solo step of a hart agent leaves a hart. *)
+  Lemma pf_xsolo_hart (i : agent) (c c' : wpcfg pxv6) :
+    xhart i c → pf_xsolo next i c c' → xhart i c'.
+  Proof.
+    intros (agx & qx & Hax & Hstx) (l & Hstep & _ & _).
+    destruct Hstep as
+      [cfg ag st' Hlk Hps
+      |cfg ag aq lat base tvs st' Hlk Hps Hr
+      |cfg ag rl base data kk st' Hlk Hps Hne
+      |cfg ag aq rl base tvs data kk st' Hlk Hps Hne Hlen Hr He
+      |cfg ag pr pw sr sw st' Hlk Hps];
+      simpl in Hax; rewrite Hlk in Hax; injection Hax as <-;
+      rewrite Hstx /= in Hps;
+      (destruct st' as [q'|dd pend]; [|done]);
+      (eexists _, q'; simpl; split; [by eapply lookup_insert_self|done]).
+  Qed.
+
+  Lemma pf_xsolo_run_hart (i : agent) (c c' : wpcfg pxv6) :
+    xhart i c → rtc (pf_xsolo next i) c c' → xhart i c'.
+  Proof.
+    intros Hh Hrun. revert Hh. induction Hrun as [|x y z Hxy _ IH]; [done|].
+    intros Hh. apply IH. by eapply pf_xsolo_hart.
+  Qed.
+
+  (** THE STEP PROJECTION. *)
+  Lemma pf_xsolo_prj (q0 : psail) (i : agent) (c c' : wpcfg pxv6) :
+    xhart i c → pf_xsolo next i c c' →
+    xhart i c' ∧ pf_solo next i (prj_cfg q0 c) (prj_cfg q0 c').
+  Proof.
+    intros (agx & qx & Hax & Hstx) (l & Hstep & Hcls & Hrmw).
+    destruct Hstep as
+      [cfg ag st' Hlk Hps
+      |cfg ag aq lat base tvs st' Hlk Hps Hr
+      |cfg ag rl base data kk st' Hlk Hps Hne
+      |cfg ag aq rl base tvs data kk st' Hlk Hps Hne Hlen Hr He
+      |cfg ag pr pw sr sw st' Hlk Hps];
+      simpl in Hax; rewrite Hlk in Hax; injection Hax as <-;
+      rewrite Hstx /= in Hps;
+      (destruct st' as [q'|dd pend]; [|done]);
+      (have Hlks : pc_ags (prj_cfg q0 cfg) !! i = Some (prj_ag q0 ag)
+         by apply prj_lookup);
+      (have Hlt : (i < length (pc_ags cfg))%nat
+         by exact (lookup_lt_Some _ _ _ Hlk));
+      rewrite /prj_cfg; cbn [pc_img pc_log pc_ags];
+      rewrite list_fmap_insert.
+    - split.
+      { exists (WPAgent (PHart q') (pa_ws ag) (pa_prom ag)), q'. simpl.
+        split; [by eapply lookup_insert_self|done]. }
+      exists WeakPromise.LSilent. split_and!.
+      + apply (PFSilent (sail_step_ni next) i (prj_cfg q0 cfg)
+                 (prj_ag q0 ag) q' Hlks).
+        rewrite /prj_ag /= Hstx. exact Hps.
+      + intros ag2 msg Hag2 Heq. simpl in Heq.
+        by destruct (app_snoc_absurd _ _ Heq).
+      + exact I.
+    - split.
+      { exists (WPAgent (PHart q') (load_post_run (pa_ws ag) aq base tvs.*1)
+                  (pa_prom ag)), q'. simpl.
+        split; [by eapply lookup_insert_self|done]. }
+      exists (WeakPromise.LLoad aq lat base tvs). split_and!.
+      + apply (PFLoad (sail_step_ni next) i (prj_cfg q0 cfg)
+                 (prj_ag q0 ag) aq lat base tvs q' Hlks);
+          [rewrite /prj_ag /= Hstx; exact Hps|exact Hr].
+      + intros ag2 msg Hag2 Heq. simpl in Heq.
+        by destruct (app_snoc_absurd _ _ Heq).
+      + exact I.
+    - split.
+      { eexists _, q'. simpl. split; [by eapply lookup_insert_self|done]. }
+      exists (WeakPromise.LStore rl base data). split_and!.
+      + apply (PFStore (sail_step_ni next) i (prj_cfg q0 cfg)
+                 (prj_ag q0 ag) rl base data kk q' Hlks);
+          [rewrite /prj_ag /= Hstx; exact Hps|exact Hne].
+      + intros ag2 msg Hag2 Heq. simpl in Heq, Hag2.
+        rewrite Hlks in Hag2. injection Hag2 as <-.
+        exact (Hcls ag msg Hlk Heq).
+      + exact I.
+    - split.
+      { eexists _, q'. simpl. split; [by eapply lookup_insert_self|done]. }
+      exists (WeakPromise.LRmw aq rl base tvs data). split_and!.
+      + apply (PFRmw (sail_step_ni next) i (prj_cfg q0 cfg)
+                 (prj_ag q0 ag) aq rl base tvs data kk q' Hlks);
+          [rewrite /prj_ag /= Hstx; exact Hps|exact Hne|exact Hlen
+          |exact Hr|exact He].
+      + intros ag2 msg Hag2 Heq. simpl in Heq, Hag2.
+        rewrite Hlks in Hag2. injection Hag2 as <-.
+        exact (Hcls ag msg Hlk Heq).
+      + intros ag2 Hag2. simpl in Hag2. rewrite Hlks in Hag2.
+        injection Hag2 as <-. exact (Hrmw ag Hlk).
+    - split.
+      { eexists _, q'. simpl. split; [by eapply lookup_insert_self|done]. }
+      exists (WeakPromise.LFence pr pw sr sw). split_and!.
+      + apply (PFFence (sail_step_ni next) i (prj_cfg q0 cfg)
+                 (prj_ag q0 ag) pr pw sr sw q' Hlks).
+        rewrite /prj_ag /= Hstx. exact Hps.
+      + intros ag2 msg Hag2 Heq. simpl in Heq.
+        by destruct (app_snoc_absurd _ _ Heq).
+      + exact I.
+  Qed.
+
+  Lemma pf_xsolo_run_prj (q0 : psail) (i : agent) (c c' : wpcfg pxv6) :
+    xhart i c → rtc (pf_xsolo next i) c c' →
+    xhart i c' ∧ rtc (pf_solo next i) (prj_cfg q0 c) (prj_cfg q0 c').
+  Proof.
+    intros Hh Hrun. revert Hh. induction Hrun as [x|x y z Hxy _ IH]; intros Hh.
+    { split; [done|apply rtc_refl]. }
+    destruct (pf_xsolo_prj q0 i x y Hh Hxy) as (Hh' & Hs).
+    destruct (IH Hh') as (Hh'' & Hrs).
+    split; [done|by eapply rtc_l].
+  Qed.
+
+  Lemma xat_bnd_prj (q0 : psail) i c :
+    xat_bnd i c → at_boundary i (prj_cfg q0 c).
+  Proof.
+    intros (ag & q & Hlk & Hst & Hm).
+    exists (prj_ag q0 ag). split; [by apply prj_lookup|].
+    by rewrite /prj_ag /= Hst.
+  Qed.
+
+  Lemma xin_blk_prj (q0 : psail) i c :
+    xin_blk i c → in_block i (prj_cfg q0 c).
+  Proof.
+    intros (ag & q & Hlk & Hst & Hm).
+    exists (prj_ag q0 ag). split; [by apply prj_lookup|].
+    by rewrite /prj_ag /= Hst.
+  Qed.
+
+  Lemma xblk_run i c c' : xblk i c c' → rtc (pf_xsolo next i) c c'.
+  Proof.
+    intros (_ & _ & c0 & H0 & Hrtc). eapply rtc_l; [exact H0|].
+    clear H0. induction Hrtc as [|x y z [_ Hs] _ IH]; [apply rtc_refl|].
+    by eapply rtc_l.
+  Qed.
+
+  Lemma xpf_in_blk_run_prj (q0 : psail) (i : agent) (c c' : wpcfg pxv6) :
+    xhart i c → rtc (xpf_in_blk i) c c' →
+    rtc (pf_in_block next i) (prj_cfg q0 c) (prj_cfg q0 c').
+  Proof.
+    intros Hh Hrtc. revert Hh.
+    induction Hrtc as [x|x y z [Hin Hxy] _ IH]; intros Hh.
+    { apply rtc_refl. }
+    destruct (pf_xsolo_prj q0 i x y Hh Hxy) as (Hh' & Hs).
+    eapply rtc_l; [split; [by apply xin_blk_prj|exact Hs]|].
+    exact (IH Hh').
+  Qed.
+
+  (** THE BLOCK, PROJECTED — a [WeakSailLTS2.sail_block]. *)
+  Lemma xblk_prj (q0 : psail) i c c' :
+    xblk i c c' → sail_block next i (prj_cfg q0 c) (prj_cfg q0 c').
+  Proof.
+    intros (Hb & Hb' & c0 & H0 & Hrtc).
+    split_and!; [by apply xat_bnd_prj|by apply xat_bnd_prj|].
+    destruct (pf_xsolo_prj q0 i c c0 (xat_bnd_hart i c Hb) H0) as (Hh0 & Hs0).
+    exists (prj_cfg q0 c0). split; [exact Hs0|].
+    exact (xpf_in_blk_run_prj q0 i c0 c' Hh0 Hrtc).
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (** THE DECOMPOSITION.  Cut a solo run at the FIRST interior boundary and
+      recurse: what precedes the cut is one [xblk], what follows is shorter. *)
+
+  Lemma xblk_split (i : agent) (n : nat) (c c' : wpcfg pxv6) :
+    relations.nsteps (pf_xsolo next i) n c c' → xhart i c → xat_bnd i c' →
+    ∃ (k : nat) (ck : wpcfg pxv6),
+      (k ≤ n)%nat ∧ rtc (xpf_in_blk i) c ck ∧ xat_bnd i ck ∧
+      relations.nsteps (pf_xsolo next i) (n - k) ck c'.
+  Proof.
+    revert c. induction n as [|n IH]; intros c Hst Hh Hb.
+    - exists 0%nat, c'. inversion Hst; subst.
+      split_and!; [lia|apply rtc_refl|done|by constructor].
+    - destruct (xhart_cases i c Hh) as [Hbc|Hic].
+      { exists 0%nat, c. split_and!; [lia|apply rtc_refl|done|].
+        by rewrite Nat.sub_0_r. }
+      inversion Hst as [|n0 x y z Hxy Hyz Hn0 Hx Hz]; subst.
+      destruct (IH y Hyz (pf_xsolo_hart i c y Hh Hxy) Hb)
+        as (k & ck & Hk & Hrun & Hbk & Hrest).
+      exists (S k), ck. split_and!; [lia| |done|].
+      + eapply rtc_l; [split; [exact Hic|exact Hxy]|exact Hrun].
+      + by replace (S n - S k)%nat with (n - k)%nat by lia.
+  Qed.
+
+  Lemma xsolo_blocks (i : agent) (n : nat) :
+    ∀ (m : nat) (c c' : wpcfg pxv6), (m ≤ n)%nat →
+      relations.nsteps (pf_xsolo next i) m c c' → xat_bnd i c → xat_bnd i c' →
+      rtc (xblk i) c c'.
+  Proof.
+    induction n as [|n IH]; intros m c c' Hm Hst Hb Hb'.
+    - assert (m = 0%nat) as -> by lia. inversion Hst; subst. apply rtc_refl.
+    - destruct m as [|m].
+      { inversion Hst; subst. apply rtc_refl. }
+      inversion Hst as [|n0 x y z Hxy Hyz Hn0 Hx Hz]; subst.
+      destruct (xblk_split i m y c' Hyz
+                  (pf_xsolo_hart i c y (xat_bnd_hart i c Hb) Hxy) Hb')
+        as (k & ck & Hk & Hrun & Hbk & Hrest).
+      eapply rtc_l; [|eapply (IH (m - k)%nat ck c'); [lia|exact Hrest|done|done]].
+      split_and!; [exact Hb|exact Hbk|]. by exists y.
+  Qed.
+
+  Lemma xsolo_run_blocks (i : agent) (c c' : wpcfg pxv6) :
+    rtc (pf_xsolo next i) c c' → xat_bnd i c → xat_bnd i c' →
+    rtc (xblk i) c c'.
+  Proof.
+    intros Hrun Hb Hb'. apply rtc_nsteps in Hrun as (n & Hn).
+    by eapply (xsolo_blocks i n n).
+  Qed.
+
+End prj.
+
+(* ====================================================================== *)
+(** ** 4. THE SEGMENT REFINEMENT
+
+    [WeakSailCone.cone_segments2]'s hart segments run from boundary to
+    boundary but may cover MANY instructions; one [WeakLang] hart step is
+    exactly ONE.  [seg2_refine] re-cuts a chain so that every hart segment is
+    a single [xblk], leaving the chain's start, its END configuration and the
+    irq/disk segments alone.  [seg2_fine] is the resulting per-segment data —
+    for harts it is SHARPER than [seg2_ok] in the block dimension and drops
+    [seg2_ok]'s parked-fence conjunct, which the lift never reads (the
+    corresponding state is pinned by [wl_cfg] anyway). *)
+
+Definition seg2_fine (s : seg2) : Prop :=
+  match s with
+  | SegHart i c c' => xblk riscv_step i c c'
+  | SegIrq i c c' => seg2_irq_ok i c c'
+  | SegDisk i c c' => seg2_disk_ok i c c'
+  end.
+
+Lemma xblk_chain (i : agent) (c c' : wpcfg pxv6) :
+  rtc (xblk riscv_step i) c c' →
+  ∃ segs, chained2 segs c c' ∧ Forall seg2_fine segs.
+Proof.
+  induction 1 as [x|x y z Hxy _ (segs & Hch & Hall)].
+  - exists []. split; [done|constructor].
+  - exists (SegHart i x y :: segs). split; [by split|by constructor].
+Qed.
+
+Lemma seg2_hart_refine (i : agent) (c c' : wpcfg pxv6) :
+  seg2_hart_ok i c c' →
+  ∃ segs, chained2 segs c c' ∧ Forall seg2_fine segs.
+Proof.
+  intros ((ag & q & Hlk & Hst) & Hb & Hb' & Hrun).
+  have Hp : pbnd (pa_st ag) := Hb ag Hlk.
+  rewrite Hst in Hp. destruct Hp as (Hm & _).
+  have Hbc : xat_bnd i c by exists ag, q.
+  destruct (pf_xsolo_run_hart riscv_step i c c' (xat_bnd_hart i c Hbc) Hrun)
+    as (ag2 & q2 & Hlk2 & Hst2).
+  have Hp2 : pbnd (pa_st ag2) := Hb' ag2 Hlk2.
+  rewrite Hst2 in Hp2. destruct Hp2 as (Hm2 & _).
+  have Hbc' : xat_bnd i c' by exists ag2, q2.
+  exact (xblk_chain i c c' (xsolo_run_blocks riscv_step i c c' Hrun Hbc Hbc')).
+Qed.
+
+Lemma seg2_refine (segs : list seg2) (c cf : wpcfg pxv6) :
+  chained2 segs c cf → Forall seg2_ok segs →
+  ∃ segs', chained2 segs' c cf ∧ Forall seg2_fine segs'.
+Proof.
+  revert c. induction segs as [|s segs IH]; intros c Hch Hall.
+  { exists []. simpl in Hch. split; [by simpl|constructor]. }
+  apply Forall_cons in Hall as [Hok Hall].
+  destruct s as [i c1 c2|i c1 c2|i c1 c2]; simpl in Hch, Hok;
+    destruct Hch as (Hsrc & Hch); subst c1;
+    destruct (IH c2 Hch Hall) as (segs' & Hch' & Hall').
+  - destruct (seg2_hart_refine i c c2 Hok) as (sh & Hchh & Hallh).
+    exists (sh ++ segs'). split.
+    + by eapply chained2_app; [exact Hchh|exact Hch'].
+    + by apply Forall_app.
+  - exists (SegIrq i c c2 :: segs'). split; [by split|by constructor].
+  - exists (SegDisk i c c2 :: segs'). split; [by split|by constructor].
 Qed.
 
 (* ====================================================================== *)
@@ -587,238 +870,260 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
-(** ** 6. Each segment maps to ONE [wprim_step] *)
+(** ** 6. THE LIFT, AND ITS SOUNDNESS
 
-(** THE HART ARM.  [WeakSailLTS2.sail_block_wrun] inverts the block into the
-    [wrun] of one instruction at [whart_view g cpu]; the frame conditions of
-    [seg_hart] then say the segment's target IS [whart_write g cpu s']. *)
-Lemma seg_hart_step (gen : nat) g u cpu g' u' :
-  (∀ b, sail_shaped (riscv_step b)) →
-  wthread_live g gen →
-  seg_hart g u cpu g' u' →
-  wthread_live g' gen ∧
-  rtc (wp_pf_run (pstep_xv6 riscv_step)) (wl_cfg g u) (wl_cfg g' u') ∧
-  wprim_step (LoopE gen cpu) g [] (LoopE gen cpu) g' [].
-Proof.
-  intros Hsh Hlive
-    (Hoc & Hblk & Himg & Hgen & Hpow & Hregs & Hws & Hdd & Hdws & Hseam).
-  have Hdk : dkag u' = dkag u by rewrite /dkag Hdd Hdws.
-  split_and!.
-  { destruct Hlive as [Hp Hg]. split; [by rewrite Hpow|by rewrite Hgen]. }
-  { rewrite /wl_cfg Hdk. apply (pf_run_frame riscv_step [dkag u]).
-    exact (sail_block_pf_run (fin_to_nat cpu) _ _ Hblk). }
-  destruct (sail_block_wrun riscv_step (fin_to_nat cpu) (whart_view g cpu)
-              (wa_dstr u cpu) (wa_iq u cpu) ∅ (hag g u <$> enum CPU)
-              (hcfg g' u') Hsh Hoc (hcfg_lookup g u cpu) Hblk)
-    as (tick & x & s' & dtl & Hrun & Heq).
-  have Hl : wglog g' = wm_log s' by exact (f_equal (@pc_log psail) Heq).
-  have Ha : (hag g' u' <$> enum CPU)
-          = <[fin_to_nat cpu :=
-                WPAgent (PSail None (wm_regs s') dtl None (wa_iq u cpu))
-                  (wm_ws s') ∅]> (hag g u <$> enum CPU)
-    by exact (f_equal (@pc_ags psail) Heq).
-  have Hcpu : hag g' u' cpu
-            = WPAgent (PSail None (wm_regs s') dtl None (wa_iq u cpu))
-                (wm_ws s') ∅.
-  { have H : (hag g' u' <$> enum CPU) !! (fin_to_nat cpu)
-           = (<[fin_to_nat cpu :=
-                  WPAgent (PSail None (wm_regs s') dtl None (wa_iq u cpu))
-                    (wm_ws s') ∅]> (hag g u <$> enum CPU)) !! (fin_to_nat cpu)
-      by rewrite Ha.
-    rewrite (hcfg_lookup g' u' cpu) in H.
-    rewrite list_lookup_insert in H;
-      [|rewrite length_fmap cpu_enum_length; apply fin_to_nat_lt].
-    apply (inj Some) in H. exact H. }
-  have Hregc : wgregs g' cpu = wm_regs s'
-    by exact (f_equal (λ a : wpagent psail, sp_regs (pa_st a)) Hcpu).
-  have Hwsc : wgws g' cpu = wm_ws s'
-    by exact (f_equal (λ a : wpagent psail, pa_ws a) Hcpu).
-  have Hdev : wm_dev s' = wgdev g'.
-  { apply (Hseam tick x s' Hrun);
-      [by rewrite Hl|by rewrite Hregc|by rewrite Hwsc]. }
-  left. exists gen, cpu. split_and!; [reflexivity|reflexivity|reflexivity|reflexivity|].
-  left. split; [exact Hlive|]. exists tick, x, s'. split; [exact Hrun|].
-  rewrite /whart_write.
-  destruct g' as [r0 i0 l0 w0 d0 n0 p0]. cbn in *.
-  rewrite -Hdev -Himg -Hgen -Hpow -Hl. f_equal.
-  - rewrite Hregs. by rewrite Hregc.
-  - rewrite Hws. by rewrite Hwsc.
-Qed.
+    [wl_lift gen segs g u] is the per-segment DEVICE-SEAM residue, and
+    nothing else: the successor [WeakLang] state is never named by it, it is
+    constructed by [wl_lift_sound] out of the [wrun] that
+    [WeakSailLTS2.sail_block_wrun] reconstructs from the segment.  The
+    continuations are quantified over exactly the successors that MATCH the
+    segment's target configuration — which is what makes the residue
+    per-decomposition rather than global. *)
 
-(** A one-hart update of the configuration, in the shape [PFSilent] /
-    [PFLoad] / … produce it. *)
-Lemma wl_cfg_hart_update g u cpu (g' : wgstate) (u' : wlaux) (st' : psail) :
-  wa_dd u' = wa_dd u → wa_dws u' = wa_dws u →
-  wgimg g' = wgimg g → wglog g' = wglog g →
-  (∀ c, c ≠ cpu → hag g' u' c = hag g u c) →
-  hag g' u' cpu = WPAgent st' (wgws g cpu) ∅ →
-  WPCfg (pc_img (wl_cfg g u)) (pc_log (wl_cfg g u))
-    (<[fin_to_nat cpu := WPAgent (PHart st') (wgws g cpu) (∅ : gset nat)]>
-       (pc_ags (wl_cfg g u)))
-  = wl_cfg g' u'.
-Proof.
-  intros Hdd Hdws Himg Hlog Hne Hcpu.
-  rewrite !wl_cfg_alt. cbn [pc_img pc_log pc_ags].
-  rewrite Himg Hlog /dkag Hdd Hdws. f_equal.
-  rewrite insert_app_l; [|rewrite wl_cfg_harts_len; apply fin_to_nat_lt].
-  f_equal.
-  have Hx : WPAgent (PHart st') (wgws g cpu) (∅ : gset nat)
-          = lift_ag (hag g' u' cpu) by rewrite Hcpu.
-  rewrite Hx.
-  apply (cpu_fmap_insert (λ c, lift_ag (hag g u c))
-           (λ c, lift_ag (hag g' u' c)) cpu).
-  intros c Hc. by rewrite (Hne c Hc).
-Qed.
+Fixpoint wl_lift (gen : nat) (segs : list seg2) (g : wgstate) (u : wlaux)
+    : Prop :=
+  match segs with
+  | [] => True
+  | SegHart i c c' :: rest =>
+      ∃ cpu : CPU, i = fin_to_nat cpu ∧
+        (** the MMIO seam: this hart's oracle stream is what the fabric
+            [wgdev g] answers, along every path of every instruction *)
+        (∀ b, oracle_consistent (wgdev g) (riscv_step b) (wa_dstr u cpu)) ∧
+        (∀ (tick : bool) (x : unit) (s' : wmstate) (dtl : dstream),
+           wrun (Some i) (riscv_step tick) (whart_view g cpu) x s' →
+           wl_cfg (whart_write g cpu s') (wl_dstr cpu dtl u) = c' →
+           wl_lift gen rest (whart_write g cpu s') (wl_dstr cpu dtl u))
+  | SegIrq i c c' :: rest =>
+      ∃ cpu : CPU, i = fin_to_nat cpu ∧
+        (** the PLIC WIRE: the delivered value is the fabric's [seip] pin *)
+        (∀ (v : type_of_register sig_seip) (iq' : istream),
+           wa_iq u cpu = v :: iq' →
+           v = bool_to_bit (dev_seip (wgdev g) (fin_to_nat cpu)) ∧
+           wl_lift gen rest (wplic_write g cpu) (wl_iq cpu iq' u))
+  | SegDisk i c c' :: rest =>
+      i = n_disk ∧
+      (** the M5 DEVICE VIEW: the pf disk agent's fabric is the machine's *)
+      wa_dd u = wgdev g ∧
+      (∀ (d' : dev_state) (w : gmap Arch.pa (bv 8)) (ws' : wstate),
+         pc_ags c' !! n_disk = Some (WPAgent (PDisk d' []) ws' ∅) →
+         pc_log c' = wglog g ++ wmsgs_of_map w →
+         (∃ mem, wdisk_step (wgdev g) mem d' w) →
+         (** …and the burst holds at the TRUE flat memory (P4) *)
+         wdisk_step (wgdev g) (wflat (wgimg g) (wglog g)) d' w ∧
+         wl_lift gen rest (wdisk_write g d' w) (wl_dk d' ws' u))
+  end.
 
-(** THE PLIC ARM. *)
-Lemma seg_plic_step (gen : nat) g u cpu g' u' :
-  wthread_live g gen →
-  seg_plic g u cpu g' u' →
-  wthread_live g' gen ∧
-  rtc (wp_pf_run (pstep_xv6 riscv_step)) (wl_cfg g u) (wl_cfg g' u') ∧
-  wprim_step (PlicLoopE gen) g [] (PlicLoopE gen) g' [].
+Lemma wpcfg_eq {P : Type} (c1 c2 : wpcfg P) :
+  pc_img c1 = pc_img c2 → pc_log c1 = pc_log c2 → pc_ags c1 = pc_ags c2 →
+  c1 = c2.
+Proof. destruct c1, c2; simpl; by intros -> -> ->. Qed.
+
+Theorem wl_lift_sound (gen : nat) (Hsh : ∀ b, sail_shaped (riscv_step b))
+    (segs : list seg2) :
+  ∀ (g : wgstate) (u : wlaux) (cf : wpcfg pxv6),
+    chained2 segs (wl_cfg g u) cf → Forall seg2_fine segs →
+    wthread_live g gen → wl_lift gen segs g u →
+    ∃ g' u', cf = wl_cfg g' u' ∧ wthread_live g' gen ∧
+             rtc (@erased_step weak_riscv_lang) (wpool gen, g) (wpool gen, g').
 Proof.
-  intros Hlive ((v & iq' & Hiq & Hv & ->) & ->).
-  split_and!; [exact Hlive| |].
-  - apply rtc_once.
-    have Heq : WPCfg (pc_img (wl_cfg g u)) (pc_log (wl_cfg g u))
-                 (<[fin_to_nat cpu :=
-                      WPAgent (PHart (PSail None
-                                        (register_set sig_seip v (wgregs g cpu))
-                                        (wa_dstr u cpu) None iq'))
-                        (wgws g cpu) (∅ : gset nat)]> (pc_ags (wl_cfg g u)))
-             = wl_cfg (wplic_write g cpu)
-                 (WLAux (wa_dstr u) (cupd cpu iq' (wa_iq u)) (wa_dd u) (wa_dws u)).
-    { apply wl_cfg_hart_update; [done|done|done|done| |].
-      - intros c Hc. rewrite /hag /wplic_write /=.
-        by rewrite (greg_insert_ne _ _ _ _ Hc) (cupd_ne _ _ _ _ Hc).
-      - rewrite /hag /wplic_write /=. by rewrite greg_insert_eq cupd_eq -Hv. }
-    rewrite -Heq. exists (fin_to_nat cpu), WeakPromise.LSilent.
-    apply (PFSilent (pstep_xv6 riscv_step) (fin_to_nat cpu) (wl_cfg g u)
-             (lift_ag (hag g u cpu)) _ (wl_cfg_hart_lookup g u cpu)).
-    cbn [pa_st lift_ag hag]. rewrite /pstep_xv6 /sail_step /=.
-    left. split; [reflexivity|]. exists v, iq'. by rewrite Hiq.
-  - right. right. right. left. exists gen.
+  induction segs as [|s segs IH]; intros g u cf Hch Hall Hlive Hlift.
+  { simpl in Hch. exists g, u. split_and!; [by rewrite Hch|done|apply rtc_refl]. }
+  apply Forall_cons in Hall as [Hfine Hall].
+  destruct s as [i c c'|i c c'|i c c']; simpl in Hch, Hfine, Hlift;
+    destruct Hch as (Hsrc & Hch); subst c.
+  - (* ---------------- ONE HART INSTRUCTION BLOCK ---------------- *)
+    destruct Hlift as (cpu & -> & Hoc & Hcont).
+    set (q0 := PSail None (wgregs g cpu) (wa_dstr u cpu) None (wa_iq u cpu)).
+    have Hlkp : pc_ags (prj_cfg q0 (wl_cfg g u)) !! (fin_to_nat cpu)
+              = Some (WPAgent (PSail None (wgregs g cpu) (wa_dstr u cpu) None
+                                 (wa_iq u cpu)) (wgws g cpu) ∅)
+      := prj_lookup q0 _ _ _ (wl_cfg_hart_lookup g u cpu).
+    have Hblk : sail_block riscv_step (fin_to_nat cpu)
+                  (prj_cfg q0 (wl_cfg g u)) (prj_cfg q0 c')
+      := xblk_prj riscv_step q0 (fin_to_nat cpu) (wl_cfg g u) c' Hfine.
+    destruct (wprim_hart_block_bwd cpu gen g (wa_dstr u cpu) (wa_iq u cpu) ∅
+                (prj_ag q0 <$> pc_ags (wl_cfg g u)) (prj_cfg q0 c')
+                Hsh Hoc Hlive Hlkp Hblk)
+      as (g2 & dtl & Hstep & Heq).
+    have Hstep2 := Hstep.
+    apply wprim_step_loop_inv in Hstep2
+      as (_ & _ & _ & [(_ & tick & xx & s' & Hrun & Hg2)|(Hnl & _)]);
+      [|by destruct (Hnl Hlive)].
+    subst g2.
+    (* the frame of the whole block, at [pxv6] *)
+    have Hxt : xtframe (fin_to_nat cpu) (wl_cfg g u) c'
+      := pf_xsolo_run_xtframe riscv_step (fin_to_nat cpu) (wl_cfg g u) c'
+           (xblk_run riscv_step (fin_to_nat cpu) (wl_cfg g u) c' Hfine).
+    destruct Hxt as (_ & Hximg & Hxfr & _).
+    (* the block's own agent, at the target *)
+    destruct (pf_xsolo_run_hart riscv_step (fin_to_nat cpu) (wl_cfg g u) c'
+                (xat_bnd_hart (fin_to_nat cpu) (wl_cfg g u)
+                   (proj1 Hfine)) 
+                (xblk_run riscv_step (fin_to_nat cpu) (wl_cfg g u) c' Hfine))
+      as (agc & qc & Hlkc & Hstc).
+    have Hagsc : prj_ag q0 <$> pc_ags c'
+               = <[fin_to_nat cpu :=
+                     WPAgent (PSail None (wgregs (whart_write g cpu s') cpu) dtl None (wa_iq u cpu))
+                       (wgws (whart_write g cpu s') cpu) ∅]>
+                   (prj_ag q0 <$> pc_ags (wl_cfg g u))
+      := f_equal (@pc_ags psail) Heq.
+    have Hcpu : prj_ag q0 agc
+              = WPAgent (PSail None (wgregs (whart_write g cpu s') cpu) dtl None (wa_iq u cpu))
+                  (wgws (whart_write g cpu s') cpu) ∅.
+    { have H : (prj_ag q0 <$> pc_ags c') !! fin_to_nat cpu
+             = (<[fin_to_nat cpu :=
+                    WPAgent (PSail None (wgregs (whart_write g cpu s') cpu) dtl None (wa_iq u cpu))
+                      (wgws (whart_write g cpu s') cpu) ∅]>
+                 (prj_ag q0 <$> pc_ags (wl_cfg g u))) !! fin_to_nat cpu
+        by rewrite Hagsc.
+      have Hlen : (fin_to_nat cpu
+                   < length (prj_ag q0 <$> pc_ags (wl_cfg g u)))%nat.
+      { rewrite length_fmap.
+        eapply lookup_lt_Some, (wl_cfg_hart_lookup g u cpu). }
+      rewrite list_lookup_fmap Hlkc /= in H.
+      rewrite list_lookup_insert in H; [|exact Hlen].
+      apply (inj Some) in H. exact H. }
+    have Hagc : agc = WPAgent (PHart (PSail None (wgregs (whart_write g cpu s') cpu) dtl None
+                                        (wa_iq u cpu))) (wgws (whart_write g cpu s') cpu) ∅.
+    { destruct agc as [st ws pr]. simpl in Hstc, Hcpu. rewrite Hstc in Hcpu |- *.
+      by injection Hcpu as -> -> ->. }
+    have Hceq : wl_cfg (whart_write g cpu s') (wl_dstr cpu dtl u) = c'.
+    { symmetry.
+      rewrite -(wl_cfg_hart_upd g u cpu (whart_write g cpu s') (wl_dstr cpu dtl u)
+                  (PSail None (wgregs (whart_write g cpu s') cpu) dtl None (wa_iq u cpu))
+                  (wgws (whart_write g cpu s') cpu)).
+      - apply wpcfg_eq; cbn [pc_img pc_log pc_ags].
+        + rewrite Hximg. done.
+        + exact (f_equal (@pc_log psail) Heq).
+        + apply (list_eq_insert (pc_ags (wl_cfg g u)) (pc_ags c')).
+          * by rewrite Hlkc Hagc.
+          * eexists. apply wl_cfg_hart_lookup.
+          * intros j Hj. by apply Hxfr.
+      - done.
+      - done.
+      - done.
+      - intros cc Hcc. rewrite /hag /whart_write /=.
+        by rewrite (greg_insert_ne _ _ _ _ Hcc) (gws_insert_ne _ _ _ _ Hcc)
+                   /wl_dstr /= (cupd_ne _ _ _ _ Hcc).
+      - by rewrite /hag /wl_dstr /= cupd_eq. }
+    have Hlive2 : wthread_live (whart_write g cpu s') gen.
+    { destruct Hlive as [Hp Hg]. rewrite /wthread_live /whart_write /=.
+      by split. }
+    destruct (IH (whart_write g cpu s') (wl_dstr cpu dtl u) cf
+                ltac:(by rewrite Hceq) Hall Hlive2
+                (Hcont tick xx s' dtl Hrun Hceq))
+      as (g' & u' & Hcf & Hlive' & Hrun').
+    exists g', u'. split_and!; [done|done|].
+    eapply rtc_l; [|exact Hrun'].
+    eapply pool_erased; [apply wpool_hart|exact Hstep].
+  - (* ---------------- ONE INTERRUPT DELIVERY ---------------- *)
+    destruct Hlift as (cpu & -> & Hwire).
+    destruct Hfine as (ag & ag' & q & q' & Hlk & Hst & Hlk' & Hst' & Hb & Hb'
+                       & Hf & Hdel & Hws & Himg' & Hlog' & Hfr & Hpfstep).
+    rewrite (wl_cfg_hart_lookup g u cpu) in Hlk. injection Hlk as <-.
+    simpl in Hst. injection Hst as <-.
+    destruct Hdel as (_ & v & iq & Hiq & Hq'). simpl in Hiq, Hq'.
+    destruct (Hwire v iq Hiq) as (Hv & Hlift').
+    have Hnp : no_promises c'
+      := wp_pf_step_no_promises (pstep_xv6 riscv_step) (fin_to_nat cpu)
+           WeakPromise.LSilent _ _ (wl_cfg_no_promises g u) Hpfstep.
+    have Hag' : ag' = WPAgent (PHart q') (wgws g cpu) ∅.
+    { have Hpr : pa_prom ag' = ∅ := Hnp _ _ Hlk'.
+      destruct ag' as [st ws pr]. simpl in Hst', Hws, Hpr.
+      by rewrite Hst' Hws Hpr. }
+    have Hceq : wl_cfg (wplic_write g cpu) (wl_iq cpu iq u) = c'.
+    { symmetry.
+      rewrite -(wl_cfg_hart_upd g u cpu (wplic_write g cpu) (wl_iq cpu iq u)
+                  q' (wgws g cpu)).
+      - apply wpcfg_eq; cbn [pc_img pc_log pc_ags].
+        + exact Himg'.
+        + exact Hlog'.
+        + apply (list_eq_insert (pc_ags (wl_cfg g u)) (pc_ags c')).
+          * by rewrite Hlk' Hag'.
+          * eexists. apply wl_cfg_hart_lookup.
+          * intros j Hj. by apply Hfr.
+      - done.
+      - done.
+      - done.
+      - intros cc Hcc. rewrite /hag /wplic_write /wl_iq /=.
+        by rewrite (greg_insert_ne _ _ _ _ Hcc) (cupd_ne _ _ _ _ Hcc).
+      - rewrite /hag /wplic_write /wl_iq /=.
+        rewrite greg_insert_eq cupd_eq -Hv. by rewrite Hq'. }
+    destruct (IH (wplic_write g cpu) (wl_iq cpu iq u) cf
+                ltac:(by rewrite Hceq) Hall Hlive Hlift')
+      as (g' & u' & Hcf & Hlive' & Hrun').
+    exists g', u'. split_and!; [done|done|].
+    eapply rtc_l; [|exact Hrun'].
+    eapply pool_erased; [apply wpool_plic|].
+    right. right. right. left. exists gen.
     split_and!; [reflexivity|reflexivity|reflexivity|reflexivity|].
     left. split; [exact Hlive|].
     exists (<[cpu := register_set sig_seip
                        (bool_to_bit (dev_seip (wgdev g) (fin_to_nat cpu)))
                        (wgregs g cpu)]> (wgregs g)).
     split; [apply PlicStepWire|reflexivity].
-Qed.
-
-(** THE DISK ARM: the burst step plus its emit group — [1 + |w|] pf steps
-    against ONE [WeakLang] disk arm (delta (i) of [WeakCompose], inverted). *)
-Lemma seg_disk_step (gen : nat) g u g' u' :
-  wthread_live g gen →
-  seg_disk g u g' u' →
-  wthread_live g' gen ∧
-  rtc (wp_pf_run (pstep_xv6 riscv_step)) (wl_cfg g u) (wl_cfg g' u') ∧
-  wprim_step (DiskLoopE gen) g [] (DiskLoopE gen) g' [].
-Proof.
-  intros Hlive (Hdd & d' & w & Hds & -> & ->).
-  set (hags := (λ c, lift_ag (hag g u c)) <$> enum CPU).
-  have Hlen : length hags = n_disk by rewrite /hags wl_cfg_harts_len.
-  have Hags : pc_ags (wl_cfg g u) = hags ++ [dkag u] by rewrite wl_cfg_alt.
-  split_and!; [exact Hlive| |].
-  - have Hburst : wp_pf_run (pstep_xv6 riscv_step) (wl_cfg g u)
-        (WPCfg (img_z (wgimg g)) (wglog g)
-           (hags ++ [WPAgent (PDisk d' (wmsgs_of_map w))
-                       (wa_dws u) (∅ : gset nat)])).
-    { have Heqm : WPCfg (pc_img (wl_cfg g u)) (pc_log (wl_cfg g u))
-                    (<[n_disk := WPAgent (PDisk d' (wmsgs_of_map w))
-                                   (pa_ws (dkag u)) (pa_prom (dkag u))]>
-                       (pc_ags (wl_cfg g u)))
-                = WPCfg (img_z (wgimg g)) (wglog g)
-                    (hags ++ [WPAgent (PDisk d' (wmsgs_of_map w))
-                                (wa_dws u) (∅ : gset nat)]).
-      { rewrite Hags.
-        change (pa_ws (dkag u)) with (wa_dws u).
-        change (pa_prom (dkag u)) with (∅ : gset nat).
-        f_equal; rewrite -Hlen; apply insert_app_last. }
-      rewrite -Heqm. exists n_disk, WeakPromise.LSilent.
-      apply (PFSilent (pstep_xv6 riscv_step) n_disk (wl_cfg g u) (dkag u)
-               (PDisk d' (wmsgs_of_map w)) (wl_cfg_disk_lookup g u)).
-      cbn [pa_st dkag]. left. split; [reflexivity|]. right.
-      split; [reflexivity|]. exists (wflat (wgimg g) (wglog g)), w.
-      split; [by rewrite Hdd|reflexivity]. }
-    eapply rtc_transitive.
-    { apply rtc_once. exact Hburst. }
-    have Hall : Forall (λ m, wm_tid m = Some (length hags) ∧ wm_data m ≠ [])
-                  (wmsgs_of_map w).
-    { apply Forall_forall. intros m Hm. split.
-      - rewrite (wmsgs_of_map_tid w m Hm). by rewrite Hlen.
-      - by apply (wmsgs_of_map_data w). }
-    have HE := emit_run (img_z (wgimg g)) hags d' (wmsgs_of_map w) Hall
-                 (wglog g) (wa_dws u).
-    exact HE.
-  - right. right. left. exists gen.
+  - (* ---------------- ONE DISK BURST + ITS EMIT GROUP ---------------- *)
+    destruct Hlift as (-> & Hdd & Hcont).
+    destruct Hfine as (d & d' & mem & w & (agd & Hlkd & Hstd)
+                       & (agd2 & Hlkd2 & Hstd2) & Hrund & Hds & Hlogd).
+    rewrite (wl_cfg_disk_lookup g u) in Hlkd. injection Hlkd as <-.
+    simpl in Hstd. injection Hstd as Hdeq.
+    have Hxt : xtframe n_disk (wl_cfg g u) c'
+      := pf_xsolo_run_xtframe riscv_step n_disk (wl_cfg g u) c' Hrund.
+    destruct Hxt as (_ & Hximg & Hxfr & _).
+    have Hnp : no_promises c'
+      := pf_run_no_promises (wl_cfg g u) c'
+           (pf_xsolo_rtc_run riscv_step n_disk (wl_cfg g u) c' Hrund)
+           (wl_cfg_no_promises g u).
+    have Hagd2 : agd2 = WPAgent (PDisk d' []) (pa_ws agd2) ∅.
+    { have Hpr : pa_prom agd2 = ∅ := Hnp _ _ Hlkd2.
+      destruct agd2 as [st ws pr]. simpl in Hstd2, Hpr |- *.
+      by rewrite Hstd2 Hpr. }
+    rewrite dmsgs_n_disk in Hlogd.
+    destruct (Hcont d' w (pa_ws agd2) ltac:(by rewrite Hlkd2 -Hagd2)
+                ltac:(exact Hlogd) ltac:(exists mem; by rewrite -Hdd Hdeq))
+      as (Htrue & Hlift').
+    have Hceq : wl_cfg (wdisk_write g d' w) (wl_dk d' (pa_ws agd2) u) = c'.
+    { symmetry.
+      rewrite -(wl_cfg_disk_upd g u (wdisk_write g d' w)
+                  (wl_dk d' (pa_ws agd2) u) (PDisk d' []) (pa_ws agd2)).
+      - apply wpcfg_eq; cbn [pc_img pc_log pc_ags].
+        + exact Hximg.
+        + exact Hlogd.
+        + apply (list_eq_insert (pc_ags (wl_cfg g u)) (pc_ags c')).
+          * by rewrite Hlkd2 -Hagd2.
+          * eexists. apply wl_cfg_disk_lookup.
+          * intros j Hj. by apply Hxfr.
+      - done.
+      - done.
+      - done. }
+    destruct (IH (wdisk_write g d' w) (wl_dk d' (pa_ws agd2) u) cf
+                ltac:(by rewrite Hceq) Hall Hlive Hlift')
+      as (g' & u' & Hcf & Hlive' & Hrun').
+    exists g', u'. split_and!; [done|done|].
+    eapply rtc_l; [|exact Hrun'].
+    eapply pool_erased; [apply wpool_disk|].
+    right. right. left. exists gen.
     split_and!; [reflexivity|reflexivity|reflexivity|reflexivity|].
-    left. split; [exact Hlive|]. exists d', w. split; [exact Hds|reflexivity].
+    left. split; [exact Hlive|]. exists d', w.
+    split; [exact Htrue|reflexivity].
 Qed.
 
 (* ====================================================================== *)
-(** ** 7. THE REGROUPING THEOREM
+(** ** 7. THE φ TRANSPORT
 
-    A block-atomic pf run of [pstep_xv6 riscv_step] from a corresponding
-    configuration IS an [rtc erased_step] of [WeakLang.weak_riscv_lang] over
-    the standard pool, and the reached configurations correspond again — same
-    log, same per-hart [wstate], same per-hart registers. *)
+    [WeakGhost.no_violation] at a [WeakLang] state refutes a HART-AUTHORED,
+    HART-OBSERVED violation at the corresponding pf configuration.  The
+    transport is SYNTACTIC — L0(c) made [pub_of] the log predicate
+    [WeakMem.wpublished], which is the one [no_violation] is stated with, and
+    [obs_flr] IS the agent's [coh]. *)
 
-Theorem xv6_seg_lang (gen : nat) g u g' u' :
-  (∀ b, sail_shaped (riscv_step b)) → wthread_live g gen →
-  xv6_seg g u g' u' →
-  wthread_live g' gen ∧
-  rtc (wp_pf_run (pstep_xv6 riscv_step)) (wl_cfg g u) (wl_cfg g' u') ∧
-  @erased_step weak_riscv_lang (wpool gen, g) (wpool gen, g').
-Proof.
-  intros Hsh Hlive [[cpu Hs]|[[cpu Hs]|Hs]].
-  - destruct (seg_hart_step gen g u cpu g' u' Hsh Hlive Hs) as (H1 & H2 & H3).
-    split_and!; [done|done|]. by eapply pool_erased; [apply wpool_hart|].
-  - destruct (seg_plic_step gen g u cpu g' u' Hlive Hs) as (H1 & H2 & H3).
-    split_and!; [done|done|]. by eapply pool_erased; [apply wpool_plic|].
-  - destruct (seg_disk_step gen g u g' u' Hlive Hs) as (H1 & H2 & H3).
-    split_and!; [done|done|]. by eapply pool_erased; [apply wpool_disk|].
-Qed.
-
-Theorem xv6_blocks_lang (gen : nat) (Hsh : ∀ b, sail_shaped (riscv_step b))
-    (x y : wgstate * wlaux) :
-  xv6_blocks x y → wthread_live x.1 gen →
-  wthread_live y.1 gen ∧
-  rtc (wp_pf_run (pstep_xv6 riscv_step)) (wl_cfg x.1 x.2) (wl_cfg y.1 y.2) ∧
-  rtc (@erased_step weak_riscv_lang) (wpool gen, x.1) (wpool gen, y.1).
-Proof.
-  induction 1 as [x|x y z Hxy _ IH]; intros Hlive.
-  - split_and!; [done|apply rtc_refl|apply rtc_refl].
-  - destruct (xv6_seg_lang gen x.1 x.2 y.1 y.2 Hsh Hlive Hxy) as (H1 & H2 & H3).
-    destruct (IH H1) as (H4 & H5 & H6).
-    split_and!; [done|by eapply rtc_transitive|by eapply rtc_l].
-Qed.
-
-(* ====================================================================== *)
-(** ** 8. THE φ TRANSPORT
-
-    [WeakGhost.no_violation] at the reached [WeakLang] state refutes a
-    HART-AUTHORED, HART-OBSERVED violation at the corresponding pf
-    configuration.  The transport is SYNTACTIC — L0(c) made [pub_of] the log
-    predicate [WeakMem.wpublished], which is the one [no_violation] is stated
-    with, and [obs_flr] IS the agent's [coh]. *)
-
-Theorem xv6_blocks_no_hart_violation
-    (gen : nat) (g0 : wgstate) (u0 : wlaux) (g' : wgstate) (u' : wlaux)
+Theorem wl_no_hart_violation (g' : wgstate) (u' : wlaux)
     (p : nat) (m : wmsg) (ci cj : CPU) (a : Z) :
-  (∀ b, sail_shaped (riscv_step b)) →
-  wthread_live g0 gen →
-  (∀ t2 g2, rtc (@erased_step weak_riscv_lang) (wpool gen, g0) (t2, g2) →
-            no_violation (wglog g2) (wgws g2)) →
-  xv6_blocks (g0, u0) (g', u') →
-  violates_at (wl_cfg g' u') p m (fin_to_nat ci) (fin_to_nat cj) a →
-  False.
+  no_violation (wglog g') (wgws g') →
+  violates_at (wl_cfg g' u') p m (fin_to_nat ci) (fin_to_nat cj) a → False.
 Proof.
-  intros Hsh Hlive Hphi Hrun (Hlog & Htid & Hcls & Hpub & Hne & Hbyte & Hobs).
-  destruct (xv6_blocks_lang gen Hsh (g0, u0) (g', u') Hrun Hlive)
-    as (_ & _ & Her).
-  have Hnv := Hphi _ _ Her.
+  intros Hnv (Hlog & Htid & Hcls & Hpub & Hne & Hbyte & Hobs).
   have Hak : wm_ak m = WCplain.
   { rewrite /cls_of in Hcls.
     destruct (wm_ak m); [reflexivity|discriminate|discriminate]. }
@@ -833,17 +1138,7 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
-(** ** 9. The initial configuration *)
-
-Lemma map_fmap_eq {A B} (f : A → B) (l : list A) : map f l = f <$> l.
-Proof. by induction l as [|x l IH]; simpl; [|rewrite IH]. Qed.
-
-Lemma fmap_ext_l {A B} (f h : A → B) (l : list A) :
-  (∀ x, f x = h x) → f <$> l = h <$> l.
-Proof.
-  intros H. induction l as [|x l IH]; [done|].
-  by rewrite !fmap_cons H IH.
-Qed.
+(** ** 8. The initial configuration *)
 
 (** The hart vector [WeakCompose.xv6_ps] is applied to. *)
 Definition xv6_harts (g : wgstate) (u : wlaux) : list psail :=
@@ -866,89 +1161,238 @@ Proof.
   - rewrite fmap_cons fmap_nil /dkag. by rewrite Hdws.
 Qed.
 
+(** …and every one of its program states is an instruction BOUNDARY — the
+    cone's [Hps_bnd], discharged rather than assumed. *)
+Lemma xv6_ps0_bnd (g : wgstate) (u : wlaux) :
+  ∀ i p, xv6_ps0 g u !! i = Some p → pbnd p.
+Proof.
+  intros i p Hi. rewrite /xv6_ps0 /xv6_ps /xv6_harts in Hi.
+  destruct (decide (i < NCPU)%nat) as [Hlt|Hge].
+  - rewrite lookup_app_l in Hi;
+      [|by rewrite length_fmap length_fmap cpu_enum_length].
+    rewrite list_lookup_fmap list_lookup_fmap in Hi.
+    destruct (enum CPU !! i) as [c|]; simplify_eq/=; by split.
+  - rewrite lookup_app_r in Hi;
+      [|rewrite length_fmap length_fmap cpu_enum_length; lia].
+    rewrite length_fmap length_fmap cpu_enum_length in Hi.
+    destruct (i - NCPU)%nat as [|k]; simpl in Hi;
+      [by simplify_eq|by destruct k; simplify_eq].
+Qed.
+
 (* ====================================================================== *)
-(** ** 10. THE RESIDUE, and the derived [pf_violation_free_hart] *)
+(** ** 9. THE RESIDUE, and THE BAD-EDGE REFUTATION *)
 
-(** RESIDUE (A) — BLOCK-ATOMICITY (the interleaving/mover residue).  An
-    arbitrary [wp_pf_run] interleaves the harts at EVENT granularity, while
-    [WeakLang] steps whole instructions; the regrouping above therefore
-    consumes runs that are already a concatenation of segments.  This premise
-    is exactly the missing reordering theorem, stated where it is used: a
-    violating pf-reachable configuration has a BLOCK-ATOMIC witness of the
-    SAME violation.  (Its intended discharge, and why it is believable for
-    rv64d, is in the header.) *)
-Definition xv6_block_cover (g0 : wgstate) (u0 : wlaux) : Prop :=
-  ∀ (c : wpcfg pxv6) p m i j a,
-    rtc (wp_pf_run (pstep_xv6 riscv_step)) (wl_cfg g0 u0) c →
-    violates_at c p m i j a →
-    ∃ g' u', xv6_blocks (g0, u0) (g', u') ∧
-             violates_at (wl_cfg g' u') p m i j a.
+(** THE MMIO/M5 SEAM, PER DECOMPOSITION (residue (A) of the header): for the
+    segment chain that a MINIMAL BAD EDGE's cone decomposes into, the
+    [WeakLang] machine can follow along.  Quantified over exactly what
+    [WeakSailCone.cone_segments2] produces — the two events, the segment
+    list, the final configuration and the violation at it — and over segment
+    chains refined to single hart blocks, which is the form the lift
+    consumes. *)
+Definition cone_liftable (gen : nat) (g0 : wgstate) (u0 : wlaux)
+    (TS : ptraces pxv6) : Prop :=
+  ∀ (b1 b2 : gev) (segs : list seg2) (cf : wpcfg pxv6),
+    bad n_disk TS b1 b2 → bad_min n_disk TS b2 →
+    chained2 segs (wl_cfg g0 u0) cf →
+    Forall seg2_fine segs →
+    violation_hart cls_of pub_of n_disk cf →
+    (∀ j ag, pc_ags cf !! j = Some ag → pbnd (pa_st ag)) →
+    wl_lift gen segs g0 u0.
 
-(** THE φ-CONSUMPTION COROLLARY: [pf_violation_free_hart] — the ONE conjunct
-    of [WeakCompose.m6_side_conditions] that φ/Iris was left carrying —
-    DERIVED from the adequacy export through the lift.
+(** The per-bundle premises of [WeakSailCone] §11-§12, verbatim its section
+    context (minus the ones this file discharges — [Hps_bnd] by
+    [xv6_ps0_bnd], [Himgt] from the boot image — and minus the ones
+    [robust_main]'s own derivation supplies). *)
+Definition xv6_cone_premises (TS : ptraces pxv6) : Prop :=
+  (** [Hcq]: the post-state of a cross-edge source is quiet *)
+  (∀ e1 e2, gdep2 TS e1 e2 → e1.1 ≠ e2.1 →
+     ∀ T ag', pt_trs TS !! e1.1 = Some T →
+       at_ags T !! S e1.2 = Some ag' → pquiet (pa_st ag')) ∧
+  (** [Hres]: every record's residual is shaped, live and oracle-consistent *)
+  (∀ i T k ag q,
+     pt_trs TS !! i = Some T → at_ags T !! k = Some ag →
+     pa_st ag = PHart q →
+     match sp_m q with
+     | None => True
+     | Some m => sail_shaped m ∧ sail_live m ∧
+                 ∃ d, oracle_consistent d m (sp_dev q)
+     end) ∧
+  (** [Hirqb]: an interrupt delivery has a boundary pre-state *)
+  (∀ i T k ag ag' q q' l,
+     pt_trs TS !! i = Some T →
+     at_ags T !! k = Some ag → at_ags T !! S k = Some ag' →
+     pa_st ag = PHart q → pa_st ag' = PHart q' →
+     irq_deliver q l q' → pbnd (PHart q)) ∧
+  (** [Hcls]: a logged message carries its author's computed class *)
+  (∀ i T k ev ag ts m,
+     pt_trs TS !! i = Some T →
+     at_evs T !! k = Some ev → at_ags T !! k = Some ag →
+     ae_ts ev = Some ts → pt_log TS !! (ts - 1)%nat = Some m →
+     wm_ak m = lbl_class (ae_lb ev) (pa_ws ag)).
 
-    THE AGENT QUANTIFIER IS NO LONGER A PREMISE (the L3 finding of §B, fixed
-    in Layer 1 on 2026-08-12).  [WeakRobust.violation_hart] restricts BOTH the
-    author and the observer to harts, exactly as [WeakGhost.no_violation]
-    does, so the two indices arrive here already bounded by
-    [WeakLang.n_disk = NCPU] and [nat_to_fin] turns them into the [CPU]s the
-    transport wants.  The disk-authored and disk-observed DMA violations that
-    made the OLD, unrestricted conjunct refutable are simply not instances of
-    the statement any more. *)
-Theorem xv6_pf_violation_free (gen : nat) (g0 : wgstate) (u0 : wlaux) :
+(** THE BUNDLE FACTS [robust_main]'s own proof derives from a behavior — and
+    which the cone consumes.  Packaged so that the "no bad edge" premise of
+    [robust_main_no_bad] may USE them rather than re-derive them. *)
+Definition tb_facts {P : Type} (pstep : P → wlabel → P → Prop) (nh : nat)
+    (img : image) (ps : list P) (TS : ptraces P) : Prop :=
+  ptraces_wf pstep TS ∧ ptraces_ws_init TS ∧ (∀ a, co_tc TS a) ∧
+  writes_fulfilled TS ∧ pt_img TS = img ∧
+  length (pt_trs TS) = length ps ∧
+  (∀ p m, pt_log TS !! p = Some m → wm_data m ≠ []) ∧
+  (∀ j T ag0, pt_trs TS !! j = Some T →
+     at_ags T !! 0%nat = Some ag0 → ps !! j = Some (pa_st ag0)) ∧
+  ptraces_fwd_own TS ∧ ee_ok TS ∧ edges_split nh TS.
+
+(** THE REFUTATION.  A bad edge would give a minimal one, whose cone
+    [WeakSailCone.cone_segments2] segments; the refinement cuts the hart
+    segments into instructions; [cone_liftable] lifts the chain into the
+    [WeakLang] machine; and φ at the state it reaches refutes the violation
+    the cone exhibits.  So there is no bad edge. *)
+Theorem xv6_no_bad_edge (gen : nat) (g0 : wgstate) (u0 : wlaux)
+    (TS : ptraces pxv6) :
   (∀ b, sail_shaped (riscv_step b)) →
   wthread_live g0 gen →
+  wglog g0 = [] → (∀ cc : CPU, wgws g0 cc = ws_init) → wa_dws u0 = ws_init →
+  img_total (img_z (wgimg g0)) →
   (∀ t2 g2, rtc (@erased_step weak_riscv_lang) (wpool gen, g0) (t2, g2) →
             no_violation (wglog g2) (wgws g2)) →
-  xv6_block_cover g0 u0 →
-  ∀ c, rtc (wp_pf_run (pstep_xv6 riscv_step)) (wl_cfg g0 u0) c →
-       ¬ violation_hart cls_of pub_of n_disk c.
+  bad_wf n_disk TS →
+  tb_facts (pstep_xv6 riscv_step) n_disk (img_z (wgimg g0)) (xv6_ps0 g0 u0) TS →
+  xv6_cone_premises TS →
+  cone_liftable gen g0 u0 TS →
+  ∀ e1 e2, ¬ bad n_disk TS e1 e2.
 Proof.
-  intros Hsh Hlive Hphi Hcov c Hrun Hviol.
-  destruct (violation_hart_violates_at n_disk c Hviol)
+  intros Hsh Hlive Hlog0 Hws0 Hdws0 Himgt Hphi Hbwf
+    (Hwf & Hwsi & Hco & Hwfl & Himg & Hnag & Hdata & Hps0 & Hfo & Hee & Hsplit)
+    (Hcq & Hres & Hirqb & Hcls) Hcl e1 e2 Hbad.
+  destruct (Hbwf e1 e2 Hbad) as (f1 & f2 & Hbad' & Hmin).
+  destruct (cone_segments2 TS (img_z (wgimg g0)) (xv6_ps0 g0 u0)
+              Hwf Hwsi Hco Hwfl Himg Hnag Hdata Hps0 Hfo Hee n_disk Hsplit
+              (xv6_ps0_bnd g0 u0) Hcq Hres Himgt Hirqb Hcls f1 f2 Hbad' Hmin)
+    as (segs & cf & Hch & Hok & _ & Hvio & Hbnd).
+  rewrite (wp_init_wl g0 u0 Hlog0 Hws0 Hdws0) in Hch.
+  destruct (seg2_refine segs (wl_cfg g0 u0) cf Hch Hok)
+    as (segs' & Hch' & Hfine).
+  have Hwl := Hcl f1 f2 segs' cf Hbad' Hmin Hch' Hfine Hvio Hbnd.
+  destruct (wl_lift_sound gen Hsh segs' g0 u0 cf Hch' Hfine Hlive Hwl)
+    as (g' & u' & Hcf & _ & Hrun).
+  destruct (violation_hart_violates_at n_disk cf Hvio)
     as (p & m & i & j & a & Hv & Hi & Hj).
-  destruct (Hcov c p m i j a Hrun Hv) as (g' & u' & Hbl & Hv').
   set (ci := nat_to_fin Hi : CPU).
   set (cj := nat_to_fin Hj : CPU).
   have Hci : fin_to_nat ci = i by apply fin_to_nat_to_fin.
   have Hcj : fin_to_nat cj = j by apply fin_to_nat_to_fin.
-  eapply (xv6_blocks_no_hart_violation gen g0 u0 g' u' p m ci cj a);
-    [exact Hsh|exact Hlive|exact Hphi|exact Hbl|].
-  by rewrite Hci Hcj.
+  eapply (wl_no_hart_violation g' u' p m ci cj a (Hphi _ _ Hrun)).
+  rewrite Hci Hcj -Hcf. exact Hv.
 Qed.
 
 (* ====================================================================== *)
-(** ** 11. THE UPDATED COMPOSITION
+(** ** 10. THE UPDATED COMPOSITION
 
-    [WeakCompose.xv6_weak_robust] with [pf_violation_free_hart] REPLACED by
-    its derivation.  The full premise list is in the header. *)
+    [WeakRobustMain.robust_main] consumes [pf_violation_free_hart] in exactly
+    ONE place — [gdep2_acyclic_main], to rule out bad edges.  Since the cone
+    route rules them out directly, that call is replaced by
+    [gdep2_acyclic_bad_free] (whose [bad_wf_strong] is vacuous once no bad
+    edge exists) and everything else is [robust_main]'s own derivation,
+    mirrored here so that [WeakRobustMain.v] itself is untouched. *)
 
+Theorem robust_main_no_bad {P : Type} (pstep : P → wlabel → P → Prop)
+    (nh : nat) (img : image) (ps : list P) (c : wpcfg P) :
+  lat_free_prog pstep → ts_oblivious pstep →
+  wp_behavior pstep img ps c →
+  (∀ mid TS,
+     rtc (wp_promise_step (P:=P)) (wp_init img ps) mid →
+     ptraces_of pstep TS mid c → main_premises nh TS) →
+  (∀ mid TS,
+     rtc (wp_promise_step (P:=P)) (wp_init img ps) mid →
+     ptraces_of pstep TS mid c → tb_facts pstep nh img ps TS →
+     ∀ e1 e2, ¬ bad nh TS e1 e2) →
+  ∃ cf, rtc (wp_pf_run pstep) (wp_init img ps) cf ∧
+        prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
+Proof.
+  intros Hlf Hobl Hb Hprem Hnb.
+  destruct (wp_behavior_fulfil_once pstep img ps c Hlf Hb)
+    as (mid & TS & Hprom & Hof & Hnp & Hacct).
+  destruct (Hprem mid TS Hprom Hof)
+    as (Hsplit & Hbwf & Hee & (sync & Hbytes)).
+  (* the derived bundle facts — verbatim [robust_main]'s *)
+  have Hwf : ptraces_wf pstep TS by eapply ptraces_of_wf.
+  have Hla : log_authored (pc_log mid).
+  { eapply log_authored_promise_run; [apply log_authored_init|exact Hprom]. }
+  have Hwfl : writes_fulfilled TS
+    by eapply (ptraces_of_writes_fulfilled pstep TS mid c).
+  have Hlne : log_ne (pc_log mid).
+  { eapply log_ne_promise_run; [apply log_ne_init|exact Hprom]. }
+  have Hinit : cfg_ws_init mid.
+  { eapply cfg_ws_init_promise_run; [apply cfg_ws_init_init|exact Hprom]. }
+  have Hwsi : ptraces_ws_init TS by eapply (ptraces_of_ws_init pstep TS mid c).
+  have Hfo : ptraces_fwd_own TS by eapply (ptraces_of_fwd_own pstep TS mid c).
+  have Hco : ∀ a, co_tc TS a
+    by eapply (co_serialized_pkg pstep TS sync Hwf Hwfl Hbytes).
+  destruct (promise_run_shape (wp_init img ps) mid Hprom)
+    as (Hpimg & Hplen & Hpst).
+  have Hof' := Hof.
+  destruct Hof' as (Himg0 & Hlog0 & Hlent & Hwft & Hfst & Hlst
+                    & Hclogc & Hcimgc & Hclenc).
+  have Himg1 : pt_img TS = img by rewrite Himg0 Hpimg.
+  have Hlen1 : length (pt_trs TS) = length ps.
+  { by rewrite Hlent Hplen /wp_init /= length_map. }
+  have Hdata1 : ∀ p m, pt_log TS !! p = Some m → wm_data m ≠ [].
+  { rewrite Hlog0. exact Hlne. }
+  have Hps1 : ∀ j T ag0, pt_trs TS !! j = Some T →
+                at_ags T !! 0%nat = Some ag0 → ps !! j = Some (pa_st ag0).
+  { intros j T ag0 HT Hag0.
+    have Hmid : pc_ags mid !! j = Some ag0 by rewrite -(Hfst j T HT).
+    destruct (Hpst j ag0 Hmid) as (ag & Hag & Hst).
+    rewrite /wp_init /= list_lookup_fmap in Hag.
+    destruct (ps !! j) as [p0|] eqn:Hp0; simpl in Hag; [|done].
+    injection Hag as <-. by rewrite Hst. }
+  (* NO BAD EDGE — so the per-edge split is [rf_edges_ok] outright *)
+  have Hnobad : ∀ e1 e2, ¬ bad nh TS e1 e2.
+  { apply (Hnb mid TS Hprom Hof). by split_and!. }
+  have Hacyc : gdep2_acyclic TS.
+  { eapply (gdep2_acyclic_bad_free pstep nh TS Hwf Hfo Hee Hsplit).
+    intros e1 e2 Hbe. by destruct (Hnobad e1 e2 Hbe). }
+  eapply (sim_full pstep TS img ps Hwf Hwsi Hco Hwfl Hlf Hobl Himg1 Hlen1
+            Hdata1 Hps1 c Hacyc).
+  - by rewrite Himg0 Hcimgc.
+  - by rewrite Hlog0 Hclogc.
+  - by rewrite Hclenc Hplen /wp_init /= length_map.
+  - exact Hlst.
+Qed.
+
+(** THE HEADLINE, LIFTED: [WeakCompose.xv6_weak_robust] with
+    [pf_violation_free_hart] replaced by the cone route's premises. *)
 Corollary xv6_weak_robust_lifted (gen : nat) (g0 : wgstate) (u0 : wlaux)
     (c : wpcfg pxv6) :
   (∀ b, sail_shaped (riscv_step b)) →
   wthread_live g0 gen →
   wglog g0 = [] → (∀ cc : CPU, wgws g0 cc = ws_init) → wa_dws u0 = ws_init →
+  img_total (img_z (wgimg g0)) →
   (∀ t2 g2, rtc (@erased_step weak_riscv_lang) (wpool gen, g0) (t2, g2) →
             no_violation (wglog g2) (wgws g2)) →
-  xv6_block_cover g0 u0 →
   (∀ (cb mid : wpcfg pxv6) (TS : ptraces pxv6),
      wp_behavior (pstep_xv6 riscv_step) (img_z (wgimg g0)) (xv6_ps0 g0 u0) cb →
      rtc (wp_promise_step (P := pxv6))
        (wp_init (img_z (wgimg g0)) (xv6_ps0 g0 u0)) mid →
      ptraces_of (pstep_xv6 riscv_step) TS mid cb →
-     main_premises n_disk TS) →
+     main_premises n_disk TS ∧ xv6_cone_premises TS ∧
+     cone_liftable gen g0 u0 TS) →
   wp_behavior (pstep_xv6 riscv_step) (img_z (wgimg g0)) (xv6_ps0 g0 u0) c →
   ∃ cf, rtc (wp_pf_run (pstep_xv6 riscv_step))
           (wp_init (img_z (wgimg g0)) (xv6_ps0 g0 u0)) cf ∧
         prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
 Proof.
-  intros Hsh Hlive Hlog Hws Hdws Hphi Hcov Hprem Hbeh.
-  apply (xv6_weak_robust riscv_step (img_z (wgimg g0)) (xv6_ps0 g0 u0) c);
-    [|exact Hbeh].
-  split; [exact Hprem|].
-  rewrite /pf_violation_free_hart (wp_init_wl g0 u0 Hlog Hws Hdws).
-  by eapply xv6_pf_violation_free.
+  intros Hsh Hlive Hlog0 Hws0 Hdws0 Himgt Hphi Hprem Hbeh.
+  eapply (robust_main_no_bad (pstep_xv6 riscv_step) n_disk
+            (img_z (wgimg g0)) (xv6_ps0 g0 u0) c
+            (xv6_lat_free riscv_step) (xv6_ts_oblivious riscv_step) Hbeh).
+  - intros mid TS Hprom Hof.
+    by destruct (Hprem c mid TS Hbeh Hprom Hof) as (H & _ & _).
+  - intros mid TS Hprom Hof Htb.
+    destruct (Hprem c mid TS Hbeh Hprom Hof) as ((_ & Hbwf & _ & _) & Hcp & Hcl).
+    by eapply (xv6_no_bad_edge gen g0 u0 TS Hsh Hlive Hlog0 Hws0 Hdws0 Himgt
+                 Hphi Hbwf Htb Hcp Hcl).
 Qed.
 
 (** …and the same with the φ export produced ON THE SPOT by
@@ -976,22 +1420,22 @@ Corollary xv6_weak_robust_adequate Σ `{!riscvGpreS Σ, !weakGpreS Σ}
        ={⊤}=∗
        ([∗ list] cc ∈ (enum CPU), WWP (LoopE gen_id cc) @ ⊤) ∗
        WWP UartLoop @ ⊤ ∗ WWP DiskLoop @ ⊤ ∗ WWP PlicLoop @ ⊤) →
-  xv6_block_cover g0 u0 →
+  img_total (img_z (wgimg g0)) →
   (∀ (cb mid : wpcfg pxv6) (TS : ptraces pxv6),
      wp_behavior (pstep_xv6 riscv_step) (img_z (wgimg g0)) (xv6_ps0 g0 u0) cb →
      rtc (wp_promise_step (P := pxv6))
        (wp_init (img_z (wgimg g0)) (xv6_ps0 g0 u0)) mid →
      ptraces_of (pstep_xv6 riscv_step) TS mid cb →
-     main_premises n_disk TS) →
+     main_premises n_disk TS ∧ xv6_cone_premises TS ∧
+     cone_liftable gen_id g0 u0 TS) →
   wp_behavior (pstep_xv6 riscv_step) (img_z (wgimg g0)) (xv6_ps0 g0 u0) c →
   ∃ cf, rtc (wp_pf_run (pstep_xv6 riscv_step))
           (wp_init (img_z (wgimg g0)) (xv6_ps0 g0 u0)) cf ∧
         prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
 Proof.
-  intros Hsh Hwp Hcov Hprem Hbeh.
+  intros Hsh Hwp Himgt Hprem Hbeh.
   eapply (xv6_weak_robust_lifted gen_id g0 u0 c Hsh);
-    [|exact Hlog|exact Hws|exact Hdws| |exact Hcov|exact Hprem
-     |exact Hbeh].
+    [|exact Hlog|exact Hws|exact Hdws|exact Himgt| |exact Hprem|exact Hbeh].
   - split; [exact Hpow|]. by rewrite Hgen0 Hgid.
   - intros t2 g2 Hr.
     exact (proj1 (weak_system_adequacy_phi Σ (enum CPU) g0 D Hgid Hpow Hgen0
