@@ -249,33 +249,6 @@ return-path lemmas are untouched, and `bm_prk None = emp` keeps
 on `wi_loop` alone, with `γpr` read off the `bm_alloc` record's new
 `ba_pr` field rather than a new binder.
 
-### 0b. HISTORICAL: why the contract could not pay for it
-
-**The `+0x0f6` arm is LIVE**, not dead: nothing in `bitmap_res` prevents
-every bit below `sb.size` being set (`free_pool` is then the empty big-op
-and `bitmap_ok` is vacuous), and the scan then reaches
-`auipc a0,0x4 / addi a0,a0,1350 / jal printk` on `"balloc: out of blocks\n"`.
-
-Neither printk interface is applicable from balloc's precondition:
-`SpecPrintk.v` is the PANIC path (it premises `panicking <> 0` and takes
-both flag cells), and `SpecPrintkGen.v` — the path balloc actually runs —
-needs `kernel_data` (the only way to mint the format string's `↦ₛ`) and
-the persistent `printk_env γpr γu γd`. `SpecBalloc.v` has neither, and
-nothing in `bio_ctx` / `log_ctx` / `dev_inv` yields them. No fs-layer spec
-threads `printk_env` today; it appears only in `SpecMain*.v`.
-
-Proposed delta: a `γpr : gname` binder plus `kernel_data -∗` and
-`printk_env γpr γu γd -∗` (both PERSISTENT, so threading them costs
-nothing), and printk's contract carried the way `panic_wp_any` already is
-— as a persistent premise that is never discharged inside the function —
-rather than as a functor argument. That last point decides the ACCEPTANCE
-CRITERION: `PRINTK_GEN`'s only instance is `LinkPrintkGen`'s own `Axiom`,
-so a functor would put a seventh entry in
-`Print Assumptions Balloc.wp_balloc_sconf`, whereas the premise form keeps
-balloc, bmap and writei at the standing six and pushes the obligation to
-whoever eventually discharges it — the same place `panic_wp_any` lands.
-Ripples into `SpecBmap.v` and `SpecWritei.v` (two persistent premises each).
-
 ### 1. THE EXISTING `Module Type BALLOC` CANNOT HOLD UNCHANGED
 
 `SpecBalloc.v`'s precondition has no superblock cells and no bitmap
@@ -330,23 +303,6 @@ got `decode_bridge_ms` where only `decode_bridge_ms_bv` closes. Patched in
 the three shards (verified, 1.9 s); the permanent fix is the selection line
 in `tools/gen_code.py`, and until it lands the next `make gen-code` silently
 reverts the patch. Full write-up in `claude-notes/durable-notes.md`.
-
-### 2b. HISTORICAL: what generating them cost
-
-Needs two `tools/code_manifest.json` rows —
-
-```
-  ["CodeBalloc.v", "balloc", "bai_", 3]     (262 bytes, so width 3)
-  ["CodeBfree.v",  "bfree",  "bfi_", 2]     (108 bytes)
-```
-
-— and a full `tools/gen_code.py` run. Measured by running the generator
-into a scratch directory against the tracked dump: the two functions add
-**56 distinct decode words** (12 compressed, 44 base) spread over **27 of
-the 32 `KernelDecode*.v` shards**. That is why it cannot be done as an
-isolated edit; per durable-notes, run the FULL generator into a scratch
-dir and copy out what changed, confirming every pre-existing Code file
-comes back byte-identical and the shard diffs are pure additions.
 
 ## The instruction map, for whoever proves them
 

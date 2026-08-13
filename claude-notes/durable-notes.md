@@ -34,46 +34,47 @@ problem was the symptom; the special-casing was the cause.
 
 ## Orchestration: model roles and division of labor
 
-This work is split between a top-level orchestration agent and the subagents it
-spawns, and the split matters. The **top-level agent should run on a powerful
-model (e.g. Fable)** and owns the high-level thinking: writing the specifications,
-the overall design and approach, and the abstractions. It does the work the
-guiding principle above is about — getting the spec and abstraction shapes right
-before anything is built on them. It must **spawn subagents on Opus or Sonnet to
-do the lower-level, mundane work** — the actual proofs, mechanical ports, and
-similar tasks — rather than doing that itself.
+The **top-level agent runs on a powerful model and owns the high-level thinking**
+— the specifications, the overall design, the abstractions — i.e. the work the
+guiding principle above is about: getting the shapes right before anything is
+built on them. It **spawns subagents on smaller models for the lower-level,
+mundane work**: the actual proofs, mechanical ports, and similar.
 
-When a subagent hits a problem doing its proof or other task, that is a signal
-back to the orchestrator, not just a local obstacle: the **top-level agent should
-help resolve it**, and where the difficulty comes from the shape of the work, it
-should revise the design, architecture, abstractions, or specifications as needed
-rather than pushing the subagent to force a proof through an awkward interface.
-Difficulty at the proof level might indicate that the spec or abstraction needs
-rework (see the guiding principle): if the difficulty points out some aspect in
-which the specs or abstractions aren't quite right, the orchestrator should revise
-the specifications, designs, abstractions, etc. accordingly.
+A subagent hitting a problem is a signal back to the orchestrator, not just a
+local obstacle. **Difficulty at the proof level often means the spec or
+abstraction is wrong**; the orchestrator should revise the design rather than
+push the subagent to force a proof through an awkward interface.
 
 ## Maintaining these notes
 
 Any project memory worth keeping goes in `claude-notes/`, committed in the repo —
-not in local per-session memory files. Put it in the right file: durable rules
-here; performance/build tuning in [`optimization.md`](optimization.md); subsystem
-design under [`design/`](design/); an in-flight worklist or plan under
-[`projects/`](projects/) (one file per project, so an agent working on one task
-never has to read another task's worklist); a finished project — no remaining
-work and no cleanup — moves to [`completed/`](completed/). Add a pointer line to
-[`README.md`](README.md) when you create a new file. When a project is fully
-done, move its file from `projects/` to `completed/` (rather than deleting it),
-so its durable design notes, gotchas, and reusable recipes stay available; lift
-any broadly-applicable lessons up into the design or durable notes as well.
+not in local per-session memory files. Record only what is useful for **future** development: architecture, conventions,
+gotchas, and techniques that will recur. **Everything else is deleted, not
+archived in place.** In particular:
 
-Record only what is useful for **future** development: architecture, conventions,
-gotchas, and techniques that will recur. Do NOT record narratives of refactorings
-or code changes that are already finished and no longer bear on future work — once
-a change has landed and its lessons are captured as a forward-looking convention,
-drop the play-by-play. This applies equally to the root `README.md`: state current
-behavior/config as fact, not "X used to do Y" / "Z is now fixed" narration of the
-change that produced it.
+- **No play-by-play.** Once a change has landed and its lesson is captured as a
+  forward-looking rule, the narrative of how it went goes away. State current
+  behavior as fact — never "X used to do Y", "Z is now fixed", "the sweep was
+  run and six files landed".
+- **No status commentary, no dates, no stage journals** in a durable file. A
+  design note says what the design IS. A project worklist says what is LEFT.
+- **A fact about something that no longer exists is deleted.** A deleted
+  apparatus, a fixed upstream bug, a superseded design — these leave a rule
+  behind, if anything, and nothing else.
+- **A measurement is durable only when it sets the SCALE of a rule** ("~5 s per
+  call", "20×"). A measurement that only records what one run of one sweep did
+  is not.
+- **Trim on the way past.** If you read a file to do your task and it has grown
+  gunk, cut it then — do not add a section about how you found it.
+
+Put it in the right file: durable rules here; performance/build tuning in
+[`optimization.md`](optimization.md); subsystem design under [`design/`](design/);
+an in-flight worklist under [`projects/`](projects/), one per effort. A finished
+project — no remaining work, no cleanup — moves to [`completed/`](completed/),
+which nobody reads for guidance and which is therefore the one place a narrative
+may survive; lift any broadly-applicable lesson up into the design or durable
+notes before it goes. Add a pointer line to [`README.md`](README.md) for any new
+file, and delete the line when the file goes.
 
 ## Build
 
@@ -81,17 +82,18 @@ change that produced it.
 - Single file: `coqc -R . xv6iris -R ../model-xv6iris Riscv -R ../kernel-rocq Kernel -w -notation-overridden <file>.v`
 - Full build: `make -f CoqMakefile -j16` (CoqMakefile auto-regenerates from `_CoqProject`; coqdep decides order).
 - ALWAYS grep the build log for `Error` — `make …; echo $?` masks make's exit via the echo.
-- **PICK `-j` BY RAM, NOT BY CORES.** A `Code*.v` worker peaks near **2 GB** and the `Code*` band runs many at once, so `-j` above `RAM_GB / 2` gets workers OOM-killed — which make reports as **`Error 137`** with no Coq error at all, on whichever targets happened to be in flight. Measured 2026-08-07 on a 15 GB / 8-core box: `-j24` killed three `Code*.v` targets; `-j6` completes, a full rebuild taking ~45 min. The `-j16`/`-j32` figures elsewhere in these notes are from a much larger machine — re-derive the bound before reusing them.
+- **PICK `-j` BY RAM, NOT BY CORES.** A `Code*.v` worker peaks near **2 GB** and the `Code*` band runs many at once, so `-j` above `RAM_GB / 2` gets workers OOM-killed — which make reports as **`Error 137`** with no Coq error at all, on whichever targets happened to be in flight. Re-derive the bound on the machine you are on; the `-j16`/`-j32` figures elsewhere in these notes are from a large one.
 - Never `git add -A` from a parent dir (sweeps sibling untracked trees `coq-sail-stdpp*/`, `lean/`, `rocq/`, `sail-riscv/`); use `git add -A .` from `iris/`.
-- Build is **both** critical-path bound and core-saturated in the middle. Measured 2026-08-03, 669 files, clean, `-j32`: **wall 479s, ΣCPU 9364s, critical path 356s, avg parallelism 19.9×.** The path is a ~86s shared prefix + a ~90s leaf-library branch + ONE ~190s whole-function proof; the ~125s of wall above the path is core starvation and is NOT recoverable by scheduling — reordering `_CoqProject` and raising `-j` were both measured and both did nothing (see `optimization.md`). Each big file pays a 12–40s `Qed` kernel-typecheck. For iterative re-checking, a `-vos`/`-vok` two-phase build drops the Qed off the critical path (no proof changes) — but interactive tactics still run, so a vos build is still >2min.
+- The build's shape (critical-path bound, where the CPU goes, what does and does not move it) is in [`optimization.md`](optimization.md) §"Build shape".
 - **opam switch:** everything builds in the project-local switch `/shared/xv6rocq` (Rocq 9.0.1, coq-iris 4.4.0, coq-stdpp/-bitvector 1.12.0, coq-sail-stdpp 0.20.1). `eval $(opam env --switch=/shared/xv6rocq)` is mandatory in any raw `coqc` invocation — a fresh shell defaults to the wrong switch (→ "Cannot find SailStdpp.*"). Rocq ≥9.1 is not an option (coq-sail-stdpp 0.20.1 is capped `< 9.1~`).
 - The generated Sail model (`Riscv.rv64d`, defines `try_step`) is NOT an opam package — rebuild from `/shared/xv6rocq/model-xv6iris/` in order `rv64d_types.v → riscv_extras.v → rv64d.v`.
 - **Stale `.vo` trap:** compiling a new file against stale sibling `.vo` produces *impossible-looking* arity/alignment/"expected X" errors, and every address `vm_compute`s to an OLD literal after a `kernel-rocq` image regen. Whenever an argument-count or address error looks impossible, check `.v -nt .vo` and `make proofs` to resync first.
 - **A `git pull` THAT TOUCHES `model-xv6iris/` MEANS `make model` FIRST, AND THE FAILURE LOOKS NOTHING LIKE A STALE MODEL.** The generated Sail model is not an opam package and nothing in `iris/`'s own makefile rebuilds it, so a pull that lands a new `rv64d.v`/`rv64d_types.v` leaves every `.vo` in the tree consistent *with each other* but stale against the new sources. Nothing breaks until make tries to rebuild the first file whose source also moved — typically `RiscvLang.v` — at which point you get a single bottom-of-the-tree error naming a model field, e.g. **`PMA_misaligned_atomicity_granule_size_exp: Not a projection`**, with the whole build behind it. That reads like a corrupt checkout or a broken proof; it is neither. The recovery is `make model` (rebuilds `rv64d_types.v -> riscv_extras.v -> rv64d.v`), then a full `iris/` rebuild — which is a near-total recompile, so budget for it. Check `ls -la model-xv6iris/*.v model-xv6iris/*.vo` after any pull: a `.v` newer than its `.vo` is the tell, and it is much cheaper to notice there than at `RiscvLang.v`.
 - **NEVER RUN `make`/`coqc` FROM A SHELL WITHOUT `eval $(opam env --switch=/shared/xv6rocq)` — INCLUDING BACKGROUND ONES.** A `nohup bash -c '...'` does not inherit an interactive shell's opam env, and the resulting failure is a bogus *"Cannot find a physical path bound to logical path bitvector.definitions with prefix stdpp"* at `RiscvLang.v` that is indistinguishable at a glance from the stale-model error above. Worse, `iris/CoqMakefile` auto-regenerates from `_CoqProject`, so a make run under the wrong switch **rewrites `CoqMakefile` with the wrong Rocq version** (the file then says `generated by Rocq/Coq 9.1.1` while the switch is 9.0.1) and every later build inherits it. Recovery: delete `iris/CoqMakefile` (and `CoqMakefile.conf`) and let a correctly-switched `make` regenerate them. Chain the `eval` into the same command as the `make`; do not assume it persists.
-- **AFTER A `git pull`, RUN `make xv6-rev-check` BEFORE `make proofs`.** `xv6-riscv/` is gitignored, so a pull that bumps `XV6_REV` (or that lands a re-dumped `kernel-rocq/`) leaves your local clone on the OLD revision — and `make proofs`' dump rules see a `kernel/kernel` ELF newer than the freshly-checked-out `kernel-rocq/*.v`, so they **silently re-dump from the stale ELF and clobber the tracked image**, moving every symbol address. What you then see is *not* a dump error: it is `ColdBoot.v` / `BootReset.v` failing with `Unable to unify "9223372036856090925" with "9223372036858188079"`, i.e. a bogus proof failure at the bottom of the tree. Recover with `git checkout -- kernel-rocq/`, fix the clone (`git -C xv6-riscv fetch && git -C xv6-riscv checkout --detach $XV6_REV`), rebuild the ELF, then `make dump-force` and confirm `git status kernel-rocq/` is **clean** — a byte-identical re-dump is the proof that the toolchain and the revision agree. (Related: `make proofs` does not depend on `user-rocq`, so a tree with `USpecSync.v` in `iris/_CoqProject` also needs `make user-rocq` or you get `No rule to make target '../user-rocq/SyncInstrs.vo'`.)
-  - **A PLAIN `git pull` THAT LANDS A NEW `kernel-rocq/*.v` NEEDS `make kernel-rocq` TOO — this is not only a `dump-force` recovery step.** `kernel-rocq/*.vo` is not rebuilt by anything in `iris/`, so after a pull that bumps `XV6_REV` the tracked sources are new and their `.vo` are whatever you last built — and every proof loads the OLD image. The tell is that `make xv6-rev-check` PASSES and `make check-decode` PASSES (both read the `.v`), while the build fails at the bottom of the tree with a bogus-looking address mismatch. 2026-08-13: `ProcGeom.v` failing `Unable to unify "2147558264" with "2147558418"`, taking all 145 `Code*.v` down with it, five days after the `.vo` were built. `ls -la kernel-rocq/*.v kernel-rocq/*.vo` and compare mtimes — it is a two-second check and it is the first thing to do when a pull is followed by an inexplicable address failure. Sequence after any pull that touches `kernel-rocq/`: `make xv6-rev-check` → `make kernel-rocq` → the `iris/` build.
-  - **`make dump-force` alone does NOT finish the recovery, and the symptom outlives it.** `dump-force` rewrites `kernel-rocq/*.v`; nothing there rebuilds `kernel-rocq/*.vo`, and `make -C iris -f CoqMakefile` — the command you reach for to re-check the proofs — has no rule for them either. So the proofs keep loading the CLOBBERED `KernelData.vo`/`KernelInstrs.vo` and keep failing at exactly the same line, which reads as "the restore did not take" or "this proof is genuinely broken on main". Run `make kernel-rocq` (or the top-level `make proofs`) after `dump-force`, and check `ls -l kernel-rocq/*.vo` against the `.v` mtimes before believing a failure. The 2026-08-06 instance: `ProofArgraw.v`'s `ar_tbl_bytes` failing `Unable to unify "bv_unsigned 248" with "bv_unsigned 234"` — a 14-byte relayout of argraw's `.rodata` jump table, from an ELF one xv6 revision behind.
+- **AFTER ANY `git pull`, THE IMAGE IS THE FIRST SUSPECT — and every way it goes wrong surfaces as the SAME bogus address failure** at the bottom of the tree (`Unable to unify "2147558264" with "2147558418"` in `ProcGeom.v` / `ColdBoot.v` / `BootReset.v`, taking all 145 `Code*.v` with it). It reads like a broken proof or a corrupt checkout and is neither. **Sequence after any pull that touches `kernel-rocq/`: `make xv6-rev-check` → `make kernel-rocq` → the `iris/` build.** Three independent causes, all with that one symptom:
+  - `xv6-riscv/` is gitignored, so a pull that bumps `XV6_REV` leaves your clone on the OLD revision — and `make proofs`' dump rules then see an ELF newer than the freshly-checked-out `kernel-rocq/*.v` and **silently re-dump from the stale ELF, clobbering the tracked image**. Recover: `git checkout -- kernel-rocq/`, fix the clone (`git -C xv6-riscv fetch && git -C xv6-riscv checkout --detach $XV6_REV`), rebuild the ELF, `make dump-force`, and confirm `git status kernel-rocq/` is **clean** — a byte-identical re-dump is the proof that the toolchain and the revision agree.
+  - **`kernel-rocq/*.vo` is rebuilt by nothing in `iris/`**, and neither `dump-force` nor `make -C iris -f CoqMakefile` has a rule for it — so new tracked sources sit beside whatever `.vo` you last built and every proof loads the OLD image. `make xv6-rev-check` and `make check-decode` both PASS (they read the `.v`), which is the tell. Compare `ls -la kernel-rocq/*.v kernel-rocq/*.vo` mtimes; it is a two-second check and it is the first thing to do.
+  - `make proofs` does not depend on `user-rocq`, so a tree with `USpecSync.v` in `iris/_CoqProject` also needs `make user-rocq` (else `No rule to make target '../user-rocq/SyncInstrs.vo'`).
 - **AFTER ANY RE-DUMP, RUN `make check-decode`.** The dump only refreshes
   `kernel-rocq/`; the `iris/` decode layer separately states each instruction's
   encoding word and decoded immediate, and those go stale in ~145 of 188
@@ -107,24 +109,20 @@ change that produced it.
   they are symbol-relative already. Design and the measured numbers:
   [`design/code-organization.md`](design/code-organization.md).
 - **Editing a file near the BOTTOM of the tree kills the single-file check loop.** Touch `RiscvFetchExec.v` / `SmodeCore.v` / `IntrDefs.v` / `WpSconfMem.v` and every downstream `coqc <one file>.v` fails with *"Compiled library X makes inconsistent assumptions over library Y"* — the siblings' `.vo`s were built against the old interface, so there is no hand-orderable sequence of single-file compiles that works. Validate such an edit with **`make -f CoqMakefile -j16 -k`** (coqdep orders it; `-k` reports every independent error in one pass) and grep the log for `Error`; reserve single-file `coqc` for leaf/proof files whose dependencies you have not touched.
-- **A `nat` EQUALITY WHOSE RHS IS A LARGE LITERAL NEEDS `Z`, NOT A BIGGER STACK.** Any route to closing such a goal — `reflexivity`, `vm_compute`, even `vm_cast_no_check` — eventually makes something materialize a literal-deep unary successor chain, and that overflows a normal 8 MB stack outright (`ProofWriteiParts.v`'s old `wi_maxfile_bsize : (MAXFILE * BSIZE)%nat = 274432%nat` died this way, deterministically, in under 4 s and under 1 GB RSS — so it does NOT look like memory pressure or a `-j` artifact, it looks like a broken proof in a file you did not touch). `Z` literals are binary `Z.pos` trees (~log2 depth), so state the fact at `Z.of_nat (… )  = <literal>` instead (`rewrite Nat2Z.inj_mul` first if the LHS is a product) and close with `vm_compute; reflexivity` — the `nat`-side factors being unfolded stay small, and the literal itself is never forced into unary form. No shell tuning needed, and no `ulimit -s` bump either — `ProofWriteiParts.v` briefly grew a `nat`-typed twin of this lemma (closed by bare `reflexivity`) that reintroduced the overflow and made a raised stack look like a real prerequisite; see the next bullet for why that twin was needed and how it was fixed for good, retiring the requirement.
-  - **If a CALLER genuinely needs the fact AT `nat`** (e.g. to `rewrite` a `nat` loop-invariant hypothesis), do not restate it over `nat` from scratch — that regresses straight back to the overflow, and it does not even show up as "the same bug again": `reflexivity`/`vm_compute` on the small unfolded factors (`268 * 1024`) succeed FINE in isolation (plenty of stack), so it looks safe under a standalone test, and only overflows once compiled inside the real file's Iris/stdpp-heavy import context (2026-08-07, `wi_maxfile_bsize_nat` — a second agent re-added exactly this, unaware the first agent's `Z` port existed for this reason, and it died the same way). Confirm any such standalone test against the actual file's build, not a scratch file. `lia`/`nia` cannot bridge the gap either — once a `nat` literal is past Rocq's abstraction threshold (~5000) it prints compactly but elaborates to an opaque `Nat.of_num_uint` application, and `lia` cannot relate that to a *computed* product (`(268 * 1024 <= 274432)%nat` fails with "Cannot find witness" even though both sides are closed numerals); it only works when the identical literal already appears verbatim on both sides. Instead derive the `nat` fact from the `Z` one via `Z.to_nat`, which never forces the big literal into unary form: state it as `… = Z.to_nat <literal>` and prove `rewrite <- <the Z lemma>, Nat2Z.id; reflexivity` — both rewrites are symbolic (a Z-literal pattern match and a generic `Z.to_nat (Z.of_nat n) = n` lemma), so the proof is O(1) regardless of context. `lia` resolves `Z.to_nat` of a literal symbolically at every call site downstream, so this is a transparent drop-in.
-- **Fork/parallel discipline:** `make clean-proofs` nukes the shared `.vo` tree and breaks concurrent siblings — a fork must `coqc` only its OWN file, one compile at a time. Never `pkill -f coqc` (the pattern matches the killer's own shell → kills Bash, exit 144; and kills sibling compiles) — use `pkill -x coqc` or kill the `rocqworker` by PID. The same self-match trap breaks WAIT loops: `until ! pgrep -f "CoqMakefile -j16"; do …` never terminates (the waiter's own command line contains the pattern) and then makes `pgrep -f CoqMakefile` report a phantom in-progress build to everyone else. Don't poll processes at all — have the build write its own sentinel (`…; echo "EXIT=$?" >> log`) and wait on `grep EXIT` of the log. **And never `git stash` in a shared working tree** — the stash captures every concurrent agent's uncommitted edits along with yours, and the pop conflicts with (or silently wipes) work you never saw; measured cost 2026-08-13: one agent's finished ProofIget refactor lost to another agent's stash. For an "untouched baseline" compile, `git show HEAD:iris/<f>.v > /tmp/copy.v` and compile the copy; leave the live tree alone.
-- **THE REBUILD CONE IS THE DEV-LOOP COST — know it before you edit, and route around it.** Measured 2026-08-13 (per-file CPU × coqdep closure): touching `ProcInv` rebuilds 316 dependents ≈ 7,400 s CPU ≈ 4–5 min wall at `-j28`; `BioInv`/`InodeInv`/`LogInv`/`FileInvDefs` ≈ 350 files / ~8,000 s; `WpLock` 548 / 10,800 s; `IntrDefs`/`SmodeCore` 600–700 / ~12,000 s. `Spec*` files are cheap (3–29 dependents) — the spec-module architecture works. Three consequences:
+- **A `nat` EQUALITY WHOSE RHS IS A LARGE LITERAL NEEDS `Z`, NOT A BIGGER STACK.** Any route to closing such a goal — `reflexivity`, `vm_compute`, even `vm_cast_no_check` — eventually materializes a literal-deep unary successor chain and overflows a normal 8 MB stack outright, deterministically, in under 4 s and under 1 GB RSS. So it does NOT look like memory pressure or a `-j` artifact; it looks like a broken proof in a file you did not touch. `Z` literals are binary `Z.pos` trees (~log2 depth), so state the fact at `Z.of_nat (…) = <literal>` (`rewrite Nat2Z.inj_mul` first if the LHS is a product) and close with `vm_compute; reflexivity`.
+  - **If a CALLER genuinely needs the fact AT `nat`**, do not restate it over `nat` — that regresses straight back to the overflow, and it hides: `reflexivity`/`vm_compute` on the small unfolded factors (`268 * 1024`) succeed FINE in isolation and only overflow inside the real file's Iris/stdpp-heavy import context, so a standalone test says it is safe. `lia`/`nia` cannot bridge it either — past Rocq's abstraction threshold (~5000) a `nat` literal elaborates to an opaque `Nat.of_num_uint`, which `lia` cannot relate to a *computed* product (`(268 * 1024 <= 274432)%nat` fails with "Cannot find witness" though both sides are closed numerals). **Derive the `nat` fact from the `Z` one via `Z.to_nat`**: state `… = Z.to_nat <literal>`, prove `rewrite <- <the Z lemma>, Nat2Z.id; reflexivity`. Both rewrites are symbolic, so it is O(1) regardless of context, and `lia` resolves `Z.to_nat` of a literal symbolically downstream — a transparent drop-in.
+- **Fork/parallel discipline:** `make clean-proofs` nukes the shared `.vo` tree and breaks concurrent siblings — a fork must `coqc` only its OWN file, one compile at a time. Never `pkill -f coqc` (the pattern matches the killer's own shell → kills Bash, exit 144; and kills sibling compiles) — use `pkill -x coqc` or kill the `rocqworker` by PID. The same self-match trap breaks WAIT loops: `until ! pgrep -f "CoqMakefile -j16"; do …` never terminates (the waiter's own command line contains the pattern) and then makes `pgrep -f CoqMakefile` report a phantom in-progress build to everyone else. Don't poll processes at all — have the build write its own sentinel (`…; echo "EXIT=$?" >> log`) and wait on `grep EXIT` of the log. **And never `git stash` in a shared working tree** — the stash captures every concurrent agent's uncommitted edits along with yours, and the pop conflicts with (or silently wipes) work you never saw. For an "untouched baseline" compile, `git show HEAD:iris/<f>.v > /tmp/copy.v` and compile the copy; leave the live tree alone.
+- **THE REBUILD CONE IS THE DEV-LOOP COST — know it before you edit, and route around it.** Touching `ProcInv` rebuilds 316 dependents ≈ 4–5 min wall at `-j28`; `BioInv`/`InodeInv`/`LogInv`/`FileInvDefs` ≈ 350 files; `WpLock` 548; `IntrDefs`/`SmodeCore` 600–700. `Spec*` files are cheap (3–29 dependents) — the spec-module architecture works. Three consequences:
   - **While iterating, build the CHAIN, not the cone:** `make -f CoqMakefile Proof<X>.vo` compiles only the prerequisites of the one file you care about (seconds after a mid-tree edit), and a single-file `coqc` checks the file you edited. Pay the full cone ONCE, in the validating `make -j` before landing — never per iteration.
   - **An ADDITIVE change to a shared invariant file belongs in a NEW leaf file** (`ProcInvExtra.v`-style, folded back at a milestone): a new file Requiring `ProcInv` costs only itself; a new lemma INSIDE `ProcInv.v` costs the 316-file cone on every iteration that recompiles it.
-  - **`-vos` is NOT a fast cone check in this tree and do not reach for it:** everything lives inside `Section`s, so vos still runs all the tactics and skips only the kernel check — measured ~40 % per file (ProofSysPause 32.5 s vos vs ~56 s vo), and a ProcInv-touch vos cone was 332 files / 456 s wall at `-j16`, no better than the real vo cone at full `-j`.
-- **Profiling:** per-file times via `make TIMED=1` (or `make proofs TIMING=1 JOBS=32` → per-sentence `*.v.timing`, parse `Chars A-B [snip] T secs`, map offset→line); per-command via `coqc -time` (a stall right after a lemma's last tactic = stuck in `Qed`). Optimize the longest Require chain, not `-j`. Delete `*.v.timing` after (don't commit). Measure any `vm_compute`/decode tactic ONE variant per `coqc` process — the 2nd variant in a process wins ~35% from bytecode-cache reuse (fabricates false savings).
-  - **`tools/proof_profile.py` does all of this in one pass** and runs in CI on every checkin (`.github/workflows/ci.yml`): the iris build there is `make … --output-sync=target TIMED=1 TIMING=1` (`tee`d to a log), and the profiler consumes that log + the `*.v.timing` files + coqdep's `.CoqMakefile.d` + `.vo` mtimes to emit most-expensive statements/files, the weighted critical path (+ other deep chains), and a parallelism-over-time chart. All of it — tables + an inline Unicode block-chart of concurrent compiles — lands in the job's **step summary** and nowhere else (no artifact upload): GitHub sanitizes raw SVG/`<img>`/`data:` out of the summary, so the chart is drawn in text. The tool still writes a higher-res `parallelism.svg` + full `report-full.txt` to its `--out-dir` for local runs. Stdlib-only, `continue-on-error`, so it never fails a green build. Run it locally the same way: `python3 tools/proof_profile.py --build-log <TIMED-log> --iris-dir iris --out-dir /tmp/prof --jobs $(nproc)`.
-    - **`TIMED=1` needs `--output-sync=target`, or the log is not parseable.** Every TIMED record is written by its own `command time` to the one pipe `tee` reads, and those writes are not atomic, so under `-j` two records interleave *inside* a line (`SpecConsoleintr.vo (reaSlp:e cSysPipe.vo (real: …, sys: 4.040.55,,`). Measured on a synthetic 4-target build: without `-O`, **zero** of 4 records survive intact; with it, all 4. `-O` changes nothing the profiler measures — per-file wall comes from the record, the parallelism chart from `.vo` mtimes, neither from line order. The profiler also drops (and now *counts and reports*) unparseable records rather than dying on them; the pairing matters because `continue-on-error` turns such a death into a green run carrying only a `Process completed with exit code 1` annotation, which reads exactly like a broken proof build. **When CI looks green but a run page shows that annotation, check which step it came from before assuming the proofs broke.**
-- **A FAILING TACTIC IN A WHOLE-FUNCTION WP LOOKS LIKE A HANG.** Rocq prints the entire goal with the error, and a syscall-altitude goal contains `ProcInv.tf_page`'s **4096-conjunct** big-op plus every `iAssert`ed continuation; formatting that takes tens of minutes, so a one-line mistake reads as an infinite loop and every "where did it stall?" reading is wrong. Put **`Set Printing Depth 40.`** at the top of any file that proves over `proc_priv` (ProofSysPipe.v does) — it turns a 40-minute non-answer into a 30-second error message. Corollary: before hunting a "hang", check that the proof is not simply *wrong*.
-- **`iFrame` ON A SEAM STATE AT SYSCALL ALTITUDE DOES NOT TERMINATE — CLOSE A SEAM BY NAMING EVERY CONJUNCT.** Discharging one of kexec's block seams with `iFrame "Hpc Hcg Hcnt Hopen … Hpriv …"` reached **>19 GB RSS and climbing, with no error**: the `Frame` instance search unfolds `proc_priv` and the goal's big-ops and does not come back. It looks exactly like a hang, and `Set Printing Depth 40` does not help because nothing is being printed. `coqc -time` localises it in one pass (the last streamed sentence is the block just *before* the `iFrame`). Replacing the `iFrame`s with named `iSplitL "H"; [iExact "H" |]` chains took the same file to **Qed in 7.2 s with every tactic under 20 s**. The rule generalises: `iFrame` is fine in small definitional lemmas and is a trap at a capstone, for the same reason `set_solver` is (see the `ltac:(set_solver)` bullet above) — both search a context that is ~200 facts wide over large terms.
-- **A COMPILE THAT NEVER FINISHES IS LOCALISED BY `coqc -time`, WHICH STREAMS.** `-time` writes one line per sentence as it goes, so the LAST LINE IN THE LOG IS THE STALLING SENTENCE — run the compile redirecting to a file and `tail` it. (Map the `Chars A - B` offset to a line with `head -c B <f>.v | wc -l`.) This turned a file that had been "compiling" for 30+ minutes across three sessions into a two-minute diagnosis. **And what it found is the failure mode to suspect first: a MIS-STATED `∀`-PREMISE.** A lemma took `Hlr_ok : ∀ aq0 rl0 …, … uleaf_ok (LoadReserved (aq, rl, Data)) w0 → …` — binding `aq0 rl0` but writing the OUTER `aq rl` into the payload — so the uniformly-quantified composer could not be supplied and `iMod` span forever on the unification instead of failing. A premise that quantifies a variable it then does not use in the body is the shape to grep for; if the same names are in scope outside, Rocq's renaming (`aq0`) is the only hint in the error message, and only if you get one at all.
-- **`timeout N coqc` does NOT kill the worker, and `pgrep -x coqc` does NOT find it.** `coqc` runs as `rocqworker --kind=compile`, so an exact-name wait loop returns while the compile is still going (giving truncated logs and phantom "stalls"), and `timeout`'s SIGTERM reaps only its direct child. The orphan then spins at 100% and **holds a worker slot, stalling the next build at a random point** — which is what makes the stall location look non-deterministic. Wait on `pgrep -f "rocqworker --kind=compile"`, or better, have the compile print its own sentinel (`bash -c 'coqc …; echo EXIT=$?'`) and wait for that; and `pkill -f rocqworker` before re-measuring.
-- **`vm_compute; reflexivity` IS RECHECKED BY THE KERNEL'S *LAZY* CONVERSION AT `Qed` — the VM's speed does not carry over.** The tactic normalizes with the VM in a second; the proof term it leaves is a plain `eq_refl`, so `Qed` re-does the whole reduction in the kernel's lazy evaluator. On model code that is a different order of magnitude: ONE such equation over the Sail cold-boot chain measured **>3.8 GB and climbing**, and fifteen of them inside a single `Qed` reached **25 GB** before being killed, while the tactic-level `vm_compute` of the same term takes 0.75 s. `-time` shows 0 s for every sentence and the file just never finishes — the async `Qed` worker is where it went (next bullet). Two fixes, both in `iris/ColdBoot.v`: close the goal with **`vm_cast_no_check (eq_refl <rhs>)`** so the kernel rechecks with the VM too; and **compute the result ONCE into its own `Definition`** (`Definition d : T. Proof. let x := eval vm_compute in e in exact x. Defined.`) plus a single VM-cast lemma `e = d`, after which every downstream fact is a shallow conversion over `d` and costs nothing. That restructuring took the file from unbounded to **13.6 s / 0.9 GB**.
-- **PROFILE WITH `-time` BEFORE THEORISING ABOUT `Qed`.** `coqc -time` prints one line per command, and if the slow line is a *tactic* then no term-size work will help. The trap this caught: **`ltac:(set_solver)` passed as a positional argument inside a whole-function proof.** `ProofSysDup` took 9 min 10 s, and `-time` put 467 s of it on three trivial side conditions (`fd0 ∉ ∅`, `fd1 ∉ {[fd0]}`) at 106/180/180 s each — `set_solver` ends in `naive_solver`, which searches *every hypothesis in scope*, and a capstone's context is ~200 register-chain facts over large mword terms. Replacing them with `apply not_elem_of_empty` / `apply not_elem_of_singleton_2` gave **9 min 10 s → 25.6 s (21x)**, after which the biggest item in the file is an ordinary 3.3 s `Qed`. The rule: discharge set/arith side conditions in a capstone with the NAMED lemma, or hoist them to a `Local Lemma` where the context is two hypotheses wide; `set_solver` is fine inside the small definitional lemmas, it is the call site that matters. See `optimization.md`.
-- **A slow `Qed` is usually proof-term SIZE, not conversion — and `rocq compile -profile <f>.json` is what tells you which.** It breaks each `Qed` into `HConstr.of_constr` / `Typeops.execute` / `close_proof` / `sort_and_universes_of_constr`; measured across this tree only ~25 % is `Typeops` (real typechecking) and the rest is term-size-linear plumbing that re-walks every *occurrence* of a shared subterm. The one-command tell is **`Set Debug "hconstr".`**, which prints each `Qed`'s `tree size` and `bindings` (the DAG): a high **tree/bindings ratio** means a small proof with an exponentially unfolded term. To localise it inside a lemma, bisect with an `Axiom cheat_ : forall (A : Type), A.` stub (unlike `Admitted` this still runs `Qed`). See `optimization.md` for the whole method and for the `unfold set_reg` 3^N trap it found.
-- **`coqc` offloads `Qed` kernel-checking to an async `rocqworker` subprocess, and `coqc -time` does NOT count that worker's time.** So `-time`'s per-sentence sum can be tiny (e.g. 14 s) while the real `/usr/bin/time` wall is minutes — the gap is the async `Qed`, NOT machine contention. A pathological `Qed` (e.g. a whole-function proof term over a transparent, eagerly-reducible register-map tower) hides this way. To see it: `/usr/bin/time -v coqc …` (wall + RSS), not `-time`. Also: a killed/`pkill`-ed `coqc` can leave orphan/zombie `rocqworker`s (`ps -eo pid,ppid,stat,comm | grep rocqworker`; `Z`/defunct = harmless, a live orphan holds a worker slot and can stall the next build) — reap them before re-measuring, and prefer `pkill -x rocqworker`/kill-by-PID over `pkill -f coqc`.
+  - **`-vos` is NOT a fast cone check in this tree and do not reach for it:** everything lives inside `Section`s, so vos still runs all the tactics and skips only the kernel check — ~40 % per file, and a whole cone at `-j16` is no better than the real vo cone at full `-j`.
+- **Profiling:** per-file times via `make TIMED=1` (or `make proofs TIMING=1 JOBS=32` → per-sentence `*.v.timing`, parse `Chars A-B [snip] T secs`, map offset→line); per-command via `coqc -time`. Delete `*.v.timing` after (don't commit). Measure any `vm_compute`/decode tactic ONE variant per `coqc` process — the 2nd variant in a process wins ~35 % from bytecode-cache reuse (fabricates false savings). **`tools/proof_profile.py` does all of it in one pass** (most-expensive statements/files, the weighted critical path, a parallelism chart) and runs in CI on every checkin, emitting to the job's step summary. Locally: `python3 tools/proof_profile.py --build-log <TIMED-log> --iris-dir iris --out-dir /tmp/prof --jobs $(nproc)`. Two traps:
+  - **`TIMED=1` needs `--output-sync=target`** or the log is not parseable: each record is written by its own `command time` to the one pipe `tee` reads, non-atomically, so under `-j` two records interleave *inside* a line and none survives. `-O` changes nothing the profiler measures.
+  - The CI step is `continue-on-error`, so a profiler crash shows as a green run carrying only a `Process completed with exit code 1` annotation — which reads exactly like a broken proof build. **When CI looks green but a run page shows that annotation, check which step it came from before assuming the proofs broke.**
+- **A FAILING TACTIC IN A WHOLE-FUNCTION WP LOOKS LIKE A HANG.** Rocq prints the entire goal with the error, and a syscall-altitude goal contains `ProcInv.tf_page`'s **4096-conjunct** big-op plus every `iAssert`ed continuation; formatting that takes tens of minutes, so a one-line mistake reads as an infinite loop and every "where did it stall?" reading is wrong. Put **`Set Printing Depth 40.`** at the top of any file that proves over `proc_priv` — it turns a 40-minute non-answer into a 30-second error message. **Before hunting a "hang", check that the proof is not simply *wrong*.**
+- **A COMPILE THAT NEVER FINISHES IS LOCALISED BY `coqc -time`, WHICH STREAMS** — the LAST LINE IN THE LOG IS THE STALLING SENTENCE, so redirect to a file and `tail` it. (Map `Chars A - B` to a line with `head -c B <f>.v | wc -l`.) **The failure mode to suspect first is a MIS-STATED `∀`-PREMISE**: a premise that binds variables it then does not use in its body (`∀ aq0 rl0, … <the OUTER aq rl> …`) can never be supplied, so `iMod` spins forever on the unification instead of failing. Grep for that shape; if the same names are in scope outside, Rocq's renaming (`aq0`) is the only hint in the error message, and only if you get one at all.
+- **`timeout N coqc` does NOT kill the worker, and `pgrep -x coqc` does NOT find it.** `coqc` runs as `rocqworker --kind=compile`, so an exact-name wait loop returns while the compile is still going (giving truncated logs and phantom "stalls"), and `timeout`'s SIGTERM reaps only its direct child. The orphan then spins at 100 % and **holds a worker slot, stalling the next build at a random point** — which is what makes the stall location look non-deterministic. Wait on `pgrep -f "rocqworker --kind=compile"`, or better, have the compile print its own sentinel (`bash -c 'coqc …; echo EXIT=$?'`); `pkill -f rocqworker` before re-measuring, and reap orphans (`ps -eo pid,ppid,stat,comm | grep rocqworker`; `Z`/defunct is harmless, a live orphan is not).
+- Everything about what makes a file slow and how to measure it is in [`optimization.md`](optimization.md).
 
 ## A `[-]` SPEC PATTERN EATS THE HYPOTHESES NAMED *AFTER* IT
 
@@ -468,247 +466,34 @@ Annotate for one or two steps; split for anything longer.
 (+0xb2 to the exit, applied at `(CID := CIDp)`) is the worked instance, and
 splitting is what made a fifteen-instruction stretch annotation-free.
 
-## Changing the kernel SOURCE: what an image shift breaks, and how to find it
+## Changing the kernel SOURCE
 
-Done once, 2026-08-06, for a 6-byte fix inside `writei` (`kernel-defects.md`
-D1). It touched ~30 proof files and ~130 sites. Every step below was paid
-for; do them in this order.
+Editing `xv6-riscv/` moves symbol addresses and takes every proof that names one
+with it. The breakage itself — relayout, immediates, `.rodata` addresses, data
+symbols, stack-budget cascades, register reallocation, Link functor arity, and
+the two tools that do the mechanical 90 % — is the same as an upstream bump and
+is documented once, in [`xv6-bump-playbook.md`](xv6-bump-playbook.md). Three
+things are specific to changing the source yourself, and they come first:
 
 **1. GATE: prove the toolchain reproduces the image BEFORE changing anything.**
 There is no record of which gcc built the tracked dumps — CI never builds the
-ELF, it uses the checked-in `kernel-rocq/*.v`. So install a toolchain, build
-at the **unchanged** pinned `XV6_REV`, dump to a scratch dir and diff against
-the tracked files. All three must be byte-identical. (Ubuntu's
-`gcc-riscv64-linux-gnu` 15.2.0 did reproduce it exactly, as of that date.)
-If they differ, STOP: a rebuild would re-do register allocation and inlining
-across the whole kernel and take every proof with it, and you would be
-debugging that instead of your change. This is the same discipline the
-README already mandates for regenerating the Sail model.
+ELF, it uses the checked-in `kernel-rocq/*.v`. Install a toolchain, build at the
+**unchanged** pinned `XV6_REV`, dump to a scratch dir, and diff against the
+tracked files: all three must be byte-identical. If they differ, STOP — a
+rebuild would re-do register allocation and inlining across the whole kernel and
+take every proof with it, and you would be debugging that instead of your change.
 
-**2. Take the MINIMAL source change.** Cherry-pick the one commit onto the
-pinned rev; do not move to a branch head. The `riscv` branch was 13 commits
-ahead touching 8 kernel files including `trampoline.S`, `memlayout.h` and
-`bio.c` — all fully-proven subsystems. Bundling them would make it
-impossible to tell which change broke what.
+**2. Take the MINIMAL source change.** Cherry-pick the one commit onto the pinned
+rev; do not move to a branch head. Bundling unrelated commits makes it impossible
+to tell which change broke what.
 
-**3. Measure the shift from the symbol tables, not by assumption.** Diff old
-vs new `KernelSyms.v`. Expect ONE uniform delta over a bounded window: the
-writei fix moved 46 symbols by +6 over `[0x80003752, 0x80005420)` and
-**nothing above it**, because `kernelvec`'s alignment padding absorbed the 6
-bytes. Data (`sb` &c.) did not move at all. A first pass that assumed
-"everything above the change shifts" flagged 92 literals in 70 files; the
-true set was 14. Shifting the other 78 would have broken working proofs.
-
-**4. Regenerate, then repair, in this order:** re-dump `kernel-rocq/`; bump
-`XV6_REV`; run `tools/gen_code.py` (it regenerates every Code file in
-`tools/code_manifest.json` straight from the image — 117 files, and it is
-what makes this tractable at all); then fix what it does NOT cover.
-
-> **`gen_code.py --only` IS A FOOTGUN — DO NOT USE IT ALONE.** `--only`
-> restricts which *Code* files are written, but `main()` ALWAYS rewrites all
-> 16 `KernelDecode*.v` shards from the `decoded` dict, which under `--only`
-> holds just that one function's words. Running `--only CodeReadi.v` would
-> have replaced the 2306-lemma shared catalogue with 84 lemmas. To add ONE
-> function: run the FULL generator into a scratch directory and copy out only
-> what changed — then confirm every pre-existing Code file came back
-> byte-identical, and that the shard diffs are pure additions with no removed
-> lines. (Adding a function also means a `tools/code_manifest.json` entry:
-> `[file, symbol, prefix, width]`, where `width` is the zero-padded hex width
-> of the offset in the lemma name — `2` under 256 bytes, `3` at or above.)
->
-> **`gen_code.py` PICKS THE CLOSING TACTIC FROM THE AST'S HEAD, AND THE
-> WHITELIST IS INCOMPLETE — A NEW INSTRUCTION FORM CAN EMIT A DECODE LEMMA
-> THAT DOES NOT COMPILE.** The generator closes each `kd_<word>` with
-> `decode_bridge_ms`, whose final `vm_compute; reflexivity` needs the two
-> sides' bitvector WELL-FORMEDNESS PROOF TERMS to coincide; where they do
-> not it selects `decode_bridge_ms_bv` instead, but only for a hard-coded
-> list (`FENCE (`, `FENCEI (`, `CSRReg (`, `CSRImm (`). **`SHIFTIWOP` is
-> missing from that list**, so every `sraiw` in the image emits a lemma
-> that fails: SRAIW's `funct7 = 0100000` sits above the 5-bit shamt, so the
-> decoder yields `Z_to_bv 5 (1024 + shamt)` while the lemma states
-> `mword_of_int shamt` — same `bv_unsigned`, different
-> `Z_to_bv_obligation_1`, and the error prints two sides that look
-> IDENTICAL (the `subrange_vec_dec` trap below, in a new place). `slliw` /
-> `srliw` / `sllw` are unaffected because their slices carry no funct7
-> bits, which is why this stayed hidden until balloc — the first covered
-> function containing `sraiw` — was added. Fixing it is one token per
-> lemma (`decode_bridge_ms` -> `decode_bridge_ms_bv`, ~1.9 s for the whole
-> shard) but the REAL fix is the selection line in `gen_code.py`, because a
-> hand-patched shard is silently reverted by the next `make gen-code`.
-> **The general rule: any instruction whose AST field is NARROWER than the
-> encoded field it is sliced from needs the `_bv` bridge.** When three
-> decode shards fail at once after adding a function, look at what
-> instruction forms that function introduced, not at the shards.
->
-> **A `Code<F>.v` WITH NO MANIFEST ROW IS A TIME BOMB, and its own `.vo`
-> hides it.** `CodeReadi.v` sat in the tree and in `_CoqProject` with a
-> `.vo`, but its 25 decode words were never in `KernelDecode*.v` — the
-> ad-hoc generator run that produced it had written the shards and they were
-> reverted afterwards. It surfaced only on the next full build, as
-> *"Variable decname should be bound to a term but is bound to the
-> identifier `kd_0ed7e663`"*, with the stale `.vo` masking it until then.
-> The manifest row is what makes a Code file reproducible, so **a Code file
-> the manifest does not list is the tell**; recover with the recipe above.
-
-### The three things that bite, none of which a grep for addresses finds
-
-- **A function that moves changes its instruction WORDS, not just its
-  address.** Every PC-relative `jal`, branch, and `auipc`/`addi` pair that
-  crosses the moved/unmoved boundary re-encodes: **−6 leaving** a moved
-  function, **+6 entering** one; both-moved and both-unmoved are unchanged.
-  That rule held for all 146 changed immediates with zero exceptions. It is
-  why proofs of functions that did NOT move (`bread`, `brelse`, `binit`,
-  `main`, `bmap`, `iupdate`) still break — they call into code that did.
-
-- **NEVER compute the fix set by value arithmetic.** Three separate ways it
-  is wrong, each hit for real — **and `tools/relayout_map.py` is the
-  mechanized form of the rule that follows** (`map` prints a Code file's
-  per-offset immediate changes; `apply` rewrites a proof with them, anchored
-  on the last `KernelSyms.<sym> + 0x<off>` it saw, so both occurrences per
-  call site move and nothing outside the region does). Three ways value
-  arithmetic is wrong: (a) `removed − added` set-difference silently
-  drops any value that reappears as a NEW immediate elsewhere — that hid
-  `ProofFilealloc` entirely; (b) immediates are written in HEX in some
-  proofs and DECIMAL in others (`0x6a2` vs `1698`), so a decimal grep misses
-  sites; (c) **adjacent call sites 6 bytes apart collide**, e.g. `iti_56`
-  2093404→2093398 next to `iti_5c` 2093398→2093392 — a sequential value
-  sweep double-shifts the first. **Build the map keyed by LEMMA NAME from
-  the regenerated `Code<F>.v` diff, and apply it by LINE NUMBER.**
-
-- **Which of the two relayout tools to reach for, and why there are two.**
-  `relayout_map.py` compares old against new **at the same offset**. That is
-  exact only while both images agree on where instructions start, so it is the
-  right tool when a function merely MOVED. The moment a function GAINS OR
-  LOSES an instruction, every later offset names a different instruction in
-  the two images: usually that surfaces as a shape change (and is quarantined
-  — everything at or above a symbol's first reshaped offset is refused), but
-  when the two unrelated instructions happen to share a shape the difference
-  looks exactly like a moved immediate. On `CodeKexec.v` that proposed
-  rewriting phase B's tail (`ld s6,480(sp)` / `j +0x64`) with phase D's
-  `ld s11,440(sp)` / `j +0x72` — both `ldsp`+`cj`, and it typechecks.
-    So on a reshaped function `relayout_map.py` is safe but nearly useless
-  (on `CodeVmfault.v` it calls 48 of 55 offsets reshaped). Use
-  **`tools/relayout_shift.py`** there: it ALIGNS the two instruction streams
-  with difflib over number-normalised ASTs, so only genuine insertions and
-  deletions fall out, and it remaps the anchor offsets themselves.
-    **Its `UNALIGNED` list is the check AND the most useful output**: it
-  should be exactly the instructions the C change added or removed, and if it
-  is longer, the alignment is wrong and nothing else it prints is
-  trustworthy. On `CodeVmfault.v` it printed, unaided, the whole semantic
-  diff of the change — the deleted `jal myproc`, the deleted `ld a5,72(a0)`
-  (p->sz), the deleted `ld a0,80(s1)` (p->pagetable), the inserted `li s4,0`.
-  It also caught what the same-offset view actively MISREPORTS: `filestat`'s
-  epilogue shifts by +4, not the +2 it appears to, because old 0x4e/0x50 were
-  already `ld s2`/`ld s3` — "the epilogue grew a saved register" was an
-  artifact of the wrong comparison. Finish with `relayout_map.py residue`
-  either way; neither tool rewrites register fields, by design.
-    **NEITHER TOOL RENAMES `<prefix>_<off>` IN THE PROOF.** `relayout_shift.py
-  --proof` rewrites the offsets and immediates a proof spells, and it
-  renumbers the lemma names in `Code<F>.v` — but not the
-  `iPoseProof (uti_0f2 …)` that NAMES them, so after a shift a block's
-  witnesses point two bytes low. That fails loudly only where the old name has
-  gone away; where the shifted range still has a lemma at the old offset it
-  TYPECHECKS, against the wrong instruction, and surfaces as an unprovable pc
-  equation later. Do the rename as ONE simultaneous pass over the block's line
-  range (a sequential `sed` double-shifts — the adjacent-call-site trap above,
-  in a new place), and take the hypothesis names (`Hif2`) and the
-  `(* +0xf2 … *)` comments with it. Grep the file for `<prefix>_` afterwards
-  and read the list against the disassembly; it is short.
-    **BOTH TOOLS HAD THE AUTHOR'S WORKTREE PATH HARD-CODED** (`ROOT =
-  '/shared/xv6iris-4'`, and a `sys.path.insert` of the same), so in any other
-  checkout they died with a `FileNotFoundError` naming somebody else's
-  directory — which reads like a missing file rather than a broken tool. Both
-  now derive `ROOT` from the script's own location. Also: `relayout_map.py`
-  wants a BARE basename (`map CodeUsertrap.v`), not a repo-relative path, or
-  it looks for `iris/iris/Code….v`.
-
-- **A STALE `iDestruct` PATTERN CAN SPLIT A NESTED CONJUNCTION AND BIND THE
-  WRONG RESOURCE — silently, and it surfaces far away.** When a bundled
-  predicate loses a conjunct, an intro pattern with the OLD arity does not
-  necessarily fail: if one of the remaining conjuncts is itself a separating
-  conjunction, the extra slots happily split IT instead.
-    Real case: `SpecPrintkGen.printk_env` went from four conjuncts to three
-  (`printk_flags_inv` was deleted with the `panicking`/`panicked` globals), and
-  `ProofMainSecondary.v` still said
-
-      iDestruct "Hpenv2" as "(_ & _ & #Hdev & _)".
-
-  The third conjunct is `WpUart.dev_inv γd γv`, itself a 4-way `∗`. So the
-  pattern kept splitting, `#Hdev` bound to `uart_inv γd` — the FIRST COMPONENT
-  of `dev_inv` — and the trailing `_` ate the rest. No arity error. It failed
-  eight lines later at an application wanting `dev_inv γd γv`, reported as
-  "cannot instantiate ... with (uart_inv γd)".
-    So when you change the shape of a bundled predicate, GREP FOR EVERY
-  `iDestruct` OF IT and re-count, rather than trusting the build to point at
-  them. The error, when it comes, names the consumer and not the pattern.
-
-- **A BITVECTOR WIDTH IS NOT AN IMMEDIATE, and rewriting one is SILENT.**
-  `relayout_map.py apply` substitutes numbers by value inside an anchored
-  region, and a proof line carries the same number in several roles:
-
-      iApply (wp_addi4_s_sconf ... (mword_of_int 12 : mword 12))
-      set (Q1 := ... (add_vec ... (sign_extend' 64 (mword_of_int 52 : mword 12))))
-
-  Only the FIRST number in each is the instruction's immediate; `mword 12`,
-  `sign_extend' 64`, `zero_extend' 12`, `ones 0` are TYPES. On the `b7c25cf`
-  bump a map entry `12 -> 4088` at `procdump+0x2e` produced
-  `mword_of_int 4088 : mword 4088` -- a 4088-BIT WORD -- and `64 -> 52` in
-  kvmmap produced `sign_extend' 52` and `: mword 52`.
-    **The 4088 failed loudly; the 52 did not stand out at all.** An audit for
-  IMPLAUSIBLE widths finds the first and misses the second, because 52 is a
-  perfectly ordinary width. The audit that works is a DIFF against HEAD:
-  collect every width token in each file before and after and compare the
-  multisets -- a relayout must never change one. (Skip the generated
-  `Code*.v` / `KernelDecode*.v`, whose widths legitimately move.)
-    The tool now freezes all of those spans, the same way it freezes pc
-  offsets and register fields. The general rule: before substituting a number
-  by value, ask what ROLE that position plays; the relayout map only ever
-  licenses changing an *immediate*.
-
-- **A REGISTER REALLOCATION IS NOT ALWAYS A RENAME, and getting that wrong
-  typechecks.** On the `psz` bump gcc swapped filestat's two lazily-spilled
-  callee-saveds -- `p` went s3->s2 and `&st` went s2->s3 -- but **the spill
-  slots did not move with them**: 48(sp) is still s2's and 40(sp) still s3's,
-  with the spills at +0x1e/+0x20 and the restores at +0x52/+0x54 all
-  unchanged. So it is a ROLE swap bounded by the prologue and the epilogue,
-  and the fix is to swap `Rs2`/`Rs3` only BETWEEN the first `c.mv` and the
-  epilogue restores, leaving the four spill/restore sites and every
-  `m !!! Regidx Rs2/Rs3` alone.
-    A blanket rename would have attributed the caller's two saved words to the
-  wrong frame slots -- **and it would still have compiled**, because both
-  slots are just `word_pointsto` at an address, so nothing at the leaf
-  distinguishes them; it would surface only in the final `callee_saved`, if at
-  all. When a register map is not a permutation of *roles*, work out where
-  each role starts and stops rather than sed-ing the register name.
-
-- **Watch for two different old immediates that map to the SAME new value.**
-  filestat had `68 -> 72` at +0x1a and `80 -> 72` at +0x42, with both `68` and
-  `80` occurring several times in the proof (80 is also the `p->pagetable`
-  struct offset). No value-keyed substitution can get that right; drop such
-  offsets from the map and do them by hand. A third variant in the same class:
-  a `c.li a3,24 -> c.li a4,24` is a REGISTER change sitting next to a literal
-  `24` that is copyout's length argument -- both tools correctly leave both
-  literals alone, but a human re-reading the block is tempted to "fix" it.
-
-- **Hand-written decode files state the word AND its decoded AST, and both
-  must move together.** `gen_code.py` does not cover the `Code*Aux.v` files.
-  Fixing only the word in `CodeFileinitAux.v` left the lemma asserting
-  `ITYPE (1468, …)` against a word that now decodes to 1462, and the file
-  failed again on the next build. Diff every asserted word in such a file
-  against the image rather than patching the one the error names.
-
-### Expect cascades, and let `-k` enumerate them
-
-Each build reveals only the next layer: a file that fails blocks its
-dependants from being attempted at all, so they surface only once it is
-fixed (`ProofFileinit` appeared two builds after `CodeFileinitAux`, which it
-depends on). Run `make -k`, collect the whole failure set, fix it as a
-batch, repeat. Do not fix-and-restart one file at a time.
-
-Also: each immediate typically appears **twice** per call site — once as the
-explicit `wp_*_s_sconf` argument and once inside a companion
-`add_vec … sign_extend'` assert or `set`. Update both, or the file fails
-again at the same offset.
+**3. Measure the shift from the SYMBOL TABLES, not by assumption.** Diff old vs
+new `KernelSyms.v`. Expect one uniform delta over a BOUNDED window — a 6-byte
+fix inside `writei` moved 46 symbols by +6 and **nothing above it**, because
+`kernelvec`'s alignment padding absorbed the 6 bytes, and the data symbols did
+not move at all. Assuming "everything above the change shifts" flagged 92
+literals in 70 files where the true set was 14; shifting the other 78 would have
+broken working proofs.
 
 ## A WEAKENING IS CHEAP TO PROVE AND EXPENSIVE TO USE — plan the sweep accordingly
 
@@ -815,92 +600,36 @@ sees through every functor and seal. Do it once at the end of any interface
 change and diff the axiom list against what the coverage report says should be
 assumed; anything else is a regression.
 
-## `make kernel` DOES NOT REBUILD THE KERNEL, AND `gen-code` DOES NOT RE-DUMP
+## Three ways a build check can LIE about being green
 
-Two independent traps that both make a version bump a SILENT NO-OP. Hit both
-on the `b7c25cf` bump; the tell was `make kernel` printing "Nothing to be done"
-seconds after a `git checkout` of a different revision.
+The failure mode of each is a green-looking ANSWER, not an error.
 
-1. **The ELF rule has only an ORDER-ONLY prerequisite:**
-
-       $(KERNEL_ELF): | $(XV6_DIR)
-               $(MAKE) -C $(XV6_DIR) kernel/kernel
-
-   `|` means "the directory must exist", not "rebuild when it changes". Once
-   `xv6-riscv/kernel/kernel` exists, `make kernel` never runs the inner make
-   again, however far the sources have moved. Force it:
-
-       make -C xv6-riscv kernel/kernel
-
-2. **`gen-code` reads `kernel-rocq/`, not the ELF.** It regenerates
-   `iris/Code*.v` + `KernelDecode*.v` FROM the dump; the dump itself is
-   produced by the `$(KDUMP)/Kernel{Syms,Data,Instrs}.v` rules, which do
-   depend on the ELF. Running `gen-code` alone after a bump therefore
-   regenerates the decode layer from the OLD dump and reports a perfectly
-   healthy-looking summary.
-
-So the order after changing `XV6_REV` is:
-
-       make -C xv6-riscv kernel/kernel      # force the image
-       make dump                            # ELF   -> kernel-rocq/
-       make gen-code                        # dump  -> iris/Code*.v
-
-**VERIFY, do not trust the summary.** Both no-ops print normal-looking output
-(`gen-code` even reports its usual counts). The cheap check is one symbol
-against the image:
-
-       grep -E "Definition kalloc " kernel-rocq/KernelSyms.v
-       grep -E " kalloc$" xv6-riscv/kernel/kernel.sym
-
-If those disagree the dump is stale, and every proof in the tree is being
-checked against an image that no longer exists.
-
-## A `.v`-vs-`.vo` MTIME SWEEP IS NOT A STALENESS CHECK
-
-The obvious "is the tree built?" loop --
-
-    for f in *.v; do [ "$f" -nt "${f%.v}.vo" ] && echo STALE $f; done
-
--- compares each file against ITS OWN `.vo` and therefore misses TRANSITIVE
-staleness entirely. Edit `SpecFoo.v`, rebuild it alone, and every `.vo` above
-it is now stale while this sweep reports the tree clean, because none of those
-`.v` files were touched. It reported "1 stale file" on a tree where
-`LinkBalloc.vo`/`LinkBmap.vo`/`LinkWritei.vo` were all stale against a
-`SpecBalloc.vo` rebuilt 35 minutes later — and the conclusion drawn from it
-("the tree is fully green") was wrong and was stated to a human.
-
-Only `make` knows the dependency graph. **The cheap correct check is
-`make -f CoqMakefile -q` (or a plain `make`, which prints `Nothing to be done`
-when genuinely up to date); the cheap correct SPOT check is
-`find . -name '*.vo' ! -newer <the .vo you just rebuilt>` restricted to the
-files that actually Require it.** Never report a build state from mtimes alone
-— and note this is the same family as the two lying build checks below: the
-failure mode is a green-looking answer, not an error.
-
-## Two ways a build check can LIE about being green
-
-Both cost real time in one session; check for them before believing a
-"clean build".
-
-- **`make ... | grep -E ... | head -N` truncates the check, not just the
-  output.**  Once `head` has its N lines it closes the pipe, so any later
-  error is never seen -- and `echo $?` after the pipeline reports the LAST
-  command's status, not make's.  Capture make's own exit status
-  (`make proofs > log 2>&1; echo $?`) and grep the file afterwards.
-
-- **A green build BEFORE a rebase says nothing about the tree AFTER it, and
-  the commit most likely to break you cannot conflict textually.** The
-  nightly dead-import sweep (`.github/workflows/dead-imports.yml`) removes and
-  RE-POINTS imports across ~100 files at a time. It changes no statement and
-  no proof, so a rebase onto it is always clean — but what it changes is which
-  names arrive TRANSITIVELY, and its most likely victim is a brand-new file,
-  whose own import list nobody has ever pruned and which therefore names half
-  its vocabulary through chains that happen to carry it. Landing
-  `ProofKexecA.v` this way put main red at `The reference is_sleeplock was not
-  found` for a few minutes. **Rebase, THEN build, THEN push — never push while
-  the verification build is still running, however small the incoming delta
-  looks.** The fix is always the same: add the requires explicitly; the next
-  sweep will prune whatever is genuinely unused.
+- **A `.v`-vs-`.vo` mtime sweep is not a staleness check.** The obvious loop
+  `for f in *.v; do [ "$f" -nt "${f%.v}.vo" ] && echo STALE $f; done` compares
+  each file against ITS OWN `.vo` and misses TRANSITIVE staleness entirely: edit
+  `SpecFoo.v`, rebuild it alone, and every `.vo` above it is stale while the
+  sweep reports the tree clean, because none of those `.v` were touched. Only
+  `make` knows the dependency graph. **The cheap correct check is `make -f
+  CoqMakefile -q`** (or a plain `make`, which prints `Nothing to be done` when
+  genuinely up to date); the cheap correct SPOT check is `find . -name '*.vo'
+  ! -newer <the .vo you just rebuilt>` restricted to the files that Require it.
+  Never report a build state from mtimes alone.
+- **`make … | grep -E … | head -N` truncates the CHECK, not just the output.**
+  Once `head` has its N lines it closes the pipe, so any later error is never
+  seen — and `echo $?` after the pipeline reports the LAST command's status, not
+  make's. Capture make's own exit status (`make proofs > log 2>&1; echo $?`) and
+  grep the file afterwards.
+- **A green build BEFORE a rebase says nothing about the tree AFTER it, and the
+  commit most likely to break you cannot conflict textually.** The nightly
+  dead-import sweep (`.github/workflows/dead-imports.yml`) removes and RE-POINTS
+  imports across ~100 files at a time. It changes no statement and no proof, so
+  the rebase is always clean — but it changes which names arrive TRANSITIVELY,
+  and its likeliest victim is a brand-new file, whose own import list nobody has
+  ever pruned and which therefore names half its vocabulary through chains that
+  happen to carry it. **Rebase, THEN build, THEN push** — never push while the
+  verification build is still running, however small the incoming delta looks.
+  The fix is always the same: add the requires explicitly; the next sweep prunes
+  whatever is genuinely unused.
 
 ## Proof coverage report
 
@@ -964,6 +693,7 @@ and axioms each proven function rests on. `--format text|md|html|json`.
 
 ## Proofmode & bitvector gotchas (recur across files)
 
+- **A STALE `iDestruct` PATTERN CAN SPLIT A NESTED CONJUNCTION AND BIND THE WRONG RESOURCE — silently, and it surfaces far away.** When a bundled predicate loses a conjunct, an intro pattern with the OLD arity does not necessarily fail: if one of the remaining conjuncts is itself a separating conjunction, the extra slots happily split IT instead. A four-slot `"(_ & _ & #Hdev & _)"` against a now-three-conjunct bundle bound `#Hdev` to the FIRST COMPONENT of the third conjunct (itself a 4-way `∗`) with no arity error, and failed eight lines later at an application wanting the whole thing — reported as "cannot instantiate … with (uart_inv γd)". **When you change the shape of a bundled predicate, grep for every `iDestruct` of it and re-count**; the error, when it comes, names the consumer and not the pattern.
 - **Some files are deliberately ssreflect-FREE, and that decides where a definition may live.** `Pt4kWalk.v` has 27 vanilla `rewrite … by …` rewrites, so it cannot `Require` anything that pulls in the iris proofmode — which `PageGeom.v` does (it needs ssreflect's `rewrite … in H |- *` for the two `uint`/`bv_unsigned` bridges it inherited from `KallocInv.v`). So a `page_base`-spelled restatement of a `Pt4kWalk` fact has to live in `PtBuild.v`, not in `Pt4kWalk.v`, even though there is no dependency CYCLE. Before planning a relocation into a low file, check whether that file uses `rewrite … by …`; the failure mode is a parse error at the first such rewrite, far from the import you added.
 - In iris proofmode: `rewrite a b c` uses SPACES not commas (`rewrite H1, H2.` fails); `rewrite lem by tac` does NOT parse (ssreflect clash) — use `rewrite lem; [|tac]` / `rewrite (lem args ltac:(tac))` / `assert … by tac`. iris-FREE files can use `rewrite … by`. Rewrite a proofmode HYP with `iEval (rewrite H) in "Hpc"` — bare `rewrite H` rewrites the WHOLE `envs_entails Δ P` (hyps AND goal) and desyncs them.
 - `iDestruct (lem with "…") as %pure` keeps the spatial inputs when the conclusion is pure (relied on by fetch/config lemmas) — a plain `iDestruct` of a pure-conclusion wand CONSUMES its premises. `big_sepM`/`big_sepL` byte extraction needs an EXPLICIT Φ (underscores leave TC evars unresolved).
@@ -1037,64 +767,6 @@ and axioms each proven function rests on. `--format text|md|html|json`.
   **`rename` must come AFTER any application of a SIBLING lemma from the same Section**, because such a reference resolves through the section variables BY NAME (they are not generalized until the Section closes) and fails with *"<lemma> depends on the variable CID which is not declared in the context"*. Lemmas from other files are already generalized and take the hart as an instance argument, so they are unaffected. Note the entry hart must stay nameable anyway whenever the proof RELATES the two harts (`rget_next_indep : rget (CID := CIDn) m rs = rget (CID := CID) m rs`), which is what `CID0` is for.
 - **WHAT SUCH A SWEEP CANNOT FIX BY PLUMBING: a leaf that FRAMES A PER-HART RESOURCE ACROSS ITS OWN STEP.** Once a step's continuation is rebound to another hart, anything the proof obtained *before* the step is about the wrong hart, and the failure is loud but misleading — `iSpecialize: cannot instantiate (?r ↦ᵣ{?dq} ?v -∗ ⌜register_lookup ?r (sregs σ) = ?v⌝) with (mcounteren ↦ᵣ□ mcen)`, or `iFrame: cannot frame hw_config`, i.e. it reads as a MISSING resource when the real problem is that you have the wrong hart's. Persistence does not help (`↦ᵣ□` is still per-hart). The fix is a design call per leaf, not a tactic: either the leaf is `b = false`-only — and then `assert ((CID : CpuId) = CID0) as -> by exact (Hs (or_introl eq_refl)).` collapses the two harts and the conversion is free — or the resource belongs in the ambient bundle rather than in a caller frame. Budget the sweep as "mechanical part + one decision per leaf that frames anything", and identify the framers up front by grepping for caller-supplied `↦ᵣ` premises and for regime/invariant arguments.
 - Section gotchas: a lemma using NO section vars is not generalized over them; `intros ->` on a section-variable equation BREAKS references to sibling section lemmas (state such wrappers outside the section); `Proof using All` generalizes over ALL context vars (callers must then pass them). A section `Variable` (e.g. `root_ppn`) auto-threads intra-file but external callers pass it as the LEADING argument.
-
-## Proof-check speed: what actually costs time in these files
-
-Measured on ProofPrintk.v.  **The "~65 s" figure below is for the 4800-line
-version of that file and is now badly stale** -- it grew to 7903 lines long
-before the explicit-cpuid branch, and a pre-refactor compile measures **93 s**
-(105 s on that branch).  A stale baseline here cost real time: it produced a
-"+56% regression" that did not exist, and the arithmetic looked convincing.
-Re-measure the baseline before believing any regression claim about this file.  `coqc -time` plus a
-per-lemma roll-up is the tool; two findings generalise:
-
-- **`vm_compute` in the leaf side conditions is FREE** -- the ubiquitous
-  `ltac:(vm_compute; discriminate)` on `uint (mword_of_int 15 : mword 5) <> 0`
-  measures at well under a millisecond.  Do not go hunting there.
-- **The cost is Iris unification against `mword`/`bv` terms.**  A bare
-  `iFrame.` over a separating conjunction of a dozen `pa_stk sp0 j` cells
-  costs ~1 s, because every FAILED match unfolds `pa_stk` through
-  `add_vec_int` down to the bitvector records.  Two fixes, both cheap:
-  - `Local Strategy 1000 [pa_stk].` -- keeps failed comparisons first-order
-    (the slot indices are literals) while `unfold pa_stk` still works where
-    the arithmetic is wanted.  `Local Opaque` does NOT work: it blocks
-    `unfold` too.  Worth ~8% of the file.
-  - name the hypotheses (`iFrame "S9 S19 ..."`) instead of a bare `iFrame.`
-    -- 6.5 s to 0.5 s on one seven-way frame.  Give them in the GOAL's
-    conjunct order; a wrong order is worse than none (one reordering
-    experiment took a frame from 2.2 s to 3.8 s).
-
-- **In a `first [...]` alternation, put the CHEAP-FAILING branch first.**
-  The cost of a tactic that FAILS grows with the proof term, so an
-  alternation that leads with an expensive-to-fail branch pays that cost at
-  every use.  Measured on `ProofProcPagetable.v`'s callee-saved transport:
-  `first [ rewrite Hx2 in Hc; vm_compute in Hc; discriminate | exact (H2
-  Hx2) | ... ]` cost ~1.3 s per use in the prologue and ~10 s per use in the
-  epilogue -- 42 s over the function -- purely in the failures of the first
-  branch.  Swapping the four `exact`s (which fail instantly on a type
-  mismatch) to the front took every use to milliseconds.  Same total work,
-  same proof, one reordering.  The rule of thumb: `exact`/`assumption` fail
-  cheaply, `rewrite ... in H` and `congruence` do not.
-- **A proof obligation that cannot be discharged may be telling you the CODE
-  is wrong.**  freeproc's `p->parent = 0` could not be proved because the
-  cell is owned by nothing -- and the reason it is owned by nothing is that
-  xv6 writes it there without `wait_lock`, which its own proc.h says is
-  required.  The fix was upstream, not a new ownership story.  Ask "is this
-  a bug?" BEFORE designing a bundle to hold the resource; modelling a bug
-  makes it permanent in the spec.
-- **`congruence` is not free in a whole-function context.**  Seconds per
-  call once the context is a hundred hypotheses deep.  Where the
-  contradiction is known, pass the hypothesis in by name and `exact` it.
-
-Beware when measuring: this is a shared machine.  Wall AND user time swing
-30%+ with someone else's load, so A/B by re-running interleaved and taking
-the minimum, or align the two `-time` logs sentence-by-sentence and calibrate
-on the median ratio of the sentences you did not touch.
-
-Splitting a file to shrink the edit-check loop was tried and REVERTED: three
-files cost the same as one for a clean build (the per-file import overhead is
-only ~1.8 s), and at a minute per check the single file is not worth the
-extra structure.
 
 ## Reusable recipes (validated; reuse verbatim)
 

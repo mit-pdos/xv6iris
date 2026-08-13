@@ -1,9 +1,8 @@
 # Bumping `XV6_REV`: the playbook
 
 How to move this development to a new upstream xv6 revision, what breaks, in
-what order, and which of it is mechanical. Written after four bumps
-(`ae96fd0`, `0024d4b`, `b7c25cf`, `03e5422a`), and it is mostly a list of ways
-the job *looks* finished when it is not.
+what order, and which of it is mechanical. Mostly a list of ways the job *looks*
+finished when it is not.
 
 Read [`durable-notes.md`](durable-notes.md) first for the build and the
 cross-cutting gotchas; this file is only about version bumps.
@@ -65,6 +64,42 @@ grep -E " kalloc$" xv6-riscv/kernel/kernel.sym
 If those disagree the dump is stale and every proof in the tree is being
 checked against an image that no longer exists.
 
+### Three `gen_code.py` footguns
+
+* **`--only` IS A FOOTGUN — DO NOT USE IT ALONE.** It restricts which *Code*
+  files are written, but `main()` ALWAYS rewrites all 16 `KernelDecode*.v`
+  shards from the `decoded` dict, which under `--only` holds just that one
+  function's words — so `--only CodeReadi.v` would replace the 2306-lemma shared
+  catalogue with 84 lemmas. To add ONE function: run the FULL generator into a
+  scratch directory and copy out only what changed, then confirm every
+  pre-existing Code file came back byte-identical and that the shard diffs are
+  pure additions. (Adding a function also needs a `tools/code_manifest.json` row
+  `[file, symbol, prefix, width]`, where `width` is the zero-padded hex width of
+  the offset in the lemma name — `2` under 256 bytes, `3` at or above.)
+* **The closing tactic is picked from the AST's head, and the whitelist is
+  INCOMPLETE — a new instruction form can emit a decode lemma that does not
+  compile.** Each `kd_<word>` is closed with `decode_bridge_ms`, whose final
+  `vm_compute; reflexivity` needs the two sides' bitvector WELL-FORMEDNESS proof
+  terms to coincide; where they do not, the generator selects
+  `decode_bridge_ms_bv` — but only for a hard-coded list (`FENCE (`, `FENCEI (`,
+  `CSRReg (`, `CSRImm (`). **`SHIFTIWOP` is missing from it**, so every `sraiw`
+  emits a failing lemma: SRAIW's `funct7 = 0100000` sits above the 5-bit shamt,
+  so the decoder yields `Z_to_bv 5 (1024 + shamt)` while the lemma states
+  `mword_of_int shamt` — same `bv_unsigned`, different obligation, and the error
+  prints two sides that look IDENTICAL. `slliw`/`srliw`/`sllw` are unaffected
+  because their slices carry no funct7 bits. **The general rule: any instruction
+  whose AST field is NARROWER than the encoded field it is sliced from needs the
+  `_bv` bridge.** Fix the selection line in `gen_code.py`, not the shard — a
+  hand-patched shard is silently reverted by the next `make gen-code`. When
+  three decode shards fail at once after adding a function, look at what
+  instruction forms that function introduced, not at the shards.
+* **A `Code<F>.v` with no manifest row is a time bomb, and its own `.vo` hides
+  it.** A Code file can sit in the tree and in `_CoqProject` with a `.vo` while
+  its decode words were never written into `KernelDecode*.v`. It surfaces only
+  on the next full build, as *"Variable decname should be bound to a term but is
+  bound to the identifier `kd_0ed7e663`"*. The manifest row is what makes a Code
+  file reproducible, so **a Code file the manifest does not list is the tell.**
+
 ---
 
 ## 2. Classify before you fix
@@ -83,13 +118,9 @@ for c in iris/Code*.v; do b=$(basename $c)
 done
 ```
 
-`UNALIGNED` counts instructions that were genuinely **inserted or deleted**.
-Everything else moved. Real results:
-
-| bump | functions with a shape change | everything else |
-|---|---|---|
-| `b7c25cf` | `uartinit: 5` | pure relayout |
-| `03e5422a` | `create: 14`, `namex: 6` | pure relayout |
+`UNALIGNED` counts instructions that were genuinely **inserted or deleted**;
+everything else merely moved. Typically one or two functions show a shape change
+and the rest of the tree is pure relayout.
 
 **`UNALIGNED` is necessary but NOT sufficient.** Alignment is on
 number-normalised ASTs, so when the new code repeats a shape already present,
@@ -108,11 +139,10 @@ Cross-check it against `git diff <old>..<new> -- kernel/` — the two should nam
 the same functions. If the sweep says a function changed shape and the C did
 not, suspect the tooling, not gcc.
 
-**Do this before touching anything.** On the `0024d4b` bump I skipped it, saw
-"48 of 55 offsets reshaped" from the same-offset tool, concluded `vmfault`
-needed a from-scratch rewrite, and spent a long time proving otherwise. The
-shift tool prints the answer directly — on `CodeVmfault.v` its `UNALIGNED`
-list *is* the semantic diff of the upstream change:
+**Do this before touching anything.** Skipping it and reading "48 of 55 offsets
+reshaped" off the *same-offset* tool says a function needs a from-scratch
+rewrite when it does not. The shift tool answers directly — its `UNALIGNED` list
+*is* the semantic diff of the upstream change:
 
     OLD 0x010  JAL myproc          <- deleted myproc() call
     OLD 0x014  LOAD 72(a0)         <- deleted p->sz read
@@ -407,27 +437,16 @@ Rules that made that work:
    regression. Note that axioms in `Link` files for cones not yet wired into
    boot do **not** appear — absence is not proof they are gone.
 3. Ascription-check every `Link` file whose functor arity changed (§4f).
-4. Update `claude-notes/`: `kernel-defects.md` if upstream fixed one of ours,
-   and the summary line in `README.md` — they drift apart easily.
+4. Update the affected `claude-notes/` files, and delete whatever the bump made
+   obsolete — a bump's whole point is often that machinery goes away.
 
 ---
 
-## 8. What upstream changes have actually looked like
+## 8. Expect a bump to DELETE work
 
-Worth calibrating on: three of the four bumps were dominated by *deletion*.
-
-* **`ae96fd0`** split `sleep(chan,lk)` into `sleep_prepare` + `sleep`, which
-  deleted the whole `lock_openable`-generic `SLEEP_GEN` interface rather than
-  porting it — the genericity moved into the acquire/release contracts the
-  caller now invokes itself.
-* **`0024d4b`** made `vmfault` stop conflating the table it is handed with
-  `myproc()->pagetable`. That deleted `p_sz`/`p_pagetable` (and the `dqs`/`dqp`
-  fractions) from four contracts, and deleted `SpecCopyout`'s entire
-  `co_license` / `co_mapped` / `arm` / `COPYOUT_GEN` apparatus, which had
-  existed solely to work around the conflation — retiring a kexec blocker more
-  cheaply than the workaround had.
-* **`b7c25cf`** restored `initsleeplock(&tx_lock,"uart")`, fixing a defect
-  *we* reported, and restored a contract shape `ae96fd0` had removed.
-
-So: when a bump makes a spec more complicated, look again. Upstream fixing a
-conflation usually means a workaround in the proofs can go.
+Most bumps here have been dominated by deletion: upstream fixing a conflation
+(a function reading `myproc()` instead of its argument, a lock that was the
+wrong kind) retires whatever the proofs had built to describe it, and the
+retirement is usually cheaper than the workaround was. **So when a bump appears
+to make a spec more complicated, look again** — and when it makes one simpler,
+delete the machinery rather than porting it.

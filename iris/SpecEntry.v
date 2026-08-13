@@ -141,7 +141,15 @@ Definition wp_entry_boot_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
       /\ and_vec mief (not_vec midelegf) = zeros' 64
       /\ mief = MIE_S
       /\ _get_Satp64_Mode (Mk_Satp64 satpf) = ('b"0000" : mword 4)
-      /\ mb_pmp_open pmpcfgf pmpaddrf ⌝ -∗
+      /\ mb_pmp_open pmpcfgf pmpaddrf
+      (* THE TIMER BIT.  timerinit sets mcounteren.TM ([ori a5,a5,2] then
+         [csrw mcounteren]), and S-mode needs to KNOW it: [TimerCap.timer_cap]
+         -- the credential clockintr runs under, and therefore one of the
+         things kerneltrap's cone closes over -- is exactly this fact plus the
+         two cells below.  Stated here for the same reason [mief = MIE_S] is:
+         the M-mode proof computes the value, so it is free there and
+         unobtainable anywhere else. *)
+      /\ eq_vec (_get_Counteren_TM mcounterenf) ('b"1" : mword 1) = true ⌝ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
     mstatus ↦ᵣ msf -∗

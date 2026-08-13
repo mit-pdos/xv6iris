@@ -12,7 +12,7 @@
 > [`../kernel-defects.md`](../kernel-defects.md) D2 is CLOSED), taken and
 > released *inside* the loop, once per byte, with the park outside it.  The
 > table below is about that final shape; the protocol split that drove it is
-> [`sleep-split.md`](sleep-split.md).
+> [`sleep-split.md`](../completed/sleep-split.md).
 
 | function | where | status |
 |---|---|---|
