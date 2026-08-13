@@ -28,11 +28,18 @@
    these slots does not exist -- so anything richer would be a predicate with no
    consumer.  When one arrives it is built at the caller from these cells.
 
-   ONLY ONE LOCK IS INITIALIZED HERE ANY MORE.  uartinit used to end with
-   [initlock(&tx_lock,"uart")] and hand its three raw cells back through this
-   contract; upstream ae96fd0 made tx_lock a sleeplock and DELETED that call
-   without replacing it (kernel-defects.md D2), so consoleinit now touches only
-   [cons.lock] and the transmit lock's storage appears nowhere in this spec.
+   TWO LOCKS ARE INITIALIZED UNDER THIS CONTRACT AGAIN.  uartinit used to end
+   with [initlock(&tx_lock,"uart")] and hand its three raw cells back through
+   here; ae96fd0 made tx_lock a SLEEPLOCK and deleted that call without
+   replacing it, leaving it uninitialized (kernel-defects.md D2, which we
+   reported).  `b7c25cf` fixes it with [initsleeplock(&tx_lock, "uart")], so
+   the storage is back -- as [SleepLock.sl_raw] in and [sl_fresh] out, six
+   fields rather than the spinlock's three.
+     It is PURE TRANSIT: consoleinit never names a field of it, and the only
+   thing the round trip costs this contract is two stack slots (K went 6 ->
+   10, since uartinit went 4 -> 8).  What it BUYS is that [sl_fresh] reaches
+   a caller that can run [sl_fresh_new], which is the missing half of
+   [LinkTxLockInit.tx_lock_init].
 
    ProofConsoleinit.v proves it as a functor over [INITLOCK] and [UARTINIT];
    consoleinit touches no MMIO of its own, so the device side is pure transit
@@ -54,6 +61,7 @@ Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import WpUart.
+Require Import SleepLock UartTxInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 
@@ -79,7 +87,7 @@ Definition devsw_console_write : mword 64 := mword_of_int (KernelSyms.devsw + 24
    only from main() before intr_on(), so it is stated at [false] with no
    [wp_next] wrapper, the same shape as SpecCpuid.v / SpecTrapinithart.v /
    SpecPlicClaim.v. *)
-Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
+Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!lockG Σ} `{!uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γd : uart_names) (m : regfile) (K : nat)
     (l : list (bv 8)) (b0 : bool)
@@ -92,8 +100,14 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
   let c_cname := lock_name_field clk in
   let c_ccpu := add_vec clk (sign_extend' 64 (mword_of_int 0x10 : mword 12)) in
   (* consoleinit's own frame is 2 slots and its deepest callee is uartinit,
-     which needs 4. *)
-  (6 <= K)%nat ->
+     which needs 8.
+
+     8, NOT 4: xv6 `b7c25cf` restored uartinit's
+     `initsleeplock(&tx_lock, "uart")` -- the call `ae96fd0` had deleted
+     without replacement, leaving the transmit sleeplock uninitialized
+     (kernel-defects.md D2).  uartinit's own frame is 2 slots and
+     initsleeplock demands 6, so uartinit went 4 -> 8 and this went 6 -> 10. *)
+  (10 <= K)%nat ->
   sie_cap_gpr m K false p -∗
   (* [kernel_data] supplies the "cons" string literal consoleinit's [auipc a1 /
      addi a1] points at -- the name it hands to initlock -- and, through
@@ -109,6 +123,11 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
   clk ↦₄ vclock -∗
   c_cname ↦₈ vcname -∗
   c_ccpu ↦₈ vccpu -∗
+  (* tx_lock's six raw fields, PASSED STRAIGHT THROUGH to uartinit.
+     consoleinit itself touches no sleeplock storage; it is only on the path
+     between the boot assembly that owns the bss and the initsleeplock call
+     that consumes it. *)
+  SleepLock.sl_raw UartTxInv.a_tx_lock -∗
   devsw_console_read ↦₈ dread0 -∗
   devsw_console_write ↦₈ dwrite0 -∗
   ( ∀ mr,
@@ -124,6 +143,9 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
     clk ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name clk "cons"%string -∗
     c_ccpu ↦₈ (zero_reg : mword 64) -∗
+    (* and back out initialized: [sl_fresh_new]'s raw material, which is what
+       lets a boot assembly mint [UartTxInv.is_txlock] (LinkTxLockInit.v). *)
+    SleepLock.sl_fresh UartTxInv.a_tx_lock "uart"%string -∗
     devsw_console_read ↦₈ (mword_of_int KernelSyms.consoleread : mword 64) -∗
     devsw_console_write ↦₈ (mword_of_int KernelSyms.consolewrite : mword 64) -∗
     WP (Loop : expr riscv_lang)) -∗
@@ -131,7 +153,7 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
 
 Module Type CONSOLEINIT.
   Parameter wp_consoleinit_sconf :
-    forall `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ} `{!sieG Σ} `{!lockG Σ} `{!uartGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γd : uart_names) (m : regfile) (K : nat)
       (l : list (bv 8)) (b0 : bool)
       (vclock : bv 32) (vcname vccpu : bv 64)

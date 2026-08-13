@@ -37,7 +37,7 @@ Section CodePrintkinitBundle.
      whole-function proof instantiates. *)
   Lemma pkni_code :
     kernel_text -∗ ilw_code KernelSyms.printkinit (mword_of_int 6) (mword_of_int 18)
-                            (mword_of_int 1968) (mword_of_int 2792) (mword_of_int 716).
+                            (mword_of_int 1968) (mword_of_int 2792) (mword_of_int 736).
   Proof.
     iIntros "#Ht". rewrite /ilw_code.
     iSplitR; [iApply (pkni_00 with "Ht")|].
@@ -87,7 +87,7 @@ Section ProofPrintkinit.
                   with "Hkdata") as "#Hstr".
     iApply (ILW.wp_initlock_wrapper_sconf m K KernelSyms.printkinit
               (mword_of_int 6) (mword_of_int 18) (mword_of_int 1968) (mword_of_int 2792)
-              (mword_of_int 716) lk name "pr"%string vlock vname vcpu b p HK
+              (mword_of_int 736) lk name "pr"%string vlock vname vcpu b p HK
               ltac:(vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)

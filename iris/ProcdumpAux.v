@@ -208,9 +208,9 @@ Qed.
 
 (* the three literals the prologue materialises, at the addresses the
    auipc/addi pairs compute *)
-Definition pd_nl_a   : Z := 0x80007070.        (* "\n"        (a0 at +0x1a, s4) *)
-Definition pd_qqq_a  : Z := 0x80007218.        (* "???"       (s3) *)
-Definition pd_fmt_a  : Z := 0x80007220.        (* "%d %s %s"  (s5) *)
+Definition pd_nl_a   : Z := 0x80007078.        (* "\n"        (a0 at +0x1a, s4) *)
+Definition pd_qqq_a  : Z := 0x80007220.        (* "???"       (s3) *)
+Definition pd_fmt_a  : Z := 0x80007228.        (* "%d %s %s"  (s5) *)
 
 Definition pd_nl  : string := String (ascii_of_nat 10) EmptyString.
 Definition pd_qqq : string := "???".
@@ -220,7 +220,7 @@ Definition pd_fmt : string := "%d %s %s".
    consecutive doublewords from [states_0]; the strings themselves are eight
    bytes apart starting at [pd_state_s0]. *)
 Definition pd_states_a : Z := KernelSyms.states_0.
-Definition pd_state_s0 : Z := 0x80007230.
+Definition pd_state_s0 : Z := 0x80007238.
 Definition pd_state_a (k : nat) : Z := pd_state_s0 + 8 * Z.of_nat k.
 Definition pd_state_p (k : nat) : mword 64 := mword_of_int (pd_state_a k).
 

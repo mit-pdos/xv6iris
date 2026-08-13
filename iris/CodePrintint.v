@@ -98,9 +98,9 @@ Section CodePrintint.
   Proof. mk_base (KernelSyms.printint + 0x1a) (mword_of_int 0x00007817 : mword 32)
     (mword_of_int (KernelSyms.printint + 0x1a) : mword 64) (UTYPE (mword_of_int 7 : mword 20, Regidx (mword_of_int 16), AUIPC)) kd_00007817. Qed.
 
-  Lemma pii_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.printint + 0x1e) : mword 64) false (ITYPE (mword_of_int 666 : mword 12, Regidx (mword_of_int 16), Regidx (mword_of_int 16), ADDI)).
-  Proof. mk_base (KernelSyms.printint + 0x1e) (mword_of_int 0x29a80813 : mword 32)
-    (mword_of_int (KernelSyms.printint + 0x1e) : mword 64) (ITYPE (mword_of_int 666 : mword 12, Regidx (mword_of_int 16), Regidx (mword_of_int 16), ADDI)) kd_29a80813. Qed.
+  Lemma pii_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.printint + 0x1e) : mword 64) false (ITYPE (mword_of_int 674 : mword 12, Regidx (mword_of_int 16), Regidx (mword_of_int 16), ADDI)).
+  Proof. mk_base (KernelSyms.printint + 0x1e) (mword_of_int 0x2a280813 : mword 32)
+    (mword_of_int (KernelSyms.printint + 0x1e) : mword 64) (ITYPE (mword_of_int 674 : mword 12, Regidx (mword_of_int 16), Regidx (mword_of_int 16), ADDI)) kd_2a280813. Qed.
 
   Lemma pii_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.printint + 0x22) : mword 64) true (RTYPE (Regidx (mword_of_int 14), zreg, Regidx (mword_of_int 17), ADD)).
   Proof. mk_rvc (KernelSyms.printint + 0x22) (mword_of_int 0x88ba : mword 16)

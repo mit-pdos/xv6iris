@@ -482,10 +482,15 @@ Section BootBssChain.
     iDestruct (bss_cut g (KernelSyms.cons + 24) KernelSyms.pr
                  (KernelSyms.pr + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hlk2 H]".
+    (* tx_lock's window is 44 bytes, not 24: it is a [struct sleeplock]
+       (b7c25cf restored uartinit's [initsleeplock], kernel-defects.md D2),
+       so [boot_main_locks_raw] discharges it with [boot_sl_raw].  The linker
+       left 48 bytes between [pr] and [kmem], so the wider cut still clears
+       the next one -- [main_lock_windows] is that check. *)
     iDestruct (bss_cut g (KernelSyms.pr + 24) KernelSyms.tx_lock
-                 (KernelSyms.tx_lock + 24) ram_hi
+                 (KernelSyms.tx_lock + 44) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hlk3 H]".
-    iDestruct (bss_cut g (KernelSyms.tx_lock + 24) KernelSyms.kmem
+    iDestruct (bss_cut g (KernelSyms.tx_lock + 44) KernelSyms.kmem
                  (KernelSyms.kmem + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hlk4 H]".
     iDestruct (bss_cut g (KernelSyms.kmem + 24) (KernelSyms.kmem + 24)

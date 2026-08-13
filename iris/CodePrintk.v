@@ -214,9 +214,9 @@ Section CodePrintk.
   Proof. mk_base (KernelSyms.printk + 0x68) (mword_of_int 0xdfa50513 : mword 32)
     (mword_of_int (KernelSyms.printk + 0x68) : mword 64) (ITYPE (mword_of_int 3578 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_dfa50513. Qed.
 
-  Lemma pki_6c : kernel_text -∗ instr (mword_of_int (KernelSyms.printk + 0x6c) : mword 64) false (JAL (mword_of_int 1630 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.printk + 0x6c) (mword_of_int 0x65e000ef : mword 32)
-    (mword_of_int (KernelSyms.printk + 0x6c) : mword 64) (JAL (mword_of_int 1630 : mword 21, Regidx (mword_of_int 1))) kd_65e000ef. Qed.
+  Lemma pki_6c : kernel_text -∗ instr (mword_of_int (KernelSyms.printk + 0x6c) : mword 64) false (JAL (mword_of_int 1650 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.printk + 0x6c) (mword_of_int 0x672000ef : mword 32)
+    (mword_of_int (KernelSyms.printk + 0x6c) : mword 64) (JAL (mword_of_int 1650 : mword 21, Regidx (mword_of_int 1))) kd_672000ef. Qed.
 
   Lemma pki_70 : kernel_text -∗ instr (mword_of_int (KernelSyms.printk + 0x70) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2012 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (KernelSyms.printk + 0x70) (mword_of_int 0xbf65 : mword 16)
@@ -674,9 +674,9 @@ Section CodePrintk.
   Proof. mk_base (KernelSyms.printk + 0x1d8) (mword_of_int 0x00007c97 : mword 32)
     (mword_of_int (KernelSyms.printk + 0x1d8) : mword 64) (UTYPE (mword_of_int 7 : mword 20, Regidx (mword_of_int 25), AUIPC)) kd_00007c97. Qed.
 
-  Lemma pki_1dc : kernel_text -∗ instr (mword_of_int (KernelSyms.printk + 0x1dc) : mword 64) false (ITYPE (mword_of_int 70 : mword 12, Regidx (mword_of_int 25), Regidx (mword_of_int 25), ADDI)).
-  Proof. mk_base (KernelSyms.printk + 0x1dc) (mword_of_int 0x046c8c93 : mword 32)
-    (mword_of_int (KernelSyms.printk + 0x1dc) : mword 64) (ITYPE (mword_of_int 70 : mword 12, Regidx (mword_of_int 25), Regidx (mword_of_int 25), ADDI)) kd_046c8c93. Qed.
+  Lemma pki_1dc : kernel_text -∗ instr (mword_of_int (KernelSyms.printk + 0x1dc) : mword 64) false (ITYPE (mword_of_int 78 : mword 12, Regidx (mword_of_int 25), Regidx (mword_of_int 25), ADDI)).
+  Proof. mk_base (KernelSyms.printk + 0x1dc) (mword_of_int 0x04ec8c93 : mword 32)
+    (mword_of_int (KernelSyms.printk + 0x1dc) : mword 64) (ITYPE (mword_of_int 78 : mword 12, Regidx (mword_of_int 25), Regidx (mword_of_int 25), ADDI)) kd_04ec8c93. Qed.
 
   Lemma pki_1e0 : kernel_text -∗ instr (mword_of_int (KernelSyms.printk + 0x1e0) : mword 64) false (SHIFTIOP (mword_of_int 60 : mword 6, Regidx (mword_of_int 21), Regidx (mword_of_int 15), SRLI)).
   Proof. mk_base (KernelSyms.printk + 0x1e0) (mword_of_int 0x03cad793 : mword 32)
@@ -934,9 +934,9 @@ Section CodePrintk.
   Proof. mk_base (KernelSyms.printk + 0x28e) (mword_of_int 0xbd450513 : mword 32)
     (mword_of_int (KernelSyms.printk + 0x28e) : mword 64) (ITYPE (mword_of_int 3028 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_bd450513. Qed.
 
-  Lemma pki_292 : kernel_text -∗ instr (mword_of_int (KernelSyms.printk + 0x292) : mword 64) false (JAL (mword_of_int 1216 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.printk + 0x292) (mword_of_int 0x4c0000ef : mword 32)
-    (mword_of_int (KernelSyms.printk + 0x292) : mword 64) (JAL (mword_of_int 1216 : mword 21, Regidx (mword_of_int 1))) kd_4c0000ef. Qed.
+  Lemma pki_292 : kernel_text -∗ instr (mword_of_int (KernelSyms.printk + 0x292) : mword 64) false (JAL (mword_of_int 1236 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.printk + 0x292) (mword_of_int 0x4d4000ef : mword 32)
+    (mword_of_int (KernelSyms.printk + 0x292) : mword 64) (JAL (mword_of_int 1236 : mword 21, Regidx (mword_of_int 1))) kd_4d4000ef. Qed.
 
   Lemma pki_296 : kernel_text -∗ instr (mword_of_int (KernelSyms.printk + 0x296) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2026 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (KernelSyms.printk + 0x296) (mword_of_int 0xbfd1 : mword 16)

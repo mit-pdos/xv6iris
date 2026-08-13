@@ -25,6 +25,7 @@ Require Import KernelDecode10.
 Require Import KernelDecode11.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
+Require Import KernelDecode16.
 Require Import KernelDecode24.
 Require Import KernelDecode25.
 Require Import KernelDecode26.
@@ -71,9 +72,9 @@ Section CodeConsoleinit.
   Proof. mk_base (KernelSyms.consoleinit + 0x14) (mword_of_int 0xe8050513 : mword 32)
     (mword_of_int (KernelSyms.consoleinit + 0x14) : mword 64) (ITYPE (mword_of_int 3712 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_e8050513. Qed.
 
-  Lemma cii_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleinit + 0x18) : mword 64) false (JAL (mword_of_int 1804 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.consoleinit + 0x18) (mword_of_int 0x70c000ef : mword 32)
-    (mword_of_int (KernelSyms.consoleinit + 0x18) : mword 64) (JAL (mword_of_int 1804 : mword 21, Regidx (mword_of_int 1))) kd_70c000ef. Qed.
+  Lemma cii_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleinit + 0x18) : mword 64) false (JAL (mword_of_int 1824 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.consoleinit + 0x18) (mword_of_int 0x720000ef : mword 32)
+    (mword_of_int (KernelSyms.consoleinit + 0x18) : mword 64) (JAL (mword_of_int 1824 : mword 21, Regidx (mword_of_int 1))) kd_720000ef. Qed.
 
   Lemma cii_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.consoleinit + 0x1c) : mword 64) false (JAL (mword_of_int 1096 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.consoleinit + 0x1c) (mword_of_int 0x448000ef : mword 32)

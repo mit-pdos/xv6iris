@@ -23,7 +23,6 @@ Require Import KernelDecode05.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
 Require Import KernelDecode08.
-Require Import KernelDecode09.
 Require Import KernelDecode10.
 Require Import KernelDecode11.
 Require Import KernelDecode12.
@@ -128,24 +127,24 @@ Section CodePopOff.
   Proof. mk_base (KernelSyms.pop_off + 0x30) (mword_of_int 0x00006517 : mword 32)
     (mword_of_int (KernelSyms.pop_off + 0x30) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00006517. Qed.
 
-  Lemma ppi_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.pop_off + 0x34) : mword 64) false (ITYPE (mword_of_int 1028 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.pop_off + 0x34) (mword_of_int 0x40450513 : mword 32)
-    (mword_of_int (KernelSyms.pop_off + 0x34) : mword 64) (ITYPE (mword_of_int 1028 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_40450513. Qed.
+  Lemma ppi_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.pop_off + 0x34) : mword 64) false (ITYPE (mword_of_int 1016 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.pop_off + 0x34) (mword_of_int 0x3f850513 : mword 32)
+    (mword_of_int (KernelSyms.pop_off + 0x34) : mword 64) (ITYPE (mword_of_int 1016 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_3f850513. Qed.
 
-  Lemma ppi_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.pop_off + 0x38) : mword 64) false (JAL (mword_of_int 2096104 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.pop_off + 0x38) (mword_of_int 0xbe9ff0ef : mword 32)
-    (mword_of_int (KernelSyms.pop_off + 0x38) : mword 64) (JAL (mword_of_int 2096104 : mword 21, Regidx (mword_of_int 1))) kd_be9ff0ef. Qed.
+  Lemma ppi_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.pop_off + 0x38) : mword 64) false (JAL (mword_of_int 2096084 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.pop_off + 0x38) (mword_of_int 0xbd5ff0ef : mword 32)
+    (mword_of_int (KernelSyms.pop_off + 0x38) : mword 64) (JAL (mword_of_int 2096084 : mword 21, Regidx (mword_of_int 1))) kd_bd5ff0ef. Qed.
 
   Lemma ppi_3c : kernel_text -∗ instr (mword_of_int (KernelSyms.pop_off + 0x3c) : mword 64) false (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (KernelSyms.pop_off + 0x3c) (mword_of_int 0x00006517 : mword 32)
     (mword_of_int (KernelSyms.pop_off + 0x3c) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00006517. Qed.
 
-  Lemma ppi_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.pop_off + 0x40) : mword 64) false (ITYPE (mword_of_int 1040 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.pop_off + 0x40) (mword_of_int 0x41050513 : mword 32)
-    (mword_of_int (KernelSyms.pop_off + 0x40) : mword 64) (ITYPE (mword_of_int 1040 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_41050513. Qed.
+  Lemma ppi_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.pop_off + 0x40) : mword 64) false (ITYPE (mword_of_int 1028 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.pop_off + 0x40) (mword_of_int 0x40450513 : mword 32)
+    (mword_of_int (KernelSyms.pop_off + 0x40) : mword 64) (ITYPE (mword_of_int 1028 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_40450513. Qed.
 
-  Lemma ppi_44 : kernel_text -∗ instr (mword_of_int (KernelSyms.pop_off + 0x44) : mword 64) false (JAL (mword_of_int 2096092 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.pop_off + 0x44) (mword_of_int 0xbddff0ef : mword 32)
-    (mword_of_int (KernelSyms.pop_off + 0x44) : mword 64) (JAL (mword_of_int 2096092 : mword 21, Regidx (mword_of_int 1))) kd_bddff0ef. Qed.
+  Lemma ppi_44 : kernel_text -∗ instr (mword_of_int (KernelSyms.pop_off + 0x44) : mword 64) false (JAL (mword_of_int 2096072 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.pop_off + 0x44) (mword_of_int 0xbc9ff0ef : mword 32)
+    (mword_of_int (KernelSyms.pop_off + 0x44) : mword 64) (JAL (mword_of_int 2096072 : mword 21, Regidx (mword_of_int 1))) kd_bc9ff0ef. Qed.
 
 End CodePopOff.

@@ -72,9 +72,9 @@ Section CodeWriteHead.
   Proof. mk_base (KernelSyms.write_head + 0xc) (mword_of_int 0x0001f917 : mword 32)
     (mword_of_int (KernelSyms.write_head + 0xc) : mword 64) (UTYPE (mword_of_int 31 : mword 20, Regidx (mword_of_int 18), AUIPC)) kd_0001f917. Qed.
 
-  Lemma whi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.write_head + 0x10) : mword 64) false (ITYPE (mword_of_int 2334 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)).
-  Proof. mk_base (KernelSyms.write_head + 0x10) (mword_of_int 0x91e90913 : mword 32)
-    (mword_of_int (KernelSyms.write_head + 0x10) : mword 64) (ITYPE (mword_of_int 2334 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)) kd_91e90913. Qed.
+  Lemma whi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.write_head + 0x10) : mword 64) false (ITYPE (mword_of_int 2314 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)).
+  Proof. mk_base (KernelSyms.write_head + 0x10) (mword_of_int 0x90a90913 : mword 32)
+    (mword_of_int (KernelSyms.write_head + 0x10) : mword 64) (ITYPE (mword_of_int 2314 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)) kd_90a90913. Qed.
 
   Lemma whi_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.write_head + 0x14) : mword 64) false (LOAD (mword_of_int 24 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 11), false, 4)).
   Proof. mk_base (KernelSyms.write_head + 0x14) (mword_of_int 0x01892583 : mword 32)
@@ -108,9 +108,9 @@ Section CodeWriteHead.
   Proof. mk_base (KernelSyms.write_head + 0x2c) (mword_of_int 0x0001f717 : mword 32)
     (mword_of_int (KernelSyms.write_head + 0x2c) : mword 64) (UTYPE (mword_of_int 31 : mword 20, Regidx (mword_of_int 14), AUIPC)) kd_0001f717. Qed.
 
-  Lemma whi_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.write_head + 0x30) : mword 64) false (ITYPE (mword_of_int 2350 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
-  Proof. mk_base (KernelSyms.write_head + 0x30) (mword_of_int 0x92e70713 : mword 32)
-    (mword_of_int (KernelSyms.write_head + 0x30) : mword 64) (ITYPE (mword_of_int 2350 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) kd_92e70713. Qed.
+  Lemma whi_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.write_head + 0x30) : mword 64) false (ITYPE (mword_of_int 2330 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
+  Proof. mk_base (KernelSyms.write_head + 0x30) (mword_of_int 0x91a70713 : mword 32)
+    (mword_of_int (KernelSyms.write_head + 0x30) : mword 64) (ITYPE (mword_of_int 2330 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) kd_91a70713. Qed.
 
   Lemma whi_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.write_head + 0x34) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (KernelSyms.write_head + 0x34) (mword_of_int 0x87aa : mword 16)
