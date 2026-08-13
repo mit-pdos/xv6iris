@@ -67,7 +67,7 @@ Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import UserPtTree.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecProcinit.
 Require Import SpecFileclose.
 Require Import SpecDevintr.

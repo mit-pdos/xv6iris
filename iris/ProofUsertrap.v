@@ -86,7 +86,7 @@ Require Import BioInv DiskPtsto DiskInv WpUart FsBlocks LogInv FsCrash.
 Require Import IrefSlots InodeRegion.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
-Require Import SchedCtx SpecPanic.
+Require Import SchedCtx PanicStub.
 Require Import UserExec.
 Require Import CodeUsertrap.
 Require Import SpecMyproc.

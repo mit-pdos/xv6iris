@@ -93,7 +93,7 @@ Require Import SchedCtx.
 Require Import WaitInv.
 Require Import SpecAcquire SpecRelease SpecMyproc SpecKilled SpecSleepPrepare SpecSleep.
 Require Import SpecCopyout SpecFreeproc.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecProcinit.
 Require Import SpecKwait.
 From Kernel Require KernelInstrs KernelSyms.

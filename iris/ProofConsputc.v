@@ -54,7 +54,7 @@ Require Import IntrDefs HartTp WpNext.
 Require Import CpuOwn.
 Require Import WpLock.
 Require Import UartTxInv.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import CodeConsputc.
 Require Import SpecUartPutc SpecConsputc.
 From Kernel Require KernelInstrs.

@@ -40,7 +40,7 @@ Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import FdSlots FileInv.
 Require Import WpLock.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import IntrDefs.
 Require Import CpuOwn.
 From Kernel Require KernelSyms.

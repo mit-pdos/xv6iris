@@ -48,7 +48,7 @@ Require Import WaitInv.
 Require Import CodeReparent.
 Require Import SpecWakeup.
 Require Import SpecReparent.
-Require Import SpecPanic.
+Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Local Open Scope Z_scope.

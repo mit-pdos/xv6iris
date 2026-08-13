@@ -110,7 +110,7 @@ Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import CodeIalloc.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecPrintkGen.
 Require Import SpecBread SpecBrelse SpecLogWrite SpecMemset SpecIget.
 Require Import SpecIalloc.

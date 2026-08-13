@@ -66,50 +66,14 @@
    cell at any fraction, which [ProcInv.proc_priv_trapframe] lends at 1/4 and
    takes back -- so [proc_priv] travels WHOLE across this block (convention 2).
 
-   ---- THE TWO OUTPUT STATES, AND WHY THE ELF BUFFER GOES NAMED ----------
+   ---- THE TWO OUTPUT STATES ---------------------------------------------
 
-   [kxc_at_1a2] and [kxc_at_12c] are named [iProp]s for the same reason
-   [ProofKexecA.kxc_at_a2] is: the chunk that produces a seam and the chunk
-   that consumes it cannot then disagree about it.
-
-   THE ONE PLACE THIS CHUNK DEPARTS FROM PHASE A's SEAM SHAPE is the ELF
-   buffer.  Phase A handed slots 14..63 back as ONE [stack_own] chunk, whose
-   contents are existential -- correct there, because nothing downstream of
-   +0x090 had read a field yet.  From +0x12c on that is no longer sound: the
-   phdr loop RE-READS [elf.phnum] on every iteration ([lhu a5,-376(s0)] at
-   +0x124) and phase D reads [elf.entry] ([ld a4,-408(s0)] at +0x2ec), so the
-   loop invariant has to pin what those reads deliver.  Both output states
-   therefore carry the 64 elf bytes as a NAMED run [ef] plus the pure
-   per-slot 8-alignment facts a re-slotting needs, and [kxc_frameB] is
-   [kxc_frameA6] with the elf slots removed and slot 67 (the PGSIZE-1 mask,
-   read at +0x162) pinned.  [kxc_elf_take] / [kxc_elf_give] are that carve
-   and its inverse; the alignment facts travel as a PURE conjunct rather than
-   as a giveback wand so that they survive the loop's induction unchanged.
-
-   ---- THE PHDR LOOP INVARIANT, AND THE [int off] TRUNCATION -------------
-
-   [kxc_at_12c] carries, in the machine's own variables:
-
-     s10 = i,  with [Z.of_nat i <= eh_phnum ef]
-     a3  = off, with [off = ph_at ef i] READ THROUGH THE [int] TRUNCATION
-     s2  = sz,  s11 = 56, s9 = s5 = 4096, s6 = the new root
-     proc_pt P,  ud_tfp P = ud_tfp (pv_upt V),
-     um_below sz P.(ud_um),  kxc_covered sz P.(ud_um),
-     bv_unsigned sz <= uvm_maxsz
-
-   The [off] conjunct is [kxc_off ef i = sign_extend' 64 (Z_to_bv 32
-   (ph_at ef i))] and NOT [mword_of_int (ph_at ef i)], and the difference is
-   the code's, not the model's: the C's [int off] makes the machine read the
-   field with an [lw] (+0x0b4) and advance it with an [addiw] (+0x120), so
-   every value the register holds is the low 32 bits of [ph_at] sign-extended
-   -- exactly what ElfEnc.v's header records about [eh_phoff].  Stated this
-   way the loop's step is [ph_at_succ] plus one [addiw] fact and needs no
-   range premise on the header.
-
-   At the entry [i = 0] and [sz = 0]: [ph_at_0] gives the [off] conjunct,
-   and [um_below] / [kxc_covered] are both trivial there -- the descriptor is
-   the EMPTY one proc_pagetable just built ([ProcPtOwn.um_below_empty], and
-   [kxc_covered] is vacuous below size 0).
+   [kxc_at_1a2] and [kxc_at_12c] are named [iProp]s in ProofKexecSeam.v, and
+   that is where their shape is documented -- the elf buffer travelling
+   NAMED rather than as existential [stack_own], [kxc_off]'s [int]
+   truncation, and the coverage half of the loop invariant.  They live in
+   their own file so that phase B2, which consumes them, does not have to
+   wait for this one to compile; the same reason ProofKexecTail.v exists.
 
    ---- CONVENTIONS FOLLOWED (projects/kexec.md) --------------------------
 
@@ -150,7 +114,7 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import SleepLock.
 Require Import WpLock.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
@@ -199,6 +163,7 @@ Require Import SpecNamei.
 Require Import SpecProcPagetable.
 Require Import ProofKexecParts.
 Require Import ProofKexecTail.
+Require Import ProofKexecSeam.
 Require Import ProofKforkParts.
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
@@ -211,484 +176,6 @@ Set Printing Depth 40.
 
 Notation KXB := KernelSyms.kexec (only parsing).
 
-(* ===================================================================== *)
-(*  PURE ARITHMETIC.                                                      *)
-(* ===================================================================== *)
-
-(* THE sp-RELATIVE SLOT of a [c.sdsp]/[c.ldsp] immediate, once and for all.
-   The running sp is [pa_stk sp0 68], the scaled immediate is [8*r], and the
-   slot reached is [68 - r] -- given here as [j] with [j + r = 68] so the
-   caller's numerals are the two the instruction stream shows.  Eight
-   instances below (uimm 60,63,61,59,58,57,56,55 -> slots 8,5,7,9,10,11,12,13)
-   plus the +0x31c reload. *)
-Lemma kxc_sp_slot (X : mword 64) (j r : nat) (v : mword 64) :
-  (j + r = 68)%nat ->
-  add_vec (mword_of_int (- (8 * Z.of_nat r)) : mword 64) v = mword_of_int 0 ->
-  add_vec (pa_stk X 68) v = pa_stk X j.
-Proof.
-  intros Hjr Hv. rewrite -Hjr -(pa_stk_assoc X j r). apply stk_pop. exact Hv.
-Qed.
-
-(* The three s0-relative displacements this chunk uses.  [addi/ld/sd rd,-N(s0)]
-   is [sign_extend' 64 (mword_of_int (4096-N) : mword 12)] and [s0] is [sp0],
-   so the slot is [N/8]. *)
-Lemma kxc_phnum_slot (X : mword 64) :     (* lhu a5,-376(s0) : elf.phnum *)
-  add_vec X (sign_extend' 64 (mword_of_int 3720 : mword 12)) = pa_stk X 47.
-Proof. apply stk_push. apply bv_eq; vm_compute; reflexivity. Qed.
-
-Lemma kxc_phoff_slot (X : mword 64) :     (* lw a3,-400(s0) : elf.phoff *)
-  add_vec X (sign_extend' 64 (mword_of_int 3696 : mword 12)) = pa_stk X 50.
-Proof. apply stk_push. apply bv_eq; vm_compute; reflexivity. Qed.
-
-Lemma kxc_mask_slot (X : mword 64) :      (* sd a5,-536(s0) : the 0xfff mask *)
-  add_vec X (sign_extend' 64 (mword_of_int 3560 : mword 12)) = pa_stk X 67.
-Proof. apply stk_push. apply bv_eq; vm_compute; reflexivity. Qed.
-
-(* ...and the two byte OFFSETS inside the elf buffer, whose base is slot 54:
-   [phoff@32] is slot 50 and [phnum@56] is slot 47. *)
-Lemma kxc_elf_off32 (X : mword 64) : pa_add (pa_stk X 54) 32 = pa_stk X 50.
-Proof. unfold pa_add, pa_stk. rewrite avi_assoc. f_equal; lia. Qed.
-
-Lemma kxc_elf_off56 (X : mword 64) : pa_add (pa_stk X 54) 56 = pa_stk X 47.
-Proof. unfold pa_add, pa_stk. rewrite avi_assoc. f_equal; lia. Qed.
-
-(* 8-alignment implies 2-alignment.  ([InstrBytes.aligned8_aligned4] is the
-   4-byte half; its 2-byte twin lives in ProofFilestatParts.v, a whole-function
-   proof file this one must not require, so it is restated.) *)
-Local Lemma kxc_z_rem8_rem2 (u : Z) : (0 <= u)%Z -> Z.rem u 8 = 0%Z -> Z.rem u 2 = 0%Z.
-Proof.
-  intros H0 H8.
-  rewrite (Z.rem_mod_nonneg u 8 H0 ltac:(lia)) in H8.
-  rewrite (Z.rem_mod_nonneg u 2 H0 ltac:(lia)).
-  apply Z.mod_divide in H8; [| lia]. apply Z.mod_divide; [lia|].
-  destruct H8 as [kk Hk]. exists (4 * kk)%Z. lia.
-Qed.
-
-Lemma kxc_aligned8_aligned2 (a : Arch.pa) :
-  is_aligned_paddr (Physaddr a) 8 = true -> is_aligned_paddr (Physaddr a) 2 = true.
-Proof.
-  unfold is_aligned_paddr. rewrite !uint_unsigned.
-  pose proof (bv_unsigned_in_range _ a) as [Hlo _].
-  intro H8. apply Z.eqb_eq in H8. apply Z.eqb_eq.
-  apply (kxc_z_rem8_rem2 _ Hlo H8).
-Qed.
-
-(* [page_base] is injective -- [page_base_ppn_unsigned] read backwards.  What
-   turns proc_pagetable's "the trapframe page is [autocast (subrange ...)]"
-   into "it is the process's own [ud_tfp]", which is the conjunct the commit
-   block (phase D) needs and [ProcInv.proc_priv_newspace] pins. *)
-Lemma kxc_page_base_inj (a b : mword 44) : page_base a = page_base b -> a = b.
-Proof.
-  intro H. apply bv_eq.
-  apply (f_equal (@bv_unsigned _)) in H.
-  rewrite !page_base_ppn_unsigned in H. lia.
-Qed.
-
-(* proc_pagetable's two numeric premises about the trapframe page, off
-   [page_valid].  (ProofAllocproc.v's [ap_tf_align] / [ap_tf_bound]; restated
-   because that is a whole-function proof file.) *)
-Lemma kxc_tf_align (r : mword 64) :
-  page_valid r -> subrange_vec_dec r 11 0 = (zeros' 12 : mword 12).
-Proof.
-  intros [Hal _]. apply aligned_low12.
-  unfold page_aligned, PGSIZE in Hal. rewrite uint_unsigned in Hal. exact Hal.
-Qed.
-
-Lemma kxc_tf_bound (r : mword 64) : page_valid r -> (uint r + 4096 < 2 ^ 56)%Z.
-Proof.
-  intros [_ [_ Hhi]]. unfold kmem_hi in Hhi.
-  assert (H56 : (2 ^ 56 = 72057594037927936)%Z) by (vm_compute; reflexivity).
-  rewrite H56. lia.
-Qed.
-
-(* ===================================================================== *)
-(*  THE COVERAGE HALF OF THE PHDR LOOP INVARIANT.                         *)
-(* ===================================================================== *)
-(* [ProcPtOwn.um_below]'s DUAL: everything strictly below [szv] IS mapped,
-   and mapped as a VALID USER leaf.  It is true of the loop -- uvmalloc maps
-   [PGROUNDUP(oldsz), newsz) and the previous iteration left [0, oldsz)
-   covered, and [PGROUNDUP(oldsz) >= oldsz] means the two runs abut with no
-   hole.  Stated page-granularly and multiplicatively, in [um_below]'s own
-   shape, so both halves talk to [lia] the same way.
-
-   *** ITS STATED CONSUMER HAS EVAPORATED, and it is now dead weight. ***
-   This half existed for phase C: [SpecCopyout.co_mapped] demanded [pte_vu]
-   over the stack pages, and there was no other way to get it.  xv6
-   `4f2fc8b` made vmfault take the size as an argument and map into the
-   table it was handed, so copyout no longer needs to know anything about
-   the running process, [co_mapped] and the whole [arm] index are deleted
-   (SpecCopyout.v), and phase C simply passes [psz] in a1.  Nothing reads
-   [kxc_covered] any more except the loop invariant that carries it.
-
-   It is LEFT IN because removing it means reopening a proven loop
-   invariant, which an image bump has no business doing; it costs only the
-   two [kxc_covered_zero] discharges.  Drop it when phase C next touches
-   this invariant for its own reasons. *)
-Definition kxc_covered (szv : mword 64) (um : gmap (mword 27) (mword 64)) : Prop :=
-  forall vpn : mword 27,
-    (bv_unsigned vpn * 4096 < bv_unsigned szv)%Z ->
-    exists w : mword 64, um !! vpn = Some w /\ pte_vu w.
-
-(* at size 0 it is VACUOUS -- which is why the phdr loop's entry pays nothing
-   for it (the descriptor proc_pagetable built maps no user page). *)
-Lemma kxc_covered_zero (um : gmap (mword 27) (mword 64)) :
-  kxc_covered (mword_of_int 0 : mword 64) um.
-Proof.
-  intros vpn Hlt. exfalso.
-  pose proof (bv_unsigned_in_range _ vpn) as [Hlo _].
-  assert (Hz : bv_unsigned (mword_of_int 0 : mword 64) = 0%Z)
-    by (vm_compute; reflexivity).
-  rewrite Hz in Hlt. lia.
-Qed.
-
-Lemma kxc_maxsz_zero : (bv_unsigned (mword_of_int 0 : mword 64) <= uvm_maxsz)%Z.
-Proof.
-  assert (Hz : bv_unsigned (mword_of_int 0 : mword 64) = 0%Z)
-    by (vm_compute; reflexivity).
-  rewrite Hz uvm_maxsz_val. lia.
-Qed.
-
-(* proc_pagetable's nesting-depth premise at kexec's own level ([cpu_own 0]). *)
-Lemma kxc_lvl0 : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
-Proof. change (2 ^ 31)%Z with 2147483648%Z. lia. Qed.
-
-(* ===================================================================== *)
-(*  THE [off] REGISTER, THROUGH THE C's [int] TRUNCATION.                  *)
-(* ===================================================================== *)
-(* The value a3 holds on entry to the phdr loop's body at iteration [i].
-   [ElfEnc.ph_at] is the file offset of header [i]; the machine only ever
-   holds its LOW 32 BITS, SIGN-EXTENDED, because the C's [off] is an [int]
-   ([lw] at +0x0b4, [addiw] at +0x120).  See ElfEnc.v's header. *)
-Definition kxc_off (ef : nat -> bv 8) (i : nat) : mword 64 :=
-  sign_extend' 64 (Z_to_bv 32 (ph_at ef i) : mword 32).
-
-Lemma kxc_off_0 (ef : nat -> bv 8) :
-  kxc_off ef 0 = sign_extend' 64 (Z_to_bv 32 (eh_phoff ef) : mword 32).
-Proof. unfold kxc_off. rewrite ph_at_0. reflexivity. Qed.
-
-(* ===================================================================== *)
-(*  THE ELF BUFFER: CARVE AND UNCARVE, and the two field WINDOWS.          *)
-(* ===================================================================== *)
-Section KexecBFrame.
-  Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
-
-  (* the elf slots as 64 NAMED bytes, with the per-slot 8-alignment facts kept
-     as a PURE side product: a byte run does not carry alignment and
-     [bytes_own_slotsn] demands it back.  [ProofKexecA.kxc_elf_acc] is the
-     same carve with the giveback packaged as a wand; this chunk needs the
-     alignment as DATA, because the naming survives into the loop invariant
-     while the giveback happens much later. *)
-  Lemma kxc_elf_take (sp0 : mword 64) :
-    stack_own (pa_stk sp0 46) 8 ⊢
-    ⌜forall i, (i < 8)%nat ->
-       is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true⌝ ∗
-    ∃ f : nat -> bv 8,
-      [∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ f j.
-  Proof.
-    iIntros "H".
-    iDestruct (kxc_elf_slots_of_stack with "H") as "H".
-    iDestruct (kxc_slots_elf sp0 with "H") as "[%Hal Hb]".
-    iSplitR; [iPureIntro; exact Hal |].
-    iApply (bb_any_named (pa_stk sp0 54) 64). rewrite /bytes_own /byte_any.
-    iExact "Hb".
-  Qed.
-
-  Lemma kxc_elf_give (sp0 : mword 64) (g : nat -> bv 8) :
-    (forall i, (i < 8)%nat ->
-       is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true) ->
-    ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ g j)
-    ⊢ stack_own (pa_stk sp0 46) 8.
-  Proof.
-    intro Hal. iIntros "Hg".
-    iApply kxc_stack_of_elf_slots. iApply (kxc_bytes_elf sp0 Hal).
-    rewrite /bytes_own. iApply (bb_named_any with "Hg").
-  Qed.
-
-  (* A READ-ONLY 2-byte window into a named run: the halfword the [lhu]
-     delivers, and the run back unchanged.  ([ByteBuf.bb_word4_acc] is the
-     writable 4-byte analogue; a read needs no [bb_set].) *)
-  Lemma kxc_win2 (a : mword 64) (f : nat -> bv 8) (o r n : nat) :
-    (o + 2 + r)%nat = n ->
-    is_aligned_paddr (Physaddr (pa_add a o)) 2 = true ->
-    ([∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ f j) ⊢
-    (pa_add a o ↦₂ (Z_to_bv 16 (le_at f o 2) : mword 16)) ∗
-    ((pa_add a o ↦₂ (Z_to_bv 16 (le_at f o 2) : mword 16)) -∗
-       [∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ f j).
-  Proof.
-    intros Hn Hal.
-    rewrite (bb_split3 a o 2 r n f Hn).
-    iIntros "(Hpre & Hmid & Hsuf)".
-    iSplitL "Hmid".
-    { iApply (word2_pointsto_intro _ _ _ Hal).
-      iApply (big_sepL_mono with "Hmid"). intros ii jj Hj.
-      apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
-      rewrite (le_at_nth_byte 16 f o 2 ii ltac:(lia) Hlt). reflexivity. }
-    (* the FIRST [rewrite] already split the run inside the giveback wand's
-       conclusion too, so there is nothing left to split here. *)
-    iIntros "Hw".
-    iDestruct (word2_pointsto_bytes with "Hw") as "Hw".
-    iSplitL "Hpre"; [iExact "Hpre" |]. iSplitR "Hsuf"; [| iExact "Hsuf"].
-    iApply (big_sepL_mono with "Hw"). intros ii jj Hj.
-    apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
-    rewrite (le_at_nth_byte 16 f o 2 ii ltac:(lia) Hlt). reflexivity.
-  Qed.
-
-  (* ...and its 4-byte twin, for the [lw]. *)
-  Lemma kxc_win4 (a : mword 64) (f : nat -> bv 8) (o r n : nat) :
-    (o + 4 + r)%nat = n ->
-    is_aligned_paddr (Physaddr (pa_add a o)) 4 = true ->
-    ([∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ f j) ⊢
-    (pa_add a o ↦₄ (Z_to_bv 32 (le_at f o 4) : mword 32)) ∗
-    ((pa_add a o ↦₄ (Z_to_bv 32 (le_at f o 4) : mword 32)) -∗
-       [∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ f j).
-  Proof.
-    intros Hn Hal.
-    rewrite (bb_split3 a o 4 r n f Hn).
-    iIntros "(Hpre & Hmid & Hsuf)".
-    iSplitL "Hmid".
-    { iApply (word4_pointsto_intro _ _ _ Hal).
-      iApply (big_sepL_mono with "Hmid"). intros ii jj Hj.
-      apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
-      rewrite (le_at_nth_byte 32 f o 4 ii ltac:(lia) Hlt). reflexivity. }
-    iIntros "Hw".
-    iDestruct (word4_pointsto_bytes with "Hw") as "Hw".
-    iSplitL "Hpre"; [iExact "Hpre" |]. iSplitR "Hsuf"; [| iExact "Hsuf"].
-    iApply (big_sepL_mono with "Hw"). intros ii jj Hj.
-    apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
-    rewrite (le_at_nth_byte 32 f o 4 ii ltac:(lia) Hlt). reflexivity.
-  Qed.
-
-End KexecBFrame.
-
-(* ===================================================================== *)
-(*  THE FRAME FROM +0x0cc ONWARD.                                         *)
-(* ===================================================================== *)
-Section KexecBFrameB.
-  Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
-
-  (* [ProofKexecA.kxc_frameA6] with (a) the ELF slots (47..54) taken OUT --
-     they travel named, see the file header -- and (b) slots 5..13 and 67
-     PINNED, because from here on every one of them holds a value some later
-     block reloads: 5..13 are the nine lazily-spilled callee-saved registers
-     and 67 is the PGSIZE-1 mask the loadseg guard reads at +0x162.
-     Slots 14..46 are [ustack] and 55..63 are [ph]/[off]/the unused word --
-     dead or written-before-read here, so they stay [stack_own]. *)
-  Definition kxc_frameB (sp0 ra0 s00 s10 s20 pv av : mword 64)
-      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64) : iProp Σ :=
-    (word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
-     word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 ∗
-     word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 ∗
-     word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 ∗
-     word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 ∗
-     word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 ∗
-     word_pointsto (pa_stk sp0 7) (DfracOwn 1) w7 ∗
-     word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8 ∗
-     word_pointsto (pa_stk sp0 9) (DfracOwn 1) w9 ∗
-     word_pointsto (pa_stk sp0 10) (DfracOwn 1) w10 ∗
-     word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11 ∗
-     word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 ∗
-     word_pointsto (pa_stk sp0 13) (DfracOwn 1) w13 ∗
-     stack_own (pa_stk sp0 13) 33 ∗
-     stack_own (pa_stk sp0 54) 9 ∗
-     word_pointsto (pa_stk sp0 64) (DfracOwn 1) av ∗
-     (∃ w65, word_pointsto (pa_stk sp0 65) (DfracOwn 1) w65) ∗
-     word_pointsto (pa_stk sp0 66) (DfracOwn 1) pv ∗
-     word_pointsto (pa_stk sp0 67) (DfracOwn 1) w67 ∗
-     (∃ w68, word_pointsto (pa_stk sp0 68) (DfracOwn 1) w68))%I.
-
-End KexecBFrameB.
-
-(* ===================================================================== *)
-(*  THE TWO OUTPUT STATES.                                                *)
-(* ===================================================================== *)
-Section KexecBSeam.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.  (* NB: icacheG + icfg come
-              from [fileG] -- ProofKexecA.v's header records why a standalone
-              [!icacheG Σ] beside [!fileG Σ] is a SECOND instance. *)
-  Context `{GEN : GenId} `{CID0 : CpuId}.
-
-  Notation Rra := (mword_of_int 1 : mword 5).
-  Notation Rs0 := (mword_of_int 8 : mword 5).
-  Notation Rs1 := (mword_of_int 9 : mword 5).
-  Notation Rs2 := (mword_of_int 18 : mword 5).
-  Notation Rs3 := (mword_of_int 19 : mword 5).
-  Notation Rs4 := (mword_of_int 20 : mword 5).
-  Notation Rs5 := (mword_of_int 21 : mword 5).
-  Notation Rs6 := (mword_of_int 22 : mword 5).
-  Notation Rs7 := (mword_of_int 23 : mword 5).
-  Notation Rs8 := (mword_of_int 24 : mword 5).
-  Notation Rs9 := (mword_of_int 25 : mword 5).
-  Notation Rs10 := (mword_of_int 26 : mword 5).
-  Notation Rs11 := (mword_of_int 27 : mword 5).
-  Notation Ra0 := (mword_of_int 10 : mword 5).
-  Notation Ra3 := (mword_of_int 13 : mword 5).
-  Notation Ra5 := (mword_of_int 15 : mword 5).
-
-  (* THE OPEN INODE, as ilock produced it and iunlockput will consume it
-     (convention 6): nine resources phases A and B both carry and neither
-     looks inside.  Bundled here so the two output states below do not each
-     spell them out. *)
-  Definition kxc_open (gfs : fs_names) (gi : gname) (cn : ic_names)
-      (cov : gset Z) (logstart : Z) (dev : mword 32) (pidv : mword 32)
-      (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
-      (dnf : dinode) (bmf : blkmap)
-      (gilf gislf : gname) : iProp Σ :=
-    (is_sleeplock gilf gislf (i_lock (ientry kf)) "inode"%string (ic_tok cn kf) ∗
-     sleeplocked gislf ∗
-     sl_pid (i_lock (ientry kf)) ↦₄ pidv ∗
-     ic_deposit cn kf (DepShr sf dev inumf gyf) ∗
-     i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev ∗
-     i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf ∗
-     i_valid (ientry kf) ↦₄ valid_word true ∗
-     ic_loaded gfs gi cov logstart kf inumf dnf bmf ∗
-     ity_shot gyf (di_type dnf) ∗
-     inode_ref_short kf (qf + sf)%Qp qf dev inumf)%I.
-
-  (* --------------------------------------------------------------- *)
-  (*  +0x1a2 -- [elf.phnum = 0], so the phdr loop is skipped entirely. *)
-  (*                                                                  *)
-  (*  The instruction AT +0x1a2 is [c.li s2,0], i.e. [sz = 0]: s2       *)
-  (*  still holds the path pointer here and the size is about to be     *)
-  (*  set.  So the descriptor conjuncts below are stated at size 0 --   *)
-  (*  which, for [um_below], says the new table maps no user page,      *)
-  (*  exactly what proc_pagetable built.                               *)
-  (*                                                                   *)
-  (*  Nothing on this path wrote s3,s5,s7..s11 (the [beqz] at +0x0b0    *)
-  (*  is before the setup), so they still agree with kexec's entry map. *)
-  (* --------------------------------------------------------------- *)
-  Definition kxc_at_1a2
-      (jp : nat)
-      (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (ga gf : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32) (used used2 : gset Z)
-      (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
-      (dnf : dinode) (bmf : blkmap)
-      (gilf gislf : gname) (n2 : nat)
-      (plen : nat) (pfun : nat -> bv 8)
-      (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
-      (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ)
-      (sp0 ra0 s00 s10 s20 pv av : mword 64)
-      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) : iProp Σ :=
-    (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
-       M !!! Regidx Rs0 = sp0 /\
-       M !!! Regidx Rs1 = proc_addr jp /\
-       M !!! Regidx Rs2 = pv /\
-       M !!! Regidx Rs4 = ientry kf /\
-       M !!! Regidx Rs6 = page_base P.(ud_root) /\
-       (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
-          r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs4 -> r <> Rs6 ->
-          M !!! Regidx r = m !!! Regidx r) ⌝ ∗
-     ⌜ (kf < NINODE)%nat /\
-       bv_unsigned inumf < 16 * Z.of_nat nib /\
-       (iput_units <= n2)%nat /\ used2 ⊆ used /\
-       (forall i, (i < 8)%nat ->
-          is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true) ⌝ ∗
-     ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
-       um_below (mword_of_int 0 : mword 64) P.(ud_um) /\
-       kxc_covered (mword_of_int 0 : mword 64) P.(ud_um) ⌝ ∗
-     pc_is (mword_of_int (KXB + 0x1a2) : mword 64) ∗
-     sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) C true ∗
-     kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
-              gilf gislf ∗
-     log_op g n2 ∗
-     iref_slots 1 ∗
-     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
-     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
-     bitmap_res gfs bmapstart cov logstart size used2 ∗
-     bslots bn 3 ∗
-     kalloc_env ga None ∗
-     proc_pt P ∗
-     proc_priv gf (proc_addr jp) pidv V ∗
-     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) ∗
-     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) ∗
-     ([∗ list] i ∈ seq 0 na,
-        [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) ∗
-     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) ∗
-     kxc_frameB sp0 ra0 s00 s10 s20 pv av w5 w6 w7 w8 w9 w10 w11 w12 w13 w67)%I.
-
-  (* --------------------------------------------------------------- *)
-  (*  +0x12c -- THE PHDR LOOP'S BODY ENTRY, hence its INVARIANT.       *)
-  (*                                                                  *)
-  (*  Read the control flow off the instructions, not the C: the loop's *)
-  (*  head IS its body at +0x12c, entered by the [c.j] at +0x0cc, with  *)
-  (*  the increment-and-test at +0x11a..+0x128 as the back edge.  So    *)
-  (*  this is the state every iteration starts from, and the chunk that *)
-  (*  proves the loop both consumes it and re-establishes it.           *)
-  (* --------------------------------------------------------------- *)
-  Definition kxc_at_12c
-      (jp : nat)
-      (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
-      (cn : ic_names) (ga gf : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32) (used used2 : gset Z)
-      (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
-      (dnf : dinode) (bmf : blkmap)
-      (gilf gislf : gname) (n2 : nat)
-      (plen : nat) (pfun : nat -> bv 8)
-      (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
-      (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ)
-      (sp0 ra0 s00 s10 s20 pv av : mword 64)
-      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64) : iProp Σ :=
-    (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
-       M !!! Regidx Rs0 = sp0 /\
-       M !!! Regidx Rs1 = proc_addr jp /\
-       M !!! Regidx Rs2 = szv /\
-       M !!! Regidx Rs4 = ientry kf /\
-       M !!! Regidx Rs5 = (mword_of_int 4096 : mword 64) /\
-       M !!! Regidx Rs6 = page_base P.(ud_root) /\
-       M !!! Regidx Rs9 = (mword_of_int 4096 : mword 64) /\
-       M !!! Regidx Rs10 = (mword_of_int (Z.of_nat i) : mword 64) /\
-       M !!! Regidx Rs11 = (mword_of_int 56 : mword 64) /\
-       M !!! Regidx Ra3 = kxc_off ef i /\
-       (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
-          r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs4 -> r <> Rs5 ->
-          r <> Rs6 -> r <> Rs9 -> r <> Rs10 -> r <> Rs11 ->
-          M !!! Regidx r = m !!! Regidx r) ⌝ ∗
-     ⌜ (kf < NINODE)%nat /\
-       bv_unsigned inumf < 16 * Z.of_nat nib /\
-       (iput_units <= n2)%nat /\ used2 ⊆ used /\
-       (forall j, (j < 8)%nat ->
-          is_aligned_paddr (Physaddr (pa_stk sp0 (54 - j))) 8 = true) ⌝ ∗
-     (* ---- THE LOOP INVARIANT ---- *)
-     ⌜ (Z.of_nat i <= eh_phnum ef)%Z /\
-       ud_tfp P = ud_tfp (pv_upt V) /\
-       (bv_unsigned szv <= uvm_maxsz)%Z /\
-       um_below szv P.(ud_um) /\
-       kxc_covered szv P.(ud_um) ⌝ ∗
-     pc_is (mword_of_int (KXB + 0x12c) : mword 64) ∗
-     sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) C true ∗
-     kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
-              gilf gislf ∗
-     log_op g n2 ∗
-     iref_slots 1 ∗
-     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
-     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
-     bitmap_res gfs bmapstart cov logstart size used2 ∗
-     bslots bn 3 ∗
-     kalloc_env ga None ∗
-     proc_pt P ∗
-     proc_priv gf (proc_addr jp) pidv V ∗
-     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) ∗
-     ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) ∗
-     ([∗ list] k ∈ seq 0 na,
-        [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) ∗
-     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) ∗
-     kxc_frameB sp0 ra0 s00 s10 s20 pv av w5 w6 w7 w8 w9 w10 w11 w12 w13 w67)%I.
-
-End KexecBSeam.
 
 (* ===================================================================== *)
 (*  THE PROOF.                                                            *)
@@ -1330,7 +817,7 @@ Section KexecBBody.
         { iPureIntro. split_and!;
             [exact HPtfp
             | rewrite HPum; exact (um_below_empty _)
-            | exact (kxc_covered_zero _)]. }
+            | exact (um_covered_zero _)]. }
         (* [iFrame] is NOT usable here: its [Frame] search unfolds [proc_priv]
            and the goal's big-ops, and this state carries a syscall-altitude
            block (measured: >19 GB and climbing before it was replaced).
@@ -1578,11 +1065,15 @@ Section KexecBBody.
         iSpecialize ("Hcont12c" $! CID24 with "[%]"); [wp_next_chain |].
         iApply ("Hcont12c" $! G11 ef P).
         rewrite /kxc_at_12c.
+        (* [kxc_at_12c] has NO threading conjunct -- see its header: by +0x12c
+           no callee-saved register still holds kexec's entry value, so the
+           clause would be vacuous here and FALSE on the back edge.  [HG11s1]
+           and [HG11thr] are true at this ENTRY and deliberately dropped. *)
         iSplitR.
         { iPureIntro. split_and!;
-            [exact HG11sp | exact HG11s0 | exact HG11s1 | exact HG11s2
+            [exact HG11sp | exact HG11s0 | exact HG11s2
             | exact HG11s4 | exact HG11s5 | exact HG11s6 | exact HG11s9
-            | exact HG11s10 | exact HG11s11 | exact HG11a3 | exact HG11thr]. }
+            | exact HG11s10 | exact HG11s11 | exact HG11a3]. }
         iSplitR.
         { iPureIntro. split_and!;
             [exact Hk | exact Hib | exact Hn2 | exact Hu2 | exact Hal]. }
@@ -1590,9 +1081,8 @@ Section KexecBBody.
         { iPureIntro. split_and!;
             [ pose proof (eh_phnum_bound ef); lia
             | exact HPtfp
-            | exact kxc_maxsz_zero
             | rewrite HPum; exact (um_below_empty _)
-            | exact (kxc_covered_zero _) ]. }
+            | exact (um_covered_zero _) ]. }
         (* [iFrame] is NOT usable here: its [Frame] search unfolds [proc_priv]
            and the goal's big-ops, and this state carries a syscall-altitude
            block (measured: >19 GB and climbing before it was replaced).

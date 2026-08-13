@@ -44,7 +44,7 @@ Require Import WpLock.
 Require Import ProcGeom.
 Require Import FdSlots.
 Require Import SchedCtx.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecMyproc SpecAcquire SpecRelease.
 Require Import SpecSleepPrepare.
 From Kernel Require KernelInstrs KernelSyms.

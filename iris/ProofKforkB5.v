@@ -81,7 +81,7 @@ Require Import WaitInv.
 Require Import SpecProcinit.
 Require Import SpecForkretPark.
 Require Import SpecAcquire SpecRelease.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import CodeKfork.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

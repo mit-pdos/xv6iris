@@ -79,7 +79,7 @@ Require Import FileInvDefs.
 Require Import PipeInvDefs.
 Require Import KallocInv.
 Require Import ProcPtOwn.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import ProcInv.
 Require Import WpUart DiskPtsto BioInv FsBlocks LogInv FsCrash.
 Require Import DinodeEnc InodeInv InodeLock.
@@ -93,7 +93,7 @@ Require Import IcacheBoot.   (* [ic_sleeplocks_acc]: the entry sleeplock the
    name is meant here except through the two contracts. *)
 Require Import DinodeEnc.
 Require Import WpLock.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecPiperead SpecIlock SpecReadi SpecIunlock SpecConsoleread.
 Require Import SpecFileread.
 Require Import CodeFileread ProofFilereadParts.

@@ -51,13 +51,13 @@ Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpLock.
 Require Import KallocInv.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import KptShare.
 Require Import CpuOwn SchedCtx FdSlots.
 Require Import FileInvDefs.
 Require Import DevModel DiskPtsto WpUart.
 Require Import PrintkFmt.
-Require Import SpecPanic StartedInv.
+Require Import PanicStub StartedInv.
 Require Import SpecCpuid SpecPrintk SpecPrintkGen.
 Require Import SpecKvminithart SpecTrapinithart SpecPlicinithart.
 Require Import SpecScheduler SpecKernelvec.

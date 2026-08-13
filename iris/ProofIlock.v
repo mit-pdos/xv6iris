@@ -132,7 +132,7 @@ Require Import IcacheEscrow.
 Require Import DinodeEnc.
 Require Import DinodeSlot.
 Require Import CodeIlock.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecAcquiresleep SpecBread SpecBrelse SpecMemmove.
 Require Import SpecIlock.
 From Kernel Require KernelSyms.

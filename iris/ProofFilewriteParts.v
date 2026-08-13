@@ -75,7 +75,7 @@ Require Import KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import IcacheRef.
 Require Import CodeFilewrite.
 Require Import ProofFilereadParts.

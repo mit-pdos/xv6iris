@@ -306,6 +306,22 @@ Proof.
   destruct (decide (x = z)) as [->|Hne]; naive_solver.
 Qed.
 
+(* the growth [ip_tail] wants at the +0x88 hand-off: itrunc's post says the
+   op's set only grew, and iput's own iupdate grows it once more *)
+Lemma ip_sub_union_l (A B S : gset Z) : A ⊆ B -> A ⊆ B ∪ S.
+Proof. intros H. exact (union_subseteq_l' _ _ _ H). Qed.
+
+(* ...and the same hand-off's two BUDGET premises.  [ip_spend_max] is
+   [it_spend] under another name, so both bounds are itrunc's own post read
+   at [it_entry crb uit = n].  Proven here over nat VARIABLES because the
+   [unfold ... in *; destruct; simpl in *; lia] that closes it in place runs
+   against every hypothesis of a whole-function proof. *)
+Lemma ip_budget_bounds (crb cru : bool) (n u' : nat) :
+  (n - it_spend crb cru <= u')%nat ->
+  (u' + it_iu cru <= n)%nat ->
+  ((n - ip_spend_max crb cru)%nat <= u')%nat /\ (u' <= n)%nat.
+Proof. unfold ip_spend_max, it_spend, it_iu. destruct crb, cru; simpl; lia. Qed.
+
 
 (* ===================================================================== *)
 (*  2.  THE TAIL'S REGISTER INVARIANT                                     *)
@@ -1466,7 +1482,13 @@ Section ProofIput.
         { iApply bi.later_intro. iApply ic_close_held. rewrite /ic_held.
           iExists dev, inum, (valid_word true). iFrame. }
         iModIntro. iExists true. iFrame "Hhalf Hrtok Hrd Htd Hvb".
-        iSplitR; [done |]. iExists ga. iFrame.
+        (* NAMED, not [iFrame]: the goal's remaining conjunct is
+           [ic_payload … true], which a bare frame unfolds through the [if]
+           and descends into for every leaf of [ic_loaded], searching the
+           whole-function context each time -- 42 s measured, against
+           nothing at all by name (optimization.md, "Framing"). *)
+        iSplitR; [done |]. iExists ga.
+        iSplitL "Hpayl"; [iExact "Hpayl" | iExact "Hlvh"].
       - (* UNLOADED: read-only, everything goes straight back *)
         iMod ("Hclose" with "[Hidv Hinh Hvld Hpayl Hlvh Hmt Hgida]") as "_".
         { iApply bi.later_intro. iApply ic_close_parked.
@@ -1846,7 +1868,9 @@ Section ProofIput.
                        dev inum with "Hdepa [Hfrg Hlvr Hlvh Hrd Hrn] Hmt Hgida").
       rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
       iSplitR "Hlvh"; [| iExact "Hlvh"].
-      iSplitR; [iPureIntro; done |].
+      (* [ic_dep_own]'s pure conjunct is [dev = dev /\ inum = inum]: give the
+         proof term.  [done] on it costs 5.4 s at this altitude. *)
+      iSplitR; [iPureIntro; exact (conj eq_refl eq_refl) |].
       rewrite /IcacheRef.inode_ref_gen /IcacheRef.inode_ident. iFrame. }
     iModIntro.
     (* the lock's resource re-forms, unchanged, and is released at +0x5c *)
@@ -2393,18 +2417,26 @@ Section ProofIput.
     (* the credited flush paid nothing, so the level that survives is [u']
        itself -- iupdate handed back [S (u' - 1)], which is the same nat *)
     iEval (rewrite Hu'1) in "Hop".
+    (* THE FOUR PURE PREMISES ARE PROVEN HERE, BY NAME.  Spliced into the
+       argument list as [ltac:] they are re-elaborated against the
+       application's still-unresolved evars, and the [set_solver] among them
+       meets the whole-function context: this ONE [iApply] measured 394 s,
+       77 % of the file.  A named hypothesis's type is fixed, so nothing is
+       re-elaborated (optimization.md, "Inline [ltac:] in argument
+       position"). *)
+    destruct Hu' as [Hulo Huhi].
+    rewrite Hun in Hulo, Huhi.
+    destruct (ip_budget_bounds crb cru n u' Hulo Huhi) as [Hblo Hbhi].
+    assert (Hdsub : (used ∖ bm_blocks bm) ⊆ used) by (apply ip_diff_sub).
+    assert (Hssub : Sb ⊆ Sb1 ∪ {[IBLOCK inum inodestart]})
+      by (exact (ip_sub_union_l _ _ _ Hsub1)).
     iApply (ip_tail (CID := CIDac2) CID j bn g gfs gi cn gtl cov logstart bmapstart
               inodestart nib size dev used (used ∖ bm_blocks bm)
               Sb (Sb1 ∪ {[IBLOCK inum inodestart]}) k q inum Mt2 ci2
               n u' (ip_spend_max crb cru) pidv dq dqb dqs m J10 K eb C sp0
               (m !!! Regidx Rs2)
               HK Hk ltac:(wp_next_chain) Hsp0eq HJ10regs Hwf2 Hciwf2
-              ltac:(unfold ip_spend_max, it_entry, it_spend, it_iu, uit in *;
-                    destruct crb, cru; simpl in *; lia)
-              ltac:(unfold it_entry, it_spend, it_iu, uit in *;
-                    destruct crb, cru; simpl in *; lia)
-              ltac:(apply ip_diff_sub)
-              ltac:(set_solver)
+              Hblo Hbhi Hdsub Hssub
               with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Hextc Hextm Htok Hhalf2 Hiauth2
                     Hslots2 Hpool2 Href Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm
                     [Hbs2 Hbs1] Hop Hcont").

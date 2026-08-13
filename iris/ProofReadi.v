@@ -107,7 +107,7 @@ Require Import ProcPtOwn.
 Require Import ProcInv.
 Require Import FileInvDefs.
 Require Import CodeReadi.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecBmap SpecBread SpecBrelse SpecEitherCopyout.
 Require Import ProofReadiParts.
 Require Import SpecReadi.

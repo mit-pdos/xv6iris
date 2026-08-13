@@ -19,7 +19,7 @@ Require Import SmodeCore.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import CpuOwn.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import RegFile.
 Require Import WpLock WpMmodeLeafBase.
 Require Import CalleeSaved StackOwn.

@@ -808,7 +808,7 @@ Require Import UserPtTree.
 Require Import KallocInv.
 Require Import SchedCtx.
 Require Import WpLock.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import FileInv FileOff.
 (* THE FOUR CLASSES THAT ARE NOT WHERE THEY LOOK.  [diskGhostG],
    [uartGhostG], [fsLogG] and [iregG] live in [DiskPtsto], [WpUart],

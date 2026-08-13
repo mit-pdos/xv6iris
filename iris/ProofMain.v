@@ -77,7 +77,7 @@ Require Import BcacheInv SleepLock.
 Require Import DevModel VirtioModel DiskPtsto WpUart.
 Require Import VirtioQueue VirtioProto DiskInv DiskBoot.
 Require Import PrintkFmt.
-Require Import SpecPanic StartedInv.
+Require Import PanicStub StartedInv.
 Require Import SpecCpuid SpecConsoleinit SpecPrintkinit SpecPrintkGen.
 Require Import SpecKinit SpecKvminit SpecKvminithart SpecProcinit.
 Require Import SpecTrapinit SpecTrapinithart SpecPlicinit SpecPlicinithart.

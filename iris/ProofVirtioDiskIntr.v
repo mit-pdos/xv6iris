@@ -50,7 +50,7 @@ Require Import VirtioModel.
 Require Import WpVirtioDev.
 Require Import WpUart.
 Require Import PermInv.
-Require Import SpecPanic SpecWakeup SpecAcquire SpecRelease.
+Require Import PanicStub SpecWakeup SpecAcquire SpecRelease.
 Require Import CodeVirtioDiskIntr.
 Require Import SpecVirtioDiskIntr.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

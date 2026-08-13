@@ -63,12 +63,12 @@ Require Import SmodeCore.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import KptShare KptExecMap KvmMap.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import StartedInv.
 Require Import SpecPrintkGen.
 Require Import ProcGeom FdSlots CpuOwn SchedCtx.
 Require Import KallocInv.
-Require Import SpecPanic.
+Require Import PanicStub.
 (* [dev_ncpu], the PLIC's modelled hart count, for plicinithart's premise *)
 Require Import DevModel.
 Require Import DiskPtsto WpUart.

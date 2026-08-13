@@ -546,6 +546,12 @@
   2
  ],
  [
+  "CodePanic.v",
+  "panic",
+  "pni_",
+  2
+ ],
+ [
   "CodePipealloc.v",
   "pipealloc",
   "pai_",

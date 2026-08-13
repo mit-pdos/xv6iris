@@ -1,7 +1,7 @@
 # kexec — the exec() system call
 
 `kexec()` (kernel/exec.c) is **the largest function in the tree**: 289
-instructions / 864 bytes at `KernelSyms.kexec = 0x80004754`, more than three
+instructions / 864 bytes at `KernelSyms.kexec`, more than three
 times the next one (`kfork`). It is also the only function that is at once an
 FS client, a page-table *builder*, and a `struct proc` mutator — the three
 subsystems meet nowhere else.
@@ -15,20 +15,42 @@ kexec-specific is the *composition*.
 
 ## CHECKPOINT — read this first
 
-**Proven: `+0x000 .. +0x0cc`.** Phase A entire (`ProofKexecA.kxc_phaseA`) and
-phase B's first chunk (`ProofKexecB.kxc_b1`). Three of kexec's eight `bad:`
-entries are discharged. Full tree green as of xv6 rev `0024d4b`.
+**Proven: `+0x000 .. +0x0cc`, plus the shared `bad:` tail `+0x324 .. +0x33e`.**
+Phase A entire (`ProofKexecA.kxc_phaseA`), phase B's first chunk
+(`ProofKexecB.kxc_b1`), and `ProofKexecB2.kxc_bad324` — which discharges
+whatever reaches it, so **all eight `bad:` entries now have a home** and the
+two loops owe only the two-instruction stub that gets them there.
 
-**Next: phase B2 — the phdr loop and the inlined loadseg loop** (`+0x0ce ..
-+0x1ac`). Its entry seam `ProofKexecB.kxc_at_12c` and its no-segments
-sibling `kxc_at_1a2` are already written and proven-into, so B2 starts from a
-fixed interface. See "Worklist" at the bottom.
+**Next: phase B2's two loops** (`+0x0ce .. +0x1ac`). Their entry seams
+`ProofKexecSeam.kxc_at_12c` (the phdr loop's body) and `kxc_at_1a2` (the
+no-segments path) are written and proven-into, and their `bad:` exits land in
+`kxc_bad324`, so B2's remaining work is bounded at both ends. See "Worklist".
 
-**Nothing is blocked.** Of the three upstream blockers this project found,
-two were fixed and the third does not gate the proof — it only bounds which
-pathnames the theorem covers (`L ≤ 1`, so `/init` and `sh`, not `/bin/sh`).
-Read "THE SIZE BOUND IS THE COVERAGE INVARIANT" below before writing any
-phase that calls `uvmalloc`.
+**A LOOP INVARIANT IN THIS FUNCTION CARRIES NO CONVENTION-1 THREADING
+CLAUSE, AND CHECKING THAT IS THE FIRST THING TO DO BEFORE WRITING ONE.** By
+`+0x12c` no callee-saved register still holds kexec's entry value — the body
+clobbers `s1` (loadseg's cursor), `s3` (`ph.filesz`), `s7` (`ph.off`) and
+`s8` (`ph.vaddr`) on the PT_LOAD path, and every other one is pinned above by
+name — so the clause is vacuous however it is written. Writing it anyway is
+not merely redundant, it is FALSE on the back edge for those four (true only
+at the `+0x0cc` entry, where nothing has run yet), so the invariant cannot be
+re-established and the loop does not close. What replaces it is the FRAME:
+slots 1..13 hold `ra,s0,s1,s2` and `m`'s `s3..s11`, every exit reloads from
+there, and that is where `callee_saved m mf` comes from on all four paths
+out. The clause was in `kxc_at_12c` when B1 published it, because it is true
+at the one state B1 could see — **a seam a loop has not yet been written
+against is a conjecture about that loop.**
+
+**PHASE B2 IS BLOCKED, ON `SpecReadi`.** Its contract takes `off` as a `nat`
+below `2^31`, and BOTH of B2's readi calls pass a 32-bit value read out of an
+untrusted ELF (`elf.phoff + 56*i` at `+0x13a`, `ph.off + i` at `+0x0e6`) that
+`exec` never checks and the caller therefore cannot bound. Generalizing
+`SpecReadi`'s `off` is the first task in the worklist, ahead of the loops —
+see blocker §4, which also has the reason the fix is smaller than it looks.
+Of the other three blockers two were fixed and the third does not gate the
+proof — it only bounds which pathnames the theorem covers (`L ≤ 1`, so
+`/init` and `sh`, not `/bin/sh`). Read "THE SIZE BOUND IS THE COVERAGE
+INVARIANT" below before writing any phase that calls `uvmalloc`.
 
 ## Status
 
@@ -46,7 +68,9 @@ phase that calls `uvmalloc`.
 | `ProofKexecParts.v` — frame carve, `kxc_epi`, `kxc_frame` | **landed, proven** |
 | `ProofKexecTail.v` — frame/seam algebra + the shared `+0x064` tail | **landed, proven** |
 | `ProofKexecA.v` — **PHASE A PROVEN** (`kxc_a1`/`kxc_a2`/`kxc_phaseA`) | **landed, proven** |
-| `ProofKexecB.v` — **B1 PROVEN** (`kxc_b1`, + the two seams) | **landed, proven** |
+| `ProofKexecB.v` — **B1 PROVEN** (`kxc_b1`) | **landed, proven** |
+| `ProofKexecSeam.v` — the B1/B2 seam layer (the two seam states, the frame algebra, the elf carve, `kxc_cs_cases`) | **landed, proven** |
+| `ProofKexecB2.v` — `kxc_frameB65` + **the shared `bad:` tail `kxc_bad324`** | **landed, proven** |
 
 **WHERE TO PUT A LEMMA TWO PHASES SHARE: `ProofKexecTail.v`, NOT `ProofKexecA.v`.**
 Phase B used to `Require Import ProofKexecA` for six pieces of frame/seam
@@ -64,6 +88,19 @@ tail in `ProofKexecTail.v` when you prove it, and keep phase files reaching each
 other only through that one.
 | phase B2 — the phdr + loadseg loops | **NEXT** |
 | phases C, D, `LinkKexec.v`, `sys_exec` | not started |
+
+**`ProofKexecSeam.kxc_cs_cases` — the thirteen callee-saved indices,
+enumerated.** `is_cs_idx` is a decision procedure, which is what a proof
+DISCHARGING `is_cs_idx r = true` at a literal `r` wants; a block that must
+ESTABLISH a threading clause runs the other way and needs the enumeration.
+Its home is `CalleeSaved.v`; it sits in the seam file only because that file
+is 548 dependents deep. **Its sp case is spelled `csp_rs1`, not
+`mword_of_int 2`** — they are equal but not `congruence`-convertible
+(`csp_rs1 := zero_extend' 5 'b"10"`), and every consumer's first move is to
+kill the impossible cases against its own `r <> csp_rs1`. With the numeral
+spelling that silently fails, the sp case stays live, and every later bullet
+handles the register one to its left — surfacing as an `upd_eq` that "does
+not match any subterm" in the branch AFTER the one that is really wrong.
 
 `exec.c` is 1/2 functions, 32/896 bytes; the tree is 170/189 functions and 81%
 of text bytes.
@@ -427,12 +464,66 @@ pay it and move on; if no, the callee's contract is wrong and generalizing it
 is the work. Relaxing namei/namex/nameiparent and copyout's source to a
 fraction remains available and is nobody's blocker.
 
-## THE THREE UPSTREAM BLOCKERS — TWO FIXED, ONE OPEN AND NOT GATING
+## THE FOUR UPSTREAM BLOCKERS — TWO FIXED, ONE OPEN AND NOT GATING, ONE OPEN AND GATING B2
 
 None of these is kexec's own design going wrong; each is a callee contract
-that was stated for the callers it had, and all three were found by trying to
+that was stated for the callers it had, and all four were found by trying to
 compose them. **§1 (copyout) and §2 (safestrcpy) are FIXED and the tree is
-green; §3 (the log budget) is open** and belongs to the fs-namei project.
+green; §3 (the log budget) is open** and belongs to the fs-namei project;
+**§4 (readi's `off`) is open and is the first thing phase B2 hits.**
+
+### 4. `SpecReadi` cannot express a 32-bit `off` — **OPEN, AND IT GATES PHASE B2**
+
+`SpecReadi` takes `off` as a **`nat`** and pins the register:
+
+```coq
+  (Z.of_nat off + Z.of_nat n < 2 ^ 31) ->
+  m !!! Regidx (mword_of_int 13) = (mword_of_int (Z.of_nat off) : mword 64) ->
+```
+
+so `off ∈ [0, 2^31)`. Both of kexec's phase-B readi calls hand a3 a value
+that **can be negative**, and neither can be bounded:
+
+- the phdr read at `+0x13a` passes `off = elf.phoff + 56*i`, computed by
+  `lw a3,-400(s0)` then `addiw a3,a5,56` — the seam file already spells it
+  `kxc_off ef i := sign_extend' 64 (Z_to_bv 32 (ph_at ef i))` for exactly
+  this reason, and `ElfEnc.eh_phoff` is `le_at f 32 4`, four untrusted bytes;
+- the loadseg read at `+0x0e6` passes `ph.off + i`, `lw s7,-480(s0)` then
+  `addw a3,s7,s1`.
+
+`exec` checks nothing about either — not `elf.phoff`, not `ph.off`. So this
+fails the project's own test (**"can the caller pay?"**): it cannot, and the
+callee's contract is therefore wrong.
+
+**THE KERNEL IS NOT AT FAULT — unlike §1, this one really is spec-only.**
+`readi`'s C parameter is `uint off`, and its first statement is
+`if (off > ip->size || off + n < off) return 0;`, so it is total for every
+32-bit `off`; loadseg's `!= n` test then sends a bogus offset straight to
+`bad:`, which is `+0x0ea`, an exit B2 already has to prove. Run the §1 lesson
+in reverse before doing the work: there is no scaffolding here modelling a
+gap between what the code does and what its callers want, so do not go
+looking for a kernel fix.
+
+**AND THE FIX IS SMALLER THAN IT LOOKS, because the postcondition already
+covers the case.** `SpecReadi.rd_clamp` is `if size < off + n then size - off
+else n`, which is `0` at `off > size` — its own header says so ("Zero when
+`off` is already past the end, which is exactly what the pre-frame exit
+returns"), and `off > ip->size` is *already reachable* inside the current
+premises (`off = 2^30`, `size = 512`). So the early-return arm is proved.
+What has to move is the REPRESENTATION premise:
+
+- `m a3 = sign_extend' 64 (Z_to_bv 32 (Z.of_nat off))` with `off < 2^32`,
+  in place of `mword_of_int (Z.of_nat off)` with `off < 2^31`;
+- the joint `off + n < 2^31` conjunct survives only where it is really used
+  (the `addw a4,a3` at readi's `+0x022`), and **after** the size test it is
+  free: that test leaves `off ≤ size ≤ MAXFILE*BSIZE ≈ 274432`, so the sum
+  cannot wrap for any sane `n`. The work is re-proving the size comparison
+  itself for a sign-extended-negative a3.
+
+`writei` has the same `off` shape and the same two-line premise; check it
+while the file is open, and check whether `SpecFileread`/`SpecFilewrite` (the
+only other consumers) would rather keep a `nat`-shaped corollary than take
+the general form — that is what `ssc_src_ok_full` did for safestrcpy in §2.
 
 ### 1. copyout assumed the destination table is the RUNNING process's — **FIXED IN THE KERNEL, and that is the lesson**
 
@@ -660,24 +751,44 @@ first one to name it.
 
 Ordered. Each step ends at a seam the next one starts from.
 
+### 0. GENERALIZE `SpecReadi`'s `off` TO 32 BITS — blocker §4
+
+Do this first: both of B2's readi calls need it, so the loops cannot even be
+stated against the current contract. §4 has the shape of the fix, why the
+postcondition needs no change, and the two sibling contracts to check while
+the file is open.
+
 ### 1. PHASE B2 — the phdr loop and the inlined loadseg loop (`+0x0ce .. +0x1ac`)
 
-The next thing to write, and the biggest single chunk left. Its interface is
-already fixed and proven-into from both ends:
+The biggest single chunk left, and its interface is fixed and proven-into on
+all three sides:
 
-- **entry**: `ProofKexecB.kxc_at_12c` (the loop body head — the loop's head is
-  its BODY at `+0x12c`, entered by a `j` from the setup, with the
+- **entry**: `ProofKexecSeam.kxc_at_12c` (the loop body head — the loop's head
+  is its BODY at `+0x12c`, entered by a `j` from the setup, with the
   increment-and-test at `+0x11a..+0x128` as the back edge), and its
   no-segments sibling `kxc_at_1a2`;
-- **exit**: `+0x1ae`, phase C's entry, which needs designing as a named seam
-  the way `kxc_at_12c` was.
+- **`bad:` exit**: `ProofKexecB2.kxc_bad324`, which starts one instruction
+  AFTER the `sd s2,-520(s0)` each stub does. The five stubs (`+0x320`,
+  `+0x340`, `+0x346`, `+0x34c`, `+0x352`) are two instructions each and are
+  written at their branch sites — they share nothing but the tail;
+- **fall-through exit**: `+0x1ae`, phase C's entry, which needs designing as a
+  named seam the way `kxc_at_12c` was.
 
 Inside it: `readi(&ph)`, four validity tests, `flags2perm`, `uvmalloc`, then
 the loadseg page loop (`walkaddr` + `readi` straight into the physical page,
-entered at `+0xf6` from two places). Two nested fuel inductions. It owns SIX
-of kexec's eight `bad:` entries (`+0x31c +0x320 +0x33c +0x342 +0x348 +0x34e`
-— note these addresses moved with the bumps; re-derive them, do not trust the
-numbers here).
+entered at `+0xf6` from two places). Two nested fuel inductions
+(`ProofFilewrite.fw_loop` is the shape: a `forall W : nat` fuel with
+`bound - cursor <= W` and an induction on `W`).
+
+**The loadseg loop needs NOTHING from the coverage invariant**, which is
+worth knowing before designing it: `walkaddr`'s success arm hands back
+`pte_vu w` and the page base, its failure arm reaches
+`panic("loadseg: address should exist")`, and the contract's `panic_wp_any`
+absorbs that outright. Nor does the loop have to show `readi` returns the
+count it asked for — the mismatch branch at `+0x0ea` is a live `bad:` exit.
+So the only real work per iteration is getting the destination bytes out of
+`proc_pt` (`ProcPtOwn.proc_pt_page_acc`, at the `w` walkaddr just named) and
+back.
 
 Specific things already established for it:
 

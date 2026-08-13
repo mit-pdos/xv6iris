@@ -111,13 +111,14 @@ MANIFEST_PROVEN = {
                 "trampoline return-to-user path, over the user page table"),
     "uservec": ("ProofUservec.v", "wp_uservec_pt",
                 "trampoline trap-from-user path, over the user page table"),
+    "panic": ("ProofPanic.v", "wp_panic_sconf",
+              "prints and spins, so no postcondition; threads PanicStub's "
+              "placeholder credential, which is printk's own premise"),
 }
 
 # Functions whose contract is *stated* but deliberately assumed (an Axiom, or a
 # hypothesis threaded through callers' specs) rather than proven.
 MANIFEST_ASSUMED = {
-    "panic": ("SpecPanic.v", "panic_wp",
-              "carried as a hypothesis by every caller; the Axiom is LinkPanic.v"),
     "kerneltrap": ("SpecKerneltrap.v", "wp_kerneltrap_returns_body",
                    "only 'it returns' is assumed; the Axiom is LinkKerneltrap.v"),
     "consoleintr": ("SpecConsoleintr.v", "wp_consoleintr_sconf_body",

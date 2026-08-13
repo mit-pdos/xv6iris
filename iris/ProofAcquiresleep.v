@@ -112,7 +112,7 @@ Require Import SchedCtx.
 Require Import WpLock.
 Require Import SleepLock.
 Require Import CodeSleeplock.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecAcquire SpecRelease SpecMyproc SpecSleep SpecSleepPrepare.
 Require Import SpecAcquiresleep.
 From Kernel Require KernelSyms.

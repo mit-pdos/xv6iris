@@ -129,7 +129,7 @@ Require Import HartTp.
 Require Import KptGhost KptShare KptExecMap KvmMap.
 Require Import KMap.
 Require Import TimerCap.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import StartedInv.
 (* the callees, for the vocabulary main's precondition is stated in *)
 Require Import SpecConsoleinit.

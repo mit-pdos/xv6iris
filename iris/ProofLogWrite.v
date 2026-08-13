@@ -82,7 +82,7 @@ Require Import BufOwn BcacheInv BioInv.
 Require Import BreadLru.
 Require Import FsBlocks LogInv.
 Require Import CodeLogWrite.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecAcquire SpecRelease SpecBpin.
 Require Import SpecLogWrite.
 From Kernel Require KernelSyms.

@@ -19,7 +19,7 @@ Require Import CalleeSaved.
 Require Import KallocInv.
 Require Import WpLock.
 Require Import IntrDefs.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import CpuOwn.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.

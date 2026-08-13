@@ -59,7 +59,7 @@ Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import SchedCtx.
 Require Import SpecAcquire SpecRelease.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecKkill.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import CodeKkill.

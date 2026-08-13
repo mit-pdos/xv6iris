@@ -49,7 +49,7 @@ Require Import WpLock.
 Require Import DiskPtsto WpUart.
 Require Import ProcGeom.
 Require Import PrintkFmt.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecPrintk SpecPrintkGen.
 Require Import SpecProcdump.
 Require Import ProcdumpAux.
@@ -293,7 +293,7 @@ Section ProcdumpLoopRes.
 
   Lemma pdl_pkastr (CIDx : CpuId) (v : mword 64) (dq : dfrac) (s : string) :
     nonul s = true -> eq_vec v (zero_reg : mword 64) = false ->
-    v ↦ₛ{dq} s -∗ pk_desc_res (CID := CIDx) v (PkAStr dq s).
+    v ↦ₛ{dq} s -∗ pk_desc_res v (PkAStr dq s).
   Proof.
     intros H1 H2. iIntros "H". unfold pk_desc_res; cbn match.
     iSplit; [iPureIntro; exact H1|].
@@ -307,7 +307,7 @@ Section ProcdumpLoopRes.
     nonul nm = true -> eq_vec nmp (zero_reg : mword 64) = false ->
     sptr ↦ₛ□ ss -∗ nmp ↦ₛ{dqn} nm -∗
     ([∗ list] i ↦ d ∈ [PkANum; PkAStr DfracDiscarded ss; PkAStr dqn nm],
-       pk_desc_res (CID := CIDx) (pk_vararg m i) d).
+       pk_desc_res (pk_vararg m i) d).
   Proof.
     intros H1 H2 Hss Hsz Hnm Hnz. iIntros "#Hs Hn".
     rewrite !big_sepL_cons big_sepL_nil H1 H2.
@@ -323,7 +323,7 @@ Section ProcdumpLoopRes.
       (sptr nmp : mword 64) (ss nm : string) (dqn : dfrac) :
     pk_vararg m 1%nat = sptr -> pk_vararg m 2%nat = nmp ->
     ([∗ list] i ↦ d ∈ [PkANum; PkAStr DfracDiscarded ss; PkAStr dqn nm],
-       pk_desc_res (CID := CIDx) (pk_vararg m i) d) -∗
+       pk_desc_res (pk_vararg m i) d) -∗
     nmp ↦ₛ{dqn} nm.
   Proof.
     intros H1 H2. iIntros "H".

@@ -68,7 +68,7 @@ Require Import ProcPtOwn.
 Require Import ProcInv.
 Require Import FileInvDefs.
 Require Import CodeWritei.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecBmap SpecBread SpecBrelse SpecLogWrite SpecEitherCopyin
         SpecIupdate.
 Require Import ProofWriteiParts.

@@ -63,7 +63,7 @@ Require Import ProcGeom CpuOwn.
 Require Import FdSlots.
 Require Import DiskPtsto WpUart.
 Require Import UartTxInv.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SchedCtx.
 Require Export SwtchCtx.
 From Kernel Require KernelSyms.

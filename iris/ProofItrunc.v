@@ -39,7 +39,7 @@ Require Import BufOwn.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
 Require Import ByteBuf.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -160,6 +160,21 @@ Lemma it_pop_imm :
   bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))
                : mword 64) = 48.
 Proof. vm_compute; reflexivity. Qed.
+
+(* THE POST'S TWO SET OBLIGATIONS, AT SET VARIABLES.  [wp_itrunc_gen] ends
+   both of its exits by handing the contract [Sq ∪ {[IBLOCK inum
+   inodestart]}] and proving the growth and the membership.  Both are one
+   stdpp lemma, and they are stated HERE rather than closed by [set_solver]
+   at the exit: a general-purpose closer at that altitude searches every
+   hypothesis of the whole-function proof, and the four calls cost 76-132 s
+   EACH -- 407 s, 87 % of the file (optimization.md, "Never let a
+   general-purpose closer meet a large context").  Here the context is two
+   wide and the cost is nil. *)
+Lemma it_sub_union_l (A B S : gset Z) : A ⊆ B -> A ⊆ B ∪ S.
+Proof. intros H. exact (union_subseteq_l' _ _ _ H). Qed.
+
+Lemma it_in_union_sing (S : gset Z) (z : Z) : z ∈ S ∪ {[z]}.
+Proof. apply elem_of_union_r, elem_of_singleton_2. reflexivity. Qed.
 
 (* ===================================================================== *)
 (*  THE TAIL: ip->size = 0, iupdate, and the six-slot epilogue            *)
@@ -2889,8 +2904,8 @@ Section ItruncMain.
          [bm_paidS]'s unpaid disjunct bought -- at [crb = true] it pins
          [n1 = u], which is what makes create's zero-spend fail arm close. *)
       iExists (if cru then S n1 else n1), (Sq ∪ {[IBLOCK inum inodestart]}).
-      iSplitR; [iPureIntro; set_solver|].
-      iSplitR; [iPureIntro; set_solver|].
+      iSplitR; [iPureIntro; exact (it_sub_union_l _ _ _ Hqsub)|].
+      iSplitR; [iPureIntro; exact (it_in_union_sing _ _)|].
       iSplitR; [iPureIntro; unfold it_entry, it_spend, it_iu in *;
                 destruct crb, cru; simpl in *; lia|].
       iExact "Hop".
@@ -2960,8 +2975,8 @@ Section ItruncMain.
                                   [Hop]");
         [exact Hcsw |].
       iExists (if cru then S n3 else n3), (Sr ∪ {[IBLOCK inum inodestart]}).
-      iSplitR; [iPureIntro; set_solver|].
-      iSplitR; [iPureIntro; set_solver|].
+      iSplitR; [iPureIntro; exact (it_sub_union_l _ _ _ Hrsub)|].
+      iSplitR; [iPureIntro; exact (it_in_union_sing _ _)|].
       iSplitR; [iPureIntro; unfold it_entry, it_spend, it_iu in *;
                 destruct crb, cru; simpl in *; lia|].
       iExact "Hop".

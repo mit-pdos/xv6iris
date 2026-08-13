@@ -104,7 +104,7 @@ Require Import BitmapInv.
 Require Import KernelDataInv.
 Require Import SpecPrintkGen.
 Require Import CodeBmap.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecBalloc SpecBread SpecBrelse SpecLogWrite.
 Require Import ProofBmapParts.
 Require Import SpecBmap.
