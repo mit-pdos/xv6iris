@@ -1941,9 +1941,17 @@ Section ProofFileread.
              assert (Hjoint : (Z.of_nat (Z.to_nat (bv_unsigned v))
                                + Z.of_nat (Z.to_nat n) < 2 ^ 31)%Z).
              { rewrite Hoffz Hnz. exact (fr_off_n_lt31 _ _ Hwf Hnb). }
-             (* readi's own joint premise is the 32-bit one *)
+             (* readi's own premises are the 32-bit ones: [off] alone, and
+                the sum GUARDED by the size test -- fileread's [f->off] is
+                below 2^31 and its count is bounded, so both are the joint
+                bound above, and the guard is discarded. *)
+             assert (Hoff32 : (Z.of_nat (Z.to_nat (bv_unsigned v))
+                               < 2 ^ 32)%Z) by lia.
              assert (Hjoint32 : (Z.of_nat (Z.to_nat (bv_unsigned v))
-                                 + Z.of_nat (Z.to_nat n) < 2 ^ 32)%Z) by lia.
+                                 <= bv_unsigned (di_size dnl) ->
+                                 Z.of_nat (Z.to_nat (bv_unsigned v))
+                                 + Z.of_nat (Z.to_nat n) < 2 ^ 32)%Z)
+               by (intros _; lia).
              (* readi takes its two uints in the ABI's sign-extended form;
                 fileread's are both below 2^31 (the joint bound above), where
                 that is the identity *)
@@ -1970,7 +1978,7 @@ Section ProofFileread.
                        pidv (DfracOwn 1) (DfracOwn (1/2))
                        J6 (K - 6)%nat eb C b
                        (fr_av_readi K HK) Hlg Hbmwf Hbmcov Hszb
-                       Hjoint32 Hj Hgs
+                       Hoff32 Hjoint32 Hj Hgs
                        HJ6a0 ltac:(rewrite HJ6a1; by vm_compute) HJ6a3' HJ6a4'
                        with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
                              Hblocks Hpriv Hprocs Hdevi Hdgeom

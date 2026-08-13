@@ -1528,7 +1528,9 @@ Section ProofDirlookupMain.
                   false (16 * i)%nat 16%nat dol dlk_dummyV
                   pidv dq dqd L6 (K - 12)%nat eb C b
                   ltac:(unfold K_readi; lia) Hlg Hbmwf Hbmcov Hszb
-                  ltac:(change (Z.of_nat 16) with 16; lia) Hj Hgs HL6a0
+                  ltac:(lia)
+                  ltac:(intros _; change (Z.of_nat 16) with 16; lia)
+                  Hj Hgs HL6a0
                   ltac:(rewrite HL6a1 dlk_zero_moi; exact (eq_vec_refl _))
                   HL6a3' HL6a4'
                   with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap

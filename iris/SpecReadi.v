@@ -120,11 +120,23 @@
 
    COVERAGE NOTE: the joint numeric premise [off + n < 2^32] is the sum in
    the MATHEMATICAL integers, and it is what makes the [c.addw a4,a3] at
-   +0x022 non-wrapping.  It is the one thing this contract still asks beyond
+   +0x022 non-wrapping.  It is the one thing this contract asks beyond
    32-bittedness, and it is what leaves xv6's own [off + n < off] overflow
    test dead by premise rather than proving what the code does when it
-   fires.  A caller that cannot bound the sum -- an [off] within [n] of 2^32
-   -- is outside this contract even though the code is total there.
+   fires.
+
+   IT IS GUARDED BY THE SIZE TEST -- [off <= ip->size -> off + n < 2^32] --
+   and the guard is not a convenience, it is what the instruction order
+   already says: +0x022 is BEHIND the [bltu a5,a3] at +0x002, so the add is
+   reached only for an [off] inside the file, where a size at most
+   MAXFILE*BSIZE makes the bound free.  Ungard it and the contract excludes
+   exactly the offsets the size test rejects, which is the case kexec's
+   phdr read hands over -- [elf.phoff] is four untrusted bytes, [n] is 56,
+   and nothing in exec bounds the sum.  The guard opens only [off > size],
+   where [rd_clamp] is already 0, so THE POSTCONDITION DOES NOT MOVE; the
+   case that would move it (a small [off] with [n] near 2^32, sum wrapping
+   while [rd_clamp] is nonzero) sits under the guard and still owes the
+   bound.
 
    readi SLEEPS (bmap, bread, brelse, and copyout on the user arm), so it
    threads the full running-process bundle.  It enters and returns at
@@ -255,12 +267,28 @@ Definition wp_readi_sconf_body
      subsumes [bv_unsigned (di_size dn) < 2^31], which is what makes the
      [c.lw a5,76(a0)] at +0x000 read the size exactly. *)
   bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
-  (* THE JOINT NUMERIC PREMISE: [off] and [n] are uints whose SUM stays
-     inside 32 bits -- not two separate bounds, which would let the
-     [c.addw a4,a3] at +0x022 wrap.  Each on its own is thereby a full
-     32-bit value, which is what a caller reading an untrusted uint out of
-     a struct can pay.  See the header's coverage note. *)
-  (Z.of_nat off + Z.of_nat n < 2 ^ 32) ->
+  (* [off] is a uint, full stop -- a caller reading one out of an untrusted
+     struct can pay this and nothing narrower. *)
+  (Z.of_nat off < 2 ^ 32) ->
+  (* THE JOINT NUMERIC PREMISE, GUARDED BY THE SIZE TEST.  The sum must not
+     wrap 32 bits, because that is what makes the [c.addw a4,a3] at +0x022
+     denote [off + n] rather than its wrap -- and it is what keeps the C's
+     own [off + n < off] overflow test dead.  But +0x022 sits AFTER the
+     [bltu a5,a3] at +0x002, so it is reached only when [off] is inside the
+     file, and that is exactly what this premise may assume.
+       Stated UNGUARDED it excludes precisely the wrapping offsets the size
+     test already rejects -- which is what kexec's phdr read hands over
+     ([elf.phoff] is four untrusted bytes and [n] is 56), and no loop in
+     exec can bound them.  Guarded, a caller discharges it from
+     [off <= size <= MAXFILE*BSIZE] by [lia], with no case analysis at the
+     call site and no bound on the untrusted field at all.
+       THE GUARD DOES NOT MOVE THE POSTCONDITION, and the direction matters:
+     it opens only [off > size], where [rd_clamp] is already 0 and the
+     pre-frame exit returns 0.  The case that WOULD move it -- a small [off]
+     with an [n] near 2^32, where the sum wraps while [rd_clamp] is not 0 --
+     has [off <= size], so the guard still demands the bound there. *)
+  (Z.of_nat off <= bv_unsigned (di_size dn) ->
+   Z.of_nat off + Z.of_nat n < 2 ^ 32) ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = ip *)

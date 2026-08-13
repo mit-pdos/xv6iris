@@ -2794,7 +2794,8 @@ Section ProofDirlinkMain.
                     false (16 * i)%nat 16%nat dol dl_dummyV
                     pidv dq dqd L6 (K - 10)%nat eb C b
                     ltac:(exact HKrd) Hlg Hbmwf Hbmcov Hszb
-                    ltac:(change (Z.of_nat 16%nat) with 16; lia)
+                    ltac:(lia)
+                    ltac:(intros _; change (Z.of_nat 16%nat) with 16; lia)
                     Hj Hgs HL6a0
                     ltac:(cbn [negb]; rewrite HL6a1 dlk_zero_moi;
                           exact (eq_vec_refl _))

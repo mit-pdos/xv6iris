@@ -2396,10 +2396,10 @@ Section ReadiMain.
                           user off n dst_olds V pidv dq dqd m K eb C b.
   Proof.
     cbv beta delta [wp_readi_sconf_body].
-    intros pcE pj dst ret_tgt HK Hgeom Hwf Hcov Hszmax Hsum Hj Hgl
+    intros pcE pj dst ret_tgt HK Hgeom Hwf Hcov Hszmax Hoff32 Hsumg Hj Hgl
            Ha0 Ha1 Ha3 Ha4.
     pose proof HK as HK'. unfold K_readi in HK'.
-    change (2 ^ 32)%Z with 4294967296%Z in Hsum.
+    change (2 ^ 32)%Z with 4294967296%Z in Hoff32.
     assert (Hgeom0 : log_geom_ok cov logstart) by exact Hgeom.
     assert (HmbZ : Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)
       by (vm_compute; reflexivity).
@@ -2427,11 +2427,10 @@ Section ReadiMain.
                      (sign_extend' 64 (mword_of_int (Z.of_nat off) : mword 32)
                       : mword 64) = w32_uarg (Z.of_nat off))
       by (apply w32_arg_unsigned; lia).
-    assert (Hsumu : bv_unsigned
-                      (sign_extend' 64
-                         (mword_of_int (Z.of_nat (off + n)) : mword 32)
-                       : mword 64) = w32_uarg (Z.of_nat (off + n)))
-      by (apply w32_arg_unsigned; lia).
+    (* [Hsumu], the same reading of the [addw]'s result, is NOT available
+       here: its bound is guarded by the size test and so is derived in the
+       fall-through arm below, where the guard has been discharged.  Only
+       a3 is read before the test. *)
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hkenv Hidev
               Hmeta Hmap Hblocks Hdst #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hcont".
     iAssert (rd_cont (CID0 := CID) γfs bn γf dev ip bm data dn user off n
@@ -2574,6 +2573,18 @@ Section ReadiMain.
        sign extension is the identity and from here on a3 is the plain
        literal every step below already expected.  [n] is NOT bounded --
        it stays a full 32-bit uint, in a4 and in s5, until the clamp. ---- *)
+    (* ...and it is what DISCHARGES THE GUARD on the joint premise.  The
+       [c.addw a4,a3] at +0x022 is behind this test, so the sum only has to
+       be non-wrapping here -- which is the whole reason the premise is
+       guarded rather than asked outright.  See SpecReadi.v's header. *)
+    assert (Hsum : (Z.of_nat off + Z.of_nat n < 4294967296)%Z).
+    { change 4294967296%Z with (2 ^ 32)%Z.
+      apply Hsumg. rewrite -Hszz. lia. }
+    assert (Hsumu : bv_unsigned
+                      (sign_extend' 64
+                         (mword_of_int (Z.of_nat (off + n)) : mword 32)
+                       : mword 64) = w32_uarg (Z.of_nat (off + n)))
+      by (apply w32_arg_unsigned; lia).
     assert (Hofflt : (Z.of_nat off < 2147483648)%Z) by lia.
     assert (Ha3lit : (sign_extend' 64 (mword_of_int (Z.of_nat off) : mword 32)
                       : mword 64) = mword_of_int (Z.of_nat off))

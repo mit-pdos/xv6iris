@@ -41,18 +41,19 @@ out. The clause was in `kxc_at_12c` when B1 published it, because it is true
 at the one state B1 could see — **a seam a loop has not yet been written
 against is a conjecture about that loop.**
 
-**`SpecReadi` NOW TAKES A 32-BIT `off`**, so B2's two readi calls
-(`elf.phoff + 56*i` at `+0x13a`, `ph.off + i` at `+0x0e6` — both 32-bit
-fields out of an untrusted ELF that `exec` never checks) can be stated: a3
-and a4 are pinned to the ABI's sign-extended form, which is what
-`ProofKexecSeam.kxc_off` already produces. **What B2 still has to pay is the
-SUM**: the contract's one remaining numeric premise is `off + n < 2^32` in
-the mathematical integers, so each loop must bound its own `off` plus its
-`n` (56, and the loadseg chunk) below `2^32`. See blocker §4. Of the other
-three blockers two were fixed and the third does not gate the proof — it
-only bounds which pathnames the theorem covers (`L ≤ 1`, so `/init` and
-`sh`, not `/bin/sh`). Read "THE SIZE BOUND IS THE COVERAGE INVARIANT" below
-before writing any phase that calls `uvmalloc`.
+**`SpecReadi` NOW TAKES A 32-BIT `off`, AND ITS SUM PREMISE IS GUARDED BY
+THE SIZE TEST**, so B2's two readi calls (`elf.phoff + 56*i` at `+0x13a`,
+`ph.off + i` at `+0x0e6` — both 32-bit fields out of an untrusted ELF that
+`exec` never checks) cost the loops **nothing**: a3 and a4 take the ABI's
+sign-extended form, which is what `ProofKexecSeam.kxc_off` already produces,
+and the sum bound is `off <= size -> off + n < 2^32`, discharged at each
+call site by `intros _; lia` from `size <= MAXFILE*BSIZE`. **No loop
+invariant here carries a conjunct about the ELF's offsets.** See blocker §4
+for why the guard is sound and why it does not move the postcondition.
+Nothing else is blocked: §3 (the log budget) is open but only bounds which
+pathnames the theorem covers (`L ≤ 1`, so `/init` and `sh`, not `/bin/sh`).
+Read "THE SIZE BOUND IS THE COVERAGE INVARIANT" below before writing any
+phase that calls `uvmalloc`.
 
 ## Status
 
@@ -466,13 +467,14 @@ pay it and move on; if no, the callee's contract is wrong and generalizing it
 is the work. Relaxing namei/namex/nameiparent and copyout's source to a
 fraction remains available and is nobody's blocker.
 
-## THE FOUR UPSTREAM BLOCKERS — TWO FIXED, ONE OPEN AND NOT GATING, ONE OPEN AND GATING B2
+## THE FOUR UPSTREAM BLOCKERS — THREE FIXED, ONE OPEN AND NOT GATING
 
 None of these is kexec's own design going wrong; each is a callee contract
 that was stated for the callers it had, and all four were found by trying to
-compose them. **§1 (copyout) and §2 (safestrcpy) are FIXED and the tree is
-green; §3 (the log budget) is open** and belongs to the fs-namei project;
-**§4 (readi's `off`) is FIXED, with one premise left for B2 to pay.**
+compose them. **§1 (copyout), §2 (safestrcpy) and §4 (readi's `off`) are
+FIXED and the tree is green; §3 (the log budget) is open** and belongs to
+the fs-namei project — it does not gate the proof, it only bounds which
+pathnames the theorem covers.
 
 ### 4. `SpecReadi` could not express a 32-bit `off` — **FIXED**
 
@@ -506,15 +508,34 @@ at the FULL 32-bit range"; `SpecReadi.rd_arg32_small` is the bridge a caller
 with a small argument uses, and the four existing callers each needed one
 `assert`.
 
-**WHAT B2 STILL HAS TO PAY: THE SUM.** The one numeric premise left is
-`Z.of_nat off + Z.of_nat n < 2 ^ 32` — in the mathematical integers, not
-mod 2^32 — because it is what makes the `c.addw a4,a3` at readi's `+0x022`
-non-wrapping, and it is what keeps xv6's own `off + n < off` overflow test
-dead. So each of B2's loops owes a bound on its own sum (`elf.phoff + 56*i`
-plus 56; `ph.off + i` plus the loadseg chunk). If a loop cannot produce one,
-the next widening is another readi spec change and not a kernel one — the
-code returns 0 on a wrapping sum — but it MOVES the postcondition, since at
-a small `off` and an `n` near 2^32 the sum wraps while `rd_clamp` is not 0.
+**THE SUM IS GUARDED BY THE SIZE TEST, AND THAT IS WHY B2 OWES NOTHING.**
+The numeric premise `Z.of_nat off + Z.of_nat n < 2 ^ 32` — in the
+mathematical integers, not mod 2^32 — is what makes the `c.addw a4,a3` at
+readi's `+0x022` non-wrapping, and what keeps xv6's own `off + n < off`
+overflow test dead. Asked outright it is unpayable here: neither of B2's
+loops can bound `elf.phoff + 56*i` or `ph.off + i`, because nothing in
+`exec` checks either field. It is therefore stated as
+
+```coq
+  (Z.of_nat off <= bv_unsigned (di_size dn) ->
+   Z.of_nat off + Z.of_nat n < 2 ^ 32) ->
+```
+
+which is what the instruction order already says: `+0x022` sits BEHIND the
+`bltu a5,a3` at `+0x002`, so the add is reached only for an `off` inside the
+file. **Every caller then discharges it by `intros _; lia`** from
+`off <= size <= MAXFILE*BSIZE = 274432` — B2's two calls have `n = 56` and
+`n <= 4096`, so the sum is under 278528 and no bound on the untrusted field
+is needed anywhere in either loop invariant.
+
+**THE GUARD DOES NOT MOVE THE POSTCONDITION, and the direction is the whole
+argument.** It opens only `off > size`, which is where `rd_clamp` is already
+0 and the pre-frame exit returns 0. The case that WOULD move it — a small
+`off` with an `n` near 2^32, where the sum wraps while `rd_clamp` is not 0 —
+sits under the guard and still owes the bound. `ProofReadi` needed one
+relocation for it: the `Hsumu` reading of the sum moves into the
+fall-through arm of the `destruct (Nat.ltb_spec szn off)` that was already
+there, which is the arm where the guard is discharged.
 
 `writei` has the same `off` shape and still asks `off + n < 2^31`; its
 callers (filewrite, and sysfile's writers) can pay it, so it was left alone.

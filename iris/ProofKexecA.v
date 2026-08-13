@@ -1212,7 +1212,8 @@ Section KexecABody.
               cov logstart dev (ientry k) bml datl dnl false 0%nat 64%nat fb V
               pidv (DfracOwn (1/4)) (DfracOwn (1/2)) Q8 (K - 68)%nat true C true
               ltac:(unfold K_readi; lia) Hlg Hbmwf Hbmcov Hszb
-              ltac:(vm_compute; reflexivity) Hjp Hgs HQ8a0
+              ltac:(vm_compute; reflexivity)
+              ltac:(intros _; vm_compute; reflexivity) Hjp Hgs HQ8a0
               ltac:(rewrite HQ8a1; vm_compute; reflexivity) HQ8a3' HQ8a4'
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hka Hidev Hmeta Hmap Hblocks
                     [Helfb Hppid] Hprocs Hdevi Hdgeom Hdlock Hbs1").
