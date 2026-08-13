@@ -288,7 +288,7 @@ Section KforkArms.
               m Mt K sp0 ra0 s00 s10 s50 pme eb b C lvl
               HK Hlvl Hbeq Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMts4 HMtthr
               with "Hcg Hcpu Hpay Htext Hpc Hb1 Hb2 Hb3 Hb4x Hb5x Hb6 Hb7 Hb8
-                    Hheld Hhart Hislock Hkalloc Hfprest Hfppt Hfptf [-]").
+                    Hheld Hhart Hislock Hkalloc Hfprest Hfppt Hfptf").
     iIntros (CID Hcross mf) "%Hpf Hcg Hpc Hcpu2 Hkalloc2".
     destruct Hpf as [Hcsmf Hmfa0].
     iSpecialize ("Hcont" $! CID with "[%]").
@@ -356,7 +356,7 @@ Section KforkArms.
     iIntros "Hcg Hcpu #Htext Hpc Hframe Hpv Hkalloc Hcont".
     iApply (ProofKfork.kfk_exit_alloc m Mt K sp0 ra0 s00 s10 s50 pme b
               HK8 Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMtthr
-              with "Hcg Htext Hpc Hframe [-]").
+              with "Hcg Htext Hpc Hframe").
     iIntros (CID Hcross mf) "%Hpf Hcg Hpc".
     destruct Hpf as [Hcsmf Hmfa0].
     iDestruct (cpu_own_transport CID0 CID lvl eb pme C b Hcross with "Hcpu") as "Hcpu".
@@ -492,7 +492,7 @@ Section KforkArms.
     iApply (ProofKforkB2.kfk_tf_copy_loop Mt (ud_tfp (pv_upt Vp)) (ud_tfp (pv_upt Vc'))
               (pv_tf Vp) (pv_tf Vc') (trap_res b + (K - 8))%nat pme
               Hpvsrc Hpvdst Hlenp Hlenc HMta5 HMta4 HMta3
-              with "Hcg Htext Hpc Htfp_p Htfp_c [-]").
+              with "Hcg Htext Hpc Htfp_p Htfp_c").
     iApply wp_next_off_intro.
     iIntros (mf) "%Hpf Hcg Hpc Htfp_p Htfp_c".
     destruct Hpf as (Hcsmf & Hmfa5 & Hmfa4).
@@ -507,7 +507,7 @@ Section KforkArms.
       by (rewrite (callee_saved_lookup Hcsmf Rs5 ltac:(vm_compute; reflexivity)); exact HMts5).
     (* ---- ProofKforkB7: MY OWN block ---- *)
     iApply (ProofKforkB7.kfk_b7 γf npa pme pid_c V1 mf (trap_res b + (K - 8))%nat pme Hmfs4 Hmfs5
-              with "Hcg Htext Hpc HCpriv [-]").
+              with "Hcg Htext Hpc HCpriv").
     iApply wp_next_off_intro.
     iIntros (Mx) "%Hpx Hcg Hpc HCpriv".
     destruct Hpx as (HMxs1 & HMxs2 & HMxs3 & HMxs4 & HMxs5 & HMxthr).
@@ -565,7 +565,7 @@ Section KforkArms.
                 (kfk_childV V2 (pv_ofile Vp) NOFILE) pme npa
                 Mx2 (trap_res b) K (S lvl) eb C
                 ltac:(lia) ltac:(lia) Hd4 Hd3
-                with "Hsc Hown Htext Hpcx Hpanic Hitb Hitinv Hirs Hpvx Hpvcx [-]").
+                with "Hsc Hown Htext Hpcx Hpanic Hitb Hitinv Hirs Hpvx Hpvcx").
       iApply wp_next_off_intro.
       iIntros (mf4) "%Hp4 Hsc4 Hown4 Hpc4 Hpvx4 Hpvcx4 Hirsp".
       destruct Hp4 as (Hthr4 & Hpid4).
@@ -591,7 +591,7 @@ Section KforkArms.
                 pme ks pid_c Vc4 ch rest (sign_extend' 64 pid_c) C
                 ltac:(lia) ltac:(lia) HjN Hgamma Hrestlen (eq_sym Hbeq) Hmf4s4 Hmf4s5 Hpid4
                 with "Hsc4 Hown4 Hpay Htext Hpc4 Hpanic Hprocs Hwlock
-                      Hheld Hhart Hpvcx4 Hfd Hirsp Hks Hkctx [-]").
+                      Hheld Hhart Hpvcx4 Hfd Hirsp Hks Hkctx").
       (* [b] is symbolic here (B5's own exit index): an ordinary crossing,
          not [wp_next_off_intro] -- the brief's correction (a). *)
       iIntros (CID5 Hcross5 mf5) "%Hcs5 Hsc5 Hown5 Hpc5".
@@ -616,7 +616,7 @@ Section KforkArms.
       iApply (ProofKfork.kfk_tail_succ (CID0 := CID5) m mf5 K sp0 ra0 s00 s10 s50
                 (sign_extend' 64 pid_c) w8 pme b
                 ltac:(lia) Hmsp Hmra Hms0 Hms1 Hms5 Hmf5sp Hmf5s1 Hmf5thr
-                with "Hsc5 Htext Hpc5 Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 [-]").
+                with "Hsc5 Htext Hpc5 Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8").
       iIntros (CID6 Hcross6 mr) "%Hpost Hsc6 Hpc6".
       destruct Hpost as (Hcsm & Hrv).
       iDestruct (cpu_own_transport CID5 CID6 lvl eb pme C b Hcross6 with "Hown5") as "Hown5".

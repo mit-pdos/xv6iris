@@ -99,7 +99,7 @@ Section KvminitBody.
     iPoseProof (kii_1a with "Htext") as "Hi1a".
     (* +0x00 addi sp,sp,-16 : 2-slot frame push *)
     iApply (wp_caddi_sp_push_s_sconf (mword_of_int KernelSyms.kvminit) (mword_of_int 48 : mword 6) mm K 2 b Hc2 Hpush
-              with "Hcg Hpc Hi00 [-]").
+              with "Hcg Hpc Hi00").
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> mm).
@@ -111,7 +111,7 @@ Section KvminitBody.
     iEval (rewrite Hp02) in "Hpc".
     (* +0x02 sd ra,8(sp) -> slot 1 *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.kvminit + 0x02)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
-              W1 (K - 2)%nat v1 b with "Hcg Hpc Hi02 [Hc1] [-]").
+              W1 (K - 2)%nat v1 b with "Hcg Hpc Hi02 [Hc1]").
     { iEval (rewrite HspW1 Hb1). iExact "Hc1". }
     iIntros (CID2 Hs2) "Hcg Hpc Hc1". iEval (rewrite HspW1 Hb1) in "Hc1".
     (* the leaf's [storeval] is [rget m rs2], let-bound outside its own
@@ -124,7 +124,7 @@ Section KvminitBody.
     iEval (rewrite Hp04) in "Hpc".
     (* +0x04 sd s0,0(sp) -> slot 2 *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.kvminit + 0x04)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
-              W1 (K - 2)%nat v2 b with "Hcg Hpc Hi04 [Hc2] [-]").
+              W1 (K - 2)%nat v2 b with "Hcg Hpc Hi04 [Hc2]").
     { iEval (rewrite HspW1 Hb2). iExact "Hc2". }
     iIntros (CID3 Hs3) "Hcg Hpc Hc2". iEval (rewrite HspW1 Hb2) in "Hc2".
     (* same bridge as above (this leaf was applied at CID2). *)
@@ -137,7 +137,7 @@ Section KvminitBody.
     iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.kvminit + 0x06)) (Cregidx (mword_of_int 0)) (mword_of_int 4 : mword 8) (mword_of_int 8 : mword 5)
               W1 (K - 2)%nat b
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi06 [-]").
+              with "Hcg Hpc Hi06").
     iIntros (CID4 Hs4) "Hcg Hpc".
     set (W2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (W1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 4 : mword 8))))]> W1).
     assert (Hp08 : add_vec_int (mword_of_int (KernelSyms.kvminit + 0x06) : mword 64) 2 = mword_of_int (KernelSyms.kvminit + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
@@ -145,7 +145,7 @@ Section KvminitBody.
     (* +0x08 jal kvmmake *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.kvminit + 0x08)) (mword_of_int 1 : mword 5) (mword_of_int 2096970 : mword 21)
               W2 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi08 [-]").
+              with "Hcg Hpc Hi08").
     iIntros (CID5 Hs5) "Hcg Hpc".
     set (J := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.kvminit + 0x08) : mword 64) 4)]> W2).
     assert (Htgt : add_vec (mword_of_int (KernelSyms.kvminit + 0x08) : mword 64) (sign_extend' 64 (mword_of_int 2096970 : mword 21)) = mword_of_int KernelSyms.kvmmake) by (apply bv_eq; vm_compute; reflexivity).
@@ -165,7 +165,7 @@ Section KvminitBody.
     iApply (wp_kvmmake γa J 0%nat (K - 2)%nat eb p C (Some nb) b
               eq_refl HKmk
               ltac:(exists nb; split; [reflexivity | exact Hnbk])
-              with "Hcg Hcnt Htext Hpc Henv [-]").
+              with "Hcg Hcnt Htext Hpc Henv").
     iIntros (CID6 Hs6 mr t pas) "Hcg Hcnt Hpc Hptree %Ha0 %Hrep %Hnodes Henv %Hcs %Hpasok Hpages".
     assert (Hret0c : ret_pc (J !!! Regidx (mword_of_int 1)) = mword_of_int (KernelSyms.kvminit + 0x0c)).
     { rewrite /J upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -173,7 +173,7 @@ Section KvminitBody.
     (* +0x0c auipc a5,0x9 : a5 := 0x8000a196 *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.kvminit + 0x0c)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 20)
               mr (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0c [-]").
+              with "Hcg Hpc Hi0c").
     iIntros (CID7 Hs7) "Hcg Hpc".
     set (A0 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.kvminit + 0x0c) : mword 64) (auipc_off (mword_of_int 9 : mword 20)))]> mr).
     assert (Hp10 : add_vec_int (mword_of_int (KernelSyms.kvminit + 0x0c) : mword 64) 4 = mword_of_int (KernelSyms.kvminit + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
@@ -183,7 +183,7 @@ Section KvminitBody.
     { rewrite /A0 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     assert (HA0_10 : A0 !!! Regidx (mword_of_int 10 : mword 5) = mr !!! Regidx (mword_of_int 10)) by (rewrite /A0 upd_ne; [reflexivity | reg_neq]).
     iApply (wp_sd_s_sconf (mword_of_int (KernelSyms.kvminit + 0x10)) (mword_of_int 10 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 262 : mword 12)
-              A0 (K - 2)%nat kpt0 b with "Hcg Hpc Hi10 [Hcell] [-]").
+              A0 (K - 2)%nat kpt0 b with "Hcg Hpc Hi10 [Hcell]").
     { (* the leaf's [pa] is [rget A0 rs1], let-bound outside its own
          [wp_next] -- read at the CALLER's ambient hart (CID7). *)
       iEval (rgne). iEval (rewrite Haddr). iExact "Hcell". }
@@ -203,7 +203,7 @@ Section KvminitBody.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.kvminit + 0x14)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
               A0 (K - 2)%nat (mm !!! Regidx (mword_of_int 1)) b (dqm:=DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi14 [Hc1] [-]").
+              with "Hcg Hpc Hi14 [Hc1]").
     { iEval (rewrite HA0sp Hb1). iExact "Hc1". }
     iIntros (CID9 Hs9) "Hcg Hpc Hc1". iEval (rewrite HA0sp Hb1) in "Hc1".
     set (L1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (mm !!! Regidx (mword_of_int 1))]> A0).
@@ -214,7 +214,7 @@ Section KvminitBody.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.kvminit + 0x16)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
               L1 (K - 2)%nat (mm !!! Regidx (mword_of_int 8)) b (dqm:=DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi16 [Hc2] [-]").
+              with "Hcg Hpc Hi16 [Hc2]").
     { iEval (rewrite HL1sp Hb2). iExact "Hc2". }
     iIntros (CID10 Hs10) "Hcg Hpc Hc2". iEval (rewrite HL1sp Hb2) in "Hc2".
     set (L2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (mm !!! Regidx (mword_of_int 8))]> L1).
@@ -233,7 +233,7 @@ Section KvminitBody.
       done. }
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.kvminit + 0x18)) (mword_of_int 16 : mword 6)
-              L2 (K - 2)%nat 2 b Hpop with "Hcg Hpc Hi18 Hframe [-]").
+              L2 (K - 2)%nat 2 b Hpop with "Hcg Hpc Hi18 Hframe").
     iIntros (CID11 Hs11) "Hcg Hpc".
     set (Efin := <[Regidx csp_rs1 := regval_into_reg (add_vec (L2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))))]> L2).
     iEval (rewrite (kii_nk K Hc2)) in "Hcg".
@@ -244,7 +244,7 @@ Section KvminitBody.
     { rewrite /Efin upd_ne; [| reg_neq]. rewrite /L2 upd_ne; [| reg_neq]. rewrite /L1 upd_eq. reflexivity. }
     assert (Hrt : ret_pc (Efin !!! Regidx (mword_of_int 1 : mword 5)) = ret_pc (mm !!! Regidx (mword_of_int 1))) by (rewrite HEfin1; reflexivity).
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.kvminit + 0x1a)) (mword_of_int 1 : mword 5) Efin K b
-              ltac:(vm_compute; discriminate) with "Hcg Hpc Hi1a [-]").
+              ltac:(vm_compute; discriminate) with "Hcg Hpc Hi1a").
     iIntros (CID12 Hs12) "Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite Hrt) in "Hpc".

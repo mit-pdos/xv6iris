@@ -840,8 +840,8 @@ Section IreclaimStep.
       iApply (wp_bgeu_taken_s_sconf (mword_of_int (KernelSyms.ireclaim + 0x78))
                 (mword_of_int 58 : mword 13) Ra4 Ra5 S3 (K - 8)%nat b
                 ltac:(nz) ltac:(nz) Hcmp ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi78 [-]").
-      iNext. iIntros (CID4 Hq4) "Hcg Hpc".
+                with "Hcg Hpc Hi78").
+      iApply bi.later_intro. iIntros (CID4 Hq4) "Hcg Hpc".
       assert (Hjt : add_vec (mword_of_int (KernelSyms.ireclaim + 0x78) : mword 64)
                       (sign_extend' 64 (mword_of_int 58 : mword 13))
                     = mword_of_int (KernelSyms.ireclaim + 0xb2)) by pcw.
@@ -2048,8 +2048,8 @@ Section IreclaimRelease.
     iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.ireclaim + 0xb0))
               (sign_extend' 21 (concat_vec (mword_of_int 2015 : mword 11) ('b"0")))
               mR (K - 8)%nat b ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hib0 [-]").
-    iIntros (CID4 Hq4). iNext. iIntros "Hcg Hpc".
+              with "Hcg Hpc Hib0").
+    iIntros (CID4 Hq4). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Hjt : add_vec (mword_of_int (KernelSyms.ireclaim + 0xb0) : mword 64)
                     (sign_extend' 64
                        (sign_extend' 21 (concat_vec (mword_of_int 2015 : mword 11) ('b"0"))))
@@ -2679,8 +2679,8 @@ Section IreclaimScan.
         iApply (wp_cbeqz_taken_s_sconf (mword_of_int (KernelSyms.ireclaim + 0xa2))
                   (mword_of_int 4 : mword 8) (Cregidx (mword_of_int 6)) Ra4
                   WC (K - 8)%nat b ltac:(vm_compute; reflexivity) ltac:(nz) Hcmp
-                  ltac:(vm_compute; reflexivity) with "Hcg Hpc Hia2 [-]").
-        iNext. iIntros (CID14 Hq14) "Hcg Hpc".
+                  ltac:(vm_compute; reflexivity) with "Hcg Hpc Hia2").
+        iApply bi.later_intro. iIntros (CID14 Hq14) "Hcg Hpc".
         assert (Hjt : add_vec (mword_of_int (KernelSyms.ireclaim + 0xa2) : mword 64)
                         (sign_extend' 64 (sign_extend' 13
                            (concat_vec (mword_of_int 4 : mword 8) ('b"0"))))
@@ -2785,8 +2785,8 @@ Section IreclaimScan.
           iApply (wp_cbeqz_taken_s_sconf (mword_of_int (KernelSyms.ireclaim + 0xa8))
                     (mword_of_int 200 : mword 8) (Cregidx (mword_of_int 7)) Ra5
                     WD (K - 8)%nat b ltac:(vm_compute; reflexivity) ltac:(nz) Hcmp2
-                    ltac:(vm_compute; reflexivity) with "Hcg Hpc Hia8 [-]").
-          iNext. iIntros (CID16 Hq16) "Hcg Hpc".
+                    ltac:(vm_compute; reflexivity) with "Hcg Hpc Hia8").
+          iApply bi.later_intro. iIntros (CID16 Hq16) "Hcg Hpc".
           assert (Hjt : add_vec (mword_of_int (KernelSyms.ireclaim + 0xa8) : mword 64)
                           (sign_extend' 64 (sign_extend' 13
                              (concat_vec (mword_of_int 200 : mword 8) ('b"0"))))
@@ -3341,8 +3341,8 @@ Section IreclaimMain.
     iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.ireclaim + 0x36))
               (sign_extend' 21 (concat_vec (mword_of_int 35 : mword 11) ('b"0")))
               RB (K - 8)%nat b ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi36 [-]").
-    iIntros (CID21 Hq21). iNext. iIntros "Hcg Hpc".
+              with "Hcg Hpc Hi36").
+    iIntros (CID21 Hq21). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Hjt : add_vec (mword_of_int (KernelSyms.ireclaim + 0x36) : mword 64)
                     (sign_extend' 64
                        (sign_extend' 21 (concat_vec (mword_of_int 35 : mword 11) ('b"0"))))

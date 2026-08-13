@@ -1861,7 +1861,7 @@ Section ProofNamexMain.
         iApply (wp_lbu_s_sconf (mword_of_int (NX + 0xfe)) Ra5 Rs1
                   (mword_of_int 0 : mword 12) Q1 (K - 12)%nat
                   (pfun (S off) : mword 8) b (dqm := DfracOwn 1)
-                  ltac:(nz) ltac:(rdok) with "Hcg Hpc Hjee [Hpb] [-]").
+                  ltac:(nz) ltac:(rdok) with "Hcg Hpc Hjee [Hpb]").
         { iEval (rgne; rewrite HQ1s1 addv_sext0). iExact "Hpb". }
         iIntros (CIDk2 Hqk2) "Hcg Hpc Hpb".
         iEval (rgne; rewrite HQ1s1 addv_sext0) in "Hpb".
@@ -1894,7 +1894,7 @@ Section ProofNamexMain.
                           exact (nx_slash_eq _ Hsl2))
                     ltac:(rewrite Htec; vm_compute; reflexivity)
                     with "Hcg Hpc Hjf2").
-          iIntros (CIDk3 Hqk3). iNext. iIntros "Hcg Hpc".
+          iIntros (CIDk3 Hqk3). iApply bi.later_intro. iIntros "Hcg Hpc".
           iEval (rewrite Htec) in "Hpc".
           iSpecialize ("IHs" $! CIDk3 with "[%]"); [wp_next_chain |].
           iApply ("IHs" $! (S off) Q2
@@ -1976,7 +1976,7 @@ Section ProofNamexMain.
         iApply (wp_lbu_s_sconf (mword_of_int (NX + 0xb8)) Ra5 Rs1
                   (mword_of_int 0 : mword 12) T1 (K - 12)%nat
                   (pfun (S off) : mword 8) b (dqm := DfracOwn 1)
-                  ltac:(nz) ltac:(rdok) with "Hcg Hpc Hjae [Hpb] [-]").
+                  ltac:(nz) ltac:(rdok) with "Hcg Hpc Hjae [Hpb]").
         { iEval (rgne; rewrite HT1s1 addv_sext0). iExact "Hpb". }
         iIntros (CIDt2 Hqt2) "Hcg Hpc Hpb".
         iEval (rgne; rewrite HT1s1 addv_sext0) in "Hpb".
@@ -2008,7 +2008,7 @@ Section ProofNamexMain.
                           exact (nx_slash_eq _ Hsl2))
                     ltac:(rewrite Htac; vm_compute; reflexivity)
                     with "Hcg Hpc Hjb2").
-          iIntros (CIDt3 Hqt3). iNext. iIntros "Hcg Hpc".
+          iIntros (CIDt3 Hqt3). iApply bi.later_intro. iIntros "Hcg Hpc".
           iEval (rewrite Htac) in "Hpc".
           iSpecialize ("IHt" $! CIDt3 with "[%]"); [wp_next_chain |].
           iApply ("IHt" $! (S off) T2
@@ -2092,7 +2092,7 @@ Section ProofNamexMain.
         iApply (wp_lbu_s_sconf (mword_of_int (NX + 0x118)) Ra5 Rs2
                   (mword_of_int 0 : mword 12) E1 (K - 12)%nat
                   (pfun (S ii) : mword 8) b (dqm := DfracOwn 1)
-                  ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj108 [Hpb] [-]").
+                  ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj108 [Hpb]").
         { iEval (rgne; rewrite HE1s2 addv_sext0). iExact "Hpb". }
         iIntros (CIDe2 Hqe2) "Hcg Hpc Hpb".
         iEval (rgne; rewrite HE1s2 addv_sext0) in "Hpb".
@@ -2146,7 +2146,7 @@ Section ProofNamexMain.
                     ltac:(rgne; rewrite HE3a4; exact (nx_a4_eq _ Hsl2))
                     ltac:(rewrite Ht8c; vm_compute; reflexivity)
                     with "Hcg Hpc Hj110").
-          iIntros (CIDe4 Hqe4). iNext. iIntros "Hcg Hpc".
+          iIntros (CIDe4 Hqe4). iApply bi.later_intro. iIntros "Hcg Hpc".
           iEval (rewrite Ht8c) in "Hpc".
           iSpecialize ("Hqc" $! CIDe4 with "[%]"); [wp_next_chain |].
           iApply ("Hqc" $! (S ii) E3
@@ -2192,7 +2192,7 @@ Section ProofNamexMain.
                       E3 (K - 12)%nat b
                       ltac:(rewrite Ht8c2; vm_compute; reflexivity)
                       with "Hcg Hpc Hj114").
-            iIntros (CIDe6 Hqe6). iNext. iIntros "Hcg Hpc".
+            iIntros (CIDe6 Hqe6). iApply bi.later_intro. iIntros "Hcg Hpc".
             iEval (rewrite Ht8c2) in "Hpc".
             (* the terminator pins the index: [bb_cstr] has no earlier NUL *)
             assert (Hep : (S ii = plen)%nat).
@@ -2214,7 +2214,7 @@ Section ProofNamexMain.
                       ltac:(rgne; rewrite HE3a5; exact (nx_nnul_ne _ Hnl2))
                       ltac:(rewrite Ht106; vm_compute; reflexivity)
                       with "Hcg Hpc Hj112").
-            iIntros (CIDe5 Hqe5). iNext. iIntros "Hcg Hpc".
+            iIntros (CIDe5 Hqe5). iApply bi.later_intro. iIntros "Hcg Hpc".
             iEval (rewrite Ht106) in "Hpc".
             iSpecialize ("IHe" $! CIDe5 with "[%]"); [wp_next_chain |].
             iApply ("IHe" $! (S ii) E3 with "[%] [%] [%] Hcg Hpc Hpath [Hqc]").
@@ -2265,7 +2265,7 @@ Section ProofNamexMain.
                   ltac:(rgne; rewrite Ha5; exact (nx_nul_eq _ Hnl))
                   ltac:(rewrite Ht130; vm_compute; reflexivity)
                   with "Hcg Hpc Hjf6").
-        iIntros (CIDm1 Hqm1). iNext. iIntros "Hcg Hpc".
+        iIntros (CIDm1 Hqm1). iApply bi.later_intro. iIntros "Hcg Hpc".
         iEval (rewrite Ht130) in "Hpc".
         assert (Hap : (a = plen)%nat).
         { destruct (Nat.eq_dec a plen) as [He | Hne]; [exact He |].
@@ -2289,7 +2289,7 @@ Section ProofNamexMain.
         iApply (wp_lbu_s_sconf (mword_of_int (NX + 0x108)) Ra5 Rs1
                   (mword_of_int 0 : mword 12) Ms (K - 12)%nat
                   (pfun a : mword 8) b (dqm := DfracOwn 1)
-                  ltac:(nz) ltac:(rdok) with "Hcg Hpc Hjf8 [Hpb] [-]").
+                  ltac:(nz) ltac:(rdok) with "Hcg Hpc Hjf8 [Hpb]").
         { iEval (rgne; rewrite Hs1 addv_sext0). iExact "Hpb". }
         iIntros (CIDm2 Hqm2) "Hcg Hpc Hpb".
         iEval (rgne; rewrite Hs1 addv_sext0) in "Hpb".
@@ -2386,7 +2386,7 @@ Section ProofNamexMain.
       iApply (wp_lbu_s_sconf (mword_of_int (NX + 0xf4)) Ra5 Rs1
                 (mword_of_int 0 : mword 12) Ms (K - 12)%nat
                 (pfun off : mword 8) b (dqm := DfracOwn 1)
-                ltac:(nz) ltac:(rdok) with "Hcg Hpc Hje4 [Hpb] [-]").
+                ltac:(nz) ltac:(rdok) with "Hcg Hpc Hje4 [Hpb]").
       { iEval (rgne; rewrite Hs1 addv_sext0). iExact "Hpb". }
       iIntros (CIDh1 Hqh1) "Hcg Hpc Hpb".
       iEval (rgne; rewrite Hs1 addv_sext0) in "Hpb".
@@ -2469,7 +2469,7 @@ Section ProofNamexMain.
                         exact (nx_nslash_ne _ Hsl0))
                   ltac:(rewrite Htf6; vm_compute; reflexivity)
                   with "Hcg Hpc Hje8").
-        iIntros (CIDh2 Hqh2). iNext. iIntros "Hcg Hpc".
+        iIntros (CIDh2 Hqh2). iApply bi.later_intro. iIntros "Hcg Hpc".
         iEval (rewrite Htf6) in "Hpc".
         iSpecialize ("Hmid" $! CIDh2 with "[%]"); [wp_next_chain |].
         iApply ("Hmid" $! off H1
@@ -2515,7 +2515,7 @@ Section ProofNamexMain.
       iApply (wp_lbu_s_sconf (mword_of_int (NX + 0xae)) Ra5 Rs1
                 (mword_of_int 0 : mword 12) Ms (K - 12)%nat
                 (pfun off : mword 8) b (dqm := DfracOwn 1)
-                ltac:(nz) ltac:(rdok) with "Hcg Hpc Hja4 [Hpb] [-]").
+                ltac:(nz) ltac:(rdok) with "Hcg Hpc Hja4 [Hpb]").
       { iEval (rgne; rewrite Hs1 addv_sext0). iExact "Hpb". }
       iIntros (CIDr1 Hqr1) "Hcg Hpc Hpb".
       iEval (rgne; rewrite Hs1 addv_sext0) in "Hpb".
@@ -2577,7 +2577,7 @@ Section ProofNamexMain.
                         exact (nx_nslash_ne _ Hsl0))
                   ltac:(rewrite Htb6; vm_compute; reflexivity)
                   with "Hcg Hpc Hja8").
-        iIntros (CIDr2 Hqr2). iNext. iIntros "Hcg Hpc".
+        iIntros (CIDr2 Hqr2). iApply bi.later_intro. iIntros "Hcg Hpc".
         iEval (rewrite Htb6) in "Hpc".
         iSpecialize ("Hqc" $! CIDr2 with "[%]"); [wp_next_chain |].
         iApply ("Hqc" $! off G1
@@ -2798,13 +2798,13 @@ Section ProofNamexMain.
                          T3 (K - 12)%nat b
                          ltac:(rewrite Htj5c; vm_compute; reflexivity)
                          with "Hcg Hpc Hj13c").
-               iIntros (CIDA5 HqA5). iNext. iIntros "Hcg Hpc".
+               iIntros (CIDA5 HqA5). iApply bi.later_intro. iIntros "Hcg Hpc".
                iEval (rewrite Htj5c) in "Hpc".
                iSpecialize ("Htail" $! CIDA5 with "[%]"); [wp_next_chain |].
                iApply ("Htail" $! T3 (mword_of_int 0 : mword 64)
                          with "[%] [%] Hcg Hpc
                          Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
-                         [-]").
+                        ").
                ++ exact HT3tr.
                ++ exact HT3s4.
                ++ iIntros (CIDf Hsf mf) "%Hcsf %Hfa0 Hcg Hpc".
@@ -2831,12 +2831,12 @@ Section ProofNamexMain.
                          ltac:(rgne; rewrite HAs6; exact Ha1)
                          ltac:(rewrite Htg5c; vm_compute; reflexivity)
                          with "Hcg Hpc Hj130").
-               iIntros (CIDA1 HqA1). iNext. iIntros "Hcg Hpc".
+               iIntros (CIDA1 HqA1). iApply bi.later_intro. iIntros "Hcg Hpc".
                iEval (rewrite Htg5c) in "Hpc".
                iSpecialize ("Htail" $! CIDA1 with "[%]"); [wp_next_chain |].
                iApply ("Htail" $! Ma ipv with "[%] [%] Hcg Hpc
                          Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
-                         [-]").
+                        ").
                ++ exact HAtr.
                ++ exact HAs4.
                ++ iIntros (CIDf Hsf mf) "%Hcsf %Hfa0 Hcg Hpc".
@@ -2858,7 +2858,7 @@ Section ProofNamexMain.
                                      Hcg Hpc Hpath".
             exfalso. exact (B4 (Hallsl a B1 B2)).
         + (* ================= EXIT B: an element starts here =========== *)
-          iApply ("Hhead" $! off Ml with "[%] [%] [%] Hcg Hpc Hpath [] [-]").
+          iApply ("Hhead" $! off Ml with "[%] [%] [%] Hcg Hpc Hpath []").
           * exact Hoff.
           * exact G9.
           * exact G19.
@@ -2895,7 +2895,7 @@ Section ProofNamexMain.
                 exact (Gthr c Hc N2 N8 N9 N18 N19 N20 N21 N22 N23 N24
                          N25 N26). }
             iSpecialize ("Hscn" $! plen CIDb with "[%]"); [wp_next_chain |].
-            iApply ("Hscn" $! a Mb with "[%] [%] [%] Hcg Hpc Hpath [-]").
+            iApply ("Hscn" $! a Mb with "[%] [%] [%] Hcg Hpc Hpath").
             -- lia.
             -- exact B2.
             -- exact B7.
@@ -3031,7 +3031,7 @@ Section ProofNamexMain.
                                   & Q24 & Q25 & Qthr).
                  iSpecialize ("Htrail" $! CIDt with "[%]"); [wp_next_chain |].
                  iApply ("Htrail" $! e Mt
-                           with "[%] [%] [%] Hcg Hpc Hpath [-]").
+                           with "[%] [%] [%] Hcg Hpc Hpath").
                  - exact E2.
                  - exact Q9.
                  - exact Q19.
@@ -3436,7 +3436,7 @@ Section ProofNamexMain.
                        iApply ("Htail" $! NU3 (mword_of_int 0 : mword 64)
                                  with "[%] [%] Hcg Hpc
                                  Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10
-                                 Hb11 Hb12 [-]").
+                                 Hb11 Hb12").
                        - exact HNU3tr.
                        - exact HNU3s4.
                        - iIntros (CIDf Hsf mf) "%Hcsf %Hfa0 Hcg Hpc".
@@ -3515,7 +3515,7 @@ Section ProofNamexMain.
                                  (K - 12)%nat (pfun o2 : mword 8) b
                                  (dqm := DfracOwn 1)
                                  ltac:(nz) ltac:(rdok)
-                                 with "Hcg Hpc Hjc8 [Hpb] [-]").
+                                 with "Hcg Hpc Hjc8 [Hpb]").
                        { iEval (rgne; rewrite HV4s1 addv_sext0).
                          iExact "Hpb". }
                        iIntros (CIDP2 HqP2) "Hcg Hpc Hpb".
@@ -3548,7 +3548,7 @@ Section ProofNamexMain.
                                        exact (nx_nul_eq _ Hnl))
                                  ltac:(rewrite Htg07a; vm_compute; reflexivity)
                                  with "Hcg Hpc Hjcc").
-                       iIntros (CIDP3 HqP3). iNext. iIntros "Hcg Hpc".
+                       iIntros (CIDP3 HqP3). iApply bi.later_intro. iIntros "Hcg Hpc".
                        iEval (rewrite Htg07a) in "Hpc".
                        (* +0x84 c.mv a0,s4 *)
                        iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x84)) Ra0
@@ -3656,13 +3656,13 @@ Section ProofNamexMain.
                                  miu (K - 12)%nat b
                                  ltac:(rewrite Htj5cP; vm_compute; reflexivity)
                                  with "Hcg Hpc Hj80").
-                       iIntros (CIDP6 HqP6). iNext. iIntros "Hcg Hpc".
+                       iIntros (CIDP6 HqP6). iApply bi.later_intro. iIntros "Hcg Hpc".
                        iEval (rewrite Htj5cP) in "Hpc".
                        iSpecialize ("Htail" $! CIDP6 with "[%]");
                          [wp_next_chain |].
                        iApply ("Htail" $! miu ipv with "[%] [%] Hcg Hpc
                                  Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10
-                                 Hb11 Hb12 [-]").
+                                 Hb11 Hb12").
                        ** exact Hmiutr.
                        ** exact Z20.
                        ** iIntros (CIDf Hsf mf) "%Hcsf %Hfa0 Hcg Hpc".
@@ -4177,7 +4177,7 @@ Section ProofNamexMain.
                                      ltac:(rewrite Htg082; vm_compute;
                                            reflexivity)
                                      with "Hcg Hpc Hjda").
-                           iIntros (CIDG6 HqG6). iNext. iIntros "Hcg Hpc".
+                           iIntros (CIDG6 HqG6). iApply bi.later_intro. iIntros "Hcg Hpc".
                            iEval (rewrite Htg082) in "Hpc".
                            (* +0x8c c.mv a0,s4 *)
                            iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x8c))
@@ -4316,14 +4316,14 @@ Section ProofNamexMain.
                                      ltac:(rewrite Htj5cM; vm_compute;
                                            reflexivity)
                                      with "Hcg Hpc Hj8a").
-                           iIntros (CIDGa HqGa). iNext. iIntros "Hcg Hpc".
+                           iIntros (CIDGa HqGa). iApply bi.later_intro. iIntros "Hcg Hpc".
                            iEval (rewrite Htj5cM) in "Hpc".
                            iSpecialize ("Htail" $! CIDGa with "[%]");
                              [wp_next_chain |].
                            iApply ("Htail" $! GC4 (mword_of_int 0 : mword 64)
                                      with "[%] [%] Hcg Hpc
                                      Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9
-                                     Hb10 Hb11 Hb12 [-]").
+                                     Hb10 Hb11 Hb12").
                            -- exact HGC4tr.
                            -- exact HGC4s4.
                            -- iIntros (CIDf Hsf mf) "%Hcsf %Hfa0 Hcg Hpc".
@@ -4376,7 +4376,7 @@ Section ProofNamexMain.
                                     (K - 12)%nat (pfun o2 : mword 8) b
                                     (dqm := DfracOwn 1)
                                     ltac:(nz) ltac:(rdok)
-                                    with "Hcg Hpc Hjc8 [Hpb] [-]").
+                                    with "Hcg Hpc Hjc8 [Hpb]").
                           { iEval (rgne; rewrite HV4s1 addv_sext0).
                             iExact "Hpb". }
                           iIntros (CIDQ2 HqQ2) "Hcg Hpc Hpb".
@@ -4433,7 +4433,7 @@ Section ProofNamexMain.
                                     ltac:(rewrite Htg0ceb; vm_compute;
                                           reflexivity)
                                     with "Hcg Hpc Hjc4").
-                          iIntros (CIDQ1 HqQ1). iNext. iIntros "Hcg Hpc".
+                          iIntros (CIDQ1 HqQ1). iApply bi.later_intro. iIntros "Hcg Hpc".
                           iEval (rewrite Htg0ceb) in "Hpc".
                           iDestruct (cpu_own_transport CIDil CIDQ1 0%nat eb
                                        (proc_addr j) C b ltac:(rewrite Hb; wp_next_chain)
@@ -4451,7 +4451,7 @@ Section ProofNamexMain.
                                      exact (nx_tdir_ne _ Hty))
                                ltac:(rewrite Htg054; vm_compute; reflexivity)
                                with "Hcg Hpc Hjc0").
-                     iIntros (CIDN0 HqN0). iNext. iIntros "Hcg Hpc".
+                     iIntros (CIDN0 HqN0). iApply bi.later_intro. iIntros "Hcg Hpc".
                      iEval (rewrite Htg054) in "Hpc".
                      iPoseProof (nxi_054 with "Htext") as "Hj54".
                      iPoseProof (nxi_056 with "Htext") as "Hj56".
@@ -4572,7 +4572,7 @@ Section ProofNamexMain.
                      iApply ("Htail" $! ND3 (mword_of_int 0 : mword 64)
                                with "[%] [%] Hcg Hpc
                                Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11
-                               Hb12 [-]").
+                               Hb12").
                      * exact HND3tr.
                      * exact HND3s4.
                      * iIntros (CIDf Hsf mf) "%Hcsf %Hfa0 Hcg Hpc".
@@ -4607,7 +4607,7 @@ Section ProofNamexMain.
                                   exact (nx_bge13_le (e - a)%nat Hshort))
                             ltac:(rewrite Htg11c; vm_compute; reflexivity)
                             with "Hcg Hpc Hj94").
-                  iIntros (CIDE3 HqE3). iNext. iIntros "Hcg Hpc".
+                  iIntros (CIDE3 HqE3). iApply bi.later_intro. iIntros "Hcg Hpc".
                   iEval (rewrite Htg11c) in "Hpc".
                   iPoseProof (nxi_12c with "Htext") as "Hj11c".
                   iPoseProof (nxi_12e with "Htext") as "Hj11e".
@@ -4880,7 +4880,7 @@ Section ProofNamexMain.
                             S6 (K - 12)%nat b
                             ltac:(rewrite Htj0a4; vm_compute; reflexivity)
                             with "Hcg Hpc Hj12e").
-                  iIntros (CIDS8 HqS8). iNext. iIntros "Hcg Hpc".
+                  iIntros (CIDS8 HqS8). iApply bi.later_intro. iIntros "Hcg Hpc".
                   iEval (rewrite Htj0a4) in "Hpc".
                   iDestruct (cpu_own_transport CIDl CIDS8 0%nat eb
                                (proc_addr j) C b ltac:(rewrite Hb; wp_next_chain)
@@ -5142,7 +5142,7 @@ Section ProofNamexMain.
     iEval (rewrite pa_add_0) in "Hp0".
     iApply (wp_lbu_s_sconf (mword_of_int (NX + 0x22)) Ra4 Ra0
               (mword_of_int 0 : mword 12) R5 (K - 12)%nat (pfun 0%nat) b (dqm:=DfracOwn 1)
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi022 [Hp0] [-]").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi022 [Hp0]").
     { iEval (rgne; rewrite HR5a0 addv_sext0). iExact "Hp0". }
     iIntros (CID18 Hq18) "Hcg Hpc Hp0".
     iEval (rgne; rewrite HR5a0 addv_sext0) in "Hp0".
@@ -5224,7 +5224,7 @@ Section ProofNamexMain.
                 ltac:(rgne; rgne; rewrite HR7a4 HR7a5; exact (nx_slash_eq _ Hsl0))
                 ltac:(rewrite Htgt048; vm_compute; reflexivity)
                 with "Hcg Hpc Hi02a").
-      iIntros (CID20 Hq20). iNext. iIntros "Hcg Hpc".
+      iIntros (CID20 Hq20). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt048) in "Hpc".
       (* +0x48 c.li a1,1 *)
       iApply (wp_cli_s_sconf (mword_of_int (NX + 0x48)) Ra1 (mword_of_int 1 : mword 6)
@@ -5310,7 +5310,7 @@ Section ProofNamexMain.
                 A4 (K - 12)%nat b
                 ltac:(rewrite Htgt03c; vm_compute; reflexivity)
                 with "Hcg Hpc Hi052").
-      iIntros (CIDA2 HqA2). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDA2 HqA2). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt03c) in "Hpc".
       (* ---- the register facts iget's [callee_saved] carries over ---- *)
       assert (HA4sp : A4 !!! Regidx csp_rs1 = pa_stk sp0 12).
@@ -5429,7 +5429,7 @@ Section ProofNamexMain.
                 A8 (K - 12)%nat b
                 ltac:(rewrite HtgtA0e4; vm_compute; reflexivity)
                 with "Hcg Hpc Hi046").
-      iIntros (CIDK5 HqK5). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDK5 HqK5). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite HtgtA0e4) in "Hpc".
       (* ---- ENTER THE WALK at off = 0, es0 = [], ncur = n ---- *)
       iDestruct (cpu_own_transport CIDig CIDK5 0%nat eb (proc_addr j) C b
@@ -5494,7 +5494,7 @@ Section ProofNamexMain.
       (* +0x32 ld a0,336(a0) : a0 := p->cwd *)
       iApply (wp_ld_s_sconf (mword_of_int (NX + 0x32)) Ra0 Ra0
                 (mword_of_int 336 : mword 12) mf1 (K - 12)%nat cwdv b (dqm := dqc)
-                ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi032 [Hcwdc] [-]").
+                ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi032 [Hcwdc]").
       { iEval (rgne; rewrite Hmpa0 p_cwd_sext). iExact "Hcwdc". }
       iIntros (CID22 Hq22) "Hcg Hpc Hcwdc".
       iEval (rgne; rewrite Hmpa0 p_cwd_sext) in "Hcwdc".
@@ -5682,7 +5682,7 @@ Section ProofNamexMain.
                 B8 (K - 12)%nat b
                 ltac:(rewrite HtgtB0e4; vm_compute; reflexivity)
                 with "Hcg Hpc Hi046").
-      iIntros (CIDB5 HqB5). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDB5 HqB5). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite HtgtB0e4) in "Hpc".
       (* ---- ENTER THE WALK at off = 0, es0 = [], ncur = n ---- *)
       iDestruct (cpu_own_transport CIDid CIDB5 0%nat eb (proc_addr j) C b

@@ -387,7 +387,7 @@ Section ProofFilecloseParts.
     iApply (wp_cldsp_s_sconf (mword_of_int (FC + 0x8e)) (mword_of_int 7 : mword 6) Rra
               Mt (K - 8)%nat ra0 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi8e Hb1 [-]").
+              with "Hcg Hpc Hi8e Hb1").
     iIntros (CID1 Hs1) "Hcg Hpc Hb1". iEval (rewrite Hpa1) in "Hb1".
     set (T1 := <[Regidx Rra := regval_into_reg ra0]> Mt).
     assert (HT1sp : T1 !!! Regidx csp_rs1 = pa_stk sp0 8)
@@ -403,7 +403,7 @@ Section ProofFilecloseParts.
     iApply (wp_cldsp_s_sconf (mword_of_int (FC + 0x90)) (mword_of_int 6 : mword 6) Rs0
               T1 (K - 8)%nat s00 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi90 Hb2 [-]").
+              with "Hcg Hpc Hi90 Hb2").
     iIntros (CID2 Hs2) "Hcg Hpc Hb2". iEval (rewrite Hpa2) in "Hb2".
     set (T2 := <[Regidx Rs0 := regval_into_reg s00]> T1).
     assert (HT2sp : T2 !!! Regidx csp_rs1 = pa_stk sp0 8)
@@ -419,7 +419,7 @@ Section ProofFilecloseParts.
     iApply (wp_cldsp_s_sconf (mword_of_int (FC + 0x92)) (mword_of_int 5 : mword 6) Rs1
               T2 (K - 8)%nat s10 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi92 Hb3 [-]").
+              with "Hcg Hpc Hi92 Hb3").
     iIntros (CID3 Hs3) "Hcg Hpc Hb3". iEval (rewrite Hpa3) in "Hb3".
     set (T3 := <[Regidx Rs1 := regval_into_reg s10]> T2).
     assert (HT3sp : T3 !!! Regidx csp_rs1 = pa_stk sp0 8)
@@ -448,7 +448,7 @@ Section ProofFilecloseParts.
       done. }
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (FC + 0x94)) (mword_of_int 4 : mword 6)
-              T3 (K - 8)%nat 8 b Hpop with "Hcg Hpc Hi94 Hframe [-]").
+              T3 (K - 8)%nat 8 b Hpop with "Hcg Hpc Hi94 Hframe").
     iIntros (CID4 Hs4) "Hcg Hpc".
     assert (Hnk : ((K - 8) + 8)%nat = K) by exact (fc_frame_back K HK).
     iEval (rewrite Hnk) in "Hcg".
@@ -468,7 +468,7 @@ Section ProofFilecloseParts.
       rewrite /T2 upd_ne; [| vm_compute; discriminate].
       rewrite /T1; apply upd_eq. }
     iApply (wp_cret_s_sconf (mword_of_int (FC + 0x96)) Rra T4 K b
-              ltac:(vm_compute; discriminate) with "Hcg Hpc Hi96 [-]").
+              ltac:(vm_compute; discriminate) with "Hcg Hpc Hi96").
     iIntros (CID5 Hs5) "Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite HT4ra) in "Hpc".
@@ -563,7 +563,7 @@ Section ProofFilecloseParts.
     iEval (rewrite -Hpa4) in "Hb4".
     iApply (wp_cldsp_s_sconf (mword_of_int za) (mword_of_int 4 : mword 6) Rs2
               Mt K v2 b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hia Hb4 [-]").
+              with "Hcg Hpc Hia Hb4").
     iIntros (CID1 Hs1) "Hcg Hpc Hb4". iEval (rewrite Hpa4) in "Hb4".
     set (U1 := <[Regidx Rs2 := regval_into_reg v2]> Mt).
     assert (HU1sp : U1 !!! Regidx csp_rs1 = pa_stk sp0 8)
@@ -576,7 +576,7 @@ Section ProofFilecloseParts.
     iEval (rewrite -Hpa5) in "Hb5".
     iApply (wp_cldsp_s_sconf (mword_of_int zb) (mword_of_int 3 : mword 6) Rs3
               U1 K v3 b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hib Hb5 [-]").
+              with "Hcg Hpc Hib Hb5").
     iIntros (CID2 Hs2) "Hcg Hpc Hb5". iEval (rewrite Hpa5) in "Hb5".
     set (U2 := <[Regidx Rs3 := regval_into_reg v3]> U1).
     assert (HU2sp : U2 !!! Regidx csp_rs1 = pa_stk sp0 8)
@@ -589,7 +589,7 @@ Section ProofFilecloseParts.
     iEval (rewrite -Hpa6) in "Hb6".
     iApply (wp_cldsp_s_sconf (mword_of_int zc) (mword_of_int 2 : mword 6) Rs4
               U2 K v4 b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hic Hb6 [-]").
+              with "Hcg Hpc Hic Hb6").
     iIntros (CID3 Hs3) "Hcg Hpc Hb6". iEval (rewrite Hpa6) in "Hb6".
     set (U3 := <[Regidx Rs4 := regval_into_reg v4]> U2).
     assert (HU3sp : U3 !!! Regidx csp_rs1 = pa_stk sp0 8)
@@ -602,7 +602,7 @@ Section ProofFilecloseParts.
     iEval (rewrite -Hpa7) in "Hb7".
     iApply (wp_cldsp_s_sconf (mword_of_int zd) (mword_of_int 1 : mword 6) Rs5
               U3 K v5 b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hid Hb7 [-]").
+              with "Hcg Hpc Hid Hb7").
     iIntros (CID4 Hs4) "Hcg Hpc Hb7". iEval (rewrite Hpa7) in "Hb7".
     set (U4 := <[Regidx Rs5 := regval_into_reg v5]> U3).
     iEval (rewrite Hde) in "Hpc".
@@ -612,7 +612,7 @@ Section ProofFilecloseParts.
        come back. *)
     iApply (wp_cj_s_sconf (mword_of_int ze) jimm U4 K b
               ltac:(rewrite Hjt; vm_compute; reflexivity)
-              with "Hcg Hpc Hie [-]").
+              with "Hcg Hpc Hie").
     iIntros (CID5 Hs5). iNext. iIntros "Hcg Hpc".
     iEval (rewrite Hjt) in "Hpc".
     iSpecialize ("Hcont" $! CID5 with "[]"); [iPureIntro; wp_next_chain|].
