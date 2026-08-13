@@ -456,6 +456,102 @@ Section KexecB2Res.
     iSplitL "I"; [iExact "I" | iExact "J"].
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (*  THE [ph] BUFFER AND THE [off] CELL, out of the frame's middle       *)
+  (*  [stack_own] and back.                                               *)
+  (*                                                                      *)
+  (*  [kxc_frameB]'s [stack_own (pa_stk sp0 54) 9] is slots 55..63: the    *)
+  (*  56-byte [struct proghdr] (slots 55..61, base slot 61), the unused    *)
+  (*  word at slot 62, and [off] at slot 63.  The phdr loop writes [off]   *)
+  (*  at +0x12c and reads five fields out of [ph] after the readi, so it   *)
+  (*  needs all three separately -- and it hands them back before the      *)
+  (*  back edge, because [kxc_at_12c] carries the chunk whole.             *)
+  (* ------------------------------------------------------------------ *)
+  Lemma kxc_ph_slots_of_stack (sp0 : mword 64) :
+    stack_own (pa_stk sp0 54) 9 ⊢
+    ([∗ list] i ∈ seq 0 7,
+       ∃ w : mword 64, word_pointsto (pa_stk sp0 (61 - i)) (DfracOwn 1) w) ∗
+    (∃ w : mword 64, word_pointsto (pa_stk sp0 62) (DfracOwn 1) w) ∗
+    (∃ w : mword 64, word_pointsto (pa_stk sp0 63) (DfracOwn 1) w).
+  Proof.
+    rewrite (kxc_slots_asc sp0 9 54). cbn [seq big_opL].
+    iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & _)".
+    cbn [Nat.add Nat.sub].
+    iSplitR "H8 H9"; [| iSplitL "H8"; [iExact "H8" | iExact "H9"]].
+    iFrame "H7 H6 H5 H4 H3 H2 H1".
+  Qed.
+
+  Lemma kxc_stack_of_ph_slots (sp0 : mword 64) (w62 w63 : mword 64) :
+    ([∗ list] i ∈ seq 0 7,
+       ∃ w : mword 64, word_pointsto (pa_stk sp0 (61 - i)) (DfracOwn 1) w) -∗
+    word_pointsto (pa_stk sp0 62) (DfracOwn 1) w62 -∗
+    word_pointsto (pa_stk sp0 63) (DfracOwn 1) w63 -∗
+    stack_own (pa_stk sp0 54) 9.
+  Proof.
+    iIntros "H A B".
+    rewrite (kxc_slots_asc sp0 9 54). cbn [seq big_opL Nat.add Nat.sub].
+    iDestruct "H" as "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & _)".
+    iFrame "H7 H6 H5 H4 H3 H2 H1". iSplitL "A"; [by iExists w62 |].
+    iSplitL "B"; [by iExists w63 | done].
+  Qed.
+
+  (* ...and the byte view of the seven, with the per-slot alignment kept as
+     a PURE side product -- a byte run does not carry alignment and
+     [bytes_own_slotsn] demands it back.  [kxc_elf_take]'s twin. *)
+  Lemma kxc_ph_take (sp0 : mword 64) :
+    ([∗ list] i ∈ seq 0 7,
+       ∃ w : mword 64, word_pointsto (pa_stk sp0 (61 - i)) (DfracOwn 1) w) ⊢
+    ⌜forall i, (i < 7)%nat ->
+       is_aligned_paddr (Physaddr (pa_stk sp0 (61 - i))) 8 = true⌝ ∗
+    ∃ f : nat -> bv 8,
+      [∗ list] j ∈ seq 0 56, pa_add (pa_stk sp0 61) j ↦ₘ f j.
+  Proof.
+    iIntros "H".
+    iDestruct (kxc_slots_ph sp0 with "H") as "[%Hal Hb]".
+    iSplitR; [iPureIntro; exact Hal |].
+    iApply (bb_any_named (pa_stk sp0 61) 56). rewrite /bytes_own /byte_any.
+    iExact "Hb".
+  Qed.
+
+  Lemma kxc_ph_give (sp0 : mword 64) (h : nat -> bv 8) :
+    (forall i, (i < 7)%nat ->
+       is_aligned_paddr (Physaddr (pa_stk sp0 (61 - i))) 8 = true) ->
+    ([∗ list] j ∈ seq 0 56, pa_add (pa_stk sp0 61) j ↦ₘ h j) ⊢
+    [∗ list] i ∈ seq 0 7,
+      ∃ w : mword 64, word_pointsto (pa_stk sp0 (61 - i)) (DfracOwn 1) w.
+  Proof.
+    intro Hal. iIntros "Hh".
+    iApply (kxc_bytes_ph sp0 Hal). rewrite /bytes_own.
+    iApply (bb_named_any with "Hh").
+  Qed.
+
+  (* An 8-byte READ window into a named run -- [ProofKexecSeam.kxc_win2] and
+     [kxc_win4] at the width the three [ld]s of ph.vaddr / ph.filesz /
+     ph.memsz use. *)
+  Lemma kxc_win8 (a : mword 64) (f : nat -> bv 8) (o r n : nat) :
+    (o + 8 + r)%nat = n ->
+    is_aligned_paddr (Physaddr (pa_add a o)) 8 = true ->
+    ([∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ f j) ⊢
+    (pa_add a o ↦₈ (Z_to_bv 64 (le_at f o 8) : mword 64)) ∗
+    ((pa_add a o ↦₈ (Z_to_bv 64 (le_at f o 8) : mword 64)) -∗
+       [∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ f j).
+  Proof.
+    intros Hn Hal.
+    rewrite (bb_split3 a o 8 r n f Hn).
+    iIntros "(Hpre & Hmid & Hsuf)".
+    iSplitL "Hmid".
+    { iApply (word_pointsto_intro _ _ _ Hal).
+      iApply (big_sepL_mono with "Hmid"). intros ii jj Hj.
+      apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
+      rewrite (le_at_nth_byte 64 f o 8 ii ltac:(lia) Hlt). reflexivity. }
+    iIntros "Hw".
+    iDestruct (word_pointsto_bytes with "Hw") as "Hw".
+    iSplitL "Hpre"; [iExact "Hpre" |]. iSplitR "Hsuf"; [| iExact "Hsuf"].
+    iApply (big_sepL_mono with "Hw"). intros ii jj Hj.
+    apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
+    rewrite (le_at_nth_byte 64 f o 8 ii ltac:(lia) Hlt). reflexivity.
+  Qed.
+
 End KexecB2Res.
 
 (* ===================================================================== *)
