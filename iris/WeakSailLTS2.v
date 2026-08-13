@@ -37,16 +37,26 @@
 
     (1') [fused_blk] — the exclusive-window seam (§2), the exact twin of
         [dev_ok_blk] and introduced for the same reason.  [WeakSailLTS]
-        delta (e) gives an [ak_latest] read a BARE arm beside the fused one
-        (hardware runs a bare [lr], a failing [sc] and a faulting AMO; the
-        LTS was stuck at all of them).  A bare step is a plain [LLoad] and
-        has NO image in [wrun], so the ⇐ direction excludes blocks that used
-        it: "every step of the block that reaches [c'] is fused", where fused
-        means "a step from an exclusive-read node APPENDS a message".
+        deltas (e)/(e'') give the two HALF-WINDOWS an arm of their own
+        (hardware runs a bare [lr], a failing [sc] and a faulting AMO, and it
+        runs a STANDALONE [sc] whose reservation is a different instruction's;
+        the LTS was stuck at all of them).  Neither has an image in [wrun]:
+        a bare exclusive read steps as a plain [LLoad], which an interpreter
+        exclusive read is not; and a standalone conditional write steps as a
+        plain [LStore], which [wrun] does accept structurally (its write arm
+        never inspects [ak_latest]) but stamps with the message class
+        [WCexcl] where the pf step carries [lbl_class], i.e. [WCrel]/
+        [WCplain].  So the ⇐ direction excludes blocks that used either:
+        "every exclusive access of the block is part of a FUSED rmw" — a step
+        from an exclusive-read node APPENDS a message (the fused arm is an
+        [LRmw], the bare one an [LLoad]), and no step is taken from a
+        conditional-write node at all (the fused arm consumes that node
+        INSIDE its bracket, so a pf configuration never sits there).
         Target-indexed like [dev_ok_blk], for the same no-threading reason,
         and — like it — a fact about the block's own run, not a ∀-path
         property of the monad.  Per-image discharge: kernel AMOs target
-        mapped lock words and do not fault.
+        mapped lock words and do not fault, and the kernel uses [amoswap],
+        not [sc].
 
     (2) [sail_block_wrun] — the ⇐ bracket (§8).  A COMPLETED block of agent
         [i] (from [sp_m = None], through the events of [next tick], back to
@@ -196,7 +206,7 @@ Proof.
                       |(_ & _ & _ & _ & w & _ & y & rs1 & _ & ->)]; done.
       * by destruct H as (_ & _ & _ & _ & _ & w & m1 & m2 & rs1 & _ & _ & _ & ->).
   - (* MemWrite *)
-    destruct (dev_addr _); [by intros [_ ->]|]. by intros (_ & _ & _ & ->).
+    destruct (dev_addr _); [by intros [_ ->]|]. by intros (_ & _ & ->).
   - (* Choose *)
     by intros [_ [c ->]].
 Qed.
@@ -369,24 +379,32 @@ Definition dev_ok_blk (next : bool → M unit) (i : agent)
     the BARE one (one [LLoad], the window abandoned).  Only the fused one has
     an image in [wrun]: the interpreter's exclusive read is not a plain load,
     and its [wbyte_ok] at [ak_latest] is strictly stronger than the [read_ok]
-    a [PFLoad] carries.  So the ⇐ direction must know the block took no bare
-    arm — and, exactly as for the device seam, that is a fact about the
-    block's ACTUAL RUN, not a ∀-path property of the monad (which value a
-    window is abandoned at depends on what was read).
+    a [PFLoad] carries.  Delta (e'') adds the MIRROR arm on the write side: a
+    STANDALONE conditional write (a lone [sc]) steps as a plain [LStore],
+    which [wrun] does take — its write arm never inspects [ak_latest] — but
+    stamps with [WCexcl] ([WeakInterp.wm_class_of]) where the pf step carries
+    [lbl_class], i.e. [WCrel]/[WCplain].  So the ⇐ direction must know the
+    block took NEITHER half-window arm — and, exactly as for the device seam,
+    that is a fact about the block's ACTUAL RUN, not a ∀-path property of the
+    monad (which value a window is abandoned at depends on what was read).
 
-    [at_excl_read i c] is "agent [i] is AT an exclusive RAM read" (with no
-    parked fence, so the step really is the read's); a step from such a
-    configuration is fused exactly when it APPENDS a message — the fused arm
-    is an [LRmw], the bare one an [LLoad], and nothing else can fire there.
-    That is [pf_solo_f], and it needs no label to state.
+    [at_excl_read i c] is "agent [i] is AT an exclusive RAM read" and
+    [at_con_write i c] is "agent [i] is AT a conditional RAM write" (both
+    with no parked fence, so the step really is the access's).  A step from
+    an exclusive read is fused exactly when it APPENDS a message — the fused
+    arm is an [LRmw], the bare one an [LLoad], and nothing else can fire
+    there — and a conditional-write configuration may not be reached at all:
+    the fused arm consumes the write node INSIDE its bracket, so the only way
+    a pf configuration sits at one is the standalone arm.  Together that is
+    [pf_solo_f], and it needs no label to state.
 
     THE INDEXING IS BY THE BLOCK'S TARGET [c'], for the reason recorded at
     [dev_ok_blk]: every peel hands back an [rtc] to the SAME [c'], so
     [fused_blk next i c'] is a constant of the mutual induction below.  It is
     also deliberately NOT a conjunct of [pf_solo]: [WeakSailComplete]'s
     reader-tail completion constructs [pf_solo] steps over an arbitrary
-    residual and takes the bare arm where the window is abandoned, so it
-    could not discharge one. *)
+    residual and takes the bare arms where the window is abandoned or never
+    opened, so it could not discharge one. *)
 Definition excl_read_node (m : option (M unit)) : Prop :=
   match m with
   | Some (Interface.Next oc _) =>
@@ -403,9 +421,30 @@ Definition at_excl_read (i : agent) (c : wpcfg psail) : Prop :=
   ∃ ag, pc_ags c !! i = Some ag ∧ sp_fence (pa_st ag) = None ∧
         excl_read_node (sp_m (pa_st ag)).
 
+(** …and the mirror node ([WeakSailLTS] delta (e'')): a CONDITIONAL RAM
+    write.  A pf configuration can only sit at one when the write is
+    STANDALONE — inside a fused window the write node is consumed by the
+    read's [LRmw] bracket and is never an agent state. *)
+Definition con_write_node (m : option (M unit)) : Prop :=
+  match m with
+  | Some (Interface.Next oc _) =>
+      match oc with
+      | Interface.MemWrite n req =>
+          dev_addr (Interface.WriteReq.pa req) = false ∧
+          ak_latest (classify (Interface.WriteReq.access_kind req)) = true
+      | _ => False
+      end
+  | _ => False
+  end.
+
+Definition at_con_write (i : agent) (c : wpcfg psail) : Prop :=
+  ∃ ag, pc_ags c !! i = Some ag ∧ sp_fence (pa_st ag) = None ∧
+        con_write_node (sp_m (pa_st ag)).
+
 Definition pf_solo_f (next : bool → M unit) (i : agent)
     (c c' : wpcfg psail) : Prop :=
-  pf_solo next i c c' ∧ (at_excl_read i c → pc_log c' ≠ pc_log c).
+  pf_solo next i c c' ∧ (at_excl_read i c → pc_log c' ≠ pc_log c) ∧
+  ¬ at_con_write i c.
 
 Lemma pf_solo_f_solo next i c c' : pf_solo_f next i c c' → pf_solo next i c c'.
 Proof. by intros [H _]. Qed.
@@ -842,7 +881,7 @@ Section unbracket.
             destruct Hst as [(Hlat & -> & -> & Hlents & w & Hw & ->)
                             |(Hlat & -> & -> & Hlents & w & Hw & y & rs1 & Hsil & ->)];
               [|exfalso;
-                exact (proj2 (Hfus _ _ Hsolo Hrtc1)
+                exact (proj1 (proj2 (Hfus _ _ Hsolo Hrtc1))
                          (ex_intro _ _ (conj Hlk (conj eq_refl (conj Hd Hlat))))
                          eq_refl)].
             rewrite Hlat in Hsh.
@@ -899,9 +938,18 @@ Section unbracket.
             as (xx & ss & Hrun & Heq).
           rewrite list_insert_insert in Heq.
           exists xx, ss. split; [exact Hrun|exact Heq].
-        * destruct Hn as (Hn0 & Hnlat).
-          destruct (block_peel next i (WPCfg (wimg s) (wm_log s) ags) c' _
+        * destruct (block_peel next i (WPCfg (wimg s) (wm_log s) ags) c' _
                       Hlk ltac:(done) Hrtc Hbd) as (c1 & Hsolo & Hrtc1).
+          (* THE STANDALONE CONDITIONAL WRITE (delta (e'')) is what
+             [fused_blk]'s [at_con_write] conjunct excludes: [wrun] would
+             stamp the message [WCexcl], the pf step stamps [lbl_class]. *)
+          have Hnlat : ak_latest (classify (Interface.WriteReq.access_kind req))
+                       = false.
+          { destruct (ak_latest (classify (Interface.WriteReq.access_kind req)))
+              eqn:Hlat; [|done].
+            exfalso. apply (proj2 (proj2 (Hfus _ _ Hsolo Hrtc1))).
+            eexists. split_and!;
+              [exact Hlk|reflexivity|by simpl; rewrite Hd Hlat]. }
           destruct (pf_solo_inv next i _ _ Hsolo) as (ag & Hag & Hcase).
           simpl in Hag. rewrite Hlk in Hag. injection Hag as <-.
           cbn [pc_img pc_log pc_ags] in Hcase.
@@ -913,7 +961,7 @@ Section unbracket.
             |(pr & pw & sr & sw & st' & Hst & _)]]]];
             rewrite /sail_step_ni /sail_mstep /= Hd in Hst;
             try (by destruct Hst as (Hx & _)).
-          destruct Hst as (Hl & _ & _ & ->). injection Hl as -> -> ->.
+          destruct Hst as (Hl & _ & ->). injection Hl as -> -> ->.
           have Hcls : lbl_class (WeakPromise.LStore
                         (ak_sync (classify (Interface.WriteReq.access_kind req)))
                         (pa_z (Interface.WriteReq.pa req))

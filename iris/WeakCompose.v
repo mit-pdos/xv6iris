@@ -716,12 +716,15 @@ Qed.
         the LTS-level statement outright — the arm is spelled stuck).
       - NO ZERO-WIDTH RAM WRITE: an [n = 0] append would grow the log with an
         empty message no label can mirror.
-      - AMO PAIRING: every exclusive [MemRead]'s continuation reaches, through
-        register/trace/choice code only, a conditional [MemWrite] to the same
-        address and width, and no conditional write occurs anywhere else.  This
+      - AMO PAIRING: every exclusive [MemRead] OPENS A WINDOW — its
+        continuation crosses, through register/trace/choice code only, either
+        to a conditional [MemWrite] to the same address and width (the window
+        CLOSES) or to the end of the instruction (it is ABANDONED).  The first
         is what lets [sail_step] BRACKET an AMO into one fused [LRmw] label
         (D-M6-5), which is the fix point [WeakInterpProj]'s header (4)
-        explicitly deferred to W5.
+        explicitly deferred to W5; the second is stage C2's (O2) fix.  A
+        conditional write OUTSIDE any window — a standalone [sc] — is
+        admitted since stage C4 and steps as a plain [LStore] ((O4) below).
     WHY DECLARED: discharging them means a syntactic analysis of the rv64d
     decoder's ~thousands of generated branches.
 
@@ -732,33 +735,36 @@ Qed.
     escape index) and the generated [WeakShapeGen*.v] sweep
     ([tools/gen_shape.py], [make gen-shape]) machine-check [gwalk None] —
     i.e. [sail_shaped] — for 294 of the 341 monadic definitions reachable
-    from [rv64d.try_step].  What stops the seam from closing is not the
-    volume of branches but TWO FACTS ABOUT THE MODEL:
+    from [rv64d.try_step].  What stopped the seam from closing was not the
+    volume of branches but TWO FACTS ABOUT THE MODEL — the first of which
+    stage C4 answered by changing the specification, the second of which is
+    an irreducible assumption:
 
-      (O4) [∀ b, sail_shaped (riscv_step b)] is FALSE.  A STANDALONE
-           STORE-CONDITIONAL ([rv64d.execute_STORECON]) issues a
-           [Write_RISCV_conditional] RAM write — [ak_latest = true] — with
-           NO exclusive [MemRead] in the same instruction, because the lr/sc
-           reservation lives in the model's pure axioms and the matching [lr]
-           is a different [riscv_step].  The AMO-PAIRING conjunct above
-           forbids exactly that.  Machine-checked at the site:
-           [WeakShapeOverrides.sail_shaped_write_ram_con_False].  This is the
-           mirror of stage C1's (O2) (an exclusive read with no conditional
-           write), which C2 fixed by weakening [amo_tail]'s [Interface.Ret]
-           arm and adding [sail_mstep]'s bare exclusive-read arm; the write
-           side needs the symmetric treatment — a BARE CONDITIONAL-WRITE arm
-           in [sail_mstep] (the write steps as a plain [LStore]; the machine
-           only gains behaviors) and the [ak_latest = false] conjunct
-           dropped, with a target-indexed run-local side condition joining
-           [dev_ok_blk]/[fused_blk].
+      (O4) [∀ b, sail_shaped (riscv_step b)] was FALSE, and STAGE C4 FIXED
+           THE SPECIFICATION.  A STANDALONE STORE-CONDITIONAL
+           ([rv64d.execute_STORECON]) issues a [Write_RISCV_conditional] RAM
+           write — [ak_latest = true] — with NO exclusive [MemRead] in the
+           same instruction, because the lr/sc reservation lives in the
+           model's pure axioms and the matching [lr] is a different
+           [riscv_step]; the old AMO-PAIRING conjunct forbade exactly that.
+           It is the mirror of stage C1's (O2) (an exclusive read with no
+           conditional write), which C2 fixed by weakening [amo_tail]'s
+           [Interface.Ret] arm and adding [sail_mstep]'s bare exclusive-read
+           arm, and C4 took the symmetric treatment: the window-closed
+           [MemWrite] arms of [sail_shaped] and [sail_mstep] lost their
+           [ak_latest = false] conjunct, so a standalone conditional write is
+           shaped and steps as a plain [LStore] (the machine only gains
+           behaviors).  The ⇐ cost went into the existing [fused_blk], whose
+           [pf_solo_f] now also forbids stepping from a conditional-write
+           node — no new premise.
       (O5) Three of [rv64d]'s [Axiom]s are MONADIC ([load_reservation],
            [cancel_reservation], [plat_term_write]) and all three are
            reachable from [try_step], so no shape fact about them is provable
            at all.  The seam's residue after (O4) is therefore three POINT
            premises about those axioms, not a [∀ b] premise.
 
-    UPGRADE PATH: (O4)'s LTS fix first (it is a specification change, of the
-    same size as C2's), then the 47-function residue of the sweep — the
+    UPGRADE PATH: (O4)'s LTS fix LANDED in stage C4; what remains is the
+    47-function residue of the sweep — the
     misaligned-split loop, [0 < split_width], and the exclusive window
     carried from [checked_mem_read] to [checked_mem_write] through
     [catch_early_return]/[liftR]/[untilMT], which is what

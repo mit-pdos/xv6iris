@@ -1,19 +1,23 @@
-(** * WeakShapeTop.v — what stage C3 can and cannot assemble
+(** * WeakShapeTop.v — the top of the shape tower, and what is still owed
 
     The plan for this file was
         [Theorem riscv_step_shaped : ∀ b, sail_shaped (riscv_step b)]
         [Theorem riscv_step_live   : ∀ b, sail_live   (riscv_step b)]
     at the top of the generated tower ([WeakShapeGen01..07.v]), closing
     [WeakCompose] §6's seam (6) and deleting both premises from
-    [WeakComposeLang.xv6_weak_robust_lifted]/[_adequate].  NEITHER IS
-    PROVABLE, and this file records the two reasons in the form the next
-    stage needs them: a REFUTATION (§1, machine-checked in
-    [WeakShapeOverrides] §5) and a RECORD OF ASSUMPTIONS (§2, a [Record]
-    rather than [Axiom]s, so that nothing here enters
-    [Print Assumptions]).
+    [WeakComposeLang.xv6_weak_robust_lifted]/[_adequate].  Stage C3 found
+    both FALSE/blocked for two reasons; stage C4 fixed the first by changing
+    the specification (§1) and the second is irreducible (§2).  What this
+    file therefore holds is: the history of (O4) as the shape of a recurring
+    finding (§1), the RECORD OF ASSUMPTIONS about the model's own monadic
+    axioms (§2 — a [Record], not [Axiom]s, so that nothing here enters
+    [Print Assumptions]), the sweep's coverage (§3), and §4, the
+    [riscv_step] wrapper reduced to the tower's remaining obligations —
+    which is exactly the list stage C5 owes.
 
     ------------------------------------------------------------------------
-    §1  (O4) — [∀ b, sail_shaped (riscv_step b)] IS FALSE.
+    §1  (O4) — WAS THE REFUTATION; FIXED IN STAGE C4 BY A SPECIFICATION
+        CHANGE, so this section is now history plus the shape of the fix.
 
     [rv64d.execute_STORECON] (an [sc.w]/[sc.d]) issues
 
@@ -28,19 +32,24 @@
     true] — and NO exclusive [MemRead] occurs anywhere in that instruction:
     the lr/sc reservation lives in the model's PURE axioms
     ([load_reservation]/[match_reservation]/[valid_reservation]), not in a
-    memory event, and the matching [lr] is a different [riscv_step].
-    [sail_shaped]'s window-closed [MemWrite] arm demands
-    [ak_latest (classify …) = false] off device addresses, so it is false at
-    every [sc] to normal memory.  Machine-checked at the leaf:
-    [WeakShapeOverrides.gwalk_write_ram_con_False] and
-    [WeakShapeOverrides.sail_shaped_write_ram_con_False].
+    memory event, and the matching [lr] is a different [riscv_step].  Through
+    stage C3 [sail_shaped]'s window-closed [MemWrite] arm demanded
+    [ak_latest (classify …) = false] off device addresses, so the fact was
+    false at every [sc] to normal memory.
 
-    This is the MIRROR of stage C1's (O2) — which found the read side (an
-    exclusive read with no conditional write) and which C2 fixed by
-    weakening [amo_tail]'s [Interface.Ret] arm and adding [sail_mstep]'s
-    BARE EXCLUSIVE-READ arm.  The write side needs the symmetric fix, and it
-    is a specification change of the same size, not a sweep change; the
-    ordered plan is in [claude-notes/projects/weak-memory-premises.md].
+    STAGE C4 TOOK THE MIRROR OF C2's (O2) FIX ([WeakSailLTS] delta (e'')):
+    the window-closed [MemWrite] arms of [sail_shaped], [sail_mstep] and the
+    kit's [gwalk]/[gwalkx] accept ANY RAM write of nonzero width, so a
+    standalone conditional write is shaped and steps as a plain
+    [WeakPromise.LStore] — one step, no bracket, since there is no open
+    window to abandon.  The two refutations that stood in
+    [WeakShapeOverrides] §5 are false now and are replaced by the positive
+    leaves [WeakShape.gwalk_write_ram_con] /
+    [WeakShapeOverrides.gwalkx_write_ram_con].  The ⇐ cost went into the
+    predicate that already pays for (O2): [WeakSailLTS2.pf_solo_f] also
+    forbids stepping from a conditional-write node, so [fused_blk] reads
+    "every exclusive access of the block is part of a fused rmw" — no new
+    premise anywhere.
 
     ------------------------------------------------------------------------
     §2  (O5) — three of [rv64d]'s [Axiom]s are MONADIC.
@@ -81,7 +90,45 @@
 
     Even capped, that is what turns seam (6) from an estimate ("a syntactic
     analysis of thousands of generated branches") into a bounded, named list
-    of remaining obligations. *)
+    of remaining obligations.
+
+    ------------------------------------------------------------------------
+    §4  [riscv_step_shaped_cone]: THE WRAPPER, AND EXACTLY WHAT IS LEFT.
+
+    [RiscvLang.riscv_step tick = try_step 0 false >>= λ _, if tick then
+    tick_clock tt else returnm tt], so the [∀ b] premise reduces to
+    [gwalk None] of TWO model functions — and those two are precisely where
+    the residue starts.  §4 proves that reduction; the two hypotheses are the
+    honest statement of what stage C5 owes, and neither is a ∀-path premise
+    about anything but the model's own code.
+
+    WHY THEY ARE NOT DISCHARGED HERE, in the order a C5 must attack them:
+
+      (a) THE GENERATED TOWER IS CAPPED AT 96 OF 294 (§3), and every function
+          between [try_step] and the memory leaves calls into the capped part
+          ([try_step] alone needs [should_inc_minstret], [run_hart_waiting],
+          [handle_interrupt], [handle_exception], [exception_handler],
+          [set_next_pc]).  So no bridge lemma above the memory cone can be
+          stated, let alone proved, before the remaining ~198 generated
+          lemmas exist.  That is a serial multi-hour [coqc] chain, not a
+          difficulty.
+      (b) THE 47-FUNCTION RESIDUE then needs hand proofs, and three of its
+          obligations are SEMANTIC rather than syntactic: [0 < split_width]
+          in [checked_mem_write] (the nonzero-width conjunct — [split_width]
+          comes from [split_misaligned], which returns [width] itself on the
+          unsplit path, so it is the Sail precondition [0 < width ≤ 4096]
+          travelling down); the fuel recursion [_rec_pt_walk]; and the
+          EXCLUSIVE WINDOW carried from [checked_mem_read]'s [read_ram] to
+          [checked_mem_write]'s [write_ram] through
+          [catch_early_return]/[liftR]/[untilMT], which is what
+          [WeakShapeOverrides] §3's escape index ([gwalkx]/[gsilent]) was
+          built to compose.  Stage C4's (O4) fix removed one obligation from
+          this list outright: a standalone conditional write no longer needs
+          a window at all.
+      (c) THE THREE AXIOMS of §2, via [gw_load_reservation] /
+          [gw_cancel_reservation] / [gw_plat_term_write] — i.e. the record is
+          consumed inside (b)'s proofs, at [vmem_read_addr],
+          [execute_STORECON] and [htif_store], not at §4's statement. *)
 
 From stdpp Require Import gmap finite list relations.
 From Stdlib.ssr Require Import ssreflect.
@@ -122,7 +169,51 @@ Lemma gw_plat_term_write (H : rv64d_axiom_shapes) b :
 Proof. by apply gwalk_quiet, (ax_plat_term_write H). Qed.
 
 (** The window-crossing form, which is what [execute_STORECON]'s tail needs
-    once (O4)'s LTS fix lands. *)
+    (it calls [cancel_reservation] AFTER the conditional write). *)
 Lemma gsilent_cancel_reservation (H : rv64d_axiom_shapes) u :
   gsilent (cancel_reservation u).
 Proof. by apply gquiet_gsilent, (ax_cancel_reservation H). Qed.
+
+Lemma gsilent_load_reservation (H : rv64d_axiom_shapes) a n :
+  gsilent (load_reservation a n).
+Proof. by apply gquiet_gsilent, (ax_load_reservation H). Qed.
+
+Lemma gsilent_plat_term_write (H : rv64d_axiom_shapes) b :
+  gsilent (plat_term_write b).
+Proof. by apply gquiet_gsilent, (ax_plat_term_write H). Qed.
+
+(* ====================================================================== *)
+(** ** 4. The [riscv_step] wrapper, over the tower's remaining obligations
+
+    [WeakSailLTS.sail_shaped] is [gwalk None] at [M unit]
+    ([WeakShape.gwalk_shaped]), so the whole [∀ b] premise of
+    [WeakComposeLang]'s capstones is the shape of [try_step] plus the shape
+    of [tick_clock] — the two functions §4's header names as C5's frontier.
+    Nothing else about the decoder is involved: the wrapper contributes only
+    a [bind] and a [bool] test. *)
+
+Require Import RiscvLang.
+
+Theorem riscv_step_shaped_cone :
+  (∀ (n : Z) (b : bool), gwalk None (try_step n b)) →
+  gwalk None (tick_clock tt) →
+  ∀ b : bool, sail_shaped (riscv_step b).
+Proof.
+  intros Htry Htick b. apply gwalk_shaped.
+  rewrite /riscv_step. apply gwalk_bind; [apply Htry|].
+  intros _. destruct b; [exact Htick|by apply gwalk_quiet, gquiet_returnm].
+Qed.
+
+(** The same reduction in the [gok] mode, for the liveness half: [glive] has
+    no [Ret]-mode subtlety, so the two halves reduce in lockstep and a C5
+    that closes [gok] of the two frontier functions closes both premises of
+    [WeakComposeLang.xv6_weak_robust_lifted] at once. *)
+Theorem riscv_step_ok_cone :
+  (∀ (n : Z) (b : bool), gok (try_step n b)) →
+  gok (tick_clock tt) →
+  ∀ b : bool, sail_shaped (riscv_step b) ∧ sail_live (riscv_step b).
+Proof.
+  intros Htry Htick b. apply gok_stageC.
+  rewrite /riscv_step. apply gok_bind; [apply Htry|].
+  intros _. destruct b; [exact Htick|apply gok_returnm].
+Qed.

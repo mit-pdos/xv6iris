@@ -387,26 +387,56 @@ Proof.
   - destruct Hq as [->|(?&?&?&?&->)]; exact I.
 Qed.
 
+(** The MIRROR of [excl_read_lbl] ([WeakSailLTS] delta (e'')): a step from a
+    CONDITIONAL-WRITE node carries an [LStore] — the RAM write arm is the
+    only one that fires there, and since C4 it accepts any [ak_latest]. *)
+Lemma con_write_lbl next p l p' :
+  sp_fence p = None → con_write_node (sp_m p) → sail_step_ni next p l p' →
+  ∃ rl base data, l = WeakPromise.LStore rl base data.
+Proof.
+  intros Hf Hcw Hstep. rewrite /sail_step_ni Hf in Hstep.
+  rewrite /con_write_node in Hcw.
+  destruct (sp_m p) as [m|]; [|done].
+  destruct m as [y|T oc k]; [done|].
+  destruct oc; try done.
+  rewrite /sail_mstep /= in Hstep. destruct Hcw as [Hd Hlat].
+  rewrite Hd in Hstep. destruct Hstep as (-> & _ & _).
+  by eexists _, _, _.
+Qed.
+
 (** …and a quiet step is a FUSED one ([WeakSailLTS2.pf_solo_f]) for free: at
-    an exclusive-read node the LTS emits an [LLoad] or an [LRmw], never a
-    quiet label, so the implication's premise is unsatisfiable there.  This
-    is what lets the whole quiet skeleton of the completions below carry the
-    "no bare exclusive read" export at no cost. *)
+    an exclusive-read node the LTS emits an [LLoad] or an [LRmw] and at a
+    conditional-write node an [LStore], never a quiet label, so both of
+    [pf_solo_f]'s obligations are vacuous there.  This is what lets the whole
+    quiet skeleton of the completions below carry the "no half-window arm"
+    export at no cost. *)
 Lemma pf_solo_q_f next i c c' : pf_solo_q next i c c' → pf_solo_f next i c c'.
 Proof.
-  intros Hq. split; [by apply pf_solo_q_solo|].
-  intros (ag & Hlk & Hfe & Hex).
-  destruct Hq as (l & Hql & Hstep).
-  destruct Hstep as
-    [cfg ag0 st' Hlk0 Hps
-    |cfg ag0 aq lat base tvs st' Hlk0 Hps Hr
-    |cfg ag0 rl base data kk st' Hlk0 Hps Hne
-    |cfg ag0 aq rl base tvs data kk st' Hlk0 Hps Hne Hlen Hr He
-    |cfg ag0 pr pw sr sw st' Hlk0 Hps];
-    simpl in Hlk; rewrite Hlk in Hlk0; injection Hlk0 as <-;
-    try (by destruct Hql as [Hx|(?&?&?&?&Hx)]; inversion Hx);
-    destruct (excl_read_lbl next (pa_st ag) _ st' Hfe Hex Hps)
-      as [(? & ? & ? & Hl)|(? & ? & ? & ? & ? & Hl)]; inversion Hl.
+  intros Hq. split_and!; [by apply pf_solo_q_solo| |].
+  - intros (ag & Hlk & Hfe & Hex).
+    destruct Hq as (l & Hql & Hstep).
+    destruct Hstep as
+      [cfg ag0 st' Hlk0 Hps
+      |cfg ag0 aq lat base tvs st' Hlk0 Hps Hr
+      |cfg ag0 rl base data kk st' Hlk0 Hps Hne
+      |cfg ag0 aq rl base tvs data kk st' Hlk0 Hps Hne Hlen Hr He
+      |cfg ag0 pr pw sr sw st' Hlk0 Hps];
+      simpl in Hlk; rewrite Hlk in Hlk0; injection Hlk0 as <-;
+      try (by destruct Hql as [Hx|(?&?&?&?&Hx)]; inversion Hx);
+      destruct (excl_read_lbl next (pa_st ag) _ st' Hfe Hex Hps)
+        as [(? & ? & ? & Hl)|(? & ? & ? & ? & ? & Hl)]; inversion Hl.
+  - intros (ag & Hlk & Hfe & Hcw).
+    destruct Hq as (l & Hql & Hstep).
+    destruct Hstep as
+      [cfg ag0 st' Hlk0 Hps
+      |cfg ag0 aq lat base tvs st' Hlk0 Hps Hr
+      |cfg ag0 rl base data kk st' Hlk0 Hps Hne
+      |cfg ag0 aq rl base tvs data kk st' Hlk0 Hps Hne Hlen Hr He
+      |cfg ag0 pr pw sr sw st' Hlk0 Hps];
+      simpl in Hlk; rewrite Hlk in Hlk0; injection Hlk0 as <-;
+      try (by destruct Hql as [Hx|(?&?&?&?&Hx)]; inversion Hx);
+      destruct (con_write_lbl next (pa_st ag) _ st' Hfe Hcw Hps)
+        as (? & ? & ? & Hl); inversion Hl.
 Qed.
 
 Lemma pf_solo_q_run_f next i c c' :
@@ -938,7 +968,7 @@ Section residual.
       destruct Hsh as (_ & Hsh).
       destruct (dev_addr (Interface.WriteReq.pa req)) eqn:Hd.
       + destruct Hstep as [_ ->]. simpl. exact Hsh.
-      + destruct Hstep as (_ & _ & _ & ->). simpl. exact Hsh.
+      + destruct Hstep as (_ & _ & ->). simpl. exact Hsh.
     - (* Choose *)
       destruct Hstep as (_ & ch & ->). simpl. by apply Hsh.
   Qed.
@@ -974,7 +1004,7 @@ Section residual.
     - (* MemWrite *)
       destruct (dev_addr (Interface.WriteReq.pa req)) eqn:Hd.
       + destruct Hstep as [_ ->]. simpl. exact Hlv.
-      + destruct Hstep as (_ & _ & _ & ->). simpl. exact Hlv.
+      + destruct Hstep as (_ & _ & ->). simpl. exact Hlv.
     - (* Choose *)
       destruct Hstep as (_ & ch & ->). simpl.
       by apply (sail_live_choose ty k Hlv).
@@ -1051,14 +1081,33 @@ Section tail.
       |by apply cls_canon_nolog|exact I].
   Qed.
 
+  (** The store wrapper.  It cannot claim [pf_solo_f] outright since C4: a
+      step from a STANDALONE conditional-write node is an [LStore] too
+      ([WeakSailLTS] delta (e'')) and is exactly what [pf_solo_f] excludes.
+      So the fused reading is handed back conditionally, and the caller —
+      which knows the node's [ak_latest] — decides. *)
   Lemma pf_sstep (i : agent) c ag rl base data st' :
     pc_ags c !! i = Some ag →
     sail_step_ni next (pa_st ag) (WeakPromise.LStore rl base data) st' →
     data ≠ [] →
-    ∃ c' ag', pf_solo_f next i c c' ∧ pc_ags c' !! i = Some ag' ∧ pa_st ag' = st'.
+    ∃ c' ag', pf_solo next i c c' ∧
+              (¬ at_con_write i c → pf_solo_f next i c c') ∧
+              pc_ags c' !! i = Some ag' ∧ pa_st ag' = st'.
   Proof.
     intros Hlk Hstep Hne.
     set (kc := lbl_class (WeakPromise.LStore rl base data) (pa_ws ag)).
+    have Hsolo : pf_solo next i c
+        (WPCfg (pc_img c) (pc_log c ++ [WMsg base data (Some i) kc])
+           (<[i := WPAgent st'
+                     (store_post_run (pa_ws ag) rl base (length data)
+                        (S (length (pc_log c)))) (pa_prom ag)]> (pc_ags c))).
+    { exists (WeakPromise.LStore rl base data). split_and!.
+      - exact (PFStore (sail_step_ni next) i c ag rl base data kc st'
+                 Hlk Hstep Hne).
+      - intros ag2 msg Hag2 Heq. simpl in Heq.
+        apply app_inv_head in Heq. injection Heq as <-.
+        rewrite Hlk in Hag2. by injection Hag2 as <-.
+      - exact I. }
     exists (WPCfg (pc_img c) (pc_log c ++ [WMsg base data (Some i) kc])
              (<[i := WPAgent st'
                        (store_post_run (pa_ws ag) rl base (length data)
@@ -1067,15 +1116,12 @@ Section tail.
               (store_post_run (pa_ws ag) rl base (length data)
                  (S (length (pc_log c)))) (pa_prom ag)).
     split_and!;
-      [split; [|by intros _ Hlog; exact (app_snoc_absurd _ _ (eq_sym Hlog))]
+      [exact Hsolo
+      |intros Hncw; split_and!;
+         [exact Hsolo
+         |by intros _ Hlog; exact (app_snoc_absurd _ _ (eq_sym Hlog))
+         |exact Hncw]
       |exact (lookup_insert_at (pc_ags c) i ag _ Hlk)|done].
-    exists (WeakPromise.LStore rl base data). split_and!.
-    - exact (PFStore (sail_step_ni next) i c ag rl base data kc st'
-               Hlk Hstep Hne).
-    - intros ag2 msg Hag2 Heq. simpl in Heq.
-      apply app_inv_head in Heq. injection Heq as <-.
-      rewrite Hlk in Hag2. by injection Hag2 as <-.
-    - exact I.
   Qed.
 
   Lemma pf_rstep (i : agent) c ag aq rl base tvs data st' :
@@ -1088,6 +1134,11 @@ Section tail.
     ∃ c' ag', pf_solo_f next i c c' ∧ pc_ags c' !! i = Some ag' ∧ pa_st ag' = st'.
   Proof.
     intros Hlk Hstep Hne Hlen Hro Hrot Hex.
+    have Hncw : ¬ at_con_write i c.
+    { intros (ag0 & Hlk0 & Hfe & Hcw). rewrite Hlk in Hlk0.
+      injection Hlk0 as <-.
+      destruct (con_write_lbl next (pa_st ag) _ st' Hfe Hcw Hstep)
+        as (? & ? & ? & Hl). inversion Hl. }
     set (kc := lbl_class (WeakPromise.LRmw aq rl base tvs data) (pa_ws ag)).
     exists (WPCfg (pc_img c) (pc_log c ++ [WMsg base data (Some i) kc])
              (<[i := WPAgent st'
@@ -1100,7 +1151,9 @@ Section tail.
                  rl base (length data) (S (length (pc_log c))))
               (pa_prom ag)).
     split_and!;
-      [split; [|by intros _ Hlog; exact (app_snoc_absurd _ _ (eq_sym Hlog))]
+      [split_and!;
+         [|by intros _ Hlog; exact (app_snoc_absurd _ _ (eq_sym Hlog))
+          |exact Hncw]
       |exact (lookup_insert_at (pc_ags c) i ag _ Hlk)|done].
     exists (WeakPromise.LRmw aq rl base tvs data). split_and!.
     - exact (PFRmw (sail_step_ni next) i c ag aq rl base tvs data kc st'
@@ -1273,11 +1326,14 @@ Section tail.
                       Hro)
             as (c1 & ag1 & Hs1 & Hlk1 & Hpa1 & Hlog1).
           exists c1, ag1, true. split_and!; [exact Hs1| |exact Hlk1|].
-          { (* a PLAIN load is fused-vacuously: the node is not exclusive *)
-            intros _. split; [exact Hs1|].
-            intros (ag0 & Hlk0 & _ & Hex). rewrite Hlk in Hlk0.
-            injection Hlk0 as <-. rewrite Hst /= Hlat in Hex.
-            by destruct Hex as [_ ?]. }
+          { (* a PLAIN load is fused-vacuously: the node is neither an
+               exclusive read nor a conditional write *)
+            intros _. split_and!; [exact Hs1| |].
+            - intros (ag0 & Hlk0 & _ & Hex). rewrite Hlk in Hlk0.
+              injection Hlk0 as <-. rewrite Hst /= Hlat in Hex.
+              by destruct Hex as [_ ?].
+            - intros (ag0 & Hlk0 & _ & Hcw). rewrite Hlk in Hlk0.
+              injection Hlk0 as <-. by rewrite Hst /= in Hcw. }
           right. exists (k (inl (w, None))), rs, d, None.
           split_and!; [exact Hpa1|apply tc_once; by eexists
                       |by apply Hsh|by apply Hlv].
@@ -1291,22 +1347,35 @@ Section tail.
                  Hlk (or_introl eq_refl));
           [rewrite Hst /sail_step_ni /sail_mstep /= Hd; by split
           |apply tc_once; by eexists|by apply Hsh|by apply Hlv].
-      + destruct Hn as (Hn0 & Hnlat).
+      + (* A RAM WRITE, conditional or not ([WeakSailLTS] delta (e'')).  The
+             step is the same [LStore] either way; what differs is whether it
+             is a half-window arm, i.e. whether the completion can export
+             [fused_blk]-compatibility — so a STANDALONE conditional write
+             sets [fu := false], exactly as the bare exclusive read does. *)
         destruct (pf_sstep i c ag
                     (ak_sync (classify (Interface.WriteReq.access_kind req)))
                     (pa_z (Interface.WriteReq.pa req))
                     (wbytes nn (Interface.WriteReq.value req))
                     (PSail (Some (k (inl None))) rs d None iq) Hlk
                     ltac:(rewrite Hst /sail_step_ni /sail_mstep /= Hd;
-                          split_and!;
-                            [reflexivity|exact Hn0|exact Hnlat|reflexivity])
+                          split_and!; [reflexivity|exact Hn|reflexivity])
                     ltac:(by apply wbytes_nonnil))
-          as (c1 & ag1 & Hs1 & Hlk1 & Hpa1).
-        exists c1, ag1, true. split_and!;
-          [exact (pf_solo_f_solo _ _ _ _ Hs1)|by intros _|exact Hlk1|].
-        right. exists (k (inl None)), rs, d, None.
-        split_and!; [exact Hpa1|apply tc_once; by eexists
-                    |exact Hsh|exact Hlv].
+          as (c1 & ag1 & Hs1 & Hfu1 & Hlk1 & Hpa1).
+        destruct (ak_latest (classify (Interface.WriteReq.access_kind req)))
+          eqn:Hlat.
+        * (* THE STANDALONE CONDITIONAL WRITE: no fused export *)
+          exists c1, ag1, false. split_and!; [exact Hs1|done|exact Hlk1|].
+          right. exists (k (inl None)), rs, d, None.
+          split_and!; [exact Hpa1|apply tc_once; by eexists
+                      |exact Hsh|exact Hlv].
+        * exists c1, ag1, true. split_and!; [exact Hs1| |exact Hlk1|].
+          { intros _. apply Hfu1.
+            intros (ag0 & Hlk0 & _ & Hcw). rewrite Hlk in Hlk0.
+            injection Hlk0 as <-. rewrite Hst /= Hd Hlat in Hcw.
+            by destruct Hcw as [_ ?]. }
+          right. exists (k (inl None)), rs, d, None.
+          split_and!; [exact Hpa1|apply tc_once; by eexists
+                      |exact Hsh|exact Hlv].
     - (* InstrAnnounce *)
       apply (tail_qcase i c ag WeakPromise.LSilent _ (k tt) rs d None iq
                Hlk (or_introl eq_refl));
@@ -1947,7 +2016,7 @@ Proof.
     destruct (dev_addr (Interface.WriteReq.pa req)) eqn:Hd.
     + destruct Hstep as [-> ->].
       eexists. split_and!; pafin.
-    + destruct Hstep as (-> & Hn & Hlat & ->).
+    + destruct Hstep as (-> & Hn & ->).
       eexists. split_and!; pafin.
   - (* Choose *)
     destruct Hstep as [-> [ch ->]].
@@ -2025,7 +2094,7 @@ Proof.
   - (* MemWrite *)
     destruct (dev_addr (Interface.WriteReq.pa req)) eqn:Hd.
     + destruct Hstep as [_ ->]. simpl. by apply Hfr.
-    + destruct Hstep as (_ & _ & _ & ->). simpl. by apply Hfr.
+    + destruct Hstep as (_ & _ & ->). simpl. by apply Hfr.
   - (* Choose *)
     destruct Hstep as (_ & ch & ->). simpl. by apply Hfr.
 Qed.
@@ -2089,7 +2158,7 @@ Proof.
   - (* MemWrite *)
     destruct (dev_addr (Interface.WriteReq.pa req)) eqn:Hd.
     + by destruct Hstep as [_ ->].
-    + by destruct Hstep as (_ & _ & _ & ->).
+    + by destruct Hstep as (_ & _ & ->).
   - (* Choose *)
     by destruct Hstep as (_ & ch & ->).
 Qed.

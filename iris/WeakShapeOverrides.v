@@ -16,25 +16,28 @@
           (abandonment-permitting) reading of the window, with the two bind
           lemmas it splits into;
       §4  [gw_solve] / [gq_solve], the tactics the generated shards run;
-      §5  THE TWO REFUTATIONS that stop stage C3 from discharging the two
-          [∀ b] premises, machine-checked at their sites.
+      §5  the stage-C3 findings (O4)/(O5) at their sites: (O4) is FIXED in
+          C4 and its two refutations are replaced by the positive leaves;
+          (O5) is what [WeakShapeTop]'s record assumes.
 
-    §5 is the finding of stage C3 and is written up in
-    [claude-notes/projects/weak-memory-premises.md]; the short form is that
-    BOTH stage-C goals are still false, for two NEW reasons that are not the
-    ones C1/C2 found and fixed:
+    §5 is written up in
+    [claude-notes/projects/weak-memory-premises.md]; the short form:
 
-    (O4) A STANDALONE STORE-CONDITIONAL.  [rv64d.execute_STORECON] issues a
-         [Write_RISCV_conditional] RAM write with NO exclusive read anywhere
-         in the instruction (the reservation lives in the model's pure
+    (O4) A STANDALONE STORE-CONDITIONAL — FIXED IN C4.
+         [rv64d.execute_STORECON] issues a [Write_RISCV_conditional] RAM
+         write with NO exclusive read anywhere in the instruction (the
+         reservation lives in the model's pure
          [match_reservation]/[valid_reservation] axioms, not in a memory
-         event).  [sail_shaped]'s [MemWrite] arm demands
+         event).  Through C3 [sail_shaped]'s [MemWrite] arm demanded
          [ak_latest (classify …) = false] off device addresses, and a
          conditional write classifies as [AV_exclusive], i.e. [ak_latest =
-         true].  So [∀ b, sail_shaped (riscv_step b)] is FALSE — the exact
+         true], so [∀ b, sail_shaped (riscv_step b)] was FALSE — the exact
          mirror image of C1's (O2), which found the READ side (an exclusive
-         read with no conditional write) and fixed it at the LTS.  See
-         [gwalk_write_ram_con_False] / [sail_shaped_write_ram_con_False].
+         read with no conditional write) and fixed it at the LTS.  C4 took
+         the symmetric fix ([WeakSailLTS] delta (e'')): the window-closed
+         [MemWrite] arms accept ANY RAM write and a standalone conditional
+         write steps as a plain [LStore].  See [gwalkx_write_ram_con] here
+         and [WeakShape.gwalk_write_ram_con].
 
     (O5) THREE OPAQUE MONADIC AXIOMS.  [rv64d] declares
          [load_reservation], [cancel_reservation] and [plat_term_write] as
@@ -351,10 +354,10 @@ Fixpoint gwalkx (w : win) (m : mon) {struct m} : Prop :=
                ak_latest (classify (Interface.WriteReq.access_kind req')) = true ∧
                gwalkx None (k (inl None))
            | None =>
+               (* any RAM write of nonzero width — [WeakShape.gwalk]'s C4
+                  arm, mirrored ([WeakSailLTS] delta (e'')) *)
                (if dev_addr (Interface.WriteReq.pa req') then True
-                else n' ≠ 0%N ∧
-                     ak_latest (classify (Interface.WriteReq.access_kind req'))
-                       = false) ∧
+                else n' ≠ 0%N) ∧
                gwalkx None (k (inl None))
            end
        | Interface.Barrier _ => λ k,
@@ -709,11 +712,14 @@ Ltac gw_solve :=
     | gw_step ].
 
 (* ====================================================================== *)
-(** ** 5. THE STAGE-C3 REFUTATIONS
+(** ** 5. THE STAGE-C3 FINDINGS: (O4) FIXED IN C4, (O5) STILL OPEN
 
     ------------------------------------------------------------------------
-    (O4) [∀ b, sail_shaped (riscv_step b)] IS FALSE: A STANDALONE
-         STORE-CONDITIONAL.
+    (O4) A STANDALONE STORE-CONDITIONAL — FIXED IN STAGE C4 BY WIDENING THE
+         SPECIFICATION; the two refutations that stood here are FALSE now and
+         are replaced by the positive leaves [gwalk_write_ram_con]
+         ([WeakShape] §6b) and [gwalkx_write_ram_con] below.  The history,
+         because the SHAPE of the finding recurs:
 
     The path, from the sources:
 
@@ -736,54 +742,53 @@ Ltac gw_solve :=
 
     This is the exact MIRROR of stage C1's (O2), which found the read side
     (an exclusive read with no conditional write, at [execute_LOADRES]) and
-    fixed it in C2 by weakening [amo_tail]'s [Interface.Ret] arm and adding
-    [sail_mstep]'s BARE exclusive-read arm.  The write side was not looked
-    at, and it needs the symmetric fix: a BARE conditional-write arm (the
-    write steps as a plain [LStore] — the machine only GAINS behaviors) plus
-    dropping the [ak_latest = false] conjunct from [sail_shaped]'s
-    window-closed [MemWrite] arm, with the ⇐ reconstruction gaining a
-    target-indexed run-local side condition in the [dev_ok_blk]/[fused_blk]
-    family.
+    which C2 fixed by weakening [amo_tail]'s [Interface.Ret] arm and adding
+    [sail_mstep]'s BARE exclusive-read arm.  C4 took the symmetric fix:
+    [sail_mstep]'s and [sail_shaped]'s window-CLOSED [MemWrite] arms lost the
+    [ak_latest = false] conjunct (the [n ≠ 0] one stays), so a standalone
+    conditional write steps as a plain [WeakPromise.LStore] — the machine
+    only GAINS behaviors, the safe direction, and one step suffices because
+    there is no window to abandon.  Its cost is on the ⇐ side, in the SAME
+    predicate that pays for (O2): [WeakSailLTS2.pf_solo_f] now also forbids
+    stepping from a conditional-write node ([at_con_write]), so
+    [fused_blk] reads "every exclusive access of the block is part of a fused
+    rmw".  A side condition is needed even though [WeakInterp.wrun]'s write
+    arm takes a conditional write unchanged (it never inspects [ak_latest]),
+    because the interpreter stamps the message [WCexcl] where the pf step
+    carries [WeakSailLTS2.lbl_class] — one inert field, but the logs must
+    agree syntactically for the reconstruction.
 
-    The refutation itself is definitional and needs no reachability
-    reasoning beyond "some fetched word decodes to [STORECON]" (it does —
-    [rv64d]'s decoder builds [STORECON] whenever [Ext_Zalrsc] is enabled and
-    the width is valid, and [sail_shaped] quantifies over every register
-    value and every fetched word). *)
+    The finding was definitional and needed no reachability reasoning beyond
+    "some fetched word decodes to [STORECON]" (it does — [rv64d]'s decoder
+    builds [STORECON] whenever [Ext_Zalrsc] is enabled and the width is
+    valid, and [sail_shaped] quantifies over every register value and every
+    fetched word). *)
 
-(** THE REFUTATION, at the leaf.  A [Write_RISCV_conditional] RAM write is
-    unwalkable with the window CLOSED, whatever its continuation. *)
-Lemma gwalk_write_ram_con_False {B} wk addr width data meta (k : _ → M B) :
+(** THE POSITIVE LEAF, in the WEAK reading ([WeakShape.gwalk_write_ram_con]
+    is the closed-reading twin).  A conditional RAM write with the window
+    CLOSED is walkable exactly like a plain one; the [0 < width] side
+    condition is the zero-width-write conjunct, the same one
+    [gwalk_write_ram_plain] carries. *)
+Lemma gwalkx_write_ram_con {B} wk addr width data meta (k : _ → M B) :
   wk = Write_RISCV_conditional ∨ wk = Write_RISCV_conditional_release →
-  dev_addr addr = false →
-  gwalk None (Defs.bind (write_ram wk (Physaddr addr) width data meta) k) →
-  False.
+  (0 < width)%Z →
+  (∀ r, gwalkx None (k r)) →
+  gwalkx None (Defs.bind (write_ram wk (Physaddr addr) width data meta) k).
 Proof.
-  intros Hwk Hd. destruct Hwk as [->| ->];
+  intros Hwk Hw Hk.
+  have Hn : Z.to_N width ≠ 0%N by apply to_N_nonzero.
+  destruct Hwk as [->| ->];
     cbv [write_ram]; cbn [Defs.bind Defs.bind0 Defs.returnm returnM
                           Interface.iMon_bind];
     cbv [Defs.sail_mem_write];
     cbn [Defs.bind Defs.bind0 Defs.returnm returnM Interface.iMon_bind];
-    simpl; rewrite Hd; by intros [[_ H] _].
+    (simpl; split; [by destruct (dev_addr addr)|]);
+    cbn [Defs.bind Defs.bind0 Defs.returnm returnM Interface.iMon_bind];
+    apply Hk.
 Qed.
 
-Lemma sail_shaped_write_ram_con_False (addr : Arch.pa) width data meta
-    (k : _ → M unit) :
-  dev_addr addr = false →
-  sail_shaped
-    (Defs.bind (write_ram Write_RISCV_conditional (Physaddr addr) width data meta) k) →
-  False.
-Proof.
-  intros Hd.
-  cbv [write_ram]; cbn [Defs.bind Defs.bind0 Defs.returnm returnM
-                        Interface.iMon_bind];
-    cbv [Defs.sail_mem_write];
-    cbn [Defs.bind Defs.bind0 Defs.returnm returnM Interface.iMon_bind].
-  simpl. rewrite Hd. by intros [[_ H] _].
-Qed.
-
-(** …and the SAME node under an OPEN window is fine
-    ([WeakShape.gwalk_write_ram_close]), which is exactly what makes an AMO
-    (read-modify-write in ONE instruction) sound and an [sc] (a write with no
-    read) unsound: the difference is entirely whether an exclusive read
-    opened the window in the SAME [riscv_step]. *)
+(** …and the SAME node under an OPEN window must be the window's CLOSING
+    write ([WeakShape.gwalk_write_ram_close]): same address, same width.
+    That asymmetry is the whole content of the exclusive-window discipline —
+    an AMO (read-modify-write in ONE instruction) fuses, a lone [sc] does
+    not, and since C4 both are steppable. *)

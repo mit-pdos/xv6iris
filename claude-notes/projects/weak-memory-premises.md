@@ -1,6 +1,7 @@
 # Shrinking the capstone's premise ledger — worklist
 
-**Status (2026-08-13): IN FLIGHT.**  Follow-on to
+**Status (2026-08-13): IN FLIGHT (stage C4 landed; C5 is the shape sweep's
+remaining tower + residue).**  Follow-on to
 [`completed/weak-memory-lift.md`](../completed/weak-memory-lift.md):
 eliminate or reduce the premises of
 `WeakComposeLang.xv6_weak_robust_lifted`/`_adequate` that are provable
@@ -352,14 +353,104 @@ discharge it).
   liveness half is therefore still OPEN, behind (O4)/(O5), and behind the
   ~100 remaining reachability obligations.
 
-**Next stage (D-C4).**  Do (O4)'s spec fix FIRST — it is the only one that
-changes a specification, and until it lands the sweep cannot be assembled.
-Then the 47-function residue needs: the misaligned-split loop's liveness
-(`N ≥ 1` from `split_misaligned`), `0 < split_width` (the zero-width-write
-conjunct), the exclusive window carried from `checked_mem_read`'s
-`read_ram` to `checked_mem_write`'s `write_ram` through
-`catch_early_return`/`liftR`/`untilMT` (the escape index of
-`WeakShapeOverrides` §3 is what composes it), and (O5)'s three point
-premises.  Only then does `gok_stageC` close `riscv_step`.
+- **C4 (LANDED 2026-08-13)** — (O4)'s spec fix, machine-checked; (O5) is
+  wired but the two `∀ b` premises STAY (the capstones are untouched).  What
+  landed:
+  - **(O4)** the window-CLOSED `MemWrite` arms of `sail_shaped`, `sail_mstep`
+    and the kit's `gwalk`/`gwalkx` lost the `ak_latest = false` conjunct (the
+    `n ≠ 0` one stays), so a STANDALONE conditional write is shaped and steps
+    as a plain `LStore`.  **The arm is ONE STEP, not a bracket** — and that
+    asymmetry with C2's bare exclusive READ is the point: C2 had to bracket
+    because a one-step bare read leaves the hart in "window mode", where the
+    residual is not `sail_shaped`; a standalone `sc` has no open window, so
+    its residual `k (inl None)` is ordinary and
+    `sail_shaped_res_step`/`tail_complete` go through untouched.
+    `amo_tail`'s write arm is unchanged (inside a window a write must still
+    BE the closing conditional write).
+  - **`wrun`'s verdict on a standalone conditional write: it ACCEPTS it** —
+    `WeakInterp.wrun`'s `MemWrite` arm never inspects `ak_latest` — **but a
+    side condition is still needed, for the MESSAGE CLASS**: `wrun` computes
+    `wm_class_of = WCexcl` there while a pf `LStore` step carries
+    `lbl_class = WCrel/WCplain`, and the ⇐ reconstruction needs the two logs
+    to agree syntactically.  (The alternative — making `lbl_class` read the
+    source node instead of the label — was rejected: `WeakRetag.cls_canonical`
+    takes `clsf : wlabel → wstate → wm_class` as a parameter, so a
+    node-dependent class would ripple into the retag machinery.)
+  - so the ⇐ cost went into the EXISTING predicate rather than a third one:
+    `pf_solo_f` gains `¬ at_con_write i c` beside its
+    `at_excl_read i c → pc_log c' ≠ pc_log c`, and **`fused_blk` now reads
+    "every exclusive access of the block is part of a fused rmw"**.  Its
+    shape, its target-indexing and every signature that carries it
+    (`sail_run_wrun`/`sail_block_wrun`/`wprim_hart_block*`/`wl_lift`'s
+    SegHart) are UNCHANGED — no new premise anywhere, and `WeakSailCone`/
+    `WeakComposeLang` needed only prose.  A conditional-write configuration
+    is reachable only for a STANDALONE write, because the fused arm consumes
+    the write node inside its bracket.
+  - suppliers of `pf_solo_f` pay almost nothing: `pf_solo_q_f` gets a second
+    vacuity argument from the new `con_write_lbl` (a step from a
+    conditional-write node emits an `LStore`, never a quiet label);
+    `pf_rstep` derives `¬ at_con_write` from its own `LRmw`; `pf_sstep` now
+    returns `pf_solo` plus `¬ at_con_write i c → pf_solo_f …`, and
+    `tail_step`'s RAM-write arm splits on `ak_latest`, reporting a standalone
+    conditional write through the SAME `fu : bool` flag C2 introduced for the
+    bare read.
+  - `WeakShapeOverrides` §5's two refutations
+    (`gwalk_write_ram_con_False`/`sail_shaped_write_ram_con_False`) are FALSE
+    now and are deleted, replaced by the positive leaves
+    `WeakShape.gwalk_write_ram_con` and
+    `WeakShapeOverrides.gwalkx_write_ram_con` (both with the `0 < width` side
+    condition `gwalk_write_ram_plain` already carried).
+  - **(O5) is wired, not discharged.**  `WeakShapeTop`'s `rv64d_axiom_shapes`
+    record keeps its three `gquiet` facts and now also exports the `gsilent`
+    forms (the window-crossing shape `execute_STORECON`'s tail needs).  §4
+    adds `riscv_step_shaped_cone` / `riscv_step_ok_cone`: the `∀ b` premises
+    reduce to `gwalk None`/`gok` of exactly TWO model functions,
+    `try_step n b` and `tick_clock tt`.
+  - **`riscv_step_shaped_ax` was NOT reached, and the blocker is (a), not the
+    proofs.**  Every function between `try_step` and the memory cone calls
+    into the part of the sweep that is BELOW the `--limit` cut (`try_step`
+    alone needs `should_inc_minstret`, `run_hart_waiting`, `handle_interrupt`,
+    `handle_exception`, `exception_handler`, `set_next_pc`), so no bridge
+    lemma above the memory cone can even be stated before the remaining ~198
+    generated lemmas exist — and that is a SERIAL multi-hour `coqc` chain
+    (the shards `Require` each other; ~10 min for shard 2, C3 measured shard 3
+    still running at 33 min).  Generating one more shard would have raised
+    coverage without unlocking anything, so C4 spent its budget on the spec
+    fix instead.  The liveness half was not attempted for the same reason.
+    MEASURED ON THIS BOX (32 cores, `-j12`): shard 01 ~7 min, shard 02 ~7 min
+    (serial -- the `Require` chain), and the whole affected chain
+    `WeakSailLTS -> LTS2 -> Complete -> Shape -> Overrides -> Gen01 -> Gen02
+    -> Top` plus `Cone -> Compose -> ComposeLang` rebuilds in ~15 min, of
+    which 14 are the two shards.  The C3 figure ("~10 min/shard, rising")
+    holds: budget the C5 chain at >= 4 more shards, rising, with NO
+    parallelism available.
+
+## What C5 owes (unchanged in kind, one obligation smaller)
+
+1. **The generated tower, to 294** — raise `gen_shape.py --limit`, shard so
+   each stays under ~10–15 min, add to `_CoqProject`, and budget a serial
+   multi-hour chain (they cannot be built in parallel).
+2. **The 47-function residue**, hand-proved in topological order; three of its
+   obligations are semantic rather than syntactic: `0 < split_width` in
+   `checked_mem_write` (the Sail precondition `0 < width ≤ 4096` travelling
+   down through `split_misaligned`, which returns `width` itself on the
+   unsplit path), the fuel recursion `_rec_pt_walk`, and the exclusive window
+   carried from `checked_mem_read`'s `read_ram` to `checked_mem_write`'s
+   `write_ram` through `catch_early_return`/`liftR`/`untilMT` (the escape
+   index `gwalkx`/`gsilent` of `WeakShapeOverrides` §3 is what composes it).
+   C4's fix removed one item from this list: a standalone conditional write
+   no longer needs a window at all.
+3. **The three axiom facts**, consumed inside 2 at `vmem_read_addr`,
+   `execute_STORECON` and `htif_store` via `WeakShapeTop`'s
+   `gw_*`/`gsilent_*` lemmas — after which the capstones can take
+   `rv64d_axiom_shapes` in place of the two `∀ b` premises.
+4. **Liveness (O3)** — still behind the ~100 `exit`/`internal_error`/
+   `assert_exp` reachability sites, plus the misaligned-split loop's
+   termination (`N ≥ 1` from `split_misaligned`).
+
+**Next stage (D-C5).**  (O4)'s spec fix LANDED in C4; the ordered list above
+is what is left, and item 1 is a scheduling problem rather than a proof one —
+plan the serial shard chain first, because nothing above the memory cone can
+be stated until it exists.
 
 Keep the tree green per commit; findings in commit messages and here.

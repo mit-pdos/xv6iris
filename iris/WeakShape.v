@@ -188,10 +188,10 @@ Fixpoint gwalk (w : win) (m : mon) {struct m} : Prop :=
                ak_latest (classify (Interface.WriteReq.access_kind req')) = true ∧
                gwalk None (k (inl None))
            | None =>
+               (* ANY RAM write of nonzero width, conditional or not
+                  ([WeakSailLTS] delta (e''), stage C4) *)
                (if dev_addr (Interface.WriteReq.pa req') then True
-                else n' ≠ 0%N ∧
-                     ak_latest (classify (Interface.WriteReq.access_kind req'))
-                       = false) ∧
+                else n' ≠ 0%N) ∧
                gwalk None (k (inl None))
            end
        | Interface.Barrier _ => λ k,
@@ -1219,13 +1219,17 @@ Lemma gwalk_MemRead_excl {E A} n req (k : _ → Defs.monad E A) :
   gwalk None (Interface.Next (Interface.MemRead n req) k).
 Proof. intros H0 H1 H2 Hk. simpl. rewrite H0 H1 H2. by split. Qed.
 
+(** ANY RAM WRITE with a nonzero width, with the window CLOSED — including a
+    STANDALONE CONDITIONAL one, which is what a lone [sc] issues
+    ([WeakSailLTS] delta (e''), stage C4's (O4) fix).  Through stage C3 this
+    lemma also demanded [ak_latest = false], which is what made
+    [∀ b, sail_shaped (riscv_step b)] false. *)
 Lemma gwalk_MemWrite_plain {E A} n req (k : _ → Defs.monad E A) :
-  (dev_addr (Interface.WriteReq.pa req) = true ∨
-   (n ≠ 0%N ∧ ak_latest (classify (Interface.WriteReq.access_kind req)) = false)) →
+  (dev_addr (Interface.WriteReq.pa req) = true ∨ n ≠ 0%N) →
   gwalk None (k (inl None)) →
   gwalk None (Interface.Next (Interface.MemWrite n req) k).
 Proof.
-  intros [Hd|[Hn Hl]] Hk; simpl.
+  intros [Hd|Hn] Hk; simpl.
   - rewrite Hd. by split.
   - destruct (dev_addr (Interface.WriteReq.pa req)); by split.
 Qed.
@@ -1315,8 +1319,26 @@ Lemma gwalk_write_ram_plain {B} addr width data meta (k : _ → M B) :
   gwalk None (Defs.bind (write_ram Write_plain (Physaddr addr) width data meta) k).
 Proof.
   intros Hw Hk. cbv [write_ram]. mred. cbv [Defs.sail_mem_write]. mred.
-  apply gwalk_MemWrite_plain; [right; split; [by apply to_N_nonzero|done]|].
+  apply gwalk_MemWrite_plain; [right; by apply to_N_nonzero|].
   mred. apply Hk.
+Qed.
+
+(** THE STANDALONE CONDITIONAL WRITE — what [rv64d.execute_STORECON] issues
+    with no exclusive read in the same instruction.  Since stage C4 this is
+    the POSITIVE lemma at the leaf where C3 recorded a refutation
+    ([WeakShapeOverrides] §5, (O4)): the write is walkable with the window
+    closed, exactly like a plain one, and the LTS steps it as a plain
+    [WeakPromise.LStore] ([WeakSailLTS] delta (e'')). *)
+Lemma gwalk_write_ram_con {B} wk addr width data meta (k : _ → M B) :
+  wk = Write_RISCV_conditional ∨ wk = Write_RISCV_conditional_release →
+  (0 < width)%Z →
+  (∀ r, gwalk None (k r)) →
+  gwalk None (Defs.bind (write_ram wk (Physaddr addr) width data meta) k).
+Proof.
+  intros Hwk Hw Hk. destruct Hwk as [->| ->];
+    cbv [write_ram]; mred; cbv [Defs.sail_mem_write]; mred;
+    (apply gwalk_MemWrite_plain; [right; by apply to_N_nonzero|]);
+    mred; apply Hk.
 Qed.
 
 (** THE CONDITIONAL WRITE — the window closer. *)

@@ -169,6 +169,48 @@
         carries the run-local side condition [WeakSailLTS2.fused_blk],
         target-indexed exactly like [dev_ok_blk].
 
+    (e'') …AND THE MIRROR IMAGE: A CONDITIONAL WRITE WITH NO EXCLUSIVE READ.
+        Delta (e) covers an exclusive read whose window is abandoned.  The
+        SYMMETRIC gap is a conditional ([AV_exclusive], [ak_latest = true])
+        write with no exclusive read anywhere in the instruction — which is
+        exactly what a STANDALONE [sc] is: [rv64d.execute_STORECON] issues
+        [write_ram Write_RISCV_conditional …], and the lr/sc reservation
+        lives in the model's PURE axioms ([load_reservation]/
+        [match_reservation]/[valid_reservation]), not in a memory event, with
+        the matching [lr] a DIFFERENT [riscv_step] (stage C3 finding (O4)).
+        Through stage C3 both [sail_shaped]'s and [sail_mstep]'s window-CLOSED
+        [MemWrite] arms demanded [ak_latest = false], so [∀ b, sail_shaped
+        (riscv_step b)] was FALSE at every [sc] and the LTS was STUCK there —
+        the same machine coverage gap as (e), on the write side.
+
+        THE FIX IS ONE CONJUNCT IN EACH: the window-closed [MemWrite] arms of
+        [sail_mstep] and [sail_shaped] accept ANY RAM write (the [n ≠ 0]
+        conjunct stays; only [ak_latest = false] goes).  A standalone
+        conditional write therefore steps as an ordinary
+        [WeakPromise.LStore] — which is the honest reading, since a
+        SUCCEEDING [sc] really does store, and the machine only GAINS
+        behaviors (the safe direction, as in (e)).  Unlike (e) the arm is
+        ONE STEP, not a bracket: there is no open window to abandon, so the
+        residual after the write is the ordinary [k (inl None)] and every
+        residual invariant ([WeakSailComplete.sail_shaped_res_step],
+        [tail_complete]) goes through with the widened shape predicate.
+        [amo_tail]'s write arm is UNCHANGED — inside an open window a
+        [MemWrite] must still BE the closing conditional write to the same
+        address and width.
+
+        WHAT IT COSTS is again a ⇐-side side condition, and it is folded into
+        the SAME predicate as (e)'s: [WeakSailLTS2.pf_solo_f] now also says
+        the step is not taken from a standalone conditional-write node
+        ([at_con_write]), so [fused_blk] reads "every exclusive access of the
+        block is part of a fused RMW".  The reason a side condition is still
+        needed even though [WeakInterp.wrun]'s write arm accepts a
+        conditional write unchanged (it never inspects [ak_latest]) is the
+        MESSAGE CLASS: [wrun] computes [WCexcl] there
+        ([WeakInterp.wm_class_of]) while a pf [LStore] step carries
+        [WeakSailLTS2.lbl_class], i.e. [WCrel]/[WCplain] — the logs would
+        differ in that one inert field.  Per-image discharge, as for (e): the
+        xv6 kernel uses [amoswap], not [sc].
+
     (e') THE ANSWERS THE SHAPE PREDICATES QUANTIFY OVER ARE THE ANSWERS THIS
         LTS SUPPLIES.  [sail_mstep]'s memory arms hand the continuation
         [inl (w, None)] (read) and [inl None] (write) and nothing else, so
@@ -428,12 +470,13 @@ Definition sail_mstep (m : M unit) (rs : regstate) (d : dev_state)
                        (dev_write_t d (Interface.WriteReq.pa req) n
                           (Interface.WriteReq.value req)) None iq
            else
+             (* ANY RAM write, conditional or not (delta (e'')): a standalone
+                [sc] has no window to close, and its store is a real store *)
              l = WeakPromise.LStore
                    (ak_sync (classify (Interface.WriteReq.access_kind req)))
                    (pa_z (Interface.WriteReq.pa req))
                    (wbytes n (Interface.WriteReq.value req)) ∧
              n ≠ 0%N ∧
-             ak_latest (classify (Interface.WriteReq.access_kind req)) = false ∧
              p' = PSail (Some (k (inl None))) rs d None iq
        | Interface.Barrier b => λ k,
            l = (barrier_lbl b).1 ∧
@@ -610,12 +653,16 @@ Qed.
 
     - no coherent reads (delta (d): rv64d never emits [AK_ifetch]/[AK_ttw]);
     - no zero-width RAM write (else the log grows with a message no label can
-      mirror — [WeakInterpProj] header (5));
+      mirror — [WeakInterpProj] header (5)).  Nothing else is asked of a RAM
+      write: a CONDITIONAL one with no exclusive read in the instruction (a
+      standalone [sc]) is admitted and steps as a plain store (delta (e''));
     - EVERY exclusive [MemRead] OPENS A WINDOW: its continuation crosses, by
       register/trace/choice code only, either to a conditional [MemWrite] to
       the SAME address and width (the window CLOSES — the fused arm) or to
       the end of the instruction (the window is ABANDONED — the bare arm),
-      and no conditional write occurs anywhere else (delta (e)).
+      and NO OTHER memory access or barrier occurs inside the window
+      (delta (e)).  Outside a window a conditional write is ordinary
+      (delta (e'')).
 
     [amo_tail pa n m] is that window.  Its [Interface.Ret] arm is [True]: a
     window MAY be abandoned (stage C1 finding (O2) — [execute_LOADRES],
@@ -642,9 +689,10 @@ Fixpoint sail_shaped (m : M unit) {struct m} : Prop :=
                      amo_tail (Interface.ReadReq.pa req) n (k (inl (w, None)))
               else ∀ w : bv (8 * n), sail_shaped (k (inl (w, None))))
        | Interface.MemWrite n req => λ k,
+           (* ANY RAM write with a nonzero width — including a STANDALONE
+              conditional one (delta (e'')) *)
            (if dev_addr (Interface.WriteReq.pa req) then True
-            else n ≠ 0%N ∧
-                 ak_latest (classify (Interface.WriteReq.access_kind req)) = false) ∧
+            else n ≠ 0%N) ∧
            sail_shaped (k (inl None))
        | _ => λ k, ∀ r, sail_shaped (k r)
        end) k
@@ -1042,13 +1090,12 @@ Section bracket.
           + rewrite /sail_step /= Hd (dev_write_t_Some _ _ _ _ _ Hdw).
             right. split; reflexivity.
           + apply Hch. by apply (lookup_insert_i _ _ _ Hlk).
-        - destruct Hn as (Hn0 & Hnlat).
-          pose proof (proj1 (IH (inl None)) _ _ _ Hsh Hrun) as Hch.
+        - pose proof (proj1 (IH (inl None)) _ _ _ Hsh Hrun) as Hch.
           intros iq prom ags Hlk.
           eapply pf_store.
           + exact Hlk.
           + rewrite /sail_step /= Hd. right.
-            split_and!; [reflexivity|exact Hn0|exact Hnlat|reflexivity].
+            split_and!; [reflexivity|exact Hn|reflexivity].
           + by apply wbytes_nonnil.
           + rewrite wbytes_length. apply Hch.
             by apply (lookup_insert_i _ _ _ Hlk). }

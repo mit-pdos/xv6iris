@@ -235,6 +235,26 @@
         [fu = true → rtc (pf_solo_f next i) c c']), so a supplier can see
         exactly when a completed reader tail is [fused_blk]-compatible.
 
+        (O4), THE MIRROR IMAGE, FIXED THE SAME WAY IN STAGE C4.  A CONDITIONAL
+        WRITE WITH NO EXCLUSIVE READ — a standalone [sc], which
+        [rv64d.execute_STORECON] issues because the lr/sc reservation lives in
+        the model's pure axioms and the matching [lr] is a different
+        [riscv_step] — made premise 1 false and the machine stuck for the
+        same reason on the write side.  The fix is one conjunct in each of
+        [sail_shaped] and [sail_mstep]: the window-closed [MemWrite] arms
+        accept ANY RAM write of nonzero width, so the standalone conditional
+        write steps as a plain [LStore] (a succeeding [sc] really does store;
+        the machine again only GAINS behaviors).  It is ONE step, not a
+        bracket — there is no open window to abandon, so no residual
+        invariant moves.  The ⇐ cost is folded into the SAME predicate:
+        [pf_solo_f] additionally forbids stepping from a conditional-write
+        node, so [fused_blk] now reads "every exclusive access of the block
+        is part of a fused rmw", and [tail_complete]'s [fu] flag reports the
+        standalone conditional write exactly as it reports the bare read.
+        (The side condition is needed even though [wrun]'s write arm accepts a
+        conditional write unchanged, because [wrun] stamps the message
+        [WCexcl] where the pf step carries [lbl_class].)
+
     (D) THE AGENT QUANTIFIER — FOUND HERE, FIXED IN LAYER 1, GONE FROM THE
         PREMISE LIST (2026-08-12).  It was a premise of this file for exactly
         one revision, under the name [xv6_violation_harts], and it was FALSE
@@ -1354,11 +1374,15 @@ Fixpoint wl_lift (gen : nat) (segs : list seg2) (g : wgstate) (u : wlaux)
           (prj_cfg (PSail None (wgregs g cpu) (wa_dev u cpu) None (wa_iq u cpu))
              c') ∧
         (** (iii) EXCLUSIVE-WINDOW FUSION along the same run: no step of the
-            block took the BARE exclusive-read arm ([WeakSailLTS] delta (e)),
-            which has no image in [wrun].  Same shape as (ii) — run-local,
-            target-indexed — and the same discharge family: per-image, kernel
-            AMOs target mapped lock words and do not fault, so their windows
-            close.  §B (O2). *)
+            block took either HALF-WINDOW arm — the BARE exclusive read
+            ([WeakSailLTS] delta (e)) or the STANDALONE conditional write
+            (delta (e'')) — neither of which [wrun] reproduces (the first is
+            a plain [LLoad] where the interpreter has an exclusive read; the
+            second differs from [wrun]'s own write only in the message
+            class).  Same shape as (ii) — run-local, target-indexed — and the
+            same discharge family: per-image, kernel AMOs target mapped lock
+            words and do not fault, so their windows close, and the kernel
+            uses [amoswap], not [sc].  §B (O2)/(O4). *)
         fused_blk riscv_step i
           (prj_cfg (PSail None (wgregs g cpu) (wa_dev u cpu) None (wa_iq u cpu))
              c') ∧

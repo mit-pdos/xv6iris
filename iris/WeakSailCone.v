@@ -1890,7 +1890,7 @@ Proof.
                     |(_ & _ & _ & _ & w & _ & y & rs1 & _ & ->)]; done.
     + by destruct H as (_ & _ & _ & _ & _ & w & m1 & m2 & rs1 & _ & _ & _ & ->).
   - (* MemWrite, RAM *)
-    by intros (_ & _ & _ & ->).
+    by intros (_ & _ & ->).
 Qed.
 
 (** …and its configuration form, which is what the refinement reads off
