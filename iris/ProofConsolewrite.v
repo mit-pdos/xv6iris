@@ -66,7 +66,7 @@ Require Import KallocInv.
 Require Import UserPtTree KvmSpec ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import DiskPtsto WpUart UartTxInv.
-Require Import SpecPanic SchedCtx.
+Require Import PanicStub SchedCtx.
 Require Import SpecEitherCopyin SpecUartwrite.
 Require Import CodeConsolewrite.
 Require Import SpecConsolewrite.
@@ -1098,7 +1098,7 @@ Section CwBodies.
       iEval (rewrite Pb46) in "Hpc".
       (* +0x46  jal either_copyin *)
       iApply (wp_jal_s_sconf (mword_of_int (CW + 0x46)) Rra
-                (mword_of_int 8598 : mword 21) B5 (av - 16)%nat true
+                (mword_of_int 8608 : mword 21) B5 (av - 16)%nat true
                 ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi46").
       iIntros (CIDc6 Hsc6) "Hcg Hpc".
       set (B6 := <[Regidx Rra := regval_into_reg
@@ -1106,7 +1106,7 @@ Section CwBodies.
       change (<[Regidx Rra := regval_into_reg
           (add_vec_int (mword_of_int (CW + 0x46) : mword 64) 4)]> B5) with B6.
       assert (Jeci : add_vec (mword_of_int (CW + 0x46) : mword 64)
-                       (sign_extend' 64 (mword_of_int 8598 : mword 21))
+                       (sign_extend' 64 (mword_of_int 8608 : mword 21))
                      = mword_of_int KernelSyms.either_copyin) by pcw.
       iEval (rewrite Jeci) in "Hpc".
       assert (HB6a0 : B6 !!! Regidx Ra0 = buf)
@@ -1224,7 +1224,7 @@ Section CwBodies.
         iEval (rewrite P52) in "Hpc".
         (* +0x52  jal uartwrite *)
         iApply (wp_jal_s_sconf (mword_of_int (CW + 0x52)) Rra
-                  (mword_of_int 1942 : mword 21) D2 (av - 16)%nat true
+                  (mword_of_int 1952 : mword 21) D2 (av - 16)%nat true
                   ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi52").
         iIntros (CIDcb Hscb) "Hcg Hpc".
         set (D3 := <[Regidx Rra := regval_into_reg
@@ -1232,7 +1232,7 @@ Section CwBodies.
         change (<[Regidx Rra := regval_into_reg
             (add_vec_int (mword_of_int (CW + 0x52) : mword 64) 4)]> D2) with D3.
         assert (Juw : add_vec (mword_of_int (CW + 0x52) : mword 64)
-                        (sign_extend' 64 (mword_of_int 1942 : mword 21))
+                        (sign_extend' 64 (mword_of_int 1952 : mword 21))
                       = mword_of_int KernelSyms.uartwrite) by pcw.
         iEval (rewrite Juw) in "Hpc".
         assert (HD3a0 : D3 !!! Regidx Ra0 = buf)

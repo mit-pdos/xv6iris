@@ -81,7 +81,7 @@ Require Import KallocInv.
 Require Import UserPtTree KvmSpec ProcPtOwn.
 Require Import FdSlots ProcInv FileInvDefs.
 Require Import ConsoleInv.
-Require Import SpecPanic SchedCtx.
+Require Import PanicStub SchedCtx.
 Require Import SpecMyproc SpecAcquire SpecKilled SpecSleepPrepare SpecSleep.
 Require Import SpecEitherCopyout SpecRelease.
 Require Import CodeConsoleread.
