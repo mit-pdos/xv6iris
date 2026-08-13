@@ -4,10 +4,13 @@
     of the WHOLE [fetch tt] at the PC page's leaf window, obtained by
     composing [WeakKptStale.wwalk_peel_of_exports] (the peel of the
     translation) with an ORDINARY-certified tail through the landed
-    single-window kit ([WeakStale] §§7–8).  The Iris absorption / ghost-
-    matching half — turning the step-level register wand and log arms of
-    [WeakKptStale.wtlb_res_pt_translateAddr_stale_at] into a WP rule — is
-    future work and is NOT attempted here.
+    single-window kit ([WeakStale] §§7–8).
+
+    §§5–6 close the loop on the Iris side: §6's [wkpt_fetch_peel_at] is the
+    ONE fupd that turns the kernel-page-table resources into this peel plus
+    [WeakKptStale] §3's ghost arms — the weak analogue of what
+    [SmodeCorePt.tlb_inv_pt_fetch] does for the SC fetch.  Turning that fupd
+    into a WP rule (the phase/funnel bookkeeping) is still future work.
 
     Design: claude-notes/design/weak-memory-walk-bridge.md §8.
 
@@ -115,6 +118,8 @@ From Stdlib Require Import ZArith Bool Lia Wf_nat.
 From stdpp Require Import gmap list.
 From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From iris.algebra Require Import dfrac.
+From iris.base_logic.lib Require Import iprop ghost_map ghost_var invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -127,6 +132,9 @@ Require Import WeakEffSkel WeakLeafEffCommon WeakFetchEff.
 Require Import WeakRacy WeakVarCert WeakStale WeakWalkStale.
 Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree.
 Require Import SmodeCore.
+Require Import WeakGhost.
+Require Import WeakWalkEff.
+Require Import KptPt.
 Require Import WeakVariant WeakKpt WeakKptStale.
 Local Open Scope Z_scope.
 Import Defs.
@@ -716,7 +724,21 @@ Section WfetchPeel.
                          WEread wak_plain la 8; WEread wak_excl la 8;
                          WEwrite wak_excl la 8 (lw' : mword 64)]
                    else [WEread wak_excl la 8;
-                         WEwrite wak_excl la 8 (lw' : mword 64)])) ).
+                         WEwrite wak_excl la 8 (lw' : mword 64)])) ) /\
+    (* THE SREGS FOOTPRINT of the member that ran — the absorption theorem's
+       new per-member conjunct ([WeakKptStale] §2bis), HOISTED out of the two
+       arms.  Hoisted and not duplicated inside them because the arms are
+       passed VERBATIM to [WeakKptStale.wwalk_peel_of_exports], which knows
+       nothing of registers; keyed on the run's own equation exactly as the
+       absorption theorem's register wand is, so the member that actually ran
+       pins [sg']. *)
+    (forall (av dv : mword 1) (sg' : mstate) (es : list weff),
+       pte_ad_le (pte_set_ad w0 av dv) lw ->
+       exec_stale la 8 (pte_set_ad w0 av dv)
+         (translateAddr (Virtaddr va) (InstructionFetch tt)) (wflat_st σ)
+       = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sg', es) ->
+       forall r : register, register_beq r tlb = false ->
+         register_lookup r (sregs sg') = register_lookup r (wm_regs σ)).
 
   Lemma wfetch_peel_of_exports (tid : option nat) (σ : wmstate)
       (root_ppn : mword 44) (va pa : mword 64) (p2 p1 w0 lw : mword 64) :
@@ -736,7 +758,7 @@ Section WfetchPeel.
     wadm_filter σ wak_plain la 8 (wwalk_filter w0 lw).
   Proof.
     intros vpn a2 a1 la Hpc Hal
-      (Hvar & Hwf & Hs2 & Hs1 & Hs0 & Hpin & Hd2 & Hd1 & Hcoll & Harm) Htail.
+      (Hvar & Hwf & Hs2 & Hs1 & Hs0 & Hpin & Hd2 & Hd1 & Hcoll & Harm & _) Htail.
     (* the translation's own peel and the filter, from the walk slice *)
     destruct (wwalk_peel_of_exports (InstructionFetch tt) tid σ root_ppn va pa
                 p2 p1 w0 lw Hvar Hwf Hs2 Hs1 Hs0 Hpin Hd2 Hd1 Hcoll Harm)
@@ -874,14 +896,18 @@ End WfetchPeel.
     every post-translation [s']; the contents transport through the family's
     memory description ([write_bytes_lookup_ne] off the leaf window).
 
-    WHAT REMAINS A PREMISE, and why.  The REGISTERS at [s']: the exports
-    bundle ([wwalk_exports], landed and not touched here) describes the
-    member's [mem] and [mdev] but not its [sregs], and the walk really does
-    write one register on a TLB miss (the absorption theorem's §2 dispatch
-    reports [sregs sg' = sg.(sregs) \/ sregs sg' = register_set tlb … ]).
-    So the fetch's register-only gates are taken at the post-states, as
-    [wfetch_gates] — a premise with NO memory, view or pinnedness content,
-    which is what the capstone below means by "gates".
+    WHAT REMAINED A PREMISE, and why — and what §5 then did about it.  The
+    REGISTERS at [s']: the exports bundle described the member's [mem] and
+    [mdev] but not its [sregs], and the walk really does write one register
+    on a TLB miss (the absorption theorem's §2 dispatch reports [sregs sg' =
+    sg.(sregs) \/ sregs sg' = register_set tlb … ]).  So the fetch's
+    register-only gates are taken at the post-states, as [wfetch_gates] — a
+    premise with NO memory, view or pinnedness content, which is what the
+    capstone below means by "gates".  [WeakKptStale] §2bis now exports that
+    missing description in its usable form (every register but [tlb]
+    survives), the bundle carries it as its LAST field, [wwalk_run_outcome]
+    transports it to the weak post-states, and §5 discharges [wfetch_gates]
+    from σ's registers outright.
 
     THE DISJOINTNESS is taken as the premise [racc_disj la 8 pa 4]: kernel
     TEXT and a page-table slot are different regions, and this is the cheap
@@ -966,12 +992,17 @@ Section WfetchTail.
          latest_ts (wm_log s') (pa_z a) = latest_ts (wm_log σ) (pa_z a)) /\
       (forall a : Arch.pa,
          (forall j : nat, (j < 8)%nat -> pa_add la j <> a) ->
-         wflat (wm_img s') (wm_log s') !! a = wflat (wm_img σ) (wm_log σ) !! a).
+         wflat (wm_img s') (wm_log s') !! a = wflat (wm_img σ) (wm_log σ) !! a) /\
+      (* the exports' hoisted sregs field, transported to the weak post-state:
+         [wrun_exec_stale_elim] identifies [wflat_st s'] with the member's own
+         post-state, whose registers the field describes. *)
+      (forall r : register, register_beq r tlb = false ->
+         register_lookup r (wm_regs s') = register_lookup r (wm_regs σ)).
   Proof.
     intros vpn a2 a1 la Hexp x s' Hrun.
     pose proof Hexp as Hexp'.
     destruct Hexp' as (Hvar & Hwf & Hs2 & Hs1 & Hs0 & Hpin & Hd2 & Hd1 & Hcoll
-                       & Harm).
+                       & Harm & Hregs).
     pose proof (pt_slot_mem_acc_wf _ _ _ Hs0) as Hwf0.
     destruct (wwalk_peel_of_exports (InstructionFetch tt) tid σ root_ppn va pa
                 p2 p1 w0 lw Hvar Hwf Hs2 Hs1 Hs0 Hpin Hd2 Hd1 Hcoll Harm)
@@ -993,7 +1024,9 @@ Section WfetchTail.
               (forall a : Arch.pa,
                  wtrace_wonly (fun (pa0 : Arch.pa) (n : N) =>
                     forall j : nat, (j < N.to_nat n)%nat -> pa_add pa0 j <> a) es ->
-                 latest_ts (wm_log s') (pa_z a) = latest_ts (wm_log σ) (pa_z a))).
+                 latest_ts (wm_log s') (pa_z a) = latest_ts (wm_log σ) (pa_z a)) /\
+              (forall r : register, register_beq r tlb = false ->
+                 register_lookup r (sregs sg') = register_lookup r (wm_regs σ))).
     { destruct Harm as [Hro | (lw' & wtr & Hupd & Hfam)].
       - (* ---------- READ-ONLY: four stale-friendly shapes ---------- *)
         assert (Hst : forall u : bv (8 * 8)%N,
@@ -1029,6 +1062,7 @@ Section WfetchTail.
         + exact Hwf'.
         + rewrite -Hes'. destruct Hes as [->|[->|[-> | ->]]]; walk_evs.
         + exact Hlt.
+        + exact (Hregs av dv sgm esm Hle Hex).
       - destruct wtr.
         + (* ---------- MISS write-back: the five-event walk ---------- *)
           assert (Hst : forall u : bv (8 * 8)%N,
@@ -1063,6 +1097,7 @@ Section WfetchTail.
           * exact Hwf'.
           * rewrite -Hes' Hes. walk_evs.
           * exact Hlt.
+          * exact (Hregs av dv sgm esm Hle Hex).
         + (* ---------- HIT write-back: the CONSTANT family ---------- *)
           assert (Hst : forall u : bv (8 * 8)%N,
                     wwalk_filter w0 lw (fun j : nat => nth_byte u j) ->
@@ -1095,9 +1130,10 @@ Section WfetchTail.
           * right. exists lw'. exact Hmem.
           * exact Hwf'.
           * rewrite -Hes' Hes. walk_evs.
-          * exact Hlt. }
+          * exact Hlt.
+          * exact (Hregs av dv sgm esm Hle Hex). }
     (* ---- and now the post-state facts the fetch's tail needs ---- *)
-    destruct Hcore as (sgm & es & Hx & Hsg & Hmdev & Hmem & Hwf' & Hev & Hlt).
+    destruct Hcore as (sgm & es & Hx & Hsg & Hmdev & Hmem & Hwf' & Hev & Hlt & Hrg).
     split_and!.
     - exact Hx.
     - exact Hwf'.
@@ -1110,6 +1146,7 @@ Section WfetchTail.
       apply write_bytes_lookup_ne. intros j Hj Heq.
       apply (Hoff j ltac:(change (N.to_nat 8) with 8%nat in Hj; lia)).
       by rewrite Heq.
+    - rewrite -(wflat_st_regs s') Hsg. exact Hrg.
   Qed.
 
   (** *** 4e. The fetch's REGISTER-ONLY gates, at the post-translation states.
@@ -1171,7 +1208,7 @@ Section WfetchTail.
       by rewrite Heq. }
     intros x s' Hrun.
     destruct (wwalk_run_outcome tid σ root_ppn va pa p2 p1 w0 lw Hexp x s' Hrun)
-      as (Hx & Hwf' & Hws & _ & Hlt & Hmem).
+      as (Hx & Hwf' & Hws & _ & Hlt & Hmem & _).
     destruct (Hgates x s' Hrun) as (Hg & Hpriv).
     split; [exact Hx|].
     refine (wfetch_tail_read tid s' pa region w Hwf' Haccp HW0 _ _ Hg
@@ -1263,6 +1300,445 @@ Section WfetchTail.
 End WfetchTail.
 
 (* ====================================================================== *)
+(** ** 5. THE GATES, FROM σ's REGISTERS
+    (the premise §4's header left open, closed by the absorption theorem's
+    new sregs export)
+
+    §4 kept [wfetch_gates] a premise because the exports bundle described the
+    member's [mem] and [mdev] but not its [sregs].  [WeakKptStale] §2bis's
+    export removes that gap: the walk moves NO register but [tlb], and the
+    five registers the gates read
+
+        [pmpcfg_n]  [pmpaddr_n]  [pma_regions]  [htif_tohost_base]
+        [cur_privilege]
+
+    are none of them [tlb].  So every gate is decided at σ and transported to
+    the post-translation states one [register_lookup] at a time.
+
+    WHAT IS LEFT — and it is not register content:
+
+      - the PMP grant's own four facts (the TOR entry's [A]/[X] bits, the
+        entry-0 order test, and the RAM coverage bound) — the residue's
+        [pmp_config], spelled at σ's registers;
+      - [pma_allows_all] (already an absorption premise), which is what
+        SUPPLIES the region and its [PMA_executable];
+      - the TEXT WORD'S RAM GEOMETRY ([addr_is_ram] at its first and last
+        byte), which is what gives [pmpRangeMatch], the two platform-band
+        gates and [dev_addr = false] — exactly the shape
+        [WeakWalkEff.wpt_read_pte_slot] takes for a page-table slot. *)
+
+Section WfetchGates.
+
+  (** *** 5a. The PMP grant for an S-mode INSTRUCTION FETCH.
+      [WeakWalkEff.exec_eff_pmpCheck_supervisor_grant_load]'s script at
+      [InstructionFetch tt] — the only edit is [pmpCheckRWX]'s bit, [X] for
+      [R] (the SC twin is [SmodePte.exec_pmpCheck_supervisor_grant]). *)
+  Lemma exec_eff_pmpCheck_supervisor_grant_fetch
+      (a : SailStdpp.Values.mword 64) (width : Z) s :
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : SailStdpp.Values.mword 64)) 4)
+      (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+      (uint a) (uint (to_bits 64 width)) = PMP_Match ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0))
+      ('b"1") = true ->
+    exec_eff (pmpCheck (Physaddr a) width (InstructionFetch tt) Supervisor) s
+    = Some (None, s, []).
+  Proof.
+    intros HA Hord Hrange HX.
+    unfold pmpCheck. rewrite exec_eff_catch_early_return.
+    replace (Z.eqb sys_pmp_count 0) with false by (vm_compute; reflexivity). cbn zeta.
+    rewrite execR_eff_bind0_eq.
+    match goal with |- context[foreach_ZM_up ?F ?T ?S ?V ?B] =>
+      assert (Hfe : execR_eff (foreach_ZM_up F T S V B) s = Some (inl None, s, [])) end.
+    { unfold foreach_ZM_up. cbn [foreach_ZM_up'].
+      rewrite execR_eff_bind_eq.
+      rewrite execR_eff_bind_eq. rewrite execR_eff_returnR. cbn match.
+      rewrite (execR_eff_liftR_seq _ _ _ _ _ (exec_eff_read_reg pmpcfg_n s)). cbn beta.
+      rewrite (execR_eff_liftR_seq _ _ _ _ _ (exec_eff_pmpReadAddrReg_val 0 s)). cbn beta.
+      rewrite (execR_eff_liftR_seq _ _ _ _ _
+                 (exec_eff_pmpMatchAddr_TOR_match a (to_bits 64 width)
+                    (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)
+                    (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)
+                    (zeros' 64) s HA Hord Hrange)). cbn beta.
+      cbn match.
+      unfold or_boolM.
+      rewrite execR_eff_bind_eq.
+      rewrite (execR_eff_liftR_seq _ _ _ _ _
+                 (_ : exec_eff (pmpCheckRWX
+                          (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)
+                          (InstructionFetch tt)) s = Some (true, s, []))).
+      2:{ unfold pmpCheckRWX. cbn match. rewrite HX. apply exec_eff_returnm. }
+      cbn match. rewrite execR_eff_returnR. cbn beta.
+      cbn match. rewrite execR_eff_bind_eq. rewrite execR_eff_returnR. cbn match.
+      unfold early_return, throw. cbn [execR_eff]. cbn match. reflexivity. }
+    rewrite Hfe. cbn match. reflexivity.
+  Qed.
+
+  (** *** 5b. THE GATES.  The region is not a parameter: [pma_allows_all]
+      produces it, together with the [PMA_executable] fact the capstone's
+      read needs, so the two travel out together. *)
+  Lemma wfetch_gates_of_regs (tid : option nat) (σ : wmstate)
+      (root_ppn : mword 44) (va pa p2 p1 w0 lw : mword 64) :
+    wwalk_exports tid σ root_ppn va pa p2 p1 w0 lw ->
+    (* the text word's RAM geometry *)
+    addr_is_ram pa ->
+    addr_is_ram (pa_add pa 3) ->
+    (* the PMP grant's four facts, at σ's registers *)
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n (wm_regs σ)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64)
+      (vec_access_dec (register_lookup pmpaddr_n (wm_regs σ)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n (wm_regs σ)) 0))
+      ('b"1") = true ->
+    (ram_base + ram_size
+     <= uint (vec_access_dec (register_lookup pmpaddr_n (wm_regs σ)) 0) * 4)%Z ->
+    (* the PMA table, and the two remaining register facts, at σ *)
+    pma_allows_all (register_lookup pma_regions (wm_regs σ)) ->
+    register_lookup htif_tohost_base (wm_regs σ) = None ->
+    register_lookup cur_privilege (wm_regs σ) = Supervisor ->
+    exists region : PMA_Region,
+      wfetch_gates tid σ va pa region /\
+      (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true.
+  Proof.
+    intros Hexp Hram Hram3 HA Hord HX Hcov Hall Hhtif Hpriv.
+    (* the region, from the RAM class *)
+    assert (Hacc : pma_ram_access pa 4).
+    { exact (pma_access_ram pa 4 3%nat Hram Hram3
+               (pma_width_ok 4 eq_refl eq_refl) eq_refl eq_refl). }
+    destruct (pma_all_ram Hall pa 4 Hacc) as (region & Hmatch & Hexec & _).
+    (* the range test, from the same geometry *)
+    assert (Hnw : (uint pa + Z.of_nat 3 < 18446744073709551616)%Z).
+    { destruct Hram as [_ Hh]. unfold ram_base, ram_size in Hh.
+      change (Z.of_nat 3) with 3%Z. lia. }
+    assert (Hfit : (uint pa + 4 <= ram_base + ram_size)%Z).
+    { pose proof (uint_pa_add pa 3%nat Hnw) as Heq.
+      destruct Hram3 as [_ Hhi3]. rewrite Heq in Hhi3.
+      change (Z.of_nat 3) with 3%Z in Hhi3.
+      unfold ram_base, ram_size in *. lia. }
+    assert (Hrange : pmpRangeMatch
+              (Z.mul (uint (zeros' 64 : SailStdpp.Values.mword 64)) 4)
+              (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n (wm_regs σ)) 0)) 4)
+              (uint pa) (uint (to_bits 64 4)) = PMP_Match).
+    { apply (ram_pmp_match_w pa _ 4);
+        [lia | vm_compute; reflexivity | | exact Hfit | exact Hcov].
+      destruct Hram as [Hlo _]. exact Hlo. }
+    exists region. split; [|exact Hexec].
+    (* ---- and now at every post-translation state ---- *)
+    intros x s' Hrun.
+    destruct (wwalk_run_outcome tid σ root_ppn va pa p2 p1 w0 lw Hexp x s' Hrun)
+      as (_ & _ & _ & _ & _ & _ & Hpres).
+    assert (Hpmpc : register_lookup pmpcfg_n (wm_regs s')
+                    = register_lookup pmpcfg_n (wm_regs σ))
+      by exact (Hpres pmpcfg_n ltac:(vm_compute; reflexivity)).
+    assert (Hpmpa : register_lookup pmpaddr_n (wm_regs s')
+                    = register_lookup pmpaddr_n (wm_regs σ))
+      by exact (Hpres pmpaddr_n ltac:(vm_compute; reflexivity)).
+    assert (Hpmar : register_lookup pma_regions (wm_regs s')
+                    = register_lookup pma_regions (wm_regs σ))
+      by exact (Hpres pma_regions ltac:(vm_compute; reflexivity)).
+    assert (Hhtif' : register_lookup htif_tohost_base (wm_regs s') = None)
+      by (rewrite (Hpres htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif).
+    assert (Hpriv' : register_lookup cur_privilege (wm_regs s') = Supervisor)
+      by (rewrite (Hpres cur_privilege ltac:(vm_compute; reflexivity)); exact Hpriv).
+    split; [|exact Hpriv'].
+    intros mm. cbn zeta. split_and!.
+    - apply exec_eff_pmpCheck_supervisor_grant_fetch; cbn [sregs].
+      + rewrite Hpmpc. exact HA.
+      + rewrite Hpmpa. exact Hord.
+      + rewrite Hpmpa. exact Hrange.
+      + rewrite Hpmpc. exact HX.
+    - rewrite Hpmar. exact Hmatch.
+    - apply exec_eff_within_clint_false;
+        [apply addr_is_ram_not_in_clint; exact Hram | lia].
+    - apply exec_eff_within_sig_false;
+        [apply addr_is_ram_not_in_sig; exact Hram | lia].
+    - apply exec_eff_within_htif_false. cbn [sregs]. exact Hhtif'.
+  Qed.
+
+  (** *** 5c. THE CAPSTONE, FROM σ's REGISTERS.
+      [wfetch_peel_selfcontained] with its two remaining register-shaped
+      premises ([wfetch_gates], and the region's [PMA_executable]) discharged
+      by 5b, and [dev_addr] read off the text's RAM geometry.  The [region] is
+      gone from the statement: nothing outside names it. *)
+  Lemma wfetch_peel_of_regs (tid : option nat) (σ : wmstate)
+      (root_ppn : mword 44) (va pa p2 p1 w0 lw : mword 64) (w : bv 32) :
+    let vpn := svpn_of va in
+    let a2 := u_pte_addr root_ppn (subrange_vec_dec vpn 26 18) in
+    let a1 := u_pte_addr (u_next_base p2) (subrange_vec_dec vpn 17 9) in
+    let la := u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0) in
+    register_lookup PC (wm_regs σ) = va ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    wwalk_exports tid σ root_ppn va pa p2 p1 w0 lw ->
+    (* the text window *)
+    is_aligned_paddr (Physaddr pa) 4 = true ->
+    addr_is_ram pa ->
+    addr_is_ram (pa_add pa 3) ->
+    acc_wf pa 4 ->
+    (forall j : nat, (j < 4)%nat -> pa_z (pa_add pa j) <> 0) ->
+    (forall j : nat, (j < 4)%nat -> pinned_read σ (acc_addr pa j)) ->
+    (forall j : nat, (N.of_nat j < 4)%N ->
+       wflat (wm_img σ) (wm_log σ) !! (pa_add pa j) = Some (nth_byte w j)) ->
+    (* the gates' σ-level register facts *)
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n (wm_regs σ)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64)
+      (vec_access_dec (register_lookup pmpaddr_n (wm_regs σ)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n (wm_regs σ)) 0))
+      ('b"1") = true ->
+    (ram_base + ram_size
+     <= uint (vec_access_dec (register_lookup pmpaddr_n (wm_regs σ)) 0) * 4)%Z ->
+    pma_allows_all (register_lookup pma_regions (wm_regs σ)) ->
+    register_lookup htif_tohost_base (wm_regs σ) = None ->
+    register_lookup cur_privilege (wm_regs σ) = Supervisor ->
+    (* the one geometric fact the caller owes about the WALKED window *)
+    racc_disj la 8 pa 4 ->
+    wstep_ok_racy tid la 8 wak_plain (wwalk_filter w0 lw) wD_any True true
+      (fetch tt) σ /\
+    wadm_filter σ wak_plain la 8 (wwalk_filter w0 lw).
+  Proof.
+    intros vpn a2 a1 la Hpc Halv Hexp Halign Hram Hram3 Haccp HW0 Hpin Hbytes
+      HA Hord HX Hcov Hall Hhtif Hpriv Hdisj.
+    destruct (wfetch_gates_of_regs tid σ root_ppn va pa p2 p1 w0 lw
+                Hexp Hram Hram3 HA Hord HX Hcov Hall Hhtif Hpriv)
+      as (region & Hgates & Hexec).
+    exact (wfetch_peel_selfcontained tid σ root_ppn va pa p2 p1 w0 lw region w
+             Hpc Halv Hexp Hdisj Haccp HW0 Hpin Hbytes Hgates Halign Hexec
+             (addr_is_ram_not_dev pa Hram)).
+  Qed.
+
+End WfetchGates.
+
+(* ====================================================================== *)
+(** ** 6. THE FUPD: the kernel page table's resources, turned into the PEEL
+    OF THE FETCH plus the ghost arms
+    (the weak twin of [SmodeCorePt.tlb_inv_pt_fetch]'s role)
+
+    ONE fupd.  It opens [WeakKptStale] §3's absorption theorem at
+    [acc := InstructionFetch tt], assembles its pure exports into §2's
+    [wwalk_exports] bundle — which is where §2bis's sregs export closes §5's
+    gates — runs 5c, and re-emits §3's conclusion UNCHANGED with the peel
+    added.  Nothing here is a new certificate: the whole section is the
+    plumbing between the two halves that were built to meet.
+
+    THE PEEL IS EXPORTED CONDITIONALLY, as
+    [racc_disj la 8 pa 4 -> …].  [la] is produced INSIDE the fupd (it is
+    computed from the invariant's own [p2]/[p1]), so a premise about it
+    cannot be stated by the caller; and the honest cheap forms of "kernel
+    text is disjoint from every page-table slot" are either false in general
+    or a re-statement of region geometry the funnel has and this file does
+    not.  The implication hands the funnel exactly the obligation it can
+    discharge once [la] is in its hands. *)
+
+Section WkFetchFupd.
+  Context `{!riscvGS Σ, !weakGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma wkpt_fetch_peel_at (root_ppn : mword 44) (T_kpt : nat)
+      (tid : option nat) (va pa : mword 64) (ppn : mword 44) (pc : kperm)
+      (σ : wmstate) (E : coPset) (w : bv 32) :
+    (* ---- [wtlb_res_pt_translateAddr_stale_at]'s premises, at the fetch ---- *)
+    ↑wkptN ⊆ E ->
+    (forall (a d : mword 1) (mxr do_sum : bool),
+       wpte_check_ok (InstructionFetch tt) Supervisor mxr do_sum
+         (pte_set_ad (mk_pte ppn (kperm_flags pc)) a d)) ->
+    (forall a d : mword 1,
+       wpte_valid (pte_set_ad (mk_pte ppn (kperm_flags pc)) a d)) ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    zero_extend' 64 (concat_vec ppn
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
+    wlog_wf (wm_log σ) ->
+    register_lookup misa (wm_regs σ) = MISA_C ->
+    register_lookup menvcfg (wm_regs σ) = MENVCFG_S ->
+    register_lookup htif_tohost_base (wm_regs σ) = None ->
+    register_lookup cur_privilege (wm_regs σ) = Supervisor ->
+    _get_Mstatus_SXL (register_lookup mstatus (wm_regs σ)) = 'b"10" ->
+    exec_eff (effectivePrivilege (InstructionFetch tt)
+                (register_lookup mstatus (wm_regs σ)) Supervisor)
+      (wflat_st σ) = Some (Supervisor, wflat_st σ, []) ->
+    exec_eff (is_shadow_stack_access (InstructionFetch tt)) (wflat_st σ)
+      = Some (false, wflat_st σ, []) ->
+    pma_allows_all (register_lookup pma_regions (wm_regs σ)) ->
+    (T_kpt <= w_vrNew (wm_ws σ))%nat ->
+    (* ---- the FETCH-side pure premises the absorption exports do not carry ---- *)
+    register_lookup PC (wm_regs σ) = va ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    is_aligned_paddr (Physaddr pa) 4 = true ->
+    addr_is_ram pa ->
+    addr_is_ram (pa_add pa 3) ->
+    acc_wf pa 4 ->
+    (forall j : nat, (j < 4)%nat -> pa_z (pa_add pa j) <> 0) ->
+    (forall j : nat, (j < 4)%nat -> pinned_read σ (acc_addr pa j)) ->
+    (forall j : nat, (N.of_nat j < 4)%N ->
+       wflat (wm_img σ) (wm_log σ) !! (pa_add pa j) = Some (nth_byte w j)) ->
+    (* ---- the text fetch's PMP grant, at σ's registers ---- *)
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n (wm_regs σ)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64)
+      (vec_access_dec (register_lookup pmpaddr_n (wm_regs σ)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n (wm_regs σ)) 0))
+      ('b"1") = true ->
+    (ram_base + ram_size
+     <= uint (vec_access_dec (register_lookup pmpaddr_n (wm_regs σ)) 0) * 4)%Z ->
+    kmap_at (svpn_of va) ppn pc -∗
+    reg_interp (wm_regs σ) -∗
+    wlog_auth (wm_log σ) -∗
+    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
+    wtlb_res_pt root_ppn T_kpt
+    ={E}=∗
+    ∃ (p2 p1 lw : mword 64),
+      let vpn := svpn_of va in
+      let w0 := mk_pte ppn (kperm_flags pc) in
+      let a2 := u_pte_addr root_ppn (subrange_vec_dec vpn 26 18) in
+      let a1 := u_pte_addr (u_next_base p2) (subrange_vec_dec vpn 17 9) in
+      let la := u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0) in
+      ⌜exists a d : mword 1, lw = pte_set_ad w0 a d⌝ ∗
+      ⌜pt_slot_mem (wflat_st σ) a2 p2 /\ pt_slot_mem (wflat_st σ) a1 p1 /\
+       pt_slot_mem (wflat_st σ) la lw⌝ ∗
+      ⌜forall j : nat, (j < 8)%nat ->
+         pinned_read σ (acc_addr a2 j) /\ pinned_read σ (acc_addr a1 j)⌝ ∗
+      ⌜racc_disj la 8 a2 8 /\ racc_disj la 8 a1 8⌝ ∗
+      ⌜forall (rak : akinfo) (wv : bv (8 * 8)%N),
+         wadm σ rak la 8 wv ->
+         (exists a d : mword 1,
+            (wv : mword 64) = pte_set_ad w0 a d) /\
+         pte_ad_le (wv : mword 64) lw⌝ ∗
+      ⌜forall j : nat, (j < 8)%nat -> nv_free (wm_log σ) (acc_addr la j)⌝ ∗
+      (* THE PEEL OF THE FETCH — the one new conjunct *)
+      ⌜racc_disj la 8 pa 4 ->
+       wstep_ok_racy tid la 8 wak_plain (wwalk_filter w0 lw) wD_any True true
+         (fetch tt) σ /\
+       wadm_filter σ wak_plain la 8 (wwalk_filter w0 lw)⌝ ∗
+      reg_interp (wm_regs σ) ∗
+      (∀ (av dv : mword 1) (sg' : mstate) (es : list weff),
+         ⌜pte_ad_le (pte_set_ad w0 av dv) lw⌝ -∗
+         ⌜exec_stale la 8 (pte_set_ad w0 av dv)
+            (translateAddr (Virtaddr va) (InstructionFetch tt)) (wflat_st σ)
+            = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sg', es)⌝ -∗
+         reg_interp (wm_regs σ) ==∗
+         reg_interp (sregs sg') ∗ wtlb_res_pt root_ppn T_kpt) ∗
+      ( (* READ-ONLY *)
+        (⌜forall av dv : mword 1,
+            pte_ad_le (pte_set_ad w0 av dv) lw ->
+            exists (sg' : mstate) (es : list weff),
+              exec_stale la 8 (pte_set_ad w0 av dv)
+                (translateAddr (Virtaddr va) (InstructionFetch tt)) (wflat_st σ)
+              = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sg', es) /\
+              mem sg' = wflat (wm_img σ) (wm_log σ) /\
+              mdev sg' = wm_dev σ /\
+              (forall r : register, register_beq r tlb = false ->
+                 register_lookup r (sregs sg') = register_lookup r (wm_regs σ)) /\
+              (es = [] \/
+               es = [WEread wak_plain a2 8; WEread wak_plain a1 8;
+                     WEread wak_plain la 8] \/
+               es = [WEread wak_excl la 8] \/
+               es = [WEread wak_plain a2 8; WEread wak_plain a1 8;
+                     WEread wak_plain la 8; WEread wak_excl la 8])⌝ ∗
+         wlog_auth (wm_log σ) ∗ wlat_interp (wm_img σ) (wm_log σ))
+        ∨
+        (* WRITE-BACK *)
+        (∃ (lw' : mword 64) (kcls : wm_class),
+           ⌜update_PTE_Bits (lw : mword 64) (InstructionFetch tt) = Some lw'⌝ ∗
+           ⌜exists wtr : bool,
+            forall av dv : mword 1,
+              pte_ad_le (pte_set_ad w0 av dv) lw ->
+              exists (sg' : mstate) (es : list weff),
+                exec_stale la 8 (pte_set_ad w0 av dv)
+                  (translateAddr (Virtaddr va) (InstructionFetch tt)) (wflat_st σ)
+                = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sg', es) /\
+                mem sg' = write_bytes (wflat (wm_img σ) (wm_log σ)) (la : Arch.pa) 8 lw' /\
+                mdev sg' = wm_dev σ /\
+                (forall r : register, register_beq r tlb = false ->
+                   register_lookup r (sregs sg') = register_lookup r (wm_regs σ)) /\
+                es = (if wtr
+                      then [WEread wak_plain a2 8; WEread wak_plain a1 8;
+                            WEread wak_plain la 8; WEread wak_excl la 8;
+                            WEwrite wak_excl la 8 (lw' : mword 64)]
+                      else [WEread wak_excl la 8;
+                            WEwrite wak_excl la 8 (lw' : mword 64)])⌝ ∗
+           wlog_auth (wm_log σ ++ [wwrite_msg tid kcls (la : Arch.pa) 8 (lw' : mword 64)]) ∗
+           wlat_interp (wm_img σ)
+             (wm_log σ ++ [wwrite_msg tid kcls (la : Arch.pa) 8 (lw' : mword 64)]))).
+  Proof.
+    intros HE Hchk Hval Hcanon Hid4k Hwlog Hmisa Hmenv Hhtif Hcp HSXL Heff Hss
+           Hall Hrcpt Hpcv Halv Halp Hram Hram3 Haccp HW0 Hpin Hbytes
+           HA Hord HX Hcov.
+    iIntros "Hat Hri Hla Hi Hres".
+    iMod (wtlb_res_pt_translateAddr_stale_at (InstructionFetch tt) root_ppn T_kpt
+            tid va pa ppn pc σ E HE Hchk Hval Hcanon Hid4k Hwlog Hmisa Hmenv
+            Hhtif Hcp HSXL Heff Hss Hall Hrcpt with "Hat Hri Hla Hi Hres")
+      as (p2 p1 lw)
+         "(%Hvar & %Hslots & %Hpins & %Hdj & %Hcoll & %Hnv & Hri & Hwand & Harm)".
+    destruct Hslots as (Hs2 & Hs1 & Hs0).
+    destruct Hdj as (Hd2 & Hd1).
+    (* the pure bundle, and with it the peel — assembled in each arm from the
+       family that arm exports (the two families differ, the nine other fields
+       do not) *)
+    iDestruct "Harm" as "[(%Hro & Hlog & Hlat) | Hw]".
+    - assert (Hexp : wwalk_exports tid σ root_ppn va pa p2 p1
+                       (mk_pte ppn (kperm_flags pc)) lw).
+      { rewrite /wwalk_exports.
+        split_and!; [exact Hvar|exact Hwlog|exact Hs2|exact Hs1|exact Hs0
+                    |exact Hpins|exact Hd2|exact Hd1|exact Hcoll| |].
+        - left. intros av dv Hle.
+          destruct (Hro av dv Hle) as (sg' & es & H1 & H2 & H3 & _ & H5).
+          exists sg', es. split_and!; [exact H1|exact H2|exact H3|exact H5].
+        - intros av dv sg' es Hle Hrun r Hr.
+          destruct (Hro av dv Hle) as (sgx & esx & H1 & _ & _ & H4 & _).
+          rewrite Hrun in H1.
+          assert (Hsg : sgx = sg') by congruence. subst sgx.
+          exact (H4 r Hr). }
+      iModIntro. iExists p2, p1, lw.
+      iSplitR; [iPureIntro; exact Hvar|].
+      iSplitR; [iPureIntro; exact (conj Hs2 (conj Hs1 Hs0))|].
+      iSplitR; [iPureIntro; exact Hpins|].
+      iSplitR; [iPureIntro; exact (conj Hd2 Hd1)|].
+      iSplitR; [iPureIntro; exact Hcoll|].
+      iSplitR; [iPureIntro; exact Hnv|].
+      iSplitR.
+      { iPureIntro.
+        exact (wfetch_peel_of_regs tid σ root_ppn va pa p2 p1 _ lw w
+                 Hpcv Halv Hexp Halp Hram Hram3 Haccp HW0 Hpin Hbytes
+                 HA Hord HX Hcov Hall Hhtif Hcp). }
+      iFrame "Hri Hwand". iLeft. iFrame "Hlog Hlat". iPureIntro. exact Hro.
+    - iDestruct "Hw" as (lw' kcls) "(%Hupd & %Hfam & Hlog & Hlat)".
+      destruct Hfam as (wtr & Hfam).
+      assert (Hexp : wwalk_exports tid σ root_ppn va pa p2 p1
+                       (mk_pte ppn (kperm_flags pc)) lw).
+      { rewrite /wwalk_exports.
+        split_and!; [exact Hvar|exact Hwlog|exact Hs2|exact Hs1|exact Hs0
+                    |exact Hpins|exact Hd2|exact Hd1|exact Hcoll| |].
+        - right. exists lw', wtr. split; [exact Hupd|].
+          intros av dv Hle.
+          destruct (Hfam av dv Hle) as (sg' & es & H1 & H2 & H3 & _ & H5).
+          exists sg', es. split_and!; [exact H1|exact H2|exact H3|exact H5].
+        - intros av dv sg' es Hle Hrun r Hr.
+          destruct (Hfam av dv Hle) as (sgx & esx & H1 & _ & _ & H4 & _).
+          rewrite Hrun in H1.
+          assert (Hsg : sgx = sg') by congruence. subst sgx.
+          exact (H4 r Hr). }
+      iModIntro. iExists p2, p1, lw.
+      iSplitR; [iPureIntro; exact Hvar|].
+      iSplitR; [iPureIntro; exact (conj Hs2 (conj Hs1 Hs0))|].
+      iSplitR; [iPureIntro; exact Hpins|].
+      iSplitR; [iPureIntro; exact (conj Hd2 Hd1)|].
+      iSplitR; [iPureIntro; exact Hcoll|].
+      iSplitR; [iPureIntro; exact Hnv|].
+      iSplitR.
+      { iPureIntro.
+        exact (wfetch_peel_of_regs tid σ root_ppn va pa p2 p1 _ lw w
+                 Hpcv Halv Hexp Halp Hram Hram3 Haccp HW0 Hpin Hbytes
+                 HA Hord HX Hcov Hall Hhtif Hcp). }
+      iFrame "Hri Hwand". iRight. iExists lw', kcls. iFrame "Hlog Hlat".
+      iSplitR; [iPureIntro; exact Hupd|].
+      iPureIntro. exists wtr. exact Hfam.
+  Qed.
+
+End WkFetchFupd.
+
+(* ====================================================================== *)
 (** ** 3. Soundness checks *)
 
 Print Assumptions wstep_ok_racy_kR_bind.
@@ -1276,3 +1752,7 @@ Print Assumptions wwalk_run_outcome.
 Print Assumptions wfetch_tail_of_exports.
 Print Assumptions wfetch_peel_selfcontained.
 Print Assumptions wfetch_peel_k_selfcontained.
+Print Assumptions exec_eff_pmpCheck_supervisor_grant_fetch.
+Print Assumptions wfetch_gates_of_regs.
+Print Assumptions wfetch_peel_of_regs.
+Print Assumptions wkpt_fetch_peel_at.

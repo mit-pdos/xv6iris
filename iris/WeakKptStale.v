@@ -583,6 +583,32 @@ Section WeakKptStaleDispatch.
 End WeakKptStaleDispatch.
 
 (* ====================================================================== *)
+(** ** 2bis. THE SREGS DESCRIPTION, WEAKENED TO THE USABLE FORM
+
+    §2's family reports the walk's register footprint as a DISJUNCTION —
+    unchanged, or exactly one [register_set tlb] whose value mentions the
+    residue's [tlbvec].  That vector is existentially hidden inside
+    [wtlb_res_pt], so §3 cannot re-export the disjunction as it stands.  It
+    exports instead the weakening the consumers actually use — the SC side's
+    ([SmodeCorePt.pt_regs_preserved], restated here rather than imported to
+    keep this file's [Require] set as it was):
+
+        EVERY REGISTER BUT [tlb] SURVIVES THE TRANSLATION.
+
+    That form mentions no vector at all, and is exactly what a gate that
+    reads [pmpcfg_n] / [pmpaddr_n] / [pma_regions] / [htif_tohost_base] /
+    [cur_privilege] at a post-translation state needs. *)
+
+Lemma wtlb_regs_preserved (rs rs' : regstate) :
+  (rs' = rs \/ exists tv, rs' = register_set tlb tv rs) ->
+  forall r : register, register_beq r tlb = false ->
+    register_lookup r rs' = register_lookup r rs.
+Proof.
+  intros [-> | (tv & ->)] r Hr; [reflexivity |].
+  exact (irrelevant_register_set r tlb rs tv Hr).
+Qed.
+
+(* ====================================================================== *)
 (** ** 3. THE RACY ABSORPTION THEOREM *)
 
 Section WeakKptStaleAbsorb.
@@ -661,6 +687,9 @@ Section WeakKptStaleAbsorb.
               = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sg', es) /\
               mem sg' = wflat (wm_img σ) (wm_log σ) /\
               mdev sg' = wm_dev σ /\
+              (* §2bis: the sregs description, in the tlbvec-free form *)
+              (forall r : register, register_beq r tlb = false ->
+                 register_lookup r (sregs sg') = register_lookup r (wm_regs σ)) /\
               (es = [] \/
                es = [WEread wak_plain a2 8; WEread wak_plain a1 8;
                      WEread wak_plain la 8] \/
@@ -682,6 +711,9 @@ Section WeakKptStaleAbsorb.
                 = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sg', es) /\
                 mem sg' = write_bytes (wflat (wm_img σ) (wm_log σ)) (la : Arch.pa) 8 lw' /\
                 mdev sg' = wm_dev σ /\
+                (* §2bis: the sregs description, in the tlbvec-free form *)
+                (forall r : register, register_beq r tlb = false ->
+                   register_lookup r (sregs sg') = register_lookup r (wm_regs σ)) /\
                 es = (if wtr
                       then [WEread wak_plain a2 8; WEread wak_plain a1 8;
                             WEread wak_plain la 8;
@@ -913,8 +945,11 @@ Section WeakKptStaleAbsorb.
                     HA Hord HX HW HR Hcov with "Hpc Hpa"). }
       iLeft. iFrame "Hla Hi". iPureIntro.
       intros av dv Hle.
-      destruct (Hfam' av dv Hle) as (sgx & esx & H1 & H2 & H3 & _ & H5).
-      exists sgx, esx. split_and!; [exact H1|exact H2|exact H3|exact H5].
+      destruct (Hfam' av dv Hle) as (sgx & esx & H1 & H2 & H3 & H4 & H5).
+      exists sgx, esx. split_and!;
+        [exact H1|exact H2|exact H3| |exact H5].
+      apply wtlb_regs_preserved.
+      destruct H4 as [H4 | (ae & de & H4)]; [by left | right; by eexists].
     - (* ================= WRITE-BACK, absorbed ================= *)
       set (lw' := pte_set_ad lw a1 d1) in *.
       assert (Habs : lw' = pte_set_ad w0 a1 d1)
@@ -1104,8 +1139,11 @@ Section WeakKptStaleAbsorb.
       iSplitR; [iPureIntro; exact Hupd'|].
       iSplitR.
       { iPureIntro. exists wtr. intros av dv Hle.
-        destruct (Hfam' av dv Hle) as (sgx & esx & H1 & H2 & H3 & _ & H5).
-        exists sgx, esx. split_and!; [exact H1|exact H2|exact H3|exact H5]. }
+        destruct (Hfam' av dv Hle) as (sgx & esx & H1 & H2 & H3 & H4 & H5).
+        exists sgx, esx. split_and!;
+          [exact H1|exact H2|exact H3| |exact H5].
+        apply wtlb_regs_preserved.
+        destruct H4 as (ae & de & H4). right. by eexists. }
       iFrame "Hla Hi".
   Qed.
 

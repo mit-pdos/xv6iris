@@ -119,13 +119,33 @@ an `exec_eff` register-frame lemma; none of the gate registers is
 `tlb`, and the Iris layer will hold them from register ownership
 anyway.
 
-What remains of this front: the Iris fupd packaging of the fetch
-restatement (the weak twin of `tlb_inv_pt_fetch` over the state
-interpretation, consuming the self-contained peel + the absorption
-theorem's ghost arms), the straddle/RVC fetch arms over §9 +
-`wstep_ok_racy_kR`, and 6c's funnel (`wwp_instr_s`) composing the CPS
-fetch peel with the execute phase, whose Q-half is now statable by
-rewriting against the family.
+**THE IRIS FUPD IS IN (2026-08-13, `WkFetchPeel` §§5–6 —
+`wkpt_fetch_peel_at`; `plat_term_write` + funext, same as the
+absorption theorem it opens).**  One fupd: the absorption theorem's
+resources in (`kmap_at`/`reg_interp`/`wlog_auth`/`wlat_interp`/
+`wtlb_res_pt`), its full conclusion out PLUS the pure conjunct
+`racc_disj la 8 pa 4 → (the peel of `fetch tt` at the PC page's window
+∧ its wadm_filter)` — CONDITIONAL because `la` is minted inside the ∃
+(the funnel discharges the text-vs-slot disjointness from region
+geometry once it holds `la`).  Enablers, both worth knowing:
+- the absorption theorem's ghost-arm families now export the SC-shaped
+  register preservation `∀ r, register_beq r tlb = false →
+  register_lookup r (sregs sg') = register_lookup r (wm_regs σ)`
+  (derived from the dispatch's tlb-only disjunct via
+  `irrelevant_register_set`; `tlbvec` never exposed) — carried in
+  `wwalk_exports` as ONE hoisted run-equation-keyed field, so the
+  peel-side arms stay verbatim;
+- `wfetch_gates_of_regs`: the fetch tail's gates all discharge at σ
+  (pmpcfg/pmpaddr/pma_regions/htif/cur_privilege — none is `tlb`),
+  with only the text word's RAM geometry + the four PMP-grant facts +
+  `pma_allows_all` left as premises; the fetch-side pmp grant needed
+  one new lemma (`exec_eff_pmpCheck_supervisor_grant_fetch`, the load
+  grant's script with R→X).
+
+What remains of this front: the straddle/RVC fetch arms over §9 +
+`wstep_ok_racy_kR`, and 6c's funnel (`wwp_instr_s`) — which now has
+every fetch-side ingredient: this fupd for the resource side, the CPS
+peel for the execute-phase bind, and the ⇐-bridge for its Q-half.
 
 **DECISION (2026-08-12, the φ-upgrade author, as §5 requested): take
 option (a), and do NOT start until the in-flight C/D/S points-to surgery
