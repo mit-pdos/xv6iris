@@ -797,6 +797,10 @@ SpecUartwrite.v
 CodeUartwrite.v
 ProofUartwrite.v
 LinkUartwrite.v
+W32Arith.v
+ConsoleInv.v
+CodeConsolewrite.v
+CodeConsoleread.v
 SpecConsoleintr.v
 LinkConsoleintr.v
 WpUartgetc.v
@@ -1053,6 +1057,7 @@ ProofFilestat.v
 LinkFilestat.v
 SpecFilewrite.v
 SpecConsolewrite.v
+ProofConsolewrite.v
 LinkConsolewrite.v
 ProofFilewriteParts.v
 ProofFilewrite.v

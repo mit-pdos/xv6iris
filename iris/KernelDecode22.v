@@ -127,6 +127,11 @@ Lemma ke_6f9c s :
   = Some (ExecuteAs (LOAD (mword_of_int 24 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 8)), s).
 Proof. apply exec_execute_C_LD_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
 
+Lemma kd_7119 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x7119 : mword 16)) s
+  = Some (C_ADDI16SP (mword_of_int 56), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
 Lemma kd_7169 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x7169 : mword 16)) s
   = Some (C_ADDI16SP (mword_of_int 45), s).

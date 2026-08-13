@@ -28,6 +28,7 @@ Require Import FdSlots WpLock.
 Require Import KallocInv.
 Require Import ProcInv.
 Require Import FileInvDefs.
+Require Import ConsoleInv.
 Require Import SpecConsoleread.
 
 Module Consoleread : CONSOLEREAD.
@@ -35,8 +36,8 @@ Module Consoleread : CONSOLEREAD.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γf : gname)
-      (γs : list gname) (j : nat) (γlp : gname)
+      (γs : list gname) (j : nat) (γlp : gname) (γc : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (n : Z) (b : bool),
-      wp_consoleread_sconf_body γa γf γs j γlp m av eb C pid V n b.
+      wp_consoleread_sconf_body γa γf γs j γlp γc m av eb C pid V n b.
 End Consoleread.

@@ -280,10 +280,11 @@ usual reason.  Reach for this shape for any other `static` helper gcc inlines.
 
 ## Remaining work
 
-- **consolewrite** is uartwrite's only caller (`console.c`, via a 64-byte
-  bounce buffer filled by `either_copyin`); its proof is what would first
-  exercise that contract.  **consoleread** and **consoleintr** are the rest of
-  console.c; proving consoleintr retires this cone's only assumption.
+- ~~**consolewrite**~~ — DONE.  uartwrite's only caller is proven and linked
+  (a 32-byte bounce buffer in its own frame, filled by `either_copyin`), so
+  the transmit contract is exercised end to end.  What is left of console.c
+  is **consoleread** and **consoleintr**; proving consoleintr retires this
+  cone's only assumption.  See [`console.md`](console.md).
 - **Boot wiring**: a `WpLock.newlock` over uartinit's `lk_fresh a_tx_lock
   "uart"` and the transmitter token from `uart_ghosts_alloc`, producing
   `is_txlock`, plus putting `is_txlock` into main's deposit payload.  Nothing

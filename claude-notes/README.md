@@ -131,6 +131,10 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 - **[`printk.md`](projects/printk.md)** — the formatted-output cone, all proven
   and linked: `pk_held`, `PrintkFmt.v`, the fuel inductions, the loop-assembly
   architecture. Only the general (non-panic) path remains.
+- **[`console.md`](projects/console.md)** — console.c: consolewrite (proven,
+  axiom-clean), consoleread (specified, proof owed) and consoleintr; the
+  `cons` module's own state in `ConsoleInv.v` and why its resource is
+  deliberately unconstrained.
 - **[`uart-driver.md`](projects/uart-driver.md)** — the interrupt-driven UART
   driver; uart.c is 4/4 functions. Read it for the transmit path's shape and for
   the rotated-loop / nested-iLöb / `uart_sent_sub` techniques. Remaining:

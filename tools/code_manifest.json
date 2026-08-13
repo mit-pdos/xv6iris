@@ -120,6 +120,18 @@
   2
  ],
  [
+  "CodeConsoleread.v",
+  "consoleread",
+  "cnri_",
+  3
+ ],
+ [
+  "CodeConsolewrite.v",
+  "consolewrite",
+  "cnwi_",
+  2
+ ],
+ [
   "CodeConsputc.v",
   "consputc",
   "cpi_",

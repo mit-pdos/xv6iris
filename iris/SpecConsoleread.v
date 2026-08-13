@@ -1,48 +1,71 @@
 (* SpecConsoleread.v -- the public interface of consoleread, stated
-   independently of its proof.
+   independently of its proof.  Requires only the definitional layer -- never
+   a whole-function proof file -- so every function proof can be checked in
+   parallel.
 
-     int consoleread(int user_dst, uint64 dst, int n);
+     int consoleread(int user_dst, uint64 dst, int n) {
+       uint target = n;  int c;  char cbuf;
+       acquire(&cons.lock);
+       while (n > 0) {
+         while (cons.r == cons.w) {
+           if (killed(myproc())) { release(&cons.lock); return -1; }
+           sleep_prepare(&cons.r);
+           release(&cons.lock);
+           sleep();
+           acquire(&cons.lock);
+         }
+         c = cons.buf[cons.r++ % INPUT_BUF_SIZE];
+         if (c == C('D')) { if (n < target) cons.r--; break; }
+         cbuf = c;
+         if (either_copyout(user_dst, dst, &cbuf, 1) == -1) break;
+         dst++;  --n;
+         if (c == '\n') break;
+       }
+       release(&cons.lock);
+       return target - n;
+     }
 
-   consoleread takes cons.lock, sleeps on &cons.r until a whole line has been
-   typed, copies up to [n] bytes of it out to the user address [dst] with
-   either_copyout, and returns the number copied -- or -1 if the process was
-   killed while it waited.  @ KernelSyms.consoleread = 0x80000178.
+   @ KernelSyms.consoleread = 0x80000178, 89 instructions / 274 bytes; a
+   96-byte frame with ra/s0/s1/s2/s3/s4/s6/s7 saved in the prologue and s5 --
+   the byte just read -- SHRINK-WRAPPED onto the paths that have one.
 
-   *** THIS CONTRACT IS ASSUMED (LinkConsoleread.v). ***  It is the third of
-   its kind, after LinkKerneltrap.v and LinkConsoleintr.v, and it exists for
-   the same reason: fileread's FD_DEVICE arm dispatches through
-   [devsw[f->major].read], the console is the only device xv6 installs, and
-   consoleread has no proof.  Isolating the assumption here keeps
-   ProofFileread.v itself axiom-free -- it is a functor over [CONSOLEREAD],
-   and proving consoleread later replaces this file and nothing else.
+   THE SHAPE IS PIPEREAD'S, and not by imitation: the two are the same animal,
+   a blocking read into USER memory by the running thread, under a spinlock
+   that a wakeup-issuing interrupt handler also takes.  Conjunct for conjunct,
+   [SpecPiperead.v] with the pipe replaced by the console:
 
-   ---- THE SHAPE, AND WHY IT IS PIPEREAD'S ------------------------------
-
-   consoleread and piperead are the same kind of animal: a blocking read into
-   USER memory by the running thread.  So this contract is stated in
-   [SpecPiperead.v]'s shape, conjunct for conjunct, minus the pipe:
-
+   * [ConsoleInv.is_conslock γc] is THE WHOLE CREDENTIAL -- one persistent
+     proposition, no reference, no fraction.  [cons] is a static global, so
+     unlike a pipe's page it is never freed and its lock is not cancellable;
+     what the lock protects is [ConsoleInv.cons_res], the 128-byte ring and
+     the three index words, and nothing of it comes back out to a caller;
    * it SLEEPS, so it threads the running-thread bundle ([procs_inv]) and
      takes the hart-generic parking premise [eb = true] at [noff = 0] --
      cons.lock is the only lock it holds and sleep demands that.  The parked
      scheduler record is NOT threaded: it lives in the running proc's own
-     [p->lock] ([SchedCtx.run_slot]), which sleep reaches by holding it;
-   * it copies out, so it takes [proc_priv] and [kalloc_env] (copyout reaches
-     vmfault, hence kalloc) and gives the block back at an EXTENDED page
-     table ([uptd_ext]), exactly as readi's user arm does;
+     [p->lock] ([SchedCtx.run_slot]), which sleep reaches by holding it.  The
+     condition lock is dropped and re-taken by consoleread ITSELF, through
+     the ordinary RELEASE / ACQUIRE contracts (SpecSleep.v's split protocol);
+   * it copies out, so it takes [proc_priv_core] and [kalloc_env]
+     (either_copyout reaches copyout, hence vmfault, hence kalloc) and gives
+     the block back at an EXTENDED page table ([uptd_ext]), exactly as
+     readi's user arm does;
    * it gives back every callee-saved register and the nesting level.
 
-   ---- WHAT THE ASSUMPTION HIDES ---------------------------------------
+   ---- WHAT IT PROMISES ABOUT THE OUTPUT -------------------------------
 
-   Worth naming, because a proven consoleread could not be silent about it:
-   consoleread reads [cons.buf] and advances [cons.r], which
-   [consoleintr] -- itself assumed (LinkConsoleintr.v) -- writes and whose
-   [wakeup] is what ends the sleep.  This contract says nothing about the
-   console's ring buffer at all, so the two assumptions are not independent:
-   together they assert that the console line discipline is correct.  What
-   fileread's caller gets out of it is only the RETURN VALUE bound
-   [-1 <= r <= n] -- deliberately, since a device read's bytes are not a
-   function of any state the file system models. *)
+   The RETURN VALUE RANGE, [-1 <= r <= n], and nothing else.  The [-1] is
+   real here (unlike consolewrite's): a process killed while it waits gets
+   it.  ([Z.max 0 n] rather than [n] so the statement is true at a
+   non-positive request too, where the loop never runs and the answer is 0.)
+
+   WHAT IT DOES NOT PROMISE IS WHICH BYTES ARRIVED, and that is a property of
+   [ConsoleInv.cons_res] rather than of this contract: the ring's contents
+   are unconstrained there because the only thing that FILLS them is
+   consoleintr, which is assumed (LinkConsoleintr.v).  See ConsoleInv.v's
+   header for why a coupling stated today would be an assumption in
+   disguise.  What fileread's caller gets out of the call is the range above,
+   which is what [SpecFileread.fileread_ret] consumes. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -65,6 +88,7 @@ Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
+Require Import ConsoleInv.
 Require Import PanicStub.
 Require Import SchedCtx.
 Require Export SwtchCtx.
@@ -83,8 +107,8 @@ Definition consoleread_stack : nat := 62%nat.
 Definition wp_consoleread_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (γf : gname) 
-    (γs : list gname) (j : nat) (γlp : gname)
+    (γa : gname) (γf : gname)
+    (γs : list gname) (j : nat) (γlp : gname) (γc : gname)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
     (pid : mword 32) (V : pprivate) (n : Z) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.consoleread in
@@ -108,6 +132,10 @@ Definition wp_consoleread_sconf_body
   (* noff = 0: sleep demands cons.lock be the ONLY lock held *)
   cpu_own 0%nat eb pj C b -∗
   kernel_text -∗ pc_is pcE -∗
+  (* THE WHOLE CREDENTIAL: cons.lock, whose resource is the ring and the
+     three indices (ConsoleInv.v).  Persistent, so nothing about the console
+     is threaded and nothing comes back. *)
+  is_conslock γc -∗
   proc_priv_core pj pid V -∗
   kalloc_env γa None -∗
   procs_inv γs -∗
@@ -118,7 +146,7 @@ Definition wp_consoleread_sconf_body
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       (* the whole of what a device read promises: it delivered somewhere
          between "failed" and "all of it". *)
-      ⌜(-1 <= r <= n)%Z⌝ -∗
+      ⌜(-1 <= r <= Z.max 0 n)%Z⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int r : mword 64)⌝ -∗
       sie_cap_gpr mf av b pj -∗
       cpu_own 0%nat eb pj C b -∗
@@ -132,7 +160,8 @@ Module Type CONSOLEREAD.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
+      (γc : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (n : Z) (b : bool),
-      wp_consoleread_sconf_body γa γf γs j γlp m av eb C pid V n b.
+      wp_consoleread_sconf_body γa γf γs j γlp γc m av eb C pid V n b.
 End CONSOLEREAD.

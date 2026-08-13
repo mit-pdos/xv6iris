@@ -1,23 +1,18 @@
-(* LinkConsolewrite.v -- the one place consolewrite's contract is ASSUMED.
+(* LinkConsolewrite.v -- consolewrite's proof, instantiated against its
+   callees'.
 
-   The fourth file of its kind (LinkKerneltrap.v, LinkConsoleintr.v and
-   LinkConsoleread.v are the others), and the write side's exact twin of the
-   third.  Every other link file in the tree instantiates a proof functor
-   against its callees' PROOFS; consolewrite has none, so this link supplies
-   the interface with an [Axiom] instead -- the single assumption the
-   filewrite cone rests on ([tools/proof_coverage.py] reports it as such).
-   Isolating it here means [ProofFilewrite.v] itself is axiom-free: it is a
-   functor over [CONSOLEWRITE], and proving consolewrite later replaces this
-   file, nothing else.
+   It WAS an [Axiom] (the fourth of its kind, beside LinkKerneltrap.v,
+   LinkConsoleintr.v and LinkConsoleread.v), because filewrite's FD_DEVICE arm
+   dispatches through [devsw[f->major].write], the console is the only device
+   xv6 installs, and consolewrite had no proof.  It has one now
+   (ProofConsolewrite.v), so this file is an ordinary two-argument functor
+   application and the filewrite cone lost an assumption.
 
-   Written out with an explicit [Axiom] rather than a [Declare Module]: both
-   are visible to [Print Assumptions], but only the keyword is visible to the
-   coverage tool's textual axiom scan.
-
-   What the assumption does and does not say: see SpecConsolewrite.v -- in
-   particular, it is silent about the uart's transmit ring, which is a
-   strictly larger elision than the console ring buffer LinkConsoleread
-   already elides. *)
+   What consolewrite needs from a caller grew with the proof, and the growth
+   is the honest part: [SpecConsolewrite.v] now asks for [WpUart.dev_inv] and
+   [UartTxInv.is_txlock] -- uartwrite's whole credential -- where the axiom
+   was silent about the transmitter altogether.  Both are persistent and both
+   ride in [SpecFilewrite.filewrite_dev_caps]. *)
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -29,15 +24,10 @@ Require Import RegFile.
 Require Import FdSlots WpLock.
 Require Import KallocInv.
 Require Import FileInv ProcInv.
+Require Import DiskPtsto WpUart.
+Require Import UartTxInv.
+Require Import LinkEitherCopyin LinkUartwrite.
+Require Import ProofConsolewrite.
 Require Import SpecConsolewrite.
 
-Module Consolewrite : CONSOLEWRITE.
-  Axiom wp_consolewrite_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ}
-      `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γf : gname)
-      (γs : list gname) (j : nat) (γlp : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (n : Z) (b : bool),
-      wp_consolewrite_sconf_body γa γf γs j γlp m av eb C pid V n b.
-End Consolewrite.
+Module Consolewrite := ConsolewriteProof EitherCopyin Uartwrite.

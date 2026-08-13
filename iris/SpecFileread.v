@@ -176,6 +176,7 @@ Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import PipeInvDefs.
 Require Import FileOff ProcInv.
+Require Import ConsoleInv.
 Require Import FileInvDefs.
 Require Import SpecReadi.
 From Kernel Require KernelSyms.
@@ -272,6 +273,7 @@ Record fread_names := MkFReadNames {
   frn_uart       : uart_names;
   frn_disk       : disk_names;
   frn_dlock      : gname;         (* virtio_disk.lock                       *)
+  frn_cons       : gname;         (* cons.lock -- the DEVICE arm's           *)
   frn_pd         : mword 64;
   frn_pav        : mword 64;
   frn_pu         : mword 64;
@@ -306,7 +308,7 @@ Global Instance fread_names_inhabited : Inhabited fread_names :=
     (UartNames 1%positive 1%positive 1%positive 1%positive)
     (DiskNames 1%positive 1%positive 1%positive 1%positive 1%positive
                1%positive 1%positive)
-    1%positive
+    1%positive 1%positive
     (mword_of_int 0) (mword_of_int 0) (mword_of_int 0)
     (MkBioNames 1%positive 1%positive 1%positive
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
@@ -333,18 +335,31 @@ Section SpecFileread.
 
   (* ---- the FD_DEVICE arm's environment ---- *)
 
+  (* WHAT THE CALLEE NEEDS, as opposed to what the DISPATCH needs.  The cell
+     below is how fileread finds consoleread; this is what consoleread itself
+     asks for (SpecConsoleread.v) -- [cons.lock], and nothing else.  ONE
+     conjunct where the write side has two ([SpecFilewrite.filewrite_dev_caps]
+     also carries the UART's), because consoleread never touches the
+     transmitter.  Persistent, so a caller pays for it once. *)
+  Definition fileread_dev_caps (fn : fread_names) : iProp Σ :=
+    is_conslock (frn_cons fn).
+
+  Global Instance fileread_dev_caps_persistent fn :
+    Persistent (fileread_dev_caps fn).
+  Proof. apply _. Qed.
+
   (* ONE cell, and only when the major is in range.  The disjunction is the
      honest statement of what the kernel installs: [consoleinit] fills
      [devsw[CONSOLE]] and nothing fills any other entry, so a read slot is
-     either null (and the code returns -1) or [consoleread] (whose contract is
-     ASSUMED, LinkConsoleread.v). *)
+     either null (and the code returns -1) or [consoleread]. *)
   Definition fileread_dev_env (fn : fread_names) (Cf : fcontent) : iProp Σ :=
     (if decide (dev_major Cf <= NDEV_max)
      then ⌜frn_rp fn (dev_major Cf) = (zero_reg : mword 64)
            \/ frn_rp fn (dev_major Cf)
                = (mword_of_int KernelSyms.consoleread : mword 64)⌝ ∗
           a_devsw_read (dev_major Cf) ↦₈{frn_dqv fn (dev_major Cf)}
-            frn_rp fn (dev_major Cf)
+            frn_rp fn (dev_major Cf) ∗
+          fileread_dev_caps fn
      else emp)%I.
 
   (* it is only READ, so it comes back as it went in *)
@@ -362,7 +377,8 @@ Section SpecFileread.
      [fileread_dev_env] at an OUT-OF-RANGE major is [emp], so the accessor is
      total: the code returns -1 before the table is indexed. *)
   Definition fileread_devsw (fn : fread_names) : iProp Σ :=
-    ([∗ list] i ∈ seq 0 (Z.to_nat NDEV_max + 1),
+    (fileread_dev_caps fn ∗
+     [∗ list] i ∈ seq 0 (Z.to_nat NDEV_max + 1),
        ⌜frn_rp fn (Z.of_nat i) = (zero_reg : mword 64)
          \/ frn_rp fn (Z.of_nat i)
              = (mword_of_int KernelSyms.consoleread : mword 64)⌝ ∗
@@ -377,8 +393,10 @@ Section SpecFileread.
        unfolding [fileread_dev_env] FIRST leaves the out side folded and the
        closing [iExact] fails on two terms that print differently for that
        reason alone. *)
-    rewrite /fileread_dev_out /fileread_dev_env.
-    iIntros "H". case_decide as Hle; [| iSplitR; [done | by iIntros "_"]].
+    rewrite /fileread_dev_out /fileread_dev_env /fileread_devsw.
+    iIntros "[#Hcaps H]".
+    case_decide as Hle;
+      [| iSplitR; [done | iIntros "_"; iFrame "Hcaps"; iExact "H"]].
     (* the major is a [bv_unsigned], hence non-negative, so it IS the index
        [Z.to_nat] of it names *)
     pose proof (proj1 (bv_unsigned_in_range _ (fc_major Cf))) as Hnn.
@@ -400,8 +418,10 @@ Section SpecFileread.
                        frn_rp fn (Z.of_nat jj))%I)
                  _ i i Hlk with "H") as "[Hone Hback]".
     iEval (rewrite Hid) in "Hone".
-    iSplitL "Hone"; [iExact "Hone"|].
-    iIntros "Hone". iApply "Hback". rewrite Hid. iExact "Hone".
+    iSplitL "Hone".
+    { iDestruct "Hone" as "[Hp Hc]". iFrame "Hp Hc". iExact "Hcaps". }
+    iIntros "(Hp & Hc & _)". iFrame "Hcaps".
+    iApply "Hback". rewrite Hid. iFrame "Hp Hc".
   Qed.
 
   (* ---- the FD_INODE arm's environment: ilock's, readi's and iunlock's ----

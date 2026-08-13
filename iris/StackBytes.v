@@ -116,6 +116,44 @@ Section StackBytes.
 
   (* ---- one 8-byte frame word <-> eight bytes ---- *)
 
+  (* ---- NAMING a run -------------------------------------------------
+
+     [bytes_own] owns each byte at an EXISTENTIAL value, and every consumer
+     that is parametric in the contents ([SpecCopyin]'s destination,
+     [SpecCopyout]'s source, uartwrite's buffer) asks instead for ONE naming
+     function.  Pulling the existential out is not free -- it is a choice over
+     the run -- so it is done once, here, by induction on the length.
+
+     At a LITERAL length the twenty-four-fold peel [ProofFilestatParts]
+     used to do is equivalent; at a length that varies (a chunked copy loop's
+     [nn]) nothing else will do. *)
+  Lemma bytes_own_name (n : nat) (a : Arch.pa) :
+    bytes_own (DfracOwn 1) a n ⊢
+    ∃ f : nat -> bv 8, ([∗ list] j ∈ seq 0 n, (pa_add a j) ↦ₘ f j).
+  Proof.
+    revert a. induction n as [| n IH]; intro a.
+    - iIntros "_". iExists (fun _ => bv_0 8). by rewrite big_sepL_nil.
+    - rewrite /bytes_own seq_S big_sepL_app big_sepL_singleton Nat.add_0_l.
+      iIntros "[Hh Hl]".
+      iDestruct (IH a with "Hh") as (g) "Hh".
+      iDestruct "Hl" as (bn) "Hl".
+      iExists (fun j => if decide (j < n)%nat then g j else bn).
+      iSplitL "Hh".
+      + iApply (big_sepL_impl with "Hh"). iIntros "!>" (k jj Hk) "H".
+        apply lookup_seq in Hk as [-> Hlt].
+        rewrite decide_True; [iExact "H" | lia].
+      + rewrite big_sepL_singleton decide_False; [iExact "Hl" | lia].
+  Qed.
+
+  (* the other direction is not a choice, only a forgetting *)
+  Lemma bytes_own_of_name (n : nat) (a : Arch.pa) (f : nat -> bv 8) :
+    ([∗ list] j ∈ seq 0 n, (pa_add a j) ↦ₘ f j) ⊢ bytes_own (DfracOwn 1) a n.
+  Proof.
+    rewrite /bytes_own. iIntros "H".
+    iApply (big_sepL_impl with "H"). iIntros "!>" (k jj Hk) "H".
+    by iExists (f jj).
+  Qed.
+
   Lemma slot_bytes_own (a : Arch.pa) (w : bv 64) :
     a ↦₈ w ⊢ ⌜ is_aligned_paddr (Physaddr a) 8 = true ⌝ ∗ bytes_own (DfracOwn 1) a 8.
   Proof.
