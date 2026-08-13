@@ -5859,3 +5859,70 @@ Not started.  But finding 4 settles its shape, and it is **not** the
   call, and two `iAssert`ed inner continuations (`:1683`/`:1709` and
   `:2452`/`:2478`) that carry the ledger.  That is iput-sized, not
   itrunc-sized.
+
+### FINDING 6 — **STAGE 3 IS BLOCKED, AND NOT ON ANYTHING IN `SpecDirlink`.
+### `DIRLINK_GEN` CANNOT BE MADE USEFUL UNTIL writei's CONTRACT EXPOSES ITS
+### AMORTIZED SPEND — which is deliberately parked.  STOPPING HERE.**
+
+The set half of stage 3 is trivial (thread `Sb` through one `writei` call,
+one `iput` call and two `iAssert`ed inner continuations).  It is also
+**useless on its own**, and the arithmetic is already in the tree:
+
+* `CreateBudget.v:265` proves `cr_u0 < 4 * dirlink_units`, i.e. create's
+  four dirlinks at the counted figure (`dirlink_units = 7`, so 28) against
+  `cr_u0 = MAXOPBLOCKS = 10`.  So create needs a spend from dirlink shaped
+  like `dl_spend crb crd cru al ind = wi16_spend crb crd cru al ind`, not
+  `dirlink_units`.
+* `wi16_spend crb crd cru al ind = bmap_cost crb al ind + (if al||crd then
+  0 else 1) + iu_spend cru` — a **credit-aware** figure.
+* But `wp_writei_gen`'s post promises `ncount - wi_cost_bmonly off n <= n'`
+  (`SpecWritei.v:893`), which is the **same coarse bound as the counted
+  form** (`:622`).  The gen form adds `⌜Sb ⊆ Sb'⌝` and *nothing else about
+  the counter*.
+* `CreateBudget.v`'s own `wi16_need_matches_landed` says this in one line:
+  `wi16_need false false = wi_cost_bmonly off 16` (both 4), with the
+  comment **"THE NEED WAS NEVER THE PROBLEM; the SPEND bound is."**
+
+So the missing contract is not `wp_writei_cred` and not `DIRLINK_GEN` — it
+is a writei contract whose POST states the amortized spend.  The machinery
+exists and is *already wired into the walk*: `ProofWritei.v` carries
+`wi_inv_bud` / `wi_inv_spent` / `bm_pot` through the loop (17 occurrences,
+invariant at `:1805`-`:1813`, steps at `:2031` and `:2839`).  What is
+missing is only the EXPOSURE at the seam.
+
+**Why this is a STOP and not an improvisation.**  `SpecWritei.v:228-237`
+records that the third amortization (the indirect block across iterations)
+is *deliberately not modelled* — "the machinery is proven and parked in
+`WriteiBudget`'s `LogAmort` section for the day a kernel change needs
+them" — and that today's accounting fits with **ZERO slack**
+(`wi_cost_bmonly_no_slack`, `wi_cost_bmonly 1023 FW_MAX = 10 =
+MAXOPBLOCKS` exactly).  Strengthening writei's post therefore reopens a
+budget that was closed on purpose, at zero margin, and the choice of WHICH
+credits to expose (`crb` alone? `crb`+`crd`? the `al` arm?) is a spec
+decision with a knock-on into `bmap`'s contract, not a threading job.
+Improvising it would have been exactly the "revise the spec rather than
+force the proof through an awkward interface" case the durable notes hand
+to the orchestrator.
+
+**What the coordinator should decide before stage 3 is re-queued:**
+
+1. Does writei expose a second post clause (leaving `wi_cost_bmonly`
+   in place, additive) of the form
+   `⌜ncount - wi_spend_amort bmapstart Sb off n <= n'⌝`, with
+   `wi_spend_amort` = `wi_cost_bmonly` minus the potential already paid
+   (`bm_pot bmapstart Sb`)?  That is the smallest change and matches what
+   the walk already proves.
+2. Or does it expose the full `wi16_spend`-shaped figure, which needs
+   `crd` (target block) and `al` (bmap allocated) — both of which are
+   *outputs* of the call, not inputs, so they would have to be
+   existentially reported in the post rather than taken as parameters.
+   `SpecBmap.bmap_alloced` / `bmap_ind` already name them, which is why
+   `wi16_spend` takes them.
+3. Either way `DIRLINK_GEN` is then ~one iput-sized walk on top, by the
+   GR-2b seam-counting rule (`ProofDirlink.v` is 3162 lines with six
+   `log_op` occurrences: one `iput` call at `:1522`, one `writei` call at
+   `:2054`, and two inner continuations at `:1683`/`:1709` and
+   `:2452`/`:2478`).
+
+Nothing was edited for stage 3.  `SpecDirlink.v` / `ProofDirlink.v` are
+untouched.
