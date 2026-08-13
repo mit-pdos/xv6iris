@@ -175,13 +175,32 @@ forbids pre-racy writes) — the fix is routing those shapes through the
 member's per-shape CONSTANCY (the absorption theorem produces it; the
 bundle drops it).  Additive when needed.
 
-What remains of this front: the S-mode racy WP RULE (new — the started
-cone's `wp_wracy_load` is pinned at `D := racc_disj`/`W := False`;
-this one consumes the step peel + family + `wexec_outcome_of_peel` at
-`wD_any`/`True`, with `wkpt_fetch_peel_at` on the resource side), the
-straddle/RVC fetch arms over §9 + `wstep_ok_racy_kR`, the
-writing-execute constancy export above, and then 6c's funnel/leaf
-sweep proper.
+**THE WP RULE IS IN (2026-08-13, `iris/WkWalkRule.v` —
+`wp_wwalk_step`; axioms = WkStepPeel's set, NO funext).**  `wwalk_cert`
+(peel + disjunctive family + wexec-keyed Q-half at
+`wD_any`/`W := True`), the rule mirroring `wp_wracy_load`'s
+`wp_wrun_step` plumbing with the continuation's equation being
+`exec_stale la 8 u (riscv_step tick) (wflat_st σ) = Some (tt,
+wflat_st σ', es)` — the leaf's ghost work rewrites it against the
+family — plus the §10 latest_ts-off-window conjunct and
+`wstep_post_racy`.  NO `sync_win` premise: the PT window's φ-obligation
+is the CLEAN arm (witness: the absorption theorem's `nv_free` export);
+the wiring into φ's preservation is flagged in the header as the
+φ-mechanization's debt.  Inhabitation is real: `wwalk_site` bundles the
+peel+family site premises indexed on (σ, tick), and
+`wp_wwalk_step_cert_of_peel` turns "every P-state is a site" + a
+Q-half into a `wwalk_cert` — P is the leaf's site predicate, which is
+how the funnel instantiates it.
+
+**The fetch-walking instruction story is now complete from the Sail
+model to the WP**: model mirrors → absorption → peels → ⇐-bridge →
+step certificate → `wp_wwalk_step`, with `wkpt_fetch_peel_at`
+supplying the resource side.  What remains of this front: 6c's
+funnel/leaf sweep proper (thread `wkpt_fetch_peel_at`'s outputs into a
+`wwalk_site`-shaped P and drive `wp_wwalk_step` for a first concrete
+S-mode instruction — the validation capstone), the straddle/RVC fetch
+arms over §9 + `wstep_ok_racy_kR`, the writing-execute constancy
+export, and the φ clean-arm wiring.
 
 **DECISION (2026-08-12, the φ-upgrade author, as §5 requested): take
 option (a), and do NOT start until the in-flight C/D/S points-to surgery
