@@ -799,7 +799,7 @@ Section xcomplete.
                 (prj_cfg_bnd q c Hbnd) Hlks
                 ltac:(by rewrite /prj_ag /= Hst)
                 Hsh Hlv)
-      as (cs' & ags' & ms & Hrun & Hlk2 & (agb & Hagb & Hmb) & Hf2 & _).
+      as (cs' & ags' & ms & fu & Hrun & _ & Hlk2 & (agb & Hagb & Hmb) & Hf2 & _).
     destruct (pf_solo_run_lift next i c (prj_cfg q c) cs' Hrun Hl)
       as (c' & Hxrun & (Himg' & Hlog' & agx & ags & Hax & Has & Hpst & Hpws & Hppr)
           & Hfr).
@@ -1886,7 +1886,8 @@ Proof.
     destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
                   |pr pw sr sw]; try done.
     + destruct lat; [done|].
-      by destruct H as (_ & _ & _ & _ & w & _ & ->).
+      destruct H as [(_ & _ & _ & _ & w & _ & ->)
+                    |(_ & _ & _ & _ & w & _ & y & rs1 & _ & ->)]; done.
     + by destruct H as (_ & _ & _ & _ & _ & w & m1 & m2 & rs1 & _ & _ & _ & ->).
   - (* MemWrite, RAM *)
     by intros (_ & _ & _ & ->).

@@ -131,15 +131,51 @@
         bracket carries that as the [sail_shaped] premise (the [no_coh_reads]
         of the task statement, folded into the one shape predicate).
 
-    (e) EXCLUSIVE ACCESSES ONLY EVER APPEAR FUSED.  The plain-store arm
-        requires [ak_latest = false], so a conditional (store-exclusive)
-        write is NOT steppable on its own: it can only be consumed as the
-        write half of the fused arm.  [sail_shaped] demands the matching
-        shape — every exclusive [MemRead] node's continuation reaches, through
-        register/trace/choice code ONLY, a conditional [MemWrite] to the same
-        address and of the same width.  This, plus [nz_writes]-style nonzero
-        widths, is the whole content of [sail_shaped]; it is the caller's
-        obligation exactly as [WeakInterpProj.nz_writes] is.
+    (e) AN EXCLUSIVE WINDOW EITHER FUSES OR IS ABANDONED — AND BOTH ARE ONE
+        STEP.  The plain-store arm requires [ak_latest = false], so a
+        conditional (store-exclusive) write is NOT steppable on its own: it
+        can only be consumed as the write half of the FUSED arm.  But real
+        hardware executes a bare [lr] with no [sc], a FAILING [sc], an
+        [amocas] whose comparison misses, and a page-walk whose exclusive PTE
+        read errors out — every one of which ABANDONS the window (stage C1
+        finding (O2); [WeakShape] §7c lists the three model sites).  Fusing
+        was the only arm, so all of those were STUCK: a machine coverage gap,
+        not merely a predicate bug.
+
+        The fix is the BARE EXCLUSIVE-READ ARM, the second disjunct of the
+        [LLoad] case of [sail_mstep]'s RAM [MemRead]: an [ak_latest] read may
+        also step as a PLAIN load ([lat := false] — an abandoned reservation
+        read has ordinary load semantics, and lat-freedom (§3) is preserved),
+        and — exactly as the fused arm brackets read/silent-window/write into
+        one [LRmw] — it brackets read/silent-window/[Interface.Ret] into one
+        [LLoad], landing the agent at the END of the instruction.  That is
+        not a convenience: it is what [amo_tail] already says, since an
+        abandoned window admits no further memory access and no barrier
+        before the instruction ends.  It also keeps the residual invariants
+        of the completion kit unchanged — after a bare step the residual is
+        [Interface.Ret], which is trivially [sail_shaped] and [sail_live], so
+        no window-mode residual ever exists.
+
+        [sail_shaped] demands the matching shape — every exclusive [MemRead]
+        node's continuation is an [amo_tail]: through register/trace/choice
+        code ONLY (no read, no barrier) it either reaches a conditional
+        [MemWrite] to the same address and of the same width, or reaches the
+        end of the instruction.  This, plus [nz_writes]-style nonzero widths,
+        is the whole content of [sail_shaped]; it is the caller's obligation
+        exactly as [WeakInterpProj.nz_writes] is.
+
+        The ⇐ direction cannot reconstruct a [wrun] from a block that used
+        the bare arm (a [wrun]'s exclusive read is not a plain load), so it
+        carries the run-local side condition [WeakSailLTS2.fused_blk],
+        target-indexed exactly like [dev_ok_blk].
+
+    (e') THE ANSWERS THE SHAPE PREDICATES QUANTIFY OVER ARE THE ANSWERS THIS
+        LTS SUPPLIES.  [sail_mstep]'s memory arms hand the continuation
+        [inl (w, None)] (read) and [inl None] (write) and nothing else, so
+        [sail_shaped]/[amo_tail] (and [WeakSailComplete.sail_live]) quantify
+        over exactly those — NOT over the full answer type, whose abort
+        branch [inr ab] the model answers with [exit tt] and which made
+        [∀ b, sail_live (riscv_step b)] refutable (stage C1 finding (O1)).
 
     (f) THE BRACKET IS PER-AGENT AND FRAMED.  [wrun_sail_bracket] is stated
         over an arbitrary agent list [ags] with agent [i]'s slot pinned and
@@ -212,6 +248,17 @@ Proof. rewrite /dev_read_t. by intros ->. Qed.
 Lemma dev_write_t_Some d pa n v d' :
   dev_write d pa n v = Some d' → dev_write_t d pa n v = d'.
 Proof. rewrite /dev_write_t. by intros ->. Qed.
+
+(** The whole-register-file update on a [wmstate].  ([WeakInterp.wset_reg] is
+    the single-register one.)  The silent window an exclusive read opens moves
+    NOTHING ELSE, so this is the only state change an ABANDONED window makes —
+    which is what the bare arm's bracket records (delta (e)) and what the ⇐
+    direction replays ([WeakSailLTS2] §4). *)
+Definition wregs_set (s : wmstate) (rs : regstate) : wmstate :=
+  WMState rs (wm_img s) (wm_log s) (wm_ws s) (wm_dev s).
+
+Lemma wregs_set_id s : wregs_set s (wm_regs s) = s.
+Proof. by destruct s. Qed.
 
 (** THE INTERRUPT ORACLE (delta (b') below).  One entry is one delivery of an
     external interrupt pin to this hart — the value [RiscvLang.plic_step]'s
@@ -335,14 +382,30 @@ Definition sail_mstep (m : M unit) (rs : regstate) (d : dev_state)
              | WeakPromise.LLoad aq false base tvs =>
                  (* a PLAIN load: the label fixes only the VALUES that flow
                     to the continuation; admissibility is the machine's job *)
-                 ak_latest (classify (Interface.ReadReq.access_kind req)) = false ∧
-                 aq = ak_sync (classify (Interface.ReadReq.access_kind req)) ∧
-                 base = pa_z (Interface.ReadReq.pa req) ∧
-                 length tvs = N.to_nat n ∧
-                 ∃ w : bv (8 * n),
-                   (∀ j : nat, (j < N.to_nat n)%nat →
-                      tvs.*2 !! j = Some (nth_byte w j)) ∧
-                   p' = PSail (Some (k (inl (w, None)))) rs d None iq
+                 (ak_latest (classify (Interface.ReadReq.access_kind req)) = false ∧
+                  aq = ak_sync (classify (Interface.ReadReq.access_kind req)) ∧
+                  base = pa_z (Interface.ReadReq.pa req) ∧
+                  length tvs = N.to_nat n ∧
+                  ∃ w : bv (8 * n),
+                    (∀ j : nat, (j < N.to_nat n)%nat →
+                       tvs.*2 !! j = Some (nth_byte w j)) ∧
+                    p' = PSail (Some (k (inl (w, None)))) rs d None iq)
+                 ∨
+                 (* THE BARE EXCLUSIVE READ (delta (e)): the window is
+                    ABANDONED — the read half has ordinary load semantics
+                    and the rest of the instruction is the silent window,
+                    bracketed to the instruction's [Interface.Ret] exactly as
+                    the fused arm brackets to its conditional write *)
+                 (ak_latest (classify (Interface.ReadReq.access_kind req)) = true ∧
+                  aq = ak_sync (classify (Interface.ReadReq.access_kind req)) ∧
+                  base = pa_z (Interface.ReadReq.pa req) ∧
+                  length tvs = N.to_nat n ∧
+                  ∃ w : bv (8 * n),
+                    (∀ j : nat, (j < N.to_nat n)%nat →
+                       tvs.*2 !! j = Some (nth_byte w j)) ∧
+                    ∃ (y : unit) (rs1 : regstate),
+                      silent_run (k (inl (w, None)), rs) (Interface.Ret y, rs1) ∧
+                      p' = PSail (Some (Interface.Ret y)) rs1 d None iq)
              | WeakPromise.LRmw aq rl base tvs data =>
                  (* THE FUSED ARM: exclusive read, silent prefix, conditional
                     write — one label *)
@@ -450,10 +513,11 @@ Definition sail_step (next : bool → M unit)
     which is why the spelling above is load-bearing (worklist W2b finding
     (v)). *)
 
-(** LAT-FREEDOM.  The only arm producing an [LLoad] pattern-matches [lat] at
-    [false]; the fused arm's read half carries no [lat] at all.  So no
-    latest-kind load is ever emitted — the hypothesis [WeakPromiseFact]'s
-    front-loading theorem takes. *)
+(** LAT-FREEDOM.  Both arms producing an [LLoad] — the plain load and the
+    BARE exclusive read (delta (e)) — pattern-match [lat] at [false]; the
+    fused arm's read half carries no [lat] at all.  So no latest-kind load is
+    ever emitted — the hypothesis [WeakPromiseFact]'s front-loading theorem
+    takes. *)
 Theorem sail_lat_free next : lat_free_prog (sail_step next).
 Proof.
   intros p aq base tvs p' H. rewrite /sail_step in H.
@@ -494,9 +558,14 @@ Proof.
   - (* MemRead *)
     destruct (dev_addr _); [by destruct H as [? _]|].
     destruct H as [Hcoh H]. destruct lat; [done|].
-    destruct H as (Hlat & Haq & Hbase & Hlt & w & Hw & Hp).
-    split; [done|]. split_and!; [done|done|done|by rewrite -Hlen|].
-    exists w. split; [|done]. intros j Hj. rewrite -Heq. by apply Hw.
+    split; [done|].
+    destruct H as [(Hlat & Haq & Hbase & Hlt & w & Hw & Hp)
+                  |(Hlat & Haq & Hbase & Hlt & w & Hw & y & rs1 & Hsil & Hp)].
+    + left. split_and!; [done|done|done|by rewrite -Hlen|].
+      exists w. split; [|done]. intros j Hj. rewrite -Heq. by apply Hw.
+    + right. split_and!; [done|done|done|by rewrite -Hlen|].
+      exists w. split; [intros j Hj; rewrite -Heq; by apply Hw|].
+      by exists y, rs1.
   - (* MemWrite *)
     destruct (dev_addr _); by destruct H as [? _].
   - (* Barrier *)
@@ -542,12 +611,22 @@ Qed.
     - no coherent reads (delta (d): rv64d never emits [AK_ifetch]/[AK_ttw]);
     - no zero-width RAM write (else the log grows with a message no label can
       mirror — [WeakInterpProj] header (5));
-    - EVERY exclusive [MemRead] is AMO-PAIRED: its continuation reaches, by
-      register/trace/choice code only, a conditional [MemWrite] to the SAME
-      address and width, and no conditional write occurs anywhere else
-      (delta (e)).
+    - EVERY exclusive [MemRead] OPENS A WINDOW: its continuation crosses, by
+      register/trace/choice code only, either to a conditional [MemWrite] to
+      the SAME address and width (the window CLOSES — the fused arm) or to
+      the end of the instruction (the window is ABANDONED — the bare arm),
+      and no conditional write occurs anywhere else (delta (e)).
 
-    [amo_tail pa n m] is the second half of that pairing. *)
+    [amo_tail pa n m] is that window.  Its [Interface.Ret] arm is [True]: a
+    window MAY be abandoned (stage C1 finding (O2) — [execute_LOADRES],
+    [execute_AMO]'s fault/mismatch arms and [update_and_write_pte]'s error
+    arms all do), and the LTS's bare arm is what steps such a tail.  What the
+    window still forbids is what would make the abandoned tail unsteppable or
+    the fused bracket unsound: no [MemRead], no [Barrier], and any [MemWrite]
+    at all must BE the closing conditional write.
+
+    Every ∀ over an answer is over the answers [sail_mstep] SUPPLIES —
+    [inl (w, None)] and [inl None] (delta (e')). *)
 Fixpoint sail_shaped (m : M unit) {struct m} : Prop :=
   match m with
   | Interface.Ret _ => True
@@ -555,31 +634,31 @@ Fixpoint sail_shaped (m : M unit) {struct m} : Prop :=
       (match oc in Interface.outcome _ T return (T → M unit) → Prop with
        | Interface.MemRead n req => λ k,
            if dev_addr (Interface.ReadReq.pa req)
-           then ∀ r, sail_shaped (k r)
+           then ∀ w : bv (8 * n), sail_shaped (k (inl (w, None)))
            else
              ak_coh (classify (Interface.ReadReq.access_kind req)) = false ∧
              (if ak_latest (classify (Interface.ReadReq.access_kind req))
               then ∀ w : bv (8 * n),
                      amo_tail (Interface.ReadReq.pa req) n (k (inl (w, None)))
-              else ∀ r, sail_shaped (k r))
+              else ∀ w : bv (8 * n), sail_shaped (k (inl (w, None))))
        | Interface.MemWrite n req => λ k,
            (if dev_addr (Interface.WriteReq.pa req) then True
             else n ≠ 0%N ∧
                  ak_latest (classify (Interface.WriteReq.access_kind req)) = false) ∧
-           (∀ r, sail_shaped (k r))
+           sail_shaped (k (inl None))
        | _ => λ k, ∀ r, sail_shaped (k r)
        end) k
   end
 with amo_tail (pa : Arch.pa) (n : N) (m : M unit) {struct m} : Prop :=
   match m with
-  | Interface.Ret _ => False
+  | Interface.Ret _ => True
   | Interface.Next oc k =>
       (match oc in Interface.outcome _ T return (T → M unit) → Prop with
        | Interface.MemWrite n' req' => λ k,
            dev_addr (Interface.WriteReq.pa req') = false ∧
            Interface.WriteReq.pa req' = pa ∧ n' = n ∧ n' ≠ 0%N ∧
            ak_latest (classify (Interface.WriteReq.access_kind req')) = true ∧
-           (∀ r, sail_shaped (k r))
+           sail_shaped (k (inl None))
        | Interface.MemRead _ _ => λ _, False
        | Interface.Barrier _ => λ _, False
        | _ => λ k, ∀ r, amo_tail pa n (k r)
@@ -778,12 +857,16 @@ Section bracket.
       reached, so [dev_read]/[dev_write] said [Some] there and the totalized
       accessors agree.
 
-      [amo_bracket pa n m]: [m] is the tail of an AMO (an [amo_tail]); it
+      [amo_bracket pa n m]: [m] is an open exclusive window (an [amo_tail]),
+      and the run inside it goes ONE OF TWO WAYS (delta (e)).  EITHER it
       reaches the conditional write by silent steps, and the REST of the
       instruction (after that write) is a pf run from the post-write
-      configuration.  The fused [LRmw] step itself is taken by the caller —
-      the read node — which is why this statement starts at the post-write
-      log. *)
+      configuration — the fused [LRmw] step itself is taken by the caller,
+      the read node, which is why that disjunct starts at the post-write log.
+      OR the window is ABANDONED: the run reaches [Interface.Ret] by silent
+      steps alone, so it touched nothing but the register file, and the
+      caller takes the BARE arm — which brackets the whole window, so this
+      disjunct carries no run at all. *)
 
   Definition sail_bracket (m : M unit) : Prop :=
     ∀ (s : wmstate) (x : unit) (s' : wmstate),
@@ -803,21 +886,24 @@ Section bracket.
     ∀ (s : wmstate) (x : unit) (s' : wmstate),
       amo_tail pa n m →
       wrun (Some i) m s x s' →
-      ∃ (m1 m2 : M unit) (rs1 : regstate) (rl : bool) (data : list (bv 8))
-        (k : wm_class),
-        silent_run (m, wm_regs s) (m1, rs1) ∧
-        wr_node m1 rl (pa_z pa) data m2 ∧
-        length data = N.to_nat n ∧ data ≠ [] ∧
-        (∀ (iq : istream) (prom : gset nat) ags,
-           ags !! i = Some (WPAgent (PSail (Some m2) rs1 (wm_dev s) None iq)
-                              (store_post_run (wm_ws s) rl (pa_z pa) (length data)
-                                 (S (length (wm_log s)))) prom) →
-           rtc (wp_pf_run (sail_step next))
-             (WPCfg (wimg s) (wm_log s ++ [WMsg (pa_z pa) data (Some i) k]) ags)
-             (WPCfg (wimg s) (wm_log s')
-                (<[i := WPAgent (PSail (Some (Interface.Ret x)) (wm_regs s')
-                                   (wm_dev s') None iq)
-                          (wm_ws s') prom]> ags))).
+      (∃ (m1 m2 : M unit) (rs1 : regstate) (rl : bool) (data : list (bv 8))
+         (k : wm_class),
+         silent_run (m, wm_regs s) (m1, rs1) ∧
+         wr_node m1 rl (pa_z pa) data m2 ∧
+         length data = N.to_nat n ∧ data ≠ [] ∧
+         (∀ (iq : istream) (prom : gset nat) ags,
+            ags !! i = Some (WPAgent (PSail (Some m2) rs1 (wm_dev s) None iq)
+                               (store_post_run (wm_ws s) rl (pa_z pa) (length data)
+                                  (S (length (wm_log s)))) prom) →
+            rtc (wp_pf_run (sail_step next))
+              (WPCfg (wimg s) (wm_log s ++ [WMsg (pa_z pa) data (Some i) k]) ags)
+              (WPCfg (wimg s) (wm_log s')
+                 (<[i := WPAgent (PSail (Some (Interface.Ret x)) (wm_regs s')
+                                    (wm_dev s') None iq)
+                           (wm_ws s') prom]> ags))))
+      ∨ (∃ rs1 : regstate,
+           silent_run (m, wm_regs s) (Interface.Ret x, rs1) ∧
+           s' = wregs_set s rs1).
 
   Local Ltac sbr_silent :=
     match goal with
@@ -837,11 +923,16 @@ Section bracket.
         let rs1 := fresh "rs1" in let rl := fresh "rl" in
         let data := fresh "data" in
         let kc := fresh "kc" in
+        let rsa := fresh "rsa" in
         destruct (proj2 (IH _) _ _ _ _ _ (Hsh _) Hrun)
-          as (m1 & m2 & rs1 & rl & data & kc & Hsil & Hwr & Hlen & Hne & Hch);
-        exists m1, m2, rs1, rl, data, kc;
-        split_and!; [|exact Hwr|exact Hlen|exact Hne|exact Hch];
-        eapply rtc_l; [|exact Hsil]; by rewrite /silent1 /=
+          as [(m1 & m2 & rs1 & rl & data & kc & Hsil & Hwr & Hlen & Hne & Hch)
+             |(rsa & Hsil & Heqs)];
+        [ left; exists m1, m2, rs1, rl, data, kc;
+          split_and!; [|exact Hwr|exact Hlen|exact Hne|exact Hch];
+          eapply rtc_l; [|exact Hsil]; by rewrite /silent1 /=
+        | right; exists rsa; split;
+            [eapply rtc_l; [|exact Hsil]; by rewrite /silent1 /=
+            |exact Heqs] ]
     end.
 
   (** THE CORE LEMMA (mutual induction over the monad, [WeakInterpProj]'s
@@ -855,7 +946,10 @@ Section bracket.
     { split.
       - intros s x s' _ [-> ->]. intros iq prom ags Hlk.
         rewrite (list_insert_id _ _ _ Hlk). apply rtc_refl.
-      - intros pa n s x s' Hamo. destruct Hamo. }
+      - (* the window may be ABANDONED at the instruction's end: no run at
+           all, and the state moved only in its registers (not at all, here) *)
+        intros pa n s x s' _ [-> ->]. right.
+        exists (wm_regs s). split; [apply rtc_refl|by rewrite wregs_set_id]. }
     split.
     - (* ---------------- sail_bracket ---------------- *)
       intros s x s' Hsh Hrun.
@@ -878,35 +972,55 @@ Section bracket.
           rewrite /wread_post Hcoh /= in Hrun.
           destruct (ak_latest (classify (Interface.ReadReq.access_kind req)))
             eqn:Hlat.
-          + (* THE FUSED RMW *)
+          + (* AN EXCLUSIVE READ: fused if the window closes, BARE if the
+               run abandons it (delta (e)) *)
             destruct (proj2 (IH (inl (w, None))) (Interface.ReadReq.pa req) nn
                         _ _ _ (Hsh w) Hrun)
-              as (m1 & m2 & rs1 & rl & data & kc & Hsil & Hwr & Hlend & Hne & Hch).
-            intros iq prom ags Hlk.
-            pose proof Hok as (Hlents & _).
-            eapply pf_rmw.
-            * exact Hlk.
-            * rewrite /sail_step /= Hd. right. split; [exact Hcoh|].
-              split_and!;
-                [exact Hlat|reflexivity|reflexivity
-                |exact (mk_tvs_length nn ts w Hlents)|exact Hlend|].
-              exists w, m1, m2, rs1.
-              split_and!; [|exact Hsil|exact Hwr|reflexivity].
-              intros j Hj. rewrite (mk_tvs_snd nn ts w Hlents).
-              by apply wbytes_lookup.
-            * exact Hne.
-            * rewrite (mk_tvs_length nn ts w Hlents) Hlend //.
-            * exact (wread_read_ok s _ _ nn ts w Hcoh Hok).
-            * exact (wread_excl_ok i s _ _ nn ts w Hcoh Hlat Hok).
-            * rewrite (mk_tvs_fst nn ts w Hlents).
-              apply Hch. by apply (lookup_insert_i _ _ _ Hlk).
+              as [(m1 & m2 & rs1 & rl & data & kc & Hsil & Hwr & Hlend & Hne & Hch)
+                 |(rs1 & Hsil & Heqs)].
+            * (* THE FUSED RMW *)
+              intros iq prom ags Hlk.
+              pose proof Hok as (Hlents & _).
+              eapply pf_rmw.
+              -- exact Hlk.
+              -- rewrite /sail_step /= Hd. right. split; [exact Hcoh|].
+                 split_and!;
+                   [exact Hlat|reflexivity|reflexivity
+                   |exact (mk_tvs_length nn ts w Hlents)|exact Hlend|].
+                 exists w, m1, m2, rs1.
+                 split_and!; [|exact Hsil|exact Hwr|reflexivity].
+                 intros j Hj. rewrite (mk_tvs_snd nn ts w Hlents).
+                 by apply wbytes_lookup.
+              -- exact Hne.
+              -- rewrite (mk_tvs_length nn ts w Hlents) Hlend //.
+              -- exact (wread_read_ok s _ _ nn ts w Hcoh Hok).
+              -- exact (wread_excl_ok i s _ _ nn ts w Hcoh Hlat Hok).
+              -- rewrite (mk_tvs_fst nn ts w Hlents).
+                 apply Hch. by apply (lookup_insert_i _ _ _ Hlk).
+            * (* THE BARE ARM: one [LLoad] brackets the whole abandoned
+                 window, landing at the instruction's [Interface.Ret] *)
+              intros iq prom ags Hlk.
+              pose proof Hok as (Hlents & _).
+              eapply pf_load with (lat := false).
+              -- exact Hlk.
+              -- rewrite /sail_step /= Hd. right. split; [exact Hcoh|]. right.
+                 split_and!;
+                   [exact Hlat|reflexivity|reflexivity
+                   |exact (mk_tvs_length nn ts w Hlents)|].
+                 exists w. split.
+                 { intros j Hj. rewrite (mk_tvs_snd nn ts w Hlents).
+                   by apply wbytes_lookup. }
+                 exists x, rs1. split; [exact Hsil|reflexivity].
+              -- exact (wread_read_ok s _ _ nn ts w Hcoh Hok).
+              -- rewrite (mk_tvs_fst nn ts w Hlents) Heqs list_insert_insert.
+                 apply rtc_refl.
           + (* a plain load *)
             pose proof (proj1 (IH (inl (w, None))) _ _ _ (Hsh _) Hrun) as Hch.
             intros iq prom ags Hlk.
             pose proof Hok as (Hlents & _).
             eapply pf_load with (lat := false).
             * exact Hlk.
-            * rewrite /sail_step /= Hd. right. split; [exact Hcoh|].
+            * rewrite /sail_step /= Hd. right. split; [exact Hcoh|]. left.
               split_and!;
                 [exact Hlat|reflexivity|reflexivity
                 |exact (mk_tvs_length nn ts w Hlents)|].
@@ -922,14 +1036,14 @@ Section bracket.
         - destruct (dev_write (wm_dev s) (Interface.WriteReq.pa req) nn
                       (Interface.WriteReq.value req)) as [d'|] eqn:Hdw;
             [|by exfalso; exact Hrun].
-          pose proof (proj1 (IH (inl None)) _ _ _ (Hsh _) Hrun) as Hch.
+          pose proof (proj1 (IH (inl None)) _ _ _ Hsh Hrun) as Hch.
           intros iq prom ags Hlk.
           eapply pf_silent; [exact Hlk| |].
           + rewrite /sail_step /= Hd (dev_write_t_Some _ _ _ _ _ Hdw).
             right. split; reflexivity.
           + apply Hch. by apply (lookup_insert_i _ _ _ Hlk).
         - destruct Hn as (Hn0 & Hnlat).
-          pose proof (proj1 (IH (inl None)) _ _ _ (Hsh _) Hrun) as Hch.
+          pose proof (proj1 (IH (inl None)) _ _ _ Hsh Hrun) as Hch.
           intros iq prom ags Hlk.
           eapply pf_store.
           + exact Hlk.
@@ -973,7 +1087,7 @@ Section bracket.
       { (* the conditional write: the fused arm's second half *)
         destruct Hsh as (Hd & Hpa & Hn & Hn0 & Hlat & Hsh).
         rewrite Hd in Hrun. subst pa n.
-        pose proof (proj1 (IH (inl None)) _ _ _ (Hsh _) Hrun) as Hch.
+        pose proof (proj1 (IH (inl None)) _ _ _ Hsh Hrun) as Hch. left.
         exists (Interface.Next (Interface.MemWrite nn req) k), (k (inl None)),
                (wm_regs s), (ak_sync (classify (Interface.WriteReq.access_kind req))),
                (wbytes nn (Interface.WriteReq.value req)),
@@ -989,10 +1103,13 @@ Section bracket.
       { (* Choose *)
         destruct Hrun as (c & Hrun).
         destruct (proj2 (IH c) _ _ _ _ _ (Hsh _) Hrun)
-          as (m1 & m2 & rs1 & rl & data & kc & Hsil & Hwr & Hlen & Hne & Hch).
-        exists m1, m2, rs1, rl, data, kc.
-        split_and!; [|exact Hwr|exact Hlen|exact Hne|exact Hch].
-        eapply rtc_l; [|exact Hsil]. rewrite /silent1 /=. by exists c. }
+          as [(m1 & m2 & rs1 & rl & data & kc & Hsil & Hwr & Hlen & Hne & Hch)
+             |(rsa & Hsil & Heqs)].
+        - left. exists m1, m2, rs1, rl, data, kc.
+          split_and!; [|exact Hwr|exact Hlen|exact Hne|exact Hch].
+          eapply rtc_l; [|exact Hsil]. rewrite /silent1 /=. by exists c.
+        - right. exists rsa. split; [|exact Heqs].
+          eapply rtc_l; [|exact Hsil]. rewrite /silent1 /=. by exists c. }
   Qed.
 
   (** THE BRACKET.  One instruction monad, run by [wrun], IS a pf run of the

@@ -65,8 +65,11 @@
         Per segment it carries exactly the DEVICE-SEAM residue and nothing
         else:
           - [SegHart]: FABRIC AGREEMENT ([wa_dev u cpu = wgdev g] — the twin
-            of [SegDisk]'s [wa_dd u = wgdev g]) and DEVICE DECODABILITY along
-            this segment's own run ([WeakSailLTS2.dev_ok_blk]), plus a
+            of [SegDisk]'s [wa_dd u = wgdev g]), DEVICE DECODABILITY along
+            this segment's own run ([WeakSailLTS2.dev_ok_blk]) and
+            EXCLUSIVE-WINDOW FUSION along the same run
+            ([WeakSailLTS2.fused_blk] — no step of the block took the BARE
+            exclusive-read arm, §B(E)), plus a
             continuation quantified over the [wrun]s whose [WeakLang]
             successor MATCHES the segment's target.  The successor updates
             that hart's private fabric to the block's own [wm_dev s'], which
@@ -186,6 +189,52 @@
         run.  Third finding of the false-premise genre in this file; cf. (B)
         and (D).
 
+    (E) THE ∀-ANSWER SHAPE PREMISES WERE REFUTABLE — (O1), FIXED IN THE
+        PREDICATES (2026-08-13, stage C1 finding / C2 fix).  Premise 1's
+        [∀ b, sail_live (riscv_step b)] was FALSE AS STATED, and so was
+        [sail_shaped]'s reading of the same arms: both quantified their
+        [MemRead]/[MemWrite] arms over the FULL answer type, including the
+        abort [inr ab], which [rv64d.read_ram] answers with [exit tt]
+        ([GenericFail]) — every load in the model goes through there
+        ([WeakShape]'s [read_ram_not_live], the refutation, deleted when this
+        was fixed).  [WeakSailLTS.sail_mstep] only ever supplies
+        [inl (w, None)] / [inl None], so the fix is to quantify over exactly
+        those.  Fourth finding of the over-quantified-∀ genre in this cone
+        (cf. (C), and [WeakSailLTS] delta (b)).  Nothing downstream weakens:
+        every consumer instantiates those arms at exactly those answers.
+
+    (F) THE EXCLUSIVE WINDOW WAS A MACHINE COVERAGE GAP — (O2), FIXED IN THE
+        LTS, AND THE NEW SEAM CONJUNCT (2026-08-13).  [sail_shaped]'s
+        [amo_tail] demanded a conditional write before the instruction ended,
+        and [sail_mstep] could step an [ak_latest] read ONLY by fusing it
+        with that write.  Hardware executes a bare [lr], a FAILING [sc], an
+        [amocas] whose comparison misses and a page walk whose exclusive PTE
+        read errors out; the model issues all of them
+        ([rv64d.execute_LOADRES], [execute_AMO]'s fault/mismatch arms,
+        [update_and_write_pte]'s error arms).  So premise 1 was false AND the
+        machine was STUCK there — a coverage gap of the same genre as
+        [Hirqb] (A'), not a predicate bug alone.  THE FIX:
+        [WeakSailLTS.amo_tail]'s [Interface.Ret] arm becomes [True] (a window
+        MAY be abandoned, and what it still forbids — reads, barriers,
+        non-closing writes — is what keeps the abandoned tail steppable), and
+        [sail_mstep] gains the BARE EXCLUSIVE-READ ARM: the read steps as a
+        plain [LLoad] (lat := false — lat-freedom is preserved) bracketing
+        the whole abandoned window to the instruction's [Interface.Ret],
+        symmetrically to the way the fused arm brackets to its conditional
+        write.  The machine only GAINS behaviors, which is the safe
+        direction, and the residual after a bare step is [Interface.Ret], so
+        no residual invariant of the completion kit moves.
+        WHAT IT COSTS: the ⇐ reconstruction cannot map a bare step back to a
+        [wrun] (an interpreter exclusive read is not a plain load), so
+        [wl_lift]'s [SegHart] gains [WeakSailLTS2.fused_blk] beside
+        [dev_ok_blk] — the same run-local, TARGET-INDEXED shape, and the same
+        per-image discharge family: kernel AMOs target mapped lock words and
+        do not fault, so their windows close.  [WeakSailComplete.tail_complete]
+        takes the fused route where the window closes and the bare one where
+        it does not, and EXPORTS WHICH (its [fu : bool] and the conjunct
+        [fu = true → rtc (pf_solo_f next i) c c']), so a supplier can see
+        exactly when a completed reader tail is [fused_blk]-compatible.
+
     (D) THE AGENT QUANTIFIER — FOUND HERE, FIXED IN LAYER 1, GONE FROM THE
         PREMISE LIST (2026-08-12).  It was a premise of this file for exactly
         one revision, under the name [xv6_violation_harts], and it was FALSE
@@ -275,7 +324,11 @@
          precisely because that lemma's own decomposition comes from
          [wp_behavior_traced] and so has no accounting.
       6. [cone_liftable] — residue (A) of §B, and THE ONLY LIFT RESIDUE:
-         the MMIO/M5 device seam, per decomposition.
+         the MMIO/M5 device seam, per decomposition.  Its [SegHart] bundle
+         now carries THREE conjuncts, not two: fabric agreement, device
+         decodability ([dev_ok_blk]) and exclusive-window fusion
+         ([fused_blk], §B(F)) — the last two being the two run-local,
+         target-indexed side conditions the ⇐ bracket needs.
       7. The 5 rv64d baseline axioms.  NO functional extensionality, NO
          classical axiom.  (Checked with [Print Assumptions] on both
          capstones; the funext-free discipline is why the refinement's
@@ -1291,6 +1344,15 @@ Fixpoint wl_lift (gen : nat) (segs : list seg2) (g : wgstate) (u : wlaux)
         dev_ok_blk riscv_step i
           (prj_cfg (PSail None (wgregs g cpu) (wa_dev u cpu) None (wa_iq u cpu))
              c') ∧
+        (** (iii) EXCLUSIVE-WINDOW FUSION along the same run: no step of the
+            block took the BARE exclusive-read arm ([WeakSailLTS] delta (e)),
+            which has no image in [wrun].  Same shape as (ii) — run-local,
+            target-indexed — and the same discharge family: per-image, kernel
+            AMOs target mapped lock words and do not fault, so their windows
+            close.  §B (O2). *)
+        fused_blk riscv_step i
+          (prj_cfg (PSail None (wgregs g cpu) (wa_dev u cpu) None (wa_iq u cpu))
+             c') ∧
         (∀ (tick : bool) (x : unit) (s' : wmstate),
            wrun (Some i) (riscv_step tick) (whart_view g cpu) x s' →
            wl_cfg (whart_write g cpu s') (wl_dev cpu (wm_dev s') u) = c' →
@@ -1334,7 +1396,7 @@ Proof.
   destruct s as [i c c'|i c c'|i c c']; simpl in Hch, Hfine, Hlift;
     destruct Hch as (Hsrc & Hch); subst c.
   - (* ---------------- ONE HART INSTRUCTION BLOCK ---------------- *)
-    destruct Hlift as (cpu & -> & Hfab & Hdev & Hcont).
+    destruct Hlift as (cpu & -> & Hfab & Hdev & Hfus & Hcont).
     set (q0 := PSail None (wgregs g cpu) (wa_dev u cpu) None (wa_iq u cpu)).
     have Hlkp : pc_ags (prj_cfg q0 (wl_cfg g u)) !! (fin_to_nat cpu)
               = Some (WPAgent (PSail None (wgregs g cpu) (wgdev g) None
@@ -1346,7 +1408,7 @@ Proof.
       := xblk_prj riscv_step q0 (fin_to_nat cpu) (wl_cfg g u) c' Hfine.
     destruct (wprim_hart_block_bwd cpu gen g (wa_iq u cpu) ∅
                 (prj_ag q0 <$> pc_ags (wl_cfg g u)) (prj_cfg q0 c')
-                Hsh Hdev Hlive Hlkp Hblk)
+                Hsh Hdev Hfus Hlive Hlkp Hblk)
       as (g2 & Hstep & Heq).
     have Hstep2 := Hstep.
     apply wprim_step_loop_inv in Hstep2

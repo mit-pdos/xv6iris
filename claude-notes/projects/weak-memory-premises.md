@@ -175,12 +175,61 @@ discharge it).
   the `sail_shaped` sweep to be clean and the `sail_live` sweep to
   carry per-site reachability facts (same checker family as D-M6-8).
 
-- **C2 (next)** — the spec fixes: narrow the predicates per (O1), the
-  `amo_tail` weakening + bare-exclusive-read arm per (O2), adapt
-  `WeakShape`'s `gwalk`/`glive` arms, ripple (WeakSailLTS →
-  WeakSailLTS2 (⇐ side condition) → WeakSailComplete (tail_complete)
-  → WeakSailCone → WeakComposeLang), capstones re-audited at the 5
-  axioms.
+- **C2 (LANDED 2026-08-13)** — the spec fixes, all machine-checked, both
+  capstones still at exactly the 5 rv64d axioms.  What landed:
+  - **(O1)** `sail_shaped`/`amo_tail`/`sail_live` (and `WeakShape`'s
+    `gwalk`/`glive`) quantify their `MemRead`/`MemWrite` arms over the
+    answers `sail_mstep` supplies — `∀ w, P (k (inl (w, None)))` and
+    `P (k (inl None))` — instead of the full answer type.  `quiet_tail`
+    needed nothing (its memory arms are `False`).
+    `WeakShape.read_ram_not_live` is false and deleted; `glive_read_ram`
+    (the positive leaf, for the three read kinds the model produces)
+    replaces it.
+  - **(O2a)** `amo_tail`'s `Ret` arm is `True`.  Everything else it forbids
+    stays (no `MemRead`, no `Barrier`, any `MemWrite` must be the closing
+    conditional write, now with the narrowed continuation) — which is
+    exactly what makes an abandoned tail steppable and barrier-free.
+  - **(O2b)** the BARE exclusive-read arm, as a second disjunct of
+    `sail_mstep`'s `LLoad` case.  **It brackets the whole abandoned window**
+    (`silent_run … (Interface.Ret y, rs1)`, `p' = PSail (Some (Ret y)) rs1 …`)
+    the way the fused arm brackets to its conditional write.  That shape
+    was FORCED and is the key design point: a one-step bare arm would leave
+    the hart in "window mode", where `sail_shaped` is not preserved and the
+    conditional write has no LTS arm — `sail_shaped_res_step` and
+    `tail_complete` would both have broken, and the residual invariant of
+    the whole cone (`WeakSailCone.res_ok`) would have had to become
+    window-indexed.  Bracketing to `Ret` keeps every residual invariant
+    literally unchanged.
+  - the ⇐ side condition is **`WeakSailLTS2.fused_blk next i c'`** =
+    `∀ c1 c2, pf_solo next i c1 c2 → rtc (pf_in_block next i) c2 c' →
+     pf_solo_f next i c1 c2`, with `pf_solo_f` = "a step from an
+    `at_excl_read` configuration APPENDS a message" — label-free (the fused
+    arm logs, the bare one does not), target-indexed exactly like
+    `dev_ok_blk`, and NOT a conjunct of `pf_solo`.  It joins `dev_ok_blk` in
+    `sail_run_wrun`/`sail_block_wrun`/`wprim_hart_block*` and in
+    `WeakComposeLang.wl_lift`'s SegHart bundle.
+  - `tail_complete` tries fused-if-available (`amo_reach` now returns
+    "closes ∨ abandoned-at-Ret") and takes the bare arm otherwise; it
+    EXPORTS which, as `∃ … (fu : bool), … ∧ (fu = true → rtc (pf_solo_f next i) c c')`.
+    The quiet skeleton pays nothing for it (`pf_solo_q_f`: a quiet step is
+    fused vacuously, since an exclusive-read node emits only `LLoad`/`LRmw`).
+- **C2 FINDING (machine-forced): the KIT cannot follow the `amo_tail`
+  weakening.**  Setting `gwalk (Some _) (Interface.Ret _) := True` REFUTES
+  `gwalk_bind` and every loop lemma of `WeakShape` §5: in `bind m k` the
+  `Ret` of `m` is where `k` begins, so a window `m` abandons ESCAPES into
+  `k` (counterexample: `m` a bare exclusive read that returns, `k` a plain
+  store).  The honest bind lemma would need `k` walkable under an arbitrary
+  window, i.e. essentially `gquiet` — true at the abandoning sites, false
+  for ordinary continuations.  `gwalk`'s window mode therefore keeps the
+  CLOSED reading, which is now strictly stronger than `amo_tail` (as its
+  `ExtraOutcome` arm already was), so `gwalk_amo_tail`/`gwalk_shaped` stay
+  sound; the two C1 refutations (`gwalk_some_quiet_False`,
+  `amo_tail_quiet_False`) are now FALSE and are replaced by the positive
+  `gquiet_amo_tail` (quiet code abandons a window).  **C3 must add one
+  index — "no window escapes `m`" — under which the bind lemma splits into
+  the escape-free case (the present one, for the ~330 functions issuing no
+  exclusive read) and the escaping case (quiet continuation).**  It is a
+  sweep-side addition; the SPECIFICATION is settled in `WeakSailLTS`.
 - **C3** — `tools/gen_shape.py` emitting the 358 per-function lemmas
   in topological order (`Hint Resolve` as the dependency mechanism)
   + the hand-written override list (memory wrappers, 4 loop sites,

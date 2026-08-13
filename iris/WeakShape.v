@@ -56,39 +56,53 @@
     the stage-C report).  None is a defect of this kit; all three are facts
     about the pair (model, shape predicates):
 
-    (O1) [sail_live] IS REFUTABLE AS STATED — its memory arms quantify over
-         EVERY answer, including the ABORT answer [inr ab], and
-         [rv64d.read_ram]'s abort arm is [exit tt] = [GenericFail].  Since
-         [Arch.abort = unit] that branch is inhabited, so
-         [sail_live (read_ram rk pa width meta)] is FALSE
-         ([read_ram_not_live] below, machine-checked), and every load path of
+    (O1) [sail_live] WAS REFUTABLE AS STATED — FIXED IN C2.  Its memory arms
+         quantified over EVERY answer, including the ABORT answer [inr ab],
+         and [rv64d.read_ram]'s abort arm is [exit tt] = [GenericFail].
+         Since [Arch.abort = unit] that branch is inhabited, so
+         [sail_live (read_ram rk pa width meta)] was FALSE
+         ([read_ram_not_live], the machine-checked refutation that stood in
+         §6b and is DELETED with the fix), and every load path of
          [riscv_step] goes through it.  The LTS never SUPPLIES an abort (see
          [WeakSailLTS.sail_mstep]: the [MemRead] arms hand the continuation
-         [inl (w, None)] and only that), so the fix is to narrow the memory
-         arms of [sail_live]/[sail_shaped] to the LTS-reachable answers.
-         [glive] here is a FAITHFUL COPY of [sail_live] (and [gwalk] differs
-         from [sail_shaped] only by the strengthening of (1)), so the kit
-         stays usable either way; the narrowing is a two-line edit in each.
+         [inl (w, None)] and only that), so the memory arms of
+         [sail_live]/[sail_shaped] — and of [glive]/[gwalk] here — now
+         quantify over exactly the LTS-supplied answers:
+             | MemRead n req  => λ k, ∀ w : bv (8 * n), P (k (inl (w, None)))
+             | MemWrite n req => λ k, P (k (inl None))
+         What was a refutation is now [glive_read_ram], the positive leaf.
 
-    (O2) AN UNPAIRED EXCLUSIVE READ (lr.d / lr.w) HAS NO SHAPE.  [gwalk]'s
-         [MemRead] arm demands, for [ak_latest = true], that the continuation
-         reach a conditional [MemWrite] to the same address before [Ret]
-         ([gwalk (Some _) (Ret _) = False]).  [rv64d.execute_LOADRES] issues
-         exactly such a read ([read_kind_of_flags _ _ true =
-         Read_RISCV_reserved], [classify … .(ak_latest) = true]) and issues
-         no conditional write on ANY continuation of it.  The pattern is
-         machine-checked here in its cleanest instance
-         ([amo_tail_quiet_False]: a window can never close over
-         register/trace code), and §7c lists the other two sites
-         ([execute_AMO], [update_and_write_pte]), which fail on SOME paths
-         rather than all.  So
-         [sail_shaped (riscv_step b)] is FALSE at every behavior whose fetch
-         decodes to an [lr] — which the ∀-path reading of a plain fetch
-         makes reachable.  The LTS has the matching hole: [sail_mstep]'s
-         [MemRead] arm with [ak_latest = true] only steps by the FUSED
-         [LRmw] label, so an unpaired lr is stuck.  Both need an
-         "exclusive-read-only" arm (label [LLoad] with the [latest] pin) if
-         lr/sc is to be in scope at all.
+    (O2) AN ABANDONED EXCLUSIVE WINDOW (bare lr, failing sc, faulting AMO)
+         HAD NO SHAPE AND NO STEP — FIXED IN C2 AT THE LTS, AND ONLY
+         PARTLY HERE.  [rv64d.execute_LOADRES] issues an [ak_latest] read
+         ([read_kind_of_flags _ _ true = Read_RISCV_reserved]) with no
+         conditional write on ANY continuation; [execute_AMO] and
+         [update_and_write_pte] do so on SOME paths (§7c).  C2's fix is in
+         [WeakSailLTS]: [amo_tail]'s [Interface.Ret] arm becomes [True] and
+         [sail_mstep] gains the BARE exclusive-read arm (delta (e) there).
+
+         THIS KIT DELIBERATELY DID NOT FOLLOW THE WEAKENING, and the reason
+         is a C2 finding worth keeping: WEAKENING [gwalk (Some _)
+         (Interface.Ret _)] TO [True] REFUTES [gwalk_bind] AND EVERY LOOP
+         LEMMA OF §5.  An abandoned window ESCAPES a [bind] — in
+         [Defs.bind m k] the [Interface.Ret] of [m] is where [k] begins, so a
+         window [m] leaves open runs on into [k] — and the honest bind lemma
+         would have to hypothesise [k] walkable under an ARBITRARY window,
+         i.e. essentially [gquiet]; that is true at the abandoning sites and
+         false for ordinary continuations, so it cannot be the sweep's bind.
+         [gwalk (Some _)] therefore keeps the CLOSED reading, which is
+         STRICTLY STRONGER than [amo_tail] (as the [ExtraOutcome] arm of (1)
+         already was) — so [gwalk_amo_tail]/[gwalk_shaped] stay sound — and
+         the abandoning sites are served instead by [gquiet_amo_tail] (§3:
+         quiet code abandons a window), which is the positive replacement for
+         the two refutations [gwalk_some_quiet_False] / [amo_tail_quiet_False]
+         that stood in §1b through C1 and are now FALSE and deleted.
+         WHAT C3 MUST ADD to cover the abandoning sites compositionally: one
+         more index — "no window escapes [m]" — under which the bind lemma
+         splits into the escape-free case (the present one, for the ~330
+         functions that issue no exclusive read) and the escaping case (with
+         a quiet continuation).  It is a sweep-side addition, not a spec
+         change: the SPECIFICATION is settled and lives in [WeakSailLTS].
 
     (O3) [whileMT]/[untilMT] ARE NOT LIVENESS-COMPOSITIONAL.  Their
          termination guard ends in [fail "Termination limit reached"], so
@@ -131,7 +145,15 @@ Set Default Proof Using "Type".
 (** ** 1. The window-indexed walk *)
 
 (** An OPEN exclusive window: the address and width the conditional write
-    must have.  [None] = no window = [sail_shaped]. *)
+    must have.  [None] = no window = [sail_shaped].
+
+    THE WINDOW MODE IS THE *CLOSED* READING, and since C2 that is STRICTLY
+    STRONGER than [WeakSailLTS.amo_tail] (whose [Interface.Ret] arm is now
+    [True] — a window may be abandoned).  The implication [gwalk_amo_tail]
+    is therefore still sound, and the strengthening is deliberate; see the
+    header's (O2) entry for WHY the weak reading cannot be the kit's:
+    weakening this arm REFUTES [gwalk_bind] and every loop lemma, because an
+    abandoned window ESCAPES a [bind] into the continuation. *)
 Definition win : Type := option (Arch.pa * N).
 
 Section Walk.
@@ -149,14 +171,14 @@ Fixpoint gwalk (w : win) (m : mon) {struct m} : Prop :=
            | Some _ => False
            | None =>
                if dev_addr (Interface.ReadReq.pa req)
-               then ∀ r, gwalk None (k r)
+               then ∀ v : bv (8 * n), gwalk None (k (inl (v, None)))
                else
                  ak_coh (classify (Interface.ReadReq.access_kind req)) = false ∧
                  (if ak_latest (classify (Interface.ReadReq.access_kind req))
                   then ∀ v : bv (8 * n),
                          gwalk (Some (Interface.ReadReq.pa req, n))
                                (k (inl (v, None)))
-                  else ∀ r, gwalk None (k r))
+                  else ∀ v : bv (8 * n), gwalk None (k (inl (v, None))))
            end
        | Interface.MemWrite n' req' => λ k,
            match w with
@@ -164,13 +186,13 @@ Fixpoint gwalk (w : win) (m : mon) {struct m} : Prop :=
                dev_addr (Interface.WriteReq.pa req') = false ∧
                Interface.WriteReq.pa req' = pa ∧ n' = n ∧ n' ≠ 0%N ∧
                ak_latest (classify (Interface.WriteReq.access_kind req')) = true ∧
-               (∀ r, gwalk None (k r))
+               gwalk None (k (inl None))
            | None =>
                (if dev_addr (Interface.WriteReq.pa req') then True
                 else n' ≠ 0%N ∧
                      ak_latest (classify (Interface.WriteReq.access_kind req'))
                        = false) ∧
-               (∀ r, gwalk None (k r))
+               gwalk None (k (inl None))
            end
        | Interface.Barrier _ => λ k,
            match w with
@@ -184,10 +206,13 @@ Fixpoint gwalk (w : win) (m : mon) {struct m} : Prop :=
               window-compositional at all — the handler would have to close
               a window it knows nothing about, and every handler the model
               builds ([catch_early_return], [liftR]) ends in
-              [returnm]/[throw], i.e. closes nothing.  The strengthening
-              costs nothing REAL: a throw between an exclusive read and its
-              conditional write ends the instruction with the window open,
-              which [amo_tail] refutes anyway one step later. *)
+              [returnm]/[throw], i.e. closes nothing.  It is a REAL
+              strengthening since C2 weakened [amo_tail]'s [Interface.Ret]
+              arm (a throw inside a window is now admitted there — it just
+              abandons the window), and it is the one place this kit is
+              still stricter than the LTS's premise; the exclusive sites that
+              throw INSIDE their window ([execute_AMO]'s post-read faults)
+              therefore need the handler-aware form, not this one. *)
            match w with
            | Some _ => False
            | None => ∀ r, gwalk None (k r)
@@ -203,6 +228,9 @@ Fixpoint glive (xf : bool) (m : mon) {struct m} : Prop :=
   | Interface.Ret _ => True
   | Interface.Next oc k =>
       (match oc in Interface.outcome _ T return (T → mon) → Prop with
+       | Interface.MemRead n req => λ k,
+           ∀ v : bv (8 * n), glive xf (k (inl (v, None)))
+       | Interface.MemWrite _ _ => λ k, glive xf (k (inl None))
        | Interface.ExtraOutcome _ => λ _, if xf then False else True
        | Interface.GenericFail _ => λ _, False
        | Interface.Discard => λ _, False
@@ -266,18 +294,18 @@ Proof.
   - (* MemRead *)
     split; [|by intros pa1 n1].
     destruct (dev_addr (Interface.ReadReq.pa t)).
-    { intros H r; by apply IH, H. }
+    { intros H v; by apply IH, H. }
     intros [Hc H]. split; [done|].
     destruct (ak_latest _).
     + intros v. by apply IH, H.
-    + intros r. by apply IH, H.
+    + intros v. by apply IH, H.
   - (* MemWrite *)
     split.
     + destruct (dev_addr (Interface.WriteReq.pa t)).
-      * intros [_ H]. split; [done|intros r; by apply IH, H].
-      * intros [Hn H]. split; [done|intros r; by apply IH, H].
+      * intros [_ H]. split; [done|by apply IH, H].
+      * intros [Hn H]. split; [done|by apply IH, H].
     + intros pa1 n1 (H1 & H2 & H3 & H4 & H5 & H6).
-      split_and!; try done. intros r. by apply IH, H6.
+      split_and!; try done. by apply IH, H6.
   - (* Barrier *)
     split; [intros H r; by apply IH, H|by intros pa1 n1].
   - (* ExtraOutcome: strengthened arm *)
@@ -295,8 +323,8 @@ Lemma glive_live (m : M unit) : glive true m ↔ sail_live m.
 Proof.
   induction m as [x|T oc k IH]; [done|].
   destruct oc; simpl; try (split; intros H r; by apply IH, H); try done.
-  destruct ty; simpl; (split; [done|done]) ||
-    (split; intros H r; by apply IH, H).
+  - destruct ty; simpl; (split; [done|done]) ||
+      (split; intros H r; by apply IH, H).
 Qed.
 
 (** The definitive form: [gok] on the instruction monad is exactly the two
@@ -313,68 +341,18 @@ Lemma glive_weaken {E A} (m : Defs.monad E A) : glive true m → glive false m.
 Proof.
   induction m as [x|T oc k IH]; [done|].
   destruct oc; simpl; try (intros H r; by apply IH); try done.
-  destruct ty; simpl; try done; intros H r; by apply IH.
+  - (* MemWrite *) intros H; by apply IH.
+  - destruct ty; simpl; try done; intros H r; by apply IH.
 Qed.
 
-(** A window can NEVER close on a quiet tail: [quiet_tail] forbids every
-    [MemWrite], and an open window demands one before [Ret].  This is the
-    machine-checked half of obstacle (O2): the tail of an unpaired [lr] is
-    quiet, so no [amo_tail] obligation over it can ever be discharged. *)
-Lemma gwalk_some_quiet_False pa n (m : M unit) :
-  gwalk (Some (pa, n)) m → quiet_tail m → False.
-Proof.
-  induction m as [x|T oc k IH]; [done|].
-  destruct oc; simpl; intros Hat Hq; try done.
-  - (* RegRead *) by eapply (IH inhabitant).
-  - (* RegWrite *) by eapply (IH tt).
-  - (* InstrAnnounce *) by eapply (IH tt).
-  - (* BranchAnnounce *) by eapply (IH tt).
-  - (* CacheOp *) by eapply (IH tt).
-  - (* TlbOp *) by eapply (IH tt).
-  - (* TakeException *) by eapply (IH tt).
-  - (* ReturnException *) by eapply (IH tt).
-  - (* TranslationStart *) by eapply (IH tt).
-  - (* TranslationEnd *) by eapply (IH tt).
-  - (* CycleCount *) by eapply (IH tt).
-  - (* GetCycleCount *) by eapply (IH 0%Z).
-  - (* Choose *)
-    destruct ty; simpl in Hq; try done.
-    + by eapply (IH false).
-    + by eapply (IH 0%Z).
-    + by eapply (IH 0%Z).
-    + by eapply (IH String.EmptyString).
-    + by eapply (IH 0%Z).
-    + by eapply (IH (Values.mword_of_int 0)).
-  - (* Message *) by eapply (IH tt).
-Qed.
-
-Lemma amo_tail_quiet_False pa n (m : M unit) :
-  amo_tail pa n m → quiet_tail m → False.
-Proof.
-  induction m as [x|T oc k IH]; [done|].
-  destruct oc; simpl; intros Hat Hq; try done.
-  - (* RegRead *) by eapply (IH inhabitant).
-  - (* RegWrite *) by eapply (IH tt).
-  - (* InstrAnnounce *) by eapply (IH tt).
-  - (* BranchAnnounce *) by eapply (IH tt).
-  - (* CacheOp *) by eapply (IH tt).
-  - (* TlbOp *) by eapply (IH tt).
-  - (* TakeException *) by eapply (IH tt).
-  - (* ReturnException *) by eapply (IH tt).
-  - (* TranslationStart *) by eapply (IH tt).
-  - (* TranslationEnd *) by eapply (IH tt).
-  - (* CycleCount *) by eapply (IH tt).
-  - (* GetCycleCount *) by eapply (IH 0%Z).
-  - (* Choose *)
-    destruct ty; simpl in Hq; try done.
-    + by eapply (IH false).
-    + by eapply (IH 0%Z).
-    + by eapply (IH 0%Z).
-    + by eapply (IH String.EmptyString).
-    + by eapply (IH 0%Z).
-    + by eapply (IH (Values.mword_of_int 0)).
-  - (* Message *) by eapply (IH tt).
-Qed.
+(** A QUIET TAIL ABANDONS THE WINDOW, and that is now legal.  This replaces
+    the two refutations [gwalk_some_quiet_False] / [amo_tail_quiet_False]
+    that stood here through stage C1 and were the machine-checked half of
+    obstacle (O2): they said a window can never close on quiet code, which
+    was fatal only because [amo_tail]'s [Interface.Ret] arm was [False].  It
+    is [True] since C2, so the same fact is now the POSITIVE lemma the
+    abandoning sites ([execute_LOADRES] and friends) discharge: it is
+    [gwalk_quiet] (§3) at an open window, and [gquiet_amo_tail] beside it. *)
 
 (* ====================================================================== *)
 (** ** 2. [bind] — the core of the kit
@@ -385,7 +363,26 @@ Qed.
     continuation is walked with no window — so the hypothesis on [k] is the
     same [gwalk None] in both modes. *)
 
-Lemma gwalk_bind {E A B} (w : win) (m : Defs.monad E A) (k : A → Defs.monad E B) :
+(** THE WINDOW-INDEXED BIND, and why it is the CLOSED reading that makes it
+    work.  A window open in [m] must CLOSE inside [m] — [gwalk (Some _)
+    (Interface.Ret _)] is [False] — after which the continuation is walked
+    with no window; so the hypothesis on [k] is the same [gwalk None] in both
+    modes.
+
+    UNDER THE WEAK ([amo_tail]) READING THIS LEMMA IS FALSE, and that is the
+    C2 finding recorded in the header: take [m] a bare exclusive read whose
+    continuation returns (a window abandoned at [m]'s [Interface.Ret], which
+    the weak reading admits) and [k] a plain store — then [bind m k] has the
+    exclusive read followed by a NON-closing write, which no reading admits.
+    The window ESCAPES the bind, so a weak-reading bind lemma would have to
+    hypothesise [k] walkable under an arbitrary window, i.e. essentially
+    quiet — which every ordinary continuation in the model is not.  The same
+    argument refutes the loop lemmas of §5.  Hence the kit stays on the
+    closed reading (sound for [sail_shaped] by [gwalk_amo_tail]), and
+    covering the ABANDONING exclusive sites needs one more index — "no
+    window escapes [m]" — which is a C3 item, not a C2 one. *)
+Lemma gwalk_bind {E A B} (w : win) (m : Defs.monad E A)
+    (k : A → Defs.monad E B) :
   gwalk w m → (∀ x, gwalk None (k x)) → gwalk w (Defs.bind m k).
 Proof.
   revert w. induction m as [x|T oc k0 IH]; intros w Hm Hk.
@@ -395,16 +392,16 @@ Proof.
   - (* MemRead *)
     destruct w as [[pa0 n0]|]; [done|].
     destruct (dev_addr (Interface.ReadReq.pa t)).
-    { intros r. by apply IH. }
+    { intros v. by apply IH. }
     destruct Hm as [Hc Hm]. split; [done|].
     destruct (ak_latest _).
     + intros v. by apply IH.
-    + intros r. by apply IH.
+    + intros v. by apply IH.
   - (* MemWrite *)
     destruct w as [[pa0 n0]|].
     + destruct Hm as (H1 & H2 & H3 & H4 & H5 & H6).
-      split_and!; try done. intros r. by apply IH.
-    + destruct Hm as [H1 H2]. split; [done|]. intros r. by apply IH.
+      split_and!; try done. by apply IH.
+    + destruct Hm as [H1 H2]. split; [done|]. by apply IH.
   - (* Barrier *)
     destruct w as [[pa0 n0]|]; [done|]. intros r. by apply IH.
   - (* ExtraOutcome *)
@@ -417,7 +414,8 @@ Proof.
   induction m as [x|T oc k0 IH]; intros Hm Hk; [by apply Hk|].
   rewrite /Defs.bind /=. destruct oc; simpl in Hm |- *;
     try (intros r; by apply IH); try done.
-  destruct ty; simpl in Hm |- *; try done; intros r; by apply IH.
+  - (* MemWrite *) by apply IH.
+  - destruct ty; simpl in Hm |- *; try done; intros r; by apply IH.
 Qed.
 
 Lemma gok_bind {E A B} (m : Defs.monad E A) (k : A → Defs.monad E B) :
@@ -534,6 +532,19 @@ Proof.
   rewrite /Defs.bind /=. destruct oc; simpl in Hm |- *;
     try (intros r; by apply IH); try done.
   destruct ty; simpl in Hm |- *; try done; intros r; by apply IH.
+Qed.
+
+(** THE ABANDONMENT FACT, which is what the sites that open a window and
+    never close it ([execute_LOADRES] and the fault arms of §7c) discharge.
+    It is stated at [WeakSailLTS.amo_tail] — NOT at [gwalk (Some _)], which
+    is the closed reading and refutes it — and it is the positive replacement
+    for the two refutations ([gwalk_some_quiet_False], [amo_tail_quiet_False])
+    that stood in §1b through stage C1. *)
+Lemma gquiet_amo_tail pa n (m : M unit) : gquiet m → amo_tail pa n m.
+Proof.
+  induction m as [x|T oc k IH]; [done|].
+  destruct oc; simpl; try done; try (intros H r; by apply IH).
+  destruct ty; simpl; try done; intros H r; by apply IH.
 Qed.
 
 Lemma gquiet_bind0 {E A} (m : Defs.monad E unit) (n : Defs.monad E A) :
@@ -737,16 +748,16 @@ Proof.
   - (* MemRead *)
     destruct w as [[pa0 n0]|]; [done|].
     destruct (dev_addr (Interface.ReadReq.pa t)).
-    { intros r. by apply IH. }
+    { intros v. by apply IH. }
     destruct Hm as [Hc Hm]. split; [done|].
     destruct (ak_latest _).
     + intros v. by apply IH.
-    + intros r. by apply IH.
+    + intros v. by apply IH.
   - (* MemWrite *)
     destruct w as [[pa0 n0]|].
     + destruct Hm as (H1 & H2 & H3 & H4 & H5 & H6).
-      split_and!; try done. intros r. by apply IH.
-    + destruct Hm as [H1 H2]. split; [done|]. intros r. by apply IH.
+      split_and!; try done. by apply IH.
+    + destruct Hm as [H1 H2]. split; [done|]. by apply IH.
   - (* Barrier *)
     destruct w as [[pa0 n0]|]; [done|]. intros r. by apply IH.
   - (* ExtraOutcome: under an open window the hypothesis is [False]
@@ -766,15 +777,15 @@ Proof.
   all: try done.
   - destruct w as [[pa0 n0]|]; [done|].
     destruct (dev_addr (Interface.ReadReq.pa t)).
-    { intros r. by apply IH. }
+    { intros v. by apply IH. }
     destruct Hm as [Hc Hm]. split; [done|].
     destruct (ak_latest _).
     + intros v. by apply IH.
-    + intros r. by apply IH.
+    + intros v. by apply IH.
   - destruct w as [[pa0 n0]|].
     + destruct Hm as (H1 & H2 & H3 & H4 & H5 & H6).
-      split_and!; try done. intros r. by apply IH.
-    + destruct Hm as [H1 H2]. split; [done|]. intros r. by apply IH.
+      split_and!; try done. by apply IH.
+    + destruct Hm as [H1 H2]. split; [done|]. by apply IH.
   - destruct w as [[pa0 n0]|]; [done|]. intros r. by apply IH.
   - destruct ty; simpl in Hl |- *; try done; intros r; by apply IH.
 Qed.
@@ -785,7 +796,8 @@ Lemma glive_try_catch_live {A E1 E2} xf (m : Defs.monad E1 A)
 Proof.
   induction m as [x|T oc k IH]; intros Hl; [done|].
   destruct oc; simpl in Hl |- *; try (intros r; by apply IH); try done.
-  destruct ty; simpl in Hl |- *; try done; intros r; by apply IH.
+  - (* MemWrite *) by apply IH.
+  - destruct ty; simpl in Hl |- *; try done; intros r; by apply IH.
 Qed.
 
 Lemma glive_try_catch {A E1 E2} xf (m : Defs.monad E1 A) (h : E1 → Defs.monad E2 A) :
@@ -794,7 +806,8 @@ Proof.
   induction m as [x|T oc k IH]; intros Hm Hh; [done|].
   destruct oc; simpl in Hm |- *;
     try (intros r; by apply IH); try done; try (by apply Hh).
-  destruct ty; simpl in Hm |- *; try done; intros r; by apply IH.
+  - (* MemWrite *) by apply IH.
+  - destruct ty; simpl in Hm |- *; try done; intros r; by apply IH.
 Qed.
 
 Lemma gquiet_try_catch {A E1 E2} (m : Defs.monad E1 A) (h : E1 → Defs.monad E2 A) :
@@ -1186,7 +1199,7 @@ Proof. reflexivity. Qed.
 Lemma gwalk_MemRead_plain {E A} n req (k : _ → Defs.monad E A) :
   ak_coh (classify (Interface.ReadReq.access_kind req)) = false →
   ak_latest (classify (Interface.ReadReq.access_kind req)) = false →
-  (∀ r, gwalk None (k r)) →
+  (∀ v : bv (8 * n), gwalk None (k (inl (v, None)))) →
   gwalk None (Interface.Next (Interface.MemRead n req) k).
 Proof.
   intros H1 H2 Hk. simpl. destruct (dev_addr (Interface.ReadReq.pa req)); [done|].
@@ -1209,7 +1222,7 @@ Proof. intros H0 H1 H2 Hk. simpl. rewrite H0 H1 H2. by split. Qed.
 Lemma gwalk_MemWrite_plain {E A} n req (k : _ → Defs.monad E A) :
   (dev_addr (Interface.WriteReq.pa req) = true ∨
    (n ≠ 0%N ∧ ak_latest (classify (Interface.WriteReq.access_kind req)) = false)) →
-  (∀ r, gwalk None (k r)) →
+  gwalk None (k (inl None)) →
   gwalk None (Interface.Next (Interface.MemWrite n req) k).
 Proof.
   intros [Hd|[Hn Hl]] Hk; simpl.
@@ -1222,16 +1235,24 @@ Lemma gwalk_MemWrite_close {E A} pa0 n0 n req (k : _ → Defs.monad E A) :
   dev_addr (Interface.WriteReq.pa req) = false →
   Interface.WriteReq.pa req = pa0 → n = n0 → n ≠ 0%N →
   ak_latest (classify (Interface.WriteReq.access_kind req)) = true →
-  (∀ r, gwalk None (k r)) →
+  gwalk None (k (inl None)) →
   gwalk (Some (pa0, n0)) (Interface.Next (Interface.MemWrite n req) k).
 Proof. intros. simpl. by split_and!. Qed.
 
+(** (O1), FIXED.  Through stage C1 these two arms quantified over EVERY
+    answer, including the ABORT answer [inr ab] that the model answers with
+    [exit tt] — so [glive]/[sail_live] were refutable at every memory access
+    ([read_ram_not_live], deleted with this change).  They now quantify over
+    exactly what [WeakSailLTS.sail_mstep] supplies, and the memory leaves of
+    §6b go through. *)
 Lemma glive_MemRead {E A} xf n req (k : _ → Defs.monad E A) :
-  (∀ r, glive xf (k r)) → glive xf (Interface.Next (Interface.MemRead n req) k).
+  (∀ v : bv (8 * n), glive xf (k (inl (v, None)))) →
+  glive xf (Interface.Next (Interface.MemRead n req) k).
 Proof. done. Qed.
 
 Lemma glive_MemWrite {E A} xf n req (k : _ → Defs.monad E A) :
-  (∀ r, glive xf (k r)) → glive xf (Interface.Next (Interface.MemWrite n req) k).
+  glive xf (k (inl None)) →
+  glive xf (Interface.Next (Interface.MemWrite n req) k).
 Proof. done. Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -1251,7 +1272,7 @@ Lemma gwalk_read_ram_plain {B} addr width meta (k : _ → M B) :
 Proof.
   intros Hk. cbv [read_ram]. mred. cbv [Defs.sail_mem_read]. mred.
   apply gwalk_MemRead_plain; [done|done|].
-  intros [[x y]|[]]; mred; [apply Hk|apply gwalk_bind_exit].
+  intros v; mred; apply Hk.
 Qed.
 
 Lemma gwalk_read_ram_excl {B} rk addr width meta (k : _ → M B) :
@@ -1266,17 +1287,23 @@ Proof.
     intros v; mred; apply Hk.
 Qed.
 
-(** (O1), MACHINE-CHECKED: [read_ram] is NOT [sail_live], for EVERY kind and
-    width — the abort answer [Values.Err tt] is admitted by the ∀-quantified
-    memory arm of [sail_live] and the model answers it with [exit tt], i.e.
-    [GenericFail].  [Arch.abort = unit], so the branch is inhabited and the
-    refutation is immediate.  Every load in the model goes through here, so
-    [∀ b, sail_live (riscv_step b)] is FALSE AS STATED. *)
-Lemma read_ram_not_live addr width meta :
-  glive true (read_ram Read_plain (Physaddr addr) width meta) → False.
+(** (O1), FIXED — and this is where it shows.  Through stage C1 the leaf's
+    LIVENESS was a REFUTATION ([read_ram_not_live], deleted with this
+    change): [sail_live]/[glive]'s memory arms quantified over EVERY answer,
+    including the abort [Values.Err tt], which the model answers with
+    [exit tt] ([GenericFail]) — so [∀ b, sail_live (riscv_step b)] was FALSE
+    at every load.  With the arms narrowed to the answers
+    [WeakSailLTS.sail_mstep] supplies ([inl (w, None)]), the leaf is live
+    outright, for each of the three read kinds the model can produce (the
+    others are [internal_error], hence dead AND not live — the same
+    reachability residue as (O3)). *)
+Lemma glive_read_ram {B} xf rk addr width meta (k : _ → M B) :
+  rk = Read_plain ∨ rk = Read_RISCV_reserved ∨ rk = Read_RISCV_reserved_acquire →
+  (∀ r, glive xf (k r)) →
+  glive xf (Defs.bind (read_ram rk (Physaddr addr) width meta) k).
 Proof.
-  cbv [read_ram]. mred. cbv [Defs.sail_mem_read]. mred.
-  intros H. exact (H (inr tt)).
+  intros Hrk Hk. destruct Hrk as [->|[->| ->]]; cbv [read_ram]; mred;
+    cbv [Defs.sail_mem_read]; mred; intros v; mred; apply Hk.
 Qed.
 
 Lemma to_N_nonzero (w : Z) : (0 < w)%Z → Z.to_N w ≠ 0%N.
@@ -1289,7 +1316,7 @@ Lemma gwalk_write_ram_plain {B} addr width data meta (k : _ → M B) :
 Proof.
   intros Hw Hk. cbv [write_ram]. mred. cbv [Defs.sail_mem_write]. mred.
   apply gwalk_MemWrite_plain; [right; split; [by apply to_N_nonzero|done]|].
-  intros [y|[]]; mred; apply Hk.
+  mred. apply Hk.
 Qed.
 
 (** THE CONDITIONAL WRITE — the window closer. *)
@@ -1305,7 +1332,7 @@ Proof.
   destruct Hwk as [->| ->]; cbv [write_ram]; mred;
     cbv [Defs.sail_mem_write]; mred;
     (eapply gwalk_MemWrite_close; [done|done|done|done|done|]);
-    intros [y|[]]; mred; apply Hk.
+    mred; apply Hk.
 Qed.
 
 (* ====================================================================== *)
@@ -1492,14 +1519,19 @@ Qed.
         [read_pte_exclusive] error arm, the [check_leaf_pte] error arm, and
         [update_PTE_Bits pte access = None].
 
-    [amo_tail] refutes all of them ([amo_tail (Interface.Ret _) = False]),
-    so [∀ b, sail_shaped (riscv_step b)] is FALSE for this model — see (O2)
-    in the header and the report at the end of the file.  The kit still
-    delivers the POSITIVE half these sites need, namely the pair
+    Through stage C1 [amo_tail] refuted all of them
+    ([amo_tail (Interface.Ret _)] was [False]), so
+    [∀ b, sail_shaped (riscv_step b)] was FALSE for this model.  C2 settled
+    that in [WeakSailLTS] — the window may be abandoned, and the LTS's bare
+    exclusive-read arm steps such a tail — so these sites are now WITHIN the
+    specification.  The kit delivers the CLOSING half outright: the pair
     [gwalk_MemRead_excl] (opens the window) / [gwalk_write_ram_close]
-    (closes it) and [gwalk_bind_quiet] (carries it across the
-    register/trace code in between); what is missing is not a lemma but an
-    arm in [sail_shaped]/[sail_mstep]. *)
+    (closes it) with [gwalk_bind_quiet] carrying it across the
+    register/trace code in between; and the ABANDONING half at the leaf,
+    [gquiet_amo_tail].  What is still missing is neither an arm nor a lemma
+    but the sweep-side ESCAPE INDEX of (O2), which is what would let an
+    abandoned window travel out through the twelve binds between
+    [read_ram] and [execute_LOADRES]. *)
 
 (* ====================================================================== *)
 (** ** 8. THE ASSEMBLY-STRATEGY REPORT (stage C, first slice)
@@ -1601,36 +1633,22 @@ Qed.
     ------------------------------------------------------------------------
     8.4 THE THREE STRUCTURAL OBSTACLES, and what to change
 
-    (O1) [sail_live] IS FALSE AS STATED, at every memory access.  Its
-         [MemRead]/[MemWrite] arms quantify over EVERY answer, including the
-         ABORT answer; [read_ram] answers an abort with [exit tt]
-         ([GenericFail]).  Machine-checked here: [read_ram_not_live].  The
-         LTS supplies only [inl (w, None)] / [inl None]
-         ([WeakSailLTS.sail_mstep]), so the fix is to NARROW the two arms of
-         [sail_live] (and, for symmetry, of [sail_shaped]) to the
-         LTS-reachable answers:
-             | MemRead n req => λ k, ∀ w, P (k (inl (w, None)))
-             | MemWrite n req => λ k, P (k (inl None))
-         Two lines each.  Nothing downstream weakens: every consumer
-         instantiates the arm at exactly those values.
+    (O1) FIXED IN C2: the [MemRead]/[MemWrite] arms of [sail_live],
+         [sail_shaped], [glive] and [gwalk] quantify over the answers the LTS
+         supplies ([inl (w, None)] / [inl None]) rather than over the full
+         answer type with its abort branch.  Two lines each; nothing
+         downstream weakened, since every consumer instantiated the arm at
+         exactly those values already.  [read_ram_not_live] (the refutation)
+         is gone; [glive_read_ram] (the leaf) is in its place.
 
-    (O2) [sail_shaped]'s EXCLUSIVE-READ ARM IS FALSE FOR THIS MODEL, and not
-         only for lr.  [amo_tail] demands a conditional write before [Ret];
-         the model issues [ak_latest] reads that are followed by no write on
-         several paths — [execute_LOADRES] (never), [execute_AMO] (the
-         AMOCAS mismatch arm and every post-read fault), and
-         [update_and_write_pte] (the [read_pte_exclusive] error arm, the
-         [check_leaf_pte] error arm, and [update_PTE_Bits = None]).  The
-         matching hole is in the LTS: [sail_mstep]'s [MemRead] arm with
-         [ak_latest = true] steps ONLY by the fused [LRmw] label, so an
-         unpaired exclusive read is STUCK.  Both need the same fix: an
-         EXCLUSIVE-READ-ONLY arm (an [LLoad] carrying the [latest] pin), and
-         [sail_shaped]'s exclusive branch becomes
-             (∀ w, amo_tail pa n (k …)) ∨ (∀ w, sail_shaped (k …))
-         — or, better, [amo_tail] is weakened to "no conditional write to a
-         DIFFERENT address/width before the next [Ret]", which is what the
-         fused-arm bracketing actually needs.  THIS IS A SPECIFICATION
-         DECISION AND BELONGS TO THE ORCHESTRATOR, not to the sweep.
+    (O2) SETTLED IN C2, IN [WeakSailLTS].  [amo_tail]'s [Interface.Ret] arm
+         is [True] (a window may be ABANDONED, keeping "no read, no barrier,
+         and any write closes the window") and [sail_mstep] has the BARE
+         exclusive-read arm, which brackets an abandoned window to the
+         instruction's end exactly as the fused arm brackets to its
+         conditional write.  What remains for the SWEEP is the escape index
+         described in (O2) of the header: this kit still walks windows in the
+         CLOSED reading, because the weak one refutes [gwalk_bind].
 
     (O3) [untilMT]/[whileMT] ARE NOT LIVENESS-COMPOSITIONAL: the guard ends
          in [fail "Termination limit reached"].  Four sites, three of them
@@ -1649,9 +1667,10 @@ Qed.
     ------------------------------------------------------------------------
     8.5 RECOMMENDED ORDER
 
-      1. Fix (O1) and decide (O2) in [WeakSailLTS]/[WeakSailComplete].
-         Until then [∀ b, sail_shaped/sail_live (riscv_step b)] is not a
-         theorem and no sweep can succeed.
+      1. DONE (C2): (O1) fixed and (O2) decided, in
+         [WeakSailLTS]/[WeakSailComplete].  The remaining sweep-side item is
+         the ESCAPE INDEX of (O2) above, without which the abandoning
+         exclusive sites cannot be composed through [bind].
       2. Discharge (O3)'s four loop sites and the ~100 unreachable-failure
          sites by hand / by a computation tactic; these are independent of
          1 and can start now.
