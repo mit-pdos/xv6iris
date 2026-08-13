@@ -115,6 +115,90 @@ Section ProofWakeup.
      prologue's own [wp_next] hands back, which a section variable could not
      express.  Every lemma below takes its own implicit [CID0]. *)
 
+  (* ---- THE BLOCK CONTINUATIONS, NAMED (RULE ONE,
+     claude-notes/optimization.md): each stays TRANSPARENT so a later
+     [iSpecialize]/[iApply] still unifies through it, and only the part
+     AFTER [fun CIDx : CpuId =>] is folded -- the surrounding
+     [wp_next]/[∀ fuel] stay syntactically visible at every site that
+     states them.  Unlike [ProofNamex]/[ProofDirlookup] this section has NO
+     [Context `{GEN : GenId} `{CID : CpuId}] (file header: the loop lemma is
+     applied at whatever hart the prologue's [wp_next] hands back, which a
+     section variable could not express), so each definition below that
+     calls [wp_next]/[pc_is]/[sie_cap_gpr]/[cpu_own] takes its own [GEN] and
+     the relevant hart(s) as explicit/generalized arguments instead. *)
+
+  (* the loop's exit continuation, control at the epilogue entry
+     [wakeup+0x54]: the SAME statement is both the lemma's own [Hqexit]
+     hypothesis below and the tail [wk_loop_body] hands [wp_next] on exit
+     (both anchored at the lemma's own [CID0], per the file header). *)
+  Definition wk_exit_body `{GEN : GenId}
+      (pme spF : mword 64) (vra vs0 vs1 vs2 vs3 vs4 vs5
+       vs6 vs7 vs8 vs9 vs10 vs11 : mword 64)
+      (av lvl : nat) (eb : bool) (C : iProp Σ) (b : bool)
+      (CID : CpuId) : iProp Σ :=
+    (∀ Mexit : regfile,
+       ⌜ Mexit !!! Regidx csp_rs1 = spF
+         /\ Mexit !!! Regidx (mword_of_int 22) = vs6
+         /\ Mexit !!! Regidx (mword_of_int 23) = vs7
+         /\ Mexit !!! Regidx (mword_of_int 24) = vs8
+         /\ Mexit !!! Regidx (mword_of_int 25) = vs9
+         /\ Mexit !!! Regidx (mword_of_int 26) = vs10
+         /\ Mexit !!! Regidx (mword_of_int 27) = vs11
+         /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mexit)) ⌝ -∗
+       sie_cap_gpr Mexit av b pme -∗
+       cpu_own lvl eb pme C b -∗
+       kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x54)) -∗
+       wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
+       WP (Loop : expr riscv_lang))%I.
+
+  (* the fuel-indexed scan invariant at the loop head [wakeup+0x38]; the
+     [∀ fuel]/[wp_next] wrapper stays at each [iAssert] site (RULE 3), only
+     what follows [fun CID : CpuId =>] is named here. *)
+  Definition wk_loop_body `{GEN : GenId}
+      (pme spF chan : mword 64) (vra vs0 vs1 vs2 vs3 vs4 vs5
+       vs6 vs7 vs8 vs9 vs10 vs11 : mword 64)
+      (av lvl : nat) (eb : bool) (C : iProp Σ) (b : bool)
+      (CID0 : CpuId) (fuel : nat) (CID : CpuId) : iProp Σ :=
+    (∀ (k : nat) (M : regfile),
+       ⌜(NPROC - k <= fuel)%nat⌝ -∗ ⌜(k < NPROC)%nat⌝ -∗
+       ⌜wkl_regs M spF chan vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
+       wp_next (CID0 := CID0) b pme (fun (CIDq : CpuId) =>
+         wk_exit_body pme spF vra vs0 vs1 vs2 vs3 vs4 vs5
+           vs6 vs7 vs8 vs9 vs10 vs11 av lvl eb C b CIDq) -∗
+       sie_cap_gpr M av b pme -∗
+       cpu_own lvl eb pme C b -∗
+       kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x38)) -∗
+       wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
+       WP (Loop : expr riscv_lang))%I.
+
+  (* the shared release tail [Hrel] both arms of the state test (and the
+     chan-mismatch exit) hand control to; the whole stretch back to the
+     release call runs at the FIXED hart [CID] (a held lock pins
+     noff >= 1, file header), so unlike the two definitions above this one
+     carries no [wp_next]/hart binder of its own. *)
+  Definition wk_rel_body `{GEN : GenId}
+      (γs : list gname) (γk : gname) (pme spF chan : mword 64)
+      (av lvl k : nat) (eb b : bool) (C : iProp Σ)
+      (vs6 vs7 vs8 vs9 vs10 vs11 : mword 64) (CID : CpuId) : iProp Σ :=
+    (∀ (Mr : regfile),
+       ⌜ Mr !!! Regidx (mword_of_int 9 : mword 5) = proc_addr k /\
+         Mr !!! Regidx (mword_of_int 2 : mword 5) = spF /\
+         Mr !!! Regidx (mword_of_int 18 : mword 5) = chan /\
+         Mr !!! Regidx (mword_of_int 19 : mword 5) = proc_addr NPROC /\
+         Mr !!! Regidx (mword_of_int 20 : mword 5) = (mword_of_int 2 : mword 64) /\
+         Mr !!! Regidx (mword_of_int 21 : mword 5) = (mword_of_int 3 : mword 64) /\
+         Mr !!! Regidx (mword_of_int 22 : mword 5) = vs6 /\
+         Mr !!! Regidx (mword_of_int 23 : mword 5) = vs7 /\
+         Mr !!! Regidx (mword_of_int 24 : mword 5) = vs8 /\
+         Mr !!! Regidx (mword_of_int 25 : mword 5) = vs9 /\
+         Mr !!! Regidx (mword_of_int 26 : mword 5) = vs10 /\
+         Mr !!! Regidx (mword_of_int 27 : mword 5) = vs11 /\
+         (forall r : regidx, r ∈ dom (rf_to_gmap Mr)) ⌝ -∗
+       sie_cap_gpr (CID := CID) Mr (trap_res b + av)%nat false pme -∗
+       pc_is (CID := CID) (mword_of_int (KernelSyms.wakeup + 0x2a)) -∗
+       locked γk CID -∗ proc_lock_res γs γk (proc_addr k) -∗
+       WP (LoopE gen_id CID : expr riscv_lang))%I.
+
   (* wakeup only RELAYS parked contexts (SLEEPING->RUNNABLE, untouched), never
      resumes them, so [proc_lock_res] (SchedCtx.v, whose context slot is the
      ▷-guarded [proc_ctx] over the scheduler swtch chain) is threaded OPAQUELY
@@ -135,20 +219,8 @@ Section ProofWakeup.
     (* the loop's exit continuation: control at the epilogue entry [wakeup+0x54],
        at whatever hart the scan ended on. *)
     wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
-      ∀ Mexit : regfile,
-        ⌜ Mexit !!! Regidx csp_rs1 = spF
-          /\ Mexit !!! Regidx (mword_of_int 22) = vs6
-          /\ Mexit !!! Regidx (mword_of_int 23) = vs7
-          /\ Mexit !!! Regidx (mword_of_int 24) = vs8
-          /\ Mexit !!! Regidx (mword_of_int 25) = vs9
-          /\ Mexit !!! Regidx (mword_of_int 26) = vs10
-          /\ Mexit !!! Regidx (mword_of_int 27) = vs11
-          /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mexit)) ⌝ -∗
-        sie_cap_gpr Mexit av b pme -∗
-        cpu_own lvl eb pme C b -∗
-        kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x54)) -∗
-        wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
-        WP (Loop : expr riscv_lang)) -∗
+      wk_exit_body pme spF vra vs0 vs1 vs2 vs3 vs4 vs5
+        vs6 vs7 vs8 vs9 vs10 vs11 av lvl eb C b CID) -∗
     ∀ (k : nat) (M : regfile),
       ⌜(k < NPROC)%nat⌝ -∗ ⌜wkl_regs M spF chan vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
       sie_cap_gpr M av b pme -∗
@@ -164,29 +236,9 @@ Section ProofWakeup.
        so the induction hypothesis is re-enterable at a migrated hart. *)
     iAssert (∀ (fuel : nat),
                wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
-                 ∀ (k : nat) (M : regfile),
-                   ⌜(NPROC - k <= fuel)%nat⌝ -∗ ⌜(k < NPROC)%nat⌝ -∗
-                   ⌜wkl_regs M spF chan vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
-                   wp_next (CID0 := CID0) b pme (fun (CIDq : CpuId) =>
-                     ∀ Mexit : regfile,
-                       ⌜ Mexit !!! Regidx csp_rs1 = spF
-                         /\ Mexit !!! Regidx (mword_of_int 22) = vs6
-                         /\ Mexit !!! Regidx (mword_of_int 23) = vs7
-                         /\ Mexit !!! Regidx (mword_of_int 24) = vs8
-                         /\ Mexit !!! Regidx (mword_of_int 25) = vs9
-                         /\ Mexit !!! Regidx (mword_of_int 26) = vs10
-                         /\ Mexit !!! Regidx (mword_of_int 27) = vs11
-                         /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mexit)) ⌝ -∗
-                       sie_cap_gpr Mexit av b pme -∗
-                       cpu_own lvl eb pme C b -∗
-                       kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x54)) -∗
-                       wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
-                       WP (Loop : expr riscv_lang)) -∗
-                   sie_cap_gpr M av b pme -∗
-                   cpu_own lvl eb pme C b -∗
-                   kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x38)) -∗
-                   wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
-                   WP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
+                 wk_loop_body pme spF chan vra vs0 vs1 vs2 vs3 vs4 vs5
+                   vs6 vs7 vs8 vs9 vs10 vs11 av lvl eb C b CID0 fuel CID))%I
+      with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
       { iIntros (CIDk Hsk k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown Htext Hpc Hframe".
         exfalso. lia. }
@@ -401,24 +453,8 @@ Section ProofWakeup.
       (* the p++ tail at 0x30.                                            *)
       (* Stated at the FIXED hart CIDf -- the whole stretch is at [false]. *)
       (* =============================================================== *)
-      iAssert (∀ (Mr : regfile),
-                 ⌜ Mr !!! Regidx (mword_of_int 9 : mword 5) = proc_addr k /\
-                   Mr !!! Regidx (mword_of_int 2 : mword 5) = spF /\
-                   Mr !!! Regidx (mword_of_int 18 : mword 5) = chan /\
-                   Mr !!! Regidx (mword_of_int 19 : mword 5) = proc_addr NPROC /\
-                   Mr !!! Regidx (mword_of_int 20 : mword 5) = (mword_of_int 2 : mword 64) /\
-                   Mr !!! Regidx (mword_of_int 21 : mword 5) = (mword_of_int 3 : mword 64) /\
-                   Mr !!! Regidx (mword_of_int 22 : mword 5) = vs6 /\
-                   Mr !!! Regidx (mword_of_int 23 : mword 5) = vs7 /\
-                   Mr !!! Regidx (mword_of_int 24 : mword 5) = vs8 /\
-                   Mr !!! Regidx (mword_of_int 25 : mword 5) = vs9 /\
-                   Mr !!! Regidx (mword_of_int 26 : mword 5) = vs10 /\
-                   Mr !!! Regidx (mword_of_int 27 : mword 5) = vs11 /\
-                   (forall r : regidx, r ∈ dom (rf_to_gmap Mr)) ⌝ -∗
-                 sie_cap_gpr (CID := CIDf) Mr (trap_res b + av)%nat false pme -∗
-                 pc_is (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x2a)) -∗
-                 locked γk CIDf -∗ proc_lock_res γs γk (proc_addr k) -∗
-                 WP (LoopE gen_id CIDf : expr riscv_lang))%I
+      iAssert (wk_rel_body γs γk pme spF chan av lvl k eb b C
+                 vs6 vs7 vs8 vs9 vs10 vs11 CIDf)%I
         with "[Hown Hpay Hframe Htail]"
         as "Hrel".
       { iIntros (Mr) "%Hmr Hcg Hpc Htok HR".

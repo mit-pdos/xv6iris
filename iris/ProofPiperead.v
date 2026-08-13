@@ -429,6 +429,144 @@ Section ProofPiperead.
   Notation Ra4 := (mword_of_int 14 : mword 5).
   Notation Ra5 := (mword_of_int 15 : mword 5).
 
+  (* ---- THE BLOCK CONTINUATIONS, NAMED (RULE ONE, claude-notes/optimization.md):
+     piperead builds four of these as local [pose]s -- [EPIP]/[CPP]/[EPIC]/
+     [WXP] (file header: EPI/M1ARM/CPHASE/WEXIT) -- plus the fuel-indexed
+     copy-loop invariant [CLOOP] and the wait loop's [wp_next] [WLOOP].  The
+     three reached through an EXPLICIT, still-visible
+     [wp_next (CID0 := CID) true pj (fun CIDx => ...)] wrapper -- [EPIP],
+     [EPIC], [CPP] -- plus [WLOOP] (same shape) fold cleanly here: only the
+     part after [fun CIDx : CpuId =>] is named, the [pose]/[iAssert] at the
+     original site keeps the [wp_next] wrapper exactly as written, and no
+     downstream tactic ([rewrite /WXP], [rewrite /EPIP], [iApply "HWX"], ...)
+     needs to change, matching [ProofNamex]/[ProofDirlookup].
+
+     [WXP] and [CLOOP] do NOT carry a [wp_next] wrapper (the stretch from
+     the copy loop through the wakeup/release tail runs at the PINNED index
+     [false], no hart binder needed -- see the file header) and, MEASURED,
+     folding either one the same way breaks the leaf instruction lemmas
+     immediately inside: [iApply (wp_addi4_s_sconf ... with "Hcg Hpc Hid4")]
+     fails with "iSpecialize: cannot instantiate ... false ?p" against
+     "false pj" -- the leaf's implicit process-pointer [p] (a section
+     variable of e.g. [WpSconfAlu]) no longer unifies once [pj] is reached
+     only through the folded body instead of appearing unfolded in the
+     surrounding [wp_next]/statement.  Confirmed by reverting each in turn:
+     the error moves to whichever of [WXP]/[CLOOP] is still folded and
+     disappears once both are left inline.  Per the file's fallback rule,
+     both are left as their original inline [pose]/[iAssert] here. *)
+
+  Definition pr_epi_body
+      (sp0 spr vra vs0 vs1 vs2 vs3 vs4 vs5 vs6 vs7 vs8 : mword 64)
+      (m : regfile) (av : nat) (pj : mword 64) (C : iProp Σ)
+      (γp : pipe_names) (w : bool) (q : Qp) (pid : mword 32) (V : pprivate)
+      (n : Z) (CIDe : CpuId) : iProp Σ :=
+    (∀ (M : regfile) (P' : uptd) (rv : mword 64),
+     ⌜ M !!! Regidx csp_rs1 = spr
+       /\ M !!! Regidx Rs4 = rv
+       /\ M !!! Regidx Rs6 = vs6
+       /\ M !!! Regidx Rs7 = vs7
+       /\ M !!! Regidx Rs8 = vs8
+       /\ M !!! Regidx Rs9 = m !!! Regidx Rs9
+       /\ M !!! Regidx Rs10 = m !!! Regidx Rs10
+       /\ M !!! Regidx Rs11 = m !!! Regidx Rs11 ⌝ -∗
+     ⌜ uptd_ext (pv_upt V) P' ⌝ -∗
+     ⌜ pipe_rw_ret n rv ⌝ -∗
+     sie_cap_gpr M (av - 12)%nat true pj -∗
+     pc_is (mword_of_int (KernelSyms.piperead + 0xe8) : mword 64) -∗
+     cpu_own 0%nat true pj C true -∗
+     pipe_ref γp w q -∗
+     proc_priv_core pj pid (upd_upt V P') -∗
+     pa_stk sp0 1 ↦₈ vra -∗ pa_stk sp0 2 ↦₈ vs0 -∗ pa_stk sp0 3 ↦₈ vs1 -∗
+     pa_stk sp0 4 ↦₈ vs2 -∗ pa_stk sp0 5 ↦₈ vs3 -∗ pa_stk sp0 6 ↦₈ vs4 -∗
+     pa_stk sp0 7 ↦₈ vs5 -∗
+     (∃ z : mword 64, pa_stk sp0 8 ↦₈ z) -∗
+     (∃ z : mword 64, pa_stk sp0 9 ↦₈ z) -∗
+     (∃ z : mword 64, pa_stk sp0 10 ↦₈ z) -∗
+     (∃ z : mword 64, pa_stk sp0 11 ↦₈ z) -∗
+     (∃ z : mword 64, pa_stk sp0 12 ↦₈ z) -∗
+     WP (Loop : expr riscv_lang))%I.
+
+  Definition pr_cphase_body
+      (spr s0v pi addrv pj sp0 vs6 vs7 vs8 : mword 64)
+      (n : Z) (m : regfile) (av : nat) (C : iProp Σ)
+      (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
+      (pid : mword 32) (V : pprivate) (CIDc : CpuId) : iProp Σ :=
+    (∀ M : regfile,
+     ⌜ M !!! Regidx csp_rs1 = spr
+       /\ M !!! Regidx Rs0 = s0v
+       /\ M !!! Regidx Rs1 = pi
+       /\ M !!! Regidx Rs3 = addrv
+       /\ M !!! Regidx Rs2 = pj
+       /\ M !!! Regidx Rs5 = (mword_of_int n : mword 64)
+       /\ M !!! Regidx Rs9 = m !!! Regidx Rs9
+       /\ M !!! Regidx Rs10 = m !!! Regidx Rs10
+       /\ M !!! Regidx Rs11 = m !!! Regidx Rs11 ⌝ -∗
+     sie_cap_gpr M (trap_res true + (av - 12))%nat false pj -∗
+     pc_is (mword_of_int (KernelSyms.piperead + 0x84) : mword 64) -∗
+     cpu_own 1%nat true pj C false -∗
+     arm_pay 0 true pj -∗
+     locked γl cpu_id -∗
+     pipe_res γp pi -∗
+     pipe_ref γp w q -∗
+     proc_priv_core pj pid V -∗
+     pa_stk sp0 8 ↦₈ vs6 -∗
+     pa_stk sp0 9 ↦₈ vs7 -∗
+     pa_stk sp0 10 ↦₈ vs8 -∗
+     (∃ z : mword 64, pa_stk sp0 11 ↦₈ z) -∗
+     (∃ z : mword 64, pa_stk sp0 12 ↦₈ z) -∗
+     WP (Loop : expr riscv_lang))%I.
+
+  Definition pr_epic_body
+      (sp0 spr vs6 vs7 vs8 : mword 64)
+      (m : regfile) (av : nat) (pj : mword 64) (C : iProp Σ)
+      (γp : pipe_names) (w : bool) (q : Qp) (pid : mword 32) (V : pprivate)
+      (n : Z) (CIDx : CpuId) : iProp Σ :=
+    (∀ (M : regfile) (P' : uptd) (rv : mword 64),
+     ⌜ M !!! Regidx csp_rs1 = spr
+       /\ M !!! Regidx Rs4 = rv
+       /\ M !!! Regidx Rs6 = vs6
+       /\ M !!! Regidx Rs7 = vs7
+       /\ M !!! Regidx Rs8 = vs8
+       /\ M !!! Regidx Rs9 = m !!! Regidx Rs9
+       /\ M !!! Regidx Rs10 = m !!! Regidx Rs10
+       /\ M !!! Regidx Rs11 = m !!! Regidx Rs11 ⌝ -∗
+     ⌜ uptd_ext (pv_upt V) P' ⌝ -∗
+     ⌜ pipe_rw_ret n rv ⌝ -∗
+     sie_cap_gpr M (av - 12)%nat true pj -∗
+     pc_is (mword_of_int (KernelSyms.piperead + 0xe8) : mword 64) -∗
+     cpu_own 0%nat true pj C true -∗
+     pipe_ref γp w q -∗
+     proc_priv_core pj pid (upd_upt V P') -∗
+     (∃ z : mword 64, pa_stk sp0 8 ↦₈ z) -∗
+     (∃ z : mword 64, pa_stk sp0 9 ↦₈ z) -∗
+     (∃ z : mword 64, pa_stk sp0 10 ↦₈ z) -∗
+     (∃ z : mword 64, pa_stk sp0 11 ↦₈ z) -∗
+     (∃ z : mword 64, pa_stk sp0 12 ↦₈ z) -∗
+     WP (Loop : expr riscv_lang))%I.
+
+  Definition pr_wloop_body
+      (W0 : regfile) (av : nat) (pj : mword 64) (C : iProp Σ)
+      (γl : gname) (pi : mword 64) (γp : pipe_names) (w : bool) (q : Qp)
+      (pid : mword 32) (V : pprivate) (sp0 : mword 64)
+      (EX CP : iProp Σ) (CIDl : CpuId) : iProp Σ :=
+    (∀ M : regfile,
+     ⌜ callee_saved W0 M ⌝ -∗
+     (EX ∧ CP) -∗
+     sie_cap_gpr M (trap_res true + (av - 12))%nat false pj -∗
+     pc_is (mword_of_int (KernelSyms.piperead + 0x34) : mword 64) -∗
+     cpu_own 1%nat true pj C false -∗
+     arm_pay 0 true pj -∗
+     locked γl cpu_id -∗
+     pipe_res γp pi -∗
+     pipe_ref γp w q -∗
+     proc_priv_core pj pid V -∗
+     (∃ z : mword 64, pa_stk sp0 8 ↦₈ z) -∗
+     (∃ z : mword 64, pa_stk sp0 9 ↦₈ z) -∗
+     (∃ z : mword 64, pa_stk sp0 10 ↦₈ z) -∗
+     (∃ z : mword 64, pa_stk sp0 11 ↦₈ z) -∗
+     (∃ z : mword 64, pa_stk sp0 12 ↦₈ z) -∗
+     WP (Loop : expr riscv_lang))%I.
+
   Lemma wp_piperead_sconf (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
@@ -622,31 +760,8 @@ Section ProofPiperead.
     clear Hpc10.
     (* ================= EPI: the epilogue at +0xe8 ================= *)
     pose (EPIP := (wp_next (CID0 := CID) true pj (fun (CIDe : CpuId) =>
-               ((∀ (M : regfile) (P' : uptd) (rv : mword 64),
-               ⌜ M !!! Regidx csp_rs1 = spr
-                 /\ M !!! Regidx Rs4 = rv
-                 /\ M !!! Regidx Rs6 = vs6
-                 /\ M !!! Regidx Rs7 = vs7
-                 /\ M !!! Regidx Rs8 = vs8
-                 /\ M !!! Regidx Rs9 = m !!! Regidx Rs9
-                 /\ M !!! Regidx Rs10 = m !!! Regidx Rs10
-                 /\ M !!! Regidx Rs11 = m !!! Regidx Rs11 ⌝ -∗
-               ⌜ uptd_ext (pv_upt V) P' ⌝ -∗
-               ⌜ pipe_rw_ret n rv ⌝ -∗
-               sie_cap_gpr M (av - 12)%nat true pj -∗
-               pc_is (mword_of_int (KernelSyms.piperead + 0xe8) : mword 64) -∗
-               cpu_own 0%nat true pj C true -∗
-               pipe_ref γp w q -∗
-               proc_priv_core pj pid (upd_upt V P') -∗
-               pa_stk sp0 1 ↦₈ vra -∗ pa_stk sp0 2 ↦₈ vs0 -∗ pa_stk sp0 3 ↦₈ vs1 -∗
-               pa_stk sp0 4 ↦₈ vs2 -∗ pa_stk sp0 5 ↦₈ vs3 -∗ pa_stk sp0 6 ↦₈ vs4 -∗
-               pa_stk sp0 7 ↦₈ vs5 -∗
-               (∃ z : mword 64, pa_stk sp0 8 ↦₈ z) -∗
-               (∃ z : mword 64, pa_stk sp0 9 ↦₈ z) -∗
-               (∃ z : mword 64, pa_stk sp0 10 ↦₈ z) -∗
-               (∃ z : mword 64, pa_stk sp0 11 ↦₈ z) -∗
-               (∃ z : mword 64, pa_stk sp0 12 ↦₈ z) -∗
-               WP (Loop : expr riscv_lang))%I)) : iProp Σ)).
+               pr_epi_body sp0 spr vra vs0 vs1 vs2 vs3 vs4 vs5 vs6 vs7 vs8
+                 m av pj C γp w q pid V n CIDe) : iProp Σ)).
     iAssert EPIP with "[Hcont]" as "EPI".
     { rewrite /EPIP.
       iIntros (CIDe Hse M P' rv) "%Hrg %Hext %Hret Hcg Hpc Hown Href Hpriv Hg1 Hg2 Hg3 Hg4 Hg5 Hg6 Hg7 Hg8 Hg9 Hg10 Hg11 Hg12".
@@ -1160,53 +1275,10 @@ Section ProofPiperead.
     (* the frame slots and the caller's continuation.                     *)
     (* ================================================================= *)
     pose (CPP := (wp_next (CID0 := CID) true pj (fun (CIDc : CpuId) =>
-        ((∀ M : regfile,
-        ⌜ M !!! Regidx csp_rs1 = spr
-          /\ M !!! Regidx Rs0 = s0v
-          /\ M !!! Regidx Rs1 = pi
-          /\ M !!! Regidx Rs3 = addrv
-          /\ M !!! Regidx Rs2 = pj
-          /\ M !!! Regidx Rs5 = (mword_of_int n : mword 64)
-          /\ M !!! Regidx Rs9 = m !!! Regidx Rs9
-          /\ M !!! Regidx Rs10 = m !!! Regidx Rs10
-          /\ M !!! Regidx Rs11 = m !!! Regidx Rs11 ⌝ -∗
-        sie_cap_gpr M (trap_res true + (av - 12))%nat false pj -∗
-        pc_is (mword_of_int (KernelSyms.piperead + 0x84) : mword 64) -∗
-        cpu_own 1%nat true pj C false -∗
-        arm_pay 0 true pj -∗
-        locked γl cpu_id -∗
-        pipe_res γp pi -∗
-        pipe_ref γp w q -∗
-        proc_priv_core pj pid V -∗
-        pa_stk sp0 8 ↦₈ vs6 -∗
-        pa_stk sp0 9 ↦₈ vs7 -∗
-        pa_stk sp0 10 ↦₈ vs8 -∗
-        (∃ z : mword 64, pa_stk sp0 11 ↦₈ z) -∗
-        (∃ z : mword 64, pa_stk sp0 12 ↦₈ z) -∗
-        WP (Loop : expr riscv_lang))%I)) : iProp Σ)).
+        pr_cphase_body spr s0v pi addrv pj sp0 vs6 vs7 vs8
+          n m av C γl γp w q pid V CIDc) : iProp Σ)).
     pose (EPIC := (wp_next (CID0 := CID) true pj (fun (CIDx : CpuId) =>
-               ((∀ (M : regfile) (P' : uptd) (rv : mword 64),
-               ⌜ M !!! Regidx csp_rs1 = spr
-                 /\ M !!! Regidx Rs4 = rv
-                 /\ M !!! Regidx Rs6 = vs6
-                 /\ M !!! Regidx Rs7 = vs7
-                 /\ M !!! Regidx Rs8 = vs8
-                 /\ M !!! Regidx Rs9 = m !!! Regidx Rs9
-                 /\ M !!! Regidx Rs10 = m !!! Regidx Rs10
-                 /\ M !!! Regidx Rs11 = m !!! Regidx Rs11 ⌝ -∗
-               ⌜ uptd_ext (pv_upt V) P' ⌝ -∗
-               ⌜ pipe_rw_ret n rv ⌝ -∗
-               sie_cap_gpr M (av - 12)%nat true pj -∗
-               pc_is (mword_of_int (KernelSyms.piperead + 0xe8) : mword 64) -∗
-               cpu_own 0%nat true pj C true -∗
-               pipe_ref γp w q -∗
-               proc_priv_core pj pid (upd_upt V P') -∗
-               (∃ z : mword 64, pa_stk sp0 8 ↦₈ z) -∗
-               (∃ z : mword 64, pa_stk sp0 9 ↦₈ z) -∗
-               (∃ z : mword 64, pa_stk sp0 10 ↦₈ z) -∗
-               (∃ z : mword 64, pa_stk sp0 11 ↦₈ z) -∗
-               (∃ z : mword 64, pa_stk sp0 12 ↦₈ z) -∗
-               WP (Loop : expr riscv_lang))%I)) : iProp Σ)).
+               pr_epic_body sp0 spr vs6 vs7 vs8 m av pj C γp w q pid V n CIDx) : iProp Σ)).
     iAssert ((EPIC ∧ CPP)%I) with "[EPI Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7]" as "EXITS".
     { iSplit.
       { rewrite /EPIC. iEval (rewrite /EPIP) in "EPI".
@@ -2194,23 +2266,8 @@ Section ProofPiperead.
       { apply uptd_ext_sz_refl. } }
     (* ================= the WAIT LOOP (iLöb) from +0x34 ================= *)
     iAssert (wp_next (CID0 := CID) true pj (fun (CIDl : CpuId) =>
-      (∀ M : regfile,
-        ⌜ callee_saved W0 M ⌝ -∗
-        (EPIC ∧ CPP) -∗
-        sie_cap_gpr M (trap_res true + (av - 12))%nat false pj -∗
-        pc_is (mword_of_int (KernelSyms.piperead + 0x34) : mword 64) -∗
-        cpu_own 1%nat true pj C false -∗
-        arm_pay 0 true pj -∗
-        locked γl cpu_id -∗
-        pipe_res γp pi -∗
-        pipe_ref γp w q -∗
-        proc_priv_core pj pid V -∗
-        (∃ z : mword 64, pa_stk sp0 8 ↦₈ z) -∗
-        (∃ z : mword 64, pa_stk sp0 9 ↦₈ z) -∗
-        (∃ z : mword 64, pa_stk sp0 10 ↦₈ z) -∗
-        (∃ z : mword 64, pa_stk sp0 11 ↦₈ z) -∗
-        (∃ z : mword 64, pa_stk sp0 12 ↦₈ z) -∗
-        WP (Loop : expr riscv_lang))))%I with "[]" as "WLOOP".
+      pr_wloop_body W0 av pj C γl pi γp w q pid V sp0 EPIC CPP CIDl))%I
+      with "[]" as "WLOOP".
     { iLöb as "IH".
       iIntros (CIDl Hsl M) "%HcsM HEX Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hq8 Hq9 Hq10 Hq11 Hq12".
       assert (HMcsp : M !!! Regidx csp_rs1 = spr)
