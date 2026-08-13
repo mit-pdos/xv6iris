@@ -193,6 +193,97 @@ Proof.
   apply w32_sext_moi. exact Hzk.
 Qed.
 
+(* ---- a uint ARGUMENT AT THE FULL 32-BIT RANGE ----------------------
+
+   Everything above is about a counter the code itself produced, and so is
+   below 2^31.  An ARGUMENT is not: RV64 passes a 32-bit argument
+   SIGN-EXTENDED, [uint] included, so a caller's [uint] at or above 2^31
+   arrives in its register as a NEGATIVE 64-bit word.  A contract that pins
+   that register to [mword_of_int x] therefore confines its parameter to
+   [0, 2^31) and cannot be widened -- no compiled caller ever puts the
+   zero-extended word there.  [SpecReadi]'s [off] and [n] are the worked
+   instance (design/fs-inode.md, "readi takes off and n at the FULL 32-bit
+   range").
+
+   [w32_uarg x] is what such a word is worth as an UNSIGNED 64-bit number --
+   the number a [bltu]/[bgeu] actually compares -- and the three orderings
+   below it are what a proof about those compares needs: a sign-extended
+   negative word is ABOVE every small bound, and a value that is at most a
+   small bound is not sign-extended at all.  Together they are why the
+   64-bit compares gcc emits DECIDE the 32-bit unsigned compares the C is
+   written in. *)
+
+Definition w32_uarg (x : Z) : Z :=
+  if decide (x < 2 ^ 31) then x else x + (2 ^ 64 - 2 ^ 32).
+
+Lemma w32_arg_unsigned (x : Z) : (0 <= x < 2 ^ 32)%Z ->
+  bv_unsigned (sign_extend' 64 (mword_of_int x : mword 32) : mword 64)
+  = w32_uarg x.
+Proof.
+  intro Hx. unfold w32_uarg. case_decide as Hs.
+  - rewrite (w32_sext_moi x ltac:(lia)) moi64_unsigned.
+    apply bvw64_small. change (2 ^ 64)%Z with 18446744073709551616%Z.
+    change (2 ^ 31)%Z with 2147483648%Z in Hs. lia.
+  - change (2 ^ 31)%Z with 2147483648%Z in Hs.
+    change (2 ^ 32)%Z with 4294967296%Z in Hx.
+    rewrite sext32_64_moi moi64_mod.
+    assert (Hsg : bv_signed (mword_of_int x : mword 32) = x - 4294967296).
+    { unfold bv_signed, bv_swrap. rewrite moi32_unsigned.
+      rewrite (bvw32_small x ltac:(lia)).
+      change (bv_half_modulus (MachineWord.MachineWord.Z_idx 32)) with 2147483648.
+      unfold bv_wrap.
+      change (bv_modulus (MachineWord.MachineWord.Z_idx 32)) with 4294967296.
+      replace (x + 2147483648)
+        with (x + 2147483648 - 4294967296 + 1 * 4294967296) by lia.
+      rewrite Z_mod_plus_full.
+      rewrite (Z.mod_small (x + 2147483648 - 4294967296) 4294967296 ltac:(lia)).
+      lia. }
+    rewrite Hsg.
+    replace ((x - 4294967296) mod 18446744073709551616)
+      with ((x - 4294967296 + 1 * 18446744073709551616)
+              mod 18446744073709551616)
+      by (rewrite Z_mod_plus_full; reflexivity).
+    rewrite (Z.mod_small (x - 4294967296 + 1 * 18446744073709551616)
+               18446744073709551616 ltac:(lia)).
+    change (2 ^ 64)%Z with 18446744073709551616%Z.
+    change (2 ^ 32)%Z with 4294967296%Z. lia.
+Qed.
+
+(* never below the value itself... *)
+Lemma w32_uarg_lb (x : Z) : (x <= w32_uarg x)%Z.
+Proof. unfold w32_uarg. case_decide; lia. Qed.
+
+(* ...ABOVE any small bound it exceeds -- a size test that FIRES... *)
+Lemma w32_uarg_gt (x y : Z) :
+  (y < 2 ^ 31)%Z -> (y < x)%Z -> (y < w32_uarg x)%Z.
+Proof. intros Hy Hlt. unfold w32_uarg. case_decide; lia. Qed.
+
+(* ...and the value itself when it is within one -- a size test that does
+   NOT fire, which is what leaves the rest of a proof in the literals. *)
+Lemma w32_uarg_le (x y : Z) :
+  (y < 2 ^ 31)%Z -> (x <= y)%Z -> (w32_uarg x <= y)%Z.
+Proof. intros Hy Hle. unfold w32_uarg. case_decide; lia. Qed.
+
+(* [addw rd,rs1,rs2] with rs1 an ABI-passed uint at the full range and rs2 a
+   64-bit literal: [addw] truncates both operands before adding, so the sign
+   extension is invisible to it and the sum comes back in the same ABI form.
+   NO PREMISE -- both sides wrap mod 2^32, which is the honest statement of
+   what the instruction does.  A caller's bound on the sum is what makes the
+   RESULT DENOTE that sum ([w32_arg_unsigned] on [a + c], which is where
+   [SpecReadi]'s joint [off + n < 2^32] is really used) rather than its
+   wrap. *)
+Lemma w32_addw_arg (a c : Z) :
+  sign_extend' 64
+    (add_vec (subrange_vec_dec
+                (sign_extend' 64 (mword_of_int a : mword 32) : mword 64) 31 0
+              : mword 32)
+             (subrange_vec_dec (mword_of_int c : mword 64) 31 0 : mword 32))
+  = (sign_extend' 64 (mword_of_int (a + c) : mword 32) : mword 64).
+Proof.
+  rewrite <- !trunc32_subrange.
+  rewrite trunc32_sext64 trunc32_mword_of_int w32_addv. reflexivity.
+Qed.
+
 (* [add_vec zero_reg x = x] -- what every [c.mv] produces. *)
 Lemma w32_zero_add (x : mword 64) : add_vec zero_reg x = x.
 Proof.
