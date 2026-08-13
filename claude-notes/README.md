@@ -142,6 +142,11 @@ are working on that effort — the relevant `projects/` file.
 
 ### `projects/` — ongoing worklists & plans (one per effort)
 
+- **[`weak-memory-premises.md`](projects/weak-memory-premises.md)** — shrinking
+  the lifted capstone's premise ledger: the Hcls retag elimination (the
+  machine is class-oblivious), the Hres→Horc derivation, the Hirqb→Hseip
+  coverage fix (mid-block SEIP deliveries commuted forward under a
+  seip-free residual), and the group-3 shape-typing sweep.
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
   crash instantiation) only; stages 1–3 are finished and archived in
   [`completed/fs-log-bio-and-logc.md`](completed/fs-log-bio-and-logc.md).
