@@ -85,7 +85,7 @@ Require Import WpLock.
 Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecAcquire SpecRelease SpecSleepPrepare SpecSleep.
 Require Import SpecBeginOp.
 Require Import CodeBeginOp.

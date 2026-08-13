@@ -133,7 +133,7 @@ Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import WaitInv.
 Require Import SpecProcinit.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecFreeproc.
 Require Import SpecMyproc.
 Require Import SpecAllocproc.

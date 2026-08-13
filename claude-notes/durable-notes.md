@@ -334,9 +334,19 @@ Hart-FREE, despite appearances: `stack_own` (physical stack memory),
 Annotating a hart-free term fails loudly — *"Wrong argument name CID (possible
 names: Σ riscvGS0)"* — so read the names before you annotate.
 
-**Why this is the shape and not an accident:** `riscv_irisGS` takes no `CpuId`,
-so `WP e` itself is hart-free, and `gregs_interp` holds EVERY hart's register
-map; `mstate_interp σ` at `CID` is the focused view of the one that is running
+**`WP e` IS HART-FREE BUT `WP Loop` IS NOT.** `riscv_irisGS` takes no `CpuId`,
+so the WP FORMER is hart-free — but the EXPRESSION names the hart
+(`Notation Loop := (LoopE gen_id cpu_id)`, RiscvLang.v). So a statement that
+quantifies a hart over a `WP Loop` goal must bind it as `(h : CpuId)`, not as
+`(h : CPU)`: with a bare `CPU` nothing puts an instance in scope and the body
+does not elaborate, with the error *"Could not find an instance for `CpuId`"*
+reported at `Loop` itself rather than at the binder. (`ProofPanic.pn_spin` is
+the worked instance; `panic_wp_any`'s `∀ h : CPU` gets away with `CPU` only
+because its body is a DEFINITION applied at `(CID := h)`, never an inline
+`WP`.)
+
+**Why the per-hart/shared split is the shape and not an accident:**
+`gregs_interp` holds EVERY hart's register map; `mstate_interp σ` at `CID` is the focused view of the one that is running
 (`gregs_interp_acc` does the focusing). So "the machine" is shared and "the
 registers I can step" are per-hart — which is exactly why a funnel whose engine
 can migrate the thread must hand its σ-callback the interp at an ARBITRARY hart,

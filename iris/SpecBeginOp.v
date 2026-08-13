@@ -62,7 +62,7 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.

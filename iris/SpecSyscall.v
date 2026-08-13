@@ -74,7 +74,7 @@ Require Import UserPtTree.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import IrefSlots.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecSysExit.   (* [K_sys_exit]: the deepest entry in the table *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

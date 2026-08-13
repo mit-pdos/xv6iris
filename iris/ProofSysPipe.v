@@ -114,7 +114,7 @@ Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import WpUart.
 Require Import DiskPtsto.
 Require Import BioInv.

@@ -114,7 +114,7 @@ Require Import WpLock.
 Require Import CpuOwn.
 Require Import ProcGeom.
 Require Import PrintkFmt.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecPrintkGen.
 From Kernel Require KernelSyms.
 Import Defs.

@@ -65,7 +65,7 @@ Require Import StackOwn CalleeSaved KernelText KernelDataInv.
 Require Import KernelRvcDecode.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
 Require Import IntrDefs HartTp WpNext WpLock.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import ProcGeom CpuOwn.
 Require Import SchedCtx.
 Require Import SleepLock.

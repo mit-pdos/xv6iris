@@ -44,7 +44,7 @@ Require Import CpuOwn SchedCtx FdSlots.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecAcquire SpecRelease SpecSleepPrepare SpecSleep SpecFreeDesc.
 Require Import CodeVirtioDiskRw.
 Require Import SpecVirtioDiskRw.

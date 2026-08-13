@@ -39,7 +39,7 @@ Require Import BufOwn.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
 Require Import ByteBuf.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.

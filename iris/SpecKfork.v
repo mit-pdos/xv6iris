@@ -171,7 +171,7 @@ Require Import IcacheEscrow.
 Require Import SpecAllocpid.
 Require Import WaitInv.
 Require Import SpecProcinit.
-Require Import SpecPanic.
+Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.

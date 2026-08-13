@@ -16,7 +16,7 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import WpMmodeLeafBase.
 Require Import CalleeSaved.
 Require Import IntrDefs HartTp WpNext.

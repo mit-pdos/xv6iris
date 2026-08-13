@@ -94,7 +94,7 @@ Require Import WpLock ProcGeom CpuOwn KernelRvcDecode.
 Require Import DevModel DiskPtsto WpUart.
 Require Import SpecUart WpSconfUartAccess.
 Require Import UartTxInv.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SchedCtx.
 Require Import FdSlots.
 Require Import SpecAcquire SpecRelease SpecSleep SpecSleepPrepare.

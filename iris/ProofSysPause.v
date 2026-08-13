@@ -133,7 +133,7 @@ Require Import FileInvDefs.
 Require Import SchedCtx.
 Require Import TicksInv.
 Require Import CodeSysPause.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecArgint SpecAcquire SpecRelease SpecMyproc SpecKilled SpecSleepPrepare SpecSleep.
 Require Import SpecSysPause.
 From Kernel Require KernelSyms.

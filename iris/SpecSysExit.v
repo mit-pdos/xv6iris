@@ -75,7 +75,7 @@ Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecProcinit.   (* [wait_lock_addr] *)
 Require Import SpecKexit.      (* [K_kexit] -- the budget this one is built on *)
 From Kernel Require KernelSyms.

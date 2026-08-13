@@ -59,7 +59,7 @@ Require Import WpLock.
 Require Import TicksInv.
 Require Import TimerCap.
 Require Import SchedCtx.
-Require Import SpecPanic.
+Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

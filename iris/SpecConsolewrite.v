@@ -93,7 +93,7 @@ Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SchedCtx.
 Require Export SwtchCtx.
 From Kernel Require KernelSyms.

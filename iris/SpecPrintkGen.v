@@ -66,7 +66,7 @@ Require Import WpNext.
 Require Import WpLock.
 Require Import CpuOwn.
 Require Import PrintkFmt.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecPrintk.
 From Kernel Require KernelSyms.
 

@@ -93,48 +93,15 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import CpuOwn.
 Require Import UartTxInv.
-Require Import SpecPanic.
-Require Import PrintkFmt.
+Require Import PanicStub.
+Require Export PrintkArgs.
 From Kernel Require KernelSyms.
 
 
-(* ---------------------------------------------------------------------- *)
-(* The caller's description of one vararg (see (2) above).                 *)
-(* ---------------------------------------------------------------------- *)
-Inductive pk_arg_desc :=
-  | PkANum                                (* an integer/char/pointer value *)
-  | PkANull                               (* a null char* -- printed "(null)" *)
-  | PkAStr (dq : dfrac) (s : string).     (* a char* to [s], owned at [dq] *)
-
-Definition pk_desc_kind (d : pk_arg_desc) : pk_kind :=
-  match d with
-  | PkANum => PkNum
-  | PkANull => PkStr
-  | PkAStr _ _ => PkStr
-  end.
-
-Definition pk_desc_res `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (v : mword 64) (d : pk_arg_desc) : iProp Σ :=
-  match d with
-  | PkANum => True
-  | PkANull => ⌜v = zero_reg⌝
-  (* a [char *] to a real string is NOT null -- the caller has to say so.
-     [v ↦ₛ{dq} s] alone does not imply it: nothing in the points-to rules out
-     address 0, and the arm needs the [beqz] at 0x21e to fall through. *)
-  | PkAStr dq s => ⌜nonul s = true⌝ ∗ ⌜eq_vec v zero_reg = false⌝ ∗ v ↦ₛ{dq} s
-  end.
-
-(* Vararg [j] is the entry value of a(j+1) = x(11+j): the ABI passes the first
-   seven in registers, and printk's prologue spills them into its own frame. *)
-Definition pk_vararg (m : regfile) (j : nat) : mword 64 :=
-  m !!! Regidx (mword_of_int (11 + Z.of_nat j) : mword 5).
-
-(* [static struct { struct spinlock lock; } pr;] -- the lock is the FIRST
-   field, so the object's address IS the lock's.  Spelled here rather than
-   taken from SpecPrintkGen.v, which sits ABOVE this file and reuses this
-   file's vocabulary; [SpecPrintkGen.pr_lock] is the same address and
-   [SpecPrintkGen.pr_res] the same (empty) resource, so the two [is_lock]s are
-   the same proposition. *)
-Definition pk_pr_lock : mword 64 := mword_of_int KernelSyms.pr.
+(* [pk_arg_desc] / [pk_desc_kind] / [pk_desc_res] / [pk_vararg] / [pk_pr_lock]
+   are the CALLER's vocabulary and live in PrintkArgs.v, which this file
+   [Require Export]s -- panic's spec needs them while sitting below this one.
+   Nothing that reached them through SpecPrintk.v has to change. *)
 
 (* printk's own frame is 24 slots ([addi sp,sp,-192] at 0x8000050a), over
    printint's 24. *)

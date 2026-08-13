@@ -103,11 +103,11 @@ Require Import IcacheRef.
 Require Import IcacheEscrow.
 Require Import KallocInv.
 Require Import UserPtTree.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import ProcInv.
 Require Import FileInvDefs.
 Require Import DirView.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecReadi SpecStrncpy SpecWritei SpecIput.
 Require Import CodeDirlink.
 Require Import SpecDirlookup.

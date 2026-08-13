@@ -56,7 +56,7 @@ Require Import ProcGeom.
 Require Import WaitInv.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import CalleeSaved.
 Require Import IntrDefs WpNext.
 Require Import CpuOwn.

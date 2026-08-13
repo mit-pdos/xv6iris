@@ -92,7 +92,7 @@ Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KvmSpec.
 Require Import SpecAllocpid.
-Require Import SpecPanic.
+Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.

@@ -127,7 +127,7 @@ Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecProcinit.   (* [wait_lock_addr] -- procinit is what makes it *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

@@ -72,7 +72,7 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecIdup.
 Require Import SpecSafestrcpy.
 Require Import ProofKforkParts.

@@ -74,7 +74,7 @@ Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import WaitInv.
-Require Import SpecPanic.
+Require Import PanicStub.
 Require Import SpecProcinit.   (* [wait_lock_addr] *)
 Require Import SpecKwait.      (* [K_kwait] -- the budget this one is built on *)
 From Kernel Require KernelSyms.
