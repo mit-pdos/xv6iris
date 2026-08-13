@@ -15,16 +15,17 @@ kexec-specific is the *composition*.
 
 ## CHECKPOINT — read this first
 
-**Proven: `+0x000 .. +0x0cc`, plus the shared `bad:` tail `+0x324 .. +0x33e`.**
+**Proven: `+0x000 .. +0x0cc`, the inlined loadseg page loop
+`+0x0ce .. +0x116`, and the shared `bad:` tail `+0x324 .. +0x33e`.**
 Phase A entire (`ProofKexecA.kxc_phaseA`), phase B's first chunk
-(`ProofKexecB.kxc_b1`), and `ProofKexecB2.kxc_bad324` — which discharges
-whatever reaches it, so **all eight `bad:` entries now have a home** and the
-two loops owe only the two-instruction stub that gets them there.
+(`ProofKexecB.kxc_b1`), `ProofKexecB2.kxc_bad324` — which discharges whatever
+reaches it, so **all eight `bad:` entries have a home** — and
+`ProofKexecB2.kxc_ls`, the loadseg loop.
 
-**Next: phase B2's two loops** (`+0x0ce .. +0x1ac`). Their entry seams
-`ProofKexecSeam.kxc_at_12c` (the phdr loop's body) and `kxc_at_1a2` (the
-no-segments path) are written and proven-into, and their `bad:` exits land in
-`kxc_bad324`, so B2's remaining work is bounded at both ends. See "Worklist".
+**Next: the phdr loop** (`+0x11a .. +0x1ac`), which is what is left of B2. It
+enters at `ProofKexecSeam.kxc_at_12c`, calls `kxc_ls` for each PT_LOAD
+segment, and exits at `+0x1ae` — phase C's entry, which still needs designing
+as a named seam the way `kxc_at_12c` was. See "Worklist".
 
 **A LOOP INVARIANT IN THIS FUNCTION CARRIES NO CONVENTION-1 THREADING
 CLAUSE, AND CHECKING THAT IS THE FIRST THING TO DO BEFORE WRITING ONE.** By
@@ -73,7 +74,8 @@ phase that calls `uvmalloc`.
 | `ProofKexecA.v` — **PHASE A PROVEN** (`kxc_a1`/`kxc_a2`/`kxc_phaseA`) | **landed, proven** |
 | `ProofKexecB.v` — **B1 PROVEN** (`kxc_b1`) | **landed, proven** |
 | `ProofKexecSeam.v` — the B1/B2 seam layer (the two seam states, the frame algebra, the elf carve, `kxc_cs_cases`) | **landed, proven** |
-| `ProofKexecB2.v` — `kxc_frameB65` + **the shared `bad:` tail `kxc_bad324`** | **landed, proven** |
+| `ProofKexecB2.v` — `kxc_frameB65`, the shared `bad:` tail `kxc_bad324`, `kxc_res` + the peel/seal pairs, and **the loadseg loop `kxc_ls`** | **landed, proven** |
+| `W32Arith.v` — the two-ABI-uint laws and the `slli/srli` truncation | **landed, proven** |
 
 **WHERE TO PUT A LEMMA TWO PHASES SHARE: `ProofKexecTail.v`, NOT `ProofKexecA.v`.**
 Phase B used to `Require Import ProofKexecA` for six pieces of frame/seam
@@ -89,7 +91,7 @@ modules each already named. **Every later phase will hit this too** — C and D
 both reach the epilogue through tails A already proved — so put the next shared
 tail in `ProofKexecTail.v` when you prove it, and keep phase files reaching each
 other only through that one.
-| phase B2 — the phdr + loadseg loops | **NEXT** |
+| phase B2 — the phdr loop (the loadseg loop is done) | **NEXT** |
 | phases C, D, `LinkKexec.v`, `sys_exec` | not started |
 
 **`ProofKexecSeam.kxc_cs_cases` — the thirteen callee-saved indices,
@@ -235,6 +237,19 @@ Three, and they nest:
 The phdr loop's continuation is a genuine "return from inside a loop" shape —
 `kwait` is the model to read first (see
 [`proc-struct-resources.md`](proc-struct-resources.md)).
+
+**WHEN A LOOP'S OBVIOUS MEASURE IS NOT AVAILABLE AT ITS HEAD, LOOK FOR ONE
+THE MACHINE WORD ITSELF BOUNDS.** The loadseg loop reads `[ph.off + i,
+ph.off + i + n)` and would like to count down `size - off` — but `ph.off` is
+four untrusted bytes, so the FIRST iteration may already be past the end of
+the file and the measure is not even non-negative there. The fuel that works
+is **`2^32 - off`**: a *continuing* iteration is one where readi returned the
+full count, hence `off + n <= size <= MAXFILE*BSIZE`, hence `off + PGSIZE`
+cannot wrap — so `off` strictly increases and the measure strictly decreases,
+while `0 <= off < 2^32` makes the `W = 0` case vacuous by arithmetic alone.
+The fuel is enormous and is never computed; all that matters is that the
+loop's head can always supply it. Reach for this shape whenever the bound a
+loop really runs on is discovered by a CALLEE rather than carried into it.
 
 ## The contract
 
@@ -766,59 +781,62 @@ first one to name it.
 
 Ordered. Each step ends at a seam the next one starts from.
 
-### 1. PHASE B2 — the phdr loop and the inlined loadseg loop (`+0x0ce .. +0x1ac`)
+### 1. PHASE B2 — the phdr loop (`+0x11a .. +0x1ac`)
 
-The biggest single chunk left, and its interface is fixed and proven-into on
-all three sides:
+The inlined loadseg loop is **done** (`ProofKexecB2.kxc_ls`); what is left is
+the phdr loop around it. Its interface is fixed and proven-into on all four
+sides:
 
-- **entry**: `ProofKexecSeam.kxc_at_12c` (the loop body head — the loop's head
-  is its BODY at `+0x12c`, entered by a `j` from the setup, with the
-  increment-and-test at `+0x11a..+0x128` as the back edge), and its
-  no-segments sibling `kxc_at_1a2`;
+- **entry**: `ProofKexecSeam.kxc_at_12c` (the loop's head is its BODY at
+  `+0x12c`, entered by a `j` from the setup, with the increment-and-test at
+  `+0x11a..+0x128` as the back edge), and its no-segments sibling
+  `kxc_at_1a2`;
+- **the segment loader**: `kxc_ls`, entered at `+0x0f6` from `+0x19a`; it
+  takes kexec's own continuation and HANDS IT BACK on its `+0x116` output,
+  which is the shape a caller with one linear `wp_next` needs;
 - **`bad:` exit**: `ProofKexecB2.kxc_bad324`, which starts one instruction
-  AFTER the `sd s2,-520(s0)` each stub does. The five stubs (`+0x320`,
-  `+0x340`, `+0x346`, `+0x34c`, `+0x352`) are two instructions each and are
-  written at their branch sites — they share nothing but the tail;
-- **fall-through exit**: `+0x1ae`, phase C's entry, which needs designing as a
-  named seam the way `kxc_at_12c` was.
+  AFTER the `sd s2,-520(s0)` each stub does. The four stubs it still owes
+  (`+0x320`, `+0x340`, `+0x346`, `+0x34c`, `+0x352`) are two instructions
+  each and are written at their branch sites — they share nothing but the
+  tail;
+- **fall-through exit**: `+0x1ae`, phase C's entry, which needs designing as
+  a named seam the way `kxc_at_12c` was.
 
-Inside it: `readi(&ph)`, four validity tests, `flags2perm`, `uvmalloc`, then
-the loadseg page loop (`walkaddr` + `readi` straight into the physical page,
-entered at `+0xf6` from two places). Two nested fuel inductions
-(`ProofFilewrite.fw_loop` is the shape: a `forall W : nat` fuel with
-`bound - cursor <= W` and an induction on `W`).
+Inside it: `readi(&ph)` into the frame's 56-byte `ph`, four validity tests,
+`flags2perm`, `uvmalloc`, then the call to `kxc_ls`. One fuel induction, at
+`phnum - i`.
 
-**The loadseg loop needs NOTHING from the coverage invariant**, which is
-worth knowing before designing it: `walkaddr`'s success arm hands back
-`pte_vu w` and the page base, its failure arm reaches
-`panic("loadseg: address should exist")`, and the contract's `panic_wp_any`
-absorbs that outright. Nor does the loop have to show `readi` returns the
-count it asked for — the mismatch branch at `+0x0ea` is a live `bad:` exit.
-So the only real work per iteration is getting the destination bytes out of
-`proc_pt` (`ProcPtOwn.proc_pt_page_acc`, at the `w` walkaddr just named) and
-back.
+**THE SIZE BOUND AFTER uvmalloc IS DERIVED, NOT CARRIED, AND THE ORDER
+MATTERS.** `ProcPtOwn.um_below_grow` — the lemma that re-establishes
+`um_below` across the call — demands `uint newsz <= uvm_maxsz`, which kexec
+cannot pay: `newsz` is `ph.vaddr + ph.memsz` out of the executable. Get it
+the other way round: `UmCovered.um_covered_after` re-establishes COVERAGE
+with no such premise, and `UmCovered.proc_pt_covered_maxsz` then reads the
+bound off the coverage. So the invariant's coverage half pays for its
+`um_below` half, one call later. Note uvmalloc's success arm is a
+disjunction and BOTH arms are live here: on `newsz < oldsz` it returns
+`oldsz` and `uvma_np oldsz newsz = 0`, so the map is unchanged and both
+halves come back verbatim.
 
 Specific things already established for it:
 
 - **KEEP the coverage invariant** — restated over `UmCovered.um_covered`
   (no `pte_vu`), because it is what bounds `sz`; see "THE SIZE BOUND IS THE
   COVERAGE INVARIANT". `um_below` stays too, and the separate
-  `bv_unsigned szv <= uvm_maxsz` conjunct can go: it is a projection of
-  coverage (`UmCovered.proc_pt_covered_maxsz`).
-- `panic("loadseg: address should exist")` is a LIVE panic and is discharged
-  free by the `panic_wp_any` the contract already carries for ilock's.
+  `bv_unsigned szv <= uvm_maxsz` conjunct can go: it is a projection
+  (`UmCovered.proc_pt_covered_maxsz`).
 - `off` is stated through the `int` truncation
   (`sign_extend' 64 (Z_to_bv 32 (ph_at ef i))`) — the C's `int off` makes the
   machine use `lw`/`addiw`, so the register only ever holds the low 32 bits.
-  **That is now the form `SpecReadi` asks for**, so the seam term goes
-  straight in; what the loop owes instead is the SUM bound
-  `off + n < 2^32` (blocker §4), which is the one numeric premise readi
-  still carries.
+  **That is the form `SpecReadi` asks for**, so the seam term goes straight
+  in; what the loop owes instead is the SUM bound `off + n < 2^32` (blocker
+  §4), discharged by `intros _; lia` from `size <= MAXFILE*BSIZE`.
 - The elf buffer travels NAMED from `+0x12c` on, not as existential-contents
   `stack_own`: the loop re-reads `elf.phnum` and phase D reads `elf.entry`.
-- `readi` here is on its KERNEL arm into a physical user page; get the bytes
-  out of `proc_pt` with `ProcPtOwn.proc_pt_page_acc`, which yields `page_own`
-  = a 4096-byte `↦ₘ` big-op, then split at the offset.
+- The `ph` buffer is carved out of `kxc_frameB`'s middle `stack_own` at each
+  iteration (`ProofKexecParts.kxc_slots_ph` / `kxc_bytes_ph`), read through
+  `ProofKexecSeam.kxc_win4`/`kxc_win2` and an 8-byte twin still to be
+  written, and handed back before the back edge.
 
 ### 2. PHASE C — the stack (`+0x1ae .. ~+0x2dc`)
 
