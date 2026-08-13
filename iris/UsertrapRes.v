@@ -120,37 +120,12 @@ Section UsertrapRes.
   Definition ut_stack (ksp : mword 64) (av : nat) : iProp Σ :=
     stack_own ksp (trap_res false + av)%nat.
 
-  (* [sconf] MINUS the mstatus cell AND the privilege cell, as a CLOSER
-     rather than as a restatement of the bundle's internals: re-spelling
-     hw_config / minstret / the mie and menvcfg pin blocks here would be a
-     second place for five pure side conditions to drift.  This is
-     [IntrDefs.sconf_at]'s idiom with one more cell handed out --
-     [sconf_at] exposes only mstatus, and the trampoline needs
-     [cur_privilege] too (userret's [sret] writes it).
-
-     BELONGS BESIDE [sconf_at] IN IntrDefs.v and is here only because
-     IntrDefs is at the bottom of the tree and editing it costs a near-total
-     rebuild; hoist it the next time something else has to touch that file. *)
-  Definition ut_sconf_closer : iProp Σ :=
-    (∀ ms' : mword 64,
-       cur_privilege ↦ᵣ Supervisor -∗ sconf_msown ms' -∗ sconf)%I.
-
-  (* the opener that makes it faithful: if this proof breaks, the closer above
-     is no longer "the rest of sconf". *)
-  Lemma ut_sconf_open :
-    sconf -∗ ∃ ms : mword 64,
-      ut_sconf_closer ∗ cur_privilege ↦ᵣ Supervisor ∗ sconf_msown ms.
-  Proof.
-    iIntros "(#Hhw & #Hminv & Hpriv & Hmsx & Hmie & Hmenv)".
-    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Htie & %Hmsf)".
-    iExists ms. iSplitR "Hpriv Hms Hhalf Htie".
-    { rewrite /ut_sconf_closer. iIntros (ms') "Hpriv' Hown'".
-      iDestruct "Hown'" as "(Hms' & Hhalf' & Htie' & %Hmsf')".
-      iFrame "Hhw Hminv Hpriv' Hmie Hmenv".
-      iExists ms'. iFrame "Hms' Hhalf' Htie'". iPureIntro. exact Hmsf'. }
-    iFrame "Hpriv". rewrite /sconf_msown. iFrame "Hms Hhalf Htie".
-    iPureIntro. exact Hmsf.
-  Qed.
+  (* [sconf] MINUS the mstatus cell AND the privilege cell is
+     [IntrDefs.sconf_priv_closer], which lives beside [sconf_at] because it
+     is [sconf_at]'s idiom with one more cell -- and it is a CLOSER rather
+     than a restatement of the bundle's internals so that re-spelling
+     hw_config / minstret / the mie and menvcfg pin blocks is not a second
+     place for five pure side conditions to drift. *)
 
   (* THE FOUR LOOSE GHOSTS -- see the header.  Values are PINNED, not
      existential: [usertrap_entry_ms] pins SPP = 0 / SPIE = 1 / SIE = 0, and
@@ -171,7 +146,7 @@ Section UsertrapRes.
      strans_inv ∗
      sie_arm false pj ∗
      strans_bit strans_bit_kpt ∗
-     ut_sconf_closer ∗
+     sconf_priv_closer ∗
      ut_ghosts ∗
      cpu_own 0%nat false pj C false ∗
      (* the running claim.  It is what [SpecYield] / [SpecKexit] want as

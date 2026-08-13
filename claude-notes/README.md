@@ -314,33 +314,9 @@ are working on that effort — the relevant `projects/` file.
   (SpecUserret/SpecUservec/SpecUsertrap, the userret→user-exec dovetail
   `UserretUser.v`), the TVM/TSR mstatus-pin extension, the proof's file
   split (catalog / store+CSR leaves / reverse pt2 switch / chain) with its
-  reusable lessons, and the remaining work: prove usertrap(), then the
-  whole-trap-loop Löb theorem that discharges `stvec_handler_wp`.
-- **[`usertrap.md`](projects/usertrap.md)** — `usertrap()`, the C half of the
-  user trap (90 instructions, 5 cones). The boundary is settled and FOUR of
-  the five blocks are proven — the tail, the syscall arm and the three cheap
-  arms — against xv6 `9dd28f5e`; the `psz` bump then landed under them, so the
-  file opens with a five-step re-point worklist (the image is already confirmed
-  honest and `UsertrapRes` / `UsertrapAux` are already green post-bump). The
-  entry + dispatch block and the seal remain. Two layers of
-  finding are recorded. The first was in the BOUNDARY: the contract stated
-  ahead of the proof took the trampoline tier's `tlb_inv_pt`/physical
-  trapframe/`user_cfg`, which together with the kernel cone's `sie_cap` are
-  **unsatisfiable** (two exclusive owners of the kernel `ptree`), so proving it
-  would have been vacuous — hence the restatement in kernel vocabulary, whose
-  entry payload turns out to be prepare_return's exit payload with the trap's
-  writes applied, ghost fractions and all. The second came out of writing the
-  walk, and three of its five items changed files usertrap does not otherwise
-  touch: **an environment bundle framed across an interrupts-enabled step has
-  to be HART-FREE** (so `devintr_caps` is carried in the `∀ h` form and
-  `syscall_env` lost its `{CID}`), the `csrci`-x0 leaf was silently DROPPING
-  `cpu_claim`, `K_usertrap` has to reserve `kv_frame_slots` for the nested
-  trap its `intr_on` admits, and two conjuncts of the post were unprovable
-  (`ud_root` does not survive exec; `udata_cov` is the dovetail's fact, not
-  usertrap's). Also the section-per-hart-EPOCH recipe, the three conversions
-  OWED to the trampoline dovetail (chief among them kpt-share's named
-  user-mode-under-shared-table follow-up), and the remaining blocks with their
-  shapes.
+  reusable lessons, and the remaining work: the whole-trap-loop Löb theorem
+  that discharges `stvec_handler_wp`, with the three conversions it owes now
+  that usertrap is proven.
 - **[`kerneltrap.md`](projects/kerneltrap.md)** — **`kerneltrap()` IS
   PROVEN.** `Print Assumptions` gives the 5 platform axioms + funext +
   consoleintr (inherited through devintr/uartintr) and nothing else: no
@@ -509,6 +485,31 @@ their durable design notes, gotchas, and reusable recipes.
   frame out of the loop, and the `proc_priv_pid_ofile` accessor its fd loop
   needed once fileclose's file-system arm wanted a pid cell out of the very
   block the loop walks.
+- **[`usertrap.md`](completed/usertrap.md)** — `usertrap()`, the C half of
+  the user trap (90 instructions, 5 cones), **PROVEN AND LINKED** — trap.c is
+  7/7 and 100 % of its bytes, and `Print Assumptions` gives the platform
+  axioms + funext + consoleintr + printk-general + syscall, with no `panic`
+  because the "not from user mode" arm is refuted from the premises. Two
+  layers of finding are recorded. The first was in the BOUNDARY: the contract
+  stated ahead of the proof took the trampoline tier's `tlb_inv_pt` /
+  physical trapframe / `user_cfg`, which together with the kernel cone's
+  `sie_cap` are **unsatisfiable** (two exclusive owners of the kernel
+  `ptree`), so proving it would have been vacuous — hence the restatement in
+  kernel vocabulary, whose entry payload turns out to be prepare_return's
+  exit payload with the trap's writes applied, ghost fractions and all. The
+  second came out of writing the walk, and three of its items changed files
+  usertrap does not otherwise touch: **an environment bundle framed across an
+  interrupts-enabled step has to be HART-FREE** (so `devintr_caps` is carried
+  in the `∀ h` form and `syscall_env` lost its `{CID}`), the `csrci`-x0 leaf
+  was silently DROPPING `cpu_claim`, `K_usertrap` has to reserve
+  `kv_frame_slots` for the nested trap its `intr_on` admits, and two
+  conjuncts of the post were unprovable (`ud_root` does not survive exec;
+  `udata_cov` is the dovetail's fact). Also the section-per-hart-EPOCH
+  recipe, the five-block walk with its block vocabulary, the three
+  conversions OWED to the trampoline dovetail (chief among them kpt-share's
+  named user-mode-under-shared-table follow-up), and — kept for the next
+  upstream bump — the worked record of re-pointing a proven function onto a
+  RESHAPED image, including the one thing `relayout_shift.py` does not do.
 - **[`sys-pipe.md`](completed/sys-pipe.md)** — sys_pipe, PROVEN and LINKED:
   the syscall where the file/proc model has to balance — two `fd_slot`s in,
   two out on all four exits, which is what forced filealloc's and pipealloc's

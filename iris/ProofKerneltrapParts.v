@@ -145,53 +145,24 @@ Section ProofKerneltrapParts.
   (*                                                                     *)
   (* [andi a5,s1,256] tests SPP (bit 8) of the SAVED sstatus, and         *)
   (* [c.andi a5,a5,2] tests SIE (bit 1) of a FRESH read.  The second is   *)
-  (* [ProofPushOff.pop_sstatus_clear_neq] already; the first is its dual  *)
-  (* and lives here, proved the same way as [WpGprCsrwC.sie_bit].         *)
+  (* [ProofPushOff.pop_sstatus_clear_neq] already; the first is one       *)
+  (* reading of [WpGprCsrwC.sstatus_spp_mask], which sits beside          *)
+  (* [sie_bit] because usertrap's panic arm is the other reading of the   *)
+  (* same equation and neither parts file may import the other's.         *)
   (* ================================================================== *)
 
-  Lemma kt_spp_bit (w : mword 64) :
-    _get_Sstatus_SPP w = ('b"1" : mword 1) -> Z.testbit (bv_unsigned w) 8 = true.
-  Proof.
-    intro HS.
-    apply (f_equal bv_unsigned) in HS.
-    unfold _get_Sstatus_SPP, subrange_vec_dec in HS.
-    rewrite autocast_refl in HS.
-    unfold to_word_idx, to_word, get_word in HS.
-    rewrite MachineWord.MachineWord.cast_idx_refl in HS.
-    unfold MachineWord.MachineWord.slice in HS.
-    rewrite bv_extract_unsigned in HS.
-    change (bv_unsigned ('b"1" : mword 1)) with 1 in HS.
-    apply (f_equal (fun z => Z.testbit z 0)) in HS.
-    change (Z.testbit 1 0) with true in HS.
-    rewrite <- HS.
-    unfold bv_wrap, bv_modulus.
-    rewrite (Z.mod_pow2_bits_low _ (Z.of_N (MachineWord.MachineWord.Z_idx (8 - 8 + 1))));
-      [| vm_compute; reflexivity].
-    rewrite Z.shiftr_spec; [| lia]. reflexivity.
-  Qed.
-
   (* SPP = 1 in the saved sstatus makes [andi a5,s1,256] NONZERO, so the
-     "not from supervisor mode" [c.beqz] falls through. *)
+     "not from supervisor mode" [c.beqz] falls through.  One instance of
+     [WpGprCsrwC.sstatus_spp_mask], which is the hypothesis-free form both
+     trap handlers read at their own polarity -- usertrap's opposite reading
+     is [ProofUsertrapParts.ut_spp_clear_eq]. *)
   Lemma kt_spp_set_neq (ms : mword 64) :
     _get_Mstatus_SPP ms = ('b"1" : mword 1) ->
     eq_vec (and_vec (sstatus_read ms)
               (sign_extend' 64 (mword_of_int 256 : mword 12))) zero_reg = false.
   Proof.
     intro HSPP.
-    assert (Hb8 : Z.testbit (bv_unsigned (sstatus_read ms)) 8 = true).
-    { apply kt_spp_bit. unfold sstatus_read. rewrite WpGprCsrwC.subrange_full.
-      rewrite WpGprCsrwC.sSPP_lower. exact HSPP. }
-    assert (Hmask : bv_unsigned (sign_extend' 64 (mword_of_int 256 : mword 12) : mword 64) = 256)
-      by (vm_compute; reflexivity).
-    apply not_true_iff_false. intro Heq.
-    apply eq_vec_true_iff in Heq.
-    apply (f_equal bv_unsigned) in Heq.
-    rewrite WpGprCsrwC.and_vec_unsigned Hmask in Heq.
-    change (bv_unsigned (zero_reg : mword 64)) with 0 in Heq.
-    apply (f_equal (fun z => Z.testbit z 8)) in Heq.
-    rewrite Z.land_spec Z.bits_0 Hb8 in Heq.
-    change (Z.testbit 256 8) with true in Heq.
-    discriminate Heq.
+    rewrite WpGprCsrwC.sstatus_spp_mask HSPP. reflexivity.
   Qed.
 
   (* ================================================================== *)

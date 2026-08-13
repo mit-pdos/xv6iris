@@ -20,6 +20,18 @@ on top of it. Spend the rework; keep the specs clean. The failure mode to avoid
 is complexity accreting (hit/miss × width × compressed × fault-arm cross-products)
 past the point where a clean abstraction can still be retrofitted.
 
+**A HOIST PROPOSED BECAUSE TWO NEAR-DUPLICATES CANNOT SEE EACH OTHER IS
+USUALLY A GENERALIZATION IN DISGUISE.** When the reason given for moving a
+lemma is "its twin lives in a sibling file and neither may import the other's",
+check first whether making them HYPOTHESIS-FREE makes them the same lemma. The
+worked instance: kerneltrap's `if ((sstatus & SPP) == 0) panic` and usertrap's
+`if ((sstatus & SPP) != 0) panic` each carried a two-lemma pair in their own
+parts file, and both pairs are readings of ONE equation —
+`WpGprCsrwC.sstatus_spp_mask`, whose statement takes no hypothesis at all
+(`… = negb (Z.testbit (bv_unsigned (_get_Mstatus_SPP ms)) 0)`), leaving each
+handler one `rewrite`. Four lemmas became one plus two corollaries. The import
+problem was the symptom; the special-casing was the cause.
+
 ## Orchestration: model roles and division of labor
 
 This work is split between a top-level orchestration agent and the subagents it
@@ -585,6 +597,18 @@ what makes this tractable at all); then fix what it does NOT cover.
   already `ld s2`/`ld s3` — "the epilogue grew a saved register" was an
   artifact of the wrong comparison. Finish with `relayout_map.py residue`
   either way; neither tool rewrites register fields, by design.
+    **NEITHER TOOL RENAMES `<prefix>_<off>` IN THE PROOF.** `relayout_shift.py
+  --proof` rewrites the offsets and immediates a proof spells, and it
+  renumbers the lemma names in `Code<F>.v` — but not the
+  `iPoseProof (uti_0f2 …)` that NAMES them, so after a shift a block's
+  witnesses point two bytes low. That fails loudly only where the old name has
+  gone away; where the shifted range still has a lemma at the old offset it
+  TYPECHECKS, against the wrong instruction, and surfaces as an unprovable pc
+  equation later. Do the rename as ONE simultaneous pass over the block's line
+  range (a sequential `sed` double-shifts — the adjacent-call-site trap above,
+  in a new place), and take the hypothesis names (`Hif2`) and the
+  `(* +0xf2 … *)` comments with it. Grep the file for `<prefix>_` afterwards
+  and read the list against the disassembly; it is short.
     **BOTH TOOLS HAD THE AUTHOR'S WORKTREE PATH HARD-CODED** (`ROOT =
   '/shared/xv6iris-4'`, and a `sys.path.insert` of the same), so in any other
   checkout they died with a `FileNotFoundError` naming somebody else's

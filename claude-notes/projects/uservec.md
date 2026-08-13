@@ -30,9 +30,11 @@ close the last assumed piece of the user-mode story: `stvec_handler_wp`
   CSRs), at `pc_is (ret_pc vktr)` with `gpr_file (uservec_gpr g …)`,
   `tlb_inv_pt kroot` live, the user table parked, the save slots holding
   g's registers.
-- **SpecUsertrap.v** — usertrap()'s boundary contract, stated but NOT
-  proven (per plan).  Entry = SpecUservec's continuation; return = exactly
-  userret's precondition (`usertrap_ret_ms`, `satp_rooted`, the re-armed
+- **SpecUsertrap.v** — usertrap()'s boundary contract as first stated,
+  which is NOT the one that was proven: read `completed/usertrap.md`
+  §"THE BOUNDARY IS STATED IN THE WRONG WORLD" before using anything below
+  this bullet.  As sketched here, entry = SpecUservec's continuation and
+  return = exactly userret's precondition (`usertrap_ret_ms`, `satp_rooted`, the re-armed
   kernel trapframe words with word 16 = KernelSyms.usertrap, callee_saved,
   a0 = user satp of a possibly-grown `pt'` with root/tfp stable).  The
   kernel-internal resources are the ABSTRACT module-type parameter
@@ -282,29 +284,23 @@ other arm is a NO-OP before assuming the contract is right.** The
 
 ## What remains after this project
 
-- Prove usertrap() (huge: syscall/devintr/vmfault/kexit/prepare_return
-  cones) and define `usertrap_res` concretely. The decode layer is
-  landed (`CodeUsertrap.v`, 90 instructions, `uti_*`) and `SpecSyscall.v`
-  / `LinkSyscall.v` state syscall's contract as ASSUMED (one abstract
-  `syscall_env γf pj` for the union of the twenty-two table entries'
-  footprints, so usertrap threads it opaquely).
-  **ONE BLOCKER LEFT** (tracked in its own file now,
-  [`eb-generic-sweep.md`](eb-generic-sweep.md), which has the recipe and the
-  worklist):
-  `SpecKexit` has `eb = true ->`, which at level 0 forces `b = true`
-  (`CpuOwn.cpu_own_eb_agree`), but usertrap's first `killed(p) → kexit(-1)`
-  runs BEFORE `intr_on()` and the second is reachable from the devintr and
-  vmfault arms. Unlike prepare_return's, this one is not a missing leaf: it
-  comes from `SpecSleep`'s own `eb = true` ("at level 0 with an enabled base
-  the trap CSRs sit in the SIE arm and the pushing acquire hands them out"),
-  so closing it is the `trap_csrs_ext eb` sweep through sleep →
-  acquiresleep → bread/bwrite/begin_op/end_op/ilock/iput/fileclose → kexit,
-  the same move `completed/sched-hart-generic.md` records for yield/sched.
-  The resources exist at usertrap's call sites — it holds the trap CSRs
-  explicitly, the TRAP having given them to it — so the sweep is mechanical,
-  just wide.
+- **usertrap() is PROVEN and LINKED** — `completed/usertrap.md` is the
+  record. Its boundary was RESTATED in the
+  kernel tier along the way: the contract sketched below took the
+  trampoline's `tlb_inv_pt` / physical trapframe / `user_cfg`, which together
+  with the kernel cone's `sie_cap` are UNSATISFIABLE, so proving it would
+  have been vacuous. What that moved rather than closed is the dovetail
+  below.
 - The whole-trap-loop theorem: Löb over trap rounds discharging
-  `stvec_handler_wp` from USERVEC + USERTRAP + USERRET + USER — the
-  resource cycle is already closed by construction (uservec's leftovers =
-  usertrap's entry bundle; usertrap's post = userret's pre; userret's
-  leftovers = uservec's bundle for the next round).
+  `stvec_handler_wp` from USERVEC + USERTRAP + USERRET + USER. **This is the
+  next piece of trampoline work, and it now owes three explicit conversions**
+  (`completed/usertrap.md`, §"What is OWED to the trampoline halves"): the
+  kernel page table exclusive → shared (`completed/kpt-share.md`'s named
+  user-mode-under-shared-table follow-up, the largest of the three and the
+  one that gates the composition), the trapframe page physical → VA (36
+  words, one `phys_to_mem_claim` each, and it also owns `udata_cov`), and
+  `user_cfg C` ⟷ `sconf`'s config cells (free: no concrete `ucfg` is ever
+  built, so the composition just sets `uc_mie := MIE_S`). The resource cycle
+  is otherwise closed by construction — uservec's leftovers = usertrap's
+  entry bundle; usertrap's post = userret's pre; userret's leftovers =
+  uservec's bundle for the next round.

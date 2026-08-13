@@ -211,7 +211,7 @@ Section UtRet2.
        so the half / quarter agreement pins [vb = 'b"0"] -- which is what
        [ut_exit_ms_ok] needs and what makes the return legal. *)
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-    iDestruct (ut_sconf_open with "Hsc") as (msf) "(Hcl & Hpriv & Hmsown)".
+    iDestruct (sconf_priv_open with "Hsc") as (msf) "(Hcl & Hpriv & Hmsown)".
     iDestruct "Hmsown" as "(Hms & Hhalf & Htie & %Hmsf)".
     iDestruct "Hcap" as "(Hstk & Hstr & Harm)".
     iDestruct (sie_arm_half_agree false (un_pj N) msf with "Hhalf Harm") as %Hsie0.
@@ -493,7 +493,7 @@ Section UtRet2.
     (*  THE EXIT: the payload back into the boundary's pieces.             *)
     (* ================================================================== *)
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-    iDestruct (ut_sconf_open with "Hsc") as (msg) "(Hcl & Hpriv & Hmsown)".
+    iDestruct (sconf_priv_open with "Hsc") as (msg) "(Hcl & Hpriv & Hmsown)".
     iDestruct (ut_exit_ms_ok msg with "Hmsown Hsret Hq4") as %Hretms2.
     iDestruct "Hmsown" as "(Hms & Hhalf & Htie & %Hmsg)".
     iDestruct (sret_bits_agree _ _ _ _ with "Htie Hsret") as %[Hspp2 Hspie2].
@@ -567,7 +567,7 @@ Section UtRet2.
       iSplitR; [iPureIntro; exact (conj Hj (conj Hjl (conj Hlen Hlg)))|].
       iSplitR; [iPureIntro; exact Hav|].
       (* the mstatus and privilege CELLS are not in [ut_trap]: they go to the
-         boundary raw, and [ut_sconf_closer] takes them back as arguments. *)
+         boundary raw, and [sconf_priv_closer] takes them back as arguments. *)
       iSplitL "Hcap Hcl Hhalf Htie Hq4 Hkptr Hsret Hcpu Hclm".
       + rewrite /ut_trap /ut_stack /ut_ghosts.
         iDestruct "Hcap" as "(Hstk & Hstr & Harm)".

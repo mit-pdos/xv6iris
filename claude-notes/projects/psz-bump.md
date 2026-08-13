@@ -1,8 +1,9 @@
 # The `psz` bump: xv6 ae96fd0 -> 0024d4b
 
 The worklist for xv6 `0024d4b2bd5e521f83cca1ac97bb5591c4610b9a`.  The image
-relayout, the generated mirrors and the specs are DONE and green; what is left
-is the handful of proofs whose C actually changed (see State, below).
+relayout, the generated mirrors, the specs and every proof whose C actually
+changed are DONE and green (see State, below).  Kept for the design record:
+what the bump DELETED, and the traps it turned up.
 
 ## What upstream did, and why it matters more than it looks
 
@@ -70,10 +71,10 @@ GREEN since: `ProofVmfault` (+ `LinkVmfault`), `ProofCopyout` (+
 funext and nothing else, so the whole copyout cone (walkaddr / vmfault /
 walk-noalloc / memmove) is axiom-clean through the link.
 
-STILL RED: `ProofCopyin`, `ProofCopyinstr`.  Note the Link chain
-`ProofCopyinstr -> LinkCopyinstr -> LinkFetchstr -> LinkArgstr` must be
-rebuilt IN ORDER once copyinstr lands; those four `.v` files need no edit, but
-their `.vo`s are stale-by-dependency until then.
+`ProofCopyin` and `ProofCopyinstr` are green too, and with them the Link
+chain `ProofCopyinstr -> LinkCopyinstr -> LinkFetchstr -> LinkArgstr` (those
+four `.v` files needed no edit, only rebuilding in order).  The whole of
+`_CoqProject` is green at `0024d4b`.
 
 ### The stack budgets this bump moved, and the one it did not
 
