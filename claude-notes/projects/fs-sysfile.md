@@ -6178,3 +6178,37 @@ Blocker A's ruling (the same posts may move again).
   half only and restored per-arm; SpecCreate.v's header and fs-icache.md
   §20.17.2 both said eight.  All §20.17.9 / CreateBudget arm-comment
   addresses are pre-9da28f5.
+
+
+### BLOCKER A, RESOLVED (2026-08-13): no kernel bug — cross-transaction
+### absorption; what remains is a LEDGER-MODEL stage
+
+The team's refutation (recorded in kernel-defects.md, "REFUTED CANDIDATE"):
+the unlink that arms namex's freeing iput must run inside the op window
+(pre-window unlinks remove the dirent first), commits require
+outstanding = 0, so the unlink's iupdate of that exact inode block is
+still in the shared lh and namex's absorbs — GROUP-wide absorption, which
+log_write's scan implements literally.  Both edges checked: (1) the entry
+cannot have left the log while create is outstanding; (2) the bitmap unit
+is priced once per op regardless of who pays first.
+
+**The re-model this earns (next design stage, before D₀ relaunches):**
+
+1. AUDIT LogInv first: is log_opS's set Sb the GROUP's logged set or a
+   per-op view?  Absorption in SpecLogWrite fires on bno ∈ Sb, and the
+   kernel's absorption is group-wide, so if Sb is already the lh-backed
+   group set the model is RIGHT and only the CONTRACTS are too coarse.
+   If it is per-op, the ghost needs re-founding first.
+2. The carrier: an invariant clause tying "cached inode with
+   di_nlink = 0" to "IBLOCK inum inodestart ∈ (group) Sb" — minted at the
+   iupdate that writes the zero (every zero-writer logs it by
+   construction), consumed by iput's credited contract so the freeing
+   iupdate spends 0.  Same shape as B′'s option (iii): the fact rides the
+   resource that already carries nlink.
+3. nameiparent/namex gen posts then expose spend ≤ (bitmap unit if
+   ∉ Sb else 0) — i.e. the walk is FREE past the group's first bitmap
+   touch — and CreateBudget adds nameiparent to its call list at that
+   figure, which its zero-slack chains tolerate (the bitmap unit was
+   already priced).
+4. Blocker B's ity_shot fix lands in the SAME post-reshape pass (the
+   namex trio's posts move once, for both).

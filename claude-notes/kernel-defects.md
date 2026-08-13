@@ -2,29 +2,31 @@
 
 A register of bugs in the kernel *being verified*, as opposed to gaps in the
 proofs: an entry here means **the C code is wrong** and the stuck proof is the
-symptom. **The register holds ONE CANDIDATE under review** — every earlier
-defect this effort found has been fixed upstream, and a fix's consequences for
-a contract are recorded with that contract, not here.
+symptom. **The register is currently empty** — every defect this effort found
+has been fixed upstream, and a fix's consequences for a contract are recorded
+with that contract, not here.
 
-## CANDIDATE C1 — create's transaction can exceed its MAXOPBLOCKS reservation
-## through nameiparent's frees (found 2026-08-13, staging the create walk)
+## REFUTED CANDIDATE (2026-08-13) — create + concurrent unlink cannot bust
+## the log: CROSS-TRANSACTION ABSORPTION covers namex's freeing iput
 
-Within create's single begin_op..end_op window, nameiparent's per-level
-`iunlockput(parent)` can be the FREEING iput: concurrently unlink the child
-then the (now empty) ancestor between namex's nlink guard and its iput, and
-the free runs inside create's op — itrunc's bfrees absorb into the one
-bitmap block, but each freed ancestor's iupdate logs a DISTINCT inode
-block.  create's own mkdir chain already closes at zero slack
-(CreateBudget.cr_budget_mkdir), so ANY such spend puts the op over
-MAXOPBLOCKS.  begin_op's admission test (log.c:138) is sound only if every
-op stays within MAXOPBLOCKS; under combined pressure the total can reach
-LOGBLOCKS and `log_write`'s check — `unreachable("too big a transaction")`,
-log.c:230 at pin 2691300 — fires, i.e. the unreachable() is reachable.
-Proof-side consequence in projects/fs-sysfile.md ("BLOCKER A"): create is
-unprovable under the landed honest contracts at every path length.
-Pending human ruling; candidate fixes are upstream-shaped (bound or defer
-namex's frees relative to the caller's op, or price walks into the
-reservation), not spec-shaped.
+Raised while staging the create walk (the ledger does not compose across
+nameiparent under per-op accounting), refuted the same day by the team:
+for namex's per-level iput to FREE, some unlink must have driven that
+inode's nlink to zero INSIDE create's op window (a pre-window unlink
+removes the dirent, so the walk never reaches the inode) — and a commit
+runs only at outstanding = 0, so that unlink's own iupdate of the SAME
+inode block is still in the shared log header; namex's iupdate absorbs
+against it (log_write's absorption scan is over lh, i.e. GROUP-wide).
+The itrunc side adds nothing: bfrees touch only the bitmap block, which
+the op's own budget prices once — whoever pays first, the other absorbs.
+So no op exceeds its MAXOPBLOCKS reservation, begin_op's admission
+arithmetic stands, and log.c:230's unreachable() stays unreachable.
+
+What survives is a MODELING obligation, not a defect: the proof's ledger
+must be able to SAY this — the freeing-iput's iupdate is absorbed because
+"cached inode with nlink = 0" implies its inode block is in the group's
+logged set.  Recorded as the re-model direction in
+projects/fs-sysfile.md ("BLOCKER A, resolved").
 
 Fixing the C is never free: the image is pinned by `XV6_REV` in the top-level
 `Makefile` and the tracked `kernel-rocq/*.v` dumps come from that revision, so
