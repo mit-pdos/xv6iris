@@ -9,7 +9,7 @@
        return 0;
      }
 
-   Twenty-four instructions (KernelInstrs @ 0x80004d36; the listing is in
+   Twenty-four instructions (KernelInstrs @ 0x80004d12; the listing is in
    CodeSysClose.v).  Three things here are new relative to the earlier
    syscall proofs, and they are what the file is about:
 
@@ -660,7 +660,7 @@ Section ProofSysClose.
       iEval (rewrite Hpp1c) in "Hpc".
       (* ---- +0x1c: jal ra,myproc ---- *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sys_close + 0x1c))
-                (mword_of_int 1 : mword 5) (mword_of_int 2083712 : mword 21) A7 (av - 4)%nat b
+                (mword_of_int 1 : mword 5) (mword_of_int 2083666 : mword 21) A7 (av - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi1c [-]").
       iIntros (CID12 Hs12) "Hcg Hpc".
@@ -669,7 +669,7 @@ Section ProofSysClose.
       change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
                 (add_vec_int (mword_of_int (KernelSyms.sys_close + 0x1c) : mword 64) 4)]> A7) with B.
       assert (Hjmp : add_vec (mword_of_int (KernelSyms.sys_close + 0x1c) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2083712 : mword 21)) = mword_of_int KernelSyms.myproc)
+                       (sign_extend' 64 (mword_of_int 2083666 : mword 21)) = mword_of_int KernelSyms.myproc)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjmp) in "Hpc".
       assert (HBra : B !!! Regidx (mword_of_int 1 : mword 5)
@@ -817,7 +817,7 @@ Section ProofSysClose.
       iEval (rewrite Hpp34) in "Hpc".
       (* ---- +0x34: jal ra,fileclose ---- *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sys_close + 0x34))
-                (mword_of_int 1 : mword 5) (mword_of_int 2093894 : mword 21) C5 (av - 4)%nat b
+                (mword_of_int 1 : mword 5) (mword_of_int 2093860 : mword 21) C5 (av - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi34 [-]").
       iIntros (CID20 Hs20) "Hcg Hpc".
@@ -826,7 +826,7 @@ Section ProofSysClose.
       change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
                 (add_vec_int (mword_of_int (KernelSyms.sys_close + 0x34) : mword 64) 4)]> C5) with D.
       assert (Hjfc : add_vec (mword_of_int (KernelSyms.sys_close + 0x34) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2093894 : mword 21)) = mword_of_int KernelSyms.fileclose)
+                       (sign_extend' 64 (mword_of_int 2093860 : mword 21)) = mword_of_int KernelSyms.fileclose)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjfc) in "Hpc".
       assert (HDra : D !!! Regidx (mword_of_int 1 : mword 5)

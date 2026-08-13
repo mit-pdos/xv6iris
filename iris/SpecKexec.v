@@ -120,16 +120,19 @@
 
    * SpecCopyout used to demand [p_pagetable p ↦₈ page_base P.(ud_root)] --
      i.e. that the table copied into IS the running process's -- because
-     copyout may call vmfault, and vmfault reads p->sz and maps into
+     copyout may call vmfault, and vmfault read p->sz and mapped into
      p->pagetable rather than the table it was passed.  kexec copies into a
-     table it has built and not yet installed.  [SpecCopyout.co_license] is
-     now that dependence as a RESOURCE: the process's two cells, or a proof
-     that the destination range is already mapped as valid USER leaves, in
-     which case the vmfault call is dead.  kexec is on the second arm -- its
-     stack pages were uvmalloc'd a few instructions earlier, at [PTE_W|
-     PTE_R|PTE_U].  (The [pte_vu] conjunct is load-bearing and exec is why:
-     a [uvmclear]'d page stays in the map with U cleared, and that page is
-     exec's own stack guard.)
+     table it has built and not yet installed, so this was a real blocker.
+
+     *** RETIRED UPSTREAM. ***  xv6 `4f2fc8b` made vmfault take the size as
+     an ARGUMENT and map into the table it was handed, and gave copyout a
+     matching [psz] parameter in a1.  copyout is now stated over an
+     arbitrary [proc_pt P] with no process cells at all, so kexec just
+     passes the new image's size and the blocker is gone.  The [co_license]
+     / [co_mapped] / [arm] apparatus that had been built to work around it
+     is deleted (SpecCopyout.v) -- which is cheaper for kexec than the
+     workaround was: it no longer has to establish [pte_vu] over its
+     destination range at all.
 
    * SpecSafestrcpy used to demand the FULL [n = 16] source bytes, an
      over-ask its own header admitted.  kexec's source is [last], a pointer
@@ -209,11 +212,20 @@ Local Open Scope Z_scope.
 Definition MAXARG : nat := 32%nat.
 Definition USERSTACK : nat := 1%nat.
 
-(* kexec's own 68-slot frame over namei's 98, which is the tallest callee
-   (readi 70, iunlockput 64, end_op 58, copyout 50, uvmalloc 42, ilock 44,
+(* kexec's own 68-slot frame over namei's 100, which is the tallest callee
+   (readi 72, iunlockput 64, end_op 58, copyout 52, uvmalloc 42, ilock 44,
    proc_pagetable / proc_freepagetable 40, begin_op 26, walkaddr 10,
-   flags2perm / safestrcpy / strlen 2). *)
-Definition K_kexec : nat := 166%nat.
+   flags2perm / safestrcpy / strlen 2).
+
+   THE TOP OF THE psz CHAIN.  Three of those numbers moved for one reason:
+   [psz] has to outlive walkaddr / vmfault / memmove inside copyout, so gcc
+   gave it a callee-saved home in s11 and copyout's frame grew to 14 slots,
+   taking its bound 50 -> 52 (SpecCopyout.v).  That propagated
+   either_copyout 56 -> 58 -> readi 70 -> 72 -> dirlookup 82 -> 84 -> namex
+   94 -> 96 -> namei 98 -> 100, and so this one 166 -> 168.  Eleven constants
+   from one register-allocation decision; none of them is a soundness
+   question, they are all just "the callee needs two more slots than it did". *)
+Definition K_kexec : nat := 168%nat.
 
 (* ===================================================================== *)
 (*  The argument-stack model.                                             *)

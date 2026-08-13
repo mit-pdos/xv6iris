@@ -7,7 +7,7 @@
        return -1;
      }
 
-   Thirty-two instructions @ 0x80004ace over a 32-byte ra/s0/s1 frame (slot 0
+   Thirty-two instructions @ 0x80004abe over a 32-byte ra/s0/s1 frame (slot 0
    is a gap), one call, one counted loop and two returns joining at the single
    epilogue at +0x28.  The contract is in SpecFdalloc.v.
 
@@ -540,14 +540,14 @@ Section ProofFdalloc.
       rewrite /A1 upd_ne; [| reg_neq]. exact HcspA0. }
     (* +0x0c: jal ra,myproc *)
     iPoseProof (fdi_0c with "Htext") as "Hi0c".
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x0c)) Rra (mword_of_int 2084344 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x0c)) Rra (mword_of_int 2084298 : mword 21)
               A2 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi0c [-]").
     iIntros (CID7 Hs7) "Hcg Hpc".
     set (A3 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.fdalloc + 0x0c) : mword 64) 4)]> A2).
     change (<[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.fdalloc + 0x0c) : mword 64) 4)]> A2) with A3.
-    assert (Hjmp : add_vec (mword_of_int (KernelSyms.fdalloc + 0x0c) : mword 64) (sign_extend' 64 (mword_of_int 2084344 : mword 21)) = mword_of_int KernelSyms.myproc)
+    assert (Hjmp : add_vec (mword_of_int (KernelSyms.fdalloc + 0x0c) : mword 64) (sign_extend' 64 (mword_of_int 2084298 : mword 21)) = mword_of_int KernelSyms.myproc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjmp) in "Hpc".
     assert (HA3ra : A3 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.fdalloc + 0x0c) : mword 64) 4)

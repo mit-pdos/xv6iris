@@ -336,7 +336,13 @@ GR-2 worklist. Do not assume the colour is simply gone.
 
 **Found:** 2026-08-12, updating to upstream `ae96fd0` ("example of sleep
 waiting for interrupt wakeup"), which rewrote the UART transmit path.
-**Status:** OPEN, and it BLOCKS the boot wiring of the whole uartwrite cone.
+**Status:** **FIXED IN THE SOURCE** by upstream `b7c25cf` ("initialize the
+tx_lock sleeplock"), which is route (1) below verbatim -- one
+`initsleeplock(&tx_lock, "uart")` at the end of `uartinit`.  It arrived in the
+pinned image for free, as an intermediate commit on the way to the branch tip
+`9da28f5`.  So the choice between the two routes below never had to be made,
+and route (2) -- indexing `is_lock` by `option string`, a ~123-site sweep that
+weakens a fact every other lock really does enjoy -- is retired unbuilt.
 
 ### The code
 
@@ -406,7 +412,13 @@ caller can discharge — the same shape as `SpecIlock`'s `i_ref`
 (1) is the better engineering; (2) is the better model of *this* source.
 Neither is cheap, and the choice is the maintainer's.
 
-### Where it is assumed meanwhile
+### Where it was assumed meanwhile
+
+**This is now a retirement, not an assumption.** `uartinit` really does
+initialize the lock, so `is_txlock` is provable where it was previously
+unprovable, and `LinkTxLockInit.v`'s axiom should come out as soon as
+`ProofUartinit` is replayed over the extra call -- see the GR-1c section of
+`projects/fs-sysfile.md`.  What stood there meanwhile:
 
 `iris/LinkTxLockInit.v`, one `Axiom` (`tx_lock_init`) handing back
 `UartTxInv.is_txlock` for the transmitter token and the frozen DLAB fact —

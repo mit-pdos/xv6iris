@@ -815,14 +815,14 @@ Section ProofFreeproc.
       iEval (rewrite Hpc10) in "Hpc".
       (* +0x10 jal kfree *)
       iPoseProof (fri_10 with "Htext") as "Hi10".
-      iApply (wp_jal_s_sconf (mword_of_int (FR + 0x10)) Rra (mword_of_int 2092880 : mword 21)
+      iApply (wp_jal_s_sconf (mword_of_int (FR + 0x10)) Rra (mword_of_int 2092846 : mword 21)
                 T0 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi10 [-]").
       iIntros (CID9 Hs9) "Hcg Hpc".
       set (T1 := <[Regidx Rra := regval_into_reg
           (add_vec_int (mword_of_int (FR + 0x10) : mword 64) 4)]> T0).
       assert (Htgtk : add_vec (mword_of_int (FR + 0x10) : mword 64)
-                        (sign_extend' 64 (mword_of_int 2092880 : mword 21))
+                        (sign_extend' 64 (mword_of_int 2092846 : mword 21))
                       = mword_of_int KernelSyms.kfree)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtk) in "Hpc".

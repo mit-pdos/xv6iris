@@ -1819,10 +1819,10 @@ Section ProofDirlinkMain.
         iEval (rewrite Hqq78) in "Hpc".
         (* +0x78 jal ra,strncpy *)
         assert (Htgtsn : add_vec (mword_of_int (DK + 0x78) : mword 64)
-                  (sign_extend' 64 (mword_of_int 2085806 : mword 21))
+                  (sign_extend' 64 (mword_of_int 2085760 : mword 21))
                   = mword_of_int KernelSyms.strncpy) by pcw.
         iApply (wp_jal_s_sconf (mword_of_int (DK + 0x78)) Rra
-                  (mword_of_int 2085806 : mword 21) W3 (K - 10)%nat b
+                  (mword_of_int 2085760 : mword 21) W3 (K - 10)%nat b
                   ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi78").
         iIntros (CIDA4 HqA4) "Hcg Hpc".
@@ -2758,25 +2758,25 @@ Section ProofDirlinkMain.
             assert (Hpp64 : add_vec_int (mword_of_int (DK + 0x60) : mword 64) 4
                             = mword_of_int (DK + 0x64)) by pcw.
             iEval (rewrite Hpp64) in "Hpc".
-            (* +0x64 addi a0,a0,2820 *)
+            (* +0x64 addi a0,a0,2762 *)
             iApply (wp_addi4_s_sconf (mword_of_int (DK + 0x64)) Ra0 Ra0
-                      (mword_of_int 2820 : mword 12) PB1 (K - 10)%nat b
+                      (mword_of_int 2762 : mword 12) PB1 (K - 10)%nat b
                       ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj64").
             iIntros (CIDpa3 Hqpa3) "Hcg Hpc".
             set (PB2 := <[Regidx Ra0 := regval_into_reg
                            (add_vec (rget PB1 Ra0)
-                              (sign_extend' 64 (mword_of_int 2820 : mword 12)))]> PB1).
+                              (sign_extend' 64 (mword_of_int 2762 : mword 12)))]> PB1).
             assert (Hpp68 : add_vec_int (mword_of_int (DK + 0x64) : mword 64) 4
                             = mword_of_int (DK + 0x68)) by pcw.
             iEval (rewrite Hpp68) in "Hpc".
             (* +0x68 jal ra,panic -- and panic() never returns *)
             iApply (wp_jal_s_sconf (mword_of_int (DK + 0x68)) Rra
-                      (mword_of_int 2084432 : mword 21) PB2 (K - 10)%nat b
+                      (mword_of_int 2084366 : mword 21) PB2 (K - 10)%nat b
                       ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                       with "Hcg Hpc Hj68").
             iIntros (CIDpa4 Hqpa4) "Hcg Hpc".
             assert (Htgtpn : add_vec (mword_of_int (DK + 0x68) : mword 64)
-                               (sign_extend' 64 (mword_of_int 2084432 : mword 21))
+                               (sign_extend' 64 (mword_of_int 2084366 : mword 21))
                              = mword_of_int KernelSyms.panic) by pcw.
             iEval (rewrite Htgtpn) in "Hpc".
             iPoseProof (panic_wp_any_at CIDpa4 with "Hpanic") as "Hpan".

@@ -65,21 +65,14 @@ SAIL_RISCV_REV ?= c32fbf4111b849061db1812355d6da9df8c2e396
 # way already move most of them).  Verified: a kernel built here reproduces
 # kernel-rocq/*.v byte for byte and symbol for symbol.
 #
-# This revision is NOT an upstream commit: it is upstream ae96fd0 plus a
-# cherry-pick of upstream 9da28f5 ("Fix kernel panic and add test case"), which
-# is kernel-defects.md D2's fix -- the nlink==0 guards in namex and create.  The
-# five upstream commits BETWEEN ae96fd0 and 9da28f5 are deliberately not taken
-# (one of them, b7c25cf, is D3's fix, whose own image bump is a separate job).
-# Reproduce the pin exactly -- the committer identity and date are what make the
-# sha deterministic:
-#
-#   git -C xv6-riscv checkout --detach ae96fd0
-#   GIT_COMMITTER_NAME="Frans Kaashoek" GIT_COMMITTER_EMAIL="kaashoek@mit.edu" \
-#   GIT_COMMITTER_DATE="2026-08-12T18:05:56-04:00" \
-#     git -C xv6-riscv cherry-pick 9da28f5
-#
-# The resulting kernel/kernel is md5 0ad3ab3cac87821e20c8eacf136bc112.
-XV6_REV ?= 1c7ccafc25faaf92e95c1051659ecd91449f29be
+# THE PIN IS A CLEAN UPSTREAM TIP AGAIN.  It was briefly a local cherry-pick
+# (ae96fd0 + 9da28f5) while the fix for kernel-defects.md D2 was ahead of the
+# revision this tree was proved against; converging on the branch tip retires
+# that apparatus, and picks up b7c25cf on the way -- which is D3's fix, so the
+# uartinit sleeplock defect is repaired in the source too.  Nothing here is a
+# local commit any more: `git -C xv6-riscv checkout --detach $(XV6_REV)`
+# reproduces the image, and that is the whole recipe.
+XV6_REV ?= 9da28f56db5fde666ce26d3eac824a599a5155c1
 
 KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.v
 

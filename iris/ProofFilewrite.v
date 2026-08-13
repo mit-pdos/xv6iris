@@ -6,7 +6,7 @@
    and [LinkFilewrite.v] instantiates it.  Instruction by instruction:
 
      * +0x00/+0x04, the pre-prologue [f->writable] test, and its -1 return
-       at +0x122 with sp and the whole frame untouched;
+       at +0x10c with sp and the whole frame untouched;
      * the prologue ([fw_pro]) and the three-way type dispatch at
        +0x16..+0x2c;
      * FD_PIPE in full: [c.ld a0,16(a0)], the [jal pipewrite], the [c.j] to
@@ -240,7 +240,7 @@
 
      +0x00 [wp_lbu_s_sconf]        a5 := zext (fc_writable Cf)
      +0x04 [wp_beqz_x0_{taken,fall}_s_sconf]   BTYPE(286, zreg, a5, BEQ)
-             taken -> +0x122; the FALL is [fw_wbool_of_fall]
+             taken -> +0x10c; the FALL is [fw_wbool_of_fall]
      +0x08..+0x14  [fw_pro]
      +0x16/+0x18/+0x1a  [wp_cmv_s_sconf]  s2:=a0, s6:=a1, s5:=a2
      +0x1c [wp_clw_s_sconf]        a5 := sext (fc_type Cf)   (a_ftype k)
@@ -625,7 +625,7 @@ Lemma fw_ret_pc_cons :
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* the record-eta step: the two paths that return WITHOUT calling anything
-   -- the pre-prologue [f->writable == 0] exit at +0x122 and the
+   -- the pre-prologue [f->writable == 0] exit at +0x10c and the
    out-of-range / null-slot device exits -- leave the page table alone. *)
 Lemma fw_upd_upt_id (V : pprivate) : upd_upt V (pv_upt V) = V.
 Proof. destruct V; reflexivity. Qed.
@@ -662,7 +662,7 @@ Proof.
   rewrite fw_zext8_zero in Hne. discriminate.
 Qed.
 
-(* the early return needs no converse: the [f->writable == 0] arm at +0x122
+(* the early return needs no converse: the [f->writable == 0] arm at +0x10c
    returns -1 before the type is ever read, so it never looks at
    [fc_wbool].  Only the FALL direction is load-bearing. *)
 
@@ -1740,14 +1740,14 @@ Section ProofFilewrite.
        is closed the instant it returns (fileread's discipline).
        ================================================================= *)
     iApply (wp_jal_s_sconf (mword_of_int (FW + 0x84)) Rra
-              (mword_of_int 2095336 : mword 21) B0 (K - 12)%nat b
+              (mword_of_int 2095332 : mword 21) B0 (K - 12)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi84 [-]").
     iIntros (CIDa1 Hsa1) "Hcg Hpc".
     set (D1 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (FW + 0x84) : mword 64) 4)]> B0).
     assert (Htgtbo : add_vec (mword_of_int (FW + 0x84) : mword 64)
-              (sign_extend' 64 (mword_of_int 2095336 : mword 21))
+              (sign_extend' 64 (mword_of_int 2095332 : mword 21))
               = mword_of_int KernelSyms.begin_op)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtbo) in "Hpc".
@@ -1798,14 +1798,14 @@ Section ProofFilewrite.
     iEval (rewrite Hpp8c) in "Hpc".
     (* ---- +0x8c jal ra,ilock ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (FW + 0x8c)) Rra
-              (mword_of_int 2092734 : mword 21) D2 (K - 12)%nat b
+              (mword_of_int 2092730 : mword 21) D2 (K - 12)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi8c [-]").
     iIntros (CIDa3 Hsa3) "Hcg Hpc".
     set (D3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (FW + 0x8c) : mword 64) 4)]> D2).
     assert (Htgtil : add_vec (mword_of_int (FW + 0x8c) : mword 64)
-              (sign_extend' 64 (mword_of_int 2092734 : mword 21))
+              (sign_extend' 64 (mword_of_int 2092730 : mword 21))
               = mword_of_int KernelSyms.ilock)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtil) in "Hpc".
@@ -1983,14 +1983,14 @@ Section ProofFilewrite.
     iEval (rewrite Hppa0) in "Hpc".
     (* ---- +0xa0 jal ra,writei ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (FW + 0xa0)) Rra
-              (mword_of_int 2093870 : mword 21) Q5 (K - 12)%nat b
+              (mword_of_int 2093866 : mword 21) Q5 (K - 12)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hia0 [-]").
     iIntros (CIDa9 Hsa9) "Hcg Hpc".
     set (Q6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (FW + 0xa0) : mword 64) 4)]> Q5).
     assert (Htgtwi : add_vec (mword_of_int (FW + 0xa0) : mword 64)
-              (sign_extend' 64 (mword_of_int 2093870 : mword 21))
+              (sign_extend' 64 (mword_of_int 2093866 : mword 21))
               = mword_of_int KernelSyms.writei)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtwi) in "Hpc".
@@ -2228,14 +2228,14 @@ Section ProofFilewrite.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppb8) in "Hpc".
     iApply (wp_jal_s_sconf (mword_of_int (FW + 0xb8)) Rra
-              (mword_of_int 2092864 : mword 21) X1 (K - 12)%nat b
+              (mword_of_int 2092860 : mword 21) X1 (K - 12)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hib8 [-]").
     iIntros (CIDb4 Hsb4) "Hcg Hpc".
     set (X2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (FW + 0xb8) : mword 64) 4)]> X1).
     assert (Htgtiu : add_vec (mword_of_int (FW + 0xb8) : mword 64)
-              (sign_extend' 64 (mword_of_int 2092864 : mword 21))
+              (sign_extend' 64 (mword_of_int 2092860 : mword 21))
               = mword_of_int KernelSyms.iunlock)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtiu) in "Hpc".
@@ -2290,14 +2290,14 @@ Section ProofFilewrite.
     (* ---- +0xbc jal ra,end_op : the transaction closes at whatever the
            chunk left of its reservation ([SpecEndOp] takes any [u]) ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (FW + 0xbc)) Rra
-              (mword_of_int 2095420 : mword 21) miu (K - 12)%nat b
+              (mword_of_int 2095416 : mword 21) miu (K - 12)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hibc [-]").
     iIntros (CIDb5 Hsb5) "Hcg Hpc".
     set (X3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (FW + 0xbc) : mword 64) 4)]> miu).
     assert (Htgteo : add_vec (mword_of_int (FW + 0xbc) : mword 64)
-              (sign_extend' 64 (mword_of_int 2095420 : mword 21))
+              (sign_extend' 64 (mword_of_int 2095416 : mword 21))
               = mword_of_int KernelSyms.end_op)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgteo) in "Hpc".
@@ -2677,7 +2677,7 @@ Section ProofFilewrite.
     iPoseProof (fwri_004 with "Htext") as "Hi04".
     (* =================================================================
        +0x00 lbu a5,9(a0) -- f->writable, BEFORE THE PROLOGUE (S3a's
-       decode note 1: the -1 return at +0x122 runs with sp untouched).
+       decode note 1: the -1 return at +0x10c runs with sp untouched).
        ================================================================= *)
     assert (Hpwr : add_vec (rget m Ra0) (sign_extend' 64 (mword_of_int 9 : mword 12))
                    = a_fwritable k).
@@ -2709,7 +2709,7 @@ Section ProofFilewrite.
     destruct (eq_vec (zero_extend' 64 (fc_writable Cf : mword 8) : mword 64)
                      (zero_reg : mword 64)) eqn:Hwrz.
     - (* ===============================================================
-         NOT WRITABLE: [beq a5,x0] is taken to +0x122, and the two
+         NOT WRITABLE: [beq a5,x0] is taken to +0x10c, and the two
          instructions there are the whole exit -- [c.li a0,-1; c.jr ra],
          with sp, the frame and every callee-saved register untouched.
          =============================================================== *)
@@ -2727,7 +2727,7 @@ Section ProofFilewrite.
                 with "Hcg Hpc Hi04 [-]").
       iNext. iIntros (CID2 Hs2) "Hcg Hpc".
       iEval (rewrite Htgt122) in "Hpc".
-      (* ---- +0x122 c.li a0,-1 ---- *)
+      (* ---- +0x10c c.li a0,-1 ---- *)
       iApply (wp_cli_s_sconf (mword_of_int (FW + 0x122)) Ra0
                 (mword_of_int 63 : mword 6) (mword_of_int (-1) : mword 64)
                 R1 K b

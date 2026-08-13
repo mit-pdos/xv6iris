@@ -432,7 +432,7 @@ Section BootBssChain.
        the word after [panicking] is the sleep channel, whose ADDRESS is all
        anyone uses -- the cell itself is never read or written and belongs to
        nobody (UartTxInv.v).  It is one of the gaps this chain skips. *)
-    (* ---- 0x8000a27c started: PINNED zero, the escrow's left disjunct ---- *)
+    (* ---- 0x8000a2ac started: PINNED zero, the escrow's left disjunct ---- *)
     iDestruct (bss_cut g (KernelSyms.panicking + 4) KernelSyms.started
                  (KernelSyms.started + 4) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hst H]".
@@ -440,7 +440,7 @@ Section BootBssChain.
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) ltac:(zeq)
                  ltac:(intros j _; apply nth_byte_zero; zeq)
                  with "Hcl Hst") as "Hst".
-    (* ---- 0x8000a238 kernel_pagetable, 0x8000a240 initproc ---- *)
+    (* ---- 0x8000a238 kernel_pagetable, 0x8000a270 initproc ---- *)
     iDestruct (bss_cut g (KernelSyms.started + 4) KernelSyms.kernel_pagetable
                  (KernelSyms.kernel_pagetable + 8) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hkpt H]".
@@ -460,7 +460,7 @@ Section BootBssChain.
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Htk H]".
     iDestruct (boot_ran_cell4 g KernelSyms.ticks Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Htk") as (vtk) "Htk".
-    (* ---- 0x8000a250 stack0[8][4096]: the per-hart stack family ---- *)
+    (* ---- 0x8000a280 stack0[8][4096]: the per-hart stack family ---- *)
     iDestruct (bss_cut g (KernelSyms.ticks + 4) KernelSyms.stack0
                  (KernelSyms.stack0 + 4096 * Z.of_nat NCPU) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hstk H]".

@@ -474,7 +474,7 @@ Section BootCarve.
 
   (* the loader really did leave [KernelData]'s byte at its address.  Above
      [text_end] the text map is exhausted ([kernel_bytes]' keys stop at
-     0x80006120), so the union takes the DATA side; and [kernel_data]'s upper
+     0x800060a0), so the union takes the DATA side; and [kernel_data]'s upper
      bound is exactly [img_end], which is what puts the byte inside
      [boot_image]'s filter. *)
   Local Lemma boot_byte_data (a : Z) (b : bv 8) :

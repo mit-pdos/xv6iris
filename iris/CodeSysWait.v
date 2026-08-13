@@ -69,9 +69,9 @@ Section CodeSysWait.
   Proof. mk_base (KernelSyms.sys_wait + 0x12) (mword_of_int 0xfe843503 : mword 32)
     (mword_of_int (KernelSyms.sys_wait + 0x12) : mword 64) (LOAD (mword_of_int 4072 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 10), false, 8)) kd_fe843503. Qed.
 
-  Lemma swi_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_wait + 0x16) : mword 64) false (JAL (mword_of_int 2095150 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_wait + 0x16) (mword_of_int 0x82fff0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_wait + 0x16) : mword 64) (JAL (mword_of_int 2095150 : mword 21, Regidx (mword_of_int 1))) kd_82fff0ef. Qed.
+  Lemma swi_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_wait + 0x16) : mword 64) false (JAL (mword_of_int 2095138 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_wait + 0x16) (mword_of_int 0x823ff0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_wait + 0x16) : mword 64) (JAL (mword_of_int 2095138 : mword 21, Regidx (mword_of_int 1))) kd_823ff0ef. Qed.
 
   Lemma swi_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_wait + 0x1a) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.sys_wait + 0x1a) (mword_of_int 0x60e2 : mword 16)

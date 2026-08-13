@@ -86,7 +86,7 @@ Local Open Scope Z_scope.
 (* The address of the string literal "pipe" that pipealloc passes to initlock.
    It sits in .rodata past etext with no ELF symbol of its own, so it is spelled
    out here (kernel.asm: 80007598 <etext+0x598>). *)
-Definition pipe_name_str : Z := 0x800075b0%Z.
+Definition pipe_name_str : Z := 0x800075b8%Z.
 
 Section SpecPipealloc.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !kallocG Σ}.

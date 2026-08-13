@@ -27,7 +27,7 @@
 
    (3) THE TWO NAME LITERALS.  dirlink wants FOURTEEN bytes of name
        buffer; the "." and ".." arguments at +0xd6 / +0xea are rodata
-       addresses 0x800075d8 and 0x800075e0, whose fourteen-byte windows
+       addresses 0x800075e0 and 0x800075e8, whose fourteen-byte windows
        run into their neighbours ("." 's window contains the ".." two
        bytes further on, and ".." 's contains the head of "unlink").
        [DirentEnc.bname] cuts at the first NUL, so both windows name the
@@ -189,8 +189,8 @@ Proof. intros ->. rewrite /MAXFILE /BSIZE. lia. Qed.
 (*  (3) THE TWO NAME LITERALS                                             *)
 (* ===================================================================== *)
 
-Definition cr_dot_addr : Z := 0x800075d8.
-Definition cr_dotdot_addr : Z := 0x800075e0.
+Definition cr_dot_addr : Z := 0x800075e0.
+Definition cr_dotdot_addr : Z := 0x800075e8.
 
 (* the fourteen bytes each window actually holds, read off
    kernel-rocq/KernelData.v.  "." 's window runs into ".." (bytes 8 and 9)

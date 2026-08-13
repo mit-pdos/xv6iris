@@ -23,6 +23,7 @@ Require Import KernelDecode05.
 Require Import KernelDecode07.
 Require Import KernelDecode10.
 Require Import KernelDecode11.
+Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
@@ -120,9 +121,9 @@ Section CodeSysDup.
   Proof. mk_rvc (KernelSyms.sys_dup + 0x30) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.sys_dup + 0x30) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma sdi_32 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_dup + 0x32) : mword 64) false (JAL (mword_of_int 2094046 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_dup + 0x32) (mword_of_int 0xbdeff0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_dup + 0x32) : mword 64) (JAL (mword_of_int 2094046 : mword 21, Regidx (mword_of_int 1))) kd_bdeff0ef. Qed.
+  Lemma sdi_32 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_dup + 0x32) : mword 64) false (JAL (mword_of_int 2094012 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_dup + 0x32) (mword_of_int 0xbbcff0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_dup + 0x32) : mword 64) (JAL (mword_of_int 2094012 : mword 21, Regidx (mword_of_int 1))) kd_bbcff0ef. Qed.
 
   Lemma sdi_36 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_dup + 0x36) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (KernelSyms.sys_dup + 0x36) (mword_of_int 0x87ca : mword 16)

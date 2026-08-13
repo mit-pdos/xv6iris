@@ -36,6 +36,7 @@ Require Import KernelDecode22.
 Require Import KernelDecode24.
 Require Import KernelDecode26.
 Require Import KernelDecode27.
+Require Import KernelDecode28.
 Require Import KernelDecode29.
 Require Import KernelDecode30.
 Require Import KernelDecode31.
@@ -121,9 +122,9 @@ Section CodeGrowproc.
   Proof. mk_rvc (KernelSyms.growproc + 0x2c) (mword_of_int 0x6928 : mword 16)
     (mword_of_int (KernelSyms.growproc + 0x2c) : mword 64) (LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), false, 8)) kd_6928 ke_6928. Qed.
 
-  Lemma gpi_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.growproc + 0x2e) : mword 64) false (JAL (mword_of_int 2094732 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.growproc + 0x2e) (mword_of_int 0xe8cff0ef : mword 32)
-    (mword_of_int (KernelSyms.growproc + 0x2e) : mword 64) (JAL (mword_of_int 2094732 : mword 21, Regidx (mword_of_int 1))) kd_e8cff0ef. Qed.
+  Lemma gpi_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.growproc + 0x2e) : mword 64) false (JAL (mword_of_int 2094698 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.growproc + 0x2e) (mword_of_int 0xe6aff0ef : mword 32)
+    (mword_of_int (KernelSyms.growproc + 0x2e) : mword 64) (JAL (mword_of_int 2094698 : mword 21, Regidx (mword_of_int 1))) kd_e6aff0ef. Qed.
 
   Lemma gpi_32 : kernel_text -∗ instr (mword_of_int (KernelSyms.growproc + 0x32) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (KernelSyms.growproc + 0x32) (mword_of_int 0x85aa : mword 16)
@@ -177,9 +178,9 @@ Section CodeGrowproc.
   Proof. mk_rvc (KernelSyms.growproc + 0x50) (mword_of_int 0x6928 : mword 16)
     (mword_of_int (KernelSyms.growproc + 0x50) : mword 64) (LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), false, 8)) kd_6928 ke_6928. Qed.
 
-  Lemma gpi_52 : kernel_text -∗ instr (mword_of_int (KernelSyms.growproc + 0x52) : mword 64) false (JAL (mword_of_int 2094628 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.growproc + 0x52) (mword_of_int 0xe24ff0ef : mword 32)
-    (mword_of_int (KernelSyms.growproc + 0x52) : mword 64) (JAL (mword_of_int 2094628 : mword 21, Regidx (mword_of_int 1))) kd_e24ff0ef. Qed.
+  Lemma gpi_52 : kernel_text -∗ instr (mword_of_int (KernelSyms.growproc + 0x52) : mword 64) false (JAL (mword_of_int 2094594 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.growproc + 0x52) (mword_of_int 0xe02ff0ef : mword 32)
+    (mword_of_int (KernelSyms.growproc + 0x52) : mword 64) (JAL (mword_of_int 2094594 : mword 21, Regidx (mword_of_int 1))) kd_e02ff0ef. Qed.
 
   Lemma gpi_56 : kernel_text -∗ instr (mword_of_int (KernelSyms.growproc + 0x56) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (KernelSyms.growproc + 0x56) (mword_of_int 0x85aa : mword 16)

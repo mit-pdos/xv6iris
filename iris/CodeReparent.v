@@ -16,12 +16,12 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelDecode00.
 Require Import KernelDecode01.
 Require Import KernelDecode02.
 Require Import KernelDecode04.
 Require Import KernelDecode05.
 Require Import KernelDecode06.
+Require Import KernelDecode09.
 Require Import KernelDecode10.
 Require Import KernelDecode11.
 Require Import KernelDecode12.
@@ -85,25 +85,25 @@ Section CodeReparent.
   Proof. mk_base (KernelSyms.reparent + 0x12) (mword_of_int 0x00011497 : mword 32)
     (mword_of_int (KernelSyms.reparent + 0x12) : mword 64) (UTYPE (mword_of_int 17 : mword 20, Regidx (mword_of_int 9), AUIPC)) kd_00011497. Qed.
 
-  Lemma rpi_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.reparent + 0x16) : mword 64) false (ITYPE (mword_of_int 2080 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
-  Proof. mk_base (KernelSyms.reparent + 0x16) (mword_of_int 0x82048493 : mword 32)
-    (mword_of_int (KernelSyms.reparent + 0x16) : mword 64) (ITYPE (mword_of_int 2080 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) kd_82048493. Qed.
+  Lemma rpi_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.reparent + 0x16) : mword 64) false (ITYPE (mword_of_int 2074 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
+  Proof. mk_base (KernelSyms.reparent + 0x16) (mword_of_int 0x81a48493 : mword 32)
+    (mword_of_int (KernelSyms.reparent + 0x16) : mword 64) (ITYPE (mword_of_int 2074 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) kd_81a48493. Qed.
 
   Lemma rpi_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.reparent + 0x1a) : mword 64) false (UTYPE (mword_of_int 8 : mword 20, Regidx (mword_of_int 20), AUIPC)).
   Proof. mk_base (KernelSyms.reparent + 0x1a) (mword_of_int 0x00008a17 : mword 32)
     (mword_of_int (KernelSyms.reparent + 0x1a) : mword 64) (UTYPE (mword_of_int 8 : mword 20, Regidx (mword_of_int 20), AUIPC)) kd_00008a17. Qed.
 
-  Lemma rpi_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.reparent + 0x1e) : mword 64) false (ITYPE (mword_of_int 704 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)).
-  Proof. mk_base (KernelSyms.reparent + 0x1e) (mword_of_int 0x2c0a0a13 : mword 32)
-    (mword_of_int (KernelSyms.reparent + 0x1e) : mword 64) (ITYPE (mword_of_int 704 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)) kd_2c0a0a13. Qed.
+  Lemma rpi_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.reparent + 0x1e) : mword 64) false (ITYPE (mword_of_int 698 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)).
+  Proof. mk_base (KernelSyms.reparent + 0x1e) (mword_of_int 0x2baa0a13 : mword 32)
+    (mword_of_int (KernelSyms.reparent + 0x1e) : mword 64) (ITYPE (mword_of_int 698 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)) kd_2baa0a13. Qed.
 
   Lemma rpi_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.reparent + 0x22) : mword 64) false (UTYPE (mword_of_int 22 : mword 20, Regidx (mword_of_int 19), AUIPC)).
   Proof. mk_base (KernelSyms.reparent + 0x22) (mword_of_int 0x00016997 : mword 32)
     (mword_of_int (KernelSyms.reparent + 0x22) : mword 64) (UTYPE (mword_of_int 22 : mword 20, Regidx (mword_of_int 19), AUIPC)) kd_00016997. Qed.
 
-  Lemma rpi_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.reparent + 0x26) : mword 64) false (ITYPE (mword_of_int 528 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)).
-  Proof. mk_base (KernelSyms.reparent + 0x26) (mword_of_int 0x21098993 : mword 32)
-    (mword_of_int (KernelSyms.reparent + 0x26) : mword 64) (ITYPE (mword_of_int 528 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)) kd_21098993. Qed.
+  Lemma rpi_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.reparent + 0x26) : mword 64) false (ITYPE (mword_of_int 522 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)).
+  Proof. mk_base (KernelSyms.reparent + 0x26) (mword_of_int 0x20a98993 : mword 32)
+    (mword_of_int (KernelSyms.reparent + 0x26) : mword 64) (ITYPE (mword_of_int 522 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)) kd_20a98993. Qed.
 
   Lemma rpi_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.reparent + 0x2a) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 5 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (KernelSyms.reparent + 0x2a) (mword_of_int 0xa029 : mword 16)

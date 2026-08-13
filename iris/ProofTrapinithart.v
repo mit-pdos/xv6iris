@@ -131,14 +131,14 @@ Section TrapinithartBody.
     set (A0 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.trapinithart + 0x08) : mword 64) (auipc_off (mword_of_int 3 : mword 20)))]> W2).
     assert (Hp0c : add_vec_int (mword_of_int (KernelSyms.trapinithart + 0x08) : mword 64) 4 = mword_of_int (KernelSyms.trapinithart + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp0c) in "Hpc".
-    (* ============ +0x0c addi a5,a5,110 : a5 := kernelvec ============ *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.trapinithart + 0x0c)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 0x6e : mword 12)
+    (* ============ +0x0c addi a5,a5,160 : a5 := kernelvec ============ *)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.trapinithart + 0x0c)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 0xa0 : mword 12)
               A0 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0c [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (A1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (add_vec (A0 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 110 : mword 12)))]> A0).
+    set (A1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (add_vec (A0 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 160 : mword 12)))]> A0).
     assert (Ha5 : A1 !!! Regidx (mword_of_int 15 : mword 5) = (mword_of_int KernelSyms.kernelvec : mword 64)).
     { rewrite /A1 upd_eq. rewrite /A0 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     assert (Hp10 : add_vec_int (mword_of_int (KernelSyms.trapinithart + 0x0c) : mword 64) 4 = mword_of_int (KernelSyms.trapinithart + 0x10)) by (apply bv_eq; vm_compute; reflexivity).

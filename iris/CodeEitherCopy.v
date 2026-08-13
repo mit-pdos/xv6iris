@@ -16,13 +16,11 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelDecode00.
 Require Import KernelDecode01.
+Require Import KernelDecode02.
 Require Import KernelDecode04.
 Require Import KernelDecode05.
-Require Import KernelDecode06.
 Require Import KernelDecode07.
-Require Import KernelDecode08.
 Require Import KernelDecode09.
 Require Import KernelDecode10.
 Require Import KernelDecode11.
@@ -48,7 +46,7 @@ Section CodeEitherCopy.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* ---- either_copyin @ KernelSyms.either_copyin, 74 bytes ---- *)
+  (* ---- either_copyin @ KernelSyms.either_copyin, 76 bytes ---- *)
 
   Lemma eci_00 : kernel_text -∗ instr (mword_of_int KernelSyms.either_copyin : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 61 : mword 6), sp, sp, ADDI)).
   Proof. mk_rvc KernelSyms.either_copyin (mword_of_int 0x7179 : mword 16)
@@ -98,91 +96,95 @@ Section CodeEitherCopy.
   Proof. mk_rvc (KernelSyms.either_copyin + 0x16) (mword_of_int 0x8936 : mword 16)
     (mword_of_int (KernelSyms.either_copyin + 0x16) : mword 64) (RTYPE (Regidx (mword_of_int 13), zreg, Regidx (mword_of_int 18), ADD)) kd_8936 exec_execute_C_MV. Qed.
 
-  Lemma eci_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x18) : mword 64) false (JAL (mword_of_int 2094604 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.either_copyin + 0x18) (mword_of_int 0xe0cff0ef : mword 32)
-    (mword_of_int (KernelSyms.either_copyin + 0x18) : mword 64) (JAL (mword_of_int 2094604 : mword 21, Regidx (mword_of_int 1))) kd_e0cff0ef. Qed.
+  Lemma eci_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x18) : mword 64) false (JAL (mword_of_int 2094598 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.either_copyin + 0x18) (mword_of_int 0xe06ff0ef : mword 32)
+    (mword_of_int (KernelSyms.either_copyin + 0x18) : mword 64) (JAL (mword_of_int 2094598 : mword 21, Regidx (mword_of_int 1))) kd_e06ff0ef. Qed.
 
-  Lemma eci_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x1c) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 15 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 1)), BEQ)).
-  Proof. mk_rvc (KernelSyms.either_copyin + 0x1c) (mword_of_int 0xcc99 : mword 16)
-    (mword_of_int (KernelSyms.either_copyin + 0x1c) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 15 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 1)), BEQ)) kd_cc99 exec_execute_C_BEQZ. Qed.
+  Lemma eci_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x1c) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 16 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 1)), BEQ)).
+  Proof. mk_rvc (KernelSyms.either_copyin + 0x1c) (mword_of_int 0xc085 : mword 16)
+    (mword_of_int (KernelSyms.either_copyin + 0x1c) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 16 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 1)), BEQ)) kd_c085 exec_execute_C_BEQZ. Qed.
 
-  Lemma eci_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x1e) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)).
-  Proof. mk_rvc (KernelSyms.either_copyin + 0x1e) (mword_of_int 0x86ca : mword 16)
-    (mword_of_int (KernelSyms.either_copyin + 0x1e) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)) kd_86ca exec_execute_C_MV. Qed.
+  Lemma eci_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x1e) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 14), ADD)).
+  Proof. mk_rvc (KernelSyms.either_copyin + 0x1e) (mword_of_int 0x874a : mword 16)
+    (mword_of_int (KernelSyms.either_copyin + 0x1e) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 14), ADD)) kd_874a exec_execute_C_MV. Qed.
 
-  Lemma eci_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x20) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)).
-  Proof. mk_rvc (KernelSyms.either_copyin + 0x20) (mword_of_int 0x864e : mword 16)
-    (mword_of_int (KernelSyms.either_copyin + 0x20) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)) kd_864e exec_execute_C_MV. Qed.
+  Lemma eci_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x20) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 13), ADD)).
+  Proof. mk_rvc (KernelSyms.either_copyin + 0x20) (mword_of_int 0x86ce : mword 16)
+    (mword_of_int (KernelSyms.either_copyin + 0x20) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 13), ADD)) kd_86ce exec_execute_C_MV. Qed.
 
-  Lemma eci_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x22) : mword 64) true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 11), ADD)).
-  Proof. mk_rvc (KernelSyms.either_copyin + 0x22) (mword_of_int 0x85d2 : mword 16)
-    (mword_of_int (KernelSyms.either_copyin + 0x22) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 11), ADD)) kd_85d2 exec_execute_C_MV. Qed.
+  Lemma eci_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x22) : mword 64) true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 12), ADD)).
+  Proof. mk_rvc (KernelSyms.either_copyin + 0x22) (mword_of_int 0x8652 : mword 16)
+    (mword_of_int (KernelSyms.either_copyin + 0x22) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 12), ADD)) kd_8652 exec_execute_C_MV. Qed.
 
-  Lemma eci_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x24) : mword 64) true (LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), false, 8)).
-  Proof. mk_rvc (KernelSyms.either_copyin + 0x24) (mword_of_int 0x6928 : mword 16)
-    (mword_of_int (KernelSyms.either_copyin + 0x24) : mword 64) (LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), false, 8)) kd_6928 ke_6928. Qed.
+  Lemma eci_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x24) : mword 64) true (LOAD (mword_of_int 72 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 11), false, 8)).
+  Proof. mk_rvc (KernelSyms.either_copyin + 0x24) (mword_of_int 0x652c : mword 16)
+    (mword_of_int (KernelSyms.either_copyin + 0x24) : mword 64) (LOAD (mword_of_int 72 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 11), false, 8)) kd_652c ke_652c. Qed.
 
-  Lemma eci_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x26) : mword 64) false (JAL (mword_of_int 2094044 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.either_copyin + 0x26) (mword_of_int 0xbdcff0ef : mword 32)
-    (mword_of_int (KernelSyms.either_copyin + 0x26) : mword 64) (JAL (mword_of_int 2094044 : mword 21, Regidx (mword_of_int 1))) kd_bdcff0ef. Qed.
+  Lemma eci_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x26) : mword 64) true (LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), false, 8)).
+  Proof. mk_rvc (KernelSyms.either_copyin + 0x26) (mword_of_int 0x6928 : mword 16)
+    (mword_of_int (KernelSyms.either_copyin + 0x26) : mword 64) (LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), false, 8)) kd_6928 ke_6928. Qed.
 
-  Lemma eci_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x2a) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
-  Proof. mk_rvc (KernelSyms.either_copyin + 0x2a) (mword_of_int 0x70a2 : mword 16)
-    (mword_of_int (KernelSyms.either_copyin + 0x2a) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) kd_70a2 exec_execute_C_LDSP. Qed.
+  Lemma eci_28 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x28) : mword 64) false (JAL (mword_of_int 2093814 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.either_copyin + 0x28) (mword_of_int 0xaf6ff0ef : mword 32)
+    (mword_of_int (KernelSyms.either_copyin + 0x28) : mword 64) (JAL (mword_of_int 2093814 : mword 21, Regidx (mword_of_int 1))) kd_af6ff0ef. Qed.
 
-  Lemma eci_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x2c) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
-  Proof. mk_rvc (KernelSyms.either_copyin + 0x2c) (mword_of_int 0x7402 : mword 16)
-    (mword_of_int (KernelSyms.either_copyin + 0x2c) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) kd_7402 exec_execute_C_LDSP. Qed.
+  Lemma eci_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x2c) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
+  Proof. mk_rvc (KernelSyms.either_copyin + 0x2c) (mword_of_int 0x70a2 : mword 16)
+    (mword_of_int (KernelSyms.either_copyin + 0x2c) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) kd_70a2 exec_execute_C_LDSP. Qed.
 
-  Lemma eci_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x2e) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)).
-  Proof. mk_rvc (KernelSyms.either_copyin + 0x2e) (mword_of_int 0x64e2 : mword 16)
-    (mword_of_int (KernelSyms.either_copyin + 0x2e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)) kd_64e2 exec_execute_C_LDSP. Qed.
+  Lemma eci_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x2e) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
+  Proof. mk_rvc (KernelSyms.either_copyin + 0x2e) (mword_of_int 0x7402 : mword 16)
+    (mword_of_int (KernelSyms.either_copyin + 0x2e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) kd_7402 exec_execute_C_LDSP. Qed.
 
-  Lemma eci_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x30) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)).
-  Proof. mk_rvc (KernelSyms.either_copyin + 0x30) (mword_of_int 0x6942 : mword 16)
-    (mword_of_int (KernelSyms.either_copyin + 0x30) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)) kd_6942 exec_execute_C_LDSP. Qed.
+  Lemma eci_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x30) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)).
+  Proof. mk_rvc (KernelSyms.either_copyin + 0x30) (mword_of_int 0x64e2 : mword 16)
+    (mword_of_int (KernelSyms.either_copyin + 0x30) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)) kd_64e2 exec_execute_C_LDSP. Qed.
 
-  Lemma eci_32 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x32) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)).
-  Proof. mk_rvc (KernelSyms.either_copyin + 0x32) (mword_of_int 0x69a2 : mword 16)
-    (mword_of_int (KernelSyms.either_copyin + 0x32) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)) kd_69a2 exec_execute_C_LDSP. Qed.
+  Lemma eci_32 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x32) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)).
+  Proof. mk_rvc (KernelSyms.either_copyin + 0x32) (mword_of_int 0x6942 : mword 16)
+    (mword_of_int (KernelSyms.either_copyin + 0x32) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)) kd_6942 exec_execute_C_LDSP. Qed.
 
-  Lemma eci_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x34) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 20), false, 8)).
-  Proof. mk_rvc (KernelSyms.either_copyin + 0x34) (mword_of_int 0x6a02 : mword 16)
-    (mword_of_int (KernelSyms.either_copyin + 0x34) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 20), false, 8)) kd_6a02 exec_execute_C_LDSP. Qed.
+  Lemma eci_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x34) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)).
+  Proof. mk_rvc (KernelSyms.either_copyin + 0x34) (mword_of_int 0x69a2 : mword 16)
+    (mword_of_int (KernelSyms.either_copyin + 0x34) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)) kd_69a2 exec_execute_C_LDSP. Qed.
 
-  Lemma eci_36 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x36) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 3 : mword 6), sp, sp, ADDI)).
-  Proof. mk_rvc (KernelSyms.either_copyin + 0x36) (mword_of_int 0x6145 : mword 16)
-    (mword_of_int (KernelSyms.either_copyin + 0x36) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 3 : mword 6), sp, sp, ADDI)) kd_6145 exec_execute_C_ADDI16SP. Qed.
+  Lemma eci_36 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x36) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 20), false, 8)).
+  Proof. mk_rvc (KernelSyms.either_copyin + 0x36) (mword_of_int 0x6a02 : mword 16)
+    (mword_of_int (KernelSyms.either_copyin + 0x36) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 20), false, 8)) kd_6a02 exec_execute_C_LDSP. Qed.
 
-  Lemma eci_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x38) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
-  Proof. mk_rvc (KernelSyms.either_copyin + 0x38) (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (KernelSyms.either_copyin + 0x38) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) kd_8082 exec_execute_C_JR. Qed.
+  Lemma eci_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x38) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 3 : mword 6), sp, sp, ADDI)).
+  Proof. mk_rvc (KernelSyms.either_copyin + 0x38) (mword_of_int 0x6145 : mword 16)
+    (mword_of_int (KernelSyms.either_copyin + 0x38) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 3 : mword 6), sp, sp, ADDI)) kd_6145 exec_execute_C_ADDI16SP. Qed.
 
-  Lemma eci_3a : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x3a) : mword 64) false (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 12))).
-  Proof. mk_base (KernelSyms.either_copyin + 0x3a) (mword_of_int 0x0009061b : mword 32)
-    (mword_of_int (KernelSyms.either_copyin + 0x3a) : mword 64) (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 12))) kd_0009061b. Qed.
+  Lemma eci_3a : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x3a) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
+  Proof. mk_rvc (KernelSyms.either_copyin + 0x3a) (mword_of_int 0x8082 : mword 16)
+    (mword_of_int (KernelSyms.either_copyin + 0x3a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) kd_8082 exec_execute_C_JR. Qed.
 
-  Lemma eci_3e : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x3e) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 11), ADD)).
-  Proof. mk_rvc (KernelSyms.either_copyin + 0x3e) (mword_of_int 0x85ce : mword 16)
-    (mword_of_int (KernelSyms.either_copyin + 0x3e) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 11), ADD)) kd_85ce exec_execute_C_MV. Qed.
+  Lemma eci_3c : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x3c) : mword 64) false (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 12))).
+  Proof. mk_base (KernelSyms.either_copyin + 0x3c) (mword_of_int 0x0009061b : mword 32)
+    (mword_of_int (KernelSyms.either_copyin + 0x3c) : mword 64) (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 12))) kd_0009061b. Qed.
 
-  Lemma eci_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x40) : mword 64) true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)).
-  Proof. mk_rvc (KernelSyms.either_copyin + 0x40) (mword_of_int 0x8552 : mword 16)
-    (mword_of_int (KernelSyms.either_copyin + 0x40) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)) kd_8552 exec_execute_C_MV. Qed.
+  Lemma eci_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x40) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 11), ADD)).
+  Proof. mk_rvc (KernelSyms.either_copyin + 0x40) (mword_of_int 0x85ce : mword 16)
+    (mword_of_int (KernelSyms.either_copyin + 0x40) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 11), ADD)) kd_85ce exec_execute_C_MV. Qed.
 
-  Lemma eci_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x42) : mword 64) false (JAL (mword_of_int 2091524 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.either_copyin + 0x42) (mword_of_int 0xa05fe0ef : mword 32)
-    (mword_of_int (KernelSyms.either_copyin + 0x42) : mword 64) (JAL (mword_of_int 2091524 : mword 21, Regidx (mword_of_int 1))) kd_a05fe0ef. Qed.
+  Lemma eci_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x42) : mword 64) true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)).
+  Proof. mk_rvc (KernelSyms.either_copyin + 0x42) (mword_of_int 0x8552 : mword 16)
+    (mword_of_int (KernelSyms.either_copyin + 0x42) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)) kd_8552 exec_execute_C_MV. Qed.
 
-  Lemma eci_46 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x46) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
-  Proof. mk_rvc (KernelSyms.either_copyin + 0x46) (mword_of_int 0x8526 : mword 16)
-    (mword_of_int (KernelSyms.either_copyin + 0x46) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
+  Lemma eci_44 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x44) : mword 64) false (JAL (mword_of_int 2091482 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.either_copyin + 0x44) (mword_of_int 0x9dbfe0ef : mword 32)
+    (mword_of_int (KernelSyms.either_copyin + 0x44) : mword 64) (JAL (mword_of_int 2091482 : mword 21, Regidx (mword_of_int 1))) kd_9dbfe0ef. Qed.
 
-  Lemma eci_48 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x48) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")), zreg)).
-  Proof. mk_rvc (KernelSyms.either_copyin + 0x48) (mword_of_int 0xb7cd : mword 16)
-    (mword_of_int (KernelSyms.either_copyin + 0x48) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")), zreg)) kd_b7cd exec_execute_C_J. Qed.
+  Lemma eci_48 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x48) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
+  Proof. mk_rvc (KernelSyms.either_copyin + 0x48) (mword_of_int 0x8526 : mword 16)
+    (mword_of_int (KernelSyms.either_copyin + 0x48) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  (* ---- either_copyout @ KernelSyms.either_copyout, 74 bytes ---- *)
+  Lemma eci_4a : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyin + 0x4a) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")), zreg)).
+  Proof. mk_rvc (KernelSyms.either_copyin + 0x4a) (mword_of_int 0xb7cd : mword 16)
+    (mword_of_int (KernelSyms.either_copyin + 0x4a) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")), zreg)) kd_b7cd exec_execute_C_J. Qed.
+
+  (* ---- either_copyout @ KernelSyms.either_copyout, 76 bytes ---- *)
 
   Lemma eco_00 : kernel_text -∗ instr (mword_of_int KernelSyms.either_copyout : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 61 : mword 6), sp, sp, ADDI)).
   Proof. mk_rvc KernelSyms.either_copyout (mword_of_int 0x7179 : mword 16)
@@ -232,88 +234,92 @@ Section CodeEitherCopy.
   Proof. mk_rvc (KernelSyms.either_copyout + 0x16) (mword_of_int 0x8936 : mword 16)
     (mword_of_int (KernelSyms.either_copyout + 0x16) : mword 64) (RTYPE (Regidx (mword_of_int 13), zreg, Regidx (mword_of_int 18), ADD)) kd_8936 exec_execute_C_MV. Qed.
 
-  Lemma eco_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x18) : mword 64) false (JAL (mword_of_int 2094678 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.either_copyout + 0x18) (mword_of_int 0xe56ff0ef : mword 32)
-    (mword_of_int (KernelSyms.either_copyout + 0x18) : mword 64) (JAL (mword_of_int 2094678 : mword 21, Regidx (mword_of_int 1))) kd_e56ff0ef. Qed.
+  Lemma eco_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x18) : mword 64) false (JAL (mword_of_int 2094674 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.either_copyout + 0x18) (mword_of_int 0xe52ff0ef : mword 32)
+    (mword_of_int (KernelSyms.either_copyout + 0x18) : mword 64) (JAL (mword_of_int 2094674 : mword 21, Regidx (mword_of_int 1))) kd_e52ff0ef. Qed.
 
-  Lemma eco_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x1c) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 15 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 1)), BEQ)).
-  Proof. mk_rvc (KernelSyms.either_copyout + 0x1c) (mword_of_int 0xcc99 : mword 16)
-    (mword_of_int (KernelSyms.either_copyout + 0x1c) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 15 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 1)), BEQ)) kd_cc99 exec_execute_C_BEQZ. Qed.
+  Lemma eco_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x1c) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 16 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 1)), BEQ)).
+  Proof. mk_rvc (KernelSyms.either_copyout + 0x1c) (mword_of_int 0xc085 : mword 16)
+    (mword_of_int (KernelSyms.either_copyout + 0x1c) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 16 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 1)), BEQ)) kd_c085 exec_execute_C_BEQZ. Qed.
 
-  Lemma eco_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x1e) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)).
-  Proof. mk_rvc (KernelSyms.either_copyout + 0x1e) (mword_of_int 0x86ca : mword 16)
-    (mword_of_int (KernelSyms.either_copyout + 0x1e) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)) kd_86ca exec_execute_C_MV. Qed.
+  Lemma eco_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x1e) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 14), ADD)).
+  Proof. mk_rvc (KernelSyms.either_copyout + 0x1e) (mword_of_int 0x874a : mword 16)
+    (mword_of_int (KernelSyms.either_copyout + 0x1e) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 14), ADD)) kd_874a exec_execute_C_MV. Qed.
 
-  Lemma eco_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x20) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)).
-  Proof. mk_rvc (KernelSyms.either_copyout + 0x20) (mword_of_int 0x864e : mword 16)
-    (mword_of_int (KernelSyms.either_copyout + 0x20) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)) kd_864e exec_execute_C_MV. Qed.
+  Lemma eco_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x20) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 13), ADD)).
+  Proof. mk_rvc (KernelSyms.either_copyout + 0x20) (mword_of_int 0x86ce : mword 16)
+    (mword_of_int (KernelSyms.either_copyout + 0x20) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 13), ADD)) kd_86ce exec_execute_C_MV. Qed.
 
-  Lemma eco_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x22) : mword 64) true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 11), ADD)).
-  Proof. mk_rvc (KernelSyms.either_copyout + 0x22) (mword_of_int 0x85d2 : mword 16)
-    (mword_of_int (KernelSyms.either_copyout + 0x22) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 11), ADD)) kd_85d2 exec_execute_C_MV. Qed.
+  Lemma eco_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x22) : mword 64) true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 12), ADD)).
+  Proof. mk_rvc (KernelSyms.either_copyout + 0x22) (mword_of_int 0x8652 : mword 16)
+    (mword_of_int (KernelSyms.either_copyout + 0x22) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 12), ADD)) kd_8652 exec_execute_C_MV. Qed.
 
-  Lemma eco_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x24) : mword 64) true (LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), false, 8)).
-  Proof. mk_rvc (KernelSyms.either_copyout + 0x24) (mword_of_int 0x6928 : mword 16)
-    (mword_of_int (KernelSyms.either_copyout + 0x24) : mword 64) (LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), false, 8)) kd_6928 ke_6928. Qed.
+  Lemma eco_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x24) : mword 64) true (LOAD (mword_of_int 72 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 11), false, 8)).
+  Proof. mk_rvc (KernelSyms.either_copyout + 0x24) (mword_of_int 0x652c : mword 16)
+    (mword_of_int (KernelSyms.either_copyout + 0x24) : mword 64) (LOAD (mword_of_int 72 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 11), false, 8)) kd_652c ke_652c. Qed.
 
-  Lemma eco_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x26) : mword 64) false (JAL (mword_of_int 2093928 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.either_copyout + 0x26) (mword_of_int 0xb68ff0ef : mword 32)
-    (mword_of_int (KernelSyms.either_copyout + 0x26) : mword 64) (JAL (mword_of_int 2093928 : mword 21, Regidx (mword_of_int 1))) kd_b68ff0ef. Qed.
+  Lemma eco_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x26) : mword 64) true (LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), false, 8)).
+  Proof. mk_rvc (KernelSyms.either_copyout + 0x26) (mword_of_int 0x6928 : mword 16)
+    (mword_of_int (KernelSyms.either_copyout + 0x26) : mword 64) (LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), false, 8)) kd_6928 ke_6928. Qed.
 
-  Lemma eco_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x2a) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
-  Proof. mk_rvc (KernelSyms.either_copyout + 0x2a) (mword_of_int 0x70a2 : mword 16)
-    (mword_of_int (KernelSyms.either_copyout + 0x2a) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) kd_70a2 exec_execute_C_LDSP. Qed.
+  Lemma eco_28 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x28) : mword 64) false (JAL (mword_of_int 2093692 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.either_copyout + 0x28) (mword_of_int 0xa7cff0ef : mword 32)
+    (mword_of_int (KernelSyms.either_copyout + 0x28) : mword 64) (JAL (mword_of_int 2093692 : mword 21, Regidx (mword_of_int 1))) kd_a7cff0ef. Qed.
 
-  Lemma eco_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x2c) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
-  Proof. mk_rvc (KernelSyms.either_copyout + 0x2c) (mword_of_int 0x7402 : mword 16)
-    (mword_of_int (KernelSyms.either_copyout + 0x2c) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) kd_7402 exec_execute_C_LDSP. Qed.
+  Lemma eco_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x2c) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
+  Proof. mk_rvc (KernelSyms.either_copyout + 0x2c) (mword_of_int 0x70a2 : mword 16)
+    (mword_of_int (KernelSyms.either_copyout + 0x2c) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) kd_70a2 exec_execute_C_LDSP. Qed.
 
-  Lemma eco_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x2e) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)).
-  Proof. mk_rvc (KernelSyms.either_copyout + 0x2e) (mword_of_int 0x64e2 : mword 16)
-    (mword_of_int (KernelSyms.either_copyout + 0x2e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)) kd_64e2 exec_execute_C_LDSP. Qed.
+  Lemma eco_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x2e) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
+  Proof. mk_rvc (KernelSyms.either_copyout + 0x2e) (mword_of_int 0x7402 : mword 16)
+    (mword_of_int (KernelSyms.either_copyout + 0x2e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) kd_7402 exec_execute_C_LDSP. Qed.
 
-  Lemma eco_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x30) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)).
-  Proof. mk_rvc (KernelSyms.either_copyout + 0x30) (mword_of_int 0x6942 : mword 16)
-    (mword_of_int (KernelSyms.either_copyout + 0x30) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)) kd_6942 exec_execute_C_LDSP. Qed.
+  Lemma eco_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x30) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)).
+  Proof. mk_rvc (KernelSyms.either_copyout + 0x30) (mword_of_int 0x64e2 : mword 16)
+    (mword_of_int (KernelSyms.either_copyout + 0x30) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)) kd_64e2 exec_execute_C_LDSP. Qed.
 
-  Lemma eco_32 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x32) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)).
-  Proof. mk_rvc (KernelSyms.either_copyout + 0x32) (mword_of_int 0x69a2 : mword 16)
-    (mword_of_int (KernelSyms.either_copyout + 0x32) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)) kd_69a2 exec_execute_C_LDSP. Qed.
+  Lemma eco_32 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x32) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)).
+  Proof. mk_rvc (KernelSyms.either_copyout + 0x32) (mword_of_int 0x6942 : mword 16)
+    (mword_of_int (KernelSyms.either_copyout + 0x32) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)) kd_6942 exec_execute_C_LDSP. Qed.
 
-  Lemma eco_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x34) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 20), false, 8)).
-  Proof. mk_rvc (KernelSyms.either_copyout + 0x34) (mword_of_int 0x6a02 : mword 16)
-    (mword_of_int (KernelSyms.either_copyout + 0x34) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 20), false, 8)) kd_6a02 exec_execute_C_LDSP. Qed.
+  Lemma eco_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x34) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)).
+  Proof. mk_rvc (KernelSyms.either_copyout + 0x34) (mword_of_int 0x69a2 : mword 16)
+    (mword_of_int (KernelSyms.either_copyout + 0x34) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)) kd_69a2 exec_execute_C_LDSP. Qed.
 
-  Lemma eco_36 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x36) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 3 : mword 6), sp, sp, ADDI)).
-  Proof. mk_rvc (KernelSyms.either_copyout + 0x36) (mword_of_int 0x6145 : mword 16)
-    (mword_of_int (KernelSyms.either_copyout + 0x36) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 3 : mword 6), sp, sp, ADDI)) kd_6145 exec_execute_C_ADDI16SP. Qed.
+  Lemma eco_36 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x36) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 20), false, 8)).
+  Proof. mk_rvc (KernelSyms.either_copyout + 0x36) (mword_of_int 0x6a02 : mword 16)
+    (mword_of_int (KernelSyms.either_copyout + 0x36) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 20), false, 8)) kd_6a02 exec_execute_C_LDSP. Qed.
 
-  Lemma eco_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x38) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
-  Proof. mk_rvc (KernelSyms.either_copyout + 0x38) (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (KernelSyms.either_copyout + 0x38) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) kd_8082 exec_execute_C_JR. Qed.
+  Lemma eco_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x38) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 3 : mword 6), sp, sp, ADDI)).
+  Proof. mk_rvc (KernelSyms.either_copyout + 0x38) (mword_of_int 0x6145 : mword 16)
+    (mword_of_int (KernelSyms.either_copyout + 0x38) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 3 : mword 6), sp, sp, ADDI)) kd_6145 exec_execute_C_ADDI16SP. Qed.
 
-  Lemma eco_3a : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x3a) : mword 64) false (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 12))).
-  Proof. mk_base (KernelSyms.either_copyout + 0x3a) (mword_of_int 0x0009061b : mword 32)
-    (mword_of_int (KernelSyms.either_copyout + 0x3a) : mword 64) (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 12))) kd_0009061b. Qed.
+  Lemma eco_3a : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x3a) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
+  Proof. mk_rvc (KernelSyms.either_copyout + 0x3a) (mword_of_int 0x8082 : mword 16)
+    (mword_of_int (KernelSyms.either_copyout + 0x3a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) kd_8082 exec_execute_C_JR. Qed.
 
-  Lemma eco_3e : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x3e) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 11), ADD)).
-  Proof. mk_rvc (KernelSyms.either_copyout + 0x3e) (mword_of_int 0x85ce : mword 16)
-    (mword_of_int (KernelSyms.either_copyout + 0x3e) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 11), ADD)) kd_85ce exec_execute_C_MV. Qed.
+  Lemma eco_3c : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x3c) : mword 64) false (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 12))).
+  Proof. mk_base (KernelSyms.either_copyout + 0x3c) (mword_of_int 0x0009061b : mword 32)
+    (mword_of_int (KernelSyms.either_copyout + 0x3c) : mword 64) (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 12))) kd_0009061b. Qed.
 
-  Lemma eco_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x40) : mword 64) true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)).
-  Proof. mk_rvc (KernelSyms.either_copyout + 0x40) (mword_of_int 0x8552 : mword 16)
-    (mword_of_int (KernelSyms.either_copyout + 0x40) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)) kd_8552 exec_execute_C_MV. Qed.
+  Lemma eco_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x40) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 11), ADD)).
+  Proof. mk_rvc (KernelSyms.either_copyout + 0x40) (mword_of_int 0x85ce : mword 16)
+    (mword_of_int (KernelSyms.either_copyout + 0x40) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 11), ADD)) kd_85ce exec_execute_C_MV. Qed.
 
-  Lemma eco_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x42) : mword 64) false (JAL (mword_of_int 2091598 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.either_copyout + 0x42) (mword_of_int 0xa4ffe0ef : mword 32)
-    (mword_of_int (KernelSyms.either_copyout + 0x42) : mword 64) (JAL (mword_of_int 2091598 : mword 21, Regidx (mword_of_int 1))) kd_a4ffe0ef. Qed.
+  Lemma eco_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x42) : mword 64) true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)).
+  Proof. mk_rvc (KernelSyms.either_copyout + 0x42) (mword_of_int 0x8552 : mword 16)
+    (mword_of_int (KernelSyms.either_copyout + 0x42) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)) kd_8552 exec_execute_C_MV. Qed.
 
-  Lemma eco_46 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x46) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
-  Proof. mk_rvc (KernelSyms.either_copyout + 0x46) (mword_of_int 0x8526 : mword 16)
-    (mword_of_int (KernelSyms.either_copyout + 0x46) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
+  Lemma eco_44 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x44) : mword 64) false (JAL (mword_of_int 2091558 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.either_copyout + 0x44) (mword_of_int 0xa27fe0ef : mword 32)
+    (mword_of_int (KernelSyms.either_copyout + 0x44) : mword 64) (JAL (mword_of_int 2091558 : mword 21, Regidx (mword_of_int 1))) kd_a27fe0ef. Qed.
 
-  Lemma eco_48 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x48) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")), zreg)).
-  Proof. mk_rvc (KernelSyms.either_copyout + 0x48) (mword_of_int 0xb7cd : mword 16)
-    (mword_of_int (KernelSyms.either_copyout + 0x48) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")), zreg)) kd_b7cd exec_execute_C_J. Qed.
+  Lemma eco_48 : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x48) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
+  Proof. mk_rvc (KernelSyms.either_copyout + 0x48) (mword_of_int 0x8526 : mword 16)
+    (mword_of_int (KernelSyms.either_copyout + 0x48) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
+
+  Lemma eco_4a : kernel_text -∗ instr (mword_of_int (KernelSyms.either_copyout + 0x4a) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")), zreg)).
+  Proof. mk_rvc (KernelSyms.either_copyout + 0x4a) (mword_of_int 0xb7cd : mword 16)
+    (mword_of_int (KernelSyms.either_copyout + 0x4a) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")), zreg)) kd_b7cd exec_execute_C_J. Qed.
 
 End CodeEitherCopy.

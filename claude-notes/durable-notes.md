@@ -515,6 +515,59 @@ what makes this tractable at all); then fix what it does NOT cover.
   sweep double-shifts the first. **Build the map keyed by LEMMA NAME from
   the regenerated `Code<F>.v` diff, and apply it by LINE NUMBER.**
 
+- **Which of the two relayout tools to reach for, and why there are two.**
+  `relayout_map.py` compares old against new **at the same offset**. That is
+  exact only while both images agree on where instructions start, so it is the
+  right tool when a function merely MOVED. The moment a function GAINS OR
+  LOSES an instruction, every later offset names a different instruction in
+  the two images: usually that surfaces as a shape change (and is quarantined
+  — everything at or above a symbol's first reshaped offset is refused), but
+  when the two unrelated instructions happen to share a shape the difference
+  looks exactly like a moved immediate. On `CodeKexec.v` that proposed
+  rewriting phase B's tail (`ld s6,480(sp)` / `j +0x64`) with phase D's
+  `ld s11,440(sp)` / `j +0x72` — both `ldsp`+`cj`, and it typechecks.
+    So on a reshaped function `relayout_map.py` is safe but nearly useless
+  (on `CodeVmfault.v` it calls 48 of 55 offsets reshaped). Use
+  **`tools/relayout_shift.py`** there: it ALIGNS the two instruction streams
+  with difflib over number-normalised ASTs, so only genuine insertions and
+  deletions fall out, and it remaps the anchor offsets themselves.
+    **Its `UNALIGNED` list is the check AND the most useful output**: it
+  should be exactly the instructions the C change added or removed, and if it
+  is longer, the alignment is wrong and nothing else it prints is
+  trustworthy. On `CodeVmfault.v` it printed, unaided, the whole semantic
+  diff of the change — the deleted `jal myproc`, the deleted `ld a5,72(a0)`
+  (p->sz), the deleted `ld a0,80(s1)` (p->pagetable), the inserted `li s4,0`.
+  It also caught what the same-offset view actively MISREPORTS: `filestat`'s
+  epilogue shifts by +4, not the +2 it appears to, because old 0x4e/0x50 were
+  already `ld s2`/`ld s3` — "the epilogue grew a saved register" was an
+  artifact of the wrong comparison. Finish with `relayout_map.py residue`
+  either way; neither tool rewrites register fields, by design.
+
+- **A REGISTER REALLOCATION IS NOT ALWAYS A RENAME, and getting that wrong
+  typechecks.** On the `psz` bump gcc swapped filestat's two lazily-spilled
+  callee-saveds -- `p` went s3->s2 and `&st` went s2->s3 -- but **the spill
+  slots did not move with them**: 48(sp) is still s2's and 40(sp) still s3's,
+  with the spills at +0x1e/+0x20 and the restores at +0x52/+0x54 all
+  unchanged. So it is a ROLE swap bounded by the prologue and the epilogue,
+  and the fix is to swap `Rs2`/`Rs3` only BETWEEN the first `c.mv` and the
+  epilogue restores, leaving the four spill/restore sites and every
+  `m !!! Regidx Rs2/Rs3` alone.
+    A blanket rename would have attributed the caller's two saved words to the
+  wrong frame slots -- **and it would still have compiled**, because both
+  slots are just `word_pointsto` at an address, so nothing at the leaf
+  distinguishes them; it would surface only in the final `callee_saved`, if at
+  all. When a register map is not a permutation of *roles*, work out where
+  each role starts and stops rather than sed-ing the register name.
+
+- **Watch for two different old immediates that map to the SAME new value.**
+  filestat had `68 -> 72` at +0x1a and `80 -> 72` at +0x42, with both `68` and
+  `80` occurring several times in the proof (80 is also the `p->pagetable`
+  struct offset). No value-keyed substitution can get that right; drop such
+  offsets from the map and do them by hand. A third variant in the same class:
+  a `c.li a3,24 -> c.li a4,24` is a REGISTER change sitting next to a literal
+  `24` that is copyout's length argument -- both tools correctly leave both
+  literals alone, but a human re-reading the block is tempted to "fix" it.
+
 - **Hand-written decode files state the word AND its decoded AST, and both
   must move together.** `gen_code.py` does not cover the `Code*Aux.v` files.
   Fixing only the word in `CodeFileinitAux.v` left the lemma asserting
@@ -581,6 +634,84 @@ is invisible to it, and all four surface as something that names no address.
   Get the real set from coqdep's graph (`.CoqMakefile.d`, transitively), `rm`
   every `.vo` in it, and rebuild before believing a count or an assumptions
   audit.
+
+### THE SWEEP'S OWN FAILURE MODE: it rewrites numbers that are not immediates
+
+Found on the 0024d4b -> 9da28f5 bump, and it is the most dangerous thing in
+this whole playbook because **the corrupted file is well-formed and fails
+somewhere else**, naming a width or a separation-logic goal rather than an
+address.
+
+`relayout_map` substitutes bare numbers inside an anchored region. It freezes
+the `<sym> + 0x<off>` spans and nothing else -- but a proof line carries several
+kinds of number, and only ONE of them is an instruction immediate:
+
+```coq
+iApply (wp_addi4_s_sconf (mword_of_int (PD + 0x2e)) Rs2 Rs2
+          (mword_of_int 22 : mword 12) ...        (* 22 is the immediate     *)
+                                                   (* 12 is a WIDTH          *)
+(add_vec (Q1 !!! Regidx (mword_of_int 10 : mword 5))    (* 10 is a REGISTER  *)
+         (sign_extend' 64 (mword_of_int 52 : mword 12)))  (* 64 is a WIDTH   *)
+          Q3 (K - 4) b ...                              (* 4 is a BUDGET     *)
+```
+
+An immediate that moves 22 -> 8 rewrites the width too (`: mword 12` became
+`: mword 8`); one that moves 64 -> 52 rewrote `sign_extend' 64` -> `52`; one
+that moved 4 -> 4044 rewrote a stack budget into `(K - 4044)`. Three real
+instances in one bump, in ProofProcdumpParts / ProofKvmmap /
+ProofVirtioDiskInit, plus an ANCHOR OFFSET (`FW + 0x122` -> `0x10c`) that the
+span-freezing was supposed to prevent and did not, because the anchor was a
+`Notation` alias.
+
+**The invariant, and it is worth enforcing mechanically: on a line the sweep
+touched, the only number that may change is the argument of `mword_of_int`, and
+not even that when it sits inside `Regidx (...)` / `Cregidx (...)`.** Everything
+else -- `: mword N`, `sign_extend' N`, `zeros' N`, a register index, `K - N`, a
+fuel count, an anchor offset -- must be exactly what the baseline had. Diff each
+swept file against its baseline, classify every number by that rule, and restore
+the ones that are not immediates. Scope the audit to lines mentioning
+`mword_of_int`, or it also "repairs" the deliberate `Definition x : Z := 0x...`
+edits the string and data passes make.
+
+### A FIFTH ADDRESS CLASS: .rodata STRING CONSTANTS, re-addressed by CONTENT
+
+Beyond the four above there is one more, and it moves by a DIFFERENT amount
+from the data segment (+8 where data took +16, so a global shift is wrong).
+A proof pins a string literal's address -- `Definition mn_boot_addr : Z :=
+0x80007078`, `kernel_data_string 0x80007038 "kmem"`, `kernel_data !! (ADDR + j)`,
+`KernelSyms.etext + 0x648`, and as a register value -- and it is neither a
+symbol nor an instruction immediate, so nothing in the decode layer sees it.
+It surfaces as a BYTE mismatch: *`Unable to unify "Some 109%bv" with "Some
+102%bv"`* -- the 'm' of "kmem" against the 'f' of "kfree", one string too early.
+
+**Do not compute a shift; look the string up by CONTENT.** Read the
+NUL-terminated string at the old address out of the old image (`objcopy -O
+binary`, base 0x80000000), find that byte sequence in the new image, and write
+where it landed. It is self-checking -- a wrong answer would have to be a
+different byte sequence with identical content -- and it needs no baseline
+arithmetic. Fix ALL the syntactic forms in one pass: a uniform shift makes
+"already fixed" and "still stale" indistinguishable from the image alone, so a
+second, narrower pass over the same file will double-shift whatever the first
+one moved, and no value-based guard can tell the two apart.
+
+### A THREE-WAY RECONCILIATION LEAVES THE TREE AT THREE IMAGES AT ONCE
+
+When both sides of a merge did their own image bump, a single map is wrong for
+most of the tree: files you kept are addressed for YOUR image, files you took
+are addressed for THEIRS, and files neither side touched are still at the merge
+base's. Detect it per file -- whichever revision a file's content matches is
+the image it is addressed for -- and give each its own map. Do it BEFORE any
+other pass edits the files, because once content has been touched the detection
+stops working and the baseline has to be reconstructed from the resolution.
+
+And decide the merge itself by CLASSIFYING each side rather than by reading
+hunks: for every collision-cone file, ask whether your side is purely numeric
+re-addressing. Where it is, take theirs wholesale (their addresses are closer
+to the target and nothing of yours is lost); where yours carries semantics,
+keep yours and re-sweep. On the 0024d4b merge that split 236 files into 131
+generated (regenerate, never merge), 90 mechanical (take theirs), 12 semantic
+(keep ours) and **2 that were semantic on both sides** -- and only those two
+needed a human.
 
 ### Expect cascades, and let `-k` enumerate them
 

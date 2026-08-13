@@ -84,9 +84,9 @@ Section CodeSysClose.
   Proof. mk_base (KernelSyms.sys_close + 0x18) (mword_of_int 0x02054163 : mword 32)
     (mword_of_int (KernelSyms.sys_close + 0x18) : mword 64) (BTYPE (mword_of_int 34 : mword 13, zreg, Regidx (mword_of_int 10), BLT)) kd_02054163. Qed.
 
-  Lemma sci_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_close + 0x1c) : mword 64) false (JAL (mword_of_int 2083712 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_close + 0x1c) (mword_of_int 0xb81fc0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_close + 0x1c) : mword 64) (JAL (mword_of_int 2083712 : mword 21, Regidx (mword_of_int 1))) kd_b81fc0ef. Qed.
+  Lemma sci_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_close + 0x1c) : mword 64) false (JAL (mword_of_int 2083666 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_close + 0x1c) (mword_of_int 0xb53fc0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_close + 0x1c) : mword 64) (JAL (mword_of_int 2083666 : mword 21, Regidx (mword_of_int 1))) kd_b53fc0ef. Qed.
 
   Lemma sci_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_close + 0x20) : mword 64) false (LOAD (mword_of_int 4076 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_base (KernelSyms.sys_close + 0x20) (mword_of_int 0xfec42783 : mword 32)
@@ -112,9 +112,9 @@ Section CodeSysClose.
   Proof. mk_base (KernelSyms.sys_close + 0x30) (mword_of_int 0xfe043503 : mword 32)
     (mword_of_int (KernelSyms.sys_close + 0x30) : mword 64) (LOAD (mword_of_int 4064 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 10), false, 8)) kd_fe043503. Qed.
 
-  Lemma sci_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_close + 0x34) : mword 64) false (JAL (mword_of_int 2093894 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_close + 0x34) (mword_of_int 0xb46ff0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_close + 0x34) : mword 64) (JAL (mword_of_int 2093894 : mword 21, Regidx (mword_of_int 1))) kd_b46ff0ef. Qed.
+  Lemma sci_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_close + 0x34) : mword 64) false (JAL (mword_of_int 2093860 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_close + 0x34) (mword_of_int 0xb24ff0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_close + 0x34) : mword 64) (JAL (mword_of_int 2093860 : mword 21, Regidx (mword_of_int 1))) kd_b24ff0ef. Qed.
 
   Lemma sci_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_close + 0x38) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).
   Proof. mk_rvc (KernelSyms.sys_close + 0x38) (mword_of_int 0x4781 : mword 16)

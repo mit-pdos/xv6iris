@@ -16,7 +16,6 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode09.
 Require Import KernelDecode10.
@@ -60,9 +59,9 @@ Section CodeArgaddr.
   Proof. mk_rvc (KernelSyms.argaddr + 0xa) (mword_of_int 0x84ae : mword 16)
     (mword_of_int (KernelSyms.argaddr + 0xa) : mword 64) (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 9), ADD)) kd_84ae exec_execute_C_MV. Qed.
 
-  Lemma aai_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.argaddr + 0xc) : mword 64) false (JAL (mword_of_int 2096878 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.argaddr + 0xc) (mword_of_int 0xeefff0ef : mword 32)
-    (mword_of_int (KernelSyms.argaddr + 0xc) : mword 64) (JAL (mword_of_int 2096878 : mword 21, Regidx (mword_of_int 1))) kd_eefff0ef. Qed.
+  Lemma aai_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.argaddr + 0xc) : mword 64) false (JAL (mword_of_int 2096876 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.argaddr + 0xc) (mword_of_int 0xeedff0ef : mword 32)
+    (mword_of_int (KernelSyms.argaddr + 0xc) : mword 64) (JAL (mword_of_int 2096876 : mword 21, Regidx (mword_of_int 1))) kd_eedff0ef. Qed.
 
   Lemma aai_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.argaddr + 0x10) : mword 64) true (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 8)).
   Proof. mk_rvc (KernelSyms.argaddr + 0x10) (mword_of_int 0xe088 : mword 16)

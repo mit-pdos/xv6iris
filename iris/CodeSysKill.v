@@ -69,9 +69,9 @@ Section CodeSysKill.
   Proof. mk_base (KernelSyms.sys_kill + 0x12) (mword_of_int 0xfec42503 : mword 32)
     (mword_of_int (KernelSyms.sys_kill + 0x12) : mword 64) (LOAD (mword_of_int 4076 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 10), false, 4)) kd_fec42503. Qed.
 
-  Lemma skli_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_kill + 0x16) : mword 64) false (JAL (mword_of_int 2094638 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_kill + 0x16) (mword_of_int 0xe2eff0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_kill + 0x16) : mword 64) (JAL (mword_of_int 2094638 : mword 21, Regidx (mword_of_int 1))) kd_e2eff0ef. Qed.
+  Lemma skli_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_kill + 0x16) : mword 64) false (JAL (mword_of_int 2094626 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_kill + 0x16) (mword_of_int 0xe22ff0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_kill + 0x16) : mword 64) (JAL (mword_of_int 2094626 : mword 21, Regidx (mword_of_int 1))) kd_e22ff0ef. Qed.
 
   Lemma skli_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_kill + 0x1a) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.sys_kill + 0x1a) (mword_of_int 0x60e2 : mword 16)

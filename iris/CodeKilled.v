@@ -16,6 +16,7 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode07.
 Require Import KernelDecode10.
@@ -26,9 +27,9 @@ Require Import KernelDecode14.
 Require Import KernelDecode15.
 Require Import KernelDecode19.
 Require Import KernelDecode21.
+Require Import KernelDecode26.
 Require Import KernelDecode27.
 Require Import KernelDecode29.
-Require Import KernelDecode30.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -67,9 +68,9 @@ Section CodeKilled.
   Proof. mk_rvc (KernelSyms.killed + 0xc) (mword_of_int 0x84aa : mword 16)
     (mword_of_int (KernelSyms.killed + 0xc) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) kd_84aa exec_execute_C_MV. Qed.
 
-  Lemma kli_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.killed + 0xe) : mword 64) false (JAL (mword_of_int 2091666 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.killed + 0xe) (mword_of_int 0xa93fe0ef : mword 32)
-    (mword_of_int (KernelSyms.killed + 0xe) : mword 64) (JAL (mword_of_int 2091666 : mword 21, Regidx (mword_of_int 1))) kd_a93fe0ef. Qed.
+  Lemma kli_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.killed + 0xe) : mword 64) false (JAL (mword_of_int 2091632 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.killed + 0xe) (mword_of_int 0xa71fe0ef : mword 32)
+    (mword_of_int (KernelSyms.killed + 0xe) : mword 64) (JAL (mword_of_int 2091632 : mword 21, Regidx (mword_of_int 1))) kd_a71fe0ef. Qed.
 
   Lemma kli_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.killed + 0x12) : mword 64) true (LOAD (mword_of_int 40 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_rvc (KernelSyms.killed + 0x12) (mword_of_int 0x549c : mword 16)
@@ -83,9 +84,9 @@ Section CodeKilled.
   Proof. mk_rvc (KernelSyms.killed + 0x16) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.killed + 0x16) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma kli_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.killed + 0x18) : mword 64) false (JAL (mword_of_int 2091792 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.killed + 0x18) (mword_of_int 0xb11fe0ef : mword 32)
-    (mword_of_int (KernelSyms.killed + 0x18) : mword 64) (JAL (mword_of_int 2091792 : mword 21, Regidx (mword_of_int 1))) kd_b11fe0ef. Qed.
+  Lemma kli_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.killed + 0x18) : mword 64) false (JAL (mword_of_int 2091758 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.killed + 0x18) (mword_of_int 0xaeffe0ef : mword 32)
+    (mword_of_int (KernelSyms.killed + 0x18) : mword 64) (JAL (mword_of_int 2091758 : mword 21, Regidx (mword_of_int 1))) kd_aeffe0ef. Qed.
 
   Lemma kli_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.killed + 0x1c) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.killed + 0x1c) (mword_of_int 0x854a : mword 16)

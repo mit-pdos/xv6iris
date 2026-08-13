@@ -1097,12 +1097,12 @@ Section ProofPrintint.
     set (Q4 := <[Regidx a6_idx := regval_into_reg (add_vec (mword_of_int (KernelSyms.printint + 0x1a) : mword 64) (auipc_off (mword_of_int 7 : mword 20)))]> Q3).
     assert (Hp1e : add_vec_int (mword_of_int (KernelSyms.printint + 0x1a) : mword 64) 4 = mword_of_int (KernelSyms.printint + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp1e) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.printint + 0x1e)) a6_idx a6_idx (mword_of_int 666 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.printint + 0x1e)) a6_idx a6_idx (mword_of_int 674 : mword 12)
               Q4 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e [-]").
     iIntros (CIDp5 Hsp5) "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (Q5 := <[Regidx a6_idx := regval_into_reg (add_vec (Q4 !!! Regidx a6_idx) (sign_extend' 64 (mword_of_int 666 : mword 12)))]> Q4).
+    set (Q5 := <[Regidx a6_idx := regval_into_reg (add_vec (Q4 !!! Regidx a6_idx) (sign_extend' 64 (mword_of_int 674 : mword 12)))]> Q4).
     assert (HQ5a6 : Q5 !!! Regidx a6_idx = (mword_of_int KernelSyms.digits : mword 64)).
     { rewrite /Q5 upd_eq. unfold regval_into_reg. rewrite /Q4 upd_eq.
       apply bv_eq; vm_compute; reflexivity. }

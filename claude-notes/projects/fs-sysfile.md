@@ -5120,3 +5120,89 @@ merge; neither `LinkTxLockInit` nor `LinkUartwrite` reaches an fs cone.
   not breaking anything today only because nothing proves against it.
 - **The `igrey` / reachability question above**, which is the one that decides
   how much of §20 stage E comes back.
+
+## GR-1c — converging on the upstream tip 9da28f5 (2026-08-13)
+
+Origin pushed `6ea54b92` (the psz bump, xv6 `0024d4b`) from `e9cf27bf` -- i.e.
+without having seen GR-1 -- so the tree had TWO independent image bumps to
+reconcile. The decision was to stop carrying a local cherry-pick and pin the
+branch tip: **`XV6_REV = 9da28f5`, a clean upstream revision**, which is
+`0024d4b` + `b7c25cf` + `9da28f5`. That picks up D3's fix for free.
+
+**All three recorded kernel defects are now fixed in the source.** D1 (writei's
+unlogged buffer) since 2026-08-06; D2 (the dangling `".."`) by `9da28f5`; D3
+(`tx_lock` never initialized) by `b7c25cf`, which is route (1) of the two the
+D3 entry costed -- so route (2), the ~123-site `option string` sweep, is retired
+unbuilt.
+
+### The reconciliation
+
+Both toolchain audits passed before anything was merged, which is what made the
+rest safe to automate: our objdump reproduces HIS tracked `kernel-rocq/*.v`
+byte-for-byte at his pinned `0024d4b`, and our generator reproduces HIS whole
+decode layer from it, **206/206 byte-identical**. His tree and ours agreed about
+the image at every level; the only difference was the source bump.
+
+The merge was decided by CLASSIFYING each side rather than by reading hunks --
+236 collision-cone files split into **131 generated** (regenerate, never merge),
+**90 where our side was purely numeric** (take his: his addresses are one image
+closer and nothing of ours is lost), **12 where ours carries the S5 ledger or
+the guard walk** (keep ours, re-sweep), and **2 semantic on both sides**
+(`ProofFilestat`, `SpecDirlink`) -- only those two needed a human, and both
+turned out to be clean unions (his psz work + our `Hdlk` threading; his
+`K_dirlink` 92->94 + our `di_nlink_stable` premise). `ProofKexecA` moved to his
+side because kexec's code changed structurally under the psz bump; our `Hdlk`
+threading was re-applied on top as a 4-site edit.
+
+The image delta from his baseline is exactly the two commits: uartinit +20
+bytes, namex +16, create +20 -- 204 of 223 symbols move (+0x14 from uartwrite,
++0x24 from dirlink, +0x38 from sys_dup, +0x40 from kernelvec by alignment,
+rodata +8, data +0x10).
+
+### What GR-1c cost that GR-1 did not predict
+
+- **The tree sat at THREE images at once**, so the sweep needed a per-file
+  baseline, detected by which revision each file's content matched.
+- **A fifth address class: .rodata string constants**, moving +8 where data took
+  +16. Re-addressed by CONTENT (read the string at the old address, find it in
+  the new image) across five syntactic forms. Doing it in two narrower passes
+  double-shifted what the first had moved -- a uniform shift makes "already
+  fixed" and "still stale" indistinguishable, so it has to be one pass.
+- **The sweep corrupted numbers that are not immediates** -- a width
+  (`: mword 12` -> `8`, `sign_extend' 64` -> `52`), a stack budget (`K - 4` ->
+  `K - 4044`), and an anchor offset (`FW + 0x122` -> `0x10c`, where the alias
+  was a `Notation` the span-freezing missed). Four sites, each failing far from
+  the edit and naming a width or a goal rather than an address. The invariant
+  and the audit that enforces it are in `durable-notes.md`; **run that audit
+  after every sweep.**
+- **Strict file-stem pairing silently drops multi-function Code files**
+  (`CodeSleeplock` covers four). Pair on the SYMBOL, not the file.
+
+### The gate
+
+`EXIT=2`, **1055 of 1062** `.vo`, nothing stale. `Print Assumptions` on all 25
+fs cones -- including Namex, Namei and Nameiparent -- is the standing six
+(funext + the five Sail externs), with fileread's `consoleread` and filewrite's
+`consolewrite` the two documented device extras. No axiom entered from either
+merge.
+
+### THE ONE PARK: uartinit, and it is a contract change
+
+Seven files are unbuilt, and they are one cone: `ProofUartinit`, `LinkUartinit`,
+`LinkConsoleinit`, `LinkMain`, `BootChain`, `BootShared`, `SystemAdequacy`.
+`b7c25cf` gives uartinit five new instructions ending in
+`jal ra,initsleeplock`, and `SpecUartinit`'s contract takes no lock storage and
+returns none -- it says so in a comment written when ae96fd0 removed the call.
+Walking the `jal` needs initsleeplock's precondition, so the contract gains a
+premise; and the honest version also gains a conclusion, because
+initsleeplock's postcondition is exactly the raw material for
+`UartTxInv.is_txlock` -- **the thing `LinkTxLockInit.tx_lock_init`
+axiomatises.** Landing it retires that axiom and turns D3 from an assumption
+into a theorem, at the cost of a boot-wiring change (uartinit's caller has to
+own the storage and take the lock back).
+
+That is a design pass, not an image repair, which is why it was parked rather
+than improvised inside an already-large bump. The instruction-level detail and
+the reasoning are in a banner at the exact stopping point in `ProofUartinit.v`.
+**Until it lands the boot/adequacy cone does not build** -- which is the honest
+statement of where the tree is, and the first thing GR-2 should decide.

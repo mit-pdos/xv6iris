@@ -312,14 +312,14 @@ Qed.
 
 Lemma vdrwd_disk_kdata_z (k : Z) :
   (0 <= k)%Z -> (k < 4096)%Z ->
-  (2147512320 <= (2147628160 + k) `mod` 18446744073709551616 < 2281701376)%Z.
-Proof. intros H0 H1. rewrite Z.mod_small; lia. Qed.
+  (2147512320 <= (KernelSyms.disk + k) `mod` 18446744073709551616 < 2281701376)%Z.
+Proof. intros H0 H1. unfold KernelSyms.disk. rewrite Z.mod_small; lia. Qed.
 
 Lemma vdrwd_disk_kdata (k : nat) : (k < 4096)%nat -> addr_is_kdata (pa_add disk_base k).
 Proof.
   intro Hk. unfold addr_is_kdata, text_end, ram_base, ram_size.
   rewrite uint_unsigned pa_add_unsigned vdrwd_wrap64_z.
-  replace (bv_unsigned (disk_base : SailStdpp.Values.mword 64)) with 2147628160%Z
+  replace (bv_unsigned (disk_base : SailStdpp.Values.mword 64)) with KernelSyms.disk
     by (vm_compute; reflexivity).
   change (0x80007000)%Z with 2147512320%Z.
   change (0x80000000 + 0x8000000)%Z with 2281701376%Z.

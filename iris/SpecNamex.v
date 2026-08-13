@@ -224,9 +224,14 @@ Import Defs.
 Local Open Scope Z_scope.
 
 (* namex's own frame is 96 bytes (12 slots); its deepest callee is dirlookup
-   at 82 (iunlockput wants 64, iput 60, ilock 44, iunlock 26, iget 16, idup
-   14, myproc 10, memmove 2). *)
-Definition K_namex : nat := 94%nat.
+   at 84 (iunlockput wants 64, iput 60, ilock 44, iunlock 26, iget 16, idup
+   14, myproc 10, memmove 2).
+
+   84, from the copyout chain: [psz] needs a callee-saved home in copyout, so
+   its frame grew to 14 slots and its bound went 50 -> 52 (SpecCopyout.v),
+   pushing either_copyout 56 -> 58, readi 70 -> 72 and dirlookup 82 -> 84.
+   Nothing else in namex's list moved. *)
+Definition K_namex : nat := 96%nat.
 
 (* The two immediates of the absolute arm, read off [li a1,1] at +0x48 and
    the [mv a0,a1] at +0x4a that makes the device argument the same word.

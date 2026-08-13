@@ -321,12 +321,12 @@ Section ProofIsmapped.
     assert (Hpp0a : add_vec_int (mword_of_int (KernelSyms.ismapped + 0x08) : mword 64) 2 = mword_of_int (KernelSyms.ismapped + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0a) in "Hpc".
     (* ---- +0x0a jal walk ---- *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.ismapped + 0x0a)) (mword_of_int 1 : mword 5) (mword_of_int 2095566 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.ismapped + 0x0a)) (mword_of_int 1 : mword 5) (mword_of_int 2095754 : mword 21)
               W3 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi0a [-]").
     iIntros (CID6 Hs6) "Hcg Hpc".
     set (W4 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.ismapped + 0x0a) : mword 64) 4)]> W3).
-    assert (Hpcwk : add_vec (mword_of_int (KernelSyms.ismapped + 0x0a) : mword 64) (sign_extend' 64 (mword_of_int 2095566 : mword 21)) = mword_of_int KernelSyms.walk) by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hpcwk : add_vec (mword_of_int (KernelSyms.ismapped + 0x0a) : mword 64) (sign_extend' 64 (mword_of_int 2095754 : mword 21)) = mword_of_int KernelSyms.walk) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcwk) in "Hpc".
     (* ---- the register facts at walk's entry ---- *)
     assert (HW4sp : W4 !!! Regidx csp_rs1 = spr).

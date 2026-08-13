@@ -152,6 +152,48 @@ Section ProofUartinit.
     iPoseProof (uii_30 with "Htext") as "Hi30".
     iPoseProof (uii_32 with "Htext") as "Hi32".
     iPoseProof (uii_36 with "Htext") as "Hi36".
+(* ######################################################################
+   ##  GR-1c PARK: uartinit CALLS initsleeplock NOW, AND THAT IS A       ##
+   ##  CONTRACT CHANGE, NOT A RE-ADDRESS.                                ##
+   ######################################################################
+
+   Upstream b7c25cf -- picked up on the way to the branch tip -- restores the
+   line ae96fd0 deleted:
+
+       uartinit(void) { ...; WriteReg(IER, ...); initsleeplock(&tx_lock, "uart"); }
+
+   That is kernel-defects.md D3's fix, so the defect is repaired in the SOURCE.
+   The proof cannot follow it without a contract change, which is why this file
+   is the one thing GR-1c did not carry:
+
+   THE CODE.  Five instructions before the epilogue, which itself moves +0x14:
+       +0x3a auipc a1,0x6   +0x3e addi a1,a1,1890   -- a1 = "uart"
+       +0x42 auipc a0,0x12  +0x46 addi a0,a0,-1350  -- a0 = &tx_lock
+       +0x4a jal ra,initsleeplock
+       +0x4e..+0x54  the old epilogue, was +0x3a..+0x40
+   The lemma names below (uii_3a/3c/3e/40) are the OLD epilogue's; they no
+   longer exist, which is the error this file stops at.
+
+   WHY IT IS NOT MECHANICAL.  `SpecUartinit.wp_uartinit_sconf_body` takes no
+   lock storage and returns none -- it says so in a comment written when
+   ae96fd0 removed the call: "NO LOCK COMES OUT OF uartinit ANY MORE".  To walk
+   the `jal` we must discharge initsleeplock's precondition, which wants the
+   tx_lock cells; nothing in the current premises supplies them, and Iris being
+   affine does not help -- the resource has to come IN before it can be dropped.
+   So the contract gains a premise, and the honest version also gains a
+   CONCLUSION: initsleeplock's postcondition is exactly the raw material for
+   `is_sleeplock`, i.e. for `UartTxInv.is_txlock` -- the thing
+   `LinkTxLockInit.v` currently axiomatises.
+
+   WHAT IT BUYS, AND WHY IT IS WORTH DOING PROPERLY.  Landing it retires
+   `LinkTxLockInit.tx_lock_init` outright: D3 stops being an assumption and
+   becomes a theorem.  That is a boot-wiring change (whoever calls uartinit has
+   to own the storage and take the lock back), so it wants a design pass rather
+   than being improvised inside an image bump -- and the bump is already large.
+
+   Everything else in this file is correct at the new image; only the walk from
+   +0x3a on is stale.  See claude-notes/projects/fs-sysfile.md, GR-1c.
+   ###################################################################### *)
     iPoseProof (uii_3a with "Htext") as "Hi3a".
     iPoseProof (uii_3c with "Htext") as "Hi3c".
     iPoseProof (uii_3e with "Htext") as "Hi3e".

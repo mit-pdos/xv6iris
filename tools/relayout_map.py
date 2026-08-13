@@ -13,10 +13,39 @@ from the dump by tools/gen_code.py, so their git diff IS the map.
 `apply` works the way durable-notes.md's playbook prescribes -- keyed by
 LEMMA OFFSET rather than by value.  It scans the proof linearly, tracking the
 most recent `KernelSyms.<sym> + 0x<off>` anchor, and inside each anchored
-region rewrites only the immediates that moved AT THAT OFFSET.  That is what
-makes it safe where a global value substitution is not: the same number means
-different things at different offsets, adjacent call sites collide, and some
-proofs write the immediate in hex and others in decimal.
+region rewrites only the immediates that moved AT THAT OFFSET OR AT OFFSET+4.
+That is what makes it safe where a global value substitution is not: the same
+number means different things at different offsets, adjacent call sites
+collide, and some proofs write the immediate in hex and others in decimal.
+
+WHAT THE MAP CANNOT SEE, and the one way it could corrupt a proof: it compares
+old against new AT THE SAME OFFSET.  That is exact only while the two images
+agree on where instructions START.  As soon as a function gains or loses an
+instruction, every offset above that point names a DIFFERENT instruction in
+the two images, and comparing them is comparing two unrelated things.  Usually
+that shows up as a shape change and is reported; but when the two unrelated
+instructions happen to share a shape, the difference looks exactly like an
+ordinary moved immediate, and substituting it splices a stranger's immediate
+into the proof.  It still typechecks as an immediate, so nothing downstream
+catches it.  (Real case: on CodeKexec.v phase C gained instructions at +0x23c,
+and the map proposed rewriting phase B's tail at +0x318 -- `ld s6,480(sp)` /
+`j +0x64` -- with phase D's `ld s11,440(sp)` / `j +0x72`.  Both `ldsp`+`cj`.)
+
+So once a symbol has ANY reshaped offset, every change at or above the LOWEST
+one is quarantined into the reshape report as UNTRUSTED, and `apply` cannot
+reach it; below the first reshape the offsets still line up and the changes
+stay usable.  This also closes a narrower hole: an offset reported as
+REGISTERS REALLOCATED used to have its IMMEDIATES substituted anyway.
+
+THE +4 IS NOT SLOP, it is the auipc/I-type pair.  A "reloc lemma" states the
+address an `auipc`/`addi` pair computes, so it ANCHORS on the auipc
+(`KernelSyms.f + 0x0c`) while spelling the immediate of the addi at `+0x10`.
+Keying strictly on the anchor skipped every one of those, silently -- three
+separate relayout batches caught them only via `residue` and fixed ~25 by
+hand.  Substitution is single-pass for the same reason: with two offsets'
+maps merged, sequential replacement could CHAIN (100->200 then 200->300
+yielding 100->300).  A literal the two maps disagree about is left alone for
+`residue` to report as AMBIGUOUS.
 
 Usage:
     relayout_map.py map   CodeBalloc.v
@@ -45,6 +74,24 @@ LEMMA_RE = re.compile(
     re.S)
 NUM_RE = re.compile(r'\b(0x[0-9a-fA-F]+|\d+)\b')
 
+# A number inside [Regidx (mword_of_int N)] is a REGISTER FIELD, not an
+# immediate.  It moves only when gcc re-did register allocation -- i.e. only
+# when the function's own code genuinely changed -- and substituting it in a
+# proof is ACTIVELY WRONG, because the same literal appears in side conditions
+# like [r <> mword_of_int 15] that have nothing to do with this instruction.
+# (Caught on ProofFetchaddr.v, where copyin's new second argument shifted five
+# registers and offset +0x1e had 14 -> 15 and 15 -> 11 colliding.)  So register
+# fields are tracked separately and reported as a reallocation warning instead.
+REGIDX_RE = re.compile(r'(?:Regidx|creg2reg_idx)\s*\(\s*mword_of_int\s+(0x[0-9a-fA-F]+|\d+)')
+
+
+def _num_kinds(ast):
+    """[(value, is_register_field)] for every number in [ast], in order."""
+    reg = [m.span(1) for m in REGIDX_RE.finditer(ast)]
+    return [(int(m.group(1), 0),
+             any(a <= m.span(1)[0] and m.span(1)[1] <= b for a, b in reg))
+            for m in NUM_RE.finditer(ast)]
+
 
 def parse_code(text):
     """{(symbol, offset) -> (ast_text, [numbers])}, offset 0 for the bare symbol.
@@ -60,7 +107,7 @@ def parse_code(text):
     for m in LEMMA_RE.finditer(text):
         off = int(m.group(3), 16) if m.group(3) else 0
         ast = ' '.join(m.group(5).split())
-        out[(m.group(2), off)] = (ast, [int(n, 0) for n in NUM_RE.findall(ast)])
+        out[(m.group(2), off)] = (ast, _num_kinds(ast))
     return out
 
 
@@ -71,7 +118,12 @@ def read_old(path):
 
 
 def build_map(code_file):
-    """{(sym, offset) -> [(old, new), ...]} plus a list of shape changes."""
+    """{(sym, offset) -> [(old, new), ...]} plus a list of shape changes.
+
+    Register-field changes never enter the substitution map: they are appended
+    to `reshaped` as a REGISTERS REALLOCATED note, because a moved register
+    means gcc recompiled the function and the proof needs a human, not a sed.
+    """
     old = parse_code(read_old(code_file))
     new = parse_code(open(os.path.join(IRIS, code_file)).read())
     changes, reshaped = {}, []
@@ -83,9 +135,44 @@ def build_map(code_file):
         if len(onums) != len(nnums) or NUM_RE.sub('#', oast) != NUM_RE.sub('#', nast):
             reshaped.append((key, oast, nast))
             continue
-        pairs = [(o, n) for o, n in zip(onums, nnums) if o != n]
+        pairs, regs = [], []
+        for (o, oreg), (n, nreg) in zip(onums, nnums):
+            if o == n:
+                continue
+            (regs if (oreg or nreg) else pairs).append((o, n))
+        if regs:
+            reshaped.append((key, 'REGISTERS REALLOCATED: '
+                             + ', '.join(f'x{o} -> x{n}' for o, n in regs), nast))
         if pairs:
             changes[key] = pairs
+
+    # OFFSETS ABOVE A SHAPE CHANGE NAME A DIFFERENT INSTRUCTION, so the
+    # old-vs-new comparison at that offset is comparing two unrelated things.
+    # Where the two happen to share a SHAPE, the diff looks like an ordinary
+    # moved immediate and would be substituted -- silently splicing a later
+    # function's instruction into an earlier one's proof.  This is not
+    # hypothetical: on CodeKexec.v, phase C gained instructions at +0x23c, and
+    # the map then proposed rewriting phase B's tail at +0x318 (`ld s6,480(sp)`
+    # / `j +0x64`) with phase D's `ld s11,440(sp)` / `j +0x72`.  Both are
+    # `ldsp`+`cj`, so nothing else would have caught it.
+    #
+    # So: once a symbol has ANY reshaped offset, every change at or above the
+    # LOWEST one is untrustworthy.  Quarantine them into `reshaped`, where
+    # `map` prints them and `apply` cannot reach them.  Below the first
+    # reshape the offsets still line up, so those changes stay usable.
+    first_reshape = {}
+    for (sym, off), _, _ in reshaped:
+        if sym not in first_reshape or off < first_reshape[sym]:
+            first_reshape[sym] = off
+    for key in sorted(changes):
+        sym, off = key
+        if sym in first_reshape and off >= first_reshape[sym]:
+            reshaped.append((key, 'UNTRUSTED: at/above this symbol\'s first shape '
+                             f'change (+0x{first_reshape[sym]:x}), so this offset no '
+                             'longer names the same instruction -- '
+                             + ', '.join(f'{o} -> {n}' for o, n in changes[key]),
+                             new[key][0]))
+            del changes[key]
     return changes, reshaped
 
 
@@ -146,20 +233,47 @@ def apply_map(proof_file, changes, syms, aliases=()):
                  if not line[m.end():m.end() + 3].strip().startswith('+')]
         if anchors or bares:
             cur = max(anchors + bares, key=lambda t: t[1])[0]
-        if cur is not None and cur in changes:
+        # THE ANCHOR IS A WINDOW, NOT A POINT.  A "reloc lemma" anchors on the
+        # AUIPC (`KernelSyms.f + 0x0c`) but spells the immediate of the I-type
+        # that COMPLETES the pair, which lives 4 bytes later -- so keying
+        # strictly on the anchor skipped every one of them, silently.  `residue`
+        # caught them as stale, but only after a human went looking: three
+        # separate batches hit this and fixed 25-odd literals by hand.
+        keys = [cur] if cur is not None else []
+        if cur is not None:
+            keys.append((cur[0], cur[1] + 4))
+        pairs = [c for k in keys for c in changes.get(k, ())]
+        if pairs:
             frozen = [line[a:b] for a, b in spans]
             new_line, off = [], 0
             for k, (a, b) in enumerate(spans):
                 new_line.append(line[off:a]); new_line.append(f'\x00{k}\x00'); off = b
             new_line.append(line[off:])
             new_line = ''.join(new_line)
-            for oldv, newv in changes[cur]:
-                for lit in (str(oldv), hex(oldv)):
-                    pat = re.compile(r'(?<![\w.])' + re.escape(lit) + r'(?![\w])')
-                    rep = str(newv) if lit == str(oldv) else hex(newv)
-                    new_line, n = pat.subn(rep, new_line)
-                    if n:
-                        log.append((i + 1, lit, rep))
+            # ONE PASS, so a literal is never re-examined after being written.
+            # Sequential per-pair substitution could CHAIN (100->200 followed by
+            # 200->300 yields 100->300); with two maps merged that stopped being
+            # hypothetical.  A literal that two entries disagree about is left
+            # alone -- `residue` reports it as AMBIGUOUS for a human to settle.
+            repl, bad = {}, set()
+            for oldv, newv in pairs:
+                for lit, rep in ((str(oldv), str(newv)), (hex(oldv), hex(newv))):
+                    if repl.get(lit, rep) != rep:
+                        bad.add(lit)
+                    repl[lit] = rep
+            for lit in bad:
+                repl.pop(lit, None)
+            if repl:
+                pat = re.compile(r'(?<![\w.])('
+                                 + '|'.join(re.escape(l) for l in
+                                            sorted(repl, key=len, reverse=True))
+                                 + r')(?![\w])')
+
+                def _sub(m, _i=i):
+                    log.append((_i + 1, m.group(1), repl[m.group(1)]))
+                    return repl[m.group(1)]
+
+                new_line = pat.sub(_sub, new_line)
             for k, s in enumerate(frozen):
                 new_line = new_line.replace(f'\x00{k}\x00', s)
             line = new_line

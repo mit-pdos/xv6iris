@@ -20,6 +20,18 @@
    sequential, the first borrow is closed before the second is opened, and
    neither accessor ever has to know about the other.
 
+   *** THE [psz] BUMP REACHES ARGSTR THROUGH ITS CALLEE, NOT ITS CODE. ***
+   argstr's own machine code did not change; fetchstr's altitude did, because
+   copyinstr's [pa0 == 0] arm now calls vmfault (SpecCopyinstr.v).  So this
+   proof takes exactly three things through and nothing else: the kalloc tier
+   ([γa], the persistent [kalloc_env]), the raised budget
+   ([argstr_stack] 30 -> 60 = 4 + fetchstr's 56), and the fact that
+   [proc_priv] no longer comes back with the descriptor it went out with --
+   fetchstr hands back [P'] under [uptd_ext (pv_upt V) P'] and argstr passes
+   both straight to its own continuation.  Nothing else in the body moved:
+   the [proc_priv_tf] borrow around argraw is untouched, since argraw sits
+   below the copy layer entirely.
+
    THE FRAME IS ASYMMETRIC, as in fetchaddr: [c.addi sp,-32] pushes but
    [c.addi16sp sp,32] pops. *)
 From Stdlib Require Import ZArith Lia List.
@@ -41,6 +53,9 @@ Require Import VcGen.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock.
 Require Import UserPtTree.
+Require Import KallocInv.
+Require Import KvmSpec.
+Require Import ProcPtOwn.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import CodeArgstr.
@@ -57,7 +72,7 @@ Local Open Scope Z_scope.
 Module ArgstrProof (Argraw : ARGRAW) (Fetchstr : FETCHSTR) : ARGSTR.
 
 Section ProofArgstr.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq :=
@@ -72,11 +87,11 @@ Section ProofArgstr.
   Notation Ra1 := (mword_of_int 11 : mword 5).
   Notation Ra2 := (mword_of_int 12 : mword 5).
 
-  Lemma wp_argstr_sconf (γf : gname)
+  Lemma wp_argstr_sconf (γa : gname) (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (i : nat) (v : mword 64)
       (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool)
-    : wp_argstr_sconf_body γf m av n eb p C i v pid V maxn buf_olds b.
+    : wp_argstr_sconf_body γa γf m av n eb p C i v pid V maxn buf_olds b.
   Proof.
     cbv beta delta [wp_argstr_sconf_body].
     intros pcE buf ret_tgt Hi Ha0 Hargs Hn Hav Hmax Hmax31.
@@ -89,7 +104,7 @@ Section ProofArgstr.
     set (M1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (m !!! Regidx csp_rs1)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc Hpriv Hbuf Hcont".
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc Hpriv #Henv Hbuf Hcont".
     iPoseProof (asi_00 with "Htext") as "Hi00".
     iPoseProof (asi_02 with "Htext") as "Hi02".
     iPoseProof (asi_04 with "Htext") as "Hi04".
@@ -245,7 +260,7 @@ Section ProofArgstr.
       rewrite /M2 upd_ne; [| reg_neq]. exact HM1sp. }
     (* ---- +0x10: jal ra,argraw ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.argstr + 0x10))
-              Rra (mword_of_int 2096846 : mword 21) M4 (av - 4)%nat b
+              Rra (mword_of_int 2096844 : mword 21) M4 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi10 [-]").
     iIntros (CID9 Hk9) "Hcg Hpc".
@@ -254,7 +269,7 @@ Section ProofArgstr.
     change (<[Regidx Rra := regval_into_reg
               (add_vec_int (mword_of_int (KernelSyms.argstr + 0x10) : mword 64) 4)]> M4) with M5.
     assert (Hjar : add_vec (mword_of_int (KernelSyms.argstr + 0x10) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2096846 : mword 21)) = mword_of_int KernelSyms.argraw)
+                     (sign_extend' 64 (mword_of_int 2096844 : mword 21)) = mword_of_int KernelSyms.argraw)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjar) in "Hpc".
     assert (HM5ra : M5 !!! Regidx Rra
@@ -335,7 +350,7 @@ Section ProofArgstr.
     { rewrite /A2 upd_ne; [| reg_neq]. rewrite /A1 upd_ne; [exact HAsp | reg_neq]. }
     (* ---- +0x18: jal ra,fetchstr ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.argstr + 0x18))
-              Rra (mword_of_int 2097008 : mword 21) A2 (av - 4)%nat b
+              Rra (mword_of_int 2097006 : mword 21) A2 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi18 [-]").
     iIntros (CID13 Hk13) "Hcg Hpc".
@@ -344,7 +359,7 @@ Section ProofArgstr.
     change (<[Regidx Rra := regval_into_reg
               (add_vec_int (mword_of_int (KernelSyms.argstr + 0x18) : mword 64) 4)]> A2) with A3.
     assert (Hjfs : add_vec (mword_of_int (KernelSyms.argstr + 0x18) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2097008 : mword 21)) = mword_of_int KernelSyms.fetchstr)
+                     (sign_extend' 64 (mword_of_int 2097006 : mword 21)) = mword_of_int KernelSyms.fetchstr)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjfs) in "Hpc".
     assert (HA3ra : A3 !!! Regidx Rra
@@ -372,10 +387,10 @@ Section ProofArgstr.
     iEval (rewrite -HA3a1) in "Hbuf".
     (* ---- fetchstr(addr, buf, max) ---- *)
     iDestruct (cpu_own_transport CID10 CID13 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Fetchstr.wp_fetchstr_sconf γf A3 (av - 4)%nat n eb p C pid V maxn buf_olds b
+    iApply (Fetchstr.wp_fetchstr_sconf γa γf A3 (av - 4)%nat n eb p C pid V maxn buf_olds b
               Hn HKfs HA3a2 Hmax31
-              with "Hcg Hcpu Htext Hpc Hpriv Hbuf [-]").
-    iIntros (CID14 Hk14 mr buf_new) "%Hcsr Hcg Hcpu Hpc Hpriv Hbuf %Hret".
+              with "Hcg Hcpu Htext Hpc Hpriv Henv Hbuf [-]").
+    iIntros (CID14 Hk14 mr P' buf_new) "%Hcsr %Hext Hcg Hcpu Hpc Hpriv Hbuf %Hret".
     iEval (rewrite HA3a1) in "Hbuf".
     assert (Hpc1c : ret_pc (A3 !!! Regidx Rra) = mword_of_int (KernelSyms.argstr + 0x1c))
       by (rewrite HA3ra; apply bv_eq; vm_compute; reflexivity).
@@ -537,7 +552,7 @@ Section ProofArgstr.
        plain instructions have moved the hart to [CID20]. *)
     iDestruct (cpu_own_transport CID14 CID20 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CID20 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! T5 buf_new with "[%] Hcg Hcpu Hpc Hpriv Hbuf [%]").
+    iApply ("Hcont" $! T5 P' buf_new with "[%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%]").
     { unfold callee_saved.
       split; [exact HT5sp|].
       split; [exact HT5s0|].
@@ -552,6 +567,7 @@ Section ProofArgstr.
       split; [apply Hthr5; vm_compute; first [reflexivity | discriminate]|].
       split; [apply Hthr5; vm_compute; first [reflexivity | discriminate]|].
       apply Hthr5; vm_compute; first [reflexivity | discriminate]. }
+    { exact Hext. }
     rewrite HT5a0. exact Hret.
   Qed.
 

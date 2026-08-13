@@ -703,13 +703,13 @@ Section ProofPrintk.
               with "Hcg Hpc Hi260 [-]").
     iIntros (CID1 Hs1) "Hcg Hpc".
     set (E1 := <[Regidx a5_idx := regval_into_reg (add_vec (mword_of_int (KernelSyms.printk + 0x260) : mword 64) (auipc_off (mword_of_int 10 : mword 20)))]> mc).
-    assert (Hpanaddr : add_vec (rget E1 a5_idx) (sign_extend' 64 (mword_of_int 2826 : mword 12))
+    assert (Hpanaddr : add_vec (rget E1 a5_idx) (sign_extend' 64 (mword_of_int 2874 : mword 12))
                        = (mword_of_int KernelSyms.panicking : mword 64)).
     { rgne. rewrite /E1 upd_eq. unfold regval_into_reg. apply bv_eq; vm_compute; reflexivity. }
     assert (Hp264 : add_vec_int (mword_of_int (KernelSyms.printk + 0x260) : mword 64) 4 = mword_of_int (KernelSyms.printk + 0x264)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp264) in "Hpc".
     iEval (rewrite -Hpanaddr) in "Hpanicking".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.printk + 0x264)) a5_idx a5_idx (mword_of_int 2826 : mword 12)
+    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.printk + 0x264)) a5_idx a5_idx (mword_of_int 2874 : mword 12)
               E1 (K - 24)%nat pv b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi264 Hpanicking [-]").
     iIntros (CID2 Hs2) "Hcg Hpc Hpanicking". iEval (rewrite Hpanaddr) in "Hpanicking".
@@ -1238,13 +1238,13 @@ Section ProofPrintk.
               with "Hcg Hpc Hi1e [-]").
     iIntros (CID1 Hst1) "Hcg Hpc".
     set (Q1 := <[Regidx a5_idx := regval_into_reg (add_vec (mword_of_int (KernelSyms.printk + 0x1e) : mword 64) (auipc_off (mword_of_int 10 : mword 20)))]> mp).
-    assert (Hpan : add_vec (rget Q1 a5_idx) (sign_extend' 64 (mword_of_int 3404 : mword 12))
+    assert (Hpan : add_vec (rget Q1 a5_idx) (sign_extend' 64 (mword_of_int 3452 : mword 12))
                    = (mword_of_int KernelSyms.panicking : mword 64)).
     { rgne. rewrite /Q1 upd_eq. unfold regval_into_reg. apply bv_eq; vm_compute; reflexivity. }
     assert (Hp22 : add_vec_int (mword_of_int (KernelSyms.printk + 0x1e) : mword 64) 4 = mword_of_int (KernelSyms.printk + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp22) in "Hpc".
     iEval (rewrite -Hpan) in "Hpanicking".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.printk + 0x22)) a5_idx a5_idx (mword_of_int 3404 : mword 12)
+    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.printk + 0x22)) a5_idx a5_idx (mword_of_int 3452 : mword 12)
               Q1 (K - 24)%nat pv b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi22 Hpanicking [-]").
     iIntros (CID2 Hst2) "Hcg Hpc Hpanicking". iEval (rewrite Hpan) in "Hpanicking".
@@ -4309,7 +4309,7 @@ Section ProofPrintk.
   Definition pk_digits (dg : mword 64) : iProp Σ :=
     ([∗ list] j ∈ seq 0 16, ∃ b : bv 8, (pa_add dg j) ↦ₘ□ b)%I.
 
-  Definition pk_digits_addr : Z := 0x80007728.
+  Definition pk_digits_addr : Z := 0x80007730.
 
   Lemma pk_digits_data :
     kernel_data -∗ pk_digits (mword_of_int pk_digits_addr : mword 64).
@@ -4708,7 +4708,7 @@ Section ProofPrintk.
     assert (Hp1dc : add_vec_int (mword_of_int (KernelSyms.printk + 0x1d8) : mword 64) 4 = mword_of_int (KernelSyms.printk + 0x1dc)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp1dc) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.printk + 0x1dc)) (mword_of_int 25 : mword 5)
-              (mword_of_int 25 : mword 5) (mword_of_int 70 : mword 12) Q7 (K - 24)%nat b
+              (mword_of_int 25 : mword 5) (mword_of_int 78 : mword 12) Q7 (K - 24)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] [-]").
     { iApply (pki_1dc with "Htext"). }
@@ -4716,7 +4716,7 @@ Section ProofPrintk.
     iEval (rgne) in "Hcg".
     set (Q8 := <[Regidx (mword_of_int 25 : mword 5) := regval_into_reg
                    (add_vec (Q7 !!! Regidx (mword_of_int 25 : mword 5))
-                      (sign_extend' 64 (mword_of_int 70 : mword 12)))]> Q7).
+                      (sign_extend' 64 (mword_of_int 78 : mword 12)))]> Q7).
     assert (HQ8s9 : Q8 !!! Regidx (mword_of_int 25 : mword 5) = (mword_of_int pk_digits_addr : mword 64)).
     { rewrite /Q8 upd_eq. unfold regval_into_reg. rewrite /Q7 upd_eq. unfold regval_into_reg.
       apply bv_eq; vm_compute; reflexivity. }
