@@ -804,6 +804,7 @@ CodeConsolewrite.v
 CodeConsoleread.v
 CodeConsoleintr.v
 SpecConsoleintr.v
+ProofConsoleintr.v
 LinkConsoleintr.v
 WpUartgetc.v
 SpecUartintr.v

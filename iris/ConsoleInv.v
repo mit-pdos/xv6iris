@@ -169,6 +169,25 @@ Section ConsoleInv.
                  (pa_add a_cons (cons_buf_off + j) ↦ₘ c)%I) bs i b Hlk).
   Qed.
 
+  (* ---- writing one byte into the ring -------------------------------
+     consoleintr's [cons.buf[cons.e++ % INPUT_BUF_SIZE] = c].  The list
+     shape is what makes this a [<[i := b']>] rather than a re-existential:
+     the length premise the accessor wants is preserved by [insert], so a
+     caller reassembles [cons_res] without re-deriving it. *)
+  Lemma cons_data_upd (bs : list (bv 8)) (i : nat) (b b' : bv 8) :
+    bs !! i = Some b ->
+    cons_data bs -∗
+    pa_add a_cons (cons_buf_off + i) ↦ₘ b ∗
+    (pa_add a_cons (cons_buf_off + i) ↦ₘ b' -∗ cons_data (<[i := b']> bs)).
+  Proof.
+    intro Hlk. rewrite /cons_data. iIntros "H".
+    iDestruct (big_sepL_insert_acc
+                 (fun (j : nat) (c : bv 8) =>
+                    (pa_add a_cons (cons_buf_off + j) ↦ₘ c)%I) bs i b Hlk
+                 with "H") as "[Hb Hcl]".
+    iFrame "Hb". iIntros "Hb". iApply ("Hcl" $! b' with "Hb").
+  Qed.
+
   (* a ring index is always in range, so a byte is always there to be read *)
   Lemma cons_data_lookup_lt (bs : list (bv 8)) (i : nat) :
     length bs = INPUT_BUF_SIZE -> (i < INPUT_BUF_SIZE)%nat ->

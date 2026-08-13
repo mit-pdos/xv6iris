@@ -13,6 +13,10 @@
    Everything here is PURE and Iris-free, and it requires only the decode /
    bitvector layer, so it costs nothing on the critical path: a proof file
    that needs it gains a leaf dependency, not a sibling whole-function one.
+   That is also why the file has since taken in the small BYTE and MASK facts
+   at the bottom, which are not 32-bit ALU laws at all: they are the other
+   thing two whole-function proofs kept restating, and this is the only leaf
+   both of them already depend on.
 
    STATED OVER PLAIN [Z], never over [mword], in the hypotheses.  [lia]
    answers "Cannot find witness" when an [mword] is merely in context, and
@@ -196,4 +200,61 @@ Proof.
   assert (Hz : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
   rewrite Hz. rewrite Z.add_0_l.
   apply bv_wrap_small, bv_unsigned_in_range.
+Qed.
+
+(* ===================================================================== *)
+(*  Bytes and power-of-two masks.                                         *)
+(* ===================================================================== *)
+
+(* a 64-bit word is the literal of its own unsigned reading *)
+Lemma w32_moi_unsigned (x : mword 64) : (mword_of_int (bv_unsigned x) : mword 64) = x.
+Proof.
+  apply bv_eq. rewrite moi64_unsigned. apply bv_wrap_small. apply bv_unsigned_in_range.
+Qed.
+
+(* [andi rd,rs,2^k-1] -- a ring index.  Stated over the MASK's value rather
+   than over a literal, so the console's [% 128] and the pipe's [% 512] are
+   the same lemma.  The [bv_unsigned] premise is what a call site closes with
+   [vm_compute]; it cannot be inferred, because the immediate is a [mword 12]
+   that has to be sign-extended first. *)
+Lemma w32_and_mask_bound (x : mword 64) (msk : mword 12) (k : Z) :
+  (0 <= k)%Z ->
+  bv_unsigned (sign_extend' 64 msk : mword 64) = Z.ones k ->
+  (0 <= bv_unsigned (and_vec x (sign_extend' 64 msk)) < 2 ^ k)%Z.
+Proof.
+  intros Hk Hm. rewrite and_vec64_unsigned Hm Z.land_ones; [| exact Hk].
+  apply Z.mod_pos_bound. apply Z.pow_pos_nonneg; lia.
+Qed.
+
+(* the two literal comparisons a [beq] against a small constant makes, as
+   decidable equalities on [Z] -- so the arm is a [destruct] on [Z.eqb]. *)
+Lemma w32_eq_moi (a b : Z) :
+  (0 <= a < 2 ^ 64)%Z -> (0 <= b < 2 ^ 64)%Z ->
+  eq_vec (mword_of_int a : mword 64) (mword_of_int b : mword 64) = Z.eqb a b.
+Proof.
+  intros Ha Hb. destruct (Z.eqb a b) eqn:Hab.
+  - apply Z.eqb_eq in Hab. subst. apply eq_vec_true_iff. reflexivity.
+  - apply Z.eqb_neq in Hab. apply eq_vec_false_iff. intro Hc.
+    apply (f_equal bv_unsigned) in Hc. rewrite !moi64_unsigned in Hc.
+    rewrite (bvw64_small a Ha) (bvw64_small b Hb) in Hc. contradiction.
+Qed.
+
+Lemma w32_neq_moi (a b : Z) :
+  (0 <= a < 2 ^ 64)%Z -> (0 <= b < 2 ^ 64)%Z ->
+  neq_vec (mword_of_int a : mword 64) (mword_of_int b : mword 64) = negb (Z.eqb a b).
+Proof. intros Ha Hb. unfold neq_vec. rewrite (w32_eq_moi a b Ha Hb). reflexivity. Qed.
+
+(* [lbu] delivers a zero-extended byte, and [sext.w] then reads it as the
+   literal it is; both facts are about the same small non-negative value, and
+   the zero-extension is the identity on the unsigned reading, so what is left
+   is only the wrap-away. *)
+Lemma w32_byte_range (db : mword 8) : (0 <= bv_unsigned db < 256)%Z.
+Proof. exact (bv_unsigned_in_range 8 db). Qed.
+
+Lemma w32_zext8_moi (db : mword 8) :
+  (zero_extend' 64 db : mword 64) = (mword_of_int (bv_unsigned db) : mword 64).
+Proof.
+  apply bv_eq. rewrite moi64_unsigned.
+  rewrite (bvw64_small (bv_unsigned db) ltac:(pose proof (w32_byte_range db); lia)).
+  reflexivity.
 Qed.

@@ -134,45 +134,67 @@ what differs, and what the difference cost:
   made with interrupts ON are `sleep` (20) and the re-`acquire` (10), both well
   inside `62 - 12`.
 
-## consoleintr — NOW IN SCOPE
+## consoleintr — HALF PROVEN
 
-xv6 `a28e94b` deleted the `case C('P'): procdump()` arm, which is what had
-kept this function assumed: procdump walks the whole proc table and prints,
-so its footprint was the scheduler's. What is left is 364 bytes whose only
-calls are
+364 bytes, 182 instructions, whose only calls are acquire / consputc ×4 /
+release / wakeup — **all four callees proven and linked**, which is what
+xv6 `a28e94b` made possible by deleting the `case C('P'): procdump()` arm.
+The decode layer is generated (`CodeConsoleintr.v`, prefix `cnti_`).
 
-    +0x014 acquire   +0x050 consputc  +0x0ce consputc  +0x10c release
-    +0x128 consputc  +0x130 consputc  +0x166 wakeup
+**Landed and green** in `iris/ProofConsoleintr.v` — the four continuations
+the function decomposes into, plus the epilogue:
 
-— **all four callees proven and linked**. So the credential is knowable:
-`is_conslock` (it takes cons.lock across the whole body) plus consputc's,
-which is `dev_inv γd γv` ∗ `is_txlock γl γd` ∗ a `uart_sent_sub γd bs` it
-extends (SpecConsputc.v). It is a straight-line switch with one bounded
-`while` (the C('U') kill-line loop, bounded by `cons.e - cons.w`), so it has
-no iLöb and no park — easier than either of the other two.
+| block | at | what |
+|---|---|---|
+| `ct_epi` | +0x110 | the epilogue, one lemma |
+| `ct_mk_exit` | +0x104 | release + epilogue; NINE jumps reach it |
+| `ct_mk_wake` | +0x156 | `cons.w = cons.e`, then `wakeup(&cons.r)` |
+| `ct_restore23` | +0xde/+0xe4/+0xea | the `ld s2 / ld s3 / j` stub, once |
+| `ct_mk_kill` | +0xb8 | the C('U') kill-line loop |
 
-Proving it retires this cone's last assumption and makes
-`LinkConsoleintr.v` an ordinary functor application; it is also what would
-make a line-discipline coupling in `cons_res` worth stating (see above).
+**LEFT: the dispatch** — the prologue, the entry `acquire`, the four-way
+`beq` chain at +0x018..+0x02c, the `cons.e - cons.r < INPUT_BUF_SIZE` guard,
+the echo/store path at +0x04e..+0x090, the `'\r'` arm at +0x12e and the
+backspace arm at +0x0f0 — and then `LinkConsoleintr.v` becomes a functor
+over ACQUIRE / CONSPUTC / RELEASE / WAKEUP.  About 85 instructions.  Nothing
+in it needs arithmetic: every branch is a `destruct` on the raw comparison
+of the symbolic character, because the contract promises nothing about which
+byte arrived.
 
-The decode layer is already generated (`CodeConsoleintr.v`, prefix `cnti_`).
-Two things the proof has to decide before the first instruction:
+### The two things the landed half settles
 
-- **THE CREDENTIAL RIPPLE.** consputc needs `dev_inv` ∗ `is_txlock` ∗ a
-  `uart_sent_sub` to extend, and acquire/release need `is_conslock`; uartintr
-  today holds only `dev_inv`. All four are PERSISTENT, so the honest shape is
-  one existential bundle — `console_caps γu := ∃ γtx γc, is_txlock γtx γu ∗
-  is_conslock γc ∗ uart_sent_sub γu []` — which adds a conjunct to
-  `SpecDevintr.devintr_caps` and NO new parameter, so the eight files that
-  merely thread that bundle do not change. `ProofMain` / `ProofMainSecondary`
-  are the two that CONSTRUCT it, and they cannot: minting the two locks is the
-  boot debt below.
-- **THE KILL-LINE LOOP AT +0xb8 IS AN iLöb, NOT A FUEL INDUCTION**, and this
-  is the one place the flat `cons_res` shows: with no relation between
-  `cons.e` and `cons.w` the loop's decrement bounds nothing. It does not need
-  one — the back edge is the TAKEN arm of the `bne` at +0xda, and
-  `wp_bne_taken_s_sconf` hands out a `▷ wp_next`, which is exactly what the
-  Löb IH is under. Nothing is returned, so no count has to survive the loop.
+- **THE KILL-LINE LOOP IS AN iLöb**, and this is where the flat `cons_res`
+  shows: with no relation between `cons.e` and `cons.w` its `cons.e--`
+  bounds nothing.  It does not need to — the back edge is the TAKEN arm of
+  the `bne` at +0xda, and `wp_bne_taken_s_sconf` hands out a `▷ wp_next`,
+  which is exactly what the Löb IH sits under.  Nothing is returned, so no
+  count has to survive the loop.  (An earlier note here called the loop
+  "bounded by `cons.e - cons.w`"; it is not, and it does not matter.)
+- **EVERY BLOCK TAKES `ct_exit_prop` AS A PREMISE** rather than holding it,
+  so each is provable from the PERSISTENT context alone and the loop's Löb
+  needs nothing threaded round its back edge.  Same rule as consoleread's
+  `cr_exits`; it is the thing to reach for first in a function with one
+  exit and many jumps to it.
+
+### The credential ripple, still owed
+
+`SpecConsoleintr.v` now DEFINES the bundle the proof needs —
+
+    console_caps γu := ∃ γtx γc, is_txlock γtx γu ∗ is_conslock γc
+                                 ∗ uart_sent_sub γu []
+
+— all persistent, with the two ghost names existential so that threading it
+adds a conjunct and NO parameter.  **The contract itself still has the old
+ASSUMED shape**, because changing it is what the whole-function proof pays
+for: uartintr's contract gains `console_caps`, `SpecDevintr.devintr_caps`
+gains it, and the eight files that merely pass that bundle along do not
+change.  `ProofMain` / `ProofMainSecondary` are the two that CONSTRUCT
+`devintr_caps` and cannot build this: `is_txlock` needs the `newlock` over
+`UartTxInv.tx_res` that ProofMain names but does not take (`Hlkfresh`,
+`Htx`, `Hdoff` are all in hand there), and `is_conslock` needs the ring's
+.bss cells, which are not in `SpecMain`'s boot bundle at all.  So landing
+the proof means choosing: an assumed premise at main, or the boot wiring
+first.
 
 ## What a relayout costs this cone — measured
 

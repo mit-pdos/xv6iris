@@ -121,64 +121,6 @@ Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 (*  commits [cons.r + 1].                                                 *)
 (* ===================================================================== *)
 
-(* a 64-bit word is the literal of its own unsigned reading *)
-Lemma cr_moi_unsigned (x : mword 64) : (mword_of_int (bv_unsigned x) : mword 64) = x.
-Proof.
-  apply bv_eq. rewrite moi64_unsigned. apply bv_wrap_small. apply bv_unsigned_in_range.
-Qed.
-
-(* %INPUT_BUF_SIZE: [andi a3,a5,127] is BELOW 128 for every value of
-   [cons.r], which is the whole of what the ring's flat resource needs --
-   see ConsoleInv.v's header. *)
-Lemma cr_and127_bound (x : mword 64) :
-  (0 <= bv_unsigned (and_vec x (sign_extend' 64 (mword_of_int 127 : mword 12))) < 128)%Z.
-Proof.
-  rewrite and_vec64_unsigned.
-  assert (H127 : bv_unsigned (sign_extend' 64 (mword_of_int 127 : mword 12) : mword 64) = 127%Z)
-    by (vm_compute; reflexivity).
-  rewrite H127.
-  replace 127%Z with (Z.ones 7) by (vm_compute; reflexivity).
-  rewrite Z.land_ones; [| lia].
-  change (2 ^ 7)%Z with 128%Z.
-  apply Z.mod_pos_bound. lia.
-Qed.
-
-(* the two literal comparisons the switch on [c] makes, as decidable
-   equalities on [Z] -- so the [beq] arms are a [destruct] on [Z.eqb]. *)
-Lemma cr_eq_moi (a b : Z) :
-  (0 <= a < 2 ^ 64)%Z -> (0 <= b < 2 ^ 64)%Z ->
-  eq_vec (mword_of_int a : mword 64) (mword_of_int b : mword 64) = Z.eqb a b.
-Proof.
-  intros Ha Hb. destruct (Z.eqb a b) eqn:Hab.
-  - apply Z.eqb_eq in Hab. subst. apply eq_vec_true_iff. reflexivity.
-  - apply Z.eqb_neq in Hab. apply eq_vec_false_iff. intro Hc.
-    apply (f_equal bv_unsigned) in Hc. rewrite !moi64_unsigned in Hc.
-    rewrite (bvw64_small a Ha) (bvw64_small b Hb) in Hc. contradiction.
-Qed.
-
-Lemma cr_neq_moi (a b : Z) :
-  (0 <= a < 2 ^ 64)%Z -> (0 <= b < 2 ^ 64)%Z ->
-  neq_vec (mword_of_int a : mword 64) (mword_of_int b : mword 64) = negb (Z.eqb a b).
-Proof. intros Ha Hb. unfold neq_vec. rewrite (cr_eq_moi a b Ha Hb). reflexivity. Qed.
-
-(* [lbu] delivers a zero-extended byte; [sext.w] then reads it as the
-   literal it is.  Both facts are about the SAME small non-negative value. *)
-Lemma cr_byte_range (db : mword 8) : (0 <= bv_unsigned db < 256)%Z.
-Proof.
-  exact (bv_unsigned_in_range 8 db).
-Qed.
-
-(* [zero_extend' 64] on a byte is the identity on the unsigned reading, so
-   this is only the wrap-away -- which is why there is no [zero_extend']
-   arithmetic here at all. *)
-Lemma cr_zext8_moi (db : mword 8) :
-  (zero_extend' 64 db : mword 64) = (mword_of_int (bv_unsigned db) : mword 64).
-Proof.
-  apply bv_eq. rewrite moi64_unsigned.
-  rewrite (bvw64_small (bv_unsigned db) ltac:(pose proof (cr_byte_range db); lia)).
-  reflexivity.
-Qed.
-
 (* [cons.r++]: the [addiw a3,a5,1] / [sw a3,152(a4)] round trip commits
    [r + 1] at width 32.  [ProofPiperead.pr_sw_nread]'s twin, at the
    FOUR-byte immediate spelling. *)
@@ -1066,10 +1008,12 @@ Section ProofConsoleread.
     set (idxw := and_vec (sign_extend' 64 rr : mword 64)
                    (sign_extend' 64 (mword_of_int 127 : mword 12))).
     set (idx := Z.to_nat (bv_unsigned idxw)).
-    assert (Hidxb : (0 <= bv_unsigned idxw < 128)%Z) by (rewrite /idxw; apply cr_and127_bound).
+    assert (Hidxb : (0 <= bv_unsigned idxw < 128)%Z) by (rewrite /idxw;
+          apply (w32_and_mask_bound _ (mword_of_int 127) 7 ltac:(lia)
+                   ltac:(vm_compute; reflexivity))).
     assert (Hidxlt : (idx < INPUT_BUF_SIZE)%nat) by (rewrite /idx /INPUT_BUF_SIZE; lia).
     assert (Hidxw : idxw = (mword_of_int (Z.of_nat idx) : mword 64)).
-    { rewrite /idx Z2Nat.id; [| lia]. symmetry. apply cr_moi_unsigned. }
+    { rewrite /idx Z2Nat.id; [| lia]. symmetry. apply w32_moi_unsigned. }
     assert (Hwv : and_vec (H3 !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 127 : mword 12))
                   = (mword_of_int (Z.of_nat idx) : mword 64)).
     { rewrite /H3 upd_ne; [| reg_neq]. rewrite HH2a5. exact Hidxw. }
@@ -1116,14 +1060,14 @@ Section ProofConsoleread.
     iEval (rewrite Hp90) in "Hpc".
     (* ---- +0x90 sext.w s5,a4 : [c] ---- *)
     set (cbv := bv_unsigned (db : mword 8)).
-    assert (Hcbr : (0 <= cbv < 256)%Z) by (rewrite /cbv; apply cr_byte_range).
+    assert (Hcbr : (0 <= cbv < 256)%Z) by (rewrite /cbv; apply w32_byte_range).
     assert (HH6a4 : H6 !!! Regidx Ra4 = zero_extend' 64 (db : mword 8))
       by (rewrite /H6; apply upd_eq).
     assert (Hsextc : sign_extend' 64 (subrange_vec_dec
         (add_vec (zero_extend' 64 (db : mword 8))
                  (sign_extend' 64 (mword_of_int 0 : mword 12))) 31 0)
         = (mword_of_int cbv : mword 64)).
-    { rewrite cr_zext8_moi. apply w32_sextw_moi. rewrite /cbv. lia. }
+    { rewrite w32_zext8_moi. apply w32_sextw_moi. rewrite /cbv. lia. }
     iPoseProof (cnri_090 with "Ht") as "Hi90".
     iApply (wp_addiw_s_sconf (mword_of_int (CR + 0x90)) Rs5 Ra4 (mword_of_int 0 : mword 12)
               H6 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
@@ -1178,7 +1122,7 @@ Section ProofConsoleread.
     { (* ============ c == C('D'): the end-of-file break at +0xe2 ======== *)
       iApply (wp_beq_taken_s_sconf (mword_of_int (CR + 0x96)) (mword_of_int 76 : mword 13)
                 Ra3 Rs5 H8 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(nz)
-                ltac:(rgall; rewrite HH8s5 HH8a3 (cr_eq_moi cbv 4 ltac:(lia) ltac:(lia)); exact HD)
+                ltac:(rgall; rewrite HH8s5 HH8a3 (w32_eq_moi cbv 4 ltac:(lia) ltac:(lia)); exact HD)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi96").
       iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hje2 : add_vec (mword_of_int (CR + 0x96) : mword 64)
@@ -1330,7 +1274,7 @@ Section ProofConsoleread.
     (* ================== c <> C('D'): copy the byte out ================= *)
     iApply (wp_beq_fall_s_sconf (mword_of_int (CR + 0x96)) (mword_of_int 76 : mword 13)
               Ra3 Rs5 H8 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(nz)
-              ltac:(rgall; rewrite HH8s5 HH8a3 (cr_eq_moi cbv 4 ltac:(lia) ltac:(lia)); exact HD)
+              ltac:(rgall; rewrite HH8s5 HH8a3 (w32_eq_moi cbv 4 ltac:(lia) ltac:(lia)); exact HD)
               with "Hcg Hpc Hi96").
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     assert (Hp9a : add_vec_int (mword_of_int (CR + 0x96) : mword 64) 4
@@ -1590,7 +1534,7 @@ Section ProofConsoleread.
       { (* ---- c == '\n': break out at +0x10e ---- *)
         iApply (wp_beq_taken_s_sconf (mword_of_int (CR + 0xb8)) (mword_of_int 86 : mword 13)
                   Ra5 Rs5 G9 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(nz)
-                  ltac:(rgall; rewrite HG9s5 HG9a5 (cr_eq_moi cbv 10 ltac:(lia) ltac:(lia)); exact HNL)
+                  ltac:(rgall; rewrite HG9s5 HG9a5 (w32_eq_moi cbv 10 ltac:(lia) ltac:(lia)); exact HNL)
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hib8").
         iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         assert (Hj10e : add_vec (mword_of_int (CR + 0xb8) : mword 64)
@@ -1647,7 +1591,7 @@ Section ProofConsoleread.
       (* ---- c is an ordinary byte: the BACK EDGE at +0xbe ---- *)
       iApply (wp_beq_fall_s_sconf (mword_of_int (CR + 0xb8)) (mword_of_int 86 : mword 13)
                 Ra5 Rs5 G9 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(nz)
-                ltac:(rgall; rewrite HG9s5 HG9a5 (cr_eq_moi cbv 10 ltac:(lia) ltac:(lia)); exact HNL)
+                ltac:(rgall; rewrite HG9s5 HG9a5 (w32_eq_moi cbv 10 ltac:(lia) ltac:(lia)); exact HNL)
                 with "Hcg Hpc Hib8").
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hpbc : add_vec_int (mword_of_int (CR + 0xb8) : mword 64) 4
