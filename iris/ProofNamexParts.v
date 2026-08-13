@@ -89,6 +89,18 @@ Local Open Scope Z_scope.
    needed is the LAST three displacements: it saves nine registers, namex
    saves eleven and its frame is twelve slots deep. *)
 
+(* THE BACK EDGE'S ONLY PURE OBLIGATION (fs-sysfile GR-2b, retrofit 6).
+   The loop invariant carries [Sb ⊆ Scur] and each turn's iunlockput hands
+   back [Scur ⊆ Scur'], so re-establishing the invariant is one transitivity
+   -- and it must be discharged BY NAME.  [set_solver] ends in
+   [naive_solver], which searches every hypothesis in scope, and inside
+   ProofNamex that context is hundreds of facts over large mword terms
+   (durable-notes: the [ltac:(set_solver)] capstone trap, measured at 106 s
+   per trivial side condition elsewhere).  Stated over plain [gset Z] with
+   two hypotheses in scope, it costs nothing and is applied positionally. *)
+Lemma nx_sub_trans (A B C : gset Z) : A ⊆ B -> B ⊆ C -> A ⊆ C.
+Proof. intros H1 H2. by transitivity B. Qed.
+
 Lemma nx_frm10 (X : mword 64) :
   add_vec (pa_stk X 12) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))
   = pa_stk X 10.

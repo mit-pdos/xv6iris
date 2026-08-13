@@ -5690,3 +5690,172 @@ itrunc's loops do.  `ProofNamex.v` is 5713 lines but has only those four
 seams; by the sizing rule above that is roughly `ProofIput`'s cost, not
 `ProofItrunc`'s.  **Single-file `coqc` loop is still mandatory there**
 (~3 min / 5.3 GB per compile).
+
+## GR-2c — stage 6 (the namex trio) LANDS, and **stage 1 turns out to be
+## already landed**: `wp_writei_gen` has been in the tree since S3l, and a
+## separate `wp_writei_cred` is not merely unnecessary, it is the shape
+## `WriteiBudget` was deliberately built to avoid
+
+### RESUME HEADER
+
+| # | contract | state |
+|---|----------|-------|
+| 2 | `SpecIupdate.wp_iupdate_cred` | landed (S5b) |
+| — | `SpecIupdate.wp_iupdate_credgen` | landed (GR-2b) |
+| 5 | `SpecIalloc.wp_ialloc_gen` | landed (S5i) |
+| 4a | `SpecItrunc.wp_itrunc_gen` | landed (GR-2b) |
+| 4b | `SpecIput.wp_iput_gen` / `SpecIunlockput.wp_iunlockput_gen` | landed (GR-2b) |
+| 6 | `SpecNamex.wp_namex_gen` + namei/nameiparent | **LANDED (GR-2c)** |
+| 1 | `SpecWritei.wp_writei_gen` | **ALREADY LANDED — see finding 4** |
+| 3 | `SpecDirlink` `DIRLINK_GEN` | not started; design below |
+
+### FINDING 4 — **STAGE 1 IS A NO-OP, AND ASKING FOR `wp_writei_cred`
+### WOULD UNDO A DELIBERATE DESIGN**
+
+`SpecWritei.v:658` defines `wp_writei_gen_body`, `:955` seals it as a
+Module Type Parameter, `ProofWritei.v:3597` proves it, and `:4607` derives
+`wp_writei_sconf` from it at the `log_op` existential's own witness.  The
+set-form contract has therefore been in the tree since S3l, exactly as the
+brief's parenthetical hinted ("S3l pre-proved the loop algebra") — the
+brief just under-read what had already been *landed* on top of that
+algebra.
+
+More importantly, a `cred` form with `crb`/`crd` booleans is the wrong
+shape **for this function specifically**, and `SpecWritei.v`'s header
+already says so:
+
+> writei TAKES NO CREDIT PARAMETER, unlike bmap and log_write.  It does not
+> need one: its loop invariant carries the unpaid bitmap block as one unit
+> of held-back POTENTIAL (`WriteiBudget.bm_pot`) rather than as a case
+> split, and `WriteiBudget.wi_inv_enter` establishes the invariant at ANY
+> entry set.  A caller that has already logged the bitmap simply gets a
+> call that spends one less than its budget allowed.
+
+`wi_inv_enter`'s own comment closes it: *"for ANY entry set, which is why
+writei needs no credit parameter of its own."*  The credit is **derived**
+from the entry set by `bm_pot bms SI` (1 if `bms ∈ SI`, else 0), inside an
+amortized invariant, rather than being a boolean the caller asserts and the
+contract must then honestly guard.  Adding a boolean twin would duplicate
+that device, re-introduce the case split the potential was built to remove,
+and give callers two ways to say the same thing.
+
+**The durable lesson, and it generalises past this tree:** when a loop's
+cost is amortized, the "credit" is a FUNCTION OF THE SET the contract
+already threads, not a separate index.  Reach for a `cr` boolean only where
+the callee is straight-line (iupdate, log_write) or where the case split is
+genuinely one-shot (bmap, itrunc's bitmap unit).  Before adding a credit
+parameter, check whether the callee's invariant already computes it.
+
+### STAGE 6: THE GROWING-SET INVARIANT, as ratified
+
+`nx_loop_body` gained one parameter (`Sb`, the caller's, fixed) and one
+∀-bound variable (`Scur`, the running set, fresh at every turn because each
+iteration's `iunlockput` picks it), with the single new premise
+`⌜Sb ⊆ Scur⌝` and `log_opS g ncur Scur` in place of `log_op g ncur`.  The
+back edge re-establishes it with ONE application of
+`ProofNamexParts.nx_sub_trans` — a three-line lemma over plain `gset Z`,
+stated precisely so that `set_solver` never runs inside a 5713-line file
+(durable-notes' capstone `set_solver` trap, measured at 106 s per trivial
+side condition elsewhere).
+
+**This is the first genuinely INVARIANT-shaped set retrofit in the thread.**
+itrunc's two loops thread a CONSTANT set — there `Sb` is a parameter and
+the running set hides inside `bm_paidS`'s existential — so 4a was pure
+plumbing.  namex's loop grows the set, so the ⊆ is a real loop obligation.
+It still cost only one lemma and one bullet, which is the measure of how
+well the ratified shape fits.
+
+The five callee sites became `wp_iput_gen` / `wp_iunlockput_gen` at
+`crb := cru := false` (namex discovers its inums as it walks and can make
+no honest credit claim about them), and the six exits and both loop entries
+each seal the existential at the set in hand: `Scur` where no call ran,
+`Sip`/`Sup` where one did, with the ⊆ discharged by `Hsbc` or by
+`nx_sub_trans _ _ _ Hsbc Hsup`.
+
+`SpecNamei` / `SpecNameiparent` are thin forwards, exactly as predicted —
+one call-site rename and one extra binder each.
+
+### FINDING 5 — **A STRONGER CALLEE BOUND DOES NOT COMPOSE FOR FREE; IT HAS
+### TO BE WEAKENED AT THE SEAM**
+
+4b's gen post gives `ncur - ip_spend_max false false <= n'`, i.e.
+`ncur - 2 <= n'`, because `ip_spend_max false false = 2` while
+`iput_units = 3` (iput's own third unit is the one it never needs
+uncredited).  namex is stated at the counted `iput_units`, and every
+`nx_bi_*` budget lemma in `ProofNamex` wants `ncur - iput_units <= n'`.
+So the *stronger* callee bound fails to typecheck against the *weaker*
+caller lemma — the error is a bare `The term "proj1 Hbdip" has type … while
+it is expected to have type …`, naming two bounds that differ only in a
+constant.
+
+The fix is one weakening per call site, placed immediately after the
+callee's `iIntros` and **keeping the hypothesis's name**:
+
+```coq
+assert (Hbdipw : ((ncur - iput_units)%nat <= nip)%nat /\ (nip <= ncur)%nat)
+  by (unfold ip_spend_max, iput_units in Hbdip |- *; simpl in Hbdip; lia).
+clear Hbdip. rename Hbdipw into Hbdip.
+```
+
+so that nothing downstream moves.  **Do this at the seam, never by
+loosening the callee's contract** — the strength is real and create wants
+it; it is only this one caller that is stated coarsely.
+
+### Gate
+
+Full `make -j24 -k` **EXIT=0**, 1061 `.vo`, coqdep-derived staleness **0**,
+`make -n` reports **0** `COQC` lines.  `Print Assumptions` on the whole
+landed set — `wp_itrunc_gen`, `wp_iput_gen`, `wp_iunlockput_gen`,
+`wp_namex_sconf`/`_gen`, `wp_namei_sconf`/`_gen`,
+`wp_nameiparent_sconf`/`_gen`, `wp_writei_gen` — the standing six alone, no
+admits.
+
+### Traps recorded
+
+* **SPLICING A GENERATED TWIN CAN SILENTLY DELETE THE ORIGINAL.**  Building
+  `namex_postS` / `wp_namex_gen_body` by slicing the file at the two
+  definitions and re-concatenating dropped `wp_namex_sconf_body` entirely —
+  the tail was spliced from `Module Type` onward and the original body was
+  never re-inserted.  It fails as *"The reference wp_namex_sconf_body was
+  not found"* at the Module Type, which reads like a typo in the Parameter.
+  When generating a twin by slicing, assert the ORIGINAL name is still
+  present in the result before writing.
+* **`Hsub` was already taken.**  `ProofNamex` binds a `sub_vec` fact called
+  `Hsub` 400 lines away, so the loop's `iIntros … %Hsub …` fails with
+  *"Hsub is already used."* — the plain-`intros` twin of the section-variable
+  shadowing trap.  Grep the file for a candidate hypothesis name before
+  introducing one in a 5000-line proof; the failure is at the intro, but the
+  cause can be anywhere.
+* **A wrapper's continuation binder list is NOT the same across sibling
+  wrappers.**  `namei`'s post binds `(ok, ipv)`; `nameiparent`'s binds
+  `(ok, nf, ipv)`.  Generating both seals from one template bound `nf` to
+  `ipv`'s slot in namei and failed as *"iIntro: cannot turn (…) into a
+  universal quantifier"* — an error that points at the wand chain, not at
+  the binder count.  Diff the two posts before templating them.
+* **A generated seal passed its own continuation twice.**  The template
+  built the `with "…"` string from the walk's whole `iIntros` list, which
+  ends in `Hcont`, and then appended `[Hcont]` for the hole — so `Hcont`
+  was supplied bare AND as a goal, and the bare one unified with the gen
+  continuation.  It fails as *"iSpecialize: cannot instantiate (wp_next …)"*
+  printing the counted and set-form continuations side by side, which reads
+  like a shape mismatch and is not one.
+
+### STAGE 3 (`DIRLINK_GEN`) — the design, since finding 4 changes it
+
+Not started.  But finding 4 settles its shape, and it is **not** the
+"composes crb/crd with the set ledger" the queue describes:
+
+* dirlink's two ledger-touching calls are `writei` (through
+  `wi16_spend crb crd cru al ind`) and one `iput`.  writei takes NO credit
+  parameter — its `crb`/`crd` are `bool_decide (… ∈ SI)` computed inside
+  `WriteiBudget`'s amortized invariant from the set it is already threading.
+* So `DIRLINK_GEN` should thread `log_opS γ ncount Sb` → `log_opS γ n' Sb'`
+  with `Sb ⊆ Sb'`, and express its SPEND as a function of memberships of
+  `Sb` (`bool_decide (bmapstart ∈ Sb)` &c.), exactly as writei does —
+  **not** as three new boolean parameters.  `cru` is the one that stays a
+  boolean, because it goes to `iupdate`, which is straight-line.
+* Sizing by the GR-2b rule (seams, not lines): `ProofDirlink.v` is 3162
+  lines with **six** `log_op` occurrences — one `iput` call, one `writei`
+  call, and two `iAssert`ed inner continuations (`:1683`/`:1709` and
+  `:2452`/`:2478`) that carry the ledger.  That is iput-sized, not
+  itrunc-sized.

@@ -799,6 +799,33 @@ additive, and the consumer discharges the antecedent from the bundle it
 already opened.  Budget a postcondition strengthening only after checking it
 against every arm that returns an input verbatim.
 
+**AN AMORTIZED LOOP'S "CREDIT" IS A FUNCTION OF THE SET THE CONTRACT
+ALREADY THREADS — DO NOT ADD A BOOLEAN FOR IT.**  Where a cost is carried as
+held-back POTENTIAL over a set (`WriteiBudget.bm_pot`: one unit iff the
+bitmap block is already in the op's logged set), the invariant computes the
+credit itself with a `bool_decide (… ∈ SI)`, and its entry lemma holds at
+*any* entry set.  Adding a `cr` parameter on top duplicates that device,
+re-introduces the case split the potential was built to remove, and gives
+callers two ways to say the same thing — a caller that has already logged
+the block simply gets a call that spends one less than its budget allowed.
+Reach for a `cr` boolean only where the callee is STRAIGHT-LINE (iupdate,
+log_write) or where the split is genuinely one-shot (bmap; itrunc's single
+bitmap unit).  **Before adding a credit parameter, check whether the
+callee's own invariant already derives it** — `SpecWritei`'s header and
+`WriteiBudget.wi_inv_enter` are the worked statement of the rule, and a
+whole planned stage was retired by reading them.
+
+**A STRONGER CALLEE BOUND DOES NOT COMPOSE FOR FREE.**  When a callee is
+generalized and its post gets *tighter* (`n - 2 <= n'` where the caller's
+own lemmas are stated at `n - 3`), every caller lemma phrased at the coarse
+constant stops typechecking — the error is a bare "The term … has type …
+while it is expected to have type …" naming two bounds that differ only in a
+literal, which reads like an arithmetic mistake. Weaken ONCE at the seam,
+right after the callee's `iIntros`, and **keep the hypothesis's name**
+(`assert (Hw : <coarse>) by (unfold …; lia). clear H. rename Hw into H.`) so
+nothing downstream moves. Never loosen the callee's contract to match: the
+strength is real and some other caller wants it.
+
 **A GENERALIZED CONTRACT THAT THE OLD ONE MUST BE *DERIVED FROM* HAS TO BE
 CHECKED AT THE OLD ONE'S CORNER BEFORE THE WALK IS WRITTEN.**  When a
 retrofit makes the general form the proven core and the landed form a seal
