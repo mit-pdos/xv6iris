@@ -927,7 +927,7 @@ Section BallocOut.
               (sign_extend' 21 (concat_vec (mword_of_int 1981 : mword 11) ('b"0")))
               QB (K - 10)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi104 [-]").
-    iIntros (CID13 Hq13). iNext. iIntros "Hcg Hpc".
+    iIntros (CID13 Hq13). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Hjt : add_vec (mword_of_int (KernelSyms.balloc + 0x104) : mword 64)
                     (sign_extend' 64 (sign_extend' 21
                        (concat_vec (mword_of_int 1981 : mword 11) ('b"0"))))
@@ -1161,7 +1161,7 @@ Section BallocExhaust.
               (mword_of_int 80 : mword 13) Ra5 Rs5 E3 (K - 10)%nat b
               ltac:(nz) ltac:(nz) Hcmp ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi98 [-]").
-    iNext. iIntros (CID6 Hq6) "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID6 Hq6) "Hcg Hpc".
     assert (Hjt : add_vec (mword_of_int (KernelSyms.balloc + 0x98) : mword 64)
                     (sign_extend' 64 (mword_of_int 80 : mword 13))
                   = mword_of_int (KernelSyms.balloc + 0xe8)) by pcw.
@@ -2553,7 +2553,7 @@ Section BallocScan.
                 (mword_of_int 8148 : mword 13) Ra0 Rs1 M (K - 10)%nat b
                 ltac:(nz) ltac:(nz) Hcmp ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hib6 [-]").
-      iNext. iIntros (CID1 Hq1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID1 Hq1) "Hcg Hpc".
       assert (Hjt : add_vec (mword_of_int (KernelSyms.balloc + 0xb6) : mword 64)
                       (sign_extend' 64 (mword_of_int 8148 : mword 13))
                     = mword_of_int (KernelSyms.balloc + 0x8a)) by pcw.
@@ -2582,7 +2582,7 @@ Section BallocScan.
                   (mword_of_int 8148 : mword 13) Ra0 Rs1 M (K - 10)%nat b
                   ltac:(nz) ltac:(nz) Hcmp ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hib6 [-]").
-        iNext. iIntros (CID1 Hq1) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID1 Hq1) "Hcg Hpc".
         assert (Hjt : add_vec (mword_of_int (KernelSyms.balloc + 0xb6) : mword 64)
                         (sign_extend' 64 (mword_of_int 8148 : mword 13))
                       = mword_of_int (KernelSyms.balloc + 0x8a)) by pcw.
@@ -3207,7 +3207,7 @@ Section BallocScan.
                        (sign_extend' 21 (concat_vec (mword_of_int 2002 : mword 11) ('b"0")))
                        SA (K - 10)%nat b ltac:(vm_compute; reflexivity)
                        with "Hcg Hpc Hie6' [-]").
-             iIntros (CID15 Hq15). iNext. iIntros "Hcg Hpc".
+             iIntros (CID15 Hq15). iApply bi.later_intro. iIntros "Hcg Hpc".
              assert (Hjt2 : add_vec (mword_of_int (KernelSyms.balloc + 0xe6) : mword 64)
                               (sign_extend' 64 (sign_extend' 21
                                  (concat_vec (mword_of_int 2002 : mword 11) ('b"0"))))
@@ -3239,7 +3239,7 @@ Section BallocScan.
                        (mword_of_int 8148 : mword 13) Rs4 Ra4 SA (K - 10)%nat b
                        ltac:(nz) ltac:(nz) Hne ltac:(vm_compute; reflexivity)
                        with "Hcg Hpc Hie2 [-]").
-             iNext. iIntros (CID14 Hq14) "Hcg Hpc".
+             iApply bi.later_intro. iIntros (CID14 Hq14) "Hcg Hpc".
              assert (Hjt3 : add_vec (mword_of_int (KernelSyms.balloc + 0xe2) : mword 64)
                               (sign_extend' 64 (mword_of_int 8148 : mword 13))
                             = mword_of_int (KernelSyms.balloc + 0xb6)) by pcw.
@@ -3271,7 +3271,7 @@ Section BallocScan.
                     ltac:(vm_compute; reflexivity) ltac:(nz) Hz1
                     ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc Hidc [-]").
-          iNext. iIntros (CID11 Hq11) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CID11 Hq11) "Hcg Hpc".
           assert (Hjt4 : add_vec (mword_of_int (KernelSyms.balloc + 0xdc) : mword 64)
                            (sign_extend' 64 (sign_extend' 13
                               (concat_vec (mword_of_int 174 : mword 8) ('b"0"))))
@@ -3912,7 +3912,7 @@ Section BallocMain.
               R11 (K - 10)%nat b
               ltac:(rewrite Htgtj; vm_compute; reflexivity)
               with "Hcg Hpc Hi036 [-]").
-    iIntros (CIDb23 Hq23). iNext. iIntros "Hcg Hpc".
+    iIntros (CIDb23 Hq23). iApply bi.later_intro. iIntros "Hcg Hpc".
     iEval (rewrite Htgtj) in "Hpc".
     iPoseProof (bai_09c with "Htext") as "Hi09c".
     iPoseProof (bai_0a0 with "Htext") as "Hi0a0".

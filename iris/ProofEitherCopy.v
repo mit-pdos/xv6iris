@@ -927,7 +927,7 @@ Section ProofEitherCopyout.
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) Hz
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi1c [-]").
-      iNext. iIntros (CID15 Hs15) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID15 Hs15) "Hcg Hpc".
       assert (Hjt : add_vec (mword_of_int (KernelSyms.either_copyout + 0x1c) : mword 64)
                       (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 16 : mword 8) ('b"0"))))
                     = mword_of_int (KernelSyms.either_copyout + 0x3c))
@@ -1051,7 +1051,7 @@ Section ProofEitherCopyout.
                 (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")))
                 L1 (av - 6)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi4a [-]").
-      iIntros (CID22 Hs22). iNext. iIntros "Hcg Hpc".
+      iIntros (CID22 Hs22). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Hjc : add_vec (mword_of_int (KernelSyms.either_copyout + 0x4a) : mword 64)
                       (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0"))))
                     = mword_of_int (KernelSyms.either_copyout + 0x2c))
@@ -1637,7 +1637,7 @@ Section ProofEitherCopyin.
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) Hz
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi1c [-]").
-      iNext. iIntros (CID15 Hs15) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID15 Hs15) "Hcg Hpc".
       assert (Hjt : add_vec (mword_of_int (KernelSyms.either_copyin + 0x1c) : mword 64)
                       (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 16 : mword 8) ('b"0"))))
                     = mword_of_int (KernelSyms.either_copyin + 0x3c))
@@ -1761,7 +1761,7 @@ Section ProofEitherCopyin.
                 (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")))
                 L1 (av - 6)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi4a [-]").
-      iIntros (CID22 Hs22). iNext. iIntros "Hcg Hpc".
+      iIntros (CID22 Hs22). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Hjc : add_vec (mword_of_int (KernelSyms.either_copyin + 0x4a) : mword 64)
                       (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0"))))
                     = mword_of_int (KernelSyms.either_copyin + 0x2c))

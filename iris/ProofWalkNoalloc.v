@@ -495,7 +495,7 @@ Section ProofWalkNoalloc.
               Mf (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rgne; exact Hs6)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi72 [-]").
-    iIntros (CIDa Hsa). iNext. iIntros "Hcg Hpc".
+    iIntros (CIDa Hsa). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htgt96 : add_vec (mword_of_int (KernelSyms.walk + 0x72) : mword 64)
                        (sign_extend' 64 (mword_of_int 36 : mword 13))
                      = mword_of_int (KernelSyms.walk + 0x96)) by (apply bv_eq; vm_compute; reflexivity).
@@ -515,7 +515,7 @@ Section ProofWalkNoalloc.
               (sign_extend' 21 (concat_vec (mword_of_int 2013 : mword 11) ('b"0")))
               F1 (K - 8)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi98 [-]").
-    iIntros (CIDc Hsc). iNext. iIntros "Hcg Hpc".
+    iIntros (CIDc Hsc). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htgt52 : add_vec (mword_of_int (KernelSyms.walk + 0x98) : mword 64)
               (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2013 : mword 11) ('b"0"))))
             = mword_of_int (KernelSyms.walk + 0x52)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1198,7 +1198,7 @@ Section ProofWalkNoalloc.
                 ltac:(rgne; rewrite HM6a5 walk_vbit_eq Hvbit0; reflexivity)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi3a [-]").
-      iNext. iIntros (CID20 Hw20) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID20 Hw20) "Hcg Hpc".
       assert (Htgt72 : add_vec (mword_of_int (KernelSyms.walk + 0x3a) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.walk + 0x72)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt72) in "Hpc".
       iApply (wp_wkn_fail mm M6 t m K dq b p HK HspM6 HM6s6 HM6x4
@@ -1283,7 +1283,7 @@ Section ProofWalkNoalloc.
               ltac:(repeat rgne; rewrite HM9s4 HM9s5; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi42 [-]").
-    iNext. iIntros (CID25 Hw25) "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID25 Hw25) "Hcg Hpc".
     assert (Hbk26 : add_vec (mword_of_int (KernelSyms.walk + 0x42) : mword 64) (sign_extend' 64 (mword_of_int 8164 : mword 13)) = mword_of_int (KernelSyms.walk + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hbk26) in "Hpc".
     (* ================= LOOP ITERATION 2 (s4 = 21, level 1) ============ *)
@@ -1337,7 +1337,7 @@ Section ProofWalkNoalloc.
                 ltac:(rgne; rewrite HN6a5 walk_vbit_eq Hvbit0; reflexivity)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi3a [-]").
-      iNext. iIntros (CID27 Hw27) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID27 Hw27) "Hcg Hpc".
       assert (Htgt72 : add_vec (mword_of_int (KernelSyms.walk + 0x3a) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.walk + 0x72)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt72) in "Hpc".
       iApply (wp_wkn_fail mm N6 t m K dq b p HK HspN6 HN6s6 HN6x4

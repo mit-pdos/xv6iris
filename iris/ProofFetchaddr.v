@@ -614,7 +614,7 @@ Section ProofFetchaddr.
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 Hbge ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi16 [-]").
-      iNext. iIntros (CID12 Hk12) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID12 Hk12) "Hcg Hpc".
       assert (Hjb : add_vec (mword_of_int (KernelSyms.fetchaddr + 0x16) : mword 64)
                       (sign_extend' 64 (mword_of_int 44 : mword 13))
                     = mword_of_int (KernelSyms.fetchaddr + 0x42))
@@ -637,7 +637,7 @@ Section ProofFetchaddr.
                 (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0")))
                 E1 (av - 4)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi44 [-]").
-      iIntros (CID14 Hk14). iNext. iIntros "Hcg Hpc".
+      iIntros (CID14 Hk14). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Hjc : add_vec (mword_of_int (KernelSyms.fetchaddr + 0x44) : mword 64)
                       (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0"))))
                     = mword_of_int (KernelSyms.fetchaddr + 0x36))
@@ -732,7 +732,7 @@ Section ProofFetchaddr.
                   ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                   Hblt ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi1e [-]").
-        iNext. iIntros (CID14 Hk14) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID14 Hk14) "Hcg Hpc".
         assert (Hjb : add_vec (mword_of_int (KernelSyms.fetchaddr + 0x1e) : mword 64)
                         (sign_extend' 64 (mword_of_int 40 : mword 13))
                       = mword_of_int (KernelSyms.fetchaddr + 0x46))
@@ -755,7 +755,7 @@ Section ProofFetchaddr.
                   (sign_extend' 21 (concat_vec (mword_of_int 2039 : mword 11) ('b"0")))
                   E2 (av - 4)%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi48 [-]").
-        iIntros (CID16 Hk16). iNext. iIntros "Hcg Hpc".
+        iIntros (CID16 Hk16). iApply bi.later_intro. iIntros "Hcg Hpc".
         assert (Hjc : add_vec (mword_of_int (KernelSyms.fetchaddr + 0x48) : mword 64)
                         (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2039 : mword 11) ('b"0"))))
                       = mword_of_int (KernelSyms.fetchaddr + 0x36))

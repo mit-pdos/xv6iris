@@ -608,7 +608,7 @@ Section ProofProcPagetable.
                 ltac:(rgne; rewrite HM1a0; rewrite Hrv0; vm_compute; reflexivity)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi14 [-]").
-      iNext. iIntros (CIDd1 Hsd1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDd1 Hsd1) "Hcg Hpc".
       assert (Htg4c0 : add_vec (mword_of_int (KernelSyms.proc_pagetable + 0x14) : mword 64)
                          (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0"))))
                        = mword_of_int (KernelSyms.proc_pagetable + 0x4c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -777,7 +777,7 @@ Section ProofProcPagetable.
                   ltac:(rgne; rewrite Hmr1a0; vm_compute; reflexivity)
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi2e [-]").
-        iNext. iIntros (CIDa1 Hsa1) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDa1 Hsa1) "Hcg Hpc".
         assert (Htg5a : add_vec (mword_of_int (KernelSyms.proc_pagetable + 0x2e) : mword 64) (sign_extend' 64 (mword_of_int 44 : mword 13))
                         = mword_of_int (KernelSyms.proc_pagetable + 0x5a)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htg5a) in "Hpc".
@@ -854,7 +854,7 @@ Section ProofProcPagetable.
                   (sign_extend' 21 (concat_vec (mword_of_int 2036 : mword 11) ('b"0")))
                   U1 (K - 4)%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hj64 [-]").
-        iIntros (CIDa7 Hsa7). iNext. iIntros "Hcg Hpc".
+        iIntros (CIDa7 Hsa7). iApply bi.later_intro. iIntros "Hcg Hpc".
         assert (Htg4c : add_vec (mword_of_int (KernelSyms.proc_pagetable + 0x64) : mword 64)
                           (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2036 : mword 11) ('b"0"))))
                         = mword_of_int (KernelSyms.proc_pagetable + 0x4c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1041,7 +1041,7 @@ Section ProofProcPagetable.
                   ltac:(rgne; rewrite Hmr2a0; vm_compute; reflexivity)
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi48 [-]").
-        iNext. iIntros (CIDb1 Hsb1) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDb1 Hsb1) "Hcg Hpc".
         assert (Htg66 : add_vec (mword_of_int (KernelSyms.proc_pagetable + 0x48) : mword 64) (sign_extend' 64 (mword_of_int 30 : mword 13))
                         = mword_of_int (KernelSyms.proc_pagetable + 0x66)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htg66) in "Hpc".
@@ -1224,7 +1224,7 @@ Section ProofProcPagetable.
                   (sign_extend' 21 (concat_vec (mword_of_int 2021 : mword 11) ('b"0")))
                   W7 (K - 4)%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hj82 [-]").
-        iIntros (CIDc6 Hsc6). iNext. iIntros "Hcg Hpc".
+        iIntros (CIDc6 Hsc6). iApply bi.later_intro. iIntros "Hcg Hpc".
         assert (Htg4c2 : add_vec (mword_of_int (KernelSyms.proc_pagetable + 0x82) : mword 64)
                            (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2021 : mword 11) ('b"0"))))
                          = mword_of_int (KernelSyms.proc_pagetable + 0x4c)) by (apply bv_eq; vm_compute; reflexivity).

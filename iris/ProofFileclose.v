@@ -460,7 +460,7 @@ Section ProofFileclose.
                 ltac:(rewrite Hregv; apply fc_pred_gtz; lia)
                 ltac:(rewrite Htgt82; vm_compute; reflexivity)
                 with "Hcg Hpc Hi22 [-]").
-      iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt82) in "Hpc".
       (* ---- the ghost step: the departing share goes home ---- *)
       destruct (proj1 (Qp.lt_sum q qt) (Hqlt Hmany)) as [qr Hqr].
@@ -1020,7 +1020,7 @@ Section ProofFileclose.
                   ltac:(rewrite Hcmp56 Hpipe; by vm_compute)
                   ltac:(rewrite Htgt98; vm_compute; reflexivity)
                   with "Hcg Hpc Hi56 [-]").
-        iNext. iIntros (CIDp1 Hsp1) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDp1 Hsp1) "Hcg Hpc".
         iEval (rewrite Htgt98) in "Hpc".
         iPoseProof (fci_98 with "Htext") as "Hi98".
         iPoseProof (fci_9a with "Htext") as "Hi9a".
@@ -1328,7 +1328,7 @@ Section ProofFileclose.
                     ltac:(rewrite Hcmp60; by apply fc_ty_inode_iff)
                     ltac:(rewrite Htgtaa; vm_compute; reflexivity)
                     with "Hcg Hpc Hi60 [-]").
-          iNext. iIntros (CIDf1 Hsf1) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDf1 Hsf1) "Hcg Hpc".
           iEval (rewrite Htgtaa) in "Hpc".
           iPoseProof (fci_aa with "Htext") as "Hiaa".
           iPoseProof (fci_ae with "Htext") as "Hiae".

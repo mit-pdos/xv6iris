@@ -1470,7 +1470,7 @@ Section ProofIput.
         iDestruct (word4_pointsto_half_join with "Hinh Hn2") as "Hnfull".
         iDestruct (word4_pointsto_half_split with "Hvld") as "[Hva Hvb]".
         iMod ("Hclose" with "[Hidv Hnfull Hva Hmt Hgida]") as "_".
-        { iNext. iApply ic_close_held. rewrite /ic_held.
+        { iApply bi.later_intro. iApply ic_close_held. rewrite /ic_held.
           iExists dev, inum, (valid_word true). iFrame. }
         iModIntro. iExists true. iFrame "Hhalf Hrtok Hrd Htd Hvb".
         (* the bare [iFrame] here used to re-search the WHOLE ambient
@@ -1483,7 +1483,7 @@ Section ProofIput.
         iSplitR; [done |]. iExists ga. iSplitL "Hpayl"; [iExact "Hpayl" | iExact "Hlvh"].
       - (* UNLOADED: read-only, everything goes straight back *)
         iMod ("Hclose" with "[Hidv Hinh Hvld Hpayl Hlvh Hmt Hgida]") as "_".
-        { iNext. iApply ic_close_parked.
+        { iApply bi.later_intro. iApply ic_close_parked.
           iApply (ic_mk_parked cn gfs gi cov logstart k dev inum false ga
                     with "Hidv Hinh Hvld Hpayl Hlvh Hmt Hgida"). }
         iModIntro. iExists false. iFrame. done. }
@@ -1616,7 +1616,7 @@ Section ProofIput.
       iDestruct (word4_pointsto_frac_split (i_inum (ientry k)) q qr inum with "Hn2")
         as "[Hrn Htn]".
       iMod ("Hclose" with "[Hidv Hinh Hvld Hpayl Hlvh Hmt Hgida]") as "_".
-      { iNext. iApply ic_close_parked.
+      { iApply bi.later_intro. iApply ic_close_parked.
         iApply (ic_mk_parked cn gfs gi cov logstart k dev inum true ga
                   with "Hidv Hinh Hvld Hpayl Hlvh Hmt Hgida"). }
       iModIntro.
@@ -1851,7 +1851,7 @@ Section ProofIput.
     iMod (ic_dep_checkout cn k (DepRef q dev inum ga') with "Hictok")
       as "[Hdepa Hdepk]".
     iMod ("Hclose" with "[Hdepa Hfrg Hlvr Hlvh Hrd Hrn Hmt Hgida]") as "_".
-    { iNext. iApply (ic_close_out cn gfs gi cov logstart k (DepRef q dev inum ga')
+    { iApply bi.later_intro. iApply (ic_close_out cn gfs gi cov logstart k (DepRef q dev inum ga')
                        dev inum with "Hdepa [Hfrg Hlvr Hlvh Hrd Hrn] Hmt Hgida").
       rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
       iSplitR "Hlvh"; [| iExact "Hlvh"].

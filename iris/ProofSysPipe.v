@@ -1445,7 +1445,7 @@ Section ProofSysPipe.
                 ltac:(rgne; rewrite HW1a0'; vm_compute; reflexivity)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi28 [-]").
-      iNext. iIntros (CID36 Hcr36) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID36 Hcr36) "Hcg Hpc".
       assert (Hbt : add_vec (mword_of_int (KernelSyms.sys_pipe + 0x28) : mword 64)
                       (sign_extend' 64 (mword_of_int 178 : mword 13))
                     = mword_of_int (KernelSyms.sys_pipe + 0xda))
@@ -1643,7 +1643,7 @@ Section ProofSysPipe.
                 ltac:(rgne; rewrite Hr1; vm_compute; reflexivity)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi3c [-]").
-      iNext. iIntros (CID43 Hcr43) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID43 Hcr43) "Hcg Hpc".
       assert (Hbt1 : add_vec (mword_of_int (KernelSyms.sys_pipe + 0x3c) : mword 64)
                        (sign_extend' 64 (mword_of_int 140 : mword 13))
                      = mword_of_int (KernelSyms.sys_pipe + 0xc8))
@@ -1802,7 +1802,7 @@ Section ProofSysPipe.
                 ltac:(rgne; rewrite Hr2; vm_compute; reflexivity)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi4c [-]").
-      iNext. iIntros (CID50 Hcr50) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID50 Hcr50) "Hcg Hpc".
       assert (Hbt2 : add_vec (mword_of_int (KernelSyms.sys_pipe + 0x4c) : mword 64)
                        (sign_extend' 64 (mword_of_int 104 : mword 13))
                      = mword_of_int (KernelSyms.sys_pipe + 0xb4))
@@ -2426,7 +2426,7 @@ Section ProofSysPipe.
                 ltac:(rgne; rewrite Hcom1; vm_compute; reflexivity)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi62 [-]").
-      iNext. iIntros (CID68 Hcr68) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID68 Hcr68) "Hcg Hpc".
       assert (Hbt3 : add_vec (mword_of_int (KernelSyms.sys_pipe + 0x62) : mword 64)
                        (sign_extend' 64 (mword_of_int 30 : mword 13))
                      = mword_of_int (KernelSyms.sys_pipe + 0x80))
@@ -2701,7 +2701,7 @@ Section ProofSysPipe.
                 ltac:(rgne; rewrite HD1a0 Hs0; vm_compute; reflexivity)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi7c [-]").
-      iNext. iIntros (CID78 Hcr78) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID78 Hcr78) "Hcg Hpc".
       assert (Hbt4 : add_vec (mword_of_int (KernelSyms.sys_pipe + 0x7c) : mword 64)
                        (sign_extend' 64 (mword_of_int 94 : mword 13))
                      = mword_of_int (KernelSyms.sys_pipe + 0xda))
