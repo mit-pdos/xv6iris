@@ -612,7 +612,7 @@ Section ProofUvmcopy.
               (sign_extend' 21 (concat_vec (mword_of_int 2 : mword 11) ('b"0")))
               N6 (K - 10)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi7c [-]").
-    iIntros (CIDe8 Hse8). iNext. iIntros "Hcg Hpc".
+    iIntros (CIDe8 Hse8). iApply bi.later_intro. iIntros "Hcg Hpc".
     iEval (rewrite Hjt7c) in "Hpc".
     iDestruct (cpu_own_transport CIDe6 CIDe8 ilvl eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
@@ -812,7 +812,7 @@ Section ProofUvmcopy.
                   (mword_of_int 88 : mword 13) Rs5 Rs1 T1 (K - 10)%nat b
                   ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                   Hcmp ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi26 [-]").
-        iNext. iIntros (CIDt2 Hst2) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDt2 Hst2) "Hcg Hpc".
         assert (Htgt7e : add_vec (mword_of_int (KernelSyms.uvmcopy + 0x26) : mword 64)
                   (sign_extend' 64 (mword_of_int 88 : mword 13))
                 = mword_of_int (KernelSyms.uvmcopy + 0x7e)) by (apply bv_eq; vm_compute; reflexivity).
@@ -967,7 +967,7 @@ Section ProofUvmcopy.
                 mw (K - 10)%nat b ltac:(vm_compute; reflexivity)
                 ltac:(vm_compute; discriminate) Hbz ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi34 [-]").
-      iIntros (CIDl6 Hsl6). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDl6 Hsl6). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt24) in "Hpc".
       assert (Holdnone : Pold.(ud_um) !! vpn_at vpn0 j = None)
         by exact (proj2 (proj2 (proj1 (proj1 Hviewo (vpn_at vpn0 j)) Hnone))).
@@ -1074,7 +1074,7 @@ Section ProofUvmcopy.
                 B2 (K - 10)%nat b ltac:(vm_compute; reflexivity)
                 ltac:(vm_compute; discriminate) Hbz ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi3e [-]").
-      iIntros (CIDl9 Hsl9). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDl9 Hsl9). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt24') in "Hpc".
       assert (Holdnone : Pold.(ud_um) !! vpn_at vpn0 j = None)
         by exact (proj2 (proj2 (proj1 (proj1 Hviewo (vpn_at vpn0 j)) Hnone))).
@@ -1205,7 +1205,7 @@ Section ProofUvmcopy.
                 C1 (K - 10)%nat b ltac:(vm_compute; reflexivity)
                 ltac:(vm_compute; discriminate) Hbz ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi46 [-]").
-      iIntros (CIDl14 Hsl14). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDl14 Hsl14). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt6c) in "Hpc".
       iDestruct (cpu_own_transport CIDl12 CIDl14 ilvl eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
@@ -1575,7 +1575,7 @@ Section ProofUvmcopy.
                 mg (K - 10)%nat b ltac:(vm_compute; reflexivity)
                 ltac:(vm_compute; discriminate) Hbz ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi64 [-]").
-      iIntros (CIDl27 Hsl27). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDl27 Hsl27). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt24'') in "Hpc".
       iDestruct (cpu_own_transport CIDl26 CIDl27 ilvl eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
@@ -1704,7 +1704,7 @@ Section ProofUvmcopy.
                 (Cregidx (mword_of_int 4)) Ra2 mm K b
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 Hz0 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi00 [-]").
-      iIntros (CIDz1 Hsz1). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDz1 Hsz1). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt96) in "Hpc".
       iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.uvmcopy + 0x96)) Ra0
                 (mword_of_int 0 : mword 6) (mword_of_int 0 : mword 64) mm K b
@@ -2260,7 +2260,7 @@ Section ProofUvmcopy.
               (sign_extend' 21 (concat_vec (mword_of_int 4 : mword 11) ('b"0")))
               R7 (K - 10)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi22 [-]").
-    iIntros (CIDr18 Hsr18). iNext. iIntros "Hcg Hpc".
+    iIntros (CIDr18 Hsr18). iApply bi.later_intro. iIntros "Hcg Hpc".
     iEval (rewrite Hjt22) in "Hpc".
     assert (Hiv0 : bv_unsigned (mword_of_int 0 : mword 64) = (4096 * Z.of_nat 0)%Z)
       by (vm_compute; reflexivity).

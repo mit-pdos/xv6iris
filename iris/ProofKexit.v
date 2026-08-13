@@ -523,7 +523,7 @@ Section KexitLoop.
                     Mt38 av b ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     Hcmpr ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc Hi3a [-]").
-          iNext. iIntros (CIDt2 Hst2) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDt2 Hst2) "Hcg Hpc".
           assert (Htgt4c : add_vec (mword_of_int (KX + 0x3a) : mword 64)
                              (sign_extend' 64 (mword_of_int 18 : mword 13)) = mword_of_int (KX + 0x4c))
             by (apply bv_eq; vm_compute; reflexivity).
@@ -625,7 +625,7 @@ Section KexitLoop.
                   M3e av b ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                   Hzr ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi40 [-]").
-        iNext. iIntros (CIDm Hsm) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDm Hsm) "Hcg Hpc".
         assert (Htgt38 : add_vec (mword_of_int (KX + 0x40) : mword 64)
                            (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 252 : mword 8) ('b"0"))))
                          = mword_of_int (KX + 0x38))
@@ -741,7 +741,7 @@ Section KexitLoop.
                   mr av b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi4a [-]").
         iIntros (CIDr Hsr).
-        iNext. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros "Hcg Hpc".
         assert (Htgt38 : add_vec (mword_of_int (KX + 0x4a) : mword 64)
                            (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2039 : mword 11) ('b"0"))))
                          = mword_of_int (KX + 0x38))
@@ -1886,7 +1886,7 @@ Section ProofKexit.
                 A5 (av - 6)%nat b ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 Htaken ltac:(rewrite Htgt3e; vm_compute; reflexivity)
                 with "Hcg Hpc Hi28 [-]").
-      iNext. iIntros (CID8 Hs8) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID8 Hs8) "Hcg Hpc".
       iEval (rewrite Htgt3e) in "Hpc".
       iDestruct (cpu_own_transport CID2 CID8 0 eb pj C b ltac:(wp_next_chain)
                    with "Hown") as "Hown".

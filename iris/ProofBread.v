@@ -640,7 +640,7 @@ Section BreadBlocks.
       iExists (if vb then (mword_of_int 1 : mword 32) else (mword_of_int 0 : mword 32)).
       iEval (rewrite -Hva) in "Hvld". iFrame "Hvld".
       iIntros "Hvld". iEval (rewrite Hva) in "Hvld".
-      iMod ("Hclose" with "[Hbody]") as "_". { iNext. iExact "Hbody". }
+      iMod ("Hclose" with "[Hbody]") as "_". { iApply bi.later_intro. iExact "Hbody". }
       iModIntro. iExists vb, bs. iSplitR; [by iPureIntro|].
       iFrame "Hvld Hbdev Hbuf Hpay". }
     iIntros (vld CIDt1 Hst1) "Hcg Hpc H".
@@ -723,7 +723,7 @@ Section BreadBlocks.
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rgne; exact Hbeqz) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hib6 [-]").
-      iNext. iIntros (CIDt2 Hst2) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDt2 Hst2) "Hcg Hpc".
       assert (Htgtc8 : add_vec (mword_of_int (KernelSyms.bread + 0xb6) : mword 64)
                          (sign_extend' 64 (sign_extend' 13
                             (concat_vec (mword_of_int 9 : mword 8) ('b"0"))))
@@ -1300,7 +1300,7 @@ Section BreadBlocks.
       iEval (rewrite -Hadev) in "Hfull". iFrame "Hfull".
       iIntros "Hfull". iEval (rewrite Hadev Hsvdev) in "Hfull".
       iDestruct ("Hback" with "Hfull") as "[Hbody Hhalf]".
-      iMod ("Hclose2" with "[Hbody]") as "_". { iNext. iExact "Hbody". }
+      iMod ("Hclose2" with "[Hbody]") as "_". { iApply bi.later_intro. iExact "Hbody". }
       iModIntro. iFrame "Hauth Hhalf". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc [Hauth Hdevs]".
@@ -1328,7 +1328,7 @@ Section BreadBlocks.
       iIntros "Hfull". iEval (rewrite Habno Hsvbno) in "Hfull".
       iDestruct ("Hback" with "Hfull")
         as "(Hbody & Hbmid & HpoolB & Hbnos & Hpool)".
-      iMod ("Hclose2" with "[Hbody]") as "_". { iNext. iExact "Hbody". }
+      iMod ("Hclose2" with "[Hbody]") as "_". { iApply bi.later_intro. iExact "Hbody". }
       iModIntro. iFrame "Hauth Hbmid HpoolB Hbnos Hpool". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc (Hauth & Hbmid & HpoolB & Hbnos & Hpool)".
@@ -1354,7 +1354,7 @@ Section BreadBlocks.
       iEval (rewrite -Hava) in "Hvld". iFrame "Hvld".
       iIntros "Hvld". iEval (rewrite Hava Hsvz) in "Hvld".
       iDestruct ("Hback" with "Hvld") as "[Hbody Hdevs]".
-      iMod ("Hclose2" with "[Hbody]") as "_". { iNext. iExact "Hbody". }
+      iMod ("Hclose2" with "[Hbody]") as "_". { iApply bi.later_intro. iExact "Hbody". }
       iModIntro. iFrame "Hauth Hdevs Hbnos". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc (Hauth & Hdevs & Hbnos)".
@@ -1665,7 +1665,7 @@ Section BreadBlocks.
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rgne; exact Hbeqz) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi7c [-]").
-      iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Htgt90 : add_vec (mword_of_int (KernelSyms.bread + 0x7c) : mword 64)
                          (sign_extend' 64 (sign_extend' 13
                             (concat_vec (mword_of_int 10 : mword 8) ('b"0"))))
@@ -1814,7 +1814,7 @@ Section BreadBlocks.
                   ltac:(rgne; rgne; exact Hbne)
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi80 [-]").
-        iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
         assert (Htgt7a : add_vec (mword_of_int (KernelSyms.bread + 0x80) : mword 64)
                            (sign_extend' 64 (mword_of_int 8186 : mword 13))
                          = mword_of_int (KernelSyms.bread + 0x7a))
@@ -2191,7 +2191,7 @@ Section BreadBlocks.
                   ltac:(rgne; rgne; exact Hbeq)
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi38 [-]").
-        iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
         assert (Htgt64 : add_vec (mword_of_int (KernelSyms.bread + 0x38) : mword 64)
                            (sign_extend' 64 (mword_of_int 44 : mword 13))
                          = mword_of_int (KernelSyms.bread + 0x64))
@@ -2364,7 +2364,7 @@ Section BreadBlocks.
                   ltac:(rgne; rgne; exact Hbne3)
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi44 [-]").
-        iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
         assert (Htgt36 : add_vec (mword_of_int (KernelSyms.bread + 0x44) : mword 64)
                            (sign_extend' 64 (mword_of_int 8178 : mword 13))
                          = mword_of_int (KernelSyms.bread + 0x36))
@@ -2383,7 +2383,7 @@ Section BreadBlocks.
                 ltac:(rgne; rgne; exact Hbne)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi3e [-]").
-      iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Htgt36 : add_vec (mword_of_int (KernelSyms.bread + 0x3e) : mword 64)
                          (sign_extend' 64 (mword_of_int 8184 : mword 13))
                        = mword_of_int (KernelSyms.bread + 0x36))

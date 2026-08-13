@@ -435,7 +435,7 @@ Section ProofSysSbrk.
                 ltac:(vm_compute; discriminate) ltac:(rgne; exact Hneg)
                 ltac:(rewrite Htgt70; vm_compute; reflexivity)
                 with "Hcg Hpc Hi60 [-]").
-      iNext. iIntros (CIDt Hst) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDt Hst) "Hcg Hpc".
       iEval (rewrite Htgt70) in "Hpc".
       iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.sys_sbrk + 0x70))
                 Rs1 (mword_of_int 63 : mword 6) (mword_of_int (-1) : mword 64) mg (av - 6)%nat b
@@ -456,7 +456,7 @@ Section ProofSysSbrk.
                 (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0"))) X1 (av - 6)%nat b
                 ltac:(rewrite Htgt64; vm_compute; reflexivity)
                 with "Hcg Hpc Hi72 [-]").
-      iIntros (CIDv Hsv). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDv Hsv). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt64) in "Hpc".
       iDestruct (cpu_own_transport CIDg CIDv 0%nat eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CIDv with "[%]"); [wp_next_chain|].
@@ -988,7 +988,7 @@ Section ProofSysSbrk.
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 ltac:(rgne; rgne; exact Hbeq) ltac:(rewrite Htgt58; vm_compute; reflexivity)
                 with "Hcg Hpc Hi2a [-]").
-      iIntros (CIDs16 Hq16). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDs16 Hq16). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt58) in "Hpc".
       iDestruct ("Hpback" $! (pv_upt V) (pv_sz V) with "[%] [%] [%] [%] Hszc Hptc Hpt")
         as "Hpriv"; [reflexivity | reflexivity | exact Hszmax | exact Hbel |].
@@ -1069,7 +1069,7 @@ Section ProofSysSbrk.
                 ltac:(vm_compute; discriminate) ltac:(rgne; exact Hbltz)
                 ltac:(rewrite Htgt58; vm_compute; reflexivity)
                 with "Hcg Hpc Hi32 [-]").
-      iIntros (CIDs19 Hq19). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDs19 Hq19). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt58) in "Hpc".
       iDestruct ("Hpback" $! (pv_upt V) (pv_sz V) with "[%] [%] [%] [%] Hszc Hptc Hpt")
         as "Hpriv"; [reflexivity | reflexivity | exact Hszmax | exact Hbel |].
@@ -1200,7 +1200,7 @@ Section ProofSysSbrk.
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 ltac:(rgne; rgne; exact Hbltu1) ltac:(rewrite Htgt74; vm_compute; reflexivity)
                 with "Hcg Hpc Hi40 [-]").
-      iIntros (CIDs25 Hq25). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDs25 Hq25). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt74) in "Hpc".
       iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.sys_sbrk + 0x74))
                 Rs1 (mword_of_int 63 : mword 6) (mword_of_int (-1) : mword 64) L4 (av - 6)%nat b
@@ -1221,7 +1221,7 @@ Section ProofSysSbrk.
                 (sign_extend' 21 (concat_vec (mword_of_int 2039 : mword 11) ('b"0"))) Y1 (av - 6)%nat b
                 ltac:(rewrite Htgt64; vm_compute; reflexivity)
                 with "Hcg Hpc Hi76 [-]").
-      iIntros (CIDs27 Hq27). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDs27 Hq27). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt64) in "Hpc".
       iDestruct ("Hpback" $! (pv_upt V) (pv_sz V) with "[%] [%] [%] [%] Hszc Hptc Hpt")
         as "Hpriv"; [reflexivity | reflexivity | exact Hszmax | exact Hbel |].
@@ -1415,7 +1415,7 @@ Section ProofSysSbrk.
               (sign_extend' 21 (concat_vec (mword_of_int 7 : mword 11) ('b"0"))) E3 (av - 6)%nat b
               ltac:(rewrite Htgt64l; vm_compute; reflexivity)
               with "Hcg Hpc Hi56 [-]").
-    iIntros (CIDs35 Hq35). iNext. iIntros "Hcg Hpc".
+    iIntros (CIDs35 Hq35). iApply bi.later_intro. iIntros "Hcg Hpc".
     iEval (rewrite Htgt64l) in "Hpc".
     (* the new size still bounds the map: it only went UP *)
     iDestruct ("Hpback" $! (pv_upt V) (add_vec (pv_sz V) (sbrk_arg v0))

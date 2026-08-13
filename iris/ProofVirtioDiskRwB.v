@@ -874,7 +874,7 @@ Section ProofVirtioDiskRwB.
                   ltac:(rgall; rewrite Hs2; exact vdrwb_bge0)
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi07a [-]").
-        iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
+        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         assert (Hb094 : add_vec (mword_of_int (KernelSyms.virtio_disk_rw + 0x07a) : mword 64)
                           (sign_extend' 64 (mword_of_int 26 : mword 13))
                         = mword_of_int (KernelSyms.virtio_disk_rw + 0x094))
@@ -938,7 +938,7 @@ Section ProofVirtioDiskRwB.
                   ltac:(rgall; rewrite HF1a5 HF1s2; exact vdrwb_bge11)
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi088 [-]").
-        iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
+        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         assert (Hb094' : add_vec (mword_of_int (KernelSyms.virtio_disk_rw + 0x088) : mword 64)
                            (sign_extend' 64 (mword_of_int 12 : mword 13))
                          = mword_of_int (KernelSyms.virtio_disk_rw + 0x094))
@@ -1064,7 +1064,7 @@ Section ProofVirtioDiskRwB.
               (sign_extend' 21 (concat_vec (mword_of_int 60 : mword 11) ('b"0")))
               A5 (trap_res eb + (K - 12))%nat false ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi044 [-]").
-    iApply wp_next_off_intro. iNext. iIntros "Hcg Hpc". rgall.
+    iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
     assert (Hj0a8 : add_vec (mword_of_int (KernelSyms.virtio_disk_rw + 0x044) : mword 64)
                       (sign_extend' 64 (sign_extend' 21
                          (concat_vec (mword_of_int 60 : mword 11) ('b"0"))))
