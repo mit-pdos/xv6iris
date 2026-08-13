@@ -42,8 +42,24 @@ pathnames the theorem covers (`L ≤ 1`, so `/init` and `sh`, not `/bin/sh`).
 | `StackBytes.slotsn_bytes_own` (general n-slot carve) | **landed, proven** |
 | `WpSconfAlu` base-encoded sp movers (width-generic) | **landed, proven** |
 | `ProofKexecParts.v` — frame carve, `kxc_epi`, `kxc_frame` | **landed, proven** |
+| `ProofKexecTail.v` — frame/seam algebra + the shared `+0x064` tail | **landed, proven** |
 | `ProofKexecA.v` — **PHASE A PROVEN** (`kxc_a1`/`kxc_a2`/`kxc_phaseA`) | **landed, proven** |
 | `ProofKexecB.v` — **B1 PROVEN** (`kxc_b1`, + the two seams) | **landed, proven** |
+
+**WHERE TO PUT A LEMMA TWO PHASES SHARE: `ProofKexecTail.v`, NOT `ProofKexecA.v`.**
+Phase B used to `Require Import ProofKexecA` for six pieces of frame/seam
+vocabulary and for one lemma, `kxc_bad64` — the `+0x064` tail that B's own
+`+0x31c` tail jumps into. Nothing requires either proof file (they are both
+leaves), so that edge bought nothing and cost the one thing a leaf can still
+cost: it put A and B **in series** on the build's critical path, which at the
+time *was* `SpecKexec → ProofKexecA → ProofKexecB` and was the longest chain in
+the tree by ~40 s. `ProofKexecTail.v` now holds the frame algebra, the seam
+definitions and the `KexecTailProof` functor (`kxc_exit_m1`, `kxc_bad64`, the
+`kxa_*` icache accessors); A opens it as `T` and B as `A`, at the same seven
+modules each already named. **Every later phase will hit this too** — C and D
+both reach the epilogue through tails A already proved — so put the next shared
+tail in `ProofKexecTail.v` when you prove it, and keep phase files reaching each
+other only through that one.
 | phase B2 — the phdr + loadseg loops | **NEXT** |
 | phases C, D, `LinkKexec.v`, `sys_exec` | not started |
 
@@ -681,7 +697,8 @@ the argv array kexec's contract consumes (a kalloc'd page per argument via
 2. `SpecKexec.v`'s header — what the contract says and what it deliberately
    does not.
 3. `ProofKexecA.v` for the idiom, `ProofKexecB.v` for the seam you continue
-   from.
+   from, and `ProofKexecTail.v` for the frame/seam vocabulary both of them are
+   written in (and for the `+0x064` tail any new phase's failure arm will want).
 4. `durable-notes.md`'s newer traps, all of which were paid for here: the
    `[-]` spec pattern eating hypotheses named after it; `iFrame` at syscall
    altitude not terminating; the exit having to be handed back when two halves

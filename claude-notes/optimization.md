@@ -137,6 +137,42 @@ Corollary for the sweep: any `ltac:(set_solver)` / `ltac:(lia)` appearing as a
 positional argument in a `Proof<F>.v` capstone is a suspect, because that is
 exactly where the context is widest.
 
+## A REQUIRE BETWEEN TWO LEAVES IS PURE CRITICAL PATH (2026-08-13)
+
+Two `Proof<F>.v` files that nothing else requires can still be the longest chain
+in the build, and one `Require` between them is the whole reason.  Measured at
+`6fe694ea`, clean `-j28`, **wall 1058 s, ΣCPU 16723 s, critical path 641 s**:
+
+```
+… → SpecKexec 226.1 → ProofKexecA 371.7 → ProofKexecB 43.1   = 640.9 s
+```
+
+versus **601.4 s** for the next-longest chain (`LinkSysPipe`).  So the entire
+margin by which the build was kexec-bound was `ProofKexecB`'s own 43 s, sitting
+behind `ProofKexecA` for a dependency that was, in substance, **one lemma**:
+`kxc_bad64`, the `+0x064` tail B's `+0x31c` tail jumps into.  (Plus six pieces
+of frame/seam vocabulary that mention no functor argument at all.)
+
+**The check is cheap and nobody runs it: for each `Proof<F>.v` that requires
+another `Proof<G>.v`, ask what it uses.**  A whole-function proof requiring a
+sibling whole-function proof is nearly always reaching for a shared *block*, not
+for the sibling's capstone — and a shared block belongs in a third file that
+both require.  The profiler's "Longest dependency chain" table names the
+offenders directly: any `Proof*` immediately following another `Proof*` on it.
+
+Here that third file is `ProofKexecTail.v` (frame algebra + seam definitions +
+the `KexecTailProof` functor holding `kxc_exit_m1` / `kxc_bad64` / the `kxa_*`
+accessors); A opens it as `T`, B as `A`, and the only edit to either proof was
+qualifying nine call sites.  A Rocq functor cannot span two files, so the split
+line is forced: whatever the two phases share has to become its own functor,
+applied twice.
+
+**Do not expect the split to pay in ΣCPU** — it pays in the chain.  The moved
+text costs the same to check, plus one file's worth of `Require` reloading
+(~10 s here), and the win is that `max(A', B)` replaces `A + B` below the shared
+prefix.  Judge such a split on the "Longest dependency chain" table, never on
+the per-file list.
+
 ## THE FIVE SHAPES THAT MADE THE ICACHE FILES THE WHOLE BUILD (2026-08-11)
 
 CI's build-profile step summary listed thirteen non-`Qed` statements above 30 s,
