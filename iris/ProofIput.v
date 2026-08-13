@@ -698,7 +698,7 @@ Section IputTail.
     iSpecialize ("Hcont" $! CIDe5 with "[]"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! P4 n' used' Sb'
               with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hbms Hins [%] Hbm Hbslots [%] [%] Hop Hislot").
-    3:{ split; [exact Hlo | exact Hhi]. }
+    4:{ split; [exact Hlo | exact Hhi]. }
     3:{ exact Hssub. }
     2:{ exact Hsub. }
     (* callee_saved m P4 *)
