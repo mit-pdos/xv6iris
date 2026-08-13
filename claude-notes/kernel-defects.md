@@ -332,6 +332,47 @@ retires, or narrows to an unreachable-by-construction case, is settled by
 restating §20's (b) over reachability; see `design/fs-icache.md` §20 and the
 GR-2 worklist. Do not assume the colour is simply gone.
 
+### The formal aftermath (GR-2d, 2026-08-13)
+
+That question is now settled, in `design/fs-icache.md` §20.17, and the answer
+is the sentence above taken literally: **the guards kill the CONSUMERS, not
+the RECORDS, so `igrey` survives — and the gated case closes at the two
+guarded sites and only there.**
+
+- **`igrey` stays, and it still has reachable consumers.** Two `dirlookup`
+  call sites re-`ilock` a directory `nameiparent` handed them and do *not*
+  re-check `nlink`: `sys_unlink` and — missed by the first reading —
+  `sys_link`, whose `dirlink(dp, name, ...)` runs `dirlookup` on an
+  unfiltered `skipelem` name. So `link(old, "/a/b/..")` really does resolve
+  an orphaned `".."` and really does `iget` its target. It is harmless
+  (`dirlink` `iput`s an entry that is either unloaded or shared, so no free
+  can follow), but the colour is genuinely consumed, and "no reachable `iget`
+  consumes a grey fragment" is false.
+- **The gated case (§20.7 row 2 (b)) closes where a guard runs.** After the
+  guard, the walk holds `di_nlink dn != 0` at the very record `ic_loaded`
+  names in its `dinode_at` and quantifies its `dir_links` over — so a
+  fragment pulled from that payload cannot be grey, because a grey fragment
+  lives only in a home whose `nlink` has reached zero. `ProofNamex` already
+  carries the fact (`Hnl0`, the guard's fall-through arm); `create`'s twin is
+  decoded at +0x2a/+0x2e. Carrying it costs ONE file: the grey disjunct of
+  `DirLinks.dir_link_at` gains `⌜di_nlink dn = 0⌝`, and `dir_links` — which
+  already takes `dn` — does not change arity, so no contract and no landed
+  proof moves.
+- **The strictly-worse third outcome above is DEAD.** The stranger's `iput`
+  reached the claim box through `namei("..")` from a deleted cwd, which is
+  exactly what the first guard refuses. So `ireg_free_au`'s `c = None`
+  obligation stops being a *false* proposition and becomes an *undischarged*
+  one — the same status this entry gives the defect itself: true on every
+  trace that does not fire it.
+- **It does not unblock `create`.** The claim discipline `create` needs is
+  still blocked at `ireg_withdraw`, which is a lemma of `SpecIlock` — a
+  contract that takes no licence and whose callers cannot supply one. A guard
+  prunes traces; it cannot hand a contract a resource. The kernel change that
+  *would* unblock it is the small one recorded under D2's third outcome —
+  hold the dinode buffer across `ialloc`'s `iget` — and upstream did not make
+  it. That change is still the cheapest route to a `create` proof, and it is
+  now the only one on the table.
+
 ## D3 — `uart.c`'s `tx_lock` sleeplock is never initialized
 
 **Found:** 2026-08-12, updating to upstream `ae96fd0` ("example of sleep

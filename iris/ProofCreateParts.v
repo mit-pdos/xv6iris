@@ -273,7 +273,11 @@ End CreateParts.
 (*  (4) THE CONSTANTS                                                     *)
 (* ===================================================================== *)
 
-Lemma cr_K_value : K_create = 106%nat.
+(* 10 own slots + nameiparent's 98.  Moved 106 -> 108 with the copyout chain
+   that pushed dirlookup 82 -> 84 (SpecCreate.v's note on [K_create] has the
+   whole ladder); 9da28f5's [dp->nlink == 0] guard did NOT move it, because
+   the frame is still 80 bytes. *)
+Lemma cr_K_value : K_create = 108%nat.
 Proof. reflexivity. Qed.
 
 Lemma cr_slots_value : create_slots = 3%nat.

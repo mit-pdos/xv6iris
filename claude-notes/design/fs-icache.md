@@ -5050,3 +5050,527 @@ existential in `ireg_slot` and the cost of removing them is a sweep.  What
 changes is the STAGE PLAN: §20.11's E is struck, D's gate is §19.9.2's, and
 `ProofIalloc.v:1622` is carried as a known-open call site in stage C rather
 than as work.
+
+### 20.17 THE FIXED BINARY, VERIFIED (GR-2d, 2026-08-13): the guards kill
+### §20.16.2's trace but NOT §20.16.3's wall.  `c = None` goes from FALSE to
+### MERELY UNDISCHARGED; row 2(b) closes at the two guarded sites and stays
+### open at two unguarded ones; the minimal carrier is one file and it is free
+
+The kernel is now pinned at upstream `9da28f5`, which put an `nlink == 0`
+guard immediately after `ilock` in BOTH walkers:
+
+```c
+  /* namex(), fs.c   -- after the type test; PROVEN, ProofNamex +0xce/+0xd2 */
+  if (ip->nlink == 0) { iunlockput(ip); return 0; }
+  /* create(), sysfile.c -- after ilock(dp); DECODED, create +0x2a/+0x2e   */
+  if (dp->nlink == 0) { iunlockput(dp); return 0; }
+```
+
+This section verifies the coordinator's eight-step ruling for how create's
+one gated case (§20.7 row 2 case (b) ORPHAN) closes on that binary.  **Three
+steps confirm, two sharpen, three refute.**  The headline: the fix is a real
+formal dividend — it retires §20.16.2, the trace that made `ireg_free_au`'s
+`c = None` a FALSE proposition — but it does not close create, because
+§20.16.3's obstruction was never about reachability.  It was about
+`ireg_withdraw` being a lemma of `SpecIlock`, a contract with no licence and
+no caller able to supply one, and a kernel fix cannot change what a contract
+can be given.
+
+Verdicts first, so no reader has to reconstruct them:
+
+| step | claim | verdict |
+|---|---|---|
+| 1 | SpecCreate needs no new arm; the guard's exit is absorbed by `ok = false` | **CONFIRMED** (five conjuncts checked) |
+| 2 | `K_create` 106 → 108; the three callee-K values | **CONFIRMED**, and the decode header is stale in a way worth recording |
+| 3 | igrey stays; the `sys_unlink` race is real | **CONFIRMED and WIDENED** — there is a second unguarded site, `sys_link` |
+| 4 | "grey fragments live only in grey homes" | **SHARPENED** — true, but lock-relative, and it owes S7 a fact nobody has stated |
+| 5 | no reachable `iget` consumes a grey fragment | **REFUTED** — `sys_link`'s `dirlink` does, via `link(old, "<dir>/..")` |
+| 6 | rows 1–6 all close; the fresh-type fact becomes a theorem | **REFUTED** — twice, independently |
+| 7 | carrier: option (i)-lite vs option (ii) | **BOTH REJECTED**; option (iii) recommended, and it is one file |
+| 8 | M1's fate on the fixed binary | **STAYS DEAD**, but for S5g's reason, not S5h's |
+
+#### 20.17.1 STEP 1 — CONFIRMED.  The guard's exit is ARM N one call later
+
+The guard's exit block is `create+0x76..0x7e`: `mv a0,s1` / `jal iunlockput`
+/ `li s2,0` / `c.j +0x62`.  Call it **ARM G**.  Walked against
+`wp_create_sconf_body`'s `ok = false` arm (`SpecCreate.v:524-527` as frozen),
+conjunct by conjunct:
+
+* **`a0 = 0`.**  `li s2,0` into the answer register, then the shared
+  epilogue.  ✓ (note the answer register is s2 on this binary, not s3 —
+  see §20.17.2.)
+* **"every inode it touched has been iunlockput".**  create has touched
+  exactly `dp`, and ARM G's `iunlockput(dp)` is the same call its sibling
+  failure arms make.  ✓
+* **the slot ledger, `(ns - create_slots) <= ns' <= ns`.**  `nameiparent`
+  takes two units and returns one on success, so the walk is at `ns - 1` at
+  the guard; `iunlockput` returns one; `ns' = ns`.  Both bounds hold with
+  room (`create_slots = 3` and the peak on this arm is 2).  ✓
+* **`Sb ⊆ Sb'` and `u' <= u`.**  The only writer on this arm is the `iput`
+  inside `iunlockput`, whose free path may `itrunc` + `iupdate`.  Both
+  clauses are exactly the monotone/decreasing shape §18 chose so that a
+  flush on a failure arm costs the contract nothing.  ✓
+* **everything structural comes back.**  The guard reads one halfword out of
+  `ic_loaded`'s `inode_meta` and writes nothing; the superblock cells, the
+  path buffer, `proc_priv`, `bslots bn 3` and `bitmap_res` (at an
+  existential `used'`) are untouched or handled by the `iunlockput` the arm
+  shares with the rest of the family.  ✓
+
+So `wp_create_sconf_body` does not move.  What DOES move is the header's
+count: the failure family is **N / G / F-BAD / A-FAIL / FAIL**, five arms
+where the text said four.  That is the one documentation edit this step
+earns, and it is landed.
+
+#### 20.17.2 STEP 2 — CONFIRMED, and the decode header is stale
+
+`K_create` = create's own frame + the deepest callee.  Both halves checked
+against the tree at this revision:
+
+* **the frame did not move.**  `CodeCreate.v`'s first instruction is
+  `c.addi16sp` encoded `0x715d`; decoding the RVC immediate
+  (`nzimm[9]=inst[12]=1`, `nzimm[8:7]=inst[4:3]=11`, `nzimm[6]=inst[5]=0`,
+  `nzimm[5]=inst[2]=1`, `nzimm[4]=inst[6]=1`) gives `-512 + 384 + 32 + 16 =
+  -80`.  The eight `c.sdsp`s still land at 72/64/56/48/40/32/24/16.  **10
+  slots**, unchanged by the guard.
+* **the callee list.**  `nameiparent` **98** (`SpecNameiparent.v:78`),
+  `dirlink` **94** (`SpecDirlink.v:195`), `dirlookup` **84**
+  (`SpecDirlookup.v:159`), `iunlockput` 64, `ialloc` 48, `ilock` 44,
+  `iupdate` 44.  The stale comment said 96 / 92 / 82 for the first three;
+  all three moved by 2 for one reason, the copyout chain SpecDirlookup
+  already documents (`psz` gets a callee-saved home, copyout 50 → 52,
+  either_copyout 56 → 58, readi 70 → 72, dirlookup 82 → 84, namex 94 → 96,
+  nameiparent 96 → 98, dirlink 92 → 94).
+
+**10 + 98 = 108.**  Landed in `SpecCreate.v` and `ProofCreateParts.cr_K_value`.
+
+**AND A FINDING THE MANDATE DID NOT ASK FOR, recorded because the walk stage
+will trip on it.**  `create` is **332 bytes** at this revision
+(`CodeCreate.v:58`), not the 312 the SpecCreate header claimed, and the guard
+did not merely append: it re-laid the whole function.  `jal nameiparent` is
+at +0x1c (was +0x20), `jal ilock` at +0x26 (was +0x2a), `jal dirlookup` at
++0x38 (was +0x36), and **the answer register changed from s3 to s2**
+(`li s2,0` at +0x7c).  Every address in the header's decode listing is
+wrong.  The listing is kept — its five structural findings are all still
+true, and they are the load-bearing part — under a banner saying so.  The
+regeneration is ProofCreate's stage work, off `CodeCreate.v`, not a spec
+edit.
+
+#### 20.17.3 STEP 3 — CONFIRMED, AND WIDENED: there are TWO unguarded
+#### `dirlookup` sites, not one
+
+The ruling's race is real and the fixed source is the proof of it.
+`sys_unlink` (`sysfile.c:189`) reads
+
+```c
+  if ((dp = nameiparent(path, name)) == 0) { ... }
+  ilock(dp);                       /* NO nlink test -- the fix touched
+                                      only namex and create            */
+  if (namecmp(name, ".") == 0 || namecmp(name, "..") == 0) goto bad;
+  if ((ip = dirlookup(dp, name, &off)) == 0) goto bad;
+```
+
+`nameiparent`'s guard fires under `dp`'s lock and then `namex` *iunlocks and
+returns*; the caller re-`ilock`s.  In that window B can unlink A's target and
+`rmdir` `dp`, so A's `dirlookup` runs in a directory whose `nlink` is zero.
+**`dirlookup` on an orphaned directory is still reachable, so §20.3's grey
+disjunct stays and §20.9(h)/(i) stand unchanged.**
+
+**The ruling misses a second site, and it is the one that matters.**
+`sys_link` (`sysfile.c:147-155`):
+
+```c
+  if ((dp = nameiparent(new, name)) == 0) goto bad;
+  ilock(dp);                                    /* NO nlink test        */
+  if (dp->dev != ip->dev || dirlink(dp, name, ip->inum) < 0) { ... }
+```
+
+`dirlink` opens with `dirlookup(dp, name, 0)`, so this is a *third* consumer
+of `dir_links`, unguarded, with the same race window — and unlike
+`sys_unlink` it does **not** filter the name.  See step 5.
+
+#### 20.17.4 STEP 4 — SHARPENED.  The theorem is right, its statement is
+#### LOCK-RELATIVE, and the conversion it presupposes owes S7 a fact
+
+**The theorem.**  *A `dir_links` fragment is `igrey` only if the directory
+whose payload holds it has `nlink = 0`.*
+
+**The basis, corrected.**  The mandate's own sentence wobbles and the
+corrected version is what §20.8's steps 3–4 actually say.  `ireg_link_grey`
+fires at `sys_unlink`'s directory arm, at `dp->nlink--`.  The fragment it
+converts is an `ilink dp` — it is `dp`'s ledger entry — but it *lives in the
+CHILD `ip`'s `dir_links`*, because it is `ip`'s `".."` record that names
+`dp`.  So the fragment's HOME is `ip`, and `ip` reaches `nlink = 0` four
+lines later in the same critical section.  Grey fragment ⟹ home is `ip` ⟹
+home has `nlink = 0`.  ✓
+
+**SHARPENING (a): the invariant is momentarily FALSE, and that is fine.**
+Between `dp->nlink--` (where the colour flips) and `ip->nlink--` (where the
+home's count reaches zero) the home still has `nlink = 1` and already holds a
+grey fragment.  This is harmless and it *tells you where the clause belongs*:
+`dir_links` rides in `ic_loaded` / `ipool_alloc`, i.e. in a payload that is
+CHECKED OUT for the whole of that window — `sys_unlink` holds `ilock(ip)`
+from before the flip to after the decrement.  A clause on a payload is an
+obligation at the PARK, and at `iunlockput(ip)` the home's record has
+`nlink = 0`.  **State the theorem over parked payloads and it is exactly
+true; state it globally and it is exactly false.**  Consumers are unaffected:
+every consumer reads `dir_links` out of a payload it holds under the home's
+own sleeplock.
+
+**SHARPENING (b): the theorem is NAME-BLIND and POSITION-BLIND, which is
+strictly better than the ruling's step 5 needs.**  Nothing in it mentions
+`".."` or index 1.  The consumer refutes grey from the home's `nlink`, never
+from the matched record's name — which matters, because the model has NO
+invariant saying record 1 of a directory is `".."`, and `dir_link_at` is
+keyed by index.
+
+**VERIFYING "no other `ireg_link_grey` call site breaks this" — vacuous, and
+worth saying why.**  There is no `ireg_link_grey` at all.  `IcacheRef.v:725`
+lands the RA-level `link_grey_of_link`; the region-level lemma §20.2 charters
+is unwritten, and the ONLY site that would call it is `sys_unlink`'s
+directory arm, which is S7 and does not exist.  Boot mints `g = 0` everywhere
+(`IcacheBoot.v:583/617` stock every directory's `dir_links` from an image the
+IOU gives `● (w_z, 0, None)`).  So the theorem is not a check on landed code:
+**it is a CONSTRAINT ON S7**, and it should be written into S7's brief as
+one.
+
+**AND AN OWED FACT NOBODY HAS STATED, found while checking (b).**  S7 cannot
+perform the conversion at all without knowing WHICH fragment to convert.
+`dp->nlink--` must consume one `ilink dp`; the only `ilink dp` in the system
+is inside `ip`'s `dir_links`, at the index of `ip`'s `".."`; and the model
+has no fact placing it.  `dir_ok` says only that live records cover; nothing
+says *a child directory's data holds a live record naming its parent*.  That
+fact is true of every directory `mkdir` builds and it is establishable at
+`create`'s `dirlink(ip, "..", dp->inum)` — the natural carrier is a payload
+conjunct beside `dir_links`, not a new ghost.  **It is S7's blocker, not
+§20.17's, but it is filed here because §20.6's preservation table quietly
+assumes it and nobody had noticed.**
+
+#### 20.17.5 STEP 5 — REFUTED.  `sys_link`'s `dirlink` consumes a grey
+#### fragment, and `skipelem` will hand it `".."` on request
+
+The ruling enumerates three shelters: (i) namex's guard, (ii) create's guard,
+(iii) `sys_unlink`/`dirlink` where the name is never `"."`/`".."`.  (i) and
+(ii) are CONFIRMED, (iii) is not.
+
+**(i) namex — CONFIRMED.**  The landed proof is the evidence: at
+`ProofNamex.v:3462` the fall-through arm carries
+`Hnl0 : di_nlink dnl <> (mword_of_int 0 : mword 16)`, where `dnl` is the
+record `ic_loaded` names in its own `dinode_at` and quantifies its
+`dir_links` over.  The guard, the region element and the fragments are all
+about the same `dn`.  That is the raw material, and it is already green.
+
+**(ii) create — CONFIRMED**, same shape at `create+0x2a/+0x2e`, decoded (see
+§20.17.2).  The mandate's sub-argument about `create("/a/..")` also checks
+out: `nameiparent` returns `dp = a`, `name = ".."`; `dirlookup(a, "..")`
+FINDS the record, so create takes the found arm and `dirlink` never runs; the
+found arm then `ilock`s the `".."` target, whose fragment came out of a home
+the guard just certified live — hence `ilink`, hence allocated.  `ARM F-BAD`
+follows for both `T_FILE` (a directory fails the +0x5c test) and `T_DIR`
+(fails the +0x4c test).  ✓
+
+**(iii) — REFUTED at `sys_link`.**  `sys_link`'s `dirlink(dp, name, ...)`
+runs `dirlookup(dp, name, 0)` with `name` produced by `skipelem` from the
+user's `new` path, unfiltered, under an unguarded `ilock(dp)`.  So
+`link(old, "/a/b/..")` makes `dirlookup` match the `".."` record of `b`, and
+if `b` was orphaned in the race window of §20.17.3 that record's fragment is
+**grey**.  A reachable `iget` consumes a grey licence.  The ruling's
+"NO reachable iget consumes a grey fragment" is false as written.
+
+**WHAT SURVIVES, and it is most of what the ruling wanted.**  Trace the
+`sys_link` consumer to its end:
+
+1. `dirlookup` matches, `iget(dev, inum)` mints or finds an entry;
+2. `dirlink` immediately does `iput(ip); return -1`.
+
+`iput` frees only on `ref == 1 && valid && nlink == 0`.  The entry here is
+either **fresh** — `iget` minted it, `valid = 0`, so `ProofIput` takes the
+`ic_unloaded` arm and no free is possible — or **shared** with whoever else
+holds the inum, so `ref >= 2`.  Either way `sys_link` **never `ilock`s and
+never frees** the grey target.  It borrows a licence and drops it.
+
+So the corrected conclusion is sharper and narrower than the ruling's:
+
+> **No reachable `iget` under a GREY licence reaches a WITHDRAW or a FREE via
+> `namex`, `create` or `sys_link`.  The one residue is `sys_unlink`'s found
+> arm, whose `ilock(ip)` IS a withdraw.**
+
+And `sys_unlink`'s residue is closed by ONE nameable invariant rather than by
+the ledger: `rmdir` runs `isdirempty`, so an orphaned directory has no live
+record but `"."` and `".."`, and `sys_unlink` refuses both by `namecmp`.  That
+is §20.6's itrunc-row obligation restated at a second consumer, it belongs in
+S7's brief, and it is the ONLY thing standing between the fixed binary and
+"no grey licence is ever cashed at a record anybody writes".
+
+#### 20.17.6 STEP 6 — REFUTED, twice and independently
+
+The ruling concludes that with (b) refuted, §19.9.1's rows 1–6 all close and
+`di_type dn = ty` becomes a theorem.  It does not, for two reasons that have
+nothing to do with each other and nothing to do with reachability.
+
+**(A) LICENCE (d) STILL HAS NO SOURCE, and row 2 cannot even be STATED
+without it.**  §20.16.4 struck licence (d) because `ireg_claim_au` cannot mint
+an `iclaim`; the landed lemma (`InodeRegion.v:1049`) pays out `True` and
+`ireg_link_ok` (`:637`) is (L1)+(L3) only — no `c` clause anywhere.  So
+`ProofIalloc.v:1622`'s own `iget` has nothing behind it, and `SpecIget`'s
+premise cannot be stated as a six-way `iname` until something founds (d).
+Upstream took **neither** of §20.16.4's two fixes for this: (F1) leaves the
+dangling `".."` in place (the guards are a walk-side fix, not a record-side
+one — `kernel-defects.md` says so), and (F2) — move `ialloc`'s `brelse` after
+its `iget`, which would have covered `:1622` with licence (e) BUFFERED — was
+never proposed upstream and is still only D2's third-outcome note.  **The one
+kernel change that would have founded (d) for free is the one that was not
+made.**
+
+**(B) §20.16.3's `ireg_withdraw` WALL IS UNTOUCHED BY THE FIX, and this is
+the load-bearing refutation.**  Suppose (A) were solved and the guarded
+clause `g = 0 -> claim_ok d c inreg` were stated.  `ireg_withdraw`
+(`InodeRegion.v:1293`) flips the arm from in-region to marker, so under the
+clause it owes `c = None` afterwards, i.e. it must consume an `iclaim` or
+refute one.  Its ONLY caller is `ProofIlock`'s fill arm, and `SpecIlock`
+takes no licence.  §20.16.5(e) explains why it cannot be given one — `namex`
+`ilock`s the child *after* `iunlockput(parent)`, so the borrowed fragment is
+already back in the parent's parked payload — and **the fix changes not one
+word of that.**  A kernel guard prunes traces; it cannot hand a contract a
+resource.  §19.7 in its purest form: the clause would wedge a landed, green
+`ProofIlock`/`ProofNamex`, on a step the machine still takes.
+
+I checked whether the clause can be re-shaped to dodge the withdraw, because
+that is the obvious next move and it deserves a death certificate rather than
+a shrug:
+
+> **(k) THE CLAUSE ON THE BYTES INSTEAD OF THE ARM** — carry the claimed type
+> in the ledger, `c = Excl ty`, with the single clause
+> `c = Excl ty -> di_type d = ty` and NO `inreg` conjunct.  This is genuinely
+> attractive and it survives four of the five movers for free: `ireg_withdraw`
+> does not change `d` at all (the record is `ds !!! islot inum`, pinned to the
+> block's bytes by `ireg_couple` on BOTH arms), so **the withdraw owes
+> nothing**; and every ordinary write already carries `di_type_stable`
+> (`ireg_write_au`, `ireg_write_link`, `ireg_write_unlink`), so the type is
+> preserved by hypothesis.  It also collapses §20.7's six-step derivation to
+> ONE agreement read: create's `iclaim ty` against the authority gives
+> `di_type (withdrawn record) = ty` on the spot, with no "no free since", no
+> "no re-claim" and no `di_type_stable` chain.  **DEAD at `ireg_free_au`, and
+> only there**: the free writes a type-0 record, so it must show `c = None`,
+> which is §20.16.2's obligation verbatim.  The wall does not move — it just
+> becomes a one-mover wall instead of a two-mover one, which is worth knowing
+> if the free ever acquires a discharge.
+
+**WHAT THE FIX DOES BUY, stated positively.**  §20.16.2's trace dies at its
+step 5: `P` walks `".."` from a deleted cwd, and `namex`'s guard now stops the
+walk AT the cwd, so `dirlookup(b, "..")` never runs, `a`'s inum is never
+`iget`ed, and the stranger's `iput` never frees a live `create`'s inode.  The
+`sys_link` variant is benign for the `valid = 0` reason of §20.17.5, and the
+`sys_unlink` variant is closed by the `isdirempty` invariant.  **So
+`ireg_free_au`'s `c = None` premise is no longer a FALSE proposition.  It is
+an UNDISCHARGED one** — exactly D2's own "true on every trace that does not
+fire the defect", one subsystem down.  §20.16.4's "do not re-price them"
+should be read as "do not re-price them *as carriers for a false
+proposition*"; the correct status is §20.15's, unpriced, with the withdraw as
+the named obstruction rather than the trace.
+
+**CONSEQUENCE FOR STAGE D.**  `SpecCreate`'s frozen `di_type dn = ty` on the
+`made` arm stays GATED, on §19.9.2's gate, as §20.16.4 left it.  What create
+CAN prove at its fresh `ilock` is `fresh_shape dn` — size 0, zero addrs, out
+of `ireg_withdraw`'s own payout (`InodeRegion.v:983`) — and not the sixteen
+bits §19.4 named as the entire deficit.  **`ARM C-OK-DIR` stays gated too**,
+because `dirlink(ip, ".")`'s first premise is `di_type dn = T_DIR`.  The gate
+belongs in a `Link*` file of its own so it cannot hide anything else in
+`Print Assumptions`; see §20.17.9.
+
+#### 20.17.7 STEP 7 — THE CARRIER.  Both priced options are rejected; the
+#### recommendation is a THIRD, and it is one file and no contracts
+
+**Re-aiming the question first.**  With step 6 refuted, the carrier is no
+longer "what does create's window derivation need" — that derivation is
+blocked upstream of any carrier.  The carrier question that is still live, and
+still worth landing, is the narrower one: **what is the minimal way to make
+the guard fact reach the colour, so that "a fragment consumed under a live
+home is `ilink`" is a lemma rather than a paragraph?**  That is stage C's (b)
+half, it is the formal content of D2's fix, and every later revival of the
+claim discipline needs it as a prerequisite.
+
+**OPTION (i)-lite — `SpecDirlookup`'s post gains "the returned inum's
+fragment was `ilink` at the read".  REJECTED, twice.**
+
+* *It is not post-only, so the S3i rule does not apply.*  The S3i rule (a
+  postcondition strengthening is free iff the premises imply it) needs
+  `dirlookup` to HOLD something about the ledger.  It holds nothing:
+  `wp_dirlookup_sconf_body`'s directory bundle is `i_dev` / `inode_meta` /
+  `inode_map` / `inode_blocks` plus the pure `dir_inums_ok data nrec nib`
+  (`SpecDirlookup.v:203`).  There is no `dir_links`, no `dinode_at`, no
+  `ireg_inv`.  So the clause is a PREMISE addition wearing a postcondition's
+  clothes, and premise additions move every consumer: `ProofNamex` (landed,
+  green, ~5000 lines, and the supply point is inside the four-exit tail where
+  `Hdlblk` is stated once for two routes) and `ProofDirlink` (landed).  Price:
+  4 contracts, 3 landed proofs, one of them the largest in the tree.
+* *And the fact it would carry is a fact about the PAST.*  "was `ilink` at the
+  read" is §20.9(b)'s death certificate verbatim — a persistent per-inum
+  allocatedness witness, dead on free-and-reclaim.  To be evidence in the
+  present the post would have to hand back the FRAGMENT, and the fragment
+  belongs to `dp`'s payload and must return before `iunlock(dp)` — which on
+  create's found arm is `iunlockput(dp)`, BEFORE the `ilock(ip)` that would
+  use it.  §20.16.5(e)'s wall, one function further out.
+
+**OPTION (ii) — a per-window argument inside `ProofCreate` using the claim
+token + L1/L3 + M1-style counting, touching neither `SpecDirlookup` nor
+`SpecIget`.  REJECTED.**  The window argument's content is a statement about
+what OTHER threads can do, and nothing inside `ProofCreate` can see another
+thread's `iget`.  The enumeration lives at `SpecIget` or nowhere — that is
+§20.4's whole point, and §19.5's eight death certificates are the record of
+trying to put it elsewhere.  M1 is independently dead (§20.17.8).  And the
+option presupposes the claim token, which is (A) above.
+
+**OPTION (iii), RECOMMENDED — THE COLOUR CARRIES ITS OWN HOME CONDITION.**
+Strengthen `DirLinks.dir_link_at`'s grey disjunct in place:
+
+```coq
+  Definition dir_link_at (self : Z) (dn : dinode)
+      (data : nat -> list (bv 8)) (k : nat) : iProp Σ :=
+    (if dir_liveb data k
+        && negb (bool_decide (bv_unsigned (dir_inum data k) = self))
+     then (ilink (bv_unsigned (dir_inum data k))
+           ∨ (igrey (bv_unsigned (dir_inum data k))
+              ∗ ⌜bv_unsigned (di_nlink dn) = 0⌝))
+     else emp)%I.
+```
+
+`dir_links` (`DirLinks.v:109`) ALREADY takes `dn` — it uses it for the type
+test and for `dir_nrec (di_size dn)` — so `dir_link_at` gains a parameter its
+only caller already has in scope, and **`dir_links`'s own arity does not
+move.**  That is the whole trick, and it is §17.6.3's move (put the
+disjunction inside the definition) applied one level down.
+
+*Why the clause is TRUE:* §20.17.4's theorem, at exactly the placement
+§20.17.4(a) forces — a payload conjunct, obligated at the park, where the
+home's `nlink` has already reached zero.
+
+*What it costs, per file:*
+
+| file | change | cost |
+|---|---|---|
+| `DirLinks.v` | the definition above; `dir_link_at_timeless` (both disjuncts timeless, unchanged); `dir_link_at_agree`, `dir_links_dirlink`, `dir_link_at_dirlink`, `dir_links_dirlink_nop` gain `dn` and re-thread it | the only real work; the `dirlink` twins already carry `dn`/`dn'` |
+| `DirLinks.v` | `dir_links_not_dir` / `_free` / `_size_zero` | **zero** — all three produce `emp` |
+| `DirLinks.v` | `dir_links_eq` gains `⌜di_nlink dn' = di_nlink dn⌝` (or the weaker implication) | **zero today** — it has no consumer in the tree yet |
+| `DirLinks.v` | NEW, three lines: `dir_link_at_live : bv_unsigned (di_nlink dn) <> 0 -> dir_link_at self dn data k -∗ …ilink…`, and its big-op lift `dir_links_live` | this IS the theorem |
+| `IcacheEscrow.v`, `IcacheBoot.v`, `ProofIlock.v`, `ProofFilewrite.v`, `ProofIput.v` | **nothing** — `dir_links`'s arity is unchanged and the three collapse lemmas they use are unchanged | zero |
+| every Spec file | **nothing** | zero |
+
+**ONE FILE, ZERO CONTRACTS, ZERO LANDED PROOFS REOPENED.**  Against option
+(i)-lite's four contracts and three landed proofs including `ProofNamex`.
+
+*New-premise ripple:* one, and it lands on a site that does not exist.  S7's
+grey conversion must re-establish `di_nlink ip = 0` at `iunlockput(ip)`, which
+it has: `ip->nlink--; iupdate(ip)` runs immediately before it.  Free today,
+and it is the same obligation §20.6's `sys_unlink` rows already carry.
+
+*Boot:* `IcacheBoot`'s IOU mints `g = 0` and stocks every directory with
+`ilink`s, so the left disjunct is always taken.  Nothing to prove.
+
+*And (iii) is a PREREQUISITE of (i)-lite, not an alternative to it.*
+(i)-lite's post clause is derivable only from (iii)'s clause plus the guard.
+So the staging is not a fork: land (iii) now; if stage C ever threads a
+licence into `SpecIget`, it threads (iii)'s conclusion.
+
+**THE STAGING TABLE (§14.4's form).**
+
+| stage | what lands | files | gate | independently correct? |
+|---|---|---|---|---|
+| **B′** | option (iii): the grey disjunct carries `di_nlink dn = 0`; `dir_link_at_live` / `dir_links_live` | `DirLinks.v` | none | YES — it is D2's fix, formalised, and it is true whatever happens to (d) |
+| **D₀** | `ProofCreate`'s walk, guard arm included, on the regenerated decode; every arm but the fresh-type fact | `ProofCreate.v`, `ProofCreateParts.v`, one `Link*` for the gate | B′ for the guard arm's colour reasoning; §19.9.2 for `di_type dn = ty` | YES with the gate visible |
+| **C′** | `SpecIget`'s licence — ONLY IF licence (d) is founded first | `SpecIget.v`, four call sites, `SpecDirlookup`, `SpecDirlink`, `ProofNamex` | **BLOCKED on (A)**: needs F2 in the kernel, or a claim token, and the claim token needs the withdraw | no |
+| **E** | struck; see §20.16.4 and §20.17.8 | — | — | — |
+
+**RECOMMENDATION: land B′, then D₀ with the gate.**  Do not attempt C′ until
+either the kernel takes F2 (`ialloc`'s `brelse` after its `iget` — licence (e)
+then covers `ProofIalloc.v:1622` and licence (d) is unnecessary) or someone
+refutes §20.17.6(B) at the withdraw.  Those are the two doors, and F2 is a
+two-line source change against a proof-side obstruction nobody has cracked in
+three sections.
+
+#### 20.17.8 STEP 8 — M1's FATE: DEAD, and the attribution in §20.16.5(c) was
+#### wrong
+
+Three questions, three answers.
+
+**Does `ireg_free_au`'s `c = None` premise "come back" on the fixed binary?**
+Half.  It comes back as an OPEN obligation (§20.17.6's positive), not as a
+dischargeable one.  It was never in `ProofIput`'s reach and still is not.
+
+**Is M1 still the right carrier?**  No — and the reason survives the fix
+completely intact, which is the point worth recording.  §20.15's objection
+(ii) is that `iref_lic z` against `● (…, r)` yields `1 <= r`, while the free
+needs `r <= 1`, i.e. the ABSENCE of other fragments, which no `nat`-counter
+authority delivers from the presence of one.  **That objection is about the
+algebra, not about the trace.**  §20.16.5(c) filed M1 as "dead, and S5g's
+three objections are now known to be symptoms" of the proposition being false;
+with the proposition no longer known false, **that attribution is retracted**:
+objection (ii) stands on its own, and so does objection (iii) (iput's free runs
+after its `release` at +0x5c, so any count fact must cross the lock — a
+temporal carrier, M2's shape).  M1 is dead for S5g's reasons, independently of
+S5h's.
+
+**Does the guard-derived absence suffice instead?**  No, and this is the same
+category error as §20.17.6(B).  The guards constrain which traces the machine
+takes; `ProofIput`'s obligation is about what its proof state contains.  A
+guard three functions away supplies no resource at `ProofIput.v:2076`.
+
+**Therefore `iref_lic` and the `r` component STAY DORMANT.**  Keep them in the
+RA — §20.16.6's arithmetic is unchanged, one existential in `ireg_slot` to
+keep versus a sweep to remove — and mark them dormant-with-a-reason in
+`IcacheRef.v`'s header at the next touch of that file.  They are not
+scaffolding for work in progress; they are a landed algebra with no consumer
+and a written reason why.
+
+#### 20.17.9 THE ProofCreate STAGE BRIEF (D₀), in landed-lemma names
+
+What the walk consumes, in execution order, with the fixed binary's offsets:
+
+* **+0x00..+0x1a, prologue.**  `cr_frame_bytes` = 80, `cr_frame_slots` = 10,
+  `cr_K_value` = **108**, `cr_slots_value` = 3 (`ProofCreateParts.v`).
+* **+0x1c `jal nameiparent`.**  `SpecNameiparent.wp_nameiparent_sconf`, K 98.
+  Spends two ledger units, returns one.  Failure → **ARM N**.
+* **+0x26 `jal ilock`.**  `SpecIlock.wp_ilock_sconf`.  Out: `ic_loaded γfs γi
+  cov logstart k inum dn bm` — which is `⌜inode_ok⌝ ∗ ⌜dir_ok⌝ ∗ dir_links
+  (bv_unsigned inum) dn data ∗ dinode_at γi inum dn ∗ inode_meta (ientry k) dn
+  ∗ …` (`IcacheEscrow.v:487-499`) — plus `ity_shot g (di_type dn)`.  **All
+  three of the guard's inputs are in this one payload, at the same `dn`.**
+* **+0x2a `lhu a5,74(s1)` / +0x2e `c.beqz`.**  `ProofNamex`'s +0xce/+0xd2
+  block transcribed: destruct `i_nlink` out of `inode_meta`, `wp_lh_s_sconf`,
+  then `nx_nlz_eq` / `nx_nlz_ne` to decide the branch (`ProofNamex.v:485-495`).
+  **Hoist those two lemmas out of `ProofNamex.v` rather than copying them** —
+  they are pure `mword 16` injectivity and belong beside `nx_sext16_inj`'s
+  home, not inside a whole-function proof.
+  - **taken → ARM G** (+0x76..+0x7e): `SpecIunlockput.wp_iunlockput_sconf`,
+    `li s2,0`, `c.j +0x62`, into the shared epilogue.  Discharges `ok = false`
+    with `ns' = ns` (§20.17.1).
+  - **fall-through**: the walk now holds `bv_unsigned (di_nlink dn) <> 0` at
+    the payload's own `dn`.  Apply **`dir_links_live`** (stage B′) to
+    `dir_links (bv_unsigned inum) dn data` and every fragment is `ilink`.
+    That is the whole of case (b)'s refutation at this site, and it is three
+    lines.
+* **+0x38 `jal dirlookup`.**  `SpecDirlookup.wp_dirlookup_sconf`, K 84.  Its
+  `di_type dn = T_DIR` premise comes from the type test; its
+  `dir_inums_ok data nrec nib` premise out of `ic_loaded`'s `⌜dir_ok⌝` via
+  `DirView.dir_ok_dir`.
+  - **found** → `iunlockput(dp)`, `ilock(ip)`, the two type tests → **ARM
+    F-OK** (`create_locked …`) or **ARM F-BAD**.
+  - **miss** → the allocate half.
+* **allocate half.**  `SpecIalloc.wp_ialloc_gen` (landed S5i), then
+  `ilock(ip)` → `ireg_withdraw`'s `⌜fresh_shape …⌝` through `ProofIlock`'s
+  third fill arm.  Then `cr_made_setf` for the three halfword stores and
+  `iupdate`; `cr_size_cap` for each `dirlink`; `SpecDirlink.wp_dirlink_sconf`
+  ×4 with `DirLinks.dir_links_dirlink` / `dir_link_at_dirlink` /
+  `dir_links_dirlink_nop`; `CreateBudget.v` for the op-wide set.
+* **THE ONE GATE.**  `di_type dn = ty` and hence `create_made` and hence
+  `ARM C-OK-DIR`'s `dirlink(ip, ".")` premise `di_type dn = T_DIR`.  Not
+  derivable (§20.17.6).  **Put it in its own `LinkCreateFreshType.v`, holding
+  exactly "`ireg_withdraw` at an inum `ialloc` claimed at `ty` returns a
+  record with `di_type = ty`", so that it cannot hide anything else in
+  `Print Assumptions`** — D3's `LinkTxLockInit.v` is the precedent for keeping
+  an assumption in a file of its own, and D3 is also the precedent for such a
+  file becoming dead code the moment the source changes.
+
+Two things the stage must NOT do: regenerate the decode by hand (`make
+gen-code` has already produced `CodeCreate.v` at 332 bytes), and touch
+`wp_create_sconf_body` (frozen; the fix costs it nothing, which is §20.17.1's
+whole finding).
