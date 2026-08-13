@@ -482,10 +482,12 @@ Section BootBssChain.
     iDestruct (bss_cut g (KernelSyms.cons + 24) KernelSyms.pr
                  (KernelSyms.pr + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hlk2 H]".
+    (* tx_lock is a sleeplock: 44 bytes, not 24.  The residue closes exactly
+       -- kmem sits at tx_lock + 48, so the next cut still starts below it. *)
     iDestruct (bss_cut g (KernelSyms.pr + 24) KernelSyms.tx_lock
-                 (KernelSyms.tx_lock + 24) ram_hi
+                 (KernelSyms.tx_lock + 44) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hlk3 H]".
-    iDestruct (bss_cut g (KernelSyms.tx_lock + 24) KernelSyms.kmem
+    iDestruct (bss_cut g (KernelSyms.tx_lock + 44) KernelSyms.kmem
                  (KernelSyms.kmem + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hlk4 H]".
     iDestruct (bss_cut g (KernelSyms.kmem + 24) (KernelSyms.kmem + 24)

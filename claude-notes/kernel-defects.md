@@ -336,9 +336,14 @@ GR-2 worklist. Do not assume the colour is simply gone.
 
 **Found:** 2026-08-12, updating to upstream `ae96fd0` ("example of sleep
 waiting for interrupt wakeup"), which rewrote the UART transmit path.
-**Status:** **FIXED IN THE SOURCE** by upstream `b7c25cf` ("initialize the
-tx_lock sleeplock"), which is route (1) below verbatim -- one
-`initsleeplock(&tx_lock, "uart")` at the end of `uartinit`.  It arrived in the
+**Status:** **FIXED IN THE SOURCE AND PROVEN.** Upstream `b7c25cf`
+("initialize the tx_lock sleeplock") is route (1) below verbatim -- one
+`initsleeplock(&tx_lock, "uart")` at the end of `uartinit` -- and
+`ProofUartinit` now WALKS that call, so the lock's initialization is a theorem
+of the boot chain rather than an assumption. The axiom that stood in for it
+(`LinkTxLockInit.v`) is deleted; it turned out to be dead code, required by no
+file and therefore never in any `Print Assumptions` set (see
+`durable-notes.md`).  It arrived in the
 pinned image for free, as an intermediate commit on the way to the branch tip
 `9da28f5`.  So the choice between the two routes below never had to be made,
 and route (2) -- indexing `is_lock` by `option string`, a ~123-site sweep that
@@ -414,11 +419,14 @@ Neither is cheap, and the choice is the maintainer's.
 
 ### Where it was assumed meanwhile
 
-**This is now a retirement, not an assumption.** `uartinit` really does
-initialize the lock, so `is_txlock` is provable where it was previously
-unprovable, and `LinkTxLockInit.v`'s axiom should come out as soon as
-`ProofUartinit` is replayed over the extra call -- see the GR-1c section of
-`projects/fs-sysfile.md`.  What stood there meanwhile:
+**Retired.** `uartinit` really does initialize the lock, `ProofUartinit`
+walks the call, and `LinkTxLockInit.v` is gone. One thing the fix does NOT
+settle: WHICH lock owns the transmitter token. `is_txlock`'s resource
+(`tx_res`) and printk's (`pr_res`) both want `uart_tx_own`, because printk
+polls the THR under `pr.lock` while uartwrite drives it under `tx_lock`. So
+uartinit's postcondition stops at `sl_fresh` -- the lock is initialized, what
+it protects is left open -- and the choice belongs to
+`projects/uart-driver.md`. What stood here meanwhile:
 
 `iris/LinkTxLockInit.v`, one `Axiom` (`tx_lock_init`) handing back
 `UartTxInv.is_txlock` for the transmitter token and the frozen DLAB fact —

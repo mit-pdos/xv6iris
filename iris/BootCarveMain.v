@@ -1067,7 +1067,9 @@ Section BootCarveMain.
     kmap_static_claims -∗
     boot_raw_ran g KernelSyms.cons (KernelSyms.cons + 24) -∗
     boot_raw_ran g KernelSyms.pr (KernelSyms.pr + 24) -∗
-    boot_raw_ran g KernelSyms.tx_lock (KernelSyms.tx_lock + 24) -∗
+    (* tx_lock is a SLEEPLOCK since ae96fd0, so its window is the
+       [struct sleeplock]'s 44 bytes, not a spinlock's 24. *)
+    boot_raw_ran g KernelSyms.tx_lock (KernelSyms.tx_lock + 44) -∗
     boot_raw_ran g KernelSyms.kmem (KernelSyms.kmem + 24) -∗
     boot_raw_ran g KernelSyms.pid_lock (KernelSyms.pid_lock + 24) -∗
     boot_raw_ran g KernelSyms.wait_lock (KernelSyms.wait_lock + 24) -∗
@@ -1085,7 +1087,7 @@ Section BootCarveMain.
     iDestruct (boot_lk_raw g KernelSyms.pr Hmem
                  ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                  ltac:(vm_compute; reflexivity) with "Hcl H2") as "H2".
-    iDestruct (boot_lk_raw g KernelSyms.tx_lock Hmem
+    iDestruct (boot_sl_raw g KernelSyms.tx_lock Hmem
                  ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                  ltac:(vm_compute; reflexivity) with "Hcl H3") as "H3".
     iDestruct (boot_lk_raw g KernelSyms.kmem Hmem

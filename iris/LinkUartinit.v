@@ -1,8 +1,9 @@
 (* LinkUartinit.v -- instantiates the Uartinit proof against the UART device
    leaves (Uart).  Sealed, so this is the only place the two ever meet.
 
-   ae96fd0 deleted uartinit's [initlock(&tx_lock,"uart")], so Initlock is no
-   longer a callee and no longer a functor argument. *)
-Require Import LinkUart ProofUartinit.
+   b7c25cf restored the transmit lock's initializer -- as an
+   [initsleeplock(&tx_lock,"uart")] now that ae96fd0 made it a sleeplock -- so
+   Initsleeplock is a callee again, and a functor argument. *)
+Require Import LinkUart LinkInitsleeplock ProofUartinit.
 
-Module Uartinit := UartinitProof Uart.
+Module Uartinit := UartinitProof Uart Initsleeplock.

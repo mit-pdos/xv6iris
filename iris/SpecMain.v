@@ -194,7 +194,7 @@ Section SpecMain.
   (* ------------------------------------------------------------------- *)
   Definition main_locks_raw : iProp Σ :=
     (lk_raw (mword_of_int KernelSyms.cons) ∗       (* consoleinit: cons.lock  *)
-     lk_raw (mword_of_int KernelSyms.tx_lock) ∗    (* consoleinit: uart tx    *)
+     sl_raw (mword_of_int KernelSyms.tx_lock) ∗    (* consoleinit: uart tx    *)
      lk_raw (mword_of_int KernelSyms.pr) ∗         (* printkinit              *)
      lk_raw (mword_of_int KernelSyms.kmem) ∗       (* kinit                   *)
      lk_raw pid_lock_addr ∗                        (* procinit                *)

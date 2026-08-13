@@ -380,7 +380,7 @@ Section ProofMain.
     pc_is (mword_of_int (KernelSyms.main + 0x42) : mword 64) -∗
     cpu_own 0 false p0 cpu_ctx_free false -∗
     lk_raw (mword_of_int KernelSyms.cons) -∗
-    lk_raw (mword_of_int KernelSyms.tx_lock) -∗
+    sl_raw (mword_of_int KernelSyms.tx_lock) -∗
     lk_raw (mword_of_int KernelSyms.pr) -∗
     (∃ r w : mword 64, devsw_console_read ↦₈ r ∗ devsw_console_write ↦₈ w) -∗
     (∃ pv pkv : mword 32,
@@ -422,7 +422,6 @@ Section ProofMain.
     pose proof mn_nl_fmt as (Hknl & Hnnl & Hlnl).
     pose proof mn_boot_fmt as (Hkbt & Hnbt & Hlbt).
     iDestruct "Hlcons" as (vcl vcn vcc) "(Hcw & Hcn & Hcc)".
-    iDestruct "Hltx" as (vtl vtn vtc) "(Htw & Htn & Htc)".
     iDestruct "Hlpr" as (vpl vpn vpc) "(Hpw & Hpn & Hpc2)".
     iDestruct "Hdevsw" as (dr0 dw0) "(Hdr & Hdw)".
     (* ---- +0x42 jal consoleinit ---- *)
@@ -439,15 +438,19 @@ Section ProofMain.
               = (mword_of_int KernelSyms.consoleinit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtci) in "Hpc".
-    (* ae96fd0 deleted uartinit's [initlock(&tx_lock,"uart")], so consoleinit
-       no longer touches the transmit lock's storage: [Htw]/[Htn]/[Htc] stay
-       in hand, unclaimed, exactly as the loader left them (kernel-defects.md
-       D2 is what would consume them). *)
+    (* b7c25cf restored uartinit's [initsleeplock(&tx_lock,"uart")], so the
+       transmit lock's storage goes DOWN to consoleinit and comes back
+       INITIALIZED ([sl_fresh]).  Nothing here consumes it -- uartintr takes
+       no lock since ae96fd0 and uartwrite's proof is not written -- so it is
+       dropped like the other unclaimed init results above.  Note [Htx] is NOT
+       spent by uartinit: which lock owns the transmitter token is the
+       uart/console campaign's open question (SpecUartinit.v's post), and
+       printk's [pr_res] keeps it below.  kernel-defects.md D3. *)
     iApply (Consoleinit.wp_consoleinit_sconf γd C0 n l0 b0
               vcl vcn vcc dr0 dw0 p0 ltac:(lia)
               with "Hcg Htext Hkdata Hpc Huinv Htx Hlb Hsent Hdlab
-                    Hcw Hcn Hcc Hdr Hdw").
-    iIntros (mc) "Hcg Hpc %Hcsci Htx Hsent #Hdoff _ _ _ _ _".
+                    Hcw Hcn Hcc Hltx Hdr Hdw").
+    iIntros (mc) "Hcg Hpc %Hcsci Htx Hsent #Hdoff _ _ _ _ _ _".
     assert (Hretci : ret_pc (C0 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
                      = (mword_of_int (KernelSyms.main + 0x46) : mword 64)).
     { rewrite /C0 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }

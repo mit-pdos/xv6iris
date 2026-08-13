@@ -5206,3 +5206,65 @@ than improvised inside an already-large bump. The instruction-level detail and
 the reasoning are in a banner at the exact stopping point in `ProofUartinit.v`.
 **Until it lands the boot/adequacy cone does not build** -- which is the honest
 statement of where the tree is, and the first thing GR-2 should decide.
+
+## GR-1d — the uartinit cone repaired; D3 proven (2026-08-13)
+
+GR-1c's one park is closed. `b7c25cf` gave `uartinit` five new instructions
+ending in `jal ra,initsleeplock`, and `ProofUartinit` now walks them, so the
+seven-file boot/adequacy cone builds again and D3's fix is a THEOREM of the
+boot chain rather than an assumption.
+
+### The chain
+
+`BootShared`'s carve widens 24 -> 44 at `tx_lock` (it is a sleeplock now, not a
+spinlock) and the residue closes with room to spare -- `kmem` sits at
+`tx_lock + 48`, so the neighbouring cut is undisturbed. `BootCarveMain` swaps
+`boot_lk_raw` for `boot_sl_raw`, which already existed for the buffer and inode
+sleeplocks; `SpecMain`'s eleventh slot becomes `sl_raw`; `SpecConsoleinit` and
+`SpecUartinit` thread it down. Budgets: uartinit 4 -> 8 (its 2-slot frame over
+initsleeplock's 6), consoleinit 6 -> 10.
+
+### What uartinit's post says, and what it deliberately does not
+
+It returns `SleepLock.sl_fresh a_tx_lock "uart"` -- initsleeplock's six results
+verbatim, which is exactly `new_sleeplock`'s premises MINUS the resource. The
+lock is initialized; what it protects is left open, because saying it means
+choosing between printk's `pr_res` and uartwrite's `tx_res` over one
+transmitter token, and **nothing consumes `is_txlock` today**. The full
+analysis and the two-file cost of settling it are in
+`projects/uart-driver.md`; `ProofMain`'s printk mint is untouched, and
+`UartTxInv.v` / `SpecPrintkGen.v` were not opened.
+
+### LinkTxLockInit was dead code
+
+Not "retired from an assumption set" -- **required by no file at all**, so it
+never appeared in any `Print Assumptions` output. Deleting it rippled nowhere.
+The reason it read as live for two rounds is a real tooling gap now recorded in
+`durable-notes.md`: `proof_coverage.py`'s textual `Axiom` scan counts axioms
+that the require graph cannot reach. A require-graph-aware pass is owed.
+
+### The gate
+
+`EXIT=0`, **1060 of 1060** in `_CoqProject` (plus one untracked `N5dChk.vo`
+stray on the mirror that predates this work), nothing unbuilt, nothing stale.
+
+`Print Assumptions`:
+- `SystemAdequacy.xv6_power_adequacy` and `.xv6_fs_adequacy`: funext + the five
+  Sail externs + **five named boot assumptions** -- `boot_dev_caps`,
+  `consoleintr`, `panic_wp_holds`, `printk_gen`, `userinit`. No `tx_lock_init`,
+  and there never was one.
+- `LinkUartinit.Uartinit.wp_uartinit_sconf` and
+  `LinkConsoleinit.Consoleinit.wp_consoleinit_sconf`: **the standing six** --
+  which is the real gain, since neither compiled at all before this change.
+- Spot checks unchanged: `LinkNamex`, `LinkIlock` both the standing six.
+
+### The one trap worth carrying
+
+`ProofUartinit`'s leaves are `wp_next`-WRAPPED (every step goes through
+`wp_next_off_intro`, which collapses the rebound hart back to the section's,
+interrupts being off throughout). `ProofKinit`'s are not. Copying ProofKinit's
+call sequence verbatim left the continuation anchored at a different hart, and
+the failure was the classic one from `durable-notes.md`: *`iSpecialize: cannot
+instantiate (P -∗ Q) with P`* where both sides print CHARACTER-FOR-CHARACTER
+the same. When cloning a call sequence between whole-function proofs, check
+which convention the target file uses before copying the intro pattern.

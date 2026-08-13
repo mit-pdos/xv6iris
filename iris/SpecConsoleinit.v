@@ -53,7 +53,9 @@ Require Import CalleeSaved.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpLock.
+Require Import SleepLock.
 Require Import WpUart.
+Require Import UartTxInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 
@@ -79,7 +81,8 @@ Definition devsw_console_write : mword 64 := mword_of_int (KernelSyms.devsw + 24
    only from main() before intr_on(), so it is stated at [false] with no
    [wp_next] wrapper, the same shape as SpecCpuid.v / SpecTrapinithart.v /
    SpecPlicClaim.v. *)
-Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
+Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!lockG Σ}
+    `{!uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γd : uart_names) (m : regfile) (K : nat)
     (l : list (bv 8)) (b0 : bool)
@@ -92,8 +95,8 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
   let c_cname := lock_name_field clk in
   let c_ccpu := add_vec clk (sign_extend' 64 (mword_of_int 0x10 : mword 12)) in
   (* consoleinit's own frame is 2 slots and its deepest callee is uartinit,
-     which needs 4. *)
-  (6 <= K)%nat ->
+     which needs 8 now that b7c25cf gave it an [initsleeplock] call. *)
+  (10 <= K)%nat ->
   sie_cap_gpr m K false p -∗
   (* [kernel_data] supplies the "cons" string literal consoleinit's [auipc a1 /
      addi a1] points at -- the name it hands to initlock -- and, through
@@ -109,6 +112,8 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
   clk ↦₄ vclock -∗
   c_cname ↦₈ vcname -∗
   c_ccpu ↦₈ vccpu -∗
+  (* the transmit sleeplock's storage, threaded straight to uartinit *)
+  sl_raw a_tx_lock -∗
   devsw_console_read ↦₈ dread0 -∗
   devsw_console_write ↦₈ dwrite0 -∗
   ( ∀ mr,
@@ -118,6 +123,9 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
     (* uartinit writes no THR, so the accepted trace is unchanged; its final
        LCR write cleared DLAB, so the half is frozen for good. *)
     uart_tx_own γd l -∗ uart_sent γd l -∗ uart_dlab_off γd -∗
+    (* uartinit initialized the transmit sleeplock; what it PROTECTS is
+       deliberately not said here -- see SpecUartinit.v's post. *)
+    sl_fresh a_tx_lock "uart"%string -∗
     (* cons.lock comes back initialized; it is a static global that is never
        freed, so its name field is DISCARDED for the persistent [lock_name],
        ready to be sealed into an [is_lock]. *)
@@ -131,7 +139,8 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
 
 Module Type CONSOLEINIT.
   Parameter wp_consoleinit_sconf :
-    forall `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ} `{!sieG Σ} `{!lockG Σ} `{!uartGhostG Σ}
+      `{GEN : GenId} `{CID : CpuId}
       (γd : uart_names) (m : regfile) (K : nat)
       (l : list (bv 8)) (b0 : bool)
       (vclock : bv 32) (vcname vccpu : bv 64)

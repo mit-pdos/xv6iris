@@ -713,6 +713,28 @@ generated (regenerate, never merge), 90 mechanical (take theirs), 12 semantic
 (keep ours) and **2 that were semantic on both sides** -- and only those two
 needed a human.
 
+### AN `Axiom` IN A FILE NOTHING REQUIRES IS INVISIBLE TO `Print Assumptions`
+
+And `tools/proof_coverage.py` still counts it, so the two disagree and the
+assumption looks live when it is dead. `LinkTxLockInit.v` sat in `_CoqProject`
+for two rounds with an `Axiom` standing in for kernel-defects.md D3 -- compiled
+on every build, counted by the coverage tool's textual `Axiom` scan, and
+reachable from NOTHING: no file `Require`d it. `Print Assumptions` can only
+report axioms on the require graph, so it never appeared in any cone's
+assumption set, and a plan to "retire it from SystemAdequacy's assumptions" was
+a plan to remove something that was not there.
+
+**Check both before believing either.** `grep -rln "Require.*<file>" iris/*.v`
+is the whole test: no hits means the axiom is dead code, and deleting it is
+free and ripples nowhere. A live assumption must be reachable, and the way to
+confirm it is `Print Assumptions` on the cone that should own it -- not the
+coverage count.
+
+**OWED, do not build it now:** `tools/proof_coverage.py`'s axiom scan should be
+require-graph aware -- an `Axiom` in an unreachable file wants reporting as
+DEAD rather than as outstanding, because the two readings differ by exactly the
+work of deleting a file.
+
 ### Expect cascades, and let `-k` enumerate them
 
 Each build reveals only the next layer: a file that fails blocks its
