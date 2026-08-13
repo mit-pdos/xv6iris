@@ -20,6 +20,18 @@ on top of it. Spend the rework; keep the specs clean. The failure mode to avoid
 is complexity accreting (hit/miss × width × compressed × fault-arm cross-products)
 past the point where a clean abstraction can still be retrofitted.
 
+**A HOIST PROPOSED BECAUSE TWO NEAR-DUPLICATES CANNOT SEE EACH OTHER IS
+USUALLY A GENERALIZATION IN DISGUISE.** When the reason given for moving a
+lemma is "its twin lives in a sibling file and neither may import the other's",
+check first whether making them HYPOTHESIS-FREE makes them the same lemma. The
+worked instance: kerneltrap's `if ((sstatus & SPP) == 0) panic` and usertrap's
+`if ((sstatus & SPP) != 0) panic` each carried a two-lemma pair in their own
+parts file, and both pairs are readings of ONE equation —
+`WpGprCsrwC.sstatus_spp_mask`, whose statement takes no hypothesis at all
+(`… = negb (Z.testbit (bv_unsigned (_get_Mstatus_SPP ms)) 0)`), leaving each
+handler one `rewrite`. Four lemmas became one plus two corollaries. The import
+problem was the symptom; the special-casing was the cause.
+
 ## Orchestration: model roles and division of labor
 
 This work is split between a top-level orchestration agent and the subagents it
@@ -401,6 +413,61 @@ every hart-indexed head in the converted range is right and cheap to script —
   builders all live in the same file as the leaf (as `WpSconfAlu`'s
   push/pop/16sp wrappers do), no call site outside it changes.
 
+### A BUNDLE FRAMED ACROSS AN INTERRUPTS-ENABLED STEP MUST BE HART-FREE
+
+At `b = true` every step's `wp_next` may resume on a different hart, and the
+only things that cross are what a leaf RE-DELIVERS (`sie_cap_gpr`) and what
+TRANSPORTS — `cpu_own`, `trap_csrs_ext`, `cpu_claim_ext`, and each of those
+only because its proposition is `emp` or a pure fact at `true`. Everything
+else a function holds there is FRAMED, and framing a hart-indexed proposition
+across a possible migration is unsound. So **the environment bundle of any
+function that runs at `b = true` has to be hart-free**, and that is a
+constraint on the INTERFACES it takes, not something the proof can arrange.
+
+Two shapes discharge it, and usertrap needed one of each:
+
+- the resource genuinely is per-hart → carry the `□ ∀ h` form, as
+  `SpecPanic.panic_wp_any` does for panic's contract and
+  `UsertrapRes.devintr_caps_any` does for `SpecDevintr.devintr_caps`
+  (`TimerCap.timer_cap` holds this hart's mcounteren/stimecmp;
+  `SpecClockintr.tick_keeper`'s left disjunct is about this hart). Check
+  satisfiability at the boot end before adopting it — the `∀ h` form can be
+  strictly stronger, and here it is: it rules out satisfying the tick keeper
+  with `tick_hart = false`, which is right, because a process can migrate onto
+  hart 0.
+- the resource is an ABSTRACT family, so nothing can transport it → drop
+  `{CID : CpuId}` from its declaration. `SpecSyscall.syscall_env` did. That is
+  not a hack: the union it stands for is locks, invariants, ghost fragments and
+  memory points-to, and its own eventual proof would hit the same wall (a
+  parking table entry returns at `true` and syscall's tail runs on from there).
+
+The one-command check is `About <bundle>`: its argument list must not contain
+`CID`.
+
+### `CpuId` IS A CLASS, SO A CROSSING NEEDS A NEW SECTION — `rename` DOES NOT WORK
+
+A leaf applied after a crossing resolves its hart by INSTANCE RESOLUTION, not
+by unifying against the hypothesis handed to it, so it picks the SECTION
+variable and fails with the *"iSpecialize: cannot instantiate (X -∗ …) with
+(X)"* both-print-identically error above. The leaves' own recipe —
+`rename CID into CID0` so the rebound hart can be called `CID` — **does not
+transfer to a caller**: what it moves is a name, what picks the hart is
+resolution, and the first leaf after the crossing still resolves at the entry
+hart (measured, in usertrap's tail). Two routes:
+
+- annotate `(CID := CIDx)` on every leaf, `(CID0 := CIDx)` on every
+  `wp_next_off_intro`, and `(CID := CIDx)` on every hart-indexed term written
+  fresh (`rget`, `tp_pin`, `cid_word`, `cpu_claim`, `sie_cap_gpr`, …);
+- or put the post-crossing stretch in a SECTION OF ITS OWN, where the ambient
+  `CID` *is* the post-crossing hart and not one annotation is needed. This is
+  the "CHAINING TWO HALVES OF A FUNCTION" recipe above, applied for a reason
+  other than the linear exit: **one section per hart EPOCH.**
+
+Annotate for one or two steps; split for anything longer.
+`ProofUsertrapTail`'s `ut_ret` (the `jal`, then prepare_return) / `ut_ret2`
+(+0xb2 to the exit, applied at `(CID := CIDp)`) is the worked instance, and
+splitting is what made a fifteen-instruction stretch annotation-free.
+
 ## Changing the kernel SOURCE: what an image shift breaks, and how to find it
 
 Done once, 2026-08-06, for a 6-byte fix inside `writei` (`kernel-defects.md`
@@ -535,6 +602,25 @@ what makes this tractable at all); then fix what it does NOT cover.
   already `ld s2`/`ld s3` — "the epilogue grew a saved register" was an
   artifact of the wrong comparison. Finish with `relayout_map.py residue`
   either way; neither tool rewrites register fields, by design.
+    **NEITHER TOOL RENAMES `<prefix>_<off>` IN THE PROOF.** `relayout_shift.py
+  --proof` rewrites the offsets and immediates a proof spells, and it
+  renumbers the lemma names in `Code<F>.v` — but not the
+  `iPoseProof (uti_0f2 …)` that NAMES them, so after a shift a block's
+  witnesses point two bytes low. That fails loudly only where the old name has
+  gone away; where the shifted range still has a lemma at the old offset it
+  TYPECHECKS, against the wrong instruction, and surfaces as an unprovable pc
+  equation later. Do the rename as ONE simultaneous pass over the block's line
+  range (a sequential `sed` double-shifts — the adjacent-call-site trap above,
+  in a new place), and take the hypothesis names (`Hif2`) and the
+  `(* +0xf2 … *)` comments with it. Grep the file for `<prefix>_` afterwards
+  and read the list against the disassembly; it is short.
+    **BOTH TOOLS HAD THE AUTHOR'S WORKTREE PATH HARD-CODED** (`ROOT =
+  '/shared/xv6iris-4'`, and a `sys.path.insert` of the same), so in any other
+  checkout they died with a `FileNotFoundError` naming somebody else's
+  directory — which reads like a missing file rather than a broken tool. Both
+  now derive `ROOT` from the script's own location. Also: `relayout_map.py`
+  wants a BARE basename (`map CodeUsertrap.v`), not a repo-relative path, or
+  it looks for `iris/iris/Code….v`.
 
 - **A STALE `iDestruct` PATTERN CAN SPLIT A NESTED CONJUNCTION AND BIND THE
   WRONG RESOURCE — silently, and it surfaces far away.** When a bundled

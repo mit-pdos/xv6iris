@@ -56,7 +56,10 @@ Without --write, `apply` prints a unified diff and changes nothing.
 """
 import re, subprocess, sys, difflib, os
 
-ROOT = '/shared/xv6iris-4'
+# DERIVED FROM THIS SCRIPT'S OWN LOCATION, not hard-coded: the tool is checked
+# in and every agent runs it from a different worktree, so an absolute path
+# here fails with a FileNotFoundError naming somebody else's checkout.
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 IRIS = os.path.join(ROOT, 'iris')
 
 # "Lemma bai_02c : kernel_text -* instr (mword_of_int (KernelSyms.balloc + 0x2c)

@@ -102,6 +102,7 @@ LinkUservec.v
 SpecUsertrap.v
 UsertrapRes.v
 ProofUsertrapParts.v
+UsertrapAux.v
 UserretUser.v
 LinkUserretUser.v
 SRegime.v
@@ -1007,8 +1008,13 @@ ProofPrepareReturnParts.v
 ProofPrepareReturn.v
 LinkPrepareReturn.v
 CodeUsertrap.v
+ProofUsertrapTail.v
+ProofUsertrapArms.v
+ProofUsertrapSys.v
 SpecSyscall.v
 LinkSyscall.v
+ProofUsertrap.v
+LinkUsertrap.v
 SpecIalloc.v
 ProofIalloc.v
 LinkIalloc.v

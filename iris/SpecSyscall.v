@@ -132,10 +132,25 @@ Definition wp_syscall_sconf_body
 Module Type SYSCALL.
   (* the kernel-side resources the syscall table's entries consume, for the
      process at [pj] whose open-file table is named by [γf].  Defined
-     concretely by the (future) proof; threaded opaquely by usertrap. *)
+     concretely by the (future) proof; threaded opaquely by usertrap.
+
+     HART-FREE, AND THAT IS PART OF THE CONTRACT rather than an accident of
+     the binder list.  The environment is FRAMED across steps that run at
+     [b = true] -- syscall's own tail after a parking table entry returns, and
+     usertrap's whole tail on this arm ([jal killed], [jal prepare_return]) --
+     and at that index a step may resume on a DIFFERENT hart.  A hart-indexed
+     resource cannot cross: [IntrDefs.trap_csrs_ext_transport] and its
+     siblings work only because their propositions are [emp] at [true], and
+     nothing of that kind is available for an abstract family.  So the union
+     of the twenty-two entries' footprints has to be hart-free, which it is:
+     locks, invariants, ghost fragments and memory points-to, no per-hart
+     register cell and no [tick_hart].  (Compare [SpecDevintr.devintr_caps],
+     which genuinely is per-hart -- [TimerCap.timer_cap] holds this hart's
+     mcounteren/stimecmp -- and which usertrap therefore carries in the
+     hart-generic [UsertrapRes.devintr_caps_any] form instead.) *)
   Parameter syscall_env :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
-      `{GEN : GenId} `{CID : CpuId},
+      `{GEN : GenId},
       gname -> mword 64 -> iProp Σ.
   Parameter wp_syscall_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}

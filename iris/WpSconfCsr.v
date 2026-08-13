@@ -1512,6 +1512,17 @@ Section WpSconfCsr.
       sie_cap_gpr m (trap_res b + n)%nat false p -∗
       intr_count 0 false -∗
       trap_csrs -∗
+      (* THE RUNNING CLAIM, out of the arm along with the trap CSRs.  It used
+         to be DROPPED here, which made this leaf lose a resource its
+         push_off sibling [wp_csrci_sstatus_s_sconf] hands back (as
+         [cpu_claim_pay k eb p]) -- sound, but it left every caller of
+         [WpIntrOff.wp_intr_off_lvl0_s_sconf] unable to reassemble a bundle
+         containing [cpu_claim].  usertrap is the first caller that notices:
+         it reaches prepare_return at [b = true] on the syscall arm and its
+         own boundary owes the claim back.  Unconditional rather than
+         [cpu_claim_pay 0 true p] because this leaf's [b = false] arm is
+         refuted above, so the arm always existed and always owned it. *)
+      cpu_claim p -∗
       cpu_cells_pay b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -1608,10 +1619,11 @@ Section WpSconfCsr.
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
     iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro; done|].
     iApply ("Hcont" $! ms0 with "[%] Hcg [Htok]
-                          [Hsepcx Hscausex Hstvalx Hsppc Hintr Hkptr] [Hcells] [$Hpc' $Hnpc]").
+                          [Hsepcx Hscausex Hstvalx Hsppc Hintr Hkptr] [Hclmx] [Hcells] [$Hpc' $Hnpc]").
     { exact Hmsf. }
     { iExact "Htok". }
     { iFrame "Hsepcx Hscausex Hstvalx Hsppc Hintr Hkptr". }
+    { iExact "Hclmx". }
     { rewrite /cpu_cells_pay. iExact "Hcells". }
   Qed.
 

@@ -71,8 +71,8 @@ Usage:
 
 ALWAYS finish with `relayout_map.py residue <Code> <Proof> [ALIAS...]`.
 """
-import sys, os, re, difflib
-sys.path.insert(0, '/shared/xv6iris-4/tools')
+import sys, os, os, re, difflib
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import relayout_map as R
 
 def align(code_file, sym):

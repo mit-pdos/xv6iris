@@ -670,6 +670,41 @@ Section IntrDefsBase.
     iDestruct (sret_bits_agree with "Htie Hc") as %[-> ->]. done.
   Qed.
 
+  (* THE TRAMPOLINE'S FLAVOUR: [sconf_at] with the PRIVILEGE cell handed out
+     as well.  [sconf_at]'s closer keeps [cur_privilege] inside, which is
+     right for kernel code -- no kernel instruction changes the privilege --
+     and wrong for the trap boundary, where userret's [sret] writes it and
+     the trap writes it back.  So a boundary that hands the kernel interior
+     [sconf] has to own that cell outside the bundle, and needs a closer that
+     takes it.  Same accessor shape as [sconf_at], one more cell; the closer
+     is a wand rather than a restatement of [sconf]'s body for the same
+     reason, so [sconf] can still grow a conjunct without touching this.
+
+     [SpecUsertrap]'s boundary is the one consumer: it delivers
+     [cur_privilege ↦ᵣ Supervisor] beside the raw CSR cells and takes it
+     back at the exit, and [UsertrapRes.ut_trap] parks the closer across the
+     whole of usertrap. *)
+  Definition sconf_priv_closer : iProp Σ :=
+    (∀ ms' : mword 64,
+       cur_privilege ↦ᵣ Supervisor -∗ sconf_msown ms' -∗ sconf)%I.
+
+  (* the opener that makes it faithful: if this proof breaks, the closer
+     above is no longer "the rest of [sconf]". *)
+  Lemma sconf_priv_open :
+    sconf -∗ ∃ ms : mword 64,
+      sconf_priv_closer ∗ cur_privilege ↦ᵣ Supervisor ∗ sconf_msown ms.
+  Proof.
+    iIntros "(#Hhw & #Hminv & Hpriv & Hmsx & Hmie & Hmenv)".
+    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Htie & %Hmsf)".
+    iExists ms. iSplitR "Hpriv Hms Hhalf Htie".
+    { rewrite /sconf_priv_closer. iIntros (ms') "Hpriv' Hown'".
+      iDestruct "Hown'" as "(Hms' & Hhalf' & Htie' & %Hmsf')".
+      iFrame "Hhw Hminv Hpriv' Hmie Hmenv".
+      iExists ms'. iFrame "Hms' Hhalf' Htie'". iPureIntro. exact Hmsf'. }
+    iFrame "Hpriv". rewrite /sconf_msown. iFrame "Hms Hhalf Htie".
+    iPureIntro. exact Hmsf.
+  Qed.
+
   (* [sie_cap] -- the kernel-code capability that EXPOSES the SIE mode as
      its index [b], backed by the ghost QUARTER's value (agreement with
      [sconf]'s tied half pins the live bit).  It owns ALL the free stack

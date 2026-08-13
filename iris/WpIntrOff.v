@@ -75,6 +75,13 @@ Section WpIntrOff.
       sie_cap_gpr m (trap_res b + n)%nat false p -∗
       cpu_own 0%nat false p C false -∗
       trap_csrs -∗
+      (* THE RUNNING CLAIM, on the same two-sided split as [trap_csrs_ext]
+         above but in the OTHER direction: at [b = true] the dismantled arm
+         pays it out, at [b = false] the caller never handed it over and keeps
+         its own, so this conjunct is [emp].  Stated as [cpu_claim_pay 0 b p]
+         rather than unconditionally for exactly that reason -- promising the
+         claim at [b = false] would be promising a second copy. *)
+      cpu_claim_pay 0%nat b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -85,16 +92,18 @@ Section WpIntrOff.
       iDestruct "Hcpu" as "[_ HC]".
       iApply (wp_csrci_sstatus_x0_s_sconf pc m n true with "Hcg [] Hpc Hinstr [HC Hcont]").
       { iPureIntro. exact (conj eq_refl eq_refl). }
-      iIntros (CIDn Hk ms) "%Hmsf Hcg Hcnt Hcsrs Hcells Hpc".
+      iIntros (CIDn Hk ms) "%Hmsf Hcg Hcnt Hcsrs Hclm Hcells Hpc".
       iDestruct (wp_next_at true p _ CIDn Hk with "Hcont") as "Hcont".
-      iApply ("Hcont" $! ms with "[%//] Hcg [Hcells Hcnt HC] Hcsrs Hpc").
-      rewrite /cpu_own /cpu_hart /cpu_cells_pay. iFrame "Hcells Hcnt HC".
+      iApply ("Hcont" $! ms with "[%//] Hcg [Hcells Hcnt HC] Hcsrs [Hclm] Hpc").
+      { rewrite /cpu_own /cpu_hart /cpu_cells_pay. iFrame "Hcells Hcnt HC". }
+      { rewrite /cpu_claim_pay. iExact "Hclm". }
     - (* ---- ALREADY DISABLED: a no-op; the caller brought the CSRs. ---- *)
       iIntros "Hcg Hcpu Hcsrs Hpc Hinstr Hcont".
       iApply (wp_csrci_sstatus_x0_idem_s_sconf pc m n with "Hcg Hpc Hinstr").
       iApply wp_next_off_intro. iIntros (ms) "%Hmsf Hcg Hpc".
       iDestruct (wp_next_here false p with "Hcont") as "Hcont".
-      iApply ("Hcont" $! ms with "[%//] Hcg Hcpu Hcsrs Hpc").
+      iApply ("Hcont" $! ms with "[%//] Hcg Hcpu Hcsrs [] Hpc").
+      rewrite /cpu_claim_pay. done.
   Qed.
 
 End WpIntrOff.
