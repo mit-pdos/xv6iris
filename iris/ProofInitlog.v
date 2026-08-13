@@ -661,6 +661,11 @@ Section ProofInitlog.
     iApply fupd_wp.
     iMod (lock_name_intro with "Hstr Hlname") as "#Hlnm".
     iMod (log_ledger_alloc) as (γops) "Hops".
+    (* GENESIS (fs-log.md §G.2): epoch 0 and an EMPTY append registry.  Both
+       are allocated here, beside the ledger, because [log_names] carries
+       them and the delayed seal below has to name the whole record. *)
+    iMod (log_epoch_alloc) as (γep) "Hepa".
+    iMod (log_reg_alloc) as (γlg) "Hxa".
     iMod (newlock_delayed ⊤ log_addr "log"%string with "Hlnm Hlock Hcpu")
       as (γlk) "Hmk".
     iModIntro.
@@ -1435,10 +1440,11 @@ Section ProofInitlog.
       iSplitL "Hslotsfs"; [iExact "Hslotsfs"|].
       iSplitL "Hpool"; [iExact "Hpool"|].
       iExact "Hmirc". }
-    iAssert (log_res (MkLogNames γlk γops) bn γfs cov logstart)
-      with "[Hout Hcmt Hnc Hops Hbatch]" as "Hres".
+    iAssert (log_res (MkLogNames γlk γops γep γlg) bn γfs cov logstart)
+      with "[Hout Hcmt Hnc Hops Hepa Hxa Hbatch]" as "Hres".
     { rewrite /log_res.
-      iExists 0%nat, false, v_nc, (∅ : gmap nat op_entry).
+      iExists 0%nat, false, v_nc, (∅ : gmap nat op_entry), 0%nat,
+              (∅ : gset (nat * Z)).
       iSplitL "Hout"; [iExact "Hout"|].
       iSplitL "Hcmt"; [iExact "Hcmt"|].
       iSplitL "Hnc"; [iExact "Hnc"|].
@@ -1447,14 +1453,20 @@ Section ProofInitlog.
       iSplitR; [iPureIntro; intros i e Hi; rewrite lookup_empty in Hi; discriminate|].
       iSplitR; [iPureIntro; lia|].
       iSplitR; [iPureIntro; discriminate|].
+      iSplitL "Hepa"; [iExact "Hepa"|].
+      iSplitL "Hxa"; [iExact "Hxa"|].
+      (* both new clauses are vacuous at genesis: no entry, no registry row *)
+      iSplitR; [iPureIntro; intros i e Hi; rewrite lookup_empty in Hi; discriminate|].
+      iSplitR; [iPureIntro; intros e' b' Hi; set_solver|].
       iExists 0%nat, ∅.
       iSplitR; [iPureIntro; rewrite op_sum_empty; unfold LOGBLOCKS; lia|].
       iSplitR; [iPureIntro; intros i e Hi; rewrite lookup_empty in Hi; discriminate|].
+      iSplitR; [iPureIntro; intros b' Hi; set_solver|].
       iExact "Hbatch". }
-    iMod ("Hmk" $! (log_res (MkLogNames γlk γops) bn γfs cov logstart)
+    iMod ("Hmk" $! (log_res (MkLogNames γlk γops γep γlg) bn γfs cov logstart)
             with "Hres") as "#Hislk".
     iAssert (∃ γ : log_names, log_ctx γ bn γfs cov logstart dev)%I as "#Hctx".
-    { iExists (MkLogNames γlk γops). rewrite /log_ctx.
+    { iExists (MkLogNames γlk γops γep γlg). rewrite /log_ctx.
       iSplitR; [iExact "Hislk"|].
       iSplitR; [iExact "Hdvp"|].
       iSplitR; [iExact "Hstp" | iExact "Hswlb"]. }

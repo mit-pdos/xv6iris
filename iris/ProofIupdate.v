@@ -371,7 +371,11 @@ Section IupdateTail.
        names that block: it is THIS inum's inode block, so the growth the
        public contract promises is exact rather than existential. *)
     iEval (rewrite Hbno) in "HopS".
-    iRename "HopS" into "Hop".
+    (* SpecLogWrite's post now hands back the entry with its birth epoch
+       named and the epoch-stamped registry row attached (fs-log.md §G.3);
+       iupdate/ialloc do not spend it yet, so it is forgotten right here and
+       everything below is unchanged.  G-2 replaces this line. *)
+    iDestruct (log_opSw_opS with "HopS") as "Hop".
     assert (Hpc6c : ret_pc (T1 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iupdate + 0x6c)) by (rewrite HT1ra; pcw).
     iEval (rewrite Hpc6c) in "Hpc".

@@ -855,3 +855,155 @@ and the two approved Spec dummies.  Gotchas: annotate (γ : log_names) on
 every new lemma (implicit generalization eats a bare γ into a Finite
 instance); grep e\.1|e\.2 in each consumer BEFORE editing — the
 re-association makes e.2 read the EPOCH silently.
+
+
+### G.11 G-1 consumer re-thread LANDED (2026-08-13) — the 13 sites, the bump,
+### and the receipt's shape (which is NOT what §G.10 predicted)
+
+The whole log cone is green again and the frozen ABI held: `ProofWritei`,
+`ProofItrunc`, `ProofDirlink` — the three `log_opS` threaders the ABI was
+frozen for — rebuilt with ZERO source change, which is the campaign's one
+falsifiable claim about the `log_opSe` alias and it survived.
+
+**THE RECEIPT'S SHAPE.**  `SpecLogWrite`'s atomic-update post no longer
+returns a bare `log_opS`; it returns
+
+    LogInv.log_opSw γ (if cr then S u else u) (Sb ∪ {[uint bno]}) (uint bno)
+      := ∃ e0, log_opSe γ u' Sb' e0 ∗ logged_at γ e0 (uint bno)
+
+— the entry and the witness UNDER ONE EXISTENTIAL, so they are forced to
+agree on the epoch.  §G.10 asked for `∃ e, logged_at γ e b` plus a side
+pure `e0 <= e`; that shape is unstatable at this contract, because `e0` is
+the caller's own birth epoch and the frozen ABI gives the caller no name
+for it.  Binding the SAME `e0` in both conjuncts says something strictly
+stronger and needs no side condition at all: *the witness's epoch is my
+live entry's epoch*, i.e. `e0 <= e` with equality.  That is exactly what
+G-3's `crz` consumes — the depositor stamps the parked zero with an epoch
+it can order against `ic_epoch_lb`, and `log_use_group`'s sandwich closes
+on `e0 = e = E`.  A bare `∃ e` would have been satisfied by a dead batch's
+row, which is the hole the header's revocation argument exists to close.
+
+`log_opSw_opS` forgets it in one line, which is why only the two `_au`
+callers (ProofIupdate, ProofIalloc) moved at all, by one `iDestruct` each,
+and `wp_log_write_gen`/`_sconf` — hence bfree/balloc/bmap/writei — did not
+move: `_gen` is re-derived from `_au` through a witness-dropping
+continuation.
+
+**THE ABSORBED-ARM MINT IS FREE, AND §G.10's RULING RESTED ON A WRONG
+PRICE.**  G.10 reserved the absorbed-arm row because its
+`(E,b) ∈ X -> b ∈ LB` obligation would have to be re-proved "from the
+credit rather than the append".  At the site it comes from neither: it
+comes from the SCAN.  `lw_closeA` is entered with `Hmem : uint bno ∈ map
+uint W` and `HLB : LB = list_to_set (map uint W)`, and the existing proof
+already derives `uint bno ∈ LB` from them on the next line.  So the mint
+was hoisted ABOVE the arm split and both exits carry it, at a cost of two
+`assert`s.  Two things follow, and the second is why it had to be done
+now rather than in G-2:
+
+* `Bud` (log_write's opaque budget resource) stays free of `d`, so the
+  closing wands did not have to be restructured — an arm-conditional
+  receipt would have had to survive `lw_closeA`'s `subst d`.
+* **G-2's depositor absorbs.**  §G.3's zero-writer is `iupdate` under a
+  sleeplock, and an inode block that has already been logged in this batch
+  makes that `log_write` take the ABSORB arm.  Under the "non-absorbed arm
+  only" ruling the receipt would simply not exist on the path §G.3 needs
+  it on.  The unconditional row makes `zero_receipt` depositable
+  unconditionally.
+
+**THE BUMP.**  `ProofEndOp` +0x62, the commit re-deposit, one
+`LogInv.log_epoch_bump` immediately before the `log_res` re-assembly.  Its
+three re-established clauses are the whole soundness story in three lines:
+`om = ∅` (`Hommt`, already proved there) makes "every live entry was born
+in the current epoch" VACUOUS; the registry cap `e' <= E` survives because
+the cap only rose; and `(S E, b) ∈ X -> b ∈ ∅` is proved by CONTRADICTION
+against the cap — no row can carry the new epoch, which is the
+self-invalidation made concrete rather than argued.
+
+**Per-file cost** (10 `iris/` files, +309/−70): LogInv +48/−0 (`log_opSw`
+and its two conversions only — the ghost core needed nothing else);
+ProofBeginOp +52/−17 (birth epoch on the minted entry, and the committing
+arm's inline RESTATEMENT of `log_res` had to grow the same six fields);
+ProofEndOp +60/−18 (two opens, three constructions, the bump);
+ProofLogWrite +107/−25 (the epoch naming, the hoisted mint, the two arms'
+registry obligations, `_gen`'s witness-dropping derivation);
+ProofInitlog +17/−5 (genesis: `log_epoch_alloc`/`log_reg_alloc` beside the
+ledger, `MkLogNames` at four arguments); SpecLogWrite +13/−1;
+ProofIupdate/ProofIalloc +5/−1 each; the two Spec dummies one token each.
+
+**Gate** (mirror, `make -f CoqMakefile -j30 -k`): EXIT=0, 1070 `.vo`,
+staleness 0, and a re-run that compiles NOTHING.  Wall clocks: the
+LogInv+SpecLogWrite+dummies chain 54 s; the ProofBeginOp/ProofInitlog chain
+15 min (17 files); the first full pass 8 min (325 files, one error);
+ProofLogWrite plus its 25 `Link*` dependents 2 min.
+
+**Gotchas that actually bit** (§G.10's two predicted ones did not — the
+`e.1`/`e.2` grep found all nine sites and every one failed loudly):
+`injection Hin as _ ->` on a `(E,b) = (E,bno)` singleton membership FAILS
+with "at most 1 introduction pattern expected" because Rocq discards the
+reflexive half; use `simplify_eq`.  And `ProofBeginOp` needed
+`iris.algebra.gset` + `iris.base_logic.lib.mono_nat` imported explicitly:
+it is the one consumer that RESTATES `log_res`'s body inline (the
+committing arm's `iAssert`), so it names `mono_nat_auth_own` and `● X`
+syntactically where every other consumer only destructs them.
+
+**TWO THINGS THE GHOST CORE ONLY SHOWS NOW THAT IT HAS CONSUMERS — read
+these before starting G-2/G-3.**
+
+1. **`log_use_group` HAS NO POSSIBLE CALLER OUTSIDE `log_write`'s OWN
+   PROOF, so §G.4's "the iupdate absorbs" needs a PRE-side spec change that
+   §G.6's table does not list.**  The lemma is stated over the OPENED
+   authority (`ghost_map_auth` + `own (ln_lg γ) (● X)`), and the only
+   places `log_res` is ever opened are ProofBeginOp / ProofEndOp /
+   ProofLogWrite / ProofInitlog.  `iput`/`iunlockput` run under a
+   SLEEPLOCK and never touch the log spinlock, so G-3's `crz` cannot fire
+   it directly.  The absorption it wants happens inside `log_write`, and
+   `log_write` takes the free (absorb) arm only when its caller passes
+   `cr = true` — whose premise today is the PURE
+   `cr = true -> uint bno ∈ Sb`, i.e. the block is in THIS op's own set.
+   Group absorption is precisely the case where it is NOT.  So G-3 must
+   relax that premise from a pure implication to a RESOURCE one, roughly
+       (if cr then ∃ e, ⌜e0 <= e⌝ ∗ logged_at γ e (uint bno) else emp)
+   carried beside a `log_opSe … e0` precondition, and ProofLogWrite's
+   credited arm must then derive `uint bno ∈ LB` by `log_use_group`
+   instead of by `Hsub`.  That is a real change to `SpecLogWrite` (a
+   premise, so every `_gen`/`_sconf` caller is affected unless it is added
+   as a separate credited contract) plus a re-proof of the credited arm —
+   NOT the "small: mints logged_at" the delta table prices.  The mint
+   landed here is only the DEPOSIT half of §G.3; the SPEND half is
+   unbuilt.
+   (One thing that IS free: `log_use_group`'s conclusion is pure, so
+   §G.2's "(∗ everything back)" costs nothing — `iDestruct` does not
+   consume a `⌜…⌝`-concluding lemma's hypotheses.)
+
+2. **`ln_ep`'s `mono_nat` is not yet load-bearing.**  Nothing anywhere
+   mints a `mono_nat_lb_own (ln_ep γ) e`; the epoch is used only as a
+   `nat` inside `log_res`'s own invariant clauses, and §G.2's stated
+   justification for a monotone ghost ("epochs are monotone") is in fact
+   discharged by G.10's fifth clause `∀ (e',b') ∈ X, e' <= E`, which is
+   pure.  As landed the auth could be deleted without weakening anything.
+   It is pre-provisioned for the right reason — G-2's `ic_epoch_lb` needs
+   a PERSISTENT "the log epoch has reached at least e" to order a parked
+   zero against a later op's birth epoch — so the item for G-2 is: add
+   `log_epoch_lb : mono_nat_auth_own (ln_ep γ) 1 E ==∗ … ∗ mono_nat_lb_own
+   (ln_ep γ) E` and `log_epoch_lb_le`, mint the lb at the park, and that
+   is what turns the escrow's ordering into the `e0 <= e` premise above.
+   Until then a reviewer will correctly ask what the ghost is for.
+
+
+### G.12 Coordinator ratification of G-1's deviations + the reshaped G-2/G-3
+
+Both G.11 deviations RATIFIED: log_opSw's bundled existential (binds the
+SAME e0 in entry and witness — stronger than the drafted side-condition
+and statable where it was not); the both-arms mint (the absorb-arm
+receipt is on exactly the path G-3's zero-writing iupdate takes).
+
+The two post-landing findings move work between stages:
+* G-3 GROWS: SpecLogWrite's credited arm's honesty premise must become a
+  RESOURCE premise (roughly: if cr then ∃ e, ⌜e0 <= e⌝ ∗ logged_at γ e
+  (uint bno), beside a log_opSe precondition) with the credited arm
+  re-proved via log_use_group instead of the own-set Hsub — this is the
+  SPEND half of §G.3; what landed in G-1 is only the deposit half.
+* G-2 GAINS the lb plumbing that makes ln_ep load-bearing:
+  log_epoch_lb / log_epoch_lb_le (persistent "the log epoch has reached
+  e"), minted at the escrow park — this is what produces the e0 <= e
+  premise for G-3's spend half.

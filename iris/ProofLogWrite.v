@@ -1737,7 +1737,8 @@ Section ProofLogWrite.
     intros pcE ret_tgt HK Hnoff Hk Ha0 Hcovbno Hnotlog Hcredit.
     (* the budget resource this run delivers, threaded opaquely through the
        lw_* helpers -- none of them inspects it *)
-    pose (Bud := (log_opS γ (if cr then S u else u) (Sb ∪ {[uint bno]}))%I).
+    pose (Bud := (log_opSw γ (if cr then S u else u) (Sb ∪ {[uint bno]})
+                    (uint bno))%I).
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hbslot Hop Hau Hheld Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbeq.
@@ -1958,12 +1959,16 @@ Section ProofLogWrite.
       iSplitL "Hr8"; [iExact "Hr8"|]. iExists vg4. iExact "Hg4". }
     (* ================= THE CRITICAL SECTION ================= *)
     rewrite /log_res.
-    iDestruct "HRres" as (out cmt nc om)
-      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hbatch)".
+    iDestruct "HRres" as (out cmt nc om Ep Xr)
+      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & Hxa & %Hlive & %Hcap & Hbatch)".
     iDestruct (log_opS_positive with "Hoauth Hop") as %Hpos.
+    (* NAME THIS OP'S BIRTH EPOCH.  The ABI hands log_write a [log_opS], in
+       which [e0] is buried; every step below needs it by name, and the
+       auth's own soundness clause is about to pin it to [Ep] anyway. *)
+    iDestruct (log_opS_named with "Hop") as (e0) "Hop".
     destruct cmt.
     { exfalso. specialize (Hcmt0 eq_refl). lia. }
-    iDestruct "Hbatch" as (nl LB) "(%Hsum & %Hsub & Hbatch)".
+    iDestruct "Hbatch" as (nl LB) "(%Hsum & %Hsub & %Hreg & Hbatch)".
     rewrite /log_batch.
     iDestruct "Hbatch" as (W L D)
       "(%Hlen & %HLB & %Hnodup & %Hwok & Hncell & HW & Hjunk & HLauth & HDauth & Hcov & Hhdr & Hlogr & Hpool & Hmirc)".
@@ -1984,13 +1989,24 @@ Section ProofLogWrite.
        exit, lh.n+1) is available only when a unit was actually spent --
        which is exactly right, because a credit makes the append branch
        unreachable ([Hcrmem] below refutes it). ---- *)
+    (* MY ENTRY IS LIVE, SO IT WAS BORN IN THE CURRENT EPOCH.  This is the
+       one place the group extension's soundness core is cashed, and it is
+       cashed BEFORE the case split because both arms need it: the ledger
+       step must hand the entry back at an epoch the caller can name, and
+       the mint below has to agree with it. *)
+    iDestruct (log_absorb_step γ om (S u) Sb e0 with "Hoauth Hop") as (i1) "%Hi1".
+    assert (He0 : e0 = Ep) by exact (Hlive i1 (S u, Sb, e0) Hi1).
+    subst e0. clear Hi1 i1.
     iAssert (|==> ∃ (om' : gmap nat op_entry),
                ghost_map_auth (ln_ops γ) 1 om' ∗
-               log_opS γ (if cr then S u else u) (Sb ∪ {[uint bno]}) ∗
+               log_opSe γ (if cr then S u else u) (Sb ∪ {[uint bno]}) Ep ∗
                ⌜size om' = out⌝ ∗
-               ⌜forall j e, om' !! j = Some e -> (e.1 <= MAXOPBLOCKS)%nat⌝ ∗
-               ⌜uint bno ∈ LB -> forall j e, om' !! j = Some e -> e.2 ⊆ LB⌝ ∗
-               ⌜forall j e, om' !! j = Some e -> e.2 ⊆ LB ∪ {[uint bno]}⌝ ∗
+               ⌜forall j e, om' !! j = Some e -> (e.1.1 <= MAXOPBLOCKS)%nat⌝ ∗
+               ⌜uint bno ∈ LB -> forall j e, om' !! j = Some e -> e.1.2 ⊆ LB⌝ ∗
+               ⌜forall j e, om' !! j = Some e -> e.1.2 ⊆ LB ∪ {[uint bno]}⌝ ∗
+               (* neither arm re-dates an entry: an absorb touches nothing
+                  and a spend rewrites the budget and the set only *)
+               ⌜forall j e, om' !! j = Some e -> e.2 = Ep⌝ ∗
                ⌜(nl + op_sum om' <= LOGBLOCKS)%nat⌝ ∗
                ⌜cr = false -> (S nl + op_sum om' <= LOGBLOCKS)%nat⌝ ∗
                (* A CREDIT PLACES THE BLOCK IN THE HEADER.  Derived HERE,
@@ -2001,8 +2017,9 @@ Section ProofLogWrite.
       with "[Hoauth Hop]" as ">Hled".
     { destruct cr.
       - (* CREDITED: the ledger does not move at all.  [bno ∈ Sb] makes
-           [Sb ∪ {[bno]} = Sb], and the entry is already [(S u, Sb)], so the
-           insert is the identity -- and the unit is handed straight back. *)
+           [Sb ∪ {[bno]} = Sb], and the entry is already [(S u, Sb, Ep)], so
+           the insert is the identity -- and the unit is handed straight
+           back. *)
         specialize (Hcredit eq_refl).
         iDestruct (log_absorb_step with "Hoauth Hop") as (i0) "%Hi0".
         assert (Hun : Sb ∪ {[uint bno]} = Sb).
@@ -2014,24 +2031,25 @@ Section ProofLogWrite.
         iSplitR; [iPureIntro; exact Hbnd|].
         iSplitR; [iPureIntro; intros _ j e Hj; exact (Hsub j e Hj)|].
         iSplitR; [iPureIntro; intros j e Hj; exact (union_subseteq_l' _ _ _ (Hsub j e Hj))|].
+        iSplitR; [iPureIntro; exact Hlive|].
         iSplitR; [iPureIntro; exact Hsum|].
         iSplitR; [iPureIntro; discriminate|].
         iSplitR.
         { iPureIntro. intros _.
-          pose proof (Hsub i0 (S u, Sb) Hi0) as Hs. cbn in Hs.
+          pose proof (Hsub i0 (S u, Sb, Ep) Hi0) as Hs. cbn in Hs.
           exact (elem_of_weaken _ _ _ Hcredit Hs). }
         (* the unit in hand bounds the sum below, hence lh.n above *)
-        iPureIntro. pose proof (op_sum_delete om i0 (S u, Sb) Hi0) as He.
+        iPureIntro. pose proof (op_sum_delete om i0 (S u, Sb, Ep) Hi0) as He.
         cbn in He. lia.
       - (* UNCREDITED: spend one, and record the block *)
-        iMod (log_spend_step γ om u Sb (uint bno) with "Hoauth Hop")
+        iMod (log_spend_step γ om u Sb Ep (uint bno) with "Hoauth Hop")
           as (i0) "(%Hi0 & Hoauth & Hop)".
-        set (om' := <[i0 := (u, Sb ∪ {[uint bno]})]> om).
+        set (om' := <[i0 := (u, Sb ∪ {[uint bno]}, Ep)]> om).
         assert (Hsum1 : (1 <= op_sum om)%nat).
-        { pose proof (op_sum_delete om i0 (S u, Sb) Hi0) as He. cbn in He. lia. }
+        { pose proof (op_sum_delete om i0 (S u, Sb, Ep) Hi0) as He. cbn in He. lia. }
         assert (Hspend : op_sum om' = (op_sum om - 1)%nat)
           by (unfold om';
-              apply (op_sum_spend om i0 u Sb (Sb ∪ {[uint bno]})); exact Hi0).
+              apply (op_sum_spend om i0 u Sb (Sb ∪ {[uint bno]}) Ep); exact Hi0).
         iModIntro. iExists om'. iFrame "Hoauth Hop".
         iSplitR.
         { iPureIntro. unfold om'. rewrite map_size_insert_Some; [exact Hsz | eauto]. }
@@ -2039,14 +2057,14 @@ Section ProofLogWrite.
         { iPureIntro. intros j e Hj. unfold om' in Hj.
           destruct (decide (j = i0)) as [->|Hne].
           - rewrite lookup_insert in Hj. injection Hj as <-. cbn.
-            pose proof (Hbnd i0 (S u, Sb) Hi0) as Hb. cbn in Hb. lia.
+            pose proof (Hbnd i0 (S u, Sb, Ep) Hi0) as Hb. cbn in Hb. lia.
           - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
             exact (Hbnd j e Hj). }
         iSplitR.
         { iPureIntro. intros HinLB j e Hj. unfold om' in Hj.
           destruct (decide (j = i0)) as [->|Hne].
           - rewrite lookup_insert in Hj. injection Hj as <-. cbn.
-            pose proof (Hsub i0 (S u, Sb) Hi0) as Hs. cbn in Hs.
+            pose proof (Hsub i0 (S u, Sb, Ep) Hi0) as Hs. cbn in Hs.
             apply union_least; [exact Hs | apply elem_of_subseteq_singleton, HinLB].
           - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
             exact (Hsub j e Hj). }
@@ -2054,18 +2072,38 @@ Section ProofLogWrite.
         { iPureIntro. intros j e Hj. unfold om' in Hj.
           destruct (decide (j = i0)) as [->|Hne].
           - rewrite lookup_insert in Hj. injection Hj as <-. cbn.
-            pose proof (Hsub i0 (S u, Sb) Hi0) as Hs. cbn in Hs.
+            pose proof (Hsub i0 (S u, Sb, Ep) Hi0) as Hs. cbn in Hs.
             exact (union_mono_r _ _ _ Hs).
           - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
             exact (union_subseteq_l' _ _ _ (Hsub j e Hj)). }
+        (* the SPEND rewrites budget and set; the birth epoch rides along
+           unchanged, which is what keeps the entry live at [Ep] *)
+        iSplitR.
+        { iPureIntro. intros j e Hj. unfold om' in Hj.
+          destruct (decide (j = i0)) as [->|Hne].
+          - rewrite lookup_insert in Hj. injection Hj as <-. reflexivity.
+          - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
+            exact (Hlive j e Hj). }
         iSplitR; [iPureIntro; rewrite Hspend; unfold LOGBLOCKS in *; lia|].
         iSplitR;
           [iPureIntro; intros _; rewrite Hspend; unfold LOGBLOCKS in *; lia|].
         iSplitR; [iPureIntro; discriminate|].
         iPureIntro. exact Hsum1. }
     iDestruct "Hled" as (om')
-      "(Hoauth & Hop & %HszL & %HbndL & %HsubA & %HsubB & %HsumA & %HsumBcr
+      "(Hoauth & Hop & %HszL & %HbndL & %HsubA & %HsubB & %HliveL & %HsumA & %HsumBcr
         & %HcrLB & %Hsum1)".
+    (* ---- THE MINT (fs-log.md §G.2).  One registry row, [(Ep, bno)], at
+       the epoch this op was born in -- which by [HliveL] is the epoch the
+       batch is running under.  It is minted HERE, before the arm split,
+       because BOTH exits earn it: the append arm is about to write the
+       block into lh.block[], and the absorb arm's scan has just reported it
+       ALREADY there ([Hmem]/[HLB] below).  §G.10 reserved the absorbed-arm
+       row on the grounds that its [(E,b) ∈ X -> b ∈ LB] obligation would
+       have to come "from the credit"; at the site it comes from the scan,
+       for free, and hoisting the mint keeps [Bud] free of the arm. ---- *)
+    iMod (log_mint_logged γ Xr Ep (uint bno) with "Hxa") as "[Hxa #Hwit]".
+    iAssert Bud with "[Hop]" as "Hop".
+    { rewrite /Bud. iApply (log_opSw_intro with "Hop"). iExact "Hwit". }
     assert (Hnl : (nl <= 29)%nat) by (unfold LOGBLOCKS in Hsum; lia).
     (* ...and in the header's terms: this is what refutes the append
        branch, since the scan can only fail to find a block that is not
@@ -2276,7 +2314,7 @@ Section ProofLogWrite.
     (* ================= THE TWO CLOSING WANDS ================= *)
     iAssert (lw_closeA γ bn γfs γd cov logstart dev k pidv bno bs bsd Φfsb Bud nl W
              ∧ lw_closeB γ bn γfs γd cov logstart dev k pidv bno bs bsd Φfsb Bud nl W)%I
-      with "[Houtc Hcmtc Hncc Hoauth HLauth HDauth Hcovrest Hcovb Hhdr Hlogr Hpool
+      with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa HLauth HDauth Hcovrest Hcovb Hhdr Hlogr Hpool
              Hmirc Hjtail HpL HpD Hextra Hslk Hpid Hvalid Hdevh Hbdisk Hbytes Hdisk
              HPhifsb Hop]"
       as "Hcl".
@@ -2290,17 +2328,35 @@ Section ProofLogWrite.
         iDestruct "Hextra" as (q) "Href".
         iModIntro.
         iSplitR "HpL HpD Href Hslk Hpid Hvalid Hdevh Hbnoc Hbdisk Hbytes Hdisk HPhifsb Hop Hslot".
-        + rewrite /log_res. iExists out, false, nc, om'.
+        + rewrite /log_res.
+          iExists out, false, nc, om', Ep, (Xr ∪ {[(Ep, uint bno)]}).
           iFrame "Houtc Hcmtc Hncc Hoauth".
           iSplitR; [iPureIntro; exact HszL|].
           iSplitR; [iPureIntro; exact HbndL|].
           iSplitR; [iPureIntro; exact Hout3|].
           iSplitR; [iPureIntro; intros Hc; discriminate|].
+          iFrame "Hepa Hxa".
+          iSplitR; [iPureIntro; exact HliveL|].
+          (* the new row carries the CURRENT epoch, so the cap still holds *)
+          iSplitR.
+          { iPureIntro. intros e' b' Hin.
+            apply elem_of_union in Hin as [Hin|Hin].
+            - exact (Hcap e' b' Hin).
+            - apply elem_of_singleton in Hin. simplify_eq. lia. }
           iExists nl, LB. iSplitR; [iPureIntro; exact HsumA|].
           (* ABSORB: W is unchanged, so LB is too, and the block is already
              in it -- which is exactly what [Hmem] says. *)
+          assert (HbnoLB : uint bno ∈ LB).
+          { rewrite HLB. by apply elem_of_list_to_set. }
           iSplitR.
-          { iPureIntro. apply HsubA. rewrite HLB. by apply elem_of_list_to_set. }
+          { iPureIntro. apply HsubA. exact HbnoLB. }
+          (* ...AND THAT IS THE ABSORBED-ARM MINT'S WHOLE COST: the block the
+             row names is in the header because the SCAN found it there. *)
+          iSplitR.
+          { iPureIntro. intros b' Hin.
+            apply elem_of_union in Hin as [Hin|Hin].
+            - exact (Hreg b' Hin).
+            - apply elem_of_singleton in Hin. simplify_eq. exact HbnoLB. }
           rewrite /log_batch. iExists W, (<[uint bno := bs]> L), D.
           iSplitR; [iPureIntro; split; [exact HlenW | exact HnlB]|].
           iSplitR; [iPureIntro; exact HLB|].
@@ -2353,12 +2409,20 @@ Section ProofLogWrite.
         iModIntro.
         iSplitR "HpL HpD Hrt Hrdev Hrbno Hslk Hpid Hvalid Hdevh Hbnoc Hbdisk Hbytes
                  Hdisk HPhifsb Hop Hslot".
-        + rewrite /log_res. iExists out, false, nc, om'.
+        + rewrite /log_res.
+          iExists out, false, nc, om', Ep, (Xr ∪ {[(Ep, uint bno)]}).
           iFrame "Houtc Hcmtc Hncc Hoauth".
           iSplitR; [iPureIntro; exact HszL|].
           iSplitR; [iPureIntro; exact HbndL|].
           iSplitR; [iPureIntro; exact Hout3|].
           iSplitR; [iPureIntro; intros Hc; discriminate|].
+          iFrame "Hepa Hxa".
+          iSplitR; [iPureIntro; exact HliveL|].
+          iSplitR.
+          { iPureIntro. intros e' b' Hin.
+            apply elem_of_union in Hin as [Hin|Hin].
+            - exact (Hcap e' b' Hin).
+            - apply elem_of_singleton in Hin. simplify_eq. lia. }
           iExists (S nl), (LB ∪ {[uint bno]}).
           (* THE APPEND BRANCH IS UNREACHABLE UNDER A CREDIT: the scan
              reported [bno] absent from lh.block[], but a credit says it is
@@ -2370,6 +2434,14 @@ Section ProofLogWrite.
           iSplitR; [iPureIntro; exact (HsumBcr Hcrf)|].
           (* APPEND: LB grows by exactly the block this op just logged *)
           iSplitR; [iPureIntro; exact HsubB|].
+          (* the minted row names the block this arm just appended, so the
+             registry's current-epoch clause holds against the GROWN LB *)
+          iSplitR.
+          { iPureIntro. intros b' Hin.
+            apply elem_of_union in Hin as [Hin|Hin].
+            - apply elem_of_union_l. exact (Hreg b' Hin).
+            - apply elem_of_singleton in Hin. simplify_eq.
+              apply elem_of_union_r, elem_of_singleton. reflexivity. }
           rewrite /log_batch. iExists (W ++ [bno]), (<[uint bno := bs]> L),
                                      (<[uint bno := true]> D).
           iSplitR.
@@ -2589,7 +2661,17 @@ Section ProofLogWrite.
               bs bsl bsd d u cr Sb ⊤ (fsblock γfs (uint bno) bs)%I
               m n eb p C K b
               HK Hnoff Hk Ha0 Hcovbno Hnotlog Hcredit
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hbslot Hop [Hfsb] Hheld Hcont").
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hbslot Hop [Hfsb] Hheld [Hcont]").
+    2: { (* the witness is DROPPED here, which is what keeps every landed
+            [wp_log_write_gen] caller byte-stable: only the atomic-update
+            form -- the one iupdate/ialloc use, and the one §G.3's receipt
+            is deposited from -- carries the epoch-stamped row. *)
+         iIntros (CIDx) "%Hchain".
+         iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
+         iIntros (mr) "Hsie Hcnt Hpc %Hcs HopW Hfsb Hlk Hslot".
+         iDestruct (log_opSw_opS with "HopW") as "HopS".
+         iApply ("Hcont" $! mr with "Hsie Hcnt Hpc [%] HopS Hfsb Hlk Hslot").
+         exact Hcs. }
     iModIntro. iExists bsl. iFrame "Hfsb".
     iIntros (_) "Hfsb". iModIntro. iExact "Hfsb".
   Qed.

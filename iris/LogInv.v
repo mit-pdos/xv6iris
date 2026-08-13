@@ -390,6 +390,54 @@ Section LogInv.
     apply gset_included in Hincl. set_solver.
   Qed.
 
+  (* ---------------------------------------------------------------- *)
+  (*  THE APPEND RECEIPT: log_write's own post-state currency           *)
+  (*  (fs-log.md §G.3)                                                  *)
+  (* ---------------------------------------------------------------- *)
+
+  (* What [log_write]'s contract hands back: the op's OWN ledger entry with
+     a NAME for its birth epoch, AND the witness for the block it just
+     logged, minted at exactly that epoch.
+
+     WHY THE EPOCH MUST BE THE CALLER'S OWN, not an existential.  Using a
+     witness ([log_use_group]) needs [e0 <= e] against the birth epoch of
+     the op that is open at the USE.  A bare [∃ e, logged_at γ e b] cannot
+     supply that -- any [e] satisfies it, a dead batch's included, and the
+     header's revocation requirement is exactly what forbids trusting one.
+     Tying [e] to the entry the caller is holding is what makes the receipt
+     CURRENCY: the entry is live, so [log_res]'s soundness clause pins its
+     [e0] to the current epoch, and the depositor can therefore stamp the
+     witness with an epoch it can later order against (§G.3's
+     [ic_epoch_lb]).
+
+     The witness rides UNDER the entry's existential rather than beside it
+     precisely because the two must agree on the epoch; splitting them into
+     two conjuncts would lose the equality and give back the useless form.
+
+     UNCONDITIONAL IN THE ARM (see the note on [log_mint_logged]'s two call
+     sites in ProofLogWrite): a log_write that ABSORBED did not append, but
+     the block it names is in the header all the same -- that is what the
+     absorb arm's scan result says -- so the registry row it mints is just
+     as true and just as usable.  §G.10's "non-absorbed arm only" ruling
+     priced the absorbed-arm row as a re-proof "from the credit"; at the
+     site it is instead immediate from the SCAN, so the arm distinction
+     buys nothing and costs every consumer a case split.
+
+     [log_opSw_opS] forgets the whole thing, so a caller that does not want
+     a witness threads [log_opS] exactly as before. *)
+  Definition log_opSw (γ : log_names) (u : nat) (Sb : gset Z)
+      (b : Z) : iProp Σ :=
+    (∃ e0 : nat, log_opSe γ u Sb e0 ∗ logged_at γ e0 b)%I.
+
+  Lemma log_opSw_intro (γ : log_names) (u : nat) (Sb : gset Z)
+      (e0 : nat) (b : Z) :
+    log_opSe γ u Sb e0 -∗ logged_at γ e0 b -∗ log_opSw γ u Sb b.
+  Proof. iIntros "H Hw". iExists e0. iFrame. Qed.
+
+  Lemma log_opSw_opS (γ : log_names) (u : nat) (Sb : gset Z) (b : Z) :
+    log_opSw γ u Sb b -∗ log_opS γ u Sb.
+  Proof. iIntros "H". iDestruct "H" as (e0) "[H _]". iExists e0. iFrame. Qed.
+
   Global Instance log_op_timeless γ u : Timeless (log_op γ u).
   Proof. apply _. Qed.
 

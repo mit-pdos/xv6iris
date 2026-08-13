@@ -1297,12 +1297,12 @@ Section EndOpBlocks.
       rewrite (callee_saved_lookup Hacq_cs c Hcs). exact (HE4thr c Hcs N2 N8 N9 N18). }
     (* ================= THE CRITICAL SECTION ================= *)
     rewrite /log_res.
-    iDestruct "HRres" as (out cmt nc om)
-      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hrest)".
+    iDestruct "HRres" as (out cmt nc om Ep Xr)
+      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & Hxa & %Hlive & %Hcap & Hrest)".
     (* committing IS still set: the committer holds the batch's fs_L
        AUTHORITY, and log_res's cmt = false arm holds one too. *)
     destruct cmt.
-    2: { iDestruct "Hrest" as (n0 LB0) "(_ & _ & Hb2)".
+    2: { iDestruct "Hrest" as (n0 LB0) "(_ & _ & _ & Hb2)".
          rewrite /log_batch.
          iDestruct "Hbatch" as (W1 L1 D1) "(_ & _ & _ & _ & _ & _ & _ & Ha1 & _)".
          iDestruct "Hb2" as (W2 L2 D2) "(_ & _ & _ & _ & _ & _ & _ & Ha2 & _)".
@@ -1508,9 +1508,19 @@ Section EndOpBlocks.
        referred to. *)
     assert (Hommt : om = ∅).
     { apply map_size_empty_iff. rewrite Hsz. exact (Hcmt0 eq_refl). }
+    (* ---- THE EPOCH BUMP (fs-log.md §G.2/§G.9 FINDING 4) ----
+       THIS is the group extension's one moving part, and it is here rather
+       than at the lh-clearing step because here the lock is re-held and the
+       batch is going back in.  [Hommt] is what makes it sound: the ledger
+       is EMPTY at this point, so the bump cannot falsify any live entry's
+       "born in the current epoch" -- there is no live entry.  Every witness
+       minted in the batch just committed keeps its old epoch and is thereby
+       DEAD: it can no longer equal [S Ep], so [log_use_group] can never
+       fire on it again.  Nothing is revoked; the index simply moves on. *)
+    iMod (log_epoch_bump γ Ep with "Hepa") as "Hepa".
     iAssert (log_res γ bn γfs cov logstart)
-      with "[Houtc Hcmtc Hncc Hoauth Hbatch]" as "HRres".
-    { rewrite /log_res. iExists out, false, nc', om.
+      with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Hbatch]" as "HRres".
+    { rewrite /log_res. iExists out, false, nc', om, (S Ep), Xr.
       iSplitL "Houtc"; [iExact "Houtc"|].
       iSplitL "Hcmtc"; [iExact "Hcmtc"|].
       iSplitL "Hncc"; [iExact "Hncc"|].
@@ -1519,10 +1529,25 @@ Section EndOpBlocks.
       iSplitR; [iPureIntro; exact Hbnd|].
       iSplitR; [iPureIntro; exact Hout3|].
       iSplitR; [iPureIntro; discriminate|].
+      iSplitL "Hepa"; [iExact "Hepa"|].
+      iSplitL "Hxa"; [iExact "Hxa"|].
+      (* vacuous: [Hommt] says there is no live entry to re-date *)
+      iSplitR.
+      { iPureIntro. intros i e Hi. rewrite Hommt lookup_empty in Hi.
+        discriminate. }
+      (* the registry still does not run ahead: the cap only went UP *)
+      iSplitR.
+      { iPureIntro. intros e' b' Hin. pose proof (Hcap e' b' Hin). lia. }
       iExists 0%nat, ∅. iSplitR; [iPureIntro; exact Hsum|].
       iSplitR.
       { iPureIntro. intros i e Hi. rewrite Hommt lookup_empty in Hi.
         discriminate. }
+      (* AND THE SELF-INVALIDATION, made concrete: the header went back
+         EMPTY, and the clause survives only because no row of the registry
+         can carry the NEW epoch -- every row is capped by the old one. *)
+      iSplitR.
+      { iPureIntro. intros b' Hin. exfalso.
+        pose proof (Hcap (S Ep) b' Hin). lia. }
       iExact "Hbatch". }
     iApply (Rel.wp_release_sconf (ln_lk γ) log_addr "log"%string
               (log_res γ bn γfs cov logstart) G2 0%nat eb (proc_addr j) C
@@ -3920,27 +3945,31 @@ Section ProofEndOp.
         rewrite (callee_saved_lookup Hacq c Hcs). exact (HR6thr c Hcs N2 N8 N9 N18). }
     (* ================= THE ACCOUNTING CRITICAL SECTION ================= *)
     rewrite /log_res.
-    iDestruct "HRres" as (out cmt nc om)
-      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hrest)".
+    iDestruct "HRres" as (out cmt nc om Ep Xr)
+      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & Hxa & %Hlive & %Hcap & Hrest)".
     iDestruct (log_op_positive with "Hoauth Hop") as %Hpos.
     (* the "log.committing" PANIC IS DEAD: an op token forces out >= 1, and
        log_res's own conjunct then refutes committing. *)
     destruct cmt.
     { exfalso. specialize (Hcmt0 eq_refl). lia. }
-    iDestruct "Hrest" as (nl LB) "(%Hsum & %Hsub & Hbatch)".
-    iMod (log_end_step with "Hoauth Hop") as (i0 Sb0) "(%Hi0 & Hoauth)".
+    iDestruct "Hrest" as (nl LB) "(%Hsum & %Hsub & %Hreg & Hbatch)".
+    iMod (log_end_step with "Hoauth Hop") as (i0 Sb0 e00) "(%Hi0 & Hoauth)".
     assert (Hszd : size (delete i0 om) = (out - 1)%nat).
     { rewrite map_size_delete Hi0 Hsz. symmetry. apply Nat.sub_1_r. }
-    assert (Hbndd : forall i e, delete i0 om !! i = Some e -> (e.1 <= MAXOPBLOCKS)%nat).
+    assert (Hbndd : forall i e, delete i0 om !! i = Some e -> (e.1.1 <= MAXOPBLOCKS)%nat).
     { intros i e Hv. apply (Hbnd i e). rewrite lookup_delete_Some in Hv.
       exact (proj2 Hv). }
     (* DELETING an entry only shrinks the map, so every surviving op's
        credit clause is the one it already had *)
-    assert (Hsubd : forall i e, delete i0 om !! i = Some e -> e.2 ⊆ LB).
+    assert (Hsubd : forall i e, delete i0 om !! i = Some e -> e.1.2 ⊆ LB).
     { intros i e Hv. apply (Hsub i e). rewrite lookup_delete_Some in Hv.
       exact (proj2 Hv). }
+    (* ...and so is its birth epoch: retiring an op cannot re-date another *)
+    assert (Hlived : forall i e, delete i0 om !! i = Some e -> e.2 = Ep).
+    { intros i e Hv. apply (Hlive i e). rewrite lookup_delete_Some in Hv.
+      exact (proj2 Hv). }
     assert (Hsumd : (nl + op_sum (delete i0 om) <= LOGBLOCKS)%nat).
-    { pose proof (op_sum_delete om i0 (u, Sb0) Hi0) as Hd. cbn in Hd. lia. }
+    { pose proof (op_sum_delete om i0 (u, Sb0, e00) Hi0) as Hd. cbn in Hd. lia. }
     assert (Hout3d : ((out - 1) <= 3)%nat) by lia.
     assert (Hout1 : (1 <= out)%nat) by lia.
     iPoseProof (eoi_26 with "Htext") as "Hi26".
@@ -4184,8 +4213,8 @@ Section ProofEndOp.
       clear Hsv34.
       (* ---- the batch is CHECKED OUT and log_res re-closed at cmt = true ---- *)
       iAssert (log_res γ bn γfs cov logstart)
-        with "[Houtc Hcmtc Hncc Hoauth]" as "HRres".
-      { rewrite /log_res. iExists (out - 1)%nat, true, nc, (delete i0 om).
+        with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa]" as "HRres".
+      { rewrite /log_res. iExists (out - 1)%nat, true, nc, (delete i0 om), Ep, Xr.
         iSplitL "Houtc"; [iExact "Houtc"|].
         iSplitL "Hcmtc"; [iExact "Hcmtc"|].
         iSplitL "Hncc"; [iExact "Hncc"|].
@@ -4193,7 +4222,13 @@ Section ProofEndOp.
         iSplitR; [iPureIntro; exact Hszd|].
         iSplitR; [iPureIntro; exact Hbndd|].
         iSplitR; [iPureIntro; exact Hout3d|].
-        iSplitR; [iPureIntro; intros _; exact Hzero|]. done. }
+        iSplitR; [iPureIntro; intros _; exact Hzero|].
+        (* the batch is checked out but the EPOCH does not move here -- the
+           bump belongs to the re-deposit, where om is provably empty *)
+        iSplitL "Hepa"; [iExact "Hepa"|].
+        iSplitL "Hxa"; [iExact "Hxa"|].
+        iSplitR; [iPureIntro; exact Hlived|].
+        iSplitR; [iPureIntro; exact Hcap|]. done. }
       assert (Hpp36 : add_vec_int (mword_of_int (KernelSyms.end_op + 0x34) : mword 64) 2
                       = mword_of_int (KernelSyms.end_op + 0x36))
         by (apply bv_eq; vm_compute; reflexivity).
@@ -4545,8 +4580,8 @@ Section ProofEndOp.
         destruct (out - 1)%nat; [contradiction | reflexivity]. }
       (* the batch goes straight back in, at the decremented outstanding *)
       iAssert (log_res γ bn γfs cov logstart)
-        with "[Houtc Hcmtc Hncc Hoauth Hbatch]" as "HRres".
-      { rewrite /log_res. iExists (out - 1)%nat, false, nc, (delete i0 om).
+        with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Hbatch]" as "HRres".
+      { rewrite /log_res. iExists (out - 1)%nat, false, nc, (delete i0 om), Ep, Xr.
         iSplitL "Houtc"; [iExact "Houtc"|].
         iSplitL "Hcmtc"; [iExact "Hcmtc"|].
         iSplitL "Hncc"; [iExact "Hncc"|].
@@ -4555,8 +4590,15 @@ Section ProofEndOp.
         iSplitR; [iPureIntro; exact Hbndd|].
         iSplitR; [iPureIntro; exact Hout3d|].
         iSplitR; [iPureIntro; discriminate|].
+        (* THE FAST PATH DOES NOT COMMIT, so the epoch stands: the other
+           open ops' entries and every witness they hold stay live. *)
+        iSplitL "Hepa"; [iExact "Hepa"|].
+        iSplitL "Hxa"; [iExact "Hxa"|].
+        iSplitR; [iPureIntro; exact Hlived|].
+        iSplitR; [iPureIntro; exact Hcap|].
         iExists nl, LB. iSplitR; [iPureIntro; exact Hsumd|].
-        iSplitR; [iPureIntro; exact Hsubd|]. iExact "Hbatch". }
+        iSplitR; [iPureIntro; exact Hsubd|].
+        iSplitR; [iPureIntro; exact Hreg|]. iExact "Hbatch". }
       assert (HT4regsE : eo_regsE m T4).
       { rewrite /eo_regsE. split.
         - rewrite HT4sp. exact (proj1 HqregsE).

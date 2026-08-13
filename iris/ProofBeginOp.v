@@ -62,8 +62,8 @@ From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language weakestpre lifting.
-From iris.algebra Require Import auth gmap frac excl.
-From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
+From iris.algebra Require Import auth gmap gset frac excl.
+From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map mono_nat.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
@@ -1277,7 +1277,8 @@ Section BoBodies.
     iPoseProof (boi_3c with "Htext") as "Hi2e".
     (* open the lock's resource for the committing test *)
     rewrite /log_res.
-    iDestruct "Hres" as (out cmt nc om) "(Hout & Hcmt & Hnc & Hauth & %Hsz & %Hbnd & %Hout3 & %Hcmtout & Hrest)".
+    iDestruct "Hres" as (out cmt nc om Ep Xr)
+      "(Hout & Hcmt & Hnc & Hauth & %Hsz & %Hbnd & %Hout3 & %Hcmtout & Hepa & Hxa & %Hlive & %Hcap & Hrest)".
     assert (Hacmt : add_vec (rget M (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 32 : mword 12)) = l_cmt).
     { rgne. rewrite Hs1. exact bo_addr_cmt. }
     (* +0x2c c.lw a5,32(s1) : a5 := log.committing *)
@@ -1315,26 +1316,35 @@ Section BoBodies.
     iPoseProof (boi_50 with "Htext") as "Hi42".
     destruct cmt.
     - (* ================= COMMITTING: c.bnez TAKEN -> +0x24 ================= *)
-      iAssert (∃ (out : nat) (cmt : bool) (nc : SailStdpp.Values.mword 32) (om : gmap nat op_entry),
+      iAssert (∃ (out : nat) (cmt : bool) (nc : SailStdpp.Values.mword 32) (om : gmap nat op_entry)
+                 (E : nat) (X : gset (nat * Z)),
                  l_out ↦₄ (mword_of_int (Z.of_nat out) : mword 32) ∗
                  l_cmt ↦₄ (mword_of_int (if cmt then 1 else 0) : mword 32) ∗
                  l_ncommit ↦₄ nc ∗
                  ghost_map_auth (ln_ops γ) 1 om ∗
                  ⌜size om = out⌝ ∗
-                 ⌜forall i e, om !! i = Some e -> (e.1 <= MAXOPBLOCKS)%nat⌝ ∗
+                 ⌜forall i e, om !! i = Some e -> (e.1.1 <= MAXOPBLOCKS)%nat⌝ ∗
                  ⌜(out <= 3)%nat⌝ ∗
                  ⌜cmt = true -> out = 0%nat⌝ ∗
+                 mono_nat_auth_own (ln_ep γ) 1 E ∗
+                 own (ln_lg γ) (● X) ∗
+                 ⌜forall i e, om !! i = Some e -> e.2 = E⌝ ∗
+                 ⌜forall e' b', ((e', b') : nat * Z) ∈ X -> (e' <= E)%nat⌝ ∗
                  (if cmt then emp
                   else ∃ (n : nat) (LB : gset Z),
                        ⌜(n + op_sum om <= LOGBLOCKS)%nat⌝ ∗
-                       ⌜forall i e, om !! i = Some e -> e.2 ⊆ LB⌝ ∗
+                       ⌜forall i e, om !! i = Some e -> e.1.2 ⊆ LB⌝ ∗
+                       ⌜forall b : Z, (E, b) ∈ X -> b ∈ LB⌝ ∗
                        log_batch bn γfs cov logstart n LB))%I
-        with "[Hout Hcmt Hnc Hauth Hrest]" as "Hres".
-      { iExists out, true, nc, om. iFrame "Hout Hcmt Hnc Hauth".
+        with "[Hout Hcmt Hnc Hauth Hepa Hxa Hrest]" as "Hres".
+      { iExists out, true, nc, om, Ep, Xr. iFrame "Hout Hcmt Hnc Hauth".
         iSplitR; [iPureIntro; exact Hsz|].
         iSplitR; [iPureIntro; exact Hbnd|].
         iSplitR; [iPureIntro; exact Hout3|].
         iSplitR; [iPureIntro; exact Hcmtout|].
+        iFrame "Hepa Hxa".
+        iSplitR; [iPureIntro; exact Hlive|].
+        iSplitR; [iPureIntro; exact Hcap|].
         iExact "Hrest". }
       iApply (wp_cbnez_taken_s_sconf (mword_of_int (KernelSyms.begin_op + 0x3c)) (mword_of_int 244 : mword 8)
                 (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) E1 (trap_res eb + (K - 4))%nat false
@@ -1352,7 +1362,7 @@ Section BoBodies.
                 HK Hj Hjl Hanch HboE1
                 with "Htext Hlog Hpanic Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc").
     - (* ================= NOT COMMITTING: fall through to +0x30 ============ *)
-      iDestruct "Hrest" as (n LB) "(%Hsum & %Hsub & Hbatch)".
+      iDestruct "Hrest" as (n LB) "(%Hsum & %Hsub & %Hreg & Hbatch)".
       iDestruct (bo_batch_lhn with "Hbatch") as "(%Hn30 & Hlhn & Hbclose)".
       iApply (wp_cbnez_fall_s_sconf (mword_of_int (KernelSyms.begin_op + 0x3c)) (mword_of_int 244 : mword 8)
                 (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) E1 (trap_res eb + (K - 4))%nat false
@@ -1599,10 +1609,18 @@ Section BoBodies.
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hp58) in "Hpc".
         (* THE LEDGER STEP: mint a fresh operation at full budget *)
-        iMod (log_begin_step γ om with "Hauth") as (i Hi) "(Hauth & HopS)".
+        (* THE OP IS BORN IN THE CURRENT EPOCH [Ep] -- that is the whole of
+           the birth-epoch bookkeeping on this side (fs-log.md §G.2): the
+           entry records the epoch it was minted in, and [log_res]'s
+           soundness clause below is re-established for the new row by
+           [reflexivity]. *)
+        iMod (log_begin_step γ om Ep with "Hauth") as (i Hi) "(Hauth & HopS)".
+        iDestruct (log_opSe_opS with "HopS") as "HopS".
         iDestruct (log_opS_op with "HopS") as "Hop".
-        iAssert (log_res γ bn γfs cov logstart) with "[Hout Hcmt Hnc Hauth Hlhn Hbclose]" as "Hres".
-        { rewrite /log_res. iExists (S out), false, nc, (<[i := (MAXOPBLOCKS, ∅)]> om).
+        iAssert (log_res γ bn γfs cov logstart)
+          with "[Hout Hcmt Hnc Hauth Hepa Hxa Hlhn Hbclose]" as "Hres".
+        { rewrite /log_res.
+          iExists (S out), false, nc, (<[i := (MAXOPBLOCKS, ∅, Ep)]> om), Ep, Xr.
           iFrame "Hout Hcmt Hnc Hauth".
           iSplitR.
           { iPureIntro. rewrite map_size_insert_None; [ by rewrite Hsz | exact Hi ]. }
@@ -1610,13 +1628,24 @@ Section BoBodies.
           { iPureIntro. intros k e Hk.
             destruct (decide (k = i)) as [->|Hne].
             - rewrite lookup_insert in Hk.
-              assert (e = (MAXOPBLOCKS, ∅)) as -> by congruence.
+              assert (e = (MAXOPBLOCKS, ∅, Ep)) as -> by congruence.
               apply Nat.le_refl.
             - rewrite lookup_insert_ne in Hk; [| exact (not_eq_sym Hne)]. exact (Hbnd k e Hk). }
           iSplitR; [iPureIntro; exact (bo_guard_out3 out n Hle)|].
           iSplitR; [iPureIntro; discriminate|].
+          iFrame "Hepa Hxa".
+          (* the new entry's birth epoch IS the current one, by construction *)
+          iSplitR.
+          { iPureIntro. intros k e Hk.
+            destruct (decide (k = i)) as [->|Hne].
+            - rewrite lookup_insert in Hk.
+              assert (e = (MAXOPBLOCKS, ∅, Ep)) as -> by congruence.
+              reflexivity.
+            - rewrite lookup_insert_ne in Hk; [| exact (not_eq_sym Hne)]. exact (Hlive k e Hk). }
+          (* the registry and the epoch are untouched by a begin_op *)
+          iSplitR; [iPureIntro; exact Hcap|].
           iExists n, LB. iSplitR.
-          { iPureIntro. rewrite (op_sum_insert om i (MAXOPBLOCKS, ∅) Hi).
+          { iPureIntro. rewrite (op_sum_insert om i (MAXOPBLOCKS, ∅, Ep) Hi).
             exact (log_reserve_ok n out om Hsz Hbnd (bo_guard_sum out n Hle)). }
           iSplitR.
           (* THE FRESH OP HAS LOGGED NOTHING, so its credit set is empty and
@@ -1625,24 +1654,30 @@ Section BoBodies.
           { iPureIntro. intros k e Hk.
             destruct (decide (k = i)) as [->|Hne].
             - rewrite lookup_insert in Hk.
-              assert (e = (MAXOPBLOCKS, ∅)) as -> by congruence.
+              assert (e = (MAXOPBLOCKS, ∅, Ep)) as -> by congruence.
               apply empty_subseteq.
             - rewrite lookup_insert_ne in Hk; [| exact (not_eq_sym Hne)]. exact (Hsub k e Hk). }
+          iSplitR; [iPureIntro; exact Hreg|].
           iApply ("Hbclose" with "Hlhn"). }
         rewrite /bo_exit.
         iSpecialize ("Hexit" $! CID with "[%]"); [wp_next_chain|].
         iApply ("Hexit" $! E9 with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hres Hop Hpid Hown Htc Hclm Hcg Hpc").
         exact HboE9.
       + (* ---- NO SPACE: the branch FALLS THROUGH, control at +0x46 ---- *)
-        iAssert (log_res γ bn γfs cov logstart) with "[Hout Hcmt Hnc Hauth Hlhn Hbclose]" as "Hres".
-        { rewrite /log_res. iExists out, false, nc, om.
+        iAssert (log_res γ bn γfs cov logstart)
+          with "[Hout Hcmt Hnc Hauth Hepa Hxa Hlhn Hbclose]" as "Hres".
+        { rewrite /log_res. iExists out, false, nc, om, Ep, Xr.
           iFrame "Hout Hcmt Hnc Hauth".
           iSplitR; [iPureIntro; exact Hsz|].
           iSplitR; [iPureIntro; exact Hbnd|].
           iSplitR; [iPureIntro; exact Hout3|].
           iSplitR; [iPureIntro; exact Hcmtout|].
+          iFrame "Hepa Hxa".
+          iSplitR; [iPureIntro; exact Hlive|].
+          iSplitR; [iPureIntro; exact Hcap|].
           iExists n, LB. iSplitR; [iPureIntro; exact Hsum|].
           iSplitR; [iPureIntro; exact Hsub|].
+          iSplitR; [iPureIntro; exact Hreg|].
           iApply ("Hbclose" with "Hlhn"). }
         iApply (wp_bge_fall_s_sconf (mword_of_int (KernelSyms.begin_op + 0x50)) (mword_of_int 28 : mword 13)
                   (mword_of_int 15 : mword 5) (mword_of_int 18 : mword 5) E8 (trap_res eb + (K - 4))%nat false

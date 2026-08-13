@@ -235,7 +235,19 @@ Definition wp_log_write_au_body
     cpu_own n eb p C b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
-    log_opS γ (if cr then S u else u) (Sb ∪ {[uint bno]}) -∗
+    (* THE ENTRY, WITH ITS BIRTH EPOCH NAMED, PLUS THE LOG WITNESS
+       (fs-log.md §G.3).  [LogInv.log_opSw] is [log_opS] with two things
+       added under the SAME existential: a name [e0] for this op's birth
+       epoch, and [logged_at γ e0 (uint bno)] -- "this block is in the
+       header of the batch my op belongs to".
+       The witness's epoch IS the caller's own entry's, which is the only
+       shape a later [log_use_group] can spend: an unmoored [∃ e] would be
+       satisfied by a dead batch's row and the header's revocation argument
+       is exactly what forbids trusting one.  Both arms mint: the append
+       arm because it just wrote the slot, the absorb arm because its scan
+       FOUND the block already there.  A caller that wants none of this
+       applies [LogInv.log_opSw_opS] and is otherwise unchanged. *)
+    log_opSw γ (if cr then S u else u) (Sb ∪ {[uint bno]}) (uint bno) -∗
     (* the caller's receipt: what its closing fupd paid out *)
     Φfsb -∗
     (* the handle re-indexed at the written bytes and now DIRTY *)

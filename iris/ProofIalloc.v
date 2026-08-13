@@ -1456,7 +1456,11 @@ Section IallocClaim.
     (* the block log_write just logged IS [IBLOCK inum inodestart]: that is
        [Hbno], and it is what makes the growth DETERMINATE. *)
     iEval (rewrite Hbno) in "HopS".
-    iRename "HopS" into "Hop".
+    (* SpecLogWrite's post now hands back the entry with its birth epoch
+       named and the epoch-stamped registry row attached (fs-log.md §G.3);
+       iupdate/ialloc do not spend it yet, so it is forgotten right here and
+       everything below is unchanged.  G-2 replaces this line. *)
+    iDestruct (log_opSw_opS with "HopS") as "Hop".
     assert (Hpc9e : ret_pc (W5 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ialloc + 0x9e)) by (rewrite HW5ra; pcw).
     iEval (rewrite Hpc9e) in "Hpc".
