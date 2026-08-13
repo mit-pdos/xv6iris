@@ -215,13 +215,13 @@ Section CodeDirlink.
   Proof. mk_base (KernelSyms.dirlink + 0x60) (mword_of_int 0x00004517 : mword 32)
     (mword_of_int (KernelSyms.dirlink + 0x60) : mword 64) (UTYPE (mword_of_int 4 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00004517. Qed.
 
-  Lemma dki_64 : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlink + 0x64) : mword 64) false (ITYPE (mword_of_int 2790 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.dirlink + 0x64) (mword_of_int 0xae650513 : mword 32)
-    (mword_of_int (KernelSyms.dirlink + 0x64) : mword 64) (ITYPE (mword_of_int 2790 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_ae650513. Qed.
+  Lemma dki_64 : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlink + 0x64) : mword 64) false (ITYPE (mword_of_int 2778 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.dirlink + 0x64) (mword_of_int 0xada50513 : mword 32)
+    (mword_of_int (KernelSyms.dirlink + 0x64) : mword 64) (ITYPE (mword_of_int 2778 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_ada50513. Qed.
 
-  Lemma dki_68 : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlink + 0x68) : mword 64) false (JAL (mword_of_int 2084402 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.dirlink + 0x68) (mword_of_int 0xe33fc0ef : mword 32)
-    (mword_of_int (KernelSyms.dirlink + 0x68) : mword 64) (JAL (mword_of_int 2084402 : mword 21, Regidx (mword_of_int 1))) kd_e33fc0ef. Qed.
+  Lemma dki_68 : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlink + 0x68) : mword 64) false (JAL (mword_of_int 2084382 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.dirlink + 0x68) (mword_of_int 0xe1ffc0ef : mword 32)
+    (mword_of_int (KernelSyms.dirlink + 0x68) : mword 64) (JAL (mword_of_int 2084382 : mword 21, Regidx (mword_of_int 1))) kd_e1ffc0ef. Qed.
 
   Lemma dki_6c : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlink + 0x6c) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)).
   Proof. mk_rvc (KernelSyms.dirlink + 0x6c) (mword_of_int 0x79a2 : mword 16)

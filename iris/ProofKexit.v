@@ -852,7 +852,7 @@ Section KexitPark.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp64) in "Hpc".
     iApply (wp_addi4_s_sconf (CID := CIDu) (mword_of_int (KX + 0x64))
-              (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 866 : mword 12)
+              (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 846 : mword 12)
               P0 av b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi64 [-]").
     iIntros (CIDv Hsv2) "Hcg Hpc".
@@ -860,7 +860,7 @@ Section KexitPark.
                      = P0 !!! Regidx (mword_of_int 10 : mword 5)) by (rgne; reflexivity).
     iEval (rewrite Hrgu10) in "Hcg".
     set (P1 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
-         (add_vec (P0 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 866 : mword 12)))]> P0).
+         (add_vec (P0 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 846 : mword 12)))]> P0).
     assert (HP1a0 : P1 !!! Regidx (mword_of_int 10 : mword 5) = wait_lock_addr).
     { rewrite /P1 upd_eq /P0 upd_eq. unfold wait_lock_addr.
       apply bv_eq; vm_compute; reflexivity. }
@@ -1192,7 +1192,7 @@ Section KexitPark.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp8e) in "Hpc".
     iApply (wp_addi4_s_sconf (CID := CIDa) (mword_of_int (KX + 0x8e))
-              (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 824 : mword 12)
+              (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 804 : mword 12)
               PA (trap_res b + av)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi8e [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -1200,7 +1200,7 @@ Section KexitPark.
                      = PA !!! Regidx (mword_of_int 10 : mword 5)) by (rgne; reflexivity).
     iEval (rewrite HrgA10) in "Hcg".
     set (PB := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
-         (add_vec (PA !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 824 : mword 12)))]> PA).
+         (add_vec (PA !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 804 : mword 12)))]> PA).
     assert (HPBa0 : PB !!! Regidx (mword_of_int 10 : mword 5) = wait_lock_addr).
     { rewrite /PB upd_eq /PA upd_eq. unfold wait_lock_addr.
       apply bv_eq; vm_compute; reflexivity. }
@@ -1301,22 +1301,22 @@ Section KexitPark.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp9e) in "Hpc".
     iApply (wp_addi4_s_sconf (CID := CIDz) (mword_of_int (KX + 0x9e))
-              (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 328 : mword 12)
+              (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 316 : mword 12)
               PZ (trap_res b + av)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi9e [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (PZ2 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
-         (add_vec (rget (CID := CIDz) PZ (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 328 : mword 12)))]> PZ).
+         (add_vec (rget (CID := CIDz) PZ (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 316 : mword 12)))]> PZ).
     assert (Hppa2 : add_vec_int (mword_of_int (KX + 0x9e) : mword 64) 4 = mword_of_int (KX + 0xa2))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppa2) in "Hpc".
     iApply (wp_jal_s_sconf (CID := CIDz) (mword_of_int (KX + 0xa2))
-              (mword_of_int 1 : mword 5) (mword_of_int 2090860 : mword 21) PZ2 (trap_res b + av)%nat false
+              (mword_of_int 1 : mword 5) (mword_of_int 2090840 : mword 21) PZ2 (trap_res b + av)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hia2 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     assert (Hjpn : add_vec (mword_of_int (KX + 0xa2) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2090860 : mword 21)) = mword_of_int KernelSyms.panic)
+                     (sign_extend' 64 (mword_of_int 2090840 : mword 21)) = mword_of_int KernelSyms.panic)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjpn) in "Hpc".
     iPoseProof (panic_wp_any_at CIDz with "Hpanic") as "Hpw".
@@ -1746,11 +1746,11 @@ Section ProofKexit.
     assert (Hrg4_15 : rget (CID := CID4) A2 (mword_of_int 15 : mword 5)
                       = A2 !!! Regidx (mword_of_int 15 : mword 5)) by (rgne; reflexivity).
     assert (Hipa : add_vec (rget (CID := CID4) A2 (mword_of_int 15 : mword 5))
-                     (sign_extend' 64 (mword_of_int 618 : mword 12))
+                     (sign_extend' 64 (mword_of_int 598 : mword 12))
                    = (mword_of_int KernelSyms.initproc : mword 64)).
     { rewrite Hrg4_15 /A2 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iApply (wp_ld_s_sconf (CID := CID4) (mword_of_int (KX + 0x1c))
-              (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 618 : mword 12)
+              (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 598 : mword 12)
               A2 (av - 6)%nat ip b (dqm := dqi) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c [Hinit] [-]").
     { iEval (rewrite Hipa). iExact "Hinit". }
@@ -1854,22 +1854,22 @@ Section ProofKexit.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp30) in "Hpc".
       iApply (wp_addi4_s_sconf (CID := CID9) (mword_of_int (KX + 0x30))
-                (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 422 : mword 12)
+                (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 410 : mword 12)
                 B0 (av - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi30 [-]").
       iIntros (CIDA HsA) "Hcg Hpc".
       set (B1 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
-           (add_vec (rget (CID := CID9) B0 (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 422 : mword 12)))]> B0).
+           (add_vec (rget (CID := CID9) B0 (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 410 : mword 12)))]> B0).
       assert (Hpp34 : add_vec_int (mword_of_int (KX + 0x30) : mword 64) 4 = mword_of_int (KX + 0x34))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp34) in "Hpc".
       iApply (wp_jal_s_sconf (CID := CIDA) (mword_of_int (KX + 0x34))
-                (mword_of_int 1 : mword 5) (mword_of_int 2090970 : mword 21) B1 (av - 6)%nat b
+                (mword_of_int 1 : mword 5) (mword_of_int 2090950 : mword 21) B1 (av - 6)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi34 [-]").
       iIntros (CIDB HsB) "Hcg Hpc".
       assert (Hjpn : add_vec (mword_of_int (KX + 0x34) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2090970 : mword 21)) = mword_of_int KernelSyms.panic)
+                       (sign_extend' 64 (mword_of_int 2090950 : mword 21)) = mword_of_int KernelSyms.panic)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjpn) in "Hpc".
       iPoseProof (panic_wp_any_at CIDB with "Hpanic") as "Hpw".

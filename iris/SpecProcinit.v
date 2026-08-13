@@ -69,9 +69,9 @@ Local Open Scope Z_scope.
    way iinit reads "itable"/"inode"). *)
 Definition pid_lock_addr : mword 64 := mword_of_int KernelSyms.pid_lock.
 Definition wait_lock_addr : mword 64 := mword_of_int KernelSyms.wait_lock.
-Definition nextpid_str : Z := 0x80007158.
-Definition waitlock_str : Z := 0x80007160.
-Definition proc_str : Z := 0x80007170.
+Definition nextpid_str : Z := 0x80007160.
+Definition waitlock_str : Z := 0x80007168.
+Definition proc_str : Z := 0x80007178.
 
 (* the cpu field of a [struct spinlock] at [lk], in the form initlock's
    contract spells it. *)

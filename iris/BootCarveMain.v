@@ -328,17 +328,26 @@ Qed.
 Lemma bhead_of_z : bhead = pa_of_z (buf_base + buf_stride * Z.of_nat NBUF).
 Proof. exact (bnode_of_z NBUF). Qed.
 
-(* the eleven [struct spinlock] windows [main_locks_raw] enumerates, IN
-   ADDRESS ORDER and pairwise disjoint -- which is what lets a client cut all
-   eleven out of the one .bss range with [boot_ran_split] alone.  Every step
-   is [x + 24 <= y] on two literals, so the whole check is one [vm_compute]
-   per conjunct.  (The full .bss decomposition -- which of these gaps holds
-   which other bundle -- is tabulated in claude-notes/completed/crash.md.) *)
+(* the eleven lock windows [main_locks_raw] enumerates, IN ADDRESS ORDER and
+   pairwise disjoint -- which is what lets a client cut all eleven out of the
+   one .bss range with [boot_ran_split] alone.  Every step is [x + w <= y] on
+   two literals, so the whole check is one [vm_compute] per conjunct.  (The
+   full .bss decomposition -- which of these gaps holds which other bundle --
+   is tabulated in claude-notes/completed/crash.md.)
+
+   TEN OF THE WINDOWS ARE 24 BYTES AND ONE IS 44: [tx_lock] is a [struct
+   sleeplock] (kernel-defects.md D2, fixed upstream in b7c25cf), so its window
+   is [boot_sl_raw]'s.  That growth is the one conjunct here worth re-deriving
+   rather than assuming, since a wider window can collide with the next cut:
+   [tx_lock] = 0x80012380 and [kmem] = 0x800123b0, so the gap the linker left
+   is 48 bytes and 44 fits with 4 to spare.  (The preceding step is TIGHT
+   already -- [pr] = 0x80012368 and [pr + 24] = [tx_lock] exactly -- so there
+   was no room to grow downwards.) *)
 Lemma main_lock_windows :
   img_end <= KernelSyms.cons /\
   KernelSyms.cons + 24 <= KernelSyms.pr /\
   KernelSyms.pr + 24 <= KernelSyms.tx_lock /\
-  KernelSyms.tx_lock + 24 <= KernelSyms.kmem /\
+  KernelSyms.tx_lock + 44 <= KernelSyms.kmem /\
   KernelSyms.kmem + 24 <= KernelSyms.pid_lock /\
   KernelSyms.pid_lock + 24 <= KernelSyms.wait_lock /\
   KernelSyms.wait_lock + 24 <= KernelSyms.tickslock /\
@@ -1053,8 +1062,12 @@ Section BootCarveMain.
   (* ------------------------------------------------------------------ *)
   (* [SpecMain.main_locks_raw]'s ELEVEN.                                 *)
   (*                                                                    *)
-  (* Inherently eleven applications of [boot_lk_raw]: the eleven         *)
-  (* [struct spinlock]s sit at UNRELATED symbols, not at a stride.  What *)
+  (* Inherently eleven applications: the eleven locks sit at UNRELATED   *)
+  (* symbols, not at a stride.  TEN are [struct spinlock]s and go        *)
+  (* through [boot_lk_raw] over a 24-byte window; [tx_lock] is a         *)
+  (* [struct sleeplock] (b7c25cf restored uartinit's initsleeplock --    *)
+  (* kernel-defects.md D2) and goes through [boot_sl_raw] over a         *)
+  (* 44-byte one, the same way the bio/inode arrays' locks do.  What     *)
   (* the lemma buys is the address bridge for each (ten of them ARE      *)
   (* [mword_of_int <symbol>]; [disk_lock] alone needs [disk_lock_of_z])  *)
   (* and the ORDER -- the windows are taken in ADDRESS order, which is   *)
@@ -1067,7 +1080,7 @@ Section BootCarveMain.
     kmap_static_claims -∗
     boot_raw_ran g KernelSyms.cons (KernelSyms.cons + 24) -∗
     boot_raw_ran g KernelSyms.pr (KernelSyms.pr + 24) -∗
-    boot_raw_ran g KernelSyms.tx_lock (KernelSyms.tx_lock + 24) -∗
+    boot_raw_ran g KernelSyms.tx_lock (KernelSyms.tx_lock + 44) -∗
     boot_raw_ran g KernelSyms.kmem (KernelSyms.kmem + 24) -∗
     boot_raw_ran g KernelSyms.pid_lock (KernelSyms.pid_lock + 24) -∗
     boot_raw_ran g KernelSyms.wait_lock (KernelSyms.wait_lock + 24) -∗
@@ -1085,7 +1098,7 @@ Section BootCarveMain.
     iDestruct (boot_lk_raw g KernelSyms.pr Hmem
                  ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                  ltac:(vm_compute; reflexivity) with "Hcl H2") as "H2".
-    iDestruct (boot_lk_raw g KernelSyms.tx_lock Hmem
+    iDestruct (boot_sl_raw g KernelSyms.tx_lock Hmem
                  ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                  ltac:(vm_compute; reflexivity) with "Hcl H3") as "H3".
     iDestruct (boot_lk_raw g KernelSyms.kmem Hmem

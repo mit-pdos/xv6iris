@@ -618,6 +618,29 @@ what makes this tractable at all); then fix what it does NOT cover.
   wants a BARE basename (`map CodeUsertrap.v`), not a repo-relative path, or
   it looks for `iris/iris/Code….v`.
 
+- **A BITVECTOR WIDTH IS NOT AN IMMEDIATE, and rewriting one is SILENT.**
+  `relayout_map.py apply` substitutes numbers by value inside an anchored
+  region, and a proof line carries the same number in several roles:
+
+      iApply (wp_addi4_s_sconf ... (mword_of_int 12 : mword 12))
+      set (Q1 := ... (add_vec ... (sign_extend' 64 (mword_of_int 52 : mword 12))))
+
+  Only the FIRST number in each is the instruction's immediate; `mword 12`,
+  `sign_extend' 64`, `zero_extend' 12`, `ones 0` are TYPES. On the `b7c25cf`
+  bump a map entry `12 -> 4088` at `procdump+0x2e` produced
+  `mword_of_int 4088 : mword 4088` -- a 4088-BIT WORD -- and `64 -> 52` in
+  kvmmap produced `sign_extend' 52` and `: mword 52`.
+    **The 4088 failed loudly; the 52 did not stand out at all.** An audit for
+  IMPLAUSIBLE widths finds the first and misses the second, because 52 is a
+  perfectly ordinary width. The audit that works is a DIFF against HEAD:
+  collect every width token in each file before and after and compare the
+  multisets -- a relayout must never change one. (Skip the generated
+  `Code*.v` / `KernelDecode*.v`, whose widths legitimately move.)
+    The tool now freezes all of those spans, the same way it freezes pc
+  offsets and register fields. The general rule: before substituting a number
+  by value, ask what ROLE that position plays; the relayout map only ever
+  licenses changing an *immediate*.
+
 - **A REGISTER REALLOCATION IS NOT ALWAYS A RENAME, and getting that wrong
   typechecks.** On the `psz` bump gcc swapped filestat's two lazily-spilled
   callee-saveds -- `p` went s3->s2 and `&st` went s2->s3 -- but **the spill
@@ -767,6 +790,46 @@ The definitive soundness check for a whole cone is still
 sees through every functor and seal. Do it once at the end of any interface
 change and diff the axiom list against what the coverage report says should be
 assumed; anything else is a regression.
+
+## `make kernel` DOES NOT REBUILD THE KERNEL, AND `gen-code` DOES NOT RE-DUMP
+
+Two independent traps that both make a version bump a SILENT NO-OP. Hit both
+on the `b7c25cf` bump; the tell was `make kernel` printing "Nothing to be done"
+seconds after a `git checkout` of a different revision.
+
+1. **The ELF rule has only an ORDER-ONLY prerequisite:**
+
+       $(KERNEL_ELF): | $(XV6_DIR)
+               $(MAKE) -C $(XV6_DIR) kernel/kernel
+
+   `|` means "the directory must exist", not "rebuild when it changes". Once
+   `xv6-riscv/kernel/kernel` exists, `make kernel` never runs the inner make
+   again, however far the sources have moved. Force it:
+
+       make -C xv6-riscv kernel/kernel
+
+2. **`gen-code` reads `kernel-rocq/`, not the ELF.** It regenerates
+   `iris/Code*.v` + `KernelDecode*.v` FROM the dump; the dump itself is
+   produced by the `$(KDUMP)/Kernel{Syms,Data,Instrs}.v` rules, which do
+   depend on the ELF. Running `gen-code` alone after a bump therefore
+   regenerates the decode layer from the OLD dump and reports a perfectly
+   healthy-looking summary.
+
+So the order after changing `XV6_REV` is:
+
+       make -C xv6-riscv kernel/kernel      # force the image
+       make dump                            # ELF   -> kernel-rocq/
+       make gen-code                        # dump  -> iris/Code*.v
+
+**VERIFY, do not trust the summary.** Both no-ops print normal-looking output
+(`gen-code` even reports its usual counts). The cheap check is one symbol
+against the image:
+
+       grep -E "Definition kalloc " kernel-rocq/KernelSyms.v
+       grep -E " kalloc$" xv6-riscv/kernel/kernel.sym
+
+If those disagree the dump is stale, and every proof in the tree is being
+checked against an image that no longer exists.
 
 ## A `.v`-vs-`.vo` MTIME SWEEP IS NOT A STALENESS CHECK
 

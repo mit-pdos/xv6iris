@@ -12,7 +12,7 @@
      off 3 = 0x03   8N1, clear DLAB   (LCR_EIGHT_BITS)
      off 2 = 0x07   enable + clear both FIFOs (FCR)
      off 1 = 0x03   enable tx/rx interrupts (IER)
-   then [initlock(&tx_lock, "uart")].
+   then [initsleeplock(&tx_lock, "uart")].
 
    STATED OVER THE TIME-0 DEVICE INVARIANT.  Device init does NOT run before
    [dev_inv] is allocated: the UART thread is a top-level thread from step 0 and
@@ -38,6 +38,20 @@
    uartinit writes no THR, so the accepted trace is unchanged and the token and
    receipt come back at the same [l].
 
+   AND IT INITIALIZES THE TRANSMIT SLEEPLOCK.  Upstream b7c25cf restored the
+   trailing lock init that ae96fd0 had dropped (kernel-defects.md D2), as
+   [initsleeplock(&tx_lock, "uart")] -- tx_lock is a [struct sleeplock] now,
+   not a spinlock, so it is six fields rather than three.  The contract
+   therefore takes the raw storage of that one lock and hands back the
+   initialized cells plus the two persistent names, in exactly
+   [SpecInitsleeplock.v]'s vocabulary: [SleepLock.sl_raw] in,
+   [SleepLock.sl_fresh] out (the same shape SpecBinit/SpecIinit use for the
+   sleeplocks THEY init, and precisely [SleepLock.sl_fresh_new]'s premises
+   minus the resource).  So the caller's ghost step
+   [sl_fresh a_tx_lock "uart" ∗ tx_res γd ==∗ is_sleeplock … a_tx_lock "uart"
+   (tx_res γd)] plus the [uart_dlab_off] below is [UartTxInv.is_txlock] --
+   the thing [LinkTxLockInit.v]'s axiom currently assumes.
+
    ProofUartinit.v proves it by running each of the seven writes through the
    invariant-opening ACCESSOR-form UART store leaf
    [SpecUart.wp_sb_uart_uinv_s_sconf] and doing one ghost step per write, out
@@ -57,7 +71,9 @@ Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import KernelText KernelDataInv.
 Require Import WpLock.
+Require Import SleepLock.
 Require Import WpUart.
+Require Import UartTxInv.
 Require Import IntrDefs.
 Require Import RegFile.
 From Kernel Require KernelSyms.
@@ -78,19 +94,21 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
    contract is stated at the literal index [false] rather than a generic
    [b], with no [wp_next] wrapper at all (it would collapse via
    [wp_next_off] anyway, since the hart cannot move). *)
-Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
+Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!lockG Σ} `{!uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γd : uart_names) (m : regfile) (K : nat)
     (l : list (bv 8)) (b0 : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
-  (4 <= K)%nat ->
+  (* THE FRAME PLUS THE CALLEE.  uartinit's own frame is [addi sp,sp,-16] = 2
+     slots, and [initsleeplock] demands [(6 <= av)] of what is left, so the
+     budget is 2 + 6. *)
+  (8 <= K)%nat ->
   sie_cap_gpr m K false p -∗
-  (* [kernel_data] is no longer needed for a string literal -- uartinit's
-     [initlock(&tx_lock, "uart")] is GONE (upstream ae96fd0 made tx_lock a
-     sleeplock and forgot to initialize it; kernel-defects.md D2) -- but it
-     stays a premise because the device-register writes are stated over the
-     same image resources. *)
+  (* [kernel_data] is load-bearing again: it is where the "uart" string
+     literal that the [auipc a1 / addi a1] pair points at comes from -- the
+     name uartinit hands [initsleeplock] -- alongside the device-register
+     writes, which are stated over the same image resources. *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the UART fabric, borrowed from the invariant around each write *)
   uart_inv γd -∗
@@ -99,6 +117,9 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
   uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_sent γd l -∗
   (* the UNFROZEN DLAB half, at an arbitrary power-on value *)
   uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
+  (* the transmit sleeplock's storage, uninitialized: all six fields of
+     [struct sleeplock tx_lock], contents arbitrary. *)
+  sl_raw a_tx_lock -∗
   ( ∀ mr,
     sie_cap_gpr mr K false p -∗
     pc_is ret_tgt -∗
@@ -107,18 +128,21 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
     uart_tx_own γd l -∗ uart_sent γd l -∗
     (* the final LCR write cleared DLAB, so the half is frozen for good *)
     uart_dlab_off γd -∗
-    (* NO LOCK COMES OUT OF uartinit ANY MORE.  It used to hand back the
-       zeroed lock word, the sealed [lock_name] and the cpu cell -- the
-       "newlock" ghost step's raw material.  ae96fd0 deleted the
-       [initlock(&tx_lock, "uart")] call and did not replace it, so uartinit
-       touches no lock storage at all and the transmit lock is whatever the
-       loader left.  kernel-defects.md D2 is where that goes. *)
+    (* THE TRANSMIT LOCK COMES BACK OUT, INITIALIZED -- the "newlock" ghost
+       step's raw material, restored.  b7c25cf's [initsleeplock(&tx_lock,
+       "uart")] zeroes [locked]/[lk.locked]/[lk.cpu]/[pid] and writes the two
+       name fields, which are then DISCARDED in favour of the persistent
+       [lock_name (sl_lk a_tx_lock) "sleep lock"] / [sl_name a_tx_lock
+       "uart"].  [SleepLock.sl_fresh_new] seals the bundle into
+       [is_sleeplock … a_tx_lock "uart" R] for the caller's choice of R
+       ([UartTxInv.tx_res γd] is the one the driver wants). *)
+    sl_fresh a_tx_lock "uart"%string -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type UARTINIT.
   Parameter wp_uartinit_sconf :
-    forall `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ} `{!sieG Σ} `{!lockG Σ} `{!uartGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γd : uart_names) (m : regfile) (K : nat)
       (l : list (bv 8)) (b0 : bool) (p : mword 64),
       wp_uartinit_sconf_body γd m K l b0 p.

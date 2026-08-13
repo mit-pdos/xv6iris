@@ -22,7 +22,16 @@
    [uart_inv], the transmitter token/receipt pair at [l], the carried
    [uart_out_lb], and the unfrozen DLAB half go straight into the uartinit
    call and its outputs (tokens at the same [l], plus the frozen
-   [uart_dlab_off]) straight into consoleinit's own postcondition. *)
+   [uart_dlab_off]) straight into consoleinit's own postcondition.
+
+   SO IS THE TRANSMIT SLEEPLOCK'S STORAGE.  xv6 `b7c25cf` restored uartinit's
+   [initsleeplock(&tx_lock, "uart")] (kernel-defects.md D2), so [sl_raw
+   a_tx_lock] rides in on the same path -- introduced here, handed to the
+   uartinit call untouched, and its [sl_fresh a_tx_lock "uart"] handed back
+   out untouched.  consoleinit never names a field of it.  The only thing
+   that costs anything is the BUDGET: uartinit went 4 -> 8 slots (its own 2
+   plus initsleeplock's 6), so consoleinit's own 2-slot frame makes 10, which
+   is what [cni_cap_bounds] now splits. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad list_numbers bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -47,8 +56,10 @@ Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
 
-(* clean-context (mword-free) nat bounds, so [lia] never sees a bv. *)
-Lemma cni_cap_bounds (K : nat) : (6 <= K)%nat -> (2 <= K)%nat /\ (4 <= K - 2)%nat.
+(* clean-context (mword-free) nat bounds, so [lia] never sees a bv.
+   2 for consoleinit's own frame; 8 for what is left over it, which is
+   uartinit's post-b7c25cf demand (2 + initsleeplock's 6). *)
+Lemma cni_cap_bounds (K : nat) : (10 <= K)%nat -> (2 <= K)%nat /\ (8 <= K - 2)%nat.
 Proof. lia. Qed.
 
 Lemma cni_nk (K : nat) : (2 <= K)%nat -> ((K - 2) + 2)%nat = K.
@@ -60,6 +71,8 @@ Proof. lia. Qed.
 Section ConsoleinitBody.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
+  (* [lockG] arrives with uartinit's sleeplock premises (SpecUartinit.v). *)
+  Context `{!lockG Σ}.
   Context `{!uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -97,7 +110,7 @@ Section ConsoleinitBody.
     cbv beta delta [wp_consoleinit_sconf_body].
     intros pcE ret_tgt clk c_cname c_ccpu HK.
     pose proof (cni_cap_bounds K HK) as (Hc2 & HK4).
-    iIntros "Hcg #Htext #Hkdata Hpc #Huinv Htx #Hlb #Hsent Hdlab Hclock Hcname Hccpu Hdr Hdw Hcont".
+    iIntros "Hcg #Htext #Hkdata Hpc #Huinv Htx #Hlb #Hsent Hdlab Hclock Hcname Hccpu Hraw Hdr Hdw Hcont".
     (* the "cons" string literal (4 chars + NUL), read out of the data image *)
     pose (name := (mword_of_int cons_name_str : mword 64)).
     assert (Hcons : forall j bt, cstring_bytes "cons"%string !! j = Some bt ->
@@ -227,13 +240,13 @@ Section ConsoleinitBody.
     assert (Hp18 : add_vec_int (mword_of_int (KernelSyms.consoleinit + 0x14) : mword 64) 4 = mword_of_int (KernelSyms.consoleinit + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp18) in "Hpc".
     (* +0x18 jal initlock *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x18)) (mword_of_int 1 : mword 5) (mword_of_int 1804 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x18)) (mword_of_int 1 : mword 5) (mword_of_int 1824 : mword 21)
               W6 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi18 [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (W7 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.consoleinit + 0x18) : mword 64) 4)]> W6).
-    assert (Htgtil : add_vec (mword_of_int (KernelSyms.consoleinit + 0x18) : mword 64) (sign_extend' 64 (mword_of_int 1804 : mword 21)) = mword_of_int KernelSyms.initlock) by (apply bv_eq; vm_compute; reflexivity).
+    assert (Htgtil : add_vec (mword_of_int (KernelSyms.consoleinit + 0x18) : mword 64) (sign_extend' 64 (mword_of_int 1824 : mword 21)) = mword_of_int KernelSyms.initlock) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtil) in "Hpc".
     assert (HW7a0 : W7 !!! Regidx (mword_of_int 10 : mword 5) = clk) by (rewrite /W7 upd_ne; [exact HW6a0 | reg_neq]).
     assert (HW7a1 : W7 !!! Regidx (mword_of_int 11 : mword 5) = name) by (rewrite /W7 upd_ne; [exact HW6a1 | reg_neq]).
@@ -281,8 +294,8 @@ Section ConsoleinitBody.
     assert (HU0sp : U0 !!! Regidx csp_rs1 = add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
       by (rewrite /U0 upd_ne; [exact Hmilsp | reg_neq]).
     iApply (wp_uartinit γd U0 (K - 2)%nat l b0 p
-              ltac:(lia) with "Hcg Htext Hkdata Hpc Huinv Htx Hlb Hsent Hdlab").
-    iIntros (mu) "Hcg Hpc %Huacs Htx #Hsent' #Hdoff".
+              ltac:(lia) with "Hcg Htext Hkdata Hpc Huinv Htx Hlb Hsent Hdlab Hraw").
+    iIntros (mu) "Hcg Hpc %Huacs Htx #Hsent' #Hdoff Hfresh".
     assert (Hretua : ret_pc (U0 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.consoleinit + 0x20)).
     { rewrite /U0 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretua) in "Hpc".
@@ -448,7 +461,7 @@ Section ConsoleinitBody.
     (* ---- hand the continuation both callees' posts + the two devsw cells;
        [Hcont] is now a plain wand chain (BOOT-ONLY: no [wp_next] wrapper),
        so there is no CID to discharge before applying it. ---- *)
-    iApply ("Hcont" $! E3 with "Hcg Hpc [%] Htx Hsent Hdoff Hclock Hcnm Hccpu Hdr Hdw").
+    iApply ("Hcont" $! E3 with "Hcg Hpc [%] Htx Hsent Hdoff Hclock Hcnm Hccpu Hfresh Hdr Hdw").
     (* callee_saved m E3: the two sub-calls preserve s1..s11/tp; the epilogue
        restores sp/s0, and ra (caller-saved) is irrelevant. *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
@@ -492,7 +505,7 @@ End ConsoleinitBody.
 (* their proven specs, discharging the CONSOLEINIT Module Type.            *)
 (* ===================================================================== *)
 Module ConsoleinitProof (Initlock : INITLOCK) (Uartinit : UARTINIT) : CONSOLEINIT.
-  Definition wp_consoleinit_sconf `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+  Definition wp_consoleinit_sconf `{!riscvGS Σ} `{!sieG Σ} `{!lockG Σ} `{!uartGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γd : uart_names) (m : regfile) (K : nat)
       (l : list (bv 8)) (b0 : bool)
       (vclock : bv 32) (vcname vccpu : bv 64)

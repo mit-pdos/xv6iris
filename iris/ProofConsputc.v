@@ -311,12 +311,12 @@ Section ProofConsputc.
       assert (Hp1e : add_vec_int (mword_of_int (KernelSyms.consputc + 0x1c) : mword 64) 2 = mword_of_int (KernelSyms.consputc + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp1e) in "Hpc".
       (* +0x1e jal uartputc_sync *)
-      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.consputc + 0x1e)) ra_idx (mword_of_int 1716 : mword 21)
+      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.consputc + 0x1e)) ra_idx (mword_of_int 1736 : mword 21)
                 T1 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi1e [-]").
       iIntros (CID7 Hs7) "Hcg Hpc".
       set (T2 := <[Regidx ra_idx := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.consputc + 0x1e) : mword 64) 4)]> T1).
-      assert (Htgtu1 : add_vec (mword_of_int (KernelSyms.consputc + 0x1e) : mword 64) (sign_extend' 64 (mword_of_int 1716 : mword 21)) = mword_of_int KernelSyms.uartputc_sync) by (apply bv_eq; vm_compute; reflexivity).
+      assert (Htgtu1 : add_vec (mword_of_int (KernelSyms.consputc + 0x1e) : mword 64) (sign_extend' 64 (mword_of_int 1736 : mword 21)) = mword_of_int KernelSyms.uartputc_sync) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtu1) in "Hpc".
       iApply (wp_uartputc γd γv T2 (K - 2)%nat l pv pkv dqm dqm2 b p HK4 Hpv Hpkv
                 with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
@@ -336,12 +336,12 @@ Section ProofConsputc.
       assert (Hp26 : add_vec_int (mword_of_int (KernelSyms.consputc + 0x22) : mword 64) 4 = mword_of_int (KernelSyms.consputc + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp26) in "Hpc".
       (* +0x26 jal uartputc_sync *)
-      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.consputc + 0x26)) ra_idx (mword_of_int 1708 : mword 21)
+      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.consputc + 0x26)) ra_idx (mword_of_int 1728 : mword 21)
                 T3 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi26 [-]").
       iIntros (CID10 Hs10) "Hcg Hpc".
       set (T4 := <[Regidx ra_idx := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.consputc + 0x26) : mword 64) 4)]> T3).
-      assert (Htgtu2 : add_vec (mword_of_int (KernelSyms.consputc + 0x26) : mword 64) (sign_extend' 64 (mword_of_int 1708 : mword 21)) = mword_of_int KernelSyms.uartputc_sync) by (apply bv_eq; vm_compute; reflexivity).
+      assert (Htgtu2 : add_vec (mword_of_int (KernelSyms.consputc + 0x26) : mword 64) (sign_extend' 64 (mword_of_int 1728 : mword 21)) = mword_of_int KernelSyms.uartputc_sync) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtu2) in "Hpc".
       iApply (wp_uartputc γd γv T4 (K - 2)%nat _ pv pkv dqm dqm2 b p HK4 Hpv Hpkv
                 with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
@@ -361,12 +361,12 @@ Section ProofConsputc.
       assert (Hp2c : add_vec_int (mword_of_int (KernelSyms.consputc + 0x2a) : mword 64) 2 = mword_of_int (KernelSyms.consputc + 0x2c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp2c) in "Hpc".
       (* +0x2c jal uartputc_sync *)
-      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.consputc + 0x2c)) ra_idx (mword_of_int 1702 : mword 21)
+      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.consputc + 0x2c)) ra_idx (mword_of_int 1722 : mword 21)
                 T5 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi2c [-]").
       iIntros (CID13 Hs13) "Hcg Hpc".
       set (T6 := <[Regidx ra_idx := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.consputc + 0x2c) : mword 64) 4)]> T5).
-      assert (Htgtu3 : add_vec (mword_of_int (KernelSyms.consputc + 0x2c) : mword 64) (sign_extend' 64 (mword_of_int 1702 : mword 21)) = mword_of_int KernelSyms.uartputc_sync) by (apply bv_eq; vm_compute; reflexivity).
+      assert (Htgtu3 : add_vec (mword_of_int (KernelSyms.consputc + 0x2c) : mword 64) (sign_extend' 64 (mword_of_int 1722 : mword 21)) = mword_of_int KernelSyms.uartputc_sync) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtu3) in "Hpc".
       iApply (wp_uartputc γd γv T6 (K - 2)%nat _ pv pkv dqm dqm2 b p HK4 Hpv Hpkv
                 with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
@@ -424,12 +424,12 @@ Section ProofConsputc.
       assert (Hp10 : add_vec_int (mword_of_int (KernelSyms.consputc + 0x0c) : mword 64) 4 = mword_of_int (KernelSyms.consputc + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp10) in "Hpc".
       (* +0x10 jal uartputc_sync *)
-      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.consputc + 0x10)) ra_idx (mword_of_int 1730 : mword 21)
+      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.consputc + 0x10)) ra_idx (mword_of_int 1750 : mword 21)
                 W3 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi10 [-]").
       iIntros (CID7' Hs7') "Hcg Hpc".
       set (F1 := <[Regidx ra_idx := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.consputc + 0x10) : mword 64) 4)]> W3).
-      assert (Htgtu : add_vec (mword_of_int (KernelSyms.consputc + 0x10) : mword 64) (sign_extend' 64 (mword_of_int 1730 : mword 21)) = mword_of_int KernelSyms.uartputc_sync) by (apply bv_eq; vm_compute; reflexivity).
+      assert (Htgtu : add_vec (mword_of_int (KernelSyms.consputc + 0x10) : mword 64) (sign_extend' 64 (mword_of_int 1750 : mword 21)) = mword_of_int KernelSyms.uartputc_sync) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtu) in "Hpc".
       iApply (wp_uartputc γd γv F1 (K - 2)%nat l pv pkv dqm dqm2 b p HK4 Hpv Hpkv
                 with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").

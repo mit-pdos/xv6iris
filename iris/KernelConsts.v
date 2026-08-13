@@ -18,7 +18,7 @@ Local Open Scope Z_scope.
 
 (* mycpu's [addi a0,a0,<imm>] completing &cpus (auipc at +0x0e)
    at [KernelSyms.mycpu + 0x12]; consumed by ProcGeom.mycpu_ret *)
-Definition mycpu_cpus_addi : Z := 0xb1e.
+Definition mycpu_cpus_addi : Z := 0xb0a.
 
 (* ...and its auipc's upper immediate
    at [KernelSyms.mycpu + 0xe]; consumed by ProcGeom.mycpu_ret *)
@@ -26,7 +26,7 @@ Definition mycpu_cpus_auipc : Z := 0x11.
 
 (* myproc's [addi a4,a4,<imm>] completing &pid_lock (auipc at +0x14)
    at [KernelSyms.myproc + 0x18]; consumed by ProofMyproc.mp_A4C *)
-Definition myproc_pidlock_addi : Z := 0xac8.
+Definition myproc_pidlock_addi : Z := 0xab4.
 
 (* ...and its auipc's upper immediate
    at [KernelSyms.myproc + 0x14]; consumed by ProofMyproc.mp_A4C *)
@@ -42,12 +42,12 @@ Definition entry_got : Z := 0x8000a278.
 
 (* kernelvec's [jal ra,kerneltrap]
    at [KernelSyms.kernelvec + 0x24]; consumed by CodeKernelvec.kv_dec19 *)
-Definition kernelvec_jal_word : Z := 0x9c4fd0ef.
+Definition kernelvec_jal_word : Z := 0x9b8fd0ef.
 
 (* ...and its decoded 21-bit immediate
    at [KernelSyms.kernelvec + 0x24]; consumed by CodeKernelvec.kv_i19 *)
-Definition kernelvec_jal_imm : Z := 0x1fd1c4.
+Definition kernelvec_jal_imm : Z := 0x1fd1b8.
 
 (* start's [addi a5,a5,<imm>] completing &main (auipc at +0x20)
    at [KernelSyms.start + 0x24]; consumed by CodeStartAux.si43 *)
-Definition start_main_addi : Z := 0xdd2.
+Definition start_main_addi : Z := 0xde6.

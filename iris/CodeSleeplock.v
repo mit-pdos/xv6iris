@@ -347,9 +347,9 @@ Section CodeSleeplock.
   Proof. mk_base (KernelSyms.initsleeplock + 0x10) (mword_of_int 0x00003597 : mword 32)
     (mword_of_int (KernelSyms.initsleeplock + 0x10) : mword 64) (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 11), AUIPC)) kd_00003597. Qed.
 
-  Lemma isl_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.initsleeplock + 0x14) : mword 64) false (ITYPE (mword_of_int 1622 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
-  Proof. mk_base (KernelSyms.initsleeplock + 0x14) (mword_of_int 0x65658593 : mword 32)
-    (mword_of_int (KernelSyms.initsleeplock + 0x14) : mword 64) (ITYPE (mword_of_int 1622 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_65658593. Qed.
+  Lemma isl_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.initsleeplock + 0x14) : mword 64) false (ITYPE (mword_of_int 1610 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
+  Proof. mk_base (KernelSyms.initsleeplock + 0x14) (mword_of_int 0x64a58593 : mword 32)
+    (mword_of_int (KernelSyms.initsleeplock + 0x14) : mword 64) (ITYPE (mword_of_int 1610 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_64a58593. Qed.
 
   Lemma isl_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.initsleeplock + 0x18) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 8 : mword 6), Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_rvc (KernelSyms.initsleeplock + 0x18) (mword_of_int 0x0521 : mword 16)

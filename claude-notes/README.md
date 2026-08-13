@@ -24,12 +24,18 @@ are working on that effort — the relevant `projects/` file.
   are the Iris context.
 - **[`kernel-defects.md`](kernel-defects.md)** — bugs found in the xv6 SOURCE
   by the verification, as opposed to gaps in the proofs. An entry there means
-  the C code is wrong and the stuck proof is the symptom. D1 (`writei`
-  releases a partially-modified buffer without logging it) is FIXED upstream;
-  **D2 is open and blocks a whole cone** — `uart.c`'s new `tx_lock` sleeplock
-  is never initialized, so its NULL name fields make `is_txlock`
-  *unprovable*, not merely unproven. Plus a list of near-misses and provably
-  dead code so the same ground is not re-covered.
+  the C code is wrong and the stuck proof is the symptom. **Both entries are
+  now FIXED UPSTREAM** — D1 (`writei` releases a partially-modified buffer
+  without logging it), and D2 (`uart.c`'s new `tx_lock` sleeplock is never
+  initialized), which `b7c25cf` closed with `initsleeplock(&tx_lock, "uart")`
+  after we reported it. The proof side of D2 now carries the lock end to end
+  (`sl_raw` in through consoleinit, `sl_fresh` back out), but
+  `LinkTxLockInit.tx_lock_init` REMAINS AN AXIOM for a reason that is a design
+  decision rather than a gap: `is_txlock` wants the transmitter token
+  `uart_tx_own`, and printk's `pr.lock` currently owns it via `pr_res` — the
+  token is exclusive, so the two locks cannot both have it. See
+  `projects/uart-driver.md`. Plus a list of near-misses and provably dead code
+  so the same ground is not re-covered.
   Read the note at the top before proposing to fix any of them: the image is
   pinned by `XV6_REV`, so editing `xv6-riscv/` moves every symbol address.
 

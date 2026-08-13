@@ -24,11 +24,25 @@
    `kernel.asm`; read it before starting.  Proving uartwrite replaces this
    file with that one, and nothing else.
 
-   A SECOND, INDEPENDENT GAP SITS UNDER THIS ONE: the [is_txlock] this
-   contract takes as a premise is currently UNSATISFIABLE, because upstream
-   never initializes `tx_lock`.  That is claude-notes/kernel-defects.md D2 and
-   it is assumed separately, in LinkTxLockInit.v -- so that proving uartwrite
-   and fixing D2 retire independently, and neither hides the other.
+   A SECOND, INDEPENDENT GAP SITS UNDER THIS ONE, and it has SHRUNK but not
+   closed.  The [is_txlock] this contract takes as a premise is still not
+   derivable, and is assumed separately in LinkTxLockInit.v -- so that proving
+   uartwrite and closing D2 retire independently, and neither hides the other.
+     WHAT CHANGED: D2 was "upstream never initializes `tx_lock`", and xv6
+   `b7c25cf` fixed exactly that, with `initsleeplock(&tx_lock, "uart")` in
+   uartinit.  The proof side now carries the lock's storage end to end --
+   `main_locks_raw` hands `sl_raw a_tx_lock` down through consoleinit to
+   uartinit, which hands `sl_fresh a_tx_lock "uart"` back (ProofMain binds it
+   as `Hslfresh`).
+     WHAT REMAINS IS A DESIGN QUESTION, not a missing step: [sl_fresh_new]
+   also wants the RESOURCE the lock is to own, and for [is_txlock] that is
+   [UartTxInv.tx_res γd = ∃ l, uart_tx_own γd l].  main holds that token --
+   and then gives it to printk's `pr.lock`, because
+   [SpecPrintkGen.pr_res γd] contains [uart_tx_own] too.  The token is
+   exclusive, so `tx_lock` and `pr.lock` cannot both own the transmitter.
+   Deciding which one does is the standing tension in
+   claude-notes/projects/uart-driver.md; until it is settled this axiom
+   stays.
 
    Written out with an explicit [Axiom] rather than a [Declare Module]: both
    are visible to [Print Assumptions], but only the keyword is visible to

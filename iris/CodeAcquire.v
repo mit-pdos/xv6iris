@@ -16,10 +16,10 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelDecode02.
 Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode05.
-Require Import KernelDecode07.
 Require Import KernelDecode10.
 Require Import KernelDecode12.
 Require Import KernelDecode13.
@@ -136,12 +136,12 @@ Section CodeAcquire.
   Proof. mk_base (KernelSyms.acquire + 0x34) (mword_of_int 0x00006517 : mword 32)
     (mword_of_int (KernelSyms.acquire + 0x34) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00006517. Qed.
 
-  Lemma aqi_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.acquire + 0x38) : mword 64) false (ITYPE (mword_of_int 1080 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.acquire + 0x38) (mword_of_int 0x43850513 : mword 32)
-    (mword_of_int (KernelSyms.acquire + 0x38) : mword 64) (ITYPE (mword_of_int 1080 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_43850513. Qed.
+  Lemma aqi_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.acquire + 0x38) : mword 64) false (ITYPE (mword_of_int 1068 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.acquire + 0x38) (mword_of_int 0x42c50513 : mword 32)
+    (mword_of_int (KernelSyms.acquire + 0x38) : mword 64) (ITYPE (mword_of_int 1068 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_42c50513. Qed.
 
-  Lemma aqi_3c : kernel_text -∗ instr (mword_of_int (KernelSyms.acquire + 0x3c) : mword 64) false (JAL (mword_of_int 2096164 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.acquire + 0x3c) (mword_of_int 0xc25ff0ef : mword 32)
-    (mword_of_int (KernelSyms.acquire + 0x3c) : mword 64) (JAL (mword_of_int 2096164 : mword 21, Regidx (mword_of_int 1))) kd_c25ff0ef. Qed.
+  Lemma aqi_3c : kernel_text -∗ instr (mword_of_int (KernelSyms.acquire + 0x3c) : mword 64) false (JAL (mword_of_int 2096144 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.acquire + 0x3c) (mword_of_int 0xc11ff0ef : mword 32)
+    (mword_of_int (KernelSyms.acquire + 0x3c) : mword 64) (JAL (mword_of_int 2096144 : mword 21, Regidx (mword_of_int 1))) kd_c11ff0ef. Qed.
 
 End CodeAcquire.

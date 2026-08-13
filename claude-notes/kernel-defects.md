@@ -194,7 +194,26 @@ the logged state where it can be stated and reasoned about.
 
 **Found:** 2026-08-12, updating to upstream `ae96fd0` ("example of sleep
 waiting for interrupt wakeup"), which rewrote the UART transmit path.
-**Status:** OPEN, and it BLOCKS the boot wiring of the whole uartwrite cone.
+**Status:** **FIXED IN THE SOURCE, 2026-08-13** — upstream `b7c25cf`
+("initialize the tx_lock sleeplock") adds `initsleeplock(&tx_lock, "uart")`
+to the end of `uartinit`, which is exactly the missing call reported below.
+
+**The proof side is wired end to end, and what is left is NOT this defect.**
+`SpecUartinit` takes `SleepLock.sl_raw a_tx_lock` and returns
+`sl_fresh a_tx_lock "uart"`; `SpecConsoleinit` passes both straight through;
+`SpecMain.main_locks_raw` carries the `tx_lock` entry as `sl_raw` (a 44-byte
+sleeplock window in the boot carve, not the old 24-byte spinlock one), and
+`ProofMain` binds the result as `Hslfresh`. Stack budgets rose with it:
+uartinit 4 -> 8, consoleinit 6 -> 10.
+
+`LinkTxLockInit.tx_lock_init` is nevertheless STILL AN AXIOM, for a reason
+that is a design decision rather than a gap: `sl_fresh_new` also wants the
+resource the lock will own, and for `is_txlock` that is
+`UartTxInv.tx_res γd = ∃ l, uart_tx_own γd l`. main holds that token and then
+gives it to printk's `pr.lock`, since `SpecPrintkGen.pr_res γd` contains
+`uart_tx_own` as well. The token is exclusive, so `tx_lock` and `pr.lock`
+cannot both own the transmitter. Which one should is the standing question in
+`projects/uart-driver.md`; settling it is what finally retires the axiom.
 
 ### The code
 

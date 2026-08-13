@@ -25,7 +25,6 @@ Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode19.
-Require Import KernelDecode21.
 Require Import KernelDecode24.
 Require Import KernelDecode30.
 Require Import KernelDecode31.
@@ -95,12 +94,12 @@ Section CodeKvmmap.
   Proof. mk_base (KernelSyms.kvmmap + 0x1c) (mword_of_int 0x00006517 : mword 32)
     (mword_of_int (KernelSyms.kvmmap + 0x1c) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00006517. Qed.
 
-  Lemma ki_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvmmap + 0x20) : mword 64) false (ITYPE (mword_of_int 64 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.kvmmap + 0x20) (mword_of_int 0x04050513 : mword 32)
-    (mword_of_int (KernelSyms.kvmmap + 0x20) : mword 64) (ITYPE (mword_of_int 64 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_04050513. Qed.
+  Lemma ki_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvmmap + 0x20) : mword 64) false (ITYPE (mword_of_int 52 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.kvmmap + 0x20) (mword_of_int 0x03450513 : mword 32)
+    (mword_of_int (KernelSyms.kvmmap + 0x20) : mword 64) (ITYPE (mword_of_int 52 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_03450513. Qed.
 
-  Lemma ki_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvmmap + 0x24) : mword 64) false (JAL (mword_of_int 2094940 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.kvmmap + 0x24) (mword_of_int 0xf5cff0ef : mword 32)
-    (mword_of_int (KernelSyms.kvmmap + 0x24) : mword 64) (JAL (mword_of_int 2094940 : mword 21, Regidx (mword_of_int 1))) kd_f5cff0ef. Qed.
+  Lemma ki_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvmmap + 0x24) : mword 64) false (JAL (mword_of_int 2094920 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.kvmmap + 0x24) (mword_of_int 0xf48ff0ef : mword 32)
+    (mword_of_int (KernelSyms.kvmmap + 0x24) : mword 64) (JAL (mword_of_int 2094920 : mword 21, Regidx (mword_of_int 1))) kd_f48ff0ef. Qed.
 
 End CodeKvmmap.
