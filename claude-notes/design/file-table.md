@@ -499,39 +499,41 @@ is what it has to be, having no marker to park.
 ### The value bound is load-bearing, not decoration
 
 `off_wf v := bv_unsigned v ≤ MAXFILE * BSIZE` rides in the resident disjunct.
-`readi`'s contract demands `off + n < 2^31` and **nothing in memory bounds a
+`readi`'s contract demands `off + n < 2^32` and **nothing in memory bounds a
 freshly loaded `off`**, so without a bound in the invariant `fileread` cannot
 call `readi` at all. It is inductive: the BSS starts zeroed, `sys_open` writes
 0, every advance is `off + r` with `r` clamped by readi/writei to the file's
 size, which is itself `≤ MAXFILE*BSIZE`; a pipe or device file never writes the
 cell.
 
-Two consequences for `fileread`'s contract, both accepted:
+Two consequences for `fileread`'s contract:
 
-* **the `off + n < 2^31` obligation becomes a premise on `n` ALONE**
+* **the joint numeric obligation becomes a premise on `n` ALONE**
   (`MAXFILE*BSIZE + n < 2^31`, `SpecFileread.v`). This is **an obligation
   fileread PASSES UPWARD, not one it creates.** `readi` and `writei` both state
-  the numeric bound *jointly* precisely because two separate `2^31` bounds let
-  the sum reach `2^32` and the `c.addw` wraps; `SpecWritei.v`'s header carries
-  the coverage note that this makes xv6's own `off + n < off` overflow check
-  dead by premise rather than proven. `sys_read` cannot discharge it from
-  unchecked user input, and **that is known debt, to be settled at `sys_read`,
-  not inside fileread.** The two options there: (a) prove readi's overflow arm
-  properly, which needs a wrapping-`addw` reading the tree does not have, or
-  (b) bound `n` at the syscall boundary.
+  the numeric bound *jointly* precisely because two separate bounds let the sum
+  wrap the `c.addw`; `SpecWritei.v`'s header carries the coverage note that
+  this makes xv6's own `off + n < off` overflow check dead by premise rather
+  than proven.
 
-  **fs-sysfile S4 settled the reading of this, against the object code.**
-  Option (b) is not open: sys_read's only branch is argfd's, so the kernel
-  genuinely does not bound `n`, and option (a) is the only faithful repair.
-  S4 also found the debt is TWO premises, not one. `SpecSysRead.v` states
-  both about the trapframe word, via
-  `sys_rw_count v := bv_signed (trunc32 v)`: the upper half of the range is
-  free (`sys_rw_count_lt`, a 32-bit signed value), `MAXFILE*BSIZE + n < 2^31`
-  is owed by sys_read alone (filewrite's chunking closes writei's joint
-  bound), and **`0 <= n` is owed by sys_read AND sys_write**, because
-  `SpecReadi`/`SpecWritei` type `n` as a `nat` and so cannot express the
-  negative case the C handles perfectly well. That last one is a modelling
-  premise rather than a kernel fact and is the cheaper of the two to retire.
+  **AND IT IS NOW RETIREABLE — the constant is `2^32` on readi's side.**
+  fs-sysfile S4 read this against the object code and concluded that
+  bounding `n` at the syscall boundary is not open (sys_read's only branch is
+  argfd's, so the kernel genuinely does not bound `n`) and that proving
+  readi's wrapping arm was therefore the only repair. A third way landed
+  instead: `SpecReadi` now takes `off` and `n` at the full 32-bit range under
+  `off + n < 2^32`, so from `off ≤ MAXFILE*BSIZE` the obligation on `n` is
+  only `n < 2^32 - 274432` — free from the `n < 2^31` that sys_read has for
+  nothing (`sys_rw_count_lt`, a 32-bit signed value) and that fileread needs
+  anyway for piperead's and consoleread's `int` contracts. What is left is
+  mechanical: restate `SpecFileread`'s premise as `0 <= n < 2^31` and
+  re-thread the three uses in `ProofFileread.v` (one is readi's, two are
+  `fr_n_range`). See projects/fs-sysfile.md, "THE SYS_READ NUMERIC PREMISE".
+
+  The OTHER half of the S4 debt is untouched by this: **`0 <= n` is owed by
+  sys_read AND sys_write**, because `SpecReadi`/`SpecWritei` type `n` as a
+  `nat` and so cannot express the negative case the C handles perfectly well.
+  That one is a modelling premise rather than a kernel fact.
 * **the delivered bytes are not describable, and this too is inherited.**
   `readi`'s postcondition describes the destination bytes only on its KERNEL
   arm; on the user arm — the one fileread takes, `a1 = 1` at `+0x3a` — it says

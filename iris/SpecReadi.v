@@ -97,10 +97,34 @@
    merely bounded -- a caller learns that a returning readi read everything
    there was to read.
 
-   COVERAGE NOTE: the joint numeric premise [off + n < 2^31] (writei's, and
-   for the same reason -- it is what makes the [c.addw] at +0x022
-   non-wrapping) makes xv6's own [off + n < off] overflow test dead by
-   premise rather than proving what the code does when it fires.
+   ==== off AND n ARE FULL 32-BIT uints =================================
+
+   Both are C [uint]s, so both range over [0, 2^32) -- and the RV64 ABI
+   hands a 32-bit argument over SIGN-EXTENDED, [uint] included, so a value
+   at or above 2^31 arrives in a3/a4 as a NEGATIVE 64-bit word.  That is
+   what the two register premises spell:
+
+     m a3 = sign_extend' 64 (mword_of_int (Z.of_nat off) : mword 32)
+
+   Below 2^31 that IS the plain literal ([rd_arg32_small]), so a caller who
+   had the old premise still reads the same one rewrite later.
+
+   THE POSTCONDITION DOES NOT MOVE WITH THE WIDENING.  [rd_clamp] is already
+   0 at [off > size], and a 32-bit [off] at or above 2^31 is past the end of
+   every file (the size is bounded by MAXFILE*BSIZE), so the arm the
+   widening opens is the arm that was already there -- the pre-frame exit,
+   returning 0.  What the widening costs is one reading of the [bltu a5,a3]
+   at +0x002: a sign-extended-negative a3 is ABOVE the size as an unsigned
+   64-bit word, which is what makes that 64-bit compare decide the 32-bit
+   unsigned one the C is written in.
+
+   COVERAGE NOTE: the joint numeric premise [off + n < 2^32] is the sum in
+   the MATHEMATICAL integers, and it is what makes the [c.addw a4,a3] at
+   +0x022 non-wrapping.  It is the one thing this contract still asks beyond
+   32-bittedness, and it is what leaves xv6's own [off + n < off] overflow
+   test dead by premise rather than proving what the code does when it
+   fires.  A caller that cannot bound the sum -- an [off] within [n] of 2^32
+   -- is outside this contract even though the code is total there.
 
    readi SLEEPS (bmap, bread, brelse, and copyout on the user arm), so it
    threads the full running-process bundle.  It enters and returns at
@@ -115,6 +139,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
+Require Import PrintintArith.
 Require Import InstrBytes.
 Require Import RegFile.
 Require Import SmodeCore.
@@ -178,6 +203,21 @@ Definition rd_delivered (data : nat -> list (bv 8)) (dst_olds : nat -> bv 8)
   then file_byte data (off + i)%nat
   else dst_olds i.
 
+(* ===================================================================== *)
+(*  THE ABI's 32-BIT ARGUMENT, FOR A CALLER WHOSE ARGUMENT IS SMALL      *)
+(* ===================================================================== *)
+
+(* [off] and [n] arrive sign-extended (see the header).  Below 2^31 that is
+   the plain 64-bit literal, which is the form every caller with a bounded
+   argument -- dirlookup's [16*i], fileread's [f->off] -- already has. *)
+Lemma rd_arg32_small (x : nat) : (Z.of_nat x < 2 ^ 31)%Z ->
+  (mword_of_int (Z.of_nat x) : mword 64)
+  = sign_extend' 64 (mword_of_int (Z.of_nat x) : mword 32).
+Proof.
+  intro Hx. symmetry. apply PrintintArith.sext32_64_small.
+  split; [apply Nat2Z.is_nonneg | exact Hx].
+Qed.
+
 Definition wp_readi_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}
@@ -215,11 +255,12 @@ Definition wp_readi_sconf_body
      subsumes [bv_unsigned (di_size dn) < 2^31], which is what makes the
      [c.lw a5,76(a0)] at +0x000 read the size exactly. *)
   bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
-  (* THE JOINT NUMERIC PREMISE, writei's verbatim: [off] and [n] are uints
-     whose SUM stays in int range -- not two separate bounds, which would
-     let the [c.addw a4,a3] at +0x022 wrap.  See the header's coverage
-     note. *)
-  (Z.of_nat off + Z.of_nat n < 2 ^ 31) ->
+  (* THE JOINT NUMERIC PREMISE: [off] and [n] are uints whose SUM stays
+     inside 32 bits -- not two separate bounds, which would let the
+     [c.addw a4,a3] at +0x022 wrap.  Each on its own is thereby a full
+     32-bit value, which is what a caller reading an untrusted uint out of
+     a struct can pay.  See the header's coverage note. *)
+  (Z.of_nat off + Z.of_nat n < 2 ^ 32) ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = ip *)
@@ -227,10 +268,13 @@ Definition wp_readi_sconf_body
   (* a1 = user_dst, reflected into the ghost boolean the way
      either_copyout's own contract spells it *)
   eq_vec (m !!! Regidx (mword_of_int 11 : mword 5)) zero_reg = negb user ->
-  (* a3 = off, a4 = n -- the RV64 ABI's sign-extended uints, which for
-     these ranges are the literals *)
-  m !!! Regidx (mword_of_int 13 : mword 5) = (mword_of_int (Z.of_nat off) : mword 64) ->
-  m !!! Regidx (mword_of_int 14 : mword 5) = (mword_of_int (Z.of_nat n) : mword 64) ->
+  (* a3 = off, a4 = n -- the RV64 ABI's sign-extended uints, at the FULL
+     32-bit range, so at or above 2^31 these words are negative.  Below
+     2^31 they are the plain literals ([rd_arg32_small]). *)
+  m !!! Regidx (mword_of_int 13 : mword 5)
+    = sign_extend' 64 (mword_of_int (Z.of_nat off) : mword 32) ->
+  m !!! Regidx (mword_of_int 14 : mword 5)
+    = sign_extend' 64 (mword_of_int (Z.of_nat n) : mword 32) ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  readi never acquires

@@ -1941,6 +1941,23 @@ Section ProofFileread.
              assert (Hjoint : (Z.of_nat (Z.to_nat (bv_unsigned v))
                                + Z.of_nat (Z.to_nat n) < 2 ^ 31)%Z).
              { rewrite Hoffz Hnz. exact (fr_off_n_lt31 _ _ Hwf Hnb). }
+             (* readi's own joint premise is the 32-bit one *)
+             assert (Hjoint32 : (Z.of_nat (Z.to_nat (bv_unsigned v))
+                                 + Z.of_nat (Z.to_nat n) < 2 ^ 32)%Z) by lia.
+             (* readi takes its two uints in the ABI's sign-extended form;
+                fileread's are both below 2^31 (the joint bound above), where
+                that is the identity *)
+             assert (HJ6a3' : J6 !!! Regidx Ra3
+                              = sign_extend' 64
+                                  (mword_of_int
+                                     (Z.of_nat (Z.to_nat (bv_unsigned v)))
+                                   : mword 32))
+               by (rewrite HJ6a3; apply rd_arg32_small; lia).
+             assert (HJ6a4' : J6 !!! Regidx Ra4
+                              = sign_extend' 64
+                                  (mword_of_int (Z.of_nat (Z.to_nat n))
+                                   : mword 32))
+               by (rewrite HJ6a4; apply rd_arg32_small; lia).
              iDestruct (cpu_own_transport CIDil CID78 0%nat eb pj C b ltac:(wp_next_chain)
                           with "Hcnt") as "Hcnt".
              iApply (Readi.wp_readi_sconf γs j γlp (frn_uart fn) (frn_disk fn)
@@ -1952,8 +1969,9 @@ Section ProofFileread.
                        (fun _ => (mword_of_int 0 : mword 8)) V
                        pidv (DfracOwn 1) (DfracOwn (1/2))
                        J6 (K - 6)%nat eb C b
-                       (fr_av_readi K HK) Hlg Hbmwf Hbmcov Hszb Hjoint Hj Hgs
-                       HJ6a0 ltac:(rewrite HJ6a1; by vm_compute) HJ6a3 HJ6a4
+                       (fr_av_readi K HK) Hlg Hbmwf Hbmcov Hszb
+                       Hjoint32 Hj Hgs
+                       HJ6a0 ltac:(rewrite HJ6a1; by vm_compute) HJ6a3' HJ6a4'
                        with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
                              Hblocks Hpriv Hprocs Hdevi Hdgeom
                              Hdlock Hbslot").

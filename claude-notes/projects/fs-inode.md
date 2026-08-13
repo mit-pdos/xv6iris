@@ -362,6 +362,12 @@ Bmap.wp_bmap_sconf` is unchanged.
       without it a large size would drive bmap past MAXFILE into its
       out-of-range panic.
 
+      And one premise WEAKER than writei's: `off` and `n` are full 32-bit
+      uints under the joint `off + n < 2^32`, with a3/a4 pinned to the
+      ABI's sign-extended form. See design/fs-inode.md, "readi takes `off`
+      and `n` at the FULL 32-bit range" — writei still asks `< 2^31` and
+      the same widening would work there if a caller ever needs it.
+
       ### Things readi paid for (all recur)
 
       - **A `Code<F>.v` can be in the tree and in `_CoqProject` and still

@@ -1047,7 +1047,7 @@ Section ReadiLoop.
     blkmap_wf cov logstart bm ->
     bm_covers bm (Z.of_nat szn) ->
     (szn <= MAXFILE * BSIZE)%nat ->
-    (Z.of_nat off + Z.of_nat n < 2 ^ 31) ->
+    (Z.of_nat off + Z.of_nat n < 2 ^ 32) ->
     (nc <= n)%nat ->
     (off + nc <= szn)%nat ->
     nc = rd_clamp (di_size dn) off n ->
@@ -1095,7 +1095,7 @@ Section ReadiLoop.
   Proof.
     intros HK Hgeom Hwf Hcov Hszmax Hsum Hncn Hoffnc Hncdef Husv Hj Hgl.
     pose proof HK as HK'. unfold K_readi in HK'.
-    change (2 ^ 31)%Z with 2147483648%Z in Hsum.
+    change (2 ^ 32)%Z with 4294967296%Z in Hsum.
     assert (Hgeom0 : log_geom_ok cov logstart) by exact Hgeom.
     destruct Hgeom as [Hcovok Hlogsub].
     pose proof Hszmax as Hszmax2.
@@ -2399,7 +2399,7 @@ Section ReadiMain.
     intros pcE pj dst ret_tgt HK Hgeom Hwf Hcov Hszmax Hsum Hj Hgl
            Ha0 Ha1 Ha3 Ha4.
     pose proof HK as HK'. unfold K_readi in HK'.
-    change (2 ^ 31)%Z with 2147483648%Z in Hsum.
+    change (2 ^ 32)%Z with 4294967296%Z in Hsum.
     assert (Hgeom0 : log_geom_ok cov logstart) by exact Hgeom.
     assert (HmbZ : Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)
       by (vm_compute; reflexivity).
@@ -2413,14 +2413,23 @@ Section ReadiMain.
     assert (Hsznlt : (Z.of_nat szn < 2147483648)%Z) by lia.
     assert (Hszlt : bv_unsigned (di_size dn) < 2147483648)
       by (rewrite -Hszz; exact Hsznlt).
-    assert (Hofflt : (Z.of_nat off < 2147483648)%Z) by lia.
-    assert (Hnlt : (Z.of_nat n < 2147483648)%Z) by lia.
     assert (Hszu : bv_unsigned (mword_of_int (Z.of_nat szn) : mword 64)
                    = Z.of_nat szn) by (apply rd_nat_u; lia).
     assert (Hoffu : bv_unsigned (mword_of_int (Z.of_nat off) : mword 64)
                     = Z.of_nat off) by (apply rd_nat_u; lia).
-    assert (Hsumu : bv_unsigned (mword_of_int (Z.of_nat (off + n)) : mword 64)
-                    = Z.of_nat (off + n)) by (apply rd_nat_u; lia).
+    (* THE TWO ABI WORDS.  [off] and [n] are full 32-bit uints, so a3, a4 and
+       the [addw]'s sum are sign-extended and worth [rd_u32] as unsigned
+       64-bit words -- above every file size exactly when they are negative.
+       See ProofReadiParts.v. *)
+    assert (Ha3u : bv_unsigned
+                     (sign_extend' 64 (mword_of_int (Z.of_nat off) : mword 32)
+                      : mword 64) = rd_u32 off)
+      by (apply rd_arg_u; lia).
+    assert (Hsumu : bv_unsigned
+                      (sign_extend' 64
+                         (mword_of_int (Z.of_nat (off + n)) : mword 32)
+                       : mword 64) = rd_u32 (off + n))
+      by (apply rd_arg_u; lia).
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hkenv Hidev
               Hmeta Hmap Hblocks Hdst #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hcont".
     iAssert (rd_cont (CID0 := CID) γfs bn γf dev ip bm data dn user off n
@@ -2482,7 +2491,8 @@ Section ReadiMain.
     { rewrite /Q0 upd_eq. rewrite (rd_sext32_moi (di_size dn) Hszlt).
       rewrite -Hszz. reflexivity. }
     assert (HQ0a3 : Q0 !!! Regidx Ra3
-                    = (mword_of_int (Z.of_nat off) : mword 64)) by lkp.
+                    = sign_extend' 64 (mword_of_int (Z.of_nat off) : mword 32))
+      by lkp.
     assert (Hpp : add_vec_int pcE 2 = mword_of_int (RI + 0x2))
       by (rewrite /pcE; pcw).
     iEval (rewrite Hpp) in "Hpc". clear Hpp.
@@ -2491,11 +2501,14 @@ Section ReadiMain.
     { (* ---- THE PRE-FRAME EXIT: li a0,0; ret, with no frame at all ---- *)
       assert (Hclamp0 : rd_clamp (di_size dn) off n = 0%nat).
       { rewrite /rd_clamp -Hszne. case_decide as Hd; [lia | exfalso; lia]. }
+      (* the size compare is 64-bit unsigned and a3 may be a sign-extended
+         NEGATIVE off; either way an [off] past the end is above the size as
+         an unsigned word ([rd_u32_gt]) *)
       iApply (wp_bltu_taken_s_sconf (mword_of_int (RI + 0x2))
                 (mword_of_int 236 : mword 13) Ra3 Ra5 Q0 K b ltac:(nz) ltac:(nz)
                 ltac:(rgne; rgne; rewrite HQ0a5 HQ0a3;
-                      rewrite (rd_ltu_read _ _ _ _ Hszu Hoffu);
-                      apply Z.ltb_lt; lia)
+                      rewrite (rd_ltu_read _ _ _ _ Hszu Ha3u);
+                      apply Z.ltb_lt; apply rd_u32_gt; lia)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi02").
       iApply bi.later_intro. iIntros (CIDx1 Hqx1) "Hcg Hpc".
       assert (Htgt : add_vec (mword_of_int (RI + 0x2) : mword 64)
@@ -2555,6 +2568,15 @@ Section ReadiMain.
       { lia. }
       { right. split; [exact HX1a0 | rewrite Hclamp0; reflexivity]. }
     }
+    (* ---- THE SIZE TEST HAS BOUNDED off.  [off <= size < 2^31], so a3's
+       sign extension is the identity and from here on a3 is the plain
+       literal every step below already expected.  [n] is NOT bounded --
+       it stays a full 32-bit uint, in a4 and in s5, until the clamp. ---- *)
+    assert (Hofflt : (Z.of_nat off < 2147483648)%Z) by lia.
+    assert (Ha3lit : (sign_extend' 64 (mword_of_int (Z.of_nat off) : mword 32)
+                      : mword 64) = mword_of_int (Z.of_nat off))
+      by (apply rd_sext32; lia).
+    rewrite Ha3lit in Ha3. rewrite Ha3lit in HQ0a3.
     (* ---- everything past this point holds the destination at [tot = 0]
        and the descriptor at [pv_upt V] ---- *)
     assert (HVid : upd_upt V (pv_upt V) = V) by apply rd_upd_upt_id.
@@ -2785,7 +2807,8 @@ Section ReadiMain.
     assert (HS6a3 : S6 !!! Regidx Ra3
                     = (mword_of_int (Z.of_nat off) : mword 64)) by lkp.
     assert (HS6a4 : S6 !!! Regidx Ra4
-                    = (mword_of_int (Z.of_nat n) : mword 64)) by lkp.
+                    = sign_extend' 64 (mword_of_int (Z.of_nat n) : mword 32))
+      by lkp.
     assert (HS6a5 : S6 !!! Regidx Ra5
                     = (mword_of_int (Z.of_nat szn) : mword 64)) by lkp.
     assert (HS6s6 : S6 !!! Regidx Rs6 = ip).
@@ -2811,9 +2834,12 @@ Section ReadiMain.
       rgne. rewrite (_ : S4 !!! Regidx Ra3
                          = (mword_of_int (Z.of_nat off) : mword 64)); [| lkp].
       rewrite add_vec_zero_l. rewrite Nat.add_0_r. reflexivity. }
-    assert (HS6s5 : S6 !!! Regidx Rs5 = (mword_of_int (Z.of_nat n) : mword 64)).
+    assert (HS6s5 : S6 !!! Regidx Rs5
+                    = sign_extend' 64 (mword_of_int (Z.of_nat n) : mword 32)).
     { rewrite /S6 upd_eq. rgne.
-      rewrite (_ : S5 !!! Regidx Ra4 = (mword_of_int (Z.of_nat n) : mword 64)); [| lkp].
+      rewrite (_ : S5 !!! Regidx Ra4
+                   = (sign_extend' 64 (mword_of_int (Z.of_nat n) : mword 32)
+                      : mword 64)); [| lkp].
       apply add_vec_zero_l. }
     assert (Hpp : add_vec_int (mword_of_int (RI + 0x20) : mword 64) 2
                   = mword_of_int (RI + 0x22)) by pcw.
@@ -2828,10 +2854,14 @@ Section ReadiMain.
                   (sign_extend' 64
                     (add_vec (subrange_vec_dec (rget S6 Ra4) 31 0 : mword 32)
                              (subrange_vec_dec (rget S6 Ra3) 31 0 : mword 32)))]> S6).
+    (* the [addw] truncates both operands, so the sign extension is invisible
+       to it and the sum comes back in the same ABI form -- [rd_addw32], on
+       the joint premise, which is the one place that premise is used *)
     assert (HT1a4 : T1 !!! Regidx Ra4
-                    = (mword_of_int (Z.of_nat (off + n)) : mword 64)).
+                    = sign_extend' 64
+                        (mword_of_int (Z.of_nat (off + n)) : mword 32)).
     { rewrite /T1 upd_eq. rgne; rgne. rewrite HS6a4 HS6a3.
-      rewrite (rd_addw (Z.of_nat n) (Z.of_nat off)
+      rewrite (rd_addw32 (Z.of_nat n) (Z.of_nat off)
                  ltac:(lia) ltac:(lia) ltac:(lia)).
       assert (Hz : (Z.of_nat n + Z.of_nat off)%Z = Z.of_nat (off + n)) by lia.
       rewrite Hz. reflexivity. }
@@ -2849,7 +2879,8 @@ Section ReadiMain.
     iIntros (CIDp10 Hqp10) "Hcg Hpc".
     set (T2 := <[Regidx Ra0 := regval_into_reg (mword_of_int 0 : mword 64)]> T1).
     assert (HT2a4 : T2 !!! Regidx Ra4
-                    = (mword_of_int (Z.of_nat (off + n)) : mword 64)) by lkp.
+                    = sign_extend' 64
+                        (mword_of_int (Z.of_nat (off + n)) : mword 32)) by lkp.
     assert (HT2a3 : T2 !!! Regidx Ra3
                     = (mword_of_int (Z.of_nat off) : mword 64)) by lkp.
     assert (HT2a5 : T2 !!! Regidx Ra5
@@ -2858,13 +2889,15 @@ Section ReadiMain.
                   = mword_of_int (RI + 0x26)) by pcw.
     iEval (rewrite Hpp) in "Hpc". clear Hpp.
     (* ===== +0x26 bltu a4,a3 : xv6's overflow test -- DEAD by the joint
-       premise (off + n cannot have wrapped, so it is >= off) ===== *)
+       premise (off + n cannot have wrapped, so the sum's word is at least
+       off's, sign-extended or not: [rd_u32_lb]) ===== *)
     iApply (wp_bltu_fall_s_sconf (mword_of_int (RI + 0x26))
               (mword_of_int 182 : mword 13) Ra3 Ra4 T2 (K - 14)%nat b
               ltac:(nz) ltac:(nz)
               ltac:(rgne; rgne; rewrite HT2a4 HT2a3;
                     rewrite (rd_ltu_read _ _ _ _ Hsumu Hoffu);
-                    apply Z.ltb_ge; lia)
+                    apply Z.ltb_ge;
+                    pose proof (rd_u32_lb (off + n)); lia)
               with "Hcg Hpc Hi26").
     iIntros (CIDp11 Hqp11) "Hcg Hpc".
     assert (Hpp : add_vec_int (mword_of_int (RI + 0x26) : mword 64) 4
@@ -2899,7 +2932,7 @@ Section ReadiMain.
       iSplitL "HfB"; [iExact "HfB"|]. iSplitL "HfC"; [iExact "HfC"|].
       iSplitL "HfD"; [iExact "HfD"|]. iExact "HfE". }
     assert (HT2s5 : T2 !!! Regidx Rs5
-                    = (mword_of_int (Z.of_nat n) : mword 64)).
+                    = sign_extend' 64 (mword_of_int (Z.of_nat n) : mword 32)).
     { rewrite (_ : T2 !!! Regidx Rs5 = (S6 !!! Regidx Rs5 : mword 64));
         [exact HS6s5 | lkp]. }
     assert (HT2s6 : T2 !!! Regidx Rs6 = ip).
@@ -3166,7 +3199,7 @@ Section ReadiMain.
                 cov logstart dev ip bm data dn user off n nc szn dst_olds V
                 (m !!! Regidx Ra1 : mword 64) pidv dq dqd m K eb C b
                 HK Hgeom0 Hwf Hcov Hsznmax
-                ltac:(change (2 ^ 31)%Z with 2147483648%Z; exact Hsum)
+                ltac:(change (2 ^ 32)%Z with 4294967296%Z; exact Hsum)
                 Hncn Hoffnc Hncdef Ha1 Hj Hgl
                 (rd_blocks off nc) 0%nat (pv_upt V) U3
                 ltac:(lia) ltac:(apply uptd_ext_refl)
@@ -3181,11 +3214,18 @@ Section ReadiMain.
     - (* ---------- it does: no clamp, nc = n ---------- *)
       assert (Hclampn : rd_clamp (di_size dn) off n = n).
       { rewrite /rd_clamp -Hszne. case_decide as Hd; [exfalso; lia | reflexivity]. }
+      (* the count survives unclamped, so it is at most the size and s5's
+         ABI word is the literal the tail counts in *)
+      assert (HT2s5' : T2 !!! Regidx Rs5
+                       = (mword_of_int (Z.of_nat n) : mword 64))
+        by (rewrite HT2s5; apply rd_sext32; lia).
+      (* the sum is at most the size, hence below 2^31, hence not
+         sign-extended: [rd_u32_le] *)
       iApply (wp_bgeu_taken_s_sconf (mword_of_int (RI + 0x2c))
                 (mword_of_int 8 : mword 13) Ra4 Ra5 T2 (K - 14)%nat b
                 ltac:(nz) ltac:(nz)
                 ltac:(rgne; rgne; rewrite HT2a5 HT2a4; apply bc_geu;
-                      rewrite Hszu Hsumu; lia)
+                      rewrite Hszu Hsumu; apply rd_u32_le; lia)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi2c").
       iApply bi.later_intro. iIntros (CIDv1 Hqv1) "Hcg Hpc".
       assert (Htgt34 : add_vec (mword_of_int (RI + 0x2c) : mword 64)
@@ -3195,16 +3235,18 @@ Section ReadiMain.
       iApply ("TAIL" $! CIDv1 T2 n with
                 "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hpc");
         [ wp_next_chain | symmetry; exact Hclampn | lia | lia | exact HT2sp
-        | exact HT2s5 | exact HT2s6 | exact HT2s7 | exact HT2s4 | exact HT2s1
+        | exact HT2s5' | exact HT2s6 | exact HT2s7 | exact HT2s4 | exact HT2s1
         | lkp | lkp | lkp | lkp | lkp ].
     - (* ---------- it does not: n := ip->size - off ---------- *)
       assert (Hclamps : rd_clamp (di_size dn) off n = (szn - off)%nat).
       { rewrite /rd_clamp -Hszne. case_decide as Hd; [reflexivity | exfalso; lia]. }
+      (* the sum is past the end of the file, and a sum past 2^31 is past it
+         as an unsigned word too: [rd_u32_gt] *)
       iApply (wp_bgeu_fall_s_sconf (mword_of_int (RI + 0x2c))
                 (mword_of_int 8 : mword 13) Ra4 Ra5 T2 (K - 14)%nat b
                 ltac:(nz) ltac:(nz)
                 ltac:(rgne; rgne; rewrite HT2a5 HT2a4; apply bc_ltu;
-                      rewrite Hszu Hsumu; lia)
+                      rewrite Hszu Hsumu; apply rd_u32_gt; lia)
                 with "Hcg Hpc Hi2c").
       iIntros (CIDv1 Hqv1) "Hcg Hpc".
       assert (Hpp : add_vec_int (mword_of_int (RI + 0x2c) : mword 64) 4

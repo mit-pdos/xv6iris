@@ -1171,6 +1171,14 @@ Section KexecABody.
     { rewrite /Q8 upd_ne; [| nz]. rewrite /Q7 upd_ne; [| nz].
       rewrite /Q6 upd_ne; [| nz]. rewrite /Q5 upd_ne; [| nz].
       rewrite /Q4 upd_ne; [| nz]. rewrite /Q3; apply upd_eq. }
+    (* readi takes its two uints in the ABI's sign-extended form; the ELF
+       header read is at off 0 for 64 bytes, where that is the identity *)
+    assert (HQ8a3' : Q8 !!! Regidx Ra3
+                     = sign_extend' 64 (mword_of_int (Z.of_nat 0) : mword 32))
+      by (rewrite HQ8a3; apply rd_arg32_small; lia).
+    assert (HQ8a4' : Q8 !!! Regidx Ra4
+                     = sign_extend' 64 (mword_of_int (Z.of_nat 64) : mword 32))
+      by (rewrite HQ8a4; apply rd_arg32_small; lia).
     assert (HQ8sp : Q8 !!! Regidx csp_rs1 = pa_stk sp0 68).
     { rewrite /Q8 upd_ne; [| nz]. rewrite /Q7 upd_ne; [| nz].
       rewrite /Q6 upd_ne; [| nz]. rewrite /Q5 upd_ne; [| nz].
@@ -1205,7 +1213,7 @@ Section KexecABody.
               pidv (DfracOwn (1/4)) (DfracOwn (1/2)) Q8 (K - 68)%nat true C true
               ltac:(unfold K_readi; lia) Hlg Hbmwf Hbmcov Hszb
               ltac:(vm_compute; reflexivity) Hjp Hgs HQ8a0
-              ltac:(rewrite HQ8a1; vm_compute; reflexivity) HQ8a3 HQ8a4
+              ltac:(rewrite HQ8a1; vm_compute; reflexivity) HQ8a3' HQ8a4'
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hka Hidev Hmeta Hmap Hblocks
                     [Helfb Hppid] Hprocs Hdevi Hdgeom Hdlock Hbs1").
     { rewrite /trap_csrs_ext. done. }

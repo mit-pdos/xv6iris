@@ -117,16 +117,17 @@
      environment may not name a slot (see above) -- and nothing else about
      the offset: the value is existential in the invariant, and the
      invariant's [off_wf] bound is what makes it usable;
-   * readi's joint numeric premise [off + n < 2^31] has to be discharged from
+   * readi's joint numeric premise [off + n < 2^32] has to be discharged from
      a bound on [n] ALONE, because nothing in memory bounds a freshly loaded
-     offset.  Hence [MAXFILE * BSIZE + n < 2^31] below.  THIS IS AN
-     OBLIGATION FILEREAD PASSES UPWARD: it is inherited from readi (and
-     writei), whose joint bound is what keeps their [c.addw] from wrapping,
-     and a caller taking [n] from unchecked user input -- sys_read -- cannot
-     discharge it.  Fixing it means either proving readi's own overflow arm
-     (which needs a wrapping-[addw] reading the tree does not have) or
-     bounding [n] at the syscall boundary; see
-     claude-notes/design/file-table.md. *)
+     offset.  Hence [MAXFILE * BSIZE + n < 2^31] below -- which is STRONGER
+     THAN READI NEEDS: readi takes both uints at the full 32-bit range, so
+     [off <= MAXFILE*BSIZE] leaves only [n < 2^32 - 274432], and the
+     [n < 2^31] this contract wants anyway (piperead's and consoleread's
+     [int] contracts, through [fr_n_range]) covers it.  Restating this
+     premise as [0 <= n < 2^31] is what retires the debt sys_read inherits,
+     and it is mechanical: three uses in ProofFileread.v, one of them
+     readi's.  See claude-notes/design/file-table.md, "The value bound is
+     load-bearing". *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -678,9 +679,10 @@ Definition wp_fileread_sconf_body
   m !!! Regidx (mword_of_int 10 : mword 5) = fnode k ->
   m !!! Regidx (mword_of_int 12 : mword 5) = (mword_of_int n : mword 64) ->
   (* THE COUNT.  Non-negative because it is a read length, and bounded so
-     that readi's joint [off + n < 2^31] follows from the invariant's
-     [off <= MAXFILE*BSIZE] alone.  See the header: this premise is inherited
-     from readi and is passed upward, not solved here. *)
+     that readi's joint [off + n < 2^32] follows from the invariant's
+     [off <= MAXFILE*BSIZE] alone.  See the header: the bound is now stronger
+     than readi needs and can be relaxed to [0 <= n < 2^31], which is what
+     retires the debt sys_read inherits. *)
   0 <= n ->
   Z.of_nat MAXFILE * Z.of_nat BSIZE + n < 2 ^ 31 ->
   (* PARKING PREMISE (hart-generic scheduler protocol): every arm sleeps. *)

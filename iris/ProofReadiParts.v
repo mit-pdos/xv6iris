@@ -197,6 +197,88 @@ Proof.
   rewrite Hsub. apply rd_sext32; lia.
 Qed.
 
+(* ---- A [uint] ARGUMENT AT THE FULL 32-BIT RANGE ----------------------
+
+   RV64 passes a 32-bit argument SIGN-EXTENDED, [uint] included, so readi's
+   [off] and [n] arrive in a3/a4 as NEGATIVE 64-bit words once they reach
+   2^31 ([SpecReadi]'s register premises).  [rd_u32] is the 64-bit UNSIGNED
+   value of that word -- the number a [bltu]/[bgeu] actually compares -- and
+   the two orderings below it are every use readi's three compares make of
+   it: a sign-extended-negative argument is ABOVE any file size, and an
+   argument that is at most a file size is not sign-extended at all. *)
+Definition rd_u32 (x : nat) : Z :=
+  if decide (Z.of_nat x < 2147483648)
+  then Z.of_nat x
+  else Z.of_nat x + 18446744069414584320.   (* + 2^64 - 2^32 *)
+
+Lemma rd_arg_u (x : nat) : (Z.of_nat x < 4294967296)%Z ->
+  bv_unsigned (sign_extend' 64 (mword_of_int (Z.of_nat x) : mword 32) : mword 64)
+  = rd_u32 x.
+Proof.
+  intro Hx. unfold rd_u32. case_decide as Hs.
+  - rewrite (rd_sext32 (Z.of_nat x) ltac:(lia) ltac:(lia)).
+    apply rd_nat_u. lia.
+  - rewrite sext32_64_moi moi64_mod.
+    assert (Hsg : bv_signed (mword_of_int (Z.of_nat x) : mword 32)
+                  = Z.of_nat x - 4294967296).
+    { unfold bv_signed, bv_swrap. rewrite moi32_unsigned.
+      rewrite (bvw32_small (Z.of_nat x) ltac:(lia)).
+      change (bv_half_modulus (MachineWord.MachineWord.Z_idx 32)) with 2147483648.
+      unfold bv_wrap.
+      change (bv_modulus (MachineWord.MachineWord.Z_idx 32)) with 4294967296.
+      replace (Z.of_nat x + 2147483648)
+        with (Z.of_nat x + 2147483648 - 4294967296 + 1 * 4294967296) by lia.
+      rewrite Z_mod_plus_full.
+      rewrite (Z.mod_small (Z.of_nat x + 2147483648 - 4294967296) 4294967296
+                 ltac:(lia)).
+      lia. }
+    rewrite Hsg.
+    replace ((Z.of_nat x - 4294967296) `mod` 18446744073709551616)
+      with ((Z.of_nat x - 4294967296 + 1 * 18446744073709551616)
+              `mod` 18446744073709551616)
+      by (rewrite Z_mod_plus_full; reflexivity).
+    rewrite Z.mod_small; lia.
+Qed.
+
+(* what the ABI's word is worth: never below the value itself... *)
+Lemma rd_u32_lb (x : nat) : (Z.of_nat x <= rd_u32 x)%Z.
+Proof. unfold rd_u32. case_decide; lia. Qed.
+
+(* ...ABOVE any file size it exceeds -- the [bltu a5,a3] at +0x002 and the
+   [bgeu a5,a4] at +0x02c on the arms where they fire... *)
+Lemma rd_u32_gt (x y : nat) :
+  (Z.of_nat y < 2147483648)%Z -> (y < x)%nat -> (Z.of_nat y < rd_u32 x)%Z.
+Proof. intros Hy Hlt. unfold rd_u32. case_decide; lia. Qed.
+
+(* ...and the literal itself when it is at most a file size, which is what
+   makes those two compares decide the 32-bit unsigned compare the C is
+   written in. *)
+Lemma rd_u32_le (x y : nat) :
+  (Z.of_nat y < 2147483648)%Z -> (x <= y)%nat -> (rd_u32 x <= Z.of_nat y)%Z.
+Proof. intros Hy Hle. unfold rd_u32. case_decide; lia. Qed.
+
+(* [c.addw a4,a3] at +0x022, at the operand forms readi reaches it with: a4
+   is an ABI uint at the FULL 32-bit range, a3 the literal the size test has
+   already bounded below 2^31.  [addw] truncates both operands before adding,
+   so the sign extension is invisible to it and the sum comes back in the
+   same ABI form; only the SUM needs a bound, and that bound is SpecReadi's
+   joint premise -- this is the one place it is used, and the reason it is
+   JOINT rather than two separate ones. *)
+Lemma rd_addw32 (a c : Z) : 0 <= a -> 0 <= c -> a + c < 4294967296 ->
+  sign_extend' 64
+    (add_vec (subrange_vec_dec
+                (sign_extend' 64 (mword_of_int a : mword 32) : mword 64) 31 0
+              : mword 32)
+             (subrange_vec_dec (mword_of_int c : mword 64) 31 0 : mword 32))
+  = (sign_extend' 64 (mword_of_int (a + c) : mword 32) : mword 64).
+Proof.
+  intros Ha Hc Hsum.
+  rewrite -!trunc32_subrange trunc32_sext64 trunc32_mword_of_int.
+  f_equal. apply bv_eq. rewrite add_vec_unsigned !moi32_unsigned.
+  unfold bv_wrap. change (bv_modulus 32) with 4294967296.
+  rewrite Zplus_mod_idemp_l Zplus_mod_idemp_r. reflexivity.
+Qed.
+
 (* [andi a5,s1,1023] : off % BSIZE *)
 Lemma rd_andi1023 (z : Z) : 0 <= z -> z < 2147483648 ->
   and_vec (mword_of_int z : mword 64)
