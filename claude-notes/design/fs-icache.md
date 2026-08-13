@@ -1569,7 +1569,22 @@ refutes); (2) sleep at noff ≥ 2 diverges; (3)
 lock on the free branch (no park, so no `cpu_own 0`), diverges on the
 locked branch. iput's REF-1 makes the divergence unreachable in
 practice; we do not prove that, we permit it — the ilock/iget live
-panics are the precedent. Route A (prove the lock free) was examined
+panics are the precedent.
+
+> **(2) STOPPED BEING TRUE at xv6 `ae96fd0`** — see
+> [`../projects/sleep-split.md`](../projects/sleep-split.md). The split
+> protocol's `sleep()` parks only when `p->chan` is still non-zero, so a
+> thread that enters it with a lock held either panics (chan armed) or
+> RETURNS having done nothing (a wakeup cleared it). Nothing can rule the
+> second arm out: `p_chan` is existential in `proc_lock_res`,
+> `sleep_prepare`'s postcondition is empty, and no receipt could survive
+> the window because `wakeup` clears the field holding only `p->lock`.
+> The lemma is `SpecSleep.wp_sleep_nested` now and it carries a return
+> continuation. **(3) is unaffected in its statement** — the locked branch
+> still never reaches the free branch's postcondition — but its PROOF is
+> now a Löb loop rather than a divergence: sleep_prepare / release / sleep /
+> acquire, forever. REF-1 makes both unreachable at iput's call site just
+> the same. Route A (prove the lock free) was examined
 and rejected: `sl_res`'s locked arm is a bare pure with no resource to
 refute by, and giving it one reparameterizes `is_sleeplock` for every
 user including bio.

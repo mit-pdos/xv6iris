@@ -44,10 +44,15 @@ Import Defs.
 (* ===================================================================== *)
 
 (* the addresses the two auipc/addi pairs compute: +0x5c/+0x60 lands on
-   0x80007290 and +0x70/+0x74 on 0x800072c0.  (0x80007270, the panic string,
-   is deliberately absent: its arm is REFUTED -- ProofUsertrapParts.v.) *)
-Definition ut_fmt1_a : Z := 0x80007290.
-Definition ut_fmt2_a : Z := 0x800072c0.
+   0x800072a8 and +0x70/+0x74 on 0x800072d8.  (0x80007288, the panic string,
+   is deliberately absent: its arm is REFUTED -- ProofUsertrapParts.v.)
+   THESE MOVE WITH EVERY IMAGE RELAYOUT and nothing but this file's own
+   [kernel_data_string] obligations will notice, so they are the first thing to
+   re-derive after a bump: `awk '/<usertrap>:/,/^$/' xv6-riscv/kernel/kernel.asm
+   | grep 'addi.*a0,a0'` prints them as objdump's `#` comments.  (xv6 9dd28f5e
+   had them at 0x80007290 / 0x800072c0.) *)
+Definition ut_fmt1_a : Z := 0x800072a8.
+Definition ut_fmt2_a : Z := 0x800072d8.
 
 Definition ut_nl : string := String (ascii_of_nat 10) EmptyString.
 

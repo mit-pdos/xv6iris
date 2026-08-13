@@ -23,6 +23,7 @@ Require Import InstrBytes KernelText.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import CodeStart.
+Require Import KernelConsts.
 Require Import CodeTimerinitAux.
 Local Open Scope Z_scope.
 
@@ -38,7 +39,9 @@ Definition si36 : mword 12 := mword_of_int 2047.  (* addi a4, 2047 *)
 Definition si38 : mword 6  := mword_of_int 1.     (* c.lui a4, 1 *)
 Definition si39 : mword 12 := mword_of_int 2048.  (* addi a4, -2048 (bits 0x800) *)
 Definition si42 : mword 20 := mword_of_int 1.     (* auipc a5, 1 *)
-Definition si43 : mword 12 := mword_of_int 3590.  (* addi a5, -506 (bits 0xe06) *)
+(* addi a5,a5,<imm> completing &main; read out of the image by
+   tools/gen_consts.py, since it moves whenever main does *)
+Definition si43 : mword 12 := mword_of_int KernelConsts.start_main_addi.
 Definition si45 : mword 6  := mword_of_int 0.     (* c.li a5, 0 *)
 Definition si47 : mword 6  := mword_of_int 16.    (* c.lui a5, 0x10 *)
 Definition si48 : mword 6  := mword_of_int 63.    (* c.addi a5, -1 *)

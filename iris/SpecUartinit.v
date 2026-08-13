@@ -81,16 +81,16 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γd : uart_names) (m : regfile) (K : nat)
-    (l : list (bv 8)) (b0 : bool) (vlock : bv 32) (vname vcpu : bv 64) (p : mword 64) :=
+    (l : list (bv 8)) (b0 : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
-  let lk : mword 64 := mword_of_int KernelSyms.tx_lock in
-  let c_name := lock_name_field lk in
-  let c_cpu := add_vec lk (sign_extend' 64 (mword_of_int 0x10 : mword 12)) in
   (4 <= K)%nat ->
   sie_cap_gpr m K false p -∗
-  (* [kernel_data] supplies the "uart" string literal uartinit's [auipc a1 /
-     addi a1] points at -- the name it hands to initlock. *)
+  (* [kernel_data] is no longer needed for a string literal -- uartinit's
+     [initlock(&tx_lock, "uart")] is GONE (upstream ae96fd0 made tx_lock a
+     sleeplock and forgot to initialize it; kernel-defects.md D2) -- but it
+     stays a premise because the device-register writes are stated over the
+     same image resources. *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the UART fabric, borrowed from the invariant around each write *)
   uart_inv γd -∗
@@ -99,9 +99,6 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
   uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_sent γd l -∗
   (* the UNFROZEN DLAB half, at an arbitrary power-on value *)
   uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
-  lk ↦₄ vlock -∗
-  c_name ↦₈ vname -∗
-  c_cpu ↦₈ vcpu -∗
   ( ∀ mr,
     sie_cap_gpr mr K false p -∗
     pc_is ret_tgt -∗
@@ -110,11 +107,12 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
     uart_tx_own γd l -∗ uart_sent γd l -∗
     (* the final LCR write cleared DLAB, so the half is frozen for good *)
     uart_dlab_off γd -∗
-    lk ↦₄ (mword_of_int 0 : mword 32) -∗
-    (* the name field is written once and then DISCARDED: what comes back is
-       the persistent [lock_name], ready to be sealed into [is_lock]. *)
-    lock_name lk "uart"%string -∗
-    c_cpu ↦₈ (zero_reg : mword 64) -∗
+    (* NO LOCK COMES OUT OF uartinit ANY MORE.  It used to hand back the
+       zeroed lock word, the sealed [lock_name] and the cpu cell -- the
+       "newlock" ghost step's raw material.  ae96fd0 deleted the
+       [initlock(&tx_lock, "uart")] call and did not replace it, so uartinit
+       touches no lock storage at all and the transmit lock is whatever the
+       loader left.  kernel-defects.md D2 is where that goes. *)
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -122,6 +120,6 @@ Module Type UARTINIT.
   Parameter wp_uartinit_sconf :
     forall `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γd : uart_names) (m : regfile) (K : nat)
-      (l : list (bv 8)) (b0 : bool) (vlock : bv 32) (vname vcpu : bv 64) (p : mword 64),
-      wp_uartinit_sconf_body γd m K l b0 vlock vname vcpu p.
+      (l : list (bv 8)) (b0 : bool) (p : mword 64),
+      wp_uartinit_sconf_body γd m K l b0 p.
 End UARTINIT.

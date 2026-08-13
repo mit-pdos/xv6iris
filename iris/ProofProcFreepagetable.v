@@ -485,7 +485,7 @@ Section ProofProcFreepagetable.
     iEval (rewrite Hpc1c) in "Hpc".
     (* +0x1c jal ra,uvmunmap *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.proc_freepagetable + 0x1c)) Rra
-              (mword_of_int 2094916 : mword 21) B4 (K - 4)%nat b
+              (mword_of_int 2094882 : mword 21) B4 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi1c [-]").
@@ -493,7 +493,7 @@ Section ProofProcFreepagetable.
     set (B5 := <[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x1c) : mword 64) 4)]> B4).
     assert (Htgt1 : add_vec (mword_of_int (KernelSyms.proc_freepagetable + 0x1c) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2094916 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2094882 : mword 21))
                     = mword_of_int KernelSyms.uvmunmap)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt1) in "Hpc".
@@ -640,7 +640,7 @@ Section ProofProcFreepagetable.
     iEval (rewrite Hpc2e) in "Hpc".
     (* +0x2e jal ra,uvmunmap *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.proc_freepagetable + 0x2e)) Rra
-              (mword_of_int 2094898 : mword 21) C5 (K - 4)%nat b
+              (mword_of_int 2094864 : mword 21) C5 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi2e [-]").
@@ -648,7 +648,7 @@ Section ProofProcFreepagetable.
     set (C6 := <[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x2e) : mword 64) 4)]> C5).
     assert (Htgt2 : add_vec (mword_of_int (KernelSyms.proc_freepagetable + 0x2e) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2094898 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2094864 : mword 21))
                     = mword_of_int KernelSyms.uvmunmap)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt2) in "Hpc".
@@ -745,7 +745,7 @@ Section ProofProcFreepagetable.
     iEval (rewrite Hpc36) in "Hpc".
     (* +0x36 jal ra,uvmfree *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.proc_freepagetable + 0x36)) Rra
-              (mword_of_int 2095358 : mword 21) D1 (K - 4)%nat b
+              (mword_of_int 2095324 : mword 21) D1 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi36 [-]").
@@ -753,7 +753,7 @@ Section ProofProcFreepagetable.
     set (D2 := <[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x36) : mword 64) 4)]> D1).
     assert (Htgt3 : add_vec (mword_of_int (KernelSyms.proc_freepagetable + 0x36) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2095358 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2095324 : mword 21))
                     = mword_of_int KernelSyms.uvmfree)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt3) in "Hpc".

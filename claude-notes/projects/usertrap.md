@@ -22,10 +22,20 @@ Prerequisites are all in place:
 
 ## CHECKPOINT — where this stands, and how to pick it up
 
-**FOUR OF THE FIVE BLOCKS ARE PROVEN.** The boundary is settled, and the
-tail, the syscall arm and the three cheap arms all compile with no `Admitted`
-and no new `Axiom`; the full `iris/` build is green. What is left is the entry
-+ dispatch block and the seal.
+**FOUR OF THE FIVE BLOCKS ARE PROVEN AND RE-POINTED ONTO xv6 `0024d4b`.** The
+merge of `origin/main` is in, the five-step re-point worklist below is DONE,
+and `_CoqProject` is fully green (`make -f CoqMakefile` reports nothing to be
+done). The tail (`ProofUsertrapTail.v`), the syscall arm
+(`ProofUsertrapSys.v`) and the three cheap arms (`ProofUsertrapArms.v`) carry
+no `Admitted` and no new `Axiom`.
+
+What remains is **the entry + dispatch block (`ProofUsertrap.v`, +0x00..+0x54)
+and the seal**, which is §"Resume here".
+
+There is also a `git stash@{0}` in this worktree holding an earlier,
+NEVER-COMPILED draft of the entry + dispatch block; it predates the bump, so
+every immediate in it is wrong. Read it, do not trust it. (Its half of step 5
+— the `R`-as-a-hart-family fix to `SpecUsertrap.v` — has landed.)
 
 Writing the walk is what turned the remaining design questions up, and they
 were not in the instruction stepping — they were in places the
@@ -37,17 +47,165 @@ line of the walk; two of them change files you would otherwise not touch.
 | file | what |
 |---|---|
 | `iris/SpecUsertrap.v` | the boundary, in the KERNEL tier (§"THE BOUNDARY IS STATED IN THE WRONG WORLD"). `USERTRAP` `Include`s a split-out `USERTRAP_RES`. |
-| `iris/UsertrapRes.v` | `usertrap_res` DEFINED, over a **`ut_names` record**; `ut_caps` / `ut_own` / `ut_env` / `ut_trap` / `ut_res`; the walk's vocabulary (`ut_frame`, `ut_cs`, `ut_csrs_raw`, `ut_hold`) and its transport. |
-| `iris/ProofUsertrapParts.v` | the pure obligations (the refuted panic arm) + `Notation UT`. |
-| `iris/UsertrapAux.v` | the two printk format strings of the unexpected-scause arm. |
-| `iris/ProofUsertrapTail.v` | **the tail, PROVEN**: `ut_kexit` (the kexit(-1) dead end), `ut_ret2` (+0xb2..+0xc6 and the exit), `ut_ret` (+0xae), `ut_a6`, `ut_fa`. All index-generic in `b`. |
-| `iris/ProofUsertrapSys.v` | **the syscall arm, PROVEN**: +0x90..+0xa2, i.e. the killed pre-check, the epc bump, the `csrsi` that pays finding 3's reserve, and `jal syscall`. |
-| `iris/ProofUsertrapArms.v` | **the three cheap arms, PROVEN**: `ut_56` (printk ×2 + setkilled), `ut_d0` (vmfault), `ut_e8` (the devintr arm's killed). All at the literal `false`. |
+| `iris/UsertrapRes.v` | `usertrap_res` DEFINED, over a **`ut_names` record**; `ut_caps` / `ut_own` / `ut_env` / `ut_trap` / `ut_res`; the walk's vocabulary (`ut_frame`, `ut_cs`, `ut_csrs_raw`, `ut_hold`) and its transport. GREEN post-bump. |
+| `iris/ProofUsertrapParts.v` | the pure obligations (the refuted panic arm) + `Notation UT`. Offset-free, so the bump did not touch it. |
+| `iris/UsertrapAux.v` | the two printk format strings of the unexpected-scause arm. GREEN post-bump (the two .rodata addresses moved). |
+| `iris/ProofUsertrapTail.v` | the tail: `ut_kexit` (the kexit(-1) dead end), `ut_ret2` (+0xb2..+0xc6 and the exit), `ut_ret` (+0xae), `ut_a6`, `ut_fa`. All index-generic in `b`. **PROVEN at xv6 `0024d4b`.** `ut_a6`'s taken branch and the whole of `ut_fa` sat above the bump's insertion and moved (+0xf2..+0xf6 -> +0xf4..+0xf8, +0xfa..+0x104 -> +0xfc..+0x106). |
+| `iris/ProofUsertrapSys.v` | the syscall arm: +0x90..+0xa2, i.e. the killed pre-check, the epc bump, the `csrsi` that pays finding 3's reserve, and `jal syscall`. **PROVEN at `0024d4b`** — every offset it names is below +0xd0, so it was the one proof file the reshape left alone. |
+| `iris/ProofUsertrapArms.v` | the three cheap arms: `ut_56` (printk ×2 + setkilled), `ut_d0` (vmfault), `ut_e8` (the devintr arm's killed). All at the literal `false`. **PROVEN at `0024d4b`** — `ut_d0` was the one block the bump made a rewrite. |
+
+## THE psz BUMP (xv6 9dd28f5e -> 0024d4b): WHAT IT COST, AND THE TOOLING
+
+DONE. Kept because the next upstream bump repeats it, and three of the steps
+are things no tool will find for you.
+
+`claude-notes/projects/psz-bump.md` is upstream's own worklist for the same
+bump and explains what `4f2fc8b` did and why (vmfault stops conflating the
+table it is handed with the running process's; the size becomes an argument in
+a1 and every later argument shifts down a register).
+
+**The image was re-confirmed the way durable-notes prescribes**:
+`git -C xv6-riscv checkout --detach $XV6_REV`, **`make -C xv6-riscv clean`**
+(the ELF was three revisions stale and `make kernel` will NOT rebuild it — its
+rule has only an order-only prerequisite, so an existing file looks up to
+date), rebuild, `make dump-force`, and `git status kernel-rocq/` came back with
+no unstaged change, which is the proof that this toolchain and this revision
+agree. Then `make kernel-rocq` and `make check-decode`, both clean.
+
+TWO TOOLING NOTES FROM DOING IT. `tools/relayout_map.py` and
+`relayout_shift.py` had the author's worktree path hard-coded
+(`ROOT = '/shared/xv6iris-4'`), so they failed with a `FileNotFoundError`
+naming somebody else's checkout; both now derive `ROOT` from the script's own
+location. And `relayout_map.py` wants a BARE basename (`map CodeUsertrap.v`),
+not `iris/CodeUsertrap.v`.
+
+### Below +0xd0 the re-point is mechanical — but MIND THE ALIAS
+
+`python3 tools/relayout_map.py map CodeUsertrap.v` reported **15 offsets
+moved, 22 reshaped**, and every reshape was at or above +0xd0. So everything
+below +0xd0 is a pure immediate re-encoding and the tool does it — **note the
+`UT` argument**, without which it silently reports zero substitutions:
+
+```
+python3 tools/relayout_map.py apply   CodeUsertrap.v Proof<X>.v UT --write
+python3 tools/relayout_map.py residue CodeUsertrap.v Proof<X>.v UT   # MANDATORY
+```
+
+`UT` is the alias `ProofUsertrapParts.v` declares
+(`Notation UT := KernelSyms.usertrap`), and the tool's `find_aliases` cannot
+see it because it scans the file being REWRITTEN, where the `Notation` does not
+appear. Passing it positionally is what `apply_map`'s `aliases` parameter is
+for.
+
+**AND `UsertrapAux.v`'S TWO .rodata ADDRESSES, WHICH NO TOOL WILL FIND FOR
+YOU.** The two printk format strings moved (`0x80007290 -> 0x800072a8`,
+`0x800072c0 -> 0x800072d8`) and nothing but that file's own
+`kernel_data_string` byte obligations notices, so it is the FIRST thing that
+fails after a bump and the last thing you would look at. The file now says
+where the numbers come from
+(`awk '/<usertrap>:/,/^$/' xv6-riscv/kernel/kernel.asm | grep 'addi.*a0,a0'`
+prints them as objdump's `#` comments). Any future bump repeats this.
+
+### From +0xd0 up, `relayout_shift.py` — and it did the whole job
+
+`relayout_map.py` QUARANTINES everything at or above a symbol's first reshaped
+offset, and rightly (durable-notes, "Which of the two relayout tools to reach
+for"). For this stretch `tools/relayout_shift.py` is the tool, and its
+`UNALIGNED` list — the check that the alignment is right — came back as
+**exactly one entry**, the one instruction the C change added. Run with
+`--proof`/`--prefix`/`--alias`, it rewrote both the offsets and the immediates
+of `ut_a6`'s kexit tail, all of `ut_fa`, and all of `ut_e8` in a single pass,
+and `relayout_map.py residue` then reported 0 residual in both files.
+
+**THE ONE THING IT DOES NOT DO IS RENAME `uti_<off>` IN THE PROOF.** It
+renumbers the lemma names in `Code<F>.v` but not the `iPoseProof (uti_0f2 …)`
+that names them, and a shifted block's names then point two bytes low —
+which fails as a plain "reference not found" only if the OLD name has gone
+away, and otherwise typechecks against the wrong instruction. Do the rename
+as a single simultaneous pass over the block's line range (a sequential
+`sed` double-shifts, exactly as durable-notes' adjacent-call-site trap
+predicts), and take the hypothesis names (`Hif2`) and the `(* +0xf2 … *)`
+comments with it.
+
+The reshaped stretch, after:
+
+```
+  +0xd0  csrr a2,stval          <- the va argument is now a2
+  +0xd4  csrr a3,scause
+  +0xd8  addi a3,a3,-13
+  +0xda  seqz a3,a3             <- the read flag is now a3
+  +0xde  ld   a1,72(s1)         <- NEW: p->sz, vmfault's psz argument
+  +0xe0  ld   a0,80(s1)             p->pagetable
+  +0xe2  jal  vmfault
+  +0xe6  bnez a0 -> +0xa6       (else fall to +0xe8: j +0x56)
+  +0xea  mv   a0,s1             \
+  +0xec  jal  killed             |  ut_e8, was at +0xe8
+  +0xf0  beqz a0 -> +0xfc        |
+  +0xf2  j +0xf6                /
+  +0xf4  li   s2,0              \  ut_a6's kexit tail, was +0xf2..+0xf6
+  +0xf6  li   a0,-1              |
+  +0xf8  jal  kexit             /
+  +0xfc  li   a5,2              \  ut_fa, was at +0xfa
+  +0xfe  bne  s2,a5 -> +0xae     |
+  +0x102 jal  yield              |
+  +0x106 j +0xae                /
+```
+
+### `ut_d0` GOT SIMPLER, WHICH IS THE POINT OF THE BUMP
+
+`SpecVmfault` now takes `mm !!! a0 = page_base P.(ud_root)`, `mm !!! a1 = szv`,
+reads the va out of **a2**, and takes NEITHER `p_sz p ↦₈{dqs} szv` NOR
+`p_pagetable p ↦₈{dqp} …` — both premises and both fractions are gone, and the
+call site loses two arguments. So the arm still opens
+`ProcInv.proc_priv_copy` — it has to READ both cells, at +0xde and +0xe0 — but
+the two cells never leave the block, and only `proc_pt` crosses the call. The
+three-lemma `tp_pin` detour (`ua_pin_sie_cap_gpr` / `ua_pin_lookup` /
+`ua_pin_cs`) is STILL needed, because the one premise the bump did NOT shed is
+`mm !!! Regidx Rtp = cid_word`; see §"One contract that does NOT fit".
+
+### `devintr_caps` lost `γtx`, so `ut_names` lost `un_tx`
+
+Upstream's `ae96fd0` made uartintr lock-free, `is_txlock` left `devintr_caps`
+(it was never mintable anyway — `kernel-defects.md` D2), and
+`SpecBootDevCaps.boot_dev_caps` is now `timer_cap` ALONE. `UsertrapRes.v`'s
+record has no `un_tx`, `devintr_caps_any` takes `γu γv γdk γtl γs pd pav pu`,
+and its satisfiability note is one member shorter and one step easier. Nothing
+else in the project mentions the tx lock.
+
+### The budgets did NOT move
+
+`K_kexit` 74, `K_sys_exit` 78, `K_syscall` 82, `devintr_stack` 40, vmfault 38 —
+so `K_usertrap = 4 + kv_frame_slots + K_syscall` (164) stands and finding 3 is
+unaffected. Rebuild in `_CoqProject` order, which is also the dependency
+order: `UsertrapRes.v` -> `ProofUsertrapTail.v` -> `ProofUsertrapArms.v` ->
+`ProofUsertrapSys.v` (a single-file `coqc` against a stale sibling reproduces
+the "inconsistent assumptions" error for reasons that have nothing to do with
+the edit).
+
+## THE `R`-AS-A-HART-FAMILY FIX — landed
+
+`usertrap_post` took `R : uptd -> mword 64 -> iProp Σ`, so the `R pt' ksp` it
+demanded back was pinned to the hart `wp_usertrap_body` was stated at — the
+ENTRY hart — while the bundle is rebuilt at the hart prepare_return RESUMED
+on. Each block lemma was individually fine (each is stated in a section whose
+ambient hart is the right one, which is why all three files compiled), and the
+mismatch would have surfaced only when the seal tried to connect the boundary's
+crossing to `ut_ret2`'s premise. `SpecUsertrap.v` now says
+
+```coq
+    (R : CpuId -> uptd -> mword 64 -> iProp Σ)
+    …  R CID pt ksp -∗                                   (* going in  *)
+    wp_next true pj (fun CID' => usertrap_post (CID := CID') (R CID') pt ksp m)
+```
+
+with `Module Type USERTRAP` supplying `fun h => usertrap_res (CID := h)`, and
+every block lemma's exit-continuation premise spells
+`usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) …`.
 
 ### Resume here
 
 **`ProofUsertrap.v` — the entry + dispatch, +0x00..+0x54 — and then the seal.**
-That is the only block left, and it is the LONGEST (about thirty
+That is the only block never written, and it is the LONGEST (about thirty
 instructions), though not the hardest: like the other four arms it runs
 entirely at `b = false`, so not one `wp_next` in it moves the hart and not one
 `(CID := ...)` annotation is needed. It covers
@@ -269,17 +427,18 @@ Offsets are `usertrap + x`. `s1 = p`, `s2 = which_dev`, `a5/a4` scratch.
   +0x22  jal myproc; s1 := a0
   +0x28  ld a5,88(a0) (p->trapframe); csrr a4,sepc; sd a4,24(a5)
   +0x30  csrr a4,scause; li a5,8; beq -> +0x90         (syscall arm)
-  +0x3a  jal devintr; s2 := a0; bnez -> +0xe8          (device arm)
+  +0x3a  jal devintr; s2 := a0; bnez -> +0xea          (device arm)
   +0x42  scause == 15 / 13 ? -> +0xd0                  (vmfault arm)
   +0x56  printk x2; setkilled(p); j +0xa6              (unexpected scause)
   +0x84  panic("usertrap: not from user mode")         (REFUTED)
   +0x90  jal killed; bnez -> +0xc8 (kexit(-1) then falls into +0x96);
          p->trapframe->epc += 4; csrsi sstatus,2 (intr_on); jal syscall
-  +0xa6  jal killed; bnez -> +0xf2 (s2 := 0; kexit(-1))
+  +0xa6  jal killed; bnez -> +0xf4 (s2 := 0; kexit(-1))
   +0xae  jal prepare_return; a0 := MAKE_SATP(p->pagetable); epilogue; ret
-  +0xd0  vmfault(p->pagetable, r_stval(), scause==13); bnez -> +0xa6 else -> +0x56
-  +0xe8  jal killed; beqz -> +0xfa; else kexit(-1)
-  +0xfa  which_dev == 2 ? jal yield ; -> +0xae
+  +0xd0  vmfault(p->pagetable, p->sz, r_stval(), scause==13);
+         bnez -> +0xa6 else -> +0x56
+  +0xea  jal killed; beqz -> +0xfc; else j +0xf6 (kexit(-1))
+  +0xfc  which_dev == 2 ? jal yield ; -> +0xae
 ```
 
 Two things worth having in mind before writing any of it:
@@ -547,18 +706,23 @@ Four smaller things that cost a compile each to find:
   instead ("cannot instantiate … with `hart_state ↦ᵣ …`"), which reads exactly
   like the hart trap and is not it.
 
-### One contract that does NOT fit, and it is not usertrap's
+### One contract that does NOT fit, and the psz bump did not fix it
 
-`SpecVmfault` still carries an un-shed raw-map premise
-`mm !!! Regidx Rtp = cid_word`, exactly as `ProofCopyout.v`'s own note
-records. Nothing in usertrap's boundary hands a BLOCK that fact about its own
-map — the bundle it holds is `gpr_file (tp_pin m)`, from which the fact is
-derivable but not free — so `ProofUsertrapArms` pays the same three-lemma price
-ProofCopyout does (`ua_pin_sie_cap_gpr` / `ua_pin_lookup` / `ua_pin_cs`, i.e.
-push the whole call through `tp_pin M` and put the map back afterwards). It is
-a vmfault-side cleanup — drop the premise and derive it from
-`gpr_file (tp_pin m)` inside vmfault's own proof — and it will bite every
-future caller the same way until it is done.
+`SpecVmfault` carries a raw-map premise `mm !!! Regidx Rtp = cid_word`, exactly
+as `ProofCopyout.v`'s own note records. Nothing in usertrap's boundary hands a
+BLOCK that fact about its own map — what it holds is `gpr_file (tp_pin m)`,
+from which the fact is derivable but not free — so `ProofUsertrapArms` pays the
+same three-lemma price ProofCopyout does (`ua_pin_sie_cap_gpr` /
+`ua_pin_lookup` / `ua_pin_cs`: push the whole call through `tp_pin M` and put
+the map back afterwards).
+
+**The psz bump shed vmfault's OTHER two premises but not this one.**
+`p_sz p ↦₈{dqs} szv` and `p_pagetable p ↦₈{dqp} …` are gone (§"THE psz BUMP"
+step 2), which is a real simplification for the arm — but `Rtp` is a different
+kind of premise: it is not about the process, it is about the raw register map,
+and the fix is the same as it was. Drop it and derive it inside vmfault's own
+proof from the `gpr_file (tp_pin m)` its bundle already holds. Until then it
+bills every caller the same way.
 
 ### Two hoists owed (both deliberate, neither blocking)
 

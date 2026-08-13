@@ -544,7 +544,12 @@ what makes this tractable at all); then fix what it does NOT cover.
   `main`, `bmap`, `iupdate`) still break — they call into code that did.
 
 - **NEVER compute the fix set by value arithmetic.** Three separate ways it
-  is wrong, each hit for real: (a) `removed − added` set-difference silently
+  is wrong, each hit for real — **and `tools/relayout_map.py` is the
+  mechanized form of the rule that follows** (`map` prints a Code file's
+  per-offset immediate changes; `apply` rewrites a proof with them, anchored
+  on the last `KernelSyms.<sym> + 0x<off>` it saw, so both occurrences per
+  call site move and nothing outside the region does). Three ways value
+  arithmetic is wrong: (a) `removed − added` set-difference silently
   drops any value that reappears as a NEW immediate elsewhere — that hid
   `ProofFilealloc` entirely; (b) immediates are written in HEX in some
   proofs and DECIMAL in others (`0x6a2` vs `1698`), so a decimal grep misses
@@ -552,6 +557,66 @@ what makes this tractable at all); then fix what it does NOT cover.
   2093404→2093398 next to `iti_5c` 2093398→2093392 — a sequential value
   sweep double-shifts the first. **Build the map keyed by LEMMA NAME from
   the regenerated `Code<F>.v` diff, and apply it by LINE NUMBER.**
+
+- **Which of the two relayout tools to reach for, and why there are two.**
+  `relayout_map.py` compares old against new **at the same offset**. That is
+  exact only while both images agree on where instructions start, so it is the
+  right tool when a function merely MOVED. The moment a function GAINS OR
+  LOSES an instruction, every later offset names a different instruction in
+  the two images: usually that surfaces as a shape change (and is quarantined
+  — everything at or above a symbol's first reshaped offset is refused), but
+  when the two unrelated instructions happen to share a shape the difference
+  looks exactly like a moved immediate. On `CodeKexec.v` that proposed
+  rewriting phase B's tail (`ld s6,480(sp)` / `j +0x64`) with phase D's
+  `ld s11,440(sp)` / `j +0x72` — both `ldsp`+`cj`, and it typechecks.
+    So on a reshaped function `relayout_map.py` is safe but nearly useless
+  (on `CodeVmfault.v` it calls 48 of 55 offsets reshaped). Use
+  **`tools/relayout_shift.py`** there: it ALIGNS the two instruction streams
+  with difflib over number-normalised ASTs, so only genuine insertions and
+  deletions fall out, and it remaps the anchor offsets themselves.
+    **Its `UNALIGNED` list is the check AND the most useful output**: it
+  should be exactly the instructions the C change added or removed, and if it
+  is longer, the alignment is wrong and nothing else it prints is
+  trustworthy. On `CodeVmfault.v` it printed, unaided, the whole semantic
+  diff of the change — the deleted `jal myproc`, the deleted `ld a5,72(a0)`
+  (p->sz), the deleted `ld a0,80(s1)` (p->pagetable), the inserted `li s4,0`.
+  It also caught what the same-offset view actively MISREPORTS: `filestat`'s
+  epilogue shifts by +4, not the +2 it appears to, because old 0x4e/0x50 were
+  already `ld s2`/`ld s3` — "the epilogue grew a saved register" was an
+  artifact of the wrong comparison. Finish with `relayout_map.py residue`
+  either way; neither tool rewrites register fields, by design.
+    **BOTH TOOLS HAD THE AUTHOR'S WORKTREE PATH HARD-CODED** (`ROOT =
+  '/shared/xv6iris-4'`, and a `sys.path.insert` of the same), so in any other
+  checkout they died with a `FileNotFoundError` naming somebody else's
+  directory — which reads like a missing file rather than a broken tool. Both
+  now derive `ROOT` from the script's own location. Also: `relayout_map.py`
+  wants a BARE basename (`map CodeUsertrap.v`), not a repo-relative path, or
+  it looks for `iris/iris/Code….v`.
+
+- **A REGISTER REALLOCATION IS NOT ALWAYS A RENAME, and getting that wrong
+  typechecks.** On the `psz` bump gcc swapped filestat's two lazily-spilled
+  callee-saveds -- `p` went s3->s2 and `&st` went s2->s3 -- but **the spill
+  slots did not move with them**: 48(sp) is still s2's and 40(sp) still s3's,
+  with the spills at +0x1e/+0x20 and the restores at +0x52/+0x54 all
+  unchanged. So it is a ROLE swap bounded by the prologue and the epilogue,
+  and the fix is to swap `Rs2`/`Rs3` only BETWEEN the first `c.mv` and the
+  epilogue restores, leaving the four spill/restore sites and every
+  `m !!! Regidx Rs2/Rs3` alone.
+    A blanket rename would have attributed the caller's two saved words to the
+  wrong frame slots -- **and it would still have compiled**, because both
+  slots are just `word_pointsto` at an address, so nothing at the leaf
+  distinguishes them; it would surface only in the final `callee_saved`, if at
+  all. When a register map is not a permutation of *roles*, work out where
+  each role starts and stops rather than sed-ing the register name.
+
+- **Watch for two different old immediates that map to the SAME new value.**
+  filestat had `68 -> 72` at +0x1a and `80 -> 72` at +0x42, with both `68` and
+  `80` occurring several times in the proof (80 is also the `p->pagetable`
+  struct offset). No value-keyed substitution can get that right; drop such
+  offsets from the map and do them by hand. A third variant in the same class:
+  a `c.li a3,24 -> c.li a4,24` is a REGISTER change sitting next to a literal
+  `24` that is copyout's length argument -- both tools correctly leave both
+  literals alone, but a human re-reading the block is tempted to "fix" it.
 
 - **Hand-written decode files state the word AND its decoded AST, and both
   must move together.** `gen_code.py` does not cover the `Code*Aux.v` files.
@@ -994,3 +1059,40 @@ extra structure.
   request's block content, which is what makes `virtio_disk_rw`'s read
   postcondition provable — claude-notes/completed/virtio-disk-rw.md).
 - Avoid ad-hoc argument couplings in preconditions (e.g. a precondition like `eq_vec (m0!!!a2) zero_reg = Nat.eqb N 0` that ties an argument to a branch condition). Prefer deriving branch conditions internally / a natural contract; if a coupling is genuinely unavoidable, flag it and confirm the form before building it out.
+
+## IMAGE CONSTANTS ARE GENERATED — do not transcribe one by hand
+
+A handful of files need an image constant as a Coq **term** rather than as an
+`instr` fact, because a spec unifies on the term: `ProcGeom.mycpu_ret` (the
+closed form of `&cpus` that every per-CPU cell address and every
+acquire/release/push_off/pop_off/myproc contract is stated in),
+`ProofMyproc.mp_A4C`, `WpDecode.w_ld`, `BootChain.entry_got`, and the
+hand-written `Code*Aux.v` files. Each used to be a transcribed literal, and
+**each went stale on every image bump** — surfacing not at its own definition
+but as an unhelpful failure in whatever consumer compiled first (a bare `lia`
+"Cannot find witness" inside `BootCarve.v`; `Unable to unify "2147558352" with
+"2147558212"` inside `ProcGeom.v`). The diagnosis is nowhere near the defect,
+which is what made them expensive.
+
+They are all generated now. **`iris/KernelConsts.v` is produced by
+`tools/gen_consts.py` (hooked into `make gen-code`)** from the same dump the
+rest of the decode layer comes from; adding one is a row in its `CONSTS`
+table, which names the symbol, the offset and the field kind (`word32` /
+`imm_i` / `imm_u` / `imm_jal` / `pcrel`, the last being the address an
+`auipc`/`addi` pair computes). If you find yourself about to write a hex
+literal that came out of `kernel.asm`, add a row instead.
+
+Two constants are NOT routed through the generator, because the dumper
+already emits exactly them and a generator would be a second copy:
+`RiscvLang.img_end` (the single PT_LOAD's `vaddr + filesz`, from
+`KernelData.kernel_segments`) and `PageGeom.kmem_lo` (the `end` symbol, from
+`KernelSyms.end_`).
+
+**Both use `Definition c : Z := ltac:(let x := eval vm_compute in <e> in exact x).`
+and that form is load-bearing, not stylistic.** Defining `kmem_lo` as
+`KernelSyms.end_` directly compiles, but `unfold kmem_lo` then leaves a
+constant `lia` cannot see through, and all six downstream `unfold kmem_lo;
+lia` sites break — measured, not hypothetical. Computing the value at
+definition time leaves a plain `Z` literal in the body, so every existing
+consumer works unchanged. It is the same "compute the result ONCE into its own
+Definition" idiom as `ColdBoot.v`'s, used for a different reason.

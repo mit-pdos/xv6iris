@@ -4,14 +4,13 @@
 Require Import LinkWalkaddr LinkVmfault LinkWalkNoalloc LinkMemmove.
 Require Import ProofCopyout.
 
-(* the process contract, unchanged: what either_copyout, piperead, kwait,
-   readi and sys_pipe already speak *)
+(* THE contract -- there is only one now.  There used to be a second module
+   [CopyoutGen] over [COPYOUT_GEN], whose license was indexed by an [arm]:
+   the process's [p->sz] / [p->pagetable] cells at [true], "the destination
+   range is already mapped as valid user leaves" at [false], the [false] arm
+   being what kexec needed since it copies into a table it has built but not
+   yet installed.  xv6 `4f2fc8b` made vmfault take the size as an argument and
+   map into the table it was handed, so copyout touches no proc cell on any
+   path and there is nothing left for [arm] to select between; the whole
+   apparatus is deleted (SpecCopyout.v).  kexec passes [psz]. *)
 Module Copyout := CopyoutProof Walkaddr Vmfault WalkNoalloc Memmove.
-
-(* the general one, whose license is indexed by an [arm]: the process's
-   [p->sz] / [p->pagetable] cells at [true], "the destination range is
-   already mapped as valid user leaves" at [false].  The [false] arm is what
-   a caller copying into a table it has built but not yet installed (kexec)
-   needs, since it has no such cells to offer; [Copyout] above is the [true]
-   arm and is derived from this module. *)
-Module CopyoutGen := CopyoutCore Walkaddr Vmfault WalkNoalloc Memmove.

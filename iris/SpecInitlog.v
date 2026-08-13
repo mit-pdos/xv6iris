@@ -115,7 +115,7 @@ Definition K_initlog : nat := 56%nat.
    etext with no ELF symbol of its own (the [auipc a1,0x4 ; addi a1,a1,-1658]
    pair at +0x1a/+0x1e), so it is spelled out here; the proof reads its bytes
    out of [kernel_data] with [kernel_data_string]. *)
-Definition log_name_str : Z := 0x800074f8.
+Definition log_name_str : Z := 0x80007510.
 
 Definition wp_initlog_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,

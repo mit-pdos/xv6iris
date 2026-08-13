@@ -129,8 +129,16 @@ Local Open Scope Z_scope.
 Import Defs.
 
 (* kwait's own ten frame slots, plus the deepest callee below it (copyout's
-   50; freeproc wants 44, sleep 22, killed 14, acquire/release/myproc 10). *)
-Definition K_kwait : nat := 60%nat.
+   52; freeproc wants 44, sleep 22, killed 14, acquire/release/myproc 10).
+
+   THE COPYOUT CALL GETS NO TRAP RESERVE, which is why this is a straight
+   10 + 52 rather than piperead's arithmetic.  kwait is [eb]-generic and
+   [trap_res false = 0] (IntrDefs.v), so the call site can offer only
+   [K - 10]; there is no reserve to borrow against, and 60 leaves the
+   obligation at [52 <= 50].  copyout's own budget went 50 -> 52 because
+   [psz] has to outlive walkaddr / vmfault / memmove, so gcc gave it a
+   callee-saved home in s11 and the frame grew to 14 slots (SpecCopyout.v). *)
+Definition K_kwait : nat := 62%nat.
 
 Definition wp_kwait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)

@@ -32,6 +32,7 @@ Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import SpecPushOff.
 Require Import SpecMyproc.
+Require Import KernelConsts.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
@@ -44,11 +45,12 @@ Local Open Scope Z_scope.
 
 
 
-(* the a4 pid_lock constant (auipc a4,0x11 at myproc+0x14 then addi a4,-1488) *)
+(* the a4 pid_lock constant: the auipc at myproc+0x14 and the addi at +0x18,
+   both read out of the image by tools/gen_consts.py *)
 Definition mp_A4C : mword 64 :=
   add_vec (add_vec (mword_of_int (KernelSyms.myproc + 0x14) : mword 64)
-                   (auipc_off (mword_of_int 0x11 : mword 20)))
-          (sign_extend' 64 (mword_of_int 0xa2e : mword 12)).
+                   (auipc_off (mword_of_int KernelConsts.myproc_pidlock_auipc : mword 20)))
+          (sign_extend' 64 (mword_of_int KernelConsts.myproc_pidlock_addi : mword 12)).
 
 (* the c.ld's +48 displacement, in the leaf's [sign_extend' 64 imm] form. *)
 Definition mp_L48 : mword 64 :=
@@ -57,8 +59,8 @@ Definition mp_L48 : mword 64 :=
 (* mycpu_ret's constant tower (= &cpus). *)
 Definition mp_CPUSC : mword 64 :=
   add_vec (add_vec (add_vec_int (mword_of_int KernelSyms.mycpu : mword 64) 14)
-                   (auipc_off (mword_of_int 0x11 : mword 20)))
-          (sign_extend' 64 (mword_of_int 0xa84 : mword 12)).
+                   (auipc_off (mword_of_int KernelConsts.mycpu_cpus_auipc : mword 20)))
+          (sign_extend' 64 (mword_of_int KernelConsts.mycpu_cpus_addi : mword 12)).
 
 Local Lemma mycpu_ret_split (tp0 : mword 64) :
   mycpu_ret tp0 = add_vec mp_CPUSC (mycpu_a5 tp0).
@@ -243,14 +245,14 @@ Section ProofMyproc.
     iEval (rewrite Hpc0a) in "Hpc".
     (* ---- 0x0a: jal ra,push_off ---- *)
     iPoseProof (mpi_0a with "Htext") as "Hi0a".
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.myproc + 0x0a)) (mword_of_int 1 : mword 5) (mword_of_int 2093758 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.myproc + 0x0a)) (mword_of_int 1 : mword 5) (mword_of_int 2093724 : mword 21)
               A1 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi0a [-]").
     iIntros (CID6 Hs6) "Hcg Hpc".
     set (A2 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.myproc + 0x0a) : mword 64) 4)]> A1).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.myproc + 0x0a) : mword 64) 4)]> A1) with A2.
-    assert (Hpcpo : add_vec (mword_of_int (KernelSyms.myproc + 0x0a) : mword 64) (sign_extend' 64 (mword_of_int 2093758 : mword 21))
+    assert (Hpcpo : add_vec (mword_of_int (KernelSyms.myproc + 0x0a) : mword 64) (sign_extend' 64 (mword_of_int 2093724 : mword 21))
                     = mword_of_int KernelSyms.push_off) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcpo) in "Hpc".
     assert (HcspA2 : A2 !!! Regidx csp_rs1 = spd).
@@ -322,27 +324,27 @@ Section ProofMyproc.
     { rewrite /B3 upd_eq /B2 upd_eq /B1 upd_eq. unfold mycpu_a5. reflexivity. }
     (* ---- 0x14: auipc a4,0x11 ---- *)
     iPoseProof (mpi_14 with "Htext") as "Hi14".
-    iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.myproc + 0x14)) (mword_of_int 14 : mword 5) (mword_of_int 0x11 : mword 20)
+    iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.myproc + 0x14)) (mword_of_int 14 : mword 5) (mword_of_int KernelConsts.myproc_pidlock_auipc : mword 20)
               B3 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi14 [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
-    set (B4 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.myproc + 0x14) : mword 64) (auipc_off (mword_of_int 0x11 : mword 20)))]> B3).
-    change (<[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.myproc + 0x14) : mword 64) (auipc_off (mword_of_int 0x11 : mword 20)))]> B3) with B4.
+    set (B4 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.myproc + 0x14) : mword 64) (auipc_off (mword_of_int KernelConsts.myproc_pidlock_auipc : mword 20)))]> B3).
+    change (<[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.myproc + 0x14) : mword 64) (auipc_off (mword_of_int KernelConsts.myproc_pidlock_auipc : mword 20)))]> B3) with B4.
     assert (Hpc18 : add_vec_int (mword_of_int (KernelSyms.myproc + 0x14) : mword 64) 4 = mword_of_int (KernelSyms.myproc + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc18) in "Hpc".
     (* ---- 0x18: addi a4,a4,-1488 ---- *)
     iPoseProof (mpi_18 with "Htext") as "Hi18".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.myproc + 0x18)) (mword_of_int 14 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 0xa2e : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.myproc + 0x18)) (mword_of_int 14 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int KernelConsts.myproc_pidlock_addi : mword 12)
               B4 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (B5 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec (B4 !!! Regidx (mword_of_int 14 : mword 5)) (sign_extend' 64 (mword_of_int 2606 : mword 12)))]> B4).
-    change (<[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec (B4 !!! Regidx (mword_of_int 14 : mword 5)) (sign_extend' 64 (mword_of_int 2606 : mword 12)))]> B4) with B5.
+    set (B5 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec (B4 !!! Regidx (mword_of_int 14 : mword 5)) (sign_extend' 64 (mword_of_int KernelConsts.myproc_pidlock_addi : mword 12)))]> B4).
+    change (<[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec (B4 !!! Regidx (mword_of_int 14 : mword 5)) (sign_extend' 64 (mword_of_int KernelConsts.myproc_pidlock_addi : mword 12)))]> B4) with B5.
     assert (Hpc1c : add_vec_int (mword_of_int (KernelSyms.myproc + 0x18) : mword 64) 4 = mword_of_int (KernelSyms.myproc + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1c) in "Hpc".
     assert (HB5a4 : B5 !!! Regidx (mword_of_int 14 : mword 5) = mp_A4C).
@@ -407,7 +409,7 @@ Section ProofMyproc.
     assert (HB7a5 : B7 !!! Regidx (mword_of_int 15 : mword 5) = p) by (rewrite /B7 upd_eq; reflexivity).
     (* ---- 0x22: jal ra,pop_off ---- *)
     iPoseProof (mpi_22 with "Htext") as "Hi22".
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.myproc + 0x22)) (mword_of_int 1 : mword 5) (mword_of_int 2093856 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.myproc + 0x22)) (mword_of_int 1 : mword 5) (mword_of_int 2093822 : mword 21)
               B8 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi22 [-]").
@@ -415,7 +417,7 @@ Section ProofMyproc.
     iIntros "Hcg Hpc".
     set (B9 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.myproc + 0x22) : mword 64) 4)]> B8).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.myproc + 0x22) : mword 64) 4)]> B8) with B9.
-    assert (Hpcpp : add_vec (mword_of_int (KernelSyms.myproc + 0x22) : mword 64) (sign_extend' 64 (mword_of_int 2093856 : mword 21))
+    assert (Hpcpp : add_vec (mword_of_int (KernelSyms.myproc + 0x22) : mword 64) (sign_extend' 64 (mword_of_int 2093822 : mword 21))
                     = mword_of_int KernelSyms.pop_off) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcpp) in "Hpc".
     assert (HB9ra : B9 !!! Regidx (mword_of_int 1 : mword 5) = mword_of_int (KernelSyms.myproc + 0x26))

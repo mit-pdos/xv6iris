@@ -7,8 +7,8 @@
    proved once in WpInitlockWrapper.v: all this file supplies is trapinit's
    thirteen instructions (CodeTrapinit.v, bundled as [tri_code] below) and the
    three relocations
-   -- a1 = &"time" (auipc 0x5 / addi -450), a0 = &tickslock (auipc 0x16 /
-   addi -666), and the jal displacement to initlock. *)
+   -- a1 = &"time" (auipc 0x5 / addi -472), a0 = &tickslock (auipc 0x16 /
+   addi -576), and the jal displacement to initlock. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -36,7 +36,7 @@ Section CodeTrapinitBundle.
      whole-function proof needs to know about trapinit's code. *)
   Lemma tri_code :
     kernel_text -∗ ilw_code KernelSyms.trapinit (mword_of_int 5) (mword_of_int 22)
-                            (mword_of_int 3632) (mword_of_int 3416) (mword_of_int 2090848).
+                            (mword_of_int 3624) (mword_of_int 3520) (mword_of_int 2090764).
   Proof.
     iIntros "#Ht". rewrite /ilw_code.
     iSplitR; [iApply (tri_00 with "Ht")|].
@@ -85,8 +85,8 @@ Section ProofTrapinit.
     iPoseProof (kernel_data_string time_name_str "time"%string name eq_refl ltac:(unfold text_end, time_name_str; lia) Htime
                   with "Hkdata") as "#Hstr".
     iApply (ILW.wp_initlock_wrapper_sconf m K KernelSyms.trapinit
-              (mword_of_int 5) (mword_of_int 22) (mword_of_int 3632) (mword_of_int 3416)
-              (mword_of_int 2090848) lk name "time"%string vlock vname vcpu b p HK
+              (mword_of_int 5) (mword_of_int 22) (mword_of_int 3624) (mword_of_int 3520)
+              (mword_of_int 2090764) lk name "time"%string vlock vname vcpu b p HK
               ltac:(vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)

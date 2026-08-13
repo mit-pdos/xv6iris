@@ -6,20 +6,20 @@
    VirtioDiskRwDefs.v.  Keeping them apart is what lets P4 compile alongside
    P1/P2/P3 rather than behind them. *)
 (* ProofVirtioDiskRwD.v -- virtio_disk_rw, phase P4: the ring write and THE
-   PUBLISH (+0x162 .. +0x186).
+   PUBLISH (+0x176 .. +0x19a).
 
    The continuation of ProofVirtioDiskRwC.v, which proves P3 and leaves the
-   seam [VirtioDiskRwRestC.vdrw_p3_exit] at +0x162.
+   seam [VirtioDiskRwRestC.vdrw_p3_exit] at +0x176.
 
-     0x162 c.ld a3,8(a5)     a3 = disk.avail = pav
-     0x164 lhu  a4,2(a3)     AU: read avail->idx      (= wrap16 np)
-     0x168 c.andi a4,a4,7 ; 0x16a c.slli a4,a4,1 ; 0x16c c.add a3,a3,a4
-     0x16e sh   a0,4(a3)     PLAIN store of the head into ring slot np mod 8
-     0x172 fence rw,rw
-     0x176 c.ld a4,8(a5) ; 0x178 lhu a5,2(a4)   the SAME np again
-     0x17c c.addiw a5,a5,1
-     0x17e sh   a5,2(a4)     THE PUBLISH (AU: avail->idx := wrap16 (S np))
-     0x182 fence rw,rw
+     0x176 c.ld a3,8(a5)     a3 = disk.avail = pav
+     0x178 lhu  a4,2(a3)     AU: read avail->idx      (= wrap16 np)
+     0x17c c.andi a4,a4,7 ; 0x17e c.slli a4,a4,1 ; 0x180 c.add a3,a3,a4
+     0x182 sh   a0,4(a3)     PLAIN store of the head into ring slot np mod 8
+     0x186 fence rw,rw
+     0x18a c.ld a4,8(a5) ; 0x18c lhu a5,2(a4)   the SAME np again
+     0x190 c.addiw a5,a5,1
+     0x192 sh   a5,2(a4)     THE PUBLISH (AU: avail->idx := wrap16 (S np))
+     0x196 fence rw,rw
 
    A FOURTH file, purely for build latency (see the worklist).  Nothing in
    P4 calls a callee, so the phase itself lives in plain Sections; only the
@@ -57,7 +57,7 @@ Require Import CpuOwn FdSlots.
 Require Import DiskPtsto VirtioProto DiskInv.
 Require Import WpUart.
 Require Import PermInv.
-Require Import SpecAcquire SpecRelease SpecSleep SpecFreeDesc.
+Require Import SpecAcquire SpecRelease SpecSleepPrepare SpecSleep SpecFreeDesc.
 Require Import VirtioDiskRwDefs.
 Require Import ProofVirtioDiskRwCSeam.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -70,9 +70,9 @@ Ltac rgall := repeat (rewrite rget_ne; [| vm_compute; discriminate]).
 Require Import ProofVirtioDiskRwD.
 
 Module VirtioDiskRwRestD (Acquire : ACQUIRE) (Release : RELEASE)
-                         (Sleep : SLEEP) (FreeDesc : FREEDESC).
+                         (SleepPrepare : SLEEP_PREPARE) (Sleep : SLEEP) (FreeDesc : FREEDESC).
 
-Module P3 := VirtioDiskRwRestC Acquire Release Sleep FreeDesc.
+Module P3 := VirtioDiskRwRestC Acquire Release SleepPrepare Sleep FreeDesc.
 
 Section ProofVirtioDiskRwDSeam.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}.
@@ -84,7 +84,7 @@ Section ProofVirtioDiskRwDSeam.
   Notation Ra5 := (mword_of_int 15 : mword 5).
 
   (* ------------------------------------------------------------------- *)
-  (* THE P4/P5 SEAM at +0x186.  The published position is no longer named:  *)
+  (* THE P4/P5 SEAM at +0x19a.  The published position is no longer named:  *)
   (* what the sleeper carries is the CLAIM fragment, from which P5 re-finds *)
   (* its [b->disk] cell inside the flight or parked entry.  The triple      *)
   (* (h,m2,t) and the [int idx[3]] local survive for P6's [free_chain];     *)
@@ -117,7 +117,7 @@ Section ProofVirtioDiskRwDSeam.
        cpu_own 1 eb (proc_addr j) C false -∗
        trap_csrs -∗
        cpu_claim (proc_addr j) -∗
-       pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x186) : mword 64) -∗
+       pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x19a) : mword 64) -∗
        locked γk cpu_id -∗
        vdrw_body γd pd pav np nr fl pk tr fr -∗
        disk_claim γd q (DClaim b (vdrwd_slot kq b h wr sector
@@ -149,7 +149,7 @@ Section ProofVirtioDiskRwDSeam.
        cpu_own 1 eb (proc_addr j) C false -∗
        trap_csrs -∗
        cpu_claim (proc_addr j) -∗
-       pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x162) : mword 64) -∗
+       pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x176) : mword 64) -∗
        locked γk cpu_id -∗
        vdrw_body γd pd pav np nr fl pk tr
          (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false) -∗

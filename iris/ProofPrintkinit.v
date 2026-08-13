@@ -7,7 +7,7 @@
    proved once in WpInitlockWrapper.v: all this file supplies is printkinit's
    thirteen instructions (CodePrintkinit.v, bundled as [pkni_code] below), the
    three relocations
-   -- a1 = &"pr" (auipc 0x6 / addi +1982), a0 = &pr (auipc 0x12 / addi -1402),
+   -- a1 = &"pr" (auipc 0x6 / addi +1968), a0 = &pr (auipc 0x12 / addi -1304),
    and the jal displacement to initlock -- and the "pr" literal itself, read out
    of the kernel's data image. *)
 From Stdlib Require Import ZArith.
@@ -37,7 +37,7 @@ Section CodePrintkinitBundle.
      whole-function proof instantiates. *)
   Lemma pkni_code :
     kernel_text -∗ ilw_code KernelSyms.printkinit (mword_of_int 6) (mword_of_int 18)
-                            (mword_of_int 1982) (mword_of_int 2694) (mword_of_int 782).
+                            (mword_of_int 1968) (mword_of_int 2792) (mword_of_int 716).
   Proof.
     iIntros "#Ht". rewrite /ilw_code.
     iSplitR; [iApply (pkni_00 with "Ht")|].
@@ -86,8 +86,8 @@ Section ProofPrintkinit.
     iPoseProof (kernel_data_string pr_name_str "pr"%string name eq_refl ltac:(unfold text_end, pr_name_str; lia) Hpr
                   with "Hkdata") as "#Hstr".
     iApply (ILW.wp_initlock_wrapper_sconf m K KernelSyms.printkinit
-              (mword_of_int 6) (mword_of_int 18) (mword_of_int 1982) (mword_of_int 2694)
-              (mword_of_int 782) lk name "pr"%string vlock vname vcpu b p HK
+              (mword_of_int 6) (mword_of_int 18) (mword_of_int 1968) (mword_of_int 2792)
+              (mword_of_int 716) lk name "pr"%string vlock vname vcpu b p HK
               ltac:(vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)

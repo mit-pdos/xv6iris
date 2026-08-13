@@ -361,7 +361,6 @@ Section UsertrapRes.
     un_pd : mword 64;
     un_pav : mword 64;
     un_pu : mword 64;
-    un_tx : gname;                    (* the uart tx lock                   *)
     un_tk : gname;                    (* the ticks lock                     *)
     un_pr : gname;                    (* the pr lock (printk-general)        *)
     un_bn : bio_names;
@@ -434,19 +433,19 @@ Section UsertrapRes.
      satisfying the tick keeper with the left disjunct, and that is right: a
      process can migrate onto hart 0. *)
   Definition devintr_caps_any (γu : uart_names) (γv : disk_names)
-      (γtx γdk γtl : gname) (γs : list gname)
+      (γdk γtl : gname) (γs : list gname)
       (pd pav pu : mword 64) : iProp Σ :=
     (□ ∀ h : CPU,
-        devintr_caps (CID := h) γu γv γtx γdk γtl γs pd pav pu)%I.
+        devintr_caps (CID := h) γu γv γdk γtl γs pd pav pu)%I.
 
-  Global Instance devintr_caps_any_persistent γu γv γtx γdk γtl γs pd pav pu :
-    Persistent (devintr_caps_any γu γv γtx γdk γtl γs pd pav pu).
+  Global Instance devintr_caps_any_persistent γu γv γdk γtl γs pd pav pu :
+    Persistent (devintr_caps_any γu γv γdk γtl γs pd pav pu).
   Proof. rewrite /devintr_caps_any. apply _. Qed.
 
   Lemma devintr_caps_any_at (h : CPU) (γu : uart_names) (γv : disk_names)
-      (γtx γdk γtl : gname) (γs : list gname) (pd pav pu : mword 64) :
-    devintr_caps_any γu γv γtx γdk γtl γs pd pav pu -∗
-    devintr_caps (CID := h) γu γv γtx γdk γtl γs pd pav pu.
+      (γdk γtl : gname) (γs : list gname) (pd pav pu : mword 64) :
+    devintr_caps_any γu γv γdk γtl γs pd pav pu -∗
+    devintr_caps (CID := h) γu γv γdk γtl γs pd pav pu.
   Proof.
     iIntros "#H". rewrite /devintr_caps_any.
     iPoseProof (bi.forall_elim h with "H") as "H2". iExact "H2".
@@ -470,7 +469,7 @@ Section UsertrapRes.
      panic_wp_any ∗
      kernel_data ∗
      is_kstack (un_pj N) (un_ks N) ∗
-     devintr_caps_any (un_u N) (un_v N) (un_tx N) (un_k N) (un_tk N) (un_s N)
+     devintr_caps_any (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
        (un_pd N) (un_pav N) (un_pu N) ∗
      printk_env (un_pr N) (un_u N) (un_v N) ∗
      is_lock (un_w N) wait_lock_addr "wait_lock"%string wait_res ∗

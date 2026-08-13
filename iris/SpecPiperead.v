@@ -54,9 +54,18 @@ Import Defs.
 Local Open Scope Z_scope.
 
 
-(* piperead's own frame is 12 slots; the deepest callee is copyout at 50
-   (walkaddr 10 / walk 8 / vmfault 38 / memmove 2); sleep wants 22,
-   wakeup 18, killed 14, myproc/acquire/release 10. *)
+(* piperead's own frame is 12 slots; the deepest callee is copyout at 52
+   (14-slot frame / walkaddr 10 / walk 8 / vmfault 38 / memmove 2); sleep
+   wants 22, wakeup 18, killed 14, myproc/acquire/release 10.
+
+   12 + 52 = 64, YET THIS IS 62, AND THAT IS NOT A ROUNDING ERROR.  Unlike
+   either_copyout's, piperead's copyout call does not sit on the bare frame:
+   it is inside the trap reserve, so the budget the call site actually has is
+   [trap_res true + (av - 12)] = [78 + (av - 12)], and 62 clears 52 with room
+   to spare.  Raising this to 64 would over-charge every caller for slots the
+   call site never needs.  (Consequence for the proof: the [52 <= ...] premise
+   no longer falls to a bare [lia] -- [trap_res true] has to be reduced first,
+   `assert (trap_res true = 78%nat) as -> by reflexivity; lia`.)  *)
 Definition piperead_stack : nat := 62%nat.
 
 Definition wp_piperead_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}

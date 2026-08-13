@@ -64,6 +64,7 @@ Require Import KptGhost VirtioProto VirtioModel SpecFreerange KvmSpec.
 Require Import LinkMain.
 From Kernel Require KernelData.
 From Kernel Require KernelSyms.
+Require Import KernelConsts.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -74,7 +75,11 @@ Local Open Scope Z_scope.
    WORD OF THE IMAGE, at the pc-relative slot [entry_got]; and the word there
    is &stack0.  [MbootVocab.mb_ld_ea] is the address the WP computes; these
    two lemmas are the only place the tree says what it IS. *)
-Definition entry_got : Z := 0x8000a208.
+(* COMPUTED from that auipc/ld pair by tools/gen_consts.py.  It moves
+   whenever the data segment does, and a stale literal failed inside
+   [entry_ld_ea_addr]'s [vm_compute] with two addresses and no hint as to
+   which one was wrong. *)
+Definition entry_got : Z := KernelConsts.entry_got.
 
 Definition v_stack0 : mword 64 := mword_of_int KernelSyms.stack0.
 

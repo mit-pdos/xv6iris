@@ -24,10 +24,12 @@ are working on that effort — the relevant `projects/` file.
   are the Iris context.
 - **[`kernel-defects.md`](kernel-defects.md)** — bugs found in the xv6 SOURCE
   by the verification, as opposed to gaps in the proofs. An entry there means
-  the C code is wrong and the stuck proof is the symptom. Currently one open
-  defect (D1: `writei` releases a partially-modified buffer without logging
-  it, so the buffer cache can diverge from the committed state), plus a list
-  of near-misses and provably dead code so the same ground is not re-covered.
+  the C code is wrong and the stuck proof is the symptom. D1 (`writei`
+  releases a partially-modified buffer without logging it) is FIXED upstream;
+  **D2 is open and blocks a whole cone** — `uart.c`'s new `tx_lock` sleeplock
+  is never initialized, so its NULL name fields make `is_txlock`
+  *unprovable*, not merely unproven. Plus a list of near-misses and provably
+  dead code so the same ground is not re-covered.
   Read the note at the top before proposing to fix any of them: the image is
   pinned by `XV6_REV`, so editing `xv6-riscv/` moves every symbol address.
 
@@ -209,6 +211,40 @@ are working on that effort — the relevant `projects/` file.
   over-asks its source by 16 bytes where kexec can only own the string, and
   the log budget does not close for a two-element path because namei charges
   one iput too many on its SUCCESS arm.
+- **[`sleep-split.md`](projects/sleep-split.md)** — updating `XV6_REV` to
+  **`ae96fd0`**, which splits `sleep(chan, lk)` into `sleep_prepare(chan)` +
+  `sleep(void)` and rewrites the UART transmit path. Read it for the design
+  the split buys — **`sleep()`'s contract IS `yield()`'s**, and the whole
+  `lock_openable`-generic `SLEEP_GEN` interface is deleted rather than ported,
+  because the genericity moves into the acquire/release contracts the caller
+  now invokes itself; `sleep_prepare()` is `setkilled()`, with an empty
+  postcondition for the same reason; and `wakeup()` got *simpler*, losing its
+  `myproc()` call along with two spec premises (with the argument for why
+  reaching one's own slot needs no new resource). It also records **the one
+  thing the split costs**: Route B (design/fs-icache.md 13.12) is no longer a
+  divergence — the park is conditional, nothing can rule out the no-park arm,
+  and the nested `acquiresleep` ends in a Löb loop instead. Also the image-relayout
+  playbook this bump forced into a tool — `tools/relayout_map.py`, which maps
+  old→new immediates by lemma OFFSET out of the regenerated `Code<F>.v` diff —
+  the four categories it deliberately does not cover, and the one open blocker
+  (`kernel-defects.md` D2: upstream's new `tx_lock` sleeplock is never
+  initialized, so `is_txlock` is unsatisfiable at boot).
+- **[`psz-bump.md`](projects/psz-bump.md)** — updating `XV6_REV` to
+  **`0024d4b`**, whose one real change is that `vmfault` stops conflating the
+  table it is handed with `myproc()->pagetable`: it takes the size as an
+  argument and maps into the table it was given, and `copyin` / `copyout` /
+  `copyinstr` gain a matching `psz` in a1 that shifts every later argument
+  down a register. Read it for **why that DELETES machinery rather than adding
+  it** — `p_sz` / `p_pagetable` (and the `dqs` / `dqp` fractions) were premises
+  of all four contracts only because the vmfault underneath read those cells,
+  and `SpecCopyout`'s whole `co_license` / `co_mapped` / `arm` / `COPYOUT_GEN`
+  apparatus existed solely to work around the conflation, so all of it goes and
+  **kexec's first upstream blocker is retired more cheaply than the workaround
+  was** (pass `psz`; pass `szv := 0` to kill the fault path outright). It also
+  carries the worked-out `ProofVmfault` transformation (48 of 55 offsets
+  reshaped, but it is the same algorithm with three reads deleted and the
+  registers reassigned), and the traps: `make -k` undercounts because files
+  downstream of a failure are never attempted, and data symbols move too.
 - **[`cwd-ref.md`](projects/cwd-ref.md)** — filling the `ProcInv.cwd_ref`
   hole (S5 of the above, promoted to its own file). `cwd_ref` is still `emp`
   while `SpecIdup.v` is now stated over the REAL inode cache, so the tree is
@@ -281,8 +317,12 @@ are working on that effort — the relevant `projects/` file.
   reusable lessons, and the remaining work: prove usertrap(), then the
   whole-trap-loop Löb theorem that discharges `stvec_handler_wp`.
 - **[`usertrap.md`](projects/usertrap.md)** — `usertrap()`, the C half of the
-  user trap (90 instructions, 5 cones). The boundary is settled and the TAIL
-  is proven; the arms, the syscall arm and the entry remain. Two layers of
+  user trap (90 instructions, 5 cones). The boundary is settled and FOUR of
+  the five blocks are proven — the tail, the syscall arm and the three cheap
+  arms — against xv6 `9dd28f5e`; the `psz` bump then landed under them, so the
+  file opens with a five-step re-point worklist (the image is already confirmed
+  honest and `UsertrapRes` / `UsertrapAux` are already green post-bump). The
+  entry + dispatch block and the seal remain. Two layers of
   finding are recorded. The first was in the BOUNDARY: the contract stated
   ahead of the proof took the trampoline tier's `tlb_inv_pt`/physical
   trapframe/`user_cfg`, which together with the kernel cone's `sie_cap` are
@@ -331,18 +371,26 @@ are working on that effort — the relevant `projects/` file.
   continuations, the Umode leaf WPs, and the sync program's function proofs
   (start/main + the sync/exit ecall stubs).
 - **[`uart-driver.md`](projects/uart-driver.md)** — the interrupt-driven UART
-  driver: uartwrite, uartintr and uartgetc, all proven (uart.c 4/4). The
-  `tx_lock` invariant (`UartTxInv.v`) whose implication "`tx_busy == 0` ⟹
-  everything accepted has been transmitted" is what licenses uartwrite's THR
-  store with no THRE poll and what uartintr's THRE arm re-establishes — the two
-  functions meet there and nowhere else. Also: why the transmitter token has to
-  live in that lock (and the resulting tension with uartputc_sync's caller-held
-  token), the `uart_sent_sub` SUBLIST output claim a driver that sleeps between
-  bytes can honestly make, the ghost-free UART read leaf (`uart_read_stable`)
-  that lets the rx drain run outside the critical section, and how to state a
-  `static` helper that gcc INLINED away (uartgetc has no symbol). consoleintr
-  is the cone's one assumption. Remaining: consolewrite, consoleintr, devintr,
-  boot wiring.
+  driver: uartwrite, uartintr and uartgetc. **Upstream `ae96fd0` rewrote the
+  transmit path**, and the file is the record of what that changed. The old
+  design's crux was the `tx_lock` invariant (`UartTxInv.v`) whose implication
+  "`tx_busy == 0` ⟹ everything accepted has been transmitted" licensed
+  uartwrite's THR store with no THRE poll — a certificate uartintr wrote and
+  uartwrite read, which is *why* the transmitter token had to live in a lock
+  shared with the interrupt handler. The new uartwrite **polls THRE itself**
+  before every byte, so the certificate, the flag and the sharing are all gone:
+  `tx_res` is just the token, uartintr takes no lock at all, and the two
+  functions meet in the sleep channel. What the lock is still for is
+  serializing writers — hence a *sleeplock*, because uartwrite now parks
+  between bytes. Read it also for the `uart_sent_sub` SUBLIST output claim a
+  driver that sleeps between bytes can honestly make, the ghost-free UART read
+  leaf (`uart_read_stable`) that lets the rx drain run outside the critical
+  section, how to state a `static` helper that gcc INLINED away (uartgetc has
+  no symbol), and the standing tension with uartputc_sync's caller-held token.
+  consoleintr is the cone's one assumption. **Blocked on `kernel-defects.md`
+  D2**: the new `tx_lock` is never `initsleeplock`ed, so `is_txlock` is
+  unsatisfiable at boot. Remaining: consolewrite, consoleintr, devintr, boot
+  wiring.
 
 
 ### `completed/` — finished projects, archived for reference

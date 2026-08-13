@@ -19,7 +19,6 @@ From Kernel Require KernelSyms.
 Require Import KernelDecode00.
 Require Import KernelDecode01.
 Require Import KernelDecode04.
-Require Import KernelDecode08.
 Require Import KernelDecode10.
 Require Import KernelDecode11.
 Require Import KernelDecode12.
@@ -31,6 +30,8 @@ Require Import KernelDecode19.
 Require Import KernelDecode20.
 Require Import KernelDecode21.
 Require Import KernelDecode22.
+Require Import KernelDecode25.
+Require Import KernelDecode28.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -69,9 +70,9 @@ Section CodePushOff.
   Proof. mk_rvc (KernelSyms.push_off + 0xe) (mword_of_int 0x84be : mword 16)
     (mword_of_int (KernelSyms.push_off + 0xe) : mword 64) (RTYPE (Regidx (mword_of_int 15), zreg, Regidx (mword_of_int 9), ADD)) kd_84be exec_execute_C_MV. Qed.
 
-  Lemma poi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.push_off + 0x10) : mword 64) false (JAL (mword_of_int 3336 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.push_off + 0x10) (mword_of_int 0x509000ef : mword 32)
-    (mword_of_int (KernelSyms.push_off + 0x10) : mword 64) (JAL (mword_of_int 3336 : mword 21, Regidx (mword_of_int 1))) kd_509000ef. Qed.
+  Lemma poi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.push_off + 0x10) : mword 64) false (JAL (mword_of_int 3370 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.push_off + 0x10) (mword_of_int 0x52b000ef : mword 32)
+    (mword_of_int (KernelSyms.push_off + 0x10) : mword 64) (JAL (mword_of_int 3370 : mword 21, Regidx (mword_of_int 1))) kd_52b000ef. Qed.
 
   Lemma poi_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.push_off + 0x14) : mword 64) true (LOAD (mword_of_int 120 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_rvc (KernelSyms.push_off + 0x14) (mword_of_int 0x5d3c : mword 16)
@@ -81,9 +82,9 @@ Section CodePushOff.
   Proof. mk_rvc (KernelSyms.push_off + 0x16) (mword_of_int 0xcb99 : mword 16)
     (mword_of_int (KernelSyms.push_off + 0x16) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 11 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) kd_cb99 exec_execute_C_BEQZ. Qed.
 
-  Lemma poi_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.push_off + 0x18) : mword 64) false (JAL (mword_of_int 3328 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.push_off + 0x18) (mword_of_int 0x501000ef : mword 32)
-    (mword_of_int (KernelSyms.push_off + 0x18) : mword 64) (JAL (mword_of_int 3328 : mword 21, Regidx (mword_of_int 1))) kd_501000ef. Qed.
+  Lemma poi_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.push_off + 0x18) : mword 64) false (JAL (mword_of_int 3362 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.push_off + 0x18) (mword_of_int 0x523000ef : mword 32)
+    (mword_of_int (KernelSyms.push_off + 0x18) : mword 64) (JAL (mword_of_int 3362 : mword 21, Regidx (mword_of_int 1))) kd_523000ef. Qed.
 
   Lemma poi_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.push_off + 0x1c) : mword 64) true (LOAD (mword_of_int 120 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_rvc (KernelSyms.push_off + 0x1c) (mword_of_int 0x5d3c : mword 16)
@@ -117,9 +118,9 @@ Section CodePushOff.
   Proof. mk_rvc (KernelSyms.push_off + 0x2a) (mword_of_int 0x8082 : mword 16)
     (mword_of_int (KernelSyms.push_off + 0x2a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) kd_8082 exec_execute_C_JR. Qed.
 
-  Lemma poi_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.push_off + 0x2c) : mword 64) false (JAL (mword_of_int 3308 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.push_off + 0x2c) (mword_of_int 0x4ed000ef : mword 32)
-    (mword_of_int (KernelSyms.push_off + 0x2c) : mword 64) (JAL (mword_of_int 3308 : mword 21, Regidx (mword_of_int 1))) kd_4ed000ef. Qed.
+  Lemma poi_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.push_off + 0x2c) : mword 64) false (JAL (mword_of_int 3342 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.push_off + 0x2c) (mword_of_int 0x50f000ef : mword 32)
+    (mword_of_int (KernelSyms.push_off + 0x2c) : mword 64) (JAL (mword_of_int 3342 : mword 21, Regidx (mword_of_int 1))) kd_50f000ef. Qed.
 
   Lemma poi_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.push_off + 0x30) : mword 64) false (SHIFTIOP (mword_of_int 1 : mword 6, Regidx (mword_of_int 9), Regidx (mword_of_int 15), SRLI)).
   Proof. mk_base (KernelSyms.push_off + 0x30) (mword_of_int 0x0014d793 : mword 32)

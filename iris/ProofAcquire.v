@@ -456,23 +456,23 @@ Section ProofAcquire.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp38) in "Hpc".
       iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.acquire + 0x38)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5)
-                (mword_of_int 0x40c : mword 12) P1 (trap_res b + (av - 4))%nat false
+                (mword_of_int 0x438 : mword 12) P1 (trap_res b + (av - 4))%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi38 [-]").
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
       set (P2 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
-          (add_vec (P1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x40c : mword 12)))]> P1).
+          (add_vec (P1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x438 : mword 12)))]> P1).
       assert (Hpp3c : add_vec_int (mword_of_int (KernelSyms.acquire + 0x38) : mword 64) 4 = mword_of_int (KernelSyms.acquire + 0x3c))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3c) in "Hpc".
       (* +0x3c jal panic : never returns *)
-      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.acquire + 0x3c)) (mword_of_int 1 : mword 5) (mword_of_int 2096098 : mword 21)
+      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.acquire + 0x3c)) (mword_of_int 1 : mword 5) (mword_of_int 2096164 : mword 21)
                 P2 (trap_res b + (av - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi3c [-]").
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
-      assert (Hpcpn : add_vec (mword_of_int (KernelSyms.acquire + 0x3c) : mword 64) (sign_extend' 64 (mword_of_int 2096098 : mword 21))
+      assert (Hpcpn : add_vec (mword_of_int (KernelSyms.acquire + 0x3c) : mword 64) (sign_extend' 64 (mword_of_int 2096164 : mword 21))
                       = mword_of_int KernelSyms.panic) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpcpn) in "Hpc".
       iDestruct (panic_wp_any_at cpu_id with "Hpanic") as "#Hpan".
@@ -514,7 +514,7 @@ Section ProofAcquire.
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hcsph. exact HcspB2. }
     iPoseProof (aqi_24 with "Htext") as "Hi24".
-    iApply (Mycpu.wp_call_mycpu_sconf_cs (mword_of_int (KernelSyms.acquire + 0x24)) (mword_of_int 0xcba : mword 21) B8 (trap_res b + (av - 4))%nat p
+    iApply (Mycpu.wp_call_mycpu_sconf_cs (mword_of_int (KernelSyms.acquire + 0x24)) (mword_of_int 0xcdc : mword 21) B8 (trap_res b + (av - 4))%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc Hi24 [-]").

@@ -122,6 +122,10 @@ MANIFEST_ASSUMED = {
                    "only 'it returns' is assumed; the Axiom is LinkKerneltrap.v"),
     "consoleintr": ("SpecConsoleintr.v", "wp_consoleintr_sconf_body",
                     "uartintr's one unproven callee; the Axiom is LinkConsoleintr.v"),
+    "uartwrite": ("SpecUartwrite.v", "wp_uartwrite_sconf_body",
+                  "contract written; body not, after ae96fd0 rewrote the "
+                  "transmit path -- the Axiom is LinkUartwrite.v and the "
+                  "definitional layer + proof plan are in iris/wip/"),
 }
 
 PROVEN, ASSUMED, PARTIAL, NONE = "proven", "assumed", "partial", "none"

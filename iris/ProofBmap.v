@@ -1867,14 +1867,14 @@ Section BmapTail.
         iEval (rewrite Hppac) in "Hpc".
         (* ===== +0xac jal ra,log_write ===== *)
         iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bmap + 0xac)) Rra
-                  (mword_of_int 3626 : mword 21) G1 (K - 6)%nat b
+                  (mword_of_int 3654 : mword 21) G1 (K - 6)%nat b
                   ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hiac").
         iIntros (CID20 Hq20) "Hcg Hpc".
         set (G2 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (KernelSyms.bmap + 0xac) : mword 64) 4)]> G1).
         assert (Htgtlw : add_vec (mword_of_int (KernelSyms.bmap + 0xac) : mword 64)
-                           (sign_extend' 64 (mword_of_int 3626 : mword 21))
+                           (sign_extend' 64 (mword_of_int 3654 : mword 21))
                          = mword_of_int KernelSyms.log_write) by pcw.
         iEval (rewrite Htgtlw) in "Hpc".
         assert (HG2a0 : G2 !!! Regidx Ra0 = bnode kk)

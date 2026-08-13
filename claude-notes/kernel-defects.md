@@ -152,6 +152,93 @@ the logged state where it can be stated and reasoned about.
 
 ---
 
+## D2 — `uart.c`'s `tx_lock` sleeplock is never initialized
+
+**Found:** 2026-08-12, updating to upstream `ae96fd0` ("example of sleep
+waiting for interrupt wakeup"), which rewrote the UART transmit path.
+**Status:** OPEN, and it BLOCKS the boot wiring of the whole uartwrite cone.
+
+### The code
+
+`ae96fd0` replaced the transmit spinlock with a sleeplock, because the new
+`uartwrite` has to hold it across a `sleep()`:
+
+```c
+ // for sending threads to serialize their writes
+ static struct sleeplock tx_lock;
+ static int tx_chan;
+
+ uartinit(void) {
+   ...
+   WriteReg(IER, IER_TX_ENABLE | IER_RX_ENABLE);
+-  initlock(&tx_lock, "uart");        /* deleted */
+ }
+```
+
+Nothing calls `initsleeplock(&tx_lock, ...)`, in `uartinit` or anywhere
+else. The old `initlock` call was deleted and no replacement was added.
+
+### The mechanism
+
+`tx_lock` is a file-static, so the loader zeroes it, and every field
+`initsleeplock` would set is already the value it would set — `locked = 0`,
+`pid = 0`, and the inner spinlock's `locked = 0` / `cpu = 0`. So the lock
+*functions*: `acquiresleep` and `releasesleep` behave correctly.
+
+What is NOT set is the two NAME fields. `initsleeplock` writes
+`lk->name = name` and `initlock(&lk->lk, "sleep lock")`; here both stay
+NULL. They are read only by the panic paths (`acquire`'s and `release`'s
+`panic("acquire")`/`panic("release")` do not print the name, but `procdump`
+and any diagnostic that walks a lock would), so the observable consequence
+is a NULL dereference in a path that only runs after another bug has
+already fired. **Benign in practice, and still wrong**: it is the only lock
+in the kernel that reaches `acquire` uninitialized.
+
+### Why the verification cares, and it cares a lot
+
+The proof of a lock's name is not decoration here. `WpLock.lock_name lk s`
+is `∃ p, lk->name ↦₈□ p ∗ p ↦ₛ□ s` — "the field points at the string" —
+and it is a conjunct of `is_lock`; `SleepLock.sl_name` is the same for the
+sleeplock's own field, and `is_sleeplock` requires both (its inner
+spinlock's name is the literal `"sleep lock"`). With the fields at zero
+the obligation is `(0 : mword 64) ↦ₛ□ s`, and address 0 is not in the
+model's memory map. **`is_sleeplock` for `tx_lock` is therefore not merely
+unproven, it is unprovable**, so `UartTxInv.is_txlock` is a premise no
+caller can discharge — the same shape as `SpecIlock`'s `i_ref`
+(`design/fs-icache.md`). The cone above it is stated and proved against
+`is_txlock` regardless; closing this closes the cone.
+
+### The two ways out
+
+1. **Fix the C**: add `initsleeplock(&tx_lock, "uart")` to `uartinit`. One
+   line, and it is what every other lock in the kernel does. Cost here is
+   the standard image-shift bill (`durable-notes.md` §"Changing the kernel
+   SOURCE") — and note this defect was found *during* a bump, so the bill
+   would be paid on top of one already in progress.
+2. **Make a lock's name optional**: index `is_lock` / `is_sleeplock` by
+   `option string`, with `None` meaning "the name field is unconstrained",
+   and add a `newlock`-from-zeroed-bytes lemma so an anonymous lock can be
+   minted at boot. That is honest about what the C actually guarantees and
+   needs no source change, but it is a wide mechanical sweep (~123 sites
+   write a lock-name literal) and it weakens a fact every other lock in the
+   tree really does enjoy.
+
+(1) is the better engineering; (2) is the better model of *this* source.
+Neither is cheap, and the choice is the maintainer's.
+
+### Where it is assumed meanwhile
+
+`iris/LinkTxLockInit.v`, one `Axiom` (`tx_lock_init`) handing back
+`UartTxInv.is_txlock` for the transmitter token and the frozen DLAB fact —
+exactly what the missing `initsleeplock` plus the usual newlock step would
+give. It is deliberately a **different file** from `LinkUartwrite.v`, which
+assumes uartwrite's contract for the unrelated reason that its proof is not
+written: proving uartwrite does not fix D2 and fixing D2 does not prove
+uartwrite, so keeping them apart is what stops either from hiding the other
+in `Print Assumptions`.
+
+---
+
 ## Near-misses and non-defects
 
 Recorded so the same ground is not re-covered.

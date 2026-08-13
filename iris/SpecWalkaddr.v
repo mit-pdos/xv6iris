@@ -32,10 +32,15 @@
    Without the reason it cannot -- a bare [a0 = 0] is permitted
    unconditionally, so no amount of knowledge about the map rules the
    branch out, and the fault path stays alive in the proof even where it is
-   dead in the machine.  That is what generalised copyout needs (see
-   [SpecCopyout.co_license]): on a table that is not the running process's
-   there are no [p->sz] / [p->pagetable] cells to give vmfault, so the call
-   must be shown UNREACHABLE, and this disjunction is what shows it.
+   dead in the machine.
+
+   (This used to be what generalised copyout needed: on a table that was not
+   the running process's there were no [p->sz] / [p->pagetable] cells to
+   give vmfault, so the call had to be shown UNREACHABLE and this
+   disjunction was what showed it.  xv6 `4f2fc8b` retired that need --
+   vmfault takes the size as an argument now -- so copyout no longer refutes
+   the arm; see SpecCopyout.v.  The disjunction stays because it is the
+   honest statement of walkaddr, and other callers still refute with it.)
 
    The three reasons are exactly the three tests the machine performs, in
    order, and each is a fact the caller can contradict on its own terms.

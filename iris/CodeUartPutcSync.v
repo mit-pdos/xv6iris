@@ -32,9 +32,11 @@ Require Import KernelDecode19.
 Require Import KernelDecode21.
 Require Import KernelDecode22.
 Require Import KernelDecode23.
+Require Import KernelDecode24.
+Require Import KernelDecode25.
 Require Import KernelDecode26.
-Require Import KernelDecode27.
 Require Import KernelDecode30.
+Require Import KernelDecode31.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -73,9 +75,9 @@ Section CodeUartPutcSync.
   Proof. mk_base (KernelSyms.uartputc_sync + 0xc) (mword_of_int 0x0000a797 : mword 32)
     (mword_of_int (KernelSyms.uartputc_sync + 0xc) : mword 64) (UTYPE (mword_of_int 10 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_0000a797. Qed.
 
-  Lemma upi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x10) : mword 64) false (LOAD (mword_of_int 2216 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
-  Proof. mk_base (KernelSyms.uartputc_sync + 0x10) (mword_of_int 0x8a87a783 : mword 32)
-    (mword_of_int (KernelSyms.uartputc_sync + 0x10) : mword 64) (LOAD (mword_of_int 2216 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) kd_8a87a783. Qed.
+  Lemma upi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x10) : mword 64) false (LOAD (mword_of_int 2348 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
+  Proof. mk_base (KernelSyms.uartputc_sync + 0x10) (mword_of_int 0x92c7a783 : mword 32)
+    (mword_of_int (KernelSyms.uartputc_sync + 0x10) : mword 64) (LOAD (mword_of_int 2348 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) kd_92c7a783. Qed.
 
   Lemma upi_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x14) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 30 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)).
   Proof. mk_rvc (KernelSyms.uartputc_sync + 0x14) (mword_of_int 0xcf95 : mword 16)
@@ -85,9 +87,9 @@ Section CodeUartPutcSync.
   Proof. mk_base (KernelSyms.uartputc_sync + 0x16) (mword_of_int 0x0000a797 : mword 32)
     (mword_of_int (KernelSyms.uartputc_sync + 0x16) : mword 64) (UTYPE (mword_of_int 10 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_0000a797. Qed.
 
-  Lemma upi_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x1a) : mword 64) false (LOAD (mword_of_int 2202 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
-  Proof. mk_base (KernelSyms.uartputc_sync + 0x1a) (mword_of_int 0x89a7a783 : mword 32)
-    (mword_of_int (KernelSyms.uartputc_sync + 0x1a) : mword 64) (LOAD (mword_of_int 2202 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) kd_89a7a783. Qed.
+  Lemma upi_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x1a) : mword 64) false (LOAD (mword_of_int 2334 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
+  Proof. mk_base (KernelSyms.uartputc_sync + 0x1a) (mword_of_int 0x91e7a783 : mword 32)
+    (mword_of_int (KernelSyms.uartputc_sync + 0x1a) : mword 64) (LOAD (mword_of_int 2334 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) kd_91e7a783. Qed.
 
   Lemma upi_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x1e) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)).
   Proof. mk_rvc (KernelSyms.uartputc_sync + 0x1e) (mword_of_int 0xef85 : mword 16)
@@ -129,9 +131,9 @@ Section CodeUartPutcSync.
   Proof. mk_base (KernelSyms.uartputc_sync + 0x3c) (mword_of_int 0x0000a797 : mword 32)
     (mword_of_int (KernelSyms.uartputc_sync + 0x3c) : mword 64) (UTYPE (mword_of_int 10 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_0000a797. Qed.
 
-  Lemma upi_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x40) : mword 64) false (LOAD (mword_of_int 2168 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
-  Proof. mk_base (KernelSyms.uartputc_sync + 0x40) (mword_of_int 0x8787a783 : mword 32)
-    (mword_of_int (KernelSyms.uartputc_sync + 0x40) : mword 64) (LOAD (mword_of_int 2168 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) kd_8787a783. Qed.
+  Lemma upi_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x40) : mword 64) false (LOAD (mword_of_int 2300 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
+  Proof. mk_base (KernelSyms.uartputc_sync + 0x40) (mword_of_int 0x8fc7a783 : mword 32)
+    (mword_of_int (KernelSyms.uartputc_sync + 0x40) : mword 64) (LOAD (mword_of_int 2300 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) kd_8fc7a783. Qed.
 
   Lemma upi_44 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x44) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 10 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)).
   Proof. mk_rvc (KernelSyms.uartputc_sync + 0x44) (mword_of_int 0xcb91 : mword 16)
@@ -157,9 +159,9 @@ Section CodeUartPutcSync.
   Proof. mk_rvc (KernelSyms.uartputc_sync + 0x4e) (mword_of_int 0x8082 : mword 16)
     (mword_of_int (KernelSyms.uartputc_sync + 0x4e) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) kd_8082 exec_execute_C_JR. Qed.
 
-  Lemma upi_50 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x50) : mword 64) false (JAL (mword_of_int 526 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.uartputc_sync + 0x50) (mword_of_int 0x20e000ef : mword 32)
-    (mword_of_int (KernelSyms.uartputc_sync + 0x50) : mword 64) (JAL (mword_of_int 526 : mword 21, Regidx (mword_of_int 1))) kd_20e000ef. Qed.
+  Lemma upi_50 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x50) : mword 64) false (JAL (mword_of_int 494 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.uartputc_sync + 0x50) (mword_of_int 0x1ee000ef : mword 32)
+    (mword_of_int (KernelSyms.uartputc_sync + 0x50) : mword 64) (JAL (mword_of_int 494 : mword 21, Regidx (mword_of_int 1))) kd_1ee000ef. Qed.
 
   Lemma upi_54 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x54) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2017 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (KernelSyms.uartputc_sync + 0x54) (mword_of_int 0xb7c9 : mword 16)
@@ -169,9 +171,9 @@ Section CodeUartPutcSync.
   Proof. mk_rvc (KernelSyms.uartputc_sync + 0x56) (mword_of_int 0xa001 : mword 16)
     (mword_of_int (KernelSyms.uartputc_sync + 0x56) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 0 : mword 11) ('b"0")), zreg)) kd_a001 exec_execute_C_J. Qed.
 
-  Lemma upi_58 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x58) : mword 64) false (JAL (mword_of_int 640 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.uartputc_sync + 0x58) (mword_of_int 0x280000ef : mword 32)
-    (mword_of_int (KernelSyms.uartputc_sync + 0x58) : mword 64) (JAL (mword_of_int 640 : mword 21, Regidx (mword_of_int 1))) kd_280000ef. Qed.
+  Lemma upi_58 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x58) : mword 64) false (JAL (mword_of_int 608 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.uartputc_sync + 0x58) (mword_of_int 0x260000ef : mword 32)
+    (mword_of_int (KernelSyms.uartputc_sync + 0x58) : mword 64) (JAL (mword_of_int 608 : mword 21, Regidx (mword_of_int 1))) kd_260000ef. Qed.
 
   Lemma upi_5c : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x5c) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2037 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (KernelSyms.uartputc_sync + 0x5c) (mword_of_int 0xb7ed : mword 16)

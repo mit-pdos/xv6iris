@@ -39,7 +39,6 @@ Require Import KernelDecode21.
 Require Import KernelDecode22.
 Require Import KernelDecode23.
 Require Import KernelDecode25.
-Require Import KernelDecode26.
 Require Import KernelDecode27.
 Require Import KernelDecode28.
 Require Import KernelDecode29.
@@ -95,9 +94,9 @@ Section CodeIlock.
   Proof. mk_rvc (KernelSyms.ilock + 0x14) (mword_of_int 0x0541 : mword 16)
     (mword_of_int (KernelSyms.ilock + 0x14) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_0541 exec_execute_C_ADDI. Qed.
 
-  Lemma ili_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0x16) : mword 64) false (JAL (mword_of_int 3310 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.ilock + 0x16) (mword_of_int 0x4ef000ef : mword 32)
-    (mword_of_int (KernelSyms.ilock + 0x16) : mword 64) (JAL (mword_of_int 3310 : mword 21, Regidx (mword_of_int 1))) kd_4ef000ef. Qed.
+  Lemma ili_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0x16) : mword 64) false (JAL (mword_of_int 3338 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.ilock + 0x16) (mword_of_int 0x50b000ef : mword 32)
+    (mword_of_int (KernelSyms.ilock + 0x16) : mword 64) (JAL (mword_of_int 3338 : mword 21, Regidx (mword_of_int 1))) kd_50b000ef. Qed.
 
   Lemma ili_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0x1a) : mword 64) true (LOAD (mword_of_int 64 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_rvc (KernelSyms.ilock + 0x1a) (mword_of_int 0x40bc : mword 16)
@@ -135,13 +134,13 @@ Section CodeIlock.
   Proof. mk_base (KernelSyms.ilock + 0x2a) (mword_of_int 0x00004517 : mword 32)
     (mword_of_int (KernelSyms.ilock + 0x2a) : mword 64) (UTYPE (mword_of_int 4 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00004517. Qed.
 
-  Lemma ili_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0x2e) : mword 64) false (ITYPE (mword_of_int 578 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.ilock + 0x2e) (mword_of_int 0x24250513 : mword 32)
-    (mword_of_int (KernelSyms.ilock + 0x2e) : mword 64) (ITYPE (mword_of_int 578 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_24250513. Qed.
+  Lemma ili_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0x2e) : mword 64) false (ITYPE (mword_of_int 550 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.ilock + 0x2e) (mword_of_int 0x22650513 : mword 32)
+    (mword_of_int (KernelSyms.ilock + 0x2e) : mword 64) (ITYPE (mword_of_int 550 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_22650513. Qed.
 
-  Lemma ili_32 : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0x32) : mword 64) false (JAL (mword_of_int 2086424 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.ilock + 0x32) (mword_of_int 0xe18fd0ef : mword 32)
-    (mword_of_int (KernelSyms.ilock + 0x32) : mword 64) (JAL (mword_of_int 2086424 : mword 21, Regidx (mword_of_int 1))) kd_e18fd0ef. Qed.
+  Lemma ili_32 : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0x32) : mword 64) false (JAL (mword_of_int 2086386 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.ilock + 0x32) (mword_of_int 0xdf2fd0ef : mword 32)
+    (mword_of_int (KernelSyms.ilock + 0x32) : mword 64) (JAL (mword_of_int 2086386 : mword 21, Regidx (mword_of_int 1))) kd_df2fd0ef. Qed.
 
   Lemma ili_36 : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0x36) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 18), sp, 8)).
   Proof. mk_rvc (KernelSyms.ilock + 0x36) (mword_of_int 0xe04a : mword 16)
@@ -159,9 +158,9 @@ Section CodeIlock.
   Proof. mk_base (KernelSyms.ilock + 0x3e) (mword_of_int 0x0001d597 : mword 32)
     (mword_of_int (KernelSyms.ilock + 0x3e) : mword 64) (UTYPE (mword_of_int 29 : mword 20, Regidx (mword_of_int 11), AUIPC)) kd_0001d597. Qed.
 
-  Lemma ili_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0x42) : mword 64) false (LOAD (mword_of_int 1614 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), false, 4)).
-  Proof. mk_base (KernelSyms.ilock + 0x42) (mword_of_int 0x64e5a583 : mword 32)
-    (mword_of_int (KernelSyms.ilock + 0x42) : mword 64) (LOAD (mword_of_int 1614 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), false, 4)) kd_64e5a583. Qed.
+  Lemma ili_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0x42) : mword 64) false (LOAD (mword_of_int 1698 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), false, 4)).
+  Proof. mk_base (KernelSyms.ilock + 0x42) (mword_of_int 0x6a25a583 : mword 32)
+    (mword_of_int (KernelSyms.ilock + 0x42) : mword 64) (LOAD (mword_of_int 1698 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), false, 4)) kd_6a25a583. Qed.
 
   Lemma ili_46 : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0x46) : mword 64) true (RTYPEW (creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 3)), creg2reg_idx (Cregidx (mword_of_int 3)), ADDW)).
   Proof. mk_rvc (KernelSyms.ilock + 0x46) (mword_of_int 0x9dbd : mword 16)
@@ -251,9 +250,9 @@ Section CodeIlock.
   Proof. mk_base (KernelSyms.ilock + 0x86) (mword_of_int 0x05048513 : mword 32)
     (mword_of_int (KernelSyms.ilock + 0x86) : mword 64) (ITYPE (mword_of_int 80 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)) kd_05048513. Qed.
 
-  Lemma ili_8a : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0x8a) : mword 64) false (JAL (mword_of_int 2087618 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.ilock + 0x8a) (mword_of_int 0xac3fd0ef : mword 32)
-    (mword_of_int (KernelSyms.ilock + 0x8a) : mword 64) (JAL (mword_of_int 2087618 : mword 21, Regidx (mword_of_int 1))) kd_ac3fd0ef. Qed.
+  Lemma ili_8a : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0x8a) : mword 64) false (JAL (mword_of_int 2087514 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.ilock + 0x8a) (mword_of_int 0xa5bfd0ef : mword 32)
+    (mword_of_int (KernelSyms.ilock + 0x8a) : mword 64) (JAL (mword_of_int 2087514 : mword 21, Regidx (mword_of_int 1))) kd_a5bfd0ef. Qed.
 
   Lemma ili_8e : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0x8e) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.ilock + 0x8e) (mword_of_int 0x854a : mword 16)
@@ -291,12 +290,12 @@ Section CodeIlock.
   Proof. mk_base (KernelSyms.ilock + 0xa2) (mword_of_int 0x00004517 : mword 32)
     (mword_of_int (KernelSyms.ilock + 0xa2) : mword 64) (UTYPE (mword_of_int 4 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00004517. Qed.
 
-  Lemma ili_a6 : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0xa6) : mword 64) false (ITYPE (mword_of_int 466 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.ilock + 0xa6) (mword_of_int 0x1d250513 : mword 32)
-    (mword_of_int (KernelSyms.ilock + 0xa6) : mword 64) (ITYPE (mword_of_int 466 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_1d250513. Qed.
+  Lemma ili_a6 : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0xa6) : mword 64) false (ITYPE (mword_of_int 438 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.ilock + 0xa6) (mword_of_int 0x1b650513 : mword 32)
+    (mword_of_int (KernelSyms.ilock + 0xa6) : mword 64) (ITYPE (mword_of_int 438 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_1b650513. Qed.
 
-  Lemma ili_aa : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0xaa) : mword 64) false (JAL (mword_of_int 2086304 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.ilock + 0xaa) (mword_of_int 0xda0fd0ef : mword 32)
-    (mword_of_int (KernelSyms.ilock + 0xaa) : mword 64) (JAL (mword_of_int 2086304 : mword 21, Regidx (mword_of_int 1))) kd_da0fd0ef. Qed.
+  Lemma ili_aa : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0xaa) : mword 64) false (JAL (mword_of_int 2086266 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.ilock + 0xaa) (mword_of_int 0xd7afd0ef : mword 32)
+    (mword_of_int (KernelSyms.ilock + 0xaa) : mword 64) (JAL (mword_of_int 2086266 : mword 21, Regidx (mword_of_int 1))) kd_d7afd0ef. Qed.
 
 End CodeIlock.

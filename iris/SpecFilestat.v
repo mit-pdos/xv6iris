@@ -161,10 +161,19 @@ Local Open Scope Z_scope.
 (* filestat's own frame is 10 slots ([c.addi16sp sp,-80]: ra, s0, s1, s4
    spilled unconditionally, s2 and s3 spilled only on the surviving arm, three
    slots for [struct stat] and one unused), and its deepest callee is COPYOUT
-   at 50 -- which dominates ilock's 44, iunlock's 26, myproc's 10 and stati's
+   at 52 -- which dominates ilock's 44, iunlock's 26, myproc's 10 and stati's
    2.  A CONSTANT, not a per-arm bound: the stack a function may need is a
-   property of the function (durable-notes.md). *)
-Definition filestat_stack : nat := (10 + 50)%nat.
+   property of the function (durable-notes.md).
+
+   52, NOT 50, AND THE 10 GETS NO TRAP RESERVE.  copyout's budget rose
+   because [psz] has to outlive walkaddr / vmfault / memmove, so gcc gave it a
+   callee-saved home in s11 and copyout's frame grew to 14 slots
+   (SpecCopyout.v).  filestat is [eb]-generic and [trap_res false = 0], so the
+   call site can offer only [K - 10] and there is nothing to borrow against --
+   the same accounting as [SpecKwait.K_kwait], and the opposite of
+   [SpecPiperead.piperead_stack], whose copyout call DOES sit inside the
+   reserve and so needed no rise. *)
+Definition filestat_stack : nat := (10 + 52)%nat.
 
 (* WHAT FILESTAT RETURNS.  copyout answers 0 or -1 and [sraiw a0,a0,31] maps
    that pair to itself; the type-error arm answers -1 outright. *)

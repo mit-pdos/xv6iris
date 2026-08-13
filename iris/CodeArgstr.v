@@ -17,6 +17,7 @@ Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode04.
+Require Import KernelDecode05.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
 Require Import KernelDecode10.
@@ -24,13 +25,12 @@ Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
+Require Import KernelDecode17.
 Require Import KernelDecode19.
 Require Import KernelDecode21.
 Require Import KernelDecode24.
 Require Import KernelDecode26.
 Require Import KernelDecode27.
-Require Import KernelDecode30.
-Require Import KernelDecode31.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -73,9 +73,9 @@ Section CodeArgstr.
   Proof. mk_rvc (KernelSyms.argstr + 0xe) (mword_of_int 0x84b2 : mword 16)
     (mword_of_int (KernelSyms.argstr + 0xe) : mword 64) (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 9), ADD)) kd_84b2 exec_execute_C_MV. Qed.
 
-  Lemma asi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.argstr + 0x10) : mword 64) false (JAL (mword_of_int 2096846 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.argstr + 0x10) (mword_of_int 0xecfff0ef : mword 32)
-    (mword_of_int (KernelSyms.argstr + 0x10) : mword 64) (JAL (mword_of_int 2096846 : mword 21, Regidx (mword_of_int 1))) kd_ecfff0ef. Qed.
+  Lemma asi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.argstr + 0x10) : mword 64) false (JAL (mword_of_int 2096844 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.argstr + 0x10) (mword_of_int 0xecdff0ef : mword 32)
+    (mword_of_int (KernelSyms.argstr + 0x10) : mword 64) (JAL (mword_of_int 2096844 : mword 21, Regidx (mword_of_int 1))) kd_ecdff0ef. Qed.
 
   Lemma asi_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.argstr + 0x14) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 12), ADD)).
   Proof. mk_rvc (KernelSyms.argstr + 0x14) (mword_of_int 0x8626 : mword 16)
@@ -85,9 +85,9 @@ Section CodeArgstr.
   Proof. mk_rvc (KernelSyms.argstr + 0x16) (mword_of_int 0x85ca : mword 16)
     (mword_of_int (KernelSyms.argstr + 0x16) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 11), ADD)) kd_85ca exec_execute_C_MV. Qed.
 
-  Lemma asi_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.argstr + 0x18) : mword 64) false (JAL (mword_of_int 2097008 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.argstr + 0x18) (mword_of_int 0xf71ff0ef : mword 32)
-    (mword_of_int (KernelSyms.argstr + 0x18) : mword 64) (JAL (mword_of_int 2097008 : mword 21, Regidx (mword_of_int 1))) kd_f71ff0ef. Qed.
+  Lemma asi_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.argstr + 0x18) : mword 64) false (JAL (mword_of_int 2097006 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.argstr + 0x18) (mword_of_int 0xf6fff0ef : mword 32)
+    (mword_of_int (KernelSyms.argstr + 0x18) : mword 64) (JAL (mword_of_int 2097006 : mword 21, Regidx (mword_of_int 1))) kd_f6fff0ef. Qed.
 
   Lemma asi_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.argstr + 0x1c) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.argstr + 0x1c) (mword_of_int 0x60e2 : mword 16)

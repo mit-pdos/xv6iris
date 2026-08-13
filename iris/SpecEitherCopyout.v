@@ -82,10 +82,17 @@ Import Defs.
 Local Open Scope Z_scope.
 
 
-(* either_copyout's own frame is 6 slots; copyout wants 50 below it
-   (walkaddr 10, vmfault 38, walk 8, memmove 2) and myproc 10, so 50 covers
-   every call it makes. *)
-Definition either_copyout_stack : nat := 56%nat.
+(* either_copyout's own frame is 6 slots (`addi sp,sp,-48`); copyout wants 52
+   below it and myproc 10, so 52 covers every call it makes.
+
+   52, NOT 50, AND ITS TWIN IS STILL 56 -- the asymmetry is real, not a typo.
+   copyout keeps [psz] alive across walkaddr / vmfault / memmove, so gcc parks
+   it in s11 and copyout's frame grew to 14 slots (`addi sp,sp,-112`), making
+   its budget 14 + 38 = 52 (SpecCopyout.v).  copyIN's and copyinstr's extra
+   argument dies before their first call, so their frames stayed at 12 slots
+   and their budget stayed 50 -- which is why [either_copyin_stack] is
+   correctly still 56 while this one is 58. *)
+Definition either_copyout_stack : nat := 58%nat.
 
 Section SpecEitherCopyout.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.

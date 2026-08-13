@@ -148,8 +148,15 @@ Import Defs.
 Local Open Scope Z_scope.
 
 (* dirlookup's own frame is 96 bytes (12 slots); its deepest callee is
-   readi at 70 (namecmp wants 4, iget 16). *)
-Definition K_dirlookup : nat := 82%nat.
+   readi at 72 (namecmp wants 4, iget 16).
+
+   72, and it is the far end of the longest budget chain this tree has: [psz]
+   must outlive walkaddr / vmfault / memmove inside copyout, so gcc parks it in
+   s11, copyout's frame grows to 14 slots and its bound goes 50 -> 52
+   (SpecCopyout.v) -> either_copyout 56 -> 58 -> readi 70 -> 72
+   (SpecReadi.v) -> this one 82 -> 84.  Five constants, one register
+   allocation decision. *)
+Definition K_dirlookup : nat := 84%nat.
 
 (* T_DIR, read off the [li a5,1] at +0x1a that [lh a4,68(a0)] is compared
    against. *)

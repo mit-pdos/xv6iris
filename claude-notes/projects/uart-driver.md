@@ -1,62 +1,95 @@
 # the UART driver: uartwrite, uartintr, uartgetc
 
-`uart.c` is **4/4 symbols proven**.  This file covers the interrupt-driven
-half — the two functions that share `tx_lock`, plus the one that has no
-symbol at all.  (`uartinit` and `uartputc_sync` are older work; the device
-model itself is `claude-notes/design/device.md`.)
+`uart.c`'s interrupt-driven half — the two functions that used to share
+`tx_lock`, plus the one that has no symbol at all.  (`uartinit` and
+`uartputc_sync` are older work; the device model itself is
+`claude-notes/design/device.md`.)
+
+> **REWRITTEN UPSTREAM at `ae96fd0`.**  The whole transmit path changed shape:
+> `tx_busy` is gone, the transmit spinlock became a *sleeplock*, `uartinit` no
+> longer initializes it (which is [`../kernel-defects.md`](../kernel-defects.md)
+> **D2**, an OPEN blocker), and `uartintr` takes no lock at all.  The status
+> table below is about the new code; the protocol change that drove it is
+> [`sleep-split.md`](sleep-split.md).
 
 | function | where | status |
 |---|---|---|
-| `uartwrite(char buf[], int n)` @ 0x800008dc, 52 instrs, 80-byte frame | SpecUartwrite / CodeUartwrite / ProofUartwrite / LinkUartwrite | proven + linked |
-| `uartintr(void)` @ 0x800009ce, 39 instrs, 32-byte frame | SpecUartintr / CodeUartintr / ProofUartintr / LinkUartintr | proven + linked (over an ASSUMED consoleintr) |
-| `uartgetc(void)` — **inlined, no symbol** | WpUartgetc | proven as a block lemma |
+| `uartwrite(char buf[], int n)` | SpecUartwrite / CodeUartwrite / **`iris/wip/`**ProofUartwrite / **LinkUartwrite (`Axiom`)** | contract restated and compiling; proof BODY NOT WRITTEN, so the contract is **ASSUMED** in `LinkUartwrite.v` — see `iris/wip/README.md` |
+| `uartintr(void)` | SpecUartintr / CodeUartintr / ProofUartintr / LinkUartintr | proven + linked; contract LOST its lock premise (over an ASSUMED consoleintr) |
+| `uartinit(void)` | SpecUartinit / ProofUartinit / LinkUartinit | proven + linked; contract LOST its lock cells (uartinit is now straight-line, no calls at all) |
+| `uartgetc(void)` — **inlined, no symbol** | WpUartgetc | proven as a block lemma, unaffected |
 
-All three rest on the definitional layer `UartTxInv.v`.
+All of them rest on the definitional layer `UartTxInv.v`, whose header is the
+authoritative statement of the new design.
 
 ```c
+static struct sleeplock tx_lock;   /* NEVER INITIALIZED -- defect D2 */
+static int tx_chan;
+
 void uartwrite(char buf[], int n) {
-  acquire(&tx_lock);
+  acquiresleep(&tx_lock);
   int i = 0;
   while (i < n) {
-    while (tx_busy != 0)
-      sleep(&tx_chan, &tx_lock);
-    WriteReg(THR, buf[i]);
-    i += 1;
-    tx_busy = 1;
+    sleep_prepare(&tx_chan);
+    if (ReadReg(LSR) & LSR_TX_IDLE) { WriteReg(THR, buf[i]); i += 1; }
+    else                            { sleep(); }
   }
-  release(&tx_lock);
+  releasesleep(&tx_lock);
+}
+
+void uartintr(void) {
+  ReadReg(ISR);                                   /* acknowledge */
+  if (ReadReg(LSR) & LSR_TX_IDLE) wakeup(&tx_chan);
+  while (1) { int c = uartgetc(); if (c == -1) break; consoleintr(c); }
 }
 ```
 
-## The crux: what licenses the THR store
+## The crux: what licenses the THR store — and why the answer got simpler
 
 `wp_uart_thr_write_s_sconf` (WpSconfUartAccess.v) will not push a byte unless
 the FIFO provably has room — `uart_tx_ready_persists` (WpUart.v) wants the
 transmitter token PLUS `uart_out_lb γu l`, i.e. a THRE observation carried
-forward.  uartputc_sync gets that by POLLING LSR.  uartwrite never polls: the
-only thing it looks at is the software flag `tx_busy`.
+forward.  There are only two ways to have one: POLL LSR, or be TOLD.
 
-So the certificate has to be *stored in the software state*, and that is what
-`UartTxInv.tx_res` does:
+The old uartwrite was told.  It never polled; it read the software flag
+`tx_busy`, which uartintr cleared after checking `LSR & LSR_TX_IDLE`.  So the
+certificate had to be *stored in the software state*, and `UartTxInv.tx_res`
+was where it lived — a `tx_busy = 0 -> uart_out_lb γu l` implication, read as
+*"`tx_busy == 0` is the software's record of somebody else's THRE
+observation"*.  That is the entire reason this file used to exist, and it is
+the reason the transmitter token could not live with a caller: uartintr needed
+it to cash the observation and uartwrite needed it to push, and the two met
+only under `tx_lock`.
 
-```coq
-tx_res γu := ∃ (b : mword 32) (l : list (bv 8)),
-   a_tx_busy ↦₄ b ∗ uart_tx_own γu l ∗
-   (⌜ b = mword_of_int 0 ⌝ -∗ uart_out_lb γu l)
-```
+**The new uartwrite polls, immediately before every byte.**  So the store is
+licensed by `uart_tx_poll_thre` applied to the writer's own `ReadReg(LSR)` two
+instructions earlier — uartputc_sync's route — and needs no invariant.  Three
+things follow, and they are the whole delta:
 
-Read it as: *`tx_busy == 0` is the software's record of a THRE observation.*
-uartintr is the writer of that record (it checks `LSR & LSR_TX_IDLE` and only
-then clears `tx_busy`), uartwrite is its reader.  The implication form is what
-makes both directions one line: the reader learns `uart_out_lb` from the `lw`
-that returns 0, and the writer re-closes with `tx_res_busy` (no certificate,
-`b = 1`) at the `sw s6,0(s1)` one instruction after the push.
+- the certificate is deleted, and with it the flag (`tx_busy` no longer
+  exists) and every lemma that moved it (`tx_res_busy` / `tx_res_idle` /
+  `new_txlock`);
+- `tx_res γu` is just `∃ l, uart_tx_own γu l`;
+- **uartintr no longer touches the token**, so it takes no lock: it observes
+  LSR (a stable read, `DevModel.uart_read_stable`, which moves no device
+  ghost) and calls `wakeup(&tx_chan)`.  `SpecUartintr` lost its `is_txlock`
+  premise outright.  The two functions now meet in the SLEEP CHANNEL rather
+  than in a resource.
 
-**Consequence — the transmitter token cannot live with a caller.**  uartintr
-needs it (to read the trace out at the THRE check, via `uart_tx_poll_thre`) and
-uartwrite needs it (to push), and the two meet only under `tx_lock`.  Hence
-`is_txlock γl γu` is the WHOLE credential a caller passes: the lock (whose
-resource is the cell + the token) plus the persistent `uart_dlab_off`.
+What the lock is still for is SERIALIZING WRITERS, and that is why it had to
+become a sleeplock: uartwrite parks between bytes, and a spinlock cannot be
+held across `sched()` (which demands noff = 1).  Hence
+`is_txlock γl γsl γu` is the WHOLE credential a caller passes: the SLEEPLOCK
+(whose resource is the token, and whose two ghost names are the inner
+spinlock's and the sleeplock's own) plus the persistent `uart_dlab_off`.
+
+**And it is currently unsatisfiable.**  `is_sleeplock` requires both NAME
+fields to point at real strings, and upstream never calls `initsleeplock` on
+`tx_lock`, so they are NULL.  See [`../kernel-defects.md`](../kernel-defects.md)
+D2 for the write-up and the two ways out.  Everything above is stated and
+proved against `is_txlock` regardless, so closing D2 closes the cone — and in
+the meantime the gap is one `Axiom`, in `iris/LinkTxLockInit.v`, which hands
+back `is_txlock` for the transmitter token and the frozen DLAB fact.
 
 ## uartwrite
 
@@ -97,6 +130,16 @@ takes):
 pass), so the C's `n <= 0` guard is exactly the `n = 0` arm.
 
 ## Proof structure (ProofUartwrite.v, ~1500 lines)
+
+> **The table and the recipes below describe the PRE-`ae96fd0` proof**, whose
+> loop was `while (tx_busy) sleep(&tx_chan, &tx_lock);` around an
+> unconditional push. The new body is one loop with an `if` — poll THRE, push
+> or park — so there is no inner sleep-retry loop and no `tx_busy` read, and
+> the outer induction is now over bytes remaining with the park INSIDE it
+> rather than nested under it. Everything here about the *shapes* still
+> applies (the `nat` induction on bytes remaining, the iLöb for the unbounded
+> park, the shrink-wrapped restores, the `uart_sent_sub` accumulation); the
+> line/offset detail does not.
 
 | lemma | covers | technique |
 |---|---|---|

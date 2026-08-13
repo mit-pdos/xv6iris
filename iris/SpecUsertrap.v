@@ -236,8 +236,21 @@ Definition usertrap_post `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG
     R pt' ksp -∗
     WP (Loop : expr riscv_lang)).
 
+(* [R] IS A HART-INDEXED FAMILY, AND IT HAS TO BE.  usertrap is handed the
+   kernel-side bundle at the hart the TRAP came in on and gives it back at the
+   hart it RESUMES on -- the two are different whenever the function parks
+   (yield, and every sleeping syscall through [SpecSyscall]'s own crossing),
+   and everything inside [UsertrapRes.ut_res] except the stack is per-hart
+   ([sie_arm], [cpu_own], [cpu_claim], the [sconf] closer's register cells,
+   the SIE ghost).  Written as a plain [uptd -> mword 64 -> iProp Σ] the
+   post's [R] is pinned to the ENTRY hart, and no proof of it exists: the tail
+   rebuilds the bundle out of what prepare_return handed back, which is at the
+   resuming hart ([ProofUsertrapTail.ut_ret2], whose whole reason for being
+   its own section is that hart).  So [R] takes the hart: [R CID] going in,
+   [R CID'] coming out, where [CID'] is the crossing's own binder.  The
+   module type below supplies [fun h => usertrap_res (CID := h)]. *)
 Definition wp_usertrap_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (R : uptd -> mword 64 -> iProp Σ)
+    (R : CpuId -> uptd -> mword 64 -> iProp Σ)
     (pt : uptd) (j : nat)
     (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.usertrap in
@@ -263,11 +276,13 @@ Definition wp_usertrap_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fi
      [R] -- see the header. *)
   stvec ↦ᵣ (mword_of_int TRAMPOLINE : mword 64) -∗
   gpr_file m -∗
-  (* everything kernel-side, abstractly *)
-  R pt ksp -∗
+  (* everything kernel-side, abstractly, AT THE ENTRY HART *)
+  R CID pt ksp -∗
   (* THE CROSSING: usertrap parks (yield, and every sleeping syscall), so it
-     may return on a different hart. *)
-  wp_next true pj (fun (CID' : CpuId) => usertrap_post (CID := CID') R pt ksp m) -∗
+     may return on a different hart -- and the bundle comes back at THAT
+     hart, which is why [R] is a family (see the note above). *)
+  wp_next true pj (fun (CID' : CpuId) =>
+    usertrap_post (CID := CID') (R CID') pt ksp m) -∗
   WP (Loop : expr riscv_lang).
 
 (* THE MODULE TYPE'S INSTANCE LIST IS THE UNION OF THE FIVE CONES', NOT THE
@@ -309,5 +324,6 @@ Module Type USERTRAP.
       `{GEN : GenId} `{CID : CpuId}
       (pt : uptd) (j : nat)
       (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64),
-      wp_usertrap_body usertrap_res pt j m ms_v sc_v stval_v sepc_v ksp.
+      wp_usertrap_body (fun h : CpuId => usertrap_res (CID := h))
+        pt j m ms_v sc_v stval_v sepc_v ksp.
 End USERTRAP.

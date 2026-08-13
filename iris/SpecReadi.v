@@ -147,9 +147,17 @@ Import Defs.
 
 Local Open Scope Z_scope.
 
-(* readi's own frame is 112 bytes (14 slots).  Its deepest callees are bmap
-   and either_copyout, both 56; bread wants 40 and brelse 26. *)
-Definition K_readi : nat := 70%nat.
+(* readi's own frame is 112 bytes (14 slots).  Its deepest callee is now
+   either_copyout at 58; bmap wants 56, bread 40, brelse 26.
+
+   58, NOT 56, and it is the far end of a chain that starts in copyout: [psz]
+   has to outlive walkaddr / vmfault / memmove there, so gcc parked it in s11,
+   copyout's frame grew to 14 slots and its budget went 50 -> 52
+   (SpecCopyout.v), which pushed either_copyout 56 -> 58 (6 + 52), which
+   pushes this one 70 -> 72.  Note bmap is UNAFFECTED and still 56 -- it does
+   not reach copyout -- so the two are no longer equal and "both 56" is no
+   longer the right way to remember this number. *)
+Definition K_readi : nat := 72%nat.
 
 (* ===================================================================== *)
 (*  THE TWO PURE FUNCTIONS THE CONTRACT SPEAKS IN                        *)

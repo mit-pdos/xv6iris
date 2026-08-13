@@ -2616,14 +2616,14 @@ Section WriteiLoop.
             iSplitL "Hr"; [iExact "Hr"|]. iExact "Hppid". }
         (* ===== +0x60 jal ra,either_copyin ===== *)
         iApply (wp_jal_s_sconf (mword_of_int (WI + 0x60)) Rra
-                  (mword_of_int 2092024 : mword 21) D7 (K - 14)%nat b
+                  (mword_of_int 2092002 : mword 21) D7 (K - 14)%nat b
                   ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi60").
         iIntros (CIDb8 Hqb8) "Hcg Hpc".
         set (D8 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (WI + 0x60) : mword 64) 4)]> D7).
         assert (Htgtec : add_vec (mword_of_int (WI + 0x60) : mword 64)
-                           (sign_extend' 64 (mword_of_int 2092024 : mword 21))
+                           (sign_extend' 64 (mword_of_int 2092002 : mword 21))
                          = mword_of_int KernelSyms.either_copyin) by pcw.
         iEval (rewrite Htgtec) in "Hpc".
         assert (HD8ra : D8 !!! Regidx Rra
@@ -2786,14 +2786,14 @@ Section WriteiLoop.
           iEval (rewrite Hpp) in "Hpc". clear Hpp.
           (* ===== +0x6a jal ra,log_write ===== *)
           iApply (wp_jal_s_sconf (mword_of_int (WI + 0x6a)) Rra
-                    (mword_of_int 1718 : mword 21) F1 (K - 14)%nat b
+                    (mword_of_int 1746 : mword 21) F1 (K - 14)%nat b
                     ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc Hi6a").
           iIntros (CIDc3 Hqc3) "Hcg Hpc".
           set (F2 := <[Regidx Rra := regval_into_reg
                         (add_vec_int (mword_of_int (WI + 0x6a) : mword 64) 4)]> F1).
           assert (Htgtlw : add_vec (mword_of_int (WI + 0x6a) : mword 64)
-                             (sign_extend' 64 (mword_of_int 1718 : mword 21))
+                             (sign_extend' 64 (mword_of_int 1746 : mword 21))
                            = mword_of_int KernelSyms.log_write) by pcw.
           iEval (rewrite Htgtlw) in "Hpc".
           assert (HF2ra : F2 !!! Regidx Rra
@@ -3250,14 +3250,14 @@ Section WriteiLoop.
           iEval (rewrite Hpp) in "Hpc". clear Hpp.
           (* ===== +0xb2 jal ra,log_write  -- THE FIX ===== *)
           iApply (wp_jal_s_sconf (mword_of_int (WI + 0xb2)) Rra
-                    (mword_of_int 1646 : mword 21) J1 (K - 14)%nat b
+                    (mword_of_int 1674 : mword 21) J1 (K - 14)%nat b
                     ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc Hib2").
           iIntros (CIDd3 Hqd3) "Hcg Hpc".
           set (J2 := <[Regidx Rra := regval_into_reg
                         (add_vec_int (mword_of_int (WI + 0xb2) : mword 64) 4)]> J1).
           assert (Htgtlw : add_vec (mword_of_int (WI + 0xb2) : mword 64)
-                             (sign_extend' 64 (mword_of_int 1646 : mword 21))
+                             (sign_extend' 64 (mword_of_int 1674 : mword 21))
                            = mword_of_int KernelSyms.log_write) by pcw.
           iEval (rewrite Htgtlw) in "Hpc".
           assert (HJ2ra : J2 !!! Regidx Rra

@@ -702,6 +702,12 @@
   2
  ],
  [
+  "CodeSleepPrepare.v",
+  "sleep_prepare",
+  "spri_",
+  2
+ ],
+ [
   "CodeSleeplock.v",
   "acquiresleep",
   "asl_",
