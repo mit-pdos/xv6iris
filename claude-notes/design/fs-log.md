@@ -788,3 +788,15 @@ parent (the namex trio's posts move once).
 3. Whether the walkers' guard observation should be packaged as its own
    named token (`nlz_obs`) minted by the guard's decode block, so crz's
    honesty premise is one resource rather than a pure conjunction.
+
+
+### G.8 RULED (2026-08-13): ABI-hiding and per-slot granularity approved by
+### the user; nlz_obs token adopted by the coordinator.  The campaign:
+
+| stage | what lands | who |
+|---|---|---|
+| G-1 | LogInv: ln_epoch in the auth + bump at the commit clear; op_entry gains hidden e0 (log_opS ABI unchanged); persistent `logged_at`; `log_use_group`; SpecLogWrite's non-absorbed arm mints `logged_at` | agent (Opus) |
+| G-2 | IcacheEscrow: zero_receipt + per-slot ic_epoch_lb on the parked payload; SpecIupdate's credgen deposits the receipt on its zero-writing arm; `nlz_obs` minted at the guard shape | agent (Opus) |
+| G-3 | crz on SpecIput/SpecIunlockput (+ consumers' FINDING-5 seams) | agent (Opus) |
+| G-4 | the trio reshape: walk_spend (<= the group bitmap unit, membership-conditional) + ity_shot g T_DIR (Blocker B) out of SpecNamex/Namei/Nameiparent; ProofNamex re-thread; CreateBudget's nameiparent row | agent (Opus) |
+| — | D0 relaunch on the corrected staging (the +0xb2 cut, dl_need premise, lhu decision pair, cr_budget_fail_file) | after G-4 gates |
