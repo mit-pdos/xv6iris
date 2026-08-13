@@ -595,7 +595,7 @@ Section ProofVirtioDiskRwB.
         iEval (rewrite Hp09c) in "Hpc".
         (* ---- +0x09c  jal sleep_prepare ---- *)
         iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x09c) : mword 64) Rra
-                  (mword_of_int 2082366 : mword 21) B2 (trap_res eb + (K - 12))%nat false
+                  (mword_of_int 2082358 : mword 21) B2 (trap_res eb + (K - 12))%nat false
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi09c").
@@ -605,7 +605,7 @@ Section ProofVirtioDiskRwB.
         change (<[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x09c) : mword 64) 4)]> B2) with B3.
         assert (Hjsp : add_vec (mword_of_int (KernelSyms.virtio_disk_rw + 0x09c) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2082366 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2082358 : mword 21))
                        = mword_of_int KernelSyms.sleep_prepare)
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjsp) in "Hpc".
@@ -678,7 +678,7 @@ Section ProofVirtioDiskRwB.
         iEval (rewrite Hp0a8) in "Hpc".
         (* ---- +0x0a8  jal release ---- *)
         iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x0a8) : mword 64) Rra
-                  (mword_of_int 2077584 : mword 21) C2 (trap_res eb + (K - 12))%nat false
+                  (mword_of_int 2077576 : mword 21) C2 (trap_res eb + (K - 12))%nat false
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi0a8").
@@ -688,7 +688,7 @@ Section ProofVirtioDiskRwB.
         change (<[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x0a8) : mword 64) 4)]> C2) with C3.
         assert (Hjrl : add_vec (mword_of_int (KernelSyms.virtio_disk_rw + 0x0a8) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2077584 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2077576 : mword 21))
                        = mword_of_int KernelSyms.release)
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjrl) in "Hpc".
@@ -721,7 +721,7 @@ Section ProofVirtioDiskRwB.
         iEval (rewrite Hr0ac) in "Hpc".
         (* ---- +0x0ac  jal sleep ---- *)
         iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x0ac) : mword 64) Rra
-                  (mword_of_int 2082410 : mword 21) mfr (K - 12)%nat eb
+                  (mword_of_int 2082402 : mword 21) mfr (K - 12)%nat eb
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi0ac").
@@ -731,7 +731,7 @@ Section ProofVirtioDiskRwB.
         change (<[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x0ac) : mword 64) 4)]> mfr) with C4.
         assert (Hjsl : add_vec (mword_of_int (KernelSyms.virtio_disk_rw + 0x0ac) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2082410 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2082402 : mword 21))
                        = mword_of_int KernelSyms.sleep)
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjsl) in "Hpc".
@@ -796,7 +796,7 @@ Section ProofVirtioDiskRwB.
         iEval (rewrite Hp0b8) in "Hpc".
         (* ---- +0x0b8  jal acquire ---- *)
         iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x0b8) : mword 64) Rra
-                  (mword_of_int 2077432 : mword 21) D2 (K - 12)%nat eb
+                  (mword_of_int 2077424 : mword 21) D2 (K - 12)%nat eb
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi0b8").
@@ -806,7 +806,7 @@ Section ProofVirtioDiskRwB.
         change (<[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x0b8) : mword 64) 4)]> D2) with D3.
         assert (Hjaq : add_vec (mword_of_int (KernelSyms.virtio_disk_rw + 0x0b8) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2077432 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2077424 : mword 21))
                        = mword_of_int KernelSyms.acquire)
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjaq) in "Hpc".

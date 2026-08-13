@@ -350,7 +350,7 @@ Section ProofPrepareReturn.
     iEval (rewrite Hpp1c) in "Hpc".
     (* ---- +0x1c: addi a5,a5,-1128 ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (PRR + 0x1c)) a5_idx a5_idx
-              (mword_of_int 2972 : mword 12) T4 (trap_res b + (av - 2))%nat false
+              (mword_of_int 2980 : mword 12) T4 (trap_res b + (av - 2))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc Hi1c").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne; rewrite /T4 upd_eq prr_uservec_addr) in "Hcg".
@@ -377,7 +377,7 @@ Section ProofPrepareReturn.
     iEval (rewrite Hpp24) in "Hpc".
     (* ---- +0x24: addi a3,a3,-1136 ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (PRR + 0x24)) a3_idx a3_idx
-              (mword_of_int 2964 : mword 12) T6 (trap_res b + (av - 2))%nat false
+              (mword_of_int 2972 : mword 12) T6 (trap_res b + (av - 2))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc Hi24").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne; rewrite /T6 upd_eq prr_trampoline_addr) in "Hcg".

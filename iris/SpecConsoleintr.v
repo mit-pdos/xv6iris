@@ -6,7 +6,7 @@
    consoleintr is xv6's console line-discipline: it takes cons.lock, edits the
    input line (kill-line, backspace, echo through consputc), stores the byte
    in cons.buf, wakes a blocked consoleread() when a whole line has arrived,
-   and releases cons.lock.  @ KernelSyms.consoleintr = 0x800002ae.
+   and releases cons.lock.  @ KernelSyms.consoleintr = 0x800002bc.
 
    *** THIS CONTRACT IS ASSUMED (LinkConsoleintr.v). ***  consoleintr is the
    one callee of uartintr with no proof, and this is the shape uartintr needs:
@@ -49,7 +49,11 @@ Require Import CpuOwn.
 Require Import SchedCtx.
 From Kernel Require KernelSyms.
 
-(* consoleintr's own frame plus its deepest callee (wakeup, 18). *)
+(* consoleintr's own frame (48 bytes = 6 slots) plus its deepest callee
+   (wakeup, 18) is 24; this is that with slack, and the slack is deliberate --
+   the contract is ASSUMED, so an over-approximation is the safe direction and
+   uartintr is already stated against it.  consputc (16) and the two lock
+   calls are all shallower than wakeup. *)
 Definition consoleintr_stack : nat := 32%nat.
 
 Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}

@@ -33,6 +33,7 @@ Require Import KernelDecode14.
 Require Import KernelDecode15.
 Require Import KernelDecode16.
 Require Import KernelDecode17.
+Require Import KernelDecode18.
 Require Import KernelDecode19.
 Require Import KernelDecode20.
 Require Import KernelDecode21.
@@ -80,9 +81,9 @@ Section CodeBalloc.
   Proof. mk_base (KernelSyms.balloc + 0xa) (mword_of_int 0x0001e797 : mword 32)
     (mword_of_int (KernelSyms.balloc + 0xa) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_0001e797. Qed.
 
-  Lemma bai_00e : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0xe) : mword 64) false (LOAD (mword_of_int 2774 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
-  Proof. mk_base (KernelSyms.balloc + 0xe) (mword_of_int 0xad67a783 : mword 32)
-    (mword_of_int (KernelSyms.balloc + 0xe) : mword 64) (LOAD (mword_of_int 2774 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) kd_ad67a783. Qed.
+  Lemma bai_00e : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0xe) : mword 64) false (LOAD (mword_of_int 2782 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
+  Proof. mk_base (KernelSyms.balloc + 0xe) (mword_of_int 0xade7a783 : mword 32)
+    (mword_of_int (KernelSyms.balloc + 0xe) : mword 64) (LOAD (mword_of_int 2782 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) kd_ade7a783. Qed.
 
   Lemma bai_012 : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0x12) : mword 64) false (BTYPE (mword_of_int 228 : mword 13, zreg, Regidx (mword_of_int 15), BEQ)).
   Proof. mk_base (KernelSyms.balloc + 0x12) (mword_of_int 0x0e078263 : mword 32)
@@ -128,9 +129,9 @@ Section CodeBalloc.
   Proof. mk_base (KernelSyms.balloc + 0x28) (mword_of_int 0x0001eb17 : mword 32)
     (mword_of_int (KernelSyms.balloc + 0x28) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 22), AUIPC)) kd_0001eb17. Qed.
 
-  Lemma bai_02c : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0x2c) : mword 64) false (ITYPE (mword_of_int 2740 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)).
-  Proof. mk_base (KernelSyms.balloc + 0x2c) (mword_of_int 0xab4b0b13 : mword 32)
-    (mword_of_int (KernelSyms.balloc + 0x2c) : mword 64) (ITYPE (mword_of_int 2740 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)) kd_ab4b0b13. Qed.
+  Lemma bai_02c : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0x2c) : mword 64) false (ITYPE (mword_of_int 2748 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)).
+  Proof. mk_base (KernelSyms.balloc + 0x2c) (mword_of_int 0xabcb0b13 : mword 32)
+    (mword_of_int (KernelSyms.balloc + 0x2c) : mword 64) (ITYPE (mword_of_int 2748 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)) kd_abcb0b13. Qed.
 
   Lemma bai_030 : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0x30) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 19), ADDI)).
   Proof. mk_rvc (KernelSyms.balloc + 0x30) (mword_of_int 0x4985 : mword 16)
@@ -424,9 +425,9 @@ Section CodeBalloc.
   Proof. mk_base (KernelSyms.balloc + 0xf6) (mword_of_int 0x00004517 : mword 32)
     (mword_of_int (KernelSyms.balloc + 0xf6) : mword 64) (UTYPE (mword_of_int 4 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00004517. Qed.
 
-  Lemma bai_0fa : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0xfa) : mword 64) false (ITYPE (mword_of_int 1366 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.balloc + 0xfa) (mword_of_int 0x55650513 : mword 32)
-    (mword_of_int (KernelSyms.balloc + 0xfa) : mword 64) (ITYPE (mword_of_int 1366 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_55650513. Qed.
+  Lemma bai_0fa : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0xfa) : mword 64) false (ITYPE (mword_of_int 1374 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.balloc + 0xfa) (mword_of_int 0x55e50513 : mword 32)
+    (mword_of_int (KernelSyms.balloc + 0xfa) : mword 64) (ITYPE (mword_of_int 1374 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_55e50513. Qed.
 
   Lemma bai_0fe : kernel_text -∗ instr (mword_of_int (KernelSyms.balloc + 0xfe) : mword 64) false (JAL (mword_of_int 2086488 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.balloc + 0xfe) (mword_of_int 0xe58fd0ef : mword 32)

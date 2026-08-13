@@ -20,7 +20,6 @@ Require Import KernelDecode00.
 Require Import KernelDecode01.
 Require Import KernelDecode02.
 Require Import KernelDecode03.
-Require Import KernelDecode04.
 Require Import KernelDecode05.
 Require Import KernelDecode06.
 Require Import KernelDecode09.
@@ -92,9 +91,9 @@ Section CodeWakeup.
   Proof. mk_base (KernelSyms.wakeup + 0x14) (mword_of_int 0x00011497 : mword 32)
     (mword_of_int (KernelSyms.wakeup + 0x14) : mword 64) (UTYPE (mword_of_int 17 : mword 20, Regidx (mword_of_int 9), AUIPC)) kd_00011497. Qed.
 
-  Lemma wki_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.wakeup + 0x18) : mword 64) false (ITYPE (mword_of_int 2142 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
-  Proof. mk_base (KernelSyms.wakeup + 0x18) (mword_of_int 0x85e48493 : mword 32)
-    (mword_of_int (KernelSyms.wakeup + 0x18) : mword 64) (ITYPE (mword_of_int 2142 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) kd_85e48493. Qed.
+  Lemma wki_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.wakeup + 0x18) : mword 64) false (ITYPE (mword_of_int 2150 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
+  Proof. mk_base (KernelSyms.wakeup + 0x18) (mword_of_int 0x86648493 : mword 32)
+    (mword_of_int (KernelSyms.wakeup + 0x18) : mword 64) (ITYPE (mword_of_int 2150 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) kd_86648493. Qed.
 
   Lemma wki_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.wakeup + 0x1c) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 2 : mword 6), zreg, Regidx (mword_of_int 20), ADDI)).
   Proof. mk_rvc (KernelSyms.wakeup + 0x1c) (mword_of_int 0x4a09 : mword 16)
@@ -108,9 +107,9 @@ Section CodeWakeup.
   Proof. mk_base (KernelSyms.wakeup + 0x20) (mword_of_int 0x00016997 : mword 32)
     (mword_of_int (KernelSyms.wakeup + 0x20) : mword 64) (UTYPE (mword_of_int 22 : mword 20, Regidx (mword_of_int 19), AUIPC)) kd_00016997. Qed.
 
-  Lemma wki_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.wakeup + 0x24) : mword 64) false (ITYPE (mword_of_int 594 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)).
-  Proof. mk_base (KernelSyms.wakeup + 0x24) (mword_of_int 0x25298993 : mword 32)
-    (mword_of_int (KernelSyms.wakeup + 0x24) : mword 64) (ITYPE (mword_of_int 594 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)) kd_25298993. Qed.
+  Lemma wki_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.wakeup + 0x24) : mword 64) false (ITYPE (mword_of_int 602 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)).
+  Proof. mk_base (KernelSyms.wakeup + 0x24) (mword_of_int 0x25a98993 : mword 32)
+    (mword_of_int (KernelSyms.wakeup + 0x24) : mword 64) (ITYPE (mword_of_int 602 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)) kd_25a98993. Qed.
 
   Lemma wki_28 : kernel_text -∗ instr (mword_of_int (KernelSyms.wakeup + 0x28) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 8 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (KernelSyms.wakeup + 0x28) (mword_of_int 0xa801 : mword 16)

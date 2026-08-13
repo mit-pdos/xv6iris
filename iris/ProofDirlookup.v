@@ -1589,12 +1589,12 @@ Section ProofDirlookupMain.
           iEval (rewrite Hpp4a) in "Hpc".
           (* +0x4a addi a0,a0,3290 : ...and its low part *)
           iApply (wp_addi4_s_sconf (mword_of_int (DL + 0x4a)) Ra0 Ra0
-                    (mword_of_int 3334 : mword 12) PA1 (K - 12)%nat b
+                    (mword_of_int 3342 : mword 12) PA1 (K - 12)%nat b
                     ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi4a").
           iIntros (CIDpa3 Hqpa3) "Hcg Hpc".
           set (PA2 := <[Regidx Ra0 := regval_into_reg
                          (add_vec (rget PA1 Ra0)
-                            (sign_extend' 64 (mword_of_int 3334 : mword 12)))]> PA1).
+                            (sign_extend' 64 (mword_of_int 3342 : mword 12)))]> PA1).
           assert (Hpp4e : add_vec_int (mword_of_int (DL + 0x4a) : mword 64) 4
                           = mword_of_int (DL + 0x4e)) by pcw.
           iEval (rewrite Hpp4e) in "Hpc".

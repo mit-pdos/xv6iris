@@ -776,7 +776,7 @@ Section ProofFreeDesc.
     iEval (rewrite Hpc52) in "Hpc".
     (* ---- +0x52: jal ra,wakeup ---- *)
     iPoseProof (fdi_52 with "Htext") as "Hi52".
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.free_desc + 0x52)) ra_idx (mword_of_int 2083122 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.free_desc + 0x52)) ra_idx (mword_of_int 2083114 : mword 21)
               E1 (K - 2)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
@@ -787,7 +787,7 @@ Section ProofFreeDesc.
     change (<[Regidx ra_idx := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.free_desc + 0x52) : mword 64) 4)]> E1) with E2.
     assert (Hjwk : add_vec (mword_of_int (KernelSyms.free_desc + 0x52) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2083122 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2083114 : mword 21))
                    = mword_of_int KernelSyms.wakeup)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjwk) in "Hpc".

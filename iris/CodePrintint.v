@@ -18,6 +18,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode00.
 Require Import KernelDecode01.
+Require Import KernelDecode02.
 Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode05.
@@ -34,6 +35,7 @@ Require Import KernelDecode16.
 Require Import KernelDecode17.
 Require Import KernelDecode19.
 Require Import KernelDecode20.
+Require Import KernelDecode22.
 Require Import KernelDecode23.
 Require Import KernelDecode24.
 Require Import KernelDecode28.
@@ -98,9 +100,9 @@ Section CodePrintint.
   Proof. mk_base (KernelSyms.printint + 0x1a) (mword_of_int 0x00007817 : mword 32)
     (mword_of_int (KernelSyms.printint + 0x1a) : mword 64) (UTYPE (mword_of_int 7 : mword 20, Regidx (mword_of_int 16), AUIPC)) kd_00007817. Qed.
 
-  Lemma pii_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.printint + 0x1e) : mword 64) false (ITYPE (mword_of_int 674 : mword 12, Regidx (mword_of_int 16), Regidx (mword_of_int 16), ADDI)).
-  Proof. mk_base (KernelSyms.printint + 0x1e) (mword_of_int 0x2a280813 : mword 32)
-    (mword_of_int (KernelSyms.printint + 0x1e) : mword 64) (ITYPE (mword_of_int 674 : mword 12, Regidx (mword_of_int 16), Regidx (mword_of_int 16), ADDI)) kd_2a280813. Qed.
+  Lemma pii_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.printint + 0x1e) : mword 64) false (ITYPE (mword_of_int 682 : mword 12, Regidx (mword_of_int 16), Regidx (mword_of_int 16), ADDI)).
+  Proof. mk_base (KernelSyms.printint + 0x1e) (mword_of_int 0x2aa80813 : mword 32)
+    (mword_of_int (KernelSyms.printint + 0x1e) : mword 64) (ITYPE (mword_of_int 682 : mword 12, Regidx (mword_of_int 16), Regidx (mword_of_int 16), ADDI)) kd_2aa80813. Qed.
 
   Lemma pii_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.printint + 0x22) : mword 64) true (RTYPE (Regidx (mword_of_int 14), zreg, Regidx (mword_of_int 17), ADD)).
   Proof. mk_rvc (KernelSyms.printint + 0x22) (mword_of_int 0x88ba : mword 16)
@@ -210,9 +212,9 @@ Section CodePrintint.
   Proof. mk_base (KernelSyms.printint + 0x74) (mword_of_int 0x0004c503 : mword 32)
     (mword_of_int (KernelSyms.printint + 0x74) : mword 64) (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), true, 1)) kd_0004c503. Qed.
 
-  Lemma pii_78 : kernel_text -∗ instr (mword_of_int (KernelSyms.printint + 0x78) : mword 64) false (JAL (mword_of_int 2096542 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.printint + 0x78) (mword_of_int 0xd9fff0ef : mword 32)
-    (mword_of_int (KernelSyms.printint + 0x78) : mword 64) (JAL (mword_of_int 2096542 : mword 21, Regidx (mword_of_int 1))) kd_d9fff0ef. Qed.
+  Lemma pii_78 : kernel_text -∗ instr (mword_of_int (KernelSyms.printint + 0x78) : mword 64) false (JAL (mword_of_int 2096550 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.printint + 0x78) (mword_of_int 0xda7ff0ef : mword 32)
+    (mword_of_int (KernelSyms.printint + 0x78) : mword 64) (JAL (mword_of_int 2096550 : mword 21, Regidx (mword_of_int 1))) kd_da7ff0ef. Qed.
 
   Lemma pii_7c : kernel_text -∗ instr (mword_of_int (KernelSyms.printint + 0x7c) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
   Proof. mk_rvc (KernelSyms.printint + 0x7c) (mword_of_int 0x14fd : mword 16)

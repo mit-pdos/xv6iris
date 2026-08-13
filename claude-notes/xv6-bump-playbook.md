@@ -139,6 +139,28 @@ Cross-check it against `git diff <old>..<new> -- kernel/` — the two should nam
 the same functions. If the sweep says a function changed shape and the C did
 not, suspect the tooling, not gcc.
 
+**A SHAPE CHANGE IN AN UNPROVEN FUNCTION COSTS NOTHING**, and the sweep says so
+directly: a function with no `Code<F>.v` cannot appear in it. On `a28e94b` the
+only reshaped function was `consoleintr`, which is assumed rather than proven
+(`LinkConsoleintr.v`), so the whole bump was pure relayout and the sweep
+printed nothing at all. An empty sweep is a real answer, not a broken command
+— confirm it against the C diff rather than re-running the tools.
+
+**AND THE SHIFT NEED NOT REACH THE END OF `.text`.** Everything after a
+function that changed size moves by the delta *until an alignment boundary
+absorbs it*. Here `consoleintr` lost 8 bytes, 170 symbols moved `-0x8`, and
+then `kernelvec` onward did not move at all — `kernelvec.S`'s alignment ate the
+8, and the freed padding surfaced as 8 fresh zero bytes in `KernelData.v`. So
+derive the per-symbol delta from `KernelSyms.v` instead of assuming one shift:
+
+```sh
+git show HEAD:kernel-rocq/KernelSyms.v > /tmp/old-syms.v   # before `make dump`
+```
+
+then diff the two symbol tables and group by delta. The groups are the map: one
+`+0` group before the change and after the absorbing boundary, one shifted
+group between.
+
 **Do this before touching anything.** Skipping it and reading "48 of 55 offsets
 reshaped" off the *same-offset* tool says a function needs a from-scratch
 rewrite when it does not. The shift tool answers directly — its `UNALIGNED` list
@@ -170,9 +192,91 @@ python3 tools/relayout_map.py residue CodeBalloc.v ProofBalloc.v [ALIAS...]
 ```
 
 Bulk-applying across a failure list is fine and is what makes a pure-relayout
-bump cheap (~600-700 substitutions over ~80 files in a few minutes). A
-throwaway driver that pairs each `Proof<F>.v` with the `Code*` modules it
-imports and auto-detects aliases does the whole batch; keep one around.
+bump cheap (~600-700 substitutions over ~80 files in a few minutes).
+`tools/relayout_batch.py` is that driver — it pairs every `Code<F>.v` whose
+diff carries immediate changes with each hand-written file that ANCHORS on one
+of its symbols (see below for why that, and not "imports the module"), and
+refuses to run at all if any source reports a SHAPE change, so §2 stays
+mandatory:
+
+```sh
+python3 tools/relayout_batch.py            # dry run
+python3 tools/relayout_batch.py --write
+python3 tools/relayout_batch.py --residue  # the mandatory post-step, every pair
+```
+
+### AN ALIAS DECLARED IN A SIBLING FILE MAKES THE BATCH REPORT A TRUTHFUL "0"
+
+`relayout_map.find_aliases` reads only the file it is rewriting, but a proof
+split into `Proof<F>.v` + `Proof<F>Parts.v` declares the alias in the Parts
+file (`Notation FC := KernelSyms.fileclose (only parsing).`) and *uses* it in
+the other. The scan then never re-anchors, `apply` reports a healthy-looking
+"0 substitutions", and the file is left stale — the failure mode the alias
+machinery exists to prevent, one file over. `relayout_batch.py` resolves
+aliases through the target's own `Require`s, and that scoping is not optional:
+`KX` is `kexec` in one proof family and `kexit` in another, so a tree-wide
+alias table would rewrite one function's region with the other's map.
+`residue` is the only thing that catches this class of miss, which is the
+reason it is mandatory rather than advisory.
+
+### PAIR BY ANCHOR, NOT BY IMPORT
+
+The obvious pairing — a proof file is a target when it names the `Code<F>`
+module it gets its instruction facts from — is wrong, and wrong in the silent
+direction. A `Proof<F>Parts.v` can state pure *arithmetic* lemmas about the
+immediates and need no instruction fact at all:
+
+```coq
+Lemma prr_uservec_addr :
+  add_vec (add_vec (mword_of_int (PRR + 0x18) : mword 64)
+             (auipc_off (mword_of_int 4 : mword 20)))
+    (sign_extend' 64 (mword_of_int 2972 : mword 12))
+  = (mword_of_int KernelSyms.uservec : mword 64).
+```
+
+That file never Requires `CodePrepareReturn`, so an import-keyed batch never
+visits it and `residue` never runs on it either — the miss is invisible to
+BOTH halves of the process, and it surfaced only as a build error
+(`Unable to unify "2147508224" with "2147508216"` — `uservec` vs `uservec - 8`).
+So the target set is every hand-written file that ANCHORS on the symbol, via
+`KernelSyms.<sym>` or via an alias its own imports declare. That widened the
+sweep from 142 files to 286 and found exactly the two missing substitutions.
+
+**Build the anchor index in one pass.** The natural phrasing — for each Code
+file, for each candidate target, work out that target's aliases — re-reads
+every target *and its whole import list* once per Code file, which is ~170 ×
+~200 × ~30 file reads: minutes of wall time that look exactly like a hang.
+Invert it: read each file once, build `sym -> [files]`, then every lookup is a
+dict hit. 20 s for the whole tree.
+
+### WHAT THE BATCH STRUCTURALLY CANNOT REACH
+
+Anything not anchored on a `KernelSyms.<sym> + off`. The live instance is the
+thin-wrapper pattern, where a whole function's immediates are *arguments* to a
+shared lemma:
+
+```coq
+ilw_code KernelSyms.fileinit (mword_of_int 3) (mword_of_int 30)
+         (mword_of_int 1406) (mword_of_int 1182) (mword_of_int 2083622).
+```
+
+There is no anchor on that line, so no map applies and only `residue` reports
+it. `grep -ln 'ilw_code\|wp_initlock_wrapper'` names them all
+(`ProofFileinit`, `ProofPrintkinit`, `ProofTrapinit`); fix by hand from
+`relayout_map.py map`. Note which of the five moved: the two `addi`
+immediates completing a data address did, the `jal` did not — caller and
+callee shifted together, so their distance is unchanged.
+
+### READING `residue`'s OUTPUT
+
+Most of what it prints is noise, and the two kinds look alike. It flags any
+*value* that is a pre-bump immediate anywhere in the map, so a pc OFFSET
+(`KernelSyms.mappages + 0x9c`) or a prose comment (`c.sdsp s2,16(sp)`) trips
+it whenever that number also moved somewhere. `AMBIGUOUS` likewise usually
+means the line already holds the correct NEW value which happens to be some
+other offset's OLD one. Triage by checking the value against the map AT THE
+LINE'S OWN ANCHOR — that is decisive in one lookup, and it is the only check
+worth doing on each.
 
 ### What the tools deliberately will NOT rewrite
 
@@ -242,11 +346,25 @@ with an opaque byte mismatch. Two blind spots to know:
 
 * `" inodes"` is the **tail** of `"iget: no inodes"`, not a literal — exact
   search finds nothing; read the raw bytes.
-* `ProofArgraw`'s `0x80007770` is a **switch jump table**, not a string. It
-  moved `+8` *and* every entry shifted `+0x0c`.
+* `argraw`'s switch **jump table** shares the region and is not a string. Its
+  entries move on any bump that moves `argraw`, but `ProofArgraw` no longer
+  spells them: `ar_tbl := KernelSyms.states_0 + 0x30` and `ar_entry` computes
+  each entry from `argraw + ar_case_off i - ar_tbl`, so a re-dump carries the
+  whole table for free. **That is the shape to copy** whenever a proof needs a
+  `.rodata` datum that is really a pair of symbols — derive, do not transcribe.
 
-Also invalidate any cached byte map before using it (`bytes_*.json`); a stale
-cache produced confidently wrong answers twice.
+Do the whole verification in one pass rather than by eye — it is ~15 lines
+against `objcopy -O binary --only-section=.rodata`, it checks the NUL-before
+condition the manual method forgets, and on a bump that moves no strings it
+returns a clean table in seconds:
+
+```sh
+grep -rn "_str[a-z_]* : Z := 0x\|_addr : Z := 0x8000[67]" iris/*.v
+```
+
+is the list to feed it; there are ~24 and every one must print the string its
+name claims. Also invalidate any cached byte map before using it
+(`bytes_*.json`); a stale cache produced confidently wrong answers twice.
 
 ### 4c. Data symbols
 
@@ -345,6 +463,13 @@ Rules learned:
   `lia`.
 * Shortcut: check the changed functions' prologues immediately, and if no frame
   grew there is no cascade.
+* **A FUNCTION THAT SHRANK CAN STILL HAVE GROWN ITS FRAME**, so "the C only
+  deleted code" does not license skipping that prologue check. `a28e94b`
+  deleted one switch arm from `consoleintr` (the `C('P')` → `procdump()` case,
+  8 bytes shorter overall) and gcc took the freed register pressure as licence
+  to re-allocate: `addi sp,sp,-32` became `addi sp,sp,-48`. Deleting a CALL
+  also retires whatever that callee contributed to the deepest-callee term, so
+  both halves of the budget move, in opposite directions.
 
 ### 4e. Register reallocation — NOT always a rename
 
@@ -429,6 +554,22 @@ Rules that made that work:
 ---
 
 ## 7. Finishing
+
+0. **`make check-decode` BEFORE the validating build, never after.** It is
+   `gen-code` plus `git diff --exit-code`, and both halves surprise you at the
+   end of a bump. The diff is against **HEAD**, so while the bump is still
+   uncommitted the target necessarily FAILS and its output is just the bump's
+   own decode changes — not a defect, and not a check that tells you anything
+   at that point. Worse, the `gen-code` half **rewrites every generated file
+   unconditionally**, so running it after a green build touches ~180 mtimes and
+   forces a from-scratch recompile of the tree. Content-wise the rewrite is a
+   no-op — confirm with a hash sweep rather than by rebuilding:
+
+   ```sh
+   cd iris && md5sum KernelDecode*.v KernelConsts.v Code*.v | md5sum
+   ```
+
+   before and after; equal digests mean the build compiled exactly those bytes.
 
 1. `make -k -j8` clean (`MAKEEXIT=0`).
 2. **`Print Assumptions` on the top-level theorem** —

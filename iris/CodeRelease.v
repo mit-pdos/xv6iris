@@ -29,7 +29,6 @@ Require Import KernelDecode19.
 Require Import KernelDecode21.
 Require Import KernelDecode25.
 Require Import KernelDecode26.
-Require Import KernelDecode27.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -112,9 +111,9 @@ Section CodeRelease.
   Proof. mk_base (KernelSyms.release + 0x2c) (mword_of_int 0x00006517 : mword 32)
     (mword_of_int (KernelSyms.release + 0x2c) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00006517. Qed.
 
-  Lemma rli_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.release + 0x30) : mword 64) false (ITYPE (mword_of_int 1036 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.release + 0x30) (mword_of_int 0x40c50513 : mword 32)
-    (mword_of_int (KernelSyms.release + 0x30) : mword 64) (ITYPE (mword_of_int 1036 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_40c50513. Qed.
+  Lemma rli_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.release + 0x30) : mword 64) false (ITYPE (mword_of_int 1044 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.release + 0x30) (mword_of_int 0x41450513 : mword 32)
+    (mword_of_int (KernelSyms.release + 0x30) : mword 64) (ITYPE (mword_of_int 1044 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_41450513. Qed.
 
   Lemma rli_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.release + 0x34) : mword 64) false (JAL (mword_of_int 2096048 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.release + 0x34) (mword_of_int 0xbb1ff0ef : mword 32)

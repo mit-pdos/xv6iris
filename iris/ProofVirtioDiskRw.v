@@ -523,7 +523,7 @@ Section ProofVirtioDiskRw.
     iPoseProof (rwi_032 with "Htext") as "Hi032".
     (* ---- +0x032  jal acquire ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x032) : mword 64) Rra
-              (mword_of_int 2077566 : mword 21) R10 (K - 12)%nat eb
+              (mword_of_int 2077558 : mword 21) R10 (K - 12)%nat eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi032").
@@ -534,7 +534,7 @@ Section ProofVirtioDiskRw.
     change (<[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x032) : mword 64) 4)]> R10) with R11.
     assert (Hjacq : add_vec (mword_of_int (KernelSyms.virtio_disk_rw + 0x032) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2077566 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2077558 : mword 21))
                     = mword_of_int KernelSyms.acquire)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjacq) in "Hpc".

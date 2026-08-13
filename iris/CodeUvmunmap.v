@@ -29,7 +29,6 @@ Require Import KernelDecode11.
 Require Import KernelDecode12.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
-Require Import KernelDecode16.
 Require Import KernelDecode17.
 Require Import KernelDecode18.
 Require Import KernelDecode19.
@@ -159,9 +158,9 @@ Section CodeUvmunmap.
   Proof. mk_base (KernelSyms.uvmunmap + 0x3a) (mword_of_int 0x00006517 : mword 32)
     (mword_of_int (KernelSyms.uvmunmap + 0x3a) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00006517. Qed.
 
-  Lemma uui_3e : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmunmap + 0x3e) : mword 64) false (ITYPE (mword_of_int 3902 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.uvmunmap + 0x3e) (mword_of_int 0xf3e50513 : mword 32)
-    (mword_of_int (KernelSyms.uvmunmap + 0x3e) : mword 64) (ITYPE (mword_of_int 3902 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_f3e50513. Qed.
+  Lemma uui_3e : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmunmap + 0x3e) : mword 64) false (ITYPE (mword_of_int 3910 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.uvmunmap + 0x3e) (mword_of_int 0xf4650513 : mword 32)
+    (mword_of_int (KernelSyms.uvmunmap + 0x3e) : mword 64) (ITYPE (mword_of_int 3910 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_f4650513. Qed.
 
   Lemma uui_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmunmap + 0x42) : mword 64) false (JAL (mword_of_int 2094642 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.uvmunmap + 0x42) (mword_of_int 0xe32ff0ef : mword 32)

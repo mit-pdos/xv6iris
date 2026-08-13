@@ -342,16 +342,16 @@ Section Ut56.
                    = mword_of_int (UT + 0x60)) by pcw.
     iEval (rewrite Hp60) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (UT + 0x60)) Ra0 Ra0
-              (mword_of_int 3272 : mword 12) M3 nx false
+              (mword_of_int 3280 : mword 12) M3 nx false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi60 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (M4 := <[Regidx Ra0 := regval_into_reg
                    (add_vec (rget M3 Ra0)
-                      (sign_extend' 64 (mword_of_int 3272 : mword 12)))]> M3).
+                      (sign_extend' 64 (mword_of_int 3280 : mword 12)))]> M3).
     change (<[Regidx Ra0 := regval_into_reg
                (add_vec (rget M3 Ra0)
-                  (sign_extend' 64 (mword_of_int 3272 : mword 12)))]> M3) with M4.
+                  (sign_extend' 64 (mword_of_int 3280 : mword 12)))]> M3) with M4.
     assert (Hp64 : add_vec_int (mword_of_int (UT + 0x60) : mword 64) 4
                    = mword_of_int (UT + 0x64)) by pcw.
     iEval (rewrite Hp64) in "Hpc".
@@ -448,16 +448,16 @@ Section Ut56.
                    = mword_of_int (UT + 0x74)) by pcw.
     iEval (rewrite Hp74) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (UT + 0x74)) Ra0 Ra0
-              (mword_of_int 3300 : mword 12) M8 nx false
+              (mword_of_int 3308 : mword 12) M8 nx false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi74 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (M9 := <[Regidx Ra0 := regval_into_reg
                    (add_vec (rget M8 Ra0)
-                      (sign_extend' 64 (mword_of_int 3300 : mword 12)))]> M8).
+                      (sign_extend' 64 (mword_of_int 3308 : mword 12)))]> M8).
     change (<[Regidx Ra0 := regval_into_reg
                (add_vec (rget M8 Ra0)
-                  (sign_extend' 64 (mword_of_int 3300 : mword 12)))]> M8) with M9.
+                  (sign_extend' 64 (mword_of_int 3308 : mword 12)))]> M8) with M9.
     assert (Hp78 : add_vec_int (mword_of_int (UT + 0x74) : mword 64) 4
                    = mword_of_int (UT + 0x78)) by pcw.
     iEval (rewrite Hp78) in "Hpc".

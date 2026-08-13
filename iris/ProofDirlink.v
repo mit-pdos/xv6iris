@@ -2816,12 +2816,12 @@ Section ProofDirlinkMain.
             iEval (rewrite Hpp64) in "Hpc".
             (* +0x64 addi a0,a0,2790 *)
             iApply (wp_addi4_s_sconf (mword_of_int (DK + 0x64)) Ra0 Ra0
-                      (mword_of_int 2818 : mword 12) PB1 (K - 10)%nat b
+                      (mword_of_int 2826 : mword 12) PB1 (K - 10)%nat b
                       ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj64").
             iIntros (CIDpa3 Hqpa3) "Hcg Hpc".
             set (PB2 := <[Regidx Ra0 := regval_into_reg
                            (add_vec (rget PB1 Ra0)
-                              (sign_extend' 64 (mword_of_int 2818 : mword 12)))]> PB1).
+                              (sign_extend' 64 (mword_of_int 2826 : mword 12)))]> PB1).
             assert (Hpp68 : add_vec_int (mword_of_int (DK + 0x64) : mword 64) 4
                             = mword_of_int (DK + 0x68)) by pcw.
             iEval (rewrite Hpp68) in "Hpc".
