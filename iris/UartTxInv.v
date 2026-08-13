@@ -1,44 +1,55 @@
-(* UartTxInv.v -- the UART transmitter's software side: the [tx_lock] spinlock
-   and what it protects, plus the two trace lemmas a driver needs to read the
-   accepted-byte history out of [dev_inv].
+(* UartTxInv.v -- the UART transmitter's software side: what serializes the
+   writers, and the two trace lemmas a driver needs to read the accepted-byte
+   history out of [dev_inv].
 
-   Geometry (uart.c's three file-static objects):
+   Geometry (uart.c's two remaining file-static objects):
 
-     a_tx_lock   -- &tx_lock   (the spinlock, "uart")
-     a_tx_busy   -- &tx_busy   (int: "the UART is still sending")
+     a_tx_lock   -- &tx_lock   (a struct sleeplock; it serializes uartwrite
+                                callers and nothing else)
      a_tx_chan   -- &tx_chan   (int: its ADDRESS is the sleep channel; the
                                 cell itself is never read or written, so
                                 nothing here owns it)
 
-   WHAT THE LOCK PROTECTS ([tx_res]).  Two things, and the second is the whole
-   point of the file:
+   WHAT THE LOCK PROTECTS ([tx_res]) IS NOW ONE THING: the EXCLUSIVE
+   TRANSMITTER TOKEN [uart_tx_own γu l] (WpUart.v) -- the right to push a byte
+   into THR, and the statement that the accepted trace is exactly [l].
 
-     - the [tx_busy] cell, at an arbitrary value;
-     - the EXCLUSIVE TRANSMITTER TOKEN [uart_tx_own] (WpUart.v) -- the right
-       to push a byte into THR, and the statement that the accepted trace is
-       exactly [l];
-     - and, hanging off [tx_busy] being zero, the certificate
-       [uart_out_lb γu l]: everything accepted has already been transmitted.
+   THE CERTIFICATE THAT USED TO LIVE HERE IS GONE, and that is the whole
+   change.  The old uart.c drove the transmitter by BEING TOLD it was idle:
+   uartintr checked LSR.THRE and cleared a [tx_busy] flag, and uartwrite's THR
+   store was licensed by the lock invariant's implication "tx_busy == 0 ⟹
+   everything accepted has been transmitted" -- the software's record of
+   somebody else's THRE observation.  That is what forced the token into a
+   lock shared with the interrupt handler, and it is what this file existed to
+   state.
 
-   That last implication is what makes uartwrite's THR store provable at all.
-   The device leaf ([wp_uart_thr_write_s_sconf]) will not let a byte be pushed
-   unless the FIFO provably has room, and the only way to know that is to have
-   SEEN it empty -- either by polling THRE (uartputc_sync's route) or by being
-   told, and the interrupt-driven driver is told: uartintr checks LSR.THRE and
-   only then clears [tx_busy].  So "tx_busy == 0" is not merely a hint that the
-   UART is idle, it is the software's record of a THRE observation, and the
-   invariant is where that record is cashed.
+   The new uart.c POLLS THRE ITSELF, immediately before every byte:
 
-   Consequently the token CANNOT live with a caller: uartintr needs it (to
-   read the trace out at the THRE check) and uartwrite needs it (to push), and
-   they meet only under this lock.
+       sleep_prepare(&tx_chan);
+       if (ReadReg(LSR) & LSR_TX_IDLE) { WriteReg(THR, buf[i]); i += 1; }
+       else                            { sleep(); }
 
-   The two [dev_inv] lemmas at the end ([uart_tx_own_snapshot],
-   [uart_tx_own_sent_prefix]) are what turn the token's "the trace is exactly
-   [l]" into statements about the PERSISTENT record [uart_sent]: a snapshot at
-   the current value, and the fact that any earlier record is a prefix of it.
-   A driver that pushes bytes across a sleep needs the second one -- it is
-   what re-links the trace it saw before parking to the one it finds after. *)
+   so the store is licensed by [uart_tx_poll_thre] applied to the writer's own
+   LSR read -- uartputc_sync's route -- and needs no invariant at all.  With
+   the certificate goes the flag ([tx_busy] no longer exists), and with the
+   flag goes the reason uartintr had to reach the token: the handler now only
+   observes LSR and calls wakeup(&tx_chan), which moves no device ghost.  The
+   two functions no longer meet in a shared resource; they meet in the sleep
+   channel.
+
+   *** OWED: [is_txlock] IS NOT CONSTRUCTIBLE AT BOOT AS THE SOURCE STANDS. ***
+   uart.c declares [static struct sleeplock tx_lock] and NEVER CALLS
+   [initsleeplock] on it -- uartinit's [initlock(&tx_lock, "uart")] went away
+   with the spinlock and nothing replaced it.  The C works (a zero-initialized
+   sleeplock reads as unlocked), but the zeroed [name] fields are NULL
+   POINTERS, and both [WpLock.lock_name] and [SleepLock.sl_name] say the field
+   points at a real NUL-terminated string -- which no address in this model's
+   memory map can satisfy.  So [is_txlock] below is a premise no caller can
+   discharge, exactly like [SpecIlock]'s [i_ref] (design/fs-icache.md).  See
+   claude-notes/kernel-defects.md D2 for the two ways out (fix the C, or make
+   a lock's NAME optional so an anonymous lock can be minted from zeroed
+   bytes).  Everything else in the cone is stated and proved against
+   [is_txlock] as if it were available, so closing D2 closes the cone. *)
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -50,6 +61,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto.
 Require Import DevModel DiskPtsto WpUart.
 Require Import WpLock.
+Require Import SleepLock.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
@@ -62,71 +74,50 @@ Section UartTxInv.
      [dev_inv] has an instance in scope. *)
   Context `{GEN : RiscvLang.GenId}.
 
-  (* ---- geometry.  The lock's own two words ([locked] at +0, [cpu] at +16)
-     belong to [lock_inv] (WpLock.v); nothing here names them. *)
+  (* ---- geometry.  The sleeplock's own words belong to [SleepLock.sl_res] /
+     the inner spinlock's [lock_inv]; nothing here names them. *)
   Definition a_tx_lock : mword 64 := mword_of_int KernelSyms.tx_lock.
-  Definition a_tx_busy : mword 64 := mword_of_int KernelSyms.tx_busy.
   Definition a_tx_chan : mword 64 := mword_of_int KernelSyms.tx_chan.
 
-  (* ---- the protected resource. *)
+  (* ---- the protected resource: the transmitter, at whatever trace it is at.
+     The trace is EXISTENTIAL here because no reader of the lock predicts it --
+     a writer learns the current value when it takes the lock, and every claim
+     it then makes about its own bytes is a [uart_sent_sub] (below), which is
+     persistent and survives the release. *)
   Definition tx_res (γu : uart_names) : iProp Σ :=
-    (∃ (b : mword 32) (l : list (bv 8)),
-       a_tx_busy ↦₄ b ∗
-       uart_tx_own γu l ∗
-       (⌜ b = (mword_of_int 0 : mword 32) ⌝ -∗ uart_out_lb γu l))%I.
+    (∃ l : list (bv 8), uart_tx_own γu l)%I.
 
-  (* the two shapes a client re-closes with: "still sending" (any trace) and
-     "idle" (the trace it has just seen fully transmitted). *)
-  Lemma tx_res_busy (γu : uart_names) (b : mword 32) (l : list (bv 8)) :
-    b <> (mword_of_int 0 : mword 32) ->
-    a_tx_busy ↦₄ b -∗ uart_tx_own γu l -∗ tx_res γu.
-  Proof.
-    iIntros (Hb) "Hcell Hown". iExists b, l. iFrame "Hcell Hown".
-    iIntros (Heq). exfalso. exact (Hb Heq).
-  Qed.
-
-  Lemma tx_res_idle (γu : uart_names) (b : mword 32) (l : list (bv 8)) :
-    a_tx_busy ↦₄ b -∗ uart_tx_own γu l -∗ uart_out_lb γu l -∗ tx_res γu.
-  Proof.
-    iIntros "Hcell Hown #Hlb". iExists b, l. iFrame "Hcell Hown".
-    iIntros (_). iExact "Hlb".
-  Qed.
+  Lemma tx_res_intro (γu : uart_names) (l : list (bv 8)) :
+    uart_tx_own γu l -∗ tx_res γu.
+  Proof. iIntros "H". by iExists l. Qed.
 
   (* ---- the lock.  [uart_dlab_off] rides along because it is persistent and
      every THR write needs it: offset 0 is the divisor latch, not THR, while
      DLAB is set, so "the byte was transmitted" is false without it.  A client
-     that holds the lock therefore holds everything the store leaf wants. *)
-  Definition is_txlock (γl : gname) (γu : uart_names) : iProp Σ :=
-    (is_lock γl a_tx_lock "uart"%string (tx_res γu) ∗ uart_dlab_off γu)%I.
+     that holds the lock therefore holds everything the store leaf wants.
 
-  Global Instance is_txlock_persistent γl γu : Persistent (is_txlock γl γu).
+     A SLEEPLOCK, not a spinlock: uartwrite parks between bytes, and it must
+     keep the transmitter across the park -- which a spinlock cannot do
+     (sched() demands noff = 1).  [γl] is the inner spinlock's ghost, [γsl] the
+     sleeplock's own. *)
+  Definition is_txlock (γl γsl : gname) (γu : uart_names) : iProp Σ :=
+    (is_sleeplock γl γsl a_tx_lock "uart"%string (tx_res γu) ∗
+     uart_dlab_off γu)%I.
+
+  Global Instance is_txlock_persistent γl γsl γu : Persistent (is_txlock γl γsl γu).
   Proof. apply _. Qed.
 
-  Lemma is_txlock_lock γl γu :
-    is_txlock γl γu -∗ is_lock γl a_tx_lock "uart"%string (tx_res γu).
+  Lemma is_txlock_lock γl γsl γu :
+    is_txlock γl γsl γu -∗ is_sleeplock γl γsl a_tx_lock "uart"%string (tx_res γu).
   Proof. iIntros "[$ _]". Qed.
 
-  Lemma is_txlock_dlab γl γu : is_txlock γl γu -∗ uart_dlab_off γu.
+  Lemma is_txlock_dlab γl γsl γu : is_txlock γl γsl γu -∗ uart_dlab_off γu.
   Proof. iIntros "[_ $]". Qed.
 
-  (* ---- construction (the "newlock" ghost step), the shape uartinit's
-     postcondition leaves behind: the freshly zeroed lock word and its
-     persistent name, the [tx_busy] cell, and the transmitter token. *)
-  Lemma new_txlock E (γu : uart_names) (b : mword 32) (l : list (bv 8)) :
-    lock_name a_tx_lock "uart"%string -∗
-    a_tx_lock ↦₄ (mword_of_int 0 : mword 32) -∗
-    lock_cpu a_tx_lock ↦₈ (zero_reg : mword 64) -∗
-    a_tx_busy ↦₄ b -∗
-    uart_tx_own γu l -∗
-    (⌜ b = (mword_of_int 0 : mword 32) ⌝ -∗ uart_out_lb γu l) -∗
-    uart_dlab_off γu ={E}=∗ ∃ γl : gname, is_txlock γl γu.
-  Proof.
-    iIntros "#Hnm Hlkw Hcpu Hbusy Hown Hlb #Hoff".
-    iMod (newlock E a_tx_lock "uart"%string (tx_res γu)
-            with "Hnm Hlkw Hcpu [Hbusy Hown Hlb]") as (γl) "#Hlk".
-    { iExists b, l. iFrame "Hbusy Hown Hlb". }
-    iModIntro. iExists γl. iFrame "Hlk Hoff".
-  Qed.
+  Lemma is_txlock_intro γl γsl γu :
+    is_sleeplock γl γsl a_tx_lock "uart"%string (tx_res γu) -∗
+    uart_dlab_off γu -∗ is_txlock γl γsl γu.
+  Proof. iIntros "#Hl #Ho". by iFrame "Hl Ho". Qed.
 
   (* ===================================================================== *)
   (*  Reading the accepted trace out of [dev_inv].                          *)

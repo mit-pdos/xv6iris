@@ -55,11 +55,24 @@ held" group is *not* uniformly private.
 ### 1. Lock-protected and genuinely mutable — `state`, `chan`, `killed`, `xstate`
 
 Every core touches these on procs it does not own: `kkill()` walks all 64 and
-writes `killed`, `wakeup()` walks all 64 and compares `chan`, `scheduler()`
-walks all 64 and reads/writes `state`, `wait()` reads a child's `xstate`.
-Full ownership, always resident in the lock's resource. This is the group
-`proc_lock_res` already covers (`state`, `chan`); `killed` and `xstate` join
-it unchanged.
+writes `killed`, `wakeup()` walks all 64 and compares — and now CLEARS —
+`chan`, `scheduler()` walks all 64 and reads/writes `state`, `wait()` reads a
+child's `xstate`. Full ownership, always resident in the lock's resource.
+This is the group `proc_lock_res` already covers (`state`, `chan`); `killed`
+and `xstate` join it unchanged.
+
+**`chan` is the WAKEUP FLAG, not bookkeeping** (upstream `ae96fd0`; see
+[`../projects/sleep-split.md`](../projects/sleep-split.md)). `sleep_prepare`
+records it, `sleep` parks only if it is still non-zero, and `wakeup` clears it
+for every matching slot whether or not that slot is SLEEPING — which is what
+closes the window the split protocol opens between a waiter's registration and
+its park. Two consequences for anyone stating a fact about the field:
+`sleep` no longer clears it on the way out and `kkill` re-queues a SLEEPING
+proc without touching it, so **"`chan` is 0 whenever the process is not
+waiting" is NOT an invariant**; and `wakeup` no longer skips `myproc()`, so
+the walk reaches the caller's own slot — which needs no new resource, because
+`p->lock` hands out only the invariant's half of the state mirror and the
+write arm is licensed by the state READ being SLEEPING, an unclaimed state.
 
 **`killed` is quantified, and that is the design, not a gap.** `proc_pub`
 holds `p_killed pa ↦₄ kl` under an existential `kl`, so the invariant says
@@ -515,7 +528,8 @@ With this shape **no caller ever destructs more than one guard**:
 | `wait` | `xstate`, `pid`, child's pagetable/trapframe | `inv_dormant` only |
 | `scheduler` | `state`, the parked context | `needs_ctx` only |
 | `allocproc` | `state`, `pid`, the free block | `inv_dormant` only |
-| `sleep` / `yield` / `sched` | `state`, `chan`, own context | `needs_ctx` only |
+| `sleep` / `yield` / `sched` | `state`, own context | `needs_ctx` only |
+| `sleep_prepare` | `chan` | none |
 
 `kkill` and `wakeup` — the two functions that walk procs they do not own — reach
 everything they touch at the top level and never learn the state. And because

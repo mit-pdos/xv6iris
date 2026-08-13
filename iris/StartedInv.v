@@ -1,7 +1,7 @@
 (* StartedInv.v -- the invariant on xv6's [started] flag, the one channel by
    which the boot hart's initialisation reaches the other harts.
 
-     volatile static int started = 0;            // main.c, @ 0x8000a230
+     volatile static int started = 0;            // main.c, @ 0x8000a240
 
      main() {
        if (cpuid() == 0) { ...all the init...; fence; started = 1; }

@@ -265,11 +265,6 @@ Section SpecMain.
         [is_lock … ticks_res], and [ticks_res] is this cell -- which is what
         the handler contract's [tick_keeper] conjunct asks of the tick hart. *)
      (∃ t : mword 32, a_ticks ↦₄ t) ∗
-     (* [tx_busy], the flag tx_lock protects (with the accepted-trace ghost).
-        Same story as [ticks]: main needs it to ALLOCATE the lock, which is
-        what the handler contract's [is_txlock] conjunct asks for -- uartintr
-        is on kerneltrap's cone. *)
-     (∃ b : mword 32, a_tx_busy ↦₄ b) ∗
      ([∗ list] k ∈ seq 0 NBUF, sl_raw (buf_lock (bnode k))) ∗
      ([∗ list] k ∈ seq 0 NBUF, blink_raw (bnode k)) ∗
      blink_raw bhead ∗

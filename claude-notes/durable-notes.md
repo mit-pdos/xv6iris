@@ -489,7 +489,12 @@ what makes this tractable at all); then fix what it does NOT cover.
   `main`, `bmap`, `iupdate`) still break — they call into code that did.
 
 - **NEVER compute the fix set by value arithmetic.** Three separate ways it
-  is wrong, each hit for real: (a) `removed − added` set-difference silently
+  is wrong, each hit for real — **and `tools/relayout_map.py` is the
+  mechanized form of the rule that follows** (`map` prints a Code file's
+  per-offset immediate changes; `apply` rewrites a proof with them, anchored
+  on the last `KernelSyms.<sym> + 0x<off>` it saw, so both occurrences per
+  call site move and nothing outside the region does). Three ways value
+  arithmetic is wrong: (a) `removed − added` set-difference silently
   drops any value that reappears as a NEW immediate elsewhere — that hid
   `ProofFilealloc` entirely; (b) immediates are written in HEX in some
   proofs and DECIMAL in others (`0x6a2` vs `1698`), so a decimal grep misses
@@ -504,6 +509,66 @@ what makes this tractable at all); then fix what it does NOT cover.
   `ITYPE (1468, …)` against a word that now decodes to 1462, and the file
   failed again on the next build. Diff every asserted word in such a file
   against the image rather than patching the one the error names.
+
+### Four more, found the hard way on the ae96fd0+9da28f5 bump
+
+The immediate sweep above is the FIRST of five layers. Each of the next four
+is invisible to it, and all four surface as something that names no address.
+
+- **`relayout_map apply` silently does NOTHING to a proof that never writes
+  `KernelSyms.<sym> + 0x<off>`.** A large family binds
+  `pcE := mword_of_int KernelSyms.<sym>` once and then steps with
+  `add_vec_int pcE N`, so the scan never re-anchors, `apply` reports a
+  truthful-looking **`0 substitutions`**, and the file is left ENTIRELY
+  stale. Five files failed exactly this way, each at its first moved
+  immediate (`ProofFileinit`, `ProofFileclose`, `ProofFileread`,
+  `ProofPrintkinit`, `ProofTrapinit`). **`0 substitutions` on a proof whose
+  own function moved is a RED FLAG, not a pass.** For those, substitute
+  file-wide from the same map, restricted to values that are unambiguous in
+  it (one new value, and not themselves a new value at another offset).
+
+- **PAIR A MAP TO A PROOF BY NAME, NEVER BY "mentions the symbol".** Applying
+  every changed Code file's map to every file naming its symbols writes one
+  function's immediates into another's: `CodeKfork`'s correct 1726 at
+  `kfork+0xcc` was overwritten with 1742 by an unrelated function's map,
+  because 1726 was an unambiguous OLD value over there. The rule that works
+  is `Code<Stem>.v` owns `(Proof|Link|Spec|Wp)<Stem><Part>.v` with `<Part>`
+  empty or starting uppercase/digit — so `Trapinit` claims `ProofTrapinit.v`
+  and not `ProofTrapinithart.v`. The damage is silent: the file still
+  compiles right up until the WP step it lies about.
+
+- **THREE LEVELS BELOW THE IMMEDIATE: absolute addresses, derived constants,
+  and divisibility factors — each one build round.** The data segment moves
+  too (+0x10 here), and a proof spells it three different ways, none of them
+  an instruction immediate:
+  1. the **absolute address** as a literal (`2147628144`, `0x800181e8`) where
+     a `KernelSyms.<sym>` would have moved for free — 54 sites in 15 files;
+  2. a **derived constant**, e.g. `bcache + 24` written as the single literal
+     `2147582464`, which no symbol-address scan matches;
+  3. a **hand-computed factor or witness** — `(536895642 + 278*kk) * 4` for
+     the alignment lemma, `exists 268453520` for `Z.divide_trans` — where the
+     number is `(base + c) / d` and moves by `0x10 / d`.
+  All three fail as **`lia`'s "Cannot find witness"** or a bare unification
+  failure with no address in the message, and (2) and (3) hide behind (1):
+  fixing the literal just moves the error a few lines up, into the alignment
+  helper. Fix all three in one pass — grep the file for every literal above
+  ~10^6 once you have touched one of them. A window-based scan for
+  `base + k` is NOT worth writing: it drowns in coincidences (a page base
+  `524294 * 4096` matched a text symbol + 4082). The build is the authority.
+
+- **A FAILED FILE KEEPS ITS OLD `.vo`, AND THE STALENESS IS TRANSITIVE — this
+  is the false green.** `make` deletes the `.glob` of a target that fails
+  (*"Deleting file 'X.glob'"*) and **leaves `X.vo` alone**, so a file that
+  never once compiled still has the `.vo` from the PREVIOUS image's build,
+  and everything above it links against a proof of a DIFFERENT KERNEL. Here
+  it reported `1062` of `1061` `.vo` with "one file red" while `ProofNamex.vo`
+  was three hours old and `LinkNamei.vo`/`LinkNameiparent.vo` were linked
+  against it — a `Print Assumptions` through that cone would have audited the
+  old image. **`X.v -nt X.vo` finds only the head of the cone**: the
+  dependants' own sources did not change, so their stale `.vo` look current.
+  Get the real set from coqdep's graph (`.CoqMakefile.d`, transitively), `rm`
+  every `.vo` in it, and rebuild before believing a count or an assumptions
+  audit.
 
 ### Expect cascades, and let `-k` enumerate them
 
@@ -939,3 +1004,40 @@ extra structure.
   request's block content, which is what makes `virtio_disk_rw`'s read
   postcondition provable — claude-notes/completed/virtio-disk-rw.md).
 - Avoid ad-hoc argument couplings in preconditions (e.g. a precondition like `eq_vec (m0!!!a2) zero_reg = Nat.eqb N 0` that ties an argument to a branch condition). Prefer deriving branch conditions internally / a natural contract; if a coupling is genuinely unavoidable, flag it and confirm the form before building it out.
+
+## IMAGE CONSTANTS ARE GENERATED — do not transcribe one by hand
+
+A handful of files need an image constant as a Coq **term** rather than as an
+`instr` fact, because a spec unifies on the term: `ProcGeom.mycpu_ret` (the
+closed form of `&cpus` that every per-CPU cell address and every
+acquire/release/push_off/pop_off/myproc contract is stated in),
+`ProofMyproc.mp_A4C`, `WpDecode.w_ld`, `BootChain.entry_got`, and the
+hand-written `Code*Aux.v` files. Each used to be a transcribed literal, and
+**each went stale on every image bump** — surfacing not at its own definition
+but as an unhelpful failure in whatever consumer compiled first (a bare `lia`
+"Cannot find witness" inside `BootCarve.v`; `Unable to unify "2147558352" with
+"2147558212"` inside `ProcGeom.v`). The diagnosis is nowhere near the defect,
+which is what made them expensive.
+
+They are all generated now. **`iris/KernelConsts.v` is produced by
+`tools/gen_consts.py` (hooked into `make gen-code`)** from the same dump the
+rest of the decode layer comes from; adding one is a row in its `CONSTS`
+table, which names the symbol, the offset and the field kind (`word32` /
+`imm_i` / `imm_u` / `imm_jal` / `pcrel`, the last being the address an
+`auipc`/`addi` pair computes). If you find yourself about to write a hex
+literal that came out of `kernel.asm`, add a row instead.
+
+Two constants are NOT routed through the generator, because the dumper
+already emits exactly them and a generator would be a second copy:
+`RiscvLang.img_end` (the single PT_LOAD's `vaddr + filesz`, from
+`KernelData.kernel_segments`) and `PageGeom.kmem_lo` (the `end` symbol, from
+`KernelSyms.end_`).
+
+**Both use `Definition c : Z := ltac:(let x := eval vm_compute in <e> in exact x).`
+and that form is load-bearing, not stylistic.** Defining `kmem_lo` as
+`KernelSyms.end_` directly compiles, but `unfold kmem_lo` then leaves a
+constant `lia` cannot see through, and all six downstream `unfold kmem_lo;
+lia` sites break — measured, not hypothetical. Computing the value at
+definition time leaves a plain `Z` literal in the body, so every existing
+consumer works unchanged. It is the same "compute the result ONCE into its own
+Definition" idiom as `ColdBoot.v`'s, used for a different reason.

@@ -488,7 +488,7 @@ Section ProofSysDup.
     iEval (rewrite Hpp10) in "Hpc".
     (* ---- +0x10: jal ra,argfd ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sys_dup + 0x10)) Rra
-              (mword_of_int 2096670 : mword 21) M5 (av - 6)%nat b
+              (mword_of_int 2096650 : mword 21) M5 (av - 6)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi10 [-]").
     iIntros (CID8 Hk8) "Hcg Hpc".
@@ -497,7 +497,7 @@ Section ProofSysDup.
     change (<[Regidx Rra := regval_into_reg
               (add_vec_int (mword_of_int (KernelSyms.sys_dup + 0x10) : mword 64) 4)]> M5) with M6.
     assert (Hjaf : add_vec (mword_of_int (KernelSyms.sys_dup + 0x10) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2096670 : mword 21)) = mword_of_int KernelSyms.argfd)
+                     (sign_extend' 64 (mword_of_int 2096650 : mword 21)) = mword_of_int KernelSyms.argfd)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjaf) in "Hpc".
     assert (HM6ra : M6 !!! Regidx Rra
@@ -710,7 +710,7 @@ Section ProofSysDup.
     { rewrite /B3 upd_eq HB2s1. apply add_vec_zero_l. }
     (* ---- +0x24: jal ra,fdalloc ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sys_dup + 0x24)) Rra
-              (mword_of_int 2096740 : mword 21) B3 (av - 6)%nat b
+              (mword_of_int 2096720 : mword 21) B3 (av - 6)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi24 [-]").
     iIntros (CID16 Hk16) "Hcg Hpc".
@@ -719,7 +719,7 @@ Section ProofSysDup.
     change (<[Regidx Rra := regval_into_reg
               (add_vec_int (mword_of_int (KernelSyms.sys_dup + 0x24) : mword 64) 4)]> B3) with B4.
     assert (Hjfd : add_vec (mword_of_int (KernelSyms.sys_dup + 0x24) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2096740 : mword 21)) = mword_of_int KernelSyms.fdalloc)
+                     (sign_extend' 64 (mword_of_int 2096720 : mword 21)) = mword_of_int KernelSyms.fdalloc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjfd) in "Hpc".
     assert (HB4ra : B4 !!! Regidx Rra
@@ -956,7 +956,7 @@ Section ProofSysDup.
     { rewrite /G1 upd_eq HD2s1. apply add_vec_zero_l. }
     (* ---- +0x32: jal ra,filedup ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sys_dup + 0x32)) Rra
-              (mword_of_int 2094094 : mword 21) G1 (av - 6)%nat b
+              (mword_of_int 2094046 : mword 21) G1 (av - 6)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi32 [-]").
     iIntros (CID22 Hk22) "Hcg Hpc".
@@ -965,7 +965,7 @@ Section ProofSysDup.
     change (<[Regidx Rra := regval_into_reg
               (add_vec_int (mword_of_int (KernelSyms.sys_dup + 0x32) : mword 64) 4)]> G1) with G2.
     assert (Hjfdp : add_vec (mword_of_int (KernelSyms.sys_dup + 0x32) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2094094 : mword 21)) = mword_of_int KernelSyms.filedup)
+                      (sign_extend' 64 (mword_of_int 2094046 : mword 21)) = mword_of_int KernelSyms.filedup)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjfdp) in "Hpc".
     assert (HG2ra : G2 !!! Regidx Rra

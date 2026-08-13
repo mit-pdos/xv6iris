@@ -8,10 +8,10 @@
 (* ProofVirtioDiskRwC.v -- virtio_disk_rw, phases P3 (and onward).
 
    The continuation of ProofVirtioDiskRwB.v.  That file proves P2.3 and
-   leaves the seam [vdrw_p2_exit] at +0x0b0; this file picks it up.
+   leaves the seam [vdrw_p2_exit] at +0x0c4; this file picks it up.
 
-     P3   descriptor / header / status / info.b formatting  +0x0b0..+0x162
-     P4   ring write, fence, and THE PUBLISH                +0x162..+0x186
+     P3   descriptor / header / status / info.b formatting  +0x0c4..+0x176
+     P4   ring write, fence, and THE PUBLISH                +0x176..+0x19a
 
    A THIRD file (rather than more of ProofVirtioDiskRwB.v) purely for build
    latency, exactly as the B file is a second one: the functor is re-opened
@@ -49,7 +49,7 @@ Require Import HartTp WpNext.
 Require Import CpuOwn FdSlots.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
-Require Import SpecAcquire SpecRelease SpecSleep SpecFreeDesc.
+Require Import SpecAcquire SpecRelease SpecSleepPrepare SpecSleep SpecFreeDesc.
 Require Import ProofVirtioDiskRwB.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -72,9 +72,9 @@ Require Import ProofVirtioDiskRwC.
 (* ===================================================================== *)
 
 Module VirtioDiskRwRestC (Acquire : ACQUIRE) (Release : RELEASE)
-                         (Sleep : SLEEP) (FreeDesc : FREEDESC).
+                         (SleepPrepare : SLEEP_PREPARE) (Sleep : SLEEP) (FreeDesc : FREEDESC).
 
-Module P2 := VirtioDiskRwRest Acquire Release Sleep FreeDesc.
+Module P2 := VirtioDiskRwRest Acquire Release SleepPrepare Sleep FreeDesc.
 
 Section ProofVirtioDiskRwCSeam.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}.
@@ -88,7 +88,7 @@ Section ProofVirtioDiskRwCSeam.
   (* ------------------------------------------------------------------- *)
   (* THE P3/P4 SEAM.                                                      *)
   (*                                                                      *)
-  (* Identical to [vdrw_p2_exit] except that (a) the pc is +0x162, (b) the *)
+  (* Identical to [vdrw_p2_exit] except that (a) the pc is +0x176, (b) the *)
   (* three descriptor bundles have become [vdrw_chain] (their formatted    *)
   (* cells plus the two untouched slot remainders) and the caller's        *)
   (* [b->disk] cell is inside it at value 1, and (c) the three registers   *)
@@ -116,7 +116,7 @@ Section ProofVirtioDiskRwCSeam.
        cpu_own 1 eb (proc_addr j) C false -∗
        trap_csrs -∗
        cpu_claim (proc_addr j) -∗
-       pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x162) : mword 64) -∗
+       pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x176) : mword 64) -∗
        locked γk cpu_id -∗
        vdrw_body γd pd pav np nr fl pk tr
          (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false) -∗

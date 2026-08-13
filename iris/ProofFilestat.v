@@ -344,7 +344,7 @@ Section ProofFilestat.
        +0x10 jal ra,myproc
        ================================================================= *)
     iApply (wp_jal_s_sconf (mword_of_int (FST + 0x10)) Rra
-              (mword_of_int 2086852 : mword 21) R4 (K - 10)%nat b
+              (mword_of_int 2086736 : mword 21) R4 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi10 [-]").
     iIntros (CID9 Hs9) "Hcg Hpc".
@@ -353,7 +353,7 @@ Section ProofFilestat.
     change (<[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (FST + 0x10) : mword 64) 4)]> R4) with R5.
     assert (Htgtmp : add_vec (mword_of_int (FST + 0x10) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2086852 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2086736 : mword 21))
                      = mword_of_int KernelSyms.myproc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtmp) in "Hpc".
@@ -608,14 +608,14 @@ Section ProofFilestat.
       iEval (rewrite Hpp26) in "Hpc".
       (* +0x26 jal ra,ilock *)
       iApply (wp_jal_s_sconf (mword_of_int (FST + 0x26)) Rra
-                (mword_of_int 2093188 : mword 21) Q2 (K - 10)%nat b
+                (mword_of_int 2093130 : mword 21) Q2 (K - 10)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi26 [-]").
       iIntros (CID19 Hs19) "Hcg Hpc".
       set (Q3 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (FST + 0x26) : mword 64) 4)]> Q2).
       assert (Htgtil : add_vec (mword_of_int (FST + 0x26) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2093188 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2093130 : mword 21))
                        = mword_of_int KernelSyms.ilock)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtil) in "Hpc".
@@ -776,14 +776,14 @@ Section ProofFilestat.
       iEval (rewrite Hpp32) in "Hpc".
       (* +0x32 jal ra,stati *)
       iApply (wp_jal_s_sconf (mword_of_int (FST + 0x32)) Rra
-                (mword_of_int 2094044 : mword 21) I3 (K - 10)%nat b
+                (mword_of_int 2093986 : mword 21) I3 (K - 10)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi32 [-]").
       iIntros (CID23 Hs23) "Hcg Hpc".
       set (I4 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (FST + 0x32) : mword 64) 4)]> I3).
       assert (Htgtst : add_vec (mword_of_int (FST + 0x32) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2094044 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2093986 : mword 21))
                        = mword_of_int KernelSyms.stati)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtst) in "Hpc".
@@ -889,14 +889,14 @@ Section ProofFilestat.
       iEval (rewrite Hpp38) in "Hpc".
       (* +0x38 jal ra,iunlock *)
       iApply (wp_jal_s_sconf (mword_of_int (FST + 0x38)) Rra
-                (mword_of_int 2093344 : mword 21) J1 (K - 10)%nat b
+                (mword_of_int 2093286 : mword 21) J1 (K - 10)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi38 [-]").
       iIntros (CID26 Hs26) "Hcg Hpc".
       set (J2 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (FST + 0x38) : mword 64) 4)]> J1).
       assert (Htgtiu : add_vec (mword_of_int (FST + 0x38) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2093344 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2093286 : mword 21))
                        = mword_of_int KernelSyms.iunlock)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtiu) in "Hpc".
@@ -1039,14 +1039,14 @@ Section ProofFilestat.
       iEval (rewrite Hpp46) in "Hpc".
       (* +0x46 jal ra,copyout *)
       iApply (wp_jal_s_sconf (mword_of_int (FST + 0x46)) Rra
-                (mword_of_int 2086062 : mword 21) U4 (K - 10)%nat b
+                (mword_of_int 2085946 : mword 21) U4 (K - 10)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi46 [-]").
       iIntros (CID31 Hs31) "Hcg Hpc".
       set (U5 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (FST + 0x46) : mword 64) 4)]> U4).
       assert (Htgtco : add_vec (mword_of_int (FST + 0x46) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2086062 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2085946 : mword 21))
                        = mword_of_int KernelSyms.copyout)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtco) in "Hpc".

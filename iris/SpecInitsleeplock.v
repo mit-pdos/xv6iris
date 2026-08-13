@@ -31,7 +31,7 @@ Import Defs.
 (* the "sleep lock" string literal in rodata (the auipc/addi pair at
    KernelSyms.initsleeplock+0x10 resolves here); the caller extracts the persistent [↦ₛ□] from
    [kernel_data] via [kernel_data_string]. *)
-Definition sl_str_addr : mword 64 := mword_of_int 0x80007548.
+Definition sl_str_addr : mword 64 := mword_of_int 0x80007560.
 
 Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
     (m : regfile) (s : string)

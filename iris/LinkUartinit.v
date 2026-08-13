@@ -1,6 +1,8 @@
-(* LinkUartinit.v -- instantiates the Uartinit proof against its callee's
-   proof (Initlock) and the UART device leaves (Uart).  Sealed, so this is the
-   only place the three ever meet. *)
-Require Import LinkUart LinkInitlock ProofUartinit.
+(* LinkUartinit.v -- instantiates the Uartinit proof against the UART device
+   leaves (Uart).  Sealed, so this is the only place the two ever meet.
 
-Module Uartinit := UartinitProof Uart Initlock.
+   ae96fd0 deleted uartinit's [initlock(&tx_lock,"uart")], so Initlock is no
+   longer a callee and no longer a functor argument. *)
+Require Import LinkUart ProofUartinit.
+
+Module Uartinit := UartinitProof Uart.

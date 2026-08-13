@@ -240,7 +240,7 @@ Proof. unfold kerneltrap_stack, kv_frame_slots. lia. Qed.
 Definition wp_kerneltrap_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γu : uart_names) (γv : disk_names) (γtx γdk γtl : gname)
+    (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
     (γs : list gname) (pd pav pu : mword 64)
     (m : regfile) (av : nat) (p : mword 64) (C : iProp Σ)
     (ep sc tv : mword 64) :=
@@ -288,7 +288,7 @@ Definition wp_kerneltrap_sconf_body
   cpu_own 0 false p C false -∗
   kernel_text -∗ pc_is pcE -∗
   sepc ↦ᵣ ep -∗ scause ↦ᵣ sc -∗ stval ↦ᵣ tv -∗
-  devintr_caps γu γv γtx γdk γtl γs pd pav pu -∗
+  devintr_caps γu γv γdk γtl γs pd pav pu -∗
   (* THE RUNNING CLAIM, handed over by the TRAP: taking the trap cleared SIE
      and so dismantled [sie_arm true p], and the claim was one of its
      conjuncts.  This is what a preempting kerneltrap spends on [yield] --
@@ -322,10 +322,10 @@ Module Type KERNELTRAP.
   Parameter wp_kerneltrap_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γu : uart_names) (γv : disk_names) (γtx γdk γtl : gname)
+      (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av : nat) (p : mword 64) (C : iProp Σ)
       (ep sc tv : mword 64),
-      wp_kerneltrap_sconf_body γu γv γtx γdk γtl γs pd pav pu
+      wp_kerneltrap_sconf_body γu γv γdk γtl γs pd pav pu
         m av p C ep sc tv.
 End KERNELTRAP.

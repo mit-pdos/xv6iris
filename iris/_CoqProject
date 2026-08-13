@@ -100,6 +100,8 @@ UservecExitPt.v
 ProofUservec.v
 LinkUservec.v
 SpecUsertrap.v
+UsertrapRes.v
+ProofUsertrapParts.v
 UserretUser.v
 LinkUserretUser.v
 SRegime.v
@@ -329,6 +331,7 @@ KernelDecode28.v
 KernelDecode29.v
 KernelDecode30.v
 KernelDecode31.v
+KernelConsts.v
 KernelDecode.v
 CodePushOff.v
 WpAmo.v
@@ -386,6 +389,10 @@ SpecSleep.v
 CodeSleep.v
 ProofSleep.v
 LinkSleep.v
+SpecSleepPrepare.v
+CodeSleepPrepare.v
+ProofSleepPrepare.v
+LinkSleepPrepare.v
 CodeWakeup.v
 SpecWakeup.v
 ProofWakeup.v
@@ -781,8 +788,8 @@ LinkEitherCopyin.v
 UartTxInv.v
 SpecUartwrite.v
 CodeUartwrite.v
-ProofUartwrite.v
 LinkUartwrite.v
+LinkTxLockInit.v
 SpecConsoleintr.v
 SpecBootDevCaps.v
 LinkBootDevCaps.v

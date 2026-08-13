@@ -28,7 +28,8 @@ carves the slot into byte cells; copyin/copyout take the single byte as their
 
 Loop structure:
 - `pipewrite`: one while loop; arms per iteration = exit −1 (readopen == 0 or
-  killed), full → `wakeup(&pi->nread); sleep(&pi->nwrite, &pi->lock)`, copyin
+  killed), full → `wakeup(&pi->nread)` then the split sleep protocol on
+  `&pi->nwrite`, copyin
   fail → break, else store byte / `nwrite++` / `i++`.  The sleep arm makes the
   loop unbounded: **iLöb induction** at the loop head (the acquiresleep
   recipe), with `i` universally quantified in the induction hypothesis.
@@ -89,21 +90,19 @@ Loop structure:
    `ltac:(rewrite Hlvl; vm_compute; reflexivity)`.
    pipewrite/piperead call copyin/copyout at lvl = 1.
 
-7. **`SLEEP_GEN`**: sleep generalized over the condition lock the same way
-   acquire/release already are — `lock_openable γk lka Rk Dk` + credential
-   `Tk` with `Tk -∗ Dk -∗ False`, `locked γk cpu_id -∗ Dk -∗ False`,
-   `locked_pre γk cpu_id -∗ Dk -∗ False`; `Tk` is threaded in and handed
-   back.  `SleepGenProof (Myproc) (Acquire) (AcquireGen) (Sched) (Release)
-   (ReleaseGen) : SLEEP_GEN` — the plain forms it needs for p->lock are
-   FUNCTOR PARAMETERS, not `AcquireOfGen`/`ReleaseOfGen` derivations inside
-   (which would add the tree's first Proof→Proof `Require` edge and
-   serialize the build along the call graph); `SleepOfGen (G : SLEEP_GEN) :
-   SLEEP` restates the old `wp_sleep_sconf_body` verbatim (Tk := emp,
-   Dk := False, `is_lock_openable`), so ProofAcquiresleep / ProofSysPause are
-   untouched.  The lk release site uses `lock_finisher_close` (Out := emp).
-   For the pipe: Tk := `pipe_ref γp w q`, Dk := `pipe_dead γl γp`,
-   Rk := `pipe_res γp pi`; the refutations are `pipe_ref_dead` /
-   `locked_dead` / `locked_pre_dead`.
+7. **The condition lock is the CALLER's** (as of xv6 ae96fd0, which split
+   `sleep(chan, lk)` into `sleep_prepare(chan)` / `release(lk)` / `sleep()` /
+   `acquire(lk)`): piperead's wait loop and pipewrite's full arm drop and
+   re-take `pi->lock` themselves through `RELEASE_GEN` / `ACQUIRE_GEN`,
+   presenting `pipe_ref γp w q` as the credential that refutes `pipe_dead`,
+   exactly as each function's entry acquire does.  Between the release and
+   the re-acquire the thread holds no lock and interrupts are back on, so
+   that stretch is `b = true`-indexed (leaves hand the hart on through
+   `wp_next true`; `cpu_own` needs `cpu_own_transport`), and `sleep()` is
+   entered at noff 0 with `eb = true`, where its `trap_csrs_ext` /
+   `cpu_claim_ext` premises are both `emp`.  The predecessor of this — a
+   `lock_openable`-generic `SLEEP_GEN` carrying `Tk`/`Dk` and three
+   refutations on the caller's behalf — is deleted; nothing needs it.
 
 8. **Stack budgets**: `pipewrite_stack := 64` (14 own slots + copyin's 50),
    `piperead_stack := 62` (12 + 50).  Both dominate sleep's 22, wakeup's 18,

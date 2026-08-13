@@ -28,6 +28,12 @@
    these slots does not exist -- so anything richer would be a predicate with no
    consumer.  When one arrives it is built at the caller from these cells.
 
+   ONLY ONE LOCK IS INITIALIZED HERE ANY MORE.  uartinit used to end with
+   [initlock(&tx_lock,"uart")] and hand its three raw cells back through this
+   contract; upstream ae96fd0 made tx_lock a sleeplock and DELETED that call
+   without replacing it (kernel-defects.md D2), so consoleinit now touches only
+   [cons.lock] and the transmit lock's storage appears nowhere in this spec.
+
    ProofConsoleinit.v proves it as a functor over [INITLOCK] and [UARTINIT];
    consoleinit touches no MMIO of its own, so the device side is pure transit
    into and out of the uartinit call. *)
@@ -78,7 +84,6 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
     (γd : uart_names) (m : regfile) (K : nat)
     (l : list (bv 8)) (b0 : bool)
     (vclock : bv 32) (vcname vccpu : bv 64)
-    (vtlock : bv 32) (vtname vtcpu : bv 64)
     (dread0 dwrite0 : mword 64) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.consoleinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
@@ -86,9 +91,6 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
   let clk : mword 64 := mword_of_int KernelSyms.cons in
   let c_cname := lock_name_field clk in
   let c_ccpu := add_vec clk (sign_extend' 64 (mword_of_int 0x10 : mword 12)) in
-  let tlk : mword 64 := mword_of_int KernelSyms.tx_lock in
-  let c_tname := lock_name_field tlk in
-  let c_tcpu := add_vec tlk (sign_extend' 64 (mword_of_int 0x10 : mword 12)) in
   (* consoleinit's own frame is 2 slots and its deepest callee is uartinit,
      which needs 4. *)
   (6 <= K)%nat ->
@@ -107,9 +109,6 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
   clk ↦₄ vclock -∗
   c_cname ↦₈ vcname -∗
   c_ccpu ↦₈ vccpu -∗
-  tlk ↦₄ vtlock -∗
-  c_tname ↦₈ vtname -∗
-  c_tcpu ↦₈ vtcpu -∗
   devsw_console_read ↦₈ dread0 -∗
   devsw_console_write ↦₈ dwrite0 -∗
   ( ∀ mr,
@@ -119,15 +118,12 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
     (* uartinit writes no THR, so the accepted trace is unchanged; its final
        LCR write cleared DLAB, so the half is frozen for good. *)
     uart_tx_own γd l -∗ uart_sent γd l -∗ uart_dlab_off γd -∗
-    (* both locks come back initialized; both are static globals that are never
-       freed, so both name fields are DISCARDED for the persistent
-       [lock_name], ready to be sealed into an [is_lock]. *)
+    (* cons.lock comes back initialized; it is a static global that is never
+       freed, so its name field is DISCARDED for the persistent [lock_name],
+       ready to be sealed into an [is_lock]. *)
     clk ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name clk "cons"%string -∗
     c_ccpu ↦₈ (zero_reg : mword 64) -∗
-    tlk ↦₄ (mword_of_int 0 : mword 32) -∗
-    lock_name tlk "uart"%string -∗
-    c_tcpu ↦₈ (zero_reg : mword 64) -∗
     devsw_console_read ↦₈ (mword_of_int KernelSyms.consoleread : mword 64) -∗
     devsw_console_write ↦₈ (mword_of_int KernelSyms.consolewrite : mword 64) -∗
     WP (Loop : expr riscv_lang)) -∗
@@ -139,7 +135,6 @@ Module Type CONSOLEINIT.
       (γd : uart_names) (m : regfile) (K : nat)
       (l : list (bv 8)) (b0 : bool)
       (vclock : bv 32) (vcname vccpu : bv 64)
-      (vtlock : bv 32) (vtname vtcpu : bv 64)
       (dread0 dwrite0 : mword 64) (p : mword 64),
-      wp_consoleinit_sconf_body γd m K l b0 vclock vcname vccpu vtlock vtname vtcpu dread0 dwrite0 p.
+      wp_consoleinit_sconf_body γd m K l b0 vclock vcname vccpu dread0 dwrite0 p.
 End CONSOLEINIT.

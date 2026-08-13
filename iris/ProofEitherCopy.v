@@ -632,7 +632,7 @@ Section ProofEitherCopyout.
       rewrite /R2 upd_ne; [exact HR1sp | reg_neq]. }
     (* ---- +0x18: jal ra,myproc ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.either_copyout + 0x18))
-              Rra (mword_of_int 2094720 : mword 21) R6 (av - 6)%nat b
+              Rra (mword_of_int 2094678 : mword 21) R6 (av - 6)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi18 [-]").
     iIntros (CID13 Hs13) "Hcg Hpc".
@@ -641,7 +641,7 @@ Section ProofEitherCopyout.
     change (<[Regidx Rra := regval_into_reg
               (add_vec_int (mword_of_int (KernelSyms.either_copyout + 0x18) : mword 64) 4)]> R6) with R7.
     assert (Hjmp : add_vec (mword_of_int (KernelSyms.either_copyout + 0x18) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2094720 : mword 21)) = mword_of_int KernelSyms.myproc)
+                     (sign_extend' 64 (mword_of_int 2094678 : mword 21)) = mword_of_int KernelSyms.myproc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjmp) in "Hpc".
     assert (HR7ra : R7 !!! Regidx Rra
@@ -776,7 +776,7 @@ Section ProofEitherCopyout.
       iEval (rewrite Hpp26) in "Hpc".
       (* ---- +0x26: jal ra,copyout ---- *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.either_copyout + 0x26))
-                Rra (mword_of_int 2093970 : mword 21) U4 (av - 6)%nat b
+                Rra (mword_of_int 2093928 : mword 21) U4 (av - 6)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi26 [-]").
       iIntros (CID20 Hs20) "Hcg Hpc".
@@ -785,7 +785,7 @@ Section ProofEitherCopyout.
       change (<[Regidx Rra := regval_into_reg
                 (add_vec_int (mword_of_int (KernelSyms.either_copyout + 0x26) : mword 64) 4)]> U4) with U5.
       assert (Hjco : add_vec (mword_of_int (KernelSyms.either_copyout + 0x26) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2093970 : mword 21)) = mword_of_int KernelSyms.copyout)
+                       (sign_extend' 64 (mword_of_int 2093928 : mword 21)) = mword_of_int KernelSyms.copyout)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjco) in "Hpc".
       assert (HU5ra : U5 !!! Regidx Rra
@@ -922,7 +922,7 @@ Section ProofEitherCopyout.
       iEval (rewrite Hpp42) in "Hpc".
       (* ---- +0x42: jal ra,memmove ---- *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.either_copyout + 0x42))
-                Rra (mword_of_int 2091640 : mword 21) K3 (av - 6)%nat b
+                Rra (mword_of_int 2091598 : mword 21) K3 (av - 6)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi42 [-]").
       iIntros (CID19 Hs19) "Hcg Hpc".
@@ -931,7 +931,7 @@ Section ProofEitherCopyout.
       change (<[Regidx Rra := regval_into_reg
                 (add_vec_int (mword_of_int (KernelSyms.either_copyout + 0x42) : mword 64) 4)]> K3) with K4.
       assert (Hjmm : add_vec (mword_of_int (KernelSyms.either_copyout + 0x42) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2091640 : mword 21)) = mword_of_int KernelSyms.memmove)
+                       (sign_extend' 64 (mword_of_int 2091598 : mword 21)) = mword_of_int KernelSyms.memmove)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjmm) in "Hpc".
       assert (HK4ra : K4 !!! Regidx Rra
@@ -1314,7 +1314,7 @@ Section ProofEitherCopyin.
       rewrite /R2 upd_ne; [exact HR1sp | reg_neq]. }
     (* ---- +0x18: jal ra,myproc ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.either_copyin + 0x18))
-              Rra (mword_of_int 2094646 : mword 21) R6 (av - 6)%nat b
+              Rra (mword_of_int 2094604 : mword 21) R6 (av - 6)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi18 [-]").
     iIntros (CID13 Hs13) "Hcg Hpc".
@@ -1323,7 +1323,7 @@ Section ProofEitherCopyin.
     change (<[Regidx Rra := regval_into_reg
               (add_vec_int (mword_of_int (KernelSyms.either_copyin + 0x18) : mword 64) 4)]> R6) with R7.
     assert (Hjmp : add_vec (mword_of_int (KernelSyms.either_copyin + 0x18) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2094646 : mword 21)) = mword_of_int KernelSyms.myproc)
+                     (sign_extend' 64 (mword_of_int 2094604 : mword 21)) = mword_of_int KernelSyms.myproc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjmp) in "Hpc".
     assert (HR7ra : R7 !!! Regidx Rra
@@ -1455,7 +1455,7 @@ Section ProofEitherCopyin.
       iEval (rewrite Hpp26) in "Hpc".
       (* ---- +0x26: jal ra,copyin ---- *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.either_copyin + 0x26))
-                Rra (mword_of_int 2094086 : mword 21) U4 (av - 6)%nat b
+                Rra (mword_of_int 2094044 : mword 21) U4 (av - 6)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi26 [-]").
       iIntros (CID20 Hs20) "Hcg Hpc".
@@ -1464,7 +1464,7 @@ Section ProofEitherCopyin.
       change (<[Regidx Rra := regval_into_reg
                 (add_vec_int (mword_of_int (KernelSyms.either_copyin + 0x26) : mword 64) 4)]> U4) with U5.
       assert (Hjci : add_vec (mword_of_int (KernelSyms.either_copyin + 0x26) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2094086 : mword 21)) = mword_of_int KernelSyms.copyin)
+                       (sign_extend' 64 (mword_of_int 2094044 : mword 21)) = mword_of_int KernelSyms.copyin)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjci) in "Hpc".
       assert (HU5ra : U5 !!! Regidx Rra
@@ -1603,7 +1603,7 @@ Section ProofEitherCopyin.
       iEval (rewrite Hpp42) in "Hpc".
       (* ---- +0x42: jal ra,memmove ---- *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.either_copyin + 0x42))
-                Rra (mword_of_int 2091566 : mword 21) K3 (av - 6)%nat b
+                Rra (mword_of_int 2091524 : mword 21) K3 (av - 6)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi42 [-]").
       iIntros (CID19 Hs19) "Hcg Hpc".
@@ -1612,7 +1612,7 @@ Section ProofEitherCopyin.
       change (<[Regidx Rra := regval_into_reg
                 (add_vec_int (mword_of_int (KernelSyms.either_copyin + 0x42) : mword 64) 4)]> K3) with K4.
       assert (Hjmm : add_vec (mword_of_int (KernelSyms.either_copyin + 0x42) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2091566 : mword 21)) = mword_of_int KernelSyms.memmove)
+                       (sign_extend' 64 (mword_of_int 2091524 : mword 21)) = mword_of_int KernelSyms.memmove)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjmm) in "Hpc".
       assert (HK4ra : K4 !!! Regidx Rra

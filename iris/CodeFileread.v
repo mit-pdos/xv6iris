@@ -136,9 +136,9 @@ Section CodeFileread.
   Proof. mk_rvc (KernelSyms.fileread + 0x2e) (mword_of_int 0x6d08 : mword 16)
     (mword_of_int (KernelSyms.fileread + 0x2e) : mword 64) (LOAD (mword_of_int 24 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), false, 8)) kd_6d08 ke_6d08. Qed.
 
-  Lemma fri_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0x30) : mword 64) false (JAL (mword_of_int 2093080 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.fileread + 0x30) (mword_of_int 0x818ff0ef : mword 32)
-    (mword_of_int (KernelSyms.fileread + 0x30) : mword 64) (JAL (mword_of_int 2093080 : mword 21, Regidx (mword_of_int 1))) kd_818ff0ef. Qed.
+  Lemma fri_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0x30) : mword 64) false (JAL (mword_of_int 2093022 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.fileread + 0x30) (mword_of_int 0xfdffe0ef : mword 32)
+    (mword_of_int (KernelSyms.fileread + 0x30) : mword 64) (JAL (mword_of_int 2093022 : mword 21, Regidx (mword_of_int 1))) kd_fdffe0ef. Qed.
 
   Lemma fri_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0x34) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 14), ADD)).
   Proof. mk_rvc (KernelSyms.fileread + 0x34) (mword_of_int 0x874e : mword 16)
@@ -160,9 +160,9 @@ Section CodeFileread.
   Proof. mk_rvc (KernelSyms.fileread + 0x3c) (mword_of_int 0x6c88 : mword 16)
     (mword_of_int (KernelSyms.fileread + 0x3c) : mword 64) (LOAD (mword_of_int 24 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), false, 8)) kd_6c88 ke_6c88. Qed.
 
-  Lemma fri_3e : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0x3e) : mword 64) false (JAL (mword_of_int 2093980 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.fileread + 0x3e) (mword_of_int 0xb9cff0ef : mword 32)
-    (mword_of_int (KernelSyms.fileread + 0x3e) : mword 64) (JAL (mword_of_int 2093980 : mword 21, Regidx (mword_of_int 1))) kd_b9cff0ef. Qed.
+  Lemma fri_3e : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0x3e) : mword 64) false (JAL (mword_of_int 2093922 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.fileread + 0x3e) (mword_of_int 0xb62ff0ef : mword 32)
+    (mword_of_int (KernelSyms.fileread + 0x3e) : mword 64) (JAL (mword_of_int 2093922 : mword 21, Regidx (mword_of_int 1))) kd_b62ff0ef. Qed.
 
   Lemma fri_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0x42) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)).
   Proof. mk_rvc (KernelSyms.fileread + 0x42) (mword_of_int 0x892a : mword 16)
@@ -188,9 +188,9 @@ Section CodeFileread.
   Proof. mk_rvc (KernelSyms.fileread + 0x4e) (mword_of_int 0x6c88 : mword 16)
     (mword_of_int (KernelSyms.fileread + 0x4e) : mword 64) (LOAD (mword_of_int 24 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), false, 8)) kd_6c88 ke_6c88. Qed.
 
-  Lemma fri_50 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0x50) : mword 64) false (JAL (mword_of_int 2093222 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.fileread + 0x50) (mword_of_int 0x8a6ff0ef : mword 32)
-    (mword_of_int (KernelSyms.fileread + 0x50) : mword 64) (JAL (mword_of_int 2093222 : mword 21, Regidx (mword_of_int 1))) kd_8a6ff0ef. Qed.
+  Lemma fri_50 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0x50) : mword 64) false (JAL (mword_of_int 2093164 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.fileread + 0x50) (mword_of_int 0x86cff0ef : mword 32)
+    (mword_of_int (KernelSyms.fileread + 0x50) : mword 64) (JAL (mword_of_int 2093164 : mword 21, Regidx (mword_of_int 1))) kd_86cff0ef. Qed.
 
   Lemma fri_54 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0x54) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)).
   Proof. mk_rvc (KernelSyms.fileread + 0x54) (mword_of_int 0x64e2 : mword 16)
@@ -228,9 +228,9 @@ Section CodeFileread.
   Proof. mk_rvc (KernelSyms.fileread + 0x64) (mword_of_int 0x6908 : mword 16)
     (mword_of_int (KernelSyms.fileread + 0x64) : mword 64) (LOAD (mword_of_int 16 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), false, 8)) kd_6908 ke_6908. Qed.
 
-  Lemma fri_66 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0x66) : mword 64) false (JAL (mword_of_int 944 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.fileread + 0x66) (mword_of_int 0x3b0000ef : mword 32)
-    (mword_of_int (KernelSyms.fileread + 0x66) : mword 64) (JAL (mword_of_int 944 : mword 21, Regidx (mword_of_int 1))) kd_3b0000ef. Qed.
+  Lemma fri_66 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0x66) : mword 64) false (JAL (mword_of_int 958 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.fileread + 0x66) (mword_of_int 0x3be000ef : mword 32)
+    (mword_of_int (KernelSyms.fileread + 0x66) : mword 64) (JAL (mword_of_int 958 : mword 21, Regidx (mword_of_int 1))) kd_3be000ef. Qed.
 
   Lemma fri_6a : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0x6a) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)).
   Proof. mk_rvc (KernelSyms.fileread + 0x6a) (mword_of_int 0x892a : mword 16)
@@ -276,9 +276,9 @@ Section CodeFileread.
   Proof. mk_base (KernelSyms.fileread + 0x84) (mword_of_int 0x0001e717 : mword 32)
     (mword_of_int (KernelSyms.fileread + 0x84) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 14), AUIPC)) kd_0001e717. Qed.
 
-  Lemma fri_88 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0x88) : mword 64) false (ITYPE (mword_of_int 424 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
-  Proof. mk_base (KernelSyms.fileread + 0x88) (mword_of_int 0x1a870713 : mword 32)
-    (mword_of_int (KernelSyms.fileread + 0x88) : mword 64) (ITYPE (mword_of_int 424 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) kd_1a870713. Qed.
+  Lemma fri_88 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0x88) : mword 64) false (ITYPE (mword_of_int 464 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
+  Proof. mk_base (KernelSyms.fileread + 0x88) (mword_of_int 0x1d070713 : mword 32)
+    (mword_of_int (KernelSyms.fileread + 0x88) : mword 64) (ITYPE (mword_of_int 464 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) kd_1d070713. Qed.
 
   Lemma fri_8c : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0x8c) : mword 64) true (RTYPE (Regidx (mword_of_int 14), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (KernelSyms.fileread + 0x8c) (mword_of_int 0x97ba : mword 16)
@@ -320,13 +320,13 @@ Section CodeFileread.
   Proof. mk_base (KernelSyms.fileread + 0x9e) (mword_of_int 0x00003517 : mword 32)
     (mword_of_int (KernelSyms.fileread + 0x9e) : mword 64) (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00003517. Qed.
 
-  Lemma fri_a2 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0xa2) : mword 64) false (ITYPE (mword_of_int 838 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.fileread + 0xa2) (mword_of_int 0x34650513 : mword 32)
-    (mword_of_int (KernelSyms.fileread + 0xa2) : mword 64) (ITYPE (mword_of_int 838 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_34650513. Qed.
+  Lemma fri_a2 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0xa2) : mword 64) false (ITYPE (mword_of_int 798 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.fileread + 0xa2) (mword_of_int 0x31e50513 : mword 32)
+    (mword_of_int (KernelSyms.fileread + 0xa2) : mword 64) (ITYPE (mword_of_int 798 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_31e50513. Qed.
 
-  Lemma fri_a6 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0xa6) : mword 64) false (JAL (mword_of_int 2082284 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.fileread + 0xa6) (mword_of_int 0xdecfc0ef : mword 32)
-    (mword_of_int (KernelSyms.fileread + 0xa6) : mword 64) (JAL (mword_of_int 2082284 : mword 21, Regidx (mword_of_int 1))) kd_decfc0ef. Qed.
+  Lemma fri_a6 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0xa6) : mword 64) false (JAL (mword_of_int 2082234 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.fileread + 0xa6) (mword_of_int 0xdbafc0ef : mword 32)
+    (mword_of_int (KernelSyms.fileread + 0xa6) : mword 64) (JAL (mword_of_int 2082234 : mword 21, Regidx (mword_of_int 1))) kd_dbafc0ef. Qed.
 
   Lemma fri_aa : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0xaa) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).
   Proof. mk_rvc (KernelSyms.fileread + 0xaa) (mword_of_int 0x57fd : mword 16)

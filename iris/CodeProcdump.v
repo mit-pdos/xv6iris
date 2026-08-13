@@ -18,12 +18,10 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode00.
 Require Import KernelDecode01.
-Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode05.
 Require Import KernelDecode06.
 Require Import KernelDecode08.
-Require Import KernelDecode10.
 Require Import KernelDecode11.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
@@ -39,6 +37,7 @@ Require Import KernelDecode23.
 Require Import KernelDecode24.
 Require Import KernelDecode25.
 Require Import KernelDecode26.
+Require Import KernelDecode27.
 Require Import KernelDecode28.
 Require Import KernelDecode30.
 Require Import KernelDecode31.
@@ -100,29 +99,29 @@ Section CodeProcdump.
   Proof. mk_base (KernelSyms.procdump + 0x16) (mword_of_int 0x00005517 : mword 32)
     (mword_of_int (KernelSyms.procdump + 0x16) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00005517. Qed.
 
-  Lemma pdi_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x1a) : mword 64) false (ITYPE (mword_of_int 3424 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.procdump + 0x1a) (mword_of_int 0xd6050513 : mword 32)
-    (mword_of_int (KernelSyms.procdump + 0x1a) : mword 64) (ITYPE (mword_of_int 3424 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_d6050513. Qed.
+  Lemma pdi_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x1a) : mword 64) false (ITYPE (mword_of_int 3426 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.procdump + 0x1a) (mword_of_int 0xd6250513 : mword 32)
+    (mword_of_int (KernelSyms.procdump + 0x1a) : mword 64) (ITYPE (mword_of_int 3426 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_d6250513. Qed.
 
-  Lemma pdi_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x1e) : mword 64) false (JAL (mword_of_int 2089436 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.procdump + 0x1e) (mword_of_int 0x9dcfe0ef : mword 32)
-    (mword_of_int (KernelSyms.procdump + 0x1e) : mword 64) (JAL (mword_of_int 2089436 : mword 21, Regidx (mword_of_int 1))) kd_9dcfe0ef. Qed.
+  Lemma pdi_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x1e) : mword 64) false (JAL (mword_of_int 2089460 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.procdump + 0x1e) (mword_of_int 0x9f4fe0ef : mword 32)
+    (mword_of_int (KernelSyms.procdump + 0x1e) : mword 64) (JAL (mword_of_int 2089460 : mword 21, Regidx (mword_of_int 1))) kd_9f4fe0ef. Qed.
 
   Lemma pdi_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x22) : mword 64) false (UTYPE (mword_of_int 16 : mword 20, Regidx (mword_of_int 9), AUIPC)).
   Proof. mk_base (KernelSyms.procdump + 0x22) (mword_of_int 0x00010497 : mword 32)
     (mword_of_int (KernelSyms.procdump + 0x22) : mword 64) (UTYPE (mword_of_int 16 : mword 20, Regidx (mword_of_int 9), AUIPC)) kd_00010497. Qed.
 
-  Lemma pdi_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x26) : mword 64) false (ITYPE (mword_of_int 1452 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
-  Proof. mk_base (KernelSyms.procdump + 0x26) (mword_of_int 0x5ac48493 : mword 32)
-    (mword_of_int (KernelSyms.procdump + 0x26) : mword 64) (ITYPE (mword_of_int 1452 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) kd_5ac48493. Qed.
+  Lemma pdi_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x26) : mword 64) false (ITYPE (mword_of_int 1566 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
+  Proof. mk_base (KernelSyms.procdump + 0x26) (mword_of_int 0x61e48493 : mword 32)
+    (mword_of_int (KernelSyms.procdump + 0x26) : mword 64) (ITYPE (mword_of_int 1566 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) kd_61e48493. Qed.
 
   Lemma pdi_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x2a) : mword 64) false (UTYPE (mword_of_int 22 : mword 20, Regidx (mword_of_int 18), AUIPC)).
   Proof. mk_base (KernelSyms.procdump + 0x2a) (mword_of_int 0x00016917 : mword 32)
     (mword_of_int (KernelSyms.procdump + 0x2a) : mword 64) (UTYPE (mword_of_int 22 : mword 20, Regidx (mword_of_int 18), AUIPC)) kd_00016917. Qed.
 
-  Lemma pdi_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x2e) : mword 64) false (ITYPE (mword_of_int 4004 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)).
-  Proof. mk_base (KernelSyms.procdump + 0x2e) (mword_of_int 0xfa490913 : mword 32)
-    (mword_of_int (KernelSyms.procdump + 0x2e) : mword 64) (ITYPE (mword_of_int 4004 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)) kd_fa490913. Qed.
+  Lemma pdi_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x2e) : mword 64) false (ITYPE (mword_of_int 22 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)).
+  Proof. mk_base (KernelSyms.procdump + 0x2e) (mword_of_int 0x01690913 : mword 32)
+    (mword_of_int (KernelSyms.procdump + 0x2e) : mword 64) (ITYPE (mword_of_int 22 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)) kd_01690913. Qed.
 
   Lemma pdi_32 : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x32) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 5 : mword 6), zreg, Regidx (mword_of_int 22), ADDI)).
   Proof. mk_rvc (KernelSyms.procdump + 0x32) (mword_of_int 0x4b15 : mword 16)
@@ -132,33 +131,33 @@ Section CodeProcdump.
   Proof. mk_base (KernelSyms.procdump + 0x34) (mword_of_int 0x00005997 : mword 32)
     (mword_of_int (KernelSyms.procdump + 0x34) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 19), AUIPC)) kd_00005997. Qed.
 
-  Lemma pdi_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x38) : mword 64) false (ITYPE (mword_of_int 3786 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)).
-  Proof. mk_base (KernelSyms.procdump + 0x38) (mword_of_int 0xeca98993 : mword 32)
-    (mword_of_int (KernelSyms.procdump + 0x38) : mword 64) (ITYPE (mword_of_int 3786 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)) kd_eca98993. Qed.
+  Lemma pdi_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x38) : mword 64) false (ITYPE (mword_of_int 3820 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)).
+  Proof. mk_base (KernelSyms.procdump + 0x38) (mword_of_int 0xeec98993 : mword 32)
+    (mword_of_int (KernelSyms.procdump + 0x38) : mword 64) (ITYPE (mword_of_int 3820 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)) kd_eec98993. Qed.
 
   Lemma pdi_3c : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x3c) : mword 64) false (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 21), AUIPC)).
   Proof. mk_base (KernelSyms.procdump + 0x3c) (mword_of_int 0x00005a97 : mword 32)
     (mword_of_int (KernelSyms.procdump + 0x3c) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 21), AUIPC)) kd_00005a97. Qed.
 
-  Lemma pdi_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x40) : mword 64) false (ITYPE (mword_of_int 3786 : mword 12, Regidx (mword_of_int 21), Regidx (mword_of_int 21), ADDI)).
-  Proof. mk_base (KernelSyms.procdump + 0x40) (mword_of_int 0xecaa8a93 : mword 32)
-    (mword_of_int (KernelSyms.procdump + 0x40) : mword 64) (ITYPE (mword_of_int 3786 : mword 12, Regidx (mword_of_int 21), Regidx (mword_of_int 21), ADDI)) kd_ecaa8a93. Qed.
+  Lemma pdi_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x40) : mword 64) false (ITYPE (mword_of_int 3820 : mword 12, Regidx (mword_of_int 21), Regidx (mword_of_int 21), ADDI)).
+  Proof. mk_base (KernelSyms.procdump + 0x40) (mword_of_int 0xeeca8a93 : mword 32)
+    (mword_of_int (KernelSyms.procdump + 0x40) : mword 64) (ITYPE (mword_of_int 3820 : mword 12, Regidx (mword_of_int 21), Regidx (mword_of_int 21), ADDI)) kd_eeca8a93. Qed.
 
   Lemma pdi_44 : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x44) : mword 64) false (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 20), AUIPC)).
   Proof. mk_base (KernelSyms.procdump + 0x44) (mword_of_int 0x00005a17 : mword 32)
     (mword_of_int (KernelSyms.procdump + 0x44) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 20), AUIPC)) kd_00005a17. Qed.
 
-  Lemma pdi_48 : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x48) : mword 64) false (ITYPE (mword_of_int 3378 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)).
-  Proof. mk_base (KernelSyms.procdump + 0x48) (mword_of_int 0xd32a0a13 : mword 32)
-    (mword_of_int (KernelSyms.procdump + 0x48) : mword 64) (ITYPE (mword_of_int 3378 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)) kd_d32a0a13. Qed.
+  Lemma pdi_48 : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x48) : mword 64) false (ITYPE (mword_of_int 3380 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)).
+  Proof. mk_base (KernelSyms.procdump + 0x48) (mword_of_int 0xd34a0a13 : mword 32)
+    (mword_of_int (KernelSyms.procdump + 0x48) : mword 64) (ITYPE (mword_of_int 3380 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)) kd_d34a0a13. Qed.
 
   Lemma pdi_4c : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x4c) : mword 64) false (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 23), AUIPC)).
   Proof. mk_base (KernelSyms.procdump + 0x4c) (mword_of_int 0x00005b97 : mword 32)
     (mword_of_int (KernelSyms.procdump + 0x4c) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 23), AUIPC)) kd_00005b97. Qed.
 
-  Lemma pdi_50 : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x50) : mword 64) false (ITYPE (mword_of_int 986 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 23), ADDI)).
-  Proof. mk_base (KernelSyms.procdump + 0x50) (mword_of_int 0x3dab8b93 : mword 32)
-    (mword_of_int (KernelSyms.procdump + 0x50) : mword 64) (ITYPE (mword_of_int 986 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 23), ADDI)) kd_3dab8b93. Qed.
+  Lemma pdi_50 : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x50) : mword 64) false (ITYPE (mword_of_int 1020 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 23), ADDI)).
+  Proof. mk_base (KernelSyms.procdump + 0x50) (mword_of_int 0x3fcb8b93 : mword 32)
+    (mword_of_int (KernelSyms.procdump + 0x50) : mword 64) (ITYPE (mword_of_int 1020 : mword 12, Regidx (mword_of_int 23), Regidx (mword_of_int 23), ADDI)) kd_3fcb8b93. Qed.
 
   Lemma pdi_54 : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x54) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 13 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (KernelSyms.procdump + 0x54) (mword_of_int 0xa829 : mword 16)
@@ -172,17 +171,17 @@ Section CodeProcdump.
   Proof. mk_rvc (KernelSyms.procdump + 0x5a) (mword_of_int 0x8556 : mword 16)
     (mword_of_int (KernelSyms.procdump + 0x5a) : mword 64) (RTYPE (Regidx (mword_of_int 21), zreg, Regidx (mword_of_int 10), ADD)) kd_8556 exec_execute_C_MV. Qed.
 
-  Lemma pdi_5c : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x5c) : mword 64) false (JAL (mword_of_int 2089374 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.procdump + 0x5c) (mword_of_int 0x99efe0ef : mword 32)
-    (mword_of_int (KernelSyms.procdump + 0x5c) : mword 64) (JAL (mword_of_int 2089374 : mword 21, Regidx (mword_of_int 1))) kd_99efe0ef. Qed.
+  Lemma pdi_5c : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x5c) : mword 64) false (JAL (mword_of_int 2089398 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.procdump + 0x5c) (mword_of_int 0x9b6fe0ef : mword 32)
+    (mword_of_int (KernelSyms.procdump + 0x5c) : mword 64) (JAL (mword_of_int 2089398 : mword 21, Regidx (mword_of_int 1))) kd_9b6fe0ef. Qed.
 
   Lemma pdi_60 : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x60) : mword 64) true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.procdump + 0x60) (mword_of_int 0x8552 : mword 16)
     (mword_of_int (KernelSyms.procdump + 0x60) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)) kd_8552 exec_execute_C_MV. Qed.
 
-  Lemma pdi_62 : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x62) : mword 64) false (JAL (mword_of_int 2089368 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.procdump + 0x62) (mword_of_int 0x998fe0ef : mword 32)
-    (mword_of_int (KernelSyms.procdump + 0x62) : mword 64) (JAL (mword_of_int 2089368 : mword 21, Regidx (mword_of_int 1))) kd_998fe0ef. Qed.
+  Lemma pdi_62 : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x62) : mword 64) false (JAL (mword_of_int 2089392 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.procdump + 0x62) (mword_of_int 0x9b0fe0ef : mword 32)
+    (mword_of_int (KernelSyms.procdump + 0x62) : mword 64) (JAL (mword_of_int 2089392 : mword 21, Regidx (mword_of_int 1))) kd_9b0fe0ef. Qed.
 
   Lemma pdi_66 : kernel_text -∗ instr (mword_of_int (KernelSyms.procdump + 0x66) : mword 64) false (ITYPE (mword_of_int 360 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
   Proof. mk_base (KernelSyms.procdump + 0x66) (mword_of_int 0x16848493 : mword 32)

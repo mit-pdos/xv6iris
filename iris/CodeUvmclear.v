@@ -17,7 +17,6 @@ Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode01.
-Require Import KernelDecode02.
 Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode05.
@@ -101,12 +100,12 @@ Section CodeUvmclear.
   Proof. mk_base (KernelSyms.uvmclear + 0x1e) (mword_of_int 0x00006517 : mword 32)
     (mword_of_int (KernelSyms.uvmclear + 0x1e) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00006517. Qed.
 
-  Lemma ucli_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmclear + 0x22) : mword 64) false (ITYPE (mword_of_int 3210 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.uvmclear + 0x22) (mword_of_int 0xc8a50513 : mword 32)
-    (mword_of_int (KernelSyms.uvmclear + 0x22) : mword 64) (ITYPE (mword_of_int 3210 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_c8a50513. Qed.
+  Lemma ucli_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmclear + 0x22) : mword 64) false (ITYPE (mword_of_int 3254 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.uvmclear + 0x22) (mword_of_int 0xcb650513 : mword 32)
+    (mword_of_int (KernelSyms.uvmclear + 0x22) : mword 64) (ITYPE (mword_of_int 3254 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_cb650513. Qed.
 
-  Lemma ucli_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmclear + 0x26) : mword 64) false (JAL (mword_of_int 2093920 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.uvmclear + 0x26) (mword_of_int 0xb60ff0ef : mword 32)
-    (mword_of_int (KernelSyms.uvmclear + 0x26) : mword 64) (JAL (mword_of_int 2093920 : mword 21, Regidx (mword_of_int 1))) kd_b60ff0ef. Qed.
+  Lemma ucli_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmclear + 0x26) : mword 64) false (JAL (mword_of_int 2093986 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.uvmclear + 0x26) (mword_of_int 0xba2ff0ef : mword 32)
+    (mword_of_int (KernelSyms.uvmclear + 0x26) : mword 64) (JAL (mword_of_int 2093986 : mword 21, Regidx (mword_of_int 1))) kd_ba2ff0ef. Qed.
 
 End CodeUvmclear.

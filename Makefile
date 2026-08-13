@@ -64,7 +64,22 @@ SAIL_RISCV_REV ?= c32fbf4111b849061db1812355d6da9df8c2e396
 # addresses out from under every proof that names one (a few commits either
 # way already move most of them).  Verified: a kernel built here reproduces
 # kernel-rocq/*.v byte for byte and symbol for symbol.
-XV6_REV ?= 9dd28f5e3526197b65a58306ce90248647c77777
+#
+# This revision is NOT an upstream commit: it is upstream ae96fd0 plus a
+# cherry-pick of upstream 9da28f5 ("Fix kernel panic and add test case"), which
+# is kernel-defects.md D2's fix -- the nlink==0 guards in namex and create.  The
+# five upstream commits BETWEEN ae96fd0 and 9da28f5 are deliberately not taken
+# (one of them, b7c25cf, is D3's fix, whose own image bump is a separate job).
+# Reproduce the pin exactly -- the committer identity and date are what make the
+# sha deterministic:
+#
+#   git -C xv6-riscv checkout --detach ae96fd0
+#   GIT_COMMITTER_NAME="Frans Kaashoek" GIT_COMMITTER_EMAIL="kaashoek@mit.edu" \
+#   GIT_COMMITTER_DATE="2026-08-12T18:05:56-04:00" \
+#     git -C xv6-riscv cherry-pick 9da28f5
+#
+# The resulting kernel/kernel is md5 0ad3ab3cac87821e20c8eacf136bc112.
+XV6_REV ?= 1c7ccafc25faaf92e95c1051659ecd91449f29be
 
 KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.v
 

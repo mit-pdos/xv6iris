@@ -72,16 +72,27 @@ Import Defs.
 Local Open Scope Z_scope.
 
 
-(* uartwrite's own frame is 10 slots; the deepest callee is sleep at 22
-   (acquire and release want 10). *)
-Definition uartwrite_stack : nat := 32%nat.
+(* uartwrite's own frame is 8 slots ([c.addi16sp sp,-64] at the prologue), and
+   the deepest callee is now ACQUIRESLEEP at 26 (releasesleep 22, sleep 20,
+   sleep_prepare 14) -- so the body's first call needs [26 <= av - 8], i.e.
+   [av >= 34], and the bound is exactly tight.
+
+   It used to be 10 + 22: a ten-slot frame over sleep, which was then the
+   deepest thing below.  Both numbers moved at ae96fd0 -- the frame shrank
+   because the register set the body needs changed, and the floor rose
+   because uartwrite now takes a SLEEPLOCK (it must hold the transmitter
+   across a park, which a spinlock cannot do) and acquiresleep's own budget
+   is what dominates.  Nothing downstream constrains this constant:
+   consolewrite, uartwrite's only caller, is unproven. *)
+Definition uartwrite_stack : nat := 34%nat.
 
 Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names) 
-    (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
+    (γs : list gname) (j : nat) (γlp : gname) (γl γsl : gname)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-    (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool) :=
+    (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool)
+    (pidv : mword 32) (dqp : dfrac) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartwrite in
   let pj := proc_addr j in
   (* a0 = the buffer, a1 = the count *)
@@ -102,9 +113,16 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (* noff = 0: sleep demands tx_lock be the ONLY lock held *)
   cpu_own 0%nat eb pj C b -∗
   kernel_text -∗ pc_is pcE -∗
-  (* the device, and the transmitter's lock -- the whole credential *)
+  (* the device, and the transmitter's lock -- the whole credential.  The
+     lock is a SLEEPLOCK now (UartTxInv.v): uartwrite parks between bytes and
+     has to keep the transmitter across the park, which a spinlock cannot do.
+     Its resource is just the token -- the [tx_busy] certificate is gone,
+     because the writer polls THRE itself before every byte. *)
   dev_inv γu γv -∗
-  is_txlock γl γu -∗
+  is_txlock γl γsl γu -∗
+  (* acquiresleep records the holder's pid in the lock, so the running
+     process's pid cell rides through at an arbitrary fraction *)
+  p_pid pj ↦₄{dqp} pidv -∗
   (* the buffer, read-only *)
   ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ{dq} f k) -∗
   (* the running-thread bundle (SpecSleep.v) *)
@@ -117,6 +135,7 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
       cpu_own 0%nat eb pj C b -∗
       pc_is ret_tgt -∗
       ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ{dq} f k) -∗
+      p_pid pj ↦₄{dqp} pidv -∗
       uart_sent_sub γu (f <$> seq 0 n) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -125,8 +144,9 @@ Module Type UARTWRITE.
   Parameter wp_uartwrite_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γu : uart_names) (γv : disk_names) (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
+      (γu : uart_names) (γv : disk_names) (γs : list gname) (j : nat) (γlp : gname) (γl γsl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool),
-      wp_uartwrite_sconf_body γu γv γs j γlp γl m av eb C n f dq b.
+      (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool)
+      (pidv : mword 32) (dqp : dfrac),
+      wp_uartwrite_sconf_body γu γv γs j γlp γl γsl m av eb C n f dq b pidv dqp.
 End UARTWRITE.

@@ -931,14 +931,14 @@ Section FsinitMain.
     assert (Hpp22 : add_vec_int (mword_of_int (KernelSyms.fsinit + 0x1e) : mword 64) 4
                     = mword_of_int (KernelSyms.fsinit + 0x22)) by pcw.
     iEval (rewrite Hpp22) in "Hpc".
-    (* ===== +0x22 addi a0,a0,866 : a0 := &sb ===== *)
+    (* ===== +0x22 addi a0,a0,964 : a0 := &sb ===== *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.fsinit + 0x22)) Ra0 Ra0
-              (mword_of_int 866 : mword 12) N4 (K - 4)%nat b
+              (mword_of_int 964 : mword 12) N4 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi22").
     iIntros (CID15 Hq15) "Hcg Hpc".
     set (N5 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (rget N4 Ra0)
-                     (sign_extend' 64 (mword_of_int 866 : mword 12)))]> N4).
+                     (sign_extend' 64 (mword_of_int 964 : mword 12)))]> N4).
     assert (HN5a0 : N5 !!! Regidx Ra0 = sb_base).
     { rewrite /N5 upd_eq. rgne. rewrite HN4a0. rewrite /sb_base. pcw. }
     assert (HN5a1 : N5 !!! Regidx Ra1 = b_data (bpa kk))
@@ -959,14 +959,14 @@ Section FsinitMain.
     iEval (rewrite Hpp26) in "Hpc".
     (* ===== +0x26 jal ra,memmove : WHERE THE EIGHT CELLS ARE BORN ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.fsinit + 0x26)) Rra
-              (mword_of_int 2086962 : mword 21) N5 (K - 4)%nat b
+              (mword_of_int 2086904 : mword 21) N5 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi26").
     iIntros (CID16 Hq16) "Hcg Hpc".
     set (N6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.fsinit + 0x26) : mword 64) 4)]> N5).
     assert (Htgtmm : add_vec (mword_of_int (KernelSyms.fsinit + 0x26) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2086962 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2086904 : mword 21))
                      = mword_of_int KernelSyms.memmove) by pcw.
     iEval (rewrite Htgtmm) in "Hpc".
     assert (HN6a0 : N6 !!! Regidx Ra0 = sb_base)
@@ -1198,14 +1198,14 @@ Section FsinitMain.
     assert (Hpp34 : add_vec_int (mword_of_int (KernelSyms.fsinit + 0x30) : mword 64) 4
                     = mword_of_int (KernelSyms.fsinit + 0x34)) by pcw.
     iEval (rewrite Hpp34) in "Hpc".
-    (* ===== +0x34 lw a4,848(a4) : a4 := sb.magic ===== *)
+    (* ===== +0x34 lw a4,946(a4) : a4 := sb.magic ===== *)
     assert (Hmgadr : add_vec (rget Q2 Ra4)
-                       (sign_extend' 64 (mword_of_int 848 : mword 12))
+                       (sign_extend' 64 (mword_of_int 946 : mword 12))
                      = sb_magic).
     { rgne. rewrite HQ2a4. rewrite /sb_magic /sb_base /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hmgadr) in "Hmg".
     iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.fsinit + 0x34)) Ra4 Ra4
-              (mword_of_int 848 : mword 12) Q2 (K - 4)%nat v_magic b
+              (mword_of_int 946 : mword 12) Q2 (K - 4)%nat v_magic b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi34 Hmg").
     iIntros (CID22 Hq22) "Hcg Hpc Hmg".
     iEval (rewrite Hmgadr) in "Hmg".
@@ -1301,14 +1301,14 @@ Section FsinitMain.
     assert (Hpp48 : add_vec_int (mword_of_int (KernelSyms.fsinit + 0x44) : mword 64) 4
                     = mword_of_int (KernelSyms.fsinit + 0x48)) by pcw.
     iEval (rewrite Hpp48) in "Hpc".
-    (* ===== +0x48 addi a1,a1,828 : a1 := &sb ===== *)
+    (* ===== +0x48 addi a1,a1,926 : a1 := &sb ===== *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.fsinit + 0x48)) Ra1 Ra1
-              (mword_of_int 828 : mword 12) Q6 (K - 4)%nat b
+              (mword_of_int 926 : mword 12) Q6 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi48").
     iIntros (CID27 Hq27) "Hcg Hpc".
     set (Q7 := <[Regidx Ra1 := regval_into_reg
                   (add_vec (rget Q6 Ra1)
-                     (sign_extend' 64 (mword_of_int 828 : mword 12)))]> Q6).
+                     (sign_extend' 64 (mword_of_int 926 : mword 12)))]> Q6).
     assert (HQ7a1 : Q7 !!! Regidx Ra1 = sb_base).
     { rewrite /Q7 upd_eq. rgne. rewrite HQ6a1. rewrite /sb_base. pcw. }
     assert (HQ7s2 : Q7 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
@@ -1343,14 +1343,14 @@ Section FsinitMain.
     iEval (rewrite Hpp4e) in "Hpc".
     (* ===== +0x4e jal ra,initlog : THE LOG LAYER IS BUILT HERE ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.fsinit + 0x4e)) Rra
-              (mword_of_int 1614 : mword 21) Q8 (K - 4)%nat b
+              (mword_of_int 1630 : mword 21) Q8 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi4e").
     iIntros (CID29 Hq29) "Hcg Hpc".
     set (Q9 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.fsinit + 0x4e) : mword 64) 4)]> Q8).
     assert (Htgtil : add_vec (mword_of_int (KernelSyms.fsinit + 0x4e) : mword 64)
-                       (sign_extend' 64 (mword_of_int 1614 : mword 21))
+                       (sign_extend' 64 (mword_of_int 1630 : mword 21))
                      = mword_of_int KernelSyms.initlog) by pcw.
     iEval (rewrite Htgtil) in "Hpc".
     assert (HQ9a0 : Q9 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))

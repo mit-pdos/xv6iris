@@ -32,7 +32,7 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
   let fl : mword 64 := mword_of_int (KernelSyms.kmem + 24) in
   let c_name := lock_name_field lk in
   let c_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-  let endaddr : mword 64 := mword_of_int 0x80023558 in
+  let endaddr : mword 64 := mword_of_int KernelSyms.end_ in
   let phystop : mword 64 := mword_of_int 0x88000000 in
   let s1entry := add_vec (and_vec (add_vec endaddr (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv in
   (22 <= K)%nat ->

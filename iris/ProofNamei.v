@@ -390,14 +390,14 @@ Section ProofNameiMain.
     iEval (rewrite Hpp0e) in "Hpc".
     (* ===== +0x0e jal ra,namex ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (NM + 0x0e)) Rra
-              (mword_of_int 2096650 : mword 21) R4 (K - 4)%nat b
+              (mword_of_int 2096634 : mword 21) R4 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi0e").
     iIntros (CID7 Hq7) "Hcg Hpc".
     set (R5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (NM + 0x0e) : mword 64) 4)]> R4).
     assert (Htgt : add_vec (mword_of_int (NM + 0x0e) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2096650 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2096634 : mword 21))
                    = mword_of_int KernelSyms.namex) by pcw.
     iEval (rewrite Htgt) in "Hpc".
     assert (HR5a1 : (R5 !!! Regidx Ra1 : mword 64) = (mword_of_int 0 : mword 64))

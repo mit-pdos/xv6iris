@@ -118,8 +118,11 @@ Section DevintrCaps.
 
        [dev_inv]      the memory-mapped device invariant (UART + PLIC +
                       virtio-mmio), which plic_claim/plic_complete open around
-                      their MMIO transactions and which the UART leaves need;
-       [is_txlock]    the transmitter's lock -- uartintr's whole credential;
+                      their MMIO transactions and which the UART leaves need.
+                      IT IS ALSO ALL uartintr WANTS NOW: ae96fd0's handler takes
+                      no lock and moves no device ghost, so [is_txlock] -- which
+                      used to sit here and which nothing can currently build
+                      (kernel-defects.md D2) -- is GONE from this bundle;
        [disk_geom]    +
        [is_lock ... disk_res]
                       virtio_disk_intr's;
@@ -135,10 +138,9 @@ Section DevintrCaps.
      ALL PERSISTENT, so the bundle is threaded and never consumed, and the
      postcondition does not mention it. *)
   Definition devintr_caps (γu : uart_names) (γv : disk_names)
-      (γtx γdk γtl : gname)  (γs : list gname)
+      (γdk γtl : gname)  (γs : list gname)
       (pd pav pu : mword 64) : iProp Σ :=
     ( dev_inv γu γv ∗
-      is_txlock γtx γu ∗
       disk_geom γv pd pav pu ∗
       is_lock γdk d_lock "virtio_disk"%string (disk_res γv pd pav pu) ∗
       timer_cap ∗
@@ -146,8 +148,8 @@ Section DevintrCaps.
       procs_inv γs ∗
       panic_wp_any )%I.
 
-  Global Instance devintr_caps_persistent γu γv γtx γdk γtl γs pd pav pu :
-    Persistent (devintr_caps γu γv γtx γdk γtl γs pd pav pu).
+  Global Instance devintr_caps_persistent γu γv γdk γtl γs pd pav pu :
+    Persistent (devintr_caps γu γv γdk γtl γs pd pav pu).
   Proof. rewrite /devintr_caps. apply _. Qed.
 
 End DevintrCaps.
@@ -160,7 +162,7 @@ Definition devintr_stack : nat := 40%nat.
 Definition wp_devintr_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γu : uart_names) (γv : disk_names) (γtx γdk γtl : gname)
+    (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
     (γs : list gname) (pd pav pu : mword 64)
     (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (dq : dfrac) (sc : mword 64) :=
@@ -175,7 +177,7 @@ Definition wp_devintr_sconf_body
   cpu_own lvl eb p C false -∗
   kernel_text -∗ pc_is pcE -∗
   scause ↦ᵣ{dq} sc -∗
-  devintr_caps γu γv γtx γdk γtl γs pd pav pu -∗
+  devintr_caps γu γv γdk γtl γs pd pav pu -∗
   ( ∀ mf : regfile,
       ⌜ callee_saved m mf /\ mf !!! Regidx (mword_of_int 10 : mword 5) = devintr_ret sc ⌝ -∗
       sie_cap_gpr mf av false p -∗
@@ -189,9 +191,9 @@ Module Type DEVINTR.
   Parameter wp_devintr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γu : uart_names) (γv : disk_names) (γtx γdk γtl : gname)
+      (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (dq : dfrac) (sc : mword 64),
-      wp_devintr_sconf_body γu γv γtx γdk γtl γs pd pav pu m av lvl eb p C dq sc.
+      wp_devintr_sconf_body γu γv γdk γtl γs pd pav pu m av lvl eb p C dq sc.
 End DEVINTR.

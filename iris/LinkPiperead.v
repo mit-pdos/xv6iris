@@ -2,9 +2,11 @@
    callees, sealing it as PIPEREAD.  This is what makes piperead count as
    PROVEN (tools/proof_coverage.py): the functor is sealed by its Module
    Type, so linking it discharges every assumption it was written against.
-   [SleepGen] is the lock-generic sleep (SpecSleep.v's SLEEP_GEN) -- the
-   pipe's lock is cancellable, so the static-[is_lock] SLEEP will not do. *)
-Require Import LinkMyproc LinkAcquire LinkKilled LinkWakeup LinkSleep LinkCopyout LinkRelease.
+
+   The split sleep protocol takes TWO callees here ([SleepPrepare] and
+   [Sleep]), and neither is lock-generic: piperead drops and re-takes the
+   pipe's cancellable lock itself, through [ReleaseGen] / [AcquireGen]. *)
+Require Import LinkMyproc LinkAcquire LinkKilled LinkWakeup LinkSleepPrepare LinkSleep LinkCopyout LinkRelease.
 Require Import ProofPiperead.
 
-Module Piperead := PipereadProof Myproc AcquireGen Killed Wakeup SleepGen Copyout ReleaseGen.
+Module Piperead := PipereadProof Myproc AcquireGen Killed Wakeup SleepPrepare Sleep Copyout ReleaseGen.

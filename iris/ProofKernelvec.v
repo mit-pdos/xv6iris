@@ -61,6 +61,7 @@ Require Import IntrDefs.
 Require WpGprCsrwCommon WpGprCsrwC.
 Require Import SpecKerneltrap SpecKernelvec.
 From Kernel Require KernelSyms.
+Require Import KernelConsts.
 Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 Import Defs.
@@ -97,7 +98,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 (* jal target / link-value arithmetic. *)
 Lemma kv_jal_tgt :
   add_vec (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64)
-          (sign_extend' 64 (mword_of_int 0x1fd242 : mword 21))
+          (sign_extend' 64 (mword_of_int KernelConsts.kernelvec_jal_imm : mword 21))
   = (mword_of_int (KernelSyms.kerneltrap) : mword 64).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
@@ -970,9 +971,9 @@ Section KernelvecCore.
     iPoseProof (kv_i19 with "Htext") as "Hi19".
     assert (Hrd19 : uint (mword_of_int 1 : mword 5) <> 0) by (vm_compute; discriminate).
     assert (Hal19 : eq_vec (access_vec_dec (add_vec (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64)
-                      (sign_extend' 64 (mword_of_int 0x1fd242 : mword 21))) 0) ('b"0") = true)
+                      (sign_extend' 64 (mword_of_int KernelConsts.kernelvec_jal_imm : mword 21))) 0) ('b"0") = true)
       by (vm_compute; reflexivity).
-    iApply (wp_jal_gpr_s_zca_pt root_ppn γ (mword_of_int (KernelSyms.kernelvec + 0x24)) (mword_of_int 1) (mword_of_int 0x1fd242)
+    iApply (wp_jal_gpr_s_zca_pt root_ppn γ (mword_of_int (KernelSyms.kernelvec + 0x24)) (mword_of_int 1) (mword_of_int KernelConsts.kernelvec_jal_imm)
               (kv_m1 m) (1/2)%Qp
  Hrd19 Hal19
               with "Hsm Htlbinv Hpc Hfile Hi19").
@@ -1415,8 +1416,8 @@ Section KernelvecHandler.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma kernelvec_handler_spec (γu : uart_names) (γv : disk_names)
-      (γtx γdk γtl : gname) (γs : list gname) (pd pav pu : mword 64) :
-    kernelvec_handler_spec_body γu γv γtx γdk γtl γs pd pav pu.
+      (γdk γtl : gname) (γs : list gname) (pd pav pu : mword 64) :
+    kernelvec_handler_spec_body γu γv γdk γtl γs pd pav pu.
   Proof.
     cbv beta delta [kernelvec_handler_spec_body].
     iIntros (Hgs) "#Hhw #Hinv #Htext #Hcaps".
@@ -1672,7 +1673,7 @@ Section KernelvecHandler.
       iExact "Hq0". }
     iDestruct (sie_cap_gpr_join with "Hhs Hscn Hcapn [Hfile]") as "Hcgk".
     { rewrite Hpin2. iExact "Hfile". }
-    iApply (Kerneltrap.wp_kerneltrap_sconf γu γv γtx γdk γtl γs pd pav pu
+    iApply (Kerneltrap.wp_kerneltrap_sconf γu γv γdk γtl γs pd pav pu
               (kv_m2 Me) (46 + av) p emp%I pc0 sc tv
               Hgs ltac:(unfold kerneltrap_stack; lia) Hdi Hpc0
               with "Hcgk Hsret Hires Hrcpt [Hcpu] Htext Hpc Hsepc Hscause Hstval Hcaps Hclm").

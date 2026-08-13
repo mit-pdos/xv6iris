@@ -69,22 +69,27 @@ Definition uartintr_stack : nat := 36%nat.
 
 Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γu : uart_names) (γv : disk_names) (γl : gname)
+    (γu : uart_names) (γv : disk_names)
      (γs : list gname)
     (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartintr in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   length γs = NPROC ->
-  (* the transient noff increments (tx_lock, and wakeup's per-proc lock) stay
-     in int range *)
+  (* the transient noff increment (wakeup's per-proc lock) stays in int range *)
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
   (uartintr_stack <= av)%nat ->
   sie_cap_gpr m av b pme -∗
   cpu_own lvl eb pme C b -∗
   kernel_text -∗ pc_is pcE -∗
-  (* the device, and the transmitter's lock -- the whole credential *)
+  (* THE DEVICE, AND NOTHING ELSE.  The transmit lock is gone from this
+     contract: ae96fd0's uartintr takes no lock and moves no device ghost --
+     it observes LSR (a stable read, [DevModel.uart_read_stable]) and calls
+     wakeup(&tx_chan).  What used to be here was [is_txlock], because the
+     handler had to reach the transmitter token to clear [tx_busy] and cash
+     a THRE observation into the lock invariant; the writer polls THRE
+     itself now (UartTxInv.v's header), so there is nothing to cash and
+     nothing to reach. *)
   dev_inv γu γv -∗
-  is_txlock γl γu -∗
   (* the running-thread bundle (wakeup / consoleintr) *)
   procs_inv γs -∗
   panic_wp_any -∗
@@ -101,8 +106,8 @@ Module Type UARTINTR.
   Parameter wp_uartintr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γu : uart_names) (γv : disk_names) (γl : gname)
+      (γu : uart_names) (γv : disk_names)
       (γs : list gname)
       (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool),
-      wp_uartintr_sconf_body γu γv γl γs m av lvl eb pme C b.
+      wp_uartintr_sconf_body γu γv γs m av lvl eb pme C b.
 End UARTINTR.
