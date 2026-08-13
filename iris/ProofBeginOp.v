@@ -1613,8 +1613,18 @@ Section BoBodies.
            the birth-epoch bookkeeping on this side (fs-log.md §G.2): the
            entry records the epoch it was minted in, and [log_res]'s
            soundness clause below is re-established for the new row by
-           [reflexivity]. *)
-        iMod (log_begin_step γ om Ep with "Hauth") as (i Hi) "(Hauth & HopS)".
+           [reflexivity].
+
+           ...AND THE EPOCH LOWER BOUND IS MINTED HERE TOO (fs-log.md
+           §G.13): this is the ONLY moment in an operation's life at which
+           the [ln_ep] auth and the client are in the same place, so
+           [log_begin_step] takes the auth and hands it straight back with
+           a persistent [log_epoch_lb γ Ep] bundled into the entry.  It
+           costs the step one extra resource in and one out and nothing
+           else -- which is why every other log ghost step below merely
+           re-packs it. *)
+        iMod (log_begin_step γ om Ep with "Hauth Hepa")
+          as (i Hi) "(Hauth & Hepa & HopS)".
         iDestruct (log_opSe_opS with "HopS") as "HopS".
         iDestruct (log_opS_op with "HopS") as "Hop".
         iAssert (log_res γ bn γfs cov logstart)

@@ -296,6 +296,40 @@ Section LogInv.
   (*  An active operation                                              *)
   (* ---------------------------------------------------------------- *)
 
+  (* THE CLIENT-SIDE EPOCH LOWER BOUND (fs-log.md §G.3/§G.13), defined HERE
+     rather than beside its two auth lemmas because [log_opSe] bundles it.
+     "the batch epoch has reached [e]": PERSISTENT and monotone, so a copy
+     taken under the log lock stays true forever outside it -- which is the
+     whole point, since a PARKER does not hold the log spinlock and can
+     never read the auth. *)
+  Definition log_epoch_lb (γ : log_names) (e : nat) : iProp Σ :=
+    mono_nat_lb_own (ln_ep γ) e.
+
+  Global Instance log_epoch_lb_persistent γ e : Persistent (log_epoch_lb γ e).
+  Proof. apply _. Qed.
+
+  Global Instance log_epoch_lb_timeless γ e : Timeless (log_epoch_lb γ e).
+  Proof. apply _. Qed.
+
+  (* MINTING, where the auth is open (every log ghost step, and begin_op's
+     in particular).  Free: the auth is handed straight back. *)
+  Lemma log_epoch_lb_get (γ : log_names) (E : nat) :
+    mono_nat_auth_own (ln_ep γ) 1 E -∗
+    mono_nat_auth_own (ln_ep γ) 1 E ∗ log_epoch_lb γ E.
+  Proof.
+    iIntros "Ha".
+    iDestruct (mono_nat_lb_own_get with "Ha") as "#Hlb".
+    iFrame "Ha". iApply "Hlb".
+  Qed.
+
+  (* ...and USING one, back under the auth: the bound is real. *)
+  Lemma log_epoch_lb_le (γ : log_names) (E e : nat) :
+    mono_nat_auth_own (ln_ep γ) 1 E -∗ log_epoch_lb γ e -∗ ⌜(e <= E)%nat⌝.
+  Proof.
+    iIntros "Ha Hl".
+    iDestruct (mono_nat_lb_own_valid with "Ha Hl") as %[_ Hle]. done.
+  Qed.
+
   (* one ledger entry with remaining budget u AND the blocks this op has
      already appended; the id is existential -- no client ever needs it,
      and the ghost steps below re-locate the entry by ownership. *)
@@ -305,10 +339,27 @@ Section LogInv.
      token outlives its op, so a stale small [e0] would admit a stale
      witness and re-open exactly the hole the header's revocation argument
      closes (fs-log.md §G.9, FINDING 1).  Exposing it on the LINEAR entry
-     is what keeps it honest: holding this IS holding the live entry. *)
+     is what keeps it honest: holding this IS holding the live entry.
+
+     ...AND IT CARRIES THE LOWER BOUND (§G.13).  [log_epoch_lb γ e0] is the
+     formal referent of §G.4's "the walker's open op freezes the epoch": a
+     client outside the log lock can never mint one, and [log_begin_step] is
+     the universal point where every op passes with the auth open, so the
+     bound is minted there and rides the entry for the op's whole life.
+     The bundle is ABI-INVISIBLE because the lb is PERSISTENT: [log_opS]'s
+     arity is untouched, every conversion below holds verbatim, and the
+     only ghost step that pays for it is the mint itself.  A LOWER bound
+     also needs no revocation -- unlike the refuted persistent birth-epoch
+     token, a stale copy stays TRUE, and truth is all it claims. *)
   Definition log_opSe (γ : log_names) (u : nat) (Sb : gset Z) (e0 : nat)
     : iProp Σ :=
-    (∃ i : nat, i ↪[ln_ops γ] (u, Sb, e0))%I.
+    ((∃ i : nat, i ↪[ln_ops γ] (u, Sb, e0)) ∗ log_epoch_lb γ e0)%I.
+
+  (* the lb read off an entry, which is what a parker/observer actually
+     carries out of the op's scope *)
+  Lemma log_opSe_lb (γ : log_names) (u : nat) (Sb : gset Z) (e0 : nat) :
+    log_opSe γ u Sb e0 -∗ log_epoch_lb γ e0.
+  Proof. iIntros "[_ #H]". iApply "H". Qed.
 
   (* ...AND THE FROZEN ABI.  Three arguments, exactly as before: every
      landed threader ([ProofWritei], [ProofItrunc], [ProofDirlink], and the
@@ -649,19 +700,28 @@ Section LogInv.
      just read the guard true, so it holds
      n + (out+1) * MAXOPBLOCKS <= LOGBLOCKS; [log_reserve_ok] below turns
      that into the new sum tie. *)
-  Lemma log_begin_step γ (om : gmap nat op_entry) (E : nat) :
-    ghost_map_auth (ln_ops γ) 1 om ==∗
+  (* ...AND IT IS THE LB'S UNIVERSAL MINT POINT (§G.13).  Every operation
+     in the system passes through here with the [ln_ep] auth open, and no
+     client can ever mint an lb anywhere else -- the auth lives inside
+     [log_res], behind the log spinlock, and a parker does not hold it.  So
+     the auth is taken and handed straight back, and [log_epoch_lb_get]
+     pays for the bound with nothing. *)
+  Lemma log_begin_step (γ : log_names) (om : gmap nat op_entry) (E : nat) :
+    ghost_map_auth (ln_ops γ) 1 om -∗
+    mono_nat_auth_own (ln_ep γ) 1 E ==∗
     ∃ i, ⌜om !! i = None⌝ ∗
       ghost_map_auth (ln_ops γ) 1 (<[i := (MAXOPBLOCKS, ∅, E)]> om) ∗
+      mono_nat_auth_own (ln_ep γ) 1 E ∗
       log_opSe γ MAXOPBLOCKS ∅ E.
   Proof.
-    iIntros "Ha".
+    iIntros "Ha Hep".
     set (i := fresh (dom om)).
     assert (Hi : om !! i = None).
     { apply not_elem_of_dom. apply is_fresh. }
     iMod (ghost_map_insert i (MAXOPBLOCKS, ∅, E) Hi with "Ha") as "[Ha He]".
-    iModIntro. iExists i. iSplitR; [done|]. iFrame "Ha".
-    rewrite /log_opSe. iExists i. iFrame.
+    iDestruct (log_epoch_lb_get with "Hep") as "[Hep #Hlb]".
+    iModIntro. iExists i. iSplitR; [done|]. iFrame "Ha Hep".
+    rewrite /log_opSe. iSplitL "He"; [iExists i; iFrame | iApply "Hlb"].
   Qed.
 
   (* the guard arithmetic: with every entry bounded, the conservative
@@ -689,11 +749,14 @@ Section LogInv.
       ghost_map_auth (ln_ops γ) 1 (<[i := (u, Sb ∪ {[b]}, e0)]> om) ∗
       log_opSe γ u (Sb ∪ {[b]}) e0.
   Proof.
-    iIntros "Ha He". rewrite /log_opSe. iDestruct "He" as (i) "He".
+    iIntros "Ha He". rewrite /log_opSe.
+    (* the lb is PERSISTENT, so every step below is a re-pack, not a
+       transfer: it survives the update untouched at the SAME [e0] *)
+    iDestruct "He" as "[He #Hlb]". iDestruct "He" as (i) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
     iMod (ghost_map_update (u, Sb ∪ {[b]}, e0) with "Ha He") as "[Ha He]".
     iModIntro. iExists i. iSplitR; [done|]. iFrame "Ha".
-    iExists i. iFrame.
+    iSplitL "He"; [iExists i; iFrame | iApply "Hlb"].
   Qed.
 
   (* log_write's ABSORB read: an op that holds a credit for [b] really has
@@ -705,7 +768,7 @@ Section LogInv.
     ghost_map_auth (ln_ops γ) 1 om -∗ log_opSe γ u Sb e0 -∗
     ∃ i, ⌜om !! i = Some (u, Sb, e0)⌝.
   Proof.
-    iIntros "Ha He". rewrite /log_opSe. iDestruct "He" as (i) "He".
+    iIntros "Ha [He _]". iDestruct "He" as (i) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
     iExists i. done.
   Qed.
@@ -719,7 +782,7 @@ Section LogInv.
       ghost_map_auth (ln_ops γ) 1 (delete i om).
   Proof.
     iIntros "Ha He". rewrite /log_op /log_opS /log_opSe.
-    iDestruct "He" as (Sb e0 i) "He".
+    iDestruct "He" as (Sb e0) "[He _]". iDestruct "He" as (i) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
     iMod (ghost_map_delete with "Ha He") as "Ha".
     iModIntro. iExists i, Sb, e0. by iFrame.
@@ -734,7 +797,7 @@ Section LogInv.
     ⌜(1 <= size om)%nat⌝.
   Proof.
     iIntros "Ha He". rewrite /log_opS /log_opSe.
-    iDestruct "He" as (e0 i) "He".
+    iDestruct "He" as (e0) "[He _]". iDestruct "He" as (i) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
     iPureIntro.
     assert (Hne : om ≠ ∅).
@@ -749,7 +812,7 @@ Section LogInv.
     ⌜(1 <= size om)%nat⌝.
   Proof.
     iIntros "Ha He". rewrite /log_op /log_opS /log_opSe.
-    iDestruct "He" as (Sb e0 i) "He".
+    iDestruct "He" as (Sb e0) "[He _]". iDestruct "He" as (i) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
     iPureIntro.
     assert (Hne : om ≠ ∅).
@@ -801,38 +864,10 @@ Section LogInv.
   (*  THE CLIENT-SIDE EPOCH LOWER BOUND (fs-log.md §G.3)                *)
   (* ---------------------------------------------------------------- *)
 
-  (* "the batch epoch has reached [e]".  PERSISTENT and monotone, so a copy
-     taken under the lock stays true forever outside it -- which is the
-     whole point: a PARKER does not hold the log spinlock and can never
-     read the auth, so every lb it will ever have must have been minted
-     while some ghost step had the auth open. *)
-  Definition log_epoch_lb (γ : log_names) (e : nat) : iProp Σ :=
-    mono_nat_lb_own (ln_ep γ) e.
+  (* [log_epoch_lb] and its two auth-facing lemmas are defined up beside
+     [log_opSe], which BUNDLES the bound (§G.13) -- [log_begin_step] mints
+     it, and that lemma is above this point. *)
 
-  Global Instance log_epoch_lb_persistent γ e : Persistent (log_epoch_lb γ e).
-  Proof. apply _. Qed.
-
-  Global Instance log_epoch_lb_timeless γ e : Timeless (log_epoch_lb γ e).
-  Proof. apply _. Qed.
-
-  (* MINTING, where the auth is open (every log ghost step, and begin_op's
-     in particular).  Free: the auth is handed straight back. *)
-  Lemma log_epoch_lb_get (γ : log_names) (E : nat) :
-    mono_nat_auth_own (ln_ep γ) 1 E -∗
-    mono_nat_auth_own (ln_ep γ) 1 E ∗ log_epoch_lb γ E.
-  Proof.
-    iIntros "Ha".
-    iDestruct (mono_nat_lb_own_get with "Ha") as "#Hlb".
-    iFrame "Ha". iApply "Hlb".
-  Qed.
-
-  (* ...and USING one, back under the auth: the bound is real. *)
-  Lemma log_epoch_lb_le (γ : log_names) (E e : nat) :
-    mono_nat_auth_own (ln_ep γ) 1 E -∗ log_epoch_lb γ e -∗ ⌜(e <= E)%nat⌝.
-  Proof.
-    iIntros "Ha Hl".
-    iDestruct (mono_nat_lb_own_valid with "Ha Hl") as %[_ Hle]. done.
-  Qed.
 
   (* THE BUMP, at the commit re-deposit (ProofEndOp's [Hommt] arm): nothing
      physical moves, and no live entry can be falsified because [out = 0]

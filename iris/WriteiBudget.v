@@ -89,6 +89,11 @@ From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import auth gmap frac.
 From iris.base_logic.lib Require Import ghost_map.
+(* [RiscvPtsto]/[DiskPtsto] are here ONLY for the two classes [log_opS]'s
+   implicit arguments now mention -- see the note on [Section LogAmort]'s
+   context below.  Nothing in this file uses a machine or a disk. *)
+Require Import RiscvPtsto.    (* riscvGS -- carries the ambient mono_natG *)
+Require Import DiskPtsto.     (* diskGhostG *)
 Require Import FsCrash.       (* BSIZE *)
 Require Import InodeInv.      (* NDIRECT, NINDIRECT, MAXFILE *)
 Require Import LogInv.        (* MAXOPBLOCKS, log_op, log_opS *)
@@ -323,7 +328,17 @@ Proof. vm_compute. lia. Qed.
 (* ===================================================================== *)
 
 Section LogAmort.
-  Context `{!logG Σ}.
+  (* [!riscvGS Σ] IS REQUIRED HERE FOR A NON-OBVIOUS REASON (fs-log.md
+     §G.13/§G.14).  [log_opS] now bundles [log_epoch_lb], which is
+     [mono_nat_lb_own] over the AMBIENT [mono_natG] -- and §G.9's ruling
+     put that instance in [riscvGS] (RiscvPtsto's [riscvF_genGS]) rather
+     than in [logG], to avoid the duplicate-class trap.  So the budget
+     ALGEBRA, which used to be statable over the log ghost alone, now needs
+     the machine's class too.  The error if it is missing names
+     [diskGhostG], not [mono_natG]: instance search fails on the first
+     unresolvable field of [riscvGS] it reaches, which is why this reads
+     like an unrelated missing import. *)
+  Context `{!riscvGS Σ, !diskGhostG Σ, !logG Σ}.
 
   (* "u units are genuinely free, and one unit is still held back for each
      block of F this op has not yet logged."

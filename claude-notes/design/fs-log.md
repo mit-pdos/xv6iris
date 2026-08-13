@@ -1028,3 +1028,193 @@ G-3's crz honesty premise is `nlz_obs cn k e0 ∗ log_opSe γ u Sb e0` at
 the SAME e0 (one resource + one shared binder; nothing else can tie the
 per-slot token to the per-op entry, and making nlz_obs carry the entry
 would force it linear when it wants persistence-within-op).
+
+
+### G.14 G-2b: the lb bundle LANDED; and §G.3's receipt is NOT STATABLE where
+### §G.3 puts it — a costed fork for the human
+
+**PART 1 — THE BUNDLE, LANDED AND GREEN.**  §G.13 executed verbatim:
+
+    log_opSe γ u Sb e0 := (∃ i, i ↪[ln_ops γ] (u, Sb, e0)) ∗ log_epoch_lb γ e0
+
+`log_epoch_lb` and its two auth-facing lemmas moved UP in LogInv.v to sit
+beside `log_opSe` (the bundle uses `log_epoch_lb_get`, so the old placement
+below `log_use_group` was a forward reference — that is the only ordering
+trap in the change).  `log_begin_step` now takes and returns the `ln_ep`
+auth and mints the bound with `log_epoch_lb_get`.
+
+**§G.13's ABI-invisibility claim VERIFIED, not trusted.**  `log_opS`'s arity
+is unchanged and `log_opSe_opS` / `log_opS_named` / `log_opSw_intro` /
+`log_opSw_opS` / the timeless instances all hold with their proof scripts
+BYTE-IDENTICAL.  Every other ghost step (`log_spend_step`,
+`log_absorb_step`, `log_end_step`, `log_opS_positive`, `log_op_positive`)
+needed exactly the predicted re-pack — one `iDestruct "He" as "[He #Hlb]"`
+and one `iSplitL … iApply "Hlb"`, because the bound is persistent and
+therefore survives `ghost_map_update` untouched at the same `e0`.  And the
+prediction that only ProofBeginOp re-opens is CONFIRMED: **ProofEndOp,
+ProofLogWrite and ProofInitlog compiled with ZERO source change**, and
+inside ProofBeginOp only the mint line moved (`with "Hauth"` →
+`with "Hauth Hepa"`, `(Hauth & HopS)` → `(Hauth & Hepa & HopS)`); the two
+`log_res` reconstructions at the space/no-space arms did not move at all,
+because `Hepa` was already in their resource lists from G-1.
+Cost: LogInv +79/−44 (most of it the moved block), ProofBeginOp +12/−2.
+
+**A THIRD COST §G.13 DID NOT SEE: `log_opS`'S TYPECLASS FOOTPRINT GREW.**
+The bundle makes `log_opS` mention `mono_nat_lb_own`, and §G.9's correction
+2 put the ambient `mono_natG` in **`riscvGS`** (RiscvPtsto's
+`riscvF_genGS`) rather than in `logG` — so a proposition that used to be
+statable over the log ghost alone now drags the machine's class in.  Two
+files in the tree state the budget ALGEBRA under `Context `{!logG Σ}`
+alone; one of them, `WriteiBudget.v`'s `Section LogAmort`, actually uses
+`log_opS` and broke.  (`CreateBudget.v` mentions it only in a comment.)
+Fix: `Context `{!riscvGS Σ, !diskGhostG Σ, !logG Σ}` plus explicit
+`Require Import RiscvPtsto DiskPtsto` — the file needs neither a machine
+nor a disk, only the two class names.  **Two traps in one error**: it
+reports the missing instance as `diskGhostG`, never `mono_natG`, because
+instance search fails on the first unresolvable field of `riscvGS` it
+reaches; and if you write `` `{!riscvGS Σ} `` without the `Require`,
+implicit generalization silently invents a VARIABLE named `riscvGS` and
+the second error message shows `riscvGS : gFunctors -> Type` sitting in
+the context — the same trap §G.10 warned about for a bare `γ` becoming a
+`Finite` instance, one class up.
+
+**PART 2 — THE BLOCKER: `zero_receipt` NAMES TWO THINGS THE ESCROW DOES NOT
+HAVE.**  §G.3 puts the receipt on the parked payload:
+
+    zero_receipt dn inum :=
+      ⌜di_nlink dn = 0⌝ → ∃ e, logged_at γ e (IBLOCK inum inodestart)
+                              ∗ ic_epoch_lb cn k e
+
+`logged_at` needs **`γ : log_names`** and `IBLOCK inum inodestart` needs
+**`inodestart : Z`**.  The escrow has NEITHER, at any level:
+
+    ic_parked   cn γfs γi cov logstart k                (IcacheEscrow.v:620)
+    ic_payload     γfs γi cov logstart k inum g v       (:550)
+    ic_loaded      γfs γi cov logstart k inum dn bm     (:487)
+
+Threading them is not an option worth pricing twice: `ic_escrow` is named
+in **39 files** and `is_itable2` in **28**, some 25 of which are `Spec*`
+statements (SpecIlock, SpecIget, SpecIput, SpecIunlockput, SpecNamex,
+SpecCreate, SpecKexec, SpecFsinit, …).  A parameter on `ic_parked`
+propagates to `ic_escrow_body → ic_escrow → ic_escrows → is_itable2` and
+moves every icache spec in the tree — categorically bigger than §G.6's
+"option-(iii)-sized" and against the standing no-arity-change convention
+(§17.6.3, §20.3, DirLinks.v:118-122).
+
+**THE CHEAP RESOLUTION, RECOMMENDED: put them in `ic_names`.**  `cn` is
+ALREADY threaded through exactly the definitions that need the receipt, so
+
+    Record ic_names := MkIcNames {
+      icn_esc : nat -> gname;  icn_mid : nat -> gname;  icn_id : nat -> gname;
+      icn_slotep : nat -> gname;   (* NEW: the per-slot mono_nat, below     *)
+      icn_lg  : gname;             (* NEW: = ln_lg γ, so logged_at is sayable *)
+      icn_ep  : gname;             (* NEW: = ln_ep γ, so log_epoch_lb is    *)
+      icn_ist : Z;                 (* NEW: = inodestart                      *)
+    }
+costs arity NOWHERE — all 39 `ic_escrow` files and all 28 `is_itable2`
+files stay byte-stable.  What it does cost, and what needs the ruling:
+* `ic_names_alloc` (IcacheEscrow.v:2079) and `icache_boot`
+  (IcacheBoot.v:831) gain the log gnames + inodestart as PARAMETERS —
+  they can no longer mint the whole record, exactly as `icfg_iref` and
+  `icfg_live` are already premises there for the same "canonical gname"
+  reason (IcacheBoot.v:833-844).  Precedent is on side of doing it.
+* the tie `⌜icn_lg cn = ln_lg γ ∧ icn_ep cn = ln_ep γ ∧ icn_ist cn =
+  inodestart⌝` has to be reachable wherever both `cn` and `γ` appear.
+  Cleanest home is a conjunct of `is_itable2` — its DEFINITION changes,
+  its arity does not, so the 28 files rebuild byte-stable.
+* BOOT ORDER IS FINE, verified: fsinit calls `initlog` at +0x4e, whose
+  post is `∃ γ, log_ctx γ …` (SpecFsinit.v:406), and the icache ghost boot
+  runs after it (SpecFsinit.v:332).  So γ exists before `ic_names_alloc`;
+  SpecFsinit is the one statement that has to open that existential
+  earlier and re-share it.
+(The alternative — adding `icfg_log`/`icfg_ist` to `IcacheRef.icfg`
+(:388), the ambient config class — is even cheaper syntactically but makes
+the log's γ AMBIENT while the whole fs cone threads it as a value, and the
+same tie is then needed anyway.  Not recommended, but it is the other
+door.)
+
+**PART 3 — THE TIE THAT CLOSES, worked out and sound.**  This is the part
+worth keeping whichever door is opened; it also says exactly WHY the
+receipt cannot be self-contained.  Ghosts:
+
+    ic_epoch_lb cn k e := mono_nat_lb_own (icn_slotep cn k) e   (persistent)
+    nlz_obs     cn k e0 := ic_epoch_lb cn k e0                  (persistent)
+
+and the PARKED payload carries, per slot,
+
+    ∃ v : nat, mono_nat_auth_own (icn_slotep cn k) 1 v ∗ log_epoch_lb γ v ∗
+      (⌜bv_unsigned (di_nlink dn) = 0⌝ →
+         ∃ e, logged_at γ e (IBLOCK inum (icn_ist cn)) ∗ ⌜v <= e⌝)
+
+Note the tie is `⌜v <= e⌝` against the SLOT'S OWN CURRENT VALUE, not
+against the observer's epoch — that is the change from §G.3, and it is what
+makes the checkout lemma close:
+
+* **mint** (observer, `di_nlink ≠ 0`, holds `log_opSe γ _ _ e0` hence
+  `log_epoch_lb γ e0`): raise `v := max v e0` (always permitted),
+  re-establish `log_epoch_lb γ (max v e0)` from whichever of the two bounds
+  it is, receipt clause VACUOUS because nlink ≠ 0, take
+  `ic_epoch_lb cn k e0`.  Free.
+* **deposit** (iput's free arm, after credgen): must show `⌜v <= e⌝` for its
+  own witness epoch `e`.  **THIS IS THE ONE STEP THAT NEEDS THE LOG AUTH**,
+  and it is the reason the receipt cannot be built at the park: `v <= e`
+  follows from `log_epoch_lb γ v` (⇒ `v <= E` by `log_epoch_lb_le`) plus
+  "my entry is live" (⇒ `e = e0 = E`), and the `ln_ep` auth lives inside
+  `log_res`, behind the log spinlock.  So it must come OUT of
+  `SpecIupdate`'s credgen post: hand IN `log_epoch_lb γ v`, get back
+  `∃ e, logged_at γ e (IBLOCK …) ∗ ⌜v <= e⌝`, the comparison discharged
+  inside log_write's ghost step where the auth is already open.  That is
+  the precise shape of §G.6's "SpecIupdate: small" row — it is an
+  additive PREMISE as well as an additive post clause.
+* **no-op parker** (ProofIunlock.v:519 and ProofIget.v:1282 — AUDITED: both
+  have `grep -c log_op` = 0, neither has any epoch to offer): threads
+  `(v, log_epoch_lb γ v, receipt)` through `ic_swap_checkout` and back into
+  `ic_swap_park` UNCHANGED.  Monotone, so it never lowers `v`; sound
+  because a no-op parker never writes a zero, and zero-DEPOSITORS always
+  have an open op.  iget's `ic_close_mid_to_parked` parks a FRESH slot at
+  `v = 0`, free from `mono_nat_lb_own_0`, and its receipt is vacuous
+  because it parks UNLOADED (no `dn` at all).
+* **consumption** (checker-outer holding `nlz_obs cn k e0` and the
+  checked-out payload): the auth gives the exact `v`; `nlz_obs` gives
+  `e0 <= v`; the receipt gives `v <= e`; conclude
+  `∃ e, ⌜e0 <= e⌝ ∗ logged_at γ e (IBLOCK …)` — EXACTLY §G.13's ruled
+  shape, with the two bounds ordered THROUGH the auth's exact value.  Two
+  lower bounds alone can never be compared, which is why §G.3's pairing of
+  `logged_at γ e` with `ic_epoch_lb cn k e` does not close on its own.
+
+**PART 4 — what is left, once the fork is ruled.**  IcacheEscrow:
+`ic_parked` gains the conjunct (+ its `Timeless` instance, `ic_mk_parked`
+:952, `ic_close_parked` :1347); `ic_swap_park` :1089 gains a premise and
+`ic_swap_checkout` :1014 a returned conjunct; `ic_close_mid_to_parked`
+:1462 gains the bottom case; `ic_open_auth_ref` :1165's rebuild wand takes
+a whole `ic_parked`, so its two call sites (ProofIput :901/:1445) gain it
+too.  Consumers: ProofIlock :2223, ProofIunlock :519, ProofIget :1282,
+ProofIput :2214.  SpecIupdate's credgen premise+post, its three derived
+bodies (`cred`/`gen`/`sconf`, SpecIupdate.v:732/:280/:118) and its three
+consumers (ProofItrunc :339, ProofWritei :1120, ProofIput :2125) — of which
+only ProofIput :2125 is in the same proof context as a park, which is the
+structural reason iput is the only depositor.
+
+
+### G.15 Coordinator ratification of G.14 (2026-08-13) — three rulings
+
+1. **ic_names carries the log gnames** (four fields; arity moves NOWHERE —
+   the 39/28-file spec surface stays byte-stable); ic_names_alloc /
+   icache_boot take them as parameters (icfg_iref/icfg_live precedent);
+   the tie ⌜icn_lg cn = ln_lg γ ∧ …⌝ lives in is_itable2's DEFINITION.
+   Boot order verified: fsinit's initlog existential opens before the
+   icache ghost boot.
+2. **The corrected tie replaces §G.3's**: two lower bounds on one counter
+   are incomparable — G.14 is right and §G.3's pairing is dead.  The
+   slot's mono-nat AUTH rides the payload at value v with log_epoch_lb γ v
+   and the receipt tied at ⌜v <= e⌝; nlz_obs is the slot lb at e0; deposit
+   goes through SpecIupdate's credgen (log_epoch_lb γ v IN, witness +
+   ⌜v <= e⌝ OUT — discharged inside log_write where the auth is open);
+   consumption closes to the ruled crz shape exactly.
+3. **The no-op-parker audit** (ProofIunlock:519, ProofIget:1282 thread
+   unchanged; iget parks fresh at v = 0 with a vacuous receipt; the only
+   with-op parker is ProofIput:2214) is adopted as the worklist.
+
+Sequencing: the lb bundle commits now as G-2a2; GR-6 (upstream: panic
+proven, kexec B2, the ProofIput/ProofItrunc profile restyle) merges next;
+G-2 items 2-4 relaunch on the merged base under these rulings.
