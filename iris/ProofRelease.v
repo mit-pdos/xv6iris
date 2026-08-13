@@ -231,12 +231,20 @@ Section ProofRelease.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite kv_addv_zero. reflexivity. }
+    (* THE SET-REMOVING INSTRUCTION, and the one that CANNOT run without the
+       set: while the lock is held the invariant owns only half of [lk->cpu],
+       so this store is licensed by redeeming the membership fragment out of
+       the hart's own held-lock set (LockSet.cpu_locks_delete).  The set is
+       opened out of [cpu_own] here and put back with [lka] gone, which is
+       why release's contract never mentions it. *)
+    iDestruct (cpu_own_locks_acc with "Hown") as (Slk) "[Hlks Hownback]".
     iApply (wp_sd_zero_lkcpu_lockopen_s_sconf (CID:=CID) γl lka R Dc (mword_of_int (KernelSyms.release + 0x12))
-              (mword_of_int 9 : mword 5) (mword_of_int 16 : mword 12) mh (trap_res outb + (av - 4))%nat false
+              (mword_of_int 9 : mword 5) (mword_of_int 16 : mword 12) mh (trap_res outb + (av - 4))%nat false Slk
               ltac:(rgne; exact Hacpu) Href
-              with "Hcg Hpc Hi12 Hlock Htoken").
+              with "Hcg Hpc Hi12 Hlock Htoken Hlks").
     iApply wp_next_off_intro.
-    iIntros "Hcg Hpc Htoken".
+    iIntros "Hcg Hpc Htoken Hlks".
+    iDestruct ("Hownback" with "Hlks") as "Hown".
     assert (Hpc16 : add_vec_int (mword_of_int (KernelSyms.release + 0x12) : mword 64) 4 = mword_of_int (KernelSyms.release + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc16) in "Hpc".
     (* ---- 0x16: fence rw,w ---- *)

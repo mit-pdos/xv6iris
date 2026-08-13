@@ -406,6 +406,10 @@ Section BootRun.
      (* the WHOLE [cpus[cid].proc] cell -- see [BootShared.boot_hart_bss].
         It is private to this hart and goes into [IntrDefs.cpu_cells]. *)
      cur_proc zero_reg ∗
+     (* this hart's HELD-LOCK AUTHORITY at the empty set (LockSet.v), minted
+        by adequacy beside the other per-hart ghosts.  It goes straight into
+        [IntrDefs.cpu_priv] at the M->S bridge and is never named again. *)
+     lk_auth cpu_id ∅ ∗
      cpu_ctx_free ∗
      True)%I.
 
@@ -455,7 +459,7 @@ Section BootRun.
     iIntros "#Htext (Hmm & Hpmpc & Hpmpa & Hpc & Hfile & Hmh & Hmepc & Hsatp &
               Hmede & Hmdl & Hmie & Hmenv & Hmcen & Hstc & Htlb & Hstvec &
               Hsepc & Hscause & Hstval & Hgot & Hstk & Hbit & Hbit2 & Hg2 &
-              Hg4a & Hg4b & Hspp1 & Hspp2 & Hnoff & Hint & Hproc & Hctx & _) Hcont".
+              Hg4a & Hg4b & Hspp1 & Hspp2 & Hnoff & Hint & Hproc & Hlks & Hctx & _) Hcont".
     pose proof (fin_to_nat_lt cpu_id) as Hn.
     (* the two persistent halves of the config bundle, kept for the bridge *)
     iDestruct (mmode_config_persist with "Hmm") as "[[#Hhw #Hmin] Hmm]".
@@ -509,7 +513,7 @@ Section BootRun.
               eq_refl
               with "Hhw Hmin Hhs Hpriv Hmst Hpmpc Hpmpa Hfile Hsatp Hmdl Hmie
                     Hmenv Hstk Hbit Hbit2 Hg2 Hg4a Hg4b Htlb Hsepc Hscause
-                    Hstval Hspp1 Hspp2 Hstvec Hnoff Hint Hproc Hctx")
+                    Hstval Hspp1 Hspp2 Hstvec Hnoff Hint Hproc Hlks Hctx")
       as (mf) "(Hcap & Hcpu & Hg & Hraw)".
     (* the two cells this seam used to drop become the timer capability.  The
        fupd goes in front of a [WP (Loop)] goal, so peel it with [fupd_wp]

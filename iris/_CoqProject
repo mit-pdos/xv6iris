@@ -195,6 +195,7 @@ SpecUser.v
 ProofUser.v
 UserKernelBridge.v
 IntrDefs.v
+LockSet.v
 WpIntrInv.v
 SpecKerneltrap.v
 SpecKernelvec.v

@@ -759,6 +759,12 @@ Section BootAlloc.
     (ghost_var (spie_name c) (1/2)%Qp sie_bit_off ∗
      ghost_var (spie_name c) (1/2)%Qp sie_bit_off)%I.
 
+  (* this hart's HELD-LOCK AUTHORITY at the empty set (LockSet.v), as
+     adequacy mints it -- its own family for the same reason [hart_spp] is
+     one: [power_boot_res] hands it out as a separate big-op. *)
+  Definition hart_locks (c : CPU) : iProp Σ :=
+    lk_auth c ∅.
+
   (* [power_boot_res] is stated in ERA-EXPLICIT ghost forms; every ambient
      form ([reg_pointsto_at], [kmap_auth], [uart_frag], [hart_full], ...) IS
      that form at [riscv_eraGS] BY DELTA (RiscvPtsto §"the era's names"), so
@@ -775,6 +781,7 @@ Section BootAlloc.
       ([∗ list] c ∈ enum CPU, hart_sie c) ∗
       ([∗ list] c ∈ enum CPU, hart_spp c) ∗
       ([∗ list] c ∈ enum CPU, hart_spie c) ∗
+      ([∗ list] c ∈ enum CPU, hart_locks c) ∗
       ([∗ list] j ∈ seq 0 NPROC, hart_full j (0%fin : CPU)) ∗
       ([∗ list] j ∈ seq 0 NPROC, pstate_full j UNUSED) ∗
       uart_frag (g.(gdev).(duart)) ∗ plic_frag (g.(gdev).(dplic)) ∗
@@ -812,10 +819,11 @@ Section BootAlloc.
     ([∗ list] c ∈ enum CPU, hart_sie c) -∗
     ([∗ list] c ∈ enum CPU, hart_spp c) -∗
     ([∗ list] c ∈ enum CPU, hart_spie c) -∗
+    ([∗ list] c ∈ enum CPU, hart_locks c) -∗
     ([∗ list] c ∈ enum CPU, boot_hart_bss c) -∗
     [∗ list] c ∈ enum CPU,
       (boot_reg_res (CID := c) (g.(gregs) c) ∗ hart_strans c ∗ hart_sie c ∗
-       hart_spp c ∗ hart_spie c ∗ boot_hart_bss c).
+       hart_spp c ∗ hart_spie c ∗ hart_locks c ∗ boot_hart_bss c).
   Proof.
     (* THREE [iApply]s OF THE WAND FORM, NOT [rewrite !big_sepL_sep].
        [big_sepL_sep] is a [⊣⊢], so rewriting with it is SETOID rewriting, and
@@ -827,12 +835,13 @@ Section BootAlloc.
        the predicates, not the goal around them.  [big_sepL_sep_2] is the wand
        form of the same fact; [iApply] matches it by head and never enters the
        setoid machinery. *)
-    iIntros "H1 H2 H3 H4 H5 H6".
-    iApply (big_sepL_sep_2 with "H1 [H2 H3 H4 H5 H6]").
-    iApply (big_sepL_sep_2 with "H2 [H3 H4 H5 H6]").
-    iApply (big_sepL_sep_2 with "H3 [H4 H5 H6]").
-    iApply (big_sepL_sep_2 with "H4 [H5 H6]").
-    iApply (big_sepL_sep_2 with "H5 H6").
+    iIntros "H1 H2 H3 H4 H5 H6 H7".
+    iApply (big_sepL_sep_2 with "H1 [H2 H3 H4 H5 H6 H7]").
+    iApply (big_sepL_sep_2 with "H2 [H3 H4 H5 H6 H7]").
+    iApply (big_sepL_sep_2 with "H3 [H4 H5 H6 H7]").
+    iApply (big_sepL_sep_2 with "H4 [H5 H6 H7]").
+    iApply (big_sepL_sep_2 with "H5 [H6 H7]").
+    iApply (big_sepL_sep_2 with "H6 H7").
   Qed.
 
   (* ONE hart's register side, run inside the shared fupd so the two PLIC wire
@@ -845,6 +854,7 @@ Section BootAlloc.
     hart_sie h -∗
     hart_spp h -∗
     hart_spie h -∗
+    hart_locks h -∗
     boot_hart_bss h
     ={E}=∗
       (∃ iv : mword 32,
@@ -855,9 +865,10 @@ Section BootAlloc.
         (register_lookup sig_meip (g.(gregs) h)).
   Proof.
     intro Hbf.
-    rewrite /hart_strans /hart_sie /hart_spp /hart_spie /boot_hart_bss.
+    rewrite /hart_strans /hart_sie /hart_spp /hart_spie /hart_locks
+            /boot_hart_bss.
     iIntros "#Hcl #Hcert #Hword Hregs [Hs1 Hs2] (Hg2 & Hg4a & Hg4b)
-             [Hspp1 Hspp2] [Hspie1 Hspie2]
+             [Hspp1 Hspp2] [Hspie1 Hspie2] Hlks
              (Hstk & Hnoff & Hint & Hproc & Hctx)".
     iMod (boot_entry_pre (CID := h) E (g.(gregs) h)
             (boot_regs_of_facts g Hbf h) with "Hcl Hcert Hregs") as
@@ -873,7 +884,7 @@ Section BootAlloc.
     iFrame "Hmm Hpmpc Hpmpa Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv
             Hmcen Hstc Htlb Hstvec Hsepc Hscause Hstval Hword Hstk
             Hs1 Hs2 Hg2 Hg4a Hg4b Hspp1 Hspie1 Hspp2 Hspie2 Hnoff Hint Hproc
-            Hctx".
+            Hlks Hctx".
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -927,7 +938,7 @@ Section BootAlloc.
     iIntros "H".
     iDestruct (power_boot_res_unpack g ndisk with "H") as
       "(Hregs & Hbytes & Hkauth & Hkfrags & Hkpt & Hstrans & Hsie & Hspp & Hspie &
-        Hpark & Hpst & Huf & Hpf & Hvf & Hdimg & Hmir & #Hcinv & #Hcert)".
+        Hlkauth & Hpark & Hpst & Huf & Hpf & Hvf & Hdimg & Hmir & #Hcinv & #Hcert)".
     (* ---- the claims bundle FIRST: both image halves need it ---- *)
     iMod (kmap_static_claims_intro with "Hkfrags") as "#Hcl".
     (* ---- the image: text persisted, data persisted up to [img_end] ---- *)
@@ -995,9 +1006,10 @@ Section BootAlloc.
     iAssert ([∗ list] c ∈ enum CPU,
                (boot_reg_res (CID := c) (g.(gregs) c) ∗
                 hart_strans c ∗ hart_sie c ∗ hart_spp c ∗ hart_spie c ∗
-                boot_hart_bss c))%I
-      with "[Hregs Hstrans Hsie Hspp Hspie Hharts]" as "Hpre".
-    { iApply (boot_hart_pre_combine with "Hregs Hstrans Hsie Hspp Hspie Hharts"). }
+                hart_locks c ∗ boot_hart_bss c))%I
+      with "[Hregs Hstrans Hsie Hspp Hspie Hlkauth Hharts]" as "Hpre".
+    { iApply (boot_hart_pre_combine with
+                "Hregs Hstrans Hsie Hspp Hspie Hlkauth Hharts"). }
     iAssert ([∗ list] c ∈ enum CPU, |={⊤}=>
                ((∃ iv : mword 32,
                    boot_hart_res (CID := c) (g.(gregs) c) iv DfracDiscarded) ∗
@@ -1010,8 +1022,9 @@ Section BootAlloc.
        the intuitionistic context (the claims bundle, [gen_cert] and the image
        word are all shared), and [_mono]'s goal is a fresh entailment. *)
     { iApply (big_sepL_impl with "Hpre").
-      iIntros "!>" (k c _) "(Hr & Hs & Hg & Hsp & Hspe & Hb)".
-      iApply (boot_hart_pre c g ⊤ Hbf with "Hcl Hcert Hword Hr Hs Hg Hsp Hspe Hb"). }
+      iIntros "!>" (k c _) "(Hr & Hs & Hg & Hsp & Hspe & Hlk & Hb)".
+      iApply (boot_hart_pre c g ⊤ Hbf with
+                "Hcl Hcert Hword Hr Hs Hg Hsp Hspe Hlk Hb"). }
     iMod (big_sepL_fupd with "Hpre") as "Hpre".
     iEval (rewrite big_sepL_sep) in "Hpre".
     iDestruct "Hpre" as "[Hres Hpins]".

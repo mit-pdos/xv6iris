@@ -711,11 +711,11 @@ Section UsertrapRes.
      this one is [C]-generic because usertrap's frame is a parameter. *)
   Lemma ut_flip_pre (pj : mword 64) (C : iProp Σ) :
     cpu_own 0%nat false pj C false -∗
-    intr_count 0 false ∗ cpu_cells 0 true pj ∗ C.
+    intr_count 0 false ∗ cpu_priv 0 true pj ∗ C.
   Proof.
-    rewrite cpu_own_off /cpu_hart /cpu_cells.
-    iIntros "(((_ & Hn & Hi & Hp) & Hc) & HC)".
-    iFrame "Hc HC Hn Hi Hp". iPureIntro. vm_compute. reflexivity.
+    rewrite cpu_own_off /cpu_hart /cpu_priv /cpu_cells.
+    iIntros "((((_ & Hn & Hi & Hp) & Hl) & Hc) & HC)".
+    iFrame "Hc HC Hn Hi Hp Hl". iPureIntro. vm_compute. reflexivity.
   Qed.
 
 End UsertrapRes.

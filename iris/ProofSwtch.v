@@ -118,14 +118,14 @@ Section ProofSwtch.
        disjunction to destruct any more (that was the pre-index [sie_arm]
        shape), so the old ghost_var_agree contradiction arm is simply GONE:
        there is no other case to refute. ---- *)
-    iEval (rewrite /cpu_own /cpu_hart /cpu_cells) in "Hcpuown".
-    iDestruct "Hcpuown" as "(((%Hcpb & Hcnoff & Hcint & Hcproc) & Hccnt) & _)".
+    iEval (rewrite /cpu_own /cpu_hart /cpu_priv /cpu_cells) in "Hcpuown".
+    iDestruct "Hcpuown" as "((((%Hcpb & Hcnoff & Hcint & Hcproc) & Hclks) & Hccnt) & _)".
     iDestruct (intr_count_pos_off 0 eb with "Hccnt") as "[Hq0cnt Hres]".
     iAssert (intr_off_tok ∗ intr_count 1 eb)%I with "[Hsiearm Hq0cnt Hres]" as "(Hq0 & Hccnt)".
     { iFrame "Hsiearm". rewrite /intr_count. iFrame "Hq0cnt Hres". }
-    iAssert (cpu_own 1 eb p emp false) with "[Hcnoff Hcint Hccnt Hcproc]" as "Hcpuown".
-    { rewrite /cpu_own /cpu_hart /cpu_cells.
-      iFrame "Hcnoff Hcint Hcproc Hccnt". iPureIntro; exact Hcpb. }
+    iAssert (cpu_own 1 eb p emp false) with "[Hcnoff Hcint Hclks Hccnt Hcproc]" as "Hcpuown".
+    { rewrite /cpu_own /cpu_hart /cpu_priv /cpu_cells.
+      iFrame "Hcnoff Hcint Hcproc Hclks Hccnt". iPureIntro; exact Hcpb. }
     iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb0.
     assert (HSIE : eq_vec (_get_Mstatus_SIE ms) ('b"1") = false)
       by (rewrite Hb0; vm_compute; reflexivity).

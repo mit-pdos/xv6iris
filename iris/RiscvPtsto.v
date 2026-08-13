@@ -4,7 +4,7 @@ From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var mono_nat
      invariants.
-From iris.algebra Require Import csum excl agree.
+From iris.algebra Require Import csum excl agree auth gset.
 From iris.program_logic Require Import weakestpre.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -90,6 +90,29 @@ Proof. solve_decision. Defined.
 (* the shared kernel page table's resource algebra: one-shot agreement on
    the A/D-canonical table. *)
 Definition kptR : cmra := csumR (exclR unitO) (agreeR (leibnizO ptree)).
+
+(* THE PER-CPU HELD-LOCK SET (LockSet.v, claude-notes/design/kernel-proofs.md):
+   an authority over the set of spinlock ADDRESSES this hart currently holds.
+   The authority rides in [IntrDefs.cpu_hart] -- i.e. with the running kernel
+   thread while interrupts are off, and inside [sie_arm true] while they are
+   on -- and a HELD lock's invariant keeps the matching [gset_disj] fragment,
+   which is what makes "[lk->cpu] is set to hart i" and "lk is in i's held
+   set" one fact rather than two.
+
+   [gset_disj] rather than a plain [gset]: the fragment must be EXCLUSIVE (so
+   release, holding it, can retire the element) and it must be UNFORGEABLE (so
+   the tie means something).  What that costs is that minting one needs
+   [lk ∉ S] -- discharged, not assumed, out of the lock's own [lk->cpu] cell;
+   see [LockSet.cpu_locks].
+
+   The key instances are PINNED to Sail's, for exactly the reason
+   [riscvF_kmapGS] pins them below: every use site elaborates
+   [gset (mword 64)] with the instances Sail's import puts in scope, and an
+   unpinned field here would take stdpp's and fail to unify. *)
+Definition lockSetR : cmra :=
+  authR (gset_disjUR (SailStdpp.Values.mword 64)
+           (EqDecision0 := @SailStdpp.Instances.Decidable_eq_mword 64)
+           (H := @SailStdpp.Instances.Countable_mword 64)).
 
 (* The ghost layer is SPLIT IN TWO (claude-notes/design/crash.md): the
    FIXED layer -- [invGS] plus every functor (inG) class -- will survive
@@ -276,6 +299,21 @@ Record riscvEraGS := RiscvEraGS {
      AMBIENT era's is by the swap counter ([riscv_swap_name] below), squeezed
      against the started-generations auth the DMA completion threads in. *)
   era_mirror_name : gname;
+  (* THE HELD-LOCK SET, CANONICALLY per hart (design/kernel-proofs.md): the
+     authority of [LockSet.cpu_locks], naming the spinlocks this hart holds.
+
+     PER-HART, like [sie_name] and [strans_name]: which locks are held is a
+     property of the HART (xv6 records it in [lk->cpu], a [struct cpu]
+     pointer), not of the thread -- and a lock is taken and given back with
+     interrupts off, so it never crosses a migration.
+
+     CANONICAL rather than a parameter, for the reason spelled out at
+     [era_sie_name]: the authority lives inside [IntrDefs.cpu_hart], hence
+     inside [cpu_own] / [sie_arm] / every whole-function contract in the
+     sconf tier, and an explicit [γ] there would have to be threaded through
+     all ~312 files that name [cpu_own].  The [inG Σ lockSetR] instance is
+     [riscvF_lockSetGS] below, not a separate class, for the same reason. *)
+  era_lockset_name : CPU -> gname;
 }.
 
 Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
@@ -296,6 +334,10 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
   riscvF_kmapGS :: @ghost_mapG Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
                     (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
   riscvF_kptGS :: inG Σ kptR;
+  (* the per-hart held-lock set's functor (LockSet.v).  A FIELD rather than a
+     standalone class: [cpu_locks] sits inside [IntrDefs.cpu_hart], so a class
+     would have to be bound in every sconf-tier section in the tree. *)
+  riscvF_lockSetGS :: inG Σ lockSetR;
   riscvF_parkGS :: ghost_varG Σ CPU;
   (* the per-proc state mirror's typing (the NAME is per-era, above).  A
      [mword 32] instance of its own -- no other ghost_var in the record
@@ -401,6 +443,7 @@ Definition riscv_kmapGS `{!riscvGS Σ} :
     (@SailStdpp.Instances.Decidable_eq_mword 27)
     (@SailStdpp.Instances.Countable_mword 27) := riscvF_kmapGS.
 Definition riscv_kptGS `{!riscvGS Σ} : inG Σ kptR := riscvF_kptGS.
+Definition riscv_lockSetGS `{!riscvGS Σ} : inG Σ lockSetR := riscvF_lockSetGS.
 Definition riscv_parkGS `{!riscvGS Σ} : ghost_varG Σ CPU := riscvF_parkGS.
 Definition riscv_pstateGS `{!riscvGS Σ} : ghost_varG Σ (SailStdpp.Values.mword 32) :=
   riscvF_pstateGS.
@@ -420,6 +463,8 @@ Definition spp_name `{!riscvGS Σ} : CPU -> gname := era_spp_name riscv_eraGS.
 Definition spie_name `{!riscvGS Σ} : CPU -> gname := era_spie_name riscv_eraGS.
 Definition park_name `{!riscvGS Σ} : nat -> gname := era_park_name riscv_eraGS.
 Definition pstate_name `{!riscvGS Σ} : nat -> gname := era_pstate_name riscv_eraGS.
+(* the ambient era's per-hart held-lock authority (LockSet.v). *)
+Definition lockset_name `{!riscvGS Σ} : CPU -> gname := era_lockset_name riscv_eraGS.
 (* the AMBIENT era's disk-image gname: what [DiskPtsto.disk_names]'s [dn_img]
    field is always constructed at ([VirtioProto.disk_ghosts_alloc]), and what
    [RiscvExec.wp_disk_step] hands the disk thread.  The seam equation the

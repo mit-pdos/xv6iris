@@ -50,7 +50,7 @@
 
 From stdpp Require Import gmap finite bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import csum excl.
+From iris.algebra Require Import csum excl auth gset.
 From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var mono_nat invariants.
 From iris.program_logic Require Import weakestpre lifting adequacy.
 Require Import SailStdpp.Operators_mwords.
@@ -120,6 +120,11 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
      [ghost_var] over the whole disk image whose halves are [state_interp]'s
      fixed conjunct and [crash_inv]'s body. *)
   riscv_pre_fstieGS :: ghost_varG Σ (Z -> bv 8);
+  (* the PER-HART HELD-LOCK SET (LockSet.v): capacity only -- the names are
+     per-era ([riscvEraGS.era_lockset_name]), one per hart, minted at boot at
+     the EMPTY set and handed to the boot client, which folds each into that
+     hart's [CpuOwn.cpu_own] ([cpu_own_init_boot]). *)
+  riscv_pre_lockSetGS :: inG Σ lockSetR;
 }.
 
 Definition riscvΣ : gFunctors :=
@@ -140,7 +145,8 @@ Definition riscvΣ : gFunctors :=
      mono_natΣ;
      ghost_mapΣ nat riscvEraGS;
      diskImgΣ;
-     ghost_varΣ (Z -> bv 8) ].
+     ghost_varΣ (Z -> bv 8);
+     GFunctor lockSetR ].
 
 Global Instance subG_riscvGpreS {Σ} : subG riscvΣ Σ -> riscvGpreS Σ.
 Proof. solve_inG. Qed.
@@ -288,6 +294,31 @@ Section reg_alloc.
       iModIntro. iExists (fun c' => if decide (c' = c) then γ else fr c').
       rewrite big_sepL_cons. iSplitL "HgA HgB HgC".
       { rewrite decide_True //. iFrame "HgA HgB HgC". }
+      iApply (big_sepL_mono with "Hrest").
+      intros k c' Hk. simpl.
+      rewrite decide_False; [done|].
+      intros ->. apply Hc. by eapply elem_of_list_lookup_2.
+  Qed.
+
+  (* the PER-HART allocation the CANONICAL HELD-LOCK SET needs (LockSet.v):
+     one fresh name per hart, its authority at the EMPTY set -- a hart that
+     has not executed an instruction holds no spinlocks.  Same induction as
+     [ghost_var_alloc_halves_cpus]; only the authority is handed out, the
+     fragments being minted one per lock by acquire. *)
+  Lemma own_alloc_lockset_cpus `{!inG Σ lockSetR} (cs : list CPU) :
+    NoDup cs ->
+    ⊢ |==> ∃ f : CPU -> gname,
+      [∗ list] c ∈ cs, own (f c) ((● (GSet ∅)) : lockSetR).
+  Proof.
+    induction cs as [|c cs' IH]; intros Hnd.
+    - iModIntro. iExists (fun _ => 1%positive). done.
+    - apply NoDup_cons in Hnd as [Hc Hnd'].
+      iMod (IH Hnd') as (fr) "Hrest".
+      iMod (own_alloc ((● (GSet ∅)) : lockSetR)) as (γ) "Hg".
+      { apply auth_auth_valid. done. }
+      iModIntro. iExists (fun c' => if decide (c' = c) then γ else fr c').
+      rewrite big_sepL_cons. iSplitL "Hg".
+      { rewrite decide_True; [ iExact "Hg" | reflexivity ]. }
       iApply (big_sepL_mono with "Hrest").
       intros k c' Hk. simpl.
       rewrite decide_False; [done|].
@@ -505,7 +536,8 @@ Proof.
      single-generation theorem hands its client no FS custody, and the first
      real one is minted by [initlog]'s swap. *)
   iMod (ghost_var_alloc (MkLogMirror (0%nat, []) (fun _ => []))) as (γmir) "_".
-  set (E0 := RiscvEraGS f Hhn Hmn γu γp γv γk γkpt γs γsie γspp γspie γpark γpst γdisk γmir).
+  iMod (own_alloc_lockset_cpus (enum CPU) (NoDup_enum CPU)) as (γlks) "Hlks".
+  set (E0 := RiscvEraGS f Hhn Hmn γu γp γv γk γkpt γs γsie γspp γspie γpark γpst γdisk γmir γlks).
   iMod (ghost_map_alloc_empty (K := nat) (V := riscvEraGS)) as (γreg) "HRauth".
   (* THE FS TIE, minted at the machine's own disk image and split: one half
      goes into [state_interp]'s fixed conjunct below, the other into
@@ -535,7 +567,7 @@ Proof.
   iMod (ghost_map_insert 0%nat E0 Hemp0 with "HRauth") as "[HRauth HRelem]".
   iMod (ghost_map_elem_persist with "HRelem") as "#HRelem".
   set (HR := RiscvGS Σ
-               (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ Hmpre _ γgen γstart _ γreg
+               (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ Hmpre _ γgen γstart _ γreg
                   _ _ γtie (Pc γswap γreg γstart) γswap)
                E0).
   (* THE CARVING, all four steps out of BootCarve.v (one copy; the crash
@@ -795,6 +827,11 @@ Section power.
      ([∗ list] c ∈ enum CPU,
         ghost_var (era_spie_name HE c) (1/2)%Qp sie_bit_off ∗
         ghost_var (era_spie_name HE c) (1/2)%Qp sie_bit_off) ∗
+     (* THE HELD-LOCK AUTHORITIES, one per hart, at the empty set.  The boot
+        client folds each into its hart's [CpuOwn.cpu_own] and never sees the
+        set again: it rides inside [IntrDefs.cpu_hart] from there on. *)
+     ([∗ list] c ∈ enum CPU,
+        own (era_lockset_name HE c) ((● (GSet ∅)) : lockSetR)) ∗
      ([∗ list] j ∈ seq 0 nproc, ghost_var (era_park_name HE j) 1 (0%fin : CPU)) ∗
      ([∗ list] j ∈ seq 0 nproc,
         ghost_var (era_pstate_name HE j) 1 (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 32)) ∗
@@ -947,7 +984,8 @@ Section power.
          checked-out arm at [initlog]'s swap. *)
       iMod (ghost_var_alloc (MkLogMirror (0%nat, []) (fun _ => [])))
         as (γmir) "Hmir".
-      set (HE := RiscvEraGS f γh γm γu γp γv γk γkpt γs γsie γspp γspie γpark γpst γdisk γmir).
+      iMod (own_alloc_lockset_cpus (enum CPU) (NoDup_enum CPU)) as (γlks) "Hlks".
+      set (HE := RiscvEraGS f γh γm γu γp γv γk γkpt γs γsie γspp γspie γpark γpst γdisk γmir γlks).
       (* the started counter ticks (PowerOff had already bumped [ggen], so
          the count moves from [ggen + 0] to [ggen + 1]) *)
       iMod (mono_nat_own_update (n := start_count g) (g.(ggen) + 1)%nat
@@ -963,11 +1001,11 @@ Section power.
       (* run the client's boot entailment over the fresh era *)
       iMod "Hback" as "_".
       iMod (Hboot HE g.(ggen) g2 Hbf with
-              "[Helems Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hspp Hspie Hpark Hpst HuF HpF HvF
+              "[Helems Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF
                 Hdfrags Hmir]")
         as "(Hwps & Hwpu & Hwpd & Hwpp)".
       { rewrite /power_boot_res.
-        iFrame "Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hspp Hspie Hpark Hpst HuF HpF HvF Hdfrags Hmir".
+        iFrame "Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF Hdfrags Hmir".
         iFrame "Helems".
         iSplitR; [iExact "Hcinv"|].
         iSplitR; [iExact "Hbornlb"|].
@@ -1082,7 +1120,7 @@ Proof.
   (* no disk image map is allocated here: the machine starts POWERED OFF, so
      there is no era, hence no image conjunct in [state_interp].  The first
      boot mints the first one ([wp_power_loop]'s PowerOn arm). *)
-  set (F := RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ _ γgen γstart _ γreg
+  set (F := RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ _ _ γgen γstart _ γreg
               _ _ γtie (Pc γswap γreg γstart) γswap).
   iModIntro.
   iExists

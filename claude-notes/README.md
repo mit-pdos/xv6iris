@@ -143,6 +143,10 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   cone callable with interrupts OFF, which is what `usertrap` needs to reach
   `kexit`: the index-free restatement, what moves with a crossing and what must
   not, and the remaining worklist in dependency order.
+- **[`lock-set.md`](projects/lock-set.md)** — the per-CPU held-lock set: what
+  landed hidden, and the tree-wide `cpu_own`-index sweep that turns it into
+  acquire's no-reentrance premise and the "interrupts on ⟹ no locks held"
+  theorem.
 - **[`user-verified.md`](projects/user-verified.md)** — VERIFIED user-mode
   execution (the Umode tier): the `uv_cap` capability, the concrete-image memory
   layer, the interrupt-absorbing step engine, and the sync program's proofs.

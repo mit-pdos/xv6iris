@@ -378,6 +378,10 @@ Section BootBridge.
        ([IntrDefs.cpu_cells]).  The field is private to this hart, so
        nothing else ever holds a fraction of it. *)
     cur_proc p0 -∗
+    (* this hart's HELD-LOCK AUTHORITY, at the empty set (LockSet.v): the
+       adequacy mint, folded straight into [cpu_own] and never named again --
+       from here on the set rides inside [IntrDefs.cpu_hart]. *)
+    lk_auth cpu_id ∅ -∗
     cpu_ctx_free
     ==∗
     ∃ mf : regfile,
@@ -389,7 +393,7 @@ Section BootBridge.
     iIntros (Hsp Htpf Hsie Hmsf Hmenv Hmiez Hmieval Hsatpm Hpmp Htp Hn Hlo Hhi Hnv)
             "#Hhw #Hmin Hhs Hpriv Hmst Hpcf Hpad Hfile Hsatp Hmdl Hmie Hmenv
              Hstk Hbit Hbit2 Hg2 Hg4a Hg4b Htlb Hsepc Hscause Hstval
-             Hspp1 Hspp2 Hstv Hnoff Hint Hproc Hctx".
+             Hspp1 Hspp2 Hstv Hnoff Hint Hproc Hlks Hctx".
     (* --- the SIE ghost: 1/2 tied + 1/4 for main + 1/4 = two eighths --- *)
     iAssert (⌜(1/4 = 1/4/2 + 1/4/2)%Qp⌝)%I as %Hq.
     { iPureIntro. apply (bool_decide_unpack _). by compute. }
@@ -441,7 +445,7 @@ Section BootBridge.
                  with "Hhw Hmin Hpriv Hmst Hg2 Hspp1 Hmie Hmdl Hmenv") as "Hsconf".
     (* --- cpus[cid] --- *)
     iDestruct (cpu_own_init_boot p0 nv iv cpu_ctx_free Hnv
-                 with "Hnoff Hint He2 Hproc Hctx") as "Hcpu".
+                 with "Hnoff Hint He2 Hproc Hlks Hctx") as "Hcpu".
     (* --- the register file: boot writes tp itself, so the raw map ALREADY
        carries this hart's id there and IS its own pin ([tp_pin_id]). --- *)
     assert (Htpm : Mf !!! Regidx Rtp = cid_word_of cpu_id).

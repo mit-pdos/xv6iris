@@ -88,7 +88,7 @@ Section CpuOwn.
   Lemma cpu_hart_excl (n n' : nat) (eb eb' : bool) (p p' : mword 64) :
     cpu_hart n eb p -∗ cpu_hart n' eb' p' -∗ False.
   Proof.
-    iIntros "((_ & Hn & _ & _) & _) ((_ & Hn' & _ & _) & _)".
+    iIntros "(((_ & Hn & _ & _) & _) & _) (((_ & Hn' & _ & _) & _) & _)".
     iDestruct (word4_pointsto_bytes with "Hn") as "Hb".
     iDestruct (word4_pointsto_bytes with "Hn'") as "Hb'".
     cbn [seq]. iDestruct "Hb" as "[H0 _]". iDestruct "Hb'" as "[H0' _]".
@@ -168,7 +168,9 @@ Section CpuOwn.
     iIntros "[%Hpure _]". destruct Hpure as [Hn _]. discriminate Hn.
   Qed.
 
-  (* boot entry: raw cells + the SIE eighth at '0'.  [iv] arbitrary. *)
+  (* boot entry: raw cells + the SIE eighth at '0' + this hart's held-lock
+     authority, which adequacy mints at the EMPTY set (a hart that has not
+     run an instruction holds no locks).  [iv] arbitrary. *)
   Lemma cpu_own_init_boot (p : mword 64) (nv iv : mword 32)
       (C : iProp Σ) :
     nv = noff_val 0 ->
@@ -176,14 +178,49 @@ Section CpuOwn.
     a_cpu_int cid_word ↦₄ iv -∗
     intr_off_tok -∗
     cur_proc p -∗
+    lk_auth cpu_id ∅ -∗
     C -∗
     cpu_own 0 false p C false.
   Proof.
-    intros ->. iIntros "Hnoff Hint Htok Hproc HC".
+    intros ->. iIntros "Hnoff Hint Htok Hproc Hlk HC".
     iFrame "HC".
     iSplitR "Htok"; [| iApply (intr_count_init_off with "Htok") ].
+    iSplitR "Hlk";
+      [| iApply (cpu_locks_any_intro ∅); iApply (cpu_locks_intro_empty with "Hlk") ].
     iSplitR. { iPureIntro. vm_compute. reflexivity. }
     iFrame "Hnoff Hproc". iExists iv. iExact "Hint".
+  Qed.
+
+  (* ===================================================================== *)
+  (* THE HELD-LOCK SET ACCESSOR -- the only way acquire and release reach   *)
+  (* it, and the reason neither contract mentions it.                       *)
+  (*                                                                        *)
+  (* The set rides existentially inside [cpu_hart] (IntrDefs.v), so a caller *)
+  (* threading [cpu_own] carries it without knowing it is there.  The two    *)
+  (* cpu-field stores open it here, hand the concrete [S] to                *)
+  (* [WpSconfLock.wp_{csd,sd_zero}_lkcpu_lockopen_s_sconf], and put back the *)
+  (* set that leaf returns.  Only at [b = false], which is not a             *)
+  (* restriction: a lock is taken and released with interrupts off.          *)
+  (*                                                                        *)
+  (* When [S] becomes an INDEX of [cpu_own] (the next phase), this accessor  *)
+  (* is what goes away -- the callers will simply name the set.              *)
+  (* ===================================================================== *)
+  Lemma cpu_own_locks_acc (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :
+    cpu_own n eb p C false -∗
+    ∃ S : gset (mword 64),
+      cpu_locks S ∗
+      (∀ S' : gset (mword 64), cpu_locks S' -∗ cpu_own n eb p C false).
+  Proof.
+    iIntros "Hown".
+    iDestruct (bi.equiv_entails_1_1 _ _ (cpu_own_off n eb p C) with "Hown")
+      as "[Hh HC]".
+    iEval (rewrite /cpu_hart /cpu_priv) in "Hh".
+    iDestruct "Hh" as "((Hcells & Hlks) & Hcnt)".
+    iDestruct "Hlks" as (S) "Hlks".
+    iExists S. iFrame "Hlks". iIntros (S') "Hlks".
+    iApply (bi.equiv_entails_1_2 _ _ (cpu_own_off n eb p C)).
+    iFrame "HC". rewrite /cpu_hart /cpu_priv. iFrame "Hcells Hcnt".
+    iApply (cpu_locks_any_intro S'). iExact "Hlks".
   Qed.
 
   (* swap the context-slot payload (e.g. park / unpark the scheduler
@@ -210,8 +247,8 @@ Section CpuOwn.
     (cur_proc p ∗
      (cur_proc p' -∗ cpu_own n eb p' C false)).
   Proof.
-    iIntros "(((%Hbound & Hnoff & Hint & Hproc) & Hcnt) & HC)".
-    iFrame "Hproc". iIntros "Hproc". iFrame "Hnoff Hint Hcnt HC Hproc".
+    iIntros "((((%Hbound & Hnoff & Hint & Hproc) & Hlks) & Hcnt) & HC)".
+    iFrame "Hproc". iIntros "Hproc". iFrame "Hnoff Hint Hlks Hcnt HC Hproc".
     iPureIntro. exact Hbound.
   Qed.
 

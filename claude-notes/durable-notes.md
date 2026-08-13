@@ -124,6 +124,27 @@ file, and delete the line when the file goes.
 - **`timeout N coqc` does NOT kill the worker, and `pgrep -x coqc` does NOT find it.** `coqc` runs as `rocqworker --kind=compile`, so an exact-name wait loop returns while the compile is still going (giving truncated logs and phantom "stalls"), and `timeout`'s SIGTERM reaps only its direct child. The orphan then spins at 100 % and **holds a worker slot, stalling the next build at a random point** — which is what makes the stall location look non-deterministic. Wait on `pgrep -f "rocqworker --kind=compile"`, or better, have the compile print its own sentinel (`bash -c 'coqc …; echo EXIT=$?'`); `pkill -f rocqworker` before re-measuring, and reap orphans (`ps -eo pid,ppid,stat,comm | grep rocqworker`; `Z`/defunct is harmless, a live orphan is not).
 - Everything about what makes a file slow and how to measure it is in [`optimization.md`](optimization.md).
 
+## `set_solver` DOES NOT WORK OVER `gset (mword n)`
+
+It fails with **"No matching clauses for match"** — an Ltac crash, not an
+unsolved goal — so it reads as a broken tactic or a corrupt state rather than
+as a wrong instance. The cause is the same instance divergence
+`RiscvPtsto.riscvF_kmapGS` pins against: a set over `mword` elaborates with
+SAIL's `Decidable_eq_mword`, and `set_solver`'s decision step wants stdpp's
+`bv_eq_dec`. The tells: **`set_unfold` alone is fine**, and the identical goal
+over `gset (bv n)` is fine.
+
+Discharge the side conditions by named lemma instead — `disjoint_singleton_l`,
+`singleton_subseteq_l`, `elem_of_singleton`, `big_sepS_delete` — or drop to
+`intros x Hx …` and finish by hand. `LockSet.v` is written this way
+throughout and its `cpu_locks_insert` carries the note at the point of use.
+
+The same pinning rule applies when a set over machine words reaches a CAMERA:
+state it as `gset_disjUR (mword 64) (EqDecision0 := @…Decidable_eq_mword 64)
+(H := @…Countable_mword 64)`, exactly as `RiscvPtsto.lockSetR` does — an
+unpinned functor field takes stdpp's instances and then fails to unify at
+every use site, with an error naming neither.
+
 ## A `[-]` SPEC PATTERN EATS THE HYPOTHESES NAMED *AFTER* IT
 
 `with "… [-] Hcont"` is self-defeating, and the error blames the wrong thing:

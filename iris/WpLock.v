@@ -3,8 +3,13 @@
    PHYSICAL fields of the Sail RISC-V machine: the 4-byte lock word
    ([lk->locked] @ +0) AND the 8-byte owner word ([lk->cpu] @ +16).
 
-     lock_inv      -- ∃ v st, lock word ↦ v ∗ lk->cpu ↦ (cpu of st) ∗ ghost st
+     lock_inv      -- ∃ v st, lock word ↦ v ∗ lk_cpu_res st lk ∗ ghost st
                         ∗ (st free ∗ v = 0 ∗ frag ∗ R  ∨  st held ∗ v ≠ 0)
+     lk_cpu_res    -- the owner field, WHOLE at 0 while the lock is free or
+                      in a one-store window, and HALF at [cpus_ptr i] plus
+                      the held-lock-set fragment [lk_in i lk] while hart [i]
+                      holds it (the other half is in that hart's
+                      [LockSet.cpu_locks]).  See the block at its definition.
      is_lock       -- lock_name ∗ inv lockN lock_inv   (persistent)
      locked γ i    -- the lock-HOLDER token: hart [i] holds the lock and
                       [lk->cpu] holds [cpus_ptr i] = &cpus[i]
@@ -35,6 +40,10 @@ From iris.base_logic.lib Require Import invariants cancelable_invariants own.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
+(* EXPORTED: [lock_cpu] (the +16 owner-field address) lives there, because the
+   per-cpu held-lock set is stated over it, and the ~40 files that reach
+   [lock_cpu] through this one keep working. *)
+Require Export LockSet.
 Require Import ProcGeom.
 Local Open Scope Z_scope.
 
@@ -219,15 +228,87 @@ Section Lock.
   Definition lock_word (lk : mword 64) (v : mword 32) : iProp Σ :=
     (lk ↦₄ v)%I.
 
-  (* [lk->cpu]: the 8-byte owner word at +16, in the address form the
-     acquire / release / holding leaves see it ([add_vec lk (sext 16)]). *)
-  Definition lock_cpu (lk : mword 64) : mword 64 :=
-    add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)).
+  (* ===================================================================
+     THE OWNER FIELD, SHARED WITH THE HOLDER'S CPU.
+
+     [lk->cpu] ([LockSet.lock_cpu], the 8-byte word at +16) is NOT owned
+     outright by the invariant once the lock is held: the invariant keeps
+     HALF, and the holding hart's held-lock set ([LockSet.cpu_locks]) keeps
+     the other half, pinned at that hart's own [struct cpu].  Beside it the
+     invariant keeps the set-membership fragment [lk_in i lk].  So the two
+     readings of "this lock is held by hart i" -- the C field and the ghost
+     set -- are one resource, and neither can drift from the other.
+
+     Two things fall out, and they are the reason for the split:
+
+       - RELEASE's [lk->cpu = 0] needs the WHOLE cell, so it cannot happen
+         until the hart hands its stake back; [lk_in i lk] is exactly the
+         licence to take it out of the set ([cpu_locks_delete]).
+       - ACQUIRE's [lk->cpu = mycpu()] finds the cell WHOLE and reading 0
+         (the lock is in its one-store window), which REFUTES [lk ∈ S] --
+         a hart already holding [lk] would be holding half of this same
+         cell at a nonzero value.  That is what lets acquire mint the
+         fragment with no precondition on the caller, and it is the
+         resource form of the C code's own argument: a hart that already
+         holds the lock never reaches this store, because [acquire] runs
+         [if(holding(lk)) panic()] first.
+
+     A free lock, and a lock in either one-store window, holds the cell
+     whole at 0 exactly as before -- so [newlock], the finisher, the
+     amoswap leaf and the word-clear leaf see no change at all.
+
+     SPLIT AT A FIXED HALF, NOT AT A STATE-DEPENDENT FRACTION.  The
+     invariant always keeps the SAME half, and what varies is what sits
+     beside it: the OTHER half when nobody holds the lock, the set fragment
+     when somebody does.  That is what keeps the two READ leaves state-blind
+     -- [WpSconfMem.wp_load_s_sconf_au] fixes its [dqm] OUTSIDE the fupd that
+     opens the invariant, so a fraction depending on the (existentially
+     quantified) [st] could not be supplied at all. *)
+  Definition lk_cpu_half (st : lock_state) (lk : mword 64) : iProp Σ :=
+    (lock_cpu lk ↦₈{DfracOwn (1/2)} lk_cpu_val st)%I.
+
+  Definition lk_cpu_rest (st : lock_state) (lk : mword 64) : iProp Σ :=
+    match st with
+    | Some (i, true) => lk_in i lk
+    | _ => lk_cpu_half st lk
+    end%I.
+
+  Definition lk_cpu_res (st : lock_state) (lk : mword 64) : iProp Σ :=
+    (lk_cpu_half st lk ∗ lk_cpu_rest st lk)%I.
+
+  (* the leaves strip this under [>] inside the step engine's callback, and
+     [st] is a VARIABLE there, so the match is stuck and the structural
+     instances cannot see the two branches.  Stated once, here. *)
+  Global Instance lk_cpu_rest_timeless st lk : Timeless (lk_cpu_rest st lk).
+  Proof. destruct st as [[i []]|]; apply _. Qed.
+  Global Instance lk_cpu_res_timeless st lk : Timeless (lk_cpu_res st lk).
+  Proof. apply _. Qed.
+
+  (* the whole cell, out of the two halves -- the form every leaf that STORES
+     to the field needs, and the form [newlock] and the finisher speak. *)
+  Lemma lk_cpu_halves (st : lock_state) (lk : mword 64) :
+    lk_cpu_half st lk ∗ lk_cpu_half st lk ⊣⊢ lock_cpu lk ↦₈ lk_cpu_val st.
+  Proof.
+    rewrite /lk_cpu_half -word_pointsto_frac_split.
+    by rewrite Qp.half_half.
+  Qed.
+
+  (* the free / window form: the whole cell at 0, exactly as before. *)
+  Lemma lk_cpu_res_free (lk : mword 64) :
+    lk_cpu_res None lk ⊣⊢ lock_cpu lk ↦₈ (zero_reg : mword 64).
+  Proof. rewrite /lk_cpu_res /=. exact (lk_cpu_halves None lk). Qed.
+  Lemma lk_cpu_res_win (i : CPU) (lk : mword 64) :
+    lk_cpu_res (Some (i, false)) lk ⊣⊢ lock_cpu lk ↦₈ (zero_reg : mword 64).
+  Proof. rewrite /lk_cpu_res /=. exact (lk_cpu_halves (Some (i, false)) lk). Qed.
+  Lemma lk_cpu_res_held (i : CPU) (lk : mword 64) :
+    lk_cpu_res (Some (i, true)) lk ⊣⊢
+    lock_cpu lk ↦₈{DfracOwn (1/2)} cpus_ptr i ∗ lk_in i lk.
+  Proof. reflexivity. Qed.
 
   Definition lock_inv (γ : gname) (lk : mword 64) (R : iProp Σ) : iProp Σ :=
     (∃ (v : mword 32) (st : lock_state),
        lock_word lk v ∗
-       lock_cpu lk ↦₈ lk_cpu_val st ∗
+       lk_cpu_res st lk ∗
        lock_auth γ st ∗
        (⌜st = None⌝ ∗ ⌜v = (mword_of_int 0 : mword 32)⌝ ∗ lock_frag γ None ∗ R
         ∨ ⌜st ≠ None⌝ ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝))%I.
@@ -412,7 +493,7 @@ Section Lock.
     iIntros "[Hclose _] Hauth Hfrag Hword Hcpu HR".
     iMod ("Hclose" with "[Hauth Hfrag Hword Hcpu HR]") as "_"; [| by iModIntro].
     iNext. iExists (mword_of_int 0 : mword 32), None.
-    rewrite /lock_word. iFrame "Hword Hcpu Hauth".
+    rewrite /lock_word lk_cpu_res_free. iFrame "Hword Hcpu Hauth".
     iLeft. by iFrame "Hfrag HR".
   Qed.
 
@@ -457,7 +538,7 @@ Section Lock.
     iDestruct (own_op with "H") as "[Ha Hf]".
     iModIntro. iExists γ.
     iExists (mword_of_int 0 : mword 32), None.
-    rewrite /lock_word. iFrame "Hword Hcpu Ha".
+    rewrite /lock_word lk_cpu_res_free. iFrame "Hword Hcpu Ha".
     iLeft. iFrame "Hf HR". done.
   Qed.
 
@@ -479,7 +560,7 @@ Section Lock.
     iModIntro. iExists γ. iIntros (R D) "HR".
     iApply (inv_alloc lockN E (lock_inv γ lk R ∨ D)).
     iNext. iLeft. iExists (mword_of_int 0 : mword 32), None.
-    rewrite /lock_word. iFrame "Hword Hcpu Ha".
+    rewrite /lock_word lk_cpu_res_free. iFrame "Hword Hcpu Ha".
     iLeft. iFrame "Hf HR". done.
   Qed.
 
@@ -522,7 +603,7 @@ Section Lock.
     iModIntro. iExists γ. iIntros (R) "HR".
     iMod (inv_alloc lockN E (lock_inv γ lk R) with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
     { iNext. iExists (mword_of_int 0 : mword 32), None.
-      rewrite /lock_word. iFrame "Hword Hcpu Ha".
+      rewrite /lock_word lk_cpu_res_free. iFrame "Hword Hcpu Ha".
       iLeft. iFrame "Hf HR". done. }
     iModIntro. iApply (is_lock_intro with "Hnm Hinv").
   Qed.

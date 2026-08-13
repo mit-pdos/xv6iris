@@ -539,16 +539,16 @@ Qed.
    The count eighth is NOT here: it is accounted for by the leaf's
    [intr_count (S k) eb] postcondition, and handing out both would be
    handing out the same eighth at two different values. *)
-Definition cpu_cells_pay `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
+Definition cpu_priv_pay `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
     (b : bool) (p : mword 64) : iProp Σ :=
-  (if b then cpu_cells 0 true p else emp)%I.
+  (if b then cpu_priv 0 true p else emp)%I.
 
-Lemma cpu_cells_pay_on `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (px : mword 64) :
-  cpu_cells_pay true px ⊣⊢ cpu_cells 0 true px.
+Lemma cpu_priv_pay_on `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (px : mword 64) :
+  cpu_priv_pay true px ⊣⊢ cpu_priv 0 true px.
 Proof. reflexivity. Qed.
 
-Lemma cpu_cells_pay_off `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (px : mword 64) :
-  cpu_cells_pay false px ⊣⊢ (emp : iProp Σ).
+Lemma cpu_priv_pay_off `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (px : mword 64) :
+  cpu_priv_pay false px ⊣⊢ (emp : iProp Σ).
 Proof. reflexivity. Qed.
 
 (* ON THE WAY IN (a csrci again -- the counting token the leaf increments).
@@ -853,7 +853,7 @@ Section WpSconfCsr.
       intr_count (S k) eb -∗
       trap_csrs_pay k eb -∗
       cpu_claim_pay k eb p -∗
-      cpu_cells_pay b p -∗
+      cpu_priv_pay b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -973,7 +973,7 @@ Section WpSconfCsr.
       { iApply (intr_count_pack_S_on with "Htok"). }
       { iFrame "Hsepcx Hscausex Hstvalx Hsppc Hintr Hkptr". }
       { rewrite /cpu_claim_pay. iExact "Hclmx". }
-      { rewrite /cpu_cells_pay. iExact "Hcells". }
+      { rewrite /cpu_priv_pay. iExact "Hcells". }
     - (* ---- b = false: the idempotent write; ghosts untouched ---- *)
       (* THE GUARD COLLAPSES THE HARTS HERE, and this arm cannot do without
          it: at [b = false] the statement's [intr_count_pre] is a REAL
@@ -1033,7 +1033,7 @@ Section WpSconfCsr.
       { intros Hk. rewrite (Heb0 Hk). cbn [sie_bit]. exact Hb0. }
       { destruct k; [rewrite (Heb0 eq_refl) |]; done. }
       { rewrite /cpu_claim_pay. destruct k; [rewrite (Heb0 eq_refl) |]; done. }
-      { rewrite /cpu_cells_pay. done. }
+      { rewrite /cpu_priv_pay. done. }
   Qed.
 
 
@@ -1124,7 +1124,7 @@ Section WpSconfCsr.
     sie_cap_gpr m (trap_res true + n)%nat b p -∗
     intr_count 1 true -∗
     trap_csrs -∗
-    cpu_cells 0 true p -∗
+    cpu_priv 0 true p -∗
     cpu_claim p -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) -∗
@@ -1443,7 +1443,7 @@ Section WpSconfCsr.
     sie_cap_gpr m (trap_res true + n)%nat eb p -∗
     (if eb then emp else intr_count 0 false) -∗
     (if eb then emp else trap_csrs) -∗
-    (if eb then emp else cpu_cells 0 true p) -∗
+    (if eb then emp else cpu_priv 0 true p) -∗
     cpu_claim_ext eb p -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) -∗
@@ -1487,13 +1487,13 @@ Section WpSconfCsr.
      leaf used to demand a separate [intr_count 0 true] BESIDE the bundle,
      and hand back [cpu_hart 0 true p] (which CONTAINS an [intr_count 0
      true]) beside an [intr_count 0 false] -- the same eighth at two
-     values, which the comment on [cpu_cells_pay] above forbids.  Nobody
+     values, which the comment on [cpu_priv_pay] above forbids.  Nobody
      could hold the premise: at [b = true] the arm owns BOTH eighths
      ([sie_arm]'s own plus the one inside [cpu_hart 0 true p]), and at
      [b = false] the last branch below refutes it outright, so the contract
      was vacuous at every index.  It now takes [intr_count_pre b 0 true]
      (the pure fact at the enabled arm, the token at the disabled one) and
-     returns the freed cells as [cpu_cells_pay b p], exactly like its
+     returns the freed cells as [cpu_priv_pay b p], exactly like its
      sibling [wp_csrci_sstatus_s_sconf]: the flip's second eighth is taken
      out of the arm's own [cpu_hart], not out of the caller. *)
   (* DISABLING, same index discipline as [wp_csrci_sstatus_s_sconf]: pre [n],
@@ -1523,7 +1523,7 @@ Section WpSconfCsr.
          [cpu_claim_pay 0 true p] because this leaf's [b = false] arm is
          refuted above, so the arm always existed and always owned it. *)
       cpu_claim p -∗
-      cpu_cells_pay b p -∗
+      cpu_priv_pay b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1624,7 +1624,7 @@ Section WpSconfCsr.
     { iExact "Htok". }
     { iFrame "Hsepcx Hscausex Hstvalx Hsppc Hintr Hkptr". }
     { iExact "Hclmx". }
-    { rewrite /cpu_cells_pay. iExact "Hcells". }
+    { rewrite /cpu_priv_pay. iExact "Hcells". }
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -1767,7 +1767,7 @@ Section WpSconfCsr.
   (* the write that DISABLES interrupts is genuinely applied at [b = true]   *)
   (* on its input side (pinning it would make push_off unstatable), and it   *)
   (* handles the crossing through its [b]-guarded payloads                   *)
-  (* ([intr_count_pre], [trap_csrs_pay], [cpu_claim_pay], [cpu_cells_pay]).  *)
+  (* ([intr_count_pre], [trap_csrs_pay], [cpu_claim_pay], [cpu_priv_pay]).  *)
   (* Nor to [wp_csrr_sstatus_s_sconf], which threads nothing extra (its      *)
   (* [hart_state] cell comes OUT of the bundle and returns INTO              *)
   (* [sie_cap_gpr_at]), nor to [WpSconfTimer]'s [wp_csrr_time_s_sconf],      *)

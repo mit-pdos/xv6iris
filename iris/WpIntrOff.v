@@ -95,7 +95,7 @@ Section WpIntrOff.
       iIntros (CIDn Hk ms) "%Hmsf Hcg Hcnt Hcsrs Hclm Hcells Hpc".
       iDestruct (wp_next_at true p _ CIDn Hk with "Hcont") as "Hcont".
       iApply ("Hcont" $! ms with "[%//] Hcg [Hcells Hcnt HC] Hcsrs [Hclm] Hpc").
-      { rewrite /cpu_own /cpu_hart /cpu_cells_pay. iFrame "Hcells Hcnt HC". }
+      { rewrite /cpu_own /cpu_hart /cpu_priv_pay. iFrame "Hcells Hcnt HC". }
       { rewrite /cpu_claim_pay. iExact "Hclm". }
     - (* ---- ALREADY DISABLED: a no-op; the caller brought the CSRs. ---- *)
       iIntros "Hcg Hcpu Hcsrs Hpc Hinstr Hcont".

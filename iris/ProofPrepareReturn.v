@@ -28,7 +28,7 @@
        stvec cell), and the KPT receipt.  The [csrw stvec] at +0x2c is legal
        only because of the first; the [csrr satp] at +0x32 only because of
        the last.  Neither cell is a premise of this contract.
-     - [cpu_cells_pay true p] + [intr_count 0 false] -- which, with the [C]
+     - [cpu_priv_pay true p] + [intr_count 0 false] -- which, with the [C]
        the entry [cpu_own] carried, REASSEMBLE [cpu_own 0 false p C false].
        That is the whole per-cpu bundle and it is why the post names it once.
      - the reserve [trap_res true] moving from the arm into usable stack.
