@@ -44,7 +44,7 @@ IRIS  := iris
 DUMPER     := tools/dump_elf.py
 GENCODE    := tools/gen_code.py
 XV6_DIR    := xv6-riscv
-XV6_URL    ?= https://github.com/mit-pdos/xv6-riscv
+XV6_URL    ?= https://github.com/zeldovich/xv6-riscv
 KERNEL_ELF := $(XV6_DIR)/kernel/kernel
 USER_DIR   := $(XV6_DIR)/user
 
@@ -64,7 +64,7 @@ SAIL_RISCV_REV ?= c32fbf4111b849061db1812355d6da9df8c2e396
 # addresses out from under every proof that names one (a few commits either
 # way already move most of them).  Verified: a kernel built here reproduces
 # kernel-rocq/*.v byte for byte and symbol for symbol.
-XV6_REV ?= 03e5422a30d24e85f2899073babd94c075d569a2
+XV6_REV ?= d80e61c5b13758173d592faebefdd2099d2ead81
 
 KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.v
 

@@ -5,29 +5,152 @@ The kernel's formatted-output path, verified bottom-up:
     printk  ->  printint  ->  consputc  ->  uartputc_sync   (proven)
             ->               consputc
 
-Status: **the whole cone is PROVEN and linked** on the panic path -- consputc,
-printint and printk itself (`LinkPrintk.v` seals `PrintkProof Consputc
-Printint : PRINTK`).  What remains is only the general (non-panic) path; see
-the end of this file.
+Status: **the whole cone is PROVEN and linked on the ONE remaining path** --
+consputc, printint and printk itself.  `LinkPrintk.v` seals `PrintkProof
+Consputc Printint Acquire Release : PRINTK` (ascription checked positively;
+`Print Assumptions` = the 5 platform axioms + funext and nothing else).  The
+old "panic path" split is gone with upstream `d80e61c5`; the sections below
+that still speak of `panicking`/`panicked` describe the OLD code and are kept
+only for their structural material (the frame map, the fuel inductions, the
+rejoining-arms epilogue, the dispatch chain), all of which survived the port
+unchanged.
 
-## The panic-path decision (read this first)
+## The d80e61c5 port: what it changed, and the traps it paid for
 
-The entire cone is verified on the path where **`panicking != 0` and
-`panicked == 0`**, because that is the path `uartputc_sync`'s existing proof
-covers (`SpecUartPutc.v`; its `pv`/`pkv` premises say exactly that). This is not
-a shortcut, it is the only currently reachable path, and it buys two real
-simplifications that show up in every spec of the cone:
+`panicking`/`panicked` are gone from printk.c, so printk ALWAYS does
+`acquire(&pr.lock)` / `release(&pr.lock)` and uartputc_sync always takes
+`tx_lock`.  `SpecConsputc.v`, `SpecPrintint.v` and `SpecPrintk.v` were
+rewritten for that one path and `ProofPrintk.v` was ported to match.
 
-- `uartputc_sync` does **no push_off/pop_off**, so nothing in the cone threads
-  an `intr_count` and no interrupt bookkeeping appears.
-- `printk` skips **both** `acquire(&pr.lock)` and `release(&pr.lock)` (its two
-  `if (panicking == 0)` tests fail), so printk's spec needs **no lock
-  resource** at all -- `pr.lock` is never touched on this path.
+### The relayout map (VERIFIED against the disassembly, not difflib)
 
-It is also the path that matters most: it is what `panic()` runs, and `panic` is
-the one caller that must work when everything else is broken. The general
-(`panicking == 0`) path is a strictly larger job and is blocked on
-uartputc_sync's own general path -- see "What is left" below.
+`tools/relayout_shift.py CodePrintk.v printk` mis-pairs the deleted
+out-of-line acquire block, so its shift map has one bogus entry
+(`0x070 -> 0x064`).  The correct map, checked instruction-by-instruction by
+encoding word (250 of the 264 old instructions map; the other 14 are the
+deleted flag tests and out-of-line call blocks), is:
+
+| old range | new | what |
+|---|---|---|
+| `0x000..0x01a` | `+0`  | prologue, unchanged |
+| `0x01e,0x22,0x26` | DELETED | the `panicking` test |
+| — | NEW `0x01e,0x22,0x26` | `auipc/addi a0,&pr ; jal acquire` |
+| `0x028..0x062` | `+2`  | va_start .. the hoisted constants |
+| `0x064..0x070` | DELETED | the out-of-line `acquire` block + its `j` back |
+| `0x072..0x25e` | `-12` | the whole format loop, dispatch and arms |
+| `0x260,0x264,0x268` | DELETED | the second `panicking` test |
+| — | NEW `0x254,0x258,0x25c` | `auipc/addi a0,&pr ; jal release` |
+| `0x26a..0x274` | `-10` | `li a0,0`, the three `ld`s, the pop, `ret` |
+| `0x276..0x286` | `+0x88` | restore block #2 (now at `0x2fe`) |
+| `0x288` | `-> 0x310` | its `c.j`, now to `0x254` |
+| `0x28a..0x296` | DELETED | the out-of-line `release` block + its `j` back |
+| `0x298..0x328` | `-0x2c` | the comparison chain |
+
+Driver: `tools/relayout_shift.py`'s `apply` with an offmap/immmap built from
+that region table rather than from difflib (40 immediates moved, no register
+reallocation).  Four classes of offset the tool cannot reach and that must be
+done by hand: `pk_entry`'s fifteen literals, `wp_printk_vaarg`'s `B`
+argument, `pk_restore_instrs`' base, and any `Htgt` assertion whose LAST
+anchor on the line is the branch TARGET rather than the branch.
+
+### The shape the port takes
+
+- printk's frame is unchanged (24 slots); `printk_stack` is 48 because
+  printint's is 24.
+- Everything between acquire's return and release's entry runs at the
+  DISABLED resource index and at avail `trap_res b + (K - 24)`, so the body
+  lemmas are stated at the literal `false` and the two exit lemmas
+  (`wp_printk_exit`, `wp_printk_exit2fe`) and `wp_printk_epi` carry BOTH
+  indices: entry `false`, exit `b` (release's `outb`, forced equal to `b` by
+  `CpuOwn.cpu_own_eb_agree`).
+- The linear `uart_tx_own γd (l ++ ...)` that used to cross the back edge is
+  replaced by the PERSISTENT `UartTxInv.uart_sent_sub`, which is a pure
+  simplification per iteration but restates every loop statement.
+- **`pk_held γpr h n eb pcur := locked γpr h ∗ arm_pay (CID := h) n eb pcur`**
+  is the trick that keeps acquire's output out of every intermediate
+  signature: naming the hart EXPLICITLY makes it a closed `iProp`, so it
+  rides through the whole format walk inside the abstract `Rest`/`R` frame
+  with no `wp_next` re-anchoring.  `cpu_own` cannot do that (it is
+  hart-indexed through `cid_word`), so it is threaded explicitly and moved
+  with `CpuOwn.cpu_own_transport` at each crossing.
+- `ProofPrintk.v`'s functor gained two parameters: `PrintkProof Consputc
+  Printint Acquire Release` (`LinkPrintk.v` updated).
+- Budgets: `printk_stack = 48`, `printint_stack = 24`, `consputc_stack = 16`,
+  and the callee premise is now `<stack> <= K` on the CALLER'S OWN `K` -- the
+  old proof passed `(K - 24)` because the old specs were stated at the
+  post-push avail.  Every `assert (HK6 : 6 <= K - 24)` in an arm became
+  `16 <= K`, and `HK14 : 14 <= K - 24` became `24 <= K`.
+- The noff premise is `(Z.of_nat n + 2 < 2^31)`, and inside the loop the arms
+  run at `S n` (pr.lock is held), so the arms want
+  `Z.of_nat (S n) + 1 < 2^31`.  That is NOT convertible with the section's
+  `Z.of_nat n + 2 < 2^31` -- `Z.of_nat (S n)` does not reduce -- so
+  `wp_printk_body7a` derives an `Hn31Sn` by `lia` and passes THAT.
+
+### The traps this port paid for
+
+- **A blanket `\bb\b -> false` substitution CORRUPTS BITSTRING LITERALS.**
+  Sail's `('b"000")` contains a standalone `b`, so a regex that rewrites the
+  index variable turns it into `('false"000")` -- which fails as a *syntax*
+  error (`'←' expected after [pattern level 0]`) hundreds of lines from the
+  edit, with nothing to suggest a substitution did it.  Exclude `'b"` before
+  running any such sweep.
+- **`cpu_id`'s implicit argument is named `CpuId`, not `CID`.**
+  `Class CpuId := cpu_id : CPU`, so `cpu_id (CID := X)` is rejected with
+  *"Wrong argument name CID (possible name: CpuId)"*.  Write `(X : CPU)`
+  instead -- the class is definitional, so that IS `cpu_id` at `X`.
+- **A `%s`/`%p` arm's second `consputc` wants the FIRST one's output claim.**
+  `uart_sent_sub` is threaded `l` in / `l ++ bs1` out, so a block with two
+  calls must hand the second call `Hsent1`, not the entry `Hsub`.  With
+  `uart_tx_own` this was a linear resource and the mistake was impossible;
+  with a PERSISTENT claim the hypothesis is still in the context and the error
+  surfaces only as an index mismatch inside `iSpecialize`.
+- **`panic_wp_any` and `uart_sent_sub` are PERSISTENT and must be introduced
+  with `#`.**  Both are consumed by a callee and still owed to the arm's own
+  continuation; intro'd spatially they are simply gone, and the error names
+  the *continuation* (`iSpecialize: "Hpan" not found`) rather than the call
+  that ate it.  The port's convention: `#Hpan` / `#Hsub` at the lemma's own
+  `iIntros`, and `_` for the copy a continuation hands back (a second `#Hpan`
+  is a not-fresh-name error).
+- **`wp_next_chain` cannot cross a link whose antecedent is the LITERAL
+  `false` when the goal's is a variable `b`/`bo`.**  It tries
+  `specialize (H Hd)` and then `or_intror`+`discriminate`, and `b = false` is
+  not discriminable.  Every mixed-index join in the loop therefore spells the
+  chain by hand: `intros Hdx; etransitivity; [ exact (Hst… Hdx) | exact
+  (Hcc… (or_introl eq_refl)) ]`.  The body of printk runs at the literal
+  `false`; the crossings in and out run at `b`, so this is not an edge case,
+  it is every exit.
+- **A `cpu_own` written FRESH inside an `iApply`'s frame bundle means the
+  MOST RECENT `CpuId` in the local context**, i.e. the hart the last
+  `iIntros (CIDx …)` introduced -- not the lemma's `CID0`.  So the bundle must
+  be preceded by `cpu_own_transport CID0 CIDx` and, on the way back, followed
+  by `cpu_own_transport CIDx CID0` naming THAT SAME hart.  (`pk_held` and
+  `pk_loop_head`/`pk_loop_post` avoid the question outright: the first names
+  its hart in the definition, the other two are applied with an explicit
+  `(CID0 := CID0)`.)  A transport whose two harts do not bracket a real
+  crossing is a no-op that still has to typecheck, and the failure prints the
+  SAME proposition twice.
+- **A mechanical `n`-substitution sweep picks the wrong `nat`.**  The port's
+  first pass wrote `cpu_own_transport … q …` inside `wp_printk_hex_loop`
+  (`q` is the nibble COUNTER) and `… nf …` inside `wp_printk_loop6c` (`nf` is
+  the FUEL), because both are the nearest `nat` binder.  Both compile-fail
+  with "cannot instantiate `cpu_own q …` with `cpu_own n …`", which reads as
+  an interface mismatch and is not one.
+- **The offset sweep cannot reach an `assert` whose LAST anchor is the branch
+  TARGET.**  Six survived here (three `c.j`, two 13-bit branches, and
+  `wp_printk_exit`'s `B + 18` fall-through, which is `0x254` now, not
+  `0x260`).  They are cheap to find offline: parse every
+  `add_vec (printk + A) (sign_extend' … imm) = printk + B` out of the proof
+  and check `A + imm = B` against `Code<F>.v`'s own immediate.  Doing that
+  once found all six before the first compile.
+
+## HISTORICAL: the panic-path decision (retired by `d80e61c5`)
+
+Before `d80e61c5` the cone was verified only where `panicking != 0` and
+`panicked == 0`, because that was the path `uartputc_sync`'s proof covered.
+Upstream deleted both flags, so there is exactly one path now and the whole
+argument is moot.  It is recorded because the shape it bought recurs: a
+one-path cone threads no `intr_count` and needs no lock resource, and the
+port's cost was almost entirely in putting those two back.
 
 ## The specs
 
@@ -126,7 +249,7 @@ Note `sie_cap_gpr_x0` (IntrDefs) already existed -- it is what lets a call site
 reduce `m !!! Regidx zreg` in a leaf post, needed for `neg rd,rs` = `sub
 rd,x0,rs`. Do not re-derive it.
 
-## What is left
+## The pieces, and what each one cost
 
 ### printint -- DONE
 
@@ -638,17 +761,15 @@ The assembly, in order (all four steps DONE):
   `wp_printk_sconf_gen` deterministic rather than dependent on which
   hypotheses a proof happened to use.
 
-### The general (non-panic) path
+### Nothing is left in the cone
 
-Blocked on uartputc_sync: only its `panicking != 0` path is proven
-(`ProofUartPutc.v`). The general path adds push_off/pop_off (both proven, and
-`CodePushOff.v`/`CodePopOff.v` are ready) and hence an `intr_count`, which would
-then have to be threaded through consputc, printint and printk. On top of that
-printk itself would take and release `pr.lock`, so its spec would grow an
-`is_lock` over whatever resource `pr.lock` protects (today: nothing -- see
-`ProofPrintkinit.v`, which leaves the lock un-invariant-ed on purpose). Do
-uartputc_sync's general path first; everything above it is then a re-threading,
-not a re-proof.
+There is no "general path" to do any more: `d80e61c5` deleted the flags, and
+the single remaining path is what is proven.  `pr.lock` still protects
+NOTHING (`SpecPrintkGen.pr_res` is `emp` -- `ProofPrintkinit.v` leaves the
+lock un-invariant-ed on purpose), which is what makes acquire/release nearly
+free here and is worth keeping in mind if a future change gives `pr` a field
+worth protecting: the whole `pk_held` trick below depends on the lock moving
+no resource.
 
 ## Build note for this tree
 

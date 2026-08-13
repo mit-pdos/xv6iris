@@ -532,6 +532,26 @@ what makes this tractable at all); then fix what it does NOT cover.
   artifact of the wrong comparison. Finish with `relayout_map.py residue`
   either way; neither tool rewrites register fields, by design.
 
+- **A STALE `iDestruct` PATTERN CAN SPLIT A NESTED CONJUNCTION AND BIND THE
+  WRONG RESOURCE — silently, and it surfaces far away.** When a bundled
+  predicate loses a conjunct, an intro pattern with the OLD arity does not
+  necessarily fail: if one of the remaining conjuncts is itself a separating
+  conjunction, the extra slots happily split IT instead.
+    Real case: `SpecPrintkGen.printk_env` went from four conjuncts to three
+  (`printk_flags_inv` was deleted with the `panicking`/`panicked` globals), and
+  `ProofMainSecondary.v` still said
+
+      iDestruct "Hpenv2" as "(_ & _ & #Hdev & _)".
+
+  The third conjunct is `WpUart.dev_inv γd γv`, itself a 4-way `∗`. So the
+  pattern kept splitting, `#Hdev` bound to `uart_inv γd` — the FIRST COMPONENT
+  of `dev_inv` — and the trailing `_` ate the rest. No arity error. It failed
+  eight lines later at an application wanting `dev_inv γd γv`, reported as
+  "cannot instantiate ... with (uart_inv γd)".
+    So when you change the shape of a bundled predicate, GREP FOR EVERY
+  `iDestruct` OF IT and re-count, rather than trusting the build to point at
+  them. The error, when it comes, names the consumer and not the pattern.
+
 - **A BITVECTOR WIDTH IS NOT AN IMMEDIATE, and rewriting one is SILENT.**
   `relayout_map.py apply` substitutes numbers by value inside an anchored
   region, and a proof line carries the same number in several roles:

@@ -56,9 +56,10 @@ userinit, and kerneltrap via Kernelvec). What the proof taught, worth keeping:
   holds it); `intr_handler_avail` needs `KERNELVEC` as a 19th functor
   argument (the alloc gives `intr_inv`, the handler contract comes from
   `kernelvec_handler_spec`).
-- `main_globals_raw` additions the assemblies demanded: the
-  panicking/panicked pair (printk_flags_inv allocation), the per-proc
+- `main_globals_raw` additions the assemblies demanded: the per-proc
   `p_chan` + `proc_pub` publics (procs_inv_alloc), `∃v, initproc ↦₈ v`.
+  (It also used to carry the panicking/panicked pair for the
+  `printk_flags_inv` allocation; `d80e61c5` deleted both globals — G2.)
   Added 2026-08-10: `[∗ list] k ∈ seq 0 NINODE, IcacheBoot.ientry_raw k`,
   the itable ENTRIES iinit does not touch (`ref` at pinned zero, the rest
   contents-existential) — the other half of `icache_boot`'s physical
@@ -292,46 +293,62 @@ pd i ⊣⊢ desc_entry_own pd i ∗ disk_slot_raw i`), and `ByteBuf.bb_chunk` (a
 buffer as k records of n bytes) came out of rebuilding `desc_entry_own` from the
 desc page's bytes — reusable.
 
-### G2 — printk's only proven contract is the PANIC path
+### G2 — printk-general is still an assumed contract, but the paths have merged
 
-`SpecPrintk.wp_printk_sconf_body` carries `eq_vec (sign_extend' 64 pv) zero_reg
-= false` — i.e. `panicking ≠ 0`. All four of main's calls are on the GENERAL
-path (`panicking == 0`), where printk takes `pr.lock`, so the proven spec does
-not apply. See [`printk.md`](printk.md): "Only the general (non-panic) path
-remains, blocked on uartputc_sync's."
-
-`SpecPrintkGen.v` + `LinkPrintkGen.v` state the general path in the
-assumed-callee shape (`Module Type` + `Axiom` in the link, as for `KERNELTRAP` —
+`SpecPrintkGen.v` + `LinkPrintkGen.v` state printk in the assumed-callee shape
+(`Module Type` + `Axiom` in the link, as for `KERNELTRAP` —
 [`../design/spec-modules.md`](../design/spec-modules.md)), so main's proof is a
-functor over it and proving printk-general later replaces exactly one file. The
+functor over it and proving printk later replaces exactly one file. The
 interface is PERSISTENT-heavy (`printk_env` is proved `Persistent`), so it
 crosses `started_inv` for free:
 
 ```coq
 printk_env γpr γd γv := is_lock γpr pr_lock "pr" (pr_res γd) ∗
-                        uart_dlab_off γd ∗ dev_inv γd γv ∗ printk_flags_inv
-pr_res γd            := ∃ l, uart_tx_own γd l ∗ uart_sent γd l
+                        uart_dlab_off γd ∗ dev_inv γd γv
+pr_res γd            := emp
 ```
-**The `pr` lock protects the transmitter token**, rather than serializing output
-with `R = emp`. A general-path printk transmits bytes, so its future proof needs
-transmit rights from somewhere that a SECONDARY hart can also pay — and the
-persistent `is_lock` is the only such place (the caller-held-token shape of
-the panic path is unpayable post-boot, and `R = emp` would have axiomatized
-an interface with no transmit-rights story at all). Consequence for main:
-the boot hart pays `pr_res` (the `uart_tx_own γ []` + `uart_sent γ []` it
-gets from the uart ghost allocation) into the lock when it builds
-`printk_env` after `printkinit`. Note the standing tension with uartwrite,
-whose proof keeps the token in `tx_lock`'s invariant
-([`uart-driver.md`](uart-driver.md)) — the two homes cannot both link into
-one system; reconciling them is the printk-general/console project's
-problem, and whichever home wins, this axiom file is the one that changes.
 
-The general contract does NOT require `panicking = 0` (that would force a
-fraction of the cell into every caller and forbid `panic` from writing it);
-the two flag cells live in their own invariant `printk_flags_inv` inside
-`printk_env`. The spec also threads `cpu_own` net-zero and the tp premise
-(the general path acquires `pr.lock`), and its post is minimal:
-`callee_saved` + ra restored, no `a0` claim, no output claim.
+**THE `pr` LOCK PROTECTS NOTHING, and upstream is why.** This section used to
+record a two-sided design problem: printk's general path needs transmit rights
+a SECONDARY hart can also pay, so `pr_res` held the transmitter
+(`∃ l, uart_tx_own γd l ∗ uart_sent γd l`) — while uartwrite's proof kept the
+same exclusive token in `tx_lock`'s invariant
+([`uart-driver.md`](uart-driver.md)). The two homes could not both link into
+one system, and that clash is exactly what made `LinkTxLockInit.tx_lock_init`
+an axiom. **xv6 `d80e61c5` settled it in the kernel**: `panicking`/`panicked`
+are deleted, printk always takes `pr.lock`, and uartputc_sync always takes
+`tx_lock` — so the transmitter is unambiguously `UartTxInv.tx_res`'s,
+`pr.lock` guards no C data and no ghost resource, and `pr_res` collapses to
+`emp` (chosen over `True` because it is the unit of `∗`: `newlock`'s resource
+argument is discharged by nothing at all). Same lesson as the copyout story in
+[`kexec.md`](kexec.md) — when a spec needs scaffolding to model a gap between
+what the code does and what every caller wants, suspect the code.
+
+Two consequences for main's proof, both live:
+
+- **The flag cells are gone from the boot chain.** `printk_flags_inv` is
+  deleted, `printk_env` is three conjuncts, `main_globals_raw` no longer
+  carries the `panicking`/`panicked` pair, and `BootShared.boot_bss_carve`
+  no longer cuts them — `img_end` is now exactly `&tx_chan`, so the walk
+  opens directly on `started` with that one word as the leading gap.
+- **`ProofMain` drops the transmitter.** consoleinit still hands `uart_tx_own`
+  / `uart_sent` back, and the `pr` `newlock` no longer wants them; the
+  `lk_fresh a_tx_lock "uart"` that uartinit's `initlock` produces is dropped
+  the same way. Nothing main promises mentions `is_txlock` — not its (absent)
+  postcondition and not the deposit wand, which asks for `printk_env` — so
+  minting the tx lock here would be dead. **That is where the remaining work
+  is**: `SpecPrintk.v` (the PROVEN contract) already takes `is_txlock γl γd`
+  as a premise, while `SpecPrintkGen`'s `printk_env` does not, so folding
+  SpecPrintkGen into SpecPrintk — which its own header now proposes, the
+  merge having unblocked it — makes main need `is_txlock`. At that point the
+  `newlock` over `UartTxInv.tx_res` belongs in `mn_grp_printk`, paid with
+  exactly the `Hlkfresh` + `Htx`/`Hsent` it drops today, and
+  `LinkTxLockInit.tx_lock_init` retires with it (`is_txlock` also has to join
+  the deposit payload so the secondaries get it).
+
+The contract threads `cpu_own` net-zero and the tp premise (it acquires
+`pr.lock`), and its post is minimal: `callee_saved` + ra restored, no `a0`
+claim, no output claim.
 
 ### G3 — `userinit()` has no spec
 

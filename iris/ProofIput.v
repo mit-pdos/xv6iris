@@ -527,13 +527,13 @@ Section IputTail.
                     = mword_of_int (KernelSyms.iput + 0x2a)) by pcw.
     iEval (rewrite Hpp2a) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.iput + 0x2a)) Ra0 Ra0
-              (mword_of_int 1340 : mword 12) D3 (trap_res eb + (K - 4))%nat false
+              (mword_of_int 1308 : mword 12) D3 (trap_res eb + (K - 4))%nat false
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2a [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (D4 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (D3 !!! Regidx Ra0)
-                     (sign_extend' 64 (mword_of_int 1340 : mword 12)))]> D3).
+                     (sign_extend' 64 (mword_of_int 1308 : mword 12)))]> D3).
     assert (HD4a0 : D4 !!! Regidx Ra0 = itable_lock).
     { rewrite /D4 upd_eq /D3 upd_eq. rewrite /itable_lock. pcw. }
     assert (Hpp2e : add_vec_int (mword_of_int (KernelSyms.iput + 0x2a) : mword 64) 4
@@ -1238,12 +1238,12 @@ Section ProofIput.
                      (auipc_off (mword_of_int 29 : mword 20)))]> R3).
     assert (Hpp10 : add_vec_int (mword_of_int (KernelSyms.iput + 0x0c) : mword 64) 4 = mword_of_int (KernelSyms.iput + 0x10)) by pcw.
     iEval (rewrite Hpp10) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.iput + 0x10)) Ra0 Ra0 (mword_of_int 1366 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.iput + 0x10)) Ra0 Ra0 (mword_of_int 1334 : mword 12)
               R4 (K - 4)%nat eb ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi10 [-]").
     iIntros (CID8 Hs8) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (R5 := <[Regidx Ra0 := regval_into_reg
-                  (add_vec (R4 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1366 : mword 12)))]> R4).
+                  (add_vec (R4 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1334 : mword 12)))]> R4).
     assert (HR5a0 : R5 !!! Regidx Ra0 = itable_lock).
     { rewrite /R5 upd_eq /R4 upd_eq. rewrite /itable_lock. pcw. }
     assert (Hpp14 : add_vec_int (mword_of_int (KernelSyms.iput + 0x10) : mword 64) 4 = mword_of_int (KernelSyms.iput + 0x14)) by pcw.
@@ -1884,13 +1884,13 @@ Section ProofIput.
                     = mword_of_int (KernelSyms.iput + 0x58)) by pcw.
     iEval (rewrite Hpp58) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.iput + 0x58)) Ra0 Ra0
-              (mword_of_int 1294 : mword 12) H1 (trap_res eb + (K - 4))%nat false
+              (mword_of_int 1262 : mword 12) H1 (trap_res eb + (K - 4))%nat false
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi58 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (H2 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (H1 !!! Regidx Ra0)
-                     (sign_extend' 64 (mword_of_int 1294 : mword 12)))]> H1).
+                     (sign_extend' 64 (mword_of_int 1262 : mword 12)))]> H1).
     assert (HH2a0 : H2 !!! Regidx Ra0 = itable_lock).
     { rewrite /H2 upd_eq /H1 upd_eq. rewrite /itable_lock. pcw. }
     assert (Hpp5c : add_vec_int (mword_of_int (KernelSyms.iput + 0x58) : mword 64) 4
@@ -2266,13 +2266,13 @@ Section ProofIput.
                     = mword_of_int (KernelSyms.iput + 0x7e)) by pcw.
     iEval (rewrite Hpp7e) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.iput + 0x7e)) Ra0 Ra0
-              (mword_of_int 1256 : mword 12) J7 (K - 4)%nat eb
+              (mword_of_int 1224 : mword 12) J7 (K - 4)%nat eb
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi7e [-]").
     iIntros (CIDm8 Hsm8) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (J8 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (J7 !!! Regidx Ra0)
-                     (sign_extend' 64 (mword_of_int 1256 : mword 12)))]> J7).
+                     (sign_extend' 64 (mword_of_int 1224 : mword 12)))]> J7).
     assert (HJ8a0 : J8 !!! Regidx Ra0 = itable_lock).
     { rewrite /J8 upd_eq /J7 upd_eq. rewrite /itable_lock. pcw. }
     assert (Hpp82 : add_vec_int (mword_of_int (KernelSyms.iput + 0x7e) : mword 64) 4

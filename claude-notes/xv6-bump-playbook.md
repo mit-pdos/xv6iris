@@ -229,6 +229,33 @@ surrounding proof can still close — but check first: an opaque constant breaks
 a `lia` that needs the concrete value. `ltac:(eval vm_compute in KernelSyms.x)`
 gives you both.
 
+### 4a-bis. THE IMMEDIATE IS RIGHT AND THE SYMBOL IS WRONG
+
+A relayout tool rewrites NUMBERS. It has no idea the callee's IDENTITY changed.
+When a bump replaces one call with another — `initsleeplock(&tx_lock,"uart")`
+became `initlock(&tx_lock,"uart")` in `d80e61c5` — the `jal` immediate moves and
+the tool updates it correctly, but the proof's companion assertion
+
+    assert (Htgtisl : add_vec pc (sign_extend' 64 imm)
+                      = mword_of_int KernelSyms.initsleeplock) by pcw.
+
+still names the OLD function. Here it fails loudly (`pcw` cannot close it), but
+the diff looks like a clean relayout, so it is easy to "fix" the immediate again
+and stay stuck. After any bump that changes WHICH function is called, grep the
+touched proofs for `= mword_of_int KernelSyms.` and check each names the
+function its immediate actually reaches.
+
+### 4a-ter. THE SHIFT IS NOT ALWAYS A SHIFT
+
+`relayout_shift.py` reports one old->new offset map, which suits a function that
+gained or lost a contiguous block. A rewrite can instead be several deletions
+and insertions at once. `uartputc_sync` in `d80e61c5` was TWO deletions and TWO
+insertions: the flag prologue (20 bytes) replaced by an `acquire` call, the
+device core moved -8 uniformly, the trailing flag test (10 bytes) replaced by a
+`release` call, and the epilogue moved -6 — net -6 (80 -> 74 bytes). Deriving
+that from `kernel.asm` directly was the right call; a single-shift reading of it
+would have been wrong everywhere.
+
 ### 4c-bis. DERIVED constants — an address divided by something
 
 The nastiest of the address categories, because no address sweep can see it.

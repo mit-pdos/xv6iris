@@ -623,7 +623,7 @@ Section ProofProcdumpLoop.
         (* ---- +0x5c jal ra,printk ---- *)
         iApply (wp_jal_s_sconf (CID := CIDq2)
                   (mword_of_int (KernelSyms.procdump + 0x5c)) Rra
-                  (mword_of_int 2089336 : mword 21) P5a K' b
+                  (mword_of_int 2089392 : mword 21) P5a K' b
                   ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi5c").
         iIntros (CIDq3 Hsq3) "Hcg Hpc".
@@ -632,7 +632,7 @@ Section ProofProcdumpLoop.
                           (mword_of_int (KernelSyms.procdump + 0x5c) : mword 64) 4)]> P5a).
         assert (Htgtpk1 : add_vec
                             (mword_of_int (KernelSyms.procdump + 0x5c) : mword 64)
-                            (sign_extend' 64 (mword_of_int 2089336 : mword 21))
+                            (sign_extend' 64 (mword_of_int 2089392 : mword 21))
                           = mword_of_int KernelSyms.printk) by pcw.
         iEval (rewrite Htgtpk1) in "Hpc".
         assert (Hra_5c : P5c !!! Regidx Rra
@@ -705,7 +705,7 @@ Section ProofProcdumpLoop.
         (* ---- +0x62 jal ra,printk ---- *)
         iApply (wp_jal_s_sconf (CID := CIDq5)
                   (mword_of_int (KernelSyms.procdump + 0x62)) Rra
-                  (mword_of_int 2089330 : mword 21) P60 K' b
+                  (mword_of_int 2089386 : mword 21) P60 K' b
                   ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi62").
         iIntros (CIDq6 Hsq6) "Hcg Hpc".
@@ -714,7 +714,7 @@ Section ProofProcdumpLoop.
                           (mword_of_int (KernelSyms.procdump + 0x62) : mword 64) 4)]> P60).
         assert (Htgtpk2 : add_vec
                             (mword_of_int (KernelSyms.procdump + 0x62) : mword 64)
-                            (sign_extend' 64 (mword_of_int 2089330 : mword 21))
+                            (sign_extend' 64 (mword_of_int 2089386 : mword 21))
                           = mword_of_int KernelSyms.printk) by pcw.
         iEval (rewrite Htgtpk2) in "Hpc".
         assert (Hra_62 : P62 !!! Regidx Rra

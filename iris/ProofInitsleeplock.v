@@ -206,12 +206,12 @@ Section ProofInitsleeplock.
     assert (Hpc14 : add_vec_int (mword_of_int (KernelSyms.initsleeplock + 0x10) : mword 64) 4 = mword_of_int (KernelSyms.initsleeplock + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc14) in "Hpc".
     (* +0x14 addi a1,a1,0x656  (a1 := sl_str_addr) *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.initsleeplock + 0x14)) (mword_of_int 11 : mword 5) (mword_of_int 11 : mword 5) (mword_of_int 0x63a : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.initsleeplock + 0x14)) (mword_of_int 11 : mword 5) (mword_of_int 11 : mword 5) (mword_of_int 0x672 : mword 12)
               A4 (av - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi14 [-]").
     iIntros (CID10 Hs10) "Hcg Hpc".
-    set (A5 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (rget A4 (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 1594 : mword 12)))]> A4).
-    change (<[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (rget A4 (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 1594 : mword 12)))]> A4) with A5.
+    set (A5 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (rget A4 (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 1650 : mword 12)))]> A4).
+    change (<[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (rget A4 (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 1650 : mword 12)))]> A4) with A5.
     assert (Hpc18 : add_vec_int (mword_of_int (KernelSyms.initsleeplock + 0x14) : mword 64) 4 = mword_of_int (KernelSyms.initsleeplock + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc18) in "Hpc".
     assert (HA5a1 : A5 !!! Regidx (mword_of_int 11 : mword 5) = sl_str_addr).

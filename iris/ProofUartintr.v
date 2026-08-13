@@ -375,7 +375,7 @@ Section ProofUartintr.
     iPoseProof (uii2_3c with "Ht") as "#Hi3c".
     iEval (rewrite UG.ug_cr7) in "Hi30".
     assert (Jcall : add_vec (mword_of_int (KernelSyms.uartintr + 0x38) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2095286 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2095342 : mword 21))
                     = mword_of_int KernelSyms.consoleintr) by pcw.
     assert (Jback : add_vec (mword_of_int (KernelSyms.uartintr + 0x3c) : mword 64)
                       (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2040 : mword 11) ('b"0"))))
@@ -426,7 +426,7 @@ Section ProofUartintr.
         change (<[Regidx Ra0 := regval_into_reg (lsr_ldval_of c)]>
                 (<[Regidx Ra5 := regval_into_reg (UG.rx_masked bt)]> M1)) with G0.
         (* +0x38 jal ra,consoleintr *)
-        iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uartintr + 0x38)) Rra (mword_of_int 2095286 : mword 21)
+        iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uartintr + 0x38)) Rra (mword_of_int 2095342 : mword 21)
                   G0 (av - 4)%nat b ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi38 [-]").
         iIntros (CIDj Hsj) "Hcg Hpc".

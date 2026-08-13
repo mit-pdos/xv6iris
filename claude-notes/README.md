@@ -38,14 +38,17 @@ are working on that effort — the relevant `projects/` file.
   now FIXED UPSTREAM** — D1 (`writei` releases a partially-modified buffer
   without logging it), and D2 (`uart.c`'s new `tx_lock` sleeplock is never
   initialized), which `b7c25cf` closed with `initsleeplock(&tx_lock, "uart")`
-  after we reported it. The proof side of D2 now carries the lock end to end
-  (`sl_raw` in through consoleinit, `sl_fresh` back out), but
-  `LinkTxLockInit.tx_lock_init` REMAINS AN AXIOM for a reason that is a design
-  decision rather than a gap: `is_txlock` wants the transmitter token
-  `uart_tx_own`, and printk's `pr.lock` currently owns it via `pr_res` — the
-  token is exclusive, so the two locks cannot both have it. See
-  `projects/uart-driver.md`. Plus a list of near-misses and provably dead code
-  so the same ground is not re-covered.
+  after we reported it — and `d80e61c5` then settled on `initlock`, tx_lock
+  being a SPINLOCK again. The proof side carries the lock end to end
+  (`lk_raw` in through consoleinit, `lk_fresh` back out).
+  `LinkTxLockInit.tx_lock_init` REMAINS AN AXIOM, but only for want of the boot
+  ASSEMBLY that runs `newlock` — the design obstruction is gone. It used to be
+  that `is_txlock` wanted the transmitter token and printk's `pr.lock` owned it
+  via `pr_res`, and the token is exclusive; `d80e61c5` put `uartputc_sync`
+  behind `tx_lock` too, so THR access is behind that one lock on both paths and
+  `pr_res` is now `emp`. See `projects/uart-driver.md` and
+  `projects/main-boot.md` §G2. Plus a list of near-misses and provably dead
+  code so the same ground is not re-covered.
   Read the note at the top before proposing to fix any of them: the image is
   pinned by `XV6_REV`, so editing `xv6-riscv/` moves every symbol address.
 
@@ -365,8 +368,14 @@ are working on that effort — the relevant `projects/` file.
   `intr_handler_spec` upgrade that rewires `ProofKernelvec` off the legacy
   `KERNELTRAP_RETURNS` axiom (= explicit-cpuid Stage 2).
 - **[`printk.md`](projects/printk.md)** — the formatted-output cone (printk →
-  printint → consputc → uartputc_sync), ALL PROVEN and linked on the PANIC
-  path (`panicking ≠ 0`, so no lock and no `intr_count` anywhere in it).
+  printint → consputc → uartputc_sync), ALL PROVEN and linked. The
+  panic-path specialization is HISTORICAL: `c47a936` deleted the
+  `panicking`/`panicked` globals, so printk now always takes `pr.lock` and
+  uartputc_sync always takes `tx_lock`, and the cone was re-proved against that
+  — see the file for the six trap classes that port turned up, the `pk_held`
+  device that carries acquire's output through the format walk without
+  re-anchoring every `wp_next`, and why the trace claim weakened from
+  `uart_sent` to `uart_sent_sub`.
   Keeps the rejoining-arms epilogue shape, `StackBytes.v`'s frame-resident
   char array, the fuel inductions (printint's digit loop, printk's format
   loop), `PrintkFmt.v` — the pure model of which varargs a format string
