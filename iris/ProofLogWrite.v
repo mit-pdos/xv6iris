@@ -1726,21 +1726,21 @@ Section ProofLogWrite.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
-      (cr : bool) (Sb : gset Z)
+      (cr : bool) (Sb : gset Z) (vlb : nat)
       (Efs : coPset) (Φfsb : iProp Σ)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (K : nat) (b : bool)
     : wp_log_write_au_body bn γ γfs γd cov logstart dev k pidv bno
-                           bs bsl bsd d u cr Sb Efs Φfsb m n eb p C K b.
+                           bs bsl bsd d u cr Sb vlb Efs Φfsb m n eb p C K b.
   Proof.
     cbv beta delta [wp_log_write_au_body].
     intros pcE ret_tgt HK Hnoff Hk Ha0 Hcovbno Hnotlog Hcredit.
     (* the budget resource this run delivers, threaded opaquely through the
        lw_* helpers -- none of them inspects it *)
     pose (Bud := (log_opSw γ (if cr then S u else u) (Sb ∪ {[uint bno]})
-                    (uint bno))%I).
+                    (uint bno) vlb)%I).
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hbslot Hop Hau Hheld Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hbslot #Hvlb Hop Hau Hheld Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbeq.
     iDestruct "Hlctx" as "#Hlctx2".
     iAssert (log_ctx γ bn γfs cov logstart dev) as "#Hlctx"; [iExact "Hlctx2"|].
@@ -2102,8 +2102,17 @@ Section ProofLogWrite.
        have to come "from the credit"; at the site it comes from the scan,
        for free, and hoisting the mint keeps [Bud] free of the arm. ---- *)
     iMod (log_mint_logged γ Xr Ep (uint bno) with "Hxa") as "[Hxa #Hwit]".
+    (* ---- AND THE ANCHOR CASHED (fs-log.md §G.17, blocker 4).  [Hepa] is
+       the [ln_ep] auth, open only here; [HliveL]'s [e0 = Ep] above is the
+       other half.  This one line is why the region's depositor can order
+       its witness against the observation counter at all -- outside this
+       ghost step the caller holds two lower bounds and can do nothing with
+       them. ---- *)
+    iDestruct (log_epoch_lb_le γ Ep vlb with "Hepa Hvlb") as %Hvle.
     iAssert Bud with "[Hop]" as "Hop".
-    { rewrite /Bud. iApply (log_opSw_intro with "Hop"). iExact "Hwit". }
+    { rewrite /Bud.
+      iApply (log_opSw_intro γ _ _ Ep (uint bno) vlb Hvle with "Hop").
+      iExact "Hwit". }
     assert (Hnl : (nl <= 29)%nat) by (unfold LOGBLOCKS in Hsum; lia).
     (* ...and in the header's terms: this is what refutes the append
        branch, since the scan can only fail to find a block that is not
@@ -2657,11 +2666,14 @@ Section ProofLogWrite.
     cbv beta delta [wp_log_write_gen_body].
     intros pcE ret_tgt HK Hnoff Hk Ha0 Hcovbno Hnotlog Hcredit.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hbslot Hop Hfsb Hheld Hcont".
+    (* the anchor at 0: a lower bound of zero is the unit, so the derived
+       form costs its callers nothing and keeps every landed one byte-stable *)
+    iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
     iApply (wp_log_write_au bn γ γfs γd cov logstart dev k pidv bno
-              bs bsl bsd d u cr Sb ⊤ (fsblock γfs (uint bno) bs)%I
+              bs bsl bsd d u cr Sb 0%nat ⊤ (fsblock γfs (uint bno) bs)%I
               m n eb p C K b
               HK Hnoff Hk Ha0 Hcovbno Hnotlog Hcredit
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hbslot Hop [Hfsb] Hheld [Hcont]").
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hbslot Hlb0 Hop [Hfsb] Hheld [Hcont]").
     2: { (* the witness is DROPPED here, which is what keeps every landed
             [wp_log_write_gen] caller byte-stable: only the atomic-update
             form -- the one iupdate/ialloc use, and the one §G.3's receipt

@@ -1439,15 +1439,17 @@ Section IallocClaim.
        The free inum's fragment is INSIDE the region and stays there, at the
        [fresh_shape] arm; the buffer is the serialiser. *)
     iRename "Hop" into "HopS".
+    (* ialloc wants no receipt, so its anchor is the unit (fs-log.md §G.17) *)
+    iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
     iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bno
               (diblk_bytes (<[DinodeEnc.islot inum := ialloc_fresh ty]> ds))
               (diblk_bytes ds) bsd d0 u
-              false Sb (⊤ ∖ ↑iregN) True%I
+              false Sb 0%nat (⊤ ∖ ↑iregN) True%I
               W5 0%nat true (proc_addr j) C (K - 8)%nat b
               HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HW5a0
               ltac:(rewrite Hbno; exact Hcov)
               ltac:(rewrite Hbno; exact Hlog) ltac:(discriminate)
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl HopS [] Hheld").
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl Hlb0 HopS [] Hheld").
     { iEval (rewrite Hbno).
       iApply (ireg_claim_au ⊤ γi γfs inodestart nib inum (ialloc_fresh ty) ds
                 ltac:(solve_ndisj) Hnib Hdswf Ht0

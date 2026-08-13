@@ -617,7 +617,7 @@ Definition wp_iupdate_credgen_body
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
-    (u : nat) (Sb : gset Z) (cru : bool)
+    (u : nat) (Sb : gset Z) (cru : bool) (v : nat)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
     (b : bool) :=
@@ -660,6 +660,13 @@ Definition wp_iupdate_credgen_body
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslots bn 2 -∗
+  (* THE DEPOSIT'S IN-HALF (fs-log.md §G.3/§G.16).  [v] is the caller's own
+     epoch anchor -- in the one caller that matters, the value its escrow
+     slot's observation counter currently holds ([IcacheEscrow.ic_ep_open]
+     hands it out with exactly this bound).  Persistent, so it costs a
+     caller nothing to keep, and every caller that has no use for the
+     receipt passes [v := 0], where the bound is the unit. *)
+  log_epoch_lb γ v -∗
   log_opS γ (S u) Sb -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
@@ -678,6 +685,15 @@ Definition wp_iupdate_credgen_body
       ireg_out γi inum dn -∗
       bslots bn 2 -∗
       log_opS γ (if cru then S u else u) (Sb ∪ {[IBLOCK inum inodestart]}) -∗
+      (* THE DEPOSIT'S OUT-HALF.  iupdate is straight-line and always
+         log_writes, so this is unconditional: the witness is minted by the
+         [log_write] ghost step (both arms since §G.11) and the comparison
+         is discharged THERE, where the [ln_ep] auth is open -- [v <= E] by
+         [log_epoch_lb_le] against the premise above, and [e = E] because a
+         live entry is born at the current epoch.  Neither half can be done
+         at the escrow park, which is why §G.3's self-contained receipt is
+         dead and this contract is where the deposit lives. *)
+      (∃ e : nat, logged_at γ e (IBLOCK inum inodestart) ∗ ⌜(v <= e)%nat⌝) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -767,11 +783,11 @@ Module Type IUPDATE.
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
-      (u : nat) (Sb : gset Z) (cru : bool)
+      (u : nat) (Sb : gset Z) (cru : bool) (v : nat)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
       wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
-                              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
+                              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru v
                               pidv dq dqd dqn dqs m K eb C b.
 End IUPDATE.

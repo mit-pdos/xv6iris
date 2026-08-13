@@ -1117,9 +1117,10 @@ Section WriteiJoin.
        charges nothing for a flush whose block the op had already logged.
        The credit is a DECIDABLE READ of the running set, so no case split
        reaches the walk -- only the returned count carries the [if]. *)
+    iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
     iApply (IU.wp_iupdate_credgen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn' dn0 bm' u SbC
-              (bool_decide (IBLOCK inum inodestart ∈ SbC))
+              (bool_decide (IBLOCK inum inodestart ∈ SbC)) 0%nat
               pidv (wi_q user dq) dqd dqn dqs T1 (K - 14)%nat eb C b
               HKiu
               ltac:(intros Hc; exact (proj1 (bool_decide_eq_true _) Hc))
@@ -1131,9 +1132,9 @@ Section WriteiJoin.
               Hadr Hdirlen Hj Hgl HT1a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hidev Hinum Hmeta Hmap
                     Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom
-                    Hdlock Hsl2 Hop").
+                    Hdlock Hsl2 Hlb0 Hop").
     iIntros (CID3 Hq3 mI) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hinum
-                           Hmeta Hmap Hsb Hdn Hsl2 Hop".
+                           Hmeta Hmap Hsb Hdn Hsl2 Hop Hwit".
     (* the borrow closes: nothing below wi_join wants the fraction *)
     iDestruct ("Hsrcback" with "Hppid") as "Hsrc".
     (* §16.4: iupdate's payout is conditional on the flushed record's type.

@@ -196,7 +196,7 @@ Definition wp_log_write_au_body
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (k : nat) (pidv bno : mword 32)
     (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
-    (cr : bool) (Sb : gset Z)
+    (cr : bool) (Sb : gset Z) (vlb : nat)
     (Efs : coPset) (Φfsb : iProp Σ)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (K : nat) (b : bool) :=
@@ -221,6 +221,12 @@ Definition wp_log_write_au_body
   log_ctx γ bn γfs cov logstart dev -∗
   (* the slot unit backing the (possible) bpin *)
   bslot bn -∗
+  (* THE CALLER'S EPOCH ANCHOR (fs-log.md §G.17, blocker 4).  Persistent and
+     free at [vlb := 0], so it costs a caller that wants no receipt nothing;
+     what it buys is the one comparison the whole group-absorption design
+     cannot make anywhere else, cashed at the ghost step below against the
+     [ln_ep] auth this function is the only client of. *)
+  log_epoch_lb γ vlb -∗
   log_opS γ (S u) Sb -∗
   (* THE CALLER'S VIEW OF THE BLOCK, AS AN ATOMIC UPDATE -- see the header
      note above.  Fired exactly once, at the ghost step. *)
@@ -247,7 +253,7 @@ Definition wp_log_write_au_body
        arm because it just wrote the slot, the absorb arm because its scan
        FOUND the block already there.  A caller that wants none of this
        applies [LogInv.log_opSw_opS] and is otherwise unchanged. *)
-    log_opSw γ (if cr then S u else u) (Sb ∪ {[uint bno]}) (uint bno) -∗
+    log_opSw γ (if cr then S u else u) (Sb ∪ {[uint bno]}) (uint bno) vlb -∗
     (* the caller's receipt: what its closing fupd paid out *)
     Φfsb -∗
     (* the handle re-indexed at the written bytes and now DIRTY *)
@@ -330,12 +336,12 @@ Module Type LOG_WRITE.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
-      (cr : bool) (Sb : gset Z)
+      (cr : bool) (Sb : gset Z) (vlb : nat)
       (Efs : coPset) (Φfsb : iProp Σ)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (K : nat) (b : bool),
       wp_log_write_au_body bn γ γfs γd cov logstart dev k pidv bno
-                           bs bsl bsd d u cr Sb Efs Φfsb m n eb p C K b.
+                           bs bsl bsd d u cr Sb vlb Efs Φfsb m n eb p C K b.
 
   (* THE CREDITED / GENERAL FORM.  [wp_log_write_sconf] below is the
      set-forgetting instance of this at [cr = false]; it is kept as its own

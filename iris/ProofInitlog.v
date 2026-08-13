@@ -1443,7 +1443,10 @@ Section ProofInitlog.
     iAssert (log_res (MkLogNames γlk γops γep γlg) bn γfs cov logstart)
       with "[Hout Hcmt Hnc Hops Hepa Hxa Hbatch]" as "Hres".
     { rewrite /log_res.
-      iExists 0%nat, false, v_nc, (∅ : gmap nat op_entry), 0%nat,
+      (* the epoch is ONE at genesis (fs-log.md §G.17): the region's
+         "never observed" counter value is zero, and the two must not
+         collide.  Both epoch clauses stay vacuous. *)
+      iExists 0%nat, false, v_nc, (∅ : gmap nat op_entry), 1%nat,
               (∅ : gset (nat * Z)).
       iSplitL "Hout"; [iExact "Hout"|].
       iSplitL "Hcmt"; [iExact "Hcmt"|].

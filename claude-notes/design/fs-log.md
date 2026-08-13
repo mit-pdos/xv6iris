@@ -1299,3 +1299,35 @@ logG sweep (the region placement needs logG only where the new contracts
 live).  The ityR-widening technique and its two traps (the `change` for
 component ops; the pair-exclusivity refutation patterns) are recorded
 here for the day a per-generation gate is genuinely needed.
+
+
+### G.18 G-2 COMPLETE (2026-08-13): the receipt lives in the region, and
+### every crz link is proven
+
+Gate: EXIT=0, 1077 .vo, staleness 0.  The G.17 shape landed with one
+work-SHRINKING deviation, ratified: the deposit lives in
+`ireg_write_unlink` — the ONLY writer in the kernel that lowers nlink —
+not in `ireg_write_au` (whose change would have been a no-op rippling to
+four callers).  Six of the seven ireg_slot_intro sites carry the receipt
+forward by `ireg_ep_mono` off `di_nlink_stable`'s first conjunct; one
+assert each.  `ireg_write_unlink` has no callers today, so its statement
+moved freely.
+
+G-3's crz premise is PRODUCIBLE END-TO-END, every link proven:
+ireg_obs_mint at the walkers' guard (dinode_at + log_opSe's lb, nlink ≠
+0) → the persistent inum-keyed nlz_obs across the walk → ireg_obs_use at
+iput (genesis epoch ≥ 1 refutes the v = 0 arm) → ∃ e, ⌜e0 ≤ e⌝ ∗
+logged_at γ e (IBLOCK inum icfg_ist) — §G.13's ruled shape exactly.  The
+tie is ⌜γ = icfg_log⌝, true at boot by icfg_alloc.
+
+OWED ITEM: ProofInitlog now compiles in ~14 min solo (terminates; .vo
+sound).  Whether the genesis 0→1 change regressed it or the cost is
+pre-existing wants a coqc -time read before D₀ (the durable-notes
+recipe); if regressed, the fix is almost certainly the one iExists in
+the log_res assembly.
+
+G-3's remaining scope, in full: SpecLogWrite's credited-arm honesty
+premise relaxes from the pure `cr = true -> uint bno ∈ Sb` to the
+resource form (if cr then ∃ e, ⌜e0 <= e⌝ ∗ logged_at γ e (uint bno) else
+emp, against the caller's log_opSe e0), and ProofLogWrite's credited arm
+re-proves via log_use_group instead of the own-set Hsub.  Then G-4.

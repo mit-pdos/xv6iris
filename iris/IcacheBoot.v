@@ -92,6 +92,8 @@ Require Import IcacheInv.
 Require Import IcacheEscrow.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+From iris.base_logic.lib Require Import mono_nat.
+Require Import LogInv.  (* [logG]: the region's zero-receipt, fs-log.md G.17 *)
 
 Local Open Scope Z_scope.
 
@@ -349,7 +351,7 @@ Proof.
 Qed.
 
 Section IcacheBootRegion.
-  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !icacheG Σ}.
+  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !icacheG Σ, !logG Σ}.
   Context `{ICFG : icfg}.
 
   (* [FsBoot.fs_L0_big], for this map *)
@@ -483,6 +485,13 @@ Section IcacheBootRegion.
        (forall bi : nat, (bi < nib)%nat -> bss bi = diblk_bytes (dss !!! bi)) ->
        image_free_nlink dss nib) ->
     ([∗ set] z ∈ region_inums nib, link_auth z 0 0 None 0) -∗
+    (* THE OBSERVATION COUNTERS (fs-log.md §G.17), one per inum and all at
+       zero: nobody has ever observed a nonzero nlink, which is exactly the
+       [⌜v = 0⌝] disjunct that carries the receipt over the mkfs image's
+       free inodes.  A PREMISE for [icfg_iref]'s reason -- the gnames are
+       the ambient class's, so only the [own_alloc] that minted them can
+       hand them over ([IcacheRef.icfg_alloc]). *)
+    ([∗ set] z ∈ region_inums nib, mono_nat_auth_own (icfg_iep z) 1 0) -∗
     ([∗ list] bi ∈ seq 0 nib,
        fsblock γfs (inodestart + Z.of_nat bi) (bss bi))
     ={E}=∗ ∃ (γi : gname) (dss : list (list dinode)),
@@ -495,7 +504,7 @@ Section IcacheBootRegion.
     intros Hnib Hlen Himg.
     destruct (image_decode nib bss Hlen) as (dss & Hl & Hwf & He).
     pose proof (Himg dss Hl Hwf He) as Hl3.
-    iIntros "Hlk Hblks".
+    iIntros "Hlk Hepa Hblks".
     iMod (ghost_map_alloc (ireg_M0 dss nib ∪ ireg_MK nib)) as (γi) "[Ha Hels]".
     iDestruct (big_sepM_union with "Hels") as "[Hels Hmks]";
       [apply ireg_M0_MK_disj |].
@@ -504,6 +513,11 @@ Section IcacheBootRegion.
     iDestruct (imark_of_marks γi nib with "Hmks") as "Hmks".
     iDestruct (big_sepS_sep_2 with "Hels Hmks") as "Hall".
     iDestruct (big_sepS_sep_2 with "Hall Hlk") as "Hall".
+    iAssert (|==> [∗ set] z ∈ region_inums nib,
+                    ireg_ep z (image_dinode dss z))%I with "[Hepa]" as ">Hep".
+    { iApply big_sepS_bupd. iApply (big_sepS_mono with "Hepa"). intros z Hz.
+      iIntros "Ha". iApply (ireg_ep_intro z (image_dinode dss z) with "Ha"). }
+    iDestruct (big_sepS_sep_2 with "Hall Hep") as "Hall".
     (* per inum: one of the two ghost entries stays in the region's arm and
        the other one is the payout; the ledger authority stays with the
        slot on BOTH arms (design §20.2) *)
@@ -512,18 +526,18 @@ Section IcacheBootRegion.
                 ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)))%I
       with "[Hall]" as "Hall".
     { iApply (big_sepS_mono with "Hall"). intros z Hz.
-      iIntros "[[Hfrag Hmk] Hla]".
+      iIntros "[[[Hfrag Hmk] Hla] Hep]".
       assert (Hok : ireg_link_ok (image_dinode dss z) 0).
       { split; [lia | exact (Hl3 z Hz)]. }
       rewrite /ireg_out /dinode_at (region_inum_faithful nib z Hnib Hz).
       case_decide as Hty.
       - iSplitR "Hmk"; [| iExact "Hmk"].
         iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 None 0 Hok
-                  with "Hla").
+                  with "Hla Hep").
         iLeft. iSplitR; [iPureIntro; left; exact Hty | iExact "Hfrag"].
       - iSplitR "Hfrag"; [| iExact "Hfrag"].
         iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 None 0 Hok
-                  with "Hla").
+                  with "Hla Hep").
         iRight. iSplitR; [iPureIntro; exact Hty | iExact "Hmk"]. }
     rewrite big_sepS_sep.
     iDestruct "Hall" as "[Hslots Hout]".
@@ -561,7 +575,7 @@ End IcacheBootRegion.
 (* ===================================================================== *)
 
 Section IcacheBootPool.
-  Context `{!riscvGS Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ,
+  Context `{!riscvGS Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
             !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId}.
 
@@ -681,7 +695,7 @@ Lemma ci_inums_empty : ci_inums ∅ = (∅ : gset Z).
 Proof. rewrite /ci_inums map_to_list_empty //. Qed.
 
 Section IcacheBootTable.
-  Context `{!riscvGS Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ,
+  Context `{!riscvGS Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
             !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId}.
 

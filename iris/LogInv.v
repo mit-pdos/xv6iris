@@ -474,20 +474,50 @@ Section LogInv.
      site it is instead immediate from the SCAN, so the arm distinction
      buys nothing and costs every consumer a case split.
 
+     ...AND IT CARRIES THE CALLER'S EPOCH ANCHOR (fs-log.md §G.17,
+     blocker 4).  [v] is a lower bound the caller brought in
+     ([log_epoch_lb γ v], a premise of [SpecLogWrite.wp_log_write_au]), and
+     [⌜v <= e0⌝] is the ONE fact in the whole absorption design that cannot
+     be established anywhere else: it is [v <= E] (by [log_epoch_lb_le])
+     composed with [e0 = E] (a live entry is born at the current epoch), and
+     BOTH halves need the [ln_ep] auth, which lives inside [log_res] behind
+     the log spinlock.  Two lower bounds on one counter are incomparable --
+     §G.14's own refutation, one tier up -- so a client holding
+     [log_epoch_lb γ v] and its own [log_opSe … e0] can do nothing with the
+     pair; the cashing has to happen here, at the ghost step, and it is free
+     there.  A caller with no receipt to build passes [v := 0].
+
      [log_opSw_opS] forgets the whole thing, so a caller that does not want
      a witness threads [log_opS] exactly as before. *)
   Definition log_opSw (γ : log_names) (u : nat) (Sb : gset Z)
-      (b : Z) : iProp Σ :=
-    (∃ e0 : nat, log_opSe γ u Sb e0 ∗ logged_at γ e0 b)%I.
+      (b : Z) (v : nat) : iProp Σ :=
+    (∃ e0 : nat, log_opSe γ u Sb e0 ∗ logged_at γ e0 b ∗ ⌜(v <= e0)%nat⌝)%I.
 
   Lemma log_opSw_intro (γ : log_names) (u : nat) (Sb : gset Z)
-      (e0 : nat) (b : Z) :
-    log_opSe γ u Sb e0 -∗ logged_at γ e0 b -∗ log_opSw γ u Sb b.
-  Proof. iIntros "H Hw". iExists e0. iFrame. Qed.
+      (e0 : nat) (b : Z) (v : nat) :
+    (v <= e0)%nat ->
+    log_opSe γ u Sb e0 -∗ logged_at γ e0 b -∗ log_opSw γ u Sb b v.
+  Proof. intros Hv. iIntros "H Hw". iExists e0. iFrame. iPureIntro. exact Hv. Qed.
 
-  Lemma log_opSw_opS (γ : log_names) (u : nat) (Sb : gset Z) (b : Z) :
-    log_opSw γ u Sb b -∗ log_opS γ u Sb.
-  Proof. iIntros "H". iDestruct "H" as (e0) "[H _]". iExists e0. iFrame. Qed.
+  Lemma log_opSw_opS (γ : log_names) (u : nat) (Sb : gset Z) (b : Z) (v : nat) :
+    log_opSw γ u Sb b v -∗ log_opS γ u Sb.
+  Proof. iIntros "H". iDestruct "H" as (e0) "(H & _ & _)". iExists e0. iFrame. Qed.
+
+  (* the receipt the region's depositor spends: the witness with the
+     caller's own anchor already ordered against it (fs-log.md §G.17). *)
+  Lemma log_opSw_witness (γ : log_names) (u : nat) (Sb : gset Z) (b : Z)
+      (v : nat) :
+    log_opSw γ u Sb b v -∗
+    log_opS γ u Sb ∗ ∃ e : nat, logged_at γ e b ∗ ⌜(v <= e)%nat⌝.
+  Proof.
+    iIntros "H". iDestruct "H" as (e0) "(H & #Hw & %Hv)".
+    iSplitL "H"; [iExists e0; iFrame |].
+    iExists e0. iFrame "Hw". iPureIntro. exact Hv.
+  Qed.
+
+  (* ...and the trivial anchor, for every caller that wants none of it *)
+  Lemma log_epoch_lb_0 (γ : log_names) : ⊢ |==> log_epoch_lb γ 0.
+  Proof. rewrite /log_epoch_lb. iApply mono_nat_lb_own_0. Qed.
 
   Global Instance log_op_timeless γ u : Timeless (log_op γ u).
   Proof. apply _. Qed.
@@ -883,10 +913,19 @@ Section LogInv.
   (*  Allocation                                                       *)
   (* ---------------------------------------------------------------- *)
 
+  (* GENESIS IS EPOCH ONE, NOT ZERO (fs-log.md §G.17).  The region's
+     zero-receipt carries a [⌜v = 0⌝] disjunct for the mkfs image's FREE
+     inodes -- records nobody has ever observed and for which no witness
+     exists or could exist -- and the only place it must be refuted is
+     [InodeRegion.ireg_ep_use], by [1 <= e0 <= v].  That needs every op's
+     birth epoch to be at least one, i.e. the epoch counter to start ABOVE
+     the observation counter's own "never observed" value.  Nothing else in
+     the log ever compares an epoch to a literal: the invariant's clauses
+     are [e0 = E] and [e' <= E], and the bump only raises. *)
   Lemma log_epoch_alloc :
-    ⊢ |==> ∃ γe : gname, mono_nat_auth_own γe 1 0%nat.
+    ⊢ |==> ∃ γe : gname, mono_nat_auth_own γe 1 1%nat.
   Proof.
-    iMod (mono_nat_own_alloc 0%nat) as (γ) "[Ha _]".
+    iMod (mono_nat_own_alloc 1%nat) as (γ) "[Ha _]".
     iModIntro. iExists γ. iFrame.
   Qed.
 

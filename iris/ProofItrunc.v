@@ -351,9 +351,12 @@ Section ItruncTail.
        walk (GR-2b): itrunc is a pure pass-through, so it threads its own
        complements here rather than pinning [eb := true] the way create's
        [wp_iupdate_cred] does. *)
+    (* itrunc wants no zero-receipt: the anchor is the unit and the
+       witness is dropped (fs-log.md §G.17) *)
+    iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
     iApply (IU.wp_iupdate_credgen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum (di_trunc dn) dn0
-              bm_empty u Sb0 cru
+              bm_empty u Sb0 cru 0%nat
               pidv dq dqd dqn dqs T1 (K - 6)%nat eb C b
               HKiu Hcru Hgeom Hist Hicov Hilog Hnib
               (* §19.6 Part 1: [di_trunc] keeps the type, so itrunc's own
@@ -363,9 +366,9 @@ Section ItruncTail.
               Hj Hgl HT1a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hidev Hinum Hmeta Hmap
                     Hsbi Hireg Hdn Hppid Hprocs Hdevi Hdgeom
-                    Hdlock Hsl Hop").
+                    Hdlock Hsl Hlb0 Hop").
     iIntros (CID4 Hq4 mI) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hinum
-                           Hmeta Hmap Hsbi Hdn Hsl Hop".
+                           Hmeta Hmap Hsbi Hdn Hsl Hop Hwit".
     (* §16.4: iupdate's payout is conditional on the flushed record's type,
        and [di_trunc] keeps the type -- so this is the allocated branch *)
     iDestruct (ireg_out_alloc_inv γi inum (di_trunc dn) Hdtnz with "Hdn")

@@ -150,6 +150,7 @@ Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 From Kernel Require KernelSyms.
+Require Import LogInv.  (* [logG]: the region's zero-receipt, fs-log.md G.17 *)
 Local Open Scope Z_scope.
 
 (* iget's own frame is 6 slots ([c.addi16sp sp,-48] at +0x00, with ra / s0 /
@@ -159,7 +160,7 @@ Local Open Scope Z_scope.
 Definition K_iget : nat := 16%nat.
 
 Definition wp_iget_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
       !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
@@ -205,7 +206,7 @@ Definition wp_iget_sconf_body
 
 Module Type IGET.
   Parameter wp_iget_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
              !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)

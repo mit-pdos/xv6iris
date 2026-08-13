@@ -132,7 +132,7 @@ Section IupdateDefs.
   Definition iu_cont `{GEN : GenId} `{CID0 : CpuId}
       (γfs : fs_names) (γi : gname) (bn : bio_names) (γ : log_names)
       (inodestart : Z) (ip : mword 64) (inum : mword 32)
-      (dn : dinode) (bm : blkmap) (u : nat) (Sbo : gset Z)
+      (dn : dinode) (bm : blkmap) (u : nat) (Sbo : gset Z) (v : nat)
       (dev : mword 32) (pidv : mword 32) (dq dqd dqn dqs : dfrac) (j : nat)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
@@ -156,6 +156,12 @@ Section IupdateDefs.
            unioned with the inode block, and forgets it again on the way
            out.  See SpecIupdate's set-form banner. *)
         log_opS γ u Sbo -∗
+        (* THE DEPOSIT'S OUT-HALF (fs-log.md §G.17).  iupdate is
+           straight-line and always log_writes, so the witness is
+           unconditional; [⌜v <= e⌝] was cashed inside [log_write] against
+           the [ln_ep] auth, which is the one place in the system that can
+           order the caller's anchor against a batch's epoch. *)
+        (∃ e : nat, logged_at γ e (IBLOCK inum inodestart) ∗ ⌜(v <= e)%nat⌝) -∗
         WP (Loop : expr riscv_lang))%I.
 
   (* THE MACHINERY HALF, out of the handle and back.  [ireg_read] needs the
@@ -212,7 +218,7 @@ Section IupdateTail.
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32) (dn dn0 : dinode) (bm : blkmap)
-      (ds : list dinode) (u : nat) (Sb : gset Z) (cru : bool)
+      (ds : list dinode) (u : nat) (Sb : gset Z) (cru : bool) (v : nat)
       (kk : nat) (bno : mword 32) (bsd : list (bv 8)) (d0 : bool)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) :
@@ -263,6 +269,7 @@ Section IupdateTail.
     inode_map γfs ip bm -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bslots bn 1 -∗
+    log_epoch_lb γ v -∗
     log_opS γ (S u) Sb -∗
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn0 -∗
@@ -270,13 +277,13 @@ Section IupdateTail.
        (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 -∗
     iu_cont (CID0 := CID0) γfs γi bn γ inodestart ip inum dn bm
             (if cru then S u else u)
-            (Sb ∪ {[IBLOCK inum inodestart]})
+            (Sb ∪ {[IBLOCK inum inodestart]}) v
             dev pidv dq dqd dqn dqs j m K eb C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr Hs2 Hkk Hbno Hcov Hlog Hnib Hdswf Hdnwf Hstab Hnlk Hcru.
     pose proof HK as HK'. unfold K_iupdate in HK'.
-    iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hmeta Hmap Hsb Hsl Hop #Hireg Hdn Hheld Hcont".
+    iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hmeta Hmap Hsb Hsl #Hvlb Hop #Hireg Hdn Hheld Hcont".
     (* THE eb/b BRIDGE, once per top-level lemma (eb-generic-sweep.md). *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     iPoseProof (iui_66 with "Htext") as "Hi66".
@@ -347,13 +354,13 @@ Section IupdateTail.
     iRename "Hop" into "HopS".
     iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bno
               (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 u
-              cru Sb (⊤ ∖ ↑iregN) (ireg_out γi inum dn)
+              cru Sb v (⊤ ∖ ↑iregN) (ireg_out γi inum dn)
               T1 0%nat eb (proc_addr j) C (K - 4)%nat b
               HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HT1a0
               ltac:(rewrite Hbno; exact Hcov)
               ltac:(rewrite Hbno; exact Hlog)
               ltac:(rewrite Hbno; exact Hcru)
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl HopS [Hdn] Hheld").
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl Hvlb HopS [Hdn] Hheld").
     { iEval (rewrite Hbno).
       (* WHICH ARM MOVE (§16.4): a type-0 flush is iput's free path and it
          ABSORBS the fragment, paying out the marker; every other flush keeps
@@ -375,7 +382,7 @@ Section IupdateTail.
        named and the epoch-stamped registry row attached (fs-log.md §G.3);
        iupdate/ialloc do not spend it yet, so it is forgotten right here and
        everything below is unchanged.  G-2 replaces this line. *)
-    iDestruct (log_opSw_opS with "HopS") as "Hop".
+    iDestruct (log_opSw_witness with "HopS") as "[Hop #Hwit]".
     assert (Hpc6c : ret_pc (T1 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iupdate + 0x6c)) by (rewrite HT1ra; pcw).
     iEval (rewrite Hpc6c) in "Hpc".
@@ -660,7 +667,7 @@ Section IupdateTail.
     rewrite /iu_cont.
     iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinum
-                     Hmeta Hmap Hsb Hdn Hsl Hop").
+                     Hmeta Hmap Hsb Hdn Hsl Hop Hwit").
     { unfold callee_saved. split_and!; assumption. }
   Qed.
 
@@ -693,7 +700,7 @@ Section ProofIupdateMain.
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
-      (u : nat) (Sb : gset Z) (cru : bool)
+      (u : nat) (Sb : gset Z) (cru : bool) (v : nat)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
@@ -735,6 +742,7 @@ Section ProofIupdateMain.
       disk_geom γd pd pav pu -∗
       is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
       bslots bn 2 -∗
+      log_epoch_lb γ v -∗
       log_opS γ (S u) Sb -∗
       wp_next true pj (fun (CID : CpuId) =>
       ∀ mf : regfile,
@@ -753,6 +761,7 @@ Section ProofIupdateMain.
           ireg_out γi inum dn -∗
           bslots bn 2 -∗
           log_opS γ (if cru then S u else u) (Sb ∪ {[IBLOCK inum inodestart]}) -∗
+          (∃ e : nat, logged_at γ e (IBLOCK inum inodestart) ∗ ⌜(v <= e)%nat⌝) -∗
           WP (Loop : expr riscv_lang)) -∗
       WP (Loop : expr riscv_lang).
   Proof.
@@ -786,14 +795,14 @@ Section ProofIupdateMain.
       by (rewrite /bm_cells length_app Hdirlen; reflexivity).
     iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
-              #Hdlock Hsl Hop Hcont".
+              #Hdlock Hsl #Hvlb Hop Hcont".
     (* THE eb/b BRIDGE (claude-notes/projects/eb-generic-sweep.md): derived
        once, used only to guard the [_ext_transport]s below -- [b] is never
        [subst]ed, it is spelled by name in dozens of leaf-instruction calls. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     iAssert (iu_cont (CID0 := CID) γfs γi bn γ inodestart ip inum dn bm
                (if cru then S u else u)
-               (Sb ∪ {[IBLOCK inum inodestart]})
+               (Sb ∪ {[IBLOCK inum inodestart]}) v
                dev pidv dq dqd dqn dqs j m K eb C b)%I with "[Hcont]" as "Hcont";
       [rewrite /iu_cont; iExact "Hcont" |].
     iDestruct "Hmeta" as "(Hmty & Hmmaj & Hmmin & Hmnl & Hmsz)".
@@ -1718,11 +1727,11 @@ Section ProofIupdateMain.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hclm") as "Hclm".
     iApply (iu_tail (CID0 := CID36) γs j γfs γi γd bn γ cov logstart inodestart
               nib dev
-              ip inum dn dn0 bm ds u Sb cru kk bno bsd0 d0 pidv dq dqd dqn dqs m mM K eb C b
+              ip inum dn dn0 bm ds u Sb cru v kk bno bsd0 d0 pidv dq dqd dqn dqs m mM K eb C b
               HK HmMsp HmMthr HmMs2 Hkk Hbno Hcov Hlog Hnib Hdswf Hdnwf Hstab Hnlk Hcru
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe
                     Hppid Hidev Hinumc [Hmty Hmmaj Hmmin Hmnl Hmsz] Hmap Hsb
-                    Hsl Hop Hireg Hdn Hheld [Hcont]").
+                    Hsl Hvlb Hop Hireg Hdn Hheld [Hcont]").
     { rewrite /inode_meta.
       iSplitL "Hmty"; [iExact "Hmty" |]. iSplitL "Hmmaj"; [iExact "Hmmaj" |].
       iSplitL "Hmmin"; [iExact "Hmmin" |]. iSplitL "Hmnl"; [iExact "Hmnl" |].
@@ -1754,17 +1763,20 @@ Qed.
     iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
+    (* the trivial anchor: a lower bound of zero is the unit, so the three
+       derived seals cost their callers nothing (fs-log.md §G.17) *)
+    iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
-              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb false
+              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb false 0%nat
               pidv dq dqd dqn dqs m K eb C b
               HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 ltac:(discriminate)
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
-                    Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hop
+                    Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hop
                     [Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     iIntros (mf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap Hsb
-                  Hiout Hsl Hop".
+                  Hiout Hsl Hop Hwit".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap
                      Hsb Hiout Hsl Hop").
@@ -1786,33 +1798,33 @@ Qed.
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
-      (u : nat) (Sb : gset Z) (cru : bool)
+      (u : nat) (Sb : gset Z) (cru : bool) (v : nat)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
     : wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
-                              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
+                              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru v
                               pidv dq dqd dqn dqs m K eb C b.
   Proof.
     cbv beta delta [wp_iupdate_credgen_body].
     intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0.
     iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
-              #Hdlock Hsl Hop Hcont".
+              #Hdlock Hsl #Hvlb Hop Hcont".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
-              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
+              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru v
               pidv dq dqd dqn dqs m K eb C b
               HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Hcru
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
-                    Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hop
+                    Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hvlb Hop
                     [Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     iIntros (mf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap Hsb
-                  Hiout Hsl Hop".
+                  Hiout Hsl Hop Hwit".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap
-                     Hsb Hiout Hsl Hop").
+                     Hsb Hiout Hsl Hop Hwit").
     exact Hcs.
   Qed.
 
@@ -1844,18 +1856,21 @@ Qed.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
+    (* the trivial anchor: a lower bound of zero is the unit, so the three
+       derived seals cost their callers nothing (fs-log.md §G.17) *)
+    iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
-              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
+              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru 0%nat
               pidv dq dqd dqn dqs m K true C b
               HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Hcru
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
-                    Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont]").
+                    Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hop [Hcont]").
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     iIntros (mf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap Hsb
-                  Hiout Hsl Hop".
+                  Hiout Hsl Hop Hwit".
     iClear "Htc Hclm".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hpc Hppid Hidev Hinumc Hmeta Hmap
@@ -1893,18 +1908,19 @@ Qed.
     iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
+    iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
     iDestruct "Hop" as (Sb0) "Hop".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
-              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb0 false
+              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb0 false 0%nat
               pidv dq dqd dqn dqs m K eb C b
               HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 ltac:(discriminate)
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
-                    Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hop
+                    Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hop
                     [Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     iIntros (mf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap Hsb
-                  Hiout Hsl Hop".
+                  Hiout Hsl Hop Hwit".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap
                      Hsb Hiout Hsl [Hop]").

@@ -77,10 +77,14 @@ From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import auth gmap frac numbers agree csum excl updates local_updates.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap invariants own ghost_var.
+From iris.base_logic.lib Require Import gen_heap invariants own ghost_var mono_nat.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto RiscvExtras.
+(* for [log_names] alone -- [icfg_log], fs-log.md G.17's region placement.
+   No class comes with it: the log's ghost lives in [logG], which this file
+   does not need and does not take. *)
+Require Import LogInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
@@ -403,6 +407,27 @@ Class icfg := MkIcfg {
      contract in the tree (§20.9(e), and §16.5's packaging argument that it
      restates).  Here it costs ZERO signature moves anywhere. *)
   icfg_link : gname;
+  (* THE LOG'S NAMES, the inode region's first block, and the per-inum
+     OBSERVATION COUNTER family (fs-log.md §G.17).  The group-absorption
+     receipt -- "a record whose nlink is zero carries the log witness of the
+     iupdate that wrote it" -- lives in [InodeRegion.ireg_slot]'s body, and
+     it names a [log_names], an [inodestart] and one [mono_nat] per inum.
+     None of the three can be threaded: [ireg_slot] is reached through
+     [ireg_inv], whose arity is fixed by 30-odd fs contracts, and §G.14/§G.16
+     showed that a tie carried in a BODY existential admits no agreement
+     with a consumer's own γ.  Ambient, exactly as [icfg_iref] and
+     [icfg_live] are and for the same reason, the tie becomes the single
+     pure premise [⌜γ = icfg_log⌝] on the three contracts that mix a
+     threaded γ with the region (the mint, the deposit and G-3's crz) -- and
+     it is true at boot by construction, [icfg_alloc] returning the
+     equation.
+
+     [icfg_iep] is a FAMILY over the inum's value rather than one gname
+     because each inum's counter must move independently; it is keyed by the
+     same [Z] [ireg_slot] is, so no conversion appears anywhere. *)
+  icfg_log : log_names;
+  icfg_ist : Z;
+  icfg_iep : Z -> gname;
 }.
 
 (* the pool at BOOT: one whole unit at each of the fifty slots, as ONE map,
@@ -464,15 +489,42 @@ Proof. apply live_seq_valid. Qed.
    [own_alloc] that mints it also mints the map.  So the caller supplies
    [LM] and its validity, and gets the ledger back at the class's own
    [icfg_link]. *)
-Lemma icfg_alloc `{!icacheG Σ} (dv : mword 32) (nib : nat) (LM : linkUR) :
+(* THE OBSERVATION-COUNTER FAMILY (fs-log.md §G.17), minted at 0 -- "nobody
+   has ever observed a nonzero nlink at this inum", which is the disjunct
+   that makes the receipt free at every record in the mkfs image, free
+   inodes included.  [ic_tok_fun_alloc]'s shape, keyed by [Z.of_nat] so the
+   result lands on [InodeRegion]'s own key. *)
+Lemma iep_fun_alloc `{!riscvGS Σ} (n j : nat) :
+  ⊢ |==> ∃ f : Z -> gname,
+    [∗ list] k ∈ seq j n, mono_nat_auth_own (f (Z.of_nat k)) 1 0.
+Proof.
+  iInduction n as [|n IH] forall (j).
+  { iModIntro. iExists (fun _ => inhabitant). cbn [seq]. done. }
+  iMod (mono_nat_own_alloc 0) as (γ) "[Hg _]".
+  iMod ("IH" $! (S j)) as (f) "Hf".
+  iModIntro. iExists (fun z => if decide (z = Z.of_nat j) then γ else f z).
+  assert (Hcons : seq j (S n) = j :: seq (S j) n) by reflexivity.
+  rewrite Hcons big_sepL_cons. iSplitL "Hg".
+  { case_decide as Hd; [iExact "Hg" | congruence]. }
+  iApply (big_sepL_mono with "Hf"). intros i k Hk.
+  apply lookup_seq in Hk as [-> _].
+  case_decide as Hd; [exfalso; lia | done].
+Qed.
+
+Lemma icfg_alloc `{!riscvGS Σ, !icacheG Σ} (dv : mword 32) (nib : nat)
+    (LM : linkUR) (γlog : log_names) (ist : Z) :
   ✓ LM ->
   ⊢ |==> ∃ (ICFG : icfg) (g0 : gname),
       ⌜icfg_dev = dv⌝ ∗ ⌜icfg_nib = nib⌝ ∗
+      ⌜icfg_log = γlog⌝ ∗ ⌜icfg_ist = ist⌝ ∗
       own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
       own icfg_live (live_boot_map g0) ∗
-      own icfg_link LM.
+      own icfg_link LM ∗
+      ([∗ list] k ∈ seq 0 (16 * nib),
+         mono_nat_auth_own (icfg_iep (Z.of_nat k)) 1 0).
 Proof.
   intros HLM.
+  iMod (iep_fun_alloc (16 * nib) 0) as (fep) "Hep".
   iMod (own_alloc (● (∅ : gmap nat (Qp * positive)) : icacheUR)) as (γ) "Ha".
   { by apply auth_auth_valid. }
   (* the boot generation: a gname is all the pool needs, and minting it as a
@@ -483,7 +535,8 @@ Proof.
   iMod (own_alloc (live_boot_map g0)) as (γl) "Hl".
   { apply live_boot_map_valid. }
   iMod (own_alloc LM) as (γlk) "Hlk"; [exact HLM |].
-  iModIntro. iExists (MkIcfg γ dv nib γl γlk), g0. by iFrame "Ha Hl Hlk".
+  iModIntro. iExists (MkIcfg γ dv nib γl γlk γlog ist fep), g0.
+  cbn [icfg_iep]. by iFrame "Ha Hl Hlk Hep".
 Qed.
 
 (* ===================================================================== *)

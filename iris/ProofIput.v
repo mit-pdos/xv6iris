@@ -2146,9 +2146,10 @@ Section ProofIput.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDit CIDm4 eb pj
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
+    iApply fupd_wp. iMod (log_epoch_lb_0 g) as "#Hlb0". iModIntro.
     iApply (IU.wp_iupdate_credgen gs j gl gu gd gk pd pav pu bn g gfs gi
               cov logstart inodestart nib dev (ientry k) inum
-              (di_free dn) (di_trunc dn) bm_empty (u' - 1)%nat Sb1 true
+              (di_free dn) (di_trunc dn) bm_empty (u' - 1)%nat Sb1 true 0%nat
               pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqs J4 (K - 4)%nat
               eb C eb
               ltac:(unfold K_iupdate; lia)
@@ -2171,10 +2172,10 @@ Section ProofIput.
                  eq_refl (ip_nlink_zero (di_nlink dn) Hnl0))
               (di_free_addrs dn) ltac:(reflexivity) Hj Hgsj HJ4a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlogc Hidv Hinh Hmeta Hmap
-                    Hins Hireg Hdat Hppid Hprocs Hdevi Hdgeom Hdlock Hbs2 [Hop]").
+                    Hins Hireg Hdat Hppid Hprocs Hdevi Hdgeom Hdlock Hbs2 Hlb0 [Hop]").
     { rewrite Hu'1. iExact "Hop". }
     iIntros (CIDiu Hsiu mfu)
-      "%Hcsu Hcg Hcnt Hextc Hextm Hpc Hppid Hidv Hinh Hmeta Hmap Hins Hdat Hbs2 Hop".
+      "%Hcsu Hcg Hcnt Hextc Hextm Hpc Hppid Hidv Hinh Hmeta Hmap Hins Hdat Hbs2 Hop Hwit".
     (* THE FREE PATH'S PAYOUT (§16.4): the flushed record has type 0, so
        iupdate ran [InodeRegion.ireg_free_au] -- the fragment went back INTO
        the region invariant and what comes out is the MARKER, which is

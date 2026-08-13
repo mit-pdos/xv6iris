@@ -113,6 +113,7 @@ Require Import PanicStub.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecIget.
 From Kernel Require KernelSyms.
+Require Import LogInv.  (* [logG]: the region's zero-receipt, fs-log.md G.17 *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -314,7 +315,7 @@ Proof. set_solver. Qed.
 Module IgetProof (Acquire : ACQUIRE) (Release : RELEASE) : IGET.
 
 Section ProofIget.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
             !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
