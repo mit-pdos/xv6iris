@@ -2883,7 +2883,8 @@ Section ItruncMain.
       iEval (rewrite Hisempty) in "Hmap".
       iEval (rewrite Hisempty) in "Hblks".
       iEval (rewrite -Hblkempty) in "Hbmr".
-      iDestruct (bm_paidS_elim with "Hpaid") as (n0 Sq) "(%Hqsub & %Hn0 & Hop)".
+      iDestruct (bm_paidS_elim with "Hpaid") as (wq n0 Sq)
+        "(%Hqsub & %Hqbm & %Hn0 & Hop)".
       (* iupdate wants a successor; bm_paidS guarantees at least S u *)
       destruct n0 as [|n1]; [exfalso; unfold it_entry in Hn0; lia|].
       (* the tail flush's credit travels through the loop's growth: the
@@ -2927,11 +2928,15 @@ Section ItruncMain.
          a growth.  [S n1 <= it_entry crb u] is what the [crb] guard on
          [bm_paidS]'s unpaid disjunct bought -- at [crb = true] it pins
          [n1 = u], which is what makes create's zero-spend fail arm close. *)
-      iExists (if cru then S n1 else n1), (Sq ∪ {[IBLOCK inum inodestart]}).
+      iExists wq, (if cru then S n1 else n1), (Sq ∪ {[IBLOCK inum inodestart]}).
       iSplitR; [iPureIntro; exact (it_sub_union_l _ _ _ Hqsub)|].
       iSplitR; [iPureIntro; exact (it_in_union_sing _ _)|].
-      iSplitR; [iPureIntro; unfold it_entry, it_spend, it_iu in *;
-                destruct crb, cru; simpl in *; lia|].
+      (* THE REPORT TRAVELS THROUGH THE TAIL'S OWN GROWTH (G-4c): the
+         bitmap membership the loops established is still there after the
+         flush, because the set only grew. *)
+      iSplitR; [iPureIntro; intros Hw; apply elem_of_union_l; exact (Hqbm Hw)|].
+      iSplitR; [iPureIntro; unfold it_entry, it_spend, it_iu, it_bm in *;
+                destruct crb, cru, wq; simpl in *; lia|].
       iExact "Hop".
     - (* ---------- there is one: take the arm ---------- *)
       iApply (wp_cbnez_taken_s_sconf (mword_of_int (IT + 0x36))
@@ -2972,7 +2977,8 @@ Section ItruncMain.
       rewrite /it_armexit.
       iIntros (CID15y Hq15y Mz) "%HMzsp %HMzthr %HMzs3 Hcg Hcnt Hextc Hextm Hpc Hppid
                                  Hidev Hsbb Hslot6 Hmap Hblks Hbmr Hsl Hpaid".
-      iDestruct (bm_paidS_elim with "Hpaid") as (n2 Sr) "(%Hrsub & %Hn2 & Hop)".
+      iDestruct (bm_paidS_elim with "Hpaid") as (wr n2 Sr)
+        "(%Hrsub & %Hrbm & %Hn2 & Hop)".
       destruct n2 as [|n3]; [exfalso; unfold it_entry in Hn2; lia|].
       iPoseProof (log_credit_mono γ cru Sb Sr e0 (IBLOCK inum inodestart) Hrsub
                     with "Hcru") as "#Hcru2".
@@ -2998,11 +3004,12 @@ Section ItruncMain.
                                   Hsbb Hsbi Hmeta Hmap Hblks Hbmr Hdn Hsl
                                   [Hop]");
         [exact Hcsw |].
-      iExists (if cru then S n3 else n3), (Sr ∪ {[IBLOCK inum inodestart]}).
+      iExists wr, (if cru then S n3 else n3), (Sr ∪ {[IBLOCK inum inodestart]}).
       iSplitR; [iPureIntro; exact (it_sub_union_l _ _ _ Hrsub)|].
       iSplitR; [iPureIntro; exact (it_in_union_sing _ _)|].
-      iSplitR; [iPureIntro; unfold it_entry, it_spend, it_iu in *;
-                destruct crb, cru; simpl in *; lia|].
+      iSplitR; [iPureIntro; intros Hw; apply elem_of_union_l; exact (Hrbm Hw)|].
+      iSplitR; [iPureIntro; unfold it_entry, it_spend, it_iu, it_bm in *;
+                destruct crb, cru, wr; simpl in *; lia|].
       iExact "Hop".
   Qed.
 
@@ -3066,12 +3073,13 @@ Section ItruncMain.
     iIntros (mf) "%Hcs Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hinum Hsbb Hsbi
                   Hmeta Hmap Hblks Hbmr Hdn Hsl Hop".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
-    iDestruct "Hop" as (u' Sb') "(_ & _ & %Hbnd & Hop)".
+    iDestruct "Hop" as (wf u' Sb') "(_ & _ & _ & %Hbnd & Hop)".
     iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hinum
                      Hsbb Hsbi Hmeta Hmap Hblks Hbmr Hdn Hsl [Hop]");
       [exact Hcs |].
     iExists u'. iSplitR.
-    { iPureIntro. unfold it_entry, it_spend, it_iu in Hbnd. simpl in Hbnd. lia. }
+    { iPureIntro. unfold it_entry, it_spend, it_iu, it_bm in Hbnd.
+      destruct wf; simpl in Hbnd; lia. }
     iApply (log_opS_op with "Hop").
   Qed.
 

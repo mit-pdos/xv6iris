@@ -1778,15 +1778,19 @@ Section ProofDirlinkMain.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       { iEval (cbn beta iota). iEmpIntro. }
-      iIntros (CIDip Hsip mip nn uu Sbp)
-        "%Hcsip Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Huu Hbmr Hbsl %Hsbp %Hnn Hop
+      iIntros (CIDip Hsip mip nn uu Sbp wdl)
+        "%Hcsip Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Huu Hbmr Hbsl %Hsbp %Hwdl %Hnn Hop
          Hislot".
       (* GR-2c FINDING 5, verbatim: the credited bound is STRONGER
-         ([ip_spend_max false false = 2] against [iput_units = 3]), and
+         ([ip_spend_w w false false <= 2] against [iput_units = 3]), and
          dirlink's own clause is stated at the coarse figure.  One weakening
          at the seam, KEEPING the name, so nothing downstream moves. *)
+      (* G-4c: the bound is now stated at the PAID-BITMAP REPORT.  dirlink
+         drops the report ([Hwdl] is unused: it links one child and its own
+         clause is the coarse counted one) and weakens as before. *)
       assert (Hnnw : ((ncount - iput_units)%nat <= nn)%nat /\ (nn <= ncount)%nat)
-        by (unfold ip_spend_max, iput_units in Hnn |- *; cbn in Hnn; lia).
+        by (unfold ip_spend_w, ip_bm, iput_units in Hnn |- *;
+            destruct wdl; cbn in Hnn; lia).
       clear Hnn. rename Hnnw into Hnn.
       assert (Hpcip : ret_pc (E1 !!! Regidx Rra : mword 64)
                       = mword_of_int (DK + 0x5c)) by (rewrite HE1ra; pcw).

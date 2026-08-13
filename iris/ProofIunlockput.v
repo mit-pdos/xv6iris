@@ -353,9 +353,9 @@ Section ProofIunlockputMain.
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlogc Hitb2 Hitbl Hesc Hireg
                     Hslk Href Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk
                     Hbslots Hnlz Hlogop").
-    iIntros (CID11 Hq11 mP n' used' Sb')
+    iIntros (CID11 Hq11 mP n' used' Sb' wp)
             "%HcsP Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins %Hsub Hbitmap Hbslots
-             %Hssub %Hbud Hlogop Hslot".
+             %Hssub %Hwbm %Hbud Hlogop Hslot".
     assert (Hpc16 : ret_pc (R6 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iunlockput + 0x16))
       by (rewrite HR6ra; pcw).
@@ -548,17 +548,18 @@ Section ProofIunlockputMain.
     iDestruct (cpu_claim_ext_transport CID11 CID16 eb pj
                  ltac:(rewrite Hbm; wp_next_chain) with "Hclm") as "Hclm".
     iSpecialize ("Hcont" $! CID16 with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! P4 n' used' Sb' with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins [%]
-                                             Hbitmap Hbslots [%] [%] Hlogop Hslot").
+    iApply ("Hcont" $! P4 n' used' Sb' wp with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins [%]
+                                             Hbitmap Hbslots [%] [%] [%] Hlogop Hslot").
     { unfold callee_saved. split_and!; assumption. }
     { exact Hsub. }
     { exact Hssub. }
+    { exact Hwbm. }
     { exact Hbud. }
   Qed.
 
   (* ===================================================================== *)
   (*  THE COUNTED SEAL, at the [log_op] existential's own witness.          *)
-  (*  [ip_spend_max false false = 2 <= iput_units], so the gen bound is     *)
+  (*  [ip_spend_w w false false <= 2 <= iput_units], so the gen bound is    *)
   (*  weaker and the seal's arithmetic goes the easy way.                   *)
   (* ===================================================================== *)
   Lemma wp_iunlockput_sconf
@@ -605,14 +606,15 @@ Section ProofIunlockputMain.
     { iEval (cbn beta iota). iEmpIntro. }
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
-    iIntros (mf n' used' Sb') "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins
-                               %Husub Hbitmap Hbslots %Hssub %Hbnd Hlogop Hslot".
+    iIntros (mf n' used' Sb' wf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins
+                               %Husub Hbitmap Hbslots %Hssub %Hwbm %Hbnd Hlogop Hslot".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf n' used' with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins
                      [%] Hbitmap Hbslots [%] [Hlogop] Hslot").
     { exact Hcs. }
     { exact Husub. }
-    { unfold ip_spend_max in Hbnd. unfold iput_units. simpl in Hbnd. lia. }
+    { unfold ip_spend_w, ip_bm in Hbnd. unfold iput_units.
+      destruct wf; simpl in Hbnd; lia. }
     { iApply (log_opS_op with "Hlogop"). }
   Qed.
 

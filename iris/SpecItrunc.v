@@ -217,6 +217,15 @@ Section ItruncSpec.
      here so this file need not import the ledger. *)
   Definition it_iu (cru : bool) : nat := if cru then 0%nat else 1%nat.
 
+  (* THE BITMAP UNIT, AS A REPORT (fs-log.md §G.22, G-4c).  [w] is "the
+     bitmap block was logged BY THIS CALL", i.e. the unit was actually
+     spent -- and spending it is the same event as putting [bmapstart] in
+     the op's set, which is why the post can promise the membership beside
+     the figure.  At [crb = true] no call ever spends it (the paid disjunct
+     pins the level at [S u]), so the report is [false] there and the
+     caller's own credit is what carries the membership. *)
+  Definition it_bm (w : bool) : nat := if w then 1%nat else 0%nat.
+
   (* what itrunc spends AT MOST: the bitmap unit (unless already paid) plus
      the tail flush (unless already credited).  Definitionally
      [CreateBudget.ip_spend crb cru true]. *)
@@ -240,19 +249,31 @@ Section ItruncSpec.
 
   (* leaving them: at least the [S u] units iupdate still needs, and never
      more than what came in.  The [crb] guard is what makes the upper bound
-     tight on the credited arm. *)
+     tight on the credited arm.
+
+     AND THE REPORT COMES OUT WITH THE LEVEL (G-4c).  The paid disjunct
+     already holds [bmapstart ∈ Sb']; discarding it here was what made the
+     walkers' [walk_spend w <= 1] unstatable, because a caller that may
+     have paid could then learn neither "it paid" nor "it did not".  [w] is
+     [negb crb && paid]: at [crb = true] the entry level IS [S u], nothing
+     was spent, and the caller carries the membership itself. *)
   Lemma bm_paidS_elim γ bmapstart crb u Sb e0 :
     bm_paidS γ bmapstart crb u Sb e0 -∗
-      ∃ (n : nat) (Sb' : gset Z),
-        ⌜Sb ⊆ Sb'⌝ ∗ ⌜(S u <= n <= it_entry crb u)%nat⌝ ∗ log_opSe γ n Sb' e0.
+      ∃ (w : bool) (n : nat) (Sb' : gset Z),
+        ⌜Sb ⊆ Sb'⌝ ∗ ⌜w = true -> bmapstart ∈ Sb'⌝ ∗
+        ⌜(it_entry crb u - it_bm w <= n <= it_entry crb u)%nat
+         /\ (S u <= n)%nat⌝ ∗
+        log_opSe γ n Sb' e0.
   Proof.
-    rewrite /bm_paidS /it_entry. iIntros "[H|[%Hc H]]".
-    - iDestruct "H" as (Sb') "(%Hsub & _ & H)".
-      iExists (S u), Sb'. iSplitR; [iPureIntro; exact Hsub|].
-      iSplitR; [iPureIntro; destruct crb; lia|]. iFrame "H".
+    rewrite /bm_paidS /it_entry /it_bm. iIntros "[H|[%Hc H]]".
+    - iDestruct "H" as (Sb') "(%Hsub & %Hin & H)".
+      iExists (negb crb), (S u), Sb'. iSplitR; [iPureIntro; exact Hsub|].
+      iSplitR; [iPureIntro; intros _; exact Hin|].
+      iSplitR; [iPureIntro; destruct crb; simpl; lia|]. iFrame "H".
     - subst crb. iDestruct "H" as (Sb') "(%Hsub & H)".
-      iExists (S (S u)), Sb'. iSplitR; [iPureIntro; exact Hsub|].
-      iSplitR; [iPureIntro; lia|]. iFrame "H".
+      iExists false, (S (S u)), Sb'. iSplitR; [iPureIntro; exact Hsub|].
+      iSplitR; [iPureIntro; discriminate|].
+      iSplitR; [iPureIntro; simpl; lia|]. iFrame "H".
   Qed.
 
   (* leaving them: at least the [S u] units iupdate still needs *)
@@ -589,12 +610,19 @@ Definition wp_itrunc_gen_body
       bslots bn 3 -∗
       (* THE LEDGER, SET FORM.  The set only GROWS, it provably contains
          this inode's block, and the counter is bracketed by the two
-         [CreateBudget] figures: at most [it_spend crb cru] is gone, and the
-         tail flush's own [it_iu cru] is gone for certain. *)
-      (∃ (u' : nat) (Sb' : gset Z),
+         [CreateBudget] figures: at most [it_bm w + it_iu cru] is gone, and
+         the tail flush's own [it_iu cru] is gone for certain.
+         [it_bm w + it_iu cru <= it_spend crb cru] always, so this is the
+         landed bound and a REPORT: [w] says whether the bitmap unit was
+         spent, and spending it is the same event as logging [bmapstart].
+         That coupling is what a WALKER's per-level [iput] needs -- without
+         it a walk of L levels can only bound its spend by L (fs-log.md
+         §G.22). *)
+      (∃ (w : bool) (u' : nat) (Sb' : gset Z),
          ⌜Sb ⊆ Sb'⌝ ∗
          ⌜IBLOCK inum inodestart ∈ Sb'⌝ ∗
-         ⌜(it_entry crb u - it_spend crb cru <= u')%nat
+         ⌜w = true -> bmapstart ∈ Sb'⌝ ∗
+         ⌜(it_entry crb u - (it_bm w + it_iu cru) <= u')%nat
           /\ (u' + it_iu cru <= it_entry crb u)%nat⌝ ∗
          log_opS γ u' Sb') -∗
       WP (Loop : expr riscv_lang)) -∗

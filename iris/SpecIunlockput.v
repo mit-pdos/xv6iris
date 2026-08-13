@@ -333,7 +333,7 @@ Definition wp_iunlockput_gen_body
      down to sleep), so it can return on another hart whatever SIE was
      doing. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (n' : nat) (used' Sb' : gset Z),
+  ∀ (mf : regfile) (n' : nat) (used' Sb' : gset Z) (w : bool),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
@@ -347,7 +347,11 @@ Definition wp_iunlockput_gen_body
       bitmap_res gfs bmapstart cov logstart size used' -∗
       bslots bn 3 -∗
       ⌜Sb ⊆ Sb'⌝ -∗
-      ⌜((n - ip_spend_max crb cru crz)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
+      (* THE PAID-BITMAP REPORT (G-4c): [w] is "this call spent the bitmap
+         unit", and it comes with the membership that makes a walker's next
+         level able to claim [crb := true]. *)
+      ⌜w = true -> bmapstart ∈ Sb'⌝ -∗
+      ⌜((n - ip_spend_w w cru crz)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_opS g n' Sb' -∗
       iref_slot -∗
       WP (Loop : expr riscv_lang)) -∗

@@ -2708,20 +2708,23 @@ Section ProofNamexMain.
                { rewrite Heb /trap_csrs_ext. done. }
                { rewrite Heb /cpu_claim_ext. done. }
                { iEval (cbn beta iota). iEmpIntro. }
-               iIntros (CIDip Hqip mip nip usedip Sip)
+               iIntros (CIDip Hqip mip nip usedip Sip wip)
                  "%Hcsip Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdip Hbits Hbslot
-                  %Hsip %Hbdip Hlog Hisl2".
+                  %Hsip %Hwip %Hbdip Hlog Hisl2".
                  (* THE CREDITED BOUND IS STRONGER THAN THE COUNTED ONE, and
-                    namex is stated at the counted one.  [ip_spend_max false
+                    namex is stated at the counted one.  [ip_spend_w w false
                     false = 2] where [iput_units = 3] -- iput's own third unit
                     is the one it never needs uncredited -- so the gen post
                     gives [ncur - 2 <= nip], and every [nx_bi_*] budget lemma
                     below wants [ncur - iput_units <= nip].  Weaken ONCE, here,
                     and keep the hypothesis's name so nothing downstream
                     moves. *)
+               (* G-4c: the gen bound is stated at the PAID-BITMAP REPORT now.
+                  This stage still WEAKENS it to the counted figure -- the
+                  report is what G-4d's loop will thread. *)
                assert (Hbdipw : ((ncur - iput_units)%nat <= nip)%nat /\ (nip <= ncur)%nat)
-                 by (unfold ip_spend_max, iput_units in Hbdip |- *;
-                     simpl in Hbdip; lia).
+                 by (unfold ip_spend_w, ip_bm, iput_units in Hbdip |- *;
+                     destruct wip; simpl in Hbdip; lia).
                clear Hbdip. rename Hbdipw into Hbdip.
                assert (Hpc13a : ret_pc (T2 !!! Regidx Rra)
                        = mword_of_int (NX + 0x14a)).
@@ -3349,12 +3352,12 @@ Section ProofNamexMain.
                      { rewrite Heb /trap_csrs_ext. done. }
                      { rewrite Heb /cpu_claim_ext. done. }
                      { iEval (cbn beta iota). iEmpIntro. }
-                     iIntros (CIDup Hqup mup nup usedup Sup)
+                     iIntros (CIDup Hqup mup nup usedup Sup wup)
                        "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup Hbits
-                        Hbslot %Hsup %Hbdup Hlog Hisl2".
+                        Hbslot %Hsup %Hwup %Hbdup Hlog Hisl2".
                      assert (Hbdupw : ((ncur - iput_units)%nat <= nup)%nat /\ (nup <= ncur)%nat)
-                       by (unfold ip_spend_max, iput_units in Hbdup |- *;
-                           simpl in Hbdup; lia).
+                       by (unfold ip_spend_w, ip_bm, iput_units in Hbdup |- *;
+                           destruct wup; simpl in Hbdup; lia).
                      clear Hbdup. rename Hbdupw into Hbdup.
                      assert (Hpc5a : ret_pc (ND2 !!! Regidx Rra)
                               = mword_of_int (NX + 0x80)).
@@ -4048,12 +4051,12 @@ Section ProofNamexMain.
                            { rewrite Heb /trap_csrs_ext. done. }
                            { rewrite Heb /cpu_claim_ext. done. }
                            { iEval (cbn beta iota). iEmpIntro. }
-                           iIntros (CIDup Hqup mup nup usedup Sup)
+                           iIntros (CIDup Hqup mup nup usedup Sup wup)
                              "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup
-                              Hbits Hbslot %Hsup %Hbdup Hlog Hisl".
+                              Hbits Hbslot %Hsup %Hwup %Hbdup Hlog Hisl".
                            assert (Hbdupw : ((ncur - iput_units)%nat <= nup)%nat /\ (nup <= ncur)%nat)
-                             by (unfold ip_spend_max, iput_units in Hbdup |- *;
-                                 simpl in Hbdup; lia).
+                             by (unfold ip_spend_w, ip_bm, iput_units in Hbdup |- *;
+                                 destruct wup; simpl in Hbdup; lia).
                            clear Hbdup. rename Hbdupw into Hbdup.
                            assert (Hpce2 : ret_pc (GB3 !!! Regidx Rra)
                                     = mword_of_int (NX + 0xf2)).
@@ -4257,12 +4260,12 @@ Section ProofNamexMain.
                            { rewrite Heb /trap_csrs_ext. done. }
                            { rewrite Heb /cpu_claim_ext. done. }
                            { iEval (cbn beta iota). iEmpIntro. }
-                           iIntros (CIDup Hqup mup nup usedup Sup)
+                           iIntros (CIDup Hqup mup nup usedup Sup wup)
                              "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup
-                              Hbits Hbslot %Hsup %Hbdup Hlog Hisl3".
+                              Hbits Hbslot %Hsup %Hwup %Hbdup Hlog Hisl3".
                            assert (Hbdupw : ((ncur - iput_units)%nat <= nup)%nat /\ (nup <= ncur)%nat)
-                             by (unfold ip_spend_max, iput_units in Hbdup |- *;
-                                 simpl in Hbdup; lia).
+                             by (unfold ip_spend_w, ip_bm, iput_units in Hbdup |- *;
+                                 destruct wup; simpl in Hbdup; lia).
                            clear Hbdup. rename Hbdupw into Hbdup.
                            assert (Hpc88 : ret_pc (GC3 !!! Regidx Rra)
                                     = mword_of_int (NX + 0x92)).
@@ -4540,12 +4543,12 @@ Section ProofNamexMain.
                      { rewrite Heb /trap_csrs_ext. done. }
                      { rewrite Heb /cpu_claim_ext. done. }
                      { iEval (cbn beta iota). iEmpIntro. }
-                     iIntros (CIDup Hqup mup nup usedup Sup)
+                     iIntros (CIDup Hqup mup nup usedup Sup wup)
                        "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup Hbits
-                        Hbslot %Hsup %Hbdup Hlog Hisl2".
+                        Hbslot %Hsup %Hwup %Hbdup Hlog Hisl2".
                      assert (Hbdupw : ((ncur - iput_units)%nat <= nup)%nat /\ (nup <= ncur)%nat)
-                       by (unfold ip_spend_max, iput_units in Hbdup |- *;
-                           simpl in Hbdup; lia).
+                       by (unfold ip_spend_w, ip_bm, iput_units in Hbdup |- *;
+                           destruct wup; simpl in Hbdup; lia).
                      clear Hbdup. rename Hbdupw into Hbdup.
                      assert (Hpc5a : ret_pc (ND2 !!! Regidx Rra)
                               = mword_of_int (NX + 0x5a)).

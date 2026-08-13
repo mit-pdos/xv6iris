@@ -290,8 +290,18 @@ Definition wp_iput_sconf_body
    term: the unit itrunc's TAIL FLUSH would otherwise spend.  So the two
    enter the figure disjunctively and a [crz] caller's freeing iput spends
    the BITMAP unit and nothing else. *)
-Definition ip_spend_max (crb cru crz : bool) : nat :=
-  ((if crb then 0%nat else 1%nat) + (if orb cru crz then 0%nat else 1%nat))%nat.
+(* THE BITMAP UNIT, AS A REPORT (fs-log.md §G.22, G-4c).  [crb] is what the
+   caller CLAIMS on the way in; [w] is what the call DID -- "the bitmap
+   block was logged by this iput" -- and the post pairs it with
+   [bmapstart ∈ Sb'], because spending that unit and logging that block are
+   one event.  A walker needs exactly this pairing: [crb] tells level i+1
+   nothing unless level i reported whether it paid.  At [crb = true] the
+   report is always [false] (itrunc's paid disjunct pins the level), so a
+   credited caller never sees its own credit spent back at it. *)
+Definition ip_bm (w : bool) : nat := if w then 1%nat else 0%nat.
+
+Definition ip_spend_w (w cru crz : bool) : nat :=
+  (ip_bm w + (if orb cru crz then 0%nat else 1%nat))%nat.
 
 Definition wp_iput_gen_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
@@ -379,7 +389,7 @@ Definition wp_iput_gen_body
      op's birth epoch, the one the credit above is ordered against. *)
   log_opSe g n Sb e0 -∗
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (n' : nat) (used' : gset Z) (Sb' : gset Z),
+  ∀ (mf : regfile) (n' : nat) (used' : gset Z) (Sb' : gset Z) (w : bool),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
@@ -394,7 +404,11 @@ Definition wp_iput_gen_body
       bslots bn 3 -∗
       (* the set only GROWS, and at most the credited worst case is gone *)
       ⌜Sb ⊆ Sb'⌝ -∗
-      ⌜((n - ip_spend_max crb cru crz)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
+      (* THE PAID-BITMAP REPORT (G-4c): [w] is "this call spent the bitmap
+         unit", and it comes with the membership that makes a walker's next
+         level able to claim [crb := true]. *)
+      ⌜w = true -> bmapstart ∈ Sb'⌝ -∗
+      ⌜((n - ip_spend_w w cru crz)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_opS g n' Sb' -∗
       iref_slot -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -424,9 +438,9 @@ Module Type IPUT.
                           k q inum n pidv dq dqb dqs m K eb C b.
   (* the credited set-form contract; [wp_iput_sconf] is this at
      [crb := cru := crz := false], derived at the [log_op] existential's own
-     witness ([ip_spend_max false false false = 2], and iput's own flush is
-     the third unit [iput_units] counts) and at the birth epoch
-     [LogInv.log_opS_named] opens. *)
+     witness ([ip_spend_w w false false <= 2], and iput's own flush is the
+     third unit [iput_units] counts) and at the birth epoch
+     [LogInv.log_opS_named] opens; the paid-bitmap report is dropped. *)
   Parameter wp_iput_gen :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}

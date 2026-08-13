@@ -1733,3 +1733,47 @@ assembly unownable).  The one thing the bundle still owes is a
 GENERATION-NAMED shed: `SpecIlock` takes `inode_shr_gen k s dev inum g`,
 while `inode_held_shed` is generation-free, so `inode_held_dir` needs its
 own carve (two lines over `live_gen_split` + `inode_ident_split`).
+
+
+### G.23 G-4c LANDED (2026-08-13): the paid-bitmap coupling — `bm_paidS`'s
+### membership stops being discarded, and the report reaches iput's caller
+
+**THE REPORT.**  `w : bool` = "this call SPENT the bitmap unit", and
+spending it is the same event as logging `bmapstart`, so the report always
+travels with `⌜w = true -> bmapstart ∈ Sb'⌝`.  Three statements carry it,
+all additive:
+
+| contract | shape |
+|---|---|
+| `SpecItrunc.bm_paidS_elim` | returns `w` (= `negb crb && paid`), the membership, and `it_entry crb u - it_bm w <= n <= it_entry crb u` beside the old `S u <= n` |
+| `wp_itrunc_gen` post | `∃ w u' Sb'`, with `it_entry crb u - (it_bm w + it_iu cru) <= u'` — the landed bound with `it_bm w` in place of `if crb then 0 else 1` |
+| `wp_iput_gen` / `wp_iunlockput_gen` posts | one more `∀ w`, the membership clause, and `ip_spend_w w cru crz = ip_bm w + (if cru \|\| crz then 0 else 1)` |
+
+`crb` LEAVES THE POST'S ARITHMETIC ENTIRELY and stays only as the entry
+credit.  At `crb = true` the report is always `false` — the paid disjunct
+pins the level at `S u`, so a credited caller never sees its own credit
+charged back, which is what makes a walk's *next* level free.
+
+**THE ONE SHAPE THAT DID NOT WORK, AND THE FIX.**  `ProofIput`'s two tail
+lemmas took the spend as a NUMBER (`spmax : nat`), and the contract's own
+clause reads it at the post's *bound* `w` — so the close arms could not
+instantiate (`iSpecialize: cannot instantiate` with the two `wp_next`s
+printing identically except for `ip_spend_w false …` vs `ip_spend_w w …`).
+The tail's parameter has to be the FUNCTION `spf : bool -> nat`, applied
+at the report inside the continuation and at the arm's own `wb` in the
+hypothesis.  Anything that reports a per-arm figure through a lemma whose
+continuation quantifies the same boolean wants this shape.
+
+**Consumers, as measured:** one binder and one `%`-clause each, and the
+FINDING 5 weakening keeps its name.  ProofNamex's five sites and
+ProofDirlink's one now read `unfold ip_spend_w, ip_bm, iput_units in H;
+destruct w<site>; simpl in H; lia` — they DROP the report; G-4d is what
+threads it.  The counted seals (`wp_itrunc_sconf`, `wp_iput_sconf`,
+`wp_iunlockput_sconf`) drop it with a `_` and a `destruct` in their
+arithmetic.  `ltac:(lia)` at a call site that now sees a beta-redex
+(`(fun w => …) false`) needs `ltac:(cbn; lia)`.
+
+Gate: MAKE_EXIT=0, 1086 `.vo`, staleness 0, `make -n` 0 `COQC`, md5s
+verified on all nine files, 52 recompiles.  `Print Assumptions` on
+`wp_itrunc_gen`, `wp_itrunc_sconf`, `wp_iput_gen`, `wp_iunlockput_gen`:
+the standing six, no admits.
