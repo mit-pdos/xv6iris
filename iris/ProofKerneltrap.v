@@ -204,7 +204,7 @@ Section ProofKerneltrap.
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 Htim ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi32 [-]").
-      iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Hpc86 : add_vec (mword_of_int (KernelSyms.kerneltrap + 0x32) : mword 64)
                         (sign_extend' 64 (mword_of_int 84 : mword 13))
                       = mword_of_int (KernelSyms.kerneltrap + 0x86)) by pcw.
@@ -263,7 +263,7 @@ Section ProofKerneltrap.
                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                   Hp0 ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi8a [-]").
-        iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
         assert (Hpcb : add_vec (mword_of_int (KernelSyms.kerneltrap + 0x8a) : mword 64)
                          (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 214 : mword 8) ('b"0"))))
                        = mword_of_int (KernelSyms.kerneltrap + 0x36)) by pcw.
@@ -401,7 +401,7 @@ Section ProofKerneltrap.
                   (sign_extend' 21 (concat_vec (mword_of_int 2003 : mword 11) ('b"0")))
                   myd (av - 6)%nat false ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi90 [-]").
-        iApply wp_next_off_intro. iNext. iIntros "Hcg Hpc".
+        iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
         assert (Hpcj : add_vec (mword_of_int (KernelSyms.kerneltrap + 0x90) : mword 64)
                          (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2003 : mword 11) ('b"0"))))
                        = mword_of_int (KernelSyms.kerneltrap + 0x36)) by pcw.

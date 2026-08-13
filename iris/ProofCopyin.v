@@ -895,7 +895,7 @@ Section ProofCopyin.
                     ltac:(rgne; first [ exact Hcmp | (rewrite Hcmp Hdone; reflexivity) ])
                     ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc Hi56 [-]").
-          iNext. iIntros (CIDg4 Hsg4) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDg4 Hsg4) "Hcg Hpc".
           assert (Htgt7a : add_vec (mword_of_int (KernelSyms.copyin + 0x56) : mword 64)
                              (sign_extend' 64 (mword_of_int 36 : mword 13))
                            = mword_of_int (KernelSyms.copyin + 0x7a))
@@ -970,7 +970,7 @@ Section ProofCopyin.
                   ltac:(rgne; rgne; first [ exact Hbge | (rewrite Hbge; apply Nat.leb_le; exact Hle) ])
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi36 [-]").
-        iNext. iIntros (CIDb3 Hsb3) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDb3 Hsb3) "Hcg Hpc".
         assert (Htgt3c : add_vec (mword_of_int (KernelSyms.copyin + 0x36) : mword 64)
                            (sign_extend' 64 (mword_of_int 6 : mword 13))
                          = mword_of_int (KernelSyms.copyin + 0x3c))
@@ -1113,7 +1113,7 @@ Section ProofCopyin.
                 ltac:(rgne; rewrite Ha0v; exact (page_valid_neq_zero _ Hpv))
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi66 [-]").
-      iNext. iIntros (CIDw6 Hsw6) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDw6 Hsw6) "Hcg Hpc".
       assert (Htgt30 : add_vec (mword_of_int (KernelSyms.copyin + 0x66) : mword 64)
                 (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 229 : mword 8) ('b"0"))))
               = mword_of_int (KernelSyms.copyin + 0x30)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1280,7 +1280,7 @@ Section ProofCopyin.
                 ltac:(rgne; rewrite Hva0r; exact (page_valid_neq_zero _ Hpvr))
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi74 [-]").
-      iNext. iIntros (CIDvf2 Hsvf2) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDvf2 Hsvf2) "Hcg Hpc".
       assert (Htgt30' : add_vec (mword_of_int (KernelSyms.copyin + 0x74) : mword 64)
                 (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 222 : mword 8) ('b"0"))))
               = mword_of_int (KernelSyms.copyin + 0x30)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1333,7 +1333,7 @@ Section ProofCopyin.
               (sign_extend' 21 (concat_vec (mword_of_int 2 : mword 11) ('b"0")))
               V6 (K - 12) b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi78 [-]").
-    iIntros (CIDu2 Hsu2). iNext. iIntros "Hcg Hpc".
+    iIntros (CIDu2 Hsu2). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Hjt78 : add_vec (mword_of_int (KernelSyms.copyin + 0x78) : mword 64)
               (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2 : mword 11) ('b"0"))))
             = mword_of_int (KernelSyms.copyin + 0x7c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1378,7 +1378,7 @@ Section ProofCopyin.
                 ltac:(rgne; first [ exact Hz | (rewrite Hz Hlen0; reflexivity) ])
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi00 [-]").
-      iNext. iIntros (CIDz0 Hsz0) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDz0 Hsz0) "Hcg Hpc".
       assert (Htgt98 : add_vec (pcE : mword 64)
                 (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 76 : mword 8) ('b"0"))))
               = mword_of_int (KernelSyms.copyin + 0x98)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1692,7 +1692,7 @@ Section ProofCopyin.
               (sign_extend' 21 (concat_vec (mword_of_int 22 : mword 11) ('b"0")))
               R10 (K - 12) b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi2e [-]").
-    iIntros (CIDp21 Hsp21). iNext. iIntros "Hcg Hpc".
+    iIntros (CIDp21 Hsp21). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Hjt2e : add_vec (mword_of_int (KernelSyms.copyin + 0x2e) : mword 64)
               (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 22 : mword 11) ('b"0"))))
             = mword_of_int (KernelSyms.copyin + 0x5a)) by (apply bv_eq; vm_compute; reflexivity).

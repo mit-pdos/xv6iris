@@ -1476,7 +1476,7 @@ Section ProofDirlinkMain.
                       rewrite Hcz; exact dlk_zero_moi)
                 ltac:(rewrite Htgt58; vm_compute; reflexivity)
                 with "Hcg Hpc Hi1a").
-      iNext. iIntros (CID13 Hq13) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID13 Hq13) "Hcg Hpc".
       iEval (rewrite Htgt58) in "Hpc".
       iPoseProof (dki_58 with "Htext") as "Hi58".
       iPoseProof (dki_5c with "Htext") as "Hi5c".
@@ -1565,7 +1565,7 @@ Section ProofDirlinkMain.
                 E2 (K - 10)%nat b
                 ltac:(rewrite Htgt9c; vm_compute; reflexivity)
                 with "Hcg Hpc Hi5e").
-      iIntros (CID16 Hq16). iNext. iIntros "Hcg Hpc".
+      iIntros (CID16 Hq16). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt9c) in "Hpc".
       iPoseProof ("Htail" $! CID16) as "Ht".
       iSpecialize ("Ht" with "[%]"); [wp_next_chain |].
@@ -2276,7 +2276,7 @@ Section ProofDirlinkMain.
                   ltac:(rgne; rewrite HQ1s1; exact (dl_sz_eqz _ Hsz0))
                   ltac:(rewrite Htgt70; vm_compute; reflexivity)
                   with "Hcg Hpc Hi22").
-        iNext. iIntros (CID16 Hq16) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID16 Hq16) "Hcg Hpc".
         iEval (rewrite Htgt70) in "Hpc".
         assert (Hk00 : k0 = 0%nat)
           by exact (eq_trans (f_equal (dir_slot data) (dl_nrec_zero _ Hsz0))
@@ -2745,7 +2745,7 @@ Section ProofDirlinkMain.
                             exact (dlk_neq16 tot Htlt))
                       ltac:(rewrite Htk60; vm_compute; reflexivity)
                       with "Hcg Hpc Hj3e").
-            iNext. iIntros (CIDpa1 Hqpa1) "Hcg Hpc".
+            iApply bi.later_intro. iIntros (CIDpa1 Hqpa1) "Hcg Hpc".
             iEval (rewrite Htk60) in "Hpc".
             (* +0x60 auipc a0,0x4 *)
             iApply (wp_auipc_s_sconf (mword_of_int (DK + 0x60)) Ra0
@@ -2843,7 +2843,7 @@ Section ProofDirlinkMain.
                       ltac:(rgne; rewrite HN1a5; exact (dlk_eqz_true _ Hfree))
                       ltac:(rewrite Htgt6c; vm_compute; reflexivity)
                       with "Hcg Hpc Hj46").
-            iNext. iIntros (CIDB9 HqB9) "Hcg Hpc".
+            iApply bi.later_intro. iIntros (CIDB9 HqB9) "Hcg Hpc".
             iEval (rewrite Htgt6c) in "Hpc".
             iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj
                        ↦ₘ file_byte data (16 * i + jj)%nat)%I
@@ -3021,7 +3021,7 @@ Section ProofDirlinkMain.
                                first [ exact Hge | reflexivity ])
                          ltac:(rewrite Htgt30; vm_compute; reflexivity)
                          with "Hcg Hpc Hj4e").
-               iNext. iIntros (CIDB12 HqB12) "Hcg Hpc".
+               iApply bi.later_intro. iIntros (CIDB12 HqB12) "Hcg Hpc".
                iEval (rewrite Htgt30) in "Hpc".
                assert (Hgtc : Z.of_nat (S i) * 16 < bv_unsigned (di_size dn)).
                { rewrite -(dl_offmul (S i)). apply Z.ltb_lt. exact Hge. }
@@ -3128,7 +3128,7 @@ Section ProofDirlinkMain.
                          (K - 10)%nat b
                          ltac:(rewrite Htgt70b; vm_compute; reflexivity)
                          with "Hcg Hpc Hj56").
-               iIntros (CIDB15 HqB15). iNext. iIntros "Hcg Hpc".
+               iIntros (CIDB15 HqB15). iApply bi.later_intro. iIntros "Hcg Hpc".
                iEval (rewrite Htgt70b) in "Hpc".
                iDestruct (dl_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
                  [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].

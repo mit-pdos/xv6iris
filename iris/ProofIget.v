@@ -662,7 +662,7 @@ Section ProofIget.
               (sign_extend' 21 (concat_vec (mword_of_int 9 : mword 11) ('b"0")))
               D5 (trap_res b + (K - 6))%nat false ltac:(rewrite Htgt44; vm_compute; reflexivity)
               with "Hcg Hpc Hi32 [-]").
-    iApply wp_next_off_intro. iNext. iIntros "Hcg Hpc".
+    iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
     iEval (rewrite Htgt44) in "Hpc".
     (* ================================================================= *)
     (*  THE SHARED TAIL, +0x8c .. +0x9c, proven ONCE and handed to the    *)
@@ -994,7 +994,7 @@ Section ProofIget.
                     ltac:(nz) ltac:(nz) ltac:(rgne; rgne; exact Htaken)
                     ltac:(rewrite Htgt6a; vm_compute; reflexivity)
                     with "Hcg Hpc Hi40 [-]").
-          iApply wp_next_off_intro. iNext. iIntros "Hcg Hpc".
+          iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
           iEval (rewrite Htgt6a) in "Hpc".
           iPoseProof (igi_6a with "Htext") as "Hi6a".
           destruct Hemp' as [Hz | (e & He & Hes3 & HMe)].
@@ -1012,7 +1012,7 @@ Section ProofIget.
                       ltac:(nz) ltac:(rgne; rewrite HN1s3 Hz; exact ig_zero_eqz)
                       ltac:(rewrite Htgt9e; vm_compute; reflexivity)
                       with "Hcg Hpc Hi6a [-]").
-            iApply wp_next_off_intro. iNext. iIntros "Hcg Hpc".
+            iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
             iEval (rewrite Htgt9e) in "Hpc".
             iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.iget + 0x9e)) Ra0
                       (mword_of_int 4 : mword 20) N1 (trap_res b + (K - 6))%nat false
@@ -1161,7 +1161,7 @@ Section ProofIget.
               iDestruct (word4_pointsto_half_split with "Hdcell") as "[Hd1 Hd2]".
               iDestruct "Hvld" as (wv) "Hvld".
               iMod ("Hclose2" with "[Hd1 Hincell Hvld Hraw Hbundle Hgid1]") as "_".
-              { iNext. iApply ic_close_mid.
+              { iApply bi.later_intro. iApply ic_close_mid.
                 iApply (ic_mk_mid_arm cn γfs γi cov logstart e dev inum wv
                           with "Hd1 Hincell Hvld [Hraw Hbundle] Hgid1").
                 iApply (ic_mk_unloaded with "Hraw Hbundle"). }
@@ -1228,7 +1228,7 @@ Section ProofIget.
                 as (gnew) "(Hauth & Hlslot & Htok2 & Hlvh & Hpend)".
               iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
               iMod ("Hclose2" with "[Ha Hcell Hcback Hlslot Hlback]") as "_".
-              { iNext. iExists (<[e := ((1/2/2)%Qp, 1%positive)]> M). iFrame "Ha".
+              { iApply bi.later_intro. iExists (<[e := ((1/2/2)%Qp, 1%positive)]> M). iFrame "Ha".
                 iSplitR.
                 { iPureIntro. destruct Hwf' as [Hdom Hcnt']. split.
                   - intros i Hi. destruct (decide (i = e)) as [->|Hne]; [exact He|].
@@ -1568,7 +1568,7 @@ Section ProofIget.
                     ltac:(rgne; rgne; rewrite HL2a4 HL2s2; by apply ig_neqv_ne)
                     ltac:(rewrite Htgt3c; vm_compute; reflexivity)
                     with "Hcg Hpc Hi4c [-]").
-          iApply wp_next_off_intro. iNext. iIntros "Hcg Hpc".
+          iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
           iEval (rewrite Htgt3c) in "Hpc".
           iDestruct ("Hback" $! M ci with "[%] [%] [Hdcell Hncell Hiu Hgid]") as "Hslots";
             [ done | done | | ].
@@ -1643,7 +1643,7 @@ Section ProofIget.
                     ltac:(rgne; rgne; rewrite HL3a4 HL3s4; by apply ig_neqv_ne)
                     ltac:(rewrite Htgt3c2; vm_compute; reflexivity)
                     with "Hcg Hpc Hi52 [-]").
-          iApply wp_next_off_intro. iNext. iIntros "Hcg Hpc".
+          iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
           iEval (rewrite Htgt3c2) in "Hpc".
           iDestruct ("Hback" $! M ci with "[%] [%] [Hdcell Hncell Hiu Hgid]") as "Hslots";
             [ done | done | | ].
@@ -1863,7 +1863,7 @@ Section ProofIget.
                   (sign_extend' 21 (concat_vec (mword_of_int 18 : mword 11) ('b"0")))
                   Z1 (K - 6)%nat b ltac:(rewrite Htgt8c; vm_compute; reflexivity)
                   with "Hcg Hpc Hi68 [-]").
-        iIntros (CIDh2 Hsh2). iNext. iIntros "Hcg Hpc".
+        iIntros (CIDh2 Hsh2). iApply bi.later_intro. iIntros "Hcg Hpc".
         iEval (rewrite Htgt8c) in "Hpc".
         iDestruct (cpu_own_transport CIDr CIDh2 n eb p C b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
@@ -1906,7 +1906,7 @@ Section ProofIget.
                   ltac:(nz) ltac:(rgne; rewrite HL1a5; exact ig_ref_bge_zero)
                   ltac:(rewrite Htgt34; vm_compute; reflexivity)
                   with "Hcg Hpc Hi46 [-]").
-        iApply wp_next_off_intro. iNext. iIntros "Hcg Hpc".
+        iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
         iEval (rewrite Htgt34) in "Hpc".
         (* +0x34 c.bnez a5 : the ref word is zero, so it falls through *)
         iApply (wp_cbnez_fall_s_sconf (mword_of_int (KernelSyms.iget + 0x34))
@@ -1974,7 +1974,7 @@ Section ProofIget.
                           unfold NINODE in He |- *; lia)
                     ltac:(rewrite Htgt3c3; vm_compute; reflexivity)
                     with "Hcg Hpc Hi36 [-]").
-          iApply wp_next_off_intro. iNext. iIntros "Hcg Hpc".
+          iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
           iEval (rewrite Htgt3c3) in "Hpc".
           iApply ("Hstep" $! L1 with "[%] [%] [%] Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hslots Hpool Hislot Hcont2").
           * split; [exact HL1s1|]. split; [exact HL1a3|]. split; [exact HL1s2|].

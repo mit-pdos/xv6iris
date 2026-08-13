@@ -260,7 +260,7 @@ Section ProofSwtch.
                     Hpc Hfile Hret
                     [Hnewwand Hvoldc Hnewpart HP Hhalf Hspp Hq0 Hcpuown Hstk_t]").
     (* ---- the ▷ continuation: iNext strips it AND the record's ▷'d pieces ---- *)
-    iNext.
+    iApply bi.later_intro.
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htr Hpc Hfile".
     (* ---- rebuild sconf ---- *)
     iAssert sconf with "[Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv]" as "Hsc".
@@ -294,7 +294,7 @@ Section ProofSwtch.
     { iPureIntro. exact Hadm. }
     { iPureIntro. exact Hcallee_new. }
     iExists Ao, oldc. iSplitL "Hvoldc".
-    { iNext. iExact "Hvoldc". }
+    { iApply bi.later_intro. iExact "Hvoldc". }
     { rewrite Hm4. iExact "HP". }
   Qed.
 

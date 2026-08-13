@@ -1168,7 +1168,7 @@ Section ProofFilewrite.
                 ltac:(exact Hcmp)
                 ltac:(rewrite Htgt82; vm_compute; reflexivity)
                 with "Hcg Hpc Hid2 [-]").
-      iNext. iIntros (CID3 Hq3) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID3 Hq3) "Hcg Hpc".
       iEval (rewrite Htgt82) in "Hpc".
       iSpecialize ("Hcont" $! CID3 with "[]"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! (nz - iz)%Z T2 with "[%] Hcg Hpc").
@@ -1224,7 +1224,7 @@ Section ProofFilewrite.
                 T3 Kn b
                 ltac:(rewrite Htgt82b; vm_compute; reflexivity)
                 with "Hcg Hpc Hid8 [-]").
-      iIntros (CID5 Hq5). iNext. iIntros "Hcg Hpc".
+      iIntros (CID5 Hq5). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt82b) in "Hpc".
       iSpecialize ("Hcont" $! CID5 with "[]"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! SpecFilewrite.FW_MAX T3 with "[%] Hcg Hpc").
@@ -1296,7 +1296,7 @@ Section ProofFilewrite.
                 ltac:(rgne; rewrite Ha0; exact Htk)
                 ltac:(rewrite Htgtb4; vm_compute; reflexivity)
                 with "Hcg Hpc Hia6 [-]").
-      iNext. iIntros (CID1 Hq1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID1 Hq1) "Hcg Hpc".
       iEval (rewrite Htgtb4) in "Hpc".
       iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! Mt v with "[%] Hcg Hpc Hcell").
@@ -2430,7 +2430,7 @@ Section ProofFilewrite.
                   ltac:(exact Hcmpc8)
                   ltac:(rewrite Htgtda; vm_compute; reflexivity)
                   with "Hcg Hpc Hic8 [-]").
-        iNext. iIntros (CIDc3 Hsc3) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDc3 Hsc3) "Hcg Hpc".
         iEval (rewrite Htgtda) in "Hpc".
         iApply (fw_rest5 (CID0 := CIDc3) Y1 (K - 12)%nat sp0
                   (m !!! Regidx Rs1) (m !!! Regidx Rs3) (m !!! Regidx Rs7)
@@ -2457,7 +2457,7 @@ Section ProofFilewrite.
                   Mr (K - 12)%nat b
                   ltac:(rewrite Htgtf4; vm_compute; reflexivity)
                   with "Hcg Hpc Hie4 [-]").
-        iIntros (CIDc5 Hsc5). iNext. iIntros "Hcg Hpc".
+        iIntros (CIDc5 Hsc5). iApply bi.later_intro. iIntros "Hcg Hpc".
         iEval (rewrite Htgtf4) in "Hpc".
         assert (HMrs4 : Mr !!! Regidx Rs4 = (mword_of_int (iz + c) : mword 64)).
         { rewrite (Hmrthr Rs4 ltac:(vm_compute; reflexivity)
@@ -2570,7 +2570,7 @@ Section ProofFilewrite.
                 ltac:(rewrite Hcmpc0; reflexivity)
                 ltac:(rewrite Htgtea; vm_compute; reflexivity)
                 with "Hcg Hpc Hic0 [-]").
-      iNext. iIntros (CIDc1 Hsc1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDc1 Hsc1) "Hcg Hpc".
       iEval (rewrite Htgtea) in "Hpc".
       iApply (fw_rest5 (CID0 := CIDc1) meo (K - 12)%nat sp0
                 (m !!! Regidx Rs1) (m !!! Regidx Rs3) (m !!! Regidx Rs7)
@@ -2714,7 +2714,7 @@ Section ProofFilewrite.
                 ltac:(rewrite HR1a5; exact Hwrz)
                 ltac:(rewrite Htgt122; vm_compute; reflexivity)
                 with "Hcg Hpc Hi04 [-]").
-      iNext. iIntros (CID2 Hs2) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID2 Hs2) "Hcg Hpc".
       iEval (rewrite Htgt122) in "Hpc".
       (* ---- +0x122 c.li a0,-1 ---- *)
       iApply (wp_cli_s_sconf (mword_of_int (FW + 0x122)) Ra0
@@ -2951,7 +2951,7 @@ Section ProofFilewrite.
                   ltac:(rewrite Hcmp1; first [exact Hp1 | reflexivity])
                   ltac:(rewrite Htgt54; vm_compute; reflexivity)
                   with "Hcg Hpc Hi20 [-]").
-        iNext. iIntros (CID9 Hs9) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID9 Hs9) "Hcg Hpc".
         iEval (rewrite Htgt54) in "Hpc".
         iPoseProof (fwri_054 with "Htext") as "Hi54".
         iPoseProof (fwri_056 with "Htext") as "Hi56".
@@ -3039,7 +3039,7 @@ Section ProofFilewrite.
                   mf (K - 12)%nat b
                   ltac:(rewrite Htgtfc; vm_compute; reflexivity)
                   with "Hcg Hpc Hi5a [-]").
-        iIntros (CID12 Hs12). iNext. iIntros "Hcg Hpc".
+        iIntros (CID12 Hs12). iApply bi.later_intro. iIntros "Hcg Hpc".
         iEval (rewrite Htgtfc) in "Hpc".
         iApply (fw_epi (CID0 := CID12) m mf K sp0 (m !!! Regidx Rra)
                   (m !!! Regidx Rs0) (m !!! Regidx Rs2) (m !!! Regidx Rs5)
@@ -3143,7 +3143,7 @@ Section ProofFilewrite.
                     ltac:(rewrite Hcmp3; first [exact Hp3 | reflexivity])
                     ltac:(rewrite Htgt5c; vm_compute; reflexivity)
                     with "Hcg Hpc Hi26 [-]").
-          iNext. iIntros (CID11 Hs11) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CID11 Hs11) "Hcg Hpc".
           iEval (rewrite Htgt5c) in "Hpc".
           (* ---- +0x5c lh a5,36(a0) : f->major, SIGN-extended ---- *)
           assert (Hpmj : add_vec (rget G6 Ra0) (sign_extend' 64 (mword_of_int 36 : mword 12))
@@ -3306,7 +3306,7 @@ Section ProofFilewrite.
                                   HDra5 Hwp0; apply eq_vec_true_iff; reflexivity)
                           ltac:(rewrite Htgt12a; vm_compute; reflexivity)
                           with "Hcg Hpc Hi7a [-]").
-                iNext. iIntros (CID18 Hs18) "Hcg Hpc".
+                iApply bi.later_intro. iIntros (CID18 Hs18) "Hcg Hpc".
                 iEval (rewrite Htgt12a) in "Hpc".
                 iApply (fw_m1j (CID0 := CID18) Dr (K - 12)%nat
                           (FW + 0x12a) (FW + 0x12c)
@@ -3460,7 +3460,7 @@ Section ProofFilewrite.
                           mf (K - 12)%nat b
                           ltac:(rewrite Htgtfcd; vm_compute; reflexivity)
                           with "Hcg Hpc Hi80 [-]").
-                iIntros (CID21 Hs21). iNext. iIntros "Hcg Hpc".
+                iIntros (CID21 Hs21). iApply bi.later_intro. iIntros "Hcg Hpc".
                 iEval (rewrite Htgtfcd) in "Hpc".
                 iApply (fw_epi (CID0 := CID21) m mf K sp0 (m !!! Regidx Rra)
                           (m !!! Regidx Rs0) (m !!! Regidx Rs2) (m !!! Regidx Rs5)
@@ -3505,7 +3505,7 @@ Section ProofFilewrite.
                              exact (fw_bltu9_true _ Hmjgt (proj2 Hmjr)))
                        ltac:(rewrite Htgt126; vm_compute; reflexivity)
                        with "Hcg Hpc Hi68 [-]").
-             iNext. iIntros (CID16 Hs16) "Hcg Hpc".
+             iApply bi.later_intro. iIntros (CID16 Hs16) "Hcg Hpc".
              iEval (rewrite Htgt126) in "Hpc".
              iApply (fw_m1j (CID0 := CID16) D4 (K - 12)%nat
                        (FW + 0x126) (FW + 0x128)
@@ -3681,7 +3681,7 @@ Section ProofFilewrite.
                            ltac:(first [exact Hbge0 | rewrite Hbge0; exact Hz0])
                            ltac:(rewrite Htgte6; vm_compute; reflexivity)
                            with "Hcg Hpc Hi32 [-]").
-                 iNext. iIntros (CID15 Hs15) "Hcg Hpc".
+                 iApply bi.later_intro. iIntros (CID15 Hs15) "Hcg Hpc".
                  iEval (rewrite Htgte6) in "Hpc".
                  (* ---- +0xe6 c.li s4,0 ---- *)
                  iApply (wp_cli_s_sconf (mword_of_int (FW + 0xe6)) Rs4
@@ -3719,7 +3719,7 @@ Section ProofFilewrite.
                            Z1 (K - 12)%nat b
                            ltac:(rewrite Htgtf4; vm_compute; reflexivity)
                            with "Hcg Hpc Hie8 [-]").
-                 iIntros (CID17 Hs17). iNext. iIntros "Hcg Hpc".
+                 iIntros (CID17 Hs17). iApply bi.later_intro. iIntros "Hcg Hpc".
                  iEval (rewrite Htgtf4) in "Hpc".
                  (* ---- +0xf4 .. : [fw_tail], at [i = 0] and [n = 0] ---- *)
                  iApply (fw_tail (CID0 := CID17) m Z1 K sp0 (m !!! Regidx Rra)
@@ -4051,7 +4051,7 @@ Section ProofFilewrite.
                            L7 (K - 12)%nat b
                            ltac:(rewrite Htgtcc; vm_compute; reflexivity)
                            with "Hcg Hpc Hi52 [-]").
-                 iIntros (CID28 Hs28). iNext. iIntros "Hcg Hpc".
+                 iIntros (CID28 Hs28). iApply bi.later_intro. iIntros "Hcg Hpc".
                  iEval (rewrite Htgtcc) in "Hpc".
                  (* ############### FRONTIER (S3q) ###############
                     PARKED AT +0xcc, THE LOOP TEST, and nothing before it is
@@ -4147,7 +4147,7 @@ Section ProofFilewrite.
                              first [rewrite Hp2 | idtac]; reflexivity)
                        ltac:(rewrite Htgt10a; vm_compute; reflexivity)
                        with "Hcg Hpc Hi2c [-]").
-             iNext. iIntros (CID13 Hs13) "Hcg Hpc".
+             iApply bi.later_intro. iIntros (CID13 Hs13) "Hcg Hpc".
              iEval (rewrite Htgt10a) in "Hpc".
              iApply (fw_panic (CID0 := CID13) G7 (K - 12)%nat sp0
                        w3 w5 w6 w9 w10 w11 pj b HG7sp

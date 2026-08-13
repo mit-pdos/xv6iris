@@ -608,7 +608,7 @@ Section ProofSysDup.
                 ltac:(rgne; rewrite HB1a0 Hr; exact sd_m1_neg)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi16 [-]").
-      iNext. iIntros (CID11 Hk11) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID11 Hk11) "Hcg Hpc".
       assert (Htgt3c : add_vec (mword_of_int (KernelSyms.sys_dup + 0x16) : mword 64)
                          (sign_extend' 64 (mword_of_int 38 : mword 13))
                        = mword_of_int (KernelSyms.sys_dup + 0x3c))
@@ -844,7 +844,7 @@ Section ProofSysDup.
                 ltac:(rgne; rewrite HD2a0 Hr2; exact sd_m1_neg)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi2c [-]").
-      iNext. iIntros (CID20 Hk20) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID20 Hk20) "Hcg Hpc".
       assert (Htgt46 : add_vec (mword_of_int (KernelSyms.sys_dup + 0x2c) : mword 64)
                          (sign_extend' 64 (mword_of_int 26 : mword 13))
                        = mword_of_int (KernelSyms.sys_dup + 0x46))
@@ -890,7 +890,7 @@ Section ProofSysDup.
                 (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0")))
                 F2 (av - 6)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi4a [-]").
-      iIntros (CID23 Hk23). iNext. iIntros "Hcg Hpc".
+      iIntros (CID23 Hk23). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htgt3c : add_vec (mword_of_int (KernelSyms.sys_dup + 0x4a) : mword 64)
                          (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0"))))
                        = mword_of_int (KernelSyms.sys_dup + 0x3c))

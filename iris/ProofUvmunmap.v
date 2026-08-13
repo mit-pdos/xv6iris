@@ -588,7 +588,7 @@ Section ProofUvmunmap.
                   ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                   Hcmp ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi4c [-]").
-        iNext. iIntros (CIDv Hsv) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDv Hsv) "Hcg Hpc".
         assert (Htgt76 : add_vec (mword_of_int (KernelSyms.uvmunmap + 0x4c) : mword 64)
                   (sign_extend' 64 (mword_of_int 42 : mword 13))
                 = mword_of_int (KernelSyms.uvmunmap + 0x76)) by (apply bv_eq; vm_compute; reflexivity).
@@ -773,7 +773,7 @@ Section ProofUvmunmap.
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 Hbz ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi5c [-]").
-      iNext. iIntros (CIDz Hsz) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDz Hsz) "Hcg Hpc".
       iEval (rewrite Htgt4a) in "Hpc".
       destruct (uu_step_absent df fx um m_ad (svpn_of va) done
                   Hwf Hfx Hvok Hview Hnone) as (HstepF & Hstep).
@@ -876,7 +876,7 @@ Section ProofUvmunmap.
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 Hbz ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi64 [-]").
-      iNext. iIntros (CIDz4 Hsz4) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDz4 Hsz4) "Hcg Hpc".
       iEval (rewrite Htgt4a') in "Hpc".
       destruct (uu_step_absent df fx um m_ad (svpn_of va) done
                   Hwf Hfx Hvok Hview Hnone) as (HstepF & Hstep).
@@ -1002,7 +1002,7 @@ Section ProofUvmunmap.
                 ltac:(vm_compute; discriminate) Hs5z
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi66 [-]").
-      iNext. iIntros (CIDz6 Hsz6) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDz6 Hsz6) "Hcg Hpc".
       assert (Htgt46' : add_vec (mword_of_int (KernelSyms.uvmunmap + 0x66) : mword 64)
                 (sign_extend' 64 (mword_of_int 8160 : mword 13))
               = mword_of_int (KernelSyms.uvmunmap + 0x46)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1152,7 +1152,7 @@ Section ProofUvmunmap.
               (sign_extend' 21 (concat_vec (mword_of_int 2025 : mword 11) ('b"0")))
               mk (K - 8) b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi74 [-]").
-    iIntros (CIDk2 Hsk2). iNext. iIntros "Hcg Hpc".
+    iIntros (CIDk2 Hsk2). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htgt46 : add_vec (mword_of_int (KernelSyms.uvmunmap + 0x74) : mword 64)
               (sign_extend' 64 (sign_extend' 21
                  (concat_vec (mword_of_int 2025 : mword 11) ('b"0"))))
@@ -1509,7 +1509,7 @@ Section ProofUvmunmap.
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 Hcmp ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi26 [-]").
-      iNext. iIntros (CIDr1 Hsr1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDr1 Hsr1) "Hcg Hpc".
       assert (Htgt78 : add_vec (mword_of_int (KernelSyms.uvmunmap + 0x26) : mword 64)
                 (sign_extend' 64 (mword_of_int 82 : mword 13))
               = mword_of_int (KernelSyms.uvmunmap + 0x78)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1556,7 +1556,7 @@ Section ProofUvmunmap.
               (sign_extend' 21 (concat_vec (mword_of_int 18 : mword 11) ('b"0")))
               R9 (K - 8) b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi2c [-]").
-    iIntros (CIDr5 Hsr5). iNext. iIntros "Hcg Hpc".
+    iIntros (CIDr5 Hsr5). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htgt50 : add_vec (mword_of_int (KernelSyms.uvmunmap + 0x2c) : mword 64)
               (sign_extend' 64 (sign_extend' 21
                  (concat_vec (mword_of_int 18 : mword 11) ('b"0"))))

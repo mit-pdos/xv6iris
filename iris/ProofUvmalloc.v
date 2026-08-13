@@ -571,7 +571,7 @@ Section ProofUvmalloc.
                 B2 (K - 10)%nat b ltac:(vm_compute; reflexivity)
                 ltac:(vm_compute; discriminate) ltac:(rgne; exact Hzt)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi3c [-]").
-      iNext. iIntros (CIDu4 Hsu4) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDu4 Hsu4) "Hcg Hpc".
       iEval (rewrite Htgt66) in "Hpc".
       (* +0x66 c.mv a2,s7 *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x66)) Ra2 Rs7 B2 (K - 10)%nat b
@@ -1141,7 +1141,7 @@ Section ProofUvmalloc.
                   (mword_of_int 8158 : mword 13) Rs4 Rs2 B12 (K - 10)%nat b
                   ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(rgne; rgne; exact Hbk)
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi58 [-]").
-        iNext. iIntros (CIDu28 Hsu28) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDu28 Hsu28) "Hcg Hpc".
         iEval (rewrite Htgt36) in "Hpc".
         (* re-anchor ["Hexit"] from this iteration's entry [CID0] to the next
            iteration's entry [CIDu28], and transport ["Hcnt"] there too (its
@@ -1234,7 +1234,7 @@ Section ProofUvmalloc.
                 (sign_extend' 21 (concat_vec (mword_of_int 10 : mword 11) ('b"0")))
                 X4 (K - 10)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi64 [-]").
-      iIntros (CIDu34 Hsu34). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDu34 Hsu34). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Hjt64) in "Hpc".
       iEval (rewrite /ua_exit) in "Hexit".
       iSpecialize ("Hexit" $! CIDu34 with "[%]"); [wp_next_chain|].
@@ -1287,7 +1287,7 @@ Section ProofUvmalloc.
               mg (K - 10)%nat b ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; discriminate) ltac:(rgne; exact Hbnt) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi54 [-]").
-    iNext. iIntros (CIDu35 Hsu35) "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDu35 Hsu35) "Hcg Hpc".
     iEval (rewrite Htgt88) in "Hpc".
     (* +0x88 c.mv a0,s1 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x88)) Ra0 Rs1 mg (K - 10)%nat b
@@ -1511,7 +1511,7 @@ Section ProofUvmalloc.
               (sign_extend' 21 (concat_vec (mword_of_int 2028 : mword 11) ('b"0")))
               G8 (K - 10)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hia0 [-]").
-    iIntros (CIDu48 Hsu48). iNext. iIntros "Hcg Hpc".
+    iIntros (CIDu48 Hsu48). iApply bi.later_intro. iIntros "Hcg Hpc".
     iEval (rewrite Hjta0) in "Hpc".
     iDestruct (ua_restore P Pi (svpn_of (pgroundup oldsz)) i Hext Hdom Hfreshi
                  with "Hpt") as "Hpt".
@@ -1589,7 +1589,7 @@ Section ProofUvmalloc.
       iApply (wp_bltu_taken_s_sconf pcE (mword_of_int 162 : mword 13) Ra1 Ra2 mm K b
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(rgne; rgne; exact Hcmp0)
                 Hala2 with "Hcg Hpc Hi00 [-]").
-      iNext. iIntros (CIDu49 Hsu49) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDu49 Hsu49) "Hcg Hpc".
       iEval (rewrite Htgta2) in "Hpc".
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0xa2)) Ra0 Ra1 mm K b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2160,7 +2160,7 @@ Section ProofUvmalloc.
                 (mword_of_int 128 : mword 13) Ra2 Rs2 R10 (K - 10)%nat b
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(rgne; rgne; exact Hbg)
                 Halta6 with "Hcg Hpc Hi26 [-]").
-      iNext. iIntros (CIDu77 Hsu77) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDu77 Hsu77) "Hcg Hpc".
       iEval (rewrite Htgta6) in "Hpc".
       (* +0xa6 c.mv a0,a2 *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0xa6)) Ra0 Ra2 R10 (K - 10)%nat b
@@ -2179,7 +2179,7 @@ Section ProofUvmalloc.
                 (sign_extend' 21 (concat_vec (mword_of_int 2024 : mword 11) ('b"0")))
                 Z1 (K - 10)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hia8 [-]").
-      iIntros (CIDu79 Hsu79). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDu79 Hsu79). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Hjta8) in "Hpc".
       iEval (rewrite /ua_exit) in "Hepi".
       iSpecialize ("Hepi" $! CIDu79 with "[%]"); [wp_next_chain|].

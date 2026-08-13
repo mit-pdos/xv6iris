@@ -497,7 +497,7 @@ Section ProofProcdumpLoop.
                     (mword_of_int 36 : mword 13) Rs2 Rs1 Ma66 K' b
                     ltac:(nz) ltac:(nz) Hcmp ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc Hi6a").
-          iNext. iIntros (CIDc Hsc) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDc Hsc) "Hcg Hpc".
           assert (Htgt8e : add_vec
                              (mword_of_int (KernelSyms.procdump + 0x6a) : mword 64)
                              (sign_extend' 64 (mword_of_int 36 : mword 13))
@@ -823,7 +823,7 @@ Section ProofProcdumpLoop.
                   (mword_of_int 249 : mword 8) (Cregidx (mword_of_int 7)) Ra5 H70 K' b
                   ltac:(vm_compute; reflexivity) ltac:(nz) Hcmp74
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi74").
-        iNext. iIntros (CID3 Hs3) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID3 Hs3) "Hcg Hpc".
         assert (Htgt66 : add_vec
                            (mword_of_int (KernelSyms.procdump + 0x74) : mword 64)
                            (sign_extend' 64
@@ -893,7 +893,7 @@ Section ProofProcdumpLoop.
                   (mword_of_int 8158 : mword 13) Ra5 Rs6 H76 K' b
                   ltac:(nz) ltac:(nz) Hcmp78 ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi78").
-        iNext. iIntros (CID5 Hs5) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID5 Hs5) "Hcg Hpc".
         assert (Htgt56 : add_vec
                            (mword_of_int (KernelSyms.procdump + 0x78) : mword 64)
                            (sign_extend' 64 (mword_of_int 8158 : mword 13))
@@ -1058,7 +1058,7 @@ Section ProofProcdumpLoop.
                 (mword_of_int 231 : mword 8) (Cregidx (mword_of_int 4)) Ra2 H86 K' b
                 ltac:(vm_compute; reflexivity) ltac:(nz) Hcmp88
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi88").
-      iNext. iIntros (CID10 Hs10) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID10 Hs10) "Hcg Hpc".
       assert (Htgt56b : add_vec
                           (mword_of_int (KernelSyms.procdump + 0x88) : mword 64)
                           (sign_extend' 64

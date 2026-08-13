@@ -732,7 +732,7 @@ Section ProofMappages.
                 ltac:(rgne; rewrite Ha0z; vm_compute; reflexivity)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi48 [-]").
-      iNext. iIntros (CIDn1 Hsn1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDn1 Hsn1) "Hcg Hpc".
       assert (Htgt9a : add_vec (mword_of_int (KernelSyms.mappages + 0x48) : mword 64)
                 (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 41 : mword 8) ('b"0"))))
               = mword_of_int (KernelSyms.mappages + 0x9a)) by (apply bv_eq; vm_compute; reflexivity).
@@ -978,7 +978,7 @@ Section ProofMappages.
                 ltac:(repeat rgne; rewrite HM11s1 HM11s2; rewrite Hlast; apply eq_vec_true_iff; reflexivity)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi62 [-]").
-      iNext. iIntros (CIDl1 Hsl1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDl1 Hsl1) "Hcg Hpc".
       assert (Htgtb2 : add_vec (mword_of_int (KernelSyms.mappages + 0x62) : mword 64) (sign_extend' 64 (mword_of_int 80 : mword 13)) = mword_of_int (KernelSyms.mappages + 0xb2)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtb2) in "Hpc".
       (* +0xb2 li a0,0 *)
@@ -996,7 +996,7 @@ Section ProofMappages.
                 F1 (K - 10)%nat b
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hib4 [-]").
-      iIntros (CIDl3 Hsl3). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDl3 Hsl3). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htgt9c : add_vec (mword_of_int (KernelSyms.mappages + 0xb4) : mword 64)
                 (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2036 : mword 11) ('b"0"))))
               = mword_of_int (KernelSyms.mappages + 0x9c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1057,7 +1057,7 @@ Section ProofMappages.
               M12 (K - 10)%nat b
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi68 [-]").
-    iIntros (CIDm3 Hsm3). iNext. iIntros "Hcg Hpc".
+    iIntros (CIDm3 Hsm3). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htgt3e : add_vec (mword_of_int (KernelSyms.mappages + 0x68) : mword 64)
               (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2027 : mword 11) ('b"0"))))
             = mword_of_int (KernelSyms.mappages + 0x3e)) by (apply bv_eq; vm_compute; reflexivity).
