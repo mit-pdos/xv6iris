@@ -196,7 +196,7 @@ Definition wp_log_write_au_body
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (k : nat) (pidv bno : mword 32)
     (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
-    (cr : bool) (Sb : gset Z) (vlb : nat)
+    (cr : bool) (Sb : gset Z) (e0 : nat) (vlb : nat)
     (Efs : coPset) (Φfsb : iProp Σ)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (K : nat) (b : bool) :=
@@ -210,9 +210,6 @@ Definition wp_log_write_au_body
   (* the block is a covered HOME block: never the log's own storage *)
   uint bno ∈ cov ->
   ~ (uint bno ∈ log_region_set logstart) ->
-  (* THE CREDIT'S PREMISE: claiming the free arm means claiming this op
-     has already appended [bno] in this batch. *)
-  (cr = true -> uint bno ∈ Sb) ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
@@ -227,7 +224,21 @@ Definition wp_log_write_au_body
      cannot make anywhere else, cashed at the ghost step below against the
      [ln_ep] auth this function is the only client of. *)
   log_epoch_lb γ vlb -∗
-  log_opS γ (S u) Sb -∗
+  (* THE CREDIT'S PREMISE, RELAXED TO A RESOURCE (fs-log.md §G.19).  Claiming
+     the free arm means claiming the block is ALREADY IN lh.block[], and
+     [LogInv.log_credit] admits the two ways of knowing that:
+       - [uint bno ∈ Sb] -- this op appended it itself (the pure premise this
+         used to be, now one disjunct; [LogInv.log_credit_own] is the
+         one-step conversion every landed credited caller uses);
+       - [logged_at γ e (uint bno)] with [e0 <= e] -- SOMEBODY appended it
+         this batch, which is the case the kernel's absorption scan actually
+         implements and the model used to under-claim (§G.1).
+     The group form is what forces [e0] into the open: it must be ordered
+     against the CALLER'S OWN birth epoch, so the ledger premise below is
+     [log_opSe] (the epoch named) rather than [log_opS] (it buried).  A
+     [cr := false] caller passes [emp] and never sees any of this. *)
+  log_credit γ cr Sb e0 (uint bno) -∗
+  log_opSe γ (S u) Sb e0 -∗
   (* THE CALLER'S VIEW OF THE BLOCK, AS AN ATOMIC UPDATE -- see the header
      note above.  Fired exactly once, at the ghost step. *)
   (|={⊤, Efs}=> ∃ bsl' : list (bv 8),
@@ -336,12 +347,12 @@ Module Type LOG_WRITE.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
-      (cr : bool) (Sb : gset Z) (vlb : nat)
+      (cr : bool) (Sb : gset Z) (e0 : nat) (vlb : nat)
       (Efs : coPset) (Φfsb : iProp Σ)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (K : nat) (b : bool),
       wp_log_write_au_body bn γ γfs γd cov logstart dev k pidv bno
-                           bs bsl bsd d u cr Sb vlb Efs Φfsb m n eb p C K b.
+                           bs bsl bsd d u cr Sb e0 vlb Efs Φfsb m n eb p C K b.
 
   (* THE CREDITED / GENERAL FORM.  [wp_log_write_sconf] below is the
      set-forgetting instance of this at [cr = false]; it is kept as its own

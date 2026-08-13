@@ -352,15 +352,23 @@ Section IupdateTail.
        logged, but its CALLER does, so the set is threaded rather than
        forgotten.  The counted seal below is what forgets it. *)
     iRename "Hop" into "HopS".
+    (* THE CREDIT, IN ITS OWN-SET FORM (fs-log.md §G.19).  log_write's
+       credited arm takes a RESOURCE now, so that the group's witness form
+       can be presented there too; iupdate's own claim is the pure own-set
+       one it always was, and [log_credit_own] is the whole conversion.  The
+       birth epoch has to be opened for it -- the contract states the credit
+       against the caller's own [e0] -- but nothing below looks at it. *)
+    iDestruct (log_opS_named with "HopS") as (e0) "HopS".
+    iPoseProof (log_credit_own γ cru Sb e0 (uint bno)
+                  ltac:(rewrite Hbno; exact Hcru)) as "#Hcrd".
     iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bno
               (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 u
-              cru Sb v (⊤ ∖ ↑iregN) (ireg_out γi inum dn)
+              cru Sb e0 v (⊤ ∖ ↑iregN) (ireg_out γi inum dn)
               T1 0%nat eb (proc_addr j) C (K - 4)%nat b
               HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HT1a0
               ltac:(rewrite Hbno; exact Hcov)
               ltac:(rewrite Hbno; exact Hlog)
-              ltac:(rewrite Hbno; exact Hcru)
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl Hvlb HopS [Hdn] Hheld").
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl Hvlb Hcrd HopS [Hdn] Hheld").
     { iEval (rewrite Hbno).
       (* WHICH ARM MOVE (§16.4): a type-0 flush is iput's free path and it
          ABSORBS the fragment, paying out the marker; every other flush keeps

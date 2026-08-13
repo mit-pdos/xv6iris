@@ -519,6 +519,66 @@ Section LogInv.
   Lemma log_epoch_lb_0 (γ : log_names) : ⊢ |==> log_epoch_lb γ 0.
   Proof. rewrite /log_epoch_lb. iApply mono_nat_lb_own_0. Qed.
 
+  (* ---------------------------------------------------------------- *)
+  (*  THE ABSORPTION CREDIT (fs-log.md §G.19)                           *)
+  (* ---------------------------------------------------------------- *)
+
+  (* What a caller of [log_write] must hand over to claim the FREE arm --
+     i.e. to say "this block is already in lh.block[], absorb it and give my
+     unit back".  It has two admissible forms and they are genuinely
+     different claims:
+
+     - OWN-SET ([b ∈ Sb]): the block is in MY op's already-logged set.  This
+       is the only form the pre-group design had, and it is pure: the
+       ledger's own soundness clause ([log_res]: every live entry's set is a
+       subset of the header) turns it into membership.  Every landed
+       credited caller -- bfree's credited arm, balloc's bitmap write,
+       writei's [bool_decide] -- claims exactly this, and [log_credit_own]
+       is their conversion.
+
+     - GROUP ([logged_at γ e b] with [e0 <= e], against the caller's OWN
+       birth epoch [e0]): the block is in the header because SOMEBODY put it
+       there this batch.  This is the form the group extension exists for,
+       and it is unstatable without a name for [e0] -- which is why this
+       premise travels beside a [log_opSe], not a [log_opS].  A witness from
+       a dead batch has [e < e0] and cannot satisfy it; that is the header's
+       revocation requirement met by indexing (§G.2).
+
+     PERSISTENT in both arms, so a caller intros it with [#] and it costs
+     nothing to keep. *)
+  Definition log_credit (γ : log_names) (cr : bool) (Sb : gset Z)
+      (e0 : nat) (b : Z) : iProp Σ :=
+    (if cr then ⌜b ∈ Sb⌝ ∨ (∃ e : nat, logged_at γ e b ∗ ⌜(e0 <= e)%nat⌝)
+     else emp)%I.
+
+  Global Instance log_credit_persistent γ cr Sb e0 b :
+    Persistent (log_credit γ cr Sb e0 b).
+  Proof. rewrite /log_credit. destruct cr; apply _. Qed.
+
+  Global Instance log_credit_timeless γ cr Sb e0 b :
+    Timeless (log_credit γ cr Sb e0 b).
+  Proof. rewrite /log_credit. destruct cr; apply _. Qed.
+
+  (* the OWN-SET claimant's conversion: the pure premise every landed
+     credited caller already discharges, in one step *)
+  Lemma log_credit_own (γ : log_names) (cr : bool) (Sb : gset Z)
+      (e0 : nat) (b : Z) :
+    (cr = true -> b ∈ Sb) -> ⊢ log_credit γ cr Sb e0 b.
+  Proof.
+    intros H. rewrite /log_credit. destruct cr.
+    - iLeft. iPureIntro. exact (H eq_refl).
+    - iEmpIntro.
+  Qed.
+
+  (* the GROUP claimant's: a witness at least as new as my op's birth *)
+  Lemma log_credit_group (γ : log_names) (cr : bool) (Sb : gset Z)
+      (e0 e : nat) (b : Z) :
+    (e0 <= e)%nat -> logged_at γ e b -∗ log_credit γ cr Sb e0 b.
+  Proof.
+    intros Hle. iIntros "#Hw". rewrite /log_credit. destruct cr; [| iEmpIntro].
+    iRight. iExists e. iFrame "Hw". iPureIntro. exact Hle.
+  Qed.
+
   Global Instance log_op_timeless γ u : Timeless (log_op γ u).
   Proof. apply _. Qed.
 
@@ -803,6 +863,33 @@ Section LogInv.
     iExists i. done.
   Qed.
 
+  (* log_write's GROUP absorb (fs-log.md §G.19): the block is in lh.block[]
+     already -- put there by this op's own earlier append or by ANOTHER
+     op's, which is the whole point of the group extension -- so no unit
+     burns and lh.n does not move, but the block joins THIS op's set all the
+     same, exactly as the append path leaves it.  The sum is untouched
+     ([op_sum_absorb]), which is what keeps the header tie
+     [n + op_sum om <= LOGBLOCKS] across a log_write that does not grow [n].
+
+     The own-set case is the degenerate instance ([Sb ∪ {[b]} = Sb], so the
+     insert is the identity map) -- which is why the credited arm needs no
+     case split on WHICH credit was presented. *)
+  Lemma log_record_step γ (om : gmap nat op_entry) (u : nat) (Sb : gset Z)
+      (e0 : nat) (b : Z) :
+    ghost_map_auth (ln_ops γ) 1 om -∗ log_opSe γ u Sb e0 ==∗
+    ∃ i, ⌜om !! i = Some (u, Sb, e0)⌝ ∗
+      ghost_map_auth (ln_ops γ) 1 (<[i := (u, Sb ∪ {[b]}, e0)]> om) ∗
+      log_opSe γ u (Sb ∪ {[b]}) e0.
+  Proof.
+    iIntros "Ha He". rewrite /log_opSe.
+    (* the lb is PERSISTENT, so this is a re-pack, not a transfer *)
+    iDestruct "He" as "[He #Hlb]". iDestruct "He" as (i) "He".
+    iDestruct (ghost_map_lookup with "Ha He") as %Hi.
+    iMod (ghost_map_update (u, Sb ∪ {[b]}, e0) with "Ha He") as "[Ha He]".
+    iModIntro. iExists i. iSplitR; [done|]. iFrame "Ha".
+    iSplitL "He"; [iExists i; iFrame | iApply "Hlb"].
+  Qed.
+
   (* end_op's retire: the whole entry goes -- SET AND ALL, which is what
      revokes every absorption credit this op handed out -- and the sum
      drops by exactly the returned budget *)
@@ -821,13 +908,16 @@ Section LogInv.
   (* an op token against the authority: out >= 1 (kills log_write's
      "outside of trans" panic and end_op's "log.committing" one, via the
      cmt -> out = 0 conjunct) *)
-  (* the same fact against a CREDITED op token *)
-  Lemma log_opS_positive γ (om : gmap nat op_entry) (u : nat) (Sb : gset Z) :
-    ghost_map_auth (ln_ops γ) 1 om -∗ log_opS γ u Sb -∗
+  (* the same fact against a CREDITED op token, at the epoch-exposed form
+     (log_write holds THAT one, §G.19) and at the ABI one, which is its
+     existential *)
+  Lemma log_opSe_positive γ (om : gmap nat op_entry) (u : nat) (Sb : gset Z)
+      (e0 : nat) :
+    ghost_map_auth (ln_ops γ) 1 om -∗ log_opSe γ u Sb e0 -∗
     ⌜(1 <= size om)%nat⌝.
   Proof.
-    iIntros "Ha He". rewrite /log_opS /log_opSe.
-    iDestruct "He" as (e0) "[He _]". iDestruct "He" as (i) "He".
+    iIntros "Ha He". rewrite /log_opSe.
+    iDestruct "He" as "[He _]". iDestruct "He" as (i) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Hi.
     iPureIntro.
     assert (Hne : om ≠ ∅).
@@ -835,6 +925,14 @@ Section LogInv.
     assert (Hs : size om ≠ 0%nat).
     { intros Hz. apply Hne. by apply map_size_empty_iff. }
     lia.
+  Qed.
+
+  Lemma log_opS_positive γ (om : gmap nat op_entry) (u : nat) (Sb : gset Z) :
+    ghost_map_auth (ln_ops γ) 1 om -∗ log_opS γ u Sb -∗
+    ⌜(1 <= size om)%nat⌝.
+  Proof.
+    iIntros "Ha He". rewrite /log_opS. iDestruct "He" as (e0) "He".
+    iApply (log_opSe_positive with "Ha He").
   Qed.
 
   Lemma log_op_positive γ (om : gmap nat op_entry) (u : nat) :
@@ -888,6 +986,46 @@ Section LogInv.
     assert (HeE : (e <= E)%nat) by exact (Hcap e b Hin).
     assert (Hee : e = E) by lia.
     rewrite Hee in Hin. iPureIntro. exact (Hreg b Hin).
+  Qed.
+
+  (* THE CREDIT, CASHED (fs-log.md §G.19).  Both admissible forms of
+     [log_credit] land on the one fact log_write's absorb path needs -- the
+     block is in the header RIGHT NOW -- by different routes, and this is
+     the only place either can be spent, because both routes go through the
+     opened ledger authority:
+
+     - the OWN-SET form through [log_res]'s credit-soundness clause
+       ([Hsub]: a live entry's set is a subset of the header);
+     - the GROUP form through [log_use_group]'s epoch sandwich.
+
+     Nothing is consumed: the conclusion is pure, so the caller keeps the
+     authority and the entry it handed in. *)
+  Lemma log_credit_use (γ : log_names) (om : gmap nat op_entry) (E : nat)
+      (X : gset (nat * Z)) (LB : gset Z)
+      (u : nat) (Sb : gset Z) (e0 : nat) (b : Z) (cr : bool) :
+    (forall i x, om !! i = Some x -> x.2 = E) ->
+    (forall e' b', ((e', b') : nat * Z) ∈ X -> (e' <= E)%nat) ->
+    (forall c : Z, ((E, c) : nat * Z) ∈ X -> c ∈ LB) ->
+    (forall i x, om !! i = Some x -> x.1.2 ⊆ LB) ->
+    ghost_map_auth (ln_ops γ) 1 om -∗
+    own (ln_lg γ) (● X) -∗
+    log_opSe γ u Sb e0 -∗
+    log_credit γ cr Sb e0 b -∗
+    ⌜cr = true -> b ∈ LB⌝.
+  Proof.
+    intros Hlive Hcap Hreg Hsub.
+    iIntros "Hao Hax He Hcr". rewrite /log_credit.
+    destruct cr; [| iPureIntro; discriminate].
+    iDestruct "Hcr" as "[%Hin | Hw]".
+    - (* own-set: my entry's set is in the header *)
+      iDestruct (log_absorb_step γ om u Sb e0 with "Hao He") as (i) "%Hi".
+      pose proof (Hsub i (u, Sb, e0) Hi) as Hs. cbn in Hs.
+      iPureIntro. intros _. exact (elem_of_weaken _ _ _ Hin Hs).
+    - (* group: a witness no older than my op's birth *)
+      iDestruct "Hw" as (e) "[#Hw %Hle]".
+      iDestruct (log_use_group γ om E X LB u Sb e0 e b Hlive Hcap Hreg Hle
+                   with "Hao Hax He Hw") as %Hb.
+      iPureIntro. intros _. exact Hb.
   Qed.
 
   (* ---------------------------------------------------------------- *)

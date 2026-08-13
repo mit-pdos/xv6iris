@@ -1331,3 +1331,89 @@ premise relaxes from the pure `cr = true -> uint bno ∈ Sb` to the
 resource form (if cr then ∃ e, ⌜e0 <= e⌝ ∗ logged_at γ e (uint bno) else
 emp, against the caller's log_opSe e0), and ProofLogWrite's credited arm
 re-proves via log_use_group instead of the own-set Hsub.  Then G-4.
+
+
+### G.19 G-3 COMPLETE (2026-08-13): the credit is a RESOURCE with two
+### admissible forms, and the credited arm RECORDS instead of no-op'ing
+
+**THE PREMISE AS LANDED.**  `LogInv.log_credit γ cr Sb e0 b` —
+
+    if cr then ⌜b ∈ Sb⌝ ∨ (∃ e, logged_at γ e b ∗ ⌜e0 <= e⌝) else emp
+
+carried as a resource premise of `wp_log_write_au_body` beside
+`log_opSe γ (S u) Sb e0` (which replaces `log_opS γ (S u) Sb`, one new
+binder `e0`).  Persistent and timeless in both arms, so every caller
+intros it with `#` and it never has to be carried anywhere.
+
+**WHY THE DISJUNCTION AND NOT THE CLEAN SINGLE RESOURCE FORM: NO EXISTING
+CREDITED CLAIMANT CAN PRODUCE A WITNESS, AND THE REASON IS STRUCTURAL,
+NOT HISTORICAL.**  Every landed `cr = true` site claims the OWN-SET fact
+and holds nothing else: bfree's credited arm (`Hcredit` threaded from
+SpecBfree), balloc's bitmap write (`Hcred`), writei's
+`bool_decide (uint … ∈ Sb2)`, iupdate's credgen `Hcru`.  A witness could
+only come from an EARLIER `log_write` of the same block by the same op —
+and that write went through `wp_log_write_gen`, whose derivation
+DELIBERATELY drops the witness (`log_opSw_opS`) to keep its callers
+byte-stable, so the receipt no longer exists by the time the credit is
+claimed.  Nor can the pure fact be converted at the call site: `b ∈ Sb`
+becomes a witness only under `log_res`'s registry, i.e. behind the log
+spinlock, which is exactly where the caller is not.  So the two forms are
+irreducibly different claims and both must be admissible; §G.11's
+`(if cr then ∃ e … else emp)` would have made every landed credited
+caller unprovable.  The disjunction costs one `iLeft`.
+
+**THE CREDITED ARM RE-PROVES BY RECORDING, NOT BY NO-OP.**  The old proof
+leaned on the pure premise twice, and the second lean is the one the
+§G.18 scope did not name: `uint bno ∈ Sb` makes `Sb ∪ {[bno]} = Sb`, so
+the credited arm's ledger step was the IDENTITY.  Under group absorption
+the block need not be in `Sb` at all, so the post's
+`log_opSw … (Sb ∪ {[uint bno]})` demands a real ghost update at unchanged
+budget: `LogInv.log_record_step` — `log_spend_step` with the budget field
+left ALONE, so the sum is untouched, by the pre-existing `op_sum_absorb`
+that was already in the file waiting for it.  Its one obligation —
+`Sb ∪ {[bno]} ⊆ LB` — is discharged by the credit itself, so the arm
+needs no case split on WHICH credit was presented: the own-set case is
+the degenerate instance where the insert happens to be the identity.
+
+**THE CASHING IS ONE LEMMA, ABOVE THE ARM SPLIT.**  `LogInv.log_credit_use`
+takes the opened authority and both `log_res` clauses (`Hsub` for the
+own-set route, `Hlive`/`Hcap`/`Hreg` for `log_use_group`'s sandwich) and
+returns the pure `⌜cr = true -> b ∈ LB⌝`.  Because the conclusion is pure
+it consumes nothing, so it runs BEFORE the ledger step with the auth,
+the registry and the entry all still in hand — which is what let the
+`⌜cr = true -> uint bno ∈ LB⌝` conjunct come OUT of the ledger `iAssert`
+(two `iSplitR`s deleted) instead of being re-derived inside each arm.
+
+**THE CONVERSION FOR EVERY EXISTING CLAIMANT IS ONE LINE:**
+`LogInv.log_credit_own : (cr = true -> b ∈ Sb) -> ⊢ log_credit γ cr Sb e0 b`.
+`wp_log_write_gen`/`_sconf` KEEP their statements verbatim (pure premise,
+`log_opS`) — `_gen`'s derivation opens the birth epoch with
+`log_opS_named` and applies `log_credit_own` — so bfree, balloc, bmap,
+writei, itrunc and dirlink are byte-stable.  Only the two `_au` callers
+moved, by the same three lines each (open `e0`, `iPoseProof
+log_credit_own`, swap the `ltac:` argument for a hypothesis name).
+
+`log_opS_positive` also had to be restated at `log_opSe`
+(`log_opSe_positive`, the ABI one derived from it in one line): log_write
+now holds the epoch-exposed form, and the committing-arm `exfalso` in the
+critical section reads that fact through `lia` without naming it — delete
+the line and the failure is `Cannot find witness` 40 lines later, in a
+tactic you did not touch.
+
+**Per-file cost** (5 files, +261/−58): LogInv +143/−5 (`log_credit` and
+its three lemmas, `log_record_step`, `log_credit_use`, `log_opSe_positive`);
+SpecLogWrite +18/−7; ProofLogWrite +79/−39 (the credited arm is the whole
+of it); ProofIupdate +11/−3; ProofIalloc +10/−4.
+
+**WHERE G-4's crz THREADING MEETS THIS PREMISE.**  `ireg_obs_use`'s payout
+is `∃ e, ⌜e0 <= e⌝ ∗ logged_at γ e (IBLOCK inum icfg_ist)` — literally
+`log_credit`'s right disjunct at `b := uint bno`, so `LogInv.log_credit_group`
+converts it in one step.  The meeting point is NOT log_write: iput's free
+arm reaches it through `iupdate`, and `SpecIupdate`'s credgen honesty
+premise is still the PURE `cru = true -> uint bno ∈ Sb` (unchanged here on
+purpose — nothing yet has a witness to pass).  So G-4's ledger-side work
+is exactly this stage's shape one tier up: credgen's premise becomes
+`log_credit γ cru Sb e0 (uint bno)` beside a `log_opSe`, ProofIupdate
+FORWARDS it instead of building it with `log_credit_own`, and credgen's
+three consumers (ProofItrunc :339, ProofWritei :1120, ProofIput :2125)
+convert with `log_credit_own` exactly as the `_gen` callers do here.
