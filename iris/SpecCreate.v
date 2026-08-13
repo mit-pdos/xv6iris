@@ -55,10 +55,59 @@
        return 0;
      }
 
-   312 bytes, 111 instructions, `create` = 0x80004ab2.  create calls NO
-   panic: every failure is an ordinary arm.
+   create calls NO panic: every failure is an ordinary arm.
 
-   ==== THE DECODE, READ OFF CodeCreate.v IN FULL =========================
+   ==== THE nlink GUARD, AND WHAT IT DOES TO THE DECODE BELOW (9da28f5) ====
+
+   The `if (dp->nlink == 0)` above is upstream `9da28f5`'s second guard
+   (`kernel-defects.md` D2; namex has the twin, and `ProofNamex` walks it).
+   It grew create from 312 bytes to **332** and it moved every offset in the
+   listing below, so:
+
+   **THE DECODE BLOCK THAT FOLLOWS IS AT PRE-9da28f5 OFFSETS AND MUST BE
+   REGENERATED BEFORE ANY WALK.**  It is kept because its FIVE structural
+   findings are all still true (four dirlink call sites for three source
+   calls; `dp->nlink++` last; create never stores `ip->type`; one register
+   carries the answer; a0 is not reloaded before either ilock).  What moved:
+   the register allocation (the answer now lives in s2, not s3) and every
+   address from the prologue on.  Read `CodeCreate.v`, not this comment.
+
+   What IS verified against the regenerated `CodeCreate.v` at this revision:
+
+     +0x00  c.addi16sp -80                   FRAME STILL 80 BYTES / 10 SLOTS
+            (0x715d), eight callee-saves at 72/64/56/48/40/32/24/16
+     +0x1c  jal nameiparent  / +0x20 mv s1,a0 (dp) / +0x22 beqz -> ARM N
+     +0x26  jal ilock                        (a0 still dp)
+     +0x2a  lhu a5,74(s1)                    dp->nlink                 [GUARD]
+     +0x2e  c.beqz a5 -> +0x76               [ARM G, the guard's exit]
+     +0x30  li a2,0 / addi a1,s0,-80 / mv a0,s1 / +0x38 jal dirlookup
+     +0x76  mv a0,s1 / +0x78 jal iunlockput (dp) / +0x7c li s2,0
+     +0x7e  c.j +0x62                        (the epilogue funnel)
+
+   **ARM G IS A MEMBER OF THE ok = false FAMILY, AND THE CONTRACT ALREADY
+   ADMITS IT** -- this is the whole reason `wp_create_sconf_body` does not
+   move for the fix.  Its exit is `iunlockput(dp); return 0`, i.e. ARM N's
+   payload one call later, so the failure arm's "a0 = 0 and create holds
+   nothing -- every inode it touched has been iunlockput" is literally true
+   of it; the slot ledger is untouched (nameiparent spends two and returns
+   one, the `iunlockput` returns the second, so `ns' = ns`, well inside
+   `ns - create_slots <= ns' <= ns`); `Sb` grows and `u` falls only by
+   whatever flush the `iput` inside `iunlockput` runs, which is exactly what
+   `Sb ⊆ Sb'` / `u' <= u` were written for.  The failure family is therefore
+   **N / G / F-BAD / A-FAIL / FAIL**, five arms where the text below says
+   four.  Design: `fs-icache.md` §20.17 step 1.
+
+   The guard's DECISION is `ProofNamex`'s at +0xce/+0xd2 verbatim -- the
+   halfword comes out of the `i_nlink` conjunct of `ic_loaded`'s
+   `inode_meta`, and `sign_extend' 64` is injective on `mword 16`, so the
+   `c.beqz` decides `di_nlink dn = 0` exactly (`ProofNamex.nx_nlz_eq` /
+   `nx_nlz_ne`; those two want hoisting out of `ProofNamex.v` rather than
+   copying).  The FALL-THROUGH is the interesting half: it hands the walk
+   `bv_unsigned (di_nlink dn) <> 0` at the SAME `dn` that `ic_loaded` names
+   in its `dinode_at` and quantifies its `dir_links` over -- which is the
+   raw material §20.17's step 4/5 consume.
+
+   ==== THE DECODE (PRE-9da28f5 OFFSETS -- SEE ABOVE) =====================
 
    FRAME: 80 bytes ([addi sp,sp,-80] at +0x00, [addi s0,sp,80] at +0x12),
    EIGHT callee-saves (ra 72, s0 64, s1 56, s2 48, s3 40, s4 32, s5 24,
@@ -271,10 +320,21 @@ Import Defs.
 
 Local Open Scope Z_scope.
 
-(* create's own frame is 80 bytes (10 slots).  Its deepest callee is
-   nameiparent (96); dirlink wants 92, dirlookup 82, iunlockput 64,
-   ialloc 48, ilock and iupdate 44 each. *)
-Definition K_create : nat := 106%nat.
+(* create's own frame is 80 bytes (10 slots) -- UNCHANGED by 9da28f5's guard,
+   which added instructions but no stack (the `c.addi16sp` at +0x00 is still
+   0x715d = -80 and the eight callee-saves still go to 72..16).  Its deepest
+   callee is nameiparent (98); dirlink wants 94, dirlookup 84, iunlockput 64,
+   ialloc 48, ilock and iupdate 44 each.
+
+   98, and the three that moved all moved for ONE reason, the copyout chain
+   SpecDirlookup.v documents: [psz] needs a callee-saved home in copyout, so
+   copyout went 50 -> 52, either_copyout 56 -> 58, readi 70 -> 72, dirlookup
+   82 -> 84, and from there namex 94 -> 96, nameiparent 96 -> 98, dirlink
+   92 -> 94.  10 + 98 = 108.  Checked against SpecNameiparent.v:78 (98),
+   SpecDirlink.v:195 (94), SpecDirlookup.v:159 (84), SpecIunlockput.v:106
+   (64), SpecIalloc.v:153 (48), SpecIlock.v:165 (44), SpecIupdate.v:113 (44).
+   [ProofCreateParts.cr_K_value] carries the same number. *)
+Definition K_create : nat := 108%nat.
 
 (* THE LEDGER UNITS create must have in hand.  nameiparent takes two and
    returns one on success; dirlookup's iget takes the second on the found
