@@ -24,9 +24,11 @@ entries are discharged. Full tree green as of xv6 rev `0024d4b`.
 sibling `kxc_at_1a2` are already written and proven-into, so B2 starts from a
 fixed interface. See "Worklist" at the bottom.
 
-**Nothing is blocked.** Of the three upstream blockers this project found, two
-were fixed and the third does not gate the proof — it only bounds which
+**Nothing is blocked.** Of the three upstream blockers this project found,
+two were fixed and the third does not gate the proof — it only bounds which
 pathnames the theorem covers (`L ≤ 1`, so `/init` and `sh`, not `/bin/sh`).
+Read "THE SIZE BOUND IS THE COVERAGE INVARIANT" below before writing any
+phase that calls `uvmalloc`.
 
 ## Status
 
@@ -279,36 +281,32 @@ Carried across iterations, in the machine's own variables (`s10 = i`,
 That dual is the one to think about. It is true — `uvmalloc` maps
 `[PGROUNDUP(oldsz), newsz)` and the previous iteration left `[0, oldsz)`
 covered, and `PGROUNDUP(oldsz) >= oldsz` means the two runs abut with no hole
-— and it is what phase C will need. State it page-granularly:
+— and it is **what makes the whole loop provable at all**: it is what bounds
+`sz`, via the pigeonhole in `UmCovered.v` ("THE SIZE BOUND IS THE COVERAGE
+INVARIANT" below). It lives there, as `UmCovered.um_covered`,
+page-granularly and with NO `pte_vu` conjunct:
 
 ```coq
-kxc_covered sz um := forall vpn, (bv_unsigned vpn * 4096 < uint sz)%Z ->
-                       exists w, um !! vpn = Some w /\ pte_vu w
+um_covered_z z um := forall vpn, (bv_unsigned vpn * 4096 < z)%Z ->
+                       is_Some (um !! vpn)
 ```
 
-### THE GAP THAT WAS PREDICTED HERE IS GONE — and how it went
+The missing `pte_vu` is not an oversight: `uvmalloc`'s post pins the new
+map's DOMAIN and nothing about the words in it, so the `pte_vu` form is not
+inductive across the call.
 
-This section used to say phase C would need `SpecUvmalloc` strengthened to
-publish its new leaves' permission, because `copyout`'s mapped arm needed
-`co_mapped` (with `pte_vu`) over pages uvmalloc had just created, and
-`uvmclear`'s premise needed the leaf's flag bits on top of that.
+### PHASE C NEEDS NOTHING ABOUT ITS DESTINATION RANGE
 
-**None of that is true any more, and the reason is worth keeping.** xv6 rev
-`0024d4b` changed the KERNEL: `vmfault` now takes the size as an argument and
-maps into the pagetable it was handed, instead of `myproc()->pagetable`.
-`copyin`/`copyout`/`copyinstr` gained a matching `psz` in a1 (shifting every
-later argument down a register), and all four contracts DROPPED `p_sz` and
-`p_pagetable` — those premises existed only because the vmfault underneath
-read those cells. Phase C now passes `psz` and needs nothing about its
-destination range at all.
+`copyout`'s mapped arm used to need `co_mapped` (with `pte_vu`) over pages
+uvmalloc had just created, and `uvmclear`'s premise needed the leaf's flag
+bits on top of that. xv6 `0024d4b` retired both: `vmfault` takes the size as
+an argument and maps into the pagetable it was handed, `copyin`/`copyout`/
+`copyinstr` gained a matching `psz` in a1, and all four contracts dropped
+`p_sz` and `p_pagetable` — those premises existed only because the vmfault
+underneath read those cells. Phase C passes `psz` and is done.
 
-`ProofKexecB.kxc_covered` — the "everything below `sz` is mapped" dual of
-`um_below`, carried in the phdr loop invariant precisely to feed that gap — is
-now **dead weight**. It is flagged in place rather than removed, because it was
-noticed mid-bump; **phase B2 should drop it from `kxc_at_12c`** unless the loop
-turns out to want it for its own reasons. Check before deleting: `um_below` is
-still needed (proc_freepagetable's premise), only its dual is orphaned.
-
+That is why the coverage invariant carries no `pte_vu`, and it is NOT a
+reason to drop the invariant: its consumer is the size bound, not `copyout`.
 
 ## Block-interface conventions (decided before the first block was written)
 
@@ -546,6 +544,49 @@ its premise (`:136`) and its postcondition (`:182`) are stated over — and quot
 that name from `SpecKexec`. Worth folding into the fs-namei fix; not worth a
 separate sweep.
 
+## THE SIZE BOUND IS THE COVERAGE INVARIANT
+
+The phdr loop calls `uvmalloc(pagetable, sz, ph.vaddr + ph.memsz, perm)`, and
+`ph.vaddr + ph.memsz` is read out of an untrusted file: exec checks only that
+`memsz >= filesz`, that the sum does not wrap, and that `vaddr` is
+page-aligned. So kexec cannot pay a bound on `newsz`, and **it cannot take
+one as a scoping premise either** — its contract takes a *path*, so the
+file's program headers live behind phase A's existential and are not nameable
+in the statement. (Contrast blocker 3, the log budget: `L` is the path's
+element count, a function of an argument, so it *can* be a premise. The test
+for whether a scoping premise is available is whether the thing it scopes is
+reachable from the contract's arguments.)
+
+It does not need one. `SpecUvmalloc`'s premise is a disjunction:
+
+```coq
+  ((uint newsz <= uvm_maxsz)%Z \/ um_covered oldsz P.(ud_um)) ->
+```
+
+growproc, which tests (`sz + n > TRAPFRAME` returns −1), passes the left arm.
+**kexec passes the right one, and the phdr loop maintains it for free** —
+`uvmalloc` maps eagerly, so everything below the size it returns really is
+mapped (`UmCovered.um_covered_after` is that step). What makes the right arm
+sufficient is `iris/UmCovered.v`: a table with every page below `z` mapped,
+no aliasing (`um_inj`) and only kalloc pages in it (`um_pages_valid`) has
+`z <= 4096 * kmem_maxppn = PHYSTOP`, which is 120× below `uvm_maxsz`. Both
+premises are conjuncts of `proc_pt_wf`, so holding `proc_pt` pays for them.
+
+Three consequences for the loop invariant:
+
+- **The coverage half is load-bearing, not bookkeeping.** It is the only
+  thing that bounds `sz` at all. Carry it.
+- **It must NOT carry `pte_vu`.** `uvmalloc`'s postcondition pins the new
+  map's DOMAIN and says nothing about the words in it, so a coverage
+  predicate with a `pte_vu` conjunct is not inductive across the very call
+  the invariant exists for. `UmCovered.um_covered_z` is `is_Some`,
+  deliberately.
+- **`bv_unsigned szv <= uvm_maxsz` need not be a separate conjunct.** It is a
+  projection of coverage (`UmCovered.proc_pt_covered_maxsz`), which is also
+  how phase B2's `bad:` tail pays `proc_freepagetable`'s size premise.
+- Phase C's `uvmalloc(pagetable, sz, sz + (USERSTACK+1)*PGSIZE, PTE_W)` uses
+  the same disjunct, so it needs no bound on `sz` either.
+
 ## What is NOT blocked
 
 - **`proc_pagetable` in the uncounted regime.** kexec runs at
@@ -640,8 +681,11 @@ numbers here).
 
 Specific things already established for it:
 
-- **Drop `kxc_covered`** from the loop invariant unless B2 wants it — see
-  "THE GAP THAT WAS PREDICTED HERE IS GONE". `um_below` stays.
+- **KEEP the coverage invariant** — restated over `UmCovered.um_covered`
+  (no `pte_vu`), because it is what bounds `sz`; see "THE SIZE BOUND IS THE
+  COVERAGE INVARIANT". `um_below` stays too, and the separate
+  `bv_unsigned szv <= uvm_maxsz` conjunct can go: it is a projection of
+  coverage (`UmCovered.proc_pt_covered_maxsz`).
 - `panic("loadseg: address should exist")` is a LIVE panic and is discharged
   free by the `panic_wp_any` the contract already carries for ilock's.
 - `off` is stated through the `int` truncation

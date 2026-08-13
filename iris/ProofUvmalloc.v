@@ -63,6 +63,7 @@ Require Import CpuOwn.
 Require Import KvmSpec.
 Require Import ByteCursor.
 Require Import ProcPt ProcPtOwn.
+Require Import UmCovered.
 Require Import CodeUvmalloc.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSconfVc.
@@ -353,7 +354,16 @@ Section ProofUvmalloc.
     bv_unsigned newsz = nz ->
     (pu mod 4096 = 0)%Z ->
     (0 <= pu)%Z ->
-    (nz <= 274877898752)%Z ->
+    (* THE ADDRESS BOUND, per iteration.  It used to be [nz <= uvm_maxsz]
+       -- one bound on the argument, uniform in [j].  It is a PREMISE ABOUT
+       THE DESCRIPTOR REACHED instead, because kexec's [newsz] comes out of a
+       file and cannot be bounded: what bounds [a] there
+       is that every page below it is already MAPPED, and physical memory is
+       finite ([UmCovered.uvma_addr_bound]).  The caller proves this from
+       whichever disjunct of the contract's premise it holds. *)
+    (forall (Pj : uptd) (j : nat), proc_pt_wf Pj -> (j < n)%nat ->
+       dom Pj.(ud_um) = dom P.(ud_um) ∪ vpn_run (svpn_of (pgroundup oldsz)) j ->
+       (pu + 4096 * Z.of_nat j + 4096 <= 274877898752)%Z) ->
     (uint oldsz <= uint newsz)%Z ->
     (forall j : nat, (pu + 4096 * Z.of_nat j < nz)%Z <-> (j < n)%nat) ->
     (forall j : nat, (j < n)%nat ->
@@ -386,7 +396,7 @@ Section ProofUvmalloc.
     ua_exit (CID0 := CID0) mm P (svpn_of (pgroundup oldsz)) n K eb p C b sp0 spr oldsz newsz -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hxrng Hperm Hb3 Hb5 Hb8 Hpu Hnz Hpumod Hpu0 Hnb Hoin Hnchar Hfresh.
+    intros HK Hxrng Hperm Hb3 Hb5 Hb8 Hpu Hnz Hpumod Hpu0 Hab Hoin Hnchar Hfresh.
     assert (HKka : (14 <= K - 10)%nat) by (clear -HK; lia).
     assert (HKms : (2 <= K - 10)%nat) by (clear -HK; lia).
     assert (HKmp : (32 <= K - 10)%nat) by (clear -HK; lia).
@@ -403,20 +413,25 @@ Section ProofUvmalloc.
     (* ---- the arithmetic of THIS iteration, all up front ---- *)
     assert (Hin : (i < n)%nat) by (clear -Hsum Hrem; lia).
     pose proof (proj2 (Hnchar i) Hin) as Hain.
+    (* the well-formedness of the CURRENT descriptor -- what [Hab] reads.
+       [iDestruct … as %_] on a PURE conclusion does not spend the resource,
+       so no keep-the-hypothesis accessor is needed. *)
+    iDestruct (proc_pt_wf_get Pi with "Hpt") as %Hwfi.
+    pose proof (Hab Pi i Hwfi Hin Hdom) as Habi.
     assert (Hbnd38 : (pu + 4096 * Z.of_nat i < 274877906944)%Z)
-      by (clear -Hain Hnb; lia).
+      by (clear -Habi; lia).
     assert (Havmod : (bv_unsigned av mod 4096 = 0)%Z)
       by (rewrite Hav; exact (ua_z_avmod pu (Z.of_nat i) Hpumod)).
     assert (Havb : (bv_unsigned av + 4096 <= 274877898752)%Z)
-      by (apply (ua_z_avfit _ nz Havmod); [rewrite Hav; clear -Hain; lia | exact Hnb]).
+      by (rewrite Hav; clear -Habi; lia).
     assert (Hpgav : pgroundup av = av).
     { apply pgroundup_id; [exact Havmod |].
       rewrite Hav. change (2 ^ 64)%Z with 18446744073709551616%Z.
-      clear -Hain Hnb. lia. }
+      clear -Habi. lia. }
     assert (Hpgpu : pgroundup (pgroundup oldsz) = pgroundup oldsz).
     { apply pgroundup_id; [rewrite Hpu; exact Hpumod |].
       rewrite Hpu. change (2 ^ 64)%Z with 18446744073709551616%Z.
-      clear -Hain Hnb. lia. }
+      clear -Habi. lia. }
     (* [uvmd_np]'s guard splits here: on the FIRST iteration the rollback
        range is empty and the guard closes it; from the second on it is the
        ordinary quotient. *)
@@ -1096,7 +1111,7 @@ Section ProofUvmalloc.
                      (add_vec (mg !!! Regidx Rs2) (mg !!! Regidx Rs3))]> mg).
       assert (Hav0b : (0 <= pu + 4096 * Z.of_nat i)%Z) by (clear -Hpu0; lia).
       assert (Hav1b : (pu + 4096 * Z.of_nat i + 4096 < 18446744073709551616)%Z)
-        by (clear -Hain Hnb; lia).
+        by (clear -Habi; lia).
       assert (Havs : bv_unsigned (add_vec av (mword_of_int 4096))
                      = (pu + 4096 * Z.of_nat (S i))%Z).
       { rewrite (bc_add_moi av (pu + 4096 * Z.of_nat i) 4096 Hav Hav0b
@@ -1551,8 +1566,14 @@ Section ProofUvmalloc.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc Hpt #Henv Hcont".
     (* ---- the PGROUNDUP arithmetic, kept over plain [Z] (the zify rule) --- *)
-    rewrite uint_unsigned in Hobd. rewrite uint_unsigned in Hnbd.
-    rewrite uvm_maxsz_val in Hobd. rewrite uvm_maxsz_val in Hnbd.
+    rewrite uint_unsigned in Hobd. rewrite uvm_maxsz_val in Hobd.
+    (* the [newsz] premise is a DISJUNCTION now (SpecUvmalloc.v); put its
+       left arm over plain [Z] so the [remember]s below abstract it too. *)
+    assert (Hnbd2 : (bv_unsigned newsz <= 274877898752)%Z
+                    \/ um_covered oldsz P.(ud_um)).
+    { destruct Hnbd as [Hb | Hc]; [left | right; exact Hc].
+      rewrite uint_unsigned in Hb. rewrite uvm_maxsz_val in Hb. exact Hb. }
+    clear Hnbd.
     pose proof (proj1 (bv_unsigned_in_range _ oldsz)) as Hov0.
     pose proof (proj1 (bv_unsigned_in_range _ newsz)) as Hnz0.
     remember (bv_unsigned oldsz) as ov eqn:Hov.
@@ -2318,8 +2339,26 @@ Section ProofUvmalloc.
     iDestruct (Hexit_shift0 with "Hepi") as "Hepi".
     iDestruct (cpu_own_transport CID CIDu85 0%nat eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
+    (* ---- THE ADDRESS BOUND the loop now takes, from whichever disjunct ---- *)
+    assert (Hobz : (bv_unsigned oldsz <= uvm_maxsz)%Z).
+    { rewrite uvm_maxsz_val. rewrite <- Hov. exact Hobd. }
+    assert (Hab : forall (Pj : uptd) (j : nat), proc_pt_wf Pj -> (j < n)%nat ->
+              dom Pj.(ud_um) = dom P.(ud_um)
+                               ∪ vpn_run (svpn_of (pgroundup oldsz)) j ->
+              (pu + 4096 * Z.of_nat j + 4096 <= 274877898752)%Z).
+    { intros Pj j Hwfj Hjn Hdomj.
+      destruct Hnbd2 as [Hb | Hc].
+      - (* TESTED: [a < newsz <= TRAPFRAME], and both ends are page-aligned *)
+        apply (ua_z_avfit _ nz).
+        + exact (ua_z_avmod pu (Z.of_nat j) Hpumod).
+        + exact (proj2 (Hnchar j) Hjn).
+        + exact Hb.
+      - (* COUNTED: every page below [a] is mapped, and there are only so
+           many pages ([UmCovered.v]) *)
+        pose proof (uvma_addr_bound P Pj oldsz j Hobz Hwfj Hc Hdomj) as Hbnd.
+        rewrite Hpuv in Hbnd. pose proof kmem_maxppn_val. lia. }
     iApply (ua_loop γa mm P xperm K eb p C sp0 spr oldsz newsz pu nz n b
-              HK Hxrng Hperm Hb3 Hb5 Hb8 Hpuv (eq_sym Hnz) Hpumod Hpu0 Hnbd Hoin
+              HK Hxrng Hperm Hb3 Hb5 Hb8 Hpuv (eq_sym Hnz) Hpumod Hpu0 Hab Hoin
               Hnchar Hfr
               n 0%nat CIDu85 P R12 (pgroundup oldsz) Hsum0 Hn1 Hav0
               (uptd_ext_refl P) (dom_run_0 (dom P.(ud_um)) (svpn_of (pgroundup oldsz)))
