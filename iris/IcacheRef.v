@@ -1147,6 +1147,66 @@ Section IcacheRef.
     (iref_frag k qtok ∗ live_frac k qid ∗
      inode_ident k (DfracOwn qid) dev inum)%I.
 
+  (* THE SHORT PARENT, GENERATION-NAMED (fs-log.md §G.24, G-4d).  Same
+     three pieces as [inode_ref_short], with the liveness slice at a NAMED
+     generation instead of the arity-preserving [live_frac] wrapper.  A
+     walker needs it for exactly one reason: it hands ilock a share at a
+     named generation, gets a one-shot back at THAT generation, and must
+     re-form a reference the consumer can read the one-shot against --
+     and [inode_ref_gather] alone loses the name, because both of its
+     inputs come back generation-erased.
+
+     Nothing is proven about stability here and nothing needs to be: the
+     generation is an [agree] ([live_gen_agree]), and a regen must consume
+     the WHOLE unit ([live_frac_bump]), which a held slice makes
+     unownable.  Holding the reference IS the stability. *)
+  Definition inode_ref_short_gen (k : nat) (qtok qid : Qp)
+      (dev inum : mword 32) (g : gname) : iProp Σ :=
+    (iref_frag k qtok ∗ live_gen k qid g ∗
+     inode_ident k (DfracOwn qid) dev inum)%I.
+
+  Lemma inode_ref_short_gen_intro k qt qi dev inum :
+    inode_ref_short k qt qi dev inum
+      ⊣⊢ ∃ g : gname, inode_ref_short_gen k qt qi dev inum g.
+  Proof.
+    rewrite /inode_ref_short /inode_ref_short_gen /live_frac.
+    iSplit.
+    - iIntros "($ & [%g Hg] & $)"; last first. iExists g. iFrame.
+    - iIntros "[%g ($ & Hg & $)]". iExists g. iFrame.
+  Qed.
+
+  Lemma inode_ref_short_gen_forget k qt qi dev inum g :
+    inode_ref_short_gen k qt qi dev inum g -∗ inode_ref_short k qt qi dev inum.
+  Proof.
+    iIntros "H". rewrite inode_ref_short_gen_intro. iExists g. iFrame.
+  Qed.
+
+  (* the two slices of one slot name one generation -- [live_gen_agree] at
+     the pointer-free altitude, which is what lets a walker learn that the
+     share it lent ilock and the parent it kept are the same generation *)
+  Lemma inode_ref_short_shr_gen_agree k qt qi s dev inum d2 n2 g1 g2 :
+    inode_ref_short_gen k qt qi dev inum g1 -∗ inode_shr_gen k s d2 n2 g2 -∗
+    ⌜g1 = g2⌝.
+  Proof.
+    iIntros "(_ & H1 & _) [_ H2]". iApply (live_gen_agree with "H1 H2").
+  Qed.
+
+  (* THE NAMED GATHER: [inode_ref_gather] with the generation surviving *)
+  Lemma inode_ref_gather_gen k qi s dev inum g :
+    inode_ref_short_gen k (qi + s)%Qp qi dev inum g -∗
+    inode_shr_gen k s dev inum g -∗
+    inode_ref_gen k (qi + s)%Qp dev inum g.
+  Proof.
+    iIntros "(Hf & Hl1 & Hid1) [Hid2 Hl2]".
+    rewrite /inode_ref_gen. iFrame "Hf".
+    iSplitL "Hl1 Hl2"; [iApply (live_gen_join with "Hl1 Hl2") |].
+    rewrite inode_ident_split. iFrame.
+  Qed.
+
+  Global Instance inode_ref_short_gen_timeless k qt qi dev inum g :
+    Timeless (inode_ref_short_gen k qt qi dev inum g).
+  Proof. apply _. Qed.
+
   Lemma inode_ref_canon k q dev inum :
     inode_ref k q dev inum ⊣⊢ inode_ref_short k q q dev inum.
   Proof.
@@ -1266,6 +1326,32 @@ Section IcacheHeld.
        inode_ref k q icfg_dev inum)%I.
 
   Global Instance inode_held_timeless v : Timeless (inode_held v).
+  Proof. apply _. Qed.
+
+  (* THE SAME REFERENCE, CARRYING ITS RECORD'S TYPE (fs-log.md §G.24,
+     G-4d).  ADDITIVE: [inode_held] does not move, and this is it with the
+     generation NAMED beside the generation's own type one-shot.  What it
+     is for: [nameiparent] returns a directory, and create performs no
+     parent type test at all (fs-sysfile.md's Blocker B) -- so the walker,
+     which DID test it under the lock, hands the fact on.  A consumer
+     cashes it by shedding a share at the same generation, calling ilock,
+     and joining the two one-shots with [ity_shot_agree]; the generation
+     cannot have moved under it, because a regen needs the whole liveness
+     unit and this reference holds a slice. *)
+  Definition inode_held_ty (v : mword 64) (ty : bv 16) : iProp Σ :=
+    (∃ (k : nat) (q : Qp) (inum : mword 32) (g : gname),
+       ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
+       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
+       inode_ref_gen k q icfg_dev inum g ∗ ity_shot g ty)%I.
+
+  Lemma inode_held_ty_forget v ty : inode_held_ty v ty -∗ inode_held v.
+  Proof.
+    iIntros "(%k & %q & %inum & %g & %Hv & %Hk & %Hb & Href & _)".
+    iExists k, q, inum. iFrame "%".
+    rewrite inode_ref_gen_intro. iExists g. iFrame.
+  Qed.
+
+  Global Instance inode_held_ty_timeless v ty : Timeless (inode_held_ty v ty).
   Proof. apply _. Qed.
 
   (* the pointer of a held entry is not null -- [fileclose] and [kexit]

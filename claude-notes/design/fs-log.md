@@ -1777,3 +1777,84 @@ Gate: MAKE_EXIT=0, 1086 `.vo`, staleness 0, `make -n` 0 `COQC`, md5s
 verified on all nine files, 52 recompiles.  `Print Assumptions` on
 `wp_itrunc_gen`, `wp_itrunc_sconf`, `wp_iput_gen`, `wp_iunlockput_gen`:
 the standing six, no admits.
+
+
+### G.24 G-4d STOPPED after its additive half: `IcacheRef`'s bundled
+### primitives LAND; the walk's `crz` mint needs TWO AMBIENT TIES the trio's
+### counted contract cannot carry, and that is a contract-shape ruling
+
+**WHAT LANDED** (gate: MAKE_EXIT=0, 1086 `.vo`, staleness 0, `make -n` 0,
+md5 verified, 368 recompiles — `IcacheRef` is a 368-file cone, so budget
+one full rebuild per edit of it).  All additive; no contract moved:
+
+* `inode_ref_short_gen` + `_intro` / `_forget` / `inode_ref_short_shr_gen_agree`,
+  and `inode_ref_gather_gen` — the gather WITH the generation surviving.
+  It is needed because both of `inode_ref_gather`'s inputs come back
+  generation-ERASED (`SpecIunlock`'s post hands back a plain `inode_shr`),
+  so a walker that lent ilock a named share cannot otherwise read ilock's
+  one-shot against the reference it re-forms.
+* `inode_held_ty v ty` — the pointer-keyed reference bundled with
+  `ity_shot g ty` at the reference's own generation, plus
+  `inode_held_ty_forget`.  Stated at an arbitrary `ty` rather than at
+  `T_DIR` so `IcacheRef` need not know `SpecDirlookup`'s constant.
+
+**THE STOP.**  Every per-level `iunlockput` in the walk must run
+`crz := true`, and `crz`'s premise (SpecIput, §G.22) carries the region's
+two ambient ties — `⌜g = icfg_log⌝` and `⌜inodestart = icfg_ist⌝` — because
+`InodeRegion.ireg_obs_mint` needs `log_epoch_lb icfg_log e0` while the walk
+holds only `log_epoch_lb g e0`, and `ireg_obs_use` pays out at
+`IBLOCK inum icfg_ist` while itrunc's credit is at `IBLOCK inum inodestart`.
+Neither is derivable: `ireg_inv` does not mention a `log_names` at all, and
+§G.16 already ruled that a tie carried in a body existential admits no
+agreement with a consumer's own γ.  So the walk can only mint if its OWN
+contract carries the ties — and `wp_namex_sconf` / `wp_namei_sconf` cannot,
+because their one consumer (`ProofKexecA`) threads `g` and `inodestart`
+with nothing tying them to the ambient cache.
+
+**THE THREE SHAPES, PRICED.**
+
+| option | contract | cost |
+|---|---|---|
+| (i) `cz`-indexed walk | the trio gains `cz : bool`, two GUARDED pure premises, and a two-shaped budget clause (`if cz then walk_spend w + … else (L+1)*iput_units`); sconf = `cz := false`, byte-stable | ~6 budget seams in a 5785-line proof each gain a `destruct cz`, at ~5 min per iteration; and the boolean is in the public contract forever |
+| (ii) AMBIENT TIES (recommended) | the trio gains `g = icfg_log` and `inodestart = icfg_ist` as PURE premises beside the two it already has (`dev = icfg_dev`, `nib = icfg_nib` — premise (1), "ProofKexit's pattern"); `SpecCreate` already carries that pair and would carry four | ZERO extra proof complexity in `ProofNamex`; ripples ONLY to `SpecKexec` (2 lines — it already carries the same pair) and the intro lines of `ProofKexecA`/`B`/`B2`/`Tail`.  **`SpecKexec` has no external consumer at all** (no `LinkKexec`, nothing outside the kexec proof requires it), so the ripple dies inside a frontier |
+| (iii) make the ties derivable | put `⌜inodestart = icfg_ist⌝` in `ireg_inv`'s body and read it under the mask | kills only HALF: the γ tie has no carrier, since `ireg_inv` names no `log_names` |
+
+(ii) is the shape the guiding principle wants — a boolean that exists only
+so one caller can opt out of a fact that is true everywhere (there is one
+log and one inode region) is the awkward interface the notes say never to
+keep.  It is out of the sanctioned statement set by exactly one file
+(`SpecKexec.v`), which is why this stopped rather than proceeded.
+
+**WHAT IS UNBLOCKED THE MOMENT THE TIE RULING LANDS**, all verified here:
+
+* the walk's own arithmetic, level by level: pass `crb := w_cur` and
+  `crz := true` at the FOUND site (+0xec), keep the invariant
+  `⌜w = true -> bmapstart ∈ S_cur⌝ ∗ ⌜n - walk_spend w <= n_cur⌝`, and
+  `w_next := w_cur || w'` closes at every level — PROVIDED the posts also
+  state `⌜crb = true -> w = false⌝`, which G-4c proved but did not
+  EXPOSE.  Without that clause a credited level's post admits `w = true`
+  and the invariant's budget step fails.  One more pure clause on
+  `wp_itrunc_gen` / `wp_iput_gen` / `wp_iunlockput_gen`, provable from
+  `bm_paidS_elim`'s `w = negb crb && paid`.
+* the walk's premise re-price: `(L + 1) * iput_units <= n` becomes
+  `walk_need L <= n` with `walk_need 0 = iput_units` and
+  `walk_need (S _) = S iput_units` — i.e. FOUR units regardless of path
+  length, which is what create's ten can pay.  The counted premise implies
+  it at both shapes, so `wp_namex_sconf` stays byte-stable.
+* the walk's post: the spend is `walk_spend w + (if ok then 0 else 1)`.
+  The `+1` is honest and unavoidable: `L_notdir` (+0x54) and `L_nlink`
+  (+0x7a) run BEFORE/AT the nlink guard, so neither is downstream of a
+  mint and neither can be credited — but both are TERMINAL, and so is
+  `L_done`'s `iput` (+0x140), so the walk pays it at most once.  The
+  SUCCESS arms cost nothing extra: namei returns at +0x140 without an
+  iput, and nameiparent returns through `L_par` (+0x84), which calls
+  `iunlock`, not `iunlockput`.  `CreateBudget.cr_uw w = cr_u0 - np_spend w`
+  is therefore exactly right for create, which proceeds only on success.
+* the bundled parent: at `L_par` the walk holds `#Hshot : ity_shot gsh
+  (di_type dnl)` and `Htyd : di_type dnl = T_DIR` (ProofNamex:3701), and
+  the named gather above turns `Hkeep`/`Hshr` into `inode_ref_gen … gsh`.
+  The one preparation needed upstream is to name the short parent's
+  generation at the SHED (`inode_ref_short_gen_intro` +
+  `inode_ref_short_shr_gen_agree` right after `inode_shr_gen_intro`), and
+  to `inode_ref_short_gen_forget` at the four `iunlockput` sites that
+  consume it.
