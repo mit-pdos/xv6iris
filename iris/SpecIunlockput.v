@@ -246,7 +246,7 @@ Definition wp_iunlockput_gen_body
     (used : gset Z)
     (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
-    (n : nat) (Sb : gset Z) (crb cru : bool)
+    (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
     (b : bool) :=
@@ -321,7 +321,14 @@ Definition wp_iunlockput_gen_body
   disk_geom gd pd pav pu -∗
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   bslots bn 3 -∗
-  log_opS g n Sb -∗
+  (* THE GROUP CREDIT, threaded verbatim to iput (SpecIput.v's [crz]):
+     [emp] at [crz = false], the walker's [nlz_obs] plus the region's two
+     ambient ties at [crz = true]. *)
+  (if crz then nlz_obs (bv_unsigned inum) e0 ∗ ⌜g = icfg_log⌝ ∗
+                ⌜inodestart = icfg_ist⌝
+   else emp) -∗
+  (* the reservation, EPOCH-NAMED: [log_opSe] in, [log_opS] out *)
+  log_opSe g n Sb e0 -∗
   (* THE CROSSING IS THE LITERAL [true]: iunlockput parks (through iput,
      down to sleep), so it can return on another hart whatever SIE was
      doing. *)
@@ -340,7 +347,7 @@ Definition wp_iunlockput_gen_body
       bitmap_res gfs bmapstart cov logstart size used' -∗
       bslots bn 3 -∗
       ⌜Sb ⊆ Sb'⌝ -∗
-      ⌜((n - ip_spend_max crb cru)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
+      ⌜((n - ip_spend_max crb cru crz)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_opS g n' Sb' -∗
       iref_slot -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -371,8 +378,8 @@ Module Type IUNLOCKPUT.
                                size dev used k qi s gy inum dn' bm' n
                                pidv dq dqb dqs m K eb C b.
   (* the credited set-form contract; [wp_iunlockput_sconf] is this at
-     [crb := cru := false], derived at the [log_op] existential's own
-     witness. *)
+     [crb := cru := crz := false], derived at the [log_op] existential's own
+     witness and at the birth epoch [LogInv.log_opS_named] opens. *)
   Parameter wp_iunlockput_gen :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
@@ -388,12 +395,12 @@ Module Type IUNLOCKPUT.
       (used : gset Z)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
-      (n : nat) (Sb : gset Z) (crb cru : bool)
+      (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
       wp_iunlockput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                              gil gisl cov logstart bmapstart inodestart nib
                              size dev used k qi s gy inum dn' bm' n Sb crb cru
-                             pidv dq dqb dqs m K eb C b.
+                             crz e0 pidv dq dqb dqs m K eb C b.
 End IUNLOCKPUT.

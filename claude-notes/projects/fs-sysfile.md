@@ -6241,3 +6241,29 @@ For the D₀ brief, the two facts that matter:
   contract does arrive, no create arm has to be re-priced -- and the shape
   the trio's post must expose is fixed: the spend bound, plus "it paid
   ⟹ `bmapstart ∈ Sb'`", which is what makes `w` an honest read.
+
+
+### G-4b (2026-08-13) — iput's `crz` LANDS; the trio does NOT move, and the
+### reason is a SECOND coupling.  **The full record is design/fs-log.md §G.22.**
+
+For the D₀ brief, what its relaunch may assume, verbatim:
+
+* **From `nameiparent`'s post: STILL NOTHING NEW.**  `SpecNamex` /
+  `SpecNamei` / `SpecNameiparent` are byte-identical for the third stage
+  running.  The success post still spends the counted
+  `(L + 1) * iput_units`, still offers no `bmapstart ∈ Sb'`, and still
+  returns a generation-FREE `IcacheRef.inode_held`.  Blocker B is open;
+  the ledger row is open.  **D₀ does not relaunch.**
+* **What DID move is one tier down and invisible to create:**
+  `wp_iput_gen` / `wp_iunlockput_gen` now take `crz` + the birth epoch, so
+  a walker's freeing `iunlockput` spends the BITMAP unit and nothing else
+  (`ip_spend_max crb cru crz`, the `cru || crz` term).  create's own
+  `iunlockput` calls are unaffected: they claim `cru` from their own
+  flush and pass `crz := false`.
+* **What is still missing, and it is NOT the crz chain:** nothing couples
+  "a level paid" to "`bmapstart ∈ Sb'`".  `SpecItrunc.bm_paidS` has the
+  fact and `bm_paidS_elim` discards it, so neither itrunc's nor iput's
+  post can state it and the walk's `np_spend w <= 1` is unprovable at any
+  path length.  G-4c (design/fs-log.md §G.22's table) is what unblocks it.
+* **`CreateBudget` is untouched and still closes** — all five arm
+  theorems are `forall w` and were not re-run against anything new here.

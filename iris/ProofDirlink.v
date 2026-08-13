@@ -1756,13 +1756,16 @@ Section ProofDirlinkMain.
         [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
       iDestruct (cpu_own_transport CIDdl CID14 0%nat eb (proc_addr j) C b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-      (* THE SET-FORM iput, at BOTH credits false -- dirlink presents no
+      (* THE SET-FORM iput, at ALL THREE credits false -- dirlink presents no
          absorption of its own; what it needs from the gen form is the
-         [Sb ⊆ Sb'] its own contract must promise past the child's flush. *)
+         [Sb ⊆ Sb'] its own contract must promise past the child's flush.
+         The birth epoch is opened for the reservation and never named
+         again: at [crz = false] iput makes no epoch-ordered claim. *)
+      iDestruct (log_opS_named with "Hop") as (edl) "Hop".
       iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                 gil gisl cov logstart bmapstart inodestart nib size dev used
                 kslot qq (zero_extend' 32 (dir_inum data kk : mword 16) : mword 32)
-                ncount Sb false false pidv dq dqb dqs E1 (K - 10)%nat eb C b
+                ncount Sb false false false edl pidv dq dqb dqs E1 (K - 10)%nat eb C b
                 ltac:(exact HKip) Hkslot
                 ltac:(intros Hc; discriminate Hc)
                 ltac:(intros Hc; discriminate Hc)
@@ -1771,9 +1774,10 @@ Section ProofDirlinkMain.
                 HE1a0
                 with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlog Hitb2 Hitbl Hesck
                       Hiregi Hslk Href Hsbb Hsbi Hbmr Hppid Hprocs Hdev Hgeom
-                      Hdlk Hbsl Hop").
+                      Hdlk Hbsl [] Hop").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
+      { iEval (cbn beta iota). iEmpIntro. }
       iIntros (CIDip Hsip mip nn uu Sbp)
         "%Hcsip Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Huu Hbmr Hbsl %Hsbp %Hnn Hop
          Hislot".
@@ -1782,7 +1786,7 @@ Section ProofDirlinkMain.
          dirlink's own clause is stated at the coarse figure.  One weakening
          at the seam, KEEPING the name, so nothing downstream moves. *)
       assert (Hnnw : ((ncount - iput_units)%nat <= nn)%nat /\ (nn <= ncount)%nat)
-        by (unfold ip_spend_max, iput_units in Hnn |- *; simpl in Hnn; lia).
+        by (unfold ip_spend_max, iput_units in Hnn |- *; cbn in Hnn; lia).
       clear Hnn. rename Hnnw into Hnn.
       assert (Hpcip : ret_pc (E1 !!! Regidx Rra : mword 64)
                       = mword_of_int (DK + 0x5c)) by (rewrite HE1ra; pcw).

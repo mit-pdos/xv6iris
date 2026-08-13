@@ -102,14 +102,14 @@ Section ProofIunlockputMain.
       (used : gset Z)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
-      (n : nat) (Sb : gset Z) (crb cru : bool)
+      (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
     : wp_iunlockput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                              gil gisl cov logstart bmapstart inodestart nib
                              size dev used k qi s gy inum dn' bm' n Sb crb cru
-                             pidv dq dqb dqs m K eb C b.
+                             crz e0 pidv dq dqb dqs m K eb C b.
   Proof.
     cbv beta delta [wp_iunlockput_gen_body].
     intros pcE ip pj ret_tgt HK Hk Hcrb Hcru Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0
@@ -118,7 +118,7 @@ Section ProofIunlockputMain.
     assert (Hipe : ip = ientry k) by reflexivity.
     iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
               #Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hpar
-              Hbms Hins Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hlogop
+              Hbms Hins Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hnlz Hlogop
               Hcont".
     (* THE eb/b BRIDGE, once per top-level lemma (eb-generic-sweep.md). *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -346,13 +346,13 @@ Section ProofIunlockputMain.
                  with "Hcont") as "Hcont".
     iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
               cov logstart bmapstart inodestart nib size dev used
-              k (qi + s)%Qp inum n Sb crb cru pidv dq dqb dqs R6 (K - 4)%nat eb C b
+              k (qi + s)%Qp inum n Sb crb cru crz e0 pidv dq dqb dqs R6 (K - 4)%nat eb C b
               ltac:(unfold K_iput; lia) Hk Hcrb Hcru
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
               Hinumb Hcovb Hnu Hj Hgl ltac:(rewrite HR6a0; exact Hipe)
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlogc Hitb2 Hitbl Hesc Hireg
                     Hslk Href Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk
-                    Hbslots Hlogop").
+                    Hbslots Hnlz Hlogop").
     iIntros (CID11 Hq11 mP n' used' Sb')
             "%HcsP Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins %Hsub Hbitmap Hbslots
              %Hssub %Hbud Hlogop Hslot".
@@ -590,17 +590,19 @@ Section ProofIunlockputMain.
               Hbms Hins Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hlogop
               Hcont".
     iDestruct "Hlogop" as (Sb0) "Hlogop".
+    iDestruct (log_opS_named with "Hlogop") as (e00) "Hlogop".
     iApply (wp_iunlockput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
               cov logstart bmapstart inodestart nib size dev used
-              k qi s gy inum dn' bm' n Sb0 false false
+              k qi s gy inum dn' bm' n Sb0 false false false e00
               pidv dq dqb dqs m K eb C b
               HK Hk ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
               Hinumb Hcovb Hnu Hj Hgl Ha0
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlogc Hitb2 Hitbl Hesc Hireg
                     Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk Hshot Hpar
-                    Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk Hbslots Hlogop
-                    [Hcont]").
+                    Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk Hbslots []
+                    Hlogop [Hcont]").
+    { iEval (cbn beta iota). iEmpIntro. }
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     iIntros (mf n' used' Sb') "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins

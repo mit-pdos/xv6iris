@@ -279,9 +279,19 @@ Definition wp_iput_sconf_body
    already logged that block) plus the two flushes, of which iput's own
    always absorbs -- itrunc's post hands out [IBLOCK inum inodestart ∈ Sb']
    determinately, so iput's [ip->type = 0] iupdate runs credited for free.
-   Definitionally [CreateBudget.ip_spend crb cru true]. *)
-Definition ip_spend_max (crb cru : bool) : nat :=
-  ((if crb then 0%nat else 1%nat) + (if cru then 0%nat else 1%nat))%nat.
+   Definitionally [CreateBudget.ip_spend crb cru true].
+
+   THE THIRD CREDIT IS THE GROUP ONE (fs-log.md §G.20 stage 2).  [cru] is
+   the OWN-SET claim "this op has already logged [IBLOCK inum inodestart]",
+   which a WALKER cannot make -- it never logged the block, some other
+   transaction-mate did.  [crz] is the same unit bought with a GROUP
+   witness instead ([InodeRegion.nlz_obs], cashed by [ireg_obs_use] into
+   [LogInv.log_credit]'s right disjunct), and it buys exactly the same
+   term: the unit itrunc's TAIL FLUSH would otherwise spend.  So the two
+   enter the figure disjunctively and a [crz] caller's freeing iput spends
+   the BITMAP unit and nothing else. *)
+Definition ip_spend_max (crb cru crz : bool) : nat :=
+  ((if crb then 0%nat else 1%nat) + (if orb cru crz then 0%nat else 1%nat))%nat.
 
 Definition wp_iput_gen_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
@@ -300,7 +310,7 @@ Definition wp_iput_gen_body
     (size : Z) (dev : mword 32)
     (used : gset Z)
     (k : nat) (q : Qp) (inum : mword 32)
-    (n : nat) (Sb : gset Z) (crb cru : bool)
+    (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
     (b : bool) :=
@@ -350,7 +360,24 @@ Definition wp_iput_gen_body
   disk_geom gd pd pav pu -∗
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   bslots bn 3 -∗
-  log_opS g n Sb -∗
+  (* THE GROUP CREDIT (fs-log.md §G.18's chain, §G.21's tier).  At
+     [crz = false] this is [emp] and every landed caller passes nothing.
+     At [crz = true] it is the walker's persistent, inum-keyed observation
+     -- "at epoch [e0], inside MY still-open op, this inum's record had a
+     NONZERO nlink" -- plus the two ambient ties [InodeRegion]'s three
+     mixed contracts carry ([IcacheRef]'s header: the region's [log_names]
+     and its first block are AMBIENT, so a threaded [g]/[inodestart] meets
+     them only through a pure equation, true at boot by [icfg_alloc]).
+     iput cashes it with [InodeRegion.ireg_obs_use] at the record whose
+     nlink its own +0x44 test found ZERO, and hands the resulting
+     [LogInv.log_credit] to itrunc's tail flush. *)
+  (if crz then nlz_obs (bv_unsigned inum) e0 ∗ ⌜g = icfg_log⌝ ∗
+                ⌜inodestart = icfg_ist⌝
+   else emp) -∗
+  (* the reservation, EPOCH-NAMED (§G.20's asymmetry: [log_opSe] in,
+     [log_opS] out -- nothing above log_write compares epochs).  [e0] is the
+     op's birth epoch, the one the credit above is ordered against. *)
+  log_opSe g n Sb e0 -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (n' : nat) (used' : gset Z) (Sb' : gset Z),
       ⌜callee_saved m mf⌝ -∗
@@ -367,7 +394,7 @@ Definition wp_iput_gen_body
       bslots bn 3 -∗
       (* the set only GROWS, and at most the credited worst case is gone *)
       ⌜Sb ⊆ Sb'⌝ -∗
-      ⌜((n - ip_spend_max crb cru)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
+      ⌜((n - ip_spend_max crb cru crz)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_opS g n' Sb' -∗
       iref_slot -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -396,9 +423,10 @@ Module Type IPUT.
                           cov logstart bmapstart inodestart nib size dev used
                           k q inum n pidv dq dqb dqs m K eb C b.
   (* the credited set-form contract; [wp_iput_sconf] is this at
-     [crb := cru := false], derived at the [log_op] existential's own
-     witness ([ip_spend_max false false = 2], and iput's own flush is the
-     third unit [iput_units] counts). *)
+     [crb := cru := crz := false], derived at the [log_op] existential's own
+     witness ([ip_spend_max false false false = 2], and iput's own flush is
+     the third unit [iput_units] counts) and at the birth epoch
+     [LogInv.log_opS_named] opens. *)
   Parameter wp_iput_gen :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
@@ -413,11 +441,11 @@ Module Type IPUT.
       (size : Z) (dev : mword 32)
       (used : gset Z)
       (k : nat) (q : Qp) (inum : mword 32)
-      (n : nat) (Sb : gset Z) (crb cru : bool)
+      (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
       wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                        cov logstart bmapstart inodestart nib size dev used
-                       k q inum n Sb crb cru pidv dq dqb dqs m K eb C b.
+                       k q inum n Sb crb cru crz e0 pidv dq dqb dqs m K eb C b.
 End IPUT.

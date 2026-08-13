@@ -2692,10 +2692,11 @@ Section ProofNamexMain.
                             C b ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
                iDestruct (wp_next_shift (b := true) (CIDa := CIDl) (CIDb := CIDA3)
                             ltac:(wp_next_chain) with "Hcont") as "Hcont".
+               iDestruct (log_opS_named with "Hlog") as (enxA) "Hlog".
                iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g gfs gi
                          cn gtl gilp gislp cov logstart bmapstart inodestart
                          nib size dev usedc pk pq pinum ncur Scur false false
-                         pidv dq dqb dqs
+                         false enxA pidv dq dqb dqs
                          T2 (K - 12)%nat eb C b
                          Kip Hpk ltac:(discriminate) ltac:(discriminate)
                          Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0
@@ -2703,9 +2704,10 @@ Section ProofNamexMain.
                          Hj Hgs HT2a0
                          with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hitb2 Hitbl
                                Hescp Hireg Hslkp Href Hbmap Hinos Hbits Hppid
-                               Hprocs Hdev Hgeom Hdlk Hbslot Hlog").
+                               Hprocs Hdev Hgeom Hdlk Hbslot [] Hlog").
                { rewrite Heb /trap_csrs_ext. done. }
                { rewrite Heb /cpu_claim_ext. done. }
+               { iEval (cbn beta iota). iEmpIntro. }
                iIntros (CIDip Hqip mip nip usedip Sip)
                  "%Hcsip Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdip Hbits Hbslot
                   %Hsip %Hbdip Hlog Hisl2".
@@ -3328,11 +3330,12 @@ Section ProofNamexMain.
                      iDestruct (cpu_own_transport CIDil CIDN2 0%nat eb
                                   (proc_addr j) C b ltac:(rewrite Hb; wp_next_chain)
                                   with "Hcnt") as "Hcnt".
+                     iDestruct (log_opS_named with "Hlog") as (enxB) "Hlog".
                      iApply (IUP.wp_iunlockput_gen gs j gl gu gd gk pd pav pu
                                bn g gfs gi cn gtl gilk gislk cov logstart
                                bmapstart inodestart nib size dev usedc
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
-                               Scur false false
+                               Scur false false false enxB
                                pidv dq dqb dqs ND2 (K - 12)%nat eb C b
                                Kiup Hik ltac:(discriminate) ltac:(discriminate)
                                Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
@@ -3342,9 +3345,10 @@ Section ProofNamexMain.
                                      Hitb2 Hitbl Hesck Hireg Hslkk Hslkd
                                      Hslpid Hdep Hidev Hiinum Hivalid Hload
                                      Hshot Hkeep Hbmap Hinos Hbits Hppid Hprocs
-                                     Hdev Hgeom Hdlk Hbslot Hlog").
+                                     Hdev Hgeom Hdlk Hbslot [] Hlog").
                      { rewrite Heb /trap_csrs_ext. done. }
                      { rewrite Heb /cpu_claim_ext. done. }
+                     { iEval (cbn beta iota). iEmpIntro. }
                      iIntros (CIDup Hqup mup nup usedup Sup)
                        "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup Hbits
                         Hbslot %Hsup %Hbdup Hlog Hisl2".
@@ -4023,12 +4027,13 @@ Section ProofNamexMain.
                                         (proc_addr j) C b
                                         ltac:(rewrite Hb; wp_next_chain)
                                         with "Hcnt") as "Hcnt".
+                           iDestruct (log_opS_named with "Hlog") as (enxC) "Hlog".
                            iApply (IUP.wp_iunlockput_gen gs j gl gu gd gk
                                      pd pav pu bn g gfs gi cn gtl gilk gislk
                                      cov logstart bmapstart inodestart nib
                                      size dev usedc ik (iq/2)%Qp (iq/2)%Qp gsh
-                                     iinum dnl bml ncur Scur false false
-                                     pidv dq dqb dqs
+                                     iinum dnl bml ncur Scur false false false
+                                     enxC pidv dq dqb dqs
                                      GB3 (K - 12)%nat eb C b
                                      Kiup Hik ltac:(discriminate) ltac:(discriminate)
                                      Hlg Hsize Hbmap0 Hbmapcov
@@ -4039,9 +4044,10 @@ Section ProofNamexMain.
                                            Hslkk Hslkd Hslpid Hdep Hidev
                                            Hiinum Hivalid Hload Hshot Hkeep Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
-                                           Hgeom Hdlk Hbslot Hlog").
+                                           Hgeom Hdlk Hbslot [] Hlog").
                            { rewrite Heb /trap_csrs_ext. done. }
                            { rewrite Heb /cpu_claim_ext. done. }
+                           { iEval (cbn beta iota). iEmpIntro. }
                            iIntros (CIDup Hqup mup nup usedup Sup)
                              "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup
                               Hbits Hbslot %Hsup %Hbdup Hlog Hisl".
@@ -4230,12 +4236,13 @@ Section ProofNamexMain.
                                         (proc_addr j) C b
                                         ltac:(rewrite Hb; wp_next_chain)
                                         with "Hcnt") as "Hcnt".
+                           iDestruct (log_opS_named with "Hlog") as (enxC) "Hlog".
                            iApply (IUP.wp_iunlockput_gen gs j gl gu gd gk
                                      pd pav pu bn g gfs gi cn gtl gilk gislk
                                      cov logstart bmapstart inodestart nib
                                      size dev usedc ik (iq/2)%Qp (iq/2)%Qp gsh
-                                     iinum dnl bml ncur Scur false false
-                                     pidv dq dqb dqs
+                                     iinum dnl bml ncur Scur false false false
+                                     enxC pidv dq dqb dqs
                                      GC3 (K - 12)%nat eb C b
                                      Kiup Hik ltac:(discriminate) ltac:(discriminate)
                                      Hlg Hsize Hbmap0 Hbmapcov
@@ -4246,9 +4253,10 @@ Section ProofNamexMain.
                                            Hslkk Hslkd Hslpid Hdep Hidev
                                            Hiinum Hivalid Hload Hshot Hkeep Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
-                                           Hgeom Hdlk Hbslot Hlog").
+                                           Hgeom Hdlk Hbslot [] Hlog").
                            { rewrite Heb /trap_csrs_ext. done. }
                            { rewrite Heb /cpu_claim_ext. done. }
+                           { iEval (cbn beta iota). iEmpIntro. }
                            iIntros (CIDup Hqup mup nup usedup Sup)
                              "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup
                               Hbits Hbslot %Hsup %Hbdup Hlog Hisl3".
@@ -4513,11 +4521,12 @@ Section ProofNamexMain.
                      iDestruct (cpu_own_transport CIDil CIDN2 0%nat eb
                                   (proc_addr j) C b ltac:(rewrite Hb; wp_next_chain)
                                   with "Hcnt") as "Hcnt".
+                     iDestruct (log_opS_named with "Hlog") as (enxB) "Hlog".
                      iApply (IUP.wp_iunlockput_gen gs j gl gu gd gk pd pav pu
                                bn g gfs gi cn gtl gilk gislk cov logstart
                                bmapstart inodestart nib size dev usedc
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
-                               Scur false false
+                               Scur false false false enxB
                                pidv dq dqb dqs ND2 (K - 12)%nat eb C b
                                Kiup Hik ltac:(discriminate) ltac:(discriminate)
                                Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
@@ -4527,9 +4536,10 @@ Section ProofNamexMain.
                                      Hitb2 Hitbl Hesck Hireg Hslkk Hslkd
                                      Hslpid Hdep Hidev Hiinum Hivalid Hload
                                      Hshot Hkeep Hbmap Hinos Hbits Hppid Hprocs
-                                     Hdev Hgeom Hdlk Hbslot Hlog").
+                                     Hdev Hgeom Hdlk Hbslot [] Hlog").
                      { rewrite Heb /trap_csrs_ext. done. }
                      { rewrite Heb /cpu_claim_ext. done. }
+                     { iEval (cbn beta iota). iEmpIntro. }
                      iIntros (CIDup Hqup mup nup usedup Sup)
                        "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup Hbits
                         Hbslot %Hsup %Hbdup Hlog Hisl2".

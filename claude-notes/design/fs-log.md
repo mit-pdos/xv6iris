@@ -1631,3 +1631,105 @@ premise discharged by `log_opSe_pos`) → `log_credit_group` →
 G-4 stage 2 (iput's own contract taking the credit and the epoch instead
 of building them with `log_credit_own`) is now the same three-line
 movement one tier up, with nothing further owed below it.
+
+
+### G.22 G-4b stage 1 LANDED (2026-08-13): iput and iunlockput take the
+### GROUP credit; and the walk's re-price is BLOCKED on a second, INDEPENDENT
+### coupling — the bitmap membership is discarded at `bm_paidS_elim`
+
+**WHAT LANDED** (gate: MAKE_EXIT=0, 1086 `.vo`, staleness 0, `make -n` 0
+`COQC`, md5s verified both sides; 6 files, 50 recompiles, 11 min wall).
+`SpecIput` / `SpecIunlockput` both gain `crz : bool` and the birth epoch
+`e0`, exactly §G.21's three-line movement one tier up:
+
+| piece | shape |
+|---|---|
+| the premise | `(if crz then nlz_obs (bv_unsigned inum) e0 ∗ ⌜g = icfg_log⌝ ∗ ⌜inodestart = icfg_ist⌝ else emp)`, beside `log_opSe g n Sb e0` |
+| the reservation | `log_opSe` IN, `log_opS` OUT — §G.20's asymmetry, unchanged |
+| the figure | `ip_spend_max crb cru crz = (if crb then 0 else 1) + (if cru \|\| crz then 0 else 1)` |
+
+**BOTH TIES ARE NEEDED, NOT ONE.**  `⌜g = icfg_log⌝` is the one §G.18
+named; `ireg_obs_use`'s payout is at `IBLOCK inum icfg_ist`, so a
+contract that threads its own `inodestart` needs `⌜inodestart = icfg_ist⌝`
+as well or the credit it produces is about a different block.  Both sit
+INSIDE the `crz` guard, so `crz = false` callers see `emp` and neither tie.
+
+**THE `orb` IS THE HONEST FIGURE.**  `cru` is the OWN-SET claim and `crz`
+the GROUP one, and they buy the SAME term — itrunc's tail flush.  iput
+therefore runs itrunc at `cru || crz` and builds that one credit by a
+two-armed `iAssert`: `log_credit_own` from `Hcru` at `crz = false`, and at
+`crz = true` `ireg_obs_use` (mask ⊤, `⌜1 <= e0⌝` off `log_opSe_pos`, the
+`nlink = 0` off iput's own +0x44 test) then `log_credit_group`.  Note
+`orb cru false` does NOT reduce for a symbolic `cru`, so every seam that
+used to close by `simpl in H; lia` now needs `destruct` over all three
+booleans — that is the whole cost at the arithmetic seams
+(`ip_budget_bounds`, `Hu'1`).
+
+**THE TAIL CREDGEN KEEPS ITS OWN EPOCH, AND MUST.**  itrunc's post CLOSES
+the epoch, so iput's `ip->type = 0` flush opens a fresh `e1` with
+`log_opS_named` — and that is sound precisely because the claim there is
+the DETERMINATE own-set one (`Hib1`, itrunc's `IBLOCK … ∈ Sb'`), never a
+group witness.  Naming it `e0` is the one compile error the stage
+produced (`e0 is already used`).
+
+**Caller cost, as measured:** one line each.  `log_opS_named` opens the
+epoch, `crz := false`, and the `emp` premise is discharged by
+`{ iEval (cbn beta iota). iEmpIntro. }` — namex's five sites, dirlink's
+one, and the two counted seals.  Every `Spec` above iput is byte-stable
+and `wp_namex_sconf` / `_gen` did not move.
+
+**THE BLOCKER, STATED EXACTLY.**  The trio's re-price to
+`walk_spend w <= 1` is NOT provable from the landed contracts, and the
+missing fact is not the inode-block credit this stage threaded — it is the
+BITMAP one:
+
+* the walk's loop can only run level *i+1* at `crb := true` if it knows
+  `bmapstart ∈ Sb_cur`, and the only event that puts it there is an
+  earlier level actually PAYING;
+* `wp_iput_gen`'s post says `Sb ⊆ Sb'` and `n - ip_spend_max … <= n'` and
+  NOTHING that couples the two, so after a level that may have paid the
+  loop knows neither "it paid" nor "it did not";
+* set `w := true` and the membership is unprovable; set `w := false` and
+  the bound is false.  Hence the honest walk bound stays LINEAR in the
+  path length and `np_spend w <= 1` is out of reach.
+
+The fact itself is TRUE and is already in the tree one tier down:
+`SpecItrunc.bm_paidS`'s paid disjunct carries `⌜bmapstart ∈ Sb'⌝` beside
+the dropped level, and it is exactly the coupling.  **`bm_paidS_elim`
+throws it away** (`iDestruct … as (Sb') "(%Hsub & _ & H)"` — the `_` is
+the whole blocker), and `wp_itrunc_gen`'s post, which exposes
+`IBLOCK inum inodestart ∈ Sb'` determinately, never mentions `bmapstart`.
+So `CreateBudget`'s own comment ("the first level that does pay puts
+`bmapstart` in the op's set, so every later level absorbs that too") is a
+claim about the KERNEL that no CONTRACT states.
+
+**THE PRICED FIX — a tier of its own, "G-4c, the paid-bitmap coupling".**
+Additive, and every existing statement derives from the new one:
+
+| file | delta | size |
+|---|---|---|
+| SpecItrunc | `bm_paidS_elimW`: the elim ALSO returns `wb : bool` with `⌜wb = true -> bmapstart ∈ Sb'⌝` and `n = it_entry crb u - (if wb then 1 else 0)`; `wp_itrunc_gen`'s post existentially exposes that `wb` (report `wb := false` at `crb = true`, where the level is pinned to `S u`) | the real statement work |
+| ProofItrunc / Parts | thread `wb` from the two tail sites to the post | ~10 sites |
+| SpecIput / SpecIunlockput | post exposes the same `wb`; the bound becomes `(if wb then 1 else 0) + (if cru \|\| crz then 0 else 1)` — `crb` leaves the ARITHMETIC and stays only as the entry credit | small |
+| ProofIput / ProofIunlockput | forward | small |
+| the 6 landed gen call sites | one more binder + the FINDING 5 weakening | one line each |
+
+Only then do the trio's post and `ProofNamex`'s loop invariant re-price,
+and their arithmetic is already machine-checked (`CreateBudget`'s five arm
+theorems are stated `forall w` and close at both values).
+
+**WHY THE TRIO'S POSTS WERE NOT MOVED FOR THE `ity_shot` HALF ALONE.**
+§G.20's ruling — "the trio's posts move once, for both" — still binds:
+moving them now for the bundled parent and again for the spend is two
+`ProofNamex` cones and two six-statement sweeps.  The bundled form's
+verify-first PASSES, so the half is ready the moment the coupling lands:
+`IcacheRef.inode_ref_gen` (:1109) and `inode_ref_gen_intro` (:1122) exist,
+`ity_shot` / `ity_shot_agree` (:555/:573) exist, and GENERATION STABILITY
+NEEDS NO NEW LEMMA — `live_gen_agree` (:879) IS the pinning fact, and a
+regen cannot run while any slice is outstanding because
+`live_frac_bump` (:972) consumes the WHOLE unit (`live_slot_regen`
+assembles `qt + c + 1/2 = 1` and a held `inode_ref_gen … g` makes that
+assembly unownable).  The one thing the bundle still owes is a
+GENERATION-NAMED shed: `SpecIlock` takes `inode_shr_gen k s dev inum g`,
+while `inode_held_shed` is generation-free, so `inode_held_dir` needs its
+own carve (two lines over `live_gen_split` + `inode_ident_split`).
