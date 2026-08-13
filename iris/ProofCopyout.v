@@ -427,6 +427,86 @@ Section ProofCopyout.
     repeat split; (rewrite upd_ne; [reflexivity | vm_compute; discriminate]).
   Qed.
 
+  (* RULE ONE (claude-notes/optimization.md): [co_loop]'s two block
+     continuations, named so the walk's proofmode steps stop re-embedding
+     ~30 lines of ∀/wands per step.  Transparent on purpose; the ∀ binders
+     stay visible at each [iAssert]. *)
+  Definition co_tail_body
+      (b : bool) (p : mword 64) (K lvl : nat) (eb : bool) (C : iProp Σ)
+      (szv : mword 64) (P : uptd) (spr va0 dstva src : mword 64)
+      (rem done len : nat) (src_bytes : nat -> bv 8)
+      (CIDh : CpuId) (Pd : uptd) (Md : regfile) (pa0 : mword 64) : iProp Σ :=
+    (⌜ uptd_ext_sz szv P Pd
+       /\ Md !!! Regidx csp_rs1 = spr
+       /\ Md !!! Regidx Rs11 = szv
+       /\ Md !!! Regidx Rs1 = va0
+       /\ Md !!! Regidx Rs3 = pa0
+       /\ Md !!! Regidx Rs4 = dstva
+       /\ Md !!! Regidx Rs5 = (mword_of_int (Z.of_nat rem) : mword 64)
+       /\ Md !!! Regidx Rs6 = pa_add src done
+       /\ Md !!! Regidx Rs7 = page_base P.(ud_root)
+       /\ Md !!! Regidx Rs8 = (mword_of_int 4096 : mword 64)
+       /\ Md !!! Regidx Rs9 = (mword_of_int 274877906943 : mword 64)
+       /\ Md !!! Regidx Rs10 = (mword_of_int (-4096) : mword 64) ⌝ -∗
+     sie_cap_gpr (CID:=CIDh) Md (K - 14)%nat b p -∗
+     cpu_own (CID:=CIDh) lvl eb p C b -∗
+     pc_is (CID:=CIDh) (mword_of_int (KernelSyms.copyout + 0x88) : mword 64) -∗
+     page_own pa0 -∗
+     (page_own pa0 -∗ proc_pt Pd) -∗
+     ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
+     wp_next (CID0:=CIDh) b p (fun (CID : CpuId) =>
+       ∀ (mj : regfile) (res : mword 64) (P' : uptd),
+         ⌜ mj !!! Regidx csp_rs1 = spr
+           /\ mj !!! Regidx Ra0 = res
+           /\ (res = (mword_of_int 0 : mword 64) \/ res = (mword_of_int (-1) : mword 64))
+           /\ uptd_ext_sz szv P P' ⌝ -∗
+         sie_cap_gpr mj (K - 14)%nat b p -∗
+         cpu_own lvl eb p C b -∗
+         pc_is (mword_of_int (KernelSyms.copyout + 0xa0) : mword 64) -∗
+         proc_pt P' -∗
+         ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
+         WP (Loop : expr riscv_lang)) -∗
+     WP (Loop : expr riscv_lang))%I.
+
+  Definition co_copy_body
+      (b : bool) (p : mword 64) (K lvl : nat) (eb : bool) (C : iProp Σ)
+      (szv : mword 64) (P : uptd) (spr va0 dstva src : mword 64)
+      (rem done navail len : nat) (src_bytes : nat -> bv 8)
+      (Pd : uptd) (pa0 : mword 64)
+      (CIDc : CpuId) (Mn : regfile) (nn : nat) : iProp Σ :=
+    (⌜ (1 <= nn)%nat /\ (nn <= rem)%nat /\ (nn <= navail)%nat
+       /\ Mn !!! Regidx csp_rs1 = spr
+       /\ Mn !!! Regidx Rs11 = szv
+       /\ Mn !!! Regidx Rs1 = va0
+       /\ Mn !!! Regidx Rs2 = (mword_of_int (Z.of_nat nn) : mword 64)
+       /\ Mn !!! Regidx Rs3 = pa0
+       /\ Mn !!! Regidx Rs4 = dstva
+       /\ Mn !!! Regidx Rs5 = (mword_of_int (Z.of_nat rem) : mword 64)
+       /\ Mn !!! Regidx Rs6 = pa_add src done
+       /\ Mn !!! Regidx Rs7 = page_base P.(ud_root)
+       /\ Mn !!! Regidx Rs8 = (mword_of_int 4096 : mword 64)
+       /\ Mn !!! Regidx Rs9 = (mword_of_int 274877906943 : mword 64)
+       /\ Mn !!! Regidx Rs10 = (mword_of_int (-4096) : mword 64) ⌝ -∗
+     sie_cap_gpr (CID:=CIDc) Mn (K - 14)%nat b p -∗
+     cpu_own (CID:=CIDc) lvl eb p C b -∗
+     pc_is (CID:=CIDc) (mword_of_int (KernelSyms.copyout + 0x36) : mword 64) -∗
+     page_own pa0 -∗
+     (page_own pa0 -∗ proc_pt Pd) -∗
+     ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
+     wp_next (CID0:=CIDc) b p (fun (CID : CpuId) =>
+       ∀ (mj : regfile) (res : mword 64) (P' : uptd),
+         ⌜ mj !!! Regidx csp_rs1 = spr
+           /\ mj !!! Regidx Ra0 = res
+           /\ (res = (mword_of_int 0 : mword 64) \/ res = (mword_of_int (-1) : mword 64))
+           /\ uptd_ext_sz szv P P' ⌝ -∗
+         sie_cap_gpr mj (K - 14)%nat b p -∗
+         cpu_own lvl eb p C b -∗
+         pc_is (mword_of_int (KernelSyms.copyout + 0xa0) : mword 64) -∗
+         proc_pt P' -∗
+         ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
+         WP (Loop : expr riscv_lang)) -∗
+     WP (Loop : expr riscv_lang))%I.
+
   (* ------------------------------------------------------------------ *)
   (* THE LOOP (+0x54 .. the back edge), by induction on [fuel].           *)
   (* ------------------------------------------------------------------ *)
@@ -588,37 +668,8 @@ Section ProofCopyout.
     assert (Hnavz : Z.of_nat navail = 4096 - Z.of_nat off).
     { unfold navail. rewrite Nat2Z.inj_sub; [reflexivity | lia]. }
     iAssert (∀ (CIDh : CpuId) (Pd : uptd) (Md : regfile) (pa0 : mword 64),
-        ⌜ uptd_ext_sz szv P Pd
-          /\ Md !!! Regidx csp_rs1 = spr
-          /\ Md !!! Regidx Rs11 = szv
-          /\ Md !!! Regidx Rs1 = va0
-          /\ Md !!! Regidx Rs3 = pa0
-          /\ Md !!! Regidx Rs4 = dstva
-          /\ Md !!! Regidx Rs5 = (mword_of_int (Z.of_nat rem) : mword 64)
-          /\ Md !!! Regidx Rs6 = pa_add src done
-          /\ Md !!! Regidx Rs7 = page_base P.(ud_root)
-          /\ Md !!! Regidx Rs8 = (mword_of_int 4096 : mword 64)
-          /\ Md !!! Regidx Rs9 = (mword_of_int 274877906943 : mword 64)
-          /\ Md !!! Regidx Rs10 = (mword_of_int (-4096) : mword 64) ⌝ -∗
-        sie_cap_gpr (CID:=CIDh) Md (K - 14)%nat b p -∗
-        cpu_own (CID:=CIDh) lvl eb p C b -∗
-        pc_is (CID:=CIDh) (mword_of_int (KernelSyms.copyout + 0x88) : mword 64) -∗
-        page_own pa0 -∗
-        (page_own pa0 -∗ proc_pt Pd) -∗
-        ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
-        wp_next (CID0:=CIDh) b p (fun (CID : CpuId) =>
-          ∀ (mj : regfile) (res : mword 64) (P' : uptd),
-            ⌜ mj !!! Regidx csp_rs1 = spr
-              /\ mj !!! Regidx Ra0 = res
-              /\ (res = (mword_of_int 0 : mword 64) \/ res = (mword_of_int (-1) : mword 64))
-              /\ uptd_ext_sz szv P P' ⌝ -∗
-            sie_cap_gpr mj (K - 14)%nat b p -∗
-            cpu_own lvl eb p C b -∗
-            pc_is (mword_of_int (KernelSyms.copyout + 0xa0) : mword 64) -∗
-            proc_pt P' -∗
-            ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
-            WP (Loop : expr riscv_lang)) -∗
-        WP (Loop : expr riscv_lang))%I
+        co_tail_body b p K lvl eb C szv P spr va0 dstva src rem done len
+          src_bytes CIDh Pd Md pa0)%I
       as "Htail".
     { iIntros (CIDh Pd Md pa0)
         "(%HText & %HTsp & %HTs11 & %HTs1 & %HTs3 & %HTs4 & %HTs5 &
@@ -665,38 +716,8 @@ Section ProofCopyout.
       iPoseProof (coi_42 with "Htext") as "Hi42".
       (* both arms reach +0x36 with s2 = n; factor the rest over [nn] *)
       iAssert (∀ (CIDc : CpuId) (Mn : regfile) (nn : nat),
-          ⌜ (1 <= nn)%nat /\ (nn <= rem)%nat /\ (nn <= navail)%nat
-            /\ Mn !!! Regidx csp_rs1 = spr
-            /\ Mn !!! Regidx Rs11 = szv
-            /\ Mn !!! Regidx Rs1 = va0
-            /\ Mn !!! Regidx Rs2 = (mword_of_int (Z.of_nat nn) : mword 64)
-            /\ Mn !!! Regidx Rs3 = pa0
-            /\ Mn !!! Regidx Rs4 = dstva
-            /\ Mn !!! Regidx Rs5 = (mword_of_int (Z.of_nat rem) : mword 64)
-            /\ Mn !!! Regidx Rs6 = pa_add src done
-            /\ Mn !!! Regidx Rs7 = page_base P.(ud_root)
-            /\ Mn !!! Regidx Rs8 = (mword_of_int 4096 : mword 64)
-            /\ Mn !!! Regidx Rs9 = (mword_of_int 274877906943 : mword 64)
-            /\ Mn !!! Regidx Rs10 = (mword_of_int (-4096) : mword 64) ⌝ -∗
-          sie_cap_gpr (CID:=CIDc) Mn (K - 14)%nat b p -∗
-          cpu_own (CID:=CIDc) lvl eb p C b -∗
-          pc_is (CID:=CIDc) (mword_of_int (KernelSyms.copyout + 0x36) : mword 64) -∗
-          page_own pa0 -∗
-          (page_own pa0 -∗ proc_pt Pd) -∗
-          ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
-          wp_next (CID0:=CIDc) b p (fun (CID : CpuId) =>
-            ∀ (mj : regfile) (res : mword 64) (P' : uptd),
-              ⌜ mj !!! Regidx csp_rs1 = spr
-                /\ mj !!! Regidx Ra0 = res
-                /\ (res = (mword_of_int 0 : mword 64) \/ res = (mword_of_int (-1) : mword 64))
-                /\ uptd_ext_sz szv P P' ⌝ -∗
-              sie_cap_gpr mj (K - 14)%nat b p -∗
-              cpu_own lvl eb p C b -∗
-              pc_is (mword_of_int (KernelSyms.copyout + 0xa0) : mword 64) -∗
-              proc_pt P' -∗
-              ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
-              WP (Loop : expr riscv_lang)) -∗
-          WP (Loop : expr riscv_lang))%I
+          co_copy_body b p K lvl eb C szv P spr va0 dstva src rem done navail
+            len src_bytes Pd pa0 CIDc Mn nn)%I
         as "Hcopy".
       { iIntros (CIDc Mn nn)
           "(%Hnn1 & %Hnnr & %Hnna & %HNsp & %HNs11 & %HNs1 & %HNs2 & %HNs3 &

@@ -419,6 +419,56 @@ Section ProofUvmunmap.
     - (* s11 *) apply HE8thr; [vm_compute; reflexivity | vm_compute; discriminate ..].
   Qed.
 
+  (* RULE ONE (claude-notes/optimization.md): [uu_loop]'s two block
+     continuations, named so the walk's proofmode steps stop re-embedding
+     ~15-20 lines of ∀/wands per step.  Transparent on purpose; the
+     [wp_next]/[fun CID => ] shape stays visible at each [iAssert], only
+     what follows the lambda is folded. *)
+  Definition uu_tail_body
+      (b : bool) (p spr va : mword 64) (uroot : mword 44)
+      (done npages : nat) (df : bool) (fx um : gmap (mword 27) (mword 64))
+      (K ilvl : nat) (eb : bool) (C : iProp Σ) (mm : regfile)
+      (CIDt : CpuId) : iProp Σ :=
+    (∀ (mt : regfile) (t' : ptree) (m' : gmap (mword 27) (mword 64)),
+     ⌜ mt !!! Regidx csp_rs1 = spr
+       /\ mt !!! Regidx Rs2 = add_vec va (mword_of_int (4096 * Z.of_nat done))
+       /\ mt !!! Regidx Rs3 = add_vec va (mword_of_int (4096 * Z.of_nat npages))
+       /\ mt !!! Regidx Rs4 = page_base uroot
+       /\ uu_s5 df mt
+       /\ mt !!! Regidx Rs6 = (mword_of_int 4096 : mword 64)
+       /\ uu_thr mm mt
+       /\ pt_rep0 t' m'
+       /\ uptg_view (uu_fx df fx (svpn_of va) (S done))
+                    (uu_um df um (svpn_of va) (S done)) m'
+       /\ pt_base t' = uroot ⌝ -∗
+     sie_cap_gpr mt (K - 8) b p -∗
+     cpu_own ilvl eb p C b -∗
+     pc_is (mword_of_int (KernelSyms.uvmunmap + 0x4a) : mword 64) -∗
+     ptree_own 2 (DfracOwn 1) t' -∗
+     upt_pages_own (uu_um df um (svpn_of va) (S done)) -∗
+     WP (Loop : expr riscv_lang))%I.
+
+  Definition uu_store_body
+      (b : bool) (p spr va : mword 64) (uroot : mword 44)
+      (done npages : nat) (df : bool) (um : gmap (mword 27) (mword 64))
+      (K ilvl : nat) (eb : bool) (C : iProp Σ) (mm mw : regfile) (t : ptree)
+      (CIDs : CpuId) : iProp Σ :=
+    (∀ ms : regfile,
+     ⌜ ms !!! Regidx csp_rs1 = spr
+       /\ ms !!! Regidx Rs1 = mw !!! Regidx Ra0
+       /\ ms !!! Regidx Rs2 = add_vec va (mword_of_int (4096 * Z.of_nat done))
+       /\ ms !!! Regidx Rs3 = add_vec va (mword_of_int (4096 * Z.of_nat npages))
+       /\ ms !!! Regidx Rs4 = page_base uroot
+       /\ uu_s5 df ms
+       /\ ms !!! Regidx Rs6 = (mword_of_int 4096 : mword 64)
+       /\ uu_thr mm ms ⌝ -∗
+     sie_cap_gpr ms (K - 8) b p -∗
+     cpu_own ilvl eb p C b -∗
+     pc_is (mword_of_int (KernelSyms.uvmunmap + 0x46) : mword 64) -∗
+     ptree_own 2 (DfracOwn 1) t -∗
+     upt_pages_own (uu_um df um (svpn_of va) (S done)) -∗
+     WP (Loop : expr riscv_lang))%I.
+
   (* ================================================================== *)
   (*  THE LOOP (+0x50 head, +0x4a tail), by induction on the remaining    *)
   (*  page count.                                                         *)
@@ -532,24 +582,8 @@ Section ProofUvmunmap.
     (*  THE +0x4a JOIN: the loop tail, over the post-body descriptor.     *)
     (* ================================================================ *)
     iAssert (wp_next b p (fun (CIDt : CpuId) =>
-        ∀ (mt : regfile) (t' : ptree) (m' : gmap (mword 27) (mword 64)),
-        ⌜ mt !!! Regidx csp_rs1 = spr
-          /\ mt !!! Regidx Rs2 = add_vec va (mword_of_int (4096 * Z.of_nat done))
-          /\ mt !!! Regidx Rs3 = add_vec va (mword_of_int (4096 * Z.of_nat npages))
-          /\ mt !!! Regidx Rs4 = page_base uroot
-          /\ uu_s5 df mt
-          /\ mt !!! Regidx Rs6 = (mword_of_int 4096 : mword 64)
-          /\ uu_thr mm mt
-          /\ pt_rep0 t' m'
-          /\ uptg_view (uu_fx df fx (svpn_of va) (S done))
-                       (uu_um df um (svpn_of va) (S done)) m'
-          /\ pt_base t' = uroot ⌝ -∗
-        sie_cap_gpr mt (K - 8) b p -∗
-        cpu_own ilvl eb p C b -∗
-        pc_is (mword_of_int (KernelSyms.uvmunmap + 0x4a) : mword 64) -∗
-        ptree_own 2 (DfracOwn 1) t' -∗
-        upt_pages_own (uu_um df um (svpn_of va) (S done)) -∗
-        WP (Loop : expr riscv_lang)))%I with "[Hcont]" as "TAIL".
+        uu_tail_body b p spr va uroot done npages df fx um K ilvl eb C mm
+          CIDt))%I with "[Hcont]" as "TAIL".
     { iIntros (CIDt Hst mt t' m').
       iIntros "(%Htsp & %Hts2 & %Hts3 & %Hts4 & %Hts5 & %Hts6 & %Htthr
                 & %Htrep & %Htview & %Htbase) Hcg Hcnt Hpc Hptree Hown".
@@ -918,21 +952,8 @@ Section ProofUvmunmap.
     (*  which is why the whole [df] split is ONE [destruct] here.         *)
     (* ================================================================ *)
     iAssert (wp_next b p (fun (CIDs : CpuId) =>
-        ∀ ms : regfile,
-        ⌜ ms !!! Regidx csp_rs1 = spr
-          /\ ms !!! Regidx Rs1 = mw !!! Regidx Ra0
-          /\ ms !!! Regidx Rs2 = add_vec va (mword_of_int (4096 * Z.of_nat done))
-          /\ ms !!! Regidx Rs3 = add_vec va (mword_of_int (4096 * Z.of_nat npages))
-          /\ ms !!! Regidx Rs4 = page_base uroot
-          /\ uu_s5 df ms
-          /\ ms !!! Regidx Rs6 = (mword_of_int 4096 : mword 64)
-          /\ uu_thr mm ms ⌝ -∗
-        sie_cap_gpr ms (K - 8) b p -∗
-        cpu_own ilvl eb p C b -∗
-        pc_is (mword_of_int (KernelSyms.uvmunmap + 0x46) : mword 64) -∗
-        ptree_own 2 (DfracOwn 1) t -∗
-        upt_pages_own (uu_um df um (svpn_of va) (S done)) -∗
-        WP (Loop : expr riscv_lang)))%I with "[TAIL]" as "STORE".
+        uu_store_body b p spr va uroot done npages df um K ilvl eb C mm mw t
+          CIDs))%I with "[TAIL]" as "STORE".
     { iIntros (CIDs Hss ms).
       iIntros "(%Hmksp & %Hss1 & %Hmks2 & %Hmks3 & %Hmks4 & %Hmks5 & %Hmks6 & %Hmkthr)
                Hcg Hcnt Hpc Hptree Hown".

@@ -520,6 +520,63 @@ Section ProofCopyin.
     { lkp. }
   Qed.
 
+  (* RULE ONE (claude-notes/optimization.md): [ci_loop]'s two block
+     continuations, named so the walk's proofmode steps stop re-embedding
+     ~20 lines of ∀/wands per step.  Transparent on purpose; the ∀ binders
+     stay visible at each [iAssert]. *)
+  Definition ci_copy_body
+      (b : bool) (p : mword 64) (CID0 : CpuId) (off rem : nat) (dst : mword 64)
+      (done : nat) (P : uptd) (szv v11 : mword 64) (K : nat)
+      (spr cur va0 pa0 : mword 64)
+      (CIDc : CpuId) (mc : regfile) (n : nat) : iProp Σ :=
+    (⌜b = false \/ p = zero_reg -> (CIDc : CPU) = (CID0 : CPU)⌝ -∗
+     ⌜(1 <= n)%nat⌝ -∗ ⌜(n <= rem)%nat⌝ -∗ ⌜(off + n <= 4096)%nat⌝ -∗
+     ⌜mc !!! Regidx Rs1 = (mword_of_int (Z.of_nat n) : mword 64)⌝ -∗
+     ⌜mc !!! Regidx Ra0 = pa0⌝ -∗
+     ⌜mc !!! Regidx csp_rs1 = spr⌝ -∗
+     ⌜mc !!! Regidx Rs2 = cur⌝ -∗
+     ⌜mc !!! Regidx Rs3 = va0⌝ -∗
+     ⌜mc !!! Regidx Rs4 = (mword_of_int (Z.of_nat rem) : mword 64)⌝ -∗
+     ⌜mc !!! Regidx Rs5 = pa_add dst done⌝ -∗
+     ⌜mc !!! Regidx Rs6 = (mword_of_int 4096 : mword 64)⌝ -∗
+     ⌜mc !!! Regidx Rs7 = page_base P.(ud_root)⌝ -∗
+     ⌜mc !!! Regidx Rs8 = (mword_of_int (-4096) : mword 64)⌝ -∗
+     ⌜mc !!! Regidx Rs9 = szv⌝ -∗
+     ⌜mc !!! Regidx Rs10 = (mword_of_int 1 : mword 64)⌝ -∗
+     ⌜mc !!! Regidx Rs11 = v11⌝ -∗
+     sie_cap_gpr mc (K - 12) b p -∗
+     pc_is (mword_of_int (KernelSyms.copyin + 0x3c) : mword 64) -∗
+     WP (Loop : expr riscv_lang))%I.
+
+  Definition ci_chunk_body
+      (b : bool) (p : mword 64) (CID0 : CpuId) (szv : mword 64) (Pc : uptd)
+      (spr cur va0 dst : mword 64) (rem done : nat) (P : uptd) (v11 : mword 64)
+      (K lvl : nat) (eb : bool) (C : iProp Σ) (len : nat) (fd : nat -> bv 8)
+      (EXIT : iProp Σ)
+      (CIDb : CpuId) (mb : regfile) (pa0 : mword 64) (Pd : uptd) : iProp Σ :=
+    (⌜b = false \/ p = zero_reg -> (CIDb : CPU) = (CID0 : CPU)⌝ -∗
+     ⌜uptd_ext_sz szv Pc Pd⌝ -∗
+     ⌜mb !!! Regidx Ra0 = pa0⌝ -∗
+     ⌜mb !!! Regidx csp_rs1 = spr⌝ -∗
+     ⌜mb !!! Regidx Rs2 = cur⌝ -∗
+     ⌜mb !!! Regidx Rs3 = va0⌝ -∗
+     ⌜mb !!! Regidx Rs4 = (mword_of_int (Z.of_nat rem) : mword 64)⌝ -∗
+     ⌜mb !!! Regidx Rs5 = pa_add dst done⌝ -∗
+     ⌜mb !!! Regidx Rs6 = (mword_of_int 4096 : mword 64)⌝ -∗
+     ⌜mb !!! Regidx Rs7 = page_base P.(ud_root)⌝ -∗
+     ⌜mb !!! Regidx Rs8 = (mword_of_int (-4096) : mword 64)⌝ -∗
+     ⌜mb !!! Regidx Rs9 = szv⌝ -∗
+     ⌜mb !!! Regidx Rs10 = (mword_of_int 1 : mword 64)⌝ -∗
+     ⌜mb !!! Regidx Rs11 = v11⌝ -∗
+     sie_cap_gpr mb (K - 12) b p -∗
+     cpu_own lvl eb p C b -∗
+     pc_is (mword_of_int (KernelSyms.copyin + 0x30) : mword 64) -∗
+     page_own pa0 -∗
+     (page_own pa0 -∗ proc_pt Pd) -∗
+     ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ fd j) -∗
+     EXIT -∗
+     WP (Loop : expr riscv_lang))%I.
+
   (* ================================================================== *)
   (*  THE LOOP (+0x56 head, +0x2c body), by induction on FUEL.           *)
   (* ================================================================== *)
@@ -620,28 +677,8 @@ Section ProofCopyin.
     (*  THE +0x2c JOIN: the chunk copy, over an arbitrary borrowed page.  *)
     (* ================================================================ *)
     iAssert (∀ (CIDb : CpuId) (mb : regfile) (pa0 : mword 64) (Pd : uptd),
-        ⌜b = false \/ p = zero_reg -> (CIDb : CPU) = (CID0 : CPU)⌝ -∗
-        ⌜uptd_ext_sz szv Pc Pd⌝ -∗
-        ⌜mb !!! Regidx Ra0 = pa0⌝ -∗
-        ⌜mb !!! Regidx csp_rs1 = spr⌝ -∗
-        ⌜mb !!! Regidx Rs2 = cur⌝ -∗
-        ⌜mb !!! Regidx Rs3 = va0⌝ -∗
-        ⌜mb !!! Regidx Rs4 = (mword_of_int (Z.of_nat rem) : mword 64)⌝ -∗
-        ⌜mb !!! Regidx Rs5 = pa_add dst done⌝ -∗
-        ⌜mb !!! Regidx Rs6 = (mword_of_int 4096 : mword 64)⌝ -∗
-        ⌜mb !!! Regidx Rs7 = page_base P.(ud_root)⌝ -∗
-        ⌜mb !!! Regidx Rs8 = (mword_of_int (-4096) : mword 64)⌝ -∗
-        ⌜mb !!! Regidx Rs9 = szv⌝ -∗
-        ⌜mb !!! Regidx Rs10 = (mword_of_int 1 : mword 64)⌝ -∗
-        ⌜mb !!! Regidx Rs11 = v11⌝ -∗
-        sie_cap_gpr mb (K - 12) b p -∗
-        cpu_own lvl eb p C b -∗
-        pc_is (mword_of_int (KernelSyms.copyin + 0x30) : mword 64) -∗
-        page_own pa0 -∗
-        (page_own pa0 -∗ proc_pt Pd) -∗
-        ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ fd j) -∗
-        EXIT -∗
-        WP (Loop : expr riscv_lang))%I with "[]" as "CHUNK".
+        ci_chunk_body b p CID0 szv Pc spr cur va0 dst rem done P v11 K lvl eb C
+          len fd EXIT CIDb mb pa0 Pd)%I with "[]" as "CHUNK".
     { iIntros (CIDb mb pa0 Pd) "%Hanchorb %Hextd %Hba0 %Hbsp %Hbs2 %Hbs3 %Hbs4 %Hbs5 %Hbs6
                             %Hbs7 %Hbs8 %Hbs9 %Hbs10 %Hbs11
                             Hcg Hcnt Hpc Hpg Hback Hdst HEXIT".
@@ -679,24 +716,8 @@ Section ProofCopyin.
       (*  THE +0x38 JOIN: the copy proper, over the chunk length [n].     *)
       (* ============================================================== *)
       iAssert (∀ (CIDc : CpuId) (mc : regfile) (n : nat),
-          ⌜b = false \/ p = zero_reg -> (CIDc : CPU) = (CID0 : CPU)⌝ -∗
-          ⌜(1 <= n)%nat⌝ -∗ ⌜(n <= rem)%nat⌝ -∗ ⌜(off + n <= 4096)%nat⌝ -∗
-          ⌜mc !!! Regidx Rs1 = (mword_of_int (Z.of_nat n) : mword 64)⌝ -∗
-          ⌜mc !!! Regidx Ra0 = pa0⌝ -∗
-          ⌜mc !!! Regidx csp_rs1 = spr⌝ -∗
-          ⌜mc !!! Regidx Rs2 = cur⌝ -∗
-          ⌜mc !!! Regidx Rs3 = va0⌝ -∗
-          ⌜mc !!! Regidx Rs4 = (mword_of_int (Z.of_nat rem) : mword 64)⌝ -∗
-          ⌜mc !!! Regidx Rs5 = pa_add dst done⌝ -∗
-          ⌜mc !!! Regidx Rs6 = (mword_of_int 4096 : mword 64)⌝ -∗
-          ⌜mc !!! Regidx Rs7 = page_base P.(ud_root)⌝ -∗
-          ⌜mc !!! Regidx Rs8 = (mword_of_int (-4096) : mword 64)⌝ -∗
-          ⌜mc !!! Regidx Rs9 = szv⌝ -∗
-          ⌜mc !!! Regidx Rs10 = (mword_of_int 1 : mword 64)⌝ -∗
-          ⌜mc !!! Regidx Rs11 = v11⌝ -∗
-          sie_cap_gpr mc (K - 12) b p -∗
-          pc_is (mword_of_int (KernelSyms.copyin + 0x3c) : mword 64) -∗
-          WP (Loop : expr riscv_lang))%I
+          ci_copy_body b p CID0 off rem dst done P szv v11 K spr cur va0 pa0
+            CIDc mc n)%I
         with "[Hdst Hcnt Hpg Hback HEXIT]" as "BODY".
       { iIntros (CIDc mc n) "%Hanchorc %Hn1 %Hnrem %Hnoff %Hcs1 %Hca0 %Hcsp %Hcs2 %Hcs3
                         %Hcs4 %Hcs5 %Hcs6 %Hcs7 %Hcs8 %Hcs9 %Hcs10 %Hcs11 Hcg Hpc".
