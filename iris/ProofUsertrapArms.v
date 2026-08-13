@@ -342,16 +342,16 @@ Section Ut56.
                    = mword_of_int (UT + 0x60)) by pcw.
     iEval (rewrite Hp60) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (UT + 0x60)) Ra0 Ra0
-              (mword_of_int 3216 : mword 12) M3 nx false
+              (mword_of_int 3272 : mword 12) M3 nx false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi60 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (M4 := <[Regidx Ra0 := regval_into_reg
                    (add_vec (rget M3 Ra0)
-                      (sign_extend' 64 (mword_of_int 3216 : mword 12)))]> M3).
+                      (sign_extend' 64 (mword_of_int 3272 : mword 12)))]> M3).
     change (<[Regidx Ra0 := regval_into_reg
                (add_vec (rget M3 Ra0)
-                  (sign_extend' 64 (mword_of_int 3216 : mword 12)))]> M3) with M4.
+                  (sign_extend' 64 (mword_of_int 3272 : mword 12)))]> M3) with M4.
     assert (Hp64 : add_vec_int (mword_of_int (UT + 0x60) : mword 64) 4
                    = mword_of_int (UT + 0x64)) by pcw.
     iEval (rewrite Hp64) in "Hpc".
@@ -370,7 +370,7 @@ Section Ut56.
       apply ut_cs_insert; [vm_compute; reflexivity | exact HcsM2]. }
     (* ---- +0x64: jal printk (call one) ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (UT + 0x64)) Rra
-              (mword_of_int 2088674 : mword 21) M4 nx false
+              (mword_of_int 2088730 : mword 21) M4 nx false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi64 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -380,7 +380,7 @@ Section Ut56.
                (add_vec_int (mword_of_int (UT + 0x64) : mword 64) 4)]> M4)
       with M5.
     assert (Hpk1 : add_vec (mword_of_int (UT + 0x64) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2088674 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2088730 : mword 21))
                    = mword_of_int KernelSyms.printk) by pcw.
     iEval (rewrite Hpk1) in "Hpc".
     assert (HM5a0 : M5 !!! Regidx Ra0 = ut_fmt1_p)
@@ -448,16 +448,16 @@ Section Ut56.
                    = mword_of_int (UT + 0x74)) by pcw.
     iEval (rewrite Hp74) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (UT + 0x74)) Ra0 Ra0
-              (mword_of_int 3244 : mword 12) M8 nx false
+              (mword_of_int 3300 : mword 12) M8 nx false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi74 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (M9 := <[Regidx Ra0 := regval_into_reg
                    (add_vec (rget M8 Ra0)
-                      (sign_extend' 64 (mword_of_int 3244 : mword 12)))]> M8).
+                      (sign_extend' 64 (mword_of_int 3300 : mword 12)))]> M8).
     change (<[Regidx Ra0 := regval_into_reg
                (add_vec (rget M8 Ra0)
-                  (sign_extend' 64 (mword_of_int 3244 : mword 12)))]> M8) with M9.
+                  (sign_extend' 64 (mword_of_int 3300 : mword 12)))]> M8) with M9.
     assert (Hp78 : add_vec_int (mword_of_int (UT + 0x74) : mword 64) 4
                    = mword_of_int (UT + 0x78)) by pcw.
     iEval (rewrite Hp78) in "Hpc".
@@ -466,7 +466,7 @@ Section Ut56.
       rewrite /M8 upd_eq. unfold ut_fmt2_p, ut_fmt2_a. pcw. }
     (* ---- +0x78: jal printk (call two) ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (UT + 0x78)) Rra
-              (mword_of_int 2088654 : mword 21) M9 nx false
+              (mword_of_int 2088710 : mword 21) M9 nx false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi78 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -476,7 +476,7 @@ Section Ut56.
                (add_vec_int (mword_of_int (UT + 0x78) : mword 64) 4)]> M9)
       with MA.
     assert (Hpk2 : add_vec (mword_of_int (UT + 0x78) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2088654 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2088710 : mword 21))
                    = mword_of_int KernelSyms.printk) by pcw.
     iEval (rewrite Hpk2) in "Hpc".
     assert (HMAa0 : MA !!! Regidx Ra0 = ut_fmt2_p)
