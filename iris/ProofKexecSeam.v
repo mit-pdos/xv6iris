@@ -224,6 +224,48 @@ Lemma kxc_lvl0 : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
 Proof. change (2 ^ 31)%Z with 2147483648%Z. lia. Qed.
 
 (* ===================================================================== *)
+(*  THE THIRTEEN CALLEE-SAVED INDICES, ENUMERATED.                        *)
+(* ===================================================================== *)
+(* [CalleeSaved.is_cs_idx] is a DECISION PROCEDURE ([existsb] over the
+   thirteen), which is all a proof needs while it is discharging
+   [is_cs_idx r = true] for a literal [r].  A block that must ESTABLISH a
+   convention-1 threading clause runs the other way -- it has a symbolic [r]
+   with [is_cs_idx r = true] and a handful of disequalities, and needs to
+   land on the one register the clause is really about.  That is this
+   lemma, and without it every such block re-derives the enumeration inline.
+
+   ITS HOME IS [CalleeSaved.v], beside [is_cs_idx] itself; it sits here only
+   because that file is 548 dependents deep and this is a one-liner (the
+   durable-notes rule: an additive change to a shared file belongs in a leaf
+   until a milestone folds it back). *)
+(* The sp case is spelled [csp_rs1], NOT [mword_of_int 2].  They are equal but
+   not CONVERTIBLE-BY-[congruence] ([csp_rs1 := zero_extend' 5 'b"10"]), and
+   every consumer's first move is to kill the impossible cases with
+   [congruence] against its own [r <> csp_rs1] premise -- which silently fails
+   on a [mword_of_int 2] disjunct and leaves the sp case live, shifting every
+   later bullet by one.  The symptom is an [upd_eq] that "does not match any
+   subterm" in the branch AFTER the one that is really wrong. *)
+Lemma kxc_cs_cases (r : mword 5) :
+  is_cs_idx r = true ->
+  r = csp_rs1 \/ r = (mword_of_int 8 : mword 5) \/
+  r = (mword_of_int 9 : mword 5) \/ r = (mword_of_int 18 : mword 5) \/
+  r = (mword_of_int 19 : mword 5) \/ r = (mword_of_int 20 : mword 5) \/
+  r = (mword_of_int 21 : mword 5) \/ r = (mword_of_int 22 : mword 5) \/
+  r = (mword_of_int 23 : mword 5) \/ r = (mword_of_int 24 : mword 5) \/
+  r = (mword_of_int 25 : mword 5) \/ r = (mword_of_int 26 : mword 5) \/
+  r = (mword_of_int 27 : mword 5).
+Proof.
+  assert (Hsp : (mword_of_int 2 : mword 5) = csp_rs1)
+    by (apply bv_eq; vm_compute; reflexivity).
+  unfold is_cs_idx. cbn [existsb]. intro H.
+  repeat match goal with
+  | H : orb _ _ = true |- _ => apply orb_true_iff in H; destruct H as [H | H]
+  end;
+  first [ discriminate
+        | apply bool_decide_eq_true_1 in H; rewrite ?Hsp in H; tauto ].
+Qed.
+
+(* ===================================================================== *)
 (*  THE [off] REGISTER, THROUGH THE C's [int] TRUNCATION.                  *)
 (* ===================================================================== *)
 (* The value a3 holds on entry to the phdr loop's body at iteration [i].
@@ -494,6 +536,22 @@ Section KexecBSeam.
   (*  the increment-and-test at +0x11a..+0x128 as the back edge.  So    *)
   (*  this is the state every iteration starts from, and the chunk that *)
   (*  proves the loop both consumes it and re-establishes it.           *)
+  (*                                                                    *)
+  (*  IT CARRIES NO THREADING CONJUNCT, AND THAT IS NOT AN OMISSION --  *)
+  (*  by +0x12c there is no callee-saved register left holding kexec's  *)
+  (*  entry value, so convention 1's [forall r, ... M r = m r] clause   *)
+  (*  would be vacuous however it were written.  The body clobbers      *)
+  (*  s1 (loadseg's cursor, +0x198), s3 (ph.filesz, +0x188), s7         *)
+  (*  (ph.off, +0x194) and s8 (ph.vaddr, +0x190) on the PT_LOAD path,   *)
+  (*  and every other callee-saved register is pinned above by name.    *)
+  (*  Writing the clause anyway is worse than dropping it: it is FALSE  *)
+  (*  on the back edge for those four (true only on the +0x0cc entry,   *)
+  (*  where nothing has run yet), so an invariant that claims it cannot *)
+  (*  be re-established and the loop does not close.                    *)
+  (*                                                                    *)
+  (*  What replaces it is the FRAME: slots 1..13 hold ra,s0,s1,s2 and   *)
+  (*  m's s3..s11, and every exit reloads from there -- which is where  *)
+  (*  [callee_saved m mf] actually comes from on all four paths out.    *)
   (* --------------------------------------------------------------- *)
   Definition kxc_at_12c
       (jp : nat)
@@ -514,7 +572,6 @@ Section KexecBSeam.
       (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64) : iProp Σ :=
     (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
        M !!! Regidx Rs0 = sp0 /\
-       M !!! Regidx Rs1 = proc_addr jp /\
        M !!! Regidx Rs2 = szv /\
        M !!! Regidx Rs4 = ientry kf /\
        M !!! Regidx Rs5 = (mword_of_int 4096 : mword 64) /\
@@ -522,11 +579,7 @@ Section KexecBSeam.
        M !!! Regidx Rs9 = (mword_of_int 4096 : mword 64) /\
        M !!! Regidx Rs10 = (mword_of_int (Z.of_nat i) : mword 64) /\
        M !!! Regidx Rs11 = (mword_of_int 56 : mword 64) /\
-       M !!! Regidx Ra3 = kxc_off ef i /\
-       (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
-          r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs4 -> r <> Rs5 ->
-          r <> Rs6 -> r <> Rs9 -> r <> Rs10 -> r <> Rs11 ->
-          M !!! Regidx r = m !!! Regidx r) ⌝ ∗
+       M !!! Regidx Ra3 = kxc_off ef i ⌝ ∗
      ⌜ (kf < NINODE)%nat /\
        bv_unsigned inumf < 16 * Z.of_nat nib /\
        (iput_units <= n2)%nat /\ used2 ⊆ used /\

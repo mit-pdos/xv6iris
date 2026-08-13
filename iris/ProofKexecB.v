@@ -1065,11 +1065,15 @@ Section KexecBBody.
         iSpecialize ("Hcont12c" $! CID24 with "[%]"); [wp_next_chain |].
         iApply ("Hcont12c" $! G11 ef P).
         rewrite /kxc_at_12c.
+        (* [kxc_at_12c] has NO threading conjunct -- see its header: by +0x12c
+           no callee-saved register still holds kexec's entry value, so the
+           clause would be vacuous here and FALSE on the back edge.  [HG11s1]
+           and [HG11thr] are true at this ENTRY and deliberately dropped. *)
         iSplitR.
         { iPureIntro. split_and!;
-            [exact HG11sp | exact HG11s0 | exact HG11s1 | exact HG11s2
+            [exact HG11sp | exact HG11s0 | exact HG11s2
             | exact HG11s4 | exact HG11s5 | exact HG11s6 | exact HG11s9
-            | exact HG11s10 | exact HG11s11 | exact HG11a3 | exact HG11thr]. }
+            | exact HG11s10 | exact HG11s11 | exact HG11a3]. }
         iSplitR.
         { iPureIntro. split_and!;
             [exact Hk | exact Hib | exact Hn2 | exact Hu2 | exact Hal]. }
