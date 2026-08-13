@@ -6119,3 +6119,62 @@ budget threading consumes dl16_post at each dirlink (the slack under
 dirlink_units = 7 is what makes the chain close) and cru at the iupdates via
 wp_iupdate_credgen.  ARM G's decision lemmas are namex's verbatim once
 hoisted (B').
+
+
+### D₀ STOPPED BEFORE ANY EDIT (2026-08-13) — two composition holes upstream of
+### every arm, one of them a KERNEL-DEFECT CANDIDATE.  Zero .v files touched.
+
+The walk agent re-derived the full 332-byte CFG from CodeCreate.v, verified
+the environment to the byte, and stopped at the shared prefix.  The durable
+content:
+
+**BLOCKER A — the log ledger does not compose across nameiparent, and the
+kernel's own reservation arithmetic is implicated.**  wp_nameiparent_gen
+honestly spends up to (L+1)*iput_units (each per-level iunlockput may be
+the FREEING iput under a concurrent unlink of an emptied ancestor — the
+guard tests nlink under lock, but the window to the iput readmits it).
+CreateBudget prices create's twelve logging calls assuming nameiparent
+spent ZERO — nameiparent is not in its call list at all — and begin_op
+mints exactly MAXOPBLOCKS = 10 with cr_budget_fail_late closing at EXACTLY
+iput_units.  So ANY nameiparent spend busts the chain: under the landed
+honest contracts create's allocate half is unprovable at every path
+length.  And the kernel side: each freed ancestor's iupdate hits a
+DISTINCT inode block (no absorption), so the op genuinely exceeds its
+MAXOPBLOCKS reservation under the adversarial schedule; begin_op's
+admission arithmetic (log.c:138) is sound only if every op stays within
+MAXOPBLOCKS, and at 2691300 the overflow check is
+`unreachable("too big a transaction")` (log.c:230) — an unreachable() this
+analysis says is REACHABLE under combined pressure.  Recorded as the
+CANDIDATE entry in kernel-defects.md; needs the human ruling (and likely
+upstream) before any re-model.  Do NOT patch around it in specs.
+
+**BLOCKER B — nothing supplies di_type dp = T_DIR.**  create performs no
+parent type test (the only type load in its 332 bytes is the FOUND CHILD's
+lhu at +0x52); §20.17.9 transcribed namex's structure into create here and
+is wrong.  Designed fix, priced: the namex trio's success posts hand back
+generation-named `ity_shot g T_DIR` for the returned parent (the fact is
+literally in ProofNamex's context at L_par), closed at consumers by
+ity_shot_agree — 6 spec statements + a ProofNamex re-thread.  HOLD until
+Blocker A's ruling (the same posts may move again).
+
+**Restage rulings for the next D₀ launch:**
+* The failure family is NOT a CFG cut: ARM FAIL has four entries and three
+  sit behind dirlink(ip,".") — i.e. behind the §19.9.2 fresh-type gate.
+  The clean cut is the +0xb2 T_DIR test: park the whole T_DIR sub-branch;
+  keep FAIL's non-dir entry.  CreateBudget wants a cr_budget_fail_file
+  theorem for that route (derivable from cr_budget_file's last conjunct +
+  ip_spend true true true = 0).
+* wp_dirlink_gen's kept counted premise (dirlink_units = 7 in hand) makes
+  the mkdir chain UNSATISFIABLE as landed — dirlinks #2/#3 run at 6 in
+  hand.  The premise must become dl_need-shaped (4/4/5/6).  Spec edit +
+  ProofDirlink re-premise; small; can land independently of A unless A
+  re-models the ledger.
+* ProofCreateParts needs a NEW decision pair for the found arm's type test:
+  it is lhu + addiw −2 + slli/srli 48 + bltu (a zero-extended range test
+  for type ∈ {2,3}), NOT namex's sign-extended bne — nx_tdir_* do not
+  apply.  The guard's lh IS namex's verbatim; nx_nlz_* transfer.
+* PROSE CORRECTIONS (stale, caught against CodeCreate.v): the prologue
+  saves SEVEN registers, not eight — s3 is saved at +0x8a on the allocate
+  half only and restored per-arm; SpecCreate.v's header and fs-icache.md
+  §20.17.2 both said eight.  All §20.17.9 / CreateBudget arm-comment
+  addresses are pre-9da28f5.
