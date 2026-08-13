@@ -41,11 +41,16 @@ out. The clause was in `kxc_at_12c` when B1 published it, because it is true
 at the one state B1 could see — **a seam a loop has not yet been written
 against is a conjecture about that loop.**
 
-**Nothing is blocked.** Of the three upstream blockers this project found,
-two were fixed and the third does not gate the proof — it only bounds which
-pathnames the theorem covers (`L ≤ 1`, so `/init` and `sh`, not `/bin/sh`).
-Read "THE SIZE BOUND IS THE COVERAGE INVARIANT" below before writing any
-phase that calls `uvmalloc`.
+**PHASE B2 IS BLOCKED, ON `SpecReadi`.** Its contract takes `off` as a `nat`
+below `2^31`, and BOTH of B2's readi calls pass a 32-bit value read out of an
+untrusted ELF (`elf.phoff + 56*i` at `+0x13a`, `ph.off + i` at `+0x0e6`) that
+`exec` never checks and the caller therefore cannot bound. Generalizing
+`SpecReadi`'s `off` is the first task in the worklist, ahead of the loops —
+see blocker §4, which also has the reason the fix is smaller than it looks.
+Of the other three blockers two were fixed and the third does not gate the
+proof — it only bounds which pathnames the theorem covers (`L ≤ 1`, so
+`/init` and `sh`, not `/bin/sh`). Read "THE SIZE BOUND IS THE COVERAGE
+INVARIANT" below before writing any phase that calls `uvmalloc`.
 
 ## Status
 
@@ -459,12 +464,66 @@ pay it and move on; if no, the callee's contract is wrong and generalizing it
 is the work. Relaxing namei/namex/nameiparent and copyout's source to a
 fraction remains available and is nobody's blocker.
 
-## THE THREE UPSTREAM BLOCKERS — TWO FIXED, ONE OPEN AND NOT GATING
+## THE FOUR UPSTREAM BLOCKERS — TWO FIXED, ONE OPEN AND NOT GATING, ONE OPEN AND GATING B2
 
 None of these is kexec's own design going wrong; each is a callee contract
-that was stated for the callers it had, and all three were found by trying to
+that was stated for the callers it had, and all four were found by trying to
 compose them. **§1 (copyout) and §2 (safestrcpy) are FIXED and the tree is
-green; §3 (the log budget) is open** and belongs to the fs-namei project.
+green; §3 (the log budget) is open** and belongs to the fs-namei project;
+**§4 (readi's `off`) is open and is the first thing phase B2 hits.**
+
+### 4. `SpecReadi` cannot express a 32-bit `off` — **OPEN, AND IT GATES PHASE B2**
+
+`SpecReadi` takes `off` as a **`nat`** and pins the register:
+
+```coq
+  (Z.of_nat off + Z.of_nat n < 2 ^ 31) ->
+  m !!! Regidx (mword_of_int 13) = (mword_of_int (Z.of_nat off) : mword 64) ->
+```
+
+so `off ∈ [0, 2^31)`. Both of kexec's phase-B readi calls hand a3 a value
+that **can be negative**, and neither can be bounded:
+
+- the phdr read at `+0x13a` passes `off = elf.phoff + 56*i`, computed by
+  `lw a3,-400(s0)` then `addiw a3,a5,56` — the seam file already spells it
+  `kxc_off ef i := sign_extend' 64 (Z_to_bv 32 (ph_at ef i))` for exactly
+  this reason, and `ElfEnc.eh_phoff` is `le_at f 32 4`, four untrusted bytes;
+- the loadseg read at `+0x0e6` passes `ph.off + i`, `lw s7,-480(s0)` then
+  `addw a3,s7,s1`.
+
+`exec` checks nothing about either — not `elf.phoff`, not `ph.off`. So this
+fails the project's own test (**"can the caller pay?"**): it cannot, and the
+callee's contract is therefore wrong.
+
+**THE KERNEL IS NOT AT FAULT — unlike §1, this one really is spec-only.**
+`readi`'s C parameter is `uint off`, and its first statement is
+`if (off > ip->size || off + n < off) return 0;`, so it is total for every
+32-bit `off`; loadseg's `!= n` test then sends a bogus offset straight to
+`bad:`, which is `+0x0ea`, an exit B2 already has to prove. Run the §1 lesson
+in reverse before doing the work: there is no scaffolding here modelling a
+gap between what the code does and what its callers want, so do not go
+looking for a kernel fix.
+
+**AND THE FIX IS SMALLER THAN IT LOOKS, because the postcondition already
+covers the case.** `SpecReadi.rd_clamp` is `if size < off + n then size - off
+else n`, which is `0` at `off > size` — its own header says so ("Zero when
+`off` is already past the end, which is exactly what the pre-frame exit
+returns"), and `off > ip->size` is *already reachable* inside the current
+premises (`off = 2^30`, `size = 512`). So the early-return arm is proved.
+What has to move is the REPRESENTATION premise:
+
+- `m a3 = sign_extend' 64 (Z_to_bv 32 (Z.of_nat off))` with `off < 2^32`,
+  in place of `mword_of_int (Z.of_nat off)` with `off < 2^31`;
+- the joint `off + n < 2^31` conjunct survives only where it is really used
+  (the `addw a4,a3` at readi's `+0x022`), and **after** the size test it is
+  free: that test leaves `off ≤ size ≤ MAXFILE*BSIZE ≈ 274432`, so the sum
+  cannot wrap for any sane `n`. The work is re-proving the size comparison
+  itself for a sign-extended-negative a3.
+
+`writei` has the same `off` shape and the same two-line premise; check it
+while the file is open, and check whether `SpecFileread`/`SpecFilewrite` (the
+only other consumers) would rather keep a `nat`-shaped corollary than take
+the general form — that is what `ssc_src_ok_full` did for safestrcpy in §2.
 
 ### 1. copyout assumed the destination table is the RUNNING process's — **FIXED IN THE KERNEL, and that is the lesson**
 
@@ -691,6 +750,13 @@ first one to name it.
 ## Worklist
 
 Ordered. Each step ends at a seam the next one starts from.
+
+### 0. GENERALIZE `SpecReadi`'s `off` TO 32 BITS — blocker §4
+
+Do this first: both of B2's readi calls need it, so the loops cannot even be
+stated against the current contract. §4 has the shape of the fix, why the
+postcondition needs no change, and the two sibling contracts to check while
+the file is open.
 
 ### 1. PHASE B2 — the phdr loop and the inlined loadseg loop (`+0x0ce .. +0x1ac`)
 
