@@ -97,15 +97,23 @@ Section ProofMemset.
        [rget] (which at tp answers the hart's id, not the map's slot), while
        the loop's premises are plain map facts.  [rget_ne] bridges them, one
        per operand, and its side conditions are exactly the three
-       [Regidx ra{1,4,5} <> Regidx Rtp] premises. *)
+       [Regidx ra{1,4,5} <> Regidx Rtp] facts -- which arrive as [SrcOk]
+       instances now, not as premises, and are read off with
+       [src_ok_not_tp] once at the top. *)
   Lemma wp_memset_loop_sconf
-      (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5) (imm_bne : mword 13)
+      (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5)
+      `{!SrcOk ra1, !SrcOk ra4, !SrcOk ra5} (imm_bne : mword 13)
       (olds : nat -> bv 8) (n : nat) (b : bool) (pcur : mword 64)
     : wp_memset_loop_sconf_body N p e cval ra1 ra4 ra5 imm_bne olds n b pcur.
   Proof.
     cbv beta delta [wp_memset_loop_sconf_body].
     intros pc0 pc4 pc6 cbyte Hra1 Hra4 Hra5 Hback Hal0
-      Hincr Hcmp Hra4ne Hra1ne Hra5sp Hra5tp Hra1tp Hra4tp Hext0 Hext4 Hext6.
+      Hincr Hcmp Hra4ne Hra1ne Hra5sp Hext0 Hext4 Hext6.
+    (* the three tp exclusions, read off the [SrcOk] instances the statement
+       carries instead of the premises it used to take *)
+    assert (Hra5tp : Regidx ra5 <> Regidx Rtp) by exact src_ok_not_tp.
+    assert (Hra1tp : Regidx ra1 <> Regidx Rtp) by exact src_ok_not_tp.
+    assert (Hra4tp : Regidx ra4 <> Regidx Rtp) by exact src_ok_not_tp.
     (* [b]-generic recursion: IH must be applicable at ANY landing hart
        (the taken-bne step can migrate), so CID has to be part of what the
        induction generalizes -- a plain [induction rem] here would fix IH at
