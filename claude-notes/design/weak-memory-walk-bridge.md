@@ -192,15 +192,33 @@ peel+family site premises indexed on (σ, tick), and
 Q-half into a `wwalk_cert` — P is the leaf's site predicate, which is
 how the funnel instantiates it.
 
+**AND THE LOG IDENTITY IS EXPORTED (2026-08-13, the last ghost-matching
+gap).**  The rule's continuation now carries `wm_log σ' = wm_log σ ++
+wtrace_msgs tid rp es` — needed because flat-memory equality does NOT
+pin the log delta (a same-value rewrite appends invisibly), and the
+interp's log auth must match σ' exactly.  Finding: the message CLASS is
+not event-recoverable (`wm_class_of` reads the dynamic release-pending
+flag `w_relp`) but IS trace-recoverable — `wtrace_msgs` threads that
+one boolean and stays exact.  The WCexcl agreement between the
+projection of the walk's CAS write and the absorption theorem's
+appended-log arm is MACHINE-CHECKED (`wtrace_msgs_walk_ro/_wb` in
+WkWalkRule §4: read-only shapes project to `[]`, write-back to the one
+`WCexcl` message).  Small debt: the base elims keep their old
+five-conjunct statements with `_msgs` twins alongside (WkFetchPeel
+destructures positionally); collapsing is a 3-token widening at
+WkFetchPeel:1053/1088/1122, noted at WeakStale §10c — take it in the
+next consolidation sweep.
+
 **The fetch-walking instruction story is now complete from the Sail
-model to the WP**: model mirrors → absorption → peels → ⇐-bridge →
-step certificate → `wp_wwalk_step`, with `wkpt_fetch_peel_at`
-supplying the resource side.  What remains of this front: 6c's
-funnel/leaf sweep proper (thread `wkpt_fetch_peel_at`'s outputs into a
-`wwalk_site`-shaped P and drive `wp_wwalk_step` for a first concrete
-S-mode instruction — the validation capstone), the straddle/RVC fetch
-arms over §9 + `wstep_ok_racy_kR`, the writing-execute constancy
-export, and the φ clean-arm wiring.
+model to the WP, ghost matching included**: model mirrors → absorption
+→ peels → ⇐-bridge (outcome + registers + memory + LOG) → step
+certificate → `wp_wwalk_step`, with `wkpt_fetch_peel_at` supplying the
+resource side.  What remains of this front: 6c's validation capstone
+(thread `wkpt_fetch_peel_at`'s outputs into a `wwalk_site`-shaped P and
+drive `wp_wwalk_step` for a first concrete S-mode instruction — no
+known gaps remain in its path), then the funnel/leaf sweep proper, the
+straddle/RVC fetch arms over §9 + `wstep_ok_racy_kR`, the
+writing-execute constancy export, and the φ clean-arm wiring.
 
 **DECISION (2026-08-12, the φ-upgrade author, as §5 requested): take
 option (a), and do NOT start until the in-flight C/D/S points-to surgery
