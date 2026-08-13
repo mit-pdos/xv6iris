@@ -942,6 +942,7 @@ WeakKptStale.v
 WkClipAdvance.v
 WkUnmapMp.v
 WkFetchPeel.v
+WkStepPeel.v
 WeakFunnelCfg.v
 WeakLeafCsrw.v
 WeakVariant.v

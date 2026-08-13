@@ -142,10 +142,46 @@ geometry once it holds `la`).  Enablers, both worth knowing:
   one new lemma (`exec_eff_pmpCheck_supervisor_grant_fetch`, the load
   grant's script with R→X).
 
-What remains of this front: the straddle/RVC fetch arms over §9 +
-`wstep_ok_racy_kR`, and 6c's funnel (`wwp_instr_s`) — which now has
-every fetch-side ingredient: this fupd for the resource side, the CPS
-peel for the execute-phase bind, and the ⇐-bridge for its Q-half.
+**THE WHOLE-STEP LAYER IS IN (2026-08-13, `iris/WkStepPeel.v` — peel,
+family and Q-half of `riscv_step tick` for a fetch-walking instruction
+with a window-free execute; axioms = `plat_term_write` + the
+reservation quartet, the same set the M-mode whole-step certificate
+carries once `execute` is mentioned).**  `wstep_peel_fetchwalk` /
+`wstep_family_fetchwalk` / `wstep_outcome_fetchwalk` /
+`wexec_outcome_of_peel`.  Structure facts worth keeping:
+`riscv_step tick = bind (try_step 0 false) (tick?)`; everything in
+`try_step` except `run_hart_active` is register-only; the fetch sits
+one `catch_early_return` down under a `liftR`, as the second argument
+of a `bind0` UNDER A BINDER (the interrupt result) — the §0 Ltac
+continuation-extractors (`rha_after_fetch`/`ts_after_rha`, extracted
+from the model term, not re-typed) exist for that reason.  Two new §1
+transports are the enabling ideas: `wstep_ok_racy_k_of_eff_nil` (an
+empty-trace `exec_eff` fact IS a CPS peel at either phase — makes every
+register-only wrapper free) and `wstep_ok_racy_kR_of_k_cer` (the
+converse of `_k_cer` — lets the post-fetch remainder be owed as an
+ordinary `wstep_ok` of its `catch_early_return`).  The family needed a
+genuine S-mode `fetch` at the stale mirror (`exec_stale_fetch_S` — did
+not exist).  Interfaces: three peel-side tails (`wexec_tail`,
+`wstep_post_tail`, `wstep_tick_tail`) and two family-side
+(`wstep_tail_eff`, `wstep_family_ready`) — kept SEPARATE (keyed on
+weak vs mirror post-states).  Gates: the interrupt arm is gated by
+⌜`dispatchInterrupt Supervisor = None`⌝ (the S-mode analog of the
+M-mode `MIE = false`); fetch-side premises are owed at `wmi σ b` for
+BOTH minstret-flag values (the funnel's choice is invisible).  ONE
+recorded narrowness: a WRITING window-free execute passes the peel but
+not the family on the TLB-hit shapes (no racy read + `trace_stale`
+forbids pre-racy writes) — the fix is routing those shapes through the
+`_const` disjunct, which needs `wwalk_exports` to expose the family
+member's per-shape CONSTANCY (the absorption theorem produces it; the
+bundle drops it).  Additive when needed.
+
+What remains of this front: the S-mode racy WP RULE (new — the started
+cone's `wp_wracy_load` is pinned at `D := racc_disj`/`W := False`;
+this one consumes the step peel + family + `wexec_outcome_of_peel` at
+`wD_any`/`True`, with `wkpt_fetch_peel_at` on the resource side), the
+straddle/RVC fetch arms over §9 + `wstep_ok_racy_kR`, the
+writing-execute constancy export above, and then 6c's funnel/leaf
+sweep proper.
 
 **DECISION (2026-08-12, the φ-upgrade author, as §5 requested): take
 option (a), and do NOT start until the in-flight C/D/S points-to surgery
