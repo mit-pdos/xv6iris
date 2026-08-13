@@ -3411,6 +3411,965 @@ console contract its `devsw` arm reaches) — unchanged by this stage.
    off the wrong pattern is a false green.
 
 
+## S5e — DESIGN-ONLY.  **§19 PART 2 IS DESIGNED AND RATIFIABLE:
+## `design/fs-icache.md` §20 (20.1–20.11).**  The user's argument holds;
+## the claim token spans ialloc's window; §19.9.1's table dies at row 2;
+## and the chartered invariant is FALSE at exactly one record — a real
+## kernel defect
+
+No `iris/` file was touched; no probe compiled; no mirror traffic.  The
+deliverable is `fs-icache.md` §20 and this entry is the ledger.
+
+**THE GHOST.**  A per-inum LINK LEDGER under an AMBIENT gname
+`icfg_link`, added to `icfg` beside `icfg_iref` / `icfg_live`
+(`IcacheRef.v:345/346/354`) — **zero signature moves anywhere**, which is
+§16.5's packaging constraint respected by construction and the door
+§19.5(g) reached for.  RA: `gmapUR Z (authR ((nat * nat) * option (excl
+unit)))`, per inum `● (w, g, c)` with three fragments — `ilink z` (a
+record names `z` and `z`'s `nlink` pays for it), `igrey z` (a record names
+`z` and NOTHING pays — §20.8), `iclaim z` (an uncommitted `ialloc`).  The
+AUTHORITY is parked in `ireg_slot` (`InodeRegion.v:446`) on **both** arms,
+with three pure clauses stated against the region's own on-disk `d`
+(`ireg_couple`, `:429`): (L1) `w <= di_nlink d`, (L2) a live claim means
+`fresh_shape d`, (L3) `di_type d = 0 -> di_nlink d = 0 /\ c = None`.
+Payoff in one line: `ilink z` ⟹ `w >= 1` ⟹ (L1) `nlink >= 1` ⟹ (L3)
+**allocated**.  Parking it with the RECORD instead is dead — the ordinary
+fill of a claim box could not re-establish `w <= nlink` at `nlink = 0`,
+S5b constraint (3) in a new costume.
+
+**`dir_ok` DOES NOT MOVE.**  It stays the pure `Prop` it is
+(`DirView.v:855`); it gains a RESOURCE TWIN `dir_links` beside it in the
+same two payloads (`IcacheEscrow.v:431`, `:474`), a big-op of one
+fragment per live non-self record, with the colour disjunction and the
+`debt` index INSIDE the definition — **no arity change, timelessness
+survives.**
+
+**`SpecIget`'s PREMISE: six licences, borrowed and returned.**  `ilink`
+(dirlookup's record) | `igrey` (§20.8) | `dinode_at`-with-nonzero-type
+(the `"."` self-lookup) | `iclaim` (ialloc) | a locked dinode BUFFER
+showing a nonzero type (ireclaim — it still holds the buffer at its iget,
+`ProofIreclaim.v:1213/1252`, and the buffer is §16.2's serialiser) |
+`ROOTINO` (namex, backed by a new region clause (L4) `root nlink >= 1`).
+Each of the six is forced by one of the four existing call sites.
+Consumed licences are DEAD: dirlookup's fragment belongs to the
+directory's payload and must go back at `iunlock`.
+
+**THE IALLOC-WINDOW RECONCILIATION — and the mandate's question answered:
+YES, the buffer is gone.**  `brelse` is `ProofIalloc.v:1528`, the `iget`
+is `:1622`, so at +0xaa the claimant holds *nothing*, not even §16.2's
+serialiser.  The fix: **`ireg_claim_au` (`InodeRegion.v:798`) pays out
+`iclaim inum` instead of `True`**, and every premise it needs is already
+in its statement — `di_type = 0` (`:804`) plus (L3) gives `c = None`, so
+the token is mintable and no outstanding copy can block it; `fresh_shape
+dn'` (`:805`) IS (L2)'s conclusion.  **§19.5(f) was wrong for one reason
+it never considered:** it rejected a per-inum ticket because "a re-claim
+is blocked by an outstanding copy", which is true only if nothing
+re-establishes the ticket's absence — (L3) does, and `ireg_free_au` is
+the agent that re-establishes it.  §19.5(a)'s "SpecIalloc cannot be
+strengthened" also falls: `iclaim` says nothing about the record's VALUE,
+only that the claim slot is still the holder's.
+
+**PRESERVATION** (full table in §20.6, one row per writer with sites):
+claim mints; **create's first `iupdate` (nlink 0->1) is the COMMIT** —
+spend `iclaim`, mint one `ilink`, and (L1) grows on both sides at once;
+`dirlink` takes an `ilink` as the resource sibling of its already-unused
+child-range premise (`SpecDirlink.v:290`); mkdir's `"."` mints NOTHING
+(the self exemption, forced by xv6's own "No ip->nlink++ for '.'") and
+its `".."` mints at `dp->nlink++`; `sys_link` mints at `ip->nlink++` and
+carries the fragment past its `iunlock`; sys_unlink zeroes the record then
+spends the fragment at `ip->nlink--` through a new `ireg_write_unlink`
+(the ONLY nlink-lowering region write); `ireg_write_au` gains a pure
+nlink-monotone premise that travels to the same five contracts
+`di_type_stable` did — **§19.9's lesson re-applies verbatim**; iput's
+`ireg_free_au` gains `di_nlink dn' = 0` and `c = None`, and then derives
+`w = 0` INSIDE the region, which is the user's premise (3) proved; boot's
+image-wf IOU grows one clause per inum.
+
+**WHAT create DERIVES.**  The token + (L2) + (L3) + `ireg_free_au`'s new
+premise + S5d's `di_type_stable` give, at `ProofIlock.v:1027`'s claim-box
+withdraw, that the record is byte-identical to the one the claim wrote:
+**`dn = ialloc_fresh ty` becomes a THEOREM**, `cr_made_setf` closes the
+`made` arm and all four dirlink premises, and **§19.9.2's "ARM C-OK-DIR
+stays gated" is LIFTED — all eight arms.**  §19.9.1's six-step table dies
+at ROW 2: each of the six licences is refuted for a just-claimed inum
+(details in §20.7's table).
+
+**THE TWO THINGS §20 DOES NOT CLOSE, both named and priced.**
+
+1. **A REFERENCE OUTLIVES THE LICENCE THAT MINTED IT.**  `ireg_free_au`'s
+   new `c = None` premise has no discharge in `ProofIput` today: (L2)
+   cannot help because §19.5(h) still stands — a truncated corpse IS
+   `fresh_shape`.  Two carriers priced: **(M1)** a fourth ledger
+   component `r` minted at `iget`, returned at `ip->ref--`, tied to the
+   entry's count by ONE clause in `itable_inv` (which already holds
+   `own icfg_iref (● M)`, `IcacheInv.v:592`) — then REF-1 gives `r = 1`
+   and a live claimant gives `r >= 2`; **(M2)** a THIRD generation bump,
+   because §17.6's bump at `ProofIput.v:1759` (+0x54) precedes the region
+   free at `:2076`, so today's generation spans a free and `live_gen`
+   certifies nothing.  **Recommend (M1)** — additive, no §17 re-opening,
+   and it formalises the exact sentence §19.9.1 could not.
+2. **THE ORPHANED `".."` — A REAL KERNEL DEFECT, and the chartered
+   invariant is FALSE because of it.**  `mkdir /a/b; chdir /a/b; rmdir
+   /a/b; rmdir /a` leaves `b`'s `".."` naming a FREED inum: `sys_unlink`'s
+   dir arm decrements `dp->nlink` while the child's `".."` record still
+   names it, and the child is not truncated until its last reference
+   goes.  `namei("..")` from that cwd then hits `panic("ilock: no type")`
+   — or, after a racing `ialloc`, resolves to an unrelated inode.  Every
+   total repair is dead (§20.9 (h)/(i)): keeping `dir_links` total blocks
+   `iput`'s free of the orphan's parent, and scoping by the directory's
+   own liveness makes `dirlookup` in a deleted cwd stuck — both
+   machine-reachable steps.  Hence the GREY colour, which keeps every
+   reachable step provable and carries no allocatedness, and hence
+   create's ONE gated case: *no orphaned directory names the claimed
+   inum*.  Unlike §19.6 Part 3's assumption this one is **unproven, not
+   false**.  **`kernel-defects.md` should gain the entry** (text drafted
+   in §20.8).
+
+**TEN DEATH CERTIFICATES** in §20.9: a purely-pure `dir_ok`; any
+persistent allocated-witness (free-and-reclaim, then currency); one
+global `auth (gmap Z nat)` in `ireg_body`; the authority parked with the
+record; a new gname; a consumed licence; counting self-records; a total
+`dir_links`; scoping by the directory's own `nlink`; and a claim-free
+ledger tied to `nlink` alone.
+
+**STAGE PLAN (5).**  **A** the ledger (region-side, threading-shaped,
+independently correct: (L1)+(L3) make "a free inode is unnamed" a theorem
+of the region).  **B** the payload twin + DirView twins + boot IOU + the
+five re-park sites.  **C** the consumers — `SpecIget`'s licence and the
+six sources, dirlookup/dirlink/namex; the stage with real proof work.
+**D** create — `SpecIalloc`'s payout, the commit exchange, the walk;
+**`SpecCreate.v` does not move**, so S5a's freeze note survives.  **E**
+the carrier (M1).  E may be sequenced before D if create's first landing
+must be unconditional.  S7 (sys_unlink) inherits the withdrawal, the grey
+conversion, the `isdirempty` obligation named in §20.6, and (L4).
+
+**Gate.** Design-only: no `iris/` change, no build, no probe, no mirror
+traffic, `/tmp/union15.log` untouched.  Working tree carries exactly two
+edited notes files.
+
+
+## S5f — §20 STAGE A: the ledger's ALGEBRA and its REGION PARKING landed and
+## gated; **THE CLAUSES ARE STOPPED-AND-REPORTED.** (L1) and (L3) form one
+## knot whose single missing fact is `di_nlink dn2 = 0` at `ProofIput`'s
+## free — and §20 did not price it.  Stage B NOT started
+
+### What landed, green
+
+* **`IcacheRef.v` — the whole ledger algebra, exactly as §20.2 spells it.**
+  `linkUR := gmapUR Z (authR (((natUR * natUR) * optionUR (exclR unitO)) *
+  natUR))` — the four components are §20.2's `w`/`g`/`c` plus §20.7's (M1)
+  reference counter `r`, so the RA is FINAL and stage E reshapes nothing.
+  `icfg` gains `icfg_link : gname` (the ambient door, §20.9(e)); `icacheG`
+  gains the `inG`; `icfg_alloc` gains the boot map as an argument, because
+  a gname is only usable by `IcacheBoot` if the `own_alloc` that mints it
+  also mints the map.  Vocabulary: `link_auth`, `ilink`, `igrey`,
+  `iclaim`, `iref_lic`, with `link_agree` / `link_w_ge` / `link_r_ge` /
+  `link_claim_agree` / `iclaim_excl` and the six moves
+  (`link_mint_link`, `link_spend_link`, `link_grey_of_link`,
+  `link_mint_claim`, `link_spend_claim`, `link_mint_ref`,
+  `link_spend_ref`).  **Nothing in it is provisional.**
+* **`InodeRegion.v` — the authority PARKED in `ireg_slot`, on both arms**
+  (§20.2's placement, §20.9(c)/(d)'s two death certificates), with
+  `ireg_slot_intro` as the one constructor every arm move goes through.
+  All four existing arm moves (`ireg_write_au`, `ireg_claim_au`,
+  `ireg_free_au`, `ireg_withdraw`) carry it, and TWO NEW ONES land:
+  `ireg_write_link` (mkdir's `".."` / sys_link's `ip->nlink++` — mint an
+  `ilink` in the same ghost step as the count that pays for it) and
+  **`ireg_write_unlink`** (sys_unlink's decrement, the ONLY nlink-lowering
+  region write, which CONSUMES an `ilink` as it lowers).
+* **`di_nlink_stable` and its tour**, §19.9's lesson re-applied verbatim:
+  `SpecIupdate` (all three bodies), `SpecWritei`, `SpecItrunc`,
+  `SpecDirlink`, and one token in `ProofIupdate` / `ProofWritei` /
+  `ProofItrunc` / `ProofDirlink` / `ProofFilewrite` / `ProofIput`.
+* **`IcacheBoot.ireg_alloc`** takes the ledger's per-inum authorities as a
+  boot premise (`[∗ set] z ∈ region_inums nib, link_auth z 0 0 None 0`),
+  the same kind of honest image obligation `ipool_shape_alloc` already is.
+* **`kernel-defects.md` gains D2**, the dangling-`".."` panic, from §20.8's
+  draft.
+
+### The blocker, stated exactly
+
+`ireg_link_ok d w` — the named predicate every arm move re-establishes — is
+`True` today.  §20.2's clauses are not there, and this is why:
+
+1. **`ireg_claim_au` cannot re-establish (L1) without (L3).**  The record
+   ialloc writes is `ialloc_fresh ty`, whose `nlink` is ZERO (it models
+   `memset(dip,0,64)`).  So (L1) at the new record is `w <= 0`, i.e.
+   `w = 0`, and the only handle the claim has is the type-0-ness its
+   caller read out of the buffer — i.e. it needs (L3), "a free record's
+   link count is zero", as an INVARIANT.  ialloc never reads `nlink` and
+   cannot supply it as a premise; `ds` is discovered by the scan and is
+   not a contract parameter, so there is no place to state it either.
+2. **(L3) is preserved by every writer but the free.**  `ireg_write_au`
+   and `ireg_claim_au` write a nonzero type (vacuous); `ireg_withdraw`
+   writes nothing.  Only iput's `ip->type = 0` flush must SHOW
+   `di_nlink = 0` of the record it writes.
+3. **xv6 establishes exactly that, and `ProofIput` loses it.**  The free is
+   guarded by `ip->nlink == 0` at iput+0x40 — the proof reads that
+   halfword off the record `dn` it holds BEFORE the window
+   (`ProofIput.v:1529`, `Hnl0`) — and then re-opens the payload after
+   `acquiresleep` as a FRESH existential `dn2` (`ProofIput.v:1938`) with no
+   link back to `dn`.  `ity_shot` pins the TYPE across the window
+   (§17.6's whole point) and **nothing pins `nlink`.**
+4. **There is no ghost way around it.**  Lowering the ledger's authority is
+   a frame-preserving update, so nothing can "clear" `w` at a record whose
+   fragments are outstanding — §19.7's rule, one level down.
+
+So the three propositions {claim needs (L3)} → {(L3) needs the free's
+`nlink = 0`} → {`ProofIput` cannot see it} are ONE knot with ONE missing
+fact, and no re-shaping of the clauses breaks it.  Every variant was tried
+against the four movers and each one moves the red step without removing
+it: (L1) alone reds `ireg_claim_au`; (L1)+(L3) reds `ProofIput`; (L1) on
+the marker arm with `True` on the in arm reds `ireg_withdraw`; `w = 0` on
+the in arm reds the free again.  **The free is always the red step, because
+the free is where the ledger has to CERTIFY "unnamed".**
+
+### Two repairs, priced
+
+**(R1) PIN THE RECORD ACROSS IPUT'S WINDOW.**  `IcacheEscrow.ic_open_held`
+takes an `ic_payload … ga true` in and gives one back; make it parametric
+in the record (`ic_payload_at … dn bm` in, the same out) so `dn2 = dn` and
+`Hnl0` reaches the free.  This is the honest repair: it is §17-family, it
+is what xv6's own REF-1 argument says, and it costs one lemma plus its two
+call sites in `ProofIput`.  **RECOMMENDED**, and it is a prerequisite for
+§20 stage A's content, not an optional extra.
+
+**(R2) CARRY THE ZERO IN THE PAYLOAD.**  Add `⌜di_nlink dn = 0⌝`-shaped
+information to the loaded payload at the point iput tests it — dead, for
+§17.5's reason: the payload is re-parked and the conjunct would have to be
+re-established by whoever picks it up.
+
+Note that (R1) is ALSO the shape §20.7's (M1) needs, from the other end:
+both are "what a REF-1 holder may conclude about a record it is not
+currently holding".
+
+### What §20 got right, and what it under-priced
+
+§20.7 already names an open obligation at `ireg_free_au` — the `c = None`
+half of (L3) — and prices (M1) for it.  What it did NOT see is that the
+`nlink` half has the SAME shape and the same home: §20.6's iput row says
+the free "gains TWO premises: `di_nlink dn' = 0` and `c = None`" and treats
+the first as free.  It is not.  Both are facts about the record iput is
+about to write, and iput's proof does not have that record.
+
+Everything else in §20 survives this unchanged: the ambient gname, the RA,
+the parking placement, the two nlink-moving writes, the grey colour, the
+ten death certificates, and D2.
+
+### The M1 clause has no home in `itable_inv` either (a second finding)
+
+§20.7's (M1) puts "one clause in `itable_inv` … ties `r z` to the count of
+the entry holding `z`".  **`itable_body` cannot state it.**  Its map is
+`M : gmap nat (Qp * positive)` (`IcacheInv.v:903`) — SLOT-keyed and
+INUM-BLIND — and the slot -> inum map is `ci`, which lives in `itable_res`
+behind the spinlock (`IcacheEscrow.v:1761`, `ic_ci_wf`), not in the
+invariant.  §20.7's own justification says "under the itable lock, where
+both halves are in hand", which points at `itable_res`; but the ledger's
+AUTHORITY is parked in the region, so `itable_res` cannot state it either
+without undoing §20.2's placement.  So (M1) needs a third design step, and
+it is not the one-clause change §20.7 priced.  `r` and `iref_lic` are
+landed in the algebra so that step costs no RA change.
+
+### NOT STARTED
+
+**Stage B in full** — `dir_links`, the five DirView twins, the boot IOU's
+fragments, the re-park sites.  It was not begun, and it should not be until
+(R1) lands: a payload twin whose fragments carry no allocatedness is the
+same hollow shape the region half is in now.  The stage-B sizing in §20.10
+is unaffected.
+
+### Gate
+
+`~/one6.sh` (single files) and one detached `~/mk6.sh` (`/tmp/mk6.log`,
+`make -f CoqMakefile -j24 -k`) against the EC2 mirror at `d779b5df`; no
+`_CoqProject` edit, no git write on EC2, mirror quiet throughout.
+
+### Traps recorded
+
+1. **`Excl ()` parses `()` as the unit TYPE in an RA position.**  The error
+   is `The term "Excl' ()%type" has type "excl' Set" while it is expected
+   to have type "excl' ()"` — which reads like a universe problem.  Write
+   `Excl tt`.
+2. **`ε` IN A GOAL DEFEATS `lia`.**  `auth_update_alloc`'s local update is
+   stated at `(a, ε)`, and after `prod_local_update'` the `nat` component's
+   goal is `w + 1 = S w + ε` — `lia` answers *"Cannot find witness"* on
+   what looks like arithmetic.  Spell the unit (`lelem 0 0 None 0`) in the
+   wrapper's statement and let the conversion happen once, there.
+3. **`iFrame` DISCHARGES A TRIVIAL PURE CONJUNCT, so a following
+   `iPureIntro` fails with `No such goal`.**  Bites exactly when a clause
+   is a placeholder (`True`) and will un-bite when it is not — so write the
+   constructor as `iSplitL "H"; [iExact "H" |]; iPureIntro`, which is
+   stable under both.
+4. **`auth_both_valid_discrete` returns a CONJUNCTION**; `proj1` of it is
+   the inclusion *pair*, not the inclusion.
+
+
+
+## S5g — §20's (R1) AND THE LEDGER'S CLAUSES ARE LANDED AND FULLY GATED.
+## `ireg_link_ok` is (L1)+(L3), "a free inode is named by no live directory
+## record" is a THEOREM of the region, and the accessor that cashes it
+## exists.  **Stage B NOT started; (R2) is STOPPED-AND-REPORTED — the
+## escrow arm is not M1's home either, and the reason is not the home**
+
+### What landed, green (5 files, full tree green first try after one fix)
+
+* **(R1) `IcacheEscrow.ic_open_held` IS RECORD-PARAMETRIC.**  New
+  `ic_payload_at γfs γi cov logstart k inum g dn bm` — the LOADED polarity
+  at a named record — with `ic_payload_at_pack` back to `ic_payload … true`
+  and its own `Timeless`.  `ic_open_held` takes and returns
+  `ic_payload_at … dn bm` (the `v` parameter is GONE; both call sites pass
+  `true`), so `ProofIput`'s post-`acquiresleep` re-open at +0x54 yields the
+  SAME `dn`, not a fresh `dn2`.  `ic_payload` itself is untouched — the
+  nineteen files that name it, and every arm that binds the record
+  existentially, did not move.
+* **`InodeRegion.ireg_link_ok d w` IS §20.2's (L1)+(L3)**:
+  `w ≤ Z.to_nat (di_nlink d)` and `di_type d = 0 → di_nlink d = 0`.  All
+  six arm moves re-establish it — `ireg_write_au` (L1 rides on
+  `di_nlink_stable`, L3 vacuous), `ireg_claim_au` (the OLD record's L3
+  collapses L1 to `w = 0`, which is the step S5f called the knot),
+  `ireg_free_au` (**`w = 0` derived inside the region**), `ireg_withdraw`
+  (record unchanged, clause verbatim), `ireg_write_link` /
+  `ireg_write_unlink` (L1 grows / falls on both sides at once).  Two pure
+  readers land with it: `ireg_link_ok_alloc` (the `ilink ⟹ w≥1 ⟹ nlink≥1
+  ⟹ type≠0` chain) and `ireg_link_ok_free`.
+* **`di_nlink_stable` GAINS ITS DOCUMENTED SECOND CONJUNCT** —
+  `di_type dn' = 0 → di_nlink dn' = 0`.  This is where (L3)'s travelling
+  half belongs and it is why the tour cost NOTHING: the premise slot
+  already exists in `SpecIupdate`×3, `SpecWritei`, `SpecItrunc`,
+  `SpecDirlink` and every proof that merely passes it through, so **zero
+  contract edits** and exactly **three discharge sites** in the whole tree
+  (`ProofFilewrite:2055`, `ProofIput`'s itrunc call, `ProofIput`'s free).
+  `_refl` / `_eq` now take the record's nonzero type (every ordinary writer
+  has it from `inode_ok`); new `di_nlink_stable_free` is iput's, and both
+  of its conjuncts come out of the one zero.
+* **`ProofIput` carries `ip->nlink == 0` to the free.**  `ip_sext64_16_inj`
+  + `ip_nlink_zero` turn the +0x44 `c.bnez` fall-through into
+  `bv_unsigned (di_nlink dn) = 0`; (R1) carries `dn` across the window;
+  `di_nlink_stable_free (di_free dn) (di_trunc dn) eq_refl …` hands it to
+  the region.  `dn2`/`bm2` are gone — the free path names one record.
+* **`InodeRegion.ireg_link_alloc`, the accessor S5f described.**
+  `ireg_read_blk`'s credential (the dinode block's machinery half, between
+  a `bread` and a `brelse`) plus `ilink z` ⟹ the decoded list and
+  `di_type (ds !!! islot z) ≠ 0`, fragment borrowed and returned,
+  mask-preserving.  This is §20.4's licence (a) cashed, and it is what
+  stage C's `SpecIget` premise will consume.
+* **`IcacheBoot.ireg_alloc` gains (L3) as an image IOU** —
+  `image_free_nlink`, in ∀-over-decodings form because `dss` is produced by
+  `image_decode` inside the proof.  Free: `ireg_alloc` still has no callers.
+
+### Gate
+
+`~/mk7.sh` (detached, `/tmp/mk7.log`, `make -f CoqMakefile -j24 -k`) on the
+EC2 mirror synced at `986e2e59` + the five files: **`EXIT=0`, zero `Error`,
+1054 `.vo` (unchanged)**.  `~/audit7.sh` → `Print Assumptions` on all
+fourteen linked fs theorems (Dirlink, Iupdate ×3, Itrunc, Iput,
+Iunlockput, Ilock, Ialloc, Writei ×2, Namex, Namei, Filewrite):
+**every one is `functional_extensionality_dep` + the five `rv64d.*`
+platform axioms**, plus filewrite's pre-existing declared
+`LinkConsolewrite.Consolewrite.wp_consolewrite_sconf`.  Cones unchanged.
+No `_CoqProject` edit, no git write on EC2, mirror quiet throughout.
+
+`lemma_diff`: +`ic_payload_at`, +`ic_payload_at_timeless`,
++`ic_payload_at_pack`, +`ic_payload_at_size` (Local) in `IcacheEscrow`;
++`di_nlink_nonneg`, +`di_nlink_stable_free`, +`ireg_link_ok_alloc`,
++`ireg_link_ok_free`, +`ireg_link_alloc` in `InodeRegion`;
++`image_free_nlink`, +`ip_sext64_16_inj`, +`ip_nlink_zero`.  Nothing
+retired: `ic_payload_excl` / `ic_payload_unloaded_excl` stay (they are the
+`ic_payload`-shaped refutations other openers use).  Every addition is
+named by §20.13/§20.14 or is the arithmetic side condition four of them
+share.
+
+### (R2) STOP-AND-REPORT: the ESCROW ARM is not M1's home either, and the
+### obstruction is the DIRECTION of the count, not the address
+
+§20.14 homes M1's clause in the escrow arm — "the arm is per-slot and knows
+its inum via `ic_id`, so it can carry *outstanding `iref_lic` fragments for
+this inum ≤ the slot's count*".  Worked against the arms' actual shapes
+(`IcacheEscrow.v:774-853`), three things object, and only the first is
+about the address:
+
+1. **The arm does not know the slot's COUNT.**  It knows its inum
+   (`ic_id cn k (1/2) true dev inum`) and it knows a LIVENESS slice
+   (`live_gen k (1/2) g`, and `ic_dep_res`'s `Qp` on the OUT arm).  The
+   count is `M !! k = Some (q, n)` under `own icfg_iref (● M)` in
+   `itable_inv` (`IcacheInv.v:592`), and no arm holds a count fragment at
+   all.  So `≤ the slot's count` has no denotation in the arm as it
+   stands; giving the arm one re-opens §13/§14's share arithmetic (the arm
+   already carries the liveness ½ as an exact complement, and a
+   differently-keyed second slice is what §17.2 got wrong).
+2. **THE DIRECTION IPUT NEEDS IS THE WHOLE-SHARE ONE, i.e. §17.5's mass
+   ledger.**  This is the real objection and it holds at EVERY home.  From
+   `iref_lic z` against `● (…, r)` an auth gives `1 ≤ r`.  iput's discharge
+   of `ireg_free_au`'s `c = None` needs `r ≤ 1` — *no OTHER reference to
+   `z` exists* — and a `nat` counter authority cannot deliver the ABSENCE
+   of fragments from the presence of one.  It needs an exact-sum clause
+   tied to something a holder owns WHOLLY, which is precisely the §14
+   machine §20.2 declared unnecessary for the `w` half (rightly — the
+   free's obligation there is read off the AUTHORITY).  **M1 is not one
+   clause in any home; it is a whole-share witness.**
+3. **AND IPUT'S FREE RUNS OUTSIDE THE ITABLE LOCK.**  `release` is at
+   iput+0x5c (`ProofIput.v`'s `wp_release_sconf`), the region free at
+   +0x70's `iupdate`; the reference was deposited into the OUT arm at +0x54
+   and `itable_half` went back with the lock.  So at the free iput holds
+   neither the count share nor the lock — only the sleeplock token and the
+   checked-out cells.  Any count fact must therefore be carried ACROSS the
+   release, which is a TEMPORAL carrier, i.e. §20.7's **(M2)** shape (a
+   generation bump at the free), not (M1)'s.
+
+**Constructive residue, for whoever prices M1 next.**  The OUT arm DOES
+persist across the release and it holds iput's whole deposited reference
+(`DepRef q dev inum g`, and REF-1 says that `q` IS the map's share).  So
+the arm is the right place for a *residual* — "the fragments for this inum
+that are not in any client's hand" — and the missing half is exactly
+"`q` is the whole share", which lives in `itable_half`.  Either M1 buys the
+whole-share witness (§14's machine, which §20.2 avoided) or (M2)'s bump
+carries REF-1 past the release; §20.14 chose neither.  **No code was
+written for (R2).**
+
+### NOT STARTED
+
+**Stage B in full** — `dir_links`, the five DirView twins, the boot IOU's
+fragments, the five re-park sites.  It was not begun.  One sizing note it
+is worth having: `dir_links` is an **iProp** over `icfg_link`, and
+`DirView.v` is a PURE file that requires neither `IcacheRef` nor the
+proofmode.  Nothing forbids it importing `IcacheRef` (no cycle:
+`IcacheRef` requires no fs file), but §20.3's "five short lemmas mirroring
+the pure ones" understates the move — DirView stops being a pure record
+view.  The alternative home is `IcacheEscrow.v`, which already imports
+both, at the cost of splitting the twins from the pure lemmas they mirror.
+**Decide that before starting B.**
+
+### Traps recorded
+
+1. **`ireg_read`'s opening leaves the SLOT big-op under a `▷`; every arm
+   move strips it with `>Hsls`.**  `ireg_read` does not (it never touches
+   the slots), so copying ITS opening into a lemma that DOES read a slot
+   fails at the clause with **`Tactic failure: iPure: (▷ ⌜ireg_link_ok …⌝)
+   not pure`** — which reads as a purity defect in the freshly-landed
+   clause and is a missing `>` three lines up.
+2. **`set (dn2 := dn)` is the wrong tool for keeping a downstream name
+   after (R1) pins the record.**  `set` abstracts occurrences of `dn` INTO
+   `dn2` — the opposite direction — and silently rewrites the context.
+   Rename the downstream occurrences instead (13 of them in `ProofIput`).
+3. **A record-parametric opener needs no new proof.**  `ic_open_held`'s
+   only use of the bundle is its SIZE cell, in the PARKED and MID
+   refutations; replacing the two `ic_payload_excl` calls with the
+   `ic_payload_at_size` / `ic_payload_size` pair fed to `iesc_word4_excl`
+   is the entire edit.  Worth knowing before re-proving a 40-line opener.
+4. **Strengthening a TRAVELLING predicate is far cheaper than adding a
+   premise.**  (L3)'s travelling half cost zero contract edits because
+   `di_nlink_stable` already rode through all five; a new premise slot
+   would have been §19.9's tour again.  Check for an existing carrier
+   before pricing a tour.
+
+### What stage C inherits (essentials)
+
+* `InodeRegion.ireg_link_alloc` — the licence-(a) accessor, ready.  Its
+  credential is the dinode block's machinery half, so the `SpecIget`
+  premise it discharges must be consumed at a caller that is between
+  `bread` and `brelse` of the target's block, or the fact must be taken at
+  the region and carried.  **That shapes §20.4's six-licence `iname`: (a)
+  is not free-standing, it is block-scoped.**
+* (L4), the ROOT clause, is NOT landed (`ireg_body` is untouched); licence
+  (f) has nothing behind it yet.  It is one conjunct in `ireg_body` plus
+  its preservation obligation on S7's unlink.
+* `ireg_claim_au` still pays out `True`, not `iclaim`: (L2) and (L3)'s
+  `c = None` half are still absent, for the reason `InodeRegion.v`'s own
+  note now records — the free cannot re-establish `c = None` without
+  CONSUMING an `iclaim` it does not hold.  Licence (d) and §20.5 wait on
+  (R2)'s repair, not on stage B or C.
+* Stage D's derivation is therefore still relative to `ireg_free_au`'s
+  unproven `c = None`, exactly as §20.11's stage-E note says — but the
+  `di_nlink dn' = 0` half of §20.6's iput row is now DISCHARGED, so what
+  D owes is one premise, not two.
+
+
+## S5h — **THE VERDICT: `ireg_free_au`'s `c = None` IS FALSE ON A REACHABLE
+## TRACE**, so (M2), (M1) and every other carrier are proofs of a false
+## proposition; §20.5's `iclaim` and §20.8's grey colour are formally
+## incompatible and stage E is DEAD as chartered.  Stage B (`dir_links`) is
+## BUILT and gated; the home question is settled
+
+### Part 1 — the M2 derivation (design §20.16, written for ratification)
+
+**Numbered §20.16, not §20.15**: §20.15 is S5g's own report.  The mandate
+said "§20.15"; the section is the one it describes.
+
+The residue S5g left — *the OUT arm crosses iput's release holding
+`DepRef q`, so let it carry the inum's `iref_lic` complement* — dies three
+times, and only the first two are about the mechanism:
+
+1. `auth nat` yields no absence at any home (S5g's point (ii));
+2. the arm's `q` is the ITABLE's share, and converting it into a ledger
+   fraction needs `itable_half`, which the arm does not hold.  `IcacheInv`
+   already proves "no other reference to slot `k`" from `iref_tok k q` at
+   REF-1 — under the lock, which is where iput is at +0x50 and is not at
+   +0x70;
+3. **and `r ≤ 1` would not have been enough anyway.**  It refutes only the
+   case where the claimant has already `iget`ed, and REF-1 refutes THAT
+   without any ledger.  The surviving case is the claimant's own
+   `(claim, iget)` window, where it holds `iclaim` and no reference at all.
+
+**THE FINDING.  The proposition every carrier was being built to prove is
+FALSE.**  §20.16.2 gives the trace, seven steps, all stock xv6: §20.8's own
+orphaned-`".."` setup, plus one preempted `create`.  A stranger walking the
+dangling `".."` `iget`s the freshly-claimed inum (licence (b) ORPHAN),
+`ilock`s the CLAIM BOX (`ireg_in` at a nonzero type IS `fresh_shape`, so the
+withdraw fires), and then **`iput`s it — `ref == 0`, `valid`, and
+`nlink == 0` because `memset(dip,0,64)` left it there — taking the FREE
+path.**  `ireg_free_au` fires with `c = Excl`.
+
+So: no generation bump, no reference count, no whole-share witness and no
+temporal colour flip can discharge it.  **§20.11's stage E is dead as
+chartered, not unpriced.  Do not re-price (M1) or (M2).**
+
+**The repair that ALMOST works, and where it stops.**  `c ≠ None → inreg`
+(the arm bit) needs no carrier at all — `ireg_free_au` already refutes the
+in-region arm at `InodeRegion.v:1215-1217` with `dinode_at_excl`, so the
+free's half is two lines — and guarding the whole claim discipline by
+`g = 0` makes the free vacuous on the defect trace.  It stops at
+**`ireg_withdraw`**, which flips `inreg` and therefore owes `c = None`
+after, and whose only reachable firing is at a claim box.  create's ilock
+can hand in the token; the stranger's cannot, and a GUARD removes an
+obligation without supplying a resource — so stating the clause makes a
+LANDED green proof (`ProofIlock`/`ProofNamex`) unprovable.  §19.7 at the
+withdraw.  Giving the withdraw stage C's `iname` premise closes the case
+analysis ((a) by `nlink = 0`, (c) by in-region, (f) by (L4), (b) turns the
+guard off — the halves fit exactly) and is **not supplyable at the call
+site**: `namex` ilocks the child after `iunlockput(parent)`, so the
+`dir_links` fragment is already back in the parent's parked payload.  The
+reference outliving its licence, one function further on than §20.7 found
+it.
+
+**Consequences to carry forward.**  Licence (d) has no source, so §20.4's
+six-licence `iname` is a FIVE-licence one and `ProofIalloc.v:1622` is a
+known-open call site rather than stage-C work.  create's fresh-ilock
+derivation keeps `fresh_shape` (from `ireg_withdraw`, §19.4) and loses the
+sixteen-bit TYPE value, so **stage D lands with arm C-OK-DIR gated exactly
+as §19.9.2 left it.**  Stages B and C are untouched — neither needs `c`.
+
+**Eight death certificates** in §20.16.5, including two new shapes worth
+having: `ireg_claim_au` paying out `dinode_at` instead of a token is dead on
+the MARKER's uniqueness (an uncached inum's `imark` is in the POOL, behind
+the itable spinlock ialloc does not hold — §16.1/§16.2's serialisation
+forbidding it); and exempting `".."` from `dir_links` the way `"."` is
+exempted is dead on EVERY trace, because `namex`'s parent step would then
+have no licence at all.
+
+**RECOMMENDATION: fix the kernel**, and this is the first time the
+verification's own progress depends on it.  Either D2's fix (retires grey,
+after which the two-line clause closes and stage E disappears) or a NEW and
+strictly smaller one: **hold `ialloc`'s dinode buffer across its `iget`**
+(move the `brelse` after `return iget(dev, inum)`).  The claim and the free
+are both serialised by that buffer, so it closes the window outright and
+makes licence (e) BUFFERED cover ialloc's call site.  `kernel-defects.md`
+gains it as D2's third outcome, with the allocate-twice harm spelled out.
+
+### Part 2 — stage B: `dir_links` IS BUILT, and the home question is settled
+
+**THE HOME: a new thin file `DirLinks.v`, above `DirView` and `IcacheRef`,
+below `IcacheEscrow`.**  Not DirView (it would stop being a pure record view
+and drag the icache algebra into every pure consumer), not `IcacheEscrow`
+(it would split the twins from the pure lemmas they mirror by 400 lines of
+arm machinery).  **The rule this instantiates: the pure vocabulary stays
+where the pure consumers are; the RESOURCE twin quantifies over it from one
+level up.**  `DirView.v` did not move a character.
+
+* `dir_link_at self data k` — the per-record ticket, the two-colour
+  disjunction inside the definition (so no arity moves anywhere), with the
+  self-record exemption `negb (bool_decide (dir_inum data k = self))`.
+* `dir_links self dn data` — type-conditional exactly as `dir_ok` is, a
+  `[∗ list]` over `seq 0 (dir_nrec (di_size dn))`.  **Timeless**, so
+  `ic_loaded_timeless` / `ipool_alloc_timeless` survive by `apply _` with no
+  edit at all.
+* four twins — `dir_links_not_dir`, `_free`, `_size_zero`, `_eq` — plus
+  `dir_link_at_agree`, the pointwise congruence the writer twin will
+  iterate over.
+* **`dir_links_dirlink` is DEFERRED, deliberately.**  Its only consumer is
+  `SpecDirlink`, whose only caller is `create` — not landed, and §20.16 has
+  just re-gated stage D anyway.  `dir_link_at_agree` is the half that does
+  not depend on how D lands.
+
+**The twin rides in both payloads with arity unchanged**:
+`IcacheEscrow.ipool_alloc` and `ic_loaded` each gain one conjunct beside
+`⌜dir_ok icfg_nib …⌝`, at `self := bv_unsigned inum` (the parameter both
+already carry).
+
+**The re-park rows, repaired** — and every one of them is the "rides
+unchanged" case, because no writer in the landed tree changes a DIRECTORY's
+bytes:
+
+| site | what it does |
+|---|---|
+| `IcacheEscrow` eviction (`:1389`) | loaded → pool, same data: the fragment goes straight back |
+| `ProofIlock`'s fill | pool's allocated arm → `ic_loaded`, same record; **and §16.4's CLAIM-BOX sub-arm gets `dir_links_size_zero`**, the resource half of "`ireg_withdraw` already pays `fresh_shape`" |
+| `ProofIput` ×2 (the nlink-undo and the +0x54 window) | `ic_payload_at` in and out, verbatim |
+| `ProofIput`'s FREE path | the fragments are SHED — the exit is `ipool_shape`'s marker arm, which carries no data.  Sound (affine), and §20.6's reachable-trace argument is why it costs no liveness; **S7 owes the `isdirempty` obligation** |
+| `ProofFilewrite` | `dir_links_not_dir` at the record writei returned: sys_open refuses writable directories, which is what `Hnodir` already records |
+| `ProofFileread` ×2, `ProofNamex` ×3, `ProofKexecA` ×3, `ProofFilestat` | readers; the fragment goes back exactly as it came out |
+| `IcacheBoot.ipool_shape_alloc` / `ipool_alloc` | the IOU grows by one resource conjunct per allocated inum — and `ipool_alloc_all_free`, which is the case the actual boot takes, needs **nothing**: a free inum hands over the MARKER and its record never leaves the region |
+
+**The boot mint is therefore free**, which §20.6's boot row did not foresee:
+the fragments only have to be produced for an image with allocated inodes,
+and that is already a premise the boot client supplies.
+
+### Gate
+
+`~/mk8.sh` (detached, `/tmp/mk8.log`, `make -f CoqMakefile -j24 -k`) on the
+EC2 mirror synced at `10bacacf` + the ten files and the new one:
+**`EXIT=0`, zero `Error`, 1055 `.vo`** (1054 + `DirLinks.vo`).  `~/audit8.sh`
+→ `Print Assumptions` on all fourteen linked fs theorems (Dirlink,
+Iupdate ×3, Itrunc, Iput, Iunlockput, Ilock, Ialloc, Writei ×2, Namex,
+Namei, Filewrite): **every one is `functional_extensionality_dep` + the five
+`rv64d.*` platform axioms**, plus filewrite's pre-existing declared
+`LinkConsolewrite.Consolewrite.wp_consolewrite_sconf`.  Cones UNCHANGED from
+S5g.  `_CoqProject` was edited IN PLACE on the mirror (one line,
+`DirLinks.v` after `DirView.v`) and never copied; no git write on EC2;
+scratch deleted; mirror quiet at the end.
+
+`lemma_diff` (`--ref 10bacacf`): **CLEAN** — nothing dropped, nothing
+admitted, no new `Axiom`/`Parameter`/`Hypothesis`.  Additions are the whole
+of `DirLinks.v` (`dir_link_at`, `dir_links`, their two `Timeless` instances,
+`dir_links_not_dir`, `_free`, `_size_zero`, `_eq`, `dir_link_at_agree`) and
+nothing else; no existing declaration changed its statement except
+`IcacheBoot.ipool_shape_alloc`, which gains the one resource premise the
+payload gained.
+
+### NOT STARTED
+
+**Stage C in full** — `SpecIget`'s licence and the six (now five) sources,
+`SpecDirlookup`'s `lookup_acc` at the matched index, `SpecDirlink`'s
+resource sibling, (L4)'s root clause in `ireg_body`.  Not begun; §20.16
+changes one thing about it (licence (d) is sourceless, so
+`ProofIalloc.v:1622` is carried as open rather than proved) and nothing
+else.  `InodeRegion.ireg_link_alloc` is still ready and still block-scoped.
+
+**`dir_links_dirlink`** — the fifth twin, §20.3's writer.  Deferred with a
+reason, not forgotten: `dir_link_at_agree` is landed and is the half the
+three-case proof iterates over.
+
+### WHAT STAGE D OWES, ARM BY ARM (the essentials, re-priced by §20.16)
+
+Against the eight-arm graph above.  §20.16 changed exactly one column:
+create's fresh ilock now yields `fresh_shape dn` and NOT
+`dn = ialloc_fresh ty`, because `iclaim` has no source.
+
+| arm | what it still owes |
+|---|---|
+| **N** (+0x26 `beqz`) | nothing new — no inode is touched |
+| **F-OK** | `dir_links` on `dp` is BORROWED by the lookup and returned at the `iunlockput(dp)`; the `ilock(ip)` of the FOUND child is a stage-C licence question, not a stage-D one |
+| **F-BAD**, **A-FAIL**, **FAIL** | nothing new: they write `nlink := 0` and release; the ledger's (L1) falls with the count via `ireg_write_unlink`, which is landed |
+| **C-OK-FILE** | the three stores + `iupdate` are `ireg_write_au` with `di_nlink_stable`, landed.  `dirlink(dp, name, inum)` needs the **resource sibling `ilink inum`**, minted at the same `iupdate` by `ireg_write_link` (landed) and deposited by `dir_links_dirlink` (**owed, stage B's deferred twin**).  The fresh ilock gives `fresh_shape dn` — enough for `inode_ok`, §19.4 — so this arm closes **without** the type value |
+| **C-OK-DIR** | everything C-OK-FILE owes, PLUS the two extra `dirlink`s.  `dirlink(ip, ".")` needs `di_type dn = T_DIR` at the fresh record — the sixteen-bit type value §19.4 named as the entire deficit and §20.16 has just confirmed is unobtainable.  **This arm stays GATED, exactly as §19.9.2 left it**; `dirlink(ip, "..")` additionally needs `ilink dp`, minted at `dp->nlink++` by `ireg_write_link`, and the self-record `"."` needs NO fragment (the exemption, landed in `dir_link_at`) |
+
+So stage D's real order is: land `dir_links_dirlink`, then seven arms
+unconditionally, then C-OK-DIR behind one named assumption whose retirement
+is a KERNEL change (§20.16.4's (F1)/(F2)) and not a proof.
+
+> **AMENDED (S5i): both halves of that sentence are wrong.**  (i) NO arm is
+> unconditional — not even N — because `SpecCreate` promises `Sb ⊆ Sb'` and
+> `SpecNameiparent` takes a set-forgetting `log_op`; see S5i Part 3 and its
+> eight-contract retrofit table.  (ii) C-OK-**FILE** is gated by the same
+> fresh-type fact, because `SpecCreate.v:516` asserts `di_type dn = ty` on
+> BOTH made branches — `fresh_shape` closes the dirlink premises, not the
+> contract's own postcondition.  And the assumption cannot be a banered
+> `Axiom`: §19.9.1's trace REFUTES the Prop, so declaring it would be an
+> inconsistency rather than a caveat.
+
+### Traps recorded
+
+1. **A NEW FILE IN THE Iris LAYER NEEDS THE `iris.base_logic.lib` REQUIRES
+   OF ITS OWN, and the error names `iProp`.**  `Require Import IcacheRef`
+   LOADS iris's libraries but does not IMPORT their names, so a file that
+   only requires the fs vocabulary fails with **`The reference iProp was not
+   found in the current environment`** at the first `: iProp Σ` — which
+   reads like a missing typeclass or a broken `Σ`.  Copy the requiring
+   file's own `From iris.… Require Import` block; `gen_heap invariants own
+   ghost_var` is what this tier uses.
+2. **...AND `Local Open Scope Z_scope`, or a bare `0` fails with `No
+   interpretation for number "0"`.**  Both `DirView.v` and `IcacheRef.v`
+   open it locally; a new file between them does not inherit it, and the
+   error appears at the FIRST lemma statement rather than at the
+   definitions, so it looks like the lemma is malformed.
+3. **`dir_liveb` UNFOLDS TO `negb (dir_freeb …)`, so rewriting the inum
+   equality under `/dir_liveb` alone does not fire.**  The failure is
+   `iExact: "H" : (if negb (dir_freeb data k) && … then … else …) does not
+   match goal` with two sides that look identical except for `data`/`data'`
+   — the tell is that `dir_freeb` is still there.  Unfold BOTH.
+4. **PICK A FRESH PROOFMODE NAME BY GREPPING THE FILE, NOT BY GUESSING.**
+   `Hdlk` was already taken in `ProofFilewrite` and `ProofNamex` (it is the
+   persistent DISK-LAYOUT hypothesis, `#Hdlk`), and the error —
+   **`iAndDestruct: "Hdlk" or (IAnon 48) not fresh`** — names the new
+   binding and not the old one.  Cost one whole build round.  Renamed to
+   `Hdlnk`.
+5. **A CONJUNCT ADDED TO A PAYLOAD MUST BE ADDED TO EVERY *CONTEXT-GATHERING*
+   `iAssert` BETWEEN THE PEEL AND THE RE-PARK, AND GREPPING FOR THE PEEL'S
+   OTHER NAMES IS HOW YOU FIND THEM.**  `ProofNamex` states the `+0xce`
+   block once for its two routes (`ProofNamex.v:3451`, `"Hdlblk"`) with an
+   explicit 30-name selection list; a new hypothesis not in that list is
+   simply absent inside the block, and the error —
+   **`iSpecialize: hypotheses ["Hdlnk"] not found`** — appears **300 lines
+   later**, at the re-park, in a branch that looks like it should have it.
+   The diagnosis is one grep: `grep -n Hdiat <file>` (any OTHER name from
+   the same peel) enumerates every list the conjunct also belongs in.
+   Two of `ProofNamex`'s three re-park sites were inside such a block; the
+   third was not, which is exactly why the failure looked branch-specific.
+6. **TWO CONCURRENT `make`s ON THE MIRROR IS A SELF-INFLICTED WOUND, and
+   the first symptom is a truncated log.**  `grep -n "EXIT="` printing
+   nothing means the build is STILL RUNNING; reading the error list at that
+   moment and relaunching gives two makes on one tree, the second of which
+   `rm`s the first's log.  Recovery: `ps -eo pid,args | grep CoqMakefile`,
+   `kill -9` the sub-make PIDs (a bare `pkill -f "CoqMakefile -j24"`
+   self-matches through ssh and returns 255 — the recorded trap, in its ssh
+   costume), then `pkill -x rocqworker`, then confirm quiet before
+   relaunching.  **Wait on the sentinel, never on a poll that reads the log
+   for errors.**
+
+
+## S5i — stage B's deferred twin LANDS (with a SHAPE CORRECTION and a named
+## gap); retrofit 5 (`wp_ialloc_gen`) LANDS.  **THE WALK IS GATED ON THREE
+## CONTRACTS THE S5a LIST NEVER NAMED, and arm N is gated too** — so
+## "seven arms unconditionally" is not reachable from here
+
+The stage's real product is the third section: create's op-wide set does
+not survive its FIRST call, and the retrofit list is EIGHT contracts, not
+five.  Read that before planning S5j.
+
+### PART 1 — `dir_links_dirlink` LANDED, in a DIFFERENT SHAPE than §20.3
+### chartered, and the difference is a real gap
+
+§20.3 charters the writer twin as "the same hypothesis list [as
+`DirView.dir_ok_dirlink`], one `ilink inum` in, the new big-op out ...
+its three cases are the ones the pure proof already splits on (`tot = 0` /
+`tot = 1` / `tot >= 2`) and **the resource moves only in the third**."
+
+**The resource moves in the SECOND as well, and there is nothing to move.**
+At `tot = 1` only the record's LOW inum byte is new; the pure sibling
+(`DirView.v:1036-1059`) survives that by the mod-256 argument — the slot
+dirlink chose is free, so its old high byte is zero and the stored
+halfword is `inum mod 256`, which the range premise still bounds.  The
+RESOURCE clause does not survive it: the record at `k0` becomes LIVE at
+the inum `inum mod 256`, `dir_link_at` demands `ilink (inum mod 256)`,
+and an `ilink inum` is a fragment at a DIFFERENT KEY.  No bending, no
+weakening: `IcacheRef.link_frag_e` is keyed by the inum.
+
+`tot = 1` is UNREACHABLE in the kernel — dirlink's window is sixteen
+bytes at a 16-aligned offset, `1024 = 64*16`, so writei's loop takes
+exactly ONE chunk of sixteen and either `bmap` fails before it (`tot = 0`)
+or the whole record goes in (`either_copyin` cannot fail on the kernel
+arm) — but **no landed contract says so**: `SpecWritei`'s post offers
+`tot <= n` and nothing else, so `SpecDirlink`'s offers `tot < 16`.
+
+So the twin is stated in the form that is TRUE WITH NO SIDE CONDITION,
+and the ticket for the written slot is the caller's to supply:
+
+```
+dir_links_dirlink      (hypotheses of dir_ok_dirlink, minus the inum range)
+                       dir_link_at self data' k0 -∗
+                       dir_links self dn data -∗ dir_links self dn' data'
+dir_link_at_dirlink    (2 <= tot) -> range clause ->
+                       ilink (bv_unsigned inum) -∗ dir_link_at self data' k0
+dir_links_dirlink_nop  (tot = 0)  dir_links self dn data -∗ dir_links self dn' data'
+```
+
+`dir_link_at_dirlink` is what create's SUCCESS arms take (`tot = 16`);
+`_nop` is what `fail:` takes after a dirlink that allocated nothing.
+**`1 <= tot <= 15` has no route**, and it is `fail:`'s other half.  The
+repair is a postcondition strengthening `tot = 0 \/ tot = 16` on
+`SpecDirlink`, which needs `SpecWritei` to expose CHUNK ATOMICITY (a write
+wholly inside one block is all-or-nothing) — a `ProofWritei` LOOP
+statement, not threading.  Price it with retrofit 1; it is the same walk.
+
+Proof notes worth keeping: the three cases are (count unmoved,
+`k0 < nrec` — `big_sepL_delete` on the GOAL only, since the OLD ticket at
+a free slot is `emp` and the hypothesis side rides by `big_sepL_mono`),
+(count unmoved, `k0 >= nrec` — no index moved), and (count grew by one,
+`seq_S` + `big_sepL_app`, the ticket being the appended element).
+
+### PART 2 — RETROFIT 5 (`wp_ialloc_gen`) LANDED; the other three RE-PRICED
+### and one of them is bigger than S5a said
+
+`SpecIalloc.wp_ialloc_gen_body` is `wp_ialloc_sconf_body` with
+`log_op γ (S u)` replaced by `log_opS γ (S u) Sb` and the two arms paying
+`log_opS γ u (Sb ∪ {[IBLOCK inum inodestart]})` / `log_opS γ (S u) Sb`.
+**No credit boolean**, and that is a fact about ialloc rather than an
+omission: the block it logs is at the inum THE SCAN chose, so no caller
+can have logged it — `CreateBudget.ia_spend` is the literal 1.  The
+growth is stated as the DETERMINATE union (not `Sb ⊆ Sb'`) because create
+needs the MEMBERSHIP afterwards, to credit its own `iupdate(ip)` and the
+iupdate inside every `dirlink` on `ip`.
+
+`ProofIalloc` is threading, exactly as S5b predicted for iupdate: `Sb` is
+constant across the whole scan (only the claim's `log_write` moves it), so
+it is one extra parameter on `ia_arms` / `ia_cont` / `ia_epilogue` /
+`ia_out` / `ia_claim` / `ia_scan`, and TWO DELETED LINES at the seam —
+`ProofIalloc.v:1440`'s `rewrite /log_op; iDestruct "Hop" as (Sb) "HopS"`
+and `:1455`'s `log_opS_op` were exactly the set-forgetting the gen form
+must not do.  `iEval (rewrite Hbno) in "HopS"` turns `wp_log_write_au`'s
+`Sb ∪ {[uint bno]}` into the contract's `Sb ∪ {[IBLOCK inum inodestart]}`.
+`wp_ialloc_sconf` is then a ~20-line derivation (destruct the caller's
+`log_op`, run the credited proof, re-pack each arm with
+`LogInv.log_opS_op`) — the continuation is rebuilt BY HAND, because
+`wp_next b p K` is `∀ CID, ⌜..⌝ -∗ K CID` and the two `K`s are not
+convertible.  That is the one place this differs from S5b's iupdate
+derivation, where `if false then S u else u` IS `u` and `iApply` closed
+it.  `Module Type IALLOC` gained one `Parameter`; `LinkIalloc` needed no
+edit.
+
+**RETROFIT 4 IS TWO CONTRACTS, NOT ONE.**  S5a priced it as
+"`SpecIput`/`SpecIunlockput` — `ip_spend crb cru freed`".  `ProofIput`
+reaches its budget through `IT.wp_itrunc_sconf` (`:2002`) and
+`IU.wp_iupdate_sconf` (`:2101`); `wp_iupdate_cred` is landed and fits, but
+`SpecItrunc` has NO set form.  Its internal device `bm_paid`
+(`SpecItrunc.v:159`) is set-form but EXISTENTIALLY quantified —
+`(∃ Sb, ⌜bmapstart ∈ Sb⌝ ∗ log_opS (S u) Sb) ∨ (∃ Sb, log_opS (S (S u)) Sb)`
+— so the caller's `Sb` is forgotten at `bm_paid_intro` and never recovered
+at `bm_paid_elim`.  Making it `Sb`-indexed with `Sb ⊆ Sb'` growth changes
+the two LOOP INVARIANTS (`ProofItrunc.v:1751` and `:1805`) and the three
+`bm_paid_use` sites.  So retrofit 4 = `wp_itrunc_gen` + `wp_iput_cred` +
+`wp_iunlockput_cred`, over 2381 + 2900 lines.
+
+Unchanged sizings: retrofit 1 (`SpecWritei.wp_writei_cred`, whose parked
+machinery is `WriteiBudget`'s `log_amort_present` / `_adopt` /
+`wi_inv_enter`) and retrofit 3 (`DIRLINK_GEN`, a second walk of a
+3162-line proof, and the only one that is not mostly threading).
+
+### PART 3 — **NOT STARTED, AND THE GATE IS NOT THE ONE THE PLAN NAMED**
+
+S5d wrote "the six ruling-free arms are still buildable"; S5h's stage-D
+order says "then seven arms unconditionally".  **Neither is reachable, and
+the obstruction is at +0x20 — create's FIRST call.**
+
+`SpecCreate`'s postcondition promises `⌜Sb ⊆ Sb'⌝` at the caller's own
+`Sb` (`SpecCreate.v:501`, FROZEN).  `SpecNameiparent` takes `log_op g n`
+and returns `log_op g n'` (`SpecNameiparent.v:159/183`), and
+`LogInv.log_op γ n` IS `∃ Sb, log_opS γ n Sb` (`LogInv.v:288`).  A caller
+that hands its `log_opS γ u Sb` in as a `log_op` gets back a `log_opS` at
+an **unrelated, existentially chosen** set; `log_opS` is exclusive, so
+nothing recovers the relation.  **Arm N — nameiparent returns 0 and create
+returns 0 — therefore does not close either.**  The same argument closes
+over `iunlockput` (F-OK, F-BAD, A-FAIL, FAIL) and `dirlink` (both success
+arms).  It is not a budget question: even an arm that logs NOTHING cannot
+say so.
+
+Nor is nameiparent's set decorative: `namex` runs `iunlockput` on every
+path component, and iput's free path truncates and flushes.  It really can
+grow the op's set, and the contract really must say by how little.
+
+**THE RETROFIT LIST IS EIGHT CONTRACTS, NOT FIVE:**
+
+| # | contract | status |
+|---|---|---|
+| 2 | `SpecIupdate.wp_iupdate_cred` | LANDED (S5b) |
+| 5 | `SpecIalloc.wp_ialloc_gen` | **LANDED (S5i)** |
+| 1 | `SpecWritei.wp_writei_cred` | not started |
+| 3 | `SpecDirlink`'s `DIRLINK_GEN` | not started (needs 1) |
+| 4a | `SpecItrunc.wp_itrunc_gen` | not started — NEW, S5a missed it |
+| 4b | `SpecIput` / `SpecIunlockput` `_cred` | not started (needs 4a) |
+| 6 | `SpecNamex` / `SpecNamei` / `SpecNameiparent` gen | **not started — NEW, and it gates arm N** |
+
+(6) is pure threading — namex logs only through the iput it already calls
+— but it is three contracts over a 5000-line proof cone, and it is the
+FIRST thing the walk touches.  **S5j should land (6) before anything
+else**: it is the cheapest of the five and it is the one that decides
+whether ANY arm of create can be written down.
+
+### THE NAMED ASSUMPTION'S SPELLING, CORRECTED
+
+S5h's stage-D table and this stage's mandate both put only **C-OK-DIR**
+behind the fresh-type assumption, on the reading that C-OK-FILE "closes on
+`fresh_shape` WITHOUT the type value".  That is true of the four `dirlink`
+PREMISES and false of `SpecCreate`'s own POSTCONDITION: the `made = true`
+arm asserts `di_type dn = ty` **on both branches** (`SpecCreate.v:516`),
+and `ty <> T_DIR -> dn = create_made ty major minor` on the FILE branch
+(`:518`).  `ireg_withdraw` pays `fresh_shape dn` = `di_type dn <> 0 /\
+di_size dn = 0 /\ di_addrs dn = replicate 13 0` — §19.4's "the entire
+deficit is the sixteen-bit type value", restated.  So **C-OK-FILE is
+gated too**, and the assumption is ONE Prop covering both made arms:
+
+```
+di_type dn = ty          (* at the record create's ilock(ip) at +0x8c withdrew *)
+```
+
+not the DIR-specific `di_type dn = T_DIR_z`.  Once it closes, so does the
+rest: `fresh_shape` gives `di_size dn = bv_0 32` and `di_addrs dn =
+replicate 13 (bv_0 32)`, so `ProofCreateParts.cr_setf dn mj mn 1 =
+create_made ty mj mn` by `cr_made_setf`'s argument, and the DIR branch's
+`di_type dn = T_DIR` is the same equation at `ty := T_DIR`.
+
+**AND IT CANNOT BE A BANERED `Axiom`.**  Stated as a standalone Prop it
+is either false (`forall ty dn, fresh_shape dn -> di_type dn = ty`
+identifies every type with every other) or it is §19.6 Part 3's premise on
+`wp_create_sconf_body` — which S5d WITHDREW because §19.9.1's six-step
+trace, every step a landed contract, REFUTES it.  An `Axiom` a landed
+contract refutes is an inconsistency, not a caveat, and `Print
+Assumptions` would report a caveat that silently proves everything.  The
+`LinkConsoleread` precedent does not transfer: that assumption is an
+unproven-but-true callee contract, this one is a false proposition.
+
+**So the retirement really is the KERNEL FIX** (§20.16.4 F1/F2 — hold
+ialloc's dinode buffer across its `iget`, or D2), and until it lands the
+honest shape for create is a contract WEAKENING (§19.9.2's `∃ty'` post),
+not an assumption.  `SpecCreate` is frozen, so that is a coordinator call.
+
+### Gate
+
+`~/one9.sh` (`/tmp/one9.log`) for the two `DirLinks.v` rounds, then ONE
+detached `~/mk9.sh` (`/tmp/mk9.log`, `make -f CoqMakefile -j24 -k`) over
+the whole tree, because `DirLinks.vo` changed and ~490 `_CoqProject` rows
+sit below it: **`EXIT=0`, zero `Error`, 1055 `.vo`** (unchanged — no new
+file), and a follow-up `make -n | grep -c "ROCQ compile"` = **0**
+remaining targets.  `_CoqProject` was NOT edited and NOT copied; no git
+write on EC2; mirror quiet at the end.
+
+`tools/lemma_diff.py --ref HEAD` over the three `.v` files: **ONE
+NEWAXIOM**, `Parameter wp_ialloc_gen` (the `Module Type IALLOC` seal,
+discharged inside `ProofIalloc` and already carried by the unmoved
+`LinkIalloc`).  Nothing GONE, nothing ADMITTED, no `cheat_`.
+
+`~/audit9.sh` → `Print Assumptions` over the fourteen linked fs theorems
+S5h audited, **plus `Ialloc.wp_ialloc_gen`**: every one is
+`functional_extensionality_dep` + the five `rv64d.*` platform axioms, with
+`Filewrite`'s pre-existing declared
+`LinkConsolewrite.Consolewrite.wp_consolewrite_sconf` unchanged.  `Ialloc`
+carries the standing six on BOTH the gen and the sconf form.
+
+`SpecCreate.v` is still byte-identical to HEAD
+(md5 `e9f1916110fde9edbf5913427f3bd842`), as are `CreateBudget.v`
+(`d941a350361831bc2b6c9b0eac666074`) and `ProofCreateParts.v`
+(`feb4b09e37301747487674b15f417bf7`) — five stages of freeze intact.
+
+### NOT STARTED
+
+* `ProofCreate.v` / `LinkCreate.v` — see Part 3.  Nothing was written; a
+  parked skeleton would have been a skeleton of an unprovable first step.
+* Retrofits 1, 3, 4a, 4b, 6.
+* The `tot = 0 \/ tot = 16` strengthening of `SpecDirlink` (Part 1's gap).
+
+### Traps recorded
+
+1. **`dir_link_at_agree`-shaped lemmas do not `apply` under
+   `big_sepL_mono`.**  The lemma reads `⊢ P -∗ Q` (i.e. `emp ⊢ P -∗ Q`);
+   `big_sepL_mono`'s obligation is `P ⊢ Q`.  The error is
+   `Unable to unify "uPred_entails emp (… -∗ …)"` with the real goal, and
+   it prints both sides with the RIGHT terms, which makes it read like a
+   `data`/`data'` mismatch.  `iIntros "Hx"; iApply (lem with "Hx")` is the
+   fix.
+2. **`apply lookup_seq in H; destruct H as [-> Hi]` substitutes `0 + i`,
+   not `i`**, and a later `replace (0 + n)%nat with k0 by lia` then
+   silently rewrites NOTHING if an intervening `simpl` already reduced it
+   — `iExact` fails on two terms that print identically.  Destruct as
+   `[Hk Hi]` and let `lia` use `Hk`, or rewrite the PROPOSITIONAL equality
+   (`rewrite <- Hkn`) rather than the arithmetic one.
+3. **A changed `.vo` low in the tree makes every single-file `coqc` above
+   it fail with `Compiled library X makes inconsistent assumptions over
+   library Y`** — which reads like a broken edit in the file you just
+   touched.  After touching `DirLinks.v` no `one9.sh` on any fs file is
+   meaningful until the tree has been remade; sequence the stage so the
+   leaf-level edits are validated FIRST and everything above them waits
+   for the one full `make`.
+
+
 ## UNSATISFIABLE, and that is the finding that matters
 
 ### B1 (proc_priv -> proc_priv_core) — DONE, and the composition probe passed first try
@@ -4051,3 +5010,1071 @@ constraint on the caller's `used'` follows from it — so the only sound answer
 there is the set nothing touched, and the SYSCALL picks the witness for its
 own continuation.  That is why `wp_sys_write_sconf_body`'s `used'` is a
 ∀-binder of the continuation and not a parameter of the contract.
+
+## GR-1 — the grand reconciliation, and the nlink guard's walk (2026-08-12/13)
+
+Origin's round 16 (`d334423a` xv6 `ae96fd0` + the split sleep protocol,
+`e9cf27bf` the generated image constants) merged with the S5e–S5i ledger, and
+the kernel moved under all of it. **The image this project is proved against is
+no longer an upstream commit**: it is `ae96fd0` plus a cherry-pick of upstream
+`9da28f5`, pinned as `XV6_REV = 1c7ccafc`, with the reproduction recipe (the
+committer identity and date are what make the sha deterministic) in the
+Makefile beside it.
+
+### The reconciliation's facts, because they bear on how the next one is run
+
+- **The merge was a union, not a chimera, and that had to be proved.** Only
+  `kernel-defects.md` conflicted textually; the other thirteen collision-cone
+  files auto-merged, which is exactly when a chimera is cheapest to acquire.
+  Three audits: all 132 of origin's re-addressed lines survived; all 1136 of
+  our added lines survived; and **0 of our added lines carry any of the 1762
+  immediates origin's sweep moved** — the ledger work is resource algebra and
+  names no image address. That last number is what licensed a SINGLE
+  re-addressing map instead of composing two.
+- **Origin's side of all eleven both-sides proofs was pure numeric
+  re-addressing** (line-for-line, numerals-only, N-for-N). Worth re-checking
+  mechanically next time before trusting an auto-merge: it is a two-minute
+  script and it decides the whole strategy.
+- **`kernel-defects.md` had two different D2s.** Ours (the dangling `".."`)
+  keeps D2; origin's (`tx_lock` never initialized) became **D3**.
+
+### D2 IS FIXED IN THE SOURCE — and what that does and does not retire
+
+`9da28f5` is D2's fix. It repairs the defect at the WALK, not at the record:
+`namex` and `create` each refuse a directory whose `nlink` has reached zero,
+immediately after the `ilock` that makes the field readable. That kills all
+three of D2's outcomes at once — the `panic("ilock: no type")`, the silent
+resolution to a re-claimed inum, and S5h's third outcome where a stranger's
+`iput` frees an inode a live `create` has already allocated — because the
+dangling `".."` is never followed.
+
+**It does not remove the record.** `b`'s `".."` still names `a` on disk and
+`a`'s `nlink` still does not pay for it, so any invariant stated over the
+RECORDS is still false at exactly that fragment. **`igrey` is therefore a live
+design question, not a deletion.** The colour models "a record nothing pays
+for", and such a record still exists; what changed is that no reachable step
+consumes one. Settling it means restating §20's (b) over REACHABILITY rather
+than over records — and only then does the grey colour retire (or narrow to an
+unreachable-by-construction case). Do not open GR-2 assuming it is gone.
+
+### The guard's walk (ProofNamex, GR-1b)
+
+namex grew 16 bytes and create 20; 80 of 223 symbols moved (`dirlink`..`create`
++0x10, `sys_dup`..`sys_pipe` +0x24, `kernelvec`.. +0x20 by alignment, data
++0x10). namex's own map came out provably complete — **0 reshaped, 0 unmapped,
+and exactly six new offsets**, which are the guard's six instructions — so 576
+offset references and 48 immediates moved mechanically and only the walk was
+left.
+
+The arm itself: `+0xce lh a5,74(s4)` / `+0xd2 c.beqz a5 -> +0x7a`, then
+`L_nlink` at `+0x7a`: `c.mv a0,s4 / jal iunlockput / c.li s4,0 / c.j +0x5c`.
+Three things made it cheap, and all three are worth expecting next time:
+
+1. **The field resource was already in hand.** `Hinl` is the `i_nlink` conjunct
+   of `Hmeta`, destructed alongside the `Hity` the type test consumes, so the
+   guard needed no resource the walk did not already hold and nothing above the
+   splice changed.
+2. **gcc emitted a FRESH block rather than sharing `L_notdir`'s** — because
+   `+0x54` falls through into the epilogue and a branch from `+0xd2` must jump.
+   So the arm is `L_notdir` instruction-for-instruction plus one `c.j`, and the
+   proof is likewise: the copy differs only in the offsets, the `jal`'s
+   immediate (a different pc), the register map, and that one `wp_cj_s_sconf`.
+   Coq names are branch-local and the two arms are disjoint branches of the
+   `di_nlink` destruct, so every `ND1`/`CIDN1`/`"Hj54"` was reused verbatim.
+3. **The contract did not move.** `SpecNamex.v` is byte-identical: the arm
+   returns 0 having released the inode through the very same `iunlockput`,
+   which is `L_notdir`'s postcondition and which the failure arm already
+   admitted.
+
+The one cost not in the sizing: the nlink read writes a5, so every step after
+it runs on a new map — a scoped `V3 -> W0` rename of the directory branch's
+body (21 sites). `HV3a5` was not among them, which is the check that a5 is dead
+there. Two new decision lemmas, `nx_nlz_eq` / `nx_nlz_ne`, in `nx_tdir_*`'s
+shape but over `eq_vec _ zero_reg` because `c.beqz` compares against x0.
+
+Sizing was ~200 lines; actual was 243, and the only error on the way was a
+name clash (`"Hjce"` is taken 400 lines later). ProofNamex compiles in **2:49 /
+5.3 GB**, so the single-file loop is the right one for this file.
+
+### The gate
+
+`EXIT=0`, **1062 `.vo`**, nothing unbuilt and nothing stale. `Print
+Assumptions` on Namex, Namei, Nameiparent and the fs cones: **the standing six**
+(funext + the five Sail externs), with fileread's `consoleread` and filewrite's
+`consolewrite` as the two documented device extras. No axiom entered from the
+merge; neither `LinkTxLockInit` nor `LinkUartwrite` reaches an fs cone.
+
+### The GR-2 queue
+
+- **create's walk on the new image.** The guard is at `create+0x2a lh a5,74(s1)`
+  / `+0x2e c.beqz a5,+0x76`, and the taken arm at `+0x76` is
+  `c.mv a0,s1 / jal iunlockput / c.li s2,0 / c.j +0x62` — the same fresh-block
+  shape as namex's, adjacent to the `iunlockput(ip)` arm at `+0x80`, sharing
+  only the epilogue at `+0x62`. `CodeCreate` has **87 reshaped offsets**, which
+  cost nothing so far because nothing walks create's instructions yet
+  (`ProofCreateParts.v` and `CreateBudget.v` name neither `KernelSyms.create`
+  nor `cri_`, and both are byte-unchanged across the bump).
+- **`SpecCreate.K_create` will have to grow.** It is `106` and it compiles
+  untouched — the spec has no hardcoded offsets — but it is a leaf-count budget
+  and the guard adds instructions plus an `iunlockput` call on the path. It is
+  not breaking anything today only because nothing proves against it.
+- **The `igrey` / reachability question above**, which is the one that decides
+  how much of §20 stage E comes back.
+
+## GR-1c — converging on the upstream tip 9da28f5 (2026-08-13)
+
+Origin pushed `6ea54b92` (the psz bump, xv6 `0024d4b`) from `e9cf27bf` -- i.e.
+without having seen GR-1 -- so the tree had TWO independent image bumps to
+reconcile. The decision was to stop carrying a local cherry-pick and pin the
+branch tip: **`XV6_REV = 9da28f5`, a clean upstream revision**, which is
+`0024d4b` + `b7c25cf` + `9da28f5`. That picks up D3's fix for free.
+
+**All three recorded kernel defects are now fixed in the source.** D1 (writei's
+unlogged buffer) since 2026-08-06; D2 (the dangling `".."`) by `9da28f5`; D3
+(`tx_lock` never initialized) by `b7c25cf`, which is route (1) of the two the
+D3 entry costed -- so route (2), the ~123-site `option string` sweep, is retired
+unbuilt.
+
+### The reconciliation
+
+Both toolchain audits passed before anything was merged, which is what made the
+rest safe to automate: our objdump reproduces HIS tracked `kernel-rocq/*.v`
+byte-for-byte at his pinned `0024d4b`, and our generator reproduces HIS whole
+decode layer from it, **206/206 byte-identical**. His tree and ours agreed about
+the image at every level; the only difference was the source bump.
+
+The merge was decided by CLASSIFYING each side rather than by reading hunks --
+236 collision-cone files split into **131 generated** (regenerate, never merge),
+**90 where our side was purely numeric** (take his: his addresses are one image
+closer and nothing of ours is lost), **12 where ours carries the S5 ledger or
+the guard walk** (keep ours, re-sweep), and **2 semantic on both sides**
+(`ProofFilestat`, `SpecDirlink`) -- only those two needed a human, and both
+turned out to be clean unions (his psz work + our `Hdlk` threading; his
+`K_dirlink` 92->94 + our `di_nlink_stable` premise). `ProofKexecA` moved to his
+side because kexec's code changed structurally under the psz bump; our `Hdlk`
+threading was re-applied on top as a 4-site edit.
+
+The image delta from his baseline is exactly the two commits: uartinit +20
+bytes, namex +16, create +20 -- 204 of 223 symbols move (+0x14 from uartwrite,
++0x24 from dirlink, +0x38 from sys_dup, +0x40 from kernelvec by alignment,
+rodata +8, data +0x10).
+
+### What GR-1c cost that GR-1 did not predict
+
+- **The tree sat at THREE images at once**, so the sweep needed a per-file
+  baseline, detected by which revision each file's content matched.
+- **A fifth address class: .rodata string constants**, moving +8 where data took
+  +16. Re-addressed by CONTENT (read the string at the old address, find it in
+  the new image) across five syntactic forms. Doing it in two narrower passes
+  double-shifted what the first had moved -- a uniform shift makes "already
+  fixed" and "still stale" indistinguishable, so it has to be one pass.
+- **The sweep corrupted numbers that are not immediates** -- a width
+  (`: mword 12` -> `8`, `sign_extend' 64` -> `52`), a stack budget (`K - 4` ->
+  `K - 4044`), and an anchor offset (`FW + 0x122` -> `0x10c`, where the alias
+  was a `Notation` the span-freezing missed). Four sites, each failing far from
+  the edit and naming a width or a goal rather than an address. The invariant
+  and the audit that enforces it are in `durable-notes.md`; **run that audit
+  after every sweep.**
+- **Strict file-stem pairing silently drops multi-function Code files**
+  (`CodeSleeplock` covers four). Pair on the SYMBOL, not the file.
+
+### The gate
+
+`EXIT=2`, **1055 of 1062** `.vo`, nothing stale. `Print Assumptions` on all 25
+fs cones -- including Namex, Namei and Nameiparent -- is the standing six
+(funext + the five Sail externs), with fileread's `consoleread` and filewrite's
+`consolewrite` the two documented device extras. No axiom entered from either
+merge.
+
+### THE ONE PARK: uartinit, and it is a contract change
+
+Seven files are unbuilt, and they are one cone: `ProofUartinit`, `LinkUartinit`,
+`LinkConsoleinit`, `LinkMain`, `BootChain`, `BootShared`, `SystemAdequacy`.
+`b7c25cf` gives uartinit five new instructions ending in
+`jal ra,initsleeplock`, and `SpecUartinit`'s contract takes no lock storage and
+returns none -- it says so in a comment written when ae96fd0 removed the call.
+Walking the `jal` needs initsleeplock's precondition, so the contract gains a
+premise; and the honest version also gains a conclusion, because
+initsleeplock's postcondition is exactly the raw material for
+`UartTxInv.is_txlock` -- **the thing `LinkTxLockInit.tx_lock_init`
+axiomatises.** Landing it retires that axiom and turns D3 from an assumption
+into a theorem, at the cost of a boot-wiring change (uartinit's caller has to
+own the storage and take the lock back).
+
+That is a design pass, not an image repair, which is why it was parked rather
+than improvised inside an already-large bump. The instruction-level detail and
+the reasoning are in a banner at the exact stopping point in `ProofUartinit.v`.
+**Until it lands the boot/adequacy cone does not build** -- which is the honest
+statement of where the tree is, and the first thing GR-2 should decide.
+
+## GR-1d — the uartinit cone repaired; D3 proven (2026-08-13)
+
+GR-1c's one park is closed. `b7c25cf` gave `uartinit` five new instructions
+ending in `jal ra,initsleeplock`, and `ProofUartinit` now walks them, so the
+seven-file boot/adequacy cone builds again and D3's fix is a THEOREM of the
+boot chain rather than an assumption.
+
+### The chain
+
+`BootShared`'s carve widens 24 -> 44 at `tx_lock` (it is a sleeplock now, not a
+spinlock) and the residue closes with room to spare -- `kmem` sits at
+`tx_lock + 48`, so the neighbouring cut is undisturbed. `BootCarveMain` swaps
+`boot_lk_raw` for `boot_sl_raw`, which already existed for the buffer and inode
+sleeplocks; `SpecMain`'s eleventh slot becomes `sl_raw`; `SpecConsoleinit` and
+`SpecUartinit` thread it down. Budgets: uartinit 4 -> 8 (its 2-slot frame over
+initsleeplock's 6), consoleinit 6 -> 10.
+
+### What uartinit's post says, and what it deliberately does not
+
+It returns `SleepLock.sl_fresh a_tx_lock "uart"` -- initsleeplock's six results
+verbatim, which is exactly `new_sleeplock`'s premises MINUS the resource. The
+lock is initialized; what it protects is left open, because saying it means
+choosing between printk's `pr_res` and uartwrite's `tx_res` over one
+transmitter token, and **nothing consumes `is_txlock` today**. The full
+analysis and the two-file cost of settling it are in
+`projects/uart-driver.md`; `ProofMain`'s printk mint is untouched, and
+`UartTxInv.v` / `SpecPrintkGen.v` were not opened.
+
+### LinkTxLockInit was dead code
+
+Not "retired from an assumption set" -- **required by no file at all**, so it
+never appeared in any `Print Assumptions` output. Deleting it rippled nowhere.
+The reason it read as live for two rounds is a real tooling gap now recorded in
+`durable-notes.md`: `proof_coverage.py`'s textual `Axiom` scan counts axioms
+that the require graph cannot reach. A require-graph-aware pass is owed.
+
+### The gate
+
+`EXIT=0`, **1060 of 1060** in `_CoqProject` (plus one untracked `N5dChk.vo`
+stray on the mirror that predates this work), nothing unbuilt, nothing stale.
+
+`Print Assumptions`:
+- `SystemAdequacy.xv6_power_adequacy` and `.xv6_fs_adequacy`: funext + the five
+  Sail externs + **five named boot assumptions** -- `boot_dev_caps`,
+  `consoleintr`, `panic_wp_holds`, `printk_gen`, `userinit`. No `tx_lock_init`,
+  and there never was one.
+- `LinkUartinit.Uartinit.wp_uartinit_sconf` and
+  `LinkConsoleinit.Consoleinit.wp_consoleinit_sconf`: **the standing six** --
+  which is the real gain, since neither compiled at all before this change.
+- Spot checks unchanged: `LinkNamex`, `LinkIlock` both the standing six.
+
+### The one trap worth carrying
+
+`ProofUartinit`'s leaves are `wp_next`-WRAPPED (every step goes through
+`wp_next_off_intro`, which collapses the rebound hart back to the section's,
+interrupts being off throughout). `ProofKinit`'s are not. Copying ProofKinit's
+call sequence verbatim left the continuation anchored at a different hart, and
+the failure was the classic one from `durable-notes.md`: *`iSpecialize: cannot
+instantiate (P -∗ Q) with P`* where both sides print CHARACTER-FOR-CHARACTER
+the same. When cloning a call sequence between whole-function proofs, check
+which convention the target file uses before copying the intro pattern.
+
+## GR-2a — **STOPPED BEFORE ANY EDIT** (base superseded by origin `6ea54b92`).
+## No `.v` file was touched and nothing was synced to the mirror.  What this
+## section carries is the DESIGN the relaunch starts from: the dependency
+## order of the eight contracts is INVERTED in the S5i table, and `bm_paid`
+## is the one algebra that has to move
+
+### RESUME HEADER
+
+| # | contract | state at stop |
+|---|---|---|
+| 2 | `SpecIupdate.wp_iupdate_cred` | LANDED (S5b), unmoved |
+| 5 | `SpecIalloc.wp_ialloc_gen` | LANDED (S5i), unmoved |
+| 1 | `SpecWritei.wp_writei_cred` | not started |
+| 3 | `SpecDirlink` `DIRLINK_GEN` | not started |
+| 4a | `SpecItrunc.wp_itrunc_gen` | **DESIGNED, not written** (below) |
+| 4b | `SpecIput`/`SpecIunlockput` `_cred` | not started |
+| 6 | namex/namei/nameiparent gen | not started |
+
+Zero `.v` files created or edited; zero files scp'd; zero mirror jobs.
+Mirror verified quiet and clean at `4bfde083`, 1062 `.vo`, `git status`
+empty.
+
+### FINDING 1 — **DERIVATION IS IMPOSSIBLE FOR ALL EIGHT, and the proof is
+### two lines.**  Every gen form must be walked; the COUNTED form is the
+### derived one
+
+`LogInv.v:278-289`: `log_opS γ u Sb := ∃ i, i ↪[ln_ops γ] (u, Sb)` and
+`log_op γ u := ∃ Sb, log_opS γ u Sb`.  The set therefore lives in a
+`ghost_map` ELEMENT — exclusive, with no auth-monotone shadow anywhere in
+the file — so a counted postcondition `log_op γ n'` hands back an element
+at an existentially chosen `Sb'` with **no** relation to the caller's
+`Sb`, and nothing in the algebra recovers one.  S5i stated this for
+nameiparent; it is general, and it settles the brief's
+"derive-outside-the-walk-if-the-algebra-permits" question for every one of
+the eight: **it does not permit, for any of them.**
+
+The direction that IS free is the other one, and it is the whole reason
+the retrofit stays additive: prove the gen/cred form as the core, then
+derive the counted seal from it **at the `log_op` existential's own
+witness** (S3l deviation 2 — destruct the caller's `log_op` and run the
+core at whatever set was hiding there, at `cr := false`), never at
+`Sb := ∅`.  `wp_bmap_sconf`, `wp_writei_sconf`, `wp_iupdate_gen` and
+`wp_ialloc_sconf` are the four landed instances.
+
+So the honest sizing for the relaunch is **five proof walks, no
+derivations**: ProofItrunc (2922), ProofIput (2381), ProofNamex (5713) on
+one chain, ProofWritei (4640), ProofDirlink (3162) on the other.  Only the
+counted SEALS are derivations, ~20 lines each.
+
+### FINDING 2 — **THE S5i DEPENDENCY ORDER IS INVERTED.**  (6) is not
+### "first and cheapest"; it is LAST on its chain
+
+The brief and the S5i table both put the namex trio first, "cheapest and
+gating".  Gating it is; first it cannot be.  `wp_namex_gen` must carry
+`log_opS g n Sb` -> `log_opS g n' Sb'` with `Sb ⊆ Sb'` across **four**
+call sites, and every one of them is an iput or an iunlockput
+(`SpecNamex.v`'s header: three iunlockputs in the loop, one iput on the
+nameiparent-of-`"/"` arm; ilock and dirlookup take no reservation at all).
+Against `SpecIput`'s landed counted post (`SpecIput.v:239`, `log_op g n'`)
+the set is lost at the FIRST turn of namex's loop, by exactly the argument
+in finding 1.  So the chain is strictly
+
+```
+4a wp_itrunc_gen  ->  4b wp_iput_cred / wp_iunlockput_cred  ->  6 namex trio
+1  wp_writei_cred ->  3  DIRLINK_GEN
+```
+
+and the two chains are independent (dirlink's cone does not reach iput's).
+The relaunch can run them as two parallel threads; `wp_iupdate_cred` (2)
+is already landed and is a shared prerequisite of both.
+
+### THE 4a DESIGN, worked out and ready to write
+
+`SpecItrunc.bm_paid` (`SpecItrunc.v:159`) is the whole obstruction, and it
+is exactly the shape S5i named: set-form but with the set EXISTENTIAL on
+both disjuncts, so the caller's `Sb` is forgotten at `bm_paid_intro`
+(`:164`) and never recovered at `bm_paid_elim` (`:172`).  Index it by the
+ENTRY set and the forgetting stops:
+
+```coq
+Definition bm_paidS (γ : log_names) (bmapstart : Z) (u : nat) (Sb : gset Z)
+  : iProp Σ :=
+  ((∃ Sb', ⌜Sb ⊆ Sb'⌝ ∗ ⌜bmapstart ∈ Sb'⌝ ∗ log_opS γ (S u) Sb')
+   ∨ (∃ Sb', ⌜Sb ⊆ Sb'⌝ ∗ log_opS γ (S (S u)) Sb'))%I.
+```
+
+Three facts make this cheap, and all three were checked against the file:
+
+1. **`Sb` is CONSTANT across both loops.**  It is the entry set, never the
+   running one — the running set is the existential `Sb'` — so the
+   retrofit is one extra parameter on `it_dir_state` / `it_ent_state`
+   (`ProofItruncParts.v:567`) and the two loop invariants
+   (`ProofItrunc.v:1751`, `:1805`), threaded, not proven.  This is
+   `ProofIalloc`'s pattern from S5i verbatim.
+2. **`bm_paid_use` (`ProofItruncParts.v:591`) does not change shape at
+   all.**  It already existentially opens the running set and closes its
+   wand at `Sb0 ∪ {[bmapstart]}`; the twin adds `⌜Sb ⊆ Sb0⌝` to what it
+   yields and re-establishes `Sb ⊆ Sb0 ∪ {[bmapstart]}` by transitivity in
+   the same two `iLeft` arms.  Both arms already land in the PAID
+   disjunct, so the growth clause is proved once per arm and never inside
+   the loop.  **The two `set_solver`s at `:605`/`:612` are inside a
+   three-variable definitional lemma, which is where S3l's rule says they
+   are fine — do not move them, and do not add one at a call site.**
+3. **The three `bm_paid_use` call sites (`ProofItrunc.v:1003`, `:1552`,
+   `:2282`) pass the set straight to `SpecBfree.wp_bfree_gen`, which is
+   ALREADY set-form** — that is what `Sb` is doing in each of those
+   `iDestruct` patterns today.  So no callee contract below itrunc moves.
+
+**The CREDITS itrunc must take, and why both are forced by
+`CreateBudget.ip_spend crb cru freed` (`CreateBudget.v:133`).**  create's
+FAIL arm needs `iunlockput(ip)` to spend **zero** while actually freeing,
+so itrunc must be able to spend zero:
+
+* `crb` (`crb = true -> bmapstart ∈ Sb`) enters `bm_paidS` at the PAID
+  disjunct with `Sb' := Sb`, so the precondition is
+  `log_opS γ (if crb then S u else S (S u)) Sb` and the bitmap unit is
+  never spent.  No new algebra: `bm_paidS_intro_cred` is the `iLeft` twin
+  of the existing `bm_paid_intro`.
+* `cru` (`cru = true -> IBLOCK inum inodestart ∈ Sb`) is passed straight
+  to the tail `iupdate` — `wp_iupdate_cred` is LANDED and takes exactly
+  this boolean — at `ProofItrunc.v:2823`/`:2895`, the two `bm_paid_elim`
+  sites that feed `it_tail`.  Those sites `destruct n0 as [|n1]` to
+  produce iupdate's successor; the credited form keeps that step.
+
+**And the post must EXPOSE `IBLOCK inum inodestart ∈ Sb'`**, determinately
+— itrunc's own tail iupdate logs it unconditionally — because that
+membership is what makes iput's OWN `iupdate` (the `ip->type = 0` flush,
+which runs immediately after itrunc returns) absorb for free.  That is the
+second `iu_spend` term of `ip_spend`, and without the exposed membership
+4b cannot hit its target.  `wp_ialloc_gen`'s determinate-union growth
+(S5i part 2) is the precedent for stating it as a membership rather than
+as a `⊆`.
+
+Postcondition shape, replacing `SpecItrunc.v:362`'s
+`(∃ u', ⌜u <= u' <= S u⌝ ∗ log_op γ u')`:
+
+```coq
+(∃ (u' : nat) (Sb' : gset Z),
+   ⌜Sb ⊆ Sb'⌝ ∗ ⌜IBLOCK inum inodestart ∈ Sb'⌝ ∗
+   ⌜(it_entry crb u - it_spend crb cru <= u')%nat
+    /\ (u' <= it_entry crb u)%nat⌝ ∗
+   log_opS γ u' Sb')
+```
+
+with `it_entry crb u := if crb then S u else S (S u)` and
+`it_spend crb cru := (if crb then 0 else 1) + iu_spend cru`.  At
+`crb := false, cru := false` this is the landed range `u <= u' <= S u`
+verbatim, which is what makes `wp_itrunc_sconf` a witness-derivation and
+leaves `ProofIput`'s current call unmoved until 4b walks it.
+
+### WHAT DID NOT GET CHECKED, and should be first at relaunch
+
+* Whether `it_tail` (the lemma `ProofItrunc.v:2834`/`:2899` apply) can take
+  the credit as a parameter without touching `it_cont` — it looked like it
+  can (`it_cont` already takes the count), but the two `iExists n1` /
+  `iExists n3` re-packings at `:2855`/`:2917` were not traced through.
+* 4b's own shape.  `ip_spend` has a `freed` boolean that iput's
+  postcondition does not currently expose, so the credited post must
+  either quantify it existentially or two-arm the budget clause the way
+  `used' ⊆ used` (`SpecIput.v:234`) is already two-armed.  That choice was
+  not made.
+* Nothing was read of `ProofWritei` / `ProofDirlink`; chain two is
+  unexamined.
+
+### THE SUPERSEDING BUMP, and what of the above survives it
+
+Origin `6ea54b92` (upstream `0024d4b`) moves twelve stack budgets, namex
+`94 -> 96` among them (`SpecNamex.K_namex`).  **None of the design above
+names an image address, an offset or a `K` constant** — it is resource
+algebra over `log_opS`, in the same sense GR-1's audit found the ledger
+work carried none of origin's 1762 moved immediates.  Finding 2's claim is
+"every namex log site is an iput or an iunlockput", which is a property of
+fs.c's source that the copyout/vmfault rework does not touch.
+
+## GR-2b — the set-form retrofit, run on the converged base in GR-2a's
+## corrected order.  **4a and 4b LAND**; the walk cost came in far under
+## the five-walk sizing, and the two questions GR-2a left open are both
+## answered — one of them by refuting the design it shipped
+
+### RESUME HEADER
+
+| # | contract | state |
+|---|----------|-------|
+| 2 | `SpecIupdate.wp_iupdate_cred` | landed (S5b), unmoved |
+| 5 | `SpecIalloc.wp_ialloc_gen` | landed (S5i), unmoved |
+| — | `SpecIupdate.wp_iupdate_credgen` | **NEW, LANDED** (the gate 4a hit) |
+| 4a | `SpecItrunc.wp_itrunc_gen` | **LANDED** |
+| 4b | `SpecIput.wp_iput_gen` / `SpecIunlockput.wp_iunlockput_gen` | **LANDED** |
+| 6 | namex/namei/nameiparent gen | not started (now unblocked) |
+| 1 | `SpecWritei.wp_writei_cred` | not started |
+| 3 | `SpecDirlink` `DIRLINK_GEN` | not started |
+
+### FINDING 1 — **THE 4a POSTCONDITION IN GR-2a's DESIGN IS WRONG, and it
+### fails in the one direction that matters: it does not imply the contract
+### it has to derive**
+
+GR-2a shipped the post's counter clause as
+
+```coq
+⌜(it_entry crb u - it_spend crb cru <= u')%nat /\ (u' <= it_entry crb u)%nat⌝
+```
+
+and claimed "at `crb := false, cru := false` this is the landed range
+`u <= u' <= S u` verbatim".  It is not.  At those values `it_entry` is
+`S (S u)`, so the upper bound reads `u' <= S (S u)` where the counted
+contract says `u' <= S u` — and since the counted form is DERIVED from the
+gen form, a loose upper bound there is not a harmless weakening, it makes
+`wp_itrunc_sconf` unprovable and the whole retrofit non-additive.
+
+The cause is that **the tail `iupdate` ALWAYS runs**, so `it_iu cru` is
+spent unconditionally whatever the loops did; only the BITMAP unit is
+data-dependent.  The correct clause is
+
+```coq
+⌜(it_entry crb u - it_spend crb cru <= u')%nat
+ /\ (u' + it_iu cru <= it_entry crb u)%nat⌝
+```
+
+(stated additively so nat truncation never enters), which collapses to
+exactly `u <= u' <= S u` uncredited and is tight on all four corners.  The
+general rule worth carrying: **when a gen form must imply a landed counted
+form, check the derivation at the uncredited corner BEFORE writing the
+walk** — a bound that is merely "true" is not enough, it has to be the
+same bound.
+
+### FINDING 2 — **`bm_paidS` NEEDS A `crb` GUARD ON THE UNPAID DISJUNCT**,
+### and without it create's zero-spend arm is unreachable
+
+GR-2a's `bm_paidS` was a plain two-disjunct set-indexed `bm_paid`.  But the
+paid disjunct is ABSORBING (`bm_paidS_use` returns `iLeft` from both arms),
+so a caller entering already-paid never had the spare unit — and a bare
+disjunction cannot say so, leaving the elim only the loose
+`n <= S (S u)`.  Guarding the unpaid arm with `⌜crb = false⌝` pins the
+level to `S u` for the whole of a credited run, and makes the elim's range
+uniformly `S u <= n <= it_entry crb u`.  That is what makes
+`CreateBudget.ip_spend true true true = 0` reachable: create's FAIL arm
+needs its freeing `iunlockput` to spend **exactly** zero.  The guard costs
+nothing — it is established once at the intro and never re-established,
+because nothing ever returns to the unpaid arm.
+
+Landed shape (`SpecItrunc.v`):
+
+```coq
+Definition bm_paidS (γ : log_names) (bmapstart : Z) (crb : bool)
+    (u : nat) (Sb : gset Z) : iProp Σ :=
+  ((∃ Sb', ⌜Sb ⊆ Sb'⌝ ∗ ⌜bmapstart ∈ Sb'⌝ ∗ log_opS γ (S u) Sb')
+   ∨ (⌜crb = false⌝ ∗ ∃ Sb', ⌜Sb ⊆ Sb'⌝ ∗ log_opS γ (S (S u)) Sb'))%I.
+```
+
+with `it_entry crb u := if crb then S u else S (S u)`,
+`it_iu cru := if cru then 0 else 1` and
+`it_spend crb cru := (if crb then 0 else 1) + it_iu cru`.  The last two are
+definitionally `CreateBudget.iu_spend` and `CreateBudget.ip_spend _ _ true`,
+spelled locally so `SpecItrunc` need not import the ledger (which would
+have been a new edge into `SpecIput`'s cone for two `if`s).
+
+### FINDING 3 — **THE `freed` BOOLEAN IS NOT LOAD-BEARING, and an
+### existential one is VACUOUS.**  4b's open question, closed
+
+GR-2a left open whether iput's credited post must expose `ip_spend`'s
+`freed`, existentially or by two-arming the budget clause the way
+`used' ⊆ used` already is.  It must do **neither**:
+
+* `ip_spend crb cru false = 0 <= ip_spend crb cru true`, so
+  `∃ freed, n - ip_spend crb cru freed <= n'` is satisfied by
+  `freed := true` whatever ran — it says exactly what the unconditional
+  worst case says, and no caller can extract more from it.
+* Two-arming it would be useless anyway, for the same reason the parking
+  premise is unconditional: **no caller can know in advance which arm
+  runs.**
+
+So the spend is stated at the worst case, unconditionally
+(`SpecIput.ip_spend_max crb cru`), and that is *enough*, because at
+`crb = cru = true` the worst case IS zero.  The general lesson: an
+existential over a monotone cost parameter is not information; check
+whether the disjunction you are about to add has a maximum before paying
+for it.
+
+### THE GATE 4a HIT, and why it is one added Parameter and not a widening
+
+`it_tail`'s flush needs the CREDITED iupdate at an `eb` itrunc's own
+contract quantifies over — itrunc is a pure pass-through, threading
+`trap_csrs_ext eb` / `cpu_claim_ext eb` to its sleeping callees.  But the
+landed `wp_iupdate_cred` pins `eb := true` (all create needs), and the
+landed `wp_iupdate_gen` is eb-generic but pinned at `cru := false`.  The
+generic core the proof already had — `ProofIupdate.iu_main_gen` — is both,
+and was simply not in the Module Type.
+
+`SpecIupdate` therefore gains a FOURTH parameter, `wp_iupdate_credgen`,
+proven by a ~20-line seal off `iu_main_gen`.  **Added beside the other
+three, not by widening one**: `ProofWritei.v:982` applies
+`IU.wp_iupdate_gen` positionally, so changing that body's arity would have
+rippled into chain two before chain two was even read.  The blast radius
+of the addition is five files (`SpecIupdate` → `{ProofIupdate, ProofIput,
+ProofItrunc}` → `{LinkIupdate, LinkItrunc}`), three of which 4a/4b touch
+anyway.
+
+### WALK COST ACTUALS vs THE FIVE-WALK SIZING
+
+GR-2a sized the relaunch at "five proof walks, no derivations", with
+ProofItrunc (2922) and ProofIput (2381) two of the five.  **Both came in
+at a small fraction of a walk**, and the reason generalises:
+
+| file | lines | what the retrofit actually was | compiles to green |
+|------|-------|-------------------------------|-------------------|
+| `ProofItruncParts.v` | 786 | 2 params on each loop state + `bm_paidS_use` (a copy of `bm_paid_use` with one `⊆` added per arm) | 1st try |
+| `ProofItrunc.v` | 2922 | ~30 threaded sites, all mechanical; 3 real seams (entry intro, 2 tail joins) | **1st try** |
+| `ProofIput.v` | 2381 | 2 tail lemmas re-parameterised + 4 call sites + the truncate arm's 2 credited calls | 2nd try (one `S (u'-1)` vs `u'` rewrite) |
+| `ProofIunlockput.v` | 556 | one call site | 1st try |
+
+**The sizing was wrong because `Sb` is THREADED, not proven.**  GR-2a
+already said this for `bm_paid` ("one extra parameter on the two loop
+invariants, threaded, not proving") but then priced the stage as five
+walks anyway.  The honest unit is not "lines in the file" but "seams where
+the ledger is opened" — itrunc has six (`bm_paidS_intro`, three
+`bm_paidS_use`, two `bm_paidS_elim`), iput has four.  Everything else is
+parameter plumbing a script does.  **Price the remaining four contracts by
+counting `log_op`/`log_opS` occurrences in the proof file, not by its
+length.**  On that measure ProofNamex's 5713 lines are still only its four
+iput/iunlockput call sites.
+
+### THE EXACT COMPOSED SHAPE `ProofCreate` WILL CONSUME
+
+For the op-wide 6-of-10 distinct-set bound (S5a), the two landed contracts
+present:
+
+```coq
+(* itrunc, at entry set Sb and credits crb cru *)
+log_opS γ (it_entry crb u) Sb
+  ⊢ ∃ u' Sb', ⌜Sb ⊆ Sb'⌝ ∗ ⌜IBLOCK inum inodestart ∈ Sb'⌝ ∗
+              ⌜it_entry crb u - it_spend crb cru <= u'
+                /\ u' + it_iu cru <= it_entry crb u⌝ ∗
+              log_opS γ u' Sb'
+
+(* iput / iunlockput, at entry set Sb and the SAME two credits *)
+log_opS g n Sb
+  ⊢ ∀ n' used' Sb', ⌜used' ⊆ used⌝ -∗ ⌜Sb ⊆ Sb'⌝ -∗
+      ⌜n - ip_spend_max crb cru <= n' <= n⌝ -∗ log_opS g n' Sb' -∗ …
+```
+
+with `ip_spend_max crb cru = (if crb then 0 else 1) + (if cru then 0 else 1)`,
+i.e. **definitionally `CreateBudget.ip_spend crb cru true`** — so create's
+arms compose against the ledger theorems already proven, unchanged.  The
+three corners create actually uses:
+
+* `crb = cru = true` (the FAIL arm's freeing `iunlockput`): `n' = n`,
+  spend **zero**, which is what `cr_budget` needs and what finding 2's
+  guard buys.
+* `crb = true, cru = false`: spend 1.
+* `crb = cru = false` (the counted seal): spend ≤ 2, and iput's own third
+  unit makes `iput_units = 3` — the landed contract, unmoved.
+
+**The NEED did not move**: iput's precondition is still `iput_units <= n`,
+so every `CreateBudget` arm is stated at `ip_need` exactly as before.  The
+credited arms could honestly ask for as little as
+`1 + ip_spend_max crb cru`, and deliberately do not — nothing needs it and
+keeping the premise fixed keeps the ledger's theorems verbatim.
+
+**What makes iput's own flush free**, and it is the one non-mechanical
+step in 4b: `wp_itrunc_gen`'s post exposes
+`IBLOCK inum inodestart ∈ Sb'` DETERMINATELY (itrunc's tail iupdate logs
+it unconditionally), so iput's `ip->type = 0; iupdate(ip)` runs at
+`cru := true` and spends nothing.  Without that exposed membership 4b
+cannot hit `ip_spend_max` and the whole credited chain collapses to the
+counted one.
+
+### `it_tail`'s PARAMETERISATION — the GR-2a unchecked item, resolved
+
+It takes the credit as a parameter with no change to `it_cont` beyond one
+extra `gset` argument.  The reason is that `it_cont` was ALREADY
+instantiated at a concrete level at both tail joins (`iExists n1` /
+`iExists n3` adapt it to the contract's range right at the call site), so
+the determinate pair `(if cru then S n1 else n1, Sb0 ∪ {[IBLOCK …]})`
+drops straight in and the widening to the contract's existential stays
+where it always was — in the main lemma, not in the tail.  The two
+`iExists` re-packings needed no tracing at all.
+
+### Traps recorded
+
+* **`Local Open Scope Z_scope` eats a `nat` definition's literals.**
+  `Definition it_iu (cru : bool) : nat := if cru then 0 else 1` fails with
+  *"The term `0` has type `Z` while it is expected to have type `nat`"* —
+  the ascription on the DEFINITION does not reach the branches.  Write
+  `0%nat` / `1%nat` per branch, and `( … + … )%nat` on any sum.
+* **A `bm_paid_use`-style destructuring pattern collides with the lemma
+  binder you just added.**  `as (cr u' Sb)` inside a lemma that now takes
+  `Sb` as a parameter is *"Sb is already used"* — the same family as the
+  `iIntros (CID …)` shadowing trap.  Rename the RUNNING set (`Sq`), never
+  the parameter: the parameter's name is what every call site spells.
+* **A credited callee's post is `S (u' - 1)`, and the next callee wants
+  `u'`.**  They are the same nat and not the same term, so the tail's
+  `iApply` fails with *"iSpecialize: cannot instantiate"* printing two
+  levels that differ only in that shape.  One `iEval (rewrite Hu'1) in
+  "Hop"` before the application; do not try to make the arithmetic line up
+  by choosing the other spelling at the call site, because the bound goals
+  then carry `S (u' - 1)` into `lia` under a `destruct crb, cru`.
+* **A positional parameter group added mid-list must be added at the same
+  place in every call site, and the compiler will NOT always say so.**
+  `ip_tail` grew `(used used' Sb Sb' : gset Z)`; one call site was written
+  `… used used' k q inum Mt ci Sb Sb' …`, which is four `gset`-typed
+  arguments in a different order and fails far away.  When a script does
+  the threading, have it rewrite the ARGUMENT LIST as one unit rather than
+  appending.
+* **A base checkout can leave the whole tree stale while a per-file
+  `coqc` loop stays green.**  The mirror reported 1061 `.vo` and every
+  single-file build passed in minutes, because each only rebuilt its own
+  dependency chain; the first full `make` then recompiled from
+  `WpGprCsrwA.v` upward.  A per-file loop is a check of the file, never of
+  the tree — and `make -q` is not the tell either (it returns 1 on the
+  phony `pre-all`/`real-all` targets even when nothing needs building).
+  Use `make -n` and look for `COQC` lines.
+
+### What 6 is now unblocked on
+
+Finding 2 of GR-2a stands: namex's four log sites are all `iput` or
+`iunlockput`, and both now have set-form contracts that carry
+`Sb ⊆ Sb'` across a call.  The loop can therefore thread the set the way
+itrunc's loops do.  `ProofNamex.v` is 5713 lines but has only those four
+seams; by the sizing rule above that is roughly `ProofIput`'s cost, not
+`ProofItrunc`'s.  **Single-file `coqc` loop is still mandatory there**
+(~3 min / 5.3 GB per compile).
+
+## GR-2c — stage 6 (the namex trio) LANDS, and **stage 1 turns out to be
+## already landed**: `wp_writei_gen` has been in the tree since S3l, and a
+## separate `wp_writei_cred` is not merely unnecessary, it is the shape
+## `WriteiBudget` was deliberately built to avoid
+
+### RESUME HEADER
+
+| # | contract | state |
+|---|----------|-------|
+| 2 | `SpecIupdate.wp_iupdate_cred` | landed (S5b) |
+| — | `SpecIupdate.wp_iupdate_credgen` | landed (GR-2b) |
+| 5 | `SpecIalloc.wp_ialloc_gen` | landed (S5i) |
+| 4a | `SpecItrunc.wp_itrunc_gen` | landed (GR-2b) |
+| 4b | `SpecIput.wp_iput_gen` / `SpecIunlockput.wp_iunlockput_gen` | landed (GR-2b) |
+| 6 | `SpecNamex.wp_namex_gen` + namei/nameiparent | **LANDED (GR-2c)** |
+| 1 | `SpecWritei.wp_writei_gen` | **ALREADY LANDED — see finding 4** |
+| 3 | `SpecDirlink` `DIRLINK_GEN` | not started; design below |
+
+### FINDING 4 — **STAGE 1 IS A NO-OP, AND ASKING FOR `wp_writei_cred`
+### WOULD UNDO A DELIBERATE DESIGN**
+
+`SpecWritei.v:658` defines `wp_writei_gen_body`, `:955` seals it as a
+Module Type Parameter, `ProofWritei.v:3597` proves it, and `:4607` derives
+`wp_writei_sconf` from it at the `log_op` existential's own witness.  The
+set-form contract has therefore been in the tree since S3l, exactly as the
+brief's parenthetical hinted ("S3l pre-proved the loop algebra") — the
+brief just under-read what had already been *landed* on top of that
+algebra.
+
+More importantly, a `cred` form with `crb`/`crd` booleans is the wrong
+shape **for this function specifically**, and `SpecWritei.v`'s header
+already says so:
+
+> writei TAKES NO CREDIT PARAMETER, unlike bmap and log_write.  It does not
+> need one: its loop invariant carries the unpaid bitmap block as one unit
+> of held-back POTENTIAL (`WriteiBudget.bm_pot`) rather than as a case
+> split, and `WriteiBudget.wi_inv_enter` establishes the invariant at ANY
+> entry set.  A caller that has already logged the bitmap simply gets a
+> call that spends one less than its budget allowed.
+
+`wi_inv_enter`'s own comment closes it: *"for ANY entry set, which is why
+writei needs no credit parameter of its own."*  The credit is **derived**
+from the entry set by `bm_pot bms SI` (1 if `bms ∈ SI`, else 0), inside an
+amortized invariant, rather than being a boolean the caller asserts and the
+contract must then honestly guard.  Adding a boolean twin would duplicate
+that device, re-introduce the case split the potential was built to remove,
+and give callers two ways to say the same thing.
+
+**The durable lesson, and it generalises past this tree:** when a loop's
+cost is amortized, the "credit" is a FUNCTION OF THE SET the contract
+already threads, not a separate index.  Reach for a `cr` boolean only where
+the callee is straight-line (iupdate, log_write) or where the case split is
+genuinely one-shot (bmap, itrunc's bitmap unit).  Before adding a credit
+parameter, check whether the callee's invariant already computes it.
+
+### STAGE 6: THE GROWING-SET INVARIANT, as ratified
+
+`nx_loop_body` gained one parameter (`Sb`, the caller's, fixed) and one
+∀-bound variable (`Scur`, the running set, fresh at every turn because each
+iteration's `iunlockput` picks it), with the single new premise
+`⌜Sb ⊆ Scur⌝` and `log_opS g ncur Scur` in place of `log_op g ncur`.  The
+back edge re-establishes it with ONE application of
+`ProofNamexParts.nx_sub_trans` — a three-line lemma over plain `gset Z`,
+stated precisely so that `set_solver` never runs inside a 5713-line file
+(durable-notes' capstone `set_solver` trap, measured at 106 s per trivial
+side condition elsewhere).
+
+**This is the first genuinely INVARIANT-shaped set retrofit in the thread.**
+itrunc's two loops thread a CONSTANT set — there `Sb` is a parameter and
+the running set hides inside `bm_paidS`'s existential — so 4a was pure
+plumbing.  namex's loop grows the set, so the ⊆ is a real loop obligation.
+It still cost only one lemma and one bullet, which is the measure of how
+well the ratified shape fits.
+
+The five callee sites became `wp_iput_gen` / `wp_iunlockput_gen` at
+`crb := cru := false` (namex discovers its inums as it walks and can make
+no honest credit claim about them), and the six exits and both loop entries
+each seal the existential at the set in hand: `Scur` where no call ran,
+`Sip`/`Sup` where one did, with the ⊆ discharged by `Hsbc` or by
+`nx_sub_trans _ _ _ Hsbc Hsup`.
+
+`SpecNamei` / `SpecNameiparent` are thin forwards, exactly as predicted —
+one call-site rename and one extra binder each.
+
+### FINDING 5 — **A STRONGER CALLEE BOUND DOES NOT COMPOSE FOR FREE; IT HAS
+### TO BE WEAKENED AT THE SEAM**
+
+4b's gen post gives `ncur - ip_spend_max false false <= n'`, i.e.
+`ncur - 2 <= n'`, because `ip_spend_max false false = 2` while
+`iput_units = 3` (iput's own third unit is the one it never needs
+uncredited).  namex is stated at the counted `iput_units`, and every
+`nx_bi_*` budget lemma in `ProofNamex` wants `ncur - iput_units <= n'`.
+So the *stronger* callee bound fails to typecheck against the *weaker*
+caller lemma — the error is a bare `The term "proj1 Hbdip" has type … while
+it is expected to have type …`, naming two bounds that differ only in a
+constant.
+
+The fix is one weakening per call site, placed immediately after the
+callee's `iIntros` and **keeping the hypothesis's name**:
+
+```coq
+assert (Hbdipw : ((ncur - iput_units)%nat <= nip)%nat /\ (nip <= ncur)%nat)
+  by (unfold ip_spend_max, iput_units in Hbdip |- *; simpl in Hbdip; lia).
+clear Hbdip. rename Hbdipw into Hbdip.
+```
+
+so that nothing downstream moves.  **Do this at the seam, never by
+loosening the callee's contract** — the strength is real and create wants
+it; it is only this one caller that is stated coarsely.
+
+### Gate
+
+Full `make -j24 -k` **EXIT=0**, 1061 `.vo`, coqdep-derived staleness **0**,
+`make -n` reports **0** `COQC` lines.  `Print Assumptions` on the whole
+landed set — `wp_itrunc_gen`, `wp_iput_gen`, `wp_iunlockput_gen`,
+`wp_namex_sconf`/`_gen`, `wp_namei_sconf`/`_gen`,
+`wp_nameiparent_sconf`/`_gen`, `wp_writei_gen` — the standing six alone, no
+admits.
+
+### Traps recorded
+
+* **SPLICING A GENERATED TWIN CAN SILENTLY DELETE THE ORIGINAL.**  Building
+  `namex_postS` / `wp_namex_gen_body` by slicing the file at the two
+  definitions and re-concatenating dropped `wp_namex_sconf_body` entirely —
+  the tail was spliced from `Module Type` onward and the original body was
+  never re-inserted.  It fails as *"The reference wp_namex_sconf_body was
+  not found"* at the Module Type, which reads like a typo in the Parameter.
+  When generating a twin by slicing, assert the ORIGINAL name is still
+  present in the result before writing.
+* **`Hsub` was already taken.**  `ProofNamex` binds a `sub_vec` fact called
+  `Hsub` 400 lines away, so the loop's `iIntros … %Hsub …` fails with
+  *"Hsub is already used."* — the plain-`intros` twin of the section-variable
+  shadowing trap.  Grep the file for a candidate hypothesis name before
+  introducing one in a 5000-line proof; the failure is at the intro, but the
+  cause can be anywhere.
+* **A wrapper's continuation binder list is NOT the same across sibling
+  wrappers.**  `namei`'s post binds `(ok, ipv)`; `nameiparent`'s binds
+  `(ok, nf, ipv)`.  Generating both seals from one template bound `nf` to
+  `ipv`'s slot in namei and failed as *"iIntro: cannot turn (…) into a
+  universal quantifier"* — an error that points at the wand chain, not at
+  the binder count.  Diff the two posts before templating them.
+* **A generated seal passed its own continuation twice.**  The template
+  built the `with "…"` string from the walk's whole `iIntros` list, which
+  ends in `Hcont`, and then appended `[Hcont]` for the hole — so `Hcont`
+  was supplied bare AND as a goal, and the bare one unified with the gen
+  continuation.  It fails as *"iSpecialize: cannot instantiate (wp_next …)"*
+  printing the counted and set-form continuations side by side, which reads
+  like a shape mismatch and is not one.
+
+### STAGE 3 (`DIRLINK_GEN`) — the design, since finding 4 changes it
+
+Not started.  But finding 4 settles its shape, and it is **not** the
+"composes crb/crd with the set ledger" the queue describes:
+
+* dirlink's two ledger-touching calls are `writei` (through
+  `wi16_spend crb crd cru al ind`) and one `iput`.  writei takes NO credit
+  parameter — its `crb`/`crd` are `bool_decide (… ∈ SI)` computed inside
+  `WriteiBudget`'s amortized invariant from the set it is already threading.
+* So `DIRLINK_GEN` should thread `log_opS γ ncount Sb` → `log_opS γ n' Sb'`
+  with `Sb ⊆ Sb'`, and express its SPEND as a function of memberships of
+  `Sb` (`bool_decide (bmapstart ∈ Sb)` &c.), exactly as writei does —
+  **not** as three new boolean parameters.  `cru` is the one that stays a
+  boolean, because it goes to `iupdate`, which is straight-line.
+* Sizing by the GR-2b rule (seams, not lines): `ProofDirlink.v` is 3162
+  lines with **six** `log_op` occurrences — one `iput` call, one `writei`
+  call, and two `iAssert`ed inner continuations (`:1683`/`:1709` and
+  `:2452`/`:2478`) that carry the ledger.  That is iput-sized, not
+  itrunc-sized.
+
+### FINDING 6 — **STAGE 3 IS BLOCKED, AND NOT ON ANYTHING IN `SpecDirlink`.
+### `DIRLINK_GEN` CANNOT BE MADE USEFUL UNTIL writei's CONTRACT EXPOSES ITS
+### AMORTIZED SPEND — which is deliberately parked.  STOPPING HERE.**
+
+The set half of stage 3 is trivial (thread `Sb` through one `writei` call,
+one `iput` call and two `iAssert`ed inner continuations).  It is also
+**useless on its own**, and the arithmetic is already in the tree:
+
+* `CreateBudget.v:265` proves `cr_u0 < 4 * dirlink_units`, i.e. create's
+  four dirlinks at the counted figure (`dirlink_units = 7`, so 28) against
+  `cr_u0 = MAXOPBLOCKS = 10`.  So create needs a spend from dirlink shaped
+  like `dl_spend crb crd cru al ind = wi16_spend crb crd cru al ind`, not
+  `dirlink_units`.
+* `wi16_spend crb crd cru al ind = bmap_cost crb al ind + (if al||crd then
+  0 else 1) + iu_spend cru` — a **credit-aware** figure.
+* But `wp_writei_gen`'s post promises `ncount - wi_cost_bmonly off n <= n'`
+  (`SpecWritei.v:893`), which is the **same coarse bound as the counted
+  form** (`:622`).  The gen form adds `⌜Sb ⊆ Sb'⌝` and *nothing else about
+  the counter*.
+* `CreateBudget.v`'s own `wi16_need_matches_landed` says this in one line:
+  `wi16_need false false = wi_cost_bmonly off 16` (both 4), with the
+  comment **"THE NEED WAS NEVER THE PROBLEM; the SPEND bound is."**
+
+So the missing contract is not `wp_writei_cred` and not `DIRLINK_GEN` — it
+is a writei contract whose POST states the amortized spend.  The machinery
+exists and is *already wired into the walk*: `ProofWritei.v` carries
+`wi_inv_bud` / `wi_inv_spent` / `bm_pot` through the loop (17 occurrences,
+invariant at `:1805`-`:1813`, steps at `:2031` and `:2839`).  What is
+missing is only the EXPOSURE at the seam.
+
+**Why this is a STOP and not an improvisation.**  `SpecWritei.v:228-237`
+records that the third amortization (the indirect block across iterations)
+is *deliberately not modelled* — "the machinery is proven and parked in
+`WriteiBudget`'s `LogAmort` section for the day a kernel change needs
+them" — and that today's accounting fits with **ZERO slack**
+(`wi_cost_bmonly_no_slack`, `wi_cost_bmonly 1023 FW_MAX = 10 =
+MAXOPBLOCKS` exactly).  Strengthening writei's post therefore reopens a
+budget that was closed on purpose, at zero margin, and the choice of WHICH
+credits to expose (`crb` alone? `crb`+`crd`? the `al` arm?) is a spec
+decision with a knock-on into `bmap`'s contract, not a threading job.
+Improvising it would have been exactly the "revise the spec rather than
+force the proof through an awkward interface" case the durable notes hand
+to the orchestrator.
+
+**What the coordinator should decide before stage 3 is re-queued:**
+
+1. Does writei expose a second post clause (leaving `wi_cost_bmonly`
+   in place, additive) of the form
+   `⌜ncount - wi_spend_amort bmapstart Sb off n <= n'⌝`, with
+   `wi_spend_amort` = `wi_cost_bmonly` minus the potential already paid
+   (`bm_pot bmapstart Sb`)?  That is the smallest change and matches what
+   the walk already proves.
+2. Or does it expose the full `wi16_spend`-shaped figure, which needs
+   `crd` (target block) and `al` (bmap allocated) — both of which are
+   *outputs* of the call, not inputs, so they would have to be
+   existentially reported in the post rather than taken as parameters.
+   `SpecBmap.bmap_alloced` / `bmap_ind` already name them, which is why
+   `wi16_spend` takes them.
+3. Either way `DIRLINK_GEN` is then ~one iput-sized walk on top, by the
+   GR-2b seam-counting rule (`ProofDirlink.v` is 3162 lines with six
+   `log_op` occurrences: one `iput` call at `:1522`, one `writei` call at
+   `:2054`, and two inner continuations at `:1683`/`:1709` and
+   `:2452`/`:2478`).
+
+Nothing was edited for stage 3.  `SpecDirlink.v` / `ProofDirlink.v` are
+untouched.
+
+## GR-3 — the second grand reconciliation (2026-08-13), and STAGE 3's RULING
+
+Origin moved to xv6 `d80e61c5` (a descendant of our `9da28f5` pin: uart's
+tx_lock becomes a SPINLOCK, the panic path is gone, plus `make fmt`) with
+their own restyle+re-address sweep, while our line carried GR-1..GR-2d.
+229 conflicts, resolved by classification — merge commit `GR-3` has the
+per-class recipe.  Three facts worth keeping: origin INDEPENDENTLY proved
+the namex nlink guard at the same offsets (so ProofNamex's merge was
+ours-dominant with zero guard rework); the d80e61c5 spinlock change
+OBSOLETED GR-1d's initsleeplock walk outright (origin's initlock-shaped
+uartinit cone taken wholesale — a kernel change can retire a proof, not
+just break it); and `fix_proof_imms` on the merged tree reports
+byte-identically to origin's own baseline, which is the cheap whole-tree
+chimera audit the GR-1 notes asked for.  Owed item: ProofIput keeps the
+direct `ic_swap_park`+`iNext` idiom; origin's `ip_swap_park_later` is not
+ported.
+
+### STAGE 3 RULING — FINDING 6's candidate 1 is REFUTED; candidate 2, ADDITIVE
+
+Candidate 1 (`wi_cost_bmonly - bm_pot` as the exposed spend) cannot close
+`cr_budget_mkdir`: the three dirlinks would bound at 4/3/3 where the true
+vector spends are 3/0/3, and `10 - 1 - (4+3+3) = -1 < iput_units`.  The
+`bm_pot` device credits only the BITMAP block; create's arithmetic lives
+on the `crd` (same-target-block) and `cru` (inode-block) absorptions,
+which no bitmap-only figure expresses.  Machine-checkable in the
+`CreateBudget` vocabulary — worth landing as a refutation lemma beside
+`wi16_need_matches_landed`.
+
+So writei exposes the `wi16_spend`-shaped figure, and ADDITIVELY: the
+landed `wi_cost_bmonly` clause stays (the LogAmort third amortization
+stays parked; no zero-slack budget reopens).  Three load-bearing
+derivations:
+
+1. **No new existentials.** `bm`/`bm'` are already post variables, so
+   `al := bmap_alloced bm bm' (off/BSIZE)` and `ind := bmap_ind (off/BSIZE)`
+   are DERIVED terms — FINDING 6's worry that al/crd "would have to be
+   existentially reported" dissolves.
+2. **`⌜Sb ⊆ Sb'⌝` alone is NOT enough.**  dirlink #2/#3's credit booleans
+   (`crb`/`crd`/`cru` at the NEXT call) are derivable only from
+   MEMBERSHIP, so the new clause must also state what LANDED:
+   al = true -> bmapstart ∈ Sb'; the target block ∈ Sb'; cru's
+   IBLOCK ∈ Sb' after the tail iupdate.
+3. **Every callee already delivers.**  `wp_bmap_gen` promises the spend at
+   `bmap_cost cr al ind` AND `bmap_alloced = true -> bmapstart ∈ Sb'`
+   (SpecBmap.v:570); set-form `log_write` returns the literal
+   `Sb ∪ {[bno]}` (SpecLogWrite.v:154); `wp_iupdate_credgen` returns
+   `Sb ∪ {[IBLOCK inum inodestart]}` (SpecIupdate.v:680).  The exposure is
+   genuinely only at writei's seam; the new clause is conditional on
+   `wi_blocks off n = 1` (dirlink's aligned-16 shape), so the multi-block
+   loop invariant is untouched.
+
+### The GR-3 gate (mirror, 2026-08-13)
+
+Full build `EXIT=0`, **1069 `.vo`**, `make -n` staleness **0**.  Two chimeras
+surfaced and fixed (`7f5ab8f8`): BootCarveMain's auto-merged sleeplock carve
+(obsolete class), and ProofIput's gen-seal goal selector — upstream's `3:{`
+displaced our `4:{` because **goal-selector numerals are numeric twins to a
+composer but their meaning depends on conjunct count**; a selector audit of
+all five composed files against the ours-parent shows that was the only
+instance.  Coverage on the merged tree: **172/189 fns proven (91%), 83% of
+text bytes** — the union of both lines (ours-parent was 151); fs.c and
+uart.c at 100%.  `Print Assumptions` (audit10.v + 10b, 34 linked
+theorems incl. the gen forms, kexit/kfork, main/uartinit/uartwrite): the
+standing six on every lemma, plus only the documented extras — consoleread
+/ consolewrite on the file r/w cones, forkret_park on kfork, and
+`wp_main_boot_sconf` carrying the assumed consoleintr / printk_gen /
+userinit contracts (the same leaves proof_coverage lists as assumed).
+Nothing entered from the merge.
+
+### The staged work
+
+| step | what | who | state |
+|------|------|-----|-------|
+| W1 | SpecWritei: wi16_spend/wi16_need/wi_tgt_blk/wi16_post + ONE new pure wand in wp_writei_gen_body; CreateBudget slimmed to import them + wi16_bmonly_amort_insufficient | design (Fable) | **LANDED** (SpecWritei/SpecDirlink/CreateBudget green on mirror) |
+| W2 | ProofWritei: thread the single-iteration ledger to wi16_post; absorb the wand in the sconf derivation | agent (Opus) | **LANDED** |
+| W3 | DIRLINK_GEN on top — iput-sized by the GR-2b seam count (6 log_op occurrences in ProofDirlink.v) | agent (Opus) | **LANDED** (first-try green on both files) |
+
+### W3 as landed (agent report, 2026-08-13)
+
+`dl16_post` (SpecDirlink.v, beside dirlink_units): guarded by
+`found = false -> tot = 16` (tot is the arm's own a0 = 0 witness, keeping
+the Prop free of the register file); the slot is the body's own `k0`
+parameter (`off := 16 * k0`); spend + membership trio exactly wi16_post's
+at that window.  **The entire writei seam is one `exact`** — wi16_post IS
+dl16_post at `off := 16*k0`, with `dl_wi_blocks : wi_blocks (16*k) 16 = 1`
+already in the file.  The two inner iAsserted continuations gained `Sb` as
+a PLAIN PARAMETER (the scan logs nothing, so it is invariant across the
+fuel induction and the IH stays folded).  iput switched to wp_iput_gen at
+false credits — GR-2c FINDING 5 fired for the third time (weaken at the
+seam, keep the name).  wp_dirlink_sconf derives from gen at the
+existential witness; no consumer moved (full SpecDirlink dependent set
+rebuilt green, LinkDirlink unchanged).
+
+**LOAD-BEARING, recorded on the agent's flag: dl16_post's spend clause is
+stated at ncount, dirlink's own entry count, which is sound only because
+NOTHING LOGS BEFORE THE APPEND's writei** (dirlookup/readi are read-only).
+If a future dirlink ever logs during the scan, the clause becomes FALSE,
+not loose.  And `dirlink_units` still says 7 while the append arm provably
+spends wi16_spend <= 4 — the slack is real and unclaimed; CREATE is the
+stage that consumes it.
+
+### W3 design ruling (Fable, 2026-08-13)
+
+DIRLINK_GEN mirrors the wi16 shape, not the boolean-parameter shape (GR-2c
+stage-3 design, reaffirmed): premise `log_opS γ ncount Sb`; post binds
+`Sb'`, returns `log_opS γ n' Sb'` with `⌜Sb ⊆ Sb'⌝`, KEEPS the counted
+`dirlink_units` clause, and adds one named Prop `dl16_post` — on the
+success-append arm (found = false, a0 = 0), the spend at
+`wi16_spend crb crd cru al ind` instantiated at dirlink's OWN writei
+window (the append slot's file block), with al/ind DERIVED from the post's
+bm/bm', credit booleans read at the ENTRY set, and the membership trio
+create's next call needs: the append's target block ∈ Sb',
+IBLOCK dinum inodestart ∈ Sb', and al = true -> bmapstart ∈ Sb'.  The
+found arm stays at the counted net-zero clause.  CreateBudget.dl_spend is
+already wi16_spend, so create's arithmetic connects without a bridge.
+Exact Rocq drafting delegated to the W2 agent (which carries the full
+wi16 context) with standing stop-and-report on any spec doubt.
+
+### W2 as landed (agent report, 2026-08-13)
+
+The agent STOPPED first, correctly: wi16_post's clause (a) was unprovable on
+one arm — wi16_spend's single `al` serves two roles, and "allocated an
+INDIRECT block for a DIRECT index" is physically impossible but was not
+contract-refutable, leaving the direct-path absorption one unit short.  The
+ruling (fix B): `wp_bmap_gen` gained clause (e),
+`bmap_ind fbn = false -> bm_ind bm' = bm_ind bm` — the honest frame fact
+both direct arms held literally.  With it, wi16_post went through VERBATIM
+at the five-boolean figure; no seam weakened.
+
+Proof shapes: `wi16_pre` (the receipt at the join — wi16_post minus the
+iupdate term, at the count in hand), `wi16_fresh` (what the loop carries —
+re-established BY REFUTATION off the pinned fuel, so the multi-block
+wi_inv_* ledger is untouched), three top-of-file arithmetic lemmas, the
+tail flush switched to `wp_iupdate_credgen`, `+1 %D` in the sconf
+derivation.  ProofWritei ~2 min/compile on the mirror (far under the 5-8
+min budgeted).  Whole SpecBmap cone rebuilt green: ProofBmap, ProofReadi,
+LinkBmap, LinkWritei, SpecFilewrite, ProofFilewrite, ProofDirlink.
+
+Two traps from the run, recorded verbatim:
+
+* **`destruct (f x) eqn:H` substitutes the scrutinee into hypotheses that
+  mention it**, so a follow-up `rewrite H in Hyp` fails with *"The LHS of H
+  does not match any subterm of the goal"* — reads like the equation is
+  wrong; the rewrite is simply already done.
+* **A callee contract that RETURNS a credit raises the caller's
+  `n' <= ncount` obligation by one**, and the failure surfaces at the
+  CALLER'S seal, not at the switched call — the mirror image of GR-2c
+  FINDING 5 (there a stronger callee bound needed weakening at the seam;
+  here a stronger callee payout needs a strengthened premise at the seam).
+  wi_size/wi_join each gained `(S u <= ncount)` beside `(u <= ncount)`,
+  named fresh so nothing downstream moved.

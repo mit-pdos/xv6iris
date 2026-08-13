@@ -570,6 +570,7 @@ ProofIinit.v
 LinkIinit.v
 InodeInv.v
 DirView.v
+DirLinks.v
 SpecBalloc.v
 SpecBmap.v
 CodeBmap.v

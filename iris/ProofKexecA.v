@@ -1062,7 +1062,7 @@ Section KexecABody.
       rewrite /Q2 upd_ne; [| regne]. exact (HQ1thr r Hr Nsp Ns0 Ns1 Ns2 Ns4). }
     (* ---- peel the loaded content for readi ---- *)
     iDestruct "Hload" as (datl)
-      "(%Hiok & %Hdok & Hdiat & Hmeta & Haddrs & Hindres & Hblocks)".
+      "(%Hiok & %Hdok & Hdlk & Hdiat & Hmeta & Haddrs & Hindres & Hblocks)".
     destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
     iAssert (inode_map gfs (ientry k) bml) with "[Haddrs Hindres]" as "Hmap".
     { rewrite /inode_map. iSplitL "Haddrs"; [iExact "Haddrs" | iExact "Hindres"]. }
@@ -1375,12 +1375,13 @@ Section KexecABody.
         iDestruct (cpu_own_transport CIDrd CID15 0%nat true (proc_addr jp) C true
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iAssert (ic_loaded gfs gi cov logstart k inum dnl bml)
-          with "[Hdiat Hmeta Hmap Hblocks]" as "Hload".
+          with "[Hdiat Hmeta Hmap Hblocks Hdlk]" as "Hload".
         { rewrite /ic_loaded /inode_map. iExists datl.
           iSplitR; [iPureIntro; split_and!;
             [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
             | exact Hszb | exact Hholes | exact Hsized] |].
           iSplitR; [iPureIntro; exact Hdok |].
+          iSplitL "Hdlk"; [iExact "Hdlk" |].
           iDestruct "Hmap" as "[Haddrs Hindres]".
           iSplitL "Hdiat"; [iExact "Hdiat" |].
           iSplitL "Hmeta"; [iExact "Hmeta" |].
@@ -1428,12 +1429,13 @@ Section KexecABody.
         iDestruct (cpu_own_transport CIDrd CID15 0%nat true (proc_addr jp) C true
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iAssert (ic_loaded gfs gi cov logstart k inum dnl bml)
-          with "[Hdiat Hmeta Hmap Hblocks]" as "Hload".
+          with "[Hdiat Hmeta Hmap Hblocks Hdlk]" as "Hload".
         { rewrite /ic_loaded /inode_map. iExists datl.
           iSplitR; [iPureIntro; split_and!;
             [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
             | exact Hszb | exact Hholes | exact Hsized] |].
           iSplitR; [iPureIntro; exact Hdok |].
+          iSplitL "Hdlk"; [iExact "Hdlk" |].
           iDestruct "Hmap" as "[Haddrs Hindres]".
           iSplitL "Hdiat"; [iExact "Hdiat" |].
           iSplitL "Hmeta"; [iExact "Hmeta" |].
@@ -1498,12 +1500,13 @@ Section KexecABody.
       iDestruct (cpu_own_transport CIDrd CID11 0%nat true (proc_addr jp) C true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iAssert (ic_loaded gfs gi cov logstart k inum dnl bml)
-        with "[Hdiat Hmeta Hmap Hblocks]" as "Hload".
+        with "[Hdiat Hmeta Hmap Hblocks Hdlk]" as "Hload".
       { rewrite /ic_loaded /inode_map. iExists datl.
         iSplitR; [iPureIntro; split_and!;
           [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
           | exact Hszb | exact Hholes | exact Hsized] |].
         iSplitR; [iPureIntro; exact Hdok |].
+        iSplitL "Hdlk"; [iExact "Hdlk" |].
         iDestruct "Hmap" as "[Haddrs Hindres]".
         iSplitL "Hdiat"; [iExact "Hdiat" |].
         iSplitL "Hmeta"; [iExact "Hmeta" |].

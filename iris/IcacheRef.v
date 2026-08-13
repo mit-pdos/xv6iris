@@ -75,7 +75,7 @@
    neither of which a lock-free reader may open. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
-From iris.algebra Require Import auth gmap frac numbers agree csum excl.
+From iris.algebra Require Import auth gmap frac numbers agree csum excl updates local_updates.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap invariants own ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
@@ -255,6 +255,42 @@ Definition iliveUR : ucmra :=
    renamed, deliberately, so the shape is the one already proven here. *)
 Definition ityR : cmra := csumR (exclR unitO) (agreeR (leibnizO (bv 16))).
 
+(* ---- THE LINK LEDGER's ALGEBRA (design/fs-icache.md §20.2) -----------
+
+   ONE per-inum authority [● (w, g, c, r)] with three counters and one
+   exclusive slot:
+
+     [w]  live directory records naming this inum whose [nlink] PAYS for
+          them -- the fragment is [ilink z];
+     [g]  live records naming it that NOTHING pays for -- the orphaned
+          [".."] of §20.8, the fragment is [igrey z].  A grey fragment
+          carries no allocatedness, and that is the point;
+     [c]  an [ialloc] has claimed the inum and has not committed
+          ([iclaim z], EXCLUSIVE -- §20.9(j): a counter would let a second
+          claim of the same inum through);
+     [r]  §20.7's (M1) carrier: the count of outstanding icache REFERENCES
+          to the inum, minted at [iget] from the caller's licence and
+          returned at [iput]'s [ip->ref--] ([iref_lic z]).
+
+   The whole §14 mass-ledger machine is unnecessary here: [w >= 1] is
+   checked against the authority at the instant it is used and never
+   remembered from an earlier one, which is exactly what makes the ledger
+   survive a free-and-reclaim where every persistent allocated-witness
+   dies (§20.9(b)).
+
+   Filed as a [gmap] under ONE ambient gname ([icfg_link] below) rather
+   than one gname per inum, for [icfg_iref]'s reason: a per-inum name
+   could not be read off a class. *)
+Definition linkElemUR : ucmra :=
+  prodUR (prodUR (prodUR natUR natUR) (optionUR (exclR unitO))) natUR.
+
+Definition linkUR : ucmra := gmapUR Z (authR linkElemUR).
+
+(* the ledger element, spelled so no proof below has to nest four
+   projections by hand *)
+Definition lelem (w g : nat) (c : option (excl unit)) (r : nat) : linkElemUR :=
+  (((w, g), c), r).
+
 (* ---- THE CHECKOUT DEPOSIT'S DESCRIPTOR (design §14.8) ----------------
 
    WHAT A CHECKED-OUT ENTRY'S ESCROW ARM IS HOLDING FOR THE THREAD INSIDE.
@@ -317,10 +353,17 @@ Class icacheG (Σ : gFunctors) := IcacheG {
   icache_liveG :: inG Σ iliveUR;
   icache_depG :: ghost_varG Σ ic_dep;
   icache_ityG :: inG Σ ityR;
+  (* THE LINK LEDGER (design §20.2).  It rides in [icacheG] and not in a
+     class of its own for [icache_idG]'s reason -- the region parks the
+     authority, but the fragments have to be nameable wherever a directory
+     payload is ([IcacheEscrow]) and wherever a licence is checked
+     ([SpecIget]), and every one of those files already carries
+     [icacheG]. *)
+  icache_linkG :: inG Σ linkUR;
 }.
 Definition icacheΣ : gFunctors :=
   #[GFunctor icacheUR; ghost_varΣ (bool * mword 32 * mword 32);
-    GFunctor iliveUR; ghost_varΣ ic_dep; GFunctor ityR].
+    GFunctor iliveUR; ghost_varΣ ic_dep; GFunctor ityR; GFunctor linkUR].
 Global Instance subG_icacheΣ {Σ} : subG icacheΣ Σ -> icacheG Σ.
 Proof. solve_inG. Qed.
 
@@ -352,6 +395,14 @@ Class icfg := MkIcfg {
      name must be canonical rather than threaded.  Nothing outside this
      cache ever mentions it. *)
   icfg_live : gname;
+  (* THE LINK LEDGER's gname (design §20.2), and it takes the same door for
+     the same reason [icfg_iref] and [icfg_live] do: the ledger's authority
+     is parked in [InodeRegion.ireg_slot] and its fragments ride in the two
+     escrow payloads, so a threaded name would enter [ireg_inv] AND
+     [IcacheEscrow.ipool_shape] -- i.e. [ic_escrow]'s arity, i.e. every fs
+     contract in the tree (§20.9(e), and §16.5's packaging argument that it
+     restates).  Here it costs ZERO signature moves anywhere. *)
+  icfg_link : gname;
 }.
 
 (* the pool at BOOT: one whole unit at each of the fifty slots, as ONE map,
@@ -404,13 +455,24 @@ Proof. apply live_seq_valid. Qed.
    what makes that premise demonstrably satisfiable rather than vacuous.
    (Nothing in the boot chain calls it yet: [FileInv.fileG] carries an
    ambient [icfg], so the file table's payload is stated over THAT one, and
-   tying the two together is the remaining half of the boot wiring.) *)
-Lemma icfg_alloc `{!icacheG Σ} (dv : mword 32) (nib : nat) :
+   tying the two together is the remaining half of the boot wiring.)
+
+   THE LEDGER'S BOOT MAP IS AN ARGUMENT (design §20.6's boot row).  Its
+   contents are a fact about the mkfs IMAGE -- one authority per inum, at
+   the count of live records naming it -- which this file knows nothing
+   about, and a gname is only usable by [IcacheBoot] if the very
+   [own_alloc] that mints it also mints the map.  So the caller supplies
+   [LM] and its validity, and gets the ledger back at the class's own
+   [icfg_link]. *)
+Lemma icfg_alloc `{!icacheG Σ} (dv : mword 32) (nib : nat) (LM : linkUR) :
+  ✓ LM ->
   ⊢ |==> ∃ (ICFG : icfg) (g0 : gname),
       ⌜icfg_dev = dv⌝ ∗ ⌜icfg_nib = nib⌝ ∗
       own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
-      own icfg_live (live_boot_map g0).
+      own icfg_live (live_boot_map g0) ∗
+      own icfg_link LM.
 Proof.
+  intros HLM.
   iMod (own_alloc (● (∅ : gmap nat (Qp * positive)) : icacheUR)) as (γ) "Ha".
   { by apply auth_auth_valid. }
   (* the boot generation: a gname is all the pool needs, and minting it as a
@@ -420,7 +482,8 @@ Proof.
   iMod (own_alloc (Cinl (Excl ()) : ityR)) as (g0) "_"; [done|].
   iMod (own_alloc (live_boot_map g0)) as (γl) "Hl".
   { apply live_boot_map_valid. }
-  iModIntro. iExists (MkIcfg γ dv nib γl), g0. by iFrame "Ha Hl".
+  iMod (own_alloc LM) as (γlk) "Hlk"; [exact HLM |].
+  iModIntro. iExists (MkIcfg γ dv nib γl γlk), g0. by iFrame "Ha Hl Hlk".
 Qed.
 
 (* ===================================================================== *)
@@ -474,6 +537,251 @@ Section IcacheIty.
     iIntros "H1 H2". by iDestruct (own_valid_2 with "H1 H2") as %[].
   Qed.
 End IcacheIty.
+
+(* ===================================================================== *)
+(*  3d. THE LINK LEDGER's VOCABULARY (design §20.2)                       *)
+(* ===================================================================== *)
+
+Section IcacheLink.
+  Context `{!icacheG Σ} `{ICFG : icfg}.
+
+  Definition link_auth_e (z : Z) (a : linkElemUR) : iProp Σ :=
+    own icfg_link ({[ z := ● a ]} : linkUR).
+  Definition link_frag_e (z : Z) (b : linkElemUR) : iProp Σ :=
+    own icfg_link ({[ z := ◯ b ]} : linkUR).
+
+  Definition link_auth (z : Z) (w g : nat) (c : option (excl unit)) (r : nat)
+    : iProp Σ := link_auth_e z (lelem w g c r).
+
+  (* THE THREE COLOURS AND THE REFERENCE LICENCE.  Each is one unit of one
+     component and nothing of the others, so they compose freely. *)
+  Definition ilink (z : Z) : iProp Σ := link_frag_e z (lelem 1 0 None 0).
+  Definition igrey (z : Z) : iProp Σ := link_frag_e z (lelem 0 1 None 0).
+  Definition iclaim (z : Z) : iProp Σ :=
+    link_frag_e z (lelem 0 0 (Some (Excl tt)) 0).
+  Definition iref_lic (z : Z) : iProp Σ := link_frag_e z (lelem 0 0 None 1).
+
+  Global Instance link_auth_e_timeless z a : Timeless (link_auth_e z a).
+  Proof. apply _. Qed.
+  Global Instance link_frag_e_timeless z b : Timeless (link_frag_e z b).
+  Proof. apply _. Qed.
+  Global Instance link_auth_timeless z w g c r : Timeless (link_auth z w g c r).
+  Proof. apply _. Qed.
+  Global Instance ilink_timeless z : Timeless (ilink z).
+  Proof. apply _. Qed.
+  Global Instance igrey_timeless z : Timeless (igrey z).
+  Proof. apply _. Qed.
+  Global Instance iclaim_timeless z : Timeless (iclaim z).
+  Proof. apply _. Qed.
+  Global Instance iref_lic_timeless z : Timeless (iref_lic z).
+  Proof. apply _. Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  READING THE AUTHORITY                                              *)
+  (* ------------------------------------------------------------------ *)
+
+  (* the raw form: auth validity, at one key, unpacked into the four
+     component orderings.  [Excl] is included only in itself, which is what
+     turns a held [iclaim] into agreement rather than a bound. *)
+  Lemma link_agree_e (z : Z) (a b : linkElemUR) :
+    link_auth_e z a -∗ link_frag_e z b -∗ ⌜b ≼ a⌝.
+  Proof.
+    rewrite /link_auth_e /link_frag_e. iIntros "Ha Hb".
+    iDestruct (own_valid_2 with "Ha Hb") as %Hv.
+    rewrite singleton_op singleton_valid in Hv.
+    iPureIntro. exact (proj1 (proj1 (auth_both_valid_discrete _ _) Hv)).
+  Qed.
+
+  Lemma link_agree (z : Z) (w g : nat) (c : option (excl unit)) (r : nat)
+      (w' g' : nat) (c' : option (excl unit)) (r' : nat) :
+    link_auth z w g c r -∗ link_frag_e z (lelem w' g' c' r') -∗
+    ⌜(w' <= w)%nat /\ (g' <= g)%nat /\ (r' <= r)%nat⌝.
+  Proof.
+    iIntros "Ha Hb".
+    iDestruct (link_agree_e with "Ha Hb") as %Hincl.
+    iPureIntro.
+    rewrite /lelem in Hincl.
+    apply prod_included in Hincl as [Hincl Hr].
+    apply prod_included in Hincl as [Hincl _].
+    apply prod_included in Hincl as [Hw Hg].
+    apply nat_included in Hw. apply nat_included in Hg.
+    apply nat_included in Hr. auto.
+  Qed.
+
+  (* THE ONE LINE §20.2 CALLS THE PAYOFF's first half. *)
+  Lemma link_w_ge (z : Z) (w g : nat) (c : option (excl unit)) (r : nat) :
+    link_auth z w g c r -∗ ilink z -∗ ⌜(1 <= w)%nat⌝.
+  Proof.
+    iIntros "Ha Hb". rewrite /ilink.
+    iDestruct (link_agree with "Ha Hb") as %(H & _ & _). done.
+  Qed.
+
+  Lemma link_r_ge (z : Z) (w g : nat) (c : option (excl unit)) (r : nat) :
+    link_auth z w g c r -∗ iref_lic z -∗ ⌜(1 <= r)%nat⌝.
+  Proof.
+    iIntros "Ha Hb". rewrite /iref_lic.
+    iDestruct (link_agree with "Ha Hb") as %(_ & _ & H). done.
+  Qed.
+
+  (* THE CLAIM AGREES rather than bounds: [Excl ()] has no proper
+     extension, so an outstanding token pins the authority's slot. *)
+  Lemma link_claim_agree (z : Z) (w g : nat) (c : option (excl unit)) (r : nat) :
+    link_auth z w g c r -∗ iclaim z -∗ ⌜c = Some (Excl tt)⌝.
+  Proof.
+    rewrite /link_auth /iclaim /link_auth_e /link_frag_e. iIntros "Ha Hb".
+    iDestruct (own_valid_2 with "Ha Hb") as %Hv.
+    rewrite singleton_op singleton_valid in Hv.
+    apply auth_both_valid_discrete in Hv as [Hincl Hval].
+    iPureIntro. rewrite /lelem in Hincl, Hval.
+    apply prod_included in Hincl as [Hincl _].
+    apply prod_included in Hincl as [_ Hc]. cbn in Hc.
+    destruct Hval as [[_ Hcv] _]. cbn in Hcv.
+    destruct c as [y |]; last first.
+    { exfalso. apply option_included in Hc as [Hc | (x & y & _ & Hy & _)];
+        [discriminate | discriminate]. }
+    apply Some_included_exclusive in Hc; [| apply _ | exact Hcv].
+    destruct y as [[] |]; [reflexivity |]. inversion Hc.
+  Qed.
+
+  Lemma iclaim_excl (z : Z) : iclaim z -∗ iclaim z -∗ False.
+  Proof.
+    rewrite /iclaim /link_frag_e. iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %Hv.
+    rewrite singleton_op singleton_valid -auth_frag_op auth_frag_valid in Hv.
+    iPureIntro. rewrite /lelem in Hv.
+    destruct Hv as [[_ Hc] _]. cbn in Hc. exact Hc.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  MOVING IT                                                          *)
+  (* ------------------------------------------------------------------ *)
+
+  (* the identity local update, which every move needs on the three
+     components it does NOT touch *)
+  Lemma link_lu_id {A : ucmra} (x y : A) : (x, y) ~l~> (x, y).
+  Proof.
+    apply local_update_unital. intros n mz Hv Hz.
+    split; [exact Hv | exact Hz].
+  Qed.
+
+  (* THE UNIT, SPELLED.  [ε] at [linkElemUR] is convertible to the
+     all-zero element, but a goal that still MENTIONS [ε] defeats [lia]
+     ("Cannot find witness"), so the allocating form takes the spelled
+     one and the conversion happens once, here. *)
+  Lemma link_update_alloc (z : Z) (a a' b' : linkElemUR) :
+    (a, lelem 0 0 None 0) ~l~> (a', b') ->
+    link_auth_e z a ==∗ link_auth_e z a' ∗ link_frag_e z b'.
+  Proof.
+    intros Hlu. rewrite /link_auth_e /link_frag_e. iIntros "Ha".
+    iMod (own_update _ _ ({[ z := ● a' ⋅ ◯ b' ]} : linkUR) with "Ha") as "H".
+    { apply singleton_update. apply auth_update_alloc. exact Hlu. }
+    rewrite -singleton_op own_op. by iFrame.
+  Qed.
+
+  Lemma link_update (z : Z) (a b a' b' : linkElemUR) :
+    (a, b) ~l~> (a', b') ->
+    link_auth_e z a -∗ link_frag_e z b ==∗
+    link_auth_e z a' ∗ link_frag_e z b'.
+  Proof.
+    intros Hlu. rewrite /link_auth_e /link_frag_e. iIntros "Ha Hb".
+    iDestruct (own_op with "[$Ha $Hb]") as "H".
+    rewrite singleton_op.
+    iMod (own_update _ _ ({[ z := ● a' ⋅ ◯ b' ]} : linkUR) with "H") as "H".
+    { apply singleton_update. by apply auth_update. }
+    rewrite -singleton_op own_op. by iFrame.
+  Qed.
+
+  (* MINT ONE [ilink] -- the record's own [nlink++] is what pays for it
+     (§20.6's mkdir/sys_link rows), so the caller re-establishes (L1). *)
+  Lemma link_mint_link (z : Z) (w g : nat) (c : option (excl unit)) (r : nat) :
+    link_auth z w g c r ==∗ link_auth z (S w) g c r ∗ ilink z.
+  Proof.
+    rewrite /link_auth /ilink. iIntros "Ha".
+    iApply (link_update_alloc with "Ha").
+    rewrite /lelem.
+    apply prod_local_update'; [| apply link_lu_id].
+    apply prod_local_update'; [| apply link_lu_id].
+    apply prod_local_update'; [| apply link_lu_id].
+    apply nat_local_update. lia.
+  Qed.
+
+  (* SPEND ONE -- sys_unlink's [ip->nlink--] (§20.6), the only lowering. *)
+  Lemma link_spend_link (z : Z) (w g : nat) (c : option (excl unit)) (r : nat) :
+    link_auth z (S w) g c r -∗ ilink z ==∗ link_auth z w g c r.
+  Proof.
+    rewrite /link_auth /ilink. iIntros "Ha Hb".
+    iMod (link_update _ _ _ (lelem w g c r) (lelem 0 0 None 0)
+            with "Ha Hb") as "[$ _]"; [| done].
+    rewrite /lelem.
+    apply prod_local_update'; [| apply link_lu_id].
+    apply prod_local_update'; [| apply link_lu_id].
+    apply prod_local_update'; [| apply link_lu_id].
+    apply nat_local_update. lia.
+  Qed.
+
+  (* THE GREY CONVERSION (§20.8): one paid record becomes an unpaid one,
+     and (L1) falls on both sides at once. *)
+  Lemma link_grey_of_link (z : Z) (w g : nat) (c : option (excl unit)) (r : nat) :
+    link_auth z (S w) g c r -∗ ilink z ==∗ link_auth z w (S g) c r ∗ igrey z.
+  Proof.
+    rewrite /link_auth /ilink /igrey. iIntros "Ha Hb".
+    iApply (link_update with "Ha Hb").
+    rewrite /lelem.
+    apply prod_local_update'; [| apply link_lu_id].
+    apply prod_local_update'; [| apply link_lu_id].
+    apply prod_local_update'; apply nat_local_update; lia.
+  Qed.
+
+  (* THE CLAIM.  Mintable exactly when the slot is empty, which is what
+     (L3)'s second half delivers at a type-0 record (§20.5) -- and what
+     the free must re-establish, §20.7's open obligation. *)
+  Lemma link_mint_claim (z : Z) (w g r : nat) :
+    link_auth z w g None r ==∗ link_auth z w g (Some (Excl tt)) r ∗ iclaim z.
+  Proof.
+    rewrite /link_auth /iclaim. iIntros "Ha".
+    iApply (link_update_alloc with "Ha").
+    rewrite /lelem.
+    apply prod_local_update'; [| apply link_lu_id].
+    apply prod_local_update'; [| apply alloc_option_local_update; done].
+    apply link_lu_id.
+  Qed.
+
+  Lemma link_spend_claim (z : Z) (w g : nat) (c : option (excl unit)) (r : nat) :
+    link_auth z w g c r -∗ iclaim z ==∗ link_auth z w g None r.
+  Proof.
+    rewrite /link_auth /iclaim. iIntros "Ha Hb".
+    iDestruct (link_claim_agree with "Ha Hb") as %->.
+    iMod (link_update _ _ _ (lelem w g None r) (lelem 0 0 None 0)
+            with "Ha Hb") as "[$ _]"; [| done].
+    rewrite /lelem.
+    apply prod_local_update'; [| apply link_lu_id].
+    apply prod_local_update'; [| apply delete_option_local_update, _].
+    apply link_lu_id.
+  Qed.
+
+  (* THE REFERENCE LICENCE (§20.7's (M1)). *)
+  Lemma link_mint_ref (z : Z) (w g : nat) (c : option (excl unit)) (r : nat) :
+    link_auth z w g c r ==∗ link_auth z w g c (S r) ∗ iref_lic z.
+  Proof.
+    rewrite /link_auth /iref_lic. iIntros "Ha".
+    iApply (link_update_alloc with "Ha").
+    rewrite /lelem.
+    apply prod_local_update'; [apply link_lu_id |].
+    apply nat_local_update. lia.
+  Qed.
+
+  Lemma link_spend_ref (z : Z) (w g : nat) (c : option (excl unit)) (r : nat) :
+    link_auth z w g c (S r) -∗ iref_lic z ==∗ link_auth z w g c r.
+  Proof.
+    rewrite /link_auth /iref_lic. iIntros "Ha Hb".
+    iMod (link_update _ _ _ (lelem w g c r) (lelem 0 0 None 0)
+            with "Ha Hb") as "[$ _]"; [| done].
+    rewrite /lelem.
+    apply prod_local_update'; [apply link_lu_id |].
+    apply nat_local_update. lia.
+  Qed.
+
+End IcacheLink.
 
 Section IcacheRefGhost.
   Context `{!icacheG Σ}.

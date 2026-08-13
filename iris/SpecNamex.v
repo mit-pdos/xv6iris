@@ -306,6 +306,67 @@ Definition namex_post
             iref_slots 2) -∗
       WP (Loop : expr riscv_lang))%I.
 
+(* THE SET-FORM CONTINUATION (fs-sysfile GR-2b, retrofit 6).  Verbatim
+   [namex_post] except that the ledger clause remembers the caller's set and
+   promises only to GROW it.  Stated as a separate definition rather than by
+   parameterising [namex_post], so the counted continuation -- which every
+   existing caller's [iApply ("Hcont" ...)] unifies against transparently --
+   is byte-identical.  The counted form is recovered from this one by
+   [LogInv.log_opS_op] at the seal, never the other way round. *)
+Definition namex_postS
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
+      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    (pj pv nb ret_tgt : mword 64) (pl : list (bv 8))
+    (m : regfile) (K : nat) (b eb : bool) (C : iProp Σ)
+    (g : log_names) (gfs : fs_names) (bn : bio_names)
+    (cov : gset Z) (logstart bmapstart inodestart size : Z)
+    (used : gset Z) (cwdv : mword 64)
+    (plen : nat) (pfun : nat -> bv 8)
+    (npar : bool) (n : nat) (Sb : gset Z) (pidv : mword 32)
+    (dq dqb dqs dqc : dfrac) : iProp Σ :=
+  (∀ (mf : regfile) (n' : nat) (used' Sb' : gset Z)
+     (ok : bool) (nf : nat -> bv 8) (ipv : mword 64),
+      ⌜callee_saved m mf⌝ -∗
+      sie_cap_gpr mf K b pj -∗
+      cpu_own 0 eb pj C b -∗
+      pc_is ret_tgt -∗
+      (* EVERYTHING LOANED COMES BACK *)
+      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      ⌜used' ⊆ used⌝ -∗
+      bitmap_res gfs bmapstart cov logstart size used' -∗
+      p_pid pj ↦₄{dq} pidv -∗
+      p_cwd pj ↦₈{dqc} cwdv -∗
+      inode_held cwdv -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+      (* the name buffer, at an UNSPECIFIED naming function -- the short
+         branch leaves the bytes above [len] alone *)
+      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nf i) -∗
+      bslots bn 3 -∗
+      (* THE SET ONLY GROWS.  namex takes no absorption credit of its
+         own -- its four log sites are iput/iunlockput calls at inums
+         it discovers as it walks, so it cannot know in advance which
+         blocks they touch.  What it MUST do is not LOSE the caller's
+         set across the loop, which against the counted contract is
+         impossible (GR-2a finding 1). *)
+      ⌜Sb ⊆ Sb'⌝ -∗
+      ⌜((n - (length (path_elems pl) + 1) * iput_units)%nat <= n')%nat
+       /\ (n' <= n)%nat⌝ -∗
+      log_opS g n' Sb' -∗
+      (* THE TWO ARMS *)
+      (if ok
+       then ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = ipv
+             /\ (npar = true ->
+                 exists es e, nameiparent_of pl es e /\ bname 14 nf = e)⌝ ∗
+            inode_held ipv ∗
+            iref_slots 1
+       else ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
+             = (mword_of_int 0 : mword 64)⌝ ∗
+            iref_slots 2) -∗
+      WP (Loop : expr riscv_lang))%I.
+
 Definition wp_namex_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
@@ -426,6 +487,143 @@ Definition wp_namex_sconf_body
                plen pfun npar n pidv dq dqb dqs dqc) -∗
   WP (Loop : expr riscv_lang).
 
+(* =====================================================================  *)
+(*  THE SET-FORM CONTRACT (fs-sysfile GR-2b, retrofit 6)                  *)
+(*                                                                        *)
+(*  namex's four log sites are ALL iput or iunlockput calls (three         *)
+(*  iunlockputs in the loop, one iput on the nameiparent-of-"/" arm;       *)
+(*  ilock and dirlookup take no reservation at all), so against the        *)
+(*  counted [SpecIput] post the caller's set was lost at the FIRST turn    *)
+(*  of the loop.  With 4b landed, each of those calls carries              *)
+(*  [Sb ⊆ Sb'] across, and the loop threads a GROWING set.                *)
+(*                                                                        *)
+(*  NO CREDITS.  namex discovers its inums as it walks, so it can make no  *)
+(*  honest [crb]/[cru] claim about them; it calls iput/iunlockput          *)
+(*  UNCREDITED and the budget clause is the counted one verbatim.  This    *)
+(*  contract adds monotonicity and nothing else -- which is exactly what   *)
+(*  create needs of it, since create's own credited calls are the dirlink  *)
+(*  and iupdate ones, not namex's.                                        *)
+(* ===================================================================== *)
+Definition wp_namex_gen_body
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
+      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+
+    (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
+    (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
+    (pd pav pu : mword 64)
+    (bn : bio_names)
+    (g : log_names) (gfs : fs_names) (gi : gname)
+    (cn : ic_names) (gtl : gname)                      (* the icache + itable *)
+    (ga : gname) (gf : gname)                          (* kalloc, file table  *)
+    (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+    (size : Z) (dev : mword 32)
+    (used : gset Z)
+    (cwdv : mword 64)                                  (* p->cwd, untouched   *)
+    (plen : nat) (pfun : nat -> bv 8)                  (* the path buffer     *)
+    (nfun : nat -> bv 8)                               (* the name buffer, in *)
+    (npar : bool)                                      (* the a1 flag         *)
+    (n : nat) (Sb : gset Z)
+    (pidv : mword 32) (dq dqb dqs dqc : dfrac)
+    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (b : bool) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.namex in
+  let pj := proc_addr j in
+  let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
+  let nb := m !!! Regidx (mword_of_int 12 : mword 5) in   (* a2 = name *)
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  let pl := bview plen pfun in
+  let L := length (path_elems pl) in
+  (K_namex <= K)%nat ->
+  (* (1) the cache's identity -- see the header *)
+  dev = icfg_dev ->
+  nib = icfg_nib ->
+  (* (2) the absolute arm's two immediates *)
+  dev = ROOTDEV ->
+  (0 < nib)%nat ->
+  (* (3) the fs geometry: iput's / itrunc's, threaded verbatim *)
+  log_geom_ok cov logstart ->
+  0 < size <= BPB ->
+  0 <= bmapstart ->
+  bmapstart ∈ cov ->
+  ~ (bmapstart ∈ log_region_set logstart) ->
+  0 <= inodestart ->
+  cov_below cov size ->
+  (* the LAYOUT fact that discharges ilock's / iput's per-inum block
+     membership at inums namex learns only at run time (N3's finding 2) *)
+  ireg_blocks_ok inodestart nib cov logstart ->
+  (* the path really is a NUL-terminated string of length [plen] *)
+  bb_cstr pfun plen ->
+  (* the length fits int: the sext.w at +0x90 truncates [len = s2 - s1], and
+     without this bound the [blt]-against-13 stops deciding [len <= 13] (and
+     the short branch fails memmove's own 2^32 bound).  SpecFetchstr's
+     header records the identical premise for strlen's [subw]. *)
+  (Z.of_nat plen < 2 ^ 31)%Z ->
+  (* (4) the budget, linear in the element count *)
+  ((L + 1) * iput_units <= n)%nat ->
+  (j < NPROC)%nat ->
+  gs !! j = Some gl ->
+  (* a1 = nameiparent, reflected into a ghost boolean the way dirlookup's
+     [poff] is *)
+  eq_vec (m !!! Regidx (mword_of_int 11 : mword 5)) zero_reg = negb npar ->
+  (* (6) PARKING PREMISE *)
+  eb = true ->
+  sie_cap_gpr m K b pj -∗
+  cpu_own 0 eb pj C b -∗
+  kernel_text -∗ pc_is pcE -∗
+  panic_wp_any -∗
+  bio_ctx bn (fs_view gfs gd dev cov) -∗
+  log_ctx g bn gfs cov logstart dev -∗
+  kalloc_env ga None -∗
+  (* ---- THE ICACHE'S PERSISTENT SET.  The FAMILIES, not the singletons:
+     namex's slots are dirlookup's outputs and cannot be named in advance,
+     which is the same reason iget takes [ic_escrows] and dirlink defined
+     [ic_sleeplocks]. ---- *)
+  is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+  itable_inv -∗
+  ic_escrows cn gfs gi cov logstart -∗
+  ic_sleeplocks cn -∗
+  ireg_inv gi gfs inodestart nib -∗
+  (* ---- the running-thread bundle and the disk fabric ---- *)
+  procs_inv gs -∗
+  dev_inv gu gd -∗
+  disk_geom gd pd pav pu -∗
+  is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+  (* ---- iput's / itrunc's own resources ---- *)
+  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  bitmap_res gfs bmapstart cov logstart size used -∗
+  (* ---- the caller's own pid cell (acquiresleep records it) ---- *)
+  p_pid pj ↦₄{dq} pidv -∗
+  (* ---- THE WORKING DIRECTORY: cell and reference, both handed back ---- *)
+  p_cwd pj ↦₈{dqc} cwdv -∗
+  inode_held cwdv -∗
+  (* ---- THE PATH: [plen] content bytes and the terminator ---- *)
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+  (* ---- THE NAME BUFFER: fourteen bytes, WRITTEN ---- *)
+  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nfun i) -∗
+  (* ---- three buffer slots (iput's itrunc arm forces three) ---- *)
+  bslots bn 3 -∗
+  (* ---- the ledger: see (5) in the header ---- *)
+  iref_slots 2 -∗
+  (* ---- this operation's reservation, SET FORM ---- *)
+  log_opS g n Sb -∗
+  (* the continuation is SEALED as [namex_post]; see its header *)
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
+     (its bread / ilock / bwrite does), and a park moves the hart with
+     interrupts off, so the crossing has nothing to do with SIE -- the
+     porting guide's "a PARKING function's [wp_next] index is [true]
+     UNCONDITIONALLY".  Spelled [b] the two coincide at the only instance
+     the [eb = true] premise admits, which is why this went unnoticed; once
+     [eb = false] is reachable the [b] form would promise the caller it
+     comes back on the hart it called from, which a park makes false. *)
+  wp_next true pj (fun (CIDc : CpuId) =>
+    namex_postS (CID := CIDc) pj pv nb ret_tgt pl m K b eb C
+                g gfs bn cov logstart bmapstart inodestart size used cwdv
+                plen pfun npar n Sb pidv dq dqb dqs dqc) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type NAMEX.
   Parameter wp_namex_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
@@ -454,4 +652,33 @@ Module Type NAMEX.
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used cwdv plen pfun nfun npar n
                           pidv dq dqb dqs dqc m K eb C b.
+  (* the set-form contract; [wp_namex_sconf] is this at the [log_op]
+     existential's own witness, with the grown set forgotten again. *)
+  Parameter wp_namex_gen :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
+             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId}
+      (gs : list gname) (j : nat) (gl : gname)
+      (gu : uart_names) (gd : disk_names) (gk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (g : log_names) (gfs : fs_names) (gi : gname)
+      (cn : ic_names) (gtl : gname)
+      (ga : gname) (gf : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (size : Z) (dev : mword 32)
+      (used : gset Z)
+      (cwdv : mword 64)
+      (plen : nat) (pfun : nat -> bv 8)
+      (nfun : nat -> bv 8)
+      (npar : bool)
+      (n : nat) (Sb : gset Z)
+      (pidv : mword 32) (dq dqb dqs dqc : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool),
+      wp_namex_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+                        ga gf cov logstart bmapstart inodestart nib
+                        size dev used cwdv plen pfun nfun npar n Sb
+                        pidv dq dqb dqs dqc m K eb C b.
 End NAMEX.

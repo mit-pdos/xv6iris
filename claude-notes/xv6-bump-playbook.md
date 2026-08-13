@@ -64,6 +64,17 @@ grep -E " kalloc$" xv6-riscv/kernel/kernel.sym
 If those disagree the dump is stale and every proof in the tree is being
 checked against an image that no longer exists.
 
+### TRAP: diff the dumps or the `objcopy -O binary` image — never the ELF's md5
+
+The kernel ELF's md5 is **build-path dependent**: `-gdwarf-2` records the
+compilation directory, so the same source built by the same compiler in two
+different checkouts gives two different ELF md5s while the loadable image is
+identical to the byte (measured 2026-08-13: two trees, two ELF md5s, one
+`objcopy -O binary` md5). Comparing ELF md5s manufactures a phantom
+reproducibility failure at exactly the moment the verify step is supposed to
+be reassuring you. The honest checks are cheap: the three `kernel-rocq/*.v`
+(what the proofs actually read) and the objcopy'd image.
+
 ### Three `gen_code.py` footguns
 
 * **`--only` IS A FOOTGUN — DO NOT USE IT ALONE.** It restricts which *Code*

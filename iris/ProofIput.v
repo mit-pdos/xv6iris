@@ -115,6 +115,7 @@ Require Import FsBlocks LogInv.
 Require Import BitmapInv.
 Require Import InodeInv.
 Require Import DinodeEnc.
+Require Import DinodeSlot.
 Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
@@ -144,6 +145,31 @@ Proof.
   - apply eq_vec_true_iff in Hab. subst b. apply eq_vec_true_iff. reflexivity.
   - apply eq_vec_false_iff in Hab. apply eq_vec_false_iff.
     intro Hc. apply Hab. exact (sext64_32_inj a b Hc).
+Qed.
+
+(* [ProofIlock.il_sext64_16_inj], restated for the same reason, and the
+   halfword ZERO test it gives.  The [c.bnez] at +0x44 falls through
+   exactly when [ip->nlink] is zero, and §20's (L3) needs that as a VALUE
+   fact about the record iput is holding -- which, since [ic_open_held]
+   went record-parametric (§20.14's (R1)), is the same record the free
+   flushes.  Without it the free cannot certify "nothing names this
+   inum". *)
+Lemma ip_sext64_16_inj (a c : mword 16) :
+  (sign_extend' 64 a : mword 64) = sign_extend' 64 c -> a = c.
+Proof.
+  intro H. rewrite -(trunc16_sext64 a) -(trunc16_sext64 c) H. reflexivity.
+Qed.
+
+Lemma ip_nlink_zero (w : mword 16) :
+  neq_vec (sign_extend' 64 w : mword 64) (zero_reg : mword 64) = false ->
+  bv_unsigned w = 0.
+Proof.
+  intro H. unfold neq_vec in H. apply negb_false_iff in H.
+  apply eq_vec_true_iff in H.
+  assert (Hz : (zero_reg : mword 64) = sign_extend' 64 (mword_of_int 0 : mword 16))
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite Hz in H. apply ip_sext64_16_inj in H.
+  rewrite H. vm_compute. reflexivity.
 Qed.
 
 (* THE TEST AT +0x1c, decided by the COUNT.  [c.li a5,1] leaves the literal
@@ -429,8 +455,8 @@ Section IputTail.
       (j : nat) (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
       (cn : ic_names) (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32) (used used' : gset Z)
-      (k n n' : nat)
+      (size : Z) (dev : mword 32) (used used' Sb Sb' : gset Z)
+      (k n n' spmax : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m D : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 vg4 : mword 64) :
@@ -441,9 +467,10 @@ Section IputTail.
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     sp0 = m !!! Regidx csp_rs1 ->
     iput_regs m D spd k ->
-    ((n - iput_units)%nat <= n')%nat ->
+    ((n - spmax)%nat <= n')%nat ->
     (n' <= n)%nat ->
     used' ⊆ used ->
+    Sb ⊆ Sb' ->
     kernel_text -∗
     is_lock gtl itable_lock "itable"%string
       (itable_res2 cn gfs gi cov logstart nib dev) -∗
@@ -470,9 +497,9 @@ Section IputTail.
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_res gfs bmapstart cov logstart size used' -∗
     bslots bn 3 -∗
-    log_op g n' -∗
+    log_opS g n' Sb' -∗
     wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (n'' : nat) (used'' : gset Z),
+      ∀ (mf : regfile) (n'' : nat) (used'' Sb'' : gset Z),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K eb pj -∗
         cpu_own 0 eb pj C eb -∗
@@ -485,13 +512,14 @@ Section IputTail.
         ⌜used'' ⊆ used⌝ -∗
         bitmap_res gfs bmapstart cov logstart size used'' -∗
         bslots bn 3 -∗
-        ⌜((n - iput_units)%nat <= n'')%nat /\ (n'' <= n)%nat⌝ -∗
-        log_op g n'' -∗
+        ⌜Sb ⊆ Sb''⌝ -∗
+        ⌜((n - spmax)%nat <= n'')%nat /\ (n'' <= n)%nat⌝ -∗
+        log_opS g n'' Sb'' -∗
         iref_slot -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros pj ret_tgt spd HK Hanch Hsp0 Hregs Hlo Hhi Hsub.
+    intros pj ret_tgt spd HK Hanch Hsp0 Hregs Hlo Hhi Hsub Hssub.
     unfold K_iput in HK.
     destruct Hregs as (HDs1 & HDsp & H18 & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
     iIntros "#Htext #Hlock Hpc Hcg Hcnt Hpay Hextc Hextm Htok HRres Hislot
@@ -668,9 +696,10 @@ Section IputTail.
     iDestruct (cpu_claim_ext_transport CID CIDe5 eb pj
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     iSpecialize ("Hcont" $! CIDe5 with "[]"); [ iPureIntro; wp_next_chain | ].
-    iApply ("Hcont" $! P4 n' used'
-              with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hbms Hins [%] Hbm Hbslots [%] Hop Hislot").
-    3:{ split; [exact Hlo | exact Hhi]. }
+    iApply ("Hcont" $! P4 n' used' Sb'
+              with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hbms Hins [%] Hbm Hbslots [%] [%] Hop Hislot").
+    4:{ split; [exact Hlo | exact Hhi]. }
+    3:{ exact Hssub. }
     2:{ exact Hsub. }
     (* callee_saved m P4 *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
@@ -703,10 +732,10 @@ Section IputTail.
       (j : nat) (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
       (cn : ic_names) (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32) (used used' : gset Z)
+      (size : Z) (dev : mword 32) (used used' Sb Sb' : gset Z)
       (k : nat) (q : Qp) (inum : mword 32)
       (Mt : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32))
-      (n n' : nat)
+      (n n' spmax : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 vg4 : mword 64) :
@@ -720,9 +749,10 @@ Section IputTail.
     iput_regs m M spd k ->
     icM_wf Mt ->
     ic_ci_wf Mt ci nib dev ->
-    ((n - iput_units)%nat <= n')%nat ->
+    ((n - spmax)%nat <= n')%nat ->
     (n' <= n)%nat ->
     used' ⊆ used ->
+    Sb ⊆ Sb' ->
     kernel_text -∗
     is_lock gtl itable_lock "itable"%string
       (itable_res2 cn gfs gi cov logstart nib dev) -∗
@@ -750,9 +780,9 @@ Section IputTail.
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_res gfs bmapstart cov logstart size used' -∗
     bslots bn 3 -∗
-    log_op g n' -∗
+    log_opS g n' Sb' -∗
     wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (n'' : nat) (used'' : gset Z),
+      ∀ (mf : regfile) (n'' : nat) (used'' Sb'' : gset Z),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K eb pj -∗
         cpu_own 0 eb pj C eb -∗
@@ -765,13 +795,14 @@ Section IputTail.
         ⌜used'' ⊆ used⌝ -∗
         bitmap_res gfs bmapstart cov logstart size used'' -∗
         bslots bn 3 -∗
-        ⌜((n - iput_units)%nat <= n'')%nat /\ (n'' <= n)%nat⌝ -∗
-        log_op g n'' -∗
+        ⌜Sb ⊆ Sb''⌝ -∗
+        ⌜((n - spmax)%nat <= n'')%nat /\ (n'' <= n)%nat⌝ -∗
+        log_opS g n'' Sb'' -∗
         iref_slot -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros pj ret_tgt spd HK Hk Hanch Hsp0 Hregs Hwf Hciwf Hlo Hhi Hsub.
+    intros pj ret_tgt spd HK Hk Hanch Hsp0 Hregs Hwf Hciwf Hlo Hhi Hsub Hssub.
     pose proof HK as HK'. unfold K_iput in HK'.
     pose proof Hregs as Hregs0.
     destruct Hregs as (HMs1 & HMsp & H18 & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
@@ -926,8 +957,8 @@ Section IputTail.
       assert (Hp1 : Pos.to_nat 1 = 1%nat) by reflexivity.
       iEval (rewrite Hp1) in "Hiu".
       iApply (ip_tail_exit CID0 j bn g gfs gi cn gtl cov logstart bmapstart inodestart
-                nib size dev used used' k n n' pidv dq dqb dqs m D2 K eb C sp0 vg4
-                HK Hanch Hsp0 HD2regs Hlo Hhi Hsub
+                nib size dev used used' Sb Sb' k n n' spmax pidv dq dqb dqs m D2 K eb C sp0 vg4
+                HK Hanch Hsp0 HD2regs Hlo Hhi Hsub Hssub
                 with "Htext Hlock Hpc Hcg Hcnt Hpay Hextc Hextm Htok [-Hiu Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm Hbslots Hop Hcont] Hiu
                       Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm Hbslots Hop Hcont").
       iExists (delete k Mt), (delete k ci). iFrame "Hhalf Hiauth Hslots Hpool".
@@ -987,8 +1018,8 @@ Section IputTail.
       { intros i Hi. reflexivity. }
       { rewrite /islot2 lookup_insert Hcik. iFrame. }
       iApply (ip_tail_exit CID0 j bn g gfs gi cn gtl cov logstart bmapstart inodestart
-                nib size dev used used' k n n' pidv dq dqb dqs m D2 K eb C sp0 vg4
-                HK Hanch Hsp0 HD2regs Hlo Hhi Hsub
+                nib size dev used used' Sb Sb' k n n' spmax pidv dq dqb dqs m D2 K eb C sp0 vg4
+                HK Hanch Hsp0 HD2regs Hlo Hhi Hsub Hssub
                 with "Htext Hlock Hpc Hcg Hcnt Hpay Hextc Hextm Htok [-Hislot Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm Hbslots Hop Hcont] Hislot
                       Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm Hbslots Hop Hcont").
       iExists (<[k := (qrest, npred)]> Mt), ci. iFrame "Hhalf Hiauth Hslots Hpool".
@@ -1048,50 +1079,11 @@ Section ProofIput.
   Lemma di_free_addrs (d : dinode) : di_addrs (di_free d) = bm_cells bm_empty.
   Proof. reflexivity. Qed.
 
-  (* [ic_swap_park] (IcacheEscrow.v) hands the escrow body back bare (its
-     conclusion is a plain [|==>], since bupd doesn't care about laters), but
-     every caller immediately feeds it to an invariant's [Hclose], which
-     wants the body back UNDER A LATER.  Done at iput's own park call site --
-     deep in the whole-function proof, at the point wp_iput_sconf's Iris
-     context is at its widest -- producing that later needs an [iNext] on the
-     "with" bracket's implied side-goal (see the call site below: [iMod (H
-     with "[Hbody]")] always leaves that goal for you to close, matched or
-     not), and [iNext] re-normalises the WHOLE ambient environment to strip a
-     later, which is context-proportional regardless of what closes the goal
-     after it.  Paying that step HERE instead, over the same six hypotheses
-     [ic_swap_park] itself takes, makes it O(1) rather than O(|Δ|); the call
-     site's own side-goal then needs nothing but [iExact].  See
-     claude-notes/optimization.md, "A modality step at a ▷ costs the
-     CONTEXT, so pay it in a lemma".  This constructor belongs next to
-     [ic_swap_park] in IcacheEscrow.v -- it lives here only because this file
-     owns no edits to that one. *)
-  Local Lemma ip_swap_park_later cn γfs γi cov logstart k (d : ic_dep)
-      (g : gname) (v : bool) (dev inum : mword 32) :
-    ic_dep_gname d = Some g ->
-    ic_escrow_body cn γfs γi cov logstart k -∗
-    ic_deposit cn k d -∗
-    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
-    i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
-    i_valid (ientry k) ↦₄ valid_word v -∗
-    ic_payload γfs γi cov logstart k inum g v -∗
-    |==> ▷ ic_escrow_body cn γfs γi cov logstart k ∗
-      ic_tok cn k ∗
-      ic_dep_own k d dev inum.
-  Proof.
-    iIntros (Hdg) "Hbody Hdep Hid Hin Hvld Hpay".
-    iMod (ic_swap_park cn γfs γi cov logstart k d g v dev inum Hdg
-            with "Hbody Hdep Hid Hin Hvld Hpay") as "(Hbody & Htok & Hown)".
-    (* NOT a bare/named [iFrame] for the ▷ conjunct: [Frame]'s automatic
-       later-insertion has to find an [IntoLaterN] instance for
-       [ic_escrow_body], which means unifying against its five-armed
-       disjunction (the same "GOAL-side search" this whole file's fixes are
-       about) -- measured at 99 s even in this six-hypothesis lemma, i.e. the
-       cost here is the RESOURCE's shape, not the context.  [iNext] on a
-       goal restricted to just [Hbody] is direct term construction instead. *)
-    iModIntro. iSplitL "Hbody"; [iNext; iExact "Hbody" | iFrame].
-  Qed.
-
-  Lemma wp_iput_sconf
+  (* THE WALK IS THE GEN FORM (GR-2a finding 1, same argument as itrunc's):
+     [log_opS] has no auth-monotone shadow, so the set-form contract cannot
+     be derived from the counted one outside a walk.  The counted contract
+     is the seal after this proof. *)
+  Lemma wp_iput_gen
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -1102,16 +1094,16 @@ Section ProofIput.
       (size : Z) (dev : mword 32)
       (used : gset Z)
       (k : nat) (q : Qp) (inum : mword 32)
-      (n : nat)
+      (n : nat) (Sb : gset Z) (crb cru : bool)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
-    : wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
-                          cov logstart bmapstart inodestart nib size dev used
-                          k q inum n pidv dq dqb dqs m K eb C b.
+    : wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
+                       cov logstart bmapstart inodestart nib size dev used
+                       k q inum n Sb crb cru pidv dq dqb dqs m K eb C b.
   Proof.
-    cbv beta delta [wp_iput_sconf_body].
-    intros pcE ip pj ret_tgt HK Hk Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
+    cbv beta delta [wp_iput_gen_body].
+    intros pcE ip pj ret_tgt HK Hk Hcrb Hcru Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
            Hnib Hcovb Hn Hj Hgsj Ha0.
     pose proof HK as HK'. unfold K_iput in HK'.
     unfold iput_units in Hn.
@@ -1384,10 +1376,11 @@ Section ProofIput.
                       = mword_of_int (KernelSyms.iput + 0x20)) by pcw.
       iEval (rewrite Hpp20) in "Hpc".
       iApply (ip_tail (CID := CIDacq) CID j bn g gfs gi cn gtl cov logstart bmapstart
-                inodestart nib size dev used used k q inum Mt ci n n pidv dq dqb dqs
+                inodestart nib size dev used used Sb Sb k q inum Mt ci n n
+                (ip_spend_max crb cru) pidv dq dqb dqs
                 m E2 K eb C sp0 vg4
                 HK Hk ltac:(wp_next_chain) Hsp0eq HE2regs Hwf Hciwf
-                ltac:(lia) ltac:(lia) ltac:(reflexivity)
+                ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
                 with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Hextc Hextm Htok Hhalf Hiauth Hslots
                       Hpool [Hrtok Hrident] Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm
                       Hbslots Hop Hcont").
@@ -1473,14 +1466,7 @@ Section ProofIput.
         { iApply bi.later_intro. iApply ic_close_held. rewrite /ic_held.
           iExists dev, inum, (valid_word true). iFrame. }
         iModIntro. iExists true. iFrame "Hhalf Hrtok Hrd Htd Hvb".
-        (* the bare [iFrame] here used to re-search the WHOLE ambient
-           whole-function context (~150 hypotheses by this point) for a
-           frame of the two-conjunct goal, even though [Hpayl]/[Hlvh] are
-           already the exact, named resources it needs -- see
-           claude-notes/optimization.md, "A named iFrame still pays a
-           GOAL-side search" (and its context-side twin, Rule Zero).
-           [iSplitL]/[iExact] name the match directly and pay nothing. *)
-        iSplitR; [done |]. iExists ga. iSplitL "Hpayl"; [iExact "Hpayl" | iExact "Hlvh"].
+        iSplitR; [done |]. iExists ga. iFrame.
       - (* UNLOADED: read-only, everything goes straight back *)
         iMod ("Hclose" with "[Hidv Hinh Hvld Hpayl Hlvh Hmt Hgida]") as "_".
         { iApply bi.later_intro. iApply ic_close_parked.
@@ -1522,10 +1508,11 @@ Section ProofIput.
         [ intros i Hi; reflexivity | intros i Hi; reflexivity | | ].
       { rewrite /islot2 HMk Hcik. iFrame. }
       iApply (ip_tail (CID := CIDacq) CID j bn g gfs gi cn gtl cov logstart bmapstart
-                inodestart nib size dev used used k q inum Mt ci n n pidv dq dqb dqs
+                inodestart nib size dev used used Sb Sb k q inum Mt ci n n
+                (ip_spend_max crb cru) pidv dq dqb dqs
                 m F1 K eb C sp0 vg4
                 HK Hk ltac:(wp_next_chain) Hsp0eq HF1regs Hwf Hciwf
-                ltac:(lia) ltac:(lia) ltac:(reflexivity)
+                ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
                 with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Hextc Hextm Htok Hhalf Hiauth Hslots
                       Hpool [Hrtok Hrident] Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm
                       Hbslots Hop Hcont").
@@ -1548,7 +1535,7 @@ Section ProofIput.
        free path it dies with the generation [live_slot_regen] retires. *)
     iDestruct "Hpayl" as (dn bm) "[Hlk #Hshot]".
     iDestruct "Hlk" as (data)
-      "(%Hok & %Hdok & Hdat & Hmeta & Haddrs & Hind & Hblks)".
+      "(%Hok & %Hdok & Hdlk & Hdat & Hmeta & Haddrs & Hind & Hblks)".
     pose proof Hok as Hok'.
     destruct Hok' as (Hbmwf & Hcovers & Hdiaddrs & Htyne & Hszcap & Hholes & Hsized).
     iEval (rewrite /inode_meta) in "Hmeta".
@@ -1597,16 +1584,18 @@ Section ProofIput.
       (* THE nlink UNDO TAKES NO BUMP (design §17.6 (3)): nothing is retyped
          on this path, the loaded payload and its shot go straight back into
          PARKED, and the two gnames [ic_open_held] now takes are equal. *)
-      iAssert (ic_payload gfs gi cov logstart k inum ga true)
-        with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks]" as "Hpayl".
-      { rewrite /ic_payload. iExists dn, bm.
+      iAssert (ic_payload_at gfs gi cov logstart k inum ga dn bm)
+        with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks Hdlk]" as "Hpayl".
+      { rewrite /ic_payload_at.
         iSplitR "Hshot"; [| iExact "Hshot"]. iExists data.
         iSplitR; [iPureIntro; exact Hok |].
-        iSplitR; [iPureIntro; exact Hdok |]. rewrite /inode_meta. iFrame. }
+        iSplitR; [iPureIntro; exact Hdok |].
+        iSplitL "Hdlk"; [iExact "Hdlk" |]. rewrite /inode_meta. iFrame. }
       iMod (ic_open_held cn gfs gi cov logstart k (⊤ ∖ ↑icEscN)
-              Mt q true ga ga dev inum ltac:(solve_ndisj) HMk
+              Mt q ga ga dev inum dn bm ltac:(solve_ndisj) HMk
               with "Hinv Hbody Hhalf Hrtok Hlvh Hgid Hpayl")
         as "(Hhalf & Hrtok & Hlvh & Hgid & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".
+      iDestruct (ic_payload_at_pack with "Hpayl") as "Hpayl".
       iDestruct "Hvldx" as (w0) "Hva".
       iDestruct (word4_pointsto_agree with "Hvb Hva") as %<-.
       iDestruct (word4_pointsto_half_join with "Hvb Hva") as "Hvld".
@@ -1625,10 +1614,11 @@ Section ProofIput.
       { rewrite /islot2 HMk Hcik. rewrite /islot_rest_at Ert /IcacheRef.inode_ident.
         iFrame. }
       iApply (ip_tail (CID := CIDacq) CID j bn g gfs gi cn gtl cov logstart bmapstart
-                inodestart nib size dev used used k q inum Mt ci n n pidv dq dqb dqs
+                inodestart nib size dev used used Sb Sb k q inum Mt ci n n
+                (ip_spend_max crb cru) pidv dq dqb dqs
                 m F2 K eb C sp0 vg4
                 HK Hk ltac:(wp_next_chain) Hsp0eq HF2regs Hwf Hciwf
-                ltac:(lia) ltac:(lia) ltac:(reflexivity)
+                ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
                 with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Hextc Hextm Htok Hhalf Hiauth Hslots
                       Hpool [Hrtok Hrd Hrn] Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm
                       Hbslots Hop Hcont").
@@ -1816,14 +1806,15 @@ Section ProofIput.
     (* the payload in hand is still the LOADED one at the OLD generation, and
        it must stay there: restating it at [ga'] would spend the fresh
        pending the +0x74 park needs.  Hence [ic_open_held]'s two gnames. *)
-    iAssert (ic_payload gfs gi cov logstart k inum ga true)
-      with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks]" as "Hpayl".
-    { rewrite /ic_payload. iExists dn, bm.
+    iAssert (ic_payload_at gfs gi cov logstart k inum ga dn bm)
+      with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks Hdlk]" as "Hpayl".
+    { rewrite /ic_payload_at.
       iSplitR "Hshot"; [| iExact "Hshot"]. iExists data.
       iSplitR; [iPureIntro; exact Hok |].
-      iSplitR; [iPureIntro; exact Hdok |]. rewrite /inode_meta. iFrame. }
+      iSplitR; [iPureIntro; exact Hdok |].
+      iSplitL "Hdlk"; [iExact "Hdlk" |]. rewrite /inode_meta. iFrame. }
     iMod (ic_open_held cn gfs gi cov logstart k (⊤ ∖ ↑icEscN)
-            Mt q true ga' ga dev inum ltac:(solve_ndisj) HMk
+            Mt q ga' ga dev inum dn bm ltac:(solve_ndisj) HMk
             with "Hinv Hbody Hhalf Hrtok Hlvh Hgid Hpayl")
       as "(Hhalf & Hrtok & Hlvh & Hgid & Hpayl & Hidv & Hnfull & Hvldx & Hmt
            & Hgida)".
@@ -1855,13 +1846,7 @@ Section ProofIput.
                        dev inum with "Hdepa [Hfrg Hlvr Hlvh Hrd Hrn] Hmt Hgida").
       rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
       iSplitR "Hlvh"; [| iExact "Hlvh"].
-      (* the pure conjunct is [dev = dev /\ inum = inum] -- [DepRef]'s own
-         [dev]/[inum] fields ARE the ones supplied to [ic_close_out] two
-         lines up, so it is [conj eq_refl eq_refl] by construction.  A bare
-         [done] here re-runs [eauto] against the whole-function proof's ~150
-         pure hypotheses looking for that (Rule Zero: "done with a wide hint
-         database"); naming the trivial proof skips the search entirely. *)
-      iSplitR; [iPureIntro; exact (conj eq_refl eq_refl) |].
+      iSplitR; [iPureIntro; done |].
       rewrite /IcacheRef.inode_ref_gen /IcacheRef.inode_ident. iFrame. }
     iModIntro.
     (* the lock's resource re-forms, unchanged, and is released at +0x5c *)
@@ -1987,18 +1972,38 @@ Section ProofIput.
     (* the checked-out bundle, opened for itrunc.  [inode_sized] is
        [inode_ok]'s seventh conjunct (§13.12(b)) -- iput's discharge of the
        one premise SpecItrunc could not otherwise get. *)
-    iEval (rewrite /ic_payload) in "Hpayl".
+    iEval (rewrite /ic_payload_at) in "Hpayl".
     (* the OLD generation's shot is dropped here -- [live_slot_regen] already
        retired [ga], and itrunc + [ip->type = 0] are about to turn this
-       [ic_loaded] into raw cells and a marker (design §17.6 (4)). *)
-    iDestruct "Hpayl" as (dn2 bm2) "[Hlk2 _]".
+       [ic_loaded] into raw cells and a marker (design §17.6 (4)).
+
+       THE RECORD IS THE SAME ONE (design §20.14's (R1)).  [ic_open_held] is
+       record-parametric, so what comes back out of the window is [dn], not
+       a fresh existential -- which is what carries the [ip->nlink == 0] the
+       +0x44 branch test established ([Hnl0] below) all the way down to the
+       region free at +0x74, where (L3) needs it. *)
+    iDestruct "Hpayl" as "[Hlk2 _]".
     iDestruct "Hlk2" as (data2)
-      "(%Hok2 & %Hdok2 & Hdat & Hmeta & Haddrs & Hind & Hblks)".
+      "(%Hok2 & %Hdok2 & Hdlk2 & Hdat & Hmeta & Haddrs & Hind & Hblks)".
+    (* [Hdlk2] -- the link-ledger fragments this directory's own records held
+       (design §20.3/§20.6's itrunc row) -- is SHED here and never re-parked:
+       the free path's exit is [ipool_shape]'s marker arm, which carries no
+       data and therefore no twin.  Dropping is sound (the logic is affine)
+       and it is what itrunc's [dir_links_size_zero] says at the pure level.
+       What it COSTS is liveness, not soundness, and the reachable-trace
+       argument is §20.6's: a file has no records, and a directory reaches
+       [nlink = 0] only through sys_unlink, which refuses a non-empty one --
+       so the only survivors are ["."] (exempt) and [".."] (already grey).
+       S7 owes that as a named obligation at the record zeroing. *)
     pose proof Hok2 as Hok2'.
     destruct Hok2' as (Hbmwf2 & Hcovers2 & Hdiaddrs2 & Htyne2 & Hszcap2 & Hholes2 & Hsized2).
     iDestruct (bslots_op bn 2 1) as "[Hbsp _]".
     iDestruct ("Hbsp" with "Hbslots") as "[Hbs2 Hbs1]".
-    assert (Hun : S (S (n - 2)%nat) = n) by lia.
+    (* CREDITED, so the level itrunc enters at depends on [crb]: paid up
+       front it is handed one unit less, and [it_entry] is what says so. *)
+    pose (uit := (n - (if crb then 1 else 2))%nat).
+    assert (Hun : it_entry crb uit = n)
+      by (unfold it_entry, uit; destruct crb; lia).
     iDestruct (cpu_own_transport CIDrl CIDm2 0%nat eb pj C eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     (* [Hextc]/[Hextm] have sat at [CIDacq] since the wide hop right after
@@ -2010,15 +2015,17 @@ Section ProofIput.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDacq CIDm2 eb pj
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
-    iApply (IT.wp_itrunc_sconf gs j gl gu gd gk pd pav pu bn g gfs gi
+    iApply (IT.wp_itrunc_gen gs j gl gu gd gk pd pav pu bn g gfs gi
               cov logstart bmapstart inodestart nib size dev used
-              (ientry k) inum dn2 dn2 bm2 data2 (n - 2)%nat
+              (ientry k) inum dn dn bm data2 uit Sb crb cru
               pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqb dqs J2 (K - 4)%nat
               eb C eb
-              ltac:(unfold K_itrunc; lia) Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
+              ltac:(unfold K_itrunc; lia) Hcrb Hcru
+              Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
               Hnib Htyne2
               (* §19.6 Part 1: iput hands itrunc ONE record for both slots. *)
-              (InodeRegion.di_type_stable_refl dn2)
+              (InodeRegion.di_type_stable_refl dn)
+              (InodeRegion.di_nlink_stable_refl dn Htyne2)
               Hbmwf2 Hcovb Hsized2 Hdiaddrs2 Hj Hgsj HJ2a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlogc Hidv Hinh Hmeta
                     [Haddrs Hind] Hblks Hbms Hins Hbm Hireg Hdat Hppid Hprocs
@@ -2028,7 +2035,12 @@ Section ProofIput.
     { rewrite Hun. iExact "Hop". }
     iIntros (CIDit Hsit mfi)
       "%Hcsi Hcg Hcnt Hextc Hextm Hpc Hppid Hidv Hinh Hbms Hins Hmeta Hmap Hblks Hbm Hdat Hbslots Hopx".
-    iDestruct "Hopx" as (u') "[%Hu' Hop]".
+    (* [Hib1] IS what makes iput's own flush free: itrunc's tail iupdate
+       logged this inum's block unconditionally, so the [ip->type = 0]
+       iupdate below runs CREDITED and spends nothing.  That is the second
+       [iu_spend] term of [CreateBudget.ip_spend], and without this
+       membership iput could not hit [ip_spend_max]. *)
+    iDestruct "Hopx" as (u' Sb1) "(%Hsub1 & %Hib1 & %Hu' & Hop)".
     assert (Hpc66 : ret_pc (J2 !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x66))
       by (rewrite HJ2ra; pcw).
     iEval (rewrite Hpc66) in "Hpc".
@@ -2049,14 +2061,14 @@ Section ProofIput.
     iEval (rewrite -Hpa66) in "Hmty".
     iApply (wp_sh_s_sconf (mword_of_int (KernelSyms.iput + 0x66)) Rz Rs1
               (mword_of_int 68 : mword 12) mfi (K - 4)%nat
-              (di_type (di_trunc dn2)) eb with "Hcg Hpc Hi66 Hmty").
+              (di_type (di_trunc dn)) eb with "Hcg Hpc Hi66 Hmty [-]").
     iIntros (CIDsh Hssh) "Hcg Hpc Hmty".
     iEval (rewrite Hpa66) in "Hmty".
     assert (Hsv66 : trunc16 (rget mfi Rz) = (mword_of_int 0 : mword 16)).
     { rewrite (rget_ne mfi Rz ltac:(nz)) Hx0. exact ip_trunc16_zero. }
     iEval (rewrite Hsv66) in "Hmty".
     (* the record iupdate will flush: the truncated one, with type zeroed *)
-    iAssert (inode_meta (ientry k) (di_free dn2))
+    iAssert (inode_meta (ientry k) (di_free dn))
       with "[Hmty Hmmaj Hmmin Hmnl Hmsz]" as "Hmeta".
     { rewrite /inode_meta /di_free /di_trunc.
       cbn [di_type di_major di_minor di_nlink di_size]. iFrame. }
@@ -2096,7 +2108,9 @@ Section ProofIput.
     assert (HJ4c : forall c : mword 5, is_cs_idx c = true ->
                      J4 !!! Regidx c = mfi !!! Regidx c).
     { intros c Hcs. rewrite /J4 upd_ne; [| regne]. exact (HJ3c c Hcs). }
-    assert (Hu'1 : S (u' - 1)%nat = u') by lia.
+    assert (Hu'1 : S (u' - 1)%nat = u')
+      by (unfold it_entry, it_spend, it_iu, uit in Hu', Hun;
+          destruct crb, cru; simpl in *; lia).
     iDestruct (bslots_op bn 2 1) as "[Hbsp2 _]".
     iDestruct ("Hbsp2" with "Hbslots") as "[Hbs2 Hbs1]".
     iDestruct (cpu_own_transport CIDit CIDm4 0%nat eb pj C eb
@@ -2108,18 +2122,30 @@ Section ProofIput.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDit CIDm4 eb pj
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
-    iApply (IU.wp_iupdate_sconf gs j gl gu gd gk pd pav pu bn g gfs gi
+    iApply (IU.wp_iupdate_credgen gs j gl gu gd gk pd pav pu bn g gfs gi
               cov logstart inodestart nib dev (ientry k) inum
-              (di_free dn2) (di_trunc dn2) bm_empty (u' - 1)%nat
+              (di_free dn) (di_trunc dn) bm_empty (u' - 1)%nat Sb1 true
               pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqs J4 (K - 4)%nat
               eb C eb
-              ltac:(unfold K_iupdate; lia) Hgeom Hist Hicov Hilog Hnib
+              ltac:(unfold K_iupdate; lia)
+              ltac:(intros _; exact Hib1)
+              Hgeom Hist Hicov Hilog Hnib
               (* §19.6 Part 1, THE LEFT DISJUNCT: this is the free path's
                  [ip->type = 0] flush, the one place in the kernel where a
                  record's type legitimately moves, and it moves to ZERO. *)
-              (InodeRegion.di_type_stable_zero (di_free dn2) (di_trunc dn2)
-                 (di_free_type dn2))
-              (di_free_addrs dn2) ltac:(reflexivity) Hj Hgsj HJ4a0
+              (InodeRegion.di_type_stable_zero (di_free dn) (di_trunc dn)
+                 (di_free_type dn))
+              (* §20.6's iput row, and §20.14's (R1) cashed.  [di_free] and
+                 [di_trunc] both rebuild the record with [di_nlink dn]
+                 verbatim, and [dn] IS the record whose [nlink] halfword
+                 the [c.bnez] at +0x44 found zero -- it survives the
+                 sleeplock window because [ic_open_held] is
+                 record-parametric.  So the region learns [di_nlink = 0] of
+                 the record it is about to type-zero, which is (L3), and
+                 (L1) then collapses to [w = 0]: nothing names this inum. *)
+              (InodeRegion.di_nlink_stable_free (di_free dn) (di_trunc dn)
+                 eq_refl (ip_nlink_zero (di_nlink dn) Hnl0))
+              (di_free_addrs dn) ltac:(reflexivity) Hj Hgsj HJ4a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlogc Hidv Hinh Hmeta Hmap
                     Hins Hireg Hdat Hppid Hprocs Hdevi Hdgeom Hdlock Hbs2 [Hop]").
     { rewrite Hu'1. iExact "Hop". }
@@ -2129,7 +2155,7 @@ Section ProofIput.
        iupdate ran [InodeRegion.ireg_free_au] -- the fragment went back INTO
        the region invariant and what comes out is the MARKER, which is
        exactly what the park below deposits. *)
-    iDestruct (ireg_out_free_inv gi inum (di_free dn2) (di_free_type dn2)
+    iDestruct (ireg_out_free_inv gi inum (di_free dn) (di_free_type dn)
                  with "Hdat") as "Hdat".
     assert (Hpc70 : ret_pc (J4 !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x70))
       by (rewrite HJ4ra; pcw).
@@ -2181,23 +2207,14 @@ Section ProofIput.
       iDestruct "Hmap" as "[Haddrs Hind]".
       iSplitR "Hpend"; [| iExact "Hpend"].
       iSplitR "Hdat".
-      - rewrite /inode_raw. iSplitL "Hmeta"; [by iExists (di_free dn2) |].
+      - rewrite /inode_raw. iSplitL "Hmeta"; [by iExists (di_free dn) |].
         iExists (bm_cells bm_empty). iSplitR; [iPureIntro; reflexivity |].
         iExact "Haddrs".
       - rewrite /ipool_shape. iRight. iExact "Hdat". }
-    (* [ip_swap_park_later] does the [ic_swap_park] call and its later in one
-       small-context step (see its comment above the section start), so
-       [Hbody] already has the ▷ this [Hclose] wants -- the bracket's implied
-       obligation is a literal [iExact], not [iNext].  [iMod (_ with
-       "[Hbody]")] still generates that obligation as a separate goal (this
-       codebase's uniform idiom, see ProofIput.v:1429/1435's plain
-       [ic_swap_park]/[iNext] pair for the shape it replaces), but closing it
-       with [iExact] skips [iNext]'s context-wide later-instance search
-       instead of merely relocating it. *)
-    iMod (ip_swap_park_later cn gfs gi cov logstart k (DepRef q dev inum ga') ga'
+    iMod (ic_swap_park cn gfs gi cov logstart k (DepRef q dev inum ga') ga'
                  false dev inum eq_refl with "Hbody Hdepk Hidv Hinh Hvld Hpayf")
       as "(Hbody & Hictok & Hrefo)".
-    iMod ("Hclose" with "[Hbody]") as "_"; [iExact "Hbody" |].
+    iMod ("Hclose" with "[Hbody]") as "_"; [by iNext |].
     iModIntro.
     (* the descriptor pins the fraction: what comes back is the reference we
        deposited, at [q], not at some existential [q2] (§14.8) -- and its
@@ -2373,16 +2390,80 @@ Section ProofIput.
                      = mword_of_int (KernelSyms.iput + 0x20)) by pcw.
     iEval (rewrite Hpp20d) in "Hpc".
     iDestruct "HRres2" as (Mt2 ci2) "(Hhalf2 & %Hwf2 & %Hciwf2 & Hiauth2 & Hslots2 & Hpool2)".
+    (* the credited flush paid nothing, so the level that survives is [u']
+       itself -- iupdate handed back [S (u' - 1)], which is the same nat *)
+    iEval (rewrite Hu'1) in "Hop".
     iApply (ip_tail (CID := CIDac2) CID j bn g gfs gi cn gtl cov logstart bmapstart
-              inodestart nib size dev used (used ∖ bm_blocks bm2) k q inum Mt2 ci2
-              n (u' - 1)%nat pidv dq dqb dqs m J10 K eb C sp0 (m !!! Regidx Rs2)
+              inodestart nib size dev used (used ∖ bm_blocks bm)
+              Sb (Sb1 ∪ {[IBLOCK inum inodestart]}) k q inum Mt2 ci2
+              n u' (ip_spend_max crb cru) pidv dq dqb dqs m J10 K eb C sp0
+              (m !!! Regidx Rs2)
               HK Hk ltac:(wp_next_chain) Hsp0eq HJ10regs Hwf2 Hciwf2
-              ltac:(unfold iput_units; lia) ltac:(lia) ltac:(apply ip_diff_sub)
+              ltac:(unfold ip_spend_max, it_entry, it_spend, it_iu, uit in *;
+                    destruct crb, cru; simpl in *; lia)
+              ltac:(unfold it_entry, it_spend, it_iu, uit in *;
+                    destruct crb, cru; simpl in *; lia)
+              ltac:(apply ip_diff_sub)
+              ltac:(set_solver)
               with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Hextc Hextm Htok Hhalf2 Hiauth2
                     Hslots2 Hpool2 Href Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm
                     [Hbs2 Hbs1] Hop Hcont").
     iApply (bslots_op bn 2 1). iFrame.
 
+  Qed.
+
+  (* ===================================================================== *)
+  (*  THE COUNTED SEAL, derived at the [log_op] existential's OWN WITNESS.  *)
+  (*  [ip_spend_max false false = 2] and iput's own flush is the third unit *)
+  (*  [iput_units] counts -- uncredited, the gen bound                      *)
+  (*  [n - 2 <= n' <= n] is WEAKER than the landed [n - iput_units <= n'],  *)
+  (*  so the seal's arithmetic goes the easy way and nothing is lost.       *)
+  (* ===================================================================== *)
+  Lemma wp_iput_sconf
+      (gs : list gname) (j : nat) (gl : gname)
+      (gu : uart_names) (gd : disk_names) (gk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (g : log_names) (gfs : fs_names) (gi : gname)
+      (cn : ic_names) (gtl : gname) (gil gisl : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (size : Z) (dev : mword 32)
+      (used : gset Z)
+      (k : nat) (q : Qp) (inum : mword 32)
+      (n : nat)
+      (pidv : mword 32) (dq dqb dqs : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool)
+    : wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
+                          cov logstart bmapstart inodestart nib size dev used
+                          k q inum n pidv dq dqb dqs m K eb C b.
+  Proof.
+    cbv beta delta [wp_iput_sconf_body].
+    intros pcE ip pj ret_tgt HK Hk Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
+           Hnib Hcovb Hn Hj Hgsj Ha0.
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlogc #Hitab #Hinv #Hesc #Hireg #Hslk
+             Href Hbms Hins Hbm Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hbslots Hop Hcont".
+    (* THE WITNESS: the set the counted reservation was hiding *)
+    iDestruct "Hop" as (Sb0) "Hop".
+    iApply (wp_iput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
+              cov logstart bmapstart inodestart nib size dev used
+              k q inum n Sb0 false false pidv dq dqb dqs m K eb C b
+              HK Hk ltac:(discriminate) ltac:(discriminate)
+              Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
+              Hnib Hcovb Hn Hj Hgsj Ha0
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlogc Hitab Hinv Hesc Hireg Hslk
+                    Href Hbms Hins Hbm Hppid Hprocs Hdevi Hdgeom Hdlock Hbslots Hop [Hcont]").
+    iEval (rewrite /wp_next).
+    iIntros (CIDf) "%Hchain".
+    iIntros (mf n' used' Sb') "%Hcs Hcg Hcnt Hextc Hextm Hpc Hppid Hbms Hins
+                               %Husub Hbm Hbslots %Hssub %Hbnd Hop Hislot".
+    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iApply ("Hcont" $! mf n' used' with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hbms Hins
+                     [%] Hbm Hbslots [%] [Hop] Hislot").
+    { exact Hcs. }
+    { exact Husub. }
+    { unfold ip_spend_max in Hbnd. unfold iput_units. simpl in Hbnd. lia. }
+    { iApply (log_opS_op with "Hop"). }
   Qed.
 
 End ProofIput.

@@ -546,6 +546,50 @@ additive, and the consumer discharges the antecedent from the bundle it
 already opened.  Budget a postcondition strengthening only after checking it
 against every arm that returns an input verbatim.
 
+**AN AMORTIZED LOOP'S "CREDIT" IS A FUNCTION OF THE SET THE CONTRACT
+ALREADY THREADS — DO NOT ADD A BOOLEAN FOR IT.**  Where a cost is carried as
+held-back POTENTIAL over a set (`WriteiBudget.bm_pot`: one unit iff the
+bitmap block is already in the op's logged set), the invariant computes the
+credit itself with a `bool_decide (… ∈ SI)`, and its entry lemma holds at
+*any* entry set.  Adding a `cr` parameter on top duplicates that device,
+re-introduces the case split the potential was built to remove, and gives
+callers two ways to say the same thing — a caller that has already logged
+the block simply gets a call that spends one less than its budget allowed.
+Reach for a `cr` boolean only where the callee is STRAIGHT-LINE (iupdate,
+log_write) or where the split is genuinely one-shot (bmap; itrunc's single
+bitmap unit).  **Before adding a credit parameter, check whether the
+callee's own invariant already derives it** — `SpecWritei`'s header and
+`WriteiBudget.wi_inv_enter` are the worked statement of the rule, and a
+whole planned stage was retired by reading them.
+
+**A STRONGER CALLEE BOUND DOES NOT COMPOSE FOR FREE.**  When a callee is
+generalized and its post gets *tighter* (`n - 2 <= n'` where the caller's
+own lemmas are stated at `n - 3`), every caller lemma phrased at the coarse
+constant stops typechecking — the error is a bare "The term … has type …
+while it is expected to have type …" naming two bounds that differ only in a
+literal, which reads like an arithmetic mistake. Weaken ONCE at the seam,
+right after the callee's `iIntros`, and **keep the hypothesis's name**
+(`assert (Hw : <coarse>) by (unfold …; lia). clear H. rename Hw into H.`) so
+nothing downstream moves. Never loosen the callee's contract to match: the
+strength is real and some other caller wants it.
+
+**A GENERALIZED CONTRACT THAT THE OLD ONE MUST BE *DERIVED FROM* HAS TO BE
+CHECKED AT THE OLD ONE'S CORNER BEFORE THE WALK IS WRITTEN.**  When a
+retrofit makes the general form the proven core and the landed form a seal
+(the shape forced whenever the resource has no auth-monotone shadow — an
+exclusive `ghost_map` element hands back a value at an unrelated
+existential, and nothing recovers a relation to the caller's), every clause
+of the general post must *instantiate to the landed clause*, not merely to
+something true.  A bound that is honest but loose at the uncredited corner
+does not weaken the new contract — **it makes the old one unprovable**, and
+the retrofit stops being additive.  The instance: itrunc's credited post was
+designed with `u' <= it_entry crb u`, which at the uncredited corner reads
+`u' <= S (S u)` where the landed contract says `u' <= S u`; the fix was to
+notice that the tail flush ALWAYS runs, so its unit is spent
+unconditionally, and to state `u' + it_iu cru <= it_entry crb u`.  Cheap to
+check (instantiate the clause at the corner and compare syntactically),
+very expensive to discover after the walk.
+
 Corollary on picking the premise: **guard a side condition on the index that makes
 it necessary.**  `src_ok b rs := b = true -> Regidx rs <> Regidx Rtp` is provable
 at every site, whereas the unguarded `rs <> Rtp` is UNPROVABLE at the three places
@@ -614,6 +658,17 @@ The failure mode of each is a green-looking ANSWER, not an error.
   genuinely up to date); the cheap correct SPOT check is `find . -name '*.vo'
   ! -newer <the .vo you just rebuilt>` restricted to the files that Require it.
   Never report a build state from mtimes alone.
+- **A PER-FILE `coqc` loop is a check of the FILE, never of the TREE — and a
+  correct `.vo` COUNT does not contradict that.** A mirror reported the expected
+  `.vo` count and every single-file `make -f CoqMakefile <t>.vo` passed in
+  minutes; the first full `make` then recompiled from the bottom, because a base
+  `git checkout` had refreshed every `.v` mtime and each per-file build had only
+  brought ITS OWN dependency chain up to date. **And `make -q` is not the tell
+  here**: it exits 1 on the phony `pre-all`/`real-all`/`post-all` targets even
+  when nothing needs building. The cheap correct probe is **`make -f
+  CoqMakefile -n` and look for `COQC` lines**; the authoritative one is a full
+  `-k` build. Budget for that full build at the START of a stage rather than
+  discovering it at the gate.
 - **`make … | grep -E … | head -N` truncates the CHECK, not just the output.**
   Once `head` has its N lines it closes the pipe, so any later error is never
   seen — and `echo $?` after the pipeline reports the LAST command's status, not
@@ -698,6 +753,7 @@ and axioms each proven function rests on. `--format text|md|html|json`.
 - In iris proofmode: `rewrite a b c` uses SPACES not commas (`rewrite H1, H2.` fails); `rewrite lem by tac` does NOT parse (ssreflect clash) — use `rewrite lem; [|tac]` / `rewrite (lem args ltac:(tac))` / `assert … by tac`. iris-FREE files can use `rewrite … by`. Rewrite a proofmode HYP with `iEval (rewrite H) in "Hpc"` — bare `rewrite H` rewrites the WHOLE `envs_entails Δ P` (hyps AND goal) and desyncs them.
 - `iDestruct (lem with "…") as %pure` keeps the spatial inputs when the conclusion is pure (relied on by fetch/config lemmas) — a plain `iDestruct` of a pure-conclusion wand CONSUMES its premises. `big_sepM`/`big_sepL` byte extraction needs an EXPLICIT Φ (underscores leave TC evars unresolved).
 - Value/frame binders must be `mword 64` (annotate; `add_vec` demands `mword n` and won't unify a `bv 64` binder even though `mword 64 ≡ bv 64`). Same trap for a value introduced from an EXISTENTIAL resource (`iDestruct "HR" as (t) "Hcell"` on a `∃ t : mword 32, a ↦₄ t` invariant body): `t` arrives as `bv 32`, so `sign_extend' 64 t` fails with "has type bv 32 while it is expected to have type mword ?n" — ascribe `(t : mword 32)` at every use (the ascription leaves no mark, so `change`/`set` terms still match the leaf's output). Decode-fact immediates must be the decoder's POSITIVE RESIDUE (−2016 → 2080; the signed literal fails `bv_is_wf`). Model names need `Defs.` qualification (`Defs.bind`/`Defs.read_reg`/`Defs.assert_exp'`; `rv64d_types.Read_plain`) or they resolve to raw Prompt_monad versions that won't unify with `M = Defs.monad`. A `.` immediately before `(*` parses as `.(` projection — leave a space.
+- **A `nat`-ASCRIBED `Definition` WHOSE BODY IS AN `if`/`match` DOES NOT PUSH THE SCOPE INTO ITS BRANCHES.** Under the tree's usual `Local Open Scope Z_scope`, `Definition c (b : bool) : nat := if b then 0 else 1` fails with *"The term `0` has type `Z` while it is expected to have type `nat`"* — the return ascription constrains the `if` as a whole, but each branch is elaborated in the ambient scope first. Write the literals `0%nat` / `1%nat` per branch, and `(… + …)%nat` on any arithmetic. The same definition written with a bare literal body (`:= 3`) is fine, which is what makes this look arbitrary.
 - `lia` cannot evaluate `2^n`/`bv_modulus`/`bv_half_modulus` — `assert (… = <literal>) as -> by (vm_compute; reflexivity)` first. In heavy-import WP files (WpSmodeGpr+SmodeCore+program_logic) `bitvector.tactics` sets a zify hook that makes `lia` return "Cannot find witness" on trivial bounds — prefer explicit `Z.le_lt_trans`/`Z.add_le_mono_r`/`Nat2Z.is_nonneg`. The hook arrives TRANSITIVELY (dropping `bitvector.tactics` from your own imports does not help), and what trips it is a goal mentioning `bv_unsigned`: so when a proof needs real arithmetic, factor the arithmetic into a lemma over plain `Z` variables and feed it the `bv_unsigned` values (`ProofMemmove.mm_overlap_arith`), where `lia` works normally. Widths appear as `MachineWord.Z_idx n`, so `change (Z.sub 57 12) with 45` (or `change (bv_modulus 27)` won't match `bv_modulus (Z_idx 27)`) before a rewrite; conversion beats rewrite for closed masks; `and_vec` needs `unfold word_binop, with_word', with_word` before `bv_and_unsigned` matches. Use `apply f_equal` (single-arg) not `f_equal` on `add_vec` bv-address equalities (over-splits into the wf proof); same for `mword_of_int a = mword_of_int b` — `f_equal` there leaves a goal `lia` then fails on, so `assert (a = b) by lia; rewrite` it instead. Regidx disequality: `intro He; injection He as He2; vm_compute in He2; congruence`.
 - **`bv_unsigned` silently elaborates at the wrong width over `Arch.pa`.** `pa_add` lands in `Arch.pa`, whose width is an unreduced `Z_idx (if xlen =? 32 then … else …)` match, so an `assert` stated as `bv_unsigned (pa_add p j) = …` gets `bv_unsigned` at THAT width and then fails to `rewrite` in a goal stated at width 64 — the two print identically, so the error reads "Found no subterm matching" on a term you can see in the goal. Ascribe: `bv_unsigned (pa_add p j : mword 64)`.
 - **A stored value that itself contains an insert-lookup derails `rewrite upd_ne`/`upd_eq`.** Several leaves write a value computed from the same map (`c.addi4spn`'s `add_vec (m1 !!! Regidx csp_rs1) …`, an slli's `shift_bits_left (m2 !!! Regidx a2_idx) …`), so the NEW map contains `(<[k := v]> f) !!! j` inside itself; ssreflect then matches that occurrence instead of the peel you meant, and you get an unprovable side goal (`Regidx 2 <> Regidx 2`) or a `discriminate` failure ("No primitive equality found"). Two fixes, both worth preferring to a bare peel: pass the value to the leaf as its explicit `wval` (`wp_slli_s_sconf`/`wp_add_s_sconf` take one) so the stored term is closed, or `iEval (rewrite <the lookup fact>) in "Hcg"` BEFORE naming the map with `set`. Pinning the instance (`rewrite (upd_ne _ (Regidx k) (Regidx j))`) also works.

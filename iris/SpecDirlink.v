@@ -175,6 +175,7 @@ Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import IcacheRef.
 Require Import IrefSlots.
+Require Import SpecBmap.
 Require Import SpecWritei.
 Require Import SpecDirlookup.
 From Kernel Require KernelSyms.
@@ -197,6 +198,45 @@ Definition K_dirlink : nat := 94%nat.
 (* writei's [wi_cost off 16] at a 16-aligned [off] (= 7), which dominates
    iput's 3. *)
 Definition dirlink_units : nat := 7%nat.
+
+(* ===================================================================== *)
+(*  THE SIXTEEN-BYTE SEAM AT dirlink's OWN WINDOW (GR-3 stage 3).         *)
+(*                                                                        *)
+(*  dirlink's single [writei] call is [n = 16] at [off = 16 * k0], the     *)
+(*  append slot -- EXACTLY the shape [SpecWritei.wi16_post] exposes, and   *)
+(*  [CreateBudget.dl_spend] IS [wi16_spend], so create's ledger connects   *)
+(*  with no bridge.  This is that fact re-stated at dirlink's binders.     *)
+(*                                                                        *)
+(*  THE CREDIT BOOLEANS ARE READ AT THE ENTRY SET [Sb], and that is not a  *)
+(*  weakening: dirlookup's [readi] prefix and the free-slot scan LOG        *)
+(*  NOTHING, so the set the writei call actually runs at IS [Sb].          *)
+(*                                                                        *)
+(*  GUARDED BY THE SUCCESS-APPEND ARM.  [found = false] is the append and  *)
+(*  [tot = 16] is the branchless [a0 = 0] of the arm's last clause; the    *)
+(*  SHORT-WRITE arm reports -1 and create does not price it.  The FOUND    *)
+(*  arm carries nothing beyond the counted net-zero clause -- it spends    *)
+(*  only iput, which create prices with [CreateBudget.ip_spend].           *)
+(*                                                                        *)
+(*  [k0] is the append slot, i.e. the body's own [let k0 := dir_slot data  *)
+(*  nrec], taken as a parameter here for the same reason the arms take     *)
+(*  [16 * k0]: it is a function of the ENTRY [data] and [dn], not of the   *)
+(*  post's binders.                                                        *)
+(* ===================================================================== *)
+Definition dl16_post (bmapstart : Z) (dinum : mword 32) (inodestart : Z)
+    (ncount n' k0 tot : nat) (found : bool) (bm bm' : blkmap)
+    (Sb Sb' : gset Z) : Prop :=
+  found = false -> tot = 16%nat ->
+  let off := (16 * k0)%nat in
+  let fbn := (off `div` BSIZE)%nat in
+  let al := bmap_alloced bm bm' fbn in
+  let ind := bmap_ind fbn in
+  let crb := bool_decide (bmapstart ∈ Sb) in
+  let crd := bool_decide (wi_tgt_blk bm' off ∈ Sb) in
+  let cru := bool_decide (IBLOCK dinum inodestart ∈ Sb) in
+  ((ncount - wi16_spend crb crd cru al ind)%nat <= n')%nat
+  /\ wi_tgt_blk bm' off ∈ Sb'
+  /\ IBLOCK dinum inodestart ∈ Sb'
+  /\ (al = true -> bmapstart ∈ Sb').
 
 (* iput's two block-membership premises, for EVERY inum the inode region
    covers rather than for the one child dirlookup happens to return.  See
@@ -281,6 +321,12 @@ Definition wp_dirlink_sconf_body
      holds the two as ONE record ([IcacheEscrow.ic_loaded]'s single
      [dinode_at]) and discharges by [InodeRegion.di_type_stable_refl]. *)
   di_type_stable dn dn0 ->
+  (* NLINK STABILITY (fs-icache.md §20.6, fs-sysfile S5f): the link
+     ledger's twin of the premise above, travelling for the same reason --
+     the record the REGION holds at the iupdate below is the stale [dn0].
+     [InodeRegion.di_nlink_stable_refl] discharges it at any caller that
+     holds the two as ONE record with a nonzero type. *)
+  di_nlink_stable dn dn0 ->
   log_geom_ok cov logstart ->
   blkmap_wf cov logstart bm ->
   blk_holes_zero bm data ->
@@ -449,6 +495,243 @@ Definition wp_dirlink_sconf_body
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(*  ...AND THE CONTRACT COMES IN TWO FORMS (fs-icache.md section 18       *)
+(*  clause 1, writei's pattern verbatim).  [wp_dirlink_sconf] above is    *)
+(*  the COUNTED form; this is the SET form, and the counted one is        *)
+(*  DERIVED from it -- [log_op] IS [∃ Sb, log_opS] -- at whatever set the *)
+(*  existential was hiding, so no existing caller moves.                  *)
+(* ===================================================================== *)
+Definition wp_dirlink_gen_body
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
+      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+
+    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+    (pd pav pu : mword 64)
+    (bn : bio_names)
+    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (cn : ic_names) (gtl : gname)                     (* the icache + itable *)
+    (γa : gname) (γf : gname) (γpr : gname)
+    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+    (bmapstart : Z) (size : Z) (dev : mword 32)
+    (used : gset Z)
+    (ip : mword 64) (dinum : mword 32)                (* the DIRECTORY       *)
+    (bm : blkmap) (data : nat -> list (bv 8))
+    (dn dn0 : dinode)
+    (fn : nat -> bv 8)                                (* the caller's name   *)
+    (inum : mword 16)                                 (* the LINKED inum     *)
+    (ncount : nat) (Sb : gset Z)
+    (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
+    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (b : bool) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.dirlink in
+  let pj := proc_addr j in
+  let nb := m !!! Regidx (mword_of_int 11 : mword 5) in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  let nrec := dir_nrec (bv_unsigned (di_size dn)) in
+  let s := bname 14 fn in
+  let k0 := dir_slot data nrec in
+  (K_dirlink <= K)%nat ->
+  (* ---- dirlookup's premises (NO granularity -- see the header) ---- *)
+  di_type dn = T_DIR ->
+  bm_covers bm (bv_unsigned (di_size dn)) ->
+  bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+  dir_inums_ok data nrec nib ->
+  (* THE APPEND FITS.  This is what kills writei's own -1 arm: the write is
+     at [16*k0 <= size] and ends at [16*k0 + 16 <= size + 16]. *)
+  bv_unsigned (di_size dn) + 16 <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+  (* ---- writei's premises ---- *)
+  (* TYPE STABILITY (fs-icache.md §19.6 Part 1, fs-sysfile S5d): writei's
+     new premise, travelling.  dirlink's own [Htype] fixes [di_type dn] at
+     T_DIR but says nothing about the region's stale [dn0]; the caller
+     holds the two as ONE record ([IcacheEscrow.ic_loaded]'s single
+     [dinode_at]) and discharges by [InodeRegion.di_type_stable_refl]. *)
+  di_type_stable dn dn0 ->
+  (* NLINK STABILITY (fs-icache.md §20.6, fs-sysfile S5f): the link
+     ledger's twin of the premise above, travelling for the same reason --
+     the record the REGION holds at the iupdate below is the stale [dn0].
+     [InodeRegion.di_nlink_stable_refl] discharges it at any caller that
+     holds the two as ONE record with a nonzero type. *)
+  di_nlink_stable dn dn0 ->
+  log_geom_ok cov logstart ->
+  blkmap_wf cov logstart bm ->
+  blk_holes_zero bm data ->
+  di_addrs dn = bm_cells bm ->
+  bv_unsigned (di_size dn) < 2 ^ 31 ->
+  0 <= inodestart ->
+  IBLOCK dinum inodestart ∈ cov ->
+  ~ (IBLOCK dinum inodestart ∈ log_region_set logstart) ->
+  bv_unsigned dinum < 16 * Z.of_nat nib ->
+  (* ---- THE LINKED CHILD'S OWN RANGE (unused here, owed to the writer) ----
+     the premise above is the DIRECTORY's inum; this one is the inum being
+     linked, and it is what lets a caller re-park [DirView.dir_ok] over the
+     record dirlink stores.  See the header. *)
+  bv_unsigned inum < 16 * Z.of_nat nib ->
+  bitmap_geom_ok cov logstart bmapstart size ->
+  printk_gen_contract γpr γu γd ->
+  (* ---- iput's premises (itrunc's geometry) ---- *)
+  0 < size <= BPB ->
+  0 <= bmapstart ->
+  bmapstart ∈ cov ->
+  ~ (bmapstart ∈ log_region_set logstart) ->
+  cov_below cov size ->
+  ireg_blocks_ok inodestart nib cov logstart ->
+  (* ENOUGH BUDGET for either arm -- see the header *)
+  (dirlink_units <= ncount)%nat ->
+  (j < NPROC)%nat ->
+  γs !! j = Some γl ->
+  (* a0 = dp *)
+  m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  (* a2 = inum, as a ZERO-extended halfword: the [sh s6,-80(s0)] at +0x7c
+     stores exactly the low sixteen bits, and every caller's inum is a real
+     inode number. *)
+  m !!! Regidx (mword_of_int 12 : mword 5)
+    = (zero_extend' 64 (inum : mword 16) : mword 64) ->
+  (* PARKING PREMISE *)
+  eb = true ->
+  sie_cap_gpr m K b pj -∗
+  cpu_own 0 eb pj C b -∗
+  kernel_text -∗ pc_is pcE -∗
+  panic_wp_any -∗
+  kernel_data -∗
+  printk_env γpr γu γd -∗
+  bio_ctx bn (fs_view γfs γd dev cov) -∗
+  log_ctx γ bn γfs cov logstart dev -∗
+  kalloc_env γa None -∗
+  (* ---- THE LOCKED DIRECTORY ---- *)
+  i_dev ip ↦₄{dqd} dev -∗
+  i_inum ip ↦₄{dqf} dinum -∗
+  inode_meta ip dn -∗
+  inode_map γfs ip bm -∗
+  inode_blocks γfs bm data -∗
+  (* ---- THE CALLER'S 14-BYTE NAME BUFFER (namecmp's f, strncpy's src) ---- *)
+  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
+  (* ---- the superblock cells and the bitmap ---- *)
+  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  bitmap_res γfs bmapstart cov logstart size used -∗
+  (* ---- the inode region and the directory's own (stale) record ---- *)
+  ireg_inv γi γfs inodestart nib -∗
+  dinode_at γi dinum dn0 -∗
+  (* ---- the caller's own pid cell ---- *)
+  p_pid pj ↦₄{dq} pidv -∗
+  (* ---- the running-thread bundle and the disk fabric ---- *)
+  procs_inv γs -∗
+  dev_inv γu γd -∗
+  disk_geom γd pd pav pu -∗
+  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  bslots bn 3 -∗
+  (* ---- THE ICACHE ---- *)
+  is_itable2 gtl cn γfs γi cov logstart nib dev -∗
+  itable_inv -∗
+  ic_escrows cn γfs γi cov logstart -∗
+  ic_sleeplocks cn -∗
+  iref_slot -∗
+  (* ---- THIS OPERATION'S RESERVATION ---- *)
+  log_opS γ ncount Sb -∗
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP,
+     and a park moves the hart with interrupts off, so the crossing has
+     nothing to do with SIE.  Spelled [b] the two coincide at the only
+     instance the [eb = true] premise admits, which is why this went
+     unnoticed; once [eb = false] is reachable the [b] form would promise
+     the caller it comes back on the hart it called from. *)
+  wp_next true pj (fun (CID : CpuId) =>
+  ∀ (mf : regfile) (found : bool)
+    (bm' : blkmap) (data' : nat -> list (bv 8)) (dn' dn0' : dinode)
+    (n' : nat) (used' : gset Z) (Sb' : gset Z)
+    (tot : nat),
+      ⌜callee_saved m mf⌝ -∗
+      sie_cap_gpr mf K b pj -∗
+      cpu_own 0 eb pj C b -∗
+      pc_is ret_tgt -∗
+      (* ---- everything comes back, at the possibly-updated indices ---- *)
+      i_dev ip ↦₄{dqd} dev -∗
+      i_inum ip ↦₄{dqf} dinum -∗
+      inode_meta ip dn' -∗
+      inode_map γfs ip bm' -∗
+      inode_blocks γfs bm' data' -∗
+      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      bitmap_res γfs bmapstart cov logstart size used' -∗
+      dinode_at γi dinum dn0' -∗
+      p_pid pj ↦₄{dq} pidv -∗
+      bslots bn 3 -∗
+      (* NET ZERO on the ledger: dirlookup's iget spends one and iput
+         returns one on the found arm; nothing is spent on the other. *)
+      iref_slot -∗
+      (* at most [dirlink_units] gone, and none gained *)
+      ⌜((ncount - dirlink_units)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
+      (* THE SET ONLY GROWS.  No ceiling -- SpecWritei's header's reason
+         applies verbatim: no obligation anywhere consumes one. *)
+      ⌜Sb ⊆ Sb'⌝ -∗
+      (* ...and on the success-append arm, the credit-aware spend and the
+         membership trio create's next call needs.  ADDITIVE -- the counted
+         [dirlink_units] clause above is untouched. *)
+      ⌜dl16_post bmapstart dinum inodestart ncount n' k0 tot found
+                 bm bm' Sb Sb'⌝ -∗
+      log_opS γ n' Sb' -∗
+      (* ---- THE [inode_ok] CONJUNCT A RE-PARKER NEEDS, AS A PRESERVATION
+         (fs-sysfile S5a finding 2) ----
+         [InodeLock.inode_ok] has seven conjuncts and the arms below
+         re-establish five of them ([blkmap_wf], [bm_covers],
+         [di_addrs = bm_cells], [blk_holes_zero], and [di_type <> 0] through
+         [dn' = wi_dinode dn ...]).  Of the remaining two the SIZE CAP is
+         RECOVERABLE by the caller -- the append lands at slot
+         [k0 <= dir_nrec size] and writes at most sixteen bytes, so the new
+         size is at most [size + 16], which is this contract's own "the
+         append fits" premise, and [ProofCreateParts.cr_size_cap] is the
+         recovery.  [InodeInv.inode_sized] is NOT: the range clause above is
+         about [file_byte], a per-BYTE view, and pins no block's LENGTH.
+
+         So it is stated here exactly as [SpecWritei] states it (S3i), as a
+         PRESERVATION rather than a fact -- writei has handed it over since
+         S3i and the found arm has [data' = data], so it is free inside
+         [ProofDirlink].  It is a postcondition STRENGTHENING, so no existing
+         caller moves; without it create cannot re-park either inode after
+         any dirlink, which is every arm from +0xb4 on. *)
+      ⌜inode_sized data -> inode_sized data'⌝ -∗
+      (* ---- THE TWO ARMS ---- *)
+      ⌜if found
+        then (* the name was already there: iput spent the child *)
+          dir_first data nrec s <> None
+          /\ mf !!! Regidx (mword_of_int 10 : mword 5)
+             = (mword_of_int (-1) : mword 64)
+          /\ bm' = bm /\ data' = data /\ dn' = dn /\ dn0' = dn0
+          /\ used' ⊆ used
+          /\ tot = 0%nat
+        else (* the append, through writei at [16*k0] *)
+          dir_first data nrec s = None
+          /\ used ⊆ used'
+          /\ blkmap_wf cov logstart bm'
+          /\ blk_holes_zero bm' data'
+          /\ di_addrs dn' = bm_cells bm'
+          /\ bv_unsigned (di_size dn') < 2 ^ 31
+          /\ bm_covers bm' (bv_unsigned (di_size dn'))
+          /\ dn' = wi_dinode dn bm' (16 * k0)%nat tot
+          /\ dn0' = dn'
+          /\ (tot <= 16)%nat
+          (* THE RANGE CLAUSE: the record's bytes in the window and NOTHING
+             ELSE.  writei's disturbed region is empty on the kernel arm --
+             see the header, and fs-icache.md §15.1(i). *)
+          /\ (forall x : nat,
+                file_byte data' x
+                = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + tot)%nat)
+                  then dirent_bytes (de_of_name inum s) !!! (x - 16 * k0)%nat
+                  else file_byte data x)
+          (* the branchless return: 0 exactly when all sixteen went in *)
+          /\ ((mf !!! Regidx (mword_of_int 10 : mword 5)
+                 = (mword_of_int 0 : mword 64) /\ tot = 16%nat)
+              \/ (mf !!! Regidx (mword_of_int 10 : mword 5)
+                    = (mword_of_int (-1) : mword 64) /\ (tot < 16)%nat))⌝ -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type DIRLINK.
   Parameter wp_dirlink_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
@@ -479,4 +762,37 @@ Module Type DIRLINK.
                             size dev used ip dinum bm data dn dn0 fn inum
                             ncount pidv dq dqd dqn dqs dqb dqbs dqf
                             m K eb C b.
+
+  (* the SET-FORM contract; [wp_dirlink_sconf] above is its instance with
+     the set forgotten, kept as its own parameter so that every existing
+     caller is unchanged (wp_writei_gen / wp_bmap_gen's pattern) *)
+  Parameter wp_dirlink_gen :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
+             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId}
+      (γs : list gname) (j : nat) (γl : gname)
+      (γu : uart_names) (γd : disk_names) (γk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (cn : ic_names) (gtl : gname)
+      (γa : gname) (γf : gname) (γpr : gname)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (bmapstart : Z) (size : Z) (dev : mword 32)
+      (used : gset Z)
+      (ip : mword 64) (dinum : mword 32)
+      (bm : blkmap) (data : nat -> list (bv 8))
+      (dn dn0 : dinode)
+      (fn : nat -> bv 8)
+      (inum : mword 16)
+      (ncount : nat) (Sb : gset Z)
+      (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool),
+      wp_dirlink_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
+                          γa γf γpr cov logstart inodestart nib bmapstart
+                          size dev used ip dinum bm data dn dn0 fn inum
+                          ncount Sb pidv dq dqd dqn dqs dqb dqbs dqf
+                          m K eb C b.
 End DIRLINK.

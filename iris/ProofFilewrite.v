@@ -6,7 +6,7 @@
    and [LinkFilewrite.v] instantiates it.  Instruction by instruction:
 
      * +0x00/+0x04, the pre-prologue [f->writable] test, and its -1 return
-       at +0x122 with sp and the whole frame untouched;
+       at +0x10c with sp and the whole frame untouched;
      * the prologue ([fw_pro]) and the three-way type dispatch at
        +0x16..+0x2c;
      * FD_PIPE in full: [c.ld a0,16(a0)], the [jal pipewrite], the [c.j] to
@@ -240,7 +240,7 @@
 
      +0x00 [wp_lbu_s_sconf]        a5 := zext (fc_writable Cf)
      +0x04 [wp_beqz_x0_{taken,fall}_s_sconf]   BTYPE(286, zreg, a5, BEQ)
-             taken -> +0x122; the FALL is [fw_wbool_of_fall]
+             taken -> +0x10c; the FALL is [fw_wbool_of_fall]
      +0x08..+0x14  [fw_pro]
      +0x16/+0x18/+0x1a  [wp_cmv_s_sconf]  s2:=a0, s6:=a1, s5:=a2
      +0x1c [wp_clw_s_sconf]        a5 := sext (fc_type Cf)   (a_ftype k)
@@ -343,6 +343,7 @@ Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import DirView.
+Require Import DirLinks.
 Require Import LogInv.
 Require Import BioInv.
 Require Import FdSlots FileInvDefs.
@@ -624,7 +625,7 @@ Lemma fw_ret_pc_cons :
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* the record-eta step: the two paths that return WITHOUT calling anything
-   -- the pre-prologue [f->writable == 0] exit at +0x122 and the
+   -- the pre-prologue [f->writable == 0] exit at +0x10c and the
    out-of-range / null-slot device exits -- leave the page table alone. *)
 Lemma fw_upd_upt_id (V : pprivate) : upd_upt V (pv_upt V) = V.
 Proof. destruct V; reflexivity. Qed.
@@ -661,7 +662,7 @@ Proof.
   rewrite fw_zext8_zero in Hne. discriminate.
 Qed.
 
-(* the early return needs no converse: the [f->writable == 0] arm at +0x122
+(* the early return needs no converse: the [f->writable == 0] arm at +0x10c
    returns -1 before the type is ever read, so it never looks at
    [fc_wbool].  Only the FALL direction is load-bearing. *)
 
@@ -1876,7 +1877,7 @@ Section ProofFilewrite.
            content (SpecIlock v2) and it IS [FileOff.off_mark]. ---- *)
     rewrite /ic_loaded.
     iDestruct "Hlk" as (datal)
-      "(%Hiok & %Hdok & Hdnat & Hmeta & Haddrs & Hindres & Hblocks)".
+      "(%Hiok & %Hdok & Hdlnk & Hdnat & Hmeta & Haddrs & Hindres & Hblocks)".
     destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
     iAssert (inode_map (fwn_fs fn) (ientry ik) bml)
       with "[Haddrs Hindres]" as "Hmap".
@@ -2052,6 +2053,8 @@ Section ProofFilewrite.
                  the in-memory and the region slot ([dnl dnl]), so writei's
                  type-stability premise is reflexivity. *)
               (InodeRegion.di_type_stable_refl dnl)
+              (* §20's (L3), vacuous here: [inode_ok]'s own nonzero type. *)
+              (InodeRegion.di_nlink_stable_refl dnl Hdty)
               Hbmwf Hholes Hbmcov
               (SpecFilewrite.fw_chunk_joint (Z.to_nat (bv_unsigned v))
                  (Z.to_nat c) Hoffb Hcb)
@@ -2148,6 +2151,13 @@ Section ProofFilewrite.
         + apply fw_wi_type.
         + reflexivity. }
     destruct Hjoin as (rz & Hrza0 & Hrzr & Hrzadv & Hiok2 & Hdok2 & Htyq & Hdn0q).
+    (* the RESOURCE twin of [Hdok2] (design §20.3).  filewrite cannot reach a
+       T_DIR inode -- sys_open refuses writable directories, which is what
+       [Hnodir] records -- so the twin is [emp] at the record writei
+       returned, exactly as [fw_dir_ok_wi] makes [dir_ok] vacuous there.  The
+       incoming [Hdlnk] was [emp] for the same reason and is dropped. *)
+    assert (Hnodir' : bv_unsigned (di_type dn') <> T_DIR_z)
+      by (rewrite Htyq; exact Hnodir).
     (* ---- +0xa4 c.mv s1,a0 : park the count ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (FW + 0xa4)) Rs1 Ra0 mwi (K - 12)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2198,6 +2208,7 @@ Section ProofFilewrite.
     { rewrite /ic_loaded /inode_map. iExists data'.
       iSplitR; [iPureIntro; exact Hiok2 |].
       iSplitR; [iPureIntro; exact Hdok2 |].
+      iSplitR; [iApply (dir_links_not_dir (bv_unsigned inum) dn' data' Hnodir') |].
       iDestruct "Hmap" as "[Haddrs Hindres]".
       rewrite Hdn0q. iFrame "Hdnat Hmeta Haddrs Hindres Hblocks". }
     (* ---- +0xb4 ld a0,24(s2) ; +0xb8 jal ra,iunlock ---- *)
@@ -2666,7 +2677,7 @@ Section ProofFilewrite.
     iPoseProof (fwri_004 with "Htext") as "Hi04".
     (* =================================================================
        +0x00 lbu a5,9(a0) -- f->writable, BEFORE THE PROLOGUE (S3a's
-       decode note 1: the -1 return at +0x122 runs with sp untouched).
+       decode note 1: the -1 return at +0x10c runs with sp untouched).
        ================================================================= *)
     assert (Hpwr : add_vec (rget m Ra0) (sign_extend' 64 (mword_of_int 9 : mword 12))
                    = a_fwritable k).
@@ -2698,7 +2709,7 @@ Section ProofFilewrite.
     destruct (eq_vec (zero_extend' 64 (fc_writable Cf : mword 8) : mword 64)
                      (zero_reg : mword 64)) eqn:Hwrz.
     - (* ===============================================================
-         NOT WRITABLE: [beq a5,x0] is taken to +0x122, and the two
+         NOT WRITABLE: [beq a5,x0] is taken to +0x10c, and the two
          instructions there are the whole exit -- [c.li a0,-1; c.jr ra],
          with sp, the frame and every callee-saved register untouched.
          =============================================================== *)
@@ -2716,7 +2727,7 @@ Section ProofFilewrite.
                 with "Hcg Hpc Hi04").
       iApply bi.later_intro. iIntros (CID2 Hs2) "Hcg Hpc".
       iEval (rewrite Htgt122) in "Hpc".
-      (* ---- +0x122 c.li a0,-1 ---- *)
+      (* ---- +0x10c c.li a0,-1 ---- *)
       iApply (wp_cli_s_sconf (mword_of_int (FW + 0x122)) Ra0
                 (mword_of_int 63 : mword 6) (mword_of_int (-1) : mword 64)
                 R1 K b

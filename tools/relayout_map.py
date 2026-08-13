@@ -56,10 +56,16 @@ Without --write, `apply` prints a unified diff and changes nothing.
 """
 import re, subprocess, sys, difflib, os
 
-# DERIVED FROM THIS SCRIPT'S OWN LOCATION, not hard-coded: the tool is checked
-# in and every agent runs it from a different worktree, so an absolute path
-# here fails with a FileNotFoundError naming somebody else's checkout.
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# The repo root and the git revision the "old" (pre-relayout) Code files are
+# read from.  ROOT is derived from this script's own location (the tool is
+# checked in and every agent runs it from a different worktree, so an absolute
+# path here fails naming somebody else's checkout); both are overridable,
+# because a relayout is not always measured against HEAD: during a MERGE the
+# pre-bump generation lives in the index (RELAYOUT_OLD_REV=''), and a two-step
+# reconciliation needs the merge base.
+ROOT = os.environ.get('RELAYOUT_ROOT',
+                      os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+OLD_REV = os.environ.get('RELAYOUT_OLD_REV', 'HEAD')
 IRIS = os.path.join(ROOT, 'iris')
 
 # "Lemma bai_02c : kernel_text -* instr (mword_of_int (KernelSyms.balloc + 0x2c)
@@ -120,7 +126,7 @@ def parse_code(text):
 
 def read_old(path):
     rel = os.path.relpath(os.path.join(IRIS, path), ROOT)
-    return subprocess.run(['git', '-C', ROOT, 'show', f'HEAD:{rel}'],
+    return subprocess.run(['git', '-C', ROOT, 'show', f'{OLD_REV}:{rel}'],
                           capture_output=True, text=True).stdout
 
 

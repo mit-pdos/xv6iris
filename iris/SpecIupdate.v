@@ -117,7 +117,7 @@ Definition K_iupdate : nat := 44%nat.
 
 Definition wp_iupdate_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
-      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -162,6 +162,17 @@ Definition wp_iupdate_sconf_body
      disjunct (its [ip->type = 0] store), writei/itrunc/create the
      equation, since none of them ever moves the type field. *)
   InodeRegion.di_type_stable dn dn0 ->
+  (* NLINK STABILITY (fs-icache.md §20.6, fs-sysfile S5f).  The link
+     ledger's (L1) will cap the live directory records naming this inum by
+     that inum's [nlink], so the region's flush must refuse to LOWER it:
+     sys_unlink's decrement is the one writer that does, and it goes
+     through [InodeRegion.ireg_write_unlink], which pays for the drop by
+     consuming a fragment.  Travels exactly as [di_type_stable] does, and
+     for the same reason: the record the REGION holds at iupdate's seam is
+     the STALE [dn0].  Every caller discharges it with
+     [InodeRegion.di_nlink_stable_refl] -- no writer at or below iupdate
+     moves [nlink] at all. *)
+  InodeRegion.di_nlink_stable dn dn0 ->
   (* ...and the record whose scalars [inode_meta] owns names exactly the
      thirteen addrs cells [inode_map] owns.  THE tie between the two
      resources; see the header. *)
@@ -268,7 +279,7 @@ Definition wp_iupdate_sconf_body
 (* ===================================================================== *)
 Definition wp_iupdate_gen_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
-      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -313,6 +324,17 @@ Definition wp_iupdate_gen_body
      disjunct (its [ip->type = 0] store), writei/itrunc/create the
      equation, since none of them ever moves the type field. *)
   InodeRegion.di_type_stable dn dn0 ->
+  (* NLINK STABILITY (fs-icache.md §20.6, fs-sysfile S5f).  The link
+     ledger's (L1) will cap the live directory records naming this inum by
+     that inum's [nlink], so the region's flush must refuse to LOWER it:
+     sys_unlink's decrement is the one writer that does, and it goes
+     through [InodeRegion.ireg_write_unlink], which pays for the drop by
+     consuming a fragment.  Travels exactly as [di_type_stable] does, and
+     for the same reason: the record the REGION holds at iupdate's seam is
+     the STALE [dn0].  Every caller discharges it with
+     [InodeRegion.di_nlink_stable_refl] -- no writer at or below iupdate
+     moves [nlink] at all. *)
+  InodeRegion.di_nlink_stable dn dn0 ->
   (* ...and the record whose scalars [inode_meta] owns names exactly the
      thirteen addrs cells [inode_map] owns.  THE tie between the two
      resources; see the header. *)
@@ -413,7 +435,7 @@ Definition wp_iupdate_gen_body
 (* ===================================================================== *)
 Definition wp_iupdate_cred_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
-      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -464,6 +486,17 @@ Definition wp_iupdate_cred_body
      disjunct (its [ip->type = 0] store), writei/itrunc/create the
      equation, since none of them ever moves the type field. *)
   InodeRegion.di_type_stable dn dn0 ->
+  (* NLINK STABILITY (fs-icache.md §20.6, fs-sysfile S5f).  The link
+     ledger's (L1) will cap the live directory records naming this inum by
+     that inum's [nlink], so the region's flush must refuse to LOWER it:
+     sys_unlink's decrement is the one writer that does, and it goes
+     through [InodeRegion.ireg_write_unlink], which pays for the drop by
+     consuming a fragment.  Travels exactly as [di_type_stable] does, and
+     for the same reason: the record the REGION holds at iupdate's seam is
+     the STALE [dn0].  Every caller discharges it with
+     [InodeRegion.di_nlink_stable_refl] -- no writer at or below iupdate
+     moves [nlink] at all. *)
+  InodeRegion.di_nlink_stable dn dn0 ->
   (* ...and the record whose scalars [inode_meta] owns names exactly the
      thirteen addrs cells [inode_map] owns.  THE tie between the two
      resources; see the header. *)
@@ -550,10 +583,108 @@ Definition wp_iupdate_cred_body
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(*  THE CREDITED SET-FORM CONTRACT, eb-GENERIC (fs-sysfile GR-2b)         *)
+(*                                                                        *)
+(*  [wp_iupdate_cred] above pins [eb := true], which is all create needs   *)
+(*  -- a syscall runs with an enabled base.  itrunc does NOT: its own      *)
+(*  contract is eb-generic (it is a pure pass-through to its sleeping      *)
+(*  callees, threading [trap_csrs_ext eb] / [cpu_claim_ext eb] straight    *)
+(*  through), and its tail flush is the one call that has to carry the     *)
+(*  [cru] credit.  So the credited walk has to be exposed at the SAME      *)
+(*  altitude the counted one already is.                                   *)
+(*                                                                        *)
+(*  This is verbatim [wp_iupdate_cred_body] with the [eb = true] premise   *)
+(*  dropped and the two complements threaded, i.e. it is exactly the       *)
+(*  generic core the proof already had.  Everything else that exists is    *)
+(*  an instance of it: [wp_iupdate_cred] is this at [eb := true],          *)
+(*  [wp_iupdate_gen] is this at [cru := false], and [wp_iupdate_sconf]     *)
+(*  is [wp_iupdate_gen] at the [log_op] existential's own witness.  Added  *)
+(*  as a FOURTH parameter rather than by widening one of the three, so no  *)
+(*  existing caller's arity moves ([ProofWritei] applies                   *)
+(*  [wp_iupdate_gen] positionally).                                        *)
+(* ===================================================================== *)
+Definition wp_iupdate_credgen_body
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
+    `{GEN : GenId} `{CID : CpuId}
+
+    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+    (pd pav pu : mword 64)
+    (bn : bio_names)
+    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+    (ip : mword 64) (inum : mword 32)
+    (dn dn0 : dinode) (bm : blkmap)
+    (u : nat) (Sb : gset Z) (cru : bool)
+    (pidv : mword 32) (dq dqd dqn dqs : dfrac)
+    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (b : bool) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
+  let pj := proc_addr j in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (K_iupdate <= K)%nat ->
+  (* the absorption credit's honesty premise, exactly as [wp_iupdate_cred] *)
+  (cru = true -> IBLOCK inum inodestart ∈ Sb) ->
+  log_geom_ok cov logstart ->
+  0 <= inodestart ->
+  IBLOCK inum inodestart ∈ cov ->
+  ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
+  bv_unsigned inum < 16 * Z.of_nat nib ->
+  InodeRegion.di_type_stable dn dn0 ->
+  InodeRegion.di_nlink_stable dn dn0 ->
+  di_addrs dn = bm_cells bm ->
+  length (bm_dir bm) = NDIRECT ->
+  (j < NPROC)%nat ->
+  γs !! j = Some γl ->
+  m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  sie_cap_gpr m K b pj -∗
+  cpu_own 0 eb pj C b -∗
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
+  kernel_text -∗ pc_is pcE -∗
+  panic_wp_any -∗
+  bio_ctx bn (fs_view γfs γd dev cov) -∗
+  log_ctx γ bn γfs cov logstart dev -∗
+  i_dev ip ↦₄{dqd} dev -∗
+  i_inum ip ↦₄{dqn} inum -∗
+  inode_meta ip dn -∗
+  inode_map γfs ip bm -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  ireg_inv γi γfs inodestart nib -∗
+  dinode_at γi inum dn0 -∗
+  p_pid pj ↦₄{dq} pidv -∗
+  procs_inv γs -∗
+  dev_inv γu γd -∗
+  disk_geom γd pd pav pu -∗
+  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  bslots bn 2 -∗
+  log_opS γ (S u) Sb -∗
+  wp_next true pj (fun (CID : CpuId) =>
+  ∀ mf : regfile,
+      ⌜callee_saved m mf⌝ -∗
+      sie_cap_gpr mf K b pj -∗
+      cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
+      pc_is ret_tgt -∗
+      p_pid pj ↦₄{dq} pidv -∗
+      i_dev ip ↦₄{dqd} dev -∗
+      i_inum ip ↦₄{dqn} inum -∗
+      inode_meta ip dn -∗
+      inode_map γfs ip bm -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      ireg_out γi inum dn -∗
+      bslots bn 2 -∗
+      log_opS γ (if cru then S u else u) (Sb ∪ {[IBLOCK inum inodestart]}) -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type IUPDATE.
   Parameter wp_iupdate_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
-             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
       `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
@@ -577,7 +708,7 @@ Module Type IUPDATE.
      is unchanged (wp_bmap_gen / wp_balloc_gen's pattern) *)
   Parameter wp_iupdate_gen :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
-             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
       `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
@@ -600,7 +731,7 @@ Module Type IUPDATE.
      [wp_iupdate_gen] is its [cru := false] instance. *)
   Parameter wp_iupdate_cred :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
-             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
       `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
@@ -618,4 +749,29 @@ Module Type IUPDATE.
       wp_iupdate_cred_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
                            pidv dq dqd dqn dqs m K eb C b.
+  (* the credited set-form contract at itrunc's altitude: eb-generic, so a
+     pure pass-through caller can hand its own complements through.  Both
+     [wp_iupdate_gen] ([cru := false]) and [wp_iupdate_cred] ([eb := true])
+     are instances; it is stated separately so neither of their arities
+     moves. *)
+  Parameter wp_iupdate_credgen :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
+      `{GEN : GenId} `{CID : CpuId}
+
+      (γs : list gname) (j : nat) (γl : gname)
+      (γu : uart_names) (γd : disk_names) (γk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+      (ip : mword 64) (inum : mword 32)
+      (dn dn0 : dinode) (bm : blkmap)
+      (u : nat) (Sb : gset Z) (cru : bool)
+      (pidv : mword 32) (dq dqd dqn dqs : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool),
+      wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+                              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
+                              pidv dq dqd dqn dqs m K eb C b.
 End IUPDATE.

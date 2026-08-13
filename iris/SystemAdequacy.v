@@ -274,9 +274,10 @@ Qed.
    and quantify over none of it, so any closed choice does.  Local, so it
    cannot leak into a proof that ought to be threading a real one.
    (The fourth field is the liveness pool's gname, design/fs-icache.md
-   §14.6; this is the ONE place in the tree that names a concrete [icfg].) *)
+   §14.6; the fifth is the LINK LEDGER's, §20.2.  This is the ONE place in
+   the tree that names a concrete [icfg].) *)
 Local Instance adequacy_icfg : icfg :=
-  MkIcfg 1%positive (mword_of_int 0 : mword 32) 0%nat 1%positive.
+  MkIcfg 1%positive (mword_of_int 0 : mword 32) 0%nat 1%positive 1%positive.
 
 Definition xv6Σ : gFunctors :=
   #[ riscvΣ; sieΣ; lockΣ; kallocΣ; fileΣ; fdslotΣ; irefslotΣ; icacheΣ;

@@ -78,41 +78,13 @@ Definition ia_spend : nat := 1.
    yet offer.  [cru] is "IBLOCK inum inodestart ∈ Sb". *)
 Definition iu_spend (cru : bool) : nat := if cru then 0 else 1.
 
-(* ---- writei at a 16-ALIGNED SIXTEEN-BYTE WINDOW, which is the only
-   shape dirlink ever runs (1024 = 64 * 16, so the record never
-   straddles): bmap's arm-wise cost, plus writei's own [log_write] of the
-   target block -- free when balloc just [bzero]ed it ([al]) or when the
-   caller had already logged it ([crd]) -- plus the trailing iupdate.
+(* ---- writei at a 16-ALIGNED SIXTEEN-BYTE WINDOW: [wi16_spend] /
+   [wi16_need] MOVED to SpecWritei.v (GR-3 stage-3, W1) -- the contract
+   itself now exposes the figure ([SpecWritei.wi16_post]), so the
+   definitions live at the seam and this file uses them by import.
+   [SpecWritei.wi16_spend] inlines [iu_spend]'s if, definitionally equal
+   to the shape this file's lemmas were proven at. *)
 
-     [crb] : bmapstart ∈ Sb          (SpecBmap's [cr], verbatim)
-     [crd] : the target block ∈ Sb
-     [cru] : IBLOCK dinum inodestart ∈ Sb
-     [al]  : bmap allocated something ([SpecBmap.bmap_alloced bm bm' fbn])
-     [ind] : the window is on the indirect path ([SpecBmap.bmap_ind fbn]) *)
-Definition wi16_spend (crb crd cru al ind : bool) : nat :=
-  bmap_cost crb al ind + (if (al || crd)%bool then 0 else 1) + iu_spend cru.
-
-(* ...and what must be IN HAND on entry.  Credits do NOT lower this:
-   [log_write]'s contract takes [log_opS (S u)] on BOTH arms (a unit in
-   hand even to absorb) and so does iupdate's.  bmap's own requirement is
-   [SpecBmap.bmap_need]. *)
-Definition wi16_need (crb ind : bool) : nat := bmap_need crb ind + 2.
-
-Lemma wi16_need_value_dir : wi16_need false false = 4.
-Proof. reflexivity. Qed.
-
-(* For comparison with the LANDED loose bound: whenever the sixteen bytes
-   sit inside one block (which 16-alignment guarantees, since
-   1024 = 64 * 16), [wi_blocks off 16 = 1] and [wi_cost_bmonly off 16 = 4]
-   -- the same number [wi16_need false false] gives.  THE NEED WAS NEVER
-   THE PROBLEM; the SPEND bound is. *)
-Lemma wi16_need_matches_landed (off : nat) :
-  wi_blocks off 16 = 1%nat ->
-  wi16_need false false = wi_cost_bmonly off 16.
-Proof.
-  intros H. unfold wi16_need, bmap_need, wi_cost_bmonly.
-  rewrite H. reflexivity.
-Qed.
 
 (* ---- dirlink: dirlookup and readi log NOTHING, so a dirlink spends
    either its writei (the append arm) or its iput (the found arm). *)
@@ -246,6 +218,22 @@ Proof. vm_compute. lia. Qed.
 (*  3. WHAT THE LANDED (UNCREDITED) CONTRACTS GIVE, AND WHY IT IS NOT     *)
 (*     ENOUGH -- the refutations, machine checked                        *)
 (* ===================================================================== *)
+
+(* THE RULING'S REFUTATION, machine-checked (GR-3 stage-3): FINDING 6's
+   candidate 1 -- exposing only the bitmap amortization, i.e. bounding
+   each single-block call by [wi_cost_bmonly - bm_pot] -- cannot close
+   the mkdir arm either: the three dirlinks would bound at 4/3/3 where
+   the true vector spends are 3/0/3, and the chain leaves less than
+   [iput_units] for the closing iunlockput.  The [bm_pot] device credits
+   only the BITMAP block; this arm's arithmetic lives on the [crd]/[cru]
+   absorptions, which no bitmap-only figure expresses.  This is why
+   [SpecWritei.wi16_post] exposes the full [wi16_spend] figure. *)
+Lemma wi16_bmonly_amort_insufficient :
+  let amort (inS : bool) : nat :=
+    (wi_cost_bmonly 0 16 - (if inS then 1 else 0))%nat in
+  (cr_u0 - ia_spend - iu_spend true
+     - amort false - amort true - amort true < iput_units)%nat.
+Proof. vm_compute. lia. Qed.
 
 (* THE LOOSE SPEND BOUND BUSTS ON THE THIRD dirlink.  With
    [wi_cost_bmonly] as the per-call allowance and no absorption credit,

@@ -83,6 +83,7 @@ Require Import FsBlocks.
 Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import DirView.
+Require Import DirLinks.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
@@ -348,7 +349,8 @@ Proof.
 Qed.
 
 Section IcacheBootRegion.
-  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !icacheG Σ}.
+  Context `{ICFG : icfg}.
 
   (* [FsBoot.fs_L0_big], for this map *)
   Lemma ireg_M0_big (Phi : Z -> dinode -> iProp Σ)
@@ -447,10 +449,40 @@ Section IcacheBootRegion.
      exactly the two cases.  The mint is strictly CHEAPER than it was: an
      all-free image now needs no image-wf premise and no pool contents
      beyond markers ([ipool_alloc_all_free] below). *)
+  (* THE LEDGER'S BOOT MINT (design §20.6's boot row, fs-sysfile S5f).  The
+     region parks one link authority per inum, so the boot client owes them
+     -- one per inum of the region, at the EMPTY ledger.  It is an honest
+     image obligation of exactly [ipool_shape_alloc]'s kind: nothing in
+     this file can manufacture a ghost the ambient [icfg_link] names.
+
+     THEY ARE STATED AT [w = 0] because stage A mints no fragment: with the
+     directory payloads' [dir_links] (stage B) the same premise grows to
+     [w_z] per inum plus the fragments that stock each directory.  The
+     authority's shape does not change when it does.
+
+     AND (L3) IS AN IMAGE OBLIGATION (fs-sysfile S5g).  With the ledger's
+     clauses landed, [ireg_slot] now says of every record that a ZERO TYPE
+     forces a zero [nlink] -- true of every mkfs image, false of nothing
+     this kernel can produce (the only writer that clears a type is iput's
+     free, which runs behind [ip->nlink == 0]), and unprovable here: the
+     bytes are the boot client's.  So it rides as a premise, in the same
+     ∀-over-decodings form the payout's own image premises take, because
+     [dss] is produced by [image_decode] inside the proof.  (L1) at [w = 0]
+     needs nothing. *)
+  Definition image_free_nlink (dss : list (list dinode)) (nib : nat) : Prop :=
+    forall z : Z, z ∈ region_inums nib ->
+      bv_unsigned (di_type (image_dinode dss z)) = 0 ->
+      bv_unsigned (di_nlink (image_dinode dss z)) = 0.
+
   Lemma ireg_alloc (E : coPset) (γfs : fs_names) (inodestart : Z) (nib : nat)
       (bss : nat -> list (bv 8)) :
     16 * Z.of_nat nib <= 2 ^ 32 ->
     (forall bi : nat, (bi < nib)%nat -> length (bss bi) = 1024%nat) ->
+    (forall dss : list (list dinode),
+       length dss = nib -> Forall diblk_wf dss ->
+       (forall bi : nat, (bi < nib)%nat -> bss bi = diblk_bytes (dss !!! bi)) ->
+       image_free_nlink dss nib) ->
+    ([∗ set] z ∈ region_inums nib, link_auth z 0 0 None 0) -∗
     ([∗ list] bi ∈ seq 0 nib,
        fsblock γfs (inodestart + Z.of_nat bi) (bss bi))
     ={E}=∗ ∃ (γi : gname) (dss : list (list dinode)),
@@ -460,9 +492,10 @@ Section IcacheBootRegion.
       ([∗ set] z ∈ region_inums nib,
          ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)).
   Proof.
-    intros Hnib Hlen.
+    intros Hnib Hlen Himg.
     destruct (image_decode nib bss Hlen) as (dss & Hl & Hwf & He).
-    iIntros "Hblks".
+    pose proof (Himg dss Hl Hwf He) as Hl3.
+    iIntros "Hlk Hblks".
     iMod (ghost_map_alloc (ireg_M0 dss nib ∪ ireg_MK nib)) as (γi) "[Ha Hels]".
     iDestruct (big_sepM_union with "Hels") as "[Hels Hmks]";
       [apply ireg_M0_MK_disj |].
@@ -470,22 +503,28 @@ Section IcacheBootRegion.
       as "Hels".
     iDestruct (imark_of_marks γi nib with "Hmks") as "Hmks".
     iDestruct (big_sepS_sep_2 with "Hels Hmks") as "Hall".
+    iDestruct (big_sepS_sep_2 with "Hall Hlk") as "Hall".
     (* per inum: one of the two ghost entries stays in the region's arm and
-       the other one is the payout *)
+       the other one is the payout; the ledger authority stays with the
+       slot on BOTH arms (design §20.2) *)
     iAssert ([∗ set] z ∈ region_inums nib,
                (ireg_slot γi z (image_dinode dss z) ∗
                 ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)))%I
       with "[Hall]" as "Hall".
     { iApply (big_sepS_mono with "Hall"). intros z Hz.
-      iIntros "[Hfrag Hmk]".
+      iIntros "[[Hfrag Hmk] Hla]".
+      assert (Hok : ireg_link_ok (image_dinode dss z) 0).
+      { split; [lia | exact (Hl3 z Hz)]. }
       rewrite /ireg_out /dinode_at (region_inum_faithful nib z Hnib Hz).
       case_decide as Hty.
       - iSplitR "Hmk"; [| iExact "Hmk"].
-        rewrite /ireg_slot. iLeft.
-        iSplitR; [iPureIntro; left; exact Hty | iExact "Hfrag"].
+        iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 None 0 Hok
+                  with "Hla").
+        iLeft. iSplitR; [iPureIntro; left; exact Hty | iExact "Hfrag"].
       - iSplitR "Hfrag"; [| iExact "Hfrag"].
-        rewrite /ireg_slot. iRight.
-        iSplitR; [iPureIntro; exact Hty | iExact "Hmk"]. }
+        iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 None 0 Hok
+                  with "Hla").
+        iRight. iSplitR; [iPureIntro; exact Hty | iExact "Hmk"]. }
     rewrite big_sepS_sep.
     iDestruct "Hall" as "[Hslots Hout]".
     iDestruct (ireg_slots_of_set γi dss nib with "Hslots") as "Hslots".
@@ -541,11 +580,16 @@ Section IcacheBootPool.
       (data : nat -> list (bv 8)) :
     inode_ok cov logstart dn bm data ->
     dir_ok icfg_nib dn data ->
+    dir_links (bv_unsigned inum) dn data -∗
     dinode_at γi inum dn -∗ ind_res γfs bm -∗ inode_blocks γfs bm data -∗
     ipool_shape γfs γi cov logstart inum.
   Proof.
-    iIntros (Hok Hdok) "Hdn Hind Hblk". rewrite /ipool_shape. iLeft.
-    iExists dn, bm, data. iFrame "Hdn Hind Hblk". done.
+    iIntros (Hok Hdok) "Hdlk Hdn Hind Hblk". rewrite /ipool_shape. iLeft.
+    iExists dn, bm, data.
+    iSplitR; [iPureIntro; exact Hok |].
+    iSplitR; [iPureIntro; exact Hdok |].
+    iSplitL "Hdlk"; [iExact "Hdlk" |].
+    iFrame "Hdn Hind Hblk".
   Qed.
 
   (* the pool is a [∗ set], so it splits and rejoins along any subset *)
@@ -570,6 +614,7 @@ Section IcacheBootPool.
        ∃ (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)),
          ⌜inode_ok cov logstart dn bm data⌝ ∗
          ⌜dir_ok icfg_nib dn data⌝ ∗
+         dir_links (bv_unsigned (mword_of_int z : mword 32)) dn data ∗
          dinode_at γi (mword_of_int z : mword 32) dn ∗
          ind_res γfs bm ∗ inode_blocks γfs bm data) -∗
     ([∗ set] z ∈ R ∖ A,
@@ -580,9 +625,9 @@ Section IcacheBootPool.
     iApply (ipool_split γfs γi cov logstart R A Hsub).
     iSplitL "Ha".
     - rewrite /ipool. iApply (big_sepS_mono with "Ha"). intros z _.
-      iIntros "(%dn & %bm & %data & %Hok & %Hdok & Hdn & Hind & Hblk)".
+      iIntros "(%dn & %bm & %data & %Hok & %Hdok & Hdlk & Hdn & Hind & Hblk)".
       iApply (ipool_shape_alloc _ _ _ _ _ dn bm data Hok Hdok
-                with "Hdn Hind Hblk").
+                with "Hdlk Hdn Hind Hblk").
     - rewrite /ipool. iApply (big_sepS_mono with "Hf"). intros z _.
       iIntros "Hmk". iApply (ipool_shape_free with "Hmk").
   Qed.

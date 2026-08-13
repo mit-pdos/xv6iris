@@ -161,6 +161,7 @@ Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import DinodeEnc.
 Require Import DirView.
+Require Import DirLinks.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
@@ -423,12 +424,22 @@ Section IcacheEscrow.
      beside [inode_ok] rather than inside it because [inode_ok]'s signature
      has no [nib] and its users are legion; [icfg_nib] is the ambient
      region size, capacity and not resource.  The FREE arm needs no such
-     conjunct: it carries no data at all, and its type is 0. *)
+     conjunct: it carries no data at all, and its type is 0.
+
+     ...AND ITS RESOURCE TWIN (§20.3, stage B).  [DirLinks.dir_links] rides
+     BESIDE [dir_ok], not inside it: one ledger fragment per live non-self
+     record, in one of the two colours [ilink]/[igrey].  [dir_ok] says the
+     named inum is IN RANGE; the twin says it is ALLOCATED, which is a fact
+     about another inum's REGION record and therefore cannot be a [Prop]
+     over [data] (§20.1, §20.9(a)).  No arity moves -- the colour
+     disjunction is inside [dir_link_at] -- and both fragments are timeless,
+     so the [Timeless] instance below survives verbatim. *)
   Definition ipool_alloc (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) : iProp Σ :=
     (∃ (dn0 : dinode) (bm0 : blkmap) (data0 : nat -> list (bv 8)),
        ⌜inode_ok cov logstart dn0 bm0 data0⌝ ∗
        ⌜dir_ok icfg_nib dn0 data0⌝ ∗
+       dir_links (bv_unsigned inum) dn0 data0 ∗
        dinode_at γi inum dn0 ∗
        ind_res γfs bm0 ∗
        inode_blocks γfs bm0 data0)%I.
@@ -465,13 +476,21 @@ Section IcacheEscrow.
      parked DIRECTORY's live records all name inums the inode region
      covers.  This is what namex destructs out of ilock's postcondition,
      and it is the reason dirlookup's [dir_inums_ok] premise is
-     dischargeable at a directory nobody named in advance. *)
+     dischargeable at a directory nobody named in advance.
+
+     ...AND ITS RESOURCE TWIN (§20.3, stage B), the twin of [ipool_alloc]'s:
+     [DirLinks.dir_links] over this record's own [data].  It is what
+     dirlookup will hand [iget] as licence (a)/(b) in stage C, borrowed out
+     of this payload at the matched index and returned before the holder's
+     iunlock.  Every re-park in the landed tree carries it unchanged
+     ([dir_links_eq]) because none of them changes a DIRECTORY's bytes. *)
   Definition ic_loaded (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (k : nat) (inum : mword 32)
       (dn : dinode) (bm : blkmap) : iProp Σ :=
     (∃ (data : nat -> list (bv 8)),
        ⌜inode_ok cov logstart dn bm data⌝ ∗
        ⌜dir_ok icfg_nib dn data⌝ ∗
+       dir_links (bv_unsigned inum) dn data ∗
        dinode_at γi inum dn ∗
        inode_meta (ientry k) dn ∗
        inode_addrs (ientry k) (bm_cells bm) ∗
@@ -540,6 +559,44 @@ Section IcacheEscrow.
   Global Instance ic_payload_timeless γfs γi cov logstart k inum g v :
     Timeless (ic_payload γfs γi cov logstart k inum g v).
   Proof. rewrite /ic_payload. destruct v; apply _. Qed.
+
+  (* THE LOADED POLARITY AT A NAMED RECORD (design §20.13/§20.14's (R1)).
+
+     [ic_payload]'s [true] branch binds the record EXISTENTIALLY, which is
+     right for the arms -- an arm says "this slot is loaded", not "it is
+     loaded at THIS record" -- and wrong for a thread that carries the
+     bundle across a window it is going to re-enter.  [ProofIput] is that
+     thread: it reads [ip->nlink] at +0x40 off the record it is holding,
+     hands the bundle back into the escrow across [acquiresleep], and takes
+     it out again at +0x54.  Through an existential the record that comes
+     back is a FRESH one and [nlink == 0] does not travel with it -- which
+     is precisely the fact the region's (L3) needs at the free (fs-sysfile
+     S5f's knot; the missing fact is [di_nlink dn2 = 0]).
+
+     So the window opener below is stated at THIS predicate: the same [dn]
+     and [bm] go in and come out.  It is exactly xv6's own REF-1 argument
+     -- the sole reference holder's record cannot move under it -- made
+     available to the proof, and it costs no arity anywhere: [ic_payload]
+     is unchanged, and every arm still binds the record existentially.
+
+     Carrying [⌜di_nlink dn = 0⌝] in the PAYLOAD instead is dead for
+     §17.5's reason: the payload is re-parked and the conjunct would have
+     to be re-established by whoever picks it up. *)
+  Definition ic_payload_at (γfs : fs_names) (γi : gname) (cov : gset Z)
+      (logstart : Z) (k : nat) (inum : mword 32) (g : gname)
+      (dn : dinode) (bm : blkmap) : iProp Σ :=
+    (ic_loaded γfs γi cov logstart k inum dn bm ∗ ity_shot g (di_type dn))%I.
+
+  Global Instance ic_payload_at_timeless γfs γi cov logstart k inum g dn bm :
+    Timeless (ic_payload_at γfs γi cov logstart k inum g dn bm).
+  Proof. rewrite /ic_payload_at. apply _. Qed.
+
+  Lemma ic_payload_at_pack γfs γi cov logstart k inum g dn bm :
+    ic_payload_at γfs γi cov logstart k inum g dn bm -∗
+    ic_payload γfs γi cov logstart k inum g true.
+  Proof.
+    rewrite /ic_payload /ic_payload_at. iIntros "H". iExists dn, bm. iExact "H".
+  Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  3.  THE THREE ARMS                                                 *)
@@ -1339,7 +1396,7 @@ Section IcacheEscrow.
     { destruct v; [| iDestruct "Hpay" as "[Hpu _]"; iExact "Hpu" ].
       iDestruct "Hpay" as (dn bm) "[Hlk _]".
       iDestruct "Hlk" as (data)
-        "(%Hok & %Hdok & Hdat & Hmeta & Haddrs & Hind & Hblks)".
+        "(%Hok & %Hdok & Hdlk & Hdat & Hmeta & Haddrs & Hind & Hblks)".
       pose proof Hok as Hok'.
       destruct Hok' as (Hwf & _ & Hda & _ & _ & _ & _).
       assert (Hcelllen : length (bm_cells bm) = 13%nat).
@@ -1348,8 +1405,10 @@ Section IcacheEscrow.
       { rewrite /inode_raw. iSplitL "Hmeta"; [by iExists dn |].
         iExists (bm_cells bm). iSplitR; [iPureIntro; exact Hcelllen |].
         iExact "Haddrs". }
-      rewrite /ipool_shape /ipool_alloc. iLeft. iExists dn, bm, data. iFrame.
-      iSplitR; iPureIntro; [exact Hok | exact Hdok]. }
+      rewrite /ipool_shape /ipool_alloc. iLeft. iExists dn, bm, data.
+      iSplitR; [iPureIntro; exact Hok |].
+      iSplitR; [iPureIntro; exact Hdok |].
+      iSplitL "Hdlk"; [iExact "Hdlk" |]. iFrame. }
     (* the two right-hand conjuncts go out structurally: [iFrame "Hgf2
        Hpool"] would search the [ic_escrow_body] conjunct -- five arms, each
        an existential over [ic_payload]/[inode_raw] -- for each of the two
@@ -1545,7 +1604,7 @@ Section IcacheEscrow.
     rewrite /ic_payload. destruct v.
     - iIntros "Hpay".
       iDestruct "Hpay" as (dn bm) "[Hlk _]".
-      iDestruct "Hlk" as (data) "(_ & _ & _ & Hmeta & _)".
+      iDestruct "Hlk" as (data) "(_ & _ & _ & _ & Hmeta & _)".
       rewrite /inode_meta. iDestruct "Hmeta" as "(_ & _ & _ & _ & Hsz)".
       iExists (di_size dn). iExact "Hsz".
     - iIntros "[Hu _]". iApply (ic_unloaded_size with "Hu").
@@ -1571,6 +1630,19 @@ Section IcacheEscrow.
     iDestruct (ic_payload_size with "H1") as (w1) "H1".
     iDestruct (ic_unloaded_size with "H2") as (w2) "H2".
     iApply (iesc_word4_excl with "H1 H2").
+  Qed.
+
+  (* The size cell of a record-named payload -- the ONE thing the window
+     opener below uses its caller's bundle for (both refutations go through
+     it), which is why that opener can be stated at [ic_payload_at] with no
+     other change to its proof. *)
+  Local Lemma ic_payload_at_size γfs γi cov logstart k inum g dn bm :
+    ic_payload_at γfs γi cov logstart k inum g dn bm -∗
+    ∃ w : bv 32, i_size (ientry k) ↦₄ w.
+  Proof.
+    iIntros "Hpay".
+    iApply (ic_payload_size γfs γi cov logstart k inum g true).
+    iApply (ic_payload_at_pack with "Hpay").
   Qed.
 
 
@@ -1614,10 +1686,22 @@ Section IcacheEscrow.
      payload's generation.  The stale [ity_shot g2 ty] dies with the
      generation that named it, on iput's own path: itrunc and [ip->type = 0]
      turn [ic_loaded] into raw cells and a marker.  The +0x44 nlink-undo
-     caller, which takes no bump, passes the two equal. *)
+     caller, which takes no bump, passes the two equal.
+
+     RECORD-PARAMETRIC (design §20.14's (R1), fs-sysfile S5g).  The bundle
+     goes in and comes out at the SAME [dn]/[bm] -- [ic_payload_at], not
+     [ic_payload]'s existential -- which is what carries iput's +0x40
+     reading of [ip->nlink] across the [acquiresleep] window and down to
+     the region free, where (L3) needs [di_nlink = 0] of the record it is
+     about to write.  Through the existential the record that came back was
+     a fresh [dn2] and the zero was lost; that lost fact is the whole of
+     S5f's (L1)/(L3) knot.  The polarity is fixed at LOADED because that is
+     the only one either caller passes and the only one a record names; the
+     [v] parameter is therefore gone.  Nothing else in the proof moves: the
+     bundle's only use here is its SIZE cell, in the two refutations. *)
   Lemma ic_open_held cn γfs γi cov logstart k (Eo : coPset)
-      (M : gmap nat (Qp * positive)) (q : Qp) (v : bool) (g1 g2 : gname)
-      (dev inum : mword 32) :
+      (M : gmap nat (Qp * positive)) (q : Qp) (g1 g2 : gname)
+      (dev inum : mword 32) (dn : dinode) (bm : blkmap) :
     ↑icacheN ⊆ Eo ->
     M !! k = Some (q, 1%positive) ->
     itable_inv -∗
@@ -1626,13 +1710,13 @@ Section IcacheEscrow.
     iref_tok k q -∗
     live_gen k (1/2) g1 -∗
     ic_id cn k (1/2) true dev inum -∗
-    ic_payload γfs γi cov logstart k inum g2 v -∗
+    ic_payload_at γfs γi cov logstart k inum g2 dn bm -∗
     |={Eo}=>
     itable_half M ∗
     iref_tok k q ∗
     live_gen k (1/2) g1 ∗
     ic_id cn k (1/2) true dev inum ∗
-    ic_payload γfs γi cov logstart k inum g2 v ∗
+    ic_payload_at γfs γi cov logstart k inum g2 dn bm ∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
     i_inum (ientry k) ↦₄ inum ∗
     (∃ w : mword 32, i_valid (ientry k) ↦₄{DfracOwn (1/2)} w) ∗
@@ -1641,10 +1725,13 @@ Section IcacheEscrow.
   Proof.
     iIntros (HE HMk) "#Hinv Hbody Hhalf Htok Hlvh Hgid Hpay".
     iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
-    - (* PARKED: its payload names the same inum (pinned by the ghost first),
-         and [dinode_at] is exclusive *)
+    - (* PARKED: its payload names the same slot's size cell, and a word
+         cell is exclusive *)
       iDestruct "Hpk" as (dev' inum' v' ga) "(_ & _ & _ & Hpay' & _ & _ & Hgt)".
-      iExFalso. iApply (ic_payload_excl with "Hpay Hpay'").
+      iExFalso.
+      iDestruct (ic_payload_at_size with "Hpay") as (w1) "Hsz1".
+      iDestruct (ic_payload_size with "Hpay'") as (w2) "Hsz2".
+      iApply (iesc_word4_excl with "Hsz1 Hsz2").
     - (* OUT: REF-1, on both deposit kinds, exactly as in
          [ic_open_auth_ref] -- the count for a reference, the LIVE mass for a
          share (14.8), the arm's own 1/2 restoring the exact complement
@@ -1672,8 +1759,9 @@ Section IcacheEscrow.
     - (* MID: its stock carries this entry's metadata cells too *)
       iDestruct "Hmid" as (dev' inum' w) "(_ & _ & _ & Hpay' & Hgt)".
       iExFalso.
-      iApply (ic_payload_unloaded_excl γfs γi cov logstart k inum inum' g2 v
-                with "Hpay Hpay'").
+      iDestruct (ic_payload_at_size with "Hpay") as (w1) "Hsz1".
+      iDestruct (ic_unloaded_size with "Hpay'") as (w2) "Hsz2".
+      iApply (iesc_word4_excl with "Hsz1 Hsz2").
     - (* EMPTY: the identification ghost *)
       iDestruct "Hvg" as (dev' inum' w) "(_ & _ & _ & _ & _ & Hgt)".
       iDestruct (ic_id_agree with "Hgid Hgt") as %(Hc & _ & _). discriminate.

@@ -248,6 +248,131 @@ Definition wp_iput_sconf_body
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(*  THE CREDITED SET-FORM CONTRACT (fs-sysfile GR-2b, retrofit 4b)        *)
+(*                                                                        *)
+(*  WHAT [freed] TURNED OUT TO BE.  GR-2a left open whether iput's post    *)
+(*  must expose the [freed] boolean of [CreateBudget.ip_spend crb cru      *)
+(*  freed], either existentially or by two-arming the budget clause the    *)
+(*  way [used' ⊆ used] is two-armed.  IT MUST DO NEITHER, and the reason   *)
+(*  is that an existential [freed] is VACUOUS: [ip_spend _ _ false = 0 <=  *)
+(*  ip_spend _ _ true], so [∃ freed, n - ip_spend crb cru freed <= n']     *)
+(*  is satisfied by [freed := true] whatever happened, i.e. it says        *)
+(*  exactly what the unconditional worst case says and no caller can       *)
+(*  extract more.  And two-arming it would be USELESS anyway, because no   *)
+(*  caller can know in advance which arm runs -- the same fact that makes  *)
+(*  the parking premise unconditional.                                    *)
+(*                                                                        *)
+(*  So the spend is stated at the WORST CASE, unconditionally, and that    *)
+(*  is enough: at [crb = cru = true] the worst case is ZERO, which is      *)
+(*  exactly what create's FAIL arm needs of the [iunlockput] that actually *)
+(*  frees ([CreateBudget.ip_spend true true true = 0]).                    *)
+(*                                                                        *)
+(*  THE NEED DOES NOT MOVE.  It is still [iput_units], so                  *)
+(*  [CreateBudget]'s arms -- which are all stated at [ip_need] -- are      *)
+(*  unaffected.  (The credited arms could honestly ask for as little as    *)
+(*  [1 + ip_spend crb cru true], but nothing needs that and keeping the    *)
+(*  premise fixed keeps the ledger's theorems verbatim.)                   *)
+(* ===================================================================== *)
+
+(* what iput spends when it DOES free: itrunc's bitmap unit (unless the op
+   already logged that block) plus the two flushes, of which iput's own
+   always absorbs -- itrunc's post hands out [IBLOCK inum inodestart ∈ Sb']
+   determinately, so iput's [ip->type = 0] iupdate runs credited for free.
+   Definitionally [CreateBudget.ip_spend crb cru true]. *)
+Definition ip_spend_max (crb cru : bool) : nat :=
+  ((if crb then 0%nat else 1%nat) + (if cru then 0%nat else 1%nat))%nat.
+
+Definition wp_iput_gen_body
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+
+    (gs : list gname) (j : nat) (gl : gname)
+    (gu : uart_names) (gd : disk_names) (gk : gname)
+    (pd pav pu : mword 64)
+    (bn : bio_names)
+    (g : log_names) (gfs : fs_names) (gi : gname)
+    (cn : ic_names)
+    (gtl : gname)
+    (gil gisl : gname)
+    (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+    (size : Z) (dev : mword 32)
+    (used : gset Z)
+    (k : nat) (q : Qp) (inum : mword 32)
+    (n : nat) (Sb : gset Z) (crb cru : bool)
+    (pidv : mword 32) (dq dqb dqs : dfrac)
+    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (b : bool) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.iput in
+  let ip : mword 64 := ientry k in
+  let pj := proc_addr j in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (K_iput <= K)%nat ->
+  (k < NINODE)%nat ->
+  (* the two absorption credits, travelling to itrunc unchanged *)
+  (crb = true -> bmapstart ∈ Sb) ->
+  (cru = true -> IBLOCK inum inodestart ∈ Sb) ->
+  log_geom_ok cov logstart ->
+  0 < size <= BPB ->
+  0 <= bmapstart ->
+  bmapstart ∈ cov ->
+  ~ (bmapstart ∈ log_region_set logstart) ->
+  0 <= inodestart ->
+  IBLOCK inum inodestart ∈ cov ->
+  ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
+  bv_unsigned inum < 16 * Z.of_nat nib ->
+  cov_below cov size ->
+  (iput_units <= n)%nat ->
+  (j < NPROC)%nat ->
+  gs !! j = Some gl ->
+  m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  sie_cap_gpr m K b pj -∗
+  cpu_own 0 eb pj C b -∗
+  trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
+  kernel_text -∗ pc_is pcE -∗
+  panic_wp_any -∗
+  bio_ctx bn (fs_view gfs gd dev cov) -∗
+  log_ctx g bn gfs cov logstart dev -∗
+  is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+  itable_inv -∗
+  ic_escrow cn gfs gi cov logstart k -∗
+  ireg_inv gi gfs inodestart nib -∗
+  is_sleeplock gil gisl (i_lock ip) "inode"%string (ic_tok cn k) -∗
+  inode_ref k q dev inum -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  bitmap_res gfs bmapstart cov logstart size used -∗
+  p_pid pj ↦₄{dq} pidv -∗
+  procs_inv gs -∗
+  dev_inv gu gd -∗
+  disk_geom gd pd pav pu -∗
+  is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+  bslots bn 3 -∗
+  log_opS g n Sb -∗
+  wp_next true pj (fun (CID : CpuId) =>
+  ∀ (mf : regfile) (n' : nat) (used' : gset Z) (Sb' : gset Z),
+      ⌜callee_saved m mf⌝ -∗
+      sie_cap_gpr mf K b pj -∗
+      cpu_own 0 eb pj C b -∗
+      trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
+      pc_is ret_tgt -∗
+      p_pid pj ↦₄{dq} pidv -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      ⌜used' ⊆ used⌝ -∗
+      bitmap_res gfs bmapstart cov logstart size used' -∗
+      bslots bn 3 -∗
+      (* the set only GROWS, and at most the credited worst case is gone *)
+      ⌜Sb ⊆ Sb'⌝ -∗
+      ⌜((n - ip_spend_max crb cru)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
+      log_opS g n' Sb' -∗
+      iref_slot -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type IPUT.
   Parameter wp_iput_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
@@ -270,4 +395,29 @@ Module Type IPUT.
       wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                           cov logstart bmapstart inodestart nib size dev used
                           k q inum n pidv dq dqb dqs m K eb C b.
+  (* the credited set-form contract; [wp_iput_sconf] is this at
+     [crb := cru := false], derived at the [log_op] existential's own
+     witness ([ip_spend_max false false = 2], and iput's own flush is the
+     third unit [iput_units] counts). *)
+  Parameter wp_iput_gen :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId}
+      (gs : list gname) (j : nat) (gl : gname)
+      (gu : uart_names) (gd : disk_names) (gk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (g : log_names) (gfs : fs_names) (gi : gname)
+      (cn : ic_names) (gtl : gname) (gil gisl : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (size : Z) (dev : mword 32)
+      (used : gset Z)
+      (k : nat) (q : Qp) (inum : mword 32)
+      (n : nat) (Sb : gset Z) (crb cru : bool)
+      (pidv : mword 32) (dq dqb dqs : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool),
+      wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
+                       cov logstart bmapstart inodestart nib size dev used
+                       k q inum n Sb crb cru pidv dq dqb dqs m K eb C b.
 End IPUT.

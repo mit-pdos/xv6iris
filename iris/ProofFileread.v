@@ -1778,7 +1778,7 @@ Section ProofFileread.
                     [ip] its own [f->ip] cell holds. ---- *)
              rewrite /ic_loaded.
              iDestruct "Hlk" as (data)
-               "(%Hiok & %Hdok & Hdnat & Hmeta & Haddrs & Hindres & Hblocks)".
+               "(%Hiok & %Hdok & Hdlk & Hdnat & Hmeta & Haddrs & Hindres & Hblocks)".
              destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes
                                & Hsized).
              iEval (rewrite -Hipk) in "Hmeta".
@@ -2039,7 +2039,7 @@ Section ProofFileread.
                 (* re-assemble the checked-out bundle, back at the SLOT *)
                 iAssert (ic_loaded (frn_fs fn) (frn_ireg fn) (frn_cov fn)
                            (frn_logstart fn) ikk inm dnl bml)
-                  with "[Hdnat Hmeta Hmap Hblocks]" as "Hlk".
+                  with "[Hdnat Hmeta Hmap Hblocks Hdlk]" as "Hlk".
                 { rewrite /ic_loaded /inode_map -Hipk. iExists data.
                   iSplitR; [iPureIntro; split_and!;
                     [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
@@ -2047,6 +2047,7 @@ Section ProofFileread.
                   (* §15(a): readi changed no byte, so the directory-wf
                      conjunct goes back exactly as it came out *)
                   iSplitR; [iPureIntro; exact Hdok |].
+                  iSplitL "Hdlk"; [iExact "Hdlk" |].
                   iDestruct "Hmap" as "[Haddrs Hindres]".
                   iFrame "Hdnat Hmeta Haddrs Hindres Hblocks". }
                 iAssert (i_valid (ientry ikk) ↦₄ valid_word true)%I
@@ -2311,7 +2312,7 @@ Section ProofFileread.
                 (* re-assemble the checked-out bundle, back at the SLOT *)
                 iAssert (ic_loaded (frn_fs fn) (frn_ireg fn) (frn_cov fn)
                            (frn_logstart fn) ikk inm dnl bml)
-                  with "[Hdnat Hmeta Hmap Hblocks]" as "Hlk".
+                  with "[Hdnat Hmeta Hmap Hblocks Hdlk]" as "Hlk".
                 { rewrite /ic_loaded /inode_map -Hipk. iExists data.
                   iSplitR; [iPureIntro; split_and!;
                     [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
@@ -2319,6 +2320,7 @@ Section ProofFileread.
                   (* §15(a): readi changed no byte, so the directory-wf
                      conjunct goes back exactly as it came out *)
                   iSplitR; [iPureIntro; exact Hdok |].
+                  iSplitL "Hdlk"; [iExact "Hdlk" |].
                   iDestruct "Hmap" as "[Haddrs Hindres]".
                   iFrame "Hdnat Hmeta Haddrs Hindres Hblocks". }
                 iAssert (i_valid (ientry ikk) ↦₄ valid_word true)%I

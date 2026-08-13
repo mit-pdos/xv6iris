@@ -150,7 +150,8 @@ Section ProofNameiparentMain.
             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_nameiparent_sconf
+  (* THE WALK IS THE SET FORM; the counted seal follows it. *)
+  Lemma wp_nameiparent_gen
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -164,16 +165,16 @@ Section ProofNameiparentMain.
       (cwdv : mword 64)
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
-      (n : nat)
+      (n : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
-    : wp_nameiparent_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    : wp_nameiparent_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                 ga gf cov logstart bmapstart inodestart nib
-                                size dev used cwdv plen pfun nfun n
+                                size dev used cwdv plen pfun nfun n Sb
                                 pidv dq dqb dqs dqc m K eb C b.
   Proof.
-    cbv beta delta [wp_nameiparent_sconf_body].
+    cbv beta delta [wp_nameiparent_gen_body].
     intros pcE pjv pv nb ret_tgt pl L
            HK Hdev Hnib Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
            Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Heb.
@@ -350,18 +351,18 @@ Section ProofNameiparentMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (NX.wp_namex_sconf gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    iApply (NX.wp_namex_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib size dev used cwdv
-              plen pfun nfun true n pidv dq dqb dqs dqc R5 (K - 2)%nat eb C b
+              plen pfun nfun true n Sb pidv dq dqb dqs dqc R5 (K - 2)%nat eb C b
               Knx Hdev Hnib Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
               Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs
               ltac:(rewrite HR5a1; exact npi_a1_true) Heb
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hkenv Hitb2 Hitbl
                     Hesc Hslks Hireg Hprocs Hdev Hgeom Hdlk Hbmap Hinos
                     Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog").
-    iIntros (CID8 Hq8 mf n' used' ok nf ipv)
+    iIntros (CID8 Hq8 mf n' used' Sb' ok nf ipv)
             "%Hcs Hcg Hcnt Hpc Hbmap Hinos %Hsub Hbits Hppid Hcwdc Hcwdr
-             Hpath Hname Hbslot %Hbudo Hlog Hok".
+             Hpath Hname Hbslot %Hssub %Hbudo Hlog Hok".
     iEval (rewrite HR5a0) in "Hpath".
     iEval (rewrite HR5a2) in "Hname".
     assert (Hpc10 : ret_pc (R5 !!! Regidx Rra : mword 64)
@@ -523,12 +524,71 @@ Section ProofNameiparentMain.
     iDestruct (cpu_own_transport CID8 CID12 0%nat eb (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! P3 n' used' ok nf ipv
+    iApply ("Hcont" $! P3 n' used' Sb' ok nf ipv
               with "[%] Hcg Hcnt Hpc Hbmap Hinos [%] Hbits Hppid Hcwdc Hcwdr
-                    Hpath Hname Hbslot [%] Hlog Hok").
+                    Hpath Hname Hbslot [%] [%] Hlog Hok").
     { unfold callee_saved. split_and!; assumption. }
     { exact Hsub. }
+    { exact Hssub. }
     { exact Hbudo. }
+  Qed.
+
+
+  (* ===================================================================== *)
+  (*  THE COUNTED SEAL, at the [log_op] existential's own witness.  The     *)
+  (*  budget clause is identical on both sides (no credit anywhere on this  *)
+  (*  chain), so the seal is pure plumbing.                                 *)
+  (* ===================================================================== *)
+  Lemma wp_nameiparent_sconf
+      (gs : list gname) (j : nat) (gl : gname)
+      (gu : uart_names) (gd : disk_names) (gk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (g : log_names) (gfs : fs_names) (gi : gname)
+      (cn : ic_names) (gtl : gname)
+      (ga : gname) (gf : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (size : Z) (dev : mword 32)
+      (used : gset Z)
+      (cwdv : mword 64)
+      (plen : nat) (pfun : nat -> bv 8)
+      (nfun : nat -> bv 8)
+      (n : nat)
+      (pidv : mword 32) (dq dqb dqs dqc : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool)
+    : wp_nameiparent_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+                          ga gf cov logstart bmapstart inodestart nib
+                          size dev used cwdv plen pfun nfun n
+                          pidv dq dqb dqs dqc m K eb C b.
+  Proof.
+    cbv beta delta [wp_nameiparent_sconf_body].
+    intros pcE pjv pv nb ret_tgt pl L
+           HK Hdev Hnib Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
+           Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Heb.
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl
+              #Hesc #Hslks #Hireg #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
+              Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog Hcont".
+    iDestruct "Hlog" as (Sb0) "Hlog".
+    iApply (wp_nameiparent_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+              ga gf cov logstart bmapstart inodestart nib
+              size dev used cwdv plen pfun nfun n Sb0
+              pidv dq dqb dqs dqc m K eb C b
+              HK Hdev Hnib Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Heb
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hkenv Hitb2 Hitbl Hesc Hslks Hireg Hprocs Hdev Hgeom Hdlk Hbmap Hinos Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog [Hcont]").
+    iEval (rewrite /wp_next).
+    iIntros (CIDf) "%Hchain".
+    iIntros (mf n' used' Sb' ok nf ipv)
+      "%Hcs Hcg Hcnt Hpc Hbmap Hinos %Husub Hbits Hppid Hcwdc Hcwdr
+       Hpath Hname Hbslot %Hssub %Hbnd Hlog Hok".
+    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iApply ("Hcont" $! mf n' used' ok nf ipv
+              with "[%] Hcg Hcnt Hpc Hbmap Hinos [%] Hbits Hppid Hcwdc Hcwdr
+                    Hpath Hname Hbslot [%] [Hlog] Hok").
+    { exact Hcs. }
+    { exact Husub. }
+    { exact Hbnd. }
+    { iApply (log_opS_op with "Hlog"). }
   Qed.
 
 End ProofNameiparentMain.

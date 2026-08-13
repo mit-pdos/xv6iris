@@ -64,6 +64,15 @@ SAIL_RISCV_REV ?= c32fbf4111b849061db1812355d6da9df8c2e396
 # addresses out from under every proof that names one (a few commits either
 # way already move most of them).  Verified: a kernel built here reproduces
 # kernel-rocq/*.v byte for byte and symbol for symbol.
+#
+# THE PIN IS A CLEAN UPSTREAM TIP.  It was briefly a local cherry-pick
+# (ae96fd0 + 9da28f5) while the fix for kernel-defects.md D2 was ahead of the
+# revision this tree was proved against; converging on the branch tip retired
+# that apparatus, and the pin has tracked the tip since (d80e61c5: tx_lock
+# becomes a spinlock, panic path removed; a28e94b: no procdump from the
+# console; 2691300: unreachable() split out of panic()).  Nothing here is a
+# local commit: `git -C xv6-riscv checkout --detach $(XV6_REV)` reproduces the
+# image, and that is the whole recipe.
 XV6_REV ?= 2691300c196b19a2965682fc6147220be85a50af
 
 KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.v

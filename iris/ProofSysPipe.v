@@ -6,7 +6,7 @@
        -> copyout(&fd0) -> copyout(&fd1) -> return 0
      bad: null whichever descriptors were installed, fileclose both, return -1
 
-   Seventy-three instructions (KernelInstrs @ 0x800053e8; the listing is in
+   Seventy-three instructions (KernelInstrs @ 0x80005420; the listing is in
    CodeSysPipe.v).  Four things carry the proof.
 
    THE psz BUMP (xv6 0024d4b).  copyout gained a [psz] argument in a1, so

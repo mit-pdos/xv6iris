@@ -298,3 +298,55 @@ usual reason.  Reach for this shape for any other `static` helper gcc inlines.
   the private copies in CodeUartinit.v / CodeUartPutcSync.v /
   CodePrintk.v are now redundant and the next decode sweep can retire
   them.
+
+## THE TRANSMITTER TOKEN: two locks, one THR (opened GR-1d, 2026-08-13)
+
+**This is the campaign's foundational design decision, and nothing else in the
+uart cone should be built on top of it until it is made.**
+
+Upstream `b7c25cf` restored `uartinit`'s `initsleeplock(&tx_lock, "uart")` --
+`kernel-defects.md` D3's fix -- so the transmit sleeplock really is initialized
+and `ProofUartinit` now walks the call. What uartinit's post does NOT say is
+what that lock protects, and the reason is a collision:
+
+```coq
+SpecPrintkGen.pr_res γd := ∃ l, uart_tx_own γd l ∗ uart_sent γd l   (* pr.lock *)
+UartTxInv.tx_res    γd := ∃ l, uart_tx_own γd l                      (* tx_lock *)
+```
+
+Both want the SAME transmitter token, and only one lock can own it.
+
+**That mirrors something real in the C.** `printk → consputc → uartputc_sync`
+POLLS the THR while holding `pr.lock`; `uartwrite` drives the THR from
+interrupts while holding `tx_lock`. Two locks serialize one device register.
+xv6 tolerates the interleaving because printk is the panic/debug path -- it is
+supposed to work when everything else is broken. The model has one token and
+cannot tolerate it.
+
+### The three ways out
+
+- **(A) The token goes to `tx_lock`** -- what the source forces if `is_txlock`
+  keeps `tx_res`. `pr_res` loses it, so printk can no longer justify a THR
+  write, and the whole printk/panic cone needs a different story.
+- **(B) The token stays with printk** and `tx_lock` is minted over a weaker
+  resource. That edits `UartTxInv.tx_res` / `is_txlock` -- i.e. uartwrite's
+  own interface, the thing the honest uartinit post was supposed to supply.
+- **(C) Split it fractionally**, each lock holding a share. Cheapest textually,
+  but "exclusive right to the transmitter" is not obviously halvable, and a
+  half-token has to mean something at the THR store leaf.
+
+### Why deferring cost nothing, and what it costs to settle
+
+Nothing consumes `is_txlock` today: `uartintr` took no lock after `ae96fd0`,
+`is_txlock` left `SpecBootDevCaps`'s credential bundle for that reason, and
+uartwrite's proof is not written. So `SpecUartinit`'s post stops at
+`SleepLock.sl_fresh a_tx_lock "uart"` -- initsleeplock's six results verbatim,
+which is exactly `new_sleeplock`'s premises MINUS the resource. Truthful about
+what happened, silent about what it guards.
+
+**Strengthening it is a TWO-FILE edit**: the post line in `SpecUartinit.v`, and
+the mint in `ProofUartinit.v` that currently stops at `sl_fresh` (one
+`sl_fresh_new`/`new_sleeplock` step, plus `is_txlock_intro` pairing it with the
+`uart_dlab_off` already in hand). `ProofConsoleinit` and `ProofMain` forward it
+untouched. It belongs here, with `LinkUartwrite`'s disposition -- both are dead
+weight until the same decision is made.
