@@ -1,10 +1,10 @@
 # kexec — the exec() system call
 
-`kexec()` (kernel/exec.c) is **the largest function in the tree**: 287
-instructions / 860 bytes at `KernelSyms.kexec = 0x800046bc`, more than three
-times the next one (`kfork`, 270 B). It is also the only function that is at
-once an FS client, a page-table *builder*, and a `struct proc` mutator — the
-three subsystems meet nowhere else.
+`kexec()` (kernel/exec.c) is **the largest function in the tree**: 289
+instructions / 864 bytes at `KernelSyms.kexec = 0x80004754`, more than three
+times the next one (`kfork`). It is also the only function that is at once an
+FS client, a page-table *builder*, and a `struct proc` mutator — the three
+subsystems meet nowhere else.
 
 Design lives here rather than in `design/`: the pieces it needs belong to
 subsystems that already have design files
@@ -13,43 +13,81 @@ subsystems that already have design files
 [`tlb-translation.md`](../design/tlb-translation.md)), and what is
 kexec-specific is the *composition*.
 
+## CHECKPOINT — read this first
+
+**Proven: `+0x000 .. +0x0cc`.** Phase A entire (`ProofKexecA.kxc_phaseA`) and
+phase B's first chunk (`ProofKexecB.kxc_b1`). Three of kexec's eight `bad:`
+entries are discharged. Full tree green as of xv6 rev `0024d4b`.
+
+**Next: phase B2 — the phdr loop and the inlined loadseg loop** (`+0x0ce ..
++0x1ac`). Its entry seam `ProofKexecB.kxc_at_12c` and its no-segments
+sibling `kxc_at_1a2` are already written and proven-into, so B2 starts from a
+fixed interface. See "Worklist" at the bottom.
+
+**Nothing is blocked.** Of the three upstream blockers this project found, two
+were fixed and the third does not gate the proof — it only bounds which
+pathnames the theorem covers (`L ≤ 1`, so `/init` and `sh`, not `/bin/sh`).
+
 ## Status
 
 | piece | state |
 | --- | --- |
-| `CodeKexec.v` (287 instr facts, prefix `kxc_`) | **landed**, generated |
-| `CodeFlags2perm.v` (16 instr facts, `fpi_`) | **landed**, generated |
-| `SpecFlags2perm.v` / `ProofFlags2perm.v` / `LinkFlags2perm.v` | **landed, PROVEN AND LINKED** |
+| `CodeKexec.v` (289 instr facts, prefix `kxc_`) | **landed**, generated |
+| `CodeFlags2perm.v` / `SpecFlags2perm.v` / `ProofFlags2perm.v` / `LinkFlags2perm.v` | **PROVEN AND LINKED** |
 | `ElfEnc.v` — the ELF byte vocabulary | **landed** |
 | `ProcInv.proc_priv_newspace` / `proc_priv_name` / `upd_name` / `upd_exec` | **landed** |
-| `SpecKexec.v` — the contract | **landed** |
-| `SpecCopyout` generalized (`COPYOUT_GEN` + `co_license`) | **landed, proven** |
+| `SpecKexec.v` — the contract, incl. `fs_fabric` | **landed** |
 | `SpecSafestrcpy` source relaxed (`ssc_src_ok`) | **landed, proven** |
 | `SpecWalkaddr` failure arm made informative | **landed, proven** |
 | `StackBytes.slotsn_bytes_own` (general n-slot carve) | **landed, proven** |
 | `WpSconfAlu` base-encoded sp movers (width-generic) | **landed, proven** |
 | `ProofKexecParts.v` — frame carve, `kxc_epi`, `kxc_frame` | **landed, proven** |
+| `ProofKexecTail.v` — frame/seam algebra + the shared `+0x064` tail | **landed, proven** |
 | `ProofKexecA.v` — **PHASE A PROVEN** (`kxc_a1`/`kxc_a2`/`kxc_phaseA`) | **landed, proven** |
-| `ProofKexecB/C/D.v` — phases B, C, D | NOT STARTED |
+| `ProofKexecB.v` — **B1 PROVEN** (`kxc_b1`, + the two seams) | **landed, proven** |
 
-`exec.c` is 1/2 functions, 32/892 bytes. `Print Assumptions
-Flags2perm.wp_flags2perm_sconf` is byte-identical to what every leaf carries
-(the 5 platform axioms + funext).
+**WHERE TO PUT A LEMMA TWO PHASES SHARE: `ProofKexecTail.v`, NOT `ProofKexecA.v`.**
+Phase B used to `Require Import ProofKexecA` for six pieces of frame/seam
+vocabulary and for one lemma, `kxc_bad64` — the `+0x064` tail that B's own
+`+0x31c` tail jumps into. Nothing requires either proof file (they are both
+leaves), so that edge bought nothing and cost the one thing a leaf can still
+cost: it put A and B **in series** on the build's critical path, which at the
+time *was* `SpecKexec → ProofKexecA → ProofKexecB` and was the longest chain in
+the tree by ~40 s. `ProofKexecTail.v` now holds the frame algebra, the seam
+definitions and the `KexecTailProof` functor (`kxc_exit_m1`, `kxc_bad64`, the
+`kxa_*` icache accessors); A opens it as `T` and B as `A`, at the same seven
+modules each already named. **Every later phase will hit this too** — C and D
+both reach the epilogue through tails A already proved — so put the next shared
+tail in `ProofKexecTail.v` when you prove it, and keep phase files reaching each
+other only through that one.
+| phase B2 — the phdr + loadseg loops | **NEXT** |
+| phases C, D, `LinkKexec.v`, `sys_exec` | not started |
 
-Two things worth keeping from `flags2perm`, small as it is:
+`exec.c` is 1/2 functions, 32/896 bytes; the tree is 170/189 functions and 81%
+of text bytes.
 
-- **THE MACHINE COMPUTES A DIFFERENT EXPRESSION FROM THE C, and the contract
-  states the machine's.** gcc turned `if (flags & 0x1) perm = PTE_X` into a
-  SHIFT-AND-MASK (`slliw a0,a0,3` then `andi a0,a0,8`), so no branch is
-  emitted for it and the answer is `8 * bit0`; only the second test survives
-  as a `beqz`. Stating `f2p` on the two BITS rather than on two comparisons is
-  what makes the contract need no range premise on the `int` argument — both
-  `andi`s clear every bit `slliw`'s sign extension could have reached.
-- **`bitblast` does not exist here** (stdpp 1.12 ships only
-  `bv_simplify`/`bv_solve`, and `bv_solve` ends in `lia`, which cannot see
-  through `Z.land`/`Z.shiftl`). Bit-level facts are hand-driven at the
-  `Z.testbit` level, in the style of `ProcPtOwn.z_pgd_land`; stdpp's
-  `bv_*_unsigned` lemmas hold by `done`, which makes the descent cheap.
+### What moved under us, and what it cost
+
+Two xv6 revision bumps landed during this work (`ae96fd0`, the split sleep
+protocol and its relayout; `0024d4b`, the vmfault fix below). **kexec's
+address, size and instruction count all changed** — it was 287 instructions at
+`0x800046bc`, it is 289 at `0x80004754`, because `copyout` gained an argument.
+The proofs came through: addresses in `Code<F>.v` are symbol-relative by
+design, and upstream carried `ProofKexecA`/`ProofKexecB` across both bumps.
+**The frame is unchanged** — still 544 bytes, still the same spill slots
+(re-verified from the regenerated `CodeKexec.v`, not from the C).
+
+Two operational notes paid for in this project, both now in `durable-notes.md`
+and both worth re-reading before the next session:
+
+- **After a pull that lands a new `kernel-rocq/*.v`, run `make kernel-rocq`.**
+  Nothing in `iris/` rebuilds the image `.vo`, and `xv6-rev-check` and
+  `check-decode` both PASS while it is stale because they read the `.v`. The
+  symptom is a bogus address mismatch at the bottom of the tree taking all 145
+  `Code*.v` with it.
+- **Rebase, then build, then push** — never push while the verification build
+  is running. A dead-import sweep cannot conflict textually and still breaks
+  a brand-new file, whose imports nobody has ever pruned.
 
 ## The shape of the function
 
@@ -214,7 +252,7 @@ but it buys nothing while the contents are existential anyway.
 `procdump`, which `design/proc-struct.md` already records as unprovable as
 written.
 
-## Phase B: the design, and the ONE upstream gap it predicts for phase C
+## Phase B: the design
 
 Phase B is `+0x090 .. +0x1ac`: `proc_pagetable`, the seven lazy spills, the
 phdr loop with the INLINED `loadseg` inside it, and the closing
@@ -248,50 +286,29 @@ kxc_covered sz um := forall vpn, (bv_unsigned vpn * 4096 < uint sz)%Z ->
                        exists w, um !! vpn = Some w /\ pte_vu w
 ```
 
-### THE GAP: `SpecUvmalloc` does not say what its new leaves ARE
+### THE GAP THAT WAS PREDICTED HERE IS GONE — and how it went
 
-Its success arm pins `uptd_ext P P'` and `dom P'.(ud_um) = dom P.(ud_um) ∪
-vpn_run vpn0 n` — **the DOMAIN and nothing else.** The old leaves survive by
-`uptd_ext`; the new ones have no stated value, so `pte_vu` is not derivable,
-and neither is anything about their permission. `proc_pt_wf` does not help:
-its `upt_acc_wf` conjunct explicitly permits `uleaf_denied`.
+This section used to say phase C would need `SpecUvmalloc` strengthened to
+publish its new leaves' permission, because `copyout`'s mapped arm needed
+`co_mapped` (with `pte_vu`) over pages uvmalloc had just created, and
+`uvmclear`'s premise needed the leaf's flag bits on top of that.
 
-This is the *same shape* as the `co_mapped` mistake — "the map has an entry
-here" is not "walkaddr will find it" — and it is the second time on this
-project that a domain-only statement turned out to be too weak.
+**None of that is true any more, and the reason is worth keeping.** xv6 rev
+`0024d4b` changed the KERNEL: `vmfault` now takes the size as an argument and
+maps into the pagetable it was handed, instead of `myproc()->pagetable`.
+`copyin`/`copyout`/`copyinstr` gained a matching `psz` in a1 (shifting every
+later argument down a register), and all four contracts DROPPED `p_sz` and
+`p_pagetable` — those premises existed only because the vmfault underneath
+read those cells. Phase C now passes `psz` and needs nothing about its
+destination range at all.
 
-**Phase B does not need it**; the one place it would (refuting
-`panic("loadseg: address should exist")` when `walkaddr` returns 0) is covered
-for free by the `panic_wp_any` kexec's contract already carries for ilock's
-live panic. **Phase C does**: `copyout`'s mapped arm needs `co_mapped` — with
-`pte_vu` — over the stack pages that phase C's own `uvmalloc` has just
-created, and there is no other way to get it.
+`ProofKexecB.kxc_covered` — the "everything below `sz` is mapped" dual of
+`um_below`, carried in the phdr loop invariant precisely to feed that gap — is
+now **dead weight**. It is flagged in place rather than removed, because it was
+noticed mid-bump; **phase B2 should drop it from `kxc_at_12c`** unless the loop
+turns out to want it for its own reasons. Check before deleting: `um_below` is
+still needed (proc_freepagetable's premise), only its dual is orphaned.
 
-*The fix*, when phase C reaches it: publish the new leaves' PERMISSION, i.e.
-
-```coq
-⌜forall i, (i < n)%nat -> exists ppn,
-   P'.(ud_um) !! vpn_at vpn0 i = uvm_pte (Z.lor xperm 18) ppn⌝
-```
-
-**Do not narrow this to `pte_vu`, tempting though it is.** `copyout`'s
-`co_mapped` wants only `pte_vu`, so on that evidence alone the weaker conjunct
-looks like the right minimal ask — but the call three instructions earlier
-settles it. `SpecUvmclear` takes
-
-```coq
-P.(ud_um) !! vpn = Some w -> uvm_perm_ok (Z.land (pte_flags10 w) 1007) -> …
-```
-
-so phase C has to exhibit the guard page's leaf and prove a predicate about
-its FLAG BITS, which `pte_vu` cannot give. Two consumers, and the second wants
-strictly more than the first — check both before choosing the shape. (This was
-narrowed to `pte_vu` and then reverted, on exactly that oversight.)
-
-The proof is immediate: mappages builds that leaf, and the
-`uvm_perm_ok (Z.lor xperm 18)` premise is already in uvmalloc's statement for
-it. Do it as part of phase C, not before: it is one file plus `ProofUvmalloc`,
-and phase C is the caller that pins the shape.
 
 ## Block-interface conventions (decided before the first block was written)
 
@@ -412,82 +429,54 @@ pay it and move on; if no, the callee's contract is wrong and generalizing it
 is the work. Relaxing namei/namex/nameiparent and copyout's source to a
 fraction remains available and is nobody's blocker.
 
-## THE THREE UPSTREAM SPEC CHANGES — TWO DONE, ONE OPEN
+## THE THREE UPSTREAM BLOCKERS — TWO FIXED, ONE OPEN AND NOT GATING
 
 None of these is kexec's own design going wrong; each is a callee contract
 that was stated for the callers it had, and all three were found by trying to
 compose them. **§1 (copyout) and §2 (safestrcpy) are FIXED and the tree is
 green; §3 (the log budget) is open** and belongs to the fs-namei project.
 
-### 1. `SpecCopyout` assumed the destination table is the RUNNING process's — **FIXED**
+### 1. copyout assumed the destination table is the RUNNING process's — **FIXED IN THE KERNEL, and that is the lesson**
 
-`wp_copyout_sconf_body` demanded `p_pagetable p ↦₈{dqp} page_base P.(ud_root)`
-and `p_sz p ↦₈{dqs} szv`. That was not decoration: copyout calls `vmfault`,
-and `vmfault` reads `p->sz` for its bound check and maps into **`p->pagetable`
-— not the table it was passed** (kernel/vm.c). kexec copies into a table that
-is not installed yet, so the premise was unpayable.
+`copyout` demanded `p_pagetable p ↦₈ page_base P.(ud_root)` and `p_sz`, which
+was really the unstated claim "the table you are copying into IS the running
+process's". It is not, in exec: kexec copies its argument strings into a table
+it has built and not yet installed.
 
-`SpecCopyout.co_license` is now that dependence as a resource, and
-`COPYOUT_GEN` is the contract over it; `COPYOUT` is `COPYOUT_GEN` at
-`arm := true`, derived, so all five existing callers (either_copyout,
-piperead, kwait, readi, sys_pipe) are untouched.
+I modelled that. `SpecCopyout` grew a `co_license` indexed by a ghost `arm` —
+the process's two cells, or a proof (`co_mapped`, with `pte_vu`) that the
+destination range was already mapped so the `vmfault` call was dead — plus a
+`COPYOUT_GEN` module type with `COPYOUT` derived at `arm := true`. It worked,
+it was proven, all five existing callers were untouched, and it forced
+`SpecWalkaddr`'s failure arm to start carrying its reason.
 
-Three things this cost that were not in the original plan, and all three are
-the reusable part:
+**Then xv6 rev `0024d4b` deleted the whole apparatus by fixing the source.**
+`vmfault` now takes the size as an argument and maps into the table it was
+handed. `co_license`, `co_mapped`, the `arm`, `COPYOUT_GEN` — all gone,
+leaving ONE contract over an arbitrary `proc_pt P`. And it retired the blocker
+*more cheaply* than the workaround did: phase C passes `psz` instead of proving
+`pte_vu` over its whole destination range, and the predicted `SpecUvmalloc`
+strengthening evaporated.
 
-- **`co_license` is INDEXED BY A BOOLEAN, not a disjunction, and that is
-  forced.** The license appears in the *postcondition* too. With a bare
-  `A ∨ B`, a caller who hands in `A` gets back `A ∨ B` and cannot recover its
-  own cells — nothing refutes `B`, because `B` is pure. The "general"
-  contract would then be strictly *weaker* than the one it replaced, and
-  `COPYOUT` would not be an instance of it. **When a resource appears on both
-  sides of a contract, a disjunction in it is not a generalization, it is a
-  loss — index the choice instead.**
-- **"the map has an entry here" is the WRONG mapped-arm condition; it needs
-  `pte_vu`.** walkaddr's test is the merged V&U one (`andi a3,a5,17`), so an
-  entry that is present and valid but has U cleared *still* sends copyout to
-  vmfault. Such entries are not hypothetical: `ProcPtOwn.proc_pt_wf_clear_u`
-  keeps a `uvmclear`'d page in `ud_um` with U gone — which is **exec's own
-  stack guard page**, created one instruction before the copies. The first
-  draft of `co_mapped` omitted `pte_vu` and was therefore false of the machine
-  at precisely the page this project creates.
-- **`SpecWalkaddr`'s failure arm had to start carrying its reason.** It was a
-  bare `a0 = 0`, deliberately information-free ("four reasons, one answer, no
-  caller cares"). A bare `a0 = 0` is permitted *unconditionally*, so no amount
-  of knowledge about the map refutes the branch, and the vmfault call stays
-  alive in the proof even where it is dead in the machine. The arm now
-  reports which of the three tests failed (`2^38 <= va`, `m !! vpn = None`,
-  or `∃ w, m !! vpn = Some w ∧ ¬ pte_vu w`). Blast radius was three
-  `destruct` patterns: `ProofCopyin`, `ProofCopyinstr`, `ProofCopyout`.
-  Generalising a caller can require making a *callee's* failure arm
-  informative; budget for it.
+**THE LESSON, and it is the most valuable thing this project produced.** The
+divergence was noticed early. This very file said so — and then said, in
+so many words, that because it was unreachable from kexec it was *"not a
+`kernel-defects.md` entry"*. **That call was wrong.** The tell was already
+visible: a contract needed an elaborate, indexed, two-armed apparatus to
+describe a function that is total and has no panics, purely to model a
+divergence between what the code does (`ismapped` on the table it was passed,
+`mappages` on its own) and what every single caller wants. When a spec needs
+scaffolding to model a gap between the code's behaviour and its every caller's
+intent, **suspect the code, and price fixing it before building the
+scaffolding** — even when the divergence is unreachable from where you stand.
+Unreachability makes it safe, not correct.
 
-Note in passing: the divergence between "the table passed" and
-"`p->pagetable`" inside `vmfault` is a real latent inconsistency in xv6, not
-just a spec artifact. It is unreachable from kexec (the pages are mapped), so
-it is **not** a `kernel-defects.md` entry — but it is why the generalised
-contract forbids the fault path rather than modelling it.
+What survived and was worth keeping: `SpecWalkaddr`'s informative failure arm
+(a bare `a0 = 0` is permitted unconditionally, so no knowledge of the map can
+refute the branch), and the rule that **when a resource appears on both sides
+of a contract, a disjunction in it is not a generalization but a loss — index
+the choice**. Both are in `durable-notes.md`.
 
-The derived `COPYOUT` came out at **38 lines, 18 of them proof** — apply the
-general lemma at `arm := true`, pack the license, unpack it in the
-continuation. That number is the check on whether the indexing was right: the
-first (disjunction) draft could not do it at any length.
-
-One mechanical trap the indexing introduced, now in `durable-notes.md`: an
-`if`-on-a-ghost-index definition drops the arguments its taken branch does not
-mention, so at a literal arm they are phantom and a crossing that leaves them
-to unification shelves them — surfacing as *"Attempt to save an incomplete
-proof"* ~350 lines later. Apply the license movers with every argument
-explicit.
-
-Two small relocations were deliberately deferred to avoid a mid-tree
-recompile; both are `Local` today with their homes named in comments:
-
-- `wa_pte_vu_bits_inv` (the converse of `PtBuild.pte_vu_bits`, plus the
-  `wa_sub_*` / `wa_z_mod_to_bit` / `wa_bit17` field extractions it restates)
-  → `PtBuild.v`, beside `pte_vu_bits`.
-- `co_pte_vu_set_ad` and `co_pte_set_ad_flag_U` → `PtAdBits.v`, beside its
-  existing V/R/W/X siblings (`flag_U` is the one that file is missing).
 
 ### 2. `SpecSafestrcpy` over-asked its SOURCE — **FIXED**
 
@@ -628,23 +617,89 @@ first one to name it.
 
 ## Worklist
 
-1. ~~The two callee re-proofs (§1 and §2 above).~~ **DONE.** Phases C and D
-   are unblocked. §3 remains, and caps kexec's contract at `L ≤ 1` path
-   elements until namei's success-arm budget is tightened.
-2. **Phase A** — `ProofKexecA.v`, entry through the ELF-header readi and the
-   magic test, plus the two short `bad:` tails that are reachable from it.
-   This is the phase whose *resources* are hardest and whose *control flow* is
-   easiest; get the FS composition right here and B/C inherit it.
-3. **Phase B** — the phdr loop and the inlined loadseg. Two nested fuel
-   inductions. `ElfEnc.v`'s `ph_at`/`ph_at_succ` is the offset recurrence.
-4. **Phase C** — the argument loops against `kxc_sp`.
-5. **Phase D** — the commit. `proc_priv_newspace` + three `tf_page_word_upd`
-   + `proc_priv_name`; `upd_exec_compose` is the equation that turns the
-   composite back into the contract's `upd_exec`.
-6. **`LinkKexec.v`**, then wire `sys_exec` (which is 0/1 and needs
-   `SpecKexec` plus the argv-page story `fetchstr`/`kalloc` builds).
+Ordered. Each step ends at a seam the next one starts from.
 
-Take the branch-per-phase strategy the fs-icache project uses. Phases A–D
-each end at a join the next one starts from, so they are separable files, and
-the spill points above tell you which callee-saved registers are live across
-each boundary.
+### 1. PHASE B2 — the phdr loop and the inlined loadseg loop (`+0x0ce .. +0x1ac`)
+
+The next thing to write, and the biggest single chunk left. Its interface is
+already fixed and proven-into from both ends:
+
+- **entry**: `ProofKexecB.kxc_at_12c` (the loop body head — the loop's head is
+  its BODY at `+0x12c`, entered by a `j` from the setup, with the
+  increment-and-test at `+0x11a..+0x128` as the back edge), and its
+  no-segments sibling `kxc_at_1a2`;
+- **exit**: `+0x1ae`, phase C's entry, which needs designing as a named seam
+  the way `kxc_at_12c` was.
+
+Inside it: `readi(&ph)`, four validity tests, `flags2perm`, `uvmalloc`, then
+the loadseg page loop (`walkaddr` + `readi` straight into the physical page,
+entered at `+0xf6` from two places). Two nested fuel inductions. It owns SIX
+of kexec's eight `bad:` entries (`+0x31c +0x320 +0x33c +0x342 +0x348 +0x34e`
+— note these addresses moved with the bumps; re-derive them, do not trust the
+numbers here).
+
+Specific things already established for it:
+
+- **Drop `kxc_covered`** from the loop invariant unless B2 wants it — see
+  "THE GAP THAT WAS PREDICTED HERE IS GONE". `um_below` stays.
+- `panic("loadseg: address should exist")` is a LIVE panic and is discharged
+  free by the `panic_wp_any` the contract already carries for ilock's.
+- `off` is stated through the `int` truncation
+  (`sign_extend' 64 (Z_to_bv 32 (ph_at ef i))`) — the C's `int off` makes the
+  machine use `lw`/`addiw`, so the register only ever holds the low 32 bits.
+- The elf buffer travels NAMED from `+0x12c` on, not as existential-contents
+  `stack_own`: the loop re-reads `elf.phnum` and phase D reads `elf.entry`.
+- `readi` here is on its KERNEL arm into a physical user page; get the bytes
+  out of `proc_pt` with `ProcPtOwn.proc_pt_page_acc`, which yields `page_own`
+  = a 4096-byte `↦ₘ` big-op, then split at the offset.
+
+### 2. PHASE C — the stack (`+0x1ae .. ~+0x2dc`)
+
+`uvmalloc` two pages, `uvmclear` the guard page, then per argument `strlen` +
+`copyout`, then one `copyout` of the pointer vector. **Now unblocked and
+cheaper than planned**: copyout takes `psz` and says nothing about the
+destination range. `SpecKexec.kxc_sp` / `kxc_sp_final` / `kxc_stack_ok` are
+the pure model of the two push loops, already written.
+
+### 3. PHASE D — the commit (`~+0x2dc .. +0x30c`)
+
+`proc_priv_newspace` (the address-space bridge that does not pin `ud_root`) +
+three `tf_page_word_upd` at `tf_epc_idx` / `tf_sp_idx` / `tf_arg_idx 1`, then
+`proc_priv_name`, then `proc_freepagetable` of the OLD table at the OLD size.
+`upd_exec_compose` turns the composite back into the contract's `upd_exec`.
+All four lemmas exist and are proven; this should be the shortest phase.
+
+### 4. `LinkKexec.v`, then `sys_exec`
+
+`sys_exec` is 0/1 with `CodeSysExec.v` already generated upstream. It builds
+the argv array kexec's contract consumes (a kalloc'd page per argument via
+`fetchstr`), so its spec and kexec's want designing against each other.
+
+### 5. Optional, none blocking
+
+- Tighten `SpecNamei`'s SUCCESS-arm budget to `L * iput_units` (namex iputs
+  the parents and RETURNS the last inode), which widens kexec from `L ≤ 1` to
+  `L ≤ 2`. Belongs to the fs-namei project. Then relax kexec's premise — it is
+  a one-line edit, NOT automatic; see blocker 3.
+- Promote `fs_fabric` to a shared `FsFabric.v` once a second contract wants it.
+- Relocate `wa_pte_vu_bits_inv` → `PtBuild.v` and `co_pte_vu_set_ad` /
+  `co_pte_set_ad_flag_U` → `PtAdBits.v` (left `Local` to avoid a mid-tree
+  recompile; note the second pair may have died with the copyout rewrite —
+  check before moving).
+- Hoist `ROOTDEV` out of `SpecNamex.v`; deduplicate the three identical
+  `ic_sleeplocks` definitions.
+
+## Reading order for whoever picks this up
+
+1. This file's CHECKPOINT, then "Block-interface conventions" (six numbered
+   rules A/B/C/D compose under — they are what keep the seams from being
+   renegotiated).
+2. `SpecKexec.v`'s header — what the contract says and what it deliberately
+   does not.
+3. `ProofKexecA.v` for the idiom, `ProofKexecB.v` for the seam you continue
+   from, and `ProofKexecTail.v` for the frame/seam vocabulary both of them are
+   written in (and for the `+0x064` tail any new phase's failure arm will want).
+4. `durable-notes.md`'s newer traps, all of which were paid for here: the
+   `[-]` spec pattern eating hypotheses named after it; `iFrame` at syscall
+   altitude not terminating; the exit having to be handed back when two halves
+   both own a `-1` tail; and the `make kernel-rocq` step after a pull.

@@ -198,7 +198,7 @@ Require Import SpecDirlink.
 Require Import SpecNamei.
 Require Import SpecProcPagetable.
 Require Import ProofKexecParts.
-Require Import ProofKexecA.
+Require Import ProofKexecTail.
 Require Import ProofKforkParts.
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
@@ -693,15 +693,17 @@ End KexecBSeam.
 (* ===================================================================== *)
 (*  THE PROOF.                                                            *)
 (* ===================================================================== *)
-(* [Iunlockput] and [EndOp] are used only through phase A's [kxc_bad64], but
-   that lemma lives inside [ProofKexecA.KexecAProof], so all seven of its
-   functor arguments have to be supplied here. *)
+(* [Iunlockput] and [EndOp] are used only through the +0x064 tail
+   [kxc_bad64], so all seven of that functor's arguments have to be supplied
+   here.  The tail lives in ProofKexecTail.v rather than in ProofKexecA.v so
+   that phase B does not have to wait for phase A to compile; see that file's
+   header. *)
 Module KexecBProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
                    (Ilock : ILOCK) (Readi : READI) (Iunlockput : IUNLOCKPUT)
                    (EndOp : END_OP) (PPT : PROC_PAGETABLE_GEN).
 
-Module A := ProofKexecA.KexecAProof Myproc BeginOp Namei Ilock Readi
-                                    Iunlockput EndOp.
+Module A := ProofKexecTail.KexecTailProof Myproc BeginOp Namei Ilock Readi
+                                          Iunlockput EndOp.
 
 Section KexecBBody.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,

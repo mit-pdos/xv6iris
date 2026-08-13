@@ -21,6 +21,44 @@ cheap in this tree, and none of these entries should be fixed casually.
 
 ---
 
+## HOW TO TELL A KERNEL DEFECT FROM A SPEC PROBLEM
+
+Read this before deciding a divergence is "just" something to model. It was
+learned expensively on `kexec`.
+
+**The tell is scaffolding.** `copyout` is total — no panics, any `dst`, any
+length — yet its contract could not be applied by exec at all, because
+`vmfault` underneath checked `ismapped` on the table it was HANDED while
+calling `mappages` on `myproc()->pagetable`. That divergence was noticed, and
+was explicitly ruled *not* a defect here on the grounds that it is unreachable
+from exec (exec's pages are already mapped). What followed was an indexed,
+two-armed `co_license` apparatus with its own module type, plus a
+strengthening of `SpecWalkaddr`, plus a *predicted* strengthening of
+`SpecUvmalloc` — all of it, in the end, machinery for describing one line of
+wrong C. Upstream then fixed the source (`vmfault` takes the size and maps
+into the table it was given), and the entire apparatus was deleted, leaving a
+simpler contract than before AND a cheaper obligation on exec than the
+workaround had.
+
+So:
+
+- **When a contract needs an elaborate case split to describe a function that
+  is total and has no panics, suspect the code**, not the specification. A
+  total function should have a contract shaped like one.
+- **When the case split exists only to say "and in this case the callee does
+  something no caller wants", that is a bug report, not a design.**
+- **Unreachability makes a defect safe, not correct.** "No current caller can
+  reach it" is a reason not to *panic* about it; it is not a reason to build
+  around it. Price the source fix first — it is often smaller than the
+  scaffolding, and it makes every downstream obligation cheaper rather than
+  more expensive.
+- The image is pinned by `XV6_REV`, so a source fix is not free (see the note
+  at the top of this file, and the "Changing the kernel SOURCE" section of
+  `durable-notes.md`). Price it; do not assume it is out of reach. Two xv6
+  revision bumps landed during the kexec work and the proofs came through
+  both, because `Code<F>.v` addresses are symbol-relative by design.
+
+
 ## D1 — `writei` releases a modified buffer without logging it
 
 **Found:** 2026-08-06, proving `writei` (`fs.c`).
