@@ -724,10 +724,46 @@ Qed.
         explicitly deferred to W5.
     WHY DECLARED: discharging them means a syntactic analysis of the rv64d
     decoder's ~thousands of generated branches.
-    UPGRADE PATH: a decidable [sail_shapedb] with a reflection lemma, evaluated
-    on [riscv_step tick] per opcode — bounded, mechanical work, and it is the
-    same shape as the [nz_writes] obligation already owed by
-    [WeakInterpProj.wrun_exec_wf]'s callers.
+
+    STATUS AFTER STAGE C3 (2026-08-13) — THE SEAM IS NOT CLOSED, AND THE
+    REASON IS NOW A THEOREM RATHER THAN AN ESTIMATE.  The syntactic analysis
+    exists and is mechanized: [WeakShape.v] (the compositional kit),
+    [WeakShapeOverrides.v] (the [gwalk]-mode combinators, [gsilent], the
+    escape index) and the generated [WeakShapeGen*.v] sweep
+    ([tools/gen_shape.py], [make gen-shape]) machine-check [gwalk None] —
+    i.e. [sail_shaped] — for 294 of the 341 monadic definitions reachable
+    from [rv64d.try_step].  What stops the seam from closing is not the
+    volume of branches but TWO FACTS ABOUT THE MODEL:
+
+      (O4) [∀ b, sail_shaped (riscv_step b)] is FALSE.  A STANDALONE
+           STORE-CONDITIONAL ([rv64d.execute_STORECON]) issues a
+           [Write_RISCV_conditional] RAM write — [ak_latest = true] — with
+           NO exclusive [MemRead] in the same instruction, because the lr/sc
+           reservation lives in the model's pure axioms and the matching [lr]
+           is a different [riscv_step].  The AMO-PAIRING conjunct above
+           forbids exactly that.  Machine-checked at the site:
+           [WeakShapeOverrides.sail_shaped_write_ram_con_False].  This is the
+           mirror of stage C1's (O2) (an exclusive read with no conditional
+           write), which C2 fixed by weakening [amo_tail]'s [Interface.Ret]
+           arm and adding [sail_mstep]'s bare exclusive-read arm; the write
+           side needs the symmetric treatment — a BARE CONDITIONAL-WRITE arm
+           in [sail_mstep] (the write steps as a plain [LStore]; the machine
+           only gains behaviors) and the [ak_latest = false] conjunct
+           dropped, with a target-indexed run-local side condition joining
+           [dev_ok_blk]/[fused_blk].
+      (O5) Three of [rv64d]'s [Axiom]s are MONADIC ([load_reservation],
+           [cancel_reservation], [plat_term_write]) and all three are
+           reachable from [try_step], so no shape fact about them is provable
+           at all.  The seam's residue after (O4) is therefore three POINT
+           premises about those axioms, not a [∀ b] premise.
+
+    UPGRADE PATH: (O4)'s LTS fix first (it is a specification change, of the
+    same size as C2's), then the 47-function residue of the sweep — the
+    misaligned-split loop, [0 < split_width], and the exclusive window
+    carried from [checked_mem_read] to [checked_mem_write] through
+    [catch_early_return]/[liftR]/[untilMT], which is what
+    [WeakShapeOverrides] §3's escape index was built to compose.  Details and
+    the ordered plan: [claude-notes/projects/weak-memory-premises.md].
 
     ------------------------------------------------------------------------
     WHAT IS *NOT* ON THIS LIST, because it is machine-checked: the Layer-1

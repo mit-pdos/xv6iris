@@ -230,11 +230,136 @@ discharge it).
   the escape-free case (the present one, for the ~330 functions issuing no
   exclusive read) and the escaping case (quiet continuation).**  It is a
   sweep-side addition; the SPECIFICATION is settled in `WeakSailLTS`.
-- **C3** — `tools/gen_shape.py` emitting the 358 per-function lemmas
-  in topological order (`Hint Resolve` as the dependency mechanism)
-  + the hand-written override list (memory wrappers, 4 loop sites,
-  exclusive sites, O3's reachability facts) → discharge the two
-  `∀ b` facts and DELETE them from the capstones (retiring seam (6)).
-  Start only after B lands and is green.
+- **C3 (LANDED 2026-08-13, PARTIAL — the two premises STAY)** — the
+  generator, the kit completion and the sweep landed; the two `∀ b`
+  premises could NOT be deleted, because BOTH stage-C goals are still
+  false/blocked for two reasons neither C1 nor C2 looked at.  See the
+  findings (O4)/(O5) below.  What landed:
+  - **`tools/gen_shape.py`** (+ `make gen-shape` / `make check-shape`), in
+    the `gen_code.py` style: parses `model-xv6iris/rv64d.v`, builds the
+    call graph (identifier closure with comments, string literals AND
+    LOCALLY-BOUND NAMES removed — without the last filter the graph has
+    spurious cycles, because Sail names local `let`s after global
+    definitions), topologically sorts the monadic definitions reachable
+    from `try_step` and emits `iris/WeakShapeGen<nn>.v` shards:
+    `Lemma gw_<f> : ∀ a0..an, gwalk None (@<f> a0..an).
+     Proof. intros; cbv [<f>]; gw_solve. Qed.` + `Hint Resolve … : gshape`.
+    Arity comes from the binder region (the text up to the depth-0 `:`);
+    `@` is used so implicit/typeclass binders are quantified positionally
+    and nothing is left as an evar; a PATTERN binder (`'(C x)`) is
+    destructed up front, because with two of them the body is a `match`
+    APPLIED to the remaining arguments and no tactic rule sees that.
+    Shard *n* Requires **every** earlier shard — `#[export]` hints are
+    activated by `Import` and are NOT re-exported transitively, so
+    requiring only *n−1* silently loses shard 1's hints at shard 3 and the
+    symptom is an "incomplete proof" in a lemma whose callee was proved two
+    shards back (lifted to `durable-notes.md`).  The generator is
+    idempotent on disk (it rewrites a shard only when its text changes),
+    and `iris/WeakShapeTop.v` sits on top of the tower.
+  - **`iris/WeakShapeOverrides.v`** — the hand-written half: the
+    `gwalk`-mode combinators `WeakShape` only had in `gok`/`gquiet` mode;
+    **`gsilent`** (quiet UP TO FAILURE — `gquiet` refutes a `GenericFail`,
+    which ~100 of the model's functions contain, so it cannot be the
+    sweep's predicate); **the ESCAPE INDEX C2 asked for** (`gwalkx`, the
+    weak/abandonment-permitting window reading, with `gwalk_gwalkx`,
+    `gwalkx_shaped`/`gwalkx_amo_tail` and the two bind lemmas:
+    `gwalkx_bind` for escape-free `m`, `gwalkx_bind_silent` for the
+    escaping case with a `gsilent` continuation — added as a NEW fixpoint
+    rather than by editing `gwalk`, so every closed-reading lemma of
+    `WeakShape` transfers unchanged); the tactics `gw_solve`/`gsl_solve`;
+    and §5, the two refutations.
+  - **the sweep itself**: 294 of the 341 monadic definitions reachable
+    from `try_step` are GENERATABLE as `gwalk None` (= `sail_shaped`
+    generalised to any monad type); the 47-function residue is exactly the
+    up-cone of `read_ram`/`write_ram` and of the three opaque monadic
+    axioms, plus `_rec_pt_walk`.  **96 of the 294 are machine-checked in
+    the tree** (`WeakShapeGen01..02.v`), the cut being `gen_shape.py`'s
+    `--limit`.  THAT CUT IS A COMPILE-TIME BUDGET, NOT A DIFFICULTY
+    BOUNDARY, and the budget is the thing to plan around next time:
+    measured here, one 48-lemma shard costs **8–13 minutes of `coqc`**
+    (the extension-enum dispatches dominate — `_rec_currentlyEnabled`
+    alone is 140 s), the cost RISES up the topological order (shard 3 was
+    still running at 33 min when it was cut), and **the shards cannot be
+    built in parallel** because the hint database is the dependency
+    mechanism and each shard `Require`s all the earlier ones.  The whole
+    294 is a multi-hour serial chain; raise `--limit` and regenerate when
+    there is a budget for it (`make gen-shape` lists exactly which
+    functions are below the cut).
+  - **the model's fuel recursions** are the only functions `cbv` +
+    `gw_solve` cannot do alone; they are hand-proved in
+    `gen_shape.py`'s `OVERRIDE_PROOFS` table (emitted at the group's
+    topological position, so a regeneration cannot revert them):
+    `_rec_hartSupports` by `fix` on its `Acc` argument, and the NINE-WAY
+    mutual `_rec_check_stateen_bit`/`_rec_currentlyEnabled`/… block by one
+    `fix` on the SHARED `Acc` proving all nine at once.  The shape that
+    made the mutual one work: after `destruct acc as [acc]`, assert the
+    nine PER-MEMBER instances `K1..K9` of the induction hypothesis at the
+    accessibility subterms `acc y H` — `eauto` cannot project a
+    conjunctive IH, and applying the IH to anything but a subterm breaks
+    the guard condition.
+
+## FINDINGS (2026-08-13, C3 — machine-checked): BOTH stage-C goals are
+## STILL false, for the MIRROR of (O2) and for three opaque model axioms
+
+- **(O4)** `∀ b, sail_shaped (riscv_step b)` is REFUTABLE — **a standalone
+  store-conditional**.  `rv64d.execute_STORECON` issues
+  `vmem_write … (con := true)` → `checked_mem_write … (con := true)` →
+  `write_kind_of_flags aq rl true = Write_RISCV_conditional[_release]` →
+  `write_ram Write_RISCV_conditional …`, i.e. a `MemWrite` whose access
+  kind is `AV_exclusive` (`ak_latest = true`), **with no exclusive
+  `MemRead` anywhere in the instruction**: the lr/sc reservation lives in
+  the model's PURE axioms (`load_reservation`/`match_reservation`/
+  `valid_reservation`), not in a memory event, and the matching `lr` is a
+  DIFFERENT `riscv_step`.  `sail_shaped`'s window-closed `MemWrite` arm
+  demands `ak_latest = false` off device addresses, so it is false at
+  every `sc`.  Machine-checked at the site:
+  `WeakShapeOverrides.gwalk_write_ram_con_False` /
+  `sail_shaped_write_ram_con_False`.
+  This is the EXACT MIRROR of C1's (O2), which found the READ side (an
+  exclusive read with no conditional write) and fixed it in C2; the write
+  side — a conditional write with no exclusive read — was never looked at.
+  RECOMMENDED FIX (the symmetric one, and it is a stage-C2-scale spec
+  change, not a sweep change): (i) drop the `ak_latest = false` conjunct
+  from `sail_shaped`'s window-closed `MemWrite` arm; (ii) add a BARE
+  CONDITIONAL-WRITE arm to `sail_mstep` — the write steps as a plain
+  `LStore` (the machine only GAINS behaviors, the safe direction, exactly
+  as C2's bare exclusive-read arm did); (iii) the ⇐ reconstruction gains a
+  target-indexed run-local side condition ("no bare conditional writes in
+  the block") joining `dev_ok_blk`/`fused_blk`, discharged per image by
+  the checker (the xv6 kernel uses `amoswap`, not `sc`).  Ripple:
+  `WeakSailLTS`, `WeakSailLTS2`, `WeakSailComplete` (`tail_complete`,
+  `amo_reach`), `WeakSailCone`, `WeakComposeLang.wl_lift`.
+- **(O5)** BOTH `∀ b` facts are additionally BLOCKED by **three opaque
+  monadic axioms of the generated model**: `rv64d` declares
+  `load_reservation`, `cancel_reservation` and `plat_term_write` as
+  `Axiom`s of type `M unit`, and all three are reachable from `try_step`
+  (`vmem_read_addr`, `execute_STORECON`, `htif_store`).  Nothing about an
+  opaque constant's shape is provable OR refutable, so even with (O4)
+  fixed the two facts cannot be closed outright.  RECOMMENDED NARROWING:
+  replace the two `∀ b` premises by three POINT premises
+  (`∀ …, gquiet (load_reservation …)` and the two others) — they are in
+  the same ledger family as the 5 rv64d axioms `Print Assumptions`
+  already reports, they are one line each, and they are the honest
+  statement of what the model does not say.  (The alternative — giving the
+  three axioms definitions in `model-xv6iris/riscv_extras.v` — moves the
+  same assumption into the model.)
+- **(O3), the liveness half, was NOT reached and is NOT refuted here.**
+  Two C1 candidates were checked and are DEAD: `mem_read_priv_meta`'s
+  `throw` arms need `(aq, rl) = (false, true)`, and every `vmem_read`/
+  `mem_read` call site passes `rl := aq && rl`, so they are unreachable;
+  and `checked_mem_read`'s `untilMT` has measure `N` with exactly `N`
+  iterations, so its termination guard is provable from `N ≥ 1`.  The
+  liveness half is therefore still OPEN, behind (O4)/(O5), and behind the
+  ~100 remaining reachability obligations.
+
+**Next stage (D-C4).**  Do (O4)'s spec fix FIRST — it is the only one that
+changes a specification, and until it lands the sweep cannot be assembled.
+Then the 47-function residue needs: the misaligned-split loop's liveness
+(`N ≥ 1` from `split_misaligned`), `0 < split_width` (the zero-width-write
+conjunct), the exclusive window carried from `checked_mem_read`'s
+`read_ram` to `checked_mem_write`'s `write_ram` through
+`catch_early_return`/`liftR`/`untilMT` (the escape index of
+`WeakShapeOverrides` §3 is what composes it), and (O5)'s three point
+premises.  Only then does `gok_stageC` close `riscv_step`.
 
 Keep the tree green per commit; findings in commit messages and here.

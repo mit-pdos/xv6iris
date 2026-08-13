@@ -230,6 +230,39 @@ explicit `wp_*_s_sconf` argument and once inside a companion
 `add_vec … sign_extend'` assert or `set`. Update both, or the file fails
 again at the same offset.
 
+## A CHAIN OF GENERATED PROOF SHARDS MUST IMPORT *EVERY* EARLIER SHARD
+
+When a generated tower uses a hint database as its dependency mechanism (the
+`tools/gen_shape.py` design: shard *n* proves lemmas whose callees were proved
+in shards `< n`, and `gw_solve` closes a leaf out of the DB), **`#[export]`
+hints are activated by `Import` and are NOT re-exported transitively.** Shard 3
+requiring only shard 2 therefore sees shard 2's hints and **silently loses
+shard 1's** — and the symptom is not a missing-hint error but *"Attempt to save
+an incomplete proof"* in a lemma whose callee was proved two shards earlier,
+i.e. it reads like a tactic bug in the lemma that failed. Emit
+`Require Import Shard01 … Shard(n-1)` in every shard (or use `#[global]`).
+Cost of the diagnosis when it bites: one full shard compile per guess, and
+these shards run ~10 minutes each.
+
+Two more rules from the same generator, both about the ~10-minute feedback
+loop:
+
+- **Make the generator IDEMPOTENT ON DISK** — write a file only when its text
+  actually changed. A generator that rewrites every shard unconditionally
+  makes `make` rebuild the whole tower after a no-op regeneration.
+- **Put the hint-DB lookup FIRST in the leaf tactic, at depth 1.** With a
+  `first [...]` chain that tries a dozen `apply`s and two nested `solve
+  [...]`s before `eauto with <db>`, the common case (a call to an
+  already-proven generated function) pays for every failing alternative, on
+  every leaf of every proof. Keep the DB premise-free so `eauto 1` suffices.
+  The exception stays the register leaves: `eauto`'s unification does not see
+  through `Arch.reg_type`, so those must be applied **by name**.
+- **A Sail function with more than one PATTERN binder (`'(C x)`) elaborates to
+  a `match` APPLIED to the remaining arguments**, which no
+  `|- P (match ?x with _ => _ end)` tactic rule matches. Destruct the pattern
+  arguments up front — the generator knows which they are from the binder
+  region, so this is derived, not guessed.
+
 ## Write the checker for a refactor's SILENT failure mode, before the sweep
 
 If a change has a way of going wrong that still compiles, that way WILL be

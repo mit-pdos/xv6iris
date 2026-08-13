@@ -897,6 +897,10 @@ WeakSailLTS.v
 WeakSailLTS2.v
 WeakSailComplete.v
 WeakShape.v
+WeakShapeOverrides.v
+WeakShapeGen01.v
+WeakShapeGen02.v
+WeakShapeTop.v
 WeakComposeLang.v
 WeakCompose.v
 WeakLang.v

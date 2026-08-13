@@ -76,6 +76,7 @@ USER_DUMPS ?= sync:Sync
 
 .PHONY: all proofs model kernel user dump dump-force kernel-rocq user-rocq \
         xv6-rev-check sail-rev-check gen-code check-decode update-decode \
+        gen-shape check-shape \
         gen-sites check-sites \
         clean clean-proofs distclean model-gen
 
@@ -188,6 +189,21 @@ GENFILES := $(addprefix $(IRIS)/,$(shell $(PYTHON) -c "import json;print(' '.joi
 check-decode: gen-code
 	git diff --exit-code -- $(IRIS)/KernelDecode*.v $(GENFILES)
 update-decode: gen-code
+
+# The stage-C3 SHAPE sweep over the Sail model: the same generated-not-patched
+# rule as the decode layer, with model-xv6iris/rv64d.v as the input.
+#
+#   make gen-shape     regenerate iris/WeakShapeGen*.v from the model
+#   make check-shape   regenerate, then fail if anything moved
+#
+# A hand-patched shard is silently reverted by the next gen-shape; anything
+# needing a hand proof belongs in iris/WeakShapeOverrides.v or in
+# tools/gen_shape.py's OVERRIDE_PROOFS table (which is emitted in the group's
+# topological position, so the hint database still orders it).
+gen-shape:
+	$(PYTHON) tools/gen_shape.py --outdir $(IRIS) --report
+check-shape: gen-shape
+	git diff --exit-code -- $(IRIS)/WeakShapeGen*.v
 
 # The memory-ordering SITE enumeration, a sibling of the decode layer: same
 # inputs (the tracked kernel-rocq/ dump), same rule that its outputs are
