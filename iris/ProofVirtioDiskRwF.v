@@ -1904,6 +1904,7 @@ Section ProofVirtioDiskRwF.
               (vdrw_sector_raw bno) m lks HK Hj Hjl Hglen Hregs Hhi
               with "Hcg Hown Htc Hclm Htext Hpc Hpanic Hpinv Hgeom Hlk
                     Htok HR Hscr").
+    all: try lkbelow.
     (* ---- P3: the chain formatting ---- *)
     iApply (P3.wp_vdrw_p3_seam (CID := CIDa) γk γs j γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
