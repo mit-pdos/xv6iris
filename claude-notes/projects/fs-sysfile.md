@@ -6929,3 +6929,93 @@ its reload story, the mint verified TO THE PREMISE with nothing to
 invent, the file-arm re-park simpler than briefed (dir_links_dirlink
 direct; the live/of_ilink round trip is mkdir-only), and A-FAIL supplied
 end to end.
+
+
+### D₀-a INCREMENT 3b LANDED — the append-fits premise is retired, writei's
+### -1 return rides the `tot = 0` corner, and the size cap is RELAYED.
+### **One clause was weakened beyond the ruling and wants ratifying:
+### `dn0' = dn'` is now `dn0 = dn -> dn0' = dn'`.**
+
+**THE PREMISE IS OUT OF BOTH BODIES.**  `bv_unsigned (di_size dn) + 16 <=
+MAXFILE*BSIZE` is gone from `wp_dirlink_sconf_body` and
+`wp_dirlink_gen_body`; a comment stands in its place so nobody re-adds it.
+`ProofDirlink`'s two `intros` lines lose `Hfit`, and `Hfit'`, `Hmbn`,
+`Hk0n` and `dl_le_add` go with it.  What survives of that chain is one
+inequality — `Hk0fit : Z.of_nat (16*k0) <= 274432`, from `Hk0le` (the slot
+is at most `nrec`) and the still-standing `Hszb` — and `dl_lt31` was
+restated at it (`x <= 274432 -> x + 16 < 2^31`), which is all writei's
+joint bound ever needed.
+
+**THE -1 ROUTE, AND WHY IT IS NOT AN ARM OF ITS OWN.**  writei's -1 return
+has two reasons.  The first (`size < off`) is still refuted by `Hk0le`.
+The second (`MAXFILE*BSIZE < off + 16`) is LIVE, and it is the FULL
+DIRECTORY and nothing else: `off` and `MAXFILE*BSIZE` are both multiples of
+sixteen and `off <= size <= MAXFILE*BSIZE`, so it forces
+`off = size = MAXFILE*BSIZE`.  That is what the C does, and every clause of
+the `found = false` arm at `tot = 0` holds there:
+
+* `dn' = wi_dinode dn bm' (16*k0) tot` **holds as the ruling claimed**: at
+  `tot = 0` with `bm' = bm` and `off <= size`, `wi_dinode` is the IDENTITY
+  — `max(size, off+0) = size`, and its addrs field is `bm_cells bm`, which
+  is the premise `di_addrs dn = bm_cells bm`.
+  `ProofDirlink.dl_wi_dinode_id` is that one-line record surgery
+  (`destruct dn; reflexivity` under a false `decide`).
+* the **branchless clause** is its second disjunct at `tot = 0 < 16`: the
+  tail computes `a0 := -(writei(...) != 16)`, and `-1 - 16` is not zero
+  either (`dl_snez_m1`), so it answers -1 exactly as a short write does.
+* **3a's `tot = 0` spend clause covers it as-is** — `dl0_spend = 4` is
+  writei's coarse `wi_cost_bmonly`, and this route spends NOTHING
+  (`n' = ncount`), so the bound is loose and true.  `dl0_spend`'s comment
+  now names both routes and says which one it is sized for.
+* every remaining conjunct (`used ⊆ used'`, `blkmap_wf`, `blk_holes_zero`,
+  `di_addrs`, `< 2^31`, `bm_covers`, the range clause, `Sb ⊆ Sb'`, the
+  counted bound) is a writei clause stated OUTSIDE its two arms and needed
+  no case split at all.
+
+**THE WALK DID NOT FORK, AND THAT IS THE TECHNIQUE WORTH KEEPING.**
+Everything from +0x90 on reads `a0` through ONE derived fact —
+`Hsnez : snez (a0 - 16) = if decide (tot = 16) then false else true` — so
+the two writei outcomes ride a single disjunction (`Hwiok`) and the
+branchless tail, the lazy restore and the epilogue are shared verbatim.
+Exactly two bullets at the end case-split.  **When a refuted callee arm
+turns live, look for the one scalar the rest of the walk actually reads
+before duplicating the walk.**
+
+**THE SIZE CAP IS RELAYED.**  `⌜di_size dn <= MAXFILE*BSIZE ->
+di_size dn' <= MAXFILE*BSIZE⌝` now sits beside `⌜inode_sized data ->
+inode_sized data'⌝` in both bodies — writei's own clause (SpecWritei.v:661)
+verbatim, guard included.  `ProofDirlink` stops `clear Hcap'`-ing it and the
+found arm answers `fun H => H`.  A re-parker needs no cap premise and no
+arithmetic, which is what the retired premise used to buy.
+
+**RETIRED AS DEAD** (all five are `lemma_diff`'s output, and every one has
+zero consumers in the tree): `ProofCreateParts.cr_size_cap`,
+`cr_size_cap_fresh`, `cr_size_cap_fresh2` — the last two produced exactly
+the deleted premise at sizes 0 and 16 — together with that file's header
+group (2), renumbered; and `ProofDirlink`'s `dl_le_add` and `dl_nnle`.
+`ProofCreate.v` is byte-untouched, so `cr_alloc_body` is too, and
+`CreateBudget.v` is byte-untouched.
+
+**THE DEVIATION, AND IT IS THE ONE THING THE RULING DID NOT PRICE.**  The
+append arm's `dn0' = dn'` is **not provable on the -1 route**: writei
+answers `dn' = dn` AND `dn0' = dn0` there, and nothing in dirlink's
+premises relates `dn0` to `dn` — the two are separate binders precisely
+because `di_type_stable` / `di_nlink_stable` exist.  It landed as the
+PRESERVATION `⌜dn0 = dn -> dn0' = dn'⌝` (durable-notes' rule: state the
+preservation when the consumer holds the antecedent going in).  It is free
+for every real caller — a caller holds the two as ONE record,
+`IcacheEscrow.ic_loaded`'s single `dinode_at`, which is the same fact
+`di_type_stable_refl` discharges the type premise from — so `eq_refl`
+recovers the old clause at each call.  If the guarded form is judged too
+weak, the alternative is the strictly stronger disjunction
+`dn0' = dn' \/ (dn0' = dn0 /\ dn' = dn /\ bm' = bm /\ data' = data)`, at
+the cost of a case split in every consumer.  **D₀-a relaunches as briefed
+either way**: the walk supplies `eq_refl` at each dirlink and reads the cap
+off the post instead of `cr_size_cap`.
+
+**OWED (not done here, one line):** `SpecIlock.v`'s header still cites
+"[dirlink(ip,\".\")]'s 'the append fits' premise" as one of the two reasons
+`fresh_shape` carries `di_size dn = 0`.  The other reason
+(`ProofCreateParts.cr_made_setf`'s `create_made` identity) stands; the
+citation is stale.  Left alone to keep this increment's surface at three
+files.

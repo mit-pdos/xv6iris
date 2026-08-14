@@ -1,7 +1,14 @@
 (* ProofCreateParts.v -- the pure and frame-level lemmas create's proof
    (fs-sysfile S5b) needs, landed ahead of the walk so that the walk is
-   about the WP and nothing else.  Four groups, none of which touches a
+   about the WP and nothing else.  Three groups, none of which touches a
    contract:
+
+   (There was a fourth, the SIZE CAP AFTER A dirlink: [cr_size_cap]
+   recovered [inode_ok]'s [di_size <= MAXFILE * BSIZE] from dirlink's "the
+   append fits" premise, which the contract no longer has.  D₀-a repair 3b
+   retired the premise as unsuppliable and [SpecDirlink] now RELAYS writei's
+   own size-cap preservation, so the caller reads the cap off the
+   postcondition and the arithmetic has no consumer.)
 
    (1) THE RECORD SURGERY.  create writes inode metadata with three
        halfword stores and nothing else -- [sh s5,70(s3)] / [sh s6,72(s3)]
@@ -15,19 +22,7 @@
        [DirView.dir_ok] -- survive it for the same reason: neither
        predicate mentions major, minor or nlink.
 
-   (2) THE SIZE CAP AFTER A dirlink.  [SpecDirlink]'s postcondition offers
-       [bv_unsigned (di_size dn') < 2 ^ 31] but NOT [inode_ok]'s tighter
-       [<= MAXFILE * BSIZE] -- the clause S3i had to add to [SpecWritei]
-       as a preservation and which [SpecDirlink] (frozen at S2, before
-       S3h) never grew.  The cap is nevertheless RECOVERABLE by the
-       caller, and [cr_size_cap] is the recovery: the append lands at a
-       slot at most [dir_nrec] and writes at most sixteen bytes, so the
-       new size is at most the old plus sixteen, which is exactly
-       dirlink's own "the append fits" premise.  (The one clause that is
-       NOT recoverable is [InodeInv.inode_sized data'] -- see the S5a
-       section's finding 2.)
-
-   (3) THE TWO NAME LITERALS.  dirlink wants FOURTEEN bytes of name
+   (2) THE TWO NAME LITERALS.  dirlink wants FOURTEEN bytes of name
        buffer; the "." and ".." arguments the auipc/addi pairs at
        +0xe4/+0xe8 and +0xf8/+0xfc compute are the rodata
        addresses 0x800075e0 and 0x800075e8, whose fourteen-byte windows
@@ -37,7 +32,7 @@
        right string -- and both are PERSISTENT, out of [kernel_data], so
        create pays nothing to produce them and nothing to get them back.
 
-   (4) THE FRAME AND LEDGER CONSTANTS, as arithmetic facts.
+   (3) THE FRAME AND LEDGER CONSTANTS, as arithmetic facts.
 
    Nothing here is create-specific in a way that would justify hiding it,
    but nothing else needs it yet either, so it lives beside the proof. *)
@@ -171,45 +166,7 @@ Lemma cr_made_clear (ty mj mn : mword 16) :
 Proof. reflexivity. Qed.
 
 (* ===================================================================== *)
-(*  (2) THE SIZE CAP AFTER A dirlink                                      *)
-(* ===================================================================== *)
-
-(* dirlink appends at [16 * k0] with [k0 <= dir_nrec size] and writes at
-   most sixteen bytes, so [max(size, 16*k0 + tot) <= size + 16] and
-   dirlink's OWN "the append fits" premise is the cap.  The size equation
-   is taken in the shape [DirView.dir_ok_dirlink] already takes it, so
-   one derivation from [dn' = wi_dinode ...] serves both consumers. *)
-Lemma cr_size_cap (dn dn' : dinode) (k0 tot : nat) :
-  (k0 <= dir_nrec (bv_unsigned (di_size dn)))%nat ->
-  (tot <= 16)%nat ->
-  bv_unsigned (di_size dn) + 16 <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
-  bv_unsigned (di_size dn')
-    = Z.max (bv_unsigned (di_size dn)) (Z.of_nat (16 * k0 + tot)) ->
-  bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE.
-Proof.
-  intros Hk0 Htot Hfit Hsz.
-  assert (Hnn : 0 <= bv_unsigned (di_size dn))
-    by exact (proj1 (bv_unsigned_in_range _ (di_size dn))).
-  destruct (dir_nrec_range (bv_unsigned (di_size dn)) Hnn) as [Hlo _].
-  rewrite Hsz. lia.
-Qed.
-
-(* the same arithmetic in the shape the FRESH child needs it: a directory
-   ialloc just claimed has size 0, so its first two links land at 0 and
-   16 and the cap is [32 <= MAXFILE * BSIZE], which is a constant. *)
-Lemma cr_size_cap_fresh (dn : dinode) :
-  bv_unsigned (di_size dn) = 0 ->
-  bv_unsigned (di_size dn) + 16 <= Z.of_nat MAXFILE * Z.of_nat BSIZE.
-Proof. intros ->. rewrite /MAXFILE /BSIZE. lia. Qed.
-
-(* ...and the second link's, one record further along *)
-Lemma cr_size_cap_fresh2 (dn : dinode) :
-  bv_unsigned (di_size dn) = 16 ->
-  bv_unsigned (di_size dn) + 16 <= Z.of_nat MAXFILE * Z.of_nat BSIZE.
-Proof. intros ->. rewrite /MAXFILE /BSIZE. lia. Qed.
-
-(* ===================================================================== *)
-(*  (3) THE TWO NAME LITERALS                                             *)
+(*  (2) THE TWO NAME LITERALS                                             *)
 (* ===================================================================== *)
 
 Definition cr_dot_addr : Z := 0x800075e0.
@@ -621,7 +578,7 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(*  (4) THE CONSTANTS                                                     *)
+(*  (3) THE CONSTANTS                                                     *)
 (* ===================================================================== *)
 
 (* 10 own slots + nameiparent's 98.  Moved 106 -> 108 with the copyout chain

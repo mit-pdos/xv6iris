@@ -210,20 +210,34 @@ Qed.
    [lia] answers "Cannot find witness" whenever an [mword] is merely in
    context, and a whole-function context is full of them (durable-notes). *)
 
-Lemma dl_le_add (x a c : Z) : x <= a -> a + 16 <= c -> x + 16 <= c.
-Proof. lia. Qed.
-
-Lemma dl_lt31 (x : Z) : x + 16 <= 274432 -> x + 16 < 2 ^ 31.
+(* the append offset is at most the size, which is at most the cap: that is
+   ALL the range writei's joint bound needs, and it is all this file has
+   since the "append fits" premise retired (D₀-a repair 3b). *)
+Lemma dl_lt31 (x : Z) : x <= 274432 -> x + 16 < 2 ^ 31.
 Proof. change (2 ^ 31) with 2147483648. lia. Qed.
 
 Lemma dl_nle (x y : Z) : x <= y -> ~ (y < x).
 Proof. lia. Qed.
 
-Lemma dl_nnle (x y : nat) : (x <= y)%nat -> ~ (y < x)%nat.
-Proof. lia. Qed.
-
 Lemma dl_lt16 (t : nat) : (t <= 16)%nat -> t <> 16%nat -> (t < 16)%nat.
 Proof. lia. Qed.
+
+(* FIT 3b -- WHEN writei WRITES NOTHING, IT CHANGES NOTHING.  Its own -1
+   return (the full directory) hands back [dn' = dn] and [bm' = bm], and the
+   append arm reports [dn' = wi_dinode dn bm' (16*k0) tot]: at [tot = 0]
+   with the offset in range the two are the SAME RECORD, which is what lets
+   that return share the arm instead of needing one of its own (D₀-a repair
+   3b).  The size does not move because [off <= size], and the addrs field
+   is the one [di_addrs] already names. *)
+Lemma dl_wi_dinode_id (dn : dinode) (bm : blkmap) (off : nat) :
+  Z.of_nat off <= bv_unsigned (di_size dn) ->
+  di_addrs dn = bm_cells bm ->
+  wi_dinode dn bm off 0%nat = dn.
+Proof.
+  intros Hoff Haddr. unfold wi_dinode.
+  rewrite Nat.add_0_r. rewrite decide_False; [| exact (dl_nle _ _ Hoff)].
+  rewrite -Haddr. destruct dn; reflexivity.
+Qed.
 
 Lemma dl_subrng (a x t : nat) : (a <= x)%nat -> (x < a + t)%nat -> (x - a < t)%nat.
 Proof. lia. Qed.
@@ -392,6 +406,16 @@ Proof.
   do 16 (destruct t as [| t]; [ vm_compute; reflexivity |]).
   exfalso. clear - Ht. lia.
 Qed.
+
+(* ...and the same [snez] at writei's OWN -1 return (the full directory:
+   D₀-a repair 3b).  [-1 - 16] is not zero either, so the branchless tail
+   answers -1 there exactly as it does on a short write. *)
+Lemma dl_snez_m1 :
+  zopz0zI_u (zero_reg : mword 64)
+    (add_vec (mword_of_int (-1) : mword 64)
+             (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
+  = true.
+Proof. vm_compute. reflexivity. Qed.
 
 Lemma dl_negw_0 :
   sign_extend' 64 (sub_vec (subrange_vec_dec (zero_reg : mword 64) 31 0 : mword 32)
@@ -1059,6 +1083,8 @@ Section ProofDirlinkMain.
              ⌜dl16_post bmapstart dinum inodestart ncount n' k0 tot found
                         bm bm' Sb Sb'⌝ -∗
              log_opS g n' Sb' -∗
+             ⌜bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+              bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE⌝ -∗
              ⌜inode_sized data -> inode_sized data'⌝ -∗
              ⌜if found
                then dir_first data nrec s <> None
@@ -1074,7 +1100,7 @@ Section ProofDirlinkMain.
                     /\ bv_unsigned (di_size dn') < 2 ^ 31
                     /\ bm_covers bm' (bv_unsigned (di_size dn'))
                     /\ dn' = wi_dinode dn bm' (16 * k0)%nat tot
-                    /\ dn0' = dn'
+                    /\ (dn0 = dn -> dn0' = dn')
                     /\ (tot <= 16)%nat
                     /\ (forall x : nat,
                           file_byte data' x
@@ -1169,6 +1195,8 @@ Section ProofDirlinkMain.
              ⌜dl16_post bmapstart dinum inodestart ncount n' k0 tot found
                         bm bm' Sb Sb'⌝ -∗
              log_opS g n' Sb' -∗
+             ⌜bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+              bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE⌝ -∗
              ⌜inode_sized data -> inode_sized data'⌝ -∗
              ⌜if found
                then dir_first data nrec s <> None
@@ -1184,7 +1212,7 @@ Section ProofDirlinkMain.
                     /\ bv_unsigned (di_size dn') < 2 ^ 31
                     /\ bm_covers bm' (bv_unsigned (di_size dn'))
                     /\ dn' = wi_dinode dn bm' (16 * k0)%nat tot
-                    /\ dn0' = dn'
+                    /\ (dn0 = dn -> dn0' = dn')
                     /\ (tot <= 16)%nat
                     /\ (forall x : nat,
                           file_byte data' x
@@ -1230,7 +1258,7 @@ Section ProofDirlinkMain.
                           m K eb C b.
   Proof.
     cbv beta delta [wp_dirlink_gen_body].
-    intros pcE pjv nb ret_tgt nrec s k0 HK Htype Hbmcov Hszb Hinums Hfit
+    intros pcE pjv nb ret_tgt nrec s k0 HK Htype Hbmcov Hszb Hinums
            Hstab Hnlk Hlg Hbmwf Hholes Haddrs Hsz31 Hist0 Hiblk Hiblog Hdinb Hcinb Hbmgeo Hpkc
            Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb Hnc Hj Hgs Ha0 Ha2 Heb.
     (* [Hcinb] -- the LINKED inum's range -- is NOT used below: dirlink's
@@ -1243,19 +1271,19 @@ Section ProofDirlinkMain.
     (* ---- numeric preliminaries, all over plain Z/nat ---- *)
     assert (Hszmb : Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)
       by (vm_compute; reflexivity).
-    assert (Hmbn : Z.of_nat (MAXFILE * BSIZE)%nat = 274432)
-      by (rewrite Nat2Z.inj_mul; exact Hszmb).
     assert (Hsznn : 0 <= bv_unsigned (di_size dn))
       by exact (proj1 (bv_unsigned_in_range _ (di_size dn))).
-    assert (Hfit' : bv_unsigned (di_size dn) + 16 <= 274432)
-      by (rewrite Hszmb in Hfit; exact Hfit).
+    assert (Hszb' : bv_unsigned (di_size dn) <= 274432)
+      by (rewrite Hszmb in Hszb; exact Hszb).
     assert (Hk0le : Z.of_nat (16 * k0)%nat <= bv_unsigned (di_size dn))
       by exact (dl_slot_off data (bv_unsigned (di_size dn)) Hsznn).
-    assert (Hk0fit : Z.of_nat (16 * k0)%nat + 16 <= 274432)
-      by exact (dl_le_add _ _ _ Hk0le Hfit').
-    assert (Hk0n : (16 * k0 + 16 <= MAXFILE * BSIZE)%nat).
-    { apply Nat2Z.inj_le. rewrite Hmbn Nat2Z.inj_add.
-      change (Z.of_nat 16%nat) with 16. exact Hk0fit. }
+    (* THE APPEND OFFSET IS IN RANGE, and that is the whole of what this
+       proof knows about it since the "append fits" premise retired: the
+       slot is at most [nrec], so [16*k0 <= size <= MAXFILE*BSIZE].  It
+       kills writei's FIRST -1 reason and NOT its second (D₀-a repair 3b);
+       the second is the full directory and is routed below. *)
+    assert (Hk0fit : Z.of_nat (16 * k0)%nat <= 274432)
+      by exact (Z.le_trans _ _ _ Hk0le Hszb').
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hkd #Hpk #Hbio #Hlog #Hkenv
               Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb Hbmr
               #Hiregi Hdat Hppid #Hprocs #Hdev #Hgeom #Hdlk Hbsl
@@ -1852,13 +1880,17 @@ Section ProofDirlinkMain.
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf true bm data dn dn0 nn uu Sbp 0%nat with
                 "[%] Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi
-                 Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] [%] [%] Hop [%] [%]").
+                 Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] [%] [%] Hop [%] [%]
+                 [%]").
       { exact Hcsf. }
       { exact (dl_budget3 ncount nn ncount (proj1 Hnn) (proj2 Hnn)). }
       { exact Hsbp. }
       (* the sixteen-byte clause is guarded by the APPEND arm *)
       { intros Hc; discriminate Hc. }
-      (* S5a finding 2: the found arm re-parks the IDENTICAL payload *)
+      (* the found arm re-parks the IDENTICAL record and the IDENTICAL
+         payload, so both preservations are the identity (S5a finding 2; the
+         cap, D₀-a repair 3b) *)
+      { exact (fun H => H). }
       { exact (fun H => H). }
       { split; [rewrite Hsome; discriminate |].
         split; [rewrite Ha0f; exact HE2a0 |].
@@ -2285,15 +2317,13 @@ Section ProofDirlinkMain.
         (* and they come back together: re-bracket into the two names the
            rest of dirlink threads *)
         iDestruct "Hsrc" as "[Hsrc Hppid]".
-        (* writei's two PRESERVATION clauses (SpecWritei.v's header) are for a
-           caller that RE-PARKS the inode.  Of the two, the SIZE CAP is
-           dropped at this boundary -- create recovers it arithmetically from
-           the append's own "the append fits" premise
-           ([ProofCreateParts.cr_size_cap]) -- and [inode_sized] is
-           FORWARDED, because nothing below dirlink can recover it (S5a
-           finding 2; the range clause is a per-BYTE view and pins no block's
-           length).  [Hsized'] therefore survives to the arm's continuation. *)
-        clear Hcap'.
+        (* writei's two PRESERVATION clauses (SpecWritei.v:661) are for a
+           caller that RE-PARKS the inode, and BOTH are forwarded now (D₀-a
+           repair 3b).  The cap used to be dropped here because create could
+           recover it from dirlink's own "the append fits" premise
+           ([ProofCreateParts.cr_size_cap]); with that premise retired the
+           arithmetic is gone and the relay is the only route.  [Hcap'] and
+           [Hsized'] both survive to the arm's continuation. *)
         (* THE DISTURBED REGION IS EMPTY (fs-icache.md §15.1(i)): dirlink's
            source is its own stack record, so writei ran on the KERNEL arm
            and [dist = 0].  Substituting it here is what turns the range
@@ -2305,18 +2335,48 @@ Section ProofDirlinkMain.
         assert (Hpcwi : ret_pc (V6 !!! Regidx Rra : mword 64)
                         = mword_of_int (DK + 0x90)) by (rewrite HV6ra; pcw).
         iEval (rewrite Hpcwi) in "Hpc".
-        (* writei's OWN -1 arm is DEAD: the write is at [off <= size] and
-           ends at [off + 16 <= MAXFILE*BSIZE] *)
-        assert (Hwiok : mwi !!! Regidx Ra0
-                          = (mword_of_int (Z.of_nat tot) : mword 64)
-                        /\ (tot <= 16)%nat
-                        /\ dn' = wi_dinode dn bm' (16 * k0)%nat tot
-                        /\ dn0' = dn').
-        { destruct Harm as [(_ & [Hbad | Hbad] & _) | Hgood];
+        (* WRITEI'S OWN -1 RETURN IS LIVE, AND IT IS THE FULL DIRECTORY
+           (D₀-a repair 3b).  Its FIRST reason ([size < off]) is still dead
+           -- the slot is at most [nrec], so [Hk0le] refutes it -- but its
+           second ([MAXFILE*BSIZE < off + 16]) is reachable at
+           [off = size = MAXFILE*BSIZE], and the premise that used to kill it
+           was unsuppliable.  So the two writei outcomes are kept as a
+           DISJUNCTION and the walk below is shared: everything from +0x90 on
+           depends on [a0] only through [Hsnez], and the arm's own clauses
+           are recovered at the end. *)
+        assert (Hwiok :
+                  (mwi !!! Regidx Ra0 = (mword_of_int (Z.of_nat tot) : mword 64)
+                   /\ (tot <= 16)%nat
+                   /\ dn' = wi_dinode dn bm' (16 * k0)%nat tot
+                   /\ dn0' = dn')
+                  \/ (mwi !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)
+                      /\ tot = 0%nat /\ bm' = bm /\ data' = data
+                      /\ dn' = dn /\ dn0' = dn0)).
+        { destruct Harm as
+            [(Hm1 & [Hbad | _] & Htz & _ & Hbmq & Hdtq & Hdnq & Hd0q & _)
+            | Hgood];
             [ exfalso; exact (dl_nle _ _ Hk0le Hbad)
-            | exfalso; exact (dl_nnle _ _ Hk0n Hbad)
-            | exact Hgood ]. }
-        destruct Hwiok as (Hwia0 & Htotle & Hdn' & Hdn0').
+            | right; exact (conj Hm1 (conj Htz (conj Hbmq
+                              (conj Hdtq (conj Hdnq Hd0q)))))
+            | left; exact Hgood ]. }
+        assert (Htotle : (tot <= 16)%nat)
+          by (destruct Hwiok as [(_ & Ht & _) | (_ & Ht & _)];
+              [ exact Ht | rewrite Ht; exact (Nat.le_0_l 16%nat) ]).
+        (* the ONE fact the branchless tail reads off [a0]: [a0 - 16] is zero
+           exactly on the full sixteen.  Both writei outcomes feed it -- the
+           -1 return at [tot = 0], where [-1 - 16] is nonzero too. *)
+        assert (Hsnez : zopz0zI_u (zero_reg : mword 64)
+                          (add_vec (mwi !!! Regidx Ra0 : mword 64)
+                             (sign_extend' 64
+                                (sign_extend' 12 (mword_of_int 48 : mword 6))))
+                        = if decide (tot = 16%nat) then false else true).
+        { destruct Hwiok as [(Ha0v & Htle & _) | (Ha0v & Htz & _)].
+          - rewrite Ha0v. destruct (decide (tot = 16%nat)) as [Hte | Htn].
+            + rewrite Hte. exact dl_snez_eq.
+            + exact (dl_snez_lt tot (dl_lt16 tot Htle Htn)).
+          - destruct (decide (tot = 16%nat)) as [Hte | _].
+            + exfalso. rewrite Htz in Hte. discriminate Hte.
+            + rewrite Ha0v. exact dl_snez_m1. }
         assert (Hwip : dl_pregs m sp0 ip nb
                          (zero_extend' 64 (inum : mword 16) : mword 64)
                          (mword_of_int (Z.of_nat (16 * k0)%nat) : mword 64) mwi)
@@ -2338,10 +2398,10 @@ Section ProofDirlinkMain.
                          (mword_of_int (Z.of_nat (16 * k0)%nat) : mword 64) V7)
           by (rewrite /V7; apply dl_pregs_caller; [exact Hcsa0 | exact Hwip]).
         assert (HV7a0 : V7 !!! Regidx Ra0
-                        = add_vec (mword_of_int (Z.of_nat tot) : mword 64)
+                        = add_vec (mwi !!! Regidx Ra0 : mword 64)
                             (sign_extend' 64
                                (sign_extend' 12 (mword_of_int 48 : mword 6)))).
-        { rewrite /V7 upd_eq. rewrite Hwia0. reflexivity. }
+        { rewrite /V7 upd_eq. reflexivity. }
         (* +0x92 sltu a0,zero,a0  ([snez]) *)
         iDestruct (sie_cap_gpr_x0 V7 (K - 10)%nat b (proc_addr j) Rz
                      ltac:(vm_compute; reflexivity) with "Hcg") as "[%Hz0 Hcg]".
@@ -2349,11 +2409,9 @@ Section ProofDirlinkMain.
                   (if decide (tot = 16%nat) then (mword_of_int 0 : mword 64)
                    else (mword_of_int 1 : mword 64)) V7 (K - 10)%nat b
                   ltac:(nz) ltac:(rdok)
-                  ltac:(rgne; rgne; rewrite Hz0 HV7a0;
+                  ltac:(rgne; rgne; rewrite Hz0 HV7a0 Hsnez;
                         destruct (decide (tot = 16%nat)) as [Hte | Htn];
-                        [ rewrite Hte dl_snez_eq; exact dl_bit_0
-                        | rewrite (dl_snez_lt tot (dl_lt16 tot Htotle Htn));
-                          exact dl_bit_1 ])
+                        [ exact dl_bit_0 | exact dl_bit_1 ])
                   with "Hcg Hpc Hi92").
         iIntros (CIDA13 HqA13) "Hcg Hpc".
         set (V8 := <[Regidx Ra0 := regval_into_reg
@@ -2431,7 +2489,8 @@ Section ProofDirlinkMain.
         iSpecialize ("Hqc" $! CIDf with "[%]"); [wp_next_chain |].
         iApply ("Hqc" $! mf false bm' data' dn' dn0' nn used' Sbw tot with
                   "[%] Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi
-                   Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] [%] [%] Hop [%] [%]").
+                   Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] [%] [%] Hop [%] [%]
+                   [%]").
         { exact Hcsf. }
         { rewrite (dl_wi_cost_bmonly k0) in Hbud. unfold dirlink_units.
           destruct Hbud as [Hbud1 Hbud2]. split; lia. }
@@ -2450,7 +2509,9 @@ Section ProofDirlinkMain.
           - intros _. destruct Hbud as [Hbud1 _].
             rewrite (dl_wi_cost_bmonly k0) in Hbud1.
             unfold dl0_spend. exact Hbud1. }
-        (* S5a finding 2: writei's own preservation, forwarded *)
+        (* writei's two preservations, forwarded (S5a finding 2; the cap,
+           D₀-a repair 3b) *)
+        { exact Hcap'. }
         { exact Hsized'. }
         { split; [exact Hnone |].
           split; [exact Hused |].
@@ -2459,8 +2520,23 @@ Section ProofDirlinkMain.
           split; [exact Haddrs' |].
           split; [exact Hsz' |].
           split; [exact Hcov' |].
-          split; [exact Hdn' |].
-          split; [exact Hdn0' |].
+          (* THE TWO RECORD CLAUSES, one per writei outcome (D₀-a repair 3b).
+             On the -1 return nothing was written and nothing flushed:
+             [wi_dinode] at [tot = 0] with the offset in range IS the entry
+             record ([dl_wi_dinode_id]), and the REGION's record is the entry
+             [dn0] -- which is [dn'] exactly when the caller handed the two in
+             as one record, hence the preservation. *)
+          split;
+            [ destruct Hwiok as [(_ & _ & Hd & _) | (_ & Htz & Hbmq & _ & Hdnq & _)];
+              [ exact Hd
+              | rewrite Hdnq Hbmq Htz;
+                exact (eq_sym (dl_wi_dinode_id dn bm (16 * k0)%nat Hk0le Haddrs)) ]
+            |].
+          split;
+            [ destruct Hwiok as [(_ & _ & _ & Hd0) | (_ & _ & _ & _ & Hdnq & Hd0q)];
+              [ exact (fun _ => Hd0)
+              | intro Hone; rewrite Hd0q Hone Hdnq; reflexivity ]
+            |].
           split; [exact Htotle |].
           split.
           - intro x. rewrite (Hrange x).
@@ -3327,7 +3403,7 @@ Section ProofDirlinkMain.
                             m K eb C b.
   Proof.
     cbv beta delta [wp_dirlink_sconf_body].
-    intros pcE pjv nb ret_tgt nrec s k0 HK Htype Hbmcov Hszb Hinums Hfit
+    intros pcE pjv nb ret_tgt nrec s k0 HK Htype Hbmcov Hszb Hinums
            Hstab Hnlk Hlg Hbmwf Hholes Haddrs Hsz31 Hist0 Hiblk Hiblog Hdinb
            Hcinb Hbmgeo Hpkc
            Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb Hnc Hj Hgs Ha0 Ha2 Heb.
@@ -3346,7 +3422,7 @@ Section ProofDirlinkMain.
               ga gf gpr cov logstart inodestart nib bmapstart size dev used
               ip dinum bm data dn dn0 fn inum ncount Sb0
               pidv dq dqd dqn dqs dqb dqbs dqf m K eb C b
-              HK Htype Hbmcov Hszb Hinums Hfit Hstab Hnlk Hlg Hbmwf Hholes
+              HK Htype Hbmcov Hszb Hinums Hstab Hnlk Hlg Hbmwf Hholes
               Haddrs Hsz31 Hist0 Hiblk Hiblog Hdinb Hcinb Hbmgeo Hpkc
               Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb (Hncg _ _) Hj Hgs Ha0 Ha2 Heb
               with "Hcg Hcnt Htext Hpc Hpanic Hkd Hpk Hbio Hlog Hkenv
@@ -3357,16 +3433,18 @@ Section ProofDirlinkMain.
     iIntros (CIDf) "%Hchain".
     iIntros (mf found bm' data' dn' dn0' n' used' Sb' tot)
       "%E1 Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb
-       Hbmr Hdat Hppid Hbsl Hislot %E2 %Esb %Ewi Hop %E3 %E4".
+       Hbmr Hdat Hppid Hbsl Hislot %E2 %Esb %Ewi Hop %E3 %E4 %E5".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf found bm' data' dn' dn0' n' used' tot
               with "[%] Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi
-                    Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] [Hop] [%] [%]").
+                    Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] [Hop] [%] [%]
+                    [%]").
     { exact E1. }
     { exact E2. }
     { iApply (log_opS_op with "Hop"). }
     { exact E3. }
     { exact E4. }
+    { exact E5. }
   Qed.
 
 End ProofDirlinkMain.
