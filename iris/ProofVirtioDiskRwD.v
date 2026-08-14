@@ -56,6 +56,14 @@ Require Import PermInv.
 Require Import CodeVirtioDiskRw.
 Require Import VirtioDiskRwDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+(* The [set_solver] override.  EXPORT, not Import: this import is         *)
+(* deliberately "dead" -- the file compiles without it, just far slower --  *)
+(* and the nightly dead-import sweep skips [Require Export] lines.         *)
+(* It has to be HERE rather than inherited: [Require Export] only          *)
+(* propagates through an unbroken chain of Exports, and this tree's        *)
+(* intermediate files use [Require Import], so nothing downstream inherits *)
+(* it.  See FastSetSolver.v.                                              *)
+Require Export FastSetSolver.
 Import Defs.
 
 Local Open Scope Z_scope.

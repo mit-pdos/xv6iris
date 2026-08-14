@@ -66,6 +66,14 @@ Require Import KptGhost.   (* kpt_unset / kpt_ghost_alloc: the shared kernel tab
 Require Import WireInv.
 Require Import PlicPlan DiskPtsto VirtioProto WpUart.
 Require Import PowerBoot.   (* the canonical reset machine + [boot_shape_boot_gstate] *)
+(* The [set_solver] override.  EXPORT, not Import: this import is         *)
+(* deliberately "dead" -- the file compiles without it, just far slower --  *)
+(* and the nightly dead-import sweep skips [Require Export] lines.         *)
+(* It has to be HERE rather than inherited: [Require Export] only          *)
+(* propagates through an unbroken chain of Exports, and this tree's        *)
+(* intermediate files use [Require Import], so nothing downstream inherits *)
+(* it.  See FastSetSolver.v.                                              *)
+Require Export FastSetSolver.
 
 (* ---------------------------------------------------------------------- *)
 (* 1. Ghost-state preconditions: what [Σ] must contain before allocation.  *)

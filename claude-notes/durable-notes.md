@@ -126,13 +126,24 @@ file, and delete the line when the file goes.
 
 ## `set_solver` DOES NOT WORK OVER `gset (mword n)`
 
-It fails with **"No matching clauses for match"** — an Ltac crash, not an
-unsolved goal — so it reads as a broken tactic or a corrupt state rather than
-as a wrong instance. The cause is the same instance divergence
+This one is NOT fixed by `iris/FastSetSolver.v`'s override (which cures the
+*context*-size blow-up); it is a goal-side instance problem and the workarounds
+below still stand.
+
+It fails with **"No matching clauses for match"**. **That message is not
+diagnostic** — it is stdpp's generic noise for *any* goal `set_solver` cannot
+close, and the identical message comes back from an ordinary unprovable
+`gset Z` goal (`ProofIput.ip_pool_set` is one). So do not read it as evidence
+of an instance problem; read it as "set_solver failed". The actual tells are
+the ones that discriminate: **`set_unfold` alone is fine** (on `a ∈ {[a]}` it
+leaves exactly `a = a`, which `exact eq_refl` then closes), and the identical
+goal over `gset (bv n)` is fine. The cause is the instance divergence
 `RiscvPtsto.riscvF_kmapGS` pins against: a set over `mword` elaborates with
-SAIL's `Decidable_eq_mword`, and `set_solver`'s decision step wants stdpp's
-`bv_eq_dec`. The tells: **`set_unfold` alone is fine**, and the identical goal
-over `gset (bv n)` is fine.
+SAIL's `Decidable_eq_mword`, and `set_solver`'s closing step wants stdpp's
+`bv_eq_dec`. Measured: with a `gset (mword 64)` anywhere in the section
+context, every shape fails — singleton membership, `S ⊆ S ∪ T`, disjointness,
+`{[a]} = {[a]} ∪ ∅` — and clearing the context does not help, which is what
+separates this from the context-size trap.
 
 Discharge the side conditions by named lemma instead — `disjoint_singleton_l`,
 `singleton_subseteq_l`, `elem_of_singleton`, `big_sepS_delete` — or drop to
@@ -867,7 +878,7 @@ and axioms each proven function rests on. `--format text|md|html|json`.
   - **`hnf` IS ALL-OR-NOTHING, AND BITVECTOR EQUALITY DOES NOT REDUCE UNDER THE LAZY EVALUATOR.** `eq_vec`/`neq_vec`/`uint` on closed words block it, so `hnf` hands back the whole head untouched whenever the head's next decision is one (`currentlyEnabled`'s misa-bit test, `to_bits_checked`'s overflow check, `legalize_xenvcfg_cbie`'s guard). Fixes, in order of preference: walk the head's bind spine by LEMMA (monad associativity stated at `exec`, so no funext) until the test is at the surface and settle it with `vm_compute` on that subterm; or VM the named blocking CALL. **Do NOT VM the blocked head itself** — the `currentlyEnabled`/`hartSupports` cone behind it is a well-founded recursion whose `Acc` guard (`pos_guard_wf`'s `fun y _ => F (F wfR) y`) DOUBLES per bit, and VM-normalising one such head took the file past **7.7 GB** before it was killed. And never `cbv -[…]` (see the negative-delta OOM note).
 - **NEVER EVALUATE MODEL CODE OVER AN *OPEN* REGISTER FILE.** `regstate`'s twenty fields are FUNCTIONS (`register_bitvector_64 -> mword 64`, …) and `register_set` wraps one in a fresh `fun r' => if r' =? r then v else <old field> r'`. Over a CLOSED base (`init_regstate`, a `dregs`-style literal) the VM keeps that as a closed value and a 300-write program costs well under a second; over a *variable* base the same run becomes a closure tower whose readback explodes — measured on the cold-boot chain: `vm_compute` >8 min at **4.6 GB**, `lazy` reached **19 GB**, versus 0.75 s closed. Symptom is a "hang" with RSS climbing, not an error. So state any model-evaluation lemma at a concrete register file and transport, or peel `register_set`s by hand (`irrelevant_register_set` + `register_lookup_set`) keeping the tower FOLDED — see the peel-kit bullet above for the worked version.
 - **`reg_lookup` is not always the faster discharge.** It is one `vm_compute` over the whole tower, which is the right call for a deep whole-function map — but on a small tower under a full `sie_cap_gpr` context it can fail to come back at all (observed: >3 min on `m2 !!! Regidx csp_rs1 = pa_stk sp0 2`, two inserts deep, in ProofMemmove). If a `by reg_lookup` hangs, peel insert by insert instead; `coqc -time` pins it immediately (the log's last sentence is the one before the hang).
-- **`set_solver` on a `gset Arch.pa` goal does not terminate.** Even `{[a]} = {[a]} ∪ ∅` ran >10 min (the address `EqDecision`/`Countable` instances are enormous). Discharge such goals algebraically — `union_empty_r_L`, `dom_union_L`, `dom_singleton_L`, a `_dom` lemma for whatever built the map — and finish with `reflexivity`/`exact`. `set_solver` on a `gset nat` is fine. Same reflex for `decide`-heavy tactics over address sets.
+- **`set_solver` on a `gset Arch.pa` goal does not terminate** — and this is one of the two traps `iris/FastSetSolver.v`'s override does NOT fix, because the cost is in the GOAL's own instances rather than in the context. Even `{[a]} = {[a]} ∪ ∅` ran >10 min (the address `EqDecision`/`Countable` instances are enormous). Discharge such goals algebraically — `union_empty_r_L`, `dom_union_L`, `dom_singleton_L`, a `_dom` lemma for whatever built the map — and finish with `reflexivity`/`exact`. `set_solver` on a `gset nat` is fine. Same reflex for `decide`-heavy tactics over address sets.
 - **`iFrame` never discharges a RUN of separate pure conjuncts `⌜A⌝ ∗ ⌜B⌝ ∗ …`**, and the reflex `iSplitR; [iPureIntro; split_and!; assumption|]` handles only the FIRST — `split_and!` then fails with *"No matching clauses for match"* on the second, because what follows is a `∗`, not a `∧`. An invariant body that opens with N pure conjuncts (DiskInv's `disk_res` has seven) is re-closed with N lines of `iSplitR; [iPureIntro; exact H|]` followed by one `iFrame` for the spatial rest. Related: `split_and!` DOES split `a <= x < b` (it is a conjunction), so a range-discharging tactic must not run after a `split_and!` that already peeled it.
 - **Reading a `ghost_map_lookup` against an auth over a UNION** (`ghost_map_auth γ 1 (m1 ∪ m2)`) is `lookup_union_Some_raw`: it yields exactly `m1 !! p = Some v ∨ (m1 !! p = None ∧ m2 !! p = Some v)`. Do not `rewrite lookup_union` and `cbn` — `union_with` leaves a two-way match to case on by hand.
 - **`iFrame` does not close a goal `[∗ list] m ∈ [m1; …; mk], P m` over a LITERAL list.** It leaves goals and the closing `}` then fails far away with *"This proof is focused, but cannot be unfocused this way"*. A cons big-op IS a nest of `∗`, so a chain of `iSplitL "Hk"; [iExact "Hk"|].` ending in `done.` works and is fast.

@@ -114,6 +114,14 @@ Require Import SpecAcquire SpecRelease.
 Require Import SpecIget.
 From Kernel Require KernelSyms.
 Require Import LogInv.  (* [logG]: the region's zero-receipt, fs-log.md G.17 *)
+(* The [set_solver] override.  EXPORT, not Import: this import is         *)
+(* deliberately "dead" -- the file compiles without it, just far slower --  *)
+(* and the nightly dead-import sweep skips [Require Export] lines.         *)
+(* It has to be HERE rather than inherited: [Require Export] only          *)
+(* propagates through an unbroken chain of Exports, and this tree's        *)
+(* intermediate files use [Require Import], so nothing downstream inherits *)
+(* it.  See FastSetSolver.v.                                              *)
+Require Export FastSetSolver.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
