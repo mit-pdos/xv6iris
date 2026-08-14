@@ -527,7 +527,7 @@ Section UsertrapRes.
   (* ------------------------------------------------------------------- *)
   Definition ut_res (Rsys : gname -> mword 64 -> iProp Σ)
       (pt : uptd) (ksp : mword 64) : iProp Σ :=
-    (∃ (N : ut_names) (V : pprivate) (av : nat) (C : iProp Σ) (lks : gset nat),
+    (∃ (N : ut_names) (V : pprivate) (av : nat) (C : iProp Σ),
        (* THE PROCESS RUNNING IS THE ONE WHOSE TABLE THE TRAMPOLINE PARKED.
           This equation is the whole reason R is keyed on [pt]: it is what
           lets userret install [MAKE_SATP(p->pagetable)] and know it is the
@@ -537,7 +537,9 @@ Section UsertrapRes.
        ⌜ add_vec (un_ks N) (mword_of_int 4096) = ksp ⌝ ∗
        ⌜ ut_wf N ⌝ ∗
        ⌜ (K_usertrap <= av)%nat ⌝ ∗
-       ut_trap (un_pj N) ksp av C lks ∗
+       (* the trampoline hands over a hart that holds NO kernel lock, so the
+          held set here is the literal [∅] rather than an existential *)
+       ut_trap (un_pj N) ksp av C ∅ ∗
        ut_env Rsys N V)%I.
 
   (* ------------------------------------------------------------------- *)

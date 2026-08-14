@@ -1838,7 +1838,7 @@ Section ProofVirtioDiskRwF.
                                    m K eb C bno dsk0 bs_buf bs_disk b Q lks.
   Proof.
     cbv beta zeta delta [wp_virtio_disk_rw_sconf_body].
-    intros HK Hbnolt Hbufkd Hj Hjl.
+    intros HK Hbnolt Hbufkd Hj Hjl Hbelow.
     iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hpanic #Hpinv
              #Hdinv #Hgeom #Hlk Hbuf Hdisk Hperm Hcont".
     (* LEVEL 0 TIES THE TWO INDICES: [cpu_own_eb_agree] gives [eb = b]
@@ -1888,7 +1888,7 @@ Section ProofVirtioDiskRwF.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0) in "Hpc".
     (* ---- P1: prologue + acquire ---- *)
-    iApply (P1.wp_vdrw_p1 γd γk pd pav pu m K eb (proc_addr j) C bno HK
+    iApply (P1.wp_vdrw_p1 γd γk pd pav pu m K eb (proc_addr j) C bno lks HK Hbelow
               with "Hcg Hown Hextc Hextm Htext Hpc Hpanic Hlk Hbno").
     iIntros (CIDa Hsa M) "%Hrh Hcg Hown Hpay Hextc Hextm Hpc Htok HR Hsaved Hscr Hbno".
     destruct Hrh as (Hregs & Hhi).

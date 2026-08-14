@@ -212,6 +212,10 @@ Section UtRet2.
     destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hcpu Hclm Hsepc Hscause Hstval Hsret Hstvec Hq4
              Hkptr [#Hcaps Hown] Hframe Hcont".
+    (* the boundary hands the trap resource back at the literal [∅] that
+       [ut_res] pins -- depth 0 forces the held set empty, so this is a
+       re-spelling, not an obligation. *)
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     (* THE QUARTER'S VALUE IS NOT A DEGREE OF FREEDOM.  prepare_return leaves
        it existential because it never reads it; the arm it also hands back is
        at [false], and [sie_arm_half_agree] reads the live SIE off that index,
@@ -568,7 +572,7 @@ Section UtRet2.
          is what [sie_cap_gpr] was holding all along -- no [tp_pin_id] step. *)
       iExact "Hfile".
     - (* [ut_res] rebuilt at the exit hart *)
-      iExists N, V, av, C, lks.
+      iExists N, V, av, C.
       iSplitR; [iPureIntro; reflexivity|].
       iSplitR; [iPureIntro; exact Hksp|].
       iSplitR; [iPureIntro; exact (conj Hj (conj Hjl (conj Hlen Hlg)))|].
@@ -588,7 +592,7 @@ Section UtRet2.
           iSplitL "Hq4". { iExact "Hq4". }
           iSplitL "Htie". { iExact "Htie". }
           iExact "Hsret". }
-        iSplitL "Hcpu". { iExact "Hcpu". }
+        iSplitL "Hcpu". { iEval (rewrite Hlkempty) in "Hcpu". iExact "Hcpu". }
         iExact "Hclm".
       + rewrite /ut_env. iSplitR; [iExact "Hcaps"|]. iExact "Hown".
   Qed.

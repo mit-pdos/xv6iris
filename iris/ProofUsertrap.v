@@ -876,7 +876,7 @@ Section UtDispatch.
         { iApply (ud_hold N V C ep sc st with
                     "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
           rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
-        iApply (A.ut_e8 SY.syscall_env N V pt ksp m0 D4 av nx C
+        iApply (A.ut_e8 SY.syscall_env N V pt ksp m0 D4 av nx C ∅
                   Hwf' Hav Hnx Htfpe Hksp Hm0sp HD4sp HD4s1 HcsD4
                   with "Htext Hpc Hcg Hhold Hframe Hcont").
       + (* no device: the two page-fault causes, then the fall-through *)
@@ -949,7 +949,7 @@ Section UtDispatch.
           { iApply (ud_hold N V C ep sc st with
                       "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
             rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
-          iApply (A.ut_d0 SY.syscall_env N V pt ksp m0 D6 av nx C
+          iApply (A.ut_d0 SY.syscall_env N V pt ksp m0 D6 av nx C ∅
                     Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp HD6sp HD6s1 HcsD6
                     with "Htext Hpc Hcg Hhold Hframe Hcont").
         * iPoseProof (uti_04c with "Htext") as "Hi4c".
@@ -1023,7 +1023,7 @@ Section UtDispatch.
              { iApply (ud_hold N V C ep sc st with
                          "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
                rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
-             iApply (A.ut_d0 SY.syscall_env N V pt ksp m0 D8 av nx C
+             iApply (A.ut_d0 SY.syscall_env N V pt ksp m0 D8 av nx C ∅
                        Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp HD8sp HD8s1 HcsD8
                        with "Htext Hpc Hcg Hhold Hframe Hcont").
           -- (* the unexpected-scause arm *)
@@ -1041,7 +1041,7 @@ Section UtDispatch.
              { iApply (ud_hold N V C ep sc st with
                          "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
                rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
-             iApply (A.ut_56 SY.syscall_env N V pt ksp m0 D8 av nx C
+             iApply (A.ut_56 SY.syscall_env N V pt ksp m0 D8 av nx C ∅
                        Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp HD8sp HD8s1 HcsD8
                        with "Htext Hpc Hcg Hhold Hframe Hcont").
   Qed.
