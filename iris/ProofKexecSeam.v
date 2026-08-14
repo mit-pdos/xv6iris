@@ -826,4 +826,151 @@ Section KexecBSeam.
      ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) ∗
      kxc_frameB sp0 ra0 s00 s10 s20 pv av w5 w6 w7 w8 w9 w10 w11 w12 w13 w67)%I.
 
+  (* --------------------------------------------------------------- *)
+  (*  THE ARGV LOOP'S FRAME, at index [c]: [kxc_frameB]'s shape with two   *)
+  (*  differences -- slot 64 (argv) is BUMPED to [pa_add av (8*c)] (the C  *)
+  (*  bumps it in the frame, not in a register), and the ustack is SPLIT   *)
+  (*  at [c]: the low [33 - c] slots (not yet written) stay one opaque     *)
+  (*  [stack_own], and the top [c] (already written, farthest slot first)  *)
+  (*  are individual cells holding [kxc_sp]'s own recurrence -- so an      *)
+  (*  exit's [spv] needs no reconciliation against what the C actually     *)
+  (*  wrote.  [alen]/[sz1] are the recurrence's [len]/[top] arguments.     *)
+  (* --------------------------------------------------------------- *)
+  Definition kxc_frameC (sp0 ra0 s00 s10 s20 pv av : mword 64)
+      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
+      (c : nat) (sz1 : mword 64) (alen : nat -> nat) : iProp Σ :=
+    (word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
+     word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 ∗
+     word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 ∗
+     word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 ∗
+     word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 ∗
+     word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 ∗
+     word_pointsto (pa_stk sp0 7) (DfracOwn 1) w7 ∗
+     word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8 ∗
+     word_pointsto (pa_stk sp0 9) (DfracOwn 1) w9 ∗
+     word_pointsto (pa_stk sp0 10) (DfracOwn 1) w10 ∗
+     word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11 ∗
+     word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 ∗
+     word_pointsto (pa_stk sp0 13) (DfracOwn 1) w13 ∗
+     stack_own (pa_stk sp0 13) (33 - c) ∗
+     ([∗ list] j ∈ seq 0 c,
+        pa_stk sp0 (46 - j) ↦₈ (mword_of_int (kxc_sp (uint sz1) alen (S j)) : mword 64)) ∗
+     stack_own (pa_stk sp0 54) 9 ∗
+     word_pointsto (pa_stk sp0 64) (DfracOwn 1) (pa_add av (8 * c)) ∗
+     (∃ w65, word_pointsto (pa_stk sp0 65) (DfracOwn 1) w65) ∗
+     word_pointsto (pa_stk sp0 66) (DfracOwn 1) pv ∗
+     word_pointsto (pa_stk sp0 67) (DfracOwn 1) w67 ∗
+     (∃ w68, word_pointsto (pa_stk sp0 68) (DfracOwn 1) w68))%I.
+
+  (* THE FOURTEEN RESOURCES NEITHER THE LOOP'S HEAD NOR ITS EXIT LOOKS      *)
+  (* INSIDE -- [kxc_res]'s phase-C analogue, minus the FS/icache pieces     *)
+  (* phase B closed out at +0x1ae and plus [iref_slots 2] (both back). *)
+  Definition kxc_c_res
+      (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z)
+      (size : Z) (used2 : gset Z)
+      (plen : nat) (pfun : nat -> bv 8)
+      (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
+      (afun : nat -> nat -> bv 8)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (sp0 ra0 s00 s10 s20 pv av : mword 64)
+      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
+      (ef : nat -> bv 8) (P : uptd) (c : nat) (sz1 : mword 64)
+      (alen : nat -> nat) : iProp Σ :=
+    (iref_slots 2 ∗
+     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
+     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
+     bitmap_res gfs bmapstart cov logstart size used2 ∗
+     bslots bn 3 ∗
+     kalloc_env ga None ∗
+     proc_pt P ∗
+     proc_priv gf (proc_addr jp) pidv V ∗
+     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) ∗
+     ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) ∗
+     ([∗ list] k ∈ seq 0 na,
+        [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) ∗
+     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) ∗
+     kxc_frameC sp0 ra0 s00 s10 s20 pv av
+                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 c sz1 alen)%I.
+
+  (* --------------------------------------------------------------- *)
+  (*  +0x21a -- THE ARGV LOOP'S HEAD, at index [c].  [oldsz] rides through  *)
+  (*  untouched (phase D's [proc_freepagetable] of the OLD table needs it   *)
+  (*  at the old size); [sz1] is the running stack top, [S1]'s own value.   *)
+  (* --------------------------------------------------------------- *)
+  Definition kxc_at_21a
+      (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z)
+      (size : Z) (used2 : gset Z)
+      (plen : nat) (pfun : nat -> bv 8)
+      (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
+      (afun : nat -> nat -> bv 8)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (M : regfile) (K : nat) (C : iProp Σ)
+      (sp0 ra0 s00 s10 s20 pv av : mword 64)
+      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
+      (ef : nat -> bv 8) (P : uptd) (oldsz sz1 : mword 64) (c : nat) : iProp Σ :=
+    (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
+       M !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64) /\
+       M !!! Regidx Ra0 = avf c /\
+       M !!! Regidx Rs2 = (mword_of_int (kxc_sp (uint sz1) alen c) : mword 64) /\
+       M !!! Regidx Rs4 = sz1 /\
+       M !!! Regidx Rs5 = proc_addr jp /\
+       M !!! Regidx Rs6 = page_base P.(ud_root) /\
+       M !!! Regidx Rs7 = (mword_of_int (uint sz1 - 4096) : mword 64) /\
+       M !!! Regidx Rs8 = (mword_of_int 32 : mword 64) /\
+       M !!! Regidx Rs9 = pa_stk sp0 46 /\
+       M !!! Regidx Rs10 = oldsz ⌝ ∗
+     ⌜ (c <= na)%nat /\ (c < 32)%nat /\ avf c <> (mword_of_int 0 : mword 64) ⌝ ∗
+     ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
+       um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
+     pc_is (mword_of_int (KXB + 0x21a) : mword 64) ∗
+     sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
+     cpu_own 0 true (proc_addr jp) C true ∗
+     kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
+               plen pfun na avf aslen afun pidv V dqb dqs dqa
+               sp0 ra0 s00 s10 s20 pv av
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c sz1 alen)%I.
+
+  (* --------------------------------------------------------------- *)
+  (*  +0x272 -- THE LOOP'S OWN EXIT STATE, at index [c] -- reached either   *)
+  (*  from the natural NULL-terminated end ([c = na]) or, at [c = 0], by     *)
+  (*  the [+0x218 beqz a0,+0x272] skip when [argv[0] = NULL] (then          *)
+  (*  [na = 0] too, since [avf 0 = 0] and every index below [na] is not).   *)
+  (*  Same invariant as the head, minus the two LIVENESS conjuncts          *)
+  (*  ([a0 = avf c], [avf c <> 0]) that only the CONTINUING test earns.     *)
+  (* --------------------------------------------------------------- *)
+  Definition kxc_at_272
+      (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z)
+      (size : Z) (used2 : gset Z)
+      (plen : nat) (pfun : nat -> bv 8)
+      (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
+      (afun : nat -> nat -> bv 8)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (M : regfile) (K : nat) (C : iProp Σ)
+      (sp0 ra0 s00 s10 s20 pv av : mword 64)
+      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
+      (ef : nat -> bv 8) (P : uptd) (oldsz sz1 : mword 64) (c : nat) : iProp Σ :=
+    (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
+       M !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64) /\
+       M !!! Regidx Rs2 = (mword_of_int (kxc_sp (uint sz1) alen c) : mword 64) /\
+       M !!! Regidx Rs4 = sz1 /\
+       M !!! Regidx Rs5 = proc_addr jp /\
+       M !!! Regidx Rs6 = page_base P.(ud_root) /\
+       M !!! Regidx Rs7 = (mword_of_int (uint sz1 - 4096) : mword 64) /\
+       M !!! Regidx Rs8 = (mword_of_int 32 : mword 64) /\
+       M !!! Regidx Rs9 = pa_stk sp0 46 /\
+       M !!! Regidx Rs10 = oldsz ⌝ ∗
+     ⌜ (c <= na)%nat /\ (c < 32)%nat /\ avf c = (mword_of_int 0 : mword 64) ⌝ ∗
+     ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
+       um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
+     pc_is (mword_of_int (KXB + 0x272) : mword 64) ∗
+     sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
+     cpu_own 0 true (proc_addr jp) C true ∗
+     kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
+               plen pfun na avf aslen afun pidv V dqb dqs dqa
+               sp0 ra0 s00 s10 s20 pv av
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c sz1 alen)%I.
+
 End KexecBSeam.

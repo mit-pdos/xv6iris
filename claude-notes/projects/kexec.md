@@ -26,7 +26,55 @@ generated `CodeKexec.v` — not just transcribed from an earlier read), and its
 second shared tail — the `-1` path at `+0x1d6 .. +0x1f2` that six of the
 phase's branches funnel into — is **proven**
 (`ProofKexecTail.KexecTailProofC.kxc_bad_1d6`; see the phase-C section
-below).  **Still open in phase C:** the `+0x1ae .. +0x1d6` setup block
+below).
+
+**A NEW FAILURE MODE, AND A RULE TO FOLLOW BEFORE WRITING THE NEXT BLOCK.**
+`kxc_c_setup` (drafted whole: myproc, PGROUNDUP, the first `uvmalloc`
+call incl. the branch into `kxc_bad_1d6`, `uvmclear`, the stackbase/argv[0]
+setup, and the final branch into the loop) got every individual step past
+`coqc` — ~25 rounds of real bugs found and fixed by the compiler, all
+genuine (missing `wp_next_retarget` before hand-in to `kxc_bad_1d6`, a bare
+`rewrite /proc_priv` that leaked into `Hcont`'s TYPE because it wasn't
+scoped with `iEval ... in "H"`, two-sided `lia` bounds that silently need
+splitting into named `assert`s before `conj`, `rewrite HYa1` only firing on
+one of two `uint` occurrences because `uint_unsigned` binds its first match
+and needs `!`, and several more) — but the file's own **`Qed` does not
+finish**: six minutes in, memory was at 17 GB and *accelerating*, not
+plateauing.  Not `iFrame` this time (there is none in the file) — the
+suspect is the ~30-deep chain of `set`-introdudced `regfile` lets (`T0..T12,
+Z0, Y, Mu, U0..U3, Z1, Z2, W1..W8`), each a transparent local definition
+built on the last: `set` doesn't abstract them the way an opaque hypothesis
+would, so the kernel's final conversion-checking pass may be re-walking the
+WHOLE chain at each step, which is exactly the shape that turns into
+quadratic-or-worse blowup. B2/B3 already embody the fix for this, just
+stated for a different reason ("every iteration on this loop would pay for
+`kxc_ls` again") — the CONSEQUENCE of splitting a whole-function proof into
+several smaller Qeds is the same either way: shorter `set`-chains per Qed.
+
+**THE RULE: don't write a phase-C block as one lemma spanning a whole
+multi-call stretch with 20+ chained `set`s.**  Split at the seam this file's
+own design already names — `+0x1f4`, right where the first `uvmalloc`
+call's branch resolves to SUCCESS — into `kxc_c1` (`+0x1ae .. +0x1d4`:
+myproc, PGROUNDUP, the `uvmalloc` call, and the branch — the FAILURE arm
+closes via `kxc_bad_1d6` as already written and already proven fast; the
+SUCCESS arm ends by publishing a new seam state, say `kxc_at_1f4`, bundling
+`sz1`, `P'`, `Hbelow'`/`Hcov'` from `kxc_grow_inv`, and the frame) and
+`kxc_c2` (`+0x1f4 .. +0x218`: `uvmclear`, the stackbase/argv[0] arithmetic,
+and the final branch into `kxc_at_21a`/`kxc_at_272`, taking `kxc_at_1f4` as
+its entry).  The FAILURE-arm code and the arithmetic lemmas already proven
+in this session (`add_neg8192_eq_sub`, `um_covered_pground`, `uvm_maxsz_lit`,
+`neq_vec64_true`, `eq_vec64_false`, `zero_reg64`, all now sitting at the top
+of `ProofKexecC.v`) carry over verbatim into whichever half needs them — the
+work here was proving the STEPS, and none of it is wasted; it is
+purely a REPACKAGING into two Qeds instead of one.  `ProofKexecC.v` as it
+stands (uncommitted) has the whole thing written and individually
+step-checked; splitting it is the next session's first move, before
+touching the argv loop.  **Do not try to shrink the single-Qed version
+further with more `lia` massaging — the compiler was not reporting a wrong
+tactic here, every step it did report on was real, and the fix is
+structural (fewer `set`s per Qed), not tactical.**
+
+**Still open in phase C:** the `+0x1ae .. +0x1d6` setup block
 (myproc, the first `uvmalloc`, `uvmclear` on the guard page), the argv loop
 (`+0x21a .. +0x272`, whose invariant is designed below but not yet proven),
 and the closing `copyout` call joining into phase D at `+0x2a6`.  Then phase
