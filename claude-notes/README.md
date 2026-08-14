@@ -142,6 +142,15 @@ are working on that effort — the relevant `projects/` file.
 
 ### `projects/` — ongoing worklists & plans (one per effort)
 
+- **[`weak-memory-event-lang.md`](projects/weak-memory-event-lang.md)** — THE
+  PLAN OF RECORD for weak-memory soundness: the event-granular weak
+  language spike (design in
+  [`design/weak-memory-event-granular.md`](design/weak-memory-event-granular.md))
+  — make the logic's machine BE the promise-free machine, so the lift and
+  its whole premise ledger (shape/liveness records, Hcq/Hseip/Hpriv,
+  cone_liftable, the retag) are deleted by construction rather than
+  proven.  Named fail criteria decide the pivot; the superseded
+  machinery is retained side by side as the failure record.
 - **[`weak-memory-premises.md`](projects/weak-memory-premises.md)** — shrinking
   the lifted capstone's premise ledger.  **The in-scope ledger is CLOSED
   (C9, 2026-08-14) — the file should move to `completed/`.**  Both halves of

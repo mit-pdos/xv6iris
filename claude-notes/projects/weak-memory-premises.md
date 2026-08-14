@@ -1,5 +1,22 @@
 # Shrinking the capstone's premise ledger — worklist
 
+**STATUS UPDATE (2026-08-14): SUPERSEDED-PENDING-SPIKE.**  The
+premise-elimination approach did not converge (the user's call, and
+right): the ledger changed shape without shrinking, because every glue
+premise was a shadow of the two-machine granularity mismatch.  The plan
+of record is now the EVENT-GRANULAR LANGUAGE
+([`../design/weak-memory-event-granular.md`](../design/weak-memory-event-granular.md),
+spike: [`weak-memory-event-lang.md`](weak-memory-event-lang.md)), under
+which the C-series artifacts (shape towers, axiom records,
+`rv64d_live_residue`, Hcq/Hseip/Hpriv, cone_liftable, the retag) are
+DELETED rather than proven.  This file is kept as the FAILURE RECORD —
+the ten findings and the stage notes below are the evidence base for the
+new design.  Phase 2 (exhibit-level discharge of `main_premises` from
+per-site WWP tokens) SURVIVES the pivot and remains the discharge plan
+for the one genuine premise family.  Do further work here ONLY if the
+spike hits a named fail criterion.
+
+
 ## C9 (LANDED 2026-08-14): the state-conditioned liveness — THE LAST
 ## PREMISE IN SCOPE.  BOTH HALVES OF SEAM (6) ARE NOW THEOREMS.
 
