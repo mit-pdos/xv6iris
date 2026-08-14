@@ -492,6 +492,13 @@ Definition wp_create_sconf_body
   1 < ninodes ->
   ninodes <= 16 * Z.of_nat nib ->
   ninodes < 2 ^ 31 ->
+  (* ...and mkfs's own [ushort] geometry beside them, carried as a premise
+     rather than as a slot widening (D0-a): it is what makes the
+     [lw a2,4(s3)] at +0xb6 agree with dirlink's ZERO-extended halfword
+     argument.  BOTH of create's proof halves consume it ([cr_alloc_half],
+     [cr_fail_half]) and nothing below the seal supplies it, so the seal
+     is where it has to stand. *)
+  16 * Z.of_nat nib <= 2 ^ 16 ->
   bv_unsigned ty <> 0 ->
   (* ---- ialloc's no-inodes arm calls printk, not panic ---- *)
   printk_gen_contract γpr γu γd ->

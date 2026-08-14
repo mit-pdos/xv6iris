@@ -368,14 +368,18 @@ Proof. right. reflexivity. Qed.
    re-establish both across a flush if the flush is told two things about
    the record it writes:
 
-     the FIRST conjunct -- [nlink] does not FALL.  Without it any holder
+     the FIRST conjunct -- [nlink] does not MOVE.  Without it any holder
      of [dinode_at] could lower [nlink] under an outstanding [ilink] and
      (L1) would break; with it, "a fragment outstanding implies
      [nlink >= 1]" is a theorem of the region rather than a survey of this
-     tree's callers.  sys_unlink's decrement is the ONE writer that lowers
-     an [nlink], and it does not go through the ordinary flush at all --
-     it goes through [ireg_write_unlink], which pays for the drop by
-     CONSUMING a fragment.
+     tree's callers.  It is an EQUALITY and not "does not fall", because
+     that is what every discharge site in the tree actually has: no writer
+     that goes through the ordinary flush moves [nlink] at all, so
+     [di_nlink_stable_refl] / [di_nlink_stable_free] take the equation as
+     input already and the two consumers below become rewrites.
+     sys_unlink's decrement is the ONE writer that moves an [nlink], and it
+     does not go through the ordinary flush at all -- it goes through
+     [ireg_write_unlink], which pays for the drop by CONSUMING a fragment.
 
      the SECOND conjunct -- a flush that CLEARS the type leaves [nlink]
      at zero.  That is iput's free path, whose C-level guard is literally
@@ -399,7 +403,7 @@ Proof. right. reflexivity. Qed.
    record".  It costs THREE discharge sites in the whole tree; every
    contract that merely carries the premise is untouched. *)
 Definition di_nlink_stable (dn' dn : dinode) : Prop :=
-  bv_unsigned (di_nlink dn) <= bv_unsigned (di_nlink dn')
+  di_nlink dn' = di_nlink dn
   /\ (bv_unsigned (di_type dn') = 0 -> bv_unsigned (di_nlink dn') = 0).
 
 (* The three ways every caller in the tree discharges it.  The first two
@@ -412,8 +416,8 @@ Lemma di_nlink_stable_eq (dn' dn : dinode) :
   bv_unsigned (di_type dn') <> 0 ->
   di_nlink_stable dn' dn.
 Proof.
-  intros Heq Hnz. rewrite /di_nlink_stable Heq.
-  split; [lia | intros H0; exfalso; exact (Hnz H0)].
+  intros Heq Hnz. rewrite /di_nlink_stable.
+  split; [exact Heq | intros H0; exfalso; exact (Hnz H0)].
 Qed.
 
 Lemma di_nlink_stable_refl (dn : dinode) :
@@ -429,17 +433,16 @@ Lemma di_nlink_stable_free (dn' dn : dinode) :
   bv_unsigned (di_nlink dn) = 0 ->
   di_nlink_stable dn' dn.
 Proof.
-  intros Heq Hz. rewrite /di_nlink_stable Heq Hz.
-  split; [lia | intros _; reflexivity].
+  intros Heq Hz. rewrite /di_nlink_stable.
+  split; [exact Heq | intros _; rewrite Heq; exact Hz].
 Qed.
 
-(* (L1)'s two arithmetic steps, over plain [Z] and outside every section --
+(* (L1)'s arithmetic steps, over plain [Z] and outside every section --
    durable-notes' rule, since the goals below have a [bv 32] in context and
-   [lia]'s zify hook then answers "Cannot find witness". *)
-Lemma ireg_wle_mono (a b : Z) (w : nat) :
-  0 <= a -> (w <= Z.to_nat a)%nat -> a <= b -> (w <= Z.to_nat b)%nat.
-Proof. lia. Qed.
-
+   [lia]'s zify hook then answers "Cannot find witness".  The ordinary
+   flush needs none of them: [di_nlink_stable]'s first conjunct is an
+   EQUALITY, so [ireg_write_au] carries (L1) by rewriting.  What is left
+   here is the LINK/UNLINK arithmetic, where [nlink] really does move. *)
 Lemma ireg_wle_zero (a : Z) (w : nat) :
   (w <= Z.to_nat a)%nat -> a = 0 -> w = 0%nat.
 Proof. intros H Ha. subst a. cbn in H. lia. Qed.
@@ -759,7 +762,7 @@ Section InodeRegion.
   Qed.
 
   (* EVERY LANDED REGION WRITER CARRIES IT FOR FREE.  [di_nlink_stable]'s
-     first conjunct says nlink never FALLS across an ordinary flush, so a
+     first conjunct says nlink does not MOVE across an ordinary flush, so a
      record can only BECOME zero if it already was -- and the old receipt is
      then literally the new one, at the same [v].  The claim, the free and
      the withdrawal are the same fact by their own premises.  The deposit
@@ -1289,24 +1292,20 @@ Section InodeRegion.
       rewrite -ireg_key_split in Hc. congruence. }
     rewrite Hdeq in Hlok.
     (* (L1) RIDES ON [di_nlink_stable]'s first conjunct: [nlink] does not
-       fall across an ordinary flush, so the cap the ledger already had is
-       still a cap.  (L3) is vacuous -- an ordinary flush writes a nonzero
-       type, which is [Hnz], and the clearing flush leaves through
-       [ireg_free_au] instead. *)
+       move across an ordinary flush, so the cap the ledger already had is
+       the SAME cap -- one rewrite, no arithmetic.  (L3) is vacuous -- an
+       ordinary flush writes a nonzero type, which is [Hnz], and the
+       clearing flush leaves through [ireg_free_au] instead. *)
     assert (Hlok' : ireg_link_ok dn' wl).
-    { split.
-      - exact (ireg_wle_mono (bv_unsigned (di_nlink dn))
-                 (bv_unsigned (di_nlink dn')) wl
-                 (di_nlink_nonneg dn) (proj1 Hlok) (proj1 Hnl)).
-      - intros H0. exfalso. exact (Hnz H0). }
+    { rewrite /ireg_link_ok (proj1 Hnl).
+      split; [exact (proj1 Hlok) | intros H0; exfalso; exact (Hnz H0)]. }
     (* THE RECEIPT TRAVELS FOR FREE (fs-log.md §G.17): [Hnl]'s first
-       conjunct says nlink never FALLS across an ordinary flush, so a zero
-       at [dn'] was already a zero at [dn] and the old receipt IS the new
-       one, at the same [v]. *)
+       conjunct says nlink does not move across an ordinary flush, so a zero
+       at [dn'] is the same zero at [dn] and the old receipt IS the new one,
+       at the same [v]. *)
     assert (Hzm : bv_unsigned (di_nlink dn') = 0 ->
                   bv_unsigned (di_nlink (ds !!! islot inum)) = 0).
-    { rewrite Hdeq. intros H0. pose proof (proj1 Hnl).
-      pose proof (di_nlink_nonneg dn). lia. }
+    { rewrite Hdeq (proj1 Hnl). intros H0. exact H0. }
     iDestruct (ireg_ep_mono (bv_unsigned inum) (ds !!! islot inum) dn' Hzm
                  with "Hep") as "Hep".
     iMod (ghost_map_update dn' with "Ha Hdn") as "[Ha Hdn]".
@@ -1560,7 +1559,7 @@ Section InodeRegion.
        C-level [ip->nlink == 0] test (§20.9(c)). *)
     assert (Hnl0' : bv_unsigned (di_nlink dn') = 0) by exact (proj2 Hnl Hz).
     assert (Hnl0 : bv_unsigned (di_nlink dn) = 0).
-    { pose proof (proj1 Hnl) as H1. pose proof (di_nlink_nonneg dn) as H2. lia. }
+    { rewrite -(proj1 Hnl). exact Hnl0'. }
     assert (Hw0 : wl = 0%nat)
       by exact (ireg_wle_zero (bv_unsigned (di_nlink dn)) wl (proj1 Hlok) Hnl0).
     assert (Hlok' : ireg_link_ok dn' wl).

@@ -7547,9 +7547,29 @@ IMPLICATION), and `cr_trunc16_zero`.
 
 **THE FOUR-ENTRY PERSISTENT RE-SHAPE IS RETIRED, NOT DEFERRED.**  The
 linearity worry existed only while `cr_fail_body` was a HYPOTHESIS of
-`cr_alloc_half`.  It now has a proof, so the mkdir arm's three entries each
-`iApply cr_fail_half`; nothing has to be `□`-duplicated and
-`cr_mkdir_body`'s shape is unaffected.
+`cr_alloc_half`.  It now has a proof, so nothing has to be `□`-duplicated
+and `cr_mkdir_body`'s shape is unaffected.
+
+**BUT THE MKDIR ARM'S THREE FAIL ENTRIES CANNOT `iApply cr_fail_half`, AND
+NOT FOR A LINEARITY REASON.**  `cr_fail_body` carries `⌜ty <> T_DIR⌝`
+(`ProofCreate.v`:1617) — and the mkdir arm's entries are precisely the
+`ty = T_DIR` ones, so the premise excludes them by construction.  The
+premise is not decoration and not removable by itself: the arm's ONE use of
+it (`Htdir` → `Htdirz`, `ProofCreate.v`:4752, consumed at :4921) is where
+the ZEROED child is re-parked as `ic_loaded`, whose `dir_links` component
+is `emp` *because the child is not a directory*.  At `T_DIR` the child owns
+real `dir_links` — the "." and ".." the arm itself wrote — and the fail
+tail has to dispose of them before the freeing `iput` at +0x13a.  That is a
+different obligation, not a dropped hypothesis.  So the three T_DIR fail
+entries are UNWRITTEN, and the treatment is a choice not yet made:
+
+- **generalize `cr_fail_body` over `ty`** — drop `⌜ty <> T_DIR⌝` and make
+  the re-park take the child's `dir_links` at either type, which means the
+  body's payload gains whatever the directory case needs; or
+- **a T_DIR SIBLING body** beside `cr_fail_body`, sharing the walk through
+  `cr_tail_half` but stating the directory child's own re-park.
+
+Both are open; nothing here decides between them.
 
 **TWO WALK NOTES worth keeping.**  `iEval (rewrite Hdn0') in "H"` did NOT
 move the parked `dinode_at` (the framing then fails with *"iFrame: cannot
