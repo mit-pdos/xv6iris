@@ -20,11 +20,33 @@ R1. **The tree type is adopted as reported** (§1.1): an inum-keyed node
     a property of the type.  `fname` = `DirentEnc.bname 14`; paths add
     no new datatype (`PathElems.path_elems` is the vocabulary).
 
-R2. **`dir_view` is first-match-wins and one-directional** (bytes →
-    tree, never back) — §1.2's duplicate-name trap goes in F1a's brief
-    IN BOLD.  Defining it as a naive fold is the campaign's first
-    pre-identified soundness bug; F2 breaks against `DirView.dir_first`
-    at the first duplicate name.
+R2. **AMENDED (2026-08-14, user): name-uniqueness is carried as an
+    INVARIANT, and `dir_view` keeps first-match only as its
+    definition.**  The user's observation: xv6 cannot reach a
+    duplicate-name state — every insertion goes through `dirlink`,
+    which refuses a present name under the caller's directory lock
+    (fs.c:613; create's own lookup is redundant protection — sys_link
+    and mkdir's "."/".." rely on dirlink's guard alone).  The report's
+    §1.2 trap is about the byte FORMAT and the current model (no landed
+    invariant carries uniqueness; `dirlookup`'s proven semantics is
+    first-match).  The amendment closed a real hole the first-match
+    dodge left open — THE UNMASKING ARGUMENT: without the invariant,
+    sys_unlink's friendly spec is FALSE, because zeroing the first
+    record with a hidden duplicate behind it leaves `name` still
+    mapped (to a different inum); the tree delta is not `delete name`.
+    Uniqueness is load-bearing for F3's unlink triple, not cosmetic.
+    It is also nearly free: `SpecDirlink` ALREADY exposes the
+    maintenance fact on both arms (append: `dir_first data nrec s =
+    None`, :653/:911; found: `<> None`), so re-establishment is
+    caller-side with zero contract movement, unlink's zeroing preserves
+    it trivially, and boot needs one computational image obligation for
+    mkfs's initial image (`image_nlink_short`'s style).  Concretely:
+    `dir_names_unique` is a pure predicate in FsTree.v (F1a) and a
+    conjunct of `node_rep`'s NDir case, riding inside `fnode` (F1b);
+    `dir_view` stays first-match AS A DEFINITION (total on all byte
+    states, no definedness side conditions) with a lemma that under
+    `dir_names_unique` it is the exact any-match map and commutes with
+    record-zeroing.  §1.2's bytes→tree one-directionality stands.
 
 R3. **No whole-tree authority, ever** (§1.3) — three §20.9 death
     certificates already cover every home one could have.  `fs_rep` is
@@ -172,6 +194,12 @@ Definition dir_view (data : nat -> list (bv 8)) (nrec : nat) : gmap fname Z
 Define it as a fold and F2 breaks against `dir_first` at the first
 duplicate.  This is the kind of off-by-one the campaign stops catch; it
 belongs in F1a's brief in bold.
+
+[COORDINATOR AMENDMENT — superseded in part by R2: uniqueness IS an
+invariant of xv6's reachable states (dirlink's guard under the lock)
+and is carried as one (`dir_names_unique` inside `fnode`'s NDir case);
+first-match survives only as `dir_view`'s definition.  See R2 for the
+unmasking argument that made the invariant load-bearing.]
 
 ### 1.3 The auth/frag split: edges primitive, tree DERIVED, no new authority
 
