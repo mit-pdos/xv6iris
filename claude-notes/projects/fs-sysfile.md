@@ -8425,3 +8425,126 @@ Four smaller ones:
    `SleepLock` and `di_type` needs `DinodeEnc`, neither of which arrives
    through `InodeInv`/`IcacheInv`; both surface as "The reference … was
    not found" in a lemma statement far from the import list.
+
+
+## S6-mkdir / S6-mknod — DONE.  Both are proven, sealed and linked, and
+## they are create's ACCEPTANCE TEST: the seal took ONE amendment and the
+## walks needed no consumer-facing lemma layer at all
+
+`SpecSysMkdir.v` / `ProofSysMkdir.v` / `LinkSysMkdir.v` and
+`SpecSysMknod.v` / `ProofSysMknod.v` / `LinkSysMknod.v`, all six in
+`_CoqProject`.  `Print Assumptions` on each seal is the standing six plus
+`create_fresh_ty` (create is in the cone) plus the transient
+`iput_acquiresleep_order_ADMITTED` — byte-identical lists, since argint
+adds argraw and argraw adds nothing.  `K_sys_mkdir = 132` (eighteen slots
+over create's 114), `K_sys_mknod = 134` (twenty).  Coverage 179 -> 181,
+`sysfile.c` 10/16 -> 12/16.
+
+### THE SEAL'S FIRST CONSUMERS FOUND EXACTLY ONE HOLE, AND IT WAS A MISSING CLAUSE, NOT A MISSING LAYER
+
+**A CONTRACT THAT HANDS BACK A HELD RESOURCE MUST PRICE THE CALLER'S
+RELEASE OF IT.**  create returns a LOCKED inode, so every caller must run
+`iunlockput` — and both of these run it BEFORE `end_op`, where
+`wp_iunlockput_*` wants `iput_units` in hand and nothing between create's
+return and that call mints a unit.  create's post offered a ceiling
+(`u' <= u`) and no floor, and its header justified the omission with "the
+caller runs `end_op`, which takes `log_op` at ANY count" — true of the
+LAST call these callers make and false of the one before it.  The general
+rule: **when a contract's payout is a resource whose release costs budget,
+the floor that pays for the release belongs in the same postcondition.**
+Check it by walking from the payout to the point the caller can no longer
+hold it, not by looking at the callee's own last instruction.
+
+Everything else composed with no glue whatever, which is the seal's real
+result:
+
+* `create_locked` destructs into exactly `wp_iunlockput_sconf`'s ten
+  resource premises — sleeplock pair, `sl_pid`, deposit, the two half
+  cells, `i_valid`, `ic_loaded`, `ity_shot`, `inode_ref_short` — in one
+  `iDestruct`, no bridging lemma, no re-shaping;
+* iunlockput's two `IBLOCK` premises are DERIVED from `ireg_blocks_ok`
+  applied at create's own `0 < bv_unsigned inum < 16 * nib`, so they cost
+  the caller one `destruct` and no threading;
+* the `ok = true` guard on both new clauses costs a consumer nothing:
+  `ok = true` is precisely when these functions run their `iunlockput`,
+  and it is spent as a single `ltac:(exact (proj2 (proj2 H) eq_refl))`.
+
+**AND THE CONSUMER AUDIT'S OWN ARITHMETIC WAS WRONG IN THE DIRECTION THAT
+MATTERS.**  The stop report priced the floor UNCONDITIONALLY at
+`iput_units`, on the strength of "the fail arm's closing `iunlockput(dp)`
+spends 0".  It does not: `ip_spend_w w cru crz` is `ip_bm w + (if cru ||
+crz then 0 else 1)`, and on the fail arms create holds NEITHER credit for
+the parent.  `cr_budget_fail_late`'s `ip_need <= u7 /\ u7 = 3` prices that
+call as CALLABLE, not as SURVIVABLE.  The rule: **an arm's ledger theorem
+tells you the call can run, not what is left afterwards — read the spend
+term, not the entry bound.**
+
+### THE TWO WALKS
+
+Both are `ProofSysChdir.v`'s structure with everything the chdir stage
+established reused verbatim (the `b`-indexed epilogue crossing, the
+dropped-and-re-minted `trap_csrs_ext`/`cpu_claim_ext` complement, the
+block-lemma-inside-the-functor rule, `cpu_own_zero_empty` for `lks = ∅`).
+Three things are new and worth carrying:
+
+* **A FUNCTION WHOSE RESULT NEVER LEAVES a0 IS MUCH CHEAPER THAN ITS
+  INSTRUCTION COUNT SUGGESTS.**  create returns `ip` in a0 and
+  iunlockput's argument is already there, so neither function saves a
+  single callee-saved register beyond ra and s0: `md_thr`/`mn_thr` exclude
+  TWO registers where `sc_thr` excludes four, there is no late `c.sdsp s1`
+  and no per-arm restore, and the closing `callee_saved` is eleven
+  applications of one transport.  Look for this shape before copying a
+  four-exception threading predicate.
+* **A C SHORT-CIRCUIT `||` COMPILES TO ONE BLOCK ENTERED TWICE, WITH NO
+  REJOIN INSTRUCTION.**  Both disjuncts branch to the `-1` tail directly,
+  so the tail lemma takes no register-restore premise and each arm applies
+  it with whatever register file it holds — unlike sys_chdir, whose ARM B
+  reloads `s1` at +0x66 before falling in.
+* **`wp_cli_s_sconf` TAKES THE STORED VALUE AS A PARAMETER, so an ABI
+  premise stated at `sign_extend' 64 <ty>` needs NO bridging lemma.**
+  Instantiating the leaf at `sign_extend' 64 T_DIR` (or `T_DEVICE`, or
+  `sign_extend' 64 (0 : mword 16)`) makes create's three argument premises
+  plain `upd_eq`s, and the leaf's own obligation is one `pcw`.  Reach for
+  this instead of proving `mword_of_int 1 = sign_extend' 64 T_DIR`.
+
+### sys_mknod's OWN PIECE: the 4 -> 2 carve, and why the tree lacked it
+
+argint writes an `int` cell; create's `short major, short minor` are read
+out of its LOW HALFWORD by the `lh`s at +0x32 / +0x36.  Frame slot 19
+therefore holds BOTH locals (`minor` low at `s0-152`, `major` high at
+`s0-148`) and is carved twice — `InstrBytes.word_pointsto_split4` into the
+two `int` cells, then `word4_pointsto_split2` into halves — and rejoined
+before the epilogue.  **The 4 -> 2 pair did not exist anywhere**: every
+other `lh` in the kernel reads an inode field, and `inode_meta` already
+hands those out at `↦₂`.  `ProofSysMknod.v` states it (`hw_lo` / `hw_hi` /
+`hw_join`, the four `nth_byte` laws, `aligned4_aligned2` / `_hi` /
+`pa_add_2_unsigned`) in the same `assemble_bytes` style as the 8 -> 4
+originals; **hoist it into `InstrBytes.v` the moment a second consumer
+appears**, and not before (the cone cost is not worth one user).
+
+Two traps it paid for:
+
+1. **STATE `hw_lo` AT `mword 16`, NOT `bv 16`.**  At `bv` the
+   `sign_extend' 64` in `wp_lh_s_sconf`'s post does not elaborate —
+   *"has type bv 16 while it is expected to have type mword ?n"* — and the
+   two print identically.  Durable-notes' "ascribe the FIRST argument",
+   met at a definition rather than a binder.
+2. **TAKE THE 8-ALIGNMENT OUT OF THE SLOT BEFORE THE FIRST SPLIT.**
+   `iDestruct (word_pointsto_aligned_p with "H") as %Hal` leaves `H` in
+   place (a pure-conclusion `iDestruct` does not consume), and BOTH joins
+   need it — `aligned8_aligned4` for the low cell and
+   `aligned8_aligned4_hi` for the high one — after the halves have stopped
+   carrying it.
+
+Two smaller ones, both from generating a twin file mechanically:
+
+3. **A frame-size sweep must be run on the `pa_stk … <n>` occurrences that
+   are NOT at a variable.**  `Hpop`'s `pa_stk (add_vec …) 18` and the pop
+   leaf's positional `18` survived a `pa_stk X 18 -> pa_stk X 20` rewrite
+   and surfaced as *"Unable to unify pa_stk sp0 18 with pa_stk sp0 20"* in
+   the epilogue, nowhere near the frame lemmas.
+4. **A binder name collides across a whole-function walk.**  `u1` named
+   both a frame slot's junk value and create's returned log count; the
+   error is a bare *"u1 is already used"* at the `iIntros` 400 lines below
+   the `iDestruct` that bound it.  Name callee-returned ledger counts
+   `un1`/`n2`-style, never `u<k>`.
