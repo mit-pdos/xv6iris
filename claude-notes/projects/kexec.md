@@ -176,29 +176,88 @@ facts are just `c<=na /\ c<32 /\ avf c<>0`, no relation between `Rs7` and
 which needs the subtraction to NOT have wrapped, which is exactly the fact
 missing).
 
-**The fix, not yet done:** add the conjunct to `kxc_at_21a`/`kxc_at_272` in
-`ProofKexecSeam.v` (both, same shape, mirroring how `Pfinal` was threaded
-in for the page table); re-verify `kxc_c_setup`'s own two exit bullets
-(trivial at `c=0`: `stackbase = sz1-4096 <= sz1 = kxc_sp(...)0`, since
-4096>=0); then `kxc_argv_step` gets it for free at entry and has to
-RE-ESTABLISH it for `S c` at both the loop-back and the `+0x272` exit
-(exactly the BLTU-fall branch's own premise, so no new work there — it's
-already the fact the branch itself carries). **Read `93d2a371`'s commit
-message in full before writing this** — it has the complete arithmetic
-chain (`sp - (len+1) >= stackbase - 4096 = sz1 - 8192 >= 0`) already
-worked out.
+**The fix — DONE AND COMPILER-VERIFIED** (a first "GCP build says it's
+fine" claim earlier in this session was PREMATURE — that build had been
+kicked off before any of this was written, so it verified nothing here;
+the real verification is the local `coqc`/`make` round documented below).
+Added the conjunct to both `kxc_at_21a`/`kxc_at_272` in `ProofKexecSeam.v`
+(same shape, alongside the existing `c<=na /\ c<32 /\ avf...` conjunct);
+updated `kxc_c_setup`'s two exit bullets in `ProofKexecC.v` with a 4th
+`split_and!` bullet, trivial at `c=0` since `kxc_sp top len 0 = top`
+definitionally; added `(8192 <= uint sz1)%Z` as a new explicit premise to
+`kxc_argv_step`'s own signature (needed for the "sz1>=8192" half of
+`93d2a371`'s argument — it does NOT fall out of `Hspok` alone, since
+`Hspok` only bounds `kxc_sp(...)c` from below by `uint sz1 - 4096`, not
+`uint sz1` itself); added `Local Lemma kxc_sp_S` (the `Fixpoint`'s `S`
+case as a named, `rewrite`-able equation) and `kxc_sp_le_top` (plain
+induction: `kxc_round16 X <= X` always since `X mod 16 >= 0` for a
+positive divisor regardless of `X`'s sign, so `kxc_sp` is non-increasing
+and `top` bounds it from above at every index — the OTHER half `93d2a371`
+needs, not spelled out in the commit message itself). Wrote the ANDI step
+(+0x226) AND the BLTU step (+0x22a) through to the fall-through arm's PC
+advance to +0x22e (both arms present; the taken/overflow arm progresses
+to the +0x358 stub and then `admit`s — its connector into `kxc_bad_1d6`
+is not written yet; the fall-through arm re-establishes `Hspok` at `S c`
+and then `admit`s the rest of the loop body). `Qed`-free but fully
+`coqc`-clean (`Admitted`, not a hidden error) as of this checkpoint.
 
-**`ProofKexecC.v` as it stands is UNCOMMITTED** (`kxc_argv_step` ends
-`admit. Admitted.` at +0x226) — the module-signature change
-(`Strlen`/`Copyout` added to `KexecCProof`), the four new lemmas above, and
-the instruction-by-instruction progress through +0x222 are all real and
-compiler-checked; only the ANDI step onward is missing. Next session:
-land the `kxc_at_21a`/`kxc_at_272` conjunct first, then resume exactly at
-+0x226 in the draft.
+**Four real bugs the compiler caught while landing the BLTU step — all
+fixed, all worth remembering for the rest of the loop:**
+1. **`f_equal.` on an mword equation can close the WHOLE goal by itself**
+   (via `reflexivity`'s use of full kernel conversion, which unfolds a
+   `Fixpoint` match on a literal `S _` — something `simpl` does NOT
+   reliably do, see #2) — a trailing `simpl. reflexivity.` after it then
+   fails with **"No such goal. Try unfocusing with '}'"** because there's
+   nothing left to run it on. Fix: drop the dead tactics once `f_equal`
+   alone closes it.
+2. **`simpl` is not a reliable way to unfold `kxc_sp top len (S i)`.**
+   `apply Z.mod_small. simpl. unfold kxc_round16. ... lia.` failed with
+   **"Cannot find witness"** because `simpl` left `kxc_sp top len (S i)`
+   folded, so `lia` saw it as an opaque atom unrelated to the `kxc_round16
+   X` hypotheses sitting right next to it. Fix: a named equation lemma
+   (`kxc_sp_S`, proved by bare `reflexivity` — which DOES do the full
+   unfold, per #1) and `rewrite` it explicitly instead of hoping `simpl`
+   will. Same fix applied to `kxc_sp_le_top`'s own induction step, which
+   had the identical `simpl`-on-`Fixpoint` pattern.
+3. **`apply Z.mod_small.` leaves the modulus as `bv_modulus 64`, not the
+   literal `18446744073709551616` — fatal for `lia`, invisible to
+   `exact`.** Two of the new arithmetic asserts closed the final range
+   goal with `lia` and failed the same way (`Cannot find witness`, and
+   spuriously looked like a SCOPING bug — see the debugging note below);
+   a THIRD, structurally identical assert (`HT2a5Z`, written earlier the
+   same session) closed the analogous goal with a bare `exact Hnowrap`
+   and worked FINE, which is what made this confusing to diagnose: `exact`
+   checks by conversion (unfolds `bv_modulus 64` for free), `lia` does
+   not. Fix: `change (bv_modulus 64) with 18446744073709551616%Z` right
+   after `apply Z.mod_small`, every time the goal is going to be closed
+   by `lia` rather than `exact`/`reflexivity`.
+4. **`Z_lt_ge_dec`'s `>=` branch is `Z.ge`, not `Z.le` flipped, and they
+   are NOT interchangeable by `exact`.** `destruct (Z_lt_ge_dec a b) as
+   [Hover|Hok]` gives `Hok : a >= b`; a downstream goal wanting `b <= a`
+   (from `Z.ltb_ge`) rejected `exact Hok` outright — `Z.ge`/`Z.le` unfold
+   to `compare ... = Gt` vs `compare ... = Lt`, different terms, and
+   `exact` does not do the inequality-flip reasoning `lia` does. Fix:
+   `lia` instead of `exact Hok` (already the standing rule elsewhere in
+   this file; this was the one place it got skipped).
 
-**Still open in phase C beyond that:** the rest of the argv loop
-(overflow exit at +0x22a, the `copyout` call and its own fail exit at
-+0x24c, the ustack write, the three-way final branch at +0x268/+0x26a),
+**Debugging note, since it cost real time and will recur:** the "Cannot
+find witness" in bug #3 first got MISDIAGNOSED as a hypothesis-scoping
+bug, because an `idtac "label:" SomeHyp.` diagnostic — the obvious way to
+try to print a hypothesis's value inline — itself errored with **"SomeHyp
+not found"**, which reads exactly like "the hypothesis isn't in context."
+It isn't a scoping check at all: `idtac`'s message arguments are Ltac-level,
+and a bare hypothesis name is not a valid one there. The tool that DOES
+work is `match goal with |- ?G => idtac "GOAL:" G end.` (prints the actual
+goal, which is what actually diagnosed the `bv_modulus`-vs-literal gap) —
+never trust `idtac H` for a hypothesis `H` as evidence of anything.
+
+**Still open in phase C beyond the BLTU:** the taken/overflow arm's
+`+0x358` connector into `kxc_bad_1d6` (needs `kxc_ustack_collapse` first,
+to turn `kxc_frameC`'s split-at-`c` ustack back into `kxc_frame_at`'s
+uniform shape — see the design note two paragraphs up); the rest of the
+fall-through arm (reload argv[c] via s11, second `strlen` call at +0x238,
+the `copyout` call and its own fail exit at +0x24c, the ustack write, the
+next-arg load at +0x264, the three-way final branch at +0x268/+0x26a);
 `kxc_argv_loop` (the fuel-induction wrapper, mirroring
 `ProofKexecB3.kxc_phdr`'s shape around `kxc_ph_step`), and the closing
 `copyout` call joining into phase D at `+0x2a6`. Then phase D, then

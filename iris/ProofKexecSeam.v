@@ -922,7 +922,8 @@ Section KexecBSeam.
        M !!! Regidx Rs8 = (mword_of_int 32 : mword 64) /\
        M !!! Regidx Rs9 = pa_stk sp0 46 /\
        M !!! Regidx Rs10 = oldsz ⌝ ∗
-     ⌜ (c <= na)%nat /\ (c < 32)%nat /\ avf c <> (mword_of_int 0 : mword 64) ⌝ ∗
+     ⌜ (c <= na)%nat /\ (c < 32)%nat /\ avf c <> (mword_of_int 0 : mword 64) /\
+       (uint sz1 - 4096 <= kxc_sp (uint sz1) alen c)%Z ⌝ ∗
      ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x21a) : mword 64) ∗
@@ -963,7 +964,8 @@ Section KexecBSeam.
        M !!! Regidx Rs8 = (mword_of_int 32 : mword 64) /\
        M !!! Regidx Rs9 = pa_stk sp0 46 /\
        M !!! Regidx Rs10 = oldsz ⌝ ∗
-     ⌜ (c <= na)%nat /\ (c < 32)%nat /\ avf c = (mword_of_int 0 : mword 64) ⌝ ∗
+     ⌜ (c <= na)%nat /\ (c < 32)%nat /\ avf c = (mword_of_int 0 : mword 64) /\
+       (uint sz1 - 4096 <= kxc_sp (uint sz1) alen c)%Z ⌝ ∗
      ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x272) : mword 64) ∗
