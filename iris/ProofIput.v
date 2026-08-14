@@ -476,7 +476,7 @@ Section IputCommon.
     ⌜∃ (qt : Qp) (nn : positive), M !! k = Some (qt, nn) /\
        (nn = 1%positive \/ ∃ qr : Qp, (qt - q)%Qp = Some qr)⌝.
   Proof.
-    rewrite /itable_half /iref_tok /iref_frag. iIntros "Ha [Hf _]".
+    rewrite /itable_half /iref_tok /iref_frag. iIntros "Ha [[Hf _] _]".
     iDestruct (own_valid_2 with "Ha Hf")
       as %[_ [Hincl _]]%auth_both_dfrac_valid_discrete.
     iPureIntro.
