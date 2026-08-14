@@ -438,7 +438,22 @@ Definition wp_kexec_sconf_body
      the [aslen i] bytes the caller owns *)
   (forall i, (i < na)%nat -> (alen i < aslen i)%nat) ->
   (forall i, (i < na)%nat -> bb_cstr (afun i) (alen i)) ->
-  (forall i, (i < na)%nat -> (Z.of_nat (alen i) < 2 ^ 31)%Z) ->
+  (* EACH ARGUMENT FITS IN A PAGE, and this is load-bearing rather than a
+     convenience.  The push at +0x222 is a 64-bit [sub], and the [bltu
+     s2,s7] that guards it does NOT catch an underflow: a wrapped [sp] is
+     ABOVE stackbase as an unsigned word, so the machine sails past the
+     test with a stack pointer near 2^64.  The success arm's
+     [kxc_stack_ok] -- an assertion, since [szv'] is existential and it
+     therefore cannot be a premise -- is a Z-level claim and is simply
+     FALSE on such a run, so something has to rule the underflow out.
+     This does: with every argument at most PGSIZE-1 the decrement is at
+     most 4096, and the invariant [stackbase <= sp] (established by the
+     previous iteration's own [bltu]) plus [stackbase = sz1 - 4096] and
+     [sz1 >= 8192] leaves [sp - (len+1) >= 0].
+       sys_exec pays it for free: [fetchstr] copies each argument into a
+     kalloc'd page and passes [max = PGSIZE], so no argument it hands over
+     is longer.  It also subsumes the [< 2^31] bound strlen asks for. *)
+  (forall i, (i < na)%nat -> (Z.of_nat (alen i) < 4096)%Z) ->
   (* ---- the running process ---- *)
   (jp < NPROC)%nat ->
   gs !! jp = Some gl ->

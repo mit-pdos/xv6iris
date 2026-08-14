@@ -493,13 +493,13 @@ pay it and move on; if no, the callee's contract is wrong and generalizing it
 is the work. Relaxing namei/namex/nameiparent and copyout's source to a
 fraction remains available and is nobody's blocker.
 
-## THE SIX UPSTREAM BLOCKERS — FIVE FIXED, ONE OPEN AND NOT GATING
+## THE SEVEN BLOCKERS — SIX FIXED, ONE OPEN AND NOT GATING
 
 None of these is kexec's own design going wrong; each is a callee contract
 that was stated for the callers it had, and all five were found by trying to
 compose them. **§1 (copyout), §2 (safestrcpy), §4 (readi's `off`), §5
-(uvmalloc's freshness) and §6 (uvmalloc's silent leaves) are FIXED and the
-tree is green; §3 (the log budget) is open** and belongs to the fs-namei project — it does not gate the proof,
+(uvmalloc's freshness), §6 (uvmalloc's silent leaves) and §7 (kexec's own
+stack claim) are FIXED and the tree is green; §3 (the log budget) is open** and belongs to the fs-namei project — it does not gate the proof,
 it only bounds which pathnames the theorem covers.
 
 **THE RECURRING SHAPE, AND IT IS WORTH RECOGNISING ON SIGHT.** §4 and §5 are
@@ -510,6 +510,36 @@ states the code actually reaches. Neither guard moves a postcondition, and
 every existing caller pays by ignoring it. When a premise looks unpayable,
 ask what the callee's own instruction order already guarantees before
 strengthening anything in the caller.
+
+### 7. kexec's OWN success arm claimed something the `bltu`s do not check — **FIXED**
+
+The push loop's `sub a5,s2,a5` at +0x222 is a 64-bit subtract and the
+`bltu s2,s7` that guards it is UNSIGNED, so an argument longer than the
+stack does not fail the test — it wraps `sp` to a value near 2^64, which is
+comfortably *above* stackbase. The success arm's `kxc_stack_ok` is a Z-level
+claim (`base <= kxc_sp top len i`) and is simply false on such a run, and it
+cannot be a premise: it mentions `szv'`, which is existential.
+
+So the contract gained the one premise that rules the underflow out —
+
+```coq
+  (forall i, (i < na)%nat -> (Z.of_nat (alen i) < 4096)%Z) ->
+```
+
+— replacing the weaker `< 2^31` (which strlen wanted and which this
+subsumes). With every argument at most `PGSIZE - 1` the decrement is at most
+4096, and `stackbase <= sp` (the previous iteration's own test) together with
+`stackbase = sz1 - 4096` and `sz1 >= 8192` gives `sp - (len+1) >= 0`. sys_exec
+pays it for free: `fetchstr` copies each argument into a kalloc'd page and
+passes `max = PGSIZE`.
+
+**THE SHAPE TO RECOGNISE, and it is not §4/§5's.** Those two were premises a
+callee asked for that the caller could not pay. This is a POSTCONDITION the
+caller promised that the code does not deliver — and the tell is a `bltu`
+standing in for a range check. An unsigned compare against a lower bound
+refutes underflow only if underflow is already impossible; when a proof
+wants "the subtraction did not wrap" out of one, the bound has to come from
+somewhere else.
 
 ### 6. `SpecUvmalloc` did not say WHAT IT MAPPED, and uvmclear needs it — **FIXED**
 
