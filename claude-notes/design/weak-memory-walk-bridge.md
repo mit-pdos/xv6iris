@@ -1,3 +1,19 @@
+> **RETARGET NOTICE (2026-08-14, the event-granular pivot).**  The
+> weak-memory soundness architecture is moving to an EVENT-GRANULAR
+> program logic (design:
+> [`weak-memory-event-granular.md`](weak-memory-event-granular.md);
+> spike PASSED at measured time parity).  Under it, THIS FILE'S FOUNDING
+> PROBLEM DISSOLVES: the walk's two reads of one slot are two separate
+> language events and may legitimately read different log entries — no
+> kind-blind single-memory `exec`, no stale mirror.  `WeakStale` and the
+> peel machinery remain VALID on the instruction-atomic tier (which
+> stays until the M4 retarget completes), but new 6c work should NOT
+> build further on them: translation proofs retarget to the event tier
+> (walk reads via the `ewp_ev_load` rule family, the A/D CAS via
+> `ewp_ev_rmw`, fetches via the pinned-text `ewp_ev_fetch`).  Landed
+> capstones are kept as the record; coordinate before starting new
+> slices.
+
 # The walk's racy leaf: the peel/bridge split (DECIDED: option (a))
 
 **STATUS (2026-08-13): THE RACY FETCH-WALK IS DONE, MODEL TO WP TO CAPSTONE.**
