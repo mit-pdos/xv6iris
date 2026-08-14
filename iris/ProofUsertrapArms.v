@@ -1178,7 +1178,7 @@ Section UtE8.
       iApply (T.ut_kexit Rsys N V
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xf8) : mword 64) 4)]> K1)
-                nx C false Hwf' ltac:(unfold K_kexit; lia)
+                nx C false lks Hwf' ltac:(unfold K_kexit; lia) ltac:(lkbelow)
                 with "Htext Hpc Hcg [-]").
       iApply (ua_hold_on Rsys N V C with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].

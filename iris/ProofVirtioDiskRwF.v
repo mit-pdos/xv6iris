@@ -1185,7 +1185,7 @@ Section VdrwfP6.
                      = mword_of_int (KernelSyms.virtio_disk_rw + 0x20e)) by pcstep.
     iApply (wp_vdrwf_iter (CID := CIDx)  γs pd h fr (d_ops h : SailStdpp.Values.mword 64)
               (Z_to_bv 32 16) (Z_to_bv 16 1) (Z_to_bv 16 (Z.of_nat m2))
-              E8 (trap_res eb + (K - 12))%nat eb (proc_addr j) C lks
+              E8 (trap_res eb + (K - 12))%nat eb (proc_addr j) C ({[lock_rank "virtio_disk"]} ∪ lks)
               ltac:(pose proof (vdrwb_K20 K HK); lia) Hh8 Hfrh Hglen HE8s2 HE8s3 ltac:(lkbelow)
               with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Wd0 Wl0 Wf0 Wn0 Hfb Hrh").
     iIntros (F1) "%HF1 Hcg Hown Hpc Hfb".
@@ -1230,7 +1230,7 @@ Section VdrwfP6.
     iApply (wp_vdrwf_iter (CID := CIDx)  γs pd m2 (fr_upd fr h true)
               (b_data b : SailStdpp.Values.mword 64)
               (Z_to_bv 32 1024) (vdrw_flags wr) (Z_to_bv 16 (Z.of_nat t))
-              G1 (trap_res eb + (K - 12))%nat eb (proc_addr j) C lks
+              G1 (trap_res eb + (K - 12))%nat eb (proc_addr j) C ({[lock_rank "virtio_disk"]} ∪ lks)
               ltac:(pose proof (vdrwb_K20 K HK); lia) Hm8 Hfr1m Hglen HG1s2 HG1s3 ltac:(lkbelow)
               with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Wd1 Wl1 Wf1 Wn1 Hfb Hrm").
     iIntros (F2) "%HF2 Hcg Hown Hpc Hfb".
@@ -1276,7 +1276,7 @@ Section VdrwfP6.
     iApply (wp_vdrwf_iter (CID := CIDx)  γs pd t (fr_upd (fr_upd fr h true) m2 true)
               (d_info_status h : SailStdpp.Values.mword 64)
               (Z_to_bv 32 1) (Z_to_bv 16 2) (Z_to_bv 16 0)
-              G2 (trap_res eb + (K - 12))%nat eb (proc_addr j) C lks
+              G2 (trap_res eb + (K - 12))%nat eb (proc_addr j) C ({[lock_rank "virtio_disk"]} ∪ lks)
               ltac:(pose proof (vdrwb_K20 K HK); lia) Ht8 Hfr2t Hglen HG2s2 HG2s3 ltac:(lkbelow)
               with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Wd2 Wl2 Wf2 Wn2 Hfb Hrt").
     iIntros (F3) "%HF3 Hcg Hown Hpc Hfb".

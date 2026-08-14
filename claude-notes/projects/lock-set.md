@@ -209,6 +209,13 @@ auditing each first.  It never unfolds `lock_rank` except under `vm_compute`
 on a goal that is two numerals; see the `locks_add_del` note below for what
 happens when `set_solver` gets near it.
 
+**Reduce the shape you actually have.**  A balanced pair inside a depth-0 body
+leaves `({[r]} ∪ lks) ∖ {[r]}`, NOT `lks ∖ {[r]}` -- so `rewrite Hlkempty
+locks_empty_del` silently fails to reduce (the `∅ ∖ _` it wants is not there)
+and the error surfaces at the next tactic.  The rewrite that works is
+`locks_union_empty` then `locks_self_del`, or `locks_add_del_below` when the
+bound is in scope.  Cost an hour in the two pipe proofs.
+
 `CpuOwn.cpu_own_zero_empty` is the other half: at depth 0 the level/set
 coupling FORCES `lks = ∅`.  Every `wp_sys_*` body, `yield`, the trap tails,
 `namei`/`nameiparent`, and every panic tail derives it instead of demanding a
