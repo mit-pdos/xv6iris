@@ -2437,11 +2437,19 @@ Section ProofDirlinkMain.
           destruct Hbud as [Hbud1 Hbud2]. split; lia. }
         { exact Hsbw. }
         (* THE SEAM: [wi16_post] at [off := 16 * k0], [n := 16] IS
-           [dl16_post] -- the two let-chains are the same terms.  The only
-           work is the two guards: [tot = 16] gives [0 < tot], and
-           [dl_wi_blocks] is the sixteen-at-16-aligned fact the file already
-           carries for both cost functions. *)
-        { intros _ Htot16. exact (Hwi16 ltac:(lia) (dl_wi_blocks k0)). }
+           [dl16_post]'s first conjunct -- the two let-chains are the same
+           terms and the guards are now the same guard, so the only work is
+           [dl_wi_blocks], the sixteen-at-16-aligned fact this file already
+           carries for both cost functions.
+           THE SECOND CONJUNCT IS ALL THIS ARM CAN SAY AT [tot = 0]: writei's
+           credit-aware clause is silent there, so what is relayed is its
+           COARSE bound [Hbud] at [wi_cost_bmonly (16*k0) 16 = 4 =
+           dl0_spend].  See [SpecDirlink.dl0_spend]. *)
+        { intros _. split.
+          - intros Htpos. exact (Hwi16 Htpos (dl_wi_blocks k0)).
+          - intros _. destruct Hbud as [Hbud1 _].
+            rewrite (dl_wi_cost_bmonly k0) in Hbud1.
+            unfold dl0_spend. exact Hbud1. }
         (* S5a finding 2: writei's own preservation, forwarded *)
         { exact Hsized'. }
         { split; [exact Hnone |].

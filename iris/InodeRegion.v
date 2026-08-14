@@ -292,14 +292,24 @@ Proof. intros H1 H2 Heq. lia. Qed.
 (* ===================================================================== *)
 
 (* Exactly what ialloc's [memset(dip, 0, 64)] followed by
-   [dip->type = type] leaves on disk: a nonzero type, a zero size and
-   thirteen zero address words.  ialloc writes NOTHING else -- in
-   particular [nlink] stays 0 until the caller's own iupdate -- so this is
-   deliberately the WEAKEST record shape a claim can promise, and it is
-   still enough for ilock's fill to build [InodeLock.inode_ok] out of
-   nothing at all ([InodeInv.bm_empty] collapses every block resource,
-   [bm_covers_nonpos] and [DirView.dir_ok_size_zero] ride on the zero
-   size).
+   [dip->type = type] leaves on disk: a nonzero type, a zero size, thirteen
+   zero address words and a ZERO LINK COUNT.  ialloc writes NOTHING else --
+   [nlink] stays 0 until the caller's own iupdate -- so this is deliberately
+   the WEAKEST record shape a claim can promise, and it is still enough for
+   ilock's fill to build [InodeLock.inode_ok] out of nothing at all
+   ([InodeInv.bm_empty] collapses every block resource, [bm_covers_nonpos]
+   and [DirView.dir_ok_size_zero] ride on the zero size).
+
+   THE NLINK CONJUNCT (design §20.18 ruling 1, the C1 layer).  The claim box
+   is the ONE record shape a caller may hold whose [nlink] the ledger has
+   never constrained from outside -- the fragment sits inside the region at
+   this arm and (L1) is discharged there from (L3) -- and create's COMMIT is
+   the first writer that has to say what that count IS: it mints one [ilink]
+   against [nlink 0 -> 1], and "the record I am flushing over has nlink 0"
+   is exactly what makes the arithmetic a fact rather than a caller's claim.
+   Free at the ONE producer ([SpecIalloc.ialloc_fresh_shape], where it is
+   [reflexivity] over [memset]'s zero) and free at every consumer, which
+   only ever destructs it.
 
    Stated with a bare [replicate 13] rather than [InodeInv.bm_cells
    bm_empty] so that this file keeps its short Require list; the bridge is
@@ -307,12 +317,19 @@ Proof. intros H1 H2 Heq. lia. Qed.
 Definition fresh_shape (d : dinode) : Prop :=
   bv_unsigned (di_type d) <> 0
   /\ bv_unsigned (di_size d) = 0
-  /\ di_addrs d = replicate 13 (bv_0 32).
+  /\ di_addrs d = replicate 13 (bv_0 32)
+  /\ bv_unsigned (di_nlink d) = 0.
 
 Lemma fresh_shape_wf (d : dinode) : fresh_shape d -> dinode_wf d.
 Proof.
-  intros (_ & _ & Ha). rewrite /dinode_wf Ha length_replicate. reflexivity.
+  intros (_ & _ & Ha & _). rewrite /dinode_wf Ha length_replicate. reflexivity.
 Qed.
+
+(* the new conjunct, named so a consumer reads it off without destructuring
+   four ways (and so the claim box's [nlink] has one place to be cited) *)
+Lemma fresh_shape_nlink (d : dinode) :
+  fresh_shape d -> bv_unsigned (di_nlink d) = 0.
+Proof. intros (_ & _ & _ & Hnl). exact Hnl. Qed.
 
 (* TYPE STABILITY (fs-icache.md §19.6 Part 1, fs-sysfile S5d).  "A flush
    either CLEARS an inode's type or leaves it exactly where it was" -- the
@@ -1966,6 +1983,75 @@ Section InodeRegion.
                 wl gl cl rl Hlok with "Hla Hep"). iExact "Harm". }
     iModIntro. iFrame "Hfrag Hhalf". iPureIntro.
     exists ds. split; [exact Hwf | split; [exact Hbytes | exact Hnz]].
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  §20.8's ORPHAN COLOUR: THE FREE MINT                                *)
+  (*     design: fs-icache.md §20.18 ruling 2                             *)
+  (* ------------------------------------------------------------------ *)
+
+  (* [ireg_link_alloc]'s shape with the BLOCK HALF removed: it reads
+     nothing, so it needs no [fs_L] credential and no [ds], and it takes no
+     fragment in.  Mask-preserving, like every other ledger move (§20.2:
+     the update is purely ghost, so it threads through no contract and a
+     caller may fire it at any point in its own proof).
+
+     WHAT IT IS FOR.  create's [fail:] after a successful [dirlink(ip,
+     "..")] sets [ip->nlink = 0] at +0x12e while the [".."] record it wrote
+     is still live on disk -- §20.8's orphaned [".."], the one record in
+     xv6 whose target's link count does not account for it.  The payload
+     that record sits in demands a ticket for [dp], and the only honest
+     colour at that instant is grey.  There is nothing to convert FROM:
+     the [ilink dp] that would have paid for it is minted at [dp->nlink++]
+     (+0x128), which on this trace never ran.
+
+     WHY IT IS SOUND, AND THE PERMANENT CONSEQUENCE.  [g] is constrained by
+     no clause of [ireg_link_ok] and [igrey] concludes nothing, so the mint
+     is a frame-preserving update at any slot and the fragment it pays out
+     is not evidence of anything.  The price -- taken DELIBERATELY, and
+     recorded rather than allowed to happen as a side effect -- is that [g]
+     can never again carry information: §20.16.3's guarded claim discipline,
+     and any later revival keyed on the orphan colour, are foreclosed from
+     here on.  §20.16.3's actual wall is [ireg_withdraw]'s and is untouched,
+     so nothing that stands today falls; what is given up is a repair route.
+     [IcacheRef.link_mint_grey] carries the same record at the algebra. *)
+  Lemma ireg_link_grey (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (inum : bv 32) :
+    ↑iregN ⊆ E ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    ireg_inv γi γfs inodestart nib ={E}=∗ igrey (bv_unsigned inum).
+  Proof.
+    iIntros (HE Hin) "#Hinv".
+    pose proof (islot_lt inum) as Hsl.
+    assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
+                   = bv_unsigned inum) by (symmetry; apply ireg_key_split).
+    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as (m) "(>Ha & Hblks)".
+    pose proof (ireg_bi_lt inum nib Hin) as Hbi.
+    iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
+                with "Hblks") as "[Hblk Hback]".
+    iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & >Hsls)".
+    assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
+    iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
+                with "Hsls") as "[Hslot Hslback]".
+    iEval (rewrite Hkey) in "Hslot".
+    iDestruct "Hslot" as "[(%wl & %gl & %rl & %cl & Hla & %Hlok) [Hep Harm]]".
+    (* the ONE ghost step: [g] moves, and no clause of [ireg_link_ok]
+       mentions it, so the slot is re-parked at the SAME record *)
+    iMod (link_mint_grey with "Hla") as "[Hla Hfrag]".
+    assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
+    { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
+    iMod ("Hclose" with "[Ha Hfsb Harm Hla Hep Hslback Hback]") as "_".
+    { iNext. iExists m. iFrame "Ha".
+      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hslback]"); [done |].
+      iExists ds. iSplitR; [done |]. iSplitR; [done |].
+      iSplitL "Hfsb"; [iExact "Hfsb" |].
+      iEval (rewrite -Hins).
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep]").
+      rewrite Hkey.
+      iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
+                wl (S gl) cl rl Hlok with "Hla Hep"). iExact "Harm". }
+    iModIntro. iExact "Hfrag".
   Qed.
 
 End InodeRegion.

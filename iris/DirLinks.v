@@ -346,6 +346,41 @@ Section DirLinks.
     iIntros "H". iLeft. iExact "H".
   Qed.
 
+  (* ...AND THE SELF-RECORD, WHICH NEEDS NO TICKET AT ALL (design §20.3's
+     forced exemption, landed as its own constructor for §20.18's C1).
+     mkdir's [dirlink(ip, ".", ip->inum)] writes a record naming the
+     directory ITSELF, and xv6 deliberately does not bump [ip->nlink] for it
+     ("No ip->nlink++ for '.': avoid cyclic ref count") -- so there is no
+     [ilink] to hand in, and none is wanted: the guard's second half is
+     false at [inum = self] and the ticket is [emp].
+
+     [dir_link_at_dirlink] above already DROPS a fragment offered at a
+     self-record (it is affine), but create cannot use it for the dot: it
+     has no fragment to offer.  This is the same two bytes, with the premise
+     that makes the ticket free instead of dropped. *)
+  Lemma dir_link_at_dirlink_self (self : Z) (dn : dinode)
+      (data data' : nat -> list (bv 8))
+      (inum : bv 16) (s : list (bv 8)) (k0 tot : nat) :
+    (2 <= tot)%nat ->
+    bv_unsigned inum = self ->
+    (forall x : nat,
+       file_byte data' x
+       = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + tot)%nat)
+         then dirent_bytes (de_of_name inum s) !!! (x - 16 * k0)%nat
+         else file_byte data x) ->
+    ⊢ dir_link_at self dn data' k0.
+  Proof.
+    intros Htot Hself Hrng.
+    assert (Hrec : dir_inum data' k0 = inum).
+    { rewrite (dir_inum_of_two data' k0 (de_of_name inum s)); [reflexivity |].
+      intros jj Hjj. rewrite (Hrng (16 * k0 + jj)%nat).
+      rewrite decide_True; [| lia].
+      replace (16 * k0 + jj - 16 * k0)%nat with jj by lia. reflexivity. }
+    rewrite /dir_link_at Hrec.
+    rewrite (bool_decide_eq_true_2 (bv_unsigned inum = self) Hself).
+    rewrite andb_false_r. done.
+  Qed.
+
   (* ...AND THE NO-WRITE ARM.  writei's short-write break at [tot = 0] moves
      no byte and no size, so the whole big-op rides -- and this is the arm
      create's [fail:] takes when a dirlink could not allocate. *)
@@ -436,6 +471,48 @@ Section DirLinks.
       [| by iIntros "_"].
     iIntros "H". iApply (big_sepL_mono with "H"). intros i k Hik.
     iIntros "Hx". iApply (dir_link_at_live self dn data k Hnz with "Hx").
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  ...AND BACK.  THE WRITE-BACK HALF OF THE SAME THEOREM              *)
+  (*     design: fs-icache.md §20.18's C1 layer                          *)
+  (* ------------------------------------------------------------------ *)
+
+  (* [dir_links_live] takes a payload's tickets apart under a LIVE home and
+     hands back the colourless [dir_ilink_at] form; a walk that then WRITES
+     the directory has to put them back, and B' landed only the outbound
+     half.  The return trip needs no hypothesis at all, because the ticket's
+     LEFT disjunct is [dn]-free: an [ilink] is a claim about the record's
+     TARGET and says nothing about the home, so it re-enters the two-colour
+     ticket at ANY [dn'] -- including the one create's [dp->nlink++] has
+     just moved.  That is what makes the round trip
+     [dir_links_live] ; <the write> ; [dir_links_of_ilink] type-check
+     across an nlink change, which is exactly create's shape. *)
+  Lemma dir_link_at_of_ilink (self : Z) (dn' : dinode)
+      (data : nat -> list (bv 8)) (k : nat) :
+    dir_ilink_at self data k -∗ dir_link_at self dn' data k.
+  Proof.
+    rewrite /dir_link_at /dir_ilink_at.
+    destruct (dir_liveb data k
+              && negb (bool_decide (bv_unsigned (dir_inum data k) = self)));
+      [| by iIntros "_"].
+    iIntros "H". iLeft. iExact "H".
+  Qed.
+
+  (* ...and the payload-level lift, [dir_links_live]'s exact inverse. *)
+  Lemma dir_links_of_ilink (self : Z) (dn' : dinode)
+      (data : nat -> list (bv 8)) :
+    (if decide (bv_unsigned (di_type dn') = T_DIR_z)
+     then ([∗ list] k ∈ seq 0 (dir_nrec (bv_unsigned (di_size dn'))),
+             dir_ilink_at self data k)
+     else emp)%I -∗
+    dir_links self dn' data.
+  Proof.
+    rewrite /dir_links.
+    destruct (decide (bv_unsigned (di_type dn') = T_DIR_z)) as [_ | _];
+      [| by iIntros "_"].
+    iIntros "H". iApply (big_sepL_mono with "H"). intros i k Hik.
+    iIntros "Hx". iApply (dir_link_at_of_ilink self dn' data k with "Hx").
   Qed.
 
 End DirLinks.

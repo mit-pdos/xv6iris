@@ -259,6 +259,37 @@ Proof. destruct crb, ind; vm_compute; lia. Qed.
 Lemma dl_need_ind (crb ind : bool) : (dl_need crb ind <= dl_need crb true)%nat.
 Proof. destruct crb, ind; vm_compute; lia. Qed.
 
+(* ---- WHAT A *FAILING* APPEND SPENDS, AND WHY IT IS NOT [dl_spend].
+   [tot = 0] is the bmap-out-of-blocks break -- writei's OTHER break, the
+   part-way [either_copyin], cannot happen here ([user = false]) and is the
+   one that log_writes before it leaves.  So the loop broke BEFORE its own
+   [log_write] and the only log_writes that ran are bmap's (the bitmap block
+   and the bzero'ed block, on the arm where it allocated one -- an allocated
+   INDIRECT block followed by a failed data block is exactly that arm) and
+   the trailing [iupdate]: [dl_spend] minus its data-block term, i.e.
+   strictly less than the success arm.
+
+   THIS CONSTANT IS NOT THAT NUMBER, and the difference is the point.
+   [SpecWritei.wi16_post] is guarded by [0 < tot] and says NOTHING at zero,
+   so the credit-aware figure is unavailable to the caller on this arm and
+   the only bound [ProofDirlink] can relay is writei's COARSE single-block
+   allowance [wi_cost_bmonly (16*k0) 16] -- FOUR
+   ([ProofDirlink.dl_wi_cost_bmonly]).  Four is what is PROVEN, so four is
+   what the contract says.  It buys create's non-directory [fail:] entry
+   (+0xc4) and the first of its mkdir entries; the two interior mkdir
+   entries need three, and what closes them is writei's post exposing the
+   spend half of [wi16_post] at [tot = 0] -- not anything dirlink can do.
+   See projects/fs-sysfile.md, D₀ increment 3a. *)
+Definition dl0_spend : nat := 4%nat.
+
+(* the provenance, as an equation rather than as a comment: it IS writei's
+   coarse allowance for a window that straddles one block. *)
+Lemma dl0_spend_bmonly : dl0_spend = wi_cost_bmonly 0 16.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma dl0_spend_lt : (dl0_spend < dirlink_units)%nat.
+Proof. vm_compute. lia. Qed.
+
 (* ===================================================================== *)
 (*  THE SIXTEEN-BYTE SEAM AT dirlink's OWN WINDOW (GR-3 stage 3).         *)
 (*                                                                        *)
@@ -271,11 +302,29 @@ Proof. destruct crb, ind; vm_compute; lia. Qed.
 (*  weakening: dirlookup's [readi] prefix and the free-slot scan LOG        *)
 (*  NOTHING, so the set the writei call actually runs at IS [Sb].          *)
 (*                                                                        *)
-(*  GUARDED BY THE SUCCESS-APPEND ARM.  [found = false] is the append and  *)
-(*  [tot = 16] is the branchless [a0 = 0] of the arm's last clause; the    *)
-(*  SHORT-WRITE arm reports -1 and create does not price it.  The FOUND    *)
-(*  arm carries nothing beyond the counted net-zero clause -- it spends    *)
-(*  only iput, which create prices with [CreateBudget.ip_spend].           *)
+(*  GUARDED BY THE APPEND ARM ALONE -- [found = false] -- AND THEN SPLIT   *)
+(*  ON [tot], because create PRICES THE FAILING APPEND TOO.  The old       *)
+(*  guard was [tot = 16], i.e. the success append: on every route into     *)
+(*  create's [fail:] the only surviving budget clause was then the counted *)
+(*  [ncount - dirlink_units], and seven from the eight-or-nine create      *)
+(*  reaches its first dirlink with leaves less than [iput_units] for the   *)
+(*  tail's first [iunlockput] -- create's failure arm was UNPAYABLE        *)
+(*  ([CreateBudget.cr_fail_counted_busts]).  Nothing forced that guard:    *)
+(*  [wi16_post]'s own is [0 < tot], and this file narrowed it.  So:        *)
+(*                                                                        *)
+(*    [0 < tot]  -- writei's own clause, relayed verbatim, and now         *)
+(*                  covering the SHORT write (1..15) as well as the        *)
+(*                  success one;                                          *)
+(*    [tot = 0]  -- the spend bound alone, at [dl0_spend] (see there for   *)
+(*                  why it is writei's coarse four and not the honest      *)
+(*                  figure).  The MEMBERSHIP half is absent on purpose:    *)
+(*                  at [tot = 0] writei never log_wrote the target block,  *)
+(*                  so nothing PUTS it in [Sb'] -- it is in there only if  *)
+(*                  the caller had already logged it, which is [crd] and   *)
+(*                  is the caller's fact, not this contract's.             *)
+(*                                                                        *)
+(*  The FOUND arm carries nothing beyond the counted net-zero clause -- it *)
+(*  spends only iput, which create prices with [CreateBudget.ip_spend].    *)
 (*                                                                        *)
 (*  [k0] is the append slot, i.e. the body's own [let k0 := dir_slot data  *)
 (*  nrec], taken as a parameter here for the same reason the arms take     *)
@@ -285,7 +334,7 @@ Proof. destruct crb, ind; vm_compute; lia. Qed.
 Definition dl16_post (bmapstart : Z) (dinum : mword 32) (inodestart : Z)
     (ncount n' k0 tot : nat) (found : bool) (bm bm' : blkmap)
     (Sb Sb' : gset Z) : Prop :=
-  found = false -> tot = 16%nat ->
+  found = false ->
   let off := (16 * k0)%nat in
   let fbn := (off `div` BSIZE)%nat in
   let al := bmap_alloced bm bm' fbn in
@@ -293,10 +342,12 @@ Definition dl16_post (bmapstart : Z) (dinum : mword 32) (inodestart : Z)
   let crb := bool_decide (bmapstart ∈ Sb) in
   let crd := bool_decide (wi_tgt_blk bm' off ∈ Sb) in
   let cru := bool_decide (IBLOCK dinum inodestart ∈ Sb) in
-  ((ncount - wi16_spend crb crd cru al ind)%nat <= n')%nat
-  /\ wi_tgt_blk bm' off ∈ Sb'
-  /\ IBLOCK dinum inodestart ∈ Sb'
-  /\ (al = true -> bmapstart ∈ Sb').
+  ((0 < tot)%nat ->
+     ((ncount - wi16_spend crb crd cru al ind)%nat <= n')%nat
+     /\ wi_tgt_blk bm' off ∈ Sb'
+     /\ IBLOCK dinum inodestart ∈ Sb'
+     /\ (al = true -> bmapstart ∈ Sb'))
+  /\ (tot = 0%nat -> ((ncount - dl0_spend)%nat <= n')%nat).
 
 (* iput's two block-membership premises, for EVERY inum the inode region
    covers rather than for the one child dirlookup happens to return.  See

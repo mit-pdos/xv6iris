@@ -6014,8 +6014,10 @@ Nothing entered from the merge.
 ### W3 as landed (agent report, 2026-08-13)
 
 `dl16_post` (SpecDirlink.v, beside dirlink_units): guarded by
-`found = false -> tot = 16` (tot is the arm's own a0 = 0 witness, keeping
-the Prop free of the register file); the slot is the body's own `k0`
+`found = false` and then split on `tot` (tot is the arm's own a0 = 0
+witness, keeping the Prop free of the register file — the `tot` split is
+increment 3a's, below; W3 landed it as `tot = 16`, which is what made
+create's `fail:` unpayable); the slot is the body's own `k0`
 parameter (`off := 16 * k0`); spend + membership trio exactly wi16_post's
 at that window.  **The entire writei seam is one `exact`** — wi16_post IS
 dl16_post at `off := 16*k0`, with `dl_wi_blocks : wi_blocks (16*k) 16 = 1`
@@ -6730,12 +6732,13 @@ Theorem cr_fail_closes_at_zero (w : bool) :
   ip_need <= cr_uw w - ia_spend - iu_spend true - 1.
 ```
 
-The last two say what the repair is and that it is enough: **widen
+The last two say what the repair is: **widen
 `dl16_post`'s guard from `tot = 16` to `0 < tot`** (which is `wi16_post`'s
 OWN guard already — `SpecWritei` never narrowed it, `SpecDirlink` did), and
-**add a `tot = 0` clause** (`ncount - 1 <= n'`: at `tot = 0` the only
-`log_write` dirlink runs is writei's trailing `iupdate`).  Both close every
-arm at every value of the reported booleans.  Note the ENTRY-side premise
+**add a `tot = 0` clause**.  Increment 3a below lands both and corrects the
+`tot = 0` figure: `ncount - 1` is neither true nor provable (bmap can
+allocate the indirect block and then fail), and what closes is not "every
+arm" but the two whose failing dirlink is create's first.  Note the ENTRY-side premise
 is fine at every arm (`dl_need false true = 6 <= 8`); it is only the SPEND
 bound that busts, which is W3's own recorded flag — *"`dirlink_units` still
 says 7 while the append arm provably spends `wi16_spend <= 4` — the slack
@@ -6781,3 +6784,112 @@ test) and ARM A-FAIL whole.  That is roughly a fifth of the allocate half
 and it would have to be parked behind a hypothesis covering the other
 four-fifths, so it is not an increment — the next D₀ launch is the one
 AFTER §20.10 stages C+D and the `SpecDirlink` spend repair.
+
+
+### D₀ INCREMENT 3a LANDED — the `SpecDirlink` spend repair.  Blocker 2 is
+### closed at the arm create actually needs; **the `tot = 0` figure is FOUR,
+### not one**, and blocker 3 (chunk atomicity) is STOPPED one tier down, on
+### writei's post
+
+**THE CLAUSE AS LANDED** (`SpecDirlink.dl16_post`, the `let` chain
+unchanged):
+
+```coq
+  found = false ->
+  let off := (16 * k0)%nat in  … let cru := … in
+  ((0 < tot)%nat ->
+     ((ncount - wi16_spend crb crd cru al ind)%nat <= n')%nat
+     /\ wi_tgt_blk bm' off ∈ Sb'
+     /\ IBLOCK dinum inodestart ∈ Sb'
+     /\ (al = true -> bmapstart ∈ Sb'))
+  /\ (tot = 0%nat -> ((ncount - dl0_spend)%nat <= n')%nat).
+```
+
+The guard `tot = 16` became `wi16_post`'s own `0 < tot`, so the clause now
+covers the SHORT write (1..15) as well as the success append, and the
+whole seam is still one term: `exact (Hwi16 Htpos (dl_wi_blocks k0))`
+where it was `exact (Hwi16 ltac:(lia) (dl_wi_blocks k0))`.  **The
+membership half is deliberately ABSENT from the `tot = 0` conjunct**: at
+zero writei broke before its own `log_write`, so nothing PUTS the target
+block in `Sb'` — it is there only if the caller had already logged it,
+which is `crd` and is the caller's own fact.  `IBLOCK … ∈ Sb'` and
+`al = true -> bmapstart ∈ Sb'` are both true at zero and are still left
+out, for the same reason the spend figure is loose: no contract exposes
+them there (below).
+
+**THE FIGURE IS FOUR, AND BOTH HALVES OF THE `- 1` IN THE REFUTATION'S
+`cr_fail_closes_at_zero` WERE WRONG — in opposite directions.**  Its
+reasoning was "at `tot = 0` the only `log_write` dirlink runs is writei's
+trailing `iupdate`".
+
+* **The TRUTH is not one.**  `tot = 0` is the bmap-out-of-blocks break, and
+  on the indirect path bmap can allocate the INDIRECT block (bitmap
+  `log_write` + the bzero'ed block) and *then* fail on the data block, so
+  `al = true` co-exists with `tot = 0`.  The honest spend there is
+  `bmap_cost crb al ind + (cru ? 0 : 1)` — i.e. `dl_spend` MINUS its
+  data-block term — which is up to four uncredited, and exactly three at
+  create's own interior links.
+* **What ProofDirlink can PROVE is neither.**  `SpecWritei.wi16_post` is
+  guarded by `0 < tot` and says nothing whatever at zero, so the only bound
+  the walk can relay on that arm is writei's COARSE single-block allowance
+  `wi_cost_bmonly (16*k0) 16`, which the file already computes as FOUR
+  (`ProofDirlink.dl_wi_cost_bmonly`).  `SpecDirlink.dl0_spend = 4` is
+  stated as that number with `dl0_spend_bmonly` recording the provenance,
+  and `dl0_spend_lt` records that it is still strictly better than the
+  counted `dirlink_units = 7` the arm had before.
+
+**WHAT FOUR BUYS, MACHINE-CHECKED** (`CreateBudget` §3b, five theorems,
+replacing the scratch text of increment 3's finding 2):
+
+| theorem | says |
+|---|---|
+| `cr_fail_counted_busts` | the pre-repair state: `dirlink_units` from create's 8-or-9 leaves 2 < `ip_need` |
+| `cr_fail_would_fit_at_u0` | it is the SPEND bound and not the entry premise — seven fits at `cr_u0` with an iput to spare |
+| `cr_fail_closes_with_credit` | the `0 < tot` clause closes at EVERY value of `w`/`crd`/`cru`/`al`/`ind` (min 5, against `ip_need = 3`) |
+| `cr_fail_closes_at_zero` | the `tot = 0` clause at `dl0_spend` closes the two routes whose failing dirlink is create's FIRST logging dirlink: **+0xc4** (ARM FAIL's non-dir entry) and **+0xf2** (`dirlink(ip, ".")`) — 5 and 4 against 3 |
+| `cr_fail_mkdir_at_zero_busts` | and the two INTERIOR mkdir entries (+0x106, +0x118) do **not**: both run at exactly SIX in hand at either value of `w`, four from six leaves two, and **three** would close both |
+
+So **create's `fail:` arm closes on paper for every short write and for the
+two entries the parked cut leaves live** — +0xc4 is the one the restage
+ruling kept, and it is the one `cr_fail_counted_busts` was written about.
+The two interior mkdir entries sit behind the parked T_DIR branch and are
+one unit short *because of the contract, not the ledger*: the honest spend
+there is three.
+
+**BLOCKER 3 (chunk atomicity) — STOPPED BEFORE ANY EDIT, and the stop is
+not in `SpecDirlink`.**  `tot = 0 \/ tot = 16` is TRUE (a 16-aligned
+sixteen-byte window is one chunk, `m = min(n - tot, BSIZE - off%BSIZE)` =
+16, and every break arm leaves `tot` at 0 — the user-copy break included,
+since a part-way copy is committed without advancing `tot`) and it is
+**not derivable from writei's contract**: the entire post pins `tot` by
+`tot <= n` and by the branchless `a0` disjunction dirlink itself builds.
+Nothing else in the twenty-odd post clauses mentions a granularity.
+
+**WHAT WRITEI'S POST WOULD NEED — one wand, and it is the same edit that
+would give the interior mkdir entries their three:**
+
+```coq
+  (* the chunk-granularity invariant, at the single-block corner *)
+  ⌜wi_blocks off n = 1%nat -> (tot = 0%nat \/ tot = n)⌝ -∗
+  (* ...and wi16_post's SPEND half, out from under the [0 < tot] guard *)
+  ⌜wi_blocks off n = 1%nat ->
+     ((ncount - wi16_spend crb crd cru al ind)%nat <= n')%nat⌝ -∗
+```
+
+i.e. **split `wi16_post`**: the spend bound holds at every `tot` — at zero
+either the bmap break ran and the data-block term was not spent at all, or
+the user-copy break ran and `log_write(bp)` happened *before* the break
+(fs.c's "might have partially updated the block"), which is exactly what
+that term pays for, so the one expression bounds both — and only the
+MEMBERSHIP trio needs `0 < tot`.  Both obligations live in
+ProofWritei's loop invariant, both are statement changes to
+`wp_writei_gen_body`, and both were outside this increment's sanctioned
+surface.  Sized as one stage: two wands, the loop invariant's break arms,
+`ProofDirlink`'s relay (one `exact` each), and `dl0_spend` then becomes
+`dl_spend` minus its data term and `cr_fail_mkdir_at_zero_busts` flips to a
+positive row.
+
+**WHAT THIS DOES NOT MOVE.**  Increment 3's FINDING 1 — the `ilink` ticket,
+§20.10 stages C+D — is untouched and is still what gates the allocate half.
+This repair is the second of the two things that stood between D₀ and its
+first `dirlink`; the first is still standing.

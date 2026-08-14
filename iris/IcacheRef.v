@@ -785,6 +785,42 @@ Section IcacheLink.
     apply prod_local_update'; apply nat_local_update; lia.
   Qed.
 
+  (* MINT ONE [igrey] FROM NOTHING -- the [g]-component twin of
+     [link_mint_link], and the source create's orphaned [".."] uses (design
+     §20.18 ruling 2).
+
+     WHY IT NEEDS NO PAYER, AND WHAT THAT COSTS PERMANENTLY.  Nothing in the
+     region constrains [g]: [InodeRegion.ireg_link_ok] caps [w] by the
+     record's [nlink] ((L1)) and reads a free record's zero off (L3), and
+     neither clause mentions [g] at all.  So raising [g] by one is a
+     frame-preserving update at ANY slot, and the fragment it pays out
+     concludes nothing -- which is exactly [igrey]'s charter (§20.3: "it
+     carries no allocatedness, and that is honest").  The mint is therefore
+     sound at the instant create needs it: the [".."] record it wrote is
+     live on disk while [ip->nlink] is about to be set to 0, and a colour
+     that asserts nothing is the truthful thing to hold there.
+
+     THE PRICE, TAKEN DELIBERATELY (§20.18 ruling 2, and it is why this
+     comment exists rather than the lemma standing alone): once ANYONE may
+     mint grey out of nothing, [g] can never again carry information.  Every
+     clause of the form "[1 <= g] licenses X" -- §20.16.3's guarded claim
+     discipline, and any later revival keyed on the orphan colour -- is
+     foreclosed from here on, because the guard could be turned on by a mint
+     that observed nothing.  §20.16.3's wall is independent of this (it is
+     [ireg_withdraw]'s, not [g]'s), so nothing that stands today falls; what
+     is given up is a repair route, knowingly. *)
+  Lemma link_mint_grey (z : Z) (w g : nat) (c : option (excl unit)) (r : nat) :
+    link_auth z w g c r ==∗ link_auth z w (S g) c r ∗ igrey z.
+  Proof.
+    rewrite /link_auth /igrey. iIntros "Ha".
+    iApply (link_update_alloc with "Ha").
+    rewrite /lelem.
+    apply prod_local_update'; [| apply link_lu_id].
+    apply prod_local_update'; [| apply link_lu_id].
+    apply prod_local_update'; [apply link_lu_id |].
+    apply nat_local_update. lia.
+  Qed.
+
   (* THE CLAIM.  Mintable exactly when the slot is empty, which is what
      (L3)'s second half delivers at a type-0 record (§20.5) -- and what
      the free must re-establish, §20.7's open obligation. *)

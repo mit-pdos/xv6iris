@@ -610,6 +610,23 @@ additive, and the consumer discharges the antecedent from the bundle it
 already opened.  Budget a postcondition strengthening only after checking it
 against every arm that returns an input verbatim.
 
+**WHEN A CONTRACT RELAYS A CALLEE'S EXPOSED CLAUSE, RELAY ITS GUARD
+VERBATIM — never re-state it at the arm you happen to need.**  A relayed
+clause costs the same whatever its guard says (the proof is one `exact`
+either way), so narrowing it buys nothing and silently deletes the OTHER
+arms from every downstream ledger — and the deletion is invisible until
+some caller has to pay for an arm the guard no longer covers, which can be
+stages later and in a different file.  `SpecDirlink.dl16_post` relayed
+`SpecWritei.wi16_post` under `tot = 16` where writei's own guard is
+`0 < tot`; the short write vanished from the contract, and create's whole
+failure arm turned out to be unprovable because of it
+(`CreateBudget.cr_fail_counted_busts`).  **And where the callee's guard
+excludes an arm the caller must still price, that is a finding about the
+CALLEE's post, not something the caller's proof can repair**: what it can
+relay there is only the coarse counted bound, and stating that honestly —
+with the figure the walk actually proves, not the one the ledger wants —
+is what turns the gap into a sized stage instead of a wrong number.
+
 **AN AMORTIZED LOOP'S "CREDIT" IS A FUNCTION OF THE SET THE CONTRACT
 ALREADY THREADS — DO NOT ADD A BOOLEAN FOR IT.**  Where a cost is carried as
 held-back POTENTIAL over a set (`WriteiBudget.bm_pot`: one unit iff the
@@ -749,6 +766,16 @@ The failure mode of each is a green-looking ANSWER, not an error.
   verification build is still running, however small the incoming delta looks.
   The fix is always the same: add the requires explicitly; the next sweep prunes
   whatever is genuinely unused.
+- **A SENTINEL WAIT LOOP READS A LOG THAT IS ALREADY THERE.** The recommended
+  "have the build write its own sentinel and wait on `grep EXIT` of the log"
+  becomes an instant false green when a *previous session* left that log on the
+  box: `until grep -q PAEXIT /tmp/pa4.log; do sleep 20; done` returned at once
+  against a file two days old, and the axiom list read out of it belonged to
+  another cone entirely (it named `consoleread`, which the cone under test
+  cannot reach — that mismatch is the tell, and it is the only one). **`rm` the
+  log in the same command that starts the job**, and check the file's mtime
+  before believing its contents. Shared `/tmp` on a long-lived mirror is full of
+  other agents' leftovers with exactly the names you would pick.
 
 ## Proof coverage report
 

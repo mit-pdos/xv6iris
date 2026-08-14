@@ -1047,7 +1047,7 @@ Section IlockLoad.
           rewrite Hagr in Hfresh.
           iEval (rewrite Hagr) in "Hdn".
           pose proof Hfresh as Hfr0.
-          destruct Hfresh as (Hfty & Hfsz & Hfad).
+          destruct Hfresh as (Hfty & Hfsz & Hfad & _).
           iModIntro. iFrame "HL". iLeft. iFrame "Hdn".
           (* §16.4's CLAIM BOX: [ireg_withdraw] just PAID [fresh_shape], and
              this is where it now leaves the function instead of being spent
