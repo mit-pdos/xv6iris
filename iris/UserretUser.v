@@ -22,12 +22,14 @@
        premises, FS/VS/TVM/TSR as extra premises here -- all facts the
        S-mode config world carries).
 
-   What is left over in userret's continuation -- the 31 trapframe words
-   and the parked kernel table [kpt_frame kroot] -- is exactly the
-   kernel-side bundle uservec's spec (SpecUservec.v) consumes on the NEXT
-   trap; the eventual whole-loop theorem keeps them inside its Löb
-   invariant together with [stvec_handler_wp]'s discharge.  Here they are
-   simply dropped (the WP does not need them). *)
+   What is left over in userret's continuation -- the 31 trapframe words --
+   is exactly the kernel-side bundle uservec's spec (SpecUservec.v)
+   consumes on the NEXT trap; the eventual whole-loop theorem keeps them
+   inside its Löb invariant together with [stvec_handler_wp]'s discharge.
+   Here they are simply dropped (the WP does not need them).  The kernel
+   table itself needs no threading at all: both userret and uservec now
+   reach it through the ambient, persistent [KptShare.kpt_inv], not a
+   parked [kpt_frame]. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
@@ -45,6 +47,7 @@ Require Import PtTree.
 Require Import KptTree UptTree UserretDefs.
 Require Import KptExecMap.
 Require Import UserPtTree UserExec UserKernelBridge.
+Require Import KptShare.
 Require Import SpecUserret SpecUser.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -97,7 +100,7 @@ Section UserretUser.
     senvcfg ↦ᵣ (mword_of_int 0 : mword 64) -∗
     sepc ↦ᵣ sepc0 -∗
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
-    tlb_inv_pt kroot -∗
+    tlb_res_pt kroot -∗
     pt_frame (upt_tree_spec (ud_root pt) (ud_tfp pt) (ud_um pt)) -∗
     pc_is (uva 0x9c) -∗
     gpr_file m -∗
@@ -172,7 +175,7 @@ Section UserretUser.
              Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf120
              Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192
              Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264
-             Htf272 Htf280 Htf112 Hkfr".
+             Htf272 Htf280 Htf112".
     iDestruct (userret_to_user_inv C pt mstatus0 sepc0 sc_v stval_v
                  (uc_mie C) (uc_mideleg C) MENVCFG_S (mword_of_int 0)
                  (uc_stvec C) (uc_medeleg C) (uc_mip C)

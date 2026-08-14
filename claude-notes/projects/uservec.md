@@ -311,11 +311,15 @@ other arm is a NO-OP before assuming the contract is right.** The
   `SpecUservec`'s postcondition as a bare `pc_is` + resource pile that an
   external argument has to match up.
 
-### The kpt exclusive → shared conversion — uservec's direction LANDED, userret's mirror and the call-site rewiring are not
+### The kpt exclusive → shared conversion — DONE, both directions, fully propagated
 
-This is the largest of the three conversions and gates the composition; it
-turned out smaller than it looked once scoped precisely (see below), but the
-remaining work is still real. **Two things established as fact, not
+This was the largest of the three conversions and gated the composition; it
+turned out smaller than it looked once scoped precisely (see below). Both
+directions, the call-site rewiring, and the Spec/Proof/Link propagation for
+uservec's and userret's own boundaries are landed and verified with a clean
+full-tree build (local `make -f CoqMakefile -j16 -k` and, independently, a
+from-scratch build on the GCP VM against the byte-identical switch — zero
+`Error` lines, `MAKEEXIT=0`). **Two things established as fact, not
 supposition, worth recording so nobody re-derives them:**
 
 - `KptShare.v`'s header comment ("the switch window... cannot be re-based on
@@ -350,41 +354,61 @@ supposition, worth recording so nobody re-derives them:**
 - `TrampStepPt.v`: `ktramp_fetch_habs_share` / `wp_instr_ktramp_pt_share` —
   the single-table kernel trampoline step engine rebuilt over
   `KptShare.tlb_res_pt` instead of `KptTree.tlb_inv_pt`. This is what a
-  POST-window kernel-side trampoline step (uservec's final `c.jalr`, and
-  whatever userret's mirror needs before its own window) runs against once
-  there is no exclusive tree left to reseal into.
-- `TransPt.v`: `tlb_inv_pt2_kcur` (+ `_intro`/`_open`/`_enter`/`_exit`) and
-  `pt2_tramp_fetch_habs_kcur` / `wp_instr_pt2_tramp_kcur` — the window
-  invariant and its one fetch-absorption call, with the kernel table in the
-  **current** slot (uservec's role: the switch installs the kernel root)
-  backed by `kpt_inv`+snapshot instead of exclusive `ptree_own`; `Sp` (the
-  **previous**, i.e. user, slot) is untouched — a per-process table
-  genuinely is exclusive and was never the problem.
-  `pt2_tramp_fetch_habs_kcur`'s proof is the real content: it inlines
-  `KptShare`'s "open, read/write, close, no ghost update needed because a
-  write-back is always canon-preserving" technique into `TransPt`'s own
-  five-way case split (O1/O2/O3-into-current/O3-into-previous/O2-previous),
-  opening `kpt_inv` for exactly the span of that one call. `Sp`'s
-  `pt2_tramp_spec` clauses are stated at the literal `tramp_vpn`, so every
-  vpn-indexed fact needs rebasing to `svpn_of va` via the `Hvpn` premise
-  before it can feed `ptree2_translateAddr_cases` — do this ONCE right after
-  destructuring `Hsel_p`/before folding `vpn := svpn_of va`
-  (`Hpres_p'` is the reusable form), not inline in each of the five arms.
+  POST-window (uservec) or PRE-window (userret) kernel-side trampoline step
+  runs against once there is no exclusive tree to reseal into / draw from.
+- `TransPt.v`: **both directions.** `tlb_inv_pt2_kcur` (+
+  `_intro`/`_open`/`_enter`/`_exit`) and `pt2_tramp_fetch_habs_kcur` /
+  `wp_instr_pt2_tramp_kcur` — kernel in the **current** slot (uservec: the
+  switch installs the kernel root). `tlb_inv_pt2_kprev` (+ the same four) and
+  `pt2_tramp_fetch_habs_kprev` / `wp_instr_pt2_tramp_kprev` — the mirror,
+  kernel in the **previous** slot (userret: the switch installs the *user*
+  root as current, so `rc` = user root and `kroot` = kernel root are two
+  independent parameters, unlike `_kcur` where they coincide). In both, the
+  shared side is backed by `kpt_inv`+snapshot instead of exclusive
+  `ptree_own`; the other (per-process, genuinely exclusive) side is
+  untouched. `_kcur_enter`/`_kprev_enter` differ in a way worth knowing:
+  `_kcur_enter` MINTS a fresh snapshot (`={E}=∗`, needs `kpt_inv_snapshot`)
+  because uservec's entry has nothing on hand yet; `_kprev_enter` is a PLAIN
+  WAND, because userret's steps 0–1 already hold an ordinary `tlb_res_pt`
+  residue (from running as ordinary shared kernel steps before the window)
+  and its snapshot carries straight through — no fupd needed. Both
+  `pt2_tramp_fetch_habs_{kcur,kprev}` inline `KptShare`'s "open, read/write,
+  close, no ghost update needed because a write-back is always
+  canon-preserving" technique into `TransPt`'s own five-way case split
+  (O1/O2/O3-into-current/O3-into-previous/O2-previous), opening `kpt_inv` for
+  exactly the span of that one call. The exclusive side's `pt2_tramp_spec`
+  clauses are stated at the literal `tramp_vpn`, so every vpn-indexed fact
+  needs rebasing to `svpn_of va` via the `Hvpn` premise before it can feed
+  `ptree2_translateAddr_cases` — do this ONCE right after destructuring
+  `Hsel_{p,c}`/before folding `vpn := svpn_of va` (`Hpres_{p,c}'` is the
+  reusable form), not inline in each of the five arms. `_kprev`'s exclusive
+  side additionally needs an explicit `Hbc : forall t, Sc t -> pt_base t =
+  rc` hypothesis (mirroring the fully-generic original `pt2_tramp_fetch_habs`)
+  since, unlike `_kcur`'s shared side, `Sc` here is abstract and carries no
+  `pt_base` fact of its own.
+- `UservecExitPt.wp_uservec_exit_pt` / `UserretEntryPt.wp_userret_entry_pt`:
+  rewired to the lemmas above. `kpt_frame kroot` is GONE from uservec's
+  premises (replaced by the persistent, ambient `kpt_inv kroot` — nothing to
+  receive) and from its postcondition (nothing to hand back — the exit fold
+  is the last touch). userret's premise is `tlb_res_pt kroot` (its steps 0–1
+  are ordinary shared kernel steps before the window even starts) and its
+  postcondition drops `kpt_frame kroot` the same way.
+- `SpecUservec.v` / `SpecUserret.v` / `ProofUservec.v` / `ProofUserret.v` /
+  their `Link*.v`: propagated — same substitutions (`kpt_frame kroot` →
+  `kpt_inv kroot` on uservec's entry and gone from its exit;
+  `tlb_inv_pt kroot` → `tlb_res_pt kroot` on userret's entry and gone from
+  its exit). Every one of these files' own `iIntros`/call-site plumbing
+  needed only the hypothesis dropped or its resource swapped — no proof
+  script logic changed, confirming the two exit lemmas' new shapes are
+  exactly what the whole-function proofs were already structured to consume.
+- `UserretUser.v` (the USERRET+USER dovetail, `UserretUser.wp_userret_user`
+  — the template the eventual `UservecUsertrap.v` should follow): updated
+  the same way (`tlb_inv_pt kroot` → `tlb_res_pt kroot`, `Hkfr` dropped from
+  the continuation). This is the one place outside the four files above that
+  actually calls `wp_userret_pt`, confirming the sweep's blast radius was
+  fully covered.
 
-**Not yet done:**
-
-1. **userret's mirror** (`tlb_inv_pt2_kprev`-style: kernel plays the
-   **previous** slot, since userret's switch installs the *user* root as
-   current) — same technique, comparable size, not yet written.
-2. **Rewire the two trampoline proofs' call sites**
-   (`UservecExitPt.wp_uservec_exit_pt`, `UserretEntryPt.wp_userret_entry_pt`)
-   to the new lemmas. This is where `kpt_frame kroot` drops out of uservec's
-   PREMISES entirely (nothing to receive — `kpt_inv kroot` is persistent and
-   ambient) and `tlb_inv_pt kroot` drops out of its POSTCONDITION entirely
-   (nothing to hand over, for the same reason) — replaced by nothing, which
-   is the actual point: usertrap picks up the kernel table the same ambient
-   way every other kernel function does, and the seam stops being a
-   resource-conversion problem.
-3. Propagate through `SpecUservec.v` / `SpecUserret.v` / `ProofUservec.v` /
-   `ProofUserret.v` / their `Link*.v` (drop the now-gone threading), and only
-   then is `UservecUsertrap.v` (the functor above) buildable.
+**What's left for the whole-trap-loop composition** (`UservecUsertrap.v`,
+the dovetail sketched above): the trapframe page physical → VA conversion,
+`user_cfg C` ⟷ `sconf`'s config cells (checked free), and then building the
+functor itself. The kpt conversion no longer blocks any of it.

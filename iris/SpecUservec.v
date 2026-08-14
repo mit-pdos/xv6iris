@@ -36,8 +36,11 @@
        [kroot] (the premises mirror userret's user-satp premises with the
        roles swapped); the jalr target is [ret_pc vktr] (bit 0 cleared by
        the hardware), which a consumer pins to KernelSyms.usertrap.
-     - [kpt_frame kroot]: the parked kernel table (userret's post); the
-       exit switch re-seals it into the live [tlb_inv_pt kroot].
+     - [kpt_inv kroot]: the ambient, persistent shared-kernel-table
+       invariant (KptShare.v).  Nothing is threaded out on the far side:
+       the exit switch folds the table back into [kpt_inv] itself rather
+       than resealing an exclusive [tlb_inv_pt], so usertrap picks up the
+       kernel table the same ambient way every other kernel function does.
 
    The continuation is universally quantified over the trap frame's
    existentials (the user register file [g], the delivered mstatus and
@@ -60,7 +63,7 @@ Require Import WpGpr.
 Require Import KernelText.
 Require Import SmodeCore.
 Require Import PtTree.
-Require Import TrampPt KptTree UptTree TransPt UserretDefs.
+Require Import TrampPt KptTree UptTree TransPt KptShare UserretDefs.
 Require Import UserPtTree UserExec.
 Require Import SpecUserret.
 From Kernel Require KernelSyms.
@@ -103,7 +106,6 @@ Definition uservec_post `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     stval ↦ᵣ stval_v -∗
     sepc ↦ᵣ sepc_v -∗
     sscratch ↦ᵣ (g !!! Regidx (mword_of_int 10) : mword 64) -∗
-    tlb_inv_pt kroot -∗
     pt_frame (upt_tree_spec uroot tfp um) -∗
     udata_own (ud_data pt) -∗
     user_cfg C -∗
@@ -180,7 +182,7 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : Cp
   user_trap_frame C pt -∗
   (* the kernel-side resources parked while user code ran *)
   sscratch ↦ᵣ sscr0 -∗
-  kpt_frame kroot -∗
+  kpt_inv kroot -∗
   tf_pa tfp 0 ↦ₚ₈{ dqk } vksat -∗
   tf_pa tfp 8 ↦ₚ₈{ dqk } vksp -∗
   tf_pa tfp 16 ↦ₚ₈{ dqk } vktr -∗
