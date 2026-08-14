@@ -75,7 +75,15 @@ IMPURE_TOKENS = []
 # put its name here, regenerate, and the build stays green with the coverage
 # number in `make gen-shape`'s report dropping to match.  Each entry is a
 # recorded residue, not a silent omission.
-SKIP = set()
+SKIP = {
+    # [check_leaf_pte] is generatable (its cone touches no memory leaf), but
+    # it sits between [_rec_pt_walk] and the page-table cone, i.e. inside the
+    # residue's own call chain, and it is proved BY HAND in
+    # iris/WeakShapeOverrides2.v alongside [_rec_pt_walk] itself -- so it is
+    # skipped here rather than emitted into a shard.  Removing this entry
+    # renumbers the whole topological order and rebuilds all seven shards.
+    'check_leaf_pte',
+}
 
 # HAND-WRITTEN PROOF OVERRIDES, kept HERE (not in a shard) so that a
 # regeneration cannot revert them, and emitted at the group's TOPOLOGICAL
@@ -305,7 +313,13 @@ def binder_groups(b):
 
 
 def is_monadic(body):
-    head = body.split(':=')[0]
+    # THE RETURN TYPE MAY START A LINE.  Sail wraps a long signature so that
+    # the `: M (...)` lands at column 0 on its own line; a bare ' M (' test
+    # then MISSES the definition entirely -- it is neither generated nor
+    # reported as residue, and the hole only shows up as a stuck leaf in a
+    # hand proof of one of its callers (found in C5 at [check_leaf_pte]).
+    # Normalising the whitespace is what makes the test line-shape-agnostic.
+    head = ' ' + ' '.join(body.split(':=')[0].split())
     return ' M (' in head or ' MR (' in head or 'monad' in head or ': M ' in head
 
 
@@ -373,8 +387,30 @@ def toposort(calls, nodes):
     return order
 
 
-def emit(names, model, outdir, shard_size, dry_run=False):
-    shards = [names[i:i + shard_size] for i in range(0, len(names), shard_size)]
+def split_shards(names, sizes):
+    """Cut [names] into shards of the given sizes; the LAST size repeats.
+
+    NOT a single uniform size, and the reason is the measured cost curve: a
+    48-lemma shard near the bottom of the topological order costs ~7 minutes
+    of `coqc`, the same size in the CSR/legalize band costs an HOUR, and a
+    shard that is killed (build timeout, machine restart) loses ALL of its
+    work because there is no partial `.vo`.  Small shards high up the order
+    are how partial progress survives -- and the chain is serial, so nothing
+    is lost by having more of them.  Keep the early sizes fixed when raising
+    coverage: changing them rewrites shards that are already built."""
+    out = []
+    i = 0
+    k = 0
+    while i < len(names):
+        n = sizes[min(k, len(sizes) - 1)]
+        out.append(names[i:i + n])
+        i += n
+        k += 1
+    return out
+
+
+def emit(names, model, outdir, shard_sizes, dry_run=False):
+    shards = split_shards(names, shard_sizes)
     written = []
     for idx, shard in enumerate(shards, start=1):
         fname = 'WeakShapeGen%02d.v' % idx
@@ -429,6 +465,18 @@ def emit(names, model, outdir, shard_size, dry_run=False):
                 with open(path, 'w') as f:
                     f.write(text)
         written.append((fname, len(shard)))
+    # STALE SHARDS ARE DELETED, not left behind: a re-shard (or a lowered
+    # --limit) otherwise leaves a WeakShapeGen<nn>.v on disk that no longer
+    # belongs to the sweep, and the next `make check-shape` cannot see the
+    # difference between that and a hand-written file.
+    if not dry_run:
+        idx = len(shards)
+        while True:
+            idx += 1
+            stale = os.path.join(outdir, 'WeakShapeGen%02d.v' % idx)
+            if not os.path.exists(stale):
+                break
+            os.remove(stale)
     return written
 
 
@@ -436,7 +484,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--model', default=MODEL)
     ap.add_argument('--outdir', default=OUTDIR)
-    ap.add_argument('--shard-size', type=int, default=48)
+    ap.add_argument('--shard-sizes', default='48,48,16',
+                    help='comma-separated shard sizes; the LAST one repeats')
     # COMPILE-TIME BUDGET, not a correctness knob.  The topological order puts
     # dependencies first, so ANY PREFIX of it is self-contained: emitting the
     # first N is a smaller but complete sweep.  Measured on this tree, a
@@ -445,8 +494,9 @@ def main():
     # multi-hour serial chain -- the shards form a Require chain and cannot be
     # built in parallel.  Raise this and regenerate when there is a build
     # budget for it; the functions beyond the cut are listed by --report.
-    ap.add_argument('--limit', type=int, default=96,
-                    help='emit only the first N of the topological order')
+    ap.add_argument('--limit', type=int, default=0,
+                    help='emit only the first N of the topological order '
+                         '(0 = the whole sweep)')
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--report', action='store_true')
     args = ap.parse_args()
@@ -494,7 +544,8 @@ def main():
         print('residue (monadic, not generatable at all): %s'
               % ' '.join(sorted(mon - set(full))))
 
-    written = emit(order, model, args.outdir, args.shard_size, args.dry_run)
+    sizes = [int(x) for x in args.shard_sizes.split(',')]
+    written = emit(order, model, args.outdir, sizes, args.dry_run)
     for fname, n in written:
         print('%s  %d lemmas' % (fname, n))
 

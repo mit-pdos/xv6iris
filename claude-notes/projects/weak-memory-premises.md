@@ -1,7 +1,8 @@
 # Shrinking the capstone's premise ledger — worklist
 
-**Status (2026-08-13): IN FLIGHT (stage C4 landed; C5 is the shape sweep's
-remaining tower + residue).**  Follow-on to
+**Status (2026-08-13): IN FLIGHT (stage C5 landed — the generated tower is
+COMPLETE and the frontier is twelve named functions; C6 is the decoder
+postcondition + the residue).**  Follow-on to
 [`completed/weak-memory-lift.md`](../completed/weak-memory-lift.md):
 eliminate or reduce the premises of
 `WeakComposeLang.xv6_weak_robust_lifted`/`_adequate` that are provable
@@ -425,32 +426,185 @@ discharge it).
     holds: budget the C5 chain at >= 4 more shards, rising, with NO
     parallelism available.
 
-## What C5 owes (unchanged in kind, one obligation smaller)
+- **C5 (LANDED 2026-08-13/14, PARTIAL — the two premises STILL STAY)** — the
+  generated tower is COMPLETE (all 294 lemmas, 15 shards) and the shape
+  premise is now reduced, machine-checked, to TWELVE named model functions;
+  but the residue could not be closed, because C5 found the obligation is
+  bigger than C4 recorded and is blocked on a second generator-scale item
+  ((O6) below).  What landed:
+  - **the tower, to 294** (`gen_shape.py --limit` now defaults to 0 = the
+    whole sweep): `WeakShapeGen01..15.v`.
+  - **TWO TACTIC-PERFORMANCE FIXES that decide whether the sweep is feasible
+    at all** — finding (O8).  Before them the chain was heading for >4 hours
+    with individual shards apparently hung; after them **the whole tower
+    plus `WeakShapePeel` and `WeakShapeTop` builds in 5 min 20 s serially**
+    (Gen01 68 s, Gen02 70 s, Gen03..15 ~2 min total, Peel 52 s).  Both are in
+    `WeakShapeOverrides.v` §4 with the measurements at the site.
+  - **`iris/WeakShapeOverrides2.v` — `gpost`, the VALUE side of the kit.**
+    Every predicate the sweep had (`gwalk`/`gwalkx`/`gsilent`) is blind to
+    `Interface.Ret`'s payload, and two of the residue's three semantic
+    obligations are facts about a RETURNED VALUE.  `gpost Q P m` = "no memory
+    event, no barrier; every returned value satisfies `P`; every raised Sail
+    exception satisfies `Q`", i.e. `gsilent` with the `Ret` arm strengthened
+    and the `ExtraOutcome` arm weakened.  **Its `ExtraOutcome` arm must IGNORE
+    the continuation** — `throw e` is `Next (ExtraOutcome e) mret` and `bind`
+    pushes the rest of the computation into that continuation, so an arm that
+    recursed would demand `∀ r, P r` at every `throw`; ignoring it is also
+    exactly what the only consumer (`try_catch`, hence `liftR` and
+    `catch_early_return`) does.  Combinators: `gpost_bind`, `gpost_try_catch`
+    (the one that turns the exception postcondition into part of the value
+    postcondition), `gpost_liftR`, `gpost_catch_early_return`, and the three
+    CONSUMERS `gwalk_bind_post`/`gwalkx_bind_post`/`gsilent_bind_post` that
+    carry a value fact into a shape obligation.
+  - **the first semantic obligation, DISCHARGED**: `gpost_split_misaligned`
+    (`0 < width → 0 < split_width`), over `gpost_split_access` +
+    `count_trailing_zeros_nonneg` + a generic `foreach_Z_down'_inv` — and the
+    write leaf it feeds, GENERALISED over the access kind
+    (`gwalk_write_ram_any`/`_solo`).  Since C4's (O4) fix the window-closed
+    `MemWrite` arm constrains only the width, so `WeakShape` §6b's
+    kind-specific leaves collapse into one lemma good for EVERY `write_kind`
+    (the three "unused" kinds are `internal_error` nodes the walk crosses).
+    That generality is not cosmetic: in `checked_mem_write` the kind is a
+    BOUND VARIABLE (`write_kind_of_flags aq rl con`'s result), never a
+    literal.
+  - **the second, DISCHARGED modulo its callees**: `gw__rec_pt_walk` /
+    `gw_pt_walk`, by the same `fix`-on-the-`Acc`-argument recipe as
+    `_rec_hartSupports`, stated over hypotheses for its three monadic callees
+    (`read_pte`, `pte_is_invalid`, `check_leaf_pte`).
+  - **`iris/WeakShapePeel.v` — the frontier, machine-checked.**  With the
+    tower complete, `try_step`, `run_hart_active` and `execute` are ordinary
+    `cbv` + `gw_solve` modulo their residue callees, so
+    `WeakShapeTop.riscv_step_shaped_residue` reduces
+    `∀ b, sail_shaped (riscv_step b)` to TWELVE one-line facts: `fetch` and
+    the eleven memory `execute_*` clauses.  `tick_clock` is discharged
+    outright, as are `htif_store` and `mmio_write` (`WeakShapeTop`, off the
+    axiom record — the HTIF path's only obstacle was `plat_term_write`).
+  - **THREE COVERAGE HOLES in `gen_shape.py`, all found by trying to use the
+    tower, two fixed:**
+    (i) `is_monadic` tested the definition head for `' M ('`, and Sail wraps a
+    long signature so that `: M (...)` starts a line — `check_leaf_pte` was
+    therefore in NEITHER the generated set NOR the reported residue.  The test
+    now normalises whitespace; `check_leaf_pte` is in `SKIP` (hand-proved
+    beside `_rec_pt_walk`) so the built shards stay byte-identical.  The same
+    hole had hidden `translate`/`translate_TLB_hit`/`translate_TLB_miss`, so
+    **the residue is 51 functions, not 47.**
+    (ii) the call graph is rooted at `try_step` ALONE, but
+    `RiscvLang.riscv_step` also calls `tick_clock`, whose cone adds two
+    monadic definitions no shard covers.  Proved by hand in `WeakShapePeel`;
+    rooting the generator at both would renumber and rebuild every shard.
+    (iii) THE TOWER HAS ONE MODE.  Every shard proves `gwalk None`, which does
+    NOT imply `gsilent`/`gpost` (it permits memory events) and says nothing
+    about liveness.  So the postcondition sweep (O6) and the liveness half
+    (O3) each need their OWN generated lemmas over the same cone.  With (O8)
+    fixed that is now a ~5-minute chain per mode rather than a multi-hour one,
+    which changes the calculus completely — but it is still a REGENERATION,
+    so decide the mode set before generating.
+  - **`gen_shape.py` also gained `--shard-sizes`** (comma list, last value
+    repeats; default `48,48,16`) and now DELETES stale higher-numbered shards,
+    which a re-shard would otherwise leave on disk where `make check-shape`
+    cannot tell them from hand-written files.  Finer shards high up the order
+    are how partial progress survives a killed build — there is no partial
+    `.vo`, and that is what turned one 60-minute loss into a 90-second one
+    while (O8) was still undiagnosed.
 
-1. **The generated tower, to 294** — raise `gen_shape.py --limit`, shard so
-   each stays under ~10–15 min, add to `_CoqProject`, and budget a serial
-   multi-hour chain (they cannot be built in parallel).
-2. **The 47-function residue**, hand-proved in topological order; three of its
-   obligations are semantic rather than syntactic: `0 < split_width` in
-   `checked_mem_write` (the Sail precondition `0 < width ≤ 4096` travelling
-   down through `split_misaligned`, which returns `width` itself on the
-   unsplit path), the fuel recursion `_rec_pt_walk`, and the exclusive window
-   carried from `checked_mem_read`'s `read_ram` to `checked_mem_write`'s
-   `write_ram` through `catch_early_return`/`liftR`/`untilMT` (the escape
-   index `gwalkx`/`gsilent` of `WeakShapeOverrides` §3 is what composes it).
-   C4's fix removed one item from this list: a standalone conditional write
-   no longer needs a window at all.
+## FINDINGS (2026-08-13/14, C5 — machine-checked): the width obligation does
+## not stop at the memory cone, and the sweep's cost was a TACTIC bug
+
+- **(O6)** `∀ ast, gwalk None (rv64d.execute ast)` is **REFUTABLE**, and it is
+  the only form of `execute`'s lemma a compositional route can use.  Sail's
+  `(0 <? width) && (width <=? 4096)` precondition is emitted as a COMMENT;
+  `word_width` is `Definition word_width : Type := Z`, so `STORE (imm, rs2,
+  rs1, 0)` is a well-typed `instruction`, and on it the model issues a
+  ZERO-WIDTH `MemWrite` (`split_misaligned` returns `(1, width)` on its
+  unsplit path), which `sail_shaped`/`gwalk`/`gwalkx`/`sail_mstep`'s `LStore`
+  arm all refuse.  Machine-checked at the leaf:
+  `WeakShapeOverrides2.gwalk_write_ram_zero_False`.
+  The `∀ ast` is unavoidable: `run_hart_active` applies `execute` to
+  `ext_decode w`'s output AND, in the `ExecuteAs other_inst` arm, to an
+  `instruction` VALUE the first `execute` returned — neither is syntax.
+  **`sail_shaped (riscv_step b)` itself is NOT refuted** (the widths the
+  decoder builds are `word_width`-derived, hence in `[1;2;4;8]`); what is
+  refuted is the ROUTE.  Closing it needs a DECODER POSTCONDITION — `gpost` of
+  `encdec_backwards` with `P` = "every width field of the resulting
+  `instruction` is in `[1;2;4;8]`", plus the same postcondition on `execute`'s
+  own `ExecuteAs` values.  MEASURED: `gw_encdec_backwards` (the ~4000-line,
+  ~250-arm decoder) costs 312 s standalone in the `gwalk` mode, so the
+  decoder is not itself a wall — the missing piece is the `gpost` mode.
+  The residue's THIRD semantic obligation (the exclusive window) is the same
+  shape: it needs `gpost` of `pmaCheck`
+  (`LoadReserved`/`StoreConditional`/`Atomic` answer `CannotSplit`, because
+  their `is_mag_applicable_access` is `false` and their
+  `pma_misaligned_exception` is an `internal_error`/`Some`, so a misaligned
+  exclusive access faults before any `read_ram`), hence `N = 1` and the window
+  is opened at most once.
+- **(O7)** A GENERATED SWEEP SHOULD EMIT EVERY MODE IT WILL EVER NEED IN ONE
+  PASS.  The shards form a serial `Require` chain, so a second mode is the
+  whole chain again; `gwalk None` implies neither `gpost` nor `glive`.
+- **(O8), THE EXPENSIVE FINDING, and the one that generalises: THE SWEEP'S
+  COST WAS A TACTIC BUG, NOT THE MODEL.**  C3/C4 measured "7-10 min per
+  48-lemma shard, rising up the order" and C5 watched a shard run 60 minutes
+  without finishing.  Both were artefacts of `gw_leaf`, and there were two
+  independent causes, each worth ~an order of magnitude:
+  1. **A LEAF TACTIC RUNS AT EVERY NODE, NOT ONLY AT LEAVES.**  `gw_solve`
+     tries `solve [gw_leaf]` before every structural step, so at a `bind` —
+     where no leaf can succeed — every alternative still ran on the whole
+     subterm.  `apply gwalk_quiet` / `apply gsilent_gwalk` succeed on ANY
+     `gwalk None ?m` goal and then hand it to `eauto`.  Gate the leaf on the
+     goal being ATOMIC (`gw_atomic`, a `lazymatch` that fails on every
+     combinator head).
+  2. **A `discriminated` HINT DB PRUNES BY HEAD CONSTANT ONLY IF THE CONSTANTS
+     ARE OPAQUE TO IT.**  Every hint concludes `gwalk None (<model function>
+     ?a …)` and the generated model's definitions are TRANSPARENT, so `eauto`
+     delta-unfolded them while matching and compared BODIES — and sibling
+     functions in a band share a long prefix, so each failed match descended
+     through two huge terms, once per hint, per node.  One line fixes it:
+     `Hint Constants Opaque : gshape`.
+  Measured: `rv64d.legalize_mie` **>40 min → 0.9 s**; `rv64d.write_CSR`
+  **>18 min → 23 s**; `WeakShapeGen01` **7 min → 68 s**; the whole 294-lemma
+  tower **>4 h (projected) → 5 min 20 s**.  THE DIAGNOSTIC THAT FOUND IT:
+  compile a COPY of the stuck shard with `coqc -time` concurrently — the log
+  streams, so the last line names the stalling lemma — then bisect the leaf
+  tactic by deleting alternatives.  A "hung" generated shard is a tactic
+  bug until proven otherwise.
+- **the memory cone's own solver does NOT scale, and that is C6's first
+  concrete task.**  `gw_htif_store` and `gw_mmio_write` go through in
+  under a second, but `checked_mem_write` — even with `0 < split_width`
+  supplied by `gwalk_bind_post` and the write leaf by `gwalk_write_ram_any` —
+  explodes at ONE step of the generic solver, inside the misaligned-split
+  `untilMT` body (25 steps of `gw_solve` are instant, 26 does not finish in
+  200 s).  It needs a HAND-STRUCTURED script, not `gw_solve`: peel
+  `catch_early_return`, the `check_pma` bind and the loop explicitly, and run
+  the solver only on the loop body's leaves.
+
+## What C6 owes (the list is shorter, and one item is bigger)
+
+1. **THE DECODER POSTCONDITION** — `gpost` of `encdec_backwards` (and of
+   `execute`, for its `ExecuteAs` values) with "every width field of the
+   resulting `instruction` is in `[1;2;4;8]`".  Without it (O6) stands and
+   `execute`'s `∀ ast` lemma is false, so nothing above the memory cone can be
+   closed.  ~4000 lines, ~250 arms: a generator-scale item, and it must be
+   emitted in the SAME pass as anything else that is generated (O7).
+2. **The 51-function residue**, in the three modes it actually needs:
+   `gwalk None` for the shape, `gpost` for the two value obligations
+   (`0 < split_width` — DONE in `WeakShapeOverrides2` §2 given `0 < width`;
+   `pmaCheck` answering `CannotSplit`, so the exclusive window opens once),
+   and `gsilent`/`gwalkx` for the abandoning exclusive tails.  `_rec_pt_walk`
+   and `pt_walk` are DONE modulo their callees.
 3. **The three axiom facts**, consumed inside 2 at `vmem_read_addr`,
    `execute_STORECON` and `htif_store` via `WeakShapeTop`'s
    `gw_*`/`gsilent_*` lemmas — after which the capstones can take
    `rv64d_axiom_shapes` in place of the two `∀ b` premises.
-4. **Liveness (O3)** — still behind the ~100 `exit`/`internal_error`/
-   `assert_exp` reachability sites, plus the misaligned-split loop's
-   termination (`N ≥ 1` from `split_misaligned`).
+4. **Liveness (O3)** — behind a whole SECOND generated tower in the `gok`
+   mode (O7), then the ~100 `exit`/`internal_error`/`assert_exp` reachability
+   sites, then the misaligned-split loop's termination.  It is the largest
+   remaining item and it is strictly behind 1 and 2.  Since (O8) the tower
+   itself is CHEAP (~5 min per mode), so the cost here is the ~100
+   reachability arguments, not the sweep.
 
-**Next stage (D-C5).**  (O4)'s spec fix LANDED in C4; the ordered list above
-is what is left, and item 1 is a scheduling problem rather than a proof one —
-plan the serial shard chain first, because nothing above the memory cone can
-be stated until it exists.
+**Next stage (D-C6).**  Regenerate with all the modes at once
+(`gwalk`/`gpost`/`gok`) — five minutes each now, and a second pass is a full
+rebuild — then do the memory cone with a hand-structured script (the generic
+solver does not get through `checked_mem_write`, see the C5 findings), then
+item 1.
 
 Keep the tree green per commit; findings in commit messages and here.

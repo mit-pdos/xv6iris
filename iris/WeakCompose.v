@@ -728,17 +728,22 @@ Qed.
     WHY DECLARED: discharging them means a syntactic analysis of the rv64d
     decoder's ~thousands of generated branches.
 
-    STATUS AFTER STAGE C3 (2026-08-13) — THE SEAM IS NOT CLOSED, AND THE
-    REASON IS NOW A THEOREM RATHER THAN AN ESTIMATE.  The syntactic analysis
+    STATUS AFTER STAGE C5 (2026-08-13) — THE SEAM IS NOT CLOSED, BUT ITS
+    RESIDUE IS NOW A LIST OF TWELVE NAMED FUNCTIONS.  The syntactic analysis
     exists and is mechanized: [WeakShape.v] (the compositional kit),
     [WeakShapeOverrides.v] (the [gwalk]-mode combinators, [gsilent], the
-    escape index) and the generated [WeakShapeGen*.v] sweep
-    ([tools/gen_shape.py], [make gen-shape]) machine-check [gwalk None] —
-    i.e. [sail_shaped] — for 294 of the 341 monadic definitions reachable
-    from [rv64d.try_step].  What stopped the seam from closing was not the
-    volume of branches but TWO FACTS ABOUT THE MODEL — the first of which
-    stage C4 answered by changing the specification, the second of which is
-    an irreducible assumption:
+    escape index), [WeakShapeOverrides2.v] ([gpost], the value side) and the
+    COMPLETE generated sweep [WeakShapeGen01..15.v] ([tools/gen_shape.py],
+    [make gen-shape]) machine-check [gwalk None] — i.e. [sail_shaped] — for
+    all 294 generatable monadic definitions reachable from [rv64d.try_step]
+    (5 min 20 s of [coqc] for the whole tower, since stage C5's (O8) fixed
+    the sweep's leaf tactic).
+    On top of it [WeakShapePeel.v] peels [try_step], [run_hart_active] and
+    [execute], so [WeakShapeTop.riscv_step_shaped_residue] reduces the whole
+    premise to [fetch] plus the eleven memory [execute_*] clauses.  What
+    stops the seam from closing is not the volume of branches but THREE FACTS
+    ABOUT THE MODEL — the first answered by a stage-C4 specification change,
+    the second an irreducible assumption, the third the stage-C5 finding:
 
       (O4) [∀ b, sail_shaped (riscv_step b)] was FALSE, and STAGE C4 FIXED
            THE SPECIFICATION.  A STANDALONE STORE-CONDITIONAL
@@ -762,14 +767,27 @@ Qed.
            reachable from [try_step], so no shape fact about them is provable
            at all.  The seam's residue after (O4) is therefore three POINT
            premises about those axioms, not a [∀ b] premise.
+      (O6) THE NO-ZERO-WIDTH-WRITE CONJUNCT NEEDS A DECODER POSTCONDITION,
+           not a memory-cone lemma.  Sail's [0 < width ≤ 4096] precondition
+           is emitted as a COMMENT and [word_width] is [Z], so
+           [execute_STORE imm rs2 rs1 0] is a well-typed [instruction] on
+           which the model issues a zero-width [MemWrite]
+           ([WeakShapeOverrides2.gwalk_write_ram_zero_False]) — i.e.
+           [∀ ast, gwalk None (execute ast)], the only form the compositional
+           route can use, is FALSE.  [sail_shaped (riscv_step tick)] itself is
+           not refuted (the decoder only builds widths in [[1;2;4;8]]); what
+           is refuted is the route, and closing it means a [gpost] sweep over
+           [encdec_backwards].  The same machinery supplies the last piece of
+           AMO PAIRING: [pmaCheck] answers [CannotSplit] for every exclusive
+           access kind, hence [split_misaligned] returns [N = 1] and the
+           window is opened at most once per instruction.
 
-    UPGRADE PATH: (O4)'s LTS fix LANDED in stage C4; what remains is the
-    47-function residue of the sweep — the
-    misaligned-split loop, [0 < split_width], and the exclusive window
-    carried from [checked_mem_read] to [checked_mem_write] through
-    [catch_early_return]/[liftR]/[untilMT], which is what
-    [WeakShapeOverrides] §3's escape index was built to compose.  Details and
-    the ordered plan: [claude-notes/projects/weak-memory-premises.md].
+    UPGRADE PATH: (O4)'s LTS fix LANDED in stage C4 and the generated tower
+    LANDED complete in C5; what remains is (O6)'s decoder postcondition and
+    the 51-function residue, of which [0 < split_width] and the fuel
+    recursion [_rec_pt_walk] are already discharged in
+    [WeakShapeOverrides2.v].  Details and the ordered plan:
+    [claude-notes/projects/weak-memory-premises.md].
 
     ------------------------------------------------------------------------
     WHAT IS *NOT* ON THIS LIST, because it is machine-checked: the Layer-1

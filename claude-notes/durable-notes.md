@@ -244,6 +244,59 @@ i.e. it reads like a tactic bug in the lemma that failed. Emit
 Cost of the diagnosis when it bites: one full shard compile per guess, and
 these shards run ~10 minutes each.
 
+**AND IT MUST EMIT EVERY MODE IT WILL EVER NEED IN THE SAME PASS.**  The
+shards are a serial `Require` chain (the hint DB is the dependency mechanism),
+so a second predicate — a liveness mode, a value-postcondition mode — costs
+the WHOLE chain again, 1-3 hours, and cannot reuse the first: `gwalk None`
+(shape) does not imply `gsilent`/`gpost` (they forbid memory events) and says
+nothing about `glive`.  Decide the predicate set before generating, not after
+the first consumer gets stuck.
+
+**A "HUNG" GENERATED SHARD IS A TACTIC BUG UNTIL PROVEN OTHERWISE, AND THE
+TWO CAUSES ARE BOTH IN THE LEAF TACTIC.**  A sweep whose solver is
+`repeat first [... | solve [leaf] | step]` runs the LEAF AT EVERY NODE, not
+only at leaves, so anything expensive in it is paid once per node of every
+proof — and it looks like the model being big, not like a bug.  Two causes,
+each ~an order of magnitude, measured on this tree (2026-08-14):
+
+- **An alternative that always `apply`s.** `apply gwalk_quiet` (`gquiet m ->
+  gwalk None m`) succeeds on *any* goal of the right head, and then hands a
+  whole subterm to `eauto`. Gate the leaf on the goal being ATOMIC — a
+  `lazymatch` that `fail`s on every combinator head (`bind`, `try_catch`,
+  `if`, `match`, the loop combinators). At a combinator node the structural
+  step is the only correct move anyway, so the gate cannot lose a proof.
+- **A `discriminated` hint DB does NOT prune unless the constants are opaque
+  to it.** Hints concluding `P (<generated function> ?a …)` over a
+  TRANSPARENT model make `eauto` delta-unfold and compare bodies; sibling
+  functions share long prefixes, so each failed match descends through two
+  huge terms, once per hint, per node. One line: `Hint Constants Opaque : db`.
+
+Measured: one lemma **>40 min -> 0.9 s**, a 200-arm CSR dispatch **>18 min ->
+23 s**, a 48-lemma shard **7 min -> 68 s**, a 294-lemma tower **>4 h
+(projected) -> 5 min 20 s**. The diagnostic: compile a COPY of the stuck file
+with `coqc -time` CONCURRENTLY (the log streams, so its last line names the
+stalling sentence), then bisect the leaf tactic by deleting alternatives.
+
+**SHARD FOR PARTIAL PROGRESS, NOT FOR BALANCE.** There is no partial `.vo`, so
+a killed build loses the whole shard; and per-lemma cost varies by orders of
+magnitude across the topological order. Make shards small where the cost is
+high (a `--shard-sizes` list whose last value repeats), and have the generator
+DELETE stale higher-numbered shards, or a re-shard leaves files on disk that
+the "regenerated, never patched" check cannot distinguish from hand-written
+ones.
+
+**THE GENERATOR'S OWN COVERAGE PREDICATES ARE WHERE THE SILENT HOLES ARE.**
+Two bit this tree, and neither showed up as a build error — a missing function
+appears as a stuck leaf in a HAND proof of one of its callers, months later:
+- a *monadic-ness* test that greps the definition head for `' M ('` misses the
+  ones Sail line-wraps so that `: M (...)` starts a line (normalise the
+  whitespace first);
+- a call graph rooted at ONE entry point misses whatever else the real
+  top-level calls (here `RiscvLang.riscv_step` also calls `tick_clock`).
+Both are one-line fixes, but fixing them RENUMBERS the topological order and
+therefore rebuilds every shard — so check them before the first full run, and
+afterwards prefer a `SKIP` entry plus a hand proof to a regeneration.
+
 Two more rules from the same generator, both about the ~10-minute feedback
 loop:
 

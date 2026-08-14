@@ -608,6 +608,19 @@ Proof. apply gok_sail_barrier. Qed.
 
 Create HintDb gshape discriminated.
 
+(** A `discriminated` DB PRUNES BY HEAD CONSTANT ONLY IF THE CONSTANTS ARE
+    OPAQUE TO IT.  Every hint here concludes [gwalk None (<model function> ?a
+    …)], and the generated model's definitions are TRANSPARENT, so without
+    this line [eauto] delta-unfolds them while matching and compares BODIES:
+    at a goal about one CSR [legalize_*] it walks into every sibling
+    [legalize_*] in the database, and the siblings share a long prefix, so
+    each failed match descends through two huge terms.  Measured on
+    [rv64d.write_CSR] (a ~200-arm dispatch that calls most of that band):
+    **>18 minutes transparent, 23 s opaque.**  It is sound here for the same
+    reason it is cheap: the sweep emits a lemma for EVERY monadic definition,
+    so a leaf never needs a constant unfolded to find its hint. *)
+#[export] Hint Constants Opaque : gshape.
+
 #[export] Hint Resolve
   gsilent_fail gsilent_exit gsilent_assert_exp gsilent_assert_exp'
   gsilent_choose_from_list
@@ -686,22 +699,75 @@ Ltac gw_step :=
   | |- gwalk _ (match ?x with _ => _ end _ _) => destruct x
   end.
 
-(** ORDER IS LOAD-BEARING AT THIS SCALE.  The common leaf is a call to an
+(** A LEAF TACTIC IS RUN AT EVERY *NODE*, NOT ONLY AT LEAVES — so any
+    alternative in it that cannot succeed on a combinator node must not be
+    REACHABLE from one.  [gw_atomic] is that gate.
+
+    THIS IS THE SINGLE BIGGEST COST IN THE WHOLE SWEEP, and it does not look
+    like a cost at all until a big term turns up (stage C5).  [gw_solve] tries
+    [solve [gw_leaf]] before every structural step, so at a [bind] — where no
+    leaf alternative CAN succeed — every one of them still ran, on the whole
+    subterm.  Two ways that is superlinear:
+
+      - [apply gwalk_quiet] / [apply gsilent_gwalk] succeed on ANY
+        [gwalk None ?m] goal and then hand the subterm to [eauto];
+      - worse, THE HINT-DATABASE LOOKUP ITSELF.  Every hint's conclusion is
+        [gwalk None (<some model function> ?a …)] and the model's functions
+        are TRANSPARENT, so unification delta-unfolds them and compares
+        bodies.  Sibling functions in the same band share a long prefix
+        ([legalize_mie] and [legalize_mideleg] are both four
+        [currentlyEnabled] binds around a deeply nested returned bitvector),
+        so the comparison descends deep into two huge terms before failing —
+        once per hint, per node.
+
+    Measured on [rv64d.legalize_mie], in the shard's own context: **>40
+    minutes ungated, 0.9 s gated** — the shard containing it simply looked
+    like a hung build.  Ordinary functions gain too ([legalize_mideleg]:
+    7.7 s → 0.9 s; [WeakShapeGen01]: 7 min → 2 min).  GATE THE WHOLE LEAF,
+    not just its expensive tail: the hint lookup is the bigger half.
+
+    ORDER IS ALSO LOAD-BEARING.  The common leaf is a call to an
     already-proven generated function, so the hint-database lookup goes
     FIRST, at depth 1 (every hint in `gshape` is premise-free, so no search
     is needed and none is paid for).  The register leaves come after it by
     NAME rather than as hints, because [eauto]'s unification does not see
     through [Arch.reg_type] — the C1 finding, still true. *)
+Ltac gw_atomic :=
+  lazymatch goal with
+  | |- gwalk _ (Defs.bind _ _) => fail
+  | |- gwalk _ (Defs.bind0 _ _) => fail
+  | |- gwalk _ (Defs.try_catch _ _) => fail
+  | |- gwalk _ (Defs.liftR _) => fail
+  | |- gwalk _ (Defs.catch_early_return _) => fail
+  | |- gwalk _ (Defs.try_catchR _ _) => fail
+  | |- gwalk _ (Defs.and_boolM _ _) => fail
+  | |- gwalk _ (Defs.or_boolM _ _) => fail
+  | |- gwalk _ (Defs.foreachM _ _ _) => fail
+  | |- gwalk _ (Defs.foreach_ZM_up _ _ _ _ _) => fail
+  | |- gwalk _ (Defs.foreach_ZM_down _ _ _ _ _) => fail
+  | |- gwalk _ (Defs.genlistM _ _) => fail
+  | |- gwalk _ (Defs.autocast_m _) => fail
+  | |- gwalk _ (Defs.untilMT _ _ _ _) => fail
+  | |- gwalk _ (Defs.whileMT _ _ _ _) => fail
+  | |- gwalk _ (if _ then _ else _) => fail
+  | |- gwalk _ (match _ with _ => _ end) => fail
+  | |- gwalk _ (match _ with _ => _ end _) => fail
+  | |- gwalk _ (match _ with _ => _ end _ _) => fail
+  | _ => idtac
+  end.
+
 Ltac gw_leaf :=
   first
     [ exact I | assumption
-    | solve [eauto 1 with gshape nocore]
-    | apply gwalk_read_reg | apply gwalk_write_reg
-    | apply gwalk_read_reg_ref | apply gwalk_write_reg_ref
-    | apply gwalk_reg_deref
-    | apply gwalk_sys_reg_read | apply gwalk_sys_reg_write
-    | apply gsilent_gwalk; solve [gsl_leaf]
-    | apply gwalk_quiet; solve [shape_leaf] ].
+    | gw_atomic;
+      first
+        [ solve [eauto 1 with gshape nocore]
+        | apply gwalk_read_reg | apply gwalk_write_reg
+        | apply gwalk_read_reg_ref | apply gwalk_write_reg_ref
+        | apply gwalk_reg_deref
+        | apply gwalk_sys_reg_read | apply gwalk_sys_reg_write
+        | apply gsilent_gwalk; solve [gsl_leaf]
+        | apply gwalk_quiet; solve [shape_leaf] ] ].
 
 Ltac gw_solve :=
   repeat first

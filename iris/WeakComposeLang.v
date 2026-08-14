@@ -308,14 +308,25 @@
          facts.  [sail_live] is NEW at this level (stage D): it used to
          arrive inside [Hres], which is now derived rather than assumed.
          STAGE C3 (2026-08-13) ESTABLISHED THAT NEITHER IS DELETABLE AS
-         STATED, and both reasons are in [WeakShapeOverrides.v] §5: the first
-         is FALSE at a standalone store-conditional ((O4) — the mirror of
-         C1's (O2), refuted by [sail_shaped_write_ram_con_False]), and both
-         are additionally blocked by three OPAQUE MONADIC AXIOMS of [rv64d]
-         ((O5)).  The mechanized sweep behind them — 294 of the model's 341
-         reachable monadic definitions, in [WeakShapeGen*.v] — is what makes
-         those two the WHOLE residue rather than an estimate.  The ordered
-         fix is in [claude-notes/projects/weak-memory-premises.md].
+         STATED: the first was FALSE at a standalone store-conditional
+         ((O4) — the mirror of C1's (O2), FIXED in C4 by widening the
+         [MemWrite] arms), and both are blocked by three OPAQUE MONADIC
+         AXIOMS of [rv64d] ((O5), [WeakShapeTop.rv64d_axiom_shapes]).
+         STAGE C5 COMPLETED THE MECHANIZED SWEEP — all 294 generatable
+         monadic definitions, [WeakShapeGen01..15.v] — and PEELED THE FIRST
+         PREMISE TO TWELVE NAMED FUNCTIONS:
+         [WeakShapeTop.riscv_step_shaped_residue] derives
+         [∀ b, sail_shaped (riscv_step b)] from [gwalk None] of [fetch] and
+         the eleven memory [execute_*] clauses, so a C6 that closes those
+         discharges this premise here with one [apply].  One of the twelve is
+         FALSE AS STATED — finding (O6): the AST's width fields are plain [Z]
+         (Sail's [1;2;4;8] precondition is a comment), so
+         [execute_STORE imm rs2 rs1 0] issues a zero-width [MemWrite]; the
+         replacement is a DECODER POSTCONDITION over [encdec_backwards],
+         which is what [WeakShapeOverrides2.gpost] exists to state.  The
+         SECOND premise ([sail_live]) cannot be peeled the same way: the
+         tower has only the [gwalk] mode (finding (O7)).  The ordered plan is
+         in [claude-notes/projects/weak-memory-premises.md].
       2. THE FRESH ERA: [gen_id = 0], [wgpow g0 = true], [wggen g0 = 0],
          [wglog g0 = []], [∀ c, wgws g0 c = ws_init], [wa_dws u0 = ws_init]
          — literally [weak_system_adequacy_phi]'s, plus the disk agent's own

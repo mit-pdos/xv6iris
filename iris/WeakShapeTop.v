@@ -3,7 +3,7 @@
     The plan for this file was
         [Theorem riscv_step_shaped : ∀ b, sail_shaped (riscv_step b)]
         [Theorem riscv_step_live   : ∀ b, sail_live   (riscv_step b)]
-    at the top of the generated tower ([WeakShapeGen01..07.v]), closing
+    at the top of the generated tower ([WeakShapeGen01..15.v]), closing
     [WeakCompose] §6's seam (6) and deleting both premises from
     [WeakComposeLang.xv6_weak_robust_lifted]/[_adequate].  Stage C3 found
     both FALSE/blocked for two reasons; stage C4 fixed the first by changing
@@ -73,60 +73,63 @@
     same assumption into the model.
 
     ------------------------------------------------------------------------
-    §3  WHAT *IS* ASSEMBLED.  [tools/gen_shape.py] can generate
-    [gwalk None] — [WeakSailLTS.sail_shaped] generalised to an arbitrary
-    monad type, by [WeakShape.gwalk_shaped] — for 294 of the 341 monadic
-    definitions [rv64d.try_step] reaches; the 47-function residue is exactly
-    the up-cone of the two memory leaves and of the three axioms above, plus
-    [_rec_pt_walk].  [WeakShapeGen01..02.v] are the first 96 of that
-    topological order, machine-checked here.  THE CUT IS A COMPILE-TIME
-    BUDGET, NOT A DIFFICULTY BOUNDARY: the shards form a [Require] chain
-    (the hint database is the dependency mechanism), so they cannot be built
-    in parallel, and a 48-lemma shard costs ~10 minutes of [coqc] on this
-    tree — the extension-enum dispatches ([currentlyEnabled] and its
-    callers) dominate.  Raise [gen_shape.py]'s [--limit] and regenerate when
-    there is a build budget for it; [make gen-shape] lists exactly which
-    functions are below the cut.
+    §3  WHAT *IS* ASSEMBLED — SINCE STAGE C5, THE WHOLE GENERATED TOWER.
+    [tools/gen_shape.py] emits [gwalk None] — [WeakSailLTS.sail_shaped]
+    generalised to an arbitrary monad type, by [WeakShape.gwalk_shaped] — for
+    all 294 generatable monadic definitions [rv64d.try_step] reaches
+    ([WeakShapeGen01..15.v], machine-checked here); the 51-function residue is
+    exactly the up-cone of the two memory leaves and of the three axioms
+    above, plus [_rec_pt_walk] and [check_leaf_pte].  The shards form a
+    [Require] chain (the hint database is the dependency mechanism), so they
+    cannot be built in parallel; a 48-lemma shard costs 7–30 minutes of
+    [coqc] on this tree, the cost rising up the topological order, and the
+    extension-enum dispatches ([currentlyEnabled] and its callers) dominate.
 
-    Even capped, that is what turns seam (6) from an estimate ("a syntactic
-    analysis of thousands of generated branches") into a bounded, named list
-    of remaining obligations.
+    THE TOWER HAS EXACTLY ONE MODE, and that is the C5 scheduling lesson
+    (finding (O7)): every shard proves [gwalk None], which does NOT imply
+    [gsilent]/[WeakShapeOverrides2.gpost] (it permits memory events) and says
+    nothing about [glive].  Neither the postcondition sweep §4 (b) needs nor
+    the liveness half can reuse it — each would have to regenerate the whole
+    serial chain in its own mode.  A GENERATED SWEEP MUST EMIT EVERY MODE IT
+    WILL EVER NEED IN ONE PASS.
 
     ------------------------------------------------------------------------
-    §4  [riscv_step_shaped_cone]: THE WRAPPER, AND EXACTLY WHAT IS LEFT.
+    §4  THE WRAPPER, AND EXACTLY WHAT IS LEFT — NOW A LIST OF TWELVE.
 
     [RiscvLang.riscv_step tick = try_step 0 false >>= λ _, if tick then
-    tick_clock tt else returnm tt], so the [∀ b] premise reduces to
-    [gwalk None] of TWO model functions — and those two are precisely where
-    the residue starts.  §4 proves that reduction; the two hypotheses are the
-    honest statement of what stage C5 owes, and neither is a ∀-path premise
-    about anything but the model's own code.
+    tick_clock tt else returnm tt].  [tick_clock] is discharged outright
+    ([WeakShapePeel.gw_tick_clock]), and with the tower complete the three
+    functions between [try_step] and the memory cone ([try_step],
+    [run_hart_active], [execute]) are ordinary [cbv] + [gw_solve] modulo their
+    residue callees ([WeakShapePeel]).  So [riscv_step_shaped_residue] below
+    reduces the whole [∀ b] premise of [WeakComposeLang]'s capstones to TWELVE
+    one-line facts: [fetch] and the eleven memory [execute_*] clauses.
 
-    WHY THEY ARE NOT DISCHARGED HERE, in the order a C5 must attack them:
+    WHY THOSE TWELVE ARE NOT DISCHARGED, in the order a C6 must attack them:
 
-      (a) THE GENERATED TOWER IS CAPPED AT 96 OF 294 (§3), and every function
-          between [try_step] and the memory leaves calls into the capped part
-          ([try_step] alone needs [should_inc_minstret], [run_hart_waiting],
-          [handle_interrupt], [handle_exception], [exception_handler],
-          [set_next_pc]).  So no bridge lemma above the memory cone can be
-          stated, let alone proved, before the remaining ~198 generated
-          lemmas exist.  That is a serial multi-hour [coqc] chain, not a
-          difficulty.
-      (b) THE 47-FUNCTION RESIDUE then needs hand proofs, and three of its
-          obligations are SEMANTIC rather than syntactic: [0 < split_width]
-          in [checked_mem_write] (the nonzero-width conjunct — [split_width]
-          comes from [split_misaligned], which returns [width] itself on the
-          unsplit path, so it is the Sail precondition [0 < width ≤ 4096]
-          travelling down); the fuel recursion [_rec_pt_walk]; and the
-          EXCLUSIVE WINDOW carried from [checked_mem_read]'s [read_ram] to
-          [checked_mem_write]'s [write_ram] through
-          [catch_early_return]/[liftR]/[untilMT], which is what
-          [WeakShapeOverrides] §3's escape index ([gwalkx]/[gsilent]) was
-          built to compose.  Stage C4's (O4) fix removed one obligation from
-          this list outright: a standalone conditional write no longer needs
-          a window at all.
+      (a) ONE OF THEM IS FALSE AS STATED — finding (O6).  Sail's
+          [(0 <? width) && (width <=? 4096)] precondition is a COMMENT and
+          [word_width] is [Z], so [execute_STORE imm rs2 rs1 0] is a
+          well-typed instance and the model issues a ZERO-WIDTH [MemWrite] on
+          it, which no shape predicate admits
+          ([WeakShapeOverrides2.gwalk_write_ram_zero_False]).  The [∀ ast]
+          form is unavoidable — [run_hart_active] applies [execute] to
+          [ext_decode]'s output and to the [ExecuteAs] redirection VALUE, and
+          neither is syntax — so what closes it is a DECODER POSTCONDITION,
+          [gpost] of [encdec_backwards] with "every width field is in
+          [[1;2;4;8]]".  [sail_shaped (riscv_step b)] itself is not refuted;
+          the compositional ROUTE is.
+      (b) THE MEMORY CONE then needs the same [gpost] machinery twice more:
+          [0 < split_width] (DISCHARGED in [WeakShapeOverrides2] §2, given
+          [0 < width] — which is (a)), and the EXCLUSIVE WINDOW, which needs
+          [gpost] of [pmaCheck] ([LoadReserved]/[StoreConditional]/[Atomic]
+          answer [CannotSplit], so [split_misaligned] returns [N = 1] and the
+          window is opened at most once — otherwise the loop's second
+          [read_ram] falls into [gwalk (Some _)]'s [MemRead] arm, which is
+          [False]).  The fuel recursion [_rec_pt_walk] is DISCHARGED
+          ([WeakShapeOverrides2] §3).
       (c) THE THREE AXIOMS of §2, via [gw_load_reservation] /
-          [gw_cancel_reservation] / [gw_plat_term_write] — i.e. the record is
+          [gw_cancel_reservation] / [gw_plat_term_write] — the record is
           consumed inside (b)'s proofs, at [vmem_read_addr],
           [execute_STORECON] and [htif_store], not at §4's statement. *)
 
@@ -135,8 +138,12 @@ From Stdlib.ssr Require Import ssreflect.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.
 From xv6iris Require Import WeakSailLTS WeakSailComplete WeakShape.
-From xv6iris Require Import WeakShapeOverrides.
-From xv6iris Require Import WeakShapeGen01 WeakShapeGen02.
+From xv6iris Require Import WeakShapeOverrides WeakShapeOverrides2.
+From xv6iris Require Import WeakShapeGen01 WeakShapeGen02 WeakShapeGen03
+  WeakShapeGen04 WeakShapeGen05 WeakShapeGen06 WeakShapeGen07 WeakShapeGen08
+  WeakShapeGen09 WeakShapeGen10 WeakShapeGen11 WeakShapeGen12 WeakShapeGen13
+  WeakShapeGen14 WeakShapeGen15.
+From xv6iris Require Import WeakShapePeel.
 Require Import Riscv.rv64d.
 
 Set Default Proof Using "Type".
@@ -182,6 +189,25 @@ Lemma gsilent_plat_term_write (H : rv64d_axiom_shapes) b :
   gsilent (plat_term_write b).
 Proof. by apply gquiet_gsilent, (ax_plat_term_write H). Qed.
 
+(** TWO OF THE RESIDUE'S FIFTY-ONE, CLOSED HERE, because they are exactly
+    the functions whose only obstacle was [plat_term_write]: the HTIF store
+    path.  [htif_store] is the axiom's single call site and [mmio_write] is
+    its only caller, so the record above is the whole of what they needed —
+    every other leaf is in the generated tower. *)
+Lemma gw_htif_store (H : rv64d_axiom_shapes) :
+  ∀ a0 a1 a2, gwalk None (@htif_store a0 a1 a2).
+Proof.
+  pose proof (gw_plat_term_write H) as Hterm.
+  intros; destruct a0; cbv [htif_store]; gw_solve.
+Qed.
+
+Lemma gw_mmio_write (H : rv64d_axiom_shapes) :
+  ∀ a0 a1 a2, gwalk None (@mmio_write a0 a1 a2).
+Proof.
+  pose proof (gw_htif_store H) as Hh.
+  intros; cbv [mmio_write]; gw_solve.
+Qed.
+
 (* ====================================================================== *)
 (** ** 4. The [riscv_step] wrapper, over the tower's remaining obligations
 
@@ -196,18 +222,48 @@ Require Import RiscvLang.
 
 Theorem riscv_step_shaped_cone :
   (∀ (n : Z) (b : bool), gwalk None (try_step n b)) →
-  gwalk None (tick_clock tt) →
   ∀ b : bool, sail_shaped (riscv_step b).
 Proof.
-  intros Htry Htick b. apply gwalk_shaped.
+  intros Htry b. apply gwalk_shaped.
   rewrite /riscv_step. apply gwalk_bind; [apply Htry|].
-  intros _. destruct b; [exact Htick|by apply gwalk_quiet, gquiet_returnm].
+  intros _. destruct b; [apply gw_tick_clock|by apply gwalk_quiet, gquiet_returnm].
+Qed.
+
+(** …AND THE SAME PREMISE PEELED TO THE RESIDUE.  This is the honest
+    statement of what stage C5 leaves owed: not "a property of the decoder"
+    but twelve named model functions, each of which is one line.  Eleven of
+    them are the memory [execute_*] clauses and one is [fetch]; §4's header
+    (a) says which of the eleven is FALSE as stated and what replaces it. *)
+Theorem riscv_step_shaped_residue
+    (Hfetch : ∀ a0, gwalk None (@fetch a0))
+    (Hexecute_LOAD : ∀ a0 a1 a2 a3 a4, gwalk None (@execute_LOAD a0 a1 a2 a3 a4))
+    (Hexecute_STORE : ∀ a0 a1 a2 a3, gwalk None (@execute_STORE a0 a1 a2 a3))
+    (Hexecute_LOADRES : ∀ a0 a1 a2 a3 a4, gwalk None (@execute_LOADRES a0 a1 a2 a3 a4))
+    (Hexecute_STORECON : ∀ a0 a1 a2 a3 a4 a5,
+        gwalk None (@execute_STORECON a0 a1 a2 a3 a4 a5))
+    (Hexecute_AMO : ∀ a0 a1 a2 a3 a4 a5 a6,
+        gwalk None (@execute_AMO a0 a1 a2 a3 a4 a5 a6))
+    (Hexecute_SSAMOSWAP : ∀ a0 a1 a2 a3 a4 a5,
+        gwalk None (@execute_SSAMOSWAP a0 a1 a2 a3 a4 a5))
+    (Hexecute_SSPUSH : ∀ a0, gwalk None (@execute_SSPUSH a0))
+    (Hexecute_SSPOPCHK : ∀ a0, gwalk None (@execute_SSPOPCHK a0))
+    (Hexecute_ZICBOM : ∀ a0 a1, gwalk None (@execute_ZICBOM a0 a1))
+    (Hexecute_ZICBOP : ∀ a0 a1 a2, gwalk None (@execute_ZICBOP a0 a1 a2))
+    (Hexecute_ZICBOZ : ∀ a0, gwalk None (@execute_ZICBOZ a0)) :
+  ∀ b : bool, sail_shaped (riscv_step b).
+Proof.
+  apply riscv_step_shaped_cone, gw_try_step, gw_run_hart_active; [done|].
+  by apply gw_execute.
 Qed.
 
 (** The same reduction in the [gok] mode, for the liveness half: [glive] has
-    no [Ret]-mode subtlety, so the two halves reduce in lockstep and a C5
-    that closes [gok] of the two frontier functions closes both premises of
-    [WeakComposeLang.xv6_weak_robust_lifted] at once. *)
+    no [Ret]-mode subtlety, so the two halves reduce in lockstep at the
+    wrapper.  BELOW the wrapper they do NOT: the generated tower is
+    [gwalk None]-only (§3), so this premise cannot be peeled to the residue
+    the way [riscv_step_shaped_residue] is — a liveness half needs its own
+    294-lemma [gok] tower FIRST, and only then the ~100 reachability sites of
+    (O3).  That ordering is finding (O7), and it is why the [gok] statement
+    still names both frontier functions. *)
 Theorem riscv_step_ok_cone :
   (∀ (n : Z) (b : bool), gok (try_step n b)) →
   gok (tick_clock tt) →
