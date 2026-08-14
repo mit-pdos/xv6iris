@@ -26,7 +26,9 @@ during phase 1 is deleted; contracts name the set.
 The substrate is landed and proven, the client sweep is DONE, and the ORDER
 has been revised once (ftable/itable above proc -- see below).
 
-**All 1085 files build.**  The sweep that started at 72 failures is done.
+**All 1094 files build**, including `origin/main` merged in at 55 commits
+(the `XV6_REV` bump to `117c0e7` and the create/kexec push).  The sweep that
+started at 72 failures is done.
 
 One thing in the tree is ASSUMED rather than proved:
 `iput_acquiresleep_order_ADMITTED` in `ProofIput.v`, the one lock-order edge
@@ -51,6 +53,33 @@ reading a blocked build: `iput` reaches `itrunc` -> `bwrite` ->
 `LinkNamex`, `LinkSysExit` and nine other FS names that look unrelated to the
 disk driver.  Those were never blocked on `iput`, and making `iput` compile
 moved none of them.  Do not infer the blocking edge from the names.
+
+### Merging upstream into a widened tree
+
+Every conflict in the 55-commit merge had the SAME shape: upstream added
+binders where we had added `lks`, so the resolution is upstream's version
+with `lks` re-applied as the LAST explicit binder.  A ten-line script that
+recognises "ours = theirs plus a trailing `lks`/`Hbelow`" resolved most of
+them; the two that needed thought were `ProofIupdate` (our order premise sat
+inside a premise block upstream deleted wholesale, so only the `locks_below`
+line survives) and `ProofUsertrapTail` (upstream's `mie_v`/`menvcfg0` pins
+and our premise both land after `ut_cs`, so both are kept).
+
+**The conflicts are the easy half.**  Six upstream-new files compiled fine on
+`origin/main` and could not compile here, because they were written against
+contracts we had already widened -- `ProofCreate` alone is 5619 lines, five
+body definitions, four half-lemmas and sixteen callee applications.  Budget
+for that: `git` reports 13 conflicts and then the compiler reports the rest,
+one file per build.
+
+**A level-0 contract needs NO order premise, and must not have one.**
+`ProofCreate` is the case that makes this concrete: `SpecCreate` carries
+`lks` as an index but no `locks_below`, so the proof cannot assume one --
+and does not need to, because `cpu_own_zero_empty` proves `lks = ∅` at depth
+0 and `lkbelow` closes every callee's bound from that equation.
+`SpecNameiparent` already worked this way.  Reach for the premise only when
+a contract can be entered with a lock ALREADY held; otherwise pose the
+emptiness once at the top of the proof and let the tactic do the rest.
 
 **A file that fails early hides every later defect in it.**  Both long-red
 files had more wrong with them than the error said: `ProofIput` had two
