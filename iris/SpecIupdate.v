@@ -719,6 +719,131 @@ Definition wp_iupdate_credgen_body
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(*  THE LINK-MINTING CONTRACT (design fs-icache.md §20.18, stage C2)      *)
+(*                                                                        *)
+(*  [ip->nlink++; iupdate(ip)] -- create's [dp->nlink++] at +0x128,        *)
+(*  mkdir's [".."] payment and sys_link's own increment.  §20.6's table    *)
+(*  calls it the ledger moving in the same ghost step as the count that    *)
+(*  pays for it: (L1) grows on BOTH sides at once, which is what keeps     *)
+(*  the region's cap an inequality nobody has to re-argue, and it is why   *)
+(*  the mint cannot be a separate fupd the caller fires beside an ordinary *)
+(*  flush -- between the two the invariant would hold [w = nlink + 1].     *)
+(*                                                                        *)
+(*  IT IS [wp_iupdate_cred_body] WITH TWO EDITS AND NOTHING ELSE.          *)
+(*    (i) [InodeRegion.di_nlink_stable dn dn0] -- "nlink does not fall" -- *)
+(*        becomes the EXACT arithmetic [nlink dn = nlink dn0 + 1].  The    *)
+(*        ordinary premise would be satisfied by this caller too, but it   *)
+(*        is not enough for the region: the mint has to know the count     *)
+(*        grew by exactly the one unit the new fragment costs.             *)
+(*   (ii) the post's [InodeRegion.ireg_out γi inum dn] becomes             *)
+(*        [dinode_at γi inum dn ∗ ilink (bv_unsigned inum)].  With a       *)
+(*        nonzero type [ireg_out] IS [dinode_at], so this is the same      *)
+(*        payout plus the minted fragment -- the ticket a written          *)
+(*        directory record needs (§20.10's finding 1) and the one thing    *)
+(*        no landed contract in the tree could produce.                    *)
+(*                                                                        *)
+(*  THE ONE ADDED PREMISE, AND WHY IT IS NOT OPTIONAL.                     *)
+(*  [bv_unsigned (di_type dn) <> 0] is a THIRD difference from the         *)
+(*  credited body, and it is forced rather than chosen: (L3) says a        *)
+(*  type-0 record has [nlink = 0], while (i) makes the flushed record's    *)
+(*  [nlink] at least one, so a type-0 [dn] makes the region's closing      *)
+(*  clause FALSE -- the write is unprovable there, not merely             *)
+(*  unsupported.  Every caller has it from [InodeLock.inode_ok]; the       *)
+(*  ordinary body does not need it only because [ireg_out]'s type-0 arm    *)
+(*  leaves through [InodeRegion.ireg_free_au] instead.                     *)
+(*                                                                        *)
+(*  A FIFTH PARAMETER, POSITIONAL, for the reason the fourth is one (the   *)
+(*  banner above): no existing caller's arity moves, and the four landed   *)
+(*  contracts stay byte-stable.  [cru]-credited and [eb := true], i.e.     *)
+(*  cut to create's altitude -- a syscall runs with an enabled base, and   *)
+(*  no nlink-raising flush in the kernel runs anywhere else.               *)
+(* ===================================================================== *)
+Definition wp_iupdate_link_body
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
+    `{GEN : GenId} `{CID : CpuId}
+
+    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+    (pd pav pu : mword 64)
+    (bn : bio_names)
+    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+    (ip : mword 64) (inum : mword 32)
+    (dn dn0 : dinode) (bm : blkmap)
+    (u : nat) (Sb : gset Z) (cru : bool)
+    (pidv : mword 32) (dq dqd dqn dqs : dfrac)
+    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (b : bool) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
+  let pj := proc_addr j in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (K_iupdate <= K)%nat ->
+  (cru = true -> IBLOCK inum inodestart ∈ Sb) ->
+  log_geom_ok cov logstart ->
+  0 <= inodestart ->
+  IBLOCK inum inodestart ∈ cov ->
+  ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
+  bv_unsigned inum < 16 * Z.of_nat nib ->
+  InodeRegion.di_type_stable dn dn0 ->
+  (* THE ADDED PREMISE (see the banner): (L3) plus the increment below make
+     a type-0 flush contradictory, so the region cannot take one here. *)
+  bv_unsigned (di_type dn) <> 0 ->
+  (* THE INCREMENT ITSELF, in place of [di_nlink_stable]: this flush RAISES
+     the count by exactly one, and that one unit is what pays for the
+     [ilink] the post hands out (§20.6's mkdir/sys_link rows). *)
+  bv_unsigned (di_nlink dn) = bv_unsigned (di_nlink dn0) + 1 ->
+  di_addrs dn = bm_cells bm ->
+  length (bm_dir bm) = NDIRECT ->
+  (j < NPROC)%nat ->
+  γs !! j = Some γl ->
+  m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  eb = true ->
+  sie_cap_gpr m K b pj -∗
+  cpu_own 0 eb pj C b -∗
+  kernel_text -∗ pc_is pcE -∗
+  panic_wp_any -∗
+  bio_ctx bn (fs_view γfs γd dev cov) -∗
+  log_ctx γ bn γfs cov logstart dev -∗
+  i_dev ip ↦₄{dqd} dev -∗
+  i_inum ip ↦₄{dqn} inum -∗
+  inode_meta ip dn -∗
+  inode_map γfs ip bm -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  ireg_inv γi γfs inodestart nib -∗
+  dinode_at γi inum dn0 -∗
+  p_pid pj ↦₄{dq} pidv -∗
+  procs_inv γs -∗
+  dev_inv γu γd -∗
+  disk_geom γd pd pav pu -∗
+  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  bslots bn 2 -∗
+  log_opS γ (S u) Sb -∗
+  wp_next true pj (fun (CID : CpuId) =>
+  ∀ mf : regfile,
+      ⌜callee_saved m mf⌝ -∗
+      sie_cap_gpr mf K b pj -∗
+      cpu_own 0 eb pj C b -∗
+      pc_is ret_tgt -∗
+      p_pid pj ↦₄{dq} pidv -∗
+      i_dev ip ↦₄{dqd} dev -∗
+      i_inum ip ↦₄{dqn} inum -∗
+      inode_meta ip dn -∗
+      inode_map γfs ip bm -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      (* THE FLUSH, AND THE MINT.  The retagged fragment exactly as the
+         other four bodies hand it back (the type is nonzero, so
+         [ireg_out] is [dinode_at] here), plus the ONE ledger fragment the
+         raised count pays for.  It travels to the [dirlink] that deposits
+         it in a directory's [DirLinks.dir_links]. *)
+      dinode_at γi inum dn -∗
+      ilink (bv_unsigned inum) -∗
+      bslots bn 2 -∗
+      log_opS γ (if cru then S u else u) (Sb ∪ {[IBLOCK inum inodestart]}) -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type IUPDATE.
   Parameter wp_iupdate_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
@@ -814,4 +939,30 @@ Module Type IUPDATE.
       wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
                               pidv dq dqd dqn dqs m K eb C b.
+
+  (* the LINK-MINTING contract (design §20.18 stage C2): the credited walk
+     at a flush that RAISES [nlink] by one, paying out the [ilink] fragment
+     that raise buys.  A fifth parameter for the fourth's reason -- widening
+     any of the four would move a landed caller's arity, and this one's
+     postcondition differs, not just its premises. *)
+  Parameter wp_iupdate_link :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
+      `{GEN : GenId} `{CID : CpuId}
+
+      (γs : list gname) (j : nat) (γl : gname)
+      (γu : uart_names) (γd : disk_names) (γk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+      (ip : mword 64) (inum : mword 32)
+      (dn dn0 : dinode) (bm : blkmap)
+      (u : nat) (Sb : gset Z) (cru : bool)
+      (pidv : mword 32) (dq dqd dqn dqs : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool),
+      wp_iupdate_link_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+                           cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
+                           pidv dq dqd dqn dqs m K eb C b.
 End IUPDATE.
