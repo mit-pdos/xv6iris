@@ -5,7 +5,16 @@ proofs: an entry here means **the C code is wrong** and the stuck proof is the
 symptom.  A fix's consequences for a contract are recorded with that contract,
 not here.
 
-## OPEN — `exec`'s `ustack[argc] = 0` writes one element past `ustack[MAXARG]`
+## UNREACHABLE, BY THE CALLER'S GUARANTEE — `exec`'s `ustack[argc] = 0` would
+## write one element past `ustack[MAXARG]`, but no caller can reach it
+
+**Kept as a live entry even though nothing can trigger it**, because the
+argument for safety lives entirely OUTSIDE `exec`: `sys_exec` guarantees a null
+pointer within the first `MAXARG` elements of `argv`, so `argc < MAXARG` at the
+loop's exit and the store is in bounds. `exec` itself does not establish that
+and cannot — see below. Unreachability makes a defect safe, not correct (this
+file's own rule), and a second caller, or a `sys_exec` that stopped scanning at
+`MAXARG`, would make it live.
 
 `kexec` declares `uint64 ustack[MAXARG]` (32 entries) and tests the bound
 INSIDE the argument loop:
@@ -31,14 +40,18 @@ frame map in `SpecKexec.v`'s header), so the extra store lands in the padding
 inside kexec's own frame and clobbers nothing.  That is an accident of this
 build, not a property of the source.
 
-The proof cannot state the bound the C implies, and that is how this surfaced:
-`ProofKexecSeam.kxc_at_272` — the loop's exit state — carries `(c <= 32)%nat`
-where the loop HEAD `kxc_at_21a` carries `(c < 32)%nat`, and the two really are
-different propositions.  Tightening the exit to `< 32` would make the argv
-loop's own natural-exit arm unprovable at exactly the 32-argument case.  The
-one-line source fix is to move the test above the loop's condition (or size the
-array `MAXARG + 1`); until then the invariant records the off-by-one rather
-than hiding it.
+**How it surfaced, and where the guarantee now lives.**  The argv loop's exit
+state `ProofKexecSeam.kxc_at_272` must publish a bound on `argc`, and the only
+one derivable from the function's OWN tests is `argc <= MAXARG` — the loop head
+`kxc_at_21a` has `c < 32`, and the null-terminated exit adds one to it without
+re-testing.  Rather than carry that as slack, `SpecKexec` takes `na < MAXARG` as
+a PREMISE and the exit state says `c < 32` outright; the argv loop threads the
+premise for that one use.  So the contract now records exactly what `sys_exec`
+promises, and a caller that cannot promise it is refused at the contract instead
+of silently reaching the store.
+
+The one-line source fix is to move the test above the loop's condition (or size
+the array `MAXARG + 1`), which would let the premise go.
 
 ## FIXED UPSTREAM (`117c0e7`) — an unchecked `nlink++` could wrap a link
 ## count to zero, in `create`'s mkdir arm and in `sys_link`

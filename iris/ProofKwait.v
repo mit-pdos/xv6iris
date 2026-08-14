@@ -3033,7 +3033,7 @@ Section ProofKwaitMain.
   Proof.
     cbv beta delta [wp_kwait_sconf_body].
     (* [Hbelow] is SpecKwait.v's own new LAST Coq premise -- see
-       claude-notes/projects/lock-set.md; kwait's whole cone (the nested
+       claude-notes/completed/lock-set.md; kwait's whole cone (the nested
        pp->lock via [kw_scan], and whatever sleep_prepare/sleep/killed/
        freeproc reach) sits at or above "proc" (11), reachable from this
        "wait_lock" (10) bound by [locks_below_mono]/

@@ -943,15 +943,16 @@ Section KexecBSeam.
   (*  Same invariant as the head, minus the two LIVENESS conjuncts          *)
   (*  ([a0 = avf c], [avf c <> 0]) that only the CONTINUING test earns.     *)
   (*                                                                        *)
-  (*  ITS COUNTER BOUND IS [c <= 32], NOT THE HEAD'S [c < 32], and the      *)
-  (*  difference is real rather than slack.  The C tests [argc >= MAXARG]   *)
-  (*  only INSIDE the loop body, i.e. only once [argv[argc]] is known       *)
-  (*  non-null, so the null-terminated exit is taken at [argc = 32] when    *)
-  (*  there are exactly 32 arguments.  The [ustack[argc] = 0] at +0x272     *)
-  (*  then writes ustack[32], one past [uint64 ustack[MAXARG]] -- which     *)
-  (*  lands inside the 33 slots (264 B, s0-368..s0-112) gcc actually        *)
-  (*  reserved, so the COMPILED code stays inside its own frame.  See       *)
-  (*  claude-notes/kernel-defects.md.                                       *)
+  (*  ITS COUNTER BOUND [c < 32] IS THE CALLER'S, NOT THE LOOP'S.  The C    *)
+  (*  tests [argc >= MAXARG] only INSIDE the loop body, i.e. only once      *)
+  (*  [argv[argc]] is known non-null, so on the C's own reasoning a vector  *)
+  (*  whose first null sits exactly at index 32 leaves the loop with        *)
+  (*  [argc = 32] and the following [ustack[argc] = 0] writes one past      *)
+  (*  [uint64 ustack[MAXARG]].  What rules that out is [SpecKexec]'s        *)
+  (*  [na < MAXARG] premise, which sys_exec -- the only caller -- supplies. *)
+  (*  So this conjunct is DERIVED FROM THE CONTRACT rather than from any    *)
+  (*  test the function performs, and the argv loop threads [na < MAXARG]   *)
+  (*  for exactly this one use.  See claude-notes/kernel-defects.md.        *)
   (* --------------------------------------------------------------- *)
   Definition kxc_at_272
       (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
@@ -976,7 +977,7 @@ Section KexecBSeam.
        M !!! Regidx Rs8 = (mword_of_int 32 : mword 64) /\
        M !!! Regidx Rs9 = pa_stk sp0 46 /\
        M !!! Regidx Rs10 = oldsz ⌝ ∗
-     ⌜ (c <= na)%nat /\ (c <= 32)%nat /\ avf c = (mword_of_int 0 : mword 64) /\
+     ⌜ (c <= na)%nat /\ (c < 32)%nat /\ avf c = (mword_of_int 0 : mword 64) /\
        (uint sz1 - 4096 <= kxc_sp (uint sz1) alen c)%Z ⌝ ∗
      ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
@@ -1053,7 +1054,7 @@ Section KexecBSeam.
        M !!! Regidx Rs5 = proc_addr jp /\
        M !!! Regidx Rs6 = page_base P.(ud_root) /\
        M !!! Regidx Rs10 = oldsz ⌝ ∗
-     ⌜ (c <= na)%nat /\ (c <= MAXARG)%nat /\
+     ⌜ (c <= na)%nat /\ (c < MAXARG)%nat /\
        avf c = (mword_of_int 0 : mword 64) /\
        kxc_stack_ok (uint sz1) (uint sz1 - 4096) alen c ⌝ ∗
      ⌜ ud_tfp P = ud_tfp (pv_upt V) /\

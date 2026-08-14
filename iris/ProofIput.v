@@ -388,7 +388,7 @@ Qed.
    so "itable" (14) must sit ABOVE "proc" (9); acquiresleep's blocking path
    runs sleep_prepare while holding the sleeplock's own spinlock, so
    "sleep lock" (4) must sit BELOW "proc".  Nothing fits between them, and
-   the obligation below needs 14 < 4.  See claude-notes/projects/lock-set.md,
+   the obligation below needs 14 < 4.  See claude-notes/completed/lock-set.md,
    "THE ONE UNLICENSED EDGE", for the three-edge cycle at the name level and
    the concrete three-CPU execution that would have to happen for it to bite.
 

@@ -1,8 +1,25 @@
-# The per-CPU held-lock set, and the lock ORDER
+# The per-CPU held-lock set, and the lock ORDER — COMPLETED
+
+**Landed. This is a record, not a worklist.** The substrate is proven, every
+client carries its order premise, the ranking is installed and audited, and
+all 1094 files build. `LockRank.v` / `LockSet.v` / `CpuOwn.v` are the live
+description; read those first and this file for the reasoning behind them.
+
+ONE THING IS ADMITTED, and it is tracked separately from this effort:
+`ProofIput.iput_acquiresleep_order_ADMITTED`, the `iput`-holds-`itable`-across-
+`acquiresleep` edge no ranking can license. It is FALSE, not merely unproven,
+so `iput` and its cone typecheck without meaning anything until it is
+replaced — see "THE ONE UNLICENSED EDGE" below for what the real discharge is
+(icache REF-1 exclusivity plus a non-blocking `acquiresleep`). `Print
+Assumptions` on any downstream theorem names it; that is the tripwire.
+
+Two sections near the foot are marked **SUPERSEDED DESIGN**: they argue for a
+`gmap nat (mword 64)` index that was never built. Everything above them
+describes what exists.
 
 The design and its phase-1 landing are in
 [`design/kernel-proofs.md`](../design/kernel-proofs.md) §Spinlocks and in
-`LockSet.v`'s own header. This file is what is LEFT.
+`LockSet.v`'s own header.
 
 **Audit the C at `XV6_REV`, not at whatever `xv6-riscv/` is checked out to.**
 That directory is gitignored and is a build input pinned by the top-level
@@ -34,7 +51,7 @@ so a contract reads `locks_below lks "log" ->` and an index reads
 `({["itable"]} ∪ lks)`.  The set held RANKS until the names refactor; see
 "Why the set holds names" below for what that bought.
 
-## Status
+## Status — COMPLETE
 
 The substrate is landed and proven, the client sweep is DONE, and the ORDER
 has been revised once (ftable/itable above proc -- see below).
@@ -569,20 +586,32 @@ Every pair of spinlocks xv6 ever holds simultaneously, as edges `a → b`
 | everything `→ pr → uart` | **`panic()` acquires `pr.lock`** — this revision deleted the `panicking` flag, so `panic` is `printk("panic: ")` + `printk("%s\n")` + self-jump, and `printk` holds `pr.lock` across `consputc` → `uartputc_sync` → `acquire(&tx_lock)`. Panic sites under a held lock are everywhere (`bget` under `bcache`, `log_write` under `log`, `sleep_prepare`/`sched` under `proc`, `free_desc` under `virtio_disk`, `iget` under `itable`, and `acquire`/`release`'s own arms under an arbitrary set) |
 | `cons → uart` | `consoleintr`'s echo `consputc` under `cons.lock` |
 | `log → bcache` | `log_write` holds `log.lock`, calls `bpin` |
-| `itable → sleep lock` | `iput` holds `itable.lock`, calls `acquiresleep` |
+| `itable → sleep lock` | `iput` holds `itable.lock`, calls `acquiresleep` — **THE ONE EDGE THE ORDER DOES NOT LICENSE**, admitted rather than proven; see "THE ONE UNLICENSED EDGE" above |
 | `{cons, log, itable, sleep lock, pipe, time, virtio_disk, wait_lock} → proc` | every `sleep_prepare` and `wakeup` call site (both acquire `p->lock`) |
 | `proc → nextpid` | `allocproc` holds `p->lock`, calls `allocpid` |
 | `proc → kmem`, `wait_lock → kmem` | `allocproc`→`kalloc`, `freeproc`→`kfree` (the latter under `wait_lock` too, from `kwait`) |
 
-It is acyclic. One total extension, which is what the rank table should be:
+It is acyclic. The INSTALLED table (`LockRank.lock_ranks`; a name not listed
+maps to 0, which is conservative — such a lock may be acquired only from the
+empty set):
 
 ```
-0 ftable · 1 itable · 2 log · 3 bcache · 4 cons · 5 sleep lock · 6 pipe
-7 time · 8 virtio_disk · 9 wait_lock · 10 proc · 11 nextpid · 12 kmem
-13 pr · 14 uart
+1 log · 2 bcache · 3 cons · 4 sleep lock · 5 pipe · 6 time · 7 virtio_disk
+8 wait_lock · 9 proc · 10 nextpid · 11 kmem · 12 pr · 13 uart
+14 itable · 15 ftable
 ```
 
-**`uart` is the TOP and nothing is acquired under it**: `uartputc_sync` holds
+**This is the SECOND ranking.** The first put `ftable`/`itable` at the bottom
+(0 and 1); `kfork` forced the revision, because it holds `np->lock` across
+`idup`/`filedup`, which makes `proc → itable` and `proc → ftable` real edges
+and both leaves have to sit ABOVE `proc`. They can, because neither is ever
+held while anything else is acquired — the rank rule is sufficient, not
+necessary, and a LEAF closes no cycle wherever you put it. If you are
+comparing against an older draft of this file, the table above is the one that
+is true.
+
+**Nothing is acquired under `uart`** (it was the TOP under the first
+ranking; the two leaves now sit above it, but it still has no outgoing edge): `uartputc_sync` holds
 `tx_lock` only across the LSR spin and the THR write; `uartwrite` calls
 `sleep_prepare(&tx_chan)` BEFORE taking `tx_lock` and `sleep()` after
 releasing it; `uartintr` takes no lock at all (it `wakeup`s and calls
@@ -594,7 +623,16 @@ NOT `panic`: it does a raw store to an undecoded device address and spins,
 taking no lock. Sites that use it (`sched`'s three checks, `pop_off`,
 `end_op`'s `log.committing`) impose no order constraint. Only `panic` does.
 
-## The shape of the index
+## SUPERSEDED DESIGN — the `gmap nat (mword 64)` index
+
+**Kept as history, not as description. This is not what was built.** The plan
+below indexed `cpu_own` by a map from rank to held address; what landed is a
+`gset` of ranks, and then (after the names refactor) a `gset string` of NAMES,
+with the order living in `locks_below` rather than in the set. The next
+section, "Why the index must be the SET, not a bound", is the argument that
+survived; the address component and the `gmap_view` camera did not. Read this
+one only for the reasoning about `lock_rank` needing no new parameter on
+`is_lock`/`newlock`/`lock_inv`, which is still true.
 
 **`cpu_own n eb p C b M` with `M : gmap nat (mword 64)` — rank ↦ the address
 held at that rank.** The rank comes from the name the lock already carries:
@@ -629,7 +667,12 @@ The camera becomes a `gmap_view nat (mword 64)` (fragment
 `r`, and agreement reads `M !! r = Some lk`) in place of the
 `auth (gset_disj (mword 64))` of phase 1.
 
-## What it buys
+## SUPERSEDED DESIGN — what the `gmap` index was to buy
+
+**Also history.** Stated over the `gmap` above, so `M ≺ r` and `dom M` should
+be read as the set and `locks_below` throughout. The claims about acquire's
+premise being the locking discipline written down, and about most call sites
+being trivial at the empty set, both held up.
 
 Write `M ≺ r` for `∀ q ∈ dom M, (q < r)%nat`.
 
