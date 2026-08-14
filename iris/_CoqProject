@@ -908,6 +908,7 @@ LinkFileclose.v
 LinkKexit.v
 LinkPipealloc.v
 LinkReadi.v
+LinkSysChdir.v
 LinkSysClose.v
 LinkSysPipe.v
 LinkWritei.v
@@ -1106,3 +1107,4 @@ LinkSysRead.v
 ProofSysWrite.v
 LinkSysWrite.v
 SpecSysChdir.v
+ProofSysChdir.v
