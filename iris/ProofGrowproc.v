@@ -972,9 +972,15 @@ Section ProofGrowproc.
                       <= uvm_maxsz)%Z).
       { rewrite uvm_maxsz_val. unfold uvma_np.
         apply gp_z_run_end; [exact Hpu0 | exact Hpumod | exact Hpule | exact Hnewle]. }
+      (* growproc TESTS the size, so it pays the freshness premise's guard by
+         ignoring it -- the run is inside TRAPFRAME whatever iteration the
+         loop is at ([Hrun]).  SpecUvmalloc.v's note says why the guard is
+         there; it is kexec that cannot bound the run. *)
       assert (Hfresh : forall i : nat, (i < uvma_np (pv_sz V) (add_vec (pv_sz V) nv))%nat ->
+                (bv_unsigned (pgroundup (pv_sz V)) + 4096 * Z.of_nat i + 4096
+                 <= uvm_maxsz)%Z ->
                 ud_um (pv_upt V) !! vpn_at (svpn_of (pgroundup (pv_sz V))) i = None).
-      { intros i Hi.
+      { intros i Hi _.
         apply (um_below_run_fresh (pv_sz V) (ud_um (pv_upt V))
                  (uvma_np (pv_sz V) (add_vec (pv_sz V) nv)) i Hbel);
           [rewrite uvm_maxsz_val; exact Hszmaxz | exact Hrun | exact Hi]. }

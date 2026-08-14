@@ -349,3 +349,180 @@ Proof.
   rewrite (bvw64_small (bv_unsigned db) ltac:(pose proof (w32_byte_range db); lia)).
   reflexivity.
 Qed.
+
+(* ===================================================================== *)
+(*  TWO ABI-PASSED uints AT ONCE -- what the exec loops compute with.      *)
+(* ===================================================================== *)
+(* [w32_addw_arg] / [w32_subw_moi] each have ONE sign-extended operand.
+   kexec's inlined loadseg has two: its [ph.off + i] ([addw a3,s7,s1]) and
+   its [ph.filesz - i] ([subw a5,s3,s1]) both take a field read out of an
+   untrusted ELF and a cursor that is itself the sign-extended form.  Like
+   [w32_addw_arg] these carry NO premise: [addw]/[subw] truncate both
+   operands first, so the sign extension is invisible to them and the answer
+   comes back in the same ABI form, wrapped mod 2^32. *)
+
+Lemma w32_addw_arg2 (a c : Z) :
+  sign_extend' 64
+    (add_vec (subrange_vec_dec
+                (sign_extend' 64 (mword_of_int a : mword 32) : mword 64) 31 0
+              : mword 32)
+             (subrange_vec_dec
+                (sign_extend' 64 (mword_of_int c : mword 32) : mword 64) 31 0
+              : mword 32))
+  = (sign_extend' 64 (mword_of_int (a + c) : mword 32) : mword 64).
+Proof.
+  rewrite <- !trunc32_subrange.
+  rewrite !trunc32_sext64 w32_addv. reflexivity.
+Qed.
+
+Lemma w32_subw_arg2 (a c : Z) :
+  sign_extend' 64
+    (sub_vec (subrange_vec_dec
+                (sign_extend' 64 (mword_of_int a : mword 32) : mword 64) 31 0
+              : mword 32)
+             (subrange_vec_dec
+                (sign_extend' 64 (mword_of_int c : mword 32) : mword 64) 31 0
+              : mword 32))
+  = (sign_extend' 64 (mword_of_int (a - c) : mword 32) : mword 64).
+Proof.
+  rewrite <- !trunc32_subrange.
+  rewrite !trunc32_sext64 w32_subv. reflexivity.
+Qed.
+
+(* [mword_of_int] on a 32-bit literal only ever sees it mod 2^32, so an ABI
+   word may be re-read at the representative in [0, 2^32).  What lets a proof
+   keep ONE canonical spelling of the cursor across the wrap. *)
+Lemma w32_arg_mod (x : Z) :
+  (sign_extend' 64 (mword_of_int (x `mod` 2 ^ 32) : mword 32) : mword 64)
+  = (sign_extend' 64 (mword_of_int x : mword 32) : mword 64).
+Proof.
+  assert (H : (mword_of_int (x `mod` 2 ^ 32) : mword 32)
+              = (mword_of_int x : mword 32)).
+  { apply bv_eq. rewrite !moi32_unsigned. unfold bv_wrap.
+    change (bv_modulus (MachineWord.MachineWord.Z_idx 32)) with 4294967296%Z.
+    replace (2 ^ 32)%Z with 4294967296%Z by (vm_compute; reflexivity).
+    by rewrite Zmod_mod. }
+  by rewrite H.
+Qed.
+
+(* ---- the [slli 0x20 / srli 0x20] ZERO-extension of an ABI uint ----
+
+   [ByteCursor.slli32_srli32] is the identity, and needs its operand below
+   2^32 to be one.  An ABI-passed uint at or above 2^31 is NOT: its register
+   holds the sign-extended (i.e. huge) word, and the pair is then a genuine
+   TRUNCATION -- which is exactly what the C's [(uint64)i] means and what
+   kexec's [slli a1,s1,0x20 ; srli a1,a1,0x20] at +0x0f6 is for. *)
+Lemma w32_slli32_srli32_wrap (x : mword 64) :
+  shift_bits_right
+    (shift_bits_left x (subrange_vec_dec (mword_of_int 32 : mword 6)
+                          (Z.sub log2_xlen 1) 0))
+    (subrange_vec_dec (mword_of_int 32 : mword 6) (Z.sub log2_xlen 1) 0)
+  = (mword_of_int (bv_unsigned x `mod` 2 ^ 32) : mword 64).
+Proof.
+  assert (Hl : shift_bits_left x (subrange_vec_dec (mword_of_int 32 : mword 6)
+                                    (Z.sub log2_xlen 1) 0)
+             = shiftl x 32).
+  { unfold shift_bits_left. f_equal; vm_compute; reflexivity. }
+  assert (Hr : forall y : mword 64,
+             shift_bits_right y (subrange_vec_dec (mword_of_int 32 : mword 6)
+                                   (Z.sub log2_xlen 1) 0) = shiftr y 32).
+  { intro y. unfold shift_bits_right. f_equal; vm_compute; reflexivity. }
+  rewrite Hl Hr. apply bv_eq.
+  unfold shiftl, shiftr, SailStdpp.Values.with_word, get_word,
+    MachineWord.MachineWord.logical_shift_left,
+    MachineWord.MachineWord.logical_shift_right.
+  rewrite bv_shiftr_unsigned bv_shiftl_unsigned moi64_unsigned.
+  assert (H32 : bv_unsigned (MachineWord.MachineWord.N_to_word
+                   (MachineWord.MachineWord.Z_idx 64)
+                   (MachineWord.MachineWord.Z_idx 32)) = 32).
+  { unfold MachineWord.MachineWord.N_to_word, MachineWord.MachineWord.Z_idx.
+    rewrite Z_to_bv_unsigned. apply bv_wrap_small. unfold bv_modulus; simpl; lia. }
+  rewrite H32.
+  pose proof (bv_unsigned_in_range 64 x) as [Hx0 Hxhi].
+  assert (E32 : (2 ^ 32 = 4294967296)%Z) by (vm_compute; reflexivity).
+  assert (E64 : (2 ^ 64 = 18446744073709551616)%Z) by (vm_compute; reflexivity).
+  assert (Hmod64 : bv_modulus (MachineWord.MachineWord.Z_idx 64) = 2 ^ 64)
+    by (unfold bv_modulus; f_equal).
+  rewrite Hmod64 in Hxhi.
+  rewrite Z.shiftl_mul_pow2; [| lia].
+  rewrite Z.shiftr_div_pow2; [| lia].
+  (* [(x * 2^32 mod 2^64) / 2^32 = x mod 2^32] *)
+  assert (Hsplit : ((bv_unsigned x * 2 ^ 32) `mod` 2 ^ 64
+                    = (bv_unsigned x `mod` 2 ^ 32) * 2 ^ 32)%Z).
+  { replace (2 ^ 64)%Z with (2 ^ 32 * 2 ^ 32)%Z by (vm_compute; reflexivity).
+    apply Z.mul_mod_distr_r; rewrite E32; lia. }
+  unfold bv_wrap at 1. rewrite Hmod64 Hsplit.
+  rewrite Z.div_mul; [| rewrite E32; lia].
+  symmetry. apply bv_wrap_small.
+  assert (Hpb : (0 <= bv_unsigned x `mod` 2 ^ 32 < 2 ^ 32)%Z).
+  { apply Z.mod_pos_bound. rewrite E32. lia. }
+  rewrite Hmod64. rewrite E32 in Hpb |- *. rewrite E64. lia.
+Qed.
+
+(* ...and its consequence at an ABI uint: the pair yields the plain literal. *)
+Lemma w32_zext_arg (z : Z) : (0 <= z < 2 ^ 32)%Z ->
+  shift_bits_right
+    (shift_bits_left (sign_extend' 64 (mword_of_int z : mword 32) : mword 64)
+       (subrange_vec_dec (mword_of_int 32 : mword 6) (Z.sub log2_xlen 1) 0))
+    (subrange_vec_dec (mword_of_int 32 : mword 6) (Z.sub log2_xlen 1) 0)
+  = (mword_of_int z : mword 64).
+Proof.
+  intro Hz. rewrite w32_slli32_srli32_wrap (w32_arg_unsigned z Hz).
+  assert (H : (w32_uarg z `mod` 2 ^ 32)%Z = z).
+  { unfold w32_uarg. case_decide.
+    - apply Z.mod_small. lia.
+    - change (2 ^ 64 - 2 ^ 32)%Z with (4294967295 * 2 ^ 32)%Z.
+      rewrite Z_mod_plus_full. apply Z.mod_small. lia. }
+  by rewrite H.
+Qed.
+
+(* An ABI uint's register word, as the LITERAL of what a [bltu]/[bgeu]
+   compares -- which is what turns a 64-bit unsigned branch on two such words
+   into a decidable [Z] test through [w32_bgeu_moi]. *)
+Lemma w32_uarg_range (x : Z) : (0 <= x < 2 ^ 32)%Z -> (0 <= w32_uarg x < 2 ^ 64)%Z.
+Proof.
+  change (2 ^ 32)%Z with 4294967296%Z. change (2 ^ 64)%Z with 18446744073709551616%Z.
+  intro Hx. unfold w32_uarg. case_decide;
+    change (2 ^ 31)%Z with 2147483648%Z in *;
+    change (2 ^ 64 - 2 ^ 32)%Z with 18446744069414584320%Z; lia.
+Qed.
+
+Lemma w32_arg_moi (x : Z) : (0 <= x < 2 ^ 32)%Z ->
+  (sign_extend' 64 (mword_of_int x : mword 32) : mword 64)
+  = (mword_of_int (w32_uarg x) : mword 64).
+Proof.
+  intro Hx.
+  rewrite <- (w32_moi_unsigned (sign_extend' 64 (mword_of_int x : mword 32))).
+  by rewrite (w32_arg_unsigned x Hx).
+Qed.
+
+Lemma w32_bgeu_arg (a c : Z) :
+  (0 <= a < 2 ^ 32)%Z -> (0 <= c < 2 ^ 32)%Z ->
+  zopz0zKzJ_u (sign_extend' 64 (mword_of_int a : mword 32) : mword 64)
+              (sign_extend' 64 (mword_of_int c : mword 32) : mword 64)
+  = Z.geb (w32_uarg a) (w32_uarg c).
+Proof.
+  intros Ha Hc. rewrite (w32_arg_moi a Ha) (w32_arg_moi c Hc).
+  apply w32_bgeu_moi; [exact (w32_uarg_range a Ha) | exact (w32_uarg_range c Hc)].
+Qed.
+
+(* ...and the mixed form, a small 64-bit literal against an ABI uint --
+   kexec's [bgeu s9,a5] deciding [min(filesz - i, PGSIZE)]. *)
+Lemma w32_bgeu_lit_arg (a c : Z) :
+  (0 <= a < 2 ^ 31)%Z -> (0 <= c < 2 ^ 32)%Z ->
+  zopz0zKzJ_u (mword_of_int a : mword 64)
+              (sign_extend' 64 (mword_of_int c : mword 32) : mword 64)
+  = Z.geb a (w32_uarg c).
+Proof.
+  intros Ha Hc. rewrite (w32_arg_moi c Hc).
+  apply w32_bgeu_moi;
+    [ change (2 ^ 31)%Z with 2147483648%Z in Ha;
+      change (2 ^ 64)%Z with 18446744073709551616%Z; lia
+    | exact (w32_uarg_range c Hc) ].
+Qed.
+
+(* A small non-negative 64-bit literal IS its own ABI form -- what lets a
+   register loaded by [lui]/[li] be handed to [w32_addw_arg2]. *)
+Lemma w32_moi_arg (z : Z) : (0 <= z < 2 ^ 31)%Z ->
+  (mword_of_int z : mword 64) = (sign_extend' 64 (mword_of_int z : mword 32) : mword 64).
+Proof. intro Hz. symmetry. exact (w32_sext_moi z Hz). Qed.

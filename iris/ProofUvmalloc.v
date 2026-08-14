@@ -366,7 +366,11 @@ Section ProofUvmalloc.
        (pu + 4096 * Z.of_nat j + 4096 <= 274877898752)%Z) ->
     (uint oldsz <= uint newsz)%Z ->
     (forall j : nat, (pu + 4096 * Z.of_nat j < nz)%Z <-> (j < n)%nat) ->
+    (* GUARDED, exactly as the contract states it: freshness is needed at
+       the iterations the loop REACHES, and [Habi] below is the bound at
+       each of them.  See SpecUvmalloc.v's note. *)
     (forall j : nat, (j < n)%nat ->
+       (pu + 4096 * Z.of_nat j + 4096 <= 274877898752)%Z ->
        P.(ud_um) !! vpn_at (svpn_of (pgroundup oldsz)) j = None) ->
     forall (rem i : nat) `(CID0 : CpuId) (Pi : uptd) (M : regfile) (av : mword 64),
     (i + rem = n)%nat -> (1 <= rem)%nat ->
@@ -457,7 +461,7 @@ Section ProofUvmalloc.
       exact (Z.lt_trans _ _ _ Hvpnb Hx). }
     assert (Hfreshi : forall j : nat, (j < i)%nat ->
               P.(ud_um) !! vpn_at (svpn_of (pgroundup oldsz)) j = None).
-    { intros j Hj. apply Hfresh. clear -Hj Hin. lia. }
+    { intros j Hj. apply Hfresh; [clear -Hj Hin; lia | clear -Habi Hj; lia]. }
     (* uvmdealloc's ONE range premise, about its [oldsz] argument (= av);
        it asks nothing about the [newsz] it is handed. *)
     assert (Hudold : (uint av <= uvm_maxsz)%Z).
@@ -1008,7 +1012,8 @@ Section ProofUvmalloc.
     { rewrite Hvpn. apply not_elem_of_dom. rewrite Hdom. intros Hin2.
       apply elem_of_union in Hin2. destruct Hin2 as [Hin2 | Hin2].
       - assert (Hnd2 : vpn_at (svpn_of (pgroundup oldsz)) i ∉ dom P.(ud_um))
-          by (apply not_elem_of_dom; exact (Hfresh i Hin)).
+          by (apply not_elem_of_dom;
+              exact (Hfresh i Hin ltac:(clear -Habi; lia))).
         exact (Hnd2 Hin2).
       - apply elem_of_vpn_run in Hin2. destruct Hin2 as (j & Hj & Hje).
         exact (vpn_at_ne (svpn_of (pgroundup oldsz)) j i Hj Hilt (eq_sym Hje)). }
@@ -2357,9 +2362,16 @@ Section ProofUvmalloc.
            many pages ([UmCovered.v]) *)
         pose proof (uvma_addr_bound P Pj oldsz j Hobz Hwfj Hc Hdomj) as Hbnd.
         rewrite Hpuv in Hbnd. pose proof kmem_maxppn_val. lia. }
+    (* the contract's guard is spelled over [bv_unsigned (pgroundup oldsz)]
+       and [uvm_maxsz]; the loop's over [pu] and the literal.  One bridge
+       rather than a spelling change on either side. *)
+    assert (Hfrg : forall j : nat, (j < n)%nat ->
+              (pu + 4096 * Z.of_nat j + 4096 <= 274877898752)%Z ->
+              P.(ud_um) !! vpn_at (svpn_of (pgroundup oldsz)) j = None).
+    { intros j Hj Hb. apply (Hfr j Hj). rewrite Hpuv uvm_maxsz_val. exact Hb. }
     iApply (ua_loop γa mm P xperm K eb p C sp0 spr oldsz newsz pu nz n b
               HK Hxrng Hperm Hb3 Hb5 Hb8 Hpuv (eq_sym Hnz) Hpumod Hpu0 Hab Hoin
-              Hnchar Hfr
+              Hnchar Hfrg
               n 0%nat CIDu85 P R12 (pgroundup oldsz) Hsum0 Hn1 Hav0
               (uptd_ext_refl P) (dom_run_0 (dom P.(ud_um)) (svpn_of (pgroundup oldsz)))
               HR12sp HR12s2 HR12s3 HR12s4 HR12s5 HR12s6 HR12s7 HR12thr
