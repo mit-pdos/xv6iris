@@ -8052,3 +8052,120 @@ read off the walk's own lower bound `8 <= n3` rather than off
   `wi16_spend <= 2` twice.  Only the third entry needs
   `cr_fail_mkdir_closes` / `_closes_ind`, and it has `bmapstart ∈ Sb4` as
   well.
+
+
+### Step 1a LANDED, and step 1 STOPPED mid-walk — **the mkdir arm's ledger
+### has ZERO slack and `8 <= n3` busts it by EXACTLY ONE UNIT**.  The
+### correlation clause and the whole helper layer are in; the WP body is
+### not, and no `.v` file carries an `Admitted`
+
+**THE FINDING, and it is the whole reason this is a separate step.**
+`CreateBudget.cr_budget_mkdir` closes at *exactly* `iput_units` (`u6 = 3`),
+so every credit on the arm is load bearing and nothing may be rounded.
+Walking the chain at the figures the CONTRACTS state rather than at the
+theorem's assumed booleans, the corner
+
+> `bmapstart ∉ Sb3` **and** `n3 = 8`
+
+leaves the C-OK tail's `iunlockput(dp)` at **two** against an `iput_units`
+of three.  It is not reachable — but nothing in `cr_mkdir_body` excluded
+it, because the two facts are NOT INDEPENDENT and the body carried only
+the weaker one:
+
+* at `w = true` nameiparent PAID for the bitmap block, so `bmapstart ∈ Sb1
+  ⊆ Sb3` and the first interior `dirlink` absorbs (`bmap_cost true true
+  false = 1`);
+* at `w = false` it did not pay, and `create_units <= u` with
+  `walk_spend false = 0` puts the count one higher — `n3 >= 9`.
+
+So `cr_mkdir_body` gains ONE pure wand,
+
+```coq
+       ⌜bmapstart ∈ Sb3 \/ (9 <= n3)%nat⌝ -∗
+```
+
+and `cr_alloc_half` discharges it in six lines at the +0xca handoff, where
+both halves are in hand (`Hwmem : w = true -> bmapstart ∈ Sb1`, and
+`cr_n3_lo` off `Hu`/`Hnp1`).  **No contract moves**: `SpecCreate.v`,
+`CreateBudget.v`, `SpecDirlink.v`, `SpecWritei.v`, `InodeRegion.v` and
+`LinkCreate*` are byte-untouched, and the clause is walk-level in exactly
+the sense the twelfth stop's ruling asked for.
+
+**AND THE SECOND HALF OF THE SAME FINDING: `al1 = true` IS PROVABLE, AND
+THE ARM DOES NOT CLOSE WITHOUT IT.**  `crb` at the second and third links
+is `bool_decide (bmapstart ∈ Sb4/Sb5)`, and the only thing that puts it
+there is the FIRST link having allocated.  That is a fact about the fresh
+child, not an assumption: `fresh_shape dnc`'s all-zero `addrs` travels
+through `inode_ok`'s `di_addrs = bm_cells` to `blkmap_get bmc 0 = 0`
+(`cr_fresh_cell0`), the successful append makes the file's first block
+covered (`bm_covers bm1 16`), and `SpecBmap.bmap_ad` fires
+(`cr_alloced_first`).  Left as an unknown boolean the chain busts again.
+
+**WHAT `al2` COSTS, AND WHY IT IS NOT WORTH BUYING.**  `al2 = false` is
+TRUE (slot 1 is in the block slot 0 just allocated) but NOT DERIVABLE at
+this seam: `bmap_ad` is refuted by `blkmap_get bm1 0 <> 0`, while
+`bmap_ai` needs "a DIRECT window never moves the indirect slot" —
+`SpecBmap`'s own clause (e), which `SpecWritei` does not relay and
+`SpecDirlink` therefore cannot.  With the correlation clause above the arm
+does not need it (`cr_mkdir_ip` closes at every value of `al2`), so the
+relay is NOT wanted; recorded because the next walk that needs a per-block
+allocation fact will meet the same missing clause.
+
+**THE HELPER LAYER, all landed and green, three groups:**
+
+* **the sixteen-bit `++`** at +0x134..+0x13a — `cr_ninner` /
+  `cr_ninner_unsigned` / `cr_nbump_bv` / `cr_nbump_unsigned` /
+  `cr_nlink_incr`.  The `lhu` zero-extends, the `c.addiw` wraps at 32 and
+  sign-extends to 64, the `sh` commits `trunc16` of that — and that IS
+  `add_vec h 1`, i.e. literally the value `SpecIupdate.wp_iupdate_link`'s
+  reshaped premise names.  `ProofCreateParts.cr_inner`'s pattern verbatim
+  (name the 32-bit intermediate; the Sail cast layer then collapses by
+  conversion, `cr_nbump_bv` is `reflexivity`) with
+  `BvShift.swrap_low_32_16` crossing the sign extension without a case
+  split on the sign.
+* **the directory-view readings** — `cr_nrec_0` / `cr_nrec_16` /
+  `cr_slot_0` / `cr_slot_1` / `cr_first_0` / `cr_dot_record` /
+  `cr_first_miss_dotdot`.  The two interior links' `found` arms are
+  refuted, and that is where the name literals earn their keep: the first
+  link runs on an EMPTY child (`dir_nrec 0 = 0`, so `dir_first` is `None`
+  outright), and the second is refuted by READING BACK the record the
+  first wrote — `DirView.dir_record_of_name` at `dirlink`'s own range
+  clause gives slot 0's inum (which settles the free-slot scan on slot
+  ONE) and its canonical name `["."]`, and `[0x2e] <> [0x2e; 0x2e]`.
+* **the ledger** — `cr_u_ge10`, `cr_n3_lo`, `cr_mkdir_dl3_need`,
+  `cr_mkdir_ip`, `cr_mkdir_n5`, `cr_mkdir_fail1/2/3`, `cr_ns_3`: every
+  entry requirement and every exit, each machine-checked at EVERY corner
+  of the reported booleans rather than at the theorem's assumed ones.
+
+**GATE (step 1a).**  `coqc ProofCreate.v` EXIT=0 — it is a build leaf, so
+nothing else recompiles — no `Admitted`/`admit`, `lemma_diff` CLEAN,
+`proof_coverage` unmoved at **177/190, sysfile.c 8/16, create ASSUMED at
+356 B**.  Every landed statement but `cr_mkdir_body`'s is byte-identical.
+
+**WHAT IS LEFT, and it is a WALK with no design question in it.**  In
+order, with everything each step needs already named:
+
+1. `cr_mkdir_half`, +0xf8..+0x144 plus the re-walked C-OK block
+   +0xe0..+0xea (the `c.j` at +0x144 is `-100`, i.e. into ARM C-OK's own
+   block, which is BELOW `cr_alloc_half`'s branch — so there is nothing to
+   share and the arm re-walks `iunlockput(dp)` / `mv s2,s3` / `ldsp s3` /
+   `c.j +0x70`).  The one call template is `cr_alloc_half`'s +0xd8
+   `dirlink`; the decode names are `cri_0f8` … `cri_144`.  Only THREE
+   `bltz`es exist on this arm (+0x10a / +0x11e / +0x130) — the fourth
+   entry of `fail:` is +0xdc's, which `cr_alloc_half` already routes.
+   All three leave through `cr_fail_mkdir_half`, which the proof
+   INSTANTIATES ITSELF: its premises are all persistent, so one lemma
+   serves three mutually exclusive branches and `cr_mkdir_half` needs no
+   extra hypothesis for the failure family.
+2. the seal, exactly as recorded above.
+
+Two things the walk should not re-derive.  The rodata windows are
+`ProofCreateParts.cr_dot_window` / `cr_dotdot_window` at `cr_dot_addr =
+0x800075e0` / `cr_dotdot_addr = 0x800075e8`, both PERSISTENT (`↦ₘ□` out of
+`kernel_data`), so `dirlink`'s `dqn` is instantiated at `DfracDiscarded`
+and the arm pays nothing to produce them; and the two `auipc`/`addi` pairs
+that compute them are `wp_auipc_s_sconf` + `wp_addi4_s_sconf` at
+`rd = rs1 = a1` (`WpInitlockWrapper.v`:117 is the worked instance —
+`ltac:(rdok)` for the `ops_ok`).  The `c.lw a2,4(s1)` at +0x10e is
+`wp_clw_s_sconf`, not `wp_lw_s_sconf`: it is the ONLY compressed load on
+the arm.
