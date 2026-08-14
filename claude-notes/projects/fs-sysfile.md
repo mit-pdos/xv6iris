@@ -7102,3 +7102,109 @@ bodies are already stated at exactly the shape those two branches need.
 ### alternative is declined (it taxes every consumer a case split for a
 ### distinction only the -1 route exhibits).  D₀-a's brief already builds
 ### on it (eq_refl at the antecedent).
+
+
+### D₀-a LANDS — `ProofCreate.cr_alloc_half` proves `cr_alloc_body` whole.
+### The mint, ARM C-OK-FILE and ARM A-FAIL are walked; the T_DIR sub-branch
+### and the non-directory `fail:` entry leave through their two premises.
+### **`cr_fail_body` lost its two `used` clauses: BOTH were unsuppliable.**
+
+`iris/ProofCreate.v` is the only file touched (1265 + / 2 −).  `make -j30
+-k` EXIT=0, 1093 `.vo`, `make -n` 0 COQC lines, `lemma_diff` CLEAN, no
+`Admitted`.  `Print Assumptions` at the seven real `Link` modules plus
+`CreateFreshTy`: **`cr_alloc_half` = the standing six + `create_fresh_ty`
+and NOTHING else** — the two parked bodies are invisible — and
+`cr_found_half` / `cr_tail_half` are the standing six, unchanged.
+`cr_alloc_body`, `cr_cont_body`, `cr_tail_body`, `cr_mkdir_body` and
+`cr_found_half`'s statement are byte-identical.
+
+**THE CONCLUSION HAS TO BE `wp_next`-WRAPPED, and stating it at a bare
+`(CIDa : CpuId)` parameter makes the lemma UNPROVABLE.**  This is the one
+shape finding and it is not obvious: `cr_alloc_body`'s own `Hcont`, the
+funnel `cr_tail_half`, and the two parked bodies are all anchored at the
+SECTION hart, while the allocate half's resources arrive at whatever hart
+the +0x3e `c.beqz` rebound to.  `wp_next_chain` closes a guard only from
+hypotheses in context, and a free `CIDa` has none relating it to `CID` — so
+the missing link IS the `wp_next` guard, and the lemma must read
+`wp_next (CID0 := CID) true (proc_addr j) (fun CIDa => cr_alloc_body … CIDa)`.
+That is also exactly the premise shape `cr_found_half` takes, so D₀-c's seal
+is one `iApply`.  **Any future "prove body B at an arbitrary hart" lemma in
+this tier has the same wall.**
+
+**THE MINT AS LANDED (+0xac).**  `IU.wp_iupdate_link` at `cru := true`,
+`ip := ientry kslot`, `dn := cr_setf dnc major minor 1`, `dn0 := dnc`,
+`u := q2` where the walk's count is `S (S q2)`.  Its five non-routine
+premises: the membership `IBLOCK cinum inodestart ∈ Sb1 ∪ {[IBLOCK …]}`
+straight off the GATE's own payout set (`cr_in_union_sing`), the type
+stability by `di_type_stable_eq … (cr_setf_type …)`, the type-nonzero by
+`cr_setf_type_nz` off `fresh_shape`'s first conjunct, the increment
+`nlink = nlink + 1` by `cr_setf_nlink` + `fresh_shape_nlink` (0 + 1), and
+`length (bm_dir bmc) = NDIRECT` by `InodeInv.blkmap_wf_dir_len`.  It costs
+NOTHING (`cru = true`), which is why the walk still has eight units at the
+`dirlink`.  It hands back `dinode_at γi cinum (cr_setf …)` and the `ilink`.
+
+**THE ARM'S SHAPE.**  +0x8a `c.sdsp s3` (the saved word is `m`'s own s3,
+straight off `cr_thr`, so slots 5 satisfies both parked bodies verbatim) →
+the gate at `u := q1`, `dqp := DfracOwn (1/2)`, `dq := DfracOwn (1/4)`,
+`iref_slot` split out of `iref_slots (ns-1)` by `cr_ns_1` — instantiated
+verbatim as the stop record banked it → `destruct alloc`.  On the alloc
+arm: `cr_regs3_of_span`, the three `sh`s (`WpSmodeHalf.wp_sh_s_sconf`,
+value `trunc16 (rget …)` closed by `DinodeSlot.trunc16_sext64` twice and
+`cr_trunc16_one` once), the mint, then the `beq` at +0xb2 through the new
+`cr_tdir_eq`/`cr_tdir_ne` (`neq_vec` IS `negb (eq_vec …)`, one `destruct`).
+T_DIR taken → `cr_mkdir_body` with the UNDEPOSITED `ilink`.  Falling
+through: `lw a2,4(s3)` → `cr_a2_low16` at the ruled `16 * nib <= 2^16`
+premise → `dirlink(dp,name)` at `dn0 := dn` (`eq_refl` at the `dn0 = dn`
+antecedent) with `dl_need` off `cr_alloc_dlneed`.  `found = true` is refuted
+by the found half's own `dir_first … = None`.  The `bltz` at +0xc4 is
+decided by dirlink's BRANCHLESS clause and by nothing else: left disjunct
+(a0 = 0, tot = 16) falls through to C-OK, right (a0 = -1, tot < 16) is taken
+to `cr_fail_body`.  C-OK re-parks the parent DIRECTLY — `dir_link_at_dirlink`
+at `dn'` consuming the `ilink` (rewritten to `cr_low16 cinum` by
+`cr_low16_unsigned`), then `dir_links_dirlink`, with the new
+`cr_wi_size_max` supplying `di_size dn' = max(…)` under
+`16*k0 + tot < 2^32` (from `dir_slot_le` + `dir_nrec_range` + the size cap)
+— then `iunlockput(dp)` uncredited at `iput_units <= n'` via `cr_alloc_ip`
+on dirlink's credit-aware clause, `c.mv s2,s3`, the lazy restore and the
+funnel.  Slot ledger: C-OK `1 + (1 + (ns-3))` = `ns-1` (`cr_slots_3`,
+`cr_ns_2`), A-FAIL `1 + (1 + (ns-2))` = `ns` (`cr_slots_2`), both inside
+`create_slots`.
+
+**THE FAILING dirlink PRICES BOTH ROUTES, and the brief's single figure is
+not enough.**  `dl16_post`'s credited clause is guarded by `0 < tot` and the
+`bltz`-taken arm only knows `tot < 16`, which admits ZERO (writei's own -1
+return, the full directory).  So the `iput_units <= n4` the parked fail body
+is handed is proven by a `Nat.eq_dec tot 0` split: `cr_alloc_ip0` off
+`dl0_spend` at zero and `cr_alloc_ip` off `wi16_spend` above it —
+`CreateBudget.cr_fail_closes_at_zero` and `cr_fail_closes_with_credit` are
+the two theorems, and this is the first place both are consumed.
+
+**THE ONE STATEMENT REPAIR, AND D₀-b MUST KNOW.**  `cr_fail_body` carried
+BOTH `⌜used ⊆ used4⌝` and `⌜used4 ⊆ used⌝`.  Together they force
+`used4 = used`, and neither is suppliable: create's contract speaks of its
+ENTRY bitmap set, the alloc half runs at `used1` with only `used1 ⊆ used`
+in hand, and the failing `dirlink`'s append arm reports `used1 ⊆ used4`
+(it can ALLOCATE).  Both clauses are deleted, with a comment in their
+place.  Nothing below wants them: `cr_cont_body` takes `bitmap_res` at an
+unconstrained `used'`.  `cr_mkdir_body`'s own `⌜used3 ⊆ used⌝` is FINE and
+is discharged at `used3 := used1` — the gate span takes no `bitmap_res`, so
+the allocate half's set does not move before the T_DIR branch.
+
+**NEW IN `ProofCreate.v`'s pure cluster** (all module-level, all with the
+walk as their only consumer): `cr_tdir_eq` / `cr_tdir_ne`, `cr_bltz_zero` /
+`cr_bltz_m1`, `cr_wi_size_max`, `cr_slots_3` / `cr_ns_2`, `cr_in_union_sing`
+/ `cr_sub_union_sing`.  One new Require: `DinodeSlot` (for
+`trunc16_sext64`; `ProofStati` carries a second copy of that lemma and the
+next touch of either should retire one).
+
+**D₀-b / D₀-c HANDOFF.**  D₀-b proves `cr_mkdir_body` (+0xe0..+0x12c: the
+two interior `dirlink`s on the child, the parent's `dirlink`, its `nlink++`
+and its `iupdate`) and `cr_fail_body` (+0x12e..+0x146), and will want to
+re-shape the latter into the persistent four-entry form the other three
+`fail:` entries need.  Its budget wall is unchanged and already recorded:
+the two INTERIOR mkdir entries reach their failing `dirlink` with six and
+`dl0_spend` is four, so `cr_fail_mkdir_at_zero_busts` still stands — what
+closes it is writei's post exposing the SPEND half of `wi16_post` at
+`tot = 0`, not anything `SpecDirlink` can do.  D₀-c is the seal:
+`wp_create_sconf` = `cr_found_half` fed `cr_alloc_half`, both premises
+supplied, and `CreateProof` ascribed `: CREATE`.
