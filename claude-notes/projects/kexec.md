@@ -20,10 +20,17 @@ B1, the whole phdr loop with the inlined loadseg loop inside it, and all
 seven of phase B's `bad:` entries.**  `ProofKexecB3.kxc_b2` /
 `kxc_b2z` are the two paths from phase B1's two outputs to `+0x1ae`.
 
-**Next: PHASE C** (`+0x1ae .. +0x2a2`), which starts at
-`ProofKexecSeam.kxc_at_1ae` and needs designing down from there — the shape
-is in "Phase C: the design" below.  Then phase D, then `ProofKexec.v` +
-`LinkKexec.v`.
+**PHASE C IS IN PROGRESS.**  Its design is worked out in full below (control
+flow re-verified independently, instruction by instruction, off the
+generated `CodeKexec.v` — not just transcribed from an earlier read), and its
+second shared tail — the `-1` path at `+0x1d6 .. +0x1f2` that six of the
+phase's branches funnel into — is **proven**
+(`ProofKexecTail.KexecTailProofC.kxc_bad_1d6`; see the phase-C section
+below).  **Still open in phase C:** the `+0x1ae .. +0x1d6` setup block
+(myproc, the first `uvmalloc`, `uvmclear` on the guard page), the argv loop
+(`+0x21a .. +0x272`, whose invariant is designed below but not yet proven),
+and the closing `copyout` call joining into phase D at `+0x2a6`.  Then phase
+D, then `ProofKexec.v` + `LinkKexec.v`.
 
 **NEVER `iFrame` IN A KEXEC PROOF.  It does not terminate.** The goal at
 this altitude carries `ProcInv.tf_page`'s 4096-conjunct big-op inside
@@ -102,7 +109,8 @@ modules each already named. **Every later phase will hit this too** — C and D
 both reach the epilogue through tails A already proved — so put the next shared
 tail in `ProofKexecTail.v` when you prove it, and keep phase files reaching each
 other only through that one.
-| phase C — the user stack (`+0x1ae .. +0x2a2`) | **NEXT** |
+| phase C — the shared `-1` tail (`+0x1d6 .. +0x1f2`), `KexecTailProofC.kxc_bad_1d6` | **landed, proven** |
+| phase C — the rest (`+0x1ae..+0x1d6` setup, the argv loop, the closing copyout) | **NEXT** |
 | phase D, `ProofKexec.v`, `LinkKexec.v`, `sys_exec` | not started |
 
 **`ProofKexecSeam.kxc_cs_cases` — the thirteen callee-saved indices,
@@ -932,8 +940,79 @@ lemma from +0x1d6, taking `um_below s3 P` and `um_covered s3 P` (the size
 premise `proc_freepagetable` asks for is again a projection of coverage) and
 the nine spill slots at `m`'s values.  It reaches `ProofKexecParts.kxc_epi`
 directly, NOT `kxc_bad64` — the inode is already closed here, so there is no
-iunlockput to do.  **That makes it the second shared tail, and
+iunlockput to do.
+
+**LANDED: `ProofKexecTail.KexecTailProofC.kxc_bad_1d6`** — the whole +0x1d6
+`.. `+0x1f2 tail, proven.  It is a SECOND functor in `ProofKexecTail.v`
+(`KexecTailProofC`, wrapping `KexecTailProof` as `T` and adding the one extra
+module, `PFP : PROC_FREEPAGETABLE`, that `kxc_exit_m1` itself does not need —
+phase A/B's existing instantiations are untouched).  Reloads all NINE of
+s3..s11 from their spill slots (unlike `kxc_bad64`, which only ever reloads
+slot 6), via eight new one-off slot-address lemmas (`kxc_slot5_sp` ..
+`kxc_slot13_sp`, `kxc_slot6_sp` already existed) beside `kxc_slot6_sp` in
+`KexecAFrame`, and a LOCAL copy of `ProofKexecSeam.kxc_cs_cases` (named
+`kxc_cs_cases9`) — Seam requires Tail, so importing the original is not an
+option; hoisting it to `CalleeSaved.v` is a 548-dependent cone this one lemma
+does not owe, per durable-notes' promote-on-second-consumer rule. Establishing
+(not discharging) the nine-way threading clause from a fully-local reload
+needs the same "land the symbolic `r` on the register the clause is really
+about" shape `kxc_cs_cases` was built for.
+
+**That makes it the second shared tail, and
 `ProofKexecTail.v` is its home** (the note under "Status").
+
+**NEXT UP: the +0x1ae .. +0x21a setup block**, re-verified independently
+against `CodeKexec.v`'s decoded ASTs (not just transcribed from the C) —
+matches the block listing above exactly, and pins down the register-level
+call arguments the next lemma needs:
+
+```
+  +0x1ae  jal ra,myproc              a0 = p
+  +0x1b2  mv s5,a0                   s5 = p            (kept; DEAD entering,
+                                                          so this is a fresh
+                                                          write, not a reuse)
+  +0x1b4  ld s10,72(a0)              s10 = p->sz = oldsz  (via a0, before a0
+                                                             is next clobbered)
+  +0x1b8..+0x1c0  s3 = PGROUNDUP(s2)              (s2 = szv, phase B's exit)
+  +0x1c4..+0x1cc  a3=4 (PTE_W) a2=s3+8192 a1=s3 a0=s6
+  +0x1ce  jal uvmalloc                uvmalloc(root=s6, s3, s3+8192, PTE_W)
+  +0x1d2  mv s4,a0                    s4 = sz1 (0 on failure)
+  +0x1d4  bnez a0,+0x1f4              failure falls through into kxc_bad_1d6
+                                       (s3 already = PGROUNDUP(szv), the size
+                                       to free -- uvmalloc's own failure arm
+                                       hands proc_pt P back UNCHANGED)
+  +0x1f4..+0x1f8  a1 = sz1 - 8192 (guard page va)  a0 = s6
+  +0x1fa  jal uvmclear                 uvmclear(root, sz1-8192) -- total, no
+                                       failure arm to thread
+  +0x1fe..+0x202  s7 = sz1 - 4096      stackbase
+  +0x206..+0x20a  a5 = slot 64 (spilled argv)  a0 = argv[0]
+  +0x20c..+0x214  s2 := s4 (=sz1)  s1 := 0  s9 := pa_stk sp0 46  s8 := 32
+  +0x218  beqz a0,+0x272            argv[0] = NULL skips the loop entirely
+  +0x21a  the argv loop head, at c = 0
+```
+
+Two things worth planning around before writing it:
+
+- **uvmalloc's failure arm needs NOTHING beyond what `kxc_at_1ae` already
+  carries.**  Its postcondition on `a0 = 0` is `proc_pt P` UNCHANGED
+  (SpecUvmalloc.v), and `s3 = PGROUNDUP(szv)` is exactly `kxc_bad_1d6`'s
+  `szf` with `um_below`/`um_covered` inherited straight from `kxc_at_1ae`'s
+  own `um_below szv` / `um_covered szv` conjuncts via
+  `UmCovered.um_covered_z_mono` (`PGROUNDUP(szv) >= szv`, the same
+  "PGROUNDUP only grows coverage" fact `UmCovered.um_covered_run` already
+  proves as a step). No new invariant conjunct.
+- **The `+0x218 beqz a0,+0x272` branch is the "two successors, one caller
+  exit" shape** (durable-notes / this file's block-interface rule 
+  `ProofKexecB3.kxc_incr`'s instance): it either enters the loop at `c = 0`
+  (`+0x21a`) or skips straight to `+0x272` with `c = 0` implicitly (no
+  registers to reconcile — `s1`/`s2`/`s7`/`s8`/`s9` are already exactly the
+  loop invariant's `c = 0` instance by construction, since they were just
+  set at +0x20c..+0x214).  So the natural shape is: this setup block ends
+  in a DISJUNCTION over "argv[0] <> 0, entering the loop head" vs "argv[0]
+  = 0, at +0x272 with c = 0" — and the loop's own top-level lemma should be
+  stated to accept EITHER as its entry (i.e. induct from a general `c`,
+  called at `c := 0` either way), so the disjunction collapses into one
+  call rather than two.
 
 **THE ARGV LOOP'S INVARIANT**, at the head `+0x21a` with index `c`:
 
