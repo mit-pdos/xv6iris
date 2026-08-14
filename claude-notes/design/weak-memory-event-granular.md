@@ -38,25 +38,46 @@ relation is `wp_pf_run (pstep_xv6 riscv_step)` BY CONSTRUCTION (a
 definitional bijection, not a simulation), so `pf_violation_free_hart`
 falls out of adequacy in a page and the lift ceases to exist as a concept.
 
-## State and expressions (σ-resident thread state)
+## State and expressions (REVISED 2026-08-14: expression-resident monad)
 
-Per the tree's long-standing methodology — registers including the PC
-live in σ, expressions are opaque generation-indexed thread tokens, and
-WP proofs track progress through exclusive state resources plus Löb, not
-expression structure — ALL thread-private program state lives in σ:
+THE PLACEMENT RULE (the user's insight, and the recorded reason): put
+control state in the EXPRESSION exactly where control flow is
+MODEL-DEFINED, and in σ where it is MEMORY-DEFINED.  The tree's
+σ-resident methodology (registers incl. the PC in σ, boring thread
+tokens, progress by ghost resources) exists because INTER-instruction
+control flow is memory-defined — what runs next depends on a fetch
+through a page table into mutable memory, all of which must be proven,
+so no stable syntactic continuation exists at instruction granularity.
+INTRA-instruction control flow is model-defined: the continuation IS the
+Sail monad value given by `riscv_step`, syntactically known and
+monotonically consumed.  So:
 
-- σ = today's `wgstate` extended with, per CPU: `hs : option (M unit)`
-  (the residual instruction monad; `None` = boundary) and the parked
-  fence; plus the canonical disk `pend : list wmsg`.
-- Expressions stay `LoopE gen cpu` / `DiskLoopE gen` / … tokens, so the
-  whole power/generation machinery (corpse arms, PowerOn forking the new
-  generation's tokens) is untouched; σ's slots belong to the live
-  generation exactly as `wgregs` already works.
-- New exclusive ghosts mirror `reg_pointsto`: `hart_prog cpu ↦{1} hs`,
-  the fence, `disk_pend ↦{1} _`, tied to σ by the state interpretation.
+- σ = today's `wgstate` VERBATIM (no new fields).  The state
+  interpretation is `weak_state_interp` unchanged; φ/`no_violation`
+  applies literally; no new ghosts.
+- Hart expressions: `LoopE gen cpu` (the boundary token — preemption
+  points and the unknowable next instruction live here) steps to
+  `CycleE gen cpu (m : M unit) (fence : option …)` — the architectural
+  execution of ONE instruction, monad and parked fence in the
+  expression; the monad rules reduce `m`; `CycleE … (Ret _) …` pops
+  back to `LoopE`.  WP-of-an-instruction becomes proof by syntactic
+  descent, and composition along the monad is a `wp_bind`-style lemma
+  over `CycleE` — the SC side's `wp_exec` pattern at the language level.
+- Devices: whole operation state in the expression — `DiskE gen
+  (pend : list wmsg) (dws : wstate)` matching the pf `PDisk` agent
+  field-for-field (empty buffer = idle; devices have no
+  preemption/fetch problem, so nothing forces a boundary form).
+- Interrupt delivery is ONLY the PLIC thread's cross-thread σ-register
+  write (as in today's WeakLang) — an asynchronous wire that fires
+  regardless of the hart's expression form.  No hart-side delivery arm.
+- Generation machinery unchanged; `CycleE` gets corpse arms like
+  `LoopE`'s.
 - The `psail` oracle components (`sp_dev`, `sp_irq`) DO NOT EXIST: device
   arms read the shared fabric σ.dev directly; interrupt delivery reads
   the PLIC wire from it.  The device seam collapses at the definition.
+- The pf correspondence gets MORE direct: `wpcfg`'s agents carry their
+  program state (`pa_st`), so pool-of-expressions maps to agent-list
+  field-for-field.
 
 ## The step relation — one arm per event kind
 
