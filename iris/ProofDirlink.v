@@ -2311,7 +2311,7 @@ Section ProofDirlinkMain.
                  Sbw)
           "%Hcswi %Hused %Hwf' %Hholes' %Haddrs' %Hsz' %Hcov' %Hcap' %Hsized'
            %Hdistb %Hdist0
-           %Hdistk %Hrange %Htie %Harm %Hbud %Hsbw %Hwi16 %Hupt
+           %Hdistk %Hrange %Htie %Harm %Hbud %Hsbw %Hwi16 %Hwiany %Hwiat %Hupt
            Hcg Hcnt _ _ Hpc Hidev Hiinum
            Hmeta Hmap Hblocks Hsbi Hsbs Hsbb Hbmr Hdat Hsrc Hbsl Hop".
         (* and they come back together: re-bracket into the two names the
@@ -2500,15 +2500,19 @@ Section ProofDirlinkMain.
            terms and the guards are now the same guard, so the only work is
            [dl_wi_blocks], the sixteen-at-16-aligned fact this file already
            carries for both cost functions.
-           THE SECOND CONJUNCT IS ALL THIS ARM CAN SAY AT [tot = 0]: writei's
-           credit-aware clause is silent there, so what is relayed is its
-           COARSE bound [Hbud] at [wi_cost_bmonly (16*k0) 16 = 4 =
-           dl0_spend].  See [SpecDirlink.dl0_spend]. *)
+           THE SECOND CONJUNCT NOW COMES OFF THE HONEST FIGURE TOO.  writei
+           states its credit-aware spend at EVERY [tot]
+           ([SpecWritei.wi16_spend_any]), so this arm relays THAT and lands
+           on the constant through [dl0_spend_covers] -- the clause is a
+           constant and four is the figure's honest maximum, so the number
+           does not move; what the constant drops is the per-call variation
+           the interior mkdir entries need.  See [SpecDirlink.dl0_spend] for
+           why tightening the clause itself is a contract-shape change. *)
         { intros _. split.
           - intros Htpos. exact (Hwi16 Htpos (dl_wi_blocks k0)).
-          - intros _. destruct Hbud as [Hbud1 _].
-            rewrite (dl_wi_cost_bmonly k0) in Hbud1.
-            unfold dl0_spend. exact Hbud1. }
+          - intros _.
+            pose proof (Hwiany (dl_wi_blocks k0)) as Hz. cbv zeta in Hz.
+            exact (dl0_of_spend _ _ _ _ _ _ _ Hz). }
         (* writei's two preservations, forwarded (S5a finding 2; the cap,
            D₀-a repair 3b) *)
         { exact Hcap'. }

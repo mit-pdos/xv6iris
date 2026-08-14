@@ -408,16 +408,17 @@ Theorem cr_fail_closes_at_zero (w : bool) :
   ip_need <= cr_uw w - ia_spend - iu_spend true - dl0_spend.
 Proof. destruct w; vm_compute; lia. Qed.
 
-(* ...AND WHAT IT DOES NOT CLOSE, which is the gap this stage records
-   rather than fixes.  The mkdir path's INTERIOR entries (+0x106's
-   [dirlink(ip, "..")] and +0x118's [dirlink(dp, name)]) both run with SIX
-   in hand -- at either value of [w], since the first dirlink hands the
-   walk's unit straight back -- and four from six leaves two.  THREE would
-   close both, and three is what the honest [tot = 0] spend is
-   ([bmap_cost] + [iupdate], i.e. [dl_spend] without its data-block term):
-   the missing step is writei's post exposing the SPEND half of
-   [SpecWritei.wi16_post] at [tot = 0], not anything dirlink can do.  The
-   T_DIR sub-branch is parked, so no landed arm depends on this. *)
+(* ...AND WHAT THE CONSTANT DOES NOT CLOSE.  The mkdir path's INTERIOR
+   entries (+0x106's [dirlink(ip, "..")] and +0x118's [dirlink(dp, name)])
+   both run with SIX in hand -- at either value of [w], since the first
+   dirlink hands the walk's unit straight back -- and four from six leaves
+   two.  THREE closes both, and three is what the honest [tot = 0] spend
+   is; [cr_fail_mkdir_closes] below is that, machine-checked at the figure
+   itself.  What stands between the two is no longer writei -- its post
+   states the credit-aware spend at every [tot]
+   ([SpecWritei.wi16_spend_any]) -- but [SpecDirlink.dl16_post]'s [tot = 0]
+   conjunct still being a CONSTANT; see [SpecDirlink.dl0_spend].  The T_DIR
+   sub-branch is parked, so no landed arm depends on this. *)
 Theorem cr_fail_mkdir_at_zero_busts (w : bool) :
   let u1 := cr_uw w - ia_spend in
   let u2 := u1 - iu_spend true in
@@ -430,6 +431,43 @@ Theorem cr_fail_mkdir_at_zero_busts (w : bool) :
   (* ... and the honest one would not. *)
   ip_need <= u3 - 3 /\ ip_need <= u4 - 3.
 Proof. destruct w; vm_compute; lia. Qed.
+
+(* THE FLIP, AT THE FIGURE ITSELF.  Both interior entries close against the
+   credit-aware spend at EVERY value of the reported booleans, provided the
+   failing append's window is DIRECT -- and it is, for +0x106: that link
+   goes into the fresh child, whose slots 0 and 1 are both in its block 0.
+   The arithmetic is [wi16_spend]'s own worst corner at [ind = false],
+   which is three ([bmap_cost crb al false <= 2], the data-block term free
+   whenever [al], and one for an unabsorbed [iupdate]) against six in hand
+   and an [ip_need] of three.  [al] is in fact FALSE on this arm -- a
+   bmap that broke out of blocks allocated no data block, and a direct
+   window's indirect slot never moves ([SpecBmap] clause (e)) -- so the
+   real figure is at most two; the theorem does not need that. *)
+Theorem cr_fail_mkdir_closes (w crb crd cru al : bool) :
+  let u1 := cr_uw w - ia_spend in
+  let u2 := u1 - iu_spend true in
+  let u3 := u2 - dl_spend w false false true false in    (* dirlink(ip,".")  *)
+  let u4 := u3 - dl_spend true true true false false in  (* dirlink(ip,"..") *)
+  ip_need <= u3 - wi16_spend crb crd cru al false /\
+  ip_need <= u4 - wi16_spend crb crd cru al false.
+Proof. destruct w, crb, crd, cru, al; vm_compute; lia. Qed.
+
+(* ...AND ON THE INDIRECT PATH, WHICH IS +0x118's ([dirlink(dp, name)] goes
+   into the PARENT, of any size), the same holds as soon as the bitmap
+   block is already in the op's set -- and it is: the mkdir arm's FIRST
+   dirlink allocated the child's block 0, and an allocating writei reports
+   [bmapstart ∈ Sb'] ([SpecWritei.wi16_post]'s membership half, which is
+   exactly what that clause is for).  The one corner that does NOT close is
+   [crb = false] with an allocating indirect window, where the figure is
+   four; it is unreachable here for that reason. *)
+Theorem cr_fail_mkdir_closes_ind (w crd cru al : bool) :
+  let u1 := cr_uw w - ia_spend in
+  let u2 := u1 - iu_spend true in
+  let u3 := u2 - dl_spend w false false true false in
+  let u4 := u3 - dl_spend true true true false false in
+  ip_need <= u3 - wi16_spend true crd cru al true /\
+  ip_need <= u4 - wi16_spend true crd cru al true.
+Proof. destruct w, crd, cru, al; vm_compute; lia. Qed.
 
 (* THE CREDIT ON THE INODE BLOCK IS LOAD BEARING TOO: an uncredited
    iupdate inside every dirlink costs three more units across the mkdir

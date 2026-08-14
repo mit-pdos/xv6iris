@@ -287,23 +287,48 @@ Proof. destruct crb, ind; vm_compute; lia. Qed.
    data-block term, i.e. strictly less than the success arm.  That is the
    larger of the two, so it is the one the constant has to cover.
 
-   THIS CONSTANT IS NOT THAT NUMBER, and the difference is the point.
-   [SpecWritei.wi16_post] is guarded by [0 < tot] and says NOTHING at zero,
-   so the credit-aware figure is unavailable to the caller on this arm and
-   the only bound [ProofDirlink] can relay is writei's COARSE single-block
-   allowance [wi_cost_bmonly (16*k0) 16] -- FOUR
-   ([ProofDirlink.dl_wi_cost_bmonly]).  Four is what is PROVEN, so four is
-   what the contract says.  It buys create's non-directory [fail:] entry
-   (+0xc4) and the first of its mkdir entries; the two interior mkdir
-   entries need three, and what closes them is writei's post exposing the
-   spend half of [wi16_post] at [tot = 0] -- not anything dirlink can do.
-   See projects/fs-sysfile.md, D₀ increment 3a. *)
+   THIS CONSTANT IS NOT THAT NUMBER, and the difference is the point.  The
+   credit-aware figure IS available at zero now
+   ([SpecWritei.wi16_spend_any], which is what the walk relays this clause
+   from), but it is a figure and this clause is a CONSTANT -- and four is
+   the honest maximum of that figure ([wi16_spend_le4]), reached by an
+   allocating INDIRECT window at an unpaid bitmap block.  So no constant
+   does better, and the per-call variation is what a caller would have to
+   read instead.  Four buys create's non-directory [fail:] entry (+0xc4)
+   and the first of its mkdir entries; the two INTERIOR mkdir entries run
+   with six in hand and need three, which every DIRECT window (and every
+   window at an already-logged bitmap block) provably gives --
+   [CreateBudget.cr_fail_mkdir_closes] / [_ind] are that arithmetic.
+   TIGHTENING THIS CLAUSE TO THE FIGURE is therefore a contract-shape
+   change, not a proof: the [tot = 0] conjunct has to become
+   [ncount - wi16_spend crb crd cru al ind <= n'] -- at which point it is
+   the [0 < tot] conjunct's own bound and the two collapse into one
+   unguarded spend clause with the memberships alone left guarded, exactly
+   as [SpecWritei.wi16_post] / [wi16_spend_any] are split.  It is parked
+   only because [ProofCreate]'s landed [fail:] entry consumes this clause
+   BY ITS TYPE ([cr_alloc_ip0] at [dl0_spend]), so the change moves
+   ProofCreate.v.  See projects/fs-sysfile.md, D₀ increment 3a. *)
 Definition dl0_spend : nat := 4%nat.
 
 (* the provenance, as an equation rather than as a comment: it IS writei's
    coarse allowance for a window that straddles one block. *)
 Lemma dl0_spend_bmonly : dl0_spend = wi_cost_bmonly 0 16.
 Proof. vm_compute. reflexivity. Qed.
+
+(* ...and it dominates the credit-aware figure at every boolean, which is
+   what lets the walk relay THIS clause off writei's honest one. *)
+Lemma dl0_spend_covers (crb crd cru al ind : bool) :
+  (wi16_spend crb crd cru al ind <= dl0_spend)%nat.
+Proof. unfold dl0_spend. exact (wi16_spend_le4 crb crd cru al ind). Qed.
+
+(* ...in the shape the walk relays it in: writei's honest [tot = 0] bound
+   ([SpecWritei.wi16_spend_any]) landed on this clause's constant. *)
+Lemma dl0_of_spend (ncount n' : nat) (crb crd cru al ind : bool) :
+  ((ncount - wi16_spend crb crd cru al ind)%nat <= n')%nat ->
+  ((ncount - dl0_spend)%nat <= n')%nat.
+Proof.
+  intro H. pose proof (dl0_spend_covers crb crd cru al ind). lia.
+Qed.
 
 Lemma dl0_spend_lt : (dl0_spend < dirlink_units)%nat.
 Proof. vm_compute. lia. Qed.

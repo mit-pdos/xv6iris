@@ -7208,3 +7208,119 @@ closes it is writei's post exposing the SPEND half of `wi16_post` at
 `tot = 0`, not anything `SpecDirlink` can do.  D₀-c is the seal:
 `wp_create_sconf` = `cr_found_half` fed `cr_alloc_half`, both premises
 supplied, and `CreateProof` ascribed `: CREATE`.
+
+
+### D₀ INCREMENT 3a LANDED — writei's post prices a FAILING single-block
+### write, and pins the write to all-or-nothing.  **The dirlink clause that
+### would spend it is BLOCKED BY ITS OWN TYPE, not by any proof: tightening
+### `dl16_post`'s `tot = 0` conjunct moves `ProofCreate.v`.**
+
+**THE TWO CLAUSES, in `wp_writei_gen_body` only** (the counted `sconf` form
+has no set and takes neither; `ProofFilewrite` is untouched):
+
+```coq
+  ⌜wi16_spend_any bmapstart inum inodestart ncount n' off n bm bm' Sb⌝ -∗
+  ⌜wi16_atomic off n tot⌝ -∗
+```
+
+`wi16_spend_any` is `wi16_post`'s spend conjunct with the `0 < tot` guard
+gone and `tot`/`Sb'` dropped from its binders — the same five-boolean
+`wi16_spend` figure at the same entry set.  `wi16_atomic off n tot` is
+`wi_blocks off n = 1 -> tot = 0 \/ tot = n`.  `wi16_post` is byte-identical:
+the membership trio keeps its guard, because on the -1 route nothing enters
+`Sb'` at all (3b's finding, unchanged).
+
+**THE ATOMICITY IS TRUE, AND THE VERIFICATION IS SEVEN EXITS.**  No arm can
+land `0 < tot < n` at `wi_blocks off n = 1`:
+
+| exit | why |
+|---|---|
+| pre-frame -1 (+0x02 → +0xfe) | `tot` is the literal 0 |
+| framed -1 (+0x2a → +0xdc) | the literal 0 |
+| `n = 0` (+0x34 → the join) | 0 = n, both disjuncts |
+| bmap out-of-blocks (+0x8e → +0xbc) | `tot` is the loop's entry value, and `wi16_fresh` says that is 0 |
+| **`either_copyin` break (+0x64 → +0xb0)** | same — the part-way chunk is committed WITHOUT advancing `tot` |
+| loop completion (+0x7e taken) | `n <= tot + mm` and `mm <= n - tot` |
+| the back edge | not an exit, and unreachable at fuel 1 |
+
+**WHAT A CONSUMER MUST NOT READ INTO IT:** all-or-nothing is about `tot`,
+not about BYTES.  The copy break leaves `tot = 0` and a nonempty disturbed
+region (`dist = mm`, the committed partial chunk).  Only `user = false`
+kills that — which is dirlink's case (§15.1(i)), and is why dirlink's slot
+is untouched at `tot = 0`.
+
+**THE COPY BREAK IS WHAT MAKES THE SPEND CLAUSE TRUE RATHER THAN VACUOUS**,
+and the C3 sizing was right about why: fs.c runs `log_write(bp)` BEFORE the
+break (the D1 fix), so that arm has spent exactly the data-block term
+`wi16_spend` charges — its receipt is the SUCCESS arm's verbatim.  The bmap
+break spends strictly less (its `log_write` is past the break), and the -1
+route spends nothing (`n' = ncount`).
+
+**NO NEW PREMISE ON `wi_size` / `wi_join`, and that is the shape finding.**
+Both new facts ride inside `ProofWritei.wi16_pre`, whose guard drops to
+`wi_blocks off n = 1` alone and whose body becomes
+`spend /\ (tot = 0 \/ tot = n) /\ (0 < tot -> memberships)`.  The three
+exits already carry that receipt, so the two big walk lemmas' statements do
+not move at all; `wi_ret` and `wi_cont` take the two extra facts, and
+`wi_join` reads them off the receipt with `wi16_pre_spend` /
+`wi16_pre_atomic` (`wi16_pre_join` now proves its own spend conjunct by
+calling the first, so the iupdate-crossing arithmetic exists once).  Two
+arms that used to discharge the receipt VACUOUSLY (`intros Hpos; exfalso;
+lia`) now prove it: the bmap break off bmap's clause (a) plus `wi16_fresh`,
+and the copy break by transplanting the success arm's `wi16_spend_step`
+block unchanged.
+
+**THE CONSUMER, AND THE WALL.**  `ProofDirlink` intros the two clauses and
+relays the spend into `dl16_post`'s `tot = 0` conjunct — `dl0_of_spend` /
+`dl0_spend_covers` in `SpecDirlink`, off the new `SpecWritei.wi16_spend_le4`.
+**The figure does not shrink the constant, because four IS the figure's
+honest maximum**: an allocating INDIRECT window at an unpaid bitmap block
+costs `bmap_cost false true true = 3` plus an unabsorbed `iupdate`, and its
+own `log_write` is free.  So no constant beats `dl0_spend = 4`, and the
+tightening has to be the SHAPE change — the `tot = 0` conjunct becoming
+`ncount - wi16_spend crb crd cru al ind <= n'`, at which point it is the
+`0 < tot` conjunct's own bound and `dl16_post` collapses to one unguarded
+spend clause plus the guarded memberships, exactly mirroring
+`wi16_post` / `wi16_spend_any`.
+
+**THAT CHANGE MOVES `ProofCreate.v`, WHICH IS WHY IT IS NOT IN THIS
+INCREMENT.**  The landed +0xc4 entry consumes the clause BY ITS TYPE:
+`destruct (Hdl16 eq_refl) as [Hpos Hzero]` then
+`cr_alloc_ip0 (S q2) n' _ (Hzero Ht0)`, and `cr_alloc_ip0`'s statement names
+`SpecDirlink.dl0_spend` as a `nat`.  Every additive dodge fails the same
+way: a third conjunct re-nests what `[Hpos Hzero]` binds, a conjunction
+inside the `tot = 0` arm changes `Hzero Ht0`'s type, and a new wand on the
+gen body needs one more `%` in create's `iIntros`.  **RULING WANTED:** land
+the collapse together with D₀-b (which edits `ProofCreate.v` anyway) — it is
+then two lines in `SpecDirlink`, one `exact` in `ProofDirlink`, and
+`cr_alloc_ip0` deleted in favour of `cr_alloc_ip` at the zero branch.
+
+**WHAT THE FIGURE BUYS, MACHINE-CHECKED NOW** (`CreateBudget`, beside the
+refutation it flips; `cr_fail_mkdir_at_zero_busts` STAYS — it is a true
+statement about the constant):
+
+| theorem | says |
+|---|---|
+| `cr_fail_mkdir_closes` | both interior mkdir entries close against `wi16_spend crb crd cru al false` at EVERY value of the four remaining booleans — the worst corner at a DIRECT window is three, against six in hand and `ip_need = 3`, i.e. zero slack |
+| `cr_fail_mkdir_closes_ind` | ...and at an INDIRECT window as soon as `crb` — which the mkdir arm has, since its first dirlink allocated the child's block 0 and an allocating writei reports `bmapstart ∈ Sb'` |
+
+The one corner that does not close is `crb = false` with an allocating
+indirect window (the figure is four there); it is unreachable at both
+interior entries for the reason in the second row.
+
+**D₀-b'S ARITHMETIC, EXACTLY.**  `u3 = u4 = 6` (machine-checked in the busts
+theorem).  +0x106 `dirlink(ip,"..")` is on the fresh child: `ind = false`,
+and on the failing arm `al = false` too (bmap allocated no data block, and a
+direct window never touches the indirect slot — SpecBmap clause (e)), so the
+honest spend is `(crd ? 0 : 1) + (cru ? 0 : 1) <= 2` and six leaves four
+against three.  +0x118 `dirlink(dp,name)` is on the parent at `crb = true`:
+`bmap_cost true al ind <= 2`, data term free when `al`, `iupdate` at most
+one — at most three, and six leaves three against three.  Both are inside
+`cr_fail_mkdir_closes` / `_ind` as stated; what D₀-b needs from the contract
+is the collapse above and nothing else.
+
+**GATE.**  `make -j30 -k` EXIT=0 on the mirror, 1093 `.vo`, `make -n`
+staleness 0, `lemma_diff` CLEAN over the five files, no `Admitted`.
+`Print Assumptions Writei.wp_writei_gen` / `Dirlink.wp_dirlink_gen` = the
+standing six.  `ProofCreate.v` and `ProofFilewrite.v` byte-untouched;
+`cr_alloc_body` and every create statement byte-identical.

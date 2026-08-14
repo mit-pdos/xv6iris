@@ -218,6 +218,14 @@ Proof. set_solver. Qed.
 (*  [IBLOCK] membership -- stated at the count IN HAND (the [S u] of       *)
 (*  [wi_size]/[wi_join]).  [wi16_pre_join] crosses the flush.              *)
 (*                                                                        *)
+(*  ITS GUARD IS THE SINGLE-BLOCK SHAPE ALONE.  The spend bound holds at   *)
+(*  EVERY [tot] ([SpecWritei.wi16_spend_any]) -- every break arm leaves    *)
+(*  the ledger at a sub-figure of the same expression -- and so does the   *)
+(*  granularity fact ([wi16_atomic]); only the two MEMBERSHIPS need        *)
+(*  [0 < tot], because the bmap break logs nothing of writei's own.  The   *)
+(*  three exits carry all three facts in this one receipt, which is why    *)
+(*  [wi_size] and [wi_join] take no further premise.                       *)
+(*                                                                        *)
 (*  [wi16_fresh] is what the LOOP carries: when the whole write fits in    *)
 (*  one block the loop runs exactly one iteration, so at the top of any    *)
 (*  iteration nothing has moved yet.  It is re-established rather than     *)
@@ -227,7 +235,7 @@ Proof. set_solver. Qed.
 (* ===================================================================== *)
 Definition wi16_pre (bms : Z) (ncount ucur off n tot : nat)
     (bm bm' : blkmap) (Sb Sc : gset Z) : Prop :=
-  (0 < tot)%nat -> wi_blocks off n = 1%nat ->
+  wi_blocks off n = 1%nat ->
   let fbn := (off `div` BSIZE)%nat in
   let al := bmap_alloced bm bm' fbn in
   let ind := bmap_ind fbn in
@@ -235,8 +243,10 @@ Definition wi16_pre (bms : Z) (ncount ucur off n tot : nat)
   let crd := bool_decide (wi_tgt_blk bm' off ∈ Sb) in
   ((ncount - (bmap_cost crb al ind
               + (if (al || crd)%bool then 0 else 1)))%nat <= ucur)%nat
-  /\ wi_tgt_blk bm' off ∈ Sc
-  /\ (al = true -> bms ∈ Sc).
+  /\ (tot = 0%nat \/ tot = n)
+  /\ ((0 < tot)%nat ->
+        wi_tgt_blk bm' off ∈ Sc
+        /\ (al = true -> bms ∈ Sc)).
 
 Definition wi16_fresh (off n tot ncount nI : nat) (bm bmI : blkmap)
     (Sb SI : gset Z) : Prop :=
@@ -247,6 +257,44 @@ Definition wi16_fresh (off n tot ncount nI : nat) (bm bmI : blkmap)
    inode block was already in the op's set and [u] otherwise, and the
    entry-set [cru] of [wi16_spend] is FALSE whenever the running set's is
    -- which is the only direction the arithmetic needs. *)
+Lemma wi16_pre_spend (bms : Z) (inum : mword 32) (inodestart : Z)
+    (ncount u off n tot : nat) (bm bm' : blkmap) (Sb Sc : gset Z) :
+  Sb ⊆ Sc ->
+  wi16_pre bms ncount (S u) off n tot bm bm' Sb Sc ->
+  wi16_spend_any bms inum inodestart ncount
+    (if bool_decide (IBLOCK inum inodestart ∈ Sc) then S u else u)%nat
+    off n bm bm' Sb.
+Proof.
+  intros Hsub Hpre. unfold wi16_spend_any, wi16_pre in *.
+  intros Hb1. specialize (Hpre Hb1). cbv zeta in Hpre |- *.
+  destruct Hpre as (H1 & _ & _).
+  unfold wi16_spend.
+  remember (bmap_cost (bool_decide (bms ∈ Sb))
+              (bmap_alloced bm bm' (off `div` BSIZE)%nat)
+              (bmap_ind (off `div` BSIZE)%nat)) as BC eqn:HBC.
+  remember (if (bmap_alloced bm bm' (off `div` BSIZE)%nat
+                || bool_decide (wi_tgt_blk bm' off ∈ Sb))%bool
+            then 0 else 1)%nat as LW eqn:HLW.
+  destruct (bool_decide (IBLOCK inum inodestart ∈ Sc)) eqn:Hc.
+  - destruct (bool_decide (IBLOCK inum inodestart ∈ Sb)); lia.
+  - assert (Hnb : bool_decide (IBLOCK inum inodestart ∈ Sb) = false).
+    { apply bool_decide_eq_false_2. intros Hin.
+      rewrite (bool_decide_eq_true_2 _ (wiset_in_mono _ Sb Sc Hsub Hin)) in Hc.
+      discriminate Hc. }
+    rewrite Hnb. lia.
+Qed.
+
+(* the granularity fact is carried by the receipt itself and crosses the
+   flush untouched -- neither the count nor the set appears in it *)
+Lemma wi16_pre_atomic (bms : Z) (ncount ucur off n tot : nat)
+    (bm bm' : blkmap) (Sb Sc : gset Z) :
+  wi16_pre bms ncount ucur off n tot bm bm' Sb Sc ->
+  wi16_atomic off n tot.
+Proof.
+  intros Hpre Hb1. specialize (Hpre Hb1). cbv zeta in Hpre.
+  destruct Hpre as (_ & H & _). exact H.
+Qed.
+
 Lemma wi16_pre_join (bms : Z) (inum : mword 32) (inodestart : Z)
     (ncount u off n tot : nat) (bm bm' : blkmap) (Sb Sc : gset Z) :
   Sb ⊆ Sc ->
@@ -255,24 +303,15 @@ Lemma wi16_pre_join (bms : Z) (inum : mword 32) (inodestart : Z)
     (if bool_decide (IBLOCK inum inodestart ∈ Sc) then S u else u)%nat
     off n tot bm bm' Sb (Sc ∪ {[IBLOCK inum inodestart]}).
 Proof.
-  intros Hsub Hpre. unfold wi16_post, wi16_pre in *.
-  intros Htot Hb1. specialize (Hpre Htot Hb1). cbv zeta in Hpre |- *.
-  destruct Hpre as (H1 & H2 & H3).
+  intros Hsub Hpre.
+  pose proof (wi16_pre_spend bms inum inodestart ncount u off n tot
+                bm bm' Sb Sc Hsub Hpre) as Hsp.
+  unfold wi16_post, wi16_spend_any, wi16_pre in *.
+  intros Htot Hb1. specialize (Hpre Hb1). specialize (Hsp Hb1).
+  cbv zeta in Hpre, Hsp |- *.
+  destruct Hpre as (_ & _ & Hmem). destruct (Hmem Htot) as (H2 & H3).
   split_and!.
-  - unfold wi16_spend.
-    remember (bmap_cost (bool_decide (bms ∈ Sb))
-                (bmap_alloced bm bm' (off `div` BSIZE)%nat)
-                (bmap_ind (off `div` BSIZE)%nat)) as BC eqn:HBC.
-    remember (if (bmap_alloced bm bm' (off `div` BSIZE)%nat
-                  || bool_decide (wi_tgt_blk bm' off ∈ Sb))%bool
-              then 0 else 1)%nat as LW eqn:HLW.
-    destruct (bool_decide (IBLOCK inum inodestart ∈ Sc)) eqn:Hc.
-    + destruct (bool_decide (IBLOCK inum inodestart ∈ Sb)); lia.
-    + assert (Hnb : bool_decide (IBLOCK inum inodestart ∈ Sb) = false).
-      { apply bool_decide_eq_false_2. intros Hin.
-        rewrite (bool_decide_eq_true_2 _ (wiset_in_mono _ Sb Sc Hsub Hin)) in Hc.
-        discriminate Hc. }
-      rewrite Hnb. lia.
+  - exact Hsp.
   - exact (wiset_in_add_r _ _ _ H2).
   - exact (wiset_in_sing_r _ _).
   - intros Ha. exact (wiset_in_add_r _ _ _ (H3 Ha)).
@@ -499,6 +538,8 @@ Section WriteiDefs.
         ⌜Sb ⊆ Sb'⌝ -∗
         (* THE SIXTEEN-BYTE SEAM, in the shape the public contract exposes *)
         ⌜wi16_post (ba_bms A) inum inodestart ncount n' off n tot bm bm' Sb Sb'⌝ -∗
+        ⌜wi16_spend_any (ba_bms A) inum inodestart ncount n' off n bm bm' Sb⌝ -∗
+        ⌜wi16_atomic off n tot⌝ -∗
         ⌜uptd_ext (pv_upt V) P'⌝ -∗
         sie_cap_gpr mf K b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) C b -∗
@@ -592,6 +633,8 @@ Section WriteiRet.
     ((ncount - wi_cost_bmonly off n)%nat <= n')%nat -> (n' <= ncount)%nat ->
     Sb ⊆ Sb' ->
     wi16_post (ba_bms A) inum inodestart ncount n' off n tot bm bm' Sb Sb' ->
+    wi16_spend_any (ba_bms A) inum inodestart ncount n' off n bm bm' Sb ->
+    wi16_atomic off n tot ->
     uptd_ext (pv_upt V) P' ->
     sie_cap_gpr M (K - 14)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b -∗
@@ -623,7 +666,7 @@ Section WriteiRet.
   Proof.
     intros HK Hsp Hs1 Hs3 Hs8 Hs9 Hs10 Hs11
            Hwf' Hhz' Hadr' Hsz' Hcov' Hcap' Hsized' Hdb Hd0 Hdk Hrange Hker Harm
-           Hlo Hhi Hsbsub Hwi16 Hext.
+           Hlo Hhi Hsbsub Hwi16 Hwiany Hwiat Hext.
     pose proof HK as HK'. unfold K_writei in HK'.
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc Hframe Hidev Hinum
               Hmeta Hmap Hblocks Hsb Hba Hdn Hsrc Hsl Hop Hcont".
@@ -883,7 +926,7 @@ Section WriteiRet.
     rewrite /wi_cont.
     iSpecialize ("Hcont" $! CID9 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! P8 tot bm' data' dn' dn0' n' wrote dist dstb P' Sb'
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hdn
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hdn
                     Hsrc Hsl Hop").
     { unfold callee_saved. split_and!; assumption. }
     { exact Hwf'. }
@@ -902,6 +945,8 @@ Section WriteiRet.
     { split; assumption. }
     { exact Hsbsub. }
     { exact Hwi16. }
+    { exact Hwiany. }
+    { exact Hwiat. }
     { exact Hext. }
   Qed.
 
@@ -1273,6 +1318,12 @@ Section WriteiJoin.
               (wiset_sub_add_r Sb SbC {[IBLOCK inum inodestart]} Hsbsub)
               (wi16_pre_join (ba_bms A) inum inodestart ncount u off n tot
                  bm bm' Sb SbC Hsbsub Hwi16)
+              (* the same receipt read for its unguarded halves: the spend
+                 across the flush, and the granularity fact it carries *)
+              (wi16_pre_spend (ba_bms A) inum inodestart ncount u off n tot
+                 bm bm' Sb SbC Hsbsub Hwi16)
+              (wi16_pre_atomic (ba_bms A) ncount (S u) off n tot
+                 bm bm' Sb SbC Hwi16)
               Hext
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hidev Hinum
                     Hmeta Hmap Hblocks Hsb Hba Hdn Hsrc Hsl Hop [Hcont]").
@@ -2325,10 +2376,20 @@ Section WriteiLoop.
                               ltac:(lia) eq_refl (proj2 Hinv2) HSuXnc
                               ltac:(lia) ltac:(lia))))
                 HSuXnc HsbSb2
-                (* VACUOUS: bmap failed on the FIRST iteration, so [tot] is
-                   still 0 and the success guard [0 < tot] cannot fire *)
-                ltac:(intros Hpos Hone; exfalso;
-                      destruct (Hfresh Hone) as (Ht0 & _); lia)
+                (* THE RECEIPT ON THE bmap-OUT-OF-BLOCKS BREAK.  bmap failed
+                   on the FIRST iteration ([wi16_fresh]), so [tot] is still
+                   the entry 0: the two MEMBERSHIPS are vacuous (nothing of
+                   writei's own was logged -- its [log_write] is past the
+                   break), and the SPEND is bmap's own arm-wise bound
+                   [Hbc1] with the target block's term simply UNSPENT.
+                   That the same expression still bounds it is the whole
+                   point of [SpecWritei.wi16_spend_any]. *)
+                ltac:(rewrite /wi16_pre; intros Hone;
+                      destruct (Hfresh Hone) as (Ht0 & Hbm0 & Hn0 & HS0);
+                      assert (Hfb0 : (off `div` BSIZE)%nat = fbn)
+                        by (rewrite Hfbne Ht0 Nat.add_0_r; reflexivity);
+                      cbv zeta; rewrite Hfb0 -Hbm0 -HS0; split_and!;
+                      [ lia | left; exact Ht0 | intros Hpos; exfalso; lia ])
                 HextI
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hidev Hinum Hmeta
@@ -3313,7 +3374,7 @@ Section WriteiLoop.
             assert (Hwi16B : wi16_pre (ba_bms A) ncount (S uY) off n (tot + mm)%nat
                                bm bm2 Sb
                                (Sb2 ∪ {[uint (blkmap_get bm2 fbn : mword 32)]})).
-            { rewrite /wi16_pre. intros _ Hone.
+            { rewrite /wi16_pre. intros Hone.
               destruct (Hfresh Hone) as (Ht0 & Hbm0 & Hn0 & HS0).
               assert (Hfb0 : (off `div` BSIZE)%nat = fbn)
                 by (rewrite Hfbne Ht0 Nat.add_0_r; reflexivity).
@@ -3340,8 +3401,12 @@ Section WriteiLoop.
                          (bool_decide (uint (blkmap_get bm2 fbn : mword 32) ∈ SI))
                          (bool_decide (uint (blkmap_get bm2 fbn : mword 32) ∈ Sb2))
                          ltac:(lia) HnLlo Hhon).
-              - exact (wiset_in_sing_r _ _).
-              - intros Ha. exact (wiset_in_add_r _ _ _ (Hbc5 Ha)). }
+              (* the single block was filled to the END of the range, which
+                 is the [n] half of the granularity fact *)
+              - right. lia.
+              - intros _. split.
+                + exact (wiset_in_sing_r _ _).
+                + intros Ha. exact (wiset_in_add_r _ _ _ (Hbc5 Ha)). }
             iApply (wi_size (CID0 := CIDc11) γs j γl γu γd γk pd pav pu γfs γi bn γ γf
                       cov logstart inodestart nib dev ip inum bm bm2 data
                       (<[fbn := wi_splice (data2 fbn) o mm g]> data2) dn dn0
@@ -3654,6 +3719,47 @@ Section WriteiLoop.
                        ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
           iDestruct (IntrDefs.cpu_claim_ext_transport CIDa14 CIDd7 eb (proc_addr j)
                        ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
+          (* ---- THE RECEIPT ON THE COPY BREAK.  [tot] did NOT advance, so
+                 the two memberships are vacuous -- but THE SPEND IS THE
+                 SUCCESS ARM'S VERBATIM, because [log_write(bp)] ran BEFORE
+                 the break (the fs.c fix; see this file's header), and that
+                 log_write is exactly the term [wi16_spend] charges for the
+                 target block.  This is the arm that makes
+                 [SpecWritei.wi16_spend_any] true at [tot = 0] rather than
+                 merely vacuous, and it is [wi16_fresh] again that lets the
+                 booleans be read at the ENTRY count and set. ---- *)
+          assert (Hwi16C : wi16_pre (ba_bms A) ncount (S uY) off n tot
+                             bm bm2 Sb
+                             (Sb2 ∪ {[uint (blkmap_get bm2 fbn : mword 32)]})).
+          { rewrite /wi16_pre. intros Hone.
+            destruct (Hfresh Hone) as (Ht0 & Hbm0 & Hn0 & HS0).
+            assert (Hfb0 : (off `div` BSIZE)%nat = fbn)
+              by (rewrite Hfbne Ht0 Nat.add_0_r; reflexivity).
+            cbv zeta. unfold wi_tgt_blk. rewrite Hfb0 -Hbm0 -HS0.
+            assert (Hhon : (bmap_alloced bmI bm2 fbn
+                            || bool_decide
+                                 (uint (blkmap_get bm2 fbn : mword 32) ∈ SI))%bool
+                           = true ->
+                           bool_decide
+                             (uint (blkmap_get bm2 fbn : mword 32) ∈ Sb2) = true).
+            { intros Hor. apply bool_decide_eq_true_2.
+              destruct (bmap_alloced bmI bm2 fbn) eqn:Hal.
+              - rewrite Hubno. apply Hbc6.
+                exact (wi_ad_of_alloced_any cov logstart bmI bm2 fbn HwfI Hfbnlt
+                         Hbnzz Hbc7 Hal).
+              - cbn in Hor.
+                exact (wiset_in_mono _ SI Sb2 Hbc3
+                         (proj1 (bool_decide_eq_true _) Hor)). }
+            split_and!.
+            - exact (wi16_spend_step ncount (S uX) (S uY)
+                       (bmap_cost (bool_decide (ba_bms A ∈ SI))
+                          (bmap_alloced bmI bm2 fbn) (bmap_ind fbn))
+                       (bmap_alloced bmI bm2 fbn)
+                       (bool_decide (uint (blkmap_get bm2 fbn : mword 32) ∈ SI))
+                       (bool_decide (uint (blkmap_get bm2 fbn : mword 32) ∈ Sb2))
+                       ltac:(lia) HnLlo Hhon).
+            - left. exact Ht0.
+            - intros Hpos. exfalso. lia. }
           iApply (wi_size (CID0 := CIDd7) γs j γl γu γd γk pd pav pu γfs γi bn γ γf
                     cov logstart inodestart nib dev ip inum bm bm2 data
                     (<[fbn := wi_splice (data2 fbn) o mm g]> data2) dn dn0
@@ -3683,12 +3789,7 @@ Section WriteiLoop.
                                   (wi_blocks off n) W off n _
                                   ltac:(lia) eq_refl (proj2 Hinv3) ltac:(lia)
                                   ltac:(lia) ltac:(lia))))
-                    ltac:(lia) HsbSb3
-                    (* VACUOUS: the copy faulted, so [tot] did not advance and
-                       it is still the entry 0 whenever the write is one
-                       block ([wi16_fresh]) *)
-                    ltac:(intros Hpos Hone; exfalso;
-                          destruct (Hfresh Hone) as (Ht0 & _); lia)
+                    ltac:(lia) HsbSb3 Hwi16C
                     Hext2
                     with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                           Hdgeom Hdlock Hframe Hidev Hinum Hmeta
@@ -3871,7 +3972,7 @@ Section WriteiMain.
       iIntros (CIDf) "%Hchain".
       iIntros (mf tot bm2 data2 dn2 dn02 n2 wrote dist dstb P2 SbF)
         "%C1 %C2 %C3 %C4 %C5 %C6 %Ccap %Csz %C7 %C8 %C8k %C9 %C10 %C11 %C12 %Csb
-         %Cwi %C13
+         %Cwi %Cwiany %Cwiat %C13
          Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap Hblocks Hsb
          Hba Hdn Hsrc Hsl Hop".
       iDestruct "Hba" as "(%Hgok2 & Hszc & Hbmsc & Hbmg)".
@@ -3879,7 +3980,7 @@ Section WriteiMain.
       iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
       iApply ("Hcont" $! mf tot bm2 data2 dn2 dn02 n2 wrote dist dstb P2 uOut SbF
                 with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
-                      [%] [%] [%] [%]
+                      [%] [%] [%] [%] [%] [%]
                       Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap
                       Hblocks Hsb Hszc Hbmsc Hbmres Hdn Hsrc Hsl Hop").
       { exact C1. } { exact HuOut. } { exact C2. } { exact C3. }
@@ -3889,6 +3990,8 @@ Section WriteiMain.
       { exact C9. } { exact C10. } { exact C11. } { exact C12. }
       { exact Csb. }
       { exact Cwi. }
+      { exact Cwiany. }
+      { exact Cwiat. }
       { exact C13. } }
     iPoseProof (wri_00 with "Htext") as "Hi00".
     iPoseProof (wri_02 with "Htext") as "Hi02".
@@ -4004,7 +4107,7 @@ Section WriteiMain.
          the one it came in with *)
       iApply ("Hcont" $! X1 0%nat bm data dn dn0 ncount
                 (fun _ => bv_0 8) 0%nat (fun _ => bv_0 8) (pv_upt V) Sb
-                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hdn
+                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hdn
                       [Hsrc] Hsl Hop").
       { unfold callee_saved. split_and!; lkp. }
       { exact Hwf. }
@@ -4028,6 +4131,11 @@ Section WriteiMain.
         reflexivity. }
       { (* ...and tot = 0, so the sixteen-byte clause is vacuous *)
         unfold wi16_post. intros Hpos. exfalso. lia. }
+      { (* the unguarded spend: this exit is BEFORE the prologue and spends
+           nothing at all, so the bound is loose by the whole figure *)
+        unfold wi16_spend_any. intros _. lia. }
+      { (* ...and it wrote nothing, which is the [tot = 0] half *)
+        unfold wi16_atomic. intros _. left. reflexivity. }
       { apply uptd_ext_refl. }
       { rewrite HVid. iExact "Hsrc". }
     }
@@ -4425,6 +4533,10 @@ Section WriteiMain.
                       | reflexivity | reflexivity | reflexivity ])
                 ltac:(lia) ltac:(lia) ltac:(reflexivity)
                 ltac:(unfold wi16_post; intros Hpos; exfalso; lia)
+                (* the second -1 exit: [n' = ncount], so the unguarded spend
+                   bound is loose, and [tot = 0] gives the granularity *)
+                ltac:(unfold wi16_spend_any; intros _; lia)
+                ltac:(unfold wi16_atomic; intros _; left; reflexivity)
                 ltac:(apply uptd_ext_refl)
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hidev Hinum
                       Hmeta Hmap Hblocks Hsb Hba Hdn Hsrc Hsl Hop [Hcont]").
@@ -4574,9 +4686,12 @@ Section WriteiMain.
                 ltac:(symmetry; exact Hdn0)
                 ltac:(unfold wi_cost_bmonly; lia) ltac:(lia) ltac:(lia)
                 ltac:(reflexivity)
-                (* tot = 0 on this arm: nothing was written, so the seam's
-                   success guard cannot fire *)
-                ltac:(unfold wi16_pre; intros Hpos; exfalso; lia)
+                (* tot = 0 = n on this arm: nothing was written, so the
+                   memberships cannot fire, the spend bound is loose by the
+                   whole figure (only the trailing iupdate ran), and the
+                   granularity fact holds at BOTH of its disjuncts *)
+                ltac:(rewrite /wi16_pre; intros Hone; cbv zeta; split_and!;
+                      [ lia | left; reflexivity | intros Hpos; exfalso; lia ])
                 ltac:(apply uptd_ext_refl)
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hidev Hinum Hmeta
@@ -4852,7 +4967,7 @@ Section WriteiMain.
     iIntros (CIDf) "%Hchain".
     iIntros (mf tot bm' data' dn' dn0' n' wrote dist dstb P' used' Sb')
       "%D1 %D2 %D3 %D4 %D5 %D6 %D7 %Dcap %Dsz %D8 %D9 %D9k %D10 %D11 %D12 %D13
-       %Dsb %Dwi %D14
+       %Dsb %Dwi %Dwiany %Dwiat %D14
        Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap Hblocks Hsb
        Hszc Hbmsc Hbmres Hdn Hsrc Hsl Hop".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].

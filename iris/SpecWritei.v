@@ -385,6 +385,17 @@ Definition wi16_spend (crb crd cru al ind : bool) : nat :=
   (bmap_cost crb al ind + (if (al || crd)%bool then 0 else 1)
    + (if cru then 0 else 1))%nat.
 
+(* THE COARSE ALLOWANCE DOMINATES THE CREDIT-AWARE FIGURE at every value
+   of the five booleans -- [wi_cost_bmonly off 16] is four whenever the
+   window sits in one block, and four is exactly the worst corner here (an
+   allocating indirect window at an unpaid bitmap block, whose own
+   [log_write] then absorbs).  So a caller that relays the coarse bound is
+   not being LOOSE about the maximum; what it loses is the per-call
+   VARIATION, which is the whole of what create's interior links need. *)
+Lemma wi16_spend_le4 (crb crd cru al ind : bool) :
+  (wi16_spend crb crd cru al ind <= 4)%nat.
+Proof. destruct crb, crd, cru, al, ind; vm_compute; lia. Qed.
+
 (* ...and what must be IN HAND on entry.  Credits do NOT lower this:
    log_write's contract takes [log_opS (S u)] on BOTH arms (a unit in hand
    even to absorb) and so does iupdate's.  bmap's own requirement is
@@ -434,6 +445,51 @@ Definition wi16_post (bmapstart : Z) (inum : mword 32) (inodestart : Z)
   /\ wi_tgt_blk bm' off ∈ Sb'
   /\ IBLOCK inum inodestart ∈ Sb'
   /\ (al = true -> bmapstart ∈ Sb').
+
+(* ...AND THE SPEND HALF AGAIN, WITHOUT THE [0 < tot] GUARD.  The same
+   expression bounds the spend at EVERY [tot], because each way out of the
+   loop leaves the ledger at a SUB-figure of it:
+
+     - the up-front [-1] return spends nothing at all ([n' = ncount]);
+     - the bmap-out-of-blocks break never reached writei's own
+       [log_write], so the data-block term is UNSPENT (and on that arm
+       [bmap_alloced] can only be the INDIRECT allocation, which
+       [bmap_cost] already prices);
+     - the part-way [either_copyin] break runs [log_write(bp)] BEFORE it
+       leaves (fs.c's "might have partially updated the block"), which is
+       exactly what the data-block term pays for.
+
+   Only the MEMBERSHIP trio of [wi16_post] genuinely needs [0 < tot]:
+   nothing enters [Sb'] on the -1 route, so no membership is available
+   there at all.  A caller that must price a FAILING single-block write --
+   create's [fail:] entries, through dirlink's append -- has no other
+   source for the credit-aware figure: the coarse [wi_cost_bmonly] clause
+   is four, and the interior mkdir entries reach their dirlink with six in
+   hand against an [iput_units] of three.  Neither [tot] nor [Sb'] appears
+   below, which is what makes this clause the SAME fact on every arm. *)
+Definition wi16_spend_any (bmapstart : Z) (inum : mword 32) (inodestart : Z)
+    (ncount n' off n : nat) (bm bm' : blkmap) (Sb : gset Z) : Prop :=
+  wi_blocks off n = 1%nat ->
+  let fbn := (off `div` BSIZE)%nat in
+  let al := bmap_alloced bm bm' fbn in
+  let ind := bmap_ind fbn in
+  let crb := bool_decide (bmapstart ∈ Sb) in
+  let crd := bool_decide (wi_tgt_blk bm' off ∈ Sb) in
+  let cru := bool_decide (IBLOCK inum inodestart ∈ Sb) in
+  ((ncount - wi16_spend crb crd cru al ind)%nat <= n')%nat.
+
+(* CHUNK ATOMICITY AT THE SINGLE-BLOCK CORNER.  A write whose whole range
+   sits in one block is copied by ONE iteration ([m = min (n - tot,
+   BSIZE - off mod BSIZE)] is the whole of [n]), so the loop either
+   completes it or leaves [tot] at the zero it started from: every break
+   arm exits WITHOUT advancing [tot], the part-way copy included (its
+   bytes become the postcondition's disturbed region [dist], not part of
+   [tot]).  Nothing else in this contract pins a granularity -- the arms
+   below bound [tot] by [tot <= n] and by the returned [a0], and a caller
+   that needs "16 or nothing" (dirlink's fixed-width dirent) cannot get it
+   from either. *)
+Definition wi16_atomic (off n tot : nat) : Prop :=
+  wi_blocks off n = 1%nat -> tot = 0%nat \/ tot = n.
 
 (* the on-disk inode writei flushes: the caller's metadata with the size
    raised to the advanced offset when the write went past the old end, and
@@ -971,6 +1027,11 @@ Definition wp_writei_gen_body
          [wi16_spend] and the three logged blocks are IN the returned set.
          ADDITIVE -- see [wi16_post]'s header. *)
       ⌜wi16_post bmapstart inum inodestart ncount n' off n tot bm bm' Sb Sb'⌝ -∗
+      (* ...the SAME spend bound with no success guard on it, and the
+         chunk-granularity fact that goes with it.  ADDITIVE -- see
+         [wi16_spend_any] / [wi16_atomic]. *)
+      ⌜wi16_spend_any bmapstart inum inodestart ncount n' off n bm bm' Sb⌝ -∗
+      ⌜wi16_atomic off n tot⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
