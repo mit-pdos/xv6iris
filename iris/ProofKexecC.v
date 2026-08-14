@@ -1601,6 +1601,383 @@ Section KexecCSetup.
 End KexecCSetup.
 
 (* =================================================================== *)
+(*  THE ARGV LOOP'S THREE [-1] EXITS -- ONE CONNECTOR.                   *)
+(*                                                                       *)
+(*  +0x358 (the stack-overflow [bltu]), +0x35c (copyout failed) and       *)
+(*  +0x26e (MAXARG reached) are THE SAME TWO INSTRUCTIONS at three        *)
+(*  addresses -- [c.mv s3,s4] then [c.j +0x1d6] -- so they are one lemma  *)
+(*  parameterised by the stub's offset, the jump's immediate, and the     *)
+(*  two [instr] facts the call site reads off [CodeKexec].  (Confirmed    *)
+(*  against [CodeKexec.kxc_358]/[kxc_35c]/[kxc_26e]: all three are the    *)
+(*  compressed [RTYPE (s4, zreg, s3, ADD)], and all three [c.j]s land on  *)
+(*  +0x1d6.)                                                             *)
+(*                                                                       *)
+(*  The instructions are the easy half.  The work is the RESOURCE side:   *)
+(*  [kxc_bad_1d6] wants [kxc_frame_at]'s ONE opaque 55-slot region, and   *)
+(*  the loop holds the frame as [kxc_frameC] -- ustack SPLIT at [c],      *)
+(*  with the [c] already-written slots carrying [kxc_sp]'s recurrence.    *)
+(*  [kxc_frameC_collapse] below is that fold, and it is why the ELF       *)
+(*  buffer has to come in here too: slots 47..54 are the only part of     *)
+(*  the frame [kxc_c_res] holds OUTSIDE [kxc_frameC].                     *)
+(*                                                                       *)
+(*  ITS OWN SECTION, CLOSED BEFORE [KexecCLoop] OPENS.  A [Local Lemma]   *)
+(*  applied from inside a section that fixes [CID0] bakes THAT hart into  *)
+(*  its own statement instead of taking a fresh per-call-site implicit,   *)
+(*  and these call sites are a dozen [wp_next]s past the entry hart --    *)
+(*  the failure is an [iSpecialize: cannot instantiate] whose two sides   *)
+(*  print identically.  (kexec.md records the round that cost.)           *)
+(* =================================================================== *)
+Section KexecCExitM1.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
+            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
+  Context `{GEN : GenId} `{CID0 : CpuId}.
+
+  Notation Rra := (mword_of_int 1 : mword 5).
+  Notation Rs0 := (mword_of_int 8 : mword 5).
+  Notation Rs1 := (mword_of_int 9 : mword 5).
+  Notation Rs2 := (mword_of_int 18 : mword 5).
+  Notation Rs3 := (mword_of_int 19 : mword 5).
+  Notation Rs4 := (mword_of_int 20 : mword 5).
+  Notation Rs5 := (mword_of_int 21 : mword 5).
+  Notation Rs6 := (mword_of_int 22 : mword 5).
+  Notation Rs7 := (mword_of_int 23 : mword 5).
+  Notation Rs8 := (mword_of_int 24 : mword 5).
+  Notation Rs9 := (mword_of_int 25 : mword 5).
+  Notation Rs10 := (mword_of_int 26 : mword 5).
+  Notation Rs11 := (mword_of_int 27 : mword 5).
+  Notation Ra0 := (mword_of_int 10 : mword 5).
+
+  Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
+  Local Ltac nz := vm_compute; discriminate.
+
+  (* [kxc_frameC]'s WRITTEN ustack prefix ([∗list] over [seq 0 c], slot [46-j]
+     at index [j]) forgotten back to an opaque [stack_own] -- what a -1-tail
+     exit needs (it hands the WHOLE frame back to [proc_freepagetable]'s
+     caller, and does not care what argv-loop progress was in it). Slot [j]
+     sits at [pa_stk sp0 (46-j)]; the LAST written slot (j = c-1) is the
+     SHALLOWEST address in the run, [pa_stk sp0 (47-c)], so induction peels
+     from the [seq]'s tail via [seq_S], matching [stack_own_app]'s own
+     "shallow slots first" shape with no reassociation needed.
+     Plain [induction c], NOT [iInduction]: this is a one-shot entailment,
+     not a Löb recursion, and an auto-generated IH fighting the leading
+     Coq-level premise is the tell that the plain tactic is wanted. *)
+  Local Lemma kxc_ustack_collapse (sp0 : mword 64) (c : nat) (f : nat -> mword 64) :
+    (c < 46)%nat ->
+    ([∗ list] j ∈ seq 0 c, pa_stk sp0 (46 - j) ↦₈ (f j : mword 64)) -∗
+    stack_own (pa_stk sp0 (46 - c)) c.
+  Proof.
+    induction c as [| c IH]; intro Hc46.
+    - rewrite stack_own_0. auto.
+    - rewrite seq_S big_sepL_app big_sepL_singleton.
+      iIntros "[Hpre Hlast]".
+      iDestruct (IH ltac:(lia) with "Hpre") as "Hrest".
+      assert (Heq : pa_stk sp0 (46 - c) = pa_stk (pa_stk sp0 (45 - c)) 1).
+      { rewrite pa_stk_assoc. f_equal. lia. }
+      iEval (rewrite Heq) in "Hlast".
+      iDestruct (stack_own_1_intro (pa_stk sp0 (45 - c)) (f c) with "Hlast") as "Hone".
+      replace (46 - S c)%nat with (45 - c)%nat by lia.
+      replace (S c) with (1 + c)%nat by lia.
+      rewrite (stack_own_app (pa_stk sp0 (45 - c)) 1 c).
+      iFrame "Hone". rewrite -Heq. iExact "Hrest".
+  Qed.
+
+  (* [kxc_frameC] (+ the ELF buffer, the frame's slots 47..54, which
+     [kxc_c_res] holds separately) back to [kxc_frame_at]'s uniform shape.
+     Three joins, in address order: the ustack's unwritten tail and its
+     written prefix rejoin at 14..46 ([kxc_ustack_collapse] + [stack_own_app]),
+     [kxc_mid_join] absorbs the ELF slots and the ph/off scratch to reach
+     14..63, and [kxc_stack_of_top5] forgets the five pinned top slots.
+     The argv slot's own value ([pa_add av (8*c)] rather than [av]) is
+     exactly what is forgotten here, which is why this direction needs no
+     hypothesis about [c] beyond its being inside the region. *)
+  (* [pc + k] on a SYMBOLIC base.  The three call sites differ only in the
+     stub's offset, so [pcw]'s [vm_compute] is not available here (its goal
+     still mentions [stub]) -- optimization.md's "never [vm_compute] a goal
+     containing a symbolic value" applies to a symbolic Z offset just as it
+     does to a symbolic [mword]. *)
+  Local Lemma avi_moi (z k : Z) :
+    add_vec_int (mword_of_int z : mword 64) k = (mword_of_int (z + k) : mword 64).
+  Proof.
+    change (add_vec_int (mword_of_int z : mword 64) k)
+      with (add_vec (mword_of_int z : mword 64) (mword_of_int k : mword 64)).
+    apply bv_eq. rewrite add_vec64_unsigned !moi64_unsigned.
+    rewrite bv_wrap_add_idemp_l bv_wrap_add_idemp_r. reflexivity.
+  Qed.
+
+  (* [stack_own_app]'s join direction with the depth supplied as an EQUATION
+     rather than syntactically.  Inside the proofmode the obvious
+     [replace 33 with ((33-c)+c)] is wrong: the "goal" a plain [replace] sees
+     is the whole [envs_entails], so it rewrites the [33] inside the
+     hypothesis's own [33 - c] too and leaves [33 - c + c - c].  Discharging
+     the arithmetic in the STATEMENT ([intros ->]) sidesteps that entirely. *)
+  Local Lemma stack_own_join (sp : Arch.pa) (n n1 n2 : nat) :
+    (n = n1 + n2)%nat ->
+    stack_own sp n1 -∗ stack_own (pa_stk sp n1) n2 -∗ stack_own sp n.
+  Proof. intros ->. iIntros "A B". rewrite stack_own_app. iSplitL "A"; done. Qed.
+
+  Local Lemma kxc_frameC_collapse
+      (sp0 ra0 s00 s10 s20 pv av : mword 64)
+      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
+      (c : nat) (sz1 : mword 64) (alen : nat -> nat) (ef : nat -> bv 8) :
+    (c <= 33)%nat ->
+    (forall i, (i < 8)%nat ->
+       is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true) ->
+    ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) -∗
+    kxc_frameC sp0 ra0 s00 s10 s20 pv av
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 c sz1 alen -∗
+    kxc_frame_at sp0 ra0 s00 s10 s20 w5 w6 w7 w8 w9 w10 w11 w12 w13.
+  Proof.
+    intros Hc33 Hal. iIntros "Helf".
+    rewrite /kxc_frameC /kxc_frame_at.
+    iIntros "(Hf1 & Hf2 & Hf3 & Hf4 & Hf5 & Hf6 & Hf7 & Hf8 & Hf9 & Hf10 &
+              Hf11 & Hf12 & Hf13 & Hust & Hwr & Hph & Hf64 & Hf65 & Hf66 &
+              Hf67 & Hf68)".
+    iDestruct "Hf65" as (w65_) "Hf65".
+    iDestruct "Hf68" as (w68_) "Hf68".
+    iDestruct (kxc_stack_of_top5 sp0 (pa_add av (8 * c)) w65_ pv w67 w68_
+                 with "Hf64 Hf65 Hf66 Hf67 Hf68") as "Htop5".
+    iDestruct (kxc_ustack_collapse sp0 c _ ltac:(lia) with "Hwr") as "Hwr".
+    assert (Haddr : pa_stk (pa_stk sp0 13) (33 - c) = pa_stk sp0 (46 - c)).
+    { rewrite pa_stk_assoc. f_equal. lia. }
+    iEval (rewrite -Haddr) in "Hwr".
+    iDestruct (stack_own_join (pa_stk sp0 13) 33 (33 - c) c ltac:(lia)
+                 with "Hust Hwr") as "Hust33".
+    iDestruct (kxc_elf_give sp0 ef Hal with "Helf") as "Aelf".
+    iDestruct (kxc_mid_join sp0 with "Hust33 Aelf Hph") as "Amid50".
+    iSplitL "Hf1"; [iExact "Hf1" |]. iSplitL "Hf2"; [iExact "Hf2" |].
+    iSplitL "Hf3"; [iExact "Hf3" |]. iSplitL "Hf4"; [iExact "Hf4" |].
+    iSplitL "Hf5"; [iExact "Hf5" |]. iSplitL "Hf6"; [iExact "Hf6" |].
+    iSplitL "Hf7"; [iExact "Hf7" |]. iSplitL "Hf8"; [iExact "Hf8" |].
+    iSplitL "Hf9"; [iExact "Hf9" |]. iSplitL "Hf10"; [iExact "Hf10" |].
+    iSplitL "Hf11"; [iExact "Hf11" |]. iSplitL "Hf12"; [iExact "Hf12" |].
+    iSplitL "Hf13"; [iExact "Hf13" |].
+    change 55%nat with (50 + 5)%nat.
+    rewrite stack_own_app (pa_stk_assoc sp0 13 50).
+    iSplitL "Amid50"; [iExact "Amid50" | iExact "Htop5"].
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (*  RE-ASSEMBLY.  The loop body destructs the frame and the resource      *)
+  (*  bundle down to individual hypotheses on entry, so every exit and the  *)
+  (*  back edge have to put them back.  [iFrame] is not an option at this   *)
+  (*  altitude (it does not terminate -- see this project's note), so the   *)
+  (*  fold is an explicit [iSplitL] chain; written ONCE here rather than    *)
+  (*  five times inside [kxc_argv_step].  Both live in THIS section so the  *)
+  (*  loop can use them too.                                               *)
+  (* ------------------------------------------------------------------- *)
+  Local Lemma kxc_frameC_intro
+      (sp0 ra0 s00 s10 s20 pv av : mword 64)
+      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 w65 w68 : mword 64)
+      (c : nat) (sz1 : mword 64) (alen : nat -> nat) :
+    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    word_pointsto (pa_stk sp0 7) (DfracOwn 1) w7 -∗
+    word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8 -∗
+    word_pointsto (pa_stk sp0 9) (DfracOwn 1) w9 -∗
+    word_pointsto (pa_stk sp0 10) (DfracOwn 1) w10 -∗
+    word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11 -∗
+    word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 -∗
+    word_pointsto (pa_stk sp0 13) (DfracOwn 1) w13 -∗
+    stack_own (pa_stk sp0 13) (33 - c) -∗
+    ([∗ list] j ∈ seq 0 c,
+       pa_stk sp0 (46 - j) ↦₈ (mword_of_int (kxc_sp (uint sz1) alen (S j)) : mword 64)) -∗
+    stack_own (pa_stk sp0 54) 9 -∗
+    word_pointsto (pa_stk sp0 64) (DfracOwn 1) (pa_add av (8 * c)) -∗
+    word_pointsto (pa_stk sp0 65) (DfracOwn 1) w65 -∗
+    word_pointsto (pa_stk sp0 66) (DfracOwn 1) pv -∗
+    word_pointsto (pa_stk sp0 67) (DfracOwn 1) w67 -∗
+    word_pointsto (pa_stk sp0 68) (DfracOwn 1) w68 -∗
+    kxc_frameC sp0 ra0 s00 s10 s20 pv av
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 c sz1 alen.
+  Proof.
+    iIntros "H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13
+             Hust Hwr Hph H64 H65 H66 H67 H68".
+    rewrite /kxc_frameC.
+    iSplitL "H1"; [iExact "H1" |]. iSplitL "H2"; [iExact "H2" |].
+    iSplitL "H3"; [iExact "H3" |]. iSplitL "H4"; [iExact "H4" |].
+    iSplitL "H5"; [iExact "H5" |]. iSplitL "H6"; [iExact "H6" |].
+    iSplitL "H7"; [iExact "H7" |]. iSplitL "H8"; [iExact "H8" |].
+    iSplitL "H9"; [iExact "H9" |]. iSplitL "H10"; [iExact "H10" |].
+    iSplitL "H11"; [iExact "H11" |]. iSplitL "H12"; [iExact "H12" |].
+    iSplitL "H13"; [iExact "H13" |]. iSplitL "Hust"; [iExact "Hust" |].
+    iSplitL "Hwr"; [iExact "Hwr" |]. iSplitL "Hph"; [iExact "Hph" |].
+    iSplitL "H64"; [iExact "H64" |].
+    iSplitL "H65"; [iExists w65; iExact "H65" |].
+    iSplitL "H66"; [iExact "H66" |]. iSplitL "H67"; [iExact "H67" |].
+    iExists w68. iExact "H68".
+  Qed.
+
+  Local Lemma kxc_c_res_intro
+      (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z)
+      (size : Z) (used2 : gset Z)
+      (plen : nat) (pfun : nat -> bv 8)
+      (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
+      (afun : nat -> nat -> bv 8)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (sp0 ra0 s00 s10 s20 pv av : mword 64)
+      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
+      (ef : nat -> bv 8) (P : uptd) (c : nat) (sz1 : mword 64)
+      (alen : nat -> nat) :
+    iref_slots 2 -∗
+    sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+    sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+    bitmap_res gfs bmapstart cov logstart size used2 -∗
+    bslots bn 3 -∗
+    kalloc_env ga None -∗
+    proc_pt P -∗
+    proc_priv gf (proc_addr jp) pidv V -∗
+    ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
+    ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) -∗
+    ([∗ list] k ∈ seq 0 na,
+       [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) -∗
+    ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) -∗
+    kxc_frameC sp0 ra0 s00 s10 s20 pv av
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 c sz1 alen -∗
+    kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
+              plen pfun na avf aslen afun pidv V dqb dqs dqa
+              sp0 ra0 s00 s10 s20 pv av
+              w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c sz1 alen.
+  Proof.
+    iIntros "Hirs Hbm Hins Hbits Hbs Hka Hpt Hpriv Hpath Hargv Hargs Helf Hframe".
+    rewrite /kxc_c_res.
+    iSplitL "Hirs"; [iExact "Hirs" |]. iSplitL "Hbm"; [iExact "Hbm" |].
+    iSplitL "Hins"; [iExact "Hins" |]. iSplitL "Hbits"; [iExact "Hbits" |].
+    iSplitL "Hbs"; [iExact "Hbs" |]. iSplitL "Hka"; [iExact "Hka" |].
+    iSplitL "Hpt"; [iExact "Hpt" |]. iSplitL "Hpriv"; [iExact "Hpriv" |].
+    iSplitL "Hpath"; [iExact "Hpath" |]. iSplitL "Hargv"; [iExact "Hargv" |].
+    iSplitL "Hargs"; [iExact "Hargs" |]. iSplitL "Helf"; [iExact "Helf" |].
+    iExact "Hframe".
+  Qed.
+
+  (* The connector itself.  [m] is kexec's ENTRY register file (the exit's
+     [callee_saved m mf] is stated against it) and [M] the file the loop is
+     at; only [M]'s sp/s4/s6 matter, because [c.mv s3,s4] is the last
+     instruction before the shared tail reloads everything else from the
+     frame. *)
+  Lemma kxc_c_exit_m1
+      (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z)
+      (size : Z) (used2 : gset Z)
+      (plen : nat) (pfun : nat -> bv 8)
+      (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
+      (afun : nat -> nat -> bv 8)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (m M : regfile) (K : nat) (C : iProp Σ)
+      (sp0 ra0 s00 s10 s20 pv av : mword 64)
+      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
+      (ef : nat -> bv 8) (P : uptd) (sz1 : mword 64) (c : nat)
+      (stub : Z) (jimm : mword 21) :
+    (K_kexec <= K)%nat ->
+    (c <= 33)%nat ->
+    (forall i, (i < 8)%nat ->
+       is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true) ->
+    m !!! Regidx csp_rs1 = sp0 -> m !!! Regidx Rra = ra0 ->
+    m !!! Regidx Rs0 = s00 -> m !!! Regidx Rs1 = s10 -> m !!! Regidx Rs2 = s20 ->
+    m !!! Regidx Rs3 = w5 -> m !!! Regidx Rs4 = w6 -> m !!! Regidx Rs5 = w7 ->
+    m !!! Regidx Rs6 = w8 -> m !!! Regidx Rs7 = w9 -> m !!! Regidx Rs8 = w10 ->
+    m !!! Regidx Rs9 = w11 -> m !!! Regidx Rs10 = w12 -> m !!! Regidx Rs11 = w13 ->
+    M !!! Regidx csp_rs1 = pa_stk sp0 68 ->
+    M !!! Regidx Rs4 = sz1 ->
+    M !!! Regidx Rs6 = page_base P.(ud_root) ->
+    um_below sz1 P.(ud_um) ->
+    um_covered sz1 P.(ud_um) ->
+    add_vec (mword_of_int (KXC + stub + 2) : mword 64) (sign_extend' 64 jimm)
+      = (mword_of_int (KXC + 0x1d6) : mword 64) ->
+    kernel_text -∗
+    instr (mword_of_int (KXC + stub) : mword 64) true
+          (RTYPE (Regidx Rs4, zreg, Regidx Rs3, ADD)) -∗
+    instr (mword_of_int (KXC + stub + 2) : mword 64) true (JAL (jimm, zreg)) -∗
+    pc_is (mword_of_int (KXC + stub) : mword 64) -∗
+    sie_cap_gpr M (K - 68)%nat true (proc_addr jp) -∗
+    cpu_own 0 true (proc_addr jp) C true -∗
+    kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
+              plen pfun na avf aslen afun pidv V dqb dqs dqa
+              sp0 ra0 s00 s10 s20 pv av
+              w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c sz1 alen -∗
+    wp_next true (proc_addr jp) (fun (CID : CpuId) =>
+    ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+       (entry spv szv' : mword 64),
+        ⌜callee_saved m mf⌝ -∗
+        ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+        sie_cap_gpr mf K true (proc_addr jp) -∗
+        cpu_own 0 true (proc_addr jp) C true -∗
+        pc_is (ret_pc ra0) -∗
+        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+        ⌜used' ⊆ used2⌝ -∗
+        bitmap_res gfs bmapstart cov logstart size used' -∗
+        kalloc_env ga None -∗
+        proc_priv gf (proc_addr jp) pidv V' -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+        ([∗ list] i ∈ seq 0 na,
+           [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
+        bslots bn 3 -∗
+        iref_slots 2 -∗
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros HK Hc33 Hal Hmsp Hmra Hms0 Hms1 Hms2
+           Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13
+           HMsp HMs4 HMs6 Hbelow Hcov Htgt.
+    unfold K_kexec in HK.
+    iIntros "#Htext Hi1 Hi2 Hpc Hcg Hcnt Hres Hcont".
+    rewrite /kxc_c_res.
+    iDestruct "Hres" as "(Hirs & Hbm & Hins & Hbits & Hbs & #Hka & Hpt & Hpriv &
+                          Hpath & Hargv & Hargs & Helf & Hframe)".
+    (* ---- +stub: c.mv s3,s4 -- the size [proc_freepagetable] will free ---- *)
+    iApply (wp_cmv_s_sconf (mword_of_int (KXC + stub)) Rs3 Rs4
+              M (K - 68)%nat true ltac:(nz) ltac:(rdok)
+              with "Hcg Hpc Hi1").
+    iIntros (CID1 Hsc1) "Hcg Hpc". iEval (rgne) in "Hcg".
+    pose (Mt := <[Regidx Rs3 := regval_into_reg
+                   (add_vec zero_reg (M !!! Regidx Rs4))]> M).
+    assert (HMts3 : Mt !!! Regidx Rs3 = sz1).
+    { rewrite /Mt upd_eq HMs4. apply add_vec_zero_l. }
+    assert (HMtsp : Mt !!! Regidx csp_rs1 = pa_stk sp0 68)
+      by (rewrite /Mt upd_ne; [exact HMsp | nz]).
+    assert (HMts6 : Mt !!! Regidx Rs6 = page_base P.(ud_root))
+      by (rewrite /Mt upd_ne; [exact HMs6 | nz]).
+    assert (Hppj : add_vec_int (mword_of_int (KXC + stub) : mword 64) 2
+                   = mword_of_int (KXC + stub + 2)) by apply avi_moi.
+    iEval (rewrite Hppj) in "Hpc".
+    (* ---- +stub+2: c.j +0x1d6 -- into the shared [-1] tail ---- *)
+    iApply (wp_cj_s_sconf (mword_of_int (KXC + stub + 2)) jimm
+              Mt (K - 68)%nat true
+              ltac:(rewrite Htgt; vm_compute; reflexivity)
+              with "Hcg Hpc Hi2").
+    iIntros (CID2 Hsc2). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iEval (rewrite Htgt) in "Hpc".
+    (* ---- the frame collapse, and the two hart re-anchorings ---- *)
+    iDestruct (kxc_frameC_collapse sp0 ra0 s00 s10 s20 pv av
+                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 c sz1 alen ef Hc33 Hal
+                 with "Helf Hframe") as "Hframeat".
+    iEval (rewrite -Hmw5 -Hmw6 -Hmw7 -Hmw8 -Hmw9 -Hmw10 -Hmw11 -Hmw12 -Hmw13)
+      in "Hframeat".
+    iDestruct (cpu_own_transport CID0 CID2 0%nat true (proc_addr jp) C true
+                 ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    assert (Hcr2 : true = false \/ proc_addr jp = zero_reg ->
+                     (CID2 : CPU) = (CID0 : CPU)) by wp_next_chain.
+    iDestruct (wp_next_retarget CID0 CID2 true (proc_addr jp) _ Hcr2
+                 with "Hcont") as "Hcont".
+    iApply (TC.kxc_bad_1d6 jp ga gf bn gfs cov logstart bmapstart inodestart
+              size used2 used2 plen pfun na avf alen aslen afun pidv V
+              dqb dqs dqa m Mt K C sp0 ra0 s00 s10 s20 pv av P sz1
+              ltac:(unfold K_kexec; lia) ltac:(reflexivity)
+              Hmsp Hmra Hms0 Hms1 Hms2 HMtsp HMts3 HMts6 Hbelow Hcov
+              with "Hcg Hcnt Htext Hpc Hpt Hka Hbm Hins Hbits Hpriv
+                    Hpath Hargv Hargs Hbs Hirs Hframeat Hcont").
+  Qed.
+
+End KexecCExitM1.
+
+(* =================================================================== *)
 (*  +0x21a .. +0x272 -- THE ARGV LOOP.                                   *)
 (*                                                                       *)
 (*  One iteration, head to back edge (or one of the three early exits    *)
@@ -1642,14 +2019,6 @@ Section KexecCLoop.
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
   Local Ltac nz := vm_compute; discriminate.
 
-  (* [kxc_frameC]'s WRITTEN ustack prefix ([∗list] over [seq 0 c], slot [46-j]
-     at index [j]) forgotten back to an opaque [stack_own] -- what a -1-tail
-     exit needs (it hands the WHOLE frame back to [proc_freepagetable]'s
-     caller, and does not care what argv-loop progress was in it). Slot [j]
-     sits at [pa_stk sp0 (46-j)]; the LAST written slot (j = c-1) is the
-     SHALLOWEST address in the run, [pa_stk sp0 (47-c)], so induction peels
-     from the [seq]'s tail via [seq_S], matching [stack_own_app]'s own
-     "shallow slots first" shape with no reassociation needed. *)
   (* [addiw rd,rs,1] on a small value: mirrors [ProofSafestrcpy.ssc_addiw_m1]'s
      technique (there for [+ (-1)]; here for [+1], so no wraparound to chase --
      the 32-bit and 64-bit truncations are both no-ops given the bound). *)
@@ -1721,26 +2090,6 @@ Section KexecCLoop.
     lia.
   Qed.
 
-  Local Lemma kxc_ustack_collapse (sp0 : mword 64) (c : nat) (f : nat -> mword 64) :
-    (c < 46)%nat ->
-    ([∗ list] j ∈ seq 0 c, pa_stk sp0 (46 - j) ↦₈ (f j : mword 64)) -∗
-    stack_own (pa_stk sp0 (46 - c)) c.
-  Proof.
-    induction c as [| c IH]; intro Hc46.
-    - rewrite stack_own_0. auto.
-    - rewrite seq_S big_sepL_app big_sepL_singleton.
-      iIntros "[Hpre Hlast]".
-      iDestruct (IH ltac:(lia) with "Hpre") as "Hrest".
-      assert (Heq : pa_stk sp0 (46 - c) = pa_stk (pa_stk sp0 (45 - c)) 1).
-      { rewrite pa_stk_assoc. f_equal. lia. }
-      iEval (rewrite Heq) in "Hlast".
-      iDestruct (stack_own_1_intro (pa_stk sp0 (45 - c)) (f c) with "Hlast") as "Hone".
-      replace (46 - S c)%nat with (45 - c)%nat by lia.
-      replace (S c) with (1 + c)%nat by lia.
-      rewrite (stack_own_app (pa_stk sp0 (45 - c)) 1 c).
-      iFrame "Hone". rewrite -Heq. iExact "Hrest".
-  Qed.
-
   (* [kxc_sp] is non-increasing: [kxc_round16 X <= X] always ([X mod 16] is
      non-negative for a positive divisor, regardless of [X]'s own sign), and
      each step only subtracts. So [top] is an upper bound at every index --
@@ -1800,6 +2149,13 @@ Section KexecCLoop.
     bb_cstr (afun c) (alen c) ->
     (Z.of_nat (alen c) < 4096)%Z ->
     (8192 <= uint sz1)%Z ->
+    (* the ELF buffer's eight slots are 8-aligned.  A fact about [sp0] ALONE,
+       constant across the whole loop, so it rides as a Coq-level premise
+       rather than as a conjunct of [kxc_at_21a]: only the three [-1] exits
+       read it, and only to fold slots 47..54 back into [kxc_frame_at]'s one
+       opaque region ([kxc_elf_give]).  [kxc_at_1ae] is where it comes from. *)
+    (forall i, (i < 8)%nat ->
+       is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true) ->
     m !!! Regidx csp_rs1 = sp0 -> m !!! Regidx Rra = ra0 ->
     m !!! Regidx Rs0 = s00 -> m !!! Regidx Rs1 = s10 -> m !!! Regidx Rs2 = s20 ->
     m !!! Regidx Rs3 = w5 -> m !!! Regidx Rs4 = w6 -> m !!! Regidx Rs5 = w7 ->
@@ -1867,7 +2223,7 @@ Section KexecCLoop.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hcna Halenlt Hcstr Halen4096 Hsz1ge
+    intros HK Hcna Halenlt Hcstr Halen4096 Hsz1ge Hal
            Hmsp Hmra Hms0 Hms1 Hms2 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13.
     unfold K_kexec in HK.
     iIntros "#Htext Hst Hcont Hout".
@@ -1912,6 +2268,10 @@ Section KexecCLoop.
     iPoseProof (kxc_26a with "Htext") as "Hi26a".
     iPoseProof (kxc_26e with "Htext") as "Hi26e".
     iPoseProof (kxc_270 with "Htext") as "Hi270".
+    iPoseProof (kxc_358 with "Htext") as "Hi358".
+    iPoseProof (kxc_35a with "Htext") as "Hi35a".
+    iPoseProof (kxc_35c with "Htext") as "Hi35c".
+    iPoseProof (kxc_35e with "Htext") as "Hi35e".
     (* ---- argument [c]'s WHOLE string-byte resource, out of [Hargs] --
        [Hargv]'s pointer-table entries at [c]/[S c] are pulled out INLINE,
        right where +0x232/+0x264 read them (kxc_c_setup's own idiom: extract,
@@ -2143,11 +2503,11 @@ Section KexecCLoop.
                  = (kxc_sp (uint sz1) alen (S c) <? uint sz1 - 4096)%Z).
     { unfold zopz0zI_u. rewrite HT3s2Z HT3s7Z. reflexivity. }
     destruct (Z_lt_ge_dec (kxc_sp (uint sz1) alen (S c)) (uint sz1 - 4096)) as [Hover | Hok].
-    + (* ==== TAKEN: genuine stack overflow. Reaches the +0x358 stub, which
-         does [mv s3,s4] (s4 = sz1) before falling into [kxc_bad_1d6] -- that
-         connector is not written yet (it first needs [kxc_frameC]'s ustack,
-         SPLIT at [c], collapsed via [kxc_ustack_collapse] back into
-         [kxc_frame_at]'s uniform shape). TODO, next session. ==== *)
+    + (* ==== TAKEN: genuine stack overflow.  Into the +0x358 stub, which is
+         [c.mv s3,s4 ; c.j +0x1d6] -- [kxc_c_exit_m1].  NOTHING in the frame
+         has moved yet at this point (the ustack write is +0x250 and the
+         argv-slot bump +0x260), so the frame folds back at [c], unchanged
+         from the loop head. ==== *)
       assert (Hcmp_true : zopz0zI_u (T3 !!! Regidx Rs2) (T3 !!! Regidx Rs7) = true)
         by (rewrite Hcmp; apply Z.ltb_lt; exact Hover).
       assert (Htgt358 : add_vec (mword_of_int (KXC + 0x22a) : mword 64)
@@ -2161,7 +2521,36 @@ Section KexecCLoop.
                 with "Hcg Hpc Hi22a").
       iIntros (CID6 Hs6). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt358) in "Hpc".
-      admit.
+      (* [Hargc] is still addressed at [Z0 !!! Ra0] -- the shape the first
+         strlen call was handed and returned; put it back on [avf c] before
+         [Hargsback] will take it. *)
+      iEval (rewrite HZ0a0) in "Hargc".
+      iDestruct ("Hargsback" with "Hargc") as "Hargs".
+      iDestruct (kxc_frameC_intro sp0 ra0 s00 s10 s20 pv av
+                   w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 w65 w68 c sz1 alen
+                   with "Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 Hf10 Hf11 Hf12 Hf13
+                         Hust Hwr Hph Hf64 Hf65 Hf66 Hf67 Hf68") as "Hframe".
+      iDestruct (kxc_c_res_intro jp bn gfs ga gf cov logstart bmapstart inodestart
+                   size used2 plen pfun na avf aslen afun pidv V dqb dqs dqa
+                   sp0 ra0 s00 s10 s20 pv av
+                   w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c sz1 alen
+                   with "Hirs Hbm Hins Hbits Hbs Hka Hpt Hpriv Hpath Hargv Hargs
+                         Helf Hframe") as "Hres".
+      iDestruct (cpu_own_transport CID0 CID6 0%nat true (proc_addr jp) C true
+                   ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+      assert (Hcr6 : true = false \/ proc_addr jp = zero_reg ->
+                       (CID6 : CPU) = (CID0 : CPU)) by wp_next_chain.
+      iDestruct (wp_next_retarget CID0 CID6 true (proc_addr jp) _ Hcr6
+                   with "Hcont") as "Hcont".
+      iApply (kxc_c_exit_m1 (CID0 := CID6) jp bn gfs ga gf cov logstart
+                bmapstart inodestart size used2 plen pfun na avf alen aslen afun
+                pidv V dqb dqs dqa m T3 K C sp0 ra0 s00 s10 s20 pv av
+                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c 0x358
+                (sign_extend' 21 (concat_vec (mword_of_int 1854 : mword 11) ('b"0")))
+                ltac:(unfold K_kexec; lia) ltac:(lia) Hal
+                Hmsp Hmra Hms0 Hms1 Hms2 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11
+                Hmw12 Hmw13 HT3sp HT3s4 HT3s6 Hbelow Hcov ltac:(pcw)
+                with "Htext Hi358 Hi35a Hpc Hcg Hcnt Hres Hcont").
     + (* ==== FALL-THROUGH: no overflow -- [Hspok] re-established at [S c]. ==== *)
       assert (Hcmp_false : zopz0zI_u (T3 !!! Regidx Rs2) (T3 !!! Regidx Rs7) = false)
         by (rewrite Hcmp; apply Z.ltb_ge; lia).
