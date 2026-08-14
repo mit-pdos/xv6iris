@@ -209,20 +209,20 @@ Section ProofAcquire.
                 with "Hcg Hpc HTc Hcont").
   Qed.
 
-  Lemma wp_acquire_gen_sconf
+  (* THE FRESH TIER, and the only thing proved here: [Hfresh : s ∉ lks] is
+     exactly what the held-set insert consumes, and nothing in the run below
+     looks at a rank.  The BELOW tier is a corollary (next lemma); see
+     SpecAcquire.v's header for why the order is policy rather than a proof
+     obligation.  [#Hpanic] STAYS in both -- neither premise kills the
+     [holding] arm. *)
+  Lemma wp_acquire_gen_fresh_sconf
       (γl : gname) (s : string) (R Tc Dc : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string)
-    : wp_acquire_gen_sconf_body γl s R Tc Dc m n eb p C av b lks.
+    : wp_acquire_gen_fresh_sconf_body γl s R Tc Dc m n eb p C av b lks.
   Proof.
-    cbv beta delta [wp_acquire_gen_sconf_body].
-    (* [Hfresh] is the new premise: this hart holds no lock of [lk]'s rank.
-       [#Hpanic] STAYS -- see SpecAcquire.v on why [Hfresh] does not yet kill
-       the [holding] arm. *)
-    intros pcE lk0 ret_tgt Hpos Hav Hbelow Href Hrefpre.
-    (* the ghost step consumes NON-MEMBERSHIP; the contract carries the BOUND,
-       which is what composes across a call graph (SpecAcquire.v). *)
-    pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
+    cbv beta delta [wp_acquire_gen_fresh_sconf_body wp_acquire_gen_pre_body].
+    intros pcE lk0 ret_tgt Hpos Hav Hfresh Href Hrefpre.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hown #Htext Hpc #Hlock HTc #Hpanic Hcont".
     (* THE ENTRY BOUND, taken before push_off raises the level: after the push
@@ -819,6 +819,19 @@ Section ProofAcquire.
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity.
   Qed.
 
+  (* THE BELOW TIER, as a corollary: the contract is antitone in its held-set
+     precondition and [locks_below lks s] implies [s ∉ lks]. *)
+  Lemma wp_acquire_gen_sconf
+      (γl : gname) (s : string) (R Tc Dc : iProp Σ)
+      (m : regfile)
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string)
+    : wp_acquire_gen_sconf_body γl s R Tc Dc m n eb p C av b lks.
+  Proof.
+    exact (wp_acquire_gen_pre_weaken γl s R Tc Dc m n eb p C av b lks
+             (s ∉ lks) (locks_below lks s) (locks_below_not_elem lks s)
+             (wp_acquire_gen_fresh_sconf γl s R Tc Dc m n eb p C av b lks)).
+  Qed.
+
 End ProofAcquire.
 
 End AcquireGenProof.
@@ -831,6 +844,30 @@ Section OfGen.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  (* The [Tc := emp] / [Dc := False] instantiation is PREMISE-AGNOSTIC, so it
+     is done once, at the FRESH tier, and the BELOW tier follows by the same
+     weakening as at the generic level.  Doing it the other way round would
+     make this fifteen-line script a cross-product. *)
+  Lemma wp_acquire_fresh_sconf
+      (γl : gname) (s : string) (R : iProp Σ)
+      (m : regfile)
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool)
+      (lks : gset string)
+    : wp_acquire_fresh_sconf_body γl s R m n eb p C av b lks.
+  Proof.
+    cbv beta delta [wp_acquire_fresh_sconf_body wp_acquire_pre_body].
+    intros pcE lk0 ret_tgt Hpos Hav Hfresh.
+    iIntros "Hcg Hown #Htext Hpc #Hlock #Hpanic Hcont".
+    iApply (G.wp_acquire_gen_fresh_sconf γl s R emp%I False%I m n eb p C av b lks
+              Hpos Hav Hfresh (lock_refute_False _) (fun i => lock_refute_False _)
+              with "Hcg Hown Htext Hpc [] [] Hpanic").
+    { iApply (is_lock_openable with "Hlock"). }
+    { done. }
+    iIntros (CIDg Hsg ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hown Hpay".
+    iSpecialize ("Hcont" $! CIDg with "[%]"); [wp_next_chain|].
+    iApply ("Hcont" $! ms mfin with "[//] Hcg Hpc [//] Htok HRes Hown Hpay").
+  Qed.
+
   Lemma wp_acquire_sconf
       (γl : gname) (s : string) (R : iProp Σ)
       (m : regfile)
@@ -838,18 +875,9 @@ Section OfGen.
       (lks : gset string)
     : wp_acquire_sconf_body γl s R m n eb p C av b lks.
   Proof.
-    cbv beta delta [wp_acquire_sconf_body].
-    intros pcE lk0 ret_tgt Hpos Hav Hbelow.
-    iIntros "Hcg Hown #Htext Hpc #Hlock #Hpanic Hcont".
-    iApply (G.wp_acquire_gen_sconf γl s R emp%I False%I m n eb p C av b lks
-              Hpos Hav Hbelow (lock_refute_False _) (fun i => lock_refute_False _)
-              with "Hcg Hown Htext Hpc [] [] Hpanic").
-    all: try lkbelow.
-    { iApply (is_lock_openable with "Hlock"). }
-    { done. }
-    iIntros (CIDg Hsg ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hown Hpay".
-    iSpecialize ("Hcont" $! CIDg with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! ms mfin with "[//] Hcg Hpc [//] Htok HRes Hown Hpay").
+    exact (wp_acquire_pre_weaken γl s R m n eb p C av b lks
+             (s ∉ lks) (locks_below lks s) (locks_below_not_elem lks s)
+             (wp_acquire_fresh_sconf γl s R m n eb p C av b lks)).
   Qed.
 
 End OfGen.
