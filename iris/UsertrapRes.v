@@ -45,10 +45,11 @@ From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto.
+Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import RegFile HartTp WpGpr.
 Require Import SmodeCore.
 Require Import KernelDataInv MstatusBits.
+Require Import MinstretInv.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import StackOwn CalleeSaved.
@@ -144,7 +145,13 @@ Section UsertrapRes.
      strans_inv ∗
      sie_arm false pj ∗
      strans_bit strans_bit_kpt ∗
-     sconf_priv_closer ∗
+     (* NOT [IntrDefs.sconf_priv_closer]: [mie]/[mideleg]/[menvcfg] are
+        [user_cfg]'s cells too (uservec/userret/user-mode hold them the
+        whole time usertrap ISN'T running), so [ut_trap] cannot claim them
+        permanently the way the closer would -- [wp_usertrap_body] borrows
+        them as loose cells for the call instead (see SpecUsertrap.v) and
+        [ut_trap_open]/the exit epilogue assemble/release [sconf] from
+        those, not from a parked closer. *)
      ut_ghosts ∗
      cpu_own 0%nat false pj C false ∗
      (* the running claim.  It is what [SpecYield] / [SpecKexit] want as
@@ -175,16 +182,25 @@ Section UsertrapRes.
      coming out here because usertrap READS them (scause three times, sepc
      once, stval twice) before ever folding them away. *)
   Lemma ut_trap_open (pj ksp : mword 64) (av : nat) (C : iProp Σ)
-      (m : regfile) (ms : mword 64) :
+      (m : regfile) (ms : mword 64) (mie_v mdv0 menvcfg0 : mword 64) :
     sconf_ms_facts ms ->
     eq_vec (_get_Mstatus_SIE ms) ('b"1") = false ->
     eq_vec (_get_Mstatus_SPP ms) ('b"1") = false ->
     _get_Mstatus_SPIE ms = ('b"1" : mword 1) ->
     m !!! Regidx csp_rs1 = ksp ->
     m !!! Regidx Rtp = cid_word ->
+    (* the three [sconf] pins, borrowed loose (see [ut_trap]'s comment) *)
+    mie_v = MIE_S ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    menvcfg0 = MENVCFG_S ->
+    hw_config -∗
+    minstret_inv -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
     mstatus ↦ᵣ ms -∗
+    mie ↦ᵣ mie_v -∗
+    mideleg ↦ᵣ mdv0 -∗
+    menvcfg ↦ᵣ menvcfg0 -∗
     gpr_file m -∗
     ut_trap pj ksp av C -∗
       sie_cap_gpr m av false pj ∗
@@ -194,11 +210,12 @@ Section UsertrapRes.
       strans_bit strans_bit_kpt ∗
       sret_bits ('b"0" : mword 1) ('b"1" : mword 1).
   Proof.
-    intros Hmsf Hsie Hspp Hspie Hsp Htp.
+    intros Hmsf Hsie Hspp Hspie Hsp Htp Hmiev Hmask Hmenvv.
+    subst mie_v.
     apply mword1_zero_of_ne_one in Hsie.
     apply mword1_zero_of_ne_one in Hspp.
-    iIntros "Hhs Hpriv Hms Hgpr Ht".
-    iDestruct "Ht" as "(Hstk & Hstr & Harm & Hkpt & Hcl & Hgh & Hcpu & Hclm)".
+    iIntros "#Hhw #Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hgpr Ht".
+    iDestruct "Ht" as "(Hstk & Hstr & Harm & Hkpt & Hgh & Hcpu & Hclm)".
     iDestruct "Hgh" as "(Hhalf & Hq & Htie & Htrav)".
     (* A named [iFrame] here still makes the tactic hunt these five atoms
        through the WHOLE goal, including the [sie_cap_gpr] conjunct that is
@@ -213,10 +230,15 @@ Section UsertrapRes.
        unchanged. *)
     iSplitR "Hcpu Hclm Hq Hkpt Htrav"; [ | iFrame "Hcpu Hclm Hq Hkpt Htrav" ].
     rewrite /sie_cap_gpr. iFrame "Hhs".
-    iSplitL "Hpriv Hms Hhalf Htie Hcl".
-    { iApply ("Hcl" $! ms with "Hpriv [Hms Hhalf Htie]").
-      rewrite /sconf_msown /sret_tie Hsie Hspp Hspie.
-      iFrame "Hms Hhalf Htie". iPureIntro. exact Hmsf. }
+    iSplitL "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv".
+    { rewrite /sconf. iFrame "Hhw Hminv Hpriv".
+      iSplitL "Hms Hhalf Htie".
+      { iExists ms. rewrite /sret_tie Hsie Hspp Hspie.
+        iFrame "Hms Hhalf Htie". iPureIntro. exact Hmsf. }
+      iSplitL "Hmie Hmdl".
+      { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmask. }
+      iExists menvcfg0. iFrame "Hmenv". subst menvcfg0.
+      iPureIntro. split; [| split; [| split; [| split]]]; vm_compute; reflexivity. }
     rewrite /sie_cap /ut_stack Hsp.
     iFrame "Hstk Hstr Harm".
     rewrite (tp_pin_id m Htp). iExact "Hgpr".
