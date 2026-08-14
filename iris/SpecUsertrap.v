@@ -249,6 +249,20 @@ Definition usertrap_post `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG
     mie ↦ᵣ mie_v -∗
     mideleg ↦ᵣ mdv0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗
+    (* [hw_config]/[minstret_inv], AT THE RESUMING HART.  Both are persistent
+       and ride at the head of [sconf] -- [wp_usertrap_body]'s own entry
+       premise hands them in as a free borrow (see its comment) on the
+       strength that "persistent costs the caller nothing", but that is only
+       true AT ONE HART: usertrap may cross to a different hart before it
+       returns (the whole reason [R] above is hart-indexed), and a caller's
+       pre-crossing copy is a DIFFERENT resource from the post-crossing one
+       (same shape, different hart index, indistinguishable on the page).
+       The proof already has the resuming hart's own copies on hand at this
+       exact point -- [ut_ret2] unpacks them straight out of [sconf] just
+       like [ut_dup_hw] does -- so exposing them here costs nothing new to
+       prove, only to thread through. *)
+    hw_config -∗
+    minstret_inv -∗
     R pt' ksp -∗
     WP (Loop : expr riscv_lang)).
 
@@ -291,7 +305,14 @@ Definition wp_usertrap_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fi
      [mideleg]/[menvcfg] below, which usertrap needs at FULL ownership
      (it assembles [IntrDefs.sconf], hence [sie_cap_gpr], out of them for its
      own internal kernel-tier step lemmas) and must therefore borrow and
-     give back explicitly, exactly like every other loose cell here. *)
+     give back explicitly, exactly like every other loose cell here.
+     [usertrap_post] hands a copy back too, in spite of that -- NOT because
+     the call could otherwise lose them (a persistent proposition is never
+     consumed), but because usertrap may CROSS HARTS before it returns, and
+     the entry copy is a resource AT THE ENTRY HART, silent on any other
+     one.  A caller that needs [hw_config] again after the call (uservec's
+     tail does, to reach userret) needs it AT THE RESUMING HART, which only
+     [usertrap_post] itself is in a position to hand over. *)
   hw_config -∗ minstret_inv -∗
   hart_state ↦ᵣ HART_ACTIVE tt -∗
   cur_privilege ↦ᵣ Supervisor -∗
@@ -364,9 +385,12 @@ Module Type USERTRAP_RES.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
              !kallocG Σ, !irefslotG Σ, !iregG Σ}
-      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44),
+      (* THE CROSS-ROUND HISTORICAL FACT, bare and undischarged -- see
+         [ProcGeom.tf_kernel_words_ok]'s own header. *)
+      (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
       usertrap_res pt ksp -∗
-      ∃ ws : list (mword 64), tf_page (ud_tfp pt) ws ∗
+      ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
         (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res pt ksp).
 End USERTRAP_RES.
 

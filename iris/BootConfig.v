@@ -411,6 +411,18 @@ Section BootBundles.
     iExact "Hb".
   Qed.
 
+  (* [senvcfg_fixed]'s twin of [hw_config_intro] -- [senvcfg] resets to 0
+     ([sail_model_init], same as every other CSR this bundle freezes) and
+     nothing ever writes it afterward, so persisting the boot client's raw
+     cell is the only ghost step, same as the five [hw_config] cells above. *)
+  Lemma senvcfg_fixed_intro :
+    senvcfg ↦ᵣ (mword_of_int 0 : mword 64) ==∗
+    senvcfg_fixed.
+  Proof.
+    iIntros "Hsenv". iMod (reg_pointsto_persist with "Hsenv") as "#Hsenv'".
+    iModIntro. iExact "Hsenv'".
+  Qed.
+
   (* [mmode_config] at the reset mstatus (0xA00000000: SXL = UXL = 2,
      MIE = MPRV = 0 -- the model's own [sail_model_init]).  All FOUR mstatus
      facts are [vm_compute] on that pinned value; the rest is

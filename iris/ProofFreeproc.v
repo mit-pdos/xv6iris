@@ -838,7 +838,12 @@ Section ProofFreeproc.
                       = add_vec_int (mword_of_int (FR + 0x10) : mword 64) 4)
         by (rewrite /T1 upd_eq; reflexivity).
       (* the trapframe page, back as the anonymous bytes kfree wants *)
-      iDestruct (tf_page_to_page_own tfp ws with "Htfp") as "Hpage".
+      iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
+      iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+        "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+          %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+          %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+      iDestruct (tf_page_to_page_own tfp ws Htfval with "Hkmapb Htfp") as "Hpage".
       (* kfree is stated over the RAW kmem lock and count, not the bundle:
          open [kalloc_env] once here.  It is at [None], hence persistent, so
          nothing is lost by opening it. *)

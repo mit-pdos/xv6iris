@@ -624,17 +624,20 @@ Section UsertrapRes.
      [ut_own_priv] + [proc_priv_tf_open]; the closer moves [V] to
      [upd_tf V ws'] (its [pv_upt] is unchanged, so [pt] is unaffected). *)
   Lemma ut_res_tf_open (Rsys : gname -> mword 64 -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) :
+      (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
+    (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
     ut_res Rsys pt ksp -∗
-    ∃ ws : list (mword 64), tf_page (ud_tfp pt) ws ∗
+    ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
       (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ ut_res Rsys pt ksp).
   Proof.
-    iIntros "H".
+    iIntros (Hgap) "H".
     iDestruct "H" as (N V av C) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Henv)".
     iDestruct "Henv" as "[Hcaps Hown]".
     iDestruct (ut_own_priv with "Hown") as "(Hpv & Hsy & Hownback)".
     iDestruct (proc_priv_tf_open with "Hpv") as (ws) "[Htf Hclose]".
-    rewrite Hupt. iExists ws. iFrame "Htf".
+    rewrite Hupt.
+    iDestruct (tf_page_length with "Htf") as %Hlen.
+    iExists ws. iSplitR; [iPureIntro; exact (Hgap ws Hlen) |]. iFrame "Htf".
     iIntros (ws') "Htf'".
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
     iDestruct ("Hownback" $! (upd_tf V ws') with "Hpv' Hsy") as "Hown'".
@@ -916,10 +919,11 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
         !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
         !kallocG Σ, !irefslotG Σ, !iregG Σ}
-      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
+    (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
     usertrap_res pt ksp -∗
-    ∃ ws : list (mword 64), tf_page (ud_tfp pt) ws ∗
+    ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
       (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res pt ksp).
-  Proof. exact (ut_res_tf_open SY.syscall_env pt ksp). Qed.
+  Proof. exact (ut_res_tf_open SY.syscall_env pt ksp kroot). Qed.
 
 End UtResFits.

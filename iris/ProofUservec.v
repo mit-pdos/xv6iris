@@ -3,10 +3,22 @@
    page chained, from the trapped-out-of-user machine ([user_trap_frame],
    the USER table installed) through the [csrw sscratch] / [li a0,TRAPFRAME]
    prologue, the 31 register-save stores into the TRAPFRAME page, the four
-   kernel-context loads, and the satp switch back to the KERNEL table,
-   ending with the pc at [ret_pc vktr] (usertrap), the kernel table folded
-   back into the ambient [kpt_inv kroot] and the user table parked as
-   [pt_frame]. *)
+   kernel-context loads, and the satp switch back to the KERNEL table --
+   THEN, where the old (pre-chaining) version stopped, straight into
+   [UT.wp_usertrap] and, once that returns, [UR.wp_userret_pt], discharging
+   [uservec_post] at the far end.  A functor over both, per SpecUservec.v's
+   header.
+
+   THE TRAPFRAME OPENS TWICE.  [usertrap_res] is the one owner of the
+   trapframe page, at the PHYSICAL tier natively (ProcInv.v) -- the SAME
+   tier this file's own 44/31-instruction walks already use, so opening it
+   (via [UT.usertrap_res_tf_open]) hands the walk its cells directly, no
+   phys<->mem crossing.  Once for the SAVE walk below, resealed just before
+   the call into usertrap; once more (a FRESH open, after usertrap hands a
+   FRESH [usertrap_res] back, possibly on a different hart) for userret's
+   own RESTORE walk, resealed again at the very end for [uservec_post]'s
+   own leftover.  [tf_page_open36] (just below) is the reusable 36-word
+   extraction both opens use. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
@@ -24,16 +36,40 @@ Require Import UserretDefs UserretPt.
 Require Import UservecDefs UservecPt UservecExitPt.
 Require Import WpIntrCore.
 Require Import UserPtTree UserExec UserKernelBridge.
+Require Import ProcInv ProcGeom.
+Require Import IntrDefs MstatusBits.
+(* the classes [usertrap_res]'s own signature needs -- see SpecUservec.v's
+   own note on the same trap (must Require directly, not just
+   transitively, or unqualified names below auto-generalize as fresh,
+   unrelated variables instead of resolving to the concrete classes). *)
+Require Import WpLock.
+Require Import FdSlots.
+Require Import FileInvDefs.
+Require Import BioInv.
+Require Import DiskPtsto.
+Require Import WpUart.
+Require Import FsBlocks LogInv.
+Require Import FsCrash.
+Require Import KallocInv.
+Require Import IrefSlots InodeRegion.
+Require Import SpecUsertrap.
+Require Import SpecUserret.
 Require Import SpecUservec.
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
 
-Module UservecProof : USERVEC.
+Module UservecProof (UT : SpecUsertrap.USERTRAP) (UR : SpecUserret.USERRET) : USERVEC.
+
 Section UservecAllPt.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+            !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+            !kallocG Σ, !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+
+  Definition usertrap_res := UT.usertrap_res.
+  Definition usertrap_res_tf_open := UT.usertrap_res_tf_open.
 
   (* the user invariant already carries the map well-formedness the exit
      switch needs *)
@@ -45,18 +81,156 @@ Section UservecAllPt.
     iPureIntro. exact Hwf.
   Qed.
 
+  (* the reusable extraction ProofUservec's tail needs twice -- once for
+     usertrap's own entry (opened via [UT.usertrap_res_tf_open]), once more
+     for userret's (opened again after usertrap hands [usertrap_res] back
+     fresh).  [tf_words] is a plain [big_sepL], so a KNOWN-length [ws]
+     splits into all 36 cells AT ONCE, no wand-by-wand borrowing -- the
+     [destruct]-per-index chain is the mechanical cost of that, paid once
+     here instead of twice inline. *)
+  Lemma tf_page_open36 (tfp : mword 44) (ws : list (mword 64)) :
+    length ws = TFWORDS ->
+    tf_page tfp ws -∗
+    ∃ w0 w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 w18 w19 w20 w21 w22 w23 w24 w25 w26 w27 w28 w29 w30 w31 w32 w33 w34 w35 : mword 64,
+      ⌜ws = [w0;w1;w2;w3;w4;w5;w6;w7;w8;w9;w10;w11;w12;w13;w14;w15;w16;w17;w18;w19;w20;w21;w22;w23;w24;w25;w26;w27;w28;w29;w30;w31;w32;w33;w34;w35]⌝ ∗
+      tf_pa tfp 0 ↦ₚ₈ w0 ∗
+    tf_pa tfp 8 ↦ₚ₈ w1 ∗
+    tf_pa tfp 16 ↦ₚ₈ w2 ∗
+    tf_pa tfp 24 ↦ₚ₈ w3 ∗
+    tf_pa tfp 32 ↦ₚ₈ w4 ∗
+    tf_pa tfp 40 ↦ₚ₈ w5 ∗
+    tf_pa tfp 48 ↦ₚ₈ w6 ∗
+    tf_pa tfp 56 ↦ₚ₈ w7 ∗
+    tf_pa tfp 64 ↦ₚ₈ w8 ∗
+    tf_pa tfp 72 ↦ₚ₈ w9 ∗
+    tf_pa tfp 80 ↦ₚ₈ w10 ∗
+    tf_pa tfp 88 ↦ₚ₈ w11 ∗
+    tf_pa tfp 96 ↦ₚ₈ w12 ∗
+    tf_pa tfp 104 ↦ₚ₈ w13 ∗
+    tf_pa tfp 112 ↦ₚ₈ w14 ∗
+    tf_pa tfp 120 ↦ₚ₈ w15 ∗
+    tf_pa tfp 128 ↦ₚ₈ w16 ∗
+    tf_pa tfp 136 ↦ₚ₈ w17 ∗
+    tf_pa tfp 144 ↦ₚ₈ w18 ∗
+    tf_pa tfp 152 ↦ₚ₈ w19 ∗
+    tf_pa tfp 160 ↦ₚ₈ w20 ∗
+    tf_pa tfp 168 ↦ₚ₈ w21 ∗
+    tf_pa tfp 176 ↦ₚ₈ w22 ∗
+    tf_pa tfp 184 ↦ₚ₈ w23 ∗
+    tf_pa tfp 192 ↦ₚ₈ w24 ∗
+    tf_pa tfp 200 ↦ₚ₈ w25 ∗
+    tf_pa tfp 208 ↦ₚ₈ w26 ∗
+    tf_pa tfp 216 ↦ₚ₈ w27 ∗
+    tf_pa tfp 224 ↦ₚ₈ w28 ∗
+    tf_pa tfp 232 ↦ₚ₈ w29 ∗
+    tf_pa tfp 240 ↦ₚ₈ w30 ∗
+    tf_pa tfp 248 ↦ₚ₈ w31 ∗
+    tf_pa tfp 256 ↦ₚ₈ w32 ∗
+    tf_pa tfp 264 ↦ₚ₈ w33 ∗
+    tf_pa tfp 272 ↦ₚ₈ w34 ∗
+    tf_pa tfp 280 ↦ₚ₈ w35 ∗
+      tf_tail tfp.
+  Proof.
+    intro Hlen. rewrite /tf_page. iIntros "(_ & Hws & Htail)".
+    destruct ws as [|w0 ws]; [discriminate Hlen|].
+    destruct ws as [|w1 ws]; [discriminate Hlen|].
+    destruct ws as [|w2 ws]; [discriminate Hlen|].
+    destruct ws as [|w3 ws]; [discriminate Hlen|].
+    destruct ws as [|w4 ws]; [discriminate Hlen|].
+    destruct ws as [|w5 ws]; [discriminate Hlen|].
+    destruct ws as [|w6 ws]; [discriminate Hlen|].
+    destruct ws as [|w7 ws]; [discriminate Hlen|].
+    destruct ws as [|w8 ws]; [discriminate Hlen|].
+    destruct ws as [|w9 ws]; [discriminate Hlen|].
+    destruct ws as [|w10 ws]; [discriminate Hlen|].
+    destruct ws as [|w11 ws]; [discriminate Hlen|].
+    destruct ws as [|w12 ws]; [discriminate Hlen|].
+    destruct ws as [|w13 ws]; [discriminate Hlen|].
+    destruct ws as [|w14 ws]; [discriminate Hlen|].
+    destruct ws as [|w15 ws]; [discriminate Hlen|].
+    destruct ws as [|w16 ws]; [discriminate Hlen|].
+    destruct ws as [|w17 ws]; [discriminate Hlen|].
+    destruct ws as [|w18 ws]; [discriminate Hlen|].
+    destruct ws as [|w19 ws]; [discriminate Hlen|].
+    destruct ws as [|w20 ws]; [discriminate Hlen|].
+    destruct ws as [|w21 ws]; [discriminate Hlen|].
+    destruct ws as [|w22 ws]; [discriminate Hlen|].
+    destruct ws as [|w23 ws]; [discriminate Hlen|].
+    destruct ws as [|w24 ws]; [discriminate Hlen|].
+    destruct ws as [|w25 ws]; [discriminate Hlen|].
+    destruct ws as [|w26 ws]; [discriminate Hlen|].
+    destruct ws as [|w27 ws]; [discriminate Hlen|].
+    destruct ws as [|w28 ws]; [discriminate Hlen|].
+    destruct ws as [|w29 ws]; [discriminate Hlen|].
+    destruct ws as [|w30 ws]; [discriminate Hlen|].
+    destruct ws as [|w31 ws]; [discriminate Hlen|].
+    destruct ws as [|w32 ws]; [discriminate Hlen|].
+    destruct ws as [|w33 ws]; [discriminate Hlen|].
+    destruct ws as [|w34 ws]; [discriminate Hlen|].
+    destruct ws as [|w35 ws]; [discriminate Hlen|].
+    destruct ws; [| discriminate Hlen].
+    iExists w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15, w16, w17, w18, w19, w20, w21, w22, w23, w24, w25, w26, w27, w28, w29, w30, w31, w32, w33, w34, w35.
+    iSplitR; [done|].
+    rewrite /tf_words /=.
+    iDestruct "Hws" as "(Hw0 & Hw1 & Hw2 & Hw3 & Hw4 & Hw5 & Hw6 & Hw7 & Hw8 & Hw9 & Hw10 & Hw11 & Hw12 & Hw13 & Hw14 & Hw15 & Hw16 & Hw17 & Hw18 & Hw19 & Hw20 & Hw21 & Hw22 & Hw23 & Hw24 & Hw25 & Hw26 & Hw27 & Hw28 & Hw29 & Hw30 & Hw31 & Hw32 & Hw33 & Hw34 & Hw35 & _)".
+    iFrame.
+  Qed.
+
+  (* the reverse of [tf_page_open36]: rebuild [tf_page] from the 36 cells,
+     inferring their VALUES from whatever resources are actually supplied
+     (every caller applies this with underscores for [w0..w35] and the
+     current [Hk*]/[Htf*] hypotheses in the wand slots -- the values are
+     whatever the 44-instruction walk left there, never written out by
+     hand). *)
+  Lemma tf_page_close36 (tfp : mword 44)
+      (w0 : mword 64) (w1 : mword 64) (w2 : mword 64) (w3 : mword 64) (w4 : mword 64) (w5 : mword 64) (w6 : mword 64) (w7 : mword 64) (w8 : mword 64) (w9 : mword 64) (w10 : mword 64) (w11 : mword 64) (w12 : mword 64) (w13 : mword 64) (w14 : mword 64) (w15 : mword 64) (w16 : mword 64) (w17 : mword 64) (w18 : mword 64) (w19 : mword 64) (w20 : mword 64) (w21 : mword 64) (w22 : mword 64) (w23 : mword 64) (w24 : mword 64) (w25 : mword 64) (w26 : mword 64) (w27 : mword 64) (w28 : mword 64) (w29 : mword 64) (w30 : mword 64) (w31 : mword 64) (w32 : mword 64) (w33 : mword 64) (w34 : mword 64) (w35 : mword 64) :
+    tf_pa tfp 0 ↦ₚ₈ w0 -∗
+    tf_pa tfp 8 ↦ₚ₈ w1 -∗
+    tf_pa tfp 16 ↦ₚ₈ w2 -∗
+    tf_pa tfp 24 ↦ₚ₈ w3 -∗
+    tf_pa tfp 32 ↦ₚ₈ w4 -∗
+    tf_pa tfp 40 ↦ₚ₈ w5 -∗
+    tf_pa tfp 48 ↦ₚ₈ w6 -∗
+    tf_pa tfp 56 ↦ₚ₈ w7 -∗
+    tf_pa tfp 64 ↦ₚ₈ w8 -∗
+    tf_pa tfp 72 ↦ₚ₈ w9 -∗
+    tf_pa tfp 80 ↦ₚ₈ w10 -∗
+    tf_pa tfp 88 ↦ₚ₈ w11 -∗
+    tf_pa tfp 96 ↦ₚ₈ w12 -∗
+    tf_pa tfp 104 ↦ₚ₈ w13 -∗
+    tf_pa tfp 112 ↦ₚ₈ w14 -∗
+    tf_pa tfp 120 ↦ₚ₈ w15 -∗
+    tf_pa tfp 128 ↦ₚ₈ w16 -∗
+    tf_pa tfp 136 ↦ₚ₈ w17 -∗
+    tf_pa tfp 144 ↦ₚ₈ w18 -∗
+    tf_pa tfp 152 ↦ₚ₈ w19 -∗
+    tf_pa tfp 160 ↦ₚ₈ w20 -∗
+    tf_pa tfp 168 ↦ₚ₈ w21 -∗
+    tf_pa tfp 176 ↦ₚ₈ w22 -∗
+    tf_pa tfp 184 ↦ₚ₈ w23 -∗
+    tf_pa tfp 192 ↦ₚ₈ w24 -∗
+    tf_pa tfp 200 ↦ₚ₈ w25 -∗
+    tf_pa tfp 208 ↦ₚ₈ w26 -∗
+    tf_pa tfp 216 ↦ₚ₈ w27 -∗
+    tf_pa tfp 224 ↦ₚ₈ w28 -∗
+    tf_pa tfp 232 ↦ₚ₈ w29 -∗
+    tf_pa tfp 240 ↦ₚ₈ w30 -∗
+    tf_pa tfp 248 ↦ₚ₈ w31 -∗
+    tf_pa tfp 256 ↦ₚ₈ w32 -∗
+    tf_pa tfp 264 ↦ₚ₈ w33 -∗
+    tf_pa tfp 272 ↦ₚ₈ w34 -∗
+    tf_pa tfp 280 ↦ₚ₈ w35 -∗
+    tf_tail tfp -∗
+    tf_page tfp [w0;w1;w2;w3;w4;w5;w6;w7;w8;w9;w10;w11;w12;w13;w14;w15;w16;w17;w18;w19;w20;w21;w22;w23;w24;w25;w26;w27;w28;w29;w30;w31;w32;w33;w34;w35].
+  Proof.
+    iIntros "Hw0 Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hw18 Hw19 Hw20 Hw21 Hw22 Hw23 Hw24 Hw25 Hw26 Hw27 Hw28 Hw29 Hw30 Hw31 Hw32 Hw33 Hw34 Hw35 Htail".
+    rewrite /tf_page. iSplitR; [done|].
+    iSplitL "Hw0 Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hw18 Hw19 Hw20 Hw21 Hw22 Hw23 Hw24 Hw25 Hw26 Hw27 Hw28 Hw29 Hw30 Hw31 Hw32 Hw33 Hw34 Hw35"; [rewrite /tf_words /=; iFrame | iFrame].
+  Qed.
+
   Lemma wp_uservec_pt (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (kroot : mword 44)
-      (sscr0 : mword 64)
-      (vksat vksp vktr vkhart : bv 64)
-      (w40 w48 w56 w64 w72 w80 w88 w96 w104 w120 w128 w136 w144 w152 w160
-       w168 w176 w184 w192 w200 w208 w216 w224 w232 w240 w248 w256 w264
-       w272 w280 w112 : bv 64)
-      (dqk : dfrac) :
-    wp_uservec_pt_body C pt Rut kroot sscr0 vksat vksp vktr vkhart
-      w40 w48 w56 w64 w72 w80 w88 w96 w104 w120 w128 w136 w144 w152 w160
-        w168 w176 w184 w192 w200 w208 w216 w224 w232 w240 w248 w256 w264
-        w272 w280 w112 dqk.
+      (kroot : mword 44) (j : nat) (sscr0 : mword 64) (vksp : mword 64) :
+    wp_uservec_pt_body usertrap_res C pt Rut kroot j sscr0 vksp.
   Proof.
     cbv beta zeta delta [wp_uservec_pt_body].
     (* [tf_pa] deliberately NOT unfolded here: its 35 trapframe cells ride in
@@ -65,12 +239,8 @@ Section UservecAllPt.
        address (~260 nodes vs ~12) is 14 % of the proof TERM.  The leaves
        unify through the definition. See claude-notes/optimization.md. *)
     unfold uservec_gpr.
-    intros Hstvec Hdqc HkMode Hkasid Hkppn.
-    iIntros "#Hkt #Hhw #Hinv #Hclaim Hframe Hsscr #Hkfr
-             Hk0 Hk8 Hk16 Hk32
-             Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf120 Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192 Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264 Htf272 Htf280
-             Htf112
-             Hcont".
+    intros Hstvec Hdqc Hmie Hjlt Hgap Hkwgap.
+    iIntros "#Hkt #Hhw #Hinv #Hclaim Hframe Hsscr #Hkfr Hures Hcont".
     (* ============ open the trapped machine ============ *)
     iDestruct (user_trap_frame_open C pt Rut with "Hframe") as (ms_v sc_v stval_v sepc_v g)
       "(%Hok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpcc & Hnpc & Hfile &
@@ -99,6 +269,24 @@ Section UservecAllPt.
     { rewrite Hstvec. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hsb) in "Hpcc".
     iEval (rewrite Hsb) in "Hnpc".
+    (* ============ open usertrap_res for the SAVE walk's own cells ======= *)
+    iDestruct (usertrap_res_tf_open pt vksp kroot (Hkwgap CID) with "Hures") as (ws0)
+      "(%Hok0 & Htf0 & Hclose0)".
+    iDestruct (tf_page_length with "Htf0") as %Hlen0.
+    iDestruct (tf_page_open36 (ud_tfp pt) ws0 Hlen0 with "Htf0") as
+      (vksat vksp0 vktr w3 vkhart
+       w40 w48 w56 w64 w72 w80 w88 w96 w104 w112 w120 w128 w136 w144 w152 w160
+       w168 w176 w184 w192 w200 w208 w216 w224 w232 w240 w248 w256 w264 w272 w280)
+      "(-> & Hk0 & Hk8 & Hk16 & Hk24 & Hk32 &
+        Htf40 & Htf48 & Htf56 & Htf64 & Htf72 & Htf80 & Htf88 & Htf96 & Htf104 & Htf112 &
+        Htf120 & Htf128 & Htf136 & Htf144 & Htf152 & Htf160 & Htf168 & Htf176 & Htf184 &
+        Htf192 & Htf200 & Htf208 & Htf216 & Htf224 & Htf232 & Htf240 & Htf248 & Htf256 &
+        Htf264 & Htf272 & Htf280 & Htail0)".
+    cbn in Hok0.
+    destruct Hok0 as ((ksat & Heq0 & HkMode & Hkasid & Hkppn) & Heq1 & Heq2 & Heq4).
+    apply Some_inj in Heq0, Heq1, Heq2, Heq4.
+    subst ksat vksp0.
+    set (dqk := DfracOwn 1 : dfrac).
     (* ============ the 44 instruction resources ============ *)
     iPoseProof (uvi_csrw_sscratch with "Hkt") as "Hi_csrw_ss".
     (* ---- csrw sscratch, a0 @ 0x00 ---- *)
@@ -1403,26 +1591,124 @@ Section UservecAllPt.
               HSIE HMPRV HSXL HTVM Hmm HPBMTE Hmenvval0 Hwfu Ht1v HkMode Hkasid Hkppn
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hclaim Hutlb Hkfr Hpc Hfile
                     Hi_sf1 Hi_csrw_satp Hi_sf2 Hi_cjalr").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hufr Hpc Hfile".
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hufr Hkres Hpc Hfile".
     iClear "Hi_sf1".
     iClear "Hi_csrw_satp".
     iClear "Hi_sf2".
     iClear "Hi_cjalr".
-    iEval (rewrite Ht0v) in "Hpc".
-    (* rebuild the config bundle *)
-    iAssert (user_cfg C) with "[Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmse Hsse]" as "Hcfg".
-    { unfold user_cfg. rewrite Hdqc.
-      iFrame "Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmse Hsse". }
-    subst M7 M6 M5 M4 M3 M2.
-    (* the continuation is sealed (SpecUservec.uservec_post) so that its
-       ~50-wand type is not re-embedded in the proof term at every one of the
-       proof's ~600 steps; open it here, once, at the return. *)
+    (* ============ derive the usertrap call's own premises ============= *)
+    iEval (rewrite Ht0v Heq2) in "Hpc".
+    assert (Hpcu : ret_pc (mword_of_int KernelSyms.usertrap : mword 64) = mword_of_int KernelSyms.usertrap)
+      by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpcu) in "Hpc".
+    destruct (Hgap ms_v Hok) as (Hsconf & Hspie).
+    assert (Hums : usertrap_entry_ms ms_v) by (split; [exact Hok | split; [exact Hsconf | exact Hspie]]).
+    assert (Hspv : M7 !!! Regidx (mword_of_int 2) = (vksp : mword 64)).
+    { unfold M7. rewrite upd_ne; [| intro He; injection He as He2; vm_compute in He2; congruence].
+      unfold M6. rewrite upd_ne; [| intro He; injection He as He2; vm_compute in He2; congruence].
+      unfold M5. rewrite upd_ne; [| intro He; injection He as He2; vm_compute in He2; congruence].
+      unfold M4. rewrite upd_eq. reflexivity. }
+    assert (Htpv0 : M7 !!! Regidx (mword_of_int 4) = (vkhart : mword 64)).
+    { unfold M7. rewrite upd_ne; [| intro He; injection He as He2; vm_compute in He2; congruence].
+      unfold M6. rewrite upd_ne; [| intro He; injection He as He2; vm_compute in He2; congruence].
+      unfold M5. rewrite upd_eq. reflexivity. }
+    assert (Htpv : M7 !!! Regidx (mword_of_int 4) = cid_word) by (rewrite Htpv0 Heq4; reflexivity).
+    (* the [ra := uva 0x9c] insert (the exit switch's own jalr-link write)
+       does not touch sp/tp *)
+    assert (Hspv' : (<[Regidx (mword_of_int 1) := regval_into_reg (uva 0x9c)]> M7)
+                      !!! Regidx (mword_of_int 2) = (vksp : mword 64)).
+    { rewrite upd_ne; [exact Hspv | intro He; injection He as He2; vm_compute in He2; congruence]. }
+    assert (Htpv' : (<[Regidx (mword_of_int 1) := regval_into_reg (uva 0x9c)]> M7)
+                      !!! Regidx (mword_of_int 4) = cid_word).
+    { rewrite upd_ne; [exact Htpv | intro He; injection He as He2; vm_compute in He2; congruence]. }
+    (* ============ reseal usertrap_res, then call usertrap =============== *)
+    iDestruct (tf_page_close36 (ud_tfp pt) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+                 with "Hk0 Hk8 Hk16 Hk24 Hk32
+                       Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf112
+                       Htf120 Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184
+                       Htf192 Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256
+                       Htf264 Htf272 Htf280 Htail0") as "Htf0'".
+    iDestruct ("Hclose0" with "Htf0'") as "Hures'".
+    iEval (rewrite Hstvec) in "Hstvec".
+    iApply (UT.wp_usertrap pt j (<[Regidx (mword_of_int 1) := regval_into_reg (uva 0x9c)]> M7)
+              ms_v sc_v stval_v sepc_v vksp (uc_mie C) (uc_mideleg C) MENVCFG_S
+              Hums Hjlt Hspv' Htpv' Hmie Hmm Hmenvval0
+              with "Hkt Hpc Hhw Hinv Hhs Hpriv Hms Hsc Hstval Hsepc Hstvec Hmie Hmdl Hmenv Hfile Hures'").
+    iApply wp_next_intro. iIntros (CID2).
+    iEval (rewrite /usertrap_post).
+    iIntros (pt' mf ms' usatp uepc sc' stval' mdv0)
+      "%Hmask %Hpttf %Haccwf %Hmapwf %Hretms %Hsconf2 %Hcalleesaved %Htpcid %Ha0usatp %Hsatprooted
+       Hhs2 Hpriv2 Hms2 Hsc2 Hstval2 Hsepc2 Hstvec2 Hpc2 Hfile2 Hmie3 Hmdl3 Hmenv3 Hhw2 Hmin2 Hures2".
+    (* ============ open usertrap_res A SECOND TIME, for userret ========== *)
+    iDestruct (UT.usertrap_res_tf_open (CID:=CID2) pt' vksp kroot (Hkwgap CID2) with "Hures2") as (ws1)
+      "(%Hok1 & Htf1 & Hclose1)".
+    iDestruct (tf_page_length with "Htf1") as %Hlen1.
+    iDestruct (tf_page_open36 (ud_tfp pt') ws1 Hlen1 with "Htf1") as
+      (u0 u1 u2 u3 u4
+       u40 u48 u56 u64 u72 u80 u88 u96 u104 u112 u120 u128 u136 u144 u152 u160
+       u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280)
+      "(-> & Hu0 & Hu8 & Hu16 & Hu24 & Hu32 &
+        Hutf40 & Hutf48 & Hutf56 & Hutf64 & Hutf72 & Hutf80 & Hutf88 & Hutf96 & Hutf104 & Hutf112 &
+        Hutf120 & Hutf128 & Hutf136 & Hutf144 & Hutf152 & Hutf160 & Hutf168 & Hutf176 & Hutf184 &
+        Hutf192 & Hutf200 & Hutf208 & Hutf216 & Hutf224 & Hutf232 & Hutf240 & Hutf248 & Hutf256 &
+        Hutf264 & Hutf272 & Hutf280 & Htail1)".
+    destruct Hsatprooted as (HuMode & Huasid & Huppn).
+    destruct Hretms as (HSIE2 & HMPRV2 & HSXL2 & HTVM2 & HMXR2 & HTSR2 & HFS2 & HVS2 & Hsretnp2).
+    iEval (rewrite Hmie) in "Hmie3".
+    assert (Hra9c : (<[Regidx (mword_of_int 1) := regval_into_reg (uva 0x9c)]> M7)
+                      !!! Regidx (mword_of_int 1) = uva 0x9c) by (rewrite upd_eq; reflexivity).
+    assert (Hpc9c : ret_pc (uva 0x9c) = uva 0x9c) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hra9c Hpc9c) in "Hpc2".
+    (* ============ call userret ============ *)
+    rewrite Hmie in Hmask.
+    (* [set (dqk := DfracOwn 1)] back at the walk's start folded EVERY
+       [DfracOwn 1] then in scope, including [Hsenv]'s -- so it now reads
+       [senvcfg ↦ᵣ{dqk} ...] rather than the literal [DfracOwn 1] the call
+       below supplies for [dqm].  Unfold it back so the two match. *)
+    iEval (unfold dqk) in "Hsenv".
+    iPoseProof (UR.wp_userret_pt kroot (ud_root pt') (ud_tfp pt') (ud_um pt') mf usatp
+              ms' MIE_S mdv0 MENVCFG_S (mword_of_int 0 : mword 64) uepc
+              u40 u48 u56 u64 u72 u80 u88 u96 u104 u112 u120 u128 u136 u144 u152 u160
+              u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280
+              (DfracOwn 1)
+              HSIE2 HMPRV2 HSXL2 HTVM2 HMXR2 Hmask Hpmm HPBMTE eq_refl eq_refl
+              Hmapwf HTSR2 Hsretnp2 Ha0usatp HuMode Huasid Huppn) as "Hwup".
+    (* [Hhw2]/[Hmin2]: THE RESUMING HART'S OWN copies, handed back by
+       [usertrap_post] -- NOT the section's original [Hhw]/[Hinv], which
+       name the ENTRY hart's resources and are a different (if
+       identically-printed) proposition whenever usertrap crossed harts.
+       See [SpecUsertrap.usertrap_post]'s comment. *)
+    iApply ("Hwup" with "Hkt Hhw2 Hmin2 Hhs2 Hpriv2 Hms2 Hmie3 Hmdl3 Hmenv3 Hsenv Hsepc2 Hclaim Hkres Hufr Hpc2 Hfile2
+                    Hutf40 Hutf48 Hutf56 Hutf64 Hutf72 Hutf80 Hutf88 Hutf96 Hutf104 Hutf112
+                    Hutf120 Hutf128 Hutf136 Hutf144 Hutf152 Hutf160 Hutf168 Hutf176 Hutf184
+                    Hutf192 Hutf200 Hutf208 Hutf216 Hutf224 Hutf232 Hutf240 Hutf248 Hutf256
+                    Hutf264 Hutf272 Hutf280").
+    iIntros "Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hsenv3 Hsepc3 Hutlb3 Hpc3 Hfile3
+             Hutf40' Hutf48' Hutf56' Hutf64' Hutf72' Hutf80' Hutf88' Hutf96' Hutf104' Hutf112'
+             Hutf120' Hutf128' Hutf136' Hutf144' Hutf152' Hutf160' Hutf168' Hutf176' Hutf184'
+             Hutf192' Hutf200' Hutf208' Hutf216' Hutf224' Hutf232' Hutf240' Hutf248' Hutf256'
+             Hutf264' Hutf272' Hutf280'".
+    (* ============ reseal usertrap_res A SECOND TIME, discharge uservec_post *)
+    iDestruct (tf_page_close36 (ud_tfp pt') u0 u1 u2 u3 u4
+                 u40 u48 u56 u64 u72 u80 u88 u96 u104 u112 u120 u128 u136 u144 u152 u160
+                 u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280
+                 with "Hu0 Hu8 Hu16 Hu24 Hu32
+                       Hutf40' Hutf48' Hutf56' Hutf64' Hutf72' Hutf80' Hutf88' Hutf96' Hutf104' Hutf112'
+                       Hutf120' Hutf128' Hutf136' Hutf144' Hutf152' Hutf160' Hutf168' Hutf176' Hutf184'
+                       Hutf192' Hutf200' Hutf208' Hutf216' Hutf224' Hutf232' Hutf240' Hutf248' Hutf256'
+                       Hutf264' Hutf272' Hutf280' Htail1") as "Htf1'".
+    iDestruct ("Hclose1" with "Htf1'") as "Hures3".
     iEval (rewrite /uservec_post) in "Hcont".
-    iSpecialize ("Hcont" $! g ms_v sc_v stval_v sepc_v with "[%]"); [ exact Hok |].
-    iApply ("Hcont" with "Hhs Hpriv Hms Hsc Hstval Hsepc Hsscr Hufr Hdata Hcfg Hpc Hfile
-             Hk0 Hk8 Hk16 Hk32
-             Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf120 Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192 Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264 Htf272 Htf280
-             Htf112").
+    iApply ("Hcont" $! pt' (userret_gpr mf u40 u48 u56 u64 u72 u80 u88 u96 u104 u112 u120 u128
+                              u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232
+                              u240 u248 u256 u264 u272 u280)
+             (sret_ms5 ms') usatp uepc sc' stval' mdv0
+             with "[%] [%] [%] [%] Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hsenv3 Hsc2 Hstval2 Hsepc3
+                    Hutlb3 Hpc3 Hfile3 Hures3").
+    - exact Hpttf.
+    - exact Hmapwf.
+    - split; [| split]; [exact HuMode | exact Huasid | exact Huppn].
+    - exact Hmask.
   Qed.
 
 End UservecAllPt.

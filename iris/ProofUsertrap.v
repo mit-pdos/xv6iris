@@ -76,7 +76,8 @@ Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom.
-Require Import UserPtTree.
+Require Import UserPtTree ProcPtOwn.
+Require Import PtTree KptTree.
 Require Import TrampPt.
 Require Import KallocInv.
 Require Import BioInv DiskPtsto WpUart FsBlocks LogInv FsCrash.
@@ -134,6 +135,19 @@ Section UtEntry.
             !kallocG Σ, !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (Rsys : gname -> mword 64 -> iProp Σ).
+
+  (* the trapframe page's own [page_valid], read off [proc_priv] without
+     consuming it -- [proc_pt_wf]'s last conjunct.  A PURE-goal [iDestruct]
+     does not spend the resource (durable-notes.md), so [Hpv] is still
+     whole for [proc_priv_tf_upd] right afterward. *)
+  Local Lemma ut_entry_tfp_valid (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv γf pa pid V -∗ ⌜page_valid (page_base (ud_tfp (pv_upt V)))⌝.
+  Proof.
+    iIntros "[(_ & _ & _ & _ & Hpt & _) _]".
+    rewrite /proc_pt_at. iDestruct "Hpt" as "(_ & _ & Hptt)".
+    iDestruct (proc_pt_wf_get with "Hptt") as "%Hwf".
+    iPureIntro. exact (proj2 (proj2 (proj2 (proj2 Hwf)))).
+  Qed.
 
   (* THE BOUNDARY'S RAW MACHINE STATE IN, THE KERNEL CONE'S STATE OUT.
      [UsertrapRes.ut_trap_open] is the resource half and is already proven --
@@ -487,8 +501,19 @@ Section UtEntry.
     iDestruct (ut_own_priv with "Hown") as "(Hpv & Hsy & Hownback)".
     iDestruct (ut_epc_exists with "Hpv") as %Hepcx.
     destruct Hepcx as [uepc Hepc].
+    iDestruct (ut_entry_tfp_valid with "Hpv") as %Hpv_valid.
     iDestruct (proc_priv_tf_upd with "Hpv") as "(Htfc & Htfp & Hpvback)".
-    iDestruct (tf_page_word_upd _ _ tf_epc_idx uepc Hepc with "Htfp")
+    (* [pt_node_claim], off [Hhw] (already a top-level, persistent premise of
+       [ut_entry]) and [Hpv_valid] -- the mem-tier convenience wrapper is
+       what the VA-tier [c.ld]/[c.sd] through the kernel identity map needs
+       (ProcInv.v's header on [tf_page_word_mem]). *)
+    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+    iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt V)) Hpv_valid with "Hkmapb") as "#Hptc".
+    iDestruct (tf_page_word_upd_mem _ _ tf_epc_idx uepc ltac:(vm_compute; lia) Hepc
+                 with "Hptc Htfp")
       as "(Hword & Htfback)".
     assert (Haddrtf : add_vec (rget S1 Ra0)
                         (sign_extend' 64 (mword_of_int 88 : mword 12))
@@ -533,7 +558,7 @@ Section UtEntry.
     { rgne. rewrite /S3 upd_ne; [| reg_neq]. rewrite /S2. apply upd_eq. }
     assert (Haddrw : add_vec (rget S3 Ra5)
                        (sign_extend' 64 (mword_of_int 24 : mword 12))
-                     = a_tf_word (ud_tfp (pv_upt V)) tf_epc_idx)
+                     = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat tf_epc_idx))
       by (rewrite HS3a5; apply prr_tf_addr_24).
     assert (Hp2e : add_vec_int (mword_of_int (UT + 0x2a) : mword 64) 4
                    = mword_of_int (UT + 0x2e)) by pcw.
@@ -1099,11 +1124,12 @@ Lemma usertrap_res_tf_open
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !kallocG Σ, !irefslotG Σ, !iregG Σ}
-    `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+    `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
+  (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
   usertrap_res pt ksp -∗
-  ∃ ws : list (mword 64), tf_page (ud_tfp pt) ws ∗
+  ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
     (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res pt ksp).
-Proof. exact (ut_res_tf_open SY.syscall_env pt ksp). Qed.
+Proof. exact (ut_res_tf_open SY.syscall_env pt ksp kroot). Qed.
 
 Section UtSeal.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
