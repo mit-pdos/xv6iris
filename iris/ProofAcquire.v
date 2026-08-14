@@ -225,6 +225,10 @@ Section ProofAcquire.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hown #Htext Hpc #Hlock HTc #Hpanic Hcont".
+    (* THE ENTRY BOUND, taken before push_off raises the level: after the push
+       the bundle offers only [size lks <= S n], one too weak to add a rank.
+       It is pure, so it survives the push in the Coq context. *)
+    iDestruct (cpu_own_size_le with "Hown") as "[%Hszlks Hown]".
     iPoseProof (aqi_00 with "Htext") as "Hi00".
     iPoseProof (aqi_02 with "Htext") as "Hi02".
     iPoseProof (aqi_04 with "Htext") as "Hi04".
@@ -556,7 +560,7 @@ Section ProofAcquire.
        one the leaf returns.  The [lock_rank s ∉ lks] obligation is [Hfresh],
        the caller's own premise; the predecessor derived it from the cpu field
        instead (see WpLock.v's owner-field block). *)
-    iDestruct (cpu_own_locks_swap with "Hown") as "[Hlks Hownback]".
+    iDestruct (cpu_own_locks_swap with "Hown") as "[Hlks [%Hsz Hownback]]".
     iApply (wp_csd_lkcpu_lockopen_s_sconf γl lk0 s R Dc (mword_of_int (KernelSyms.acquire + 0x28))
               (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               (mword_of_int 16 : mword 12) Cm (trap_res b + (av - 4))%nat false lks
@@ -564,7 +568,11 @@ Section ProofAcquire.
               with "Hcg Hpc Hi28 Hlock Htokp Hlks").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Htok Hlks".
-    iDestruct ("Hownback" with "Hlks") as "Hown".
+    (* [size ({[rank s]} ∪ lks) = S (size lks) <= S n] -- the entry bound plus
+       the freshness premise.  [size_add] is proved at an abstract rank so no
+       [set_solver] meets [lock_rank] here. *)
+    iDestruct ("Hownback" $! ({[lock_rank s]} ∪ lks)
+                 ltac:(exact (size_add_le (lock_rank s) lks n Hfresh Hszlks)) with "Hlks") as "Hown".
     assert (Hpc2a : add_vec_int (mword_of_int (KernelSyms.acquire + 0x28) : mword 64) 2 = mword_of_int (KernelSyms.acquire + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2a) in "Hpc".
     (* ---- 0x2a/0x2c/0x2e: c.ldsp ra/s0/s1 ---- *)

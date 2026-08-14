@@ -239,14 +239,16 @@ Section ProofRelease.
        authority out at [lks] and puts back [lks ∖ {[lock_rank s]}], which is
        exactly release's postcondition.  No premise is needed -- membership is
        DERIVED from the fragment the lock invariant was holding. *)
-    iDestruct (cpu_own_locks_swap with "Hown") as "[Hlks Hownback]".
+    iDestruct (cpu_own_locks_swap with "Hown") as "[Hlks [%Hsz Hownback]]".
     iApply (wp_sd_zero_lkcpu_lockopen_s_sconf (CID:=CID) γl lka s R Dc (mword_of_int (KernelSyms.release + 0x12))
               (mword_of_int 9 : mword 5) (mword_of_int 16 : mword 12) mh (trap_res outb + (av - 4))%nat false lks
               ltac:(rgne; exact Hacpu) Href
               with "Hcg Hpc Hi12 Hlock Htoken Hlks").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Htoken Hlks".
-    iDestruct ("Hownback" with "Hlks") as "Hown".
+    (* release only ever SHRINKS the set, so the coupling survives outright. *)
+    iDestruct ("Hownback" $! (lks ∖ {[lock_rank s]})
+                 ltac:(exact (size_del_le (lock_rank s) lks (S n) Hsz)) with "Hlks") as "Hown".
     assert (Hpc16 : add_vec_int (mword_of_int (KernelSyms.release + 0x12) : mword 64) 4 = mword_of_int (KernelSyms.release + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc16) in "Hpc".
     (* ---- 0x16: fence rw,w ---- *)

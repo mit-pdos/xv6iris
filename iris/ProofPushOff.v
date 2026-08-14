@@ -914,7 +914,7 @@ Section ProofPushOff.
         rewrite /cpu_own /cpu_hart /cpu_priv /cpu_cells.
         iSplitL "Hnoff Hintena Hlks Hcnt Hproc".
         { iSplitL "Hnoff Hintena Hlks Hproc".
-          { iSplitL "Hnoff Hintena Hproc"; [| iExact "Hlks" ].
+          { iSplitL "Hnoff Hintena Hproc"; [| iApply (cpu_locks_lvl_weaken with "Hlks"); lia ].
             iSplitR. { iPureIntro. change (Z.of_nat (S 0)) with 1%Z. lia. }
             iSplitL "Hnoff".
             { assert (Hstore1 : (autocast (T := mword) (subrange_vec_dec (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0)) (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = noff_val (S 0)).
@@ -1091,7 +1091,7 @@ Section ProofPushOff.
         rewrite /cpu_own /cpu_hart /cpu_priv /cpu_cells.
         iSplitL "Hnoff Hintena Hlks Hcnt Hproc".
         { iSplitL "Hnoff Hintena Hlks Hproc".
-          { iSplitL "Hnoff Hintena Hproc"; [| iExact "Hlks" ].
+          { iSplitL "Hnoff Hintena Hproc"; [| iApply (cpu_locks_lvl_weaken with "Hlks"); lia ].
             iSplitR. { iPureIntro. rewrite Nat2Z.inj_succ in Hbound |- *. lia. }
             iSplitL "Hnoff".
             { assert (Hstoref : (autocast (T := mword) (subrange_vec_dec (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0)) (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = noff_val (S (S n'))).
@@ -1223,7 +1223,7 @@ Section ProofPushOff.
     : wp_pop_off_sconf_body m av n eb p C lks.
   Proof.
     cbv beta delta [wp_pop_off_sconf_body].
-    intros pcE ret_tgt bexit Hav.
+    intros pcE ret_tgt bexit Hav Hszlks.
     pose (a0v := mycpu_ret cid_word : mword 64).
     pose (noffv := noff_val (S n) : mword 32).
     pose (intenav := intena_val eb : mword 32).
@@ -1517,7 +1517,7 @@ Section ProofPushOff.
         rewrite /cpu_own /cpu_hart /cpu_priv /cpu_cells.
         iSplitL "Hnoff Hint Hlks Htok Hproc".
         { iSplitL "Hnoff Hint Hlks Hproc".
-          { iSplitL "Hnoff Hint Hproc"; [| iExact "Hlks" ].
+          { iSplitL "Hnoff Hint Hproc"; [| iApply (cpu_locks_lvl_relevel _ _ _ ltac:(exact Hszlks) with "Hlks") ].
             iSplitR.
             { iPureIntro. rewrite Nat2Z.inj_succ in Hbound |- *. lia. }
             iSplitL "Hnoff".
@@ -1696,7 +1696,7 @@ Section ProofPushOff.
         { rewrite /cpu_own /cpu_hart /cpu_priv /cpu_cells.
           iSplitL "Hnoff Hint Hlks Htok Hproc".
           { iSplitL "Hnoff Hint Hlks Hproc".
-            { iSplitL "Hnoff Hint Hproc"; [| iExact "Hlks" ].
+            { iSplitL "Hnoff Hint Hproc"; [| iApply (cpu_locks_lvl_relevel _ _ _ ltac:(exact Hszlks) with "Hlks") ].
               iSplitR. { iPureIntro. change (Z.of_nat 0) with 0%Z. lia. }
               iSplitL "Hnoff".
               { assert (Hdec : noff_val 0 = storeval).
@@ -1879,7 +1879,7 @@ Section ProofPushOff.
                   with "Hcg [Htok] Htcp [Hnoff Hint Hproc Hlks] Hclm Hpc Hi24").
         { iApply (intr_count_pack_S_on 0 with "Htok"). }
         { rewrite /cpu_priv /cpu_cells.
-          iSplitL "Hnoff Hint Hproc"; [| iExact "Hlks" ].
+          iSplitL "Hnoff Hint Hproc"; [| iApply (cpu_locks_lvl_relevel _ _ _ ltac:(exact Hszlks) with "Hlks") ].
           iSplitR. { iPureIntro. change (Z.of_nat 0) with 0%Z. lia. }
           iSplitL "Hnoff". { iEval (rewrite Hdec). iExact "Hnoff". }
           iSplitL "Hint". { iExists intenav. iExact "Hint". }

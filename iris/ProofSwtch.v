@@ -88,8 +88,8 @@ Section ProofSwtch.
            mword 64 -d> mword 64 -d> iPropO Σ)
       (An Ao : ctx_adm)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
-      (av : nat) (eb : bool) (p : mword 64) (lks : gset nat) :
-    wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p lks.
+      (av : nat) (eb : bool) (p : mword 64) :
+    wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p.
   Proof.
     cbv beta delta [wp_swtch_sconf_body].
     iIntros (Hlen_old Holdc Hnewc Hadm)
@@ -123,7 +123,7 @@ Section ProofSwtch.
     iDestruct (intr_count_pos_off 0 eb with "Hccnt") as "[Hq0cnt Hres]".
     iAssert (intr_off_tok ∗ intr_count 1 eb)%I with "[Hsiearm Hq0cnt Hres]" as "(Hq0 & Hccnt)".
     { iFrame "Hsiearm". rewrite /intr_count. iFrame "Hq0cnt Hres". }
-    iAssert (cpu_own 1 eb p emp false lks) with "[Hcnoff Hcint Hclks Hccnt Hcproc]" as "Hcpuown".
+    iAssert (cpu_own 1 eb p emp false {[lock_rank "proc"]}) with "[Hcnoff Hcint Hclks Hccnt Hcproc]" as "Hcpuown".
     { rewrite /cpu_own /cpu_hart /cpu_priv /cpu_cells.
       iFrame "Hcnoff Hcint Hcproc Hclks Hccnt". iPureIntro; exact Hcpb. }
     iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb0.
@@ -289,9 +289,9 @@ Section ProofSwtch.
        construction -- and the spec's [adm An cpu_id] premise is
        exactly its admissibility obligation.  The hand-off names the OLD
        record's own index [Ao]. *)
-    (* [valid_context_pre]'s resume wand is [∀ h m eb' lks]; instantiate its
-       held-lock binder at the set our own bundle carries. *)
-    iApply ("Hnewwand" $! cpu_id (vregs_den rho swtch_regs1) eb lks
+    (* [valid_context_pre]'s resume wand is [∀ h m eb'] -- the held set is no
+       longer a binder, it is the pinned proc singleton on both sides. *)
+    iApply ("Hnewwand" $! cpu_id (vregs_den rho swtch_regs1) eb
               with "[] [] Hcg_t Hcpuown Hpc Hnewpart [Hvoldc HP]").
     { iPureIntro. exact Hadm. }
     { iPureIntro. exact Hcallee_new. }

@@ -183,7 +183,7 @@ Section SchedPostSwtch.
        (γs : list gname)
       (j : nat) (γl : gname) (ch' : mword 64)
       (m m' : regfile) (av : nat) (eb eb' : bool)
-      (sp0 spd vgap : mword 64) (lks : gset nat) :
+      (sp0 spd vgap : mword 64) :
     let pj := proc_addr j in
     (6 <= av)%nat ->
     (* the pushed frame base, and where the frame lives *)
@@ -213,10 +213,10 @@ Section SchedPostSwtch.
        swtch, and the resumer comes back holding it too.  ∅ appears only in
        the scheduler loop, between its [release(&p->lock)] and the next
        [acquire] -- which is exactly where [intr_on()] sits.  Stated with the
-       opaque [lks] rather than the literal singleton because that is what
+       the literal proc singleton, which is what
        [wp_sched_sconf]'s own (∀-generic) contract hands this helper -- the
        set is carried, never inspected, so genericity costs nothing here. *)
-    cpu_own 1 eb' pj emp false lks -∗
+    cpu_own 1 eb' pj emp false {[lock_rank "proc"]} -∗
     pc_is (mword_of_int (KernelSyms.sched + 0x72)) -∗
     (* the five saved callee-saved words + the frame's bottom slot *)
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
@@ -237,7 +237,7 @@ Section SchedPostSwtch.
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
         proc_held cpu_id j γl RUNNING ch0 -∗
         trap_csrs -∗
-        cpu_own 1 eb pj emp false lks -∗
+        cpu_own 1 eb pj emp false {[lock_rank "proc"]} -∗
         own_ctx (p_context pj) -∗
         hart_full j cpu_id -∗
         ▷ sched_vc_at γs cpu_id (a_cpu_ctx cid_word) pj -∗
@@ -364,8 +364,8 @@ Section SchedPostSwtch.
       - iApply (intr_count_retune_on 0 eb' with "Hcnt2").
       - iApply (intr_count_retune_off 0 eb' with "Hcnt2"). }
     (* refold [cpu_own 1 eb pj emp false] -- at the swtch seam, carrying the
-       same opaque [lks] this helper was handed (see the header comment). *)
-    iAssert (cpu_own 1 eb pj emp false lks) with "[Hcur2 Hnoff2 Hint2 Hlks2 Hcnt2]" as "Hcpu".
+       pinned proc singleton (see the header comment). *)
+    iAssert (cpu_own 1 eb pj emp false {[lock_rank "proc"]}) with "[Hcur2 Hnoff2 Hint2 Hlks2 Hcnt2]" as "Hcpu".
     { rewrite cpu_own_off /cpu_hart /cpu_priv /cpu_cells.
       iFrame "Hnoff2 Hcnt2 Hcur2 Hint2 Hlks2". iPureIntro; vm_compute; reflexivity. }
     (* ------------------------------------------------------------------ *)
@@ -568,8 +568,8 @@ Section ProofSched.
 
   Lemma wp_sched_sconf 
       (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
-      (m : regfile) (av : nat) (eb : bool) (lks : gset nat)
-    : wp_sched_sconf_body γs j γl st ch m av eb lks.
+      (m : regfile) (av : nat) (eb : bool)
+    : wp_sched_sconf_body γs j γl st ch m av eb.
   Proof.
     cbv beta delta [wp_sched_sconf_body].
     intros pcE pj ret_tgt Hj Hgl Hneeds Hav.
@@ -698,7 +698,7 @@ Section ProofSched.
     (* ------------------------------------------------------------------ *)
     assert (HA2ra : A2 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.sched + 0x0e) : mword 64) 4)
       by (rewrite /A2 upd_eq; reflexivity).
-    iApply (Myproc.wp_myproc_sconf A2 (av - 6)%nat 1 eb (proc_addr j) emp false lks
+    iApply (Myproc.wp_myproc_sconf A2 (av - 6)%nat 1 eb (proc_addr j) emp false {[lock_rank "proc"]}
               ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
@@ -1298,7 +1298,7 @@ Section ProofSched.
     (* FULL-BUNDLE swtch: hand [sie_cap_gpr] and [cpu_own] whole (the swtch
        proof internally carves the stack/off-eighth and parks them in the OLD
        record).  Refold the check-chain cells into the level-1 [cpu_own]. *)
-    iAssert (cpu_own 1 eb pj emp false lks) with "[Hnoff Hint Hlks Hcnt Hcur]" as "Hcpu".
+    iAssert (cpu_own 1 eb pj emp false {[lock_rank "proc"]}) with "[Hnoff Hint Hlks Hcnt Hcur]" as "Hcpu".
     { rewrite cpu_own_off /cpu_hart /cpu_priv /cpu_cells.
       iFrame "Hnoff Hint Hcnt Hcur Hlks". iPureIntro; vm_compute; reflexivity. }
     (* build the parking-proc payload (proc-held facts only; the cpu bundle
@@ -1313,33 +1313,17 @@ Section ProofSched.
        ∀-hart, and what lets [procs_inv] be hart-free. *)
     iApply (Swtch.wp_swtch_sconf (p_sched γs) (Some cpu_id) None
               (p_context (proc_addr j)) (a_cpu_ctx cid_word)
-              Mc ctxvs (av - 6)%nat eb pj lks
+              Mc ctxvs (av - 6)%nat eb pj
               Hctxlen Holdc Hnewc (adm_pin cpu_id)
               with "Htext Hcg Hcpu Hpc Hctxcells Hvc [HP]").
     { iEval (rewrite (rget_tp Mc)). iExact "HP". }
-    (* [lks'] IS A FRESH, INDEPENDENT BINDER (SpecSwtch.v): the resumption of
-       a migratable ([Ao = None]) parked context is a DIFFERENT critical
-       section from the one that suspended it, and nothing in the swtch
-       primitive ties its held-lock set back to this call's own entry [lks].
-       ================================================================
-       OPEN GAP, NOT CLOSED BY THIS PASS: [wp_sched_sconf_body]'s exit
-       (SpecSched.v) still asks for [cpu_own 1 eb pj emp false lks] -- the
-       SAME [lks] this function entered with -- but nothing available here
-       (swtch's generic contract, [SchedCtx.p_sched]'s chain payload,
-       [proc_held]/[hart_full]) establishes [lks' = lks]. Semantically the
-       claim is TRUE (the scheduler's own loop invariant re-acquires exactly
-       [{[lock_rank "proc"]}] immediately before every swtch that resumes a
-       parked proc, so every real resumption's [lks'] is that same
-       singleton) but that is a protocol fact about [SchedCtx.p_sched]
-       specifically, not something [SpecSwtch.v]'s hart-generic contract can
-       state. Closing this needs either: (a) a new premise on
-       [wp_sched_sconf_body] pinning [lks = {[lock_rank "proc"]}] plus a
-       matching ghost fact in [SchedCtx.p_sched]'s resume-side payload
-       asserting the resumer already holds that singleton, or (b) some other
-       linking fact this pass did not find. Flagging rather than guessing;
-       do not treat the [Qed] below as verified past this point without a
-       build. *)
-    iIntros (h m' eb' lks') "%Hadm' %Hcallee Hcg Hcpu Hpc Hctxback Hresume".
+    (* THE SEAM IS CLOSED BY THE CONTRACT, not by a ghost fact: [SpecSwtch]
+       pins the held set at [{[lock_rank "proc"]}] on BOTH sides, because
+       swtch is reachable only while holding exactly this proc's lock (sched's
+       own [noff != 1] check is the C-level statement of it).  The resumption
+       therefore arrives at the same singleton rather than at a freshly
+       quantified set nothing could tie back. *)
+    iIntros (h m' eb') "%Hadm' %Hcallee Hcg Hcpu Hpc Hctxback Hresume".
     (* [Ao = None] -- the resumption's hart is NOT pinned; [Hadm'] is vacuous
        and everything from here on is at an arbitrary [h]. *)
     clear Hadm'.
@@ -1485,7 +1469,7 @@ Section ProofSched.
     { intros [Hf | Hz]; [ discriminate
                         | exfalso; exact (sched_pj_nonzero j Hj Hz) ]. }
     (* ONE application of the post-resume half, at the resuming hart. *)
-    iApply (sched_post_swtch (CID := h)  γs j γl ch' m m' av eb eb' sp0 spd vgap lks
+    iApply (sched_post_swtch (CID := h)  γs j γl ch' m m' av eb eb' sp0 spd vgap
               ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
               Hsp_m' Hs2addr Hs3v Hf20 Hf21 Hf22 Hf23 Hf24 Hf25 Hf26 Hf27
               with "Htext Hcg Hcpu Hpc Hr1 Hr2 Hr3 Hr4 Hr5 Hgap Hheld' Htc' [Hctxback] Htag' Hvc' Hcont").

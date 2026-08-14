@@ -189,6 +189,49 @@ Section LockSet.
     lk_auth i ∅ -∗ cpu_locks_at i ∅.
   Proof. iIntros "Ha". iFrame "Ha". Qed.
 
+  (* ---- THE LEVEL/SET COUPLING -------------------------------------------
+
+     [size lks <= n]: the hart holds no more locks than it has outstanding
+     [push_off]s.  It is TRUE because every acquire pushes exactly once and
+     every release pops exactly once, while a BARE push_off/pop_off pair moves
+     [n] without touching the set.
+
+     WHAT IT BUYS, and it is the reason it exists: at [n = 0] it reads
+     [size lks <= 0], i.e. [lks = ∅].  That is exactly what pop_off's
+     re-enabling branch must produce -- [cpu_own]'s [b = true] arm demands an
+     empty held set -- so "you may only turn interrupts back on holding no
+     spinlock" becomes DERIVED from the counting discipline rather than
+     imposed as a separate conjunct.
+
+     WHY IT IS BUNDLED WITH THE AUTHORITY rather than added as a third
+     conjunct of [cpu_priv]: 24 sites across 8 files destructure the cpu
+     bundle positionally, and keeping [cpu_priv] at two conjuncts leaves every
+     one of those patterns matching unchanged.
+
+     IT IS NOT PRESERVED BY A BARE [pop_off] ON ITS OWN -- unwinding [S n] to
+     [n] with the set untouched needs [size lks <= n], which the invariant at
+     [S n] does not give.  pop_off therefore takes it as a PREMISE, and that
+     premise is the honest content of "you may only unwind a push once
+     whatever it was paired with is gone": release discharges it because it
+     has just deleted a rank ([size (lks ∖ {[r]}) = size lks - 1 <= n]), and a
+     bare pusher discharges it from its own pre-push fact, which is pure and
+     therefore still in context at the pop. *)
+  Definition cpu_locks_lvl_at (i : CPU) (n : nat) (lks : gset nat) : iProp Σ :=
+    (cpu_locks_at i lks ∗ ⌜(size lks <= n)%nat⌝)%I.
+
+  Lemma cpu_locks_lvl_at_elim (i : CPU) (n : nat) (lks : gset nat) :
+    cpu_locks_lvl_at i n lks -∗ cpu_locks_at i lks ∗ ⌜(size lks <= n)%nat⌝.
+  Proof. iIntros "[$ $]". Qed.
+
+  Lemma cpu_locks_lvl_at_intro (i : CPU) (n : nat) (lks : gset nat) :
+    (size lks <= n)%nat -> cpu_locks_at i lks -∗ cpu_locks_lvl_at i n lks.
+  Proof. iIntros (Hsz) "H". iFrame "H". iPureIntro. exact Hsz. Qed.
+
+  (* the level only ever needs WEAKENING upward (a push_off) *)
+  Lemma cpu_locks_lvl_at_weaken (i : CPU) (n n' : nat) (lks : gset nat) :
+    (n <= n')%nat -> cpu_locks_lvl_at i n lks -∗ cpu_locks_lvl_at i n' lks.
+  Proof. iIntros (Hle) "[H %Hsz]". iFrame "H". iPureIntro. lia. Qed.
+
 End LockSet.
 
 Section LockSetAmbient.
@@ -202,5 +245,41 @@ Section LockSetAmbient.
   Lemma cpu_locks_unfold (S : gset nat) :
     cpu_locks S ⊣⊢ cpu_locks_at cpu_id S.
   Proof. reflexivity. Qed.
+
+  (* the ambient-hart spelling of the level/set coupling *)
+  Definition cpu_locks_lvl (n : nat) (S : gset nat) : iProp Σ :=
+    cpu_locks_lvl_at cpu_id n S.
+
+  Lemma cpu_locks_lvl_elim (n : nat) (S : gset nat) :
+    cpu_locks_lvl n S -∗ cpu_locks S ∗ ⌜(size S <= n)%nat⌝.
+  Proof. iApply cpu_locks_lvl_at_elim. Qed.
+
+  Lemma cpu_locks_lvl_intro (n : nat) (S : gset nat) :
+    (size S <= n)%nat -> cpu_locks S -∗ cpu_locks_lvl n S.
+  Proof. iIntros (H). iApply cpu_locks_lvl_at_intro. exact H. Qed.
+
+  (* push_off raises the level; the coupling only ever needs WEAKENING *)
+  Lemma cpu_locks_lvl_weaken (n n' : nat) (S : gset nat) :
+    (n <= n')%nat -> cpu_locks_lvl n S -∗ cpu_locks_lvl n' S.
+  Proof. iIntros (Hle). iApply cpu_locks_lvl_at_weaken. exact Hle. Qed.
+
+  (* RE-LEVEL the coupling: the only thing that ever changes is the level, and
+     the new bound is supplied by whoever is moving it (push_off weakens for
+     free, pop_off's caller states it).  Subsumes [cpu_locks_lvl_weaken]. *)
+  Lemma cpu_locks_lvl_relevel (n n' : nat) (S : gset nat) :
+    (size S <= n')%nat -> cpu_locks_lvl n S -∗ cpu_locks_lvl n' S.
+  Proof.
+    iIntros (H) "H". iDestruct (cpu_locks_lvl_elim with "H") as "[H _]".
+    iApply (cpu_locks_lvl_intro n' S H with "H").
+  Qed.
+
+  (* [n = 0] forces the set EMPTY -- the fact pop_off's re-enable branch and
+     [cpu_own]'s [b = true] arm both want. *)
+  Lemma cpu_locks_lvl_zero (S : gset nat) :
+    cpu_locks_lvl 0 S -∗ cpu_locks S ∗ ⌜S = ∅⌝.
+  Proof.
+    iIntros "H". iDestruct (cpu_locks_lvl_elim with "H") as "[$ %Hsz]".
+    iPureIntro. apply leibniz_equiv, size_empty_inv. lia.
+  Qed.
 
 End LockSetAmbient.

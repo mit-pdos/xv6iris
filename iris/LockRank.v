@@ -135,6 +135,30 @@ Lemma locks_add_del (r : nat) (lks : gset nat) :
   r ∉ lks -> ({[r]} ∪ lks) ∖ {[r]} = lks.
 Proof. intros Hnin. set_solver. Qed.
 
+(* the cardinality step an acquire takes, proved once at an abstract rank so
+   no [set_solver] ever meets [lock_rank] (see [locks_add_del]). *)
+Lemma size_add (r : nat) (lks : gset nat) :
+  r ∉ lks -> size ({[r]} ∪ lks) = S (size lks).
+Proof.
+  intros Hnin. rewrite size_union; [| set_solver ].
+  rewrite size_singleton. lia.
+Qed.
+
+(* and the release counterpart: deleting never grows the set *)
+Lemma size_del (r : nat) (lks : gset nat) : size (lks ∖ {[r]}) <= size lks.
+Proof. apply subseteq_size. set_solver. Qed.
+
+(* THE TWO COUPLING STEPS, stated so a call site needs no arithmetic of its
+   own -- the proof files open [Z_scope], so a bare [lia] on these [nat] goals
+   there is fighting the scope rather than the maths. *)
+Lemma size_add_le (r : nat) (lks : gset nat) (n : nat) :
+  r ∉ lks -> size lks <= n -> size ({[r]} ∪ lks) <= S n.
+Proof. intros Hnin Hle. rewrite (size_add r lks Hnin). lia. Qed.
+
+Lemma size_del_le (r : nat) (lks : gset nat) (n : nat) :
+  size lks <= n -> size (lks ∖ {[r]}) <= n.
+Proof. intros Hle. pose proof (size_del r lks). lia. Qed.
+
 (* the two degenerate shapes the scheduler's literal singleton needs, for the
    same reason: keep [lock_rank] out of [set_solver]'s way. *)
 Lemma locks_self_del (r : nat) : ({[r]} : gset nat) ∖ {[r]} = ∅.

@@ -189,7 +189,9 @@ Section CpuOwn.
     intros ->. iIntros "Hnoff Hint Htok Hproc Hlk HC".
     iFrame "HC".
     iSplitR "Htok"; [| iApply (intr_count_init_off with "Htok") ].
-    iSplitR "Hlk"; [| iApply (cpu_locks_intro_empty with "Hlk") ].
+    iSplitR "Hlk";
+      [| iApply (cpu_locks_lvl_intro 0 ∅); [ rewrite size_empty; lia
+         | iApply (cpu_locks_intro_empty with "Hlk") ] ].
     iSplitR. { iPureIntro. vm_compute. reflexivity. }
     iFrame "Hnoff Hproc". iExists iv. iExact "Hint".
   Qed.
@@ -206,20 +208,48 @@ Section CpuOwn.
   (* released with interrupts off, and the [b = true] arm forces [lks = ∅]   *)
   (* anyway.                                                                 *)
   (* ===================================================================== *)
+  (* PEEK at the level/set coupling without consuming the bundle.  acquire
+     needs its ENTRY bound: after push_off the bundle sits at [S n] and only
+     offers [size lks <= S n], which is one too weak to add a rank
+     ([size ({[r]} ∪ lks) = S (size lks)], so the insert wants [size lks <= n]).
+     The fact is pure, so extracting it before the push and carrying it across
+     is enough -- both arms supply it, the enabled one because it forces
+     [lks = ∅]. *)
+  Lemma cpu_own_size_le (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (b : bool) (lks : gset nat) :
+    cpu_own n eb p C b lks -∗ ⌜(size lks <= n)%nat⌝ ∗ cpu_own n eb p C b lks.
+  Proof.
+    destruct b.
+    - iIntros "[%Hp HC]". destruct Hp as (Hn & Heb & Hl).
+      iSplitR. { iPureIntro. subst lks. rewrite size_empty. lia. }
+      iFrame "HC". iPureIntro. done.
+    - iIntros "[Hh HC]".
+      iEval (rewrite /cpu_hart /cpu_priv) in "Hh".
+      iDestruct "Hh" as "((Hcells & Hlvl) & Hcnt)".
+      iDestruct (cpu_locks_lvl_elim with "Hlvl") as "[Hlks %Hsz]".
+      iSplitR; [ iPureIntro; exact Hsz | ].
+      iFrame "HC". rewrite /cpu_hart /cpu_priv. iFrame "Hcells Hcnt".
+      iApply (cpu_locks_lvl_intro n lks Hsz with "Hlks").
+  Qed.
+
   Lemma cpu_own_locks_swap (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (lks : gset nat) :
     cpu_own n eb p C false lks -∗
-    cpu_locks lks ∗
-    (∀ lks' : gset nat, cpu_locks lks' -∗ cpu_own n eb p C false lks').
+    cpu_locks lks ∗ ⌜(size lks <= n)%nat⌝ ∗
+    (∀ lks' : gset nat,
+       ⌜(size lks' <= n)%nat⌝ -∗ cpu_locks lks' -∗ cpu_own n eb p C false lks').
   Proof.
     iIntros "Hown".
     iDestruct (bi.equiv_entails_1_1 _ _ (cpu_own_off n eb p C lks) with "Hown")
       as "[Hh HC]".
     iEval (rewrite /cpu_hart /cpu_priv) in "Hh".
-    iDestruct "Hh" as "((Hcells & Hlks) & Hcnt)".
-    iFrame "Hlks". iIntros (lks') "Hlks".
+    iDestruct "Hh" as "((Hcells & Hlvl) & Hcnt)".
+    iDestruct (cpu_locks_lvl_elim with "Hlvl") as "[Hlks %Hsz]".
+    iFrame "Hlks". iSplitR; [ iPureIntro; exact Hsz | ].
+    iIntros (lks' Hsz') "Hlks".
     iApply (bi.equiv_entails_1_2 _ _ (cpu_own_off n eb p C lks')).
-    iFrame "HC". rewrite /cpu_hart /cpu_priv. iFrame "Hcells Hcnt Hlks".
+    iFrame "HC". rewrite /cpu_hart /cpu_priv. iFrame "Hcells Hcnt".
+    iApply (cpu_locks_lvl_intro n lks' Hsz' with "Hlks").
   Qed.
 
   (* swap the context-slot payload (e.g. park / unpark the scheduler

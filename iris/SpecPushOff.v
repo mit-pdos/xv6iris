@@ -136,6 +136,16 @@ Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
      facts of [cpu_own]: the level is S n > 0, SIE is pinned '0' by the count
      eighth, and the final pop's re-enable branch reads intena = [eb]. *)
   (4 <= av)%nat ->
+  (* THE UNWIND PREMISE.  [cpu_priv]'s coupling gives [size lks <= S n] on the
+     way in, and the exit bundle needs [size lks <= n] -- popping a level with
+     the set untouched is the one step the coupling does not survive on its
+     own.  So the caller states it, which is the honest content of "you may
+     only unwind a push once whatever it was paired with is gone": release has
+     just deleted a rank, and a bare pusher (uartputc_sync, myproc, cpuid)
+     kept its own pre-push bound, which is pure and still in context.
+     At [n = 0] it reads [lks = ∅] -- exactly what the re-enabling exit's
+     [b = true] arm demands, so that arm is DERIVED here, not imposed. *)
+  (size lks <= n)%nat ->
   sie_cap_gpr m (trap_res bexit + av)%nat false p -∗
   cpu_own (S n) eb p C false lks -∗
   arm_pay n eb p -∗

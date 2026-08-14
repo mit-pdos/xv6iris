@@ -80,6 +80,81 @@ it inside the invariant open -- a leaf signature change plus a `SpecHolding`
 variant concluding `a0 = 0`.  Separate piece of work; do not plan around it
 being free.
 
+## THE TWO SEAMS, AND HOW EACH IS CLOSED
+
+Both were open gaps where a hart's held set had no source.  They are closed
+DIFFERENTLY, and the difference is the point.
+
+### swtch: the contract STATES the set, it is not derived
+
+`SpecSwtch.wp_swtch_sconf_body` takes `cpu_own 1 eb p emp false
+{[lock_rank "proc"]}` and hands back the SAME singleton at the resuming hart.
+There is no `lks` parameter and no `∀ lks'` binder.
+
+The predecessor quantified the resumption's set (`∀ h m eb' lks'`), and that
+is what made the seam unprovable: swtch deposits a MIGRATABLE record, so the
+resumption is a different critical section on a possibly different hart, and
+nothing ties a freshly-quantified set back to anything.  No ghost fact fixes
+that -- `p_sched_at_cpu` hands back `proc_held`, which carries the lock TOKEN
+(`locked γl i`, the lock-STATE ghost), while the held-SET fragment
+(`LockSet.lk_in i r`) lives inside the lock invariant's `Some (i, true)` state
+and cannot be read out without opening it.  Two independent attempts
+established this.
+
+The fix is to stop deriving and start REQUIRING: swtch is reachable only from
+`sched` and the scheduler, xv6's rule for it is "hold p->lock across the
+switch", and `sched`'s own `if (mycpu()->noff != 1) panic("sched locks")` is
+the C-level statement of exactly that.  So the set is a constant in the
+contract, precisely as the level `1` already was.  **Do not reach for a ghost
+linking fact or a payload thread here** -- both were tried and are strictly
+more machinery for the same conclusion.
+
+### pop_off: the LEVEL/SET COUPLING, and why it needs a premise
+
+`IntrDefs.cpu_priv` carries `size lks <= n` -- the hart holds no more locks
+than it has outstanding `push_off`s.  At `n = 0` that reads `lks = ∅`, which
+is what pop_off's re-enabling branch must produce (`cpu_own`'s `b = true` arm
+demands an empty set), so **"you may only turn interrupts back on holding no
+spinlock" is DERIVED from the counting discipline** rather than imposed.
+
+It is carried as `LockSet.cpu_locks_lvl n lks := cpu_locks lks ∗ ⌜size lks <=
+n⌝` -- bundled INTO the authority, not added as a third conjunct of
+`cpu_priv`, because 24 sites across 8 files destructure the cpu bundle
+positionally and this keeps every one of those patterns matching.
+
+**It is not preserved by a bare `pop_off`**, which unwinds `S n` to `n` with
+the set untouched: the invariant at `S n` gives `size lks <= S n` and the exit
+needs `size lks <= n`.  pop_off therefore takes it as a PREMISE, which is the
+honest content of "you may only unwind a push once whatever it was paired with
+is gone".  release discharges it because it has just deleted a rank; a bare
+pusher discharges it from its own pre-push fact, which is pure and so still in
+context at the pop.
+
+**acquire needs its ENTRY bound for the same reason, mirrored.** After
+push_off the bundle is at `S n` and offers only `size lks <= S n`, one too
+weak to add a rank (`size ({[r]} ∪ lks) = S (size lks)` wants `size lks <=
+n`).  `CpuOwn.cpu_own_size_le` peeks it before the push -- both arms supply
+it, the enabled one because it forces `lks = ∅`.
+
+## TWO TRAPS THIS COST, BOTH INVISIBLE UNTIL THEY UNIFY WRONG
+
+- **`set_solver` MUST NOT MEET `lock_rank`.**  `lock_rank "log"` is
+  `rank_lookup` over a 15-way `String.eqb` chain, and `set_solver`'s
+  membership case analysis normalises it at every occurrence.  A generated
+  `assert (({[lock_rank "log"]} ∪ lks) ∖ {[lock_rank "log"]} = lks) by
+  set_solver` at 65 sites took **25 minutes per file** on ProofEndOp and
+  ProofWakeup and never finished.  Every such identity is proved ONCE at an
+  abstract rank in LockRank.v (`locks_add_del`, `locks_self_del`,
+  `locks_union_empty`, `size_add`, `size_del`, and the two `_le` forms that
+  keep the arithmetic there too), and call sites are a bare `apply`.  A sweep
+  that emits one tactic in bulk multiplies whatever is wrong with it -- put
+  this rule in the brief.
+- **`LockSet.v` and `CpuOwn.v` open `Z_scope`.**  `size lks <= n` there
+  elaborates as `Z.le` with coercions, so a hypothesis and a goal print
+  IDENTICALLY and fail to unify (*"has type `size lks <= n` while it is
+  expected to have type `(size lks <= n)%nat`"*).  Annotate every coupling
+  occurrence `%nat`.  Same trap bit `ProofLogWrite` on a `lock_rank` comparison.
+
 ## WHAT IS LEFT: propagating the premise to the ~50 acquire call sites
 
 ~100 files still fail, and they are almost all LOCK CLIENTS.  This part is NOT

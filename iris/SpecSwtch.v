@@ -52,7 +52,7 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
          mword 64 -d> mword 64 -d> iPropO Σ)
     (An Ao : ctx_adm)
     (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
-    (av : nat) (eb : bool) (p : mword 64) (lks : gset nat) :=
+    (av : nat) (eb : bool) (p : mword 64) :=
   length old_vs = 14%nat ->
   m0 !!! Regidx (mword_of_int 10 : mword 5) = oldc ->
   m0 !!! Regidx (mword_of_int 11 : mword 5) = newc ->
@@ -78,24 +78,27 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
      to struct cpu, so the same-eb contract is realized one level up by
      sched's own epilogue intena store + ghost retune. *)
   sie_cap_gpr m0 av false p -∗
-  cpu_own 1 eb p emp false lks -∗
+  (* THE HELD SET IS PINNED AT THE PROC LOCK, both directions.  swtch is
+     reachable only from [sched] and the scheduler, and xv6's rule for it is
+     "hold p->lock across the switch" -- [sched]'s own
+     [if (mycpu()->noff != 1) panic("sched locks")] is the C-level statement
+     of it.  So the set is a CONSTANT here, exactly as the level [1] is, and
+     the resumer gets the same constant back.  Quantifying it instead (as an
+     [lks'] the resumer invents) is what left the seam unprovable: a
+     migratable record's resumption is a different critical section, so
+     nothing would tie the two sets together. *)
+  cpu_own 1 eb p emp false {[lock_rank "proc"]} -∗
   pc_is (mword_of_int KernelSyms.swtch) -∗
   ctx_cells oldc old_vs -∗
   ▷ valid_context P An newc p -∗
   (* the payload's [A'] slot is always the RESUMER's record index, and the
      resumer of this crossing is the caller itself -- so it is [Ao]. *)
   P cpu_id Ao newc oldc (rget m0 (mword_of_int 4 : mword 5)) p -∗
-  (* [lks'] IS ITS OWN BINDER, not the entry [lks].  The caller's continuation
-     becomes the OLD record's resume wand ([SwtchCtx.valid_context_pre]), which
-     is quantified over the held-lock set the RESUMER will be carrying -- a
-     later resumption is a different critical section from the one that
-     suspended, so nothing ties the two sets together.  The entry [lks] above
-     indexes only the bundle the suspender hands in. *)
-  ( ∀ (h : CPU) (m : regfile) (eb' : bool) (lks' : gset nat),
+  ( ∀ (h : CPU) (m : regfile) (eb' : bool),
       ⌜adm Ao h⌝ -∗
       ⌜callee_img m = callee_img m0⌝ -∗
       sie_cap_gpr (CID := h) m av false p -∗
-      cpu_own (CID := h) 1 eb' p emp false lks' -∗
+      cpu_own (CID := h) 1 eb' p emp false {[lock_rank "proc"]} -∗
       pc_is (CID := h) (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
       ctx_cells oldc (callee_img m0) -∗
       (∃ (A' : ctx_adm) (cret : mword 64),
@@ -111,6 +114,6 @@ Module Type SWTCH.
            mword 64 -d> mword 64 -d> iPropO Σ)
       (An Ao : ctx_adm)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
-      (av : nat) (eb : bool) (p : mword 64) (lks : gset nat),
-      wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p lks.
+      (av : nat) (eb : bool) (p : mword 64),
+      wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p.
 End SWTCH.

@@ -209,7 +209,7 @@ Lemma sc_cpu_own_open `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
   a_cpu_noff cid_word ↦₄ noff_val 0 ∗
   (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) ∗
   intr_count 0 eb ∗
-  cur_proc px ∗ cpu_locks lks ∗ C.
+  cur_proc px ∗ cpu_locks_lvl 0 lks ∗ C.
 Proof.
   rewrite cpu_own_off /cpu_hart /cpu_priv /cpu_cells.
   iIntros "((((_ & Hn & Hi & Hp) & Hl) & Hc) & HC)". iFrame.
@@ -220,7 +220,7 @@ Lemma sc_cpu_own_mk `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (px :
   (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
   intr_count 0 false -∗
   cur_proc px -∗
-  cpu_locks lks -∗
+  cpu_locks_lvl 0 lks -∗
   cpu_own 0 false px emp false lks.
 Proof.
   iIntros "Hn Hi Hc Hp Hl". rewrite cpu_own_off /cpu_hart /cpu_priv /cpu_cells.
@@ -1420,7 +1420,7 @@ Section ProofScheduler.
         iEval (rewrite (sc_retag_p Mc (av - 10)%nat zero_reg (proc_addr jj))) in "Hcg".
         iApply (Swtch.wp_swtch_sconf (p_sched γs) None (Some cpu_id)
                   (a_cpu_ctx cid_word) (p_context (proc_addr jj))
-                  Mc ctxvs (av - 10)%nat ebc (proc_addr jj) {[lock_rank "proc"]}
+                  Mc ctxvs (av - 10)%nat ebc (proc_addr jj)
                   Hctxlen Holdc Hnewc (adm_none cpu_id)
                   with "Htext Hcg Hcpu Hpc Hctxcells [Hvc] [HP]").
         { iExact "Hvc". }
@@ -1455,7 +1455,7 @@ Section ProofScheduler.
            (b) a matching premise on [wp_sched_sconf_body] pinning sched()'s
            own [lks] to it.  Flagged, not guessed: do NOT treat the [Qed]
            below as verified past this point without a build. *)
-        iIntros (h m' eb' lks') "%Hadm' %Hcallee Hcg Hcpu Hpc Hctxback Hresume".
+        iIntros (h m' eb') "%Hadm' %Hcallee Hcg Hcpu Hpc Hctxback Hresume".
         (* cpus[cid].context is only ever resumed from this hart's own tp --
            which is exactly what its pinned index says. *)
         pose proof (adm_pin_inv _ _ Hadm') as Hh. subst h.
@@ -1495,7 +1495,7 @@ Section ProofScheduler.
            step is honest either way; the gap documented at the [iIntros]
            above surfaces at the [iApply "Tail"] below, where [sc_tail_body]
            demands the literal [{[lock_rank "proc"]}]. *)
-        iDestruct (cpu_own_set_proc 1 eb' (proc_addr jj) zero_reg emp lks' with "Hcpu") as "[Hproc Hback]".
+        iDestruct (cpu_own_set_proc 1 eb' (proc_addr jj) zero_reg emp {[lock_rank "proc"]} with "Hcpu") as "[Hproc Hback]".
         (* RECLAIM: c->proc : &proc[jj] -> 0.  A PLAIN STORE, for the same
            reason the dispatch one is.  The hart tag came back WHOLE in the
            park payload and goes into proc jj's lock below. *)

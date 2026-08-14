@@ -893,8 +893,12 @@ Section IntrDefsBase.
      too, and bundling them is what keeps a leaf from taking one and
      stranding the other.  It also means the [cpu_hart] pair below still has
      TWO conjuncts, so nothing that destructures it changed shape. *)
+  (* [cpu_locks_lvl n lks], not bare [cpu_locks lks]: the authority now travels
+     with the coupling [size lks <= n] (LockSet.v).  Bundled INTO the second
+     conjunct rather than added as a third, so every positional destructuring
+     of this bundle keeps matching. *)
   Definition cpu_priv (n : nat) (eb : bool) (p : mword 64) (lks : gset nat) : iProp Σ :=
-    (cpu_cells n eb p ∗ cpu_locks lks)%I.
+    (cpu_cells n eb p ∗ cpu_locks_lvl n lks)%I.
 
   (* the private state PLUS the counting token -- the whole per-cpu bundle
      minus the caller's context-slot payload [C] (which is an ordinary caller
