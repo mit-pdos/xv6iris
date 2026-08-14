@@ -8054,10 +8054,10 @@ read off the walk's own lower bound `8 <= n3` rather than off
   well.
 
 
-### Step 1a LANDED, and step 1 STOPPED mid-walk — **the mkdir arm's ledger
-### has ZERO slack and `8 <= n3` busts it by EXACTLY ONE UNIT**.  The
-### correlation clause and the whole helper layer are in; the WP body is
-### not, and no `.v` file carries an `Admitted`
+### Step 1a LANDED — **the mkdir arm's ledger has ZERO slack and
+### `8 <= n3` busts it by EXACTLY ONE UNIT**.  The correlation clause
+### and the whole helper layer are what fix it
+
 
 **THE FINDING, and it is the whole reason this is a separate step.**
 `CreateBudget.cr_budget_mkdir` closes at *exactly* `iput_units` (`u6 = 3`),
@@ -8171,71 +8171,101 @@ that compute them are `wp_auipc_s_sconf` + `wp_addi4_s_sconf` at
 the arm.
 
 
-### Step 1 STOPPED mid-walk (2026-08-14).  **+0xf8 .. +0x130 IS WRITTEN AND
-### COMPILES** — all three `dirlink`s and both interior fall-throughs — and
-### the `++`/mint block has a RUNAWAY tactic in its head.  No `.v` in the
-### tree carries an `Admitted`; what landed is steps 1a and 1b
+### D₀ CLOSES — **`create` is PROVEN.**  `cr_mkdir_half` discharges
+### `cr_mkdir_body` whole, `wp_create_sconf` seals the three halves, and
+### `LinkCreate.v` flips the coverage report 177 -> 178
+### (`sysfile.c` 8 -> 9, `create` 356 B)
 
-**WHAT IS PROVEN AND WHAT IS NOT.**  The walk was developed against the
-mirror at ~3m30s per iteration with a trailing `Admitted`, and the
-prefix through the third `dirlink`'s post (`+0xf8` … `+0x130`, ~880 lines)
-reaches `MAKEEXIT=0`.  What is NOT written: the `++`/mint/C-OK block
-(drafted, ~286 lines, does not terminate — see below), and the three
-`fail:` entries.  **Neither the prefix nor the draft is committed**: a
-walk lemma is worth nothing until it is whole, and the tree's no-`Admitted`
-rule is the whole reason the parked-body architecture exists.  The drafts
-are parked on the mirror at `/shared/cr_mkdir_half_parts1to3.v.draft` and
-`/shared/cr_mkdir_half_part4.v.draft`.
+**WHAT LANDED.**  `cr_mkdir_half` walks +0xf8 .. +0x144 (three
+`dirlink`s, the parent's `nlink++`, its `iupdate`), RE-WALKS ARM C-OK at
++0xe0 .. +0xea — the join is below `cr_alloc_half`'s branch, so there is
+nothing to share — and routes the three `bltz` exits at +0x10a / +0x11e /
++0x130 through `cr_fail_mkdir_half`.  `wp_create_sconf` is then
+`cr_found_half` fed `cr_alloc_half` fed the two parked bodies, and
+`CreateProof` is ascribed `: CREATE`.  `Print Assumptions` is the
+standing six plus `create_fresh_ty` plus the transient
+`iput_acquiresleep_order_ADMITTED`, and nothing else.
 
-**THE STOP: A NON-TERMINATING STEP IN THE PARENT'S POST-`dirlink` ASSERT
-BLOCK.**  With the whole `++`/mint/C-OK block truncated away — leaving only
-`Hdpeq`/`subst dp03`, `Hp3ty`, `Hp3nl`, `Hp3szmax`, `Hp3iok`, `Hp3dok`,
-`Hp3nlnz` — the worker still spins: **>10 min and 22 GB against a 3m30s /
-5.6 GB baseline**, on a machine where the whole file is otherwise 3m30s.
-Two bisection probes localise it to that block and no further; the next run
-should localise the sentence with `coqc -time` (it STREAMS, so the last
-line of the log IS the stalling sentence — durable-notes) rather than by
-more truncation, which costs ten minutes per bit.  The two candidates worth
-checking first, both durable-notes shapes: `rewrite Hdp3` under a
-`reflexivity` that must unfold `SpecWritei.wi_dinode`'s `decide`, and the
-`Z.of_nat (16 * dir_slot …)` `lia` inside `Hp3szmax`.  Note the same three
-asserts are FINE for the child (`Hc1*`, `Hc2*`, both green): what is
-different here is that the parent's `k0` is a `dir_slot data (dir_nrec …)`
-term rather than a literal.
+**A CLOSER'S COST IS THE CONTEXT, SO DEPTH DECIDES WHETHER THE IDENTICAL
+SENTENCE TERMINATES.**  Three sentences of the `++`/mint block ran >10
+min at 22 GB against a 3m30s / 5.6 GB file: the post-`dirlink` size
+read-back's inline `lia`, and two `ltac:(lia)`s spliced into
+`DirLinks.dir_link_at_dirlink`'s `2 <= tot` slot.  Every one is a single
+equation away from trivial, and `cr_alloc_half` runs the *same*
+`cr_wi_size_max` chain inline and is fine — what differs is that the
+mkdir arm sits three `dirlink`s deeper, so `lia`'s atom scan meets three
+calls' worth of accumulated arithmetic.  Hoisting each into
+`assert (H : …). { clear -<the one equation>. lia. }` took the whole file
+to **3:13 / 5.1 GB**, i.e. faster than the baseline that did not contain
+this arm at all.  Rule, now in `optimization.md`: an inline `ltac:` whose
+tactic is a general-purpose closer is priced by the DEPTH of its call
+site, not by the goal.
 
-**FIVE WALK-LEVEL FINDINGS, all paid for, none of them design questions:**
+**THE SEAL'S ONE PIECE OF REAL WORK IS THE FRAME ALIGNMENT.**  The three
+lower halves take `is_aligned_paddr (Physaddr (pa_stk sp0 10/9)) 8` as
+pure premises, and no rearrangement of the parked bodies produces them:
+a word points-to carries alignment and a byte run does not
+(`StackBytes.v`'s header), and by the time the bodies hand the frame over
+slots 10 and 9 have been carved into the sixteen `name` bytes.  The seal
+owns neither — but it owns `sie_cap_gpr`, which HOLDS this hart's stack.
+`ProofCreate.cr_cap_align` pushes the ten-slot frame exactly as the
+prologue would, reads the two alignments off slots 10 and 9, and KEEPS
+the capability: the conclusion is pure, and an `iDestruct … as %_` into
+the pure context does not consume its argument (`StackBytes.
+slot_bytes_own` uses the same idiom on its own argument).  Anything else
+in the seal is four `iApply`s and no glue.
 
-* **only THREE `bltz`es live on this arm.**  +0x10a / +0x11e / +0x130; the
-  `fail:` label's fourth entry is +0xdc's, which `cr_alloc_half` already
-  routes.  The CFG listing above says four and means four ENTRIES, not four
-  on this arm.
-* **`cr_mkdir_half` needs NO premise for the failure family.**
-  `cr_fail_mkdir_half`'s premises are all persistent, so the proof
-  instantiates it itself, once per branch — three mutually exclusive
-  branches, one lemma, no extra hypothesis and no `□`.
-* **the returned name buffer must be re-introduced under a FRESH name.**
-  The rodata windows are `↦ₘ□`, so they land in the INTUITIONISTIC context
-  and the `iApply` does not consume them; re-introducing `Hdotw` after the
-  call fails with `iIntro: "Hdotw" not fresh`.  (An owned buffer — the
-  parent's `Hnb14` — may keep its name, which is why `cr_alloc_half` does.)
-* **the child's `dir_links` arrives at `dnc`, not at `cr_setf dnc …`.**  The
-  two are NOT interconvertible in general (the grey disjunct names
-  `nlink`), but at a FRESH child both big-ops are empty, so the conversion
-  is three lines off `Hcnrec0` and no `dir_links_eq` is wanted.
-* **`dl16_post`'s record-preservation clause has to be `subst`ed, not
-  `iEval`-rewritten.**  `dinode_at γi cinum dc01` is what the post hands
-  back and `dc1` is what the next call's `dn0` must be; `iEval (rewrite
-  (Hdc01 eq_refl)) in "Hcdiat"` silently does not fire, and
-  `assert … ; subst` does.
+**`ic_mk_loaded` APPLIES OUTRIGHT ON THIS ARM**, where the file arm's
+site needs the hand rewrite plus a named `iSplitL` chain, because
+`wp_iupdate_link` hands `dinode_at` and `inode_meta` back ALREADY at the
+bumped record — there is no `dn0'` -> `dn'` rewrite standing between the
+pieces and the constructor.  When a site's returned resources are one
+rewrite short, keep the rewrite and swap only the terminal `iFrame`.
 
-**AND THE TWO DECODE-LEVEL ONES.**  `16 * 0 + jj - 16 * 0` is NOT
+**FIVE WALK-LEVEL FACTS worth keeping.**
+
+* only THREE `bltz`es live on this arm (+0x10a / +0x11e / +0x130); the
+  `fail:` label's fourth entry is +0xdc's, which `cr_alloc_half` routes.
+  The CFG listing's "four" means four ENTRIES, not four on this arm.
+* **`cr_fail_mkdir_half` needs no premise.**  Its premises are all
+  persistent, so the walk instantiates it once per branch — three
+  mutually exclusive branches, one lemma, no extra hypothesis and no `□`.
+* **a persistent name window must be re-introduced under a FRESH name.**
+  The rodata windows are `↦ₘ□`, so they land in the INTUITIONISTIC
+  context and the `iApply` does not consume them; re-introducing `Hdotw`
+  after the call fails with `iIntro: "Hdotw" not fresh`.  An OWNED buffer
+  (the parent's `Hnb14`) may keep its name.
+* **`dl16_post`'s record-preservation clause must be `subst`ed, not
+  `iEval`-rewritten.**  `iEval (rewrite (Hdc01 eq_refl)) in "Hcdiat"`
+  silently does not fire; `assert … ; subst` does.
+* the child's `dir_links` arrives at `dnc`, not at `cr_setf dnc …`; the
+  two are not interconvertible in general (the grey disjunct names
+  `nlink`), but at a FRESH child both big-ops are empty and the
+  conversion is three lines off `Hcnrec0`.
+
+**AND THE TWO INDEX-NORMALISATION TRAPS.**  `16 * 0 + jj - 16 * 0` is NOT
 definitionally `jj` (`Nat.sub` blocks on a variable), so every
 `dir_record_of_name` / `dir_link_at_dirlink` call needs
-`replace … with jj by lia` — hoist it into one `Hwin` assert per record
-rather than repeating it in three `ltac:`s.  And `bmap_alloced bmc bm1
-(16 * 0 / BSIZE)` does not match a `bmap_alloced bmc bm1 0` hypothesis
-syntactically; restate it at the divided index (`by exact`, the conversion
-is free) before rewriting it into the spend.
+`replace … with jj by lia` — hoist it into one `Hwin` assert per record.
+And `bmap_alloced bmc bm1 (16 * 0 / BSIZE)` does not match a
+`bmap_alloced bmc bm1 0` hypothesis syntactically; restate it at the
+divided index (`by exact`) before rewriting it into the spend.
+
+**THE PARENT'S ROUND TRIP ACROSS THE `++`** is `DirLinks.dir_links_live`
+out and `dir_links_of_ilink` back; the return leg takes NO hypothesis,
+which is exactly why it crosses an `nlink` change by construction.  The
+third `fail:` entry re-parks the parent by `dir_links_dirlink_nop`
+instead, available because dirlink's atomicity at `tot < 16` IS
+`tot = 0`.
+
+**GATE.**  `coqc` green on the mirror at `c9e90ea7` (all 1091
+`iris/*.v` md5-verified first), 3:13 / 5.1 GB; `make -f CoqMakefile -j24
+-k` MAKEEXIT=0 with 0 `COQC` lines and staleness 0; no `Admitted`/`admit`
+anywhere in `iris/`; `SpecCreate.v`, `SpecCreateFreshTy.v`,
+`CreateBudget.v`, `ProofCreateParts.v` and `LinkCreateFreshTy.v`
+byte-untouched.
+
+
 
 ## S6-chdir — the contract LANDS and two blocks of the walk are PARKED
 ## GREEN; the walk itself is NOT written, and the reason is that the

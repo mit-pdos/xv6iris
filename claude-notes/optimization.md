@@ -414,6 +414,22 @@ invariant. If several such args exist, use the **unshelve hoist**: replace the
 inline `ltac:`s with bare `_`, prefix `unshelve iApply`, and discharge the evar
 subgoals as standalone `{ … }` goals.
 
+**An inline `ltac:` whose tactic is a GENERAL-PURPOSE CLOSER is priced by the
+DEPTH of its call site, not by its goal** — so the identical sentence
+terminates in one arm of a function and does not terminate in another. Three
+`lia`s in `ProofCreate.cr_mkdir_half` (the post-`dirlink` size read-back, and
+two `ltac:(lia)`s in `DirLinks.dir_link_at_dirlink`'s `2 <= tot` slot) ran
+**>10 min at 22 GB** where `cr_alloc_half` runs the same `cr_wi_size_max` chain
+inline and is fine; the difference is only that the mkdir arm sits three
+`dirlink`s deeper, so `lia`'s atom scan meets three calls' worth of accumulated
+arithmetic. Each goal was one equation away from trivial. Hoisting them to
+`assert (H : …). { clear -<the one equation>. lia. }` took the file to **3:13 /
+5.1 GB**, faster than the baseline that did not contain the arm at all. The tell
+is that the goal looks tiny; do not read a stalling `lia` as a hard arithmetic
+problem, read it as a context problem, and note that `clear -H` is only
+available once the goal is a NAMED assert — which is the second reason not to
+splice a closer into argument position.
+
 - Grep for `ltac:(intros` inside a `kernel_data_window` / `kernel_data_string`
   argument list — every hit is this bug.
 - The related fix is often to state the byte premise over a SYMBOLIC index as its
