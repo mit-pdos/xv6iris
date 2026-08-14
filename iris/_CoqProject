@@ -531,8 +531,11 @@ SpecInitlog.v
 SpecBeginOp.v
 SpecEndOp.v
 SpecLogWrite.v
+SpecSysSync.v
 ProofBeginOp.v
 LinkBeginOp.v
+ProofSysSync.v
+LinkSysSync.v
 ProofLogWrite.v
 LinkLogWrite.v
 ProofWriteHead.v

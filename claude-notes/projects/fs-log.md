@@ -12,8 +12,10 @@ rework is [`../completed/bio.md`](../completed/bio.md).
 
 ## Status (2026-08-05)
 
-- **log.c is 6/7 functions proven and linked**; `CodeSysSync.v` is
-  catalogued (sys_sync's Spec/Proof are the open work below).
+- **log.c is 7/7 functions proven and linked.** sys_sync's contract is
+  EMPTY, deliberately — see item 2 below for what the postcondition is
+  waiting on, and `SpecSysSync.v`'s header for why an "epoch advanced"
+  post would not have been enough on its own.
 - **`xv6_fs_adequacy` / `xv6_fs_adequacy_xv6Σ` are proven**, with
   `xv6_power_adequacy` untouched and BOTH axiom footprints identical (the
   recorded ten). The crash slot carries `FsCrash.P_fs_named`; the theorem's
@@ -123,28 +125,20 @@ equals the last committed one.
      the boot image, so the FS layer above sees the recovered state. The gap
      the D2 finding describes is only in what `P_fs`'s HISTORY can record.
    - `ProofInstallTrans`: the recovering arm becomes live.
-2. **sys_sync.** `CodeSysSync.v` is catalogued (38 instruction facts). Left:
-   - the two receipt-strengthening additions the design doc's item 5 spells
-     out: `LogInv.log_mirror_at` gains a PARTIAL SLOT RECORD (so
-     `fs_commit_permit` can name the committed state on the batch's own write
-     set), and `log_res` gains a faithful `nat` `ncommit` + `mono_nat` auth +
-     the committer's deposited receipt;
-   - `SpecSysSync` + `ProofSysSync`: the `ncommit` sleep loop, with
-     `ProofBeginOp`'s iLöb retry loop as the precedent. Note gcc never
-     materialised `n = ncommit + 1`: s2 holds the ORIGINAL count and the back
-     edge is `bge s2,a5` ("loop while old >= current"), i.e. a do-while whose
-     exit condition is "the counter strictly advanced".
-   - **The loop body is `acquiresleep`'s body, instruction for instruction**:
-     `sleep_prepare(&log); release(&log.lock); sleep(); acquire(&log.lock)`,
-     the same four-call quartet `ProofAcquiresleep` already discharges. One
-     register serves all four calls because `&log` and `&log.lock` are the
-     same address (`lock` is `struct log`'s first field). So the sleep half of
-     sys_sync is a transcription of a proven proof, and only the `ncommit`
-     reasoning above is new.
-   - s1/s2 are spilled LAZILY — inside the taken branch, not the prologue —
-     so the frame's live set differs between the two arms (`filestat`'s
-     pattern; see the playbook §4e).
-   - This takes log.c to 7/7.
+2. **sys_sync's POSTCONDITION.** The function itself is proven and linked
+   (`SpecSysSync` / `ProofSysSync` / `LinkSysSync`, axiom footprint
+   identical to begin_op's), so what is left here is purely the contract:
+   today it says only "runs to completion, callee-saved preserved, returns
+   0", because a durability statement needs currency the log does not yet
+   hand out. The two additions are the design doc's item 5 —
+   `LogInv.log_mirror_at`'s PARTIAL SLOT RECORD (so `fs_commit_permit` can
+   name the committed state on the batch's own write set) and a commit
+   counter carrying the committer's deposited receipt. `ProofEndOp` already
+   HOLDS that receipt at the commit point (it is `fs_commit_permit`'s `Q`)
+   and drops it; the deposit is the whole of the change on that side.
+   Read the design doc's item 5 before starting: it now records what the
+   FAST PATH can and cannot certify, which is the constraint that decides
+   the shape.
 3. **The ∀-era FS boot composition.** `FsBoot.v` is DONE and axiom-free: it
    changes the boot mint's granularity from bytes to blocks and runs the
    `fs_alloc` handshake, so `fs_boot_bundle` takes `bio_init`'s premises
