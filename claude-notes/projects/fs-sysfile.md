@@ -7468,127 +7468,116 @@ fed `cr_alloc_half`, both premises supplied, `CreateProof` ascribed
 `: CREATE`.
 
 
-### D₀-c THE FAIL ARM — **STOPPED BEFORE ANY EDIT.**  The `nlz_obs` mint is
-### NOT needed (and not threadable); what blocks the arm is ONE LEDGER UNIT
-### at the SECOND `iunlockput`, and `cr_fail_body`'s landed premise cannot
-### express it.  Zero `.v` files touched
+### D₀-c LANDS — `ProofCreate.cr_fail_half` proves `cr_fail_body` whole.
+### **create pays its freeing iput with `cru`, not `crz`** — the mint is
+### neither needed nor threadable — and the arm needed TWO premises the
+### landed statement did not have, both now in it
+
+`cr_fail_half` is the +0x12e..+0x146 walk: the zero store, the unlink
+flush, `iunlockput(ip)` (the put that FREES), `iunlockput(dp)`, the lazy
+`ld s3`, the funnel with `s2 = 0`.  Three files (`SpecDirlink.v`,
+`ProofDirlink.v`, `ProofCreate.v`; +691/−10).
 
 **FINDING 1 — `crz` IS THE WRONG CREDIT HERE, AND `cru` IS FREE.**
 `SpecIput.ip_spend_w w cru crz = ip_bm w + (if cru || crz then 0 else 1)`:
-the two credits are *interchangeable* in the figure, and create — unlike a
-walker — can make the OWN-SET claim.  `cr_fail_body` already carries
-`⌜IBLOCK cinum inodestart ∈ Sb4⌝`, and the +0x134 flush unions that block
-into the op's set again, so `cru := true` at +0x13a is discharged by
-`elem_of_union_r` and buys exactly the unit `crz` would have bought.
-**Nothing in create's `fail:` arm needs `nlz_obs`.**  (C4's work is still
-consumed at +0x134 — the receipt premise's LEFT disjunct off the two tie
-premises — just not as `crz`.)
+the two credits buy the SAME unit, and create — unlike a walker — can make
+the OWN-SET claim, because `cr_fail_body` already carries
+`⌜IBLOCK cinum inodestart ∈ Sb4⌝` and the +0x134 flush unions that block in
+again.  So **no `nlz_obs` is minted anywhere on create's fail arm**, and
+`InodeRegion`'s observation machinery has no consumer here.
 
-**FINDING 2 — AND THE MINT COULD NOT REACH +0x13a ANYWAY: THE BIRTH EPOCH
-DIES AT THE +0x134 CONTRACT BOUNDARY.**  `wp_iupdate_unlink` is
-`log_opS γ (S u) Sb` in, `log_opS γ … (Sb ∪ …)` out — the birth-epoch
-existential is re-closed (§G.20's asymmetry, deliberate).  The mint needs
-`nlink ≠ 0`, i.e. it must run BEFORE the flush; the `crz` premise needs
-`nlz_obs … e0` at the SAME `e0` as the `log_opSe … e0` handed to the iput,
-i.e. AFTER it.  `log_opS_named` re-opens at a fresh `e0'` with no relation
-to `e0` (`log_epoch_lb` is a lower bound and two lower bounds are
-incomparable — §G.14), and `nlz_obs` only weakens DOWNWARD.  So a `crz`
-fail arm would need a SEVENTH iupdate body (`log_opSe` in, `log_opSe`
-out), not a mint placement.  Namex gets away with one mint because no call
-between its guard and its two credited iputs consumes the reservation.
+**FINDING 2 — AND IT COULD NOT HAVE BEEN THREADED: THE BIRTH EPOCH DIES AT
++0x134.**  `wp_iupdate_unlink` is `log_opS` in / `log_opS` out (§G.20's
+asymmetry, deliberate).  The mint needs `nlink ≠ 0`, so it must run BEFORE
+the flush; the `crz` premise needs `nlz_obs … e0` at the epoch of the
+`log_opSe` handed to the iput, i.e. AFTER it.  `log_opS_named` re-opens at
+an unrelated `e0'`, two `log_epoch_lb`s are incomparable (§G.14), and
+`nlz_obs` weakens only downward.  **A `crz` fail arm would need a SEVENTH
+iupdate body (`log_opSe` in AND out), not a different mint placement.**
+Namex escapes this only because nothing between its guard and its two
+credited iputs consumes the reservation.  The C4 receipt's first consumer
+is therefore `sys_unlink`, not create — what create consumes of C4 is the
+FLUSH's disjunctive receipt premise, on the LEFT (witness) route, off the
+two ambient ties it already carries as contract premises.
 
-**WHERE THE MINT WOULD GO IF IT WERE EVER WANTED: the fail body's ENTRY,
-with `cr_fail_body` BYTE-IDENTICAL.**  The body receives
-`dinode_at γi cinum (cr_setf dnc major minor 1)` (nlink = 1 ≠ 0 until
-+0x12e's store, which writes the CACHED record only) and
-`⌜bv_unsigned cinum < 16 * Z.of_nat nib⌝`; `ireg_inv`, `⌜γ = icfg_log⌝`
-and `⌜inodestart = icfg_ist⌝` are premises of the PROVING LEMMA, exactly as
-in `cr_alloc_half`.  `cr_alloc_half` never had to be reopened for this.
+**THE TWO PREMISES `cr_fail_body` GAINED, and why each is forced.**
 
-**THE BLOCKER — the arm's SECOND `iunlockput` is one unit short of being
-callable, machine-checked.**  `cr_fail_body`'s ledger premise is
-`⌜(iput_units <= n4)%nat /\ (n4 <= u)%nat⌝` and nothing else.  +0x13a's
-`iunlockput(ip)` is entered at `crb := false` (no route to
-`bmapstart ∈ Sb4`: dirlink's membership clauses are guarded by `0 < tot`
-and give `bmapstart` only at `al = true`), so its post admits the report
-`w = true` and spends `ip_bm true = 1` whatever `cru`/`crz` say.  +0x140's
-`iunlockput(dp)` then wants `iput_units <= n'` with `n' >= 3 - 1 = 2`.
-`ip_need <= u5` in `cr_budget_fail_file` is stated at `ip_spend true true
-true`, i.e. it PRESUMES `crb := true` at that call; the walk cannot claim
-it.  Probed on the mirror (`/shared/xv6iris-c4`, EXIT=0, 1.9 s):
+* `⌜tot = 0%nat⌝`, replacing `⌜(tot < 16)%nat⌝`.  The arm must re-park the
+  PARENT's `DirLinks.dir_links` before it can `iunlockput(dp)`, and at
+  `0 < tot < 16` **no re-park exists**: `dir_link_at_dirlink` wants a ticket
+  for the record the partial write left (`2 <= tot`), and the only `ilink`
+  in hand is the one +0x134 spends; at `tot = 1` the record goes live at
+  `inum mod 256`, for which no fragment exists anywhere (DirLinks' S5i
+  note).  That is not a proof gap — **a live record naming an inode whose
+  `nlink` the arm then zeroes would break (L1)**, so the arm is TRUE only
+  where the write was all-or-nothing.  What makes it available is the
+  ATOMICITY RELAY: `SpecDirlink.dl16_post` gains `/\ (tot = 0 \/ tot = 16)`,
+  relayed verbatim from `SpecWritei.wi16_atomic` at `dl_wi_blocks k0` (one
+  `split` in `ProofDirlink`, at the one site that proves the append arm).
+  This is increment 3's finding-3 repair, finally consumed: 3a landed the
+  writei half and no caller had needed the relay until now.  At `tot = 0`
+  the re-park is `dir_links_dirlink_nop` and needs no ticket at all.
+* `⌜(S iput_units <= n4)%nat \/ bmapstart ∈ Sb4⌝`, beside the landed ledger
+  clause, which is byte-identical.  The tail runs TWO `iunlockput`s and the
+  first is entered UNCREDITED on the bitmap, so its post admits the report
+  `w = true` and spends one whatever `cru`/`crz` say — and `iunlockput(dp)`
+  then wants `iput_units` out of `n4 - 1`, which `iput_units <= n4` does not
+  give.  (`CreateBudget.cr_budget_fail_file` closes only because it is
+  stated at `ip_spend true true true`, i.e. it PRESUMES `crb := true`; the
+  walk cannot claim that.)  Either disjunct closes it, and the walk is NOT
+  duplicated: the call is made once at `crb := bool_decide (bmapstart ∈ Sb)`
+  — the honest reading — and the case split happens AFTER, on pure facts
+  (`cr_fail_ip_right` where the decision is true, since §G.25's
+  `crb = true -> w = false` pins the report; `cr_fail_ip_left` where it is
+  false, where the body's other disjunct pays).  The `\/` is not decoration:
+  `S iput_units <= n4` alone is unsuppliable at the two INTERIOR mkdir
+  entries (six in hand, three spent), and `bmapstart ∈ Sb4` alone is
+  unsuppliable at +0xc4 (a failing dirlink reports `bmapstart` only when it
+  allocated).  +0xc4 supplies the LEFT disjunct unconditionally
+  (`cr_alloc_ip4`: eight in, `wi16_spend <= 4`), which is `cr_alloc_half`'s
+  one added proof line — its STATEMENT did not move.
 
-```coq
-Theorem probe_fail_tail_busts (cru crz : bool) :
-  let n4 := iput_units in                          (* all the body knows *)
-  let n' := (n4 - ip_spend_w true cru crz)%nat in  (* w = true admitted   *)
-  n' < iput_units.
-Proof. destruct cru, crz; vm_compute; lia. Qed.
+**NEW IN `ProofCreate.v`'s pure cluster:** `cr_alloc_ip4`, `cr_fail_ip_left`
+/ `cr_fail_ip_right` (the two ledger readings), `cr_crb_honest` /
+`cr_crb_claim` (the two directions of the `bool_decide` crb — stated rather
+than inlined, because an `ltac:(… bool_decide_eq_true_1 …)` in argument
+position must guess `P` from an expected type that is still an evar and
+fails with an uninferable placeholder naming a `bool_decide` of the
+IMPLICATION), and `cr_trunc16_zero`.
 
-Theorem probe_fail_tail_closes4 (w : bool) (n4 n' : nat) :
-  (S iput_units <= n4)%nat ->
-  ((n4 - ip_spend_w w true false)%nat <= n')%nat -> (iput_units <= n')%nat.
+**THE FOUR-ENTRY PERSISTENT RE-SHAPE IS RETIRED, NOT DEFERRED.**  The
+linearity worry existed only while `cr_fail_body` was a HYPOTHESIS of
+`cr_alloc_half`.  It now has a proof, so the mkdir arm's three entries each
+`iApply cr_fail_half`; nothing has to be `□`-duplicated and
+`cr_mkdir_body`'s shape is unaffected.
 
-Theorem probe_fail_tail_closes_crb (n4 n' : nat) :
-  (iput_units <= n4)%nat ->
-  ((n4 - ip_spend_w false true false)%nat <= n')%nat -> (iput_units <= n')%nat.
+**TWO WALK NOTES worth keeping.**  `iEval (rewrite Hdn0') in "H"` did NOT
+move the parked `dinode_at` (the framing then fails with *"iFrame: cannot
+frame (dinode_at γi dind dn0')"*, which reads as a mismatched record);
+`subst dn0'` beside the intros is the reliable form, and it fixes the whole
+Iris context at once.  And the `sh zero,74(s3)` at +0x12e is the +0xa6 store
+with `Rz` in the source slot: `sie_cap_gpr_x0` for `Mx !!! Rz = zero_reg`,
+then `cr_trunc16_zero`.
 
-Theorem probe_alloc_ip4 (nc n' : nat) (crb crd cru al ind : bool) :
-  (8 <= nc)%nat -> ((nc - wi16_spend crb crd cru al ind)%nat <= n')%nat ->
-  (S iput_units <= n')%nat.          (* 8 - 4: the +0xc4 entry has FOUR *)
+**GATE.**  `make -f CoqMakefile -j30 -k` MAKE_EXIT=0 on the mirror
+(`/shared/xv6iris-c4`), 1093 `.vo`, `make -n` **0** `COQC` lines, 0 `Error`,
+`lemma_diff` CLEAN over the three files, no `Admitted`/`admit`.
+`Print Assumptions` at the eight real modules: **`cr_fail_half` = the
+standing six ALONE** (not even `create_fresh_ty` — the fail arm is below the
+gate), `cr_alloc_half` = the six + `create_fresh_ty`, `cr_found_half` /
+`cr_tail_half` / `Dirlink.wp_dirlink_gen` / `wp_dirlink_sconf` = the six.
+`cr_alloc_body`, `cr_mkdir_body`, `cr_cont_body`, `cr_tail_body` and
+`cr_alloc_half` / `cr_found_half`'s statements are byte-identical;
+`cr_fail_body` moved by exactly the two premises above.
 
-Theorem probe_mkdir_interior_only_three :
-  let u3 := (cr_uw false - ia_spend - iu_spend true
-             - dl_spend false false false true false)%nat in
-  u3 = 6 /\ (u3 - wi16_spend false false false true false)%nat = 3.
-```
+**WHAT IS LEFT OF D₀ IS TWO THINGS.**  `cr_mkdir_body`, behind the nlink-wrap
+ruling (kernel-defects.md candidate; unchanged), and D₀-c's seal —
+`wp_create_sconf` = `cr_found_half` fed `cr_alloc_half`, whose two parked
+bodies are now `cr_fail_half` (proven) and `cr_mkdir_body` (blocked), then
+`CreateProof` ascribed `: CREATE`.
 
-**THE STATEMENT CHANGE WANTED (the coordinator rules).**  ONE added pure
-premise on `cr_fail_body`, beside the existing ledger clause, which stays
-byte-identical:
-
-```coq
-       ⌜(S iput_units <= n4)%nat \/ bmapstart ∈ Sb4⌝ -∗
-```
-
-and the walk `destruct`s it: LEFT → `crb := false`, spend `<= 1`, `n' >= 3`;
-RIGHT → `crb := true`, which pins `w = false` (§G.25's clause), spend `0`.
-`cr_alloc_half`'s STATEMENT does not move; its PROOF gains one line at the
-+0xc4 exit (`left; exact (cr_alloc_ip4 …)` — the left disjunct holds
-UNCONDITIONALLY there, `probe_alloc_ip4`).  Two alternatives, priced:
-
-* **`⌜S iput_units <= n4⌝` alone** — simpler, suppliable at +0xc4 and at
-  +0xf2, but NOT at the two INTERIOR mkdir entries (`probe_mkdir_interior_
-  only_three`: six in hand, three spent, three left), so it would re-block
-  D₀-b's arm the `dl16_post` collapse just unblocked.  Declined.
-* **lower iput/iunlockput's ENTRY need for credited callers** (SpecIput's
-  own §"THE NEED DOES NOT MOVE" comment prices it at `1 + ip_spend crb cru
-  true`) — does not help: the call that needs the room is `iunlockput(dp)`,
-  and `cru` for the PARENT's block is available only at `0 < tot`.
-
-**THE FOUR-ENTRY PERSISTENT RE-SHAPE IS UNNECESSARY — keep the linear
-single-entry form.**  The linearity worry existed only while `cr_fail_body`
-was a HYPOTHESIS of `cr_alloc_half`.  Once it has a proof (`cr_fail_half`,
-a lemma beside `cr_tail_half`), the mkdir arm's three entries each
-`iApply cr_fail_half` and nothing has to be `□`-duplicated; `cr_alloc_half`
-and `cr_mkdir_body` keep their landed shapes.
-
-**EVERYTHING ELSE FOR THE ARM IS PRESENT — the relaunch is a walk.**
-+0x12e's `sh zero,74(s3)` is the +0xa6 store's pattern at
-`cr_setf … 0` (`inode_meta`/`i_nlink` unfold + `iFrame`, `WpSmodeHalf.
-wp_sh_s_sconf`); +0x134's premises are all in hand (`di_type_stable` by
-`cr_setf_type`, type-nonzero off `fresh_shape`, `1 = 0 + 1` by
-`cr_setf_nlink`, `di_addrs`/`bm_cells` off `inode_ok`, `blkmap_wf_dir_len`,
-the `ilink` undeposited from +0xac, `iLeft` off the two ties, `cru := true`
-off `IBLOCK cinum ∈ Sb4`, `eb = true` as a lemma premise);
-`ic_escrow`/`is_sleeplock` at `kslot` come from `cr_esc_acc`/`cr_slk_acc`
-under the body's own `⌜kslot < NINODE⌝`; +0x144's reload re-forms
-`cr_tregs` off slot 5 (`m !!! Rs3`, in the premise list) and the funnel is
-`cr_tail_half`; `cr_cont_body`'s ledger clause has NO lower bound on `u'`,
-so the tail owes nothing after the two iputs.
-
-**MIRROR STATE, and it is a false-green trap.**  The EC2 box's MAIN tree
-`/shared/xv6iris` is FIVE FILES BEHIND HEAD (pre-C4: `SpecIupdate.v`,
-`ProofIupdate.v`, `ProofIalloc.v`, `SpecLogWrite.v`, `ProofLogWrite.v`) and
-has no `.vo` at all.  `/shared/xv6iris-c4` is content-identical to HEAD
-(aggregate md5 of `iris/*.v` matches) and warm at 1093 `.vo` — use it, or
-re-sync the main tree first.
+**MIRROR.**  The EC2 box's MAIN tree `/shared/xv6iris` is FIVE FILES BEHIND
+HEAD (pre-C4: `SpecIupdate.v`, `ProofIupdate.v`, `ProofIalloc.v`,
+`SpecLogWrite.v`, `ProofLogWrite.v`) and has NO `.vo` — building there is a
+false green.  `/shared/xv6iris-c4` is content-identical to HEAD and warm at
+1093 `.vo`; this landing was gated there and left clean.

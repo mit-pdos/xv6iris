@@ -363,6 +363,23 @@ Proof. vm_compute. lia. Qed.
 (*                    six in hand against an [iput_units] of three -- so   *)
 (*                    the per-call VARIATION, not the maximum, is what     *)
 (*                    they need ([CreateBudget.cr_fail_mkdir_closes]).     *)
+(*    THE ATOMICITY -- [tot = 0 \/ tot = 16], relayed VERBATIM from        *)
+(*                    [SpecWritei.wi16_atomic] at this call's single-block *)
+(*                    window ([dl_wi_blocks]).  It is not a convenience:   *)
+(*                    create's [fail:] arm must re-park the PARENT's       *)
+(*                    [DirLinks.dir_links] before it can [iunlockput] the  *)
+(*                    parent, and at [0 < tot < 16] there is no re-park at *)
+(*                    all -- [dir_link_at_dirlink] wants a ticket for the  *)
+(*                    record the partial write left ([2 <= tot], and the   *)
+(*                    only [ilink] in hand is the one the [fail:] flush    *)
+(*                    spends), [dir_links_dirlink_nop] wants [tot = 0],    *)
+(*                    and at [tot = 1] the record goes live at [inum mod   *)
+(*                    256], for which no fragment exists anywhere          *)
+(*                    (DirLinks' S5i note).  That is not a proof gap: a    *)
+(*                    live record naming an inode whose [nlink] the arm    *)
+(*                    then zeroes would BREAK (L1), so the arm is true     *)
+(*                    only where the write was all-or-nothing.  Writei's   *)
+(*                    seven exits are why it always is.                    *)
 (*    [0 < tot]    -- the MEMBERSHIP trio alone, and its guard is not      *)
 (*                    inherited but forced: at [tot = 0] writei never      *)
 (*                    log_wrote the target block, so nothing PUTS it in    *)
@@ -393,6 +410,7 @@ Definition dl16_post (bmapstart : Z) (dinum : mword 32) (inodestart : Z)
   let crd := bool_decide (wi_tgt_blk bm' off ∈ Sb) in
   let cru := bool_decide (IBLOCK dinum inodestart ∈ Sb) in
   ((ncount - wi16_spend crb crd cru al ind)%nat <= n')%nat
+  /\ (tot = 0%nat \/ tot = 16%nat)
   /\ ((0 < tot)%nat ->
         wi_tgt_blk bm' off ∈ Sb'
         /\ IBLOCK dinum inodestart ∈ Sb'

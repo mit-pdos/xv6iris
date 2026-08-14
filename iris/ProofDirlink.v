@@ -2507,7 +2507,12 @@ Section ProofDirlinkMain.
         { intros _. split.
           - pose proof (Hwiany (dl_wi_blocks k0)) as Hz. cbv zeta in Hz.
             exact Hz.
-          - intros Htpos. exact (proj2 (Hwi16 Htpos (dl_wi_blocks k0))). }
+          - split.
+            (* THE ATOMICITY, relayed verbatim: writei's own all-or-nothing
+               clause at this window, which is what makes create's [fail:]
+               re-park of the parent exist at all (SpecDirlink's header). *)
+            + exact (Hwiat (dl_wi_blocks k0)).
+            + intros Htpos. exact (proj2 (Hwi16 Htpos (dl_wi_blocks k0))). }
         (* writei's two preservations, forwarded (S5a finding 2; the cap,
            D₀-a repair 3b) *)
         { exact Hcap'. }
