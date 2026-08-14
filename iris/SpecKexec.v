@@ -434,6 +434,18 @@ Definition wp_kexec_sconf_body
   (* ---- the argument vector: [na] non-null pointers then a NULL ---- *)
   (forall i, (i < na)%nat -> avf i <> (mword_of_int 0 : mword 64)) ->
   avf na = (mword_of_int 0 : mword 64) ->
+  (* ...AND THE NULL IS INSIDE THE FIRST [MAXARG] ELEMENTS.  This is a
+     PREMISE rather than something kexec discovers, because kexec cannot
+     discover it: its own [argc >= MAXARG] test runs only once [argv[argc]]
+     is known non-null, so a vector whose first null sits exactly at index
+     [MAXARG] walks straight out of the loop with [argc = MAXARG] and the
+     following [ustack[argc] = 0] writes one past [uint64 ustack[MAXARG]].
+     sys_exec is the only caller and it guarantees the null is below MAXARG,
+     which is what makes that store unreachable; see
+     claude-notes/kernel-defects.md for the C-level story.  With the premise
+     the argv loop's exit invariant can say [argc < MAXARG] outright instead
+     of carrying the off-by-one as slack. *)
+  (na < MAXARG)%nat ->
   (* each argument is a NUL-terminated string of [alen i] characters inside
      the [aslen i] bytes the caller owns *)
   (forall i, (i < na)%nat -> (alen i < aslen i)%nat) ->

@@ -2160,6 +2160,10 @@ Section KexecCLoop.
     bb_cstr (afun c) (alen c) ->
     (Z.of_nat (alen c) < 4096)%Z ->
     (8192 <= uint sz1)%Z ->
+    (* sys_exec's own guarantee, threaded for ONE use: the natural exit at
+       [S c] must publish [S c < MAXARG], and nothing the function tests
+       establishes it -- see [kxc_at_272]'s header. *)
+    (na < MAXARG)%nat ->
     (* the ELF buffer's eight slots are 8-aligned.  A fact about [sp0] ALONE,
        constant across the whole loop, so it rides as a Coq-level premise
        rather than as a conjunct of [kxc_at_21a]: only the three [-1] exits
@@ -2234,9 +2238,9 @@ Section KexecCLoop.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hcna Halenlt Hcstr Halen4096 Hsz1ge Hal
+    intros HK Hcna Halenlt Hcstr Halen4096 Hsz1ge Hnamax Hal
            Hmsp Hmra Hms0 Hms1 Hms2 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13.
-    unfold K_kexec in HK.
+    unfold K_kexec in HK. unfold MAXARG in Hnamax.
     iIntros "#Htext Hst Hcont Hout".
     rewrite /kxc_at_21a.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs1 & %HMa0 & %HMs2 & %HMs4 & %HMs5 & %HMs6 &
@@ -3649,6 +3653,7 @@ Section KexecCArgvLoop.
     (forall i, (i < na)%nat -> (Z.of_nat (alen i) < 4096)%Z) ->
     avf na = (mword_of_int 0 : mword 64) ->
     (8192 <= uint sz1)%Z ->
+    (na < MAXARG)%nat ->
     (forall i, (i < 8)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true) ->
     m !!! Regidx csp_rs1 = sp0 -> m !!! Regidx Rra = ra0 ->
@@ -3715,7 +3720,7 @@ Section KexecCArgvLoop.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Halen_bound Halen_cstr Halen_4096 Havf_na Hsz1ge Hal
+    intros HK Halen_bound Halen_cstr Halen_4096 Havf_na Hsz1ge Hnamax Hal
            Hmsp Hmra Hms0 Hms1 Hms2 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11
            Hmw12 Hmw13.
     intro W. revert CID0.
@@ -3734,7 +3739,7 @@ Section KexecCArgvLoop.
               pidv V dqb dqs dqa m M K C sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P oldsz sz1 c
               HK Hcna (Halen_bound c Hcna) (Halen_cstr c Hcna)
-              (Halen_4096 c Hcna) Hsz1ge Hal
+              (Halen_4096 c Hcna) Hsz1ge Hnamax Hal
               Hmsp Hmra Hms0 Hms1 Hms2 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11
               Hmw12 Hmw13
               with "Htext Hst Hcont [Hout]").
