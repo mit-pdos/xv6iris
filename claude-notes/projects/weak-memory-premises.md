@@ -1,5 +1,42 @@
 # Shrinking the capstone's premise ledger — worklist
 
+## C9 (next): the state-conditioned liveness — the LAST premise in scope
+
+Design (orchestrator, 2026-08-14).  `sail_live`'s ∀b form is refuted
+(O9's witness quantifies register reads over all values; the throw
+gates read `cur_privilege`).  But its ONLY consumer is completion
+non-stuckness (`tail_complete` + the `hres` threading that feeds it),
+and `sail_mstep` answers register reads from the CONCRETE state
+(`k (register_lookup r rs)`), so the honest predicate is
+**`sail_live_st rs m`** — RegReads answered concretely from `rs`,
+memory values still ∀-chosen (the completion's freedom), failure nodes
+refused.  Plan:
+1. Define `sail_live_st` (+ a `glive_st` kit mode; the second-mode
+   bind-reuse lesson applies — prefix facts from the existing tower
+   where the prefix is register-free; a `goodbP`-style concrete-state
+   driver from DecodeSetU is the right engine for register-branching
+   cones).
+2. Per-boundary fact: `priv_ok rs → sail_live_st rs (riscv_step b)`
+   where `priv_ok rs := cur_privilege ∈ {M,S,U}` (+ whatever else the
+   O3 sites need — the fuel sites are state-independent and already
+   killed; enumerate the rest via the generator's liveness mode +
+   hand lemmas at the ~100 failure sites, reachability-refuted or
+   priv-gated).
+3. New sharp per-trace premise **`Hpriv`** (every record's
+   `cur_privilege ∈ {M,S,U}`) joining Hcq/Hseip — per-image discharge:
+   xv6 never enables H (misa.H clear; the model-level reachability
+   invariant is the recorded upgrade path that would delete Hpriv).
+4. Re-thread `live_res`/`hres_derived`/`tail_complete` on
+   `sail_live_st` at the record's own registers; DELETE the capstone's
+   `∀ b, sail_live (riscv_step b)` premise in favor of
+   `rv64d_axiom_shapes`(-extended if the three axiom stubs need
+   liveness forms too — they already carry gsilent facts) + `Hpriv`
+   inside `xv6_cone_premises`.
+After C9 the effort's in-scope ledger is: `main_premises`,
+`Hcq ∧ Hseip ∧ Hpriv`, `cone_liftable`, `rv64d_axiom_shapes`,
+`img_total`, fresh era, the WP package, the 5 axioms — everything
+else is a discharge campaign by charter.
+
 **Status (2026-08-14): IN FLIGHT (stage C8 landed — (O10)'s specification fix,
 the kit collapse, the memory cone, and THE CAPSTONE SWAP: the shape premise is
 now a THEOREM, `WeakShapeTop.riscv_step_shaped_ax` over the three-fact record
