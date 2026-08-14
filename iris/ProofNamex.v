@@ -5681,7 +5681,7 @@ Section ProofNamexMain.
       iApply (ID.wp_idup_sconf gtl cn gfs gi cov logstart nib
                 ck (cq/2)%Qp dev cinum
                 B3 0%nat eb (proc_addr j) C (K - 12)%nat b lks
-                Kid ltac:(vm_compute; reflexivity) Hckl HB3a0 Hbelow
+                Kid ltac:(vm_compute; reflexivity) Hckl HB3a0 ltac:(lkbelow)
                 with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hpanic Hisl1 Hcshr").
       all: try lkbelow.
       iIntros (CIDid Hqid mid) "Hcg Hcnt Hpc %Hidp Hcshr (%qn & Href)".

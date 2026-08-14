@@ -869,7 +869,7 @@ Section UtD0.
     assert (HcsP7 : ut_cs m0 (tp_pin M7)) by exact (ua_pin_cs m0 M7 HcsM7).
     iEval (rewrite <- (ua_pin_sie_cap_gpr M7 nx false (un_pj N))) in "Hcg".
     iApply (VM.wp_vmfault_sconf (un_kl N) (tp_pin M7) (pv_upt V) (pv_sz V) nx
-              0%nat false (un_pj N) C false
+              0%nat false (un_pj N) C false lks
               ltac:(lia) (rget_tp M7) HP7a0 HP7a1 Hszb
               ltac:(vm_compute; reflexivity)
               with "Hcg Hcpu Htext Hpc Hppt Hkenv [-]").

@@ -68,12 +68,27 @@ call the function is *about* -- and the fd scan underneath them quietly calls
 `filedup`.  Whenever a bound looks obvious because one prominent callee states
 it, check the quiet ones.
 
+**And never name a rank in a cancellation either.**  The balanced
+acquire/release obligation `({[r]} ∪ lks) ∖ {[r]} = lks` used to be closed by
+`apply locks_add_del; assumption`, which needs a `rank ∉ lks` hypothesis at
+exactly that rank in context -- true only because each file happened to have
+posed one at its own floor.  All 63 sites now read `apply
+locks_add_del_below; lkbelow`, which derives the non-membership from whatever
+bound is in scope.
+
 `tools/rank-audit.py` checks this, and checks it at BOTH levels -- Spec bodies
 against the contracts they call, and each local `Lemma` in a Proof file
 against the contracts called inside its own span.  It reads the table out of
 `LockRank.v`, so it stays honest across a reordering.  Run it after any new
 premise and after any change to `lock_ranks`; it exits nonzero with the
 offending premise and the rank it should carry.
+
+What it does NOT see: calls through a LOCAL HYPOTHESIS -- `Hballoc`,
+`Hlogwrite`, `Hpk`, a functor parameter -- because it matches `Mod.wp_x`.
+Three local lemmas in `ProofIalloc`/`ProofIreclaim` had to be lowered to
+`"log"` for exactly that reason, after the audit called them clean.  A clean
+audit means "no rank is above a callee it names"; it does not mean the floor
+is right.
 
 When the ranking itself changes, recompute each contract's floor by FIXPOINT
 over the call graph rather than by eye: a contract's new bound is the minimum

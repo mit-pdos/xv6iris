@@ -2424,8 +2424,9 @@ Section ProofPipewrite.
                 apply callee_saved_insert_r; [vm_compute; reflexivity|].
                 apply callee_saved_insert_r; [vm_compute; reflexivity|]. apply callee_saved_refl. }
               iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γlp G2
-                        (trap_res true + (av - 14))%nat 1%nat true C false lks
-                        Hj Hjlp ltac:(rewrite Ha0G2; exact (pw_pnwrite_nz pi Hpv)) Hlvl1 Hav14 Hbelowproc
+                        (trap_res true + (av - 14))%nat 1%nat true C false
+                        ({[lock_rank "pipe"]} ∪ lks)
+                        Hj Hjlp ltac:(rewrite Ha0G2; exact (pw_pnwrite_nz pi Hpv)) Hlvl1 Hav14 ltac:(lkbelow)
                         with "Hcg Hown Htext Hpc Hpinv Hpanic").
               all: try lkbelow.
               iApply wp_next_off_intro. iIntros (Msp) "%Hspcs Hcg Hown Hpc". rgall.

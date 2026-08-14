@@ -424,7 +424,7 @@ Section UtSysBlock.
       assert (Hcsmg : ut_cs m0 mg)
         by exact (ut_cs_trans m0 S4 mg HcsS4 (ut_cs_of_callee_saved _ _ Hcsg)).
       iApply (T.ut_a6 (CID := CID2) SY.syscall_env N V2 pt ksp m0 mg av
-                n2 C true
+                n2 C true lks
                 Hwf' Hav ltac:(rewrite Hn2; unfold trap_res, kv_frame_slots in *; lia)
                 ltac:(rewrite Htfg HV1upt; exact Htfpe) Hksp Hm0sp
                 Hmgsp Hmgs1 Hcsmg

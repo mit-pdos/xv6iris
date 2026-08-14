@@ -1008,3 +1008,23 @@ lia` sites break — measured, not hypothetical. Computing the value at
 definition time leaves a plain `Z` literal in the body, so every existing
 consumer works unchanged. It is the same "compute the result ONCE into its own
 Definition" idiom as `ColdBoot.v`'s, used for a different reason.
+
+## A paren-splice bug that DUPLICATES rather than truncates
+
+A rewriter over Coq source that walks outward for an enclosing `(` must handle
+"there isn't one".  Python's `rstart`-style scan returns `-1` there, and
+`s[:lo] + rep + s[hi:]` with a negative `lo` silently emits the file's tail
+TWICE instead of failing.  Eight files came back at ~2x their length with two
+copies of their `Module <X>Proof`, and the only visible symptom was a single
+odd line at the seam (`End EndOpProof.lkbelow : ...`).
+
+Two habits that catch it immediately:
+
+* after any bulk rewrite, check STRUCTURE, not just syntax -- `grep -c '^Module '`
+  per file, and compare line counts against the previous commit.  A file that
+  doubled is not a subtle bug.
+* make the matcher fail loudly on `-1` instead of indexing with it.
+
+The line-count check is also what distinguishes "my rewriter ate this" from
+"someone else's work landed here", which is worth being sure about before
+reverting anything.
