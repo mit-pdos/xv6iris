@@ -26,13 +26,28 @@ during phase 1 is deleted; contracts name the set.
 The substrate is landed and proven, the client sweep is essentially done, and
 the ORDER has been revised once (ftable/itable above proc -- see below).
 
-Three files were still red at the last full build:
+At the last full build, 15 of 1085 files have no `.vo`.  TWO of those fail to
+compile; the other THIRTEEN are blocked behind them and were never attempted:
 
 * `ProofIput` -- RED ON PURPOSE, and expected to stay that way until the
   icache REF-1 work lands.  See "THE ONE UNLICENSED EDGE" below; the failing
   `assert` in the file carries the same explanation.
-* `ProofUsertrapArms`, `ProofVirtioDiskRwF` -- ordinary held-set threading,
-  fixes in flight.
+* `ProofVirtioDiskRwF` -- the phase-chain convention seam, in progress.
+* blocked by `ProofIput`: `LinkIput`, `LinkIunlockput`, `LinkFileclose`,
+  `LinkDirlink`, `LinkNamex`, `LinkNamei`, `LinkNameiparent`, `LinkKexit`,
+  `LinkSysExit`, `LinkSysClose`, `LinkSysPipe`, `LinkPipealloc`; blocked by
+  `ProofVirtioDiskRwF`: `LinkVirtioDiskRw`.
+
+That blocked set is the real price of the deferred `iput` edge, and it is
+worth keeping in view: leaving that one proof red costs the LINKING of iput,
+iunlockput, fileclose, dirlink, namex, namei, nameiparent, kexit, sys_exit,
+sys_close, sys_pipe and pipealloc.
+
+**Count what is MISSING, not what errored.**  `make -k` does not delete a
+stale `.vo` when a later compile fails, and it skips the dependents in
+silence -- so the error count said "2" while thirteen more were unverified,
+some against artifacts predating the order change.  `for f in *.v; do [ -f
+"${f%.v}.vo" ] || echo "$f"; done` is the honest check.
 
 ## The substrate is LANDED AND PROVEN, the clients are most of the way
 
