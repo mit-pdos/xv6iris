@@ -673,7 +673,36 @@ Qed.
     at all must BE the closing conditional write.
 
     Every ∀ over an answer is over the answers [sail_mstep] SUPPLIES —
-    [inl (w, None)] and [inl None] (delta (e')). *)
+    [inl (w, None)] and [inl None] (delta (e')), and since stage C6 that
+    principle also governs [Interface.ExtraOutcome]: see delta (e''') and
+    [WeakShapeAst] §1.
+
+    (e''') A RAISED SAIL EXCEPTION IS A DEAD END, NOT A CONTINUATION —
+    stage C6's finding (O9), and the fifth instance of the over-quantified-∀
+    genre.  [Interface.ExtraOutcome {A} : eOutcome A → outcome A] is indexed
+    by the MONAD'S OWN RETURN TYPE, and [Defs.throw e = Next (ExtraOutcome e)
+    mret], so [Defs.bind (Defs.throw e) k] is [Next (ExtraOutcome e) k]: a
+    default arm [∀ r, sail_shaped (k r)] walks the whole rest of the
+    instruction AT EVERY VALUE OF THE THROWN-AT TYPE.  [sail_mstep] has NO
+    arm for [ExtraOutcome] — the agent is STUCK there
+    ([WeakSailLTS2]'s unbracket cases say so in as many words, and
+    [WeakSailComplete]'s header (a) already claims the node is vacuous; the
+    claim was true of [GenericFail]/[Discard], whose answer types ARE empty,
+    and false of this one.  So the arm is [True]: nothing follows a throw
+    because the machine never takes a step from one.  [amo_tail] likewise.
+
+    WHAT IT COST BEFORE THE FIX (the concrete refutation, machine-checked at
+    the leaf in [WeakShapeAst] §1): [rv64d.encdec_backwards] reaches
+    [zicfiss_xSSE priv] under [and_boolM (currentlyEnabled Ext_Zicfiss) …]
+    with [priv] read from [cur_privilege]; [currentlyEnabled Ext_Zicfiss]
+    reduces to [currentlyEnabled Ext_A], i.e. [misa.A], so the gate is TRUE
+    at ordinary register states, and at [priv = VirtualSupervisor] the
+    function raises [internal_error "Hypervisor extension not supported"].
+    Its continuation is [λ instruction, … execute instruction …] — so the old
+    arm demanded [sail_shaped] of [execute ast] for EVERY [ast], including
+    [STORE (imm, rs2, rs1, 0)], whose zero-width [MemWrite] no arm admits
+    (stage C5's (O6)).  I.e. [∀ b, sail_shaped (riscv_step b)] was FALSE as
+    stated, not merely unreachable by the compositional route. *)
 Fixpoint sail_shaped (m : M unit) {struct m} : Prop :=
   match m with
   | Interface.Ret _ => True
@@ -694,6 +723,9 @@ Fixpoint sail_shaped (m : M unit) {struct m} : Prop :=
            (if dev_addr (Interface.WriteReq.pa req) then True
             else n ≠ 0%N) ∧
            sail_shaped (k (inl None))
+       (* (e''') a raised Sail exception is a DEAD END: [sail_mstep] has no
+          arm for it, so nothing about the continuation is asked. *)
+       | Interface.ExtraOutcome _ => λ _, True
        | _ => λ k, ∀ r, sail_shaped (k r)
        end) k
   end
@@ -709,6 +741,7 @@ with amo_tail (pa : Arch.pa) (n : N) (m : M unit) {struct m} : Prop :=
            sail_shaped (k (inl None))
        | Interface.MemRead _ _ => λ _, False
        | Interface.Barrier _ => λ _, False
+       | Interface.ExtraOutcome _ => λ _, True   (* (e'''), as above *)
        | _ => λ k, ∀ r, amo_tail pa n (k r)
        end) k
   end.

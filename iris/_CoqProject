@@ -899,6 +899,8 @@ WeakSailComplete.v
 WeakShape.v
 WeakShapeOverrides.v
 WeakShapeOverrides2.v
+WeakShapeAst.v
+WeakShapeDec.v
 WeakShapeGen01.v
 WeakShapeGen02.v
 WeakShapeGen03.v

@@ -199,24 +199,27 @@ Fixpoint gwalk (w : win) (m : mon) {struct m} : Prop :=
            | Some _ => False
            | None => ∀ r, gwalk None (k r)
            end
-       | Interface.ExtraOutcome _ => λ k,
-           (* STRICTLY STRONGER THAN [amo_tail] (which admits this node by its
-              default arm): NO SAIL EXCEPTION MAY BE RAISED WHILE AN
-              EXCLUSIVE WINDOW IS OPEN.  Without this, [try_catch] is not
-              window-compositional at all — the handler would have to close
-              a window it knows nothing about, and every handler the model
-              builds ([catch_early_return], [liftR]) ends in
-              [returnm]/[throw], i.e. closes nothing.  It is a REAL
-              strengthening since C2 weakened [amo_tail]'s [Interface.Ret]
-              arm (a throw inside a window is now admitted there — it just
-              abandons the window), and it is the one place this kit is
-              still stricter than the LTS's premise; the exclusive sites that
-              throw INSIDE their window ([execute_AMO]'s post-read faults)
-              therefore need the handler-aware form, not this one. *)
-           match w with
-           | Some _ => False
-           | None => ∀ r, gwalk None (k r)
-           end
+       | Interface.ExtraOutcome _ => λ _,
+           (* (e''') SINCE STAGE C6 THE WINDOW-CLOSED MODE IS [True], matching
+              [WeakSailLTS]'s narrowed arm: [Interface.ExtraOutcome] is
+              indexed by the MONAD'S OWN RETURN TYPE and [sail_mstep] has no
+              arm for it, so a raised Sail exception is a DEAD END and
+              nothing may be asked of its continuation — asking [∀ r, …]
+              there walks the rest of the instruction at every value of that
+              type, which is finding (O9).
+
+              THE WINDOW-OPEN MODE KEEPS [False], and that is a KIT-SIDE
+              strengthening, not a specification claim ([WeakSailLTS]'s
+              [amo_tail] admits the node): [Defs.try_catch] REPLACES an
+              [ExtraOutcome] node by the handler AT THE WINDOW THAT NODE WAS
+              REACHED UNDER, and every handler the model builds
+              ([catch_early_return], [liftR]) ends in [returnm]/[throw], i.e.
+              closes nothing — so admitting a throw inside a window here
+              would make [gwalk_try_catch] demand [gwalk (Some _) (h e)] and
+              refute it at [catch_early_return].  The abandoning reading is
+              [WeakShapeOverrides.gwalkx], whose arm IS [True] in both
+              modes. *)
+           match w with Some _ => False | None => True end
        | _ => λ k, ∀ r, gwalk w (k r)
        end) k
   end.
@@ -308,8 +311,8 @@ Proof.
       split_and!; try done. by apply IH, H6.
   - (* Barrier *)
     split; [intros H r; by apply IH, H|by intros pa1 n1].
-  - (* ExtraOutcome: strengthened arm *)
-    split; [intros H r; by apply IH, H|by intros pa1 n1].
+  - (* ExtraOutcome: (e''') — a dead end on both sides *)
+    by split.
 Qed.
 
 Lemma gwalk_shaped (m : M unit) : gwalk None m → sail_shaped m.
@@ -404,8 +407,8 @@ Proof.
     + destruct Hm as [H1 H2]. split; [done|]. by apply IH.
   - (* Barrier *)
     destruct w as [[pa0 n0]|]; [done|]. intros r. by apply IH.
-  - (* ExtraOutcome *)
-    destruct w as [[pa0 n0]|]; [done|]. intros r. by apply IH.
+  - (* ExtraOutcome: (e''') — nothing is asked of the continuation *)
+    done.
 Qed.
 
 Lemma glive_bind {E A B} xf (m : Defs.monad E A) (k : A → Defs.monad E B) :
@@ -482,8 +485,14 @@ Lemma bind_exit_not_live {E A B} xf (k : A → Defs.monad E B) :
 Proof. done. Qed.
 
 Lemma gwalk_throw {E A} (e : E) : gwalk None (Defs.throw (A := A) e).
-Proof. rewrite /Defs.throw /=. by intros r. Qed.
+Proof. done. Qed.
 
+(** THE KIT-SIDE STRENGTHENING, STILL A REFUTATION AFTER (e'''): the
+    specification ([WeakSailLTS.amo_tail]) admits a throw inside a window,
+    but [gwalk] does not — see the [ExtraOutcome] arm for why
+    ([gwalk_try_catch] would otherwise need its handler at an open window,
+    which [catch_early_return]'s [returnm] arm refutes).  The abandoning
+    reading [WeakShapeOverrides.gwalkx] is where such a site is walked. *)
 Lemma gwalk_throw_some {E A} pa n (e : E) :
   gwalk (Some (pa, n)) (Defs.throw (A := A) e) → False.
 Proof. done. Qed.
@@ -737,7 +746,8 @@ Proof. done. Qed.
     i.e. closes nothing — so an exclusive window can cross such a boundary
     only when the enclosed code provably raises NOTHING.  That is
     [gwalk_try_catch_live], and it is the shape all three exclusive call
-    sites need. *)
+    sites need.  It is also why [gwalk]'s [ExtraOutcome] arm keeps [False]
+    in the window-open mode after (e''') — see the arm's own comment. *)
 
 Lemma gwalk_try_catch {A E1 E2} w (m : Defs.monad E1 A) (h : E1 → Defs.monad E2 A) :
   gwalk w m → (∀ e, gwalk None (h e)) → gwalk w (Defs.try_catch m h).
@@ -760,8 +770,9 @@ Proof.
     + destruct Hm as [H1 H2]. split; [done|]. by apply IH.
   - (* Barrier *)
     destruct w as [[pa0 n0]|]; [done|]. intros r. by apply IH.
-  - (* ExtraOutcome: under an open window the hypothesis is [False]
-       (the strengthened arm); with the window closed, the handler. *)
+  - (* ExtraOutcome: under an open window the hypothesis is [False] (the
+       kit-side strengthening the arm keeps); with the window closed, the
+       handler. *)
     destruct w as [[pa0 n0]|]; [done|]. apply Hh.
 Qed.
 

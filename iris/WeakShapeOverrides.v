@@ -365,11 +365,7 @@ Fixpoint gwalkx (w : win) (m : mon) {struct m} : Prop :=
            | Some _ => False
            | None => ∀ r, gwalkx None (k r)
            end
-       | Interface.ExtraOutcome _ => λ k,
-           match w with
-           | Some _ => False
-           | None => ∀ r, gwalkx None (k r)
-           end
+       | Interface.ExtraOutcome _ => λ _, True   (* (e'''), as in [gwalk] *)
        | _ => λ k, ∀ r, gwalkx w (k r)
        end) k
   end.
@@ -393,7 +389,7 @@ Proof.
       split_and!; try done. by apply IH.
     + destruct Hm as [H1 H2]. split; [done|]. by apply IH.
   - destruct w as [[pa0 n0]|]; [done|]. intros r. by apply IH.
-  - destruct w as [[pa0 n0]|]; [done|]. intros r. by apply IH.
+  - (* ExtraOutcome: (e''') — [True] in both modes here *) done.
 Qed.
 
 Lemma gsilent_gwalkx {E A} w (m : Defs.monad E A) : gsilent m → gwalkx w m.
@@ -424,7 +420,8 @@ Proof.
     + intros pa1 n1 (H1 & H2 & H3 & H4 & H5 & H6).
       split_and!; try done. by apply IH, H6.
   - split; [intros H r; by apply IH, H|by intros pa1 n1].
-  - split; [intros H r; by apply IH, H|by intros pa1 n1].
+  - (* ExtraOutcome: (e''') — [True] here, and [amo_tail]'s arm is [True] too *)
+    by split.
 Qed.
 
 Lemma gwalkx_shaped (m : M unit) : gwalkx None m → sail_shaped m.
@@ -453,7 +450,7 @@ Proof.
       split_and!; try done. by apply IH.
     + destruct Hm as [H1 H2]. split; [done|]. by apply IH.
   - destruct w as [[pa0 n0]|]; [done|]. intros r. by apply IH.
-  - destruct w as [[pa0 n0]|]; [done|]. intros r. by apply IH.
+  - (* ExtraOutcome: (e''') *) done.
 Qed.
 
 (** THE ESCAPING BIND: [m] may leave a window open at its [Interface.Ret], so
@@ -477,7 +474,7 @@ Proof.
       split_and!; try done. by apply IH.
     + destruct Hm as [H1 H2]. split; [done|]. by apply IH.
   - destruct w as [[pa0 n0]|]; [done|]. intros r. by apply IH.
-  - destruct w as [[pa0 n0]|]; [done|]. intros r. by apply IH.
+  - (* ExtraOutcome: (e''') *) done.
 Qed.
 
 (** The abandoning exclusive READ, in the weak reading: the continuation may

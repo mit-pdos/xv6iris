@@ -373,9 +373,9 @@ Proof.
   intros Hw Hk.
   have Hn : Z.to_N width ≠ 0%N by apply to_N_nonzero.
   cbv [write_ram]. destruct wk; mred; cbv [Defs.sail_mem_write]; mred;
-    try (apply gwalk_MemWrite_plain; [by right|mred; apply Hk]);
-    (intros r; mred; cbv [Defs.sail_mem_write]; mred;
-     apply gwalk_MemWrite_plain; [by right|mred; apply Hk]).
+    (* the three "unused" kinds are [internal_error] nodes, i.e.
+       [Interface.ExtraOutcome]s, which delta (e''') admits outright *)
+    first [ apply gwalk_MemWrite_plain; [by right|mred; apply Hk] | done ].
 Qed.
 
 Lemma gwalk_write_ram_solo wk addr width data meta :
@@ -384,9 +384,7 @@ Proof.
   intros Hw.
   have Hn : Z.to_N width ≠ 0%N by apply to_N_nonzero.
   cbv [write_ram]. destruct wk; mred; cbv [Defs.sail_mem_write]; mred;
-    try (apply gwalk_MemWrite_plain; [by right|mred; apply gwalk_ret]);
-    (intros r; mred; cbv [Defs.sail_mem_write]; mred;
-     apply gwalk_MemWrite_plain; [by right|mred; apply gwalk_ret]).
+    first [ apply gwalk_MemWrite_plain; [by right|mred; apply gwalk_ret] | done ].
 Qed.
 
 (* ====================================================================== *)

@@ -230,6 +230,60 @@ explicit `wp_*_s_sconf` argument and once inside a companion
 `add_vec … sign_extend'` assert or `set`. Update both, or the file fails
 again at the same offset.
 
+## A PREDICATE OVER AN EFFECT MONAD: CHECK EVERY OUTCOME'S *ANSWER TYPE*, NOT
+## JUST WHETHER THE MACHINE HAS AN ARM FOR IT
+
+Six times on this tree a shape/liveness predicate over a Sail-style
+interaction monad has been **refutable because one arm quantified over answers
+the machine never supplies** (the ∀-path oracle; `sail_live`'s memory abort;
+the exclusive-window read; the standalone conditional write; the decoder's
+zero width; and finally the throw). The recurring mistake is not the ∀ itself
+— it is deciding an arm is harmless from the CONSTRUCTOR's name instead of
+from its answer type.
+
+**The rule.** For every constructor of the outcome type, write down two
+things: (a) does the LTS/stepping relation have an arm for it, and (b) what is
+its ANSWER TYPE? A default arm `∀ r, P (k r)` is:
+
+- harmless when the answer type is **empty** (`GenericFail`, `Discard` — their
+  index is `False`, so the arm is vacuous);
+- a silent, unbounded **strengthening** when the answer type is inhabited and
+  the machine supplies nothing — and this is the dangerous case, because it
+  reads exactly like the harmless one.
+
+The instance that cost a stage: `ExtraOutcome {A} : eOutcome A -> outcome A`
+is indexed by **the monad's own return type**, and `throw e = Next
+(ExtraOutcome e) mret`, so `bind (throw e) k = Next (ExtraOutcome e) k`. A
+default arm therefore walks the WHOLE REST OF THE COMPUTATION at every value
+of the type the throw pretends to produce — for a decoder that is every
+instruction, including ill-formed ones the decoder cannot build. The tree's
+own comment already said "the agent is stuck there, so the node is vacuous";
+the claim was true of two of the three failure outcomes and false of the
+third. Fix: narrow the arm to what the machine supplies (here: nothing, i.e.
+`True`).
+
+Corollary for the KIT built on top of such a predicate: a kit may be STRICTLY
+STRONGER than the specification where that buys compositionality (this tree
+keeps `gwalk (Some _) (ExtraOutcome _) = False` so that `try_catch`'s handler
+hypothesis stays at the closed window), but say so at the arm — a kit-side
+strengthening and a specification claim look identical six months later.
+
+## A STATE-PINNED BOOLEAN TRAVERSAL AND A ∀-QUANTIFIED ONE ARE THE SAME
+## TRAVERSAL: PORT THE DRIVER, NOT THE THEOREM
+
+A decode/config traversal that answers `RegRead` from a CONCRETE state
+(`iris/DecodeSetU.v`'s `goodbP D P m s`) and one that answers it with `∀ r`
+(`WeakShapeOverrides2.gpost`) differ in exactly one arm. Everything else —
+the clause-spine rule, the bind rules, the leaf driver, the per-mapping
+Q-rules — transfers line for line, and the pinning arm is simply DELETED
+(disabled-extension families are then traversed on both branches, which costs
+dead arms and nothing else). So when a state-pinned result exists and you need
+a state-generic one, do not re-derive it and do not try to reuse the theorem:
+copy the driver and drop the pin. What makes this sound is worth checking
+explicitly first — here, that the fields being constrained (instruction
+widths) come from a mapping applied to an opcode slice and no gate touches
+them.
+
 ## A CHAIN OF GENERATED PROOF SHARDS MUST IMPORT *EVERY* EARLIER SHARD
 
 When a generated tower uses a hint database as its dependency mechanism (the

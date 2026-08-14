@@ -1,8 +1,9 @@
 # Shrinking the capstone's premise ledger — worklist
 
-**Status (2026-08-13): IN FLIGHT (stage C5 landed — the generated tower is
-COMPLETE and the frontier is twelve named functions; C6 is the decoder
-postcondition + the residue).**  Follow-on to
+**Status (2026-08-14): IN FLIGHT (stage C6 landed — the DECODER
+POSTCONDITION is proven and state-generic, and finding (O9) fixed a
+specification bug that had made `∀ b, sail_shaped (riscv_step b)` FALSE; what
+remains is the value-carrying window mode, the memory cone, and liveness).**  Follow-on to
 [`completed/weak-memory-lift.md`](../completed/weak-memory-lift.md):
 eliminate or reduce the premises of
 `WeakComposeLang.xv6_weak_robust_lifted`/`_adequate` that are provable
@@ -601,10 +602,154 @@ discharge it).
    itself is CHEAP (~5 min per mode), so the cost here is the ~100
    reachability arguments, not the sweep.
 
-**Next stage (D-C6).**  Regenerate with all the modes at once
-(`gwalk`/`gpost`/`gok`) — five minutes each now, and a second pass is a full
-rebuild — then do the memory cone with a hand-structured script (the generic
-solver does not get through `checked_mem_write`, see the C5 findings), then
-item 1.
+- **C6 (LANDED 2026-08-14, PARTIAL — the two premises STILL STAY)** — C5's
+  item 1 (THE DECODER POSTCONDITION) is DONE, machine-checked and
+  state-generic; and getting there turned up (O9), which is why it could not
+  have been done before: **`∀ b, sail_shaped (riscv_step b)` was FALSE AS
+  STATED, not merely unreachable by the compositional route.**  What landed:
+  - **(O9), the finding, and its spec fix** — see below.  `WeakSailLTS`
+    delta (e'''): `sail_shaped`'s and `amo_tail`'s `Interface.ExtraOutcome`
+    arm is `True`.  `WeakShape.gwalk` follows in the window-CLOSED mode only
+    (the window-open `False` is a kit-side strengthening `gwalk_try_catch`
+    needs — see the arm's comment); `WeakShapeOverrides.gwalkx` follows in
+    both.  Fallout was five proof lines in `WeakShape`/`WeakShapeOverrides`
+    and one tactic branch in `WeakShapeOverrides2.gwalk_write_ram_any/_solo`
+    (the three "unused" write kinds are `internal_error` nodes, i.e.
+    `ExtraOutcome`s, and they are now admitted outright instead of by
+    `intros r`); **everything from `WeakSailLTS2` down — `WeakSailComplete`,
+    `WeakSailCone`, `WeakCompose`, `WeakComposeLang` — needed NOTHING**,
+    because the LTS is stuck at such a node and every completeness proof
+    already went to `exfalso` through `block_forced_stuck` there.
+  - **`iris/WeakShapeAst.v`** — `ast_wf`, the postcondition, EXACTLY as
+    strong as the residue needs (`0 < width` on the six width-carrying
+    constructors, `True` elsewhere; NOT the `[1;2;4;8]` membership
+    `DecodeSetU.width_ok1248` records, which no consumer wants); §1's
+    machine-checked leaf for (O9) (`throw_bind_node`,
+    `liftR_throw_bind_node`); §3's consumers (`gwalk_bind_pure`,
+    `gwalkx_bind_pure`, `gpureP_liftR`, `gpureP_spine`,
+    `gpureP_spine_pure`); and §4 **`gpure`**, the mode.
+  - **`gpure` = `gpost (λ _, True) (λ _, True)`** — `gsilent` with the THROW
+    arm opened up.  It is forced: three functions of the decoder's own cone
+    (`zicfiss_xSSE`, `_rec_get_xLPE`, `_rec_virtual_memory_supported`) raise
+    `internal_error`, so `gsilent` refutes them, and `gwalk None` (what the
+    tower proves) does not imply any value-carrying mode.  Full combinator
+    kit + `gpu_solve`, same (O8) discipline (gated atomic leaf,
+    `Hint Constants Opaque`).
+  - **`iris/WeakShapeDec.v`** — the decoder's whole cone (35 monadic
+    definitions, incl. the nine-way mutual `stateen` fuel block and
+    `_rec_hartSupports`, by the `fix`-on-the-`Acc` recipe) in `gpure`, and
+    then the two theorems:
+    **`gpureP_ext_decode : ∀ w, gpureP ast_wf (ext_decode w)`** and
+    **`gpureP_ext_decode_compressed`**.  MEASURED: the cone 19 s, the whole
+    file (cone + both ~250-arm traversals) **54 s**.
+  - **WHAT WAS REUSED FROM `iris/DecodeSetU.v`, AND WHAT COULD NOT BE.**
+    `DecodeSetU` already walks both decoders with a leaf predicate
+    (`goodbP D P m s`) and gets the COMPLETE decode image
+    (`decodable_u`/`decodable_c`, hence `width_ok1248` on every memory
+    clause).  It is VALUE-PINNED at the U-mode reference state `dstateU` —
+    its `RegRead` arm answers from a concrete register file, which is what
+    lets `dtp_pin` `vm_compute` disabled extension families out of the image.
+    The fetch in `run_hart_active` runs at an ARBITRARY register state, so
+    what was reused is the METHOD, not the theorems: the clause-spine rule
+    (`goodbP_spine` ⇝ `gpureP_spine`), the driver's shape (`dtp_core` ⇝
+    `dp_core`), the `width_enc_wide_backwards` Q-rule (`dtp_width_wide` ⇝
+    `dp_width_wide`), and the observation that **the width fields are
+    gate-INDEPENDENT** (they come from `width_enc_backwards` /
+    `width_enc_wide_backwards` on a funct3/funct2 slice), so dropping the
+    pinning costs dead arms and never a width.  THE GENERAL RULE: a
+    state-pinned boolean traversal and a ∀-quantified `gpost` traversal are
+    the SAME traversal with different `RegRead` arms; port the driver, not
+    the theorem, and drop exactly the pinning arm.
+  - **`sail_shaped`'s premise is NOT yet reduced further.**  The peel
+    (`WeakShapePeel`) and `WeakShapeTop.riscv_step_shaped_residue` are
+    UNCHANGED: consuming the decoder postcondition at `run_hart_active` needs
+    one more piece, and C6 stopped there — see "what C7 owes" (1).
+
+## FINDING (2026-08-14, C6 — the leaf machine-checked, the path from the
+## sources): (O9) — `∀ b, sail_shaped (riscv_step b)` was FALSE AS STATED
+
+- **(O9)** `Interface.ExtraOutcome {A} : eOutcome A -> outcome A` is indexed
+  by **the monad's own return type**, and `Defs.throw e = Next (ExtraOutcome
+  e) mret`, so `Defs.bind (Defs.throw e) k = Next (ExtraOutcome e) k`
+  (`WeakShapeAst.throw_bind_node`).  Through C5 `sail_shaped`/`gwalk`/`glive`
+  handled the node by their DEFAULT arm, `∀ r, sail_shaped (k r)` — i.e. they
+  walked the ENTIRE REST OF THE INSTRUCTION at every value of the thrown-at
+  type.  `WeakSailComplete`'s header (a) already justified that arm with
+  "their result types are empty (or abstract)", which is true of
+  `GenericFail`/`Discard` (result type `False`) and FALSE of `ExtraOutcome`.
+  **THE PATH THAT MAKES IT BITE:** `run_hart_active` binds
+  `liftR (ext_decode w) >>= λ instruction, … execute instruction …`;
+  `encdec_backwards`'s SSPUSH arm evaluates
+  `and_boolM (currentlyEnabled Ext_Zicfiss) (read_reg cur_privilege >>=
+  zicfiss_xSSE)`; `currentlyEnabled Ext_Zicfiss` bottoms out in
+  `currentlyEnabled Ext_A = misa.A`, a REGISTER, so the gate is true at
+  ordinary states; and `zicfiss_xSSE VirtualSupervisor = internal_error
+  "Hypervisor extension not supported" = throw …`.  Every shape predicate's
+  `RegRead` arm quantifies over `cur_privilege`'s answer, so the old arm
+  demanded `sail_shaped` of the continuation at EVERY `instruction` —
+  exactly the `∀ ast` that C5's (O6) refutes at `STORE (imm, rs2, rs1, 0)`.
+  (`_rec_get_xLPE` throws the same way behind the same gate;
+  `amo_encoding_valid`'s `reserved_behavior` arm is dead only because
+  `amocas_odd_register_reserved_behavior = AMOCAS_Illegal` here.)
+  **FIX (LANDED): (O1)'s fix applied to a third arm** — quantify over the
+  answers `sail_mstep` SUPPLIES, and it supplies NONE for `ExtraOutcome`
+  (the agent is stuck; `WeakSailLTS2`'s unbracket cases say so).  Arm := `True`.
+  **THE GENERALISABLE RULE, and it is the sixth instance of this genre:**
+  for EVERY outcome constructor, check (a) whether the LTS has an arm for it
+  and (b) **what its ANSWER TYPE is** — a predicate arm `∀ r, P (k r)` over
+  an answer the machine never supplies is a silent, unbounded strengthening,
+  and the danger is highest exactly where the answer type is not `False` but
+  is not observed either.
+- **the liveness half is refuted by the SAME witness, and not by a shape
+  bug.**  `glive`'s `ExtraOutcome` arm is `if xf then False else True`, so
+  `sail_live` FORBIDS a raised exception outright and the `zicfiss_xSSE` path
+  is reachable in the same ∀-quantified sense.  What that needs is the (O3)
+  reachability narrowing — xv6 runs with the H extension off, so
+  `cur_privilege` is never `VirtualSupervisor`/`VirtualUser` — i.e. **a
+  register-state side condition, which is why the liveness half cannot be
+  stated as `∀ b` at all.**  Recorded, not fixed: the honest shape is
+  `sail_live` under a register-state precondition (the `D-M6-8` checker
+  family), and it should be settled BEFORE a `gok` tower is generated.
+
+## What C7 owes
+
+1. **CONSUME the decoder postcondition at `run_hart_active`** — the one
+   piece C6 stopped short of, and it is a KIT item, not a proof item.
+   `run_hart_active` applies `execute` twice: to `ext_decode`'s output (now
+   covered) and to the `ExecuteAs other_inst` REDIRECTION VALUE.
+   **PROVENANCE VERDICT (C6, from the sources): every `ExecuteAs` in the
+   whole model is produced by a PURE function** — `execute_SINVAL_VMA` and
+   the ~60 `execute_C_*` compressed expansions — **and every width in those
+   payloads is a LITERAL 1/2/4/8**, so `ast_wf` holds of every redirection
+   target.  But `execute`'s monadic clauses have to be shown not to return
+   `ExecuteAs`, and no existing predicate can say that: `gwalk`/`gwalkx` are
+   value-blind and `gpost`/`gpure` forbid memory events.  What is needed is
+   `gwalk`-WITH-A-RET-POSTCONDITION (`gwpx Q P w m` = `gwalkx` with the `Ret`
+   arm strengthened), whose bind rule takes `gwalk None` for the PREFIX — so
+   **the existing 294-lemma tower is reusable for every prefix** and only the
+   ~65 `execute_*` clauses need the new mode.  Design it before writing it.
+2. **The memory cone** — unchanged from C5's item 2, and it is the big one:
+   ~40 hand lemmas in topological order from `read_ram`/`write_ram` up to
+   `fetch` + the eleven `execute_*`.  Three semantic obligations inside it:
+   `0 < split_width` (DONE, `WeakShapeOverrides2` §2, given `ast_wf`),
+   `pmaCheck` answering `CannotSplit` for exclusive accesses (so
+   `split_misaligned` returns `N = 1` — note `split_misaligned`'s
+   `do_not_split` is TRUE whenever `splittable = CannotSplit`, so that half
+   is one line once `pmaCheck`'s postcondition exists), and the AMO window
+   (the read's `(pa, n)` must equal the closing write's, which needs the
+   translated address and the width threaded through BOTH `checked_mem_read`
+   and `checked_mem_write` — a value-level obligation, i.e. item 1's mode
+   again).  `checked_mem_write`'s misaligned-split `untilMT` still needs the
+   hand-structured script C5 prescribed.
+   NOTE: the whole cone goes through `translate → update_and_write_pte`,
+   which issues an exclusive read + conditional write, so **every** memory
+   instruction — not just the AMOs — pays the window obligation.
+3. **The three axiom facts** — unchanged (`WeakShapeTop.rv64d_axiom_shapes`).
+4. **Liveness** — behind (O9)'s liveness half: settle the register-state
+   precondition FIRST (see the finding), then the `gok` tower, then the ~100
+   reachability sites.
+5. `tools/gen_shape.py` should grow a `--mode` flag (finding (O7)); C6's 35
+   `gpure` lemmas were written out by hand because the cone was small, and
+   item 1's ~65 will not be.
 
 Keep the tree green per commit; findings in commit messages and here.
