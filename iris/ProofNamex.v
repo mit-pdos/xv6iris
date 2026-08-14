@@ -3192,9 +3192,9 @@ Section ProofNamexMain.
                                    Hgeom Hdlk Hbs1").
                    { rewrite Heb /trap_csrs_ext. done. }
                    { rewrite Heb /cpu_claim_ext. done. }
-                   iIntros (CIDil Hqil mil dnl bml)
+                   iIntros (CIDil Hqil mil dnl bml fl_)
                      "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hinos Hbs1 Hslkd Hslpid Hdep
-                      Hidev Hiinum Hivalid Hload #Hshot".
+                      Hidev Hiinum Hivalid Hload #Hshot %Hfr_".
                    assert (Hpcbc : ret_pc (V2 !!! Regidx Rra)
                             = mword_of_int (NX + 0xc6)).
                    { rewrite HV2ra. pcw. }

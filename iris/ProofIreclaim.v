@@ -1576,9 +1576,9 @@ Section IreclaimOrphan.
                     Hshr Hsbi Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
-    iIntros (CID18 Hq18 mL dnl bml)
+    iIntros (CID18 Hq18 mL dnl bml fl_)
       "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsbi Hsl1 Hslkd Hslpid Hdep Hidev Hiinum
-       Hvalid Hloaded #Hshot".
+       Hvalid Hloaded #Hshot %Hfr_".
     assert (Hpc5e : ret_pc (OC !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x5e))
       by (rewrite HOCra; pcw).

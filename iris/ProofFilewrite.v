@@ -1853,9 +1853,9 @@ Section ProofFilewrite.
                     Hdev Hgeo Hdlk Hbsl1").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
-    iIntros (CIDil Hsil mil dnl bml)
+    iIntros (CIDil Hsil mil dnl bml fl_)
       "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsbi Hbsl1 Hheld Hslpid Hdep
-       Hidev Hinum Hvalid Hlk #Hshot".
+       Hidev Hinum Hvalid Hlk #Hshot %Hfr_".
     iDestruct ("Hpbk2" with "Hppid") as "Hpriv".
     assert (Hpc90 : ret_pc (D3 !!! Regidx Rra) = mword_of_int (FW + 0x90)).
     { rewrite HD3ra. apply bv_eq; vm_compute; reflexivity. }

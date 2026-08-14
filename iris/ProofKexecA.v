@@ -1042,8 +1042,8 @@ Section KexecABody.
                     Hshr Hins Hppid Hprocs Hdevi Hdgeom Hdlock Hbs1").
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
-    iIntros (CIDil Hsil M1 dnl bml) "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hins Hbs1
-             Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload Hity".
+    iIntros (CIDil Hsil M1 dnl bml fl_) "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hins Hbs1
+             Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload Hity %Hfr_".
     assert (Hpc3a : ret_pc (Q2 !!! Regidx Rra) = mword_of_int (KXA + 0x3a))
       by (rewrite HQ2ra; pcw).
     iEval (rewrite Hpc3a) in "Hpc".

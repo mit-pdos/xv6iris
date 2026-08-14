@@ -1459,9 +1459,9 @@ Section ProofCreateMain.
                       Hslkd Hshr Hsbi Hppid Hprocs Hdevi Hgeom Hdlk Hbs1").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
-      iIntros (CIDil Hqil mil dnl bml)
+      iIntros (CIDil Hqil mil dnl bml fld)
         "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslkdd Hslpid Hdep
-         Hidev Hiinum Hivalid Hload #Hshotl".
+         Hidev Hiinum Hivalid Hload #Hshotl %Hfrd".
       assert (Hpcil : ret_pc (Q2 !!! Regidx Rra : mword 64)
                       = mword_of_int (CK + 0x2a)) by (rewrite HQ2ra; pcw).
       iEval (rewrite Hpcil) in "Hpc".
@@ -1998,9 +1998,9 @@ Section ProofCreateMain.
                           Hdlk Hbs1").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
-          iIntros (CIDic Hqic mic dnc bmc)
+          iIntros (CIDic Hqic mic dnc bmc flc)
             "%Hcsic Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hcslkd Hcslpid Hcdep
-             Hcidev Hciinum Hcivalid Hcload #Hcshot".
+             Hcidev Hciinum Hcivalid Hcload #Hcshot %Hfrc".
           assert (Hpcic : ret_pc (F5 !!! Regidx Rra : mword 64)
                           = mword_of_int (CK + 0x4c)) by (rewrite HF5ra; pcw).
           iEval (rewrite Hpcic) in "Hpc".

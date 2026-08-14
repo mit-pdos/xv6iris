@@ -1754,9 +1754,9 @@ Section ProofFileread.
              (* v3: ilock also hands back the checkout descriptor's other
                 half, which iunlock consumes to select its own escrow arm
                 (design §14.8) *)
-             iIntros (CIDil Hsil mil dnl bml)
+             iIntros (CIDil Hsil mil dnl bml fl_)
                "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hslpid Hdep
-                Hidev Hinum Hvalid Hlk #Hshot".
+                Hidev Hinum Hvalid Hlk #Hshot %Hfr_".
              iDestruct ("Hpivbk" with "Hppid") as "Hpriv".
              assert (Hpc34 : ret_pc (I2 !!! Regidx Rra) = mword_of_int (FR + 0x34)).
              { rewrite HI2ra. apply bv_eq; vm_compute; reflexivity. }
