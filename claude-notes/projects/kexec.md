@@ -429,19 +429,63 @@ named:**
   `rewrite` it in, never relying on `f_equal` to hand `lia` a clean goal
   through a non-transparent wrapper.
 
-**Still open in phase C:** the three-way final branch at
-+0x268/+0x26a/+0x26e (natural end into `kxc_at_272`, loop-back into
-`kxc_at_21a (S c)`, or MAXARG-exceeded into the shared `-1` tail via yet
-ANOTHER stub); BOTH the `+0x358` and `+0x35c` connectors into
-`kxc_bad_1d6` (needs `kxc_ustack_collapse` first, to turn `kxc_frameC`'s
-split-at-`c` ustack back into `kxc_frame_at`'s uniform shape — see the
-design note above; the SAME connector code should serve both stubs AND
-the `+0x26e` one, since all three just do `mv s3,s4` before falling into
-the shared tail — worth writing ONE lemma the first time it's needed
-rather than three copies); `kxc_argv_loop` (the fuel-induction wrapper,
+**`kxc_argv_step` IS PROVEN — `Qed`, whole file 85 s, admit-free.** All
+three of its `-1` exits go through ONE connector, `kxc_c_exit_m1`, and its
+three-way final branch is closed. What the connector settled, and what to
+reuse from it:
+
+- **The three stubs really are one lemma.** `+0x358` (stack overflow),
+  `+0x35c` (copyout failed) and `+0x26e` (MAXARG) are the same two
+  instructions — `c.mv s3,s4 ; c.j +0x1d6` — at three addresses, so the
+  lemma takes the stub's Z offset, the `c.j` immediate and the two `instr`
+  facts, and the caller supplies `CodeKexec`'s own. Re-derived from
+  `CodeKexec`, not from the disassembly: all three `c.j`s do land on
+  `+0x1d6`.
+- **Its own section, closed before `KexecCLoop` opens.** A `Local Lemma`
+  applied from inside a section that fixes `CID0` bakes THAT hart into its
+  statement; these call sites are a dozen `wp_next`s past the entry hart.
+- **The resource half is the work.** `kxc_frameC_collapse` folds the loop's
+  frame — ustack SPLIT at `c`, the written prefix carrying `kxc_sp`'s
+  recurrence — back to `kxc_frame_at`'s one opaque 55-slot region, which is
+  what `kxc_bad_1d6` takes. That pulls the ELF buffer in too (slots 47..54
+  are the only part of the frame `kxc_c_res` holds OUTSIDE `kxc_frameC`),
+  and `kxc_elf_give` wants their 8-alignment — a fact about `sp0` alone, so
+  it rides as a Coq-level PREMISE of `kxc_argv_step` rather than as a
+  constant conjunct of `kxc_at_21a`. **Thread it on to the loop wrapper and
+  to phase C's top-level lemma; `kxc_at_1ae` is where it comes from.**
+- **`kxc_frameC_intro` / `kxc_c_res_intro`** are the re-assembly the loop
+  body owes on every exit and on the back edge — written once, in the same
+  section, because `iFrame` does not terminate at this altitude.
+
+**Two traps paid for here, both of which will recur:**
+1. **A bare `replace X with Y` inside the proofmode rewrites the
+   HYPOTHESES too.** The "goal" a plain `replace`/`rewrite` sees is the
+   whole `envs_entails`, so `replace 33 with ((33-c)+c)` on a goal
+   `stack_own _ 33` also hit the `33` inside a hypothesis's own `33 - c`
+   and left `33 - c + c - c` — reported as `iExact: does not match goal`,
+   which reads like a resource bug. Fix: put the arithmetic in the
+   STATEMENT of a helper (`stack_own_join (n = n1 + n2)`, `intros ->`), or
+   scope the rewrite with `iEval (…) in "H"`.
+2. **A lemma parameterised by a symbolic Z offset cannot use `pcw`.**
+   `apply bv_eq; vm_compute` needs closed literals; `avi_moi` does the
+   `pc + k` bridge symbolically instead. Same rule as the symbolic-`mword`
+   one, one type down.
+
+**A THIRD missing-conjunct finding, and this one is a KERNEL DEFECT rather
+than a proof gap — see [`../kernel-defects.md`](../kernel-defects.md).**
+`kxc_at_272` needed `(c <= 32)%nat` where the loop head `kxc_at_21a` has
+`(c < 32)%nat`, because the C tests `argc >= MAXARG` only INSIDE the loop
+body: with exactly 32 arguments the null-terminated exit is taken at
+`argc = 32` and the following `ustack[argc] = 0` writes one element past
+`uint64 ustack[MAXARG]`. Harmless as compiled (gcc reserved 33 slots), but
+**do not "tighten" that conjunct back to `< 32`** — the natural-exit arm
+becomes unprovable at exactly that case, which is the proof correctly
+refusing to certify the off-by-one.
+
+**Still open in phase C:** `kxc_argv_loop` (the fuel-induction wrapper,
 mirroring `ProofKexecB3.kxc_phdr`'s shape around `kxc_ph_step`), and the
-closing `copyout` call joining into phase D at `+0x2a6`. Then phase D,
-then `ProofKexec.v` + `LinkKexec.v`.
+closing `copyout` call at `+0x272 .. +0x2a6` joining into phase D. Then
+phase D, then `ProofKexec.v` + `LinkKexec.v`.
 
 <details>
 <summary>Superseded diagnosis (kept for the record — the "17 GB" symptom
@@ -546,8 +590,9 @@ both reach the epilogue through tails A already proved — so put the next share
 tail in `ProofKexecTail.v` when you prove it, and keep phase files reaching each
 other only through that one.
 | phase C — the shared `-1` tail (`+0x1d6 .. +0x1f2`), `KexecTailProofC.kxc_bad_1d6` | **landed, proven** |
-| phase C — the setup block (`+0x1ae .. +0x218`), `ProofKexecC.KexecCProof.KexecCSetup.kxc_c_setup` | **proven, uncommitted** |
-| phase C — the argv loop (`+0x21a .. +0x272`) and the closing copyout | **NEXT** |
+| phase C — the setup block (`+0x1ae .. +0x218`), `ProofKexecC.KexecCProof.KexecCSetup.kxc_c_setup` | **landed, proven** |
+| phase C — the argv loop's STEP (`+0x21a .. +0x272`, one iteration), `kxc_argv_step`, and the shared `-1` connector `kxc_c_exit_m1` | **landed, proven** |
+| phase C — `kxc_argv_loop` (the fuel induction) and the closing copyout | **NEXT** |
 | phase D, `ProofKexec.v`, `LinkKexec.v`, `sys_exec` | not started |
 
 **`ProofKexecSeam.kxc_cs_cases` — the thirteen callee-saved indices,
