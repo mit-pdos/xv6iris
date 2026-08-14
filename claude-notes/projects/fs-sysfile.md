@@ -7019,3 +7019,78 @@ off the post instead of `cr_size_cap`.
 (`ProofCreateParts.cr_made_setf`'s `create_made` identity) stands; the
 citation is stale.  Left alone to keep this increment's surface at three
 files.
+
+
+### D₀-a PRE-WORK LANDED (2026-08-14); the walk STOPPED mid-arm — ARM
+### A-FAIL and the gate span are WRITTEN AND COMPILE, ARM C-OK-FILE is not,
+### and the tree carries no `Admitted`
+
+**WHAT IS IN THE TREE** (`iris/ProofCreate.v`, one file, commit "D0-a
+pre-work"): all three pre-work items plus the two parked bodies' statements.
+Full `make -j30 -k` EXIT=0, 1093 `.vo`, `make -n` 0 `COQC` lines,
+coqdep-derived staleness 0; `Print Assumptions` on `cr_tail_half` and
+`cr_found_half` — instantiated at the seven real `Link` modules plus
+`CreateFreshTy` — is the standing six alone; `lemma_diff` CLEAN;
+`CreateBudget.v` and `SpecCreate.v` byte-untouched; `cr_found_half`'s
+STATEMENT, `cr_alloc_body`, `cr_cont_body`, `cr_tail_body` byte-identical.
+
+* **A.** `cr_tail_half` — the +0x62 funnel as a standalone lemma. Premises:
+  `kernel_text`, `cr_kb`'s `(K - 10) + 10 = K`, the two frame alignments,
+  and the two frame identities (`m !!! sp = sp0`, `ret_pc (m !!! ra) =
+  ret_tgt`, both `eq_refl` at the call site).
+* **B.** `cr_thr3` / `cr_regs3` and five lemmas: three propagation twins of
+  the `cr_regs` ones plus `cr_regs3_of_span` (entry, off
+  `SpecCreateFreshTy.cr_cs_but_s3`) and `cr_tregs_of_regs3` (exit, off the
+  `c.ldsp s3,40(sp)`).
+* **C.** the pure cluster: `cr_zext64_16_unsigned`, `cr_sext64_32_unsigned`,
+  `cr_a2_halfword`, `cr_low16` / `cr_low16_unsigned` / `cr_a2_low16`,
+  `cr_moi16_unsigned`, `cr_trunc16_one`, `cr_setf_fresh_made`, and the three
+  `nat` readings `cr_alloc_dlneed` / `cr_alloc_ip` / `cr_alloc_ip0`.
+* **D.** `cr_mkdir_body` (+0xe0) and `cr_fail_body` (+0x12e), both
+  hypothesis-shaped. `CreateProof` gains `(CFT : CREATE_FRESH_TY)`.
+
+**THE WALK GOT AS FAR AS THE GATE AND ARM A-FAIL, AND BOTH TYPECHECK.**
+`cr_alloc_half`'s statement, its intro, the eighth save at +0x8a, the whole
+gate span +0x8c..+0x98, and ARM A-FAIL end to end (+0xd4 `c.mv a0,s1`,
++0xd6 `iunlockput(dp)` uncredited, +0xda `c.mv s2,s3`, +0xdc the lazy
+restore, +0xde into the funnel, and the discharge into `cr_cont_body` at
+`ok := false`) compiled green with only the C-OK-FILE arm `admit`ed. That
+arm was then REVERTED rather than landed: **the tree must not carry an
+`Admitted` walk**, and a third parked body at +0x9c would split the arm
+where the child's payload is open — a shape D₀-b did not ask for and would
+have to unpick.
+
+**WHAT THE ABANDONED PASS ESTABLISHED, so the relaunch does not re-derive
+it:**
+
+* the gate instantiates with **`u := q1` where `n1 = S q1`** (`9 <= n1` from
+  `cr_n1_lo`, so `8 <= q1`), `dqp := DfracOwn (1/2)`, `dq := DfracOwn (1/4)`
+  off `ProcInv.proc_priv_pid`, and `iref_slot` split out of
+  `iref_slots (ns - 1)` by `(ns-1) = 1 + (ns-2)` + `iref_slots_op`. Its two
+  callee hypotheses go in as `(fun CIDx => IA.wp_ialloc_gen (CID := CIDx))`
+  / `(fun CIDx => IL.wp_ilock_sconf (CID := CIDx))`, and its register
+  premises are `cr_regs`'s own `Has4` and `Has1` verbatim.
+* **`cr_kb`'s tuple is `(HK10 & HKnp & HKil & HKdlu & HKiup & HKia & HKiu &
+  HKdlk & HKsum)` — `HKiup` is iunlockput and `HKiu` is iupdate.** The
+  natural misreading typechecks nothing and the error names two `K_*`
+  constants, which reads as an arity mistake.
+* ARM A-FAIL's slot ledger is `1 + (1 + (ns - 2))` (`cr_slots_2`): the
+  gate's fail arm hands the `iref_slot` back AND `iunlockput` returns one.
+  Its `iunlockput` runs at `crb = cru = crz = false` with `S q1 >= 9` in
+  hand, i.e. `CreateBudget.cr_budget_found_w`'s second conjunct.
+* the +0x8a store's saved word is `Ma !!! s3 = m !!! s3` straight off
+  `cr_thr`, so slot 5 carries `m`'s own s3 for the whole epoch and the two
+  `c.ldsp`s at +0xd0/+0xdc restore exactly it.
+
+**WHAT IS LEFT, and it is one arm:** +0x9c/+0xa0/+0xa6 (the three `sh`s
+through `cr_setf`), **+0xac THE MINT** (`IU.wp_iupdate_link` at
+`cru := true`, `dn0 := dnc`, the increment premise off
+`fresh_shape_nlink`, the type-nonzero off `cr_setf_type_nz`, `IBLOCK cinum
+inodestart ∈ Sb` off the gate's own payout set), +0xb2 the `beq` (`eq_vec`,
+not `neq_vec` — `wp_beq_fall/taken_s_sconf` compare `rget rs1` with
+`rget rs2`, so `ProofNamexParts.nx_tdir_eq/_ne` need one `negb` bridge),
++0xb6 the `lw` (through `cr_a2_low16`), +0xba/+0xbe, +0xc0 `dirlink` at
+`crb := w` with `eq_refl` for the `dn0 = dn` antecedent, +0xc4 the `bltz`,
+the parent's re-park by `DirLinks.dir_links_dirlink` with
+`dir_link_at_dirlink` at `tot = 16`, and +0xc8..+0xd2. The two parked
+bodies are already stated at exactly the shape those two branches need.
