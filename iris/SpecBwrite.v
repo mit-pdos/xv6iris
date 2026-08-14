@@ -69,7 +69,7 @@ Definition wp_bwrite_sconf_body
     (pidv dev bno : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
     (bs bsd : list (bv 8)) (b : bool)
-    (Q : iProp Σ) :=
+    (Q : iProp Σ) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bwrite in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -83,9 +83,12 @@ Definition wp_bwrite_sconf_body
   (* a0 is the buffer *)
   (k < NBUF)%nat ->
   m !!! Regidx (mword_of_int 10 : mword 5) = bnode k ->
+  (* the order premise, at the LOWEST rank this cone touches; every
+     higher one follows by [locks_below_mono]. *)
+  locks_below lks (lock_rank "sleep lock") ->
   sie_cap_gpr m K b pj -∗
   (* enters at noff 0 (rw's acquire raises it to what sleep demands) *)
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM.  bwrite has NO acquire of
      its own -- it delegates entirely to virtio_disk_rw, and everything past
      that call sleeps, so a parking thread must hand [trap_csrs] and
@@ -134,7 +137,7 @@ Definition wp_bwrite_sconf_body
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -160,7 +163,7 @@ Module Type BWRITE.
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (bs bsd : list (bv 8)) (b : bool)
-      (Q : iProp Σ),
+      (Q : iProp Σ) (lks : gset nat),
       wp_bwrite_sconf_body γs j γl γu γd γk pd pav pu bn V k
-                           pidv dev bno dq m K eb C bs bsd b Q.
+                           pidv dev bno dq m K eb C bs bsd b Q lks.
 End BWRITE.

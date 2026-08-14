@@ -338,11 +338,11 @@ Section ProofFileread.
       (γa γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (Cf : fcontent) (fn : fread_names)
       (pidv : mword 32) (V : pprivate)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool)
-    : wp_fileread_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C n b.
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool) (lks : gset nat)
+    : wp_fileread_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C n b lks.
   Proof.
     cbv beta delta [wp_fileread_sconf_body].
-    intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Ha2 Hn0 Hnb Heb.
+    intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Ha2 Hn0 Hnb Heb Hbelow.
     unfold fileread_stack in HK.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic Href Hpriv Hkenv #Hprocs Henv Hcont".
@@ -829,8 +829,9 @@ Section ProofFileread.
                      with "Hcnt") as "Hcnt".
         iApply (Piperead.wp_piperead_sconf γa γf γs j γlp (fp_lock pn) (fp_pipe pn)
                   (fc_wbool Cf) q Q2 (K - 6)%nat eb C pidv V n b
-                  Hj Hgs Hlens HQ2a2 (fr_n_range n Hn0 Hnb) (fr_av_pipe K HK) Heb
+                  _ Hj Hgs Hlens HQ2a2 (fr_n_range n Hn0 Hnb) (fr_av_pipe K HK) Heb
                   with "Hcg Hcnt Htext Hpc [] Hpref Hpriv Hkenv Hprocs Hpanic").
+        all: try lkbelow.
         { iEval (rewrite HQ2a0). iExact "Hpipe". }
         iIntros (CIDpr Hspr mf P') "%Hcspr %Hupt %Hretpr Hcg Hcnt Hpc Hpref Hpriv".
         assert (Hpc6a : ret_pc (Q2 !!! Regidx Rra) = mword_of_int (FR + 0x6a)).
@@ -1384,10 +1385,12 @@ Section ProofFileread.
                 iApply (Consoleread.wp_consoleread_sconf γa γf γs j γlp
                           (frn_cons fn)
                           E2 (K - 6)%nat eb C pidv V n b
-                          Hj Hgs Hlens HE2a0 HE2a2 (fr_n_range n Hn0 Hnb)
+                          lks Hj Hgs Hlens HE2a0 HE2a2 (fr_n_range n Hn0 Hnb)
                           (fr_av_cons K HK) Heb
+                          ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hconslk Hpriv Hkenv
                                 Hprocs Hpanic").
+                all: try lkbelow.
                 iIntros (CIDcr Hscr mf r P') "%Hcscr %Hupt %Hrr %Hra0 Hcg Hcnt Hpc
                                               Hpriv".
                 assert (Hpc96 : ret_pc (E2 !!! Regidx Rra) = mword_of_int (FR + 0x96)).
@@ -1744,11 +1747,12 @@ Section ProofFileread.
                        icfg_dev inm
                        pidv (DfracOwn (1/4)) (frn_dqs fn)
                        I2 (K - 6)%nat eb C b
-                       (fr_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
-                       ltac:(rewrite HI2a0; exact Hipk)
+                       _ (fr_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
+                       ltac:(rewrite HI2a0; exact Hipk) Hbelow
                        with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hitbl Hesc Hireg
                              Hslk Href Hsb Hppid Hprocs
                              Hdevi Hdgeom Hdlock Hbslot").
+             all: try lkbelow.
              { rewrite Heb /trap_csrs_ext. done. }
              { rewrite Heb /cpu_claim_ext. done. }
              (* v3: ilock also hands back the checkout descriptor's other
@@ -1977,12 +1981,13 @@ Section ProofFileread.
                        (fun _ => (mword_of_int 0 : mword 8)) V
                        pidv (DfracOwn 1) (DfracOwn (1/2))
                        J6 (K - 6)%nat eb C b
-                       (fr_av_readi K HK) Hlg Hbmwf Hbmcov Hszb
+                       _ (fr_av_readi K HK) Hlg Hbmwf Hbmcov Hszb
                        Hoff32 Hjoint32 Hj Hgs
-                       HJ6a0 ltac:(rewrite HJ6a1; by vm_compute) HJ6a3' HJ6a4'
+                       HJ6a0 ltac:(rewrite HJ6a1; by vm_compute) HJ6a3' HJ6a4' Hbelow
                        with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
                              Hblocks Hpriv Hprocs Hdevi Hdgeom
                              Hdlock Hbslot").
+             all: try lkbelow.
              { rewrite Heb /trap_csrs_ext. done. }
              { rewrite Heb /cpu_claim_ext. done. }
              iIntros (CIDrd Hsrd mrd tot P') "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks
@@ -2147,11 +2152,13 @@ Section ProofFileread.
                           ikk (ssh/2)%Qp gsh icfg_dev inm
                           dnl bml
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj C b
-                          (fr_av_iunlock K HK) Hik
+                          lks (fr_av_iunlock K HK) Hik
                           ltac:(rewrite HN2a0; exact Hipk)
+                          ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk
                                 Hheld Hslpid Hppid Hprocs
                                 Hdep Hidev Hinum Hvalid Hlk Hshot").
+                all: try lkbelow.
                 iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout".
                 iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
                 (* THE GATHER: iunlock gives the half back WITHOUT its
@@ -2420,11 +2427,13 @@ Section ProofFileread.
                           ikk (ssh/2)%Qp gsh icfg_dev inm
                           dnl bml
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj C b
-                          (fr_av_iunlock K HK) Hik
+                          lks (fr_av_iunlock K HK) Hik
                           ltac:(rewrite HN2a0; exact Hipk)
+                          ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk
                                 Hheld Hslpid Hppid Hprocs
                                 Hdep Hidev Hinum Hvalid Hlk Hshot").
+                all: try lkbelow.
                 iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout".
                 iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
                 (* THE GATHER: iunlock gives the half back WITHOUT its

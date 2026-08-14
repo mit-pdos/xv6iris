@@ -78,7 +78,16 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
      to struct cpu, so the same-eb contract is realized one level up by
      sched's own epilogue intena store + ghost retune. *)
   sie_cap_gpr m0 av false p -∗
-  cpu_own 1 eb p emp false -∗
+  (* THE HELD SET IS PINNED AT THE PROC LOCK, both directions.  swtch is
+     reachable only from [sched] and the scheduler, and xv6's rule for it is
+     "hold p->lock across the switch" -- [sched]'s own
+     [if (mycpu()->noff != 1) panic("sched locks")] is the C-level statement
+     of it.  So the set is a CONSTANT here, exactly as the level [1] is, and
+     the resumer gets the same constant back.  Quantifying it instead (as an
+     [lks'] the resumer invents) is what left the seam unprovable: a
+     migratable record's resumption is a different critical section, so
+     nothing would tie the two sets together. *)
+  cpu_own 1 eb p emp false {[lock_rank "proc"]} -∗
   pc_is (mword_of_int KernelSyms.swtch) -∗
   ctx_cells oldc old_vs -∗
   ▷ valid_context P An newc p -∗
@@ -89,7 +98,7 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
       ⌜adm Ao h⌝ -∗
       ⌜callee_img m = callee_img m0⌝ -∗
       sie_cap_gpr (CID := h) m av false p -∗
-      cpu_own (CID := h) 1 eb' p emp false -∗
+      cpu_own (CID := h) 1 eb' p emp false {[lock_rank "proc"]} -∗
       pc_is (CID := h) (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
       ctx_cells oldc (callee_img m0) -∗
       (∃ (A' : ctx_adm) (cret : mword 64),

@@ -126,10 +126,16 @@ Section ProofPipealloc.
       (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile) (v0 v1 : mword 64) (on : option nat)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool)
-    : wp_pipealloc_sconf_body γfl γf γkl γk fl m v0 v1 on n eb p C K b.
+      (lks : gset nat)
+    : wp_pipealloc_sconf_body γfl γf γkl γk fl m v0 v1 on n eb p C K b lks.
   Proof.
     cbv beta delta [wp_pipealloc_sconf_body].
-    intros pcE pf0 pf1 ret_tgt HK Hfl Hnoffpos.
+    (* [Hbelow] is the ORDER premise pipealloc's whole cone needs: the LOWEST
+       rank it touches is "ftable" (1), via filealloc/fileclose -- kalloc's
+       "kmem" (13) is reached by [LockRank.locks_below_mono] below.  Threaded
+       verbatim to every filealloc/fileclose call site; weakened once for
+       kalloc's. *)
+    intros pcE pf0 pf1 ret_tgt HK Hfl Hnoffpos Hbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkdata Hpc #Hftab #Hkmem Hav #Hpanic
               Hslota Hslotb Hc0 Hc1 Hcont".
@@ -343,7 +349,7 @@ Section ProofPipealloc.
                 mj !!! Regidx c = m !!! Regidx c) ⌝ -∗
         sie_cap_gpr mj (K - 6)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.pipealloc + 0xb8)) -∗
-        cpu_own n eb p C b -∗
+        cpu_own n eb p C b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb p -∗
         (∃ w4 w5 : mword 64, pa_stk sp0 4 ↦₈ w4 ∗ pa_stk sp0 5 ↦₈ w5) -∗
@@ -534,7 +540,7 @@ Section ProofPipealloc.
                 Mt !!! Regidx c = m !!! Regidx c) ⌝ -∗
         sie_cap_gpr Mt (K - 6)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.pipealloc + 0xa8)) -∗
-        cpu_own n eb p C b -∗
+        cpu_own n eb p C b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb p -∗
         (∃ w4 w5 : mword 64, pa_stk sp0 4 ↦₈ w4 ∗ pa_stk sp0 5 ↦₈ w5) -∗
@@ -559,7 +565,7 @@ Section ProofPipealloc.
                 Mt !!! Regidx c = m !!! Regidx c) ⌝ -∗
         sie_cap_gpr Mt (K - 6)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.pipealloc + 0xa4)) -∗
-        cpu_own n eb p C b -∗
+        cpu_own n eb p C b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb p -∗
         file_ref γf k0 1 Cf0 -∗
@@ -717,9 +723,10 @@ Section ProofPipealloc.
                      with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CIDt CIDt5 eb p ltac:(ext_chain Hbf)
                      with "Hextm") as "Hextm".
-        iApply (Fileclose.wp_fileclose_sconf γfl γf k1 1%Qp Cf1 inhabitant on (∅ : gset Z) U4 n eb p C (K - 6)%nat b
-                  ltac:(unfold fileclose_stack, K_iput; lia) Hnoffpos HU4a0
+        iApply (Fileclose.wp_fileclose_sconf γfl γf k1 1%Qp Cf1 inhabitant on (∅ : gset Z) U4 n eb p C (K - 6)%nat b lks
+                  ltac:(unfold fileclose_stack, K_iput; lia) Hnoffpos HU4a0 Hbelow
                   with "Hcg Hcnt Hextc Hextm Htext Hpc Hftab Hpanic Href1 []").
+        all: try lkbelow.
         { iApply (fileclose_env_none _ _ _ _ _ _ _ Hk1ty). }
         (* fileclose hands back the unit the reference was holding: it is
            the WRITE end's, and together with [Hunit0] it pays the two
@@ -794,9 +801,10 @@ Section ProofPipealloc.
                    with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDu CIDu1 eb p ltac:(ext_chain Hbf)
                    with "Hextm") as "Hextm".
-      iApply (Fileclose.wp_fileclose_sconf γfl γf k0 1%Qp Cf0 inhabitant on (∅ : gset Z) V1 n eb p C (K - 6)%nat b
-                ltac:(unfold fileclose_stack, K_iput; lia) Hnoffpos HV1a0
+      iApply (Fileclose.wp_fileclose_sconf γfl γf k0 1%Qp Cf0 inhabitant on (∅ : gset Z) V1 n eb p C (K - 6)%nat b lks
+                ltac:(unfold fileclose_stack, K_iput; lia) Hnoffpos HV1a0 Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hftab Hpanic Href0 []").
+      all: try lkbelow.
       (* an untyped file costs its closer nothing -- no pipe, no inode, so no
          file system.  [inhabitant] above is the ghost bundle the arms this
          file cannot take would have been indexed by. *)
@@ -862,9 +870,10 @@ Section ProofPipealloc.
       by (rewrite /mA; apply upd_eq).
     iDestruct (cpu_own_transport CID CID11 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Filealloc.wp_filealloc_sconf γfl γf mA n eb p C (K - 6)%nat b
-              ltac:(lia) Hnoffpos
+    iApply (Filealloc.wp_filealloc_sconf γfl γf mA n eb p C (K - 6)%nat b lks
+              ltac:(lia) Hnoffpos ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hftab Hpanic Hslota").
+    all: try lkbelow.
     iIntros (CID12 Hs12 mB) "Hcg Hcnt Hpc %HcsB Hpost0".
     assert (Hpc1c : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.pipealloc + 0x1c))
       by (rewrite HmAra; apply bv_eq; vm_compute; reflexivity).
@@ -967,9 +976,10 @@ Section ProofPipealloc.
       by (rewrite /mC; apply upd_eq).
     iDestruct (cpu_own_transport CID12 CID15 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Filealloc.wp_filealloc_sconf γfl γf mC n eb p C (K - 6)%nat b
-              ltac:(lia) Hnoffpos
+    iApply (Filealloc.wp_filealloc_sconf γfl γf mC n eb p C (K - 6)%nat b lks
+              ltac:(lia) Hnoffpos ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hftab Hpanic Hslotb").
+    all: try lkbelow.
     iIntros (CID16 Hs16 mD) "Hcg Hcnt Hpc %HcsD Hpost1".
     assert (Hpc24 : ret_pc (mC !!! Regidx Rra) = mword_of_int (KernelSyms.pipealloc + 0x24))
       by (rewrite HmCra; apply bv_eq; vm_compute; reflexivity).
@@ -1126,9 +1136,15 @@ Section ProofPipealloc.
       by (rewrite /mE; apply upd_eq).
     iDestruct (cpu_own_transport CID16 CID20 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Kalloc.wp_kalloc_sconf γkl γk fl mE on n eb p C (K - 6)%nat b
+    iApply (Kalloc.wp_kalloc_sconf γkl γk fl mE on n eb p C (K - 6)%nat b lks
               ltac:(lia) Hfl Hnoffpos
+              (* "kmem" (13) outranks "ftable" (1): weaken [Hbelow] up to it --
+                 kalloc's own acquire needs no more than that, since
+                 pipealloc's kalloc call is balanced and never nests under a
+                 held "ftable". *)
+              ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hkmem Hav Hpanic").
+    all: try lkbelow.
     iIntros (CID21 Hs21 mF) "Hcg Hcnt Hpc %HcsF Hkp".
     assert (Hpc30 : ret_pc (mE !!! Regidx Rra) = mword_of_int (KernelSyms.pipealloc + 0x30))
       by (rewrite HmEra; apply bv_eq; vm_compute; reflexivity).

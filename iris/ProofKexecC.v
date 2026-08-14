@@ -297,7 +297,7 @@ Section KexecCSetup.
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr mf K true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) C true -∗
+        cpu_own 0 true (proc_addr jp) C true ∅ -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -393,7 +393,8 @@ Section KexecCSetup.
     iDestruct (cpu_own_transport CID0 CID1 0%nat true (proc_addr jp) C true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Myproc.wp_myproc_sconf T0 (K - 68)%nat 0%nat true (proc_addr jp)
-              C true ltac:(lia) ltac:(lia) with "Hcg Hcnt Htext Hpc").
+              C true ∅ ltac:(lia) ltac:(lia) with "Hcg Hcnt Htext Hpc").
+    all: try lkbelow.
     iIntros (CID2 Hs2 ms M1) "%Hmsf Hcg Hcnt Hpc %HM1".
     destruct HM1 as [Hcs1 HM1a0].
     assert (Hpc1b2 : ret_pc (T0 !!! Regidx Rra) = mword_of_int (KXC + 0x1b2))
@@ -799,7 +800,7 @@ Section KexecCSetup.
     assert (Hbelow_pground : um_below (pgroundup szv) P.(ud_um))
       by (apply (um_below_mono szv (pgroundup szv) P.(ud_um) Hpground_ge Hbelow)).
     iApply (Uvmalloc.wp_uvmalloc_sconf ga Y P 4 (K - 68)%nat true
-              (proc_addr jp) C true ltac:(lia) HYtp HYa0 HYa3
+              (proc_addr jp) C true ∅ ltac:(lia) HYtp HYa0 HYa3
               ltac:(lia) uvm_perm_ok_22
               ltac:(rewrite HYa1 uint_unsigned; exact Hmaxpground)
               ltac:(right; rewrite HYa1; exact Hcov_pground)
@@ -810,6 +811,7 @@ Section KexecCSetup.
                              ltac:(lia))
                     )
               with "Hcg Hcnt Htext Hpc Hpt Hka").
+    all: try lkbelow.
 
     iIntros (CID16 Hs16 Mu) "Hcg Hcnt Hpc %Hcsu Hpost".
     assert (Hpc1d2 : ret_pc (Y !!! Regidx Rra) = mword_of_int (KXC + 0x1d2))
@@ -901,7 +903,7 @@ Section KexecCSetup.
                    with "Hcont") as "Hcont".
       iApply (TC.kxc_bad_1d6 jp ga gf bn gfs cov logstart bmapstart inodestart
                 size used used2 plen pfun na avf alen aslen afun pidv V
-                dqb dqs dqa m U0 K C sp0 ra0 s00 s10 s20 pv av P (pgroundup szv)
+                dqb dqs dqa m U0 K C ∅ sp0 ra0 s00 s10 s20 pv av P (pgroundup szv)
                 ltac:(unfold K_kexec; lia) Hu2
                 Hmsp Hmra Hms0 Hms1 Hms2 HU0sp HU0s3 HU0s6
                 Hbelow_pground Hcov_pground
@@ -1386,6 +1388,8 @@ Section KexecCSetup.
         by (rewrite /W7 upd_ne; [exact HW6a0 | nz]).
       assert (HW7sp : W7 !!! Regidx csp_rs1 = pa_stk sp0 68)
         by (rewrite /W7 upd_ne; [exact HW6sp | nz]).
+      assert (HW7s0 : W7 !!! Regidx Rs0 = sp0)
+        by (rewrite /W7 upd_ne; [exact HW6s0 | nz]).
       assert (HW7s1 : W7 !!! Regidx Rs1 = (mword_of_int 0 : mword 64))
         by (rewrite /W7 upd_ne; [exact HW6s1 | nz]).
       assert (HW7s2 : W7 !!! Regidx Rs2 = sz1)
@@ -1421,6 +1425,8 @@ Section KexecCSetup.
         by (rewrite /W8 upd_ne; [exact HW7a0 | nz]).
       assert (HW8sp : W8 !!! Regidx csp_rs1 = pa_stk sp0 68)
         by (rewrite /W8 upd_ne; [exact HW7sp | nz]).
+      assert (HW8s0 : W8 !!! Regidx Rs0 = sp0)
+        by (rewrite /W8 upd_ne; [exact HW7s0 | nz]).
       assert (HW8s1 : W8 !!! Regidx Rs1 = (mword_of_int 0 : mword 64))
         by (rewrite /W8 upd_ne; [exact HW7s1 | nz]).
       assert (HW8s2 : W8 !!! Regidx Rs2 = sz1)
@@ -1509,14 +1515,17 @@ Section KexecCSetup.
         rewrite /kxc_at_272.
         iSplitR.
         { iPureIntro. split_and!;
-            [ exact HW8sp | exact HW8s1
+            [ exact HW8sp | exact HW8s0 | exact HW8s1
             | rewrite HW8s2 /kxc_sp uint_unsigned w32_moi_unsigned; reflexivity
             | exact HW8s4 | exact HW8s5
             | rewrite HrootF Hroot'; exact HW8s6 | rewrite -Hs7eq; exact HW8s7
             | exact HW8s8 | exact HW8s9 | exact HW8s10]. }
         iSplitR.
-        { iPureIntro. split_and!; [lia | lia |].
-          rewrite -HW8a0. exact Heq0. }
+        (* the stackbase bound at [c = 0] is [kxc_sp]'s base case: the loop has
+           not moved [sp] yet, so it reads [uint sz1 - 4096 <= uint sz1]. *)
+        { iPureIntro. split_and!;
+            [ lia | lia | rewrite -HW8a0; exact Heq0
+            | cbn [kxc_sp]; lia ]. }
         iSplitR.
         { iPureIntro. split_and!;
             [rewrite HtfpF Htfp'; exact HPtfp | exact HbelowF | exact HcovF]. }
@@ -1546,13 +1555,15 @@ Section KexecCSetup.
         rewrite /kxc_at_21a.
         iSplitR.
         { iPureIntro. split_and!;
-            [ exact HW8sp | exact HW8s1 | rewrite -HW8a0; reflexivity
+            [ exact HW8sp | exact HW8s0 | exact HW8s1 | rewrite -HW8a0; reflexivity
             | rewrite HW8s2 /kxc_sp uint_unsigned w32_moi_unsigned; reflexivity
             | exact HW8s4 | exact HW8s5
             | rewrite HrootF Hroot'; exact HW8s6 | rewrite -Hs7eq; exact HW8s7
             | exact HW8s8 | exact HW8s9 | exact HW8s10]. }
         iSplitR.
-        { iPureIntro. split_and!; [lia | lia | rewrite -HW8a0; exact Hne0]. }
+        { iPureIntro. split_and!;
+            [ lia | lia | rewrite -HW8a0; exact Hne0
+            | cbn [kxc_sp]; lia ]. }
         iSplitR.
         { iPureIntro. split_and!;
             [rewrite HtfpF Htfp'; exact HPtfp | exact HbelowF | exact HcovF]. }

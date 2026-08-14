@@ -64,6 +64,10 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
     
     (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
     (m : regfile) (av : nat) (eb : bool) :=
+  (* THE SET IS THE PROC SINGLETON, not a parameter: sched is reachable only
+     while holding exactly this proc's lock (its own [noff != 1] check says
+     so), and [SpecSwtch] pins the same constant on both sides of the
+     crossing. *)
   let pcE : mword 64 := mword_of_int KernelSyms.sched in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
@@ -117,7 +121,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
      exactly the eb retune back to the caller's own state, now realized
      against the DISPATCHING hart's fresh [trap_csrs] (the entry stash is
      about the wrong hart's ghost). *)
-  cpu_own 1 eb pj emp false -∗
+  cpu_own 1 eb pj emp false {[lock_rank "proc"]} -∗
   own_ctx (p_context pj) -∗
   (* THE HART TAG, WHOLE.  The parking thread merged the slot's half with its
      own claim's half at [SchedCtx.proc_slots_running], and the reclaiming
@@ -136,7 +140,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
       (* the dispatch payload's, i.e. the RESUMING hart's -- and [intr_res]
          rides inside it, which is what the caller's own retune needs. *)
       trap_csrs -∗
-      cpu_own 1 eb pj emp false -∗
+      cpu_own 1 eb pj emp false {[lock_rank "proc"]} -∗
       own_ctx (p_context pj) -∗
       hart_full j cpu_id -∗
       ▷ sched_vc γs (a_cpu_ctx cid_word) pj -∗
@@ -174,7 +178,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
    is an ordinary caller frame and is simply dropped on the floor.       *)
 Definition wp_sched_locks_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat) :=
+    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sched in
   let pj := proc_addr j in
   (j < NPROC)%nat ->
@@ -190,7 +194,7 @@ Definition wp_sched_locks_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
   procs_inv γs -∗
   locked γl cpu_id -∗
   (* THE POINT: a SECOND lock is held. *)
-  cpu_own (S (S n)) eb pj C false -∗
+  cpu_own (S (S n)) eb pj C false lks -∗
   panic_wp_any -∗
   WP (Loop : expr riscv_lang).
 
@@ -204,6 +208,6 @@ Module Type SCHED.
   Parameter wp_sched_locks :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat),
-      wp_sched_locks_body γs j γl m av eb C n.
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat) (lks : gset nat),
+      wp_sched_locks_body γs j γl m av eb C n lks.
 End SCHED.

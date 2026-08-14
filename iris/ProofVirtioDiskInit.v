@@ -747,12 +747,12 @@ Section ProofVirtioDiskInit.
   Lemma wp_virtio_disk_init_sconf (γv : disk_names) (γa : gname) (m : regfile) (K : nat)
       (eb : bool) (pp : mword 64) (C : iProp Σ) (on : option nat)
       (c0 : virtio_cfg) (vlock : bv 32) (vname vcpu : bv 64)
-      (pd0 pav0 pu0 : mword 64) (free0 : nat -> bv 8)
+      (pd0 pav0 pu0 : mword 64) (free0 : nat -> bv 8) (lks : gset nat)
     : wp_virtio_disk_init_sconf_body γv γa m K eb pp C on c0 vlock vname vcpu
-                                     pd0 pav0 pu0 free0.
+                                     pd0 pav0 pu0 free0 lks.
   Proof.
     cbv beta delta [wp_virtio_disk_init_sconf_body].
-    intros pcE ret_tgt c_name c_cpu HK Hex Hcid Hlive0.
+    intros pcE ret_tgt c_name c_cpu HK Hex Hcid Hlive0 Hkmem.
     destruct Hex as (nb & Hon & Hnb). subst on.
     pose proof (vdi_cap_bounds K HK) as (Hc4 & Hc2 & Hc14 & Hknk).
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
@@ -1579,9 +1579,10 @@ Section ProofVirtioDiskInit.
     assert (HB39s2 : B39 !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int 11)
       by (peel; exact HB30s2).
     iApply (AK.wp_kalloc_sconf γa γk (mword_of_int (KernelSyms.kmem + 24))
-              B39 (Some nb) 0%nat eb pp C (K - 4)%nat false Hc14
-              ltac:(reflexivity) ltac:(vm_compute; reflexivity)
+              B39 (Some nb) 0%nat eb pp C (K - 4)%nat false _ Hc14
+              ltac:(reflexivity) ltac:(vm_compute; reflexivity) Hkmem
               with "Hcg Hcpu Htext Hpc Hklock Havl Hpanic").
+    all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (mk1) "Hcg Hcpu Hpc %Hk1cs Hkpost".
     assert (Hr0c2 : ret_pc (B39 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.virtio_disk_init + 0x0c2)).
@@ -1653,9 +1654,10 @@ Section ProofVirtioDiskInit.
     assert (HC3s2 : C3 !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int 11)
       by (peel; exact Hk1s2).
     iApply (AK.wp_kalloc_sconf γa γk (mword_of_int (KernelSyms.kmem + 24))
-              C3 (Some (nb - 1)%nat) 0%nat eb pp C (K - 4)%nat false Hc14
-              ltac:(reflexivity) ltac:(vm_compute; reflexivity)
+              C3 (Some (nb - 1)%nat) 0%nat eb pp C (K - 4)%nat false _ Hc14
+              ltac:(reflexivity) ltac:(vm_compute; reflexivity) Hkmem
               with "Hcg Hcpu Htext Hpc Hklock Havl Hpanic").
+    all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (mk2) "Hcg Hcpu Hpc %Hk2cs Hkpost".
     assert (Hr0d0 : ret_pc (C3 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.virtio_disk_init + 0x0d0)).
@@ -1704,9 +1706,10 @@ Section ProofVirtioDiskInit.
     assert (HD2s1 : D2 !!! Regidx (mword_of_int 9 : mword 5) = disk_base) by (peel; exact Hk2s1).
     assert (HD2s2 : D2 !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int 11) by (peel; exact Hk2s2).
     iApply (AK.wp_kalloc_sconf γa γk (mword_of_int (KernelSyms.kmem + 24))
-              D2 (Some (nb - 2)%nat) 0%nat eb pp C (K - 4)%nat false Hc14
-              ltac:(reflexivity) ltac:(vm_compute; reflexivity)
+              D2 (Some (nb - 2)%nat) 0%nat eb pp C (K - 4)%nat false _ Hc14
+              ltac:(reflexivity) ltac:(vm_compute; reflexivity) Hkmem
               with "Hcg Hcpu Htext Hpc Hklock Havl Hpanic").
+    all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (mk3) "Hcg Hcpu Hpc %Hk3cs Hkpost".
     assert (Hr0d6 : ret_pc (D2 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.virtio_disk_init + 0x0d6)).

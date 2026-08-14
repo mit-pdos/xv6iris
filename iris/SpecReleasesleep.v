@@ -45,14 +45,23 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
     
     (γs : list gname)
     (γl γsl : gname) (s : string) (R : iProp Σ)
-    (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
+    (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.releasesleep in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
                    in
   (22 <= av)%nat ->
+  (* THE ORDER PREMISE for the INNER spinlock of the sleeplock, which
+     [initlock]s at the name "sleep lock" (the sleeplock itself is not a
+     spinlock and has no rank): everything the caller holds ranks strictly
+     below it.  [LockRank.locks_below_not_elem] recovers the non-membership
+     the set algebra below needs.  No execution ever holds two "sleep lock"s
+     at once (LockRank.v).  releasesleep is BALANCED -- entry and exit
+     [cpu_own] carry the same [lks] -- because the C's single return path
+     releases lk->lk; the wakeup() in between is itself balanced. *)
+  locks_below lks (lock_rank "sleep lock") ->
   sie_cap_gpr m av b pme -∗
-  cpu_own 0 eb pme C b -∗
+  cpu_own 0 eb pme C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
   (* the holder's bundle, surrendered back into the lock *)
@@ -66,7 +75,7 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
     ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
       sie_cap_gpr mf av b pme -∗
-      cpu_own 0 eb pme C b -∗
+      cpu_own 0 eb pme C b lks -∗
       pc_is ret_tgt -∗
           WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -74,9 +83,9 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
 Module Type RELEASESLEEP.
   Parameter wp_releasesleep_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      
+
       (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool),
-      wp_releasesleep_sconf_body γs γl γsl s R m pd pme av eb C b.
+      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat),
+      wp_releasesleep_sconf_body γs γl γsl s R m pd pme av eb C b lks.
 End RELEASESLEEP.

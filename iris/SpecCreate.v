@@ -432,6 +432,35 @@ Section CreateSpec.
        ic_loaded γfs γi cov logstart k inum dn bm ∗
        ity_shot g (di_type dn) ∗
        inode_ref_short k (qi + s)%Qp qi dev inum)%I.
+
+  (* Assembled structurally, not by [iFrame]: at the syscall altitude this
+     is built at (hundreds of accumulated hypotheses), even a NAMED
+     [iFrame "H1 .. H10"] over these ten conjuncts measured 26-28 s per call
+     site in ProofCreate.v -- [iSplitL]/[iExact] is free, the same fix as
+     [IcacheEscrow.ic_mk_loaded] for the same reason (optimization.md,
+     "Framing"). *)
+  Lemma create_locked_mk cn γfs γi cov logstart dev pidv k qi s g inum dn bm
+      γil γisl :
+    is_sleeplock γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) -∗
+    sleeplocked γisl -∗
+    sl_pid (i_lock (ientry k)) ↦₄ pidv -∗
+    ic_deposit cn k (DepShr s dev inum g) -∗
+    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
+    i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
+    i_valid (ientry k) ↦₄ valid_word true -∗
+    ic_loaded γfs γi cov logstart k inum dn bm -∗
+    ity_shot g (di_type dn) -∗
+    inode_ref_short k (qi + s)%Qp qi dev inum -∗
+    create_locked cn γfs γi cov logstart dev pidv k qi s g inum dn bm.
+  Proof.
+    iIntros "Hlk Hlkd Hpid Hdep Hdev Hinum Hvalid Hload Hshot Href".
+    rewrite /create_locked. iExists γil, γisl.
+    iSplitL "Hlk"; [iExact "Hlk" |]. iSplitL "Hlkd"; [iExact "Hlkd" |].
+    iSplitL "Hpid"; [iExact "Hpid" |]. iSplitL "Hdep"; [iExact "Hdep" |].
+    iSplitL "Hdev"; [iExact "Hdev" |]. iSplitL "Hinum"; [iExact "Hinum" |].
+    iSplitL "Hvalid"; [iExact "Hvalid" |]. iSplitL "Hload"; [iExact "Hload" |].
+    iSplitL "Hshot"; [iExact "Hshot" | iExact "Href"].
+  Qed.
 End CreateSpec.
 
 Definition wp_create_sconf_body
@@ -457,7 +486,7 @@ Definition wp_create_sconf_body
     (ns : nat)                                        (* the iref ledger     *)
     (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.create in
   let pj := proc_addr j in
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
@@ -517,7 +546,7 @@ Definition wp_create_sconf_body
   (* PARKING PREMISE (hart-generic scheduler protocol) *)
   eb = true ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   (* the two persistent credentials ialloc's printk arm needs, and the
@@ -569,7 +598,7 @@ Definition wp_create_sconf_body
     (u' : nat) (Sb' : gset Z) (ns' : nat) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       pc_is ret_tgt -∗
       (* everything structural comes back untouched *)
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
@@ -641,9 +670,9 @@ Module Type CREATE.
       (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_create_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
                            γa γf γpr cov logstart bmapstart inodestart nib
                            ninodes size dev used plen pfun ty major minor
-                           V u Sb ns pidv dqb dqs dqbs dqn m K eb C b.
+                           V u Sb ns pidv dqb dqs dqbs dqn m K eb C b lks.
 End CREATE.

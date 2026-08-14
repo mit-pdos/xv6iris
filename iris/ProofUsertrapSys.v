@@ -99,7 +99,7 @@ Section UtSysBlock.
 
   Lemma ut_90 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (C : iProp Σ)
-      (mie_v menvcfg0 : mword 64) :
+      (mie_v menvcfg0 : mword 64) (lks : gset nat) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
@@ -118,7 +118,7 @@ Section UtSysBlock.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x90)) -∗
     sie_cap_gpr m nx false (un_pj N) -∗
-    ut_hold (SY.syscall_env) N V C false -∗
+    ut_hold (SY.syscall_env) N V C false lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
@@ -133,6 +133,9 @@ Section UtSysBlock.
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
     iDestruct "Hhold" as "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
+    (* depth 0 forces the held set empty, so killed/kexit's order premises
+       need no hypothesis of this lemma's own. *)
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     iAssert (procs_inv (un_s N)) with "[]" as "#Hpi".
     { iDestruct "Hcaps" as "($ & _)". }
     iAssert (panic_wp_any) with "[]" as "#Hpa".
@@ -166,9 +169,10 @@ Section UtSysBlock.
     assert (HcsM1 : ut_cs m0 M1)
       by (rewrite /M1; apply ut_cs_insert; [vm_compute; reflexivity | exact Hcs]).
     iApply (KI.wp_killed_sconf (un_s N) (un_j N) (un_l N)
-              M1 nx 0%nat false (un_pj N) C false
+              M1 nx 0%nat false (un_pj N) C false lks
               HM1a0 Hj Hjl ltac:(vm_compute; reflexivity) ltac:(lia)
               with "Hcg Hcpu Htext Hpc Hpi Hpa [-]").
+    all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mf kl) "[%Hcskl %Hkla0] Hcg Hcpu Hpc".
     assert (Hret94 : ret_pc (M1 !!! Regidx Rra) = mword_of_int (UT + 0x94))
       by (rewrite HM1ra; pcw).
@@ -231,8 +235,9 @@ Section UtSysBlock.
       iApply (T.ut_kexit SY.syscall_env N V
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xca) : mword 64) 4)]> K1)
-                nx C false Hwf' ltac:(unfold K_kexit; lia)
+                nx C false lks Hwf' ltac:(unfold K_kexit; lia)
                 with "Htext Hpc Hcg [-]").
+      all: try lkbelow.
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].
       iSplitL "Hclm"; [iExact "Hclm"|].
@@ -360,7 +365,9 @@ Section UtSysBlock.
                 with "Hcg [Hcnt] [Hcsrs] [Hcells] [Hclm] Hpc Hi9e [-]").
       { iExact "Hcnt". }
       { rewrite /trap_csrs_ext. iExact "Hcsrs". }
-      { iExact "Hcells". }
+      (* re-enabling SIE demands the empty held set -- which depth 0 already
+         forces, so this is a re-spelling, not an obligation. *)
+      { iEval (rewrite Hlkempty) in "Hcells". iExact "Hcells". }
       { rewrite /cpu_claim_ext. iExact "Hclm". }
       iApply wp_next_off_intro. iIntros (msf) "%Hmsf Hcg Hpc".
       assert (Hpa2 : add_vec_int (mword_of_int (UT + 0x9e) : mword 64) 4
@@ -398,11 +405,13 @@ Section UtSysBlock.
         apply ut_cs_insert; [vm_compute; reflexivity |].
         exact Hcsmf. }
       iApply (SY.wp_syscall_sconf (CID := CID1) (un_f N) (un_s N) (un_j N) (un_l N)
-                S4 n2 C (un_pid N) V1
+                S4 n2 C (un_pid N) V1 lks
                 Hj Hjl ltac:(rewrite Hn2; unfold K_syscall, K_sys_exit, K_kexit,
                                             kv_frame_slots; lia)
                 with "Hcg [HC] Htext Hkd Hpc Hpi Hpa Hsy Hpv [-]").
-      { iApply (cpu_own_on_intro (CID := CID1) (un_pj N) C with "HC"). }
+      (* [cpu_own_on_intro] mints the bundle at the literal [∅]; [lks = ∅]
+         at depth 0 makes that the set syscall's contract names. *)
+      { rewrite Hlkempty. iApply (cpu_own_on_intro (CID := CID1) (un_pj N) C with "HC"). }
       iIntros (CID2 Hk2 mg V2) "%Hcsg %Htfg Hcg Hcpu Hsy Hpv Hpc".
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).
@@ -420,12 +429,13 @@ Section UtSysBlock.
         by exact (ut_cs_trans m0 S4 mg HcsS4 (ut_cs_of_callee_saved _ _ Hcsg)).
       iApply (T.ut_a6 (CID := CID2) SY.syscall_env N V2 pt ksp m0 mg av
                 n2 C true
-                mie_v menvcfg0
+                mie_v menvcfg0 lks
                 Hwf' Hav ltac:(rewrite Hn2; unfold trap_res, kv_frame_slots in *; lia)
                 ltac:(rewrite Htfg HV1upt; exact Htfpe) Hksp Hm0sp
                 Hmgsp Hmgs1 Hcsmg
                 Hmiev Hmenvv
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
+      all: try lkbelow.
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitR; [rewrite /trap_csrs_ext; done|].
       iSplitR; [rewrite /cpu_claim_ext; done|].

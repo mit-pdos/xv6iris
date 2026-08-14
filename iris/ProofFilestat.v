@@ -193,11 +193,11 @@ Section ProofFilestat.
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fstat_names)
       (pidv : mword 32) (V : pprivate)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool)
-    : wp_filestat_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C b.
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+    : wp_filestat_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C b lks.
   Proof.
     cbv beta delta [wp_filestat_sconf_body].
-    intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Heb.
+    intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Heb Hbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic Href Hpriv Hkenv #Hprocs Henv Hcont".
     (* PIN THE INDEX.  This contract still carries [eb = true ->], and at
@@ -394,7 +394,7 @@ Section ProofFilestat.
     iDestruct (cpu_own_transport CID CID9 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Myproc.wp_myproc_sconf R5 (K - 10)%nat 0%nat eb pj C b
-              fst_noff0 (fst_av_myproc K HK) with "Hcg Hcnt Htext Hpc").
+              _ fst_noff0 (fst_av_myproc K HK) with "Hcg Hcnt Htext Hpc").
     iIntros (CID10 Hs10 ms P0) "%Hms Hcg Hcnt Hpc %HcsP0".
     destruct HcsP0 as [HcsP0 HP0a0].
     assert (Hpc14 : ret_pc (R5 !!! Regidx Rra) = mword_of_int (FST + 0x14))
@@ -694,11 +694,13 @@ Section ProofFilestat.
                 icfg_dev inm
                 pidv (DfracOwn (1/4)) (fsn_dqs fn)
                 Q3 (K - 10)%nat eb C b
-                (fst_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
+                _ (fst_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
                 ltac:(rewrite HQ3a0; exact Hipk)
+                Hbelow
                 with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hitbl Hesc Hireg
                       Hslk Hshr Hsb Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hbslot").
+      all: try lkbelow.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iIntros (CIDil Hsil mil dnl bml fl_)
@@ -968,12 +970,16 @@ Section ProofFilestat.
                 (fsn_cov fn) (fsn_logstart fn)
                 ikk (ssh/2)%Qp gsh icfg_dev inm
                 dnl bml
-                pidv (DfracOwn (1/4)) J2 (K - 10)%nat eb pj C b
+                pidv (DfracOwn (1/4)) J2 (K - 10)%nat eb pj C b lks
                 (fst_av_iunlock K HK) Hik
                 ltac:(rewrite HJ2a0; exact Hipk)
+                (* iunlock's bound is "sleep lock"(6); filestat's own is
+                   "bcache"(4), and [locks_below_mono] weakens it. *)
+                ltac:(lkbelow)
                 with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk
                       Hheld Hslpid Hppid Hprocs
                       Hdep Hidev Hinum Hvalid Hlk Hshot").
+      all: try lkbelow.
       iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr".
       iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
       (* THE GATHER: iunlock gives the half back WITHOUT its generation; the
@@ -1159,9 +1165,10 @@ Section ProofFilestat.
       iDestruct (cpu_own_transport CIDiu CID31 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply (Copyout.wp_copyout_sconf γa U6 (pv_upt V) (pv_sz V) 24%nat fbytes
-                (K - 10)%nat 0%nat eb pj C b
+                (K - 10)%nat 0%nat eb pj C b lks
                 (fst_av_copyout K HK) HU6a0 HU6a1 HU6a4 fst_len24 Hszb fst_noff0
                 with "Hcg Hcnt Htext Hpc Hpt Hkenv Hbuf").
+      all: try lkbelow.
       iIntros (CID32 Hs32 mco P') "Hcg Hcnt Hpc Hpt Hbuf %Hcsco %Hext %Hret".
       iEval (rewrite HU6a3) in "Hbuf".
       iDestruct ("Hpback" $! P' ltac:(exact Hext) with "Hszc Hptc Hpt") as "Hpriv".

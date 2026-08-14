@@ -88,11 +88,11 @@ Section ProofArgstr.
   Lemma wp_argstr_sconf (γa : gname) (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (i : nat) (v : mword 64)
-      (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool)
-    : wp_argstr_sconf_body γa γf m av n eb p C i v pid V maxn buf_olds b.
+      (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) (lks : gset nat)
+    : wp_argstr_sconf_body γa γf m av n eb p C i v pid V maxn buf_olds b lks.
   Proof.
     cbv beta delta [wp_argstr_sconf_body].
-    intros pcE buf ret_tgt Hi Ha0 Hargs Hn Hav Hmax Hmax31.
+    intros pcE buf ret_tgt Hi Ha0 Hargs Hn Hav Hmax Hmax31 Hlkbelow.
     unfold argstr_stack in Hav.
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx Rra).
@@ -297,7 +297,7 @@ Section ProofArgstr.
     iDestruct (cpu_own_transport CID CID9 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Argraw.wp_argraw_sconf M5 (av - 4)%nat n eb p C
               i (ud_tfp (pv_upt V)) (pv_tf V) v (DfracOwn (1/4)) b
-              Hi HM5a0 Hargs Hn ltac:(lia)
+              _ Hi HM5a0 Hargs Hn ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Htfp Htfa").
     iIntros (CID10 Hk10 A) "[%HcsA %HAa0] Hcg Hcpu Hpc Htfp Htfa".
     iDestruct ("Hpbacktf" with "Htfp Htfa") as "Hpriv".
@@ -386,8 +386,9 @@ Section ProofArgstr.
     (* ---- fetchstr(addr, buf, max) ---- *)
     iDestruct (cpu_own_transport CID10 CID13 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Fetchstr.wp_fetchstr_sconf γa γf A3 (av - 4)%nat n eb p C pid V maxn buf_olds b
-              Hn HKfs HA3a2 Hmax31
+              _ Hn HKfs HA3a2 Hmax31
               with "Hcg Hcpu Htext Hpc Hpriv Henv Hbuf").
+    all: try lkbelow.
     iIntros (CID14 Hk14 mr P' buf_new) "%Hcsr %Hext Hcg Hcpu Hpc Hpriv Hbuf %Hret".
     iEval (rewrite HA3a1) in "Hbuf".
     assert (Hpc1c : ret_pc (A3 !!! Regidx Rra) = mword_of_int (KernelSyms.argstr + 0x1c))

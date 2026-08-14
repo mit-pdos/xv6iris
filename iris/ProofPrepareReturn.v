@@ -104,8 +104,8 @@ Section ProofPrepareReturn.
 
   Lemma wp_prepare_return_sconf (γf : gname) (ks : mword 64) (pid : mword 32)
       (V : pprivate) (m : regfile) (av : nat) (C : iProp Σ) (p : mword 64)
-      (epc : mword 64) (b : bool)
-    : wp_prepare_return_sconf_body γf ks pid V m av C p epc b.
+      (epc : mword 64) (b : bool) (lks : gset nat)
+    : wp_prepare_return_sconf_body γf ks pid V m av C p epc b lks.
   Proof.
     cbv beta delta [wp_prepare_return_sconf_body].
     intros pcE ret_tgt Hav Hepc.
@@ -247,7 +247,7 @@ Section ProofPrepareReturn.
     iEval (rewrite Hentry) in "Hpc".
     iDestruct (cpu_own_transport CID CID5 0%nat b p C b
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf M3 (av - 2)%nat 0%nat b p C b
+    iApply (Myproc.wp_myproc_sconf M3 (av - 2)%nat 0%nat b p C b lks
               prr_n0 ltac:(lia) with "Hcg Hcpu Htext Hpc").
     iIntros (CID6 Hk6 msq A) "%Hmsq Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].

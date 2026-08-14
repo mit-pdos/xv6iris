@@ -91,7 +91,7 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      (γs : list gname) (j : nat) (γl : gname)
     (γt : gname) (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
     (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
-    (dqt : dfrac) (b : bool) :=
+    (dqt : dfrac) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_pause in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -107,9 +107,14 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      trap CSRs across the crossing -- at level 0 with an enabled base the
      pushing acquire produces exactly that set.  See SpecSched.v. *)
   eb = true ->
+  (* acquire's order premise: every lock this hart already holds ranks below
+     "time"'s -- sys_pause acquires and releases [tickslock] (possibly many
+     times, around each loop iteration's [sleep]) but is BALANCED overall,
+     so [lks] is unchanged end to end. *)
+  locks_below lks (lock_rank "time") ->
   sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* argint's trapframe resources *)
   p_trapframe pj ↦₈{dqt} page_base tfp -∗
@@ -126,7 +131,7 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
         mf !!! Regidx (mword_of_int 10 : mword 5) = r /\
         (r = (zero_reg : mword 64) \/ r = mword_of_int (-1)) ⌝ -∗
       sie_cap_gpr mf av b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       pc_is ret_tgt -∗
       p_trapframe pj ↦₈{dqt} page_base tfp -∗
       tf_page tfp ws -∗
@@ -139,6 +144,6 @@ Module Type SYSPAUSE.
        (γs : list gname) (j : nat) (γl : gname)
       (γt : gname) (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
-      (dqt : dfrac) (b : bool),
-      wp_sys_pause_sconf_body γs j γl γt m av eb C i tfp ws v dqt b.
+      (dqt : dfrac) (b : bool) (lks : gset nat),
+      wp_sys_pause_sconf_body γs j γl γt m av eb C i tfp ws v dqt b lks.
 End SYSPAUSE.

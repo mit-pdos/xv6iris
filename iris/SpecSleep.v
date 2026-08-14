@@ -91,15 +91,26 @@ Import Defs.
 
 Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) :=
+    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sleep in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (20 <= av)%nat ->
+  (* THE ORDER PREMISE FOR SLEEP'S OWN ACQUIRE.  The split protocol left
+     sleep holding NO caller lock on entry, but sleep still takes p->lock
+     itself (proc.c: [acquire(&p->lock)] before the state store), so acquire's
+     [locks_below lks (lock_rank s)] has to come from here.  BALANCED in
+     the held set -- the release at +0x22 gives the rank straight back on both
+     arms -- so [lks] is unchanged in the postcondition, and this premise is
+     exactly what makes the insert/delete cancel ([locks_below_not_elem]).
+     Trivial at [lks = ∅] ([locks_below_empty]), which is every real call site
+     (sleep is only ever reached from a thread that has already released its
+     condition lock). *)
+  locks_below lks (lock_rank "proc"%string) ->
   sie_cap_gpr m av eb pj -∗
-  cpu_own 0 eb pj C eb -∗
+  cpu_own 0 eb pj C eb lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
   panic_wp_any -∗
@@ -109,7 +120,7 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf av eb pj -∗
-      cpu_own 0 eb pj C eb -∗
+      cpu_own 0 eb pj C eb lks -∗
       pc_is ret_tgt -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
@@ -165,7 +176,7 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
    do not prove that, we permit it. *)
 Definition wp_sleep_nested_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat) :=
+    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sleep in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -174,15 +185,24 @@ Definition wp_sleep_nested_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
   (20 <= av)%nat ->
   (* the interior acquire reaches [S (S n)], transiently +1 *)
   (Z.of_nat n + 3 < 2 ^ 31)%Z ->
+  (* AND IT IS STILL SLEEP'S OWN ACQUIRE THAT NEEDS THIS, not the caller's
+     lock: [lks] here is the set the caller already holds (it is at [S n], so
+     [lks] is non-empty), and every rank in it must sit strictly BELOW
+     p->lock's -- which is the real xv6 order (a nested sleeper holds
+     "sleep lock" at 6 or "log" at 3, both under "proc" at 11).  Both arms
+     stay balanced in the set -- the no-park arm releases what it took, the
+     park arm panics inside sched and never returns -- so the postcondition
+     carries the entry [lks] unchanged. *)
+  locks_below lks (lock_rank "proc"%string) ->
   sie_cap_gpr m av false pj -∗
-  cpu_own (S n) eb pj C false -∗
+  cpu_own (S n) eb pj C false lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
   panic_wp_any -∗
   (∀ (mf : regfile),
      ⌜callee_saved m mf⌝ -∗
      sie_cap_gpr mf av false pj -∗
-     cpu_own (S n) eb pj C false -∗
+     cpu_own (S n) eb pj C false lks -∗
      pc_is ret_tgt -∗
      WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -191,11 +211,11 @@ Module Type SLEEP.
   Parameter wp_sleep_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ),
-      wp_sleep_sconf_body γs j γl m av eb C.
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (lks : gset nat),
+      wp_sleep_sconf_body γs j γl m av eb C lks.
   Parameter wp_sleep_nested :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat),
-      wp_sleep_nested_body γs j γl m av eb C n.
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat) (lks : gset nat),
+      wp_sleep_nested_body γs j γl m av eb C n lks.
 End SLEEP.

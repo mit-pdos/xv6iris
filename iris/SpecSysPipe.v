@@ -164,7 +164,7 @@ Definition wp_sys_pipe_sconf_body
     (γa : gname)  (γfl γf : gname)
     (fn : fclose_names) (on : option nat) (us : gset Z)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) :=
+    (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat) :=
   (* [pipeG] is not a separate binder: [fileG] subsumes it (FileInv.v), and
      naming both would put TWO instance paths to [inG Σ fracR] in scope --
      they print identically and do not unify, so a [pipe_ref] built through
@@ -178,11 +178,15 @@ Definition wp_sys_pipe_sconf_body
      assumed about it: argaddr does not check, and copyout is the check. *)
   pv_tf V !! tf_arg_idx 0 = Some v ->
   (sys_pipe_stack <= av)%nat ->
+  (* sys_pipe acquires no lock of its own -- it is a pure pass-through to its
+     three fileclose calls (inside [sp_close2]), whose own lowest rank is
+     "ftable" (1).  One premise covers the whole cone. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m av b p -∗
   (* [n = 0]: copyout's chain reaches vmfault, whose kalloc runs with
      interrupts un-pushed (SpecCopyout.v) -- and sys_pipe holds no lock
      across any of its calls anyway. *)
-  cpu_own 0%nat eb p C b -∗
+  cpu_own 0%nat eb p C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true], so no existing
      call site changes; at [eb = false] the real pair, which can only have
      come from the TRAP.  sys_pipe acquires no lock of its own, so it mints
@@ -221,7 +225,7 @@ Definition wp_sys_pipe_sconf_body
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       sie_cap_gpr mf av b p -∗
-      cpu_own 0%nat eb p C b -∗
+      cpu_own 0%nat eb p C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb p -∗
       pc_is ret_tgt -∗
@@ -242,6 +246,6 @@ Module Type SYSPIPE.
       (γa : gname) (γfl γf : gname)
       (fn : fclose_names) (on : option nat) (us : gset Z)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool),
-      wp_sys_pipe_sconf_body γa γfl γf fn on us m av eb p C v pid V b.
+      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat),
+      wp_sys_pipe_sconf_body γa γfl γf fn on us m av eb p C v pid V b lks.
 End SYSPIPE.

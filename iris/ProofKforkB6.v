@@ -233,7 +233,7 @@ Section KforkPrologue.
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
       (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate)
-      (R : iProp Σ) :
+      (R : iProp Σ) (lks : gset nat) :
     let sp0 : mword 64 := m !!! Regidx csp_rs1 in
     let ra0 : mword 64 := m !!! Regidx Rra in
     let s00 : mword 64 := m !!! Regidx Rs0 in
@@ -241,8 +241,13 @@ Section KforkPrologue.
     let s50 : mword 64 := m !!! Regidx Rs5 in
     (K_kfork <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
+    (* this block's only lock-touching callee is allocproc, whose own bound
+       is at "proc" (11) -- uvmcopy's kalloc calls run while np->lock is
+       already held, but rank above "proc" follows by [locks_below_mono]
+       and its own contract does not yet expose the premise. *)
+    locks_below lks (lock_rank "proc") ->
     sie_cap_gpr m K b pme -∗
-    cpu_own lvl eb pme C b -∗
+    cpu_own lvl eb pme C b lks -∗
     kernel_text -∗
     pc_is (mword_of_int KF : mword 64) -∗
     panic_wp_any -∗
@@ -275,7 +280,7 @@ Section KforkPrologue.
            [SpecKfork.kfork_post] needs it unconditionally -- an affine BI
            lets a proof drop it silently, which is exactly how it went
            missing from this continuation the first time. *)
-        cpu_own lvl eb pme C b -∗
+        cpu_own lvl eb pme C b lks -∗
         kernel_text -∗
         pc_is (mword_of_int (KF + 0x10a) : mword 64) -∗
         kfk_frame sp0 ra0 s00 s10 s50 -∗
@@ -339,7 +344,7 @@ Section KforkPrologue.
         IrefSlots.iref_slots (1 + IREFSPARE) -∗
         SwtchCtx.own_ctx (p_context npa) -∗
         IntrDefs.arm_pay lvl eb pme -∗
-        cpu_own (S lvl) eb pme C false -∗
+        cpu_own (S lvl) eb pme C false ({[lock_rank "proc"]} ∪ lks) -∗
         kalloc_env γa None -∗
         R -∗
         WP (Loop : expr riscv_lang))) -∗
@@ -410,7 +415,7 @@ Section KforkPrologue.
                 either way, hence convertible, and [iApply] bridges them. *)
              (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest)) -∗
         IntrDefs.arm_pay lvl eb pme -∗
-        cpu_own (S lvl) eb pme C false -∗
+        cpu_own (S lvl) eb pme C false ({[lock_rank "proc"]} ∪ lks) -∗
         kalloc_env γa None -∗
         is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
         is_ftable γl γf -∗
@@ -420,7 +425,7 @@ Section KforkPrologue.
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros sp0 ra0 s00 s10 s50 HK Hlvl.
+    intros sp0 ra0 s00 s10 s50 HK Hlvl Hbelow.
     unfold K_kfork in HK.
     iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hplock #Hwlock #Hftbl #Hitbl
              #Hitinv Henv Hpv HR Hcont10a Hcont7c Hcont4a".
@@ -573,7 +578,7 @@ Section KforkPrologue.
       by (rewrite /M2 upd_eq; reflexivity).
     (* ---- myproc(): a0 = pme ---- *)
     iDestruct (cpu_own_transport CID0 CID7 lvl eb pme C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf M2 K1 lvl eb pme C b
+    iApply (Myproc.wp_myproc_sconf M2 K1 lvl eb pme C b _
               ltac:(lia) ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
     iIntros (CID8 Hs8 ms A) "%Hms Hcg Hcpu Hpc %HcsA".
@@ -640,9 +645,10 @@ Section KforkPrologue.
     assert (HM5ra : M5 !!! Regidx Rra = add_vec_int (mword_of_int (KF + 0x12) : mword 64) 4)
       by (rewrite /M5 upd_eq; reflexivity).
     iDestruct (cpu_own_transport CID8 CID10 lvl eb pme C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Allocproc.wp_allocproc_core γa γp γf γs M5 lvl K1 eb pme C on b
-              ltac:(lia) ltac:(lia)
+    iApply (Allocproc.wp_allocproc_core γa γp γf γs M5 lvl K1 eb pme C on b lks
+              ltac:(lia) ltac:(lia) Hbelow
               with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hplock Henv").
+    all: try lkbelow.
     iIntros (CID11 Hs11 mf6) "%HcsB Hpc Hpost".
     assert (Hpc16 : ret_pc (M5 !!! Regidx Rra) = mword_of_int (KF + 0x16))
       by (rewrite HM5ra; apply bv_eq; vm_compute; reflexivity).
@@ -926,9 +932,11 @@ Section KforkPrologue.
       iModIntro.
       iDestruct "Henv'" as "#Henv'".
       iApply (Uvmcopy.wp_uvmcopy_sconf γa N5p (pv_upt Vp) (pv_upt Vc) (trap_res b + K1)%nat eb pme C (S lvl) false
+                ({[lock_rank "proc"]} ∪ lks)
                 ltac:(lia) ltac:(lia) HN5ptp HN5pa0 HN5pa1 HszbP
                 ltac:(intros i _; rewrite HCempty; apply lookup_empty)
                 with "Hcg Hcpu Htext Hpc HPpt HCpt Henv'").
+      all: try lkbelow.
       iIntros (CID19 Hs19 mf9) "Hcg Hcpu Hpc %HcsD HPpt Hpost9".
       assert (Hpc2c : ret_pc (N5p !!! Regidx Rra) = mword_of_int (KF + 0x2c))
         by (rewrite HN5pra; apply bv_eq; vm_compute; reflexivity).

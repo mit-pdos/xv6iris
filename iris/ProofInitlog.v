@@ -283,14 +283,14 @@ Section ProofInitlog.
       (v_start v_dev v_nc v_n : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool)
+      (b : bool) (lks : gset nat)
     : wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γfs
                             cov logstart dev sb bs_hdr L D
                             vlock vname vcpu v_start v_dev v_nc v_n
-                            pidv dq dqs m K eb C b.
+                            pidv dq dqs m K eb C b lks.
   Proof.
     cbv beta delta [wp_initlog_sconf_body].
-    intros pcE pj ret_tgt c_name c_cpu HK Hgeom Hj Hgl Heb Hhdr0 Hma0 Hma1.
+    intros pcE pj ret_tgt c_name c_cpu HK Hgeom Hj Hgl Heb Hhdr0 Hma0 Hma1 Hbelow.
     destruct Hgeom as [Hcovok Hlogsub].
     subst eb.
     unfold K_initlog in HK.
@@ -814,9 +814,11 @@ Section ProofInitlog.
     iApply (Bread.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (mword_of_int logstart : mword 32) dq
               T3 (K - 6)%nat true C b
-              HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HT3a0 HT3a1
+              _ HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HT3a0 HT3a1
+              Hbelow
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hs1u").
+    all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iIntros (CID22 Hs22 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt _ _ Hpc Hppid Hheld".
@@ -969,8 +971,10 @@ Section ProofInitlog.
     assert (HKbl : (K_brelse <= K - 6)%nat) by (unfold K_brelse; lia).
     iApply (Brelse.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk pidv dev
               (mword_of_int logstart : mword 32) dq B2 (K - 6)%nat true pj C
-              bs_hdr bsd0 d0 b HKbl HA HB2a0
+              bs_hdr bsd0 d0 b _ HKbl HA HB2a0
+              Hbelow
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hheld").
+    all: try lkbelow.
     iIntros (CID27 Hs27 mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hs1u".
     assert (Hpc62 : ret_pc (B2 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.initlog + 0x62)).
@@ -1077,10 +1081,12 @@ Section ProofInitlog.
               cov logstart dev true 0%nat ([] : list (mword 32))
               (fun _ : nat => ([] : list (bv 8))) L D pidv dq
               C2 (K - 6)%nat true C b True%I
-              HKit Hgeomok Hj Hgl
+              _ HKit Hgeomok Hj Hgl
               Hrec0 HC2a0 Hshape0 Hnodup0 Hwcov0 Hlw0
+              Hbelow
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil1 HLauth HDauth
                     Hnil2 Hs2 [] []").
+    all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     (* THE EMPTY WRITE SET's per-entry permits: this call installs NOTHING
@@ -1189,9 +1195,10 @@ Section ProofInitlog.
               cov logstart dev 0%nat ([] : list (mword 32)) L pidv dq
               D2 (K - 6)%nat true C b
               (log_mirror_at (0%nat, []) ∗ swap_lb (S gen_id))%I
-              HKwh Hgeomok Hj Hgl Hshape0
+              _ HKwh Hgeomok Hj Hgl Hshape0
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
                     Hs1u [Hmirf]").
+    all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     { iExists bs_hdr. iExact "Hfsb". }

@@ -886,13 +886,6 @@ Section IntrDefsBase.
   (* not a bare [∃], so the ~15 sites that build or take apart [cpu_hart]  *)
   (* can frame it by name.                                                 *)
   (* ------------------------------------------------------------------- *)
-  Definition cpu_locks_any : iProp Σ :=
-    (∃ S : gset (mword 64), cpu_locks S)%I.
-
-  Lemma cpu_locks_any_intro (S : gset (mword 64)) :
-    cpu_locks S -∗ cpu_locks_any.
-  Proof. iIntros "H". iExists S. iExact "H". Qed.
-
   (* THIS HART'S PRIVATE STATE: the [cpus[cid]] cells and the held-lock set.
      They are ONE conjunct because they travel together and must: every seam
      that hands the cells across (push_off/pop_off, the sret and csrsi
@@ -900,16 +893,23 @@ Section IntrDefsBase.
      too, and bundling them is what keeps a leaf from taking one and
      stranding the other.  It also means the [cpu_hart] pair below still has
      TWO conjuncts, so nothing that destructures it changed shape. *)
-  Definition cpu_priv (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
-    (cpu_cells n eb p ∗ cpu_locks_any)%I.
+  (* [cpu_locks_lvl n lks], not bare [cpu_locks lks]: the authority now travels
+     with the coupling [size lks <= n] (LockSet.v).  Bundled INTO the second
+     conjunct rather than added as a third, so every positional destructuring
+     of this bundle keeps matching. *)
+  Definition cpu_priv (n : nat) (eb : bool) (p : mword 64) (lks : gset nat) : iProp Σ :=
+    (cpu_cells n eb p ∗ cpu_locks_lvl n lks)%I.
 
   (* the private state PLUS the counting token -- the whole per-cpu bundle
      minus the caller's context-slot payload [C] (which is an ordinary caller
      FRAME: an opaque [iProp Σ] crosses a migration for free, and every live
      instantiation that can reach the enabled arm is [emp]).  This is exactly
      what push_off / pop_off move between the arm and the code. *)
-  Definition cpu_hart (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
-    (cpu_priv n eb p ∗ intr_count n eb)%I.
+  (* [lks], never [S]: [S] is [nat]'s successor constructor and [cpu_own (S n)
+     ...] appears at 61 sites -- binding [S] as the held set shadows it and
+     breaks every one of them. *)
+  Definition cpu_hart (n : nat) (eb : bool) (p : mword 64) (lks : gset nat) : iProp Σ :=
+    (cpu_priv n eb p lks ∗ intr_count n eb)%I.
 
   (* THE SIE ARM IS AN INDEX, NOT AN INTERNAL DISJUNCTION.  It used to be
      [A ∨ B], which made every leaf SIE-agnostic at the price of hiding the
@@ -1282,7 +1282,7 @@ Section IntrDefsBase.
            (∃ v : mword 64, stval ↦ᵣ v) ∗
            (∃ a b : mword 1, sret_bits a b) ∗
            cpu_claim p ∗
-           cpu_hart 0 true p)
+           cpu_hart 0 true p ∅)
      else ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1))%I.
 
   Definition sie_cap_of (R : CPU -d> iPropO Σ) (m : regfile) (avail : nat)
@@ -1326,7 +1326,11 @@ Section IntrDefsBase.
         pure hand-over -- and it is what [WpSconfSret.wp_sret_s_sconf] asks of
         whoever re-enables interrupts. *)
      strans_bit strans_bit_kpt ∗
-     cpu_hart 0 false p ∗
+     (* ∅: the trap fired with interrupts ENABLED, and an enabled hart holds
+        no spinlock -- so a handler always starts from the empty held set,
+        which is what makes its own acquires (clockintr's tickslock,
+        uartintr, virtio_disk_intr) legal at the bottom of the order. *)
+     cpu_hart 0 false p ∅ ∗
      cpu_claim p ∗
      R cpu_id ∗
      pc_is handler)%I.
@@ -1786,7 +1790,7 @@ Section IntrDefs.
            (∃ v : mword 64, stval ↦ᵣ v) ∗
            (∃ a b : mword 1, sret_bits a b) ∗
            cpu_claim p ∗
-           cpu_hart 0 true p)
+           cpu_hart 0 true p ∅)
      else ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1))%I.
 
   (* THE ARM INDEX IS THE LIVE BIT, at either index and without a case split
@@ -1816,7 +1820,7 @@ Section IntrDefs.
       (∃ v : mword 64, stval ↦ᵣ v) ∗
       (∃ a b : mword 1, sret_bits a b) ∗
       cpu_claim p ∗
-      cpu_hart 0 true p)).
+      cpu_hart 0 true p ∅)).
   Proof.
     iSplit.
     - iIntros "H". iDestruct "H" as ([]) "H"; [ iRight | iLeft ]; iExact "H".
@@ -1835,14 +1839,14 @@ Section IntrDefs.
     ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
     trap_csrs ∗
     cpu_claim p ∗
-    cpu_hart 0 true p.
+    cpu_hart 0 true p ∅.
   Proof. iIntros "(Hbit & Hres & Hkpt & Hsep & Hsca & Hstv & Hspp & Hclm & Hcpu)". iFrame. Qed.
 
   Lemma sie_arm_on_in (p : mword 64) :
     ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) -∗
     trap_csrs -∗
     cpu_claim p -∗
-    cpu_hart 0 true p -∗
+    cpu_hart 0 true p ∅ -∗
     sie_arm true p.
   Proof. iIntros "Hbit (Hsep & Hsca & Hstv & Hspp & Hres & Hkpt) Hclm Hcpu". iFrame. Qed.
 

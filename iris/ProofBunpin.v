@@ -111,12 +111,12 @@ Section ProofBunpin.
   (* [b] (from [sie_cap_gpr]'s arm) and [n],[eb] (from [cpu_own]'s count) are
      two independent presentations of the same SIE state; see
      ProofFiledup.v's identical helper for the full comment. *)
-  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) :
-    sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b -∗
+  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) (lks : gset nat) :
+    sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
-    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as [-> ->]. done.
+    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as (-> & -> & _). done.
     - destruct n as [|n']; [ | done ].
       iDestruct "Hcnt" as "[[_ Hint] _]".
       iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm) & _)".
@@ -154,14 +154,15 @@ Section ProofBunpin.
 
   Lemma wp_bunpin_sconf (bn : bio_names) (V : bio_view Σ) (k : nat)
       (q : Qp) (dev bno : mword 32)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool)
-    : wp_bunpin_sconf_body bn V k q dev bno m n eb p C K b.
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset nat)
+    : wp_bunpin_sconf_body bn V k q dev bno m n eb p C K b lks.
   Proof.
     cbv beta delta [wp_bunpin_sconf_body].
-    intros pcE ret_tgt HK HnZ Hk Ha0.
+    intros pcE ret_tgt HK HnZ Hk Ha0 Hbelow.
+    pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hctx #Hpanic Href Hcont".
-    iDestruct (sie_b_agree m n K eb b p C with "Hcg Hcnt") as %Houtb.
+    iDestruct (sie_b_agree m n K eb b p C lks with "Hcg Hcnt") as %Houtb.
     iDestruct (bio_ctx_lock with "Hctx") as "#Hlock".
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -318,9 +319,10 @@ Section ProofBunpin.
     iDestruct (cpu_own_transport CID CID9 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf (bn_lk bn) "bcache"%string (bcache_res bn V) mA
-              n eb p C (K - 4)%nat b
-              HnZ ltac:(lia)
+              n eb p C (K - 4)%nat b lks
+              HnZ ltac:(lia) Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
     assert (Hpc18 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.bunpin + 0x18)).
@@ -551,11 +553,17 @@ Section ProofBunpin.
     iEval (rewrite Houtb) in "Hcg".
     iApply (Release.wp_release_sconf (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) D5
               n eb p C (K - 4)%nat
+              ({[lock_rank "bcache"]} ∪ lks)
               ltac:(rewrite HD5a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
+    (* bunpin is BALANCED: the set release hands back collapses to the entry
+       [lks] -- [Hfresh] is what makes the singleton insert/delete cancel. *)
+    assert (Hsetback : ({[lock_rank "bcache"]} ∪ lks) ∖ {[lock_rank "bcache"]} = lks)
+      by (apply locks_add_del_below; lkbelow).
+    iEval (rewrite Hsetback) in "Hcnt".
     iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
     rewrite <- Houtb in Hsr.
     pose proof Hrelpins as Hrelpins_cs.

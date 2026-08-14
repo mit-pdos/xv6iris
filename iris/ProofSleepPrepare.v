@@ -76,10 +76,11 @@ Section ProofSleepPrepare.
 
   Lemma wp_sleep_prepare_sconf (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (C : iProp Σ) (b : bool)
-    : wp_sleep_prepare_sconf_body γs j γl m av n eb C b.
+      (lks : gset nat)
+    : wp_sleep_prepare_sconf_body γs j γl m av n eb C b lks.
   Proof.
     cbv beta delta [wp_sleep_prepare_sconf_body].
-    intros pcE pj chan ret_tgt Hj Hgl Hchan Hn Hav.
+    intros pcE pj chan ret_tgt Hj Hgl Hchan Hn Hav Hno.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs Hpanic Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq.
@@ -201,7 +202,7 @@ Section ProofSleepPrepare.
     iDestruct (cpu_own_transport CID CID8 n eb pj C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Myproc.wp_myproc_sconf A3 (av - 4)%nat n eb pj C b
-              ltac:(lia) ltac:(lia)
+              _ ltac:(lia) ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
     iIntros (CID9 Hs9 ms mp) "%Hmsf Hcg Hcpu Hpc %Hmp".
     destruct Hmp as [Hcs_mp Ha0_mp].
@@ -250,9 +251,10 @@ Section ProofSleepPrepare.
     iDestruct (cpu_own_transport CID9 CID11 n eb pj C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Acquire.wp_acquire_sconf γl "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) B2 n eb pj C (av - 4)%nat b
-              Hn ltac:(lia)
+              (proc_lock_res γs γl (proc_addr j)) B2 n eb pj C (av - 4)%nat b lks
+              Hn ltac:(lia) Hno
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HB2a0). iExact "Hislock". }
     iIntros (CIDacq Hsacq ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay".
     assert (Hp18 : ret_pc (B2 !!! Regidx spr_ra) = mword_of_int (KernelSyms.sleep_prepare + 0x18))
@@ -335,9 +337,17 @@ Section ProofSleepPrepare.
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
               (proc_lock_res γs γl (proc_addr j)) C2 n eb pj C (av - 4)%nat
+              ({[lock_rank "proc"]} ∪ lks)
               Hlka ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay").
     iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hcs_rel Hcpu".
+    (* acquire handed back [{[rank "proc"]} ∪ lks]; release hands back that
+       set minus the same singleton.  [Hno], via [locks_below_not_elem],
+       says "proc" was fresh in [lks], so the round trip is a no-op. *)
+    pose proof (locks_below_not_elem lks (lock_rank "proc") Hno) as Hnotin.
+    assert (Heqlks : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks)
+      by (apply locks_add_del_below; lkbelow).
+    iEval (rewrite Heqlks) in "Hcpu".
     rewrite Hbeq in Hsrel.
     iEval (rewrite Hbeq) in "Hcg". iEval (rewrite Hbeq) in "Hcpu".
     assert (Hp24 : ret_pc (C2 !!! Regidx spr_ra) = mword_of_int (KernelSyms.sleep_prepare + 0x24))

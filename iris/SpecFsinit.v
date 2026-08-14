@@ -249,7 +249,7 @@ Definition wp_fsinit_sconf_body
     (v_start v_dev v_nc v_n : mword 32)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fsinit in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -310,8 +310,12 @@ Definition wp_fsinit_sconf_body
   (* PARKING PREMISE -- bread sleeps, and so does everything under
      initlog and ireclaim *)
   eb = true ->
+  (* fsinit's cone: its own bread/brelse ("bcache", 4), initlog
+     ("bcache", 4) and ireclaim ("itable", 2) -- "itable" is the lowest,
+     so one premise there covers the whole cone via [locks_below_mono]. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
   printk_env γpr γu γd -∗
@@ -380,7 +384,7 @@ Definition wp_fsinit_sconf_body
   ∀ (mf : regfile) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       (* ================================================================ *)
@@ -440,12 +444,12 @@ Module Type FSINIT.
       (v_start v_dev v_nc v_n : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl γpr
                            cov logstart bmapstart inodestart ninodes nib size
                            used dev
                            v_magic v_size v_nblocks v_ninodes v_nlog
                            v_logstart v_inodestart v_bmapstart bs_sb sb_old
                            bs_hdr L D vlock vname vcpu v_start v_dev v_nc v_n
-                           pidv dq m K eb C b.
+                           pidv dq m K eb C b lks.
 End FSINIT.

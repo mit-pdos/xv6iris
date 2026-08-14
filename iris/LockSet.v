@@ -1,52 +1,56 @@
-(* LockSet.v -- THE PER-CPU HELD-LOCK SET.
+(* LockSet.v -- THE PER-CPU HELD-LOCK SET, ORDERED.
 
-   Every hart owns a ghost set of the spinlocks it currently holds, named by
-   their [struct spinlock]'s ADDRESS.  The authority rides in
-   [IntrDefs.cpu_hart] -- with the running kernel thread while interrupts are
-   off, inside [sie_arm true] while they are on -- and a lock whose [lk->cpu]
-   field is SET keeps the matching fragment [lk_in i lk] inside its own
-   invariant ([WpLock.lock_inv]).  So
+   Every hart owns a ghost set of the RANKS ([LockRank.lock_rank], keyed on the
+   string [initlock] was given) of the spinlocks it currently holds.  The
+   authority rides in [IntrDefs.cpu_hart] -- with the running kernel thread
+   while interrupts are off, inside [sie_arm true] while they are on -- and a
+   lock whose [lk->cpu] field is SET keeps the matching fragment
+   [lk_in i (lock_rank s)] inside its own invariant ([WpLock.lock_inv]).  So
 
-       "lk->cpu = &cpus[i]"   and   "lk is in hart i's held set"
+       "lk->cpu = &cpus[i]"   and   "rank(lk) is in hart i's held set"
 
    are ONE fact, not two: the fragment cannot be forged and cannot be
    duplicated, and agreement against the authority reads the membership off it
    ([cpu_locks_in]).
 
    ---------------------------------------------------------------------
-   WHY THE SET ALSO OWNS HALF OF [lk->cpu], AND WHY THAT IS THE WHOLE POINT
+   WHY RANKS, AND WHAT THAT DELETED
 
    [gset_disj] gives exclusivity and unforgeability, but minting a fragment
-   needs [lk ∉ S] -- and acquire has no such precondition (nor should it yet:
-   the deadlock discipline is a later phase).  What discharges it is the CPU
-   FIELD ITSELF.  The set does not merely name the locks this hart holds; for
-   each of them it OWNS HALF of that lock's [lk->cpu] cell, pinned at
-   [cpus_ptr i] ([lk_stake]).  The lock's invariant holds the other half.
-   Hence:
+   needs [r ∉ S].  That is supplied by acquire's ORDER PREMISE
+   ([LockRank.locks_below S r], via [locks_below_not_elem]) -- "everything you
+   hold ranks strictly below the lock you are taking", which is the deadlock
+   discipline itself and is trivial at [S = ∅].
 
-     - at acquire's [lk->cpu = mycpu()] the invariant still holds the cell
-       WHOLE, at 0 (the lock is in the one-store window).  If [lk] were
-       already in the set, the hart would be holding a half of that same cell
-       at [cpus_ptr i] -- and [cpus_ptr i ≠ 0].  So [lk ∉ S] is DERIVED, from
-       the very field the abstraction is about ([cpu_locks_fresh]).
-     - at release's [lk->cpu = 0] the invariant holds only HALF, so the store
-       is impossible until the hart gives its stake back -- which the
-       fragment, via [cpu_locks_delete], is exactly the licence to do.
+   This is the whole reason the set is cheap.  The predecessor keyed on lock
+   ADDRESSES and had no order premise, so it had to DERIVE [lk ∉ S] from the
+   machine: the hart co-owned HALF of every held lock's [lk->cpu] cell, pinned
+   at [cpus_ptr i], and freshness fell out of the cell disagreeing at 0.  With
+   the premise supplying freshness directly, that half-cell apparatus
+   ([lk_stake], [lk_cpu_half], the 1/2 fractions and the two exchange wands in
+   the cpu-word store leaves) is gone: the lock invariant owns its [lk->cpu]
+   cell WHOLE in every state, and the set is pure ghost -- [cpu_locks_at] is
+   the authority and nothing else, with no big-op over held locks.
 
-   This is the resource reading of the C code's own argument: a hart that
-   already holds [lk] does not reach the store, because [acquire] runs
-   [if(holding(lk)) panic()] first and panic never returns.  Here the
-   panic-free path is not asserted, it is what the field ownership already
-   says.
+   Two consequences worth knowing:
+
+   - the fragment's exclusivity now says NO TWO LOCKS OF THE SAME FAMILY may
+     be held at once, which is a restriction xv6 satisfies (LockRank.v's
+     header) and which acquire's premise already implies;
+   - [set_solver] WORKS here.  Over [gset (mword n)] it crashes with "No
+     matching clauses for match" -- Sail's [Decidable_eq_mword] against
+     stdpp's [bv_eq_dec] -- which is why the durable notes carry a
+     discharge-by-named-lemma rule for this file.  With [nat] elements that
+     rule no longer applies and the named-lemma spellings below are ordinary
+     stdpp.
 
    ---------------------------------------------------------------------
-   WHAT IS NOT HERE YET.  The set is HIDDEN: it rides inside [cpu_hart] under
-   an existential, so no acquire/release/push_off/pop_off contract mentions
-   it.  Exposing it as an index of [CpuOwn.cpu_own] -- which is what lets
-   acquire demand [lk ∉ S], and later a lock ORDER -- is the next phase, and
-   it is what makes "interrupts enabled implies the held set is empty"
-   statable ([sie_arm true] carries [cpu_hart 0 true p], so the constraint
-   lands there for free once [S] is an index). *)
+   THE TIE IS STILL A FACT ABOUT THE MACHINE, and it is what makes acquire's
+   [if(holding(lk)) panic] arm DEAD rather than merely discharged: a hart
+   whose set omits [rank lk] cannot have [lk->cpu = cpus_ptr i], because the
+   only state in which the cell reads [cpus_ptr i] is the one whose invariant
+   holds [lk_in i (rank lk)] -- and that agrees against the authority.  See
+   [WpLock.lock_inv] for where the fragment sits. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap sets bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -55,6 +59,7 @@ From iris.base_logic.lib Require Import own.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
+Require Export LockRank.
 Require Import ProcGeom.   (* cpus_ptr and its injectivity/nonzero facts *)
 Local Open Scope Z_scope.
 
@@ -70,34 +75,32 @@ Section LockSet.
 
   (* ---- the ghost pieces --------------------------------------------- *)
 
-  (* the authority: hart [i]'s held set.  Canonically named, so no contract
-     carries a [γ] (RiscvPtsto.era_lockset_name). *)
-  Definition lk_auth (i : CPU) (S : gset (mword 64)) : iProp Σ :=
+  (* the authority: hart [i]'s held set, as RANKS.  Canonically named, so no
+     contract carries a [γ] (RiscvPtsto.era_lockset_name). *)
+  Definition lk_auth (i : CPU) (S : gset nat) : iProp Σ :=
     own (lockset_name i) (● (GSet S) : lockSetR).
 
   (* THE MEMBERSHIP FACT a lock with [lk->cpu] set keeps in its invariant. *)
-  Definition lk_in (i : CPU) (lk : mword 64) : iProp Σ :=
-    own (lockset_name i) (◯ (GSet {[lk]}) : lockSetR).
+  Definition lk_in (i : CPU) (r : nat) : iProp Σ :=
+    own (lockset_name i) (◯ (GSet {[r]}) : lockSetR).
 
-  (* the hart's STAKE in a held lock's cpu field: half the cell, pinned at
-     its own [struct cpu].  The lock's invariant holds the other half. *)
-  Definition lk_stake (i : CPU) (lk : mword 64) : iProp Σ :=
-    (lock_cpu lk ↦₈{DfracOwn (1/2)} cpus_ptr i)%I.
-
-  (* THE SET, as hart [i] owns it. *)
-  Definition cpu_locks_at (i : CPU) (S : gset (mword 64)) : iProp Σ :=
-    (lk_auth i S ∗ [∗ set] lk ∈ S, lk_stake i lk)%I.
+  (* THE SET, as hart [i] owns it.  Pure ghost: the half-cell stakes the
+     address-keyed predecessor carried alongside are gone (see the header). *)
+  Definition cpu_locks_at (i : CPU) (S : gset nat) : iProp Σ :=
+    lk_auth i S.
 
   Global Instance lk_auth_timeless i S : Timeless (lk_auth i S).
   Proof. apply _. Qed.
-  Global Instance lk_in_timeless i lk : Timeless (lk_in i lk).
+  Global Instance lk_in_timeless i r : Timeless (lk_in i r).
+  Proof. apply _. Qed.
+  Global Instance cpu_locks_at_timeless i S : Timeless (cpu_locks_at i S).
   Proof. apply _. Qed.
 
   (* ---- the laws ------------------------------------------------------ *)
 
-  (* THE TIE: the fragment a held lock keeps pins its address into the set. *)
-  Lemma lk_in_agree (i : CPU) (S : gset (mword 64)) (lk : mword 64) :
-    lk_auth i S -∗ lk_in i lk -∗ ⌜lk ∈ S⌝.
+  (* THE TIE: the fragment a held lock keeps pins its rank into the set. *)
+  Lemma lk_in_agree (i : CPU) (S : gset nat) (r : nat) :
+    lk_auth i S -∗ lk_in i r -∗ ⌜r ∈ S⌝.
   Proof.
     iIntros "Ha Hf".
     iDestruct (own_valid_2 with "Ha Hf") as %Hv.
@@ -107,101 +110,127 @@ Section LockSet.
     apply singleton_subseteq_l in Hincl. exact Hincl.
   Qed.
 
-  Lemma cpu_locks_in (i : CPU) (S : gset (mword 64)) (lk : mword 64) :
-    cpu_locks_at i S -∗ lk_in i lk -∗ ⌜lk ∈ S⌝.
-  Proof. iIntros "[Ha _] Hf". iApply (lk_in_agree with "Ha Hf"). Qed.
+  Lemma cpu_locks_in (i : CPU) (S : gset nat) (r : nat) :
+    cpu_locks_at i S -∗ lk_in i r -∗ ⌜r ∈ S⌝.
+  Proof. iIntros "Ha Hf". iApply (lk_in_agree with "Ha Hf"). Qed.
 
-  (* the fragment is EXCLUSIVE -- two harts, or one hart twice, cannot both
-     claim the same lock.  This is what makes the tie a fact about the
-     machine rather than a decoration. *)
-  Lemma lk_in_excl (i : CPU) (lk : mword 64) :
-    lk_in i lk -∗ lk_in i lk -∗ False.
+  (* THE FORM ACQUIRE USES, contrapositively: a rank this hart does not hold
+     cannot belong to a lock whose invariant is in the [Some (i, true)] state,
+     because that state keeps [lk_in i r].  This is what makes the
+     [if(holding(lk)) panic] arm dead.
+
+     Stated at NON-MEMBERSHIP, which is all the refutation needs.  The lock
+     ORDER gives it via [locks_below_not_elem] ([cpu_locks_not_in_below]
+     below) once deadlock-freedom lands. *)
+  Lemma cpu_locks_not_in (i : CPU) (S : gset nat) (r : nat) :
+    r ∉ S ->
+    cpu_locks_at i S -∗ lk_in i r -∗ False.
+  Proof.
+    iIntros (Hnin) "Ha Hf".
+    iDestruct (cpu_locks_in with "Ha Hf") as %Hin.
+    iPureIntro. exact (Hnin Hin).
+  Qed.
+
+  Lemma cpu_locks_not_in_below (i : CPU) (S : gset nat) (r : nat) :
+    locks_below S r ->
+    cpu_locks_at i S -∗ lk_in i r -∗ False.
+  Proof. intros Hb. apply cpu_locks_not_in, locks_below_not_elem, Hb. Qed.
+
+  (* the fragment is EXCLUSIVE -- one hart cannot hold two locks of the same
+     rank, i.e. two of the same FAMILY.  xv6 never does (LockRank.v), and
+     acquire's order premise forbids it independently. *)
+  Lemma lk_in_excl (i : CPU) (r : nat) :
+    lk_in i r -∗ lk_in i r -∗ False.
   Proof.
     iIntros "H1 H2".
     iDestruct (own_valid_2 with "H1 H2") as %Hv.
     rewrite -auth_frag_op auth_frag_valid gset_disj_valid_op in Hv.
-    (* [set_solver] is NOT usable over [gset (mword _)] -- see the note at the
-       head of [cpu_locks_insert]. *)
-    iPureIntro. apply disjoint_singleton_l in Hv.
-    apply Hv, elem_of_singleton. reflexivity.
+    iPureIntro. set_solver.
   Qed.
 
-  (* THE DERIVATION acquire runs on: a cpu field that does not read
-     [cpus_ptr i] cannot belong to a lock in hart [i]'s set, because the set
-     would be holding a half of that very cell at [cpus_ptr i]. *)
-  Lemma cpu_locks_stake_ne (i : CPU) (S : gset (mword 64)) (lk : mword 64)
-      (dq : dfrac) (v : mword 64) :
-    v <> cpus_ptr i ->
-    cpu_locks_at i S -∗ lock_cpu lk ↦₈{dq} v -∗ ⌜lk ∉ S⌝.
+  (* acquire's ghost step.  The side condition is the order premise, not a
+     fact read off the machine -- which is the whole simplification. *)
+  Lemma cpu_locks_insert (i : CPU) (S : gset nat) (r : nat) :
+    r ∉ S ->
+    cpu_locks_at i S ==∗ cpu_locks_at i ({[r]} ∪ S) ∗ lk_in i r.
   Proof.
-    iIntros (Hne) "[_ Hst] Hcell".
-    destruct (decide (lk ∈ S)) as [Hin | Hnin]; [| by iPureIntro ].
-    iDestruct (big_sepS_elem_of _ _ lk Hin with "Hst") as "Hs".
-    iDestruct (word_pointsto_agree with "Hcell Hs") as %Heq.
-    exfalso. exact (Hne Heq).
-  Qed.
-
-  (* the instance acquire uses: the lock is in its one-store window, so the
-     invariant still reads the field as 0 and holds it WHOLE. *)
-  Lemma cpu_locks_fresh (i : CPU) (S : gset (mword 64)) (lk : mword 64)
-      (dq : dfrac) :
-    cpu_locks_at i S -∗ lock_cpu lk ↦₈{dq} (zero_reg : mword 64) -∗ ⌜lk ∉ S⌝.
-  Proof.
-    iIntros "Hcl Hcell".
-    iApply (cpu_locks_stake_ne i S lk dq (zero_reg : mword 64) with "Hcl Hcell").
-    apply eq_vec_false_iff. exact (cpus_ptr_nonzero i).
-  Qed.
-
-  (* acquire's ghost step, taken with the stake carved out of the cell the
-     store has just written.
-
-     TACTIC NOTE, and it bites anywhere a set over machine words appears:
-     **[set_solver] does not work over [gset (mword n)]**.  It fails with
-     "No matching clauses for match" -- not with an unsolved goal -- because
-     its decision step runs on Sail's [Decidable_eq_mword] rather than
-     stdpp's [bv_eq_dec] (the same instance divergence [riscvF_kmapGS] pins
-     against in RiscvPtsto.v).  [set_unfold] alone is fine, and the same
-     goals over [gset (bv n)] are fine.  Discharge membership/disjointness
-     side conditions with the named lemmas instead
-     ([disjoint_singleton_l], [singleton_subseteq_l], [elem_of_singleton]). *)
-  Lemma cpu_locks_insert (i : CPU) (S : gset (mword 64)) (lk : mword 64) :
-    lk ∉ S ->
-    cpu_locks_at i S -∗ lk_stake i lk ==∗
-    cpu_locks_at i ({[lk]} ∪ S) ∗ lk_in i lk.
-  Proof.
-    iIntros (Hnin) "[Ha Hst] Hs".
-    assert (Hdisj : {[lk]} ## S) by (apply disjoint_singleton_l; exact Hnin).
-    iMod (own_update _ _ ((● (GSet ({[lk]} ∪ S)) ⋅ ◯ (GSet {[lk]})) : lockSetR)
+    iIntros (Hnin) "Ha".
+    assert (Hdisj : {[r]} ## S) by set_solver.
+    iMod (own_update _ _ ((● (GSet ({[r]} ∪ S)) ⋅ ◯ (GSet {[r]})) : lockSetR)
             with "Ha") as "[Ha Hf]".
     { apply auth_update_alloc.
       apply gset_disj_alloc_empty_local_update. exact Hdisj. }
     iModIntro. iFrame "Hf Ha".
-    rewrite big_sepS_union; [| exact Hdisj ].
-    rewrite big_sepS_singleton. iFrame "Hs Hst".
   Qed.
 
-  (* release's ghost step: the fragment is the licence to take the stake
-     back, which is what makes the [lk->cpu = 0] store possible at all. *)
-  Lemma cpu_locks_delete (i : CPU) (S : gset (mword 64)) (lk : mword 64) :
-    cpu_locks_at i S -∗ lk_in i lk ==∗
-    ⌜lk ∈ S⌝ ∗ cpu_locks_at i (S ∖ {[lk]}) ∗ lk_stake i lk.
+  (* the spelling acquire actually meets: the premise it already carries. *)
+  Lemma cpu_locks_insert_below (i : CPU) (S : gset nat) (r : nat) :
+    locks_below S r ->
+    cpu_locks_at i S ==∗ cpu_locks_at i ({[r]} ∪ S) ∗ lk_in i r.
   Proof.
-    iIntros "Hcl Hf".
-    iDestruct (cpu_locks_in with "Hcl Hf") as %Hin.
-    iDestruct "Hcl" as "[Ha Hst]".
-    rewrite (big_sepS_delete _ S lk Hin).
-    iDestruct "Hst" as "[Hs Hst]".
-    iMod (own_update_2 _ _ _ ((● (GSet (S ∖ {[lk]}))) : lockSetR) with "Ha Hf")
+    intros Hb. apply cpu_locks_insert, locks_below_not_elem, Hb.
+  Qed.
+
+  (* release's ghost step: the fragment is the licence to retire the rank. *)
+  Lemma cpu_locks_delete (i : CPU) (S : gset nat) (r : nat) :
+    cpu_locks_at i S -∗ lk_in i r ==∗
+    ⌜r ∈ S⌝ ∗ cpu_locks_at i (S ∖ {[r]}).
+  Proof.
+    iIntros "Ha Hf".
+    iDestruct (cpu_locks_in with "Ha Hf") as %Hin.
+    iMod (own_update_2 _ _ _ ((● (GSet (S ∖ {[r]}))) : lockSetR) with "Ha Hf")
       as "Ha".
     { apply auth_update_dealloc. apply gset_disj_dealloc_local_update. }
-    iModIntro. iFrame "Hs Ha Hst". iPureIntro. exact Hin.
+    iModIntro. iFrame "Ha". iPureIntro. exact Hin.
   Qed.
 
-  (* boot: the authority arrives from adequacy at the empty set, with no
-     stakes outstanding. *)
+  (* boot: the authority arrives from adequacy at the empty set. *)
   Lemma cpu_locks_intro_empty (i : CPU) :
     lk_auth i ∅ -∗ cpu_locks_at i ∅.
-  Proof. iIntros "Ha". iFrame "Ha". by rewrite big_sepS_empty. Qed.
+  Proof. iIntros "Ha". iFrame "Ha". Qed.
+
+  (* ---- THE LEVEL/SET COUPLING -------------------------------------------
+
+     [size lks <= n]: the hart holds no more locks than it has outstanding
+     [push_off]s.  It is TRUE because every acquire pushes exactly once and
+     every release pops exactly once, while a BARE push_off/pop_off pair moves
+     [n] without touching the set.
+
+     WHAT IT BUYS, and it is the reason it exists: at [n = 0] it reads
+     [size lks <= 0], i.e. [lks = ∅].  That is exactly what pop_off's
+     re-enabling branch must produce -- [cpu_own]'s [b = true] arm demands an
+     empty held set -- so "you may only turn interrupts back on holding no
+     spinlock" becomes DERIVED from the counting discipline rather than
+     imposed as a separate conjunct.
+
+     WHY IT IS BUNDLED WITH THE AUTHORITY rather than added as a third
+     conjunct of [cpu_priv]: 24 sites across 8 files destructure the cpu
+     bundle positionally, and keeping [cpu_priv] at two conjuncts leaves every
+     one of those patterns matching unchanged.
+
+     IT IS NOT PRESERVED BY A BARE [pop_off] ON ITS OWN -- unwinding [S n] to
+     [n] with the set untouched needs [size lks <= n], which the invariant at
+     [S n] does not give.  pop_off therefore takes it as a PREMISE, and that
+     premise is the honest content of "you may only unwind a push once
+     whatever it was paired with is gone": release discharges it because it
+     has just deleted a rank ([size (lks ∖ {[r]}) = size lks - 1 <= n]), and a
+     bare pusher discharges it from its own pre-push fact, which is pure and
+     therefore still in context at the pop. *)
+  Definition cpu_locks_lvl_at (i : CPU) (n : nat) (lks : gset nat) : iProp Σ :=
+    (cpu_locks_at i lks ∗ ⌜(size lks <= n)%nat⌝)%I.
+
+  Lemma cpu_locks_lvl_at_elim (i : CPU) (n : nat) (lks : gset nat) :
+    cpu_locks_lvl_at i n lks -∗ cpu_locks_at i lks ∗ ⌜(size lks <= n)%nat⌝.
+  Proof. iIntros "[$ $]". Qed.
+
+  Lemma cpu_locks_lvl_at_intro (i : CPU) (n : nat) (lks : gset nat) :
+    (size lks <= n)%nat -> cpu_locks_at i lks -∗ cpu_locks_lvl_at i n lks.
+  Proof. iIntros (Hsz) "H". iFrame "H". iPureIntro. exact Hsz. Qed.
+
+  (* the level only ever needs WEAKENING upward (a push_off) *)
+  Lemma cpu_locks_lvl_at_weaken (i : CPU) (n n' : nat) (lks : gset nat) :
+    (n <= n')%nat -> cpu_locks_lvl_at i n lks -∗ cpu_locks_lvl_at i n' lks.
+  Proof. iIntros (Hle) "[H %Hsz]". iFrame "H". iPureIntro. lia. Qed.
 
 End LockSet.
 
@@ -211,10 +240,46 @@ Section LockSetAmbient.
 
   (* the ambient hart's held set -- the spelling every contract in the sconf
      tier uses, [cpu_hart] included. *)
-  Definition cpu_locks (S : gset (mword 64)) : iProp Σ := cpu_locks_at cpu_id S.
+  Definition cpu_locks (S : gset nat) : iProp Σ := cpu_locks_at cpu_id S.
 
-  Lemma cpu_locks_unfold (S : gset (mword 64)) :
+  Lemma cpu_locks_unfold (S : gset nat) :
     cpu_locks S ⊣⊢ cpu_locks_at cpu_id S.
   Proof. reflexivity. Qed.
+
+  (* the ambient-hart spelling of the level/set coupling *)
+  Definition cpu_locks_lvl (n : nat) (S : gset nat) : iProp Σ :=
+    cpu_locks_lvl_at cpu_id n S.
+
+  Lemma cpu_locks_lvl_elim (n : nat) (S : gset nat) :
+    cpu_locks_lvl n S -∗ cpu_locks S ∗ ⌜(size S <= n)%nat⌝.
+  Proof. iApply cpu_locks_lvl_at_elim. Qed.
+
+  Lemma cpu_locks_lvl_intro (n : nat) (S : gset nat) :
+    (size S <= n)%nat -> cpu_locks S -∗ cpu_locks_lvl n S.
+  Proof. iIntros (H). iApply cpu_locks_lvl_at_intro. exact H. Qed.
+
+  (* push_off raises the level; the coupling only ever needs WEAKENING *)
+  Lemma cpu_locks_lvl_weaken (n n' : nat) (S : gset nat) :
+    (n <= n')%nat -> cpu_locks_lvl n S -∗ cpu_locks_lvl n' S.
+  Proof. iIntros (Hle). iApply cpu_locks_lvl_at_weaken. exact Hle. Qed.
+
+  (* RE-LEVEL the coupling: the only thing that ever changes is the level, and
+     the new bound is supplied by whoever is moving it (push_off weakens for
+     free, pop_off's caller states it).  Subsumes [cpu_locks_lvl_weaken]. *)
+  Lemma cpu_locks_lvl_relevel (n n' : nat) (S : gset nat) :
+    (size S <= n')%nat -> cpu_locks_lvl n S -∗ cpu_locks_lvl n' S.
+  Proof.
+    iIntros (H) "H". iDestruct (cpu_locks_lvl_elim with "H") as "[H _]".
+    iApply (cpu_locks_lvl_intro n' S H with "H").
+  Qed.
+
+  (* [n = 0] forces the set EMPTY -- the fact pop_off's re-enable branch and
+     [cpu_own]'s [b = true] arm both want. *)
+  Lemma cpu_locks_lvl_zero (S : gset nat) :
+    cpu_locks_lvl 0 S -∗ cpu_locks S ∗ ⌜S = ∅⌝.
+  Proof.
+    iIntros "H". iDestruct (cpu_locks_lvl_elim with "H") as "[$ %Hsz]".
+    iPureIntro. apply leibniz_equiv, size_empty_inv. lia.
+  Qed.
 
 End LockSetAmbient.

@@ -64,6 +64,14 @@ Require Import VirtioDiskRwDefs.
 Require Import ProofVirtioDiskRwD.
 Require Import ProofVirtioDiskRwE.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+(* The [set_solver] override.  EXPORT, not Import: this import is         *)
+(* deliberately "dead" -- the file compiles without it, just far slower --  *)
+(* and the nightly dead-import sweep skips [Require Export] lines.         *)
+(* It has to be HERE rather than inherited: [Require Export] only          *)
+(* propagates through an unbroken chain of Exports, and this tree's        *)
+(* intermediate files use [Require Import], so nothing downstream inherits *)
+(* it.  See FastSetSolver.v.                                              *)
+Require Export FastSetSolver.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -519,13 +527,17 @@ Section VdrwfP6.
       (va : SailStdpp.Values.mword 64) (vl : SailStdpp.Values.mword 32)
       (vf vn : SailStdpp.Values.mword 16)
       (M : regfile) (av : nat) (eb : bool) (pme : SailStdpp.Values.mword 64)
-      (C : iProp Σ) :
+      (C : iProp Σ) (lks : gset nat) :
     (K_free_desc <= av)%nat -> (i < 8)%nat -> fr i = false ->
     length γs = NPROC ->
     M !!! Regidx Rs2 = (mword_of_int (Z.of_nat i) : SailStdpp.Values.mword 64) ->
     M !!! Regidx Rs3 = (disk_base : SailStdpp.Values.mword 64) ->
+    (* the vdisk lock is held here (level 1) and [lks] already contains its
+       rank -- P1-P4's convention, see the note in lock-set.md; free_desc
+       reaches wakeup at "proc". *)
+    locks_below lks (lock_rank "proc") ->
     sie_cap_gpr M av false pme -∗
-    cpu_own 1 eb pme C false -∗
+    cpu_own 1 eb pme C false lks -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x1f4) : mword 64) -∗
     panic_wp_any -∗ procs_inv γs -∗
     d_desc_ptr ↦₈□ pd -∗
@@ -538,13 +550,13 @@ Section VdrwfP6.
          /\ Mf !!! Regidx Rs1 = (zero_extend' 64 vf : SailStdpp.Values.mword 64)
          /\ Mf !!! Regidx Rs2 = (zero_extend' 64 vn : SailStdpp.Values.mword 64)⌝ -∗
         sie_cap_gpr Mf av false pme -∗
-        cpu_own 1 eb pme C false -∗
+        cpu_own 1 eb pme C false lks -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x20c) : mword 64) -∗
         free_bundles pd (fr_upd fr i true) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hav Hi8 Hfri Hlen Hs2 Hs3.
+    intros Hav Hi8 Hfri Hlen Hs2 Hs3 Hbelow.
     iIntros "Hcg Hown #Htext Hpc #Hpanic #Hpinv #Hdp Hd0 Hd8 Hd12 Hd14 Hbun Hrest Hcont".
     iPoseProof (rwi_1f4 with "Htext") as "Hi1d2".
     iPoseProof (rwi_1f8 with "Htext") as "Hi1d6".
@@ -687,9 +699,10 @@ Section VdrwfP6.
     iEval (rewrite (free_bundles_split pd fr i Hi8)) in "Hbun".
     iDestruct "Hbun" as "[[Hcell _] Hbrest]".
     iEval (rewrite Hfri) in "Hcell".
-    iApply (FreeDesc.wp_free_desc_sconf γs pd i N7 av 1%nat eb pme C va vl vf vn false
+    iApply (FreeDesc.wp_free_desc_sconf γs pd i N7 av 1%nat eb pme C va vl vf vn false lks
               Hav Hi8 HN7a0 ltac:(intro r; apply rf_to_gmap_dom) Hlen vdrwb_lvl1
               with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Hcell Hd0 Hd8 Hd12 Hd14").
+    all: try lkbelow.
     iApply wp_next_off_intro. iIntros (Mf) "%Hf Hcg Hown _ Hpc Hcell Hd0 Hd8 Hd12 Hd14".
     destruct Hf as (Hcs & _).
     assert (Hret : ret_pc (N7 !!! Regidx Rra) = mword_of_int (KernelSyms.virtio_disk_rw + 0x20c))
@@ -738,12 +751,17 @@ Section VdrwfP6.
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (m : regfile) (wr sector : SailStdpp.Values.mword 64)
       (bno : SailStdpp.Values.mword 32) (bs_buf bs_disk : list (bv 8))
-      (Q : iProp Σ) (kq : nat * positive) :
+      (Q : iProp Σ) (kq : nat * positive) (lks : gset nat) :
     (K_virtio_disk_rw <= K)%nat -> length γs = NPROC ->
     length bs_buf = 1024%nat -> length bs_disk = 1024%nat ->
     (bv_unsigned sector * 512)%Z = (1024 * uint bno)%Z ->
     (forall k, (k < 1024)%nat -> addr_is_kdata (pa_add (b_data b) k)) ->
     m !!! Regidx csp_rs1 = (sp0 : SailStdpp.Values.mword 64) ->
+    (* P6 RELEASES disk.vdisk_lock, so its entry set must sit below that
+       rank for the cancellation to close -- which is stronger than the
+       "proc" its free_desc/wakeup cone needs, and delivers it by
+       [locks_below_mono]. *)
+    locks_below lks (lock_rank "virtio_disk") ->
     kernel_text -∗ panic_wp_any -∗ procs_inv γs -∗
     (* THE CRASH-PERMIT CHANNEL (PermInv.v): the invariant to collect the
        receipt from, and the persistent handle that says WHICH receipt is
@@ -764,7 +782,7 @@ Section VdrwfP6.
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K eb (proc_addr j) -∗
-        cpu_own 0 eb (proc_addr j) C eb -∗
+        cpu_own 0 eb (proc_addr j) C eb lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra)) -∗
@@ -776,9 +794,9 @@ Section VdrwfP6.
         ▷ Q -∗
         WP (Loop : expr riscv_lang)) -∗
     P5.vdrw_p5_exit CID γk γs j γd pd pav pu K eb C sp0 b wr sector bs_buf
-                    bs_disk m kq.
+                    bs_disk m kq lks.
   Proof.
-    intros HK Hglen Hlenbuf Hlendisk Hsec Hbufkd Hsp0m.
+    intros HK Hglen Hlenbuf Hlendisk Hsec Hbufkd Hsp0m Hbelow.
     iIntros "#Htext #Hpanic #Hpinv #Hqinv #Hrcpt #Hgeom #Hlk Hsaved Hbno Hcont".
     rewrite /P5.vdrw_p5_exit.
     iIntros (CIDx Hsx M q np nr fl pk tr fr h m2 t pin)
@@ -1177,8 +1195,8 @@ Section VdrwfP6.
                      = mword_of_int (KernelSyms.virtio_disk_rw + 0x20e)) by pcstep.
     iApply (wp_vdrwf_iter (CID := CIDx)  γs pd h fr (d_ops h : SailStdpp.Values.mword 64)
               (Z_to_bv 32 16) (Z_to_bv 16 1) (Z_to_bv 16 (Z.of_nat m2))
-              E8 (trap_res eb + (K - 12))%nat eb (proc_addr j) C
-              ltac:(pose proof (vdrwb_K20 K HK); lia) Hh8 Hfrh Hglen HE8s2 HE8s3
+              E8 (trap_res eb + (K - 12))%nat eb (proc_addr j) C ({[lock_rank "virtio_disk"]} ∪ lks)
+              ltac:(pose proof (vdrwb_K20 K HK); lia) Hh8 Hfrh Hglen HE8s2 HE8s3 ltac:(lkbelow)
               with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Wd0 Wl0 Wf0 Wn0 Hfb Hrh").
     iIntros (F1) "%HF1 Hcg Hown Hpc Hfb".
     destruct HF1 as (HF1thr & HF1s1 & HF1s2).
@@ -1222,8 +1240,8 @@ Section VdrwfP6.
     iApply (wp_vdrwf_iter (CID := CIDx)  γs pd m2 (fr_upd fr h true)
               (b_data b : SailStdpp.Values.mword 64)
               (Z_to_bv 32 1024) (vdrw_flags wr) (Z_to_bv 16 (Z.of_nat t))
-              G1 (trap_res eb + (K - 12))%nat eb (proc_addr j) C
-              ltac:(pose proof (vdrwb_K20 K HK); lia) Hm8 Hfr1m Hglen HG1s2 HG1s3
+              G1 (trap_res eb + (K - 12))%nat eb (proc_addr j) C ({[lock_rank "virtio_disk"]} ∪ lks)
+              ltac:(pose proof (vdrwb_K20 K HK); lia) Hm8 Hfr1m Hglen HG1s2 HG1s3 ltac:(lkbelow)
               with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Wd1 Wl1 Wf1 Wn1 Hfb Hrm").
     iIntros (F2) "%HF2 Hcg Hown Hpc Hfb".
     destruct HF2 as (HF2thr & HF2s1 & HF2s2).
@@ -1268,8 +1286,8 @@ Section VdrwfP6.
     iApply (wp_vdrwf_iter (CID := CIDx)  γs pd t (fr_upd (fr_upd fr h true) m2 true)
               (d_info_status h : SailStdpp.Values.mword 64)
               (Z_to_bv 32 1) (Z_to_bv 16 2) (Z_to_bv 16 0)
-              G2 (trap_res eb + (K - 12))%nat eb (proc_addr j) C
-              ltac:(pose proof (vdrwb_K20 K HK); lia) Ht8 Hfr2t Hglen HG2s2 HG2s3
+              G2 (trap_res eb + (K - 12))%nat eb (proc_addr j) C ({[lock_rank "virtio_disk"]} ∪ lks)
+              ltac:(pose proof (vdrwb_K20 K HK); lia) Ht8 Hfr2t Hglen HG2s2 HG2s3 ltac:(lkbelow)
               with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Wd2 Wl2 Wf2 Wn2 Hfb Hrt").
     iIntros (F3) "%HF3 Hcg Hown Hpc Hfb".
     destruct HF3 as (HF3thr & HF3s1 & HF3s2).
@@ -1403,9 +1421,13 @@ Section VdrwfP6.
       rewrite /H1 upd_ne; [| reg_neq]. exact HG3sp. }
     iApply (Release.wp_release_sconf (CID := CIDx) γk d_lock "virtio_disk"%string
               (disk_res γd pd pav pu) H3 0%nat eb (proc_addr j) C (K - 12)%nat
+              ({[lock_rank "virtio_disk"]} ∪ lks)
               HH3a0 ltac:(pose proof (vdrw_K10 K HK); lia)
               with "Hcg Htext Hpc Hlk Htok HR Hown Hpay").
     iIntros (CIDr Hsr MR) "Hcg Hpc %HcsR Hown".
+    (* the release gave the virtio rank back; hand the caller the bare set
+       P1-P4 name (see the two-conventions note in lock-set.md). *)
+    iEval (rewrite (locks_add_del_below (lock_rank "virtio_disk") lks Hbelow)) in "Hown".
     assert (Hp1fa : ret_pc (H3 !!! Regidx Rra) = mword_of_int (KernelSyms.virtio_disk_rw + 0x21c))
       by (rewrite HH3ra; pcstep).
     iEval (rewrite Hp1fa) in "Hpc".
@@ -1819,12 +1841,12 @@ Section ProofVirtioDiskRwF.
       (pd pav pu : SailStdpp.Values.mword 64)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (bno dsk0 : SailStdpp.Values.mword 32) (bs_buf bs_disk : list (bv 8))
-      (b : bool) (Q : iProp Σ)
+      (b : bool) (Q : iProp Σ) (lks : gset nat)
     : wp_virtio_disk_rw_sconf_body γs j γl γu γd γk pd pav pu
-                                   m K eb C bno dsk0 bs_buf bs_disk b Q.
+                                   m K eb C bno dsk0 bs_buf bs_disk b Q lks.
   Proof.
     cbv beta zeta delta [wp_virtio_disk_rw_sconf_body].
-    intros HK Hbnolt Hbufkd Hj Hjl.
+    intros HK Hbnolt Hbufkd Hj Hjl Hbelow.
     iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hpanic #Hpinv
              #Hdinv #Hgeom #Hlk Hbuf Hdisk Hperm Hcont".
     (* LEVEL 0 TIES THE TWO INDICES: [cpu_own_eb_agree] gives [eb = b]
@@ -1874,7 +1896,7 @@ Section ProofVirtioDiskRwF.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0) in "Hpc".
     (* ---- P1: prologue + acquire ---- *)
-    iApply (P1.wp_vdrw_p1 γd γk pd pav pu m K eb (proc_addr j) C bno HK
+    iApply (P1.wp_vdrw_p1 γd γk pd pav pu m K eb (proc_addr j) C bno lks HK Hbelow
               with "Hcg Hown Hextc Hextm Htext Hpc Hpanic Hlk Hbno").
     iIntros (CIDa Hsa M) "%Hrh Hcg Hown Hpay Hextc Hextm Hpc Htok HR Hsaved Hscr Hbno".
     destruct Hrh as (Hregs & Hhi).
@@ -1887,29 +1909,51 @@ Section ProofVirtioDiskRwF.
     (* ---- P2: the descriptor allocator (with its sleep-retry loop) ---- *)
     iApply (P2.wp_vdrw_p2 (CID := CIDa) γk γs j γl γd pd pav pu M K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-              (vdrw_sector_raw bno) m HK Hj Hjl Hglen Hregs Hhi
+              (vdrw_sector_raw bno) m lks HK Hj Hjl Hglen Hregs Hhi
               with "Hcg Hown Htc Hclm Htext Hpc Hpanic Hpinv Hgeom Hlk
                     Htok HR Hscr").
+    all: try lkbelow.
     (* ---- P3: the chain formatting ---- *)
     iApply (P3.wp_vdrw_p3_seam (CID := CIDa) γk γs j γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-              (vdrw_sector_raw bno) dsk0 m with "Htext Hgeom Hbdisk").
-    (* ---- P4: the ring write and THE PUBLISH ---- *)
+              (vdrw_sector_raw bno) dsk0 m lks with "Htext Hgeom Hbdisk").
+    (* ---- P4: the ring write and THE PUBLISH ----
+
+       APPLIED AT THE UNION, and it is the only seam in this chain that is.
+       [ProofVirtioDiskRwDSeam] states BOTH its predicates ([vdrw_p4_exit],
+       [vdrw_p3_exit_x]) with a bare [lks] at the level-1 [cpu_own], where
+       [CSeam]'s [vdrw_p3_exit] and [E]'s [vdrw_p5_exit]/[vdrw_p5_loop] all
+       spell [{[lock_rank "virtio_disk"]} ∪ lks].  D is the outlier, so its
+       [lks] parameter means the FULL held set while everyone else's means the
+       OUTER one, and the translation between the two conventions is already
+       done by [wp_vdrw_p5_seam]'s conclusion.  Feeding D the union here is
+       what makes the two neighbours line up:
+
+         P3 seam consumes  vdrw_p3_exit    ... lks             = cpu_own ({[vd]} ∪ lks)
+         P4 seam produces  vdrw_p3_exit_x  ... ({[vd]} ∪ lks)  = cpu_own ({[vd]} ∪ lks)  ✓
+         P4 seam consumes  vdrw_p4_exit    ... ({[vd]} ∪ lks)  = cpu_own ({[vd]} ∪ lks)
+         P5 seam produces  vdrw_p4_exit    ... ({[vd]} ∪ lks)                            ✓
+
+       Do NOT "fix" this by passing the union to P3 as well: P3 seam produces
+       [P2.vdrw_p2_exit] at whatever index it is given, and P2's own wp leaves
+       that goal at the bare [lks].  Moving both moves the mismatch rather
+       than closing it. *)
     iApply (P4.wp_vdrw_p4_seam (CID := CIDa) γk γs j γu γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-              bno bs_buf bs_disk m kq Hbnolt Hlenbuf Hbufkd
+              bno bs_buf bs_disk m kq ({[lock_rank "virtio_disk"]} ∪ lks)
+              Hbnolt Hlenbuf Hbufkd
               with "Htext Hdinv Hgeom Hbufm Hdisk Hpend").
     (* ---- P5: the device kick and the completion wait ---- *)
     iApply (P5.wp_vdrw_p5_seam (CID := CIDa) γk γs j γl γu γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-              (vdrw_sector_raw bno) bs_buf bs_disk m kq HK Hj Hjl
-              (vdrwf_bnz _ (Hbufkd 0%nat ltac:(lia)))
+              (vdrw_sector_raw bno) bs_buf bs_disk m kq lks HK Hj Hjl
+              (vdrwf_bnz _ (Hbufkd 0%nat ltac:(lia))) ltac:(lkbelow)
               with "Htext Hpanic Hpinv Hdinv Hlk").
     (* ---- P6: the payoff, free_chain, release, epilogue ---- *)
     iApply (wp_vdrw_p6_seam (CID := CIDa) γk γs j γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) m (m !!! Regidx Ra1)
-              (vdrw_sector_raw bno) bno bs_buf bs_disk Q kq
-              HK Hglen Hlenbuf Hlendisk Hsecval Hbufkd eq_refl
+              (vdrw_sector_raw bno) bno bs_buf bs_disk Q kq lks
+              HK Hglen Hlenbuf Hlendisk Hsecval Hbufkd eq_refl ltac:(lkbelow)
               with "Htext Hpanic Hpinv Hqinv Hrcpt Hgeom Hlk Hsaved Hbno").
     iIntros (CIDf Hsf mf) "%Hcsf Hcg Hown Hextc Hextm Hpc Hbufo Hdisko HQ".
     iEval (rewrite Hsld) in "Hbufo".

@@ -193,7 +193,7 @@ Definition wp_ialloc_sconf_body
     (u : nat)
     (pidv : mword 32) (dq dqs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ialloc in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -224,8 +224,13 @@ Definition wp_ialloc_sconf_body
   m !!! Regidx (mword_of_int 11 : mword 5) = (sign_extend' 64 ty : mword 64) ->
   (* PARKING PREMISE (hart-generic scheduler protocol) -- bread sleeps *)
   eb = true ->
+  (* ialloc's cone: bread/brelse ("bcache", 4), log_write ("log", 3), iget
+     ("itable", 2, on the tail claim), printk ("pr", 14, the no-inodes
+     arm) -- "itable" is the lowest, so one premise there covers the
+     whole cone via [locks_below_mono]. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   (* the general printk path's two PERSISTENT credentials *)
@@ -271,7 +276,7 @@ Definition wp_ialloc_sconf_body
     (dn' : dinode),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       pc_is ret_tgt -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -332,7 +337,7 @@ Definition wp_ialloc_gen_body
     (u : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ialloc in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -363,8 +368,13 @@ Definition wp_ialloc_gen_body
   m !!! Regidx (mword_of_int 11 : mword 5) = (sign_extend' 64 ty : mword 64) ->
   (* PARKING PREMISE (hart-generic scheduler protocol) -- bread sleeps *)
   eb = true ->
+  (* ialloc's cone: bread/brelse ("bcache", 4), log_write ("log", 3), iget
+     ("itable", 2, on the tail claim), printk ("pr", 14, the no-inodes
+     arm) -- "itable" is the lowest, so one premise there covers the
+     whole cone via [locks_below_mono]. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   (* the general printk path's two PERSISTENT credentials *)
@@ -414,7 +424,7 @@ Definition wp_ialloc_gen_body
     (dn' : dinode),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       pc_is ret_tgt -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -464,10 +474,10 @@ Module Type IALLOC.
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                          cov logstart inodestart ninodes nib dev ty u Sb
-                         pidv dq dqs dqn m K eb C b.
+                         pidv dq dqs dqn m K eb C b lks.
 
   Parameter wp_ialloc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
@@ -486,8 +496,8 @@ Module Type IALLOC.
       (u : nat)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                            cov logstart inodestart ninodes nib dev ty u
-                           pidv dq dqs dqn m K eb C b.
+                           pidv dq dqs dqn m K eb C b lks.
 End IALLOC.

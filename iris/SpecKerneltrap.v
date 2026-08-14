@@ -243,7 +243,7 @@ Definition wp_kerneltrap_sconf_body
     (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
     (γs : list gname) (pd pav pu : mword 64)
     (m : regfile) (av : nat) (p : mword 64) (C : iProp Σ)
-    (ep sc tv : mword 64) :=
+    (ep sc tv : mword 64) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kerneltrap in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   length γs = NPROC ->
@@ -253,6 +253,11 @@ Definition wp_kerneltrap_sconf_body
   (* the saved epc is instruction-aligned, so restoring it lands verbatim
      (sepc's write legalizes through the same bit-0 clear [ret_pc] is) *)
   ret_pc ep = ep ->
+  (* kerneltrap dispatches devintr, whose cone bottoms out at cons.lock
+     ("cons", 5) through uartintr -> consoleintr -- BELOW clockintr's
+     tickslock (8) and virtio's (9), and a bound has to be stated at the
+     minimum, since [locks_below_mono] raises but never lowers. *)
+  locks_below lks (lock_rank "cons") ->
   sie_cap_gpr m av false p -∗
   (* THE TRAP CAME FROM S-MODE WITH INTERRUPTS ENABLED: SPP = 1 and
      SPIE = 1.  This is the [sret_bits] travelling half, which is what
@@ -285,7 +290,7 @@ Definition wp_kerneltrap_sconf_body
      handler resource.  It crosses the yield park inside [trap_csrs] and comes
      back as the RESUMING hart's, which is why it is a post as well. *)
   strans_bit strans_bit_kpt -∗
-  cpu_own 0 false p C false -∗
+  cpu_own 0 false p C false lks -∗
   kernel_text -∗ pc_is pcE -∗
   sepc ↦ᵣ ep -∗ scause ↦ᵣ sc -∗ stval ↦ᵣ tv -∗
   devintr_caps γu γv γdk γtl γs pd pav pu -∗
@@ -309,7 +314,7 @@ Definition wp_kerneltrap_sconf_body
       (* at the RESUMING hart -- see the premise *)
       intr_res -∗
       strans_bit strans_bit_kpt -∗
-      cpu_own 0 false p C false -∗
+      cpu_own 0 false p C false lks -∗
       (* sepc is RESTORED to the trapped pc; scause and stval belong to the
          resuming hart, so their values are existential *)
       sepc ↦ᵣ ep -∗ scause ↦ᵣ sc' -∗ stval ↦ᵣ tv' -∗
@@ -325,7 +330,7 @@ Module Type KERNELTRAP.
       (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av : nat) (p : mword 64) (C : iProp Σ)
-      (ep sc tv : mword 64),
+      (ep sc tv : mword 64) (lks : gset nat),
       wp_kerneltrap_sconf_body γu γv γdk γtl γs pd pav pu
-        m av p C ep sc tv.
+        m av p C ep sc tv lks.
 End KERNELTRAP.

@@ -90,16 +90,23 @@ Definition wp_begin_op_sconf_body
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.begin_op in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_begin_op <= K)%nat ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
+  (* THE ORDER PREMISE FOR begin_op'S OWN ACQUIRE.  begin_op takes "log"
+     itself (rank 3, LockRank.v) and calls nothing that acquires a
+     lower-ranked lock (sleep/sleep_prepare only ever touch "proc", rank 11,
+     strictly above), so the one bound at "log" covers everything this
+     function needs -- [locks_below_mono] weakens it to "proc" for the
+     interior sleep calls. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   (* enters at noff 0; the acquire raises it to what sleep demands *)
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM.  begin_op's own acquire
      mints the pay its interior sleeps need at [eb = true] (the complement is
      [emp] and the caller brings nothing); at [eb = false] the push_off frees
@@ -122,7 +129,7 @@ Definition wp_begin_op_sconf_body
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -143,7 +150,7 @@ Module Type BEGIN_OP.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_begin_op_sconf_body γs j γl bn γ γfs cov logstart dev
-                             pidv dq m K eb C b.
+                             pidv dq m K eb C b lks.
 End BEGIN_OP.

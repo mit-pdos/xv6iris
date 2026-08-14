@@ -187,7 +187,7 @@ Definition wp_dirlookup_sconf_body
     (hasp : bool) (pofv : mword 32)                   (* poff, two-armed     *)
     (pidv : mword 32) (dq dqd dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.dirlookup in
   let pj := proc_addr j in
   let nb := m !!! Regidx (mword_of_int 11 : mword 5) in
@@ -214,8 +214,11 @@ Definition wp_dirlookup_sconf_body
   eq_vec (m !!! Regidx (mword_of_int 12 : mword 5)) zero_reg = negb hasp ->
   (* PARKING PREMISE -- readi sleeps *)
   eb = true ->
+  (* the order premise, at the LOWEST rank this cone touches; every
+     higher one follows by [locks_below_mono]. *)
+  locks_below lks (lock_rank "bcache") ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -252,7 +255,7 @@ Definition wp_dirlookup_sconf_body
   ∀ (mf : regfile) (found : bool) (k : nat) (kslot : nat) (q : Qp),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       pc_is ret_tgt -∗
       (* THE DIRECTORY COMES BACK UNTOUCHED *)
       i_dev ip ↦₄{dqd} dev -∗
@@ -301,8 +304,8 @@ Module Type DIRLOOKUP.
       (hasp : bool) (pofv : mword 32)
       (pidv : mword 32) (dq dqd dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_dirlookup_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
                               γa γf cov logstart nib dev ip bm data dn
-                              fn hasp pofv pidv dq dqd dqn m K eb C b.
+                              fn hasp pofv pidv dq dqd dqn m K eb C b lks.
 End DIRLOOKUP.

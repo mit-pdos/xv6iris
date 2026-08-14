@@ -59,20 +59,23 @@ Definition uvmcreate_post `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN
        kalloc_env γa (avail_sub on 1)))%I.
 
 Definition wp_uvmcreate_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
+    (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
   (18 <= K)%nat ->
   (* kalloc's push/pop addresses this cpu's cells through tp *)
   mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
+  (* uvmcreate's one callee is kalloc, whose bound is at "kmem" (13);
+     nothing else in its cone touches a lock.  One premise covers it. *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
-  cpu_own lvl eb p C b -∗ kernel_text -∗
+  cpu_own lvl eb p C b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.uvmcreate) -∗
   kalloc_env γa on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr mr K b p -∗
-    cpu_own lvl eb p C b -∗
+    cpu_own lvl eb p C b lks -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     uvmcreate_post γa on (mm !!! Regidx (mword_of_int 4))
@@ -83,6 +86,6 @@ Definition wp_uvmcreate_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
 Module Type UVMCREATE.
   Parameter wp_uvmcreate_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
-      wp_uvmcreate_sconf_body γa mm lvl K eb p C on b.
+      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat),
+      wp_uvmcreate_sconf_body γa mm lvl K eb p C on b lks.
 End UVMCREATE.

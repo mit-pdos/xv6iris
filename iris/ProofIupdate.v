@@ -298,12 +298,12 @@ Section IupdateDefs.
       (dn : dinode) (bm : blkmap) (u : nat) (Sbo : gset Z) (v : nat)
       (Pout : iProp Σ)
       (dev : mword 32) (pidv : mword 32) (dq dqd dqn dqs : dfrac) (j : nat)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) : iProp Σ :=
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K b (proc_addr j) -∗
-        cpu_own 0 eb (proc_addr j) C b -∗
+        cpu_own 0 eb (proc_addr j) C b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
@@ -396,7 +396,7 @@ Section IupdateTail.
       (kk : nat) (bno : mword 32) (bsd : list (bv 8)) (d0 : bool)
       (Pout : iProp Σ)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
     (K_iupdate <= K)%nat ->
     iu_sp m M ->
     iu_thr m M ->
@@ -405,8 +405,12 @@ Section IupdateTail.
     uint bno = IBLOCK inum inodestart ->
     IBLOCK inum inodestart ∈ cov ->
     ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
+    (* iu_tail reaches log_write ("log", 3) and brelse ("bcache", 4); log is
+       the lower of the two, so one premise at its rank covers both via
+       [locks_below_mono]. *)
+    locks_below lks (lock_rank "log") ->
     sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
-    cpu_own 0 eb (proc_addr j) C b -∗
+    cpu_own 0 eb (proc_addr j) C b lks -∗
     (* THE COMPLEMENT, PURE PASS-THROUGH: log_write and brelse are not in the
        ALREADY-GENERALIZED set, so neither touches it -- it rides untouched
        from here to the final [Hcont] specialization (one wide transport,
@@ -448,10 +452,10 @@ Section IupdateTail.
     iu_cont (CID0 := CID0) γfs bn γ inodestart ip inum dn bm
             (if cru then S u else u)
             (Sb ∪ {[IBLOCK inum inodestart]}) v Pout
-            dev pidv dq dqd dqn dqs j m K eb C b -∗
+            dev pidv dq dqd dqn dqs j m K eb C b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hsp Hthr Hs2 Hkk Hbno Hcov Hlog.
+    intros HK Hsp Hthr Hs2 Hkk Hbno Hcov Hlog Hbelow.
     pose proof HK as HK'. unfold K_iupdate in HK'.
     iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hmeta Hmap Hsb Hsl #Hvlb #Hcrd0 Hop Hau Hheld Hcont".
     (* THE eb/b BRIDGE, once per top-level lemma (eb-generic-sweep.md). *)
@@ -508,7 +512,7 @@ Section IupdateTail.
     assert (HT1thr : iu_thr m T1).
     { intros c Hcs N2 N8 N9 N18.
       rewrite /T1 upd_ne; [| regne]. exact (HT0thr c Hcs N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr j) C b
+   iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr j) C b 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
@@ -533,10 +537,12 @@ Section IupdateTail.
               (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 u
               cru Sb e0 v (⊤ ∖ ↑iregN) Pout
               T1 0%nat eb (proc_addr j) C (K - 4)%nat b
-              HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HT1a0
+              _ HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HT1a0
               ltac:(rewrite Hbno; exact Hcov)
               ltac:(rewrite Hbno; exact Hlog)
+              Hbelow
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl Hvlb Hcrd HopS [Hau] Hheld").
+    all: try lkbelow.
     { iEval (rewrite Hbno). iExact "Hau". }
     iIntros (CID3 Hq3 mL) "Hcg Hcnt Hpc %Hcs1 HopS Hdn Hlk Hsl".
     (* log_write returned the set grown by the block it logged, and [Hbno]
@@ -602,7 +608,7 @@ Section IupdateTail.
     assert (HT3thr : iu_thr m T3).
     { intros c Hcs N2 N8 N9 N18.
       rewrite /T3 upd_ne; [| regne]. exact (HT2thr c Hcs N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID3 CID5 0 eb (proc_addr j) C b
+    iDestruct (cpu_own_transport CID3 CID5 0 eb (proc_addr j) C b 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID2) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
@@ -610,8 +616,12 @@ Section IupdateTail.
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bno dq T3 (K - 4)%nat eb (proc_addr j) C
               (diblk_bytes (<[islot inum := dn]> ds)) bsd true b
-              HKbl Hkk HT3a0
+              lks HKbl Hkk HT3a0
+              (* brelse's bound is "bcache"(4); iu_tail's own is "log"(3),
+                 and [locks_below_mono] weakens it. *)
+              ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
+    all: try lkbelow.
     iIntros (CID6 Hq6 mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl1".
     assert (Hpc72 : ret_pc (T3 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iupdate + 0x72)) by (rewrite HT3ra; pcw).
@@ -821,7 +831,7 @@ Section IupdateTail.
     assert (Cs11 : P5 !!! Regidx (mword_of_int 27 : mword 5)
                   = (m !!! Regidx (mword_of_int 27 : mword 5) : mword 64))
       by (apply Hfin; iuidx).
-    iDestruct (cpu_own_transport CID6 CID12 0 eb (proc_addr j) C b
+    iDestruct (cpu_own_transport CID6 CID12 0 eb (proc_addr j) C b 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     (* THE WIDE HOP: neither log_write nor brelse threads the complement, so
        it is still at CID0 (iu_tail's own entry hart) -- span all the way to
@@ -869,7 +879,7 @@ Section ProofIupdateMain.
       (u : nat) (Sb : gset Z) (cru : bool) (e0 v : nat) (Pout : iProp Σ)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool)
+      (b : bool) (lks : gset nat)
     : let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
       let pj := proc_addr j in
       let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -884,8 +894,12 @@ Section ProofIupdateMain.
       (j < NPROC)%nat ->
       γs !! j = Some γl ->
       m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+      (* iupdate's cone: bread ("bcache", 4), log_write ("log", 3), brelse
+         ("bcache", 4) -- "log" is the lowest, so one premise there covers
+         the whole cone via [locks_below_mono]. *)
+      locks_below lks (lock_rank "log") ->
       sie_cap_gpr m K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       kernel_text -∗ pc_is pcE -∗
@@ -919,7 +933,7 @@ Section ProofIupdateMain.
       ∀ mf : regfile,
           ⌜callee_saved m mf⌝ -∗
           sie_cap_gpr mf K b pj -∗
-          cpu_own 0 eb pj C b -∗
+          cpu_own 0 eb pj C b lks -∗
           trap_csrs_ext eb -∗
           cpu_claim_ext eb pj -∗
           pc_is ret_tgt -∗
@@ -936,7 +950,7 @@ Section ProofIupdateMain.
           WP (Loop : expr riscv_lang)) -∗
       WP (Loop : expr riscv_lang).
   Proof.
-    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0.
+    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow.
     pose proof HK as HK'. unfold K_iupdate in HK'.
     destruct Hgeom as [Hcovok Hlogsub].
     destruct (Hcovok _ Hcov) as [Hibpos Hiblt].
@@ -974,7 +988,7 @@ Section ProofIupdateMain.
     iAssert (iu_cont (CID0 := CID) γfs bn γ inodestart ip inum dn bm
                (if cru then S u else u)
                (Sb ∪ {[IBLOCK inum inodestart]}) v Pout
-               dev pidv dq dqd dqn dqs j m K eb C b)%I with "[Hcont]" as "Hcont";
+               dev pidv dq dqd dqn dqs j m K eb C b lks)%I with "[Hcont]" as "Hcont";
       [rewrite /iu_cont; iExact "Hcont" |].
     iDestruct "Hmeta" as "(Hmty & Hmmaj & Hmmin & Hmnl & Hmsz)".
     iPoseProof (iui_00 with "Htext") as "Hi00".
@@ -1293,7 +1307,7 @@ Section ProofIupdateMain.
     assert (HRAthr : iu_thr m RA).
     { intros c Hcs N2 N8 N9 N18.
       rewrite /RA upd_ne; [| regne]. exact (HR9thr c Hcs N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID CID14 0 eb (proc_addr j) C b
+    iDestruct (cpu_own_transport CID CID14 0 eb (proc_addr j) C b 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID CID14 eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Htc") as "Htc".
@@ -1306,9 +1320,13 @@ Section ProofIupdateMain.
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bno dq
               RA (K - 4)%nat eb C b
-              HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HRAa0 HRAa1
+              lks HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HRAa0 HRAa1
+              (* bread's bound is "bcache"(4); iupdate's own is "log"(3),
+                 and [locks_below_mono] weakens it. *)
+              ltac:(lkbelow)
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
+    all: try lkbelow.
     iIntros (CID15 Hq15 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Htc Hclm Hpc Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc24 : ret_pc (RA !!! Regidx Rra : mword 64)
@@ -1903,8 +1921,8 @@ Section ProofIupdateMain.
     iApply (iu_tail (CID0 := CID36) γs j γfs γd bn γ cov logstart inodestart
               dev
               ip inum dn bm ds u Sb cru e0 v kk bno bsd0 d0 Pout
-              pidv dq dqd dqn dqs m mM K eb C b
-              HK HmMsp HmMthr HmMs2 Hkk Hbno Hcov Hlog
+              pidv dq dqd dqn dqs m mM K eb C b lks
+              HK HmMsp HmMthr HmMs2 Hkk Hbno Hcov Hlog Hbelow
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe
                     Hppid Hidev Hinumc [Hmty Hmmaj Hmmin Hmnl Hmsz] Hmap Hsb
                     Hsl Hvlb Hcrd0 Hop Hau Hheld [Hcont]").
@@ -1929,13 +1947,13 @@ Qed.
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool)
+      (b : bool) (lks : gset nat)
     : wp_iupdate_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                           cov logstart inodestart nib dev ip inum dn dn0 bm u Sb
-                          pidv dq dqd dqn dqs m K eb C b.
+                          pidv dq dqd dqn dqs m K eb C b lks.
   Proof.
     cbv beta delta [wp_iupdate_gen_body].
-    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0.
+    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Hbelow.
     iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
@@ -1961,8 +1979,8 @@ Qed.
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb false e0 0%nat
               (ireg_out γi inum dn)
-              pidv dq dqd dqn dqs m K eb C b
-              HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0
+              pidv dq dqd dqn dqs m K eb C b lks
+              HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
                     [Hcont]").
@@ -1994,13 +2012,13 @@ Qed.
       (u : nat) (Sb : gset Z) (cru : bool) (e0 v : nat)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool)
+      (b : bool) (lks : gset nat)
     : wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
-                              pidv dq dqd dqn dqs m K eb C b.
+                              pidv dq dqd dqn dqs m K eb C b lks.
   Proof.
     cbv beta delta [wp_iupdate_credgen_body].
-    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0.
+    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Hbelow.
     iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl #Hvlb #Hcrd Hop Hcont".
@@ -2010,8 +2028,8 @@ Qed.
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
               (ireg_out γi inum dn)
-              pidv dq dqd dqn dqs m K eb C b
-              HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0
+              pidv dq dqd dqn dqs m K eb C b lks
+              HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hvlb Hcrd Hop
                     [Hcont]").
@@ -2042,13 +2060,13 @@ Qed.
       (u : nat) (Sb : gset Z) (cru : bool)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool)
+      (b : bool) (lks : gset nat)
     : wp_iupdate_cred_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
-                           pidv dq dqd dqn dqs m K eb C b.
+                           pidv dq dqd dqn dqs m K eb C b lks.
   Proof.
     cbv beta delta [wp_iupdate_cred_body].
-    intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Heb.
+    intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Heb Hbelow.
     subst eb.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
@@ -2066,8 +2084,8 @@ Qed.
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat
               (ireg_out γi inum dn)
-              pidv dq dqd dqn dqs m K true C b
-              HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0
+              pidv dq dqd dqn dqs m K true C b lks
+              HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
                     [Hcont]").
@@ -2104,13 +2122,13 @@ Qed.
       (u : nat)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool)
+      (b : bool) (lks : gset nat)
     : wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                             cov logstart inodestart nib dev ip inum dn dn0 bm u
-                            pidv dq dqd dqn dqs m K eb C b.
+                            pidv dq dqd dqn dqs m K eb C b lks.
   Proof.
     cbv beta delta [wp_iupdate_sconf_body].
-    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0.
+    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Hbelow.
     iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
@@ -2125,8 +2143,8 @@ Qed.
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb0 false e0 0%nat
               (ireg_out γi inum dn)
-              pidv dq dqd dqn dqs m K eb C b
-              HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0
+              pidv dq dqd dqn dqs m K eb C b lks
+              HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
                     [Hcont]").
@@ -2161,14 +2179,14 @@ Qed.
       (u : nat) (Sb : gset Z) (cru : bool)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool)
+      (b : bool) (lks : gset nat)
     : wp_iupdate_link_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
-                           pidv dq dqd dqn dqs m K eb C b.
+                           pidv dq dqd dqn dqs m K eb C b lks.
   Proof.
     cbv beta delta [wp_iupdate_link_body].
     intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnz Hbump Hgrd
-           Hda Hdirlen Hj Hgl Ha0 Heb.
+           Hda Hdirlen Hj Hgl Ha0 Heb Hbelow.
     subst eb.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
@@ -2186,8 +2204,8 @@ Qed.
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat
               (dinode_at γi inum dn ∗ ilink (bv_unsigned inum))%I
-              pidv dq dqd dqn dqs m K true C b
-              HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0
+              pidv dq dqd dqn dqs m K true C b lks
+              HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
                     [Hcont]").
@@ -2225,14 +2243,14 @@ Qed.
       (u : nat) (Sb : gset Z) (cru : bool)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool)
+      (b : bool) (lks : gset nat)
     : wp_iupdate_unlink_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
-                             pidv dq dqd dqn dqs m K eb C b.
+                             pidv dq dqd dqn dqs m K eb C b lks.
   Proof.
     cbv beta delta [wp_iupdate_unlink_body].
     intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnz Hnl Hda Hdirlen
-           Hj Hgl Ha0 Heb.
+           Hj Hgl Ha0 Heb Hbelow.
     subst eb.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hlink Hrc Hppid #Hprocs #Hdevi #Hdgeom
@@ -2252,8 +2270,8 @@ Qed.
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat
               (dinode_at γi inum dn)%I
-              pidv dq dqd dqn dqs m K true C b
-              HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0
+              pidv dq dqd dqn dqs m K true C b lks
+              HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
                     [Hcont]").

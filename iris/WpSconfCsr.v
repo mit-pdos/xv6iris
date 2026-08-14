@@ -541,10 +541,10 @@ Qed.
    handing out the same eighth at two different values. *)
 Definition cpu_priv_pay `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
     (b : bool) (p : mword 64) : iProp Σ :=
-  (if b then cpu_priv 0 true p else emp)%I.
+  (if b then cpu_priv 0 true p ∅ else emp)%I.
 
 Lemma cpu_priv_pay_on `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (px : mword 64) :
-  cpu_priv_pay true px ⊣⊢ cpu_priv 0 true px.
+  cpu_priv_pay true px ⊣⊢ cpu_priv 0 true px ∅.
 Proof. reflexivity. Qed.
 
 Lemma cpu_priv_pay_off `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (px : mword 64) :
@@ -1124,7 +1124,7 @@ Section WpSconfCsr.
     sie_cap_gpr m (trap_res true + n)%nat b p -∗
     intr_count 1 true -∗
     trap_csrs -∗
-    cpu_priv 0 true p -∗
+    cpu_priv 0 true p ∅ -∗
     cpu_claim p -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) -∗
@@ -1443,7 +1443,7 @@ Section WpSconfCsr.
     sie_cap_gpr m (trap_res true + n)%nat eb p -∗
     (if eb then emp else intr_count 0 false) -∗
     (if eb then emp else trap_csrs) -∗
-    (if eb then emp else cpu_priv 0 true p) -∗
+    (if eb then emp else cpu_priv 0 true p ∅) -∗
     cpu_claim_ext eb p -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) -∗

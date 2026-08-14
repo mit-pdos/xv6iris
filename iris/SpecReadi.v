@@ -249,7 +249,7 @@ Definition wp_readi_sconf_body
     (V : pprivate)
     (pidv : mword 32) (dq dqd : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.readi in
   let pj := proc_addr j in
   let dst := m !!! Regidx (mword_of_int 12 : mword 5) in
@@ -303,8 +303,13 @@ Definition wp_readi_sconf_body
     = sign_extend' 64 (mword_of_int (Z.of_nat off) : mword 32) ->
   m !!! Regidx (mword_of_int 14 : mword 5)
     = sign_extend' 64 (mword_of_int (Z.of_nat n) : mword 32) ->
+  (* readi's cone: its own bread and brelse both directly acquire "bcache"
+     (rank 4, LockRank.v); bmap (BMAP_NOALLOC) and either_copyout expose no
+     locks_below premise of their own, so "bcache" is the lowest -- and
+     only -- bound this contract states. *)
+  locks_below lks (lock_rank "bcache") ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  readi never acquires
      anything itself -- its interior sleepers (bmap's bread, its own
      bread, brelse, either_copyout's copyout) all supply and consume the
@@ -386,7 +391,7 @@ Definition wp_readi_sconf_body
              = (mword_of_int (Z.of_nat tot) : mword 64)
            /\ tot = rd_clamp (di_size dn) off n)⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -427,9 +432,9 @@ Module Type READI.
       (V : pprivate)
       (pidv : mword 32) (dq dqd : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_readi_sconf_body γs j γl γu γd γk pd pav pu bn γfs γa γf
                           cov logstart dev ip bm data dn
                           user off n dst_olds V
-                          pidv dq dqd m K eb C b.
+                          pidv dq dqd m K eb C b lks.
 End READI.

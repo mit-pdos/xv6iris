@@ -264,10 +264,13 @@ Section KforkB3Proof.
   Lemma kfkb3_fd_loop
       (γl γf : gname) (pme npa : mword 64) (pid_p pid_c : mword 32)
       (Vp V0 : pprivate) (m0 : regfile) (rsv K n : nat) (eb b : bool)
-      (C : iProp Σ) (sp0v s00v : mword 64) :
+      (C : iProp Σ) (sp0v s00v : mword 64) (lks : gset nat) :
     (22 <= K)%nat ->
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
     pv_ofile V0 = replicate NOFILE (zero_reg : mword 64) ->
+    (* the scan's only lock-touching callee is filedup, whose own bound is
+       at "ftable" (1) -- nothing else in this block acquires. *)
+    locks_below lks (lock_rank "ftable") ->
     kernel_text -∗
     is_ftable γl γf -∗
     panic_wp_any -∗
@@ -283,19 +286,19 @@ Section KforkB3Proof.
             Mx !!! Regidx Rs4 = npa /\ Mx !!! Regidx Rs5 = pme /\
             kfkb3_thr m0 Mx⌝ -∗
           sie_cap_gpr Mx (rsv + (K - 8))%nat b pme -∗
-          cpu_own n eb pme C b -∗
+          cpu_own n eb pme C b lks -∗
           pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
           proc_priv γf pme pid_p Vp -∗
           proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) NOFILE) -∗
           WP (Loop : expr riscv_lang)) -∗
       sie_cap_gpr M (rsv + (K - 8))%nat b pme -∗
-      cpu_own n eb pme C b -∗
+      cpu_own n eb pme C b lks -∗
       pc_is (mword_of_int (KF + 0x96) : mword 64) -∗
       proc_priv γf pme pid_p Vp -∗
       proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) i) -∗
       WP (Loop : expr riscv_lang)).
   Proof.
-    intros HK Hn HV0.
+    intros HK Hn HV0 Hbelow.
     iIntros "#Htext #Hft #Hpanic".
     assert (HK14 : (14 <= (rsv + (K - 8)))%nat)
       by (pose proof (kfkb3_stack K HK); lia).
@@ -319,13 +322,13 @@ Section KforkB3Proof.
                 Mx !!! Regidx Rs4 = npa /\ Mx !!! Regidx Rs5 = pme /\
                 kfkb3_thr m0 Mx⌝ -∗
               sie_cap_gpr Mx (rsv + (K - 8))%nat b pme -∗
-              cpu_own n eb pme C b -∗
+              cpu_own n eb pme C b lks -∗
               pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
               proc_priv γf pme pid_p Vp -∗
               proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) NOFILE) -∗
               WP (Loop : expr riscv_lang)) -∗
           sie_cap_gpr M (rsv + (K - 8))%nat b pme -∗
-          cpu_own n eb pme C b -∗
+          cpu_own n eb pme C b lks -∗
           pc_is (mword_of_int (KF + 0x96) : mword 64) -∗
           proc_priv γf pme pid_p Vp -∗
           proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) i) -∗
@@ -347,7 +350,7 @@ Section KforkB3Proof.
             Mt !!! Regidx Rs3 = p_cwd pme /\ Mt !!! Regidx Rs4 = npa /\
             Mt !!! Regidx Rs5 = pme /\ kfkb3_thr m0 Mt⌝ -∗
           sie_cap_gpr Mt (rsv + (K - 8))%nat b pme -∗
-          cpu_own n eb pme C b -∗
+          cpu_own n eb pme C b lks -∗
           pc_is (mword_of_int (KF + 0x8e) : mword 64) -∗
           proc_priv γf pme pid_p Vp -∗
           proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) (S i)) -∗
@@ -606,8 +609,9 @@ Section KforkB3Proof.
         iDestruct (cpu_own_transport CIDk CIDn n eb pme C b ltac:(wp_next_chain) with "Hown")
           as "Hown".
         iApply (FD.wp_filedup_sconf γl γf k q Cf L2 n eb pme C (rsv + (K - 8))%nat b
-                  HK14 Hn HL2a0k
+                  _ HK14 Hn HL2a0k Hbelow
                   with "Hcg Hown Htext Hpc Hft Hpanic Hfds Href").
+        all: try lkbelow.
         iIntros (CIDo Hsto mr) "Hcg Hown Hpc %Hcsmr Hslota Hslotb".
         destruct Hcsmr as [Hcsmr Hmra0].
         assert (Hpc9e : ret_pc (L2 !!! Regidx Rra) = mword_of_int (KF + 0x9e)).

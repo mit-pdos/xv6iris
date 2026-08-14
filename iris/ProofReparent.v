@@ -603,11 +603,15 @@ Section ProofReparentLoop.
       (ps : list (mword 64)) (dqi : dfrac)
       (vra vs0 vs1 vs2 vs3 vs4 : mword 64)
       (vs5 vs6 vs7 vs8 vs9 vs10 vs11 : mword 64)
-      (lvl av : nat) (eb : bool) (C : iProp Σ) (b : bool) :
+      (lvl av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
     length γs = NPROC ->
     length ps = NPROC ->
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     (18 <= av)%nat ->
+    (* wakeup's order premise, carried verbatim through the scan: the loop
+       neither acquires nor releases anything itself, so [lks] -- and hence
+       this bound -- is a loop INVARIANT, unchanged across every iteration. *)
+    locks_below lks (lock_rank "proc") ->
     procs_inv γs -∗
     panic_wp_any -∗
     (* the exit continuation: control at the epilogue entry [reparent+0x46]. *)
@@ -615,7 +619,7 @@ Section ProofReparentLoop.
       ∀ Mexit : regfile,
         ⌜ rpx_regs Mexit spF vs5 vs6 vs7 vs8 vs9 vs10 vs11 ⌝ -∗
         sie_cap_gpr Mexit av b pme -∗
-        cpu_own lvl eb pme C b -∗
+        cpu_own lvl eb pme C b lks -∗
         kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x46)) -∗
         rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
         (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
@@ -624,14 +628,14 @@ Section ProofReparentLoop.
     ∀ (k : nat) (M : regfile),
       ⌜(k < NPROC)%nat⌝ -∗ ⌜rpl_regs M spF pv vs5 vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
       sie_cap_gpr M av b pme -∗
-      cpu_own lvl eb pme C b -∗
+      cpu_own lvl eb pme C b lks -∗
       kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x34)) -∗
       rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
       (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
       parents_own (rp_upto pv ip k ps) -∗
       WP (Loop : expr riscv_lang).
   Proof.
-    intros Hlen Hpslen Hlvl Hav.
+    intros Hlen Hpslen Hlvl Hav Hno.
     iIntros "#Hpinv #Hpanic Hqexit".
     iAssert (∀ (fuel : nat),
                wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
@@ -642,14 +646,14 @@ Section ProofReparentLoop.
                      ∀ Mexit : regfile,
                        ⌜ rpx_regs Mexit spF vs5 vs6 vs7 vs8 vs9 vs10 vs11 ⌝ -∗
                        sie_cap_gpr Mexit av b pme -∗
-                       cpu_own lvl eb pme C b -∗
+                       cpu_own lvl eb pme C b lks -∗
                        kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x46)) -∗
                        rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
                        (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
                        parents_own (rp_map pv ip ps) -∗
                        WP (Loop : expr riscv_lang)) -∗
                    sie_cap_gpr M av b pme -∗
-                   cpu_own lvl eb pme C b -∗
+                   cpu_own lvl eb pme C b lks -∗
                    kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x34)) -∗
                    rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
                    (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
@@ -667,7 +671,7 @@ Section ProofReparentLoop.
                  ∀ Mt : regfile,
                    ⌜ rpl_regs Mt spF pv vs5 vs6 vs7 vs8 vs9 vs10 vs11 k ⌝ -∗
                    sie_cap_gpr Mt av b pme -∗
-                   cpu_own lvl eb pme C b -∗
+                   cpu_own lvl eb pme C b lks -∗
                    pc_is (mword_of_int (KernelSyms.reparent + 0x2c)) -∗
                    rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
                    (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
@@ -904,13 +908,21 @@ Section ProofReparentLoop.
                      with "Hown") as "Hown".
         (* wakeup(initproc): everything it changes is invisible; [procs_inv] is
            persistent and the level round-trips. *)
+        (* the held set round-trips: reparent takes no lock of its own, and
+           wakeup is BALANCED in [lks] (it acquires and releases each
+           [pp->lock] within a single iteration, so its own entry and exit
+           sets agree).  So both the set and wakeup's order bound [Hno] are
+           pure passthroughs of the enclosing contract's -- reparent adds
+           nothing to the held set, hence nothing to the premise. *)
         iApply (Wakeup.wp_wakeup_sconf (CID := CIDp)  M40 γs
-                  pme lvl av eb C b
+                  pme lvl av eb C b lks
                   ltac:(lia)
                   ltac:(intro r; apply rf_to_gmap_dom)
                   Hlen
                   ltac:(lia)
+                  Hno
                   with "Hcg Hown Htext Hpc Hpanic Hpinv").
+        all: try lkbelow.
         iIntros (CIDq Hsq Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc".
         assert (Hpc44 : ret_pc (M40 !!! Regidx (mword_of_int 1 : mword 5))
                         = mword_of_int (KernelSyms.reparent + 0x44)).
@@ -1034,11 +1046,11 @@ Section ProofReparent.
 
   Lemma wp_reparent_sconf `{GEN : GenId} `{CID0 : CpuId}
        (m : regfile) (γs : list gname) (pme ip : mword 64)
-      (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool)
-    : wp_reparent_sconf_body m γs pme ip ps dqi lvl K eb C b.
+      (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+    : wp_reparent_sconf_body m γs pme ip ps dqi lvl K eb C b lks.
   Proof.
     cbv beta delta [wp_reparent_sconf_body].
-    intros pcE pv rettgt HK Hdom Hlen Hlvl.
+    intros pcE pv rettgt HK Hdom Hlen Hlvl Hno.
     iIntros "Hcg Hown #Htext Hpc #Hpanic #Hpinv Hinit Hpar".
     iDestruct (parents_own_length with "Hpar") as %Hpslen.
     iIntros "Hcont".
@@ -1059,8 +1071,8 @@ Section ProofReparent.
                   (m !!! Regidx (mword_of_int 23 : mword 5)) (m !!! Regidx (mword_of_int 24 : mword 5))
                   (m !!! Regidx (mword_of_int 25 : mword 5)) (m !!! Regidx (mword_of_int 26 : mword 5))
                   (m !!! Regidx (mword_of_int 27 : mword 5))
-                  lvl (K - 6)%nat eb C b
-                  Hlen Hpslen Hlvl ltac:(unfold K_reparent in HK; lia)
+                  lvl (K - 6)%nat eb C b lks
+                  Hlen Hpslen Hlvl ltac:(unfold K_reparent in HK; lia) Hno
                   with "Hpinv Hpanic") as "Hloop".
     iSpecialize ("Hloop" with "[Hcont]").
     { (* exit continuation = the epilogue at +0x46 *)

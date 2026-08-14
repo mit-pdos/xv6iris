@@ -121,11 +121,12 @@ Section ProofBpin.
   Proof. intros H0 H1. rewrite /incr32. by apply moi32_storeval_succ. Qed.
 
   Lemma wp_bpin_sconf (bn : bio_names) (V : bio_view Σ) (k : nat)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool)
-    : wp_bpin_sconf_body bn V k m n eb p C K b.
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset nat)
+    : wp_bpin_sconf_body bn V k m n eb p C K b lks.
   Proof.
     cbv beta delta [wp_bpin_sconf_body].
-    intros pcE ret_tgt HK Hnoffpos Hk Ha0.
+    intros pcE ret_tgt HK Hnoffpos Hk Ha0 Hbelow.
+    pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hctx #Hpanic Hbslot Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbeq.
@@ -277,9 +278,10 @@ Section ProofBpin.
       by (rewrite /mA; apply upd_eq).
     iDestruct (cpu_own_transport CID CID9 n eb p C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf (bn_lk bn) "bcache"%string (bcache_res bn V) mA
-              n eb p C (K - 4)%nat b
-              Hnoffpos ltac:(lia)
+              n eb p C (K - 4)%nat b lks
+              Hnoffpos ltac:(lia) Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CID10 Hs10 ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
     assert (Hpc18 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.bpin + 0x18)).
@@ -519,11 +521,17 @@ Section ProofBpin.
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) D5
               n eb p C (K - 4)%nat
+              ({[lock_rank "bcache"]} ∪ lks)
               ltac:(rewrite HD5a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
     iIntros (CID11 Hs11 mr) "Hcg Hpc %Hrelpins Hcnt".
+    (* bpin is BALANCED: the set release hands back collapses to the entry
+       [lks] -- [Hfresh] is what makes the singleton insert/delete cancel. *)
+    assert (Hsetback : ({[lock_rank "bcache"]} ∪ lks) ∖ {[lock_rank "bcache"]} = lks)
+      by (apply locks_add_del_below; lkbelow).
+    iEval (rewrite Hsetback) in "Hcnt".
     rewrite Hbeq in Hs11.
     iEval (rewrite Hbeq) in "Hcg". iEval (rewrite Hbeq) in "Hcnt".
     assert (Hpc2a : ret_pc (D5 !!! Regidx Rra) = mword_of_int (KernelSyms.bpin + 0x2a)).

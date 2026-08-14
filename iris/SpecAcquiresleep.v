@@ -47,7 +47,7 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
     
     (γs : list gname) (j : nat)
     (γl γsl : gname) (s : string) (R : iProp Σ)
-    (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) (b : bool) :=
+    (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.acquiresleep in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let pj := proc_addr j in
@@ -55,8 +55,14 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
                    in
   (j < NPROC)%nat ->
   (26 <= av)%nat ->
+  (* acquiresleep's own acquire(&slk->lk) needs every lock this hart
+     already holds to rank below "sleep lock".  The RAW spinlock is
+     released again before this function returns (the sleeplock's
+     higher-level "locked" state is a separate ghost token, [sleeplocked],
+     untouched by [lks]), so [lks] itself is unchanged end to end. *)
+  locks_below lks (lock_rank "sleep lock") ->
   sie_cap_gpr m av b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM.  Everything below sleeps,
      and a parking thread must hand [trap_csrs] and [cpu_claim] across the
      crossing (SpecSched.v).  At [eb = true] acquiresleep's OWN acquire frees
@@ -85,7 +91,7 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
       sie_cap_gpr mf av b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -145,7 +151,7 @@ Definition wp_acquiresleep_nested_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdsl
     (γs : list gname) (j : nat)
     (γl γsl : gname) (s : string) (R : iProp Σ)
     (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac)
-    (n : nat) :=
+    (n : nat) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.acquiresleep in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let pj := proc_addr j in
@@ -155,9 +161,17 @@ Definition wp_acquiresleep_nested_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdsl
   (* the interior acquire pushes to [S (S n)] and sleep's own acquire to
      [S (S (S n))], transiently +1 *)
   (Z.of_nat n + 4 < 2 ^ 31)%Z ->
+  (* same order fact as the non-nested route, for the same "sleep lock"
+     acquire; [lks] here is whatever the caller (e.g. iput, holding
+     "itable") already has, and "sleep lock" (6) outranks "itable" (2), so
+     [locks_below lks (lock_rank "itable")] (iput's own premise) is not
+     enough by itself -- the caller must give the bound AT "sleep lock",
+     i.e. [locks_below lks (lock_rank "sleep lock")], which subsumes it via
+     [locks_below_mono]. *)
+  locks_below lks (lock_rank "sleep lock") ->
   sie_cap_gpr m av false pj -∗
   (* NESTED: a spinlock IS held on entry, and is still held on exit *)
-  cpu_own (S n) eb pj C false -∗
+  cpu_own (S n) eb pj C false lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
   panic_wp_any -∗
@@ -167,7 +181,7 @@ Definition wp_acquiresleep_nested_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdsl
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
       sie_cap_gpr mf av false pj -∗
-      cpu_own (S n) eb pj C false -∗
+      cpu_own (S n) eb pj C false lks -∗
       pc_is ret_tgt -∗
       sleeplocked γsl -∗
       sl_pid slk ↦₄ pidv -∗
@@ -182,13 +196,13 @@ Module Type ACQUIRESLEEP.
 
       (γs : list gname) (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac} (b : bool),
-      wp_acquiresleep_sconf_body γs j γl γsl s R m pidv av eb C dq b.
+      (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac} (b : bool) (lks : gset nat),
+      wp_acquiresleep_sconf_body γs j γl γsl s R m pidv av eb C dq b lks.
   Parameter wp_acquiresleep_nested_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ)
       (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac}
-      (n : nat),
-      wp_acquiresleep_nested_body γs j γl γsl s R m pidv av eb C dq n.
+      (n : nat) (lks : gset nat),
+      wp_acquiresleep_nested_body γs j γl γsl s R m pidv av eb C dq n lks.
 End ACQUIRESLEEP.

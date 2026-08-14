@@ -92,8 +92,8 @@ Section ProofClockintr.
   (* [eb = true].  At any [S _] level the match is [false] outright.        *)
   (* ================================================================== *)
   Local Lemma ci_outb_false (M : regfile) (av n : nat) (eb : bool)
-      (p : mword 64) (C : iProp Σ) :
-    sie_cap_gpr M av false p -∗ cpu_own n eb p C false -∗
+      (p : mword 64) (C : iProp Σ) (lks : gset nat) :
+    sie_cap_gpr M av false p -∗ cpu_own n eb p C false lks -∗
     ⌜ (match n with O => eb | S _ => false end) = false ⌝.
   Proof.
     iIntros "Hcg Hcnt".
@@ -303,17 +303,18 @@ Section ProofClockintr.
   (* THE WHOLE FUNCTION.                                                 *)
   (* ================================================================== *)
   Lemma wp_clockintr_sconf  (γl : gname) (γs : list gname)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
-    : wp_clockintr_sconf_body γl γs m n eb p C av.
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (lks : gset nat)
+    : wp_clockintr_sconf_body γl γs m n eb p C av lks.
   Proof.
     cbv beta delta [wp_clockintr_sconf_body].
-    intros pcE ret_tgt Hn Hav.
+    intros pcE ret_tgt Hn Hav Hbelow.
+    pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (ra0 := (m !!! Regidx ra_idx : mword 64)).
     set (s00 := (m !!! Regidx s0_idx : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Htcap Htk Hcont".
     (* release's exit index, fixed once here (it is used only at the very end) *)
-    iDestruct (ci_outb_false m av n eb p C with "Hcg Hcnt") as %Hout.
+    iDestruct (ci_outb_false m av n eb p C lks with "Hcg Hcnt") as %Hout.
     (* ===================== PROLOGUE (16-byte frame) ===================== *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1)
                       (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))
@@ -498,10 +499,12 @@ Section ProofClockintr.
         rewrite /B0 upd_ne; [| vm_compute; discriminate]. exact Hmosp. }
       (* ===================== acquire(&tickslock) ===================== *)
       iApply (Acquire.wp_acquire_sconf γl "time"%string ticks_res B2
-                n eb p C (av - 2)%nat false
+                n eb p C (av - 2)%nat false lks
                 ltac:(lia)
                 ltac:(lia)
+                Hbelow
                 with "Hcg Hcnt Htext Hpc [Hlkl] Hpanic").
+      all: try lkbelow.
       { iEval (rewrite HB2a0). iExact "Hlkl". }
       iApply wp_next_off_intro.
       iIntros (ms MA) "%Hms Hcg Hpc %HcsA Htok HR Hcnt Hpay".
@@ -634,12 +637,16 @@ Section ProofClockintr.
         exact HB2sp. }
       (* ===================== wakeup(&ticks) ===================== *)
       iApply (Wakeup.wp_wakeup_sconf D5 γs p
-                (S n) (av - 2)%nat eb C false
+                (S n) (av - 2)%nat eb C false ({[lock_rank "time"]} ∪ lks)
                 ltac:(lia)
                 ltac:(intro r; apply rf_to_gmap_dom)
                 Hlen
                 ltac:(lia)
+                (locks_below_union_singleton lks (lock_rank "time") (lock_rank "proc")
+                   ltac:(vm_compute; lia)
+                   ltac:(lkbelow))
                 with "Hcg Hcnt Htext Hpc Hpanic Hpi").
+      all: try lkbelow.
       iApply wp_next_off_intro.
       iIntros (MW) "%HcsW Hcg Hcnt #Htext2 Hpc".
       destruct HcsW as [HcsW _].
@@ -714,6 +721,7 @@ Section ProofClockintr.
       iEval (rewrite Hridx) in "Hcg".
       iApply (Release.wp_release_sconf γl a_tickslock "time"%string ticks_res E2
                 n eb p C (av - 2)%nat
+                ({[lock_rank "time"]} ∪ lks)
                 ltac:(rewrite HE2a0; apply addv_sext0)
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlkl] [Htok] [HR] Hcnt Hpay").
@@ -722,6 +730,12 @@ Section ProofClockintr.
       { iExact "HR". }
       rewrite Hout. iApply wp_next_off_intro.
       iIntros (MR) "Hcg Hpc %HcsR Hcnt".
+      (* clockintr is BALANCED: the set release hands back collapses to the
+         entry [lks] -- [Hfresh] is what makes the singleton insert/delete
+         cancel. *)
+      assert (Hsetback : ({[lock_rank "time"]} ∪ lks) ∖ {[lock_rank "time"]} = lks)
+      by (apply locks_add_del_below; lkbelow).
+      iEval (rewrite Hsetback) in "Hcnt".
       assert (Hpc54 : ret_pc (E2 !!! Regidx ra_idx) = mword_of_int (KernelSyms.clockintr + 0x54))
         by (rewrite HE2ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc54) in "Hpc".

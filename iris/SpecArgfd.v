@@ -187,7 +187,7 @@ End SpecArgfd.
 Definition wp_argfd_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (i : nat) (v : mword 64)
-    (pid : mword 32) (V : pprivate) (oldfd : mword 32) (oldf : mword 64) (b : bool) :=
+    (pid : mword 32) (V : pprivate) (oldfd : mword 32) (oldf : mword 64) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.argfd in
   let pfd := m !!! Regidx (mword_of_int 11 : mword 5) in
   let pf := m !!! Regidx (mword_of_int 12 : mword 5) in
@@ -203,7 +203,7 @@ Definition wp_argfd_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (argfd_stack <= av)%nat ->
   sie_cap_gpr m av b p -∗
-  cpu_own n eb p C b -∗
+  cpu_own n eb p C b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
   ofd_out pfd oldfd -∗
@@ -212,7 +212,7 @@ Definition wp_argfd_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf av b p -∗
-      cpu_own n eb p C b -∗
+      cpu_own n eb p C b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid V -∗
       argfd_post pfd pf oldfd oldf v (pv_ofile V)
@@ -225,6 +225,6 @@ Module Type ARGFD.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (i : nat) (v : mword 64)
-      (pid : mword 32) (V : pprivate) (oldfd : mword 32) (oldf : mword 64) (b : bool),
-      wp_argfd_sconf_body γf m av n eb p C i v pid V oldfd oldf b.
+      (pid : mword 32) (V : pprivate) (oldfd : mword 32) (oldf : mword 64) (b : bool) (lks : gset nat),
+      wp_argfd_sconf_body γf m av n eb p C i v pid V oldfd oldf b lks.
 End ARGFD.

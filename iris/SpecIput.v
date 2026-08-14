@@ -134,7 +134,7 @@ Definition wp_iput_sconf_body
     (n : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -163,13 +163,19 @@ Definition wp_iput_sconf_body
   gs !! j = Some gl ->
   (* a0 = ip *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  (* THE FRESHNESS PREMISE, AT THE LOWEST RANK IPUT (OR ANY CALLEE) TOUCHES:
+     "itable" (2) directly, then upward -- "sleep lock" (6) via the
+     truncate arm's nested acquiresleep, "log"/"bcache" via itrunc/iupdate.
+     One bound covers all of them ([LockRank.locks_below_mono] /
+     [locks_below_union_singleton] derive each at its own call site). *)
+  locks_below lks (lock_rank "log") ->
   (* PARKING PREMISE -- UNCONDITIONAL.  iput MAY truncate, and no caller
      can know in advance which arm runs, so the bundle is not conditional.
      (Note (B1): under Route B the truncate arm's acquiresleep is the
      NESTED one, which does not park; bread under itrunc/iupdate still
      does, so this premise stays.) *)
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   (* the trap-CSR complement: [emp] at [eb = true], where iput's own
      acquire mints what the interior sleeps need; the real pair at
      [eb = false], where the caller holds it because the TRAP gave it
@@ -216,7 +222,7 @@ Definition wp_iput_sconf_body
   ∀ (mf : regfile) (n' : nat) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
   (* the trap-CSR complement: [emp] at [eb = true], where iput's own
      acquire mints what the interior sleeps need; the real pair at
      [eb = false], where the caller holds it because the TRAP gave it
@@ -323,7 +329,7 @@ Definition wp_iput_gen_body
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -347,8 +353,10 @@ Definition wp_iput_gen_body
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  (* THE FRESHNESS PREMISE -- see [wp_iput_sconf_body]. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
@@ -392,7 +400,7 @@ Definition wp_iput_gen_body
   ∀ (mf : regfile) (n' : nat) (used' : gset Z) (Sb' : gset Z) (w : bool),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -436,10 +444,10 @@ Module Type IPUT.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                           cov logstart bmapstart inodestart nib size dev used
-                          k q inum n pidv dq dqb dqs m K eb C b.
+                          k q inum n pidv dq dqb dqs m K eb C b lks.
   (* the credited set-form contract; [wp_iput_sconf] is this at
      [crb := cru := crz := false], derived at the [log_op] existential's own
      witness ([ip_spend_w w false false <= 2], and iput's own flush is the
@@ -462,8 +470,8 @@ Module Type IPUT.
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                        cov logstart bmapstart inodestart nib size dev used
-                       k q inum n Sb crb cru crz e0 pidv dq dqb dqs m K eb C b.
+                       k q inum n Sb crb cru crz e0 pidv dq dqb dqs m K eb C b lks.
 End IPUT.

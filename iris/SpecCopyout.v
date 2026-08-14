@@ -111,7 +111,7 @@ Import Defs.
 Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
     (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
-    (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) :=
+    (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.copyout in
   (* a0 = pagetable, a1 = psz, a2 = dstva, a3 = src, a4 = len *)
   let src := mm !!! Regidx (mword_of_int 13) in
@@ -138,8 +138,11 @@ Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   (* vmfault's kalloc keeps its transient noff increment in int range;
      [lvl] is otherwise generic (usertrap calls at 0, the pipe loops at 1) *)
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
+  (* copyout -> walkaddr -> walk; [walk] states its bound at "kmem" whether or
+     not the alloc arm is taken *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
-  cpu_own lvl eb p C b -∗
+  cpu_own lvl eb p C b lks -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt P -∗
@@ -148,7 +151,7 @@ Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (P' : uptd),
     sie_cap_gpr mr K b p -∗
-    cpu_own lvl eb p C b -∗
+    cpu_own lvl eb p C b lks -∗
     pc_is ret_tgt -∗
     proc_pt P' -∗
     ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
@@ -164,6 +167,6 @@ Module Type COPYOUT.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
-      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool),
-      wp_copyout_sconf_body γa mm P szv len src_bytes K lvl eb p C b.
+      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat),
+      wp_copyout_sconf_body γa mm P szv len src_bytes K lvl eb p C b lks.
 End COPYOUT.

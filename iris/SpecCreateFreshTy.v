@@ -161,7 +161,7 @@ Definition create_fresh_ty_body
     (u : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqs dqn : dfrac)
     (Ma : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) : Prop :=
+    (b : bool) (lks : gset nat) : Prop :=
   let pj := proc_addr j in
   (* ---- ialloc's and ilock's own geometry, verbatim ---- *)
   (K_ialloc <= K)%nat ->
@@ -186,6 +186,10 @@ Definition create_fresh_ty_body
   (kd < NINODE)%nat ->
   (* PARKING PREMISE *)
   eb = true ->
+  (* the span's cone is ialloc ("log", 1) and ilock ("bcache", 2, and the
+     inode sleeplock above it); "log" is the lower, so one premise there
+     covers both via [locks_below_mono]. *)
+  locks_below lks (lock_rank "log") ->
   (* ---- THE TWO REAL CONTRACTS, AS HYPOTHESES.  This is what keeps
      [ProofIalloc] and [ProofIlock] load-bearing: the axiom below assumes
      nothing about either function, only about the record identity across
@@ -199,11 +203,12 @@ Definition create_fresh_ty_body
      (cov' : gset Z) (logstart' inodestart' ninodes' : Z) (nib' : nat)
      (dev' : mword 32) (ty' : mword 16) (u' : nat) (Sb' : gset Z)
      (pidv' : mword 32) (dq' dqs' dqn' : dfrac)
-     (m' : regfile) (K' : nat) (eb' : bool) (C' : iProp Σ) (b' : bool),
+     (m' : regfile) (K' : nat) (eb' : bool) (C' : iProp Σ) (b' : bool)
+     (lks' : gset nat),
      wp_ialloc_gen_body (CID := CIDa) γs' j' γl' γu' γd' γk' pd' pav' pu' bn'
                         γ' γfs' γi' cn' gtl' γpr' cov' logstart' inodestart'
                         ninodes' nib' dev' ty' u' Sb' pidv' dq' dqs' dqn'
-                        m' K' eb' C' b') ->
+                        m' K' eb' C' b' lks') ->
   (forall `{CIDl : CpuId}
      (γs' : list gname) (j' : nat) (γl' : gname)
      (γu' : uart_names) (γd' : disk_names) (γk' : gname)
@@ -212,14 +217,15 @@ Definition create_fresh_ty_body
      (cov' : gset Z) (logstart' inodestart' : Z) (nib' : nat)
      (k' : nat) (s' : Qp) (g' : gname) (dev' inum' : mword 32)
      (pidv' : mword 32) (dq' dqs' : dfrac)
-     (m' : regfile) (K' : nat) (eb' : bool) (C' : iProp Σ) (b' : bool),
+     (m' : regfile) (K' : nat) (eb' : bool) (C' : iProp Σ) (b' : bool)
+     (lks' : gset nat),
      wp_ilock_sconf_body (CID := CIDl) γs' j' γl' γu' γd' γk' pd' pav' pu' bn'
                          γfs' γi' cn' gil' gisl' cov' logstart' inodestart'
                          nib' k' s' g' dev' inum' pidv' dq' dqs'
-                         m' K' eb' C' b') ->
+                         m' K' eb' C' b' lks') ->
   (* ================= THE SPAN ================= *)
   sie_cap_gpr Ma K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is (mword_of_int (KernelSyms.create + 0xa4) : mword 64) -∗
   panic_wp_any -∗
   kernel_data -∗
@@ -251,7 +257,7 @@ Definition create_fresh_ty_body
     (gil gisl : gname) (dn : dinode) (bm : blkmap),
       ⌜cr_cs_but_s3 Ma Mo⌝ -∗
       sie_cap_gpr Mo K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -313,8 +319,8 @@ Module Type CREATE_FRESH_TY.
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (Ma : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       create_fresh_ty_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                            cov logstart inodestart ninodes nib dev ty kd dqp
-                           u Sb pidv dq dqs dqn Ma K eb C b.
+                           u Sb pidv dq dqs dqn Ma K eb C b lks.
 End CREATE_FRESH_TY.

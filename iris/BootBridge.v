@@ -386,7 +386,7 @@ Section BootBridge.
     ==∗
     ∃ mf : regfile,
       sie_cap_gpr mf (kv_frame_slots + K) false p0 ∗
-      cpu_own 0 false p0 cpu_ctx_free false ∗
+      cpu_own 0 false p0 cpu_ctx_free false ∅ ∗
       ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
       main_hart_raw tlbvec0.
   Proof.

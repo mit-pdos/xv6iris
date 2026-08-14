@@ -654,7 +654,7 @@ Section KexecB2Body.
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
       (m Mt : regfile) (K : nat) (C : iProp Σ)
       (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (szf : mword 64) :
+      (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (lks : gset nat) :
     (K_kexec <= K)%nat ->
     (kf < NINODE)%nat ->
     log_geom_ok cov logstart ->
@@ -686,7 +686,7 @@ Section KexecB2Body.
     um_below szf P.(ud_um) ->
     um_covered szf P.(ud_um) ->
     sie_cap_gpr Mt (K - 68)%nat true (proc_addr jp) -∗
-    cpu_own 0 true (proc_addr jp) C true -∗
+    cpu_own 0 true (proc_addr jp) C true lks -∗
     kernel_text -∗
     panic_wp_any -∗
     pc_is (mword_of_int (KXB + 0x324) : mword 64) -∗
@@ -720,7 +720,7 @@ Section KexecB2Body.
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr mf K true (proc_addr jp) -∗
-          cpu_own 0 true (proc_addr jp) C true -∗
+          cpu_own 0 true (proc_addr jp) C true lks -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -748,6 +748,9 @@ Section KexecB2Body.
        -- which names the hypothesis and not the reason. *)
     iIntros "Hcg Hcnt #Htext #Hpanic Hpc #Hfab Hopen Hbm Hins Hbits #Hka Hpt
              Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe Hcont".
+    (* depth 0 forces the held set empty, so proc_freepagetable's order
+       premise needs no hypothesis of this lemma's own. *)
+    iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     rewrite /kxc_frameBpin.
     iDestruct "Hframe" as "(Hf1 & Hf2 & Hf3 & Hf4 & Hf5 & Hf6 & Hf7 & Hf8 &
                             Hf9 & Hf10 & Hf11 & Hf12 & Hf13 & Hust & Hph &
@@ -841,12 +844,13 @@ Section KexecB2Body.
     iDestruct (cpu_own_transport CID0 CID3 0%nat true (proc_addr jp) C true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (PFP.wp_proc_freepagetable_sconf ga T3 P (K - 68)%nat true
-              (proc_addr jp) C 0%nat true
+              (proc_addr jp) C 0%nat true lks
               ltac:(lia) kxc_lvl0 HT3a0
               ltac:(rewrite HT3a1 uint_unsigned;
                     exact (proc_pt_covered_maxsz P szf Hwf Hcov))
               ltac:(rewrite HT3a1; exact Hbelow)
               with "Hcg Hcnt Htext Hpc Hpt Hka").
+    all: try lkbelow.
     iIntros (CID4 Hsq4 mr) "Hcg Hcnt Hpc %Hcspf".
     assert (Hpc32e : ret_pc (T3 !!! Regidx Rra) = mword_of_int (KXB + 0x32e))
       by (rewrite HT3ra; pcw).
@@ -1070,7 +1074,7 @@ Section KexecB2Body.
               gilf gislf ga gf cov logstart bmapstart inodestart nib size
               dev used used2 kf qf sf gyf inumf dnf bmf n2
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa
-              m U8 K C sp0 ra0 s00 s10 s20 pv av
+              m U8 K C lks sp0 ra0 s00 s10 s20 pv av
               HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
               Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 HU8sp HU8s4 HU8thr
               with "Hcg Hcnt Htext Hpanic Hpc Hfab Hslkk Hslkd Hslpid Hdep
@@ -1204,7 +1208,7 @@ Section KexecB2Loops.
       (m : regfile) (K : nat) (C : iProp Σ)
       (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd)
-      (ip : nat) (va : mword 64) (fz po : Z) :
+      (ip : nat) (va : mword 64) (fz po : Z) (lks : gset nat) :
     (K_kexec <= K)%nat ->
     (kf < NINODE)%nat ->
     log_geom_ok cov logstart ->
@@ -1250,7 +1254,7 @@ Section KexecB2Loops.
     Ml !!! Regidx Rs10 = (mword_of_int (Z.of_nat ip) : mword 64) ->
     Ml !!! Regidx Rs11 = (mword_of_int 56 : mword 64) ->
     sie_cap_gpr Ml (K - 68)%nat true (proc_addr jp) -∗
-    cpu_own 0 true (proc_addr jp) C true -∗
+    cpu_own 0 true (proc_addr jp) C true lks -∗
     kernel_text -∗
     panic_wp_any -∗
     pc_is (mword_of_int (KXB + 0xf6) : mword 64) -∗
@@ -1275,7 +1279,7 @@ Section KexecB2Loops.
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr mf K true (proc_addr jp) -∗
-          cpu_own 0 true (proc_addr jp) C true -∗
+          cpu_own 0 true (proc_addr jp) C true lks -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1305,7 +1309,7 @@ Section KexecB2Loops.
           Mx !!! Regidx Rs10 = (mword_of_int (Z.of_nat ip) : mword 64) /\
           Mx !!! Regidx Rs11 = (mword_of_int 56 : mword 64)⌝ -∗
         sie_cap_gpr Mx (K - 68)%nat true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) C true -∗
+        cpu_own 0 true (proc_addr jp) C true lks -∗
         pc_is (mword_of_int (KXB + 0x116) : mword 64) -∗
         kxc_res jp bn g gfs gi cn gf cov logstart bmapstart inodestart size dev
                 used2 kf qf sf gyf inumf dnf bmf gilf gislf n2 plen pfun na avf
@@ -1320,7 +1324,7 @@ Section KexecB2Loops.
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
               sie_cap_gpr mf K true (proc_addr jp) -∗
-              cpu_own 0 true (proc_addr jp) C true -∗
+              cpu_own 0 true (proc_addr jp) C true lks -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1354,6 +1358,9 @@ Section KexecB2Loops.
         by (apply Z.mod_pos_bound; lia).
       cbn in Hfuel. lia. }
     iIntros "Hcg Hcnt #Htext #Hpanic Hpc #Hfab #Hka Hres Hcont Hc116".
+    (* depth 0 forces the held set empty, so readi's order premise needs no
+       hypothesis of this lemma's own. *)
+    iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct "Hfab" as "(#Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
@@ -1677,7 +1684,7 @@ Section KexecB2Loops.
                  (forall r : mword 5, is_cs_idx r = true -> r <> Rs2 ->
                     Md !!! Regidx r = Ml !!! Regidx r)⌝ -∗
                sie_cap_gpr Md (K - 68)%nat true (proc_addr jp) -∗
-               cpu_own (CID := CIDd) 0 true (proc_addr jp) C true -∗
+               cpu_own (CID := CIDd) 0 true (proc_addr jp) C true lks -∗
                pc_is (mword_of_int (KXB + 0xda) : mword 64) -∗
                WP (Loop : expr riscv_lang))%I
       with "[Hopen Hlog Hirs Hbm Hins Hbits Hbs Hpt Hpriv
@@ -1872,7 +1879,7 @@ Section KexecB2Loops.
       iApply (Readi.wp_readi_sconf gs jp gl gu gd gk pd pav pu bn gfs ga gf
                 cov logstart dev (ientry kf) bmf datl dnf false offn nn fpg V
                 pidv (DfracOwn (1/4)) (DfracOwn (1/2)) D6 (K - 68)%nat true C
-                true ltac:(unfold K_readi; lia) Hlg Hbmwf Hbmcov Hszb
+                true lks ltac:(unfold K_readi; lia) Hlg Hbmwf Hbmcov Hszb
                 ltac:(rewrite HoffnZ; lia)
                 ltac:(intros Hg; rewrite HoffnZ in Hg |- *;
                       pose proof Hszb as Hs; rewrite Hmb in Hs; lia)
@@ -1880,6 +1887,7 @@ Section KexecB2Loops.
                 ltac:(rewrite HD6a1; vm_compute; reflexivity) HD6a3 HD6a4
                 with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hka Hidev Hmeta Hmap
                       Hblocks [Hdst Hppid] Hprocs Hdevi Hdgeom Hdlock Hbs1").
+      all: try lkbelow.
       { rewrite /trap_csrs_ext. done. }
       { rewrite /cpu_claim_ext. done. }
       { iSplitL "Hdst"; [iExact "Hdst" | iExact "Hppid"]. }
@@ -2138,7 +2146,7 @@ Section KexecB2Loops.
                   gi cn gtl gilf gislf ga gf cov logstart bmapstart inodestart
                   nib size dev used used2 kf qf sf gyf inumf dnf bmf n2 plen
                   pfun na avf alen aslen afun pidv V dqb dqs dqa m M2 K C
-                  sp0 ra0 s00 s10 s20 pv av w63 w67 ef P w65
+                  sp0 ra0 s00 s10 s20 pv av w63 w67 ef P w65 lks
                   HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                   Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2
                   ltac:(rewrite (HM2get csp_rs1 ltac:(vm_compute; reflexivity)

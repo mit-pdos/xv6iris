@@ -41,20 +41,22 @@ Module PrintkGen : PRINTK_GEN.
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γpr : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
-      {dqf : dfrac} (f : string) (descs : list pk_arg_desc) (b : bool) :
-    wp_printk_gen_sconf_body γpr γd γv m0 K eb pj C dqf f descs b.
+      {dqf : dfrac} (f : string) (descs : list pk_arg_desc) (b : bool)
+      (lks : gset nat) :
+    wp_printk_gen_sconf_body γpr γd γv m0 K eb pj C dqf f descs b lks.
   Proof.
     rewrite /wp_printk_gen_sconf_body /=.
-    intros HK Hlen Hnonul Hkinds Hdlen.
+    intros HK Hlen Hnonul Hkinds Hdlen Hbelow.
     iIntros "Hcap Htext Hkdata Hpc Hpanic Hcpu Hpenv Hfmt Hdescs Hcont".
     iDestruct "Hpenv" as "(#Hprlk & #Hdoff & #Hdev & [%γl #Htxl] & #Hsub0)".
     iAssert (panic_wp_any) as "#Hpa".
     { iApply panic_wp_any_holds. }
     iApply (Printk.wp_printk_sconf γpr γl γd γv m0 K [] 0%nat eb C
-              (dqf := dqf) f descs b pj
+              (dqf := dqf) f descs b pj lks
               ltac:(rewrite /printk_stack; lia)
               Hlen Hnonul Hkinds Hdlen ltac:(lia)
               with "Hcap Hcpu Htext Hkdata Hpc Hpa Hfmt Hdescs Hprlk Hdev Htxl Hsub0").
+    all: try lkbelow.
     iIntros (CID2 Hpin).
     iDestruct ("Hcont" $! CID2 Hpin) as "Hcont2".
     iIntros (mf cs) "Hcap2 Hcpu2 Hpc2 %Hpost Hfmt2 Hdescs2 Hsub2".

@@ -50,11 +50,11 @@ Section ProofKalloc.
   Lemma wp_kalloc_sconf
       (γl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile)
-      (on : option nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool)
-    : wp_kalloc_sconf_body γl γk fl m on n eb p C K b.
+      (on : option nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset nat)
+    : wp_kalloc_sconf_body γl γk fl m on n eb p C K b lks.
   Proof.
     cbv beta delta [wp_kalloc_sconf_body].
-    intros pcE ret_tgt HK Hfl Hnoffpos.
+    intros pcE ret_tgt HK Hfl Hnoffpos Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hlock Havail #Hpanic Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbmatch. symmetry in Hbmatch.
@@ -176,10 +176,12 @@ Section ProofKalloc.
     iDestruct (cpu_own_transport CID CID8 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γl "kmem"%string (kmem_res γk fl) mA
-              n eb p C (K - 4)%nat b
+              n eb p C (K - 4)%nat b lks
               Hnoffpos
               ltac:(lia)
+              Hfresh
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
     assert (Hpc16 : ret_pc (mA !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kalloc + 0x16)).
@@ -288,7 +290,7 @@ Section ProofKalloc.
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Hbmatch) in "Hcg".
       iApply (Release.wp_release_sconf γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) E3
-                n eb p C (K - 4)%nat
+                n eb p C (K - 4)%nat ({[lock_rank "kmem"]} ∪ lks)
                 ltac:(rewrite HE3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
@@ -296,6 +298,9 @@ Section ProofKalloc.
       rewrite -Hbmatch.
       iIntros (CIDrel Hsrel mr0) "Hcg Hpc %Hrelpins Hcnt".
       rename mr0 into mr.
+      pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
+      iEval (rewrite (_ : ({[lock_rank "kmem"]} ∪ lks) ∖ {[lock_rank "kmem"]} = lks);
+             [| apply locks_add_del_below; lkbelow]) in "Hcnt".
       assert (Hpc58 : ret_pc (E3 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kalloc + 0x58)).
       { rewrite HE3ra. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hpc58) in "Hpc".
@@ -578,7 +583,7 @@ Section ProofKalloc.
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Hbmatch) in "Hcg".
       iApply (Release.wp_release_sconf γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) R12
-                n eb p C (K - 4)%nat
+                n eb p C (K - 4)%nat ({[lock_rank "kmem"]} ∪ lks)
                 ltac:(rewrite HR12a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
@@ -586,6 +591,9 @@ Section ProofKalloc.
       rewrite -Hbmatch.
       iIntros (CIDrel Hsrel mr0) "Hcg Hpc %Hrelpins Hcnt".
       rename mr0 into mr.
+      pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
+      iEval (rewrite (_ : ({[lock_rank "kmem"]} ∪ lks) ∖ {[lock_rank "kmem"]} = lks);
+             [| apply locks_add_del_below; lkbelow]) in "Hcnt".
       assert (Hpc36 : ret_pc (R12 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kalloc + 0x36)).
       { rewrite HR12ra. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hpc36) in "Hpc".

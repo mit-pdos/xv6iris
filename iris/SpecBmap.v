@@ -274,7 +274,7 @@ Definition wp_bmap_sconf_body
     (n : nat)
     (pidv : mword 32) (dq dqd dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bmap in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -302,8 +302,11 @@ Definition wp_bmap_sconf_body
   (* a0 = ip; a1 = bn, sign-extended as the RV64 ABI passes a uint *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bnw ->
+  (* bmap ALLOCATES here, so its cone reaches balloc -> log_write ("log", 3);
+     the bread/brelse floor ("bcache", 4) follows by [locks_below_mono]. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  bmap holds no lock of its
      own -- every push_off/pop_off pair that can mint or spend an
      [arm_pay 0 eb _] lives inside bread/balloc (and, through them,
@@ -399,7 +402,7 @@ Definition wp_bmap_sconf_body
              = sign_extend' 64 (blkmap_get bm' fbn : mword 32)
            /\ bv_unsigned (blkmap_get bm' fbn) <> 0)⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -459,7 +462,7 @@ Definition wp_bmap_gen_body
     (n : nat) (cr : bool) (Sb : gset Z)
     (pidv : mword 32) (dq dqd dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bmap in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -488,8 +491,11 @@ Definition wp_bmap_gen_body
   γs !! j = Some γl ->
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bnw ->
+  (* bmap ALLOCATES here, so its cone reaches balloc -> log_write ("log", 3);
+     the bread/brelse floor ("bcache", 4) follows by [locks_below_mono]. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT.  Same pure-pass-through shape as
      [wp_bmap_sconf_body] above -- required so that a LOOPING caller (e.g.
      writei, which must present the bitmap-block credit across several
@@ -536,7 +542,7 @@ Definition wp_bmap_gen_body
              = sign_extend' 64 (blkmap_get bm' fbn : mword 32)
            /\ bv_unsigned (blkmap_get bm' fbn) <> 0)⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -606,10 +612,10 @@ Module Type BMAP.
       (n : nat)
       (pidv : mword 32) (dq dqd dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_bmap_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                          cov logstart bmapstart size dev used γpr ip bm data fbn n
-                         pidv dq dqd dqb dqs m K eb C b.
+                         pidv dq dqd dqb dqs m K eb C b lks.
 
   (* the SET-FORM contract; [wp_bmap_sconf] above is its instance at
      [cr := false] with the set forgotten, kept as its own parameter so
@@ -630,11 +636,11 @@ Module Type BMAP.
       (n : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_bmap_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
                        cov logstart bmapstart size dev used γpr ip bm data fbn
                        n cr Sb
-                       pidv dq dqd dqb dqs m K eb C b.
+                       pidv dq dqd dqb dqs m K eb C b lks.
 End BMAP.
 
 (* ===================================================================== *)
@@ -689,7 +695,7 @@ Definition wp_bmap_noalloc_sconf_body
     (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (fbn : nat)
     (pidv : mword 32) (dq dqd : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bmap in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -705,8 +711,11 @@ Definition wp_bmap_noalloc_sconf_body
   γs !! j = Some γl ->
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bnw ->
+  (* the NO-ALLOC bmap never reaches log_write, so its floor is just the
+     bread/brelse one -- requiring "log" of its callers would be over-strong. *)
+  locks_below lks (lock_rank "bcache") ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR -- see the allocating
      contract above; the no-alloc arm still sleeps (bread), so it is a
      pure pass-through here too. *)
@@ -742,7 +751,7 @@ Definition wp_bmap_noalloc_sconf_body
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
          = sign_extend' 64 (blkmap_get bm fbn : mword 32)⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -769,8 +778,8 @@ Module Type BMAP_NOALLOC.
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (fbn : nat)
       (pidv : mword 32) (dq dqd : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_bmap_noalloc_sconf_body γs j γl γu γd γk pd pav pu bn γfs
                                  cov logstart dev ip bm data fbn pidv dq dqd
-                                 m K eb C b.
+                                 m K eb C b lks.
 End BMAP_NOALLOC.

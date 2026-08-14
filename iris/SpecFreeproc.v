@@ -231,7 +231,7 @@ Section SpecFreeproc.
       (j : nat) (γl : gname) (V : pprivate) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-      (ilvl : nat) :=
+      (ilvl : nat) (lks : gset nat) :=
     let pcE : mword 64 := mword_of_int KernelSyms.freeproc in
     let pa := proc_addr j in
     let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -241,8 +241,12 @@ Section SpecFreeproc.
        increment in int range *)
     (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
     mm !!! Regidx (mword_of_int 10 : mword 5) = pa ->
+    (* freeproc's own kfree(trapframe) is direct, at "kmem"(13); the
+       proc_freepagetable arm's own callees carry no order premise of their
+       own yet, so this is the whole cone this contract needs to state. *)
+    locks_below lks (lock_rank "kmem") ->
     sie_cap_gpr mm K false pme -∗
-    cpu_own ilvl eb pme C false -∗
+    cpu_own ilvl eb pme C false lks -∗
     kernel_text -∗
     pc_is pcE -∗
     proc_held cpu_id j γl st ch -∗
@@ -253,7 +257,7 @@ Section SpecFreeproc.
     wp_next false pme (fun (CID : CpuId) =>
       ∀ (mr : regfile),
       sie_cap_gpr mr K false pme -∗
-      cpu_own ilvl eb pme C false -∗
+      cpu_own ilvl eb pme C false lks -∗
       pc_is ret_tgt -∗
       ⌜callee_saved mm mr⌝ -∗
       proc_held cpu_id j γl UNUSED (zero_reg : mword 64) -∗
@@ -274,6 +278,6 @@ Module Type FREEPROC.
       (j : nat) (γl : gname) (V : pprivate) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-      (ilvl : nat),
-      wp_freeproc_sconf_body γa mm j γl V pid st ch opt otf K eb pme C ilvl.
+      (ilvl : nat) (lks : gset nat),
+      wp_freeproc_sconf_body γa mm j γl V pid st ch opt otf K eb pme C ilvl lks.
 End FREEPROC.

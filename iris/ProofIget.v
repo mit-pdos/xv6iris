@@ -114,6 +114,14 @@ Require Import SpecAcquire SpecRelease.
 Require Import SpecIget.
 From Kernel Require KernelSyms.
 Require Import LogInv.  (* [logG]: the region's zero-receipt, fs-log.md G.17 *)
+(* The [set_solver] override.  EXPORT, not Import: this import is         *)
+(* deliberately "dead" -- the file compiles without it, just far slower --  *)
+(* and the nightly dead-import sweep skips [Require Export] lines.         *)
+(* It has to be HERE rather than inherited: [Require Export] only          *)
+(* propagates through an unbroken chain of Exports, and this tree's        *)
+(* intermediate files use [Require Import], so nothing downstream inherits *)
+(* it.  See FastSetSolver.v.                                              *)
+Require Export FastSetSolver.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -338,12 +346,12 @@ Section ProofIget.
   Local Ltac regne := reg_ne_side.
 
   (* [ProofIdup.sie_b_agree], verbatim. *)
-  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) :
-    sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b -∗
+  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) (lks : gset nat) :
+    sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
-    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as [-> ->]. done.
+    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as (-> & -> & _). done.
     - destruct n as [|n']; [ | done ].
       iDestruct "Hcnt" as "[[_ Hint] _]".
       iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm) & _)".
@@ -399,16 +407,16 @@ Section ProofIget.
       (cov : gset Z) (logstart : Z) (nib : nat)
       (dev inum : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (K : nat) (b : bool)
+      (K : nat) (b : bool) (lks : gset nat)
     : wp_iget_sconf_body γl cn γfs γi cov logstart nib dev inum
-                         m n eb p C K b.
+                         m n eb p C K b lks.
   Proof.
     cbv beta delta [wp_iget_sconf_body].
-    intros pcE ret_tgt HK HnZ Hnib Ha0 Ha1.
+    intros pcE ret_tgt HK HnZ Hnib Ha0 Ha1 Hfresh.
     unfold K_iget in HK.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv #Hescs #Hpanic Hislot Hcont".
-    iDestruct (sie_b_agree m n K eb b p C with "Hcg Hcnt") as %Houtb.
+    iDestruct (sie_b_agree m n K eb b p C lks with "Hcg Hcnt") as %Houtb.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
     iPoseProof (igi_00 with "Htext") as "Hi00".
@@ -601,8 +609,9 @@ Section ProofIget.
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γl "itable"%string
               (itable_res2 cn γfs γi cov logstart nib dev) mA
-              n eb p C (K - 6)%nat b HnZ ltac:(lia)
+              n eb p C (K - 6)%nat b lks HnZ ltac:(lia) Hfresh
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
     assert (Hpc20 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.iget + 0x20)).
@@ -735,7 +744,7 @@ Section ProofIget.
                 c <> Rs2 -> c <> Rs3 -> c <> Rs4 ->
                 mt !!! Regidx c = m !!! Regidx c) ⌝ -∗
         sie_cap_gpr (CID := CIDt) mt (K - 6)%nat b p -∗
-        cpu_own (CID := CIDt) n eb p C b -∗
+        cpu_own (CID := CIDt) n eb p C b lks -∗
         pc_is (CID := CIDt) (mword_of_int (KernelSyms.iget + 0x8c) : mword 64) -∗
         IcacheRef.inode_ref kk q dev inum -∗
         WP (Loop : expr riscv_lang)))%I).
@@ -947,7 +956,7 @@ Section ProofIget.
                             /\ M !! e = None) ⌝ -∗
       sie_cap_gpr Mr (trap_res b + (K - 6))%nat false p -∗
       pc_is (mword_of_int (KernelSyms.iget + 0x44) : mword 64) -∗
-      cpu_own (S n) eb p C false -∗
+      cpu_own (S n) eb p C false ({[lock_rank "itable"]} ∪ lks) -∗
       arm_pay n eb p -∗
       locked γl cpu_id -∗
       itable_half M -∗
@@ -982,7 +991,7 @@ Section ProofIget.
                               /\ M !! e = None) ⌝ -∗
         sie_cap_gpr Ms (trap_res b + (K - 6))%nat false p -∗
         pc_is (mword_of_int (KernelSyms.iget + 0x3c) : mword 64) -∗
-        cpu_own (S n) eb p C false -∗
+        cpu_own (S n) eb p C false ({[lock_rank "itable"]} ∪ lks) -∗
         arm_pay n eb p -∗
         locked γl cpu_id -∗
         itable_half M -∗
@@ -1450,11 +1459,15 @@ Section ProofIget.
             iEval (rewrite Houtb) in "Hcg".
             iApply (Release.wp_release_sconf γl itable_lock "itable"%string
                       (itable_res2 cn γfs γi cov logstart nib dev) V4
-                      n eb p C (K - 6)%nat ltac:(rewrite HV4a0; reflexivity) ltac:(lia)
+                      n eb p C (K - 6)%nat ({[lock_rank "itable"]} ∪ lks)
+                      ltac:(rewrite HV4a0; reflexivity) ltac:(lia)
                       with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
             { iExact "Hlock". }
             iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
             iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
+            pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
+            iEval (rewrite (_ : ({[lock_rank "itable"]} ∪ lks) ∖ {[lock_rank "itable"]} = lks);
+                   [| apply locks_add_del_below; lkbelow]) in "Hcnt".
             rewrite <- Houtb in Hsr.
             pose proof Hrelpins as Hrelpins_cs.
             assert (Hpc8c : ret_pc (V4 !!! Regidx Rra) = mword_of_int (KernelSyms.iget + 0x8c)).
@@ -1860,11 +1873,15 @@ Section ProofIget.
         iEval (rewrite Houtb) in "Hcg".
         iApply (Release.wp_release_sconf γl itable_lock "itable"%string
                   (itable_res2 cn γfs γi cov logstart nib dev) L7
-                  n eb p C (K - 6)%nat ltac:(rewrite HL7a0; reflexivity) ltac:(lia)
+                  n eb p C (K - 6)%nat ({[lock_rank "itable"]} ∪ lks)
+                  ltac:(rewrite HL7a0; reflexivity) ltac:(lia)
                   with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
         { iExact "Hlock". }
         iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
         iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
+        pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
+        iEval (rewrite (_ : ({[lock_rank "itable"]} ∪ lks) ∖ {[lock_rank "itable"]} = lks);
+               [| apply locks_add_del_below; lkbelow]) in "Hcnt".
         rewrite <- Houtb in Hsr.
         pose proof Hrelpins as Hrelpins_cs.
         assert (Hpc66 : ret_pc (L7 !!! Regidx Rra) = mword_of_int (KernelSyms.iget + 0x66)).

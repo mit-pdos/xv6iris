@@ -88,12 +88,12 @@ Section ProofSysFork.
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (b : bool) (pid : mword 32) (V : pprivate)
+      (b : bool) (pid : mword 32) (V : pprivate) (lks : gset nat)
     : wp_sys_fork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart nib
-                             m lvl av eb p C b pid V.
+                             m lvl av eb p C b pid V lks.
   Proof.
     cbv beta delta [wp_sys_fork_sconf_body].
-    intros pcE ret_tgt Hav Hlvl.
+    intros pcE ret_tgt Hav Hlvl Hbelow.
     unfold K_sys_fork in Hav.
     set (imm_entry := (mword_of_int 48 : mword 6)).
     set (imm_dealloc := (mword_of_int 16 : mword 6)).
@@ -176,8 +176,8 @@ Section ProofSysFork.
     iDestruct (cpu_own_transport CID CID5 lvl eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     (* ---- kfork(): a0 = -1 or the child's pid; the parent's block back ---- *)
     iApply (Kfork.wp_kfork_sconf γa γp γw γl γf γil γic γs cn γfs cov logstart nib
-              Bj lvl (av - 2)%nat eb p C b pid V
-              ltac:(lia) Hlvl
+              Bj lvl (av - 2)%nat eb p C b pid V lks
+              ltac:(lia) Hlvl ltac:(lkbelow)
               with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hplock Hwlock Hftbl
                     Hitbl Hitinv Henv Hpriv").
     iIntros (CID6 Hs6 MF) "%HcsMF Hpc Hpost".

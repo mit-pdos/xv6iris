@@ -910,7 +910,7 @@ Section ProofCopyinstr.
   Local Lemma cs_loop (γa : gname)
       (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (C : iProp Σ)
       (dst spr : mword 64) (maxn : nat)
-      (v10 v11 : mword 64) (b : bool) (pcur : mword 64) :
+      (v10 v11 : mword 64) (b : bool) (pcur : mword 64) (lks : gset nat) :
     (50 <= K)%nat ->
     (Z.of_nat maxn < 18446744073709551616)%Z ->
     (uint szv <= 2 ^ 38)%Z ->
@@ -929,8 +929,9 @@ Section ProofCopyinstr.
     m !!! Regidx Rs9 = (mword_of_int 1 : mword 64) ->
     m !!! Regidx Rs10 = v10 ->
     m !!! Regidx Rs11 = v11 ->
+    locks_below lks (lock_rank "kmem") ->
     sie_cap_gpr m (K - 12)%nat b pcur -∗
-    cpu_own lvl eb pcur C b -∗
+    cpu_own lvl eb pcur C b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.copyinstr + 0x7c) : mword 64) -∗
     proc_pt Pc -∗
@@ -945,7 +946,7 @@ Section ProofCopyinstr.
       ⌜copyinstr_ret maxn g res⌝ -∗
       ⌜uptd_ext_sz szv P P'⌝ -∗
       sie_cap_gpr mj (K - 12)%nat b pcur -∗
-      cpu_own lvl eb pcur C b -∗
+      cpu_own lvl eb pcur C b lks -∗
       pc_is (mword_of_int (KernelSyms.copyinstr + 0x4e) : mword 64) -∗
       proc_pt P' -∗
       ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ g j) -∗
@@ -955,7 +956,8 @@ Section ProofCopyinstr.
     intros HK Hmax64 Hszb Hlvl.
     intro fuel.
     induction fuel as [| fuel IH];
-      intros done rem CID0 Pc m f Hfuel Hrem Hsum Hnul Hext Hsp Hs1 Hs3 Hs4 Hs5 Hs6 Hs8 Hs9 Hs10 Hs11;
+      intros done rem CID0 Pc m f Hfuel Hrem Hsum Hnul Hext Hsp Hs1 Hs3 Hs4 Hs5 Hs6 Hs8 Hs9 Hs10 Hs11
+        Hlkbelow;
       [ exfalso; lia |].
     iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hdst Hcont".
     iDestruct "Henv" as (γk) "(#Hlock & #Havail & #Hpanic)".
@@ -974,7 +976,7 @@ Section ProofCopyinstr.
       ⌜copyinstr_ret maxn g res⌝ -∗
       ⌜uptd_ext_sz szv P P'⌝ -∗
       sie_cap_gpr mj (K - 12)%nat b pcur -∗
-      cpu_own lvl eb pcur C b -∗
+      cpu_own lvl eb pcur C b lks -∗
       pc_is (mword_of_int (KernelSyms.copyinstr + 0x4e) : mword 64) -∗
       proc_pt P' -∗
       ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ g j) -∗
@@ -1112,7 +1114,7 @@ Section ProofCopyinstr.
         ⌜mc !!! Regidx Rs10 = v10⌝ -∗
         ⌜mc !!! Regidx Rs11 = v11⌝ -∗
         sie_cap_gpr mc (K - 12)%nat b pcur -∗
-        cpu_own lvl eb pcur C b -∗
+        cpu_own lvl eb pcur C b lks -∗
         pc_is (mword_of_int (KernelSyms.copyinstr + 0x8a) : mword 64) -∗
         page_own pa0 -∗
         (page_own pa0 -∗ proc_pt Pd) -∗
@@ -1543,6 +1545,7 @@ Section ProofCopyinstr.
                       Hf1 Hf2 Hf3 Hnulg (uptd_ext_sz_trans szv P Pc Pd Hext Hextd)
                       HD5sp HD5s1 HD5s3 HD5s4 HD5s5 HD5s6
                       HD5s8 HD5s9 HD5s10 HD5s11
+                      Hlkbelow
                       with "Hcg Hcnt Htext Hpc Hpt Henv Hdst HEXIT"). } }
       (* ---- +0x6c: sub a3,s2,s7 ---- *)
       iApply (wp_sub_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x8a)) Ra2 Rs2 Rs1
@@ -1717,8 +1720,9 @@ Section ProofCopyinstr.
       assert (HF5a2' : tp_pin F5 !!! Regidx Ra2 = va0)
         by (rewrite (tp_pin_ne (CIDx := CIDu6) F5 Ra2 ltac:(ridx_neq)); exact HF5a2).
       iApply (Vmfault.wp_vmfault_sconf γa (tp_pin F5) Pc szv (K - 12)%nat lvl eb pcur C b
-                ltac:(lia) HF5tp HF5a0' HF5a1' Hszb Hlvl
+                _ ltac:(lia) HF5tp HF5a0' HF5a1' Hszb Hlvl
                 with "Hcg Hcnt Htext Hpc Hpt Henv").
+      all: try lkbelow.
       iIntros (CIDvf Hsvf mv) "Hcg Hcnt Hpc %Hvcs Hvpost".
       iEval (rewrite HF5a2' Hidem) in "Hvpost".
       assert (Hret3a : ret_pc (tp_pin (CID:=CIDu6) F5 !!! Regidx Rra)
@@ -1891,11 +1895,11 @@ Section ProofCopyinstr.
   Lemma wp_copyinstr_sconf
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (maxn : nat) (dst_olds : nat -> bv 8)
-      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool)
-    : wp_copyinstr_sconf_body γa mm P szv maxn dst_olds K lvl eb p C b.
+      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat)
+    : wp_copyinstr_sconf_body γa mm P szv maxn dst_olds K lvl eb p C b lks.
   Proof.
     cbv beta delta [wp_copyinstr_sconf_body].
-    intros pcE dst ret_tgt HK Hroot Hsza1 Hmaxr Hmax64 Hszb Hlvl.
+    intros pcE dst ret_tgt HK Hroot Hsza1 Hmaxr Hmax64 Hszb Hlvl Hlkbelow.
     assert (E64 : (2 ^ 64)%Z = 18446744073709551616%Z) by (vm_compute; reflexivity).
     rewrite E64 in Hmax64.
     set (sp0 := mm !!! Regidx csp_rs1).
@@ -2323,11 +2327,12 @@ Section ProofCopyinstr.
       iDestruct (cpu_own_transport CID CIDp18 lvl eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply (cs_loop γa P szv K lvl eb C dst (pa_stk sp0 12) maxn
-                (mm !!! Regidx Rs10) (mm !!! Regidx Rs11) b p
+                (mm !!! Regidx Rs10) (mm !!! Regidx Rs11) b p lks
                 HK Hmax64 Hszb Hlvl maxn 0%nat maxn CIDp18 P M8 dst_olds
                 Hg1 Hmax1 Hg3 (bb_nonul_0 dst_olds) (uptd_ext_sz_refl szv P)
                 HM8sp HM8s1 HM8s3 HM8s4 HM8s5 HM8s6
                 HM8s8 HM8s9 HM8s10 HM8s11
+                Hlkbelow
                 with "Hcg Hcnt Htext Hpc Hpt Henv Hdst").
       iIntros (CIDj Hsj mj res P' g)
         "%Hjsp %Hj10 %Hj11 %Hja0 %Hjret %Hjext Hcg Hcnt Hpc Hpt Hdst".

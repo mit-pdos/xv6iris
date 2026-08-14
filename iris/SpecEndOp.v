@@ -101,7 +101,7 @@ Definition wp_end_op_sconf_body
     (u : nat)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.end_op in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -113,8 +113,19 @@ Definition wp_end_op_sconf_body
   log_geom_ok cov logstart ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
+  (* the order premise: end_op's own two critical sections both acquire
+     "log" (rank 3) directly, balanced end to end, so [lks] -- the caller's
+     held set -- is the SAME value at both acquire call sites.  wakeup's own
+     "proc" (rank 11) order premise is a consequence at the point it is
+     called (with "log" held): [locks_below_mono] lifts this bound to 11,
+     [locks_below_union_singleton] pushes it across the held "log" singleton.
+     commit's interior bread/bwrite/brelse run with "log" ALREADY RELEASED
+     (the C releases before calling commit()) and their Spec files (SpecBread
+     etc.) surface no order premise of their own for their callers to
+     satisfy, so nothing about them is stated here. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
@@ -153,7 +164,7 @@ Definition wp_end_op_sconf_body
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -176,7 +187,7 @@ Module Type END_OP.
       (u : nat)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_end_op_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
-                           cov logstart dev u pidv dq m K eb C b.
+                           cov logstart dev u pidv dq m K eb C b lks.
 End END_OP.

@@ -67,15 +67,18 @@ Definition consputc_stack : nat := 16%nat.
 
 Definition wp_consputc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-    (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64) :=
+    (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset nat) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let pcE := mword_of_int KernelSyms.consputc in
   let ra0 := m0 !!! Regidx ra_idx in
   let ret_tgt := ret_pc ra0 in
   (consputc_stack <= K)%nat ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
+  (* the order premise, at the LOWEST rank this cone touches; every
+     higher one follows by [locks_below_mono]. *)
+  locks_below lks (lock_rank "uart") ->
   sie_cap_gpr m0 K b p -∗
-  cpu_own n eb p C b -∗
+  cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   dev_inv γd γv -∗
@@ -84,7 +87,7 @@ Definition wp_consputc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGho
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf cs,
     sie_cap_gpr mf K b p -∗
-    cpu_own n eb p C b -∗
+    cpu_own n eb p C b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
     uart_sent_sub γd (bs ++ cs) -∗
@@ -95,6 +98,6 @@ Module Type CONSPUTC.
   Parameter wp_consputc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-      (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64),
-      wp_consputc_sconf_body γl γd γv m0 K bs n eb C b p.
+      (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset nat),
+      wp_consputc_sconf_body γl γd γv m0 K bs n eb C b p lks.
 End CONSPUTC.

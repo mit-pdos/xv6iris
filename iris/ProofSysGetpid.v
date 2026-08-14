@@ -90,8 +90,8 @@ Section ProofSysGetpid.
   (* =================================================================== *)
   Lemma wp_sys_getpid_sconf (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (b : bool)
-    : wp_sys_getpid_sconf_body γf m av n eb p C pid V b.
+      (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat)
+    : wp_sys_getpid_sconf_body γf m av n eb p C pid V b lks.
   Proof.
     cbv beta delta [wp_sys_getpid_sconf_body].
     intros pcE ret_tgt Hn Hav.
@@ -181,7 +181,7 @@ Section ProofSysGetpid.
     iDestruct (cpu_own_transport CID CID5 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     (* ---- myproc(): a0 = p, callee-saved preserved ---- *)
     iApply (Myproc.wp_myproc_sconf Bj (av - 2)%nat n eb p C b
-              Hn ltac:(lia)
+              _ Hn ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
     iIntros (CID6 Hs6 ms MF) "%Hms Hcg Hcpu Hpc %HcsMF".
     destruct HcsMF as [HcsMF HMFa0].
