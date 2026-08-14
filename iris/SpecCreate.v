@@ -398,10 +398,22 @@ Proof. reflexivity. Qed.
 Lemma create_made_wf ty major minor : dinode_wf (create_made ty major minor).
 Proof. rewrite /dinode_wf /create_made /=. reflexivity. Qed.
 
+(* NO STANDALONE [icacheG] / [icfg] IN ANY CONTEXT BELOW, and that is
+   load-bearing rather than tidy.  [FileInvDefs.fileG] CARRIES both as
+   field instances ([file_icacheG], [file_icfg]), so a context binding
+   [!fileG Σ] AND [!icacheG Σ] has two [icacheG]s -- and create is the
+   first function where the two MEET: [ProcInv.cwd_ref] (which create
+   hands to [nameiparent]) resolves its [inode_held] through [fileG],
+   while every [ic_*] here would resolve through the standalone one.  The
+   two propositions then print IDENTICALLY and fail to unify, with
+   durable-notes' *"iSpecialize: cannot instantiate (P -∗ Q) with P"*.
+   Worse, the [Module Type] below would be UNPROVABLE while stating it,
+   because a sealer must supply the statement at INDEPENDENT instances.
+   [SpecKexec] already binds it this way for the same reason; keep it. *)
 Section CreateSpec.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId}.
 
   (* THE LOCKED-INODE PAYOUT.  Exactly [SpecIunlock]'s / [SpecIunlockput]'s
@@ -429,7 +441,7 @@ End CreateSpec.
 Definition wp_create_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -607,7 +619,7 @@ Module Type CREATE.
   Parameter wp_create_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

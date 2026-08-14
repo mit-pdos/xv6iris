@@ -540,11 +540,27 @@ Lemma cr_pop (X : mword 64) :
   = X.
 Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
 
-(* [addi s0,sp,80] at +0x10: the frame pointer is the ENTRY sp *)
+(* [addi s0,sp,80] at +0x10: the frame pointer is the ENTRY sp.
+   THE EXTENSION IS [sign_extend'], NOT [zero_extend']: the immediate is a
+   positive twelve-bit field so the two agree in VALUE, but they are
+   different TERMS and [WpSconfAlu.wp_caddi4spn_s_sconf]'s post is written
+   with the signed one, so the zero-extended reading does not rewrite at
+   the call site.  (The [c.sdsp] / [c.ldsp] slot addresses below really are
+   [zero_extend'] -- that is [WpSconfMem.wp_csdsp_s_sconf]'s own form --
+   which is why only this one lemma differs.) *)
 Lemma cr_fp (X : mword 64) :
-  add_vec (pa_stk X 10) (zero_extend' 64 (caddi4spn_imm (mword_of_int 20 : mword 8)))
+  add_vec (pa_stk X 10) (sign_extend' 64 (caddi4spn_imm (mword_of_int 20 : mword 8)))
   = X.
 Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
+
+(* [addi a1,s0,-80] at +0x18 / +0x32 (and +0xba / +0x10e on the allocate
+   half): the sixteen-byte [name[DIRSIZ]] local is the BOTTOM of the frame,
+   i.e. the entry sp minus eighty, which is [pa_stk sp0 10] -- the same
+   address the two unused frame slots 9 and 10 name.  Base-encoded, so the
+   immediate is the raw twelve-bit [4016] and not a [caddi*] field. *)
+Lemma cr_name_addr (X : mword 64) :
+  add_vec X (sign_extend' 64 (mword_of_int 4016 : mword 12)) = pa_stk X 10.
+Proof. apply stk_push. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* the eight slot addresses the seven prologue saves and s3's late save use:
    ra 72 -> slot 1, s0 64 -> 2, s1 56 -> 3, s2 48 -> 4, s3 40 -> 5,

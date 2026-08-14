@@ -6502,3 +6502,103 @@ the `dn`/`bm` of the parent as ARGUMENTS and captures everything else,
 introduced `with "[Hcont …]"`.  Stated that way it is a hypothesis of the
 walk lemma and `Print Assumptions` sees nothing — which is the difference
 between "lands gated" and an `Admitted`.
+
+
+### D₀ FOUND HALF LANDED — `ProofCreate.cr_found_half`.  The allocate half
+### is a PREMISE, not an axiom
+
+`ProofCreate.v` exists.  `CreateProof` is the seven-callee functor
+(`NP IL IUP DL IA IU DLK`), deliberately NOT ascribed `: CREATE` — the seal
+is `wp_create_sconf` and it needs the allocate half.  Proven: the
+prologue's seven saves (slot 40 is s3's and this half never writes it),
+`nameiparent`, ARM N, `ilock(dp)`, the `dp->nlink == 0` guard, ARM G,
+`dirlookup`, ARM F-BAD from both entries, ARM F-OK through the +0x62
+funnel.  Every immediate is read off `CodeCreate.v`'s own lemma
+statements.  `Print Assumptions` = the standing six; `cr_alloc_body`
+appears ONCE in the STATEMENT and zero times in the assumptions.
+
+**THE GATE'S SHAPE, for whoever writes the allocate half.**
+`cr_alloc_body` ∀-quantifies the register file at +0x8a, slot 5's
+untouched word, the parent's `kd`/`qd`/`gd`/`γil`/`γisl`/`dind`/`dn`/`bm`/
+`data`, the name buffer's TWO byte functions (nameiparent rewrote only the
+fourteen), and `n1`/`Sb1`/`used1` beside the paid-bitmap report `w`.  It
+hands the locked parent over IN PIECES (`dir_links` / `dinode_at` /
+`inode_meta` / `inode_map` / `inode_blocks`, not `ic_loaded`) because the
+allocate half's `dirlink(dp,name)` takes them at a NAMED `data`, and
+re-parking is one `iExists` away.  Its LAST premise is the contract's own
+continuation ANCHORED AT THE ENTRY HART (ProofDirlink's `dl_after_body`
+shape), so the found half hands `Hcont` over untouched and the block does
+its own retargeting.
+
+**PROCESS BREACH, RECORDED.**  `SpecCreate.v`'s three binder lists lost
+`ICFG : icfg, !icacheG Σ` — a STATEMENT change to a landed contract,
+outside the increment's sanctioned set.  **The stop-and-report belonged
+BEFORE that edit and did not happen**; the change was made first and
+reported after.  It was accepted on merits, and the merits are real
+(below), but the sequence was wrong: this campaign's record is that the
+stops themselves repeatedly caught what certainty missed, and "the fix is
+certain" is exactly the state in which the rule is worth most.
+
+**WHY THE DEDUPLICATION IS RIGHT (the accepted justification).**
+`FileInvDefs.fileG` CARRIES `icacheG` and `icfg` as field instances
+(`file_icacheG`, `file_icfg`), so a context binding `!fileG Σ` AND
+`!icacheG Σ` has two `icacheG`s — durable-notes' typeclass trap 2.  create
+is the FIRST function where the two meet: `ProcInv.cwd_ref`, which create
+hands to `nameiparent`, resolves its `inode_held` through `fileG`, while
+every `ic_*` in the contract resolved through the standalone one.  They
+print character-for-character identically and fail to unify.  Worse,
+`Module Type CREATE` was UNSEALABLE while stating it, because a sealer must
+supply the body at INDEPENDENT instances.  `SpecKexec` has always bound it
+the deduplicated way and `ProofKexecA`'s `Context` carries the same note.
+**A file at this altitude must never bind `!icacheG Σ` or `ICFG : icfg`
+beside `!fileG Σ`.**
+
+**`ProofCreateParts.cr_fp` HAD THE WRONG EXTENSION** — stated at
+`zero_extend' 64 (caddi4spn_imm …)` where `WpSconfAlu.wp_caddi4spn_s_sconf`'s
+post is `sign_extend'`.  Same VALUE (a positive twelve-bit field), different
+TERM, so the one lemma written for +0x10 never rewrote there.  The `c.sdsp`
+/ `c.ldsp` slot addresses really ARE `zero_extend'` — that is
+`wp_csdsp_s_sconf`'s own form — which is why only this one was wrong.
+`cr_name_addr` added beside it for the base-encoded `addi a1,s0,-80`.
+
+**THE CFG WAS RIGHT AND THE PROSE WAS WRONG ABOUT ARM F-BAD.**  +0x80 runs
+ONE `iunlockput`, on `s2` = the CHILD.  The parent's is at +0x42 and is
+SHARED with F-OK.  The ledger table's "F-BAD: `iunlockput(dp)`,
+`iunlockput(ip)`" is right as a count of the ARM's calls; "both entries"
+means the two ways of REACHING +0x80 (the `bne` at +0x4e and the `bltu` at
++0x5e), not two calls at +0x80.
+
+**TWO TRAPS PAID FOR, both already durable but not previously connected to
+a walk this size:**
+
+* **`set_solver` IS QUADRATIC IN THE PROOF CONTEXT (S3l), and at syscall
+  altitude ONE `split; [set_solver | lia]` bullet measured **147.8 s** in
+  this file** — four of them were most of a ten-minute compile.  Every
+  closing bullet is a pure fact about a `gset Z` and a `nat`, so they are
+  now named lemmas proven at the top of the file where the context is
+  empty (`cr_sub2` / `cr_sub3` / `cr_le2` / `cr_le3` / `cr_slots_*`), and
+  the call sites are `exact` terms with no search.  Compile: **10 min → 1m38s.**
+  The same goes for bare `lia`: cheap in isolation, not in there.
+* **`rget` IS HART-INDEXED, so an equation about it written FRESH in the
+  proof means the SECTION hart while a LEAF's output names the REBOUND
+  one.**  The +0x52..+0x5a `lhu`/`addiw`/`slli`/`srli` chain has to be
+  normalised with `rgne` AFTER the `upd_eq` that exposes the inner `rget`;
+  a hand-written `forall M, rget M Ra5 = M !!! Regidx Ra5` bridge fails
+  with "does not match any subterm" against a goal that visibly contains
+  the term.  Same family as the `cpu_own`/`wp_next` retarget traps, and
+  the same tell.
+
+**THE ONE RESOURCE-ALGEBRA LEMMA THE TREE WAS MISSING.**
+`IcacheRef.inode_ref_shed` loses the generation, and the point of
+`nameiparent`'s `inode_held_ty` payout is that the share handed to `ilock`
+names the SAME generation as the type one-shot beside it.  `cr_carve_gen` /
+`cr_shed_gen` are `inode_ref_carve` / `inode_ref_shed` with
+`live_frac_split` replaced by `live_gen_split`.  **Their home is
+`IcacheRef.v`**; they sit in the proof file only because that file's
+rebuild cone is the whole tree.  Take them at the next touch of it.
+
+**SEAM WEAKENINGS (GR-2c finding 5).**  All three `iunlockput`s report at
+`ip_spend_w w false false`, stronger than the `iput_units` the arm rows
+cite; each weakens once by a named lemma, keeping the hypothesis name.
+`crz` is `false` on every one, and on ARM G BY CONSTRUCTION — the mint
+needs a NONZERO nlink observation and ARM G is the zero one.
