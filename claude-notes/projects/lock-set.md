@@ -60,6 +60,26 @@ also dispatches uartintr -> consoleintr, which acquires `cons.lock` at 5.  An
 audit of every premise-carrying contract against the contracts it calls found
 no others; the check is worth re-running after any new premise lands.
 
+### When one function has two modes, the premise goes CONDITIONAL
+
+`bmap` is the case that shows the shape.  Its alloc-capable mode reaches
+`balloc`/`log_write` at `"log"` (3); its no-alloc mode bottoms out at the
+bread/brelse floor `"bcache"` (4).  Stating the contract at 3 would burden
+every no-alloc caller with a bound it does not need; stating it at 4 would not
+deliver 3 on the alloc path, because `locks_below_mono` only raises.  So
+`SpecBmap`/`ProofBmap.wp_bmap_gen` take BOTH, the second guarded:
+
+```coq
+locks_below lks (lock_rank "bcache") ->
+(ak <> None -> locks_below lks (lock_rank "log")) ->
+```
+
+and each alloc branch opens with `pose proof (Hlog ltac:(discriminate)) as
+Hbelow_log`, which puts the unguarded fact in scope so `lkbelow`'s
+`assumption` branch finds it.  Reach for this whenever the rank-minimum rule
+above would otherwise force a whole call graph up to a bound only one arm
+needs.
+
 ### The two tactics the sweep runs on
 
 `LockRank.lkbelow` discharges an order side condition by whichever of the five

@@ -724,6 +724,9 @@ Section KexecB2Body.
        -- which names the hypothesis and not the reason. *)
     iIntros "Hcg Hcnt #Htext #Hpanic Hpc #Hfab Hopen Hbm Hins Hbits #Hka Hpt
              Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe Hcont".
+    (* depth 0 forces the held set empty, so proc_freepagetable's order
+       premise needs no hypothesis of this lemma's own. *)
+    iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     rewrite /kxc_frameB65.
     iDestruct "Hframe" as "(Hf1 & Hf2 & Hf3 & Hf4 & Hf5 & Hf6 & Hf7 & Hf8 &
                             Hf9 & Hf10 & Hf11 & Hf12 & Hf13 & Hust & Hph &
@@ -1047,7 +1050,7 @@ Section KexecB2Body.
               gilf gislf ga gf cov logstart bmapstart inodestart nib size
               dev used used2 kf qf sf gyf inumf dnf bmf n2
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa
-              m U8 K C sp0 ra0 s00 s10 s20 pv av
+              m U8 K C lks sp0 ra0 s00 s10 s20 pv av
               HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
               Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 HU8sp HU8s4 HU8thr
               with "Hcg Hcnt Htext Hpanic Hpc Hfab Hslkk Hslkd Hslpid Hdep
@@ -1848,7 +1851,7 @@ Section KexecB2Loops.
       iApply (Readi.wp_readi_sconf gs jp gl gu gd gk pd pav pu bn gfs ga gf
                 cov logstart dev (ientry kf) bmf datl dnf false offn nn fpg V
                 pidv (DfracOwn (1/4)) (DfracOwn (1/2)) D6 (K - 68)%nat true C
-                true ltac:(unfold K_readi; lia) Hlg Hbmwf Hbmcov Hszb
+                true lks ltac:(unfold K_readi; lia) Hlg Hbmwf Hbmcov Hszb
                 ltac:(rewrite HoffnZ; lia)
                 ltac:(intros Hg; rewrite HoffnZ in Hg |- *;
                       pose proof Hszb as Hs; rewrite Hmb in Hs; lia)

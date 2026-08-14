@@ -347,6 +347,9 @@ Section KexecBBody.
     iDestruct (kxc_sie_b_agree M90 0%nat (K - 68)%nat eb b (proc_addr jp) C
                  with "Hcg Hcnt") as %Houtb.
     subst eb. cbn in Houtb. subst b.
+    (* depth 0 forces the held set empty, so proc_pagetable's order premise
+       needs no hypothesis of this lemma's own. *)
+    iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     (* ---- the frame, opened ---- *)
     rewrite /kxc_frameA6.
     iDestruct "Hframe" as "(Hf1 & Hf2 & Hf3 & Hf4 & (%v5 & Hf5) & Hf6 &
@@ -815,6 +818,9 @@ Section KexecBBody.
            contexts. *)
         iSplitL "Hpc"; [iExact "Hpc" |].
         iSplitL "Hcg"; [iExact "Hcg" |].
+        (* [kxc_at_1a2] names the held set as the literal [∅]; depth 0 makes
+           that the same set [Hcnt] carries. *)
+        iEval (rewrite Hlkempty) in "Hcnt".
         iSplitL "Hcnt"; [iExact "Hcnt" |].
         iSplitL "Hopen"; [iExact "Hopen" |].
         iSplitL "Hlog"; [iExact "Hlog" |].
@@ -1080,6 +1086,8 @@ Section KexecBBody.
            contexts. *)
         iSplitL "Hpc"; [iExact "Hpc" |].
         iSplitL "Hcg"; [iExact "Hcg" |].
+        (* the seam predicate names the held set as the literal [∅]. *)
+        iEval (rewrite Hlkempty) in "Hcnt".
         iSplitL "Hcnt"; [iExact "Hcnt" |].
         iSplitL "Hopen"; [iExact "Hopen" |].
         iSplitL "Hlog"; [iExact "Hlog" |].
@@ -1191,7 +1199,7 @@ Section KexecBBody.
                 gilf gislf ga gf cov logstart bmapstart inodestart nib size
                 dev used used2 kf qf sf gyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa
-                m B1 K C sp0 ra0 s00 s10 s20 pv av
+                m B1 K C lks sp0 ra0 s00 s10 s20 pv av
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
                 Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 HB1sp HB1s4 HB1thr
                 with "Hcg Hcnt Htext Hpanic Hpc Hfab Hslkk Hslkd Hslpid Hdep

@@ -2896,7 +2896,7 @@ Section ProofConsoleintr.
                       = mword_of_int (CT + 0xf0)) by pcw.
       iEval (rewrite Hj0f0) in "Hpc".
       iApply (ct_bs (CIDq := CIDaq) γtx γc γu γv pme m S3 K lvl eb C b sp0 lks
-                HS3sp HS3cs HK Hlvl Hchain
+                HS3sp HS3cs HK Hlvl Hchain Hbelow
                 with "Ht Hpanic Hdev Htxl Hsub Hcg Hpc Hcnt Hpay Hlocked Hres Hrest EXIT"). }
     (* ---- the default arm ---- *)
     iApply (wp_beq_fall_s_sconf (mword_of_int (CT + 0x28)) (mword_of_int 200 : mword 13)

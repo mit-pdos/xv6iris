@@ -1655,7 +1655,7 @@ Section IallocClaim.
     iDestruct (wp_next_shift (b := true) (CIDa := CID11) (CIDb := CID15) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IG.wp_iget_sconf gtl cn γfs γi cov logstart nib dev inum
-              WA 0%nat true (proc_addr j) C (K - 8)%nat b
+              WA 0%nat true (proc_addr j) C (K - 8)%nat b lks
               ltac:(unfold K_iget; lia) ltac:(vm_compute; reflexivity)
               Hnib HWAa0 HWAa1
               Hbelow
@@ -2160,7 +2160,7 @@ Section IallocScan.
       iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
       iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
                 (fs_view γfs γd dev cov) pidv dev bno dq
-                G4 (K - 8)%nat true C b
+                G4 (K - 8)%nat true C b lks
                 HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HG4a0 HG4a1
                 (* bread's bound is "bcache"(4); ia_scan's own is
                    "itable"(2), and [locks_below_mono] weakens it. *)
@@ -2526,7 +2526,7 @@ Section IallocScan.
           [rewrite /bio_locked; iExact "Hheld" |].
         iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
                   pidv dev bno dq GB (K - 8)%nat true (proc_addr j) C
-                  (diblk_bytes ds) bsd0 d0 b HKbl Hkk HGBa0
+                  (diblk_bytes ds) bsd0 d0 b lks HKbl Hkk HGBa0
                   (* brelse's bound is "bcache"(4); ia_scan's own is
                      "itable"(2), and [locks_below_mono] weakens it. *)
                   ltac:(exact (locks_below_mono lks (lock_rank "itable")

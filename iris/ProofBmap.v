@@ -1946,7 +1946,7 @@ Section BmapTail.
         iApply (Hlogwrite _ _ bn γ γfs γd cov logstart dev kk pidv
                   (bm_ind bmI) (ind_bytes (<[q := blk]> (bm_ent bmI)))
                   (ind_bytes (bm_ent bmI)) bsd0 d0 w cri S1
-                  G2 0%nat eb (proc_addr j) C (K - 6)%nat b
+                  G2 0%nat eb (proc_addr j) C (K - 6)%nat b lks
                   HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HG2a0
                   ltac:(rewrite Huind; exact Hicov)
                   ltac:(rewrite Huind; exact Hilog)
@@ -2511,6 +2511,7 @@ Section ProofBmapMain.
         destruct ak as [[γ bms sz uu dqb dqs γpr]|]; [| exfalso; exact (Haknz eq_refl Hdz)].
         pose proof (Hn5i ltac:(discriminate)) as Hn5.
         pose proof (Hba ltac:(discriminate)) as Hballoc.
+        pose proof (Hlog ltac:(discriminate)) as Hbelow_log.
         iDestruct (bm_kit_elim γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev n
                      Sb eq_refl with "Hkit")
           as "(%Hbgok & #Hlctx & Hsl2 & Hop & Hsbsz & Hsbbm & Hbmg)".
@@ -2596,7 +2597,7 @@ Section ProofBmapMain.
         iEval (rewrite Hnn) in "Hop".
         iApply (Hballoc _ _ γs j γl γu γd γk pd pav pu bn γ γfs
                   cov logstart bms sz dev uc γpr u2 cr Sb pidv dq dqb dqs D5
-                  (K - 6)%nat eb C b
+                  (K - 6)%nat eb C b lks
                   HKba Hgeom Hprkc Hbgsz Hbg0 Hbgcov Hbglog
                   ltac:(intros Hc; specialize (Hcr0 Hc); cbn in Hcr0;
                         exact (bmset_sing_in _ _ Hcr0))
@@ -3081,6 +3082,7 @@ Section ProofBmapMain.
                       (Haknz eq_refl) Hiz)].
         pose proof (Hn5i ltac:(discriminate)) as Hn5.
         pose proof (Hba ltac:(discriminate)) as Hballoc.
+        pose proof (Hlog ltac:(discriminate)) as Hbelow_log.
         iDestruct (bm_kit_elim γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev n
                      Sb eq_refl with "Hkit")
           as "(%Hbgok & #Hlctx & Hsl2 & Hop & Hsbsz & Hsbbm & Hbmg)".
@@ -3171,7 +3173,7 @@ Section ProofBmapMain.
         iEval (rewrite Hnn) in "Hop".
         iApply (Hballoc _ _ γs j γl γu γd γk pd pav pu bn γ γfs
                   cov logstart bms sz dev uc γpr u2 cr Sb pidv dq dqb dqs P1
-                  (K - 6)%nat eb C b
+                  (K - 6)%nat eb C b lks
                   HKba Hgeom Hprkc Hbgsz Hbg0 Hbgcov Hbglog
                   ltac:(intros Hc; specialize (Hcr0 Hc); cbn in Hcr0;
                         exact (bmset_sing_in _ _ Hcr0))

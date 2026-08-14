@@ -694,7 +694,7 @@ Section PwConts.
        pw_frame7 m sp0 -∗
        stack_own (pa_stk sp0 7%nat) 7%nat -∗
        sie_cap_gpr M (trap_res true + (av - 14))%nat false (proc_addr j) -∗
-       cpu_own 1%nat eb (proc_addr j) C false lks -∗
+       cpu_own 1%nat eb (proc_addr j) C false ({[lock_rank "pipe"]} ∪ lks) -∗
        arm_pay 0%nat eb (proc_addr j) -∗
        locked γl cpu_id -∗
        pipe_res γp pi -∗
@@ -717,7 +717,7 @@ Section PwConts.
        pw_frame5 m sp0 -∗
        pw_chslot sp0 -∗
        sie_cap_gpr M (trap_res true + (av - 14))%nat false (proc_addr j) -∗
-       cpu_own 1%nat eb (proc_addr j) C false lks -∗
+       cpu_own 1%nat eb (proc_addr j) C false ({[lock_rank "pipe"]} ∪ lks) -∗
        arm_pay 0%nat eb (proc_addr j) -∗
        locked γl cpu_id -∗
        pipe_res γp pi -∗
@@ -749,7 +749,7 @@ Section PwConts.
        pw_frame5 m sp0 -∗
        pw_chslot sp0 -∗
        sie_cap_gpr M (trap_res true + (av - 14))%nat false (proc_addr j) -∗
-       cpu_own 1%nat eb (proc_addr j) C false lks -∗
+       cpu_own 1%nat eb (proc_addr j) C false ({[lock_rank "pipe"]} ∪ lks) -∗
        arm_pay 0%nat eb (proc_addr j) -∗
        locked γl cpu_id -∗
        pipe_res γp pi -∗
@@ -934,7 +934,7 @@ Section PwGuard.
     kernel_text -∗
     pw_frame7 m sp0 -∗ pw_frame5 m sp0 -∗ pw_chslot sp0 -∗
     sie_cap_gpr M (trap_res true + (av - 14))%nat false (proc_addr j) -∗
-    cpu_own 1%nat eb (proc_addr j) C false lks -∗
+    cpu_own 1%nat eb (proc_addr j) C false ({[lock_rank "pipe"]} ∪ lks) -∗
     arm_pay 0%nat eb (proc_addr j) -∗
     locked γl cpu_id -∗
     pipe_res γp pi -∗
@@ -1365,8 +1365,9 @@ Section ProofPipewrite.
         assert (HwK : (18 <= trap_res true + (av - 14))%nat) by lia.
         assert (HwdomW : forall r : regidx, r ∈ dom (rf_to_gmap T2)) by (intro r; apply rf_to_gmap_dom).
         assert (Hwlvl : (Z.of_nat 1%nat + 1 < 2 ^ 31)%Z) by (rewrite H31; lia).
-        iApply (Wakeup.wp_wakeup_sconf T2 γs (proc_addr j) 1%nat (trap_res true + (av - 14))%nat true C false lks
-                  HwK HwdomW Hlen Hwlvl Hbelowproc
+        iApply (Wakeup.wp_wakeup_sconf T2 γs (proc_addr j) 1%nat (trap_res true + (av - 14))%nat true C false
+                  ({[lock_rank "pipe"]} ∪ lks)
+                  HwK HwdomW Hlen Hwlvl ltac:(lkbelow)
                   with "Hcg Hown Htext Hpc Hpanic Hpinv").
         all: try lkbelow.
         iApply wp_next_off_intro. iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc". rgall.
@@ -1443,7 +1444,6 @@ Section ProofPipewrite.
         (* the pipe lock's release left [lks ∖ {[rank "pipe"]}]; [lks = ∅] at
            depth 0 makes that the empty set the exit continuation names. *)
         iEval (rewrite Hlkempty locks_empty_del) in "Hown".
-        iEval (rewrite Hlkempty) in "EPI".
         iSpecialize ("EPI" $! CIDp16 with "[%]"); [wp_next_chain|].
         iApply ("EPI" $! mr P' with "[%] [%] [%] HF7 Hhi Hcg Hown Hpc Href Hpriv").
         + apply (pw_base_regs_cs m M mr (pa_stk sp0 14%nat) HcsMmr).
@@ -1540,6 +1540,9 @@ Section ProofPipewrite.
         assert (Hs2' : M' !!! Regidx Rs2 = (mword_of_int (-1) : mword 64)).
         { rewrite (Rrest (mword_of_int 18) ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz)). exact Hs2Q3. }
         rewrite /pw_epi.
+        (* the pipe lock's release left [lks ∖ {[rank "pipe"]}]; [lks = ∅] at
+           depth 0 makes that the empty set this exit names. *)
+        iEval (rewrite Hlkempty locks_empty_del) in "Hown".
         iSpecialize ("EPI" $! CIDrs with "[%]"); [wp_next_chain|].
         iApply ("EPI" $! M' P' with "[%] [%] [%] HF7 [HF5 HCH] Hcg Hown Hpc Href Hpriv").
         + unfold pw_base_regs. split_and!; assumption.

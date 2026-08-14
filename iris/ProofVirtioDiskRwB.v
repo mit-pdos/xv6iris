@@ -247,7 +247,7 @@ Section ProofVirtioDiskRwB.
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
        sie_cap_gpr M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
-       cpu_own 1 eb (proc_addr j) C false lks -∗
+       cpu_own 1 eb (proc_addr j) C false ({[lock_rank "virtio_disk"]} ∪ lks) -∗
        trap_csrs -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x0c4) : mword 64) -∗
@@ -272,7 +272,7 @@ Section ProofVirtioDiskRwB.
         /\ M !!! Regidx Rs5 = (disk_base : mword 64)
         /\ vdrw_hi M m0⌝ -∗
        sie_cap_gpr M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
-       cpu_own 1 eb (proc_addr j) C false lks -∗
+       cpu_own 1 eb (proc_addr j) C false ({[lock_rank "virtio_disk"]} ∪ lks) -∗
        trap_csrs -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x0bc) : mword 64) -∗
@@ -299,7 +299,7 @@ Section ProofVirtioDiskRwB.
        released, against this same [lks]. *)
     locks_below lks (lock_rank "virtio_disk") ->
     sie_cap_gpr M0 (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
-    cpu_own 1 eb (proc_addr j) C false lks -∗
+    cpu_own 1 eb (proc_addr j) C false ({[lock_rank "virtio_disk"]} ∪ lks) -∗
     trap_csrs -∗
     cpu_claim (proc_addr j) -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x036) : mword 64) -∗
@@ -519,7 +519,7 @@ Section ProofVirtioDiskRwB.
                   ⌜forall r : mword 5, is_cs_idx r = true ->
                      Mz !!! Regidx r = M1 !!! Regidx r⌝ -∗
                   sie_cap_gpr Mz (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
-                  cpu_own 1 eb (proc_addr j) C false lks -∗
+                  cpu_own 1 eb (proc_addr j) C false ({[lock_rank "virtio_disk"]} ∪ lks) -∗
                   trap_csrs -∗
                   cpu_claim (proc_addr j) -∗
                   pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x094) : mword 64) -∗
@@ -643,11 +643,11 @@ Section ProofVirtioDiskRwB.
            Noff-balanced and index-generic: it neither parks nor touches the
            lock, so the condition lock and its resource just ride along. *)
         iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γl B3
-                  (trap_res eb + (K - 12))%nat 1%nat eb C false lks
+                  (trap_res eb + (K - 12))%nat 1%nat eb C false
+                  ({[lock_rank "virtio_disk"]} ∪ lks)
                   Hj Hjl ltac:(rewrite HB3a0; vm_compute; reflexivity) vdrwb_lvl1
                   ltac:(pose proof (vdrw_K22 K HK); lia)
-                  ltac:(exact (locks_below_mono lks (lock_rank "virtio_disk")
-                                 (lock_rank "proc") Hbelow ltac:(vm_compute; lia)))
+                  ltac:(lkbelow)
                   with "Hcg Hown Htext Hpc Hpinv Hpanic").
         all: try lkbelow.
         iApply wp_next_off_intro. iIntros (mfp) "%Hpcs Hcg Hown Hpc". rgall.
@@ -730,6 +730,12 @@ Section ProofVirtioDiskRwB.
                   HC3a0 ltac:(pose proof (vdrw_K10 K HK); lia)
                   with "Hcg Htext Hpc Hlk Htok HR Hown Hpay").
         iIntros (CIDrl Hsrl mfr) "Hcg Hpc %Hrcs Hown". rgall.
+        (* the balanced acquire/release pair leaves the held set where P2.3
+           started: cancel the release's [∪ ∖] back down to the bare [lks]
+           the sleep/re-acquire steps below (and [IH]) expect. *)
+        assert (Hsetback : ({[lock_rank "virtio_disk"]} ∪ lks) ∖ {[lock_rank "virtio_disk"]} = lks)
+          by (apply locks_add_del_below; exact Hbelow).
+        iEval (rewrite Hsetback) in "Hown".
         assert (Hr0ac : ret_pc (C3 !!! Regidx Rra)
                         = mword_of_int (KernelSyms.virtio_disk_rw + 0x0ac))
           by (rewrite HC3ra; apply bv_eq; vm_compute; reflexivity).
@@ -843,7 +849,7 @@ Section ProofVirtioDiskRwB.
         iDestruct (cpu_own_transport CIDsl CIDd3 0 eb (proc_addr j) C eb
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iApply (Acquire.wp_acquire_sconf γk "virtio_disk"%string
-                  (disk_res γd pd pav pu) D3 0%nat eb (proc_addr j) C (K - 12)%nat eb
+                  (disk_res γd pd pav pu) D3 0%nat eb (proc_addr j) C (K - 12)%nat eb lks
                   vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia) Hbelow
                   with "Hcg Hown Htext Hpc [] Hpanic").
         all: try lkbelow.
@@ -922,7 +928,8 @@ Section ProofVirtioDiskRwB.
         iDestruct "Hidx" as "(Hx0 & Hx1 & Hx2 & Hxp)".
         iApply (wp_vdrw_free_at (CID := CIDlp)  γs pd h (fr_upd fr h false) M1 (trap_res eb + (K - 12))%nat
                   eb (proc_addr j) C (pa_stk sp0 12) 0x07e
-                  (mword_of_int 4000 : mword 12) (mword_of_int 2096448 : mword 21) lks
+                  (mword_of_int 4000 : mword 12) (mword_of_int 2096448 : mword 21)
+                  ({[lock_rank "virtio_disk"]} ∪ lks)
                   ltac:(pose proof (vdrwb_K20 K HK); lia) Hh8 (fr_upd_eq fr h false) Hlen Hidx0a
                   ltac:(apply bv_eq; vm_compute; reflexivity)
                   ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -998,7 +1005,8 @@ Section ProofVirtioDiskRwB.
         iApply (wp_vdrw_free_at (CID := CIDlp)  γs pd h
                   (fr_upd (fr_upd fr h false) m2 false) M1 (trap_res eb + (K - 12))%nat
                   eb (proc_addr j) C (pa_stk sp0 12) 0x07e
-                  (mword_of_int 4000 : mword 12) (mword_of_int 2096448 : mword 21) lks
+                  (mword_of_int 4000 : mword 12) (mword_of_int 2096448 : mword 21)
+                  ({[lock_rank "virtio_disk"]} ∪ lks)
                   ltac:(pose proof (vdrwb_K20 K HK); lia) Hh8 Hfrh' Hlen Hidx0a
                   ltac:(apply bv_eq; vm_compute; reflexivity)
                   ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -1051,7 +1059,8 @@ Section ProofVirtioDiskRwB.
         iApply (wp_vdrw_free_at (CID := CIDlp)  γs pd m2
                   (fr_upd (fr_upd (fr_upd fr h false) m2 false) h true) G1 (trap_res eb + (K - 12))%nat
                   eb (proc_addr j) C (pa_add (pa_stk sp0 12) 4) 0x08c
-                  (mword_of_int 4004 : mword 12) (mword_of_int 2096434 : mword 21) lks
+                  (mword_of_int 4004 : mword 12) (mword_of_int 2096434 : mword 21)
+                  ({[lock_rank "virtio_disk"]} ∪ lks)
                   ltac:(pose proof (vdrwb_K20 K HK); lia) Hm8 Hfrm' Hlen Hidx1a'
                   ltac:(apply bv_eq; vm_compute; reflexivity)
                   ltac:(apply bv_eq; vm_compute; reflexivity)

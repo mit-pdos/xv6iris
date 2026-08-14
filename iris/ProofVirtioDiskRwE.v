@@ -474,6 +474,7 @@ Section ProofVirtioDiskRwE.
       (* ================= sleep_prepare(b) ================= *)
       iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γl W2
                 (trap_res eb + (K - 12))%nat 1%nat eb C false
+                ({[lock_rank "virtio_disk"]} ∪ lks)
                 Hj Hjl ltac:(rewrite HW2a0; exact Hbnz) vdrwb_lvl1
                 ltac:(pose proof (vdrw_K22 K HK); lia)
                 with "Hcg Hown Htext Hpc Hpinv Hpanic").

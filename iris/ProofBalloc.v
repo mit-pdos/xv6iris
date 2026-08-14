@@ -2024,7 +2024,7 @@ Section BallocBzero.
     iDestruct (IntrDefs.cpu_claim_ext_transport CID4 CID16 eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iApply (ba_restore (CID0 := CID16)  j γfs bn γ cov logstart bmapstart size
-              used bi u cr Sb bnoD pidv dq dqb dqs m mR2 K eb C b
+              used bi u cr Sb bnoD pidv dq dqb dqs m mR2 K eb C b lks
               HK HmR2sp HmR2thr ltac:(rewrite HmR2s1 HbnoDsext; reflexivity)
               HbnoDnz
               ltac:(rewrite -bb_uint32 HbnoD; exact Hbicov)
@@ -2475,7 +2475,7 @@ Section BallocAlloc.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iApply (ba_bzero (CID0 := CID9)  γs j γl γu γd γk pd pav pu γfs bn γ
               cov logstart bmapstart size dev used bi u cr Sb bsD
-              pidv dq dqb dqs m mR K eb C b
+              pidv dq dqb dqs m mR K eb C b lks
               HK Hsize Hbirange Hbicov Hbilog Hbinz HbsDlen Hj Hgl
               HmRsp HmRthr HmRs1 HmRs7 Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe Hppid Hsbsz Hsbbm Hdevi Hdgeom Hdlock Hsl Hop
@@ -2612,7 +2612,7 @@ Section BallocScan.
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
       iApply (ba_exhaust (CID0 := CID1)  γs j γfs γd bn γ γpr γu cov logstart
                 bmapstart size dev used u cr Sb kk bnoB (bitmap_bytes used) bsdX dX
-                pidv dq dqb dqs m M K eb C b HK Hpk Hsize Hsp Hthr Hs2 Hs5 Hs6 Hs8 Hkk Hbelow
+                pidv dq dqb dqs m M K eb C b lks HK Hpk Hsize Hsp Hthr Hs2 Hs5 Hs6 Hs8 Hkk Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanic Hpenv Hbio Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hbmr Hop Hlk [Hcont]").
       { iApply (wp_next_shift (b := true) (CIDa := CIDx) (CIDb := CID1) ltac:(wp_next_chain)
                   with "Hcont"). }
@@ -2641,7 +2641,7 @@ Section BallocScan.
                      ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
         iApply (ba_exhaust (CID0 := CID1)  γs j γfs γd bn γ γpr γu cov logstart
                   bmapstart size dev used u cr Sb kk bnoB (bitmap_bytes used) bsdX dX
-                  pidv dq dqb dqs m M K eb C b HK Hpk Hsize Hsp Hthr Hs2 Hs5 Hs6 Hs8 Hkk Hbelow
+                  pidv dq dqb dqs m M K eb C b lks HK Hpk Hsize Hsp Hthr Hs2 Hs5 Hs6 Hs8 Hkk Hbelow
                   with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanic Hpenv Hbio Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hbmr Hop Hlk [Hcont]").
         { iApply (wp_next_shift (b := true) (CIDa := CIDx) (CIDb := CID1) ltac:(wp_next_chain)
                     with "Hcont"). }
@@ -3267,7 +3267,7 @@ Section BallocScan.
                           ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
              iApply (ba_exhaust (CID0 := CID15)  γs j γfs γd bn γ γpr γu cov logstart
                        bmapstart size dev used u cr Sb kk bnoB (bitmap_bytes used) bsdX dX
-                       pidv dq dqb dqs m SA K eb C b HK Hpk Hsize HSAsp HSAthr HSAs2
+                       pidv dq dqb dqs m SA K eb C b lks HK Hpk Hsize HSAsp HSAthr HSAs2
                        HSAs5 HSAs6 HSAs8 Hkk Hbelow
                        with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanic Hpenv Hbio Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hbmr Hop Hlk [Hcont]").
              { iApply (wp_next_shift (b := true) (CIDa := CIDx) (CIDb := CID15)
@@ -3329,7 +3329,7 @@ Section BallocScan.
                        ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
           iApply (ba_alloc (CID0 := CID11)  γs j γl γu γd γk pd pav pu γfs bn γ
                     cov logstart bmapstart size dev used bi u cr Sb kk bnoB bsdX dX
-                    pidv dq dqb dqs m S8 K eb C b
+                    pidv dq dqb dqs m S8 K eb C b lks
                     HK Hgeom Hsize Hbirange Hnu Hok HbnoB Hbmcov Hbmlog Hkk Hj Hgl
                     HS8sp HS8thr ltac:(rewrite HS8a5 Hqeq; reflexivity)
                     ltac:(rewrite HS8a2 Hqeq; reflexivity)

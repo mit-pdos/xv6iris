@@ -98,7 +98,7 @@ Section UtSysBlock.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma ut_90 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
-      (m0 m : regfile) (av nx : nat) (C : iProp Σ) :
+      (m0 m : regfile) (av nx : nat) (C : iProp Σ) (lks : gset nat) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
@@ -115,7 +115,7 @@ Section UtSysBlock.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x90)) -∗
     sie_cap_gpr m nx false (un_pj N) -∗
-    ut_hold (SY.syscall_env) N V C false -∗
+    ut_hold (SY.syscall_env) N V C false lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
@@ -129,6 +129,9 @@ Section UtSysBlock.
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
     iDestruct "Hhold" as "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
+    (* depth 0 forces the held set empty, so killed/kexit's order premises
+       need no hypothesis of this lemma's own. *)
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     iAssert (procs_inv (un_s N)) with "[]" as "#Hpi".
     { iDestruct "Hcaps" as "($ & _)". }
     iAssert (panic_wp_any) with "[]" as "#Hpa".
@@ -162,7 +165,7 @@ Section UtSysBlock.
     assert (HcsM1 : ut_cs m0 M1)
       by (rewrite /M1; apply ut_cs_insert; [vm_compute; reflexivity | exact Hcs]).
     iApply (KI.wp_killed_sconf (un_s N) (un_j N) (un_l N)
-              M1 nx 0%nat false (un_pj N) C false
+              M1 nx 0%nat false (un_pj N) C false lks
               HM1a0 Hj Hjl ltac:(vm_compute; reflexivity) ltac:(lia)
               with "Hcg Hcpu Htext Hpc Hpi Hpa [-]").
     all: try lkbelow.

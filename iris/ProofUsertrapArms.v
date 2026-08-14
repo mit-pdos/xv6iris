@@ -154,7 +154,7 @@ Section UtArmsCommon.
      [trap_csrs_ext false] is not syntactically a [∗]: destructuring it
      directly is a coin flip on whether resolution unfolds the definition. *)
   Lemma ua_hold_off (N : ut_names) (V : pprivate) (C : iProp Σ) (lks : gset nat) :
-    ut_hold Rsys N V C false -∗
+    ut_hold Rsys N V C false lks -∗
       cpu_own 0%nat false (un_pj N) C false lks ∗ trap_csrs ∗
       cpu_claim (un_pj N) ∗ ut_env Rsys N V.
   Proof. iIntros "H". iExact "H". Qed.
@@ -162,7 +162,7 @@ Section UtArmsCommon.
   Lemma ua_hold_on (N : ut_names) (V : pprivate) (C : iProp Σ) (lks : gset nat) :
     cpu_own 0%nat false (un_pj N) C false lks -∗ trap_csrs -∗
     cpu_claim (un_pj N) -∗ ut_env Rsys N V -∗
-    ut_hold Rsys N V C false.
+    ut_hold Rsys N V C false lks.
   Proof.
     iIntros "Hcpu Hcsrs Hclm Henv". rewrite /ut_hold.
     iSplitL "Hcpu"; [iExact "Hcpu"|].
@@ -218,7 +218,7 @@ Section Ut56.
      SpecAcquiresleep / SpecHoldingsleep take -- given straight back, so the
      process record does not move and [ut_a6] is applied at the SAME [V]. *)
   Lemma ut_56 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
-      (m0 m : regfile) (av nx : nat) (C : iProp Σ) :
+      (m0 m : regfile) (av nx : nat) (C : iProp Σ) (lks : gset nat) :
     printk_gen_contract (un_pr N) (un_u N) (un_v N) ->
     ut_wf N ->
     (K_usertrap <= av)%nat ->
@@ -232,7 +232,7 @@ Section Ut56.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x56)) -∗
     sie_cap_gpr m nx false (un_pj N) -∗
-    ut_hold Rsys N V C false -∗
+    ut_hold Rsys N V C false lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
@@ -246,6 +246,9 @@ Section Ut56.
     iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
     iDestruct (ua_hold_off Rsys N V C with "Hhold") as
       "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
+    (* depth 0 forces the held set empty, so the printk / killed / setkilled
+       order premises need no hypothesis of this lemma's own. *)
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     (* the four persistent members this block needs, read WITHOUT consuming
        [Hcaps] (durable-notes: destructuring an intuitionistic hypothesis
        eats the name, and the exit hands [ut_env] back). *)
@@ -392,7 +395,7 @@ Section Ut56.
     assert (HcsM5 : ut_cs m0 M5)
       by (rewrite /M5; apply ut_cs_insert; [vm_compute; reflexivity | exact HcsM4]).
     iApply (Hpk CID M5 nx false (un_pj N) C DfracDiscarded ut_fmt1
-              ut_fmt1_descs false ltac:(lia) ut_fmt1_len ut_fmt1_nonul
+              ut_fmt1_descs false lks ltac:(lia) ut_fmt1_len ut_fmt1_nonul
               ut_fmt1_kinds ut_fmt1_ndescs
               with "Hcg Htext Hkd Hpc Hpw Hcpu Hpenv [Hf1] []").
     all: try lkbelow.
@@ -638,7 +641,7 @@ Section UtD0.
      unexpected-scause arm; the right arm returns the backed page, so it is
      taken and the code joins +0xa6 -- with the process record MOVED. *)
   Lemma ut_d0 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
-      (m0 m : regfile) (av nx : nat) (C : iProp Σ) :
+      (m0 m : regfile) (av nx : nat) (C : iProp Σ) (lks : gset nat) :
     printk_gen_contract (un_pr N) (un_u N) (un_v N) ->
     ut_wf N ->
     (K_usertrap <= av)%nat ->
@@ -652,7 +655,7 @@ Section UtD0.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xd0)) -∗
     sie_cap_gpr m nx false (un_pj N) -∗
-    ut_hold Rsys N V C false -∗
+    ut_hold Rsys N V C false lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
@@ -666,6 +669,9 @@ Section UtD0.
     iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
     iDestruct (ua_hold_off Rsys N V C with "Hhold") as
       "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
+    (* depth 0 forces the held set empty, so the printk / killed / setkilled
+       order premises need no hypothesis of this lemma's own. *)
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     iAssert (kalloc_env (un_kl N) None) with "[]" as "#Hkenv".
     { iApply (ut_caps_kalloc N with "Hcaps"). }
     iDestruct "Hcsrs" as "(Hsepc & Hscause & Hstval & Hsret & Hres & Hkpt)".
@@ -994,7 +1000,7 @@ Section UtE8.
      was set from devintr's return value at +0x3e and [ut_fa] only branches
      on it. *)
   Lemma ut_e8 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
-      (m0 m : regfile) (av nx : nat) (C : iProp Σ) :
+      (m0 m : regfile) (av nx : nat) (C : iProp Σ) (lks : gset nat) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
@@ -1007,7 +1013,7 @@ Section UtE8.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xea)) -∗
     sie_cap_gpr m nx false (un_pj N) -∗
-    ut_hold Rsys N V C false -∗
+    ut_hold Rsys N V C false lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
@@ -1021,6 +1027,9 @@ Section UtE8.
     iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
     iDestruct (ua_hold_off Rsys N V C with "Hhold") as
       "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
+    (* depth 0 forces the held set empty, so the printk / killed / setkilled
+       order premises need no hypothesis of this lemma's own. *)
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     iAssert (procs_inv (un_s N)) with "[]" as "#Hpi".
     { iDestruct "Hcaps" as "($ & _)". }
     iAssert (panic_wp_any) with "[]" as "#Hpa".

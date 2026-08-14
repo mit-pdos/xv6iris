@@ -984,6 +984,9 @@ Section UtFa.
     iPoseProof (uti_0fc with "Htext") as "Hifc".
     iPoseProof (uti_0fe with "Htext") as "Hife".
     iDestruct "Hhold" as "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
+    (* depth 0 forces the held set empty, which is what lets the yield arm
+       hand [cpu_own ... ∅] to a contract that pins [∅] (SpecYield.v). *)
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     iAssert (procs_inv (un_s N)) with "[]" as "#Hpi".
     { iDestruct "Hcaps" as "($ & _)". }
     iAssert (panic_wp_any) with "[]" as "#Hpa".
@@ -1080,6 +1083,7 @@ Section UtFa.
                    ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
       iDestruct (cpu_claim_ext_transport CID CID3 b (un_pj N)
                    ltac:(wp_next_chain) with "Hclm") as "Hclm".
+      iEval (rewrite Hlkempty) in "Hcpu".
       iApply (YI.wp_yield_sconf (CID := CID3) (un_s N) (un_j N) (un_l N)
                 M2 nx b C Hj Hjl ltac:(lia)
                 with "Hcg Hcpu Htext Hpc Hpi Hpa Hcsrs Hclm [-]").
@@ -1119,7 +1123,9 @@ Section UtFa.
       iApply (ut_ret (CID := CID5) Rsys N V pt ksp m0 mf av nx C b lks
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
-      rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
+      (* the yield arm came back at the literal [∅]; [lks = ∅] at depth 0
+         makes that the set [ut_hold] names. *)
+      rewrite /ut_hold Hlkempty. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].
       iSplitL "Hclm"; [iExact "Hclm"|].
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].

@@ -2280,7 +2280,7 @@ Section ProofFilewrite.
               (fwn_cov fn) (fwn_logstart fn)
               ik (sh / 2)%Qp g icfg_dev
               inum dn' bm'
-              pidv (DfracOwn (1/4)) X2 (K - 12)%nat eb (proc_addr jx) C b
+              pidv (DfracOwn (1/4)) X2 (K - 12)%nat eb (proc_addr jx) C b lks
               (fw_av_iunlock K HK) P9 ltac:(rewrite HX2a0; exact P8)
               (* iunlock's bound is "sleep lock"(6); fw_loop's own is
                  "log"(3), and [locks_below_mono] weakens it. *)
@@ -3049,7 +3049,7 @@ Section ProofFilewrite.
         iDestruct (cpu_own_transport CID CID11 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iApply (Pipewrite.wp_pipewrite_sconf γa γf γs j γlp (fp_lock pn) (fp_pipe pn)
-                  (fc_wbool Cf) q P2 (K - 12)%nat eb C pidv V n b
+                  (fc_wbool Cf) q P2 (K - 12)%nat eb C pidv V n b lks
                   Hj Hgs Hlens HP2a2 (fw_n_range n Hn) (fw_av_pipe K HK) Heb
                   with "Hcg Hcnt Htext Hpc [] Hpref Hpriv Hkenv Hprocs Hpanic").
         all: try lkbelow.
@@ -3473,7 +3473,7 @@ Section ProofFilewrite.
                              with "Hcnt") as "Hcnt".
                 iApply (Consolewrite.wp_consolewrite_sconf γa γf γs j γlp
                           (fwn_uart fn) (fwn_disk fn) (fwn_txlock fn)
-                          E2 (K - 12)%nat eb C pidv V n b
+                          E2 (K - 12)%nat eb C pidv V n b lks
                           Hj Hgs Hlens HE2a0 HE2a2 (fw_n_range n Hn)
                           (fw_av_cons K HK) Heb
                           with "Hcg Hcnt Htext Hpc Hpriv Hkenv Hdevinv Htxlk

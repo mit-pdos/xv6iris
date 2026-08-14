@@ -95,7 +95,7 @@ Section ProofKerneltrap.
        which is what lets the yield arm hand [cpu_own ... ∅] to a contract
        that pins [∅] (SpecYield.v), and what makes devintr's order premise
        trivial. *)
-    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
+    iDestruct (CpuOwn.cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     (* ---- the head: prologue, the three reads, both panic tests ---- *)
     iApply (kt_pro m av ep sc ltac:(unfold kerneltrap_stack in Hav; lia) Hepal
               with "Hcg Hmir Htext Hpc Hsepc Hscause").
@@ -417,7 +417,7 @@ Section ProofKerneltrap.
         iApply (kt_epi m myd (m !!! Regidx csp_rs1)
                   (m !!! Regidx ra_idx) (m !!! Regidx s0_idx) (m !!! Regidx s1_idx)
                   (m !!! Regidx s2_idx) (m !!! Regidx s3_idx) v6
-                  ep ep' ms0 (av - 6)%nat 0 C va vb lks
+                  ep ep' ms0 (av - 6)%nat 0 C va vb ∅   (* yield returned at the empty set *)
                   ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                   ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                   Hydsp Hyds2 Hyds1 Hepal Hms0f Hsie0 Hspp0 Hspie0 Hydthr
@@ -432,6 +432,9 @@ Section ProofKerneltrap.
            precisely why the yield happened at all. *)
         (* NO RE-SEAL NEEDED -- see the twin on the no-yield path above. *)
         iRename "Havail_y" into "Havz".
+        (* yield handed the bundle back at the literal [∅] (its contract pins
+           it); [lks = ∅] at depth 0 makes that kerneltrap's own set. *)
+        iEval (rewrite -Hlkempty) in "Hcpu".
         iSpecialize ("Hcont" $! CIDy with "[%]").
         { intros [Hf | Hz]; [ discriminate | exfalso; exact (Hpne Hz) ]. }
         iApply ("Hcont" $! mf ms_f sc' tv' with "[%] [%] [%] [%] Hcgat Hmir Havz Hkptr_y Hcpu

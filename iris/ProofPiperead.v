@@ -2560,8 +2560,7 @@ Section ProofPiperead.
         iDestruct "HEX" as "[HEPI _]". iEval (rewrite /EPIC) in "HEPI".
         (* the pipe lock's release left [lks ∖ {[rank "pipe"]}]; [lks = ∅] at
            depth 0 makes that the empty set the exit continuation names. *)
-        iEval (rewrite Hlkempty locks_empty_del) in "Hown".
-        iEval (rewrite Hlkempty) in "HEPI".
+        iEval (rewrite Hlkempty locks_empty_del -Hlkempty) in "Hown".
         iSpecialize ("HEPI" $! CIDp31 with "[%]"); [wp_next_chain|].
         iApply ("HEPI" $! N3 (pv_upt V) (mword_of_int (-1))
                   with "[%] [%] [%] Hcg Hpc Hown Href Hpriv
