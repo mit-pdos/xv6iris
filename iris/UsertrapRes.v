@@ -544,6 +544,60 @@ Section UsertrapRes.
     rewrite /ut_own. iFrame "Hb Hbm Hip Hfd Hir Hpv Hsy".
   Qed.
 
+  (* THE TRAPFRAME BORROW, at the [proc_priv] level.  [proc_fields] /
+     [proc_pt_at] / [cwd_ref] / [p_pid] are all functions of [pprivate]
+     fields [upd_tf] does not touch (see [upd_tf]'s own header comment), so
+     the closer reassembles at whatever NEW content [ws'] the caller hands
+     back, no rewriting needed beyond unfolding [upd_tf] itself. *)
+  Lemma proc_priv_tf_open (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv γf pa pid V -∗
+    ∃ ws : list (mword 64), tf_page (ud_tfp (pv_upt V)) ws ∗
+      (∀ ws' : list (mword 64), tf_page (ud_tfp (pv_upt V)) ws' -∗
+         proc_priv γf pa pid (upd_tf V ws')).
+  Proof.
+    rewrite /proc_priv /proc_priv_core.
+    iIntros "((%Ha & %Hb & Hpid & Hpf & Hpt & Htf & Hcwd) & Hof)".
+    iExists (pv_tf V). iFrame "Htf".
+    iIntros (ws') "Htf'".
+    (* [iFrame]/[cbn] both hang trying to match hypotheses against the
+       OPAQUE [upd_tf V ws'] inside the goal (the opening [rewrite]
+       does not reach under this closer's [∀ ws'] binder).  Name each
+       projection's equality EXPLICITLY instead -- one [reflexivity] per
+       field, each instant since it is a single iota step -- and
+       [rewrite] them in by NAME, a directed search rather than a blind
+       match. *)
+    (* [pv_name] is NOT in this list: [proc_fields] takes the WHOLE
+       record (not one of its projections) as its argument, so
+       [pv_name (upd_tf V ws')] never appears as a direct subterm of the
+       goal at all -- [proc_fields]'s own OUTPUT is what needs equating
+       (Heq7), not one more of its inputs.  [proc_pt_at]/[cwd_ref]/
+       [proc_ofiles] all take a PROJECTION directly, so Heq2/Heq4/Heq3
+       reach them; [proc_fields] was the one outlier, and it is what
+       [iFrame] was hanging trying to match without a hint. *)
+    assert (Heq1 : pv_sz (upd_tf V ws') = pv_sz V) by reflexivity.
+    assert (Heq2 : pv_upt (upd_tf V ws') = pv_upt V) by reflexivity.
+    assert (Heq3 : pv_ofile (upd_tf V ws') = pv_ofile V) by reflexivity.
+    assert (Heq4 : pv_cwd (upd_tf V ws') = pv_cwd V) by reflexivity.
+    assert (Heq6 : pv_tf (upd_tf V ws') = ws') by reflexivity.
+    assert (Heq7 : proc_fields pa (DfracOwn 1) (upd_tf V ws')
+                   = proc_fields pa (DfracOwn 1) V) by reflexivity.
+    rewrite /proc_priv /proc_priv_core Heq1 Heq2 Heq3 Heq4 Heq6 Heq7.
+    (* Even with the goal now fully reduced to the target shape, [iFrame]
+       hangs -- its typeclass-based [Frame] search is apparently
+       pathological in this section's large ambient instance context,
+       independent of matching. Bypass it: plain [iSplitL]/[iExact] are
+       structural (no typeclass search at all). *)
+    iSplitL "Hpid Hpf Hpt Htf' Hcwd".
+    - iSplitR; [done|]. iSplitR; [done|].
+      iSplitL "Hpid"; [iExact "Hpid"|].
+      iSplitL "Hpf"; [iExact "Hpf"|].
+      iSplitL "Hpt"; [iExact "Hpt"|].
+      iSplitL "Htf'"; [iExact "Htf'"|].
+      iExact "Hcwd".
+    - iExact "Hof".
+  Qed.
+
   (* ------------------------------------------------------------------- *)
   (* [usertrap_res] itself.                                              *)
   (* ------------------------------------------------------------------- *)
@@ -561,6 +615,34 @@ Section UsertrapRes.
        ⌜ (K_usertrap <= av)%nat ⌝ ∗
        ut_trap (un_pj N) ksp av C ∗
        ut_env Rsys N V)%I.
+
+  (* THE TRAPFRAME BORROW, lifted to [usertrap_res] -- the concrete proof
+     of [SpecUsertrap.USERTRAP_RES.usertrap_res_tf_open].  Opens via
+     [ut_own_priv] + [proc_priv_tf_open]; the closer moves [V] to
+     [upd_tf V ws'] (its [pv_upt] is unchanged, so [pt] is unaffected). *)
+  Lemma ut_res_tf_open (Rsys : gname -> mword 64 -> iProp Σ)
+      (pt : uptd) (ksp : mword 64) :
+    ut_res Rsys pt ksp -∗
+    ∃ ws : list (mword 64), tf_page (ud_tfp pt) ws ∗
+      (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ ut_res Rsys pt ksp).
+  Proof.
+    iIntros "H".
+    iDestruct "H" as (N V av C) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Henv)".
+    iDestruct "Henv" as "[Hcaps Hown]".
+    iDestruct (ut_own_priv with "Hown") as "(Hpv & Hsy & Hownback)".
+    iDestruct (proc_priv_tf_open with "Hpv") as (ws) "[Htf Hclose]".
+    rewrite Hupt. iExists ws. iFrame "Htf".
+    iIntros (ws') "Htf'".
+    iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
+    iDestruct ("Hownback" $! (upd_tf V ws') with "Hpv' Hsy") as "Hown'".
+    iExists N, (upd_tf V ws'), av, C.
+    iFrame "Htrap Hcaps Hown'".
+    iPureIntro. split; [| split; [| split]].
+    - rewrite /upd_tf. exact Hupt.
+    - exact Hksp.
+    - exact Hwf.
+    - exact Hav.
+  Qed.
 
   (* ------------------------------------------------------------------- *)
   (* THE WALK'S OWN VOCABULARY -- what the block lemmas of ProofUsertrap  *)
@@ -826,5 +908,15 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
         !kallocG Σ, !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
     ut_res SY.syscall_env.
+
+  Lemma usertrap_res_tf_open
+      `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+        !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+        !kallocG Σ, !irefslotG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+    usertrap_res pt ksp -∗
+    ∃ ws : list (mword 64), tf_page (ud_tfp pt) ws ∗
+      (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res pt ksp).
+  Proof. exact (ut_res_tf_open SY.syscall_env pt ksp). Qed.
 
 End UtResFits.

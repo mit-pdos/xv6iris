@@ -1091,6 +1091,16 @@ Definition usertrap_res
     `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
   ut_res SY.syscall_env.
 
+Lemma usertrap_res_tf_open
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !kallocG Σ, !irefslotG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+  usertrap_res pt ksp -∗
+  ∃ ws : list (mword 64), tf_page (ud_tfp pt) ws ∗
+    (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res pt ksp).
+Proof. exact (ut_res_tf_open SY.syscall_env pt ksp). Qed.
+
 Section UtSeal.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
