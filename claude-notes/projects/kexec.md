@@ -522,11 +522,31 @@ that the next phase (or the next loop anywhere) should reuse:
   and a "Cannot find witness" from `lia`.  `rewrite -!Z.add_assoc` between
   the two passes fixes it.
 
-**What is left: phase D (`+0x2a6 .. +0x31a`), then `ProofKexec.v` +
-`LinkKexec.v`, then `sys_exec`.**  Phase D is drafted in `ProofKexecD.v`
-(not yet in `_CoqProject`): the name scan's three lemmas
-(`kxd_scan_tail` / `kxd_name_step` / `kxd_name_loop`) and the commit's
-helper facts are written; the commit body itself is not.
+**PHASE D IS DONE TOO — `ProofKexecD.v`, admit-free.**  Every instruction
+of kexec is now covered by a proven block; what is left is the
+COMPOSITION (`ProofKexec.v` + `LinkKexec.v`) and then `sys_exec`.
+
+**THE FIRST THING THE COMPOSITION MUST SETTLE IS THE LOCK SET.**
+`SpecKexec`'s `cpu_own 0 eb pj C b lks` leaves `lks` generic and
+`ProofKexecA.kxc_phaseA` / `ProofKexecB.kxc_b1` carry it through, but
+every SEAM in `ProofKexecSeam.v` — `kxc_at_1a2`, `kxc_at_12c`,
+`kxc_at_1a4`, `kxc_at_1ae`, `kxc_at_21a`, `kxc_at_272`, `kxc_at_2a6` —
+hardcodes `cpu_own 0 true … true ∅`, and phases B2/B3/C/D are proven
+against that.  So the chain can only be assembled at `lks = ∅` unless the
+seams gain the parameter.  Two ways out, and the choice is a SPEC
+decision, not a proof one:
+  * add `lks = ∅` to `SpecKexec`'s premises — true (kexec is a syscall
+    entry, no lock is held across it) and free, but it narrows the
+    contract; or
+  * give the seven seam definitions an `lks` parameter — a mechanical
+    sweep over four files and their rebuild, and it keeps the contract as
+    general as its callees'.
+The second is the cleaner shape by this project's own guiding principle;
+the first is what the existing `∅`s already assume.  **Read
+`ProofKexecB.kxc_b1` before deciding** — it takes `b` and `lks` generic
+yet publishes a seam pinned at `true`/`∅`, so one of the two is already
+constrained somewhere that is not its premise list, and whichever it is
+settles this.
 
 **THE NAME SCAN'S INVARIANT IS DELIBERATELY WEAK, and that is the design
 decision worth keeping.** `kexec_ok` asks only for an EXISTENTIAL name of
@@ -673,6 +693,7 @@ Spec file — `coqdep` is how you confirm it worked (grep the consuming phase's
 | phase C — the argv loop's STEP (`+0x21a .. +0x272`, one iteration), `kxc_argv_step`, and the shared `-1` connector `kxc_c_exit_m1` | **landed, proven** |
 | phase C — `kxc_argv_loop` (the fuel induction over the step) | **landed, proven** |
 | phase C — the closing copyout (`+0x272 .. +0x2a6`), `kxc_c_close`, and the `kxc_d_res` / `kxc_at_2a6` seam | **landed, proven** |
+| phase D — **THE COMMIT PROVEN** (`+0x2a6 .. +0x31a`): `ProofKexecD.v`'s name scan (`kxd_scan_tail` / `kxd_name_step` / `kxd_name_loop`), `kxd_commit`, `kxd_phaseD` | **landed, proven** |
 | phase D, `ProofKexec.v`, `LinkKexec.v`, `sys_exec` | not started |
 
 **`ProofKexecSeam.kxc_cs_cases` — the thirteen callee-saved indices,
