@@ -482,10 +482,50 @@ body: with exactly 32 arguments the null-terminated exit is taken at
 becomes unprovable at exactly that case, which is the proof correctly
 refusing to certify the off-by-one.
 
-**Still open in phase C:** `kxc_argv_loop` (the fuel-induction wrapper,
-mirroring `ProofKexecB3.kxc_phdr`'s shape around `kxc_ph_step`), and the
-closing `copyout` call at `+0x272 .. +0x2a6` joining into phase D. Then
-phase D, then `ProofKexec.v` + `LinkKexec.v`.
+**PHASE C IS DONE — `+0x1ae .. +0x2a6` entire, admit-free.**  Four lemmas:
+`kxc_c_setup`, `kxc_argv_step`, `kxc_argv_loop`, `kxc_c_close`, plus the
+shared `-1` connector `kxc_c_exit_m1`.  Three things from the closing block
+that the next phase (or the next loop anywhere) should reuse:
+
+- **`kxc_stack_ok`'s first conjunct is universally quantified and the loop
+  invariant carries the bound only at the CURRENT index — and that is
+  enough.**  `kxc_sp` is non-increasing (`kxc_sp_mono`), so the bound at the
+  last index implies it at every earlier one.  Do not strengthen the
+  invariant to the `forall` form; it is derivable.
+- **copyout wants a NAMED BYTE run and a frame gives WORD cells.**
+  `StackBytes` has the whole round trip: `slotsn_bytes_own` (which also
+  hands out the eight-alignment facts the return needs), `bytes_own_name`
+  to choose the naming function, `bytes_own_of_name` + `bytes_own_slotsn`
+  coming back, then a `stack_own` fold.
+- **A `bv_wrap` normalisation needs the sum RE-ASSOCIATED between passes.**
+  `Z.add` is left-nested, so after one `bv_wrap_add_idemp_l` pass the
+  surviving wrap sits at the head of `(w + sp0) + -256` rather than as the
+  immediate left operand of the top `+`, and the lemma silently stops
+  matching.  The tell is a residual `bv_wrap` in an otherwise linear goal
+  and a "Cannot find witness" from `lia`.  `rewrite -!Z.add_assoc` between
+  the two passes fixes it.
+
+**What is left: phase D (`+0x2a6 .. +0x31a`), then `ProofKexec.v` +
+`LinkKexec.v`, then `sys_exec`.**  Phase D is drafted in `ProofKexecD.v`
+(not yet in `_CoqProject`): the name scan's three lemmas
+(`kxd_scan_tail` / `kxd_name_step` / `kxd_name_loop`) and the commit's
+helper facts are written; the commit body itself is not.
+
+**THE NAME SCAN'S INVARIANT IS DELIBERATELY WEAK, and that is the design
+decision worth keeping.** `kexec_ok` asks only for an EXISTENTIAL name of
+the right length, so the scan never has to model "the byte after the final
+`/`" — all it carries is that the pointer it leaves in slot 66 is INSIDE
+the path buffer, which is exactly what `safestrcpy`'s `ssc_src_ok` needs
+(its second disjunct, at the buffer's own NUL). A dozen lines of invariant
+instead of a string-search specification.
+
+**The commit block opens `proc_priv` THREE times, not once**, and that is
+forced rather than clumsy: the trapframe write at +0x2aa needs
+`proc_priv_newspace`, the `safestrcpy` in the middle needs
+`proc_priv_name`, and the two accessors cannot be open at once. The three
+closes compose to the contract's own one-shot `upd_exec` — `kxd_upd_compose`
+is that equation, and `ProcInv.upd_exec_compose` is why the order comes out
+right.
 
 <details>
 <summary>Superseded diagnosis (kept for the record — the "17 GB" symptom
@@ -592,7 +632,8 @@ other only through that one.
 | phase C — the shared `-1` tail (`+0x1d6 .. +0x1f2`), `KexecTailProofC.kxc_bad_1d6` | **landed, proven** |
 | phase C — the setup block (`+0x1ae .. +0x218`), `ProofKexecC.KexecCProof.KexecCSetup.kxc_c_setup` | **landed, proven** |
 | phase C — the argv loop's STEP (`+0x21a .. +0x272`, one iteration), `kxc_argv_step`, and the shared `-1` connector `kxc_c_exit_m1` | **landed, proven** |
-| phase C — `kxc_argv_loop` (the fuel induction) and the closing copyout | **NEXT** |
+| phase C — `kxc_argv_loop` (the fuel induction over the step) | **landed, proven** |
+| phase C — the closing copyout (`+0x272 .. +0x2a6`), `kxc_c_close`, and the `kxc_d_res` / `kxc_at_2a6` seam | **landed, proven** |
 | phase D, `ProofKexec.v`, `LinkKexec.v`, `sys_exec` | not started |
 
 **`ProofKexecSeam.kxc_cs_cases` — the thirteen callee-saved indices,

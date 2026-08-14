@@ -1897,7 +1897,7 @@ Section KexecCExitM1.
     instr (mword_of_int (KXC + stub + 2) : mword 64) true (JAL (jimm, zreg)) -∗
     pc_is (mword_of_int (KXC + stub) : mword 64) -∗
     sie_cap_gpr M (K - 68)%nat true (proc_addr jp) -∗
-    cpu_own 0 true (proc_addr jp) C true -∗
+    cpu_own 0 true (proc_addr jp) C true ∅ -∗
     kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
               plen pfun na avf aslen afun pidv V dqb dqs dqa
               sp0 ra0 s00 s10 s20 pv av
@@ -1908,7 +1908,7 @@ Section KexecCExitM1.
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr mf K true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) C true -∗
+        cpu_own 0 true (proc_addr jp) C true ∅ -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1970,7 +1970,7 @@ Section KexecCExitM1.
                  with "Hcont") as "Hcont".
     iApply (TC.kxc_bad_1d6 jp ga gf bn gfs cov logstart bmapstart inodestart
               size used2 used2 plen pfun na avf alen aslen afun pidv V
-              dqb dqs dqa m Mt K C sp0 ra0 s00 s10 s20 pv av P sz1
+              dqb dqs dqa m Mt K C ∅ sp0 ra0 s00 s10 s20 pv av P sz1
               ltac:(unfold K_kexec; lia) ltac:(reflexivity)
               Hmsp Hmra Hms0 Hms1 Hms2 HMtsp HMts3 HMts6 Hbelow Hcov
               with "Hcg Hcnt Htext Hpc Hpt Hka Hbm Hins Hbits Hpriv
@@ -2175,7 +2175,7 @@ Section KexecCLoop.
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr mf K true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) C true -∗
+        cpu_own 0 true (proc_addr jp) C true ∅ -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -2207,7 +2207,7 @@ Section KexecCLoop.
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
               sie_cap_gpr mf K true (proc_addr jp) -∗
-              cpu_own 0 true (proc_addr jp) C true -∗
+              cpu_own 0 true (proc_addr jp) C true ∅ -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -3020,11 +3020,11 @@ Section KexecCLoop.
       iEval (rewrite Hsplit big_sepL_app) in "Hargc".
       iDestruct "Hargc" as "[Hargc1 Hargc2]".
       iApply (Copyout.wp_copyout_sconf ga Z2 P sz1 (S (alen c)) (afun c)
-                (K - 68)%nat 0%nat true (proc_addr jp) C true
+                (K - 68)%nat 0%nat true (proc_addr jp) C true ∅
                 ltac:(lia) HZ2a0 HZ2a1
                 ltac:(rewrite HZ2a4; f_equal; lia)
                 ltac:(change (2 ^ 64)%Z with 18446744073709551616%Z; lia)
-                Hsz1max38 ltac:(lia)
+                Hsz1max38 ltac:(lia) (locks_below_empty _)
                 with "Hcg Hcnt Htext Hpc Hpt Hka Hargc1").
       iIntros (CID19 Hs19 T13 Pfinal2) "Hcg Hcnt Hpc Hpt Hargc1 %Hcs2 %Hextsz %Hco_res".
       iCombine "Hargc1 Hargc2" as "Hargc".
@@ -3661,7 +3661,7 @@ Section KexecCArgvLoop.
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr mf K true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) C true -∗
+        cpu_own 0 true (proc_addr jp) C true ∅ -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -3688,7 +3688,7 @@ Section KexecCArgvLoop.
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
               sie_cap_gpr mf K true (proc_addr jp) -∗
-              cpu_own 0 true (proc_addr jp) C true -∗
+              cpu_own 0 true (proc_addr jp) C true ∅ -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -3984,7 +3984,7 @@ Section KexecCClose.
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr mf K true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) C true -∗
+        cpu_own 0 true (proc_addr jp) C true ∅ -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -4011,7 +4011,7 @@ Section KexecCClose.
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
               sie_cap_gpr mf K true (proc_addr jp) -∗
-              cpu_own 0 true (proc_addr jp) C true -∗
+              cpu_own 0 true (proc_addr jp) C true ∅ -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -4517,7 +4517,7 @@ Section KexecCClose.
                    with "Hcont") as "Hcont".
       iApply (TC.kxc_bad_1d6 jp ga gf bn gfs cov logstart bmapstart inodestart
                 size used2 used2 plen pfun na avf alen aslen afun pidv V
-                dqb dqs dqa m X7 K C sp0 ra0 s00 s10 s20 pv av P sz1
+                dqb dqs dqa m X7 K C ∅ sp0 ra0 s00 s10 s20 pv av P sz1
                 ltac:(unfold K_kexec; lia) ltac:(reflexivity)
                 Hmsp Hmra Hms0 Hms1 Hms2 HX7sp HX7s3 HX7s6 Hbelow Hcov
                 with "Hcg Hcnt Htext Hpc Hpt Hka Hbm Hins Hbits Hpriv
@@ -4768,11 +4768,11 @@ Section KexecCClose.
         change (2 ^ 38 - 8192)%Z with 274877898752%Z in Hmax.
         change (2 ^ 38)%Z with 274877906944%Z. lia. }
       iApply (Copyout.wp_copyout_sconf ga X12 P sz1 (8 * S c)%nat ufun
-                (K - 68)%nat 0%nat true (proc_addr jp) C true
+                (K - 68)%nat 0%nat true (proc_addr jp) C true ∅
                 ltac:(lia) HX12a0 HX12a1
                 ltac:(rewrite HX12a4; f_equal; lia)
                 ltac:(change (2 ^ 64)%Z with 18446744073709551616%Z; lia)
-                Hsz1max38 ltac:(lia)
+                Hsz1max38 ltac:(lia) (locks_below_empty _)
                 with "Hcg Hcnt Htext Hpc Hpt Hka Hubytes").
       iIntros (CID16 Hs16c X13 P2) "Hcg Hcnt Hpc Hpt Hubytes %Hcs %Hextsz %Hco_res".
       iEval (rewrite HX12a3) in "Hubytes".
@@ -4910,7 +4910,7 @@ Section KexecCClose.
                      with "Hcont") as "Hcont".
         iApply (TC.kxc_bad_1d6 jp ga gf bn gfs cov logstart bmapstart inodestart
                   size used2 used2 plen pfun na avf alen aslen afun pidv V
-                  dqb dqs dqa m X13 K C sp0 ra0 s00 s10 s20 pv av P2 sz1
+                  dqb dqs dqa m X13 K C ∅ sp0 ra0 s00 s10 s20 pv av P2 sz1
                   ltac:(unfold K_kexec; lia) ltac:(reflexivity)
                   Hmsp Hmra Hms0 Hms1 Hms2 HX13sp HX13s3 HX13s6' Hbelow2 Hcov2
                   with "Hcg Hcnt Htext Hpc Hpt Hka Hbm Hins Hbits Hpriv
