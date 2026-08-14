@@ -1,6 +1,9 @@
 # The Layer-1 fabric generalization — worklist (mini-M5)
 
-**Status (2026-08-14): PLANNED, design analysis done (orchestrator).**
+**Status (2026-08-14): G1–G4 landed; G5a/G5b/G5c1 landed (see "G5 LANDED"
+at the bottom — the acyclicity route is the DEVICE EPOCH); G5c2/G5c3
+BLOCKED on a Layer-1 signature finding that G6 must design around; G6
+open.**
 The event-language spike PASSED
 ([`weak-memory-event-lang.md`](weak-memory-event-lang.md)); its one
 architectural debt is the S2 finding: `WeakPromise.wpcfg` has exactly two
@@ -114,3 +117,165 @@ for the archive.
   lemma_diff justified; worklists updated.
 
 Per-stage commits, tree green each time, findings in commit messages.
+
+## G5 LANDED (2026-08-14) — a, b, c1; c2/c3 BLOCKED, see the finding
+
+### G5a — the acyclicity route that worked: THE DEVICE EPOCH
+
+Preference (1) of the stage brief, with the residue NAMED per-edge rather
+than assumed globally (so route (3) was not needed).  In
+`WeakRobustOrd.v`:
+
+- **`depoch DS e`** — the DEVICE EPOCH of an event: the witness position
+  just past the LAST fabric-touching event of `e`'s OWN AGENT at or
+  before `e` in that agent's trace (`dep_go`, a fold over `pd_ord DS`).
+- **`depoch_gpo_le`** — a `gpo`-later event has epoch ≥.  NO hypothesis:
+  the defining predicate is monotone in the trace index.
+- **`depoch_dev` / `depoch_gdev_lt`** — a LISTED event's epoch is EXACTLY
+  `S` its own witness index (the upper bound is (W3), the witness
+  refining each agent's trace order), so `gdev` raises it by one.  This
+  is the brief's "gpo-adjacency bridged by per-agent monotonicity", and
+  it is a theorem, not a premise.
+- **`dev_epoch_ok TS DS`** — THE NAMED RESIDUE: no `grf` and no `gE` edge
+  LOWERS the epoch, i.e. no reads-from runs backwards ACROSS A FABRIC
+  ACCESS.  Per-edge, no cycle quantifier — the epistemic shape of
+  `rf_edges_ok`/`ee_ok`, and strictly weaker than the refuted W7 ("rf is
+  forward in behavior time"): it only forbids an inversion that crosses a
+  device access.  `dev_epoch_ok_nil` makes it free at the empty witness,
+  so every dev-free consumer is unaffected.
+- **`gdep3_acyclic_epoch`** (global) and **`gdep3_acyclic_at_epoch`**
+  (POINTWISE: an event off every `gdep2` cycle is off every `gdep3`
+  cycle) — the latter is what the exhibit's cone consumes, since the
+  exhibit has no global acyclicity to spend.  `tc_gdep3_epoch` is the
+  shared split.
+
+**WHY THE RESIDUE CANNOT BE DISCHARGED (the G3 finding one level down).**
+An `grf` edge genuinely may lower the epoch, and nothing in the bundle
+forbids it.  The refutation, recorded at the definition:
+
+```
+D₁ (agent A, witness index 10) --gpo--> w (agent A, a fulfil)
+w --grf--> r (agent B) --gpo--> D₂ (agent B, witness index 3)
+D₂ --gdev⁺--> D₁                              (3 < 10)
+```
+
+is a `gdep3` cycle with an ACYCLIC `gdep2` and all of (W1)–(W4)
+satisfied.  The witness order is the behavior's temporal order, so the
+`gdev` chain says only `D₂ < D₁` in time, hence `r < D₂ < D₁ < w`; and
+`r` reading `w`'s message BEFORE `w` executes is precisely a read of a
+PROMISE, which the front-loaded promise phase supplies.  Note the "device
+events are silent" hypothesis the brief offered does NOT help: the
+inverting edge is between two MEMORY events.  So the epoch is where the
+gap is smallest, and the gap is exactly `dev_epoch_ok`.
+
+### G5b — the exhibit/composition over the real witness
+
+`WeakRobustMain.v` rewired off the empty-witness instantiation:
+
+- `Section cone` / `Section exhibit` take `DS`, `ptraces_wit TS DS`,
+  `pd_init DS = d0`, `dev_epoch_ok TS DS`; the cone `Ucone`/`ancr`/
+  `Rcone`/`cone_Qinv` are over `gdep3` (so gdev-predecessors are in the
+  cone, which is what `Qinv_step`'s predecessor hypothesis demands).
+- `gdep2_acyclic_main` unchanged; NEW `gdep3_acyclic_main` = it + G5a's
+  rank.  `robust_main` now feeds `sim_full` the REAL witness.
+- `robust_main` / `robust_transport` LOSE the `(∀ p l p', pdev … = false)`
+  scope premise and take the package per `(mid, TS, DS)` through
+  `ptraces_dev_of` (via `wp_behavior_fulfil_once_dev`).
+- `main_premises nh TS DS` = `edges_split ∧ bad_wf ∧ ee_ok ∧
+  dev_epoch_ok ∧ ∃ sync, ptraces_bytes_ok`; `main_premises_nil` is the
+  dev-free packaging.
+- **DEVIATION (forced, recorded at the definition):** `bad`'s
+  "no publishing ancestor" conjunct, and `bad_min`, are over `gdep3`, not
+  `gdep2`.  The exhibit replays the `gdep3` cone, so the ¬pub arm finds
+  its publishing fulfil in the `gdep3` ancestry; quantifying the conjunct
+  over `gdep2` would leave that arm unusable.  It STRENGTHENS `bad`,
+  hence `edges_split`; at the empty witness `gdep3` IS `gdep2` and
+  nothing moves.  `bad`/`bad_min`/`bad_wf`/`edges_split`/`main_premises`
+  all gained the `DS` index; `bad_wf_strong`/`gdep2_acyclic_bad_free`
+  too.
+- The cone-acyclicity family (`rf_edges_ok_on_min`, `anc_mr`,
+  `cone_acyc2_of_min`, `cone_acyc_of_min`) moved OUT of the section to
+  TOP LEVEL with named binders, plus dev-free corollaries
+  (`cone_acyc_of_min_nil`, `cone_Qinv_nil`, `tc_gdep3_nil`), because both
+  the witness route and the archived route (`WeakRobustCone`,
+  `WeakSailCone`, `WeakComposeLang`) name them and section discharge made
+  their argument lists depend on which variables a proof happened to use.
+- Archived route kept compiling at `PDevs d0 []` / `PDevs tt []`;
+  `WeakComposeLang.tb_facts` gained a `DS` parameter.
+
+### G5c1 — the user-approved Sail constructor merge (LANDED)
+
+`WeakEvLang.eexpr` now has ONE hart constructor
+`Sail (gen) (cpu) (m : M unit) (fn : option …)`; `ELoop gen cpu` and
+`ECycle gen cpu m fn` are transparent DEFINITIONS (`ELoop` a Definition
+rather than a Notation because `epower_fork` applies `ELoop gen` to one
+argument).  Fallout:
+
+- `emonad_step`'s `Ret` arm IS the boundary rule now
+  (`∃ tick, e' = Sail gen c (riscv_step tick) None ∧ σ' = σ`): the old
+  "pop to `ELoop`, then fetch" is ONE step.  `eprim_step` has five arms,
+  one hart arm, ONE corpse arm.
+- Every inversion lemma keeps its statement VERBATIM
+  (`eprim_step_loop_inv`, `eprim_step_cycle_inv`, …); only the proofs
+  moved.  `ewp_ecycle` / `ewp_eloop` (the RESTART rule) unchanged.
+- **The one statement that had to move:** `ewp_ev_ret` and
+  `ewp_ev_seq_ret` LOSE their `▷`.  `ECycle gen c (Ret u) None` IS
+  `ELoop gen c` (the result type is `unit`), so there is no step left to
+  strip; `ewp_ev_ret` is now the conversion and the real rule is
+  `ewp_eloop`.  Three `iNext`s deleted in `WeakEvStarted`; all the
+  started-handshake and composition lemma STATEMENTS are unchanged.
+
+### G5c2/c3 — BLOCKED, and the block is a finding G6 must design around
+
+`epf_step` CANNOT be exhibited as an instance of `wp_pf_step` in the
+direction the capstone needs.  ⇐ (every `epf_step` is a `wp_pf_step` of
+the instance) is fine and is the definitional correspondence; the
+capstone needs ⇒ — every `wp_pf_run` of the instance is an `epf_run` —
+because `pf_violation_free_hart` quantifies over ALL pf runs, and it
+fails at THREE points where `wp_pf_step` is a strict OVER-approximation
+of what the language can do:
+
+1. **The message CLASS is a free binder.**  `PFStore`/`PFRmw` quantify
+   `∃ k, … WMsg base data (Some i) k`, while the language COMPUTES it
+   (`WeakInterp.wm_class_of ak ws` at the storing hart's own `wstate`).
+   `cls_of`/`pub_of`/`violation_hart` are all class-sensitive, so the pf
+   machine reaches violating logs the language cannot produce.  `pstep`
+   cannot constrain it: the class is neither in the label nor derivable
+   from the program state (it reads `w_relp`, a `wstate` field).
+2. **The disk's DMA reads the flat memory.**  `edisk_burst` runs
+   `wdisk_step (wgdev σ) (wflat (wgimg σ) (wglog σ)) d' w`; `pstep` has
+   no memory argument, so the arm has to be existential in `mem` —
+   exactly the archived route's recorded delta (i)
+   (`WeakCompose.pstep_xv6`'s disk arm).
+3. **The PLIC arm needs the target hart's INDEX** (`dev_seip (wgdev σ)
+   (fin_to_nat c)`) and `pstep` has none.  This one is CHEAPLY FIXABLE —
+   put the `CPU` in `pexv6`'s `PHart` constructor — and is recorded only
+   so it is not rediscovered.
+
+So the S2 "zero glue premises" claim survives at `epf_run` and does NOT
+survive the move to `wp_pf_run` at any Layer-1 instance: the glue that
+re-enters is the SAME pair the archived route already names (class
+canonicity — `WeakRetag.cls_canonical` — and the DMA's memory argument).
+NOTHING was forced: no capstone was written, no premise invented.
+
+**WHAT G6 OWES.**  Either (a) make the class an OUTPUT of the program
+step (widen `wlabel`'s store arm or `pstep`'s signature) so the pf
+machine cannot pick it, and give the disk arm its memory — i.e. a Layer-1
+signature change, the natural successor to the G1 fabric change; or (b)
+relativize `pf_violation_free_hart` to the pf runs the EXHIBIT actually
+builds (whose classes come from the behavior's own log, which is what
+`cls_canonical` says), which is a `WeakRobustMain` change and keeps
+Layer 1's signature; then finish G5c2/c3.  Plus the original G6 list
+(WeakCompose §6 rewrite, the S6/6c retarget note, worklists).
+
+**Audit at the G5 landing.**  Full `make -f CoqMakefile -j12 -k` green.
+`Print Assumptions` over 15 lemmas — `gdep3_acyclic_epoch`,
+`robust_main`, `bad_edge_violates`, `xv6_weak_robust`,
+`xv6_weak_robust_prefix` CLOSED under the global context; the ten model-
+facing ones (`xv6_weak_robust_lifted`, `xv6_weak_robust_adequate`,
+`weak_ev_pf_violation_free`, `ewp_eloop`, `ewp_ev_ret`,
+`ewp_ev_seq_ret`, `ewp_ev_started_set`/`_load`/`_fence`/`_wait_seq`) on
+EXACTLY the five rv64d axioms: `rv64d.valid_reservation`,
+`rv64d.plat_term_write`, `rv64d.match_reservation`,
+`rv64d.load_reservation`, `rv64d.cancel_reservation`.
+`tools/lemma_diff.py --ref HEAD`: CLEAN.  No `Axiom`, no `Admitted`.

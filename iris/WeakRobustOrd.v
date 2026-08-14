@@ -514,6 +514,202 @@ Section ord.
   Proof. apply gdep3_acyclic_no_gdev. intros x y. apply gdev_nil. Qed.
 
   (* ---------------------------------------------------------------- *)
+  (** ** THE DEVICE EPOCH — the rank that discharges the criterion for
+         [gpo] and [gdev], and NAMES the residue (G5a)
+
+      THE ROUTE (worklist G5a, preference (1)).  The criterion
+      [gdep3_acyclic_of_rank] wants a rank that [gdep2] never lowers and
+      [gdev] always raises.  There is one canonical candidate — THE
+      DEVICE EPOCH of an event: the witness position just past the LAST
+      fabric-touching event of that event's OWN AGENT at or before it in
+      that agent's trace.
+
+      What the epoch buys, and it is exactly what the worklist's route
+      (1) predicts:
+
+      - [depoch_gpo_le]: a [gpo]-later event has an epoch ≥, because the
+        predicate defining the epoch is monotone in the trace index.  No
+        hypothesis at all.
+      - [depoch_dev] / [depoch_gdev_lt]: a LISTED event's epoch is
+        EXACTLY [S] its own witness index — the upper bound is (W3), the
+        witness refining each agent's trace order — so a [gdev] edge
+        raises the epoch by one.  This is the "gpo-adjacency to device
+        events bridged by per-agent monotonicity" the route asks for, and
+        it is a theorem.
+
+      WHAT DOES NOT FOLLOW, AND WHY IT CANNOT (the honest residue, and
+      the G3 finding one level down).  An [grf]/[gE] edge may LOWER the
+      epoch, and no premise of the bundle forbids it.  The refutation is
+      the promise mechanism again, one step past W7's:
+
+          D₁ (agent A, witness index 10)  --gpo-->  w (agent A, a fulfil)
+          w  --grf-->  r (agent B)  --gpo-->  D₂ (agent B, witness index 3)
+          D₂ --gdev⁺--> D₁  (3 < 10)
+
+      is a [gdep3] cycle with an ACYCLIC [gdep2] and all of (W1)–(W4)
+      satisfied: the witness order is the behavior's temporal order, so
+      the chain says only [D₂ < D₁] in time, hence [r < D₂ < D₁ < w];
+      and [r] reading [w]'s message BEFORE [w] executes is precisely a
+      read of a PROMISE, which the front-loaded promise phase supplies.
+      So the union's acyclicity is not derivable from [gdep2]'s here
+      either, and the epoch is where the gap is smallest.
+
+      THE RESIDUE IS THEREFORE PER-EDGE, NOT GLOBAL: [dev_epoch_ok] says
+      no reads-from and no floor-protection edge runs BACKWARDS ACROSS A
+      FABRIC ACCESS.  It is strictly weaker than the refuted W7 ("rf is
+      forward in behavior time"), it has the shape of the other per-edge
+      obligations ([rf_edges_ok], [ee_ok] — no cycle quantifier, one
+      statement per edge), and it collapses to [True] whenever the
+      witness is empty ([dev_epoch_ok_nil]), which is what keeps every
+      dev-free consumer free of it. *)
+
+  (** [dep_go l e m] — the epoch of [e] computed over the witness suffix
+      [l] whose head sits at witness position [m]: [S (m + i)] for the
+      LAST position [i] of [l] holding an event of [e]'s own agent at or
+      before [e], and [0] if there is none. *)
+  Fixpoint dep_go (l : list gev) (e : gev) (m : nat) : nat :=
+    match l with
+    | [] => 0%nat
+    | e' :: l' =>
+        Nat.max (if bool_decide (e'.1 = e.1 ∧ (e'.2 ≤ e.2)%nat)
+                 then S m else 0%nat)
+                (dep_go l' e (S m))
+    end.
+
+  Lemma dep_go_lb l e m i e' :
+    l !! i = Some e' → e'.1 = e.1 → (e'.2 ≤ e.2)%nat →
+    (S (m + i) ≤ dep_go l e m)%nat.
+  Proof.
+    revert m i. induction l as [|x l IH]; intros m i Hi Hag Hle;
+      [by rewrite lookup_nil in Hi|].
+    destruct i as [|i]; rewrite lookup_cons in Hi.
+    - simplify_eq. simpl.
+      have -> : bool_decide (e'.1 = e.1 ∧ (e'.2 ≤ e.2)%nat) = true
+        by apply bool_decide_eq_true.
+      lia.
+    - simpl. have := IH (S m) i Hi Hag Hle. lia.
+  Qed.
+
+  Lemma dep_go_ub l e m N :
+    (∀ i e', l !! i = Some e' → e'.1 = e.1 → (e'.2 ≤ e.2)%nat →
+       (S (m + i) ≤ N)%nat) →
+    (dep_go l e m ≤ N)%nat.
+  Proof.
+    revert m. induction l as [|x l IH]; intros m H; [simpl; lia|].
+    simpl. apply Nat.max_lub.
+    - destruct (bool_decide (x.1 = e.1 ∧ (x.2 ≤ e.2)%nat)) eqn:Hb; [|lia].
+      apply bool_decide_eq_true in Hb as [Hag Hle].
+      have := H 0%nat x eq_refl Hag Hle. lia.
+    - apply IH. intros i e' Hi Hag Hle.
+      have := H (S i) e' Hi Hag Hle. lia.
+  Qed.
+
+  Lemma dep_go_mono l e1 e2 m :
+    e1.1 = e2.1 → (e1.2 ≤ e2.2)%nat → (dep_go l e1 m ≤ dep_go l e2 m)%nat.
+  Proof.
+    intros Hag Hle. revert m. induction l as [|x l IH]; intros m; [done|].
+    simpl. apply Nat.max_le_compat; [|apply IH].
+    destruct (bool_decide (x.1 = e1.1 ∧ (x.2 ≤ e1.2)%nat)) eqn:Hb; [|lia].
+    apply bool_decide_eq_true in Hb as [H1 H2].
+    have -> : bool_decide (x.1 = e2.1 ∧ (x.2 ≤ e2.2)%nat) = true.
+    { apply bool_decide_eq_true. split; [congruence|lia]. }
+    lia.
+  Qed.
+
+  Definition depoch (DS : pdevs D) (e : gev) : nat := dep_go (pd_ord DS) e 0%nat.
+
+  Lemma depoch_lb DS e m e' :
+    pd_ord DS !! m = Some e' → e'.1 = e.1 → (e'.2 ≤ e.2)%nat →
+    (S m ≤ depoch DS e)%nat.
+  Proof.
+    intros Hm Hag Hle.
+    have := dep_go_lb (pd_ord DS) e 0%nat m e' Hm Hag Hle. rewrite /depoch. lia.
+  Qed.
+
+  (** A LISTED event's epoch is [S] its own witness index — the upper
+      bound is (W3): a LATER witness entry of the same agent is a LATER
+      trace position, so it cannot be at or before [e]. *)
+  Lemma depoch_dev TS DS m e :
+    ptraces_wit TS DS → pd_ord DS !! m = Some e → depoch DS e = S m.
+  Proof.
+    intros (_ & _ & HW3 & _) Hm.
+    have Hlb : (S m ≤ depoch DS e)%nat by eapply depoch_lb; [exact Hm|done|done].
+    have Hub : (depoch DS e ≤ S m)%nat.
+    { apply dep_go_ub. intros i e' Hi Hag Hle.
+      destruct (decide (i ≤ m)%nat) as [?|Hgt]; [lia|exfalso].
+      have Hm' : pd_ord DS !! m = Some (e.1, e.2)
+        by rewrite -(surjective_pairing e).
+      have Hi' : pd_ord DS !! i = Some (e.1, e'.2)
+        by rewrite -Hag -(surjective_pairing e').
+      have := HW3 m i e.1 e.2 e'.2 ltac:(lia) Hm' Hi'. lia. }
+    lia.
+  Qed.
+
+  Lemma depoch_gpo_le TS DS e1 e2 :
+    gpo TS e1 e2 → (depoch DS e1 ≤ depoch DS e2)%nat.
+  Proof. intros (Hag & Hlt & _ & _). apply dep_go_mono; [done|lia]. Qed.
+
+  Lemma depoch_gdev_lt TS DS e1 e2 :
+    ptraces_wit TS DS → gdev TS DS e1 e2 → (depoch DS e1 < depoch DS e2)%nat.
+  Proof.
+    intros Hwit (m & Hm1 & Hm2).
+    rewrite (depoch_dev TS DS m e1 Hwit Hm1)
+            (depoch_dev TS DS (S m) e2 Hwit Hm2). lia.
+  Qed.
+
+  (** THE NAMED RESIDUE: no reads-from and no floor-protection edge runs
+      BACKWARDS across a fabric access.  Per-edge, no cycle quantifier —
+      the same epistemic shape as [rf_edges_ok] and [ee_ok]. *)
+  Definition dev_epoch_ok TS (DS : pdevs D) : Prop :=
+    ∀ e1 e2, (grf TS e1 e2 ∨ gE TS e1 e2) →
+      (depoch DS e1 ≤ depoch DS e2)%nat.
+
+  Lemma dev_epoch_ok_nil TS (d : D) : dev_epoch_ok TS (PDevs d []).
+  Proof. intros e1 e2 _. rewrite /depoch /=. lia. Qed.
+
+  Lemma depoch_gdep2_le TS DS e1 e2 :
+    dev_epoch_ok TS DS → gdep2 TS e1 e2 → (depoch DS e1 ≤ depoch DS e2)%nat.
+  Proof.
+    intros Hok [[Hpo|Hrf]|HE];
+      [by eapply depoch_gpo_le|apply Hok; by left|apply Hok; by right].
+  Qed.
+
+  (** THE SPLIT, which is all three consumers need: a [gdep3] PATH is a
+      [gdep2] path or it strictly raised the epoch. *)
+  Lemma tc_gdep3_epoch TS DS x y :
+    ptraces_wit TS DS → dev_epoch_ok TS DS →
+    tc (gdep3 TS DS) x y →
+    tc (gdep2 TS) x y ∨ (depoch DS x < depoch DS y)%nat.
+  Proof.
+    intros Hwit Hok.
+    apply (tc_union_rank (gdep3 TS DS) (gdep2 TS) (gdev TS DS) (depoch DS)).
+    - by intros u v Hd.
+    - intros u v. by apply depoch_gdep2_le.
+    - intros u v. by eapply depoch_gdev_lt.
+  Qed.
+
+  (** POINTWISE: an event off every [gdep2] cycle is off every [gdep3]
+      cycle.  (This is the form the EXHIBIT's cone consumes — it has no
+      global acyclicity to spend.) *)
+  Lemma gdep3_acyclic_at_epoch TS DS e :
+    ptraces_wit TS DS → dev_epoch_ok TS DS →
+    ¬ tc (gdep2 TS) e e → ¬ tc (gdep3 TS DS) e e.
+  Proof.
+    intros Hwit Hok Hac Hc.
+    destruct (tc_gdep3_epoch TS DS e e Hwit Hok Hc) as [Hc2|Hlt];
+      [by apply Hac|lia].
+  Qed.
+
+  (** …and the global theorem, as an instance of the G3 criterion. *)
+  Theorem gdep3_acyclic_epoch TS DS :
+    ptraces_wit TS DS → dev_epoch_ok TS DS →
+    gdep2_acyclic TS → gdep3_acyclic TS DS.
+  Proof.
+    intros Hwit Hok Hac e.
+    by eapply (gdep3_acyclic_at_epoch TS DS e Hwit Hok (Hac e)).
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
   (** ** DELIVERABLE 4, part 1: the SUBSET vocabulary
 
       GENERALIZED over the edge relation [R] (G3): the sort and its

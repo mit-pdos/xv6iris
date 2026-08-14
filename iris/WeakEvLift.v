@@ -349,7 +349,7 @@ Section core.
     iMod ("H" $! σ with "Hσ") as "[%Hred Hk]".
     iModIntro. iSplitR.
     { iPureIntro. destruct Hred as (e' & σ' & Hstep).
-      exists [], e', σ', []. right; left. exists gen, c, m, fn.
+      exists [], e', σ', []. left. exists gen, c, m, fn.
       split_and!; try reflexivity. left. by split. }
     iIntros (e2 σ2 efs Hstep) "!>".
     apply eprim_step_cycle_inv in Hstep as (-> & -> & Harm).
@@ -383,19 +383,19 @@ Section core.
     iSplitL; [|done]. iApply "H".
   Qed.
 
-  (** THE INSTRUCTION END: [Ret] pops back to the boundary token, at
-      [fn = None] (the park/fire discipline is local to the cycle — (D5)). *)
+  (** THE INSTRUCTION END, AFTER THE G5 CONSTRUCTOR MERGE.  [Ret u] at
+      [fn = None] IS the boundary value ([ELoop gen c] is a DEFINITION for
+      it — [u] is [tt] because the monad's result type is [unit]), so this
+      rule no longer costs a step: the old "pop to [ELoop]" transition and
+      the old boundary rule are ONE rule now, and it is [ewp_eloop] above
+      (the RESTART).  What survives here is the conversion, kept under its
+      old name so that the certification adapter's statements do not move.
+      THE ▷ IS GONE, deliberately: there is no step left to strip. *)
   Lemma ewp_ev_ret (gen : nat) (c : CPU) (u : unit) :
     gen = 0%nat ->
-    ▷ EWP (ELoop gen c) @ ⊤ -∗
+    EWP (ELoop gen c) @ ⊤ -∗
     EWP (ECycle gen c (Interface.Ret u) None) @ ⊤.
-  Proof.
-    iIntros (Hgen) "H". iApply (ewp_ecycle gen c _ None Hgen).
-    iIntros (σ) "Hσ". iApply fupd_mask_intro; [set_solver|]. iIntros "Hcl".
-    iSplitR; [iPureIntro; by do 2 eexists|].
-    iNext. iIntros (e' σ') "%Hcy". simpl in Hcy. destruct Hcy as (-> & ->).
-    iMod "Hcl" as "_". iModIntro. iFrame "Hσ". iExact "H".
-  Qed.
+  Proof. iIntros (Hgen) "H". by destruct u. Qed.
 
   (** THE PARKED FENCE FIRING — the only arm enabled while [fn ≠ None] (D5). *)
   Lemma ewp_ev_fence_fire (gen : nat) (c : CPU) (m : M unit)
@@ -1657,7 +1657,7 @@ Section adapter.
     gen = 0%nat ->
     enode_tag (esil nn D x).2 = 0%nat ->
     ereg_frame c x.1 D -∗
-    ▷ (ereg_frame c (esil nn D x).1 D -∗ EWP (ELoop gen c) @ ⊤) -∗
+    (ereg_frame c (esil nn D x).1 D -∗ EWP (ELoop gen c) @ ⊤) -∗
     EWP (ECycle gen c x.2 None) @ ⊤.
   Proof.
     iIntros (Hgen Htag) "Hrf H".

@@ -1791,7 +1791,7 @@ Qed.
 Definition cone_liftable (gen : nat) (g0 : wgstate) (u0 : wlaux)
     (TS : ptraces pxv6 unit) : Prop :=
   ∀ (b1 b2 : gev) (segs : list seg2) (cf : wpcfg pxv6 unit),
-    bad n_disk TS b1 b2 → bad_min n_disk TS b2 →
+    bad n_disk TS (PDevs tt []) b1 b2 → bad_min n_disk TS (PDevs tt []) b2 →
     chained2 segs (wl_cfg g0 u0) cf →
     Forall seg2_fine segs →
     violation_hart cls_of pub_of n_disk cf →
@@ -1842,14 +1842,14 @@ Definition xv6_cone_premises (TS : ptraces pxv6 unit) : Prop :=
     [robust_main_no_bad] may USE them rather than re-derive them. *)
 Definition tb_facts {P D : Type} (pstep : P → D → wlabel → P → D → Prop)
     (nh : nat)
-    (img : image) (ps : list P) (TS : ptraces P D) : Prop :=
+    (img : image) (ps : list P) (DS : pdevs D) (TS : ptraces P D) : Prop :=
   ptraces_wf pstep TS ∧ ptraces_ws_init TS ∧ (∀ a, co_tc TS a) ∧
   writes_fulfilled TS ∧ pt_img TS = img ∧
   length (pt_trs TS) = length ps ∧
   (∀ p m, pt_log TS !! p = Some m → wm_data m ≠ []) ∧
   (∀ j T ag0, pt_trs TS !! j = Some T →
      at_ags T !! 0%nat = Some ag0 → ps !! j = Some (pa_st ag0)) ∧
-  ptraces_fwd_own TS ∧ ee_ok TS ∧ edges_split nh TS.
+  ptraces_fwd_own TS ∧ ee_ok TS ∧ edges_split nh TS DS.
 
 (** THE FULFILMENT ACCOUNTING ([WeakRobustTrace.wp_behavior_fulfil_once]'s
     fourth output), named so that [robust_main_no_bad] can TAKE a
@@ -1890,16 +1890,16 @@ Theorem xv6_no_bad_edge (gen : nat) (g0 : wgstate) (u0 : wlaux)
   img_total (img_z (wgimg g0)) →
   (∀ t2 g2, rtc (@erased_step weak_riscv_lang) (wpool gen, g0) (t2, g2) →
             no_violation (wglog g2) (wgws g2)) →
-  bad_wf n_disk TS →
+  bad_wf n_disk TS (PDevs tt []) →
   (** the fabric scope, as everywhere on the archived per-hart track *)
   (∀ j T k ev, pt_trs TS !! j = Some T →
      at_evs T !! k = Some ev → ae_dev ev = None) →
   tb_facts (pstep_unit (pstep_xv6 riscv_step)) n_disk (img_z (wgimg g0))
-    (xv6_ps0 g0 u0) TS →
+    (xv6_ps0 g0 u0) (PDevs tt []) TS →
   xv6_cone_premises TS →
   WeakRetag.cls_canonical lbl_class TS →
   cone_liftable gen g0 u0 TS →
-  ∀ e1 e2, ¬ bad n_disk TS e1 e2.
+  ∀ e1 e2, ¬ bad n_disk TS (PDevs tt []) e1 e2.
 Proof.
   intros Hsh Hslv Hlive Hlog0 Hws0 Hdws0 Himgt Hphi Hbwf Hdf
     (Hwf & Hwsi & Hco & Hwfl & Himg & Hnag & Hdata & Hps0 & Hfo & Hee & Hsplit)
@@ -1960,15 +1960,16 @@ Theorem robust_main_no_bad {P D : Type}
   rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid →
   ptraces_of pstep TS mid c →
   fulfil_acct mid TS →
-  main_premises nh TS →
+  main_premises nh TS (PDevs d0 []) →
   (∀ j T k ev, pt_trs TS !! j = Some T →
      at_evs T !! k = Some ev → ae_dev ev = None) →
-  (tb_facts pstep nh img ps TS → ∀ e1 e2, ¬ bad nh TS e1 e2) →
+  (tb_facts pstep nh img ps (PDevs d0 []) TS →
+     ∀ e1 e2, ¬ bad nh TS (PDevs d0 []) e1 e2) →
   ∃ cf, rtc (wp_pf_run pstep) (wp_init img d0 ps) cf ∧
         prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
 Proof.
   intros Hlf Hobl Hprom Hof Hacct Hprem Hdf Hnb.
-  destruct Hprem as (Hsplit & Hbwf & Hee & (sync & Hbytes)).
+  destruct Hprem as (Hsplit & Hbwf & Hee & Hepo & (sync & Hbytes)).
   (* the derived bundle facts — verbatim [robust_main]'s *)
   have Hwf : ptraces_wf pstep TS by eapply ptraces_of_wf.
   have Hla : log_authored (pc_log mid).
@@ -2004,10 +2005,10 @@ Proof.
     destruct (ps !! j) as [p0|] eqn:Hp0; simpl in Hag; [|done].
     injection Hag as <-. by rewrite Hst. }
   (* NO BAD EDGE — so the per-edge split is [rf_edges_ok] outright *)
-  have Hnobad : ∀ e1 e2, ¬ bad nh TS e1 e2.
+  have Hnobad : ∀ e1 e2, ¬ bad nh TS (PDevs d0 []) e1 e2.
   { apply Hnb. by split_and!. }
   have Hacyc : gdep2_acyclic TS.
-  { eapply (gdep2_acyclic_bad_free pstep nh TS Hwf Hfo Hee Hsplit).
+  { eapply (gdep2_acyclic_bad_free pstep nh TS (PDevs d0 []) Hwf Hfo Hee Hsplit).
     intros e1 e2 Hbe. by destruct (Hnobad e1 e2 Hbe). }
   eapply (sim_full pstep pdev TS (PDevs d0 []) img d0 ps Hwf Hwsi Hco Hwfl Hlf
             Hobl Himg1 Hlen1 Hdata1 Hps1 (ptraces_wit_nil TS d0 Hdf) eq_refl
@@ -2035,7 +2036,7 @@ Corollary xv6_weak_robust_lifted (gen : nat) (g0 : wgstate) (u0 : wlaux)
        (wp_init (img_z (wgimg g0)) tt (xv6_ps0 g0 u0)) mid →
      ptraces_of (pstep_unit (pstep_xv6 riscv_step)) TS mid cb →
      WeakRetag.cls_canonical lbl_class TS →
-     main_premises n_disk TS ∧ xv6_cone_premises TS ∧
+     main_premises n_disk TS (PDevs tt []) ∧ xv6_cone_premises TS ∧
      cone_liftable gen g0 u0 TS) →
   wp_behavior (pstep_unit (pstep_xv6 riscv_step)) (img_z (wgimg g0)) tt (xv6_ps0 g0 u0) c →
   ∃ cf, rtc (wp_pf_run (pstep_unit (pstep_xv6 riscv_step)))
@@ -2097,7 +2098,7 @@ Proof.
               Hprom' Hof' (fulfil_acct_retag _ mid TS Hacct) Hmain Hdf)
     as (cf & Hrun & Hpg & Hmm).
   { intros Htb.
-    destruct Hmain as (_ & Hbwf & _ & _).
+    destruct Hmain as (_ & Hbwf & _ & _ & _).
     by eapply (xv6_no_bad_edge gen g0 u0 _
                  Hsh Hslv Hlive Hlog0 Hws0 Hdws0 Himgt Hphi Hbwf Hdf Htb Hcp
                  Hcanon Hcl). }
@@ -2141,7 +2142,7 @@ Corollary xv6_weak_robust_adequate Σ `{!riscvGpreS Σ, !weakGpreS Σ}
        (wp_init (img_z (wgimg g0)) tt (xv6_ps0 g0 u0)) mid →
      ptraces_of (pstep_unit (pstep_xv6 riscv_step)) TS mid cb →
      WeakRetag.cls_canonical lbl_class TS →
-     main_premises n_disk TS ∧ xv6_cone_premises TS ∧
+     main_premises n_disk TS (PDevs tt []) ∧ xv6_cone_premises TS ∧
      cone_liftable gen_id g0 u0 TS) →
   wp_behavior (pstep_unit (pstep_xv6 riscv_step)) (img_z (wgimg g0)) tt (xv6_ps0 g0 u0) c →
   ∃ cf, rtc (wp_pf_run (pstep_unit (pstep_xv6 riscv_step)))

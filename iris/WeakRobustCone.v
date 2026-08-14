@@ -456,7 +456,7 @@ Section coneblocks.
   Context (Hfo : WeakRobustAcyc.ptraces_fwd_own TS).
   Context (Hee : WeakRobustAcyc2.ee_ok TS).
   Context (nh : nat).
-  Context (Hsplit : edges_split nh TS).
+  Context (Hsplit : edges_split nh TS (PDevs d0 [])).
 
   (** THE BOUNDARY PREDICATE and the two premises about it. *)
   Context (bnd : P → Prop).
@@ -1485,7 +1485,7 @@ Section coneblocks.
       why the block-contiguous one serves. *)
 
   Theorem blocks_violates b1 :
-    bad nh TS b1 b2 →
+    bad nh TS (PDevs d0 []) b1 b2 →
     ∃ cfs cf,
       (** the run, with its per-event segment structure *)
       length cfs = S (length done_full) ∧
@@ -1629,7 +1629,7 @@ Section coneblocks.
         + exact Hepge.
         + exists t0, (msg_at TS t0). split_and!;
             [exact Hepts|exact Heplog|exact Hrelq].
-        + by apply ord0_tc.
+        + apply tc_gdep2_gdep3. by apply ord0_tc.
       - done.
       - exact Hbyte.
       - rewrite /obs_flr Hlk2 /=. lia. }
@@ -1675,7 +1675,7 @@ Section main.
   Context (Hfo : WeakRobustAcyc.ptraces_fwd_own TS).
   Context (Hee : WeakRobustAcyc2.ee_ok TS).
   Context (nh : nat).
-  Context (Hsplit : edges_split nh TS).
+  Context (Hsplit : edges_split nh TS (PDevs d0 [])).
   Context (bnd : P → Prop).
   Context `{!∀ p, Decision (bnd p)}.
   Context (Hbnd0 : ∀ i T ag0, pt_trs TS !! i = Some T →
@@ -1688,7 +1688,7 @@ Section main.
     lb_writes (ae_lb ev') = false ∧ lb_loads (ae_lb ev') = false).
 
   Theorem bad_edge_violates_blocks b1 b2 :
-    bad nh TS b1 b2 → bad_min nh TS b2 →
+    bad nh TS (PDevs d0 []) b1 b2 → bad_min nh TS (PDevs d0 []) b2 →
     ∃ (order : list gev) (cfs : list (wpcfg P D)) (cf : wpcfg P D),
       (** (a) THE ORDER: the cone plus the bad read, duplicate-free,
               with the bad read LAST and every [gdep2] predecessor
@@ -1727,10 +1727,12 @@ Section main.
     have Hrf2 := Hrf. destruct Hrf2 as (t0 & a0 & Hts0 & Hrd0).
     have Hb2wf : gev_wf TS b2 by eapply gev_reads_wf.
     have Hb2mem : is_mem TS b2 by eapply reads_mem.
-    have Hrr : ¬ tc (gdep2 TS) b2 b2 by apply (Hmin b1 b2 Hbad).
-    destruct (cone_Qinv pstep pdev TS img d0 ps Hwf Hwsi Hco Hwfl Hlf Hobl Himg
-                Hnag Hdata Hps0 Hdf b2 Hb2wf Hrr
-                (cone_acyc_of_min pstep TS Hwf Hfo Hee nh Hsplit b2 Hmin))
+    have Hrr : ¬ tc (gdep2 TS) b2 b2.
+    { intros Hc. apply (Hmin b1 b2 Hbad). by apply tc_gdep2_gdep3. }
+    destruct (cone_Qinv_nil pstep pdev TS img d0 ps Hwf Hwsi Hco Hwfl Hlf Hobl
+                Himg Hnag Hdata Hps0 Hdf b2 Hb2wf Hrr
+                (cone_acyc_of_min_nil pstep TS d0 nh b2 Hwf Hfo Hee Hdf
+                   Hsplit Hmin))
       as (ord0 & HQ0 & Hmem0).
     destruct (topo_sort (Rblk' TS bnd b2 ord0) (bids TS bnd b2 ord0)
                 (Rblk'_acyc pstep pdev TS img d0 ps Hwf Hwsi Hco Hwfl Hlf Hobl Himg

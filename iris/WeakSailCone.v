@@ -933,7 +933,7 @@ Section cone.
   Context (Hfo : WeakRobustAcyc.ptraces_fwd_own TS).
   Context (Hee : WeakRobustAcyc2.ee_ok TS).
   Context (nh : nat).
-  Context (Hsplit : edges_split nh TS).
+  Context (Hsplit : edges_split nh TS (PDevs tt [])).
 
   (** (B4-1) initial states are boundaries *)
   Context (Hps_bnd : ∀ i p, ps !! i = Some p → pbnd p).
@@ -2494,7 +2494,7 @@ Section package.
   Context (Hfo : WeakRobustAcyc.ptraces_fwd_own TS).
   Context (Hee : WeakRobustAcyc2.ee_ok TS).
   Context (nh : nat).
-  Context (Hsplit : edges_split nh TS).
+  Context (Hsplit : edges_split nh TS (PDevs tt [])).
   Context (Hps_bnd : ∀ i p, ps !! i = Some p → pbnd p).
   Context (Hcq : ∀ e1 e2, gdep2 TS e1 e2 → e1.1 ≠ e2.1 →
                    ∀ T ag', pt_trs TS !! e1.1 = Some T →
@@ -2565,7 +2565,7 @@ Section package.
   Qed.
 
   Theorem cone_segments (b1 b2 : gev) :
-    bad nh TS b1 b2 → bad_min nh TS b2 →
+    bad nh TS (PDevs tt []) b1 b2 → bad_min nh TS (PDevs tt []) b2 →
     ∃ (order : list gev) (cfs : list (wpcfg pxv6 unit)) (cmid : wpcfg pxv6 unit)
       (segs : list seg) (cf : wpcfg pxv6 unit),
       (** (a) THE BLOCK-CONTIGUOUS CONE CHAIN, forwarded from
@@ -2604,7 +2604,8 @@ Section package.
     destruct Hbad2 as (Hrf & Hne12 & Hh1 & Hh2 & _ & _).
     have Hrf2 := Hrf. destruct Hrf2 as (ts0 & a0 & Hts0 & Hrd0).
     have Hb2wf : gev_wf TS b2 by eapply gev_reads_wf.
-    have Hrr : ¬ tc (gdep2 TS) b2 b2 by apply (Hmin b1 b2 Hbad).
+    have Hrr : ¬ tc (gdep2 TS) b2 b2.
+    { intros Hc. apply (Hmin b1 b2 Hbad). by apply tc_gdep2_gdep3. }
     destruct (bad_edge_violates_blocks (pstep_unit (pstep_xv6 riscv_step))
                 (λ _ _ _, false) TS img tt ps
                 Hwf Hwsi Hco Hwfl (xv6_lat_free riscv_step)
@@ -3348,7 +3349,7 @@ Section package.
   (** *** THE PACKAGED, FULLY SEGMENTED THEOREM *)
 
   Theorem cone_segments2 (b1 b2 : gev) :
-    bad nh TS b1 b2 → bad_min nh TS b2 →
+    bad nh TS (PDevs tt []) b1 b2 → bad_min nh TS (PDevs tt []) b2 →
     ∃ (segs : list seg2) (cf : wpcfg pxv6 unit),
       chained2 segs (wp_init img tt ps) cf ∧
       Forall seg2_ok segs ∧
@@ -3361,7 +3362,8 @@ Section package.
     destruct Hbad2 as (Hrf & Hne12 & Hh1 & Hh2 & _ & _).
     have Hrf2 := Hrf. destruct Hrf2 as (ts0 & a0 & Hts0 & Hrd0).
     have Hb2wf : gev_wf TS b2 by eapply gev_reads_wf.
-    have Hrr : ¬ tc (gdep2 TS) b2 b2 by apply (Hmin b1 b2 Hbad).
+    have Hrr : ¬ tc (gdep2 TS) b2 b2.
+    { intros Hc. apply (Hmin b1 b2 Hbad). by apply tc_gdep2_gdep3. }
     destruct (bad_edge_violates_blocks (pstep_unit (pstep_xv6 riscv_step))
                 (λ _ _ _, false) TS img tt ps
                 Hwf Hwsi Hco Hwfl (xv6_lat_free riscv_step)

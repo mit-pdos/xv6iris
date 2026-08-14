@@ -94,13 +94,23 @@ Local Open Scope Z_scope.
     [ELoop] already had. *)
 
 Inductive eexpr :=
-  | ELoop  (gen : nat) (cpu : CPU)
-  | ECycle (gen : nat) (cpu : CPU) (m : M unit)
+  | Sail   (gen : nat) (cpu : CPU) (m : M unit)
            (fn : option (bool * bool * bool * bool))
   | EUart  (gen : nat)
   | EDisk  (gen : nat) (pend : list wmsg) (dws : wstate)
   | EPlic  (gen : nat)
   | EPower.
+
+(** THE BOUNDARY VALUE, and the mid-instruction one.  [ELoop] is not a
+    constructor any more: the boundary IS the hart sitting at the monad's
+    own terminal value, which is unique because the result type is [unit].
+    Both are kept as (transparent) DEFINITIONS so that every statement of
+    the spike files keeps elaborating verbatim, and so that [ELoop gen] may
+    still be applied to one argument ([epower_fork]'s [<$>]). *)
+Definition ELoop (gen : nat) (cpu : CPU) : eexpr :=
+  Sail gen cpu (Interface.Ret tt) None.
+Definition ECycle (gen : nat) (cpu : CPU) (m : M unit)
+    (fn : option (bool * bool * bool * bool)) : eexpr := Sail gen cpu m fn.
 
 Definition eval := Empty_set.
 Definition eobs := Empty_set.
@@ -261,8 +271,11 @@ Section hart.
   Definition emonad_step (m : M unit) (e' : eexpr) (σ' : wgstate) : Prop :=
     match m with
     | Interface.Ret _ =>
-        (* end of the instruction: back to the boundary token *)
-        e' = ELoop gen c /\ σ' = σ
+        (* THE RESTART (the merged boundary rule): the hart is at the
+           terminal value, i.e. AT an instruction boundary, and fetches a
+           fresh instruction.  The old two-step "pop to [ELoop], then
+           fetch" is one step now — [Ret tt] IS the boundary token. *)
+        exists tick : bool, e' = Sail gen c (riscv_step tick) None /\ σ' = σ
     | Interface.Next oc k =>
         (match oc in Interface.outcome _ T return (T -> M unit) -> Prop with
          | Interface.RegRead r _ => fun k =>
@@ -472,15 +485,10 @@ Proof. reflexivity. Qed.
 Definition eprim_step
     (e : eexpr) (σ : wgstate) (κ : list eobs)
     (e' : eexpr) (σ' : wgstate) (efs : list eexpr) : Prop :=
-  (* the BOUNDARY: fetch a fresh instruction (the tick nondeterminism is
-     [RiscvLang.prim_step]'s, verbatim) *)
-  (exists gen cpu, e = ELoop gen cpu /\ κ = [] /\ efs = [] /\
-    ((ethread_live σ gen /\ σ' = σ /\
-      exists tick : bool, e' = ECycle gen cpu (riscv_step tick) None)
-     \/ (~ ethread_live σ gen /\ e' = e /\ σ' = σ)))
-  \/
-  (* the CYCLE: one event of the instruction *)
-  (exists gen cpu m fn, e = ECycle gen cpu m fn /\ κ = [] /\ efs = [] /\
+  (* THE HART, one arm (G5c): one event of the instruction, where the
+     instruction BOUNDARY is the [Ret tt] node and its event is the fetch.
+     One corpse arm, and one bookkeeping step per instruction fewer. *)
+  (exists gen cpu m fn, e = Sail gen cpu m fn /\ κ = [] /\ efs = [] /\
     ((ethread_live σ gen /\ ecycle_step gen σ cpu m fn e' σ')
      \/ (~ ethread_live σ gen /\ e' = e /\ σ' = σ)))
   \/
@@ -523,11 +531,17 @@ Lemma eprim_step_loop_inv gen cpu σ κ e' σ' efs :
     exists tick : bool, e' = ECycle gen cpu (riscv_step tick) None)
    \/ (~ ethread_live σ gen /\ e' = ELoop gen cpu /\ σ' = σ)).
 Proof.
-  intros [(gen0 & cpu0 & Heq & ? & ? & Harm)
-         | [(? & ? & ? & ? & Heq & _) | [(? & Heq & _)
-         | [(? & ? & ? & Heq & _) | [(? & Heq & _) | (Heq & _)]]]]];
-    try discriminate Heq.
-  injection Heq as -> ->. by split_and!.
+  intros [(gen0 & cpu0 & m0 & fn0 & Heq & Hk & Hf & Harm)
+         | [(? & Heq & _) | [(? & ? & ? & Heq & _)
+         | [(? & Heq & _) | (Heq & _)]]]];
+    rewrite /ELoop in Heq; try discriminate Heq.
+  injection Heq as <- <- <- <-.
+  split_and!; [exact Hk|exact Hf|].
+  destruct Harm as [(Hl & Hcy)|(Hd & Hee & Hss)].
+  - rewrite /ecycle_step /emonad_step /= in Hcy.
+    destruct Hcy as (tick & -> & ->).
+    left. split_and!; [exact Hl|reflexivity|by exists tick].
+  - right. by split_and!.
 Qed.
 
 Lemma eprim_step_cycle_inv gen cpu m fn σ κ e' σ' efs :
@@ -536,12 +550,11 @@ Lemma eprim_step_cycle_inv gen cpu m fn σ κ e' σ' efs :
   ((ethread_live σ gen /\ ecycle_step gen σ cpu m fn e' σ')
    \/ (~ ethread_live σ gen /\ e' = ECycle gen cpu m fn /\ σ' = σ)).
 Proof.
-  intros [(? & ? & Heq & _)
-         | [(gen0 & cpu0 & m0 & fn0 & Heq & ? & ? & Harm)
+  intros [(gen0 & cpu0 & m0 & fn0 & Heq & ? & ? & Harm)
          | [(? & Heq & _) | [(? & ? & ? & Heq & _)
-         | [(? & Heq & _) | (Heq & _)]]]]];
-    try discriminate Heq.
-  injection Heq as -> -> -> ->. by split_and!.
+         | [(? & Heq & _) | (Heq & _)]]]];
+    rewrite /ECycle in Heq; try discriminate Heq.
+  injection Heq as <- <- <- <-. by split_and!.
 Qed.
 
 Lemma eprim_step_uart_inv gen σ κ e' σ' efs :
@@ -550,10 +563,9 @@ Lemma eprim_step_uart_inv gen σ κ e' σ' efs :
   ((ethread_live σ gen /\ euart_step σ σ')
    \/ (~ ethread_live σ gen /\ σ' = σ)).
 Proof.
-  intros [(? & ? & Heq & _)
-         | [(? & ? & ? & ? & Heq & _)
+  intros [(? & ? & ? & ? & Heq & _)
          | [(gen0 & Heq & ? & ? & ? & Harm) | [(? & ? & ? & Heq & _)
-         | [(? & Heq & _) | (Heq & _)]]]]];
+         | [(? & Heq & _) | (Heq & _)]]]];
     try discriminate Heq.
   injection Heq as ->. by split_and!.
 Qed.
@@ -564,11 +576,10 @@ Lemma eprim_step_disk_inv gen pend dws σ κ e' σ' efs :
   ((ethread_live σ gen /\ edisk_step gen pend dws σ e' σ')
    \/ (~ ethread_live σ gen /\ e' = EDisk gen pend dws /\ σ' = σ)).
 Proof.
-  intros [(? & ? & Heq & _)
-         | [(? & ? & ? & ? & Heq & _)
+  intros [(? & ? & ? & ? & Heq & _)
          | [(? & Heq & _)
          | [(gen0 & p0 & d0 & Heq & ? & ? & Harm)
-         | [(? & Heq & _) | (Heq & _)]]]]];
+         | [(? & Heq & _) | (Heq & _)]]]];
     try discriminate Heq.
   injection Heq as -> -> ->. by split_and!.
 Qed.
@@ -579,10 +590,9 @@ Lemma eprim_step_plic_inv gen σ κ e' σ' efs :
   ((ethread_live σ gen /\ eplic_step σ σ')
    \/ (~ ethread_live σ gen /\ σ' = σ)).
 Proof.
-  intros [(? & ? & Heq & _)
-         | [(? & ? & ? & ? & Heq & _)
+  intros [(? & ? & ? & ? & Heq & _)
          | [(? & Heq & _) | [(? & ? & ? & Heq & _)
-         | [(gen0 & Heq & ? & ? & ? & Harm) | (Heq & _)]]]]];
+         | [(gen0 & Heq & ? & ? & ? & Harm) | (Heq & _)]]]];
     try discriminate Heq.
   injection Heq as ->. by split_and!.
 Qed.
@@ -595,10 +605,9 @@ Lemma eprim_step_power_inv σ κ e' σ' efs :
                   (S (wggen σ)) false)
    \/ (wgpow σ = false /\ efs = epower_fork (wggen σ) /\ eboot_shape σ σ')).
 Proof.
-  intros [(? & ? & Heq & _)
-         | [(? & ? & ? & ? & Heq & _)
+  intros [(? & ? & ? & ? & Heq & _)
          | [(? & Heq & _) | [(? & ? & ? & Heq & _)
-         | [(? & Heq & _) | (_ & ? & ? & Harm)]]]]];
+         | [(? & Heq & _) | (_ & ? & ? & Harm)]]]];
     try discriminate Heq.
   by split_and!.
 Qed.
@@ -611,7 +620,7 @@ Lemma ecycle_step_img gen σ c m fn e' σ' :
 Proof.
   rewrite /ecycle_step. destruct fn as [[[[pr pw] sr] sw]|].
   { by intros (_ & ->). }
-  destruct m as [y|T oc k]; [by intros (_ & ->)|].
+  destruct m as [y|T oc k]; [by intros (? & _ & ->)|].
   destruct oc; simpl; try (by intros (_ & ->)); try (by intros []).
   - (* MemRead *)
     destruct (dev_addr _).
@@ -631,7 +640,7 @@ Lemma ecycle_step_era gen σ c m fn e' σ' :
 Proof.
   rewrite /ecycle_step. destruct fn as [[[[pr pw] sr] sw]|].
   { by intros (_ & ->). }
-  destruct m as [y|T oc k]; [by intros (_ & ->)|].
+  destruct m as [y|T oc k]; [by intros (? & _ & ->)|].
   destruct oc; simpl; try (by intros (_ & ->)); try (by intros []).
   - destruct (dev_addr _).
     + by intros (w & d' & _ & _ & ->).
@@ -652,7 +661,8 @@ Lemma ecycle_step_shape gen σ c m fn e' σ' :
 Proof.
   rewrite /ecycle_step. destruct fn as [[[[pr pw] sr] sw]|].
   { intros (-> & _). right. by do 2 eexists. }
-  destruct m as [y|T oc k]; [intros (-> & _); by left|].
+  destruct m as [y|T oc k];
+    [intros (tick & -> & _); right; by exists (riscv_step tick), None|].
   destruct oc; simpl;
     try (intros (-> & _); right; by do 2 eexists); try (by intros []).
   - destruct (dev_addr _).
@@ -673,7 +683,7 @@ Proof.
   rewrite /ecycle_step. destruct fn as [[[[pr pw] sr] sw]|].
   { intros (_ & ->). exists []. by rewrite app_nil_r. }
   destruct m as [y|T oc k];
-    [intros (_ & ->); exists []; by rewrite app_nil_r|].
+    [intros (? & _ & ->); exists []; by rewrite app_nil_r|].
   destruct oc; simpl;
     try (intros (_ & ->); exists []; by rewrite app_nil_r);
     try (by intros []).
@@ -696,7 +706,7 @@ Proof.
   intros H Hne. revert H. rewrite /ecycle_step.
   destruct fn as [[[[pr pw] sr] sw]|].
   { intros (_ & ->). by rewrite /ewg_ws /= gws_insert_ne. }
-  destruct m as [y|T oc k]; [by intros (_ & ->)|].
+  destruct m as [y|T oc k]; [by intros (? & _ & ->)|].
   destruct oc; simpl;
     try (by intros (_ & ->)); try (by intros []).
   - destruct (dev_addr _).
@@ -717,7 +727,7 @@ Lemma ecycle_step_ws_le gen σ c m fn e' σ' :
 Proof.
   rewrite /ecycle_step. destruct fn as [[[[pr pw] sr] sw]|].
   { intros (_ & ->). rewrite /ewg_ws /= gws_insert_eq. apply fence_post_le. }
-  destruct m as [y|T oc k]; [intros (_ & ->); reflexivity|].
+  destruct m as [y|T oc k]; [intros (? & _ & ->); reflexivity|].
   destruct oc; simpl; try (by intros (_ & ->)); try (by intros []).
   - destruct (dev_addr _).
     + intros (w & d' & _ & _ & ->). reflexivity.
@@ -758,28 +768,32 @@ Qed.
 
 Lemma eprim_step_loop_dead gen cpu σ :
   ~ ethread_live σ gen -> eprim_step (ELoop gen cpu) σ [] (ELoop gen cpu) σ [].
-Proof. intros Hd. left. exists gen, cpu. split_and!; try reflexivity. by right. Qed.
+Proof.
+  intros Hd. left. exists gen, cpu, (Interface.Ret tt), None.
+  split_and!; try reflexivity. by right.
+Qed.
 
 Lemma eprim_step_loop_live gen cpu σ (tick : bool) :
   ethread_live σ gen ->
   eprim_step (ELoop gen cpu) σ [] (ECycle gen cpu (riscv_step tick) None) σ [].
 Proof.
-  intros Hl. left. exists gen, cpu. split_and!; try reflexivity.
-  left. split_and!; [exact Hl|reflexivity|]. by exists tick.
+  intros Hl. left. exists gen, cpu, (Interface.Ret tt), None.
+  split_and!; try reflexivity. left. split; [exact Hl|].
+  rewrite /ecycle_step /emonad_step /=. by exists tick.
 Qed.
 
 Lemma eprim_step_cycle_dead gen cpu m fn σ :
   ~ ethread_live σ gen ->
   eprim_step (ECycle gen cpu m fn) σ [] (ECycle gen cpu m fn) σ [].
 Proof.
-  intros Hd. right; left. exists gen, cpu, m, fn.
+  intros Hd. left. exists gen, cpu, m, fn.
   split_and!; try reflexivity. by right.
 Qed.
 
 Lemma eprim_step_uart_dead gen σ :
   ~ ethread_live σ gen -> eprim_step (EUart gen) σ [] (EUart gen) σ [].
 Proof.
-  intros Hd. right; right; left. exists gen. split_and!; try reflexivity.
+  intros Hd. right; left. exists gen. split_and!; try reflexivity.
   by right.
 Qed.
 
@@ -787,14 +801,14 @@ Lemma eprim_step_disk_dead gen pend dws σ :
   ~ ethread_live σ gen ->
   eprim_step (EDisk gen pend dws) σ [] (EDisk gen pend dws) σ [].
 Proof.
-  intros Hd. right; right; right; left. exists gen, pend, dws.
+  intros Hd. right; right; left. exists gen, pend, dws.
   split_and!; try reflexivity. by right.
 Qed.
 
 Lemma eprim_step_plic_dead gen σ :
   ~ ethread_live σ gen -> eprim_step (EPlic gen) σ [] (EPlic gen) σ [].
 Proof.
-  intros Hd. right; right; right; right; left. exists gen.
+  intros Hd. right; right; right; left. exists gen.
   split_and!; try reflexivity. by right.
 Qed.
 
@@ -804,14 +818,14 @@ Lemma eprim_step_power_off σ :
     (WGState (wgregs σ) (wgimg σ) (wglog σ) (wgws σ) (wgdev σ)
              (S (wggen σ)) false) [].
 Proof.
-  intros Hon. right; right; right; right; right. split_and!; try reflexivity.
+  intros Hon. right; right; right; right. split_and!; try reflexivity.
   left. by split_and!.
 Qed.
 
 Lemma eprim_step_uart_idle gen σ :
   ethread_live σ gen -> eprim_step (EUart gen) σ [] (EUart gen) σ [].
 Proof.
-  intros Hl. right; right; left. exists gen. split_and!; try reflexivity.
+  intros Hl. right; left. exists gen. split_and!; try reflexivity.
   left. split; [exact Hl|]. exists (wgdev σ). split; [apply UartStepIdle|].
   by destruct σ.
 Qed.
@@ -823,7 +837,7 @@ Lemma eprim_step_plic_wire gen σ (c : CPU) :
        (register_set sig_seip
           (bool_to_bit (dev_seip (wgdev σ) (fin_to_nat c))) (wgregs σ c))) [].
 Proof.
-  intros Hl. right; right; right; right; left. exists gen.
+  intros Hl. right; right; right; left. exists gen.
   split_and!; try reflexivity. left. split; [exact Hl|]. by exists c.
 Qed.
 
@@ -856,13 +870,13 @@ Lemma eprim_step_disk_reducible gen pend dws σ :
   exists e' σ', eprim_step (EDisk gen pend dws) σ [] e' σ' [].
 Proof.
   intros Hl Hc. destruct pend as [|m rest].
-  - do 2 eexists. right; right; right; left. exists gen, [], dws.
+  - do 2 eexists. right; right; left. exists gen, [], dws.
     split_and!; try reflexivity.
     left. split; [exact Hl|]. left. split; [reflexivity|].
     exists (wgdev σ), ∅. split; [apply WDiskStepIdle|].
     rewrite wmsgs_of_map_empty. split; [reflexivity|by destruct σ].
   - rewrite /epend_canon in Hc. apply Forall_cons in Hc as [[Hd Ht] _].
-    do 2 eexists. right; right; right; left. exists gen, (m :: rest), dws.
+    do 2 eexists. right; right; left. exists gen, (m :: rest), dws.
     split_and!; try reflexivity.
     left. split; [exact Hl|]. right. exists m, rest. by split_and!.
 Qed.

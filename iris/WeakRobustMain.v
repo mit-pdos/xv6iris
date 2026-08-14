@@ -421,24 +421,39 @@ Definition pub_event_raises {P D : Type} (TS : ptraces P D) (e : gev) : Prop :=
     [WeakCompose.pstep_xv6] only the hart arms emit [LLoad]/[LRmw] (the
     disk arm emits stores only — [WeakCompose.xv6_lat_free]'s disk
     case).  Like the writer's bound it only NARROWS the [bad] escape
-    hatch of [edges_split]. *)
-Definition bad {P D : Type} (nh : nat) (TS : ptraces P D) (e1 e2 : gev) : Prop :=
+    hatch of [edges_split].
+
+    THE ANCESTRY IS OVER [gdep3], NOT [gdep2] (G5's one deviation from the
+    W2c shape, and it is forced).  The exhibit replays the ancestor cone of
+    the bad read, and with a fabric the cone that is DOWNWARD CLOSED for
+    [WeakRobustSim.Qinv_step] is the [gdep3 = gdep2 ∪ gdev] one — the
+    replay has to hand each fabric-touching event the fabric it recorded,
+    so a [gdev] predecessor of a cone event is a cone event.  The
+    "no publishing ancestor" conjunct therefore has to quantify over the
+    SAME relation the cone is closed under, or the ¬pub arm of
+    [bad_edge_violates] cannot use the publishing fulfil it finds in the
+    cone.  It STRENGTHENS [bad] (the ∃ it negates ranges over a bigger
+    relation), hence strengthens [edges_split]; under a dev-free marker
+    [gdep3] IS [gdep2] ([gdep3_nil_gdep2]) and nothing moves. *)
+Definition bad {P D : Type} (nh : nat) (TS : ptraces P D) (DS : pdevs D)
+    (e1 e2 : gev) : Prop :=
   grf TS e1 e2 ∧ e1.1 ≠ e2.1 ∧ (e1.1 < nh)%nat ∧ (e2.1 < nh)%nat ∧
   (∃ ts m, gev_ts TS e1 = Some ts ∧ pt_log TS !! (ts - 1)%nat = Some m ∧
            wm_ak m = WCplain) ∧
   ¬ (∃ ep, ep.1 = e1.1 ∧ (e1.2 ≤ ep.2)%nat ∧ pub_event TS ep ∧
-           tc (gdep2 TS) ep e2).
+           tc (gdep3 TS DS) ep e2).
 
 (** THE WEAKENED PER-EDGE PREMISE.  Same quantification as
     [WeakRobustAcyc.rf_edges_ok], with the conclusion weakened to a
     disjunction. *)
-Definition edges_split {P D : Type} (nh : nat) (TS : ptraces P D) : Prop :=
+Definition edges_split {P D : Type} (nh : nat) (TS : ptraces P D)
+    (DS : pdevs D) : Prop :=
   ∀ e1 e2 T ts a k' ev',
     gev_ts TS e1 = Some ts → gev_reads TS e2 a ts → e1.1 ≠ e2.1 →
     pt_trs TS !! e2.1 = Some T →
     (e2.2 < k')%nat →
     at_evs T !! k' = Some ev' → is_Some (ae_ts ev') →
-    edge_ok T e2.2 k' ts ∨ bad nh TS e1 e2.
+    edge_ok T e2.2 k' ts ∨ bad nh TS DS e1 e2.
 
 (** …and the RELATIVIZED strong premise: [edge_ok] at every cross edge
     whose READER satisfies [W].  This is the shape the walk below
@@ -466,11 +481,14 @@ Qed.
     is exactly what this excludes: it has no minimal element, its
     events' pf-realization is circular, and its message never enters the
     pf log, so no exhibit can be built. *)
-Definition bad_min {P D : Type} (nh : nat) (TS : ptraces P D) (e2 : gev) : Prop :=
-  ∀ f1 f2, bad nh TS f1 f2 → ¬ tc (gdep2 TS) f2 e2.
+Definition bad_min {P D : Type} (nh : nat) (TS : ptraces P D) (DS : pdevs D)
+    (e2 : gev) : Prop :=
+  ∀ f1 f2, bad nh TS DS f1 f2 → ¬ tc (gdep3 TS DS) f2 e2.
 
-Definition bad_wf {P D : Type} (nh : nat) (TS : ptraces P D) : Prop :=
-  ∀ e1 e2, bad nh TS e1 e2 → ∃ f1 f2, bad nh TS f1 f2 ∧ bad_min nh TS f2.
+Definition bad_wf {P D : Type} (nh : nat) (TS : ptraces P D) (DS : pdevs D)
+    : Prop :=
+  ∀ e1 e2, bad nh TS DS e1 e2 →
+    ∃ f1 f2, bad nh TS DS f1 f2 ∧ bad_min nh TS DS f2.
 
 (* ------------------------------------------------------------------ *)
 (** ** LAYER 3: THE RELATIVIZED WALK
@@ -651,13 +669,14 @@ End walk.
     walk looks.  The main theorem deliberately takes the WEAK form
     ([bad_wf]: some bad edge is minimal), which does NOT give this and
     is what the exhibit is for. *)
-Definition bad_wf_strong {P D : Type} (nh : nat) (TS : ptraces P D) : Prop :=
-  ∀ e1 e2, bad nh TS e1 e2 → ¬ tc (gdep2 TS) e2 e2.
+Definition bad_wf_strong {P D : Type} (nh : nat) (TS : ptraces P D)
+    (DS : pdevs D) : Prop :=
+  ∀ e1 e2, bad nh TS DS e1 e2 → ¬ tc (gdep2 TS) e2 e2.
 
 Theorem gdep2_acyclic_bad_free {P D : Type} (pstep : P → D → wlabel → P → D → Prop)
-    (nh : nat) (TS : ptraces P D) :
+    (nh : nat) (TS : ptraces P D) (DS : pdevs D) :
   ptraces_wf pstep TS → ptraces_fwd_own TS → ee_ok TS →
-  edges_split nh TS → bad_wf_strong nh TS →
+  edges_split nh TS DS → bad_wf_strong nh TS DS →
   gdep2_acyclic TS.
 Proof.
   intros Hwf Hfo Hee Hsplit Hbs.
@@ -855,22 +874,24 @@ Section cone.
   Context (Hdata : ∀ p m, pt_log TS !! p = Some m → wm_data m ≠ []).
   Context (Hps0 : ∀ j T ag0, pt_trs TS !! j = Some T →
                     at_ags T !! 0%nat = Some ag0 → ps !! j = Some (pa_st ag0)).
-  (** the fabric scope, as in [WeakRobustSim]: the replay here is the
-      DEV-FREE instance of G4's fabric-carrying one — the witness is
-      empty, so [gdep3] is [gdep2] and the fabric never moves.  (G5
-      rewires this to the general witness.) *)
-  Context (Hdf : ∀ j T k ev, pt_trs TS !! j = Some T →
-                   at_evs T !! k = Some ev → ae_dev ev = None).
+  (** THE FABRIC (G5b): the behavior's own device-order witness.  The
+      cone is the ancestry under [gdep3 = gdep2 ∪ gdev] — [Qinv_step]'s
+      predecessor hypothesis is over [gdep3], so a [gdev] predecessor of
+      a cone event is a cone event, and the replay hands every
+      fabric-touching event the fabric it recorded. *)
+  Context (DS : pdevs D).
+  Context (Hwit : ptraces_wit TS DS).
+  Context (Hd0 : pd_init DS = d0).
 
   (** The event whose ancestry is replayed (the bad read), and the three
       facts about it the cone needs: it is a real event, it is not on a
       cycle, and no cycle passes through its ancestry. *)
   Context (r : gev).
   Context (Hrwf : gev_wf TS r).
-  Context (Hrr : ¬ tc (gdep2 TS) r r).
-  Context (Hconeacyc : ∀ e, tc (gdep2 TS) e r → ¬ tc (gdep2 TS) e e).
+  Context (Hrr : ¬ tc (gdep3 TS DS) r r).
+  Context (Hconeacyc : ∀ e, tc (gdep3 TS DS) e r → ¬ tc (gdep3 TS DS) e e).
 
-  Definition ancr : list gev := anc (gdep2 TS) (gev_enum TS) r.
+  Definition ancr : list gev := anc (gdep3 TS DS) (gev_enum TS) r.
 
   Definition Ucone (e : gev) : Prop := e ∈ ancr ∧ e ≠ r.
 
@@ -880,19 +901,20 @@ Section cone.
   Lemma r_in_enum : r ∈ gev_enum TS.
   Proof. by apply elem_of_gev_enum. Qed.
 
-  Lemma elem_of_ancr e : e ∈ ancr ↔ (e = r ∨ tc (gdep2 TS) e r).
+  Lemma elem_of_ancr e : e ∈ ancr ↔ (e = r ∨ tc (gdep3 TS DS) e r).
   Proof.
-    apply (elem_of_anc (gdep2 TS) (gev_enum TS) r r_in_enum).
-    - intros x y Hd. apply elem_of_gev_enum. by destruct (gdep2_wf TS x y Hd).
+    apply (elem_of_anc (gdep3 TS DS) (gev_enum TS) r r_in_enum).
+    - intros x y Hd. apply elem_of_gev_enum.
+      by destruct (gdep3_wf TS DS x y Hwit Hd).
     - apply NoDup_gev_enum.
   Qed.
 
-  Lemma Ucone_iff e : Ucone e ↔ (gev_wf TS e ∧ tc (gdep2 TS) e r).
+  Lemma Ucone_iff e : Ucone e ↔ (gev_wf TS e ∧ tc (gdep3 TS DS) e r).
   Proof.
     split.
     - intros [Hin Hne]. split.
       + apply elem_of_gev_enum.
-        eapply (anc_iter_carrier (gdep2 TS) (gev_enum TS) r r_in_enum);
+        eapply (anc_iter_carrier (gdep3 TS DS) (gev_enum TS) r r_in_enum);
           exact Hin.
       + apply elem_of_ancr in Hin as [->|Htc]; [done|exact Htc].
     - intros [Hwfe Htc]. split.
@@ -903,22 +925,22 @@ Section cone.
   Lemma Ucone_wf e : Ucone e → gev_wf TS e.
   Proof. intros H. by apply Ucone_iff in H as [? _]. Qed.
 
-  Lemma Ucone_dc : dc TS (gdep2 TS) Ucone.
+  Lemma Ucone_dc : dc TS (gdep3 TS DS) Ucone.
   Proof.
     intros e e' HU Hd Hwf'. apply Ucone_iff. apply Ucone_iff in HU as [_ Htc].
     split; [done|]. by eapply tc_l.
   Qed.
 
-  Lemma Ucone_sub_ok : sub_ok TS (gdep2 TS) Ucone.
+  Lemma Ucone_sub_ok : sub_ok TS (gdep3 TS DS) Ucone.
   Proof. split; [apply Ucone_dc|apply Ucone_wf]. Qed.
 
   (** The RESTRICTED relation and its acyclicity. *)
-  Definition Rcone (x y : gev) : Prop := gdep2 TS x y ∧ Ucone x ∧ Ucone y.
+  Definition Rcone (x y : gev) : Prop := gdep3 TS DS x y ∧ Ucone x ∧ Ucone y.
 
   Local Instance Rcone_dec : RelDecision Rcone.
   Proof. intros x y. rewrite /Rcone. apply and_dec; apply _. Defined.
 
-  Lemma tc_Rcone x y : tc Rcone x y → tc (gdep2 TS) x y ∧ Ucone x.
+  Lemma tc_Rcone x y : tc Rcone x y → tc (gdep3 TS DS) x y ∧ Ucone x.
   Proof.
     induction 1 as [x y (Hd & Hx & Hy)|x y z (Hd & Hx & Hy) Htc IH].
     - split; [by apply tc_once|done].
@@ -935,30 +957,29 @@ Section cone.
       simulation invariant established over the whole of it. *)
   Theorem cone_Qinv :
     ∃ order,
-      Qinv pstep TS (PDevs d0 []) img d0 ps order ∧
-      (∀ e, e ∈ order ↔ (gev_wf TS e ∧ tc (gdep2 TS) e r)).
+      Qinv pstep TS DS img d0 ps order ∧
+      (∀ e, e ∈ order ↔ (gev_wf TS e ∧ tc (gdep3 TS DS) e r)).
   Proof.
     destruct (topo_sort Rcone (gev_enum_S TS Ucone) Rcone_acyc
                 (NoDup_gev_enum_S TS Ucone)) as (order & Hnd & Hmem0 & Hord).
     have Hmem : ∀ e, e ∈ order ↔ (gev_wf TS e ∧ Ucone e).
     { intros e. rewrite Hmem0. apply elem_of_gev_enum_S. }
-    have Hpre : ∀ n, (n ≤ length order)%nat → Qinv pstep TS (PDevs d0 []) img d0 ps (take n order).
+    have Hpre : ∀ n, (n ≤ length order)%nat → Qinv pstep TS DS img d0 ps (take n order).
     { intros n. induction n as [|n IH]; intros Hn.
-      { rewrite take_0. by apply (Qinv_nil pstep TS (PDevs d0 []) img d0 ps Hwf Hnag Hps0 eq_refl). }
+      { rewrite take_0. by apply (Qinv_nil pstep TS DS img d0 ps Hwf Hnag Hps0 Hd0). }
       have [e He] : is_Some (order !! n) by apply lookup_lt_is_Some_2; lia.
       rewrite (take_S_r order n e He).
       have Hein : e ∈ order by eapply elem_of_list_lookup_2.
       have Hes : gev_wf TS e ∧ Ucone e by apply Hmem.
-      eapply (Qinv_step pstep pdev TS (PDevs d0 []) img d0 ps Hwf Hwsi Hco Hwfl
-                Hlf Hobl Himg Hnag Hdata (ptraces_wit_nil TS d0 Hdf) (take n order) e).
+      eapply (Qinv_step pstep pdev TS DS img d0 ps Hwf Hwsi Hco Hwfl
+                Hlf Hobl Himg Hnag Hdata Hwit (take n order) e).
       - apply IH. lia.
       - apply Hes.
       - (* not already processed *)
         intros Hin. apply elem_of_take in Hin as (i & Hi & Hilt).
         have : i = n by eapply list_relations.NoDup_lookup. lia.
-      - (* every predecessor is processed (the witness is empty, so a
-           [gdep3] predecessor is a [gdep2] one) *)
-        intros e' Hd%(gdep3_nil_gdep2 TS d0) Hwf'.
+      - (* every predecessor is processed — the cone is [gdep3]-closed *)
+        intros e' Hd Hwf'.
         have HU' : Ucone e' by eapply Ucone_dc; [apply Hes|exact Hd|exact Hwf'].
         have He' : e' ∈ order by apply Hmem.
         apply elem_of_list_lookup in He' as (i & Hi).
@@ -1016,6 +1037,124 @@ Proof.
     by destruct (Hro jb t v Htv) as (Hv & _).
 Qed.
 
+(* ------------------------------------------------------------------ *)
+(** ** LAYER 5b: THE MINIMAL-BAD-TARGET CONE IS ACYCLIC
+
+    Stated TOP-LEVEL, with every hypothesis a named binder rather than a
+    section variable: BOTH the witness route ([Section exhibit] below) and
+    the archived dev-free route ([WeakRobustCone], [WeakComposeLang]) name
+    these, and a section discharge would make their argument lists depend
+    on which variables each proof happens to use. *)
+
+Lemma rf_edges_ok_on_min {P D : Type} (TS : ptraces P D) (DS : pdevs D)
+    (nh : nat) (b2 : gev) :
+  edges_split nh TS DS → bad_min nh TS DS b2 →
+  rf_edges_ok_on TS (λ e, tc (gdep3 TS DS) e b2).
+Proof.
+  intros Hsplit Hmin f1 f2 T ts a k' ev' Hts Hrd Hne HW HT Hlt Hev Hsome.
+  destruct (Hsplit f1 f2 T ts a k' ev' Hts Hrd Hne HT Hlt Hev Hsome)
+    as [Hok|Hbad]; [exact Hok|].
+  by destruct (Hmin f1 f2 Hbad HW).
+Qed.
+
+(** The [gdep3]-cone predicate is closed under MUTUAL [gdep2]
+    reachability, which is what the relativized walk asks of its [W]. *)
+Lemma rtc_gdep2_gdep3 {P D : Type} (TS : ptraces P D) (DS : pdevs D) x y :
+  rtc (gdep2 TS) x y → rtc (gdep3 TS DS) x y.
+Proof.
+  induction 1 as [|a b c Hab _ IH]; [done|].
+  eapply rtc_l; [by apply gdep2_gdep3|exact IH].
+Qed.
+
+Lemma anc_mr {P D : Type} (TS : ptraces P D) (DS : pdevs D) (b2 : gev) :
+  ∀ u x, tc (gdep3 TS DS) u b2 → rtc (gdep2 TS) u x → rtc (gdep2 TS) x u →
+    tc (gdep3 TS DS) x b2.
+Proof.
+  intros u x HW _ Hxu. eapply tc_rtc_l; [|exact HW].
+  by apply rtc_gdep2_gdep3.
+Qed.
+
+(** THE CONE'S ACYCLICITY, in two steps — the two halves of G5a: the
+    relativized walk ([gdep2_acyclic_on]) kills every [gdep2] cycle
+    through the cone, and the DEVICE EPOCH lifts that pointwise to
+    [gdep3] ([gdep3_acyclic_at_epoch]). *)
+Lemma cone_acyc2_of_min {P D : Type} (pstep : P → D → wlabel → P → D → Prop)
+    (TS : ptraces P D) (DS : pdevs D) (nh : nat) (b2 : gev) :
+  ptraces_wf pstep TS → ptraces_fwd_own TS → ee_ok TS →
+  edges_split nh TS DS → bad_min nh TS DS b2 →
+  ∀ e, tc (gdep3 TS DS) e b2 → ¬ tc (gdep2 TS) e e.
+Proof.
+  intros Hwf Hfo Hee Hsplit Hmin.
+  apply (gdep2_acyclic_on pstep TS (λ e, tc (gdep3 TS DS) e b2) Hwf Hfo
+           (rf_edges_ok_on_min TS DS nh b2 Hsplit Hmin) Hee
+           (anc_mr TS DS b2)).
+Qed.
+
+Lemma cone_acyc_of_min {P D : Type} (pstep : P → D → wlabel → P → D → Prop)
+    (TS : ptraces P D) (DS : pdevs D) (nh : nat) (b2 : gev) :
+  ptraces_wf pstep TS → ptraces_fwd_own TS → ee_ok TS →
+  ptraces_wit TS DS → dev_epoch_ok TS DS →
+  edges_split nh TS DS → bad_min nh TS DS b2 →
+  ∀ e, tc (gdep3 TS DS) e b2 → ¬ tc (gdep3 TS DS) e e.
+Proof.
+  intros Hwf Hfo Hee Hwit Hepo Hsplit Hmin e He.
+  apply (gdep3_acyclic_at_epoch TS DS e Hwit Hepo).
+  by apply (cone_acyc2_of_min pstep TS DS nh b2 Hwf Hfo Hee Hsplit Hmin).
+Qed.
+
+(** THE DEV-FREE READINGS (the archived instruction-atomic route): with
+    an empty witness [gdep3] IS [gdep2] and the two statements are the
+    pre-G5 ones, term for term. *)
+Lemma tc_gdep3_nil {P D : Type} (TS : ptraces P D) (d : D) x y :
+  tc (gdep3 TS (PDevs d [])) x y → tc (gdep2 TS) x y.
+Proof. apply tc_subrel. intros u v. apply (gdep3_nil_gdep2 TS d). Qed.
+
+Corollary cone_acyc_of_min_nil {P D : Type}
+    (pstep : P → D → wlabel → P → D → Prop)
+    (TS : ptraces P D) (d : D) (nh : nat) (b2 : gev) :
+  ptraces_wf pstep TS → ptraces_fwd_own TS → ee_ok TS →
+  (∀ i T k ev, pt_trs TS !! i = Some T → at_evs T !! k = Some ev →
+     ae_dev ev = None) →
+  edges_split nh TS (PDevs d []) → bad_min nh TS (PDevs d []) b2 →
+  ∀ e, tc (gdep2 TS) e b2 → ¬ tc (gdep2 TS) e e.
+Proof.
+  intros Hwf Hfo Hee Hdf Hsplit Hmin e He Hc.
+  eapply (cone_acyc_of_min pstep TS (PDevs d []) nh b2 Hwf Hfo Hee
+            (ptraces_wit_nil TS d Hdf) (dev_epoch_ok_nil TS d) Hsplit Hmin e).
+  - by apply tc_gdep2_gdep3.
+  - by apply tc_gdep2_gdep3.
+Qed.
+
+Corollary cone_Qinv_nil {P D : Type} (pstep : P → D → wlabel → P → D → Prop)
+    (pdev : P → wlabel → P → bool)
+    (TS : ptraces P D) (img : image) (d0 : D) (ps : list P) :
+  ptraces_wf pstep TS → ptraces_ws_init TS → (∀ a, co_tc TS a) →
+  writes_fulfilled TS → lat_free_prog pstep → ts_oblivious pstep →
+  pt_img TS = img → length (pt_trs TS) = length ps →
+  (∀ p m, pt_log TS !! p = Some m → wm_data m ≠ []) →
+  (∀ j T ag0, pt_trs TS !! j = Some T →
+     at_ags T !! 0%nat = Some ag0 → ps !! j = Some (pa_st ag0)) →
+  (∀ j T k ev, pt_trs TS !! j = Some T → at_evs T !! k = Some ev →
+     ae_dev ev = None) →
+  ∀ r, gev_wf TS r → ¬ tc (gdep2 TS) r r →
+  (∀ e, tc (gdep2 TS) e r → ¬ tc (gdep2 TS) e e) →
+  ∃ order,
+    Qinv pstep TS (PDevs d0 []) img d0 ps order ∧
+    (∀ e, e ∈ order ↔ (gev_wf TS e ∧ tc (gdep2 TS) e r)).
+Proof.
+  intros Hwf Hwsi Hco Hwfl Hlf Hobl Himg Hnag Hdata Hps0 Hdf r Hrwf Hrr Hcone.
+  destruct (cone_Qinv pstep pdev TS img d0 ps Hwf Hwsi Hco Hwfl Hlf Hobl Himg
+              Hnag Hdata Hps0 (PDevs d0 []) (ptraces_wit_nil TS d0 Hdf) eq_refl
+              r Hrwf
+              ltac:(intros Hc; apply Hrr; by eapply tc_gdep3_nil)
+              ltac:(intros e He Hc; eapply (Hcone e);
+                    by eapply tc_gdep3_nil))
+    as (order & HQ & Hmem).
+  exists order. split; [exact HQ|].
+  intros e. rewrite Hmem. split; intros [H1 H2]; split; try done;
+    [by eapply tc_gdep3_nil|by apply tc_gdep2_gdep3].
+Qed.
+
 Section exhibit.
   Context {P D : Type}.
   Context (pstep : P → D → wlabel → P → D → Prop).
@@ -1032,41 +1171,16 @@ Section exhibit.
   Context (Hdata : ∀ p m, pt_log TS !! p = Some m → wm_data m ≠ []).
   Context (Hps0 : ∀ j T ag0, pt_trs TS !! j = Some T →
                     at_ags T !! 0%nat = Some ag0 → ps !! j = Some (pa_st ag0)).
-  (** the fabric scope, as in [WeakRobustSim]: the replay here is the
-      DEV-FREE instance of G4's fabric-carrying one — the witness is
-      empty, so [gdep3] is [gdep2] and the fabric never moves.  (G5
-      rewires this to the general witness.) *)
-  Context (Hdf : ∀ j T k ev, pt_trs TS !! j = Some T →
-                   at_evs T !! k = Some ev → ae_dev ev = None).
+  (** THE FABRIC (G5b): the real witness, and the NAMED per-trace residue
+      G5a's rank criterion runs on. *)
+  Context (DS : pdevs D).
+  Context (Hwit : ptraces_wit TS DS).
+  Context (Hd0 : pd_init DS = d0).
+  Context (Hepo : dev_epoch_ok TS DS).
   Context (Hfo : ptraces_fwd_own TS).
   Context (Hee : ee_ok TS).
   Context (nh : nat).
-  Context (Hsplit : edges_split nh TS).
-
-  (** A MINIMAL bad target's ancestry carries no cycle: every cross edge
-      into it is [edge_ok] (a [bad] one would put a bad target in the
-      ancestry), so the relativized walk applies. *)
-  Lemma rf_edges_ok_on_min b2 :
-    bad_min nh TS b2 → rf_edges_ok_on TS (λ e, tc (gdep2 TS) e b2).
-  Proof.
-    intros Hmin f1 f2 T ts a k' ev' Hts Hrd Hne HW HT Hlt Hev Hsome.
-    destruct (Hsplit f1 f2 T ts a k' ev' Hts Hrd Hne HT Hlt Hev Hsome)
-      as [Hok|Hbad]; [exact Hok|].
-    by destruct (Hmin f1 f2 Hbad HW).
-  Qed.
-
-  Lemma anc_mr b2 :
-    ∀ u x, tc (gdep2 TS) u b2 → rtc (gdep2 TS) u x → rtc (gdep2 TS) x u →
-      tc (gdep2 TS) x b2.
-  Proof. intros u x HW _ Hxu. by eapply tc_rtc_l. Qed.
-
-  Lemma cone_acyc_of_min b2 :
-    bad_min nh TS b2 → ∀ e, tc (gdep2 TS) e b2 → ¬ tc (gdep2 TS) e e.
-  Proof.
-    intros Hmin.
-    apply (gdep2_acyclic_on pstep TS (λ e, tc (gdep2 TS) e b2) Hwf Hfo
-             (rf_edges_ok_on_min b2 Hmin) Hee (anc_mr b2)).
-  Qed.
+  Context (Hsplit : edges_split nh TS DS).
 
   (** THE EXHIBIT: a minimal bad edge builds a promise-free run to a
       VIOLATING configuration — and the violation is HART-RESTRICTED
@@ -1074,7 +1188,7 @@ Section exhibit.
       φ: the author is [bad]'s writer and the observer is its reader,
       and [bad] bounds both by [nh]. *)
   Theorem bad_edge_violates b1 b2 :
-    bad nh TS b1 b2 → bad_min nh TS b2 →
+    bad nh TS DS b1 b2 → bad_min nh TS DS b2 →
     ∃ cf, rtc (wp_pf_run pstep) (wp_init img d0 ps) cf ∧
           violation_hart cls_of pub_of nh cf.
   Proof.
@@ -1085,33 +1199,38 @@ Section exhibit.
     have Hrf' := Hrf. destruct Hrf' as (t' & a & Hts1' & Hrd2).
     have Htt : t' = t by rewrite Hts1 in Hts1'; simplify_eq.
     subst t'.
-    have Hrr : ¬ tc (gdep2 TS) b2 b2 by apply (Hmin b1 b2 Hbad).
+    have Hrr : ¬ tc (gdep3 TS DS) b2 b2 by apply (Hmin b1 b2 Hbad).
     have Hb2wf : gev_wf TS b2 by eapply gev_reads_wf.
     have Hb1wf : gev_wf TS b1 by eapply gev_ts_wf.
     have Htpos : (0 < t)%nat by eapply (gev_ts_pos pstep TS b1 t Hwf Hts1).
     (* ---- the cone, sorted, plus the bad read itself ---- *)
     destruct (cone_Qinv pstep pdev TS img d0 ps Hwf Hwsi Hco Hwfl Hlf Hobl Himg
-                Hnag Hdata Hps0 Hdf b2 Hb2wf Hrr (cone_acyc_of_min b2 Hmin))
+                Hnag Hdata Hps0 DS Hwit Hd0 b2 Hb2wf Hrr
+                (cone_acyc_of_min pstep TS DS nh b2 Hwf Hfo Hee Hwit Hepo
+                   Hsplit Hmin))
       as (order & HQ & Hmem).
     have Hq : qorder TS order
-      by eapply (Qinv_order pstep TS (PDevs d0 []) img d0 ps).
+      by eapply (Qinv_order pstep TS DS img d0 ps).
     have Hb2nin : b2 ∉ order.
     { intros Hin. apply Hmem in Hin as [_ Htc]. by apply Hrr. }
-    have Hpre2 : ∀ e', gdep2 TS e' b2 → gev_wf TS e' → e' ∈ order.
+    have Hpre3 : ∀ e', gdep3 TS DS e' b2 → gev_wf TS e' → e' ∈ order.
     { intros e' Hd Hw'. apply Hmem. split; [done|by apply tc_once]. }
-    have HQ' : Qinv pstep TS (PDevs d0 []) img d0 ps (order ++ [b2]).
-    { eapply (Qinv_step pstep pdev TS (PDevs d0 []) img d0 ps Hwf Hwsi Hco Hwfl
-                Hlf Hobl Himg Hnag Hdata (ptraces_wit_nil TS d0 Hdf) order b2);
+    have Hpre2 : ∀ e', gdep2 TS e' b2 → gev_wf TS e' → e' ∈ order.
+    { intros e' Hd Hw'. apply Hpre3; [by apply gdep2_gdep3|done]. }
+    have HQ' : Qinv pstep TS DS img d0 ps (order ++ [b2]).
+    { eapply (Qinv_step pstep pdev TS DS img d0 ps Hwf Hwsi Hco Hwfl
+                Hlf Hobl Himg Hnag Hdata Hwit order b2);
         [done|done|done|].
-      intros e' Hd%(gdep3_nil_gdep2 TS d0) Hw'. by apply Hpre2. }
+      intros e' Hd Hw'. by apply Hpre3. }
     have Hq' : qorder TS (order ++ [b2])
-      by eapply (Qinv_order pstep TS (PDevs d0 []) img d0 ps).
-    destruct (Qinv_run pstep TS (PDevs d0 []) img d0 ps (order ++ [b2]) HQ')
+      by eapply (Qinv_order pstep TS DS img d0 ps).
+    destruct (Qinv_run pstep TS DS img d0 ps (order ++ [b2]) HQ')
       as (cf & Hrun & Hcimg & Hclog & Hclen & Hcags & _).
     exists cf. split; [exact Hrun|].
     (* ---- the bad message and its pf position ---- *)
     have Hb1in : b1 ∈ order.
-    { apply Hmem. split; [done|]. apply tc_once, grf_gdep2. by exists t, a. }
+    { apply Hmem. split; [done|].
+      apply tc_once, gdep2_gdep3, grf_gdep2. by exists t, a. }
     have Hb1in' : b1 ∈ order ++ [b2] by apply elem_of_app; left.
     have Htfl : t ∈ fl TS (order ++ [b2]).
     { apply elem_of_fl. by exists b1. }
@@ -1238,8 +1357,8 @@ Section exhibit.
 
   (** …hence, under [pf_violation_free_hart], NO bad edge exists at all. *)
   Theorem no_bad_edge :
-    pf_violation_free_hart cls_of pub_of nh pstep img d0 ps → bad_wf nh TS →
-    ∀ e1 e2, ¬ bad nh TS e1 e2.
+    pf_violation_free_hart cls_of pub_of nh pstep img d0 ps → bad_wf nh TS DS →
+    ∀ e1 e2, ¬ bad nh TS DS e1 e2.
   Proof.
     intros Hvf Hbwf e1 e2 Hbad.
     destruct (Hbwf e1 e2 Hbad) as (f1 & f2 & Hbadf & Hmin).
@@ -1250,7 +1369,7 @@ Section exhibit.
   (** …so the per-edge premise is the full [rf_edges_ok] after all, and
       the extended graph is acyclic. *)
   Theorem gdep2_acyclic_main :
-    pf_violation_free_hart cls_of pub_of nh pstep img d0 ps → bad_wf nh TS →
+    pf_violation_free_hart cls_of pub_of nh pstep img d0 ps → bad_wf nh TS DS →
     gdep2_acyclic TS.
   Proof.
     intros Hvf Hbwf.
@@ -1259,6 +1378,18 @@ Section exhibit.
     destruct (Hsplit e1 e2 T ts b k' ev' Hts Hrd Hne HT Hlt Hev Hsome)
       as [Hok|Hbad]; [exact Hok|].
     by destruct (no_bad_edge Hvf Hbwf e1 e2 Hbad).
+  Qed.
+
+  (** …and the FABRIC-ORDERED graph is acyclic too, by G5a's rank: the
+      device epoch never falls along [gdep2] (that is [dev_epoch_ok],
+      plus the free [gpo] half) and strictly rises along [gdev]. *)
+  Theorem gdep3_acyclic_main :
+    pf_violation_free_hart cls_of pub_of nh pstep img d0 ps → bad_wf nh TS DS →
+    gdep3_acyclic TS DS.
+  Proof.
+    intros Hvf Hbwf.
+    apply (gdep3_acyclic_epoch TS DS Hwit Hepo).
+    by apply gdep2_acyclic_main.
   Qed.
 
 End exhibit.
@@ -1273,9 +1404,22 @@ End exhibit.
     from the behavior, exactly as [WeakRobustSim]'s wrapper derives
     them. *)
 
-Definition main_premises {P D : Type} (nh : nat) (TS : ptraces P D) : Prop :=
-  edges_split nh TS ∧ bad_wf nh TS ∧ ee_ok TS ∧
+Definition main_premises {P D : Type} (nh : nat) (TS : ptraces P D)
+    (DS : pdevs D) : Prop :=
+  edges_split nh TS DS ∧ bad_wf nh TS DS ∧ ee_ok TS ∧
+  dev_epoch_ok TS DS ∧
   (∃ sync, ptraces_bytes_ok TS sync).
+
+(** THE DEV-FREE READING of the package: with an empty witness the fabric
+    residue is free and [gdep3] is [gdep2], so a caller that runs at a
+    marker which never fires owes exactly what W2c's package asked for. *)
+Lemma main_premises_nil {P D : Type} (nh : nat) (TS : ptraces P D) (d : D) :
+  edges_split nh TS (PDevs d []) → bad_wf nh TS (PDevs d []) → ee_ok TS →
+  (∃ sync, ptraces_bytes_ok TS sync) →
+  main_premises nh TS (PDevs d []).
+Proof.
+  intros ????. split_and!; [done|done|done|by apply dev_epoch_ok_nil|done].
+Qed.
 
 Section main.
   Context {P D : Type}.
@@ -1299,26 +1443,27 @@ Section main.
       as stated — see the worklist's findings (v) and W2c (3)). *)
   Theorem robust_main nh img d0 ps c :
     pdev_ok pstep pdev →
-    (** THE FABRIC SCOPE (G4's boundary): the marker never fires — the
-        replay is the dev-free one, see [WeakRobustSim.wp_behavior_robust] *)
-    (∀ p l p', pdev p l p' = false) →
     lat_free_prog pstep → ts_oblivious pstep →
     wp_behavior pstep img d0 ps c →
-    (∀ mid TS,
+    (** THE PREMISE PACKAGE, PER TRACED BUNDLE *AND WITNESS* (G5b): the
+        factorization hands out [(mid, TS, DS)] and every clause of the
+        package that mentions the fabric mentions [DS]. *)
+    (∀ mid TS DS,
        rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid →
-       ptraces_of pstep TS mid c →
-       main_premises nh TS) →
+       ptraces_dev_of pstep pdev TS DS mid c →
+       main_premises nh TS DS) →
     pf_violation_free_hart cls_of pub_of nh pstep img d0 ps →
     ∃ cf, rtc (wp_pf_run pstep) (wp_init img d0 ps) cf ∧
           prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
   Proof.
-    intros Hpok Hnodev Hlf Hobl Hb Hprem Hvf.
+    intros Hpok Hlf Hobl Hb Hprem Hvf.
     destruct (wp_behavior_fulfil_once_dev pstep pdev img d0 ps c Hpok Hlf Hb)
       as (mid & TS & DS & Hprom & Hofd & Hnp & Hacct).
-    have Hdf := ptraces_dev_of_free pstep pdev TS DS mid c Hnodev Hofd.
+    have Hwit : ptraces_wit TS DS by eapply ptraces_dev_of_wit.
+    have Hdinit : pd_init DS = pc_dev mid by destruct Hofd as (_ & ? & _).
+    destruct (Hprem mid TS DS Hprom Hofd)
+      as (Hsplit & Hbwf & Hee & Hepo & (sync & Hbytes)).
     destruct Hofd as (Hof & _).
-    destruct (Hprem mid TS Hprom Hof)
-      as (Hsplit & Hbwf & Hee & (sync & Hbytes)).
     (* the derived bundle facts — as in [wp_behavior_robust] *)
     have Hwf : ptraces_wf pstep TS by eapply ptraces_of_wf.
     have Hla : log_authored (pc_log mid).
@@ -1353,14 +1498,16 @@ Section main.
       rewrite /wp_init /= list_lookup_fmap in Hag.
       destruct (ps !! j) as [p0|] eqn:Hp0; simpl in Hag; [|done].
       injection Hag as <-. by rewrite Hst. }
+    have Hd01 : pd_init DS = d0 by rewrite Hdinit Hpdev.
     (* THE ACYCLICITY: the exhibit rules out every bad edge, so the
-       per-edge split IS [rf_edges_ok] and the W2b walk closes *)
-    have Hacyc : gdep2_acyclic TS.
-    { eapply (gdep2_acyclic_main pstep pdev TS img d0 ps Hwf Hwsi Hco Hwfl Hlf
-                Hobl Himg1 Hlen1 Hdata1 Hps1 Hdf Hfo Hee nh Hsplit Hvf Hbwf). }
-    eapply (sim_full pstep pdev TS (PDevs d0 []) img d0 ps Hwf Hwsi Hco Hwfl
-              Hlf Hobl Himg1 Hlen1 Hdata1 Hps1 (ptraces_wit_nil TS d0 Hdf)
-              eq_refl c (gdep3_acyclic_nodev TS d0 Hacyc)).
+       per-edge split IS [rf_edges_ok] and the W2b walk closes; the
+       DEVICE EPOCH (G5a) then lifts it to the fabric-ordered graph *)
+    have Hacyc : gdep3_acyclic TS DS.
+    { eapply (gdep3_acyclic_main pstep pdev TS img d0 ps Hwf Hwsi Hco Hwfl Hlf
+                Hobl Himg1 Hlen1 Hdata1 Hps1 DS Hwit Hd01 Hepo Hfo Hee nh
+                Hsplit Hvf Hbwf). }
+    eapply (sim_full pstep pdev TS DS img d0 ps Hwf Hwsi Hco Hwfl
+              Hlf Hobl Himg1 Hlen1 Hdata1 Hps1 Hwit Hd01 c Hacyc).
     - by rewrite Himg0 Hcimgc.
     - by rewrite Hlog0 Hclogc.
     - by rewrite Hclenc Hplen /wp_init /= length_map.
@@ -1382,25 +1529,24 @@ Section main.
 
   Corollary robust_transport nh img d0 ps c :
     pdev_ok pstep pdev →
-    (∀ p l p', pdev p l p' = false) →
     lat_free_prog pstep → ts_oblivious pstep →
     completable img d0 ps c →
-    (∀ cend mid TS,
+    (∀ cend mid TS DS,
        wp_behavior pstep img d0 ps cend →
        rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid →
-       ptraces_of pstep TS mid cend →
-       main_premises nh TS) →
+       ptraces_dev_of pstep pdev TS DS mid cend →
+       main_premises nh TS DS) →
     pf_violation_free_hart cls_of pub_of nh pstep img d0 ps →
     ∃ cend cf,
       rtc (wpstep pstep) c cend ∧ no_promises cend ∧
       rtc (wp_pf_run pstep) (wp_init img d0 ps) cf ∧
       prog_of cf = prog_of cend ∧ (∀ a, mem_of cf a = mem_of cend a).
   Proof.
-    intros Hpok Hnodev Hlf Hobl (Hpre & cend & Hrest & Hnp) Hprem Hvf.
+    intros Hpok Hlf Hobl (Hpre & cend & Hrest & Hnp) Hprem Hvf.
     have Hbeh : wp_behavior pstep img d0 ps cend.
     { split; [by eapply rtc_transitive|exact Hnp]. }
-    destruct (robust_main nh img d0 ps cend Hpok Hnodev Hlf Hobl Hbeh
-                (λ mid TS, Hprem cend mid TS Hbeh) Hvf)
+    destruct (robust_main nh img d0 ps cend Hpok Hlf Hobl Hbeh
+                (λ mid TS DS, Hprem cend mid TS DS Hbeh) Hvf)
       as (cf & Hrun & Hprog & Hmem).
     by exists cend, cf.
   Qed.

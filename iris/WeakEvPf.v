@@ -450,16 +450,16 @@ Proof.
     rewrite -(epool_list_hset P c h').
     eapply erased_step_of_lookup; [apply epool_list_hart_lookup|].
     rewrite /ehexpr Hh /=.
-    right; left. exists (ep_gen P), c, m0, fn0.
+    left. exists (ep_gen P), c, m0, fn0.
     split_and!; try reflexivity. left. by split.
   - rewrite -(epool_list_dset P pd dw).
     eapply erased_step_of_lookup; [apply epool_list_disk_lookup|].
-    right; right; right; left. exists (ep_gen P), (ep_pend P), (ep_dws P).
+    right; right; left. exists (ep_gen P), (ep_pend P), (ep_dws P).
     split_and!; try reflexivity. left. by split.
   - rewrite -(epool_list_id (epool_list P) NCPU (EUart (ep_gen P)));
       [|apply epool_list_uart_lookup].
     eapply erased_step_of_lookup; [apply epool_list_uart_lookup|].
-    right; right; left. exists (ep_gen P). split_and!; try reflexivity.
+    right; left. exists (ep_gen P). split_and!; try reflexivity.
     left. by split.
   - rewrite -(epool_list_id (epool_list P) (S (S NCPU)) (EPlic (ep_gen P))).
     2:{ rewrite /epool_list lookup_app_r;
@@ -494,7 +494,7 @@ Proof.
   { intros (_ & ->). exists (LFence pr pw sr sw).
     split; [reflexivity|apply gws_insert_eq]. }
   destruct m as [y|T oc k].
-  { intros (_ & ->). exists LSilent. by split. }
+  { intros (? & _ & ->). exists LSilent. by split. }
   destruct oc; simpl;
     try (intros (_ & ->); exists LSilent; by split);
     try (by intros []).

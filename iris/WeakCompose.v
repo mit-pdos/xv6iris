@@ -262,11 +262,11 @@ Qed.
       form, because [bad] bounds both ends of its edge. *)
 Definition m6_side_conditions (next : bool → M unit) (img : image)
     (ps : list pxv6) : Prop :=
-  (∀ (c mid : wpcfg pxv6 unit) (TS : ptraces pxv6 unit),
+  (∀ (c mid : wpcfg pxv6 unit) (TS : ptraces pxv6 unit) (DS : pdevs unit),
      wp_behavior (pstep_unit (pstep_xv6 next)) img tt ps c →
      rtc (wp_promise_step (P := pxv6) (D := unit)) (wp_init img tt ps) mid →
-     ptraces_of (pstep_unit (pstep_xv6 next)) TS mid c →
-     main_premises n_disk TS)
+     ptraces_dev_of (pstep_unit (pstep_xv6 next)) xv6_pdev TS DS mid c →
+     main_premises n_disk TS DS)
   ∧ pf_violation_free_hart cls_of pub_of n_disk (pstep_unit (pstep_xv6 next)) img tt ps.
 
 (* ====================================================================== *)
@@ -291,9 +291,9 @@ Theorem xv6_weak_robust (next : bool → M unit) (img : image) (ps : list pxv6)
 Proof.
   intros [Hprem Hvf] Hbeh.
   apply (robust_main (pstep_unit (pstep_xv6 next)) xv6_pdev n_disk img tt ps c
-           (xv6_pdev_ok next) xv6_pdev_false
+           (xv6_pdev_ok next)
            (xv6_lat_free next) (xv6_ts_oblivious next) Hbeh
-           (λ mid TS, Hprem c mid TS Hbeh) Hvf).
+           (λ mid TS DS, Hprem c mid TS DS Hbeh) Hvf).
 Qed.
 
 (** W2c's COMPLETABLE-PREFIX form — the shape the adequacy composition wants,
@@ -311,7 +311,7 @@ Corollary xv6_weak_robust_prefix (next : bool → M unit) (img : image)
 Proof.
   intros [Hprem Hvf] Hc.
   apply (robust_transport (pstep_unit (pstep_xv6 next)) xv6_pdev n_disk img tt
-           ps c (xv6_pdev_ok next) xv6_pdev_false
+           ps c (xv6_pdev_ok next)
            (xv6_lat_free next) (xv6_ts_oblivious next) Hc Hprem Hvf).
 Qed.
 

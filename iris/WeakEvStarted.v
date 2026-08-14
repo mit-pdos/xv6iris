@@ -267,7 +267,7 @@ Section started_ev.
               (ecur_write (esil n2 D
                  (ecur_read (bv_unsigned wf) (esil n1 D (rs, m)))))
               eq_refl Htag with "Hrf").
-    iNext. iIntros "Hrf". iApply ("Hcont" $! wsw with "[%] Hws Hrf").
+    iIntros "Hrf". iApply ("Hcont" $! wsw with "[%] Hws Hrf").
     rewrite /wsw. etrans; [exact Hle_f|apply store_post_run_le].
   Qed.
 
@@ -439,7 +439,7 @@ Section started_ev.
               (ecur_read (bv_unsigned w)
                  (esil n2 D (ecur_read (bv_unsigned wf) (esil n1 D (rs, m)))))
               eq_refl (Htag w) with "Hrf").
-    iNext. iIntros "Hrf". iApply ("Hcont" $! wsl w with "[%] Harm Hws Hrf").
+    iIntros "Hrf". iApply ("Hcont" $! wsl w with "[%] Harm Hws Hrf").
     rewrite /wsl /eread_ws. etrans; [exact Hle_f|apply load_post_run_le].
   Qed.
 
@@ -511,7 +511,7 @@ Section started_ev.
               (ecur_bar (esil n2 D
                  (ecur_read (bv_unsigned wf) (esil n1 D (rs, m)))))
               eq_refl Htag with "Hrf").
-    iNext. iIntros "Hrf". iApply ("Hcont" $! wsb with "[%] HP Hws Hrf").
+    iIntros "Hrf". iApply ("Hcont" $! wsb with "[%] HP Hws Hrf").
     etrans; [exact Hle_f|exact Hle_b].
   Qed.
 
