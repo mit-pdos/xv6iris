@@ -126,6 +126,11 @@ Require Export IcacheRef.
    and hence in the context of the four files that STATE something over
    [ireg_inv] -- the enumerated sweep. *)
 Require Import LogInv.
+(* [add_vec_unsigned], for (L4)'s two bridge lemmas below.  Already in this
+   file's transitive closure (through [IcacheRef]); named here because a
+   [Require Import] in a sibling does not put its lemmas in scope. *)
+Require Import SailStdpp.Values SailStdpp.MachineWord.
+Require Import RiscvExtras.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -461,6 +466,54 @@ Proof. lia. Qed.
 Lemma di_nlink_nonneg (d : dinode) : 0 <= bv_unsigned (di_nlink d).
 Proof. exact (proj1 (bv_unsigned_in_range _ (di_nlink d))). Qed.
 
+(* ---- (L4)'s ARITHMETIC, AND THE SIGNED/UNSIGNED CATCH IT EXISTS FOR ----
+
+   xv6 117c0e7 guards both nlink-raising sites with [>= NLINK_MAX], which
+   gcc compiles to [== 32767] because [nlink] is a SIGNED short and it knows
+   the range.  The ledger's premise is UNSIGNED, and the two differ at
+   [bv_unsigned = 65535] -- signed [-1] -- where the guard passes and the
+   sixteen-bit [++] still wraps to zero.  So the guard alone does NOT close
+   the increment ([ProofCreateParts.cr_nlink_guard_leaves_the_wrap] is the
+   witness); what closes it is (L4), the range fact that a link count is a
+   NON-NEGATIVE short, and the guard is exactly what makes (L4)
+   PRESERVABLE.  That is what the kernel fix bought, and it is why (L4) is
+   an INVARIANT and not a premise: no caller can name the record it is
+   about (fs-sysfile.md's eleventh stop, the "no name for dp" objection).
+
+   [ireg_nlink_bump] is stated as a CONJUNCTION on purpose: the first half
+   is what [ireg_write_link] owes the ledger and the second is what it owes
+   the invariant, and neither holds without the other's hypothesis -- the
+   range alone would not survive the write, and the guard alone leaves the
+   wrap.  One lemma, so a writer cannot take half of it. *)
+Lemma ireg_nlink_step (h : mword 16) :
+  bv_unsigned h <> 65535 ->
+  bv_unsigned (add_vec h (mword_of_int 1 : mword 16)) = bv_unsigned h + 1.
+Proof.
+  intro Hne.
+  pose proof (bv_unsigned_in_range _ h) as Hr. unfold bv_modulus in Hr.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 16))%Z with 65536%Z in Hr.
+  rewrite add_vec_unsigned.
+  assert (H1 : bv_unsigned (mword_of_int 1 : mword 16) = 1)
+    by (vm_compute; reflexivity).
+  rewrite H1.
+  apply bv_wrap_small. unfold bv_modulus.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 16))%Z with 65536%Z. lia.
+Qed.
+
+Lemma ireg_nlink_bump (h : mword 16) :
+  bv_unsigned h <= 32767 ->
+  h <> (mword_of_int 32767 : mword 16) ->
+  bv_unsigned (add_vec h (mword_of_int 1 : mword 16)) = bv_unsigned h + 1
+  /\ bv_unsigned (add_vec h (mword_of_int 1 : mword 16)) <= 32767.
+Proof.
+  intros Hle Hne.
+  assert (Hnz : bv_unsigned h <> 32767).
+  { intro Hc. apply Hne. apply bv_eq. rewrite Hc. vm_compute. reflexivity. }
+  assert (Hstep : bv_unsigned (add_vec h (mword_of_int 1 : mword 16))
+                  = bv_unsigned h + 1) by (apply ireg_nlink_step; lia).
+  split; [exact Hstep | rewrite Hstep; lia].
+Qed.
+
 (* THE MARKER'S KEY.  The claim box needs a per-inum EXCLUSIVE token whose
    two homes are the region invariant and a pool/entry marker; a second
    ghost name for it would have to appear in [ireg_inv] AND in
@@ -659,10 +712,24 @@ Section InodeRegion.
      work -- the free cannot re-establish [c = None] without CONSUMING an
      [iclaim] it does not hold, and until something mints one there is
      nothing for a clause to say.  The [c] component rides unconstrained
-     through every mover below, exactly as it did before. *)
+     through every mover below, exactly as it did before.
+
+     (L4) [di_nlink d <= 32767] -- a link count is a NON-NEGATIVE short.
+     The clause the mkdir arm's [dp->nlink++] turned out to need and the
+     twelfth stop found missing: xv6's guard is a SIGNED test and
+     [wp_iupdate_link]'s premise is an unsigned one, so the guard alone
+     leaves the wrap at 65535 (= signed -1) alive.  It is stated HERE for
+     (L1)'s reason and one more: the record is the region's, and no caller
+     can name it.  PRESERVATION is where the whole clause is paid for, and
+     every arm move but one gets it free -- [di_nlink_stable] leaves the
+     count alone, [fresh_shape] and the free write a zero, and the unlink
+     LOWERS it.  The exception is [ireg_write_link], which is why that
+     mover, alone of the six, takes a premise about the OLD count: the
+     kernel's own guard, without which (L4) is not preservable at all. *)
   Definition ireg_link_ok (d : dinode) (w : nat) : Prop :=
     (w <= Z.to_nat (bv_unsigned (di_nlink d)))%nat                    (* L1 *)
-    /\ (bv_unsigned (di_type d) = 0 -> bv_unsigned (di_nlink d) = 0). (* L3 *)
+    /\ (bv_unsigned (di_type d) = 0 -> bv_unsigned (di_nlink d) = 0)  (* L3 *)
+    /\ bv_unsigned (di_nlink d) <= 32767.                             (* L4 *)
 
   (* (L1)'s contrapositive, and the reason the ledger exists: a record with
      an outstanding fragment is ALLOCATED.  Pure, so that every arm move
@@ -670,15 +737,22 @@ Section InodeRegion.
   Lemma ireg_link_ok_alloc (d : dinode) (w : nat) :
     ireg_link_ok d w -> (1 <= w)%nat -> bv_unsigned (di_type d) <> 0.
   Proof.
-    intros [Hle Hz] Hw H0. specialize (Hz H0).
+    intros [Hle [Hz _]] Hw H0. specialize (Hz H0).
     rewrite Hz in Hle. cbn in Hle. lia.
   Qed.
+
+  (* (L4) read off without destructuring three ways -- the one clause a
+     WRITER needs and the two above do not mention. *)
+  Lemma ireg_link_ok_short (d : dinode) (w : nat) :
+    ireg_link_ok d w -> bv_unsigned (di_nlink d) <= 32767.
+  Proof. intros [_ [_ H4]]. exact H4. Qed.
 
   (* ...and (L3)+(L1) at a FREE record: nothing names it. *)
   Lemma ireg_link_ok_free (d : dinode) (w : nat) :
     ireg_link_ok d w -> bv_unsigned (di_type d) = 0 -> w = 0%nat.
   Proof.
-    intros [Hle Hz] H0. specialize (Hz H0). rewrite Hz in Hle. cbn in Hle. lia.
+    intros [Hle [Hz _]] H0. specialize (Hz H0). rewrite Hz in Hle. cbn in Hle.
+    lia.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -1298,7 +1372,10 @@ Section InodeRegion.
        clearing flush leaves through [ireg_free_au] instead. *)
     assert (Hlok' : ireg_link_ok dn' wl).
     { rewrite /ireg_link_ok (proj1 Hnl).
-      split; [exact (proj1 Hlok) | intros H0; exfalso; exact (Hnz H0)]. }
+      split_and!;
+        [ exact (proj1 Hlok)
+        | intros H0; exfalso; exact (Hnz H0)
+        | exact (ireg_link_ok_short dn wl Hlok) ]. }
     (* THE RECEIPT TRAVELS FOR FREE (fs-log.md §G.17): [Hnl]'s first
        conjunct says nlink does not move across an ordinary flush, so a zero
        at [dn'] is the same zero at [dn] and the old receipt IS the new one,
@@ -1413,12 +1490,15 @@ Section InodeRegion.
     assert (Hw0 : wl = 0%nat)
       by exact (ireg_link_ok_free (ds !!! islot inum) wl Hlok Ht0).
     assert (Hlok' : ireg_link_ok dn' wl).
-    { subst wl. split; [lia | intros H0; exfalso; exact (proj1 Hfr H0)]. }
+    { subst wl. split_and!;
+        [ lia
+        | intros H0; exfalso; exact (proj1 Hfr H0)
+        | rewrite (fresh_shape_nlink dn' Hfr); lia ]. }
     (* the claimed slot's old record is type-0, so (L3) already gives it
        [nlink = 0] and the receipt carries unconditionally *)
     assert (Hzm : bv_unsigned (di_nlink dn') = 0 ->
                   bv_unsigned (di_nlink (ds !!! islot inum)) = 0).
-    { intros _. exact (proj2 Hlok Ht0). }
+    { intros _. exact (proj1 (proj2 Hlok) Ht0). }
     iDestruct (ireg_ep_mono (bv_unsigned inum) (ds !!! islot inum) dn' Hzm
                  with "Hep") as "Hep".
     rewrite /dinode_at.
@@ -1563,7 +1643,7 @@ Section InodeRegion.
     assert (Hw0 : wl = 0%nat)
       by exact (ireg_wle_zero (bv_unsigned (di_nlink dn)) wl (proj1 Hlok) Hnl0).
     assert (Hlok' : ireg_link_ok dn' wl).
-    { subst wl. split; [lia | intros _; exact Hnl0']. }
+    { subst wl. split_and!; [lia | intros _; exact Hnl0' | rewrite Hnl0'; lia]. }
     (* the free writes a zero over a zero: [Hnl0] above IS the receipt's
        antecedent already discharged at the old record (fs-log.md §G.17) *)
     assert (Hzm : bv_unsigned (di_nlink dn') = 0 ->
@@ -1697,7 +1777,19 @@ Section InodeRegion.
     dinode_wf dn' ->
     bv_unsigned (di_type dn') <> 0 ->
     di_type_stable dn' dn ->
-    bv_unsigned (di_nlink dn') = bv_unsigned (di_nlink dn) + 1 ->
+    (* THE INCREMENT, AT THE MACHINE'S OWN WIDTH (the twelfth stop).  The
+       caller supplies what its [sh] actually gives it -- the sixteen-bit
+       [++] -- together with the kernel's own NLINK_MAX guard, and the
+       Z-level equation the ledger needs is derived HERE, under (L4).
+       A CALLER CANNOT STATE THE Z FORM: at [di_nlink dn = 65535] it is
+       FALSE, and nothing outside this region bounds the count above -- so
+       the old premise was suppliable only where the count was already
+       known ([fresh_shape]'s zero) and was unprovable at the one site that
+       raises a real directory's count.  Both new premises are walk-level
+       facts at every raising site: the store's own value, and the
+       branch xv6 117c0e7 added. *)
+    di_nlink dn' = add_vec (di_nlink dn : mword 16) (mword_of_int 1) ->
+    di_nlink dn <> (mword_of_int 32767 : mword 16) ->
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
     |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
@@ -1708,7 +1800,7 @@ Section InodeRegion.
        ={E ∖ ↑iregN, E}=∗
        dinode_at γi inum dn' ∗ ilink (bv_unsigned inum)).
   Proof.
-    iIntros (HE Hin Hwf Hdn' Hnz Hstab Hnl) "#Hinv Hdn".
+    iIntros (HE Hin Hwf Hdn' Hnz Hstab Hbump Hgrd) "#Hinv Hdn".
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
@@ -1739,14 +1831,26 @@ Section InodeRegion.
     { pose proof (Hcp0 (islot inum) Hsl) as Hc.
       rewrite -ireg_key_split in Hc. congruence. }
     rewrite Hdeq in Hlok.
+    (* (L4) IS OPEN HERE AND NOWHERE ELSE, so this is where the machine's
+       [++] becomes the ledger's [+1].  The same lemma hands back the
+       clause's own PRESERVATION, and it is one lemma so that a writer
+       cannot take the arithmetic without re-establishing the invariant
+       that made it true. *)
+    destruct (ireg_nlink_bump (di_nlink dn) (ireg_link_ok_short dn wl Hlok) Hgrd)
+      as [Hstep Hshort].
+    assert (Hnl : bv_unsigned (di_nlink dn') = bv_unsigned (di_nlink dn) + 1)
+      by (rewrite Hbump; exact Hstep).
+    assert (Hsh' : bv_unsigned (di_nlink dn') <= 32767)
+      by (rewrite Hbump; exact Hshort).
     (* (L1) GROWS ON BOTH SIDES AT ONCE: the count that pays for the new
        fragment is written in the same ghost step that mints it. *)
     assert (Hlok' : ireg_link_ok dn' (S wl)).
-    { split.
+    { split_and!.
       - exact (ireg_wle_plus (bv_unsigned (di_nlink dn))
                  (bv_unsigned (di_nlink dn')) wl
                  (di_nlink_nonneg dn) (proj1 Hlok) Hnl).
-      - intros H0. exfalso. exact (Hnz H0). }
+      - intros H0. exfalso. exact (Hnz H0).
+      - exact Hsh'. }
     (* nlink GROWS here, so the receipt's antecedent is absurd at [dn'] *)
     assert (Hzm : bv_unsigned (di_nlink dn') = 0 ->
                   bv_unsigned (di_nlink (ds !!! islot inum)) = 0).
@@ -1872,11 +1976,16 @@ Section InodeRegion.
     (* ...and (L1) FALLS on both sides at once, which is what keeps a
        fragment from ever outliving the count that backs it. *)
     assert (Hlok' : ireg_link_ok dn' wl0).
-    { split.
+    { split_and!.
       - exact (ireg_wle_succ (bv_unsigned (di_nlink dn))
                  (bv_unsigned (di_nlink dn')) wl0
                  (di_nlink_nonneg dn') (proj1 Hlok) Hnl).
-      - intros H0. exfalso. exact (Hnz H0). }
+      - intros H0. exfalso. exact (Hnz H0).
+      (* (L4) FALLS OUT OF THE UNLINK FOR FREE, and that asymmetry is the
+         whole reason only the raising mover takes a premise: [Hnl] here
+         reads [old = new + 1], so the new count is BELOW a count the
+         invariant already bounded. *)
+      - pose proof (ireg_link_ok_short _ _ Hlok). lia. }
     iMod (link_spend_link with "Hla Hfrag") as "Hla".
     iMod (ghost_map_update dn' with "Ha Hdn") as "[Ha Hdn]".
     set (m' := <[bv_unsigned inum := dn']> m).

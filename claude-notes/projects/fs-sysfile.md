@@ -7842,3 +7842,90 @@ byte-untouched; `proof_coverage` unmoved — **177 of 190 proven (93%), 20494
 of 23626 text bytes (87%), `sysfile.c` 8/16, `create` ASSUMED at 356 B**.
 Note for whoever writes the seal's gate: the baseline is 177, not the 176
 the D₀-c-era briefs carry, so the flip is 177 -> 178 and `sysfile.c` 8 -> 9.
+
+
+### (L4) LANDS — the region carries `di_nlink d <= 32767`, and
+### `wp_iupdate_link`'s increment premise moves to the MACHINE's width.
+### Increment 1 of the twelfth stop's ruling (route 1, the invariant over a
+### second axiom)
+
+**THE CLAUSE.**  `InodeRegion.ireg_link_ok` gains a third conjunct beside
+(L1) and (L3):
+
+```coq
+    /\ bv_unsigned (di_nlink d) <= 32767.                             (* L4 *)
+```
+
+**WHY IT IS AN INVARIANT AND NOT A PREMISE** is the eleventh stop's "no name
+for dp" objection, unchanged: the record is the region's and no caller can
+name it.  **Why it is preservable at all is the kernel fix** — that is what
+117c0e7 bought, and it is the whole content of §20.18's option 3 ("option 2
+with the proof obligation stated").
+
+**PRESERVATION IS FREE AT FIVE OF THE SIX MOVERS, AND THAT ASYMMETRY IS THE
+SHAPE.**  `ireg_write_au` transfers it across `di_nlink_stable`'s first
+conjunct; `ireg_claim_au` gets it from `fresh_shape`'s zero; `ireg_free_au`
+writes a zero; `ireg_write_unlink` LOWERS the count, so the new value is
+below one the invariant already bounded (one `pose proof` + `lia`).  Only
+`ireg_write_link` pays, and what it pays is the premise reshape below.
+
+**THE RESHAPE, AND IT IS FORCED RATHER THAN CHOSEN.**  `ireg_write_link` and
+`SpecIupdate.wp_iupdate_link` swap
+
+```coq
+  bv_unsigned (di_nlink dn) = bv_unsigned (di_nlink dn0) + 1 ->
+```
+
+for the two facts a WALK actually has:
+
+```coq
+  di_nlink dn = add_vec (di_nlink dn0 : mword 16) (mword_of_int 1) ->
+  di_nlink dn0 <> (mword_of_int 32767 : mword 16) ->
+```
+
+The Z equation is then derived inside the region by
+`InodeRegion.ireg_nlink_bump`, which is a CONJUNCTION on purpose — the first
+half is what the mover owes the ledger, the second is (L4)'s own
+preservation, and neither holds without the other's hypothesis.  One lemma,
+so no writer can take the arithmetic without re-establishing the invariant
+that made it true.  `ireg_nlink_step` is its ungated half.
+
+**THE ARITHMETIC MOVED DOWN, and the guiding principle is why.**  The two
+bridge lemmas were landed in `ProofCreateParts` with the stop; they now live
+in `InodeRegion` beside `di_nlink_nonneg` and the three `ireg_wle_*`, because
+the region is the only place the bound is open and a second copy at create's
+altitude is a near-duplicate that cannot see its twin.  `lemma_diff` reports
+the two `GONE` lines and that is the intended move.  What STAYS in
+`ProofCreateParts` (3d) is `cr_nlink_guard_leaves_the_wrap` alone — the
+witness that the kernel guard by itself does not close the increment.  It is
+now also the standing check on (L4): delete the clause and that corner comes
+straight back.
+
+**THE BOOT OBLIGATION IS FREE TODAY.**  `IcacheBoot.image_nlink_short` rides
+in `ireg_alloc`'s EXISTING ∀-over-decodings premise slot (widened to a
+conjunction, durable-notes' own advice), so no arity moves — and
+`ireg_alloc` has no callers yet, so the cost is zero until C7 wires it.  It
+is honest at the source: mkfs writes 1 or 2, no kernel path raises past
+32767 (117c0e7) and none lowers below zero (`sys_unlink` panics first,
+`CodeSysUnlink.v:203`), and it is unprovable here for exactly (L3)'s reason —
+any 64 bytes decode.
+
+**`wp_iupdate_unlink` KEEPS ITS Z-FORM PREMISE, deliberately.**  The
+asymmetry is the finding, not an oversight: lowering never wraps in the
+reachable range, every caller reaches that contract having just written a
+KNOWN halfword (create's fail arm writes a literal zero at +0x146), and (L4)
+is preserved there for free.  Matching the shapes would buy symmetry and cost
+the landed consumer a re-thread; the reason is recorded at the premise.
+
+**FIVE FILES.**  `InodeRegion.v` (the clause, the two bridge lemmas, the
+`ireg_link_ok_short` reader, the five arm moves, the reshape),
+`IcacheBoot.v`, `SpecIupdate.v` (the premise + two banners),
+`ProofIupdate.v` (`iu_step_link`'s relay + the `intros` line),
+`ProofCreate.v` (the fresh-child mint's two new facts, both `vm_compute` off
+`fresh_shape`'s zero), `ProofCreateParts.v` (the trim).  Two traps paid for,
+both durable-notes' own: `mword 16` does not unify with a `bv 16` argument
+LEFT to right, so the premise is written `add_vec (di_nlink dn : mword 16)
+(mword_of_int 1)` and not with the ascription on the second argument; and
+adding a conjunct to a three-way `Prop` breaks every `proj2` of it silently
+at the OTHER projection's site — `ireg_link_ok_short` exists so the next
+clause does not.

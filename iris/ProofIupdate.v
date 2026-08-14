@@ -214,18 +214,24 @@ Section IupdateDefs.
     dinode_wf dn ->
     bv_unsigned (di_type dn) <> 0 ->
     di_type_stable dn dn0 ->
-    bv_unsigned (di_nlink dn) = bv_unsigned (di_nlink dn0) + 1 ->
+    (* THE INCREMENT AT THE MACHINE'S WIDTH, plus the kernel's own guard --
+       [InodeRegion.ireg_write_link]'s reshaped premises, relayed verbatim.
+       The Z-level equation this used to take is derived inside the region,
+       under (L4), because that is the only place it is available at all
+       (fs-sysfile.md's twelfth stop). *)
+    di_nlink dn = add_vec (di_nlink dn0 : mword 16) (mword_of_int 1) ->
+    di_nlink dn0 <> (mword_of_int 32767 : mword 16) ->
     ireg_inv γi γfs inodestart nib -∗
     iu_region_step γ γfs γi inodestart inum dn dn0 e0
       (dinode_at γi inum dn ∗ ilink (bv_unsigned inum)).
   Proof.
-    intros Hnib Hdnwf Hnz Hstab Hnl. iIntros "#Hireg" (ds) "%Hdswf Hdn".
+    intros Hnib Hdnwf Hnz Hstab Hbump Hgrd. iIntros "#Hireg" (ds) "%Hdswf Hdn".
     (* nlink RISES here, so the receipt is vacuous at the written record
        and the anchor is the unit -- the same one adapter line the ordinary
        step takes. *)
     rewrite /iu_region_au. iApply lw_au_lb0.
     iApply (ireg_write_link ⊤ γi γfs inodestart nib inum dn0 dn ds
-              ltac:(solve_ndisj) Hnib Hdswf Hdnwf Hnz Hstab Hnl
+              ltac:(solve_ndisj) Hnib Hdswf Hdnwf Hnz Hstab Hbump Hgrd
               with "Hireg Hdn").
   Qed.
 
@@ -2161,8 +2167,8 @@ Qed.
                            pidv dq dqd dqn dqs m K eb C b.
   Proof.
     cbv beta delta [wp_iupdate_link_body].
-    intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnz Hnl Hda Hdirlen
-           Hj Hgl Ha0 Heb.
+    intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnz Hbump Hgrd
+           Hda Hdirlen Hj Hgl Ha0 Heb.
     subst eb.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
@@ -2175,7 +2181,7 @@ Qed.
       as "#Hcrd".
     (* THE ONE SUBSTITUTION *)
     iPoseProof (iu_step_link γ γfs γi inodestart nib inum dn dn0 e0 Hnib
-                  (iu_dinode_wf dn bm Hda Hdirlen) Hnz Hstab Hnl
+                  (iu_dinode_wf dn bm Hda Hdirlen) Hnz Hstab Hbump Hgrd
                   with "Hireg") as "Hstep".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat

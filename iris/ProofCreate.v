@@ -4166,11 +4166,21 @@ Section ProofCreateMain.
         by (rewrite /W3; apply cr_regs3_caller; [exact Hcsra | exact HW2regs]).
       (* the mint's arithmetic and its membership premise *)
       assert (Htyz : bv_unsigned (di_type dnc) <> 0) by exact (proj1 Hfresh).
-      assert (Hinc : bv_unsigned (di_nlink
-                       (cr_setf dnc major minor (mword_of_int 1 : mword 16)))
-                     = bv_unsigned (di_nlink dnc) + 1).
-      { rewrite cr_setf_nlink (fresh_shape_nlink dnc Hfresh).
+      (* THE MINT'S TWO WALK-LEVEL FACTS (the reshaped premise, the twelfth
+         stop).  [wp_iupdate_link] no longer takes the Z-level increment --
+         no caller could prove it at an arbitrary count -- but the value
+         the [sh] committed and the guard's own disequality.  At the FRESH
+         child both are [fresh_shape]'s zero, so both are [vm_compute]. *)
+      assert (Hcnl0 : di_nlink dnc = (mword_of_int 0 : mword 16)).
+      { apply bv_eq. rewrite (fresh_shape_nlink dnc Hfresh).
         vm_compute. reflexivity. }
+      assert (Hbump : di_nlink (cr_setf dnc major minor
+                                  (mword_of_int 1 : mword 16))
+                      = add_vec (di_nlink dnc : mword 16) (mword_of_int 1)).
+      { rewrite cr_setf_nlink Hcnl0. apply bv_eq; vm_compute; reflexivity. }
+      assert (Hgrd : di_nlink dnc <> (mword_of_int 32767 : mword 16)).
+      { rewrite Hcnl0. intro Hc. apply (f_equal bv_unsigned) in Hc.
+        vm_compute in Hc. discriminate. }
       assert (Hcadd : di_addrs (cr_setf dnc major minor
                                  (mword_of_int 1 : mword 16)) = bm_cells bmc)
         by (rewrite cr_setf_addrs; exact (proj1 (proj2 (proj2 Hciok)))).
@@ -4192,7 +4202,7 @@ Section ProofCreateMain.
                 ltac:(exact (di_type_stable_eq _ _
                         (cr_setf_type dnc major minor _)))
                 ltac:(exact (cr_setf_type_nz dnc major minor _ Htyz))
-                Hinc Hcadd Hcdirlen Hj Hgs HW3a0 Heb
+                Hbump Hgrd Hcadd Hcdirlen Hj Hgs HW3a0 Heb
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hcidev Hciinum
                       Hcmeta Hcmap Hsbi Hiregi Hcdiat Hppid Hprocs Hdevi
                       Hgeom Hdlk Hbs2 Hop").

@@ -732,10 +732,14 @@ Definition wp_iupdate_credgen_body
 (*                                                                        *)
 (*  IT IS [wp_iupdate_cred_body] WITH TWO EDITS AND NOTHING ELSE.          *)
 (*    (i) [InodeRegion.di_nlink_stable dn dn0] -- "nlink does not fall" -- *)
-(*        becomes the EXACT arithmetic [nlink dn = nlink dn0 + 1].  The    *)
-(*        ordinary premise would be satisfied by this caller too, but it   *)
-(*        is not enough for the region: the mint has to know the count     *)
-(*        grew by exactly the one unit the new fragment costs.             *)
+(*        becomes the EXACT increment.  The ordinary premise would be      *)
+(*        satisfied by this caller too, but it is not enough for the       *)
+(*        region: the mint has to know the count grew by exactly the one   *)
+(*        unit the new fragment costs.  It is stated at the MACHINE's      *)
+(*        width ([di_nlink dn = add_vec (di_nlink dn0) 1]) plus the        *)
+(*        kernel's NLINK_MAX guard, not as the Z equation -- see the       *)
+(*        premise itself for why the Z form is unsuppliable and what       *)
+(*        derives it (InodeRegion's (L4), the twelfth stop).               *)
 (*   (ii) the post's [InodeRegion.ireg_out γi inum dn] becomes             *)
 (*        [dinode_at γi inum dn ∗ ilink (bv_unsigned inum)].  With a       *)
 (*        nonzero type [ireg_out] IS [dinode_at], so this is the same      *)
@@ -792,8 +796,24 @@ Definition wp_iupdate_link_body
   bv_unsigned (di_type dn) <> 0 ->
   (* THE INCREMENT ITSELF, in place of [di_nlink_stable]: this flush RAISES
      the count by exactly one, and that one unit is what pays for the
-     [ilink] the post hands out (§20.6's mkdir/sys_link rows). *)
-  bv_unsigned (di_nlink dn) = bv_unsigned (di_nlink dn0) + 1 ->
+     [ilink] the post hands out (§20.6's mkdir/sys_link rows).
+
+     STATED AT THE MACHINE'S OWN WIDTH, AND THAT IS FORCED (fs-sysfile.md's
+     twelfth stop).  The Z-level equation
+     [bv_unsigned (di_nlink dn) = bv_unsigned (di_nlink dn0) + 1] is what
+     the ledger needs, but NO CALLER CAN PROVE IT: the store is a
+     sixteen-bit [++] ([lhu] / [addiw] / [sh]), it wraps at
+     [bv_unsigned = 65535], and nothing outside [InodeRegion] bounds a link
+     count above -- xv6 117c0e7's guard is a SIGNED test [== 32767] and
+     leaves that corner alive
+     ([ProofCreateParts.cr_nlink_guard_leaves_the_wrap] is the witness).
+     So the caller supplies the two facts its WALK has -- the value the
+     [sh] commits, and the branch the guard gave it -- and the region
+     derives the Z equation under (L4), where the bound is open.  Both are
+     free at the fresh-child mint, where [fresh_shape] pins the old count
+     to zero. *)
+  di_nlink dn = add_vec (di_nlink dn0 : mword 16) (mword_of_int 1) ->
+  di_nlink dn0 <> (mword_of_int 32767 : mword 16) ->
   di_addrs dn = bm_cells bm ->
   length (bm_dir bm) = NDIRECT ->
   (j < NPROC)%nat ->
@@ -928,7 +948,18 @@ Definition wp_iupdate_unlink_body
   bv_unsigned (di_type dn) <> 0 ->
   (* THE DECREMENT, the flip of the fifth body's increment: the OLD count
      is the new one plus one, and the [ilink] premise below is what pays
-     for it. *)
+     for it.
+
+     DELIBERATELY STILL IN Z FORM, and the asymmetry with its sibling is
+     the point (the twelfth stop's ruling asked for the call).  The
+     increment had to move to the machine's width because a caller cannot
+     prove the Z equation of a count it does not bound; the DECREMENT has
+     no such problem -- lowering never wraps in the reachable range, every
+     caller reaches this contract having just written a KNOWN halfword
+     (create's fail arm writes a literal zero at +0x146), and (L4) is
+     preserved here for free because the new count is below one the
+     invariant already bounded.  Matching the shapes would buy symmetry
+     and cost the landed consumer a re-thread, so it is not done. *)
   bv_unsigned (di_nlink dn0) = bv_unsigned (di_nlink dn) + 1 ->
   di_addrs dn = bm_cells bm ->
   length (bm_dir bm) = NDIRECT ->

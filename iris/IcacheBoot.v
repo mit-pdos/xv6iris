@@ -476,6 +476,19 @@ Section IcacheBootRegion.
       bv_unsigned (di_type (image_dinode dss z)) = 0 ->
       bv_unsigned (di_nlink (image_dinode dss z)) = 0.
 
+  (* ...AND (L4) IS AN IMAGE OBLIGATION FOR THE SAME REASON (the twelfth
+     stop).  [ireg_slot] now also says of every record that its link count
+     is a NON-NEGATIVE short -- true of every mkfs image (mkfs writes 1 or
+     2), false of nothing this kernel can produce (xv6 117c0e7 refuses the
+     raise at 32767 and no path lowers below zero -- [sys_unlink] panics
+     first), and unprovable here for the same reason (L3) is: the bytes are
+     the boot client's and any 64 of them decode.  It rides in the SAME
+     ∀-over-decodings premise slot rather than a new one, so [ireg_alloc]'s
+     arity does not move. *)
+  Definition image_nlink_short (dss : list (list dinode)) (nib : nat) : Prop :=
+    forall z : Z, z ∈ region_inums nib ->
+      bv_unsigned (di_nlink (image_dinode dss z)) <= 32767.
+
   Lemma ireg_alloc (E : coPset) (γfs : fs_names) (inodestart : Z) (nib : nat)
       (bss : nat -> list (bv 8)) :
     16 * Z.of_nat nib <= 2 ^ 32 ->
@@ -483,7 +496,7 @@ Section IcacheBootRegion.
     (forall dss : list (list dinode),
        length dss = nib -> Forall diblk_wf dss ->
        (forall bi : nat, (bi < nib)%nat -> bss bi = diblk_bytes (dss !!! bi)) ->
-       image_free_nlink dss nib) ->
+       image_free_nlink dss nib /\ image_nlink_short dss nib) ->
     ([∗ set] z ∈ region_inums nib, link_auth z 0 0 None 0) -∗
     (* THE OBSERVATION COUNTERS (fs-log.md §G.17), one per inum and all at
        zero: nobody has ever observed a nonzero nlink, which is exactly the
@@ -503,7 +516,7 @@ Section IcacheBootRegion.
   Proof.
     intros Hnib Hlen Himg.
     destruct (image_decode nib bss Hlen) as (dss & Hl & Hwf & He).
-    pose proof (Himg dss Hl Hwf He) as Hl3.
+    destruct (Himg dss Hl Hwf He) as [Hl3 Hl4].
     iIntros "Hlk Hepa Hblks".
     iMod (ghost_map_alloc (ireg_M0 dss nib ∪ ireg_MK nib)) as (γi) "[Ha Hels]".
     iDestruct (big_sepM_union with "Hels") as "[Hels Hmks]";
@@ -528,7 +541,7 @@ Section IcacheBootRegion.
     { iApply (big_sepS_mono with "Hall"). intros z Hz.
       iIntros "[[[Hfrag Hmk] Hla] Hep]".
       assert (Hok : ireg_link_ok (image_dinode dss z) 0).
-      { split; [lia | exact (Hl3 z Hz)]. }
+      { split_and!; [lia | exact (Hl3 z Hz) | exact (Hl4 z Hz)]. }
       rewrite /ireg_out /dinode_at (region_inum_faithful nib z Hnib Hz).
       case_decide as Hty.
       - iSplitR "Hmk"; [| iExact "Hmk"].
