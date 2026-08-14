@@ -779,7 +779,7 @@ Section UtDispatch.
       { iApply (ud_hold N V C ep sc st with
                   "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
         rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
-      iApply (S.ut_90 N V pt ksp m0 D2 av nx C
+      iApply (S.ut_90 N V pt ksp m0 D2 av nx C ∅
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp HD2sp HD2s1 HD2a0 HcsD2
                 with "Htext Hpc Hcg Hhold Hframe Hcont").
     - (* not a syscall: the device demultiplexer *)
@@ -819,7 +819,7 @@ Section UtDispatch.
             [vm_compute; reflexivity | exact HcsD2]).
       iApply (DE.wp_devintr_sconf (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
                 (un_pd N) (un_pav N) (un_pu N)
-                D3 nx 0 false (un_pj N) C (DfracOwn 1) sc
+                D3 nx 0 false (un_pj N) C (DfracOwn 1) sc ∅
                 Hlen ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia)
                 ltac:(unfold devintr_stack; lia)
                 with "Hcg Hcpu Htext Hpc Hsc Hdc [-]").

@@ -749,9 +749,11 @@ Section VdrwfP6.
     (bv_unsigned sector * 512)%Z = (1024 * uint bno)%Z ->
     (forall k, (k < 1024)%nat -> addr_is_kdata (pa_add (b_data b) k)) ->
     m !!! Regidx csp_rs1 = (sp0 : SailStdpp.Values.mword 64) ->
-    (* the vdisk lock is held across P6 (P1-P4's convention: its rank is
-       already in [lks]); free_desc's wakeup is at "proc". *)
-    locks_below lks (lock_rank "proc") ->
+    (* P6 RELEASES disk.vdisk_lock, so its entry set must sit below that
+       rank for the cancellation to close -- which is stronger than the
+       "proc" its free_desc/wakeup cone needs, and delivers it by
+       [locks_below_mono]. *)
+    locks_below lks (lock_rank "virtio_disk") ->
     kernel_text -∗ panic_wp_any -∗ procs_inv γs -∗
     (* THE CRASH-PERMIT CHANNEL (PermInv.v): the invariant to collect the
        receipt from, and the persistent handle that says WHICH receipt is
