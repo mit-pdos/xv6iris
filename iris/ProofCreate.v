@@ -687,11 +687,15 @@ Proof.
 Qed.
 
 (* ---- (iii) THE ARM'S LEDGER READINGS.  [CreateBudget.cr_budget_file]
-   is the theorem; these are it at the two figures the CONTRACTS state,
+   is the theorem; these are it at the figures the CONTRACTS state,
    exactly as [cr_n1_lo] / [cr_after_ip] are for the found half.  The
    walk reaches its [dirlink] with [q1 >= 8] ([cr_uw w - ia_spend -
    iu_spend true] is 8 or 7... at [w = false] it is nine minus one), and
-   [dl_need] is at most six, [wi16_spend] at most five. *)
+   [dl_need] is at most six, [wi16_spend] at most five.
+   ONE spend reading serves BOTH exits of that [dirlink]: since the
+   [dl16_post] collapse the failing append reports the same credit-aware
+   [wi16_spend] as the succeeding one, so the [bltz]-taken branch needs no
+   [tot]-split and no constant-shaped twin ([cr_alloc_ip0], retired). *)
 Lemma cr_alloc_dlneed (nc : nat) (crb ind : bool) :
   (8 <= nc)%nat -> (SpecDirlink.dl_need crb ind <= nc)%nat.
 Proof.
@@ -708,13 +712,6 @@ Proof.
   intros Hnc Hn'.
   unfold wi16_spend, SpecBmap.bmap_cost, iput_units in *.
   destruct crb, crd, cru, al, ind; simpl in *; lia.
-Qed.
-
-Lemma cr_alloc_ip0 (nc n' : nat) :
-  (8 <= nc)%nat -> ((nc - SpecDirlink.dl0_spend)%nat <= n')%nat ->
-  (iput_units <= n')%nat.
-Proof.
-  intros Hnc Hn'. unfold SpecDirlink.dl0_spend, iput_units in *. lia.
 Qed.
 
 (* ---- (iv) THE T_DIR DECISION AT +0xb2, WHICH IS A [beq] AND NOT A [bne].
@@ -3981,7 +3978,12 @@ Section ProofCreateMain.
           exfalso. destruct Harm as (Hfst & _). exact (Hfst Hnone).
         * destruct Harm as (_ & Husd' & Hwf' & Hholes' & Haddr' & Hsz31' &
                             Hcov' & Hdn' & Hdn0' & Htot16 & Hrng & Hbl).
-          destruct (Hdl16 eq_refl) as [Hpos Hzero].
+          (* the append arm's two halves: the spend is UNGUARDED (it prices
+             the failing append at the same credit-aware figure), the
+             memberships are guarded by [0 < tot] and this walk never wants
+             them -- the parent's next call is an [iunlockput], which reads
+             the ledger only. *)
+          destruct (Hdl16 eq_refl) as [Hspend Hmem].
           (* the re-park's arithmetic: the append slot is inside the file *)
           assert (Hk0le : (dir_slot data (dir_nrec (bv_unsigned (di_size dn)))
                            <= dir_nrec (bv_unsigned (di_size dn)))%nat)
@@ -4116,8 +4118,7 @@ Section ProofCreateMain.
                by (rewrite /Y2; apply cr_regs3_caller;
                    [exact Hcsra | exact HY1regs]).
              assert (Hipn' : (iput_units <= n')%nat)
-               by exact (cr_alloc_ip (S q2) n' _ _ _ _ _ ltac:(lia)
-                           (proj1 (Hpos ltac:(lia)))).
+               by exact (cr_alloc_ip (S q2) n' _ _ _ _ _ ltac:(lia) Hspend).
              iDestruct (cpu_own_transport CIDdl CIDD3 0%nat eb (proc_addr j) C b
                           ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
              iDestruct (log_opS_named with "Hop") as (e0) "Hop".
@@ -4296,16 +4297,14 @@ Section ProofCreateMain.
              iEval (rewrite Htg12e) in "Hpc".
              iDestruct (cpu_own_transport CIDdl CIDE1 0%nat eb (proc_addr j) C b
                           ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-             (* THE FAILING APPEND'S TWO ROUTES, and the walk prices BOTH:
-                [dl16_post]'s credited clause is guarded by [0 < tot] and
+             (* THE FAILING APPEND'S TWO ROUTES, and ONE figure prices both.
                 [tot < 16] admits zero (writei's own -1 return, the full
-                directory).  [CreateBudget.cr_fail_closes_with_credit] and
-                [cr_fail_closes_at_zero] are the two theorems. *)
-             assert (Hipn'' : (iput_units <= n')%nat).
-             { destruct (Nat.eq_dec tot 0) as [Ht0 | Ht0].
-               - exact (cr_alloc_ip0 (S q2) n' ltac:(lia) (Hzero Ht0)).
-               - exact (cr_alloc_ip (S q2) n' _ _ _ _ _ ltac:(lia)
-                          (proj1 (Hpos ltac:(lia)))). }
+                directory), and since the [dl16_post] collapse the spend
+                clause is unguarded, so this is the SAME reading the C-OK
+                branch above makes -- no [tot]-split, no constant.
+                [CreateBudget.cr_fail_closes_with_credit] is the theorem. *)
+             assert (Hipn'' : (iput_units <= n')%nat)
+               by exact (cr_alloc_ip (S q2) n' _ _ _ _ _ ltac:(lia) Hspend).
              (* dirlink's slot is NET ZERO, so the ledger is back at [ns - 2]
                 -- the figure the parked fail arm is stated at. *)
              iDestruct (iref_slots_combine with "Hislk Hislrr") as "Hislr".

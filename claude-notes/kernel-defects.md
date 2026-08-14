@@ -2,9 +2,43 @@
 
 A register of bugs in the kernel *being verified*, as opposed to gaps in the
 proofs: an entry here means **the C code is wrong** and the stuck proof is the
-symptom. **The register is currently empty** — every defect this effort found
-has been fixed upstream, and a fix's consequences for a contract are recorded
-with that contract, not here.
+symptom.  The register holds **one open CANDIDATE** (unchecked `nlink`
+saturation, below); every other defect this effort found has been fixed
+upstream, and a fix's consequences for a contract are recorded with that
+contract, not here.
+
+## CANDIDATE (2026-08-14) — `nlink` SATURATION IS UNCHECKED, so `create`'s
+## `mkdir` arm and `sys_link` can WRAP a link count to zero
+
+xv6 raises a link count in exactly two places — `create`'s `dp->nlink++`
+at create+0x11c (`lhu` / `addiw 1` / `sh`, on the T_DIR path) and
+`sys_link`'s `ip->nlink++` — and NEITHER tests for saturation.  `nlink`
+is a `short` on disk, so at 65535 the `sh` stores 0: the record becomes
+indistinguishable from a FREE inode while live directory entries still
+name it, and the next `iput` frees a directory that is still linked.
+There is no `panic`, no error return, and no diagnostic; the corruption
+is silent and on disk.
+
+**The proof-side symptom, which is how it was found.**  The link ledger
+(InodeRegion (L1) `w <= nlink`, (L3) `type = 0 -> nlink = 0`) makes the
+store *unprovable*, not merely unsupported: `SpecIupdate.
+wp_iupdate_link`'s premise `bv_unsigned (di_nlink dn) = bv_unsigned
+(di_nlink dn0) + 1` cannot be met when the halfword wrapped — the
+ledger refuses a genuinely corrupting store, which is the ledger working.
+
+**Attainability.**  65535 links to one directory means 65533
+subdirectories of it, one inode each, so the filesystem must be
+near-maximal; mkfs's default `NINODES = 200` is nowhere near it, and
+create itself carries `16 * nib <= 2^16`.  Unreachable on the shipped
+geometry, reachable in principle — durable-notes' rule applies:
+unreachability makes a defect safe, not correct.
+
+**The fix is one test** (`if (dp->nlink >= 65535) goto fail;` beside the
+existing `fail:` label, which already unwinds exactly this state), or a
+wider on-disk field.  Until it lands, create's mkdir arm cannot be
+walked without a gate; the analysis of what a gate would have to look
+like — and why no premise on any landed statement can supply the bound —
+is in projects/fs-sysfile.md, "D₀-b STOPPED".
 
 ## REFUTED CANDIDATE (2026-08-13) — create + concurrent unlink cannot bust
 ## the log: CROSS-TRANSACTION ABSORPTION covers namex's freeing iput

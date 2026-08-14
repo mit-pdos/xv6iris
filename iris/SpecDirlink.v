@@ -299,15 +299,13 @@ Proof. destruct crb, ind; vm_compute; lia. Qed.
    with six in hand and need three, which every DIRECT window (and every
    window at an already-logged bitmap block) provably gives --
    [CreateBudget.cr_fail_mkdir_closes] / [_ind] are that arithmetic.
-   TIGHTENING THIS CLAUSE TO THE FIGURE is therefore a contract-shape
-   change, not a proof: the [tot = 0] conjunct has to become
-   [ncount - wi16_spend crb crd cru al ind <= n'] -- at which point it is
-   the [0 < tot] conjunct's own bound and the two collapse into one
-   unguarded spend clause with the memberships alone left guarded, exactly
-   as [SpecWritei.wi16_post] / [wi16_spend_any] are split.  It is parked
-   only because [ProofCreate]'s landed [fail:] entry consumes this clause
-   BY ITS TYPE ([cr_alloc_ip0] at [dl0_spend]), so the change moves
-   ProofCreate.v.  See projects/fs-sysfile.md, D₀ increment 3a. *)
+   THE COLLAPSE HAS SINCE LANDED (D₀-b), so [dl16_post] no longer states
+   this constant at all: its spend clause is the credit-aware figure,
+   UNGUARDED, exactly as [SpecWritei.wi16_post] / [wi16_spend_any] are
+   split.  What survives here is the constant itself, which
+   [CreateBudget]'s [cr_fail_closes_at_zero] / [cr_fail_mkdir_at_zero_
+   busts] are stated at, together with the two bridges a caller that
+   prefers the constant to the figure still reaches it by. *)
 Definition dl0_spend : nat := 4%nat.
 
 (* the provenance, as an equation rather than as a comment: it IS writei's
@@ -346,25 +344,34 @@ Proof. vm_compute. lia. Qed.
 (*  NOTHING, so the set the writei call actually runs at IS [Sb].          *)
 (*                                                                        *)
 (*  GUARDED BY THE APPEND ARM ALONE -- [found = false] -- AND THEN SPLIT   *)
-(*  ON [tot], because create PRICES THE FAILING APPEND TOO.  The old       *)
-(*  guard was [tot = 16], i.e. the success append: on every route into     *)
-(*  create's [fail:] the only surviving budget clause was then the counted *)
-(*  [ncount - dirlink_units], and seven from the eight-or-nine create      *)
-(*  reaches its first dirlink with leaves less than [iput_units] for the   *)
-(*  tail's first [iunlockput] -- create's failure arm was UNPAYABLE        *)
-(*  ([CreateBudget.cr_fail_counted_busts]).  Nothing forced that guard:    *)
-(*  [wi16_post]'s own is [0 < tot], and this file narrowed it.  So:        *)
+(*  THE WAY writei SPLITS IT, because create PRICES THE FAILING APPEND     *)
+(*  TOO.  The old guard was [tot = 16], i.e. the success append: on every  *)
+(*  route into create's [fail:] the only surviving budget clause was then  *)
+(*  the counted [ncount - dirlink_units], and seven from the eight-or-nine *)
+(*  create reaches its first dirlink with leaves less than [iput_units]    *)
+(*  for the tail's first [iunlockput] -- create's failure arm was          *)
+(*  UNPAYABLE ([CreateBudget.cr_fail_counted_busts]).  Nothing forced that *)
+(*  guard, and nothing forces a [tot]-split at all:                       *)
 (*                                                                        *)
-(*    [0 < tot]  -- writei's own clause, relayed verbatim, and now         *)
-(*                  covering the SHORT write (1..15) as well as the        *)
-(*                  success one;                                          *)
-(*    [tot = 0]  -- the spend bound alone, at [dl0_spend] (see there for   *)
-(*                  why it is writei's coarse four and not the honest      *)
-(*                  figure).  The MEMBERSHIP half is absent on purpose:    *)
-(*                  at [tot = 0] writei never log_wrote the target block,  *)
-(*                  so nothing PUTS it in [Sb'] -- it is in there only if  *)
-(*                  the caller had already logged it, which is [crd] and   *)
-(*                  is the caller's fact, not this contract's.             *)
+(*    THE SPEND    -- UNGUARDED, the credit-aware figure, relayed from     *)
+(*                    [SpecWritei.wi16_spend_any].  One expression bounds  *)
+(*                    every arm: the -1 return spends nothing, the bmap    *)
+(*                    break leaves the data-block term unspent, and the    *)
+(*                    success append spends the figure exactly.  A         *)
+(*                    constant here ([dl0_spend]) would be four, and the   *)
+(*                    two INTERIOR mkdir entries reach their dirlink with  *)
+(*                    six in hand against an [iput_units] of three -- so   *)
+(*                    the per-call VARIATION, not the maximum, is what     *)
+(*                    they need ([CreateBudget.cr_fail_mkdir_closes]).     *)
+(*    [0 < tot]    -- the MEMBERSHIP trio alone, and its guard is not      *)
+(*                    inherited but forced: at [tot = 0] writei never      *)
+(*                    log_wrote the target block, so nothing PUTS it in    *)
+(*                    [Sb'] -- it is in there only if the caller had       *)
+(*                    already logged it, which is [crd] and is the         *)
+(*                    caller's fact, not this contract's.                  *)
+(*                                                                        *)
+(*  This mirrors [SpecWritei.wi16_post] / [wi16_spend_any] exactly, which  *)
+(*  is what makes the relay two [exact]s.                                  *)
 (*                                                                        *)
 (*  The FOUND arm carries nothing beyond the counted net-zero clause -- it *)
 (*  spends only iput, which create prices with [CreateBudget.ip_spend].    *)
@@ -385,12 +392,11 @@ Definition dl16_post (bmapstart : Z) (dinum : mword 32) (inodestart : Z)
   let crb := bool_decide (bmapstart ∈ Sb) in
   let crd := bool_decide (wi_tgt_blk bm' off ∈ Sb) in
   let cru := bool_decide (IBLOCK dinum inodestart ∈ Sb) in
-  ((0 < tot)%nat ->
-     ((ncount - wi16_spend crb crd cru al ind)%nat <= n')%nat
-     /\ wi_tgt_blk bm' off ∈ Sb'
-     /\ IBLOCK dinum inodestart ∈ Sb'
-     /\ (al = true -> bmapstart ∈ Sb'))
-  /\ (tot = 0%nat -> ((ncount - dl0_spend)%nat <= n')%nat).
+  ((ncount - wi16_spend crb crd cru al ind)%nat <= n')%nat
+  /\ ((0 < tot)%nat ->
+        wi_tgt_blk bm' off ∈ Sb'
+        /\ IBLOCK dinum inodestart ∈ Sb'
+        /\ (al = true -> bmapstart ∈ Sb')).
 
 (* iput's two block-membership premises, for EVERY inum the inode region
    covers rather than for the one child dirlookup happens to return.  See

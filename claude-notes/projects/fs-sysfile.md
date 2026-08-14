@@ -7324,3 +7324,145 @@ staleness 0, `lemma_diff` CLEAN over the five files, no `Admitted`.
 `Print Assumptions Writei.wp_writei_gen` / `Dirlink.wp_dirlink_gen` = the
 standing six.  `ProofCreate.v` and `ProofFilewrite.v` byte-untouched;
 `cr_alloc_body` and every create statement byte-identical.
+
+
+### D₀-b — the `dl16_post` COLLAPSE LANDS; the mkdir arm is **STOPPED
+### BEFORE ANY WALK INSTRUCTION** on the nlink++ overflow gate, and the
+### premise cannot be supplied by ANY landed statement.  `cr_mkdir_body`
+### is byte-identical and the tree carries no `Admitted`
+
+**THE COLLAPSE, AS LANDED** (`SpecDirlink.dl16_post`, the `let` chain
+unchanged):
+
+```coq
+  found = false ->
+  let off := (16 * k0)%nat in  … let cru := … in
+  ((ncount - wi16_spend crb crd cru al ind)%nat <= n')%nat
+  /\ ((0 < tot)%nat ->
+        wi_tgt_blk bm' off ∈ Sb'
+        /\ IBLOCK dinum inodestart ∈ Sb'
+        /\ (al = true -> bmapstart ∈ Sb')).
+```
+
+i.e. exactly the `wi16_post` / `wi16_spend_any` split, one tier up: the
+SPEND is unguarded and credit-aware, the MEMBERSHIPS keep the `0 < tot`
+they genuinely have.  Four files, and each moved by the predicted amount:
+
+* `SpecDirlink.v` — the shape change plus its header.  `dl0_spend` and
+  its three lemmas STAY: `CreateBudget.cr_fail_closes_at_zero` /
+  `cr_fail_mkdir_at_zero_busts` are stated at the constant and are true
+  statements about it, and `dl0_of_spend` is still how a caller that
+  prefers a constant reaches one.  Nothing in the tree consumes them now.
+* `ProofDirlink.v` — the relay is two `exact`s where it was an `exact`
+  plus a `dl0_of_spend` landing: the spend off `Hwiany (dl_wi_blocks k0)`,
+  the memberships off `proj2 (Hwi16 Htpos (dl_wi_blocks k0))`.
+* `ProofCreate.v` — `cr_alloc_ip0` DELETED (`lemma_diff`'s one line), the
+  `+0xc4` entry's `Nat.eq_dec tot 0` split gone, and BOTH exits of the
+  `dirlink` at +0xc0 now read the same hypothesis: `destruct (Hdl16
+  eq_refl) as [Hspend Hmem]`, then `cr_alloc_ip … Hspend` at the C-OK
+  branch and at the `fail:` branch alike.  `cr_alloc_half`'s STATEMENT,
+  `cr_alloc_body`, `cr_mkdir_body`, `cr_fail_body`, `cr_cont_body`,
+  `cr_tail_body` and `cr_found_half`'s statement are byte-identical.
+* `CreateBudget.v` — the attainability one-liner `cr_wi16_spend_max :
+  wi16_spend false false false true true = 4` (the witness that
+  `wi16_spend_le4`'s bound is TIGHT, i.e. that no constant could ever have
+  bought the interior mkdir entries their three — only the per-call
+  variation could), plus the one stale sentence it makes false.  No
+  theorem moved.
+
+**WHAT THE COLLAPSE BUYS, and it is the whole reason it was bundled
+here:** the two INTERIOR mkdir entries (+0x106, +0x118) reach their
+failing `dirlink` with six in hand, `dl0_spend` is four, and
+`cr_fail_mkdir_at_zero_busts` said four does not close.  They now read
+`wi16_spend`, and `cr_fail_mkdir_closes` / `_closes_ind` close them.  The
+budget wall D₀-b inherited is GONE; the arm is blocked on something else
+entirely.
+
+**THE STOP: `cr_mkdir_body` DOES NOT CARRY `⌜nlink dp < 65535⌝`, AND
+THERE IS NOWHERE TO PUT IT.**  The re-ruling of §20.18 ruling 3 (the
+eleventh stop) asked for the bound as "the visible walk-level hypothesis,
+the tree's gate convention, NOT a contract premise".  Checked against the
+landed statements, that shape does not exist, and the reason is the
+quantifier structure rather than any proof difficulty:
+
+* the store is real and the wrap is real: +0x11c is `lhu a5,74(s1)`,
+  +0x120 `c.addiw a5,1`, +0x122 `sh a5,74(s1)` — at 65535 the halfword
+  written is 0.  `SpecIupdate.wp_iupdate_link`'s premise is
+  `bv_unsigned (di_nlink dn) = bv_unsigned (di_nlink dn0) + 1`, which at
+  the wrap reads `0 = 65536`.  **The +0x128 flush is UNPROVABLE there**,
+  and it is not optional: the `ilink dind` it mints is the ONLY ticket
+  for the `".."` record the arm wrote at +0x102, so without it the
+  child's `dir_links` cannot be re-parked either.  The gate blocks the
+  whole arm, not two instructions.
+* **a hypothesis on `cr_mkdir_half` cannot work.**  `cr_alloc_half` takes
+  the parked body as `∀ kd qd gd γil γisl dind dn bm data nf nsl,
+  wp_next … (cr_mkdir_body … dn …)`, so a lemma proving
+  `⌜nlink dn < 65535⌝ -> …` is not a term of that type at any `dn`.
+* **so it would have to be one of `cr_mkdir_body`'s own ∀-introduced
+  wands — and then `cr_alloc_half` must SUPPLY it, which it cannot.**  At
+  +0xb2 the allocate half holds, about the parent, exactly what
+  `cr_alloc_body`'s ∀-list gave it: `di_type dn = T_DIR`, `di_nlink dn ≠
+  0`, `inode_ok`, `dir_ok`, `dir_first … = None`.  Nothing bounds `nlink`
+  above.  Pushing it into `cr_alloc_body` moves the same problem to
+  `cr_found_half`, whose only `nlink` fact is the guard's `≠ 0` (the
+  `lh` + `c.beqz` at +0x2a tests zero and nothing else), and from there to
+  `wp_create_sconf_body` — **which is the "no name for dp" objection the
+  eleventh stop already RATIFIED as fatal**: dp is found by `nameiparent`
+  at run time and create's contract has no word for its record.
+* **and it is not derivable from resources.**  InodeRegion's cap is (L1)
+  `w <= di_nlink d` — a LOWER bound on `nlink` from outstanding `ilink`s,
+  the direction that is useless here — and (L3) says nothing about the
+  top.  No invariant in the tree counts a record's incoming links from
+  above, and none can cheaply: the honest bound is "one per inode in the
+  filesystem", i.e. `nlink dp <= ninodes + 1`, and `ninodes <= 16 * nib <=
+  2^16` does not give `< 65535`.
+
+**THE THREE CANDIDATE RESOLUTIONS, priced, for the ruling.**
+
+1. **A span-pinned gate, `SpecCreateFreshTy`-style** (a new
+   `SpecCreateNlink.v` + `LinkCreateNlink.v` assuming the +0x11c..+0x128
+   run delivers the raised record).  Cheap and matches the convention —
+   but it differs from `create_fresh_ty` in the way that matters: THAT
+   axiom is TRUE of the binary and merely uncarried, whereas this one is
+   FALSE at the corner the kernel does not check.  An axiom that is false
+   in a reachable-in-principle state is not a gate, it is a hole, and
+   Increment 2's own rule ("check a new assumed contract by instantiating
+   it twice") is about exactly this class.  **Recommended against.**
+2. **Fix the kernel** (`if (dp->nlink >= 65535) goto fail;`), which makes
+   the bound a fact of the code and gives the walk a fifth `fail:` entry
+   it is already shaped for.  Registered as the CANDIDATE in
+   kernel-defects.md.  Cost is the `XV6_REV` bump and its address churn —
+   the expensive part is the re-dump, not the proof.
+3. **Carry the bound as a REGION invariant** ((L4) `di_nlink d < 65535`
+   for every record), which has a name and needs no premise anywhere.
+   It is not preservable against the UNFIXED kernel — create's own
+   increment is what would break it — so it is option 2 with the proof
+   obligation stated, not an alternative to it.
+
+Everything else the arm needs was checked and is present, so the
+relaunch after the ruling is a walk and not a design: `DirLinks.
+dir_link_at_dirlink_self` (the `"."` record, ticket-free, `2 <= tot` and
+the range clause), `dir_links_live` / `dir_ilink_at` /
+`dir_link_at_of_ilink` / `dir_links_of_ilink` (the deferred re-park's
+round trip — the return leg takes NO hypothesis, so it crosses the
+nlink++ by construction), `wp_iupdate_link` at `cru := true` off the
+parent's own `IBLOCK dind inodestart ∈ Sb'` from the +0x114 `dirlink`'s
+trailing flush, and the four `bltz` exits' arithmetic (now
+`cr_fail_mkdir_closes` / `_closes_ind`, above).
+
+**GATE.**  `make -f CoqMakefile -j30 -k` EXIT=0 on the mirror (24 files
+in the cone), 1093 `.vo`, `make -n` 0 `COQC` lines, `lemma_diff` = the
+single intended `GONE Lemma cr_alloc_ip0`, no `Admitted`/`admit`.
+`Print Assumptions` at the seven real `Link` modules plus `CreateFreshTy`:
+`cr_alloc_half` = the standing six + `create_fresh_ty` (the two parked
+bodies invisible), `cr_found_half` / `cr_tail_half` / `Dirlink.
+wp_dirlink_gen` = the standing six.
+
+**D₀-c's SCOPE IS UNCHANGED AND D₀-b's IS NOW EXACTLY ONE THING.**  What
+is left of D₀-b is `cr_mkdir_body` alone, behind the ruling above.
+`cr_fail_body` (+0x12e..+0x146, and the re-shape into the persistent
+four-entry form the mkdir arm's three other entries need) is untouched
+and unblocked — its budget is `cr_fail_closes_with_credit` at every
+entry now.  D₀-c is still the seal: `wp_create_sconf` = `cr_found_half`
+fed `cr_alloc_half`, both premises supplied, `CreateProof` ascribed
+`: CREATE`.

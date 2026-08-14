@@ -414,11 +414,12 @@ Proof. destruct w; vm_compute; lia. Qed.
    dirlink hands the walk's unit straight back -- and four from six leaves
    two.  THREE closes both, and three is what the honest [tot = 0] spend
    is; [cr_fail_mkdir_closes] below is that, machine-checked at the figure
-   itself.  What stands between the two is no longer writei -- its post
-   states the credit-aware spend at every [tot]
-   ([SpecWritei.wi16_spend_any]) -- but [SpecDirlink.dl16_post]'s [tot = 0]
-   conjunct still being a CONSTANT; see [SpecDirlink.dl0_spend].  The T_DIR
-   sub-branch is parked, so no landed arm depends on this. *)
+   itself.  NOTHING STANDS BETWEEN THE TWO ANY MORE: writei states the
+   credit-aware spend at every [tot] ([SpecWritei.wi16_spend_any]) and
+   [SpecDirlink.dl16_post] now relays it UNGUARDED, so the interior entries
+   are priced by [cr_fail_mkdir_closes] / [_ind] and not by this constant.
+   The theorem stays because it is a true statement ABOUT THE CONSTANT, and
+   [dl0_spend] is still what a caller that prefers a constant reaches. *)
 Theorem cr_fail_mkdir_at_zero_busts (w : bool) :
   let u1 := cr_uw w - ia_spend in
   let u2 := u1 - iu_spend true in
@@ -468,6 +469,16 @@ Theorem cr_fail_mkdir_closes_ind (w crd cru al : bool) :
   ip_need <= u3 - wi16_spend true crd cru al true /\
   ip_need <= u4 - wi16_spend true crd cru al true.
 Proof. destruct w, crd, cru, al; vm_compute; lia. Qed.
+
+(* ...AND THAT CORNER IS ATTAINED, WHICH IS WHY THE COLLAPSE HAD TO BE A
+   SHAPE CHANGE RATHER THAN A SMALLER CONSTANT.  An allocating INDIRECT
+   window at an unpaid bitmap block spends the full four
+   ([SpecWritei.wi16_spend_le4] is the bound; this is the witness), so
+   [SpecDirlink.dl0_spend = 4] was already the best constant available and
+   no arithmetic could have bought the interior mkdir entries their three.
+   What buys it is the per-call VARIATION -- the two theorems above. *)
+Lemma cr_wi16_spend_max : wi16_spend false false false true true = 4%nat.
+Proof. vm_compute. reflexivity. Qed.
 
 (* THE CREDIT ON THE INODE BLOCK IS LOAD BEARING TOO: an uncredited
    iupdate inside every dirlink costs three more units across the mkdir

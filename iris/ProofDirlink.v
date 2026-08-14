@@ -2495,24 +2495,19 @@ Section ProofDirlinkMain.
         { rewrite (dl_wi_cost_bmonly k0) in Hbud. unfold dirlink_units.
           destruct Hbud as [Hbud1 Hbud2]. split; lia. }
         { exact Hsbw. }
-        (* THE SEAM: [wi16_post] at [off := 16 * k0], [n := 16] IS
-           [dl16_post]'s first conjunct -- the two let-chains are the same
-           terms and the guards are now the same guard, so the only work is
-           [dl_wi_blocks], the sixteen-at-16-aligned fact this file already
-           carries for both cost functions.
-           THE SECOND CONJUNCT NOW COMES OFF THE HONEST FIGURE TOO.  writei
-           states its credit-aware spend at EVERY [tot]
-           ([SpecWritei.wi16_spend_any]), so this arm relays THAT and lands
-           on the constant through [dl0_spend_covers] -- the clause is a
-           constant and four is the figure's honest maximum, so the number
-           does not move; what the constant drops is the per-call variation
-           the interior mkdir entries need.  See [SpecDirlink.dl0_spend] for
-           why tightening the clause itself is a contract-shape change. *)
+        (* THE SEAM: [dl16_post] IS [wi16_post] / [wi16_spend_any] at
+           [off := 16 * k0], [n := 16] -- the let-chains are the same terms
+           and the guards are the same guards, so each half is one [exact]
+           and the only work is [dl_wi_blocks], the sixteen-at-16-aligned
+           fact this file already carries for both cost functions.  The
+           SPEND comes off the unguarded [wi16_spend_any] (so it prices the
+           failing append at the same credit-aware figure, which is what
+           create's interior mkdir entries need), the MEMBERSHIPS off
+           [wi16_post] under the guard they genuinely have. *)
         { intros _. split.
-          - intros Htpos. exact (Hwi16 Htpos (dl_wi_blocks k0)).
-          - intros _.
-            pose proof (Hwiany (dl_wi_blocks k0)) as Hz. cbv zeta in Hz.
-            exact (dl0_of_spend _ _ _ _ _ _ _ Hz). }
+          - pose proof (Hwiany (dl_wi_blocks k0)) as Hz. cbv zeta in Hz.
+            exact Hz.
+          - intros Htpos. exact (proj2 (Hwi16 Htpos (dl_wi_blocks k0))). }
         (* writei's two preservations, forwarded (S5a finding 2; the cap,
            D₀-a repair 3b) *)
         { exact Hcap'. }
