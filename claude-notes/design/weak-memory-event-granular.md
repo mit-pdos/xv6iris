@@ -140,6 +140,46 @@ exhibit-level route of the premises worklist's phase 2) + the WP package
 - The disk agent matches the pf disk 1:1; the `wa_dd = wgdev` and
   flat-memory-pinning residues disappear.
 
+## Proof engineering: reflective batching is MANDATORY (2026-08-14)
+
+THE COMMITMENT: the language's step granularity must not become the
+proof's step granularity.  Stepping the proofmode through every bind
+(an interp-open per `RegRead`) would be strictly worse than today's
+vm_compute-style execution and is forbidden as the proof interface:
+
+- Per-node rules are the SEMANTICS (for the correspondence and
+  adequacy).  The PROOF INTERFACE is one derived rule per SILENT
+  STRETCH: a reflective `run_silent : regfile → M unit →
+  option (regfile × M unit)` (the `DecodeSetU.bval`/`goodbP` mold;
+  `Choose` values supplied by the certification) computing through
+  consecutive non-memory nodes to the next memory event / fence / Ret.
+  Its soundness lemma (`run_silent … = Some … → rtc silent-step …`) and
+  the Iris n-step rule are proven ONCE; each use is one application +
+  one vm_compute equation — per-site proof terms O(1), reduction in the
+  VM, never in the proofmode.
+- DECODE IS IMPORTED, NOT RE-SOLVED: after the fetch event,
+  decode+prologue is one silent stretch = one reflective step; the
+  `kd_` catalogue / `decode_bridge_ms` / concrete-state bridge are
+  consumed inside `run_silent`'s computation unchanged.
+- CERTIFICATIONS LIFT WHOLESALE: the chain lemma's real form is an
+  adapter from today's certification data (interpreter run + read
+  values + register delta + event list) to `EWP (CycleE …)`, with
+  obligations ONLY at memory events.  Cost target per leaf: today's
+  cost + one application per memory event.
+- WHY BATCHING IS SOUND: a silent stretch touches only hart-exclusive
+  state (own registers, own expression), so interference neither
+  disables it nor changes its result — frame once across the stretch.
+  Memory events are exactly the points where the world may act, and
+  are NOT batched.
+- Proof-term discipline per durable-notes applies verbatim
+  (`vm_cast_no_check`, compute-once-into-a-Definition, async-Qed
+  traps): `run_silent` on a decode stretch must be VM-cast, never
+  lazily Qed-rechecked.
+- S5's measurement matrix: batched (the real interface) vs naive
+  per-node (calibration only, to document why batching is mandatory)
+  vs today's instruction-atomic originals; parity target = batched ≈
+  today.
+
 ## The risks the spike must test (fail criteria, named in advance)
 
 1. MID-INSTRUCTION INTERFERENCE IS REAL SEMANTICS: the log can grow
