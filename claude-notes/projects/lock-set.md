@@ -83,7 +83,14 @@ against the contracts called inside its own span.  It reads the table out of
 premise and after any change to `lock_ranks`; it exits nonzero with the
 offending premise and the rank it should carry.
 
-What it does NOT see: calls through a LOCAL HYPOTHESIS -- `Hballoc`,
+It knows about three kinds of edge: Spec-to-Spec, Proof-lemma-to-Spec, and
+Proof-lemma-to-Proof-lemma ACROSS files (kfork's arms call
+`ProofKforkB5.kfk_b5`, which is nobody's Spec).  That last one was added
+after `kfork` was mis-stated three separate times -- first at `"ftable"`,
+then at `"proc"`, and only correct at `"wait_lock"`, which it takes AFTER
+releasing `np->lock` and which lives in a different file.
+
+What it still does NOT see: calls through a LOCAL HYPOTHESIS -- `Hballoc`,
 `Hlogwrite`, `Hpk`, a functor parameter -- because it matches `Mod.wp_x`.
 Three local lemmas in `ProofIalloc`/`ProofIreclaim` had to be lowered to
 `"log"` for exactly that reason, after the audit called them clean.  A clean

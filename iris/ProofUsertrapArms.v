@@ -972,6 +972,7 @@ Section UtD0.
       iApply (T.ut_a6 Rsys N V' pt ksp m0 mr av nx C false lks
                 Hwf' Hav Hnx HV'tfp Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
+      all: try lkbelow.
       iApply (ua_hold_on Rsys N V' C with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
   Qed.

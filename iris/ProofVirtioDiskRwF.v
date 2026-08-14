@@ -524,6 +524,10 @@ Section VdrwfP6.
     length γs = NPROC ->
     M !!! Regidx Rs2 = (mword_of_int (Z.of_nat i) : SailStdpp.Values.mword 64) ->
     M !!! Regidx Rs3 = (disk_base : SailStdpp.Values.mword 64) ->
+    (* the vdisk lock is held here (level 1) and [lks] already contains its
+       rank -- P1-P4's convention, see the note in lock-set.md; free_desc
+       reaches wakeup at "proc". *)
+    locks_below lks (lock_rank "proc") ->
     sie_cap_gpr M av false pme -∗
     cpu_own 1 eb pme C false lks -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x1f4) : mword 64) -∗
@@ -544,7 +548,7 @@ Section VdrwfP6.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hav Hi8 Hfri Hlen Hs2 Hs3.
+    intros Hav Hi8 Hfri Hlen Hs2 Hs3 Hbelow.
     iIntros "Hcg Hown #Htext Hpc #Hpanic #Hpinv #Hdp Hd0 Hd8 Hd12 Hd14 Hbun Hrest Hcont".
     iPoseProof (rwi_1f4 with "Htext") as "Hi1d2".
     iPoseProof (rwi_1f8 with "Htext") as "Hi1d6".
@@ -1179,7 +1183,7 @@ Section VdrwfP6.
     iApply (wp_vdrwf_iter (CID := CIDx)  γs pd h fr (d_ops h : SailStdpp.Values.mword 64)
               (Z_to_bv 32 16) (Z_to_bv 16 1) (Z_to_bv 16 (Z.of_nat m2))
               E8 (trap_res eb + (K - 12))%nat eb (proc_addr j) C lks
-              ltac:(pose proof (vdrwb_K20 K HK); lia) Hh8 Hfrh Hglen HE8s2 HE8s3
+              ltac:(pose proof (vdrwb_K20 K HK); lia) Hh8 Hfrh Hglen HE8s2 HE8s3 ltac:(lkbelow)
               with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Wd0 Wl0 Wf0 Wn0 Hfb Hrh").
     iIntros (F1) "%HF1 Hcg Hown Hpc Hfb".
     destruct HF1 as (HF1thr & HF1s1 & HF1s2).
@@ -1224,7 +1228,7 @@ Section VdrwfP6.
               (b_data b : SailStdpp.Values.mword 64)
               (Z_to_bv 32 1024) (vdrw_flags wr) (Z_to_bv 16 (Z.of_nat t))
               G1 (trap_res eb + (K - 12))%nat eb (proc_addr j) C lks
-              ltac:(pose proof (vdrwb_K20 K HK); lia) Hm8 Hfr1m Hglen HG1s2 HG1s3
+              ltac:(pose proof (vdrwb_K20 K HK); lia) Hm8 Hfr1m Hglen HG1s2 HG1s3 ltac:(lkbelow)
               with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Wd1 Wl1 Wf1 Wn1 Hfb Hrm").
     iIntros (F2) "%HF2 Hcg Hown Hpc Hfb".
     destruct HF2 as (HF2thr & HF2s1 & HF2s2).
@@ -1270,7 +1274,7 @@ Section VdrwfP6.
               (d_info_status h : SailStdpp.Values.mword 64)
               (Z_to_bv 32 1) (Z_to_bv 16 2) (Z_to_bv 16 0)
               G2 (trap_res eb + (K - 12))%nat eb (proc_addr j) C lks
-              ltac:(pose proof (vdrwb_K20 K HK); lia) Ht8 Hfr2t Hglen HG2s2 HG2s3
+              ltac:(pose proof (vdrwb_K20 K HK); lia) Ht8 Hfr2t Hglen HG2s2 HG2s3 ltac:(lkbelow)
               with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Wd2 Wl2 Wf2 Wn2 Hfb Hrt").
     iIntros (F3) "%HF3 Hcg Hown Hpc Hfb".
     destruct HF3 as (HF3thr & HF3s1 & HF3s2).

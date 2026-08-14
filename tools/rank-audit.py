@@ -14,7 +14,22 @@ RANK = {m.group(1): int(m.group(2))
         for m in re.finditer(r'\("([^"]+)",\s*(\d+)\)', RANKS)}
 NAME = {v: k for k, v in RANK.items()}
 
+# rank of every premise-carrying body: Spec definitions AND the local Lemmas
+# in the Proof files, because a Proof lemma routinely calls another file's
+# local Lemma (kfork's arms call ProofKforkB5.kfk_b5) and the Spec-only map
+# cannot see those.
 spec = {}
+for f in glob.glob('Proof*.v'):
+    s2 = open(f).read().split('\n')
+    hd = [(i, l) for i, l in enumerate(s2)
+          if re.match(r'\s*(Local\s+)?(Lemma|Definition)\s+\w+', l)]
+    for k, (i, l) in enumerate(hd):
+        end = hd[k+1][0] if k+1 < len(hd) else len(s2)
+        seg = '\n'.join(s2[i:end])
+        r = re.search(r'locks_below\s+lks\s+\(lock_rank\s+"([^"]+)"\)\s*->', seg)
+        if r:
+            nm = re.match(r'\s*(?:Local\s+)?(?:Lemma|Definition)\s+(\w+)', l).group(1)
+            spec[nm] = RANK[r.group(1)]
 for f in glob.glob('Spec*.v'):
     for p in re.split(r'(?m)^(?=\s*Definition\s+wp_\w+_body\b)', open(f).read()):
         m = re.match(r'\s*Definition\s+(wp_\w+)_body\b', p)

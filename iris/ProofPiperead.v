@@ -1580,7 +1580,7 @@ Section ProofPiperead.
           rewrite /X5 upd_ne; [| congruence]. apply HthrX; exact Hr. }
         iSpecialize ("EPI" $! CIDp29 with "[%]"); [wp_next_chain|].
         iEval (rewrite Hlkempty) in "EPI".
-        iEval (rewrite Hlkempty locks_empty_del) in "Hown".
+        iEval (rewrite Hlkempty locks_union_empty locks_self_del) in "Hown".
         iApply ("EPI" $! X7 P' rv with "[%] [%] [%] Hcg Hpc Hown Href Hpriv
                   Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 [Hc8] [Hc9] [Hc10] [Hc11] Hq12").
         { split_and!.
@@ -1964,7 +1964,7 @@ Section ProofPiperead.
           by (assert (trap_res true = 78%nat) as -> by reflexivity; lia).
         iApply (Copyout.wp_copyout_sconf γa K10 P' (pv_sz V) 1%nat
                   (fun _ => trunc8 (K5 !!! Regidx Ra5)) (trap_res true + (av - 12))%nat 1%nat true pj C
-                  false lks
+                  false ({[lock_rank "pipe"]} ∪ lks)
                   HK52 HK10a0 HK10a1 HK10a4 pr_len1_64 Hszb pr_lvl1
                   with "Hcg Hown Htext Hpc Hpt Henv [Hch]").
         all: try lkbelow.
@@ -2449,8 +2449,9 @@ Section ProofPiperead.
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_refl. }
-      iApply (Killed.wp_killed_sconf γs j γlp L3 (trap_res true + (av - 12))%nat 1%nat true pj C false lks
-                HL3a0 Hj Hjl pr_lvl1 ltac:(lia) Hbelow_proc
+      iApply (Killed.wp_killed_sconf γs j γlp L3 (trap_res true + (av - 12))%nat 1%nat true pj C false
+                ({[lock_rank "pipe"]} ∪ lks)
+                HL3a0 Hj Hjl pr_lvl1 ltac:(lia) ltac:(lkbelow)
                 with "Hcg Hown Htext Hpc Hpinv Hpanic").
       all: try lkbelow.
       iApply wp_next_off_intro. iIntros (mk kl) "[%Hkcs %Hka0] Hcg Hown Hpc". rgall.
@@ -2559,9 +2560,10 @@ Section ProofPiperead.
         iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) (pv_upt V)⌝)%I as "#Hxr"; [iPureIntro; apply uptd_ext_sz_refl|].
         iDestruct ("Hpback" $! (pv_upt V) with "Hxr Hszc Hptc Hpt") as "Hpriv".
         iDestruct "HEX" as "[HEPI _]". iEval (rewrite /EPIC) in "HEPI".
-        (* the pipe lock's release left [lks ∖ {[rank "pipe"]}]; [lks = ∅] at
-           depth 0 makes that the empty set the exit continuation names. *)
-        iEval (rewrite Hlkempty locks_empty_del -Hlkempty) in "Hown".
+        (* the pipe lock's release left [({[rank "pipe"]} ∪ lks) ∖ {[rank
+           "pipe"]}]; [lks = ∅] at depth 0 makes that the empty set, which is
+           renamed back to [lks] for the exit continuation. *)
+        iEval (rewrite Hlkempty locks_union_empty locks_self_del -Hlkempty) in "Hown".
         iSpecialize ("HEPI" $! CIDp31 with "[%]"); [wp_next_chain|].
         iApply ("HEPI" $! N3 (pv_upt V) (mword_of_int (-1))
                   with "[%] [%] [%] Hcg Hpc Hown Href Hpriv
@@ -2664,8 +2666,8 @@ Section ProofPiperead.
       (* the panic arm ("sleep_prepare: zero chan") is refuted by the page the
          pipe lives on: &pi->nread is 536 bytes into it. *)
       iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γlp Sl2
-                (trap_res true + (av - 12))%nat 1%nat true C false lks
-                Hj Hjl ltac:(rewrite HSl2a0; exact (pr_pnread_nz pi Hpv)) pr_lvl1 ltac:(lia) Hbelow_proc
+                (trap_res true + (av - 12))%nat 1%nat true C false ({[lock_rank "pipe"]} ∪ lks)
+                Hj Hjl ltac:(rewrite HSl2a0; exact (pr_pnread_nz pi Hpv)) pr_lvl1 ltac:(lia) ltac:(lkbelow)
                 with "Hcg Hown Htext Hpc Hpinv Hpanic").
       all: try lkbelow.
       iApply wp_next_off_intro. iIntros (msp) "%Hspcs Hcg Hown Hpc". rgall.
@@ -2757,9 +2759,10 @@ Section ProofPiperead.
          noff 0 with interrupts ENABLED, so [trap_csrs_ext true = emp] and
          [cpu_claim_ext true pj = emp] -- sleep's own acquire mints the pair
          out of the enabled SIE arm. *)
-      (* the release above left [lks ∖ {[rank "pipe"]}]; [lks = ∅] at depth 0
-         makes that the bare entry set sleep's contract names. *)
-      iEval (rewrite Hlkempty locks_empty_del -Hlkempty) in "Hown".
+      (* the release above left [({[rank "pipe"]} ∪ lks) ∖ {[rank "pipe"]}];
+         [lks = ∅] at depth 0 makes that the empty set, which is renamed back
+         to [lks] -- the bare entry set sleep's contract names. *)
+      iEval (rewrite Hlkempty locks_union_empty locks_self_del -Hlkempty) in "Hown".
       iApply (Sleep.wp_sleep_sconf γs j γlp Sl5 (av - 12)%nat true C lks
                 Hj Hjl ltac:(lia) Hbelow_proc
                 with "Hcg Hown Htext Hpc Hpinv Hpanic [] []").

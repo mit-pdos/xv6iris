@@ -241,11 +241,14 @@ Section KforkArms.
     pv_cwd Vc = (zero_reg : mword 64) ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs4 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r) ->
-    (* THE FLOOR OF THIS CONE IS allocproc's "proc" (9).  The fd scan's
-       filedup ("ftable", 15) and idup ("itable", 14) now sit ABOVE it -- that
-       is the whole point of the leaf placement in LockRank.v -- so they follow
-       from this one by [locks_below_mono], as do kalloc/uvmcopy's "kmem". *)
-    locks_below lks (lock_rank "proc") ->
+    (* THE FLOOR OF THIS CONE IS wait_lock (8), which kfork takes AFTER
+       releasing np->lock (kernel/proc.c:295) and which ProofKforkB5 states.
+       allocproc's "proc" (9) is the call the function is about and the one
+       the eye goes to, but it is not the lowest; the fd scan's filedup
+       ("ftable", 15) and idup ("itable", 14) sit above [proc] by the leaf
+       placement in LockRank.v, and kalloc/uvmcopy's "kmem" above that.  All
+       four follow from this one by [locks_below_mono]. *)
+    locks_below lks (lock_rank "wait_lock") ->
     procs_inv γs -∗
     (* ENTRY is in-lock (allocproc returned holding np->lock: level
        [S lvl], arm [false]), so the index carries the reserve of the arm
@@ -439,11 +442,14 @@ Section KforkArms.
     npa = proc_addr j -> (j < NPROC)%nat -> γs !! j = Some γl2 ->
     pv_ofile Vc' = replicate NOFILE (zero_reg : mword 64) ->
     pv_cwd Vc' = (zero_reg : mword 64) ->
-    (* THE FLOOR OF THIS CONE IS allocproc's "proc" (9).  The fd scan's
-       filedup ("ftable", 15) and idup ("itable", 14) now sit ABOVE it -- that
-       is the whole point of the leaf placement in LockRank.v -- so they follow
-       from this one by [locks_below_mono], as do kalloc/uvmcopy's "kmem". *)
-    locks_below lks (lock_rank "proc") ->
+    (* THE FLOOR OF THIS CONE IS wait_lock (8), which kfork takes AFTER
+       releasing np->lock (kernel/proc.c:295) and which ProofKforkB5 states.
+       allocproc's "proc" (9) is the call the function is about and the one
+       the eye goes to, but it is not the lowest; the fd scan's filedup
+       ("ftable", 15) and idup ("itable", 14) sit above [proc] by the leaf
+       placement in LockRank.v, and kalloc/uvmcopy's "kmem" above that.  All
+       four follow from this one by [locks_below_mono]. *)
+    locks_below lks (lock_rank "wait_lock") ->
     kernel_text -∗
     panic_wp_any -∗
     procs_inv γs -∗
@@ -605,6 +611,7 @@ Section KforkArms.
                 ltac:(lia) ltac:(lia) HjN Hgamma Hrestlen (eq_sym Hbeq) Hmf4s4 Hmf4s5 Hpid4
                 with "Hsc4 Hown4 Hpay Htext Hpc4 Hpanic Hprocs Hwlock
                       Hheld Hhart Hpvcx4 Hfd Hirsp Hks Hkctx").
+      all: try lkbelow.
       (* [b] is symbolic here (B5's own exit index): an ordinary crossing,
          not [wp_next_off_intro] -- the brief's correction (a). *)
       iIntros (CID5 Hcross5 mf5) "%Hcs5 Hsc5 Hown5 Hpc5".
