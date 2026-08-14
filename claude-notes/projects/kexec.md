@@ -113,10 +113,96 @@ None of these are performance issues; they are exactly the kind of thing
 `optimization.md`'s Rule Zero is for — the compiler reports them instantly
 and cheaply once nothing upstream is hanging.
 
-**Still open in phase C:** the argv loop (`+0x21a .. +0x272`, whose
-invariant is designed below but not yet proven), and the closing `copyout`
-call joining into phase D at `+0x2a6`. Then phase D, then `ProofKexec.v` +
-`LinkKexec.v`.
+**THE ARGV LOOP'S STEP LEMMA (`kxc_argv_step`) IS IN PROGRESS — drafted and
+individually compiler-verified through +0x222 (myproc analogue done; the
+`jal strlen` call, `addiw a5,a0,1`, `sub a5,s2,a5` all check), STOPPED at
++0x226 (`andi s2,a5,-16`) on a genuine DESIGN GAP, not a tactic bug — read
+this whole entry before touching it again.**
+
+`ProofKexecC.v`'s `Section KexecCLoop` (after `KexecCSetup`, same file,
+`Strlen : STRLEN` and `Copyout : COPYOUT` added to `KexecCProof`'s own
+functor parameters) has the whole instruction listing re-verified against
+`CodeKexec.v` directly (every `kxc_21a` .. `kxc_272` fact read off, not
+guessed from the C or the earlier disassembly pass) — trust that listing
+over re-deriving it. Four new general-purpose lemmas landed alongside it,
+all compiler-checked:
+
+- `kxc_addiw_p1 (n:nat) : Z.of_nat n<4096 -> sign_extend'64(subrange_vec_dec
+  (add_vec (mword_of_int(Z.of_nat n)) (sign_extend'64 1)) 31 0) =
+  mword_of_int(Z.of_nat n+1)` — `addiw rd,rs,1` on a bounded value.
+  Mirrors `ProofSafestrcpy.ssc_addiw_m1`'s technique (there for `+(-1)`).
+- `kxc_round16_land (Y:Z) : 0<=Y<2^64 -> Z.land Y 18446744073709551600 =
+  Y - Y mod 16` and `kxc_round16_andi (X:mword64) : and_vec X
+  (sign_extend'64 (mword_of_int(-16))) = mword_of_int(kxc_round16
+  (bv_unsigned X))` — bridges `andi s2,a5,-16` to `SpecKexec.kxc_round16`.
+  The route is `Stdlib.ZArith.Zbitwise`'s `Z.sub_land_same_l` (`x - x&y =
+  x&~y`) plus `Z.land_ones`; **`sub_land_same_l` lives inside `Module Z`,
+  so it's `Z.sub_land_same_l`, not bare** — the not-found error if you
+  forget. Nothing already in the tree did this; every prior `andi` call
+  site masked with a small POSITIVE constant (127, 15, …), never `-16`.
+- `kxc_ustack_collapse (sp0:mword64)(c:nat)(f:nat->mword64) : c<46 ->
+  ([∗list] j∈seq 0 c, pa_stk sp0(46-j)↦₈ f j) -∗ stack_own(pa_stk sp0
+  (46-c)) c` — folds `kxc_frameC`'s WRITTEN ustack prefix back to opaque
+  `stack_own`, which a `-1`-tail exit needs (`kxc_mid_join` wants the WHOLE
+  33-slot region opaque, and the loop only has it split at `c`). Plain
+  `induction c`, NOT `iInduction` — this is a one-shot entailment, not a
+  Löb recursion, and `iInduction`'s auto-generated IH fighting a leading
+  Coq-level premise (`c<46`) is exactly the kind of friction that's the
+  tell you want the plain tactic.
+
+**Two mechanical fixes worth remembering for the rest of this lemma:**
+`wp_sub_s_sconf`/`wp_andi_s_sconf`/`wp_slli_s_sconf` all take `wval`
+as an EXPLICIT ARGUMENT (unlike `wp_cmv_s_sconf`/`wp_addiw_s_sconf`, which
+compute it internally via a `let`) — and then ALSO want a SEPARATE proof
+that `wval` matches the semantics, typically closed by `reflexivity` since
+`rget m r` and `m !!! Regidx r` are convertible. And **every external-call
+spec in this codebase (`Strlen.wp_strlen_sconf` included) takes the process
+address `p := proc_addr jp` as an explicit trailing argument**, easy to
+forget since it comes after `b` and before the Coq-level premises.
+
+**THE GAP: `kxc_at_21a`/`kxc_at_272` (`ProofKexecSeam.v`) need a NEW pure
+conjunct, `(uint sz1 - 4096 <= kxc_sp (uint sz1) alen c)%Z` (i.e. `M!!!Rs7
+<= M!!!Rs2`, "the current sp has not gone below stackbase"), or the ANDI
+step cannot be closed soundly.** This is `git log`'s own already-landed
+"blocker §7" fix (`93d2a371`, `SpecKexec.v`'s `(Z.of_nat (alen i) <
+4096)%Z` premise, already threaded into `kxc_c_setup`/`kxc_argv_step`) —
+but that commit's ARITHMETIC ARGUMENT ("`stackbase<=sp` from the PREVIOUS
+iteration's own `bltu`, `sub` is at most 4096, `sz1>=8192`, so no
+underflow") needs `stackbase<=sp` to be AVAILABLE AT THE START of each
+step, and nothing currently carries it there — `kxc_at_21a`'s own pure
+facts are just `c<=na /\ c<32 /\ avf c<>0`, no relation between `Rs7` and
+`Rs2` at all. Without it, the `andi`'s `wval` can't be related to
+`kxc_sp(...)( S c)` (need `bv_unsigned(sub_vec ...) = (exact Z difference)`,
+which needs the subtraction to NOT have wrapped, which is exactly the fact
+missing).
+
+**The fix, not yet done:** add the conjunct to `kxc_at_21a`/`kxc_at_272` in
+`ProofKexecSeam.v` (both, same shape, mirroring how `Pfinal` was threaded
+in for the page table); re-verify `kxc_c_setup`'s own two exit bullets
+(trivial at `c=0`: `stackbase = sz1-4096 <= sz1 = kxc_sp(...)0`, since
+4096>=0); then `kxc_argv_step` gets it for free at entry and has to
+RE-ESTABLISH it for `S c` at both the loop-back and the `+0x272` exit
+(exactly the BLTU-fall branch's own premise, so no new work there — it's
+already the fact the branch itself carries). **Read `93d2a371`'s commit
+message in full before writing this** — it has the complete arithmetic
+chain (`sp - (len+1) >= stackbase - 4096 = sz1 - 8192 >= 0`) already
+worked out.
+
+**`ProofKexecC.v` as it stands is UNCOMMITTED** (`kxc_argv_step` ends
+`admit. Admitted.` at +0x226) — the module-signature change
+(`Strlen`/`Copyout` added to `KexecCProof`), the four new lemmas above, and
+the instruction-by-instruction progress through +0x222 are all real and
+compiler-checked; only the ANDI step onward is missing. Next session:
+land the `kxc_at_21a`/`kxc_at_272` conjunct first, then resume exactly at
++0x226 in the draft.
+
+**Still open in phase C beyond that:** the rest of the argv loop
+(overflow exit at +0x22a, the `copyout` call and its own fail exit at
++0x24c, the ustack write, the three-way final branch at +0x268/+0x26a),
+`kxc_argv_loop` (the fuel-induction wrapper, mirroring
+`ProofKexecB3.kxc_phdr`'s shape around `kxc_ph_step`), and the closing
+`copyout` call joining into phase D at `+0x2a6`. Then phase D, then
+`ProofKexec.v` + `LinkKexec.v`.
 
 <details>
 <summary>Superseded diagnosis (kept for the record — the "17 GB" symptom
