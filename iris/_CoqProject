@@ -1113,6 +1113,8 @@ SpecSysMkdir.v
 ProofSysMkdir.v
 LinkSysMkdir.v
 SpecSysMknod.v
+ProofSysMknod.v
+LinkSysMknod.v
 SysLinkBudget.v
 SpecSysLink.v
 ProofSysLinkParts.v
