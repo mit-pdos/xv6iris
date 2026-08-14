@@ -429,6 +429,7 @@ Section UtSysBlock.
                 ltac:(rewrite Htfg HV1upt; exact Htfpe) Hksp Hm0sp
                 Hmgsp Hmgs1 Hcsmg
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
+      all: try lkbelow.
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitR; [rewrite /trap_csrs_ext; done|].
       iSplitR; [rewrite /cpu_claim_ext; done|].

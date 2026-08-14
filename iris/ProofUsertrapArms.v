@@ -926,7 +926,7 @@ Section UtD0.
                    with "Hsz Hpgt Hppt") as "Hpv".
       rewrite upd_upt_id.
       iDestruct ("Hownback" $! V with "Hpv Hsy") as "Hown".
-      iApply (ut_56 Rsys N V pt ksp m0 mr av nx C
+      iApply (ut_56 Rsys N V pt ksp m0 mr av nx C lks
                 Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       iApply (ua_hold_on Rsys N V C with "Hcpu Hcsrs Hclm [-]").

@@ -578,6 +578,7 @@ Section KforkArms.
                 Mx2 (trap_res b) K (S lvl) eb C ({[lock_rank "proc"]} ∪ lks)
                 ltac:(lia) ltac:(lia) Hd4 Hd3
                 with "Hsc Hown Htext Hpcx Hpanic Hitb Hitinv Hirs Hpvx Hpvcx").
+      all: try lkbelow.
       iApply wp_next_off_intro.
       iIntros (mf4) "%Hp4 Hsc4 Hown4 Hpc4 Hpvx4 Hpvcx4 Hirsp".
       destruct Hp4 as (Hthr4 & Hpid4).
@@ -601,6 +602,7 @@ Section KforkArms.
          and B5's entry index has to be syntactically that. *)
       iApply (B5.kfk_b5 γs γf γw γl2 j mf4 K lvl eb b
                 pme ks pid_c Vc4 ch rest (sign_extend' 64 pid_c) C
+                ({[lock_rank "proc"]} ∪ lks)
                 ltac:(lia) ltac:(lia) HjN Hgamma Hrestlen (eq_sym Hbeq) Hmf4s4 Hmf4s5 Hpid4
                 with "Hsc4 Hown4 Hpay Htext Hpc4 Hpanic Hprocs Hwlock
                       Hheld Hhart Hpvcx4 Hfd Hirsp Hks Hkctx").

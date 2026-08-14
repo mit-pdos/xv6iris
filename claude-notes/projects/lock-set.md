@@ -142,6 +142,22 @@ the three-CPU cycle you would draw from the raw edges -- that one is broken
 instead by the fact that the lock `kfork` holds is a NOT-RUNNING process's,
 and `sleep_prepare` only ever acquires the running process's own.
 
+### virtio_disk_rw has TWO conventions for what `lks` means
+
+Worth knowing before touching that function, because both are defensible and
+they meet at a seam.  `virtio_disk_rw` takes `disk.vdisk_lock` once at entry
+and holds it for most of the body, so its P1-P4 halves treat `lks` as the FULL
+held set -- the virtio rank is already in it, and their level-1 `cpu_own`
+reads plain `lks`.  P5 releases and re-acquires that lock across the sleep
+protocol, so it treats `lks` as the OUTER set and spells its level-1 `cpu_own`
+`{[lock_rank "virtio_disk"]} ∪ lks`.
+
+`wp_vdrw_p5_seam` (`ProofVirtioDiskRwE.v`) is where they meet, and it has to
+TRANSLATE: it consumes a `vdrw_p5_exit ... lks` and produces a
+`P4.vdrw_p4_exit ... ({[lock_rank "virtio_disk"]} ∪ lks)`.  Passing the same
+`lks` to both sides typechecks at the seam and fails ~500 lines later, inside
+the Löb loop, which is what makes this one expensive to find.
+
 ### When one function has two modes, the premise goes CONDITIONAL
 
 `bmap` is the case that shows the shape.  Its alloc-capable mode reaches

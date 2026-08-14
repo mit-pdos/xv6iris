@@ -2050,7 +2050,7 @@ Section IreclaimRelease.
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bno dq V2 (K - 8)%nat true (proc_addr j) C
               bs bsd0 d0 b lks ltac:(unfold K_brelse; lia) Hkk HV2a0
-              Hbelow
+              ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
     iIntros (CID3 Hq3 mR) "%Hcsr Hcg Hcnt Hpc Hppid Hsl1".

@@ -389,7 +389,7 @@ Section ProofVirtioDiskRwE.
     vdrw_p5_exit CID γk γs j γd pd pav pu K eb C sp0 b wr sector bs_buf bs_disk
                  m0 kq lks -∗
     P4.vdrw_p4_exit CID γk γs j γd pd pav pu K eb C sp0 b wr sector bs_buf
-                    bs_disk m0 kq lks.
+                    bs_disk m0 kq ({[lock_rank "virtio_disk"]} ∪ lks).
   Proof.
     intros HK Hj Hjl Hbnz Hbelow.
     iIntros "#Htext #Hpanic #Hpinv #Hdinv #Hlk Hexit".

@@ -1129,7 +1129,7 @@ Section ProofFileclose.
                   (mword_of_int KernelSyms.kmem)
                   (mword_of_int (KernelSyms.kmem + 24)) on
                   P3 n eb p C (K - 8)%nat b
-                  _ Hw1 Hav22 Hn2 eq_refl eq_refl
+                  lks Hw1 Hav22 Hn2 eq_refl eq_refl
                   ltac:(lkbelow)
                   with "Hcg Hcnt Htext Hpc Hispipe Hpref Hkmem Hav Hprocs Hpanic").
         all: try lkbelow.

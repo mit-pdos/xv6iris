@@ -2152,7 +2152,7 @@ Section ProofFileread.
                           ikk (ssh/2)%Qp gsh icfg_dev inm
                           dnl bml
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj C b
-                          _ (fr_av_iunlock K HK) Hik
+                          lks (fr_av_iunlock K HK) Hik
                           ltac:(rewrite HN2a0; exact Hipk)
                           ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk
@@ -2427,7 +2427,7 @@ Section ProofFileread.
                           ikk (ssh/2)%Qp gsh icfg_dev inm
                           dnl bml
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj C b
-                          _ (fr_av_iunlock K HK) Hik
+                          lks (fr_av_iunlock K HK) Hik
                           ltac:(rewrite HN2a0; exact Hipk)
                           ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk
