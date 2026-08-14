@@ -471,8 +471,7 @@ Section IupdateTail.
               _ HKbl Hkk HT3a0
               (* brelse's bound is "bcache"(4); iu_tail's own is "log"(3),
                  and [locks_below_mono] weakens it. *)
-              ltac:(exact (locks_below_mono lks (lock_rank "log")
-                             (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
     iIntros (CID6 Hq6 mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl1".
@@ -1171,8 +1170,7 @@ Section ProofIupdateMain.
               _ HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HRAa0 HRAa1
               (* bread's bound is "bcache"(4); iupdate's own is "log"(3),
                  and [locks_below_mono] weakens it. *)
-              ltac:(exact (locks_below_mono lks (lock_rank "log")
-                             (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.

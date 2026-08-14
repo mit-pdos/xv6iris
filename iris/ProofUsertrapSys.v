@@ -231,8 +231,9 @@ Section UtSysBlock.
       iApply (T.ut_kexit SY.syscall_env N V
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xca) : mword 64) 4)]> K1)
-                nx C false Hwf' ltac:(unfold K_kexit; lia)
+                nx C false lks Hwf' ltac:(unfold K_kexit; lia)
                 with "Htext Hpc Hcg [-]").
+      all: try lkbelow.
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].
       iSplitL "Hclm"; [iExact "Hclm"|].
@@ -360,7 +361,9 @@ Section UtSysBlock.
                 with "Hcg [Hcnt] [Hcsrs] [Hcells] [Hclm] Hpc Hi9e [-]").
       { iExact "Hcnt". }
       { rewrite /trap_csrs_ext. iExact "Hcsrs". }
-      { iExact "Hcells". }
+      (* re-enabling SIE demands the empty held set -- which depth 0 already
+         forces, so this is a re-spelling, not an obligation. *)
+      { iEval (rewrite Hlkempty) in "Hcells". iExact "Hcells". }
       { rewrite /cpu_claim_ext. iExact "Hclm". }
       iApply wp_next_off_intro. iIntros (msf) "%Hmsf Hcg Hpc".
       assert (Hpa2 : add_vec_int (mword_of_int (UT + 0x9e) : mword 64) 4
@@ -398,11 +401,13 @@ Section UtSysBlock.
         apply ut_cs_insert; [vm_compute; reflexivity |].
         exact Hcsmf. }
       iApply (SY.wp_syscall_sconf (CID := CID1) (un_f N) (un_s N) (un_j N) (un_l N)
-                S4 n2 C (un_pid N) V1
+                S4 n2 C (un_pid N) V1 lks
                 Hj Hjl ltac:(rewrite Hn2; unfold K_syscall, K_sys_exit, K_kexit,
                                             kv_frame_slots; lia)
                 with "Hcg [HC] Htext Hkd Hpc Hpi Hpa Hsy Hpv [-]").
-      { iApply (cpu_own_on_intro (CID := CID1) (un_pj N) C with "HC"). }
+      (* [cpu_own_on_intro] mints the bundle at the literal [∅]; [lks = ∅]
+         at depth 0 makes that the set syscall's contract names. *)
+      { rewrite Hlkempty. iApply (cpu_own_on_intro (CID := CID1) (un_pj N) C with "HC"). }
       iIntros (CID2 Hk2 mg V2) "%Hcsg %Htfg Hcg Hcpu Hsy Hpv Hpc".
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).

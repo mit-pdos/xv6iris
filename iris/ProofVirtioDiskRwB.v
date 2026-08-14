@@ -773,8 +773,7 @@ Section ProofVirtioDiskRwB.
                      ltac:(wp_next_chain) with "Hextm") as "Hextm".
         iApply (Sleep.wp_sleep_sconf γs j γl C4 (K - 12)%nat eb C lks
                   Hj Hjl ltac:(pose proof (vdrw_K22 K HK); lia)
-                  ltac:(exact (locks_below_mono lks (lock_rank "virtio_disk")
-                                 (lock_rank "proc") Hbelow ltac:(vm_compute; lia)))
+                  ltac:(lkbelow)
                   with "Hcg Hown Htext Hpc Hpinv Hpanic Hextc Hextm").
         all: try lkbelow.
         (* SLEEP RETURNS ON HART [CIDsl]. *)

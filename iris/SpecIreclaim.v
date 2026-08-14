@@ -246,7 +246,7 @@ Definition wp_ireclaim_sconf_body
      ("log", 3), ilock ("bcache", 4), iunlock ("sleep lock", 6) --
      "itable" is the lowest, so one premise there covers the whole cone
      via [locks_below_mono]. *)
-  locks_below lks (lock_rank "itable") ->
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗

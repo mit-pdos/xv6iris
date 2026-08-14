@@ -241,6 +241,11 @@ Section KforkArms.
     pv_cwd Vc = (zero_reg : mword 64) ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs4 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r) ->
+    (* THE FLOOR OF THIS CONE IS allocproc's "proc" (9).  The fd scan's
+       filedup ("ftable", 15) and idup ("itable", 14) now sit ABOVE it -- that
+       is the whole point of the leaf placement in LockRank.v -- so they follow
+       from this one by [locks_below_mono], as do kalloc/uvmcopy's "kmem". *)
+    locks_below lks (lock_rank "proc") ->
     procs_inv γs -∗
     (* ENTRY is in-lock (allocproc returned holding np->lock: level
        [S lvl], arm [false]), so the index carries the reserve of the arm
@@ -270,7 +275,7 @@ Section KforkArms.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hlvl Hbeq Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMts4 Hnpa HjN Hgamma
-      Hofnull Hcwdnull HMtthr.
+      Hofnull Hcwdnull HMtthr Hbelow.
     subst npa.
     iIntros "#Hprocs Hcg Hcpu Hpay #Htext Hpc Hframe
              Hpv HCpriv Hheld Hhart Hfd Hir Hctx Hkalloc Hcont".
@@ -289,6 +294,7 @@ Section KforkArms.
               HK Hlvl Hbeq Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMts4 HMtthr
               with "Hcg Hcpu Hpay Htext Hpc Hb1 Hb2 Hb3 Hb4x Hb5x Hb6 Hb7 Hb8
                     Hheld Hhart Hislock Hkalloc Hfprest Hfppt Hfptf").
+    all: try lkbelow.
     iIntros (CID Hcross mf) "%Hpf Hcg Hpc Hcpu2 Hkalloc2".
     destruct Hpf as [Hcsmf Hmfa0].
     iSpecialize ("Hcont" $! CID with "[%]").
@@ -433,6 +439,11 @@ Section KforkArms.
     npa = proc_addr j -> (j < NPROC)%nat -> γs !! j = Some γl2 ->
     pv_ofile Vc' = replicate NOFILE (zero_reg : mword 64) ->
     pv_cwd Vc' = (zero_reg : mword 64) ->
+    (* THE FLOOR OF THIS CONE IS allocproc's "proc" (9).  The fd scan's
+       filedup ("ftable", 15) and idup ("itable", 14) now sit ABOVE it -- that
+       is the whole point of the leaf placement in LockRank.v -- so they follow
+       from this one by [locks_below_mono], as do kalloc/uvmcopy's "kmem". *)
+    locks_below lks (lock_rank "proc") ->
     kernel_text -∗
     panic_wp_any -∗
     procs_inv γs -∗
@@ -473,7 +484,7 @@ Section KforkArms.
   Proof.
     intros HK Hlvl Hbeq Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMts4 HMts5
       HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr Hnpa HjN Hgamma
-      Hofnull Hcwdnull.
+      Hofnull Hcwdnull Hbelow.
     subst tfsrc tfdst.
     iIntros "#Htext #Hpanic #Hprocs Hcg Hcpu Hpc Hframe Hpv HCpriv
              Hheld Hhart Hfd Hctxex Hpay Hkalloc Hwlock Hft
@@ -542,7 +553,8 @@ Section KforkArms.
        arm-generic and instantiated at [b := false], so it cannot compute the
        reserve itself -- it takes it as the opaque [rsv] parameter. *)
     iPoseProof (B3.kfkb3_fd_loop γl γf pme npa pid_p pid_c Vp V2 m (trap_res b) K (S lvl) eb false C
-                  (pa_stk sp0 8) (Mt !!! Regidx Rs0) ltac:(lia) ltac:(lia) HofnullV2) as "Hb3app".
+                  (pa_stk sp0 8) (Mt !!! Regidx Rs0) ({[lock_rank "proc"]} ∪ lks)
+                  ltac:(lia) ltac:(lia) HofnullV2 ltac:(lkbelow)) as "Hb3app".
     iSpecialize ("Hb3app" with "Htext Hft Hpanic").
     iSpecialize ("Hb3app" $! 0%nat Mx
       with "[%] [%] [Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
@@ -670,7 +682,7 @@ Section KforkMain.
       m lvl K eb pme C b pid_p Vp lks.
   Proof.
     cbv beta delta [wp_kfork_sconf_body]. cbn zeta.
-    intros HK Hlvl.
+    intros HK Hlvl Hbelow.
     iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hplock #Hwlock #Hftbl
              #Hitbl #Hitinv Henv Hpv Hcont".
     (* the SIE index the two lock-holding exits come back at *)
@@ -719,7 +731,7 @@ Section KforkMain.
                 (wpk_K_ge52 K HK) Hlvl Hbeq
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 HMtsp ltac:(rewrite HMts4 Hnpa; reflexivity) Hnpa HjN Hgamma
-                Hofn Hcwdn HMtthr
+                Hofn Hcwdn HMtthr ltac:(lkbelow)
                 with "Hprocs Hcg Hcpu Hpay Ht Hpc Hframe Hpv HCp Hheld Hhart
                       Hfd Hir Hctx Hke [HR]").
       (* the crossing fact by NAME, never as an inline [ltac:] in argument
@@ -743,7 +755,7 @@ Section KforkMain.
                 (wpk_K_ge56 K HK) Hlvl Hbeq
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 HMtsp HMts4 HMts5 HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr
-                Hnpa HjN Hgamma Hofn Hcwdn
+                Hnpa HjN Hgamma Hofn Hcwdn ltac:(lkbelow)
                 with "Ht Hpanic Hprocs Hcg Hcpu Hpc Hframe Hpv HCp Hheld Hhart
                       Hfd Hctx Hpay Hke Hwl Hft Hit Hiti Hirs [HR]").
       (* the crossing fact by NAME, never as an inline [ltac:] in argument

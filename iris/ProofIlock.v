@@ -2200,8 +2200,7 @@ Section ProofIlockMain.
               Hj ltac:(lia)
               (* acquiresleep's bound is "sleep lock"(6); ilock's own is
                  "bcache"(4), and [locks_below_mono] weakens it. *)
-              ltac:(exact (locks_below_mono lks (lock_rank "bcache")
-                             (lock_rank "sleep lock") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hextm Htext Hpc [] Hpanic Hppid Hprocs").
     all: try lkbelow.
     { iEval (rewrite HR6a0). iExact "Hslk". }

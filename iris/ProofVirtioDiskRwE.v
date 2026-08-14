@@ -244,7 +244,7 @@ Section ProofVirtioDiskRwE.
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
        sie_cap_gpr M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
-       cpu_own 1 eb (proc_addr j) C false lks -∗
+       cpu_own 1 eb (proc_addr j) C false ({[lock_rank "virtio_disk"]} ∪ lks) -∗
        trap_csrs -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x1d2) : mword 64) -∗
@@ -274,7 +274,7 @@ Section ProofVirtioDiskRwE.
         /\ M !!! Regidx Rs2 = (mword_of_int 1 : SailStdpp.Values.mword 64)
         /\ vdrw_hi M m0⌝ -∗
        sie_cap_gpr M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
-       cpu_own 1 eb (proc_addr j) C false lks -∗
+       cpu_own 1 eb (proc_addr j) C false ({[lock_rank "virtio_disk"]} ∪ lks) -∗
        trap_csrs -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x1b4) : mword 64) -∗
@@ -378,6 +378,9 @@ Section ProofVirtioDiskRwE.
        ([ProofVirtioDiskRwF.vdrwf_bnz]); it is not derivable from anything
        this phase holds, because a points-to says nothing about the address. *)
     eq_vec (b : SailStdpp.Values.mword 64) (zero_reg : SailStdpp.Values.mword 64) = false ->
+    (* the seam still holds disk.vdisk_lock; sleep_prepare/wakeup at
+       "proc" (11) follow from this by [locks_below_mono]. *)
+    locks_below lks (lock_rank "virtio_disk") ->
     kernel_text -∗
     panic_wp_any -∗
     procs_inv γs -∗
@@ -388,7 +391,7 @@ Section ProofVirtioDiskRwE.
     P4.vdrw_p4_exit CID γk γs j γd pd pav pu K eb C sp0 b wr sector bs_buf
                     bs_disk m0 kq lks.
   Proof.
-    intros HK Hj Hjl Hbnz.
+    intros HK Hj Hjl Hbnz Hbelow.
     iIntros "#Htext #Hpanic #Hpinv #Hdinv #Hlk Hexit".
     rewrite /P4.vdrw_p4_exit.
     iIntros (CIDx Hsx M q np nr fl pk tr fr h m2 t pin)
@@ -532,6 +535,7 @@ Section ProofVirtioDiskRwE.
       (* ================= release(&disk.vdisk_lock) ================= *)
       iApply (Release.wp_release_sconf γk d_lock "virtio_disk"%string
                 (disk_res γd pd pav pu) W4 0%nat eb (proc_addr j) C (K - 12)%nat
+                ({[lock_rank "virtio_disk"]} ∪ lks)
                 HW4a0 ltac:(pose proof (vdrw_K10 K HK); lia)
                 with "Hcg Htext Hpc Hlk Htok HR Hown Hpay").
       iIntros (CIDrl Hsrl mfr) "Hcg Hpc %Hrcs Hown". rgall.
@@ -566,7 +570,10 @@ Section ProofVirtioDiskRwE.
                    ltac:(wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDlp CIDjs eb (proc_addr j)
                    ltac:(wp_next_chain) with "Hextm") as "Hextm".
-      iApply (Sleep.wp_sleep_sconf γs j γl W5 (K - 12)%nat eb C
+      (* the release above gave the virtio rank back; spell the set as the
+         bare entry one sleep's contract names. *)
+      iEval (rewrite (locks_add_del_below (lock_rank "virtio_disk") lks Hbelow)) in "Hown".
+      iApply (Sleep.wp_sleep_sconf γs j γl W5 (K - 12)%nat eb C lks
                 Hj Hjl ltac:(pose proof (vdrw_K22 K HK); lia)
                 with "Hcg Hown Htext Hpc Hpinv Hpanic Hextc Hextm").
       all: try lkbelow.

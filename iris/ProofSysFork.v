@@ -93,7 +93,7 @@ Section ProofSysFork.
                              m lvl av eb p C b pid V lks.
   Proof.
     cbv beta delta [wp_sys_fork_sconf_body].
-    intros pcE ret_tgt Hav Hlvl.
+    intros pcE ret_tgt Hav Hlvl Hbelow.
     unfold K_sys_fork in Hav.
     set (imm_entry := (mword_of_int 48 : mword 6)).
     set (imm_dealloc := (mword_of_int 16 : mword 6)).
@@ -177,7 +177,7 @@ Section ProofSysFork.
     (* ---- kfork(): a0 = -1 or the child's pid; the parent's block back ---- *)
     iApply (Kfork.wp_kfork_sconf γa γp γw γl γf γil γic γs cn γfs cov logstart nib
               Bj lvl (av - 2)%nat eb p C b pid V lks
-              ltac:(lia) Hlvl
+              ltac:(lia) Hlvl ltac:(lkbelow)
               with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hplock Hwlock Hftbl
                     Hitbl Hitinv Henv Hpriv").
     iIntros (CID6 Hs6 MF) "%HcsMF Hpc Hpost".

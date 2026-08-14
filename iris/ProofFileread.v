@@ -1387,8 +1387,7 @@ Section ProofFileread.
                           E2 (K - 6)%nat eb C pidv V n b
                           _ Hj Hgs Hlens HE2a0 HE2a2 (fr_n_range n Hn0 Hnb)
                           (fr_av_cons K HK) Heb
-                          ltac:(exact (locks_below_mono lks (lock_rank "bcache")
-                                 (lock_rank "cons") Hbelow ltac:(vm_compute; lia)))
+                          ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hconslk Hpriv Hkenv
                                 Hprocs Hpanic").
                 all: try lkbelow.
@@ -2155,8 +2154,7 @@ Section ProofFileread.
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj C b
                           _ (fr_av_iunlock K HK) Hik
                           ltac:(rewrite HN2a0; exact Hipk)
-                          ltac:(exact (locks_below_mono lks (lock_rank "bcache")
-                                 (lock_rank "sleep lock") Hbelow ltac:(vm_compute; lia)))
+                          ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk
                                 Hheld Hslpid Hppid Hprocs
                                 Hdep Hidev Hinum Hvalid Hlk Hshot").
@@ -2431,8 +2429,7 @@ Section ProofFileread.
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj C b
                           _ (fr_av_iunlock K HK) Hik
                           ltac:(rewrite HN2a0; exact Hipk)
-                          ltac:(exact (locks_below_mono lks (lock_rank "bcache")
-                                 (lock_rank "sleep lock") Hbelow ltac:(vm_compute; lia)))
+                          ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk
                                 Hheld Hslpid Hppid Hprocs
                                 Hdep Hidev Hinum Hvalid Hlk Hshot").

@@ -3188,8 +3188,7 @@ Section ProofNamexMain.
                              ik (iq/2)%Qp gsh dev iinum pidv dq dqs
                              V2 (K - 12)%nat eb C b lks
                              Kil Hik Hlg Hinos0 Hibc Hib' Hj Hgs HV2a0
-                             (locks_below_mono lks (lock_rank "itable")
-                                (lock_rank "bcache") Hbelow ltac:(vm_compute; lia))
+                             ltac:(lkbelow)
                              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hitbl Hesck
                                    Hireg Hslkk Hshr Hinos Hppid Hprocs Hdev
                                    Hgeom Hdlk Hbs1").
@@ -3687,9 +3686,7 @@ Section ProofNamexMain.
                                  cov logstart ik (iq/2)%Qp gsh dev iinum dnl bml
                                  pidv dq NP3 (K - 12)%nat eb (proc_addr j) C b lks
                                  Kiu Hik HP3a0
-                                 (locks_below_mono lks (lock_rank "itable")
-                                    (lock_rank "sleep lock") Hbelow
-                                    ltac:(vm_compute; lia))
+                                 ltac:(lkbelow)
                                  with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesck
                                        Hslkk Hslkd Hslpid Hppid Hprocs Hdep
                                        Hidev Hiinum Hivalid Hload Hshot").

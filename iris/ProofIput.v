@@ -2141,8 +2141,7 @@ Section ProofIput.
               Hbmwf2 Hcovb Hsized2 Hdiaddrs2 Hj Hgsj HJ2a0
               (* itrunc's bound is "log"(3); iput's own is "itable"(2), and
                  [locks_below_mono] weakens it. *)
-              ltac:(exact (locks_below_mono lks (lock_rank "itable")
-                             (lock_rank "log") Hfresh ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlogc Hidv Hinh Hmeta
                     [Haddrs Hind] Hblks Hbms Hins Hbm Hireg Hdat Hppid Hprocs
                     Hdevi Hdgeom Hdlock [Hbs2 Hbs1] Hcrui [Hop]").
@@ -2283,8 +2282,7 @@ Section ProofIput.
               (di_free_addrs dn) ltac:(reflexivity) Hj Hgsj HJ4a0
               (* iupdate's bound is "log"(3); iput's own is "itable"(2), and
                  [locks_below_mono] weakens it. *)
-              ltac:(exact (locks_below_mono lks (lock_rank "itable")
-                             (lock_rank "log") Hfresh ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlogc Hidv Hinh Hmeta Hmap
                     Hins Hireg Hdat Hppid Hprocs Hdevi Hdgeom Hdlock Hbs2 Hlb0
                     Hcrdu [Hop]").
@@ -2403,8 +2401,7 @@ Section ProofIput.
               J6 pidv pj (K - 4)%nat eb C eb lks ltac:(lia)
               (* releasesleep's bound is "sleep lock"(6); iput's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
-              ltac:(exact (locks_below_mono lks (lock_rank "itable")
-                             (lock_rank "sleep lock") Hfresh ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc [] Hstok [Hspid] Hictok Hpanic Hprocs").
     all: try lkbelow.
     { iEval (rewrite HJ6a0). iExact "Hslk". }

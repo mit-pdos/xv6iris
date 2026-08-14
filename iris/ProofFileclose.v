@@ -1130,8 +1130,7 @@ Section ProofFileclose.
                   (mword_of_int (KernelSyms.kmem + 24)) on
                   P3 n eb p C (K - 8)%nat b
                   _ Hw1 Hav22 Hn2 eq_refl eq_refl
-                  (locks_below_mono lks (lock_rank "ftable") (lock_rank "pipe")
-                     Hbelow ltac:(vm_compute; lia))
+                  ltac:(lkbelow)
                   with "Hcg Hcnt Htext Hpc Hispipe Hpref Hkmem Hav Hprocs Hpanic").
         all: try lkbelow.
         iIntros (CIDp5 Hsp5 mp) "Hcg Hcnt Hpc %Hpcs Hav".
@@ -1389,8 +1388,7 @@ Section ProofFileclose.
                     (fcn_cov fn) (fcn_logstart fn) (fcn_dev fn)
                     (fcn_pid fn) (fcn_dq fn) B1 (K - 8)%nat eb C b lks
                     ltac:(unfold K_begin_op; lia) Hjlt Hgl
-                    (locks_below_mono lks (lock_rank "ftable") (lock_rank "log")
-                       Hbelow ltac:(vm_compute; lia))
+                    ltac:(lkbelow)
                     with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hlog Hpid Hprocs").
           all: try lkbelow.
           iIntros (CIDf3 Hsf3 mb) "%Hbcs Hcg Hcnt Hextc Hextm Hpc Hpid Hop".
@@ -1461,8 +1459,7 @@ Section ProofFileclose.
                     Hist0 Hiblk Hiblog Hinb Hcovb
                     ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hjlt Hgl
                     ltac:(rewrite HB3a0; exact Hipe)
-                    (locks_below_mono lks (lock_rank "ftable") (lock_rank "itable")
-                       Hbelow ltac:(vm_compute; lia))
+                    ltac:(lkbelow)
                     with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlog Hitab Hitinv
                           Hescrow Hireg Hslk Href Hsbb Hsbi Hbmres Hpid Hprocs
                           Hdev Hgeo Hdlk Hbsl Hop").
@@ -1505,8 +1502,7 @@ Section ProofFileclose.
                     (fcn_dev fn) ni (fcn_pid fn) (fcn_dq fn)
                     B4 (K - 8)%nat eb C b lks
                     ltac:(unfold K_end_op; lia) Hgeom Hjlt Hgl
-                    (locks_below_mono lks (lock_rank "ftable") (lock_rank "log")
-                       Hbelow ltac:(vm_compute; lia))
+                    ltac:(lkbelow)
                     with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hpid
                           Hprocs Hdev Hgeo Hdlk Hop").
           all: try lkbelow.

@@ -3600,8 +3600,7 @@ Section BmapSeal.
                     exact (BA.wp_balloc_gen (GEN := GEN0) (CID := CID0)))
               ltac:(intros _ GEN0 CID0;
                     exact (LW.wp_log_write_gen (GEN := GEN0) (CID := CID0)))
-              ltac:(exact (locks_below_mono lks (lock_rank "log")
-                             (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               ltac:(intros _; exact Hbelow)
               HK
               ltac:(intros _; pose proof (bmap_need_le4 false (bmap_ind fbn)); lia)
@@ -3683,8 +3682,7 @@ Section BmapSeal.
                     exact (BA.wp_balloc_gen (GEN := GEN0) (CID := CID0)))
               ltac:(intros _ GEN0 CID0;
                     exact (LW.wp_log_write_gen (GEN := GEN0) (CID := CID0)))
-              ltac:(exact (locks_below_mono lks (lock_rank "log")
-                             (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               ltac:(intros _; exact Hbelow)
               HK ltac:(intros _; exact Hneed)
               ltac:(intros Hc; cbn [bm_bmsset ba_bms];

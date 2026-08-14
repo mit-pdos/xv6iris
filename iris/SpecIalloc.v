@@ -226,7 +226,7 @@ Definition wp_ialloc_sconf_body
      ("itable", 2, on the tail claim), printk ("pr", 14, the no-inodes
      arm) -- "itable" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
-  locks_below lks (lock_rank "itable") ->
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -370,7 +370,7 @@ Definition wp_ialloc_gen_body
      ("itable", 2, on the tail claim), printk ("pr", 14, the no-inodes
      arm) -- "itable" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
-  locks_below lks (lock_rank "itable") ->
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗

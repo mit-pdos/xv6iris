@@ -790,8 +790,7 @@ Section LogWriteBlocks.
        acquire, giving exactly the set bpin is entered at. *)
     assert (Hlt : (lock_rank "log" < lock_rank "bcache")%nat) by (vm_compute; lia).
     assert (Hble : locks_below lks (lock_rank "bcache"))
-      by (exact (locks_below_mono lks (lock_rank "log") (lock_rank "bcache") Hno
-                   ltac:(lia))).
+      by lkbelow.
     assert (Hnobc2 : locks_below ({[lock_rank "log"]} ∪ lks) (lock_rank "bcache"))
       by (exact (locks_below_union_singleton lks (lock_rank "log") (lock_rank "bcache")
                    Hlt Hble)).

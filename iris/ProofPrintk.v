@@ -7521,7 +7521,7 @@ Section ProofPrintk.
     - assert (Hent : pk_entry c0 c1 c2 = 0x23a)
         by (unfold pk_entry; rewrite Hd0 L1 L2 Hu0 L3 L4 Hx0 L5 L6 Hp0 Hc0 Hs0c Hm0; reflexivity).
       iEval (rewrite Hent) in "Hpc".
-      iApply (wp_printk_arm_pct γd γv mc K l n eb C γl Rest b pcur lks HK Hn31
+      iApply (wp_printk_arm_pct γd γv mc K l n eb C γl Rest b pcur lks HK Hn31 ltac:(lkbelow)
                 with "Hcg Htext Hpc Hcnt Hpan Hdev Hsub Htxl HR").
       iIntros (CIDn1 Hstn1 mf bs) "%Hcs Hcg Hpc Hcnt _ #Hsent HR".
       iDestruct (cpu_own_transport CIDn1 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -7534,7 +7534,7 @@ Section ProofPrintk.
     - assert (Hent : pk_entry c0 c1 c2 = 0x2ee)
         by (unfold pk_entry; rewrite Hd0 L1 L2 Hu0 L3 L4 Hx0 L5 L6 Hp0 Hc0 Hs0c Hm0 Hnn; reflexivity).
       iEval (rewrite Hent) in "Hpc".
-      iApply (wp_printk_arm_unknown γd γv mc K l n eb C γl Rest b pcur lks HK Hn31
+      iApply (wp_printk_arm_unknown γd γv mc K l n eb C γl Rest b pcur lks HK Hn31 ltac:(lkbelow)
                 with "Hcg Htext Hpc Hcnt Hpan Hdev Hsub Htxl HR").
       iIntros (CIDn2 Hstn2 mf bs) "%Hcs Hcg Hpc Hcnt _ #Hsent HR".
       iDestruct (cpu_own_transport CIDn2 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -7608,6 +7608,12 @@ Section ProofPrintk.
     Hypothesis Hflen : (Z.of_nat (String.length f) < 2147483645)%Z.
     Hypothesis Hnn : nonul f = true.
     Hypothesis Hdlen : (length descs <= 7)%nat.
+    (* THE ORDER PREMISE, at section scope because every directive arm in
+       this loop reaches consputc/printint, whose cone runs up to "uart"
+       (15).  printk's own contract states its bound at "pr" (14) and
+       [locks_below_mono] raises it, so the two instantiations below
+       discharge this with [lkbelow]. *)
+    Hypothesis Hbelow : locks_below lks (lock_rank "uart").
 
     (* the frame as the loop carries it: everything the prologue and setup
        built, with the va_list cursor at [k] arguments consumed *)
@@ -7899,7 +7905,7 @@ Section ProofPrintk.
                           (∃ w : mword 64, (pa_stk sp0 22) ↦₈ w) ∗
                           (∃ w : mword 64, (pa_stk sp0 24) ↦₈ w) ∗
                           pk_loop_head (CID0 := CID0) i l)%I false pcur lks
-                         HK Hk7 Hi33 Hn31Sn Hfst Hfsp Hfs0 Hf22 Hf20 Hs1f
+                         HK Hk7 Hi33 Hn31Sn Hfst Hfsp Hfs0 Hf22 Hf20 Hs1f ltac:(lkbelow)
                          with "Hcg Htext Hkdata Hpc S19 Hap Hva Hcnt Hpan Hdev Hsent Htxl [$Hfmt $Hdescs $H9 $H10 $H12 $Hsv $S8 $S22 $S24 $Hhead]").
                iIntros (CIDarm Hstarm mg bs) "%Hcs2 Hcg Hpc S19 Hap Hva Hcnt _ #Hsent2 (Hfmt & Hdescs & H9 & H10 & H12 & Hsv & S8 & S22 & S24 & Hhead)".
                iDestruct (cpu_own_transport CIDarm CID0 (S n) eb pcur C false ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -7958,7 +7964,7 @@ Section ProofPrintk.
                           (∃ w : mword 64, (pa_stk sp0 22) ↦₈ w) ∗
                           (∃ w : mword 64, (pa_stk sp0 24) ↦₈ w) ∗
                           pk_loop_head (CID0 := CID0) i l)%I false pcur lks
-                         HK16 Hk7 Hn31Sn Hfst Hkd0 Hfs0 Hs1f
+                         HK16 Hk7 Hn31Sn Hfst Hkd0 Hfs0 Hs1f ltac:(lkbelow)
                          with "Hcg Htext Hkdata Hpc S19 Hap Hva Hdk0 Hcnt Hpan Hdev Hsent Htxl [$Hfmt $Hdcl $H9 $H10 $H12 $Hsv $S8 $S22 $S24 $Hhead]").
                iIntros (CIDarm2 Hstarm2 mg bs) "%Hcs2 Hcg Hpc S19 Hap Hva Hdk0 Hcnt _ #Hsent2 (Hfmt & Hdcl & H9 & H10 & H12 & Hsv & S8 & S22 & S24 & Hhead)".
                iDestruct (cpu_own_transport CIDarm2 CID0 (S n) eb pcur C false ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -7998,7 +8004,7 @@ Section ProofPrintk.
                       (fmtv ↦ₛ{ dqf } f ∗
                        ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) ∗
                        pk_loop_frame k ∗ pk_loop_head (CID0 := CID0) i l)%I false pcur lks
-                      HK16 Hn31Sn Hfst Hc0f Hs1f
+                      HK16 Hn31Sn Hfst Hc0f Hs1f ltac:(lkbelow)
                       with "Hcg Htext Hpc Hcnt Hpan Hdev Hsent Htxl [$Hfmt $Hdescs $Hfr $Hhead]").
             iIntros (CIDarm3 Hstarm3 mg bs) "%Hcs2 Hcg Hpc Hcnt _ #Hsent2 (Hfmt & Hdescs & Hfr & Hhead)".
             iDestruct (cpu_own_transport CIDarm3 CID0 (S n) eb pcur C false ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -8314,7 +8320,7 @@ Section ProofPrintk.
       iEval (rewrite Hap0) in "Hap".
       iApply (wp_printk_body7a γd γv γpr ((CIDacq : CPU)) γl m0
                 (trap_res b + (K - 24))%nat K n eb C dqf f descs b p ({[lock_rank "pr"]} ∪ lks)
-                ltac:(lia) eq_refl Houtb ltac:(lia) Hn2 Hflen Hnn Hdlen
+                ltac:(lia) eq_refl Houtb ltac:(lia) Hn2 Hflen Hnn Hdlen ltac:(lkbelow)
                 (CID0 := CIDse2) mq 0%nat 0%nat bs
                 ltac:(exact (Hstse2 (or_introl eq_refl))) Hilen0 Hinv0 Hqsp Hqs0 Hqs2 Hqs4' Hqa0 Hqs9 Hqconsts
                 with "Hcg Htext Hkdata Hpc Hfmt Hdescs Hcnt Hpan Hlk2 Hheld Hdev Hsub Htxl [H9 H10 H12 Hva Hsv S8 S19 S22 Hap S24] [Hcont]").
@@ -8329,7 +8335,7 @@ Section ProofPrintk.
               [ exact (Hstlh (or_introl eq_refl)) | exact (Hstse2 (or_introl eq_refl)) ]).
         iApply (wp_printk_loop6c γd γv γpr ((CIDacq : CPU)) γl m0
                   (trap_res b + (K - 24))%nat K n eb C dqf f descs b p ({[lock_rank "pr"]} ∪ lks)
-                  ltac:(lia) eq_refl Houtb ltac:(lia) Hn2 Hflen Hnn Hdlen
+                  ltac:(lia) eq_refl Houtb ltac:(lia) Hn2 Hflen Hnn Hdlen ltac:(lkbelow)
                   (String.length f) (CID0 := CIDlh) mk k' p' ((bs ++ cs)%list)
                   Hhh2 ltac:(lia) Hplen' Hinv' Hksp Hks0 Hks2 Hks1 Hks9 Hkconsts
                   with "Hcg Htext Hkdata Hpc Hfmt Hdescs Hcnt Hpan Hlk Hheld Hdev Hsub2 Htxl Hfr [Hcont]").

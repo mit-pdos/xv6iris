@@ -1333,6 +1333,9 @@ Section KexecB2Loops.
         by (apply Z.mod_pos_bound; lia).
       cbn in Hfuel. lia. }
     iIntros "Hcg Hcnt #Htext #Hpanic Hpc #Hfab #Hka Hres Hcont Hc116".
+    (* depth 0 forces the held set empty, so readi's order premise needs no
+       hypothesis of this lemma's own. *)
+    iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct "Hfab" as "(#Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".

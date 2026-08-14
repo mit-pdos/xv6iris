@@ -674,8 +674,7 @@ Section SsBodies.
   Proof.
     intros pj HK Hj Hjl Hanch Hspd Hss Hbelow.
     assert (Hbelowproc : locks_below lks (lock_rank "proc"))
-      by (apply (locks_below_mono lks (lock_rank "log") (lock_rank "proc") Hbelow);
-          vm_compute; lia).
+      by lkbelow.
     assert (Hbeloweproc : locks_below ({[lock_rank "log"]} ∪ lks) (lock_rank "proc"))
       by (apply locks_below_union_singleton; [vm_compute; lia | exact Hbelowproc]).
     iIntros "#Htext #Hlog #Hpanic #Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc".

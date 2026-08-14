@@ -231,6 +231,10 @@ Definition wp_kfork_sconf_body
      test, and that is still the honest reading of the code -- but it is no
      longer a PREMISE: [ProcInv.cwd_ref] has no null arm, so the parent's
      own [proc_priv] carries it ([proc_priv_cwd_nonzero]). *)
+  (* the floor of kfork's cone is ftable.lock (1), reached through the fd
+     scan's filedup; allocproc's "proc" (11) and kalloc/uvmcopy's "kmem"
+     (13) both follow by [LockRank.locks_below_mono]. *)
+  locks_below lks (lock_rank "proc") ->
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b lks -∗
   kernel_text -∗ pc_is pcE -∗

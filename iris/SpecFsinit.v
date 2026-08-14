@@ -313,7 +313,7 @@ Definition wp_fsinit_sconf_body
   (* fsinit's cone: its own bread/brelse ("bcache", 4), initlog
      ("bcache", 4) and ireclaim ("itable", 2) -- "itable" is the lowest,
      so one premise there covers the whole cone via [locks_below_mono]. *)
-  locks_below lks (lock_rank "itable") ->
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗

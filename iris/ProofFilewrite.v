@@ -1856,8 +1856,7 @@ Section ProofFilewrite.
               ltac:(rewrite HD3a0; exact P8)
               (* ilock's bound is "bcache"(4); fw_loop's own is "log"(3),
                  and [locks_below_mono] weakens it. *)
-              ltac:(exact (locks_below_mono lks (lock_rank "log")
-                             (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hit Hesc Hireg
                     Hslk2 Hshrl Hsbi Hppid Hprocs
                     Hdev Hgeo Hdlk Hbsl1").
@@ -2284,8 +2283,7 @@ Section ProofFilewrite.
               (fw_av_iunlock K HK) P9 ltac:(rewrite HX2a0; exact P8)
               (* iunlock's bound is "sleep lock"(6); fw_loop's own is
                  "log"(3), and [locks_below_mono] weakens it. *)
-              ltac:(exact (locks_below_mono lks (lock_rank "log")
-                             (lock_rank "sleep lock") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hpanic Hit Hesc Hslk2
                     Hheld Hslpid Hppid Hprocs
                     Hdep Hidev Hinum Hvalid Hlk [Hshot]").

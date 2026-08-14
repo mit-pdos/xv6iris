@@ -271,7 +271,7 @@ Section ProofIunlockputMain.
                  with "Hcont") as "Hcont".
     (* "sleep lock" (6) outranks "itable" (2): weaken [Hfresh]'s bound. *)
     assert (Hfresh_sl : locks_below lks (lock_rank "sleep lock"))
-      by (apply (locks_below_mono lks (lock_rank "itable")); [exact Hfresh | vm_compute; lia]).
+      by lkbelow.
     iApply (IU.wp_iunlock_sconf gs gfs gi cn gil gisl cov logstart k s gy dev inum
               dn' bm' pidv dq R4 (K - 4)%nat eb pj C b lks
               ltac:(unfold K_iunlock; lia) Hk ltac:(rewrite HR4a0; exact Hipe)

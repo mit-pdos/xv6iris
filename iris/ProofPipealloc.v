@@ -1142,7 +1142,7 @@ Section ProofPipealloc.
                  kalloc's own acquire needs no more than that, since
                  pipealloc's kalloc call is balanced and never nests under a
                  held "ftable". *)
-              ltac:(apply (locks_below_mono lks (lock_rank "ftable")); [exact Hbelow | vm_compute; lia])
+              ltac:lkbelow
               with "Hcg Hcnt Htext Hpc Hkmem Hav Hpanic").
     all: try lkbelow.
     iIntros (CID21 Hs21 mF) "Hcg Hcnt Hpc %HcsF Hkp".

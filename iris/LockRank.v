@@ -36,29 +36,49 @@ Local Open Scope nat_scope.
    and every [wakeup] acquires, so it sits above all of them), then the
    allocators, and finally the two panic-path locks.
 
-   [pr] and [uart] are at the TOP because [panic] takes [pr.lock]: this
+   [pr] and [uart] sit above everything a panic can fire under, because
+   [panic] takes [pr.lock]: this
    revision has no [panicking] flag, so panic is [printk] + [printk] +
    self-jump and printk holds [pr.lock] across [consputc] -> [uartputc_sync]
    -> [acquire(&tx_lock)].  Panic fires under nearly every lock, so nothing
-   may sit above them.  [uart] is maximal and has no outgoing edge at all:
-   [uartwrite] calls [sleep_prepare] before acquiring [tx_lock] and [sleep]
-   after releasing it, and [uartintr] takes no lock. *)
+   BELOW the two leaves may sit above them.  [uart] has no outgoing edge at
+   all: [uartwrite] calls [sleep_prepare] before acquiring [tx_lock] and
+   [sleep] after releasing it, and [uartintr] takes no lock.  Neither does
+   [bcache]: [bget] RELEASES bcache.lock before its [acquiresleep].  Those
+   two facts are what keep the graph acyclic.
+
+   THE ONE UNLICENSED EDGE is [iput]: it holds itable.lock (14) across
+   [acquiresleep] (4).  With [proc] below [itable] (kfork) and [sleep lock]
+   below [proc] ([acquiresleep] -> [sleep_prepare]), there is no room to
+   place [itable] between them -- so that site is justified by an argument
+   rather than by rank, namely xv6's own comment at kernel/fs.c:339, "ip->ref
+   == 1 means no other process can have ip locked, so this acquiresleep()
+   won't block (or deadlock)".  Owed: the icache REF-1 exclusivity theorem
+   (design/fs-icache.md) and a non-blocking [acquiresleep] variant. *)
 Definition lock_ranks : list (string * nat) :=
-  [ ("ftable",       1)
-  ; ("itable",       2)
-  ; ("log",          3)
-  ; ("bcache",       4)   (* log_write -> bpin *)
-  ; ("cons",         5)
-  ; ("sleep lock",   6)   (* iput holds itable.lock across acquiresleep *)
-  ; ("pipe",         7)
-  ; ("time",         8)
-  ; ("virtio_disk",  9)
-  ; ("wait_lock",   10)
-  ; ("proc",        11)   (* every sleep_prepare / wakeup *)
-  ; ("nextpid",     12)   (* allocproc -> allocpid *)
-  ; ("kmem",        13)   (* allocproc -> kalloc, freeproc -> kfree *)
-  ; ("pr",          14)   (* panic -> printk *)
-  ; ("uart",        15)   (* printk -> consputc -> uartputc_sync *)
+  [ ("log",          1)
+  ; ("bcache",       2)   (* log_write -> bpin *)
+  ; ("cons",         3)
+  ; ("sleep lock",   4)
+  ; ("pipe",         5)
+  ; ("time",         6)
+  ; ("virtio_disk",  7)
+  ; ("wait_lock",    8)
+  ; ("proc",         9)   (* every sleep_prepare / wakeup *)
+  ; ("nextpid",     10)   (* allocproc -> allocpid *)
+  ; ("kmem",        11)   (* allocproc -> kalloc, freeproc -> kfree *)
+  ; ("pr",          12)   (* panic -> printk *)
+  ; ("uart",        13)   (* printk -> consputc -> uartputc_sync *)
+  (* THE TWO LEAVES, ABOVE [proc].  kfork takes np->lock from allocproc and
+     then, STILL HOLDING IT, runs filedup over the fd table and idup on the
+     cwd (kernel/proc.c:287-288), so there are real [proc -> ftable] and
+     [proc -> itable] edges.  Both locks can carry a rank above [proc]
+     because neither is ever held while anything else is acquired:
+     filedup/filealloc are acquire-bump-release, fileclose RELEASES
+     ftable.lock before it reaches pipeclose/begin_op/iput, and iget is
+     acquire-scan-release. *)
+  ; ("itable",      14)
+  ; ("ftable",      15)
   ].
 
 Fixpoint rank_lookup (l : list (string * nat)) (s : string) : nat :=
@@ -71,9 +91,9 @@ Definition lock_rank (s : string) : nat := rank_lookup lock_ranks s.
 
 (* every rank a real xv6 lock can carry is computed by [vm_compute], so a
    caller's order premise at concrete names is a decision procedure. *)
-Lemma lock_rank_proc : lock_rank "proc" = 11.
+Lemma lock_rank_proc : lock_rank "proc" = 9.
 Proof. reflexivity. Qed.
-Lemma lock_rank_kmem : lock_rank "kmem" = 13.
+Lemma lock_rank_kmem : lock_rank "kmem" = 11.
 Proof. reflexivity. Qed.
 
 (* ---- the order premise -------------------------------------------------- *)

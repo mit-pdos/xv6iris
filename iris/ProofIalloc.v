@@ -1465,8 +1465,7 @@ Section IallocClaim.
               ltac:(rewrite Hbno; exact Hlog)
               (* log_write's bound is "log"(3); ia_claim's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
-              ltac:(exact (locks_below_mono lks (lock_rank "itable")
-                             (lock_rank "log") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl Hlb0 Hcrd HopS [] Hheld").
     all: try lkbelow.
     { iEval (rewrite Hbno).
@@ -1561,8 +1560,7 @@ Section IallocClaim.
               bsd true b lks HKbl Hkk HW7a0
               (* brelse's bound is "bcache"(4); ia_claim's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
-              ltac:(exact (locks_below_mono lks (lock_rank "itable")
-                             (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
     iIntros (CID12 Hq12 mR) "%Hcsr Hcg Hcnt Hpc Hppid Hsl1".
@@ -2164,8 +2162,7 @@ Section IallocScan.
                 HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HG4a0 HG4a1
                 (* bread's bound is "bcache"(4); ia_scan's own is
                    "itable"(2), and [locks_below_mono] weakens it. *)
-                ltac:(exact (locks_below_mono lks (lock_rank "itable")
-                               (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+                ltac:(lkbelow)
                 with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hsl1").
       all: try lkbelow.
@@ -2529,8 +2526,7 @@ Section IallocScan.
                   (diblk_bytes ds) bsd0 d0 b lks HKbl Hkk HGBa0
                   (* brelse's bound is "bcache"(4); ia_scan's own is
                      "itable"(2), and [locks_below_mono] weakens it. *)
-                  ltac:(exact (locks_below_mono lks (lock_rank "itable")
-                                 (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+                  ltac:(lkbelow)
                   with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
         all: try lkbelow.
         iIntros (CID15 Hq15 mR) "%Hcsr Hcg Hcnt Hpc Hppid Hsl1".

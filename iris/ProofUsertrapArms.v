@@ -501,7 +501,7 @@ Section Ut56.
       apply ut_cs_insert; [vm_compute; reflexivity |].
       apply ut_cs_insert; [vm_compute; reflexivity | exact HcsP1']. }
     iApply (Hpk CID MA nx false (un_pj N) C DfracDiscarded ut_fmt2
-              ut_fmt2_descs false ltac:(lia) ut_fmt2_len ut_fmt2_nonul
+              ut_fmt2_descs false lks ltac:(lia) ut_fmt2_len ut_fmt2_nonul
               ut_fmt2_kinds ut_fmt2_ndescs
               with "Hcg Htext Hkd Hpc Hpw Hcpu Hpenv [Hf2] []").
     all: try lkbelow.
@@ -567,7 +567,7 @@ Section Ut56.
     assert (HcsMC : ut_cs m0 MC)
       by (rewrite /MC; apply ut_cs_insert; [vm_compute; reflexivity | exact HcsMB]).
     iApply (SK.wp_setkilled_sconf (un_s N) (un_j N) (un_l N) MC nx 0%nat false
-              (un_pj N) C false HMCa0 Hj Hjl ltac:(vm_compute; reflexivity)
+              (un_pj N) C false lks HMCa0 Hj Hjl ltac:(vm_compute; reflexivity)
               ltac:(lia) with "Hcg Hcpu Htext Hpc Hpi Hpa [-]").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (S1) "%HcsS1 Hcg Hcpu Hpc".
@@ -595,9 +595,10 @@ Section Ut56.
     iEval (rewrite Hpa6) in "Hpc".
     (* ---- the bundle back together, and on to +0xa6 ---- *)
     iDestruct ("Hownback" $! V with "Hpv Hsy") as "Hown".
-    iApply (T.ut_a6 Rsys N V pt ksp m0 S1 av nx C false
+    iApply (T.ut_a6 Rsys N V pt ksp m0 S1 av nx C false lks
               Hwf' Hav Hnx Htfpe Hksp Hm0sp HS1sp HS1s1 HcsS1'
               with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
+    all: try lkbelow.
     iApply (ua_hold_on Rsys N V C with "Hcpu [-Hclm Hown] Hclm [-]").
     - rewrite /trap_csrs.
       iSplitL "Hsepc"; [iExists ep; iExact "Hsepc"|].

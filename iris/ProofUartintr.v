@@ -805,8 +805,7 @@ Section ProofUartintr.
                 ltac:(intro r; apply rf_to_gmap_dom)
                 Hlen
                 ltac:(lia)
-                ltac:(exact (locks_below_mono lks (lock_rank "cons")
-                               (lock_rank "proc") Hbelow ltac:(vm_compute; lia)))
+                ltac:(lkbelow)
                 with "Hcg Hcnt Ht Hpc Hpanic Hpinv").
       all: try lkbelow.
       iIntros (CIDW4 HsW4 Mw) "[%Hcsw %Hdomw] Hcg Hcnt Ht2 Hpc".

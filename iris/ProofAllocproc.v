@@ -281,7 +281,7 @@ Lemma ap_below_nextpid (lks : gset nat) :
   locks_below ({[lock_rank "proc"]} ∪ lks) (lock_rank "nextpid").
 Proof.
   intros Hbelow. apply locks_below_union_singleton; [vm_compute; lia |].
-  eapply locks_below_mono; [exact Hbelow | vm_compute; lia].
+  lkbelow.
 Qed.
 
 Lemma ap_below_kmem (lks : gset nat) :
@@ -289,7 +289,7 @@ Lemma ap_below_kmem (lks : gset nat) :
   locks_below ({[lock_rank "proc"]} ∪ lks) (lock_rank "kmem").
 Proof.
   intros Hbelow. apply locks_below_union_singleton; [vm_compute; lia |].
-  eapply locks_below_mono; [exact Hbelow | vm_compute; lia].
+  lkbelow.
 Qed.
 
 (* the two instances of the exit test, as closed facts *)

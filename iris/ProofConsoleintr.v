@@ -682,7 +682,7 @@ Section ProofConsoleintr.
     intros HK Hlen Hlvl Hb Hbelow. subst b.
     assert (Hbelow_proc : locks_below ({[lock_rank "cons"]} ∪ lks) (lock_rank "proc")).
     { apply locks_below_union_singleton; [vm_compute; lia |].
-      eapply locks_below_mono; [exact Hbelow | vm_compute; lia]. }
+      lkbelow. }
     iIntros "#Ht #Hpanic #Hpinv".
     rewrite /ct_wake_prop.
     iIntros (CIDw Hsw M wv) "%Hsp %Ha2 %Hcs Hcg Hpc Hcnt Hpay Hlocked Hres Hrest EXIT".

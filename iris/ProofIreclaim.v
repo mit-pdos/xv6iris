@@ -1395,8 +1395,7 @@ Section IreclaimOrphan.
               bs bsd0 d0 b lks ltac:(unfold K_brelse; lia) Hkk HO9a0
               (* brelse's bound is "bcache"(4); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
-              ltac:(exact (locks_below_mono lks (lock_rank "itable")
-                             (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
     iIntros (CID12 Hq12 mR) "%Hcsr Hcg Hcnt Hpc Hppid Hsl1".
@@ -1481,8 +1480,7 @@ Section IreclaimOrphan.
               ltac:(unfold K_begin_op; lia) Hj Hgl
               (* begin_op's bound is "log"(3); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
-              ltac:(exact (locks_below_mono lks (lock_rank "itable")
-                             (lock_rank "log") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hlctx Hppid Hprocs").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -1594,8 +1592,7 @@ Section IreclaimOrphan.
               HOCa0
               (* ilock's bound is "bcache"(4); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
-              ltac:(exact (locks_below_mono lks (lock_rank "itable")
-                             (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hitbl Hescrow Hireg Hslk
                     Hshr Hsbi Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
@@ -1703,8 +1700,7 @@ Section IreclaimOrphan.
               ltac:(unfold K_iunlock; lia) Hkslot HOEa0
               (* iunlock's bound is "sleep lock"(6); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
-              ltac:(exact (locks_below_mono lks (lock_rank "itable")
-                             (lock_rank "sleep lock") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hescrow Hslk Hslkd Hslpid
                     Hppid Hprocs Hdep Hidev Hiinum Hvalid Hloaded Hshot").
     all: try lkbelow.
@@ -1879,8 +1875,7 @@ Section IreclaimOrphan.
               ltac:(unfold K_end_op; lia) Hgeom Hj Hgl
               (* end_op's bound is "log"(3); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
-              ltac:(exact (locks_below_mono lks (lock_rank "itable")
-                             (lock_rank "log") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlctx Hseam Hgen Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hop").
     all: try lkbelow.
@@ -2436,8 +2431,7 @@ Section IreclaimScan.
                 HW6a0 HW6a1
                 (* bread's bound is "bcache"(4); irc_scan's own is
                    "itable"(2), and [locks_below_mono] weakens it. *)
-                ltac:(exact (locks_below_mono lks (lock_rank "itable")
-                               (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+                ltac:(lkbelow)
                 with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hsl1").
       all: try lkbelow.
@@ -2758,8 +2752,7 @@ Section IreclaimScan.
                   HWCs1 HWCs2 HWCs4 HWCs5 HWCs6
                   (* irc_release's bound is "bcache"(4); irc_scan's own is
                      "itable"(2), and [locks_below_mono] weakens it. *)
-                  ltac:(exact (locks_below_mono lks (lock_rank "itable")
-                                 (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+                  ltac:(lkbelow)
                   with "Hcg Hcnt Htext Hpc Hpanic Hbio Hprocs Hframe Hppid
                         Hsbn Hsbi Hsbb Hsl Hiref Hbm Hlk [] [Hcont]").
         { iApply "IH". }
@@ -2882,8 +2875,7 @@ Section IreclaimScan.
                     HWDs1 HWDs2 HWDs4 HWDs5 HWDs6
                     (* irc_release's bound is "bcache"(4); irc_scan's own is
                        "itable"(2), and [locks_below_mono] weakens it. *)
-                    ltac:(exact (locks_below_mono lks (lock_rank "itable")
-                                   (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+                    ltac:(lkbelow)
                     with "Hcg Hcnt Htext Hpc Hpanic Hbio Hprocs Hframe Hppid
                           Hsbn Hsbi Hsbb Hsl Hiref Hbm Hlk [] [Hcont]").
           { iApply "IH". }

@@ -153,7 +153,7 @@ Definition wp_iunlockput_sconf_body
   (* THE FRESHNESS PREMISE, AT THE LOWEST RANK: "itable" (2), via
      [iput]'s own requirement; iunlock's "sleep lock" (6) is higher and
      follows by [locks_below_mono]. *)
-  locks_below lks (lock_rank "itable") ->
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* the trap-CSR complement, threaded straight from iput's own precondition
@@ -283,7 +283,7 @@ Definition wp_iunlockput_gen_body
   (* THE FRESHNESS PREMISE, AT THE LOWEST RANK: "itable" (2), via
      [iput]'s own requirement; iunlock's "sleep lock" (6) is higher and
      follows by [locks_below_mono]. *)
-  locks_below lks (lock_rank "itable") ->
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* the trap-CSR complement, threaded straight from iput's own precondition

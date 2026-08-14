@@ -426,7 +426,7 @@ Definition wp_dirlink_sconf_body
   eb = true ->
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
-  locks_below lks (lock_rank "itable") ->
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -665,7 +665,7 @@ Definition wp_dirlink_gen_body
   eb = true ->
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
-  locks_below lks (lock_rank "itable") ->
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗

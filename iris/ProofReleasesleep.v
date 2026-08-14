@@ -318,8 +318,7 @@ Section ProofReleasesleep.
                  lock" (6), which is still strictly below it. *)
               (locks_below_union_singleton lks (lock_rank "sleep lock"%string) (lock_rank "proc"%string)
                  ltac:(vm_compute; lia)
-                 (locks_below_mono lks (lock_rank "sleep lock"%string) (lock_rank "proc"%string) Hno
-                    ltac:(vm_compute; lia)))
+                 ltac:(lkbelow))
               with "Hcg Hown Htext Hpc Hpanic Hpinv").
     all: try lkbelow.
     iApply wp_next_off_intro.

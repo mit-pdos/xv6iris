@@ -644,7 +644,7 @@ Section ProofClockintr.
                 ltac:(lia)
                 (locks_below_union_singleton lks (lock_rank "time") (lock_rank "proc")
                    ltac:(vm_compute; lia)
-                   (locks_below_mono lks (lock_rank "time") (lock_rank "proc") Hbelow ltac:(vm_compute; lia)))
+                   ltac:(lkbelow))
                 with "Hcg Hcnt Htext Hpc Hpanic Hpi").
       all: try lkbelow.
       iApply wp_next_off_intro.

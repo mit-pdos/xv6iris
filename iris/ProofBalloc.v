@@ -1093,8 +1093,7 @@ Section BallocExhaust.
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bnoB dq E1 (K - 10)%nat eb (proc_addr j) C bsX bsdX dX b lks
               HKbl Hkk HE1a0
-              ltac:(exact (locks_below_mono lks (lock_rank "log")
-                             (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
     iIntros (CID3 Hq3 mR) "%Hcs1 Hcg Hcnt Hpc Hppid Hsl1".
@@ -1655,8 +1654,7 @@ Section BallocBzero.
               (fs_view γfs γd dev cov) pidv dev bnoD dq
               Z2 (K - 10)%nat eb C b lks
               HKbr HbnoDlt eq_refl HbnoDcov eq_refl Hj Hgl HZ2a0 HZ2a1
-              ltac:(exact (locks_below_mono lks (lock_rank "log")
-                             (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
@@ -1995,8 +1993,7 @@ Section BallocBzero.
               pidv dev bnoD dq ZB (K - 10)%nat eb (proc_addr j) C
               (replicate BSIZE (bv_0 8)) bsd0 true b lks
               HKbl2 Hkk2 HZBa0
-              ltac:(exact (locks_below_mono lks (lock_rank "log")
-                             (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
     iIntros (CID16 Hq16 mR2) "%Hcs4 Hcg Hcnt Hpc Hppid Hsl1".
@@ -2437,8 +2434,7 @@ Section BallocAlloc.
               pidv dev bnoB dq A5 (K - 10)%nat eb (proc_addr j) C
               (bitmap_bytes (used ∪ {[ bi ]})) bsdX true b lks
               HKbl Hkk HA5a0
-              ltac:(exact (locks_below_mono lks (lock_rank "log")
-                             (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
     iIntros (CID9 Hq9 mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl1".
@@ -4153,8 +4149,7 @@ Section BallocMain.
               (fs_view γfs γd dev cov) pidv dev bnoB dq
               RA (K - 10)%nat eb C b lks
               HKbr HbnoBlt eq_refl HbnoBcov eq_refl Hj Hgl HRAa0 HRAa1
-              ltac:(exact (locks_below_mono lks (lock_rank "log")
-                             (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
@@ -4355,7 +4350,7 @@ Section BallocMain.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iApply (ba_scan γs j γl γu γd γk pd pav pu γfs bn γ γpr cov logstart
               bmapstart size dev used u cr Sb kk bnoB bsd0 d0 pidv dq dqb dqs
-              m K eb C b (Z.to_nat BPB)
+              m K eb C b lks (Z.to_nat BPB)
               HK Hpk Hgeom Hsize HbnoB Hbmcov Hbmlog Hok Hkk Hj Hgl Hcred
               CIDb33 0 W4 ba_fuel_full ba_bi_zero HW4sp HW4thr
               HW4a0 HW4a4 HW4s1 HW4s2 HW4s3 HW4s4 HW4s5 HW4s6 HW4s7 HW4s8 Hbelow

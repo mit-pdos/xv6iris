@@ -975,8 +975,7 @@ Section ProofFilestat.
                 ltac:(rewrite HJ2a0; exact Hipk)
                 (* iunlock's bound is "sleep lock"(6); filestat's own is
                    "bcache"(4), and [locks_below_mono] weakens it. *)
-                ltac:(exact (locks_below_mono lks (lock_rank "bcache")
-                               (lock_rank "sleep lock") Hbelow ltac:(vm_compute; lia)))
+                ltac:(lkbelow)
                 with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk
                       Hheld Hslpid Hppid Hprocs
                       Hdep Hidev Hinum Hvalid Hlk Hshot").

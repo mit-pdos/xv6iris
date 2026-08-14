@@ -777,8 +777,7 @@ Section BfreeTail.
               (* brelse's bound is at "bcache"(4); ours is at "log"(3), and
                  [locks_below_mono] weakens it.  This is the composition the
                  bound exists for -- one premise covers the whole cone. *)
-              ltac:(exact (locks_below_mono lks (lock_rank "log")
-                             (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
     iIntros (CID5 Hq5 mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl1".
@@ -1384,8 +1383,7 @@ Section ProofBfreeMain.
               (fs_view γfs γd dev cov) pidv dev bnoB dq
               RA (K - 4)%nat b C b lks
               HKbr HbnoBlt eq_refl HbnoBcov eq_refl Hj Hgl HRAa0 HRAa1
-              ltac:(exact (locks_below_mono lks (lock_rank "log")
-                             (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.

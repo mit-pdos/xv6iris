@@ -932,8 +932,7 @@ Section UwBodies.
       iApply (Acquire.wp_acquire_sconf γl "uart"%string (tx_res γu) Q4
                 0%nat true pj C (av - 10)%nat true lks ltac:(lia)
                 ltac:(unfold uartwrite_stack in Hav; lia)
-                ltac:(exact (locks_below_mono lks (lock_rank "proc")
-                               (lock_rank "uart") Hfresh ltac:(vm_compute; lia)))
+                ltac:(lkbelow)
                 with "Hcg Hcnt Ht Hpc [Hlk] Hpanic").
       all: try lkbelow.
       { iEval (rewrite HQ4a0). iExact "Hlk". }
@@ -1024,8 +1023,7 @@ Section UwBodies.
         iIntros (CIDr Hsr MR) "Hcg Hpc %HcsR Hcnt".
         (* the release/park window: nothing is held across sleep() *)
         pose proof (locks_below_not_elem lks (lock_rank "uart")
-                      (locks_below_mono lks (lock_rank "proc") (lock_rank "uart")
-                         Hfresh ltac:(vm_compute; lia))) as Hnotin.
+                      ltac:(lkbelow)) as Hnotin.
         assert (Hsetback : ({[lock_rank "uart"]} ∪ lks) ∖ {[lock_rank "uart"]} = lks)
       by (apply locks_add_del; assumption).
         iEval (rewrite Hsetback) in "Hcnt".
@@ -1184,8 +1182,7 @@ Section UwBodies.
         iIntros (CIDr2 Hsr2 MR2) "Hcg Hpc %HcsR2 Hcnt".
         (* the byte's own turn is BALANCED: what it acquired it released *)
         pose proof (locks_below_not_elem lks (lock_rank "uart")
-                      (locks_below_mono lks (lock_rank "proc") (lock_rank "uart")
-                         Hfresh ltac:(vm_compute; lia))) as Hnotin2.
+                      ltac:(lkbelow)) as Hnotin2.
         assert (Hsetback2 : ({[lock_rank "uart"]} ∪ lks) ∖ {[lock_rank "uart"]} = lks)
       by (apply locks_add_del; assumption).
         iEval (rewrite Hsetback2) in "Hcnt".

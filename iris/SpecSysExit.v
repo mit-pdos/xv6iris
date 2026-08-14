@@ -126,7 +126,7 @@ Definition wp_sys_exit_sconf_body
      of its own -- it is a pure pass-through to kexit, whose own lowest rank
      is "ftable" (1), via the fileclose loop -- so this is exactly kexit's
      own premise, unconsumed. *)
-  locks_below lks (lock_rank "ftable") ->
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
   cpu_own 0%nat eb pj C b lks -∗

@@ -1074,8 +1074,7 @@ Section ProofPipewrite.
        see claude-notes/projects/lock-set.md's note on this function's
        region-crossing threading), so this one lift covers all of them. *)
     assert (Hbelowproc : locks_below lks (lock_rank "proc"))
-      by (apply (locks_below_mono lks (lock_rank "pipe") (lock_rank "proc") Hbelow);
-          vm_compute; lia).
+      by lkbelow.
     assert (Hav64 : (64 <= av)%nat) by (unfold pipewrite_stack in Hav; exact Hav).
     assert (H31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
     assert (H63 : (2 ^ 63 = 9223372036854775808)%Z) by (vm_compute; reflexivity).
@@ -1413,7 +1412,7 @@ Section ProofPipewrite.
           apply kv_addv_zero. }
         assert (HavR : (10 <= av - 14)%nat) by lia.
         iApply (ReleaseGen.wp_release_gen_sconf γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp) emp%I
-                  T4 0%nat true (proc_addr j) C (av - 14)%nat lks HlkaT4 HavR
+                  T4 0%nat true (proc_addr j) C (av - 14)%nat ({[lock_rank "pipe"]} ∪ lks) HlkaT4 HavR
                   ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
         { iApply lock_finisher_close. }
@@ -1443,7 +1442,7 @@ Section ProofPipewrite.
         rewrite /pw_epi.
         (* the pipe lock's release left [lks ∖ {[rank "pipe"]}]; [lks = ∅] at
            depth 0 makes that the empty set the exit continuation names. *)
-        iEval (rewrite Hlkempty locks_empty_del) in "Hown".
+        iEval (rewrite Hlkempty) in "Hown".
         iSpecialize ("EPI" $! CIDp16 with "[%]"); [wp_next_chain|].
         iApply ("EPI" $! mr P' with "[%] [%] [%] HF7 Hhi Hcg Hown Hpc Href Hpriv").
         + apply (pw_base_regs_cs m M mr (pa_stk sp0 14%nat) HcsMmr).
@@ -1482,7 +1481,7 @@ Section ProofPipewrite.
           apply kv_addv_zero. }
         assert (HavR : (10 <= av - 14)%nat) by lia.
         iApply (ReleaseGen.wp_release_gen_sconf γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp) emp%I
-                  Q2 0%nat true (proc_addr j) C (av - 14)%nat lks HlkaQ2 HavR
+                  Q2 0%nat true (proc_addr j) C (av - 14)%nat ({[lock_rank "pipe"]} ∪ lks) HlkaQ2 HavR
                   ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
         { iApply lock_finisher_close. }
@@ -1542,7 +1541,7 @@ Section ProofPipewrite.
         rewrite /pw_epi.
         (* the pipe lock's release left [lks ∖ {[rank "pipe"]}]; [lks = ∅] at
            depth 0 makes that the empty set this exit names. *)
-        iEval (rewrite Hlkempty locks_empty_del) in "Hown".
+        iEval (rewrite Hlkempty) in "Hown".
         iSpecialize ("EPI" $! CIDrs with "[%]"); [wp_next_chain|].
         iApply ("EPI" $! M' P' with "[%] [%] [%] HF7 [HF5 HCH] Hcg Hown Hpc Href Hpriv").
         + unfold pw_base_regs. split_and!; assumption.
@@ -2188,8 +2187,9 @@ Section ProofPipewrite.
             rewrite Hs3L1. apply add_vec_zero_l. }
           assert (Hlvl1 : (Z.of_nat 1%nat + 1 < 2 ^ 31)%Z) by (rewrite H31; lia).
           assert (Hav14 : (14 <= trap_res true + (av - 14))%nat) by lia.
-          iApply (Killed.wp_killed_sconf γs j γlp L3 (trap_res true + (av - 14))%nat 1%nat true (proc_addr j) C false lks
-                    Ha0L3 Hj Hjlp Hlvl1 Hav14 Hbelowproc
+          iApply (Killed.wp_killed_sconf γs j γlp L3 (trap_res true + (av - 14))%nat 1%nat true (proc_addr j) C false
+                    ({[lock_rank "pipe"]} ∪ lks)
+                    Ha0L3 Hj Hjlp Hlvl1 Hav14 ltac:(lkbelow)
                     with "Hcg Hown Htext Hpc Hpinv Hpanic").
           all: try lkbelow.
           iApply wp_next_off_intro. iIntros (K0 kl) "%Hkfacts Hcg Hown Hpc". rgall.

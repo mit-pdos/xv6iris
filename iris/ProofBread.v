@@ -1157,8 +1157,7 @@ Section BreadBlocks.
     iApply (ASL.wp_acquiresleep_sconf (dq := dq)  γs j (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bown bn k) H7 pidv (K - 6)%nat eb C eb lks
               Hj ltac:(unfold K_bread in HK; lia)
-              (locks_below_mono lks (lock_rank "bcache") (lock_rank "sleep lock") Hbelow
-                 ltac:(vm_compute; lia))
+              ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hextm Htext Hpc [] Hpanic Hppid Hprocs").
     all: try lkbelow.
     { iEval (rewrite HH7a0). iExact "Hslk". }
@@ -1530,8 +1529,7 @@ Section BreadBlocks.
     iApply (ASL.wp_acquiresleep_sconf (dq := dq)  γs j (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bown bn k) C6 pidv (K - 6)%nat eb C eb lks
               Hj ltac:(unfold K_bread in HK; lia)
-              (locks_below_mono lks (lock_rank "bcache") (lock_rank "sleep lock") Hbelow
-                 ltac:(vm_compute; lia))
+              ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hextm Htext Hpc [] Hpanic Hppid Hprocs").
     all: try lkbelow.
     { iEval (rewrite HC6a0). iExact "Hslk". }

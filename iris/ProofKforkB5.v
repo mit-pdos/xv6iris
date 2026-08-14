@@ -259,7 +259,7 @@ Section ProofKforkB5.
     { iApply (SchedCtx.procs_inv_lookup γs j γl Hgl with "Hpinv"). }
     iIntros (CID1 Hs1 mr1) "Hcg Hpc %Hcs_2_r1 Hown".
     assert (Hfresh_proc : locks_below lks (lock_rank "proc"))
-      by (apply (locks_below_mono lks (lock_rank "wait_lock")); [exact Hfresh | vm_compute; lia]).
+      by lkbelow.
     pose proof (locks_below_not_elem _ _ Hfresh_proc) as Hfresh_proc_ne.
     iEval (rewrite (_ : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks);
            [| apply locks_add_del; assumption]) in "Hown".

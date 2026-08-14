@@ -1904,7 +1904,7 @@ Section ProofVirtioDiskRwF.
     iApply (P5.wp_vdrw_p5_seam (CID := CIDa) γk γs j γl γu γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
               (vdrw_sector_raw bno) bs_buf bs_disk m kq lks HK Hj Hjl
-              (vdrwf_bnz _ (Hbufkd 0%nat ltac:(lia)))
+              (vdrwf_bnz _ (Hbufkd 0%nat ltac:(lia))) ltac:(lkbelow)
               with "Htext Hpanic Hpinv Hdinv Hlk").
     (* ---- P6: the payoff, free_chain, release, epilogue ---- *)
     iApply (wp_vdrw_p6_seam (CID := CIDa) γk γs j γd pd pav pu K eb C

@@ -1533,8 +1533,7 @@ Section ProofDirlookupMain.
                   Hj Hgs HL6a0
                   ltac:(rewrite HL6a1 dlk_zero_moi; exact (eq_vec_refl _))
                   HL6a3' HL6a4'
-                  ltac:(exact (locks_below_mono lks (lock_rank "itable")
-                                 (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+                  ltac:(lkbelow)
                   with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
                         Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbslot").
         all: try lkbelow.

@@ -48,17 +48,77 @@ acquire takes `locks_below lks (lock_rank s)`.  The non-membership form
 (`lock_rank s ∉ lks`) landed first and is gone; `locks_below_not_elem` derives
 it where the fragment mint and the holder refutation still want it.  The
 reason for the swap is that a caller needs MANY not-in facts and only ONE
-bound: `iput` states its bound at `"itable"` (2) and that one premise covers
-`itable`, the sleeplock spinlock (6) and `log` (3) all at once.
+bound: `iput` states its bound at `"log"` (1) and that one premise covers
+`log`, `bcache` (2) and the sleeplock spinlock (4) all at once.
 
 **A contract must state its bound at the MINIMUM rank over its whole cone.**
 `locks_below lks r` gets STRONGER as `r` drops, and `locks_below_mono` only
-RAISES a bound, so a contract stating `"time"` (8) cannot deliver the `"cons"`
-(5) one of its callees wants.  `SpecDevintr` and `SpecKerneltrap` were both
+RAISES a bound, so a contract stating `"time"` (6) cannot deliver the `"cons"`
+(3) one of its callees wants.  `SpecDevintr` and `SpecKerneltrap` were both
 wrong this way -- they said `"time"`, for clockintr's tickslock, but devintr
-also dispatches uartintr -> consoleintr, which acquires `cons.lock` at 5.  An
+also dispatches uartintr -> consoleintr, which acquires `cons.lock` at 3.  An
 audit of every premise-carrying contract against the contracts it calls found
-no others; the check is worth re-running after any new premise lands.
+no others among the CONTRACTS, and it is worth re-running after any new
+premise lands.
+
+But the rule applies to LOCAL lemmas too, and there the Spec-level audit does
+not reach.  `kfork` is the case that found it: its arms were stated at
+allocproc's `"proc"`, which is where the eye goes, because allocproc is the
+call the function is *about* -- and the fd scan underneath them quietly calls
+`filedup`.  Whenever a bound looks obvious because one prominent callee states
+it, check the quiet ones.
+
+When the ranking itself changes, recompute each contract's floor by FIXPOINT
+over the call graph rather than by eye: a contract's new bound is the minimum
+over its callees' new bounds, and lowering one lowers its callers.  Moving
+`ftable`/`itable` above `proc` moved nineteen contracts down to `"log"` that
+way, most of them nowhere near a file table.
+
+### The two LEAVES sit above `proc`, and why the graph is acyclic
+
+`kfork` (`kernel/proc.c:266-294`) takes `np` from `allocproc()`, which RETURNS
+holding `np->lock`, and then -- still holding it -- runs `filedup` over the fd
+table and `idup` on the cwd.  Those are real `proc -> ftable` and
+`proc -> itable` edges, so both of those locks carry a rank ABOVE `proc`.
+
+They can, because neither is ever held while anything else is acquired:
+`filedup`/`filealloc` are acquire-bump-release, `fileclose` RELEASES
+`ftable.lock` before it reaches `pipeclose`/`begin_op`/`iput`, and `iget` is
+acquire-scan-release.  A leaf can be taken from anywhere without closing a
+cycle -- the rank rule is sufficient, not necessary, and this is where the
+slack is.
+
+Two more sinks are what make the whole graph a DAG, and both are easy to
+misread:
+
+* **`bcache` never reaches `proc`.**  `bget` does `release(&bcache.lock)`
+  BEFORE its `acquiresleep(&b->lock)`, in both arms.
+* **`uart` never reaches `proc`.**  `uartwrite` calls `sleep_prepare` BEFORE
+  `acquire(&tx_lock)` and `sleep` after releasing it; `uartintr`'s `wakeup`
+  is outside the lock.
+
+Every remaining edge flows toward `proc` (`cons`/`log`/`pipe`/`sleep lock`/
+`time`/`virtio_disk`/`wait_lock` all reach it through `sleep_prepare` or
+`wakeup`), and out of `proc` to the sinks `nextpid`/`kmem`/`itable`/`ftable`.
+`log -> bcache` (via `bpin`) and `cons`,`pr` `-> uart` are the only others.
+
+### THE ONE UNLICENSED EDGE: iput holds itable across acquiresleep
+
+`iput` (`kernel/fs.c:341-348`) holds `itable.lock` (14) across
+`acquiresleep` (4).  With `proc` (9) below `itable` and `sleep lock` below
+`proc` (`acquiresleep` -> `sleep_prepare` -> `acquire(&p->lock)`,
+`sleeplock.c:26`), there is NO room to place `itable` between them.  So that
+one site is justified by an argument rather than by rank -- which is exactly
+what xv6's own comment says at `fs.c:339`:
+
+> `ip->ref == 1` means no other process can have ip locked, so this
+> `acquiresleep()` won't block (or deadlock).
+
+Owed: the icache REF-1 exclusivity theorem (`design/fs-icache.md`) and a
+non-blocking `acquiresleep` variant.  Note the ref-1 argument does NOT rescue
+the three-CPU cycle you would draw from the raw edges -- that one is broken
+instead by the fact that the lock `kfork` holds is a NOT-RUNNING process's,
+and `sleep_prepare` only ever acquires the running process's own.
 
 ### When one function has two modes, the premise goes CONDITIONAL
 
@@ -81,6 +141,16 @@ above would otherwise force a whole call graph up to a bound only one arm
 needs.
 
 ### The two tactics the sweep runs on
+
+**Never hard-code a rank in a proof.**  109 sites used to spell their mono
+step out, `ltac:(exact (locks_below_mono lks (lock_rank "itable")
+(lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))`, which pins BOTH ranks
+and the direction into the proof script -- so every one of them broke the
+moment the table moved.  They are all `lkbelow` now, which recomputes the step
+against whatever `lock_ranks` currently says.  The rewrite that did it is
+worth keeping in mind: paren-matching over Coq source MUST mask comments and
+string literals first, because `(*` is an open paren and a naive matcher walks
+straight out of the term and eats the comment above it.
 
 `LockRank.lkbelow` discharges an order side condition by whichever of the five
 composition lemmas applies -- empty set, an exact hypothesis, a lower-ranked

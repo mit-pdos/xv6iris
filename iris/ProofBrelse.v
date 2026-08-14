@@ -541,7 +541,7 @@ Section ProofBrelse.
        (rank 6), strictly above "bcache" (rank 4) -- [locks_below_mono]
        weakens [Hbelow] up to that rank once, here, for both call sites. *)
     assert (Hbelow_sl : locks_below lks (lock_rank "sleep lock"))
-      by (eapply locks_below_mono; [exact Hbelow | vm_compute; lia]).
+      by ltac:(lkbelow).
     pose proof (locks_below_not_elem _ _ Hbelow_sl) as Hfresh_sl.
     assert (HK26 : (26 <= K)%nat) by (unfold K_brelse in HK; exact HK).
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).

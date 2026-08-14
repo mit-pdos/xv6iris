@@ -160,7 +160,7 @@ Definition wp_pipealloc_sconf_body
   (* pipealloc's cone bottoms out at ftable.lock (1), via
      filealloc/fileclose; kalloc's "kmem" (13) is reached from this one
      by [LockRank.locks_below_mono]. *)
-  locks_below lks (lock_rank "ftable") ->
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true], so no existing

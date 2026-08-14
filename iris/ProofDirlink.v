@@ -2829,8 +2829,7 @@ Section ProofDirlinkMain.
                     HL6a3' HL6a4'
                     (* readi's own floor is "bcache"(4); dirlink's is
                        "itable"(2), and [locks_below_mono] weakens it. *)
-                    ltac:(exact (locks_below_mono lks (lock_rank "itable")
-                                   (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+                    ltac:(lkbelow)
                     with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
                           Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbs1").
           all: try lkbelow.

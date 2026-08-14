@@ -2455,8 +2455,7 @@ Section WriteiLoop.
                 B3 (K - 14)%nat eb C b lks
                 HKbr Hblt' eq_refl Hbcov'
                 eq_refl Hj Hgl HB3a0 HB3a1
-                ltac:(exact (locks_below_mono lks (lock_rank "log")
-                               (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+                ltac:(lkbelow)
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
       all: try lkbelow.
       iIntros (CIDa9 Hqa9 mBr kkb bsB bsdB dB)
@@ -3144,8 +3143,7 @@ Section WriteiLoop.
                     F4 (K - 14)%nat eb
                     (proc_addr j) C (wi_splice (data2 fbn) o mm g) bsdB true b lks
                     HKbl Hkklt HF4a0
-                    ltac:(exact (locks_below_mono lks (lock_rank "log")
-                                   (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+                    ltac:(lkbelow)
                     with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hheld").
           all: try lkbelow.
           iIntros (CIDc7 Hqc7 mR) "%HcsR Hcg Hcnt Hpc Hppid Hsl1".
@@ -3644,8 +3642,7 @@ Section WriteiLoop.
                     J4 (K - 14)%nat eb
                     (proc_addr j) C (wi_splice (data2 fbn) o mm g) bsdB true b lks
                     HKbl Hkklt HJ4a0
-                    ltac:(exact (locks_below_mono lks (lock_rank "log")
-                                   (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+                    ltac:(lkbelow)
                     with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hheld").
           all: try lkbelow.
           iIntros (CIDd7 Hqd7 mR) "%HcsR Hcg Hcnt Hpc Hppid Hsl1".

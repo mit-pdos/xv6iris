@@ -2021,8 +2021,7 @@ Section ItruncIArm.
               HA1a0 HA1a1
               (* bread's bound is "bcache"(4); it_iarm's own is "log"(3),
                  and [locks_below_mono] weakens it. *)
-              ltac:(exact (locks_below_mono lks (lock_rank "log")
-                             (lock_rank "bcache") Hlkbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
     iIntros (CID4 Hq4 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc
@@ -2249,8 +2248,7 @@ Section ItruncIArm.
               HKbl Hkk HB1a0
               (* brelse's bound is "bcache"(4); it_iarm's own is "log"(3),
                  and [locks_below_mono] weakens it. *)
-              ltac:(exact (locks_below_mono lks (lock_rank "log")
-                             (lock_rank "bcache") Hlkbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hheld").
     all: try lkbelow.
     iIntros (CID12 Hq12 mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl1".
