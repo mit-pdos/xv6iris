@@ -85,7 +85,8 @@ Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
-Require Import FdSlots FileInv ProcInv.
+Require Import FdSlots ProcInv.
+Require Import FileInvDefs.
 Require Import DiskPtsto WpUart.
 Require Import UartTxInv.
 Require Import PanicStub.

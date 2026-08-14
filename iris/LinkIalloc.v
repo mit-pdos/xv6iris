@@ -19,11 +19,11 @@
 
    *** READ THIS BEFORE TRUSTING "THE STANDING SIX". ***  ialloc's
    no-inodes arm IS LIVE and calls printk on its GENERAL path, and
-   [PRINTK_GEN]'s only instance is [LinkPrintkGen]'s own [Axiom].
+   [PRINTK_GEN]'s only instance is [LinkPrintk]'s own [Axiom].
    Instantiating that functor -- here or in [ProofIalloc.v] -- would put a
    SEVENTH entry in [Print Assumptions Ialloc.wp_ialloc_sconf].
    [SpecIalloc.v] therefore takes printk's contract as a PURE HYPOTHESIS
-   ([SpecPrintkGen.printk_gen_contract]), which keeps the count at the
+   ([SpecPrintk.printk_gen_contract]), which keeps the count at the
    standing six -- but that is NOT self-containment: ialloc's six are
    modulo a THREADED printk obligation that its callers must eventually
    discharge, exactly the standing that [SpecPanic.panic_wp_any] already

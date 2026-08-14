@@ -48,7 +48,7 @@
    [free_pool] is then the empty big-op and [bitmap_ok] is vacuous -- so the
    scan CAN fall out of the loop and reach
    [auipc a0,0x4 / addi a0,a0,1350 / jal printk] on "balloc: out of blocks".
-   That is the GENERAL printk path ([SpecPrintkGen.v]), not the panic path,
+   That is the GENERAL printk path ([SpecPrintk.v]), not the panic path,
    so this contract takes:
 
      - [γpr] and the two PERSISTENT credentials [kernel_data] and
@@ -56,10 +56,10 @@
        [KernelDataInv.kernel_data_string] mints its persistent [↦ₛ□] out of
        [kernel_data]);
      - printk's contract as a [Prop] HYPOTHESIS
-       ([SpecPrintkGen.printk_gen_contract]), never as a functor argument.
+       ([SpecPrintk.printk_gen_contract]), never as a functor argument.
 
    *** READ THIS BEFORE TRUSTING "THE STANDING SIX". ***  [PRINTK_GEN]'s only
-   instance is [LinkPrintkGen]'s own [Axiom].  Instantiating the functor here
+   instance is [LinkPrintk]'s own [Axiom].  Instantiating the functor here
    would put a SEVENTH entry in [Print Assumptions Balloc.wp_balloc_sconf] --
    and, through the ripple, in bmap's and writei's too.  Carrying it as a
    hypothesis keeps all three at the standing six, but that is NOT
@@ -119,7 +119,7 @@ Require Import WpNext.
 Require Import WpLock.
 Require Import PanicStub.
 Require Import KernelDataInv.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -138,9 +138,9 @@ Import Defs.
 Local Open Scope Z_scope.
 
 (* balloc's own frame is 80 bytes (10 slots) -- [c.addi16sp sp,-80] at
-   +0x00; its deepest callee is bread (40).  log_write wants 18 and
-   brelse less. *)
-Definition K_balloc : nat := 50%nat.
+   +0x00; its deepest callee is now printk on the out-of-blocks path (48,
+   printk_stack).  bread wants 40, log_write 18 and brelse less. *)
+Definition K_balloc : nat := 58%nat.
 
 Definition wp_balloc_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,

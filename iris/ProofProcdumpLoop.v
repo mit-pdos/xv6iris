@@ -50,7 +50,7 @@ Require Import DiskPtsto WpUart.
 Require Import ProcGeom.
 Require Import PrintkFmt.
 Require Import PanicStub.
-Require Import SpecPrintk SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import SpecProcdump.
 Require Import ProcdumpAux.
 Require Import CodeProcdump.
@@ -451,7 +451,7 @@ Section ProofProcdumpLoop.
       (m0 : regfile) (spv p : mword 64) (K' : nat) (eb b : bool) (C : iProp Σ)
       (lks : gset nat) :
     printk_gen_contract γpr γd γv ->
-    (38 <= K')%nat ->
+    (48 <= K')%nat ->
     kernel_text -∗ kernel_data -∗ printk_env γpr γd γv -∗ panic_wp_any -∗
     (* THE EXIT CONTINUATION, at the epilogue entry, taken as a PREMISE *)
     wp_next (CID0 := CID0) b p (fun (CIDq : CpuId) =>

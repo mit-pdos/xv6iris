@@ -54,8 +54,6 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock.
 Require Import UserPtTree.
 Require Import KallocInv.
-Require Import KvmSpec.
-Require Import ProcPtOwn.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import CodeArgstr.

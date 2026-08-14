@@ -71,7 +71,7 @@ Definition pk_vararg (m : regfile) (j : nat) : mword 64 :=
   m !!! Regidx (mword_of_int (11 + Z.of_nat j) : mword 5).
 
 (* [static struct { struct spinlock lock; } pr;] -- the lock is the FIRST
-   field, so the object's address IS the lock's.  ([SpecPrintkGen.pr_lock] is
-   the same address and [SpecPrintkGen.pr_res] the empty resource this lock
+   field, so the object's address IS the lock's.  ([SpecPrintk.pr_lock] is
+   the same address and [SpecPrintk.pr_res] the empty resource this lock
    protects, so the two [is_lock]s are the same proposition.) *)
 Definition pk_pr_lock : mword 64 := mword_of_int KernelSyms.pr.

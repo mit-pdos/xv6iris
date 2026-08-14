@@ -29,7 +29,7 @@
    neither [SpecPanic]'s contract nor printk's panic path is in this cone.
    The only printk usertrap reaches is the GENERAL one, on the
    unexpected-scause arm, and that is [ProofUsertrapArms]' threaded
-   [SpecPrintkGen.printk_gen_contract] hypothesis -- discharged from the
+   [SpecPrintk.printk_gen_contract] hypothesis -- discharged from the
    [PRINTK_GEN] functor argument at the seal below.
 
    TWO THINGS ABOUT THE DISPATCH, both from the notes:
@@ -69,30 +69,26 @@ Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import InstrBytes.
-Require Import KernelText KernelDataInv KernelRvcDecode.
-Require Import MstatusBits.
-Require Import WpGprCsrwCommon WpGprCsrwA WpGprCsrwB WpGprCsrwC.
-Require Import WpGprCsrrB.
+Require Import KernelText KernelRvcDecode.
+Require Import WpGprCsrwCommon WpGprCsrwA.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfCsr WpSconfBtype.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom.
 Require Import UserPtTree.
-Require Import ProcPtOwn.
 Require Import TrampPt.
-Require Import KallocInv KvmSpec.
-Require Import BioInv DiskPtsto DiskInv WpUart FsBlocks LogInv FsCrash.
+Require Import KallocInv.
+Require Import BioInv DiskPtsto WpUart FsBlocks LogInv FsCrash.
 Require Import IrefSlots InodeRegion.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
-Require Import SchedCtx PanicStub.
-Require Import UserExec.
+Require Import SchedCtx.
 Require Import CodeUsertrap.
 Require Import SpecMyproc.
 Require Import SpecKilled SpecSetkilled SpecKexit SpecYield SpecPrepareReturn.
 Require Import SpecDevintr SpecVmfault.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import SpecKernelvec.
 Require Import SpecSyscall SpecSysExit.
 Require Import SpecUsertrap UsertrapRes.
@@ -1057,7 +1053,7 @@ End UtDispatch.
    * printk's contract is a PURE hypothesis all the way down
      ([ProofUsertrapArms]' [ut_56]/[ut_d0] take it as an [->]), so that the
      three blocks below the dispatch carry no functor argument for it.  It is
-     OBTAINED here from [PK], which is what puts [LinkPrintkGen]'s axiom in
+     OBTAINED here from [PK], which is what puts [LinkPrintk]'s axiom in
      usertrap's footprint -- deliberately, since the unexpected-scause arm is
      LIVE and does call printk on its general path.
    * the boundary's crossing is at [wp_next true (proc_addr j)] while the

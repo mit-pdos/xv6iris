@@ -102,7 +102,7 @@ Require Import BlockWords.
 Require Import InodeInv.
 Require Import BitmapInv.
 Require Import KernelDataInv.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import CodeBmap.
 Require Import PanicStub.
 Require Import SpecBalloc SpecBread SpecBrelse SpecLogWrite.
@@ -1040,14 +1040,14 @@ Section BmapRelease.
     iEval (rewrite Hpp84) in "Hpc".
     (* ===== +0x84 jal ra,brelse ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bmap + 0x84)) Rra
-              (mword_of_int 2096414 : mword 21) T0 (K - 6)%nat b
+              (mword_of_int 2096244 : mword 21) T0 (K - 6)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi84").
     iIntros (CID2 Hq2) "Hcg Hpc".
     set (T1 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.bmap + 0x84) : mword 64) 4)]> T0).
     assert (Htgt : add_vec (mword_of_int (KernelSyms.bmap + 0x84) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2096414 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2096244 : mword 21))
                    = mword_of_int KernelSyms.brelse) by pcw.
     iEval (rewrite Htgt) in "Hpc".
     assert (HT1a0 : T1 !!! Regidx Ra0 = bnode kk)
@@ -1313,14 +1313,14 @@ Section BmapTail.
     iEval (rewrite Hpp68) in "Hpc".
     (* ===== +0x68 jal ra,bread ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bmap + 0x68)) Rra
-              (mword_of_int 2096178 : mword 21) I1 (K - 6)%nat b
+              (mword_of_int 2096008 : mword 21) I1 (K - 6)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi68").
     iIntros (CID3 Hq3) "Hcg Hpc".
     set (I2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.bmap + 0x68) : mword 64) 4)]> I1).
     assert (Htgtbr : add_vec (mword_of_int (KernelSyms.bmap + 0x68) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2096178 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2096008 : mword 21))
                      = mword_of_int KernelSyms.bread) by pcw.
     iEval (rewrite Htgtbr) in "Hpc".
     assert (HI2a0 : I2 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
@@ -1637,14 +1637,14 @@ Section BmapTail.
       iEval (rewrite Hpp9e) in "Hpc".
       (* ===== +0x9e jal ra,balloc ===== *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bmap + 0x9e)) Rra
-                (mword_of_int 2096732 : mword 21) A0 (K - 6)%nat b
+                (mword_of_int 2096454 : mword 21) A0 (K - 6)%nat b
                 ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi9e").
       iIntros (CID14 Hq14) "Hcg Hpc".
       set (A1 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KernelSyms.bmap + 0x9e) : mword 64) 4)]> A0).
       assert (Htgtba : add_vec (mword_of_int (KernelSyms.bmap + 0x9e) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2096732 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2096454 : mword 21))
                        = mword_of_int KernelSyms.balloc) by pcw.
       iEval (rewrite Htgtba) in "Hpc".
       assert (HA1a0 : A1 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
@@ -1894,14 +1894,14 @@ Section BmapTail.
         iEval (rewrite Hppac) in "Hpc".
         (* ===== +0xac jal ra,log_write ===== *)
         iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bmap + 0xac)) Rra
-                  (mword_of_int 3670 : mword 21) G1 (K - 6)%nat b
+                  (mword_of_int 3500 : mword 21) G1 (K - 6)%nat b
                   ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hiac").
         iIntros (CID20 Hq20) "Hcg Hpc".
         set (G2 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (KernelSyms.bmap + 0xac) : mword 64) 4)]> G1).
         assert (Htgtlw : add_vec (mword_of_int (KernelSyms.bmap + 0xac) : mword 64)
-                           (sign_extend' 64 (mword_of_int 3670 : mword 21))
+                           (sign_extend' 64 (mword_of_int 3500 : mword 21))
                          = mword_of_int KernelSyms.log_write) by pcw.
         iEval (rewrite Htgtlw) in "Hpc".
         assert (HG2a0 : G2 !!! Regidx Ra0 = bnode kk)
@@ -2532,14 +2532,14 @@ Section ProofBmapMain.
         iEval (rewrite Hpp2a) in "Hpc".
         (* ===== +0x2a jal ra,balloc ===== *)
         iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bmap + 0x2a)) Rra
-                  (mword_of_int 2096848 : mword 21) D4 (K - 6)%nat b
+                  (mword_of_int 2096570 : mword 21) D4 (K - 6)%nat b
                   ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi2a").
         iIntros (CID17 Hq17) "Hcg Hpc".
         set (D5 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (KernelSyms.bmap + 0x2a) : mword 64) 4)]> D4).
         assert (Htgtba : add_vec (mword_of_int (KernelSyms.bmap + 0x2a) : mword 64)
-                           (sign_extend' 64 (mword_of_int 2096848 : mword 21))
+                           (sign_extend' 64 (mword_of_int 2096570 : mword 21))
                          = mword_of_int KernelSyms.balloc) by pcw.
         iEval (rewrite Htgtba) in "Hpc".
         assert (HD5a0 : D5 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
@@ -3104,14 +3104,14 @@ Section ProofBmapMain.
         iEval (rewrite Hpp50) in "Hpc".
         (* ===== +0x50 jal ra,balloc ===== *)
         iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bmap + 0x50)) Rra
-                  (mword_of_int 2096810 : mword 21) P0 (K - 6)%nat b
+                  (mword_of_int 2096532 : mword 21) P0 (K - 6)%nat b
                   ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi50").
         iIntros (CID19 Hq19) "Hcg Hpc".
         set (P1 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (KernelSyms.bmap + 0x50) : mword 64) 4)]> P0).
         assert (Htgtba : add_vec (mword_of_int (KernelSyms.bmap + 0x50) : mword 64)
-                           (sign_extend' 64 (mword_of_int 2096810 : mword 21))
+                           (sign_extend' 64 (mword_of_int 2096532 : mword 21))
                          = mword_of_int KernelSyms.balloc) by pcw.
         iEval (rewrite Htgtba) in "Hpc".
         assert (HP1a0 : P1 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))

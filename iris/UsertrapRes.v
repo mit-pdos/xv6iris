@@ -46,10 +46,9 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes.
 Require Import RegFile HartTp WpGpr.
 Require Import SmodeCore.
-Require Import KernelText KernelDataInv MstatusBits.
+Require Import KernelDataInv MstatusBits.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import StackOwn CalleeSaved.
@@ -71,9 +70,8 @@ Require Import PanicStub.
 Require Import SpecProcinit.
 Require Import SpecFileclose.
 Require Import SpecDevintr.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import SpecSyscall.
-Require Import SpecKexit.
 Require Import SpecKernelvec.   (* the two kernelvec trap-vector facts *)
 Require Import SpecUsertrap.   (* USERTRAP_RES -- the fit is checked at the foot *)
 From Kernel Require KernelSyms.

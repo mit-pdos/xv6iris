@@ -36,7 +36,7 @@
 
    4. [panic_env], the persistent credentials printk needs, bundled so a call
       site threads one hypothesis and not four: pr.lock's [is_lock] (whose
-      resource is [emp] -- see [SpecPrintkGen.pr_res]), the device invariant
+      resource is [emp] -- see [SpecPrintk.pr_res]), the device invariant
       and the tx_lock credential.  A [uart_sent_sub] rides beside it, indexed
       by the trace prefix, because printk threads that claim in as well as
       out.

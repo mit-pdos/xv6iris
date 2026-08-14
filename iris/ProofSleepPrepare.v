@@ -36,15 +36,14 @@ Require Import RegFile WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import KernelRvcDecode.
-Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
+Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import IntrDefs.
-Require Import HartTp WpNext.
+Require Import WpNext.
 Require Import CpuOwn.
 Require Import WpLock.
 Require Import ProcGeom.
 Require Import FdSlots.
 Require Import SchedCtx.
-Require Import PanicStub.
 Require Import SpecMyproc SpecAcquire SpecRelease.
 Require Import SpecSleepPrepare.
 From Kernel Require KernelInstrs KernelSyms.

@@ -78,7 +78,7 @@ Require Import DevModel VirtioModel DiskPtsto WpUart.
 Require Import VirtioQueue VirtioProto DiskInv DiskBoot.
 Require Import PrintkFmt.
 Require Import PanicStub StartedInv.
-Require Import SpecCpuid SpecConsoleinit SpecPrintkinit SpecPrintkGen.
+Require Import SpecCpuid SpecConsoleinit SpecPrintkinit SpecPrintk.
 Require Import SpecKinit SpecKvminit SpecKvminithart SpecProcinit.
 Require Import SpecTrapinit SpecTrapinithart SpecPlicinit SpecPlicinithart.
 Require Import SpecBinit SpecIinit SpecFileinit SpecVirtioDiskInit.
@@ -370,7 +370,7 @@ Section ProofMain.
   (* =================================================================== *)
   (* 0x42 .. 0x6a -- consoleinit(); printkinit(); printk x3, and the TWO   *)
   (* ghost steps in between: the [pr] lock -- which now protects NOTHING   *)
-  (* ([SpecPrintkGen.pr_res] is [emp]; d80e61c5 moved the transmitter to   *)
+  (* ([SpecPrintk.pr_res] is [emp]; d80e61c5 moved the transmitter to   *)
   (* [tx_lock], which uartputc_sync takes for itself) -- and [printk_env]. *)
   (* The panic-flag invariant is gone with the flags themselves.           *)
   (* =================================================================== *)
@@ -484,19 +484,20 @@ Section ProofMain.
     iEval (rewrite Hretpi) in "Hpc".
     (* ---- the ghost steps: three [newlock]s and [printk_env] ----
 
-       PR.LOCK'S [newlock] IS PAID FOR WITH NOTHING.  [SpecPrintkGen.pr_res]
+       PR.LOCK'S [newlock] IS PAID FOR WITH NOTHING.  [SpecPrintk.pr_res]
        is [emp]: d80e61c5 put uartputc_sync's THR write under [tx_lock], so
        the transmitter belongs to [UartTxInv.tx_res] and pr.lock is left
        serializing format walks, which has no separation-logic content.  That
        is what frees the [uart_tx_own] this block hands to tx_lock's
        [newlock] instead. *)
     iApply fupd_wp.
+    (* promote once, so both [console_caps] and [printk_env] below can reuse
+       the same persistent witness instead of re-deriving it. *)
+    iDestruct "Hsent" as "#Hsent".
+    iPoseProof (uart_sent_sub_nil γd l0 with "Hsent") as "#Hsub0".
     iMod (newlock ⊤ (mword_of_int KernelSyms.pr) "pr"%string (pr_res γd)
             with "Hprnm Hprw Hprcpu []") as (γpr) "#Hprlk".
     { rewrite /pr_res. done. }
-    iAssert (printk_env γpr γd γv) as "#Hpenv".
-    { rewrite /printk_env /pr_lock. iSplitR; [iExact "Hprlk"|].
-      iSplitR; [iExact "Hdoff" | iExact "Hdev"]. }
     (* ---- THE OTHER TWO [newlock]s, and this is the point of the group.
        consoleinit has just run [initlock] on cons.lock and, through uartinit,
        on tx_lock; both come back as [WpLock.newlock]'s raw material, and both
@@ -511,13 +512,23 @@ Section ProofMain.
     iMod (newlock ⊤ UartTxInv.a_tx_lock "uart"%string (tx_res γd)
             with "Htxnm Htxw Htxcpu [Htx]") as (γtx) "#Htxinv".
     { iApply (tx_res_intro γd l0 with "Htx"). }
+    (* [is_txlock]'s two halves are exactly [Htxinv]/[Hdoff] -- the same pair
+       [console_caps] below folds inline -- so mint it once here and feed
+       both consumers (LinkPrintk.v needs the witness to invoke the real
+       [SpecPrintk.wp_printk_sconf]). *)
+    iPoseProof (is_txlock_intro γtx γd with "Htxinv Hdoff") as "#Htxl".
+    iAssert (printk_env γpr γd γv) as "#Hpenv".
+    { rewrite /printk_env /pr_lock. iSplitR; [iExact "Hprlk"|].
+      iSplitR; [iExact "Hdoff" |].
+      iSplitR; [iExact "Hdev" |].
+      iSplitR; [iExists γtx; iExact "Htxl" | iExact "Hsub0"]. }
     iMod (newlock ⊤ a_cons "cons"%string cons_res
             with "Hclnm Hclw Hclcpu Hring") as (γcl) "#Hconslk".
     iAssert (console_caps γd) as "#Hccaps".
     { rewrite /console_caps. iExists γtx, γcl.
-      iSplitR; [rewrite /is_txlock; iSplitR; [iExact "Htxinv" | iExact "Hdoff"] |].
+      iSplitR; [iExact "Htxl" |].
       iSplitR; [iExact "Hconslk" |].
-      iApply (uart_sent_sub_nil γd l0 with "Hsent"). }
+      iExact "Hsub0". }
     iModIntro.
     (* ---- +0x4a auipc a0,0x6 / +0x4e addi a0,a0,476 : a0 := &"\n" ---- *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.main + 0x4a)) (mword_of_int 10 : mword 5)

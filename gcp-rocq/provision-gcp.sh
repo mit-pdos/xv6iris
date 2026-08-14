@@ -190,6 +190,55 @@ systemctl enable --now rocq-idle-shutdown.timer
 STARTUP
 }
 
+# The `ssh-keys` metadata value: $SSH_KEY.pub plus every key in
+# $EXTRA_AUTHORIZED_KEYS, as `user:<key>` lines.
+#
+# authorized_keys is a richer format than this metadata accepts, so the filter
+# is not cosmetic. Comments and blank lines are dropped, and so is any entry
+# carrying OPTIONS (`command="..." ssh-ed25519 ...`, `restrict,...`): the guest
+# agent writes each metadata line into authorized_keys verbatim, so an options
+# prefix would smuggle a forced command onto the VM under a key that looks
+# ordinary here -- and a from="..." restriction naming the local network would
+# silently not apply on the VM, which is the more likely way to get this wrong.
+# Keeping only bare `<type> <base64> [comment]` lines makes what is authorized
+# on the VM exactly what it looks like.
+#
+# Deduplication is on type+base64, ignoring the comment, so $SSH_KEY.pub
+# appearing in authorized_keys too (the usual case when you can ssh to this
+# machine) does not double the entry.
+render_ssh_keys() {
+  {
+    cat "$SSH_KEY.pub"
+    [[ -r "$EXTRA_AUTHORIZED_KEYS" ]] && cat "$EXTRA_AUTHORIZED_KEYS"
+  } 2>/dev/null | awk -v user="$SSH_USER" '
+    $1 ~ /^(ssh-(rsa|dss|ed25519)|ecdsa-sha2-nistp(256|384|521)|sk-(ssh-ed25519|ecdsa-sha2-nistp256)@openssh\.com)$/ &&
+      NF >= 2 && !seen[$1 " " $2]++ { print user ":" $0 }'
+}
+
+# Metadata is set at create time only, so this is what carries a key change to
+# a VM that already exists -- and add-metadata REPLACES the ssh-keys value
+# wholesale, which is what makes it idempotent rather than cumulative. The
+# guest agent rewrites the VM's authorized_keys within a few seconds; nothing
+# needs restarting. A key REMOVED from the local authorized_keys is revoked on
+# the VM by the same mechanism, so this is the only place keys are decided.
+ensure_ssh_keys() {
+  local keys want have
+  keys="$(mktemp)"; TMPFILES+=( "$keys" )
+  render_ssh_keys > "$keys"
+  want="$(cat "$keys")"
+  [[ -n "$want" ]] || die "no usable public keys (checked $SSH_KEY.pub and $EXTRA_AUTHORIZED_KEYS)"
+
+  have="$(g compute instances describe "$INSTANCE" --zone="$ZONE" \
+            --format='value(metadata.items.filter("key:ssh-keys").extract("value").flatten())' 2>/dev/null || true)"
+  if [[ "$have" == "$want" ]]; then
+    say "ssh keys already current ($(wc -l < "$keys") authorized)"
+    return
+  fi
+  say "updating ssh-keys metadata ($(wc -l < "$keys") authorized for $SSH_USER)"
+  g compute instances add-metadata "$INSTANCE" --zone="$ZONE" \
+    --metadata-from-file="ssh-keys=$keys" >/dev/null
+}
+
 ensure_instance() {
   if g compute instances describe "$INSTANCE" --zone="$ZONE" >/dev/null 2>&1; then
     say "instance $INSTANCE already exists"
@@ -200,7 +249,7 @@ ensure_instance() {
   startup="$(mktemp)"; keys="$(mktemp)"
   TMPFILES+=( "$startup" "$keys" )
   render_startup_script > "$startup"
-  printf '%s:%s\n' "$SSH_USER" "$(cat "$SSH_KEY.pub")" > "$keys"
+  render_ssh_keys > "$keys"
 
   # A new instance has a new host key. Since we pin host keys to the instance
   # name via HostKeyAlias (so a changing external IP is not mistaken for an
@@ -424,6 +473,7 @@ main() {
   ensure_firewall
   ensure_data_disk
   ensure_instance
+  ensure_ssh_keys
   start_if_stopped
   wait_for_ssh
   # apt needs no data disk, so run it first and let it overlap with the format.

@@ -52,7 +52,6 @@ Require Import MstatusFacts.
 Require Import SmodeCore.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn SchedCtx.
-Require Import ConsoleInv SpecConsoleintr.
 Require Import SpecMain.
 Require Import BootConfig BootBridge PowerBoot.
 Require Import LinkEntry.

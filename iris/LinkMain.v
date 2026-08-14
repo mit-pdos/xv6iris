@@ -9,7 +9,7 @@
 
    Every credential kerneltrap's cone needs is now MINTED by the boot chain --
    there is no assumed boot-capability argument any more. *)
-Require Import LinkCpuid LinkConsoleinit LinkPrintkinit LinkPrintkGen.
+Require Import LinkCpuid LinkConsoleinit LinkPrintkinit LinkPrintk.
 Require Import LinkKinit LinkKvminit LinkKvminithart LinkProcinit.
 Require Import LinkTrapinit LinkTrapinithart LinkPlicinit LinkPlicinithart.
 Require Import LinkBinit LinkIinit LinkFileinit LinkVirtioDiskInit.

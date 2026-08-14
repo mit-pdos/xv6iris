@@ -36,7 +36,6 @@ From iris.algebra Require Import auth gmap frac numbers excl.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap invariants own ghost_var.
 Require Import SailStdpp.Values.
-Require Import RiscvModelBytes.
 Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import InodeInv.

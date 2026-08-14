@@ -52,7 +52,7 @@
    half of [is_txlock] below.  What is still owed is only the boot ASSEMBLY
    that runs that step -- a [WpLock.newlock] -- and the resource it
    must supply, [tx_res], which is the printk cone's business now that
-   [SpecPrintkGen.pr_res] no longer holds the transmitter. *)
+   [SpecPrintk.pr_res] no longer holds the transmitter. *)
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -64,7 +64,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto.
 Require Import DevModel DiskPtsto WpUart.
 Require Import WpLock.
-Require Import SleepLock.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
@@ -112,7 +111,7 @@ Section UartTxInv.
 
      so nothing is held across the park and one ghost suffices.  uartputc_sync
      takes the same lock, which is what makes the two transmit paths agree --
-     and is why [SpecPrintkGen.pr_res] no longer needs the transmitter at all.
+     and is why [SpecPrintk.pr_res] no longer needs the transmitter at all.
 
      THE COST IS BORNE BY THE CALLERS' TRACE CLAIM, not by this predicate:
      a driver that re-acquires per byte cannot claim a CONTIGUOUS

@@ -115,9 +115,9 @@ Section CodeItrunc.
   Proof. mk_base (KernelSyms.itrunc + 0x24) (mword_of_int 0x0009a503 : mword 32)
     (mword_of_int (KernelSyms.itrunc + 0x24) : mword 64) (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 10), false, 4)) kd_0009a503. Qed.
 
-  Lemma iti_28 : kernel_text -∗ instr (mword_of_int (KernelSyms.itrunc + 0x28) : mword 64) false (JAL (mword_of_int 2095686 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.itrunc + 0x28) (mword_of_int 0xa47ff0ef : mword 32)
-    (mword_of_int (KernelSyms.itrunc + 0x28) : mword 64) (JAL (mword_of_int 2095686 : mword 21, Regidx (mword_of_int 1))) kd_a47ff0ef. Qed.
+  Lemma iti_28 : kernel_text -∗ instr (mword_of_int (KernelSyms.itrunc + 0x28) : mword 64) false (JAL (mword_of_int 2096118 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.itrunc + 0x28) (mword_of_int 0xbf7ff0ef : mword 32)
+    (mword_of_int (KernelSyms.itrunc + 0x28) : mword 64) (JAL (mword_of_int 2096118 : mword 21, Regidx (mword_of_int 1))) kd_bf7ff0ef. Qed.
 
   Lemma iti_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.itrunc + 0x2c) : mword 64) false (STORE (mword_of_int 0 : mword 12, zreg, Regidx (mword_of_int 9), 4)).
   Proof. mk_base (KernelSyms.itrunc + 0x2c) (mword_of_int 0x0004a023 : mword 32)
@@ -223,9 +223,9 @@ Section CodeItrunc.
   Proof. mk_base (KernelSyms.itrunc + 0x70) (mword_of_int 0x0009a503 : mword 32)
     (mword_of_int (KernelSyms.itrunc + 0x70) : mword 64) (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 10), false, 4)) kd_0009a503. Qed.
 
-  Lemma iti_74 : kernel_text -∗ instr (mword_of_int (KernelSyms.itrunc + 0x74) : mword 64) false (JAL (mword_of_int 2095610 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.itrunc + 0x74) (mword_of_int 0x9fbff0ef : mword 32)
-    (mword_of_int (KernelSyms.itrunc + 0x74) : mword 64) (JAL (mword_of_int 2095610 : mword 21, Regidx (mword_of_int 1))) kd_9fbff0ef. Qed.
+  Lemma iti_74 : kernel_text -∗ instr (mword_of_int (KernelSyms.itrunc + 0x74) : mword 64) false (JAL (mword_of_int 2096042 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.itrunc + 0x74) (mword_of_int 0xbabff0ef : mword 32)
+    (mword_of_int (KernelSyms.itrunc + 0x74) : mword 64) (JAL (mword_of_int 2096042 : mword 21, Regidx (mword_of_int 1))) kd_babff0ef. Qed.
 
   Lemma iti_78 : kernel_text -∗ instr (mword_of_int (KernelSyms.itrunc + 0x78) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2039 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (KernelSyms.itrunc + 0x78) (mword_of_int 0xb7fd : mword 16)
@@ -247,9 +247,9 @@ Section CodeItrunc.
   Proof. mk_base (KernelSyms.itrunc + 0x84) (mword_of_int 0x0009a503 : mword 32)
     (mword_of_int (KernelSyms.itrunc + 0x84) : mword 64) (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 10), false, 4)) kd_0009a503. Qed.
 
-  Lemma iti_88 : kernel_text -∗ instr (mword_of_int (KernelSyms.itrunc + 0x88) : mword 64) false (JAL (mword_of_int 2095590 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.itrunc + 0x88) (mword_of_int 0x9e7ff0ef : mword 32)
-    (mword_of_int (KernelSyms.itrunc + 0x88) : mword 64) (JAL (mword_of_int 2095590 : mword 21, Regidx (mword_of_int 1))) kd_9e7ff0ef. Qed.
+  Lemma iti_88 : kernel_text -∗ instr (mword_of_int (KernelSyms.itrunc + 0x88) : mword 64) false (JAL (mword_of_int 2096022 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.itrunc + 0x88) (mword_of_int 0xb97ff0ef : mword 32)
+    (mword_of_int (KernelSyms.itrunc + 0x88) : mword 64) (JAL (mword_of_int 2096022 : mword 21, Regidx (mword_of_int 1))) kd_b97ff0ef. Qed.
 
   Lemma iti_8c : kernel_text -∗ instr (mword_of_int (KernelSyms.itrunc + 0x8c) : mword 64) false (STORE (mword_of_int 128 : mword 12, zreg, Regidx (mword_of_int 19), 4)).
   Proof. mk_base (KernelSyms.itrunc + 0x8c) (mword_of_int 0x0809a023 : mword 32)

@@ -129,7 +129,7 @@
    [%d] conversion -- where balloc's and ialloc's messages have none.  As in
    SpecBalloc.v / SpecIalloc.v the contract takes [γpr], the two PERSISTENT
    credentials [kernel_data] and [printk_env], and printk's contract as a
-   PURE Prop HYPOTHESIS ([SpecPrintkGen.printk_gen_contract]) rather than as
+   PURE Prop HYPOTHESIS ([SpecPrintk.printk_gen_contract]) rather than as
    a functor argument.  See SpecBalloc.v's "READ THIS BEFORE TRUSTING THE
    STANDING SIX": carrying it as a hypothesis keeps [Print Assumptions] at the
    standing six, but the six are then modulo a THREADED printk obligation,
@@ -152,7 +152,7 @@ Require Import WpNext.
 Require Import WpLock.
 Require Import PanicStub.
 Require Import KernelDataInv.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.

@@ -45,17 +45,16 @@ Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import InstrBytes.
-Require Import KernelText KernelDataInv KernelRvcDecode.
-Require Import WpGprCsrwCommon WpGprCsrwA.
+Require Import KernelText KernelDataInv.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfCsr WpSconfBtype.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom.
 Require Import UserPtTree.
-Require Import ProcPtOwn.
-Require Import KallocInv KvmSpec.
-Require Import BioInv DiskPtsto DiskInv WpUart FsBlocks LogInv FsCrash.
+Require Import KallocInv.
+Require Import PanicStub.
+Require Import BioInv DiskPtsto WpUart FsBlocks LogInv FsCrash.
 Require Import IrefSlots InodeRegion.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.

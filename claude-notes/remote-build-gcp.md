@@ -130,6 +130,25 @@ That creates the firewall rule, the 1 TB data disk, the Spot instance, the
 idle-shutdown timer, and the shared opam switch. Every step checks before it
 creates, so re-running is safe and cheap.
 
+### Who can ssh in
+
+`$SSH_KEY.pub` plus every key in `$EXTRA_AUTHORIZED_KEYS` (default
+`~/.ssh/authorized_keys`) is authorized for `$SSH_USER`, so anyone who can
+already reach this machine can also ssh straight to the VM and watch a build
+the agent started. Re-running `provision-gcp.sh` is how a key change reaches
+an EXISTING instance: `ssh-keys` metadata is written only at create time, and
+`ensure_ssh_keys` re-writes it wholesale on every run. That makes removals work
+too — a key dropped locally is revoked on the VM by the same step, and the
+guest agent rewrites the VM's `authorized_keys` within seconds, with nothing to
+restart.
+
+Entries carrying **options** (`command="…" ssh-ed25519 …`, `restrict,…`) are
+dropped rather than forwarded. The guest agent copies each metadata line into
+`authorized_keys` verbatim, so an options prefix would carry a forced command
+onto the VM under a key that reads as ordinary — and, the likelier mistake, a
+`from="…"` restriction naming your local network would silently not apply
+there. What is authorized on the VM is therefore always a bare key.
+
 `provision-gcp.sh` does **not** create the project switch — that is specific to
 this development. After provisioning:
 
@@ -152,6 +171,46 @@ Verified: stop → restart takes ~15s with all state intact.
 
 Rocq builds are incrementally resumable, so a preemption mid-build costs only
 the file in flight — `make` picks up where it left off.
+
+**BUT A BUILD DRIVEN THROUGH THE SSH PIPE LOSES ITS LOG WITH THE MACHINE, AND
+THE LOG IS WHAT YOU WANTED.** `run-on-gcp make | tee build.log` streams through
+`ssh`, so a preemption kills the pipe and the local log ends wherever the pipe
+buffer last flushed — which is nowhere near where the build actually got to,
+and reads like a stall rather than a preemption. Worse, the block buffering
+means a *live* build also looks stalled for minutes at a time, so you cannot
+tell the two apart. Run it detached ON THE VM, writing its own log and its own
+sentinel, and poll that:
+
+```sh
+run-on-gcp --no-sync bash -c '
+  cd /mnt/rocq/trees/<tree>
+  setsid nohup bash -c "make -k proofs > /mnt/rocq/build.log 2>&1;
+                        echo MAKEEXIT=\$? >> /mnt/rocq/build.log" \
+    >/dev/null 2>&1 </dev/null &'
+run-on-gcp --no-sync grep -c MAKEEXIT /mnt/rocq/build.log     # 1 = finished
+```
+
+The log then survives the preemption too, so the restart resumes against a log
+you can still read.
+
+**THE VM IS SHARED, so every whole-machine reading is somebody else's build as
+much as yours.** `uptime`'s load, `pgrep -c rocqworker`, even `pgrep -x make`
+count every tree at once — several `/mnt/rocq/trees/*` build concurrently. To
+find YOUR build, ask for the working directory, which is the only thing that
+distinguishes them (the command line does not — it is `make -k proofs` in all
+of them):
+
+```sh
+for p in $(pgrep -x make); do echo "$p $(readlink /proc/$p/cwd)"; done
+```
+
+**AND NEVER PATTERN-KILL ON THE VM.** `pkill -f "rocqworker --kind=compile"` to
+stop your own build kills every *other* tree's workers in the same breath —
+their `make` reports `Error 143` on whatever was in flight and their agent sees
+a broken build with no cause. (This is `durable-notes.md`'s `pkill -f coqc`
+trap one level up: there the pattern matched the killer's own shell, here it
+matches the neighbours.) Kill the `make` you launched **by PID**, from the
+`/proc/*/cwd` list above, and leave the workers to exit with it.
 
 **Switching to on-demand when Spot capacity is thrashing.** Repeated
 preemptions inside one build (each restart re-syncs, restarts the VM and

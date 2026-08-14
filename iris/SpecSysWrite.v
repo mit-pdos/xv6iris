@@ -93,28 +93,20 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import SleepLock.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import DinodeEnc.
-Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheInv.
-Require Import IcacheEscrow.
 Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
-Require Import PipeInvDefs.
-Require Import FileOff ProcInv.
+Require Import ProcInv.
 Require Import FileInvDefs.
 Require Import SpecArgfd.
-Require Import SpecArgint.
-Require Import SpecArgaddr.
 Require Import SpecSysRead.
 Require Import SpecFilewrite.
 From Kernel Require KernelSyms.

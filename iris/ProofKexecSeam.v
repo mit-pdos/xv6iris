@@ -32,8 +32,6 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import RegFile.
-Require Import HartTp.
-Require Import WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
@@ -41,15 +39,10 @@ Require Import StackBytes.
 Require Import CalleeSaved.
 Require Import KernelRvcDecode.
 Require Import InstrBytes.
-Require Import KernelText.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpSmodeHalf.
-Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import SleepLock.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
@@ -65,44 +58,24 @@ Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
-Require Import DirentEnc.
-Require Import PathElems.
 Require Import InodeInv.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import IcacheInv.
 Require Import KallocInv.
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import DinodeEnc.
-Require Import DirView.
 Require Import InodeLock.
-Require Import SchedCtx.
-Require Import DiskInv.
-Require Import PtTree.
-Require Import PtBuild.
-Require Import ProcPt.
+Require Import ProcInv.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 (* EXPORT, not Import: the seam states carry [um_covered], so every
    consumer needs its vocabulary and its zero-size discharge. *)
 Require Export UmCovered.
-Require Import FileInv.
+Require Import FileInvDefs.
 Require Import SpecIput.
-Require Import SpecKexec.
-Require Import SpecMyproc.
-Require Import SpecBeginOp.
-Require Import SpecEndOp.
-Require Import SpecIlock.
-Require Import SpecReadi.
-Require Import SpecIunlockput.
-Require Import SpecDirlink.
-Require Import SpecNamei.
-Require Import SpecProcPagetable.
 Require Import ProofKexecParts.
 Require Import ProofKexecTail.
-Require Import ProofKforkParts.
-Require Import CodeKexec.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 

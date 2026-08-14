@@ -74,7 +74,7 @@ Require Import SpecBmap SpecBread SpecBrelse SpecLogWrite SpecEitherCopyin
 Require Import ProofWriteiParts.
 Require Import BitmapInv.
 Require Import KernelDataInv.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import SpecWritei.
 (* the loop's ledger algebra: bm_pot, wi_inv_bud/wi_inv_spent, the two step
    lemmas, wi_inv_enter/wi_inv_exit and the two iteration bounds.  Section 10
@@ -2085,14 +2085,14 @@ Section WriteiLoop.
     iEval (rewrite Hpp) in "Hpc". clear Hpp.
     (* ===== +0x88 jal ra,bmap ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (WI + 0x88)) Rra
-              (mword_of_int 2095042 : mword 21) A2 (K - 14)%nat b
+              (mword_of_int 2095212 : mword 21) A2 (K - 14)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi88").
     iIntros (CIDa3 Hqa3) "Hcg Hpc".
     set (A3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (WI + 0x88) : mword 64) 4)]> A2).
     assert (Htgtbm : add_vec (mword_of_int (WI + 0x88) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2095042 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2095212 : mword 21))
                      = mword_of_int KernelSyms.bmap) by pcw.
     iEval (rewrite Htgtbm) in "Hpc".
     assert (HA3ra : A3 !!! Regidx Rra

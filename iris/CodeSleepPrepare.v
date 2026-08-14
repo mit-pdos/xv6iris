@@ -18,7 +18,6 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode02.
 Require Import KernelDecode04.
-Require Import KernelDecode05.
 Require Import KernelDecode07.
 Require Import KernelDecode10.
 Require Import KernelDecode11.
@@ -34,6 +33,7 @@ Require Import KernelDecode23.
 Require Import KernelDecode27.
 Require Import KernelDecode28.
 Require Import KernelDecode30.
+Require Import KernelDecode31.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -132,8 +132,8 @@ Section CodeSleepPrepare.
   Proof. mk_base (KernelSyms.sleep_prepare + 0x34) (mword_of_int 0x2cc50513 : mword 32)
     (mword_of_int (KernelSyms.sleep_prepare + 0x34) : mword 64) (ITYPE (mword_of_int 716 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_2cc50513. Qed.
 
-  Lemma spri_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.sleep_prepare + 0x38) : mword 64) false (JAL (mword_of_int 2091256 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sleep_prepare + 0x38) (mword_of_int 0x8f9fe0ef : mword 32)
-    (mword_of_int (KernelSyms.sleep_prepare + 0x38) : mword 64) (JAL (mword_of_int 2091256 : mword 21, Regidx (mword_of_int 1))) kd_8f9fe0ef. Qed.
+  Lemma spri_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.sleep_prepare + 0x38) : mword 64) false (JAL (mword_of_int 2091296 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sleep_prepare + 0x38) (mword_of_int 0x921fe0ef : mword 32)
+    (mword_of_int (KernelSyms.sleep_prepare + 0x38) : mword 64) (JAL (mword_of_int 2091296 : mword 21, Regidx (mword_of_int 1))) kd_921fe0ef. Qed.
 
 End CodeSleepPrepare.

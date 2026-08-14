@@ -113,7 +113,7 @@ Require Import IcacheEscrow.
 Require Import IcacheBoot.
 Require Import CodeIreclaim.
 Require Import PanicStub.
-Require Import SpecPrintk SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import SpecBread SpecBrelse SpecIget.
 Require Import SpecBeginOp SpecEndOp.
 Require Import SpecIlock SpecIunlock SpecIput.
@@ -1212,14 +1212,14 @@ Section IreclaimOrphan.
     iEval (rewrite Hpp44) in "Hpc".
     (* ===== +0x44 jal ra,iget -- THE BUFFER IS STILL HELD ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.ireclaim + 0x44)) Rra
-              (mword_of_int 2095902 : mword 21) O5 (K - 8)%nat b
+              (mword_of_int 2095602 : mword 21) O5 (K - 8)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi44").
     iIntros (CID7 Hq7) "Hcg Hpc".
     set (O6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.ireclaim + 0x44) : mword 64) 4)]> O5).
     assert (Htgtig : add_vec (mword_of_int (KernelSyms.ireclaim + 0x44) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2095902 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2095602 : mword 21))
                      = mword_of_int KernelSyms.iget) by pcw.
     iEval (rewrite Htgtig) in "Hpc".
     assert (HO6a0 : O6 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))

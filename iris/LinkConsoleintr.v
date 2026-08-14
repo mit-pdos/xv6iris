@@ -18,13 +18,7 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto SmodeCore.
-Require Import RegFile.
-Require Import FdSlots WpLock.
-Require Import IrefSlots.
-Require Import ConsoleInv.
 Require Import LinkAcquire LinkConsputc LinkRelease LinkWakeup.
 Require Import ProofConsoleintr.
-Require Import SpecConsoleintr.
 
 Module Consoleintr := ConsoleintrProof Acquire Consputc Release Wakeup.

@@ -74,10 +74,8 @@ Require Import ProcGeom CpuOwn.
 Require Import SchedCtx.
 Require Import PanicStub.
 Require Import DiskPtsto WpUart DiskInv.
-Require Import UartTxInv.
 Require Import TimerCap.
 Require Import SpecClockintr.
-Require Import ConsoleInv.
 Require Import SpecConsoleintr.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.

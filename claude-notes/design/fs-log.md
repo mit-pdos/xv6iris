@@ -300,8 +300,9 @@ locks — matching the code); re-acquires, deposits, cmt := 0.
   recorded-open mkfs-image mint, completed/crash.md). Real recovery
   (install from a committed on-disk log) is stage 4 — it is the consumer
   of `P_fs`'s crash-receipt.
-- **sys_sync**: deferred with stage 4 (its spec is a durability receipt:
-  needs D-side client views).
+- **sys_sync**: proven, with an EMPTY contract (`SpecSysSync.v`). The
+  durability receipt it should return needs D-side client views and is
+  item 5 of the stage-4 list below.
 
 ## Stage 4 — the crash side (recorded now, built with recovery)
 
@@ -572,6 +573,31 @@ resolution must make the stranded pieces RE-CREATABLE, i.e.:
      shape: the fast path (`committing == 0 && outstanding == 0`) returns
      the LAST commit's receipt, and that is the strong case — nothing is in
      flight, so the durable state IS the current logical one.
+   - **THE FAST PATH CANNOT MINT A CERTIFICATE ABOUT ITS OWN BATCH, AND
+     THAT IS WHAT DECIDES THE RECEIPT'S SHAPE.** "The batch at epoch `E` is
+     empty" is a fact about a MOMENT, not about the epoch: a later
+     begin_op/log_write pair fills that very batch while the epoch is still
+     `E`. So no persistent proposition about `E` survives the release, and
+     a postcondition of the form "the epoch has advanced past yours" is
+     unavailable on exactly the arm where nothing was pending — which is
+     why an epoch bound alone is not a usable contract, however faithful
+     the counter is made. Two consequences for the design:
+     - the receipt has to be indexed by a COMMIT THAT ACTUALLY RAN, so
+       that what sys_sync returns is a claim about a completed event
+       rather than about an interval; and
+     - the caller's own claim (`logged_at γ e b`, log_write's receipt) has
+       to be on the table AS A PREMISE, presented while the log lock is
+       held. Presented there it is contradictory with an empty batch at
+       `e` (`log_res`'s registry clause places the block in `LB`), so the
+       fast path can only be reached at `e` strictly behind the current
+       batch — which is precisely the case where the answer is already
+       durable. A caller with nothing to flush gets nothing, and that is
+       the truth rather than a gap.
+     `log_res` would also need the idle clause `outstanding = 0 -> n = 0`
+     for the fast path to know its batch is empty at all; it is inductive
+     for free (every transition that leaves `outstanding` at zero — the
+     initlog seal, end_op's re-deposit after the commit — leaves `n` at
+     zero too, and every other one has `outstanding >= 1`).
    - **WHAT sys_sync CANNOT SAY, and why it is not a defect.** "The caller's
      own writes are durable" is not a log-layer statement: two ops in one
      batch may write the same block, so a caller's content claim is
@@ -590,7 +616,7 @@ Cost inventory (all contained): the era image ghost + boot mint seam
 mostly mechanical); the permit→tag reshape at `virtio_proto_step` /
 `wp_disk_loop`; the state_interp `ghost_var` conjunct; `P_fs` + the boot
 token; bwrite's spec gains the tag argument (threaded to rw); initlog's
-recovery spec/proof; sys_sync.
+recovery spec/proof; sys_sync's receipt (the function itself is proven).
 
 ## Decision record (rejected shapes)
 

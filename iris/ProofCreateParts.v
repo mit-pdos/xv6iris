@@ -49,7 +49,6 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
-Require Import RegFile.
 Require Import KernelText.
 Require Import KernelDataInv.
 Require Import FsCrash.
@@ -58,7 +57,6 @@ Require Import DirentEnc.
 Require Import DirView.
 Require Import InodeInv.
 Require Import InodeLock.
-Require Import InodeRegion.
 Require Import SpecIalloc.
 Require Import SpecCreate.
 (* [nx_sext16_inj] -- the halfword-decision cluster B' hoisted out of
@@ -377,11 +375,11 @@ Proof. rewrite cr_trange_device. vm_compute. reflexivity. Qed.
 (*  (4) THE CONSTANTS                                                     *)
 (* ===================================================================== *)
 
-(* 10 own slots + nameiparent's 98.  Moved 106 -> 108 with the copyout chain
-   that pushed dirlookup 82 -> 84 (SpecCreate.v's note on [K_create] has the
+(* 10 own slots + nameiparent's 104.  Moved 108 -> 114 with the bmap chain
+   that pushed dirlookup 84 -> 90 (SpecCreate.v's note on [K_create] has the
    whole ladder); 9da28f5's [dp->nlink == 0] guard did NOT move it, because
    the frame is still 80 bytes. *)
-Lemma cr_K_value : K_create = 108%nat.
+Lemma cr_K_value : K_create = 114%nat.
 Proof. reflexivity. Qed.
 
 Lemma cr_slots_value : create_slots = 3%nat.

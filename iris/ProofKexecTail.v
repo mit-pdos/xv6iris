@@ -70,7 +70,7 @@ Require Import CalleeSaved.
 Require Import KernelRvcDecode.
 Require Import InstrBytes.
 Require Import KernelText.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
@@ -103,13 +103,10 @@ Require Import ProcInv.
 Require Import FileInvDefs.
 (* Names the nightly dead-import sweep stopped delivering transitively. *)
 Require Import DinodeEnc.
-Require Import DirView.
 Require Import InodeLock.
 Require Import SchedCtx.
 Require Import DiskInv.
-Require Import UserPtTree.
-Require Import ProcPtOwn.
-Require Import FileInv.
+Require Import FileInvDefs.
 Require Import SpecIput.
 Require Import SpecKexec.
 Require Import SpecMyproc.

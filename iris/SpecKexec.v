@@ -212,20 +212,19 @@ Local Open Scope Z_scope.
 Definition MAXARG : nat := 32%nat.
 Definition USERSTACK : nat := 1%nat.
 
-(* kexec's own 68-slot frame over namei's 100, which is the tallest callee
-   (readi 72, iunlockput 64, end_op 58, copyout 52, uvmalloc 42, ilock 44,
+(* kexec's own 68-slot frame over namei's 106, which is the tallest callee
+   (readi 78, iunlockput 64, end_op 58, copyout 52, uvmalloc 42, ilock 44,
    proc_pagetable / proc_freepagetable 40, begin_op 26, walkaddr 10,
    flags2perm / safestrcpy / strlen 2).
 
-   THE TOP OF THE psz CHAIN.  Three of those numbers moved for one reason:
-   [psz] has to outlive walkaddr / vmfault / memmove inside copyout, so gcc
-   gave it a callee-saved home in s11 and copyout's frame grew to 14 slots,
-   taking its bound 50 -> 52 (SpecCopyout.v).  That propagated
-   either_copyout 56 -> 58 -> readi 70 -> 72 -> dirlookup 82 -> 84 -> namex
-   94 -> 96 -> namei 98 -> 100, and so this one 166 -> 168.  Eleven constants
-   from one register-allocation decision; none of them is a soundness
-   question, they are all just "the callee needs two more slots than it did". *)
-Definition K_kexec : nat := 168%nat.
+   THE TOP OF THE BMAP CHAIN now, not the psz/copyout one: printk's real
+   stack need (48, printk_stack) dominates bmap (64), which dominates
+   balloc's out-of-blocks arm (58), which propagated readi 72 -> 78 ->
+   dirlookup 84 -> 90 -> namex 96 -> 102 -> namei 100 -> 106, and so this
+   one 168 -> 174.  None of it is a soundness question, it is all just "the
+   callee needs six more slots than it did" (SpecReadi.v's header has the
+   arithmetic). *)
+Definition K_kexec : nat := 174%nat.
 
 (* ===================================================================== *)
 (*  The argument-stack model.                                             *)

@@ -28,7 +28,7 @@
 
    (b) THE LOCKS ARRIVE.  Two of them, and both are persistent credentials
        rather than resources: [pr.lock] itself, which after the transmitter
-       moved out of it protects NOTHING ([SpecPrintkGen.pr_res] is [emp] -- see
+       moved out of it protects NOTHING ([pr_res] below is [emp] -- see
        (c)), and [UartTxInv.is_txlock γl γd], which every byte below needs.
        With them comes the ordinary spinlock-caller accounting: [cpu_own]
        threaded net-zero (printk leaves the interrupt level as it found it),
@@ -167,3 +167,125 @@ Module Type PRINTK.
       (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64) (lks : gset nat),
       wp_printk_sconf_body γpr γl γd γv m0 K bs n eb C dqf f descs b p lks.
 End PRINTK.
+
+(* ========================================================================
+   THE WEAK COROLLARY.  [wp_printk_sconf_body] above is the real, code-derived
+   contract, and it is what ~15 non-trace callers (main's boot banners,
+   usertrap's unexpected-scause diagnostic, and several fs.c error arms) do
+   NOT want to carry in full: threading [γl]/[bs]/a general [n] and the
+   [uart_sent_sub] trace postcondition through a whole proof cone just to
+   call printk once, on a path nobody reads the output of, is pure overhead.
+
+   [wp_printk_gen_sconf_body] is [wp_printk_sconf_body] with [n := 0] and
+   [bs := []] baked in and the trace/return-value postcondition dropped --
+   the strictly weaker fact those callers actually need.  [printk_env]
+   bundles exactly the extra ingredients that instantiation wants
+   ([γl]/[is_txlock] and the trivial [uart_sent_sub γd []] witness) as ONE
+   persistent credential, and [printk_gen_contract] packages the whole thing
+   as a [Prop] so a caller can carry it as a plain hypothesis instead of
+   instantiating a functor -- [LinkPrintk.v] proves it once, as a corollary
+   of [PRINTK] above, and every consumer threads that proof (or, for
+   main/main-secondary/usertrap, the [PRINTK_GEN] functor it also seals). *)
+
+(* the [pr] lock, the one object the general path touches that panic's own
+   call site does not thread explicitly.  [static struct { struct spinlock
+   lock; } pr;] -- the lock is the FIRST field, so the object's address IS
+   the lock's.  Same address as [PrintkArgs.pk_pr_lock]. *)
+Definition pr_lock : mword 64 := mword_of_int KernelSyms.pr.
+
+Section PrintkGen.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
+  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* pr.lock protects NOTHING: d80e61c5 put uartputc_sync's THR write under
+     [tx_lock], so the transmitter is [UartTxInv.tx_res]'s and pr.lock is left
+     serializing format walks, which has no separation-logic content.  [emp]
+     over [True] because it is the unit of [∗], so [newlock]'s resource
+     argument is discharged by nothing at all. *)
+  Definition pr_res (γd : uart_names) : iProp Σ := emp%I.
+
+  (* The whole general-path credential, and it is PERSISTENT -- which is
+     what lets it cross main's [started] invariant to the other harts for
+     free (claude-notes/projects/main-boot.md). [is_txlock]/[uart_sent_sub]
+     are what [wp_printk_sconf_body] additionally wants over [is_lock]/
+     [dev_inv] -- both already sitting at this credential's one construction
+     site (ProofMain.v's [mn_grp_printk], right where [console_caps] is built
+     from the very same [Htxinv]/[Hdoff]/[Hsent]).  [uart_sent_sub γd []] is
+     the trivial (any-trace) witness: gen callers make no claim about what
+     has been sent, so the empty sublist is all the corollary below ever
+     needs to hand [wp_printk_sconf_body]'s [bs]. *)
+  Definition printk_env (γpr : gname) (γd : uart_names) (γv : disk_names) : iProp Σ :=
+    (is_lock γpr pr_lock "pr"%string (pr_res γd) ∗
+     uart_dlab_off γd ∗
+     dev_inv γd γv ∗
+     (∃ γl : gname, is_txlock γl γd) ∗
+     uart_sent_sub γd [])%I.
+
+  Global Instance printk_env_persistent γpr γd γv : Persistent (printk_env γpr γd γv).
+  Proof. apply _. Qed.
+
+End PrintkGen.
+
+Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
+    `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+    (γpr : gname) (γd : uart_names) (γv : disk_names)
+    (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
+    (dqf : dfrac) (f : string) (descs : list pk_arg_desc) (b : bool) :=
+  let ra_idx : mword 5 := mword_of_int 1 in
+  let a0_idx : mword 5 := mword_of_int 10 in
+  let pcE : mword 64 := mword_of_int KernelSyms.printk in
+  let ra0 := m0 !!! Regidx ra_idx in
+  let ret_tgt := ret_pc ra0 in
+  let fmt := m0 !!! Regidx a0_idx in
+  (* a LITERAL, not [printk_stack <= K], so a caller's bare [ltac:(lia)]
+     still closes it -- [printk_stack] is opaque to [lia] and every
+     established call site just does [ltac:(lia)] against its own ambient
+     bound.  Matches [printk_stack] exactly: same frame, minus [γl]/[bs]/[n]
+     in this contract's own argument list. *)
+  (48 <= K)%nat ->
+  (Z.of_nat (String.length f) < 2147483645)%Z ->
+  nonul f = true ->
+  pk_kinds f = map pk_desc_kind descs ->
+  (length descs <= 7)%nat ->
+  sie_cap_gpr m0 K b pj -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_wp -∗
+  (* the interrupt level is left exactly as found: acquire/release pair *)
+  cpu_own 0%nat eb pj C b -∗
+  (* the general path's whole credential (persistent) *)
+  printk_env γpr γd γv -∗
+  fmt ↦ₛ{ dqf } f -∗
+  ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d) -∗
+  wp_next b pj (fun (CID : CpuId) =>
+    ∀ mf : regfile,
+    sie_cap_gpr mf K b pj -∗
+    pc_is ret_tgt -∗
+    ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
+    cpu_own 0%nat eb pj C b -∗
+    fmt ↦ₛ{ dqf } f -∗
+    ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d) -∗
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
+(* printk's general contract as a PROP, so a caller can carry it as a
+   HYPOTHESIS rather than instantiate a functor -- the [Prop] twin of
+   [SpecPanic.panic_wp_any], and the same idiom [ProofBmap.balloc_contract]
+   uses.  [LinkPrintk.printk_gen_contract_holds] proves it unconditionally, so
+   a holder pays nothing beyond the standing platform/stdlib axioms. *)
+Definition printk_gen_contract `{!riscvGS Σ, !sieG Σ, !lockG Σ}
+    `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId}
+    (γpr : gname) (γd : uart_names) (γv : disk_names) : Prop :=
+  forall (CIDp : CpuId)
+    (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
+    (dqf : dfrac) (f : string) (descs : list pk_arg_desc) (b : bool),
+    wp_printk_gen_sconf_body (CID := CIDp) γpr γd γv m0 K eb pj C dqf f descs b.
+
+Module Type PRINTK_GEN.
+  Parameter wp_printk_gen_sconf :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ}
+      `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+      (γpr : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
+      {dqf : dfrac} (f : string) (descs : list pk_arg_desc) (b : bool),
+      wp_printk_gen_sconf_body γpr γd γv m0 K eb pj C dqf f descs b.
+End PRINTK_GEN.
