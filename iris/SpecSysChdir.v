@@ -108,6 +108,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
+Require Import LockRank.
 Require Import WpNext.
 Require Import WpLock.
 Require Import PanicStub.
@@ -189,7 +190,7 @@ Definition wp_sys_chdir_sconf_body
     (v : mword 64)                                      (* syscall argument 0  *)
     (pid : mword 32) (V : pprivate)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_chdir in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -218,8 +219,14 @@ Definition wp_sys_chdir_sconf_body
      carries *)
   pv_tf V !! tf_arg_idx 0 = Some v ->
   sie_cap_gpr m K b pj -∗
-  (* entered with no lock held *)
-  cpu_own 0 eb pj C b -∗
+  (* ENTERED WITH NO LOCK HELD, and that is why there is no [locks_below]
+     premise here where sys_close has one: the depth is pinned at ZERO, so
+     [CpuOwn.cpu_own_zero_empty] DERIVES [lks = ∅] and every order goal the
+     nine callees raise -- begin_op / iput / iunlockput / end_op at "log",
+     ilock at "bcache", iunlock at "sleep lock", argstr at "kmem" -- is
+     [locks_below ∅ _].  Taking the premise anyway would push an obligation
+     out into [SpecSyscall] for nothing. *)
+  cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true] -- which this
      contract's own premise forces -- so no caller gains an obligation; it
      is threaded rather than framed because begin_op / ilock / iput /
@@ -265,7 +272,7 @@ Definition wp_sys_chdir_sconf_body
          in.  [uptd_ext] is argstr's own report, relayed. *)
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -275,7 +282,6 @@ Definition wp_sys_chdir_sconf_body
       (* the free pool only SHRINKS -- iput's truncate arm is the only mover *)
       ⌜used' ⊆ used⌝ -∗
       bitmap_res gfs bmapstart cov logstart size used' -∗
-      procs_inv gs -∗
       (* the allowance, whole: see the header's ledger *)
       iref_slots 2 -∗
       sys_chdir_post γf pj pid (upd_upt V P')
@@ -303,8 +309,8 @@ Module Type SYSCHDIR.
       (v : mword 64)
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_sys_chdir_sconf_body γf γa gs j gl gu gd gk pd pav pu bn g gfs gi
                               cn gtl cov logstart bmapstart inodestart nib
-                              size dev used dqb dqs v pid V m K eb C b.
+                              size dev used dqb dqs v pid V m K eb C b lks.
 End SYSCHDIR.
