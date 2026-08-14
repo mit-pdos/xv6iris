@@ -661,6 +661,77 @@ and each is a real piece of work with a known shape:
    no wider fallout. Validated by a from-scratch GCP `make proofs`:
    `MAKEEXIT=0`, 7 files rebuilt, zero errors.
 
+## THE TRAPFRAME BORROW — a SECOND, structurally identical fix, landed
+
+`usertrap_res` also PERMANENTLY holds the trapframe page (`ProcInv.tf_page`,
+VA tier, inside `proc_priv`, inside `ut_own`) — `ut_own`'s own header comment
+used to say usertrap is "the ONE OWNER of ... the trapframe page (at the VA
+tier) -- which is why SpecUsertrap.v's boundary hands over neither." That was
+a deliberate, correct design UNTIL `Rut` started threading `usertrap_res`
+through `user_inv`: uservec ALSO owns the same page's bytes, at the physical
+tier, as `tf_pa` cells (`SpecUserret.v`'s vocabulary), for the whole
+44-instruction save/restore walk -- a second full claim on the same bytes,
+same shape as the `mie`/`mideleg`/`menvcfg` conflict.
+
+Unlike that fix, this one did NOT widen `wp_usertrap_body`'s own type (which
+would have rippled into `ut_own`/`ut_env`, hence `ut_dispatch` and every one
+of the four block lemmas, hence -- transitively -- every syscall/devintr/
+vmfault/printk-general proof that consumes `proc_priv` internally: a MUCH
+wider blast radius than mie/mideleg's, since those files are NOT in this
+project's own cone). Instead, `SpecUsertrap.USERTRAP_RES` gained one new
+accessor, exposed alongside `usertrap_res` itself:
+
+```coq
+Parameter usertrap_res_tf_open :
+  ... (pt : uptd) (ksp : mword 64),
+  usertrap_res pt ksp -∗
+  ∃ ws : list (mword 64), tf_page (ud_tfp pt) ws ∗
+    (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res pt ksp).
+```
+
+A HOLDER of `usertrap_res` (uservec, once it receives it as an ordinary
+premise -- see `uservec.md`) can borrow `tf_page` out for a moment and hand
+back a DIFFERENT one to reseal it. Concretely: `UsertrapRes.proc_priv_tf_open`
+splits `proc_priv` apart (the closer moves `V` to `upd_tf V ws'` -- `pv_upt`
+is unchanged by `upd_tf`, so `pt` is unaffected); `ut_res_tf_open` lifts it
+through `ut_own_priv`; `UtResFits`/`ProofUsertrap.v`'s `UsertrapProof` each
+supply the concrete instance. `ut_own`/`ut_env`/`ut_dispatch`/the four block
+lemmas/every syscall-handler proof are UNTOUCHED -- confirmed by the same
+from-scratch GCP `make proofs` used for the mie/mideleg fix.
+
+**The proof-engineering trap this hit, worth recording**: `proc_priv_tf_open`
+needs to reassemble `proc_priv γf pa pid (upd_tf V ws')` from pieces obtained
+against the ORIGINAL `V`. `upd_tf` only touches `pv_tf`, so every other
+projection is DEFINITIONALLY the same value -- but getting Rocq to see that
+without hanging took five failed attempts, in order: (1) a bare `cbn` (no
+delta list) to force the reduction -- hangs, chasing the unfold through
+`proc_fields`/`proc_pt_at`/`proc_ofiles`, the exact "bare `cbn` next to a
+definition that expands into a big structure" trap durable-notes already
+warns about; (2) a SECOND `rewrite /proc_priv_core` once the first
+(unrelated) one had already exhausted the pattern -- also hangs (rewrite's
+"nothing left to match" search is not fast just because the search space is
+empty); (3) a TARGETED `cbn [proc_priv proc_priv_core upd_tf pv_sz ...]` --
+completes instantly itself, but the FOLLOWING bare `iFrame` then hangs; (4)
+per-field `assert ... by reflexivity` + `rewrite` by name -- finally a FAST,
+DIAGNOSABLE failure ("LHS does not match any subterm") instead of a hang,
+which is what actually cracked the case: `proc_fields` takes the WHOLE
+record `V` as its argument, not one of its projections, so no per-field
+equality ever reaches it, and it was `proc_fields`'s mismatch `iFrame` was
+hanging on, not a reduction issue at all. (5) Adding
+`proc_fields pa dq (upd_tf V ws') = proc_fields pa dq V` (also `reflexivity`
+— the record-update again cancels under `proc_fields`'s own unused-field
+irrelevance) still left a bare `iFrame` hanging even on the now-fully-reduced
+goal -- `iFrame`'s own typeclass-based `Frame` search appears to be
+pathological in this section's large ambient instance context (14+ typeclass
+parameters) independent of matching. The fix that finally worked: bypass
+`iFrame` entirely with explicit `iSplitL "..."; [iExact "..." | ...]` chains
+-- purely structural, no typeclass search. **Takeaway for next time a
+`proc_priv`/`pprivate`-shaped record needs reassembling after an `upd_*`:
+go straight to per-field `reflexivity` equalities for any WHOLE-record
+argument (not just individual projections), and reach for explicit
+`iSplitL`/`iExact` over `iFrame` on the first sign of an unexplained hang in
+a heavily-instanced section -- don't spend five rounds finding that out.**
+
 ## THE `R`-AS-A-HART-FAMILY FIX — landed
 
 `usertrap_post` took `R : uptd -> mword 64 -> iProp Σ`, so the `R pt' ksp` it

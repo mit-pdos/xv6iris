@@ -109,6 +109,7 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import FdSlots.
 Require Import FileInvDefs.
+Require Import ProcInv.
 (* the classes the module type's [usertrap_res] parameter needs -- see the
    note above [Module Type USERTRAP] at the foot of this file *)
 Require Import BioInv.
@@ -344,6 +345,29 @@ Module Type USERTRAP_RES.
              !kallocG Σ, !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId},
       uptd -> mword 64 -> iProp Σ.
+
+  (* THE TRAPFRAME BORROW.  [usertrap_res] owns the trapframe page at the
+     VA tier internally (via [ProcInv.proc_priv]/[tf_page]) -- it is the
+     ONE OWNER, per [UsertrapRes.ut_own]'s own header comment -- but uservec
+     ALSO owns the same page's bytes, at the physical tier, as [tf_pa]
+     cells (SpecUserret.v's vocabulary), for the whole 44-instruction save/
+     restore walk.  Rather than have [usertrap_res] itself borrow-and-return
+     the page (which would ripple [wp_usertrap_body]'s type and, through it,
+     ONLY every internal usertrap block that already threads [usertrap_res]
+     opaquely -- no external file), this accessor lets a HOLDER of
+     [usertrap_res] pull [tf_page] out for a moment and hand back a
+     (possibly different) one to reseal it -- exactly the shape uservec's
+     tail needs: open, convert its own [tf_pa] cells in, close. Concrete
+     proof: [UsertrapRes.usertrap_res_tf_open], via [proc_priv_split] +
+     [ut_own_priv]. *)
+  Parameter usertrap_res_tf_open :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
+      usertrap_res pt ksp -∗
+      ∃ ws : list (mword 64), tf_page (ud_tfp pt) ws ∗
+        (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res pt ksp).
 End USERTRAP_RES.
 
 Module Type USERTRAP.
