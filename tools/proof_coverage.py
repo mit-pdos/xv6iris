@@ -500,6 +500,7 @@ def scan_proofs(repo: str) -> Proofs:
 
     known = {os.path.basename(f) for f in files}
     body_of_modtype = {}   # body definition name -> modtype (filled from Parameters)
+    body_delegates = {}    # thin instantiation body -> _body names its RHS references
 
     for path in files:
         base = os.path.basename(path)
@@ -548,6 +549,12 @@ def scan_proofs(repo: str) -> Proofs:
             elif kw == "Definition" and name.endswith("_body"):
                 m = ENTRY_PC.search(text)
                 if not m:
+                    # No entry pc of its own: possibly a thin instantiation of
+                    # an indexed body (wp_f_sconf_body := wp_f_pre_body ... pre).
+                    refs = [b for b in re.findall(r"\b(\w+_body)\b", text)
+                            if b != name]
+                    if refs:
+                        body_delegates[name] = refs
                     continue
                 p.specs.append(Spec(
                     file=base, line=line, body=name,
@@ -555,6 +562,20 @@ def scan_proofs(repo: str) -> Proofs:
                     offset=int(m.group(2), 0) if m.group(2) else 0,
                     whole=runs_to_end(text, m.group(1), local_defs)))
 
+    # A Module Type may export a thin instantiation of an indexed body
+    # (wp_f_sconf_body := wp_f_pre_body ... pre); credit the pc-pinning body
+    # through the delegation, transitively.
+    changed = True
+    while changed:
+        changed = False
+        for thin, refs in body_delegates.items():
+            mt = body_of_modtype.get(thin)
+            if not mt:
+                continue
+            for r in refs:
+                if r not in body_of_modtype:
+                    body_of_modtype[r] = mt
+                    changed = True
     for s in p.specs:
         s.modtype = body_of_modtype.get(s.body, "")
     return p
