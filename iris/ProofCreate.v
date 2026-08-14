@@ -1114,12 +1114,24 @@ Proof.
   unfold SpecNamex.walk_spend in Hn. lia.
 Qed.
 
+(* the FIRST interior link's spend, at the two unknown booleans: [cru] is
+   true (create's own ialloc/iupdate put the child's inode block in the
+   set) and the window is DIRECT (slot 0 of a fresh child), so it is at
+   most two -- which is what leaves the second link its four. *)
+Lemma cr_mkdir_dl1 (nc n' : nat) (crb crd al : bool) :
+  ((nc - wi16_spend crb crd true al false)%nat <= n')%nat ->
+  ((nc - 2)%nat <= n')%nat.
+Proof.
+  intro H. unfold wi16_spend, SpecBmap.bmap_cost in *.
+  destruct crb, crd, al; simpl in *; lia.
+Qed.
+
 Lemma cr_mkdir_dl3_need (n3 n4 n5 : nat)
-    (crb1 crd1 crb2 al2 crb3 ind3 : bool) :
+    (crb1 crd1 crb2 crd2 al2 crb3 ind3 : bool) :
   (8 <= n3)%nat ->
   (crb1 = false -> (9 <= n3)%nat) ->
   ((n3 - wi16_spend crb1 crd1 true true false)%nat <= n4)%nat ->
-  ((n4 - wi16_spend crb2 true true al2 false)%nat <= n5)%nat ->
+  ((n4 - wi16_spend crb2 crd2 true al2 false)%nat <= n5)%nat ->
   crb2 = true -> crb3 = true ->
   (SpecDirlink.dl_need crb3 ind3 <= n5)%nat.
 Proof.
@@ -1127,15 +1139,15 @@ Proof.
   unfold wi16_spend, SpecBmap.bmap_cost, SpecDirlink.dl_need,
          wi16_need, SpecBmap.bmap_need in *.
   destruct crb1; [| pose proof (Hw eq_refl) ];
-    destruct crd1, al2, ind3; simpl in *; lia.
+    destruct crd1, crd2, al2, ind3; simpl in *; lia.
 Qed.
 
 Lemma cr_mkdir_ip (n3 n4 n5 n6 : nat)
-    (crb1 crd1 crb2 al2 crb3 crd3 cru3 al3 ind3 : bool) :
+    (crb1 crd1 crb2 crd2 al2 crb3 crd3 cru3 al3 ind3 : bool) :
   (8 <= n3)%nat ->
   (crb1 = false -> (9 <= n3)%nat) ->
   ((n3 - wi16_spend crb1 crd1 true true false)%nat <= n4)%nat ->
-  ((n4 - wi16_spend crb2 true true al2 false)%nat <= n5)%nat ->
+  ((n4 - wi16_spend crb2 crd2 true al2 false)%nat <= n5)%nat ->
   ((n5 - wi16_spend crb3 crd3 cru3 al3 ind3)%nat <= n6)%nat ->
   crb2 = true -> crb3 = true ->
   (iput_units <= n6)%nat /\ (1 <= n6)%nat.
@@ -1143,20 +1155,20 @@ Proof.
   intros H3 Hw H4 H5 H6 -> ->.
   unfold wi16_spend, SpecBmap.bmap_cost, iput_units in *.
   destruct crb1; [| pose proof (Hw eq_refl) ];
-    destruct crd1, al2, crd3, cru3, al3, ind3; simpl in *; lia.
+    destruct crd1, crd2, al2, crd3, cru3, al3, ind3; simpl in *; lia.
 Qed.
 
-Lemma cr_mkdir_n5 (n3 n4 n5 : nat) (crb1 crd1 crb2 al2 : bool) :
+Lemma cr_mkdir_n5 (n3 n4 n5 : nat) (crb1 crd1 crb2 crd2 al2 : bool) :
   (8 <= n3)%nat ->
   (crb1 = false -> (9 <= n3)%nat) ->
   ((n3 - wi16_spend crb1 crd1 true true false)%nat <= n4)%nat ->
-  ((n4 - wi16_spend crb2 true true al2 false)%nat <= n5)%nat ->
+  ((n4 - wi16_spend crb2 crd2 true al2 false)%nat <= n5)%nat ->
   crb2 = true -> (6 <= n5)%nat.
 Proof.
   intros H3 Hw H4 H5 ->.
   unfold wi16_spend, SpecBmap.bmap_cost in *.
   destruct crb1; [| pose proof (Hw eq_refl) ];
-    destruct crd1, al2; simpl in *; lia.
+    destruct crd1, crd2, al2; simpl in *; lia.
 Qed.
 
 (* ...and the three FAIL exits' readings.  The first two entries discharge
@@ -1173,16 +1185,16 @@ Proof.
   destruct crb, crd, al; simpl in *; lia.
 Qed.
 
-Lemma cr_mkdir_fail2 (n3 n4 n' : nat) (crb1 crd1 crb2 al2 : bool) :
+Lemma cr_mkdir_fail2 (n3 n4 n' : nat) (crb1 crd1 crb2 crd2 al2 : bool) :
   (8 <= n3)%nat ->
   ((n3 - wi16_spend crb1 crd1 true true false)%nat <= n4)%nat ->
-  ((n4 - wi16_spend crb2 true true al2 false)%nat <= n')%nat ->
+  ((n4 - wi16_spend crb2 crd2 true al2 false)%nat <= n')%nat ->
   crb2 = true ->
   (iput_units <= n')%nat /\ (S iput_units <= n')%nat.
 Proof.
   intros H3 H4 H5 ->.
   unfold wi16_spend, SpecBmap.bmap_cost, iput_units in *.
-  destruct crb1, crd1, al2; simpl in *; lia.
+  destruct crb1, crd1, crd2, al2; simpl in *; lia.
 Qed.
 
 Lemma cr_mkdir_fail3 (n5 n' : nat) (crb3 crd3 cru3 al3 ind3 : bool) :
