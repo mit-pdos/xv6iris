@@ -1908,11 +1908,13 @@ Section ProofVirtioDiskRwF.
     (* ---- P3: the chain formatting ---- *)
     iApply (P3.wp_vdrw_p3_seam (CID := CIDa) γk γs j γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-              (vdrw_sector_raw bno) dsk0 m lks with "Htext Hgeom Hbdisk").
+              (vdrw_sector_raw bno) dsk0 m ({[lock_rank "virtio_disk"]} ∪ lks)
+              with "Htext Hgeom Hbdisk").
     (* ---- P4: the ring write and THE PUBLISH ---- *)
     iApply (P4.wp_vdrw_p4_seam (CID := CIDa) γk γs j γu γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-              bno bs_buf bs_disk m kq lks Hbnolt Hlenbuf Hbufkd
+              bno bs_buf bs_disk m kq ({[lock_rank "virtio_disk"]} ∪ lks)
+              Hbnolt Hlenbuf Hbufkd
               with "Htext Hdinv Hgeom Hbufm Hdisk Hpend").
     (* ---- P5: the device kick and the completion wait ---- *)
     iApply (P5.wp_vdrw_p5_seam (CID := CIDa) γk γs j γl γu γd pd pav pu K eb C
