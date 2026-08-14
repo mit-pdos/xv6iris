@@ -1414,6 +1414,17 @@ Proof.
   exact (z_mk_flags _ f Hf).
 Qed.
 
+(* THE FLAG BYTE A uvmalloc'd LEAF CARRIES.  mappages ors in PTE_V and sets
+   no A/D bit, so the ten flag bits are exactly [perm | 1] -- which is what
+   lets a caller holding [SpecUvmalloc]'s new-leaf conjunct compute
+   uvmclear's [Z.land (pte_flags10 w) 1007]. *)
+Lemma uvm_pte_flags (perm : Z) (r : mword 64) :
+  (0 <= perm < 1024)%Z -> pte_flags10 (uvm_pte perm r) = Z.lor perm 1.
+Proof.
+  intro Hp. unfold uvm_pte, mappages_pte.
+  apply pte_flags10_mk. exact (pb_lor1_range perm Hp).
+Qed.
+
 (* a leaf with no extension bits IS its ppn and its flag byte.  ([pte_hi_zero]
    supplies the hypothesis from the four 4K-leaf predicates.) *)
 Lemma mk_pte_eta (w : mword 64) :

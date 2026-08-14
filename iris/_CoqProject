@@ -1082,6 +1082,8 @@ ProofKexecSeam.v
 ProofKexecA.v
 ProofKexecB.v
 ProofKexecB2.v
+ProofKexecB3.v
+ProofKexecC.v
 SpecSysFstat.v
 SpecSysRead.v
 SpecSysWrite.v

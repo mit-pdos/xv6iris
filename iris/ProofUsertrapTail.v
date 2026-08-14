@@ -39,7 +39,7 @@ From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras.
+Require Import RiscvLang RiscvPtsto RiscvExtras RiscvFetchExec.
 Require Import PageGeom.
 Require Import RegFile HartTp WpNext CpuOwn.
 Require Import WpMmodeLeafBase.
@@ -168,7 +168,8 @@ Section UtRet2.
      needed.  [ut_ret] below applies it at [(CID := CIDp)]. *)
   Lemma ut_ret2 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 mf : regfile) (av nx : nat) (C : iProp Σ) (b : bool)
-      (uepc : mword 64) (vb : mword 1) :
+      (uepc : mword 64) (vb : mword 1)
+      (mie_v menvcfg0 : mword 64) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
@@ -178,6 +179,13 @@ Section UtRet2.
     mf !!! Regidx csp_rs1 = pa_stk ksp 4 ->
     mf !!! Regidx Rs1 = un_pj N ->
     ut_cs m0 mf ->
+    (* [mie]/[menvcfg] -- each a unique architectural constant -- are pinned
+       and threaded through the whole call (see UsertrapRes.v's [ut_trap]
+       header comment); [mideleg]'s value is NOT (see [usertrap_post]'s
+       comment) and is discovered fresh from [sconf] below, not threaded
+       as a parameter here. *)
+    mie_v = MIE_S ->
+    menvcfg0 = MENVCFG_S ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xb2)) -∗
     (* ---- exactly what prepare_return handed back ---- *)
@@ -195,10 +203,11 @@ Section UtRet2.
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
-      (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0) -∗
+      (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
+                     mie_v menvcfg0) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcs.
+    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcs Hmiev Hmenvv.
     (* the budget, in numbers [lia] can see -- every one of these is a
        [Definition] and the index arithmetic below is what needs them *)
     pose proof Hav as Hav'.
@@ -494,13 +503,25 @@ Section UtRet2.
     (*  THE EXIT: the payload back into the boundary's pieces.             *)
     (* ================================================================== *)
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-    iDestruct (sconf_priv_open with "Hsc") as (msg) "(Hcl & Hpriv & Hmsown)".
+    (* [sconf] is destructured DIRECTLY here -- not via [sconf_priv_open],
+       whose closer would re-park [mie]/[mideleg]/[menvcfg] rather than
+       hand them out loose (see [ut_trap]'s header comment). *)
+    iDestruct "Hsc" as "(_ & _ & Hpriv & Hmsx & Hmiex & Hmenvx)".
+    iDestruct "Hmsx" as (msg) "Hmsown".
     iDestruct (ut_exit_ms_ok msg with "Hmsown Hsret Hq4") as %Hretms2.
     iDestruct "Hmsown" as "(Hms & Hhalf & Htie & %Hmsg)".
     iDestruct (sret_bits_agree _ _ _ _ with "Htie Hsret") as %[Hspp2 Hspie2].
     iDestruct (ghost_var_agree with "Hhalf Hq4") as %Hsie2.
     rewrite /sret_tie Hspp2 Hspie2.
     rewrite Hsie2.
+    (* [mie]/[menvcfg]: each pinned to its unique constant, so the exit
+       value provably equals what [ut_trap_open] was handed at entry.
+       [mideleg]: a fresh witness, handed to [Hcont] as-is (see
+       [usertrap_post]'s comment). *)
+    iDestruct "Hmiex" as (mdv0) "(Hmie & Hmdl & %Hmaskx)".
+    subst mie_v.
+    iDestruct "Hmenvx" as (menvcfg0') "(Hmenv & _ & _ & _ & _ & %Hmeq)".
+    subst menvcfg0' menvcfg0.
     (* [mf'] IS [tp_pin S9]: usertrap may have MIGRATED, so the tp SLOT of the
        map it threaded still holds the ENTRY hart's id while [gpr_file] holds
        the pinned one.  Handing over the pinned map makes the boundary's
@@ -544,9 +565,11 @@ Section UtRet2.
     iSpecialize ("Hcont" $! CID with "[%]"); [intros _; reflexivity|].
     iDestruct ("Hownback" $! V with "Hpv Hsy") as "Hown".
     iApply ("Hcont" $! (pv_upt V) (tp_pin S9) msg
-              (kvi_satp_word (ud_root (pv_upt V))) (mepc_val uepc) scv stv
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [%]
-                    Hhs Hpriv Hms Hscause Hstval Hsepc [Hstvec] Hpc [Hfile] [-]").
+              (kvi_satp_word (ud_root (pv_upt V))) (mepc_val uepc) scv stv mdv0
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
+                    Hhs Hpriv Hms Hscause Hstval Hsepc [Hstvec] Hpc [Hfile]
+                    Hmie Hmdl Hmenv [-]").
+    - exact Hmaskx.
     - exact Htfpe.
     - exact Haccwf.
     - exact Hmapwf.
@@ -567,16 +590,15 @@ Section UtRet2.
       iSplitR; [iPureIntro; exact Hksp|].
       iSplitR; [iPureIntro; exact (conj Hj (conj Hjl (conj Hlen Hlg)))|].
       iSplitR; [iPureIntro; exact Hav|].
-      (* the mstatus and privilege CELLS are not in [ut_trap]: they go to the
-         boundary raw, and [sconf_priv_closer] takes them back as arguments. *)
-      iSplitL "Hcap Hcl Hhalf Htie Hq4 Hkptr Hsret Hcpu Hclm".
+      (* the mstatus and privilege CELLS, and now [mie]/[mideleg]/[menvcfg]
+         too, are NOT in [ut_trap]: they go to the boundary raw (above). *)
+      iSplitL "Hcap Hhalf Htie Hq4 Hkptr Hsret Hcpu Hclm".
       + rewrite /ut_trap /ut_stack /ut_ghosts.
         iDestruct "Hcap" as "(Hstk & Hstr & Harm)".
         iSplitL "Hstk". { rewrite /S9 upd_eq. iExact "Hstk". }
         iSplitL "Hstr". { iExact "Hstr". }
         iSplitL "Harm". { iExact "Harm". }
         iSplitL "Hkptr". { iExact "Hkptr". }
-        iSplitL "Hcl". { iExact "Hcl". }
         iSplitL "Hhalf Hq4 Htie Hsret".
         { iSplitL "Hhalf". { iExact "Hhalf". }
           iSplitL "Hq4". { iExact "Hq4". }
@@ -600,7 +622,8 @@ Section UtRet.
   (* +0xae: jal prepare_return, then the second half at ITS hart.          *)
   (* ==================================================================== *)
   Lemma ut_ret (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
-      (m0 m : regfile) (av nx : nat) (C : iProp Σ) (b : bool) :
+      (m0 m : regfile) (av nx : nat) (C : iProp Σ) (b : bool)
+      (mie_v menvcfg0 : mword 64) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
@@ -610,6 +633,8 @@ Section UtRet.
     m !!! Regidx csp_rs1 = pa_stk ksp 4 ->
     m !!! Regidx Rs1 = un_pj N ->
     ut_cs m0 m ->
+    mie_v = MIE_S ->
+    menvcfg0 = MENVCFG_S ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xae)) -∗
     sie_cap_gpr m nx b (un_pj N) -∗
@@ -617,10 +642,11 @@ Section UtRet.
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
-      (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0) -∗
+      (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
+                     mie_v menvcfg0) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs.
+    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     unfold K_syscall, K_sys_exit, K_kexit in Hks.
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -684,6 +710,7 @@ Section UtRet.
     assert (HVrupt : pv_upt Vr = pv_upt V) by (rewrite /Vr; destruct V; reflexivity).
     iDestruct ("Hownback" $! Vr with "Hpv Hsy") as "Hown".
     iApply (ut_ret2 (CID := CIDp) Rsys N Vr pt ksp m0 mf av nx C b uepc vb
+              mie_v menvcfg0
               Hwf' Hav Hnx ltac:(rewrite HVrupt; exact Htfpe) Hksp Hm0sp
               ltac:(rewrite (callee_saved_lookup Hcspr csp_rs1
                               ltac:(vm_compute; reflexivity)); exact HM1sp)
@@ -691,6 +718,7 @@ Section UtRet.
                               ltac:(vm_compute; reflexivity)); exact HM1s1)
               ltac:(exact (ut_cs_trans m0 M1 mf HcsM1
                              (ut_cs_of_callee_saved _ _ Hcspr)))
+              Hmiev Hmenvv
               with "Htext Hpc Hcg Hcpu Hclm Hsepc Hscause Hstval Hsret Hstvec
                     Hq4 Hkptr [Hown] Hframe Hcont").
     rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
@@ -713,7 +741,8 @@ Section UtA6.
      dead code in the resource sense -- kexit never returns -- so the [c.li
      s2,0] is stepped and its value never read again. *)
   Lemma ut_a6 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
-      (m0 m : regfile) (av nx : nat) (C : iProp Σ) (b : bool) :
+      (m0 m : regfile) (av nx : nat) (C : iProp Σ) (b : bool)
+      (mie_v menvcfg0 : mword 64) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
@@ -723,6 +752,8 @@ Section UtA6.
     m !!! Regidx csp_rs1 = pa_stk ksp 4 ->
     m !!! Regidx Rs1 = un_pj N ->
     ut_cs m0 m ->
+    mie_v = MIE_S ->
+    menvcfg0 = MENVCFG_S ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xa6)) -∗
     sie_cap_gpr m nx b (un_pj N) -∗
@@ -730,10 +761,11 @@ Section UtA6.
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
-      (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0) -∗
+      (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
+                     mie_v menvcfg0) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs.
+    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     unfold K_syscall, K_sys_exit, K_kexit in Hks.
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -916,7 +948,9 @@ Section UtA6.
       iDestruct (wp_next_retarget CID3 CID4 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ut_ret (CID := CID4) Rsys N V pt ksp m0 mf av nx C b
+                mie_v menvcfg0
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
+                Hmiev Hmenvv
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].
@@ -942,7 +976,8 @@ Section UtFa.
      them BACK -- it parks and resumes, so its crossing is real and everything
      has to be re-anchored on the far side. *)
   Lemma ut_fa (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
-      (m0 m : regfile) (av nx : nat) (C : iProp Σ) (b : bool) :
+      (m0 m : regfile) (av nx : nat) (C : iProp Σ) (b : bool)
+      (mie_v menvcfg0 : mword 64) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
@@ -952,6 +987,8 @@ Section UtFa.
     m !!! Regidx csp_rs1 = pa_stk ksp 4 ->
     m !!! Regidx Rs1 = un_pj N ->
     ut_cs m0 m ->
+    mie_v = MIE_S ->
+    menvcfg0 = MENVCFG_S ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xfc)) -∗
     sie_cap_gpr m nx b (un_pj N) -∗
@@ -959,10 +996,11 @@ Section UtFa.
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
-      (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0) -∗
+      (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
+                     mie_v menvcfg0) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs.
+    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     unfold K_syscall, K_sys_exit, K_kexit in Hks.
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -1019,7 +1057,9 @@ Section UtFa.
       iDestruct (wp_next_retarget CID CID2 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ut_ret (CID := CID2) Rsys N V pt ksp m0 M1 av nx C b
+                mie_v menvcfg0
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp HM1sp HM1s1 HcsM1
+                Hmiev Hmenvv
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].
@@ -1103,7 +1143,9 @@ Section UtFa.
       iDestruct (wp_next_retarget CID4 CID5 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ut_ret (CID := CID5) Rsys N V pt ksp m0 mf av nx C b
+                mie_v menvcfg0
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
+                Hmiev Hmenvv
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].

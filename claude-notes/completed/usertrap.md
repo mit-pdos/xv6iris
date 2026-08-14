@@ -616,14 +616,50 @@ and each is a real piece of work with a known shape:
    footprint from `ud_um` and therefore establishes
    `udata_cov (ud_um pt') (ud_data pt')` by construction
    (`ProcPtOwn.ud_pas_cov`).
-3. **`user_cfg C` ⟷ `sconf`'s config cells.** Plain cells on both sides;
-   needs `uc_mie C = MIE_S`, since `sconf` PINS mie while `ucfg` only
-   constrains `mie & ~mideleg = 0`. **Checked, and it is free**: the record
-   constructor `UCfg` appears NOWHERE in the tree — no concrete `ucfg` is
-   ever built (every user-tier statement carries `C` as a parameter), so the
-   composition that eventually builds one just sets `uc_mie := MIE_S`
-   (`0x220`), for which `uc_mm` holds at `mideleg = 0xffff`. No field change,
-   no ripple; the seam needs only the premise.
+3. **`user_cfg C` ⟷ `sconf`'s config cells — DONE, but the "it is free" call
+   below was WRONG; see the correction.** Original claim: needs
+   `uc_mie C = MIE_S`, and since no concrete `ucfg` is ever built in the
+   tree, the eventual composition can just set `uc_mie := MIE_S` for free,
+   no ripple. **That undersold the problem.** The real issue surfaced only
+   once `usertrap_res` started getting threaded THROUGH `user_inv` (the
+   `Rut` conjunct, `uservec.md`'s "ARCHITECTURAL CORRECTION" section):
+   `usertrap_res`'s `ut_trap` bundled `IntrDefs.sconf_priv_closer`, which —
+   per `sconf_priv_open`'s own proof — captures `mie`/`mideleg`/`menvcfg`
+   PERMANENTLY the moment it is first built (every later open/close cycle
+   re-parks the SAME captured cells, never releasing them loose). Meanwhile
+   `user_cfg` ALSO claims full, continuous ownership of the same three
+   registers the whole time uservec/userret/user-mode run. Once `Rut` makes
+   both live in the same proof state simultaneously, that is a genuine
+   double-ownership conflict, not a free premise. **Fix landed** (commit on
+   `usertrap-res-mie-split`, branched off the `uservec-rut-threading`
+   session): `wp_usertrap_body` now borrows `mie`/`mideleg`/`menvcfg` as
+   ORDINARY LOOSE CELLS for the duration of the call (entry premises
+   `hw_config -∗ minstret_inv -∗ mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗
+   menvcfg ↦ᵣ menvcfg0 -∗`, mirroring exactly how userret already borrows
+   them), and hands them back at `usertrap_post`'s exit — `mie_v`/`menvcfg0`
+   echoed unchanged (each a unique architectural constant, so entry=exit is
+   provable), `mideleg` as a FRESH existential (`mdv0` moved from
+   `usertrap_post`'s fixed parameter list into its own `∀`-bound list,
+   alongside `ms'`/`sc'`/`stval'`) — because `mideleg`'s value is a genuine
+   existential inside `sconf`, and nothing tracks "the same witness" across
+   usertrap's internal instruction-step lemmas, which carry `sie_cap_gpr`
+   (hence `sconf`) opaquely the whole way from `ut_entry` to `ut_ret2`'s
+   exit, never re-destructuring it in between — so trying to prove the exit
+   value equals the entry one is not just extra work, it is not provable
+   with the resources on hand. `ut_trap` drops `sconf_priv_closer` entirely;
+   `ut_trap_open` builds `sconf` directly from the fresh loose cells instead
+   of applying a pre-baked closer; `ut_ret2`'s exit epilogue destructures
+   `sconf` directly (not via `sconf_priv_open`) to extract the three cells
+   loose. Blast radius: exactly six files, all of them already in this
+   project's own cone — `SpecUsertrap.v`, `UsertrapRes.v`, `ProofUsertrap.v`,
+   `ProofUsertrapTail.v`, `ProofUsertrapArms.v`, `ProofUsertrapSys.v` — the
+   four block lemmas (`ut_56`/`ut_d0`/`ut_e8`/`ut_90`) and the two tail
+   wrappers (`ut_ret`/`ut_a6`/`ut_fa`, `ut_ret2`) each just gained
+   `(mie_v menvcfg0 : mword 64)` params threaded straight through; nothing
+   outside this project's own files ever referenced `usertrap_res`/
+   `usertrap_post` at the time of the fix, confirmed by grep, so there was
+   no wider fallout. Validated by a from-scratch GCP `make proofs`:
+   `MAKEEXIT=0`, 7 files rebuilt, zero errors.
 
 ## THE `R`-AS-A-HART-FAMILY FIX — landed
 

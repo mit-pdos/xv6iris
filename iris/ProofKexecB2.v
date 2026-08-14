@@ -10,13 +10,14 @@
 
    ---- THE FRAME ALGEBRA -------------------------------------------------
 
-   [kxc_frameB65] is [ProofKexecSeam.kxc_frameB] with slot 65 PINNED, plus
+   [kxc_frameBpin] is [ProofKexecSeam.kxc_frameB] with slots 63 AND 65
+   PINNED, plus
    the three moves between it and its neighbours.  Slot 65 is the C's [sz1],
    and it is existential in [kxc_frameB] for a good reason -- at +0x0cc
    nothing has written it yet -- but from +0x180 on it holds a value the
    [bad:] tail READS, so every state in this file pins it.
 
-   [kxc_frameB65_to_A6] is the move that tail makes: slots 5 and 7..13 lose
+   [kxc_frameBpin_to_A6] is the move that tail makes: slots 5 and 7..13 lose
    their values (they are lazily spilled, and phase A's tail reaches the
    epilogue on paths where they were never written, so [kxc_frameA6] takes
    them existentially) and the NAMED elf run goes back into the middle
@@ -174,8 +175,22 @@ Section KexecB2Frame.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
-  Definition kxc_frameB65 (sp0 ra0 s00 s10 s20 pv av : mword 64)
-      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w65 w67 : mword 64) : iProp Σ :=
+  (* slots 55..62 are [ph]'s seven words and the unused one; slot 63 is [off],
+     split out and PINNED for the reason the header gives. *)
+  Lemma kxc_slot63_split (sp0 : mword 64) :
+    stack_own (pa_stk sp0 54) 9 ⊣⊢
+    stack_own (pa_stk sp0 54) 8 ∗
+    (∃ w : mword 64, word_pointsto (pa_stk sp0 63) (DfracOwn 1) w).
+  Proof.
+    rewrite (kxc_slots_asc sp0 9 54) (kxc_slots_asc sp0 8 54).
+    cbn [seq big_opL Nat.add].
+    iSplit.
+    - iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & _)". iFrame.
+    - iIntros "((H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & _) & H9)". iFrame.
+  Qed.
+
+  Definition kxc_frameBpin (sp0 ra0 s00 s10 s20 pv av : mword 64)
+      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67 : mword 64) : iProp Σ :=
     (word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
      word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 ∗
      word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 ∗
@@ -190,7 +205,8 @@ Section KexecB2Frame.
      word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 ∗
      word_pointsto (pa_stk sp0 13) (DfracOwn 1) w13 ∗
      stack_own (pa_stk sp0 13) 33 ∗
-     stack_own (pa_stk sp0 54) 9 ∗
+     stack_own (pa_stk sp0 54) 8 ∗
+     word_pointsto (pa_stk sp0 63) (DfracOwn 1) w63 ∗
      word_pointsto (pa_stk sp0 64) (DfracOwn 1) av ∗
      word_pointsto (pa_stk sp0 65) (DfracOwn 1) w65 ∗
      word_pointsto (pa_stk sp0 66) (DfracOwn 1) pv ∗
@@ -198,16 +214,17 @@ Section KexecB2Frame.
      (∃ w68, word_pointsto (pa_stk sp0 68) (DfracOwn 1) w68))%I.
 
   (* the two directions between it and [kxc_frameB] *)
-  Lemma kxc_frameB65_of_B (sp0 ra0 s00 s10 s20 pv av : mword 64)
+  Lemma kxc_frameBpin_of_B (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64) :
     kxc_frameB sp0 ra0 s00 s10 s20 pv av w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ⊢
-    ∃ w65, kxc_frameB65 sp0 ra0 s00 s10 s20 pv av
-                        w5 w6 w7 w8 w9 w10 w11 w12 w13 w65 w67.
+    ∃ w63 w65, kxc_frameBpin sp0 ra0 s00 s10 s20 pv av
+                        w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67.
   Proof.
-    rewrite /kxc_frameB /kxc_frameB65.
+    rewrite /kxc_frameB /kxc_frameBpin.
     iIntros "(A1 & A2 & A3 & A4 & A5 & A6 & A7 & A8 & A9 & A10 & A11 & A12 &
               A13 & Aust & Aph & A64 & (%w65 & A65) & A66 & A67 & A68)".
-    iExists w65.
+    rewrite kxc_slot63_split. iDestruct "Aph" as "(Aph & (%w63 & A63))".
+    iExists w63, w65.
     iSplitL "A1"; [iExact "A1" |]. iSplitL "A2"; [iExact "A2" |].
     iSplitL "A3"; [iExact "A3" |]. iSplitL "A4"; [iExact "A4" |].
     iSplitL "A5"; [iExact "A5" |]. iSplitL "A6"; [iExact "A6" |].
@@ -215,20 +232,21 @@ Section KexecB2Frame.
     iSplitL "A9"; [iExact "A9" |]. iSplitL "A10"; [iExact "A10" |].
     iSplitL "A11"; [iExact "A11" |]. iSplitL "A12"; [iExact "A12" |].
     iSplitL "A13"; [iExact "A13" |]. iSplitL "Aust"; [iExact "Aust" |].
-    iSplitL "Aph"; [iExact "Aph" |]. iSplitL "A64"; [iExact "A64" |].
+    iSplitL "Aph"; [iExact "Aph" |]. iSplitL "A63"; [iExact "A63" |].
+    iSplitL "A64"; [iExact "A64" |].
     iSplitL "A65"; [iExact "A65" |]. iSplitL "A66"; [iExact "A66" |].
     iSplitL "A67"; [iExact "A67" | iExact "A68"].
   Qed.
 
-  Lemma kxc_frameB_of_B65 (sp0 ra0 s00 s10 s20 pv av : mword 64)
-      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w65 w67 : mword 64) :
-    kxc_frameB65 sp0 ra0 s00 s10 s20 pv av
-                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w65 w67 ⊢
+  Lemma kxc_frameB_of_Bpin (sp0 ra0 s00 s10 s20 pv av : mword 64)
+      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67 : mword 64) :
+    kxc_frameBpin sp0 ra0 s00 s10 s20 pv av
+                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67 ⊢
     kxc_frameB sp0 ra0 s00 s10 s20 pv av w5 w6 w7 w8 w9 w10 w11 w12 w13 w67.
   Proof.
-    rewrite /kxc_frameB /kxc_frameB65.
+    rewrite /kxc_frameB /kxc_frameBpin.
     iIntros "(A1 & A2 & A3 & A4 & A5 & A6 & A7 & A8 & A9 & A10 & A11 & A12 &
-              A13 & Aust & Aph & A64 & A65 & A66 & A67 & A68)".
+              A13 & Aust & Aph & A63 & A64 & A65 & A66 & A67 & A68)".
     iSplitL "A1"; [iExact "A1" |]. iSplitL "A2"; [iExact "A2" |].
     iSplitL "A3"; [iExact "A3" |]. iSplitL "A4"; [iExact "A4" |].
     iSplitL "A5"; [iExact "A5" |]. iSplitL "A6"; [iExact "A6" |].
@@ -236,7 +254,10 @@ Section KexecB2Frame.
     iSplitL "A9"; [iExact "A9" |]. iSplitL "A10"; [iExact "A10" |].
     iSplitL "A11"; [iExact "A11" |]. iSplitL "A12"; [iExact "A12" |].
     iSplitL "A13"; [iExact "A13" |]. iSplitL "Aust"; [iExact "Aust" |].
-    iSplitL "Aph"; [iExact "Aph" |]. iSplitL "A64"; [iExact "A64" |].
+    iSplitR "A64 A65 A66 A67 A68".
+    { rewrite kxc_slot63_split.
+      iSplitL "Aph"; [iExact "Aph" | by iExists w63]. }
+    iSplitL "A64"; [iExact "A64" |].
     iSplitL "A65"; [by iExists w65 |]. iSplitL "A66"; [iExact "A66" |].
     iSplitL "A67"; [iExact "A67" | iExact "A68"].
   Qed.
@@ -244,19 +265,22 @@ Section KexecB2Frame.
   (* ...and the move the [bad:] tail makes: slots 5,7..13 lose their values,
      the elf run goes back into the middle [stack_own], and what is left is
      exactly [kxc_frameA6] at slot 6. *)
-  Lemma kxc_frameB65_to_A6 (sp0 ra0 s00 s10 s20 pv av : mword 64)
-      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w65 w67 : mword 64)
+  Lemma kxc_frameBpin_to_A6 (sp0 ra0 s00 s10 s20 pv av : mword 64)
+      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) :
     (forall i, (i < 8)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true) ->
-    kxc_frameB65 sp0 ra0 s00 s10 s20 pv av
-                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w65 w67 -∗
+    kxc_frameBpin sp0 ra0 s00 s10 s20 pv av
+                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67 -∗
     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) -∗
     kxc_frameA6 sp0 ra0 s00 s10 s20 pv av w6.
   Proof.
-    intro Hal. rewrite /kxc_frameB65 /kxc_frameA6.
+    intro Hal. rewrite /kxc_frameBpin /kxc_frameA6.
     iIntros "(A1 & A2 & A3 & A4 & A5 & A6 & A7 & A8 & A9 & A10 & A11 & A12 &
-              A13 & Aust & Aph & A64 & A65 & A66 & A67 & A68) Helf".
+              A13 & Aust & Aph0 & A63 & A64 & A65 & A66 & A67 & A68) Helf".
+    iAssert (stack_own (pa_stk sp0 54) 9) with "[Aph0 A63]" as "Aph".
+    { rewrite kxc_slot63_split.
+      iSplitL "Aph0"; [iExact "Aph0" | by iExists w63]. }
     iDestruct (kxc_elf_give sp0 ef Hal with "Helf") as "Aelf".
     iSplitL "A1"; [iExact "A1" |]. iSplitL "A2"; [iExact "A2" |].
     iSplitL "A3"; [iExact "A3" |]. iSplitL "A4"; [iExact "A4" |].
@@ -305,7 +329,7 @@ Section KexecB2Res.
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
-      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w65 w67 : mword 64)
+      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) : iProp Σ :=
     (kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
@@ -322,8 +346,8 @@ Section KexecB2Res.
      ([∗ list] k ∈ seq 0 na,
         [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) ∗
      ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) ∗
-     kxc_frameB65 sp0 ra0 s00 s10 s20 pv av
-                  w5 w6 w7 w8 w9 w10 w11 w12 w13 w65 w67)%I.
+     kxc_frameBpin sp0 ra0 s00 s10 s20 pv av
+                  w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67)%I.
 
   (* ------------------------------------------------------------------ *)
   (*  [ic_loaded] PEELED FOR readi, AND SEALED AGAIN.                    *)
@@ -629,7 +653,7 @@ Section KexecB2Body.
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
       (m Mt : regfile) (K : nat) (C : iProp Σ)
-      (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
+      (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (szf : mword 64) :
     (K_kexec <= K)%nat ->
     (kf < NINODE)%nat ->
@@ -684,11 +708,11 @@ Section KexecB2Body.
     bslots bn 3 -∗
     iref_slots 1 -∗
     log_op g n2 -∗
-    kxc_frameB65 sp0 ra0 s00 s10 s20 pv av
+    kxc_frameBpin sp0 ra0 s00 s10 s20 pv av
       (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
       (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
       (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
-      szf w67 -∗
+      w63 szf w67 -∗
     (* ---- kexec's own continuation, which [kxc_bad64] closes ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
@@ -724,10 +748,10 @@ Section KexecB2Body.
        -- which names the hypothesis and not the reason. *)
     iIntros "Hcg Hcnt #Htext #Hpanic Hpc #Hfab Hopen Hbm Hins Hbits #Hka Hpt
              Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe Hcont".
-    rewrite /kxc_frameB65.
+    rewrite /kxc_frameBpin.
     iDestruct "Hframe" as "(Hf1 & Hf2 & Hf3 & Hf4 & Hf5 & Hf6 & Hf7 & Hf8 &
                             Hf9 & Hf10 & Hf11 & Hf12 & Hf13 & Hust & Hph &
-                            Hf64 & Hf65 & Hf66 & Hf67 & Hf68)".
+                            Hf63 & Hf64 & Hf65 & Hf66 & Hf67 & Hf68)".
     iPoseProof (kxc_324 with "Htext") as "Hi324".
     iPoseProof (kxc_328 with "Htext") as "Hi328".
     iPoseProof (kxc_32a with "Htext") as "Hi32a".
@@ -1053,9 +1077,9 @@ Section KexecB2Body.
                     Hidev Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits
                     Hka Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont]
                     Hcont").
-    iApply (kxc_frameB65_to_A6 sp0 ra0 s00 s10 s20 pv av
-              _ _ _ _ _ _ _ _ _ _ _ ef Hal with "[-Helf] Helf").
-    rewrite /kxc_frameB65.
+    iApply (kxc_frameBpin_to_A6 sp0 ra0 s00 s10 s20 pv av
+              _ _ _ _ _ _ _ _ _ _ _ _ ef Hal with "[-Helf] Helf").
+    rewrite /kxc_frameBpin.
     iSplitL "Hf1"; [iExact "Hf1" |]. iSplitL "Hf2"; [iExact "Hf2" |].
     iSplitL "Hf3"; [iExact "Hf3" |]. iSplitL "Hf4"; [iExact "Hf4" |].
     iSplitL "Hf5"; [iExact "Hf5" |]. iSplitL "Hf6"; [iExact "Hf6" |].
@@ -1063,7 +1087,8 @@ Section KexecB2Body.
     iSplitL "Hf9"; [iExact "Hf9" |]. iSplitL "Hf10"; [iExact "Hf10" |].
     iSplitL "Hf11"; [iExact "Hf11" |]. iSplitL "Hf12"; [iExact "Hf12" |].
     iSplitL "Hf13"; [iExact "Hf13" |]. iSplitL "Hust"; [iExact "Hust" |].
-    iSplitL "Hph"; [iExact "Hph" |]. iSplitL "Hf64"; [iExact "Hf64" |].
+    iSplitL "Hph"; [iExact "Hph" |]. iSplitL "Hf63"; [iExact "Hf63" |].
+    iSplitL "Hf64"; [iExact "Hf64" |].
     iSplitL "Hf65"; [iExact "Hf65" |]. iSplitL "Hf66"; [iExact "Hf66" |].
     iSplitL "Hf67"; [iExact "Hf67" | iExact "Hf68"].
   Qed.
@@ -1163,7 +1188,7 @@ Section KexecB2Loops.
   (*  enormous and never computed; what matters is that it is a [nat] the  *)
   (*  head can always supply.                                              *)
   (* =================================================================== *)
-  Local Lemma kxc_ls `{CID0 : CpuId}
+  Lemma kxc_ls `{CID0 : CpuId}
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
@@ -1177,7 +1202,7 @@ Section KexecB2Loops.
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
       (m : regfile) (K : nat) (C : iProp Σ)
-      (sp0 ra0 s00 s10 s20 pv av w65 w67 : mword 64)
+      (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd)
       (ip : nat) (va : mword 64) (fz po : Z) :
     (K_kexec <= K)%nat ->
@@ -1238,7 +1263,7 @@ Section KexecB2Loops.
             (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
             (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
             (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
-            w65 w67 ef P -∗
+            w63 w65 w67 ef P -∗
     (* ---- kexec's OWN continuation.  Convention 3: this block owns its
        [bad:] exit (+0x0ea -> +0x324) and discharges it against the
        contract rather than handing it out; the ONE output below therefore
@@ -1288,7 +1313,7 @@ Section KexecB2Loops.
                 (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                 (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                 (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
-                w65 w67 ef P -∗
+                w63 w65 w67 ef P -∗
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
           ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
             (entry spv szv' : mword 64),
@@ -2113,7 +2138,7 @@ Section KexecB2Loops.
                   gi cn gtl gilf gislf ga gf cov logstart bmapstart inodestart
                   nib size dev used used2 kf qf sf gyf inumf dnf bmf n2 plen
                   pfun na avf alen aslen afun pidv V dqb dqs dqa m M2 K C
-                  sp0 ra0 s00 s10 s20 pv av w67 ef P w65
+                  sp0 ra0 s00 s10 s20 pv av w63 w67 ef P w65
                   HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                   Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2
                   ltac:(rewrite (HM2get csp_rs1 ltac:(vm_compute; reflexivity)
