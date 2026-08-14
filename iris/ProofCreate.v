@@ -117,11 +117,18 @@ Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import PanicStub.
 Require Import SpecPrintkGen.
+Require Import SpecBmap SpecWritei.
 Require Import SpecIput SpecIalloc SpecIupdate.
 Require Import SpecIlock SpecIunlockput.
 Require Import SpecDirlookup SpecDirlink.
 Require Import SpecNamex SpecNameiparent.
 Require Import SpecCreate.
+(* the ONE assumed contract: the four-instruction span +0x8c..+0x98 that
+   pins [di_type dn = ty] across [ialloc]/[ilock].  Taken as a FUNCTOR
+   ARGUMENT beside the seven real callees, so that this file names no
+   [Axiom] and [Print Assumptions] reports it only where the functor is
+   instantiated -- exactly as it reports the other seven. *)
+Require Import SpecCreateFreshTy.
 Require Import CreateBudget.
 Require Import CodeCreate.
 Require Import ProofDirlookupParts ProofNamexParts ProofCreateParts.
@@ -135,7 +142,7 @@ Set Printing Depth 40.
 
 Module CreateProof (NP : NAMEIPARENT) (IL : ILOCK) (IUP : IUNLOCKPUT)
                    (DL : DIRLOOKUP) (IA : IALLOC) (IU : IUPDATE)
-                   (DLK : DIRLINK).
+                   (DLK : DIRLINK) (CFT : CREATE_FRESH_TY).
 (* NOT ascribed [: CREATE] yet: the seal is [wp_create_sconf], which needs
    the allocate half.  [IA] / [IU] / [DLK] are the allocate half's callees
    and are taken here so that the functor's arity does not move when it
@@ -285,6 +292,178 @@ Lemma cr_tregs_of_regs (m : regfile) (sp0 dpv ansv : mword 64)
   cr_regs m sp0 dpv ansv ty mj mn Mx -> cr_tregs m sp0 Mx.
 Proof. intros (H2 & _ & _ & _ & _ & _ & _ & Hthr). split; assumption. Qed.
 
+(* ---- ...AND THE SAME BUNDLE ON THE ALLOCATE HALF, WHERE s3 IS LIVE ----
+
+   The [c.mv s3,a0] at +0x94 (inside the gate span) writes the EIGHTH
+   callee-saved register, so [cr_thr]'s claim "s3 still holds the caller's
+   value" is false from +0x94 until the [c.ldsp s3,40(sp)] at +0xd0 /
+   +0xdc puts it back.  [cr_thr3] is [cr_thr] with s3 removed from the
+   agreeing set and [cr_regs3] pins the live value in its place -- stated
+   POSITIVELY, exactly as [cr_regs] is, so that no premise anywhere is a
+   claim about a set the reader has to go and look up (durable-notes).
+
+   Two lemmas bracket the s3 epoch and nothing else needs to know about it:
+   [cr_regs3_of_span] is the ENTRY (the span's own register contract is
+   [SpecCreateFreshTy.cr_cs_but_s3], i.e. "callee-saved everywhere but s3",
+   and the [c.mv] gives its value), and [cr_tregs_of_regs3] is the EXIT
+   (the reload restores [m]'s own s3, which is exactly what [cr_thr] was
+   missing).  The three propagation lemmas beside them mirror
+   [cr_regs_caller] / [cr_regs_cs] / [cr_regs_s2] one-for-one. *)
+Definition cr_thr3 (m : regfile) (Mx : regfile) : Prop :=
+  forall c : mword 5, is_cs_idx c = true ->
+    c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 -> c <> Rs2 -> c <> Rs3 ->
+    c <> Rs4 -> c <> Rs5 -> c <> Rs6 ->
+    Mx !!! Regidx c = m !!! Regidx c.
+
+Definition cr_regs3 (m : regfile) (sp0 dpv ansv s3v : mword 64)
+    (ty mj mn : mword 16) (Mx : regfile) : Prop :=
+  Mx !!! Regidx csp_rs1 = pa_stk sp0 10
+  /\ Mx !!! Regidx Rs0 = sp0
+  /\ Mx !!! Regidx Rs1 = dpv
+  /\ Mx !!! Regidx Rs2 = ansv
+  /\ Mx !!! Regidx Rs3 = s3v
+  /\ Mx !!! Regidx Rs4 = (sign_extend' 64 ty : mword 64)
+  /\ Mx !!! Regidx Rs5 = (sign_extend' 64 mj : mword 64)
+  /\ Mx !!! Regidx Rs6 = (sign_extend' 64 mn : mword 64)
+  /\ cr_thr3 m Mx.
+
+Lemma cr_thr3_caller (m Mx : regfile) (r : mword 5) (v : mword 64) :
+  is_cs_idx r = false -> cr_thr3 m Mx -> cr_thr3 m (<[Regidx r := v]> Mx).
+Proof.
+  intros Hr H c Hc N2 N8 N9 N18 N19 N20 N21 N22.
+  rewrite upd_ne; [exact (H c Hc N2 N8 N9 N18 N19 N20 N21 N22)
+                  | dlk_rne2 Hr Hc].
+Qed.
+
+Lemma cr_regs3_caller (m : regfile) (sp0 dpv ansv s3v : mword 64)
+    (ty mj mn : mword 16) (Mx : regfile) (r : mword 5) (v : mword 64) :
+  is_cs_idx r = false -> cr_regs3 m sp0 dpv ansv s3v ty mj mn Mx ->
+  cr_regs3 m sp0 dpv ansv s3v ty mj mn (<[Regidx r := v]> Mx).
+Proof.
+  intros Hr (H2 & H8 & H9 & H18 & H19 & H20 & H21 & H22 & Hthr).
+  unfold cr_regs3. split_and!.
+  - rewrite upd_ne; [exact H2 | dlk_rne1 Hr].
+  - rewrite upd_ne; [exact H8 | dlk_rne1 Hr].
+  - rewrite upd_ne; [exact H9 | dlk_rne1 Hr].
+  - rewrite upd_ne; [exact H18 | dlk_rne1 Hr].
+  - rewrite upd_ne; [exact H19 | dlk_rne1 Hr].
+  - rewrite upd_ne; [exact H20 | dlk_rne1 Hr].
+  - rewrite upd_ne; [exact H21 | dlk_rne1 Hr].
+  - rewrite upd_ne; [exact H22 | dlk_rne1 Hr].
+  - exact (cr_thr3_caller m Mx r v Hr Hthr).
+Qed.
+
+Lemma cr_regs3_cs (m : regfile) (sp0 dpv ansv s3v : mword 64)
+    (ty mj mn : mword 16) (Mx My : regfile) :
+  callee_saved Mx My -> cr_regs3 m sp0 dpv ansv s3v ty mj mn Mx ->
+  cr_regs3 m sp0 dpv ansv s3v ty mj mn My.
+Proof.
+  intros Hcs (H2 & H8 & H9 & H18 & H19 & H20 & H21 & H22 & Hthr).
+  unfold cr_regs3. split_and!.
+  - rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact H2.
+  - rewrite (callee_saved_lookup Hcs Rs0 ltac:(vm_compute; reflexivity)). exact H8.
+  - rewrite (callee_saved_lookup Hcs Rs1 ltac:(vm_compute; reflexivity)). exact H9.
+  - rewrite (callee_saved_lookup Hcs Rs2 ltac:(vm_compute; reflexivity)). exact H18.
+  - rewrite (callee_saved_lookup Hcs Rs3 ltac:(vm_compute; reflexivity)). exact H19.
+  - rewrite (callee_saved_lookup Hcs Rs4 ltac:(vm_compute; reflexivity)). exact H20.
+  - rewrite (callee_saved_lookup Hcs Rs5 ltac:(vm_compute; reflexivity)). exact H21.
+  - rewrite (callee_saved_lookup Hcs Rs6 ltac:(vm_compute; reflexivity)). exact H22.
+  - intros c Hc N2 N8 N9 N18 N19 N20 N21 N22.
+    rewrite (callee_saved_lookup Hcs c Hc).
+    exact (Hthr c Hc N2 N8 N9 N18 N19 N20 N21 N22).
+Qed.
+
+(* the [c.mv s2,s3] at +0xce (ARM C-OK) and +0xda (ARM A-FAIL) *)
+Lemma cr_regs3_s2 (m : regfile) (sp0 dpv ansv ansv' s3v : mword 64)
+    (ty mj mn : mword 16) (Mx : regfile) (v : mword 64) :
+  v = ansv' -> cr_regs3 m sp0 dpv ansv s3v ty mj mn Mx ->
+  cr_regs3 m sp0 dpv ansv' s3v ty mj mn (<[Regidx Rs2 := v]> Mx).
+Proof.
+  intros Hv (H2 & H8 & H9 & H18 & H19 & H20 & H21 & H22 & Hthr).
+  unfold cr_regs3. split_and!.
+  - rewrite upd_ne; [exact H2 | vm_compute; discriminate].
+  - rewrite upd_ne; [exact H8 | vm_compute; discriminate].
+  - rewrite upd_ne; [exact H9 | vm_compute; discriminate].
+  - rewrite upd_eq. exact Hv.
+  - rewrite upd_ne; [exact H19 | vm_compute; discriminate].
+  - rewrite upd_ne; [exact H20 | vm_compute; discriminate].
+  - rewrite upd_ne; [exact H21 | vm_compute; discriminate].
+  - rewrite upd_ne; [exact H22 | vm_compute; discriminate].
+  - intros c Hc N2 N8 N9 N18 N19 N20 N21 N22.
+    rewrite upd_ne; [exact (Hthr c Hc N2 N8 N9 N18 N19 N20 N21 N22)
+                    | dlk_xne N18].
+Qed.
+
+(* the [c.ldsp s3,40(sp)] at +0xd0 / +0xdc *)
+Lemma cr_regs3_s3 (m : regfile) (sp0 dpv ansv s3v s3w : mword 64)
+    (ty mj mn : mword 16) (Mx : regfile) (v : mword 64) :
+  v = s3w -> cr_regs3 m sp0 dpv ansv s3v ty mj mn Mx ->
+  cr_regs3 m sp0 dpv ansv s3w ty mj mn (<[Regidx Rs3 := v]> Mx).
+Proof.
+  intros Hv (H2 & H8 & H9 & H18 & H19 & H20 & H21 & H22 & Hthr).
+  unfold cr_regs3. split_and!.
+  - rewrite upd_ne; [exact H2 | vm_compute; discriminate].
+  - rewrite upd_ne; [exact H8 | vm_compute; discriminate].
+  - rewrite upd_ne; [exact H9 | vm_compute; discriminate].
+  - rewrite upd_ne; [exact H18 | vm_compute; discriminate].
+  - rewrite upd_eq. exact Hv.
+  - rewrite upd_ne; [exact H20 | vm_compute; discriminate].
+  - rewrite upd_ne; [exact H21 | vm_compute; discriminate].
+  - rewrite upd_ne; [exact H22 | vm_compute; discriminate].
+  - intros c Hc N2 N8 N9 N18 N19 N20 N21 N22.
+    rewrite upd_ne; [exact (Hthr c Hc N2 N8 N9 N18 N19 N20 N21 N22)
+                    | dlk_xne N19].
+Qed.
+
+(* ENTRY: the gate span promises [callee_saved] EVERYWHERE BUT s3 and
+   reports s3's own value per arm, so [cr_regs] in gives [cr_regs3] out. *)
+Lemma cr_regs3_of_span (m : regfile) (sp0 dpv ansv s3v : mword 64)
+    (ty mj mn : mword 16) (Ma Mo : regfile) :
+  cr_cs_but_s3 Ma Mo ->
+  (Mo !!! Regidx Rs3 : mword 64) = s3v ->
+  cr_regs m sp0 dpv ansv ty mj mn Ma ->
+  cr_regs3 m sp0 dpv ansv s3v ty mj mn Mo.
+Proof.
+  intros Hsp Hs3 (H2 & H8 & H9 & H18 & H20 & H21 & H22 & Hthr).
+  unfold cr_regs3. split_and!.
+  - rewrite (Hsp csp_rs1 ltac:(vm_compute; reflexivity)
+               ltac:(vm_compute; discriminate)). exact H2.
+  - rewrite (Hsp Rs0 ltac:(vm_compute; reflexivity)
+               ltac:(vm_compute; discriminate)). exact H8.
+  - rewrite (Hsp Rs1 ltac:(vm_compute; reflexivity)
+               ltac:(vm_compute; discriminate)). exact H9.
+  - rewrite (Hsp Rs2 ltac:(vm_compute; reflexivity)
+               ltac:(vm_compute; discriminate)). exact H18.
+  - exact Hs3.
+  - rewrite (Hsp Rs4 ltac:(vm_compute; reflexivity)
+               ltac:(vm_compute; discriminate)). exact H20.
+  - rewrite (Hsp Rs5 ltac:(vm_compute; reflexivity)
+               ltac:(vm_compute; discriminate)). exact H21.
+  - rewrite (Hsp Rs6 ltac:(vm_compute; reflexivity)
+               ltac:(vm_compute; discriminate)). exact H22.
+  - intros c Hc N2 N8 N9 N18 N19 N20 N21 N22.
+    rewrite (Hsp c Hc N19).
+    exact (Hthr c Hc N2 N8 N9 N18 N20 N21 N22).
+Qed.
+
+(* EXIT: once the reload has put [m]'s own s3 back, the s3 exception is
+   gone and the funnel's [cr_tregs] is available again. *)
+Lemma cr_tregs_of_regs3 (m : regfile) (sp0 dpv ansv : mword 64)
+    (ty mj mn : mword 16) (Mx : regfile) :
+  cr_regs3 m sp0 dpv ansv (m !!! Regidx Rs3 : mword 64) ty mj mn Mx ->
+  cr_tregs m sp0 Mx.
+Proof.
+  intros (H2 & _ & _ & _ & H19 & _ & _ & _ & Hthr).
+  split; [exact H2 |].
+  intros c Hc N2 N8 N9 N18 N20 N21 N22.
+  destruct (Z.eq_dec (bv_unsigned c) 19) as [Heq | Hne].
+  - assert (Hc3 : c = Rs3)
+      by (apply bv_eq; rewrite Heq; vm_compute; reflexivity).
+    rewrite Hc3. exact H19.
+  - refine (Hthr c Hc N2 N8 N9 N18 _ N20 N21 N22).
+    intro Hc3. apply Hne. rewrite Hc3. vm_compute. reflexivity.
+Qed.
+
 (* ===================================================================== *)
 (*  1b.  THE LEDGER READINGS, over plain [nat]                            *)
 (*                                                                        *)
@@ -383,6 +562,141 @@ Proof. unfold create_slots. lia. Qed.
 (* a live directory record's inum is nonzero, as a [Z] fact *)
 Lemma cr_pos_of_nz (x : Z) : 0 <= x -> x <> 0 -> 0 < x.
 Proof. lia. Qed.
+
+(* ===================================================================== *)
+(*  1c.  THE ALLOCATE HALF'S OWN PURE CLUSTER                             *)
+(*                                                                        *)
+(*  Three things the walk from +0x8a to +0xd2 needs and nothing else in   *)
+(*  the tree has: the HALFWORD BRIDGE at +0xb6, the record identity the   *)
+(*  three [sh]s produce, and the arm's ledger readings.                    *)
+(* ===================================================================== *)
+
+(* ---- (i) THE HALFWORD BRIDGE.  The [lw a2,4(s3)] at +0xb6 loads the
+   child's inum as a SIGN-extended 32-bit cell; [SpecDirlink]'s a2 premise
+   is a ZERO-extended SIXTEEN-bit one, because the [sh s6,-80(s0)] inside
+   dirlink stores exactly sixteen bits.  The two agree below 2^16, and
+   what bounds the inum there is the ruled premise
+   [16 * Z.of_nat nib <= 2^16] -- mkfs's own [ushort] geometry, carried as
+   a premise of the alloc-half lemma (D0-a, the eleventh stop's item-2
+   ruling) rather than as a slot widening. *)
+Lemma cr_zext64_16_unsigned (h : mword 16) :
+  bv_unsigned (zero_extend' 64 h : mword 64) = bv_unsigned h.
+Proof.
+  cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
+       to_word get_word MachineWord.MachineWord.zero_extend].
+  rewrite bv_zero_extend_unsigned; [ reflexivity | cbn; lia ].
+Qed.
+
+Definition cr_low16 (v : mword 32) : mword 16 := mword_of_int (bv_unsigned v).
+
+Lemma cr_moi16_unsigned (z : Z) :
+  bv_unsigned (mword_of_int z : mword 16) = bv_wrap 16 z.
+Proof.
+  unfold mword_of_int, SailStdpp.Values.mword_of_int,
+         MachineWord.MachineWord.Z_to_word.
+  rewrite Z_to_bv_unsigned.
+  change (MachineWord.MachineWord.Z_idx 16) with 16%N. reflexivity.
+Qed.
+
+Lemma cr_low16_unsigned (v : mword 32) :
+  bv_unsigned v < 2 ^ 16 -> bv_unsigned (cr_low16 v) = bv_unsigned v.
+Proof.
+  intro Hv. pose proof (bv_unsigned_in_range _ v) as Hlo.
+  unfold cr_low16. rewrite cr_moi16_unsigned.
+  apply bv_wrap_small. unfold bv_modulus.
+  change (2 ^ Z.of_N 16)%Z with (2^16)%Z. lia.
+Qed.
+
+Lemma cr_sext64_32_unsigned (v : mword 32) :
+  bv_unsigned v < 2 ^ 31 ->
+  bv_unsigned (sign_extend' 64 v : mword 64) = bv_unsigned v.
+Proof.
+  intro Hv.
+  pose proof (bv_unsigned_in_range _ v) as Hlo.
+  (* the [change] MUST NOT be done before the [bv_swrap_small] rewrite: it
+     also rewrites the implicit width inside [@bv_unsigned (Z_idx 32) v],
+     after which a hand-instantiated rewrite finds no subterm. *)
+  assert (Hhm32 : bv_half_modulus (MachineWord.MachineWord.Z_idx 32) = 2^31)
+    by reflexivity.
+  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
+       to_word get_word MachineWord.MachineWord.sign_extend].
+  rewrite bv_sign_extend_unsigned.
+  change (MachineWord.MachineWord.Z_idx 64) with 64%N.
+  unfold bv_signed.
+  rewrite bv_swrap_small; [ apply bvw64_small; lia | rewrite Hhm32; lia ].
+Qed.
+
+Lemma cr_a2_halfword (v : mword 32) (h : mword 16) :
+  bv_unsigned v = bv_unsigned h ->
+  (sign_extend' 64 v : mword 64) = (zero_extend' 64 h : mword 64).
+Proof.
+  intro Hvh.
+  pose proof (bv_unsigned_in_range _ h) as Hh. unfold bv_modulus in Hh.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 16)) with 65536 in Hh.
+  apply bv_eq.
+  rewrite cr_zext64_16_unsigned.
+  rewrite (cr_sext64_32_unsigned v ltac:(rewrite Hvh; lia)).
+  exact Hvh.
+Qed.
+
+Lemma cr_a2_low16 (v : mword 32) :
+  bv_unsigned v < 2 ^ 16 ->
+  (sign_extend' 64 v : mword 64) = (zero_extend' 64 (cr_low16 v) : mword 64).
+Proof.
+  intro Hv. apply cr_a2_halfword. rewrite (cr_low16_unsigned v Hv). reflexivity.
+Qed.
+
+(* the [c.li a4,1] at +0xa4 stores a SIXTEEN-bit one through the [sh] at
+   +0xa6: [trunc16] of the 64-bit literal. *)
+Lemma cr_trunc16_one :
+  trunc16 (mword_of_int 1 : mword 64) = (mword_of_int 1 : mword 16).
+Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+
+(* ---- (ii) THE RECORD THE THREE [sh]s LEAVE.  [ProofCreateParts.
+   cr_made_setf] is this identity at [ialloc_fresh ty]; what the walk
+   actually holds after [ilock] is an ARBITRARY record with
+   [fresh_shape] and the gate's [di_type dn = ty], which is exactly as
+   much as [create_made] needs. *)
+Lemma cr_setf_fresh_made (dn : dinode) (ty mj mn : mword 16) :
+  fresh_shape dn -> di_type dn = ty ->
+  cr_setf dn mj mn (mword_of_int 1 : mword 16) = create_made ty mj mn.
+Proof.
+  intros (_ & Hsz & Hadd & _) Hty.
+  unfold cr_setf, create_made.
+  rewrite Hty Hadd. f_equal.
+  apply bv_eq. rewrite Hsz. reflexivity.
+Qed.
+
+(* ---- (iii) THE ARM'S LEDGER READINGS.  [CreateBudget.cr_budget_file]
+   is the theorem; these are it at the two figures the CONTRACTS state,
+   exactly as [cr_n1_lo] / [cr_after_ip] are for the found half.  The
+   walk reaches its [dirlink] with [q1 >= 8] ([cr_uw w - ia_spend -
+   iu_spend true] is 8 or 7... at [w = false] it is nine minus one), and
+   [dl_need] is at most six, [wi16_spend] at most five. *)
+Lemma cr_alloc_dlneed (nc : nat) (crb ind : bool) :
+  (8 <= nc)%nat -> (SpecDirlink.dl_need crb ind <= nc)%nat.
+Proof.
+  intro Hnc.
+  unfold SpecDirlink.dl_need, wi16_need, SpecBmap.bmap_need, iput_units.
+  destruct crb, ind; simpl; lia.
+Qed.
+
+Lemma cr_alloc_ip (nc n' : nat) (crb crd cru al ind : bool) :
+  (8 <= nc)%nat ->
+  ((nc - wi16_spend crb crd cru al ind)%nat <= n')%nat ->
+  (iput_units <= n')%nat.
+Proof.
+  intros Hnc Hn'.
+  unfold wi16_spend, SpecBmap.bmap_cost, iput_units in *.
+  destruct crb, crd, cru, al, ind; simpl in *; lia.
+Qed.
+
+Lemma cr_alloc_ip0 (nc n' : nat) :
+  (8 <= nc)%nat -> ((nc - SpecDirlink.dl0_spend)%nat <= n')%nat ->
+  (iput_units <= n')%nat.
+Proof.
+  intros Hnc Hn'. unfold SpecDirlink.dl0_spend, iput_units in *. lia.
+Qed.
 
 (* ===================================================================== *)
 (*  2.  THE PROOF                                                         *)
@@ -611,6 +925,263 @@ Section ProofCreateMain.
        WP (Loop : expr riscv_lang))%I.
 
   (* ------------------------------------------------------------------- *)
+  (*  ...AND THE FUNNEL ITSELF, HOISTED (D0-a pre-work A).                 *)
+  (*                                                                       *)
+  (*  It was an [iAssert] inside [cr_found_half], where the allocate half  *)
+  (*  -- which reaches +0x62 through TWO more arms -- could not see it.    *)
+  (*  Nothing about it is found-half-specific: it speaks only of the seven *)
+  (*  restored registers, the ten frame slots and [kernel_text], so the    *)
+  (*  five premises below are its whole context.  [cr_found_half]'s        *)
+  (*  statement is byte-identical either way; it now gets the funnel by    *)
+  (*  one [iDestruct] instead of a 230-line bullet.                        *)
+  (* ------------------------------------------------------------------- *)
+  Lemma cr_tail_half (j : nat) (m : regfile) (sp0 ret_tgt : mword 64)
+      (K : nat) (b : bool) :
+    ((K - 10) + 10)%nat = K ->
+    is_aligned_paddr (Physaddr (pa_stk sp0 10)) 8 = true ->
+    is_aligned_paddr (Physaddr (pa_stk sp0 9)) 8 = true ->
+    (m !!! Regidx csp_rs1 : mword 64) = sp0 ->
+    ret_pc (m !!! Regidx Rra : mword 64) = ret_tgt ->
+    kernel_text -∗
+    □ wp_next (CID0 := CID) true (proc_addr j)
+        (fun CIDt : CpuId => cr_tail_body j m sp0 ret_tgt K b CIDt).
+  Proof.
+    intros HKsum Hal10 Hal9 Hspm Hrt.
+    assert (Hcsa0 : is_cs_idx Ra0 = false) by (vm_compute; reflexivity).
+    assert (Hcsra : is_cs_idx Rra = false) by (vm_compute; reflexivity).
+    iIntros "#Htext". iModIntro.
+    iIntros (CIDt Hst Mt w5 dnew)
+      "%HTr Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb Hqc".
+    destruct HTr as [HTsp HTthr].
+    iPoseProof (cri_062 with "Htext") as "Hj62".
+    iPoseProof (cri_064 with "Htext") as "Hj64".
+    iPoseProof (cri_066 with "Htext") as "Hj66".
+    iPoseProof (cri_068 with "Htext") as "Hj68".
+    iPoseProof (cri_06a with "Htext") as "Hj6a".
+    iPoseProof (cri_06c with "Htext") as "Hj6c".
+    iPoseProof (cri_06e with "Htext") as "Hj6e".
+    iPoseProof (cri_070 with "Htext") as "Hj70".
+    iPoseProof (cri_072 with "Htext") as "Hj72".
+    iPoseProof (cri_074 with "Htext") as "Hj74".
+    (* +0x62 c.mv a0,s2 : the answer register *)
+    iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x62)) Ra0 Rs2 Mt
+              (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj62").
+    iIntros (CIDT0 HqT0) "Hcg Hpc". iEval (rgne) in "Hcg".
+    set (P0 := <[Regidx Ra0 := regval_into_reg
+                  (add_vec (zero_reg : mword 64) (Mt !!! Regidx Rs2))]> Mt).
+    assert (HP0sp : P0 !!! Regidx csp_rs1 = pa_stk sp0 10)
+      by (rewrite /P0 upd_ne; [exact HTsp | nz]).
+    assert (Hq064 : add_vec_int (mword_of_int (CK + 0x62) : mword 64) 2
+                    = mword_of_int (CK + 0x64)) by pcw.
+    iEval (rewrite Hq064) in "Hpc".
+    (* +0x64 .. +0x70 : the seven restores *)
+    assert (HT1 : add_vec (P0 !!! Regidx csp_rs1)
+                    (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))
+                  = pa_stk sp0 1) by (rewrite HP0sp; apply cr_frm1).
+    iEval (rewrite -HT1) in "Hb1".
+    iApply (wp_cldsp_s_sconf (mword_of_int (CK + 0x64)) (mword_of_int 9 : mword 6)
+              Rra P0 (K - 10)%nat (m !!! Regidx Rra : mword 64) b
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj64 Hb1").
+    iIntros (CIDT1 HqT1) "Hcg Hpc Hb1".
+    set (P1 := <[Regidx Rra := regval_into_reg (m !!! Regidx Rra : mword 64)]> P0).
+    assert (HP1sp : P1 !!! Regidx csp_rs1 = pa_stk sp0 10)
+      by (rewrite /P1 upd_ne; [exact HP0sp | nz]).
+    assert (Hq066 : add_vec_int (mword_of_int (CK + 0x64) : mword 64) 2
+                    = mword_of_int (CK + 0x66)) by pcw.
+    iEval (rewrite Hq066) in "Hpc".
+    assert (HT2 : add_vec (P1 !!! Regidx csp_rs1)
+                    (zero_extend' 64 (concat_vec (mword_of_int 8 : mword 6) ('b"000")))
+                  = pa_stk sp0 2) by (rewrite HP1sp; apply cr_frm2).
+    iEval (rewrite -HT2) in "Hb2".
+    iApply (wp_cldsp_s_sconf (mword_of_int (CK + 0x66)) (mword_of_int 8 : mword 6)
+              Rs0 P1 (K - 10)%nat (m !!! Regidx Rs0 : mword 64) b
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj66 Hb2").
+    iIntros (CIDT2 HqT2) "Hcg Hpc Hb2".
+    set (P2 := <[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0 : mword 64)]> P1).
+    assert (HP2sp : P2 !!! Regidx csp_rs1 = pa_stk sp0 10)
+      by (rewrite /P2 upd_ne; [exact HP1sp | nz]).
+    assert (Hq068 : add_vec_int (mword_of_int (CK + 0x66) : mword 64) 2
+                    = mword_of_int (CK + 0x68)) by pcw.
+    iEval (rewrite Hq068) in "Hpc".
+    assert (HT3 : add_vec (P2 !!! Regidx csp_rs1)
+                    (zero_extend' 64 (concat_vec (mword_of_int 7 : mword 6) ('b"000")))
+                  = pa_stk sp0 3) by (rewrite HP2sp; apply cr_frm3).
+    iEval (rewrite -HT3) in "Hb3".
+    iApply (wp_cldsp_s_sconf (mword_of_int (CK + 0x68)) (mword_of_int 7 : mword 6)
+              Rs1 P2 (K - 10)%nat (m !!! Regidx Rs1 : mword 64) b
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj68 Hb3").
+    iIntros (CIDT3 HqT3) "Hcg Hpc Hb3".
+    set (P3 := <[Regidx Rs1 := regval_into_reg (m !!! Regidx Rs1 : mword 64)]> P2).
+    assert (HP3sp : P3 !!! Regidx csp_rs1 = pa_stk sp0 10)
+      by (rewrite /P3 upd_ne; [exact HP2sp | nz]).
+    assert (Hq06a : add_vec_int (mword_of_int (CK + 0x68) : mword 64) 2
+                    = mword_of_int (CK + 0x6a)) by pcw.
+    iEval (rewrite Hq06a) in "Hpc".
+    assert (HT4 : add_vec (P3 !!! Regidx csp_rs1)
+                    (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))
+                  = pa_stk sp0 4) by (rewrite HP3sp; apply cr_frm4).
+    iEval (rewrite -HT4) in "Hb4".
+    iApply (wp_cldsp_s_sconf (mword_of_int (CK + 0x6a)) (mword_of_int 6 : mword 6)
+              Rs2 P3 (K - 10)%nat (m !!! Regidx Rs2 : mword 64) b
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj6a Hb4").
+    iIntros (CIDT4 HqT4) "Hcg Hpc Hb4".
+    set (P4 := <[Regidx Rs2 := regval_into_reg (m !!! Regidx Rs2 : mword 64)]> P3).
+    assert (HP4sp : P4 !!! Regidx csp_rs1 = pa_stk sp0 10)
+      by (rewrite /P4 upd_ne; [exact HP3sp | nz]).
+    assert (Hq06c : add_vec_int (mword_of_int (CK + 0x6a) : mword 64) 2
+                    = mword_of_int (CK + 0x6c)) by pcw.
+    iEval (rewrite Hq06c) in "Hpc".
+    assert (HT6 : add_vec (P4 !!! Regidx csp_rs1)
+                    (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))
+                  = pa_stk sp0 6) by (rewrite HP4sp; apply cr_frm6).
+    iEval (rewrite -HT6) in "Hb6".
+    iApply (wp_cldsp_s_sconf (mword_of_int (CK + 0x6c)) (mword_of_int 4 : mword 6)
+              Rs4 P4 (K - 10)%nat (m !!! Regidx Rs4 : mword 64) b
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj6c Hb6").
+    iIntros (CIDT5 HqT5) "Hcg Hpc Hb6".
+    set (P5 := <[Regidx Rs4 := regval_into_reg (m !!! Regidx Rs4 : mword 64)]> P4).
+    assert (HP5sp : P5 !!! Regidx csp_rs1 = pa_stk sp0 10)
+      by (rewrite /P5 upd_ne; [exact HP4sp | nz]).
+    assert (Hq06e : add_vec_int (mword_of_int (CK + 0x6c) : mword 64) 2
+                    = mword_of_int (CK + 0x6e)) by pcw.
+    iEval (rewrite Hq06e) in "Hpc".
+    assert (HT7 : add_vec (P5 !!! Regidx csp_rs1)
+                    (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000")))
+                  = pa_stk sp0 7) by (rewrite HP5sp; apply cr_frm7).
+    iEval (rewrite -HT7) in "Hb7".
+    iApply (wp_cldsp_s_sconf (mword_of_int (CK + 0x6e)) (mword_of_int 3 : mword 6)
+              Rs5 P5 (K - 10)%nat (m !!! Regidx Rs5 : mword 64) b
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj6e Hb7").
+    iIntros (CIDT6 HqT6) "Hcg Hpc Hb7".
+    set (P6 := <[Regidx Rs5 := regval_into_reg (m !!! Regidx Rs5 : mword 64)]> P5).
+    assert (HP6sp : P6 !!! Regidx csp_rs1 = pa_stk sp0 10)
+      by (rewrite /P6 upd_ne; [exact HP5sp | nz]).
+    assert (Hq070 : add_vec_int (mword_of_int (CK + 0x6e) : mword 64) 2
+                    = mword_of_int (CK + 0x70)) by pcw.
+    iEval (rewrite Hq070) in "Hpc".
+    assert (HT8 : add_vec (P6 !!! Regidx csp_rs1)
+                    (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))
+                  = pa_stk sp0 8) by (rewrite HP6sp; apply cr_frm8).
+    iEval (rewrite -HT8) in "Hb8".
+    iApply (wp_cldsp_s_sconf (mword_of_int (CK + 0x70)) (mword_of_int 2 : mword 6)
+              Rs6 P6 (K - 10)%nat (m !!! Regidx Rs6 : mword 64) b
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj70 Hb8").
+    iIntros (CIDT7 HqT7) "Hcg Hpc Hb8".
+    set (P7 := <[Regidx Rs6 := regval_into_reg (m !!! Regidx Rs6 : mword 64)]> P6).
+    assert (HP7sp : P7 !!! Regidx csp_rs1 = pa_stk sp0 10)
+      by (rewrite /P7 upd_ne; [exact HP6sp | nz]).
+    assert (Hq072 : add_vec_int (mword_of_int (CK + 0x70) : mword 64) 2
+                    = mword_of_int (CK + 0x72)) by pcw.
+    iEval (rewrite Hq072) in "Hpc".
+    iEval (rewrite HT1) in "Hb1". iEval (rewrite HT2) in "Hb2".
+    iEval (rewrite HT3) in "Hb3". iEval (rewrite HT4) in "Hb4".
+    iEval (rewrite HT6) in "Hb6". iEval (rewrite HT7) in "Hb7".
+    iEval (rewrite HT8) in "Hb8".
+    (* the [name] local goes back to being two frame slots *)
+    iDestruct (dlk_name_bytes with "Hnb") as "Hnbb".
+    iDestruct (cr_bytes_slots sp0 Hal10 Hal9 with "Hnbb") as (w10 w9) "[Hc10 Hc9]".
+    iAssert (stack_own sp0 10) with
+      "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hc9 Hc10]" as "Hstk".
+    { rewrite stack_own_slots. cbn [seq].
+      iSplitL "Hb1"; [iExists _; iExact "Hb1" |].
+      iSplitL "Hb2"; [iExists _; iExact "Hb2" |].
+      iSplitL "Hb3"; [iExists _; iExact "Hb3" |].
+      iSplitL "Hb4"; [iExists _; iExact "Hb4" |].
+      iSplitL "Hb5"; [iExists _; iExact "Hb5" |].
+      iSplitL "Hb6"; [iExists _; iExact "Hb6" |].
+      iSplitL "Hb7"; [iExists _; iExact "Hb7" |].
+      iSplitL "Hb8"; [iExists _; iExact "Hb8" |].
+      iSplitL "Hc9"; [iExists _; iExact "Hc9" |].
+      iSplitL "Hc10"; [iExists _; iExact "Hc10" |].
+      done. }
+    (* ===== +0x72 c.addi16sp sp,80 : the pop ===== *)
+    assert (Hwv : add_vec (P7 !!! Regidx csp_rs1 : mword 64)
+                    (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6)))
+                  = sp0) by (rewrite HP7sp; apply cr_pop).
+    assert (Hpop : (P7 !!! Regidx csp_rs1 : mword 64)
+                   = pa_stk (add_vec (P7 !!! Regidx csp_rs1 : mword 64)
+                       (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6)))) 10)
+      by (rewrite Hwv; exact HP7sp).
+    iEval (rewrite -Hwv) in "Hstk".
+    iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (CK + 0x72))
+              (mword_of_int 5 : mword 6) P7 (K - 10)%nat 10 b Hpop
+              with "Hcg Hpc Hj72 Hstk").
+    iIntros (CIDT8 HqT8) "Hcg Hpc".
+    set (P8 := <[Regidx csp_rs1 := regval_into_reg
+                   (add_vec (P7 !!! Regidx csp_rs1 : mword 64)
+                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6))))]> P7).
+    iEval (rewrite HKsum) in "Hcg".
+    assert (Hq074 : add_vec_int (mword_of_int (CK + 0x72) : mword 64) 2
+                    = mword_of_int (CK + 0x74)) by pcw.
+    iEval (rewrite Hq074) in "Hpc".
+    (* ===== +0x74 c.ret ===== *)
+    assert (CPra : P8 !!! Regidx Rra = (m !!! Regidx Rra : mword 64)).
+    { rewrite /P8 upd_ne; [| nz]. rewrite /P7 upd_ne; [| nz].
+      rewrite /P6 upd_ne; [| nz]. rewrite /P5 upd_ne; [| nz].
+      rewrite /P4 upd_ne; [| nz]. rewrite /P3 upd_ne; [| nz].
+      rewrite /P2 upd_ne; [| nz]. rewrite /P1 upd_eq. reflexivity. }
+    iApply (wp_cret_s_sconf (mword_of_int (CK + 0x74)) Rra P8 K b
+              ltac:(nz) with "Hcg Hpc Hj74").
+    iIntros (CIDT9 HqT9) "Hcg Hpc".
+    iEval (rgne) in "Hpc".
+    assert (Hretf : ret_pc (P8 !!! Regidx Rra : mword 64) = ret_tgt)
+      by (rewrite CPra; exact Hrt).
+    iEval (rewrite Hretf) in "Hpc".
+    assert (CPsp : P8 !!! Regidx csp_rs1 = (m !!! Regidx csp_rs1 : mword 64)).
+    { rewrite /P8 upd_eq. rewrite Hwv. symmetry. exact Hspm. }
+    assert (CPs0 : P8 !!! Regidx Rs0 = (m !!! Regidx Rs0 : mword 64)).
+    { rewrite /P8 upd_ne; [| nz]. rewrite /P7 upd_ne; [| nz].
+      rewrite /P6 upd_ne; [| nz]. rewrite /P5 upd_ne; [| nz].
+      rewrite /P4 upd_ne; [| nz]. rewrite /P3 upd_ne; [| nz].
+      rewrite /P2 upd_eq. reflexivity. }
+    assert (CPs1 : P8 !!! Regidx Rs1 = (m !!! Regidx Rs1 : mword 64)).
+    { rewrite /P8 upd_ne; [| nz]. rewrite /P7 upd_ne; [| nz].
+      rewrite /P6 upd_ne; [| nz]. rewrite /P5 upd_ne; [| nz].
+      rewrite /P4 upd_ne; [| nz]. rewrite /P3 upd_eq. reflexivity. }
+    assert (CPs2 : P8 !!! Regidx Rs2 = (m !!! Regidx Rs2 : mword 64)).
+    { rewrite /P8 upd_ne; [| nz]. rewrite /P7 upd_ne; [| nz].
+      rewrite /P6 upd_ne; [| nz]. rewrite /P5 upd_ne; [| nz].
+      rewrite /P4 upd_eq. reflexivity. }
+    assert (CPs4 : P8 !!! Regidx Rs4 = (m !!! Regidx Rs4 : mword 64)).
+    { rewrite /P8 upd_ne; [| nz]. rewrite /P7 upd_ne; [| nz].
+      rewrite /P6 upd_ne; [| nz]. rewrite /P5 upd_eq. reflexivity. }
+    assert (CPs5 : P8 !!! Regidx Rs5 = (m !!! Regidx Rs5 : mword 64)).
+    { rewrite /P8 upd_ne; [| nz]. rewrite /P7 upd_ne; [| nz].
+      rewrite /P6 upd_eq. reflexivity. }
+    assert (CPs6 : P8 !!! Regidx Rs6 = (m !!! Regidx Rs6 : mword 64)).
+    { rewrite /P8 upd_ne; [| nz]. rewrite /P7 upd_eq. reflexivity. }
+    assert (CPo : forall c : mword 5, is_cs_idx c = true ->
+              c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 -> c <> Rs2 ->
+              c <> Rs4 -> c <> Rs5 -> c <> Rs6 ->
+              P8 !!! Regidx c = (m !!! Regidx c : mword 64)).
+    { intros c Hc N2 N8 N9 N18 N20 N21 N22.
+      rewrite /P8 upd_ne; [| dlk_xne N2].
+      rewrite /P7 upd_ne; [| dlk_xne N22].
+      rewrite /P6 upd_ne; [| dlk_xne N21].
+      rewrite /P5 upd_ne; [| dlk_xne N20].
+      rewrite /P4 upd_ne; [| dlk_xne N18].
+      rewrite /P3 upd_ne; [| dlk_xne N9].
+      rewrite /P2 upd_ne; [| dlk_xne N8].
+      rewrite /P1 upd_ne; [| dlk_rne2 Hcsra Hc].
+      rewrite /P0 upd_ne; [| dlk_rne2 Hcsa0 Hc].
+      exact (HTthr c Hc N2 N8 N9 N18 N20 N21 N22). }
+    assert (CPa0 : P8 !!! Regidx Ra0 = (Mt !!! Regidx Rs2 : mword 64)).
+    { rewrite /P8 upd_ne; [| nz]. rewrite /P7 upd_ne; [| nz].
+      rewrite /P6 upd_ne; [| nz]. rewrite /P5 upd_ne; [| nz].
+      rewrite /P4 upd_ne; [| nz]. rewrite /P3 upd_ne; [| nz].
+      rewrite /P2 upd_ne; [| nz]. rewrite /P1 upd_ne; [| nz].
+      rewrite /P0 upd_eq. apply add_vec_zero_l. }
+    iSpecialize ("Hqc" $! CIDT9 with "[%]"); [wp_next_chain |].
+    iApply ("Hqc" $! P8 with "[%] [%] Hcg Hpc").
+    - unfold callee_saved. split_and!;
+        first [ exact CPsp | exact CPs0 | exact CPs1 | exact CPs2
+              | exact CPs4 | exact CPs5 | exact CPs6
+              | apply CPo; first [ vm_compute; reflexivity
+                                 | vm_compute; discriminate ] ].
+    - exact CPa0.
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
   (*  THE PARKED GATE: the whole ALLOCATE half, +0x8a onward               *)
   (*                                                                       *)
   (*  Reached ONLY by the [c.beqz a0] at +0x3e being TAKEN, i.e. by        *)
@@ -715,6 +1286,305 @@ Section ProofCreateMain.
                          V u Sb ns pidv dqb dqs dqbs dqn m K eb C b j
                          ret_tgt CIDc) -∗
        WP (Loop : expr riscv_lang))%I.
+
+  (* ------------------------------------------------------------------- *)
+  (*  THE TWO BODIES THE C-OK-FILE WALK PARKS (D0-a).                      *)
+  (*                                                                       *)
+  (*  Both are HYPOTHESES of [cr_alloc_half], exactly as [cr_alloc_body]   *)
+  (*  is a hypothesis of [cr_found_half]: [Print Assumptions] sees         *)
+  (*  neither, and whoever proves them composes.                          *)
+  (*                                                                       *)
+  (*  [cr_mkdir_body] is the [beq s4,a4] at +0xb2 TAKEN, i.e. the whole    *)
+  (*  T_DIR sub-branch (+0xe0..+0x12c: the two interior [dirlink]s on the  *)
+  (*  child, the parent's [dirlink], its [nlink++] and its [iupdate]).     *)
+  (*  D0-b consumes it.  Note what it is handed and what it is NOT: the    *)
+  (*  child's [ilink] ticket is UNDEPOSITED -- +0xac minted it and the     *)
+  (*  non-directory arm spends it at +0xc0, so on this branch it is still  *)
+  (*  in hand and the mkdir arm's own [dirlink(dp,name)] at +0x114 is      *)
+  (*  what spends it.                                                     *)
+  (*                                                                       *)
+  (*  [cr_fail_body] is +0x12e, reached HERE only from the [bltz] at       *)
+  (*  +0xc4 (the other three entries are behind the T_DIR branch and       *)
+  (*  therefore inside [cr_mkdir_body]), so a LINEAR premise is right and  *)
+  (*  D0-b will re-shape it into the persistent four-entry form.  It is    *)
+  (*  handed the parent's [dir_links] AT THE ENTRY INDICES together with   *)
+  (*  the undeposited [ilink] and dirlink's own range clause, and NOT a    *)
+  (*  re-parked payload: at [tot = 1] neither [DirLinks.dir_link_at_       *)
+  (*  dirlink] (which wants [2 <= tot]) nor [dir_links_dirlink_nop] (which *)
+  (*  wants [tot = 0]) applies, and that hole is DirLinks' own recorded    *)
+  (*  S5i gap, not something this arm may paper over.                     *)
+  (* ------------------------------------------------------------------- *)
+  Definition cr_mkdir_body
+      (γs : list gname) (j : nat) (γl : gname)
+      (γu : uart_names) (γd : disk_names) (γk : gname)
+      (pd pav pu : mword 64) (bn : bio_names)
+      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (cn : ic_names) (gtl : gname)
+      (γa γf γpr : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (ninodes size : Z) (dev : mword 32) (used : gset Z)
+      (plen : nat) (pfun : nat -> bv 8) (pv : mword 64)
+      (ty major minor : mword 16) (V : pprivate)
+      (u : nat) (Sb : gset Z) (ns : nat)
+      (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
+      (m : regfile) (sp0 ret_tgt : mword 64) (K : nat) (eb : bool)
+      (C : iProp Σ) (b : bool)
+      (* ---- what the found half froze, i.e. [cr_alloc_body]'s own binders *)
+      (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
+      (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
+      (nf nsl : nat -> bv 8)
+      (CIDm : CpuId) : iProp Σ :=
+    (∀ (Mx : regfile) (kslot : nat) (q : Qp) (g gil gisl : gname)
+       (cinum : mword 32) (dnc : dinode) (bmc : blkmap)
+       (datc : nat -> list (bv 8)) (n3 : nat) (Sb3 used3 : gset Z),
+       (* the register file: s1 = dp, s2 = 0, s3 = ip, and s3's saved word
+          is still [m]'s own in slot 5 *)
+       ⌜cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64) (ientry kslot)
+          ty major minor Mx⌝ -∗
+       (* THE BRANCH ITSELF: +0xb2 is taken exactly on [ty = T_DIR] *)
+       ⌜ty = SpecDirlookup.T_DIR⌝ -∗
+       (* the parent, as the found half left it *)
+       ⌜(kd < NINODE)%nat⌝ -∗
+       ⌜bv_unsigned dind < 16 * Z.of_nat nib⌝ -∗
+       ⌜di_type dn = SpecDirlookup.T_DIR⌝ -∗
+       ⌜di_nlink dn <> (mword_of_int 0 : mword 16)⌝ -∗
+       ⌜inode_ok cov logstart dn bm data⌝ -∗
+       ⌜dir_ok nib dn data⌝ -∗
+       ⌜exists es e, nameiparent_of (bview plen pfun) es e
+                     /\ bname 14 nf = e⌝ -∗
+       ⌜dir_first data (dir_nrec (bv_unsigned (di_size dn)))
+                  (bname 14 nf) = None⌝ -∗
+       (* the child, as the gate and the three [sh]s left it *)
+       ⌜(kslot < NINODE)%nat⌝ -∗
+       ⌜0 < bv_unsigned cinum < ninodes⌝ -∗
+       ⌜bv_unsigned cinum < 16 * Z.of_nat nib⌝ -∗
+       ⌜fresh_shape dnc⌝ -∗
+       ⌜di_type dnc = ty⌝ -∗
+       ⌜inode_ok cov logstart dnc bmc datc⌝ -∗
+       ⌜dir_ok nib dnc datc⌝ -∗
+       (* the ledger *)
+       ⌜Sb ⊆ Sb3⌝ -∗
+       ⌜IBLOCK cinum inodestart ∈ Sb3⌝ -∗
+       ⌜(8 <= n3)%nat /\ (n3 <= u)%nat⌝ -∗
+       ⌜used3 ⊆ used⌝ -∗
+       (* the machine *)
+       sie_cap_gpr Mx (K - 10)%nat b (proc_addr j) -∗
+       cpu_own 0 eb (proc_addr j) C b -∗
+       pc_is (mword_of_int (CK + 0xe0)) -∗
+       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
+       (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
+       (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
+       ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ nf jj) -∗
+       ([∗ list] jj ∈ seq 14 2, pa_add (pa_stk sp0 10) jj ↦ₘ nsl jj) -∗
+       (* THE LOCKED PARENT, in pieces *)
+       is_sleeplock γil γisl (i_lock (ientry kd)) "inode"%string
+                    (ic_tok cn kd) -∗
+       sleeplocked γisl -∗
+       sl_pid (i_lock (ientry kd)) ↦₄ pidv -∗
+       ic_deposit cn kd (DepShr (qd/2)%Qp dev dind gd) -∗
+       i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
+       i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dind -∗
+       i_valid (ientry kd) ↦₄ valid_word true -∗
+       dir_links (bv_unsigned dind) dn data -∗
+       dinode_at γi dind dn -∗
+       inode_meta (ientry kd) dn -∗
+       inode_map γfs (ientry kd) bm -∗
+       inode_blocks γfs bm data -∗
+       ity_shot gd (di_type dn) -∗
+       inode_ref_short_gen kd (qd/2 + qd/2)%Qp (qd/2)%Qp dev dind gd -∗
+       (* THE LOCKED CHILD, in pieces, at the FLUSHED record *)
+       is_sleeplock gil gisl (i_lock (ientry kslot)) "inode"%string
+                    (ic_tok cn kslot) -∗
+       sleeplocked gisl -∗
+       sl_pid (i_lock (ientry kslot)) ↦₄ pidv -∗
+       ic_deposit cn kslot (DepShr (q/2)%Qp dev cinum g) -∗
+       i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev -∗
+       i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} cinum -∗
+       i_valid (ientry kslot) ↦₄ valid_word true -∗
+       dir_links (bv_unsigned cinum) dnc datc -∗
+       dinode_at γi cinum (cr_setf dnc major minor (mword_of_int 1 : mword 16)) -∗
+       inode_meta (ientry kslot)
+                  (cr_setf dnc major minor (mword_of_int 1 : mword 16)) -∗
+       inode_map γfs (ientry kslot) bmc -∗
+       inode_blocks γfs bmc datc -∗
+       ity_shot g (di_type dnc) -∗
+       inode_ref_short_gen kslot (q/2 + q/2)%Qp (q/2)%Qp dev cinum g -∗
+       (* THE MINT, UNDEPOSITED *)
+       ilink (bv_unsigned cinum) -∗
+       (* everything the contract still owes back *)
+       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
+       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+       bitmap_res γfs bmapstart cov logstart size used3 -∗
+       p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
+       (p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
+          proc_priv γf (proc_addr j) pidv V) -∗
+       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+       bslots bn 3 -∗
+       iref_slots (ns - 2) -∗
+       log_opS γ n3 Sb3 -∗
+       wp_next (CID0 := CID) true (proc_addr j)
+         (fun CIDc : CpuId =>
+            cr_cont_body γfs γi cn γ γf bn cov logstart bmapstart inodestart
+                         nib ninodes size dev used plen pfun pv ty major minor
+                         V u Sb ns pidv dqb dqs dqbs dqn m K eb C b j
+                         ret_tgt CIDc) -∗
+       WP (Loop : expr riscv_lang))%I.
+
+  Definition cr_fail_body
+      (γs : list gname) (j : nat) (γl : gname)
+      (γu : uart_names) (γd : disk_names) (γk : gname)
+      (pd pav pu : mword 64) (bn : bio_names)
+      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (cn : ic_names) (gtl : gname)
+      (γa γf γpr : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (ninodes size : Z) (dev : mword 32) (used : gset Z)
+      (plen : nat) (pfun : nat -> bv 8) (pv : mword 64)
+      (ty major minor : mword 16) (V : pprivate)
+      (u : nat) (Sb : gset Z) (ns : nat)
+      (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
+      (m : regfile) (sp0 ret_tgt : mword 64) (K : nat) (eb : bool)
+      (C : iProp Σ) (b : bool)
+      (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
+      (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
+      (nf nsl : nat -> bv 8)
+      (CIDf : CpuId) : iProp Σ :=
+    (∀ (Mx : regfile) (kslot : nat) (q : Qp) (g gil gisl : gname)
+       (cinum : mword 32) (dnc : dinode) (bmc : blkmap)
+       (datc : nat -> list (bv 8))
+       (bm' : blkmap) (data' : nat -> list (bv 8)) (dn' dn0' : dinode)
+       (tot : nat) (n4 : nat) (Sb4 used4 : gset Z),
+       ⌜cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64) (ientry kslot)
+          ty major minor Mx⌝ -∗
+       ⌜ty <> SpecDirlookup.T_DIR⌝ -∗
+       (* the parent's ENTRY facts *)
+       ⌜(kd < NINODE)%nat⌝ -∗
+       ⌜bv_unsigned dind < 16 * Z.of_nat nib⌝ -∗
+       ⌜di_type dn = SpecDirlookup.T_DIR⌝ -∗
+       ⌜di_nlink dn <> (mword_of_int 0 : mword 16)⌝ -∗
+       ⌜inode_ok cov logstart dn bm data⌝ -∗
+       ⌜dir_ok nib dn data⌝ -∗
+       (* the child *)
+       ⌜(kslot < NINODE)%nat⌝ -∗
+       ⌜0 < bv_unsigned cinum < ninodes⌝ -∗
+       ⌜bv_unsigned cinum < 16 * Z.of_nat nib⌝ -∗
+       ⌜fresh_shape dnc⌝ -∗
+       ⌜di_type dnc = ty⌝ -∗
+       ⌜inode_ok cov logstart dnc bmc datc⌝ -∗
+       ⌜dir_ok nib dnc datc⌝ -∗
+       (* WHAT THE FAILING [dirlink(dp,name)] AT +0xc0 LEFT, verbatim from
+          [SpecDirlink]'s append arm.  [tot < 16] is the [bltz] at +0xc4
+          having fired; the RE-PARK of [dir_links] is deliberately NOT done
+          here (see the header). *)
+       ⌜(tot < 16)%nat⌝ -∗
+       ⌜used ⊆ used4⌝ -∗
+       ⌜blkmap_wf cov logstart bm'⌝ -∗
+       ⌜blk_holes_zero bm' data'⌝ -∗
+       ⌜di_addrs dn' = bm_cells bm'⌝ -∗
+       ⌜bv_unsigned (di_size dn') < 2 ^ 31⌝ -∗
+       ⌜bm_covers bm' (bv_unsigned (di_size dn'))⌝ -∗
+       ⌜bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE⌝ -∗
+       ⌜inode_sized data'⌝ -∗
+       ⌜dn' = wi_dinode dn bm'
+                (16 * dir_slot data (dir_nrec (bv_unsigned (di_size dn))))%nat
+                tot⌝ -∗
+       ⌜dn0' = dn'⌝ -∗
+       ⌜forall x : nat,
+          file_byte data' x
+          = if decide ((16 * dir_slot data
+                          (dir_nrec (bv_unsigned (di_size dn))) <= x)%nat
+                       /\ (x < 16 * dir_slot data
+                             (dir_nrec (bv_unsigned (di_size dn))) + tot)%nat)
+            then dirent_bytes
+                   (de_of_name (cr_low16 cinum) (bname 14 nf))
+                   !!! (x - 16 * dir_slot data
+                          (dir_nrec (bv_unsigned (di_size dn))))%nat
+            else file_byte data x⌝ -∗
+       (* the ledger, at the figure [CreateBudget.cr_fail_closes_at_zero]
+          and [cr_fail_closes_with_credit] are the theorems for *)
+       ⌜Sb ⊆ Sb4⌝ -∗
+       ⌜IBLOCK cinum inodestart ∈ Sb4⌝ -∗
+       ⌜(iput_units <= n4)%nat /\ (n4 <= u)%nat⌝ -∗
+       ⌜used4 ⊆ used⌝ -∗
+       (* the machine *)
+       sie_cap_gpr Mx (K - 10)%nat b (proc_addr j) -∗
+       cpu_own 0 eb (proc_addr j) C b -∗
+       pc_is (mword_of_int (CK + 0x12e)) -∗
+       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
+       (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
+       (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
+       ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ nf jj) -∗
+       ([∗ list] jj ∈ seq 14 2, pa_add (pa_stk sp0 10) jj ↦ₘ nsl jj) -∗
+       (* THE LOCKED PARENT, in pieces, at the POST-dirlink indices --
+          with [dir_links] still at the ENTRY ones and the ticket in hand *)
+       is_sleeplock γil γisl (i_lock (ientry kd)) "inode"%string
+                    (ic_tok cn kd) -∗
+       sleeplocked γisl -∗
+       sl_pid (i_lock (ientry kd)) ↦₄ pidv -∗
+       ic_deposit cn kd (DepShr (qd/2)%Qp dev dind gd) -∗
+       i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
+       i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dind -∗
+       i_valid (ientry kd) ↦₄ valid_word true -∗
+       dir_links (bv_unsigned dind) dn data -∗
+       dinode_at γi dind dn0' -∗
+       inode_meta (ientry kd) dn' -∗
+       inode_map γfs (ientry kd) bm' -∗
+       inode_blocks γfs bm' data' -∗
+       ity_shot gd (di_type dn) -∗
+       inode_ref_short_gen kd (qd/2 + qd/2)%Qp (qd/2)%Qp dev dind gd -∗
+       (* THE LOCKED CHILD, at the flushed record *)
+       is_sleeplock gil gisl (i_lock (ientry kslot)) "inode"%string
+                    (ic_tok cn kslot) -∗
+       sleeplocked gisl -∗
+       sl_pid (i_lock (ientry kslot)) ↦₄ pidv -∗
+       ic_deposit cn kslot (DepShr (q/2)%Qp dev cinum g) -∗
+       i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev -∗
+       i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} cinum -∗
+       i_valid (ientry kslot) ↦₄ valid_word true -∗
+       dir_links (bv_unsigned cinum) dnc datc -∗
+       dinode_at γi cinum (cr_setf dnc major minor (mword_of_int 1 : mword 16)) -∗
+       inode_meta (ientry kslot)
+                  (cr_setf dnc major minor (mword_of_int 1 : mword 16)) -∗
+       inode_map γfs (ientry kslot) bmc -∗
+       inode_blocks γfs bmc datc -∗
+       ity_shot g (di_type dnc) -∗
+       inode_ref_short_gen kslot (q/2 + q/2)%Qp (q/2)%Qp dev cinum g -∗
+       (* THE MINT.  UNDEPOSITED: at [tot = 1] the written record is live at
+          [cinum mod 256] and no ticket for that key exists anywhere, so the
+          re-park is not available at this seam. *)
+       ilink (bv_unsigned cinum) -∗
+       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
+       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+       bitmap_res γfs bmapstart cov logstart size used4 -∗
+       p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
+       (p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
+          proc_priv γf (proc_addr j) pidv V) -∗
+       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+       bslots bn 3 -∗
+       iref_slots (ns - 2) -∗
+       log_opS γ n4 Sb4 -∗
+       wp_next (CID0 := CID) true (proc_addr j)
+         (fun CIDc : CpuId =>
+            cr_cont_body γfs γi cn γ γf bn cov logstart bmapstart inodestart
+                         nib ninodes size dev used plen pfun pv ty major minor
+                         V u Sb ns pidv dqb dqs dqbs dqn m K eb C b j
+                         ret_tgt CIDc) -∗
+       WP (Loop : expr riscv_lang))%I.
+
 
   (* =================================================================== *)
   (*  3.  THE WALK                                                        *)
@@ -1147,239 +2017,8 @@ Section ProofCreateMain.
     (*  THE EPILOGUE FUNNEL at +0x62 -- SIX arms reach it, so the          *)
     (*  continuation is abstract and the body speaks only of [cr_tregs].   *)
     (* ================================================================== *)
-    iAssert (□ wp_next (CID0 := CID) true (proc_addr j) (fun CIDt : CpuId =>
-               cr_tail_body j m sp0 ret_tgt K b CIDt))%I
-      with "[]" as "#Htail".
-    { iModIntro.
-      iIntros (CIDt Hst Mt w5 dnew)
-        "%HTr Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb Hqc".
-      destruct HTr as [HTsp HTthr].
-      iPoseProof (cri_062 with "Htext") as "Hj62".
-      iPoseProof (cri_064 with "Htext") as "Hj64".
-      iPoseProof (cri_066 with "Htext") as "Hj66".
-      iPoseProof (cri_068 with "Htext") as "Hj68".
-      iPoseProof (cri_06a with "Htext") as "Hj6a".
-      iPoseProof (cri_06c with "Htext") as "Hj6c".
-      iPoseProof (cri_06e with "Htext") as "Hj6e".
-      iPoseProof (cri_070 with "Htext") as "Hj70".
-      iPoseProof (cri_072 with "Htext") as "Hj72".
-      iPoseProof (cri_074 with "Htext") as "Hj74".
-      (* +0x62 c.mv a0,s2 : the answer register *)
-      iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x62)) Ra0 Rs2 Mt
-                (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj62").
-      iIntros (CIDT0 HqT0) "Hcg Hpc". iEval (rgne) in "Hcg".
-      set (P0 := <[Regidx Ra0 := regval_into_reg
-                    (add_vec (zero_reg : mword 64) (Mt !!! Regidx Rs2))]> Mt).
-      assert (HP0sp : P0 !!! Regidx csp_rs1 = pa_stk sp0 10)
-        by (rewrite /P0 upd_ne; [exact HTsp | nz]).
-      assert (Hq064 : add_vec_int (mword_of_int (CK + 0x62) : mword 64) 2
-                      = mword_of_int (CK + 0x64)) by pcw.
-      iEval (rewrite Hq064) in "Hpc".
-      (* +0x64 .. +0x70 : the seven restores *)
-      assert (HT1 : add_vec (P0 !!! Regidx csp_rs1)
-                      (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))
-                    = pa_stk sp0 1) by (rewrite HP0sp; apply cr_frm1).
-      iEval (rewrite -HT1) in "Hb1".
-      iApply (wp_cldsp_s_sconf (mword_of_int (CK + 0x64)) (mword_of_int 9 : mword 6)
-                Rra P0 (K - 10)%nat (m !!! Regidx Rra : mword 64) b
-                ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj64 Hb1").
-      iIntros (CIDT1 HqT1) "Hcg Hpc Hb1".
-      set (P1 := <[Regidx Rra := regval_into_reg (m !!! Regidx Rra : mword 64)]> P0).
-      assert (HP1sp : P1 !!! Regidx csp_rs1 = pa_stk sp0 10)
-        by (rewrite /P1 upd_ne; [exact HP0sp | nz]).
-      assert (Hq066 : add_vec_int (mword_of_int (CK + 0x64) : mword 64) 2
-                      = mword_of_int (CK + 0x66)) by pcw.
-      iEval (rewrite Hq066) in "Hpc".
-      assert (HT2 : add_vec (P1 !!! Regidx csp_rs1)
-                      (zero_extend' 64 (concat_vec (mword_of_int 8 : mword 6) ('b"000")))
-                    = pa_stk sp0 2) by (rewrite HP1sp; apply cr_frm2).
-      iEval (rewrite -HT2) in "Hb2".
-      iApply (wp_cldsp_s_sconf (mword_of_int (CK + 0x66)) (mword_of_int 8 : mword 6)
-                Rs0 P1 (K - 10)%nat (m !!! Regidx Rs0 : mword 64) b
-                ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj66 Hb2").
-      iIntros (CIDT2 HqT2) "Hcg Hpc Hb2".
-      set (P2 := <[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0 : mword 64)]> P1).
-      assert (HP2sp : P2 !!! Regidx csp_rs1 = pa_stk sp0 10)
-        by (rewrite /P2 upd_ne; [exact HP1sp | nz]).
-      assert (Hq068 : add_vec_int (mword_of_int (CK + 0x66) : mword 64) 2
-                      = mword_of_int (CK + 0x68)) by pcw.
-      iEval (rewrite Hq068) in "Hpc".
-      assert (HT3 : add_vec (P2 !!! Regidx csp_rs1)
-                      (zero_extend' 64 (concat_vec (mword_of_int 7 : mword 6) ('b"000")))
-                    = pa_stk sp0 3) by (rewrite HP2sp; apply cr_frm3).
-      iEval (rewrite -HT3) in "Hb3".
-      iApply (wp_cldsp_s_sconf (mword_of_int (CK + 0x68)) (mword_of_int 7 : mword 6)
-                Rs1 P2 (K - 10)%nat (m !!! Regidx Rs1 : mword 64) b
-                ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj68 Hb3").
-      iIntros (CIDT3 HqT3) "Hcg Hpc Hb3".
-      set (P3 := <[Regidx Rs1 := regval_into_reg (m !!! Regidx Rs1 : mword 64)]> P2).
-      assert (HP3sp : P3 !!! Regidx csp_rs1 = pa_stk sp0 10)
-        by (rewrite /P3 upd_ne; [exact HP2sp | nz]).
-      assert (Hq06a : add_vec_int (mword_of_int (CK + 0x68) : mword 64) 2
-                      = mword_of_int (CK + 0x6a)) by pcw.
-      iEval (rewrite Hq06a) in "Hpc".
-      assert (HT4 : add_vec (P3 !!! Regidx csp_rs1)
-                      (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))
-                    = pa_stk sp0 4) by (rewrite HP3sp; apply cr_frm4).
-      iEval (rewrite -HT4) in "Hb4".
-      iApply (wp_cldsp_s_sconf (mword_of_int (CK + 0x6a)) (mword_of_int 6 : mword 6)
-                Rs2 P3 (K - 10)%nat (m !!! Regidx Rs2 : mword 64) b
-                ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj6a Hb4").
-      iIntros (CIDT4 HqT4) "Hcg Hpc Hb4".
-      set (P4 := <[Regidx Rs2 := regval_into_reg (m !!! Regidx Rs2 : mword 64)]> P3).
-      assert (HP4sp : P4 !!! Regidx csp_rs1 = pa_stk sp0 10)
-        by (rewrite /P4 upd_ne; [exact HP3sp | nz]).
-      assert (Hq06c : add_vec_int (mword_of_int (CK + 0x6a) : mword 64) 2
-                      = mword_of_int (CK + 0x6c)) by pcw.
-      iEval (rewrite Hq06c) in "Hpc".
-      assert (HT6 : add_vec (P4 !!! Regidx csp_rs1)
-                      (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))
-                    = pa_stk sp0 6) by (rewrite HP4sp; apply cr_frm6).
-      iEval (rewrite -HT6) in "Hb6".
-      iApply (wp_cldsp_s_sconf (mword_of_int (CK + 0x6c)) (mword_of_int 4 : mword 6)
-                Rs4 P4 (K - 10)%nat (m !!! Regidx Rs4 : mword 64) b
-                ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj6c Hb6").
-      iIntros (CIDT5 HqT5) "Hcg Hpc Hb6".
-      set (P5 := <[Regidx Rs4 := regval_into_reg (m !!! Regidx Rs4 : mword 64)]> P4).
-      assert (HP5sp : P5 !!! Regidx csp_rs1 = pa_stk sp0 10)
-        by (rewrite /P5 upd_ne; [exact HP4sp | nz]).
-      assert (Hq06e : add_vec_int (mword_of_int (CK + 0x6c) : mword 64) 2
-                      = mword_of_int (CK + 0x6e)) by pcw.
-      iEval (rewrite Hq06e) in "Hpc".
-      assert (HT7 : add_vec (P5 !!! Regidx csp_rs1)
-                      (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000")))
-                    = pa_stk sp0 7) by (rewrite HP5sp; apply cr_frm7).
-      iEval (rewrite -HT7) in "Hb7".
-      iApply (wp_cldsp_s_sconf (mword_of_int (CK + 0x6e)) (mword_of_int 3 : mword 6)
-                Rs5 P5 (K - 10)%nat (m !!! Regidx Rs5 : mword 64) b
-                ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj6e Hb7").
-      iIntros (CIDT6 HqT6) "Hcg Hpc Hb7".
-      set (P6 := <[Regidx Rs5 := regval_into_reg (m !!! Regidx Rs5 : mword 64)]> P5).
-      assert (HP6sp : P6 !!! Regidx csp_rs1 = pa_stk sp0 10)
-        by (rewrite /P6 upd_ne; [exact HP5sp | nz]).
-      assert (Hq070 : add_vec_int (mword_of_int (CK + 0x6e) : mword 64) 2
-                      = mword_of_int (CK + 0x70)) by pcw.
-      iEval (rewrite Hq070) in "Hpc".
-      assert (HT8 : add_vec (P6 !!! Regidx csp_rs1)
-                      (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))
-                    = pa_stk sp0 8) by (rewrite HP6sp; apply cr_frm8).
-      iEval (rewrite -HT8) in "Hb8".
-      iApply (wp_cldsp_s_sconf (mword_of_int (CK + 0x70)) (mword_of_int 2 : mword 6)
-                Rs6 P6 (K - 10)%nat (m !!! Regidx Rs6 : mword 64) b
-                ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj70 Hb8").
-      iIntros (CIDT7 HqT7) "Hcg Hpc Hb8".
-      set (P7 := <[Regidx Rs6 := regval_into_reg (m !!! Regidx Rs6 : mword 64)]> P6).
-      assert (HP7sp : P7 !!! Regidx csp_rs1 = pa_stk sp0 10)
-        by (rewrite /P7 upd_ne; [exact HP6sp | nz]).
-      assert (Hq072 : add_vec_int (mword_of_int (CK + 0x70) : mword 64) 2
-                      = mword_of_int (CK + 0x72)) by pcw.
-      iEval (rewrite Hq072) in "Hpc".
-      iEval (rewrite HT1) in "Hb1". iEval (rewrite HT2) in "Hb2".
-      iEval (rewrite HT3) in "Hb3". iEval (rewrite HT4) in "Hb4".
-      iEval (rewrite HT6) in "Hb6". iEval (rewrite HT7) in "Hb7".
-      iEval (rewrite HT8) in "Hb8".
-      (* the [name] local goes back to being two frame slots *)
-      iDestruct (dlk_name_bytes with "Hnb") as "Hnbb".
-      iDestruct (cr_bytes_slots sp0 Hal10 Hal9 with "Hnbb") as (w10 w9) "[Hc10 Hc9]".
-      iAssert (stack_own sp0 10) with
-        "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hc9 Hc10]" as "Hstk".
-      { rewrite stack_own_slots. cbn [seq].
-        iSplitL "Hb1"; [iExists _; iExact "Hb1" |].
-        iSplitL "Hb2"; [iExists _; iExact "Hb2" |].
-        iSplitL "Hb3"; [iExists _; iExact "Hb3" |].
-        iSplitL "Hb4"; [iExists _; iExact "Hb4" |].
-        iSplitL "Hb5"; [iExists _; iExact "Hb5" |].
-        iSplitL "Hb6"; [iExists _; iExact "Hb6" |].
-        iSplitL "Hb7"; [iExists _; iExact "Hb7" |].
-        iSplitL "Hb8"; [iExists _; iExact "Hb8" |].
-        iSplitL "Hc9"; [iExists _; iExact "Hc9" |].
-        iSplitL "Hc10"; [iExists _; iExact "Hc10" |].
-        done. }
-      (* ===== +0x72 c.addi16sp sp,80 : the pop ===== *)
-      assert (Hwv : add_vec (P7 !!! Regidx csp_rs1 : mword 64)
-                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6)))
-                    = sp0) by (rewrite HP7sp; apply cr_pop).
-      assert (Hpop : (P7 !!! Regidx csp_rs1 : mword 64)
-                     = pa_stk (add_vec (P7 !!! Regidx csp_rs1 : mword 64)
-                         (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6)))) 10)
-        by (rewrite Hwv; exact HP7sp).
-      iEval (rewrite -Hwv) in "Hstk".
-      iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (CK + 0x72))
-                (mword_of_int 5 : mword 6) P7 (K - 10)%nat 10 b Hpop
-                with "Hcg Hpc Hj72 Hstk").
-      iIntros (CIDT8 HqT8) "Hcg Hpc".
-      set (P8 := <[Regidx csp_rs1 := regval_into_reg
-                     (add_vec (P7 !!! Regidx csp_rs1 : mword 64)
-                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6))))]> P7).
-      iEval (rewrite HKsum) in "Hcg".
-      assert (Hq074 : add_vec_int (mword_of_int (CK + 0x72) : mword 64) 2
-                      = mword_of_int (CK + 0x74)) by pcw.
-      iEval (rewrite Hq074) in "Hpc".
-      (* ===== +0x74 c.ret ===== *)
-      assert (CPra : P8 !!! Regidx Rra = (m !!! Regidx Rra : mword 64)).
-      { rewrite /P8 upd_ne; [| nz]. rewrite /P7 upd_ne; [| nz].
-        rewrite /P6 upd_ne; [| nz]. rewrite /P5 upd_ne; [| nz].
-        rewrite /P4 upd_ne; [| nz]. rewrite /P3 upd_ne; [| nz].
-        rewrite /P2 upd_ne; [| nz]. rewrite /P1 upd_eq. reflexivity. }
-      iApply (wp_cret_s_sconf (mword_of_int (CK + 0x74)) Rra P8 K b
-                ltac:(nz) with "Hcg Hpc Hj74").
-      iIntros (CIDT9 HqT9) "Hcg Hpc".
-      iEval (rgne) in "Hpc".
-      assert (Hretf : ret_pc (P8 !!! Regidx Rra : mword 64) = ret_tgt)
-        by (rewrite CPra; reflexivity).
-      iEval (rewrite Hretf) in "Hpc".
-      assert (CPsp : P8 !!! Regidx csp_rs1 = (m !!! Regidx csp_rs1 : mword 64)).
-      { rewrite /P8 upd_eq. rewrite Hwv. symmetry. exact Hspm. }
-      assert (CPs0 : P8 !!! Regidx Rs0 = (m !!! Regidx Rs0 : mword 64)).
-      { rewrite /P8 upd_ne; [| nz]. rewrite /P7 upd_ne; [| nz].
-        rewrite /P6 upd_ne; [| nz]. rewrite /P5 upd_ne; [| nz].
-        rewrite /P4 upd_ne; [| nz]. rewrite /P3 upd_ne; [| nz].
-        rewrite /P2 upd_eq. reflexivity. }
-      assert (CPs1 : P8 !!! Regidx Rs1 = (m !!! Regidx Rs1 : mword 64)).
-      { rewrite /P8 upd_ne; [| nz]. rewrite /P7 upd_ne; [| nz].
-        rewrite /P6 upd_ne; [| nz]. rewrite /P5 upd_ne; [| nz].
-        rewrite /P4 upd_ne; [| nz]. rewrite /P3 upd_eq. reflexivity. }
-      assert (CPs2 : P8 !!! Regidx Rs2 = (m !!! Regidx Rs2 : mword 64)).
-      { rewrite /P8 upd_ne; [| nz]. rewrite /P7 upd_ne; [| nz].
-        rewrite /P6 upd_ne; [| nz]. rewrite /P5 upd_ne; [| nz].
-        rewrite /P4 upd_eq. reflexivity. }
-      assert (CPs4 : P8 !!! Regidx Rs4 = (m !!! Regidx Rs4 : mword 64)).
-      { rewrite /P8 upd_ne; [| nz]. rewrite /P7 upd_ne; [| nz].
-        rewrite /P6 upd_ne; [| nz]. rewrite /P5 upd_eq. reflexivity. }
-      assert (CPs5 : P8 !!! Regidx Rs5 = (m !!! Regidx Rs5 : mword 64)).
-      { rewrite /P8 upd_ne; [| nz]. rewrite /P7 upd_ne; [| nz].
-        rewrite /P6 upd_eq. reflexivity. }
-      assert (CPs6 : P8 !!! Regidx Rs6 = (m !!! Regidx Rs6 : mword 64)).
-      { rewrite /P8 upd_ne; [| nz]. rewrite /P7 upd_eq. reflexivity. }
-      assert (CPo : forall c : mword 5, is_cs_idx c = true ->
-                c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 -> c <> Rs2 ->
-                c <> Rs4 -> c <> Rs5 -> c <> Rs6 ->
-                P8 !!! Regidx c = (m !!! Regidx c : mword 64)).
-      { intros c Hc N2 N8 N9 N18 N20 N21 N22.
-        rewrite /P8 upd_ne; [| dlk_xne N2].
-        rewrite /P7 upd_ne; [| dlk_xne N22].
-        rewrite /P6 upd_ne; [| dlk_xne N21].
-        rewrite /P5 upd_ne; [| dlk_xne N20].
-        rewrite /P4 upd_ne; [| dlk_xne N18].
-        rewrite /P3 upd_ne; [| dlk_xne N9].
-        rewrite /P2 upd_ne; [| dlk_xne N8].
-        rewrite /P1 upd_ne; [| dlk_rne2 Hcsra Hc].
-        rewrite /P0 upd_ne; [| dlk_rne2 Hcsa0 Hc].
-        exact (HTthr c Hc N2 N8 N9 N18 N20 N21 N22). }
-      assert (CPa0 : P8 !!! Regidx Ra0 = (Mt !!! Regidx Rs2 : mword 64)).
-      { rewrite /P8 upd_ne; [| nz]. rewrite /P7 upd_ne; [| nz].
-        rewrite /P6 upd_ne; [| nz]. rewrite /P5 upd_ne; [| nz].
-        rewrite /P4 upd_ne; [| nz]. rewrite /P3 upd_ne; [| nz].
-        rewrite /P2 upd_ne; [| nz]. rewrite /P1 upd_ne; [| nz].
-        rewrite /P0 upd_eq. apply add_vec_zero_l. }
-      iSpecialize ("Hqc" $! CIDT9 with "[%]"); [wp_next_chain |].
-      iApply ("Hqc" $! P8 with "[%] [%] Hcg Hpc").
-      - unfold callee_saved. split_and!;
-          first [ exact CPsp | exact CPs0 | exact CPs1 | exact CPs2
-                | exact CPs4 | exact CPs5 | exact CPs6
-                | apply CPo; first [ vm_compute; reflexivity
-                                   | vm_compute; discriminate ] ].
-      - exact CPa0. }
+    iDestruct (cr_tail_half j m sp0 ret_tgt K b HKsum Hal10 Hal9
+                 eq_refl eq_refl with "Htext") as "#Htail".
     destruct okp.
     - (* ============================================================== *)
       (*  nameiparent SUCCEEDED -- the parent is a LOCKED-ABLE DIRECTORY  *)
