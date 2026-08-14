@@ -1132,7 +1132,7 @@ Section ProofGrowproc.
         - exact Hbel.
         - left. split; [reflexivity | split; reflexivity]. }
       (* SUCCESS: the map gained the run, and a0 is the NEW size *)
-      iDestruct "Hpost" as (P') "(%Hext & %Hdom & %Hret & Hpt)".
+      iDestruct "Hpost" as (P') "(%Hext & %Hdom & %Hleaf & %Hret & Hpt)".
       assert (Hret' : mr !!! Regidx Ra0 = add_vec (pv_sz V) nv).
       { destruct Hret as [[Hlt _] | [_ Hr]]; [| exact Hr].
         exfalso. rewrite !uint_unsigned in Hlt.

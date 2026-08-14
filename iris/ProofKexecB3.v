@@ -2052,7 +2052,7 @@ Section KexecB3Body.
                            proc_pt P4)%I
                   with "[Hpost]" as "Hstep".
                 { iDestruct "Hpost" as "[[%Hz Hpt] | (%P4 & %Hext & %Hdom &
-                                                      %Harm & Hpt)]".
+                                                      %Hleaf & %Harm & Hpt)]".
                   - iExists P. iSplitR; [| iExact "Hpt"]. iPureIntro.
                     split_and!; [reflexivity | reflexivity | | ].
                     + intro Hne. exfalso. apply Hne. rewrite Hz.

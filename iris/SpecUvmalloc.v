@@ -148,10 +148,21 @@ Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
     ( (* out of memory: rolled back to exactly the table we were given *)
       (⌜mr !!! Regidx (mword_of_int 10) = (mword_of_int 0 : mword 64)⌝ ∗
        proc_pt P)
-      ∨ (* the map gained precisely the run *)
+      ∨ (* the map gained precisely the run, at precisely the permission *)
       (∃ P' : uptd,
          ⌜uptd_ext P P'⌝ ∗
          ⌜dom P'.(ud_um) = dom P.(ud_um) ∪ vpn_run vpn0 n⌝ ∗
+         (* WHAT THE NEW LEAVES ARE.  The domain is enough for a caller that
+            only wants to know the run is mapped; it is NOT enough for one
+            that then EDITS a leaf -- exec calls uvmclear on the stack guard
+            page, and [SpecUvmclear]'s permission premise is about that
+            leaf's flag byte.  mappages writes [uvm_pte (xperm|18) r] and
+            sets no A/D bit, so this is what it wrote.  (The zero FILL is
+            still not exposed: that is the [proc_pt] tier's limitation, and
+            a different question from what the PTE says.) *)
+         ⌜forall v : mword 27, v ∈ vpn_run vpn0 n ->
+            ∃ r : mword 64,
+              P'.(ud_um) !! v = Some (uvm_pte (Z.lor xperm 18) r)⌝ ∗
          ⌜ ((uint newsz < uint oldsz)%Z /\
             mr !!! Regidx (mword_of_int 10) = oldsz)
            \/ ((uint oldsz <= uint newsz)%Z /\
