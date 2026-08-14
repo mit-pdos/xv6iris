@@ -18,6 +18,11 @@ VirtioModel.v
 DiskImg.v
 DevModel.v
 RiscvLang.v
+HartBlock.v
+HartLift.v
+HartEvents.v
+HartAmo.v
+HartRegNode.v
 RegFile.v
 HartTp.v
 WpNext.v

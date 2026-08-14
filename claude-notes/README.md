@@ -52,6 +52,12 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   keystones, the interrupt invariant + absorbing step engine, the SIE-agnostic
   bundle, the interrupt-stack file layout.
 - **[`multi-cpu.md`](design/multi-cpu.md)** — the ambient-hart multi-CPU model.
+- **[`main-cycle-port.md`](design/main-cycle-port.md)** — the expression-resident
+  Sail monad: `HartE gen cpu m` steps one monad NODE per language step, so a
+  page walk, a TLB write-back, a fetch and a data access of one instruction can
+  interleave with other harts. The placement rule, the fused-AMO window, the
+  proof interface that keeps step granularity out of proof granularity, and the
+  phasing (the tree is red across the port — read §6 before starting).
 - **[`adequacy.md`](design/adequacy.md)** — whole-system adequacy.
 - **[`crash.md`](design/crash.md)** — power, crashes and generations: the ghost
   power thread, generation-indexed loop expressions, the fixed/era `riscvGS`
@@ -110,6 +116,9 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   resource argument rather than by licensing the lock order. Read it for the
   sleeplock DEPOSIT and why a purely pure held arm can never be refuted.
   **The tree now has no admitted statements.**
+- **[`main-cycle-port.md`](projects/main-cycle-port.md)** — the expression-resident
+  monad port (design in [`design/main-cycle-port.md`](design/main-cycle-port.md)):
+  what exists, the ordered remaining work, and the red-tree caveat. **Live.**
 - **[`fs-sysfile.md`](projects/fs-sysfile.md)** — the syscall-layer campaign
   (file.c's last 2 + sysfile.c's 11). **Live and actively appended to.**
 - **[`fs-fragments-campaign.md`](projects/fs-fragments-campaign.md)** — the

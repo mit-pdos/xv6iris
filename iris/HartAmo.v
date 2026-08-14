@@ -1,0 +1,372 @@
+(* HartAmo.v -- the FUSED-AMO WP rule: exclusive read, silent window,
+   conditional write, ONE step and hence ONE invariant access.  This is what
+   keeps a lock acquire atomic in the logic (main-cycle-port.md §3, the
+   MANDATORY fused window; the guard story lives with the language's arms in
+   RiscvLang.v).
+
+   THE VALUE-DEPENDENCE SHAPE.  A caller (an acquire) does not know the
+   loaded value [w] until it opens its invariant -- so [w] is EXISTENTIAL
+   inside the fupd, and everything downstream of the read is a FUNCTION of
+   [w]: the window landing is [hsil k D (rs, hread_resume (bv_unsigned w) m)]
+   and the write request is [wreq w].  The ∀-[w] premises say the window
+   lands on a conditional write FOR EVERY value the read could return; for
+   xv6's one atomic ([amoswap.w.aq]) the window is [rX rs2] plus pure
+   arithmetic, so the landing shape (and [wreq]'s pa/value) is constant in
+   [w] and the premises are uniform.  (An [amocas]-style instruction whose
+   WINDOW SHAPE branches on the loaded value cannot satisfy them -- it does
+   not take this rule; xv6 executes none.)
+
+   THE CALLBACK IS MEMORY-ONLY: the rule itself owns the register side (the
+   window's [hreg_frame D] transport, machine file included), frames the
+   device fabric, and hands the caller exactly the byte-heap window --
+   [gen_heap_interp mm] in, the written map out.  The caller's [read_bytes]
+   witness both certifies the arm's ∃ and pins the machine's choice of [w]. *)
+From stdpp Require Import gmap bitvector.definitions.
+From iris.proofmode Require Import proofmode.
+From iris.base_logic.lib Require Import gen_heap ghost_map.
+From iris.program_logic Require Import language weakestpre.
+Require Import SailStdpp.Operators_mwords.
+Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import RiscvModelBytes.
+Require Import RiscvLang RiscvPtsto RiscvExec HartLift.
+Local Open Scope Z_scope.
+
+(* ====================================================================== *)
+(* 1. The pure window layer: the footprinted functional walk against the    *)
+(*    language's unfootprinted window relation ([silent1]/[silent_run]/     *)
+(*    [wr_node], RiscvLang.v).                                              *)
+(* ====================================================================== *)
+
+(* soundness: a footprinted step IS a window step *)
+Lemma hsil_node_silent1 (D : gset register) (rs rs' : regstate)
+    (m m' : M unit) :
+  hsil_node D rs m = Some (rs', m') -> silent1 (m, rs) (m', rs').
+Proof.
+  (* Proof plan: destruct on the node; every hsil_node arm is a silent1
+     arm with the same successor (the D-gates only restrict, never alter). *)
+  intros Hnode. destruct m as [y|T oc k]; [by simpl in Hnode|].
+  destruct oc; simpl in Hnode; try discriminate Hnode;
+    try (case_decide; [|discriminate Hnode]);
+    injection Hnode as <- <-; by cbn.
+Qed.
+
+(* determinism: where the footprinted step is defined, the window relation
+   has no other successor.  ([hsil_node] refuses [Choose], the one
+   nondeterministic silent arm, so this holds arm by arm.) *)
+Lemma hsil_node_silent1_det (D : gset register) (rs rs' : regstate)
+    (m m' : M unit) (c' : M unit * regstate) :
+  hsil_node D rs m = Some (rs', m') -> silent1 (m, rs) c' -> c' = (m', rs').
+Proof.
+  intros Hnode Hsil. destruct m as [y|T oc k]; [by simpl in Hnode|].
+  destruct oc; simpl in Hnode; try discriminate Hnode;
+    try (case_decide; [|discriminate Hnode]);
+    injection Hnode as <- <-; cbn in Hsil; exact Hsil.
+Qed.
+
+(* the walk is a window run *)
+Lemma hrun_silent_silent_run (k : nat) (D : gset register) (rs : regstate)
+    (m : M unit) :
+  silent_run (m, rs) ((hrun_silent k D rs m).2, (hrun_silent k D rs m).1).
+Proof.
+  (* Proof plan: induction on k; empty run when the node refuses. *)
+  revert rs m. induction k as [|k IH]; intros rs m; simpl.
+  - apply rtc_refl.
+  - destruct (hsil_node D rs m) as [[rs1 m1]|] eqn:Hnode.
+    + eapply rtc_l; [exact (hsil_node_silent1 D rs rs1 m m1 Hnode)|].
+      apply IH.
+    + apply rtc_refl.
+Qed.
+
+(* the far end: a projected conditional write IS a [wr_node] *)
+Lemma hwin_wr_node (nw : N) (wreq : Interface.WriteReq.t nw) (m1 : M unit)
+    (mem : gmap Arch.pa (bv 8)) :
+  hwrite_req_at nw m1 = Some wreq ->
+  dev_addr (Interface.WriteReq.pa wreq) = false ->
+  ak_excl (Interface.WriteReq.access_kind wreq) = true ->
+  wr_node m1 mem
+    (write_bytes mem (Interface.WriteReq.pa wreq) nw
+       (Interface.WriteReq.value wreq))
+    (hwrite_resume m1).
+Proof.
+  (* Proof plan: [hwrite_req_at_inv] exhibits the continuation; the
+     wr_node record is then the guards + reflexivity. *)
+  intros Hw Hd Hex.
+  destruct (hwrite_req_at_inv nw m1 wreq Hw) as (K & -> & Hres).
+  rewrite Hres. cbn. by split_and!.
+Qed.
+
+(* THE UNIQUENESS OF THE WINDOW: when the caller's walk lands on a
+   conditional write, the machine's window (any [silent_run]+[wr_node]
+   decomposition) is exactly that walk.  The induction pairs the fuel with
+   the rtc: at each node either the walk is over (a [MemWrite] head, where
+   [silent1] has no arm, so the machine chain must stop too) or the
+   footprinted step succeeds (it must -- a refused node would strand the walk
+   short of a [MemWrite] head, contradicting the projection premise) and
+   [hsil_node_silent1_det] forces the machine's step to match. *)
+Lemma hwin_unique (k : nat) (D : gset register) (rs0 : regstate)
+    (m0 : M unit) (nw : N) (wreq : Interface.WriteReq.t nw)
+    (mem mem1 : gmap Arch.pa (bv 8)) (m1 m2 : M unit) (rs1 : regstate) :
+  hwrite_req_at nw (hrun_silent k D rs0 m0).2 = Some wreq ->
+  silent_run (m0, rs0) (m1, rs1) ->
+  wr_node m1 mem mem1 m2 ->
+  m1 = (hrun_silent k D rs0 m0).2 /\ rs1 = (hrun_silent k D rs0 m0).1 /\
+  mem1 = write_bytes mem (Interface.WriteReq.pa wreq) nw
+           (Interface.WriteReq.value wreq) /\
+  m2 = hwrite_resume m1.
+Proof.
+  (* Proof plan: revert everything, induct on k with the rtc inverted per
+     step ([rtc_inv]).  Key case facts:
+     - if [hsil_node D rs0 m0 = None] and the walk still landed on a write,
+       then [hrun_silent k D rs0 m0 = (rs0, m0)] and [m0] itself is the
+       [MemWrite]; then [silent1 (m0, rs0) _] is False (no MemWrite arm),
+       so the machine chain is refl and [wr_node]'s components compute via
+       [hwrite_req_at_inv].
+     - if [hsil_node D rs0 m0 = Some (rsx, mx)]: [m0] is a silent-class
+       node, so [wr_node m0 ...] is False (chain cannot stop here), the
+       machine chain is nonempty, its head equals [(mx, rsx)] by
+       [hsil_node_silent1_det], and the IH (at k-1... careful: fuel k
+       decrements on the Some branch of hrun_silent) closes it.
+     - k = 0: [hrun_silent 0 D rs0 m0 = (rs0, m0)], same as the None case. *)
+  revert rs0 m0. induction k as [|k IH]; intros rs0 m0 Hproj Hrun Hwr.
+  - simpl in Hproj |- *.
+    destruct (hwrite_req_at_inv nw m0 wreq Hproj) as (K & -> & Hres).
+    apply rtc_inv in Hrun as [Heq | ([mc rsc] & Hstep & _)];
+      [|by cbn in Hstep].
+    injection Heq as Hm1 Hrs1. subst m1 rs1.
+    cbn in Hwr. destruct Hwr as (Hd & Hex & Hmem1 & Hm2).
+    split_and!; [reflexivity|reflexivity|exact Hmem1|].
+    rewrite Hres. exact Hm2.
+  - simpl in Hproj |- *.
+    destruct (hsil_node D rs0 m0) as [[rsx mx]|] eqn:Hnode.
+    + apply rtc_inv in Hrun as [Heq | ([mc rsc] & Hstep & Hrun')].
+      * (* chain cannot stop at a silent-class node *)
+        exfalso. injection Heq as Hm1 Hrs1. subst m1.
+        destruct m0 as [y|T oc kk]; [by cbn in Hwr|].
+        destruct oc; try (by cbn in Hwr); simpl in Hnode; discriminate Hnode.
+      * pose proof (hsil_node_silent1_det D rs0 rsx m0 mx (mc, rsc)
+                      Hnode Hstep) as Hc.
+        injection Hc as -> ->.
+        exact (IH rsx mx Hproj Hrun' Hwr).
+    + destruct (hwrite_req_at_inv nw m0 wreq Hproj) as (K & -> & Hres).
+      apply rtc_inv in Hrun as [Heq | ([mc rsc] & Hstep & _)];
+        [|by cbn in Hstep].
+      injection Heq as Hm1 Hrs1. subst m1 rs1.
+      cbn in Hwr. destruct Hwr as (Hd & Hex & Hmem1 & Hm2).
+      split_and!; [reflexivity|reflexivity|exact Hmem1|].
+      rewrite Hres. exact Hm2.
+Qed.
+
+(* the agreement transport, functional both sides: two files agreeing on
+   [D] walk to the SAME monad, with files still agreeing on [D].  Total --
+   no success hypothesis -- because a refusal is simultaneous on both sides
+   (the refusing node's class or D-membership is file-independent, and a
+   [RegRead]'s answer only differs off [D]). *)
+Lemma hrun_silent_agree (k : nat) (D : gset register) (rs rs0 : regstate)
+    (m : M unit) :
+  reg_agree_on D rs rs0 ->
+  (hrun_silent k D rs0 m).2 = (hrun_silent k D rs m).2 /\
+  reg_agree_on D (hrun_silent k D rs m).1 (hrun_silent k D rs0 m).1.
+Proof.
+  (* Proof plan: induction on k over [hsil_node_agree] (HartLift.v); note
+     hsil_node_agree is stated caller→machine, match directions carefully. *)
+  revert rs rs0 m. induction k as [|k IH]; intros rs rs0 m Hag.
+  - simpl. by split.
+  - simpl. destruct (hsil_node D rs m) as [[rs1 m1]|] eqn:Hnode1.
+    + destruct (hsil_node_agree D rs rs0 m m1 rs1 Hag Hnode1)
+        as (rs2 & Hnode2 & Hag').
+      rewrite Hnode2. exact (IH rs1 rs2 m1 Hag').
+    + destruct (hsil_node D rs0 m) as [[rs2 m2]|] eqn:Hnode2.
+      * exfalso.
+        assert (Hag' : reg_agree_on D rs0 rs).
+        { intros r Hr. symmetry. by apply Hag. }
+        destruct (hsil_node_agree D rs0 rs m m2 rs2 Hag' Hnode2)
+          as (rs3 & Hnode3 & _).
+        rewrite Hnode1 in Hnode3. discriminate Hnode3.
+      * by split.
+Qed.
+
+(* ====================================================================== *)
+(* 2. The ghost transport: update the register bridge and the caller's      *)
+(*    frame along the walk, in one bupd.                                    *)
+(* ====================================================================== *)
+
+Section amo.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma hreg_frame_update_run (k : nat) (D : gset register)
+      (rs rs0 : regstate) (m : M unit) :
+    reg_agree_on D rs rs0 ->
+    reg_interp rs0 -∗ hreg_frame rs D ==∗
+    reg_interp (hrun_silent k D rs0 m).1 ∗
+    hreg_frame (hrun_silent k D rs m).1 D.
+  Proof.
+    (* Proof plan: induction on k; per node, RegWrite goes through
+       [hreg_frame_update], everything else [hreg_frame_ext]; the two sides
+       stay in lock-step by [hsil_node_agree]. *)
+    revert rs rs0 m. induction k as [|k IH]; intros rs rs0 m Hag.
+    - assert (HL : (hrun_silent 0 D rs m).1 = rs) by reflexivity.
+      assert (HM : (hrun_silent 0 D rs0 m).1 = rs0) by reflexivity.
+      rewrite HL HM. iIntros "Hi Hf". iModIntro. by iFrame.
+    - destruct (hsil_node D rs m) as [[rs1 m1]|] eqn:Hnode1.
+      + destruct (hsil_node_agree D rs rs0 m m1 rs1 Hag Hnode1)
+          as (rs2 & Hnode2 & Hag').
+        assert (HL : (hrun_silent (S k) D rs m).1
+                     = (hrun_silent k D rs1 m1).1)
+          by (simpl; by rewrite Hnode1).
+        assert (HM : (hrun_silent (S k) D rs0 m).1
+                     = (hrun_silent k D rs2 m1).1)
+          by (simpl; by rewrite Hnode2).
+        rewrite HL HM. iIntros "Hi Hf".
+        iAssert (|==> reg_interp rs2 ∗ hreg_frame rs1 D)%I
+          with "[Hi Hf]" as ">[Hi Hf]".
+        { destruct m as [y|T oc kk]; [by simpl in Hnode1|].
+          destruct oc; simpl in Hnode1; try discriminate Hnode1;
+            first
+              [ (* RegWrite *)
+                case_decide as HrD; [|discriminate Hnode1];
+                injection Hnode1 as Hq1 Hq2; simpl in Hnode2;
+                case_decide; [|discriminate Hnode2];
+                injection Hnode2 as Hq3 Hq4; subst rs1 rs2;
+                iMod (hreg_frame_update rs D _ regval rs0 HrD
+                        with "Hi Hf") as "[Hi Hf]";
+                iModIntro; by iFrame "Hi Hf"
+              | (* RegRead: the file does not move *)
+                case_decide as HrD; [|discriminate Hnode1];
+                injection Hnode1 as Hq1 Hq2; simpl in Hnode2;
+                case_decide; [|discriminate Hnode2];
+                injection Hnode2 as Hq3 Hq4; subst rs1 rs2;
+                iModIntro; iFrame "Hi"; by iApply (hreg_frame_ext rs rs D)
+              | injection Hnode1 as Hq1 Hq2; simpl in Hnode2;
+                injection Hnode2 as Hq3 Hq4; subst rs1 rs2;
+                iModIntro; iFrame "Hi";
+                by iApply (hreg_frame_ext rs rs D) ]. }
+        by iApply (IH rs1 rs2 m1 Hag' with "Hi Hf").
+      + destruct (hsil_node D rs0 m) as [[rs2 m2]|] eqn:Hnode2.
+        * exfalso.
+          assert (Hag' : reg_agree_on D rs0 rs).
+          { intros r Hr. symmetry. by apply Hag. }
+          destruct (hsil_node_agree D rs0 rs m m2 rs2 Hag' Hnode2)
+            as (rs3 & Hnode3 & _).
+          rewrite Hnode1 in Hnode3. discriminate Hnode3.
+        * assert (HL : (hrun_silent (S k) D rs m).1 = rs)
+            by (simpl; by rewrite Hnode1).
+          assert (HM : (hrun_silent (S k) D rs0 m).1 = rs0)
+            by (simpl; by rewrite Hnode2).
+          rewrite HL HM. iIntros "Hi Hf". iModIntro. by iFrame.
+  Qed.
+
+  (* ==================================================================== *)
+  (* 3. THE RULE.                                                          *)
+  (* ==================================================================== *)
+
+  Lemma wp_hart_amo (D : gset register) (k : nat) (n : N)
+      (req : Interface.ReadReq.t n) (m : M unit) (rs : regstate)
+      (nw : N) (wreq : bv (8 * n) -> Interface.WriteReq.t nw) :
+    hread_req_at n m = Some req ->
+    dev_addr (Interface.ReadReq.pa req) = false ->
+    ak_excl (Interface.ReadReq.access_kind req) = true ->
+    (* the window, certified FOR EVERY read value: [k] footprinted silent
+       steps from the resumed read land on the conditional write [wreq w] *)
+    (forall w : bv (8 * n),
+       hwrite_req_at nw
+         (hsil k D (rs, hread_resume (bv_unsigned w) m)).2 = Some (wreq w)) ->
+    (forall w, dev_addr (Interface.WriteReq.pa (wreq w)) = false) ->
+    (forall w, ak_excl (Interface.WriteReq.access_kind (wreq w)) = true) ->
+    gen_cert -∗
+    hreg_frame rs D -∗
+    (∀ mm : gmap Arch.pa (bv 8), gen_heap_interp mm ={⊤,∅}=∗
+       ∃ w : bv (8 * n),
+         ⌜read_bytes mm (Interface.ReadReq.pa req) n = Some w⌝ ∗
+         ▷ (|={∅,⊤}=> gen_heap_interp
+                (write_bytes mm (Interface.WriteReq.pa (wreq w)) nw
+                   (Interface.WriteReq.value (wreq w))) ∗
+              (hreg_frame
+                 (hsil k D (rs, hread_resume (bv_unsigned w) m)).1 D -∗
+               WP (HartE gen_id cpu_id
+                     (hwrite_resume
+                        (hsil k D (rs, hread_resume (bv_unsigned w) m)).2)
+                   : expr riscv_lang)))) -∗
+    WP (HartE gen_id cpu_id m : expr riscv_lang).
+  Proof.
+    (* Proof plan: via wp_hart_step.  Sketch:
+       - destruct σ as [rsM memM devM]; split mstate_interp; feed [memM] to
+         the caller's fupd; obtain w + the read_bytes fact + continuation.
+       - [hread_req_at_inv] gives m = Next (MemRead n req) K and
+         hread_resume (bv_unsigned w) m = K (inl (w, None)) =: m0.
+       - THE WITNESS: the fused arm at w, with
+         silent_run  := [hrun_silent_silent_run k D rsM m0],
+         wr_node     := [hwin_wr_node] at the MACHINE landing -- whose monad
+         equals the caller-side landing by [hrun_silent_agree] (the files
+         agree on D by [hreg_frame_agree]) -- and the byte lookups from
+         [read_bytes_spec].
+       - THE INVERSION (∀ successors): the arm's w' equals w by
+         [read_bytes_spec] + [bv_eq_of_bytes]; then [hwin_unique] (at the
+         machine file) pins (m1, rs1, mem1, m'); rewrite the machine landing
+         monad to the caller-side one by [hrun_silent_agree].
+       - ghost: [hreg_frame_update_run] moves the register bridge to the
+         machine landing file and the caller's frame to the caller landing
+         file; the caller's continuation supplies the written byte heap;
+         [dev_interp] is framed.
+       - re-assemble mstate_interp (MState (machine landing).1 written devM). *)
+    intros Hrd Hdva Hex Hwin Hwdev Hwex.
+    destruct (hread_req_at_inv n m req Hrd) as (K & -> & Hres).
+    iIntros "#Hcert Hrf Hcb".
+    iApply (wp_hart_step with "Hcert").
+    iIntros (σ) "Hσ". destruct σ as [rsM memM devM].
+    iDestruct "Hσ" as "(Hri & Hmem & Hdv)".
+    iDestruct (hreg_frame_agree rs D rsM with "Hri Hrf") as %Hag.
+    iMod ("Hcb" $! memM with "Hmem") as (w) "(%Hrb & Hk)".
+    (* normalise the caller-side landing to hrun_silent form *)
+    assert (Hhsil : hsil k D (rs, K (inl (w, None)))
+                    = hrun_silent k D rs (K (inl (w, None)))) by reflexivity.
+    iEval (rewrite (Hres w) Hhsil) in "Hk".
+    pose proof (Hwin w) as HwinW.
+    rewrite (Hres w) Hhsil in HwinW.
+    destruct (hrun_silent_agree k D rs rsM (K (inl (w, None))) Hag)
+      as [Hmeq _].
+    pose proof HwinW as HwinM. rewrite -Hmeq in HwinM.
+    pose proof (read_bytes_spec memM (Interface.ReadReq.pa req) n w Hrb)
+      as Hbytes.
+    pose proof (hrun_silent_silent_run k D rsM (K (inl (w, None)))) as HsilM.
+    pose proof (hwin_wr_node nw (wreq w)
+                  (hrun_silent k D rsM (K (inl (w, None)))).2 memM
+                  HwinM (Hwdev w) (Hwex w)) as HwrM.
+    iModIntro.
+    iExists (hwrite_resume (hrun_silent k D rsM (K (inl (w, None)))).2),
+      (MState (hrun_silent k D rsM (K (inl (w, None)))).1
+         (write_bytes memM (Interface.WriteReq.pa (wreq w)) nw
+            (Interface.WriteReq.value (wreq w))) devM).
+    iSplitR.
+    { iPureIntro. simpl. rewrite Hdva. right.
+      split; [exact Hex|].
+      exists w, (hrun_silent k D rsM (K (inl (w, None)))).2,
+        (hrun_silent k D rsM (K (inl (w, None)))).1,
+        (write_bytes memM (Interface.WriteReq.pa (wreq w)) nw
+           (Interface.WriteReq.value (wreq w))).
+      split_and!; [exact Hbytes|exact HsilM|exact HwrM|reflexivity]. }
+    iNext. iIntros (m' σ') "%Hstep".
+    simpl in Hstep. rewrite Hdva in Hstep.
+    destruct Hstep as [[Hex0 _] |
+      (_ & w' & m1 & rs1 & mem1 & Hbytes' & Hsil' & Hwr' & Hσ')];
+      [congruence|].
+    assert (Hweq : w' = w).
+    { apply bv_eq_of_bytes. intros j Hj.
+      pose proof (Hbytes' j Hj) as Hb1. pose proof (Hbytes j Hj) as Hb2.
+      rewrite Hb2 in Hb1. apply (inj Some) in Hb1. symmetry. exact Hb1. }
+    subst w'.
+    destruct (hwin_unique k D rsM (K (inl (w, None))) nw (wreq w)
+                memM mem1 m1 m' rs1 HwinM Hsil' Hwr')
+      as (Hm1 & Hrs1 & Hmem1 & Hm2).
+    subst.
+    iMod (hreg_frame_update_run k D rs rsM (K (inl (w, None))) Hag
+            with "Hri Hrf") as "[Hri Hrf]".
+    iMod "Hk" as "[Hmem' HWP]".
+    iModIntro.
+    iSplitR "HWP Hrf".
+    { rewrite /mstate_interp /=. iFrame "Hri Hmem' Hdv". }
+    rewrite Hmeq.
+    by iApply "HWP".
+  Qed.
+
+End amo.

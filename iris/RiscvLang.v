@@ -8,7 +8,7 @@
 (*      which ssreflect -- pulled in by iris -- forbids).           *)
 (* ============================================================== *)
 
-From stdpp Require Import gmap finite bitvector.definitions.
+From stdpp Require Import gmap finite relations bitvector.definitions.
 From iris.program_logic Require Import language.
 (* NOTE: SailStdpp.Base/Values/TypeCasts are imported LATER (before the         *)
 (* ExecClose section), NOT here: they make the model's [mword] Countable        *)
@@ -426,12 +426,266 @@ Class CpuId := cpu_id : CPU.
    generation and the tree is exactly as strong as before. *)
 Class GenId := gen_id : nat.
 
+(* ---------------------------------------------------------------------- *)
+(* THE HART EXPRESSION CARRIES THE IN-FLIGHT SAIL MONAD                     *)
+(* (claude-notes/design/main-cycle-port.md).                                *)
+(*                                                                          *)
+(* THE PLACEMENT RULE.  Control state lives in the EXPRESSION exactly where  *)
+(* control flow is MODEL-defined, and in [gstate] where it is MEMORY-        *)
+(* defined.  INTER-instruction control flow is memory-defined -- the next    *)
+(* instruction is fetched through a page table out of mutable memory, which  *)
+(* has to be PROVEN -- so the instruction boundary is a boring token and the *)
+(* registers/PC stay in σ.  INTRA-instruction control flow is model-defined: *)
+(* the continuation IS the Sail monad value, syntactically known and         *)
+(* consumed monotonically.  So [HartE gen cpu m] is: hart [cpu] of           *)
+(* generation [gen], with [m] left to run of the current cycle -- and        *)
+(* WP-of-an-instruction becomes proof by syntactic descent on [m].           *)
+(*                                                                          *)
+(* [LoopE] is a DEFINITION, not a constructor: the boundary is the unique    *)
+(* end-of-cycle value [Ret tt] (the cycle's result type is [unit]).  Every   *)
+(* statement in the tree that mentions [LoopE gen cpu] therefore keeps       *)
+(* elaborating unchanged; only proofs that unfold the hart step break.       *)
+(*                                                                          *)
+(* THE LOOP LIVES IN THE STEP RELATION, and that is the only place it can:   *)
+(* [M] is an inductive type, so there is no in-monad loop value (the         *)
+(* immediate-subterm relation on [M] is well-founded).  [hart_node_step]     *)
+(* unfolds it at the boundary, choosing the tick nondeterministically        *)
+(* exactly as the old whole-instruction arm did.                             *)
+(* ---------------------------------------------------------------------- *)
+
 Inductive mexpr :=
-  | LoopE (gen : nat) (cpu : CPU)
+  | HartE (gen : nat) (cpu : CPU) (m : M unit)
   | UartLoopE (gen : nat)
   | DiskLoopE (gen : nat)
   | PlicLoopE (gen : nat)
   | PowerLoopE.
+
+(* THE INSTRUCTION BOUNDARY.  [Ret tt] is the unique value of [M unit], so
+   this is exactly "hart [cpu] has nothing left to run of its cycle". *)
+Definition LoopE (gen : nat) (cpu : CPU) : mexpr :=
+  HartE gen cpu (Interface.Ret tt).
+
+(* ---------------------------------------------------------------------- *)
+(* IS THIS ACCESS EXCLUSIVE (the read/write halves of an atomic RMW)?       *)
+(*                                                                          *)
+(* Read off the ACCESS KIND alone.  [AK_ifetch]/[AK_ttw] are never emitted  *)
+(* by this model (fetch goes through [mem_read (InstructionFetch tt) …] and  *)
+(* the walker through [mem_read_priv (Load PageTableEntry) …], both landing  *)
+(* in [Read_plain]), so those arms are faithful but dead; they are spelled   *)
+(* out anyway so a model regeneration that starts emitting them is a         *)
+(* semantics change rather than a silent reclassification.                   *)
+(* [AV_atomic_rmw] is never emitted either -- AMOs use the CONDITIONAL       *)
+(* (exclusive) kinds -- and both are treated the same here, so nothing is    *)
+(* lost by the merge.                                                        *)
+(* ---------------------------------------------------------------------- *)
+(* Spelled with QUALIFIED names: RiscvLang must not [Import]
+   SailStdpp.ConcurrencyInterfaceTypes -- see the header note on
+   [Countable_mword] and the type of [mstate.mem]. *)
+Definition av_excl (v : SailStdpp.ConcurrencyInterfaceTypes.Access_variety)
+    : bool :=
+  match v with
+  | SailStdpp.ConcurrencyInterfaceTypes.AV_plain => false
+  | SailStdpp.ConcurrencyInterfaceTypes.AV_exclusive => true
+  | SailStdpp.ConcurrencyInterfaceTypes.AV_atomic_rmw => true
+  end.
+
+Definition ak_excl (ak : Interface.accessKind) : bool :=
+  match ak with
+  | SailStdpp.ConcurrencyInterfaceTypes.AK_explicit eak =>
+      av_excl (SailStdpp.ConcurrencyInterfaceTypes.Explicit_access_kind_variety eak)
+  | SailStdpp.ConcurrencyInterfaceTypes.AK_ifetch _ => false
+  | SailStdpp.ConcurrencyInterfaceTypes.AK_ttw _ => false
+  | SailStdpp.ConcurrencyInterfaceTypes.AK_arch a =>
+      av_excl (RISCV_strong_access_variety a)
+  end.
+
+(* ---------------------------------------------------------------------- *)
+(* THE FUSED-AMO INGREDIENTS.                                               *)
+(*                                                                          *)
+(* An exclusive RAM read steps TOGETHER with the silent nodes that follow    *)
+(* it and with its paired conditional write, as ONE language step.  That     *)
+(* fusion is what keeps a lock acquire a SINGLE invariant access in the      *)
+(* logic; without it no atomic-acquire rule is statable at all.              *)
+(*                                                                          *)
+(* [silent1] is the hart-local, memory-free node relation over a cursor      *)
+(* [(residual monad, this hart's register file)] -- it walks the window      *)
+(* between the exclusive read and the conditional write.  It deliberately    *)
+(* has NO memory or device arm: the window may not contain another access.   *)
+(* ---------------------------------------------------------------------- *)
+
+Definition silent1 (c c' : M unit * regstate) : Prop :=
+  match c.1 with
+  | Interface.Ret _ => False
+  | Interface.Next oc k =>
+      (match oc in Interface.outcome _ T return (T -> M unit) -> Prop with
+       | Interface.RegRead r _        => fun k => c' = (k (register_lookup r c.2), c.2)
+       | Interface.RegWrite r _ v     => fun k => c' = (k tt, register_set r v c.2)
+       | Interface.InstrAnnounce _    => fun k => c' = (k tt, c.2)
+       | Interface.BranchAnnounce _ _ => fun k => c' = (k tt, c.2)
+       | Interface.Barrier _          => fun k => c' = (k tt, c.2)
+       | Interface.CacheOp _          => fun k => c' = (k tt, c.2)
+       | Interface.TlbOp _            => fun k => c' = (k tt, c.2)
+       | Interface.TakeException _    => fun k => c' = (k tt, c.2)
+       | Interface.ReturnException _  => fun k => c' = (k tt, c.2)
+       | Interface.TranslationStart _ => fun k => c' = (k tt, c.2)
+       | Interface.TranslationEnd _   => fun k => c' = (k tt, c.2)
+       | Interface.CycleCount         => fun k => c' = (k tt, c.2)
+       | Interface.Message _          => fun k => c' = (k tt, c.2)
+       | Interface.GetCycleCount      => fun k => c' = (k 0%Z, c.2)
+       | Interface.Choose _           => fun k => exists ch, c' = (k ch, c.2)
+       | _ => fun _ => False
+       end) k
+  end.
+
+Definition silent_run : relation (M unit * regstate) := rtc silent1.
+
+(* The window's far end: the paired CONDITIONAL (exclusive) RAM write.  It is
+   given the pre-memory and names the post-memory, so the arm that uses it
+   needs no dependent pairing of the width with the value. *)
+Definition wr_node (m : M unit) (mem mem' : gmap Arch.pa (bv 8))
+    (m' : M unit) : Prop :=
+  match m with
+  | Interface.Ret _ => False
+  | Interface.Next oc k =>
+      (match oc in Interface.outcome _ T return (T -> M unit) -> Prop with
+       | Interface.MemWrite n req => fun k =>
+           dev_addr (Interface.WriteReq.pa req) = false /\
+           ak_excl (Interface.WriteReq.access_kind req) = true /\
+           mem' = write_bytes mem (Interface.WriteReq.pa req) n
+                    (Interface.WriteReq.value req) /\
+           m' = k (inl None)
+       | _ => fun _ => False
+       end) k
+  end.
+
+(* ---------------------------------------------------------------------- *)
+(* THE HART'S PER-NODE STEP.                                                *)
+(*                                                                          *)
+(* One arm per [Interface.outcome] node, transcribing what [run]'s          *)
+(* interpreter does at that node -- registers against [gregs cpu], RAM       *)
+(* against [gmem], MMIO against [gdev] through [dev_read]/[dev_write].       *)
+(* Alignment/PMA/permission logic stays INSIDE the monad, where the model    *)
+(* put it.  Fences are semantically inert at SC, so [Barrier] is silent.     *)
+(*                                                                          *)
+(* STUCK IS FINE.  [GenericFail]/[Discard]/[ExtraOutcome] have no arm, and   *)
+(* there is deliberately NO shape or liveness predicate about the monad --   *)
+(* a shape predicate is a promise about an instruction's FUTURE, and no rule *)
+(* here mentions the future.                                                 *)
+(*                                                                          *)
+(* SEMANTIC DELTA, stated honestly: mid-instruction interleaving is now      *)
+(* REAL.  Another hart's or a device's step can land between two events of   *)
+(* one instruction.  At SC this admits strictly more runs than the old       *)
+(* whole-instruction machine, whose runs embed as the contiguous-block       *)
+(* special case (see the solo-block bracket in RiscvExec.v).                 *)
+(* ---------------------------------------------------------------------- *)
+
+(* THE HART-LOCAL NODE STEP, on ONE HART'S VIEW [mstate] -- the same
+   currency [run] works in, and the same currency the lifting layer's
+   σ-callback hands the caller ([mstate_interp]).  [hart_node_step] below is
+   then literally "focus this hart, take one local node, write back", exactly
+   the shape the old whole-instruction arm had with [run] in place of
+   [mnode_step].  That is what lets the lifting rule keep its structure. *)
+Definition mnode_step (s : mstate) (m : M unit) (m' : M unit) (s' : mstate)
+    : Prop :=
+  match m with
+  (* THE BOUNDARY / RESTART RULE.  The cycle is over; begin the next one.
+     [tick] is chosen nondeterministically here exactly as the old
+     whole-instruction arm chose it -- the sound weakening of the model
+     [loop]'s deterministic every-[plat_insns_per_tick] tick. *)
+  | Interface.Ret _ => exists tick : bool, m' = riscv_step tick /\ s' = s
+  | Interface.Next oc k =>
+      (match oc in Interface.outcome _ T return (T -> M unit) -> Prop with
+       (* registers *)
+       | Interface.RegRead r _ => fun k =>
+           m' = k (register_lookup r s.(sregs)) /\ s' = s
+       | Interface.RegWrite r _ v => fun k =>
+           m' = k tt /\ s' = set_reg s r v
+       | Interface.MemRead n req => fun k =>
+           if dev_addr (Interface.ReadReq.pa req) then
+             (* MMIO: the device answers, and its state may move (an RHR read
+                pops the receive FIFO).  The accessor is the PARTIAL one -- a
+                bad width or an undecoded offset inside a device window is
+                stuck, which costs nothing: nothing in this tower ever has to
+                know that an instruction COMPLETES. *)
+             exists (w : bv (8 * n)) (d' : dev_state),
+               dev_read s.(mdev) (Interface.ReadReq.pa req) n = Some (w, d') /\
+               m' = k (inl (w, None)) /\ s' = MState s.(sregs) s.(mem) d'
+           else
+             (* THE PLAIN RAM READ.  GUARDED by [ak_excl = false]: without the
+                guard this arm and the fused one below OVERLAP at an exclusive
+                read, so the machine could take the read ALONE and let the
+                paired write arrive as a separate event -- the RMW would cease
+                to be atomic and no ONE-INVARIANT-ACCESS acquire rule could be
+                stated at all.  The cost of the guard is that a BARE exclusive
+                read with no fused write is stuck; the kernel executes none
+                (its only atomic is acquire's [amoswap.w.aq], and the image
+                contains no [lr]/[sc] at all). *)
+             (ak_excl (Interface.ReadReq.access_kind req) = false /\
+              exists w : bv (8 * n),
+                (forall j : nat, (N.of_nat j < n)%N ->
+                   s.(mem) !! (pa_add (Interface.ReadReq.pa req) j)
+                   = Some (nth_byte w j)) /\
+                m' = k (inl (w, None)) /\ s' = s)
+             \/
+             (* THE FUSED AMO WINDOW: the exclusive read, the silent nodes
+                between, and the paired conditional write are ONE step.  This
+                is what keeps a lock acquire a single invariant access. *)
+             (ak_excl (Interface.ReadReq.access_kind req) = true /\
+              exists (w : bv (8 * n)) (m1 : M unit) (rs1 : regstate)
+                     (mem1 : gmap Arch.pa (bv 8)),
+                (forall j : nat, (N.of_nat j < n)%N ->
+                   s.(mem) !! (pa_add (Interface.ReadReq.pa req) j)
+                   = Some (nth_byte w j)) /\
+                silent_run (k (inl (w, None)), s.(sregs)) (m1, rs1) /\
+                wr_node m1 s.(mem) mem1 m' /\
+                s' = MState rs1 mem1 s.(mdev))
+       | Interface.MemWrite n req => fun k =>
+           if dev_addr (Interface.WriteReq.pa req) then
+             exists d' : dev_state,
+               dev_write s.(mdev) (Interface.WriteReq.pa req) n
+                 (Interface.WriteReq.value req) = Some d' /\
+               m' = k (inl None) /\ s' = MState s.(sregs) s.(mem) d'
+           else
+             (* UNGUARDED on purpose: a STANDALONE conditional write takes the
+                ordinary store arm.  It is the exclusive READ that the fused
+                arm claims, so the two never overlap. *)
+             m' = k (inl None) /\
+             s' = MState s.(sregs)
+                    (write_bytes s.(mem) (Interface.WriteReq.pa req) n
+                       (Interface.WriteReq.value req)) s.(mdev)
+       (* trace / announce / fence outcomes: state no-ops, exactly as [run].
+          At SC a fence is semantically inert, so [Barrier] is silent and
+          nothing is parked. *)
+       | Interface.InstrAnnounce _    => fun k => m' = k tt /\ s' = s
+       | Interface.BranchAnnounce _ _ => fun k => m' = k tt /\ s' = s
+       | Interface.Barrier _          => fun k => m' = k tt /\ s' = s
+       | Interface.CacheOp _          => fun k => m' = k tt /\ s' = s
+       | Interface.TlbOp _            => fun k => m' = k tt /\ s' = s
+       | Interface.TakeException _    => fun k => m' = k tt /\ s' = s
+       | Interface.ReturnException _  => fun k => m' = k tt /\ s' = s
+       | Interface.TranslationStart _ => fun k => m' = k tt /\ s' = s
+       | Interface.TranslationEnd _   => fun k => m' = k tt /\ s' = s
+       | Interface.CycleCount         => fun k => m' = k tt /\ s' = s
+       | Interface.Message _          => fun k => m' = k tt /\ s' = s
+       | Interface.GetCycleCount      => fun k => m' = k 0%Z /\ s' = s
+       (* nondeterminism: branch over every choice *)
+       | Interface.Choose _           => fun k => exists ch, m' = k ch /\ s' = s
+       (* failure / discard / injected exception: stuck *)
+       | _ => fun _ => False
+       end) k
+  end.
+
+(* ... and the global arm: focus the hart, take one local node, write back.
+   Compare the OLD hart arm, which was this with [run (riscv_step tick)] in
+   place of [mnode_step] -- the write-back is character-for-character the
+   same, which is why the lifting rule's proof structure survives. *)
+Definition hart_node_step (gen : nat) (g : gstate) (cpu : CPU) (m : M unit)
+    (e' : mexpr) (g' : gstate) : Prop :=
+  exists (m' : M unit) (s' : mstate),
+    mnode_step (MState (g.(gregs) cpu) g.(gmem) g.(gdev)) m m' s' /\
+    e' = HartE gen cpu m' /\
+    g' = GState (<[cpu := s'.(sregs)]> g.(gregs)) s'.(mem) s'.(mdev)
+           g.(ggen) g.(gpow).
 
 (* ---------------------------------------------------------------------- *)
 (* THE RESET MACHINE (claude-notes/design/crash.md): what the loader and    *)
@@ -862,12 +1116,11 @@ Notation PowerLoop := PowerLoopE.
 Definition prim_step
     (e : mexpr) (g : gstate) (κ : list mobs)
     (e' : mexpr) (g' : gstate) (efs : list mexpr) : Prop :=
-  (exists gen cpu, e = LoopE gen cpu /\ e' = LoopE gen cpu /\ κ = [] /\ efs = [] /\
-    ((thread_live g gen /\
-      exists (tick : bool) (u : unit) (s' : mstate),
-        run (riscv_step tick) (MState (g.(gregs) cpu) g.(gmem) g.(gdev)) u s' /\
-        g' = GState (<[cpu := s'.(sregs)]> g.(gregs)) s'.(mem) s'.(mdev) g.(ggen) g.(gpow))
-     \/ (~ thread_live g gen /\ g' = g)))
+  (* THE HART ARM, one Sail-monad NODE at a time.  [LoopE] is a [HartE], so
+     the corpse arm covers the instruction boundary uniformly -- one arm. *)
+  (exists gen cpu m, e = HartE gen cpu m /\ κ = [] /\ efs = [] /\
+    ((thread_live g gen /\ hart_node_step gen g cpu m e' g')
+     \/ (~ thread_live g gen /\ e' = e /\ g' = g)))
   \/
   (exists gen, e = UartLoopE gen /\ e' = UartLoopE gen /\ κ = [] /\ efs = [] /\
     ((thread_live g gen /\
@@ -904,10 +1157,189 @@ Proof.
   split.
   - intros [].
   - intros e v Hv. discriminate Hv.
-  - intros e s κ e' s' efs
-      [(gen & cpu & -> & _) | [(gen & -> & _) | [(gen & -> & _)
-       | [(gen & -> & _) | (-> & _)]]]];
-      reflexivity.
+  - intros e s κ e' s' efs _. reflexivity.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* PER-ARM INVERSION.  Every consumer of [prim_step] destructs the five-way *)
+(* disjunction; doing it by name here keeps the ~200-character destruct     *)
+(* patterns out of the lifting rules and makes an added arm one edit.       *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma prim_step_hart_inv gen cpu m g κ e' g' efs :
+  prim_step (HartE gen cpu m) g κ e' g' efs ->
+  κ = [] /\ efs = [] /\
+  ((thread_live g gen /\ hart_node_step gen g cpu m e' g')
+   \/ (~ thread_live g gen /\ e' = HartE gen cpu m /\ g' = g)).
+Proof.
+  intros [(gen0 & cpu0 & m0 & Heq & ? & ? & Harm)
+         | [(? & Heq & _) | [(? & Heq & _) | [(? & Heq & _) | (Heq & _)]]]];
+    try discriminate Heq.
+  injection Heq as -> -> ->. by split_and!.
+Qed.
+
+Lemma prim_step_uart_inv gen g κ e' g' efs :
+  prim_step (UartLoopE gen) g κ e' g' efs ->
+  e' = UartLoopE gen /\ κ = [] /\ efs = [] /\
+  ((thread_live g gen /\
+    exists d', uart_step g.(gdev) d' /\
+      g' = GState g.(gregs) g.(gmem) d' g.(ggen) g.(gpow))
+   \/ (~ thread_live g gen /\ g' = g)).
+Proof.
+  intros [(? & ? & ? & Heq & _)
+         | [(gen0 & Heq & ? & ? & ? & Harm) | [(? & Heq & _)
+         | [(? & Heq & _) | (Heq & _)]]]];
+    try discriminate Heq.
+  injection Heq as ->. by split_and!.
+Qed.
+
+Lemma prim_step_disk_inv gen g κ e' g' efs :
+  prim_step (DiskLoopE gen) g κ e' g' efs ->
+  e' = DiskLoopE gen /\ κ = [] /\ efs = [] /\
+  ((thread_live g gen /\
+    exists d' m', disk_step g.(gdev) g.(gmem) d' m' /\
+      g' = GState g.(gregs) m' d' g.(ggen) g.(gpow))
+   \/ (~ thread_live g gen /\ g' = g)).
+Proof.
+  intros [(? & ? & ? & Heq & _)
+         | [(? & Heq & _) | [(gen0 & Heq & ? & ? & ? & Harm)
+         | [(? & Heq & _) | (Heq & _)]]]];
+    try discriminate Heq.
+  injection Heq as ->. by split_and!.
+Qed.
+
+Lemma prim_step_plic_inv gen g κ e' g' efs :
+  prim_step (PlicLoopE gen) g κ e' g' efs ->
+  e' = PlicLoopE gen /\ κ = [] /\ efs = [] /\
+  ((thread_live g gen /\
+    exists gr', plic_step g.(gdev) g.(gregs) gr' /\
+      g' = GState gr' g.(gmem) g.(gdev) g.(ggen) g.(gpow))
+   \/ (~ thread_live g gen /\ g' = g)).
+Proof.
+  intros [(? & ? & ? & Heq & _)
+         | [(? & Heq & _) | [(? & Heq & _)
+         | [(gen0 & Heq & ? & ? & ? & Harm) | (Heq & _)]]]];
+    try discriminate Heq.
+  injection Heq as ->. by split_and!.
+Qed.
+
+Lemma prim_step_power_inv g κ e' g' efs :
+  prim_step PowerLoopE g κ e' g' efs ->
+  e' = PowerLoopE /\ κ = [] /\
+  ((g.(gpow) = true /\ efs = [] /\
+     g' = GState g.(gregs) g.(gmem) g.(gdev) (S g.(ggen)) false)
+   \/ (g.(gpow) = false /\ efs = power_fork g.(ggen) /\ boot_shape g g')).
+Proof.
+  intros [(? & ? & ? & Heq & _)
+         | [(? & Heq & _) | [(? & Heq & _) | [(? & Heq & _) | (_ & ? & ? & Harm)]]]];
+    try discriminate Heq.
+  by split_and!.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* SHAPE FACTS a hart step preserves: the successor is the SAME hart of the *)
+(* SAME generation, and the era fields never move.  Both are needed by      *)
+(* every lifting rule, and both are one [destruct] away -- but that         *)
+(* [destruct] is over ~20 outcome arms, so it is done ONCE here.            *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma hart_node_step_shape gen g cpu m e' g' :
+  hart_node_step gen g cpu m e' g' -> exists m', e' = HartE gen cpu m'.
+Proof. intros (m' & s' & _ & -> & _). by eexists. Qed.
+
+Lemma hart_node_step_era gen g cpu m e' g' :
+  hart_node_step gen g cpu m e' g' ->
+  g'.(ggen) = g.(ggen) /\ g'.(gpow) = g.(gpow).
+Proof. by intros (m' & s' & _ & _ & ->). Qed.
+
+(* A hart node never moves the disk IMAGE (crash.md): register effects, RAM
+   accesses and the fused AMO do not touch the device fabric at all, and an
+   MMIO transaction goes through [dev_read]/[dev_write], which preserve
+   [v_disk].  The per-NODE twin of [run_v_disk], and what lets the hart
+   lifting rule FRAME [state_interp]'s durable disk conjunct. *)
+Lemma mnode_step_v_disk s m m' s' :
+  mnode_step s m m' s' -> v_disk (dvirtio (mdev s')) = v_disk (dvirtio (mdev s)).
+Proof.
+  rewrite /mnode_step. destruct m as [y|T oc k].
+  { by intros (tick & _ & ->). }
+  destruct oc; simpl;
+    try (by intros (_ & ->)); try (by intros []).
+  - (* MemRead *)
+    destruct (dev_addr _).
+    + intros (w & d' & Hdr & _ & ->). cbn.
+      exact (dev_read_v_disk _ _ _ _ _ Hdr).
+    + by intros [(_ & w & _ & _ & ->)
+                |(_ & w & m1 & rs1 & mem1 & _ & _ & _ & ->)].
+  - (* MemWrite *)
+    destruct (dev_addr _).
+    + intros (d' & Hdw & _ & ->). cbn.
+      exact (dev_write_v_disk _ _ _ _ _ Hdw).
+    + by intros (_ & ->).
+  - (* Choose *) by intros (ch & _ & ->).
+Qed.
+
+Lemma hart_node_step_v_disk gen g cpu m e' g' :
+  hart_node_step gen g cpu m e' g' ->
+  v_disk (dvirtio g'.(gdev)) = v_disk (dvirtio g.(gdev)).
+Proof.
+  intros (m' & s' & Hn & _ & ->). cbn. exact (mnode_step_v_disk _ _ _ _ Hn).
+Qed.
+
+(* THE BATCHING LICENCE (claude-notes/design/main-cycle-port.md §5): apart
+   from hart [c]'s own steps and a PowerOn's whole-machine reset, the ONLY
+   thing any step of any other thread can do to hart [c]'s register file is
+   [plic_step]'s [sig_seip] wire write.  This is the meta-level soundness of
+   every batched register rule: a stretch of nodes whose registers the
+   caller owns (and [sig_seip] is not ownable -- it lives in [WireInv])
+   cannot be invalidated by interference. *)
+Lemma prim_step_hart_regs_frame e g κ e' g' efs (c : CPU) :
+  prim_step e g κ e' g' efs ->
+  (forall gen m, e <> HartE gen c m) ->
+  e <> PowerLoopE ->
+  g'.(gregs) c = g.(gregs) c \/
+  g'.(gregs) c = register_set sig_seip
+      (bool_to_bit (dev_seip g.(gdev) (fin_to_nat c))) (g.(gregs) c).
+Proof.
+  intros Hstep Hnot Hnp.
+  destruct Hstep as
+    [ (gen & cpu & m & -> & _ & _ & [ (_ & (m' & s' & _ & _ & ->)) | (_ & _ & ->) ])
+    | [ (gen & -> & _ & _ & _ & [ (_ & d' & _ & ->) | (_ & ->) ])
+    | [ (gen & -> & _ & _ & _ & [ (_ & d' & m' & _ & ->) | (_ & ->) ])
+    | [ (gen & -> & _ & _ & _ & [ (_ & gr' & Hp & ->) | (_ & ->) ])
+    | (-> & _) ] ] ] ];
+    try (by left).
+  - (* another hart's node: [c] is not [cpu], so the insert misses [c] *)
+    left. cbn. rewrite /insert /greg_insert.
+    case_decide as Hc; [exfalso; subst c; exact (Hnot gen m eq_refl)|done].
+  - (* the wire: [sig_seip] on whichever hart the PLIC chose *)
+    destruct Hp as [c0]. cbn. rewrite /insert /greg_insert.
+    case_decide as Hc; [subst c0; by right|by left].
+Qed.
+
+(* THE CORPSE STEP is always available, at every expression that carries a
+   generation -- which is what makes [wp_dead] provable uniformly. *)
+Lemma prim_step_hart_dead gen cpu m g :
+  ~ thread_live g gen -> prim_step (HartE gen cpu m) g [] (HartE gen cpu m) g [].
+Proof.
+  intros Hd. left. exists gen, cpu, m. split_and!; try reflexivity. by right.
+Qed.
+
+(* THE BOUNDARY always steps when live: the restart arm needs no resources
+   and no facts about memory -- the fetch is a LATER node.  The successor
+   state is written with the arm's own (identity) register write-back rather
+   than as [g]: the two are only EXTENSIONALLY equal, and collapsing them
+   would cost this file [functional_extensionality] for a reducibility
+   witness that does not need it. *)
+Lemma prim_step_hart_restart gen cpu g (tick : bool) :
+  thread_live g gen ->
+  prim_step (LoopE gen cpu) g [] (HartE gen cpu (riscv_step tick))
+    (GState (<[cpu := g.(gregs) cpu]> g.(gregs)) g.(gmem) g.(gdev)
+       g.(ggen) g.(gpow)) [].
+Proof.
+  intros Hl. left. exists gen, cpu, (Interface.Ret tt).
+  split_and!; try reflexivity. left. split; [exact Hl|].
+  exists (riscv_step tick), (MState (g.(gregs) cpu) g.(gmem) g.(gdev)).
+  split_and!; [by exists tick|reflexivity|reflexivity].
 Qed.
 
 Definition riscv_lang : language := Language riscv_lang_mixin.
