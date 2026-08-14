@@ -87,7 +87,7 @@ Context `{GEN : GenId} `{CID : CpuId}.
   iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
   iPoseProof "Hhw" as "#Hhwc".
   iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-    "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+    "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
       %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
   destruct (pma_all_io Hpma_all (uart_pa off) 1
              (uart_pa_access_io off 1 Hoff (pma_width_ok 1 eq_refl eq_refl))) as (region_st & Hmatch_st & _ & Hwrite_st).
@@ -275,7 +275,7 @@ Qed.
   iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
   iPoseProof "Hhw" as "#Hhwc".
   iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-    "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+    "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
       %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
   destruct (pma_all_io Hpma_all (uart_pa off) 1
              (uart_pa_access_io off 1 Hoff (pma_width_ok 1 eq_refl eq_refl))) as (region_ld & Hmatch_ld & Hread_ld & _).

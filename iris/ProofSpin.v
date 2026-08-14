@@ -136,7 +136,7 @@ Qed.
     iDestruct "Hmm" as "(#Hhw & Hmmrest)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & %HmisaS & %HmisaC & _)".
+      "(#Hmisa & _ & _ & _ & _ & _ & %HmisaS & %HmisaC & _)".
     iAssert (mmode_config (DfracOwn q)) with "[Hmmrest]" as "Hmm".
     { rewrite /mmode_config. iFrame "Hhw". iExact "Hmmrest". }
     (* Löb: assume the loop already runs from any resource snapshot at pc_spin *)

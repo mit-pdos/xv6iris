@@ -270,7 +270,7 @@ Section KvminithartBody.
     pose proof Hmsf2 as (HMPRV2 & HSXL2 & HMXR2 & HTSR2 & HXS2 & HFS2 & HVS2 & HSD2 & HMPP2 & HTVM2).
     iPoseProof "Hhw2" as "#Hhwc2".
     iDestruct "Hhwc2" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & %HmisaS & _)".
+      "(#Hmisa & _ & _ & _ & _ & _ & %HmisaS & _)".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv2.
     iDestruct (reg_valid with "Hreg Hms") as %Lms2.

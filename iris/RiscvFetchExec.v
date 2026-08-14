@@ -258,12 +258,16 @@ Section HwConfig.
      no longer needs their values -- [should_inc] is total).  [elp] IS bundled,
      persistently and existentially, pinned to NOT [LP_EXPECTED] so it discharges
      the landing-pad side condition [eq_vec elp (landing_pad_bits_backwards
-     LP_EXPECTED) = false] that the run_hart_active / fetch WPs require. *)
+     LP_EXPECTED) = false] that the run_hart_active / fetch WPs require.
+     [senvcfg] is bundled at a PINNED literal (not existentially, unlike misa/
+     mseccfg/elp): like mseccfg it is a board obligation ([RiscvLang.reset_regs]),
+     never written again -- xv6 has no line that touches senvcfg -- so it is the
+     sixth frozen cell, held the same way [htif_tohost_base] is. *)
   Definition hw_config : iProp Σ :=
     (∃ (misa0 mseccfg0 : mword 64) (pmar0 : list PMA_Region) (elp0 : mword 1),
      misa ↦ᵣ□ misa0 ∗ mseccfg ↦ᵣ□ mseccfg0 ∗
      pma_regions ↦ᵣ□ pmar0 ∗ htif_tohost_base ↦ᵣ□ None ∗
-     elp ↦ᵣ□ elp0 ∗
+     elp ↦ᵣ□ elp0 ∗ senvcfg ↦ᵣ□ (mword_of_int 0 : mword 64) ∗
      ⌜ eq_vec (_get_Misa_S misa0) ('b"1") = true ⌝ ∗
      ⌜ eq_vec (_get_Misa_C misa0) ('b"1") = true ⌝ ∗
      ⌜ eq_vec (_get_Misa_U misa0) ('b"1") = true ⌝ ∗

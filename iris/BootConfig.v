@@ -2,7 +2,7 @@
 (* BootConfig.v -- the CONFIG BUNDLES a boot proof needs, built from the    *)
 (* reset machine.                                                          *)
 (*                                                                         *)
-(* [RiscvLang.reset_regs] pins fourteen register VALUES per hart (the PMA   *)
+(* [RiscvLang.reset_regs] pins fifteen register VALUES per hart (the PMA    *)
 (* table [RiscvLang.pma_boot] among them; pmpcfg is the one clause stated   *)
 (* as a PREDICATE, [pmp_all_off], and not as a value); but what             *)
 (* [SpecEntry.wp_entry_boot] takes is not those values -- it is the bundles *)
@@ -18,7 +18,7 @@
 (*      of NO table.                                                        *)
 (*   §2 [boot_D] -- the register set a boot client must ask adequacy for.   *)
 (*   §3 [hw_config_intro] / [mmode_config_intro] -- the bundles, from the   *)
-(*      reset cells.  The five frozen cells are PERSISTED here (they are    *)
+(*      reset cells.  The six frozen cells are PERSISTED here (they are     *)
 (*      never written again); every pure fact is [vm_compute] on a pinned   *)
 (*      value.                                                              *)
 (* ====================================================================== *)
@@ -334,7 +334,8 @@ Definition boot_D_named : list register :=
     (mcycle : register); (mtime : register); (mip : register);
     (sig_seip : register); (sig_meip : register);
     (tlb : register); (stvec : register);
-    (sepc : register); (scause : register); (stval : register) ].
+    (sepc : register); (scause : register); (stval : register);
+    (senvcfg : register) ].
 
 Definition boot_D_list : list register := boot_D_named ++ boot_gpr_list.
 
@@ -366,7 +367,7 @@ Section BootBundles.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* [hw_config] out of the five FROZEN reset cells.  Persisting them is the
+  (* [hw_config] out of the six FROZEN reset cells.  Persisting them is the
      only ghost step (they are never written again -- that is what makes the
      bundle persistent and hence free to thread); every pure conjunct is
      [vm_compute] on a value [reset_regs] pinned.  [kmap_static_claims] comes
@@ -377,21 +378,23 @@ Section BootBundles.
     pma_regions ↦ᵣ pma_boot -∗
     htif_tohost_base ↦ᵣ None -∗
     elp ↦ᵣ landing_pad_bits_backwards NO_LP_EXPECTED -∗
+    senvcfg ↦ᵣ boot_w64 0 -∗
     kmap_static_claims ==∗
     hw_config.
   Proof.
-    iIntros "Hmisa Hsec Hpma Hhtif Help #Hb".
+    iIntros "Hmisa Hsec Hpma Hhtif Help Hsenv #Hb".
     iMod (reg_pointsto_persist with "Hmisa") as "#Hmisa'".
     iMod (reg_pointsto_persist with "Hsec")  as "#Hsec'".
     iMod (reg_pointsto_persist with "Hpma")  as "#Hpma'".
     iMod (reg_pointsto_persist with "Hhtif") as "#Hhtif'".
     iMod (reg_pointsto_persist with "Help")  as "#Help'".
+    iMod (reg_pointsto_persist with "Hsenv") as "#Hsenv'".
     iModIntro. rewrite /hw_config.
     iExists (boot_w64 0x800000000014112D), (boot_w64 0), pma_boot,
             (landing_pad_bits_backwards NO_LP_EXPECTED).
     iSplit; [iExact "Hmisa'"|]. iSplit; [iExact "Hsec'"|].
     iSplit; [iExact "Hpma'"|]. iSplit; [iExact "Hhtif'"|].
-    iSplit; [iExact "Help'"|].
+    iSplit; [iExact "Help'"|]. iSplit; [iExact "Hsenv'"|].
     iSplit; [iPureIntro; vm_compute; reflexivity|].   (* misa.S *)
     iSplit; [iPureIntro; vm_compute; reflexivity|].   (* misa.C *)
     iSplit; [iPureIntro; vm_compute; reflexivity|].   (* misa.U *)
@@ -534,6 +537,7 @@ Section BootRegs.
       sepc ↦ᵣ register_lookup sepc rs ∗
       scause ↦ᵣ register_lookup scause rs ∗
       stval ↦ᵣ register_lookup stval rs ∗
+      senvcfg ↦ᵣ register_lookup senvcfg rs ∗
       ([∗ list] r ∈ boot_gpr_list, r ↦ᵣ register_lookup r rs).
   Proof.
     rewrite boot_reg_list /boot_D_list big_sepL_app.
@@ -541,9 +545,9 @@ Section BootRegs.
     iDestruct "Hn" as "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 &
                         H11 & H12 & H13 & H14 & H15 & H16 & H17 & H18 & H19 &
                         H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27 & H28 &
-                        H29 & H30 & H31 & H32 & H33 & _)".
+                        H29 & H30 & H31 & H32 & H33 & H34 & _)".
     iFrame "H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17
-            H18 H19 H20 H21 H22 H23 H24 H25 H26 H27 H28 H29 H30 H31 H32 H33".
+            H18 H19 H20 H21 H22 H23 H24 H25 H26 H27 H28 H29 H30 H31 H32 H33 H34".
   Qed.
 
   (* the register FILE a reset hart's GPRs form: x0 reads zero (the [gpr_pt]

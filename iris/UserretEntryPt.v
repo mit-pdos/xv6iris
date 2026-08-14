@@ -102,7 +102,7 @@ Section UserretEntryPt.
              Hfmap Hi0 Hi1 Hi2 Hi3 Hcont".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     assert (Hva00 : add_vec_int (uva 0x9c) 4 = uva 0xa0)
       by (apply bv_eq; vm_compute; reflexivity).

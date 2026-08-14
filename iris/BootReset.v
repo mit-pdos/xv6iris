@@ -48,11 +48,11 @@
 (* rather than transcribed.                                                  *)
 (*                                                                          *)
 (* THE POWER-ON MODEL: garbage in every register, plus                        *)
-(* [ArchReset.board_init]'s ten explicit board-guaranteed writes, plus the     *)
+(* [ArchReset.board_init]'s eleven explicit board-guaranteed writes, plus the  *)
 (* privileged spec's own [reset] with its configuration validation.  That      *)
 (* file's header carries the write list and the reason the anchored program    *)
 (* deliberately does NOT run [sail_model_init].  NOTHING IS LEFT OVER: every   *)
-(* one of [reset_regs]' fifteen facts is either one of those ten writes        *)
+(* one of [reset_regs]' sixteen facts is either one of those eleven writes     *)
 (* carried through a chain that does not touch it, or DERIVED here from the    *)
 (* spec's reset at an ARBITRARY power-on file -- PC, nextPC, cur_privilege,    *)
 (* hart_state, elp, misa's extension bits, and pmpcfg's [pmp_all_off] per      *)
@@ -332,7 +332,7 @@ Ltac peel := repeat pstep.
 (* ---------------------------------------------------------------------- *)
 (* 1. WHAT THE BOARD'S WRITES ESTABLISH.                                   *)
 (*                                                                         *)
-(*    [ArchReset.board_init]'s ten writes and nothing else -- the power-on   *)
+(*    [ArchReset.board_init]'s eleven writes and nothing else -- the power-on *)
 (*    file is garbage everywhere else.  Read that file's header for why each  *)
 (*    write is there and why [sail_model_init] is NOT in the anchored         *)
 (*    program; this section is only the peel.                                *)
@@ -348,7 +348,8 @@ Definition board_ok (hid : mword 64) (rs : regstate) : Prop :=
   /\ register_lookup pc_reset_address rs = boot_w64 0x80000000
   /\ register_lookup mhartid rs = hid
   /\ register_lookup mie rs = boot_w64 0
-  /\ register_lookup mideleg rs = boot_w64 0.
+  /\ register_lookup mideleg rs = boot_w64 0
+  /\ register_lookup senvcfg rs = boot_w64 0.
 
 Lemma exec_board_init (hid : mword 64) (s0 : mstate) (rs : regstate) :
   pfin s0 (board_ok hid) (board_init hid pma_boot) rs.
@@ -728,7 +729,7 @@ Qed.
 (* EXACTLY [reset_regs], at an ARBITRARY power-on register file: five values the
    privileged spec's own [reset] writes (PC, nextPC, cur_privilege, hart_state,
    elp), misa's extension bits from [reset_misa] over the board's MXL, pmpcfg's
-   [pmp_all_off] from [reset_pmp] per entry (§3), and the board's own nine other
+   [pmp_all_off] from [reset_pmp] per entry (§3), and the board's own ten other
    writes carried through a chain that does not touch them.  Nothing is left over
    for a patch layer. *)
 Definition post_ok (hid : mword 64) (rs : regstate) : Prop :=
@@ -748,14 +749,15 @@ Definition post_ok (hid : mword 64) (rs : regstate) : Prop :=
   /\ register_lookup mideleg rs = boot_w64 0
   (* the spec's own [reset_pmp], derived per entry over the open file (§3) --
      no longer a patched value *)
-  /\ pmp_all_off (register_lookup pmpcfg_n rs).
+  /\ pmp_all_off (register_lookup pmpcfg_n rs)
+  /\ register_lookup senvcfg rs = boot_w64 0.
 
 Lemma exec_init_model (hid : mword 64) (s0 : mstate) (rs : regstate) :
   board_ok hid rs ->
   pfin s0 (post_ok hid) (init_model_at "" plat_hook) rs.
 Proof.
   intros (Hmisa & Hmstat & Hmsec & Hmenv & Hhtif & Hpma & Hpcr & Hmhid
-          & Hmie & Hmdl).
+          & Hmie & Hmdl & Hsenv).
   unfold init_model_at.
   refine (px_step _ _ _ true _ _ _ (exec_config_is_valid rs _ _ Hpma) _).
   unfold reset_at, plat_hook.
@@ -795,7 +797,9 @@ Proof.
     by (rewrite (Hfr mie ltac:(vm_compute; reflexivity)); lkres; reflexivity).
   assert (Hmdl' : register_lookup mideleg rsp = boot_w64 0)
     by (rewrite (Hfr mideleg ltac:(vm_compute; reflexivity)); lkres; reflexivity).
-  clear Hfr Hmisa Hmstat Hmsec Hmenv Hhtif Hpma Hpcr Hmhid Hmie Hmdl.
+  assert (Hsenv' : register_lookup senvcfg rsp = boot_w64 0)
+    by (rewrite (Hfr senvcfg ltac:(vm_compute; reflexivity)); lkres; reflexivity).
+  clear Hfr Hmisa Hmstat Hmsec Hmenv Hhtif Hpma Hpcr Hmhid Hmie Hmdl Hsenv.
   peel.
   apply px_done. unfold post_ok. split_and!; lkres;
     first [ reflexivity | assumption | apply bv_eq; vm_compute; reflexivity ].
@@ -809,7 +813,7 @@ Lemma exec_init_boot_requirements (hid : mword 64) (s0 : mstate) (rs : regstate)
   post_ok hid rs -> pfin s0 (post_ok hid) (init_boot_requirements tt) rs.
 Proof.
   intros (HPC & HnPC & Hpriv & Hhs & Hmhid & Hmstat & Hmisa & Hmsec & Hmenv
-          & Hhtif & Help & Hpma & Hmie & Hmdl & Hpmp).
+          & Hhtif & Help & Hpma & Hmie & Hmdl & Hpmp & Hsenv).
   unfold init_boot_requirements. peel.
   apply px_done. unfold post_ok. split_and!; lkres;
     first [ reflexivity | assumption ].
@@ -832,7 +836,7 @@ Qed.
 (* 6. THE THEOREM: [reset_regs] OF A RUN FROM ARBITRARY POWER-ON GARBAGE.  *)
 (*                                                                        *)
 (*    This is what [RiscvLang.boot_facts]' register clause is FOR: every    *)
-(*    consumer still asks for [reset_regs] (the fifteen-way fact set, by    *)
+(*    consumer still asks for [reset_regs] (the sixteen-way fact set, by    *)
 (*    name), and this is the bridge -- for EVERY power-on file [rs0], not   *)
 (*    for a chosen one.  [BootShared.boot_regs_of_facts] is its only        *)
 (*    caller, so the whole chain above it is unchanged.                     *)
@@ -851,6 +855,6 @@ Proof.
   destruct (Huniq _ _ Hrun) as [_ Heq].
   injection Heq as Heq. subst rs1.
   destruct Hpost as (HPC & HnPC & Hpriv & Hhs & Hmhid & Hmstat & Hmisa & Hmsec
-                     & Hmenv & Hhtif & Help & Hpma & Hmie & Hmdl & Hpmp).
+                     & Hmenv & Hhtif & Help & Hpma & Hmie & Hmdl & Hpmp & Hsenv).
   unfold reset_regs. split_and!; assumption.
 Qed.

@@ -711,7 +711,7 @@ Section WpUmodeStore.
     iDestruct (reg_valid_dq with "Hreg Hmse") as %Lmse.
     iDestruct (reg_valid_dq with "Hreg Hsse") as %Lsse.
     iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & #Hpma & #Hhtif & #Help & _ & _ & _ & _ & %Hpma_all
+      "(#Hmisa & _ & #Hpma & #Hhtif & #Help & _ & _ & _ & _ & _ & %Hpma_all
         & _ & _ & %Help_ne & _ & %Hmisaval & _)".
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
     iDestruct (reg_valid_dq with "Hreg Hpma") as %Lpma.

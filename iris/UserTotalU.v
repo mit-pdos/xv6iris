@@ -111,7 +111,7 @@ Section UserTotalU.
     iIntros "Hreg #Hhw Hcfg".
     iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hcmenv & Hsenv & Hms0 & Hss0)".
     iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hmisa0 & _)".
+      "(#Hmisa & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hmisa0 & _)".
     iDestruct (reg_valid_dq with "Hreg Hsenv") as %Lsenv0.
     iDestruct (reg_valid_dq with "Hreg Hms0") as %Lms00.
     iDestruct (reg_valid_dq with "Hreg Hss0") as %Lss00.
@@ -400,7 +400,7 @@ Section UserTotalU.
   Proof.
     iIntros "Hreg #Hhw".
     iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hm & _)".
+      "(#Hmisa & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hm & _)".
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %L.
     iPureIntro. rewrite L. exact Hm.
   Qed.

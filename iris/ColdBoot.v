@@ -2,7 +2,7 @@
 (* ColdBoot.v -- THE MODEL'S OWN COLD BOOT, and with it the machine-checked *)
 (* justification of [RiscvLang.reset_regs].                                 *)
 (*                                                                          *)
-(* [reset_regs] states fifteen facts per hart -- fourteen register values    *)
+(* [reset_regs] states sixteen facts per hart -- fifteen register values     *)
 (* plus pmpcfg's [pmp_all_off] -- and until this file                        *)
 (* existed each of them was justified by a table in the notes that said      *)
 (* which line of the Sail model wrote it.  A table is a transcription: it     *)
@@ -59,7 +59,7 @@
 (* anchored program no longer runs [sail_model_init] (ArchReset's header says    *)
 (* why).  §3's [cold_boot_pma] therefore only reads the closed run's value      *)
 (* back; what holds the table to the model's own CONFIG is §3b's                *)
-(* [board_regs_after_sim], which shows the board's eight value writes are a     *)
+(* [board_regs_after_sim], which shows the board's nine value writes are a      *)
 (* no-op after the simulator's own initializers.  Two things made the swap possible, both recorded in  *)
 (* claude-notes/completed/crash.md: the tower's PMA obligation is stated PER    *)
 (* ADDRESS CLASS ([RiscvFetchExec.pma_allows_ram] / [pma_allows_io]), since the *)
@@ -325,7 +325,9 @@ Lemma board_regs_after_sim :
   /\ register_lookup mie (sregs sim_board_state)
     = register_lookup mie (sregs sim_state)
   /\ register_lookup mideleg (sregs sim_board_state)
-    = register_lookup mideleg (sregs sim_state).
+    = register_lookup mideleg (sregs sim_state)
+  /\ register_lookup senvcfg (sregs sim_board_state)
+    = register_lookup senvcfg (sregs sim_state).
 Proof.
   (* [reflexivity] settles the six the simulator writes EXPLICITLY; mie and
      mideleg come from [init_regstate]'s [inhabitant], which is [zeros] rather
