@@ -53,7 +53,7 @@ Section ProofRelease.
   Lemma wp_release_gen_sconf
       (γl : gname) (lka : mword 64) (s : string) (R Dc Out : iProp Σ)
       (m : regfile)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (lks : gset nat)
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (lks : gset string)
     : wp_release_gen_sconf_body γl lka s R Dc Out m n eb p C av lks.
   Proof.
     cbv beta delta [wp_release_gen_sconf_body].
@@ -236,7 +236,7 @@ Section ProofRelease.
        so this store is licensed by redeeming the membership fragment out of
        the hart's own held-lock set (LockSet.cpu_locks_delete).  The set is an
        INDEX now, so it is NAMED here: [cpu_own_locks_swap] takes the
-       authority out at [lks] and puts back [lks ∖ {[lock_rank s]}], which is
+       authority out at [lks] and puts back [lks ∖ {[s]}], which is
        exactly release's postcondition.  No premise is needed -- membership is
        DERIVED from the fragment the lock invariant was holding. *)
     iDestruct (cpu_own_locks_swap with "Hown") as "[Hlks [%Hsz Hownback]]".
@@ -250,8 +250,8 @@ Section ProofRelease.
        the set STRICTLY shrank: [size lks <= S n] becomes
        [size (lks ∖ {[rank s]}) <= n], which is exactly pop_off's unwind
        premise below.  That is the whole compositional argument. *)
-    iDestruct ("Hownback" $! (lks ∖ {[lock_rank s]})
-                 ltac:(exact (size_del_le (lock_rank s) lks (S n) Hsz)) with "Hlks") as "Hown".
+    iDestruct ("Hownback" $! (lks ∖ {[s]})
+                 ltac:(exact (size_del_le s lks (S n) Hsz)) with "Hlks") as "Hown".
     assert (Hpc16 : add_vec_int (mword_of_int (KernelSyms.release + 0x12) : mword 64) 4 = mword_of_int (KernelSyms.release + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc16) in "Hpc".
     (* ---- 0x16: fence rw,w ---- *)
@@ -294,7 +294,7 @@ Section ProofRelease.
        above deleted this lock's rank, so the set now fits under [n]. *)
     iApply (PushOff.wp_pop_off_sconf M1 (av - 4)%nat n eb p C _
               ltac:(lia)
-              ltac:(exact (size_del_lt (lock_rank s) lks n Hin Hsz))
+              ltac:(exact (size_del_lt s lks n Hin Hsz))
               with "Hcg Hown Hpay Htext Hpc").
     iIntros (CIDpo Hspo mf) "Hcg Hown Hpc %Hmf".
     iEval (rewrite upd_eq) in "Hpc".
@@ -507,7 +507,7 @@ Section OfGen.
       (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
-      (lks : gset nat)
+      (lks : gset string)
     : wp_release_sconf_body γl lka s R m n eb p C av lks.
   Proof.
     cbv beta delta [wp_release_sconf_body].
@@ -542,7 +542,7 @@ Section CancelOfGen.
       (γl : gname) (lka : mword 64) (s : string) (R D Out : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
-      (lks : gset nat)
+      (lks : gset string)
     : wp_release_cancel_sconf_body γl lka s R D Out m n eb p C av lks.
   Proof.
     cbv beta delta [wp_release_cancel_sconf_body].

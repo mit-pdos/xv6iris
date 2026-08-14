@@ -100,7 +100,7 @@ Definition wp_sys_sync_sconf_body
     (γ : log_names) (γfs : fs_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_sync in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -110,7 +110,7 @@ Definition wp_sys_sync_sconf_body
   (* acquire's order premise: sys_sync acquires and releases [log.lock]
      (possibly many times, around each wait iteration's [sleep]) but is
      BALANCED overall, so [lks] is unchanged end to end. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   (* enters at noff 0; the acquire raises it to what sleep demands *)
   cpu_own 0 eb pj C b lks -∗
@@ -150,6 +150,6 @@ Module Type SYS_SYNC.
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_sys_sync_sconf_body γs j γl bn γ γfs cov logstart dev m K eb C b lks.
 End SYS_SYNC.

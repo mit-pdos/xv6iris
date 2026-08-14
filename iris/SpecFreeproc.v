@@ -231,7 +231,7 @@ Section SpecFreeproc.
       (j : nat) (γl : gname) (V : pprivate) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-      (ilvl : nat) (lks : gset nat) :=
+      (ilvl : nat) (lks : gset string) :=
     let pcE : mword 64 := mword_of_int KernelSyms.freeproc in
     let pa := proc_addr j in
     let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -244,7 +244,7 @@ Section SpecFreeproc.
     (* freeproc's own kfree(trapframe) is direct, at "kmem"(13); the
        proc_freepagetable arm's own callees carry no order premise of their
        own yet, so this is the whole cone this contract needs to state. *)
-    locks_below lks (lock_rank "kmem") ->
+    locks_below lks "kmem" ->
     sie_cap_gpr mm K false pme -∗
     cpu_own ilvl eb pme C false lks -∗
     kernel_text -∗
@@ -278,6 +278,6 @@ Module Type FREEPROC.
       (j : nat) (γl : gname) (V : pprivate) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-      (ilvl : nat) (lks : gset nat),
+      (ilvl : nat) (lks : gset string),
       wp_freeproc_sconf_body γa mm j γl V pid st ch opt otf K eb pme C ilvl lks.
 End FREEPROC.

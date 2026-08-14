@@ -219,7 +219,7 @@ Section IreclaimDefs.
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (used : gset Z)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac) (j : nat)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset nat) : iProp Σ :=
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset string) : iProp Σ :=
     (* the LITERAL [true], matching the contract's crossing: this function
        can sleep, so its continuation is about an arbitrary hart. *)
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
@@ -247,7 +247,7 @@ Section IreclaimDefs.
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (used : gset Z) (dev : mword 32)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac) (j : nat)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset nat) (fuel : nat) : iProp Σ :=
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset string) (fuel : nat) : iProp Σ :=
     (∀ (Mn : regfile) (inumn : mword 32) (usedn : gset Z) (CIDn : CpuId),
        ⌜(Z.to_nat (ninodes - bv_unsigned inumn) <= fuel)%nat⌝ -∗
        ⌜0 < bv_unsigned inumn < ninodes⌝ -∗
@@ -301,7 +301,7 @@ Section IreclaimEpilogue.
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (used used' : gset Z)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_ireclaim <= K)%nat ->
     used' ⊆ used ->
     irc_sp m M ->
@@ -676,7 +676,7 @@ Section IreclaimStep.
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (used usedn : gset Z) (dev : mword 32) (inum : mword 32) (fuel : nat)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
-      (m Ml : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m Ml : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_ireclaim <= K)%nat ->
     ninodes < 2 ^ 31 ->
     usedn ⊆ used ->
@@ -923,7 +923,7 @@ Section IreclaimOrphan.
       (dev inum bno : mword 32) (kk : nat)
       (bs bsd0 : list (bv 8)) (d0 : bool) (fuel : nat)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
-      (m Ml : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m Ml : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_ireclaim <= K)%nat ->
     log_geom_ok cov logstart ->
     0 <= inodestart ->
@@ -953,7 +953,7 @@ Section IreclaimOrphan.
     (* irc_orphan's cone: printk ("pr", 14), iget/iput ("itable", 2),
        begin_op/end_op ("log", 3), ilock ("bcache", 4), iunlock
        ("sleep lock", 6) -- "itable" is the lowest. *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     sie_cap_gpr Ml (K - 8)%nat b (proc_addr j) -∗
     cpu_own 0 true (proc_addr j) C b lks -∗
     kernel_text -∗ kernel_data -∗
@@ -1942,7 +1942,7 @@ Section IreclaimRelease.
       (dev inum bno : mword 32) (kk : nat)
       (bs bsd0 : list (bv 8)) (d0 : bool) (fuel : nat)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
-      (m Ml : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m Ml : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_ireclaim <= K)%nat ->
     ninodes < 2 ^ 31 ->
     (Z.to_nat (ninodes - bv_unsigned inum) <= S fuel)%nat ->
@@ -1957,7 +1957,7 @@ Section IreclaimRelease.
     Ml !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64) ->
     Ml !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64) ->
     (* irc_release's only lock-touching callee is brelse, at "bcache" (4). *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     sie_cap_gpr Ml (K - 8)%nat b (proc_addr j) -∗
     cpu_own 0 true (proc_addr j) C b lks -∗
     kernel_text -∗
@@ -2128,7 +2128,7 @@ Section IreclaimScan.
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (nib : nat) (used : gset Z) (dev : mword 32)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_ireclaim <= K)%nat ->
     log_geom_ok cov logstart ->
     0 <= inodestart ->
@@ -2146,7 +2146,7 @@ Section IreclaimScan.
     γs !! j = Some γl ->
     (* irc_scan reaches irc_step (no lock), irc_orphan ("itable", 2) and
        irc_release ("bcache", 4) every turn; "itable" is the lowest. *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     kernel_text -∗ kernel_data -∗
     panic_wp_any -∗
     printk_env γpr γu γd -∗
@@ -2913,7 +2913,7 @@ Section IreclaimMain.
       (dev : mword 32)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat) :
+      (b : bool) (lks : gset string) :
       wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                              cov logstart bmapstart inodestart ninodes nib size
                              used dev pidv dq dqb dqs dqn m K eb C b lks.

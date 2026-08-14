@@ -123,7 +123,7 @@ Section ProofSwtch.
     iDestruct (intr_count_pos_off 0 eb with "Hccnt") as "[Hq0cnt Hres]".
     iAssert (intr_off_tok ∗ intr_count 1 eb)%I with "[Hsiearm Hq0cnt Hres]" as "(Hq0 & Hccnt)".
     { iFrame "Hsiearm". rewrite /intr_count. iFrame "Hq0cnt Hres". }
-    iAssert (cpu_own 1 eb p emp false {[lock_rank "proc"]}) with "[Hcnoff Hcint Hclks Hccnt Hcproc]" as "Hcpuown".
+    iAssert (cpu_own 1 eb p emp false {["proc"]}) with "[Hcnoff Hcint Hclks Hccnt Hcproc]" as "Hcpuown".
     { rewrite /cpu_own /cpu_hart /cpu_priv /cpu_cells.
       iFrame "Hcnoff Hcint Hcproc Hclks Hccnt". iPureIntro; exact Hcpb. }
     iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb0.

@@ -468,7 +468,7 @@ Section WriteHeadDefs.
       (γfs : fs_names) (bn : bio_names) (logstart : Z) (n : nat)
       (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac) (j : nat)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
       (Q : iProp Σ) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs' : list (bv 8)),
@@ -530,7 +530,7 @@ Section WriteHeadBlocks.
       (pidv : mword 32) (dq : dfrac)
       (k : nat) (bno : mword 32) (bsh bs0 bsd0 : list (bv 8)) (d0 : bool)
       (f : nat -> bv 8)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) (Q : iProp Σ) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) (Q : iProp Σ) :
     (K_write_head <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     uint bno = logstart ->
@@ -550,7 +550,7 @@ Section WriteHeadBlocks.
     M !!! Regidx Rs1 = bnode k ->
     (* wh_tail's own acquire (via brelse's unlink/splice) is at "bcache"
        (rank 4); nothing below it is touched here. *)
-    locks_below lks (lock_rank "bcache") ->
+    locks_below lks "bcache" ->
     sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
@@ -1036,7 +1036,7 @@ Section WriteHeadBlocks.
       (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac)
       (kk : nat) (bno : mword 32) (bsh bs0 bsd0 : list (bv 8)) (d0 : bool)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) (fuel : nat)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) (fuel : nat)
       (Q : iProp Σ) :
     (K_write_head <= K)%nat ->
     (uint bno < 2147483648)%Z ->
@@ -1049,7 +1049,7 @@ Section WriteHeadBlocks.
     (* the loop itself acquires nothing; its exit falls into [wh_tail],
        which wants "bcache" (rank 4) for brelse -- threaded through
        unchanged since the loop body never nests a deeper acquire. *)
-    locks_below lks (lock_rank "bcache") ->
+    locks_below lks "bcache" ->
     forall (i : nat) (M : regfile) (f : nat -> bv 8),
     (i < n)%nat ->
     (n - i <= fuel)%nat ->
@@ -1337,7 +1337,7 @@ Section ProofWriteHead.
       (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (Q : iProp Σ) (lks : gset nat)
+      (b : bool) (Q : iProp Σ) (lks : gset string)
     : wp_write_head_sconf_body γs j γl γu γd γk pd pav pu bn γfs
                                cov logstart dev n W L pidv dq m K eb C b Q lks.
   Proof.

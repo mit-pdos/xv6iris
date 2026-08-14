@@ -116,14 +116,14 @@ Section ProofUsertrapTail.
      kexit does not want, and dropping it is right -- the syscalls' footprint
      belongs to a process that is going to run one. *)
   Lemma ut_kexit (N : ut_names) (V : pprivate) (m : regfile) (nx : nat)
-      (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (C : iProp Σ) (b : bool) (lks : gset string) :
     ut_wf N ->
     (K_kexit <= nx)%nat ->
     (* kexit's own cone bottoms out at "ftable" (1) -- the fileclose loop --
        and every deeper lock it reaches (itable/log/wait_lock/proc) follows
        by [locks_below_mono] inside its own contract, so this is the ONE
        premise the tail owes it. *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     kernel_text -∗
     pc_is (mword_of_int KernelSyms.kexit) -∗
     sie_cap_gpr m nx b (un_pj N) -∗
@@ -175,7 +175,7 @@ Section UtRet2.
   Lemma ut_ret2 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 mf : regfile) (av nx : nat) (C : iProp Σ) (b : bool)
       (uepc : mword 64) (vb : mword 1)
-      (mie_v menvcfg0 : mword 64) (lks : gset nat) :
+      (mie_v menvcfg0 : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
@@ -633,7 +633,7 @@ Section UtRet.
   (* ==================================================================== *)
   Lemma ut_ret (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (C : iProp Σ) (b : bool)
-      (mie_v menvcfg0 : mword 64) (lks : gset nat) :
+      (mie_v menvcfg0 : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
@@ -752,7 +752,7 @@ Section UtA6.
      s2,0] is stepped and its value never read again. *)
   Lemma ut_a6 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (C : iProp Σ) (b : bool)
-      (mie_v menvcfg0 : mword 64) (lks : gset nat) :
+      (mie_v menvcfg0 : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
@@ -768,7 +768,7 @@ Section UtA6.
        branch's [ut_kexit]; killed itself (rank "proc" = 11) follows by
        [locks_below_mono].  The not-killed branch (ut_ret / prepare_return)
        touches no lock at all. *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xa6)) -∗
     sie_cap_gpr m nx b (un_pj N) -∗
@@ -995,7 +995,7 @@ Section UtFa.
      has to be re-anchored on the far side. *)
   Lemma ut_fa (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (C : iProp Σ) (b : bool)
-      (mie_v menvcfg0 : mword 64) (lks : gset nat) :
+      (mie_v menvcfg0 : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->

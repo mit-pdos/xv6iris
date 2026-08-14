@@ -101,7 +101,7 @@ Definition wp_end_op_sconf_body
     (u : nat)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.end_op in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -123,7 +123,7 @@ Definition wp_end_op_sconf_body
      (the C releases before calling commit()) and their Spec files (SpecBread
      etc.) surface no order premise of their own for their callers to
      satisfy, so nothing about them is stated here. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   trap_csrs_ext eb -∗
@@ -187,7 +187,7 @@ Module Type END_OP.
       (u : nat)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_end_op_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                            cov logstart dev u pidv dq m K eb C b lks.
 End END_OP.

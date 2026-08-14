@@ -193,7 +193,7 @@ Definition wp_ialloc_sconf_body
     (u : nat)
     (pidv : mword 32) (dq dqs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ialloc in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -228,7 +228,7 @@ Definition wp_ialloc_sconf_body
      ("itable", 2, on the tail claim), printk ("pr", 14, the no-inodes
      arm) -- "itable" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -337,7 +337,7 @@ Definition wp_ialloc_gen_body
     (u : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ialloc in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -372,7 +372,7 @@ Definition wp_ialloc_gen_body
      ("itable", 2, on the tail claim), printk ("pr", 14, the no-inodes
      arm) -- "itable" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -474,7 +474,7 @@ Module Type IALLOC.
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                          cov logstart inodestart ninodes nib dev ty u Sb
                          pidv dq dqs dqn m K eb C b lks.
@@ -496,7 +496,7 @@ Module Type IALLOC.
       (u : nat)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                            cov logstart inodestart ninodes nib dev ty u
                            pidv dq dqs dqn m K eb C b lks.

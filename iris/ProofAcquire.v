@@ -212,7 +212,7 @@ Section ProofAcquire.
   Lemma wp_acquire_gen_sconf
       (γl : gname) (s : string) (R Tc Dc : iProp Σ)
       (m : regfile)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset nat)
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string)
     : wp_acquire_gen_sconf_body γl s R Tc Dc m n eb p C av b lks.
   Proof.
     cbv beta delta [wp_acquire_gen_sconf_body].
@@ -557,7 +557,7 @@ Section ProofAcquire.
        leaf, and put back with [lock_rank s] in it.  The set is now an INDEX
        of [cpu_own], so it is NAMED here rather than opened existentially --
        [cpu_own_locks_swap] takes the authority out at [lks] and puts back the
-       one the leaf returns.  The [lock_rank s ∉ lks] obligation is [Hfresh],
+       one the leaf returns.  The [s ∉ lks] obligation is [Hfresh],
        the caller's own premise; the predecessor derived it from the cpu field
        instead (see WpLock.v's owner-field block). *)
     iDestruct (cpu_own_locks_swap with "Hown") as "[Hlks [%Hsz Hownback]]".
@@ -571,8 +571,8 @@ Section ProofAcquire.
     (* [size ({[rank s]} ∪ lks) = S (size lks) <= S n] -- the entry bound plus
        the freshness premise.  [size_add] is proved at an abstract rank so no
        [set_solver] meets [lock_rank] here. *)
-    iDestruct ("Hownback" $! ({[lock_rank s]} ∪ lks)
-                 ltac:(exact (size_add_le (lock_rank s) lks n Hfresh Hszlks)) with "Hlks") as "Hown".
+    iDestruct ("Hownback" $! ({[s]} ∪ lks)
+                 ltac:(exact (size_add_le s lks n Hfresh Hszlks)) with "Hlks") as "Hown".
     assert (Hpc2a : add_vec_int (mword_of_int (KernelSyms.acquire + 0x28) : mword 64) 2 = mword_of_int (KernelSyms.acquire + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2a) in "Hpc".
     (* ---- 0x2a/0x2c/0x2e: c.ldsp ra/s0/s1 ---- *)
@@ -835,7 +835,7 @@ Section OfGen.
       (γl : gname) (s : string) (R : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool)
-      (lks : gset nat)
+      (lks : gset string)
     : wp_acquire_sconf_body γl s R m n eb p C av b lks.
   Proof.
     cbv beta delta [wp_acquire_sconf_body].

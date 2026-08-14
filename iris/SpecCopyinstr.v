@@ -98,7 +98,7 @@ Definition copyinstr_ret (maxn : nat) (f : nat -> bv 8) (r : mword 64) : Prop :=
 Definition wp_copyinstr_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
     (P : uptd) (szv : mword 64) (maxn : nat) (dst_olds : nat -> bv 8)
-    (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat) :=
+    (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.copyinstr in
   (* a0 = pagetable, a1 = psz, a2 = dst, a3 = srcva, a4 = max *)
   let dst := mm !!! Regidx (mword_of_int 12 : mword 5) in
@@ -117,7 +117,7 @@ Definition wp_copyinstr_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   (* vmfault's kalloc keeps its transient noff increment in int range *)
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
   (* copyinstr -> walkaddr -> walk *)
-  locks_below lks (lock_rank "kmem") ->
+  locks_below lks "kmem" ->
   sie_cap_gpr mm K b p -∗
   cpu_own lvl eb p C b lks -∗
   kernel_text -∗
@@ -143,6 +143,6 @@ Module Type COPYINSTR.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (maxn : nat) (dst_olds : nat -> bv 8)
-      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat),
+      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string),
       wp_copyinstr_sconf_body γa mm P szv maxn dst_olds K lvl eb p C b lks.
 End COPYINSTR.

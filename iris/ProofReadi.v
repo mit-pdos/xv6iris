@@ -259,7 +259,7 @@ Section ReadiDefs.
       (user : bool) (off n : nat) (dst_olds : nat -> bv 8)
       (V : pprivate)
       (pidv : mword 32) (dq dqd : dfrac) (j : nat)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) : iProp Σ :=
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (tot : nat) (P' : uptd),
         ⌜callee_saved m mf⌝ -∗
@@ -304,7 +304,7 @@ Section ReadiRet.
       (user : bool) (off n tot : nat) (dst_olds : nat -> bv 8)
       (V : pprivate) (P' : uptd)
       (pidv : mword 32) (dq dqd : dfrac) (j : nat)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_readi <= K)%nat ->
     rd_sp m M ->
     (* the six registers this block does NOT restore are already back *)
@@ -619,7 +619,7 @@ Section ReadiJoin.
       (user : bool) (off n tot : nat) (dst_olds : nat -> bv 8)
       (V : pprivate) (P' : uptd) (ans : mword 64)
       (pidv : mword 32) (dq dqd : dfrac) (j : nat)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_readi <= K)%nat ->
     rd_sp m M ->
     M !!! Regidx Rs3 = ans ->
@@ -759,7 +759,7 @@ Section ReadiExit.
       (V : pprivate) (P' : uptd) (ans : mword 64)
       (pidv : mword 32) (dq dqd : dfrac) (j : nat)
       (za zb zc zd ze zf : Z) (jimm : mword 21)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_readi <= K)%nat ->
     rd_sp m M ->
     M !!! Regidx Rs3 = ans ->
@@ -1041,7 +1041,7 @@ Section ReadiLoop.
       (user : bool) (off n nc szn : nat) (dst_olds : nat -> bv 8)
       (V : pprivate) (usv : mword 64)
       (pidv : mword 32) (dq dqd : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_readi <= K)%nat ->
     log_geom_ok cov logstart ->
     blkmap_wf cov logstart bm ->
@@ -1056,7 +1056,7 @@ Section ReadiLoop.
     γs !! j = Some γl ->
     (* readi's cone: its own bread and brelse both directly acquire
        "bcache" (rank 4) -- see SpecReadi.v. *)
-    locks_below lks (lock_rank "bcache") ->
+    locks_below lks "bcache" ->
     forall (W tot : nat) (PI : uptd) (M : regfile),
     (tot < nc)%nat ->
     uptd_ext (pv_upt V) PI ->
@@ -2398,7 +2398,7 @@ Section ReadiMain.
       (V : pprivate)
       (pidv : mword 32) (dq dqd : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_readi_sconf_body γs j γl γu γd γk pd pav pu bn γfs γa γf
                           cov logstart dev ip bm data dn
                           user off n dst_olds V pidv dq dqd m K eb C b lks.

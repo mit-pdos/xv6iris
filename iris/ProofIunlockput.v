@@ -105,7 +105,7 @@ Section ProofIunlockputMain.
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_iunlockput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                              gil gisl cov logstart bmapstart inodestart nib
                              size dev used k qi s gy inum dn' bm' n Sb crb cru
@@ -270,7 +270,7 @@ Section ProofIunlockputMain.
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     (* "sleep lock" outranks "itable": weaken [Hfresh]'s bound. *)
-    assert (Hfresh_sl : locks_below lks (lock_rank "sleep lock"))
+    assert (Hfresh_sl : locks_below lks "sleep lock")
       by lkbelow.
     iApply (IU.wp_iunlock_sconf gs gfs gi cn gil gisl cov logstart k s gy dev inum
               dn' bm' pidv dq R4 (K - 4)%nat eb pj C b lks
@@ -585,7 +585,7 @@ Section ProofIunlockputMain.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_iunlockput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                gil gisl cov logstart bmapstart inodestart nib
                                size dev used k qi s gy inum dn' bm' n

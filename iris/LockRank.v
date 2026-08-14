@@ -12,7 +12,7 @@
    -- and an audit of every acquire / sleep_prepare / sleep / wakeup /
    acquiresleep site in the kernel says no execution ever holds two members of
    any of them at once.  So a rank on the name alone totally orders every pair
-   xv6 can actually hold, and [gset nat] is the whole state.  The reasons are
+   xv6 can actually hold, and [gset string] is the whole state.  The reasons are
    per-family and two of them are load-bearing rather than incidental -- see
    claude-notes/projects/lock-set.md, which also carries the edge table this
    ranking extends.
@@ -100,64 +100,76 @@ Proof. reflexivity. Qed.
 
 (* "every lock this hart holds ranks strictly below [r]" -- acquire's whole
    precondition, and the only thing a caller ever has to prove about the held
-   set. *)
-Definition locks_below (S : gset nat) (r : nat) : Prop :=
-  forall q, q ∈ S -> q < r.
+   set.
+
+   THE SET HOLDS NAMES, THE ORDER IS A RANK ON THEM.  [lock_rank] appears
+   HERE, in the comparison, and nowhere inside the set -- which is what makes
+   the set algebra cheap (see [locks_add_del]) and what makes a contract read
+   [locks_below lks "log"] rather than [locks_below lks (lock_rank "log")].
+   Two names with the same rank would still be distinguished by the set, so
+   nothing is conflated; the ranks only ever order them. *)
+Definition locks_below (S : gset string) (r : string) : Prop :=
+  forall q, q ∈ S -> lock_rank q < lock_rank r.
 
 Global Instance locks_below_dec S r : Decision (locks_below S r).
 Proof.
   unfold locks_below.
-  destruct (decide (set_Forall (fun q => q < r) S)) as [H | H].
+  destruct (decide (set_Forall (fun q => lock_rank q < lock_rank r) S)) as [H | H].
   - left. exact H.
   - right. intros Hc. apply H. intros q Hq. exact (Hc q Hq).
 Defined.
 
-Lemma locks_below_empty (r : nat) : locks_below ∅ r.
+Lemma locks_below_empty (r : string) : locks_below ∅ r.
 Proof. intros q Hq. set_solver. Qed.
 
 (* THE FRESHNESS FACT.  This is what lets the held set be a [gset] with a
    conditional insert: a rank strictly above everything held is, in
    particular, not held. *)
-Lemma locks_below_not_elem (S : gset nat) (r : nat) :
+Lemma locks_below_not_elem (S : gset string) (r : string) :
   locks_below S r -> r ∉ S.
-Proof. intros Hb Hin. exact (Nat.lt_irrefl r (Hb r Hin)). Qed.
+Proof. intros Hb Hin. exact (Nat.lt_irrefl _ (Hb r Hin)). Qed.
 
 (* threading: after acquiring at [r], the next acquire at [r'] needs the old
    set below [r'] and [r < r']. *)
-Lemma locks_below_union_singleton (S : gset nat) (r r' : nat) :
-  r < r' -> locks_below S r' -> locks_below ({[r]} ∪ S) r'.
+Lemma locks_below_union_singleton (S : gset string) (r r' : string) :
+  lock_rank r < lock_rank r' -> locks_below S r' -> locks_below ({[r]} ∪ S) r'.
 Proof.
   intros Hlt Hb q Hq. apply elem_of_union in Hq as [Hq | Hq].
   - apply elem_of_singleton in Hq. subst q. exact Hlt.
   - exact (Hb q Hq).
 Qed.
 
-Lemma locks_below_mono (S : gset nat) (r r' : nat) :
-  locks_below S r -> r <= r' -> locks_below S r'.
+Lemma locks_below_mono (S : gset string) (r r' : string) :
+  locks_below S r -> lock_rank r <= lock_rank r' -> locks_below S r'.
 Proof. intros Hb Hle q Hq. specialize (Hb q Hq). lia. Qed.
 
 (* releasing never invalidates an order premise *)
-Lemma locks_below_difference (S : gset nat) (X : gset nat) (r : nat) :
+Lemma locks_below_difference (S : gset string) (X : gset string) (r : string) :
   locks_below S r -> locks_below (S ∖ X) r.
 Proof. intros Hb q Hq. apply Hb. set_solver. Qed.
 
-(* THE RELEASE CANCELLATION, PROVED ONCE AT AN ABSTRACT RANK.
+(* THE RELEASE CANCELLATION, PROVED ONCE AT AN ABSTRACT NAME.
 
    A balanced acquire/release pair leaves the held set where it started, and
-   every such site needs [({[r]} ∪ lks) ∖ {[r]} = lks].  Do NOT prove that
-   inline with [set_solver] at a CONCRETE lock: the goal then contains
-   [lock_rank "name"] four times over, each an unfolding of [rank_lookup]'s
-   15-way [String.eqb] chain, and [set_solver]'s membership case analysis
-   normalises every one of them.  Measured: minutes per site.  Proved here at
-   an opaque [r] it is instant, and the call sites become [apply
-   locks_add_del] with no set reasoning at all. *)
-Lemma locks_add_del (r : nat) (lks : gset nat) :
+   every such site needs [({[r]} ∪ lks) ∖ {[r]} = lks].  Prove it here, at an
+   opaque [r], and the call sites become [apply locks_add_del] with no set
+   reasoning at all.
+
+   THE HAZARD THIS AVOIDS USED TO BE MUCH WORSE.  When the set held RANKS, a
+   [set_solver] at a concrete lock met [lock_rank "name"] four times over,
+   each an unfolding of [rank_lookup]'s 15-way [String.eqb] chain, and
+   set_solver's membership case analysis normalised every one -- measured at
+   minutes per site.  Names removed [rank_lookup] from the sets entirely, so
+   an inline [set_solver] is now merely string comparisons rather than
+   catastrophic.  Keep the discipline anyway: an abstract element is instant,
+   and nothing here needs to know which lock it is. *)
+Lemma locks_add_del (r : string) (lks : gset string) :
   r ∉ lks -> ({[r]} ∪ lks) ∖ {[r]} = lks.
 Proof. intros Hnin. set_solver. Qed.
 
-(* the cardinality step an acquire takes, proved once at an abstract rank so
-   no [set_solver] ever meets [lock_rank] (see [locks_add_del]). *)
-Lemma size_add (r : nat) (lks : gset nat) :
+(* the cardinality step an acquire takes, proved once at an abstract name so
+   no [set_solver] ever meets a concrete lock (see [locks_add_del]). *)
+Lemma size_add (r : string) (lks : gset string) :
   r ∉ lks -> size ({[r]} ∪ lks) = S (size lks).
 Proof.
   intros Hnin. rewrite size_union; [| set_solver ].
@@ -165,13 +177,13 @@ Proof.
 Qed.
 
 (* and the release counterpart: deleting never grows the set *)
-Lemma size_del (r : nat) (lks : gset nat) : size (lks ∖ {[r]}) <= size lks.
+Lemma size_del (r : string) (lks : gset string) : size (lks ∖ {[r]}) <= size lks.
 Proof. apply subseteq_size. set_solver. Qed.
 
 (* THE RELEASE STEP OF THE COUPLING: a set that CONTAINED the rank strictly
    shrinks, which is what takes [size lks <= S n] to [size (lks ∖ {[r]}) <= n]
    -- i.e. exactly pop_off's unwind premise. *)
-Lemma size_del_lt (r : nat) (lks : gset nat) (n : nat) :
+Lemma size_del_lt (r : string) (lks : gset string) (n : nat) :
   r ∈ lks -> size lks <= S n -> size (lks ∖ {[r]}) <= n.
 Proof.
   intros Hin Hle.
@@ -185,48 +197,49 @@ Qed.
 
 (* the coupling at level 0, as an equation -- pop_off's re-enable branch needs
    it in several places and it should not be re-derived at each *)
-Lemma size_le_zero_empty (lks : gset nat) : size lks <= 0 -> lks = ∅.
+Lemma size_le_zero_empty (lks : gset string) : size lks <= 0 -> lks = ∅.
 Proof. intros H. apply leibniz_equiv, size_empty_inv. lia. Qed.
 
 (* the empty set fits under any level -- stated so a call site needs no
    [rewrite size_empty] whose LHS may not appear syntactically *)
-Lemma size_empty_le (n : nat) : size (∅ : gset nat) <= n.
+Lemma size_empty_le (n : nat) : size (∅ : gset string) <= n.
 Proof. rewrite size_empty. lia. Qed.
 
 (* THE TWO COUPLING STEPS, stated so a call site needs no arithmetic of its
    own -- the proof files open [Z_scope], so a bare [lia] on these [nat] goals
    there is fighting the scope rather than the maths. *)
-Lemma size_add_le (r : nat) (lks : gset nat) (n : nat) :
+Lemma size_add_le (r : string) (lks : gset string) (n : nat) :
   r ∉ lks -> size lks <= n -> size ({[r]} ∪ lks) <= S n.
 Proof. intros Hnin Hle. rewrite (size_add r lks Hnin). lia. Qed.
 
-Lemma size_del_le (r : nat) (lks : gset nat) (n : nat) :
+Lemma size_del_le (r : string) (lks : gset string) (n : nat) :
   size lks <= n -> size (lks ∖ {[r]}) <= n.
 Proof. intros Hle. pose proof (size_del r lks). lia. Qed.
 
 (* the two degenerate shapes the scheduler's literal singleton needs, for the
    same reason: keep [lock_rank] out of [set_solver]'s way. *)
-Lemma locks_self_del (r : nat) : ({[r]} : gset nat) ∖ {[r]} = ∅.
+Lemma locks_self_del (r : string) : ({[r]} : gset string) ∖ {[r]} = ∅.
 Proof. set_solver. Qed.
-Lemma locks_union_empty (r : nat) : ({[r]} : gset nat) ∪ ∅ = {[r]}.
+Lemma locks_union_empty (r : string) : ({[r]} : gset string) ∪ ∅ = {[r]}.
 Proof. set_solver. Qed.
 
 (* the other half of the depth-0 story: a balanced release inside a body whose
    entry set is forced empty leaves [∅ ∖ {[r]}], which is [∅].  Proved at an
    ABSTRACT [X] so no call site ever runs [set_solver] against [lock_rank]'s
    fifteen-way [String.eqb] chain. *)
-Lemma locks_empty_del (X : gset nat) : (∅ : gset nat) ∖ X = ∅.
+Lemma locks_empty_del (X : gset string) : (∅ : gset string) ∖ X = ∅.
 Proof. set_solver. Qed.
 
 (* the same at the premise a caller actually holds *)
-Lemma locks_add_del_below (r : nat) (lks : gset nat) :
+Lemma locks_add_del_below (r : string) (lks : gset string) :
   locks_below lks r -> ({[r]} ∪ lks) ∖ {[r]} = lks.
 Proof. intros Hb. apply locks_add_del, locks_below_not_elem, Hb. Qed.
 
 (* the set a hart holds is a CHAIN: acquire's premise makes every new element
    strictly greater than everything present, so [locks_below] of the singleton
    below is all a nested caller ever states. *)
-Lemma locks_below_singleton (r r' : nat) : r < r' -> locks_below {[r]} r'.
+Lemma locks_below_singleton (r r' : string) :
+  lock_rank r < lock_rank r' -> locks_below {[r]} r'.
 Proof. intros Hlt q Hq. apply elem_of_singleton in Hq. subst q. exact Hlt. Qed.
 
 (* THE CALL-SITE DISCHARGER.

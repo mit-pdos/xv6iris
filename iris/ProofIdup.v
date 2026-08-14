@@ -106,7 +106,7 @@ Section ProofIdup.
      presentations of the same SIE state, and the ghost eighth they share
      pins the relationship.  Read once at entry, it is what lets release's
      derived exit index equal idup's own (symmetric) [b]. *)
-  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) (lks : gset nat) :
+  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) (lks : gset string) :
     sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
@@ -125,7 +125,7 @@ Section ProofIdup.
       (cov : gset Z) (logstart : Z) (nib : nat)
       (k : nat) (s : Qp) (dev inum : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (K : nat) (b : bool) (lks : gset nat)
+      (K : nat) (b : bool) (lks : gset string)
     : wp_idup_sconf_body γl cn γfs γi cov logstart nib k s dev inum
                          m n eb p C K b lks.
   Proof.
@@ -530,7 +530,7 @@ Section ProofIdup.
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Houtb) in "Hcg".
     iApply (Release.wp_release_sconf γl itable_lock "itable"%string (itable_res2 cn γfs γi cov logstart nib dev) D5
-              n eb p C (K - 4)%nat ({[lock_rank "itable"]} ∪ lks)
+              n eb p C (K - 4)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HD5a0; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
@@ -541,7 +541,7 @@ Section ProofIdup.
        [Hfresh]'s bound gives the non-membership that collapses it back to
        the untouched [lks]. *)
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
-    iEval (rewrite (_ : ({[lock_rank "itable"]} ∪ lks) ∖ {[lock_rank "itable"]} = lks);
+    iEval (rewrite (_ : ({["itable"]} ∪ lks) ∖ {["itable"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hcnt".
     rewrite <- Houtb in Hsr.
     pose proof Hrelpins as Hrelpins_cs.

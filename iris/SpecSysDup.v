@@ -112,7 +112,7 @@ End SpecSysDup.
 
 Definition wp_sys_dup_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat) :=
+    (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_dup in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* sys_dup reads syscall argument 0, out of the trapframe page [proc_priv]
@@ -131,7 +131,7 @@ Definition wp_sys_dup_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
      exactly this shape.  A syscall entry point holds nothing, so at every
      real instantiation [lks] is ∅ and this is [locks_below_empty]; the body
      is stated ∀-generically in [lks], so it has to be said. *)
-  locks_below lks (lock_rank "ftable") ->
+  locks_below lks "ftable" ->
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -153,6 +153,6 @@ Module Type SYSDUP.
   Parameter wp_sys_dup_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat),
+      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string),
       wp_sys_dup_sconf_body γl γf m av n eb p C v pid V b lks.
 End SYSDUP.

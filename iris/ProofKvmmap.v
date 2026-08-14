@@ -45,7 +45,7 @@ Section ProofKvmmap.
       (γa : gname)
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat)
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string)
     : wp_kvmmap_sconf_body γa mm t m npages perm lvl K eb p C on b lks.
   Proof.
     cbv beta delta [wp_kvmmap_sconf_body].

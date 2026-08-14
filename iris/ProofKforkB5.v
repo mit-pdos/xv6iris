@@ -145,7 +145,7 @@ Section ProofKforkB5.
       (Mt : regfile) (K lvl : nat) (eb b : bool)
       (pme ks : mword 64) (pid_c : mword 32) (Vc : pprivate)
       (ch : mword 64) (rest : list (mword 64)) (rv : mword 64)
-      (C : iProp Σ) (lks : gset nat) :
+      (C : iProp Σ) (lks : gset string) :
     (18 <= K)%nat ->
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     (j < NPROC)%nat ->
@@ -159,14 +159,14 @@ Section ProofKforkB5.
        "wait_lock" (10), acquired directly at +0xd0; "proc" (11), released
        immediately on entry and re-acquired at +0xe6, is higher and follows
        by [locks_below_mono] at each of its two call sites. *)
-    locks_below lks (lock_rank "wait_lock") ->
+    locks_below lks "wait_lock" ->
     (* ENTRY: np->lock is held (level [S lvl], arm [false]), so the index
        carries the trap reserve of the arm this block will EXIT at, i.e. [b].
        EXIT below is at [(K - 8)] with arm [b] -- same physical carve
        [trap_res b + (K - 8)] -- so the reserve is conserved across the block;
        the three releases and two acquires inside it each conserve it too. *)
     sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
-    cpu_own (S lvl) eb pme C false ({[lock_rank "proc"]} ∪ lks) -∗
+    cpu_own (S lvl) eb pme C false ({["proc"]} ∪ lks) -∗
     IntrDefs.arm_pay lvl eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xc2) : mword 64) -∗
@@ -253,15 +253,15 @@ Section ProofKforkB5.
     iEval (rewrite Hb) in "Hcg".
     iApply (RL.wp_release_sconf (CID := CID0) γl (proc_addr j) "proc"%string
               (SchedCtx.proc_lock_res γs γl (proc_addr j)) M2 lvl eb pme C (K - 8)%nat
-              ({[lock_rank "proc"]} ∪ lks)
+              ({["proc"]} ∪ lks)
               Hlka1 (kfkb5_stack_ok K HK)
               with "Hcg Htext Hpc [Hpinv] Htok HRused Hown Hpay").
     { iApply (SchedCtx.procs_inv_lookup γs j γl Hgl with "Hpinv"). }
     iIntros (CID1 Hs1 mr1) "Hcg Hpc %Hcs_2_r1 Hown".
-    assert (Hfresh_proc : locks_below lks (lock_rank "proc"))
+    assert (Hfresh_proc : locks_below lks "proc")
       by lkbelow.
     pose proof (locks_below_not_elem _ _ Hfresh_proc) as Hfresh_proc_ne.
-    iEval (rewrite (_ : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks);
+    iEval (rewrite (_ : ({["proc"]} ∪ lks) ∖ {["proc"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hown".
     assert (Hpc_c8 : ret_pc (M2 !!! Regidx Rra) = mword_of_int (KF + 0xc8)).
     { rewrite HM2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -425,12 +425,12 @@ Section ProofKforkB5.
     iEval (rewrite Hb) in "Hcg".
     iApply (RL.wp_release_sconf (CID := CID5) γw SpecProcinit.wait_lock_addr "wait_lock"%string
               WaitInv.wait_res M8 lvl eb pme C (K - 8)%nat
-              ({[lock_rank "wait_lock"]} ∪ lks)
+              ({["wait_lock"]} ∪ lks)
               Hlka2 (kfkb5_stack_ok K HK)
               with "Hcg Htext Hpc Hwl Htokw Hwaitres Hown Hpay").
     iIntros (CID6 Hs6 mr6) "Hcg Hpc %Hcs_8_r6 Hown".
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
-    iEval (rewrite (_ : ({[lock_rank "wait_lock"]} ∪ lks) ∖ {[lock_rank "wait_lock"]} = lks);
+    iEval (rewrite (_ : ({["wait_lock"]} ∪ lks) ∖ {["wait_lock"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hown".
     assert (Hpc_e4 : ret_pc (M8 !!! Regidx Rra) = mword_of_int (KF + 0xe4)).
     { rewrite HM8ra. apply bv_eq; vm_compute; reflexivity. }
@@ -602,12 +602,12 @@ Section ProofKforkB5.
     iEval (rewrite Hb) in "Hcg".
     iApply (RL.wp_release_sconf (CID := CID9) γl (proc_addr j) "proc"%string
               (SchedCtx.proc_lock_res γs γl (proc_addr j)) M13 lvl eb pme C (K - 8)%nat
-              ({[lock_rank "proc"]} ∪ lks)
+              ({["proc"]} ∪ lks)
               Hlka3 (kfkb5_stack_ok K HK)
               with "Hcg Htext Hpc [Hpinv] Htok2 HR3 Hown Hpay").
     { iApply (SchedCtx.procs_inv_lookup γs j γl Hgl with "Hpinv"). }
     iIntros (CID10 Hs10 mr10) "Hcg Hpc %Hcs_13_r10 Hown".
-    iEval (rewrite (_ : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks);
+    iEval (rewrite (_ : ({["proc"]} ∪ lks) ∖ {["proc"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hown".
     assert (Hpc_f6 : ret_pc (M13 !!! Regidx Rra) = mword_of_int (KF + 0xf6)).
     { rewrite HM13ra. apply bv_eq; vm_compute; reflexivity. }

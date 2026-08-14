@@ -94,7 +94,7 @@ Section ProofMappages.
       (mm Mf : regfile) (t tf : ptree)
       (m : gmap (mword 27) (mword 64)) (npages k : nat) (perm : Z) (K lvl : nat)
       (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (q : nat) (b : bool)
-      (lks : gset nat) :
+      (lks : gset string) :
     let va := mm !!! Regidx (mword_of_int 11) in
     let vpn0 := svpn_of va in
     let ppn0 := (autocast (T := mword) (subrange_vec_dec (mm !!! Regidx (mword_of_int 13)) 55 12) : mword 44) in
@@ -412,7 +412,7 @@ Section ProofMappages.
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (K lvl : nat)
       (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat)
-      (rem : nat) (b : bool) (lks : gset nat) :
+      (rem : nat) (b : bool) (lks : gset string) :
     forall (k : nat) (Mk : regfile) (tk : ptree) (consumed : nat),
     let va := mm !!! Regidx (mword_of_int 11) in
     let pa := mm !!! Regidx (mword_of_int 13) in
@@ -453,7 +453,7 @@ Section ProofMappages.
     pt_present_mono t tk ->
     pt_nodes tk = (pt_nodes t + consumed)%nat ->
     (consumed + pt_missing tk (vpn_at vpn0 k) (npages - k) <= pt_missing t vpn0 npages)%nat ->
-    locks_below lks (lock_rank "kmem") ->
+    locks_below lks "kmem" ->
     sie_cap_gpr Mk (K - 10)%nat b p -∗ cpu_own lvl eb p C b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.mappages + 0x3e)) -∗
@@ -1160,7 +1160,7 @@ Section ProofMappages.
       (γa : gname)
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat)
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string)
     : wp_mappages_sconf_body γa mm t m npages perm lvl K eb p C on b lks.
   Proof.
     cbv beta delta [wp_mappages_sconf_body].

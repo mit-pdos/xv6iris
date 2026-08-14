@@ -302,7 +302,7 @@ Section SpProps.
   (* +0x7e -- the shared epilogue.  [r] is the value already parked in a0. *)
   Definition sp_tail `{GEN : GenId} (CID0 : CPU)  (j : nat)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (sp0 pj : mword 64) (lks : gset nat) : iProp Σ :=
+      (sp0 pj : mword 64) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ (M : regfile) (r : mword 64),
         ⌜ sp_base m M sp0 /\ sp_saved m M /\
@@ -319,7 +319,7 @@ Section SpProps.
   (* +0x70 -- release(&tickslock); return 0. *)
   Definition sp_exit0 `{GEN : GenId} (CID0 : CPU) (γt : gname) (j : nat)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (sp0 pj : mword 64) (lks : gset nat) : iProp Σ :=
+      (sp0 pj : mword 64) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ M : regfile,
         ⌜ sp_base m M sp0 /\ sp_saved m M ⌝ -∗
@@ -328,7 +328,7 @@ Section SpProps.
         sp_free sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈ w) -∗
         locked γt cpu_id -∗ ticks_res -∗
         sie_cap_gpr M (trap_res true + (av - 8))%nat false pj -∗
-        cpu_own 1 eb pj C false ({[lock_rank "time"]} ∪ lks) -∗ arm_pay 0 eb pj -∗
+        cpu_own 1 eb pj C false ({["time"]} ∪ lks) -∗ arm_pay 0 eb pj -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x80)) -∗
         sp_tail CID0 j m av eb C sp0 pj lks -∗
         WP (Loop : expr riscv_lang)))%I.
@@ -337,7 +337,7 @@ Section SpProps.
      register shape is the loop's and slots 3/4/5 hold the spilled s1/s2/s3. *)
   Definition sp_exitk `{GEN : GenId} (CID0 : CPU) (γt : gname) (j : nat)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (sp0 pj tk : mword 64) (lks : gset nat) : iProp Σ :=
+      (sp0 pj tk : mword 64) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ M : regfile,
         ⌜ sp_base m M sp0 /\ sp_lregs M tk ⌝ -∗
@@ -350,7 +350,7 @@ Section SpProps.
         (∃ w : bv 64, pa_stk sp0 8 ↦₈ w) -∗
         locked γt cpu_id -∗ ticks_res -∗
         sie_cap_gpr M (trap_res true + (av - 8))%nat false pj -∗
-        cpu_own 1 eb pj C false ({[lock_rank "time"]} ∪ lks) -∗ arm_pay 0 eb pj -∗
+        cpu_own 1 eb pj C false ({["time"]} ∪ lks) -∗ arm_pay 0 eb pj -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x9c)) -∗
         sp_tail CID0 j m av eb C sp0 pj lks -∗
         WP (Loop : expr riscv_lang)))%I.
@@ -358,7 +358,7 @@ Section SpProps.
   (* +0x4a -- the wait loop's head. *)
   Definition sp_loop `{GEN : GenId} (CID0 : CPU) (γt : gname) (j : nat)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (sp0 pj tk : mword 64) (nv : mword 32) (lks : gset nat) : iProp Σ :=
+      (sp0 pj tk : mword 64) (nv : mword 32) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ M : regfile,
         ⌜ sp_base m M sp0 /\ sp_lregs M tk ⌝ -∗
@@ -371,7 +371,7 @@ Section SpProps.
         pa_add (pa_stk sp0 7) 4 ↦₄ nv -∗ sp_join7 sp0 -∗
         locked γt cpu_id -∗ ticks_res -∗
         sie_cap_gpr M (trap_res true + (av - 8))%nat false pj -∗
-        cpu_own 1 eb pj C false ({[lock_rank "time"]} ∪ lks) -∗ arm_pay 0 eb pj -∗
+        cpu_own 1 eb pj C false ({["time"]} ∪ lks) -∗ arm_pay 0 eb pj -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x4a)) -∗
         sp_exit0 CID0 γt j m av eb C sp0 pj lks -∗
         sp_exitk CID0 γt j m av eb C sp0 pj tk lks -∗
@@ -383,7 +383,7 @@ Section SpProps.
      the [n < 0] fixup's back edge land here. *)
   Definition sp_acq `{GEN : GenId} (CID0 : CPU) (γt : gname) (j : nat)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (sp0 pj : mword 64) (lks : gset nat) : iProp Σ :=
+      (sp0 pj : mword 64) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ (M : regfile) (nv : mword 32),
         ⌜ sp_base m M sp0 /\ sp_saved m M ⌝ -∗
@@ -424,7 +424,7 @@ Section SpBodies.
   (* ---- the shared epilogue: +0x7e .. +0x84 (c.ret) ---- *)
   Lemma sp_tail_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU) (j : nat)
       (m M : regfile) (r : mword 64) (av : nat) (eb : bool) (C : iProp Σ)
-      (sp0 pj : mword 64) (tfp : mword 44) (ws : list (mword 64)) (dqt : dfrac) (lks : gset nat) :
+      (sp0 pj : mword 64) (tfp : mword 44) (ws : list (mword 64)) (dqt : dfrac) (lks : gset string) :
     let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
     (30 <= av)%nat ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
@@ -582,13 +582,13 @@ Section SpBodies.
   Lemma sp_exit0_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (γt : gname) (j : nat)
       (m N : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (sp0 pj : mword 64) (lks : gset nat) :
+      (sp0 pj : mword 64) (lks : gset string) :
     (30 <= av)%nat ->
     eb = true ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     sp_base m N sp0 -> sp_saved m N ->
     (* acquire's freshness premise -- see [sp_acq_body] where it originates *)
-    locks_below lks (lock_rank "time") ->
+    locks_below lks "time" ->
     kernel_text -∗
     is_tickslock γt -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
@@ -596,7 +596,7 @@ Section SpBodies.
     sp_free sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈ w) -∗
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr N (trap_res true + (av - 8))%nat false pj -∗
-    cpu_own 1 eb pj C false ({[lock_rank "time"]} ∪ lks) -∗ arm_pay 0 eb pj -∗
+    cpu_own 1 eb pj C false ({["time"]} ∪ lks) -∗ arm_pay 0 eb pj -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x80)) -∗
     sp_tail CID0 j m av eb C sp0 pj lks -∗
     WP (Loop : expr riscv_lang).
@@ -659,14 +659,14 @@ Section SpBodies.
       rewrite /a_tickslock. apply bv_eq; vm_compute; reflexivity. }
     (* release(&tickslock) *)
     iApply (Release.wp_release_sconf γt a_tickslock "time"%string ticks_res X2
-              0%nat true pj C (av - 8)%nat ({[lock_rank "time"]} ∪ lks)
+              0%nat true pj C (av - 8)%nat ({["time"]} ∪ lks)
               ltac:(rewrite HX2a0; apply sp_add_vec_0) ltac:(lia)
               with "Hcg Htext Hpc Hlk2 Htok HR Hown Hpay").
     iIntros (CIDr Hsr mrl) "Hcg Hpc %HcsX2 Hown".
     (* sp_exit0 is BALANCED at the tail: release strips exactly the rank it
        just took, so [Htail]'s [lks] is the entry set unchanged. *)
-    pose proof (locks_below_not_elem lks (lock_rank "time") Hfresh) as Hnotin.
-    assert (Hsetback : ({[lock_rank "time"]} ∪ lks) ∖ {[lock_rank "time"]} = lks)
+    pose proof (locks_below_not_elem lks "time" Hfresh) as Hnotin.
+    assert (Hsetback : ({["time"]} ∪ lks) ∖ {["time"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hown".
     assert (Hx7c : ret_pc (X2 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0x8c))
@@ -701,13 +701,13 @@ Section SpBodies.
   Lemma sp_exitk_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (γt : gname) (j : nat)
       (m N : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (sp0 pj tk : mword 64) (lks : gset nat) :
+      (sp0 pj tk : mword 64) (lks : gset string) :
     (30 <= av)%nat ->
     eb = true ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     sp_base m N sp0 -> sp_lregs N tk ->
     (* acquire's freshness premise -- see [sp_acq_body] where it originates *)
-    locks_below lks (lock_rank "time") ->
+    locks_below lks "time" ->
     kernel_text -∗
     is_tickslock γt -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
@@ -719,7 +719,7 @@ Section SpBodies.
     (∃ w : bv 64, pa_stk sp0 8 ↦₈ w) -∗
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr N (trap_res true + (av - 8))%nat false pj -∗
-    cpu_own 1 eb pj C false ({[lock_rank "time"]} ∪ lks) -∗ arm_pay 0 eb pj -∗
+    cpu_own 1 eb pj C false ({["time"]} ∪ lks) -∗ arm_pay 0 eb pj -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x9c)) -∗
     sp_tail CID0 j m av eb C sp0 pj lks -∗
     WP (Loop : expr riscv_lang).
@@ -785,14 +785,14 @@ Section SpBodies.
     { rewrite /K2 upd_ne; [| reg_neq]. rewrite /K1 upd_eq. rewrite /K0 upd_eq.
       rewrite /a_tickslock. apply bv_eq; vm_compute; reflexivity. }
     iApply (Release.wp_release_sconf γt a_tickslock "time"%string ticks_res K2
-              0%nat true pj C (av - 8)%nat ({[lock_rank "time"]} ∪ lks)
+              0%nat true pj C (av - 8)%nat ({["time"]} ∪ lks)
               ltac:(rewrite HK2a0; apply sp_add_vec_0) ltac:(lia)
               with "Hcg Htext Hpc Hlk2 Htok HR Hown Hpay").
     iIntros (CIDr Hsr mrk) "Hcg Hpc %HcsK2 Hown".
     (* sp_exitk is BALANCED at the tail: release strips exactly the rank it
        just took, so [Htail]'s [lks] is the entry set unchanged. *)
-    pose proof (locks_below_not_elem lks (lock_rank "time") Hfresh) as Hnotin.
-    assert (Hsetback : ({[lock_rank "time"]} ∪ lks) ∖ {[lock_rank "time"]} = lks)
+    pose proof (locks_below_not_elem lks "time" Hfresh) as Hnotin.
+    assert (Hsetback : ({["time"]} ∪ lks) ∖ {["time"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hown".
     assert (Hk98 : ret_pc (K2 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0xa8))
@@ -914,7 +914,7 @@ Section SpBodies.
   Lemma sp_post_sleep_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (γt : gname) (j : nat)
       (m M : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (sp0 pj tk : mword 64) (nv : mword 32) (lks : gset nat) :
+      (sp0 pj tk : mword 64) (nv : mword 32) (lks : gset string) :
     (30 <= av)%nat ->
     eb = true ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
@@ -933,7 +933,7 @@ Section SpBodies.
     pa_add (pa_stk sp0 7) 4 ↦₄ nv -∗ sp_join7 sp0 -∗
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr M (trap_res true + (av - 8))%nat false pj -∗
-    cpu_own 1 eb pj C false ({[lock_rank "time"]} ∪ lks) -∗ arm_pay 0 eb pj -∗
+    cpu_own 1 eb pj C false ({["time"]} ∪ lks) -∗ arm_pay 0 eb pj -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x6a)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1122,7 +1122,7 @@ Section SpBodies.
   Lemma sp_loop_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (γs : list gname) (γt γl : gname) (j : nat)
       (m M : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (sp0 pj tk : mword 64) (nv : mword 32) (lks : gset nat) :
+      (sp0 pj tk : mword 64) (nv : mword 32) (lks : gset string) :
     (30 <= av)%nat ->
     eb = true ->
     (j < NPROC)%nat ->
@@ -1132,7 +1132,7 @@ Section SpBodies.
     sp_base m M sp0 -> sp_lregs M tk ->
     (* acquire's freshness premise, for the loop's re-acquire after sleep()
        -- see [sp_acq_body] where it originates *)
-    locks_below lks (lock_rank "time") ->
+    locks_below lks "time" ->
     kernel_text -∗
     is_tickslock γt -∗
     procs_inv γs -∗
@@ -1150,7 +1150,7 @@ Section SpBodies.
     pa_add (pa_stk sp0 7) 4 ↦₄ nv -∗ sp_join7 sp0 -∗
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr M (trap_res true + (av - 8))%nat false pj -∗
-    cpu_own 1 eb pj C false ({[lock_rank "time"]} ∪ lks) -∗ arm_pay 0 eb pj -∗
+    cpu_own 1 eb pj C false ({["time"]} ∪ lks) -∗ arm_pay 0 eb pj -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x4a)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1194,7 +1194,7 @@ Section SpBodies.
                     = add_vec_int (mword_of_int (KernelSyms.sys_pause + 0x4a) : mword 64) 4) by (rewrite /L0; apply upd_eq).
     (* myproc/killed/sleep_prepare all run here with the tickslock STILL
        held (the C releases it only after sleep_prepare), so the ambient
-       held set is [{[lock_rank "time"]} ∪ lks], matching [Hown]'s actual
+       held set is [{["time"]} ∪ lks], matching [Hown]'s actual
        type -- not the bare [lks] this stretch is entered with.  "proc"
        (11) outranks "time" (8), so [Hfresh]'s bound lifts by
        [locks_below_mono] and carries across the held "time" singleton by
@@ -1202,11 +1202,11 @@ Section SpBodies.
        wait_lock -> proc shape. *)
     assert (Htime_lt_proc : (lock_rank "time" < lock_rank "proc")%nat)
       by (vm_compute; lia).
-    assert (Hfresh_proc : locks_below ({[lock_rank "time"]} ∪ lks) (lock_rank "proc")).
+    assert (Hfresh_proc : locks_below ({["time"]} ∪ lks) "proc").
     { apply locks_below_union_singleton; [exact Htime_lt_proc |].
       lkbelow. }
     iApply (Myproc.wp_myproc_sconf L0 (trap_res true + (av - 8))%nat 1%nat eb (proc_addr j) C false
-              ({[lock_rank "time"]} ∪ lks) Hn1 ltac:(lia)
+              ({["time"]} ∪ lks) Hn1 ltac:(lia)
               with "Hcg Hown Htext Hpc").
     iApply wp_next_off_intro. iIntros (msM mfm) "%HmsM Hcg Hown Hpc %Hmp".
     destruct Hmp as (Hmpcs & Hmpa0).
@@ -1237,7 +1237,7 @@ Section SpBodies.
     assert (HL1a0 : L1 !!! Regidx (mword_of_int 10 : mword 5) = proc_addr j).
     { rewrite /L1 upd_ne; [| reg_neq]. rewrite Hmpa0. reflexivity. }
     iApply (Killed.wp_killed_sconf γs j γl L1 (trap_res true + (av - 8))%nat 1%nat eb (proc_addr j) C false
-              ({[lock_rank "time"]} ∪ lks)
+              ({["time"]} ∪ lks)
               HL1a0 Hj Hjl Hn1 ltac:(lia) Hfresh_proc
               with "Hcg Hown Htext Hpc Hpinv Hpanic").
     all: try lkbelow.
@@ -1332,7 +1332,7 @@ Section SpBodies.
         by (rewrite Heb; change (trap_res true) with kv_frame_slots; lia).
       (* =================== sleep_prepare(&ticks) =================== *)
       iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γl L3
-                (trap_res eb + (av - 8))%nat 1%nat eb C false ({[lock_rank "time"]} ∪ lks)
+                (trap_res eb + (av - 8))%nat 1%nat eb C false ({["time"]} ∪ lks)
                 Hj Hjl HL3nz Hn1 Hpav Hfresh_proc
                 with "Hcg Hown Htext Hpc Hpinv Hpanic").
       all: try lkbelow.
@@ -1380,13 +1380,13 @@ Section SpBodies.
       { rewrite /L5 upd_ne; [| reg_neq]. rewrite /L4 upd_eq. rewrite Hp9. apply add_vec_zero_l. }
       (* ==================== release(&tickslock) ==================== *)
       iApply (Release.wp_release_sconf γt a_tickslock "time"%string ticks_res L5
-                0%nat eb (proc_addr j) C (av - 8)%nat ({[lock_rank "time"]} ∪ lks)
+                0%nat eb (proc_addr j) C (av - 8)%nat ({["time"]} ∪ lks)
                 ltac:(rewrite HL5a0; apply sp_add_vec_0) ltac:(lia)
                 with "Hcg Htext Hpc Hlk2 Htok HR Hown Hpay").
       iIntros (CIDr Hsr mfr) "Hcg Hpc %Hrcs Hown".
       (* the release/re-acquire window: nothing is held across sleep() *)
-      pose proof (locks_below_not_elem lks (lock_rank "time") Hfresh) as Hnotin.
-      assert (Hsetback : ({[lock_rank "time"]} ∪ lks) ∖ {[lock_rank "time"]} = lks)
+      pose proof (locks_below_not_elem lks "time" Hfresh) as Hnotin.
+      assert (Hsetback : ({["time"]} ∪ lks) ∖ {["time"]} = lks)
       by (apply locks_add_del_below; lkbelow).
       iEval (rewrite Hsetback) in "Hown".
       assert (Hl60 : ret_pc (L5 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0x60))
@@ -1495,7 +1495,7 @@ Section SpBodies.
   Lemma sp_acq_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (γs : list gname) (γt γl : gname) (j : nat)
       (m M : regfile) (nv : mword 32) (av : nat) (eb : bool) (C : iProp Σ)
-      (sp0 pj : mword 64) (lks : gset nat) :
+      (sp0 pj : mword 64) (lks : gset string) :
     (30 <= av)%nat ->
     eb = true ->
     (j < NPROC)%nat ->
@@ -1504,7 +1504,7 @@ Section SpBodies.
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     sp_base m M sp0 -> sp_saved m M ->
     (* acquire's freshness premise: this hart does not already hold "time" *)
-    locks_below lks (lock_rank "time") ->
+    locks_below lks "time" ->
     kernel_text -∗
     is_tickslock γt -∗
     procs_inv γs -∗
@@ -1847,7 +1847,7 @@ Section ProofSysPause.
   Lemma wp_sys_pause_sconf  (γs : list gname)
       (j : nat) (γl : gname) (γt : gname) (m : regfile) (av : nat) (eb : bool)
       (C : iProp Σ) (i : nat) (tfp : mword 44) (ws : list (mword 64))
-      (v : mword 64) (dqt : dfrac) (b : bool) (lks : gset nat)
+      (v : mword 64) (dqt : dfrac) (b : bool) (lks : gset string)
     : wp_sys_pause_sconf_body γs j γl γt m av eb C i tfp ws v dqt b lks.
   Proof.
     cbv beta delta [wp_sys_pause_sconf_body].

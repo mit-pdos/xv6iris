@@ -396,7 +396,7 @@ Definition wp_kexec_sconf_body
     (pidv : mword 32) (V : pprivate)
     (dqb dqs dqa : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kexec in
   let pj := proc_addr jp in
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
@@ -536,7 +536,7 @@ Module Type KEXEC.
       (pidv : mword 32) (V : pprivate)
       (dqb dqs dqa : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_kexec_sconf_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used plen pfun na avf alen aslen afun

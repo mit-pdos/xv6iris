@@ -252,7 +252,7 @@ Section ProofCopyin.
   (*  vmfault's [read] constant out to s10, which the prologue saves.     *)
   (* ================================================================== *)
   Local Lemma ci_epilogue `{CID0 : CpuId}
-      (mm mj : regfile) (K ncnt : nat) (eb b : bool) (res sp0 pcur : mword 64) (C : iProp Σ) (lks : gset nat) :
+      (mm mj : regfile) (K ncnt : nat) (eb b : bool) (res sp0 pcur : mword 64) (C : iProp Σ) (lks : gset string) :
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 58 : mword 6))) in
     (12 <= K)%nat ->
     mm !!! Regidx csp_rs1 = sp0 ->
@@ -553,7 +553,7 @@ Section ProofCopyin.
       (spr cur va0 dst : mword 64) (rem done : nat) (P : uptd) (v11 : mword 64)
       (K lvl : nat) (eb : bool) (C : iProp Σ) (len : nat) (fd : nat -> bv 8)
       (EXIT : iProp Σ)
-      (CIDb : CpuId) (mb : regfile) (pa0 : mword 64) (Pd : uptd) (lks : gset nat) : iProp Σ :=
+      (CIDb : CpuId) (mb : regfile) (pa0 : mword 64) (Pd : uptd) (lks : gset string) : iProp Σ :=
     (⌜b = false \/ p = zero_reg -> (CIDb : CPU) = (CID0 : CPU)⌝ -∗
      ⌜uptd_ext_sz szv Pc Pd⌝ -∗
      ⌜mb !!! Regidx Ra0 = pa0⌝ -∗
@@ -583,7 +583,7 @@ Section ProofCopyin.
   Local Lemma ci_loop `{CID0 : CpuId} (γa : gname)
       (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
       (C : iProp Σ) (dst spr : mword 64) (len : nat) (b : bool)
-      (v11 : mword 64) (lks : gset nat) :
+      (v11 : mword 64) (lks : gset string) :
     (50 <= K)%nat ->
     (Z.of_nat len < 2 ^ 64)%Z ->
     (uint szv <= 2 ^ 38)%Z ->
@@ -601,7 +601,7 @@ Section ProofCopyin.
     m !!! Regidx Rs9 = szv ->
     m !!! Regidx Rs10 = (mword_of_int 1 : mword 64) ->
     m !!! Regidx Rs11 = v11 ->
-    locks_below lks (lock_rank "kmem") ->
+    locks_below lks "kmem" ->
     sie_cap_gpr m (K - 12) b p -∗
     cpu_own lvl eb p C b lks -∗
     kernel_text -∗
@@ -1381,7 +1381,7 @@ Section ProofCopyin.
   Lemma wp_copyin_sconf
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (dst_olds : nat -> bv 8)
-      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string)
     : wp_copyin_sconf_body γa mm P szv len dst_olds K lvl eb p C b lks.
   Proof.
     cbv beta delta [wp_copyin_sconf_body].

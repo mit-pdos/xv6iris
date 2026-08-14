@@ -95,7 +95,7 @@ Section ProofAllocpid.
 
 
   Lemma wp_allocpid_sconf (γp : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string)
     : wp_allocpid_sconf_body γp m av n eb p C b lks.
   Proof.
     cbv beta delta [wp_allocpid_sconf_body].
@@ -411,14 +411,14 @@ Section ProofAllocpid.
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γp alp_pid_lock "nextpid"%string nextpid_res B7 n eb p C (av - 4)%nat
-              ({[lock_rank "nextpid"]} ∪ lks)
+              ({["nextpid"]} ∪ lks)
               Hlka ltac:(pose proof (apid_K10 av Hav); lia)
               with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
     iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hcsrel Hcpu".
     (* allocpid is BALANCED: what it acquired it released, so the set
        release hands back collapses to the entry [lks] -- [Hfresh] is what
        makes the singleton insert/delete cancel. *)
-    assert (Hsetback : ({[lock_rank "nextpid"]} ∪ lks) ∖ {[lock_rank "nextpid"]} = lks)
+    assert (Hsetback : ({["nextpid"]} ∪ lks) ∖ {["nextpid"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcpu".
     (* ===================== EPILOGUE (generic b again) ===================== *)

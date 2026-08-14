@@ -249,7 +249,7 @@ Definition wp_readi_sconf_body
     (V : pprivate)
     (pidv : mword 32) (dq dqd : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.readi in
   let pj := proc_addr j in
   let dst := m !!! Regidx (mword_of_int 12 : mword 5) in
@@ -307,7 +307,7 @@ Definition wp_readi_sconf_body
      (rank 4, LockRank.v); bmap (BMAP_NOALLOC) and either_copyout expose no
      locks_below premise of their own, so "bcache" is the lowest -- and
      only -- bound this contract states. *)
-  locks_below lks (lock_rank "bcache") ->
+  locks_below lks "bcache" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  readi never acquires
@@ -432,7 +432,7 @@ Module Type READI.
       (V : pprivate)
       (pidv : mword 32) (dq dqd : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_readi_sconf_body γs j γl γu γd γk pd pav pu bn γfs γa γf
                           cov logstart dev ip bm data dn
                           user off n dst_olds V

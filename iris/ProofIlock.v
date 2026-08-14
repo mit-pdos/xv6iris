@@ -321,7 +321,7 @@ Section IlockDefs.
       (cov : gset Z) (logstart : Z) (inodestart : Z)
       (k : nat) (ip : mword 64) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac) (j : nat)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) : iProp Σ :=
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) : iProp Σ :=
     (* THE LITERAL [true], matching SpecIlock's crossing: ilock PARKS (its
        acquiresleep sleeps), so its continuation is about an arbitrary hart
        whatever SIE was doing.  Spelled [b] this was sound only because the
@@ -367,7 +367,7 @@ Section IlockEpilogue.
       (k : nat) (ip : mword 64) (dev inum : mword 32)
       (dn : dinode) (bm : blkmap) (filled : bool)
       (pidv : mword 32) (dq dqs : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_ilock <= K)%nat ->
     il_sp m M ->
     il_thr5 m M ->
@@ -652,7 +652,7 @@ Section IlockLoad.
       (dev : mword 32)
       (k : nat) (ip : mword 64) (inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_ilock <= K)%nat ->
     il_sp m M ->
     il_thr5 m M ->
@@ -668,7 +668,7 @@ Section IlockLoad.
     (* il_load reaches bread/brelse, whose bound is "bcache" (4); it is the
        whole point of this helper (the fill arm), so it needs the premise
        threaded on its own binder list just like [wp_ilock_sconf] itself. *)
-    locks_below lks (lock_rank "bcache") ->
+    locks_below lks "bcache" ->
     sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
@@ -1957,7 +1957,7 @@ Section ProofIlockMain.
       (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_ilock_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
                           cov logstart inodestart nib k s g dev inum
                           pidv dq dqs m K eb C b lks.

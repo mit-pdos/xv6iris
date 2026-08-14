@@ -190,7 +190,7 @@ Definition wp_sys_chdir_sconf_body
     (v : mword 64)                                      (* syscall argument 0  *)
     (pid : mword 32) (V : pprivate)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_chdir in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -309,7 +309,7 @@ Module Type SYSCHDIR.
       (v : mword 64)
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_sys_chdir_sconf_body γf γa gs j gl gu gd gk pd pav pu bn g gfs gi
                               cn gtl cov logstart bmapstart inodestart nib
                               size dev used dqb dqs v pid V m K eb C b lks.

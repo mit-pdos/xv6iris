@@ -229,7 +229,7 @@ Section KforkArms.
       (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64) (C : iProp Σ)
       (pid_p : mword 32) (Vp : pprivate)
       (sp0 ra0 s00 s10 s50 : mword 64) (npa : mword 64) (j : nat)
-      (pid_c : mword 32) (ch : mword 64) (Vc : pprivate) (Mt : regfile) (lks : gset nat) :
+      (pid_c : mword 32) (ch : mword 64) (Vc : pprivate) (Mt : regfile) (lks : gset string) :
     (52 <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     match lvl with O => eb | S _ => false end = b ->
@@ -248,14 +248,14 @@ Section KforkArms.
        ("ftable", 15) and idup ("itable", 14) sit above [proc] by the leaf
        placement in LockRank.v, and kalloc/uvmcopy's "kmem" above that.  All
        four follow from this one by [locks_below_mono]. *)
-    locks_below lks (lock_rank "wait_lock") ->
+    locks_below lks "wait_lock" ->
     procs_inv γs -∗
     (* ENTRY is in-lock (allocproc returned holding np->lock: level
        [S lvl], arm [false]), so the index carries the reserve of the arm
        this block returns at, namely [b].  See ProofKforkB1/B5 -- the
        whole post-allocproc stretch of kfork runs at this index. *)
     sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
-    cpu_own (S lvl) eb pme C false ({[lock_rank "proc"]} ∪ lks) -∗
+    cpu_own (S lvl) eb pme C false ({["proc"]} ∪ lks) -∗
     arm_pay lvl eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x7c) : mword 64) -∗
@@ -334,7 +334,7 @@ Section KforkArms.
       (γa γf : gname) (cn : ic_names)
       (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64) (C : iProp Σ)
       (pid_p : mword 32) (Vp : pprivate)
-      (sp0 ra0 s00 s10 s50 : mword 64) (Mt : regfile) (lks : gset nat) :
+      (sp0 ra0 s00 s10 s50 : mword 64) (Mt : regfile) (lks : gset string) :
     (8 <= K)%nat ->
     m !!! Regidx csp_rs1 = sp0 -> m !!! Regidx Rra = ra0 -> m !!! Regidx Rs0 = s00 ->
     m !!! Regidx Rs1 = s10 -> m !!! Regidx Rs5 = s50 ->
@@ -424,7 +424,7 @@ Section KforkArms.
       (pid_p : mword 32) (Vp : pprivate)
       (sp0 ra0 s00 s10 s50 : mword 64)
       (Mt : regfile) (npa : mword 64) (j : nat) (γl2 : gname)
-      (pid_c : mword 32) (ch : mword 64) (Vc' : pprivate) (tfsrc tfdst : mword 44) (lks : gset nat) :
+      (pid_c : mword 32) (ch : mword 64) (Vc' : pprivate) (tfsrc tfdst : mword 44) (lks : gset string) :
     (56 <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     match lvl with O => eb | S _ => false end = b ->
@@ -449,7 +449,7 @@ Section KforkArms.
        ("ftable", 15) and idup ("itable", 14) sit above [proc] by the leaf
        placement in LockRank.v, and kalloc/uvmcopy's "kmem" above that.  All
        four follow from this one by [locks_below_mono]. *)
-    locks_below lks (lock_rank "wait_lock") ->
+    locks_below lks "wait_lock" ->
     kernel_text -∗
     panic_wp_any -∗
     procs_inv γs -∗
@@ -458,7 +458,7 @@ Section KforkArms.
        this block returns at, namely [b].  See ProofKforkB1/B5 -- the
        whole post-allocproc stretch of kfork runs at this index. *)
     sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
-    cpu_own (S lvl) eb pme C false ({[lock_rank "proc"]} ∪ lks) -∗
+    cpu_own (S lvl) eb pme C false ({["proc"]} ∪ lks) -∗
     pc_is (mword_of_int (KF + 0x4a) : mword 64) -∗
     kfk_frame_at sp0 ra0 s00 s10 s50
       (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4) -∗
@@ -559,7 +559,7 @@ Section KforkArms.
        arm-generic and instantiated at [b := false], so it cannot compute the
        reserve itself -- it takes it as the opaque [rsv] parameter. *)
     iPoseProof (B3.kfkb3_fd_loop γl γf pme npa pid_p pid_c Vp V2 m (trap_res b) K (S lvl) eb false C
-                  (pa_stk sp0 8) (Mt !!! Regidx Rs0) ({[lock_rank "proc"]} ∪ lks)
+                  (pa_stk sp0 8) (Mt !!! Regidx Rs0) ({["proc"]} ∪ lks)
                   ltac:(lia) ltac:(lia) HofnullV2 ltac:(lkbelow)) as "Hb3app".
     iSpecialize ("Hb3app" with "Htext Hft Hpanic").
     iSpecialize ("Hb3app" $! 0%nat Mx
@@ -581,7 +581,7 @@ Section KforkArms.
       (* ---- ProofKforkB4: idup / safestrcpy / pid read ---- *)
       iApply (B4.kfk_b4 γf γil γic cn γfs cov logstart nib pid_p pid_c Vp
                 (kfk_childV V2 (pv_ofile Vp) NOFILE) pme npa
-                Mx2 (trap_res b) K (S lvl) eb C ({[lock_rank "proc"]} ∪ lks)
+                Mx2 (trap_res b) K (S lvl) eb C ({["proc"]} ∪ lks)
                 ltac:(lia) ltac:(lia) Hd4 Hd3
                 with "Hsc Hown Htext Hpcx Hpanic Hitb Hitinv Hirs Hpvx Hpvcx").
       all: try lkbelow.
@@ -684,7 +684,7 @@ Section KforkMain.
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-      (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset nat)
+      (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string)
  :
     wp_kfork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart nib
       m lvl K eb pme C b pid_p Vp lks.

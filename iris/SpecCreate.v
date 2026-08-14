@@ -486,7 +486,7 @@ Definition wp_create_sconf_body
     (ns : nat)                                        (* the iref ledger     *)
     (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.create in
   let pj := proc_addr j in
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
@@ -670,7 +670,7 @@ Module Type CREATE.
       (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_create_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
                            γa γf γpr cov logstart bmapstart inodestart nib
                            ninodes size dev used plen pfun ty major minor

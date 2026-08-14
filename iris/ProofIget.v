@@ -346,7 +346,7 @@ Section ProofIget.
   Local Ltac regne := reg_ne_side.
 
   (* [ProofIdup.sie_b_agree], verbatim. *)
-  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) (lks : gset nat) :
+  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) (lks : gset string) :
     sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
@@ -407,7 +407,7 @@ Section ProofIget.
       (cov : gset Z) (logstart : Z) (nib : nat)
       (dev inum : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (K : nat) (b : bool) (lks : gset nat)
+      (K : nat) (b : bool) (lks : gset string)
     : wp_iget_sconf_body γl cn γfs γi cov logstart nib dev inum
                          m n eb p C K b lks.
   Proof.
@@ -956,7 +956,7 @@ Section ProofIget.
                             /\ M !! e = None) ⌝ -∗
       sie_cap_gpr Mr (trap_res b + (K - 6))%nat false p -∗
       pc_is (mword_of_int (KernelSyms.iget + 0x44) : mword 64) -∗
-      cpu_own (S n) eb p C false ({[lock_rank "itable"]} ∪ lks) -∗
+      cpu_own (S n) eb p C false ({["itable"]} ∪ lks) -∗
       arm_pay n eb p -∗
       locked γl cpu_id -∗
       itable_half M -∗
@@ -991,7 +991,7 @@ Section ProofIget.
                               /\ M !! e = None) ⌝ -∗
         sie_cap_gpr Ms (trap_res b + (K - 6))%nat false p -∗
         pc_is (mword_of_int (KernelSyms.iget + 0x3c) : mword 64) -∗
-        cpu_own (S n) eb p C false ({[lock_rank "itable"]} ∪ lks) -∗
+        cpu_own (S n) eb p C false ({["itable"]} ∪ lks) -∗
         arm_pay n eb p -∗
         locked γl cpu_id -∗
         itable_half M -∗
@@ -1459,14 +1459,14 @@ Section ProofIget.
             iEval (rewrite Houtb) in "Hcg".
             iApply (Release.wp_release_sconf γl itable_lock "itable"%string
                       (itable_res2 cn γfs γi cov logstart nib dev) V4
-                      n eb p C (K - 6)%nat ({[lock_rank "itable"]} ∪ lks)
+                      n eb p C (K - 6)%nat ({["itable"]} ∪ lks)
                       ltac:(rewrite HV4a0; reflexivity) ltac:(lia)
                       with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
             { iExact "Hlock". }
             iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
             iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
             pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
-            iEval (rewrite (_ : ({[lock_rank "itable"]} ∪ lks) ∖ {[lock_rank "itable"]} = lks);
+            iEval (rewrite (_ : ({["itable"]} ∪ lks) ∖ {["itable"]} = lks);
                    [| apply locks_add_del_below; lkbelow]) in "Hcnt".
             rewrite <- Houtb in Hsr.
             pose proof Hrelpins as Hrelpins_cs.
@@ -1873,14 +1873,14 @@ Section ProofIget.
         iEval (rewrite Houtb) in "Hcg".
         iApply (Release.wp_release_sconf γl itable_lock "itable"%string
                   (itable_res2 cn γfs γi cov logstart nib dev) L7
-                  n eb p C (K - 6)%nat ({[lock_rank "itable"]} ∪ lks)
+                  n eb p C (K - 6)%nat ({["itable"]} ∪ lks)
                   ltac:(rewrite HL7a0; reflexivity) ltac:(lia)
                   with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
         { iExact "Hlock". }
         iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
         iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
         pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
-        iEval (rewrite (_ : ({[lock_rank "itable"]} ∪ lks) ∖ {[lock_rank "itable"]} = lks);
+        iEval (rewrite (_ : ({["itable"]} ∪ lks) ∖ {["itable"]} = lks);
                [| apply locks_add_del_below; lkbelow]) in "Hcnt".
         rewrite <- Houtb in Hsr.
         pose proof Hrelpins as Hrelpins_cs.

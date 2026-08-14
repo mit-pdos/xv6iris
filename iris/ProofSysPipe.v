@@ -576,7 +576,7 @@ Section ProofSysPipe.
       (fn : fclose_names) (on : option nat) (us : gset Z)
       (Mt : regfile) (nav : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (sp0 : mword 64) (k0 k1 : nat) (q0 q1 : Qp) (Cf0 Cf1 : fcontent)
-      (za zb zc zd ze zf : Z) (imm1 imm2 : mword 21) (b : bool) (lks : gset nat) :
+      (za zb zc zd ze zf : Z) (imm1 imm2 : mword 21) (b : bool) (lks : gset string) :
     (fileclose_stack <= nav)%nat ->
     Mt !!! Regidx Rs0 = sp0 ->
     (* the pc successors and the two relocated call targets *)
@@ -591,7 +591,7 @@ Section ProofSysPipe.
       = mword_of_int KernelSyms.fileclose ->
     (* sp_close2's own two fileclose calls want "ftable" (1); nothing else in
        its body touches a lock. *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     sie_cap_gpr Mt nav b p -∗
     cpu_own 0%nat eb p C b lks -∗
     (* THE COMPLEMENT, THREADED THROUGH BOTH CLOSES.  fileclose takes it at
@@ -963,7 +963,7 @@ Section ProofSysPipe.
   Lemma wp_sys_pipe_sconf (γa : gname) (γfl γf : gname)
       (fn : fclose_names) (on : option nat) (us : gset Z)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat)
+      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string)
     : wp_sys_pipe_sconf_body γa γfl γf fn on us m av eb p C v pid V b lks.
   Proof.
     cbv beta delta [wp_sys_pipe_sconf_body].

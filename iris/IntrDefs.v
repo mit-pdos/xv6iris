@@ -897,7 +897,7 @@ Section IntrDefsBase.
      with the coupling [size lks <= n] (LockSet.v).  Bundled INTO the second
      conjunct rather than added as a third, so every positional destructuring
      of this bundle keeps matching. *)
-  Definition cpu_priv (n : nat) (eb : bool) (p : mword 64) (lks : gset nat) : iProp Σ :=
+  Definition cpu_priv (n : nat) (eb : bool) (p : mword 64) (lks : gset string) : iProp Σ :=
     (cpu_cells n eb p ∗ cpu_locks_lvl n lks)%I.
 
   (* the private state PLUS the counting token -- the whole per-cpu bundle
@@ -908,7 +908,7 @@ Section IntrDefsBase.
   (* [lks], never [S]: [S] is [nat]'s successor constructor and [cpu_own (S n)
      ...] appears at 61 sites -- binding [S] as the held set shadows it and
      breaks every one of them. *)
-  Definition cpu_hart (n : nat) (eb : bool) (p : mword 64) (lks : gset nat) : iProp Σ :=
+  Definition cpu_hart (n : nat) (eb : bool) (p : mword 64) (lks : gset string) : iProp Σ :=
     (cpu_priv n eb p lks ∗ intr_count n eb)%I.
 
   (* THE SIE ARM IS AN INDEX, NOT AN INTERNAL DISJUNCTION.  It used to be

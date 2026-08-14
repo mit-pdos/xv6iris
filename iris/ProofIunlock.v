@@ -122,7 +122,7 @@ Section ProofIunlockMain.
       (cn : ic_names) (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (b : bool) (lks : gset nat) : iProp Σ :=
+      (b : bool) (lks : gset string) : iProp Σ :=
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
@@ -143,7 +143,7 @@ Section ProofIunlockMain.
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev inum
                             dn' bm' pidv dq m K eb p C b lks.
   Proof.

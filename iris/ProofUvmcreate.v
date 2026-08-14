@@ -94,7 +94,7 @@ Section ProofUvmcreate.
   (*  the "with" clause supplies at each call site. *)
   Local Lemma uvc_htail `{CID0 : CpuId}
       (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat)
+      (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string)
       (Mt : regfile) (rv sp0 : mword 64) (v4 : bv 64) :
     (4 <= K)%nat ->
     Mt !!! Regidx csp_rs1 = add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) ->
@@ -271,7 +271,7 @@ Section ProofUvmcreate.
 
   Lemma wp_uvmcreate_sconf (γa : gname)
       (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (on : option nat) (b : bool) (lks : gset nat)
+      (on : option nat) (b : bool) (lks : gset string)
     : wp_uvmcreate_sconf_body γa mm lvl K eb p C on b lks.
   Proof.
     cbv beta delta [wp_uvmcreate_sconf_body].

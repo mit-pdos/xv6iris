@@ -459,7 +459,7 @@ Section ProofPiperead.
       (sp0 spr vra vs0 vs1 vs2 vs3 vs4 vs5 vs6 vs7 vs8 : mword 64)
       (m : regfile) (av : nat) (pj : mword 64) (C : iProp Σ)
       (γp : pipe_names) (w : bool) (q : Qp) (pid : mword 32) (V : pprivate)
-      (n : Z) (CIDe : CpuId) (lks : gset nat) : iProp Σ :=
+      (n : Z) (CIDe : CpuId) (lks : gset string) : iProp Σ :=
     (∀ (M : regfile) (P' : uptd) (rv : mword 64),
      ⌜ M !!! Regidx csp_rs1 = spr
        /\ M !!! Regidx Rs4 = rv
@@ -490,7 +490,7 @@ Section ProofPiperead.
       (spr s0v pi addrv pj sp0 vs6 vs7 vs8 : mword 64)
       (n : Z) (m : regfile) (av : nat) (C : iProp Σ)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
-      (pid : mword 32) (V : pprivate) (CIDc : CpuId) (lks : gset nat) : iProp Σ :=
+      (pid : mword 32) (V : pprivate) (CIDc : CpuId) (lks : gset string) : iProp Σ :=
     (∀ M : regfile,
      ⌜ M !!! Regidx csp_rs1 = spr
        /\ M !!! Regidx Rs0 = s0v
@@ -503,7 +503,7 @@ Section ProofPiperead.
        /\ M !!! Regidx Rs11 = m !!! Regidx Rs11 ⌝ -∗
      sie_cap_gpr M (trap_res true + (av - 12))%nat false pj -∗
      pc_is (mword_of_int (KernelSyms.piperead + 0x84) : mword 64) -∗
-     cpu_own 1%nat true pj C false ({[lock_rank "pipe"]} ∪ lks) -∗
+     cpu_own 1%nat true pj C false ({["pipe"]} ∪ lks) -∗
      arm_pay 0 true pj -∗
      locked γl cpu_id -∗
      pipe_res γp pi -∗
@@ -520,7 +520,7 @@ Section ProofPiperead.
       (sp0 spr vs6 vs7 vs8 : mword 64)
       (m : regfile) (av : nat) (pj : mword 64) (C : iProp Σ)
       (γp : pipe_names) (w : bool) (q : Qp) (pid : mword 32) (V : pprivate)
-      (n : Z) (CIDx : CpuId) (lks : gset nat) : iProp Σ :=
+      (n : Z) (CIDx : CpuId) (lks : gset string) : iProp Σ :=
     (∀ (M : regfile) (P' : uptd) (rv : mword 64),
      ⌜ M !!! Regidx csp_rs1 = spr
        /\ M !!! Regidx Rs4 = rv
@@ -548,13 +548,13 @@ Section ProofPiperead.
       (W0 : regfile) (av : nat) (pj : mword 64) (C : iProp Σ)
       (γl : gname) (pi : mword 64) (γp : pipe_names) (w : bool) (q : Qp)
       (pid : mword 32) (V : pprivate) (sp0 : mword 64)
-      (EX CP : iProp Σ) (CIDl : CpuId) (lks : gset nat) : iProp Σ :=
+      (EX CP : iProp Σ) (CIDl : CpuId) (lks : gset string) : iProp Σ :=
     (∀ M : regfile,
      ⌜ callee_saved W0 M ⌝ -∗
      (EX ∧ CP) -∗
      sie_cap_gpr M (trap_res true + (av - 12))%nat false pj -∗
      pc_is (mword_of_int (KernelSyms.piperead + 0x34) : mword 64) -∗
-     cpu_own 1%nat true pj C false ({[lock_rank "pipe"]} ∪ lks) -∗
+     cpu_own 1%nat true pj C false ({["pipe"]} ∪ lks) -∗
      arm_pay 0 true pj -∗
      locked γl cpu_id -∗
      pipe_res γp pi -∗
@@ -571,7 +571,7 @@ Section ProofPiperead.
       (γs : list gname) (j : nat) (γlp : gname)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset nat)
+      (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string)
     : wp_piperead_sconf_body γa γf γs j γlp γl γp w q m av eb C pid V n b lks.
   Proof.
     cbv beta delta [wp_piperead_sconf_body].
@@ -580,7 +580,7 @@ Section ProofPiperead.
     (* piperead's own cone bottoms out at "pipe" (7); killed/sleep_prepare/
        sleep/wakeup all sit at "proc" (11), strictly higher, so this ONE
        weakening (LockRank.locks_below_mono) covers every one of them. *)
-    assert (Hbelow_proc : locks_below lks (lock_rank "proc")).
+    assert (Hbelow_proc : locks_below lks "proc").
     { lkbelow. }
     assert (Hn31 : (-2147483648 <= n < 2147483648)%Z)
       by (change (2 ^ 31)%Z with 2147483648%Z in Hnrng; lia).
@@ -1409,7 +1409,7 @@ Section ProofPiperead.
           ⌜ pipe_rw_ret n rv ⌝ -∗
           sie_cap_gpr M2 (trap_res true + (av - 12))%nat false pj -∗
           pc_is (mword_of_int (KernelSyms.piperead + 0xd4) : mword 64) -∗
-          cpu_own 1%nat true pj C false ({[lock_rank "pipe"]} ∪ lks) -∗
+          cpu_own 1%nat true pj C false ({["pipe"]} ∪ lks) -∗
           arm_pay 0 true pj -∗
           locked γl cpu_id -∗
           pipe_res γp pi -∗
@@ -1454,7 +1454,7 @@ Section ProofPiperead.
         assert (HwK : (18 <= trap_res true + (av - 12))%nat) by lia.
         assert (HwdomX : forall r : regidx, r ∈ dom (rf_to_gmap X2)) by (intro r; apply rf_to_gmap_dom).
         iApply (Wakeup.wp_wakeup_sconf X2 γs pj 1%nat (trap_res true + (av - 12))%nat true C false
-                  ({[lock_rank "pipe"]} ∪ lks)
+                  ({["pipe"]} ∪ lks)
                   HwK HwdomX Hlen pr_lvl1 ltac:(lkbelow)
                   with "Hcg Hown Htext Hpc Hpanic Hpinv").
         all: try lkbelow.
@@ -1510,7 +1510,7 @@ Section ProofPiperead.
             by (apply bv_eq; vm_compute; reflexivity).
           apply kv_addv_zero. }
         iApply (ReleaseGen.wp_release_gen_sconf γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp) emp%I
-                  X4 0%nat true pj C (av - 12)%nat ({[lock_rank "pipe"]} ∪ lks) HX4lka ltac:(lia)
+                  X4 0%nat true pj C (av - 12)%nat ({["pipe"]} ∪ lks) HX4lka ltac:(lia)
                   ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
         { iApply lock_finisher_close. }
@@ -1662,7 +1662,7 @@ Section ProofPiperead.
           WXP -∗
           sie_cap_gpr M3 (trap_res true + (av - 12))%nat false pj -∗
           pc_is (mword_of_int (KernelSyms.piperead + 0x92) : mword 64) -∗
-          cpu_own 1%nat true pj C false ({[lock_rank "pipe"]} ∪ lks) -∗
+          cpu_own 1%nat true pj C false ({["pipe"]} ∪ lks) -∗
           arm_pay 0 true pj -∗
           locked γl cpu_id -∗
           pipe_res γp pi -∗
@@ -1964,7 +1964,7 @@ Section ProofPiperead.
           by (assert (trap_res true = 78%nat) as -> by reflexivity; lia).
         iApply (Copyout.wp_copyout_sconf γa K10 P' (pv_sz V) 1%nat
                   (fun _ => trunc8 (K5 !!! Regidx Ra5)) (trap_res true + (av - 12))%nat 1%nat true pj C
-                  false ({[lock_rank "pipe"]} ∪ lks)
+                  false ({["pipe"]} ∪ lks)
                   HK52 HK10a0 HK10a1 HK10a4 pr_len1_64 Hszb pr_lvl1
                   with "Hcg Hown Htext Hpc Hpt Henv [Hch]").
         all: try lkbelow.
@@ -2450,7 +2450,7 @@ Section ProofPiperead.
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_refl. }
       iApply (Killed.wp_killed_sconf γs j γlp L3 (trap_res true + (av - 12))%nat 1%nat true pj C false
-                ({[lock_rank "pipe"]} ∪ lks)
+                ({["pipe"]} ∪ lks)
                 HL3a0 Hj Hjl pr_lvl1 ltac:(lia) ltac:(lkbelow)
                 with "Hcg Hown Htext Hpc Hpinv Hpanic").
       all: try lkbelow.
@@ -2521,7 +2521,7 @@ Section ProofPiperead.
           apply callee_saved_insert_r; [vm_compute; reflexivity|].
           apply callee_saved_insert_r; [vm_compute; reflexivity|]. exact HcsMmk. }
         iApply (ReleaseGen.wp_release_gen_sconf γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp) emp%I
-                  N2 0%nat true pj C (av - 12)%nat ({[lock_rank "pipe"]} ∪ lks) HN2lka ltac:(lia)
+                  N2 0%nat true pj C (av - 12)%nat ({["pipe"]} ∪ lks) HN2lka ltac:(lia)
                   ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
         { iApply lock_finisher_close. }
@@ -2666,7 +2666,7 @@ Section ProofPiperead.
       (* the panic arm ("sleep_prepare: zero chan") is refuted by the page the
          pipe lives on: &pi->nread is 536 bytes into it. *)
       iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γlp Sl2
-                (trap_res true + (av - 12))%nat 1%nat true C false ({[lock_rank "pipe"]} ∪ lks)
+                (trap_res true + (av - 12))%nat 1%nat true C false ({["pipe"]} ∪ lks)
                 Hj Hjl ltac:(rewrite HSl2a0; exact (pr_pnread_nz pi Hpv)) pr_lvl1 ltac:(lia) ltac:(lkbelow)
                 with "Hcg Hown Htext Hpc Hpinv Hpanic").
       all: try lkbelow.
@@ -2721,7 +2721,7 @@ Section ProofPiperead.
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_insert_r; [vm_compute; reflexivity|]. exact HcsMkmsp. }
       iApply (ReleaseGen.wp_release_gen_sconf γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp) emp%I
-                Sl4 0%nat true pj C (av - 12)%nat ({[lock_rank "pipe"]} ∪ lks) HSl4lka ltac:(lia)
+                Sl4 0%nat true pj C (av - 12)%nat ({["pipe"]} ∪ lks) HSl4lka ltac:(lia)
                 ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                 with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
       { iApply lock_finisher_close. }

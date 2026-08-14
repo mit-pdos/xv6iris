@@ -412,7 +412,7 @@ Section ProofGrowproc.
   (* =================================================================== *)
   Lemma wp_growproc_sconf (γa : gname) (γf : gname)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat)
+      (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string)
     : wp_growproc_sconf_body γa γf m av eb p C pid V b lks.
   Proof.
     cbv beta delta [wp_growproc_sconf_body].

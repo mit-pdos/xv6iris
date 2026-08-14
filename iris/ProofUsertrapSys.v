@@ -99,7 +99,7 @@ Section UtSysBlock.
 
   Lemma ut_90 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (C : iProp Σ)
-      (mie_v menvcfg0 : mword 64) (lks : gset nat) :
+      (mie_v menvcfg0 : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->

@@ -329,7 +329,7 @@ Section UvmcopyDefs.
      being consumed at the hart it was built at. *)
   Definition uc_exit `{CID0 : CpuId} (mm : regfile)
       (Pold Pnew : uptd) (vpn0 : mword 27) (n K : nat) (eb : bool)
-      (p : mword 64) (C : iProp Σ) (spr : mword 64) (ilvl : nat) (b : bool) (lks : gset nat) : iProp Σ :=
+      (p : mword 64) (C : iProp Σ) (spr : mword 64) (ilvl : nat) (b : bool) (lks : gset string) : iProp Σ :=
     wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ( ∀ (mj : regfile) (res : mword 64),
       ⌜ mj !!! Regidx csp_rs1 = spr
@@ -448,7 +448,7 @@ Section ProofUvmcopy.
   Local Lemma uc_err `{CID0 : CpuId} (γa : gname) (mm : regfile)
       (Pold Pnew Pj : uptd) (vpn0 : mword 27) (n j : nat) (K : nat)
       (eb : bool) (p : mword 64) (C : iProp Σ) (spr iv : mword 64)
-      (M : regfile) (ilvl : nat) (b : bool) (lks : gset nat) :
+      (M : regfile) (ilvl : nat) (b : bool) (lks : gset string) :
     (42 <= K)%nat ->
     (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
     svpn_of (mword_of_int 0 : mword 64) = vpn0 ->
@@ -463,7 +463,7 @@ Section ProofUvmcopy.
     uc_thr mm M ->
     (* uc_err's one callee is uvmunmap, whose do_free-!=0 call bottoms out
        at kfree's "kmem" (13) bound; nothing else here touches a lock. *)
-    locks_below lks (lock_rank "kmem") ->
+    locks_below lks "kmem" ->
     sie_cap_gpr M (K - 10)%nat b p -∗
     cpu_own ilvl eb p C b lks -∗
     kernel_text -∗
@@ -644,7 +644,7 @@ Section ProofUvmcopy.
      above [uc_err] -- nothing in this loop's own body needs it any more. *)
   Local Lemma uc_loop (γa : gname) (mm : regfile)
       (Pold Pnew : uptd) (vpn0 : mword 27) (n K : nat) (eb : bool)
-      (p : mword 64) (C : iProp Σ) (spr sz : mword 64) (nz : Z) (ilvl : nat) (b : bool) (lks : gset nat) :
+      (p : mword 64) (C : iProp Σ) (spr sz : mword 64) (nz : Z) (ilvl : nat) (b : bool) (lks : gset string) :
     (42 <= K)%nat ->
     (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
     svpn_of (mword_of_int 0 : mword 64) = vpn0 ->
@@ -670,7 +670,7 @@ Section ProofUvmcopy.
        13) and, via [uc_err], kfree again through uvmunmap.  mappages is
        also in the cone but carries no order premise of its own to pass
        (SpecMappages.v/SpecWalk.v -- outside this pass's file list). *)
-    locks_below lks (lock_rank "kmem") ->
+    locks_below lks "kmem" ->
     sie_cap_gpr M (K - 10)%nat b p -∗
     cpu_own ilvl eb p C b lks -∗
     kernel_text -∗
@@ -1685,7 +1685,7 @@ Section ProofUvmcopy.
   Lemma wp_uvmcopy_sconf
       (γa : gname) (mm : regfile)
       (Pold Pnew : uptd) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset nat)
+      (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset string)
     : wp_uvmcopy_sconf_body γa mm Pold Pnew K eb p C ilvl b lks.
   Proof.
     cbv beta delta [wp_uvmcopy_sconf_body].

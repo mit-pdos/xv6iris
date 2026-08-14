@@ -92,7 +92,7 @@ Section ProofKilled.
 
 
   Lemma wp_killed_sconf  (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string)
     : wp_killed_sconf_body γs j γl m av n eb p C b lks.
   Proof.
     cbv beta delta [wp_killed_sconf_body].
@@ -322,12 +322,12 @@ Section ProofKilled.
        acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) C4 n eb p C (av - 4)%nat ({[lock_rank "proc"]} ∪ lks)
+              (proc_lock_res γs γl (proc_addr j)) C4 n eb p C (av - 4)%nat ({["proc"]} ∪ lks)
               Hlka ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay").
     iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hcs_rel Hcpu".
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
-    iEval (rewrite (_ : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks);
+    iEval (rewrite (_ : ({["proc"]} ∪ lks) ∖ {["proc"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hcpu".
     (* release's exit index is [outb := match n with O => eb | S _ => false
        end]; [Hbeq] (derived up front) folds it back to [b] so the whole

@@ -95,7 +95,7 @@ Section ProofVirtioDiskRwDSeam.
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
       (bs_buf bs_disk : list (bv 8)) (m0 : regfile)
-      (kq : nat * positive) (lks : gset nat) : iProp Σ :=
+      (kq : nat * positive) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
      ∀ (M : regfile) (q np nr : nat) (fl pk : gmap nat dclaim)
        (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) (h m2 t : nat) pin,
@@ -133,7 +133,7 @@ Section ProofVirtioDiskRwDSeam.
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
-      (m0 : regfile) (lks : gset nat) : iProp Σ :=
+      (m0 : regfile) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
      ∀ (M : regfile) (np nr : nat) (fl pk : gmap nat dclaim)
        (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) (h m2 t : nat),
@@ -164,7 +164,7 @@ Section ProofVirtioDiskRwDSeam.
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr : SailStdpp.Values.mword 64)
       (bno : SailStdpp.Values.mword 32) (bs_buf bs_disk : list (bv 8))
-      (m0 : regfile) (kq : nat * positive) (lks : gset nat) :
+      (m0 : regfile) (kq : nat * positive) (lks : gset string) :
     (uint bno < 2147483648)%Z ->
     length bs_buf = 1024%nat ->
     (forall k, (k < 1024)%nat -> addr_is_kdata (pa_add (b_data b) k)) ->

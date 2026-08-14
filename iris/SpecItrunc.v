@@ -319,7 +319,7 @@ Definition wp_itrunc_sconf_body
     (u : nat)
     (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.itrunc in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -393,7 +393,7 @@ Definition wp_itrunc_sconf_body
   (* itrunc's cone: bfree ("log", 3), bread/brelse ("bcache", 4) on the
      indirect arm, and its closing iupdate ("log", 3) -- "log" is the
      lowest, so one premise there covers the whole cone. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  itrunc itself never
@@ -532,7 +532,7 @@ Definition wp_itrunc_gen_body
     (u : nat) (Sb : gset Z) (crb cru : bool) (e0 : nat)
     (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.itrunc in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -566,7 +566,7 @@ Definition wp_itrunc_gen_body
   (* itrunc's cone: bfree ("log", 3), bread/brelse ("bcache", 4) on the
      indirect arm, and its closing iupdate ("log", 3) -- "log" is the
      lowest, so one premise there covers the whole cone. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   trap_csrs_ext eb -∗
@@ -672,7 +672,7 @@ Module Type ITRUNC.
       (u : nat)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_itrunc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart bmapstart inodestart nib size dev used
                            ip inum dn dn0 bm data u
@@ -699,7 +699,7 @@ Module Type ITRUNC.
       (u : nat) (Sb : gset Z) (crb cru : bool) (e0 : nat)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_itrunc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                          cov logstart bmapstart inodestart nib size dev used
                          ip inum dn dn0 bm data u Sb crb cru e0

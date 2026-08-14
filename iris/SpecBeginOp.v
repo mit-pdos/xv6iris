@@ -90,7 +90,7 @@ Definition wp_begin_op_sconf_body
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.begin_op in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -103,7 +103,7 @@ Definition wp_begin_op_sconf_body
      strictly above), so the one bound at "log" covers everything this
      function needs -- [locks_below_mono] weakens it to "proc" for the
      interior sleep calls. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   (* enters at noff 0; the acquire raises it to what sleep demands *)
   cpu_own 0 eb pj C b lks -∗
@@ -150,7 +150,7 @@ Module Type BEGIN_OP.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_begin_op_sconf_body γs j γl bn γ γfs cov logstart dev
                              pidv dq m K eb C b lks.
 End BEGIN_OP.

@@ -1434,7 +1434,7 @@ Section ProofFilewrite.
       (kx : nat) (qx : Qp) (Cf : fcontent) (fn : fwrite_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool)
-      (sp0 w12 pj : mword 64) (lks : gset nat) :
+      (sp0 w12 pj : mword 64) (lks : gset string) :
     (* ---- the contract's own premises, unchanged ---- *)
     (filewrite_stack <= K)%nat ->
     (kx < NFILE)%nat ->
@@ -1488,7 +1488,7 @@ Section ProofFilewrite.
     (* the loop body's cone: begin_op/end_op ("log", 3), ilock ("bcache",
        4), iunlock ("sleep lock", 6) -- "log" is the lowest, on this
        recursion's own binder list so the back-edge re-proves it. *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     sie_cap_gpr M (K - 12)%nat b pj -∗
     cpu_own 0%nat eb pj C b lks -∗
     kernel_text -∗
@@ -2674,7 +2674,7 @@ Section ProofFilewrite.
       (k : nat) (q : Qp) (Cf : fcontent) (fn : fwrite_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool)
-      (lks : gset nat)
+      (lks : gset string)
     : wp_filewrite_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C n b lks.
   Proof.
     cbv beta delta [wp_filewrite_sconf_body].

@@ -367,7 +367,7 @@ Section ProofUartPutc.
   (* =================================================================== *)
   Lemma wp_uartputc_sconf (γl : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (bs : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset nat)
+      (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset string)
     : wp_uartputc_sconf_body γl γd γv m0 K bs n eb C b p lks.
   Proof.
     cbv beta delta [wp_uartputc_sconf_body].
@@ -589,7 +589,7 @@ Section ProofUartPutc.
     (* ===== release(&tx_lock) ===== *)
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γl a_tx_lock "uart"%string (tx_res γd) H3c n eb p C (K - 4)%nat
-              ({[lock_rank "uart"]} ∪ lks)
+              ({["uart"]} ∪ lks)
               Hlka Hav with "Hcg Ht Hpc Hlk Hlocked [Hown] Hcpu Hpay").
     { iApply (tx_res_intro γd (l ++ [sb]) with "Hown"). }
     iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hcs_rel Hcpu".
@@ -599,8 +599,8 @@ Section ProofUartPutc.
        release hands back collapses to the entry [lks] -- [Hfresh] (via
        [locks_below_not_elem]) is what makes the singleton insert/delete
        cancel. *)
-    pose proof (locks_below_not_elem lks (lock_rank "uart") Hfresh) as Hnotin.
-    assert (Hsetback : ({[lock_rank "uart"]} ∪ lks) ∖ {[lock_rank "uart"]} = lks)
+    pose proof (locks_below_not_elem lks "uart" Hfresh) as Hnotin.
+    assert (Hsetback : ({["uart"]} ∪ lks) ∖ {["uart"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcpu".
     assert (Hret3c : ret_pc (H3c !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.uartputc_sync + 0x40))

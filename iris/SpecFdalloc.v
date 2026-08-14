@@ -221,7 +221,7 @@ End SpecFdalloc.
 Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γf : gname) (k : nat) (D : gset nat)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat) :=
+    (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fdalloc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* a0 is the file to install *)
@@ -252,6 +252,6 @@ Module Type FDALLOC.
   Parameter wp_fdalloc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γf : gname) (k : nat) (D : gset nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat),
+      (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string),
       wp_fdalloc_sconf_body γf k D m av n eb p C pid V b lks.
 End FDALLOC.

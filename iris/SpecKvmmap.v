@@ -25,7 +25,7 @@ From Kernel Require KernelSyms.
 
 
 Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat) :=
+    (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string) :=
   let va := mm !!! Regidx (mword_of_int 11) in
   let pa := mm !!! Regidx (mword_of_int 12) in
   let vpn0 := svpn_of va in
@@ -50,7 +50,7 @@ Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   (forall i, (i < npages)%nat -> m !! vpn_at vpn0 i = None) ->
   (* order premise at the lowest rank this cone reaches: kvmmap -> mappages
      -> walk -> kalloc ("kmem", 13). *)
-  locks_below lks (lock_rank "kmem") ->
+  locks_below lks "kmem" ->
   match on with
   | None => panic_wp_any   (* hart-GENERIC: the panic arm is reached after
                               [b]-generic instructions, i.e. possibly on a
@@ -81,6 +81,6 @@ Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
 Module Type KVMMAP.
   Parameter wp_kvmmap_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat),
+      (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string),
       wp_kvmmap_sconf_body γa mm t m npages perm lvl K eb p C on b lks.
 End KVMMAP.

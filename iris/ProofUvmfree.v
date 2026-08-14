@@ -235,7 +235,7 @@ Section ProofUvmfree.
   Lemma wp_uvmfree_sconf
       (γa : gname) (mm : regfile)
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
-      (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset nat)
+      (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset string)
     : wp_uvmfree_sconf_body γa mm uroot um K eb p C ilvl b lks.
   Proof.
     cbv beta delta [wp_uvmfree_sconf_body].

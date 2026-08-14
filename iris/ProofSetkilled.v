@@ -65,7 +65,7 @@ Section ProofSetkilled.
   Notation sk_a5 := (mword_of_int 15 : mword 5).
 
   Lemma wp_setkilled_sconf  (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string)
     : wp_setkilled_sconf_body γs j γl m av n eb p C b lks.
   Proof.
     cbv beta delta [wp_setkilled_sconf_body].
@@ -277,7 +277,7 @@ Section ProofSetkilled.
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
               (proc_lock_res γs γl (proc_addr j)) C3 n eb p C (av - 4)%nat
-              ({[lock_rank "proc"%string]} ∪ lks)
+              ({["proc"%string]} ∪ lks)
               Hlka ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay").
     iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hcs_rel Hcpu".
@@ -286,8 +286,8 @@ Section ProofSetkilled.
        [locks_below_not_elem] turns it into the non-membership the set
        algebra actually needs, and then the round trip is the identity --
        which is what the postcondition's [cpu_own n eb p C b lks] wants. *)
-    pose proof (locks_below_not_elem lks (lock_rank "proc"%string) Hno) as Hnotin.
-    assert (Heqlks : ({[lock_rank "proc"%string]} ∪ lks) ∖ {[lock_rank "proc"%string]} = lks)
+    pose proof (locks_below_not_elem lks "proc"%string Hno) as Hnotin.
+    assert (Heqlks : ({["proc"%string]} ∪ lks) ∖ {["proc"%string]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Heqlks) in "Hcpu".
     rewrite Hbeq in Hsrel.

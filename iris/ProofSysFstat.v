@@ -327,7 +327,7 @@ Section ProofSysFstat.
   Lemma wp_sys_fstat_sconf
       (γa γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (fn : fstat_names) (pidv : mword 32) (V : pprivate) (v : mword 64)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
     : wp_sys_fstat_sconf_body γa γf γs j γlp fn pidv V v m av eb C b lks.
   Proof.
     cbv beta delta [wp_sys_fstat_sconf_body].

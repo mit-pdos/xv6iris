@@ -78,7 +78,7 @@ Definition wp_userinit_sconf_body
     (γa : gname)  (γs : list gname)
     (m0 : regfile) (K : nat)
     (eb : bool) (pj : mword 64) (C : iProp Σ)
-    (on : option nat) (v0 : mword 64) (b : bool) (lks : gset nat) :=
+    (on : option nat) (v0 : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.userinit in
   let ra_idx : mword 5 := mword_of_int 1 in
   let ra0 := m0 !!! Regidx ra_idx in
@@ -116,6 +116,6 @@ Module Type USERINIT.
       (γa : gname) (γs : list gname)
       (m0 : regfile) (K : nat)
       (eb : bool) (pj : mword 64) (C : iProp Σ)
-      (on : option nat) (v0 : mword 64) (b : bool) (lks : gset nat),
+      (on : option nat) (v0 : mword 64) (b : bool) (lks : gset string),
       wp_userinit_sconf_body γa γs m0 K eb pj C on v0 b lks.
 End USERINIT.

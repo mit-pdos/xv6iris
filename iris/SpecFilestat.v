@@ -449,7 +449,7 @@ Definition wp_filestat_sconf_body
     (k : nat) (q : Qp) (Cf : fcontent)           (* the borrowed reference  *)
     (fn : fstat_names)                           (* the inode arm's ghosts  *)
     (pidv : mword 32) (V : pprivate)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :=
+    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.filestat in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -468,7 +468,7 @@ Definition wp_filestat_sconf_body
   (* filestat's cone: ilock ("bcache", 4) and iunlock ("sleep lock", 6) --
      "bcache" is the lower, so one premise there covers both via
      [locks_below_mono]. *)
-  locks_below lks (lock_rank "bcache") ->
+  locks_below lks "bcache" ->
   sie_cap_gpr m K b pj -∗
   (* noff = 0: everything below reaches sleep *)
   cpu_own 0%nat eb pj C b lks -∗
@@ -514,6 +514,6 @@ Module Type FILESTAT.
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fstat_names)
       (pidv : mword 32) (V : pprivate)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat),
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string),
       wp_filestat_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C b lks.
 End FILESTAT.

@@ -378,7 +378,7 @@ Section ProofProcdumpLoop.
 
   Definition pdl_loop_body `{GEN : GenId} (CID0 : CpuId)
       (spv p : mword 64) (m0 : regfile) (K' : nat) (eb b : bool)
-      (C : iProp Σ) (lks : gset nat) (fuel : nat) (CIDf : CpuId) : iProp Σ :=
+      (C : iProp Σ) (lks : gset string) (fuel : nat) (CIDf : CpuId) : iProp Σ :=
     (∀ (j : nat) (M : regfile),
        ⌜ (NPROC - j <= fuel)%nat ⌝ -∗
        ⌜ (j < NPROC)%nat ⌝ -∗
@@ -400,7 +400,7 @@ Section ProofProcdumpLoop.
 
   Definition pdl_adv_body `{GEN : GenId} (CID0 : CpuId)
       (spv p : mword 64) (m0 : regfile) (K' : nat) (eb b : bool)
-      (C : iProp Σ) (lks : gset nat) (j : nat) (CIDa : CpuId) : iProp Σ :=
+      (C : iProp Σ) (lks : gset string) (j : nat) (CIDa : CpuId) : iProp Σ :=
     (∀ (Ma : regfile),
        ⌜ pd_regs_loop Ma spv j /\ pd_regs_hi m0 Ma ⌝ -∗
        wp_next (CID0 := CID0) b p (fun (CIDq : CpuId) =>
@@ -420,7 +420,7 @@ Section ProofProcdumpLoop.
 
   Definition pdl_print_body `{GEN : GenId} (CID0 : CpuId)
       (spv p : mword 64) (m0 : regfile) (K' : nat) (eb b : bool)
-      (C : iProp Σ) (lks : gset nat) (j : nat) (CIDp : CpuId) : iProp Σ :=
+      (C : iProp Σ) (lks : gset string) (j : nat) (CIDp : CpuId) : iProp Σ :=
     (∀ (Mp : regfile) (sptr : mword 64) (ss nm2 : string)
        (dq1 dq2 dq3 : dfrac) (st2 pid2 : mword 32),
        ⌜ pd_regs_loop Mp spv j /\ pd_regs_hi m0 Mp ⌝ -∗
@@ -449,12 +449,12 @@ Section ProofProcdumpLoop.
   Lemma wp_pd_loop `{GEN : GenId} `{CID0 : CpuId}
       (γpr : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (spv p : mword 64) (K' : nat) (eb b : bool) (C : iProp Σ)
-      (lks : gset nat) :
+      (lks : gset string) :
     printk_gen_contract γpr γd γv ->
     (48 <= K')%nat ->
     (* procdump's own cone touches no lock directly -- printk (rank "pr") is
        the only callee, and it is the whole order premise. *)
-    locks_below lks (lock_rank "pr") ->
+    locks_below lks "pr" ->
     kernel_text -∗ kernel_data -∗ printk_env γpr γd γv -∗ panic_wp_any -∗
     (* THE EXIT CONTINUATION, at the epilogue entry, taken as a PREMISE *)
     wp_next (CID0 := CID0) b p (fun (CIDq : CpuId) =>

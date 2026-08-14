@@ -207,12 +207,12 @@ Section ProofConsputc.
   Hypothesis wp_uartputc :
     forall `{CID : CpuId} (γl : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (bs : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset nat),
+      (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset string),
       wp_uartputc_sconf_body γl γd γv m0 K bs n eb C b p lks.
 
   Lemma wp_consputc_sconf_gen (γl : gname) (γd : uart_names) (γv : disk_names)
       (m : regfile) (K : nat) (bs : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset nat)
+      (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset string)
     : wp_consputc_sconf_body γl γd γv m K bs n eb C b p lks.
   Proof.
     cbv beta delta [wp_consputc_sconf_body].
@@ -485,7 +485,7 @@ End ProofConsputc.
 (* ===================================================================== *)
   Definition wp_consputc_sconf `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-      (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset nat)
+      (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset string)
       : wp_consputc_sconf_body γl γd γv m0 K bs n eb C b p lks :=
     (* eta-expand to keep [UartPutc.wp_uartputc_sconf]'s own [CID] genuinely
        polymorphic per application (see ProofConsoleinit.v's identical fix

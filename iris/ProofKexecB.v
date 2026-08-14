@@ -231,7 +231,7 @@ Section KexecBBody.
       (pidv : mword 32) (V : pprivate)
       (dqb dqs dqa : dfrac)
       (m M90 : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool)
-      (lks : gset nat)
+      (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64) :
     (K_kexec <= K)%nat ->
     log_geom_ok cov logstart ->

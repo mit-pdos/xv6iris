@@ -249,7 +249,7 @@ Definition wp_fsinit_sconf_body
     (v_start v_dev v_nc v_n : mword 32)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fsinit in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -313,7 +313,7 @@ Definition wp_fsinit_sconf_body
   (* fsinit's cone: its own bread/brelse ("bcache", 4), initlog
      ("bcache", 4) and ireclaim ("itable", 2) -- "itable" is the lowest,
      so one premise there covers the whole cone via [locks_below_mono]. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -444,7 +444,7 @@ Module Type FSINIT.
       (v_start v_dev v_nc v_n : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl γpr
                            cov logstart bmapstart inodestart ninodes nib size
                            used dev

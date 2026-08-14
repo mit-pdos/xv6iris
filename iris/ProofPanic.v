@@ -193,7 +193,7 @@ Section ProofPanic.
       (γpr γl : gname) (γd : uart_names) (γv : disk_names)
       (m : regfile) (K : nat) (bs : list (bv 8))
       (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64)
-      (dm : pk_arg_desc) (lks : gset nat)
+      (dm : pk_arg_desc) (lks : gset string)
     : wp_panic_sconf_body γpr γl γd γv m K bs n eb C b p dm lks.
   Proof.
     cbv beta zeta delta [wp_panic_sconf_body].

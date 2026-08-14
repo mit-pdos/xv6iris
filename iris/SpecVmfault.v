@@ -70,7 +70,7 @@ From Kernel Require KernelSyms.
 Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
     (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) (b : bool) (lks : gset nat) :=
+    (C : iProp Σ) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.vmfault in
   (* a0 = pagetable, a1 = psz, a2 = va, a3 = read *)
   let va := mm !!! Regidx (mword_of_int 12) in
@@ -95,7 +95,7 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   (* vmfault's whole cone bottoms out at "kmem" (13): the kalloc for the new
      page and, on the mappages-failure arm, the kfree that undoes it.
      ismapped/mappages take no lock, so one premise covers everything. *)
-  locks_below lks (lock_rank "kmem") ->
+  locks_below lks "kmem" ->
   sie_cap_gpr mm K b p -∗
   cpu_own lvl eb p C b lks -∗
   kernel_text -∗
@@ -123,6 +123,6 @@ Module Type VMFAULT.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (b : bool) (lks : gset nat),
+      (C : iProp Σ) (b : bool) (lks : gset string),
       wp_vmfault_sconf_body γa mm P szv K lvl eb p C b lks.
 End VMFAULT.

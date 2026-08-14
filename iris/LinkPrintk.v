@@ -42,7 +42,7 @@ Module PrintkGen : PRINTK_GEN.
       (γpr : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
       {dqf : dfrac} (f : string) (descs : list pk_arg_desc) (b : bool)
-      (lks : gset nat) :
+      (lks : gset string) :
     wp_printk_gen_sconf_body γpr γd γv m0 K eb pj C dqf f descs b lks.
   Proof.
     rewrite /wp_printk_gen_sconf_body /=.

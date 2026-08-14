@@ -603,7 +603,7 @@ Section EndOpDefs.
      hart (durable-notes: a whole-function post must not be spelled inline). *)
   Definition eo_cont `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (pidv : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) : iProp Σ :=
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
@@ -617,7 +617,7 @@ Section EndOpDefs.
 
   Lemma eo_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId}
        (j : nat) (pidv : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     (* the guard is at the LITERAL [true] now, matching eo_cont's own index *)
     (true = false \/ proc_addr j = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
     eo_cont (CID0 := CIDa)  j pidv dq m K eb C b lks -∗
@@ -893,7 +893,7 @@ Section EndOpBlocks.
   (* ================================================================== *)
   Local Lemma eo_epi `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (pidv : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_end_op <= K)%nat ->
     eo_regsE m M ->
     sie_cap_gpr M (K - 8)%nat b (proc_addr j) -∗
@@ -1147,13 +1147,13 @@ Section EndOpBlocks.
       (bn : bio_names) (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (pidv : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset string) :
     (K_end_op <= K)%nat ->
     eo_regsE m M ->
     (* the order premise: [eo_tail] opens with its OWN re-acquire of "log"
        (rank 3), from the OUTER set [lks] (the lock is not held on entry --
        the first critical section already released it before commit() ran). *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     sie_cap_gpr M (K - 8)%nat eb (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C eb lks -∗
     trap_csrs_ext eb -∗
@@ -1437,11 +1437,11 @@ Section EndOpBlocks.
        across the "log" singleton this hart is holding right now. *)
     assert (Hlog_lt_proc : (lock_rank "log" < lock_rank "proc")%nat)
       by (vm_compute; lia).
-    assert (Hbelow_wk1 : locks_below ({[lock_rank "log"]} ∪ lks) (lock_rank "proc")).
+    assert (Hbelow_wk1 : locks_below ({["log"]} ∪ lks) "proc").
     { apply locks_below_union_singleton; [exact Hlog_lt_proc |].
       lkbelow. }
     iApply (Wk.wp_wakeup_sconf F4 γs (proc_addr j) 1%nat
-              (trap_res eb + (K - 8))%nat eb C false ({[lock_rank "log"]} ∪ lks)
+              (trap_res eb + (K - 8))%nat eb C false ({["log"]} ∪ lks)
               ltac:(pose proof (eo_Kwk K HK); lia) HwdomF Hlen eo_noff1
               Hbelow_wk1
               with "Hcg Hcnt Htext Hpc Hpanic Hprocs").
@@ -1578,13 +1578,13 @@ Section EndOpBlocks.
     iApply (Rel.wp_release_sconf (ln_lk γ) log_addr "log"%string
               (log_res γ bn γfs cov logstart) G2 0%nat eb (proc_addr j) C
               (K - 8)%nat
-              ({[lock_rank "log"]} ∪ lks)
+              ({["log"]} ∪ lks)
               ltac:(rewrite HG2a0; rewrite /log_addr; apply bv_eq; vm_compute; reflexivity)
               ltac:(pose proof (eo_Klk K HK); lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
     iIntros (CIDc1 Hsc1 mr) "Hcg Hpc %Hrel Hcnt".
-    assert (Hsetback : ({[lock_rank "log"]} ∪ lks) ∖ {[lock_rank "log"]} = lks)
+    assert (Hsetback : ({["log"]} ∪ lks) ∖ {["log"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
     assert (Hpc66 : ret_pc (G2 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0x66)).
@@ -1692,7 +1692,7 @@ Section EndOpBlocks.
       (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset string) :
     (K_end_op <= K)%nat ->
     log_geom_ok cov logstart ->
     (j < NPROC)%nat ->
@@ -1704,7 +1704,7 @@ Section EndOpBlocks.
     eo_regs m M ->
     (* threaded through unchanged to [eo_tail]'s own re-acquire of "log" --
        [eo_commit] itself never touches the lock. *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     sie_cap_gpr M (K - 8)%nat eb (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C eb lks -∗
     trap_csrs_ext eb -∗
@@ -2215,7 +2215,7 @@ Section EndOpBlocks.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (n : nat) (W : list (mword 32)) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset nat) (fuel : nat) :
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset string) (fuel : nat) :
     (K_end_op <= K)%nat ->
     log_geom_ok cov logstart ->
     (j < NPROC)%nat ->
@@ -2225,7 +2225,7 @@ Section EndOpBlocks.
     (forall w, w ∈ W -> uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)) ->
     (* threaded through the whole fuel induction unchanged (no acquire in
        this loop's own body) to [eo_commit] -> [eo_tail]'s re-acquire. *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     forall (CID0 : CpuId) (t : nat) (M : regfile) (L : gmap Z (list (bv 8)))
            (Lw : nat -> list (bv 8)),
     (t < n)%nat ->
@@ -3458,7 +3458,7 @@ Section EndOpBlocks.
       (bn : bio_names) (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (pidv : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset string) :
     (K_end_op <= K)%nat ->
     eo_regsE m M ->
     (* THE OUTER/INNER TRAP (claude-notes sweep, point 5): [eo_fast]'s own
@@ -3467,11 +3467,11 @@ Section EndOpBlocks.
        continuation straight through.  But [eo_fast] is entered from the
        C's "else { wakeup(&log); }" arm, i.e. WHILE STILL HOLDING "log", so
        the ENTRY [cpu_own] must read the INNER set
-       [{[lock_rank "log"]} ∪ lks], not bare [lks] -- the interior release
+       [{["log"]} ∪ lks], not bare [lks] -- the interior release
        (below) is what brings it back down to bare [lks] for [Hcont]. *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     sie_cap_gpr M (trap_res eb + (K - 8))%nat false (proc_addr j) -∗
-    cpu_own 1 eb (proc_addr j) C false ({[lock_rank "log"]} ∪ lks) -∗
+    cpu_own 1 eb (proc_addr j) C false ({["log"]} ∪ lks) -∗
     arm_pay 0 eb (proc_addr j) -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
@@ -3563,11 +3563,11 @@ Section EndOpBlocks.
        wakeup's own order premise. *)
     assert (Hlog_lt_proc : (lock_rank "log" < lock_rank "proc")%nat)
       by (vm_compute; lia).
-    assert (Hbelow_wk2 : locks_below ({[lock_rank "log"]} ∪ lks) (lock_rank "proc")).
+    assert (Hbelow_wk2 : locks_below ({["log"]} ∪ lks) "proc").
     { apply locks_below_union_singleton; [exact Hlog_lt_proc |].
       lkbelow. }
     iApply (Wk.wp_wakeup_sconf E3 γs (proc_addr j) 1%nat
-              (trap_res eb + (K - 8))%nat eb C false ({[lock_rank "log"]} ∪ lks)
+              (trap_res eb + (K - 8))%nat eb C false ({["log"]} ∪ lks)
               ltac:(pose proof (eo_Kwk K HK); lia) HwdomE Hlen eo_noff1
               Hbelow_wk2
               with "Hcg Hcnt Htext Hpc Hpanic Hprocs").
@@ -3656,13 +3656,13 @@ Section EndOpBlocks.
     iApply (Rel.wp_release_sconf (ln_lk γ) log_addr "log"%string
               (log_res γ bn γfs cov logstart) G3 0%nat eb (proc_addr j) C
               (K - 8)%nat
-              ({[lock_rank "log"]} ∪ lks)
+              ({["log"]} ∪ lks)
               ltac:(rewrite HG3a0; rewrite /log_addr; apply bv_eq; vm_compute; reflexivity)
               ltac:(pose proof (eo_Klk K HK); lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
     iIntros (CIDc1 Hsc1 mr) "Hcg Hpc %Hrel Hcnt".
-    assert (Hsetback : ({[lock_rank "log"]} ∪ lks) ∖ {[lock_rank "log"]} = lks)
+    assert (Hsetback : ({["log"]} ∪ lks) ∖ {["log"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
     assert (Hpc92 : ret_pc (G3 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0x92)).
@@ -3704,7 +3704,7 @@ Section ProofEndOp.
       (u : nat)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_end_op_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                            cov logstart dev u pidv dq m K eb C b lks.
   Proof.
@@ -4367,13 +4367,13 @@ Section ProofEndOp.
         rewrite /U5 upd_ne; [| regne]. exact (HU4thr c Hcs N2 N8 N9 N18). }
       iApply (Rel.wp_release_sconf (ln_lk γ) log_addr "log"%string
                 (log_res γ bn γfs cov logstart) U5 0%nat eb (proc_addr j) C (K - 8)%nat
-                ({[lock_rank "log"]} ∪ lks)
+                ({["log"]} ∪ lks)
                 ltac:(rewrite HU5a0; rewrite /log_addr; apply bv_eq; vm_compute; reflexivity)
                 ltac:(pose proof (eo_Klk K HK); lia)
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
       { iExact "Hlock". }
       iIntros (CIDr Hsr mr) "Hcg Hpc %Hrel Hcnt".
-      assert (Hsetback : ({[lock_rank "log"]} ∪ lks) ∖ {[lock_rank "log"]} = lks)
+      assert (Hsetback : ({["log"]} ∪ lks) ∖ {["log"]} = lks)
         by (apply locks_add_del_below; lkbelow).
       iEval (rewrite Hsetback) in "Hcnt".
       assert (Hpc3c : ret_pc (U5 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0x3c)).

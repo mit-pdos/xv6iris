@@ -16,10 +16,23 @@ succeeds against the wrong remote and the pin stays an unknown object.)
 
 ## Where it stands
 
-Every hart owns `cpu_locks S`, a held-lock set of RANKS tied to `lk->cpu` by
-co-ownership of that field, maintained by acquire and release, and `cpu_own`
-carries it as an index.  The existential wrapper `cpu_locks_any` that hid it
-during phase 1 is deleted; contracts name the set.
+Every hart owns `cpu_locks S`, a held-lock set of NAMES (the string
+`initlock` was given) tied to `lk->cpu` by co-ownership of that field,
+maintained by acquire and release, and `cpu_own` carries it as an index.  The
+existential wrapper `cpu_locks_any` that hid it during phase 1 is deleted;
+contracts name the set.
+
+The ORDER on those names is `lock_rank`, and it lives in `locks_below`, not in
+the set:
+
+```coq
+Definition locks_below (S : gset string) (r : string) : Prop :=
+  forall q, q ∈ S -> lock_rank q < lock_rank r.
+```
+
+so a contract reads `locks_below lks "log" ->` and an index reads
+`({["itable"]} ∪ lks)`.  The set held RANKS until the names refactor; see
+"Why the set holds names" below for what that bought.
 
 ## Status
 
@@ -106,9 +119,9 @@ What that establishes, machine-checked rather than argued:
   `lk_cpu_half`, `lk_cpu_rest`, the fixed 1/2 fraction and the two exchange
   wands are DELETED; the lock invariant owns `lk->cpu` at `DfracOwn 1` in
   every state and the read leaves are state-blind for free;
-- the **rank-keyed set** works end to end: `lkcpu_take_exchange` mints
-  `lk_in i (lock_rank s)` from the caller's premise, where the predecessor had
-  to derive freshness from the cpu cell;
+- the **name-keyed set** works end to end: `lkcpu_take_exchange` mints
+  `lk_in i s` from the caller's premise, where the predecessor had to derive
+  freshness from the cpu cell;
 - **`CpuOwn.cpu_own_locks_swap`** is the right replacement for the deleted
   existential accessor `cpu_own_locks_acc`: it takes the authority out at a
   set the caller NAMES and puts back a DIFFERENT one, which is what an
@@ -116,12 +129,40 @@ What that establishes, machine-checked rather than argued:
 
 ### The premise IS the order bound
 
-acquire takes `locks_below lks (lock_rank s)`.  The non-membership form
-(`lock_rank s ∉ lks`) landed first and is gone; `locks_below_not_elem` derives
+acquire takes `locks_below lks s`.  The non-membership form (`s ∉ lks`)
+landed first and is gone; `locks_below_not_elem` derives
 it where the fragment mint and the holder refutation still want it.  The
 reason for the swap is that a caller needs MANY not-in facts and only ONE
 bound: `iput` states its bound at `"log"` (1) and that one premise covers
 `log`, `bcache` (2) and the sleeplock spinlock (4) all at once.
+
+### Why the set holds names
+
+It held ranks first, and `lock_rank` was written into every index and every
+bound: `cpu_own … ({[lock_rank "itable"]} ∪ lks)`, `locks_below lks (lock_rank
+"log")`.  Moving to names was a one-commit script -- 910 binders, 428
+singletons and ~490 bounds across 298 files, five files by hand -- because the
+representation is concentrated: `(lks : gset nat)` alone was 910 of the 1005
+`gset nat` occurrences.  The substrate is four lines: `RiscvPtsto.lockSetR :
+authR (gset_disjUR string)` and the rank binders in
+`LockRank`/`LockSet`/`WpLock`/`WpSconfLock`.
+
+**It removed a measured hazard rather than adding one.**  The obvious worry is
+that string sets make `set_solver` slower than nat sets.  The opposite is
+true, and the reason is in `locks_add_del`'s header: `rank_lookup` is a 15-way
+`String.eqb` chain, and while the set held ranks a `set_solver` at a concrete
+lock normalised FOUR copies of it -- minutes per site.  Names carry no
+`rank_lookup` in the set at all, so `lock_rank` now survives in twelve places
+tree-wide, every one a rank COMPARISON.  Keep the abstract-element discipline
+anyway; it costs nothing and an inline `set_solver` at a concrete lock is
+merely unnecessary now rather than catastrophic.
+
+**Check the tooling after any representation change.**  This refactor moved
+the premise syntax and every `rank-audit.py` regex silently stopped matching
+-- it printed `clean` while checking ZERO premises.  The tool now re-derives
+the premise count from the tree and exits 2 if it looks implausible.  That
+tripwire is the general lesson: a redundant checker that can pass vacuously is
+worse than no checker.
 
 **A contract must state its bound at the MINIMUM rank over its whole cone** --
 where "cone" means every rank it ACQUIRES *and every rank it RELEASES*.  The

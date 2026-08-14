@@ -942,6 +942,16 @@ Section KexecBSeam.
   (*  [na = 0] too, since [avf 0 = 0] and every index below [na] is not).   *)
   (*  Same invariant as the head, minus the two LIVENESS conjuncts          *)
   (*  ([a0 = avf c], [avf c <> 0]) that only the CONTINUING test earns.     *)
+  (*                                                                        *)
+  (*  ITS COUNTER BOUND IS [c <= 32], NOT THE HEAD'S [c < 32], and the      *)
+  (*  difference is real rather than slack.  The C tests [argc >= MAXARG]   *)
+  (*  only INSIDE the loop body, i.e. only once [argv[argc]] is known       *)
+  (*  non-null, so the null-terminated exit is taken at [argc = 32] when    *)
+  (*  there are exactly 32 arguments.  The [ustack[argc] = 0] at +0x272     *)
+  (*  then writes ustack[32], one past [uint64 ustack[MAXARG]] -- which     *)
+  (*  lands inside the 33 slots (264 B, s0-368..s0-112) gcc actually        *)
+  (*  reserved, so the COMPILED code stays inside its own frame.  See       *)
+  (*  claude-notes/kernel-defects.md.                                       *)
   (* --------------------------------------------------------------- *)
   Definition kxc_at_272
       (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
@@ -966,7 +976,7 @@ Section KexecBSeam.
        M !!! Regidx Rs8 = (mword_of_int 32 : mword 64) /\
        M !!! Regidx Rs9 = pa_stk sp0 46 /\
        M !!! Regidx Rs10 = oldsz ⌝ ∗
-     ⌜ (c <= na)%nat /\ (c < 32)%nat /\ avf c = (mword_of_int 0 : mword 64) /\
+     ⌜ (c <= na)%nat /\ (c <= 32)%nat /\ avf c = (mword_of_int 0 : mword 64) /\
        (uint sz1 - 4096 <= kxc_sp (uint sz1) alen c)%Z ⌝ ∗
      ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
@@ -977,5 +987,83 @@ Section KexecBSeam.
                plen pfun na avf aslen afun pidv V dqb dqs dqa
                sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c sz1 alen)%I.
+
+  (* --------------------------------------------------------------- *)
+  (*  PHASE D'S RESOURCES.  [kxc_c_res] with the ustack folded back to a     *)
+  (*  single opaque region: past +0x2a6 nothing reads what the argv loop     *)
+  (*  wrote there, so the frame is [kxc_frameB]'s shape again -- reused      *)
+  (*  verbatim, at slot 64's BUMPED value ([pa_add av (8*c)], where the      *)
+  (*  loop left it) rather than at [av].  The ELF buffer stays NAMED: the    *)
+  (*  commit reads [elf.entry] out of it at +0x2f0.                         *)
+  (* --------------------------------------------------------------- *)
+  Definition kxc_d_res
+      (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z)
+      (size : Z) (used2 : gset Z)
+      (plen : nat) (pfun : nat -> bv 8)
+      (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
+      (afun : nat -> nat -> bv 8)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (sp0 ra0 s00 s10 s20 pv av : mword 64)
+      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
+      (ef : nat -> bv 8) (P : uptd) (c : nat) : iProp Σ :=
+    (iref_slots 2 ∗
+     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
+     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
+     bitmap_res gfs bmapstart cov logstart size used2 ∗
+     bslots bn 3 ∗
+     kalloc_env ga None ∗
+     proc_pt P ∗
+     proc_priv gf (proc_addr jp) pidv V ∗
+     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) ∗
+     ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) ∗
+     ([∗ list] k ∈ seq 0 na,
+        [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) ∗
+     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) ∗
+     kxc_frameB sp0 ra0 s00 s10 s20 pv (pa_add av (8 * c))
+                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67)%I.
+
+  (* --------------------------------------------------------------- *)
+  (*  +0x2a6 -- PHASE C's EXIT AND PHASE D's ENTRY.  Both copyouts are done  *)
+  (*  and every [bad:] entry is behind us, so this state ASSERTS the two     *)
+  (*  conditions the success arm of [kexec_ok] quotes -- the argument-count  *)
+  (*  bound and [kxc_stack_ok] -- rather than assuming them.  [s2] is the    *)
+  (*  final [sp] the trapframe will get, spelled as the contract's own       *)
+  (*  [kxc_sp_final] so phase D needs no reconciliation, and [s3] is [sz1]   *)
+  (*  because +0x28e set it for the two [bad:] branches that no longer fire. *)
+  (* --------------------------------------------------------------- *)
+  Definition kxc_at_2a6
+      (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z)
+      (size : Z) (used2 : gset Z)
+      (plen : nat) (pfun : nat -> bv 8)
+      (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
+      (afun : nat -> nat -> bv 8)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (M : regfile) (K : nat) (C : iProp Σ)
+      (sp0 ra0 s00 s10 s20 pv av : mword 64)
+      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
+      (ef : nat -> bv 8) (P : uptd) (oldsz sz1 : mword 64) (c : nat) : iProp Σ :=
+    (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
+       M !!! Regidx Rs0 = sp0 /\
+       M !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64) /\
+       M !!! Regidx Rs2
+         = (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64) /\
+       M !!! Regidx Rs4 = sz1 /\
+       M !!! Regidx Rs5 = proc_addr jp /\
+       M !!! Regidx Rs6 = page_base P.(ud_root) /\
+       M !!! Regidx Rs10 = oldsz ⌝ ∗
+     ⌜ (c <= na)%nat /\ (c <= MAXARG)%nat /\
+       avf c = (mword_of_int 0 : mword 64) /\
+       kxc_stack_ok (uint sz1) (uint sz1 - 4096) alen c ⌝ ∗
+     ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
+       um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
+     pc_is (mword_of_int (KXB + 0x2a6) : mword 64) ∗
+     sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
+     cpu_own 0 true (proc_addr jp) C true ∅ ∗
+     kxc_d_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
+               plen pfun na avf aslen afun pidv V dqb dqs dqa
+               sp0 ra0 s00 s10 s20 pv av
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c)%I.
 
 End KexecBSeam.

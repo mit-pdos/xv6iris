@@ -65,7 +65,7 @@ Import Defs.
 Definition wp_sleep_prepare_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (C : iProp Σ) (b : bool)
-    (lks : gset nat) :=
+    (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sleep_prepare in
   let pj := proc_addr j in
   (* a0 = the channel *)
@@ -81,7 +81,7 @@ Definition wp_sleep_prepare_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdsl
   (14 <= av)%nat ->
   (* the caller's held set must bound below "proc"'s rank (LockRank.v);
      [locks_below_not_elem] gives the non-membership the ghost step needs. *)
-  locks_below lks (lock_rank "proc") ->
+  locks_below lks "proc" ->
   sie_cap_gpr m av b pj -∗
   cpu_own n eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -101,6 +101,6 @@ Module Type SLEEP_PREPARE.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (C : iProp Σ) (b : bool)
-      (lks : gset nat),
+      (lks : gset string),
       wp_sleep_prepare_sconf_body γs j γl m av n eb C b lks.
 End SLEEP_PREPARE.

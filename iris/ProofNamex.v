@@ -1078,7 +1078,7 @@ Section ProofNamexMain.
       (g : log_names) (gfs : fs_names) (bn : bio_names)
       (cov : gset Z) (logstart bmapstart inodestart size : Z)
       (used : gset Z) (cwdv : mword 64) (npar : bool) (n : nat) (Sb : gset Z)
-      (pidv : mword 32) (dq dqb dqs dqc : dfrac) (fuel : nat) (CIDl : CpuId) (lks : gset nat) : iProp Σ :=
+      (pidv : mword 32) (dq dqb dqs dqc : dfrac) (fuel : nat) (CIDl : CpuId) (lks : gset string) : iProp Σ :=
     (* THE GROWING SET (fs-sysfile GR-2b, retrofit 6).  [Sb] is the caller's,
        fixed; [Scur] is the loop's running set, existentially fresh at every
        turn because each iteration's iunlockput returns a set it chose.  The
@@ -1155,7 +1155,7 @@ Section ProofNamexMain.
       (g : log_names) (gfs : fs_names) (bn : bio_names)
       (cov : gset Z) (logstart bmapstart inodestart size : Z)
       (cwdv : mword 64) (pidv : mword 32) (dq dqb dqs dqc : dfrac)
-      (CIDt : CpuId) (lks : gset nat) : iProp Σ :=
+      (CIDt : CpuId) (lks : gset string) : iProp Σ :=
     (∀ (Mt : regfile) (nf' : nat -> bv 8),
      ⌜nx_regs m sp0 (pa_add pv e) ipv nb
         (m !!! Regidx Ra1 : mword 64) Mt⌝ -∗
@@ -1211,7 +1211,7 @@ Section ProofNamexMain.
       (n : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_namex_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                         ga gf cov logstart bmapstart inodestart nib
                         size dev used cwdv plen pfun nfun npar n Sb
@@ -5884,7 +5884,7 @@ Section ProofNamexMain.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_namex_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used cwdv plen pfun nfun npar n

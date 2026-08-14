@@ -603,7 +603,7 @@ Section ProofReparentLoop.
       (ps : list (mword 64)) (dqi : dfrac)
       (vra vs0 vs1 vs2 vs3 vs4 : mword 64)
       (vs5 vs6 vs7 vs8 vs9 vs10 vs11 : mword 64)
-      (lvl av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (lvl av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     length γs = NPROC ->
     length ps = NPROC ->
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
@@ -611,7 +611,7 @@ Section ProofReparentLoop.
     (* wakeup's order premise, carried verbatim through the scan: the loop
        neither acquires nor releases anything itself, so [lks] -- and hence
        this bound -- is a loop INVARIANT, unchanged across every iteration. *)
-    locks_below lks (lock_rank "proc") ->
+    locks_below lks "proc" ->
     procs_inv γs -∗
     panic_wp_any -∗
     (* the exit continuation: control at the epilogue entry [reparent+0x46]. *)
@@ -1046,7 +1046,7 @@ Section ProofReparent.
 
   Lemma wp_reparent_sconf `{GEN : GenId} `{CID0 : CpuId}
        (m : regfile) (γs : list gname) (pme ip : mword 64)
-      (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
     : wp_reparent_sconf_body m γs pme ip ps dqi lvl K eb C b lks.
   Proof.
     cbv beta delta [wp_reparent_sconf_body].

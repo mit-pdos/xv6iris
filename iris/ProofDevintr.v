@@ -122,7 +122,7 @@ Section ProofDevintr.
   Lemma di_epi
       (m0 M : regfile) (sp0 ra0 s00 retv : mword 64)
       (k lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (dq : dfrac) (sc : mword 64) (v3 v4 : mword 64) (lks : gset nat) :
+      (dq : dfrac) (sc : mword 64) (v3 v4 : mword 64) (lks : gset string) :
     m0 !!! Regidx csp_rs1 = sp0 ->
     m0 !!! Regidx ra_idx = ra0 ->
     m0 !!! Regidx s0_idx = s00 ->
@@ -254,7 +254,7 @@ Section ProofDevintr.
       (γu : uart_names) (γv : disk_names)
       (m0 M : regfile) (sp0 ra0 s00 s10 irq : mword 64)
       (k lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (dq : dfrac) (sc : mword 64) (v4 : mword 64) (lks : gset nat) :
+      (dq : dfrac) (sc : mword 64) (v4 : mword 64) (lks : gset string) :
     (6 <= k)%nat ->
     m0 !!! Regidx csp_rs1 = sp0 ->
     m0 !!! Regidx ra_idx = ra0 ->
@@ -399,7 +399,7 @@ Section ProofDevintr.
       (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (dq : dfrac) (sc : mword 64) (lks : gset nat)
+      (dq : dfrac) (sc : mword 64) (lks : gset string)
     : wp_devintr_sconf_body γu γv γdk γtl γs pd pav pu m av lvl eb p C dq sc lks.
   Proof.
     cbv beta delta [wp_devintr_sconf_body].

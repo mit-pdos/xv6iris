@@ -76,7 +76,7 @@ Import Defs.
 
 Definition wp_kkill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
      (γs : list gname)
-    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat) :=
+    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kkill in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   length γs = NPROC ->
@@ -87,7 +87,7 @@ Definition wp_kkill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
      held set must bound below "proc"'s rank (LockRank.v).  Trivial at
      [lks = ∅]; [locks_below_not_elem] gives the non-membership the ghost
      step needs. *)
-  locks_below lks (lock_rank "proc") ->
+  locks_below lks "proc" ->
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -108,6 +108,6 @@ Module Type KKILL.
   Parameter wp_kkill_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
        (γs : list gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat),
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string),
       wp_kkill_sconf_body γs m av n eb p C b lks.
 End KKILL.

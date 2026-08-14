@@ -428,7 +428,7 @@ Section ProofUvmunmap.
       (b : bool) (p spr va : mword 64) (uroot : mword 44)
       (done npages : nat) (df : bool) (fx um : gmap (mword 27) (mword 64))
       (K ilvl : nat) (eb : bool) (C : iProp Σ) (mm : regfile)
-      (CIDt : CpuId) (lks : gset nat) : iProp Σ :=
+      (CIDt : CpuId) (lks : gset string) : iProp Σ :=
     (∀ (mt : regfile) (t' : ptree) (m' : gmap (mword 27) (mword 64)),
      ⌜ mt !!! Regidx csp_rs1 = spr
        /\ mt !!! Regidx Rs2 = add_vec va (mword_of_int (4096 * Z.of_nat done))
@@ -452,7 +452,7 @@ Section ProofUvmunmap.
       (b : bool) (p spr va : mword 64) (uroot : mword 44)
       (done npages : nat) (df : bool) (um : gmap (mword 27) (mword 64))
       (K ilvl : nat) (eb : bool) (C : iProp Σ) (mm mw : regfile) (t : ptree)
-      (CIDs : CpuId) (lks : gset nat) : iProp Σ :=
+      (CIDs : CpuId) (lks : gset string) : iProp Σ :=
     (∀ ms : regfile,
      ⌜ ms !!! Regidx csp_rs1 = spr
        /\ ms !!! Regidx Rs1 = mw !!! Regidx Ra0
@@ -476,7 +476,7 @@ Section ProofUvmunmap.
   Local Lemma uu_loop `{CID0 : CpuId} (γa : gname)
       (mm : regfile) (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
       (um : gmap (mword 27) (mword 64)) (npages K : nat) (eb b df : bool)
-      (p : mword 64) (C : iProp Σ) (va spr : mword 64) (ilvl : nat) (lks : gset nat) :
+      (p : mword 64) (C : iProp Σ) (va spr : mword 64) (ilvl : nat) (lks : gset string) :
     (22 <= K)%nat ->
     (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
     (* the WIDE bound: the cursor stays inside the Sv39 user space and does
@@ -505,7 +505,7 @@ Section ProofUvmunmap.
     uu_thr mm m ->
     (* the loop's kfree only runs when [do_free != 0] ([destruct df] below);
        at [df = false] the run never touches a lock at all. *)
-    (if df then locks_below lks (lock_rank "kmem") else True) ->
+    (if df then locks_below lks "kmem" else True) ->
     sie_cap_gpr m (K - 8) b p -∗
     cpu_own ilvl eb p C b lks -∗
     kernel_text -∗
@@ -1200,7 +1200,7 @@ Section ProofUvmunmap.
       (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
       (um : gmap (mword 27) (mword 64))
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (ilvl : nat) (b df : bool) (lks : gset nat) :
+      (C : iProp Σ) (ilvl : nat) (b df : bool) (lks : gset string) :
     let pcE : mword 64 := mword_of_int KernelSyms.uvmunmap in
     let va := mm !!! Regidx (mword_of_int 11) in
     let vpn0 := svpn_of va in
@@ -1220,7 +1220,7 @@ Section ProofUvmunmap.
     (forall k : nat, (k < npages)%nat -> uu_vpn_ok df (vpn_at vpn0 k)) ->
     (* threaded straight to [uu_loop]: kfree's "kmem" bound applies only
        when [do_free != 0]. *)
-    (if df then locks_below lks (lock_rank "kmem") else True) ->
+    (if df then locks_below lks "kmem" else True) ->
     sie_cap_gpr mm K b p -∗
     cpu_own ilvl eb p C b lks -∗
     kernel_text -∗
@@ -1711,7 +1711,7 @@ Section SealUvmunmap.
   Lemma wp_uvmunmap_sconf
       (γa : gname) (mm : regfile)
       (P : uptd) (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset nat)
+      (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset string)
     : wp_uvmunmap_sconf_body γa mm P npages K eb p C ilvl b lks.
   Proof.
     cbv beta delta [wp_uvmunmap_sconf_body].
@@ -1755,7 +1755,7 @@ Section SealUvmunmapBare.
       (γa : gname) (mm : regfile)
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset nat)
+      (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset string)
     : wp_uvmunmap_bare_sconf_body γa mm uroot um npages K eb p C ilvl b lks.
   Proof.
     cbv beta delta [wp_uvmunmap_bare_sconf_body].
@@ -1800,7 +1800,7 @@ Section SealUvmunmapFixed.
       (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
       (um : gmap (mword 27) (mword 64)) (v : mword 27)
       (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset nat)
+      (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset string)
     : wp_uvmunmap_fixed_sconf_body γa mm fx uroot um v K eb p C ilvl b lks.
   Proof.
     cbv beta delta [wp_uvmunmap_fixed_sconf_body].

@@ -572,7 +572,7 @@ Section InstallTransDefs.
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool)
-      (R : iProp Σ) (lks : gset nat) : iProp Σ :=
+      (R : iProp Σ) (lks : gset string) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
@@ -600,7 +600,7 @@ Section InstallTransDefs.
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool)
-      (R : iProp Σ) (lks : gset nat) :
+      (R : iProp Σ) (lks : gset string) :
     (* the guard is at the LITERAL [true] now, matching it_cont's own index *)
     (true = false \/ proc_addr j = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
     it_cont (CID0 := CIDa)  j bn γfs logstart n W Lw L D pidv dq m K eb C b R lks -∗
@@ -774,7 +774,7 @@ Section InstallTransBlocks.
       (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (R : iProp Σ) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (R : iProp Σ) (lks : gset string) :
     (K_install_trans <= K)%nat ->
     M !!! Regidx csp_rs1 = it_spr m ->
     M !!! Regidx Rs9 = (m !!! Regidx Rs9 : mword 64) ->
@@ -1201,7 +1201,7 @@ Section InstallTransBlocks.
       (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (R : iProp Σ) (lks : gset nat) :
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (R : iProp Σ) (lks : gset string) :
     (K_install_trans <= K)%nat ->
     log_geom_ok cov logstart ->
     (j < NPROC)%nat ->
@@ -1217,7 +1217,7 @@ Section InstallTransBlocks.
     (* install_trans's own cone: it directly breads/bwrites/brelses/bunpins
        against "bcache"(4) only.  Threaded on this recursive helper's own
        binder list -- every recursive call re-proves it unchanged. *)
-    locks_below lks (lock_rank "bcache") ->
+    locks_below lks "bcache" ->
     sie_cap_gpr M (K - 10)%nat eb (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C eb lks -∗
     trap_csrs_ext eb -∗
@@ -2188,7 +2188,7 @@ Section ProofInstallTrans.
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (R : iProp Σ) (lks : gset nat)
+      (b : bool) (R : iProp Σ) (lks : gset string)
     : wp_install_trans_sconf_body γs j γl γu γd γk pd pav pu bn γfs
                                   cov logstart dev recovering n W Lw L D
                                   pidv dq m K eb C b R lks.

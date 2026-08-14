@@ -20,6 +20,23 @@ B1, the whole phdr loop with the inlined loadseg loop inside it, and all
 seven of phase B's `bad:` entries.**  `ProofKexecB3.kxc_b2` /
 `kxc_b2z` are the two paths from phase B1's two outputs to `+0x1ae`.
 
+**THE PHASE B2/B3/C BUILD CHAIN IS BROKEN.** `ProofKexecB3.v` no longer
+`Require`s `ProofKexecB2.v`, and `ProofKexecC.v` requires neither
+`ProofKexecB2.v` nor `ProofKexecB3.v` — `coqdep` confirms none of the three
+`.vo`s appears in another's dependency list. `SpecKexecB2.v` states
+`kxc_ls`/`kxc_bad324` (what B3 actually consumes out of B2) as `Module Type
+KEXECB2` Parameters over `_body` `Definition`s, plus the WHOLE of
+`KexecB2Frame`/`KexecB2Res` (the frame algebra and the resource bundle,
+verbatim — B3 turned out to call several of their small lemmas too, not
+just the two headline `Definition`s); `ProofKexecB3.v`'s `KexecB2Proof`
+ascribes `: KEXECB2` and `ProofKexecB3.v` takes `B2` as an abstract functor
+argument of that type instead of applying the functor itself. `SpecKexecB3.v`
+does the same for `kxc_b2`/`kxc_b2z`, ready for when phase C's argv loop
+needs them — `ProofKexecC.v` does not yet take a `(B3 : KEXECB3)` argument
+because it does not yet consume them; add that argument, not a
+`Require Import ProofKexecB3.`, when it does. See SpecKexecB2.v's header
+for the full rationale and the design/spec-modules.md pattern this applies.
+
 **PHASE C IS IN PROGRESS.**  Its design is worked out in full below (control
 flow re-verified independently, instruction by instruction, off the
 generated `CodeKexec.v` — not just transcribed from an earlier read), and its
@@ -429,19 +446,103 @@ named:**
   `rewrite` it in, never relying on `f_equal` to hand `lia` a clean goal
   through a non-transparent wrapper.
 
-**Still open in phase C:** the three-way final branch at
-+0x268/+0x26a/+0x26e (natural end into `kxc_at_272`, loop-back into
-`kxc_at_21a (S c)`, or MAXARG-exceeded into the shared `-1` tail via yet
-ANOTHER stub); BOTH the `+0x358` and `+0x35c` connectors into
-`kxc_bad_1d6` (needs `kxc_ustack_collapse` first, to turn `kxc_frameC`'s
-split-at-`c` ustack back into `kxc_frame_at`'s uniform shape — see the
-design note above; the SAME connector code should serve both stubs AND
-the `+0x26e` one, since all three just do `mv s3,s4` before falling into
-the shared tail — worth writing ONE lemma the first time it's needed
-rather than three copies); `kxc_argv_loop` (the fuel-induction wrapper,
-mirroring `ProofKexecB3.kxc_phdr`'s shape around `kxc_ph_step`), and the
-closing `copyout` call joining into phase D at `+0x2a6`. Then phase D,
-then `ProofKexec.v` + `LinkKexec.v`.
+**`kxc_argv_step` IS PROVEN — `Qed`, whole file 85 s, admit-free.** All
+three of its `-1` exits go through ONE connector, `kxc_c_exit_m1`, and its
+three-way final branch is closed. What the connector settled, and what to
+reuse from it:
+
+- **The three stubs really are one lemma.** `+0x358` (stack overflow),
+  `+0x35c` (copyout failed) and `+0x26e` (MAXARG) are the same two
+  instructions — `c.mv s3,s4 ; c.j +0x1d6` — at three addresses, so the
+  lemma takes the stub's Z offset, the `c.j` immediate and the two `instr`
+  facts, and the caller supplies `CodeKexec`'s own. Re-derived from
+  `CodeKexec`, not from the disassembly: all three `c.j`s do land on
+  `+0x1d6`.
+- **Its own section, closed before `KexecCLoop` opens.** A `Local Lemma`
+  applied from inside a section that fixes `CID0` bakes THAT hart into its
+  statement; these call sites are a dozen `wp_next`s past the entry hart.
+- **The resource half is the work.** `kxc_frameC_collapse` folds the loop's
+  frame — ustack SPLIT at `c`, the written prefix carrying `kxc_sp`'s
+  recurrence — back to `kxc_frame_at`'s one opaque 55-slot region, which is
+  what `kxc_bad_1d6` takes. That pulls the ELF buffer in too (slots 47..54
+  are the only part of the frame `kxc_c_res` holds OUTSIDE `kxc_frameC`),
+  and `kxc_elf_give` wants their 8-alignment — a fact about `sp0` alone, so
+  it rides as a Coq-level PREMISE of `kxc_argv_step` rather than as a
+  constant conjunct of `kxc_at_21a`. **Thread it on to the loop wrapper and
+  to phase C's top-level lemma; `kxc_at_1ae` is where it comes from.**
+- **`kxc_frameC_intro` / `kxc_c_res_intro`** are the re-assembly the loop
+  body owes on every exit and on the back edge — written once, in the same
+  section, because `iFrame` does not terminate at this altitude.
+
+**Two traps paid for here, both of which will recur:**
+1. **A bare `replace X with Y` inside the proofmode rewrites the
+   HYPOTHESES too.** The "goal" a plain `replace`/`rewrite` sees is the
+   whole `envs_entails`, so `replace 33 with ((33-c)+c)` on a goal
+   `stack_own _ 33` also hit the `33` inside a hypothesis's own `33 - c`
+   and left `33 - c + c - c` — reported as `iExact: does not match goal`,
+   which reads like a resource bug. Fix: put the arithmetic in the
+   STATEMENT of a helper (`stack_own_join (n = n1 + n2)`, `intros ->`), or
+   scope the rewrite with `iEval (…) in "H"`.
+2. **A lemma parameterised by a symbolic Z offset cannot use `pcw`.**
+   `apply bv_eq; vm_compute` needs closed literals; `avi_moi` does the
+   `pc + k` bridge symbolically instead. Same rule as the symbolic-`mword`
+   one, one type down.
+
+**A THIRD missing-conjunct finding, and this one is a KERNEL DEFECT rather
+than a proof gap — see [`../kernel-defects.md`](../kernel-defects.md).**
+`kxc_at_272` needed `(c <= 32)%nat` where the loop head `kxc_at_21a` has
+`(c < 32)%nat`, because the C tests `argc >= MAXARG` only INSIDE the loop
+body: with exactly 32 arguments the null-terminated exit is taken at
+`argc = 32` and the following `ustack[argc] = 0` writes one element past
+`uint64 ustack[MAXARG]`. Harmless as compiled (gcc reserved 33 slots), but
+**do not "tighten" that conjunct back to `< 32`** — the natural-exit arm
+becomes unprovable at exactly that case, which is the proof correctly
+refusing to certify the off-by-one.
+
+**PHASE C IS DONE — `+0x1ae .. +0x2a6` entire, admit-free.**  Four lemmas:
+`kxc_c_setup`, `kxc_argv_step`, `kxc_argv_loop`, `kxc_c_close`, plus the
+shared `-1` connector `kxc_c_exit_m1`.  Three things from the closing block
+that the next phase (or the next loop anywhere) should reuse:
+
+- **`kxc_stack_ok`'s first conjunct is universally quantified and the loop
+  invariant carries the bound only at the CURRENT index — and that is
+  enough.**  `kxc_sp` is non-increasing (`kxc_sp_mono`), so the bound at the
+  last index implies it at every earlier one.  Do not strengthen the
+  invariant to the `forall` form; it is derivable.
+- **copyout wants a NAMED BYTE run and a frame gives WORD cells.**
+  `StackBytes` has the whole round trip: `slotsn_bytes_own` (which also
+  hands out the eight-alignment facts the return needs), `bytes_own_name`
+  to choose the naming function, `bytes_own_of_name` + `bytes_own_slotsn`
+  coming back, then a `stack_own` fold.
+- **A `bv_wrap` normalisation needs the sum RE-ASSOCIATED between passes.**
+  `Z.add` is left-nested, so after one `bv_wrap_add_idemp_l` pass the
+  surviving wrap sits at the head of `(w + sp0) + -256` rather than as the
+  immediate left operand of the top `+`, and the lemma silently stops
+  matching.  The tell is a residual `bv_wrap` in an otherwise linear goal
+  and a "Cannot find witness" from `lia`.  `rewrite -!Z.add_assoc` between
+  the two passes fixes it.
+
+**What is left: phase D (`+0x2a6 .. +0x31a`), then `ProofKexec.v` +
+`LinkKexec.v`, then `sys_exec`.**  Phase D is drafted in `ProofKexecD.v`
+(not yet in `_CoqProject`): the name scan's three lemmas
+(`kxd_scan_tail` / `kxd_name_step` / `kxd_name_loop`) and the commit's
+helper facts are written; the commit body itself is not.
+
+**THE NAME SCAN'S INVARIANT IS DELIBERATELY WEAK, and that is the design
+decision worth keeping.** `kexec_ok` asks only for an EXISTENTIAL name of
+the right length, so the scan never has to model "the byte after the final
+`/`" — all it carries is that the pointer it leaves in slot 66 is INSIDE
+the path buffer, which is exactly what `safestrcpy`'s `ssc_src_ok` needs
+(its second disjunct, at the buffer's own NUL). A dozen lines of invariant
+instead of a string-search specification.
+
+**The commit block opens `proc_priv` THREE times, not once**, and that is
+forced rather than clumsy: the trapframe write at +0x2aa needs
+`proc_priv_newspace`, the `safestrcpy` in the middle needs
+`proc_priv_name`, and the two accessors cannot be open at once. The three
+closes compose to the contract's own one-shot `upd_exec` — `kxd_upd_compose`
+is that equation, and `ProcInv.upd_exec_compose` is why the order comes out
+right.
 
 <details>
 <summary>Superseded diagnosis (kept for the record — the "17 GB" symptom
@@ -526,7 +627,9 @@ edge — is the unit the phdr loop's induction is over.
 | `ProofKexecA.v` — **PHASE A PROVEN** (`kxc_a1`/`kxc_a2`/`kxc_phaseA`) | **landed, proven** |
 | `ProofKexecB.v` — **B1 PROVEN** (`kxc_b1`) | **landed, proven** |
 | `ProofKexecSeam.v` — the B1/B2 seam layer (the two seam states, the frame algebra, the elf carve, `kxc_cs_cases`) | **landed, proven** |
+| `SpecKexecB2.v` — `KEXECB2` (the `kxc_ls`/`kxc_bad324` interface B3 consumes), the frame algebra and the resource bundle | **landed, proven** |
 | `ProofKexecB2.v` — `kxc_frameBpin`, the shared `bad:` tail `kxc_bad324`, `kxc_res` + the peel/seal pairs, and the loadseg loop `kxc_ls` | **landed, proven** |
+| `SpecKexecB3.v` — `KEXECB3` (the `kxc_b2`/`kxc_b2z` interface phase C will consume) | **landed, proven, not yet consumed** |
 | `ProofKexecB3.v` — **THE PHDR LOOP**: `kxc_incr`, `kxc_ph_step`, `kxc_phdr`, `kxc_seam1a2`, `kxc_close`, and phase B2 whole (`kxc_b2` / `kxc_b2z`) | **landed, proven** |
 | `W32Arith.v` — the two-ABI-uint laws and the `slli/srli` truncation | **landed, proven** |
 | `SpecUvmalloc` / `ProofUvmalloc` — the success arm now names the new LEAVES (blocker §6) | **landed, proven** |
@@ -545,9 +648,31 @@ modules each already named. **Every later phase will hit this too** — C and D
 both reach the epilogue through tails A already proved — so put the next shared
 tail in `ProofKexecTail.v` when you prove it, and keep phase files reaching each
 other only through that one.
+
+**THAT RULE IS FOR REUSABLE VOCABULARY — A PROVEN, PHASE-SPECIFIC FACT (e.g.
+a whole loop's induction) NEEDS THE `SpecKexecB2.v`/`SpecKexecB3.v` MOVE
+INSTEAD.** `ProofKexecTail.v`'s move works when the shared thing can just be
+RELOCATED to a neutral leaf both phases require directly (it is cheap and has
+no phase-specific proof weight). `kxc_ls`/`kxc_bad324`/`kxc_b2`/`kxc_b2z` are
+the opposite: each is the expensive PAYOFF of one phase's own file (a loop
+induction, a resource-shuffle) that the NEXT phase only ever consumes as an
+opaque fact, never re-derives. Relocating those would just drag their whole
+proof machinery into the shared leaf. The fix is `spec-modules.md`'s
+Spec/Proof functor pattern turned inward on one function's own phase split:
+state the consumed lemmas' types (plus whatever pure vocabulary they are
+phrased over — take the WHOLE section they live in, not just the headline
+`Definition`, since the next phase tends to call the small lemmas around it
+too) in a `Module Type` in a `Spec<Phase><Phase>.v` file; have the producing
+phase's functor ascribe to it; have the consuming phase take the producer as
+an ABSTRACT functor argument of that type rather than applying the producer's
+functor itself. The two phases then meet only through the fast, `Qed`-free
+Spec file — `coqdep` is how you confirm it worked (grep the consuming phase's
+`.vo` dependency line for the producer's `.vo`; it should not appear).
 | phase C — the shared `-1` tail (`+0x1d6 .. +0x1f2`), `KexecTailProofC.kxc_bad_1d6` | **landed, proven** |
-| phase C — the setup block (`+0x1ae .. +0x218`), `ProofKexecC.KexecCProof.KexecCSetup.kxc_c_setup` | **proven, uncommitted** |
-| phase C — the argv loop (`+0x21a .. +0x272`) and the closing copyout | **NEXT** |
+| phase C — the setup block (`+0x1ae .. +0x218`), `ProofKexecC.KexecCProof.KexecCSetup.kxc_c_setup` | **landed, proven** |
+| phase C — the argv loop's STEP (`+0x21a .. +0x272`, one iteration), `kxc_argv_step`, and the shared `-1` connector `kxc_c_exit_m1` | **landed, proven** |
+| phase C — `kxc_argv_loop` (the fuel induction over the step) | **landed, proven** |
+| phase C — the closing copyout (`+0x272 .. +0x2a6`), `kxc_c_close`, and the `kxc_d_res` / `kxc_at_2a6` seam | **landed, proven** |
 | phase D, `ProofKexec.v`, `LinkKexec.v`, `sys_exec` | not started |
 
 **`ProofKexecSeam.kxc_cs_cases` — the thirteen callee-saved indices,

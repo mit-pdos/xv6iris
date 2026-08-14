@@ -364,7 +364,7 @@ Section CtBodies.
 
   (* the function's own exit, as a [wp_next] at the entry hart *)
   Definition ct_ret `{CID0 : CpuId} (pme : mword 64) (m0 : regfile)
-      (K lvl : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) : iProp Σ :=
+      (K lvl : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
        ∀ Mf : regfile,
          ⌜ callee_saved m0 Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
@@ -378,7 +378,7 @@ Section CtBodies.
   (* =================================================================== *)
   Lemma ct_epi `{CID : CpuId} (CID0 : CPU)
       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool) (C : iProp Σ)
-      (sp0 : mword 64) (b : bool) (lks : gset nat) :
+      (sp0 : mword 64) (b : bool) (lks : gset string) :
     m0 !!! Regidx csp_rs1 = sp0 ->
     M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ->
     ct_cs_hi M m0 ->
@@ -532,14 +532,14 @@ Section ProofConsoleintr.
   (* =================================================================== *)
   Definition ct_exit_prop `{CID0 : CpuId}
       (γc : gname) (pme : mword 64) (m0 : regfile) (K lvl : nat) (eb : bool)
-      (C : iProp Σ) (b : bool) (sp0 : mword 64) (lks : gset nat) : iProp Σ :=
+      (C : iProp Σ) (b : bool) (sp0 : mword 64) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) b pme (fun (CIDx : CpuId) =>
        ∀ M : regfile,
          ⌜ M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ⌝ -∗
          ⌜ ct_cs_hi M m0 ⌝ -∗
          sie_cap_gpr M (trap_res b + (K - 6))%nat false pme -∗
          pc_is (mword_of_int (CT + 0x104)) -∗
-         cpu_own (S lvl) eb pme C false ({[lock_rank "cons"]} ∪ lks) -∗
+         cpu_own (S lvl) eb pme C false ({["cons"]} ∪ lks) -∗
          arm_pay lvl eb pme -∗
          locked γc cpu_id -∗
          cons_res -∗
@@ -547,14 +547,14 @@ Section ProofConsoleintr.
          WP (Loop : expr riscv_lang)))%I.
 
   Lemma ct_mk_exit (γc : gname) (pme : mword 64) (m0 : regfile) (K lvl : nat)
-      (eb : bool) (C : iProp Σ) (b : bool) (sp0 : mword 64) (lks : gset nat) :
+      (eb : bool) (C : iProp Σ) (b : bool) (sp0 : mword 64) (lks : gset string) :
     m0 !!! Regidx csp_rs1 = sp0 ->
     (consoleintr_stack <= K)%nat ->
     match lvl with O => eb | S _ => false end = b ->
     (* release's set arithmetic: the entry [cpu_own] holds
-       [{[lock_rank "cons"]} ∪ lks], and release needs [lock_rank "cons"] to
-       drop back OUT of it cleanly, i.e. [lock_rank "cons" ∉ lks]. *)
-    locks_below lks (lock_rank "cons") ->
+       [{["cons"]} ∪ lks], and release needs [lock_rank "cons"] to
+       drop back OUT of it cleanly, i.e. ["cons" ∉ lks]. *)
+    locks_below lks "cons" ->
     kernel_text -∗ is_conslock γc -∗ ct_saved sp0 m0 -∗
     ct_ret (CID0 := CID) pme m0 K lvl eb C b lks -∗
     ct_exit_prop (CID0 := CID) γc pme m0 K lvl eb C b sp0 lks.
@@ -618,11 +618,11 @@ Section ProofConsoleintr.
       rewrite /X3 upd_ne; [| congruence]. rewrite /X2 upd_ne; [| congruence].
       rewrite /X1 upd_ne; [| congruence]. reflexivity. }
     iApply (Release.wp_release_sconf γc a_cons "cons"%string cons_res X3
-              lvl eb pme C (K - 6)%nat ({[lock_rank "cons"]} ∪ lks) HX3lka
+              lvl eb pme C (K - 6)%nat ({["cons"]} ∪ lks) HX3lka
               ltac:(unfold consoleintr_stack in HK; lia)
               with "Hcg Ht Hpc Hlk Hlocked Hres Hcnt Hpay").
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hcsr Hcnt". rgall.
-    assert (Hsetback : ({[lock_rank "cons"]} ∪ lks) ∖ {[lock_rank "cons"]} = lks)
+    assert (Hsetback : ({["cons"]} ∪ lks) ∖ {["cons"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
     iEval (rewrite HX3ra) in "Hpc".
@@ -648,7 +648,7 @@ Section ProofConsoleintr.
   (* =================================================================== *)
   Definition ct_wake_prop `{CID0 : CpuId}
       (γc : gname) (pme : mword 64) (m0 : regfile)
-      (K lvl : nat) (eb : bool) (C : iProp Σ) (b : bool) (sp0 : mword 64) (lks : gset nat) : iProp Σ :=
+      (K lvl : nat) (eb : bool) (C : iProp Σ) (b : bool) (sp0 : mword 64) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) b pme (fun (CIDw : CpuId) =>
        ∀ (M : regfile) (wv : mword 64),
          ⌜ M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ⌝ -∗
@@ -656,7 +656,7 @@ Section ProofConsoleintr.
          ⌜ ct_cs_hi M m0 ⌝ -∗
          sie_cap_gpr M (trap_res b + (K - 6))%nat false pme -∗
          pc_is (mword_of_int (CT + 0x156)) -∗
-         cpu_own (S lvl) eb pme C false ({[lock_rank "cons"]} ∪ lks) -∗
+         cpu_own (S lvl) eb pme C false ({["cons"]} ∪ lks) -∗
          arm_pay lvl eb pme -∗
          locked γc cpu_id -∗
          cons_res -∗
@@ -665,22 +665,22 @@ Section ProofConsoleintr.
          WP (Loop : expr riscv_lang)))%I.
 
   Lemma ct_mk_wake (γc : gname) (γs : list gname) (pme : mword 64) (m0 : regfile)
-      (K lvl : nat) (eb : bool) (C : iProp Σ) (b : bool) (sp0 : mword 64) (lks : gset nat) :
+      (K lvl : nat) (eb : bool) (C : iProp Σ) (b : bool) (sp0 : mword 64) (lks : gset string) :
     (consoleintr_stack <= K)%nat ->
     length γs = NPROC ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     match lvl with O => eb | S _ => false end = b ->
     (* wakeup is called while cons.lock is STILL held, i.e. its held set is
-       [{[lock_rank "cons"]} ∪ lks], not bare [lks] -- so this is the same
+       [{["cons"]} ∪ lks], not bare [lks] -- so this is the same
        "cons" order fact as [ct_mk_exit], lifted (via [locks_below_mono] and
        [locks_below_union_singleton]) to wakeup's own "proc" (11) premise
        below. *)
-    locks_below lks (lock_rank "cons") ->
+    locks_below lks "cons" ->
     kernel_text -∗ panic_wp_any -∗ procs_inv γs -∗
     ct_wake_prop (CID0 := CID) γc pme m0 K lvl eb C b sp0 lks.
   Proof.
     intros HK Hlen Hlvl Hb Hbelow. subst b.
-    assert (Hbelow_proc : locks_below ({[lock_rank "cons"]} ∪ lks) (lock_rank "proc")).
+    assert (Hbelow_proc : locks_below ({["cons"]} ∪ lks) "proc").
     { apply locks_below_union_singleton; [vm_compute; lia |].
       lkbelow. }
     iIntros "#Ht #Hpanic #Hpinv".
@@ -765,7 +765,7 @@ Section ProofConsoleintr.
       rewrite /W2 upd_ne; [| congruence]. rewrite /W1 upd_ne; [| congruence]. reflexivity. }
     iApply (Wakeup.wp_wakeup_sconf W4 γs pme (S lvl)
               (trap_res (match lvl with O => eb | S _ => false end) + (K - 6))%nat eb C false
-              ({[lock_rank "cons"]} ∪ lks)
+              ({["cons"]} ∪ lks)
               ltac:(unfold consoleintr_stack in HK; lia)
               ltac:(intro r; apply rf_to_gmap_dom) Hlen ltac:(lia) Hbelow_proc
               with "Hcg Hcnt Ht Hpc Hpanic Hpinv").
@@ -801,7 +801,7 @@ Section ProofConsoleintr.
   Lemma ct_restore23 `{CIDq : CpuId}
       (γc : gname) (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
       (C : iProp Σ) (b : bool) (sp0 : mword 64) (pc1 pc2 pc3 : mword 64)
-      (jimm : mword 11) (lks : gset nat) :
+      (jimm : mword 11) (lks : gset string) :
     M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ->
     ct_cs_top M m0 ->
     add_vec_int pc1 2 = pc2 ->
@@ -813,7 +813,7 @@ Section ProofConsoleintr.
     (b = false \/ pme = zero_reg -> (CIDq : CPU) = (CID : CPU)) ->
     (* same "cons" bound as the sibling arms: this one reaches consputc,
        whose cone runs up to "uart" (15). *)
-    locks_below lks (lock_rank "cons") ->
+    locks_below lks "cons" ->
     instr pc1 true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")),
                           sp, Regidx Rs2, false, 8)) -∗
     instr pc2 true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")),
@@ -821,7 +821,7 @@ Section ProofConsoleintr.
     instr pc3 true (JAL (sign_extend' 21 (concat_vec jimm ('b"0")), zreg)) -∗
     sie_cap_gpr M (trap_res b + (K - 6))%nat false pme -∗
     pc_is pc1 -∗
-    cpu_own (S lvl) eb pme C false ({[lock_rank "cons"]} ∪ lks) -∗
+    cpu_own (S lvl) eb pme C false ({["cons"]} ∪ lks) -∗
     arm_pay lvl eb pme -∗
     locked γc cpu_id -∗
     cons_res -∗
@@ -894,7 +894,7 @@ Section ProofConsoleintr.
   Definition ct_kill_prop `{CID0 : CpuId}
       (γc : gname)
       (pme : mword 64) (m0 : regfile) (K lvl : nat) (eb : bool)
-      (C : iProp Σ) (b : bool) (sp0 : mword 64) (lks : gset nat) : iProp Σ :=
+      (C : iProp Σ) (b : bool) (sp0 : mword 64) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) b pme (fun (CIDk : CpuId) =>
        ∀ (M : regfile) (rr ww ee : mword 32) (bs : list (bv 8)),
          ⌜ M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ⌝ -∗
@@ -907,7 +907,7 @@ Section ProofConsoleintr.
          ct_exit_prop (CID0 := CID0) γc pme m0 K lvl eb C b sp0 lks -∗
          sie_cap_gpr M (trap_res b + (K - 6))%nat false pme -∗
          pc_is (mword_of_int (CT + 0xb8)) -∗
-         cpu_own (S lvl) eb pme C false ({[lock_rank "cons"]} ∪ lks) -∗
+         cpu_own (S lvl) eb pme C false ({["cons"]} ∪ lks) -∗
          arm_pay lvl eb pme -∗
          locked γc cpu_id -∗
          a_cons_r ↦₄ rr -∗ a_cons_w ↦₄ ww -∗ a_cons_e ↦₄ ee -∗ cons_data bs -∗
@@ -918,14 +918,14 @@ Section ProofConsoleintr.
 
   Lemma ct_mk_kill (γtx γc : gname) (γu : uart_names) (γv : disk_names)
       (pme : mword 64) (m0 : regfile) (K lvl : nat) (eb : bool)
-      (C : iProp Σ) (b : bool) (sp0 : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (b : bool) (sp0 : mword 64) (lks : gset string) :
     (consoleintr_stack <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     match lvl with O => eb | S _ => false end = b ->
     (* the entry [cpu_own] is at the plain [lks] -- consputc's own [uart]
        premise is reached by [lkbelow] pushing this across the [cons]
        singleton [ct_kill_prop]'s continuation adds. *)
-    locks_below lks (lock_rank "cons") ->
+    locks_below lks "cons" ->
     kernel_text -∗ panic_wp_any -∗
     dev_inv γu γv -∗ is_txlock γtx γu -∗ uart_sent_sub γu [] -∗
     ct_kill_prop (CID0 := CID) γc pme m0 K lvl eb C b sp0 lks.
@@ -1107,7 +1107,7 @@ Section ProofConsoleintr.
       by (rewrite /L6; apply upd_eq).
     iApply (Consputc.wp_consputc_sconf γtx γu γv L6
               (trap_res (match lvl with O => eb | S _ => false end) + (K - 6))%nat
-              [] (S lvl) eb C false pme ({[lock_rank "cons"]} ∪ lks)
+              [] (S lvl) eb C false pme ({["cons"]} ∪ lks)
               ltac:(unfold consoleintr_stack, consputc_stack in *; lia) ltac:(lia)
               with "Hcg Hcnt Ht Hpc Hpanic Hdev Htxl Hsub").
     all: try lkbelow.
@@ -1218,7 +1218,7 @@ Section ProofConsoleintr.
   Lemma ct_cr `{CIDq : CpuId}
       (γtx γc : gname) (γu : uart_names) (γv : disk_names)
       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
-      (C : iProp Σ) (b : bool) (sp0 : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (b : bool) (sp0 : mword 64) (lks : gset string) :
     M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ->
     ct_cs_hi M m0 ->
     (consoleintr_stack <= K)%nat ->
@@ -1226,12 +1226,12 @@ Section ProofConsoleintr.
     (b = false \/ pme = zero_reg -> (CIDq : CPU) = (CID : CPU)) ->
     (* same "cons" bound as the sibling arms: this one reaches consputc,
        whose cone runs up to "uart" (15). *)
-    locks_below lks (lock_rank "cons") ->
+    locks_below lks "cons" ->
     kernel_text -∗ panic_wp_any -∗
     dev_inv γu γv -∗ is_txlock γtx γu -∗ uart_sent_sub γu [] -∗
     sie_cap_gpr M (trap_res b + (K - 6))%nat false pme -∗
     pc_is (mword_of_int (CT + 0x12e)) -∗
-    cpu_own (S lvl) eb pme C false ({[lock_rank "cons"]} ∪ lks) -∗
+    cpu_own (S lvl) eb pme C false ({["cons"]} ∪ lks) -∗
     arm_pay lvl eb pme -∗
     locked γc cpu_id -∗
     cons_res -∗
@@ -1277,7 +1277,7 @@ Section ProofConsoleintr.
                     = add_vec_int (mword_of_int (CT + 0x130) : mword 64) 4)
       by (rewrite /D2; apply upd_eq).
     iApply (Consputc.wp_consputc_sconf γtx γu γv D2
-              (trap_res b + (K - 6))%nat [] (S lvl) eb C false pme ({[lock_rank "cons"]} ∪ lks)
+              (trap_res b + (K - 6))%nat [] (S lvl) eb C false pme ({["cons"]} ∪ lks)
               ltac:(unfold consoleintr_stack, consputc_stack in *; lia) ltac:(lia)
               with "Hcg Hcnt Ht Hpc Hpanic Hdev Htxl Hsub").
     all: try lkbelow.
@@ -1464,7 +1464,7 @@ Section ProofConsoleintr.
   Lemma ct_bs `{CIDq : CpuId}
       (γtx γc : gname) (γu : uart_names) (γv : disk_names)
       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
-      (C : iProp Σ) (b : bool) (sp0 : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (b : bool) (sp0 : mword 64) (lks : gset string) :
     M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ->
     ct_cs_hi M m0 ->
     (consoleintr_stack <= K)%nat ->
@@ -1472,12 +1472,12 @@ Section ProofConsoleintr.
     (b = false \/ pme = zero_reg -> (CIDq : CPU) = (CID : CPU)) ->
     (* same "cons" bound as the sibling arms: the backspace path also
        reaches consputc, whose cone runs up to "uart" (15). *)
-    locks_below lks (lock_rank "cons") ->
+    locks_below lks "cons" ->
     kernel_text -∗ panic_wp_any -∗
     dev_inv γu γv -∗ is_txlock γtx γu -∗ uart_sent_sub γu [] -∗
     sie_cap_gpr M (trap_res b + (K - 6))%nat false pme -∗
     pc_is (mword_of_int (CT + 0xf0)) -∗
-    cpu_own (S lvl) eb pme C false ({[lock_rank "cons"]} ∪ lks) -∗
+    cpu_own (S lvl) eb pme C false ({["cons"]} ∪ lks) -∗
     arm_pay lvl eb pme -∗
     locked γc cpu_id -∗
     cons_res -∗
@@ -1639,7 +1639,7 @@ Section ProofConsoleintr.
                     = add_vec_int (mword_of_int (CT + 0x128) : mword 64) 4)
       by (rewrite /B8; apply upd_eq).
     iApply (Consputc.wp_consputc_sconf γtx γu γv B8
-              (trap_res b + (K - 6))%nat [] (S lvl) eb C false pme ({[lock_rank "cons"]} ∪ lks)
+              (trap_res b + (K - 6))%nat [] (S lvl) eb C false pme ({["cons"]} ∪ lks)
               ltac:(unfold consoleintr_stack, consputc_stack in *; lia) ltac:(lia)
               with "Hcg Hcnt Ht Hpc Hpanic Hdev Htxl Hsub").
     all: try lkbelow.
@@ -1686,17 +1686,17 @@ Section ProofConsoleintr.
   (* =================================================================== *)
   Lemma ct_kill_pre `{CIDq : CpuId}
       (γc : gname) (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
-      (C : iProp Σ) (b : bool) (sp0 : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (b : bool) (sp0 : mword 64) (lks : gset string) :
     M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ->
     ct_cs_hi M m0 ->
     (b = false \/ pme = zero_reg -> (CIDq : CPU) = (CID : CPU)) ->
     (* same "cons" bound as the sibling arms: this one reaches consputc,
        whose cone runs up to "uart" (15). *)
-    locks_below lks (lock_rank "cons") ->
+    locks_below lks "cons" ->
     kernel_text -∗
     sie_cap_gpr M (trap_res b + (K - 6))%nat false pme -∗
     pc_is (mword_of_int (CT + 0x92)) -∗
-    cpu_own (S lvl) eb pme C false ({[lock_rank "cons"]} ∪ lks) -∗
+    cpu_own (S lvl) eb pme C false ({["cons"]} ∪ lks) -∗
     arm_pay lvl eb pme -∗
     locked γc cpu_id -∗
     cons_res -∗
@@ -1905,7 +1905,7 @@ Section ProofConsoleintr.
   Lemma ct_store `{CIDq : CpuId}
       (γtx γc : gname) (γu : uart_names) (γv : disk_names)
       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
-      (C : iProp Σ) (b : bool) (sp0 : mword 64) (cv : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (b : bool) (sp0 : mword 64) (cv : mword 64) (lks : gset string) :
     M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ->
     M !!! Regidx Rs1 = cv ->
     ct_cs_hi M m0 ->
@@ -1914,12 +1914,12 @@ Section ProofConsoleintr.
     (b = false \/ pme = zero_reg -> (CIDq : CPU) = (CID : CPU)) ->
     (* same "cons" bound as the sibling arms: the store path reaches
        consputc, whose cone runs up to "uart" (15). *)
-    locks_below lks (lock_rank "cons") ->
+    locks_below lks "cons" ->
     kernel_text -∗ panic_wp_any -∗
     dev_inv γu γv -∗ is_txlock γtx γu -∗ uart_sent_sub γu [] -∗
     sie_cap_gpr M (trap_res b + (K - 6))%nat false pme -∗
     pc_is (mword_of_int (CT + 0x4e)) -∗
-    cpu_own (S lvl) eb pme C false ({[lock_rank "cons"]} ∪ lks) -∗
+    cpu_own (S lvl) eb pme C false ({["cons"]} ∪ lks) -∗
     arm_pay lvl eb pme -∗
     locked γc cpu_id -∗
     cons_res -∗
@@ -1966,7 +1966,7 @@ Section ProofConsoleintr.
                     = add_vec_int (mword_of_int (CT + 0x50) : mword 64) 4)
       by (rewrite /F2; apply upd_eq).
     iApply (Consputc.wp_consputc_sconf γtx γu γv F2
-              (trap_res b + (K - 6))%nat [] (S lvl) eb C false pme ({[lock_rank "cons"]} ∪ lks)
+              (trap_res b + (K - 6))%nat [] (S lvl) eb C false pme ({["cons"]} ∪ lks)
               ltac:(unfold consoleintr_stack, consputc_stack in *; lia) ltac:(lia)
               with "Hcg Hcnt Ht Hpc Hpanic Hdev Htxl Hsub").
     all: try lkbelow.
@@ -2352,7 +2352,7 @@ Section ProofConsoleintr.
   Lemma ct_dflt `{CIDq : CpuId}
       (γtx γc : gname) (γu : uart_names) (γv : disk_names)
       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
-      (C : iProp Σ) (b : bool) (sp0 : mword 64) (cv : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (b : bool) (sp0 : mword 64) (cv : mword 64) (lks : gset string) :
     M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ->
     M !!! Regidx Rs1 = cv ->
     ct_cs_hi M m0 ->
@@ -2361,12 +2361,12 @@ Section ProofConsoleintr.
     (b = false \/ pme = zero_reg -> (CIDq : CPU) = (CID : CPU)) ->
     (* same "cons" bound as the sibling arms: the default path reaches
        consputc, whose cone runs up to "uart" (15). *)
-    locks_below lks (lock_rank "cons") ->
+    locks_below lks "cons" ->
     kernel_text -∗ panic_wp_any -∗
     dev_inv γu γv -∗ is_txlock γtx γu -∗ uart_sent_sub γu [] -∗
     sie_cap_gpr M (trap_res b + (K - 6))%nat false pme -∗
     pc_is (mword_of_int (CT + 0x2c)) -∗
-    cpu_own (S lvl) eb pme C false ({[lock_rank "cons"]} ∪ lks) -∗
+    cpu_own (S lvl) eb pme C false ({["cons"]} ∪ lks) -∗
     arm_pay lvl eb pme -∗
     locked γc cpu_id -∗
     cons_res -∗
@@ -2574,7 +2574,7 @@ Section ProofConsoleintr.
   (* =================================================================== *)
   Lemma wp_consoleintr_sconf (γu : uart_names) (γv : disk_names)
       (m : regfile) (γs : list gname)
-      (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
     : wp_consoleintr_sconf_body γu γv m γs pme lvl K eb C b lks.
   Proof.
     cbv beta delta [wp_consoleintr_sconf_body].

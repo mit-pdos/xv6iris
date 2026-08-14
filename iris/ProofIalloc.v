@@ -468,7 +468,7 @@ Section IallocDefs.
       (γ : log_names) (bn : bio_names)
       (inodestart ninodes : Z) (nib : nat) (dev : mword 32) (ty : mword 16)
       (u : nat) (Sb : gset Z) (pidv : mword 32) (dq dqs dqn : dfrac) (j : nat)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset nat) : iProp Σ :=
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset string) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (alloc : bool) (kslot : nat) (q : Qp) (inum : mword 32)
         (dn' : dinode),
@@ -530,7 +530,7 @@ Section IallocEpilogue.
       (inodestart ninodes : Z) (nib : nat) (dev : mword 32) (ty : mword 16)
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqs dqn : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_ialloc <= K)%nat ->
     (* NOT in the parked statement: the claim arm has to hand [ia_cont] the
        [fresh_shape dn'] conjunct, and [ialloc_fresh_shape] is exactly
@@ -754,7 +754,7 @@ Section IallocOut.
       (inodestart ninodes : Z) (nib : nat) (dev : mword 32) (ty : mword 16)
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqs dqn : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_ialloc <= K)%nat ->
     bv_unsigned ty <> 0 ->          (* threaded to [ia_epilogue]; see there *)
     printk_gen_contract γpr γu γd ->
@@ -1095,7 +1095,7 @@ Section IallocClaim.
       (inum : mword 32) (ds : list dinode) (u : nat) (Sb : gset Z)
       (kk : nat) (bno : mword 32) (bsd : list (bv 8)) (d0 : bool)
       (pidv : mword 32) (dq dqs dqn : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_ialloc <= K)%nat ->
     log_geom_ok cov logstart ->
     (* the scan's state at +0x88 *)
@@ -1121,7 +1121,7 @@ Section IallocClaim.
     (* ia_claim reaches log_write ("log", 3), brelse ("bcache", 4) and its
        tail iget ("itable", 2); "itable" is the lowest of the three, so one
        premise at its rank covers the whole cone via [locks_below_mono]. *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     sie_cap_gpr M (K - 8)%nat b (proc_addr j) -∗
     cpu_own 0 true (proc_addr j) C b lks -∗
     kernel_text -∗
@@ -1889,7 +1889,7 @@ Section IallocScan.
       (cov : gset Z) (logstart inodestart ninodes : Z) (nib : nat)
       (dev : mword 32) (ty : mword 16) (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqs dqn : dfrac)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_ialloc <= K)%nat ->
     log_geom_ok cov logstart ->
     0 <= inodestart ->
@@ -1904,7 +1904,7 @@ Section IallocScan.
     (* ia_scan reaches bread/brelse ("bcache", 4, every turn) and ia_claim
        ("itable", 2, the claim arm); "itable" is the lower, so one premise
        at its rank covers the whole cone via [locks_below_mono]. *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     kernel_text -∗ kernel_data -∗
     panic_wp_any -∗
     printk_env γpr γu γd -∗
@@ -2751,7 +2751,7 @@ Section IallocMain.
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat) :
+      (b : bool) (lks : gset string) :
       wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                          cov logstart inodestart ninodes nib dev ty u Sb
                          pidv dq dqs dqn m K eb C b lks.
@@ -3236,7 +3236,7 @@ Section IallocMain.
       (u : nat)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat) :
+      (b : bool) (lks : gset string) :
       wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                            cov logstart inodestart ninodes nib dev ty u
                            pidv dq dqs dqn m K eb C b lks.

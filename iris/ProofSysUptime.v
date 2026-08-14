@@ -116,7 +116,7 @@ Section ProofSysUptime.
 
 
   Lemma wp_sys_uptime_sconf (γl : gname)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset nat)
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string)
     : wp_sys_uptime_sconf_body γl m n eb p C av b lks.
   Proof.
     cbv beta delta [wp_sys_uptime_sconf_body].
@@ -380,7 +380,7 @@ Section ProofSysUptime.
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γl a_tickslock "time"%string ticks_res B5
               n eb p C (av - 4)%nat
-              ({[lock_rank "time"]} ∪ lks)
+              ({["time"]} ∪ lks)
               ltac:(rewrite HB5a0; apply addv_sext0)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlk] [Htok] [HR] Hcnt Hpay").
@@ -394,8 +394,8 @@ Section ProofSysUptime.
     iEval (rewrite Hbeq) in "Hcg". iEval (rewrite Hbeq) in "Hcnt".
     (* sys_uptime is BALANCED: what it acquired it released, so the set
        release hands back collapses to the entry [lks]. *)
-    pose proof (locks_below_not_elem lks (lock_rank "time") Hfresh) as Hnotin.
-    assert (Hsetback : ({[lock_rank "time"]} ∪ lks) ∖ {[lock_rank "time"]} = lks)
+    pose proof (locks_below_not_elem lks "time" Hfresh) as Hnotin.
+    assert (Hsetback : ({["time"]} ∪ lks) ∖ {["time"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
     assert (Hpc2c : ret_pc (B5 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_uptime + 0x2c))

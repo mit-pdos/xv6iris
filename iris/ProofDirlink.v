@@ -1022,7 +1022,7 @@ Section ProofDirlinkMain.
       (bn : bio_names) (g : log_names) (ncount : nat) (Sb : gset Z) (K : nat)
       (b eb : bool) (C : iProp Σ) (k0 : nat) (inum : mword 16) (nrec : nat)
       (s : list (bv 8)) (ret_tgt : mword 64)
-      (CIDa : CpuId) (lks : gset nat) : iProp Σ :=
+      (CIDa : CpuId) (lks : gset string) : iProp Σ :=
     (∀ (Mp : regfile) (dolz : nat -> bv 8) (w5 w6 : mword 64),
        ⌜dl_pregs m sp0 ip nb
           (zero_extend' 64 (inum : mword 16) : mword 64)
@@ -1128,7 +1128,7 @@ Section ProofDirlinkMain.
       (pidv : mword 32) (bn : bio_names) (g : log_names) (ncount : nat)
       (Sb : gset Z)
       (k0 : nat) (s : list (bv 8)) (ret_tgt : mword 64) (dqd : dfrac)
-      (fuel : nat) (CIDl : CpuId) (lks : gset nat) : iProp Σ :=
+      (fuel : nat) (CIDl : CpuId) (lks : gset string) : iProp Σ :=
     (∀ (i : nat) (Ml : regfile) (dol : nat -> bv 8),
        ⌜(S nrec - i <= fuel)%nat⌝ -∗
        (* §15(b): THE LOOP TEST, not [i < nrec] -- without
@@ -1250,7 +1250,7 @@ Section ProofDirlinkMain.
       (ncount : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_dirlink_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf gpr cov logstart inodestart nib bmapstart
                           size dev used ip dinum bm data dn dn0 fn inum
@@ -3407,7 +3407,7 @@ Section ProofDirlinkMain.
       (ncount : nat)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_dirlink_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                             ga gf gpr cov logstart inodestart nib bmapstart
                             size dev used ip dinum bm data dn dn0 fn inum

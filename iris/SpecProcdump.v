@@ -152,7 +152,7 @@ End ProcdumpView.
 Definition wp_procdump_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γpr : gname) (γd : uart_names) (γv : disk_names)
-    (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat) :=
+    (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let pcE : mword 64 := mword_of_int KernelSyms.procdump in
   let ra0 := m !!! Regidx ra_idx in
@@ -164,7 +164,7 @@ Definition wp_procdump_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
   (* procdump takes no lock of its own (the header's whole point); its one
      callee, printk, is entered at rank "pr" -- the lowest (only) rank this
      cone touches, so this is the whole order premise. *)
-  locks_below lks (lock_rank "pr") ->
+  locks_below lks "pr" ->
   sie_cap_gpr m K b p -∗
   (* the interrupt level is left exactly as found: printk's acquire/release *)
   cpu_own 0%nat eb p C b lks -∗
@@ -188,6 +188,6 @@ Module Type PROCDUMP.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γpr : gname) (γd : uart_names) (γv : disk_names)
-      (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat),
+      (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string),
       wp_procdump_sconf_body γpr γd γv m K eb p C b lks.
 End PROCDUMP.

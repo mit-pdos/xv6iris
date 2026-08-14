@@ -201,7 +201,7 @@ Section FsinitDefs.
       (v_magic v_size v_nblocks v_nlog : mword 32)
       (bs_sb : list (bv 8))
       (pidv : mword 32) (dq : dfrac) (j : nat)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset nat) : iProp Σ :=
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset string) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (used' : gset Z),
         ⌜callee_saved m mf⌝ -∗
@@ -283,7 +283,7 @@ Section FsinitEpilogue.
       (v_magic v_size v_nblocks v_nlog : mword 32)
       (bs_sb : list (bv 8))
       (pidv : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_fsinit <= K)%nat ->
     used' ⊆ used ->
     fsi_sp m M ->
@@ -542,7 +542,7 @@ Section FsinitMain.
       (v_start v_dev v_nc v_n : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat) :
+      (b : bool) (lks : gset string) :
       wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl γpr
                            cov logstart bmapstart inodestart ninodes nib size
                            used dev

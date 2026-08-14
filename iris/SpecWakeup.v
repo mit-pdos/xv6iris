@@ -40,7 +40,7 @@ From Kernel Require KernelSyms.
    arm is licensed by the state READ being SLEEPING, which is unclaimed, so
    the proof never has to know which slot is the caller's. *)
 Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-     (m : regfile) (γs : list gname) (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :=
+     (m : regfile) (γs : list gname) (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :=
   let sp0 : mword 64 := m !!! Regidx csp_rs1 in
   let spF := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
   let rettgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -52,7 +52,7 @@ Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslot
   (* acquire's order premise: every lock this hart already holds ranks below
      "proc"'s -- wakeup acquires and releases each proc's lock in turn, so
      this contract is BALANCED and [lks] is unchanged end to end. *)
-  locks_below lks (lock_rank "proc") ->
+  locks_below lks "proc" ->
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b lks -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.wakeup) -∗
@@ -69,6 +69,6 @@ Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslot
 Module Type WAKEUP.
   Parameter wp_wakeup_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-       (m : regfile) (γs : list gname) (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat),
+       (m : regfile) (γs : list gname) (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string),
       wp_wakeup_sconf_body m γs pme lvl K eb C b lks.
 End WAKEUP.

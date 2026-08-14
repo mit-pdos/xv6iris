@@ -63,7 +63,7 @@ Section WpIntrOff.
 
   Lemma wp_intr_off_lvl0_s_sconf
       (pc : mword 64) (b : bool) (p : mword 64)
-      (m : regfile) (n : nat) (C : iProp Σ) (lks : gset nat) :
+      (m : regfile) (n : nat) (C : iProp Σ) (lks : gset string) :
     sie_cap_gpr m n b p -∗
     cpu_own 0%nat b p C b lks -∗
     trap_csrs_ext b -∗

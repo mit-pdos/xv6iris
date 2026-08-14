@@ -393,6 +393,27 @@ parameter would buy nothing.
 - Spec files must not `Require Export` (the ssreflect-`by` propagation hazard in
   [`code-organization.md`](code-organization.md) applies here too).
 
+## The same pattern within one function's own phase split
+
+A function too big for one file (`kexec.md`'s phases A/B2/B3/C) hits the same
+build-serialization problem along its OWN phase seams, not just at
+caller/callee edges: a later phase's file naming an earlier phase's proof
+file in a `Require` puts the two in series even though the later phase only
+ever consumes a handful of the earlier phase's lemmas as opaque facts.
+`ProofKexecTail.v`'s header is the first fix (REUSABLE vocabulary — frame
+algebra, a shared tail lemma — just moves to a neutral leaf both phases
+require directly, since it is cheap to re-elaborate and has no phase-specific
+proof weight). `SpecKexecB2.v`/`SpecKexecB3.v` are this file's Spec/Proof
+functor pattern applied to the other case, an expensive PHASE-SPECIFIC proof
+(a whole loop's induction) the next phase only consumes as a fact: state the
+consumed lemmas as `Module Type` Parameters over `_body` Definitions in a
+`Spec<Phase><Phase>.v`, have the producing phase's functor ascribe to it, and
+have the consuming phase take the producer as an ABSTRACT functor argument of
+that type instead of applying the producer's functor itself — see
+`claude-notes/projects/kexec.md`'s entry on it for the two rules' dividing
+line and why moving the whole vocabulary SECTION (not just its headline
+`Definition`) turned out to matter.
+
 ## Adding a new function
 
 Write `Spec<F>.v` first (interface + notation), then `Proof<F>.v` as a functor

@@ -142,7 +142,7 @@ Definition wp_install_trans_sconf_body
     (L : gmap Z (list (bv 8))) (D : gmap Z bool)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (R : iProp Σ) (lks : gset nat) :=
+    (b : bool) (R : iProp Σ) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.install_trans in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -172,7 +172,7 @@ Definition wp_install_trans_sconf_body
   (* install_trans directly breads/bwrites/brelses/bunpins, all against
      "bcache" (4); it takes no lock of its own and calls no other function
      with a lower bound, so this is the one premise its whole cone needs. *)
-  locks_below lks (lock_rank "bcache") ->
+  locks_below lks "bcache" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  install_trans has NO
@@ -283,7 +283,7 @@ Module Type INSTALL_TRANS.
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (R : iProp Σ) (lks : gset nat),
+      (b : bool) (R : iProp Σ) (lks : gset string),
       wp_install_trans_sconf_body γs j γl γu γd γk pd pav pu bn γfs
                                   cov logstart dev recovering n W Lw L D
                                   pidv dq m K eb C b R lks.

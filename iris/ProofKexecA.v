@@ -302,7 +302,7 @@ Section KexecABody.
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate)
       (dqb dqs dqa : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64) :
     let L := length (path_elems (bview plen pfun)) in
     (K_kexec <= K)%nat ->
@@ -807,7 +807,7 @@ Section KexecABody.
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate)
       (dqb dqs dqa : dfrac)
-      (m M32 : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (m M32 : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av ipv : mword 64) (n1 : nat) :
     let L := length (path_elems (bview plen pfun)) in
     (K_kexec <= K)%nat ->
@@ -1634,7 +1634,7 @@ Section KexecAMain.
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate)
       (dqb dqs dqa : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64) :
     let L := length (path_elems (bview plen pfun)) in
     (K_kexec <= K)%nat ->

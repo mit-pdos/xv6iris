@@ -283,7 +283,7 @@ Section ProofInitlog.
       (v_start v_dev v_nc v_n : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γfs
                             cov logstart dev sb bs_hdr L D
                             vlock vname vcpu v_start v_dev v_nc v_n

@@ -511,7 +511,7 @@ Section ProofFreeDesc.
   Lemma wp_free_desc_sconf  (γs : list gname)
       (pd : mword 64) (i : nat)
       (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-      (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) (lks : gset nat)
+      (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) (lks : gset string)
     : wp_free_desc_sconf_body γs pd i m K lvl eb pme C va vl vf vn b lks.
   Proof.
     cbv beta delta [wp_free_desc_sconf_body].

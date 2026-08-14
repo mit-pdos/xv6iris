@@ -66,7 +66,7 @@ Definition uartputc_stack : nat := 14%nat.
 
 Definition wp_uartputc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-    (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset nat) :=
+    (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset string) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let a0_idx : mword 5 := mword_of_int 10 in
   let pcE := mword_of_int KernelSyms.uartputc_sync in
@@ -82,7 +82,7 @@ Definition wp_uartputc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGho
   (* acquire's order premise: every lock this hart already holds ranks below
      "uart"'s -- uartputc_sync acquires and releases [tx_lock] in the same
      call, so this contract is BALANCED: [lks] is unchanged end to end. *)
-  locks_below lks (lock_rank "uart") ->
+  locks_below lks "uart" ->
   sie_cap_gpr m0 K b p -∗
   (* the interrupt level is left exactly as found: an acquire/release pair *)
   cpu_own n eb p C b lks -∗
@@ -105,6 +105,6 @@ Module Type UARTPUTC.
   Parameter wp_uartputc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-      (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset nat),
+      (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset string),
       wp_uartputc_sconf_body γl γd γv m0 K bs n eb C b p lks.
 End UARTPUTC.

@@ -219,7 +219,7 @@ Section KforkB4Proof.
       (cov : gset Z) (logstart : Z) (nib : nat)
       (pid_p pid_c : mword 32) (Vp Vc : pprivate)
       (pme npa : mword 64)
-      (m : regfile) (rsv K lvl : nat) (eb : bool) (C : iProp Σ) (lks : gset nat) :
+      (m : regfile) (rsv K lvl : nat) (eb : bool) (C : iProp Σ) (lks : gset string) :
     (22 <= K)%nat ->
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     (* the itable this block holds the lock for IS the one [cwd_ref] names,
@@ -233,7 +233,7 @@ Section KforkB4Proof.
     (* THE FRESHNESS PREMISE: this block's [idup(p->cwd)] acquires and
        releases [itable.lock] internally (balanced -- [lks] is unchanged),
        so the caller must already hold only locks BELOW its rank. *)
-    locks_below lks (lock_rank "itable") ->
+    locks_below lks "itable" ->
     (* THE PARENT HAS A WORKING DIRECTORY.  [ProcInv.cwd_ref] is two-armed
        on the pointer -- a process between [p->cwd = 0] and its next chdir
        owns no reference -- and xv6's fork does [np->cwd = idup(p->cwd)]

@@ -1085,7 +1085,9 @@ ProofKexecTail.v
 ProofKexecSeam.v
 ProofKexecA.v
 ProofKexecB.v
+SpecKexecB2.v
 ProofKexecB2.v
+SpecKexecB3.v
 ProofKexecB3.v
 ProofKexecC.v
 SpecSysFstat.v

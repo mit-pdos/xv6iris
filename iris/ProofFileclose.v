@@ -126,7 +126,7 @@ Section ProofFileclose.
      own.  (Copied from ProofFiledup; a shared home for it would drag the
      lock layer into every function proof that has one.) *)
   Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool)
-      (p : mword 64) (C : iProp Σ) (lks : gset nat) :
+      (p : mword 64) (C : iProp Σ) (lks : gset string) :
     sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
@@ -144,7 +144,7 @@ Section ProofFileclose.
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fclose_names) (on : option nat) (us : gset Z)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (K : nat) (b : bool) (lks : gset nat)
+      (K : nat) (b : bool) (lks : gset string)
     : wp_fileclose_sconf_body γfl γf k q Cf fn on us m n eb p C K b lks.
   Proof.
     cbv beta delta [wp_fileclose_sconf_body].
@@ -549,7 +549,7 @@ Section ProofFileclose.
       iEval (rewrite Houtb) in "Hcg".
       iApply (Release.wp_release_sconf γfl ftable_addr "ftable"%string
                 (ftable_res γf) E3 n eb p C (K - 8)%nat
-                ({[lock_rank "ftable"]} ∪ lks)
+                ({["ftable"]} ∪ lks)
                 ltac:(rewrite HE3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
@@ -558,7 +558,7 @@ Section ProofFileclose.
       (* fileclose is BALANCED on this arm: the set release hands back
          collapses to the entry [lks] -- [Hfresh] makes the singleton
          insert/delete cancel. *)
-      assert (Hsetback : ({[lock_rank "ftable"]} ∪ lks) ∖ {[lock_rank "ftable"]} = lks)
+      assert (Hsetback : ({["ftable"]} ∪ lks) ∖ {["ftable"]} = lks)
       by (apply locks_add_del_below; lkbelow).
       iEval (rewrite Hsetback) in "Hcnt".
       iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
@@ -940,14 +940,14 @@ Section ProofFileclose.
       iEval (rewrite Houtb) in "Hcg".
       iApply (Release.wp_release_sconf γfl ftable_addr "ftable"%string
                 (ftable_res γf) G3 n eb p C (K - 8)%nat
-                ({[lock_rank "ftable"]} ∪ lks)
+                ({["ftable"]} ∪ lks)
                 ltac:(rewrite HG3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
       { iExact "Hlock". }
       iIntros (CIDr2 Hsr2 mr2) "Hcg Hpc %Hrel2 Hcnt".
       (* fileclose is BALANCED on this arm too. *)
-      assert (Hsetback : ({[lock_rank "ftable"]} ∪ lks) ∖ {[lock_rank "ftable"]} = lks)
+      assert (Hsetback : ({["ftable"]} ∪ lks) ∖ {["ftable"]} = lks)
       by (apply locks_add_del_below; lkbelow).
       iEval (rewrite Hsetback) in "Hcnt".
       iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".

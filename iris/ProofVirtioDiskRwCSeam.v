@@ -100,7 +100,7 @@ Section ProofVirtioDiskRwCSeam.
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
-      (m0 : regfile) (lks : gset nat) : iProp Σ :=
+      (m0 : regfile) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
      ∀ (M : regfile) (np nr : nat) (fl pk : gmap nat dclaim)
        (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) (h m2 t : nat),
@@ -113,7 +113,7 @@ Section ProofVirtioDiskRwCSeam.
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
        sie_cap_gpr M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
-       cpu_own 1 eb (proc_addr j) C false ({[lock_rank "virtio_disk"]} ∪ lks) -∗
+       cpu_own 1 eb (proc_addr j) C false ({["virtio_disk"]} ∪ lks) -∗
        trap_csrs -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x176) : mword 64) -∗
@@ -130,7 +130,7 @@ Section ProofVirtioDiskRwCSeam.
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
-      (dsk0 : SailStdpp.Values.mword 32) (m0 : regfile) (lks : gset nat) :
+      (dsk0 : SailStdpp.Values.mword 32) (m0 : regfile) (lks : gset string) :
     kernel_text -∗
     disk_geom γd pd pav pu -∗
     b_disk b ↦₄ dsk0 -∗

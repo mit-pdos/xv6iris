@@ -97,7 +97,7 @@ Section ProofFiledup.
      index rather than stating it" describes.  Read once at function entry,
      it is exactly the fact that lets release's derived exit index equal
      filedup's own (symmetric) [b]. *)
-  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) (lks : gset nat) :
+  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) (lks : gset string) :
     sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
@@ -113,7 +113,7 @@ Section ProofFiledup.
 
   Lemma wp_filedup_sconf
       (γl γf : gname) (k : nat) (q : Qp) (Cf : fcontent)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset nat)
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset string)
     : wp_filedup_sconf_body γl γf k q Cf m n eb p C K b lks.
   Proof.
     cbv beta delta [wp_filedup_sconf_body].
@@ -454,7 +454,7 @@ Section ProofFiledup.
     iEval (rewrite Houtb) in "Hcg".
     iApply (Release.wp_release_sconf γl ftable_addr "ftable"%string (ftable_res γf) D5
               n eb p C (K - 4)%nat
-              ({[lock_rank "ftable"]} ∪ lks)
+              ({["ftable"]} ∪ lks)
               ltac:(rewrite HD5a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
@@ -462,7 +462,7 @@ Section ProofFiledup.
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
     (* filedup is BALANCED: the set release hands back collapses to the entry
        [lks] -- [Hfresh] is what makes the singleton insert/delete cancel. *)
-    assert (Hsetback : ({[lock_rank "ftable"]} ∪ lks) ∖ {[lock_rank "ftable"]} = lks)
+    assert (Hsetback : ({["ftable"]} ∪ lks) ∖ {["ftable"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
     iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".

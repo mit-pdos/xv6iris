@@ -74,7 +74,7 @@ Local Open Scope Z_scope.
 Definition wp_filedup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname)
     (k : nat) (q : Qp) (Cf : fcontent)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool)
-    (lks : gset nat) :=
+    (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.filedup in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (* filedup's own frame is 4 slots (addi sp,sp,-32); acquire/release want 10
@@ -83,7 +83,7 @@ Definition wp_filedup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, 
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* a0 is the file being duplicated *)
   m !!! Regidx (mword_of_int 10 : mword 5) = fnode k ->
-  locks_below lks (lock_rank "ftable") ->
+  locks_below lks "ftable" ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -110,6 +110,6 @@ Module Type FILEDUP.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname)
       (k : nat) (q : Qp) (Cf : fcontent)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool)
-      (lks : gset nat),
+      (lks : gset string),
       wp_filedup_sconf_body γl γf k q Cf m n eb p C K b lks.
 End FILEDUP.

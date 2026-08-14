@@ -94,7 +94,7 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
     (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
     (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool)
-    (pidv : mword 32) (dqp : dfrac) (lks : gset nat) :=
+    (pidv : mword 32) (dqp : dfrac) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartwrite in
   let pj := proc_addr j in
   (* a0 = the buffer, a1 = the count *)
@@ -121,7 +121,7 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      floor of the cone -- and [locks_below_mono] (11 <= 15) lifts it to
      "uart" for the acquire call.  uartwrite is BALANCED overall (each byte's
      acquire/release pair cancels), so [lks] is unchanged end to end. *)
-  locks_below lks (lock_rank "proc") ->
+  locks_below lks "proc" ->
   sie_cap_gpr m av b pj -∗
   (* noff = 0: sleep demands tx_lock be the ONLY lock held *)
   cpu_own 0%nat eb pj C b lks -∗
@@ -165,6 +165,6 @@ Module Type UARTWRITE.
       (γu : uart_names) (γv : disk_names) (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool)
-      (pidv : mword 32) (dqp : dfrac) (lks : gset nat),
+      (pidv : mword 32) (dqp : dfrac) (lks : gset string),
       wp_uartwrite_sconf_body γu γv γs j γlp γl m av eb C n f dq b pidv dqp lks.
 End UARTWRITE.

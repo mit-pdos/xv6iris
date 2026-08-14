@@ -64,7 +64,7 @@ Module CreateFreshTy : CREATE_FRESH_TY.
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (Ma : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       create_fresh_ty_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                            cov logstart inodestart ninodes nib dev ty kd dqp
                            u Sb pidv dq dqs dqn Ma K eb C b lks.

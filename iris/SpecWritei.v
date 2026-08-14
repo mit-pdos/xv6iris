@@ -525,7 +525,7 @@ Definition wp_writei_sconf_body
     (V : pprivate) (ncount : nat)
     (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.writei in
   let pj := proc_addr j in
   let src := m !!! Regidx (mword_of_int 12 : mword 5) in
@@ -617,7 +617,7 @@ Definition wp_writei_sconf_body
   (* writei's loop reaches bread/log_write/brelse, whose bound is at "log"
      (3); nothing writei's cone touches ranks lower.  One premise covers the
      whole cone (mirrors SpecBfree.v's). *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  writei holds no lock of
@@ -812,7 +812,7 @@ Definition wp_writei_gen_body
     (V : pprivate) (ncount : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.writei in
   let pj := proc_addr j in
   let src := m !!! Regidx (mword_of_int 12 : mword 5) in
@@ -897,7 +897,7 @@ Definition wp_writei_gen_body
   (* writei's loop reaches bread/log_write/brelse, whose bound is at "log"
      (3); nothing writei's cone touches ranks lower.  One premise covers the
      whole cone (mirrors SpecBfree.v's). *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  Same pure-pass-through
@@ -1091,7 +1091,7 @@ Module Type WRITEI.
       (V : pprivate) (ncount : nat)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_writei_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
                            cov logstart inodestart nib bmapstart size dev used γpr
                            ip inum bm data dn dn0
@@ -1122,7 +1122,7 @@ Module Type WRITEI.
       (V : pprivate) (ncount : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_writei_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
                          cov logstart inodestart nib bmapstart size dev used γpr
                          ip inum bm data dn dn0

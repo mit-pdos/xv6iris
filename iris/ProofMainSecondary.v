@@ -540,7 +540,7 @@ Section ProofMainSecondary.
       by (rewrite /P5 upd_ne; [exact HP4a0 | reg_neq]).
     iApply (PrintkGen.wp_printk_gen_sconf γpr γd γv P5 n false p0 cpu_ctx_free
               ms_hart [PkANum] false ∅ ltac:(lia) Hlh Hnh ltac:(rewrite Hkh; reflexivity)
-              ltac:(cbn [length]; lia) (locks_below_empty (lock_rank "pr"))
+              ltac:(cbn [length]; lia) (locks_below_empty "pr")
               with "Hcg Htext Hkdata Hpc Hpanic Hcpu Hpenv [] []").
     all: try lkbelow.
     { rewrite HP5a0. iExact "Hfmt". }

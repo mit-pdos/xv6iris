@@ -50,7 +50,7 @@ Definition wp_virtio_disk_intr_sconf_body
      (γs : list gname)
     (γu : uart_names) (γd : disk_names) (γk : gname)
     (pd pav pu : mword 64)
-    (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat) :=
+    (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.virtio_disk_intr in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_virtio_disk_intr <= K)%nat ->
@@ -60,7 +60,7 @@ Definition wp_virtio_disk_intr_sconf_body
   (* acquire's order premise: every lock this hart already holds ranks below
      "virtio_disk"'s -- virtio_disk_intr acquires and releases [disk.vdisk_lock]
      once, so this contract is BALANCED and [lks] is unchanged end to end. *)
-  locks_below lks (lock_rank "virtio_disk") ->
+  locks_below lks "virtio_disk" ->
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -84,6 +84,6 @@ Module Type VIRTIODISKINTR.
        (γs : list gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat),
+      (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) (lks : gset string),
       wp_virtio_disk_intr_sconf_body γs γu γd γk pd pav pu m K lvl eb pme C b lks.
 End VIRTIODISKINTR.

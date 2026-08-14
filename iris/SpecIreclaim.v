@@ -202,7 +202,7 @@ Definition wp_ireclaim_sconf_body
     (dev : mword 32)
     (pidv : mword 32) (dq dqb dqs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ireclaim in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -246,7 +246,7 @@ Definition wp_ireclaim_sconf_body
      ("log", 3), ilock ("bcache", 4), iunlock ("sleep lock", 6) --
      "itable" is the lowest, so one premise there covers the whole cone
      via [locks_below_mono]. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -343,7 +343,7 @@ Module Type IRECLAIM.
       (dev : mword 32)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                              cov logstart bmapstart inodestart ninodes nib size
                              used dev pidv dq dqb dqs dqn m K eb C b lks.

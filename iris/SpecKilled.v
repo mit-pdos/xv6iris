@@ -56,7 +56,7 @@ Import Defs.
 
 Definition wp_killed_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
      (γs : list gname) (j : nat) (γl : gname)
-    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat) :=
+    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.killed in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* the argument is proc j *)
@@ -69,7 +69,7 @@ Definition wp_killed_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
   (* THE FRESHNESS PREMISE: killed acquires and releases [p->lock]
      internally (balanced -- [lks] is unchanged across the whole call), so
      the caller must already hold only locks BELOW "proc"'s rank. *)
-  locks_below lks (lock_rank "proc") ->
+  locks_below lks "proc" ->
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -89,6 +89,6 @@ Module Type KILLED.
   Parameter wp_killed_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
        (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat),
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string),
       wp_killed_sconf_body γs j γl m av n eb p C b lks.
 End KILLED.

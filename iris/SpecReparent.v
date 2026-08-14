@@ -68,7 +68,7 @@ Definition K_reparent : nat := 24%nat.
 
 Definition wp_reparent_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
      (m : regfile) (γs : list gname) (pme ip : mword 64)
-    (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :=
+    (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.reparent in
   let pv : mword 64 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let rettgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -82,10 +82,10 @@ Definition wp_reparent_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefsl
      pp->lock, so the bound is exactly [SpecWakeup]'s and reparent is a pure
      conduit for it.  Satisfiable at reparent's only call site: kexit enters
      holding wait_lock (rank 10) and "proc" is rank 11, so the caller's set is
-     [{[lock_rank "wait_lock"]}] and 10 < 11.  reparent is BALANCED -- it takes
+     [{["wait_lock"]}] and 10 < 11.  reparent is BALANCED -- it takes
      no lock of its own and wakeup's own contract is balanced -- so [lks] is
      unchanged end to end and this premise is not re-established anywhere. *)
-  locks_below lks (lock_rank "proc") ->
+  locks_below lks "proc" ->
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -107,6 +107,6 @@ Module Type REPARENT.
   Parameter wp_reparent_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
        (m : regfile) (γs : list gname) (pme ip : mword 64)
-      (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat),
+      (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string),
       wp_reparent_sconf_body m γs pme ip ps dqi lvl K eb C b lks.
 End REPARENT.

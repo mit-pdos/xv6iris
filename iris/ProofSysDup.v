@@ -337,7 +337,7 @@ Section ProofSysDup.
   (* =================================================================== *)
   Lemma wp_sys_dup_sconf (γl γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat)
+      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string)
     : wp_sys_dup_sconf_body γl γf m av n eb p C v pid V b lks.
   Proof.
     cbv beta delta [wp_sys_dup_sconf_body].

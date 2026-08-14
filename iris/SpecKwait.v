@@ -143,7 +143,7 @@ Definition K_kwait : nat := 62%nat.
 Definition wp_kwait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
-    (pid : mword 32) (V : pprivate) (lks : gset nat) :=
+    (pid : mword 32) (V : pprivate) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kwait in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -155,7 +155,7 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, 
   (* kwait acquires wait_lock (10) and, nested under it, each pp->lock ("proc",
      11); freeproc/either_copyout reach "kmem" (13).  10 is the floor, and the
      nested acquires follow by [locks_below_union_singleton]/[locks_below_mono]. *)
-  locks_below lks (lock_rank "wait_lock") ->
+  locks_below lks "wait_lock" ->
   sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
   cpu_own 0 eb pj C b lks -∗
@@ -187,6 +187,6 @@ Module Type KWAIT.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
-      (pid : mword 32) (V : pprivate) (lks : gset nat),
+      (pid : mword 32) (V : pprivate) (lks : gset string),
       wp_kwait_sconf_body γa γf γw γs j γl m av eb C b pid V lks.
 End KWAIT.

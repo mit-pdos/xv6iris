@@ -153,13 +153,13 @@ Section UtArmsCommon.
      proofmode's [IntoSep] search is keyed on the head of the hypothesis, and
      [trap_csrs_ext false] is not syntactically a [∗]: destructuring it
      directly is a coin flip on whether resolution unfolds the definition. *)
-  Lemma ua_hold_off (N : ut_names) (V : pprivate) (C : iProp Σ) (lks : gset nat) :
+  Lemma ua_hold_off (N : ut_names) (V : pprivate) (C : iProp Σ) (lks : gset string) :
     ut_hold Rsys N V C false lks -∗
       cpu_own 0%nat false (un_pj N) C false lks ∗ trap_csrs ∗
       cpu_claim (un_pj N) ∗ ut_env Rsys N V.
   Proof. iIntros "H". iExact "H". Qed.
 
-  Lemma ua_hold_on (N : ut_names) (V : pprivate) (C : iProp Σ) (lks : gset nat) :
+  Lemma ua_hold_on (N : ut_names) (V : pprivate) (C : iProp Σ) (lks : gset string) :
     cpu_own 0%nat false (un_pj N) C false lks -∗ trap_csrs -∗
     cpu_claim (un_pj N) -∗ ut_env Rsys N V -∗
     ut_hold Rsys N V C false lks.
@@ -219,7 +219,7 @@ Section Ut56.
      process record does not move and [ut_a6] is applied at the SAME [V]. *)
   Lemma ut_56 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (C : iProp Σ)
-      (mie_v menvcfg0 : mword 64) (lks : gset nat) :
+      (mie_v menvcfg0 : mword 64) (lks : gset string) :
     printk_gen_contract (un_pr N) (un_u N) (un_v N) ->
     ut_wf N ->
     (K_usertrap <= av)%nat ->
@@ -649,7 +649,7 @@ Section UtD0.
      taken and the code joins +0xa6 -- with the process record MOVED. *)
   Lemma ut_d0 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (C : iProp Σ)
-      (mie_v menvcfg0 : mword 64) (lks : gset nat) :
+      (mie_v menvcfg0 : mword 64) (lks : gset string) :
     printk_gen_contract (un_pr N) (un_u N) (un_v N) ->
     ut_wf N ->
     (K_usertrap <= av)%nat ->
@@ -1017,7 +1017,7 @@ Section UtE8.
      on it. *)
   Lemma ut_e8 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (C : iProp Σ)
-      (mie_v menvcfg0 : mword 64) (lks : gset nat) :
+      (mie_v menvcfg0 : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->

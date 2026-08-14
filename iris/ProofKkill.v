@@ -187,14 +187,14 @@ Section ProofKkill.
   (* ================================================================== *)
   Lemma wp_kkill_loop `{GEN : GenId} `{CID0 : CpuId}
        (γs : list gname) (mb : regfile)
-      (spd pidv pme : mword 64) (lvl av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (spd pidv pme : mword 64) (lvl av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     length γs = NPROC ->
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     (10 <= av)%nat ->
     (* the scan enters each slot fresh: the caller's held set must bound
        below "proc"'s rank (LockRank.v); [locks_below_not_elem] gives the
        per-slot non-membership the ghost step needs. *)
-    locks_below lks (lock_rank "proc") ->
+    locks_below lks "proc" ->
     procs_inv γs -∗
     panic_wp_any -∗
     (* the exit continuation: control at the epilogue entry [kkill+0x52],
@@ -423,7 +423,7 @@ Section ProofKkill.
           iEval (rewrite Hbmatch) in "Hcg".
           iApply (Release.wp_release_sconf (CID := CIDf) γk (proc_addr k) "proc"%string
                     (proc_lock_res γs γk (proc_addr k)) Mr4c lvl eb pme C av
-                    ({[lock_rank "proc"]} ∪ lks)
+                    ({["proc"]} ∪ lks)
                     Hlka2 ltac:(lia)
                     with "Hcg Htext Hpc Hlockk Htok HR Hown Hpay").
           rewrite -Hbmatch.
@@ -432,8 +432,8 @@ Section ProofKkill.
              that set minus the same singleton, and [Hno] (via
              [locks_below_not_elem]) says the round trip is a no-op: this
              hart never held a "proc" lock to begin with. *)
-          pose proof (locks_below_not_elem lks (lock_rank "proc") Hno) as Hnotin1.
-          assert (Heqlks1 : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks)
+          pose proof (locks_below_not_elem lks "proc" Hno) as Hnotin1.
+          assert (Heqlks1 : ({["proc"]} ∪ lks) ∖ {["proc"]} = lks)
       by (apply locks_add_del_below; lkbelow).
           iEval (rewrite Heqlks1) in "Hown".
           assert (Hpc50 : ret_pc (Mr4c !!! Regidx Rra) = mword_of_int (KernelSyms.kkill + 0x50))
@@ -711,14 +711,14 @@ Section ProofKkill.
         iEval (rewrite Hbmatch) in "Hcg".
         iApply (Release.wp_release_sconf (CID := CIDf) γk (proc_addr k) "proc"%string
                   (proc_lock_res γs γk (proc_addr k)) M2e lvl eb pme C av
-                  ({[lock_rank "proc"]} ∪ lks)
+                  ({["proc"]} ∪ lks)
                   Hlka1 ltac:(lia)
                   with "Hcg Htext Hpc Hlockk Htok HR Hown Hpay").
         rewrite -Hbmatch.
         iIntros (CIDg Hsg mr) "Hcg Hpc %Hpinsr Hown".
         (* see the +0x4c release above: [Hno] kills the difference. *)
-        pose proof (locks_below_not_elem lks (lock_rank "proc") Hno) as Hnotin2.
-        assert (Heqlks2 : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks)
+        pose proof (locks_below_not_elem lks "proc" Hno) as Hnotin2.
+        assert (Heqlks2 : ({["proc"]} ∪ lks) ∖ {["proc"]} = lks)
       by (apply locks_add_del_below; lkbelow).
         iEval (rewrite Heqlks2) in "Hown".
         assert (Hpc32 : ret_pc (M2e !!! Regidx Rra) = mword_of_int (KernelSyms.kkill + 0x32))
@@ -859,7 +859,7 @@ Section ProofKkillMain.
   Notation Rs3 := (mword_of_int 19 : mword 5).
 
   Lemma wp_kkill_sconf  (γs : list gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string)
     : wp_kkill_sconf_body γs m av n eb p C b lks.
   Proof.
     cbv beta delta [wp_kkill_sconf_body].

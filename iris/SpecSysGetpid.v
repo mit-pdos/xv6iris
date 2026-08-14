@@ -64,7 +64,7 @@ Import Defs.
 
 Definition wp_sys_getpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat) :=
+    (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_getpid in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* myproc's push_off transient increment stays in int range *)
@@ -90,6 +90,6 @@ Module Type SYSGETPID.
   Parameter wp_sys_getpid_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat),
+      (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string),
       wp_sys_getpid_sconf_body γf m av n eb p C pid V b lks.
 End SYSGETPID.

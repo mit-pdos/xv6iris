@@ -244,7 +244,7 @@ Section UvmallocDefs.
      ProofFreerange. *)
   Definition ua_exit `{GEN : GenId} `{CID0 : CpuId} (mm : regfile)
       (P : uptd) (vpn0 : mword 27) (n : nat) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (b : bool) (lks : gset nat) (sp0 spr oldsz newsz : mword 64) : iProp Σ :=
+      (C : iProp Σ) (b : bool) (lks : gset string) (sp0 spr oldsz newsz : mword 64) : iProp Σ :=
     wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ∀ (mj : regfile) (res : mword 64),
       ⌜ mj !!! Regidx csp_rs1 = spr
@@ -349,7 +349,7 @@ Section ProofUvmalloc.
   (* ------------------------------------------------------------------ *)
   Local Lemma ua_loop (γa : gname) (mm : regfile)
       (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (sp0 spr oldsz newsz : mword 64) (pu nz : Z) (n : nat) (b : bool) (lks : gset nat) :
+      (sp0 spr oldsz newsz : mword 64) (pu nz : Z) (n : nat) (b : bool) (lks : gset string) :
     (42 <= K)%nat ->
     (0 <= xperm < 512)%Z ->
     uvm_perm_ok (Z.lor xperm 18) ->
@@ -384,7 +384,7 @@ Section ProofUvmalloc.
     (* every iteration's kalloc/kfree is balanced against "kmem" (13); the
        loop's own body touches nothing lower.  One premise for the whole
        cone, fixed across every iteration since [lks] never changes. *)
-    locks_below lks (lock_rank "kmem") ->
+    locks_below lks "kmem" ->
     forall (rem i : nat) `(CID0 : CpuId) (Pi : uptd) (M : regfile) (av : mword 64),
     (i + rem = n)%nat -> (1 <= rem)%nat ->
     bv_unsigned av = (pu + 4096 * Z.of_nat i)%Z ->
@@ -1600,7 +1600,7 @@ Section ProofUvmalloc.
   Lemma wp_uvmalloc_sconf
       (γa : gname) (mm : regfile)
       (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (b : bool) (lks : gset nat)
+      (C : iProp Σ) (b : bool) (lks : gset string)
     : wp_uvmalloc_sconf_body γa mm P xperm K eb p C b lks.
   Proof.
     cbv beta delta [wp_uvmalloc_sconf_body].

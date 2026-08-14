@@ -126,7 +126,7 @@ Definition sys_sbrk_ok (V : pprivate) (v0 v1 : mword 64)
 Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (pid : mword 32) (V : pprivate) (v0 v1 : mword 64) (b : bool) (lks : gset nat) :=
+    (pid : mword 32) (V : pprivate) (v0 v1 : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_sbrk in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* the two syscall arguments, out of the trapframe page [proc_priv]
@@ -156,6 +156,6 @@ Module Type SYSSBRK.
   Parameter wp_sys_sbrk_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γf : gname) (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (v0 v1 : mword 64) (b : bool) (lks : gset nat),
+      (pid : mword 32) (V : pprivate) (v0 v1 : mword 64) (b : bool) (lks : gset string),
       wp_sys_sbrk_sconf_body γa γf m av eb p C pid V v0 v1 b lks.
 End SYSSBRK.

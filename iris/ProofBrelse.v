@@ -246,7 +246,7 @@ Section ProofBrelse.
   Local Lemma brelse_tail `{CID0 : CpuId}  (bn : bio_names)
       (V : bio_view Σ)
       (m M : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (lks : gset nat) :
+      (lks : gset string) :
     (K_brelse <= K)%nat ->
     M !!! Regidx csp_rs1
       = add_vec (m !!! Regidx csp_rs1)
@@ -257,16 +257,16 @@ Section ProofBrelse.
     (* THE OUTER order fact: [lks] here is the enclosing [wp_brelse_sconf]'s
        own held-set, threaded through unchanged -- this helper is entered
        ALREADY holding "bcache" (its precondition below is
-       [{[lock_rank "bcache"]} ∪ lks], not bare [lks]; see the OUTER/INNER
+       [{["bcache"]} ∪ lks], not bare [lks]; see the OUTER/INNER
        convention in claude-notes/projects/lock-set.md). *)
-    locks_below lks (lock_rank "bcache") ->
+    locks_below lks "bcache" ->
     sie_cap_gpr M (trap_res eb + (K - 4))%nat false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.brelse + 0x60) : mword 64) -∗
     is_lock (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_res bn V -∗
-    cpu_own 1%nat eb p C false ({[lock_rank "bcache"]} ∪ lks) -∗
+    cpu_own 1%nat eb p C false ({["bcache"]} ∪ lks) -∗
     arm_pay 0%nat eb p -∗
     pa_stk (m !!! Regidx csp_rs1) 1 ↦₈ (m !!! Regidx Rra) -∗
     pa_stk (m !!! Regidx csp_rs1) 2 ↦₈ (m !!! Regidx Rs0) -∗
@@ -349,13 +349,13 @@ Section ProofBrelse.
     assert (HT3ra : T3 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.brelse + 0x68) : mword 64) 4)
       by (rewrite /T3; apply upd_eq).
     iApply (Rl.wp_release_sconf (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) T3
-              0%nat eb p C (K - 4)%nat ({[lock_rank "bcache"]} ∪ lks)
+              0%nat eb p C (K - 4)%nat ({["bcache"]} ∪ lks)
               ltac:(rewrite HT3a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
-    assert (Hsetback : ({[lock_rank "bcache"]} ∪ lks) ∖ {[lock_rank "bcache"]} = lks)
+    assert (Hsetback : ({["bcache"]} ∪ lks) ∖ {["bcache"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
     assert (Hpc6c : ret_pc (T3 !!! Regidx Rra) = mword_of_int (KernelSyms.brelse + 0x6c)).
@@ -531,7 +531,7 @@ Section ProofBrelse.
       (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (bs bsd : list (bv 8)) (d : bool) (b : bool) (lks : gset nat)
+      (bs bsd : list (bv 8)) (d : bool) (b : bool) (lks : gset string)
     : wp_brelse_sconf_body γs bn V k pidv dev bno dq m K eb p C bs bsd d b lks.
   Proof.
     cbv beta delta [wp_brelse_sconf_body].
@@ -540,7 +540,7 @@ Section ProofBrelse.
     (* holdingsleep/releasesleep's own order premises are at "sleep lock"
        (rank 6), strictly above "bcache" (rank 4) -- [locks_below_mono]
        weakens [Hbelow] up to that rank once, here, for both call sites. *)
-    assert (Hbelow_sl : locks_below lks (lock_rank "sleep lock"))
+    assert (Hbelow_sl : locks_below lks "sleep lock")
       by ltac:(lkbelow).
     pose proof (locks_below_not_elem _ _ Hbelow_sl) as Hfresh_sl.
     assert (HK26 : (26 <= K)%nat) by (unfold K_brelse in HK; exact HK).

@@ -204,7 +204,7 @@ Proof. reflexivity. Qed.
    five hand-rolled destructuring patterns (the bundle is LEFT-nested now:
    [((cells ∗ count) ∗ C)]). *)
 Lemma sc_cpu_own_open `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (px : mword 64) (C : iProp Σ) (eb : bool) (lks : gset nat) :
+    (px : mword 64) (C : iProp Σ) (eb : bool) (lks : gset string) :
   cpu_own 0 eb px C false lks -∗
   a_cpu_noff cid_word ↦₄ noff_val 0 ∗
   (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) ∗
@@ -215,7 +215,7 @@ Proof.
   iIntros "((((_ & Hn & Hi & Hp) & Hl) & Hc) & HC)". iFrame.
 Qed.
 
-Lemma sc_cpu_own_mk `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (px : mword 64) (lks : gset nat) :
+Lemma sc_cpu_own_mk `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (px : mword 64) (lks : gset string) :
   a_cpu_noff cid_word ↦₄ noff_val 0 -∗
   (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
   intr_count 0 false -∗
@@ -228,7 +228,7 @@ Proof.
 Qed.
 
 Lemma sc_cpu_own_of_cells `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (px : mword 64) (eb : bool) (lks : gset nat) :
+    (px : mword 64) (eb : bool) (lks : gset string) :
   cpu_priv 0 eb px lks -∗ intr_count 0 false -∗ cpu_own 0 false px emp false lks.
 Proof.
   rewrite cpu_own_off /cpu_hart /cpu_priv /cpu_cells.
@@ -336,7 +336,7 @@ Section ProofScheduler.
            the release of proc jj's lock, so it is the one place in this file
            where the held set changes.  Every other [cpu_own] here is at one
            of those two literals. *)
-        cpu_own 1 ebx zero_reg emp false {[lock_rank "proc"]} -∗
+        cpu_own 1 ebx zero_reg emp false {["proc"]} -∗
         trap_csrs -∗
         own_ctx (a_cpu_ctx cid_word) -∗
         ( ( ⌜(S jj < NPROC)%nat⌝ -∗ ∀ (Mn : regfile),
@@ -996,7 +996,7 @@ Section ProofScheduler.
       iEval (rewrite -Hn) in "Hcg".
       iApply (Release.wp_release_sconf γl (proc_addr jj) "proc"%string
                 (proc_lock_res γs γl (proc_addr jj)) T1 0 ebx zero_reg emp n
-                {[lock_rank "proc"]}
+                {["proc"]}
                 Hlka ltac:(pose proof (sc_res_le ebx); lia)
                 with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
       (* release's crossing index is its EXIT index [outb = ebx] -- it re-enables
@@ -1007,7 +1007,7 @@ Section ProofScheduler.
       (* the release drops the ONE rank this loop iteration took, so the round
          re-enters the loop head at the empty set -- which is what the next
          [intr_on] (and [sc_flip_pre]) requires. *)
-      assert (Heqrel : ({[lock_rank "proc"]} : gset nat) ∖ {[lock_rank "proc"]} = ∅)
+      assert (Heqrel : ({["proc"]} : gset string) ∖ {["proc"]} = ∅)
         by (apply locks_self_del).
       iEval (rewrite Heqrel) in "Hcpu".
       assert (Hq50 : ret_pc (T1 !!! Regidx Rra) = mword_of_int (KernelSyms.scheduler + 0x50))
@@ -1154,12 +1154,12 @@ Section ProofScheduler.
       (* ================================================================ *)
       (* the loop-head set is EMPTY (the previous iteration's release emptied
          it, and [intr_on] at +0x86 could not have run otherwise), so acquire's
-         order premise is [locks_below ∅ (lock_rank "proc")] -- the degenerate
+         order premise is [locks_below ∅ "proc"] -- the degenerate
          case, [LockRank.locks_below_empty].  This acquire is what PRODUCES the
          {proc} set that the c->proc store, the swtch and [sched]'s own
          contract all carry. *)
-      assert (Hnoproc : locks_below (∅ : gset nat) (lock_rank "proc"))
-        by (exact (locks_below_empty (lock_rank "proc"))).
+      assert (Hnoproc : locks_below (∅ : gset string) "proc")
+        by (exact (locks_below_empty "proc")).
       iApply (Acquire.wp_acquire_sconf γl "proc"%string
                 (proc_lock_res γs γl (proc_addr jj)) M1 0 ebc zero_reg emp n ebc ∅
                 ltac:(lia) ltac:(pose proof (sc_res_le ebc); lia) Hnoproc
@@ -1172,7 +1172,7 @@ Section ProofScheduler.
       iIntros (msq macq) "%Hmsfq Hcg Hpc %Hcsaq Hlocked HR Hcpu Hpay".
       (* acquire hands back [{[rank "proc"]} ∪ ∅]; normalise it to the literal
          singleton every in-lock site below (and [Tail]) is written at. *)
-      assert (Hequn : ({[lock_rank "proc"]} : gset nat) ∪ ∅ = {[lock_rank "proc"]})
+      assert (Hequn : ({["proc"]} : gset string) ∪ ∅ = {["proc"]})
         by (apply locks_union_empty).
       iEval (rewrite Hequn) in "Hcpu".
       (* acquire's push_off folded the reserve back into the usable count, so
@@ -1330,7 +1330,7 @@ Section ProofScheduler.
         (* +0x68 sd s1,48(s4) : c->proc = p *)
         assert (HM2s4r : add_vec (rget M2 Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12))
                          = a_cpu_proc cid_word) by (rgne; exact HM2s4).
-        iDestruct (cpu_own_set_proc 1 ebc zero_reg (proc_addr jj) emp {[lock_rank "proc"]} with "Hcpu") as "[Hproc Hback]".
+        iDestruct (cpu_own_set_proc 1 ebc zero_reg (proc_addr jj) emp {["proc"]} with "Hcpu") as "[Hproc Hback]".
         (* DISPATCH: c->proc : 0 -> &proc[jj].  A PLAIN STORE to memory this
            hart already owns whole -- no invariant, no mask change. *)
         assert (HM2s1rr : rget M2 Rs1 = proc_addr jj) by (rgne; exact HM2s1).
@@ -1431,14 +1431,14 @@ Section ProofScheduler.
            eventually resume THIS cpu context -- a proc calling sched() -- is
            in a DIFFERENT critical section from the one suspending here, and
            the swtch primitive ties its held-lock set to nothing.  The entry
-           set [{[lock_rank "proc"]}] indexes only the bundle handed IN.
+           set [{["proc"]}] indexes only the bundle handed IN.
            ================================================================
            OPEN GAP, NOT CLOSED BY THIS PASS -- the mirror image of the one
            ProofSched.v documents at its own [Swtch.wp_swtch_sconf] (that file
            is the OTHER end of this same crossing, resuming the same [p_sched]
            chain).  Everything below -- [cpu_own_set_proc] at +0x76 and the
            [iApply "Tail"] that releases proc jj's lock -- is written at the
-           literal [{[lock_rank "proc"]}], because that IS the value in every
+           literal [{["proc"]}], because that IS the value in every
            real execution: sched() is only ever called holding exactly p->lock
            at noff == 1, so the resumer's set is that singleton.  But nothing
            available here proves it: [p_sched_at_cpu]'s payload yields
@@ -1447,8 +1447,8 @@ Section ProofScheduler.
            lock INVARIANT's [Some (i, true)] state and cannot be read out
            without opening it), and [cpu_own]'s level index [1] is not tied to
            the cardinality of its set anywhere in the model.  So neither
-           [lock_rank "proc" ∈ lks'] nor [lks' ⊆ {[lock_rank "proc"]}] is
-           derivable, and [lks' = {[lock_rank "proc"]}] is a protocol fact
+           ["proc" ∈ lks'] nor [lks' ⊆ {["proc"]}] is
+           derivable, and [lks' = {["proc"]}] is a protocol fact
            about [SchedCtx.p_sched] that no resource currently states.
            Closing it needs a DESIGN DECISION above this file: likely (a) a
            new ghost conjunct in [SchedCtx.p_sched]'s resume-side payload
@@ -1495,8 +1495,8 @@ Section ProofScheduler.
            it carries the RESUMER's set.  The accessor is set-generic, so this
            step is honest either way; the gap documented at the [iIntros]
            above surfaces at the [iApply "Tail"] below, where [sc_tail_body]
-           demands the literal [{[lock_rank "proc"]}]. *)
-        iDestruct (cpu_own_set_proc 1 eb' (proc_addr jj) zero_reg emp {[lock_rank "proc"]} with "Hcpu") as "[Hproc Hback]".
+           demands the literal [{["proc"]}]. *)
+        iDestruct (cpu_own_set_proc 1 eb' (proc_addr jj) zero_reg emp {["proc"]} with "Hcpu") as "[Hproc Hback]".
         (* RECLAIM: c->proc : &proc[jj] -> 0.  A PLAIN STORE, for the same
            reason the dispatch one is.  The hart tag came back WHOLE in the
            park payload and goes into proc jj's lock below. *)
@@ -1600,7 +1600,7 @@ Section ProofScheduler.
            THIS IS WHERE THE OPEN GAP DOCUMENTED AT THE [Swtch.wp_swtch_sconf]
            CONTINUATION ABOVE BITES.  "Hcpu" now carries the swtch resume
            wand's independent [lks'], while [sc_tail_body] is stated at the
-           literal [{[lock_rank "proc"]}] -- which is the true value on every
+           literal [{["proc"]}] -- which is the true value on every
            real execution but is not derivable from anything in scope.  The
            statement is deliberately LEFT at the singleton rather than
            generalised to [lks']: generalising it only relocates the same

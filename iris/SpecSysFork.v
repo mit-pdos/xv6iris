@@ -94,14 +94,14 @@ Definition wp_sys_fork_sconf_body
     (γa γp γw γl γf γil γic : gname) (γs : list gname)
     (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
     (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (b : bool) (pid : mword 32) (V : pprivate) (lks : gset nat) :=
+    (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_fork in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_sys_fork <= av)%nat ->
   (* propagates to kfork's own nesting bound *)
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
   (* straight through to kfork, whose cone floors at wait_lock (8) *)
-  locks_below lks (lock_rank "wait_lock") ->
+  locks_below lks "wait_lock" ->
   sie_cap_gpr m av b p -∗
   cpu_own lvl eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -139,7 +139,7 @@ Module Type SYSFORK.
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (b : bool) (pid : mword 32) (V : pprivate) (lks : gset nat),
+      (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string),
       wp_sys_fork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart nib
                              m lvl av eb p C b pid V lks.
 End SYSFORK.

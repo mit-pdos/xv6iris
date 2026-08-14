@@ -42,7 +42,7 @@ Import Defs.
    caller owes a refutation of the dead state [Dc] for each.  acquire disposes
    of nothing, so [Dc] merely rides along.  A static kernel lock instantiates
    at [Dc := False] ([wp_acquire_sconf_body] below). *)
-Definition wp_acquire_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset nat) :=
+Definition wp_acquire_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.acquire in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -73,9 +73,9 @@ Definition wp_acquire_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN :
      fragment, which is not persistent and would have to be borrowed and
      returned inside the invariant open.  That leaf change plus a
      [SpecHolding] variant concluding [a0 = 0] is a separate piece of work.
-     It is strictly stronger than the [lock_rank s ∉ lks] the ghost step
+     It is strictly stronger than the [s ∉ lks] the ghost step
      needs, and that is the point -- see the composition note above. *)
-  locks_below lks (lock_rank s) ->
+  locks_below lks s ->
   (⊢ Tc -∗ Dc -∗ False) ->
   (* [∀ i : CPU], not pinned at the entry [cpu_id]: acquire's entry can be at
      [b = true] (the enabled arm forces [n = 0]), so "enter at CID with
@@ -122,12 +122,12 @@ Definition wp_acquire_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN :
     pc_is ret_tgt -∗
     ⌜ callee_saved m mfin ⌝ -∗
     locked γl cpu_id -∗ R -∗
-    cpu_own (S n) eb p C false ({[lock_rank s]} ∪ lks) -∗
+    cpu_own (S n) eb p C false ({[s]} ∪ lks) -∗
     arm_pay n eb p -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
-Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset nat) :=
+Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.acquire in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -158,9 +158,9 @@ Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : Gen
      fragment, which is not persistent and would have to be borrowed and
      returned inside the invariant open.  That leaf change plus a
      [SpecHolding] variant concluding [a0 = 0] is a separate piece of work.
-     It is strictly stronger than the [lock_rank s ∉ lks] the ghost step
+     It is strictly stronger than the [s ∉ lks] the ghost step
      needs, and that is the point -- see the composition note above. *)
-  locks_below lks (lock_rank s) ->
+  locks_below lks s ->
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -195,19 +195,19 @@ Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : Gen
     pc_is ret_tgt -∗
     ⌜ callee_saved m mfin ⌝ -∗
     locked γl cpu_id -∗ R -∗
-    cpu_own (S n) eb p C false ({[lock_rank s]} ∪ lks) -∗
+    cpu_own (S n) eb p C false ({[s]} ∪ lks) -∗
     arm_pay n eb p -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type ACQUIRE_GEN.
   Parameter wp_acquire_gen_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset nat),
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string),
       wp_acquire_gen_sconf_body γl s R Tc Dc m n eb p C av b lks.
 End ACQUIRE_GEN.
 
 Module Type ACQUIRE.
   Parameter wp_acquire_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset nat),
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string),
       wp_acquire_sconf_body γl s R m n eb p C av b lks.
 End ACQUIRE.

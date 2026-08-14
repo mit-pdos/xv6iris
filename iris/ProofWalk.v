@@ -76,7 +76,7 @@ Section ProofWalk.
   (* ================================================================= *)
   Lemma wp_walk_epilogue_sconf `{GEN : GenId} `{CID : CpuId} (γa : gname)
       (mm Mf : regfile) (t tf : ptree) (K : nat) (lvl : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (q : nat) (b : bool) (lks : gset nat) :
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (q : nat) (b : bool) (lks : gset string) :
     let va := mm !!! Regidx (mword_of_int 11) in
     let vpn := svpn_of va in
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -362,7 +362,7 @@ Section ProofWalk.
   (* ================================================================= *)
   Lemma wp_walk_tail_sconf `{GEN : GenId} `{CID : CpuId} (γa : gname)
       (mm Mf : regfile) (t tf : ptree) (b0 : mword 44) (K : nat) (lvl : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (q : nat) (b : bool) (lks : gset nat) :
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (q : nat) (b : bool) (lks : gset string) :
     let va := mm !!! Regidx (mword_of_int 11) in
     let vpn := svpn_of va in
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -701,7 +701,7 @@ Section ProofWalk.
       (tG : mword 44 -> ptree) (N clvl : nat)
       (cellA : mword 64) (w0 : bv 64) (K : nat) (lvl : nat)
       (eb : bool) (p : mword 64) (C : iProp Σ) (F : iProp Σ)
-      (on : option nat) (g : nat) (b : bool) (lks : gset nat) :
+      (on : option nat) (g : nat) (b : bool) (lks : gset string) :
     let va := mm !!! Regidx (mword_of_int 11) in
     let vpn := svpn_of va in
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -725,7 +725,7 @@ Section ProofWalk.
           ptree_own clvl (DfracOwn 1) (pt_empty_node bn) -∗
           ptree_own N (DfracOwn 1) (tG bn))) ->
     (* the one lock this arm touches: kalloc's own "kmem" bound *)
-    locks_below lks (lock_rank "kmem") ->
+    locks_below lks "kmem" ->
     sie_cap_gpr Mf (K - 8)%nat b p -∗ cpu_own lvl eb p C b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.walk + 0x72)) -∗
@@ -1194,7 +1194,7 @@ Section ProofWalk.
 
   Lemma wp_walk_loop_sconf `{GEN : GenId} `{CID : CpuId} (γa : gname)
       (mm Mf : regfile) (t cur : ptree) (L : nat) (w : mword 64) (K : nat) (lvl : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (g : nat) (b : bool) (lks : gset nat) :
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (g : nat) (b : bool) (lks : gset string) :
     let va := mm !!! Regidx (mword_of_int 11) in
     let vpn := svpn_of va in
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -1221,7 +1221,7 @@ Section ProofWalk.
     (g + grafts_lvl L cur vpn = pt_missing t vpn 1)%nat ->
     (* the loop may recurse into [wp_walk_alloc_sconf], whose own bound is
        "kmem"; nothing else on this path touches a lock *)
-    locks_below lks (lock_rank "kmem") ->
+    locks_below lks "kmem" ->
     sie_cap_gpr Mf (K - 8)%nat b p -∗ cpu_own lvl eb p C b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.walk + 0x26)) -∗
@@ -1673,7 +1673,7 @@ Section ProofWalk.
   Lemma wp_walk_sconf `{GEN : GenId} `{CID : CpuId} (γa : gname)
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat)
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string)
     : wp_walk_sconf_body γa mm t m K lvl eb p C on b lks.
   Proof.
     cbv beta delta [wp_walk_sconf_body].

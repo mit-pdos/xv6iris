@@ -233,7 +233,7 @@ Section KforkPrologue.
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
       (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate)
-      (R : iProp Σ) (lks : gset nat) :
+      (R : iProp Σ) (lks : gset string) :
     let sp0 : mword 64 := m !!! Regidx csp_rs1 in
     let ra0 : mword 64 := m !!! Regidx Rra in
     let s00 : mword 64 := m !!! Regidx Rs0 in
@@ -245,7 +245,7 @@ Section KforkPrologue.
        is at "proc" (11) -- uvmcopy's kalloc calls run while np->lock is
        already held, but rank above "proc" follows by [locks_below_mono]
        and its own contract does not yet expose the premise. *)
-    locks_below lks (lock_rank "proc") ->
+    locks_below lks "proc" ->
     sie_cap_gpr m K b pme -∗
     cpu_own lvl eb pme C b lks -∗
     kernel_text -∗
@@ -344,7 +344,7 @@ Section KforkPrologue.
         IrefSlots.iref_slots (1 + IREFSPARE) -∗
         SwtchCtx.own_ctx (p_context npa) -∗
         IntrDefs.arm_pay lvl eb pme -∗
-        cpu_own (S lvl) eb pme C false ({[lock_rank "proc"]} ∪ lks) -∗
+        cpu_own (S lvl) eb pme C false ({["proc"]} ∪ lks) -∗
         kalloc_env γa None -∗
         R -∗
         WP (Loop : expr riscv_lang))) -∗
@@ -415,7 +415,7 @@ Section KforkPrologue.
                 either way, hence convertible, and [iApply] bridges them. *)
              (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest)) -∗
         IntrDefs.arm_pay lvl eb pme -∗
-        cpu_own (S lvl) eb pme C false ({[lock_rank "proc"]} ∪ lks) -∗
+        cpu_own (S lvl) eb pme C false ({["proc"]} ∪ lks) -∗
         kalloc_env γa None -∗
         is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
         is_ftable γl γf -∗
@@ -932,7 +932,7 @@ Section KforkPrologue.
       iModIntro.
       iDestruct "Henv'" as "#Henv'".
       iApply (Uvmcopy.wp_uvmcopy_sconf γa N5p (pv_upt Vp) (pv_upt Vc) (trap_res b + K1)%nat eb pme C (S lvl) false
-                ({[lock_rank "proc"]} ∪ lks)
+                ({["proc"]} ∪ lks)
                 ltac:(lia) ltac:(lia) HN5ptp HN5pa0 HN5pa1 HszbP
                 ltac:(intros i _; rewrite HCempty; apply lookup_empty)
                 with "Hcg Hcpu Htext Hpc HPpt HCpt Henv'").

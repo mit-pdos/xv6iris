@@ -2,9 +2,43 @@
 
 A register of bugs in the kernel *being verified*, as opposed to gaps in the
 proofs: an entry here means **the C code is wrong** and the stuck proof is the
-symptom.  The register holds **no open entry**: every defect this effort found
-has been fixed upstream, and a fix's consequences for a contract are recorded
-with that contract, not here.
+symptom.  A fix's consequences for a contract are recorded with that contract,
+not here.
+
+## OPEN — `exec`'s `ustack[argc] = 0` writes one element past `ustack[MAXARG]`
+
+`kexec` declares `uint64 ustack[MAXARG]` (32 entries) and tests the bound
+INSIDE the argument loop:
+
+```c
+for (argc = 0; argv[argc]; argc++) {
+  if (argc >= MAXARG) goto bad;
+  ...
+  ustack[argc] = sp;
+}
+ustack[argc] = 0;                 /* argc can be 32 here */
+```
+
+The test only runs once `argv[argc]` is known non-null, so with **exactly 32
+arguments** the loop's null-terminated exit is taken at `argc == 32` and the
+store after it addresses `ustack[32]` — out of bounds by one element.  (33
+arguments does hit `bad`, and 31 or fewer never gets near it; it is the exact
+boundary that escapes.)
+
+**Not exploitable as compiled**, which is why it has stayed invisible: gcc
+reserved **33** slots for the array (264 B at `s0-368 .. s0-112`, read off the
+frame map in `SpecKexec.v`'s header), so the extra store lands in the padding
+inside kexec's own frame and clobbers nothing.  That is an accident of this
+build, not a property of the source.
+
+The proof cannot state the bound the C implies, and that is how this surfaced:
+`ProofKexecSeam.kxc_at_272` — the loop's exit state — carries `(c <= 32)%nat`
+where the loop HEAD `kxc_at_21a` carries `(c < 32)%nat`, and the two really are
+different propositions.  Tightening the exit to `< 32` would make the argv
+loop's own natural-exit arm unprovable at exactly the 32-argument case.  The
+one-line source fix is to move the test above the loop's condition (or size the
+array `MAXARG + 1`); until then the invariant records the off-by-one rather
+than hiding it.
 
 ## FIXED UPSTREAM (`117c0e7`) — an unchecked `nlink++` could wrap a link
 ## count to zero, in `create`'s mkdir arm and in `sys_link`

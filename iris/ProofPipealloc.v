@@ -126,7 +126,7 @@ Section ProofPipealloc.
       (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile) (v0 v1 : mword 64) (on : option nat)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool)
-      (lks : gset nat)
+      (lks : gset string)
     : wp_pipealloc_sconf_body γfl γf γkl γk fl m v0 v1 on n eb p C K b lks.
   Proof.
     cbv beta delta [wp_pipealloc_sconf_body].

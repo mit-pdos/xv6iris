@@ -234,12 +234,13 @@ Section Lock.
      [lk->cpu] ([LockSet.lock_cpu], the 8-byte word at +16) is owned WHOLE by
      the invariant in every state.  What varies is what sits beside it: while
      hart [i] holds the lock, the invariant also keeps the held-set fragment
-     [lk_in i r] at this lock's RANK ([LockRank.lock_rank] of its name).  So
+     [lk_in i r] at this lock's NAME (its rank orders it, but the set holds
+     the name -- see LockRank.v's [locks_below]).  So
      the two readings of "this lock is held by hart i" -- the C field and the
      ghost set -- are one resource, and neither can drift from the other:
 
        - RELEASE's [lk->cpu = 0] retires the fragment, which is exactly the
-         licence to take the rank out of the hart's set
+         licence to take the name out of the hart's set
          ([LockSet.cpu_locks_delete]).
        - ACQUIRE's [lk->cpu = mycpu()] mints it, which needs [r ∉ S] -- and
          that is supplied by the caller's ORDER PREMISE
@@ -261,13 +262,13 @@ Section Lock.
      supplying freshness, all of it goes: the cell is [DfracOwn 1] in every
      state, the read leaves are state-blind for free, and the stores are
      ordinary stores. *)
-  Definition lk_cpu_frag (st : lock_state) (r : nat) : iProp Σ :=
+  Definition lk_cpu_frag (st : lock_state) (r : string) : iProp Σ :=
     match st with
     | Some (i, true) => lk_in i r
     | _ => emp
     end%I.
 
-  Definition lk_cpu_res (st : lock_state) (lk : mword 64) (r : nat) : iProp Σ :=
+  Definition lk_cpu_res (st : lock_state) (lk : mword 64) (r : string) : iProp Σ :=
     (lock_cpu lk ↦₈ lk_cpu_val st ∗ lk_cpu_frag st r)%I.
 
   (* the leaves strip this under [>] inside the step engine's callback, and
@@ -279,13 +280,13 @@ Section Lock.
   Proof. apply _. Qed.
 
   (* the free / window form: the whole cell at 0 and no fragment. *)
-  Lemma lk_cpu_res_free (lk : mword 64) (r : nat) :
+  Lemma lk_cpu_res_free (lk : mword 64) (r : string) :
     lk_cpu_res None lk r ⊣⊢ lock_cpu lk ↦₈ (zero_reg : mword 64).
   Proof. rewrite /lk_cpu_res /=. apply bi.sep_emp. Qed.
-  Lemma lk_cpu_res_win (i : CPU) (lk : mword 64) (r : nat) :
+  Lemma lk_cpu_res_win (i : CPU) (lk : mword 64) (r : string) :
     lk_cpu_res (Some (i, false)) lk r ⊣⊢ lock_cpu lk ↦₈ (zero_reg : mword 64).
   Proof. rewrite /lk_cpu_res /=. apply bi.sep_emp. Qed.
-  Lemma lk_cpu_res_held (i : CPU) (lk : mword 64) (r : nat) :
+  Lemma lk_cpu_res_held (i : CPU) (lk : mword 64) (r : string) :
     lk_cpu_res (Some (i, true)) lk r ⊣⊢
     lock_cpu lk ↦₈ cpus_ptr i ∗ lk_in i r.
   Proof. reflexivity. Qed.
@@ -296,7 +297,7 @@ Section Lock.
   Definition lock_inv (γ : gname) (lk : mword 64) (s : string) (R : iProp Σ) : iProp Σ :=
     (∃ (v : mword 32) (st : lock_state),
        lock_word lk v ∗
-       lk_cpu_res st lk (lock_rank s) ∗
+       lk_cpu_res st lk s ∗
        lock_auth γ st ∗
        (⌜st = None⌝ ∗ ⌜v = (mword_of_int 0 : mword 32)⌝ ∗ lock_frag γ None ∗ R
         ∨ ⌜st ≠ None⌝ ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝))%I.

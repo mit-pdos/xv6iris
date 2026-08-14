@@ -243,7 +243,7 @@ Definition wp_kerneltrap_sconf_body
     (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
     (γs : list gname) (pd pav pu : mword 64)
     (m : regfile) (av : nat) (p : mword 64) (C : iProp Σ)
-    (ep sc tv : mword 64) (lks : gset nat) :=
+    (ep sc tv : mword 64) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kerneltrap in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   length γs = NPROC ->
@@ -257,7 +257,7 @@ Definition wp_kerneltrap_sconf_body
      ("cons", 5) through uartintr -> consoleintr -- BELOW clockintr's
      tickslock (8) and virtio's (9), and a bound has to be stated at the
      minimum, since [locks_below_mono] raises but never lowers. *)
-  locks_below lks (lock_rank "cons") ->
+  locks_below lks "cons" ->
   sie_cap_gpr m av false p -∗
   (* THE TRAP CAME FROM S-MODE WITH INTERRUPTS ENABLED: SPP = 1 and
      SPIE = 1.  This is the [sret_bits] travelling half, which is what
@@ -330,7 +330,7 @@ Module Type KERNELTRAP.
       (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av : nat) (p : mword 64) (C : iProp Σ)
-      (ep sc tv : mword 64) (lks : gset nat),
+      (ep sc tv : mword 64) (lks : gset string),
       wp_kerneltrap_sconf_body γu γv γdk γtl γs pd pav pu
         m av p C ep sc tv lks.
 End KERNELTRAP.

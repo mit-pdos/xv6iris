@@ -29,7 +29,7 @@ Import Defs.
 
 
 Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat) :=
+    (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string) :=
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn := svpn_of va in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -50,7 +50,7 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `
      descent finds an empty slot; kalloc's own bound is "kmem" (13), and
      nothing else in walk's cone touches a lock.  One premise covers the
      whole cone. *)
-  locks_below lks (lock_rank "kmem") ->
+  locks_below lks "kmem" ->
   sie_cap_gpr mm K b p -∗ cpu_own lvl eb p C b lks -∗
   kernel_text -∗
   pc_is (mword_of_int KernelSyms.walk) -∗
@@ -79,7 +79,7 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `
 Module Type WALK.
   Parameter wp_walk_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat),
+      (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string),
       wp_walk_sconf_body γa mm t m K lvl eb p C on b lks.
 End WALK.
 

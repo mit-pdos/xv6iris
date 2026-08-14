@@ -98,7 +98,7 @@ Definition wp_log_write_gen_body
     (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
     (cr : bool) (Sb : gset Z)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (K : nat) (b : bool) (lks : gset nat) :=
+    (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.log_write in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (K_log_write <= K)%nat ->
@@ -130,7 +130,7 @@ Definition wp_log_write_gen_body
      is a consequence rather than a second premise.  Trivial at [lks = ∅],
      which every landed caller is at (a caller of log_write holds sleeplocks,
      not spinlocks). *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -210,7 +210,7 @@ Definition wp_log_write_au_body
     (cr : bool) (Sb : gset Z) (e0 : nat) (vlb : nat)
     (Efs : coPset) (Φfsb : iProp Σ)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (K : nat) (b : bool) (lks : gset nat) :=
+    (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.log_write in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (K_log_write <= K)%nat ->
@@ -222,7 +222,7 @@ Definition wp_log_write_au_body
   uint bno ∈ cov ->
   ~ (uint bno ∈ log_region_set logstart) ->
   (* THE FRESHNESS BOUND -- see [wp_log_write_gen_body] *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -372,7 +372,7 @@ Definition wp_log_write_gene_body
     (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
     (cr : bool) (Sb : gset Z) (e0 : nat)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (K : nat) (b : bool) (lks : gset nat) :=
+    (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.log_write in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (K_log_write <= K)%nat ->
@@ -384,7 +384,7 @@ Definition wp_log_write_gene_body
   uint bno ∈ cov ->
   ~ (uint bno ∈ log_region_set logstart) ->
   (* THE FRESHNESS BOUND -- see [wp_log_write_gen_body] *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -432,7 +432,7 @@ Definition wp_log_write_sconf_body
     (k : nat) (pidv bno : mword 32)
     (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (K : nat) (b : bool) (lks : gset nat) :=
+    (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.log_write in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (K_log_write <= K)%nat ->
@@ -452,7 +452,7 @@ Definition wp_log_write_sconf_body
   uint bno ∈ cov ->
   ~ (uint bno ∈ log_region_set logstart) ->
   (* THE FRESHNESS BOUND -- see [wp_log_write_gen_body] *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -501,7 +501,7 @@ Module Type LOG_WRITE.
       (cr : bool) (Sb : gset Z) (e0 : nat) (vlb : nat)
       (Efs : coPset) (Φfsb : iProp Σ)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (K : nat) (b : bool) (lks : gset nat),
+      (K : nat) (b : bool) (lks : gset string),
       wp_log_write_au_body bn γ γfs γd cov logstart dev k pidv bno
                            bs bsl bsd d u cr Sb e0 vlb Efs Φfsb m n eb p C K b lks.
 
@@ -517,7 +517,7 @@ Module Type LOG_WRITE.
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
       (cr : bool) (Sb : gset Z) (e0 : nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (K : nat) (b : bool) (lks : gset nat),
+      (K : nat) (b : bool) (lks : gset string),
       wp_log_write_gene_body bn γ γfs γd cov logstart dev k pidv bno
                              bs bsl bsd d u cr Sb e0 m n eb p C K b lks.
 
@@ -534,7 +534,7 @@ Module Type LOG_WRITE.
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
       (cr : bool) (Sb : gset Z)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (K : nat) (b : bool) (lks : gset nat),
+      (K : nat) (b : bool) (lks : gset string),
       wp_log_write_gen_body bn γ γfs γd cov logstart dev k pidv bno
                             bs bsl bsd d u cr Sb m n eb p C K b lks.
 
@@ -546,7 +546,7 @@ Module Type LOG_WRITE.
       (k : nat) (pidv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (K : nat) (b : bool) (lks : gset nat),
+      (K : nat) (b : bool) (lks : gset string),
       wp_log_write_sconf_body bn γ γfs γd cov logstart dev k pidv bno
                               bs bsl bsd d u m n eb p C K b lks.
 End LOG_WRITE.

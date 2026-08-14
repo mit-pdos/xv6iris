@@ -113,7 +113,7 @@ Section KforkB1Proof.
       (V : pprivate) (pid : mword 32) (P : uptd) (ws : list (mword 64))
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s50 : mword 64)
-      (pme : mword 64) (eb b : bool) (C : iProp Σ) (lvl : nat) (lks : gset nat) :
+      (pme : mword 64) (eb b : bool) (C : iProp Σ) (lvl : nat) (lks : gset string) :
     (52 <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     (* The EXIT arm, named.  This block is entered with np->lock HELD, so its
@@ -144,13 +144,13 @@ Section KforkB1Proof.
     (* THE FRESHNESS PREMISE: this block RELEASES [p->lock] (rank "proc")
        before returning, so [lks] is the OUTER set -- below "proc"'s rank --
        and the entry resource carries "proc" ∪ [lks] explicitly. *)
-    locks_below lks (lock_rank "proc") ->
+    locks_below lks "proc" ->
     (* ENTRY: in-lock (level [S lvl], arm [false]), so the index carries the
        reserve of the exit arm [b].  EXIT below is at [K] and arm [b]: the
        physical carve [trap_res b + (K - 8)] -> [trap_res b + K] is exactly the
        8-slot epilogue pop, i.e. the reserve is CONSERVED across this block. *)
     sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
-    cpu_own (S lvl) eb pme C false ({[lock_rank "proc"]} ∪ lks) -∗
+    cpu_own (S lvl) eb pme C false ({["proc"]} ∪ lks) -∗
     arm_pay lvl eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x7c) : mword 64) -∗
@@ -221,7 +221,7 @@ Section KforkB1Proof.
       by (rewrite /T1 upd_ne; [exact HT0a0 | vm_compute; discriminate]).
     (* ---- freeproc ---- *)
     iApply (FP.wp_freeproc_sconf γa T1 j γl V pid USED ch (Some P) (Some (ud_tfp P, ws))
-              (trap_res b + (K - 8))%nat eb pme C (S lvl) ({[lock_rank "proc"]} ∪ lks)
+              (trap_res b + (K - 8))%nat eb pme C (S lvl) ({["proc"]} ∪ lks)
               ltac:(pose proof (kfkb1_K44 K HK); lia) (kfkb1_lvlS lvl Hlvl) HT1a0
               with "Hcg Hcpu Htext Hpc Hheld Hfprest Hfppt Hfptf Henv").
     all: try lkbelow.
@@ -300,12 +300,12 @@ Section KforkB1Proof.
     iEval (rewrite -Hb) in "Hcg".
     iApply (RL.wp_release_sconf γl (proc_addr j) "proc"%string
               (proc_lock_res γs γl (proc_addr j)) T3 lvl eb pme C (K - 8)%nat
-              ({[lock_rank "proc"]} ∪ lks)
+              ({["proc"]} ∪ lks)
               Hlka (kfkb1_K10 K HK)
               with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hcsr Hcpu".
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
-    iEval (rewrite (_ : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks);
+    iEval (rewrite (_ : ({["proc"]} ∪ lks) ∖ {["proc"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hcpu".
     assert (Hp88 : ret_pc (T3 !!! Regidx Rra) = mword_of_int (KF + 0x88))
       by (rewrite HT3ra; apply bv_eq; vm_compute; reflexivity).

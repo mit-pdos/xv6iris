@@ -483,10 +483,10 @@ Section WpSconfLock.
        instance redeems the set fragment to complete the cell in the first
        place. *)
     (forall st : lock_state,
-       ⊢ lock_auth γl st -∗ lk_cpu_res st lk (lock_rank s) -∗ T ==∗
+       ⊢ lock_auth γl st -∗ lk_cpu_res st lk s -∗ T ==∗
          ⌜st <> None⌝ ∗ ⌜stn <> None⌝ ∗ lock_auth γl stn ∗
          lock_cpu lk ↦₈ lk_cpu_val st ∗
-         (lock_cpu lk ↦₈ lk_cpu_val stn ==∗ lk_cpu_res stn lk (lock_rank s) ∗ T')) ->
+         (lock_cpu lk ↦₈ lk_cpu_val stn ==∗ lk_cpu_res stn lk s ∗ T')) ->
     (⊢ T -∗ Dc -∗ False) ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗
@@ -552,8 +552,8 @@ Section WpSconfLock.
      acquire's [if(holding(lk)) panic] arm.  Deadlock-freedom wants the
      stronger [LockRank.locks_below S r], which implies this one
      ([locks_below_not_elem]) and lands later. *)
-  Local Lemma lkcpu_take_exchange (γl : gname) (lk : mword 64) (r : nat)
-      (S : gset nat) (Hfresh : r ∉ S) (st : lock_state) :
+  Local Lemma lkcpu_take_exchange (γl : gname) (lk : mword 64) (r : string)
+      (S : gset string) (Hfresh : r ∉ S) (st : lock_state) :
     ⊢ lock_auth γl st -∗ lk_cpu_res st lk r -∗
       (locked_pre γl cpu_id ∗ cpu_locks_at cpu_id S) ==∗
       ⌜st <> None⌝ ∗ ⌜Some (cpu_id, true) <> None⌝ ∗
@@ -580,8 +580,8 @@ Section WpSconfLock.
   (* release: the fragment the invariant kept is redeemed to retire the rank
      from the hart's set.  No premise: membership is DERIVED from the fragment
      ([cpu_locks_delete]), which is the direction that never needed the order. *)
-  Local Lemma lkcpu_give_exchange (γl : gname) (lk : mword 64) (r : nat)
-      (S : gset nat) (st : lock_state) :
+  Local Lemma lkcpu_give_exchange (γl : gname) (lk : mword 64) (r : string)
+      (S : gset string) (st : lock_state) :
     ⊢ lock_auth γl st -∗ lk_cpu_res st lk r -∗
       (locked γl cpu_id ∗ cpu_locks_at cpu_id S) ==∗
       ⌜st <> None⌝ ∗ ⌜Some (cpu_id, false) <> None⌝ ∗
@@ -616,16 +616,16 @@ Section WpSconfLock.
      mints the set fragment.  The predecessor had no premise and instead
      derived [lk ∉ S] from the cpu field -- see WpLock.v's owner-field block
      for what that cost.  (The lock ORDER strengthens this to
-     [LockRank.locks_below S (lock_rank s)] in a later phase.) *)
+     [LockRank.locks_below S s] in a later phase.) *)
   Lemma wp_csd_lkcpu_lockopen_s_sconf
       (γl : gname) (lk : mword 64) (s : string) (R Dc : iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
-      (m : regfile) (n : nat) (b : bool) (S : gset nat) :
+      (m : regfile) (n : nat) (b : bool) (S : gset string) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let h0 := cpu_id in
     pa = lock_cpu lk ->
     rget m rs2 = mycpu_ret cid_word ->
-    lock_rank s ∉ S ->
+    s ∉ S ->
     (⊢ locked_pre γl h0 -∗ Dc -∗ False) ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗
@@ -637,7 +637,7 @@ Section WpSconfLock.
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 2) -∗
       locked γl h0 -∗
-      cpu_locks_at h0 ({[lock_rank s]} ∪ S) -∗
+      cpu_locks_at h0 ({[s]} ∪ S) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -655,10 +655,10 @@ Section WpSconfLock.
     iIntros "Hcg Hpc Hinstr #Hlock Htok Hcl Hcont".
     iApply (wp_sd_lkcpu_lockopen_gen true γl lk s R Dc pc rs2 rs1 imm m n
               (locked_pre γl h0 ∗ cpu_locks_at h0 S)%I
-              (locked γl h0 ∗ cpu_locks_at h0 ({[lock_rank s]} ∪ S))%I
+              (locked γl h0 ∗ cpu_locks_at h0 ({[s]} ∪ S))%I
               (Some (h0, true)) b
               Hpacpu Hsv
-              (lkcpu_take_exchange γl lk (lock_rank s) S Hfresh)
+              (lkcpu_take_exchange γl lk s S Hfresh)
               ltac:(iIntros "[Htok _]"; iApply Href; iExact "Htok")
               with "Hcg Hpc Hinstr Hlock [Htok Hcl] [Hcont]").
     { iFrame "Htok Hcl". }
@@ -676,7 +676,7 @@ Section WpSconfLock.
   Lemma wp_sd_zero_lkcpu_lockopen_s_sconf
       (γl : gname) (lk : mword 64) (s : string) (R Dc : iProp Σ)
       (pc : mword 64) (rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
-      (m : regfile) (n : nat) (b : bool) (S : gset nat) :
+      (m : regfile) (n : nat) (b : bool) (S : gset string) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let h0 := cpu_id in
     pa = lock_cpu lk ->
@@ -691,10 +691,10 @@ Section WpSconfLock.
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       locked_pre γl h0 -∗
-      cpu_locks_at h0 (S ∖ {[lock_rank s]}) -∗
+      cpu_locks_at h0 (S ∖ {[s]}) -∗
       (* the rank WAS held -- so the caller knows the set strictly shrank,
          which is what pop_off's unwind premise needs. *)
-      ⌜lock_rank s ∈ S⌝ -∗
+      ⌜s ∈ S⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -716,10 +716,10 @@ Section WpSconfLock.
     iApply (wp_sd_lkcpu_lockopen_gen false γl lk s R Dc pc
               (mword_of_int 0 : mword 5) rs1 imm m n
               (locked γl h0 ∗ cpu_locks_at h0 S)%I
-              (locked_pre γl h0 ∗ cpu_locks_at h0 (S ∖ {[lock_rank s]}) ∗ ⌜lock_rank s ∈ S⌝)%I
+              (locked_pre γl h0 ∗ cpu_locks_at h0 (S ∖ {[s]}) ∗ ⌜s ∈ S⌝)%I
               (Some (h0, false)) b
               Hpacpu Hsv
-              (lkcpu_give_exchange γl lk (lock_rank s) S)
+              (lkcpu_give_exchange γl lk s S)
               ltac:(iIntros "[Htok _]"; iApply Href; iExact "Htok")
               with "Hcg Hpc Hinstr Hlock [Htok Hcl] [Hcont]").
     { iFrame "Htok Hcl". }

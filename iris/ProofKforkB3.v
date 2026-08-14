@@ -264,13 +264,13 @@ Section KforkB3Proof.
   Lemma kfkb3_fd_loop
       (γl γf : gname) (pme npa : mword 64) (pid_p pid_c : mword 32)
       (Vp V0 : pprivate) (m0 : regfile) (rsv K n : nat) (eb b : bool)
-      (C : iProp Σ) (sp0v s00v : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (sp0v s00v : mword 64) (lks : gset string) :
     (22 <= K)%nat ->
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
     pv_ofile V0 = replicate NOFILE (zero_reg : mword 64) ->
     (* the scan's only lock-touching callee is filedup, whose own bound is
        at "ftable" (1) -- nothing else in this block acquires. *)
-    locks_below lks (lock_rank "ftable") ->
+    locks_below lks "ftable" ->
     kernel_text -∗
     is_ftable γl γf -∗
     panic_wp_any -∗

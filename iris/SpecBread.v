@@ -72,7 +72,7 @@ Definition wp_bread_sconf_body
     (bn : bio_names) (V : bio_view Σ)
     (pidv dev bno : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bread in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -95,7 +95,7 @@ Definition wp_bread_sconf_body
      own acquiresleep call needs "sleep lock" (rank 6, LockRank.v); the bound
      is stated at the LOWER rank -- [locks_below_mono] (4 <= 6) lifts it to
      cover the acquiresleep call too, so one premise suffices for both. *)
-  locks_below lks (lock_rank "bcache") ->
+  locks_below lks "bcache" ->
   sie_cap_gpr m K b pj -∗
   (* enters at noff 0; the acquires raise it to what sleep demands *)
   cpu_own 0 eb pj C b lks -∗
@@ -165,7 +165,7 @@ Module Type BREAD.
       (bn : bio_names) (V : bio_view Σ)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_bread_sconf_body γs j γl γu γd γk pd pav pu bn V
                           pidv dev bno dq m K eb C b lks.
 End BREAD.

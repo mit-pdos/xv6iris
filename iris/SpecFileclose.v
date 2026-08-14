@@ -616,7 +616,7 @@ Definition wp_fileclose_sconf_body
     (k : nat) (q : Qp) (Cf : fcontent)                (* the reference        *)
     (fn : fclose_names) (on : option nat) (us : gset Z) (* the arms' ghosts   *)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (K : nat) (b : bool) (lks : gset nat) :=
+    (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fileclose in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (fileclose_stack <= K)%nat ->
@@ -625,7 +625,7 @@ Definition wp_fileclose_sconf_body
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* a0 is the file being closed *)
   m !!! Regidx (mword_of_int 10 : mword 5) = fnode k ->
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, ON EVERY ARM.  [emp] at [eb = true], where
@@ -675,6 +675,6 @@ Module Type FILECLOSE.
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fclose_names) (on : option nat) (us : gset Z)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (K : nat) (b : bool) (lks : gset nat),
+      (K : nat) (b : bool) (lks : gset string),
       wp_fileclose_sconf_body γfl γf k q Cf fn on us m n eb p C K b lks.
 End FILECLOSE.

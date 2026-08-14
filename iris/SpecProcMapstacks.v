@@ -38,7 +38,7 @@ From Kernel Require KernelSyms.
    kvmmap-fail branch is DEAD and the success-only post is honest -- NO panic_wp.
    stack_own bound 44 = own 10-slot frame + kvmmap's 34 (PROVISIONAL). *)
 Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat) :=
+    (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (* the kalloc chain below keeps its transient noff increment in int
      range; [lvl] is otherwise generic (the identity pin this replaced was
@@ -53,7 +53,7 @@ Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
   (* proc_mapstacks kalloc's a page for each of the 64 kernel stacks: its
      cone touches "kmem" (13) via the per-iteration kalloc call, and nothing
      lower (kvmmap's own Spec exposes no locks_below premise). *)
-  locks_below lks (lock_rank "kmem") ->
+  locks_below lks "kmem" ->
   sie_cap_gpr mm K b p -∗
   cpu_own lvl eb p C b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.proc_mapstacks) -∗
@@ -80,6 +80,6 @@ Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
 Module Type PROC_MAPSTACKS.
   Parameter wp_proc_mapstacks_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat),
+      (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string),
       wp_proc_mapstacks_sconf_body γa mm t m lvl K eb p C on b lks.
 End PROC_MAPSTACKS.

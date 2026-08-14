@@ -116,7 +116,7 @@ Section ProofUvmdealloc.
      [wp_consputc_epi]. *)
   Lemma wp_uvmdealloc_epi `{CID0 : CpuId}
       (mm mj : regfile) (P : uptd) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (b : bool) (oldsz newsz res ret_tgt : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (b : bool) (oldsz newsz res ret_tgt : mword 64) (lks : gset string) :
     (4 <= K)%nat ->
     (b = false \/ p = zero_reg -> (CID0 : CPU) = (CID : CPU)) ->
     ret_tgt = ret_pc (mm !!! Regidx Rra) ->
@@ -336,7 +336,7 @@ Section ProofUvmdealloc.
 
   Lemma wp_uvmdealloc_sconf
       (γa : gname) (mm : regfile)
-      (P : uptd) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (P : uptd) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string)
     : wp_uvmdealloc_sconf_body γa mm P K eb p C b lks.
   Proof.
     cbv beta delta [wp_uvmdealloc_sconf_body].

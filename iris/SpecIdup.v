@@ -139,7 +139,7 @@ Definition wp_idup_sconf_body
     (cov : gset Z) (logstart : Z) (nib : nat)
     (k : nat) (s : Qp) (dev inum : mword 32)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (K : nat) (b : bool) (lks : gset nat) :=
+    (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.idup in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (K_idup <= K)%nat ->
@@ -151,7 +151,7 @@ Definition wp_idup_sconf_body
   (* THE FRESHNESS PREMISE: idup acquires and releases [itable.lock]
      internally (balanced -- [lks] is unchanged across the whole call), so
      the caller must already hold only locks BELOW "itable"'s rank. *)
-  locks_below lks (lock_rank "itable") ->
+  locks_below lks "itable" ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -187,7 +187,7 @@ Module Type IDUP.
       (cov : gset Z) (logstart : Z) (nib : nat)
       (k : nat) (s : Qp) (dev inum : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (K : nat) (b : bool) (lks : gset nat),
+      (K : nat) (b : bool) (lks : gset string),
       wp_idup_sconf_body γl cn γfs γi cov logstart nib k s dev inum
                          m n eb p C K b lks.
 End IDUP.
