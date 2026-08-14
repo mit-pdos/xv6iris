@@ -6602,3 +6602,63 @@ rebuild cone is the whole tree.  Take them at the next touch of it.
 cite; each weakens once by a named lemma, keeping the hypothesis name.
 `crz` is `false` on every one, and on ARM G BY CONSTRUCTION — the mint
 needs a NONZERO nlink observation and ARM G is the zero one.
+
+
+### D₀ INCREMENTS 1 AND 2 LANDED — the fresh-type gate is a SPAN, and
+### `fresh_shape` turned out never to have been gated at all
+
+**INCREMENT 1 — `SpecIlock` exposes the claim box.**  Its post gains
+`filled : bool` and `⌜filled = true -> fresh_shape dn⌝`.  Nothing new is
+proven: `InodeRegion.ireg_withdraw` has always paid `fresh_shape` into
+`ProofIlock`'s third fill sub-arm (§16.4's claim box) and that arm spent
+it on `inode_ok`/`dir_ok` and dropped it.  The indicator has to be a
+boolean rather than a fact because `fresh_shape` is FALSE on the cached
+arm and on the ordinary fill.  Eight call sites (ProofCreate ×2,
+ProofNamex, ProofFileread, ProofFilewrite, ProofFilestat, ProofIreclaim,
+ProofKexecA) each gained one binder and one pure hypothesis; no seam
+tightened, so no FINDING-5 weakening was needed.  Full tree green first
+try.
+
+**INCREMENT 2 — the gate, and the finding that made it a span.**
+`SpecCreateFreshTy.v` + `LinkCreateFreshTy.v`.
+
+**THE FINDING, which is the durable part: A ONE-LINE GATE IS
+INCONSISTENT.**  §19.9.2 and §20.17.9 both anticipated a narrow fact —
+"`ireg_withdraw` at an inum `ialloc` claimed at `ty` returns a record with
+`di_type = ty`".  Written as a pure fact, or as an entailment over the
+resources create holds after `ilock`, `ty` and `dn` are FREE and nothing
+relates them, so two instantiations at `ty₁ ≠ ty₂` on one `dn` derive
+`False`.  The tree has no resource carrying the claim's provenance — that
+IS licence (d), struck at §20.16.4, and `ireg_claim_au` pays out `True` by
+design — so the pinning can only come from the PROGRAM POINT.
+
+**THE RULE THIS LEAVES: FOR AN ASSUMPTION, THE SHAPE IS A SOUNDNESS
+QUESTION, NOT A STYLE ONE.**  An assumed contract that can derive `False`
+defeats every `Print Assumptions` audit in the tree, its own included —
+so "state it as narrowly as the consumer needs" is the WRONG rule for an
+axiom.  The right one: **an axiom must quantify over something that pins
+its free variables to the machine**, and the cheapest such thing is a
+span of instructions.  Check any new assumed contract by instantiating it
+twice and looking for a contradiction before writing the proof that uses
+it.
+
+**THE LANDED SHAPE.**  A span over create's +0x8c..+0x98 — `c.mv a1,s4`,
+`lw a0,0(s1)`, `jal ialloc`, `c.mv s3,a0`, `c.beqz`, `jal ilock` —
+delivering at +0x9c (allocated) or +0xd4 (ARM A-FAIL).  `ty` is pinned by
+`Ma !!! s4 = sign_extend' 64 ty`, so two different types have
+contradictory premises and the axiom is consistent.  **It hides neither
+callee**: `wp_ialloc_gen` and `wp_ilock_sconf` are HYPOTHESES of the
+parameter, supplied by `ProofCreate` from its own `IA`/`IL` functor
+arguments, so a wrong `ProofIalloc` or `ProofIlock` is not covered — which
+is the difference between this and an assumed `wp_ilock_fresh`.  Four
+instructions is the whole price; create proves the other 158.
+
+**WHAT IS ASSUMED, EXACTLY: `di_type dn = ty`, and the `filled = true`
+that makes it meaningful.**  `fresh_shape dn` is NOT assumed — it arrives
+from increment 1's clause at the pinned `filled`.  So the old deficit's
+size half is now proven content and only the type half is a gate.
+
+**WHAT RETIRES IT:** a carrier for "no free-and-reclaim since my claim"
+(§20.7), which needs the kernel's F2 or a refutation of §20.17.6(B) at the
+withdraw.  Then this file and its `Axiom` are deleted and `ProofCreate`
+loses one hypothesis and gains four instructions.

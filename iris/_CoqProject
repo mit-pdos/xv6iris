@@ -1088,9 +1088,11 @@ SpecSysFstat.v
 SpecSysRead.v
 SpecSysWrite.v
 SpecCreate.v
+SpecCreateFreshTy.v
 CreateBudget.v
 ProofCreateParts.v
 ProofCreate.v
+LinkCreateFreshTy.v
 ProofSysFstat.v
 ProofSysRead.v
 LinkSysRead.v

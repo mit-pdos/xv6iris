@@ -4026,6 +4026,33 @@ trace, and it is smaller than it looks:
   Part 2.**  Plan S5e's walk accordingly: seven of create's eight arms,
   with the mkdir arm parked.
 
+**CORRECTION (D₀): THE DEFICIT ABOVE IS TWO THINGS, AND ONLY ONE IS A
+GATE — AND THAT ONE CANNOT BE STATED AS A FACT.**
+
+* **`fresh_shape dn` (size 0, zero addrs) IS A THEOREM.**
+  `InodeRegion.ireg_withdraw` proves it and hands it to `ProofIlock`'s
+  claim-box fill sub-arm, which spent it on `inode_ok`/`dir_ok` and
+  dropped it.  `SpecIlock` now EXPOSES it behind a `filled : bool` output
+  — false on the cached arm and on the ordinary fill, so the indicator is
+  the condition, not a premise.  It was never gated; the contract merely
+  failed to say it.  This is what carries S5a finding 1's
+  "`di_size dn = 0`" and `create_made`'s record identity.
+* **`di_type dn = ty` is the gate, and it is the whole gate.**
+
+**AND A ONE-LINE GATE IS INCONSISTENT.**  In any pure statement — or any
+entailment over the resources create holds after `ilock` — `ty` and `dn`
+are free with nothing relating them, so two instantiations at `ty₁ ≠ ty₂`
+on one `dn` derive `False`.  The tree has no resource carrying the claim's
+provenance (that IS licence (d), struck at §20.16.4; `ireg_claim_au` pays
+out `True` by design), so the pinning can come only from the PROGRAM
+POINT — the halfword in `s4`.  **The assumed statement is therefore a SPAN
+containing the `jal ialloc` that reads it** (`SpecCreateFreshTy.v`: four
+instructions, +0x8c..+0x98, delivering at +0x9c / +0xd4), with
+`wp_ialloc_gen` and `wp_ilock_sconf` as HYPOTHESES so neither proof is
+hidden.  An assumed contract that can derive `False` defeats every
+`Print Assumptions` audit in the tree, its own included — so for an
+assumption the SHAPE is a soundness question and not a style one.
+
 ## 20. THE ALLOCATEDNESS INVARIANT (§19.6 PART 2), DESIGNED (fs-sysfile
 ## S5e, 2026-08-12): a per-inum LINK LEDGER filed in the region, six
 ## licences on `SpecIget`, and the claim token that spans ialloc's window
@@ -5573,12 +5600,21 @@ What the walk consumes, in execution order, with the fixed binary's offsets:
   `dir_links_dirlink_nop`; `CreateBudget.v` for the op-wide set.
 * **THE ONE GATE.**  `di_type dn = ty` and hence `create_made` and hence
   `ARM C-OK-DIR`'s `dirlink(ip, ".")` premise `di_type dn = T_DIR`.  Not
-  derivable (§20.17.6).  **Put it in its own `LinkCreateFreshType.v`, holding
-  exactly "`ireg_withdraw` at an inum `ialloc` claimed at `ty` returns a
-  record with `di_type = ty`", so that it cannot hide anything else in
-  `Print Assumptions`** — D3's `LinkTxLockInit.v` is the precedent for keeping
-  an assumption in a file of its own, and D3 is also the precedent for such a
-  file becoming dead code the moment the source changes.
+  derivable (§20.17.6).  It lives in `SpecCreateFreshTy.v` /
+  `LinkCreateFreshTy.v` — D3's `LinkTxLockInit.v` is the precedent for
+  keeping an assumption in a file of its own, and D3 is also the precedent
+  for such a file becoming dead code the moment the source changes.
+
+  **THIS BULLET USED TO SAY "holding exactly `ireg_withdraw` at an inum
+  `ialloc` claimed at `ty` returns a record with `di_type = ty`".  THAT
+  STATEMENT IS INCONSISTENT AND MUST NOT BE WRITTEN** — see §19.9.2's
+  correction: with `ty` and `dn` free and no resource relating them, two
+  instantiations derive `False`.  The landed gate is a SPAN over create's
+  own +0x8c..+0x98 (four instructions, both callee contracts as
+  hypotheses), which is the smallest statement in which `ty` is pinned —
+  by the halfword in `s4` — and therefore the smallest consistent one.
+  The size half of the old deficit is no longer assumed at all:
+  `SpecIlock`'s `filled` indicator carries `fresh_shape`.
 
 Two things the stage must NOT do: regenerate the decode by hand (`make
 gen-code` has already produced `CodeCreate.v` at 332 bytes), and touch
