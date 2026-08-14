@@ -28,7 +28,86 @@ phase's branches funnel into — is **proven**
 (`ProofKexecTail.KexecTailProofC.kxc_bad_1d6`; see the phase-C section
 below).
 
-**A NEW FAILURE MODE, AND A RULE TO FOLLOW BEFORE WRITING THE NEXT BLOCK.**
+**THE "17 GB Qed" DIAGNOSIS BELOW WAS WRONG — CORRECTED HERE, READ THIS
+FIRST.** A later session ran `coqc -time -async-proofs off` (durable-notes'
+Rule Zero, `optimization.md`'s diagnosis-first rule) and the stall was NEVER
+in `Qed` at all — `-time` showed every individual sentence sub-second all the
+way to 79-100% of the file, repeatably, across many reruns. The real culprit
+was one TACTIC: `HW2s7`'s proof did `apply bv_eq; vm_compute` on a goal that
+still mentioned `sz1` (`pose`d from `uvmalloc`'s returned size — genuinely
+symbolic, not a closed literal). That is exactly `optimization.md`'s "never
+`vm_compute` a goal containing a symbolic `mword` variable" trap: RSS climbed
+~500 MB/s, linearly, no plateau, and would have hit the reported 40 GB inside
+two more minutes had the earlier session not killed it first. The `set`→
+`pose` swap made in that same round (30 chained `regfile` lets, `T0..T12,
+Z0, Y, U0..U3, Z1, W1..W8`) is ALSO the right call per `optimization.md`'s
+"Register maps" section (every one of them is unfolded by an explicit
+`rewrite /Xn`, never relied on `set`'s goal-folding) — keep it — but it is
+NOT what was hanging, and would not have fixed the real bug by itself.
+**The fix: never let a `pose`d symbolic value reach `vm_compute`.** Bridge
+two chained immediate offsets against a symbolic base via `bv_eq` +
+`add_vec64_unsigned`/`moi64_unsigned` + `bv_wrap_add_idemp_l` + `f_equal`
+(closes to a CLOSED-numeral goal only — `PrintintArith.wrap_add3'`/
+`addv_moi_moi` is the recipe, copied in LOCALLY as `kxc_wrap_add3'`/
+`kxc_addv_moi_moi`) rather than ever handing the whole equation to
+`vm_compute`. **Do not `Require Import PrintintArith` into a WP file** — its
+own header says why (a `Local Open Scope Z_scope` that is supposed to stay
+file-local but empirically leaks past `Require Import` and breaks every bare
+`nat` numeral in a typeclass-method position, e.g. `seq j n !! i`, with
+"Could not find an instance for `Lookup Z Z (list nat)`"); copy the one or
+two lemmas needed instead, as `ProofKexecC.v` now does.
+
+With that fixed, plus a run of genuinely pre-existing bugs the compiler
+had simply never reached before (`ProofKexecC.v` never got past ~79% of
+the file until the `vm_compute` hang was gone), `kxc_c_setup` now compiles
+CLEANLY past the entire setup block, both branches' frame reassembly, and
+into `kxc_c_res`'s resource-by-resource close — stopping only at a genuine
+DESIGN bug: **`Hout`'s third argument (the loop invariant's `P`) was
+instantiated with `P'` (uvmalloc's grown table) in both branches, but the
+LAST resource actually in hand is `Hptcl : proc_pt (uptd_set P' (svpn_of
+…) (pte_clear_u …))`** — the table AFTER `uvmclear` clears the guard page's
+PTE too. `uptd_set` only touches `ud_um` (`ud_root`/`ud_tfp` pass through
+by construction — `ProcPtOwn.uptd_set`), so the `ud_root`/`ud_tfp` bullets
+carry over via a one-line `unfold uptd_set; reflexivity`-shaped fact once
+named, but `um_below`/`um_covered` on THIS table (one page's PTE
+overwritten from `P'`'s) need proving — almost certainly a short "insert
+preserves coverage" lemma next to `um_covered_pground`/`kxc_grow_inv`
+(`UmCovered.v`/`ProcPtOwn.v` are where its siblings live), not yet written.
+**This is the next concrete step**: name `Pfinal := uptd_set P' (svpn_of
+(Z1 !!! Regidx (mword_of_int 11))) (pte_clear_u (uvm_pte (Z.lor 4 18)
+rleaf))`, pass `Pfinal` (not `P'`) as `Hout`'s third argument in both
+branches, and prove `um_below sz1 Pfinal.(ud_um)` / `um_covered sz1
+Pfinal.(ud_um)` from `Hbelow'`/`Hcov'` (which are about `P'`) plus whatever
+"clearing one page doesn't uncover a size bound below it" fact is missing.
+
+Along the way (found only because the file finally compiled far enough to
+reach them): a missing `w67` argument to `kxc_frameC` (dropped a slot,
+shifting every arg after it); `oldsz` used as a bare identifier where the
+lemma actually wanted `pv_sz V` (name collision with an unrelated "oldsz"
+in a comment about `uvmalloc`'s OWN argument); `wp_cli_s_sconf` (compressed
+`c.li`, signed 6-bit immediate) used for `+0x214`'s `li s8,32`, which is
+actually the NON-compressed 4-byte `addi s8,zero,32` (32 overflows `c.li`'s
+±32 range) — confirmed against `kernel.asm` and `CodeKexec.kxc_214`'s own
+`instr _ false _`; fix is `wp_li4_s_sconf`, `mword 12` immediate, and
+`Hpp218`'s advance is 4 not 2; and two `rewrite -Hroot' -Htfp'`-shaped
+bullets that had the wrong lemma/direction entirely (should be `rewrite
+Hroot'`/`rewrite Htfp'` — `Hroot' : P'.(ud_root) = P.(ud_root)`, `Htfp'`
+same shape, from `destruct Hext as (Hroot' & Htfp' & _)` on `uptd_ext`).
+None of these are performance issues; they are exactly the kind of thing
+`optimization.md`'s Rule Zero is for — the compiler reports them instantly
+and cheaply once nothing upstream is hanging.
+
+**Still open in phase C:** the `Pfinal`/coverage-survives-`uptd_set` fix
+just above (next concrete step), then the argv loop (`+0x21a .. +0x272`,
+whose invariant is designed below but not yet proven), and the closing
+`copyout` call joining into phase D at `+0x2a6`. Then phase D, then
+`ProofKexec.v` + `LinkKexec.v`. `ProofKexecC.v` as it stands is
+uncommitted — does not yet compile past the `Pfinal` gap.
+
+<details>
+<summary>Superseded diagnosis (kept for the record — the "17 GB" symptom
+was real, the "30-deep `set` chain" root cause was not)</summary>
+
 `kxc_c_setup` (drafted whole: myproc, PGROUNDUP, the first `uvmalloc`
 call incl. the branch into `kxc_bad_1d6`, `uvmclear`, the stackbase/argv[0]
 setup, and the final branch into the loop) got every individual step past
@@ -46,39 +125,9 @@ Z0, Y, Mu, U0..U3, Z1, Z2, W1..W8`), each a transparent local definition
 built on the last: `set` doesn't abstract them the way an opaque hypothesis
 would, so the kernel's final conversion-checking pass may be re-walking the
 WHOLE chain at each step, which is exactly the shape that turns into
-quadratic-or-worse blowup. B2/B3 already embody the fix for this, just
-stated for a different reason ("every iteration on this loop would pay for
-`kxc_ls` again") — the CONSEQUENCE of splitting a whole-function proof into
-several smaller Qeds is the same either way: shorter `set`-chains per Qed.
+quadratic-or-worse blowup.
 
-**THE RULE: don't write a phase-C block as one lemma spanning a whole
-multi-call stretch with 20+ chained `set`s.**  Split at the seam this file's
-own design already names — `+0x1f4`, right where the first `uvmalloc`
-call's branch resolves to SUCCESS — into `kxc_c1` (`+0x1ae .. +0x1d4`:
-myproc, PGROUNDUP, the `uvmalloc` call, and the branch — the FAILURE arm
-closes via `kxc_bad_1d6` as already written and already proven fast; the
-SUCCESS arm ends by publishing a new seam state, say `kxc_at_1f4`, bundling
-`sz1`, `P'`, `Hbelow'`/`Hcov'` from `kxc_grow_inv`, and the frame) and
-`kxc_c2` (`+0x1f4 .. +0x218`: `uvmclear`, the stackbase/argv[0] arithmetic,
-and the final branch into `kxc_at_21a`/`kxc_at_272`, taking `kxc_at_1f4` as
-its entry).  The FAILURE-arm code and the arithmetic lemmas already proven
-in this session (`add_neg8192_eq_sub`, `um_covered_pground`, `uvm_maxsz_lit`,
-`neq_vec64_true`, `eq_vec64_false`, `zero_reg64`, all now sitting at the top
-of `ProofKexecC.v`) carry over verbatim into whichever half needs them — the
-work here was proving the STEPS, and none of it is wasted; it is
-purely a REPACKAGING into two Qeds instead of one.  `ProofKexecC.v` as it
-stands (uncommitted) has the whole thing written and individually
-step-checked; splitting it is the next session's first move, before
-touching the argv loop.  **Do not try to shrink the single-Qed version
-further with more `lia` massaging — the compiler was not reporting a wrong
-tactic here, every step it did report on was real, and the fix is
-structural (fewer `set`s per Qed), not tactical.**
-
-**Still open in phase C:** the `+0x1ae .. +0x1d6` setup block
-(myproc, the first `uvmalloc`, `uvmclear` on the guard page), the argv loop
-(`+0x21a .. +0x272`, whose invariant is designed below but not yet proven),
-and the closing `copyout` call joining into phase D at `+0x2a6`.  Then phase
-D, then `ProofKexec.v` + `LinkKexec.v`.
+</details>
 
 **NEVER `iFrame` IN A KEXEC PROOF.  It does not terminate.** The goal at
 this altitude carries `ProcInv.tf_page`'s 4096-conjunct big-op inside
